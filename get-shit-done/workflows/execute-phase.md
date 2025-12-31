@@ -1284,6 +1284,25 @@ Summary: .planning/phases/XX-name/{phase}-{plan}-SUMMARY.md
 ---
 ```
 
+<spawn_next_session>
+**REQUIRED:** Spawn new session for auto-continue.
+
+Check if spawn is enabled:
+```bash
+# Check if mode is yolo OR spawn.enabled is true in config
+MODE=$(cat .planning/config.json 2>/dev/null | grep -o '"mode"[[:space:]]*:[[:space:]]*"[^"]*"' | grep -o '"[^"]*"$' | tr -d '"')
+SPAWN_ENABLED=$(cat .planning/config.json 2>/dev/null | grep -o '"spawn"[[:space:]]*:[[:space:]]*{[^}]*"enabled"[[:space:]]*:[[:space:]]*true')
+
+if [[ "$MODE" == "yolo" ]] || [[ -n "$SPAWN_ENABLED" ]]; then
+  PROJECT=$(basename "$(pwd)")
+  tmux new-window -n "$PROJECT" -c "$(pwd)"
+  tmux send-keys -t "$PROJECT" "claude --dangerously-skip-permissions --chrome '/gsd:progress'" Enter
+  echo "✓ New session spawned in tmux window '$PROJECT'"
+  echo "  Type 'exit' to close this session."
+fi
+```
+</spawn_next_session>
+
 Wait for user to clear and run next command.
 </if>
 
@@ -1339,6 +1358,25 @@ This milestone is 100% done.
 ---
 ```
 
+<spawn_next_session>
+**REQUIRED:** Spawn new session for auto-continue.
+
+Check if spawn is enabled:
+```bash
+# Check if mode is yolo OR spawn.enabled is true in config
+MODE=$(cat .planning/config.json 2>/dev/null | grep -o '"mode"[[:space:]]*:[[:space:]]*"[^"]*"' | grep -o '"[^"]*"$' | tr -d '"')
+SPAWN_ENABLED=$(cat .planning/config.json 2>/dev/null | grep -o '"spawn"[[:space:]]*:[[:space:]]*{[^}]*"enabled"[[:space:]]*:[[:space:]]*true')
+
+if [[ "$MODE" == "yolo" ]] || [[ -n "$SPAWN_ENABLED" ]]; then
+  PROJECT=$(basename "$(pwd)")
+  tmux new-window -n "$PROJECT" -c "$(pwd)"
+  tmux send-keys -t "$PROJECT" "claude --dangerously-skip-permissions --chrome '/gsd:progress'" Enter
+  echo "✓ New session spawned in tmux window '$PROJECT'"
+  echo "  Type 'exit' to close this session."
+fi
+```
+</spawn_next_session>
+
 **If phase complete but more phases remain:**
 
 ```
@@ -1368,6 +1406,25 @@ All [Y] plans finished.
 
 ---
 ```
+
+<spawn_next_session>
+**REQUIRED:** Spawn new session for auto-continue.
+
+Check if spawn is enabled:
+```bash
+# Check if mode is yolo OR spawn.enabled is true in config
+MODE=$(cat .planning/config.json 2>/dev/null | grep -o '"mode"[[:space:]]*:[[:space:]]*"[^"]*"' | grep -o '"[^"]*"$' | tr -d '"')
+SPAWN_ENABLED=$(cat .planning/config.json 2>/dev/null | grep -o '"spawn"[[:space:]]*:[[:space:]]*{[^}]*"enabled"[[:space:]]*:[[:space:]]*true')
+
+if [[ "$MODE" == "yolo" ]] || [[ -n "$SPAWN_ENABLED" ]]; then
+  PROJECT=$(basename "$(pwd)")
+  tmux new-window -n "$PROJECT" -c "$(pwd)"
+  tmux send-keys -t "$PROJECT" "claude --dangerously-skip-permissions --chrome '/gsd:progress'" Enter
+  echo "✓ New session spawned in tmux window '$PROJECT'"
+  echo "  Type 'exit' to close this session."
+fi
+```
+</spawn_next_session>
 
 </step>
 

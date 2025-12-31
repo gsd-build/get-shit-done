@@ -89,7 +89,7 @@ CONTEXT: [✓ if CONTEXT.md exists | - if not]
 </step>
 
 <step name="route">
-**Determine next action:**
+**Determine next action and AUTO-EXECUTE:**
 
 Find the next plan number that needs work.
 Check if `{phase}-{plan}-PLAN.md` exists for that number.
@@ -98,20 +98,17 @@ Check if `{phase}-{plan}-PLAN.md` exists for that number.
 
 - Read its `<objective>` section
 - Show: "Ready to execute: [path] - [objective summary]"
-- Display (see ~/.claude/get-shit-done/references/continuation-format.md):
+- Display:
   ```
   ---
 
-  ## ▶ Next Up
+  ## ▶ Auto-executing
 
   **{phase}-{plan}: [Plan Name]** — [objective summary from PLAN.md]
 
-  `/gsd:execute-plan [full-path-to-PLAN.md]`
-
-  <sub>`/clear` first → fresh context window</sub>
-
   ---
   ```
+- **AUTO-EXECUTE:** Invoke `SlashCommand("/gsd:execute-plan [full-path-to-PLAN.md]")`
 
 **If PLAN.md does NOT exist:**
 
@@ -126,16 +123,13 @@ Check if `{phase}-{plan}-PLAN.md` exists for that number.
   ```
   ---
 
-  ## ▶ Next Up
+  ## ▶ Auto-executing
 
   **Phase [N]: [Name]** — [Goal from ROADMAP.md]
 
-  `/gsd:plan-phase [phase-number]`
-
-  <sub>`/clear` first → fresh context window</sub>
-
   ---
   ```
+- **AUTO-EXECUTE:** Invoke `SlashCommand("/gsd:plan-phase [phase-number]")`
 
 **If CONTEXT.md does NOT exist:**
 
@@ -143,29 +137,25 @@ Check if `{phase}-{plan}-PLAN.md` exists for that number.
   ```
   ---
 
-  ## ▶ Next Up
+  ## ▶ Auto-executing
 
   **Phase [N]: [Name]** — [Goal from ROADMAP.md]
 
-  `/gsd:plan-phase [phase]`
-
-  <sub>`/clear` first → fresh context window</sub>
-
-  ---
-
-  **Also available:**
-  - `/gsd:discuss-phase [phase]` — gather context first
-  - `/gsd:research-phase [phase]` — investigate unknowns
-  - `/gsd:list-phase-assumptions [phase]` — see Claude's assumptions
+  Planning phase (no CONTEXT.md found, will gather context during planning)
 
   ---
   ```
+- **AUTO-EXECUTE:** Invoke `SlashCommand("/gsd:plan-phase [phase-number]")`
 
 **If all plans complete for current phase:**
 
 - Check if more phases exist in ROADMAP
-- If yes: Show `/gsd:plan-phase [next-phase]` command to paste
-- If no (milestone 100% complete): Show `/gsd:complete-milestone` command to paste
+- If yes:
+  - Display: "Phase complete, transitioning to next phase"
+  - **AUTO-EXECUTE:** Invoke `SlashCommand("/gsd:plan-phase [next-phase]")`
+- If no (milestone 100% complete):
+  - Display: "🎉 Milestone complete!"
+  - **AUTO-EXECUTE:** Invoke `SlashCommand("/gsd:complete-milestone")`
   </step>
 
 <step name="edge_cases">
@@ -185,6 +175,6 @@ Check if `{phase}-{plan}-PLAN.md` exists for that number.
 - [ ] Current position clear with visual progress
 - [ ] What's next clearly explained
 - [ ] Smart routing: /gsd:execute-plan if plan exists, /gsd:plan-phase if not
-- [ ] User confirms before any action
-- [ ] Seamless handoff to appropriate gsd command
+- [ ] Auto-execute: Immediately invoke the next appropriate gsd command
+- [ ] Seamless continuation without user intervention
       </success_criteria>
