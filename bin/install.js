@@ -94,8 +94,27 @@ function install(isGlobal) {
   copyWithPathReplacement(skillSrc, skillDest, pathPrefix);
   console.log(`  ${green}✓${reset} Installed get-shit-done`);
 
+  // Copy bin scripts (queue-next.sh, session-start-hook.sh)
+  const binSrc = path.join(src, 'bin');
+  const binDest = path.join(skillDest, 'bin');
+  fs.mkdirSync(binDest, { recursive: true });
+
+  const binFiles = ['queue-next.sh', 'session-start-hook.sh'];
+  for (const file of binFiles) {
+    const srcFile = path.join(binSrc, file);
+    const destFile = path.join(binDest, file);
+    if (fs.existsSync(srcFile)) {
+      fs.copyFileSync(srcFile, destFile);
+      fs.chmodSync(destFile, 0o755);  // Make executable
+    }
+  }
+  console.log(`  ${green}✓${reset} Installed bin scripts (auto-continue support)`);
+
   console.log(`
   ${green}Done!${reset} Run ${cyan}/gsd:help${reset} to get started.
+
+  ${dim}Auto-continue: Add session-start-hook.sh to your hooks.json${reset}
+  ${dim}See: ${pathPrefix}get-shit-done/references/auto-continue.md${reset}
 `);
 }
 

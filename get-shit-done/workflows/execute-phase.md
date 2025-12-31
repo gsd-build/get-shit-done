@@ -1284,6 +1284,16 @@ Summary: .planning/phases/XX-name/{phase}-{plan}-SUMMARY.md
 ---
 ```
 
+<queue_for_auto_continue>
+Queue this command for auto-continue after `/clear`:
+
+```bash
+~/.claude/get-shit-done/bin/queue-next.sh "/gsd:execute-plan .planning/phases/XX-name/{phase}-{next-plan}-PLAN.md"
+```
+
+Replace `XX-name` and `{phase}-{next-plan}` with actual values from the plan path.
+</queue_for_auto_continue>
+
 Wait for user to clear and run next command.
 </if>
 
@@ -1339,6 +1349,14 @@ This milestone is 100% done.
 ---
 ```
 
+<queue_for_auto_continue>
+Queue this command for auto-continue after `/clear`:
+
+```bash
+~/.claude/get-shit-done/bin/queue-next.sh "/gsd:complete-milestone"
+```
+</queue_for_auto_continue>
+
 **If phase complete but more phases remain:**
 
 ```
@@ -1368,6 +1386,16 @@ All [Y] plans finished.
 
 ---
 ```
+
+<queue_for_auto_continue>
+Queue this command for auto-continue after `/clear`:
+
+```bash
+~/.claude/get-shit-done/bin/queue-next.sh "/gsd:plan-phase [X+1]"
+```
+
+Replace `[X+1]` with the actual next phase number.
+</queue_for_auto_continue>
 
 </step>
 

@@ -458,6 +458,16 @@ Exit skill and invoke SlashCommand("/gsd:plan-phase [X+1]")
 ---
 ```
 
+<queue_for_auto_continue>
+Queue this command for auto-continue after `/clear`:
+
+```bash
+~/.claude/get-shit-done/bin/queue-next.sh "/gsd:plan-phase [X+1]"
+```
+
+Replace `[X+1]` with the actual next phase number.
+</queue_for_auto_continue>
+
 </if>
 
 **If no next phase (milestone 100% complete):**
@@ -500,6 +510,16 @@ Exit skill and invoke SlashCommand("/gsd:complete-milestone [version]")
 
 ---
 ```
+
+<queue_for_auto_continue>
+Queue this command for auto-continue after `/clear`:
+
+```bash
+~/.claude/get-shit-done/bin/queue-next.sh "/gsd:complete-milestone [version]"
+```
+
+Replace `[version]` with the actual milestone version from ROADMAP.md.
+</queue_for_auto_continue>
 
 </if>
 
