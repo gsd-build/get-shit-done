@@ -1284,21 +1284,6 @@ Summary: .planning/phases/XX-name/{phase}-{plan}-SUMMARY.md
 ---
 ```
 
-<queue_for_auto_continue>
-**REQUIRED:** Queue the next command for auto-continue.
-
-Run this bash command NOW, substituting the actual plan path you identified above:
-
-```bash
-~/.claude/get-shit-done/bin/queue-next.sh "/gsd:execute-plan [ACTUAL_PLAN_PATH]"
-```
-
-Example: If next plan is `.planning/phases/01-foundation/01-02-PLAN.md`, run:
-```bash
-~/.claude/get-shit-done/bin/queue-next.sh "/gsd:execute-plan .planning/phases/01-foundation/01-02-PLAN.md"
-```
-</queue_for_auto_continue>
-
 Wait for user to clear and run next command.
 </if>
 
@@ -1354,15 +1339,6 @@ This milestone is 100% done.
 ---
 ```
 
-<queue_for_auto_continue>
-**REQUIRED:** Queue the next command for auto-continue.
-
-Run this bash command NOW:
-```bash
-~/.claude/get-shit-done/bin/queue-next.sh "/gsd:complete-milestone"
-```
-</queue_for_auto_continue>
-
 **If phase complete but more phases remain:**
 
 ```
@@ -1392,20 +1368,6 @@ All [Y] plans finished.
 
 ---
 ```
-
-<queue_for_auto_continue>
-**REQUIRED:** Queue the next command for auto-continue.
-
-Run this bash command NOW, substituting the actual phase number:
-```bash
-~/.claude/get-shit-done/bin/queue-next.sh "/gsd:plan-phase [NEXT_PHASE_NUMBER]"
-```
-
-Example: If phase 2 just completed, run:
-```bash
-~/.claude/get-shit-done/bin/queue-next.sh "/gsd:plan-phase 3"
-```
-</queue_for_auto_continue>
 
 </step>
 
