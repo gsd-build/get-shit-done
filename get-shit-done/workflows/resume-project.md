@@ -193,8 +193,7 @@ Based on user selection, route to appropriate workflow:
 
   `/gsd:execute-plan [path]`
 
-  <sub>`/clear` first → fresh context window</sub>
-
+  
   ---
   ```
 - **Plan phase** → Show command for user to run after clearing:
@@ -207,8 +206,7 @@ Based on user selection, route to appropriate workflow:
 
   `/gsd:plan-phase [phase-number]`
 
-  <sub>`/clear` first → fresh context window</sub>
-
+  
   ---
 
   **Also available:**

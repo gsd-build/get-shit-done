@@ -401,7 +401,6 @@ Project initialized:
 
 `/gsd:plan-phase 1`
 
-<sub>`/clear` first → fresh context window</sub>
 
 ---
 

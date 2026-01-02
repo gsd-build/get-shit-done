@@ -222,12 +222,6 @@ Created: .planning/phases/${PHASE}-${SLUG}/${PHASE}-CONTEXT.md
 `/gsd:plan-phase ${PHASE}`
 
 ---
-
-**Also available:**
-- `/gsd:research-phase ${PHASE}` — investigate unknowns
-- Review/edit CONTEXT.md before continuing
-
----
 ```
 </interactive_fallback>
 
