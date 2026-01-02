@@ -316,6 +316,29 @@ Confirm: "Committed: docs: create milestone v[X.Y] [Name]"
 </step>
 
 <step name="offer_next">
+<yolo_spawn>
+**If yolo mode: Execute spawn directly:**
+
+```bash
+PROJECT="$(basename "$(pwd)")-phase[N]-$(date +%s)"
+tmux new-window -n "$PROJECT" -c "$(pwd)" "claude --dangerously-skip-permissions --chrome '/gsd:plan-phase [N]'"
+```
+
+Then report:
+```
+Milestone v[X.Y] [Name] created:
+- Phases: [N]-[M] ([count] phases)
+- Directories created
+- ROADMAP.md updated
+
+✓ Spawned: $PROJECT → /gsd:plan-phase [N]
+Switch: Ctrl+B n
+```
+</yolo_spawn>
+
+<interactive_fallback>
+**If NOT yolo mode:**
+
 ```
 Milestone v[X.Y] [Name] created:
 - Phases: [N]-[M] ([count] phases)
@@ -331,17 +354,10 @@ Milestone v[X.Y] [Name] created:
 
 `/gsd:plan-phase [N]`
 
-<sub>`/clear` first → fresh context window</sub>
-
----
-
-**Also available:**
-- `/gsd:discuss-phase [N]` — gather context first
-- `/gsd:research-phase [N]` — investigate unknowns
-- Review roadmap
-
 ---
 ```
+</interactive_fallback>
+
 </step>
 
 </process>

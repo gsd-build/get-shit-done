@@ -556,6 +556,31 @@ Confirm: "Committed: chore: complete v[X.Y] milestone"
 </step>
 
 <step name="offer_next">
+<yolo_spawn>
+**If yolo mode: Execute spawn directly:**
+
+```bash
+PROJECT="$(basename "$(pwd)")-next-milestone-$(date +%s)"
+tmux new-window -n "$PROJECT" -c "$(pwd)" "claude --dangerously-skip-permissions --chrome '/gsd:discuss-milestone'"
+```
+
+Then report:
+```
+✅ Milestone v[X.Y] [Name] complete
+
+Shipped:
+- [N] phases ([M] plans, [P] tasks)
+- [One sentence of what shipped]
+
+Tag: v[X.Y]
+
+✓ Spawned: $PROJECT → /gsd:discuss-milestone
+Switch: Ctrl+B n
+```
+</yolo_spawn>
+
+<interactive_fallback>
+**If NOT yolo mode:**
 
 ```
 ✅ Milestone v[X.Y] [Name] complete
@@ -575,15 +600,9 @@ Tag: v[X.Y]
 
 `/gsd:discuss-milestone`
 
-<sub>`/clear` first → fresh context window</sub>
-
----
-
-**Also available:**
-- `/gsd:new-milestone` — create directly if scope is clear
-
 ---
 ```
+</interactive_fallback>
 
 </step>
 

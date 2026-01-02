@@ -180,7 +180,26 @@ Write file.
 </step>
 
 <step name="confirm_creation">
-Present CONTEXT.md summary:
+Present CONTEXT.md summary, then spawn or handoff based on mode.
+
+<yolo_spawn>
+**If yolo mode: Execute spawn directly:**
+
+```bash
+PROJECT="$(basename "$(pwd)")-phase${PHASE}-$(date +%s)"
+tmux new-window -n "$PROJECT" -c "$(pwd)" "claude --dangerously-skip-permissions --chrome '/gsd:plan-phase ${PHASE}'"
+```
+
+Then report:
+```
+Created: .planning/phases/${PHASE}-${SLUG}/${PHASE}-CONTEXT.md
+✓ Spawned: $PROJECT → /gsd:plan-phase ${PHASE}
+Switch: Ctrl+B n
+```
+</yolo_spawn>
+
+<interactive_fallback>
+**If NOT yolo mode**, show summary and next step:
 
 ```
 Created: .planning/phases/${PHASE}-${SLUG}/${PHASE}-CONTEXT.md
@@ -202,8 +221,6 @@ Created: .planning/phases/${PHASE}-${SLUG}/${PHASE}-CONTEXT.md
 
 `/gsd:plan-phase ${PHASE}`
 
-<sub>`/clear` first → fresh context window</sub>
-
 ---
 
 **Also available:**
@@ -212,6 +229,7 @@ Created: .planning/phases/${PHASE}-${SLUG}/${PHASE}-CONTEXT.md
 
 ---
 ```
+</interactive_fallback>
 
 </step>
 

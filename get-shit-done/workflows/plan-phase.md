@@ -257,6 +257,28 @@ For multi-plan phases: each plan has focused scope, references previous plan sum
 </step>
 
 <step name="offer_next">
+<yolo_spawn>
+**If yolo mode: Execute spawn directly:**
+
+```bash
+PROJECT="$(basename "$(pwd)")-{phase}-01-$(date +%s)"
+PLAN_PATH=".planning/phases/XX-name/{phase}-01-PLAN.md"
+tmux new-window -n "$PROJECT" -c "$(pwd)" "claude --dangerously-skip-permissions --chrome '/gsd:execute-plan $PLAN_PATH'"
+```
+
+Then report:
+```
+Phase plan created: .planning/phases/XX-name/{phase}-01-PLAN.md
+[X] tasks defined.
+
+✓ Spawned: $PROJECT → /gsd:execute-plan
+Switch: Ctrl+B n
+```
+</yolo_spawn>
+
+<interactive_fallback>
+**If NOT yolo mode:**
+
 ```
 Phase plan created: .planning/phases/XX-name/{phase}-01-PLAN.md
 [X] tasks defined.
@@ -269,16 +291,10 @@ Phase plan created: .planning/phases/XX-name/{phase}-01-PLAN.md
 
 `/gsd:execute-plan .planning/phases/XX-name/{phase}-01-PLAN.md`
 
-<sub>`/clear` first - fresh context window</sub>
-
----
-
-**Also available:**
-- Review/adjust tasks before executing
-[If multiple plans: - View all plans: `ls .planning/phases/XX-name/*-PLAN.md`]
-
 ---
 ```
+</interactive_fallback>
+
 </step>
 
 </process>

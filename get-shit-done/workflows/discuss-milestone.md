@@ -123,7 +123,33 @@ Loop until "Create milestone" selected.
 </step>
 
 <step name="handoff">
-Present summary and hand off to create-milestone:
+**In yolo mode: Spawn new session directly. No /clear needed.**
+
+<yolo_spawn>
+**EXECUTE THIS DIRECTLY** (don't show /clear messaging):
+
+```bash
+PROJECT="$(basename "$(pwd)")-milestone-$(date +%s)"
+# Build context string with actual values from discussion
+CONTEXT="v[X.Y] [Theme Name] - Features: [Feature 1], [Feature 2], [Feature 3]"
+tmux new-window -n "$PROJECT" -c "$(pwd)" "claude --dangerously-skip-permissions --chrome '/gsd:new-milestone $CONTEXT'"
+```
+
+Then present:
+```
+✓ Spawned new session: $PROJECT
+
+Milestone scope:
+- v[X.Y] [Theme Name]
+- Features: [list]
+- Estimated phases: [N]
+
+Switch to new window: Ctrl+B n
+```
+</yolo_spawn>
+
+<interactive_fallback>
+**Only if NOT yolo mode**, show manual handoff:
 
 ```
 Milestone scope defined:
@@ -131,12 +157,8 @@ Milestone scope defined:
 **Features:**
 - [Feature 1]: [description]
 - [Feature 2]: [description]
-- [Feature 3]: [description]
 
 **Suggested milestone:** v[X.Y] [Theme Name]
-**Estimated phases:** [N]
-
-Ready to create the milestone structure.
 
 ---
 
@@ -144,12 +166,11 @@ Ready to create the milestone structure.
 
 **Create Milestone v[X.Y]** — [Theme Name]
 
-`/gsd:new-milestone`
-
-<sub>`/clear` first → fresh context window</sub>
+`/gsd:new-milestone [context]`
 
 ---
 ```
+</interactive_fallback>
 
 Pass context forward by summarizing:
 - Features to build (the substance)
