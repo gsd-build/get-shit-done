@@ -7,60 +7,85 @@ allowed-tools:
   - Write
   - Glob
   - Grep
+  - Task
+  - TodoWrite
   - AskUserQuestion
   - WebFetch
   - mcp__context7__*
 ---
 
 <objective>
-Create executable phase prompt with discovery, context injection, and task breakdown.
+Create executable PLAN.md files for a phase.
 
-Purpose: Break down roadmap phases into concrete, executable PLAN.md files that Claude can execute.
-Output: One or more PLAN.md files in the phase directory (.planning/phases/XX-name/{phase}-{plan}-PLAN.md)
+Purpose: Break down roadmap phases into concrete, executable plans that Claude can run.
+Output: One or more PLAN.md files in .planning/phases/XX-name/
 </objective>
-
-<execution_context>
-@~/.claude/get-shit-done/workflows/plan-phase.md
-@~/.claude/get-shit-done/templates/phase-prompt.md
-@~/.claude/get-shit-done/references/plan-format.md
-@~/.claude/get-shit-done/references/scope-estimation.md
-@~/.claude/get-shit-done/references/checkpoints.md
-@~/.claude/get-shit-done/references/tdd.md
-</execution_context>
 
 <context>
 Phase number: $ARGUMENTS (optional - auto-detects next unplanned phase if not provided)
 
-**Load project state first:**
+**Load minimal state for orchestration:**
 @.planning/STATE.md
-
-**Load roadmap:**
-@.planning/ROADMAP.md
-
-**Load phase context if exists (created by /gsd:discuss-phase):**
-Check for and read `.planning/phases/XX-name/{phase}-CONTEXT.md` - contains research findings, clarifications, and decisions from phase discussion.
-
-**Load codebase context if exists:**
-Check for `.planning/codebase/` and load relevant documents based on phase type.
+@.planning/config.json
 </context>
 
-<process>
-1. Check .planning/ directory exists (error if not - user should run /gsd:new-project)
-2. If phase number provided via $ARGUMENTS, validate it exists in roadmap
-3. If no phase number, detect next unplanned phase from roadmap
-4. Follow plan-phase.md workflow:
-   - Load project state and accumulated decisions
-   - Perform mandatory discovery (Level 0-3 as appropriate)
-   - Read project history (prior decisions, issues, concerns)
-   - Break phase into tasks
-   - Estimate scope and split into multiple plans if needed
-   - Create PLAN.md file(s) with executable structure
-</process>
+<delegate_execution>
+**IMPORTANT: Delegate to sub-agent for context efficiency.**
+
+**Step 1: Validate project exists**
+```bash
+[ -d .planning ] || { echo "ERROR: No .planning/ directory. Run /gsd:new-project first."; exit 1; }
+```
+
+**Step 2: Determine phase number**
+If $ARGUMENTS provided, use it. Otherwise, detect next unplanned phase from ROADMAP.md.
+
+**Step 3: Delegate planning to sub-agent**
+
+Use Task tool with subagent_type="general-purpose":
+
+```
+Create execution plan(s) for phase: [PHASE_NUMBER]
+
+**Read and follow the workflow:**
+~/.claude/get-shit-done/workflows/plan-phase.md
+
+**Reference files (read as needed):**
+- ~/.claude/get-shit-done/templates/phase-prompt.md (PLAN.md structure)
+- ~/.claude/get-shit-done/references/plan-format.md (task format rules)
+- ~/.claude/get-shit-done/references/scope-estimation.md (when to split plans)
+- ~/.claude/get-shit-done/references/checkpoints.md (checkpoint types)
+- ~/.claude/get-shit-done/references/tdd.md (test-driven guidance)
+
+**Project context to read:**
+- .planning/ROADMAP.md (phase goals and dependencies)
+- .planning/PROJECT.md (project vision and constraints)
+- .planning/STATE.md (decisions, issues, context)
+- .planning/config.json (depth setting, mode)
+- .planning/phases/XX-name/*-CONTEXT.md (if exists - from discuss-phase)
+- .planning/phases/XX-name/*-RESEARCH.md (if exists - from research-phase)
+- .planning/codebase/ (if exists - codebase context)
+
+**Your task:**
+1. Load all project context
+2. Perform discovery (Level 0-3 per workflow)
+3. Break phase into 2-3 task plans
+4. Estimate scope, split if needed (max 3 tasks per plan)
+5. Create PLAN.md file(s) with executable structure
+6. Each plan must have: objective, context, tasks, verification, success_criteria
+
+**Return to parent:**
+- Number of plans created
+- Plan file paths
+- Brief description of each plan
+- Suggested next command (/gsd:execute-plan [path])
+```
+
+</delegate_execution>
 
 <success_criteria>
-
 - One or more PLAN.md files created in .planning/phases/XX-name/
-- Each plan has: objective, execution_context, context, tasks, verification, success_criteria, output
+- Each plan has executable structure
 - Tasks are specific enough for Claude to execute
-- User knows next steps (execute plan or review/adjust)
-  </success_criteria>
+- User knows next steps
+</success_criteria>

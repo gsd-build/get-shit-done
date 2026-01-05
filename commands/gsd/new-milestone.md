@@ -6,53 +6,73 @@ argument-hint: "[milestone name, e.g., 'v2.0 Features']"
 <objective>
 Create a new milestone for an existing project with defined phases.
 
-Purpose: After completing a milestone (or when ready to define next chunk of work), creates the milestone structure in ROADMAP.md with phases, updates STATE.md, and creates phase directories.
-Output: New milestone in ROADMAP.md, updated STATE.md, phase directories created
+Purpose: After completing a milestone, creates the next milestone structure in ROADMAP.md with phases, updates STATE.md, and creates phase directories.
 </objective>
-
-<execution_context>
-@~/.claude/get-shit-done/workflows/create-milestone.md
-@~/.claude/get-shit-done/templates/roadmap.md
-</execution_context>
 
 <context>
 Milestone name: $ARGUMENTS (optional - will prompt if not provided)
 
-**Load project state first:**
+**Load minimal state for orchestration:**
 @.planning/STATE.md
-
-**Load roadmap:**
-@.planning/ROADMAP.md
-
-**Load milestones (if exists):**
-@.planning/MILESTONES.md
+@.planning/config.json
 </context>
 
-<process>
-1. Load project context (STATE.md, ROADMAP.md, MILESTONES.md)
-2. Calculate next milestone version and starting phase number
-3. If milestone name provided in arguments, use it; otherwise prompt
-4. Gather phases (per depth setting: quick 3-5, standard 5-8, comprehensive 8-12):
-   - If called from /gsd:discuss-milestone, use provided context
-   - Otherwise, prompt for phase breakdown
-5. Detect research needs for each phase
-6. Confirm phases (respect config.json gate settings)
-7. Follow create-milestone.md workflow:
-   - Update ROADMAP.md with new milestone section
-   - Create phase directories
-   - Update STATE.md for new milestone
-   - Git commit milestone creation
-8. Offer next steps (discuss first phase, plan first phase, review)
-</process>
+<delegate_execution>
+**IMPORTANT: Delegate to sub-agent for context efficiency.**
+
+**Step 1: Validate project exists**
+```bash
+[ -d .planning ] || { echo "ERROR: No .planning/ directory. Run /gsd:new-project first."; exit 1; }
+[ -f .planning/ROADMAP.md ] || { echo "ERROR: No ROADMAP.md found. Run /gsd:create-roadmap first."; exit 1; }
+```
+
+**Step 2: Delegate milestone creation to sub-agent**
+
+Use Task tool with subagent_type="general-purpose":
+
+```
+Create a new milestone.
+
+**Read and follow the workflow:**
+~/.claude/get-shit-done/workflows/create-milestone.md
+
+**Template to use:**
+- ~/.claude/get-shit-done/templates/roadmap.md (milestone section format)
+
+**Project context to read:**
+- .planning/ROADMAP.md (previous milestones, phase numbering)
+- .planning/STATE.md (current position, deferred issues)
+- .planning/MILESTONES.md (if exists - milestone history)
+- .planning/PROJECT.md (project vision)
+- .planning/config.json (depth setting for phase count)
+
+**Milestone name argument:** $ARGUMENTS (prompt user if empty)
+
+**Your task:**
+1. Calculate next milestone version and starting phase number
+2. If no name provided, prompt user for milestone name
+3. Gather phases per depth setting (quick: 3-5, standard: 5-8, comprehensive: 8-12)
+4. Detect research needs for each phase
+5. Update ROADMAP.md with new milestone section
+6. Create phase directories
+7. Update STATE.md for new milestone
+8. Commit changes
+
+**Return to parent:**
+- Milestone version created
+- Number of phases
+- Phase directories created
+- Git commit hash
+- Suggested next command (/gsd:plan-phase [N])
+```
+
+</delegate_execution>
 
 <success_criteria>
-
-- Next phase number calculated correctly (continues from previous milestone)
-- Phases defined per depth setting (quick: 3-5, standard: 5-8, comprehensive: 8-12)
-- Research flags assigned for each phase
-- ROADMAP.md updated with new milestone section
+- Phases defined per depth setting
+- ROADMAP.md updated with new milestone
 - Phase directories created
 - STATE.md reset for new milestone
 - Git commit made
 - User knows next steps
-  </success_criteria>
+</success_criteria>

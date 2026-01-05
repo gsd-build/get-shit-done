@@ -4,6 +4,8 @@ allowed-tools:
   - Read
   - Write
   - Bash
+  - Task
+  - TodoWrite
   - AskUserQuestion
   - Glob
 ---
@@ -14,101 +16,71 @@ Create project roadmap with phase breakdown.
 Roadmaps define what work happens in what order. Run after /gsd:new-project.
 </objective>
 
-<execution_context>
-@~/.claude/get-shit-done/workflows/create-roadmap.md
-@~/.claude/get-shit-done/templates/roadmap.md
-@~/.claude/get-shit-done/templates/state.md
-</execution_context>
-
 <context>
-@.planning/PROJECT.md
+**Load minimal state for orchestration:**
 @.planning/config.json
 </context>
 
-<process>
+<delegate_execution>
+**IMPORTANT: Delegate to sub-agent for context efficiency.**
 
-<step name="validate">
+**Step 1: Validate project exists**
 ```bash
-# Verify project exists
 [ -f .planning/PROJECT.md ] || { echo "ERROR: No PROJECT.md found. Run /gsd:new-project first."; exit 1; }
 ```
-</step>
 
-<step name="check_existing">
-Check if roadmap already exists:
-
+**Step 2: Check for existing roadmap**
 ```bash
 [ -f .planning/ROADMAP.md ] && echo "ROADMAP_EXISTS" || echo "NO_ROADMAP"
 ```
 
-**If ROADMAP_EXISTS:**
-Use AskUserQuestion:
-- header: "Roadmap exists"
-- question: "A roadmap already exists. What would you like to do?"
-- options:
-  - "View existing" - Show current roadmap
-  - "Replace" - Create new roadmap (will overwrite)
-  - "Cancel" - Keep existing roadmap
+If ROADMAP_EXISTS, ask user:
+- "View existing" - Show current roadmap and exit
+- "Replace" - Continue with creation
+- "Cancel" - Exit
 
-If "View existing": `cat .planning/ROADMAP.md` and exit
-If "Cancel": Exit
-If "Replace": Continue with workflow
-</step>
+**Step 3: Delegate roadmap creation to sub-agent**
 
-<step name="create_roadmap">
-Follow the create-roadmap.md workflow starting from detect_domain step.
+Use Task tool with subagent_type="general-purpose":
 
-The workflow handles:
-- Domain expertise detection
-- Phase identification
-- Research flags for each phase
-- Confirmation gates (respecting config mode)
-- ROADMAP.md creation
-- STATE.md initialization
-- Phase directory creation
-- Git commit
-</step>
-
-<step name="done">
 ```
-Roadmap created:
-- Roadmap: .planning/ROADMAP.md
-- State: .planning/STATE.md
-- [N] phases defined
+Create a project roadmap.
 
----
+**Read and follow the workflow:**
+~/.claude/get-shit-done/workflows/create-roadmap.md
 
-## ▶ Next Up
+**Templates to use:**
+- ~/.claude/get-shit-done/templates/roadmap.md (ROADMAP.md structure)
+- ~/.claude/get-shit-done/templates/state.md (STATE.md structure)
 
-**Phase 1: [Name]** — [Goal from ROADMAP.md]
+**Project context to read:**
+- .planning/PROJECT.md (project vision, requirements, constraints)
+- .planning/config.json (depth setting for phase count)
 
-`/gsd:plan-phase 1`
+**Your task:**
+1. Read PROJECT.md to understand the project
+2. Detect domain expertise level
+3. Identify phases (quick: 3-5, standard: 5-8, comprehensive: 8-12)
+4. Assign research flags to each phase
+5. Create ROADMAP.md following template
+6. Initialize STATE.md
+7. Create phase directories
+8. Commit changes
 
-<sub>`/clear` first → fresh context window</sub>
-
----
-
-**Also available:**
-- `/gsd:discuss-phase 1` — gather context first
-- `/gsd:research-phase 1` — investigate unknowns
-- Review roadmap
-
----
+**Return to parent:**
+- Number of phases created
+- Phase names and goals (brief)
+- Research flags summary
+- Git commit hash
+- Suggested next command (/gsd:plan-phase 1)
 ```
-</step>
 
-</process>
-
-<output>
-- `.planning/ROADMAP.md`
-- `.planning/STATE.md`
-- `.planning/phases/XX-name/` directories
-</output>
+</delegate_execution>
 
 <success_criteria>
-- [ ] PROJECT.md validated
-- [ ] ROADMAP.md created with phases
-- [ ] STATE.md initialized
-- [ ] Phase directories created
-- [ ] Changes committed
+- ROADMAP.md created with phases
+- STATE.md initialized
+- Phase directories created
+- Changes committed
+- User knows next steps
 </success_criteria>

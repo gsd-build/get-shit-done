@@ -7,6 +7,8 @@ allowed-tools:
   - Glob
   - Grep
   - Write
+  - Task
+  - TodoWrite
   - WebFetch
   - WebSearch
   - mcp__context7__*
@@ -15,76 +17,78 @@ allowed-tools:
 <objective>
 Comprehensive research on HOW to implement a phase before planning.
 
-This is for niche/complex domains where Claude's training data is sparse or outdated. Research discovers:
-- What libraries exist for this problem
-- What architecture patterns experts use
-- What the standard stack looks like
-- What problems people commonly hit
-- What NOT to hand-roll (use existing solutions)
+For niche/complex domains where Claude's training data is sparse or outdated. Discovers libraries, architecture patterns, standard stacks, common pitfalls.
 
 Output: RESEARCH.md with ecosystem knowledge that informs quality planning.
 </objective>
 
-<execution_context>
-@~/.claude/get-shit-done/workflows/research-phase.md
-@~/.claude/get-shit-done/templates/research.md
-@~/.claude/get-shit-done/references/research-pitfalls.md
-</execution_context>
-
 <context>
 Phase number: $ARGUMENTS (required)
 
-**Load project state:**
+**Load minimal state for orchestration:**
 @.planning/STATE.md
-
-**Load roadmap:**
-@.planning/ROADMAP.md
-
-**Load phase context if exists:**
-Check for `.planning/phases/XX-name/{phase}-CONTEXT.md` - bonus context from discuss-phase.
 </context>
-
-<process>
-1. Validate phase number argument (error if missing or invalid)
-2. Check if phase exists in roadmap - extract phase description
-3. Check if RESEARCH.md already exists (offer to update or use existing)
-4. Load CONTEXT.md if it exists (bonus context for research direction)
-5. Follow research-phase.md workflow:
-   - Analyze phase to identify knowledge gaps
-   - Determine research domains (architecture, ecosystem, patterns, pitfalls)
-   - Execute comprehensive research via Context7, official docs, WebSearch
-   - Cross-verify all findings
-   - Create RESEARCH.md with actionable ecosystem knowledge
-6. Offer next steps (plan the phase)
-</process>
 
 <when_to_use>
 **Use research-phase for:**
-- 3D graphics (Three.js, WebGL, procedural generation)
-- Game development (physics, collision, AI, procedural content)
-- Audio/music (Web Audio API, DSP, synthesis)
-- Shaders (GLSL, Metal, ISF)
-- ML/AI integration (model serving, inference, pipelines)
-- Real-time systems (WebSockets, WebRTC, sync)
-- Specialized frameworks with active ecosystems
+- 3D graphics, game dev, audio/music, shaders, ML/AI
+- Real-time systems, specialized frameworks
 - Any domain where "how do experts do this" matters
 
-**Skip research-phase for:**
-- Standard web dev (auth, CRUD, REST APIs)
-- Well-known patterns (forms, validation, testing)
-- Simple integrations (Stripe, SendGrid with clear docs)
-- Commodity features Claude handles well
+**Skip for:** Standard web dev, well-known patterns, simple integrations
 </when_to_use>
 
+<delegate_execution>
+**IMPORTANT: Delegate to sub-agent for context efficiency.**
+
+**Step 1: Validate phase argument**
+```bash
+[ -z "$ARGUMENTS" ] && { echo "ERROR: Phase number required. Usage: /gsd:research-phase [phase]"; exit 1; }
+[ -d .planning ] || { echo "ERROR: No .planning/ directory. Run /gsd:new-project first."; exit 1; }
+```
+
+**Step 2: Delegate research to sub-agent**
+
+Use Task tool with subagent_type="general-purpose":
+
+```
+Research phase: [PHASE_NUMBER]
+
+**Read and follow the workflow:**
+~/.claude/get-shit-done/workflows/research-phase.md
+
+**Reference files:**
+- ~/.claude/get-shit-done/templates/research.md (RESEARCH.md structure)
+- ~/.claude/get-shit-done/references/research-pitfalls.md (what to avoid)
+
+**Project context to read:**
+- .planning/ROADMAP.md (phase description and goals)
+- .planning/PROJECT.md (project constraints)
+- .planning/STATE.md (accumulated decisions)
+- .planning/phases/XX-name/*-CONTEXT.md (if exists)
+
+**Your task:**
+1. Identify the phase in ROADMAP.md
+2. Analyze phase to identify knowledge gaps
+3. Determine research domains (architecture, ecosystem, patterns, pitfalls)
+4. Execute comprehensive research (Context7, official docs, WebSearch)
+5. Cross-verify all findings
+6. Create RESEARCH.md with actionable ecosystem knowledge
+
+**Return to parent:**
+- Research domains covered
+- Key libraries/tools identified
+- Architecture patterns found
+- Major pitfalls catalogued
+- RESEARCH.md path
+- Suggested next command (/gsd:plan-phase [N])
+```
+
+</delegate_execution>
+
 <success_criteria>
-- [ ] Phase validated against roadmap
-- [ ] Domain/ecosystem identified from phase description
-- [ ] Comprehensive research executed (Context7 + official docs + WebSearch)
-- [ ] All WebSearch findings cross-verified with authoritative sources
-- [ ] RESEARCH.md created with ecosystem knowledge
-- [ ] Standard stack/libraries identified
-- [ ] Architecture patterns documented
-- [ ] Common pitfalls catalogued
-- [ ] What NOT to hand-roll is clear
-- [ ] User knows next steps (plan phase)
+- Phase validated against roadmap
+- Comprehensive research executed
+- RESEARCH.md created with ecosystem knowledge
+- User knows next steps (plan phase)
 </success_criteria>

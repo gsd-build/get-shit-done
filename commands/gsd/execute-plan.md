@@ -9,102 +9,102 @@ allowed-tools:
   - Glob
   - Grep
   - Task
+  - TodoWrite
   - AskUserQuestion
-  - SlashCommand
 ---
 
 <objective>
 Execute a PLAN.md file, create SUMMARY.md, update project state, commit.
 
-Uses intelligent segmentation:
-
-- Plans without checkpoints → spawn subagent for full autonomous execution
-- Plans with verify checkpoints → segment execution, pause at checkpoints
-- Plans with decision checkpoints → execute in main context
-  </objective>
-
-<execution_context>
-@~/.claude/get-shit-done/workflows/execute-phase.md
-@~/.claude/get-shit-done/templates/summary.md
-@~/.claude/get-shit-done/references/checkpoints.md
-@~/.claude/get-shit-done/references/tdd.md
-</execution_context>
+Uses intelligent segmentation based on checkpoints in the plan.
+</objective>
 
 <context>
 Plan path: $ARGUMENTS
 
-**Load project state first:**
+**Load minimal state for orchestration:**
 @.planning/STATE.md
-
-**Load workflow config:**
 @.planning/config.json
 </context>
 
-<process>
-1. Check .planning/ directory exists (error if not - user should run /gsd:new-project)
-2. Verify plan at $ARGUMENTS exists
-3. Check if SUMMARY.md already exists (plan already executed?)
-4. Load workflow config for mode (interactive/yolo)
-5. Follow execute-phase.md workflow:
-   - Parse plan and determine execution strategy (A/B/C)
-   - Execute tasks (via subagent or main context as appropriate)
-   - Handle checkpoints and deviations
-   - Create SUMMARY.md
-   - Update STATE.md
-   - Commit changes
-</process>
+<delegate_execution>
+**IMPORTANT: Delegate to sub-agent for context efficiency.**
 
-<execution_strategies>
-**Strategy A: Fully Autonomous** (no checkpoints)
+This command orchestrates plan execution. The heavy workflow logic runs in a sub-agent's fresh context.
 
-- Spawn subagent to execute entire plan
-- Subagent creates SUMMARY.md and commits
-- Main context: orchestration only (~5% usage)
+**Step 1: Validate inputs**
+```bash
+[ -d .planning ] || { echo "ERROR: No .planning/ directory. Run /gsd:new-project first."; exit 1; }
+[ -f "$ARGUMENTS" ] || { echo "ERROR: Plan not found at $ARGUMENTS"; exit 1; }
+```
 
-**Strategy B: Segmented** (has verify-only checkpoints)
+**Step 2: Quick-check for existing summary**
+```bash
+SUMMARY_PATH="${ARGUMENTS/PLAN.md/SUMMARY.md}"
+[ -f "$SUMMARY_PATH" ] && echo "WARNING: SUMMARY.md exists - plan may already be executed"
+```
 
-- Execute in segments between checkpoints
-- Subagent for autonomous segments
-- Main context for checkpoints
-- Aggregate results → SUMMARY → commit
+**Step 3: Scan plan for checkpoint type**
+Read the PLAN.md briefly to determine execution strategy:
+- No checkpoints → Strategy A (fully autonomous sub-agent)
+- Verify-only checkpoints → Strategy B (segmented sub-agent)
+- Decision checkpoints → Strategy C (main context execution)
 
-**Strategy C: Decision-Dependent** (has decision checkpoints)
+**Step 4: Execute based on strategy**
 
-- Execute in main context
-- Decision outcomes affect subsequent tasks
-- Quality maintained through small scope (2-3 tasks per plan)
-  </execution_strategies>
+<if strategy="A or B">
+Use Task tool with subagent_type="general-purpose":
 
-<deviation_rules>
-During execution, handle discoveries automatically:
+```
+Execute the plan at: [PLAN_PATH]
 
-1. **Auto-fix bugs** - Fix immediately, document in Summary
-2. **Auto-add critical** - Security/correctness gaps, add and document
-3. **Auto-fix blockers** - Can't proceed without fix, do it and document
-4. **Ask about architectural** - Major structural changes, stop and ask user
-5. **Log enhancements** - Nice-to-haves, log to ISSUES.md, continue
+**Read and follow the workflow:**
+~/.claude/get-shit-done/workflows/execute-phase.md
 
-Only rule 4 requires user intervention.
-</deviation_rules>
+**Reference files (read as needed):**
+- ~/.claude/get-shit-done/templates/summary.md
+- ~/.claude/get-shit-done/references/checkpoints.md
+- ~/.claude/get-shit-done/references/tdd.md
 
-<commit_rules>
-**Critical: Stage only files this plan actually modified.**
+**Project context:**
+- .planning/STATE.md
+- .planning/config.json
 
-NEVER use:
+**Your task:**
+1. Read the PLAN.md file
+2. Execute all tasks following the workflow
+3. Create SUMMARY.md in the same directory as PLAN.md
+4. Update STATE.md with progress
+5. Update ROADMAP.md plan status
+6. Commit with message: feat({phase}-{plan}): [summary]
 
-- `git add .`
-- `git add -A`
-- `git add src/` or any broad directory
+**Critical rules:**
+- Stage files individually (never git add . or git add -A)
+- Handle deviations per workflow rules
+- Document everything in SUMMARY.md
 
-Stage each file individually from the modified-files list.
-</commit_rules>
+**Return to parent:**
+- Execution status (success/partial/blocked)
+- Tasks completed count
+- SUMMARY.md path
+- Commit hash
+- Any blockers or decisions needed
+- Suggested next command
+```
+</if>
+
+<if strategy="C">
+Execute in main context since decisions affect subsequent tasks.
+Read the workflow at ~/.claude/get-shit-done/workflows/execute-phase.md and follow it.
+</if>
+
+</delegate_execution>
 
 <success_criteria>
-
-- [ ] All tasks executed
-- [ ] SUMMARY.md created with substantive content
-- [ ] STATE.md updated (position, decisions, issues, session)
-- [ ] ROADMAP updated (plan count, phase status)
-- [ ] Changes committed with feat({phase}-{plan}): [summary]
-- [ ] User informed of next steps
-      </success_criteria>
+- All tasks executed
+- SUMMARY.md created
+- STATE.md updated
+- ROADMAP.md updated
+- Changes committed
+- User informed of next steps
+</success_criteria>
