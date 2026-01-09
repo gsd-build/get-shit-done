@@ -6,160 +6,211 @@ allowed-tools:
   - Bash
   - Grep
   - Glob
+  - Task
+  - Edit
+  - Write
 ---
 
 <objective>
-Run the entire GSD workflow autonomously. Plans each phase, executes it, and moves to the next until the milestone is complete.
+Run the entire GSD workflow autonomously using parallel subagents.
 
-For yolo-mode users who don't want to babysit the loop.
+Architecture:
+- **Executor**: Main thread, plans and executes phases serially
+- **Planner**: Background agent, stays one phase ahead
+- **Committer**: Background agent, commits completed work
+- **Documenter**: Background agent, updates changelog
+
+For yolo-mode users who want speed without babysitting.
 </objective>
 
 <process>
 
 <step name="verify">
-**Verify project exists:**
+**Verify project is ready:**
 
 ```bash
-[ -f .planning/ROADMAP.md ] || { echo "ERROR: No ROADMAP.md found. Run /gsd:new-project and /gsd:create-roadmap first."; exit 1; }
+[ -f .planning/ROADMAP.md ] || { echo "ERROR: No ROADMAP.md. Run /gsd:new-project first."; exit 1; }
 ```
 
-If no roadmap exists, exit with error message.
+Read current state:
+- `.planning/STATE.md` - current position
+- `.planning/ROADMAP.md` - total phases, what's next
 </step>
 
-<step name="check_config">
-**Check if yolo mode (recommended but not required):**
+<step name="parse_state">
+**Determine current position:**
 
-```bash
-cat .planning/config.json 2>/dev/null | grep -q '"mode": "yolo"' && echo "YOLO_MODE" || echo "INTERACTIVE_MODE"
-```
+From STATE.md, extract:
+- Current phase number
+- Current plan number
+- Total phases from ROADMAP.md
 
-If INTERACTIVE_MODE, warn:
-```
-Note: You're in interactive mode. Autopilot works best with yolo mode.
-Consider updating .planning/config.json to set "mode": "yolo"
-Continuing anyway...
-```
+Calculate:
+- `CURRENT_PHASE`: Phase currently being worked on
+- `NEXT_PHASE`: CURRENT_PHASE + 1 (for pipelined planning)
+- `TOTAL_PHASES`: Total count from roadmap
 </step>
 
-<step name="create_runner">
-**Create the autonomous runner script if it doesn't exist:**
+<step name="spawn_planner">
+**Spawn background planner (if next phase exists):**
+
+If NEXT_PHASE <= TOTAL_PHASES and next phase has no PLAN.md yet:
+
+```
+Launch Task:
+  subagent_type: "general-purpose"
+  run_in_background: true
+  prompt: |
+    You are the PLANNER agent. Your job is to plan ahead while the executor works.
+
+    Read:
+    - .planning/ROADMAP.md (get phase {NEXT_PHASE} details)
+    - .planning/PROJECT.md (project context)
+    - .planning/STATE.md (current state)
+
+    Then run: /gsd:plan-phase {NEXT_PHASE}
+
+    Do NOT execute the plan. Just create it and exit.
+    The executor will handle execution when ready.
+```
+
+Store the planner's output_file path for later checking.
+</step>
+
+<step name="execute_current">
+**Execute current phase (main thread, blocking):**
+
+Find the next unexecuted PLAN.md in current phase:
 
 ```bash
-[ -f ./run-gsd.sh ] && echo "Runner exists" || cat > ./run-gsd.sh << 'SCRIPT'
-#!/bin/bash
-# GSD Autopilot - follows Claude's suggestions autonomously
-# Created by /gsd:autopilot
-
-PROJECT_DIR="$(cd "$(dirname "$0")" && pwd)"
-cd "$PROJECT_DIR"
-
-LOG_FILE=".planning/build.log"
-TEMP_OUTPUT=$(mktemp)
-
-log() {
-    echo "$1" | tee -a "$LOG_FILE"
-}
-
-log "=== GSD Autopilot ==="
-log "Project: $PROJECT_DIR"
-log "Started: $(date)"
-log ""
-
-# Start with progress check, or use provided command
-NEXT_CMD="${1:-/gsd:progress}"
-
-while true; do
-    log "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
-    log "Running: $NEXT_CMD"
-    log "Time: $(date)"
-    log "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
-
-    # Run the command, capture output
-    if ! claude --dangerously-skip-permissions -p "$NEXT_CMD" 2>&1 | tee -a "$LOG_FILE" > "$TEMP_OUTPUT"; then
-        log "!!! Command failed. Check log for details."
-        log "Resume with: ./run-gsd.sh \"$NEXT_CMD\""
-        rm -f "$TEMP_OUTPUT"
-        exit 1
-    fi
-
-    # Extract next suggested command (first backtick-wrapped /gsd: command)
-    NEXT_CMD=$(grep -oE '`/gsd:[^`]+`' "$TEMP_OUTPUT" | head -1 | tr -d '`')
-
-    if [ -z "$NEXT_CMD" ]; then
-        log ""
-        log "=== BUILD COMPLETE ==="
-        log "No more /gsd: commands found."
-        log "Finished: $(date)"
-        break
-    fi
-
-    # Skip /clear suggestions (not needed in -p mode)
-    if [[ "$NEXT_CMD" == *"clear"* ]]; then
-        NEXT_CMD=$(grep -oE '`/gsd:[^`]+`' "$TEMP_OUTPUT" | grep -v clear | head -1 | tr -d '`')
-        [ -z "$NEXT_CMD" ] && break
-    fi
-
-    # Stop after complete-milestone (natural end point)
-    if [[ "$NEXT_CMD" == *"complete-milestone"* ]]; then
-        log ""
-        log ">>> Running final command: $NEXT_CMD"
-        claude --dangerously-skip-permissions -p "$NEXT_CMD" 2>&1 | tee -a "$LOG_FILE"
-        log ""
-        log "=== MILESTONE COMPLETE ==="
-        log "Finished: $(date)"
-        break
-    fi
-
-    log ">>> Next: $NEXT_CMD"
-    log ""
+# Find plans without matching summaries
+for plan in .planning/phases/{CURRENT_PHASE}-*/*-PLAN.md; do
+  summary="${plan%-PLAN.md}-SUMMARY.md"
+  [ ! -f "$summary" ] && echo "$plan" && break
 done
+```
 
-rm -f "$TEMP_OUTPUT"
-SCRIPT
-chmod +x ./run-gsd.sh
-echo "Created run-gsd.sh"
+If a plan needs execution:
+- Run `/gsd:execute-plan {path-to-PLAN.md}` (blocking - wait for completion)
+
+If no plans exist for current phase:
+- Run `/gsd:plan-phase {CURRENT_PHASE}` first (blocking)
+- Then execute the created plan
+</step>
+
+<step name="spawn_cleanup">
+**After each plan completes, spawn cleanup crew:**
+
+**Committer agent (background):**
+```
+Launch Task:
+  subagent_type: "Bash"
+  run_in_background: true
+  prompt: |
+    Commit the work just completed.
+
+    1. git add -A
+    2. Read the most recent SUMMARY.md to understand what was done
+    3. Create a commit with a descriptive message based on the summary
+    4. Format: "feat(phase-N): brief description of what was built"
+
+    Do NOT push. Just commit locally.
+```
+
+**Documenter agent (background):**
+```
+Launch Task:
+  subagent_type: "general-purpose"
+  run_in_background: true
+  prompt: |
+    You are the DOCUMENTER agent. Update project documentation.
+
+    1. Read the most recent SUMMARY.md in .planning/phases/
+    2. If CHANGELOG.md exists in project root, add an entry for this work
+    3. If README.md exists and has a "Features" or "Status" section, update it
+
+    Keep updates minimal and factual. Don't over-document.
+    If no docs need updating, just exit.
 ```
 </step>
 
-<step name="launch">
-**Launch autopilot in background:**
+<step name="check_planner">
+**Check if planner finished (non-blocking):**
 
+If planner was spawned earlier, check its output_file:
+- If complete: Next phase is ready to execute when we get there
+- If still running: That's fine, it'll finish before we need it
+
+This is pipelining - planner stays ahead of executor.
+</step>
+
+<step name="loop_or_complete">
+**Determine next action:**
+
+Check if current phase is complete:
 ```bash
-nohup ./run-gsd.sh > .planning/autopilot-output.log 2>&1 &
-AUTOPILOT_PID=$!
-echo "Autopilot PID: $AUTOPILOT_PID"
+plans=$(ls .planning/phases/{CURRENT_PHASE}-*/*-PLAN.md 2>/dev/null | wc -l)
+summaries=$(ls .planning/phases/{CURRENT_PHASE}-*/*-SUMMARY.md 2>/dev/null | wc -l)
 ```
 
-**Report to user:**
+If summaries < plans:
+- More plans to execute in current phase
+- Go back to execute_current step
+
+If summaries = plans (phase complete):
+- Increment CURRENT_PHASE
+- If CURRENT_PHASE > TOTAL_PHASES: Build complete!
+- Otherwise: Go back to spawn_planner step for next iteration
+</step>
+
+<step name="completion">
+**When all phases done:**
 
 ```
-Autopilot is running in background (PID: [pid]).
+═══════════════════════════════════════════════════════════
+                    BUILD COMPLETE
+═══════════════════════════════════════════════════════════
 
-━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+All {TOTAL_PHASES} phases executed.
 
-Monitor progress:
-  tail -f .planning/build.log
+Background agents may still be finishing:
+- Check committer: tail .claude/tasks/{committer_id}.output
+- Check documenter: tail .claude/tasks/{documenter_id}.output
 
-Check if running:
-  ps aux | grep run-gsd
+Review:
+  git log --oneline -20    # See commits made
+  cat CHANGELOG.md         # See documentation updates
 
-Stop autopilot:
-  pkill -f run-gsd.sh
-
-Resume if interrupted:
-  ./run-gsd.sh "/gsd:progress"
-
-━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-
-You can close this terminal. The build continues in background.
+Next:
+  /gsd:verify-work         # Manual UAT testing
+  /gsd:complete-milestone  # When ready to ship
 ```
 </step>
 
 </process>
 
+<execution_model>
+```
+Timeline:
+═════════════════════════════════════════════════════════════►
+
+Executor:   [██ Plan P1 ██][████ Execute P1 ████][████ Execute P2 ████][███...]
+Planner:                   [██ Plan P2 ██]       [██ Plan P3 ██]
+Committer:                              [█]                   [█]
+Documenter:                              [██]                  [██]
+
+Legend:
+[██] = Working
+Executor blocks, others run in background
+Planner stays ~1 phase ahead
+Cleanup crew fires after each execution
+```
+</execution_model>
+
 <success_criteria>
-- [ ] Project has ROADMAP.md
-- [ ] Runner script created and executable
-- [ ] Autopilot launched in background
-- [ ] User has monitoring/control instructions
+- [ ] All phases planned and executed
+- [ ] Commits created for each completed plan
+- [ ] Documentation updated where appropriate
+- [ ] No blocking on cleanup tasks
+- [ ] Planner stayed ahead of executor
 </success_criteria>
