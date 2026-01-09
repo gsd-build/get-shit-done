@@ -116,6 +116,17 @@ Execute a PLAN.md file directly.
 
 Usage: `/gsd:execute-plan .planning/phases/01-foundation/01-01-PLAN.md`
 
+**`/gsd:autopilot`**
+Run autonomous build loop without intervention.
+
+- Plans and executes all remaining phases automatically
+- Follows Claude's suggested next commands
+- Logs everything to `.planning/build.log`
+- Runs in background - you can close the terminal
+- Best with YOLO mode enabled
+
+Usage: `/gsd:autopilot`
+
 ### Roadmap Management
 
 **`/gsd:add-phase <description>`**
@@ -283,6 +294,14 @@ Change anytime by editing `.planning/config.json`
 /gsd:create-roadmap
 /gsd:plan-phase 1
 /gsd:execute-plan .planning/phases/01-foundation/01-01-PLAN.md
+```
+
+**Full autonomous build (YOLO mode):**
+
+```
+/gsd:new-project        # Set mode to "yolo"
+/gsd:create-roadmap
+/gsd:autopilot          # Builds everything, walk away
 ```
 
 **Resuming work after a break:**
