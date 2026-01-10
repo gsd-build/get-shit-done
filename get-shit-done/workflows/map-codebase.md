@@ -77,6 +77,7 @@ wait for completion in the collect_results step. Do NOT run them sequentially.
 
 **Execution rule:** In a single response, issue 4 Task tool calls (one per agent) with
 `run_in_background=true`. Do not wait between calls.
+Do NOT include `session_id` in Task tool calls; let the runtime assign it.
 
 **Agent 1: Stack + Integrations (Technology Focus)**
 
