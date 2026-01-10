@@ -121,6 +121,13 @@ ls ~/.config/opencode/tool/gsd.ts
 cat ~/.config/opencode/opencode.json | rg gsd:
 ```
 
+If commands still show “Unknown GSD command”, re-run the installer to refresh
+the command templates in opencode.json:
+
+```bash
+npx gsd-opencode-install
+```
+
 Uninstall:
 
 ```bash

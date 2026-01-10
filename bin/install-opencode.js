@@ -46,6 +46,20 @@ function parseFrontMatter(content) {
   return result
 }
 
+function stripFrontMatter(content) {
+  if (!content.startsWith("---\n")) return content
+  const end = content.indexOf("\n---", 4)
+  if (end === -1) return content
+  return content.slice(end + 4).trim()
+}
+
+function rewriteReferences(content) {
+  return content.replace(
+    /@~\/\.claude\/get-shit-done\//g,
+    "@~/.config/opencode/get-shit-done/",
+  )
+}
+
 function stripJsonComments(text) {
   return text.replace(/\/\*[\s\S]*?\*\//g, "").replace(/\/\/.*$/gm, "")
 }
@@ -67,8 +81,14 @@ function buildCommandMap() {
     const content = readText(path.join(commandsSource, file))
     const fm = parseFrontMatter(content)
     if (!fm.name || !fm.name.startsWith("gsd:")) continue
+    const body = rewriteReferences(stripFrontMatter(content))
+    const template = [
+      `Command arguments: $ARGUMENTS`,
+      "",
+      body,
+    ].join("\n")
     map[fm.name] = {
-      template: `/${fm.name} $ARGUMENTS`,
+      template,
       description: fm.description || "GSD command",
     }
   }
