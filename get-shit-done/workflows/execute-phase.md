@@ -1123,6 +1123,146 @@ When all task agents, queued groups, and sequential tasks are done:
 - Proceed to merge_task_results step
 </step>
 
+<step name="merge_task_results">
+**Aggregate results from parallel task execution for SUMMARY generation.**
+
+After all task agents complete, merge results into unified execution record.
+
+**1. Collect results from each agent:**
+
+For each completed task agent in agent-history.json with matching parallel_group:
+
+```bash
+# Get all task results for this plan
+jq '.entries[] | select(.parallel_group | startswith("plan-{PHASE}-{PLAN}")) | select(.granularity == "task_group")' .planning/agent-history.json
+```
+
+Extract from each:
+- Files created/modified (from files_modified field)
+- Task outcomes (from task_results field)
+- Deviations encountered
+- Checkpoints skipped (from checkpoints_skipped field)
+
+**2. Merge into unified execution record:**
+
+```
+Task Execution Results (Plan 11-02):
+═══════════════════════════════════════════════════
+
+| Task | Agent | Status | Files | Deviations | Checkpoint |
+|------|-------|--------|-------|------------|------------|
+| 1 | agent_01HXXX (parallel) | ✓ Complete | 2 | 0 | - |
+| 2 | main context (sequential) | ✓ Complete | 1 | 1 | - |
+| 3 | agent_01HXXX (parallel) | ✓ Complete | 2 | 0 | - |
+| 4 | agent_01HYYY (parallel) | ✓ Complete | 1 | 0 | skipped |
+| 5 | agent_01HYYY (parallel) | ✓ Complete | 2 | 0 | - |
+| 6 | main context (sequential) | ✓ Complete | 1 | 0 | - |
+
+═══════════════════════════════════════════════════
+```
+
+**3. Handle merge conflicts (file-level):**
+
+If two agents unexpectedly modified the same file (should not happen if dependency analysis is correct, but as a safeguard):
+
+```
+⚠️ File conflict detected: src/config.ts
+
+Modified by:
+- Task 1 (agent_01HXXX)
+- Task 3 (agent_01HXXX)
+
+This shouldn't happen with proper dependency analysis.
+Review required.
+
+Options:
+1. Review diff and merge manually
+2. Keep Task 1 changes only
+3. Keep Task 3 changes only
+4. Keep both (may have issues)
+```
+
+Use AskUserQuestion to get resolution:
+- header: "File Conflict"
+- question: "[file] was modified by multiple tasks. How to resolve?"
+- options: Review diff, Keep first, Keep second, Keep both
+
+**4. Aggregate for SUMMARY.md:**
+
+After conflict resolution (if any):
+
+```markdown
+## Task Execution Summary
+
+**Execution mode:** Parallel task groups
+**Total tasks:** 6
+**Parallel groups:** 2 (4 tasks parallelized)
+**Sequential tasks:** 2 (dependency chain)
+**Checkpoints skipped:** 1 (Task 4: human-verify)
+
+### Task Results
+
+| Task | Execution | Status | Duration |
+|------|-----------|--------|----------|
+| Task 1 | Parallel (Group 1) | Complete | 45s |
+| Task 2 | Sequential | Complete | 30s |
+| Task 3 | Parallel (Group 1) | Complete | 40s |
+| Task 4 | Parallel (Group 2) | Complete | 20s |
+| Task 5 | Parallel (Group 2) | Complete | 35s |
+| Task 6 | Sequential | Complete | 25s |
+
+### Files Modified
+
+Aggregated from all tasks (deduplicated):
+- `src/auth.ts` - Task 1
+- `src/utils.ts` - Task 3
+- `src/types.ts` - Task 2
+- `src/config.ts` - Task 4
+- `src/api.ts` - Tasks 5, 6
+
+### Deviations
+
+Combined from all tasks:
+- [Rule 2 - Missing Critical] Task 2: Added input validation (deviation from task agent report)
+
+### Performance
+
+- **Total duration:** 4m 12s
+- **Sequential estimate:** 8m 30s (sum of all task durations)
+- **Speedup:** 2.0x
+- **Time saved:** 4m 18s
+```
+
+**5. Commit handling (deferred to orchestrator):**
+
+Task agents do NOT commit. After SUMMARY generated:
+
+```bash
+# Stage all files from all tasks
+for task in completed_tasks:
+  for file in task.files_modified:
+    git add "$file"
+
+# Stage SUMMARY.md
+git add .planning/phases/XX-name/{phase}-{plan}-SUMMARY.md
+
+# Single plan commit
+git commit -m "feat({phase}-{plan}): {description}
+
+- Tasks completed: {total}
+- Parallel groups: {group_count}
+- Checkpoints skipped: {skip_count}
+- Total duration: {duration} (parallel)
+- Sequential estimate: {estimate}"
+```
+
+**6. Route to next step:**
+
+After merging complete:
+- If more plans in phase: offer_next
+- If last plan: update_roadmap → git_commit_metadata
+</step>
+
 <step name="parse_segments">
 **Intelligent segmentation: Parse plan into execution segments.**
 
