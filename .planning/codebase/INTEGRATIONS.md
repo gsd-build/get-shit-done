@@ -5,47 +5,51 @@
 ## APIs & External Services
 
 **External APIs:**
-- Claude Code (Anthropic's AI coding assistant platform, via slash commands and chat message transformations) - `.opencode/plugin/gsd.ts`, `.claude-plugin/plugin.json`
-- OpenCode AI (plugin framework for Claude Code) - `.opencode/package.json`, `.opencode/plugin/gsd.ts`
+- Not detected
+
+**Email/SMS:**
+- Not detected
 
 ## Data Storage
 
 **Databases:**
-- None
+- Not detected
 
 **File Storage:**
-- None
+- Not detected
+
+**Caching:**
+- Not detected
 
 ## Authentication & Identity
 
 **Auth Provider:**
-- None
+- Not detected
 
 ## Monitoring & Observability
 
 **Error Tracking:**
-- None
+- Not detected
 
 **Analytics:**
-- None
+- Not detected
 
 **Logs:**
-- None (console output only)
+- Not detected
 
 ## CI/CD & Deployment
 
 **Hosting:**
-- Claude Code plugin marketplace
-- Local installation via npm scripts
+- Not detected
 
 **CI Pipeline:**
-- None
+- Not detected
 
 ## Environment Configuration
 
 **Development:**
-- No required env vars
-- Configuration via plugin framework
+- No environment variables required
+- No mock/stub services needed
 
 **Staging:**
 - Not applicable
@@ -56,10 +60,10 @@
 ## Webhooks & Callbacks
 
 **Incoming:**
-- None
+- Not detected
 
 **Outgoing:**
-- None
+- Not detected
 
 ---
 

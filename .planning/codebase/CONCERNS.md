@@ -4,79 +4,89 @@
 
 ## Tech Debt
 
-**Large installation script:**
-- Issue: bin/install.js is 212 lines and handles multiple concerns (arg parsing, path expansion, file copying with replacements)
-- Why: Monolithic design for simplicity
-- Impact: Harder to maintain and test individual pieces
-- Fix approach: Extract helper functions for path operations, config parsing, and file copying
+**Large files requiring maintenance:**
+- Issue: Several Markdown files exceed 200 lines, reducing maintainability
+- Files: `get-shit-done/workflows/execute-phase.md` (1625 lines), `get-shit-done/templates/research.md` (529 lines), `get-shit-done/workflows/plan-phase.md` (488 lines), `get-shit-done/workflows/create-roadmap.md` (481 lines), `get-shit-done/templates/codebase/testing.md` (480 lines), `README.md` (456 lines)
+- Why: Comprehensive documentation and workflow definitions
+- Impact: Harder to navigate and maintain large files
+- Fix approach: Split into smaller, focused files or sections
 
 **Missing error handling in installation scripts:**
-- Issue: File operations in bin/install.js, bin/install-opencode.js, bin/uninstall-opencode.js lack try/catch blocks
-- Files: `bin/install.js`, `bin/install-opencode.js`, `bin/uninstall-opencode.js`
-- Why: Synchronous operations assumed to succeed
-- Impact: Unhandled exceptions during installation could leave system in inconsistent state
-- Fix approach: Wrap file operations in try/catch, provide meaningful error messages and cleanup on failure
+- Issue: File system operations lack try/catch blocks
+- Files: `bin/install.js` (fs.mkdirSync, fs.copyFileSync, fs.writeFileSync operations)
+- Why: Rapid development without comprehensive error handling
+- Impact: Installation can crash with unhandled exceptions
+- Fix approach: Add try/catch blocks around file operations with user-friendly error messages
+
+**Potentially obsolete files:**
+- Issue: Legacy installation scripts for older system
+- Files: `bin/install-opencode.js`, `bin/uninstall-opencode.js`
+- Why: Appears to be for "OpenCode" system, not current Claude Code
+- Impact: Maintenance overhead for unused code
+- Fix approach: Review if files are still needed; remove if obsolete
 
 ## Known Bugs
 
-**No automated test suite:**
-- Issue: Repository has no test suite as per guidelines, relies on manual verification
-- Impact: Changes could break functionality without detection
-- Workaround: Manual testing via command execution
-- Root cause: Explicit design decision for simplicity
+**No critical bugs identified:**
+- Symptoms: N/A
+- Trigger: N/A
+- Workaround: N/A
+- Root cause: N/A
+- Blocked by: N/A
 
 ## Security Considerations
 
 **No security concerns identified:**
-- No hardcoded secrets, external API keys, or unsafe operations found
-- File operations are local and controlled
+- Risk: N/A
+- Current mitigation: N/A
+- Recommendations: N/A
 
 ## Performance Bottlenecks
 
-**No performance concerns identified:**
-- No databases, inefficient loops, or performance-critical code paths
-- Installation is one-time operation with minimal file I/O
+**No performance issues identified:**
+- Problem: N/A
+- Measurement: N/A
+- Cause: N/A
+- Improvement path: N/A
 
 ## Fragile Areas
 
-**Installation scripts:**
-- Why fragile: Synchronous file operations without error handling, complex path manipulation
-- Common failures: Permission errors, path resolution issues, partial installation
-- Safe modification: Add comprehensive error handling and validation before making changes
-- Test coverage: No automated tests (manual verification required)
+**Installation script file operations:**
+- Why fragile: Direct file system operations without error handling
+- Common failures: Permission errors, disk space issues, path resolution failures
+- Safe modification: Test changes on multiple platforms before committing
+- Test coverage: Manual testing only
 
 ## Scaling Limits
 
 **Not applicable:**
-- No runtime services or databases
-- One-time installation process
+- Current capacity: N/A
+- Limit: N/A
+- Symptoms at limit: N/A
+- Scaling path: N/A
 
 ## Dependencies at Risk
 
-**Not detected:**
-- Minimal dependencies (@opencode-ai/plugin is actively maintained)
+**No external dependencies:**
+- Risk: N/A
+- Impact: N/A
+- Migration plan: N/A
 
 ## Missing Critical Features
 
-**Automated testing:**
-- Problem: No test suite for installation scripts and command definitions
-- Current workaround: Manual verification after changes
-- Blocks: Reliable deployment and refactoring confidence
-- Implementation complexity: Medium (would require test framework setup)
+**Not identified:**
+- Problem: N/A
+- Current workaround: N/A
+- Blocks: N/A
+- Implementation complexity: N/A
 
 ## Test Coverage Gaps
 
-**Installation functionality:**
-- What's not tested: File copying, path replacement, directory creation logic
-- Risk: Installation could fail silently or corrupt Claude Code configuration
+**No automated testing implemented:**
+- What's not tested: Installation scripts, workflow execution, template generation
+- Risk: Bugs in core functionality go undetected
 - Priority: Medium
-- Difficulty to test: Requires mocking file system operations
-
-**Command definitions:**
-- What's not tested: Markdown syntax validation, frontmatter parsing
-- Risk: Invalid command files could break Claude Code integration
-- Priority: Low
-- Difficulty to test: Would need custom validation scripts
+- Difficulty to test: Requires Claude Code environment setup
 
 ---
 

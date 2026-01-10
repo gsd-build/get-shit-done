@@ -5,99 +5,100 @@
 ## Naming Patterns
 
 **Files:**
-- kebab-case for Markdown files (command definitions, templates, workflows)
-- camelCase for JavaScript files (installer scripts)
-- Lower-kebab-case for command files (new-project.md, plan-phase.md)
+- kebab-case for all files (command-handler.js, user-service.md)
+- *.md for Markdown documents
+- *.js for JavaScript source files
 
 **Functions:**
-- camelCase for all functions (parseConfigDirArg, expandTilde, copyWithPathReplacement)
+- camelCase for all functions
+- Examples: parseConfigDirArg, expandTilde, copyWithPathReplacement
 
 **Variables:**
 - camelCase for variables
-- UPPER_CASE for constants (ANSI color codes)
+- Examples: hasGlobal, hasLocal, explicitConfigDir
 
 **Types:**
-- Not applicable (JavaScript only, no TypeScript in main codebase)
+- Not applicable (JavaScript, no TypeScript)
 
 ## Code Style
 
 **Formatting:**
-- 2 space indentation consistently
-- Mixed quotes (single in CommonJS, double in ES modules)
-- Semicolons present in CommonJS, absent in ES modules
+- 2 space indentation
+- Mixed quotes (single and double quotes used)
+- Inconsistent semicolons
+- Unix line endings
 
 **Linting:**
-- None configured (no ESLint or similar)
+- No linting tools configured
+- Manual code style enforcement
 
 ## Import Organization
 
 **Order:**
-1. Node.js built-ins (fs, path, os)
-2. External packages (@opencode-ai/plugin)
-3. Local imports
+- Node.js built-ins first
+- Local modules second
 
 **Grouping:**
-- Blank lines between groups
-- Alphabetical within groups
+- Built-ins separated from local imports
 
 **Path Aliases:**
-- None defined
+- No path aliases configured
 
 ## Error Handling
 
 **Patterns:**
-- Basic try/catch blocks in file operations
-- Console error logging
-- Process exit on failures
+- No structured error handling in installation scripts
+- Fail-fast approach with basic error messages
 
 **Error Types:**
-- Generic Error objects
-- No custom error classes
+- File system errors not caught
+- Installation failures result in unhandled exceptions
 
 ## Logging
 
 **Framework:**
 - Console methods (console.log, console.error)
+- No structured logging library
 
 **Patterns:**
-- Colored output using ANSI escape codes
-- Error logging before exit
-- Success confirmation messages
+- Direct console output for user feedback
+- No persistent logging
 
 ## Comments
 
 **When to Comment:**
-- JSDoc style for function descriptions
-- Explain complex logic or workarounds
+- JSDoc style /** */ for function documentation
+- Single-line // for implementation notes
 
 **JSDoc/TSDoc:**
-- Used for main functions in installer scripts
-- Format: /** * Description */
+- Basic JSDoc with descriptions
+- No parameter or return type documentation
 
 **TODO Comments:**
-- Not detected in current codebase
+- Not found in codebase
 
 ## Function Design
 
 **Size:**
-- Functions vary in size (installer has some large functions)
+- Functions kept reasonably small
+- Installation logic is the main complexity
 
 **Parameters:**
-- Variable parameter counts
-- Destructuring not heavily used
+- Function parameters use descriptive names
+- No complex parameter objects
 
 **Return Values:**
-- Explicit returns
-- Some functions return values, others perform side effects
+- Direct return values
+- No Result<T, E> patterns
 
 ## Module Design
 
 **Exports:**
-- CommonJS exports (module.exports) in installer
-- ES module exports (export) in plugin code
+- CommonJS exports (module.exports)
+- Single export per file
 
 **Barrel Files:**
-- None used
+- Not used
 
 ---
 

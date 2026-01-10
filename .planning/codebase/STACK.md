@@ -5,48 +5,38 @@
 ## Languages
 
 **Primary:**
-- TypeScript 5.3 - Plugin code in .opencode/ directory
-
-**Secondary:**
-- JavaScript - CLI scripts in bin/ directory
-- Markdown - Command definitions, templates, workflows, references
+- JavaScript - All application code
 
 ## Runtime
 
 **Environment:**
-- Node.js 20.x (LTS) - Runtime for all scripts
+- Node.js >=16.7.0
+- CLI tool only, no browser runtime
 
-**Package Manager:**
-- npm 10.x
-- Lockfile: No package-lock.json detected
+## Package Manager
+
+**Manager:**
+- npm
+- No lockfile (no dependencies to lock)
 
 ## Frameworks
 
 **Core:**
-- None (vanilla Node.js CLI and plugin)
-
-**Testing:**
-- None (manual verification only)
-
-**Build/Dev:**
-- None (direct Node.js execution)
+- None (vanilla Node.js CLI)
 
 ## Key Dependencies
 
 **Critical:**
-- @opencode-ai/plugin 1.1.11 - Claude Code plugin framework
-
-**Infrastructure:**
-- Node.js built-ins - fs, path, os for file operations
+- Node.js built-ins - fs, path, os, readline for file operations
 
 ## Configuration
 
 **Environment:**
 - No environment variables required
-- Configuration via JSON template files
+- Configuration via CLI flags only (--global, --local, --config-dir)
 
 **Build:**
-- No build configuration (direct execution)
+- No build configuration needed
 
 ## Platform Requirements
 
@@ -55,5 +45,11 @@
 - No external dependencies
 
 **Production:**
-- Claude Code plugin system
-- Installed to ~/.claude/ or ./.claude/
+- Distributed as npm package
+- Installed globally via npm install -g
+- Runs on user's Node.js installation
+
+---
+
+*Stack analysis: 2025-01-10*
+*Update after major dependency changes*

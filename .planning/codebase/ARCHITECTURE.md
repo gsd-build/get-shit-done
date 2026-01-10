@@ -4,110 +4,120 @@
 
 ## Pattern Overview
 
-**Overall:** Prompt-driven development system
+**Overall:** Plugin-based Meta-prompting System
 
 **Key Characteristics:**
-- Plugin for Claude Code AI assistant
-- Markdown-based prompts and templates
-- No runtime server or application logic
-- Meta-prompting and context engineering
+- Markdown-based configuration instead of code
+- Claude Code as runtime execution environment
+- File-based state management (.planning/ directory)
+- Command-driven workflow orchestration
+- Template-driven output generation
 
 ## Layers
 
-**Command Layer:**
-- Purpose: User interface via slash commands
-- Contains: Slash command definitions and prompts
-- Location: `commands/gsd/*.md`
+**Commands Layer:**
+- Purpose: User interface and command routing
+- Contains: Slash command definitions in Markdown format
 - Depends on: Workflow layer for execution logic
-- Used by: Claude Code users
+- Used by: Claude Code runtime
+- Location: `commands/gsd/*.md`
 
-**Workflow Layer:**
-- Purpose: Development process logic and prompt engineering
-- Contains: Multi-step workflow definitions
-- Location: `get-shit-done/workflows/*.md`
-- Depends on: Template and reference layers
+**Workflows Layer:**
+- Purpose: Process definitions and business logic
+- Contains: Step-by-step execution instructions
+- Depends on: Template layer for output generation
 - Used by: Command handlers
+- Location: `get-shit-done/workflows/*.md`
 
-**Template Layer:**
-- Purpose: Output generation formats and structures
-- Contains: Markdown templates for consistent output
-- Location: `get-shit-done/templates/*.md`
+**Templates Layer:**
+- Purpose: Output generation and formatting
+- Contains: Reusable document structures with variables
 - Depends on: None (static templates)
-- Used by: Workflow prompts
+- Used by: Workflows for generating project files
+- Location: `get-shit-done/templates/*.md`
 
-**Reference Layer:**
-- Purpose: Contextual knowledge and guidelines
-- Contains: Injected context materials and principles
+**References Layer:**
+- Purpose: Knowledge base and reusable guidance
+- Contains: Best practices and reference materials
+- Depends on: None (static content)
+- Used by: Workflows for context injection
 - Location: `get-shit-done/references/*.md`
-- Depends on: None (static references)
-- Used by: Workflow prompts
 
 ## Data Flow
 
-**Slash Command Execution:**
+**Command Execution Flow:**
 
-1. User types `/gsd:<command>` in Claude Code
-2. Claude Code reads corresponding `.md` file from `commands/gsd/`
-3. Command prompt executes workflow from `get-shit-done/workflows/`
-4. Workflow injects templates from `get-shit-done/templates/` and references from `get-shit-done/references/`
-5. Claude Code generates response and potentially modifies project files
+1. User runs slash command (e.g., `/gsd:new-project`)
+2. Claude loads command definition from installed location
+3. Command references workflow file for execution logic
+4. Workflow reads templates and reference materials
+5. Workflow processes project context from .planning/ directory
+6. Templates generate output files (plans, summaries, etc.)
+7. Project state updated and changes committed
+8. Results displayed to user
 
 **State Management:**
-- File-based: All state lives in project `.planning/` directory
+- File-based: All state lives in `.planning/` directory
 - No persistent in-memory state
 - Each command execution is independent
 
 ## Key Abstractions
 
-**Slash Commands:**
-- Purpose: User-facing commands for development tasks
-- Examples: `commands/gsd/new-project.md`, `commands/gsd/plan-phase.md`
-- Pattern: Markdown files with YAML frontmatter defining command metadata
+**Project Phases:**
+- Purpose: Hierarchical work breakdown units
+- Examples: Research phase, planning phase, execution phase
+- Pattern: Sequential workflow with dependencies
 
-**Workflow Prompts:**
-- Purpose: Encapsulate reusable development logic
-- Examples: `get-shit-done/workflows/execute-phase.md`, `get-shit-done/workflows/map-codebase.md`
-- Pattern: Step-by-step procedures with task spawning and file generation
+**Plans:**
+- Purpose: Executable task definitions
+- Examples: PLAN.md files with frontmatter metadata
+- Pattern: Structured task lists with status tracking
 
-**Markdown Templates:**
-- Purpose: Consistent output formats for planning documents
-- Examples: `get-shit-done/templates/project.md`, `get-shit-done/templates/roadmap.md`
-- Pattern: Structured Markdown with placeholder variables
+**Summaries:**
+- Purpose: Completion records and progress tracking
+- Examples: SUMMARY.md files with outcome documentation
+- Pattern: Frontmatter metadata with timestamps and links
+
+**Context Injection:**
+- Purpose: Include external files in workflows
+- Examples: @references for file inclusion
+- Pattern: @path/to/file.md syntax for content injection
 
 ## Entry Points
 
-**Installer Entry:**
+**CLI Installation:**
 - Location: `bin/install.js`
-- Triggers: `npx get-shit-done-cc` or `node bin/install.js`
-- Responsibilities: Copy files to Claude Code config directory
+- Triggers: User runs `npm install -g` or `npx get-shit-done-cc`
+- Responsibilities: Copy files to Claude configuration directory
 
-**Commands:**
+**Slash Commands:**
 - Location: `commands/gsd/*.md`
-- Triggers: User slash commands in Claude Code
+- Triggers: User types command in Claude interface
 - Responsibilities: Route to appropriate workflow execution
 
 ## Error Handling
 
-**Strategy:** Basic error handling in installation scripts, no runtime errors in prompts
+**Strategy:** Fail-fast approach with descriptive error messages
 
 **Patterns:**
-- Try/catch in file operations
-- Console error logging
-- Process exit on failures
+- Command validation before execution
+- Clear error messages to user
+- No complex error recovery (manual intervention required)
 
 ## Cross-Cutting Concerns
 
 **Logging:**
-- Console output for installation feedback
-- No structured logging in prompts
+- Console output for user feedback
+- No persistent logging infrastructure
 
 **Validation:**
-- Manual verification of command execution
-- No automated validation
+- Input validation in command definitions
+- File existence checks in workflows
 
 **File Operations:**
-- Synchronous file operations in installer
-- Template copying with path replacement
+- Atomic file operations where possible
+- Path resolution and validation
+- Backup and restore patterns
 
 ---
 
