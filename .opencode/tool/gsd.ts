@@ -33,9 +33,16 @@ function loadCommandsIndex() {
   const index = new Map<string, { name: string; filePath: string }>()
   for (const filePath of listCommandFiles()) {
     const content = readText(filePath)
-    const name = parseFrontMatterName(content)
-    if (!name) continue
-    index.set(name, { name, filePath })
+    const frontmatterName = parseFrontMatterName(content)
+    const fileName = path.basename(filePath, ".md")
+    const name = frontmatterName || fileName
+    const entry = { name, filePath }
+    index.set(name, entry)
+    if (name.startsWith("gsd:")) {
+      index.set(name.slice("gsd:".length), entry)
+    } else {
+      index.set(`gsd:${name}`, entry)
+    }
   }
   return index
 }
@@ -71,9 +78,12 @@ export const list = tool({
   args: {},
   async execute() {
     const index = loadCommandsIndex()
-    const commands = Array.from(index.values())
-      .sort((a, b) => a.name.localeCompare(b.name))
-      .map((entry) => ({ name: entry.name, file: entry.filePath }))
+    const canonical = new Map<string, { name: string; file: string }>()
+    for (const entry of index.values()) {
+      const name = entry.name.startsWith("gsd:") ? entry.name : `gsd:${entry.name}`
+      if (!canonical.has(name)) canonical.set(name, { name, file: entry.filePath })
+    }
+    const commands = Array.from(canonical.values()).sort((a, b) => a.name.localeCompare(b.name))
 
     const lines = commands.map((entry) => `- ${entry.name}`)
     const payload = JSON.stringify({ commands }, null, 2)

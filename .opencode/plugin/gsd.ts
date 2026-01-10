@@ -32,9 +32,16 @@ function loadCommandsIndex() {
   const index = new Map<string, { name: string; filePath: string }>()
   for (const filePath of listCommandFiles()) {
     const content = readText(filePath)
-    const name = parseFrontMatterName(content)
-    if (!name) continue
-    index.set(name, { name, filePath })
+    const frontmatterName = parseFrontMatterName(content)
+    const fileName = path.basename(filePath, ".md")
+    const name = frontmatterName || fileName
+    const entry = { name, filePath }
+    index.set(name, entry)
+    if (name.startsWith("gsd:")) {
+      index.set(name.slice("gsd:".length), entry)
+    } else {
+      index.set(`gsd:${name}`, entry)
+    }
   }
   return index
 }
