@@ -16,6 +16,8 @@ const configDir =
 const gsdRoot = path.join(configDir, "get-shit-done")
 const pluginPath = path.join(configDir, "plugin", "gsd.ts")
 const toolPath = path.join(configDir, "tool", "gsd.ts")
+const exploreAgentPath = path.join(configDir, "agent", "Explore.md")
+const generalAgentPath = path.join(configDir, "agent", "general-purpose.md")
 const configPathJson = path.join(configDir, "opencode.json")
 const configPathJsonc = path.join(configDir, "opencode.jsonc")
 
@@ -48,6 +50,12 @@ if (fs.existsSync(pluginPath)) {
 }
 if (fs.existsSync(toolPath)) {
   fs.rmSync(toolPath, { force: true })
+}
+if (fs.existsSync(exploreAgentPath)) {
+  fs.rmSync(exploreAgentPath, { force: true })
+}
+if (fs.existsSync(generalAgentPath)) {
+  fs.rmSync(generalAgentPath, { force: true })
 }
 
 const loaded = loadConfig()

@@ -118,6 +118,8 @@ Troubleshooting:
 ls ~/.config/opencode/get-shit-done/commands/gsd
 ls ~/.config/opencode/plugin/gsd.ts
 ls ~/.config/opencode/tool/gsd.ts
+ls ~/.config/opencode/agent/Explore.md
+ls ~/.config/opencode/agent/general-purpose.md
 cat ~/.config/opencode/opencode.json | rg gsd:
 ```
 

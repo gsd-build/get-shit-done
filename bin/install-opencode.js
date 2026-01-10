@@ -17,6 +17,7 @@ const repoRoot = path.resolve(__dirname, "..")
 const gsdRoot = path.join(configDir, "get-shit-done")
 const pluginDir = path.join(configDir, "plugin")
 const toolDir = path.join(configDir, "tool")
+const agentDir = path.join(configDir, "agent")
 const configPathJson = path.join(configDir, "opencode.json")
 const configPathJsonc = path.join(configDir, "opencode.jsonc")
 
@@ -28,6 +29,7 @@ const templatesSource = path.join(repoRoot, "get-shit-done")
 fs.mkdirSync(pluginDir, { recursive: true })
 fs.mkdirSync(toolDir, { recursive: true })
 fs.mkdirSync(path.join(gsdRoot, "commands"), { recursive: true })
+fs.mkdirSync(agentDir, { recursive: true })
 
 function readText(filePath) {
   return fs.readFileSync(filePath, "utf8")
@@ -112,6 +114,39 @@ fs.cpSync(commandsSource, path.join(gsdRoot, "commands", "gsd"), {
   recursive: true,
   force: true,
 })
+
+const exploreAgent = `---
+description: Codebase exploration agent for GSD
+mode: subagent
+permission:
+  read: allow
+  list: allow
+  glob: allow
+  grep: allow
+  bash: allow
+  edit: deny
+---
+
+Explore the codebase and report findings. Do not edit files.
+`
+
+const generalAgent = `---
+description: General-purpose GSD execution agent
+mode: subagent
+permission:
+  read: allow
+  list: allow
+  glob: allow
+  grep: allow
+  bash: allow
+  edit: allow
+---
+
+Execute assigned tasks and report results clearly.
+`
+
+fs.writeFileSync(path.join(agentDir, "Explore.md"), exploreAgent)
+fs.writeFileSync(path.join(agentDir, "general-purpose.md"), generalAgent)
 
 const { config, configPath, raw, parseError } = loadConfig()
 const gsdCommands = buildCommandMap()
