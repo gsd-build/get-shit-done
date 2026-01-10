@@ -109,6 +109,150 @@ Wait for confirmation before proceeding.
 </if>
 </step>
 
+<step name="analyze_plan_dependencies">
+**Parallel execution analysis for multi-plan phases.**
+
+This step triggers when `/gsd:execute-plan` is run WITHOUT a path argument, or after completing a plan when multiple remain.
+
+**Entry point behavior:**
+
+When `/gsd:execute-plan` is run WITHOUT a path argument:
+1. Detect current phase from STATE.md
+2. Find all unexecuted plans in phase (PLAN without SUMMARY)
+3. If multiple unexecuted plans exist, trigger parallelization analysis
+4. If only one plan, proceed to normal execution
+
+When `/gsd:execute-plan <path>` is run WITH a specific path:
+1. Execute that specific plan (current behavior)
+2. After completion, check if remaining plans can be parallelized
+
+**Skip conditions:**
+- Config has `parallelization.plan_level: false` → execute sequentially
+- Only 1 unexecuted plan → no parallelization needed
+- Plan frontmatter has `parallel: false` → that plan runs sequentially
+
+**1. Discover unexecuted plans:**
+
+```bash
+# Find all plans without matching summaries
+for plan in .planning/phases/XX-name/*-PLAN.md; do
+  summary="${plan//-PLAN.md/-SUMMARY.md}"
+  [ ! -f "$summary" ] && echo "$plan"
+done
+```
+
+**2. For each plan, extract dependency info:**
+
+```bash
+# Extract from frontmatter
+grep -A5 "^---" "$plan" | grep "requires:"
+
+# Extract files modified (from <files> elements)
+grep -oP '(?<=<files>)[^<]+' "$plan"
+
+# Check for checkpoint tasks
+grep -c 'type="checkpoint' "$plan"
+```
+
+**3. Build dependency graph:**
+
+For each plan, determine:
+- `requires`: Prior phases/plans this depends on (from frontmatter)
+- `files_modified`: Files this plan will modify (from `<files>` elements)
+- `has_checkpoints`: Contains human interaction points
+- `checkpoint_count`: Number of checkpoints
+
+**4. Detect conflicts:**
+
+```
+File conflict rules:
+- If Plan A and Plan B both modify same file → sequential
+- If Plan B reads file created by Plan A → B depends on A
+- If Plan B references Plan A's SUMMARY → B depends on A
+```
+
+**5. Categorize plans:**
+
+| Category | Criteria | Action |
+|----------|----------|--------|
+| independent | No inter-plan dependencies, no file conflicts | Can run in parallel |
+| dependent | Requires another plan in this phase | Wait for dependency |
+| has_checkpoints | Contains checkpoint tasks | Special handling |
+
+**6. Checkpoint handling in background mode:**
+
+By default, plans with checkpoints ARE included in parallelization.
+
+In background mode, checkpoints are handled as:
+- `checkpoint:human-verify`: Skip and log "skipped - background mode"
+- `checkpoint:decision`: Use first option and log choice
+- `checkpoint:human-action`: Skip and log warning
+
+User can disable checkpoint skipping via config: `skip_checkpoints: false`
+If `skip_checkpoints: false`, plans with checkpoints run sequentially in foreground.
+
+**7. Decision logic:**
+
+```
+if config.parallelization.plan_level === false:
+  → Execute all plans sequentially
+
+if unexecuted_plans.count === 1:
+  → Execute single plan normally
+
+if all plans are independent:
+  → Spawn all in parallel (up to max_concurrent)
+
+if some plans are independent:
+  → Spawn independents, queue dependents
+
+if all plans are dependent (chain):
+  → Execute sequentially (current behavior)
+```
+
+**8. Present analysis:**
+
+<if mode="yolo">
+```
+⚡ Auto-approved: Parallel execution
+
+Phase [X] has [N] plans:
+  Parallel: [list] (no conflicts)
+  Sequential: [list] (dependencies)
+
+Spawning [N] parallel agents...
+```
+
+Proceed to spawn_parallel_agents step.
+</if>
+
+<if mode="interactive">
+```
+Phase [X] has [N] plans
+
+Parallelizable: [N] plans (no conflicts)
+  - 11-01, 11-03, 11-04
+  - 11-03 has 2 checkpoints (will be skipped in background)
+
+Sequential: [N] plan(s) (dependencies)
+  - 11-02 (needs 11-01 output)
+
+Spawn [N] parallel agents? (yes / sequential / review)
+```
+
+Wait for user confirmation.
+</if>
+
+**9. Route to execution:**
+
+| Analysis Result | Next Step |
+|-----------------|-----------|
+| Multiple independent plans | spawn_parallel_agents |
+| Single plan only | record_start_time (normal flow) |
+| All sequential | record_start_time (normal flow) |
+| User chose "sequential" | record_start_time (normal flow) |
+</step>
+
 <step name="record_start_time">
 Record execution start time for performance tracking:
 
