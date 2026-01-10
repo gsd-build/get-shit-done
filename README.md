@@ -118,6 +118,7 @@ Troubleshooting:
 ls ~/.config/opencode/get-shit-done/commands/gsd
 ls ~/.config/opencode/plugin/gsd.ts
 ls ~/.config/opencode/tool/gsd.ts
+cat ~/.config/opencode/opencode.json | rg gsd:
 ```
 
 Uninstall:

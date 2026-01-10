@@ -16,6 +16,24 @@ const configDir =
 const gsdRoot = path.join(configDir, "get-shit-done")
 const pluginPath = path.join(configDir, "plugin", "gsd.ts")
 const toolPath = path.join(configDir, "tool", "gsd.ts")
+const configPathJson = path.join(configDir, "opencode.json")
+const configPathJsonc = path.join(configDir, "opencode.jsonc")
+
+function readText(filePath) {
+  return fs.readFileSync(filePath, "utf8")
+}
+
+function stripJsonComments(text) {
+  return text.replace(/\/\*[\s\S]*?\*\//g, "").replace(/\/\/.*$/gm, "")
+}
+
+function loadConfig() {
+  const configPath = fs.existsSync(configPathJsonc) ? configPathJsonc : configPathJson
+  if (!fs.existsSync(configPath)) return null
+  const raw = readText(configPath)
+  const parsed = JSON.parse(stripJsonComments(raw))
+  return { config: parsed, configPath }
+}
 
 if (fs.existsSync(gsdRoot)) {
   fs.rmSync(gsdRoot, { recursive: true, force: true })
@@ -25,6 +43,18 @@ if (fs.existsSync(pluginPath)) {
 }
 if (fs.existsSync(toolPath)) {
   fs.rmSync(toolPath, { force: true })
+}
+
+const loaded = loadConfig()
+if (loaded) {
+  const { config, configPath } = loaded
+  if (config.command) {
+    for (const key of Object.keys(config.command)) {
+      if (key.startsWith("gsd:")) delete config.command[key]
+    }
+  }
+  fs.writeFileSync(configPath, JSON.stringify(config, null, 2))
+  console.log(`Removed GSD commands from ${configPath}`)
 }
 
 console.log(`Removed GSD OpenCode plugin from ${configDir}`)
