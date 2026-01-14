@@ -24,14 +24,43 @@ ${cyan}   ██████╗ ███████╗██████╗
    ╚═════╝ ╚══════╝╚═════╝${reset}
 
   Get Shit Done ${dim}v${pkg.version}${reset}
-  A meta-prompting, context engineering and spec-driven
-  development system for Claude Code by TÂCHES.
+  Meta-prompting system for Claude Code and OpenCode by TÂCHES
+  Context engineering • Spec-driven development
 `;
 
 // Parse args
 const args = process.argv.slice(2);
 const hasGlobal = args.includes('--global') || args.includes('-g');
 const hasLocal = args.includes('--local') || args.includes('-l');
+
+// Parse --platform argument
+function parsePlatformArg() {
+  const platformIndex = args.findIndex(arg => arg === '--platform');
+  if (platformIndex !== -1) {
+    const nextArg = args[platformIndex + 1];
+    if (!nextArg || nextArg.startsWith('-')) {
+      console.error(`  ${yellow}--platform requires a value (claude-code or opencode)${reset}`);
+      process.exit(1);
+    }
+    if (nextArg !== 'claude-code' && nextArg !== 'opencode') {
+      console.error(`  ${yellow}--platform must be 'claude-code' or 'opencode'${reset}`);
+      process.exit(1);
+    }
+    return nextArg;
+  }
+  // Also handle --platform=value format
+  const platformArg = args.find(arg => arg.startsWith('--platform='));
+  if (platformArg) {
+    const value = platformArg.split('=')[1];
+    if (value !== 'claude-code' && value !== 'opencode') {
+      console.error(`  ${yellow}--platform must be 'claude-code' or 'opencode'${reset}`);
+      process.exit(1);
+    }
+    return value;
+  }
+  return null;
+}
+const explicitPlatform = parsePlatformArg();
 
 // Parse --config-dir argument
 function parseConfigDirArg() {
@@ -62,28 +91,34 @@ if (hasHelp) {
   console.log(`  ${yellow}Usage:${reset} npx get-shit-done-cc [options]
 
   ${yellow}Options:${reset}
-    ${cyan}-g, --global${reset}              Install globally (to Claude config directory)
-    ${cyan}-l, --local${reset}               Install locally (to ./.claude in current directory)
+    ${cyan}--platform <name>${reset}          Target platform (claude-code or opencode)
+    ${cyan}-g, --global${reset}              Install globally
+    ${cyan}-l, --local${reset}               Install locally (to ./.claude or .opencode)
     ${cyan}-c, --config-dir <path>${reset}   Specify custom Claude config directory
     ${cyan}-h, --help${reset}                Show this help message
 
   ${yellow}Examples:${reset}
-    ${dim}# Install to default ~/.claude directory${reset}
-    npx get-shit-done-cc --global
+    ${dim}# Interactive prompt (choose platform and location)${reset}
+    npx get-shit-done-cc
 
-    ${dim}# Install to custom config directory (for multiple Claude accounts)${reset}
-    npx get-shit-done-cc --global --config-dir ~/.claude-bc
+    ${dim}# Install to Claude Code global directory${reset}
+    npx get-shit-done-cc --platform claude-code --global
+
+    ${dim}# Install to OpenCode local directory${reset}
+    npx get-shit-done-cc --platform opencode --local
+
+    ${dim}# Install to custom Claude config directory${reset}
+    npx get-shit-done-cc --platform claude-code --global --config-dir ~/.claude-bc
 
     ${dim}# Using environment variable${reset}
-    CLAUDE_CONFIG_DIR=~/.claude-bc npx get-shit-done-cc --global
-
-    ${dim}# Install to current project only${reset}
-    npx get-shit-done-cc --local
+    CLAUDE_CONFIG_DIR=~/.claude-bc npx get-shit-done-cc --platform claude-code --global
 
   ${yellow}Notes:${reset}
-    The --config-dir option is useful when you have multiple Claude Code
-    configurations (e.g., for different subscriptions). It takes priority
-    over the CLAUDE_CONFIG_DIR environment variable.
+    Without --platform, you will be prompted to choose between:
+      • claude-code: Installs to ~/.claude/ or ./.claude/
+      • opencode: Installs to ~/.config/opencode/ or .opencode/
+
+    The --config-dir option only applies to claude-code platform.
 `);
   process.exit(0);
 }
@@ -99,9 +134,33 @@ function expandTilde(filePath) {
 }
 
 /**
+ * Transform content for OpenCode platform
+ */
+function transformForOpenCode(content) {
+  // Remove name: line
+  content = content.replace(/^name:\s+gsd:.+$/m, '');
+
+  // Remove argument-hint: line
+  content = content.replace(/^argument-hint:\s+.+$/m, '');
+
+  // Remove allowed-tools block (multiline YAML array)
+  content = content.replace(/^allowed-tools:\n(  - .+\n)*/m, '');
+
+  // Clean up empty frontmatter or lines with only whitespace
+  content = content.replace(/^---\n\n+---/, '---\n---');
+
+  // If frontmatter is empty, add a minimal description comment
+  if (content.match(/^---\n---/)) {
+    content = content.replace(/^---\n---/, '---\ndescription: GSD command for OpenCode\n---');
+  }
+
+  return content;
+}
+
+/**
  * Recursively copy directory, replacing paths in .md files
  */
-function copyWithPathReplacement(srcDir, destDir, pathPrefix) {
+function copyWithPathReplacement(srcDir, destDir, pathPrefix, platform) {
   fs.mkdirSync(destDir, { recursive: true });
 
   const entries = fs.readdirSync(srcDir, { withFileTypes: true });
@@ -111,11 +170,27 @@ function copyWithPathReplacement(srcDir, destDir, pathPrefix) {
     const destPath = path.join(destDir, entry.name);
 
     if (entry.isDirectory()) {
-      copyWithPathReplacement(srcPath, destPath, pathPrefix);
+      copyWithPathReplacement(srcPath, destPath, pathPrefix, platform);
     } else if (entry.name.endsWith('.md')) {
-      // Replace ~/.claude/ with the appropriate prefix in markdown files
+      // Read file
       let content = fs.readFileSync(srcPath, 'utf8');
-      content = content.replace(/~\/\.claude\//g, pathPrefix);
+
+      // Transform for OpenCode if needed
+      if (platform === 'opencode') {
+        content = transformForOpenCode(content);
+      }
+
+      // Replace paths with platform-specific prefix
+      if (platform === 'opencode') {
+        content = content.replace(/~\/\.claude\/get-shit-done\//g, '~/.config/opencode/gsd/');
+        content = content.replace(/~\/\.claude\/commands\//g, '~/.config/opencode/command/');
+        content = content.replace(/\.\/\.claude\/get-shit-done\//g, '.opencode/gsd/');
+        content = content.replace(/\.\/\.claude\/commands\//g, '.opencode/command/');
+      } else {
+        // Claude Code platform
+        content = content.replace(/~\/\.claude\//g, pathPrefix);
+      }
+
       fs.writeFileSync(destPath, content);
     } else {
       fs.copyFileSync(srcPath, destPath);
@@ -126,72 +201,115 @@ function copyWithPathReplacement(srcDir, destDir, pathPrefix) {
 /**
  * Install to the specified directory
  */
-function install(isGlobal) {
+function install(isGlobal, platform) {
   const src = path.join(__dirname, '..');
-  // Priority: explicit --config-dir arg > CLAUDE_CONFIG_DIR env var > default ~/.claude
-  const configDir = expandTilde(explicitConfigDir) || expandTilde(process.env.CLAUDE_CONFIG_DIR);
-  const defaultGlobalDir = configDir || path.join(os.homedir(), '.claude');
-  const claudeDir = isGlobal
-    ? defaultGlobalDir
-    : path.join(process.cwd(), '.claude');
 
-  const locationLabel = isGlobal
-    ? claudeDir.replace(os.homedir(), '~')
-    : claudeDir.replace(process.cwd(), '.');
+  let targetDir, commandsSubdir, frameworkDirName, locationLabel, pathPrefix;
 
-  // Path prefix for file references
-  // Use actual path when CLAUDE_CONFIG_DIR is set, otherwise use ~ shorthand
-  const pathPrefix = isGlobal
-    ? (configDir ? `${claudeDir}/` : '~/.claude/')
-    : './.claude/';
+  if (platform === 'claude-code') {
+    // Claude Code directories
+    const configDir = expandTilde(explicitConfigDir) || expandTilde(process.env.CLAUDE_CONFIG_DIR);
+    const defaultGlobalDir = configDir || path.join(os.homedir(), '.claude');
+    targetDir = isGlobal ? defaultGlobalDir : path.join(process.cwd(), '.claude');
+    commandsSubdir = 'commands';
+    frameworkDirName = 'get-shit-done';
+    locationLabel = isGlobal
+      ? targetDir.replace(os.homedir(), '~')
+      : targetDir.replace(process.cwd(), '.');
+    pathPrefix = isGlobal
+      ? (configDir ? `${targetDir}/` : '~/.claude/')
+      : './.claude/';
+  } else if (platform === 'opencode') {
+    // OpenCode directories
+    targetDir = isGlobal
+      ? path.join(os.homedir(), '.config', 'opencode')
+      : path.join(process.cwd(), '.opencode');
+    commandsSubdir = 'command'; // singular for OpenCode
+    frameworkDirName = 'gsd'; // simplified for OpenCode
+    locationLabel = isGlobal
+      ? targetDir.replace(os.homedir(), '~')
+      : targetDir.replace(process.cwd(), '.');
+    pathPrefix = isGlobal ? '~/.config/opencode/' : '.opencode/';
+  }
 
-  console.log(`  Installing to ${cyan}${locationLabel}${reset}\n`);
+  console.log(`  Installing to ${cyan}${locationLabel}${reset} ${dim}(${platform})${reset}\n`);
 
   // Create commands directory
-  const commandsDir = path.join(claudeDir, 'commands');
+  const commandsDir = path.join(targetDir, commandsSubdir);
   fs.mkdirSync(commandsDir, { recursive: true });
 
   // Copy commands/gsd with path replacement
   const gsdSrc = path.join(src, 'commands', 'gsd');
   const gsdDest = path.join(commandsDir, 'gsd');
-  copyWithPathReplacement(gsdSrc, gsdDest, pathPrefix);
-  console.log(`  ${green}✓${reset} Installed commands/gsd`);
+  copyWithPathReplacement(gsdSrc, gsdDest, pathPrefix, platform);
+  console.log(`  ${green}✓${reset} Installed ${commandsSubdir}/gsd`);
 
-  // Copy get-shit-done skill with path replacement
+  // Copy framework with path replacement
   const skillSrc = path.join(src, 'get-shit-done');
-  const skillDest = path.join(claudeDir, 'get-shit-done');
-  copyWithPathReplacement(skillSrc, skillDest, pathPrefix);
-  console.log(`  ${green}✓${reset} Installed get-shit-done`);
+  const skillDest = path.join(targetDir, frameworkDirName);
+  copyWithPathReplacement(skillSrc, skillDest, pathPrefix, platform);
+  console.log(`  ${green}✓${reset} Installed ${frameworkDirName}`);
 
+  const commandName = platform === 'claude-code' ? '/gsd:help' : '@general';
   console.log(`
-  ${green}Done!${reset} Launch Claude Code and run ${cyan}/gsd:help${reset}.
+  ${green}Done!${reset} Launch ${platform === 'claude-code' ? 'Claude Code' : 'OpenCode'} and run ${cyan}${commandName}${reset}.
 `);
 }
 
 /**
- * Prompt for install location
+ * Prompt for platform selection
  */
-function promptLocation() {
+function promptPlatform(callback) {
   const rl = readline.createInterface({
     input: process.stdin,
     output: process.stdout
   });
 
-  const configDir = expandTilde(explicitConfigDir) || expandTilde(process.env.CLAUDE_CONFIG_DIR);
-  const globalPath = configDir || path.join(os.homedir(), '.claude');
-  const globalLabel = globalPath.replace(os.homedir(), '~');
+  console.log(`  ${yellow}Which platform?${reset}
+
+  ${cyan}1${reset}) Claude Code ${dim}(~/.claude)${reset}
+  ${cyan}2${reset}) OpenCode    ${dim}(~/.config/opencode)${reset}
+`);
+
+  rl.question(`  Choice ${dim}[1]${reset}: `, (answer) => {
+    rl.close();
+    const choice = answer.trim() || '1';
+    const platform = choice === '2' ? 'opencode' : 'claude-code';
+    callback(platform);
+  });
+}
+
+/**
+ * Prompt for install location
+ */
+function promptLocation(platform) {
+  const rl = readline.createInterface({
+    input: process.stdin,
+    output: process.stdout
+  });
+
+  let globalLabel, localLabel;
+  if (platform === 'claude-code') {
+    const configDir = expandTilde(explicitConfigDir) || expandTilde(process.env.CLAUDE_CONFIG_DIR);
+    const globalPath = configDir || path.join(os.homedir(), '.claude');
+    globalLabel = globalPath.replace(os.homedir(), '~');
+    localLabel = './.claude';
+  } else {
+    globalLabel = '~/.config/opencode';
+    localLabel = './.opencode';
+  }
 
   console.log(`  ${yellow}Where would you like to install?${reset}
 
   ${cyan}1${reset}) Global ${dim}(${globalLabel})${reset} - available in all projects
-  ${cyan}2${reset}) Local  ${dim}(./.claude)${reset} - this project only
+  ${cyan}2${reset}) Local  ${dim}(${localLabel})${reset} - this project only
 `);
 
   rl.question(`  Choice ${dim}[1]${reset}: `, (answer) => {
     rl.close();
     const choice = answer.trim() || '1';
     const isGlobal = choice !== '2';
-    install(isGlobal);
+    install(isGlobal, platform);
   });
 }
 
@@ -202,10 +320,29 @@ if (hasGlobal && hasLocal) {
 } else if (explicitConfigDir && hasLocal) {
   console.error(`  ${yellow}Cannot use --config-dir with --local${reset}`);
   process.exit(1);
-} else if (hasGlobal) {
-  install(true);
-} else if (hasLocal) {
-  install(false);
+} else if (explicitConfigDir && explicitPlatform && explicitPlatform !== 'claude-code') {
+  console.error(`  ${yellow}--config-dir only applies to claude-code platform${reset}`);
+  process.exit(1);
+}
+
+// Determine if we have everything we need
+const platformDetermined = explicitPlatform !== null;
+const locationDetermined = hasGlobal || hasLocal;
+
+if (platformDetermined && locationDetermined) {
+  // All args provided
+  install(hasGlobal, explicitPlatform);
+} else if (platformDetermined && !locationDetermined) {
+  // Platform specified, need location
+  promptLocation(explicitPlatform);
+} else if (!platformDetermined && locationDetermined) {
+  // Location specified, need platform
+  promptPlatform((platform) => {
+    install(hasGlobal, platform);
+  });
 } else {
-  promptLocation();
+  // Need both platform and location
+  promptPlatform((platform) => {
+    promptLocation(platform);
+  });
 }
