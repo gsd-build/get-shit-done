@@ -1,0 +1,196 @@
+{
+  "name": "gsd-opencode",
+  "displayName": "GSD for OpenCode",
+  "description": "Get Shit Done - A meta-prompting, context engineering and spec-driven development system for OpenCode",
+  "version": "1.4.15",
+  "engines": {
+    "opencode": "^1.0.0"
+  },
+  "categories": [
+    "Other"
+  ],
+  "activationEvents": [
+    "onCommand:opencode.gsd.help"
+  ],
+  "main": "./extension.js",
+  "contributes": {
+    "commands": [
+      {
+        "command": "opencode.gsd.help",
+        "title": "GSD: Help",
+        "category": "GSD"
+      },
+      {
+        "command": "opencode.gsd.newProject",
+        "title": "GSD: New Project",
+        "category": "GSD"
+      },
+      {
+        "command": "opencode.gsd.createRoadmap",
+        "title": "GSD: Create Roadmap",
+        "category": "GSD"
+      },
+      {
+        "command": "opencode.gsd.mapCodebase",
+        "title": "GSD: Map Codebase",
+        "category": "GSD"
+      },
+      {
+        "command": "opencode.gsd.discussPhase",
+        "title": "GSD: Discuss Phase",
+        "category": "GSD"
+      },
+      {
+        "command": "opencode.gsd.researchPhase",
+        "title": "GSD: Research Phase",
+        "category": "GSD"
+      },
+      {
+        "command": "opencode.gsd.listPhaseAssumptions",
+        "title": "GSD: List Phase Assumptions",
+        "category": "GSD"
+      },
+      {
+        "command": "opencode.gsd.planPhase",
+        "title": "GSD: Plan Phase",
+        "category": "GSD"
+      },
+      {
+        "command": "opencode.gsd.executePlan",
+        "title": "GSD: Execute Plan",
+        "category": "GSD"
+      },
+      {
+        "command": "opencode.gsd.executePhase",
+        "title": "GSD: Execute Phase",
+        "category": "GSD"
+      },
+      {
+        "command": "opencode.gsd.status",
+        "title": "GSD: Status",
+        "category": "GSD"
+      },
+      {
+        "command": "opencode.gsd.addPhase",
+        "title": "GSD: Add Phase",
+        "category": "GSD"
+      },
+      {
+        "command": "opencode.gsd.insertPhase",
+        "title": "GSD: Insert Phase",
+        "category": "GSD"
+      },
+      {
+        "command": "opencode.gsd.removePhase",
+        "title": "GSD: Remove Phase",
+        "category": "GSD"
+      },
+      {
+        "command": "opencode.gsd.discussMilestone",
+        "title": "GSD: Discuss Milestone",
+        "category": "GSD"
+      },
+      {
+        "command": "opencode.gsd.newMilestone",
+        "title": "GSD: New Milestone",
+        "category": "GSD"
+      },
+      {
+        "command": "opencode.gsd.completeMilestone",
+        "title": "GSD: Complete Milestone",
+        "category": "GSD"
+      },
+      {
+        "command": "opencode.gsd.progress",
+        "title": "GSD: Progress",
+        "category": "GSD"
+      },
+      {
+        "command": "opencode.gsd.resumeWork",
+        "title": "GSD: Resume Work",
+        "category": "GSD"
+      },
+      {
+        "command": "opencode.gsd.pauseWork",
+        "title": "GSD: Pause Work",
+        "category": "GSD"
+      },
+      {
+        "command": "opencode.gsd.considerIssues",
+        "title": "GSD: Consider Issues",
+        "category": "GSD"
+      },
+      {
+        "command": "opencode.gsd.debug",
+        "title": "GSD: Debug",
+        "category": "GSD"
+      },
+      {
+        "command": "opencode.gsd.addTodo",
+        "title": "GSD: Add Todo",
+        "category": "GSD"
+      },
+      {
+        "command": "opencode.gsd.checkTodos",
+        "title": "GSD: Check Todos",
+        "category": "GSD"
+      },
+      {
+        "command": "opencode.gsd.planFix",
+        "title": "GSD: Plan Fix",
+        "category": "GSD"
+      },
+      {
+        "command": "opencode.gsd.verifyWork",
+        "title": "GSD: Verify Work",
+        "category": "GSD"
+      }
+    ],
+    "keybindings": [
+      {
+        "command": "opencode.gsd.help",
+        "key": "ctrl+shift+g ctrl+shift+h",
+        "when": "editorTextFocus"
+      },
+      {
+        "command": "opencode.gsd.newProject",
+        "key": "ctrl+shift+g ctrl+shift+n",
+        "when": "editorTextFocus"
+      },
+      {
+        "command": "opencode.gsd.progress",
+        "key": "ctrl+shift+g ctrl+shift+p",
+        "when": "editorTextFocus"
+      }
+    ],
+    "configuration": {
+      "title": "GSD",
+      "properties": {
+        "gsd.maxConcurrentAgents": {
+          "type": "number",
+          "default": 3,
+          "description": "Maximum number of concurrent agents for parallel execution"
+        },
+        "gsd.skipCheckpoints": {
+          "type": "boolean",
+          "default": true,
+          "description": "Skip human checkpoints in background execution"
+        },
+        "gsd.minPlansForParallel": {
+          "type": "number",
+          "default": 2,
+          "description": "Minimum plans to trigger parallelization"
+        }
+      }
+    }
+  },
+  "scripts": {
+    "vscode:prepublish": "npm run compile",
+    "compile": "tsc -p ./",
+    "watch": "tsc -watch -p ./"
+  },
+  "devDependencies": {
+    "@types/node": "^16.0.0",
+    "@types/vscode": "^1.0.0"
+  }
+}
