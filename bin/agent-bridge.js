@@ -30,7 +30,7 @@ class AgentBridge {
         priority: 'medium'
       },
       'documentation': {
-        patterns: ['document', 'comment', 'readme', 'doc'],
+        patterns: ['document', 'comment', 'readme', 'doc', 'update'],
         agent: 'documentor',
         priority: 'low'
       },

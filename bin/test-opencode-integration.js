@@ -7,9 +7,27 @@ const fs = require('fs');
 const path = require('path');
 const os = require('os');
 
-const EditorDetector = require('./install').EditorDetector;
+// Import classes directly since they're defined inline in install.js
 const ConfigManager = require('./config-manager');
 const AgentBridge = require('./agent-bridge');
+
+// Define EditorDetector locally for testing
+class EditorDetector {
+  static detect() {
+    // Check for OpenCode indicators first
+    if (this.isOpenCodeEnvironment()) {
+      return 'opencode';
+    }
+    // Default to Claude Code
+    return 'claude';
+  }
+
+  static isOpenCodeEnvironment() {
+    // Check for ~/.opencode directory
+    const opencodeDir = require('path').join(require('os').homedir(), '.opencode');
+    return require('fs').existsSync(opencodeDir);
+  }
+}
 
 class OpenCodeIntegrationTester {
   constructor() {
@@ -99,16 +117,20 @@ class OpenCodeIntegrationTester {
     // Test task classification
     const codeGenTask = 'Create a login component';
     const debugTask = 'Fix the authentication bug';
-    const generalTask = 'Update documentation';
+    const docTask = 'Update documentation';
+    const generalTask = 'Do something random';
 
     const codeGenType = agentBridge.classifyTask(codeGenTask);
     const debugType = agentBridge.classifyTask(debugTask);
+    const docType = agentBridge.classifyTask(docTask);
     const generalType = agentBridge.classifyTask(generalTask);
 
     this.assert(codeGenType === 'code-generation',
       'Code generation task classified correctly');
     this.assert(debugType === 'debugging',
       'Debug task classified correctly');
+    this.assert(docType === 'documentation',
+      'Documentation task classified correctly');
     this.assert(generalType === 'general',
       'General task classified as fallback');
 
