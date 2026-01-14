@@ -32,7 +32,7 @@
       },
       {
         "command": "opencode.gsd.mapCodebase",
-        "title": "GSD: Map Codebase",
+        "title": "GSD: Map Codebase (Preview)",
         "category": "GSD"
       },
       {
@@ -42,7 +42,7 @@
       },
       {
         "command": "opencode.gsd.researchPhase",
-        "title": "GSD: Research Phase",
+        "title": "GSD: Research Phase (Preview)",
         "category": "GSD"
       },
       {
@@ -52,17 +52,17 @@
       },
       {
         "command": "opencode.gsd.planPhase",
-        "title": "GSD: Plan Phase",
+        "title": "GSD: Plan Phase (Preview)",
         "category": "GSD"
       },
       {
         "command": "opencode.gsd.executePlan",
-        "title": "GSD: Execute Plan",
+        "title": "GSD: Execute Plan (Preview)",
         "category": "GSD"
       },
       {
         "command": "opencode.gsd.executePhase",
-        "title": "GSD: Execute Phase",
+        "title": "GSD: Execute Phase (Preview)",
         "category": "GSD"
       },
       {
@@ -122,7 +122,7 @@
       },
       {
         "command": "opencode.gsd.debug",
-        "title": "GSD: Debug",
+        "title": "GSD: Debug (Preview)",
         "category": "GSD"
       },
       {

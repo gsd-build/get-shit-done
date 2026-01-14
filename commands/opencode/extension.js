@@ -95,12 +95,81 @@ class GSDCommandHandler {
   }
 
   async processCommand(content, args) {
-    // Parse the markdown content and extract the command logic
-    const lines = content.split('\n');
+    const outputChannel = vscode.window.createOutputChannel('GSD');
+    outputChannel.show();
+    outputChannel.clear();
 
-    // Find the objective section
+    outputChannel.appendLine('🚀 GSD Command Execution');
+    outputChannel.appendLine('========================');
+    outputChannel.appendLine('');
+
+    // Parse command name from content
+    const lines = content.split('\n');
+    let commandName = 'unknown';
+    for (const line of lines) {
+      if (line.startsWith('name: gsd:')) {
+        commandName = line.split('gsd:')[1].trim();
+        break;
+      }
+    }
+
+    outputChannel.appendLine(`Command: /gsd:${commandName}`);
+    outputChannel.appendLine(`Arguments: ${args.join(' ') || 'none'}`);
+    outputChannel.appendLine('');
+
+    // Check if this command requires agent execution
+    const requiresAgents = this.commandRequiresAgents(commandName);
+
+    if (requiresAgents) {
+      outputChannel.appendLine('⚠️  AGENT EXECUTION REQUIRED');
+      outputChannel.appendLine('─────────────────────────────');
+      outputChannel.appendLine('');
+      outputChannel.appendLine('This GSD command requires spawning AI agents to execute complex workflows.');
+      outputChannel.appendLine('The current OpenCode integration does not yet support full agent execution.');
+      outputChannel.appendLine('');
+      outputChannel.appendLine('🔄 WORKAROUNDS:');
+      outputChannel.appendLine('• Use Claude Code for agent-based commands');
+      outputChannel.appendLine('• Manual execution of the workflow steps');
+      outputChannel.appendLine('• Check the command documentation for manual steps');
+      outputChannel.appendLine('');
+
+      // Show command documentation
+      this.showCommandDocumentation(content, outputChannel);
+    } else {
+      outputChannel.appendLine('✅ BASIC COMMAND EXECUTION');
+      outputChannel.appendLine('──────────────────────────');
+      outputChannel.appendLine('');
+      outputChannel.appendLine('This command can be executed manually. See documentation below:');
+      outputChannel.appendLine('');
+
+      this.showCommandDocumentation(content, outputChannel);
+    }
+
+    outputChannel.appendLine('');
+    outputChannel.appendLine('💡 For full GSD functionality, use Claude Code');
+    outputChannel.appendLine('   The OpenCode integration is currently in development.');
+  }
+
+  commandRequiresAgents(commandName) {
+    // Commands that require spawning AI agents/subagents
+    const agentCommands = [
+      'map-codebase',     // Spawns Explore agents
+      'execute-plan',     // Spawns general-purpose agents
+      'execute-phase',    // Spawns multiple agents in parallel
+      'plan-phase',       // May spawn research agents
+      'research-phase',   // Spawns research agents
+      'debug'             // Spawns debugging agents
+    ];
+
+    return agentCommands.includes(commandName);
+  }
+
+  showCommandDocumentation(content, outputChannel) {
+    const lines = content.split('\n');
     let inObjective = false;
+    let inProcess = false;
     let objective = '';
+    let process = '';
 
     for (const line of lines) {
       if (line.includes('<objective>')) {
@@ -109,22 +178,35 @@ class GSDCommandHandler {
       }
       if (line.includes('</objective>')) {
         inObjective = false;
-        break;
+        continue;
       }
-      if (inObjective) {
+      if (inObjective && !line.includes('<objective>')) {
         objective += line + '\n';
+      }
+
+      if (line.includes('<process>')) {
+        inProcess = true;
+        continue;
+      }
+      if (line.includes('</process>')) {
+        inProcess = false;
+        continue;
+      }
+      if (inProcess && !line.includes('<process>')) {
+        process += line + '\n';
       }
     }
 
-    // For now, display the objective in the output channel
-    // In a full implementation, this would integrate with OpenCode's agent system
-    const outputChannel = vscode.window.createOutputChannel('GSD');
-    outputChannel.show();
-    outputChannel.appendLine(`Executing: ${objective.trim()}`);
-    outputChannel.appendLine(`Args: ${JSON.stringify(args)}`);
-    outputChannel.appendLine('---');
-    outputChannel.appendLine('Note: Full GSD integration requires OpenCode agent bridge implementation');
-    outputChannel.appendLine('This is a placeholder for the command execution logic.');
+    if (objective.trim()) {
+      outputChannel.appendLine('🎯 OBJECTIVE:');
+      outputChannel.appendLine(objective.trim());
+      outputChannel.appendLine('');
+    }
+
+    if (process.trim()) {
+      outputChannel.appendLine('📋 MANUAL EXECUTION STEPS:');
+      outputChannel.appendLine(process.trim());
+    }
   }
 }
 
