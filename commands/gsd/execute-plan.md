@@ -48,15 +48,44 @@ Plan path: $ARGUMENTS
    - plan_number: `02`
    - plan_path: full path
 
-4. **Fill and spawn subagent**
+4. **Pre-execution summary (interactive mode only)**
+   Check config.json for mode. Skip this step if mode=yolo.
+
+   Parse PLAN.md to extract:
+   - objective: First sentence or line from `<objective>` element
+   - task_count: Count of `<task` elements
+   - files: Collect unique file paths from `<files>` elements within tasks
+
+   Display friendly summary before spawning:
+   ```
+   ════════════════════════════════════════
+   EXECUTING: {phase_number}-{plan_number} {phase_name}
+   ════════════════════════════════════════
+
+   Building: {objective one-liner}
+   Tasks: {task_count}
+   Files: {comma-separated file list}
+
+   Full plan: {plan_path}
+   ════════════════════════════════════════
+   ```
+
+   No confirmation needed. Proceed to spawn after displaying.
+
+   In yolo mode, display abbreviated version:
+   ```
+   ⚡ Executing {phase_number}-{plan_number}: {objective one-liner}
+   ```
+
+5. **Fill and spawn subagent**
    - Fill subagent-task-prompt template with extracted values
    - Spawn: `Task(prompt=filled_template, subagent_type="general-purpose")`
 
-5. **Handle subagent return**
+6. **Handle subagent return**
    - If contains "## CHECKPOINT REACHED": Execute checkpoint_handling
    - If contains "## PLAN COMPLETE": Verify SUMMARY exists, report success
 
-6. **Report completion**
+7. **Report completion**
    - Show SUMMARY path
    - Show commits from subagent return
    - Offer next steps
