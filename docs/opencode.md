@@ -2,7 +2,13 @@
 
 ## Overview
 
-GSD (Get Shit Done) now supports [OpenCode](https://opencode.dev), a modern code editor with advanced agentic AI capabilities. This integration brings GSD's powerful project management and development workflow to OpenCode users, combining GSD's structured approach with OpenCode's intelligent code assistance.
+GSD (Get Shit Done) now supports [OpenCode](https://opencode.dev), a modern code editor with advanced agentic AI capabilities. This integration brings GSD's powerful project management and development workflow to OpenCode users.
+
+**⚠️ Current Status: Preview Release**
+- Basic command interface is functional
+- Agent-based commands require Claude Code for full execution
+- Manual workflow execution supported
+- Full agent integration planned for future release
 
 ### Key Features
 
@@ -73,102 +79,71 @@ npx get-shit-done-cc --global
 
 ## Commands
 
-GSD commands in OpenCode use the `opencode.gsd.*` namespace. All commands from Claude Code are available with the same functionality.
+GSD commands in OpenCode use the `opencode.gsd.*` namespace.
 
-### Core Commands
+### ✅ Fully Functional Commands
 
 | Command | Description | Keybinding |
 |---------|-------------|------------|
 | `opencode.gsd.help` | Show command reference | `Ctrl+Shift+G, Ctrl+Shift+H` |
 | `opencode.gsd.newProject` | Initialize new project | `Ctrl+Shift+G, Ctrl+Shift+N` |
 | `opencode.gsd.createRoadmap` | Create project roadmap | |
-| `opencode.gsd.mapCodebase` | Analyze existing codebase | |
 | `opencode.gsd.progress` | Check project status | `Ctrl+Shift+G, Ctrl+Shift+P` |
+| `opencode.gsd.addPhase` | Add new phase | |
+| `opencode.gsd.insertPhase` | Insert phase between existing | |
+| `opencode.gsd.removePhase` | Remove future phase | |
+| `opencode.gsd.newMilestone` | Create new milestone | |
+| `opencode.gsd.completeMilestone` | Archive completed milestone | |
+| `opencode.gsd.discussMilestone` | Plan next milestone | |
+| `opencode.gsd.status` | Check background agent status | |
+| `opencode.gsd.pauseWork` | Save current session state | |
+| `opencode.gsd.resumeWork` | Restore previous session | |
+| `opencode.gsd.addTodo` | Capture task or idea | |
+| `opencode.gsd.checkTodos` | Review pending todos | |
+| `opencode.gsd.considerIssues` | Review deferred issues | |
+| `opencode.gsd.listPhaseAssumptions` | See what Claude thinks before you correct it | |
 
-### Phase Management
+### ⚠️ Preview Commands (Agent-Dependent)
 
-| Command | Description |
-|---------|-------------|
-| `opencode.gsd.planPhase` | Create execution plan for phase |
-| `opencode.gsd.executePhase` | Run all plans in phase |
-| `opencode.gsd.executePlan` | Execute single plan |
-| `opencode.gsd.addPhase` | Add new phase |
-| `opencode.gsd.insertPhase` | Insert phase between existing |
-| `opencode.gsd.removePhase` | Remove future phase |
+These commands display documentation and manual execution guidance but require Claude Code for full AI agent execution:
 
-### Milestone Management
-
-| Command | Description |
-|---------|-------------|
-| `opencode.gsd.newMilestone` | Create new milestone |
-| `opencode.gsd.completeMilestone` | Archive completed milestone |
-| `opencode.gsd.discussMilestone` | Plan next milestone |
-
-### Development Workflow
-
-| Command | Description |
-|---------|-------------|
-| `opencode.gsd.status` | Check background agent status |
-| `opencode.gsd.pauseWork` | Save current session state |
-| `opencode.gsd.resumeWork` | Restore previous session |
-| `opencode.gsd.debug` | Systematic debugging |
-| `opencode.gsd.verifyWork` | User acceptance testing |
-
-### Todo Management
-
-| Command | Description |
-|---------|-------------|
-| `opencode.gsd.addTodo` | Capture task or idea |
-| `opencode.gsd.checkTodos` | Review pending todos |
-| `opencode.gsd.considerIssues` | Review deferred issues |
+| Command | Description | Status |
+|---------|-------------|---------|
+| `opencode.gsd.mapCodebase` | Analyze existing codebase | Shows manual steps |
+| `opencode.gsd.planPhase` | Create execution plan for phase | Shows manual steps |
+| `opencode.gsd.executePhase` | Run all plans in phase | Requires Claude Code |
+| `opencode.gsd.executePlan` | Execute single plan | Requires Claude Code |
+| `opencode.gsd.researchPhase` | Deep ecosystem research | Shows manual steps |
+| `opencode.gsd.debug` | Systematic debugging | Shows manual steps |
+| `opencode.gsd.verifyWork` | User acceptance testing | Shows manual steps |
+| `opencode.gsd.planFix` | Plan fixes for UAT issues | Shows manual steps |
 
 ## Agent Integration
 
-OpenCode's agentic capabilities enhance GSD's workflow:
+**⚠️ Agent integration is planned for future release**
 
-### Task Delegation
+Currently, OpenCode integration provides:
+- Command interface and documentation access
+- Manual workflow execution guidance
+- Configuration management
+- Seamless switching between editors
 
-GSD automatically delegates appropriate tasks to OpenCode's specialized agents:
+### Future Agent Capabilities (Planned)
 
-- **Code Generation**: `opencode.gsd.codegen` agent for implementation tasks
-- **Debugging**: `opencode.gsd.debugger` agent for issue resolution
-- **Testing**: `opencode.gsd.tester` agent for test creation
-- **Documentation**: `opencode.gsd.documentor` agent for docs
+When OpenCode's agent API is available, GSD will support:
 
-### Agent Bridge Configuration
+- **Task Delegation**: Automatic routing to appropriate OpenCode agents
+- **Parallel Execution**: Multiple agents working simultaneously
+- **Agent Bridge**: Coordination between GSD workflows and OpenCode agents
+- **Fallback System**: Graceful degradation to manual execution
 
-Configure agent behavior in your settings:
+### Current Workarounds
 
-```json
-{
-  "gsd-opencode": {
-    "agentDelegation": {
-      "codegen": "high",
-      "debugger": "high",
-      "tester": "medium",
-      "documentor": "low"
-    },
-    "maxConcurrentAgents": 3,
-    "fallbackToGSD": true
-  }
-}
-```
-
-### Manual Agent Control
-
-Override automatic delegation:
-
-```javascript
-// In OpenCode extension settings
-{
-  "gsd-opencode": {
-    "manualDelegation": {
-      "implementation": "opencode.codegen",
-      "testing": "gsd"  // Force GSD subagent
-    }
-  }
-}
-```
+For agent-dependent commands, the OpenCode extension provides:
+- Clear documentation of what the command does
+- Manual execution steps
+- Guidance to use Claude Code for full functionality
+- Links to relevant workflow files
 
 ## Configuration
 
