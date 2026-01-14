@@ -17,7 +17,8 @@
     "ai",
     "meta-prompting",
     "context-engineering",
-    "spec-driven-development"
+    "spec-driven-development",
+    "multi-agent"
   ],
   "author": "TÂCHES",
   "license": "MIT",
