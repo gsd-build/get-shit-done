@@ -14,7 +14,7 @@
 <br>
 
 ```bash
-npx get-shit-done-cc
+npx github:evilbuck/get-shit-done
 ```
 
 **Works on Mac, Windows, and Linux.**
@@ -72,7 +72,7 @@ People who want to describe what they want and have it built correctly — witho
 ## Getting Started
 
 ```bash
-npx get-shit-done-cc
+npx github:evilbuck/get-shit-done
 ```
 
 The installer will prompt you to choose:
@@ -82,16 +82,29 @@ The installer will prompt you to choose:
 Verify installation with `/gsd:help` (Claude Code) or `@general` (OpenCode).
 
 <details>
+<summary><strong>Install from specific branch or tag</strong></summary>
+
+```bash
+# From a specific branch
+npx github:evilbuck/get-shit-done#feature-branch
+
+# From a specific tag/release
+npx github:evilbuck/get-shit-done#v1.4.27
+```
+
+</details>
+
+<details>
 <summary><strong>Non-interactive Install (Docker, CI, Scripts)</strong></summary>
 
 ```bash
 # Claude Code
-npx get-shit-done-cc --platform claude-code --global   # Install to ~/.claude/
-npx get-shit-done-cc --platform claude-code --local    # Install to ./.claude/
+npx github:evilbuck/get-shit-done --platform claude-code --global   # Install to ~/.claude/
+npx github:evilbuck/get-shit-done --platform claude-code --local    # Install to ./.claude/
 
 # OpenCode
-npx get-shit-done-cc --platform opencode --global      # Install to ~/.config/opencode/
-npx get-shit-done-cc --platform opencode --local       # Install to .opencode/
+npx github:evilbuck/get-shit-done --platform opencode --global      # Install to ~/.config/opencode/
+npx github:evilbuck/get-shit-done --platform opencode --local       # Install to .opencode/
 ```
 
 Use `--platform` to specify target platform and `--global` (`-g`) or `--local` (`-l`) for location.
@@ -367,18 +380,18 @@ You're never locked in. The system adapts.
 
 **Commands not working as expected?**
 - Run `/gsd:help` to verify installation
-- Re-run `npx get-shit-done-cc` to reinstall
+- Re-run `npx github:evilbuck/get-shit-done` to reinstall
 
 **Updating to the latest version?**
 ```bash
-npx get-shit-done-cc@latest
+npx github:evilbuck/get-shit-done#main
 ```
 
 **Using Docker or containerized environments?**
 
 If file reads fail with tilde paths (`~/.claude/...`), set `CLAUDE_CONFIG_DIR` before installing:
 ```bash
-CLAUDE_CONFIG_DIR=/home/youruser/.claude npx get-shit-done-cc --global
+CLAUDE_CONFIG_DIR=/home/youruser/.claude npx github:evilbuck/get-shit-done --global
 ```
 This ensures absolute paths are used instead of `~` which may not expand correctly in containers.
 
