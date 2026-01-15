@@ -65,20 +65,28 @@ Output: Milestone archived, roadmap reorganized, git tagged.
    - Update ROADMAP.md to one-line summary with link
    - Offer to create next milestone
 
-5. **Update PROJECT.md:**
+5. **Update milestones in metrics.json:**
+
+   ```bash
+   jq '.milestones[0].status = "complete" | .last_updated = now | todate' \
+      .planning/metrics.json > .planning/metrics.tmp && \
+      mv .planning/metrics.tmp .planning/metrics.json
+   ```
+
+6. **Update PROJECT.md:**
 
    - Add "Current State" section with shipped version
    - Add "Next Milestone Goals" section
    - Archive previous content in `<details>` (if v1.1+)
 
-6. **Commit and tag:**
+7. **Commit and tag:**
 
    - Stage: MILESTONES.md, PROJECT.md, ROADMAP.md, STATE.md, archive file
    - Commit: `chore: archive v{{version}} milestone`
    - Tag: `git tag -a v{{version}} -m "[milestone summary]"`
    - Ask about pushing tag
 
-7. **Offer next steps:**
+8. **Offer next steps:**
    - Plan next milestone
    - Archive planning
    - Done for now
