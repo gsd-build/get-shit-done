@@ -261,6 +261,23 @@ questions: [
 
 </step>
 
+<step name="create_metrics">
+
+**Create .planning/metrics.json:**
+
+```bash
+# Copy template
+cp ~/.claude/get-shit-done/templates/metrics.json .planning/metrics.json
+
+# Fill in project name
+PROJECT_NAME=$(head -1 .planning/PROJECT.md | sed 's/^# //')
+jq --arg name "$PROJECT_NAME" '.project_name = $name | .last_updated = now | todate' \
+   .planning/metrics.json > .planning/metrics.tmp && \
+   mv .planning/metrics.tmp .planning/metrics.json
+```
+
+</step>
+
 <step name="config">
 
 Create `.planning/config.json` with chosen mode, depth, and parallelization using `templates/config.json` structure.
@@ -270,7 +287,7 @@ Create `.planning/config.json` with chosen mode, depth, and parallelization usin
 <step name="commit">
 
 ```bash
-git add .planning/PROJECT.md .planning/config.json
+git add .planning/PROJECT.md .planning/config.json .planning/metrics.json
 git commit -m "$(cat <<'EOF'
 docs: initialize [project-name]
 
@@ -292,6 +309,7 @@ Project initialized:
 
 - Project: .planning/PROJECT.md
 - Config: .planning/config.json (mode: [chosen mode])
+- Metrics: .planning/metrics.json
 [If .planning/codebase/ exists:] - Codebase: .planning/codebase/ (7 documents)
 
 ---
@@ -323,6 +341,7 @@ Skip research, define requirements from what you know, then create roadmap.
 
 - `.planning/PROJECT.md`
 - `.planning/config.json`
+- `.planning/metrics.json`
 
 </output>
 
@@ -333,6 +352,7 @@ Skip research, define requirements from what you know, then create roadmap.
 - [ ] Requirements initialized as hypotheses (greenfield) or with inferred Validated (brownfield)
 - [ ] Key Decisions table initialized
 - [ ] config.json has workflow mode, depth, and parallelization
+- [ ] metrics.json created with project name
 - [ ] All committed to git
 
 </success_criteria>
