@@ -80,6 +80,35 @@ Build plan inventory:
 Skip completed plans. If all complete, report "Phase already executed" and exit.
 </step>
 
+<step name="update_current_phase_metrics">
+**Update metrics.json for new phase:**
+
+```bash
+# Get phase info
+PHASE_NUM=$(echo "$PHASE_ARG" | grep -oE '^[0-9]+')
+PHASE_NAME=$(grep "^## Phase $PHASE_NUM:" .planning/ROADMAP.md | sed 's/.*: //')
+PHASES_COMPLETE=$(($PHASE_NUM - 1))
+
+# Count plans in phase
+PLAN_COUNT=$(ls .planning/phases/*-${PHASE_NUM}-*/*-PLAN.md 2>/dev/null | wc -l | xargs)
+
+jq --arg num "$PHASE_NUM" \
+   --arg name "$PHASE_NAME" \
+   --arg complete "$PHASES_COMPLETE" \
+   --arg plans "$PLAN_COUNT" \
+   '.current_phase.number = ($num | tonumber) |
+    .current_phase.name = $name |
+    .current_phase.status = "in_progress" |
+    .current_phase.plans_complete = 0 |
+    .current_phase.plans_total = ($plans | tonumber) |
+    .overall_progress.phases_complete = ($complete | tonumber) |
+    .last_updated = now | todate |
+    .overall_progress.percentage = ((.overall_progress.phases_complete / .overall_progress.phases_total) * 100 | floor)' \
+   .planning/metrics.json > .planning/metrics.tmp && \
+   mv .planning/metrics.tmp .planning/metrics.json
+```
+</step>
+
 <step name="group_by_wave">
 Read `wave` from each plan's frontmatter and group by wave number:
 
@@ -227,7 +256,21 @@ Execute each wave in sequence. Autonomous plans within a wave run in parallel.
 
    See `<checkpoint_handling>` for details.
 
-6. **Proceed to next wave**
+6. **Update metrics with completed plans:**
+
+   ```bash
+   # Count completed plans in this phase
+   COMPLETED_PLANS=$(ls .planning/phases/*-${PHASE_NUM}-*/*-SUMMARY.md 2>/dev/null | wc -l | xargs)
+
+   jq --arg complete "$COMPLETED_PLANS" \
+      '.current_phase.plans_complete = ($complete | tonumber) |
+       .last_updated = now | todate |
+       .current_phase.status = (if .current_phase.plans_complete == .current_phase.plans_total then "complete" else "in_progress" end)' \
+      .planning/metrics.json > .planning/metrics.tmp && \
+      mv .planning/metrics.tmp .planning/metrics.json
+   ```
+
+7. **Proceed to next wave**
 
 </step>
 
