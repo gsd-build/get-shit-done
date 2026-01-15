@@ -48,19 +48,13 @@ Available metrics:
 
 ## Display Format Options
 
-You can present GSD metrics in multiple formats. Choose the one that best fits the existing statusline style:
+Mix and match to fit your statusline style:
 
-### Option 1: Compact text format
-🎯 P3: Core TUI 📊 2/5
-
-### Option 2: Percentage format
-🎯 P3: Core TUI 22%
-
-### Option 3: Visual progress bar
-🎯 P3: Core TUI 🧠 ███░░░░░░░ 22%
-
-### Option 4: Detailed breakdown
-🎯 Phase 3: Core TUI (2/5 plans) | Overall: 22%
+- `🎯 P2: Auth 📊 3/5` — phase + plans done
+- `🚀 Auth System ███░░ 60%` — progress bar vibes  
+- `[gsd:2/auth:3/5:45%]` — hacker minimal
+- `Phase 2 · Auth · 3 of 5 plans` — clean prose
+- `⚡ P2 ▓▓▓░░ 3/5 ✨` — go wild
 
 ## Implementation
 
@@ -70,10 +64,10 @@ Add this bash code to read the metrics:
 # GSD Statusline Integration
 gsd_info=""
 if [ -f ".planning/metrics.json" ]; then
-    phase_num=$(jq -r '.current_phase.number' .planning/metrics.json 2>/dev/null)
-    phase_name=$(jq -r '.current_phase.name' .planning/metrics.json 2>/dev/null | cut -c1-15)
-    plans=$(jq -r '"\(.current_phase.plans_complete)/\(.current_phase.plans_total)"' .planning/metrics.json 2>/dev/null)
-    overall_pct=$(jq -r '.overall_progress.percentage' .planning/metrics.json 2>/dev/null)
+    phase_num=$(jq -r '.current_phase.number // empty' .planning/metrics.json 2>/dev/null)
+    phase_name=$(jq -r '.current_phase.name // empty' .planning/metrics.json 2>/dev/null | cut -c1-15)
+    plans=$(jq -r '"\(.current_phase.plans_complete // 0)/\(.current_phase.plans_total // 0)"' .planning/metrics.json 2>/dev/null)
+    overall_pct=$(jq -r '.overall_progress.percentage // 0' .planning/metrics.json 2>/dev/null)
 
     if [ -n "$phase_num" ]; then
         # Choose format based on existing statusline style:

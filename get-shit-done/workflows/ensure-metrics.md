@@ -16,13 +16,15 @@ if [ ! -f ".planning/metrics.json" ]; then
 
     # Parse ROADMAP.md for data
     PROJECT_NAME=$(head -1 .planning/PROJECT.md 2>/dev/null | sed 's/^# //' || echo "")
-    PHASES_TOTAL=$(grep -c "^## Phase" .planning/ROADMAP.md 2>/dev/null || echo "0")
+    PHASES_TOTAL=$(grep -c "^## Phase" .planning/ROADMAP.md 2>/dev/null || true)
+    PHASES_TOTAL=${PHASES_TOTAL:-0}
 
     # Get current phase from STATE.md or default to 1
     CURRENT_PHASE=$(grep "current_phase:" .planning/STATE.md 2>/dev/null | grep -oE '[0-9]+' || echo "1")
 
     # Count phases marked complete in ROADMAP
-    PHASES_COMPLETE=$(grep -c "Status.*Complete" .planning/ROADMAP.md 2>/dev/null || echo "0")
+    PHASES_COMPLETE=$(grep -c "Status.*Complete" .planning/ROADMAP.md 2>/dev/null || true)
+    PHASES_COMPLETE=${PHASES_COMPLETE:-0}
 
     # Update metrics
     jq --arg pname "$PROJECT_NAME" \
@@ -33,7 +35,7 @@ if [ ! -f ".planning/metrics.json" ]; then
         .overall_progress.phases_total = ($ptotal | tonumber) |
         .current_phase.number = ($cphase | tonumber) |
         .overall_progress.phases_complete = ($pcomplete | tonumber) |
-        .overall_progress.percentage = ((.overall_progress.phases_complete / .overall_progress.phases_total) * 100 | floor) |
+        .overall_progress.percentage = (if .overall_progress.phases_total > 0 then ((.overall_progress.phases_complete / .overall_progress.phases_total) * 100 | floor) else 0 end) |
         .last_updated = now | todate |
         .current_phase.status = "in_progress"' \
        .planning/metrics.json > .planning/metrics.tmp && \

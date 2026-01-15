@@ -85,8 +85,14 @@ The workflow handles:
 **Update metrics.json with roadmap info:**
 
 ```bash
+# Ensure metrics.json exists (backward compat for projects created before this feature)
+if [ ! -f ".planning/metrics.json" ]; then
+    cp ~/.claude/get-shit-done/templates/metrics.json .planning/metrics.json
+fi
+
 # Count total phases
-PHASES_TOTAL=$(grep -c "^## Phase" .planning/ROADMAP.md)
+PHASES_TOTAL=$(grep -c "^## Phase" .planning/ROADMAP.md || true)
+PHASES_TOTAL=${PHASES_TOTAL:-0}
 
 jq --arg total "$PHASES_TOTAL" \
    '.overall_progress.phases_total = ($total | tonumber) |

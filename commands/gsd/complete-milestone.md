@@ -68,9 +68,12 @@ Output: Milestone archived, roadmap reorganized, git tagged.
 5. **Update milestones in metrics.json:**
 
    ```bash
-   jq '.milestones[0].status = "complete" | .last_updated = now | todate' \
-      .planning/metrics.json > .planning/metrics.tmp && \
-      mv .planning/metrics.tmp .planning/metrics.json
+   # Skip if metrics.json doesn't exist (older projects)
+   if [ -f ".planning/metrics.json" ]; then
+       jq '.milestones[0].status = "complete" | .last_updated = now | todate' \
+          .planning/metrics.json > .planning/metrics.tmp && \
+          mv .planning/metrics.tmp .planning/metrics.json
+   fi
    ```
 
 6. **Update PROJECT.md:**
