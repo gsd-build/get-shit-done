@@ -283,8 +283,8 @@ function promptPlatform(callback) {
 
   console.log(`  ${yellow}Which platform?${reset}
 
-  ${cyan}1${reset}) Claude Code ${dim}(~/.claude)${reset}
-  ${cyan}2${reset}) OpenCode    ${dim}(~/.config/opencode)${reset}
+  ${cyan}1${reset}) Claude Code
+  ${cyan}2${reset}) OpenCode
 `);
 
   rl.question(`  Choice ${dim}[1]${reset}: `, (answer) => {
