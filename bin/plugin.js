@@ -596,6 +596,97 @@ function listPlugins() {
 }
 
 /**
+ * Show detailed information about a plugin
+ */
+function showPluginInfo(pluginName) {
+  // Validate pluginName is provided
+  if (!pluginName) {
+    console.error(`  ${red}Error:${reset} Plugin name required. Usage: plugin info <name>`);
+    process.exit(1);
+  }
+
+  const configDir = getConfigDir();
+  const pluginDir = path.join(configDir, pluginName);
+  const manifestPath = path.join(pluginDir, 'plugin.json');
+
+  // Check if plugin exists
+  if (!fs.existsSync(manifestPath)) {
+    console.error(`  ${red}Error:${reset} Plugin ${cyan}${pluginName}${reset} not installed`);
+    process.exit(1);
+  }
+
+  // Parse manifest
+  let manifest;
+  try {
+    manifest = JSON.parse(fs.readFileSync(manifestPath, 'utf8'));
+  } catch (parseErr) {
+    console.error(`  ${red}Error:${reset} Corrupted plugin.json - ${parseErr.message}`);
+    process.exit(1);
+  }
+
+  // Display formatted output
+  console.log(`\n  ${cyan}Plugin:${reset} ${cyan}${manifest.name}${reset} v${manifest.version}`);
+  if (manifest.description) {
+    console.log(`  ${dim}${manifest.description}${reset}`);
+  }
+
+  // Author and repository
+  console.log('');
+  if (manifest.author) {
+    console.log(`  Author: ${manifest.author}`);
+  }
+  if (manifest.repository) {
+    console.log(`  Repository: ${manifest.repository}`);
+  }
+
+  const gsd = manifest.gsd || {};
+
+  // Commands
+  if (gsd.commands && Array.isArray(gsd.commands) && gsd.commands.length > 0) {
+    console.log(`\n  ${cyan}Commands:${reset}`);
+    for (const cmd of gsd.commands) {
+      const desc = cmd.description ? ` - ${dim}${cmd.description}${reset}` : '';
+      console.log(`    /${cmd.name}${desc}`);
+    }
+  }
+
+  // Agents
+  if (gsd.agents && Array.isArray(gsd.agents) && gsd.agents.length > 0) {
+    console.log(`\n  ${cyan}Agents:${reset}`);
+    for (const agent of gsd.agents) {
+      const desc = agent.description ? ` - ${dim}${agent.description}${reset}` : '';
+      console.log(`    ${agent.name}${desc}`);
+    }
+  }
+
+  // Hooks
+  if (gsd.hooks && Array.isArray(gsd.hooks) && gsd.hooks.length > 0) {
+    console.log(`\n  ${cyan}Hooks:${reset}`);
+    for (const hook of gsd.hooks) {
+      const desc = hook.description ? ` - ${dim}${hook.description}${reset}` : '';
+      console.log(`    ${hook.event}${desc}`);
+    }
+  }
+
+  // Installation info
+  const installed = manifest._installed || {};
+  console.log(`\n  ${cyan}Installation:${reset}`);
+
+  if (installed.date) {
+    const dateStr = installed.date.split('T')[0]; // Format as YYYY-MM-DD
+    console.log(`    Installed: ${dateStr}`);
+  }
+
+  if (installed.linked && installed.source) {
+    console.log(`    ${yellow}Linked from:${reset} ${installed.source}`);
+  } else {
+    console.log(`    Location: ~/.claude/${manifest.name}/`);
+  }
+
+  console.log('');
+}
+
+/**
  * Check for existing plugin installation and handle conflicts
  */
 function checkExistingInstallation(pluginName, configDir) {
