@@ -1,6 +1,6 @@
 ---
 name: gsd:plugin
-description: Manage GSD plugins (install, uninstall, list)
+description: Manage GSD plugins (install, uninstall, list, info)
 argument-hint: "<action> [source|name]"
 allowed-tools: [Bash, Read]
 ---
@@ -15,6 +15,7 @@ Plugin management for GSD. Install, uninstall, and manage plugins.
 - `/gsd:plugin uninstall <name>` - Remove an installed plugin
 - `/gsd:plugin uninstall <name> --dry-run` - Preview what would be removed
 - `/gsd:plugin list` - List all installed plugins with status
+- `/gsd:plugin info <name>` - Show detailed plugin information
 </overview>
 
 <process>
@@ -36,6 +37,15 @@ Parse the user's command and execute the appropriate action.
 1. Run: `node ~/.claude/get-shit-done/bin/plugin.js list`
 2. Report the list of installed plugins with their name, version, description, and linked status
 
+**For info:**
+1. Extract plugin name
+2. Run: `node ~/.claude/get-shit-done/bin/plugin.js info <name>`
+3. Report plugin details including:
+   - Name, version, description
+   - Author and repository
+   - Commands, agents, and hooks provided
+   - Installation date and location (or linked source)
+
 **Error handling:**
 If the plugin.js command fails, show the error output to the user.
 
@@ -51,6 +61,7 @@ Usage:
   /gsd:plugin uninstall <name>          Remove a plugin
   /gsd:plugin uninstall <name> --dry-run Preview removal
   /gsd:plugin list                      List installed plugins
+  /gsd:plugin info <name>               Show plugin details
 
 Examples:
   /gsd:plugin install https://github.com/user/my-plugin
@@ -58,6 +69,7 @@ Examples:
   /gsd:plugin install ./my-plugin --link
   /gsd:plugin uninstall my-plugin
   /gsd:plugin uninstall my-plugin --dry-run
+  /gsd:plugin info my-plugin
 ```
 </process>
 
@@ -86,4 +98,22 @@ Uninstall:
 
 Preview uninstall:
 `/gsd:plugin uninstall my-plugin --dry-run`
+
+Show plugin details:
+`/gsd:plugin info my-plugin`
+Output:
+```
+Plugin: my-plugin v1.0.0
+  My awesome GSD plugin
+
+Author: developer@example.com
+Repository: https://github.com/user/my-plugin
+
+Commands:
+  /my-plugin:analyze - Analyze code patterns
+
+Installation:
+  Installed: 2026-01-16
+  Location: ~/.claude/my-plugin/
+```
 </examples>

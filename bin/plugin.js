@@ -501,11 +501,15 @@ function showHelp() {
   ${yellow}Usage:${reset}
     plugin install <source>   Install a plugin from git URL or local path
     plugin list               List all installed plugins with status
+    plugin info <name>        Show detailed plugin information
     plugin uninstall <name>   Remove an installed plugin
 
   ${yellow}Examples:${reset}
     ${dim}# List all installed plugins${reset}
     plugin list
+
+    ${dim}# Show plugin details${reset}
+    plugin info my-plugin
 
     ${dim}# Install from git repository${reset}
     plugin install https://github.com/user/my-plugin
@@ -858,6 +862,9 @@ switch (command) {
     break;
   case 'list':
     listPlugins();
+    break;
+  case 'info':
+    showPluginInfo(source);
     break;
   case 'uninstall':
     uninstallPlugin(source);
