@@ -386,6 +386,33 @@ function stopServices(pluginName) {
 }
 
 /**
+ * Clean up Docker services for a plugin (stop, remove containers, and remove volumes)
+ * Used during uninstall for complete cleanup
+ */
+function cleanupServices(pluginName, composePath) {
+  const docker = isDockerAvailable();
+  if (!docker.available) {
+    console.log(`  ${yellow}Warning:${reset} Docker not available, skipping container cleanup for ${pluginName}`);
+    return false;
+  }
+
+  if (!fs.existsSync(composePath)) {
+    console.log(`  ${yellow}Warning:${reset} Docker Compose file not found: ${composePath}`);
+    return false;
+  }
+
+  try {
+    console.log(`  Cleaning up containers and volumes for ${cyan}${pluginName}${reset}...`);
+    execSync(`${docker.command} -f "${composePath}" down -v --remove-orphans`, { stdio: 'pipe' });
+    console.log(`  ${green}✓${reset} Containers and volumes removed`);
+    return true;
+  } catch (err) {
+    console.log(`  ${yellow}Warning:${reset} Failed to clean up services: ${err.message}`);
+    return false;
+  }
+}
+
+/**
  * Check health of plugin services by running health check script
  * Returns: { status: 'healthy'|'unhealthy'|'no-services'|'no-healthcheck'|'missing-script'|'error', error?, path? }
  */
@@ -614,6 +641,11 @@ function uninstallPlugin(pluginName) {
   const isLinked = manifest._installed?.linked === true;
   const linkedSource = manifest._installed?.source;
 
+  // Check for services (need compose path before deletion)
+  const services = manifest.gsd?.services;
+  const hasServices = services && services['docker-compose'];
+  const composePath = hasServices ? path.join(pluginDir, services['docker-compose']) : null;
+
   // Show header
   if (dryRun) {
     console.log(`\n  Would uninstall: ${cyan}${manifest.name}${reset} v${manifest.version}${isLinked ? ` ${dim}(linked)${reset}` : ''}`);
@@ -651,6 +683,10 @@ function uninstallPlugin(pluginName) {
 
   // Dry run mode - just show what would be removed
   if (dryRun) {
+    // Show service cleanup notice if services exist
+    if (hasServices) {
+      console.log(`  Would stop and remove containers for ${pluginName}`);
+    }
     for (const item of toRemove) {
       console.log(`  - ~/.claude/${item.display}`);
     }
@@ -659,6 +695,11 @@ function uninstallPlugin(pluginName) {
     }
     console.log(`\n  Run without --dry-run to actually uninstall.`);
     return;
+  }
+
+  // Clean up services before file removal (compose file must exist)
+  if (hasServices && composePath) {
+    cleanupServices(pluginName, composePath);
   }
 
   // Actually remove files
