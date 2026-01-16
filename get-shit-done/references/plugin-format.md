@@ -581,17 +581,44 @@ volumes:
   neo4j_data:
 ```
 
+**Note on volumes:**
+Named volumes (like `neo4j_data`) persist across container restarts but are deleted on uninstall. For data that should survive uninstall, use bind mounts to a location outside `~/.claude/`.
+
 **Service lifecycle:**
-- Services start when plugin is installed and enabled
-- Services stop when plugin is disabled or uninstalled
-- Health checks verify service availability
-- Disabling a plugin stops services but keeps configuration files
-- Re-enabling restarts services using existing configuration
+
+| Event | Action | Command |
+|-------|--------|---------|
+| Plugin install | Start services | `docker compose up -d` |
+| Plugin enable | Start services | `docker compose up -d` |
+| Plugin disable | Stop services | `docker compose down` |
+| Plugin uninstall | Remove containers + volumes | `docker compose down -v --remove-orphans` |
+
+**Lifecycle details:**
+
+1. **On install:** Services start automatically if Docker is available. Plugin remains installed even if Docker is unavailable.
+
+2. **On enable:** Services start. If Docker is unavailable, plugin is enabled but services won't run (warning shown).
+
+3. **On disable:** Services stop. Containers are stopped but not removed. Data volumes are preserved.
+
+4. **On uninstall:** Full cleanup - containers stopped, removed, and named volumes deleted. This ensures a clean slate for reinstallation.
+
+**Health checks:**
+
+If `healthCheck` script is provided, it runs when:
+- Displaying plugin info (`plugin info <name>`)
+- The script should exit 0 for healthy, non-zero for unhealthy
+- Health check output is captured for error reporting
+
+**Docker requirements:**
+
+- Docker Desktop or Docker Engine must be installed
+- `docker compose` (v2) or `docker-compose` (v1) command must be available
+- If Docker is unavailable, plugin operations succeed with warnings
+- Services are optional - plugins work without Docker if no services defined
 
 **For plugins without services:**
 Set `services` to `null` or omit the field entirely.
-
-*Detailed service implementation in Phase 5 (Self-Contained Dependencies)*
 </services_overview>
 
 <activation_behavior>
