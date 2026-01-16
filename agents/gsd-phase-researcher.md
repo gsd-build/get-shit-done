@@ -450,6 +450,11 @@ PHASE_DIR=$(ls -d .planning/phases/${PADDED_PHASE}-* .planning/phases/${PHASE}-*
 
 # Read CONTEXT.md if exists (from /gsd:discuss-phase)
 cat "${PHASE_DIR}"/*-CONTEXT.md 2>/dev/null
+
+# Check if planning docs should be committed (default: true)
+COMMIT_PLANNING_DOCS=$(cat .planning/config.json 2>/dev/null | grep -o '"commit_docs"[[:space:]]*:[[:space:]]*[^,}]*' | grep -o 'true\|false' || echo "true")
+# Auto-detect gitignored (overrides config)
+git check-ignore -q .planning 2>/dev/null && COMMIT_PLANNING_DOCS=false
 ```
 
 **If CONTEXT.md exists**, it contains user decisions that MUST constrain your research:
@@ -525,6 +530,10 @@ Write to: `${PHASE_DIR}/${PADDED_PHASE}-RESEARCH.md`
 Where `PHASE_DIR` is the full path (e.g., `.planning/phases/01-foundation`)
 
 ## Step 6: Commit Research
+
+**If `COMMIT_PLANNING_DOCS=false`:** Skip git operations, log "Skipping planning docs commit (commit_docs: false)"
+
+**If `COMMIT_PLANNING_DOCS=true` (default):**
 
 ```bash
 git add "${PHASE_DIR}/${PADDED_PHASE}-RESEARCH.md"

@@ -953,6 +953,10 @@ After making edits, self-check:
 
 ### Step 6: Commit Revised Plans
 
+**If `COMMIT_PLANNING_DOCS=false`:** Skip git operations, log "Skipping planning docs commit (commit_docs: false)"
+
+**If `COMMIT_PLANNING_DOCS=true` (default):**
+
 ```bash
 git add .planning/phases/${PHASE}-*/${PHASE}-*-PLAN.md
 git commit -m "fix(${PHASE}): revise plans based on checker feedback"
@@ -998,6 +1002,17 @@ Read `.planning/STATE.md` and parse:
 - Blockers/concerns (things this phase may address)
 
 If STATE.md missing but .planning/ exists, offer to reconstruct or continue without.
+
+**Load planning config:**
+
+```bash
+# Check if planning docs should be committed (default: true)
+COMMIT_PLANNING_DOCS=$(cat .planning/config.json 2>/dev/null | grep -o '"commit_docs"[[:space:]]*:[[:space:]]*[^,}]*' | grep -o 'true\|false' || echo "true")
+# Auto-detect gitignored (overrides config)
+git check-ignore -q .planning 2>/dev/null && COMMIT_PLANNING_DOCS=false
+```
+
+Store `COMMIT_PLANNING_DOCS` for use in git operations.
 </step>
 
 <step name="load_codebase_context">
@@ -1208,6 +1223,10 @@ Update ROADMAP.md to finalize phase placeholders created by add-phase or insert-
 
 <step name="git_commit">
 Commit phase plan(s) and updated roadmap:
+
+**If `COMMIT_PLANNING_DOCS=false`:** Skip git operations, log "Skipping planning docs commit (commit_docs: false)"
+
+**If `COMMIT_PLANNING_DOCS=true` (default):**
 
 ```bash
 git add .planning/phases/${PHASE}-*/${PHASE}-*-PLAN.md .planning/ROADMAP.md

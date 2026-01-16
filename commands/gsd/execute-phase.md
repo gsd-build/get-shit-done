@@ -99,7 +99,9 @@ Phase: $ARGUMENTS
    - Skip if: REQUIREMENTS.md doesn't exist, or phase has no Requirements line
 
 10. **Commit phase completion**
-    Bundle all phase metadata updates in one commit:
+    Check `COMMIT_PLANNING_DOCS` from config.json (default: true).
+    If false: Skip git operations for .planning/ files.
+    If true: Bundle all phase metadata updates in one commit:
     - Stage: `git add .planning/ROADMAP.md .planning/STATE.md`
     - Stage REQUIREMENTS.md if updated: `git add .planning/REQUIREMENTS.md`
     - Commit: `docs({phase}): complete {phase-name} phase`

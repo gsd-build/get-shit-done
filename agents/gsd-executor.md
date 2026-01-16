@@ -39,6 +39,17 @@ Options:
 ```
 
 **If .planning/ doesn't exist:** Error - project not initialized.
+
+**Load planning config:**
+
+```bash
+# Check if planning docs should be committed (default: true)
+COMMIT_PLANNING_DOCS=$(cat .planning/config.json 2>/dev/null | grep -o '"commit_docs"[[:space:]]*:[[:space:]]*[^,}]*' | grep -o 'true\|false' || echo "true")
+# Auto-detect gitignored (overrides config)
+git check-ignore -q .planning 2>/dev/null && COMMIT_PLANNING_DOCS=false
+```
+
+Store `COMMIT_PLANNING_DOCS` for use in git operations.
 </step>
 
 <step name="load_plan">
@@ -691,6 +702,10 @@ Resume file: [path to .continue-here if exists, else "None"]
 
 <final_commit>
 After SUMMARY.md and STATE.md updates:
+
+**If `COMMIT_PLANNING_DOCS=false`:** Skip git operations for planning files, log "Skipping planning docs commit (commit_docs: false)"
+
+**If `COMMIT_PLANNING_DOCS=true` (default):**
 
 **1. Stage execution artifacts:**
 

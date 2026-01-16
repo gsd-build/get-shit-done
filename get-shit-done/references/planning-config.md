@@ -31,8 +31,14 @@ Configuration options for `.planning/` directory behavior.
 **Checking the config:**
 
 ```bash
+# Check config.json first
 COMMIT_DOCS=$(cat .planning/config.json 2>/dev/null | grep -o '"commit_docs"[[:space:]]*:[[:space:]]*[^,}]*' | grep -o 'true\|false' || echo "true")
+
+# Auto-detect gitignored (overrides config)
+git check-ignore -q .planning 2>/dev/null && COMMIT_DOCS=false
 ```
+
+**Auto-detection:** If `.planning/` is gitignored, `commit_docs` is automatically `false` regardless of config.json. This prevents git errors when users have `.planning/` in `.gitignore`.
 
 **Conditional git operations:**
 
