@@ -16,7 +16,7 @@ None
 
 - [x] **Phase 1: Plugin Format Specification** - Define unified plugin structure that scales from simple to complex
 - [x] **Phase 2: Plugin Installation** - Package-manager style install from git repos and local paths
-- [ ] **Phase 3: Plugin Discovery** - List available and installed plugins
+- [x] **Phase 3: Plugin Discovery** - List available and installed plugins
 - [ ] **Phase 4: Plugin Activation** - Command-based activation with optional parameters
 - [ ] **Phase 5: Self-Contained Dependencies** - Docker and service support within plugin folders
 - [ ] **Phase 6: Documentation** - Plugin development guide with basic-to-complex examples
@@ -53,8 +53,8 @@ Plans:
 **Plans**: TBD
 
 Plans:
-- [ ] 03-01: List installed plugins with status
-- [ ] 03-02: Plugin info and details display
+- [x] 03-01: List installed plugins with status
+- [x] 03-02: Plugin info and details display
 
 ### Phase 4: Plugin Activation
 **Goal**: Enable/disable plugins, integrate plugin commands into GSD command namespace
@@ -97,7 +97,7 @@ Phases execute in numeric order: 1 → 2 → 3 → 4 → 5 → 6
 |-------|----------------|--------|-----------|
 | 1. Plugin Format Specification | 3/3 | Complete | 2026-01-16 |
 | 2. Plugin Installation | 3/3 | Complete | 2026-01-16 |
-| 3. Plugin Discovery | 0/2 | Not started | - |
+| 3. Plugin Discovery | 2/2 | Complete | 2026-01-16 |
 | 4. Plugin Activation | 0/2 | Not started | - |
 | 5. Self-Contained Dependencies | 0/3 | Not started | - |
 | 6. Documentation | 0/2 | Not started | - |
