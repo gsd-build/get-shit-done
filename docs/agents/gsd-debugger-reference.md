@@ -5,7 +5,7 @@
 |-----------|-------|
 | **Type** | Agent |
 | **Location** | `agents/gsd-debugger.md` |
-| **Size** | 1185 lines |
+| **Size** | 1184 lines |
 | **Documentation Tier** | Standard |
 | **Complexity Score** | 2+3+2+2 = **9/12** |
 
