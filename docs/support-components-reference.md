@@ -276,6 +276,7 @@ Comprehensive reference for GSD workflows, templates, and reference documents.
 | continue-here.md | .continue-here.md | execute-plan | State, Work, Next Action |
 | planner-subagent-prompt.md | (agent prompt) | plan-phase | Planning Context, Quality Gate |
 | debug-subagent-prompt.md | (agent prompt) | debug/diagnose | Symptoms, Mode, Debug File |
+| config.json | .planning/config.json | /gsd:new-project | mode, depth, parallelization, gates, safety |
 
 ---
 
@@ -377,6 +378,54 @@ must_haves:
 | trigger | string | Yes | Verbatim user input (immutable) |
 | created | string | Yes | ISO timestamp (immutable) |
 | updated | string | Yes | ISO timestamp (update on every change) |
+
+---
+
+### config.json Schema
+
+Produced by `/gsd:new-project` and consumed by commands that read `.planning/config.json`. The source of truth for this schema is `get-shit-done/templates/config.json`.
+
+```json
+{
+  "mode": "interactive",
+  "depth": "standard",
+  "parallelization": {
+    "enabled": true,
+    "plan_level": true,
+    "task_level": false,
+    "skip_checkpoints": true,
+    "max_concurrent_agents": 3,
+    "min_plans_for_parallel": 2
+  },
+  "gates": {
+    "confirm_project": true,
+    "confirm_phases": true,
+    "confirm_roadmap": true,
+    "confirm_breakdown": true,
+    "confirm_plan": true,
+    "execute_next_plan": true,
+    "issues_review": true,
+    "confirm_transition": true
+  },
+  "safety": {
+    "always_confirm_destructive": true,
+    "always_confirm_external_services": true
+  }
+}
+```
+
+**Fields:**
+- `mode`: string mode selector (e.g., `interactive`).  
+- `depth`: string planning depth (e.g., `standard`).  
+- `parallelization`: object controlling parallel execution:
+  - `enabled`: boolean to allow parallelism.
+  - `plan_level`: boolean to run plans in parallel.
+  - `task_level`: boolean to run tasks in parallel.
+  - `skip_checkpoints`: boolean to bypass checkpoints during parallel runs.
+  - `max_concurrent_agents`: integer cap for simultaneous agents.
+  - `min_plans_for_parallel`: integer threshold before parallelism activates.
+- `gates`: object of boolean confirmation gates (`confirm_project`, `confirm_phases`, `confirm_roadmap`, `confirm_breakdown`, `confirm_plan`, `execute_next_plan`, `issues_review`, `confirm_transition`).
+- `safety`: object of boolean safety toggles (`always_confirm_destructive`, `always_confirm_external_services`).
 
 ---
 
