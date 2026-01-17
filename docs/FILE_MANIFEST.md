@@ -198,6 +198,17 @@ Complete inventory of all GSD system files with metadata for documentation and m
 
 ---
 
+## Operational Scripts & Hooks
+
+| File | Purpose | Relationship Notes | Lines |
+|------|---------|--------------------|-------|
+| bin/install.js | Installer/CLI setup entrypoint that configures GSD for local use | Coordinates setup tasks invoked by installation workflow and ensures the CLI is wired for command usage | 415 |
+| hooks/statusline.js | UI/statusline integration for surfacing runtime status | Feeds status output into terminal integrations so command workflows can expose progress and context | 84 |
+| hooks/gsd-check-update.js | Update check hook for detecting newer GSD versions | Invoked by CLI/session hooks to prompt update awareness without interrupting core flows | 51 |
+| get-shit-done/templates/config.json | Workflow config template used to bootstrap default settings | Seeded during setup to provide baseline configuration consumed by workflows and commands | 26 |
+
+---
+
 ## Summary Statistics
 
 | Category | File Count | Total Lines |
@@ -207,7 +218,8 @@ Complete inventory of all GSD system files with metadata for documentation and m
 | Workflows | 12 | 5,615 |
 | Templates | 30 | 5,802 |
 | References | 7 | 2,450 |
-| **Total** | **84** | **27,591** |
+| Operational Scripts & Hooks | 4 | 576 |
+| **Total** | **88** | **28,167** |
 
 ---
 
