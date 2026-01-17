@@ -15,6 +15,7 @@ For modification tasks, load documents in this order:
 
 **Minimal context load:** Index + Scaffolding (~3,000 tokens)
 **Typical modification load:** Above + 1-2 component docs (~4,500-5,500 tokens)
+**Operational component load:** Above + operational-components-reference (~4,000-4,800 tokens)
 
 ---
 
@@ -72,6 +73,7 @@ For modification tasks, load documents in this order:
 | Document | Coverage | Est. Tokens | When to Load |
 |----------|----------|-------------|--------------|
 | [support-components-reference.md](support-components-reference.md) | Workflows, templates, references | ~1,100 | Modifying workflows, understanding template schemas, using references |
+| [operational-components-reference.md](operational-components-reference.md) | Install flow, statusline, update check | ~450 | Modifying installer or hooks behavior |
 | [FILE_MANIFEST.md](FILE_MANIFEST.md) | Complete file inventory | ~500 | Finding file locations, understanding relationships |
 
 ---
@@ -270,6 +272,7 @@ executor ──► SUMMARY.md ──► verifier ──► VERIFICATION.md
 | Architecture review | Index + Scaffolding | ~2,700 |
 | Agent modification | Above + agent reference | ~3,500-4,500 |
 | Command modification | Above + command reference | ~3,300-3,500 |
+| Operational component change | Above + operational-components-reference | ~3,100-3,300 |
 | Full system change | Above + multiple references | ~5,000-6,000 |
 
 ### Document Sizes
@@ -291,8 +294,9 @@ executor ──► SUMMARY.md ──► verifier ──► VERIFICATION.md
 | core-commands-reference.md | 341 | ~600 |
 | secondary-commands-reference.md | 366 | ~650 |
 | support-components-reference.md | 627 | ~1,100 |
+| operational-components-reference.md | 132 | ~450 |
 | FILE_MANIFEST.md | 265 | ~500 |
-| **Total Documentation** | ~4,722 | ~9,700 |
+| **Total Documentation** | ~4,854 | ~10,150 |
 
 ### Recommended Loading Strategy
 
@@ -334,3 +338,4 @@ executor ──► SUMMARY.md ──► verifier ──► VERIFICATION.md
 | core-commands-reference.md | Complete | 2026-01-17 |
 | secondary-commands-reference.md | Complete | 2026-01-17 |
 | support-components-reference.md | Complete | 2026-01-17 |
+| operational-components-reference.md | Complete | 2026-01-17 |
