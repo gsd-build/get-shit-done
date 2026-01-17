@@ -1,0 +1,21 @@
+version: '3.8'
+
+services:
+  [SERVICE_NAME]:
+    image: [SERVICE_IMAGE]
+    container_name: gsd-[PLUGIN_NAME]-[SERVICE_NAME]
+    ports:
+      - "[HOST_PORT]:[CONTAINER_PORT]"
+    environment:
+      - [ENV_VAR]=[ENV_VALUE]
+    volumes:
+      - [PLUGIN_NAME]_data:/data
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "echo", "healthy"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
+volumes:
+  [PLUGIN_NAME]_data:
