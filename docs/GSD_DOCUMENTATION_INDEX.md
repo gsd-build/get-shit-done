@@ -312,7 +312,7 @@ executor ──► SUMMARY.md ──► verifier ──► VERIFICATION.md
 ## Version
 
 - **Documentation Version:** v1.0
-- **GSD Version:** 1.5.28
+- **GSD Version:** 1.6.3
 - **Generated:** 2026-01-17
 - **Source Files:** 84 GSD files (27,591 lines)
 
