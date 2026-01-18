@@ -77,30 +77,30 @@
 
 | REQ-ID | Phase | Status |
 |--------|-------|--------|
-| PROF-01 | TBD | Pending |
-| PROF-02 | TBD | Pending |
-| PROF-03 | TBD | Pending |
-| PROF-04 | TBD | Pending |
-| DQ-01 | TBD | Pending |
-| DQ-02 | TBD | Pending |
-| DQ-03 | TBD | Pending |
-| DQ-04 | TBD | Pending |
-| AI-01 | TBD | Pending |
-| AI-02 | TBD | Pending |
-| AI-03 | TBD | Pending |
-| AI-04 | TBD | Pending |
-| LIN-01 | TBD | Pending |
-| LIN-02 | TBD | Pending |
-| LIN-03 | TBD | Pending |
-| LIN-04 | TBD | Pending |
-| VIS-01 | TBD | Pending |
-| VIS-02 | TBD | Pending |
-| VIS-03 | TBD | Pending |
-| VIS-04 | TBD | Pending |
-| INT-01 | TBD | Pending |
-| INT-02 | TBD | Pending |
-| INT-03 | TBD | Pending |
-| INT-04 | TBD | Pending |
+| PROF-01 | Phase 1 | Pending |
+| PROF-02 | Phase 1 | Pending |
+| PROF-03 | Phase 1 | Pending |
+| PROF-04 | Phase 1 | Pending |
+| DQ-01 | Phase 2 | Pending |
+| DQ-02 | Phase 2 | Pending |
+| DQ-03 | Phase 2 | Pending |
+| DQ-04 | Phase 2 | Pending |
+| AI-01 | Phase 2 | Pending |
+| AI-02 | Phase 2 | Pending |
+| AI-03 | Phase 2 | Pending |
+| AI-04 | Phase 2 | Pending |
+| LIN-01 | Phase 3 | Pending |
+| LIN-02 | Phase 3 | Pending |
+| LIN-03 | Phase 3 | Pending |
+| LIN-04 | Phase 3 | Pending |
+| VIS-01 | Phase 4 | Pending |
+| VIS-02 | Phase 4 | Pending |
+| VIS-03 | Phase 4 | Pending |
+| VIS-04 | Phase 4 | Pending |
+| INT-01 | Phase 4 | Pending |
+| INT-02 | Phase 3 | Pending |
+| INT-03 | Phase 2 | Pending |
+| INT-04 | Phase 1 | Pending |
 
 ---
 
