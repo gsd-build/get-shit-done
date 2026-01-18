@@ -1,0 +1,26 @@
+# Data Profiler Agent Dependencies
+# Install: pip install -r requirements.txt
+
+# Data source connectors
+pyiceberg[glue,pyarrow,pandas]>=0.10.0
+boto3>=1.35.0
+
+# Data processing and profiling
+pandas>=2.0.0
+ydata-profiling>=4.18.0
+numpy>=2.0.0
+scipy>=1.0.0
+
+# Schema validation
+pydantic>=2.0.0
+
+# Strands Agents SDK
+strands-agents>=1.0.0
+
+# Supabase client (for entrypoint)
+supabase>=2.0.0
+
+# Note: AWS credentials must be configured via:
+# - Environment variables (AWS_ACCESS_KEY_ID, AWS_SECRET_ACCESS_KEY)
+# - IAM role (when running on AWS)
+# - AWS CLI credentials (~/.aws/credentials)

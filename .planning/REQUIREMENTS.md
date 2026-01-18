@@ -9,10 +9,10 @@
 
 ### Data Profiling
 
-- [ ] **PROF-01**: User can view automated statistics (nulls, distinct counts, distributions, cardinality) for any connected data source
-- [ ] **PROF-02**: System automatically infers data types and formats from scanned data
-- [ ] **PROF-03**: User can view distribution analysis (min, max, mean, median, std dev) for numeric columns
-- [ ] **PROF-04**: System flags statistical anomalies and unusual patterns in data
+- [x] **PROF-01**: User can view automated statistics (nulls, distinct counts, distributions, cardinality) for any connected data source
+- [x] **PROF-02**: System automatically infers data types and formats from scanned data
+- [x] **PROF-03**: User can view distribution analysis (min, max, mean, median, std dev) for numeric columns
+- [x] **PROF-04**: System flags statistical anomalies and unusual patterns in data
 
 ### Data Quality
 
@@ -47,7 +47,7 @@
 - [ ] **INT-01**: Developers can access metadata and quality results via REST API
 - [ ] **INT-02**: System emits and consumes OpenLineage events for interoperability
 - [ ] **INT-03**: Quality validations integrate with AWS Step Functions pipelines
-- [ ] **INT-04**: System connects to Athena and Redshift for data scanning
+- [x] **INT-04**: System connects to Athena and Redshift for data scanning
 
 ---
 
@@ -77,10 +77,10 @@
 
 | REQ-ID | Phase | Status |
 |--------|-------|--------|
-| PROF-01 | Phase 1 | Pending |
-| PROF-02 | Phase 1 | Pending |
-| PROF-03 | Phase 1 | Pending |
-| PROF-04 | Phase 1 | Pending |
+| PROF-01 | Phase 1 | Complete |
+| PROF-02 | Phase 1 | Complete |
+| PROF-03 | Phase 1 | Complete |
+| PROF-04 | Phase 1 | Complete |
 | DQ-01 | Phase 2 | Pending |
 | DQ-02 | Phase 2 | Pending |
 | DQ-03 | Phase 2 | Pending |
@@ -100,7 +100,7 @@
 | INT-01 | Phase 4 | Pending |
 | INT-02 | Phase 3 | Pending |
 | INT-03 | Phase 2 | Pending |
-| INT-04 | Phase 1 | Pending |
+| INT-04 | Phase 1 | Complete |
 
 ---
 

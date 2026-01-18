@@ -1,0 +1,24 @@
+{
+  "name": "data-profiler-backend",
+  "version": "1.0.0",
+  "description": "Backend API for Data Profiler",
+  "main": "index.ts",
+  "scripts": {
+    "build": "tsc",
+    "typecheck": "tsc --noEmit",
+    "dev": "ts-node api/index.ts",
+    "test": "echo \"No tests yet\""
+  },
+  "dependencies": {
+    "@supabase/supabase-js": "^2.45.0",
+    "@aws-sdk/client-sfn": "^3.600.0",
+    "zod": "^3.23.0"
+  },
+  "devDependencies": {
+    "@types/node": "^20.14.0",
+    "typescript": "^5.5.0"
+  },
+  "engines": {
+    "node": ">=18"
+  }
+}
