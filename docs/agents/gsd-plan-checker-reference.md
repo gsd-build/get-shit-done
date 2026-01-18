@@ -5,12 +5,12 @@
 |-----------|-------|
 | **Type** | Agent |
 | **Location** | `agents/gsd-plan-checker.md` |
-| **Size** | 746 lines |
+| **Size** | 745 lines |
 | **Documentation Tier** | Deep Reference |
-| **Complexity Score** | 2+3+3+2 = **10** |
+| **Complexity Score** | 3+3+3+2 = **11** |
 
 ### Complexity Breakdown
-- **Centrality: 2** — Only called by plan-phase orchestrator; output consumed by planner for revision
+- **Centrality: 3** — Called by plan-phase and verify-work orchestrators; output consumed by planner for revision
 - **Complexity: 3** — 6 verification dimensions, structured issue format, dependency graph analysis
 - **Failure Impact: 3** — Bad plans approved = cascading execution failures, wasted context
 - **Novelty: 2** — Pre-execution verification pattern; goal-backward applied to plans
@@ -18,7 +18,7 @@
 ---
 
 ## Purpose
-The GSD Plan Checker verifies that plans WILL achieve the phase goal BEFORE execution. It applies goal-backward analysis to plans themselves, catching issues that would cause execution failures: missing requirement coverage, incomplete tasks, circular dependencies, broken wiring, scope overruns, and poorly-derived must_haves.
+The GSD Plan Checker verifies that plans WILL achieve the phase goal BEFORE execution. It applies goal-backward analysis to plans themselves, catching issues that would cause execution failures: missing requirement coverage, incomplete tasks, circular dependencies, broken wiring, scope overruns, and poorly-derived must_haves. It runs both on initial phase plans (via `/gsd:plan-phase`) and on gap-fix plans created during `/gsd:verify-work`.
 
 **Critical distinction:**
 - `gsd-verifier`: Verifies code DID achieve goal (after execution)
@@ -223,7 +223,7 @@ issue:
 Step 1: Load Context
 ├── Normalize phase and find directory
 ├── List all PLAN.md files
-├── Get phase goal from ROADMAP.md
+├── Get phase goal from verification context (ROADMAP.md in plan-phase; UAT gap goal in verify-work)
 └── Get phase brief if exists
 
 Step 2: Load All Plans
@@ -298,6 +298,7 @@ Step 10: Determine Overall Status
 | File | What It Uses | Why |
 |------|--------------|-----|
 | `.planning/ROADMAP.md` | Phase goal | Target for coverage |
+| `.planning/REQUIREMENTS.md` (optional) | Requirements list | Additional coverage targets when provided |
 | `.planning/phases/XX-*/*-PLAN.md` | All plan content | Verification subject |
 | `.planning/phases/XX-*/*-BRIEF.md` | Phase context | Additional requirements |
 
@@ -310,6 +311,7 @@ Step 10: Determine Overall Status
 | Command/Agent | Mode | Context Provided |
 |---------------|------|------------------|
 | `/gsd:plan-phase` | After planner creates plans | Phase number, plan paths |
+| `/gsd:verify-work` | Gap closure (fix plans) | Phase number, plan paths, UAT gap goal |
 | Re-verification | After planner revises | Same, expecting fixes |
 
 ### Output Consumed By
@@ -317,6 +319,7 @@ Step 10: Determine Overall Status
 |----------|--------------|-----|
 | `gsd-planner` (revision mode) | Structured issues | Makes targeted fixes |
 | `plan-phase` orchestrator | Status | Decides: execute or revise |
+| `verify-work` workflow | Status | Decides: execute fixes or loop revisions |
 
 ---
 
@@ -421,11 +424,12 @@ issue:
 
 **Upstream Impact (who calls this):**
 - `plan-phase` orchestrator — May need to handle new status types
+- `verify-work` workflow — May need to handle new status types
 - Re-verification flow — May need different context
 
 **Downstream Impact (who consumes output):**
 - `gsd-planner` (revision mode) — Expects specific issue structure with dimension, severity, fix_hint
-- Orchestrator — Uses status to decide execute vs revise
+- Orchestrators — Use status to decide execute vs revise (plan-phase and verify-work)
 
 **Breaking Changes to Watch:**
 - Changing issue YAML structure → breaks planner revision parsing
@@ -470,6 +474,6 @@ THRESHOLDS:
 • Tasks/plan: 2-3 (target), 4 (warning), 5+ (blocker)
 • Files/plan: 5-8 (target), 10 (warning), 15+ (blocker)
 
-SPAWNED BY: /gsd:plan-phase (after planner creates plans)
-CONSUMED BY: gsd-planner (revision mode), orchestrator
+SPAWNED BY: /gsd:plan-phase (after planner creates plans), /gsd:verify-work (gap-fix plans)
+CONSUMED BY: gsd-planner (revision mode), plan-phase and verify-work workflows
 ```
