@@ -322,6 +322,51 @@ Set during `/gsd:new-project`:
 
 Change anytime by editing `.planning/config.json`
 
+## Automated Verification
+
+`/gsd:verify-work` supports optional automated testing with Playwright MCP.
+
+**Configuration** (in `.planning/config.json`):
+
+```json
+{
+  "agent_acceptance_testing": {
+    "auto_enabled": false,
+    "fallback_to_human": true,
+    "app_url": "http://localhost:3000"
+  }
+}
+```
+
+| Setting | Description | Default |
+|---------|-------------|---------|
+| `auto_enabled` | Enable automated verification | `false` |
+| `fallback_to_human` | Fall back to human if Playwright unavailable | `true` |
+| `app_url` | URL to test against | `http://localhost:3000` |
+
+**How it works:**
+
+1. Tests are categorized by keywords in expected behavior
+2. Automatable tests (element visibility, clicks, forms, navigation) run first
+3. Human-required tests (design, UX, clarity) always need manual verification
+4. Automated issues can be overridden if they're false positives
+
+**Test categories:**
+
+| Category | Keywords | Automatable |
+|----------|----------|-------------|
+| element_visibility | visible, appears, shows | Yes |
+| click_result | click + opens/closes | Yes |
+| form_submission | submit, form, sends | Yes |
+| text_content | contains, says, message | Yes |
+| navigation | navigate, redirect, URL | Yes |
+| visual_design | looks, style, design | No - Human |
+| subjective_ux | feels, intuitive, UX | No - Human |
+
+**Requirements:**
+- Playwright MCP server must be configured
+- App must be running at `app_url`
+
 ## Common Workflows
 
 **Starting a new project:**

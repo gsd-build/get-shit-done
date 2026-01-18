@@ -38,27 +38,34 @@ Phase: $ARGUMENTS (optional)
 1. Check for active UAT sessions (resume or start new)
 2. Find SUMMARY.md files for the phase
 3. Extract testable deliverables (user-observable outcomes)
-4. Create {phase}-UAT.md with test list
-5. Present tests one at a time:
-   - Show expected behavior
-   - Wait for plain text response
+4. Categorize tests for automation (based on keywords in expected behavior)
+5. **If automated verification enabled** (config.agent_acceptance_testing.auto_enabled):
+   - Detect Playwright MCP availability
+   - Run automated tests for eligible tests (element_visibility, click_result, etc.)
+   - Record pass:auto or issue:auto with evidence
+   - Falls back to human verification if Playwright unavailable
+6. Create {phase}-UAT.md with test list and automation results
+7. Present remaining tests one at a time:
+   - Skip pass:auto tests (already verified)
+   - For issue:auto: show evidence, allow "override" if false positive
+   - For pending: show expected behavior, wait for response
    - "yes/y/next" = pass, anything else = issue (severity inferred)
-6. Update UAT.md after each response
-7. On completion: commit, present summary
-8. If issues found:
-   - Spawn parallel debug agents to diagnose root causes
-   - Spawn gsd-planner in --gaps mode to create fix plans
-   - Spawn gsd-plan-checker to verify fix plans
-   - Iterate planner ↔ checker until plans pass (max 3)
-   - Present ready status with `/clear` then `/gsd:execute-phase`
+8. Update UAT.md after each response
+9. On completion: commit, present summary (with automation stats)
+10. If issues found:
+    - Spawn parallel debug agents to diagnose root causes
+    - Spawn gsd-planner in --gaps mode to create fix plans
+    - Spawn gsd-plan-checker to verify fix plans
+    - Iterate planner ↔ checker until plans pass (max 3)
+    - Present ready status with `/clear` then `/gsd:execute-phase`
 </process>
 
 <anti_patterns>
 - Don't use AskUserQuestion for test responses — plain text conversation
 - Don't ask severity — infer from description
 - Don't present full checklist upfront — one test at a time
-- Don't run automated tests — this is manual user validation
 - Don't fix issues during testing — log as gaps, diagnose after all tests complete
+- Don't automate subjective tests — visual design, UX feel, clarity require human judgment
 </anti_patterns>
 
 <offer_next>
@@ -207,9 +214,14 @@ Review the issues above and either:
 
 <success_criteria>
 - [ ] UAT.md created with tests from SUMMARY.md
-- [ ] Tests presented one at a time with expected behavior
+- [ ] Tests categorized for automation (automatable, automation_category)
+- [ ] If auto_enabled: Playwright detected and automated tests run
+- [ ] Automated results recorded with evidence (pass:auto, issue:auto)
+- [ ] Human tests presented one at a time with expected behavior
 - [ ] Plain text responses (no structured forms)
 - [ ] Severity inferred, never asked
+- [ ] Override supported for false positive issue:auto
+- [ ] Summary includes passed_auto, passed_human, automation_status
 - [ ] Batched writes: on issue, every 5 passes, or completion
 - [ ] Committed on completion
 - [ ] If issues: parallel debug agents diagnose root causes

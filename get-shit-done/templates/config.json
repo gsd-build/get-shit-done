@@ -22,5 +22,10 @@
   "safety": {
     "always_confirm_destructive": true,
     "always_confirm_external_services": true
+  },
+  "agent_acceptance_testing": {
+    "auto_enabled": false,
+    "fallback_to_human": true,
+    "app_url": "http://localhost:3000"
   }
 }
