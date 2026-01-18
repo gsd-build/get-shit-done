@@ -3,6 +3,9 @@ import 'source-map-support/register';
 import * as cdk from 'aws-cdk-lib';
 import { DataStack } from '../lib/data-stack';
 import { ProfilerStack } from '../lib/profiler-stack';
+import { DQRecommenderStack } from '../lib/dq-recommender-stack';
+import { ValidatorStack } from '../lib/validator-stack';
+import { AlertingStack } from '../lib/alerting-stack';
 
 const app = new cdk.App();
 
@@ -37,3 +40,42 @@ const profilerStack = new ProfilerStack(app, 'DataFoundationsProfilerStack', {
 
 // Explicit dependency: ProfilerStack depends on DataStack
 profilerStack.addDependency(dataStack);
+
+// DQRecommenderStack: DQ Recommender service (Lambda, API Gateway)
+const dqRecommenderStack = new DQRecommenderStack(app, 'DataFoundationsDQRecommenderStack', {
+  env,
+  description: 'Data Foundations - DQ Recommender service (Lambda, API Gateway)',
+  tags: {
+    Project: 'DataFoundations',
+    Component: 'DQRecommenderStack',
+  },
+});
+
+// ValidatorStack: Validation workflow (Step Functions, Lambda)
+// Depends on DQRecommenderStack for approval Lambda
+const validatorStack = new ValidatorStack(app, 'DataFoundationsValidatorStack', {
+  env,
+  approvalHandlerArn: dqRecommenderStack.approvalHandler.functionArn,
+  description: 'Data Foundations - Validation workflow (Step Functions, Lambda)',
+  tags: {
+    Project: 'DataFoundations',
+    Component: 'ValidatorStack',
+  },
+});
+
+// Explicit dependency: ValidatorStack depends on DQRecommenderStack
+validatorStack.addDependency(dqRecommenderStack);
+
+// AlertingStack: Alerting infrastructure (EventBridge, Lambda)
+// Depends on ValidatorStack for EventBridge event sources
+const alertingStack = new AlertingStack(app, 'DataFoundationsAlertingStack', {
+  env,
+  description: 'Data Foundations - Alerting infrastructure (EventBridge, Lambda)',
+  tags: {
+    Project: 'DataFoundations',
+    Component: 'AlertingStack',
+  },
+});
+
+// Explicit dependency: AlertingStack depends on ValidatorStack
+alertingStack.addDependency(validatorStack);

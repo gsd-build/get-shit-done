@@ -11,7 +11,7 @@ This roadmap delivers the Data Lineage & Quality module through four phases, sta
 - Decimal phases (e.g., 2.1): Urgent insertions (marked with INSERTED)
 
 - [x] **Phase 1: Foundation & Data Profiling** - Infrastructure, connectors, and Data Profiler agent
-- [ ] **Phase 2: Data Quality & AI Recommendations** - DQ checks, AI rule generation, validation workflow
+- [x] **Phase 2: Data Quality & AI Recommendations** - DQ checks, AI rule generation, validation workflow
 - [ ] **Phase 3: Column-Level Lineage** - Data flow tracking with transformation visibility
 - [ ] **Phase 4: Visibility & Integration** - Dashboard, alerts, API, historical trends
 
@@ -44,12 +44,13 @@ Plans:
   3. User can run quality checks (null, unique, range, referential integrity) against data sources
   4. User receives alerts when data freshness exceeds configured SLA or volume anomalies are detected
   5. Quality validations can execute within AWS Step Functions pipelines
-**Plans**: 3 plans
+**Plans**: 4 plans
 
 Plans:
-- [ ] 02-01-PLAN.md — DQ Recommender Agent & Rule Engine (Strands agent, Bedrock, rule templates, approval workflow)
-- [ ] 02-02-PLAN.md — Data Validator & Pipeline Integration (Glue DQ, Step Functions, freshness monitoring, alerting)
-- [ ] 02-03-PLAN.md — Quality Rules Frontend (rule creation UI, validation results, alert dashboard)
+- [x] 02-01-PLAN.md — DQ Recommender Agent & Rule Engine (Strands agent, Bedrock, rule templates, approval workflow)
+- [x] 02-02-PLAN.md — Data Validator & Pipeline Integration (Glue DQ, Step Functions, freshness monitoring, alerting)
+- [x] 02-03a-PLAN.md — Quality Rules Frontend (rule creation UI, AI generator, approval panel)
+- [x] 02-03b-PLAN.md — Validations & Alerts Frontend (validation results, alert dashboard)
 
 ### Phase 3: Column-Level Lineage
 **Goal**: Users can trace data flow and transformations across connected sources
@@ -92,6 +93,6 @@ Phases execute in numeric order: 1 -> 2 -> 3 -> 4 (decimal phases insert between
 | Phase | Plans Complete | Status | Completed |
 |-------|----------------|--------|-----------|
 | 1. Foundation & Data Profiling | 3/3 | Complete | 2025-01-18 |
-| 2. Data Quality & AI Recommendations | 0/4 | Planned | - |
+| 2. Data Quality & AI Recommendations | 4/4 | Complete | 2025-01-18 |
 | 3. Column-Level Lineage | 0/3 | Not started | - |
 | 4. Visibility & Integration | 0/2 | Not started | - |

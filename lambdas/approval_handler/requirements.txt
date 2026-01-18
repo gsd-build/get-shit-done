@@ -1,0 +1,10 @@
+# Approval Handler Lambda dependencies
+
+# AWS SDK
+boto3>=1.35.0
+
+# Lambda Powertools for logging, tracing, and API handling
+aws-lambda-powertools>=3.0.0
+
+# Supabase client for database updates
+supabase>=2.0.0
