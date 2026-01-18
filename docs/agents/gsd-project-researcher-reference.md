@@ -5,16 +5,16 @@
 |-----------|-------|
 | **Type** | Agent |
 | **Location** | `agents/gsd-project-researcher.md` |
-| **Size** | 866 lines |
+| **Size** | 321 lines |
 | **Documentation Tier** | Enhanced Standard |
 | **Complexity Score** | 2+2+2+2 = **8/12** |
-| **Verified Against** | Source code 2026-01-18 |
+| **Verified Against** | Source files (2026-01-18): `agents/gsd-project-researcher.md`, `commands/gsd/new-project.md`, `get-shit-done/templates/research-project/*.md` |
 
 ---
 
 ## Purpose
 
-Researches the domain ecosystem before roadmap creation, producing comprehensive findings that inform phase structure. Answers "What does this domain ecosystem look like?" by surveying technology landscape, feature categories, architecture patterns, and domain-specific pitfalls.
+Researches the domain ecosystem before roadmap creation, producing research artifacts that inform phase structure. Answers "What does this domain ecosystem look like?" by surveying technology landscape, feature categories, architecture patterns, and domain-specific pitfalls.
 
 **Key distinction:** Project-level research (entire domain) vs Phase-researcher (specific implementation).
 
@@ -25,16 +25,17 @@ Researches the domain ecosystem before roadmap creation, producing comprehensive
 | Constraint | Rule | Source Section |
 |------------|------|----------------|
 | Treat training as hypothesis | Training data is 6-18 months stale; verify with Context7/official docs | `<philosophy>` |
-| Follow source hierarchy | Context7 > Official Docs > WebSearch verified > WebSearch unverified | `<source_hierarchy>` |
-| Include confidence levels | HIGH/MEDIUM/LOW on all findings with justification | `<verification_protocol>` |
-| DO NOT commit | Spawned in parallel; orchestrator commits all files together | `<execution_flow>` Step 6 |
-| Be opinionated | Clear recommendations, not just lists of options | `<success_criteria>` |
+| Follow source hierarchy | Context7 → Official Docs → Official GitHub → WebSearch (verified) → WebSearch (unverified) | `<source_hierarchy>` |
+| Include confidence levels | HIGH/MEDIUM/LOW on all findings with justification | `<verification_protocol>` & templates |
+| Be opinionated | Clear recommendations, not just lists of options | `<downstream_consumer>` / `<success_criteria>` |
+| Do not commit | Orchestrator/synthesizer commits; researcher only writes assigned file | `<execution_flow>` Step 6; `/gsd:new-project` Phase 6 |
+| Use assigned template | Write to the file specified by the orchestrator prompt | `/gsd:new-project` Phase 6 + templates |
 
 ---
 
 ## Training as Hypothesis Philosophy (CRITICAL)
 
-**Source:** `<philosophy>` lines ~40-80
+**Source:** `<philosophy>`
 
 Claude's training data is 6-18 months stale. Treat pre-existing knowledge as hypothesis, not fact.
 
@@ -59,6 +60,8 @@ Claude's training data is 6-18 months stale. Treat pre-existing knowledge as hyp
 | **Feasibility** | "Can we do X?" or "Is Y possible?" | YES/NO/MAYBE with conditions, blockers, risk factors |
 | **Comparison** | "Compare A vs B" | Comparison matrix, clear recommendation with rationale, tradeoffs |
 
+**Actual orchestration note:** `/gsd:new-project` does **not** set these modes. Instead, it spawns four parallel instances that each research a single dimension (stack, features, architecture, pitfalls) and write one file using the corresponding template. SUMMARY.md is produced by `gsd-research-synthesizer`, not by this agent.
+
 ---
 
 ## Tool Strategy (CRITICAL)
@@ -78,13 +81,18 @@ Execute in this order for each research domain:
    └── Direct URLs to official documentation
    └── Confidence: HIGH
 
-3. WebSearch
+3. Official GitHub
+   └── README, releases, changelogs
+   └── Issues for known problems
+   └── Confidence: HIGH/MEDIUM depending on content
+
+4. WebSearch
    └── For ecosystem discovery
    └── ALWAYS include current year in query
    └── Cross-reference multiple sources
    └── Confidence: MEDIUM (verified) or LOW (unverified)
 
-4. Verification Pass
+5. Verification Pass
    └── Cross-reference all findings
    └── Check for contradictions
    └── Assign final confidence levels
@@ -99,179 +107,85 @@ Execute in this order for each research domain:
 | Level | Sources | How to Use |
 |-------|---------|------------|
 | **HIGH** | Context7, official documentation, official releases | State as fact |
-| **MEDIUM** | WebSearch verified with official source, multiple credible sources agree | State with attribution |
+| **MEDIUM** | Official GitHub (README/release notes), WebSearch verified with official source, multiple credible sources agree | State with attribution |
 | **LOW** | WebSearch only, single source, unverified | Flag as needing validation |
 
 ---
 
-## Output Files (5 Standard + 2 Conditional)
+## Research Outputs & Data Requirements
 
-**Source:** `<output_files>`
+**Source:** `/gsd:new-project` Phase 6 + `get-shit-done/templates/research-project/*.md`
 
-### Standard (Always Created)
+### Required Output Files (Project Research)
 
-| File | Purpose | Key Sections |
-|------|---------|--------------|
-| **SUMMARY.md** | Executive summary with roadmap implications | Key Findings, Roadmap Implications, Confidence Assessment |
-| **STACK.md** | Technology recommendations | Recommended Stack (by category), Alternatives Considered, Installation |
-| **FEATURES.md** | Feature landscape | Table Stakes, Differentiators, Anti-Features, MVP Recommendation |
-| **ARCHITECTURE.md** | System structure patterns | Component Boundaries, Data Flow, Critical Connections |
-| **PITFALLS.md** | Common mistakes | Problem, Symptom, Prevention, If You Hit It |
+| File | Produced By | Purpose | Required Sections / Data |
+|------|-------------|---------|---------------------------|
+| **STACK.md** | `gsd-project-researcher` (stack task) | Recommend standard stack for the domain | Domain, date, confidence; core technologies (versioned); supporting libraries; dev tools; installation; alternatives; what NOT to use; stack patterns by variant; version compatibility; sources |
+| **FEATURES.md** | `gsd-project-researcher` (features task) | Map feature landscape | Domain, date, confidence; table stakes; differentiators; anti-features; feature dependencies + notes; MVP definition (Launch/Add After/Future); prioritization matrix; competitor analysis; sources |
+| **ARCHITECTURE.md** | `gsd-project-researcher` (architecture task) | Describe standard architecture patterns | Domain, date, confidence; system overview diagram; component responsibilities; recommended project structure + rationale; architectural patterns; data flow; scaling considerations; anti-patterns; integration points; sources |
+| **PITFALLS.md** | `gsd-project-researcher` (pitfalls task) | Document domain-specific pitfalls | Domain, date, confidence; critical pitfalls with warning signs + phase to address; technical debt patterns; integration gotchas; performance traps; security mistakes; UX pitfalls; "looks done but isn't" checklist; recovery strategies; pitfall-to-phase mapping; sources |
+| **SUMMARY.md** | `gsd-research-synthesizer` (after 4 tasks) | Executive synthesis with roadmap implications | Project, domain, date, confidence; exec summary; key findings by stack/features/architecture/pitfalls; roadmap implications with phases + ordering rationale; research flags; confidence assessment; gaps; sources (tiered) |
 
-### Conditional
+### Templates (Authoritative Formats)
 
-| File | When Created | Purpose |
-|------|--------------|---------|
-| **COMPARISON.md** | Comparison mode | Side-by-side matrix, clear winner with rationale |
-| **FEASIBILITY.md** | Feasibility mode | YES/NO/MAYBE, blockers, risk factors |
-
----
-
-## Output File Templates
-
-**Source:** `<output_files>` detailed templates
-
-### STACK.md Template
-```markdown
-# Technology Stack
-
-**Project:** [name]
-**Researched:** [date]
-
-## Recommended Stack
-
-### Core Framework
-| Technology | Version | Purpose | Why |
-|------------|---------|---------|-----|
-| [tech] | [ver] | [what] | [rationale] |
-
-### Database
-| Technology | Version | Purpose | Why |
-|------------|---------|---------|-----|
-
-### Infrastructure
-| Technology | Version | Purpose | Why |
-|------------|---------|---------|-----|
-
-### Supporting Libraries
-| Library | Version | Purpose | When to Use |
-|---------|---------|---------|-------------|
-
-## Alternatives Considered
-
-| Category | Recommended | Alternative | Why Not |
-|----------|-------------|-------------|---------|
-
-## Installation
-
-\`\`\`bash
-# Core
-npm install [packages]
-
-# Dev dependencies
-npm install -D [packages]
-\`\`\`
-
-## Sources
-- [Context7/official sources]
-```
-
-### FEATURES.md Template
-```markdown
-# Feature Landscape
-
-**Domain:** [type of product]
-**Researched:** [date]
-
-## Table Stakes
-
-Features users expect. Missing = product feels incomplete.
-
-| Feature | Why Expected | Complexity | Notes |
-|---------|--------------|------------|-------|
-
-## Differentiators
-
-Features that set product apart. Not expected, but valued.
-
-| Feature | Value Proposition | Complexity | Notes |
-|---------|-------------------|------------|-------|
-
-## Anti-Features
-
-Features to explicitly NOT build. Common mistakes in this domain.
-
-| Anti-Feature | Why Avoid | What to Do Instead |
-|--------------|-----------|-------------------|
-
-## MVP Recommendation
-
-For MVP, prioritize:
-1. [Table stakes feature]
-2. [One differentiator]
-
-Defer to post-MVP:
-- [Feature]: [reason]
-
-## Sources
-- [Competitor analysis, market research]
-```
+All project research files use templates at:
+- `get-shit-done/templates/research-project/STACK.md`
+- `get-shit-done/templates/research-project/FEATURES.md`
+- `get-shit-done/templates/research-project/ARCHITECTURE.md`
+- `get-shit-done/templates/research-project/PITFALLS.md`
+- `get-shit-done/templates/research-project/SUMMARY.md`
 
 ---
 
 ## Quality Check Protocol
 
-**Source:** `<execution_flow>` Step 4
+**Source:** `<verification_protocol>`
 
 Before declaring research complete, verify:
 
-- [ ] All domains investigated (not just some)
-- [ ] Negative claims verified with official docs
+- [ ] All domains investigated for the assigned dimension
+- [ ] Negative claims verified with official docs or releases
 - [ ] Multiple sources for critical claims
+- [ ] URLs provided for authoritative sources
+- [ ] Publication dates checked for currency
 - [ ] Confidence levels assigned honestly
 - [ ] "What might I have missed?" review completed
 - [ ] Current year included in WebSearch queries
-- [ ] Publication dates checked for currency
 
 ---
 
 ## Execution Flow
 
-**Source:** `<execution_flow>`
+**Source:** `<execution_flow>` + `/gsd:new-project` Phase 6
 
 ```
 Step 1: Receive Project Context
-├── Parse PROJECT.md content
+├── Parse PROJECT.md summary (via orchestrator)
 ├── Understand core value, constraints
 └── Identify domain to research
 
-Step 2: Identify Research Domains
-├── Technology Landscape (frameworks, platforms)
-├── Feature Landscape (table stakes, differentiators)
-├── Architecture Patterns (component boundaries)
-└── Domain Pitfalls (common mistakes)
+Step 2: Identify Research Dimension
+├── Stack (standard stack for domain)
+├── Features (table stakes/differentiators/anti-features)
+├── Architecture (component boundaries, data flow)
+└── Pitfalls (common mistakes)
 
 Step 3: Execute Research Protocol
-├── For each domain, follow tool strategy in order
+├── Follow tool strategy in order
 ├── Document findings with confidence levels
 └── Cross-reference all findings
 
 Step 4: Quality Check
 ├── Run verification protocol checklist
-└── Flag any gaps or uncertainties
+└── Flag gaps or uncertainties
 
-Step 5: Write Output Files
-├── SUMMARY.md (always)
-├── STACK.md (always)
-├── FEATURES.md (always)
-├── ARCHITECTURE.md (if patterns discovered)
-├── PITFALLS.md (always)
-├── COMPARISON.md (if comparison mode)
-└── FEASIBILITY.md (if feasibility mode)
+Step 5: Write Output File
+├── Write to the file specified by the prompt
+└── Use template from get-shit-done/templates/research-project/
 
 Step 6: Return Structured Result
 ├── DO NOT commit
-└── Return to orchestrator with summary
+└── Orchestrator/synthesizer handles commits
 ```
 
 ---
@@ -280,10 +194,10 @@ Step 6: Return Structured Result
 
 | Category | Details |
 |----------|---------|
-| **Reads** | PROJECT.md (if exists), Context7 docs, Official docs (WebFetch), WebSearch results |
-| **Writes** | `.planning/research/SUMMARY.md`, `STACK.md`, `FEATURES.md`, `ARCHITECTURE.md`, `PITFALLS.md` |
-| **Spawned By** | `/gsd:new-project`, `/gsd:new-milestone` |
-| **Consumed By** | `gsd-roadmapper` (phase structure), `gsd-research-synthesizer` (synthesis) |
+| **Reads** | Project context (PROJECT.md summary), Context7 docs, official docs, WebSearch results |
+| **Writes** | One of `.planning/research/{STACK,FEATURES,ARCHITECTURE,PITFALLS}.md` per task |
+| **Spawned By** | `/gsd:new-project`, `/gsd:new-milestone` (per agent definition) |
+| **Consumed By** | `gsd-research-synthesizer` (SUMMARY.md), `gsd-roadmapper` (reads SUMMARY.md during roadmap creation) |
 
 ---
 
@@ -303,9 +217,10 @@ Step 6: Return Structured Result
 ### Files Created
 | File | Purpose |
 |------|---------|
-| .planning/research/SUMMARY.md | Executive summary |
 | .planning/research/STACK.md | Technology recommendations |
-| ... | ... |
+| .planning/research/FEATURES.md | Feature landscape |
+| .planning/research/ARCHITECTURE.md | Architecture patterns |
+| .planning/research/PITFALLS.md | Domain pitfalls |
 
 ### Confidence Assessment
 | Area | Level | Reason |
@@ -345,9 +260,9 @@ Step 6: Return Structured Result
 | State training knowledge as fact | May be outdated/wrong | Verify with Context7/official docs first |
 | Skip Context7 | Miss authoritative current info | Context7 FIRST for known technologies |
 | Present LOW confidence as authoritative | Misleads downstream consumers | Flag uncertainty, recommend validation |
-| Commit files | Other researchers running in parallel | DO NOT commit; orchestrator handles |
-| Mix research modes | Confusing output | One mode per research session |
-| Skip version numbers | Incompatible recommendations | Specific versions with rationale |
+| Write SUMMARY.md in project research task | SUMMARY is synthesized later | Only write the assigned dimension file |
+| Commit files | Orchestrator/synthesizer handles commits | DO NOT commit |
+| Skip version numbers | Incompatible recommendations | Provide versions with rationale |
 | Generic recommendations | Not actionable | Opinionated: "Use X because Y" |
 
 ---
@@ -357,16 +272,16 @@ Step 6: Return Structured Result
 ### If gsd-project-researcher Changes:
 
 **Upstream Impact:**
-- `new-project` command — May need to update parallel spawn logic
-- `new-milestone` command — Same spawning pattern
+- `/gsd:new-project` — spawns 4 parallel researchers for STACK/FEATURES/ARCHITECTURE/PITFALLS
+- `/gsd:new-milestone` — same spawning pattern per agent definition
 
 **Downstream Impact:**
-- `gsd-research-synthesizer` — Expects 4 specific files (STACK, FEATURES, ARCH, PITFALLS)
-- `gsd-roadmapper` — Reads SUMMARY.md for phase suggestions
+- `gsd-research-synthesizer` — expects STACK/FEATURES/ARCHITECTURE/PITFALLS to build SUMMARY.md
+- `gsd-roadmapper` — reads SUMMARY.md during roadmap creation
 
 **Breaking Changes to Watch:**
 - Output file names/paths
-- SUMMARY.md section structure
+- Template section structure
 - Confidence level values
 - File commit behavior (must NOT commit)
 
@@ -374,18 +289,18 @@ Step 6: Return Structured Result
 
 ## Section Index
 
-| Section | Lines (approx) | Purpose |
-|---------|----------------|---------|
-| `<role>` | 1-30 | Identity, spawners, responsibilities |
-| `<philosophy>` | 31-80 | Training as hypothesis, honest reporting |
-| `<research_modes>` | 81-150 | Ecosystem, Feasibility, Comparison |
-| `<source_hierarchy>` | 151-200 | HIGH/MEDIUM/LOW confidence sources |
-| `<tool_strategy>` | 201-280 | Context7 → Official → WebSearch order |
-| `<verification_protocol>` | 281-350 | Quality check checklist |
-| `<output_files>` | 351-600 | All output file templates |
-| `<execution_flow>` | 601-750 | Step-by-step process |
-| `<structured_returns>` | 751-830 | Return message formats |
-| `<success_criteria>` | 831-866 | Completion checklist |
+| Section | Purpose |
+|---------|---------|
+| `<role>` | Identity, spawners, responsibilities |
+| `<philosophy>` | Training as hypothesis, honest reporting |
+| `<research_modes>` | Ecosystem, Feasibility, Comparison |
+| `<source_hierarchy>` | HIGH/MEDIUM/LOW confidence sources |
+| `<tool_strategy>` | Context7 → Official → GitHub → WebSearch order |
+| `<verification_protocol>` | Quality check checklist |
+| `<output_formats>` | Output templates referenced in agent file |
+| `<execution_flow>` | Step-by-step process |
+| `<structured_returns>` | Return message formats |
+| `<success_criteria>` | Completion checklist |
 
 ---
 
@@ -393,16 +308,14 @@ Step 6: Return Structured Result
 
 ```
 WHAT:     Domain ecosystem research before roadmap creation
-MODES:    Ecosystem (default), Feasibility, Comparison
-OUTPUT:   .planning/research/ (SUMMARY, STACK, FEATURES, ARCHITECTURE, PITFALLS)
+MODES:    Ecosystem (default), Feasibility, Comparison (only if orchestrator sets)
+OUTPUT:   .planning/research/ (STACK, FEATURES, ARCHITECTURE, PITFALLS)
+SUMMARY:  Written by gsd-research-synthesizer from the four files
 
 CORE RULES:
 • Treat training data as hypothesis — verify with Context7/official docs
-• Follow source hierarchy: Context7 > Official > WebSearch verified > unverified
+• Follow source hierarchy: Context7 > Official Docs > Official GitHub > WebSearch verified > unverified
 • Include confidence levels on all findings (HIGH/MEDIUM/LOW)
 • DO NOT commit — orchestrator handles commits after all researchers complete
 • Be opinionated — clear recommendations, not just lists
-
-SPAWNED BY: /gsd:new-project, /gsd:new-milestone
-CONSUMED BY: gsd-roadmapper (phase structure), gsd-research-synthesizer
 ```
