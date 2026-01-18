@@ -5,12 +5,12 @@
 |-----------|-------|
 | **Type** | Agent |
 | **Location** | `agents/gsd-verifier.md` |
-| **Size** | 779 lines |
+| **Size** | 778 lines |
 | **Documentation Tier** | Deep Reference |
 | **Complexity Score** | 3+3+3+3 = **12** |
 
 ### Complexity Breakdown
-- **Centrality: 3** — Called after every phase execution; output triggers gap closure or phase completion
+- **Centrality: 3** — Spawned after phase execution; output triggers gap closure or phase completion
 - **Complexity: 3** — 4-level verification hierarchy (existence→substantive→wired→functional), truth vs artifact distinction, re-verification mode
 - **Failure Impact: 3** — Missed gaps = broken features ship; false positives = unnecessary rework
 - **Novelty: 3** — Goal-backward verification is core GSD innovation; programmatic stub detection is unique
@@ -251,6 +251,9 @@ return <div>No messages</div>  // Always shows static text
 | `.planning/REQUIREMENTS.md` | Requirements mapped to phase | Coverage check |
 | Previous VERIFICATION.md | Prior gaps (re-verification) | Focus verification |
 | Source code files | Actual implementations | Truth verification |
+| `get-shit-done/workflows/verify-phase.md` | Verification flow + required reading | Orchestrates verification steps |
+| `get-shit-done/templates/verification-report.md` | VERIFICATION.md layout | Required report format |
+| `get-shit-done/references/verification-patterns.md` | Stub/wiring patterns | Standardized checks |
 
 ### Writes
 | File | Content | Format |
@@ -260,14 +263,14 @@ return <div>No messages</div>  // Always shows static text
 ### Spawned By
 | Command/Agent | Mode | Context Provided |
 |---------------|------|------------------|
-| `/gsd:verify-work` | Initial | Phase directory |
-| `/gsd:verify-work` (after gap closure) | Re-verification | Phase directory, previous VERIFICATION.md exists |
+| `/gsd:execute-phase` | Initial | Phase directory, phase goal |
+| `/gsd:execute-phase` (after gap closure) | Re-verification | Phase directory, previous VERIFICATION.md exists |
 
 ### Output Consumed By
 | Consumer | What They Use | How |
 |----------|--------------|-----|
 | `gsd-planner` (gap closure mode) | `gaps:` in frontmatter | Creates targeted fix plans |
-| `verify-work` orchestrator | Status and score | Determines next action |
+| `execute-phase` orchestrator | Status, score, and recommended fixes | Determines next action |
 | User | Human verification items | Manual testing guidance |
 
 ---
@@ -303,6 +306,13 @@ All must-haves verified. Phase goal achieved. Ready to proceed.
    - Missing: {what needs to be added}
 
 Structured gaps in VERIFICATION.md frontmatter for `/gsd:plan-phase --gaps`.
+
+### Recommended Fixes
+
+{N} fix plans recommended:
+
+1. {phase}-{next}-PLAN.md: {name}
+2. {phase}-{next+1}-PLAN.md: {name}
 ```
 
 ### Verification Complete (Human Needed)
@@ -330,6 +340,7 @@ Automated checks passed. Awaiting human verification.
 ## VERIFICATION.md Schema
 
 ### Frontmatter
+The verification report template includes the core fields below. The verifier may extend the frontmatter with `re_verification`, `gaps`, and `human_verification` when needed.
 ```yaml
 ---
 phase: XX-name
@@ -403,6 +414,12 @@ human_verification:  # Only if status: human_needed
 
 ### Gaps Summary
 {Narrative summary}
+
+### Recommended Fix Plans
+{Only if gaps_found}
+
+## Verification Metadata
+{Approach, must-have source, automated/human check counts, timing}
 ```
 
 ---
@@ -425,11 +442,12 @@ human_verification:  # Only if status: human_needed
 ### If gsd-verifier Changes:
 
 **Upstream Impact (who calls this):**
-- `verify-work` command — May need to handle new status types
-- Orchestrator — May need to present new human verification formats
+- `execute-phase` command — May need to handle new status types
+- Verification workflow — May need to present new human verification formats
 
 **Downstream Impact (who consumes output):**
 - `gsd-planner` (gap closure) — Expects `gaps:` structure in frontmatter
+- `execute-phase` orchestrator — Expects status/score and fix plan recommendations when gaps are found
 - User — Expects human_verification items in specific format
 
 **Breaking Changes to Watch:**
@@ -450,7 +468,7 @@ human_verification:  # Only if status: human_needed
 | `<output>` | 535-666 | VERIFICATION.md creation and return format |
 | `<critical_rules>` | 668-685 | Non-negotiable constraints |
 | `<stub_detection_patterns>` | 687-759 | Universal and language-specific patterns |
-| `<success_criteria>` | 761-779 | Completion checklist |
+| `<success_criteria>` | 761-778 | Completion checklist |
 
 ---
 
@@ -474,6 +492,6 @@ VERIFICATION LEVELS:
 3. WIRED: Imported AND used
 4. FUNCTIONAL: Works correctly (human testing)
 
-SPAWNED BY: /gsd:verify-work
-CONSUMED BY: gsd-planner (gap closure), orchestrator, user
+SPAWNED BY: /gsd:execute-phase (verify-phase workflow)
+CONSUMED BY: gsd-planner (gap closure), execute-phase orchestrator, user
 ```
