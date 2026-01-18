@@ -242,22 +242,72 @@ Comprehensive reference for GSD workflows, templates, and reference documents.
 
 ---
 
-### discovery-phase.md Details
+### discovery-phase.md Details (Expanded)
 
-**Purpose:** Shallow research for library/option decisions during planning.
+**Purpose:** Shallow research for library/option decisions during planning. Answers "which library should we use?" not "how do we build this system?"
 
-**Steps:**
+**Distinction from research-phase:**
+
+| Aspect | discovery-phase | research-phase |
+|--------|-----------------|----------------|
+| Depth | Shallow (which library) | Deep (ecosystem knowledge) |
+| Scope | Single decision | Entire phase domain |
+| Output | DISCOVERY.md | {phase}-RESEARCH.md |
+| Trigger | During planning when choice needed | Before planning for complex domains |
+| Duration | Minutes | 10-30 minutes |
+
+**When to Use:**
+- "Should we use Prisma or Drizzle?"
+- "JWT vs session cookies?"
+- "Which animation library for React?"
+
+**When NOT to Use (use research-phase instead):**
+- 3D/WebGL development
+- Audio processing
+- Machine learning
+- Game development
+- Any unfamiliar domain
+
+**Execution Flow:**
 1. Identify discovery question from planning context
 2. Query sources (Context7 → Official Docs → WebSearch)
-3. Compare options with pros/cons
+3. Compare 2-4 options with pros/cons
 4. Write DISCOVERY.md with recommendation
 5. Mark confidence level (HIGH/MEDIUM/LOW)
 
-**Key Behaviors:**
-- Shallow: answers "which library" not "how to build"
-- Source hierarchy for reliability
-- Low confidence findings marked for validation
-- Differs from RESEARCH.md (deep ecosystem research)
+**DISCOVERY.md Structure:**
+```markdown
+# Discovery: {Question}
+
+## Recommendation
+
+**Use:** {recommended option}
+**Confidence:** HIGH | MEDIUM | LOW
+**Reason:** {1-2 sentence justification}
+
+## Options Considered
+
+### {Option 1}
+- Pros: {list}
+- Cons: {list}
+- Fit: {how it fits this project}
+
+### {Option 2}
+- Pros: {list}
+- Cons: {list}
+- Fit: {how it fits this project}
+
+## Decision Factors
+
+| Factor | {Option 1} | {Option 2} |
+|--------|------------|------------|
+| {Factor 1} | {rating} | {rating} |
+
+## Sources
+
+- {source 1} (confidence level)
+- {source 2} (confidence level)
+```
 
 ---
 
@@ -297,6 +347,216 @@ Comprehensive reference for GSD workflows, templates, and reference documents.
 | codebase/concerns.md | .planning/codebase/CONCERNS.md | gsd-codebase-mapper | Tech Debt, Bugs, Performance |
 | todo.md | .planning/todos/pending/*.md, .planning/todos/done/*.md | add-todo | Problem, Solution, Metadata |
 | config.json | .planning/config.json | /gsd:new-project | mode, depth, parallelization, gates, safety |
+
+---
+
+### PLAN.md Frontmatter Schema
+
+Required frontmatter for `{phase}-{plan}-PLAN.md` files (see `get-shit-done/templates/phase-prompt.md`):
+
+```yaml
+---
+phase: "01-foundation"           # Phase directory name
+plan: "01"                       # Plan number within phase
+type: execute                    # Always execute or tdd
+wave: 1                          # Execution order (1 = first/parallel)
+depends_on: []                   # Plan IDs this depends on (e.g., ["01-01"])
+files_modified: []               # Files this plan modifies
+autonomous: true                 # false = pause at checkpoints
+user_setup: []                   # Human-required setup items (optional)
+must_haves:
+  truths:                        # User-observable outcomes (3-7 items)
+    - "User can log in with email"
+    - "Session persists across refresh"
+  artifacts:                     # Files that must exist with quality bar
+    - path: "src/lib/auth.ts"
+      provides: "Auth functions"
+      min_lines: 50
+      exports: ["login", "logout", "getCurrentUser"]
+    - path: "src/app/api/auth/login/route.ts"
+      provides: "Login endpoint"
+      min_lines: 30
+  key_links:                     # Connections that must exist (3-5 items)
+    - from: "src/components/LoginForm.tsx"
+      to: "/api/auth/login"
+      via: "fetch POST"
+      pattern: "fetch.*api/auth/login"
+    - from: "src/app/api/auth/login/route.ts"
+      to: "prisma.user"
+      via: "database query"
+      pattern: "prisma\\.user\\.findUnique"
+---
+```
+
+**Field Requirements:**
+
+| Field | Required | Default | Notes |
+|-------|----------|---------|-------|
+| phase | Yes | — | Must match phase directory |
+| plan | Yes | — | Two-digit string |
+| type | Yes | execute | Always `execute` or `tdd` |
+| wave | Yes | 1 | Determines parallel execution |
+| depends_on | Yes | [] | Array of plan IDs (e.g., ["01-01"]) |
+| files_modified | Yes | [] | Files this plan modifies |
+| autonomous | Yes | true | Set false for checkpoints |
+| user_setup | No | [] | Human-required setup items |
+| must_haves | Yes | — | Verification contract |
+
+**must_haves.truths Rules:**
+- Must be user-observable (not "bcrypt installed" but "passwords are secure")
+- Testable by human using the app
+- 3-7 items typical
+
+**must_haves.artifacts Rules:**
+- Every artifact needs `path` and `provides`
+- `min_lines`, `exports`, `contains` optional but recommended
+- `min_lines` prevents stub acceptance
+
+**must_haves.key_links Rules:**
+- Identifies critical wiring between artifacts
+- `via` describes connection type
+- `pattern` optional regex to verify connection
+- Prevents "created but not connected" failures
+
+---
+
+### UAT.md Schema
+
+Schema for `{phase}-UAT.md` files from `/gsd:verify-work` (see `get-shit-done/templates/UAT.md`):
+
+```yaml
+---
+status: testing | complete | diagnosed
+phase: "01-foundation"
+source: 01-01-SUMMARY.md, 01-02-SUMMARY.md
+started: "2026-01-18T14:30:00Z"
+updated: "2026-01-18T14:45:00Z"
+---
+```
+
+**Report Sections (in order):**
+1. **Current Test** — Active test being presented (overwritten per test)
+2. **Tests** — Per-test results with user feedback
+3. **Summary** — Counts: total, passed, issues, pending, skipped
+4. **Gaps** — YAML format for `plan-phase --gaps` consumption
+
+**Test Entry Format:**
+```markdown
+### 1. View Comments on Post
+expected: Comments section expands, shows count and comment list
+result: pass
+
+### 2. Create Top-Level Comment
+expected: Submit comment via rich text editor, appears in list
+result: issue
+reported: "works but doesn't show until I refresh the page"
+severity: major
+```
+
+**Gap Entry (YAML format for diagnosis):**
+```yaml
+- truth: "Comment appears immediately after submission"
+  status: failed
+  reason: "User reported: works but doesn't show until I refresh"
+  severity: major
+  test: 2
+  root_cause: ""     # Filled by diagnosis
+  artifacts: []      # Filled by diagnosis
+  missing: []        # Filled by diagnosis
+  debug_session: ""  # Filled by diagnosis
+```
+
+**Severity Inference (never asked):**
+
+| User describes | Infer |
+|----------------|-------|
+| Crash, error, fails completely | blocker |
+| Doesn't work, nothing happens | major |
+| Works but..., slow, minor | minor |
+| Color, font, spacing, visual | cosmetic |
+
+---
+
+### Continuation File Schema
+
+Schema for `.planning/phases/XX-name/.continue-here.md` session handoff files (see `get-shit-done/templates/continue-here.md`):
+
+```yaml
+---
+phase: XX-name
+task: 3
+total_tasks: 7
+status: in_progress
+last_updated: 2026-01-18T14:30:00Z
+---
+```
+
+```markdown
+<current_state>
+[Where exactly are we? What's the immediate context?]
+</current_state>
+
+<completed_work>
+[What got done this session - be specific]
+
+- Task 1: [name] - Done
+- Task 2: [name] - Done
+- Task 3: [name] - In progress, [what's done on it]
+</completed_work>
+
+<remaining_work>
+[What's left in this phase]
+
+- Task 3: [name] - [what's left to do]
+- Task 4: [name] - Not started
+</remaining_work>
+
+<decisions_made>
+[Key decisions and why - so next session doesn't re-debate]
+
+- Decided to use [X] because [reason]
+</decisions_made>
+
+<blockers>
+[Anything stuck or waiting on external factors]
+
+- [Blocker 1]: [status/workaround]
+</blockers>
+
+<context>
+[Mental state, "vibe", anything that helps resume smoothly]
+</context>
+
+<next_action>
+[The very first thing to do when resuming]
+
+Start with: [specific action]
+</next_action>
+```
+
+**Frontmatter Fields:**
+
+| Field | Required | Description |
+|-------|----------|-------------|
+| phase | Yes | Phase directory name |
+| task | Yes | Current task number |
+| total_tasks | Yes | Total tasks in plan |
+| status | Yes | `in_progress`, `blocked`, `almost_done` |
+| last_updated | Yes | ISO timestamp |
+
+**When Created:**
+- Context reaches 70%+ and degradation detected
+- User requests `/gsd:pause-work`
+- Before checkpoint that requires `/clear`
+
+**When Consumed:**
+- `/gsd:resume-work` detects file, presents context, routes to continuation
+- File deleted after successful resume
+
+**Critical Rules:**
+- `<next_action>` must be actionable without reading anything else
+- Include WHY decisions were made, not just what
+- Be specific enough that a fresh Claude instance understands immediately
 
 ---
 
@@ -923,5 +1183,5 @@ GSD follows conventions documented in `GSD-STYLE.md` at the repository root. Key
 
 ---
 
-*Generated: 2026-01-17*
+*Generated: 2026-01-18*
 *Source: get-shit-done/workflows/, get-shit-done/templates/, get-shit-done/references/*

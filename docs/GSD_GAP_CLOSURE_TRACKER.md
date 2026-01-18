@@ -2,7 +2,7 @@
 
 > **Created:** 2026-01-18
 > **Last Updated:** 2026-01-18
-> **Current Stage:** 2 of 7 (Complete)
+> **Current Stage:** 3 of 7 (Complete)
 
 ## Task Status Legend
 - [ ] Not started
@@ -27,10 +27,10 @@
 - [x] 2.7 Add Checkpoint Types Reference section
 
 ## Stage 3: Support Components Schemas (P0/P1)
-- [ ] 3.1 Add PLAN.md frontmatter schema
-- [ ] 3.2 Add UAT.md YAML schema
-- [ ] 3.3 Add .continue-here.md schema
-- [ ] 3.4 Add discovery-phase.md detailed behavior
+- [x] 3.1 Add PLAN.md frontmatter schema
+- [x] 3.2 Add UAT.md YAML schema
+- [x] 3.3 Add .continue-here.md schema
+- [x] 3.4 Add discovery-phase.md detailed behavior
 
 ## Stage 4: Secondary Commands Enhancement (P1)
 - [ ] 4.1 Add /gsd:audit-milestone comprehensive documentation
@@ -61,5 +61,6 @@
 | 1 | Verify source files | N/A | Complete | All 6 source files accessible |
 | 1 | Verify output dir | N/A | Complete | /mnt/user-data/outputs/ writable |
 | 2 | 2.1-2.7 User Journey Corrections | GSD_USER_JOURNEY.md | Complete | All corrections verified present (v1.1) |
+| 3 | 3.1-3.4 | support-components-reference.md | Complete | 4 schemas added |
 
 ---
