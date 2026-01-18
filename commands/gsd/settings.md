@@ -110,56 +110,7 @@ Use AskUserQuestion:
 
 Update `enhancements.*` booleans accordingly (selected = true, not selected = false).
 
-## 5. Parallelization (`parallelization.*`)
-
-Explain:
-- Controls how aggressively GSD can run independent work in parallel.
-
-Use AskUserQuestion with multiple questions:
-
-```
-questions: [
-  {
-    header: "Parallelization",
-    question: "Run plans in parallel? (current: enabled={current_enabled})",
-    multiSelect: false,
-    options: [
-      { label: "Parallel (Recommended)", description: "Independent plans run simultaneously (limited by Max Agents)" },
-      { label: "Sequential", description: "One plan at a time" }
-    ]
-  },
-  {
-    header: "Max Agents",
-    question: "Max concurrent agents (current: {current_max_concurrent_agents})",
-    multiSelect: false,
-    options: [
-      { label: "1", description: "Single-threaded" },
-      { label: "2", description: "Low parallelism" },
-      { label: "3", description: "Default" },
-      { label: "4", description: "High parallelism" },
-      { label: "5", description: "Very high" }
-    ]
-  },
-  {
-    header: "Threshold",
-    question: "Minimum plans required to run in parallel (current: {current_min_plans_for_parallel})",
-    multiSelect: false,
-    options: [
-      { label: "1", description: "Parallelize whenever possible" },
-      { label: "2", description: "Default" },
-      { label: "3", description: "Only parallelize larger waves" }
-    ]
-  }
-]
-```
-
-Apply mapping:
-- Parallel → `parallelization.enabled=true`
-- Sequential → `parallelization.enabled=false`
-- Max Agents → `max_concurrent_agents` integer
-- Threshold → `min_plans_for_parallel` integer
-
-## 6. Gates (`gates.*`)
+## 5. Gates (`gates.*`)
 
 Explain:
 - Gates matter most in `mode: custom` (interactive/yolo override most prompting behavior).
@@ -192,7 +143,7 @@ Use AskUserQuestion:
 
 Set each gate boolean to true if selected, false otherwise.
 
-## 7. Safety Rails (`safety.*`)
+## 6. Safety Rails (`safety.*`)
 
 Explain:
 - Safety rails apply regardless of mode: they should block or confirm risky actions.
@@ -207,7 +158,7 @@ Use AskUserQuestion:
 
 Set booleans accordingly.
 
-## 8. Summary + Apply
+## 7. Summary + Apply
 
 Summarize the changes:
 - Show old → new for each changed key
@@ -222,11 +173,11 @@ Use AskUserQuestion:
 
 If abort: exit without writing.
 
-## 9. Write Config
+## 8. Write Config
 
 Write `.planning/config.json` with pretty formatting (2 spaces) and trailing newline.
 
-## 10. Optional Commit
+## 9. Optional Commit
 
 Use AskUserQuestion:
 - header: "Git"

@@ -237,7 +237,7 @@ EOF
 
 ## Phase 5: Workflow Preferences
 
-Ask all workflow preferences in a single AskUserQuestion call (4 questions):
+Ask all workflow preferences in a single AskUserQuestion call (3 questions):
 
 ```
 questions: [
@@ -261,15 +261,6 @@ questions: [
     ]
   },
   {
-    header: "Execution",
-    question: "Run plans in parallel?",
-    multiSelect: false,
-    options: [
-      { label: "Parallel (Recommended)", description: "Independent plans run simultaneously" },
-      { label: "Sequential", description: "One plan at a time" }
-    ]
-  },
-  {
     header: "Enhancements",
     question: "Enable enhanced workflows?",
     multiSelect: true,
@@ -282,17 +273,13 @@ questions: [
 ]
 ```
 
-Create `.planning/config.json` with chosen mode, depth, parallelization, and enhancements.
+Create `.planning/config.json` with chosen mode, depth, and enhancements.
 
 **Enhancements mapping:**
 - "Decision Ledger" selected → `enhancements.decision_ledger: true`
 - "Codebase Research" selected → `enhancements.codebase_research: true`
 - "Plan Audit" selected → `enhancements.plan_audit: true`
 - `enhancements.session_safety: true` always (default on, low overhead)
-
-**Parallelization mapping:**
-- "Parallel" selected → `parallelization.enabled: true`
-- "Sequential" selected → `parallelization.enabled: false`
 
 **Commit config.json:**
 
@@ -303,7 +290,6 @@ chore: add project config
 
 Mode: [chosen mode]
 Depth: [chosen depth]
-Parallelization: [enabled/disabled]
 Enhancements: [list enabled enhancements or "defaults only"]
 EOF
 )"

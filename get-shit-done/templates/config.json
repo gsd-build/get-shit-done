@@ -1,11 +1,6 @@
 {
   "mode": "interactive",
   "depth": "standard",
-  "parallelization": {
-    "enabled": true,
-    "max_concurrent_agents": 3,
-    "min_plans_for_parallel": 2
-  },
   "gates": {
     "confirm_project": true,
     "confirm_phases": true,
