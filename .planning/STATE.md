@@ -10,29 +10,29 @@ See: .planning/PROJECT.md (updated 2025-01-18)
 ## Current Position
 
 Phase: 2 of 4 (Data Quality & AI Recommendations)
-Plan: 3a of 4 in current phase
+Plan: 3b of 4 in current phase
 Status: In progress
-Last activity: 2026-01-18 - Completed 02-03a-PLAN.md
+Last activity: 2026-01-18 - Completed 02-03b-PLAN.md
 
-Progress: [██████░░░░] 60%
+Progress: [███████░░░] 70%
 
 ## Performance Metrics
 
 **Velocity:**
-- Total plans completed: 6
-- Average duration: 10.5 min
-- Total execution time: 1.05 hours
+- Total plans completed: 7
+- Average duration: 10.1 min
+- Total execution time: 1.18 hours
 
 **By Phase:**
 
 | Phase | Plans | Total | Avg/Plan |
 |-------|-------|-------|----------|
 | 01-foundation | 3/3 | 37 min | 12.3 min |
-| 02-dq-recommendations | 3/4 | 25 min | 8.3 min |
+| 02-dq-recommendations | 4/5 | 33 min | 8.3 min |
 
 **Recent Trend:**
-- Last 5 plans: 01-03 (16 min), 02-01 (8 min), 02-02 (10 min), 02-03a (7 min)
-- Trend: Accelerating (frontend builds on established patterns)
+- Last 5 plans: 02-01 (8 min), 02-02 (10 min), 02-03a (7 min), 02-03b (8 min)
+- Trend: Stable (frontend patterns well-established)
 
 *Updated after each plan completion*
 
@@ -74,6 +74,10 @@ Recent decisions affecting current work:
 - [02-03a]: Mode selector via query params (?mode=ai|template|manual)
 - [02-03a]: Conditional ApprovalPanel rendering for pending rules
 - [02-03a]: Required rejection reason for approval workflow
+- [02-03b]: 5s polling for running validations (matches profile polling pattern)
+- [02-03b]: 30s polling for alert badge count (balance responsiveness vs load)
+- [02-03b]: Alert status workflow: open -> acknowledged -> resolved (with snooze)
+- [02-03b]: Quality score thresholds: green >80%, yellow 60-80%, red <60%
 
 ### Pending Todos
 
@@ -85,6 +89,6 @@ None yet.
 
 ## Session Continuity
 
-Last session: 2026-01-18T21:46:36Z
-Stopped at: Completed 02-03a-PLAN.md
+Last session: 2026-01-18T21:47:32Z
+Stopped at: Completed 02-03b-PLAN.md
 Resume file: None
