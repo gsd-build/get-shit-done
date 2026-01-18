@@ -8,3 +8,10 @@ CLAUDE.md
 
 # Local test installs
 .claude/
+
+# Python
+__pycache__/
+*.pyc
+
+# CDK
+cdk.out/
