@@ -3,11 +3,49 @@
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import { cn } from '@/lib/utils';
+import { useOpenAlertCount } from '@/hooks/use-alerts';
 
-const navigation = [
+interface NavItem {
+  name: string;
+  href: string;
+  showBadge?: boolean;
+}
+
+const navigation: NavItem[] = [
   { name: 'Sources', href: '/sources' },
   { name: 'Profiles', href: '/profiles' },
+  { name: 'Rules', href: '/rules' },
+  { name: 'Validations', href: '/validations' },
+  { name: 'Alerts', href: '/alerts', showBadge: true },
 ];
+
+function NavLink({ item, isActive, badgeCount }: { item: NavItem; isActive: boolean; badgeCount?: number }) {
+  return (
+    <Link
+      href={item.href}
+      className={cn(
+        'flex items-center justify-between rounded-md px-3 py-2 text-sm font-medium transition-colors',
+        isActive
+          ? 'bg-primary text-primary-foreground'
+          : 'text-muted-foreground hover:bg-muted hover:text-foreground'
+      )}
+    >
+      <span>{item.name}</span>
+      {item.showBadge && badgeCount !== undefined && badgeCount > 0 && (
+        <span
+          className={cn(
+            'ml-2 inline-flex h-5 min-w-5 items-center justify-center rounded-full px-1.5 text-xs font-medium',
+            isActive
+              ? 'bg-primary-foreground/20 text-primary-foreground'
+              : 'bg-red-100 text-red-800'
+          )}
+        >
+          {badgeCount}
+        </span>
+      )}
+    </Link>
+  );
+}
 
 export default function DashboardLayout({
   children,
@@ -15,6 +53,7 @@ export default function DashboardLayout({
   children: React.ReactNode;
 }) {
   const pathname = usePathname();
+  const { data: alertCount } = useOpenAlertCount();
 
   return (
     <div className="flex h-screen">
@@ -27,18 +66,12 @@ export default function DashboardLayout({
           {navigation.map((item) => {
             const isActive = pathname.startsWith(item.href);
             return (
-              <Link
+              <NavLink
                 key={item.name}
-                href={item.href}
-                className={cn(
-                  'flex items-center rounded-md px-3 py-2 text-sm font-medium transition-colors',
-                  isActive
-                    ? 'bg-primary text-primary-foreground'
-                    : 'text-muted-foreground hover:bg-muted hover:text-foreground'
-                )}
-              >
-                {item.name}
-              </Link>
+                item={item}
+                isActive={isActive}
+                badgeCount={item.showBadge ? alertCount : undefined}
+              />
             );
           })}
         </nav>
