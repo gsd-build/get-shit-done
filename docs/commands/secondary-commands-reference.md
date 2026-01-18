@@ -148,7 +148,7 @@ Remove unstarted future phase and renumber all subsequent phases.
 
 | Command | Purpose | Key Args | Spawns | Output |
 |---------|---------|----------|--------|--------|
-| `new-milestone` | Start new milestone cycle | `[name]` | researchers, roadmapper | PROJECT.md, ROADMAP.md |
+| `new-milestone` | Start new milestone cycle | `[name]` | researchers, roadmapper | PROJECT.md, REQUIREMENTS.md, ROADMAP.md, STATE.md |
 | `complete-milestone` | Archive milestone and tag | `<version>` | None | Archive files, git tag |
 | `audit-milestone` | Verify milestone completion | `[version]` | gsd-integration-checker | MILESTONE-AUDIT.md |
 | `plan-milestone-gaps` | Create phases for audit gaps | None | None | ROADMAP.md updated |
@@ -160,7 +160,7 @@ questioning → research (optional) → requirements → roadmap.
 
 **Key difference from new-project:** PROJECT.md exists with history, focuses on "what's next."
 
-**Flow:** Present last milestone → Deep questioning → Version decision → Update PROJECT.md → Research → Requirements → Roadmap
+**Flow:** Present last milestone → Deep questioning → Version decision → Update PROJECT.md → Research → Requirements → Roadmap → Update STATE.md
 
 ---
 
@@ -303,7 +303,7 @@ Restore complete project context from previous session:
 
 ### /gsd:pause-work
 
-Create handoff when pausing mid-phase:
+Create handoff when pausing mid-phase (written to `.planning/phases/XX-name/.continue-here.md`, committed as WIP):
 ```markdown
 ## .continue-here.md
 - Current position (phase, plan, task)
@@ -335,7 +335,7 @@ Systematic debugging using scientific method:
 
 **Key feature:** Survives `/clear` — debug file persists state. Run `/gsd:debug` with no args to resume.
 
-**Output:** Archives resolved issues to `.planning/debug/resolved/`.
+**Output:** `.planning/debug/{slug}.md` for active sessions.
 
 ---
 
@@ -349,7 +349,7 @@ Analyze existing codebase with parallel mapper agents:
 
 **Use before:** `/gsd:new-project` on brownfield codebases.
 
-**Creates:** `.planning/codebase/` with 7 documents.
+**Creates:** `.planning/codebase/` with 7 documents (committed after generation).
 
 ---
 
@@ -357,8 +357,8 @@ Analyze existing codebase with parallel mapper agents:
 
 | Command | Purpose | Key Args | Spawns | Output |
 |---------|---------|----------|--------|--------|
-| `add-todo` | Capture idea/task from conversation | `[description]` | None | `.planning/todos/pending/` |
-| `check-todos` | List and select todo to work on | `[area]` | None | Move to `.planning/todos/done/` |
+| `add-todo` | Capture idea/task from conversation | `[description]` | None | `.planning/todos/pending/`, updates STATE.md + commit |
+| `check-todos` | List and select todo to work on | `[area]` | None | Move to `.planning/todos/done/` (updates STATE.md + commit) |
 
 ### /gsd:add-todo
 
@@ -368,7 +368,7 @@ Capture idea during work without derailing:
 
 **Extracts:** Title, problem, solution hints, relevant files, area (api/ui/auth/database/testing/docs/tooling/general).
 
-**Checks for duplicates** before creating.
+**Checks for duplicates** before creating. Updates STATE.md (pending count) and commits the todo.
 
 ---
 
@@ -381,7 +381,7 @@ Review and select todo to work on:
 4. Check roadmap for phase match
 5. Offer actions: work now, add to phase, create phase, brainstorm, put back
 
-**Moves to done/** when "Work on it now" selected.
+**Moves to done/** when "Work on it now" selected, updates STATE.md, and commits the move.
 
 ---
 
