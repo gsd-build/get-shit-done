@@ -4,6 +4,59 @@ Complete inventory of all GSD system files with metadata for documentation and m
 
 ---
 
+## Documentation & Guides
+
+### Root Documentation & Governance
+
+| File | Purpose | Lines |
+|------|---------|-------|
+| README.md | Repository overview, installation, and usage guidance | 484 |
+| CHANGELOG.md | Release notes and version history | 1050 |
+| LICENSE | License terms for GSD | 21 |
+| GSD-STYLE.md | Writing conventions and style guide for GSD docs | 434 |
+| GSD_ARCHITECTURE_SCAFFOLDING.md | Architecture reference, registries, invariants, and key flows | 434 |
+| GSD_DOCUMENTATION_EXECUTION_PLAN.md | Documentation execution plan and coverage strategy | 1220 |
+
+### Documentation Index & Guides (docs/*.md)
+
+| File | Purpose | Lines |
+|------|---------|-------|
+| docs/GSD_DOCUMENTATION_INDEX.md | Master navigation index for GSD documentation | 398 |
+| docs/GSD_USER_JOURNEY.md | End-to-end user journey narrative and flow mapping | 469 |
+| docs/FILE_MANIFEST.md | Complete file inventory with metadata | 340 |
+
+### Component References (docs/*-components-reference.md)
+
+| File | Purpose | Lines |
+|------|---------|-------|
+| docs/support-components-reference.md | Detailed reference for workflows, templates, and references | 1187 |
+| docs/operational-components-reference.md | Installer, hooks, and operational behavior reference | 259 |
+
+### Command References (docs/commands/*.md)
+
+| File | Purpose | Lines |
+|------|---------|-------|
+| docs/commands/core-commands-reference.md | Deep reference for core workflow commands | 419 |
+| docs/commands/secondary-commands-reference.md | Reference for supporting commands | 458 |
+
+### Agent References (docs/agents/*.md)
+
+| File | Purpose | Lines |
+|------|---------|-------|
+| docs/agents/gsd-planner-reference.md | Deep reference for gsd-planner behavior | 464 |
+| docs/agents/gsd-executor-reference.md | Deep reference for gsd-executor behavior | 407 |
+| docs/agents/gsd-verifier-reference.md | Deep reference for gsd-verifier behavior | 497 |
+| docs/agents/gsd-plan-checker-reference.md | Deep reference for gsd-plan-checker behavior | 479 |
+| docs/agents/gsd-debugger-reference.md | Standard reference for gsd-debugger behavior | 341 |
+| docs/agents/gsd-codebase-mapper-reference.md | Standard reference for gsd-codebase-mapper behavior | 131 |
+| docs/agents/gsd-project-researcher-reference.md | Standard reference for gsd-project-researcher behavior | 321 |
+| docs/agents/gsd-phase-researcher-reference.md | Standard reference for gsd-phase-researcher behavior | 417 |
+| docs/agents/gsd-roadmapper-reference.md | Standard reference for gsd-roadmapper behavior | 413 |
+| docs/agents/gsd-integration-checker-reference.md | Standard reference for gsd-integration-checker behavior | 173 |
+| docs/agents/gsd-research-synthesizer-reference.md | Summary reference for gsd-research-synthesizer behavior | 185 |
+
+---
+
 ## Agents (agents/*.md)
 
 | File | Purpose | Lines | Complexity |
@@ -198,6 +251,14 @@ Complete inventory of all GSD system files with metadata for documentation and m
 
 ---
 
+## Project Metadata & Distribution
+
+| File | Purpose | Lines |
+|------|---------|-------|
+| package.json | NPM package metadata, CLI bin mapping, version source for installer | 32 |
+
+---
+
 ## Operational Scripts & Hooks
 
 | File | Purpose | Relationship Notes | Lines |
@@ -213,13 +274,15 @@ Complete inventory of all GSD system files with metadata for documentation and m
 
 | Category | File Count | Total Lines |
 |----------|------------|-------------|
+| Documentation & Guides | 24 | 11,001 |
 | Agents | 11 | 8,337 |
 | Commands | 24 | 5,387 |
 | Workflows | 12 | 5,615 |
 | Templates | 30 | 5,802 |
 | References | 7 | 2,450 |
+| Project Metadata & Distribution | 1 | 32 |
 | Operational Scripts & Hooks | 4 | 576 |
-| **Total** | **88** | **28,167** |
+| **Total** | **113** | **39,200** |
 
 ---
 
