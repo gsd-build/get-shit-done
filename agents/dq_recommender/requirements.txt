@@ -1,0 +1,10 @@
+# DQ Recommender Agent dependencies
+
+# Strands Agents SDK for agent framework
+strands-agents>=1.0.0
+
+# AWS SDK for Bedrock and Glue APIs
+boto3>=1.35.0
+
+# Data validation
+pydantic>=2.0.0
