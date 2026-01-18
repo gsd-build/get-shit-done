@@ -82,14 +82,14 @@ Output: Milestone archived (roadmap + requirements), PROJECT.md evolved, git tag
 
 4. **Archive milestone:**
 
-   - Create `.planning/milestones/v{{version}}-ROADMAP.md`
+   - Create `.planning/milestones/v{{version}}/v{{version}}-ROADMAP.md`
    - Extract full phase details from ROADMAP.md
    - Fill milestone-archive.md template
    - Update ROADMAP.md to one-line summary with link
 
 5. **Archive requirements:**
 
-   - Create `.planning/milestones/v{{version}}-REQUIREMENTS.md`
+   - Create `.planning/milestones/v{{version}}/v{{version}}-REQUIREMENTS.md`
    - Mark all v1 requirements as complete (checkboxes checked)
    - Note requirement outcomes (validated, adjusted, dropped)
    - Delete `.planning/REQUIREMENTS.md` (fresh one created for next milestone)
@@ -114,8 +114,8 @@ Output: Milestone archived (roadmap + requirements), PROJECT.md evolved, git tag
 
 <success_criteria>
 
-- Milestone archived to `.planning/milestones/v{{version}}-ROADMAP.md`
-- Requirements archived to `.planning/milestones/v{{version}}-REQUIREMENTS.md`
+- Milestone archived to `.planning/milestones/v{{version}}/v{{version}}-ROADMAP.md`
+- Requirements archived to `.planning/milestones/v{{version}}/v{{version}}-REQUIREMENTS.md`
 - `.planning/REQUIREMENTS.md` deleted (fresh for next milestone)
 - ROADMAP.md collapsed to one-line entry
 - PROJECT.md updated with current state

@@ -64,7 +64,7 @@
 | `/gsd:new-project` | Project init (questioning→research→requirements→roadmap) | gsd-project-researcher (×4 parallel), gsd-research-synthesizer, gsd-roadmapper | `commands/gsd/new-project.md` |
 | `/gsd:plan-phase` | Phase planning with verification loop | gsd-phase-researcher, gsd-planner, gsd-plan-checker | `commands/gsd/plan-phase.md` |
 | `/gsd:execute-phase` | Wave-based execution + verification | gsd-executor (parallel), gsd-verifier | `commands/gsd/execute-phase.md` |
-| `/gsd:verify-work` | Conversational UAT session | gsd-debugger (if issues), gsd-planner (--gaps) | `commands/gsd/verify-work.md` |
+| `/gsd:verify-work` | Conversational UAT session | gsd-debugger (if issues), gsd-planner (--gaps), gsd-plan-checker | `commands/gsd/verify-work.md` |
 | `/gsd:debug` | Scientific debugging | gsd-debugger | `commands/gsd/debug.md` |
 | `/gsd:progress` | Status check + intelligent routing | None | `commands/gsd/progress.md` |
 | `/gsd:discuss-phase` | Capture user vision before planning | None | `commands/gsd/discuss-phase.md` |
@@ -74,6 +74,17 @@
 | `/gsd:map-codebase` | Brownfield codebase analysis | gsd-codebase-mapper | `commands/gsd/map-codebase.md` |
 | `/gsd:new-milestone` | Start new milestone cycle | gsd-project-researcher (×4), gsd-research-synthesizer, gsd-roadmapper | `commands/gsd/new-milestone.md` |
 | `/gsd:complete-milestone` | Archive milestone, tag release | None | `commands/gsd/complete-milestone.md` |
+| `/gsd:plan-milestone-gaps` | Create phases to close audit gaps | None | `commands/gsd/plan-milestone-gaps.md` |
+| `/gsd:pause-work` | Create a session handoff checkpoint | None | `commands/gsd/pause-work.md` |
+| `/gsd:resume-work` | Resume work with context restoration | None | `commands/gsd/resume-work.md` |
+| `/gsd:add-todo` | Capture a follow-up todo | None | `commands/gsd/add-todo.md` |
+| `/gsd:check-todos` | Review captured todos | None | `commands/gsd/check-todos.md` |
+| `/gsd:update` | Update GSD install | None | `commands/gsd/update.md` |
+| `/gsd:whats-new` | Show release notes | None | `commands/gsd/whats-new.md` |
+| `/gsd:add-phase` | Add a roadmap phase | None | `commands/gsd/add-phase.md` |
+| `/gsd:insert-phase` | Insert a phase in the roadmap | None | `commands/gsd/insert-phase.md` |
+| `/gsd:remove-phase` | Remove a roadmap phase | None | `commands/gsd/remove-phase.md` |
+| `/gsd:help` | GSD command index | None | `commands/gsd/help.md` |
 
 ---
 
@@ -206,7 +217,13 @@ When agents perform research, sources are ranked by confidence:
 │       └── XX-UAT.md           # User acceptance testing
 ├── todos/                  # Session: Captured ideas
 ├── debug/                  # Session: Debug investigations
-└── cache/                  # Session: Update checks
+└── cache/                  # Session: Project-local caches
+```
+
+Global update-check cache (installed hook):
+
+```
+~/.claude/cache/gsd-update-check.json
 ```
 
 ---
@@ -230,7 +247,7 @@ When agents perform research, sources are ranked by confidence:
 │   └─→ Spawn gsd-research-synthesizer → SUMMARY.md
 ├─→ Phase 7: Define Requirements → REQUIREMENTS.md
 ├─→ Phase 8: Spawn gsd-roadmapper → ROADMAP.md, STATE.md
-└─→ Phase 9: Present completion + next steps
+└─→ Phase 10: Present completion + next steps
 ```
 
 ### Flow 2: Phase Planning
@@ -302,7 +319,7 @@ When agents perform research, sources are ranked by confidence:
 │   └─→ infers severity
 ├─→ writes UAT.md
 └─→ If issues: spawn gsd-debugger (parallel per issue)
-    └─→ writes diagnoses → spawn gsd-planner --gaps
+    └─→ writes diagnoses → spawn gsd-planner --gaps → gsd-plan-checker
 ```
 
 ---
