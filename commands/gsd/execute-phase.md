@@ -38,6 +38,81 @@ Phase: $ARGUMENTS
 </context>
 
 <process>
+
+## 0. Session Safety Pre-flight Checks
+
+**Check if session safety is enabled:**
+```bash
+SESSION_SAFETY=$(cat .planning/config.json 2>/dev/null | grep -o '"session_safety":[^,}]*' | cut -d':' -f2 | tr -d ' ')
+```
+
+**If `session_safety` is not explicitly `false`** (default ON), run these checks:
+
+### 0a. Session Conflict Check
+
+```bash
+if [ -f .planning/ACTIVE-SESSIONS.json ]; then
+  cat .planning/ACTIVE-SESSIONS.json
+fi
+```
+
+**If another session claims this phase:**
+```
+⚠️ Session Conflict Detected
+
+Another session is working on Phase {X}:
+- Session ID: {id}
+- Started: {timestamp}
+- Last activity: {timestamp}
+
+Options:
+1. Continue anyway (may cause conflicts)
+2. Wait for other session to complete
+3. Claim this phase (invalidates other session)
+```
+
+Wait for user response. If continuing, update ACTIVE-SESSIONS.json with this session.
+
+### 0b. Context Resume Detection
+
+**If conversation contains summary of prior work** (context was compacted):
+```
+⚠️ Context Resume Detected
+
+This session was continued from a previous conversation.
+Prior context has been compacted into a summary.
+
+For complex plans (5+ tasks): Recommend starting fresh session.
+
+Continue here? (y/n)
+```
+
+If user says no, provide command to restart fresh:
+```
+Run: /clear then /gsd:execute-phase {X}
+```
+
+### 0c. Previous Progress Check
+
+```bash
+ls .planning/phases/${PHASE}-*/*-PROGRESS.md 2>/dev/null
+ls .planning/phases/${PHASE}-*/*-SUMMARY.md 2>/dev/null
+```
+
+**If PROGRESS.md exists:** Resume from last checkpoint (read PROGRESS.md for state)
+
+**If SUMMARY.md exists (and no PROGRESS.md):**
+```
+Phase {X} appears complete. Re-run?
+1. Yes, re-execute all plans
+2. No, show me the summary
+3. Only run incomplete plans
+```
+
+**If neither exists:** Fresh execution, proceed to step 1.
+
+---
+
 1. **Validate phase exists**
    - Find phase directory matching argument
    - Count PLAN.md files
