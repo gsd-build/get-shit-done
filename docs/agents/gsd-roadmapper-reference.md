@@ -190,7 +190,7 @@ Mapped: 12/12 ✓
 Options:
 1. Create Phase 6: Notifications
 2. Add to existing Phase 5
-3. Defer to v2 (update REQUIREMENTS.md)
+3. Defer to v2 (update .planning/REQUIREMENTS.md)
 ```
 
 **Do not proceed until coverage = 100%.**
@@ -202,73 +202,27 @@ Options:
 **Source:** `<output_formats>`
 
 ### ROADMAP.md Structure
-```markdown
-# [Project] Roadmap
 
-## Overview
-[2-3 sentences describing project and phase strategy]
+Use the template at `get-shit-done/templates/roadmap.md`.
 
-## Phases
-
-### Phase 1: [Name]
-**Goal:** [Outcome, not task]
-**Dependencies:** None
-**Requirements:** REQ-01, REQ-02
-**Success Criteria:**
-1. [Observable behavior 1]
-2. [Observable behavior 2]
-3. [Observable behavior 3]
-
-### Phase 2: [Name]
-**Goal:** [Outcome]
-**Dependencies:** Phase 1
-**Requirements:** REQ-03, REQ-04, REQ-05
-**Success Criteria:**
-1. [Observable behavior]
-...
-
-## Progress
-
-| Phase | Status | Plans |
-|-------|--------|-------|
-| 1 - Setup | ⬜ Pending | - |
-| 2 - Auth | ⬜ Pending | - |
-...
-```
+Key elements to preserve from the template:
+- Overview paragraph (single paragraph summary of the journey)
+- Phase list with checkbox status and one-line descriptions
+- Phase Details blocks with **Goal**, **Depends on**, **Requirements**, **Success Criteria**, and **Plans** count
+- Plans checklist entries (e.g., `01-01`, `02-02`) for each phase
+- Progress table with plans-complete counts, status, and completion date
+- Decimal phases labeled as INSERTED and ordered numerically between integers
 
 ### STATE.md Structure
-```markdown
-# Project State
 
-## Project Reference
-**Core Value:** [from PROJECT.md]
-**Current Focus:** [active work description]
+Use the template at `get-shit-done/templates/state.md`.
 
-## Current Position
-**Phase:** [N]
-**Plan:** [X of Y]
-**Status:** [planning | executing | verifying]
-**Progress:** [████░░░░░░] 40%
-
-## Performance Metrics
-**Plans Completed:** X
-**Average Plan Duration:** Xm
-
-## Accumulated Context
-### Decisions Made
-- [Decision with rationale]
-
-### TODOs (Non-Blocking)
-- [ ] [Future consideration]
-
-### Blockers
-- [Current blocker if any]
-
-## Session Continuity
-**Last Action:** [what was done]
-**Next Action:** [what to do next]
-**Suggested Command:** `/gsd:xxx`
-```
+Key elements to preserve from the template:
+- Project Reference pointing to `.planning/PROJECT.md`
+- Current Position with phase/plan indices, status, last activity, and progress bar
+- Performance Metrics (velocity, phase breakdown, recent trend)
+- Accumulated Context (Decisions, Pending Todos, Blockers/Concerns)
+- Session Continuity with last session info and resume file path
 
 ---
 
@@ -278,13 +232,13 @@ Options:
 
 ```
 Step 1: Receive Context
-├── PROJECT.md content (core value, constraints)
-├── REQUIREMENTS.md content (v1 requirements with REQ-IDs)
+├── .planning/PROJECT.md content (core value, constraints)
+├── .planning/REQUIREMENTS.md content (v1 requirements with REQ-IDs)
 ├── research/SUMMARY.md content (if exists)
 └── config.json (depth setting)
 
 Step 2: Extract Requirements
-├── Parse REQUIREMENTS.md
+├── Parse .planning/REQUIREMENTS.md
 ├── Count total v1 requirements
 ├── Extract categories (AUTH, CONTENT, etc.)
 └── Build requirement list with IDs
@@ -314,7 +268,7 @@ Step 6: Validate Coverage
 Step 7: Write Files IMMEDIATELY
 ├── Write ROADMAP.md
 ├── Write STATE.md
-├── Update REQUIREMENTS.md traceability section
+├── Update .planning/REQUIREMENTS.md traceability section
 └── Files on disk = context preserved
 
 Step 8: Return Summary
@@ -333,8 +287,8 @@ Step 9: Handle Revision (if needed)
 
 | Category | Details |
 |----------|---------|
-| **Reads** | PROJECT.md (core value), REQUIREMENTS.md (v1 reqs), research/SUMMARY.md (if exists), config.json (depth) |
-| **Writes** | `.planning/ROADMAP.md`, `.planning/STATE.md`, REQUIREMENTS.md traceability update |
+| **Reads** | .planning/PROJECT.md (core value), .planning/REQUIREMENTS.md (v1 reqs), research/SUMMARY.md (if exists), config.json (depth) |
+| **Writes** | `.planning/ROADMAP.md`, `.planning/STATE.md`, `.planning/REQUIREMENTS.md` traceability update |
 | **Spawned By** | `/gsd:new-project` |
 | **Consumed By** | `/gsd:plan-phase`, `gsd-planner`, `gsd-verifier` |
 
@@ -441,7 +395,7 @@ Step 9: Handle Revision (if needed)
 ```
 WHAT:     Requirement → phase mapping with goal-backward success criteria
 MODES:    Single mode (roadmap creation)
-OUTPUT:   .planning/ROADMAP.md, .planning/STATE.md, REQUIREMENTS.md traceability
+OUTPUT:   .planning/ROADMAP.md, .planning/STATE.md, .planning/REQUIREMENTS.md traceability
 
 CORE RULES:
 • Derive phases from requirements (don't impose template)
