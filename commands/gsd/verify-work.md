@@ -38,12 +38,12 @@ Phase: $ARGUMENTS (optional)
 1. Check for active UAT sessions (resume or start new)
 2. Find SUMMARY.md files for the phase
 3. Extract testable deliverables (user-observable outcomes)
-4. Categorize tests for automation (based on keywords in expected behavior)
+4. Categorize tests by verification type (ui, api, data, file, cli, subjective)
 5. **If automated verification enabled** (config.agent_acceptance_testing.auto_enabled):
-   - Detect Playwright MCP availability
-   - Run automated tests for eligible tests (element_visibility, click_result, etc.)
-   - Record pass:auto or issue:auto with evidence
-   - Falls back to human verification if Playwright unavailable
+   - Detect available verification tools (Playwright, database MCPs, HTTP tools, etc.)
+   - Run automated tests for eligible tests using appropriate tools
+   - Record pass:auto or issue:auto with auto_method and evidence
+   - Falls back to human verification if no tool available for a test type
 6. Create {phase}-UAT.md with test list and automation results
 7. Present remaining tests one at a time:
    - Skip pass:auto tests (already verified)
@@ -214,9 +214,9 @@ Review the issues above and either:
 
 <success_criteria>
 - [ ] UAT.md created with tests from SUMMARY.md
-- [ ] Tests categorized for automation (automatable, automation_category)
-- [ ] If auto_enabled: Playwright detected and automated tests run
-- [ ] Automated results recorded with evidence (pass:auto, issue:auto)
+- [ ] Tests categorized by verification type (ui, api, data, file, cli, subjective)
+- [ ] If auto_enabled: available tools detected and automated tests run
+- [ ] Automated results recorded with auto_method and evidence (pass:auto, issue:auto)
 - [ ] Human tests presented one at a time with expected behavior
 - [ ] Plain text responses (no structured forms)
 - [ ] Severity inferred, never asked

@@ -25,7 +25,6 @@
   },
   "agent_acceptance_testing": {
     "auto_enabled": false,
-    "fallback_to_human": true,
-    "app_url": "http://localhost:3000"
+    "fallback_to_human": true
   }
 }

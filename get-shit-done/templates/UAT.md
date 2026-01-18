@@ -28,43 +28,53 @@ awaiting: user response
 
 ### 1. [Test Name]
 expected: [observable behavior - what user should see]
+verification_type: ui | api | data | file | cli
 automatable: true | false
-automation_category: element_visibility | click_result | form_submission | text_content | navigation | null
 result: [pending]
 
 ### 2. [Test Name]
 expected: [observable behavior]
+verification_type: ui
 automatable: true
-automation_category: element_visibility
 result: pass:auto
+auto_method: playwright
 auto_evidence: "Element #login-form found and visible"
 
 ### 3. [Test Name]
 expected: [observable behavior]
+verification_type: ui
 automatable: false
-automation_category: null
 result: pass
-<!-- Human verification - no auto_evidence -->
+<!-- Human verification for subjective UI - no auto_evidence -->
 
 ### 4. [Test Name]
 expected: [observable behavior]
+verification_type: api
 automatable: true
-automation_category: text_content
 result: issue:auto
-auto_evidence: "Expected 'Welcome' but found 'Error: unauthorized'"
+auto_method: http
+auto_evidence: "Expected 200 OK but got 401 Unauthorized"
 
 ### 5. [Test Name]
 expected: [observable behavior]
+verification_type: ui
 automatable: false
-automation_category: null
 result: issue
 reported: "[verbatim user response]"
 severity: major
 
 ### 6. [Test Name]
 expected: [observable behavior]
+verification_type: data
+automatable: true
+result: pass:auto
+auto_method: supabase
+auto_evidence: "Record found in users table with expected fields"
+
+### 7. [Test Name]
+expected: [observable behavior]
+verification_type: ui
 automatable: false
-automation_category: null
 result: skipped
 reason: [why skipped]
 
@@ -114,16 +124,16 @@ automation_status: full | partial | unavailable | disabled
 **Tests:**
 - Each test: OVERWRITE result field when user responds or automation completes
 - `result` values: [pending], pass, pass:auto, issue, issue:auto, skipped
-- `automatable`: true if test can be automated, false if requires human judgment
-- `automation_category`: element_visibility, click_result, form_submission, text_content, navigation, or null
-- If automated: add `auto_evidence` with Playwright verification result
+- `verification_type`: ui, api, data, file, or cli
+- `automatable`: true for mechanical checks, false for subjective judgments
+- If automated: add `auto_method` (tool used) and `auto_evidence` (verification result)
 - If human issue: add `reported` (verbatim) and `severity` (inferred)
 - If skipped: add `reason` if provided
 
 **Summary:**
 - OVERWRITE counts after each response
 - Tracks: total, passed, passed_auto, passed_human, issues, pending, skipped
-- `automation_status`: full (all automatable passed), partial (some automated), unavailable (Playwright not available), disabled (config off)
+- `automation_status`: full (all automatable passed), partial (some automated), unavailable (no tools available), disabled (config off)
 
 **Gaps:**
 - APPEND only when issue found (YAML format)
@@ -169,17 +179,18 @@ automation_status: full | partial | unavailable | disabled
 **Creation:** When /gsd:verify-work starts new session
 - Extract tests from SUMMARY.md files
 - Set status to "testing"
-- Categorize each test for automation potential (automatable: true/false, automation_category)
+- Categorize each test for automation potential (automatable: true/false, verification_type)
 - Current Test points to test 1
 - All tests have result: [pending]
 
 **Automation phase (if enabled):**
 - Check config.agent_acceptance_testing.auto_enabled
-- Detect Playwright MCP availability
+- Detect available verification tools (Playwright, database MCPs, HTTP tools, etc.)
 - For each test with automatable: true:
-  - Execute Playwright verification based on automation_category
+  - Select appropriate tool based on verification_type
+  - Execute verification and record auto_method used
   - Record pass:auto or issue:auto with auto_evidence
-  - On error: fall back to [pending] for human verification
+  - On error or no tool available: fall back to [pending] for human verification
 - Update automation_status in Summary
 
 **During human testing:**
@@ -239,51 +250,72 @@ updated: 2025-01-15T10:45:00Z
 
 ### 1. View Comments on Post
 expected: Comments section expands, shows count and comment list
+verification_type: ui
 automatable: true
-automation_category: element_visibility
 result: pass:auto
+auto_method: playwright
 auto_evidence: "Element [data-testid='comments-section'] visible with 3 comments"
 
 ### 2. Create Top-Level Comment
 expected: Submit comment via rich text editor, appears in list with author info
+verification_type: ui
 automatable: true
-automation_category: form_submission
 result: issue:auto
+auto_method: playwright
 auto_evidence: "Form submitted but comment not found in list after 5s wait"
 
 ### 3. Reply to a Comment
 expected: Click Reply, inline composer appears, submit shows nested reply
+verification_type: ui
 automatable: true
-automation_category: click_result
 result: pass:auto
+auto_method: playwright
 auto_evidence: "Reply button clicked, composer visible, reply submitted and nested under parent"
 
 ### 4. Visual Nesting
 expected: 3+ level thread shows indentation, left borders, caps at reasonable depth
+verification_type: ui
 automatable: false
-automation_category: null
 result: pass
-<!-- Human verified visual appearance -->
+<!-- Human verified - subjective visual design -->
 
 ### 5. Delete Own Comment
 expected: Click delete on own comment, removed or shows [deleted] if has replies
+verification_type: ui
 automatable: true
-automation_category: click_result
 result: pass:auto
+auto_method: playwright
 auto_evidence: "Delete clicked, confirmation accepted, comment replaced with [deleted]"
 
 ### 6. Comment Count
 expected: Post shows accurate count, increments when adding comment
+verification_type: ui
 automatable: true
-automation_category: text_content
 result: pass:auto
+auto_method: playwright
 auto_evidence: "Count element shows '4', incremented from '3' after adding comment"
+
+### 7. API Returns Comments
+expected: GET /api/comments returns array of comment objects with id, text, author
+verification_type: api
+automatable: true
+result: pass:auto
+auto_method: http
+auto_evidence: "Response 200 OK, body contains array with 4 comment objects"
+
+### 8. Comment Persisted to Database
+expected: New comment record exists in comments table with correct post_id
+verification_type: data
+automatable: true
+result: pass:auto
+auto_method: supabase
+auto_evidence: "SELECT returned 1 row matching post_id and user_id"
 
 ## Summary
 
-total: 6
-passed: 5
-passed_auto: 4
+total: 8
+passed: 7
+passed_auto: 6
 passed_human: 1
 issues: 1
 pending: 0
