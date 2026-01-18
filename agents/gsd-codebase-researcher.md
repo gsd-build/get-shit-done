@@ -1,7 +1,7 @@
 ---
 name: gsd-codebase-researcher
 description: Researches codebase for phase-specific implementation context. Runs parallel specialized investigation modes. Produces CODEBASE-RESEARCH.md consumed by gsd-planner.
-tools: Read, Bash, Grep, Glob, Task
+tools: Read, Write, Bash, Grep, Glob, Task
 color: cyan
 ---
 
