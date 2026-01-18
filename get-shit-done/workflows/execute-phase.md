@@ -465,27 +465,87 @@ git commit -m "docs(phase-{X}): complete phase execution"
 </step>
 
 <step name="offer_next">
-Present next steps based on milestone status:
+Route based on config mode (from config.json) and verification status.
+
+**Read config mode:**
+```bash
+MODE=$(cat .planning/config.json 2>/dev/null | grep -o '"mode"[[:space:]]*:[[:space:]]*"[^"]*"' | cut -d'"' -f4)
+MODE=${MODE:-interactive}  # Default to interactive
+```
+
+**Routing logic:**
+
+| Status | Mode | Action |
+|--------|------|--------|
+| `passed` + more phases | yolo | Auto-continue to next phase |
+| `passed` + more phases | interactive | Use AskUserQuestion |
+| `passed` + last phase | yolo | Auto-continue to audit |
+| `passed` + last phase | interactive | Use AskUserQuestion |
+
+---
+
+**YOLO Mode: Auto-Continue**
+
+If mode is "yolo" and verification passed, output brief banner and continue:
+
+```
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+ GSD ► PHASE {X} COMPLETE ✓ → Continuing to Phase {X+1}
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+```
+
+Then immediately:
+- If more phases → Execute `/gsd:execute-phase {X+1}`
+- If last phase → Execute `/gsd:audit-milestone`
+
+---
+
+**Interactive Mode: Use AskUserQuestion**
 
 **If more phases remain:**
+
+Output completion banner, then use AskUserQuestion:
+
+```json
+{
+  "questions": [{
+    "header": "Next Step",
+    "question": "Phase {X} complete. What's next?",
+    "multiSelect": false,
+    "options": [
+      { "label": "Continue to Phase {X+1} (Recommended)", "description": "Execute next phase" },
+      { "label": "Review what was built", "description": "See execution summary" },
+      { "label": "Take a break", "description": "Pause work" }
+    ]
+  }]
+}
 ```
-## Next Up
 
-**Phase {X+1}: {Name}** — {Goal}
-
-`/gsd:plan-phase {X+1}`
-
-<sub>`/clear` first for fresh context</sub>
-```
+Handle response:
+- "Continue" → Run `/gsd:execute-phase {X+1}`
+- "Review" → Show summary, ask again
+- "Take a break" → Run `/gsd:pause-work`
 
 **If milestone complete:**
-```
-MILESTONE COMPLETE!
 
-All {N} phases executed.
+Output completion banner, then use AskUserQuestion:
 
-`/gsd:complete-milestone`
+```json
+{
+  "questions": [{
+    "header": "Milestone Done",
+    "question": "All phases complete! What's next?",
+    "multiSelect": false,
+    "options": [
+      { "label": "Audit milestone (Recommended)", "description": "Verify cross-phase integration" },
+      { "label": "Complete milestone", "description": "Skip audit, archive" },
+      { "label": "Manual testing", "description": "Run /gsd:verify-work" }
+    ]
+  }]
+}
 ```
+
+Handle response accordingly.
 </step>
 
 </process>

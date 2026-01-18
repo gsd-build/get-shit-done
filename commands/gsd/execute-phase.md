@@ -38,34 +38,40 @@ Phase: $ARGUMENTS
 </context>
 
 <process>
-1. **Validate phase exists**
+1. **Load config**
+   ```bash
+   cat .planning/config.json 2>/dev/null
+   ```
+   Extract `mode` field: "yolo" or "interactive" (default: "interactive")
+
+2. **Validate phase exists**
    - Find phase directory matching argument
    - Count PLAN.md files
    - Error if no plans found
 
-2. **Discover plans**
+3. **Discover plans**
    - List all *-PLAN.md files in phase directory
    - Check which have *-SUMMARY.md (already complete)
    - If `--gaps-only`: filter to only plans with `gap_closure: true`
    - Build list of incomplete plans
 
-3. **Group by wave**
+4. **Group by wave**
    - Read `wave` from each plan's frontmatter
    - Group plans by wave number
    - Report wave structure to user
 
-4. **Execute waves**
+5. **Execute waves**
    For each wave in order:
    - Spawn `gsd-executor` for each plan in wave (parallel Task calls)
    - Wait for completion (Task blocks)
    - Verify SUMMARYs created
    - Proceed to next wave
 
-5. **Aggregate results**
+6. **Aggregate results**
    - Collect summaries from all plans
    - Report phase completion status
 
-6. **Commit any orchestrator corrections**
+7. **Commit any orchestrator corrections**
    Check for uncommitted changes before verification:
    ```bash
    git status --porcelain
@@ -78,49 +84,81 @@ Phase: $ARGUMENTS
 
    **If clean:** Continue to verification.
 
-7. **Verify phase goal**
+8. **Verify phase goal**
    - Spawn `gsd-verifier` subagent with phase directory and goal
    - Verifier checks must_haves against actual codebase (not SUMMARY claims)
    - Creates VERIFICATION.md with detailed report
    - Route by status:
-     - `passed` → continue to step 8
+     - `passed` → continue to step 9
      - `human_needed` → present items, get approval or feedback
      - `gaps_found` → present gaps, offer `/gsd:plan-phase {X} --gaps`
 
-8. **Update roadmap and state**
+9. **Update roadmap and state**
    - Update ROADMAP.md, STATE.md
 
-9. **Update requirements**
-   Mark phase requirements as Complete:
-   - Read ROADMAP.md, find this phase's `Requirements:` line (e.g., "AUTH-01, AUTH-02")
-   - Read REQUIREMENTS.md traceability table
-   - For each REQ-ID in this phase: change Status from "Pending" to "Complete"
-   - Write updated REQUIREMENTS.md
-   - Skip if: REQUIREMENTS.md doesn't exist, or phase has no Requirements line
+10. **Update requirements**
+    Mark phase requirements as Complete:
+    - Read ROADMAP.md, find this phase's `Requirements:` line (e.g., "AUTH-01, AUTH-02")
+    - Read REQUIREMENTS.md traceability table
+    - For each REQ-ID in this phase: change Status from "Pending" to "Complete"
+    - Write updated REQUIREMENTS.md
+    - Skip if: REQUIREMENTS.md doesn't exist, or phase has no Requirements line
 
-10. **Commit phase completion**
+11. **Commit phase completion**
     Bundle all phase metadata updates in one commit:
     - Stage: `git add .planning/ROADMAP.md .planning/STATE.md`
     - Stage REQUIREMENTS.md if updated: `git add .planning/REQUIREMENTS.md`
     - Commit: `docs({phase}): complete {phase-name} phase`
 
-11. **Offer next steps**
-    - Route to next action (see `<offer_next>`)
+12. **Route to next action**
+    Based on config mode and verification status (see `<offer_next>`)
 </process>
 
 <offer_next>
-Output this markdown directly (not as a code block). Route based on status:
+Route based on config mode and verification status.
 
-| Status | Route |
-|--------|-------|
-| `gaps_found` | Route C (gap closure) |
-| `human_needed` | Present checklist, then re-route based on approval |
-| `passed` + more phases | Route A (next phase) |
-| `passed` + last phase | Route B (milestone complete) |
+## Mode Detection
+
+Read mode from config.json (loaded in step 1):
+- `"yolo"` → Auto-continue without asking
+- `"interactive"` (default) → Use AskUserQuestion to present options
+
+## Routing Table
+
+| Status | Mode | Action |
+|--------|------|--------|
+| `gaps_found` | any | Route C (gap closure) - always ask, gaps need attention |
+| `human_needed` | any | Present checklist, wait for approval |
+| `passed` + more phases | yolo | **Auto-continue**: Run `/gsd:execute-phase {Z+1}` |
+| `passed` + more phases | interactive | Route A with AskUserQuestion |
+| `passed` + last phase | yolo | **Auto-continue**: Run `/gsd:audit-milestone` |
+| `passed` + last phase | interactive | Route B with AskUserQuestion |
 
 ---
 
+## YOLO Mode: Auto-Continue
+
+**If mode is "yolo" and verification passed:**
+
+Output completion banner, then immediately continue:
+
+```
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+ GSD ► PHASE {Z} COMPLETE ✓ → Continuing to Phase {Z+1}
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+```
+
+Then execute next phase directly (no user input required):
+- If more phases → Run `/gsd:execute-phase {Z+1}`
+- If last phase → Run `/gsd:audit-milestone`
+
+---
+
+## Interactive Mode: Use AskUserQuestion
+
 **Route A: Phase verified, more phases remain**
+
+Output completion banner:
 
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
  GSD ► PHASE {Z} COMPLETE ✓
@@ -133,25 +171,33 @@ Goal verified ✓
 
 ───────────────────────────────────────────────────────────────
 
-## ▶ Next Up
+Then use AskUserQuestion:
 
-**Phase {Z+1}: {Name}** — {Goal from ROADMAP.md}
+```json
+{
+  "questions": [{
+    "header": "Next Step",
+    "question": "Phase {Z} complete. What's next?",
+    "multiSelect": false,
+    "options": [
+      { "label": "Continue to Phase {Z+1} (Recommended)", "description": "Execute next phase: {Phase Z+1 Name}" },
+      { "label": "Review what was built", "description": "See execution summary before continuing" },
+      { "label": "Take a break", "description": "Pause work, can resume later with /gsd:resume-work" }
+    ]
+  }]
+}
+```
 
-/gsd:discuss-phase {Z+1} — gather context and clarify approach
-
-<sub>/clear first → fresh context window</sub>
+**Handle response:**
+- "Continue to Phase {Z+1}" → Run `/gsd:execute-phase {Z+1}`
+- "Review what was built" → Show summary, then ask again
+- "Take a break" → Run `/gsd:pause-work`
 
 ───────────────────────────────────────────────────────────────
-
-**Also available:**
-- /gsd:plan-phase {Z+1} — skip discussion, plan directly
-- /gsd:verify-work {Z} — manual acceptance testing before continuing
-
-───────────────────────────────────────────────────────────────
-
----
 
 **Route B: Phase verified, milestone complete**
+
+Output completion banner:
 
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
  GSD ► MILESTONE COMPLETE 🎉
@@ -164,23 +210,29 @@ All phase goals verified ✓
 
 ───────────────────────────────────────────────────────────────
 
-## ▶ Next Up
+Then use AskUserQuestion:
 
-**Audit milestone** — verify requirements, cross-phase integration, E2E flows
+```json
+{
+  "questions": [{
+    "header": "Milestone Done",
+    "question": "All phases complete! What's next?",
+    "multiSelect": false,
+    "options": [
+      { "label": "Audit milestone (Recommended)", "description": "Verify requirements, cross-phase integration, E2E flows" },
+      { "label": "Complete milestone", "description": "Skip audit, archive directly" },
+      { "label": "Manual testing first", "description": "Run /gsd:verify-work before archiving" }
+    ]
+  }]
+}
+```
 
-/gsd:audit-milestone
-
-<sub>/clear first → fresh context window</sub>
+**Handle response:**
+- "Audit milestone" → Run `/gsd:audit-milestone`
+- "Complete milestone" → Run `/gsd:complete-milestone`
+- "Manual testing first" → Run `/gsd:verify-work`
 
 ───────────────────────────────────────────────────────────────
-
-**Also available:**
-- /gsd:verify-work — manual acceptance testing
-- /gsd:complete-milestone — skip audit, archive directly
-
-───────────────────────────────────────────────────────────────
-
----
 
 **Route C: Gaps found — need additional planning**
 
@@ -199,30 +251,29 @@ Report: .planning/phases/{phase_dir}/{phase}-VERIFICATION.md
 
 ───────────────────────────────────────────────────────────────
 
-## ▶ Next Up
+Use AskUserQuestion (even in yolo mode - gaps need attention):
 
-**Plan gap closure** — create additional plans to complete the phase
+```json
+{
+  "questions": [{
+    "header": "Gaps Found",
+    "question": "Phase has gaps. How to proceed?",
+    "multiSelect": false,
+    "options": [
+      { "label": "Plan gap closure (Recommended)", "description": "Create plans to fix missing items" },
+      { "label": "See full report", "description": "Review VERIFICATION.md before deciding" },
+      { "label": "Skip gaps, continue anyway", "description": "Accept incomplete phase, move on" }
+    ]
+  }]
+}
+```
 
-/gsd:plan-phase {Z} --gaps
-
-<sub>/clear first → fresh context window</sub>
+**Handle response:**
+- "Plan gap closure" → Run `/gsd:plan-phase {Z} --gaps`
+- "See full report" → Show VERIFICATION.md, then ask again
+- "Skip gaps, continue anyway" → Proceed to next phase (with warning logged)
 
 ───────────────────────────────────────────────────────────────
-
-**Also available:**
-- cat .planning/phases/{phase_dir}/{phase}-VERIFICATION.md — see full report
-- /gsd:verify-work {Z} — manual testing before planning
-
-───────────────────────────────────────────────────────────────
-
----
-
-After user runs /gsd:plan-phase {Z} --gaps:
-1. Planner reads VERIFICATION.md gaps
-2. Creates plans 04, 05, etc. to close gaps
-3. User runs /gsd:execute-phase {Z} again
-4. Execute-phase runs incomplete plans (04, 05...)
-5. Verifier runs again → loop until passed
 </offer_next>
 
 <wave_execution>
