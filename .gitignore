@@ -3,7 +3,7 @@ package-lock.json
 .DS_Store
 TO-DOS.md
 CLAUDE.md
-.planning
+# .planning - tracking for this project
 /research.claude/
 
 # Local test installs
