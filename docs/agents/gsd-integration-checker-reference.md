@@ -50,6 +50,7 @@ Integration verification checks four connection types:
 
 ## Verification Process
 Extract from phase SUMMARY.md files what each phase provides vs consumes.
+
 ### Step 1: Build Export/Import Map
 Extract from phase SUMMARYs what each phase provides vs consumes.
 
@@ -72,7 +73,7 @@ Check sensitive routes (dashboard, settings, profile) actually check auth.
 Trace common flows: Auth flow, Data display flow, Form submission flow.
 
 ### Step 6: Compile Integration Report
-Structure findings for milestone auditor.
+Structure findings for milestone auditor as a markdown report (not YAML).
 
 ---
 
@@ -88,7 +89,7 @@ Structure findings for milestone auditor.
 
 ## Output Format
 
-Structured report with sections:
+Structured markdown report with sections:
 
 | Section | Contents |
 |---------|----------|
@@ -98,36 +99,44 @@ Structured report with sections:
 | **E2E Flows** | Complete/Broken flow counts |
 | **Detailed Findings** | Orphaned exports, missing connections, broken flows, unprotected routes |
 
-### Wiring Status Schema
-```yaml
-wiring:
-  connected:
-    - export: "getCurrentUser"
-      from: "Phase 1 (Auth)"
-      used_by: ["Phase 3", "Phase 4"]
-  orphaned:
-    - export: "formatUserData"
-      from: "Phase 2"
-      reason: "Exported but never imported"
-  missing:
-    - expected: "Auth check in Dashboard"
-      from: "Phase 1"
-      to: "Phase 3"
-      reason: "Dashboard doesn't call useAuth"
-```
+### Expected Markdown Skeleton
+```markdown
+## Integration Check Complete
 
-### Flow Status Schema
-```yaml
-flows:
-  complete:
-    - name: "User signup"
-      steps: ["Form", "API", "DB", "Redirect"]
-  broken:
-    - name: "View dashboard"
-      broken_at: "Data fetch"
-      reason: "Dashboard component doesn't fetch user data"
-      steps_complete: ["Route", "Component render"]
-      steps_missing: ["Fetch", "State", "Display"]
+### Wiring Summary
+
+**Connected:** {N} exports properly used
+**Orphaned:** {N} exports created but unused
+**Missing:** {N} expected connections not found
+
+### API Coverage
+
+**Consumed:** {N} routes have callers
+**Orphaned:** {N} routes with no callers
+
+### Auth Protection
+
+**Protected:** {N} sensitive areas check auth
+**Unprotected:** {N} sensitive areas missing auth
+
+### E2E Flows
+
+**Complete:** {N} flows work end-to-end
+**Broken:** {N} flows have breaks
+
+### Detailed Findings
+
+#### Orphaned Exports
+{List each with from/reason}
+
+#### Missing Connections
+{List each with from/to/expected/reason}
+
+#### Broken Flows
+{List each with name/broken_at/reason/missing_steps}
+
+#### Unprotected Routes
+{List each with path/reason}
 ```
 
 ---
@@ -157,7 +166,7 @@ CORE RULES:
 • Check CONNECTIONS not existence (existence is phase-level)
 • Trace full paths: Component → API → DB → Response → Display
 • Be specific about breaks with file/line references
-• Return structured YAML format for aggregation
+• Return the structured markdown report for aggregation
 
 SPAWNED BY: /gsd:audit-milestone
 CONSUMED BY: Milestone auditor (aggregates with phase verification)
