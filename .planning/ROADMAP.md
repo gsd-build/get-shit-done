@@ -45,10 +45,11 @@ Plans:
   3. User is prompted to decide on docs with validation issues (include/exclude)
   4. Each verified claim shows confidence level (HIGH/MEDIUM/LOW)
   5. Validation uses dedicated sub-agent following gsd-verifier patterns
-**Plans**: TBD
+**Plans**: 2 plans
 
 Plans:
-- [ ] 02-01: TBD
+- [ ] 02-01-PLAN.md — Create gsd-doc-validator agent
+- [ ] 02-02-PLAN.md — Integrate validation into map-codebase workflow
 
 ### Phase 3: Workflow Integration
 **Goal**: Validated user docs are available to all downstream GSD phases
@@ -84,8 +85,8 @@ Phases execute in numeric order: 1 -> 2 -> 3 -> 4
 
 | Phase | Plans Complete | Status | Completed |
 |-------|----------------|--------|-----------|
-| 1. Document Ingestion Core | 2/2 | ✓ Complete | 2026-01-19 |
-| 2. Document Validation | 0/TBD | Not started | - |
+| 1. Document Ingestion Core | 2/2 | Complete | 2026-01-19 |
+| 2. Document Validation | 0/2 | Planned | - |
 | 3. Workflow Integration | 0/TBD | Not started | - |
 | 4. Documentation and Release | 0/TBD | Not started | - |
 
