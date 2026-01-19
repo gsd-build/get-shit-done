@@ -549,6 +549,536 @@ function validateFrontmatter(frontmatter) {
 }
 ```
 
+## Security Rule Documentation Patterns
+
+This section provides implementation guidance for documenting security rules (SEC-01 through SEC-07) in constitution templates. Each pattern includes good/bad examples, rationale templates, and verification guidance.
+
+### SEC-01: No Hardcoded Secrets (NON-NEGOTIABLE)
+
+**Pattern:** API keys, passwords, tokens, connection strings must never appear in source code.
+
+**Good Example (Environment Variables):**
+```javascript
+// GOOD: Secrets from environment variables
+const apiKey = process.env.API_KEY;
+const dbPassword = process.env.DB_PASSWORD;
+
+// Database connection using env vars
+const connection = mysql.createConnection({
+  host: process.env.DB_HOST,
+  user: process.env.DB_USER,
+  password: process.env.DB_PASSWORD
+});
+```
+
+**Good Example (Secrets Manager):**
+```python
+# GOOD: Secrets from AWS Secrets Manager
+import boto3
+from botocore.exceptions import ClientError
+
+def get_secret(secret_name):
+    client = boto3.client('secretsmanager')
+    response = client.get_secret_value(SecretId=secret_name)
+    return response['SecretString']
+
+api_key = get_secret('prod/api-key')
+```
+
+**Bad Example (Hardcoded):**
+```javascript
+// BAD: Hardcoded credentials
+const apiKey = 'sk_live_4eC39HqLyjWDarjtT1zdp7dc';
+const dbPassword = 'MyP@ssw0rd123!';
+
+// BAD: Connection string with embedded credentials
+const connectionString = 'mongodb://admin:password123@localhost:27017/mydb';
+```
+
+**Rationale Template:**
+Hardcoded secrets create multiple security risks: (1) Secrets committed to version control remain in git history permanently, even after removal. (2) Anyone with repository access (developers, contractors, CI/CD systems) can extract credentials. (3) Secrets cannot be rotated without code changes and redeployment. (4) Public repositories expose credentials to entire internet. According to OWASP, hardcoded secrets are a critical vulnerability that enables unauthorized access, data breaches, and lateral movement within systems.
+
+**Verification Guidance:**
+- Grep patterns: `grep -rE "(password|api_key|secret|token)\s*=\s*['\"][^'\"]+" --include="*.js" --include="*.py" --include="*.java"`
+- Check for connection strings: `grep -rE "(mongodb|postgresql|mysql)://[^@]+:[^@]+@" .`
+- Files to examine: `.env.example` should exist with placeholders, `.env` should be in `.gitignore`
+- Git history scan: `git log -p | grep -i "password\|api.key\|secret"`
+- Exclude: Test fixtures with dummy data, documentation examples
+
+### SEC-02: Parameterized Queries Only (NON-NEGOTIABLE)
+
+**Pattern:** All database queries must use parameterized statements or prepared statements. Never concatenate user input into SQL strings.
+
+**Good Example (Node.js with Parameterization):**
+```javascript
+// GOOD: Parameterized query
+const userId = req.params.id;
+const query = 'SELECT * FROM users WHERE id = ?';
+connection.query(query, [userId], (error, results) => {
+  // Handle results
+});
+```
+
+**Good Example (Python with Prepared Statement):**
+```python
+# GOOD: Parameterized query with psycopg2
+cursor = conn.cursor()
+user_name = request.form['username']
+cursor.execute("SELECT * FROM users WHERE username = %s", (user_name,))
+results = cursor.fetchall()
+```
+
+**Good Example (Java with PreparedStatement):**
+```java
+// GOOD: PreparedStatement separates code from data
+String custName = request.getParameter("customerName");
+String query = "SELECT account_balance FROM user_data WHERE user_name = ?";
+PreparedStatement pstmt = connection.prepareStatement(query);
+pstmt.setString(1, custName);
+ResultSet results = pstmt.executeQuery();
+```
+
+**Bad Example (String Concatenation):**
+```javascript
+// BAD: SQL injection vulnerability
+const userId = req.params.id;
+const query = 'SELECT * FROM users WHERE id = ' + userId;
+connection.query(query, (error, results) => {
+  // Attacker can inject: 1 OR 1=1
+});
+
+// BAD: Template literal injection
+const email = req.body.email;
+const query = `SELECT * FROM users WHERE email = '${email}'`;
+// Attacker can inject: ' OR '1'='1
+```
+
+**Bad Example (Python String Formatting):**
+```python
+# BAD: String formatting vulnerable to injection
+user_input = request.args.get('id')
+query = f"SELECT * FROM users WHERE id = {user_input}"
+cursor.execute(query)
+# Attacker can inject: 1; DROP TABLE users; --
+```
+
+**Rationale Template:**
+SQL injection enables attackers to: (1) Extract entire database contents including passwords and PII. (2) Modify or delete data (DROP TABLE, UPDATE all rows). (3) Execute administrative operations (create users, change permissions). (4) Read arbitrary files from the database server. (5) In some cases, execute operating system commands. Parameterized queries prevent SQL injection by ensuring user input is always treated as data, never as executable SQL code. The database driver handles proper escaping and quoting automatically. According to OWASP, SQL injection remains in the Top 10 web vulnerabilities and is the primary attack vector for database breaches.
+
+**Verification Guidance:**
+- Grep patterns for concatenation: `grep -rE "(SELECT|INSERT|UPDATE|DELETE).*\+.*req\.|request\.|params\.|body\." --include="*.js"`
+- Template literals: `grep -rE '\$\{.*req\.|request\.|params\.' --include="*.js"`
+- Python string formatting: `grep -rE '(f"|\.format\().*SELECT|INSERT|UPDATE|DELETE' --include="*.py"`
+- Look for: `connection.query()`, `cursor.execute()`, `Statement.executeQuery()` calls
+- Verify: All user input variables appear in parameter arrays, not in SQL strings
+- Exclude: Static queries with no user input, query builders that handle parameterization
+
+### SEC-03: Input Validation Required (ERROR)
+
+**Pattern:** All user input must be validated for type, format, range, length, and character set before processing.
+
+**Good Example (Type and Format Validation):**
+```javascript
+// GOOD: Allowlist validation with regex
+function validateZipCode(zipCode) {
+  const zipPattern = /^\d{5}(-\d{4})?$/;
+  if (!zipPattern.test(zipCode)) {
+    throw new ValidationError('Invalid zip code format');
+  }
+  return zipCode;
+}
+
+// GOOD: Type and range validation
+function validateAge(age) {
+  const numericAge = parseInt(age, 10);
+  if (isNaN(numericAge) || numericAge < 0 || numericAge > 150) {
+    throw new ValidationError('Age must be 0-150');
+  }
+  return numericAge;
+}
+```
+
+**Good Example (Server-Side Schema Validation):**
+```javascript
+// GOOD: Joi schema validation
+const Joi = require('joi');
+
+const userSchema = Joi.object({
+  username: Joi.string().alphanum().min(3).max(30).required(),
+  email: Joi.string().email().required(),
+  age: Joi.number().integer().min(0).max(150)
+});
+
+app.post('/register', (req, res) => {
+  const { error, value } = userSchema.validate(req.body);
+  if (error) {
+    return res.status(400).json({ error: error.details[0].message });
+  }
+  // Proceed with validated data
+});
+```
+
+**Bad Example (No Validation):**
+```javascript
+// BAD: Direct use of user input without validation
+app.post('/user', (req, res) => {
+  const age = req.body.age;  // Could be string, negative, huge number
+  const email = req.body.email;  // Could be malformed, missing
+
+  // Process without validation
+  database.insertUser({ age, email });
+});
+```
+
+**Bad Example (Client-Side Only):**
+```html
+<!-- BAD: Client-side validation easily bypassed -->
+<form onsubmit="return validateForm()">
+  <input type="email" id="email" required>
+</form>
+
+<script>
+  // Only client-side - attacker can bypass with curl/Postman
+  function validateForm() {
+    const email = document.getElementById('email').value;
+    return email.includes('@');
+  }
+</script>
+```
+
+**Rationale Template:**
+Unvalidated input enables multiple attack vectors: (1) Type confusion attacks (sending array when string expected). (2) Buffer overflow (extremely long strings crash application). (3) Business logic bypass (negative quantities, out-of-range dates). (4) Downstream injection attacks (malicious input passed to SQL, shell commands, templates). Client-side validation provides UX feedback but offers zero security—attackers bypass it with direct API calls. Server-side validation must verify type, format, range, and length. Allowlisting (defining what IS valid) is significantly more secure than denylisting (blocking known bad patterns). According to OWASP, 42% of API breaches originate from improper input validation.
+
+**Verification Guidance:**
+- Look for: Direct use of `req.body`, `req.params`, `req.query` without validation
+- Check for validation libraries: `joi`, `yup`, `express-validator`, `zod`
+- Verify: Validation happens server-side before database operations
+- Grep patterns: `grep -rE "req\.(body|params|query)\.\w+.*database|pool|query" --include="*.js"`
+- API endpoints: Each POST/PUT/PATCH handler should have validation
+- Exclude: GET requests reading from database (still need output sanitization)
+
+### SEC-04: Output Sanitization Required (ERROR)
+
+**Pattern:** User-controlled data displayed in UI must be HTML-encoded or sanitized to prevent XSS attacks.
+
+**Good Example (HTML Entity Encoding):**
+```javascript
+// GOOD: React automatically escapes text content
+function UserProfile({ username }) {
+  return <div>{username}</div>;  // React escapes special chars
+}
+
+// GOOD: Manual encoding for plain JavaScript
+function escapeHtml(unsafe) {
+  return unsafe
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;")
+    .replace(/"/g, "&quot;")
+    .replace(/'/g, "&#039;");
+}
+
+element.textContent = userInput;  // Safe - textContent auto-encodes
+```
+
+**Good Example (HTML Sanitization for Rich Content):**
+```javascript
+// GOOD: DOMPurify for user-generated HTML
+import DOMPurify from 'dompurify';
+
+function BlogPost({ userContent }) {
+  const sanitized = DOMPurify.sanitize(userContent);
+  return <div dangerouslySetInnerHTML={{ __html: sanitized }} />;
+}
+```
+
+**Bad Example (Unsanitized Output):**
+```javascript
+// BAD: Direct insertion of user input
+element.innerHTML = userInput;  // XSS vulnerability
+
+// BAD: Unescaped template literal
+const html = `<div>${userComment}</div>`;  // XSS if userComment contains <script>
+document.body.innerHTML = html;
+
+// BAD: jQuery direct HTML insertion
+$('#content').html(userInput);  // XSS vulnerability
+```
+
+**Bad Example (Incomplete Sanitization):**
+```javascript
+// BAD: Denylisting approach - easily bypassed
+function badSanitize(input) {
+  return input.replace(/<script>/g, '');  // Bypassed by <SCRIPT>, <img onerror=>
+}
+```
+
+**Rationale Template:**
+Cross-Site Scripting (XSS) allows attackers to: (1) Steal session cookies and authentication tokens. (2) Perform actions as the victim user (transfer money, change password). (3) Deface websites. (4) Redirect users to phishing sites. (5) Install keyloggers and track user behavior. XSS occurs when user-controlled data is rendered in HTML without proper encoding. Output encoding converts special characters (`<`, `>`, `&`, `"`, `'`) into HTML entities so browsers render them as text, not executable code. For rich content (markdown, WYSIWYG editors), use battle-tested sanitization libraries like DOMPurify that parse HTML and remove dangerous elements/attributes. Never build custom sanitization—attackers find bypasses. According to OWASP, XSS affects approximately two-thirds of web applications.
+
+**Verification Guidance:**
+- Look for: `innerHTML`, `dangerouslySetInnerHTML`, `document.write()` with user data
+- Check React: `dangerouslySetInnerHTML` must use DOMPurify or similar
+- Grep patterns: `grep -rE "innerHTML|dangerouslySetInnerHTML" --include="*.js" --include="*.jsx"`
+- Verify: User input variables are encoded before HTML rendering
+- Check for sanitization libraries: `DOMPurify`, `sanitize-html`, `xss`
+- Template engines: Ensure auto-escaping enabled (Handlebars `{{ }}` not `{{{ }}}`)
+- Exclude: Static HTML with no user input, admin-only content from trusted sources
+
+### SEC-05: Authentication/Authorization Checks (ERROR)
+
+**Pattern:** Protected resources must verify user identity (authentication) and permissions (authorization) before granting access.
+
+**Good Example (Express Middleware):**
+```javascript
+// GOOD: Authentication middleware
+function requireAuth(req, res, next) {
+  const token = req.headers.authorization?.split(' ')[1];
+  if (!token) {
+    return res.status(401).json({ error: 'Authentication required' });
+  }
+
+  try {
+    const decoded = jwt.verify(token, process.env.JWT_SECRET);
+    req.user = decoded;
+    next();
+  } catch (error) {
+    return res.status(401).json({ error: 'Invalid token' });
+  }
+}
+
+// GOOD: Authorization check
+function requireRole(role) {
+  return (req, res, next) => {
+    if (req.user.role !== role) {
+      return res.status(403).json({ error: 'Insufficient permissions' });
+    }
+    next();
+  };
+}
+
+// Apply to protected routes
+app.delete('/users/:id', requireAuth, requireRole('admin'), deleteUser);
+```
+
+**Good Example (Resource-Level Authorization):**
+```javascript
+// GOOD: Verify user owns resource before modification
+app.put('/posts/:id', requireAuth, async (req, res) => {
+  const post = await db.posts.findById(req.params.id);
+
+  if (!post) {
+    return res.status(404).json({ error: 'Post not found' });
+  }
+
+  // Horizontal privilege escalation prevention
+  if (post.authorId !== req.user.id) {
+    return res.status(403).json({ error: 'Not your post' });
+  }
+
+  // Proceed with update
+  await db.posts.update(req.params.id, req.body);
+  res.json({ success: true });
+});
+```
+
+**Bad Example (No Authentication Check):**
+```javascript
+// BAD: Unprotected endpoint
+app.delete('/users/:id', (req, res) => {
+  // Anyone can delete any user - no auth check
+  database.deleteUser(req.params.id);
+  res.json({ success: true });
+});
+```
+
+**Bad Example (Authentication Without Authorization):**
+```javascript
+// BAD: Checks authentication but not authorization
+app.get('/users/:id/orders', requireAuth, (req, res) => {
+  // User is authenticated but can view ANY user's orders
+  const orders = database.getOrders(req.params.id);
+  res.json(orders);
+  // Should check: req.params.id === req.user.id
+});
+```
+
+**Rationale Template:**
+Broken authentication and authorization are consistently in OWASP Top 10. Missing checks enable: (1) Unauthorized access to sensitive data (view other users' orders, medical records, financial info). (2) Privilege escalation (regular user performs admin actions). (3) Account takeover (modify other users' profiles, passwords). (4) Data manipulation (delete or modify resources owned by others). Authentication verifies "who you are" via credentials/tokens. Authorization verifies "what you can do" based on roles and ownership. Both must be checked on the server side for every protected request. Client-side checks provide UX but no security. According to OWASP, horizontal privilege escalation (accessing other users' resources) is an especially common weakness.
+
+**Verification Guidance:**
+- Look for: Endpoints with authentication middleware: `requireAuth`, `passport.authenticate()`
+- Check: Authorization logic verifies `req.user.id === resourceOwnerId`
+- Grep patterns: `grep -rE "app\.(get|post|put|delete|patch)" --include="*.js"` then verify middleware
+- Protected endpoints: `/admin/*`, `/users/:id/*`, DELETE/PUT/PATCH operations
+- Verify: Token validation, role checks, resource ownership checks
+- Test: Can user A access user B's resources by changing ID in URL?
+- Exclude: Public endpoints (login, register, public content)
+
+### SEC-06: Secure Dependency Management (WARNING)
+
+**Pattern:** Use dependencies from trusted sources, keep them updated, scan for known vulnerabilities.
+
+**Good Example (Dependency Auditing):**
+```bash
+# GOOD: Regular vulnerability scanning
+npm audit
+npm audit fix  # Auto-fix non-breaking vulnerabilities
+
+# GOOD: Use CI/CD checks
+npm ci  # Enforces lockfile, fails on inconsistencies
+```
+
+**Good Example (Dependency Verification):**
+```json
+// package.json - GOOD: Pinned versions for security-critical deps
+{
+  "dependencies": {
+    "express": "4.18.2",  // Exact version
+    "jsonwebtoken": "~9.0.0"  // Patch updates only
+  },
+  "devDependencies": {
+    "eslint": "^8.0.0"  // Dev tools can be more flexible
+  }
+}
+```
+
+**Good Example (Automated Monitoring):**
+```yaml
+# .github/workflows/security.yml
+name: Security Scan
+on: [push, schedule]
+jobs:
+  audit:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v3
+      - run: npm audit --audit-level=moderate
+      - uses: snyk/actions/node@master  # Third-party scanning
+```
+
+**Bad Example (Outdated Dependencies):**
+```json
+// BAD: Dependencies 2+ years old with known vulnerabilities
+{
+  "dependencies": {
+    "express": "4.15.0",  // Released 2017, has CVEs
+    "lodash": "4.17.4"    // Known prototype pollution vuln
+  }
+}
+```
+
+**Bad Example (Unsafe Ranges):**
+```json
+// BAD: Wildcard versions allow breaking/vulnerable changes
+{
+  "dependencies": {
+    "jsonwebtoken": "*",     // Any version - extremely dangerous
+    "axios": "latest"        // Unpredictable updates
+  }
+}
+```
+
+**Rationale Template:**
+Supply chain attacks are the fastest-growing threat vector. Attackers compromise popular packages to inject malicious code reaching millions of users. Vulnerable dependencies introduce known security flaws that attackers actively exploit. In 2025, the Shai-Hulud worm compromised 500+ npm packages through self-replicating supply chain attack (CISA alert). Secure dependency management requires: (1) Using lockfiles (`package-lock.json`) for deterministic builds. (2) Running `npm audit` regularly to detect known CVEs. (3) Avoiding blind updates—wait 21+ days before adopting new versions. (4) Using `npm ci` in CI/CD to enforce exact versions. (5) Enabling 2FA on package registries to prevent account takeover. According to industry research, by 2026 more than half of Node.js security incidents stem from compromised dependencies.
+
+**Verification Guidance:**
+- Check files: `package-lock.json` or `yarn.lock` committed to repo
+- Run: `npm audit` and check exit code (0 = no vulnerabilities)
+- Verify: No dependencies with `*` or `latest` in `package.json`
+- Check: Last `npm audit` or `npm update` timestamp in git history
+- CI/CD: Security scanning integrated in build pipeline
+- Look for: Snyk, Dependabot, GitHub Security Alerts enabled
+- Exclude: Dev dependencies with low security impact (linters, formatters)
+
+### SEC-07: No Sensitive Data Exposure (WARNING)
+
+**Pattern:** Error messages, logs, and API responses must not leak passwords, tokens, PII, or internal system details.
+
+**Good Example (Safe Error Handling):**
+```javascript
+// GOOD: Generic error messages to users
+app.use((err, req, res, next) => {
+  // Log full error server-side for debugging
+  logger.error('Request failed', {
+    error: err.message,
+    stack: err.stack,
+    userId: req.user?.id  // User ID OK, no password
+  });
+
+  // Send generic message to client
+  res.status(500).json({
+    error: 'An error occurred processing your request',
+    requestId: req.id  // For support correlation
+  });
+});
+```
+
+**Good Example (Safe Logging):**
+```javascript
+// GOOD: Filter sensitive fields from logs
+const sanitizeForLogging = (obj) => {
+  const safe = { ...obj };
+  delete safe.password;
+  delete safe.token;
+  delete safe.creditCard;
+  delete safe.ssn;
+  return safe;
+};
+
+logger.info('User login', sanitizeForLogging(req.body));
+```
+
+**Bad Example (Leaking Stack Traces):**
+```javascript
+// BAD: Exposing stack traces to users
+app.use((err, req, res, next) => {
+  res.status(500).json({
+    error: err.message,
+    stack: err.stack,  // Reveals file paths, framework versions
+    query: err.sql     // Leaks database schema
+  });
+});
+```
+
+**Bad Example (Logging Sensitive Data):**
+```javascript
+// BAD: Logging passwords and tokens
+logger.info('User registration', req.body);
+// req.body contains: { username: 'alice', password: 'secret123' }
+
+logger.debug('API request', {
+  headers: req.headers  // Contains Authorization: Bearer token
+});
+```
+
+**Bad Example (Verbose SQL Errors):**
+```javascript
+// BAD: Database errors reveal schema
+app.get('/users/:id', (req, res) => {
+  db.query('SELECT * FROM users WHERE id = ?', [req.params.id], (err, rows) => {
+    if (err) {
+      // Reveals table structure, column names
+      return res.status(500).json({ error: err.message });
+    }
+    res.json(rows);
+  });
+});
+```
+
+**Rationale Template:**
+Sensitive data exposure in logs and errors enables attackers to: (1) Extract credentials from log files (passwords, API keys accidentally logged). (2) Discover internal architecture (stack traces reveal file paths, framework versions). (3) Map database schema (verbose SQL errors show table/column names). (4) Steal PII for identity theft (SSN, credit cards in logs). (5) Replay session tokens found in logs. According to OWASP Top 10:2025 (A09), security logging failures include inserting sensitive data into log files (CWE-532). Production error messages should be generic ("An error occurred") while detailed errors go to secure logging systems. Logs must never contain passwords, tokens, credit cards, SSN, or health data. Stack traces and SQL errors should only appear in development environments, never production.
+
+**Verification Guidance:**
+- Check error handlers: Should send generic messages to clients
+- Look for: `err.stack`, `err.sql` sent in API responses
+- Grep patterns: `grep -rE "logger\.(info|debug|warn).*password|token|secret" --include="*.js"`
+- Verify: Logging libraries filter sensitive fields
+- Check: Environment-specific error handling (verbose in dev, generic in prod)
+- Look for: `process.env.NODE_ENV === 'production'` checks
+- Test: Trigger errors and verify responses don't leak internals
+- Exclude: Development/staging environments with controlled access
+
 ## State of the Art
 
 | Old Approach | Current Approach | When Changed | Impact |
@@ -589,6 +1119,13 @@ Things that couldn't be fully resolved:
 - [semver GitHub repository](https://github.com/npm/node-semver) - Version comparison functions
 - [markdown-tree-parser GitHub repository](https://github.com/ksylvan/markdown-tree-parser) - Markdown section extraction
 - Node.js official documentation (path module, os module, fs module) - Platform-independent file operations
+- [OWASP Secrets Management Cheat Sheet](https://cheatsheetseries.owasp.org/cheatsheets/Secrets_Management_Cheat_Sheet.html) - Hardcoded secrets patterns
+- [OWASP SQL Injection Prevention Cheat Sheet](https://cheatsheetseries.owasp.org/cheatsheets/SQL_Injection_Prevention_Cheat_Sheet.html) - Parameterized query examples
+- [OWASP Input Validation Cheat Sheet](https://cheatsheetseries.owasp.org/cheatsheets/Input_Validation_Cheat_Sheet.html) - Validation patterns
+- [OWASP XSS Prevention Cheat Sheet](https://cheatsheetseries.owasp.org/cheatsheets/Cross_Site_Scripting_Prevention_Cheat_Sheet.html) - Output sanitization examples
+- [OWASP Authentication Cheat Sheet](https://cheatsheetseries.owasp.org/cheatsheets/Authentication_Cheat_Sheet.html) - Auth/authz patterns
+- [OWASP Authorization Cheat Sheet](https://cheatsheetseries.owasp.org/cheatsheets/Authorization_Cheat_Sheet.html) - Permission check patterns
+- [OWASP Logging Cheat Sheet](https://cheatsheetseries.owasp.org/cheatsheets/Logging_Cheat_Sheet.html) - Sensitive data in logs
 
 ### Secondary (MEDIUM confidence)
 - [YAML indentation pitfalls - Flipper File](https://flipperfile.com/developer-guides/yaml/why-yaml-indentation-breaks-easily/) - 70% of YAML errors are indentation-related
@@ -596,6 +1133,10 @@ Things that couldn't be fully resolved:
 - [Configuration merging patterns - webpack-merge](https://survivejs.com/blog/webpack-merge-interview/) - Array concatenation vs replacement strategies
 - [ESLint configuration severity levels](https://deepwiki.com/eslint/eslint-jp/3.2-rules-and-severity-levels) - Established pattern for ERROR/WARNING severity
 - [Node.js sync vs async best practices](https://medium.com/@shubham3480/node-part-v-0f626ead588d) - When sync methods are appropriate
+- [npm Security Best Practices - OWASP](https://cheatsheetseries.owasp.org/cheatsheets/NPM_Security_Cheat_Sheet.html) - Dependency management
+- [CISA Alert: npm Supply Chain Compromise](https://www.cisa.gov/news-events/alerts/2025/09/23/widespread-supply-chain-compromise-impacting-npm-ecosystem) - Shai-Hulud worm incident
+- [Node.js Security Best Practices 2026](https://medium.com/@sparklewebhelp/node-js-security-best-practices-for-2026-3b27fb1e8160) - Current security guidance
+- [OWASP Top 10:2025 A09](https://owasp.org/Top10/2025/A09_2025-Security_Logging_and_Alerting_Failures/) - Logging security
 
 ### Tertiary (LOW confidence - WebSearch only)
 - Various npm comparison sites (npm-compare.com) - Library popularity metrics
@@ -607,6 +1148,7 @@ Things that couldn't be fully resolved:
 - Standard stack: HIGH - gray-matter, semver, deepmerge are industry standards with official documentation verified
 - Architecture: HIGH - Patterns synthesized from official docs and established Node.js best practices
 - Pitfalls: MEDIUM to HIGH - YAML indentation (70% statistic verified), version comparison (semver docs), path handling (Node.js docs). Some pitfalls from general best practices.
+- Security patterns: HIGH - All examples derived from OWASP official cheat sheets with WebSearch verification for 2026 context
 
 **Research date:** 2026-01-19
 **Valid until:** ~30 days (stable ecosystem, unlikely to change rapidly)
@@ -617,3 +1159,6 @@ Things that couldn't be fully resolved:
 3. Validate version compatibility before merge (fail fast on major version mismatch)
 4. Use `path.join()` and `os.homedir()` for all path operations (cross-platform)
 5. Validate rule ID uniqueness after merge (prevent duplicates)
+6. Security rule documentation must include good/bad code examples from OWASP patterns
+7. Each security rule needs rationale explaining attack vectors and impacts
+8. Verification guidance must provide specific grep patterns and file checks
