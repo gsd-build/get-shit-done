@@ -18,36 +18,15 @@ Your job: Explore thoroughly, then write document(s) directly. Return confirmati
 </role>
 
 <why_this_matters>
-**These documents are consumed by other GSD commands:**
+**These docs guide other GSD commands:**
+- `/gsd:plan-phase` loads relevant docs when creating plans
+- `/gsd:execute-phase` references docs to follow conventions and place files correctly
 
-**`/gsd:plan-phase`** loads relevant codebase docs when creating implementation plans:
-| Phase Type | Documents Loaded |
-|------------|------------------|
-| UI, frontend, components | CONVENTIONS.md, STRUCTURE.md |
-| API, backend, endpoints | ARCHITECTURE.md, CONVENTIONS.md |
-| database, schema, models | ARCHITECTURE.md, STACK.md |
-| testing, tests | TESTING.md, CONVENTIONS.md |
-| integration, external API | INTEGRATIONS.md, STACK.md |
-| refactor, cleanup | CONCERNS.md, ARCHITECTURE.md |
-| setup, config | STACK.md, STRUCTURE.md |
-
-**`/gsd:execute-phase`** references codebase docs to:
-- Follow existing conventions when writing code
-- Know where to place new files (STRUCTURE.md)
-- Match testing patterns (TESTING.md)
-- Avoid introducing more technical debt (CONCERNS.md)
-
-**What this means for your output:**
-
-1. **File paths are critical** - The planner/executor needs to navigate directly to files. `src/services/user.ts` not "the user service"
-
-2. **Patterns matter more than lists** - Show HOW things are done (code examples) not just WHAT exists
-
-3. **Be prescriptive** - "Use camelCase for functions" helps the executor write correct code. "Some functions use camelCase" doesn't.
-
-4. **CONCERNS.md drives priorities** - Issues you identify may become future phases. Be specific about impact and fix approach.
-
-5. **STRUCTURE.md answers "where do I put this?"** - Include guidance for adding new code, not just describing what exists.
+**Output requirements:**
+- **File paths** - Always backticked (`src/services/user.ts`)
+- **Patterns over lists** - Show HOW (code examples), not just WHAT
+- **Be prescriptive** - "Use camelCase" not "Some use camelCase"
+- **STRUCTURE.md** - Include guidance for new code, not just existing layout
 </why_this_matters>
 
 <philosophy>
@@ -76,75 +55,87 @@ Based on focus, determine which documents you'll write:
 - `concerns` → CONCERNS.md
 </step>
 
+<step name="detect_language">
+Identify primary language before detailed exploration.
+
+```bash
+ls package.json requirements.txt pyproject.toml Cargo.toml go.mod pom.xml build.gradle 2>/dev/null
+```
+
+| File | Language | Extensions |
+|------|----------|------------|
+| package.json | TypeScript/JS | *.ts, *.tsx, *.js |
+| requirements.txt, pyproject.toml | Python | *.py |
+| Cargo.toml | Rust | *.rs |
+| go.mod | Go | *.go |
+| pom.xml, build.gradle | Java/Kotlin | *.java, *.kt |
+
+Store detected language for use in exploration commands.
+</step>
+
 <step name="explore_codebase">
 Explore the codebase thoroughly for your focus area.
 
-**For tech focus:**
+**Exploration by focus:**
+
+| Focus | Key Files | Key Patterns |
+|-------|-----------|--------------|
+| tech | Manifest, config files, .env* | SDK imports |
+| arch | Entry points, source dirs | Import patterns, layers |
+| quality | Lint/format config, test config | Naming patterns |
+| concerns | Large files, TODO/FIXME | Error handling gaps |
+
+**Common exploration commands (adapt for detected language):**
+
 ```bash
-# Package manifests
-ls package.json requirements.txt Cargo.toml go.mod pyproject.toml 2>/dev/null
+# Manifest and config
 cat package.json 2>/dev/null | head -100
+ls -la *.config.* .env* tsconfig.json 2>/dev/null
 
-# Config files
-ls -la *.config.* .env* tsconfig.json .nvmrc .python-version 2>/dev/null
-
-# Find SDK/API imports
-grep -r "import.*stripe\|import.*supabase\|import.*aws\|import.*@" src/ --include="*.ts" --include="*.tsx" 2>/dev/null | head -50
-```
-
-**For arch focus:**
-```bash
 # Directory structure
 find . -type d -not -path '*/node_modules/*' -not -path '*/.git/*' | head -50
 
-# Entry points
-ls src/index.* src/main.* src/app.* src/server.* app/page.* 2>/dev/null
-
-# Import patterns to understand layers
+# Imports and dependencies
 grep -r "^import" src/ --include="*.ts" --include="*.tsx" 2>/dev/null | head -100
-```
 
-**For quality focus:**
-```bash
-# Linting/formatting config
-ls .eslintrc* .prettierrc* eslint.config.* biome.json 2>/dev/null
-cat .prettierrc 2>/dev/null
-
-# Test files and config
-ls jest.config.* vitest.config.* 2>/dev/null
-find . -name "*.test.*" -o -name "*.spec.*" | head -30
-
-# Sample source files for convention analysis
-ls src/**/*.ts 2>/dev/null | head -10
-```
-
-**For concerns focus:**
-```bash
-# TODO/FIXME comments
-grep -rn "TODO\|FIXME\|HACK\|XXX" src/ --include="*.ts" --include="*.tsx" 2>/dev/null | head -50
-
-# Large files (potential complexity)
-find src/ -name "*.ts" -o -name "*.tsx" | xargs wc -l 2>/dev/null | sort -rn | head -20
-
-# Empty returns/stubs
-grep -rn "return null\|return \[\]\|return {}" src/ --include="*.ts" --include="*.tsx" 2>/dev/null | head -30
+# Issues and debt
+grep -rn "TODO\|FIXME\|HACK" src/ --include="*.ts" --include="*.tsx" 2>/dev/null | head -50
 ```
 
 Read key files identified during exploration. Use Glob and Grep liberally.
 </step>
 
 <step name="write_documents">
-Write document(s) to `.planning/codebase/` using the templates below.
+Write document(s) to `.planning/codebase/` using templates referenced below.
 
-**Document naming:** UPPERCASE.md (e.g., STACK.md, ARCHITECTURE.md)
+**Template references by focus:**
 
-**Template filling:**
-1. Replace `[YYYY-MM-DD]` with current date
-2. Replace `[Placeholder text]` with findings from exploration
-3. If something is not found, use "Not detected" or "Not applicable"
-4. Always include file paths with backticks
+**tech focus:**
+@~/.claude/get-shit-done/templates/codebase/stack.md
+@~/.claude/get-shit-done/templates/codebase/integrations.md
 
-Use the Write tool to create each document.
+**arch focus:**
+@~/.claude/get-shit-done/templates/codebase/architecture.md
+@~/.claude/get-shit-done/templates/codebase/structure.md
+
+**quality focus:**
+@~/.claude/get-shit-done/templates/codebase/conventions.md
+@~/.claude/get-shit-done/templates/codebase/testing.md
+
+**concerns focus:**
+@~/.claude/get-shit-done/templates/codebase/concerns.md
+
+**Naming convention:**
+- Template files: lowercase (stack.md) - reference docs
+- Output files: UPPERCASE (STACK.md) - planning artifacts
+
+**Template usage:**
+1. Read template for your focus area
+2. Follow "File Template" section structure
+3. Reference `<good_examples>` for quality guidance
+4. Apply `<guidelines>` for what to include/exclude
+5. Replace placeholders with findings
+6. Always include file paths with backticks
 </step>
 
 <step name="return_confirmation">
@@ -165,560 +156,13 @@ Ready for orchestrator summary.
 
 </process>
 
-<templates>
-
-## STACK.md Template (tech focus)
-
-```markdown
-# Technology Stack
-
-**Analysis Date:** [YYYY-MM-DD]
-
-## Languages
-
-**Primary:**
-- [Language] [Version] - [Where used]
-
-**Secondary:**
-- [Language] [Version] - [Where used]
-
-## Runtime
-
-**Environment:**
-- [Runtime] [Version]
-
-**Package Manager:**
-- [Manager] [Version]
-- Lockfile: [present/missing]
-
-## Frameworks
-
-**Core:**
-- [Framework] [Version] - [Purpose]
-
-**Testing:**
-- [Framework] [Version] - [Purpose]
-
-**Build/Dev:**
-- [Tool] [Version] - [Purpose]
-
-## Key Dependencies
-
-**Critical:**
-- [Package] [Version] - [Why it matters]
-
-**Infrastructure:**
-- [Package] [Version] - [Purpose]
-
-## Configuration
-
-**Environment:**
-- [How configured]
-- [Key configs required]
-
-**Build:**
-- [Build config files]
-
-## Platform Requirements
-
-**Development:**
-- [Requirements]
-
-**Production:**
-- [Deployment target]
-
----
-
-*Stack analysis: [date]*
-```
-
-## INTEGRATIONS.md Template (tech focus)
-
-```markdown
-# External Integrations
-
-**Analysis Date:** [YYYY-MM-DD]
-
-## APIs & External Services
-
-**[Category]:**
-- [Service] - [What it's used for]
-  - SDK/Client: [package]
-  - Auth: [env var name]
-
-## Data Storage
-
-**Databases:**
-- [Type/Provider]
-  - Connection: [env var]
-  - Client: [ORM/client]
-
-**File Storage:**
-- [Service or "Local filesystem only"]
-
-**Caching:**
-- [Service or "None"]
-
-## Authentication & Identity
-
-**Auth Provider:**
-- [Service or "Custom"]
-  - Implementation: [approach]
-
-## Monitoring & Observability
-
-**Error Tracking:**
-- [Service or "None"]
-
-**Logs:**
-- [Approach]
-
-## CI/CD & Deployment
-
-**Hosting:**
-- [Platform]
-
-**CI Pipeline:**
-- [Service or "None"]
-
-## Environment Configuration
-
-**Required env vars:**
-- [List critical vars]
-
-**Secrets location:**
-- [Where secrets are stored]
-
-## Webhooks & Callbacks
-
-**Incoming:**
-- [Endpoints or "None"]
-
-**Outgoing:**
-- [Endpoints or "None"]
-
----
-
-*Integration audit: [date]*
-```
-
-## ARCHITECTURE.md Template (arch focus)
-
-```markdown
-# Architecture
-
-**Analysis Date:** [YYYY-MM-DD]
-
-## Pattern Overview
-
-**Overall:** [Pattern name]
-
-**Key Characteristics:**
-- [Characteristic 1]
-- [Characteristic 2]
-- [Characteristic 3]
-
-## Layers
-
-**[Layer Name]:**
-- Purpose: [What this layer does]
-- Location: `[path]`
-- Contains: [Types of code]
-- Depends on: [What it uses]
-- Used by: [What uses it]
-
-## Data Flow
-
-**[Flow Name]:**
-
-1. [Step 1]
-2. [Step 2]
-3. [Step 3]
-
-**State Management:**
-- [How state is handled]
-
-## Key Abstractions
-
-**[Abstraction Name]:**
-- Purpose: [What it represents]
-- Examples: `[file paths]`
-- Pattern: [Pattern used]
-
-## Entry Points
-
-**[Entry Point]:**
-- Location: `[path]`
-- Triggers: [What invokes it]
-- Responsibilities: [What it does]
-
-## Error Handling
-
-**Strategy:** [Approach]
-
-**Patterns:**
-- [Pattern 1]
-- [Pattern 2]
-
-## Cross-Cutting Concerns
-
-**Logging:** [Approach]
-**Validation:** [Approach]
-**Authentication:** [Approach]
-
----
-
-*Architecture analysis: [date]*
-```
-
-## STRUCTURE.md Template (arch focus)
-
-```markdown
-# Codebase Structure
-
-**Analysis Date:** [YYYY-MM-DD]
-
-## Directory Layout
-
-```
-[project-root]/
-├── [dir]/          # [Purpose]
-├── [dir]/          # [Purpose]
-└── [file]          # [Purpose]
-```
-
-## Directory Purposes
-
-**[Directory Name]:**
-- Purpose: [What lives here]
-- Contains: [Types of files]
-- Key files: `[important files]`
-
-## Key File Locations
-
-**Entry Points:**
-- `[path]`: [Purpose]
-
-**Configuration:**
-- `[path]`: [Purpose]
-
-**Core Logic:**
-- `[path]`: [Purpose]
-
-**Testing:**
-- `[path]`: [Purpose]
-
-## Naming Conventions
-
-**Files:**
-- [Pattern]: [Example]
-
-**Directories:**
-- [Pattern]: [Example]
-
-## Where to Add New Code
-
-**New Feature:**
-- Primary code: `[path]`
-- Tests: `[path]`
-
-**New Component/Module:**
-- Implementation: `[path]`
-
-**Utilities:**
-- Shared helpers: `[path]`
-
-## Special Directories
-
-**[Directory]:**
-- Purpose: [What it contains]
-- Generated: [Yes/No]
-- Committed: [Yes/No]
-
----
-
-*Structure analysis: [date]*
-```
-
-## CONVENTIONS.md Template (quality focus)
-
-```markdown
-# Coding Conventions
-
-**Analysis Date:** [YYYY-MM-DD]
-
-## Naming Patterns
-
-**Files:**
-- [Pattern observed]
-
-**Functions:**
-- [Pattern observed]
-
-**Variables:**
-- [Pattern observed]
-
-**Types:**
-- [Pattern observed]
-
-## Code Style
-
-**Formatting:**
-- [Tool used]
-- [Key settings]
-
-**Linting:**
-- [Tool used]
-- [Key rules]
-
-## Import Organization
-
-**Order:**
-1. [First group]
-2. [Second group]
-3. [Third group]
-
-**Path Aliases:**
-- [Aliases used]
-
-## Error Handling
-
-**Patterns:**
-- [How errors are handled]
-
-## Logging
-
-**Framework:** [Tool or "console"]
-
-**Patterns:**
-- [When/how to log]
-
-## Comments
-
-**When to Comment:**
-- [Guidelines observed]
-
-**JSDoc/TSDoc:**
-- [Usage pattern]
-
-## Function Design
-
-**Size:** [Guidelines]
-
-**Parameters:** [Pattern]
-
-**Return Values:** [Pattern]
-
-## Module Design
-
-**Exports:** [Pattern]
-
-**Barrel Files:** [Usage]
-
----
-
-*Convention analysis: [date]*
-```
-
-## TESTING.md Template (quality focus)
-
-```markdown
-# Testing Patterns
-
-**Analysis Date:** [YYYY-MM-DD]
-
-## Test Framework
-
-**Runner:**
-- [Framework] [Version]
-- Config: `[config file]`
-
-**Assertion Library:**
-- [Library]
-
-**Run Commands:**
-```bash
-[command]              # Run all tests
-[command]              # Watch mode
-[command]              # Coverage
-```
-
-## Test File Organization
-
-**Location:**
-- [Pattern: co-located or separate]
-
-**Naming:**
-- [Pattern]
-
-**Structure:**
-```
-[Directory pattern]
-```
-
-## Test Structure
-
-**Suite Organization:**
-```typescript
-[Show actual pattern from codebase]
-```
-
-**Patterns:**
-- [Setup pattern]
-- [Teardown pattern]
-- [Assertion pattern]
-
-## Mocking
-
-**Framework:** [Tool]
-
-**Patterns:**
-```typescript
-[Show actual mocking pattern from codebase]
-```
-
-**What to Mock:**
-- [Guidelines]
-
-**What NOT to Mock:**
-- [Guidelines]
-
-## Fixtures and Factories
-
-**Test Data:**
-```typescript
-[Show pattern from codebase]
-```
-
-**Location:**
-- [Where fixtures live]
-
-## Coverage
-
-**Requirements:** [Target or "None enforced"]
-
-**View Coverage:**
-```bash
-[command]
-```
-
-## Test Types
-
-**Unit Tests:**
-- [Scope and approach]
-
-**Integration Tests:**
-- [Scope and approach]
-
-**E2E Tests:**
-- [Framework or "Not used"]
-
-## Common Patterns
-
-**Async Testing:**
-```typescript
-[Pattern]
-```
-
-**Error Testing:**
-```typescript
-[Pattern]
-```
-
----
-
-*Testing analysis: [date]*
-```
-
-## CONCERNS.md Template (concerns focus)
-
-```markdown
-# Codebase Concerns
-
-**Analysis Date:** [YYYY-MM-DD]
-
-## Tech Debt
-
-**[Area/Component]:**
-- Issue: [What's the shortcut/workaround]
-- Files: `[file paths]`
-- Impact: [What breaks or degrades]
-- Fix approach: [How to address it]
-
-## Known Bugs
-
-**[Bug description]:**
-- Symptoms: [What happens]
-- Files: `[file paths]`
-- Trigger: [How to reproduce]
-- Workaround: [If any]
-
-## Security Considerations
-
-**[Area]:**
-- Risk: [What could go wrong]
-- Files: `[file paths]`
-- Current mitigation: [What's in place]
-- Recommendations: [What should be added]
-
-## Performance Bottlenecks
-
-**[Slow operation]:**
-- Problem: [What's slow]
-- Files: `[file paths]`
-- Cause: [Why it's slow]
-- Improvement path: [How to speed up]
-
-## Fragile Areas
-
-**[Component/Module]:**
-- Files: `[file paths]`
-- Why fragile: [What makes it break easily]
-- Safe modification: [How to change safely]
-- Test coverage: [Gaps]
-
-## Scaling Limits
-
-**[Resource/System]:**
-- Current capacity: [Numbers]
-- Limit: [Where it breaks]
-- Scaling path: [How to increase]
-
-## Dependencies at Risk
-
-**[Package]:**
-- Risk: [What's wrong]
-- Impact: [What breaks]
-- Migration plan: [Alternative]
-
-## Missing Critical Features
-
-**[Feature gap]:**
-- Problem: [What's missing]
-- Blocks: [What can't be done]
-
-## Test Coverage Gaps
-
-**[Untested area]:**
-- What's not tested: [Specific functionality]
-- Files: `[file paths]`
-- Risk: [What could break unnoticed]
-- Priority: [High/Medium/Low]
-
----
-
-*Concerns audit: [date]*
-```
-
-</templates>
-
 <critical_rules>
 
 **WRITE DOCUMENTS DIRECTLY.** Do not return findings to orchestrator. The whole point is reducing context transfer.
 
 **ALWAYS INCLUDE FILE PATHS.** Every finding needs a file path in backticks. No exceptions.
 
-**USE THE TEMPLATES.** Fill in the template structure. Don't invent your own format.
+**USE THE TEMPLATES.** Read the referenced template, follow its structure. Don't invent your own format.
 
 **BE THOROUGH.** Explore deeply. Read actual files. Don't guess.
 
@@ -730,9 +174,11 @@ Ready for orchestrator summary.
 
 <success_criteria>
 - [ ] Focus area parsed correctly
+- [ ] Primary language detected
 - [ ] Codebase explored thoroughly for focus area
+- [ ] Templates read and followed
 - [ ] All documents for focus area written to `.planning/codebase/`
-- [ ] Documents follow template structure
+- [ ] Documents follow template structure with `<good_examples>` quality
 - [ ] File paths included throughout documents
 - [ ] Confirmation returned (not document contents)
 </success_criteria>
