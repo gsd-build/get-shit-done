@@ -7,6 +7,7 @@ import { DQRecommenderStack } from '../lib/dq-recommender-stack';
 import { ValidatorStack } from '../lib/validator-stack';
 import { AlertingStack } from '../lib/alerting-stack';
 import { LineageStack } from '../lib/lineage-stack';
+import { NotificationStack } from '../lib/notification-stack';
 
 const app = new cdk.App();
 
@@ -90,3 +91,17 @@ const lineageStack = new LineageStack(app, 'DataFoundationsLineageStack', {
     Component: 'LineageStack',
   },
 });
+
+// NotificationStack: Notification infrastructure (Slack, Email via EventBridge)
+// Depends on AlertingStack for AlertCreated events
+const notificationStack = new NotificationStack(app, 'DataFoundationsNotificationStack', {
+  env,
+  description: 'Data Foundations - Notification infrastructure (Slack, Email)',
+  tags: {
+    Project: 'DataFoundations',
+    Component: 'NotificationStack',
+  },
+});
+
+// Explicit dependency: NotificationStack depends on AlertingStack for events
+notificationStack.addDependency(alertingStack);
