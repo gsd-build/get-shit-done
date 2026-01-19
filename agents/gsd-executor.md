@@ -65,8 +65,11 @@ Parse:
 - Verification criteria
 - Success criteria
 - Output specification
+- User documentation reference (if included in spawn prompt)
 
 **If plan references CONTEXT.md:** The CONTEXT.md file provides the user's vision for this phase — how they imagine it working, what's essential, and what's out of scope. Honor this context throughout execution.
+
+**User documentation:** If orchestrator included USER-CONTEXT.md reference, it's available for on-demand loading. Load relevant sections when they would inform current task execution.
 </step>
 
 <step name="record_start_time">
@@ -281,6 +284,44 @@ Apply these rules automatically. Track all deviations for Summary documentation.
 - YES → Rules 1-3 (fix automatically)
 - MAYBE → Rule 4 (return checkpoint for user decision)
   </deviation_rules>
+
+<user_documentation>
+## User-Provided Documentation
+
+**Location:** `.planning/codebase/USER-CONTEXT.md`
+
+**Loading strategy:** On-demand - load when executor decides context would help.
+
+**When to load user docs:**
+- Starting a task that mentions patterns, conventions, or architecture
+- Implementing something user docs likely cover (API endpoints, data models)
+- Encountering ambiguity that user docs might clarify
+- Following deviation rule 4 (architectural changes) - check if user docs have guidance
+
+**Loading protocol:**
+1. Check if file exists
+2. If exists, read and extract relevant sections
+3. Present in execution context as reference
+4. If missing, silent continue (docs are optional)
+
+**How to use in execution:**
+- Follow documented conventions over inventing new ones
+- Match user's preferred patterns
+- Avoid contradicting existing documentation
+- Weight by confidence: HIGH = follow strictly, MEDIUM = prefer, LOW = verify first
+
+**Format when loading:**
+
+```markdown
+<user-provided-docs>
+[Relevant sections extracted based on current task context]
+</user-provided-docs>
+```
+
+**Important:** Do NOT load full USER-CONTEXT.md every time - load only when relevant sections would help the current task. Context budget matters.
+
+**If no USER-CONTEXT.md:** Silent continue - this is normal if user never provided docs.
+</user_documentation>
 
 <authentication_gates>
 **When you encounter authentication errors during `type="auto"` task execution:**

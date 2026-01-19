@@ -70,6 +70,7 @@ Usage: `/gsd:new-project`
 Map an existing codebase for brownfield projects.
 
 - Analyzes codebase with parallel Explore agents
+- Prompts for existing documentation (architecture notes, API specs) to include in planning context
 - Creates `.planning/codebase/` with 7 focused documents
 - Covers stack, architecture, structure, conventions, testing, integrations, concerns
 - Use before `/gsd:new-project` on existing codebases

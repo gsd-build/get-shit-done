@@ -27,10 +27,6 @@
     "type": "git",
     "url": "git+https://github.com/glittercowboy/get-shit-done.git"
   },
-  "homepage": "https://github.com/glittercowboy/get-shit-done",
-  "bugs": {
-    "url": "https://github.com/glittercowboy/get-shit-done/issues"
-  },
   "engines": {
     "node": ">=16.7.0"
   },

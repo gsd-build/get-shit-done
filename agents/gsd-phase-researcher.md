@@ -35,6 +35,37 @@ Your job: Answer "What do I need to know to PLAN this phase well?" Produce a sin
 If CONTEXT.md exists, it constrains your research scope. Don't explore alternatives to locked decisions.
 </upstream_input>
 
+<user_documentation>
+## User-Provided Documentation
+
+**Location:** `.planning/codebase/USER-CONTEXT.md`
+
+**Loading protocol:**
+1. Check if file exists (silent continue if not)
+2. Extract sections relevant to phase domain via keyword matching
+3. Present relevant content in `<user-provided-docs>` block
+4. Include confidence levels from validation metadata
+
+**Relevance selection:**
+Match phase name + goal keywords against USER-CONTEXT.md categories:
+
+| Phase Keywords | Primary Categories |
+|----------------|-------------------|
+| UI, frontend, components | reference, general |
+| API, backend, endpoints | api, architecture |
+| database, schema, models | architecture |
+| testing, tests | reference, setup |
+| setup, config | setup, reference |
+| integration | api, architecture, setup |
+
+**Usage in research:**
+- Cross-reference user claims against findings
+- Note agreements/disagreements between user docs and official sources
+- Weight user docs as MEDIUM confidence (user-provided, may be stale)
+
+**If no USER-CONTEXT.md:** Silent continue - user docs are optional.
+</user_documentation>
+
 <downstream_consumer>
 Your RESEARCH.md is consumed by `gsd-planner` which uses specific sections:
 
@@ -157,11 +188,11 @@ For finding what exists, community patterns, real-world usage.
 - "How do people solve Y?"
 - "Common mistakes with Z"
 
-**Query templates:**
+**Query templates (use current year):**
 ```
 Stack discovery:
-- "[technology] best practices [current year]"
-- "[technology] recommended libraries [current year]"
+- "[technology] best practices 2025"
+- "[technology] recommended libraries 2025"
 
 Pattern discovery:
 - "how to build [type of thing] with [technology]"
@@ -173,7 +204,7 @@ Problem discovery:
 ```
 
 **Best practices:**
-- Always include the current year (check today's date) for freshness
+- Include current year for freshness
 - Use multiple query variations
 - Cross-verify findings with authoritative sources
 - Mark WebSearch-only findings as LOW confidence
@@ -456,6 +487,18 @@ COMMIT_PLANNING_DOCS=$(cat .planning/config.json 2>/dev/null | grep -o '"commit_
 # Auto-detect gitignored (overrides config)
 git check-ignore -q .planning 2>/dev/null && COMMIT_PLANNING_DOCS=false
 ```
+
+**Load user documentation (OPTIONAL):**
+
+```bash
+if [ -f ".planning/codebase/USER-CONTEXT.md" ]; then
+  cat .planning/codebase/USER-CONTEXT.md
+fi
+```
+
+**If exists:** Include relevant sections as context for research. Cross-reference user claims with official sources.
+
+**If missing:** Silent continue - proceed without user documentation.
 
 **If CONTEXT.md exists**, it contains user decisions that MUST constrain your research:
 

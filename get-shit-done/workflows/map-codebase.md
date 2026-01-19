@@ -1,9 +1,9 @@
 <purpose>
-Orchestrate parallel codebase mapper agents to analyze codebase and produce structured documents in .planning/codebase/
+Orchestrate parallel codebase mapper agents to analyze codebase and produce structured documents in .planning/codebase/. Optionally ingest user-provided documentation first.
 
 Each agent has fresh context, explores a specific focus area, and **writes documents directly**. The orchestrator only receives confirmation + line counts, then writes a summary.
 
-Output: .planning/codebase/ folder with 7 structured documents about the codebase state.
+Output: .planning/codebase/ folder with 7 structured documents about the codebase state, plus optional USER-CONTEXT.md with user-provided documentation.
 </purpose>
 
 <philosophy>
@@ -38,6 +38,117 @@ Default to "balanced" if not set.
 | gsd-codebase-mapper | sonnet | haiku | haiku |
 
 Store resolved model for use in Task calls below.
+</step>
+
+<step name="prompt_for_docs">
+Prompt inline (freeform, NOT AskUserQuestion):
+
+"Do you have any existing documentation I should know about?
+(File paths, directories, or 'no' to skip)"
+
+Wait for user response.
+
+**If "no" / empty / skip:**
+Brief acknowledgment: "Got it, continuing with codebase mapping..."
+Set `HAS_USER_DOCS=false`
+Continue to check_existing.
+
+**If path(s) provided:**
+Set `HAS_USER_DOCS=true`
+Initialize `USER_DOC_PATHS` list with provided path(s)
+Continue to collect_doc_paths.
+</step>
+
+<step name="collect_doc_paths">
+Loop until done:
+
+**Validate current path(s):**
+```bash
+for path in ${USER_DOC_PATHS}; do
+  if [ -e "$path" ]; then
+    if [ -d "$path" ]; then
+      echo "DIR:$path"
+    else
+      echo "FILE:$path"
+    fi
+  else
+    echo "INVALID:$path"
+  fi
+done
+```
+
+**For each path:**
+- Valid file: Brief confirmation "Found: [filename]"
+- Valid directory: "Found directory: [path] - will scan for docs"
+- Invalid: Use AskUserQuestion:
+  - header: "Path not found"
+  - question: "Couldn't find [path]. Continue without it?"
+  - options: ["Yes, continue", "Let me correct the path"]
+  - If correct: Replace path and re-validate
+
+**After all paths validated:**
+Prompt inline: "Add another? (path or 'done')"
+
+If "done" -> Continue to spawn_doc_ingestor
+If path -> Add to USER_DOC_PATHS, loop again
+</step>
+
+<step name="spawn_doc_ingestor">
+Skip this step if `HAS_USER_DOCS=false`.
+
+Spawn gsd-doc-ingestor agent.
+
+Task tool parameters:
+```
+subagent_type: "gsd-doc-ingestor"
+description: "Ingest user documentation"
+```
+
+Prompt:
+```
+Ingest user-provided documentation.
+
+**Paths to process:**
+${USER_DOC_PATHS}
+
+**Instructions:**
+1. Check for existing USER-CONTEXT.md (ask replace/merge if exists)
+2. Validate each path
+3. For directories: scan and identify relevant documentation
+4. Categorize documents (architecture, API, general, etc.)
+5. Write to .planning/codebase/USER-CONTEXT.md
+6. Return confirmation with counts
+```
+
+Wait for agent completion.
+
+Display agent's confirmation to user:
+"[Agent confirmation]"
+
+Continue to spawn_doc_validator.
+</step>
+
+<step name="spawn_doc_validator">
+Only execute if HAS_USER_DOCS is true and doc ingestion completed successfully.
+
+Spawn the gsd-doc-validator subagent to validate user documentation:
+
+Use Task tool:
+- subagent_type: gsd-doc-validator
+- description: "Validate user documentation claims against codebase"
+- prompt: "Validate the user-provided documentation in USER-CONTEXT.md against the actual codebase. Extract technical claims, verify each against real code, assign confidence levels, present any issues to the user for decision, and update USER-CONTEXT.md with validation status."
+
+Wait for completion. The validator will:
+1. Extract technical claims from USER-CONTEXT.md
+2. Verify claims against actual codebase files
+3. Present LOW confidence claims to user via AskUserQuestion
+4. Collect user decisions (Include/Exclude/Mark stale)
+5. Annotate USER-CONTEXT.md with validation results
+
+Store validation result for offer_next step.
+DOCS_VALIDATED = true after successful completion.
+
+Continue to check_existing.
 </step>
 
 <step name="check_existing">
@@ -277,6 +388,7 @@ wc -l .planning/codebase/*.md
 Codebase mapping complete.
 
 Created .planning/codebase/:
+- USER-CONTEXT.md ([N] lines) - User-provided documentation (if created)
 - STACK.md ([N] lines) - Technologies and dependencies
 - ARCHITECTURE.md ([N] lines) - System design and patterns
 - STRUCTURE.md ([N] lines) - Directory layout and organization
@@ -285,6 +397,12 @@ Created .planning/codebase/:
 - INTEGRATIONS.md ([N] lines) - External services and APIs
 - CONCERNS.md ([N] lines) - Technical debt and issues
 
+[If DOCS_VALIDATED is true, add validation summary:]
+**Documentation validation:**
+- [N] claims validated
+- [N] HIGH confidence, [N] MEDIUM, [N] LOW
+- [If LOW claims existed:] User resolved [N] LOW confidence claims
+- USER-CONTEXT.md annotated with validation status
 
 ---
 
@@ -306,13 +424,21 @@ Created .planning/codebase/:
 ---
 ```
 
+Note: Only include USER-CONTEXT.md in the list if it was created (user provided docs).
+Note: Only include validation summary if DOCS_VALIDATED is true.
+
 End workflow.
 </step>
 
 </process>
 
 <success_criteria>
+- User prompted for existing documentation
+- User docs processed (if provided) or skipped gracefully
 - .planning/codebase/ directory created
+- USER-CONTEXT.md written (if docs provided)
+- User documentation validated (if provided)
+- USER-CONTEXT.md annotated with validation status (if docs provided)
 - 4 parallel gsd-codebase-mapper agents spawned with run_in_background=true
 - Agents write documents directly (orchestrator doesn't receive document contents)
 - Read agent output files to collect confirmations

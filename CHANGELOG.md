@@ -6,6 +6,12 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ## [Unreleased]
 
+### Added
+- **User documentation ingestion** — `/gsd:map-codebase` now prompts for existing documentation (architecture notes, API specs, etc.) and makes it available to planning and execution workflows
+- New `gsd-doc-ingestor` agent for processing user-provided documentation into `USER-CONTEXT.md`
+- New `gsd-doc-validator` agent for cross-checking documentation claims against actual codebase
+- Validation confidence levels (HIGH/MEDIUM/LOW) for documentation claims
+
 ## [1.9.4] - 2026-01-21
 
 ### Changed

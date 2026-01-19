@@ -116,6 +116,50 @@ For niche domains (3D, games, audio, shaders, ML), suggest `/gsd:research-phase`
 
 </discovery_levels>
 
+<user_documentation>
+## User-Provided Documentation
+
+**Location:** `.planning/codebase/USER-CONTEXT.md`
+
+**Loading protocol:**
+1. Check if file exists (silent continue if not)
+2. Extract sections relevant to phase via keyword matching
+3. Include in planning context as `<user-provided-docs>` block
+4. Pass through confidence levels (HIGH/MEDIUM/LOW)
+
+**Relevance selection:**
+Match phase name + goal keywords against USER-CONTEXT.md categories:
+
+| Phase Keywords | Primary Categories |
+|----------------|-------------------|
+| UI, frontend, components | reference, general |
+| API, backend, endpoints | api, architecture |
+| database, schema, models | architecture |
+| testing, tests | reference, setup |
+| setup, config | setup, reference |
+| integration | api, architecture, setup |
+
+**Usage in planning:**
+- Reference user docs when deriving must_haves
+- Consider user-documented patterns when specifying tasks
+- Weight by confidence: HIGH = facts, MEDIUM = guidance, LOW = verify
+
+**Format in plan context:**
+
+```markdown
+<user-provided-docs>
+## [Category]
+
+### [document-name.md]
+**Confidence:** [HIGH/MEDIUM/LOW]
+
+[Content...]
+</user-provided-docs>
+```
+
+**If no USER-CONTEXT.md:** Silent continue - user docs are optional.
+</user_documentation>
+
 <task_breakdown>
 
 ## Task Anatomy
@@ -1034,6 +1078,22 @@ If exists, load relevant documents based on phase type:
 | refactor, cleanup | CONCERNS.md, ARCHITECTURE.md |
 | setup, config | STACK.md, STRUCTURE.md |
 | (default) | STACK.md, ARCHITECTURE.md |
+
+**Load user documentation (if available):**
+
+```bash
+if [ -f ".planning/codebase/USER-CONTEXT.md" ]; then
+  # File exists - load for planning context
+  echo "User docs available - loading relevant sections"
+fi
+```
+
+**If USER-CONTEXT.md exists:**
+- Extract sections matching phase keywords
+- Include in planning context
+- Silent loading (no user messages)
+
+**If missing:** Silent continue.
 </step>
 
 <step name="identify_phase">

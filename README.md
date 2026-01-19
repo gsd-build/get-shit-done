@@ -166,7 +166,7 @@ If you prefer not to use that flag, add this to your project's `.claude/settings
 
 ## How It Works
 
-> **Already have code?** Run `/gsd:map-codebase` first. It spawns parallel agents to analyze your stack, architecture, conventions, and concerns. Then `/gsd:new-project` knows your codebase — questions focus on what you're adding, and planning automatically loads your patterns.
+> **Already have code?** Run `/gsd:map-codebase` first. It prompts for any existing documentation you have (architecture notes, API specs, etc.) and spawns parallel agents to analyze your stack, architecture, conventions, and concerns. Then `/gsd:new-project` knows your codebase — questions focus on what you're adding, and planning automatically loads your patterns and documentation.
 
 ### 1. Initialize Project
 

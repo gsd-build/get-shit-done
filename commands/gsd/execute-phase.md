@@ -72,6 +72,11 @@ Phase: $ARGUMENTS
    - Group plans by wave number
    - Report wave structure to user
 
+3.5. **Check for user documentation**
+   - Check if `.planning/codebase/USER-CONTEXT.md` exists
+   - If exists: Include in executor spawn context (transparent to user)
+   - If missing: Silent continue without user docs
+
 4. **Execute waves**
    For each wave in order:
    - Spawn `gsd-executor` for each plan in wave (parallel Task calls)
@@ -261,14 +266,22 @@ PLAN_01_CONTENT=$(cat "{plan_01_path}")
 PLAN_02_CONTENT=$(cat "{plan_02_path}")
 PLAN_03_CONTENT=$(cat "{plan_03_path}")
 STATE_CONTENT=$(cat .planning/STATE.md)
+
+# Read user docs if available (from step 3.5)
+if [ -f ".planning/codebase/USER-CONTEXT.md" ]; then
+  USER_DOCS_CONTENT=$(cat .planning/codebase/USER-CONTEXT.md)
+  USER_DOCS_SECTION="User documentation:\n${USER_DOCS_CONTENT}"
+else
+  USER_DOCS_SECTION=""
+fi
 ```
 
 Spawn all plans in a wave with a single message containing multiple Task calls, with inlined content:
 
 ```
-Task(prompt="Execute plan at {plan_01_path}\n\nPlan:\n{plan_01_content}\n\nProject state:\n{state_content}", subagent_type="gsd-executor", model="{executor_model}")
-Task(prompt="Execute plan at {plan_02_path}\n\nPlan:\n{plan_02_content}\n\nProject state:\n{state_content}", subagent_type="gsd-executor", model="{executor_model}")
-Task(prompt="Execute plan at {plan_03_path}\n\nPlan:\n{plan_03_content}\n\nProject state:\n{state_content}", subagent_type="gsd-executor", model="{executor_model}")
+Task(prompt="Execute plan at {plan_01_path}\n\nPlan:\n{plan_01_content}\n\nProject state:\n{state_content}\n\n{user_docs_section}", subagent_type="gsd-executor", model="{executor_model}")
+Task(prompt="Execute plan at {plan_02_path}\n\nPlan:\n{plan_02_content}\n\nProject state:\n{state_content}\n\n{user_docs_section}", subagent_type="gsd-executor", model="{executor_model}")
+Task(prompt="Execute plan at {plan_03_path}\n\nPlan:\n{plan_03_content}\n\nProject state:\n{state_content}\n\n{user_docs_section}", subagent_type="gsd-executor", model="{executor_model}")
 ```
 
 All three run in parallel. Task tool blocks until all complete.
