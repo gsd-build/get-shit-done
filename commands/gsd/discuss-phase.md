@@ -32,8 +32,62 @@ Phase number: $ARGUMENTS (required)
 @.planning/ROADMAP.md
 </context>
 
+<user_documentation>
+## User-Provided Documentation
+
+**Location:** `.planning/codebase/USER-CONTEXT.md`
+
+**Loading:** At discussion start, check for and load relevant user documentation.
+
+```bash
+if [ -f ".planning/codebase/USER-CONTEXT.md" ]; then
+  cat .planning/codebase/USER-CONTEXT.md
+fi
+```
+
+**If exists:**
+- Extract sections relevant to current phase (via keyword matching on phase name + goal)
+- Use as background context when analyzing gray areas
+- Reference when asking questions ("Your docs mention X - does that still apply?")
+- Note potential conflicts if user answers contradict their docs
+
+**If missing:**
+- Silent continue (no error, no suggestion to run map-codebase)
+- Proceed with discussion normally
+
+**Relevance selection by phase type:**
+
+| Phase Keywords | Load Categories |
+|----------------|-----------------|
+| UI, frontend | reference, general |
+| API, backend | api, architecture |
+| database, schema | architecture |
+| testing | reference, setup |
+| setup, config | setup, reference |
+| integration | api, architecture, setup |
+
+**Conflict handling:**
+When user answer contradicts their documentation:
+- Note the discrepancy naturally: "Your docs describe X, but you mentioned Y - should the docs be updated, or has this changed?"
+- User's current answer takes precedence (docs may be stale)
+- No blocking or error - just gentle surfacing
+</user_documentation>
+
 <process>
 1. Validate phase number (error if missing or not in roadmap)
+
+1.5. **Load user documentation (if available)**
+
+   Check for USER-CONTEXT.md:
+   ```bash
+   if [ -f ".planning/codebase/USER-CONTEXT.md" ]; then
+     echo "User docs found - loading relevant sections"
+   fi
+   ```
+
+   **If exists:** Load sections relevant to phase. Use as background context.
+   **If missing:** Silent continue - proceed without user docs.
+
 2. Check if CONTEXT.md exists (offer update/view/skip if yes)
 3. **Analyze phase** — Identify domain and generate phase-specific gray areas
 4. **Present gray areas** — Multi-select: which to discuss? (NO skip option)
@@ -62,6 +116,8 @@ Generate 3-4 **phase-specific** gray areas, not generic categories.
 - "More questions about [area], or move to next?"
 - If more → ask 4 more, check again
 - After all areas → "Ready to create context?"
+- Reference user docs when relevant ("Your architecture doc mentions...")
+- Note if user answer differs from their docs (gentle conflict surfacing)
 
 **Do NOT ask about (Claude handles these):**
 - Technical implementation
