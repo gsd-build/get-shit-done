@@ -140,7 +140,7 @@ Task(
 </constraints>
 
 <output>
-Write PLAN.md to: ${QUICK_DIR}/PLAN.md
+Write plan to: ${QUICK_DIR}/${next_num}-PLAN.md
 Return: ## PLANNING COMPLETE with plan path
 </output>
 ",
@@ -150,11 +150,11 @@ Return: ## PLANNING COMPLETE with plan path
 ```
 
 After planner returns:
-1. Verify PLAN.md exists at `${QUICK_DIR}/PLAN.md`
+1. Verify plan exists at `${QUICK_DIR}/${next_num}-PLAN.md`
 2. Extract plan count (typically 1 for quick tasks)
-3. Report: "Plan created: ${QUICK_DIR}/PLAN.md"
+3. Report: "Plan created: ${QUICK_DIR}/${next_num}-PLAN.md"
 
-If PLAN.md not found, error: "Planner failed to create PLAN.md"
+If plan not found, error: "Planner failed to create ${next_num}-PLAN.md"
 
 ---
 
@@ -167,13 +167,13 @@ Task(
   prompt="
 Execute quick task ${next_num}.
 
-Plan: @${QUICK_DIR}/PLAN.md
+Plan: @${QUICK_DIR}/${next_num}-PLAN.md
 Project state: @.planning/STATE.md
 
 <constraints>
 - Execute all tasks in the plan
 - Commit each task atomically
-- Create SUMMARY.md in the quick task directory
+- Create summary at: ${QUICK_DIR}/${next_num}-SUMMARY.md
 - Do NOT update ROADMAP.md (quick tasks are separate from planned phases)
 </constraints>
 ",
@@ -183,11 +183,11 @@ Project state: @.planning/STATE.md
 ```
 
 After executor returns:
-1. Verify SUMMARY.md exists at `${QUICK_DIR}/SUMMARY.md`
+1. Verify summary exists at `${QUICK_DIR}/${next_num}-SUMMARY.md`
 2. Extract commit hash from executor output
 3. Report completion status
 
-If SUMMARY.md not found, error: "Executor failed to create SUMMARY.md"
+If summary not found, error: "Executor failed to create ${next_num}-SUMMARY.md"
 
 Note: For quick tasks producing multiple plans (rare), spawn executors in parallel waves per execute-phase patterns.
 
@@ -235,8 +235,8 @@ Stage and commit quick task artifacts:
 
 ```bash
 # Stage quick task artifacts
-git add ${QUICK_DIR}/PLAN.md
-git add ${QUICK_DIR}/SUMMARY.md
+git add ${QUICK_DIR}/${next_num}-PLAN.md
+git add ${QUICK_DIR}/${next_num}-SUMMARY.md
 git add .planning/STATE.md
 
 # Commit with quick task format
@@ -263,7 +263,7 @@ GSD > QUICK TASK COMPLETE
 
 Quick Task ${next_num}: ${DESCRIPTION}
 
-Summary: ${QUICK_DIR}/SUMMARY.md
+Summary: ${QUICK_DIR}/${next_num}-SUMMARY.md
 Commit: ${commit_hash}
 
 ---
@@ -279,8 +279,8 @@ Ready for next task: /gsd:quick
 - [ ] Slug generated (lowercase, hyphens, max 40 chars)
 - [ ] Next number calculated (001, 002, 003...)
 - [ ] Directory created at `.planning/quick/NNN-slug/`
-- [ ] PLAN.md created by planner
-- [ ] SUMMARY.md created by executor
+- [ ] `${next_num}-PLAN.md` created by planner
+- [ ] `${next_num}-SUMMARY.md` created by executor
 - [ ] STATE.md updated with quick task row
 - [ ] Artifacts committed
 </success_criteria>
