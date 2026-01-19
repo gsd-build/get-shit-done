@@ -6,8 +6,20 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ## [Unreleased]
 
+## [1.6.5] - 2026-01-19
+
 ### Added
-- `/gsd:map-codebase` now prompts for existing documentation to include in planning context
+- **User documentation ingestion** — `/gsd:map-codebase` now prompts for existing documentation (architecture notes, API specs, etc.) and makes it available to planning and execution workflows
+- New `gsd-doc-ingestor` agent for processing user-provided documentation into `USER-CONTEXT.md`
+- New `gsd-doc-validator` agent for cross-checking documentation claims against actual codebase
+- Validation confidence levels (HIGH/MEDIUM/LOW) for documentation claims
+- Smart doc selection loads only relevant documentation based on phase type
+
+### Fixed
+- New agents (`gsd-doc-ingestor`, `gsd-doc-validator`) now properly installed to `~/.claude/agents/`
+
+### Important
+- **Restart Claude Code after updating** — New agents are discovered at session start. Run `/gsd:update` then restart Claude Code for doc ingestion to use subagents correctly.
 
 ## [1.6.4] - 2026-01-17
 
@@ -928,7 +940,8 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 - YOLO mode for autonomous execution
 - Interactive mode with checkpoints
 
-[Unreleased]: https://github.com/glittercowboy/get-shit-done/compare/v1.6.4...HEAD
+[Unreleased]: https://github.com/glittercowboy/get-shit-done/compare/v1.6.5...HEAD
+[1.6.5]: https://github.com/glittercowboy/get-shit-done/releases/tag/v1.6.5
 [1.6.4]: https://github.com/glittercowboy/get-shit-done/releases/tag/v1.6.4
 [1.6.3]: https://github.com/glittercowboy/get-shit-done/releases/tag/v1.6.3
 [1.6.2]: https://github.com/glittercowboy/get-shit-done/releases/tag/v1.6.2

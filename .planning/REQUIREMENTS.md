@@ -97,9 +97,9 @@ Which phases cover which requirements. Updated during roadmap creation.
 | WFL-02 | Phase 3 | Complete |
 | WFL-03 | Phase 3 | Complete |
 | WFL-04 | Phase 3 | Complete |
-| DOC-01 | Phase 4 | Pending |
-| DOC-02 | Phase 4 | Pending |
-| REL-01 | Phase 4 | Pending |
+| DOC-01 | Phase 4 | Complete |
+| DOC-02 | Phase 4 | Complete |
+| REL-01 | Phase 4 | Complete |
 
 **Coverage:**
 - v1 requirements: 19 total
@@ -108,4 +108,4 @@ Which phases cover which requirements. Updated during roadmap creation.
 
 ---
 *Requirements defined: 2026-01-19*
-*Last updated: 2026-01-19 after Phase 3 completion*
+*Last updated: 2026-01-19 after Phase 4 completion*

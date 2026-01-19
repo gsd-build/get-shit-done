@@ -15,7 +15,7 @@ Decimal phases appear between their surrounding integers in numeric order.
 - [x] **Phase 1: Document Ingestion Core** - Collect and store user-provided docs during map-codebase
 - [x] **Phase 2: Document Validation** - Validate doc claims against actual codebase
 - [x] **Phase 3: Workflow Integration** - Make validated docs available to downstream phases
-- [ ] **Phase 4: Documentation and Release** - User-facing docs and release prep
+- [x] **Phase 4: Documentation and Release** - User-facing docs and release prep
 
 ## Phase Details
 
@@ -78,7 +78,7 @@ Plans:
 **Plans**: 1 plan
 
 Plans:
-- [ ] 04-01-PLAN.md — Update README, help.md, and CHANGELOG with doc ingestion feature
+- [x] 04-01-PLAN.md — Update README, help.md, and CHANGELOG with doc ingestion feature
 
 ## Progress
 
@@ -90,7 +90,7 @@ Phases execute in numeric order: 1 -> 2 -> 3 -> 4
 | 1. Document Ingestion Core | 2/2 | Complete | 2026-01-19 |
 | 2. Document Validation | 2/2 | Complete | 2026-01-19 |
 | 3. Workflow Integration | 3/3 | Complete | 2026-01-19 |
-| 4. Documentation and Release | 0/1 | Not started | - |
+| 4. Documentation and Release | 1/1 | Complete | 2026-01-19 |
 
 ---
 *Roadmap created: 2026-01-19*
