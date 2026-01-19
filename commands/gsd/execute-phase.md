@@ -54,6 +54,11 @@ Phase: $ARGUMENTS
    - Group plans by wave number
    - Report wave structure to user
 
+3.5. **Check for user documentation**
+   - Check if `.planning/codebase/USER-CONTEXT.md` exists
+   - If exists: Include in executor spawn context (transparent to user)
+   - If missing: Silent continue without user docs
+
 4. **Execute waves**
    For each wave in order:
    - Spawn `gsd-executor` for each plan in wave (parallel Task calls)
@@ -231,9 +236,9 @@ After user runs /gsd:plan-phase {Z} --gaps:
 Spawn all plans in a wave with a single message containing multiple Task calls:
 
 ```
-Task(prompt="Execute plan at {plan_01_path}\n\nPlan: @{plan_01_path}\nProject state: @.planning/STATE.md", subagent_type="gsd-executor")
-Task(prompt="Execute plan at {plan_02_path}\n\nPlan: @{plan_02_path}\nProject state: @.planning/STATE.md", subagent_type="gsd-executor")
-Task(prompt="Execute plan at {plan_03_path}\n\nPlan: @{plan_03_path}\nProject state: @.planning/STATE.md", subagent_type="gsd-executor")
+Task(prompt="Execute plan at {plan_01_path}\n\nPlan: @{plan_01_path}\nProject state: @.planning/STATE.md\nUser docs (if available): @.planning/codebase/USER-CONTEXT.md", subagent_type="gsd-executor")
+Task(prompt="Execute plan at {plan_02_path}\n\nPlan: @{plan_02_path}\nProject state: @.planning/STATE.md\nUser docs (if available): @.planning/codebase/USER-CONTEXT.md", subagent_type="gsd-executor")
+Task(prompt="Execute plan at {plan_03_path}\n\nPlan: @{plan_03_path}\nProject state: @.planning/STATE.md\nUser docs (if available): @.planning/codebase/USER-CONTEXT.md", subagent_type="gsd-executor")
 ```
 
 All three run in parallel. Task tool blocks until all complete.
