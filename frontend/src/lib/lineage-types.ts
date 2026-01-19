@@ -73,6 +73,8 @@ export interface TableNodeData {
   columns: ColumnData[];
   isHighlighted?: boolean;
   isExpanded?: boolean;
+  // Index signature for React Flow compatibility
+  [key: string]: unknown;
 }
 
 export interface ColumnEdgeData {
@@ -80,6 +82,8 @@ export interface ColumnEdgeData {
   transformationSubtype: TransformationSubtype | null;
   transformationDescription: string | null;
   isHighlighted?: boolean;
+  // Index signature for React Flow compatibility
+  [key: string]: unknown;
 }
 
 // ============================================================================
