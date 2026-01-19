@@ -89,6 +89,12 @@ Build a list of all phases with their numbers and completion status.
 <step name="validate_target_phase">
 Verify that the target phase exists in the roadmap:
 
+**Special case: Phase 0**
+- If after_phase is 0, this means "insert before Phase 1"
+- Skip existence check (phase 0 doesn't exist in roadmap)
+- The new phase will become Phase 1, and all existing phases renumber up
+
+**Normal case: Phase 1+**
 1. Search for `### Phase {after_phase}:` heading (with zero-padded format like `### Phase 02:`)
 2. If not found:
 
@@ -148,6 +154,17 @@ Collect all phases that need renumbering:
 2. Find all decimal phases > target (e.g., 3.1, 3.2 when target is 2)
 3. Calculate new phase numbers (all increment by 1)
 4. Calculate new phase number for insertion: `target + 1`
+
+**Check for no subsequent phases:**
+If no phases exist after the target (i.e., inserting after the last phase):
+
+```
+No phases to renumber. Use `/gsd:add-phase {description}` to append a new phase at the end.
+```
+
+Exit without making any changes. This command is specifically for insertion with renumbering.
+
+**Normal case - phases exist to renumber:**
 
 Example for `insert-new-phase 2`:
 ```
@@ -420,8 +437,8 @@ Updated {file_count} files"
 
 **No subsequent phases to renumber:**
 - Inserting after the last phase (functionally same as add-phase)
-- Just create new phase at end, suggest using `/gsd:add-phase` instead
-- Still proceed if user confirms
+- Exit without making any changes
+- Inform user: "No phases to renumber. Use `/gsd:add-phase {description}` to append a new phase at the end."
 
 **Multiple decimal phases:**
 - Renumber all decimals with their parent integer
@@ -445,8 +462,10 @@ Updated {file_count} files"
 - Skip directory operations for that phase
 
 **Insert after phase 0:**
-- ERROR: Cannot insert before Phase 1
-- Phase 0 doesn't exist in GSD convention
+- Interpret as "insert new Phase 1 before current Phase 1"
+- All existing phases get renumbered (1→2, 2→3, etc.)
+- Apply same completion constraint: block if Phase 1 (or any phase) is completed
+- Phase 0 doesn't need to exist in ROADMAP.md - it's a special value meaning "at the beginning"
 
 </edge_cases>
 
