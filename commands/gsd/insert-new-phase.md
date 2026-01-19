@@ -451,6 +451,7 @@ Updated {file_count} files"
 **Target phase doesn't exist:**
 - ERROR with list of available phases
 - Exit gracefully
+- Note: This check doesn't apply to phase 0 (special value for "insert at beginning")
 
 **No ROADMAP.md:**
 - ERROR: No project initialized
