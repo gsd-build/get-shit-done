@@ -8,3 +8,6 @@ CLAUDE.md
 
 # Local test installs
 .claude/
+
+# Documentation site build output
+docs/_site/
