@@ -22,7 +22,7 @@ process.stdin.on('end', () => {
     let ctx = '';
     if (remaining != null) {
       const rem = Math.round(remaining);
-      const used = 100 - rem;
+      const used = Math.max(0, Math.min(100, 100 - rem));
 
       // Build progress bar (10 segments)
       const filled = Math.floor(used / 10);
