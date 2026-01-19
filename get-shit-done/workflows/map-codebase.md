@@ -107,6 +107,29 @@ Wait for agent completion.
 Display agent's confirmation to user:
 "[Agent confirmation]"
 
+Continue to spawn_doc_validator.
+</step>
+
+<step name="spawn_doc_validator" priority="after-ingestor">
+Only execute if HAS_USER_DOCS is true and doc ingestion completed successfully.
+
+Spawn the gsd-doc-validator subagent to validate user documentation:
+
+Use Task tool:
+- subagent_type: gsd-doc-validator
+- description: "Validate user documentation claims against codebase"
+- prompt: "Validate the user-provided documentation in USER-CONTEXT.md against the actual codebase. Extract technical claims, verify each against real code, assign confidence levels, present any issues to the user for decision, and update USER-CONTEXT.md with validation status."
+
+Wait for completion. The validator will:
+1. Extract technical claims from USER-CONTEXT.md
+2. Verify claims against actual codebase files
+3. Present LOW confidence claims to user via AskUserQuestion
+4. Collect user decisions (Include/Exclude/Mark stale)
+5. Annotate USER-CONTEXT.md with validation results
+
+Store validation result for offer_next step.
+DOCS_VALIDATED = true after successful completion.
+
 Continue to check_existing.
 </step>
 
@@ -341,6 +364,12 @@ Created .planning/codebase/:
 - INTEGRATIONS.md ([N] lines) - External services and APIs
 - CONCERNS.md ([N] lines) - Technical debt and issues
 
+[If DOCS_VALIDATED is true, add validation summary:]
+**Documentation validation:**
+- [N] claims validated
+- [N] HIGH confidence, [N] MEDIUM, [N] LOW
+- [If LOW claims existed:] User resolved [N] LOW confidence claims
+- USER-CONTEXT.md annotated with validation status
 
 ---
 
@@ -363,6 +392,7 @@ Created .planning/codebase/:
 ```
 
 Note: Only include USER-CONTEXT.md in the list if it was created (user provided docs).
+Note: Only include validation summary if DOCS_VALIDATED is true.
 
 End workflow.
 </step>
@@ -374,6 +404,8 @@ End workflow.
 - User docs processed (if provided) or skipped gracefully
 - .planning/codebase/ directory created
 - USER-CONTEXT.md written (if docs provided)
+- User documentation validated (if provided)
+- USER-CONTEXT.md annotated with validation status (if docs provided)
 - 4 parallel gsd-codebase-mapper agents spawned with run_in_background=true
 - Agents write documents directly (orchestrator doesn't receive document contents)
 - Read agent output files to collect confirmations
