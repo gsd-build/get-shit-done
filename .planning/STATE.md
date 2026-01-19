@@ -5,33 +5,33 @@
 See: .planning/PROJECT.md (updated 2026-01-19)
 
 **Core value:** User-provided documentation is ingested, validated, and made available to all downstream GSD phases
-**Current focus:** Phase 2 - Document Validation
+**Current focus:** Phase 3 - Workflow Integration
 
 ## Current Position
 
-Phase: 2 of 4 (Document Validation)
-Plan: 1 of TBD in current phase
-Status: In progress
-Last activity: 2026-01-19 — Completed 02-01-PLAN.md (gsd-doc-validator agent)
+Phase: 3 of 4 (Workflow Integration)
+Plan: 0 of TBD in current phase
+Status: Ready to discuss/plan
+Last activity: 2026-01-19 — Phase 2 complete (verified)
 
-Progress: [####......] 30%
+Progress: [#####.....] 50%
 
 ## Performance Metrics
 
 **Velocity:**
-- Total plans completed: 3
+- Total plans completed: 4
 - Average duration: 3 min
-- Total execution time: 8 min
+- Total execution time: 10 min
 
 **By Phase:**
 
 | Phase | Plans | Total | Avg/Plan |
 |-------|-------|-------|----------|
 | 01-document-ingestion-core | 2 | 4 min | 2 min |
-| 02-document-validation | 1 | 4 min | 4 min |
+| 02-document-validation | 2 | 6 min | 3 min |
 
 **Recent Trend:**
-- Last 5 plans: 01-01 (2 min), 01-02 (2 min), 02-01 (4 min)
+- Last 5 plans: 01-01 (2 min), 01-02 (2 min), 02-01 (4 min), 02-02 (2 min)
 - Trend: Consistent
 
 *Updated after each plan completion*
@@ -54,6 +54,7 @@ Recent decisions affecting current work:
 - Version claims always MEDIUM (not verified against deps)
 - Location match required for HIGH confidence
 - Prose/architectural descriptions marked MEDIUM, not LOW
+- spawn_doc_validator runs after spawn_doc_ingestor, before check_existing
 
 ### Pending Todos
 
@@ -66,5 +67,5 @@ None yet.
 ## Session Continuity
 
 Last session: 2026-01-19
-Stopped at: Completed 02-01-PLAN.md
+Stopped at: Phase 2 complete, ready for Phase 3 planning
 Resume file: None
