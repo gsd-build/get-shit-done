@@ -125,11 +125,32 @@ Wait for agent completion.
 Display agent's confirmation to user:
 "[Agent confirmation]"
 
+Continue to ask_validation.
+</step>
+
+<step name="ask_validation">
+Only execute if HAS_USER_DOCS is true and doc ingestion completed successfully.
+
+Ask user if they want validation:
+
+"Would you like me to validate your documentation against the codebase?
+(This checks if file paths, function names, etc. still exist)
+
+Yes / No"
+
+**If "yes" / "y" / empty:**
+Set `VALIDATE_DOCS=true`
 Continue to spawn_doc_validator.
+
+**If "no" / "n" / "skip":**
+Set `VALIDATE_DOCS=false`
+Set `DOCS_VALIDATED=false`
+Brief acknowledgment: "Skipping validation, continuing with codebase mapping..."
+Continue to check_existing.
 </step>
 
 <step name="spawn_doc_validator">
-Only execute if HAS_USER_DOCS is true and doc ingestion completed successfully.
+Only execute if VALIDATE_DOCS is true.
 
 Spawn the gsd-doc-validator subagent to validate user documentation:
 
