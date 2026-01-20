@@ -81,11 +81,21 @@ Store in shell variables for duration calculation at completion.
 </step>
 
 <step name="determine_execution_pattern">
-Check for checkpoints in the plan:
+Check plan type and checkpoints:
 
 ```bash
+# Check plan type from frontmatter
+grep -E "^type:" [plan-path] | head -1
+# Check for checkpoints
 grep -n "type=\"checkpoint" [plan-path]
 ```
+
+**Pattern T: TDD plan (`type: tdd` in frontmatter)**
+
+- Plan contains `<feature>` element instead of `<tasks>`
+- Execute using RED-GREEN-REFACTOR cycle (see tdd_plan_execution)
+- Produces 2-3 commits per feature (test/feat/refactor)
+- Create SUMMARY.md with TDD phases documented
 
 **Pattern A: Fully autonomous (no checkpoints)**
 
@@ -109,15 +119,17 @@ grep -n "type=\"checkpoint" [plan-path]
   </step>
 
 <step name="execute_tasks">
-Execute each task in the plan.
+Execute the plan based on its type.
 
-**For each task:**
+**If Pattern T (TDD plan):** Skip to `<tdd_plan_execution>` section.
+
+**For standard plans, execute each task:**
 
 1. **Read task type**
 
 2. **If `type="auto"`:**
 
-   - Check if task has `tdd="true"` attribute → follow TDD execution flow
+   - Check if task has `tdd="true"` attribute → follow TDD task flow in `<tdd_execution>`
    - Work toward task completion
    - **If CLI/API returns authentication error:** Handle as authentication gate
    - **When you discover additional work not in plan:** Apply deviation rules automatically
@@ -507,8 +519,132 @@ If you were spawned as a continuation agent (your prompt has `<completed_tasks>`
 6. **Continue until plan completes or next checkpoint**
    </continuation_handling>
 
+<tdd_plan_execution>
+When executing a plan with `type: tdd` in frontmatter, use this flow instead of standard task execution.
+
+**TDD Plan Structure:**
+
+TDD plans contain `<feature>` element (not `<tasks>`):
+
+```xml
+<feature>
+  <name>Feature name</name>
+  <files>source.ts, source.test.ts</files>
+  <behavior>
+    Expected behavior in testable terms
+    Cases: input → expected output
+  </behavior>
+  <tests>
+    <acceptance>...</acceptance>
+    <edge_cases>...</edge_cases>
+    <security>...</security>
+    <performance>...</performance>
+  </tests>
+  <implementation>How to implement once tests pass</implementation>
+</feature>
+```
+
+**Execution Flow:**
+
+**1. Setup test infrastructure (if needed):**
+
+```bash
+# Detect project type and ensure test framework exists
+detect_and_setup_tests() {
+  if [ -f "package.json" ]; then
+    # Node.js - check for test framework
+    grep -qE "(jest|vitest|mocha)" package.json || npm install -D vitest
+  elif [ -f "pyproject.toml" ] || [ -f "requirements.txt" ]; then
+    # Python - check for pytest
+    pip show pytest >/dev/null 2>&1 || pip install pytest
+  elif [ -f "go.mod" ]; then
+    # Go - testing is built-in, no setup needed
+    :
+  elif [ -f "Cargo.toml" ]; then
+    # Rust - testing is built-in, no setup needed
+    :
+  elif [ -f "build.gradle" ]; then
+    # Java/Gradle - JUnit usually included
+    :
+  elif [ -f "pom.xml" ]; then
+    # Java/Maven - JUnit usually included
+    :
+  fi
+}
+```
+
+**2. RED - Write ALL failing tests first:**
+
+Read `<tests>` section with 4 categories:
+- `<acceptance>` — From must_haves.truths
+- `<edge_cases>` — Null, empty, overflow, malformed
+- `<security>` — Based on project's security_compliance level
+- `<performance>` — Response time, memory thresholds
+
+For EACH test category:
+1. Write tests that describe expected behavior
+2. Run tests - ALL must fail (if any pass, investigate)
+3. Commit all tests together:
+   ```
+   test({phase}-{plan}): add failing tests for [feature]
+
+   - [N] acceptance tests
+   - [N] edge case tests
+   - [N] security tests
+   - [N] performance tests
+   ```
+
+**3. GREEN - Implement to pass:**
+
+- Read `<implementation>` element for guidance
+- Write minimal code to make ALL tests pass
+- Run tests iteratively until green
+- Commit:
+   ```
+   feat({phase}-{plan}): implement [feature]
+
+   All tests passing:
+   - Acceptance: [N]/[N]
+   - Edge cases: [N]/[N]
+   - Security: [N]/[N]
+   - Performance: [N]/[N]
+   ```
+
+**4. REFACTOR (if needed):**
+
+- Clean up code if obvious improvements
+- Run tests - MUST still pass
+- Commit only if changes made:
+   ```
+   refactor({phase}-{plan}): clean up [feature]
+   ```
+
+**TDD Plan Commits:** Each TDD plan produces 2-3 atomic commits.
+
+**Error handling:**
+
+- If ANY test passes in RED phase: Feature may exist or test is wrong — investigate
+- If tests don't pass in GREEN phase: Debug, iterate until all green
+- If tests fail in REFACTOR phase: Undo refactor, try smaller changes
+
+**Security test selection:**
+
+Read `security_compliance` from `.planning/config.json`:
+
+| Level | Include Tests For |
+|-------|-------------------|
+| none | Input validation, output encoding, no hardcoded secrets |
+| soc2 | + Access control, audit logging, encryption |
+| hipaa | + PHI masking, minimum necessary access |
+| pci-dss | + PAN never logged, CVV never stored, MFA |
+| iso27001 | + Least privilege, key rotation |
+
+Reference: `@~/.claude/get-shit-done/references/security-compliance.md`
+
+</tdd_plan_execution>
+
 <tdd_execution>
-When executing a task with `tdd="true"` attribute, follow RED-GREEN-REFACTOR cycle.
+When executing a task with `tdd="true"` attribute (within standard plans), follow RED-GREEN-REFACTOR cycle.
 
 **1. Check test infrastructure (if first TDD task):**
 
