@@ -12,11 +12,13 @@ interface NavItem {
 }
 
 const navigation: NavItem[] = [
+  { name: 'Overview', href: '/overview' },
   { name: 'Sources', href: '/sources' },
   { name: 'Profiles', href: '/profiles' },
   { name: 'Rules', href: '/rules' },
   { name: 'Validations', href: '/validations' },
   { name: 'Alerts', href: '/alerts', showBadge: true },
+  { name: 'Lineage', href: '/lineage' },
 ];
 
 function NavLink({ item, isActive, badgeCount }: { item: NavItem; isActive: boolean; badgeCount?: number }) {
