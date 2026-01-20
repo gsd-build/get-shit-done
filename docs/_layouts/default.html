@@ -306,6 +306,94 @@
       letter-spacing: -0.01em;
     }
 
+    /* Details/Summary */
+    details {
+      background: var(--bg-secondary);
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      margin: 1rem 0;
+      overflow: hidden;
+    }
+
+    details summary {
+      padding: 0.75rem 1rem;
+      cursor: pointer;
+      color: var(--text);
+      font-size: 0.95rem;
+      list-style: none;
+    }
+
+    details summary::-webkit-details-marker {
+      display: none;
+    }
+
+    details summary::before {
+      content: "▶";
+      display: inline-block;
+      margin-right: 0.5rem;
+      font-size: 0.7rem;
+      transition: transform 0.2s;
+    }
+
+    details[open] summary::before {
+      transform: rotate(90deg);
+    }
+
+    details summary:hover {
+      background: var(--bg-hover);
+    }
+
+    details[open] summary {
+      border-bottom: 1px solid var(--border);
+    }
+
+    details .details-content {
+      padding: 1rem;
+    }
+
+    details p {
+      margin: 0 1rem 1rem;
+    }
+
+    details p:first-of-type {
+      margin-top: 1rem;
+    }
+
+    details pre {
+      margin: 1rem;
+      border-radius: 8px;
+    }
+
+    /* Badges */
+    .badges {
+      display: flex;
+      gap: 0.5rem;
+      margin: 1rem 0;
+    }
+
+    .badges img {
+      height: 20px;
+    }
+
+    /* Testimonials */
+    .testimonials {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 0.75rem;
+      margin: 1.5rem 0;
+    }
+
+    .testimonials p {
+      font-size: 0.9rem;
+      font-style: italic;
+      color: var(--text-muted);
+      margin: 0;
+      padding: 0.6rem 1rem;
+      background: var(--bg-secondary);
+      border: 1px solid var(--border);
+      border-radius: 8px;
+    }
+
     /* Terminal preview */
     .terminal-preview {
       margin: 2rem 0 2.5rem;
@@ -772,6 +860,7 @@
         <li><a href="{{ '/getting-started' | relative_url }}" {% if page.url contains 'getting-started' %}class="active"{% endif %}>Getting Started</a></li>
         <li><a href="{{ '/commands' | relative_url }}" {% if page.url contains 'commands' %}class="active"{% endif %}>Commands</a></li>
         <li><a href="{{ '/philosophy' | relative_url }}" {% if page.url contains 'philosophy' %}class="active"{% endif %}>Philosophy</a></li>
+        <li><a href="{{ '/troubleshooting' | relative_url }}" {% if page.url contains 'troubleshooting' %}class="active"{% endif %}>Troubleshooting</a></li>
         <li><a href="{{ '/support' | relative_url }}" {% if page.url contains 'support' %}class="active"{% endif %}>Support</a></li>
       </ul>
     </nav>
@@ -815,6 +904,7 @@
         <li><a href="{{ '/getting-started' | relative_url }}" {% if page.url contains 'getting-started' %}class="active"{% endif %}>Getting Started</a></li>
         <li><a href="{{ '/commands' | relative_url }}" {% if page.url contains 'commands' %}class="active"{% endif %}>Commands</a></li>
         <li><a href="{{ '/philosophy' | relative_url }}" {% if page.url contains 'philosophy' %}class="active"{% endif %}>Philosophy</a></li>
+        <li><a href="{{ '/troubleshooting' | relative_url }}" {% if page.url contains 'troubleshooting' %}class="active"{% endif %}>Troubleshooting</a></li>
         <li><a href="{{ '/support' | relative_url }}" {% if page.url contains 'support' %}class="active"{% endif %}>Support</a></li>
       </ul>
       <div class="bottom-sheet-footer">

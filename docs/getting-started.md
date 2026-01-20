@@ -25,6 +25,92 @@ npx get-shit-done-cc
 
 This installs GSD commands and agents into your Claude Code configuration.
 
+### Staying Updated
+
+GSD evolves fast. Check for updates periodically:
+
+```
+/gsd:whats-new
+```
+
+Update with:
+
+```bash
+npx get-shit-done-cc@latest
+```
+
+<details markdown="1">
+<summary><strong>Non-interactive Install (Docker, CI, Scripts)</strong></summary>
+
+```bash
+npx get-shit-done-cc --global   # Install to ~/.claude/
+npx get-shit-done-cc --local    # Install to ./.claude/
+```
+
+Use `--global` (`-g`) or `--local` (`-l`) to skip the interactive prompt.
+
+</details>
+
+<details markdown="1">
+<summary><strong>Development Installation</strong></summary>
+
+Clone the repository and run the installer locally:
+
+```bash
+git clone https://github.com/glittercowboy/get-shit-done.git
+cd get-shit-done
+node bin/install.js --local
+```
+
+Installs to `./.claude/` for testing modifications before contributing.
+
+</details>
+
+---
+
+## Recommended: Skip Permissions Mode
+
+GSD is designed for frictionless automation. Run Claude Code with:
+
+```bash
+claude --dangerously-skip-permissions
+```
+
+This is how GSD is intended to be used — stopping to approve `date` and `git commit` 50 times defeats the purpose.
+
+<details markdown="1">
+<summary><strong>Alternative: Granular Permissions</strong></summary>
+
+If you prefer not to use that flag, add this to your project's `.claude/settings.json`:
+
+```json
+{
+  "permissions": {
+    "allow": [
+      "Bash(date:*)",
+      "Bash(echo:*)",
+      "Bash(cat:*)",
+      "Bash(ls:*)",
+      "Bash(mkdir:*)",
+      "Bash(wc:*)",
+      "Bash(head:*)",
+      "Bash(tail:*)",
+      "Bash(sort:*)",
+      "Bash(grep:*)",
+      "Bash(tr:*)",
+      "Bash(git add:*)",
+      "Bash(git commit:*)",
+      "Bash(git status:*)",
+      "Bash(git log:*)",
+      "Bash(git diff:*)",
+      "Bash(git tag:*)"
+    ]
+  }
+}
+```
+
+</details>
+
 ---
 
 ## Your First Project
@@ -180,38 +266,9 @@ Check them later:
 
 ---
 
-## Troubleshooting
-
-### "Claude seems confused about the project"
-
-Check your `.planning/PROJECT.md`. Is it accurate? Run `/gsd:progress` to see what Claude thinks the current state is.
-
-### "Plans are too big"
-
-GSD plans should have 2-3 tasks max. If you're seeing more, your phases might be too large. Consider splitting them:
-
-```
-/gsd:add-phase
-```
-
-### "Context seems degraded"
-
-This shouldn't happen with GSD, but if it does:
-
-```
-/gsd:pause-work
-```
-
-Then start a fresh session and:
-
-```
-/gsd:resume-work
-```
-
----
-
 ## Next Steps
 
 - [How It Works](/how-it-works) — Understand the architecture
 - [Commands Reference](/commands) — Full command documentation
 - [Philosophy](/philosophy) — Why GSD exists
+- [Troubleshooting](/troubleshooting) — Common issues and fixes

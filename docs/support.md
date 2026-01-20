@@ -9,17 +9,19 @@ If GSD is saving you time (or making Claude Code feel *actually reliable*), spon
 
 ---
 
-## The Short Version
+## Why I Built This
 
-<div class="support-actions" markdown="1">
+I'm a solo developer. I don't write code — Claude Code does.
 
-**1. Star the repo** so more developers find it.
+Other spec-driven development tools exist; BMAD, Speckit... But they all seem to make things way more complicated than they need to be (sprint ceremonies, story points, stakeholder syncs, retrospectives, Jira workflows) or lack real big picture understanding of what you're building. I'm not a 50-person software company. I don't want to play enterprise theater. I'm just a creative person trying to build great things that work.
 
-**2. Sponsor the work** so ongoing maintenance is sustainable.
+So I built GSD. The complexity is in the system, not in your workflow. Behind the scenes: context engineering, XML prompt formatting, subagent orchestration, state management. What you see: a few commands that just work.
 
-**3. Share a concrete win** (tweet, blog post, internal note) so others understand what it does.
+The system gives Claude everything it needs to do the work *and* verify it. I trust the workflow. It just does a good job.
 
-</div>
+That's what this is. No enterprise roleplay bullshit. Just an incredibly effective system for building cool stuff consistently using Claude Code.
+
+— **TÂCHES**
 
 ---
 
@@ -56,6 +58,16 @@ If GSD is saving you time (or making Claude Code feel *actually reliable*), spon
 ---
 
 ## Other Ways To Help
+
+<div class="support-actions" markdown="1">
+
+**1. Star the repo** so more developers find it.
+
+**2. Sponsor the work** so ongoing maintenance is sustainable.
+
+**3. Share a concrete win** (tweet, blog post, internal note) so others understand what it does.
+
+</div>
 
 - **Report bugs** — Open issues with clear reproduction steps
 - **Improve docs** — PRs for typos, clarifications, or new guides are welcome

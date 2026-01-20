@@ -17,6 +17,12 @@ Stop wrestling with context rot. Stop watching Claude lose track of what it's bu
 npx get-shit-done-cc
 ```
 
+<div class="badges">
+  <a href="https://www.npmjs.com/package/get-shit-done-cc"><img src="https://img.shields.io/npm/v/get-shit-done-cc?style=flat-square&color=CB3837" alt="npm version"></a>
+  <a href="https://github.com/glittercowboy/get-shit-done"><img src="https://img.shields.io/github/stars/glittercowboy/get-shit-done?style=flat-square&color=181717" alt="GitHub stars"></a>
+  <a href="https://www.npmjs.com/package/get-shit-done-cc"><img src="https://img.shields.io/npm/dm/get-shit-done-cc?style=flat-square&color=CB3837" alt="npm downloads"></a>
+</div>
+
 ---
 
 ## The Problem
@@ -33,6 +39,12 @@ GSD solves context rot through **spec-driven development** and **context enginee
 - **Atomic execution.** 2-3 tasks per plan. Complete before context degrades
 - **Fresh contexts.** Subagents spawn with full 200k windows for heavy lifting
 - **Structured artifacts.** PROJECT.md, REQUIREMENTS.md, ROADMAP.md—Claude always knows what's happening
+
+<div class="testimonials">
+  <p>"If you know clearly what you want, this WILL build it for you. No bs."</p>
+  <p>"I've done SpecKit, OpenSpec and Taskmaster — this has produced the best results for me."</p>
+  <p>"By far the most powerful addition to my Claude Code. Nothing over-engineered. Literally just gets shit done."</p>
+</div>
 
 ---
 
