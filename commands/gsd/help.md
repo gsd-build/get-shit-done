@@ -285,6 +285,73 @@ List pending todos and select one to work on.
 Usage: `/gsd:check-todos`
 Usage: `/gsd:check-todos api`
 
+### User Acceptance Testing
+
+**`/gsd:verify-work [phase]`**
+Validate built features through conversational UAT.
+
+- Extracts testable deliverables from SUMMARY.md files
+- Presents tests one at a time (yes/no responses)
+- Automatically diagnoses failures and creates fix plans
+- Ready for re-execution if issues found
+
+Usage: `/gsd:verify-work 3`
+
+### Milestone Auditing
+
+**`/gsd:audit-milestone [version]`**
+Audit milestone completion against original intent.
+
+- Reads all phase VERIFICATION.md files
+- Checks requirements coverage
+- Spawns integration checker for cross-phase wiring
+- Creates MILESTONE-AUDIT.md with gaps and tech debt
+
+Usage: `/gsd:audit-milestone`
+
+**`/gsd:plan-milestone-gaps`**
+Create phases to close gaps identified by audit.
+
+- Reads MILESTONE-AUDIT.md and groups gaps into phases
+- Prioritizes by requirement priority (must/should/nice)
+- Adds gap closure phases to ROADMAP.md
+- Ready for `/gsd:plan-phase` on new phases
+
+Usage: `/gsd:plan-milestone-gaps`
+
+### Configuration
+
+**`/gsd:settings`**
+Configure workflow toggles and model profile interactively.
+
+- Toggle researcher, plan checker, verifier agents
+- Select model profile (quality/balanced/budget)
+- Updates `.planning/config.json`
+
+Usage: `/gsd:settings`
+
+**`/gsd:set-profile <profile>`**
+Quick switch model profile for GSD agents.
+
+- `quality` — Opus everywhere except verification
+- `balanced` — Opus for planning, Sonnet for execution (default)
+- `budget` — Sonnet for writing, Haiku for research/verification
+
+Usage: `/gsd:set-profile budget`
+
+### Codebase Intelligence
+
+**`/gsd:query-intel <type> [path]`**
+Query the codebase intelligence graph database.
+
+- `dependents <file>` — What files depend on this? (blast radius)
+- `hotspots` — Which files have the most dependents?
+
+Requires `/gsd:analyze-codebase` to build the graph first.
+
+Usage: `/gsd:query-intel dependents src/lib/db.ts`
+Usage: `/gsd:query-intel hotspots`
+
 ### Utility Commands
 
 **`/gsd:help`**
@@ -299,6 +366,15 @@ See what's changed since your installed version.
 - Provides update instructions when behind
 
 Usage: `/gsd:whats-new`
+
+**`/gsd:update`**
+Update GSD to latest version with changelog preview.
+
+- Shows what changed before updating
+- Confirms before running install
+- Better than raw `npx get-shit-done-cc`
+
+Usage: `/gsd:update`
 
 ## Files & Structure
 

@@ -6,6 +6,29 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ## [Unreleased]
 
+## [1.9.0] - 2025-01-20
+
+### Added
+- **Codebase Intelligence System** — Automatic semantic understanding of your codebase
+  - `/gsd:analyze-codebase` now generates semantic entities (modules, services, utils) from AST analysis
+  - `/gsd:query-intel` command for CLI access to dependency graph (`dependents`, `hotspots`)
+  - SQLite graph database (`.planning/intel/graph.db`) stores entity relationships
+  - SessionStart hook injects relevant codebase context into conversations
+  - PostToolUse hook maintains index incrementally as files change
+  - Stop hook prunes deleted files from index
+- **Model Profiles** — `/gsd:set-profile` for quality/balanced/budget agent configurations
+- **Workflow Settings** — `/gsd:settings` command for toggling workflow behaviors interactively
+
+### Changed
+- Subagent prompts now include codebase intelligence context when available
+- New project initialization creates intel directory structure
+- Install process registers intel hooks automatically
+- Documentation updated: help.md, README.md with new commands and codebase intelligence features
+
+### Fixed
+- Orchestrators now inline file contents in Task prompts (fixes context issues with @ references)
+- Tech debt from milestone audit addressed
+
 ## [1.8.0] - 2026-01-19
 
 ### Added
@@ -957,7 +980,8 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 - YOLO mode for autonomous execution
 - Interactive mode with checkpoints
 
-[Unreleased]: https://github.com/glittercowboy/get-shit-done/compare/v1.8.0...HEAD
+[Unreleased]: https://github.com/glittercowboy/get-shit-done/compare/v1.9.0...HEAD
+[1.9.0]: https://github.com/glittercowboy/get-shit-done/releases/tag/v1.9.0
 [1.8.0]: https://github.com/glittercowboy/get-shit-done/releases/tag/v1.8.0
 [1.7.1]: https://github.com/glittercowboy/get-shit-done/releases/tag/v1.7.1
 [1.7.0]: https://github.com/glittercowboy/get-shit-done/releases/tag/v1.7.0

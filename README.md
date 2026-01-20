@@ -326,13 +326,14 @@ Use for: bug fixes, small features, config changes, one-off tasks.
 
 ### Codebase Intelligence
 
-GSD learns your codebase patterns automatically. As Claude writes code, a PostToolUse hook indexes exports and imports, detects naming conventions, and builds a lightweight intelligence layer.
+GSD learns your codebase patterns automatically. As Claude writes code, a PostToolUse hook indexes exports and imports, detects naming conventions, and builds a semantic understanding of your codebase.
 
 **How it works:**
 
 1. **Automatic learning** — Every time Claude writes or edits a JS/TS file, the hook extracts exports/imports and updates `.planning/intel/index.json`
 2. **Convention detection** — Analyzes exports for naming patterns (camelCase, PascalCase, etc.), identifies directory purposes, detects file suffixes
-3. **Context injection** — At session start, injects a summary into Claude's context so it knows your codebase structure and conventions
+3. **Graph database** — Stores entity relationships in SQLite for dependency analysis
+4. **Context injection** — At session start, injects a summary into Claude's context so it knows your codebase structure and conventions
 
 **For existing codebases:**
 
@@ -342,12 +343,20 @@ GSD learns your codebase patterns automatically. As Claude writes code, a PostTo
 
 Performs a bulk scan of your codebase to bootstrap the intelligence layer. Works standalone — no `/gsd:new-project` required. After initial analysis, hooks continue incremental learning.
 
+**Query the graph:**
+
+```
+/gsd:query-intel dependents src/lib/db.ts   # What depends on this file?
+/gsd:query-intel hotspots                    # Most-depended-on files
+```
+
 **Files created:**
 
 | File | Purpose |
 |------|---------|
 | `.planning/intel/index.json` | File exports and imports index |
 | `.planning/intel/conventions.json` | Detected patterns (naming, directories, suffixes) |
+| `.planning/intel/graph.db` | SQLite database with entity relationships |
 | `.planning/intel/summary.md` | Concise context for session injection |
 
 **Benefits:**
@@ -355,6 +364,8 @@ Performs a bulk scan of your codebase to bootstrap the intelligence layer. Works
 - Claude follows your naming conventions automatically
 - New files go in the right directories
 - Consistency maintained across sessions
+- Query blast radius before refactoring
+- Identify high-impact hotspot files
 - No manual documentation of patterns needed
 
 ### Context Engineering
@@ -449,6 +460,7 @@ You're never locked in. The system adapts.
 | `/gsd:plan-phase [N]` | Research + plan + verify for a phase |
 | `/gsd:execute-phase <N>` | Execute all plans in parallel waves, verify when complete |
 | `/gsd:verify-work [N]` | Manual user acceptance testing ¹ |
+| `/gsd:audit-milestone` | Verify milestone achieved its definition of done |
 | `/gsd:complete-milestone` | Archive milestone, tag release |
 | `/gsd:new-milestone [name]` | Start next version: questions → research → requirements → roadmap |
 
@@ -458,6 +470,8 @@ You're never locked in. The system adapts.
 |---------|--------------|
 | `/gsd:progress` | Where am I? What's next? |
 | `/gsd:help` | Show all commands and usage guide |
+| `/gsd:whats-new` | See what changed since your installed version |
+| `/gsd:update` | Update GSD with changelog preview |
 
 ### Brownfield
 
@@ -465,6 +479,7 @@ You're never locked in. The system adapts.
 |---------|--------------|
 | `/gsd:map-codebase` | Analyze existing codebase before new-project |
 | `/gsd:analyze-codebase` | Bootstrap codebase intelligence for existing projects |
+| `/gsd:query-intel <type>` | Query dependency graph (dependents, hotspots) |
 
 ### Phase Management
 
@@ -473,6 +488,8 @@ You're never locked in. The system adapts.
 | `/gsd:add-phase` | Append phase to roadmap |
 | `/gsd:insert-phase [N]` | Insert urgent work between phases |
 | `/gsd:remove-phase [N]` | Remove future phase, renumber |
+| `/gsd:list-phase-assumptions [N]` | See Claude's intended approach before planning |
+| `/gsd:plan-milestone-gaps` | Create phases to close gaps from audit |
 
 ### Session
 
