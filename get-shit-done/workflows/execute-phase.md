@@ -26,11 +26,16 @@ Default to "balanced" if not set.
 
 Use model lookup table:
 
-| Agent | quality | balanced | budget |
-|-------|---------|----------|--------|
-| gsd-executor | opus | sonnet | sonnet |
-| gsd-verifier | sonnet | sonnet | haiku |
-| general-purpose | — | — | — |
+| Agent | quality | balanced | budget | adaptive |
+|-------|---------|----------|--------|----------|
+| gsd-executor | opus | sonnet | sonnet | dynamic |
+| gsd-verifier | sonnet | sonnet | haiku | dynamic |
+| general-purpose | — | — | — | — |
+
+**For adaptive profile:**
+- Model selection is dynamic per plan based on complexity
+- Use evaluate-complexity workflow before spawning each executor
+- See `adaptive-model-selection.md` reference for details
 
 **For adaptive profile:**
 
@@ -297,7 +302,23 @@ Execute each wave in sequence. Autonomous plans within a wave run in parallel.
 
    Task tool blocks until each agent finishes. All parallel agents return together.
 
-3. **Report completion and what was built:**
+3. **Log usage (if .planning/usage.json exists):**
+
+   After agent completes, log task to usage tracking:
+
+   ```bash
+   # Log usage for each completed plan
+   node hooks/gsd-usage-log.js "phase-{phase_num}-plan-{plan_num}" "{selected_model}" "{complexity_score}"
+   ```
+
+   Where:
+   - `selected_model`: Model used for this agent (haiku/sonnet/opus)
+   - `complexity_score`: Complexity score from adaptive evaluation (or omit for static profiles)
+
+   **Note:** Token counts (input_tokens, output_tokens) are optional and can be omitted.
+   Usage tracking is silent-fail by design - never blocks execution.
+
+4. **Report completion and what was built:**
 
    For each completed agent:
    - Verify SUMMARY.md exists at expected path
@@ -326,7 +347,7 @@ Execute each wave in sequence. Autonomous plans within a wave run in parallel.
    - Bad: "Wave 2 complete. Proceeding to Wave 3."
    - Good: "Terrain system complete — 3 biome types, height-based texturing, physics collision meshes. Vehicle physics (Wave 3) can now reference ground surfaces."
 
-4. **Handle failures:**
+5. **Handle failures:**
 
    If any agent in wave fails:
    - Report which plan failed and why
@@ -334,11 +355,11 @@ Execute each wave in sequence. Autonomous plans within a wave run in parallel.
    - If continue: proceed to next wave (dependent plans may also fail)
    - If stop: exit with partial completion report
 
-5. **Execute checkpoint plans between waves:**
+6. **Execute checkpoint plans between waves:**
 
    See `<checkpoint_handling>` for details.
 
-6. **Proceed to next wave**
+7. **Proceed to next wave**
 
 </step>
 

@@ -24,7 +24,10 @@ const HOOKS_TO_COPY = [
   'gsd-intel-prune.js',
   'gsd-check-update.js',
   'gsd-statusline.js',
-  'gsd-team-plan-check.js'
+  'gsd-team-plan-check.js',
+  'gsd-statusline-enhanced.js',
+  'gsd-usage-session.js',
+  'gsd-usage-log.js'
 ];
 
 async function build() {

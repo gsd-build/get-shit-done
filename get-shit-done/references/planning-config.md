@@ -31,7 +31,17 @@ Configuration options for `.planning/` directory behavior.
   },
   "claude_plan_type": "unknown",
   "team_plan_warning_shown": false,
-  "team_plan_checked_at": null
+  "team_plan_checked_at": null,
+  "statusline": {
+    "level": "standard",
+    "show_costs": true,
+    "show_model_usage": false,
+    "show_adaptive_info": false,
+    "show_rate_limits": true,
+    "show_git_state": false,
+    "show_tests": false,
+    "show_time": false
+  }
 }
 ```
 
@@ -77,6 +87,26 @@ Configuration options for `.planning/` directory behavior.
 | `claude_plan_type` | `unknown` | Detected plan type: `team`, `personal`, or `unknown` |
 | `team_plan_warning_shown` | `false` | Whether one-time team plan warning displayed |
 | `team_plan_checked_at` | `null` | ISO timestamp of last plan detection |
+
+**Statusline options:**
+
+| Option | Default | Description |
+|--------|---------|-------------|
+| `statusline.level` | `"standard"` | Display level: `"minimal"`, `"standard"`, or `"detailed"` |
+| `statusline.show_costs` | `true` | Display session/project cost tracking |
+| `statusline.show_model_usage` | `false` | Display H/S/O model distribution (adaptive profile only) |
+| `statusline.show_adaptive_info` | `false` | Display last model selection + complexity score (adaptive only) |
+| `statusline.show_rate_limits` | `true` | Display rate limit warnings when triggered |
+| `statusline.show_git_state` | `false` | Display git status (uncommitted, ahead/behind) |
+| `statusline.show_tests` | `false` | Display test runner status (future enhancement) |
+| `statusline.show_time` | `false` | Display session duration |
+
+**Configure with:** `/gsd:statusline-settings`
+
+**Display levels:**
+- `minimal`: Model + directory + context only
+- `standard`: Adds phase progress and costs
+- `detailed`: All enabled options displayed
 
 </config_schema>
 
