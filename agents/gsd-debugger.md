@@ -779,6 +779,7 @@ started: [when broke / always broken]
 <!-- OVERWRITE as understanding evolves -->
 
 root_cause: [empty until found]
+test_file: [empty until written - REQUIRED before fix]
 fix: [empty until applied]
 verification: [empty until verified]
 files_changed: []
@@ -953,20 +954,44 @@ If inconclusive:
 </step>
 
 <step name="fix_and_verify">
-**Apply fix and verify.**
+**Apply fix using TDD: write test first, then fix.**
 
 Update status to "fixing".
 
-**1. Implement minimal fix**
+**1. RED - Write failing test that reproduces the bug**
+- Create test file if doesn't exist (use project's test framework)
+- Write test that captures the exact bug behavior from Symptoms
+- Test MUST fail initially (proves it reproduces the bug)
+- If test passes: bug may already be fixed or test is wrong - investigate
+- Update Resolution.test_file with test path
+
+```bash
+# Detect project type and run test
+PROJECT_TYPE=$(detect_project_type)
+case "$PROJECT_TYPE" in
+  node) npm test -- --testNamePattern="bug reproduction" ;;
+  python) pytest -k "bug_reproduction" ;;
+  go) go test -run ".*BugReproduction.*" ./... ;;
+  rust) cargo test bug_reproduction ;;
+  *) echo "Run test manually" ;;
+esac
+```
+
+**2. GREEN - Apply minimal fix**
 - Update Current Focus with confirmed root cause
 - Make SMALLEST change that addresses root cause
+- Run test again - MUST pass now
+- If test still fails: fix is incomplete, iterate
 - Update Resolution.fix and Resolution.files_changed
 
-**2. Verify**
+**3. Verify against original Symptoms**
 - Update status to "verifying"
-- Test against original Symptoms
+- Test against original Symptoms (manual verification)
+- Run full test suite to check for regressions
 - If verification FAILS: status -> "investigating", return to investigation_loop
 - If verification PASSES: Update Resolution.verification, proceed to archive_session
+
+**TDD is MANDATORY.** A fix without a regression test is not accepted.
 </step>
 
 <step name="archive_session">
@@ -994,8 +1019,11 @@ git add -A
 git commit -m "fix: {brief description}
 
 Root cause: {root_cause}
+Test: {test_file}
 Debug session: .planning/debug/resolved/{slug}.md"
 ```
+
+**Commit MUST include the regression test.** A fix without a test is rejected.
 
 If `COMMIT_PLANNING_DOCS=false`:
 ```bash
@@ -1004,7 +1032,8 @@ git add -A
 git reset .planning/
 git commit -m "fix: {brief description}
 
-Root cause: {root_cause}"
+Root cause: {root_cause}
+Test: {test_file}"
 ```
 
 Report completion and offer next steps.
@@ -1122,12 +1151,14 @@ Orchestrator presents checkpoint to user, gets response, spawns fresh continuati
 **Debug Session:** .planning/debug/resolved/{slug}.md
 
 **Root Cause:** {what was wrong}
+**Regression Test:** {test file path} (written before fix)
 **Fix Applied:** {what was changed}
 **Verification:** {how verified}
 
 **Files Changed:**
-- {file1}: {change}
-- {file2}: {change}
+- {test_file}: regression test (RED → GREEN)
+- {file1}: {fix change}
+- {file2}: {related change}
 
 **Commit:** {hash}
 ```
@@ -1198,6 +1229,9 @@ Check for mode flags in prompt context:
 - [ ] Eliminated prevents re-investigation
 - [ ] Can resume perfectly from any /clear
 - [ ] Root cause confirmed with evidence before fixing
+- [ ] **TDD: Failing test written BEFORE fix (RED)**
+- [ ] **TDD: Test passes AFTER fix (GREEN)**
 - [ ] Fix verified against original symptoms
+- [ ] Regression test included in commit
 - [ ] Appropriate return format based on mode
 </success_criteria>

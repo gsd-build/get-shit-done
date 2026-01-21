@@ -443,6 +443,445 @@ Categorize findings:
 - ℹ️ Info: Notable but not problematic
 </step>
 
+<step name="verify_quality">
+**Check quality must_haves if present in plan frontmatter.**
+
+```bash
+# Check if any plan has quality requirements
+grep -l "quality:" "$PHASE_DIR"/*-PLAN.md 2>/dev/null
+```
+
+If quality section exists in must_haves, verify each criterion.
+
+### 0. Detect Project Type
+
+```bash
+detect_project_type() {
+  if [ -f "package.json" ]; then
+    echo "node"
+  elif [ -f "pyproject.toml" ] || [ -f "setup.py" ] || [ -f "requirements.txt" ]; then
+    echo "python"
+  elif [ -f "go.mod" ]; then
+    echo "go"
+  elif [ -f "Cargo.toml" ]; then
+    echo "rust"
+  elif [ -f "build.gradle" ] || [ -f "pom.xml" ]; then
+    echo "java"
+  elif ls *.csproj *.sln >/dev/null 2>&1; then
+    echo "dotnet"
+  else
+    echo "unknown"
+  fi
+}
+
+PROJECT_TYPE=$(detect_project_type)
+```
+
+### Test File Patterns by Project Type
+
+| Type | Test Files | Test Pattern | Assertion Pattern |
+|------|------------|--------------|-------------------|
+| node | `*.test.ts`, `*.spec.js`, `__tests__/*` | `test\(`, `it\(`, `describe\(` | `expect\(`, `assert` |
+| python | `test_*.py`, `*_test.py` | `def test_`, `class Test` | `assert`, `self.assert` |
+| go | `*_test.go` | `func Test`, `func Benchmark` | `t.Error`, `t.Fatal`, `require.` |
+| rust | `#[test]`, `tests/*.rs` | `#\[test\]`, `fn test_` | `assert!`, `assert_eq!` |
+| java | `*Test.java`, `*Spec.java` | `@Test`, `void test` | `assert`, `assertEquals` |
+| dotnet | `*Tests.cs`, `*Spec.cs` | `[Test]`, `[Fact]` | `Assert.` |
+
+### 1. Find Test Files
+
+```bash
+find_test_files() {
+  case "$PROJECT_TYPE" in
+    node)
+      find . -name "*.test.ts" -o -name "*.test.js" -o -name "*.spec.ts" -o -name "*.spec.js" | grep -v node_modules
+      ;;
+    python)
+      find . -name "test_*.py" -o -name "*_test.py" | grep -v __pycache__ | grep -v venv
+      ;;
+    go)
+      find . -name "*_test.go"
+      ;;
+    rust)
+      find . -name "*.rs" -path "*/tests/*" -o -name "*.rs" -exec grep -l "#\[test\]" {} \;
+      ;;
+    java)
+      find . -name "*Test.java" -o -name "*Spec.java"
+      ;;
+    dotnet)
+      find . -name "*Tests.cs" -o -name "*Spec.cs"
+      ;;
+    *)
+      find . -name "*test*" -o -name "*spec*" | head -20
+      ;;
+  esac
+}
+```
+
+### 2. Test Category Existence
+
+For TDD plans (`type: tdd`), verify all 4 test categories exist:
+
+```bash
+verify_test_categories() {
+  local test_files="$1"
+  local missing=()
+
+  # Category patterns (language-agnostic keywords)
+  local has_acceptance=$(echo "$test_files" | xargs grep -l -E "acceptance|should.*return|should.*create|happy.?path|success" 2>/dev/null | wc -l)
+  local has_edge=$(echo "$test_files" | xargs grep -l -E "edge|null|empty|invalid|overflow|boundary|negative|zero|missing" 2>/dev/null | wc -l)
+  local has_security=$(echo "$test_files" | xargs grep -l -E "security|injection|xss|csrf|auth|sanitiz|escap|permission|forbidden" 2>/dev/null | wc -l)
+  local has_perf=$(echo "$test_files" | xargs grep -l -E "performance|benchmark|timeout|< ?[0-9]+.?ms|slow|fast|throughput" 2>/dev/null | wc -l)
+
+  [ "$has_acceptance" -eq 0 ] && missing+=("acceptance")
+  [ "$has_edge" -eq 0 ] && missing+=("edge_cases")
+  [ "$has_security" -eq 0 ] && missing+=("security")
+  [ "$has_perf" -eq 0 ] && missing+=("performance")
+
+  if [ ${#missing[@]} -eq 0 ]; then
+    echo "PASSED: All 4 test categories present"
+  else
+    echo "FAILED: Missing test categories: ${missing[*]}"
+  fi
+}
+```
+
+### 3. Per-Category Minimum Tests
+
+```bash
+verify_category_coverage() {
+  local test_files="$1"
+  local min_per_category=2
+
+  # Count tests per category (language-agnostic)
+  local acceptance=$(echo "$test_files" | xargs grep -c -E "acceptance|should.*return|should.*create|happy.?path" 2>/dev/null | awk -F: '{sum+=$2} END {print sum}')
+  local edge=$(echo "$test_files" | xargs grep -c -E "null|empty|invalid|overflow|boundary|negative|missing" 2>/dev/null | awk -F: '{sum+=$2} END {print sum}')
+  local security=$(echo "$test_files" | xargs grep -c -E "security|injection|xss|auth|sanitiz|permission" 2>/dev/null | awk -F: '{sum+=$2} END {print sum}')
+  local perf=$(echo "$test_files" | xargs grep -c -E "performance|benchmark|timeout|throughput" 2>/dev/null | awk -F: '{sum+=$2} END {print sum}')
+
+  echo "Category coverage:"
+  echo "  Acceptance: ${acceptance:-0} tests (min: $min_per_category)"
+  echo "  Edge cases: ${edge:-0} tests (min: $min_per_category)"
+  echo "  Security: ${security:-0} tests (min: $min_per_category)"
+  echo "  Performance: ${perf:-0} tests (min: $min_per_category)"
+
+  if [ "${acceptance:-0}" -ge "$min_per_category" ] && \
+     [ "${edge:-0}" -ge "$min_per_category" ] && \
+     [ "${security:-0}" -ge "$min_per_category" ] && \
+     [ "${perf:-0}" -ge "$min_per_category" ]; then
+    echo "PASSED: All categories meet minimum"
+  else
+    echo "FAILED: Some categories below minimum"
+  fi
+}
+```
+
+### 4. Test Quality Validation (Anti-Fake Tests)
+
+Detect tests written to pass rather than to test:
+
+```bash
+verify_test_quality() {
+  local test_files="$1"
+  local fake_patterns=0
+  local issues=()
+
+  # Pattern 1: Always-true assertions (all languages)
+  if echo "$test_files" | xargs grep -qE "expect\(true\)|assert True|assert\.True|assertTrue\(true\)|Assert\.True\(true\)" 2>/dev/null; then
+    issues+=("Always-true assertions found")
+    ((fake_patterns++))
+  fi
+
+  # Pattern 2: Empty test bodies
+  if echo "$test_files" | xargs grep -qE "test.*\{\s*\}|def test_.*:\s*pass|fn test_.*\{\s*\}" 2>/dev/null; then
+    issues+=("Empty test bodies found")
+    ((fake_patterns++))
+  fi
+
+  # Pattern 3: No assertions - count tests vs assertions
+  local test_count=$(echo "$test_files" | xargs grep -cE "test\(|it\(|def test_|func Test|#\[test\]|\@Test" 2>/dev/null | awk -F: '{sum+=$2} END {print sum}')
+  local assert_count=$(echo "$test_files" | xargs grep -cE "expect\(|assert|Assert|should\.|require\.|t\.Error|t\.Fatal" 2>/dev/null | awk -F: '{sum+=$2} END {print sum}')
+  if [ "${test_count:-0}" -gt 0 ] && [ "${assert_count:-0}" -lt "${test_count:-0}" ]; then
+    issues+=("Some tests have no assertions ($assert_count assertions for $test_count tests)")
+    ((fake_patterns++))
+  fi
+
+  # Pattern 4: Only existence checks without value verification
+  local existence_only=$(echo "$test_files" | xargs grep -cE "toBeDefined|is not None|!= nil|\\.IsNotNull" 2>/dev/null | awk -F: '{sum+=$2} END {print sum}')
+  local value_checks=$(echo "$test_files" | xargs grep -cE "toBe\(|toEqual\(|assertEqual|assert_eq|\.Equal\(|Equals\(" 2>/dev/null | awk -F: '{sum+=$2} END {print sum}')
+  if [ "${existence_only:-0}" -gt 0 ] && [ "${value_checks:-0}" -eq 0 ]; then
+    issues+=("Only existence checks without value verification")
+    ((fake_patterns++))
+  fi
+
+  # Pattern 5: Excessive mocking
+  local mock_count=$(echo "$test_files" | xargs grep -cE "mock\(|Mock\(|@patch|jest\.mock|vi\.mock|mockito" 2>/dev/null | awk -F: '{sum+=$2} END {print sum}')
+  if [ "${mock_count:-0}" -gt "${test_count:-0}" ]; then
+    issues+=("Excessive mocking - more mocks than tests")
+    ((fake_patterns++))
+  fi
+
+  if [ "$fake_patterns" -eq 0 ]; then
+    echo "PASSED: Tests appear to be genuine"
+  else
+    echo "FAILED: $fake_patterns fake test patterns detected:"
+    for issue in "${issues[@]}"; do
+      echo "  - $issue"
+    done
+  fi
+}
+```
+
+### 5. Run Tests (Project-Agnostic)
+
+```bash
+run_tests() {
+  case "$PROJECT_TYPE" in
+    node)
+      npm test 2>&1
+      ;;
+    python)
+      pytest 2>&1 || python -m pytest 2>&1 || python -m unittest discover 2>&1
+      ;;
+    go)
+      go test ./... 2>&1
+      ;;
+    rust)
+      cargo test 2>&1
+      ;;
+    java)
+      ./gradlew test 2>&1 || mvn test 2>&1
+      ;;
+    dotnet)
+      dotnet test 2>&1
+      ;;
+    *)
+      echo "Unknown project type - check test command in PROJECT.md"
+      return 1
+      ;;
+  esac
+}
+
+verify_tests_pass() {
+  run_tests
+  local result=$?
+
+  if [ $result -eq 0 ]; then
+    echo "PASSED: All tests pass"
+  else
+    echo "FAILED: Tests are failing"
+  fi
+}
+```
+
+### 6. Test Coverage (Project-Agnostic)
+
+```bash
+verify_test_coverage() {
+  local min_coverage="$1"
+  local coverage=""
+
+  case "$PROJECT_TYPE" in
+    node)
+      coverage=$(npm test -- --coverage --coverageReporters=text 2>/dev/null | grep "All files" | awk '{print $4}' | tr -d '%')
+      ;;
+    python)
+      coverage=$(pytest --cov --cov-report=term 2>/dev/null | grep "TOTAL" | awk '{print $NF}' | tr -d '%')
+      ;;
+    go)
+      coverage=$(go test -cover ./... 2>/dev/null | grep -oE "[0-9]+\.[0-9]+%" | head -1 | tr -d '%')
+      ;;
+    rust)
+      # cargo-tarpaulin required
+      coverage=$(cargo tarpaulin --out Stdout 2>/dev/null | grep -oE "[0-9]+\.[0-9]+%" | head -1 | tr -d '%')
+      ;;
+    java)
+      # Extract from jacoco report
+      coverage=$(find . -name "index.html" -path "*jacoco*" -exec grep -oE "Total[^0-9]*[0-9]+" {} \; | grep -oE "[0-9]+$" | head -1)
+      ;;
+    dotnet)
+      coverage=$(dotnet test --collect:"XPlat Code Coverage" 2>/dev/null | grep -oE "Line coverage: [0-9.]+" | grep -oE "[0-9.]+")
+      ;;
+    *)
+      echo "WARNING: Cannot determine coverage for $PROJECT_TYPE"
+      return 0
+      ;;
+  esac
+
+  if [ -n "$coverage" ] && [ "${coverage%.*}" -ge "$min_coverage" ]; then
+    echo "PASSED: Coverage $coverage% >= $min_coverage%"
+  else
+    echo "FAILED: Coverage ${coverage:-unknown}% < $min_coverage%"
+  fi
+}
+```
+
+### 7. Security Tests (Project-Agnostic)
+
+```bash
+verify_security_tests() {
+  local level="$1"
+  local result=0
+
+  case "$PROJECT_TYPE" in
+    node)
+      npm test -- --grep "security" 2>/dev/null || npm test -- --testNamePattern="security" 2>/dev/null
+      result=$?
+      ;;
+    python)
+      pytest -k "security" 2>/dev/null
+      result=$?
+      ;;
+    go)
+      go test -run ".*Security.*" ./... 2>/dev/null
+      result=$?
+      ;;
+    rust)
+      cargo test security 2>/dev/null
+      result=$?
+      ;;
+    java)
+      ./gradlew test --tests "*Security*" 2>/dev/null || mvn test -Dtest="*Security*" 2>/dev/null
+      result=$?
+      ;;
+    dotnet)
+      dotnet test --filter "FullyQualifiedName~Security" 2>/dev/null
+      result=$?
+      ;;
+    *)
+      echo "WARNING: Cannot run security tests for $PROJECT_TYPE"
+      return 0
+      ;;
+  esac
+
+  if [ $result -eq 0 ]; then
+    echo "PASSED: Security tests pass for $level"
+  else
+    echo "FAILED: Security tests failing"
+  fi
+}
+```
+
+### 8. Vulnerability Scan (Project-Agnostic)
+
+```bash
+verify_no_vulnerabilities() {
+  local critical=0
+  local high=0
+
+  case "$PROJECT_TYPE" in
+    node)
+      npm audit --json 2>/dev/null > /tmp/audit.json
+      critical=$(grep -o '"critical":[0-9]*' /tmp/audit.json | head -1 | grep -o '[0-9]*')
+      high=$(grep -o '"high":[0-9]*' /tmp/audit.json | head -1 | grep -o '[0-9]*')
+      ;;
+    python)
+      # pip-audit or safety required
+      pip-audit --format=json 2>/dev/null > /tmp/audit.json || safety check --json 2>/dev/null > /tmp/audit.json
+      critical=$(grep -c '"CRITICAL"\|"critical"' /tmp/audit.json 2>/dev/null || echo 0)
+      high=$(grep -c '"HIGH"\|"high"' /tmp/audit.json 2>/dev/null || echo 0)
+      ;;
+    go)
+      # govulncheck required
+      govulncheck ./... 2>/dev/null > /tmp/audit.txt
+      critical=$(grep -c "CRITICAL" /tmp/audit.txt 2>/dev/null || echo 0)
+      high=$(grep -c "HIGH" /tmp/audit.txt 2>/dev/null || echo 0)
+      ;;
+    rust)
+      cargo audit 2>/dev/null > /tmp/audit.txt
+      critical=$(grep -c "CRITICAL" /tmp/audit.txt 2>/dev/null || echo 0)
+      high=$(grep -c "HIGH\|warning:" /tmp/audit.txt 2>/dev/null || echo 0)
+      ;;
+    java)
+      # OWASP dependency-check or gradle plugin
+      ./gradlew dependencyCheckAnalyze 2>/dev/null || mvn dependency-check:check 2>/dev/null
+      critical=$(grep -c "CRITICAL" build/reports/dependency-check-report.html 2>/dev/null || echo 0)
+      high=$(grep -c "HIGH" build/reports/dependency-check-report.html 2>/dev/null || echo 0)
+      ;;
+    dotnet)
+      dotnet list package --vulnerable 2>/dev/null > /tmp/audit.txt
+      critical=$(grep -c "Critical" /tmp/audit.txt 2>/dev/null || echo 0)
+      high=$(grep -c "High" /tmp/audit.txt 2>/dev/null || echo 0)
+      ;;
+    *)
+      echo "WARNING: Cannot scan vulnerabilities for $PROJECT_TYPE"
+      return 0
+      ;;
+  esac
+
+  if [ "${critical:-0}" -eq 0 ] && [ "${high:-0}" -eq 0 ]; then
+    echo "PASSED: No critical/high vulnerabilities"
+  else
+    echo "FAILED: Found ${critical:-0} critical, ${high:-0} high vulnerabilities"
+  fi
+}
+```
+
+### 9. Performance Tests (Project-Agnostic)
+
+```bash
+verify_performance_tests() {
+  local result=0
+
+  case "$PROJECT_TYPE" in
+    node)
+      npm test -- --grep "performance" 2>/dev/null || npm test -- --testNamePattern="performance" 2>/dev/null
+      result=$?
+      ;;
+    python)
+      pytest -k "performance or benchmark" 2>/dev/null
+      result=$?
+      ;;
+    go)
+      go test -run ".*Performance.*" -bench=. ./... 2>/dev/null
+      result=$?
+      ;;
+    rust)
+      cargo test performance 2>/dev/null && cargo bench 2>/dev/null
+      result=$?
+      ;;
+    java)
+      ./gradlew test --tests "*Performance*" 2>/dev/null || mvn test -Dtest="*Performance*" 2>/dev/null
+      result=$?
+      ;;
+    dotnet)
+      dotnet test --filter "FullyQualifiedName~Performance" 2>/dev/null
+      result=$?
+      ;;
+    *)
+      echo "WARNING: Cannot run performance tests for $PROJECT_TYPE"
+      return 0
+      ;;
+  esac
+
+  if [ $result -eq 0 ]; then
+    echo "PASSED: Performance tests pass"
+  else
+    echo "WARNING: Performance tests failing (non-blocking)"
+  fi
+}
+```
+
+### Quality Status
+
+| Check | Status | Severity |
+|-------|--------|----------|
+| Test categories exist | Required | Blocker if missing |
+| Per-category minimum | Required | Blocker if below minimum |
+| Test quality (no fakes) | Required | Blocker if fake patterns |
+| Tests pass | Required | Blocker if failing |
+| Overall coverage | Required | Blocker if below threshold |
+| Security tests | Required | Blocker if failing |
+| Vulnerabilities | Required | Blocker if critical/high |
+| Performance | Optional | Warning only |
+
+**Supported project types:** Node.js, Python, Go, Rust, Java, .NET
+
+**Reference:** @~/.claude/get-shit-done/references/security-compliance.md
+
+Record quality verification results in VERIFICATION.md.
+</step>
+
 <step name="identify_human_verification">
 **Flag items that need human verification.**
 
@@ -620,6 +1059,7 @@ The orchestrator will:
 - [ ] All key links verified
 - [ ] Requirements coverage assessed (if applicable)
 - [ ] Anti-patterns scanned and categorized
+- [ ] Quality must_haves verified (coverage, security, vulnerabilities) if present
 - [ ] Human verification items identified
 - [ ] Overall status determined
 - [ ] Fix plans generated (if gaps_found)

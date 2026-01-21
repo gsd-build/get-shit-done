@@ -15,6 +15,13 @@ Debug issues using scientific method with subagent isolation.
 **Orchestrator role:** Gather symptoms, spawn gsd-debugger agent, handle checkpoints, spawn continuations.
 
 **Why subagent:** Investigation burns context fast (reading files, forming hypotheses, testing). Fresh 200k context per investigation. Main context stays lean for user interaction.
+
+**CRITICAL: You are the ORCHESTRATOR, not the debugger.**
+- DO NOT investigate the issue yourself
+- DO NOT read code files to debug
+- DO NOT form hypotheses or test theories
+- ONLY gather symptoms, then SPAWN gsd-debugger agent
+- The agent does ALL investigation work
 </objective>
 
 <context>
@@ -65,7 +72,7 @@ Use AskUserQuestion for each:
 4. **Timeline** - When did this start? Ever worked?
 5. **Reproduction** - How do you trigger it?
 
-After all gathered, confirm ready to investigate.
+After all gathered, **IMMEDIATELY spawn gsd-debugger agent** (step 3). Do NOT start investigating yourself.
 
 ## 3. Spawn gsd-debugger Agent
 
@@ -163,7 +170,7 @@ Task(
 <success_criteria>
 - [ ] Active sessions checked
 - [ ] Symptoms gathered (if new)
-- [ ] gsd-debugger spawned with context
+- [ ] **gsd-debugger agent SPAWNED** (mandatory - never debug directly)
 - [ ] Checkpoints handled correctly
 - [ ] Root cause confirmed before fixing
 </success_criteria>

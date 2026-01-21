@@ -797,6 +797,84 @@ Why lower:
 
 Each phase involves file reads, test runs, output analysis. The back-and-forth is heavier than linear execution.
 
+## TDD-First Enforcement
+
+### Rule: Logic Plans Must Be TDD
+
+For any plan with testable business logic, you MUST:
+- Set `type: tdd` in frontmatter
+- Include `<tests>` section with 4 categories
+
+### Required Test Categories
+
+All TDD plans must include tests in 4 categories. Write ALL tests in RED phase before implementation.
+
+```xml
+<tests>
+  <acceptance>
+    - From must_haves.truths — prove feature does what it should
+  </acceptance>
+  <edge_cases>
+    - Null, empty, overflow, malformed input
+    - Boundary conditions
+  </edge_cases>
+  <security>
+    - Based on project's security_compliance level
+    - Reference: @~/.claude/get-shit-done/references/security-compliance.md
+  </security>
+  <performance>
+    - Response time thresholds
+    - Memory limits
+    - Throughput requirements
+  </performance>
+</tests>
+```
+
+### Security Test Selection
+
+Read `security_compliance` from `.planning/config.json`:
+
+| Level | Security Tests |
+|-------|----------------|
+| none | Input validation, output encoding, no hardcoded secrets |
+| soc2 | + Access control, audit logging, encryption at rest |
+| hipaa | + PHI masking, minimum necessary access, 6-year retention |
+| pci-dss | + PAN never logged, CVV never stored, MFA for admin |
+| iso27001 | + Least privilege, key rotation, incident detection |
+
+### Refactor Plan Decision
+
+Add a refactor plan (wave N+1) when:
+- 3+ feature plans in phase
+- Feature plans share files (technical debt likely)
+- Security compliance >= soc2 (stricter code quality)
+
+```yaml
+---
+phase: XX-name
+plan: NN
+type: execute
+refactor: true    # Marks as refactor plan
+wave: N+1         # After feature plans
+depends_on: [all feature plans]
+---
+```
+
+### Quality in must_haves
+
+TDD plans should include quality section:
+
+```yaml
+must_haves:
+  truths: [...]
+  artifacts: [...]
+  key_links: [...]
+  quality:
+    test_coverage_min: 80
+    security_compliance: soc2    # From config.json
+    no_critical_vulnerabilities: true
+```
+
 </tdd_integration>
 
 <gap_closure_mode>
