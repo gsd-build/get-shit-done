@@ -345,9 +345,17 @@ Create `.planning/config.json` with all settings:
     "research": true|false,
     "plan_check": true|false,
     "verifier": true|false
-  }
+  },
+  "claude_plan_type": "unknown",
+  "team_plan_warning_shown": false,
+  "team_plan_checked_at": null
 }
 ```
+
+**Plan type fields:**
+- `claude_plan_type` — Detected plan type (team/personal/unknown), populated by `/gsd:check-plan` or SessionStart hook
+- `team_plan_warning_shown` — Whether one-time team plan warning has been displayed
+- `team_plan_checked_at` — Timestamp of last plan detection
 
 **If commit_docs = No:**
 - Set `commit_docs: false` in config.json

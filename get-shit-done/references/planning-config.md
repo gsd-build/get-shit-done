@@ -3,17 +3,57 @@
 Configuration options for `.planning/` directory behavior.
 
 <config_schema>
+
+**Full schema:**
+
 ```json
-"planning": {
+{
+  "mode": "interactive|yolo",
+  "depth": "quick|standard|comprehensive",
+  "parallelization": true,
   "commit_docs": true,
-  "search_gitignored": false
+  "workflow": {
+    "research": true,
+    "plan_check": true,
+    "verifier": true
+  },
+  "claude_plan_type": "unknown",
+  "team_plan_warning_shown": false,
+  "team_plan_checked_at": null
 }
 ```
+
+**Core workflow options:**
+
+| Option | Default | Description |
+|--------|---------|-------------|
+| `mode` | `interactive` | Workflow mode: `yolo` (auto-approve) or `interactive` (confirm steps) |
+| `depth` | `standard` | Planning thoroughness: `quick`, `standard`, or `comprehensive` |
+| `parallelization` | `true` | Whether to run independent plans in parallel waves |
+
+**Planning options:**
 
 | Option | Default | Description |
 |--------|---------|-------------|
 | `commit_docs` | `true` | Whether to commit planning artifacts to git |
 | `search_gitignored` | `false` | Add `--no-ignore` to broad rg searches |
+
+**Workflow agent toggles:**
+
+| Option | Default | Description |
+|--------|---------|-------------|
+| `workflow.research` | `true` | Spawn research agent before planning |
+| `workflow.plan_check` | `true` | Spawn plan checker to verify plans |
+| `workflow.verifier` | `true` | Spawn verifier after execution |
+
+**Plan detection options:**
+
+| Option | Default | Description |
+|--------|---------|-------------|
+| `claude_plan_type` | `unknown` | Detected plan type: `team`, `personal`, or `unknown` |
+| `team_plan_warning_shown` | `false` | Whether one-time team plan warning displayed |
+| `team_plan_checked_at` | `null` | ISO timestamp of last plan detection |
+
 </config_schema>
 
 <commit_docs_behavior>
