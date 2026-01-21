@@ -1,6 +1,6 @@
 ---
 name: gsd:analyze-codebase
-description: Scan existing codebase and populate .planning/intel/ with file index, conventions, and semantic entity files
+description: Scan existing codebase and populate .planning/intel/ with file index, conventions, and semantic entity files. Supports 35+ programming languages with automatic stack detection.
 argument-hint: ""
 allowed-tools:
   - Read
@@ -39,6 +39,28 @@ After initial scan, the PostToolUse hook (hooks/intel-index.js) maintains increm
 </context>
 
 <process>
+
+## Step 0: Detect programming stacks
+
+Run stack detection to identify all languages and frameworks in the codebase:
+
+```bash
+node hooks/lib/detect-stacks.js "$(pwd)" json > /tmp/gsd-stacks.json
+cat /tmp/gsd-stacks.json
+```
+
+Parse the JSON result to get:
+- `detected[]` - Array of detected stacks with confidence scores
+- `primary` - The dominant stack (highest confidence)
+- `isPolyglot` - Boolean indicating multiple stacks detected
+- `stackCount` - Number of stacks above threshold
+
+**Decision logic:**
+- If `stackCount` is 0: Fall back to default JS/TS patterns (current behavior)
+- If `stackCount` is 1: Use single stack's globs and patterns
+- If `stackCount` > 1 (polyglot): Spawn subagent per stack in Step 0.5
+
+Store detected stacks for use in subsequent steps. Primary stack determines conventions priority.
 
 ## Step 1: Create directory structure
 
