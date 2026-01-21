@@ -163,6 +163,7 @@ function cleanupOrphanedFiles(claudeDir) {
   const orphanedFiles = [
     'hooks/gsd-notify.sh',  // Removed in v1.6.x
     'hooks/statusline.js',  // Renamed to gsd-statusline.js in v1.9.0
+    'hooks/gsd-statusline.js',  // Replaced with gsd-statusline-enhanced.js in v2.0.x
   ];
 
   for (const relPath of orphanedFiles) {
@@ -181,6 +182,7 @@ function cleanupOrphanedHooks(settings) {
   const orphanedHookPatterns = [
     'gsd-notify.sh',  // Removed in v1.6.x
     'hooks/statusline.js',  // Renamed to gsd-statusline.js in v1.9.0
+    'gsd-statusline.js',  // Replaced with gsd-statusline-enhanced.js in v2.0.x
   ];
 
   let cleaned = false;
@@ -387,8 +389,8 @@ function install(isGlobal) {
   const settingsPath = path.join(claudeDir, 'settings.json');
   const settings = cleanupOrphanedHooks(readSettings(settingsPath));
   const statuslineCommand = isGlobal
-    ? 'node "$HOME/.claude/hooks/gsd-statusline.js"'
-    : 'node .claude/hooks/gsd-statusline.js';
+    ? 'node "$HOME/.claude/hooks/gsd-statusline-enhanced.js"'
+    : 'node .claude/hooks/gsd-statusline-enhanced.js';
   const updateCheckCommand = isGlobal
     ? 'node "$HOME/.claude/hooks/gsd-check-update.js"'
     : 'node .claude/hooks/gsd-check-update.js';
