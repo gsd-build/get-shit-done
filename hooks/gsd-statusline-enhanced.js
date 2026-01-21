@@ -240,7 +240,7 @@ function parseRoadmapMD(content) {
 
 function formatModel(model, profile) {
   if (profile === 'adaptive') {
-    return `\x1b[2mAdaptive ✨\x1b[0m`;
+    return `\x1b[2mAdaptive\x1b[0m \x1b[2m(\x1b[0m${model}\x1b[2m) ✨\x1b[0m`;
   }
   return `\x1b[2m${model}\x1b[0m`;
 }
