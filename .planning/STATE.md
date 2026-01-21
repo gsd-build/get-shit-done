@@ -85,6 +85,10 @@ Progress: [███████████░] 96%
 | Load profile per invocation | 06-03 | Each subagent loads only its stack profile, reduces context |
 | Use regex patterns exactly from profiles | 06-03 | Consistency across stacks for summary aggregation |
 | Observe naming from actual code | 06-03 | Detect real patterns vs profile defaults |
+| Step 0 calls detect-stacks.js | 06-04 | Detect stacks before file scanning |
+| Step 0.5 spawns per-stack subagents | 06-04 | Polyglot codebases analyzed in parallel with fresh context |
+| Stack field initialized to null | 06-04 | Incremental updates set null, bulk scan populates actual values |
+| Subagent delegation preserves context | 06-04 | Orchestrator receives ~50 tokens per stack, not full analysis |
 | Stack field derived from extension | 06-05 | .ts -> typescript, .py -> python, maintains consistency |
 | Framework field is optional | 06-05 | Only when framework-specific imports detected |
 | Omit framework when not detected | 06-05 | Don't use null or "none", keeps frontmatter clean |
