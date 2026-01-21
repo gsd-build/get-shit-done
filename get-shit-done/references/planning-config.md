@@ -10,12 +10,24 @@ Configuration options for `.planning/` directory behavior.
 {
   "mode": "interactive|yolo",
   "depth": "quick|standard|comprehensive",
+  "model_profile": "quality|balanced|budget|adaptive",
   "parallelization": true,
-  "commit_docs": true,
+  "planning": {
+    "commit_docs": true,
+    "search_gitignored": false
+  },
   "workflow": {
     "research": true,
     "plan_check": true,
     "verifier": true
+  },
+  "adaptive_settings": {
+    "enable_auto_selection": true,
+    "prefer_cost_optimization": true,
+    "fallback_on_rate_limit": true,
+    "min_model": "haiku",
+    "max_model": "opus",
+    "log_selections": true
   },
   "claude_plan_type": "unknown",
   "team_plan_warning_shown": false,
@@ -29,6 +41,7 @@ Configuration options for `.planning/` directory behavior.
 |--------|---------|-------------|
 | `mode` | `interactive` | Workflow mode: `yolo` (auto-approve) or `interactive` (confirm steps) |
 | `depth` | `standard` | Planning thoroughness: `quick`, `standard`, or `comprehensive` |
+| `model_profile` | `balanced` | Model selection strategy: `quality`, `balanced`, `budget`, or `adaptive` |
 | `parallelization` | `true` | Whether to run independent plans in parallel waves |
 
 **Planning options:**
@@ -45,6 +58,17 @@ Configuration options for `.planning/` directory behavior.
 | `workflow.research` | `true` | Spawn research agent before planning |
 | `workflow.plan_check` | `true` | Spawn plan checker to verify plans |
 | `workflow.verifier` | `true` | Spawn verifier after execution |
+
+**Adaptive model selection options:**
+
+| Option | Default | Description |
+|--------|---------|-------------|
+| `adaptive_settings.enable_auto_selection` | `true` | Enable complexity-based model selection |
+| `adaptive_settings.prefer_cost_optimization` | `true` | Prefer Haiku over Sonnet for simple tasks |
+| `adaptive_settings.fallback_on_rate_limit` | `true` | Automatically retry with smaller model on rate limits |
+| `adaptive_settings.min_model` | `"haiku"` | Minimum model to use (haiku/sonnet/opus) |
+| `adaptive_settings.max_model` | `"opus"` | Maximum model to use (haiku/sonnet/opus) |
+| `adaptive_settings.log_selections` | `true` | Log model selections to .planning/usage.json |
 
 **Plan detection options:**
 

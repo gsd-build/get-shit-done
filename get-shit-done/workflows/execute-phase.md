@@ -22,7 +22,9 @@ MODEL_PROFILE=$(cat .planning/config.json 2>/dev/null | grep -o '"model_profile"
 
 Default to "balanced" if not set.
 
-**Model lookup table:**
+**For static profiles (quality/balanced/budget):**
+
+Use model lookup table:
 
 | Agent | quality | balanced | budget |
 |-------|---------|----------|--------|
@@ -30,7 +32,13 @@ Default to "balanced" if not set.
 | gsd-verifier | sonnet | sonnet | haiku |
 | general-purpose | — | — | — |
 
-Store resolved models for use in Task calls below.
+**For adaptive profile:**
+
+Model selection deferred until task execution. Each plan's complexity is evaluated before spawning executor.
+
+See `@~/.claude/get-shit-done/workflows/evaluate-complexity.md` for evaluation logic.
+
+Store resolved profile for use in Task calls below.
 </step>
 
 <step name="load_project_state">
@@ -190,7 +198,56 @@ Execute each wave in sequence. Autonomous plans within a wave run in parallel.
    - Bad: "Executing terrain generation plan"
    - Good: "Procedural terrain generator using Perlin noise — creates height maps, biome zones, and collision meshes. Required before vehicle physics can interact with ground."
 
-2. **Read files and spawn all autonomous agents in wave simultaneously:**
+2. **Evaluate complexity and select model (if adaptive profile):**
+
+   If `MODEL_PROFILE` is "adaptive", evaluate each plan's complexity:
+
+   ```bash
+   # For each plan in wave
+   for plan_path in wave_plans; do
+     # Count files in <files> tags
+     FILES_COUNT=$(grep -oP '<files>.*?</files>' "$plan_path" | wc -l)
+
+     # Check for complexity indicators
+     NOVEL=$(grep -i "new library\|unfamiliar\|novel" "$plan_path" >/dev/null && echo "+3" || echo "0")
+     ARCH=$(grep -i "architecture\|design decision" "$plan_path" >/dev/null && echo "+3" || echo "0")
+     CROSS=$(grep -i "spans\|multiple subsystems" "$plan_path" >/dev/null && echo "+2" || echo "0")
+
+     # Calculate score
+     SCORE=$((FILES_COUNT + NOVEL + ARCH + CROSS))
+
+     # Select model
+     if [ $SCORE -le 3 ]; then
+       # Simple: prefer cost optimization
+       PREFER_COST=$(cat .planning/config.json | grep -o '"prefer_cost_optimization"[[:space:]]*:[[:space:]]*true' >/dev/null && echo "true" || echo "false")
+       if [ "$PREFER_COST" = "true" ]; then
+         EXECUTOR_MODEL="haiku"
+       else
+         EXECUTOR_MODEL="sonnet"
+       fi
+     elif [ $SCORE -le 7 ]; then
+       # Medium
+       EXECUTOR_MODEL="sonnet"
+     else
+       # Complex
+       EXECUTOR_MODEL="opus"
+     fi
+
+     echo "Plan: $plan_path | Complexity: $SCORE | Model: $EXECUTOR_MODEL"
+   done
+   ```
+
+   **For static profiles:** Use lookup table from resolve_model_profile step.
+
+   **Log selection (if enabled):**
+
+   ```bash
+   if [ "$(cat .planning/config.json | grep -o '"log_selections"[[:space:]]*:[[:space:]]*true')" ]; then
+     echo "{\"timestamp\":\"$(date -u +%Y-%m-%dT%H:%M:%SZ)\",\"task\":\"$plan_path\",\"score\":$SCORE,\"model\":\"$EXECUTOR_MODEL\"}" >> .planning/usage.json
+   fi
+   ```
+
+3. **Read files and spawn all autonomous agents in wave simultaneously:**
 
    Before spawning, read file contents. The `@` syntax does not work across Task() boundaries - content must be inlined.
 
