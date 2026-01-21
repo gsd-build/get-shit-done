@@ -33,7 +33,9 @@ Parse current values (default to `true` if not present):
 - `workflow.research` — spawn researcher during plan-phase
 - `workflow.plan_check` — spawn plan checker during plan-phase
 - `workflow.verifier` — spawn verifier during execute-phase
+- `workflow.tdd` — enforce TDD for all plans (default: `true`)
 - `model_profile` — which model each agent uses (default: `balanced`)
+- `security_compliance` — security compliance level (default: `none`)
 
 ## 3. Present Settings
 
@@ -77,6 +79,27 @@ AskUserQuestion([
       { label: "Yes", description: "Verify must-haves after execution" },
       { label: "No", description: "Skip post-execution verification" }
     ]
+  },
+  {
+    question: "Enforce TDD workflow? (write tests before code)",
+    header: "TDD",
+    multiSelect: false,
+    options: [
+      { label: "Yes (Recommended)", description: "All plans use RED-GREEN-REFACTOR cycle" },
+      { label: "No", description: "Standard execution without mandatory tests" }
+    ]
+  },
+  {
+    question: "Security compliance level?",
+    header: "Security",
+    multiSelect: false,
+    options: [
+      { label: "none", description: "Basic security best practices" },
+      { label: "soc2", description: "SOC 2 Type II (B2B SaaS)" },
+      { label: "hipaa", description: "HIPAA (healthcare, PHI)" },
+      { label: "pci-dss", description: "PCI-DSS (payments)" },
+      { label: "iso27001", description: "ISO 27001 (enterprise ISMS)" }
+    ]
   }
 ])
 ```
@@ -91,10 +114,12 @@ Merge new settings into existing config.json:
 {
   ...existing_config,
   "model_profile": "quality" | "balanced" | "budget",
+  "security_compliance": "none" | "soc2" | "hipaa" | "pci-dss" | "iso27001",
   "workflow": {
     "research": true/false,
     "plan_check": true/false,
-    "verifier": true/false
+    "verifier": true/false,
+    "tdd": true/false
   }
 }
 ```
@@ -116,8 +141,13 @@ Display:
 | Plan Researcher      | {On/Off} |
 | Plan Checker         | {On/Off} |
 | Execution Verifier   | {On/Off} |
+| TDD Workflow         | {On/Off} |
+| Security Compliance  | {none/soc2/hipaa/pci-dss/iso27001} |
 
 These settings apply to future /gsd:plan-phase and /gsd:execute-phase runs.
+
+**TDD Workflow:** When enabled, all plans use RED-GREEN-REFACTOR cycle with 4 test categories.
+**Security Compliance:** Determines which security tests are required. See @~/.claude/get-shit-done/references/security-compliance.md
 
 Quick commands:
 - /gsd:set-profile <profile> — switch model profile
@@ -130,7 +160,7 @@ Quick commands:
 
 <success_criteria>
 - [ ] Current config read
-- [ ] User presented with 4 settings (profile + 3 toggles)
-- [ ] Config updated with model_profile and workflow section
+- [ ] User presented with 6 settings (profile + 4 toggles + security)
+- [ ] Config updated with model_profile, security_compliance, and workflow section
 - [ ] Changes confirmed to user
 </success_criteria>
