@@ -640,6 +640,12 @@ Read `security_compliance` from `.planning/config.json`:
 
 ```bash
 SECURITY_LEVEL=$(cat .planning/config.json 2>/dev/null | grep -oE '"security_compliance"\s*:\s*"[^"]*"' | grep -oE '"[^"]*"$' | tr -d '"' || echo "none")
+
+# Validate against allowed values
+case "$SECURITY_LEVEL" in
+  none|soc2|hipaa|pci-dss|iso27001) ;;
+  *) echo "Warning: Invalid security_compliance '$SECURITY_LEVEL', using 'none'" >&2; SECURITY_LEVEL="none" ;;
+esac
 ```
 
 | Level | Include Tests For |

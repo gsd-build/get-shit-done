@@ -90,15 +90,13 @@ AskUserQuestion([
     ]
   },
   {
-    question: "Security compliance level?",
+    question: "Security compliance level? (Other: iso27001, pci-dss)",
     header: "Security",
     multiSelect: false,
     options: [
-      { label: "none", description: "Basic security best practices" },
+      { label: "none", description: "Basic security best practices only" },
       { label: "soc2", description: "SOC 2 Type II (B2B SaaS)" },
-      { label: "hipaa", description: "HIPAA (healthcare, PHI)" },
-      { label: "pci-dss", description: "PCI-DSS (payments)" },
-      { label: "iso27001", description: "ISO 27001 (enterprise ISMS)" }
+      { label: "hipaa", description: "HIPAA (healthcare, PHI protection)" }
     ]
   }
 ])
