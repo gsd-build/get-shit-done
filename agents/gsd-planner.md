@@ -842,6 +842,19 @@ All TDD plans must include tests in 4 categories. Write ALL tests in RED phase b
 
 Read `security_compliance` from `.planning/config.json`:
 
+```bash
+SECURITY_LEVEL=$(cat .planning/config.json 2>/dev/null | grep -oE '"security_compliance"\s*:\s*"[^"]*"' | grep -oE '"[^"]*"$' | tr -d '"' || echo "none")
+
+# Validate against allowed values
+case "$SECURITY_LEVEL" in
+  none|soc2|hipaa|pci-dss|iso27001) ;;
+  *) echo "Warning: Invalid security_compliance '$SECURITY_LEVEL', using 'none'" >&2; SECURITY_LEVEL="none" ;;
+esac
+
+# Verify security reference exists
+test -f "$HOME/.claude/get-shit-done/references/security-compliance.md" || echo "Warning: Security reference not found" >&2
+```
+
 | Level | Security Tests |
 |-------|----------------|
 | none | Input validation, output encoding, no hardcoded secrets |
@@ -879,9 +892,11 @@ must_haves:
   key_links: [...]
   quality:
     test_coverage_min: 80
-    security_compliance: soc2    # From config.json
+    security_compliance: soc2    # MUST match SECURITY_LEVEL from config.json
     no_critical_vulnerabilities: true
 ```
+
+**Validation:** `quality.security_compliance` MUST equal `SECURITY_LEVEL` read from config.json. Mismatch is an error.
 
 </tdd_integration>
 
