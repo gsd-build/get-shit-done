@@ -189,7 +189,7 @@ Tasks must be specific enough for clean execution. Compare:
 **First, check if TDD is enabled:**
 
 ```bash
-TDD_ENABLED=$(cat .planning/config.json 2>/dev/null | grep -o '"tdd"[[:space:]]*:[[:space:]]*[^,}]*' | grep -o 'true\|false' || echo "true")
+TDD_ENABLED=$(cat .planning/config.json 2>/dev/null | grep -oE '"tdd"\s*:\s*(true|false)' | grep -oE 'true|false' || echo "true")
 ```
 
 **If `TDD_ENABLED=false`:** Skip TDD entirely. Create all plans with `type: execute`.

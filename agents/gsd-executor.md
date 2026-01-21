@@ -84,8 +84,8 @@ Store in shell variables for duration calculation at completion.
 Check plan type, TDD setting, and checkpoints:
 
 ```bash
-# Check if TDD workflow is enabled in config
-TDD_ENABLED=$(cat .planning/config.json 2>/dev/null | grep -o '"tdd"[[:space:]]*:[[:space:]]*[^,}]*' | grep -o 'true\|false' || echo "true")
+# Check if TDD workflow is enabled in config (handles "tdd":true and "tdd": true)
+TDD_ENABLED=$(cat .planning/config.json 2>/dev/null | grep -oE '"tdd"\s*:\s*(true|false)' | grep -oE 'true|false' || echo "true")
 
 # Check plan type from frontmatter
 grep -E "^type:" [plan-path] | head -1
@@ -553,6 +553,8 @@ TDD plans contain `<feature>` element (not `<tasks>`):
 
 **1. Setup test infrastructure (if needed):**
 
+Run this function before writing tests:
+
 ```bash
 # Detect project type and ensure test framework exists
 detect_and_setup_tests() {
@@ -635,6 +637,10 @@ For EACH test category:
 **Security test selection:**
 
 Read `security_compliance` from `.planning/config.json`:
+
+```bash
+SECURITY_LEVEL=$(cat .planning/config.json 2>/dev/null | grep -oE '"security_compliance"\s*:\s*"[^"]*"' | grep -oE '"[^"]*"$' | tr -d '"' || echo "none")
+```
 
 | Level | Include Tests For |
 |-------|-------------------|

@@ -960,7 +960,7 @@ Update status to "fixing".
 
 **Check TDD setting:**
 ```bash
-TDD_ENABLED=$(cat .planning/config.json 2>/dev/null | grep -o '"tdd"[[:space:]]*:[[:space:]]*[^,}]*' | grep -o 'true\|false' || echo "true")
+TDD_ENABLED=$(cat .planning/config.json 2>/dev/null | grep -oE '"tdd"\s*:\s*(true|false)' | grep -oE 'true|false' || echo "true")
 ```
 
 **If `TDD_ENABLED=false`:** Skip to step 2 (GREEN) - apply fix directly without writing test first.
