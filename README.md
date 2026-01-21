@@ -172,8 +172,6 @@ If you prefer not to use that flag, add this to your project's `.claude/settings
 graph TD
     subgraph Initialization
         B1["/gsd:map-codebase (Optional)"] --> S1
-        B2["/gsd:analyze-codebase - Bootstrap codebase intelligence"]
-        B3["/gsd:query-intel - Query dependency graph"]
         S1["/gsd:new-project (First Milestone)"] --> PC
         S2["/gsd:new-milestone (Subsequent)"] --> PC
         PC["Define Vision, Requirements & Roadmap"]
