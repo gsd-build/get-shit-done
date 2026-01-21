@@ -10,18 +10,18 @@ See: .planning/PROJECT.md (updated 2026-01-19)
 ## Current Position
 
 Phase: 6 of 6 (Multi-Stack Analyzer)
-Plan: 3 of 6
+Plan: 5 of 6
 Status: In progress
-Last activity: 2026-01-21 — Completed 06-03-PLAN.md (Stack Analyzer Subagent)
+Last activity: 2026-01-21 — Completed 06-05-PLAN.md (Entity Template Update)
 
-Progress: [██████████░] 93%
+Progress: [███████████░] 96%
 
 ## Performance Metrics
 
 **Velocity:**
-- Total plans completed: 15
+- Total plans completed: 16
 - Average duration: 2.5 min
-- Total execution time: 38 min
+- Total execution time: 40 min
 
 **By Phase:**
 
@@ -32,7 +32,7 @@ Progress: [██████████░] 93%
 | 3. Brownfield & Integration | 3/3 | 6 min | 2.0 min |
 | 4. Semantic Intelligence | 5/5 | 13 min | 2.6 min |
 | 5. Subagent Codebase Analysis | 1/2 | 1 min | 1.0 min |
-| 6. Multi-Stack Analyzer | 3/6 | 7 min | 2.3 min |
+| 6. Multi-Stack Analyzer | 4/6 | 9 min | 2.3 min |
 
 *Updated after each plan completion*
 
@@ -85,6 +85,10 @@ Progress: [██████████░] 93%
 | Load profile per invocation | 06-03 | Each subagent loads only its stack profile, reduces context |
 | Use regex patterns exactly from profiles | 06-03 | Consistency across stacks for summary aggregation |
 | Observe naming from actual code | 06-03 | Detect real patterns vs profile defaults |
+| Stack field derived from extension | 06-05 | .ts -> typescript, .py -> python, maintains consistency |
+| Framework field is optional | 06-05 | Only when framework-specific imports detected |
+| Omit framework when not detected | 06-05 | Don't use null or "none", keeps frontmatter clean |
+| Stack values match stack-profiles.yaml | 06-05 | Ensures consistency across detection and generation |
 
 ### Pending Todos
 
@@ -101,7 +105,7 @@ Progress: [██████████░] 93%
 ## Session Continuity
 
 Last session: 2026-01-21
-Stopped at: Completed 06-03-PLAN.md (Stack Analyzer Subagent)
+Stopped at: Completed 06-05-PLAN.md (Entity Template Update)
 Resume file: None
 
 ## Phase Progress
@@ -119,6 +123,6 @@ Resume file: None
 - 06-01: Multi-stack detection ✓
 - 06-02: Stack profiles configuration ✓
 - 06-03: Stack analyzer subagent ✓
-- 06-04: Export/import extractor (pending)
-- 06-05: Naming convention analyzer (pending)
+- 06-04: Lightweight orchestrator update ✓
+- 06-05: Entity template update ✓
 - 06-06: Integration testing (pending)
