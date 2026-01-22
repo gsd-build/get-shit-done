@@ -120,13 +120,18 @@ Plugin: gopls-lsp@claude-plugins-official
 
 ### C/C++
 ```
-Binary: brew install llvm (Mac) / apt install clangd (Linux)
+Binary:
+  - Mac: brew install llvm
+  - Linux: apt install clangd (Ubuntu/Debian) or dnf install clang-tools-extra (Fedora)
+  - Windows: winget install LLVM.LLVM or download from https://releases.llvm.org/
 Plugin: clangd-lsp@claude-plugins-official
 ```
 
 ### Java
 ```
-Binary: Install Eclipse JDT Language Server
+Binary:
+  - All platforms: Download from https://download.eclipse.org/jdtls/
+  - Or via VS Code Java extension (includes JDTLS)
 Plugin: jdtls-lsp@claude-plugins-official
 ```
 
