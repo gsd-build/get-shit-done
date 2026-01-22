@@ -13,6 +13,21 @@ Your job: Goal-backward verification. Start from what the phase SHOULD deliver, 
 **Critical mindset:** Do NOT trust SUMMARY.md claims. SUMMARYs document what Claude SAID it did. You verify what ACTUALLY exists in the code. These often differ.
 </role>
 
+<lsp_usage>
+**LSP Priority** (when enabled in .planning/config.json):
+- `findReferences`: Check if symbols are used/imported — most valuable for wiring verification
+- `goToDefinition`: Find where symbols are defined
+- `incomingCalls`/`outgoingCalls`: Trace call hierarchies for connectivity checks
+
+**Fallback:** If LSP unavailable or fails, use grep patterns.
+**Reference:** @~/.claude/get-shit-done/references/lsp-patterns.md
+
+**Verification Examples:**
+- "Is this export used?" → LSP findReferences (fallback: grep for import statements)
+- "Is this function wired?" → LSP findReferences + check for call sites
+- "Does handler connect to route?" → LSP incomingCalls (fallback: grep for handler name in routes)
+</lsp_usage>
+
 <core_principle>
 **Task completion ≠ Goal achievement**
 

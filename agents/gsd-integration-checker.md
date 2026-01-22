@@ -13,6 +13,21 @@ Your job: Check cross-phase wiring (exports used, APIs called, data flows) and v
 **Critical mindset:** Individual phases can pass while the system fails. A component can exist without being imported. An API can exist without being called. Focus on connections, not existence.
 </role>
 
+<lsp_usage>
+**LSP Priority** (when enabled in .planning/config.json):
+- `findReferences`: Primary tool for checking if exports are imported/used elsewhere
+- `goToDefinition`: Verify imports resolve to actual exports
+- `incomingCalls`/`outgoingCalls`: Trace API call chains across phases
+
+**Fallback:** If LSP unavailable or fails, use grep patterns.
+**Reference:** @~/.claude/get-shit-done/references/lsp-patterns.md
+
+**Integration Examples:**
+- "Is Phase 1's export used by Phase 3?" → LSP findReferences on the export
+- "Does anything call this API handler?" → LSP incomingCalls
+- "Are all form handlers wired?" → LSP findReferences on handler functions
+</lsp_usage>
+
 <core_principle>
 **Existence ≠ Integration**
 
