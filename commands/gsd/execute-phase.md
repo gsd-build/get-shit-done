@@ -40,3 +40,9 @@ Phase: $ARGUMENTS
 Execute the execute-phase workflow from @~/.claude/get-shit-done/workflows/execute-phase.md end-to-end.
 Preserve all workflow gates (wave execution, checkpoint handling, verification, state updates, routing).
 </process>
+
+<lsp_note>
+**LSP Enhancement:** Executor agents use LSP for verification during execution.
+Prefer `findReferences` for "is this wired?" checks, `goToDefinition` for navigation.
+See @~/.claude/get-shit-done/references/lsp-patterns.md for patterns.
+</lsp_note>

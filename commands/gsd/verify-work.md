@@ -37,3 +37,8 @@ Phase: $ARGUMENTS (optional)
 Execute the verify-work workflow from @~/.claude/get-shit-done/workflows/verify-work.md end-to-end.
 Preserve all workflow gates (session management, test presentation, diagnosis, fix planning, routing).
 </process>
+
+<lsp_note>
+**LSP Enhancement:** When diagnosing issues, prefer LSP `findReferences` for "is this used?" queries.
+See @~/.claude/get-shit-done/references/lsp-patterns.md for patterns.
+</lsp_note>
