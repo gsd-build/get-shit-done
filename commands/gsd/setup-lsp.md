@@ -90,80 +90,194 @@ Update with LSP settings:
 
 Write to `.planning/config.json`.
 
-## 4. Display Setup Instructions
+## 4. Check Existing Plugins
 
-For each selected language, show:
+Read user's Claude Code settings to see which plugins are already installed:
+
+```bash
+cat ~/.claude/settings.json 2>/dev/null
+```
+
+Parse `enabledPlugins` object. Build list of:
+- **Already installed:** plugins with `true` value
+- **Need to install:** plugins for selected languages not in settings
+
+Plugin mapping:
+| Language | Plugin ID |
+|----------|-----------|
+| TypeScript/JavaScript | `typescript-lsp@claude-plugins-official` |
+| Python | `pyright-lsp@claude-plugins-official` |
+| Rust | `rust-analyzer-lsp@claude-plugins-official` |
+| Go | `gopls-lsp@claude-plugins-official` |
+| C/C++ | `clangd-lsp@claude-plugins-official` |
+| Java | `jdtls-lsp@claude-plugins-official` |
+
+## 5. Install Missing Plugins
+
+**If all needed plugins already installed:**
+
+```
+✅ All required LSP plugins are already installed:
+   - typescript-lsp@claude-plugins-official
+   - pyright-lsp@claude-plugins-official
+```
+
+Skip to Step 6.
+
+**If plugins need to be installed:**
+
+Show status and ask:
+
+```
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+ GSD ► LSP PLUGINS
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+Already installed:
+  ✅ typescript-lsp@claude-plugins-official
+  ✅ pyright-lsp@claude-plugins-official
+
+Need to install:
+  ⬜ rust-analyzer-lsp@claude-plugins-official
+  ⬜ gopls-lsp@claude-plugins-official
+```
+
+```
+AskUserQuestion([
+  {
+    question: "Install the missing LSP plugins now?",
+    header: "Plugins",
+    multiSelect: false,
+    options: [
+      { label: "Yes - Update settings.json (Recommended)", description: "I'll add them to ~/.claude/settings.json" },
+      { label: "Yes - Use /plugin commands", description: "I'll run /plugin install for each" },
+      { label: "No - Show me how", description: "Show manual instructions" }
+    ]
+  }
+])
+```
+
+**If "Yes - Update settings.json" (Recommended):**
+
+Read current settings.json, add missing plugins to `enabledPlugins`, write back:
+
+```bash
+# Read existing settings
+cat ~/.claude/settings.json
+```
+
+Use the Edit tool to add missing plugins to `enabledPlugins` object:
+
+```json
+{
+  "enabledPlugins": {
+    ...existing_plugins,
+    "rust-analyzer-lsp@claude-plugins-official": true,
+    "gopls-lsp@claude-plugins-official": true
+  }
+}
+```
+
+Confirm:
+```
+✅ Updated ~/.claude/settings.json
+   Added: rust-analyzer-lsp@claude-plugins-official
+   Added: gopls-lsp@claude-plugins-official
+
+   Restart Claude Code for changes to take effect.
+```
+
+**If "Yes - Use /plugin commands":**
+
+Run `/plugin install {plugin-id}` for each missing plugin:
+
+```
+Installing rust-analyzer-lsp@claude-plugins-official...
+/plugin install rust-analyzer-lsp@claude-plugins-official
+
+Installing gopls-lsp@claude-plugins-official...
+/plugin install gopls-lsp@claude-plugins-official
+```
+
+**If "No - Show me how" (manual):**
+
+Show both options:
+
+```
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+ GSD ► MANUAL PLUGIN INSTALLATION
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+Option 1: Run these commands in Claude Code:
+
+/plugin install rust-analyzer-lsp@claude-plugins-official
+/plugin install gopls-lsp@claude-plugins-official
+
+Option 2: Add to ~/.claude/settings.json in "enabledPlugins":
+
+{
+  "enabledPlugins": {
+    "rust-analyzer-lsp@claude-plugins-official": true,
+    "gopls-lsp@claude-plugins-official": true
+  }
+}
+```
+
+## 6. Display Binary Install Instructions
+
+For each selected language, show binary install commands:
 
 ### TypeScript/JavaScript
 ```
-Binary: npm install -g typescript-language-server typescript
-Plugin: typescript-lsp@claude-plugins-official
+npm install -g typescript-language-server typescript
 ```
 
 ### Python
 ```
-Binary: pip install pyright
-Plugin: pyright-lsp@claude-plugins-official
+pip install pyright
 ```
 
 ### Rust
 ```
-Binary: rustup component add rust-analyzer
-Plugin: rust-analyzer-lsp@claude-plugins-official
+rustup component add rust-analyzer
 ```
 
 ### Go
 ```
-Binary: go install golang.org/x/tools/gopls@latest
-Plugin: gopls-lsp@claude-plugins-official
+go install golang.org/x/tools/gopls@latest
 ```
 
 ### C/C++
 ```
-Binary:
-  - Mac: brew install llvm
-  - Linux: apt install clangd (Ubuntu/Debian) or dnf install clang-tools-extra (Fedora)
-  - Windows: winget install LLVM.LLVM or download from https://releases.llvm.org/
-Plugin: clangd-lsp@claude-plugins-official
+Mac:     brew install llvm
+Linux:   apt install clangd (Ubuntu/Debian) or dnf install clang-tools-extra (Fedora)
+Windows: winget install LLVM.LLVM or download from https://releases.llvm.org/
 ```
 
 ### Java
 ```
-Binary:
-  - All platforms: Download from https://download.eclipse.org/jdtls/
-  - Or via VS Code Java extension (includes JDTLS)
-Plugin: jdtls-lsp@claude-plugins-official
+All platforms: Download from https://download.eclipse.org/jdtls/
+Or via VS Code Java extension (includes JDTLS)
 ```
 
-Show combined instructions:
+Show combined:
 
 ```
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
- GSD ► LSP SETUP INSTRUCTIONS
+ GSD ► INSTALL LANGUAGE SERVERS
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-
-## Step 1: Install Language Servers
 
 {binary install commands for each selected language}
 
-## Step 2: Enable Plugins in Claude Code
-
-Add to your Claude Code settings.json:
-
-{
-  "plugins": {
-    "{plugin-name}@claude-plugins-official": { "enabled": true }
-  }
-}
-
-## Step 3: Set Environment Variable
-
-Add to your shell profile:
-
-export ENABLE_LSP_TOOL=1
+Note: You may already have these installed. Check with:
+  which tsserver
+  which pyright
+  which rust-analyzer
+  which gopls
+  which clangd
 ```
 
-## 5. Check Environment Variable
+## 7. Check Environment Variable
 
 ```bash
 echo $ENABLE_LSP_TOOL
@@ -209,7 +323,7 @@ echo 'set -gx ENABLE_LSP_TOOL 1' >> ~/.config/fish/config.fish
 
 **Note:** Tell user to run `source ~/.zshrc` (or equivalent) or restart terminal.
 
-## 6. Verify Readiness
+## 8. Verify Readiness
 
 Show status summary:
 
@@ -244,7 +358,9 @@ Agents will automatically fall back to grep if LSP is unavailable.
 <success_criteria>
 - [ ] Languages detected or user selected
 - [ ] config.json updated with lsp.enabled=true and lsp.languages
-- [ ] Setup instructions displayed for each language
+- [ ] Existing plugins checked in ~/.claude/settings.json
+- [ ] Missing plugins installed (settings.json edit, /plugin command, or manual shown)
+- [ ] Binary install instructions displayed for each language
 - [ ] ENABLE_LSP_TOOL checked (and optionally added to profile)
 - [ ] Status summary shown with next steps
 </success_criteria>
