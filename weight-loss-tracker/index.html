@@ -58,7 +58,7 @@
             font-weight: 500;
         }
 
-        .form-group input {
+        .form-group input, .form-group select {
             width: 100%;
             padding: 12px;
             border: 2px solid #e0e0e0;
@@ -67,7 +67,7 @@
             transition: border-color 0.3s;
         }
 
-        .form-group input:focus {
+        .form-group input:focus, .form-group select:focus {
             outline: none;
             border-color: #667eea;
         }
@@ -99,6 +99,15 @@
             margin-top: 10px;
         }
 
+        .btn-success {
+            background: linear-gradient(135deg, #28a745 0%, #20c997 100%);
+        }
+
+        .btn-warning {
+            background: linear-gradient(135deg, #ffc107 0%, #fd7e14 100%);
+            color: #333;
+        }
+
         .stats-grid {
             display: grid;
             grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
@@ -117,13 +126,19 @@
             color: white;
         }
 
+        .stat-box.workout {
+            background: linear-gradient(135deg, #28a745 0%, #20c997 100%);
+            color: white;
+        }
+
         .stat-value {
             font-size: 2rem;
             font-weight: bold;
             color: #333;
         }
 
-        .stat-box.highlight .stat-value {
+        .stat-box.highlight .stat-value,
+        .stat-box.workout .stat-value {
             color: white;
         }
 
@@ -133,7 +148,8 @@
             margin-top: 5px;
         }
 
-        .stat-box.highlight .stat-label {
+        .stat-box.highlight .stat-label,
+        .stat-box.workout .stat-label {
             color: rgba(255,255,255,0.9);
         }
 
@@ -247,6 +263,129 @@
             font-size: 0.9rem;
         }
 
+        .workout-streak {
+            display: flex;
+            justify-content: center;
+            gap: 8px;
+            margin-top: 15px;
+            flex-wrap: wrap;
+        }
+
+        .streak-day {
+            width: 40px;
+            height: 40px;
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 0.7rem;
+            font-weight: bold;
+            background: #e0e0e0;
+            color: #666;
+        }
+
+        .streak-day.completed {
+            background: linear-gradient(135deg, #28a745 0%, #20c997 100%);
+            color: white;
+        }
+
+        .streak-day.today {
+            border: 3px solid #667eea;
+        }
+
+        .workout-item {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 12px;
+            border-bottom: 1px solid #eee;
+            background: #f8f9fa;
+            border-radius: 8px;
+            margin-bottom: 8px;
+        }
+
+        .workout-type {
+            display: inline-block;
+            padding: 4px 12px;
+            border-radius: 20px;
+            font-size: 0.8rem;
+            background: #667eea;
+            color: white;
+        }
+
+        .workout-duration {
+            color: #666;
+            font-size: 0.9rem;
+        }
+
+        .alert {
+            padding: 15px;
+            border-radius: 8px;
+            margin-bottom: 15px;
+        }
+
+        .alert-warning {
+            background: #fff3cd;
+            border: 1px solid #ffc107;
+            color: #856404;
+        }
+
+        .alert-success {
+            background: #d4edda;
+            border: 1px solid #28a745;
+            color: #155724;
+        }
+
+        .alert-info {
+            background: #cce5ff;
+            border: 1px solid #007bff;
+            color: #004085;
+        }
+
+        .whatsapp-setup {
+            background: #25D366;
+            color: white;
+            padding: 15px;
+            border-radius: 8px;
+            margin-bottom: 15px;
+        }
+
+        .whatsapp-setup a {
+            color: white;
+            text-decoration: underline;
+        }
+
+        .tab-buttons {
+            display: flex;
+            gap: 10px;
+            margin-bottom: 20px;
+        }
+
+        .tab-btn {
+            flex: 1;
+            padding: 10px;
+            border: 2px solid #667eea;
+            background: white;
+            color: #667eea;
+            border-radius: 8px;
+            cursor: pointer;
+            font-weight: 500;
+            transition: all 0.3s;
+        }
+
+        .tab-btn.active {
+            background: #667eea;
+            color: white;
+        }
+
+        .tab-content {
+            display: none;
+        }
+
+        .tab-content.active {
+            display: block;
+        }
+
         @media (max-width: 600px) {
             h1 {
                 font-size: 1.8rem;
@@ -255,12 +394,38 @@
             .stat-value {
                 font-size: 1.5rem;
             }
+
+            .streak-day {
+                width: 35px;
+                height: 35px;
+                font-size: 0.6rem;
+            }
         }
     </style>
 </head>
 <body>
     <div class="container">
         <h1>Weight Loss Tracker</h1>
+
+        <!-- WhatsApp Status -->
+        <div class="card" id="whatsappCard">
+            <h2>WhatsApp Notifications</h2>
+            <div id="whatsappStatus"></div>
+            <div class="form-group">
+                <label for="phoneNumber">Phone Number (with country code, e.g., +1234567890)</label>
+                <input type="tel" id="phoneNumber" placeholder="+1234567890">
+            </div>
+            <div class="form-group">
+                <label for="apiKey">CallMeBot API Key</label>
+                <input type="text" id="apiKey" placeholder="Enter your API key">
+            </div>
+            <p style="font-size: 0.85rem; color: #666; margin-bottom: 15px;">
+                To get your free API key: Send "I allow callmebot to send me messages" to +34 644 51 95 23 on WhatsApp.
+                You'll receive your API key instantly.
+            </p>
+            <button class="btn btn-success" onclick="saveWhatsAppConfig()">Save WhatsApp Settings</button>
+            <button class="btn btn-secondary" onclick="testWhatsApp()">Send Test Message</button>
+        </div>
 
         <!-- Goal Setting Card -->
         <div class="card">
@@ -276,18 +441,64 @@
             <button class="btn" onclick="saveGoals()">Save Goals</button>
         </div>
 
-        <!-- Log Weight Card -->
+        <!-- Tab Navigation for Weight/Workout -->
         <div class="card">
-            <h2>Log Today's Weight</h2>
-            <div class="form-group">
-                <label for="weightDate">Date</label>
-                <input type="date" id="weightDate">
+            <div class="tab-buttons">
+                <button class="tab-btn active" onclick="switchTab('weight')">Log Weight</button>
+                <button class="tab-btn" onclick="switchTab('workout')">Log Workout</button>
             </div>
-            <div class="form-group">
-                <label for="currentWeight">Weight (lbs)</label>
-                <input type="number" id="currentWeight" step="0.1" placeholder="Enter your weight">
+
+            <!-- Log Weight Tab -->
+            <div class="tab-content active" id="weightTab">
+                <div class="form-group">
+                    <label for="weightDate">Date</label>
+                    <input type="date" id="weightDate">
+                </div>
+                <div class="form-group">
+                    <label for="currentWeight">Weight (lbs)</label>
+                    <input type="number" id="currentWeight" step="0.1" placeholder="Enter your weight">
+                </div>
+                <button class="btn" onclick="logWeight()">Log Weight</button>
             </div>
-            <button class="btn" onclick="logWeight()">Log Weight</button>
+
+            <!-- Log Workout Tab -->
+            <div class="tab-content" id="workoutTab">
+                <div id="workoutAlert"></div>
+                <div class="form-group">
+                    <label for="workoutDate">Date</label>
+                    <input type="date" id="workoutDate">
+                </div>
+                <div class="form-group">
+                    <label for="workoutType">Workout Type</label>
+                    <select id="workoutType">
+                        <option value="cardio">Cardio</option>
+                        <option value="strength">Strength Training</option>
+                        <option value="hiit">HIIT</option>
+                        <option value="yoga">Yoga</option>
+                        <option value="swimming">Swimming</option>
+                        <option value="cycling">Cycling</option>
+                        <option value="running">Running</option>
+                        <option value="walking">Walking</option>
+                        <option value="other">Other</option>
+                    </select>
+                </div>
+                <div class="form-group">
+                    <label for="workoutDuration">Duration (minutes)</label>
+                    <input type="number" id="workoutDuration" placeholder="Enter duration in minutes">
+                </div>
+                <div class="form-group">
+                    <label for="workoutNotes">Notes (optional)</label>
+                    <input type="text" id="workoutNotes" placeholder="Any notes about your workout">
+                </div>
+                <button class="btn btn-success" onclick="logWorkout()">Log Workout</button>
+            </div>
+        </div>
+
+        <!-- Workout Streak Card -->
+        <div class="card">
+            <h2>This Week's Workouts</h2>
+            <div class="workout-streak" id="workoutStreak"></div>
+            <div id="streakAlert" style="margin-top: 15px;"></div>
         </div>
 
         <!-- Stats Card -->
@@ -310,6 +521,14 @@
                     <div class="stat-value" id="statLost">--</div>
                     <div class="stat-label">Total Lost</div>
                 </div>
+                <div class="stat-box workout">
+                    <div class="stat-value" id="statWorkouts">0</div>
+                    <div class="stat-label">Workouts This Week</div>
+                </div>
+                <div class="stat-box workout">
+                    <div class="stat-value" id="statStreak">0</div>
+                    <div class="stat-label">Day Streak</div>
+                </div>
             </div>
             <div class="progress-bar-container">
                 <div class="progress-bar" id="progressBar" style="width: 0%"></div>
@@ -325,18 +544,31 @@
             </div>
         </div>
 
-        <!-- History Card -->
+        <!-- Weight History Card -->
         <div class="card">
             <h2>Weight History</h2>
             <div class="history-list" id="historyList">
                 <div class="empty-state">
-                    <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z" />
-                    </svg>
                     <p>No weight entries yet. Start logging your progress!</p>
                 </div>
             </div>
-            <button class="btn btn-secondary" onclick="exportData()">Export Data (CSV)</button>
+        </div>
+
+        <!-- Workout History Card -->
+        <div class="card">
+            <h2>Workout History</h2>
+            <div class="history-list" id="workoutHistoryList">
+                <div class="empty-state">
+                    <p>No workouts logged yet. Get moving!</p>
+                </div>
+            </div>
+        </div>
+
+        <!-- Actions Card -->
+        <div class="card">
+            <h2>Data Management</h2>
+            <button class="btn btn-secondary" onclick="exportData()">Export All Data (CSV)</button>
+            <button class="btn btn-secondary" onclick="syncToServer()">Sync to Server</button>
             <button class="btn btn-danger" onclick="clearAllData()">Clear All Data</button>
         </div>
     </div>
@@ -345,23 +577,109 @@
     <script>
         // Data storage
         let weightData = JSON.parse(localStorage.getItem('weightData')) || [];
+        let workoutData = JSON.parse(localStorage.getItem('workoutData')) || [];
         let goals = JSON.parse(localStorage.getItem('weightGoals')) || { start: null, goal: null };
+        let whatsappConfig = JSON.parse(localStorage.getItem('whatsappConfig')) || { phone: '', apiKey: '' };
         let chart = null;
+
+        // Server URL (change this to your server address)
+        const SERVER_URL = window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1'
+            ? `http://${window.location.hostname}:3000`
+            : '';
 
         // Initialize
         document.addEventListener('DOMContentLoaded', function() {
-            // Set default date to today
-            document.getElementById('weightDate').valueAsDate = new Date();
+            // Set default dates to today
+            const today = new Date().toISOString().split('T')[0];
+            document.getElementById('weightDate').value = today;
+            document.getElementById('workoutDate').value = today;
 
             // Load saved goals
             if (goals.start) document.getElementById('startWeight').value = goals.start;
             if (goals.goal) document.getElementById('goalWeight').value = goals.goal;
 
+            // Load WhatsApp config
+            if (whatsappConfig.phone) document.getElementById('phoneNumber').value = whatsappConfig.phone;
+            if (whatsappConfig.apiKey) document.getElementById('apiKey').value = whatsappConfig.apiKey;
+
             // Update UI
             updateStats();
             updateHistory();
+            updateWorkoutHistory();
             updateChart();
+            updateWorkoutStreak();
+            updateWhatsAppStatus();
+            checkWorkoutReminder();
         });
+
+        // Tab switching
+        function switchTab(tab) {
+            document.querySelectorAll('.tab-btn').forEach(btn => btn.classList.remove('active'));
+            document.querySelectorAll('.tab-content').forEach(content => content.classList.remove('active'));
+
+            if (tab === 'weight') {
+                document.querySelector('.tab-btn:first-child').classList.add('active');
+                document.getElementById('weightTab').classList.add('active');
+            } else {
+                document.querySelector('.tab-btn:last-child').classList.add('active');
+                document.getElementById('workoutTab').classList.add('active');
+            }
+        }
+
+        // Save WhatsApp config
+        function saveWhatsAppConfig() {
+            const phone = document.getElementById('phoneNumber').value.trim();
+            const apiKey = document.getElementById('apiKey').value.trim();
+
+            if (!phone || !apiKey) {
+                alert('Please enter both phone number and API key');
+                return;
+            }
+
+            whatsappConfig = { phone, apiKey };
+            localStorage.setItem('whatsappConfig', JSON.stringify(whatsappConfig));
+            updateWhatsAppStatus();
+            syncToServer();
+            alert('WhatsApp settings saved!');
+        }
+
+        // Update WhatsApp status
+        function updateWhatsAppStatus() {
+            const statusDiv = document.getElementById('whatsappStatus');
+            if (whatsappConfig.phone && whatsappConfig.apiKey) {
+                statusDiv.innerHTML = `<div class="alert alert-success">WhatsApp notifications enabled for ${whatsappConfig.phone}</div>`;
+            } else {
+                statusDiv.innerHTML = `<div class="alert alert-warning">WhatsApp notifications not configured. Set up below to receive reminders!</div>`;
+            }
+        }
+
+        // Test WhatsApp
+        async function testWhatsApp() {
+            if (!whatsappConfig.phone || !whatsappConfig.apiKey) {
+                alert('Please save your WhatsApp settings first');
+                return;
+            }
+
+            try {
+                const response = await fetch(`${SERVER_URL}/api/test-whatsapp`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(whatsappConfig)
+                });
+                const result = await response.json();
+                if (result.success) {
+                    alert('Test message sent! Check your WhatsApp.');
+                } else {
+                    alert('Failed to send test message: ' + result.error);
+                }
+            } catch (error) {
+                // Fallback: direct API call
+                const message = encodeURIComponent('Weight Loss Tracker: Test message successful! Your notifications are working.');
+                const url = `https://api.callmebot.com/whatsapp.php?phone=${whatsappConfig.phone}&text=${message}&apikey=${whatsappConfig.apiKey}`;
+                window.open(url, '_blank');
+                alert('Test message triggered. Check your WhatsApp!');
+            }
+        }
 
         // Save goals
         function saveGoals() {
@@ -378,6 +696,7 @@
 
             updateStats();
             updateChart();
+            syncToServer();
             alert('Goals saved successfully!');
         }
 
@@ -391,7 +710,6 @@
                 return;
             }
 
-            // Check if entry for this date already exists
             const existingIndex = weightData.findIndex(entry => entry.date === date);
             if (existingIndex !== -1) {
                 if (confirm('An entry for this date already exists. Update it?')) {
@@ -403,22 +721,99 @@
                 weightData.push({ date, weight });
             }
 
-            // Sort by date
             weightData.sort((a, b) => new Date(a.date) - new Date(b.date));
-
-            // Save to localStorage
             localStorage.setItem('weightData', JSON.stringify(weightData));
-
-            // Clear input
             document.getElementById('currentWeight').value = '';
 
-            // Update UI
             updateStats();
             updateHistory();
             updateChart();
+            syncToServer();
         }
 
-        // Delete entry
+        // Log workout
+        function logWorkout() {
+            const date = document.getElementById('workoutDate').value;
+            const type = document.getElementById('workoutType').value;
+            const duration = parseInt(document.getElementById('workoutDuration').value);
+            const notes = document.getElementById('workoutNotes').value;
+
+            if (!date || !duration) {
+                alert('Please enter date and duration');
+                return;
+            }
+
+            workoutData.push({
+                date,
+                type,
+                duration,
+                notes,
+                timestamp: new Date().toISOString()
+            });
+
+            workoutData.sort((a, b) => new Date(b.date) - new Date(a.date));
+            localStorage.setItem('workoutData', JSON.stringify(workoutData));
+
+            document.getElementById('workoutDuration').value = '';
+            document.getElementById('workoutNotes').value = '';
+
+            updateStats();
+            updateWorkoutHistory();
+            updateWorkoutStreak();
+            syncToServer();
+            alert('Workout logged!');
+        }
+
+        // Check workout reminder
+        function checkWorkoutReminder() {
+            const today = new Date();
+            const twoDaysAgo = new Date(today);
+            twoDaysAgo.setDate(twoDaysAgo.getDate() - 2);
+
+            const recentWorkouts = workoutData.filter(w => new Date(w.date) >= twoDaysAgo);
+            const alertDiv = document.getElementById('streakAlert');
+
+            if (recentWorkouts.length === 0 && workoutData.length > 0) {
+                alertDiv.innerHTML = `<div class="alert alert-warning">You haven't worked out in 2+ days! Time to get moving!</div>`;
+            } else if (recentWorkouts.length > 0) {
+                alertDiv.innerHTML = `<div class="alert alert-success">Great job staying active!</div>`;
+            } else {
+                alertDiv.innerHTML = '';
+            }
+        }
+
+        // Update workout streak display
+        function updateWorkoutStreak() {
+            const streakDiv = document.getElementById('workoutStreak');
+            const today = new Date();
+            const days = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
+
+            // Get start of current week (Sunday)
+            const startOfWeek = new Date(today);
+            startOfWeek.setDate(today.getDate() - today.getDay());
+            startOfWeek.setHours(0, 0, 0, 0);
+
+            let html = '';
+            for (let i = 0; i < 7; i++) {
+                const day = new Date(startOfWeek);
+                day.setDate(startOfWeek.getDate() + i);
+                const dateStr = day.toISOString().split('T')[0];
+
+                const hasWorkout = workoutData.some(w => w.date === dateStr);
+                const isToday = day.toDateString() === today.toDateString();
+
+                let classes = 'streak-day';
+                if (hasWorkout) classes += ' completed';
+                if (isToday) classes += ' today';
+
+                html += `<div class="${classes}">${days[i]}</div>`;
+            }
+
+            streakDiv.innerHTML = html;
+            checkWorkoutReminder();
+        }
+
+        // Delete weight entry
         function deleteEntry(date) {
             if (confirm('Are you sure you want to delete this entry?')) {
                 weightData = weightData.filter(entry => entry.date !== date);
@@ -426,6 +821,19 @@
                 updateStats();
                 updateHistory();
                 updateChart();
+                syncToServer();
+            }
+        }
+
+        // Delete workout entry
+        function deleteWorkout(timestamp) {
+            if (confirm('Are you sure you want to delete this workout?')) {
+                workoutData = workoutData.filter(entry => entry.timestamp !== timestamp);
+                localStorage.setItem('workoutData', JSON.stringify(workoutData));
+                updateStats();
+                updateWorkoutHistory();
+                updateWorkoutStreak();
+                syncToServer();
             }
         }
 
@@ -435,12 +843,15 @@
             const statCurrent = document.getElementById('statCurrent');
             const statGoal = document.getElementById('statGoal');
             const statLost = document.getElementById('statLost');
+            const statWorkouts = document.getElementById('statWorkouts');
+            const statStreak = document.getElementById('statStreak');
             const progressBar = document.getElementById('progressBar');
             const progressText = document.getElementById('progressText');
 
             statStart.textContent = goals.start ? `${goals.start} lbs` : '--';
             statGoal.textContent = goals.goal ? `${goals.goal} lbs` : '--';
 
+            // Weight stats
             if (weightData.length > 0) {
                 const currentWeight = weightData[weightData.length - 1].weight;
                 statCurrent.textContent = `${currentWeight} lbs`;
@@ -471,25 +882,55 @@
                 progressBar.style.width = '0%';
                 progressText.textContent = 'Set your goals and start logging!';
             }
+
+            // Workout stats - this week
+            const today = new Date();
+            const startOfWeek = new Date(today);
+            startOfWeek.setDate(today.getDate() - today.getDay());
+            startOfWeek.setHours(0, 0, 0, 0);
+
+            const thisWeekWorkouts = workoutData.filter(w => new Date(w.date) >= startOfWeek);
+            statWorkouts.textContent = thisWeekWorkouts.length;
+
+            // Calculate streak
+            let streak = 0;
+            const sortedWorkouts = [...workoutData].sort((a, b) => new Date(b.date) - new Date(a.date));
+            if (sortedWorkouts.length > 0) {
+                let checkDate = new Date();
+                checkDate.setHours(0, 0, 0, 0);
+
+                for (let i = 0; i < 365; i++) {
+                    const dateStr = checkDate.toISOString().split('T')[0];
+                    if (workoutData.some(w => w.date === dateStr)) {
+                        streak++;
+                        checkDate.setDate(checkDate.getDate() - 1);
+                    } else if (i === 0) {
+                        // If no workout today, check if yesterday counts
+                        checkDate.setDate(checkDate.getDate() - 1);
+                        const yesterdayStr = checkDate.toISOString().split('T')[0];
+                        if (workoutData.some(w => w.date === yesterdayStr)) {
+                            streak++;
+                            checkDate.setDate(checkDate.getDate() - 1);
+                        } else {
+                            break;
+                        }
+                    } else {
+                        break;
+                    }
+                }
+            }
+            statStreak.textContent = streak;
         }
 
-        // Update history list
+        // Update weight history list
         function updateHistory() {
             const historyList = document.getElementById('historyList');
 
             if (weightData.length === 0) {
-                historyList.innerHTML = `
-                    <div class="empty-state">
-                        <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z" />
-                        </svg>
-                        <p>No weight entries yet. Start logging your progress!</p>
-                    </div>
-                `;
+                historyList.innerHTML = `<div class="empty-state"><p>No weight entries yet. Start logging your progress!</p></div>`;
                 return;
             }
 
-            // Show most recent first
             const reversedData = [...weightData].reverse();
 
             historyList.innerHTML = reversedData.map((entry, index) => {
@@ -520,6 +961,48 @@
                             ${changeHtml}
                             <button class="delete-btn" onclick="deleteEntry('${entry.date}')" title="Delete entry">&times;</button>
                         </div>
+                    </div>
+                `;
+            }).join('');
+        }
+
+        // Update workout history
+        function updateWorkoutHistory() {
+            const historyList = document.getElementById('workoutHistoryList');
+
+            if (workoutData.length === 0) {
+                historyList.innerHTML = `<div class="empty-state"><p>No workouts logged yet. Get moving!</p></div>`;
+                return;
+            }
+
+            historyList.innerHTML = workoutData.slice(0, 20).map(entry => {
+                const formattedDate = new Date(entry.date + 'T00:00:00').toLocaleDateString('en-US', {
+                    weekday: 'short',
+                    month: 'short',
+                    day: 'numeric'
+                });
+
+                const typeLabels = {
+                    cardio: 'Cardio',
+                    strength: 'Strength',
+                    hiit: 'HIIT',
+                    yoga: 'Yoga',
+                    swimming: 'Swimming',
+                    cycling: 'Cycling',
+                    running: 'Running',
+                    walking: 'Walking',
+                    other: 'Other'
+                };
+
+                return `
+                    <div class="workout-item">
+                        <div>
+                            <span class="workout-type">${typeLabels[entry.type] || entry.type}</span>
+                            <span class="workout-duration">${entry.duration} min</span>
+                            <div class="history-date">${formattedDate}</div>
+                            ${entry.notes ? `<div style="color: #666; font-size: 0.8rem; margin-top: 4px;">${entry.notes}</div>` : ''}
+                        </div>
+                        <button class="delete-btn" onclick="deleteWorkout('${entry.timestamp}')" title="Delete workout">&times;</button>
                     </div>
                 `;
             }).join('');
@@ -560,7 +1043,6 @@
                 pointHoverRadius: 7
             }];
 
-            // Add goal line if set
             if (goals.goal) {
                 datasets.push({
                     label: 'Goal',
@@ -601,19 +1083,38 @@
             });
         }
 
+        // Sync data to server
+        async function syncToServer() {
+            if (!SERVER_URL) return;
+
+            try {
+                await fetch(`${SERVER_URL}/api/sync`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        weightData,
+                        workoutData,
+                        goals,
+                        whatsappConfig
+                    })
+                });
+            } catch (error) {
+                console.log('Server sync failed (server may not be running):', error.message);
+            }
+        }
+
         // Export data as CSV
         function exportData() {
-            if (weightData.length === 0) {
-                alert('No data to export');
-                return;
-            }
-
-            let csv = 'Date,Weight (lbs)\n';
+            let csv = 'Weight Data\nDate,Weight (lbs)\n';
             weightData.forEach(entry => {
                 csv += `${entry.date},${entry.weight}\n`;
             });
 
-            // Add goals
+            csv += '\nWorkout Data\nDate,Type,Duration (min),Notes\n';
+            workoutData.forEach(entry => {
+                csv += `${entry.date},${entry.type},${entry.duration},"${entry.notes || ''}"\n`;
+            });
+
             csv += '\nGoals\n';
             csv += `Starting Weight,${goals.start || 'Not set'}\n`;
             csv += `Goal Weight,${goals.goal || 'Not set'}\n`;
@@ -622,23 +1123,32 @@
             const url = window.URL.createObjectURL(blob);
             const a = document.createElement('a');
             a.href = url;
-            a.download = `weight-tracker-${new Date().toISOString().split('T')[0]}.csv`;
+            a.download = `fitness-tracker-${new Date().toISOString().split('T')[0]}.csv`;
             a.click();
             window.URL.revokeObjectURL(url);
         }
 
         // Clear all data
         function clearAllData() {
-            if (confirm('Are you sure you want to delete ALL your weight data and goals? This cannot be undone!')) {
+            if (confirm('Are you sure you want to delete ALL your data? This cannot be undone!')) {
                 localStorage.removeItem('weightData');
+                localStorage.removeItem('workoutData');
                 localStorage.removeItem('weightGoals');
+                localStorage.removeItem('whatsappConfig');
                 weightData = [];
+                workoutData = [];
                 goals = { start: null, goal: null };
+                whatsappConfig = { phone: '', apiKey: '' };
                 document.getElementById('startWeight').value = '';
                 document.getElementById('goalWeight').value = '';
+                document.getElementById('phoneNumber').value = '';
+                document.getElementById('apiKey').value = '';
                 updateStats();
                 updateHistory();
+                updateWorkoutHistory();
                 updateChart();
+                updateWorkoutStreak();
+                updateWhatsAppStatus();
                 alert('All data cleared');
             }
         }
