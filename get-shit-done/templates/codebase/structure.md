@@ -151,6 +151,12 @@ get-shit-done/
 - Key files: new-project.md, plan-phase.md, execute-plan.md
 - Subdirectories: None (flat structure)
 
+**commands/video/**
+- Purpose: Trailer workflow slash commands for Claude Code
+- Contains: *.md files (one per command)
+- Key files: new.md, discuss.md, bible.md, shotlist.md, package.md
+- Subdirectories: None (flat structure)
+
 **get-shit-done/references/**
 - Purpose: Core philosophy and guidance documents
 - Contains: principles.md, questioning.md, plan-format.md
@@ -161,7 +167,7 @@ get-shit-done/
 - Purpose: Document templates for .planning/ files
 - Contains: Template definitions with frontmatter
 - Key files: project.md, roadmap.md, plan.md, summary.md
-- Subdirectories: codebase/ (new - for stack/architecture/structure templates)
+- Subdirectories: codebase/ (new - for stack/architecture/structure templates), video/ (trailer workflow scaffolding)
 
 **get-shit-done/workflows/**
 - Purpose: Reusable multi-step procedures
@@ -206,7 +212,7 @@ get-shit-done/
 ## Where to Add New Code
 
 **New Slash Command:**
-- Primary code: `commands/gsd/{command-name}.md`
+- Primary code: `commands/gsd/{command-name}.md` or `commands/video/{command-name}.md`
 - Tests: `tests/commands/{command-name}.test.js` (if testing implemented)
 - Documentation: Update `README.md` with new command
 

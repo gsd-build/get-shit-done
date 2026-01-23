@@ -1,0 +1,15 @@
+version: 1
+bible_version: 1
+shots:
+  - id: s01
+    beat: "establish"
+    lock_ref: "locks/lock_b001_f01.png"
+    duration_s: 6
+    veo_prompt: >
+      (motion-only) Slow push-in, rain, neon reflections, shallow depth of field.
+  - id: s02
+    beat: "tension"
+    lock_ref: "locks/lock_b001_f07.png"
+    duration_s: 6
+    veo_prompt: >
+      (motion-only) Lateral tracking, foreground bokeh sweep, subtle handheld drift.

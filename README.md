@@ -481,6 +481,21 @@ You're never locked in. The system adapts.
 
 ---
 
+## Video Workflow (Trailer Port)
+
+Video commands mirror the GSD philosophy but output a trailer bible, shotlist, and render package.
+
+| Command | What it does |
+|---------|--------------|
+| `/video:new` | Scaffold a video workspace with trailer templates |
+| `/video:discuss` | Capture the trailer intent brief (structured YAML) |
+| `/video:bible` | Generate a versioned Bible with locks + negatives |
+| `/video:contact-sheet <character|environment|style>` | Create contact sheet prompt packs + rubric |
+| `/video:shotlist` | Generate trailer shotlist with beats + motion prompts |
+| `/video:package` | Bundle prompts + checklist into a render package |
+
+---
+
 ## Configuration
 
 GSD stores project settings in `.planning/config.json`. Configure during `/gsd:new-project` or update later with `/gsd:settings`.

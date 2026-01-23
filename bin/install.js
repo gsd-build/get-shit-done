@@ -877,6 +877,18 @@ function install(isGlobal, runtime = 'claude') {
     } else {
       failures.push('command/gsd-*');
     }
+
+    // Copy commands/video/*.md as command/video-*.md (flatten structure)
+    const videoSrc = path.join(src, 'commands', 'video');
+    if (fs.existsSync(videoSrc)) {
+      copyFlattenedCommands(videoSrc, commandDir, 'video', pathPrefix, runtime);
+      if (verifyInstalled(commandDir, 'command/video-*')) {
+        const count = fs.readdirSync(commandDir).filter(f => f.startsWith('video-')).length;
+        console.log(`  ${green}✓${reset} Installed ${count} video commands to command/`);
+      } else {
+        failures.push('command/video-*');
+      }
+    }
   } else {
     // Claude Code: nested structure in commands/ directory
     const commandsDir = path.join(targetDir, 'commands');
@@ -889,6 +901,17 @@ function install(isGlobal, runtime = 'claude') {
       console.log(`  ${green}✓${reset} Installed commands/gsd`);
     } else {
       failures.push('commands/gsd');
+    }
+
+    const videoSrc = path.join(src, 'commands', 'video');
+    if (fs.existsSync(videoSrc)) {
+      const videoDest = path.join(commandsDir, 'video');
+      copyWithPathReplacement(videoSrc, videoDest, pathPrefix, runtime);
+      if (verifyInstalled(videoDest, 'commands/video')) {
+        console.log(`  ${green}✓${reset} Installed commands/video`);
+      } else {
+        failures.push('commands/video');
+      }
     }
   }
 

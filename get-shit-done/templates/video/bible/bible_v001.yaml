@@ -1,0 +1,41 @@
+version: 1
+intent:
+  title: ""
+  logline: ""
+  duration_target_s: 45
+  vibe:
+    - "premium"
+    - "trailer"
+    - "cinematic"
+
+locks:
+  character:
+    identity_lock: []
+    wardrobe_lock: []
+    negatives: []
+  environment:
+    style_lock: []
+    props_lock: []
+    negatives: []
+  style:
+    camera: []
+    lighting: []
+    post: []
+    negatives: []
+
+contact_sheet:
+  frames: 12
+  story_beats:
+    - establish
+    - tension
+    - reveal
+    - action
+    - emotion
+    - twist
+  selection_rubric:
+    identity: "0-5"
+    world: "0-5"
+    style: "0-5"
+    iconic_frames: "0-5"
+
+selected_locks: []
