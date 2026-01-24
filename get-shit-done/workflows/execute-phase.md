@@ -7,12 +7,13 @@ The orchestrator's job is coordination, not execution. Each subagent loads the e
 </core_principle>
 
 <optimization_flags>
-**v2.0 Optimization Support:**
+**v2.0+ Optimization Support:**
 
 Read these flags from config.json during `resolve_model_profile` step:
 - `optimization.compact_workflows` — use execute-plan-compact.md (default: false)
 - `optimization.lazy_references` — skip checkpoint ref for autonomous plans (default: false)
 - `optimization.tiered_instructions` — use gsd-executor-core (default: false)
+- `optimization.delta_context` — load only relevant context portions (default: false)
 
 **Token savings when enabled:**
 | Optimization | Per-Executor Savings |
@@ -20,8 +21,17 @@ Read these flags from config.json during `resolve_model_profile` step:
 | compact_workflows | ~12,500 tokens |
 | lazy_references (autonomous) | ~8,700 tokens |
 | tiered_instructions | ~2,200 tokens |
+| delta_context | ~1,000-2,600 tokens |
 
 All flags default to `false` for backward compatibility.
+
+**Delta Context Details:**
+When `delta_context: true`, instead of loading full STATE.md (~1,300 tokens):
+- Extract phase section from ROADMAP.md (~400 tokens vs ~2,000 full)
+- Extract relevant decisions from STATE.md (~300 tokens vs ~1,300 full)
+- Extract task-mapped requirements from REQUIREMENTS.md (~200 tokens vs ~2,000 full)
+
+See `@~/.claude/get-shit-done/references/delta-context-helpers.md` for extraction functions.
 </optimization_flags>
 
 <required_reading>
@@ -57,6 +67,7 @@ Store resolved models for use in Task calls below.
 COMPACT_WORKFLOWS=$(cat .planning/config.json 2>/dev/null | grep -o '"compact_workflows"[[:space:]]*:[[:space:]]*[^,}]*' | grep -o 'true\|false' || echo "false")
 LAZY_REFERENCES=$(cat .planning/config.json 2>/dev/null | grep -o '"lazy_references"[[:space:]]*:[[:space:]]*[^,}]*' | grep -o 'true\|false' || echo "false")
 TIERED_INSTRUCTIONS=$(cat .planning/config.json 2>/dev/null | grep -o '"tiered_instructions"[[:space:]]*:[[:space:]]*[^,}]*' | grep -o 'true\|false' || echo "false")
+DELTA_CONTEXT=$(cat .planning/config.json 2>/dev/null | grep -o '"delta_context"[[:space:]]*:[[:space:]]*[^,}]*' | grep -o 'true\|false' || echo "false")
 ```
 </step>
 
@@ -224,8 +235,46 @@ Execute each wave in sequence. Autonomous plans within a wave run in parallel.
    ```bash
    # Read each plan in the wave
    PLAN_CONTENT=$(cat "{plan_path}")
-   STATE_CONTENT=$(cat .planning/STATE.md)
    CONFIG_CONTENT=$(cat .planning/config.json 2>/dev/null)
+
+   # === CONTEXT LOADING (delta_context aware) ===
+   if [ "$DELTA_CONTEXT" = "true" ]; then
+     # Extract phase section from ROADMAP (not full file)
+     PHASE_SECTION=$(sed -n "/^## Phase ${PHASE_NUM}:/,/^## Phase [0-9]\|^---/p" .planning/ROADMAP.md | head -n -1)
+
+     # Extract relevant decisions from STATE (global + phase-specific only)
+     CURRENT_POS=$(sed -n '/^## Current Position/,/^## /p' .planning/STATE.md | head -n -1)
+     GLOBAL_DECISIONS=$(grep -E "^- \[Global\]" .planning/STATE.md 2>/dev/null || true)
+     PHASE_DECISIONS=$(grep -E "^- \[Phase ${PHASE_NUM}\]" .planning/STATE.md 2>/dev/null || true)
+
+     # Build minimal context
+     CONTEXT_FOR_EXECUTOR="## Phase Context
+   ${PHASE_SECTION}
+
+   ## Current Position
+   ${CURRENT_POS}
+
+   ## Relevant Decisions
+   ${GLOBAL_DECISIONS}
+   ${PHASE_DECISIONS}"
+
+     # Extract task-mapped requirements if plan specifies them
+     TASK_REQS=$(grep "^requirements:" "{plan_path}" | sed 's/requirements:[[:space:]]*//' || true)
+     if [ -n "$TASK_REQS" ] && [ -f .planning/REQUIREMENTS.md ]; then
+       REQ_HEADER=$(head -3 .planning/REQUIREMENTS.md)
+       REQ_ROWS=$(for ID in $(echo "$TASK_REQS" | tr ',' '\n'); do grep "| ${ID} |" .planning/REQUIREMENTS.md; done)
+       CONTEXT_FOR_EXECUTOR="${CONTEXT_FOR_EXECUTOR}
+
+   ## Task Requirements
+   ${REQ_HEADER}
+   ${REQ_ROWS}"
+     fi
+   else
+     # Full context mode (backward compatible)
+     STATE_CONTENT=$(cat .planning/STATE.md)
+     CONTEXT_FOR_EXECUTOR="## Project State
+   ${STATE_CONTENT}"
+   fi
    ```
 
    Use Task tool with multiple parallel calls. Each agent gets prompt with inlined content:
@@ -248,8 +297,7 @@ Execute each wave in sequence. Autonomous plans within a wave run in parallel.
    Plan:
    {plan_content}
 
-   Project state:
-   {state_content}
+   {context_for_executor}
 
    Config (if exists):
    {config_content}

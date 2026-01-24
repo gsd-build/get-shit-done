@@ -63,9 +63,13 @@ Phase: $ARGUMENTS
    COMPACT_WORKFLOWS=$(cat .planning/config.json 2>/dev/null | grep -o '"compact_workflows"[[:space:]]*:[[:space:]]*[^,}]*' | grep -o 'true\|false' || echo "false")
    LAZY_REFERENCES=$(cat .planning/config.json 2>/dev/null | grep -o '"lazy_references"[[:space:]]*:[[:space:]]*[^,}]*' | grep -o 'true\|false' || echo "false")
    TIERED_INSTRUCTIONS=$(cat .planning/config.json 2>/dev/null | grep -o '"tiered_instructions"[[:space:]]*:[[:space:]]*[^,}]*' | grep -o 'true\|false' || echo "false")
+   DELTA_CONTEXT=$(cat .planning/config.json 2>/dev/null | grep -o '"delta_context"[[:space:]]*:[[:space:]]*[^,}]*' | grep -o 'true\|false' || echo "false")
    ```
 
    Default all to "false" for backward compatibility. Store for use in subagent spawning.
+
+   **Delta context reference:** When `delta_context: true`, load selective context per agent.
+   See `@~/.claude/get-shit-done/references/delta-context-helpers.md` for extraction functions.
 
 1. **Validate phase exists**
    - Find phase directory matching argument
@@ -276,11 +280,10 @@ After user runs /gsd:plan-phase {Z} --gaps:
 Before spawning, read file contents. The `@` syntax does not work across Task() boundaries.
 
 ```bash
-# Read each plan and STATE.md
+# Read each plan
 PLAN_01_CONTENT=$(cat "{plan_01_path}")
 PLAN_02_CONTENT=$(cat "{plan_02_path}")
 PLAN_03_CONTENT=$(cat "{plan_03_path}")
-STATE_CONTENT=$(cat .planning/STATE.md)
 
 # Determine executor type based on optimization flags
 if [ "$TIERED_INSTRUCTIONS" = "true" ]; then
@@ -300,10 +303,59 @@ fi
 PLAN_01_AUTONOMOUS=$(grep "^autonomous:" "{plan_01_path}" | grep -o 'true\|false' || echo "true")
 ```
 
+**Build context based on delta_context flag:**
+
+```bash
+# === DELTA CONTEXT LOADING ===
+# When delta_context=true, load only relevant portions of context files
+
+if [ "$DELTA_CONTEXT" = "true" ]; then
+  # Extract phase section from ROADMAP (not full file)
+  PHASE_SECTION=$(sed -n "/^## Phase ${PHASE_NUM}:/,/^## Phase [0-9]\|^---/p" .planning/ROADMAP.md | head -n -1)
+
+  # Extract relevant decisions from STATE (global + phase-specific only)
+  CURRENT_POS=$(sed -n '/^## Current Position/,/^## /p' .planning/STATE.md | head -n -1)
+  GLOBAL_DECISIONS=$(grep -E "^- \[Global\]" .planning/STATE.md 2>/dev/null || true)
+  PHASE_DECISIONS=$(grep -E "^- \[Phase ${PHASE_NUM}\]" .planning/STATE.md 2>/dev/null || true)
+
+  # Build minimal context for executor
+  CONTEXT_FOR_EXECUTOR="## Phase Context
+${PHASE_SECTION}
+
+## Current Position
+${CURRENT_POS}
+
+## Relevant Decisions
+${GLOBAL_DECISIONS}
+${PHASE_DECISIONS}"
+
+  # Extract task-mapped requirements if plan specifies them
+  TASK_REQS=$(grep "^requirements:" "{plan_path}" 2>/dev/null | sed 's/requirements:[[:space:]]*//' || true)
+  if [ -n "$TASK_REQS" ] && [ -f .planning/REQUIREMENTS.md ]; then
+    REQ_HEADER=$(head -3 .planning/REQUIREMENTS.md)
+    REQ_ROWS=""
+    for ID in $(echo "$TASK_REQS" | tr ',' '\n' | tr -d ' '); do
+      REQ_ROWS="${REQ_ROWS}$(grep "| ${ID} |" .planning/REQUIREMENTS.md 2>/dev/null || true)\n"
+    done
+    CONTEXT_FOR_EXECUTOR="${CONTEXT_FOR_EXECUTOR}
+
+## Task Requirements
+${REQ_HEADER}
+${REQ_ROWS}"
+  fi
+
+else
+  # === FULL CONTEXT MODE (backward compatible) ===
+  STATE_CONTENT=$(cat .planning/STATE.md)
+  CONTEXT_FOR_EXECUTOR="## Project State
+${STATE_CONTENT}"
+fi
+```
+
 **Build subagent prompt with conditional references:**
 
 ```
-# Base prompt template
+# Base prompt template (uses CONTEXT_FOR_EXECUTOR instead of raw STATE)
 EXECUTOR_PROMPT="Execute plan at {plan_path}
 
 Execution workflow: @~/.claude/get-shit-done/workflows/${WORKFLOW_FILE}
@@ -311,8 +363,7 @@ Execution workflow: @~/.claude/get-shit-done/workflows/${WORKFLOW_FILE}
 Plan:
 {plan_content}
 
-Project state:
-{state_content}"
+{context_for_executor}"
 
 # Add checkpoint reference based on lazy_references flag
 if [ "$LAZY_REFERENCES" = "false" ] || [ "$PLAN_AUTONOMOUS" = "false" ]; then
@@ -340,6 +391,7 @@ All three run in parallel. Task tool blocks until all complete.
 - `compact_workflows: true` → ~12,500 tokens saved per executor (execute-plan-compact.md vs full)
 - `lazy_references: true` + autonomous → ~8,700 tokens saved per executor (no checkpoints.md)
 - `tiered_instructions: true` → ~2,200 tokens saved per executor (gsd-executor-core vs full)
+- `delta_context: true` → ~1,000-2,600 tokens saved per executor (selective context loading)
 </wave_execution>
 
 <checkpoint_handling>

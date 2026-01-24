@@ -6,6 +6,27 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ## [Unreleased]
 
+## [2.1.0] - 2026-01-24
+
+### Added
+- **Delta Context Protocol Implemented**: Load only relevant portions of context files per subagent
+  - `delta-context-helpers.md` reference file with extraction functions
+  - `extract_phase_section()` - extracts current phase from ROADMAP.md (~1,600 tokens saved)
+  - `extract_relevant_decisions()` - extracts global + phase-specific decisions from STATE.md (~1,000 tokens saved)
+  - `extract_mapped_requirements()` - extracts task-mapped requirements from REQUIREMENTS.md (~1,800 tokens saved)
+  - Context matrix defining what each agent type receives
+- `optimization.delta_context` flag in config.json (default: true in template)
+
+### Changed
+- `execute-phase.md` command now reads `delta_context` flag and builds selective context
+- `execute-phase.md` workflow updated with delta context loading logic
+- Subagent prompts now receive `{context_for_executor}` instead of raw STATE.md
+
+### Performance
+- **~1,000-2,600 additional tokens saved per executor** with delta_context enabled
+- **~4,600 tokens saved per phase** (3 executors + 1 verifier)
+- Combined with other v2.0 optimizations: **~28,000-30,000 tokens saved per phase**
+
 ## [2.0.0] - 2026-01-24
 
 ### 🚀 Major Release: Zero Degradation Token Optimization
@@ -27,7 +48,7 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 - **Compact Workflow Files**: Optimized versions with 80%+ reduction
   - `execute-plan-compact.md` (81% smaller)
   - `checkpoints-minimal.md` (72% smaller)
-- **Delta Context Protocol**: (Design only) Load only relevant sections of context files - planned for v2.1
+- **Delta Context Protocol**: Load only relevant sections of context files - fully implemented (see [Unreleased])
 - **Lazy Reference Loading**: Conditional checkpoint reference loading based on plan autonomy
 - **Context Budget Warning System**: Monitor token usage at 40%/60%/75% thresholds
 - **Optimization Configuration**: New `optimization` section in config.json
@@ -50,7 +71,7 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
   - Lazy references: ~8,700 tokens/executor (autonomous plans)
   - Tiered instructions: ~2,200 tokens/executor
 - **Backward compatible**: All optimizations default to `false`
-- **Note**: Delta context (additional 15-20% savings) planned for v2.1
+- **Delta context**: Now implemented - additional ~4,600 tokens saved per phase (see [Unreleased])
 
 ### Migration
 - Existing v1.x projects detected automatically
@@ -1113,7 +1134,9 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 - YOLO mode for autonomous execution
 - Interactive mode with checkpoints
 
-[Unreleased]: https://github.com/glittercowboy/get-shit-done/compare/v1.9.12...HEAD
+[Unreleased]: https://github.com/Marco-Cricchio/get-shit-done/compare/v2.1.0...HEAD
+[2.1.0]: https://github.com/Marco-Cricchio/get-shit-done/releases/tag/v2.1.0
+[2.0.0]: https://github.com/Marco-Cricchio/get-shit-done/releases/tag/v2.0.0
 [1.9.12]: https://github.com/glittercowboy/get-shit-done/releases/tag/v1.9.12
 [1.9.11]: https://github.com/glittercowboy/get-shit-done/releases/tag/v1.9.11
 [1.9.10]: https://github.com/glittercowboy/get-shit-done/releases/tag/v1.9.10
