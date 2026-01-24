@@ -45,9 +45,11 @@ STOP here if no project found.
 cat .planning/config.json
 ```
 
-Parse the JSON to check for `gsd_version` field.
+Parse the JSON to check for:
+1. `gsd_version` field
+2. `optimization` section (required for complete v2.0 config)
 
-**If gsd_version exists and >= 2.0.0:**
+**If gsd_version exists and >= 2.0.0 AND optimization section exists:**
 ```
 ╔═══════════════════════════════════════════════════════════╗
 ║  GSD Migration                                            ║
@@ -61,6 +63,10 @@ No migration needed.
 ```
 
 STOP here if already migrated.
+
+**If gsd_version >= 2.0.0 BUT optimization section is MISSING:**
+
+This is an incomplete migration (possibly manual edit or corruption). Continue to analysis phase to add missing sections.
 
 **If gsd_version is missing or < 2.0.0:**
 

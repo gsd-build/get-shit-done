@@ -6,6 +6,22 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ## [Unreleased]
 
+## [2.1.1] - 2026-01-24
+
+### Fixed
+- **Tiered Loading Self-Sufficiency**: `gsd-executor-core.md` no longer references extended file
+  - Auth gate handling inlined (STOP, checkpoint, specify auth steps)
+  - TDD cycle summary inlined (RED-GREEN-REFACTOR with atomic commits)
+- **TDD Task Detection**: `execute-phase.md` now detects `tdd="true"` tasks and uses full executor
+  - Ensures detailed TDD guidance is available when needed
+  - Core executor used only for non-TDD plans (preserves token savings)
+- **Migration Edge Case**: `migrate.md` now checks for `optimization` section presence
+  - Prevents skipping migration when config has `gsd_version` but missing `optimization`
+  - Handles corrupted or manually edited configs gracefully
+
+### Changed
+- Updated CONCERNS.md: 3 critical issues marked as RESOLVED/MITIGATED
+
 ## [2.1.0] - 2026-01-24
 
 ### Added

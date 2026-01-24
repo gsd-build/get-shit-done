@@ -285,8 +285,11 @@ PLAN_01_CONTENT=$(cat "{plan_01_path}")
 PLAN_02_CONTENT=$(cat "{plan_02_path}")
 PLAN_03_CONTENT=$(cat "{plan_03_path}")
 
-# Determine executor type based on optimization flags
-if [ "$TIERED_INSTRUCTIONS" = "true" ]; then
+# Determine executor type based on optimization flags and plan content
+# TDD tasks require full executor for detailed RED-GREEN-REFACTOR guidance
+HAS_TDD_TASKS=$(grep -l 'tdd="true"' "{plan_01_path}" "{plan_02_path}" "{plan_03_path}" 2>/dev/null | head -1)
+
+if [ "$TIERED_INSTRUCTIONS" = "true" ] && [ -z "$HAS_TDD_TASKS" ]; then
   EXECUTOR_TYPE="gsd-executor-core"
 else
   EXECUTOR_TYPE="gsd-executor"

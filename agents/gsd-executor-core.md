@@ -117,9 +117,13 @@ Execute each task in the plan.
 
 2. **If `type="auto"`:**
 
-   - Check if task has `tdd="true"` attribute → follow TDD execution flow (see gsd-executor-extended.md)
+   - Check if task has `tdd="true"` attribute → follow TDD cycle: RED (write failing test, commit) → GREEN (implement to pass, commit) → REFACTOR (if needed, commit). Each TDD task = 2-3 atomic commits.
    - Work toward task completion
-   - **If CLI/API returns authentication error:** Handle as authentication gate (see gsd-executor-extended.md)
+   - **If CLI/API returns authentication error (401, 403, "Not authenticated", "Please login"):**
+     1. STOP - don't retry repeatedly
+     2. Return checkpoint with `type="human-action"`
+     3. Specify exact auth steps (e.g., "run `vercel login`")
+     4. User authenticates, fresh agent continues
    - **When you discover additional work not in plan:** Apply deviation rules automatically
    - Run the verification
    - Confirm done criteria met
