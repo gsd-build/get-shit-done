@@ -567,25 +567,31 @@ must_haves:
     - "User can see existing messages"
     - "User can send a message"
     - "Messages persist across refresh"
+
   artifacts:
     - path: "src/components/Chat.tsx"
-      provides: "Message list rendering"
-      min_lines: 30
+      provides: "Message list and input"
+      min_lines: 50
     - path: "src/app/api/chat/route.ts"
-      provides: "Message CRUD operations"
+      provides: "Message CRUD"
       exports: ["GET", "POST"]
     - path: "prisma/schema.prisma"
       provides: "Message model"
       contains: "model Message"
+
   key_links:
     - from: "src/components/Chat.tsx"
-      to: "/api/chat"
-      via: "fetch in useEffect"
-      pattern: "fetch.*api/chat"
+      to: "/api/chat GET"
+      via: "useEffect fetch on mount"
+      pattern: "useEffect\\([^)]*fetch.*api/chat"
+    - from: "src/components/Chat.tsx"
+      to: "/api/chat POST"
+      via: "form submit handler"
+      pattern: "onSubmit[^}]*fetch.*POST"
     - from: "src/app/api/chat/route.ts"
       to: "prisma.message"
       via: "database query"
-      pattern: "prisma\\.message\\.(find|create)"
+      pattern: "prisma\\.message\\.(findMany|create)"
 ```
 
 **Field descriptions:**
@@ -604,6 +610,72 @@ must_haves:
 | `key_links[].to` | Target artifact or endpoint. |
 | `key_links[].via` | How they connect (description). |
 | `key_links[].pattern` | Optional. Regex to verify connection exists. |
+
+### Key Links (Wiring Verification)
+
+Key links verify that artifacts are actually connected, not just co-existing. This catches "stub city" — when files exist but don't call each other.
+
+**Structure:**
+```yaml
+key_links:
+  - from: "source file or component"
+    to: "target file, endpoint, or concept"
+    via: "description of how they connect"
+    pattern: "regex to verify connection exists"
+```
+
+**Common Patterns:**
+
+**Component → API:**
+```yaml
+- from: "src/components/LoginForm.tsx"
+  to: "/api/auth/login"
+  via: "fetch POST on form submit"
+  pattern: "fetch\\(['\"].*api/auth/login['\"].*POST"
+```
+*Catches: Form exists but onSubmit only prevents default*
+
+**API → Database:**
+```yaml
+- from: "src/app/api/users/route.ts"
+  to: "prisma.user"
+  via: "Prisma findMany query"
+  pattern: "prisma\\.user\\.(findMany|findUnique|create)"
+```
+*Catches: API route returns hardcoded data instead of querying*
+
+**Form → Handler with Action:**
+```yaml
+- from: "src/components/ContactForm.tsx"
+  to: "mutation or API call"
+  via: "onSubmit triggers API"
+  pattern: "onSubmit[^}]*(fetch|mutate|axios)"
+```
+*Catches: Handler only logs to console*
+
+**State → Render:**
+```yaml
+- from: "src/components/MessageList.tsx"
+  to: "messages state"
+  via: "map over messages array"
+  pattern: "messages\\.map\\(|messages\\.length"
+```
+*Catches: State exists but JSX shows hardcoded "No messages"*
+
+**Hook → Effect:**
+```yaml
+- from: "src/hooks/useMessages.ts"
+  to: "API fetch"
+  via: "useEffect on mount"
+  pattern: "useEffect\\([^)]*fetch.*\\[\\]"
+```
+*Catches: Hook declared but effect is empty*
+
+**Pattern Writing Tips:**
+- Escape special regex chars: `\\.` for dot, `\\(` for paren
+- Use `['\"]` to match single or double quotes
+- Use `.*` sparingly — be specific to reduce false positives
+- Test patterns with `grep -E "pattern" file.tsx`
 
 **Why this matters:**
 
