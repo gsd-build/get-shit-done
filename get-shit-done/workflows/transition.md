@@ -514,15 +514,7 @@ Exit skill and invoke SlashCommand("/gsd:complete-milestone {version}")
 </process>
 
 <implicit_tracking>
-
-Progress tracking is IMPLICIT:
-
-- "Plan phase 2" → Phase 1 must be done (or ask)
-- "Plan phase 3" → Phases 1-2 must be done (or ask)
-- Transition workflow makes it explicit in ROADMAP.md
-
-No separate "update progress" step. Forward motion IS progress.
-
+Progress tracking is IMPLICIT: planning phase N implies phases 1-(N-1) complete. No separate progress step—forward motion IS progress.
 </implicit_tracking>
 
 <partial_completion>

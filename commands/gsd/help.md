@@ -27,13 +27,7 @@ Output ONLY the reference content below. Do NOT add:
 
 ## Staying Updated
 
-GSD evolves fast. Check for updates periodically:
-
-```
-/gsd:whats-new
-```
-
-Shows what changed since your installed version. Update with:
+GSD evolves fast. Update periodically:
 
 ```bash
 npx get-shit-done-cc@latest
@@ -75,17 +69,6 @@ Map an existing codebase for brownfield projects.
 - Use before `/gsd:new-project` on existing codebases
 
 Usage: `/gsd:map-codebase`
-
-**`/gsd:analyze-codebase`**
-Bootstrap codebase intelligence for existing projects.
-
-- Scans all JS/TS files and extracts exports/imports
-- Detects naming conventions, directory patterns, file suffixes
-- Creates `.planning/intel/` with index, conventions, and summary
-- Works standalone (no `/gsd:new-project` required)
-- After initial scan, PostToolUse hook continues incremental learning
-
-Usage: `/gsd:analyze-codebase`
 
 ### Phase Planning
 
@@ -339,42 +322,29 @@ Quick switch model profile for GSD agents.
 
 Usage: `/gsd:set-profile budget`
 
-### Codebase Intelligence
-
-**`/gsd:query-intel <type> [path]`**
-Query the codebase intelligence graph database.
-
-- `dependents <file>` — What files depend on this? (blast radius)
-- `hotspots` — Which files have the most dependents?
-
-Requires `/gsd:analyze-codebase` to build the graph first.
-
-Usage: `/gsd:query-intel dependents src/lib/db.ts`
-Usage: `/gsd:query-intel hotspots`
-
 ### Utility Commands
 
 **`/gsd:help`**
 Show this command reference.
 
-**`/gsd:whats-new`**
-See what's changed since your installed version.
+**`/gsd:update`**
+Update GSD to latest version with changelog preview.
 
 - Shows installed vs latest version comparison
 - Displays changelog entries for versions you've missed
 - Highlights breaking changes
-- Provides update instructions when behind
-
-Usage: `/gsd:whats-new`
-
-**`/gsd:update`**
-Update GSD to latest version with changelog preview.
-
-- Shows what changed before updating
 - Confirms before running install
 - Better than raw `npx get-shit-done-cc`
 
 Usage: `/gsd:update`
+
+**`/gsd:join-discord`**
+Join the GSD Discord community.
+
+- Get help, share what you're building, stay updated
+- Connect with other GSD users
+
+Usage: `/gsd:join-discord`
 
 ## Files & Structure
 
@@ -389,10 +359,6 @@ Usage: `/gsd:update`
 │   └── done/             # Completed todos
 ├── debug/                # Active debug sessions
 │   └── resolved/         # Archived resolved issues
-├── intel/                # Codebase intelligence (auto-populated)
-│   ├── index.json        # File exports and imports
-│   ├── conventions.json  # Detected patterns
-│   └── summary.md        # Context for session injection
 ├── codebase/             # Codebase map (brownfield projects)
 │   ├── STACK.md          # Languages, frameworks, dependencies
 │   ├── ARCHITECTURE.md   # Patterns, layers, data flow

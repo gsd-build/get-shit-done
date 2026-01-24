@@ -416,9 +416,6 @@ Output: [What artifacts will be created]
 @.planning/ROADMAP.md
 @.planning/STATE.md
 
-# Codebase intelligence (if exists)
-@.planning/intel/summary.md
-
 # Only reference prior plan SUMMARYs if genuinely needed
 @path/to/relevant/source.ts
 </context>
@@ -1037,25 +1034,6 @@ If exists, load relevant documents based on phase type:
 | refactor, cleanup | CONCERNS.md, ARCHITECTURE.md |
 | setup, config | STACK.md, STRUCTURE.md |
 | (default) | STACK.md, ARCHITECTURE.md |
-</step>
-
-<step name="load_codebase_intelligence">
-Check for codebase intelligence:
-
-```bash
-cat .planning/intel/summary.md 2>/dev/null
-```
-
-If exists, this provides:
-- File count and structure overview
-- Detected naming conventions (use these when creating new files)
-- Key directories and their purposes
-- Export patterns
-
-**How to use:**
-- Follow detected naming conventions when planning new exports
-- Place new files in directories that match their purpose
-- Reference existing patterns when describing implementation
 </step>
 
 <step name="identify_phase">

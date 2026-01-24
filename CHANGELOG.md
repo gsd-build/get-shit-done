@@ -6,24 +6,98 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ## [Unreleased]
 
+## [1.9.12] - 2025-01-23
+
+### Removed
+- `/gsd:whats-new` command — use `/gsd:update` instead (shows changelog with cancel option)
+
+### Fixed
+- Restored auto-release GitHub Actions workflow
+
+## [1.9.11] - 2026-01-23
+
+### Changed
+- Switched to manual npm publish workflow (removed GitHub Actions CI/CD)
+
+### Fixed
+- Discord badge now uses static format for reliable rendering
+
+## [1.9.10] - 2026-01-23
+
+### Added
+- Discord community link shown in installer completion message
+
+## [1.9.9] - 2026-01-23
+
+### Added
+- `/gsd:join-discord` command to quickly access the GSD Discord community invite link
+
+## [1.9.8] - 2025-01-22
+
+### Added
+- Uninstall flag (`--uninstall`) to cleanly remove GSD from global or local installations
+
+### Fixed
+- Context file detection now matches filename variants (handles both `CONTEXT.md` and `{phase}-CONTEXT.md` patterns)
+
+## [1.9.7] - 2026-01-22
+
+### Fixed
+- OpenCode installer now uses correct XDG-compliant config path (`~/.config/opencode/`) instead of `~/.opencode/`
+- OpenCode commands use flat structure (`command/gsd-help.md`) matching OpenCode's expected format
+- OpenCode permissions written to `~/.config/opencode/opencode.json`
+
+## [1.9.6] - 2026-01-22
+
+### Added
+- Interactive runtime selection: installer now prompts to choose Claude Code, OpenCode, or both
+- Native OpenCode support: `--opencode` flag converts GSD to OpenCode format automatically
+- `--both` flag to install for both Claude Code and OpenCode in one command
+- Auto-configures `~/.opencode.json` permissions for seamless GSD doc access
+
+### Changed
+- Installation flow now asks for runtime first, then location
+- Updated README with new installation options
+
+## [1.9.5] - 2025-01-22
+
+### Fixed
+- Subagents can now access MCP tools (Context7, etc.) - workaround for Claude Code bug #13898
+- Installer: Escape/Ctrl+C now cancels instead of installing globally
+- Installer: Fixed hook paths on Windows
+- Removed stray backticks in `/gsd:new-project` output
+
+### Changed
+- Condensed verbose documentation in templates and workflows (-170 lines)
+- Added CI/CD automation for releases
+
+## [1.9.4] - 2026-01-21
+
+### Changed
+- Checkpoint automation now enforces automation-first principle: Claude starts servers, handles CLI installs, and fixes setup failures before presenting checkpoints to users
+- Added server lifecycle protocol (port conflict handling, background process management)
+- Added CLI auto-installation handling with safe-to-install matrix
+- Added pre-checkpoint failure recovery (fix broken environment before asking user to verify)
+- DRY refactor: checkpoints.md is now single source of truth for automation patterns
+
+## [1.9.2] - 2025-01-21
+
+### Removed
+- **Codebase Intelligence System** — Removed due to overengineering concerns
+  - Deleted `/gsd:analyze-codebase` command
+  - Deleted `/gsd:query-intel` command
+  - Removed SQLite graph database and sql.js dependency (21MB)
+  - Removed intel hooks (gsd-intel-index.js, gsd-intel-session.js, gsd-intel-prune.js)
+  - Removed entity file generation and templates
+
+### Fixed
+- new-project now properly includes model_profile in config
+
 ## [1.9.0] - 2025-01-20
 
 ### Added
-- **Codebase Intelligence System** — Automatic semantic understanding of your codebase
-  - `/gsd:analyze-codebase` now generates semantic entities (modules, services, utils) from AST analysis
-  - `/gsd:query-intel` command for CLI access to dependency graph (`dependents`, `hotspots`)
-  - SQLite graph database (`.planning/intel/graph.db`) stores entity relationships
-  - SessionStart hook injects relevant codebase context into conversations
-  - PostToolUse hook maintains index incrementally as files change
-  - Stop hook prunes deleted files from index
 - **Model Profiles** — `/gsd:set-profile` for quality/balanced/budget agent configurations
 - **Workflow Settings** — `/gsd:settings` command for toggling workflow behaviors interactively
-
-### Changed
-- Subagent prompts now include codebase intelligence context when available
-- New project initialization creates intel directory structure
-- Install process registers intel hooks automatically
-- Documentation updated: help.md, README.md with new commands and codebase intelligence features
 
 ### Fixed
 - Orchestrators now inline file contents in Task prompts (fixes context issues with @ references)
@@ -981,7 +1055,17 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 - YOLO mode for autonomous execution
 - Interactive mode with checkpoints
 
-[Unreleased]: https://github.com/glittercowboy/get-shit-done/compare/v1.9.0...HEAD
+[Unreleased]: https://github.com/glittercowboy/get-shit-done/compare/v1.9.12...HEAD
+[1.9.12]: https://github.com/glittercowboy/get-shit-done/releases/tag/v1.9.12
+[1.9.11]: https://github.com/glittercowboy/get-shit-done/releases/tag/v1.9.11
+[1.9.10]: https://github.com/glittercowboy/get-shit-done/releases/tag/v1.9.10
+[1.9.9]: https://github.com/glittercowboy/get-shit-done/releases/tag/v1.9.9
+[1.9.8]: https://github.com/glittercowboy/get-shit-done/releases/tag/v1.9.8
+[1.9.7]: https://github.com/glittercowboy/get-shit-done/releases/tag/v1.9.7
+[1.9.6]: https://github.com/glittercowboy/get-shit-done/releases/tag/v1.9.6
+[1.9.5]: https://github.com/glittercowboy/get-shit-done/releases/tag/v1.9.5
+[1.9.4]: https://github.com/glittercowboy/get-shit-done/releases/tag/v1.9.4
+[1.9.2]: https://github.com/glittercowboy/get-shit-done/releases/tag/v1.9.2
 [1.9.0]: https://github.com/glittercowboy/get-shit-done/releases/tag/v1.9.0
 [1.8.0]: https://github.com/glittercowboy/get-shit-done/releases/tag/v1.8.0
 [1.7.1]: https://github.com/glittercowboy/get-shit-done/releases/tag/v1.7.1

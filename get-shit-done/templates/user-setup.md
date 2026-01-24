@@ -304,20 +304,8 @@ curl -X POST http://localhost:3000/api/test-email \
 
 ## Guidelines
 
-**Include in USER-SETUP.md:**
-- Environment variable names and where to find values
-- Account creation URLs (if new service)
-- Dashboard configuration steps
-- Verification commands to confirm setup works
-- Local development alternatives (e.g., `stripe listen`)
-
-**Do NOT include:**
-- Actual secret values (never)
-- Steps Claude can automate (package installs, code changes, file creation)
-- Generic instructions ("set up your environment")
+**Never include:** Actual secret values. Steps Claude can automate (package installs, code changes).
 
 **Naming:** `{phase}-USER-SETUP.md` matches the phase number pattern.
-
 **Status tracking:** User marks checkboxes and updates status line when complete.
-
 **Searchability:** `grep -r "USER-SETUP" .planning/` finds all phases with user requirements.

@@ -1,5 +1,4 @@
 node_modules/
-package-lock.json
 .DS_Store
 TO-DOS.md
 CLAUDE.md
@@ -14,4 +13,8 @@ docs/_site/
 
 # Build artifacts (committed to npm, not git)
 hooks/dist/
+
+# Animation assets
+animation/
+*.gif
 

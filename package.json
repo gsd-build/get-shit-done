@@ -1,6 +1,6 @@
 {
   "name": "get-shit-done-cc",
-  "version": "1.9.1",
+  "version": "1.9.13",
   "description": "A meta-prompting, context engineering and spec-driven development system for Claude Code by TÂCHES.",
   "bin": {
     "get-shit-done-cc": "bin/install.js"
@@ -36,8 +36,7 @@
   },
   "dependencies": {},
   "devDependencies": {
-    "esbuild": "^0.24.0",
-    "sql.js": "^1.12.0"
+    "esbuild": "^0.24.0"
   },
   "scripts": {
     "build:hooks": "node scripts/build-hooks.js",

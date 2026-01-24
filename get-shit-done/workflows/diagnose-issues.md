@@ -201,21 +201,8 @@ Do NOT offer manual next steps - verify-work handles the rest.
 </process>
 
 <context_efficiency>
-**Orchestrator context:** ~15%
-- Parse UAT.md gaps
-- Fill template strings
-- Spawn parallel Task calls
-- Collect results
-- Update UAT.md
-
-**Each debug agent:** Fresh 200k context
-- Loads full debug workflow
-- Loads debugging references
-- Investigates with full capacity
-- Returns root cause
-
-**No symptom gathering.** Agents start with symptoms pre-filled from UAT.
-**No fix application.** Agents only diagnose - plan-phase --gaps handles fixes.
+Agents start with symptoms pre-filled from UAT (no symptom gathering).
+Agents only diagnose—plan-phase --gaps handles fixes (no fix application).
 </context_efficiency>
 
 <failure_handling>

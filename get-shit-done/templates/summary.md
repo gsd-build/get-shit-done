@@ -233,37 +233,14 @@ The one-liner should tell someone what actually shipped.
 </example>
 
 <guidelines>
-**When to create:**
-- After completing each phase plan
-- Required output from execute-plan workflow
-- Documents what actually happened vs what was planned
+**Frontmatter:** MANDATORY - complete all fields. Enables automatic context assembly for future planning.
 
-**Frontmatter completion:**
-- MANDATORY: Complete all frontmatter fields during summary creation
-- See <frontmatter_guidance> for field purposes
-- Frontmatter enables automatic context assembly for future planning
-
-**One-liner requirements:**
-- Must be substantive (describe what shipped, not "phase complete")
-- Should tell someone what was accomplished
-- Examples: "JWT auth with refresh rotation using jose library" not "Authentication implemented"
-
-**Performance tracking:**
-- Include duration, start/end timestamps
-- Used for velocity metrics in STATE.md
-
-**Deviations section:**
-- Documents unplanned work handled via deviation rules
-- Separate from "Issues Encountered" (which is planned work problems)
-- Auto-fixed issues: What was wrong, how fixed, verification
+**One-liner:** Must be substantive. "JWT auth with refresh rotation using jose library" not "Authentication implemented".
 
 **Decisions section:**
-- Key decisions made during execution
-- Include rationale (why this choice)
+- Key decisions made during execution with rationale
 - Extracted to STATE.md accumulated context
 - Use "None - followed plan as specified" if no deviations
 
-**After creation:**
-- STATE.md updated with position, decisions, issues
-- Next plan can reference decisions made
+**After creation:** STATE.md updated with position, decisions, issues.
 </guidelines>

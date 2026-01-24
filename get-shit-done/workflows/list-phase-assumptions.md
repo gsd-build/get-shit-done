@@ -132,7 +132,7 @@ Wait for user response.
 Acknowledge the corrections:
 
 ```
-Got it. Key corrections:
+Key corrections:
 - [correction 1]
 - [correction 2]
 
@@ -142,7 +142,7 @@ This changes my understanding significantly. [Summarize new understanding]
 **If user confirms assumptions:**
 
 ```
-Great, assumptions validated.
+Assumptions validated.
 ```
 
 Continue to offer_next.

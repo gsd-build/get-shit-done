@@ -550,24 +550,9 @@ All {N} phases executed.
 </process>
 
 <context_efficiency>
-**Why this works:**
-
-Orchestrator context usage: ~10-15%
-- Read plan frontmatter (small)
-- Analyze dependencies (logic, no heavy reads)
-- Fill template strings
-- Spawn Task calls
-- Collect results
-
-Each subagent: Fresh 200k context
-- Loads full execute-plan workflow
-- Loads templates, references
-- Executes plan with full capacity
-- Creates SUMMARY, commits
-
-**No polling.** Task tool blocks until completion. No TaskOutput loops.
-
-**No context bleed.** Orchestrator never reads workflow internals. Just paths and results.
+Orchestrator: ~10-15% context (frontmatter, spawning, results).
+Subagents: Fresh 200k each (full workflow + execution).
+No polling (Task blocks). No context bleed.
 </context_efficiency>
 
 <failure_handling>

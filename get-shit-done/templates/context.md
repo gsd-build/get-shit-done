@@ -275,14 +275,6 @@ The output should answer: "What does the researcher need to investigate? What ch
 - "Fast and responsive"
 - "Easy to use"
 
-**Sections explained:**
-
-- **Domain** — The scope anchor. Copied/derived from ROADMAP.md. Fixed boundary.
-- **Decisions** — Organized by areas discussed (NOT predefined categories). Section headers come from the actual discussion — "Layout style", "Flag design", "Grouping criteria", etc.
-- **Claude's Discretion** — Explicit acknowledgment of what Claude can decide during implementation.
-- **Specifics** — Product references, examples, "like X but..." statements.
-- **Deferred** — Ideas captured but explicitly out of scope. Prevents scope creep while preserving good ideas.
-
 **After creation:**
 - File lives in phase directory: `.planning/phases/XX-name/{phase}-CONTEXT.md`
 - `gsd-phase-researcher` uses decisions to focus investigation

@@ -52,20 +52,6 @@ git check-ignore -q .planning 2>/dev/null && COMMIT_PLANNING_DOCS=false
 Store `COMMIT_PLANNING_DOCS` for use in git operations.
 </step>
 
-<step name="load_codebase_intelligence">
-Check for codebase intelligence:
-
-```bash
-cat .planning/intel/summary.md 2>/dev/null
-```
-
-If exists:
-- Follow detected naming conventions when writing code
-- Place new files in directories that match their purpose
-- Use established patterns (camelCase, PascalCase, etc.)
-
-This context helps maintain codebase consistency during execution.
-</step>
 
 <step name="load_plan">
 Read the plan file provided in your prompt context.
@@ -361,6 +347,21 @@ Type "done" when authenticated.
 </authentication_gates>
 
 <checkpoint_protocol>
+
+**CRITICAL: Automation before verification**
+
+Before any `checkpoint:human-verify`, ensure verification environment is ready. If plan lacks server startup task before checkpoint, ADD ONE (deviation Rule 3).
+
+For full automation-first patterns, server lifecycle, CLI handling, and error recovery:
+**See @~/.claude/get-shit-done/references/checkpoints.md**
+
+**Quick reference:**
+- Users NEVER run CLI commands - Claude does all automation
+- Users ONLY visit URLs, click UI, evaluate visuals, provide secrets
+- Claude starts servers, seeds databases, configures env vars
+
+---
+
 When encountering `type="checkpoint:*"`:
 
 **STOP immediately.** Do not continue to next task.

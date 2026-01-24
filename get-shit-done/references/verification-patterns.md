@@ -593,3 +593,20 @@ Some things can't be verified programmatically. Flag these for human testing:
 ```
 
 </human_verification_triggers>
+
+<checkpoint_automation_reference>
+
+## Pre-Checkpoint Automation
+
+For automation-first checkpoint patterns, server lifecycle management, CLI installation handling, and error recovery protocols, see:
+
+**@~/.claude/get-shit-done/references/checkpoints.md** → `<automation_reference>` section
+
+Key principles:
+- Claude sets up verification environment BEFORE presenting checkpoints
+- Users never run CLI commands (visit URLs only)
+- Server lifecycle: start before checkpoint, handle port conflicts, keep running for duration
+- CLI installation: auto-install where safe, checkpoint for user choice otherwise
+- Error handling: fix broken environment before checkpoint, never present checkpoint with failed setup
+
+</checkpoint_automation_reference>

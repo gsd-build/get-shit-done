@@ -173,7 +173,7 @@ REQUIREMENTS=$(cat .planning/REQUIREMENTS.md 2>/dev/null | grep -A100 "## Requir
 DECISIONS=$(grep -A20 "### Decisions Made" .planning/STATE.md 2>/dev/null)
 
 # Get phase context if exists
-PHASE_CONTEXT=$(cat "${PHASE_DIR}/${PHASE}-CONTEXT.md" 2>/dev/null)
+PHASE_CONTEXT=$(cat "${PHASE_DIR}"/*-CONTEXT.md 2>/dev/null)
 ```
 
 Fill research prompt and spawn:
@@ -206,8 +206,8 @@ Write research findings to: {phase_dir}/{phase}-RESEARCH.md
 
 ```
 Task(
-  prompt=research_prompt,
-  subagent_type="gsd-phase-researcher",
+  prompt="First, read ~/.claude/agents/gsd-phase-researcher.md for your role and instructions.\n\n" + research_prompt,
+  subagent_type="general-purpose",
   model="{researcher_model}",
   description="Research Phase {phase}"
 )
@@ -249,9 +249,6 @@ RESEARCH_CONTENT=$(cat "${PHASE_DIR}"/*-RESEARCH.md 2>/dev/null)
 # Gap closure files (only if --gaps mode)
 VERIFICATION_CONTENT=$(cat "${PHASE_DIR}"/*-VERIFICATION.md 2>/dev/null)
 UAT_CONTENT=$(cat "${PHASE_DIR}"/*-UAT.md 2>/dev/null)
-
-# Codebase intelligence (if exists)
-INTEL_CONTENT=$(cat .planning/intel/summary.md 2>/dev/null)
 ```
 
 ## 8. Spawn gsd-planner Agent
@@ -292,11 +289,6 @@ Fill prompt with inlined content and spawn:
 {verification_content}
 {uat_content}
 
-**Codebase Intel (if exists):**
-<codebase-intel>
-{intel_content}
-</codebase-intel>
-
 </planning_context>
 
 <downstream_consumer>
@@ -323,8 +315,8 @@ Before returning PLANNING COMPLETE:
 
 ```
 Task(
-  prompt=filled_prompt,
-  subagent_type="gsd-planner",
+  prompt="First, read ~/.claude/agents/gsd-planner.md for your role and instructions.\n\n" + filled_prompt,
+  subagent_type="general-purpose",
   model="{planner_model}",
   description="Plan Phase {phase}"
 )
@@ -453,8 +445,8 @@ Return what changed.
 
 ```
 Task(
-  prompt=revision_prompt,
-  subagent_type="gsd-planner",
+  prompt="First, read ~/.claude/agents/gsd-planner.md for your role and instructions.\n\n" + revision_prompt,
+  subagent_type="general-purpose",
   model="{planner_model}",
   description="Revise Phase {phase} plans"
 )

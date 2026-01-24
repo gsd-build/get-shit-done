@@ -81,7 +81,7 @@ ls .planning/phases/${PHASE}-*/RESEARCH.md 2>/dev/null
 ```bash
 grep -A20 "Phase ${PHASE}:" .planning/ROADMAP.md
 cat .planning/REQUIREMENTS.md 2>/dev/null
-cat .planning/phases/${PHASE}-*/${PHASE}-CONTEXT.md 2>/dev/null
+cat .planning/phases/${PHASE}-*/*-CONTEXT.md 2>/dev/null
 grep -A30 "### Decisions Made" .planning/STATE.md 2>/dev/null
 ```
 
@@ -148,8 +148,8 @@ Write to: .planning/phases/${PHASE}-{slug}/${PHASE}-RESEARCH.md
 
 ```
 Task(
-  prompt=filled_prompt,
-  subagent_type="gsd-phase-researcher",
+  prompt="First, read ~/.claude/agents/gsd-phase-researcher.md for your role and instructions.\n\n" + filled_prompt,
+  subagent_type="general-purpose",
   model="{researcher_model}",
   description="Research Phase {phase}"
 )
@@ -182,8 +182,8 @@ Research file: @.planning/phases/${PHASE}-{slug}/${PHASE}-RESEARCH.md
 
 ```
 Task(
-  prompt=continuation_prompt,
-  subagent_type="gsd-phase-researcher",
+  prompt="First, read ~/.claude/agents/gsd-phase-researcher.md for your role and instructions.\n\n" + continuation_prompt,
+  subagent_type="general-purpose",
   model="{researcher_model}",
   description="Continue research Phase {phase}"
 )

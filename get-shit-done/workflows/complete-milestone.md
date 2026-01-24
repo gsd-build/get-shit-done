@@ -29,12 +29,7 @@ When a milestone completes, this workflow:
 5. Performs full PROJECT.md evolution review
 6. Offers to create next milestone inline
 
-**Context Efficiency:**
-
-- Completed milestones: One line each (~50 tokens)
-- Full details: In archive files (loaded only when needed)
-- Result: ROADMAP.md stays constant size forever
-- Result: REQUIREMENTS.md is always milestone-scoped (not cumulative)
+**Context Efficiency:** Archives keep ROADMAP.md constant-size and REQUIREMENTS.md milestone-scoped.
 
 **Archive Format:**
 
