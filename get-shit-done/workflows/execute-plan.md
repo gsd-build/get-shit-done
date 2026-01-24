@@ -7,6 +7,7 @@ Read STATE.md before any operation to load project context.
 Read config.json for planning behavior settings.
 
 @~/.claude/get-shit-done/references/git-integration.md
+@~/.claude/get-shit-done/references/state-derivation.md
 </required_reading>
 
 <process>
@@ -30,7 +31,19 @@ Store resolved model for use in Task calls below.
 </step>
 
 <step name="load_project_state">
-Before any operation, read project state:
+Before any operation, derive project state from filesystem (parallel-safe):
+
+```bash
+# Derive state from filesystem - parallel-safe, no race conditions
+# See state-derivation.md for function implementations
+source ~/.claude/get-shit-done/references/state-derivation.md 2>/dev/null || true
+
+CURRENT_PHASE=$(get_current_phase ".planning")
+CURRENT_PLAN=$(get_current_plan ".planning/phases/${CURRENT_PHASE}-"*)
+PROGRESS=$(get_progress ".planning")
+```
+
+**Also read STATE.md for accumulated context** (decisions, blockers, session info):
 
 ```bash
 cat .planning/STATE.md 2>/dev/null
@@ -38,10 +51,10 @@ cat .planning/STATE.md 2>/dev/null
 
 **If file exists:** Parse and internalize:
 
-- Current position (phase, plan, status)
 - Accumulated decisions (constraints on this execution)
 - Blockers/concerns (things to watch for)
-- Brief alignment status
+- Session continuity info
+- **NOTE:** Position/progress derived above, not from STATE.md (parallel-safe)
 
 **If file missing but .planning/ exists:**
 
@@ -69,24 +82,28 @@ Store `COMMIT_PLANNING_DOCS` for use in git operations.
 </step>
 
 <step name="identify_plan">
-Find the next plan to execute:
-- Check roadmap for "In progress" phase
-- Find plans in that phase directory
-- Identify first plan without corresponding SUMMARY
+Find the next plan to execute using state derivation (parallel-safe):
 
 ```bash
-cat .planning/ROADMAP.md
-# Look for phase with "In progress" status
-# Then find plans in that phase
-ls .planning/phases/XX-name/*-PLAN.md 2>/dev/null | sort
-ls .planning/phases/XX-name/*-SUMMARY.md 2>/dev/null | sort
+# Use derivation function for parallel-safe plan discovery
+# Multiple terminals can query simultaneously - no conflicts
+NEXT_PLAN=$(get_current_plan "$PHASE_DIR")
+if [ "$NEXT_PLAN" = "none" ]; then
+  echo "Phase complete - all plans have SUMMARY files"
+fi
 ```
 
-**Logic:**
+**Fallback:** Check roadmap for phase status if needed:
+```bash
+cat .planning/ROADMAP.md
+```
+
+**Legacy Logic (for reference):**
 
 - If `01-01-PLAN.md` exists but `01-01-SUMMARY.md` doesn't → execute 01-01
 - If `01-01-SUMMARY.md` exists but `01-02-SUMMARY.md` doesn't → execute 01-02
 - Pattern: Find first PLAN file without matching SUMMARY file
+- **This is what get_current_plan() implements atomically**
 
 **Decimal phase handling:**
 

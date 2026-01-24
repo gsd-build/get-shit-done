@@ -16,6 +16,7 @@ allowed-tools:
 
 <execution_context>
 @~/.claude/get-shit-done/references/ui-brand.md
+@~/.claude/get-shit-done/utilities/task-timeout.md
 </execution_context>
 
 <objective>
@@ -37,6 +38,10 @@ Phase number: $ARGUMENTS (optional - auto-detects next unplanned phase if not pr
 - `--gaps` — Gap closure mode (reads VERIFICATION.md, skips research)
 - `--skip-verify` — Skip planner → checker verification loop
 
+@~/.claude/get-shit-done/references/state-derivation.md
+
+**Note:** Phase auto-detection uses state derivation (get_current_phase) for parallel-safe next-phase determination.
+
 Normalize phase input in step 2 before any directory lookups.
 </context>
 
@@ -50,10 +55,15 @@ ls .planning/ 2>/dev/null
 
 **If not found:** Error - user should run `/gsd:new-project` first.
 
-**Resolve model profile for agent spawning:**
+**Resolve model profile and timeouts for agent spawning:**
 
 ```bash
 MODEL_PROFILE=$(cat .planning/config.json 2>/dev/null | grep -o '"model_profile"[[:space:]]*:[[:space:]]*"[^"]*"' | grep -o '"[^"]*"$' | tr -d '"' || echo "balanced")
+
+# Read timeout config (defaults from task-timeout.md)
+RESEARCHER_TIMEOUT=$(cat .planning/config.json 2>/dev/null | grep -o '"researcher"[[:space:]]*:[[:space:]]*[0-9]*' | grep -o '[0-9]*' || echo "420000")
+PLANNER_TIMEOUT=$(cat .planning/config.json 2>/dev/null | grep -o '"planner"[[:space:]]*:[[:space:]]*[0-9]*' | grep -o '[0-9]*' || echo "300000")
+CHECKER_TIMEOUT=$(cat .planning/config.json 2>/dev/null | grep -o '"verifier"[[:space:]]*:[[:space:]]*[0-9]*' | grep -o '[0-9]*' || echo "180000")
 ```
 
 Default to "balanced" if not set.
@@ -66,7 +76,7 @@ Default to "balanced" if not set.
 | gsd-planner | opus | opus | sonnet |
 | gsd-plan-checker | sonnet | sonnet | haiku |
 
-Store resolved models for use in Task calls below.
+Store resolved models and timeouts for use in Task calls below.
 
 ## 2. Parse and Normalize Arguments
 
@@ -176,6 +186,15 @@ DECISIONS=$(grep -A20 "### Decisions Made" .planning/STATE.md 2>/dev/null)
 PHASE_CONTEXT=$(cat "${PHASE_DIR}"/*-CONTEXT.md 2>/dev/null)
 ```
 
+**Before spawning, report to user:**
+
+```bash
+echo "Starting gsd-phase-researcher agent..."
+echo "Expected duration: $((RESEARCHER_TIMEOUT / 60000)) minutes"
+echo "Expected output: ${PHASE}-RESEARCH.md"
+START_TIME=$(date +%s)
+```
+
 Fill research prompt and spawn:
 
 ```markdown
@@ -211,6 +230,13 @@ Task(
   model="{researcher_model}",
   description="Research Phase {phase}"
 )
+```
+
+**After Task() returns:**
+
+```bash
+END_TIME=$(date +%s)
+echo "Researcher completed in $((END_TIME - START_TIME))s"
 ```
 
 ### Handle Researcher Return
@@ -260,6 +286,15 @@ Display stage banner:
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
 ◆ Spawning planner...
+```
+
+**Before spawning, report to user:**
+
+```bash
+echo "Starting gsd-planner agent..."
+echo "Expected duration: $((PLANNER_TIMEOUT / 60000)) minutes"
+echo "Expected outputs: *-PLAN.md files"
+START_TIME=$(date +%s)
 ```
 
 Fill prompt with inlined content and spawn:
@@ -322,6 +357,13 @@ Task(
 )
 ```
 
+**After Task() returns:**
+
+```bash
+END_TIME=$(date +%s)
+echo "Planner completed in $((END_TIME - START_TIME))s"
+```
+
 ## 9. Handle Planner Return
 
 Parse planner output:
@@ -350,6 +392,15 @@ Display:
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
 ◆ Spawning plan checker...
+```
+
+**Before spawning, report to user:**
+
+```bash
+echo "Starting gsd-plan-checker agent..."
+echo "Expected duration: $((CHECKER_TIMEOUT / 60000)) minutes"
+echo "Expected output: Verification report (pass/issues)"
+START_TIME=$(date +%s)
 ```
 
 Read plans and requirements for the checker:
@@ -394,6 +445,13 @@ Task(
 )
 ```
 
+**After Task() returns:**
+
+```bash
+END_TIME=$(date +%s)
+echo "Checker completed in $((END_TIME - START_TIME))s"
+```
+
 ## 11. Handle Checker Return
 
 **If `## VERIFICATION PASSED`:**
@@ -418,6 +476,15 @@ Read current plans for revision context:
 
 ```bash
 PLANS_CONTENT=$(cat "${PHASE_DIR}"/*-PLAN.md 2>/dev/null)
+```
+
+**Before spawning, report to user:**
+
+```bash
+echo "Starting gsd-planner agent..."
+echo "Expected duration: $((PLANNER_TIMEOUT / 60000)) minutes"
+echo "Expected outputs: Updated *-PLAN.md files"
+START_TIME=$(date +%s)
 ```
 
 Spawn gsd-planner with revision prompt:
@@ -450,6 +517,13 @@ Task(
   model="{planner_model}",
   description="Revise Phase {phase} plans"
 )
+```
+
+**After Task() returns:**
+
+```bash
+END_TIME=$(date +%s)
+echo "Planner completed in $((END_TIME - START_TIME))s"
 ```
 
 - After planner returns → spawn checker again (step 10)

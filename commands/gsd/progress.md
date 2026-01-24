@@ -49,10 +49,15 @@ If missing both ROADMAP.md and PROJECT.md: suggest `/gsd:new-project`.
 <step name="load">
 **Load full project context:**
 
-- Read `.planning/STATE.md` for living memory (position, decisions, issues)
+- Read `.planning/STATE.md` for accumulated context (decisions, issues, session info)
 - Read `.planning/ROADMAP.md` for phase structure and objectives
 - Read `.planning/PROJECT.md` for current state (What This Is, Core Value, Requirements)
 - Read `.planning/config.json` for settings (model_profile, workflow toggles)
+
+**State derivation reference:**
+@~/.claude/get-shit-done/references/state-derivation.md
+
+**Note:** Position/progress are derived from filesystem (SUMMARY.md existence = complete), not parsed from STATE.md. This enables parallel work from multiple terminals without race conditions.
   </step>
 
 <step name="recent">
@@ -64,14 +69,26 @@ If missing both ROADMAP.md and PROJECT.md: suggest `/gsd:new-project`.
   </step>
 
 <step name="position">
-**Parse current position:**
+**Parse current position using state derivation (parallel-safe):**
 
-- From STATE.md: current phase, plan number, status
-- Calculate: total plans, completed plans, remaining plans
-- Note any blockers or concerns
-- Check for CONTEXT.md: For phases without PLAN.md files, check if `{phase}-CONTEXT.md` exists in phase directory
-- Count pending todos: `ls .planning/todos/pending/*.md 2>/dev/null | wc -l`
-- Check for active debug sessions: `ls .planning/debug/*.md 2>/dev/null | grep -v resolved | wc -l`
+Use state derivation functions for position detection:
+
+```bash
+# Derive state from filesystem - parallel-safe, no race conditions
+CURRENT_PHASE=$(get_current_phase ".planning")
+CURRENT_PLAN=$(get_current_plan ".planning/phases/${CURRENT_PHASE}-"*)
+PROGRESS=$(get_progress ".planning")
+```
+
+Position is derived from filesystem (SUMMARY.md existence), not parsed from STATE.md.
+
+**Additional context from STATE.md:**
+- Blockers/concerns (accumulated context)
+- Recent decisions (constraints on current work)
+
+**Check for CONTEXT.md:** For phases without PLAN.md files, check if `{phase}-CONTEXT.md` exists in phase directory
+**Count pending todos:** `ls .planning/todos/pending/*.md 2>/dev/null | wc -l`
+**Check for active debug sessions:** `ls .planning/debug/*.md 2>/dev/null | grep -v resolved | wc -l`
   </step>
 
 <step name="report">

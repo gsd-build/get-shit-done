@@ -25,7 +25,26 @@ Context budget: ~15% orchestrator, 100% fresh per subagent.
 <execution_context>
 @~/.claude/get-shit-done/references/ui-brand.md
 @~/.claude/get-shit-done/workflows/execute-phase.md
+@~/.claude/get-shit-done/utilities/task-timeout.md
 </execution_context>
+
+<artifact_checking>
+Helper function for verifying agent outputs:
+
+```bash
+check_artifacts() {
+  local artifacts=("$@")
+  local all_exist=true
+  for artifact in "${artifacts[@]}"; do
+    if [[ ! -f "$artifact" ]]; then
+      echo "Missing: $artifact" >&2
+      all_exist=false
+    fi
+  done
+  echo "$all_exist"
+}
+```
+</artifact_checking>
 
 <context>
 Phase: $ARGUMENTS
@@ -35,14 +54,21 @@ Phase: $ARGUMENTS
 
 @.planning/ROADMAP.md
 @.planning/STATE.md
+@~/.claude/get-shit-done/references/state-derivation.md
+
+**Parallel safety note:** Plan discovery uses state derivation (SUMMARY.md existence = complete). Two terminals can execute different phases simultaneously without race conditions.
 </context>
 
 <process>
-0. **Resolve Model Profile**
+0. **Resolve Model Profile and Timeouts**
 
-   Read model profile for agent spawning:
+   Read model profile and timeout configuration for agent spawning:
    ```bash
    MODEL_PROFILE=$(cat .planning/config.json 2>/dev/null | grep -o '"model_profile"[[:space:]]*:[[:space:]]*"[^"]*"' | grep -o '"[^"]*"$' | tr -d '"' || echo "balanced")
+
+   # Read timeout config (defaults from task-timeout.md)
+   EXECUTOR_TIMEOUT=$(cat .planning/config.json 2>/dev/null | grep -o '"executor"[[:space:]]*:[[:space:]]*[0-9]*' | grep -o '[0-9]*' || echo "600000")
+   VERIFIER_TIMEOUT=$(cat .planning/config.json 2>/dev/null | grep -o '"verifier"[[:space:]]*:[[:space:]]*[0-9]*' | grep -o '[0-9]*' || echo "180000")
    ```
 
    Default to "balanced" if not set.
@@ -54,7 +80,7 @@ Phase: $ARGUMENTS
    | gsd-executor | opus | sonnet | sonnet |
    | gsd-verifier | sonnet | sonnet | haiku |
 
-   Store resolved models for use in Task calls below.
+   Store resolved models and timeouts for use in Task calls below.
 
 1. **Validate phase exists**
    - Find phase directory matching argument
@@ -102,7 +128,32 @@ Phase: $ARGUMENTS
    **If `workflow.verifier` is `false`:** Skip to step 8 (treat as passed).
 
    **Otherwise:**
+
+   ```bash
+   # Define expected artifact
+   EXPECTED_ARTIFACTS=("${PHASE_DIR}/${PHASE}-VERIFICATION.md")
+
+   # Report to user
+   EXPECTED_DURATION_MIN=$((VERIFIER_TIMEOUT / 60000))
+   echo "Starting gsd-verifier agent..."
+   echo "Expected duration: ${EXPECTED_DURATION_MIN} minutes"
+   echo "Expected output: ${PHASE}-VERIFICATION.md"
+   START_TIME=$(date +%s)
+   ```
+
    - Spawn `gsd-verifier` subagent with phase directory and goal
+
+   ```bash
+   # After Task() returns
+   END_TIME=$(date +%s)
+   ACTUAL_DURATION_S=$((END_TIME - START_TIME))
+   echo "Verifier completed in ${ACTUAL_DURATION_S}s"
+
+   # Check artifact
+   if [[ ! -f "${PHASE_DIR}/${PHASE}-VERIFICATION.md" ]]; then
+     echo "Verifier did not produce VERIFICATION.md"
+   fi
+   ```
    - Verifier checks must_haves against actual codebase (not SUMMARY claims)
    - Creates VERIFICATION.md with detailed report
    - Route by status:
@@ -261,6 +312,26 @@ PLAN_01_CONTENT=$(cat "{plan_01_path}")
 PLAN_02_CONTENT=$(cat "{plan_02_path}")
 PLAN_03_CONTENT=$(cat "{plan_03_path}")
 STATE_CONTENT=$(cat .planning/STATE.md)
+
+# Expected: SUMMARY.md for each plan in this wave
+EXPECTED_ARTIFACTS=()
+for plan in ${WAVE_PLANS[@]}; do
+  plan_id=$(basename "$plan" -PLAN.md)
+  EXPECTED_ARTIFACTS+=("${PHASE_DIR}/${plan_id}-SUMMARY.md")
+done
+```
+
+**Before spawning, report to user:**
+
+```bash
+EXPECTED_DURATION_MIN=$((EXECUTOR_TIMEOUT / 60000))
+echo "Starting gsd-executor agent(s)..."
+echo "Expected duration: ${EXPECTED_DURATION_MIN} minutes per agent"
+echo "Expected outputs:"
+for artifact in "${EXPECTED_ARTIFACTS[@]}"; do
+  echo "  - $(basename "$artifact")"
+done
+START_TIME=$(date +%s)
 ```
 
 Spawn all plans in a wave with a single message containing multiple Task calls, with inlined content:
@@ -272,6 +343,44 @@ Task(prompt="Execute plan at {plan_03_path}\n\nPlan:\n{plan_03_content}\n\nProje
 ```
 
 All three run in parallel. Task tool blocks until all complete.
+
+**After Task() returns, report timing and check artifacts:**
+
+```bash
+END_TIME=$(date +%s)
+ACTUAL_DURATION_S=$((END_TIME - START_TIME))
+EXPECTED_DURATION_S=$((EXECUTOR_TIMEOUT / 1000))
+
+# Check artifacts
+ARTIFACTS_EXIST=true
+for artifact in "${EXPECTED_ARTIFACTS[@]}"; do
+  if [[ ! -f "$artifact" ]]; then
+    echo "Missing: $artifact" >&2
+    ARTIFACTS_EXIST=false
+  fi
+done
+
+# Report based on duration + artifacts
+if [[ $ACTUAL_DURATION_S -gt $EXPECTED_DURATION_S ]]; then
+  if [[ "$ARTIFACTS_EXIST" == "true" ]]; then
+    echo "Wave completed in ${ACTUAL_DURATION_S}s (exceeded expected ${EXPECTED_DURATION_S}s) but all SUMMARYs present"
+  else
+    echo "Wave exceeded expected duration AND missing artifacts:"
+    for artifact in "${EXPECTED_ARTIFACTS[@]}"; do
+      [[ ! -f "$artifact" ]] && echo "  Missing: $artifact"
+    done
+  fi
+else
+  if [[ "$ARTIFACTS_EXIST" == "true" ]]; then
+    echo "Wave completed in ${ACTUAL_DURATION_S}s"
+  else
+    echo "Wave completed but missing artifacts:"
+    for artifact in "${EXPECTED_ARTIFACTS[@]}"; do
+      [[ ! -f "$artifact" ]] && echo "  Missing: $artifact"
+    done
+  fi
+fi
+```
 
 **No polling.** No background agents. No TaskOutput loops.
 </wave_execution>

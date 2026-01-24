@@ -252,3 +252,7 @@ Each plan produces 2-4 commits (tasks + metadata). Clear, granular, bisectable.
 - "Commit noise" irrelevant when consumer is Claude, not humans
 
 </commit_strategy_rationale>
+
+## See Also
+
+- **State Derivation**: @state-derivation.md - Parallel-safe state computation patterns

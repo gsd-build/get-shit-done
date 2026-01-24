@@ -9,15 +9,40 @@ The orchestrator's job is coordination, not execution. Each subagent loads the f
 <required_reading>
 Read STATE.md before any operation to load project context.
 Read config.json for planning behavior settings.
+
+**State derivation (parallel-safe):**
+@~/.claude/get-shit-done/references/state-derivation.md
+
+**Timeout handling:**
+@~/.claude/get-shit-done/utilities/task-timeout.md
+
+**Artifact verification helper:**
+```bash
+check_artifacts() {
+  local artifacts=("$@")
+  local all_exist=true
+  for artifact in "${artifacts[@]}"; do
+    if [[ ! -f "$artifact" ]]; then
+      echo "Missing: $artifact" >&2
+      all_exist=false
+    fi
+  done
+  echo "$all_exist"
+}
+```
 </required_reading>
 
 <process>
 
 <step name="resolve_model_profile" priority="first">
-Read model profile for agent spawning:
+Read model profile and timeout configuration for agent spawning:
 
 ```bash
 MODEL_PROFILE=$(cat .planning/config.json 2>/dev/null | grep -o '"model_profile"[[:space:]]*:[[:space:]]*"[^"]*"' | grep -o '"[^"]*"$' | tr -d '"' || echo "balanced")
+
+# Read timeout config (defaults from task-timeout.md)
+EXECUTOR_TIMEOUT=$(cat .planning/config.json 2>/dev/null | grep -o '"executor"[[:space:]]*:[[:space:]]*[0-9]*' | grep -o '[0-9]*' || echo "600000")
+VERIFIER_TIMEOUT=$(cat .planning/config.json 2>/dev/null | grep -o '"verifier"[[:space:]]*:[[:space:]]*[0-9]*' | grep -o '[0-9]*' || echo "180000")
 ```
 
 Default to "balanced" if not set.
@@ -30,20 +55,32 @@ Default to "balanced" if not set.
 | gsd-verifier | sonnet | sonnet | haiku |
 | general-purpose | — | — | — |
 
-Store resolved models for use in Task calls below.
+Store resolved models and timeouts for use in Task calls below.
 </step>
 
 <step name="load_project_state">
-Before any operation, read project state:
+Before any operation, derive project state from filesystem (parallel-safe):
+
+```bash
+# Derive state from filesystem - parallel-safe, no race conditions
+# See state-derivation.md for function implementations
+source ~/.claude/get-shit-done/references/state-derivation.md 2>/dev/null || true
+
+CURRENT_PHASE=$(get_current_phase ".planning")
+PHASE_STATUS=$(get_phase_status ".planning/phases/${CURRENT_PHASE}-"*)
+PROGRESS=$(get_progress ".planning")
+```
+
+**Also read STATE.md for accumulated context** (decisions, blockers, session info):
 
 ```bash
 cat .planning/STATE.md 2>/dev/null
 ```
 
 **If file exists:** Parse and internalize:
-- Current position (phase, plan, status)
 - Accumulated decisions (constraints on this execution)
 - Blockers/concerns (things to watch for)
+- **NOTE:** Position/progress derived above, not from STATE.md (parallel-safe)
 
 **If file missing but .planning/ exists:**
 ```
@@ -90,10 +127,22 @@ Report: "Found {N} plans in {phase_dir}"
 </step>
 
 <step name="discover_plans">
-List all plans and extract metadata:
+List all plans and identify incomplete ones using state derivation (parallel-safe):
 
 ```bash
-# Get all plans
+# Use derivation for parallel-safe plan discovery
+# Multiple terminals can query simultaneously - no conflicts
+PHASE_STATUS=$(get_phase_status "$PHASE_DIR")
+if [ "$PHASE_STATUS" = "complete" ]; then
+  echo "Phase complete - all plans have SUMMARY files"
+  exit 0
+fi
+
+# Get first incomplete plan
+NEXT_PLAN=$(get_current_plan "$PHASE_DIR")
+echo "Next incomplete plan: $NEXT_PLAN"
+
+# Get all plans for full inventory
 ls -1 "$PHASE_DIR"/*-PLAN.md 2>/dev/null | sort
 
 # Get completed plans (have SUMMARY.md)
@@ -201,6 +250,19 @@ Execute each wave in sequence. Autonomous plans within a wave run in parallel.
    CONFIG_CONTENT=$(cat .planning/config.json 2>/dev/null)
    ```
 
+   **Before spawning, report to user:**
+
+   ```bash
+   echo "Starting gsd-executor agent(s)..."
+   echo "Expected duration: $((EXECUTOR_TIMEOUT / 60000)) minutes per agent"
+   echo "Expected outputs:"
+   for plan_path in ${WAVE_PLANS}; do
+     plan_id=$(basename "$plan_path" -PLAN.md)
+     echo "  - ${plan_id}-SUMMARY.md"
+   done
+   START_TIME=$(date +%s)
+   ```
+
    Use Task tool with multiple parallel calls. Each agent gets prompt with inlined content:
 
    ```
@@ -239,6 +301,23 @@ Execute each wave in sequence. Autonomous plans within a wave run in parallel.
 2. **Wait for all agents in wave to complete:**
 
    Task tool blocks until each agent finishes. All parallel agents return together.
+
+   **After Task() returns, report timing and verify artifacts:**
+
+   ```bash
+   END_TIME=$(date +%s)
+   ACTUAL_DURATION_S=$((END_TIME - START_TIME))
+   echo "Wave completed in ${ACTUAL_DURATION_S}s"
+
+   # Verify each plan produced SUMMARY.md
+   for plan_path in ${WAVE_PLANS}; do
+     plan_id=$(basename "$plan_path" -PLAN.md)
+     summary_path="${PHASE_DIR}/${plan_id}-SUMMARY.md"
+     if [[ ! -f "$summary_path" ]]; then
+       echo "Missing SUMMARY: $summary_path"
+     fi
+   done
+   ```
 
 3. **Report completion and what was built:**
 
@@ -401,6 +480,14 @@ Verify phase achieved its GOAL, not just completed its TASKS.
 
 **Spawn verifier:**
 
+```bash
+# Before spawning
+echo "Starting gsd-verifier agent..."
+echo "Expected duration: $((VERIFIER_TIMEOUT / 60000)) minutes"
+echo "Expected output: ${PHASE}-VERIFICATION.md"
+START_TIME=$(date +%s)
+```
+
 ```
 Task(
   prompt="Verify phase {phase_number} goal achievement.
@@ -413,6 +500,17 @@ Verify what actually exists in the code.",
   subagent_type="gsd-verifier",
   model="{verifier_model}"
 )
+```
+
+```bash
+# After verifier returns
+END_TIME=$(date +%s)
+echo "Verifier completed in $((END_TIME - START_TIME))s"
+
+VERIFICATION_FILE="${PHASE_DIR}/${PHASE}-VERIFICATION.md"
+if [[ ! -f "$VERIFICATION_FILE" ]]; then
+  echo "Verifier did not produce VERIFICATION.md"
+fi
 ```
 
 **Read verification status:**
@@ -584,13 +682,19 @@ No polling (Task blocks). No context bleed.
 If phase execution was interrupted (context limit, user exit, error):
 
 1. Run `/gsd:execute-phase {phase}` again
-2. discover_plans finds completed SUMMARYs
-3. Skips completed plans
+2. discover_plans uses `get_current_plan()` to find first incomplete plan
+3. Skips completed plans (SUMMARY.md existence check is atomic)
 4. Resumes from first incomplete plan
 5. Continues wave-based execution
 
+**Parallel safety:**
+- State derivation uses atomic filesystem operations
+- Two terminals can resume simultaneously on different phases
+- No race conditions in SUMMARY.md existence checks
+- STATE.md tracks session context (for humans), not execution position
+
 **STATE.md tracks:**
-- Last completed plan
-- Current wave
-- Any pending checkpoints
+- Accumulated decisions and blockers (for context)
+- Session continuity info (for humans)
+- **NOTE:** Execution position derived from SUMMARY existence, not STATE.md
 </resumption>

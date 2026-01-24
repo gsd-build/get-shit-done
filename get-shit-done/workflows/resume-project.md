@@ -12,6 +12,7 @@ Instantly restore full project context so "Where were we?" has an immediate, com
 
 <required_reading>
 @~/.claude/get-shit-done/references/continuation-format.md
+@~/.claude/get-shit-done/references/state-derivation.md
 </required_reading>
 
 <process>
@@ -32,22 +33,38 @@ ls .planning/PROJECT.md 2>/dev/null && echo "Project file exists"
 
 <step name="load_state">
 
-Read and parse STATE.md, then PROJECT.md:
+Derive project position from filesystem (parallel-safe), then read context from STATE.md:
 
 ```bash
+# Derive position from filesystem - parallel-safe, no race conditions
+# See state-derivation.md for function implementations
+source ~/.claude/get-shit-done/references/state-derivation.md 2>/dev/null || true
+
+CURRENT_PHASE=$(get_current_phase ".planning")
+CURRENT_PLAN=$(get_current_plan ".planning/phases/${CURRENT_PHASE}-"*)
+PROGRESS=$(get_progress ".planning")
+
+echo "Derived: Phase=$CURRENT_PHASE, Plan=$CURRENT_PLAN, Progress=$PROGRESS"
+
+# Read accumulated context from STATE.md and PROJECT.md
 cat .planning/STATE.md
 cat .planning/PROJECT.md
 ```
 
-**From STATE.md extract:**
+**From filesystem derivation (source of truth for position):**
+
+- **Current Phase**: First incomplete phase from ROADMAP.md
+- **Current Plan**: First PLAN without matching SUMMARY
+- **Progress**: Computed from SUMMARY file counts
+
+**From STATE.md (accumulated context, not position):**
 
 - **Project Reference**: Core value and current focus
-- **Current Position**: Phase X of Y, Plan A of B, Status
-- **Progress**: Visual progress bar
 - **Recent Decisions**: Key decisions affecting current work
 - **Pending Todos**: Ideas captured during sessions
 - **Blockers/Concerns**: Issues carried forward
 - **Session Continuity**: Where we left off, any resume files
+- **NOTE:** Position in STATE.md may lag behind filesystem; derivation is authoritative
 
 **From PROJECT.md extract:**
 
@@ -59,17 +76,18 @@ cat .planning/PROJECT.md
 </step>
 
 <step name="check_incomplete_work">
-Look for incomplete work that needs attention:
+Look for incomplete work using state derivation (parallel-safe):
 
 ```bash
+# Use derivation for parallel-safe incomplete plan detection
+# This is the same check two terminals can run simultaneously
+CURRENT_PLAN=$(get_current_plan ".planning/phases/${CURRENT_PHASE}-"*)
+if [ "$CURRENT_PLAN" != "none" ]; then
+  echo "Incomplete plan: $CURRENT_PLAN"
+fi
+
 # Check for continue-here files (mid-plan resumption)
 ls .planning/phases/*/.continue-here*.md 2>/dev/null
-
-# Check for plans without summaries (incomplete execution)
-for plan in .planning/phases/*/*-PLAN.md; do
-  summary="${plan/PLAN/SUMMARY}"
-  [ ! -f "$summary" ] && echo "Incomplete: $plan"
-done 2>/dev/null
 
 # Check for interrupted agents
 if [ -f .planning/current-agent-id.txt ] && [ -s .planning/current-agent-id.txt ]; then
@@ -97,7 +115,15 @@ fi
   </step>
 
 <step name="present_status">
-Present complete project status to user:
+Present complete project status using derived position (parallel-safe):
+
+```bash
+# Use derived values (computed in load_state step)
+# These come from state derivation functions, not STATE.md
+echo "Phase: $CURRENT_PHASE"
+echo "Plan: $CURRENT_PLAN"
+echo "Progress: $PROGRESS%"
+```
 
 ```
 ╔══════════════════════════════════════════════════════════════╗
@@ -105,11 +131,11 @@ Present complete project status to user:
 ╠══════════════════════════════════════════════════════════════╣
 ║  Building: [one-liner from PROJECT.md "What This Is"]         ║
 ║                                                               ║
-║  Phase: [X] of [Y] - [Phase name]                            ║
-║  Plan:  [A] of [B] - [Status]                                ║
-║  Progress: [██████░░░░] XX%                                  ║
+║  Phase: [CURRENT_PHASE] - [Phase name from ROADMAP.md]       ║
+║  Plan:  [CURRENT_PLAN] - [derived from SUMMARY existence]    ║
+║  Progress: [████████░░] [PROGRESS]%                          ║
 ║                                                               ║
-║  Last activity: [date] - [what happened]                     ║
+║  Last activity: [date from STATE.md] - [what happened]       ║
 ╚══════════════════════════════════════════════════════════════╝
 
 [If incomplete work found:]
@@ -269,21 +295,39 @@ This ensures if session ends unexpectedly, next resume knows the state.
 <reconstruction>
 If STATE.md is missing but other artifacts exist:
 
-"STATE.md missing. Reconstructing from artifacts..."
+"STATE.md missing. Deriving state from filesystem..."
+
+**Primary approach (v1.11+): State derivation**
+
+Position and progress can be derived directly from filesystem without STATE.md:
+
+```bash
+# Derive state - no STATE.md needed for position
+CURRENT_PHASE=$(get_current_phase ".planning")
+CURRENT_PLAN=$(get_current_plan ".planning/phases/${CURRENT_PHASE}-"*)
+PROGRESS=$(get_progress ".planning")
+DECISIONS=$(get_decisions ".planning")
+BLOCKERS=$(get_blockers ".planning")
+```
+
+This is parallel-safe and works even if STATE.md is corrupted or missing.
+
+**Secondary: Reconstruct STATE.md for human reference**
 
 1. Read PROJECT.md → Extract "What This Is" and Core Value
-2. Read ROADMAP.md → Determine phases, find current position
+2. Use derivation → Get current position from SUMMARY existence
 3. Scan \*-SUMMARY.md files → Extract decisions, concerns
 4. Count pending todos in .planning/todos/pending/
 5. Check for .continue-here files → Session continuity
 
-Reconstruct and write STATE.md, then proceed normally.
+Reconstruct and write STATE.md for human reference, but execution position comes from derivation.
 
 This handles cases where:
 
 - Project predates STATE.md introduction
 - File was accidentally deleted
 - Cloning repo without full .planning/ state
+- Two sessions wrote to STATE.md simultaneously (cosmetic corruption)
   </reconstruction>
 
 <quick_resume>

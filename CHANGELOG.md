@@ -6,6 +6,29 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ## [Unreleased]
 
+## [1.11.0] - 2026-01-24
+
+### Added
+- **Parallel Work Support** — Run multiple GSD sessions simultaneously without state corruption
+  - State derivation library (`get-shit-done/references/state-derivation.md`) with 6 bash functions
+  - Parallel safety test harness (`get-shit-done/references/state-derivation-tests.sh`) with 15 tests
+  - User documentation (`get-shit-done/docs/parallel-work.md`)
+  - Validation scenarios (`get-shit-done/references/parallel-validation-scenarios.md`)
+
+### Changed
+- Workflows and commands now derive state from filesystem (SUMMARY.md existence) instead of STATE.md
+- STATE.md becomes write-only for position tracking (human reference, not machine state store)
+
+## [1.10.0] - 2026-01-24
+
+### Added
+- **Agent Timeout Handling** — Graceful degradation when agents run longer than expected
+  - Timeout utility pattern (`get-shit-done/utilities/task-timeout.md`) with timing visibility and artifact-based success detection
+  - User-facing documentation (`get-shit-done/docs/timeout-behavior.md`, `get-shit-done/docs/configuration.md`)
+
+### Changed
+- Success determined by artifact presence, not just duration compliance
+
 ## [1.9.12] - 2025-01-23
 
 ### Removed

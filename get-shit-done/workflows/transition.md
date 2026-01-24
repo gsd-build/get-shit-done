@@ -8,6 +8,9 @@
 4. Current phase's plan files (`*-PLAN.md`)
 5. Current phase's summary files (`*-SUMMARY.md`)
 
+**State derivation (parallel-safe):**
+@~/.claude/get-shit-done/references/state-derivation.md
+
 </required_reading>
 
 <purpose>
@@ -22,33 +25,58 @@ Mark current phase complete and advance to next. This is the natural point where
 
 <step name="load_project_state" priority="first">
 
-Before transition, read project state:
+Before transition, derive project state from filesystem (parallel-safe):
+
+```bash
+# Derive state from filesystem - parallel-safe, no race conditions
+# See state-derivation.md for function implementations
+source ~/.claude/get-shit-done/references/state-derivation.md 2>/dev/null || true
+
+CURRENT_PHASE=$(get_current_phase ".planning")
+PHASE_STATUS=$(get_phase_status ".planning/phases/${CURRENT_PHASE}-"*)
+PROGRESS=$(get_progress ".planning")
+
+echo "Derived: Phase=$CURRENT_PHASE, Status=$PHASE_STATUS, Progress=$PROGRESS"
+```
+
+**Also read STATE.md and PROJECT.md for accumulated context:**
 
 ```bash
 cat .planning/STATE.md 2>/dev/null
 cat .planning/PROJECT.md 2>/dev/null
 ```
 
-Parse current position to verify we're transitioning the right phase.
-Note accumulated context that may need updating after transition.
+Parse accumulated context that may need updating after transition.
+**NOTE:** Position derived above, not from STATE.md (parallel-safe).
 
 </step>
 
 <step name="verify_completion">
 
-Check current phase has all plan summaries:
+Check current phase completion using state derivation (parallel-safe):
 
 ```bash
+# Use derivation for parallel-safe phase completion check
+# Two terminals can query simultaneously - no conflicts
+PHASE_STATUS=$(get_phase_status "$PHASE_DIR")
+if [ "$PHASE_STATUS" = "complete" ]; then
+  echo "Phase complete - all plans have SUMMARY files"
+else
+  echo "Phase incomplete"
+  NEXT_PLAN=$(get_current_plan "$PHASE_DIR")
+  echo "Next incomplete plan: $NEXT_PLAN"
+fi
+
+# For detailed view:
 ls .planning/phases/XX-current/*-PLAN.md 2>/dev/null | sort
 ls .planning/phases/XX-current/*-SUMMARY.md 2>/dev/null | sort
 ```
 
 **Verification logic:**
 
-- Count PLAN files
-- Count SUMMARY files
-- If counts match: all plans complete
-- If counts don't match: incomplete
+- get_phase_status() checks SUMMARY existence for each PLAN
+- If status = "complete": all plans have SUMMARY files
+- If status = "incomplete": at least one PLAN lacks SUMMARY
 
 <config-check>
 
