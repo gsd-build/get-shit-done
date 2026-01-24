@@ -102,6 +102,11 @@ ls src/index.* src/main.* src/app.* src/server.* app/page.* 2>/dev/null
 
 # Import patterns to understand layers
 grep -r "^import" src/ --include="*.ts" --include="*.tsx" 2>/dev/null | head -100
+
+# Feature detection (for brownfield projects)
+grep -r "export.*function\|export.*class\|export default" src/lib/ src/services/ --include="*.ts" 2>/dev/null | head -30
+ls -d src/features/*/ src/modules/*/ 2>/dev/null
+grep -r "^import.*from ['\"]@/" src/ --include="*.ts" | head -50
 ```
 
 **For quality focus:**
@@ -407,6 +412,57 @@ Ready for orchestrator summary.
 
 **Testing:**
 - `[path]`: [Purpose]
+
+## Feature Map
+
+*For brownfield projects: Maps existing features to their implementation.*
+
+| Feature | Entry Point | Dependencies | Data Flow |
+|---------|-------------|--------------|-----------|
+| [Feature] | `[path/to/entry.ts]` | [dep1, dep2] | [Brief flow description] |
+
+**How to populate:**
+- Feature: High-level capability name (Auth, Posts, Payments)
+- Entry Point: Primary file that implements the feature
+- Dependencies: Other features or external packages required
+- Data Flow: Brief description of data transformation (Input → Processing → Output)
+
+### Feature Dependencies
+
+```mermaid
+graph LR
+  [Feature1] --> [Feature2]
+  [Feature1] --> [Feature3]
+```
+
+*Mermaid diagram shows which features depend on others. Renders in GitHub/VSCode.*
+
+**When to include Feature Map:**
+- Brownfield projects with existing features
+- Projects with 3+ distinct features
+- When joining an existing codebase
+
+**Skip Feature Map when:**
+- Greenfield project (no features yet)
+- Simple single-feature projects
+- Features are obvious from directory structure
+
+### Feature Map Example
+
+| Feature | Entry Point | Dependencies | Data Flow |
+|---------|-------------|--------------|-----------|
+| Auth | `src/lib/auth.ts` | prisma, jose, cookies | Credentials → Validate → JWT → Cookie |
+| Users | `src/lib/users.ts` | prisma, auth | Auth → Query → User |
+| Posts | `src/lib/posts.ts` | prisma, auth | Auth → CRUD → DB |
+| Search | `src/lib/search.ts` | prisma, posts, users | Query → Filter → Results |
+
+```mermaid
+graph TD
+  Auth --> Users
+  Auth --> Posts
+  Users --> Search
+  Posts --> Search
+```
 
 ## Naming Conventions
 
