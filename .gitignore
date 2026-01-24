@@ -4,9 +4,12 @@ TO-DOS.md
 CLAUDE.md
 /research.claude/
 commands.html
+GSD-V2-OPTIMIZATION-DESIGN.md
+TOKEN-BENCHMARK.md
 
 # Local test installs
 .claude/
+.planning/
 
 # Build artifacts (committed to npm, not git)
 hooks/dist/
