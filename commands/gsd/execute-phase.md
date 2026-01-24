@@ -130,11 +130,18 @@ Phase: $ARGUMENTS
     - Commit: `docs({phase}): complete {phase-name} phase`
 
 11. **Offer next steps**
+    - Check auto_chain config first
     - Route to next action (see `<offer_next>`)
 </process>
 
 <offer_next>
-Output this markdown directly (not as a code block). Route based on status:
+**First, check auto_chain config:**
+
+```bash
+AUTO_CHAIN=$(cat .planning/config.json 2>/dev/null | grep -o '"auto_chain"[[:space:]]*:[[:space:]]*[^,}]*' | grep -o 'true\|false' || echo "false")
+```
+
+Route based on status:
 
 | Status | Route |
 |--------|-------|
@@ -146,6 +153,41 @@ Output this markdown directly (not as a code block). Route based on status:
 ---
 
 **Route A: Phase verified, more phases remain**
+
+**If `auto_chain` is `true` AND status is `passed` with more phases:**
+
+Display brief completion message and auto-trigger next phase:
+
+```
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+| GSD ► PHASE {Z} COMPLETE ✓
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+**Phase {Z}: {Name}**
+
+{Y} plans executed
+Goal verified ✓
+
+───────────────────────────────────────────────────────────────
+
+⚡ AUTO-CHAIN ENABLED
+
+Clearing context and planning Phase {Z+1}...
+
+───────────────────────────────────────────────────────────────
+```
+
+Then immediately:
+1. Clear context with `/clear`
+2. Run `/gsd:plan-phase {Z+1}`
+
+**If `auto_chain` is `false` OR gaps found OR milestone complete:**
+
+Output standard next steps (see routes below).
+
+---
+
+**Route A (manual mode): Phase verified, more phases remain**
 
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
  GSD ► PHASE {Z} COMPLETE ✓

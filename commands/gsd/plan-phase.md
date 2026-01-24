@@ -469,6 +469,41 @@ Wait for user response.
 
 ## 13. Present Final Status
 
+**Check auto_chain config:**
+
+```bash
+AUTO_CHAIN=$(cat .planning/config.json 2>/dev/null | grep -o '"auto_chain"[[:space:]]*:[[:space:]]*[^,}]*' | grep -o 'true\|false' || echo "false")
+```
+
+**If `auto_chain` is `true`:**
+
+Display brief status:
+
+```
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+| GSD ► PHASE {X} PLANNED ✓
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+**Phase {X}: {Name}** — {N} plan(s) in {M} wave(s)
+
+Research: {Completed | Used existing | Skipped}
+Verification: {Passed | Passed with override | Skipped}
+
+───────────────────────────────────────────────────────────────
+
+⚡ AUTO-CHAIN ENABLED
+
+Clearing context and executing phase...
+
+───────────────────────────────────────────────────────────────
+```
+
+Then immediately:
+1. Clear context with `/clear`
+2. Run `/gsd:execute-phase {X}`
+
+**If `auto_chain` is `false`:**
+
 Route to `<offer_next>`.
 
 </process>

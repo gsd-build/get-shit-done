@@ -30,6 +30,7 @@ cat .planning/config.json
 ```
 
 Parse current values (default to `true` if not present):
+- `auto_chain` — automatically chain plan → execute → plan (default: `false`)
 - `workflow.research` — spawn researcher during plan-phase
 - `workflow.plan_check` — spawn plan checker during plan-phase
 - `workflow.verifier` — spawn verifier during execute-phase
@@ -41,6 +42,15 @@ Use AskUserQuestion with current values shown:
 
 ```
 AskUserQuestion([
+  {
+    question: "Auto-chain workflow? (plan → execute → plan automatically)",
+    header: "Auto-Chain",
+    multiSelect: false,
+    options: [
+      { label: "Yes", description: "Automatically execute after planning and plan next phase after execution" },
+      { label: "No (Default)", description: "Manual control - you run each command" }
+    ]
+  },
   {
     question: "Which model profile for agents?",
     header: "Model",
@@ -90,6 +100,7 @@ Merge new settings into existing config.json:
 ```json
 {
   ...existing_config,
+  "auto_chain": true/false,
   "model_profile": "quality" | "balanced" | "budget",
   "workflow": {
     "research": true/false,
@@ -112,6 +123,7 @@ Display:
 
 | Setting              | Value |
 |----------------------|-------|
+| Auto-Chain           | {On/Off} |
 | Model Profile        | {quality/balanced/budget} |
 | Plan Researcher      | {On/Off} |
 | Plan Checker         | {On/Off} |
@@ -130,7 +142,7 @@ Quick commands:
 
 <success_criteria>
 - [ ] Current config read
-- [ ] User presented with 4 settings (profile + 3 toggles)
-- [ ] Config updated with model_profile and workflow section
+- [ ] User presented with 5 settings (auto_chain + profile + 3 toggles)
+- [ ] Config updated with auto_chain, model_profile and workflow section
 - [ ] Changes confirmed to user
 </success_criteria>

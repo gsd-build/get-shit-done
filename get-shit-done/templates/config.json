@@ -1,6 +1,7 @@
 {
   "mode": "interactive",
   "depth": "standard",
+  "auto_chain": false,
   "workflow": {
     "research": true,
     "plan_check": true,
