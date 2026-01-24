@@ -131,10 +131,38 @@ After completion, create `.planning/phases/XX-name/{phase}-{plan}-SUMMARY.md`
 | `autonomous` | Yes | `true` if no checkpoints, `false` if has checkpoints |
 | `user_setup` | No | Array of human-required setup items (external services) |
 | `must_haves` | Yes | Goal-backward verification criteria (see below) |
+| `provides` | No | Array of artifacts this plan creates and exports (see below) |
+| `consumes` | No | Array of artifacts this plan imports from other plans (see below) |
 
 **Wave is pre-computed:** Wave numbers are assigned during `/gsd:plan-phase`. Execute-phase reads `wave` directly from frontmatter and groups plans by wave number. No runtime dependency analysis needed.
 
 **Must-haves enable verification:** The `must_haves` field carries goal-backward requirements from planning to execution. After all plans complete, execute-phase spawns a verification subagent that checks these criteria against the actual codebase.
+
+### Provides/Consumes Schema
+
+**provides** - What this plan creates for other plans to use:
+
+```yaml
+provides:
+  - name: "ComponentName"      # Semantic name
+    type: "component|function|types|hook|util|api"
+    file: "src/path/to/file.ts"
+    exports: ["export1", "export2"]  # Actual export names
+```
+
+**consumes** - What this plan needs from other plans:
+
+```yaml
+consumes:
+  - name: "ComponentName"      # Must match a `provides.name` from another plan
+    from_plan: "01-01"         # Plan ID that provides this
+    import_path: "@/path"      # How it will be imported
+```
+
+**Guidelines:**
+- Only list items that cross plan boundaries
+- Internal helpers/utils within a plan don't need listing
+- `consumes` creates implicit `depends_on` — if you consume from 01-01, you depend on it
 
 ---
 
@@ -303,6 +331,18 @@ wave: 1
 depends_on: []
 files_modified: [src/features/user/model.ts, src/features/user/api.ts, src/features/user/UserList.tsx]
 autonomous: true
+
+provides:
+  - name: "UserModel"
+    type: "types"
+    file: "src/features/user/model.ts"
+    exports: ["User", "CreateUserInput"]
+  - name: "UserAPI"
+    type: "api"
+    file: "src/features/user/api.ts"
+    exports: ["GET", "POST"]
+
+consumes: []  # First plan, no dependencies
 ---
 
 <objective>
@@ -362,6 +402,20 @@ wave: 2
 depends_on: ["03-01", "03-02"]
 files_modified: [src/components/Dashboard.tsx]
 autonomous: false
+
+provides:
+  - name: "Dashboard"
+    type: "component"
+    file: "src/components/Dashboard.tsx"
+    exports: ["Dashboard"]
+
+consumes:
+  - name: "UserModel"
+    from_plan: "03-01"
+    import_path: "@/features/user/model"
+  - name: "ProductModel"
+    from_plan: "03-02"
+    import_path: "@/features/product/model"
 ---
 
 <objective>
