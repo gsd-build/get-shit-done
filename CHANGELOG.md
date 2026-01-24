@@ -27,8 +27,8 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 - **Compact Workflow Files**: Optimized versions with 80%+ reduction
   - `execute-plan-compact.md` (81% smaller)
   - `checkpoints-minimal.md` (72% smaller)
-- **Delta Context Protocol**: Load only relevant sections of context files instead of full files
-- **Lazy Reference Loading**: Load reference files only when actually needed
+- **Delta Context Protocol**: (Design only) Load only relevant sections of context files - planned for v2.1
+- **Lazy Reference Loading**: Conditional checkpoint reference loading based on plan autonomy
 - **Context Budget Warning System**: Monitor token usage at 40%/60%/75% thresholds
 - **Optimization Configuration**: New `optimization` section in config.json
   - Three levels: `minimal` (v1 compat), `standard`, `aggressive`
@@ -45,10 +45,12 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 - Checkpoint references loaded only for non-autonomous plans
 
 ### Performance
-- **29-31% reduction** in tokens per phase cycle
-- **50% reduction** in total project token consumption (small projects: 1.90M → 1.35M)
-- **13% cost savings** on balanced profile projects
-- **Up to 40% savings** with aggressive optimization enabled
+- **~23,000 tokens saved per phase** with all optimizations enabled:
+  - Compact workflows: ~12,500 tokens/executor
+  - Lazy references: ~8,700 tokens/executor (autonomous plans)
+  - Tiered instructions: ~2,200 tokens/executor
+- **Backward compatible**: All optimizations default to `false`
+- **Note**: Delta context (additional 15-20% savings) planned for v2.1
 
 ### Migration
 - Existing v1.x projects detected automatically
