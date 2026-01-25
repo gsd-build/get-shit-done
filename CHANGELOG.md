@@ -6,6 +6,8 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ## [Unreleased]
 
+## [2.1.3] - 2026-01-25
+
 ### Fixed
 - **Robust Config Parsing**: All config.json parsing now uses jq with grep fallback for cross-platform reliability
   - Fixes fragility with different JSON formatting/nesting
