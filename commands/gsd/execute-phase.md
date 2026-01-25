@@ -42,7 +42,12 @@ Phase: $ARGUMENTS
 
    Read model profile for agent spawning:
    ```bash
-   MODEL_PROFILE=$(cat .planning/config.json 2>/dev/null | grep -o '"model_profile"[[:space:]]*:[[:space:]]*"[^"]*"' | grep -o '"[^"]*"$' | tr -d '"' || echo "balanced")
+   # Try jq first (robust), fallback to grep (compatible)
+   if command -v jq >/dev/null 2>&1; then
+     MODEL_PROFILE=$(jq -r '.model_profile // "balanced"' .planning/config.json 2>/dev/null || echo "balanced")
+   else
+     MODEL_PROFILE=$(cat .planning/config.json 2>/dev/null | grep -o '"model_profile"[[:space:]]*:[[:space:]]*"[^"]*"' | grep -o '"[^"]*"$' | tr -d '"' || echo "balanced")
+   fi
    ```
 
    Default to "balanced" if not set.
@@ -52,9 +57,32 @@ Phase: $ARGUMENTS
    | Agent | quality | balanced | budget |
    |-------|---------|----------|--------|
    | gsd-executor | opus | sonnet | sonnet |
+   | gsd-executor-core | opus | sonnet | sonnet |
    | gsd-verifier | sonnet | sonnet | haiku |
+   | gsd-verifier-core | sonnet | sonnet | haiku |
 
    Store resolved models for use in Task calls below.
+
+   **Read optimization flags:**
+   ```bash
+   # Try jq first (robust), fallback to grep (compatible)
+   if command -v jq >/dev/null 2>&1; then
+     COMPACT_WORKFLOWS=$(jq -r '.optimization.compact_workflows // false' .planning/config.json 2>/dev/null || echo "false")
+     LAZY_REFERENCES=$(jq -r '.optimization.lazy_references // false' .planning/config.json 2>/dev/null || echo "false")
+     TIERED_INSTRUCTIONS=$(jq -r '.optimization.tiered_instructions // false' .planning/config.json 2>/dev/null || echo "false")
+     DELTA_CONTEXT=$(jq -r '.optimization.delta_context // false' .planning/config.json 2>/dev/null || echo "false")
+   else
+     COMPACT_WORKFLOWS=$(cat .planning/config.json 2>/dev/null | grep -o '"compact_workflows"[[:space:]]*:[[:space:]]*[^,}]*' | grep -o 'true\|false' || echo "false")
+     LAZY_REFERENCES=$(cat .planning/config.json 2>/dev/null | grep -o '"lazy_references"[[:space:]]*:[[:space:]]*[^,}]*' | grep -o 'true\|false' || echo "false")
+     TIERED_INSTRUCTIONS=$(cat .planning/config.json 2>/dev/null | grep -o '"tiered_instructions"[[:space:]]*:[[:space:]]*[^,}]*' | grep -o 'true\|false' || echo "false")
+     DELTA_CONTEXT=$(cat .planning/config.json 2>/dev/null | grep -o '"delta_context"[[:space:]]*:[[:space:]]*[^,}]*' | grep -o 'true\|false' || echo "false")
+   fi
+   ```
+
+   Default all to "false" for backward compatibility. Store for use in subagent spawning.
+
+   **Delta context reference:** When `delta_context: true`, load selective context per agent.
+   See `@~/.claude/get-shit-done/references/delta-context-helpers.md` for extraction functions.
 
 1. **Validate phase exists**
    - Find phase directory matching argument
@@ -97,12 +125,29 @@ Phase: $ARGUMENTS
    **If clean:** Continue to verification.
 
 7. **Verify phase goal**
-   Check config: `WORKFLOW_VERIFIER=$(cat .planning/config.json 2>/dev/null | grep -o '"verifier"[[:space:]]*:[[:space:]]*[^,}]*' | grep -o 'true\|false' || echo "true")`
+   Check config:
+   ```bash
+   # Try jq first (robust), fallback to grep (compatible)
+   if command -v jq >/dev/null 2>&1; then
+     WORKFLOW_VERIFIER=$(jq -r '.workflow.verifier // true' .planning/config.json 2>/dev/null || echo "true")
+   else
+     WORKFLOW_VERIFIER=$(cat .planning/config.json 2>/dev/null | grep -o '"verifier"[[:space:]]*:[[:space:]]*[^,}]*' | grep -o 'true\|false' || echo "true")
+   fi
+   ```
 
    **If `workflow.verifier` is `false`:** Skip to step 8 (treat as passed).
 
+   **Determine verifier type:**
+   ```bash
+   if [ "$TIERED_INSTRUCTIONS" = "true" ]; then
+     VERIFIER_TYPE="gsd-verifier-core"
+   else
+     VERIFIER_TYPE="gsd-verifier"
+   fi
+   ```
+
    **Otherwise:**
-   - Spawn `gsd-verifier` subagent with phase directory and goal
+   - Spawn `{VERIFIER_TYPE}` subagent with phase directory and goal
    - Verifier checks must_haves against actual codebase (not SUMMARY claims)
    - Creates VERIFICATION.md with detailed report
    - Route by status:
@@ -256,24 +301,142 @@ After user runs /gsd:plan-phase {Z} --gaps:
 Before spawning, read file contents. The `@` syntax does not work across Task() boundaries.
 
 ```bash
-# Read each plan and STATE.md
+# Read each plan
 PLAN_01_CONTENT=$(cat "{plan_01_path}")
 PLAN_02_CONTENT=$(cat "{plan_02_path}")
 PLAN_03_CONTENT=$(cat "{plan_03_path}")
-STATE_CONTENT=$(cat .planning/STATE.md)
+
+# Determine executor type based on optimization flags and plan content
+# TDD tasks require full executor for detailed RED-GREEN-REFACTOR guidance
+HAS_TDD_TASKS=$(grep -l 'tdd="true"' "{plan_01_path}" "{plan_02_path}" "{plan_03_path}" 2>/dev/null | head -1)
+
+if [ "$TIERED_INSTRUCTIONS" = "true" ] && [ -z "$HAS_TDD_TASKS" ]; then
+  EXECUTOR_TYPE="gsd-executor-core"
+else
+  EXECUTOR_TYPE="gsd-executor"
+fi
+
+# TDD tasks require full context (not just delta) to access:
+# - Existing test patterns in the project
+# - Testing conventions and setup
+# - Global decisions that affect TDD approach
+if [ -n "$HAS_TDD_TASKS" ] && [ "$DELTA_CONTEXT" = "true" ]; then
+  echo "ℹ️  TDD tasks detected, using full context mode (overriding delta_context)"
+  DELTA_CONTEXT="false"
+fi
+
+# Determine workflow file based on optimization flags
+if [ "$COMPACT_WORKFLOWS" = "true" ]; then
+  WORKFLOW_FILE="execute-plan-compact.md"
+else
+  WORKFLOW_FILE="execute-plan.md"
+fi
+
+# Check if plan is autonomous (for lazy references)
+PLAN_01_AUTONOMOUS=$(grep "^autonomous:" "{plan_01_path}" | grep -o 'true\|false' || echo "true")
 ```
 
-Spawn all plans in a wave with a single message containing multiple Task calls, with inlined content:
+**Build context based on delta_context flag:**
+
+```bash
+# === DELTA CONTEXT LOADING ===
+# When delta_context=true, load only relevant portions of context files
+
+if [ "$DELTA_CONTEXT" = "true" ]; then
+  # Extract phase section from ROADMAP (not full file)
+  # Use sed -E for cross-platform regex, sed '$d' instead of head -n -1 for macOS compatibility
+  PHASE_SECTION=$(sed -En "/^## Phase ${PHASE_NUM}:/,/^## Phase [0-9]|^---/p" .planning/ROADMAP.md | sed '$d')
+
+  # Extract relevant decisions from STATE (global + phase-specific only)
+  CURRENT_POS=$(sed -En '/^## Current Position/,/^## /p' .planning/STATE.md | sed '$d')
+  GLOBAL_DECISIONS=$(grep -E "^- \[Global\]" .planning/STATE.md 2>/dev/null || true)
+  PHASE_DECISIONS=$(grep -E "^- \[Phase ${PHASE_NUM}\]" .planning/STATE.md 2>/dev/null || true)
+
+  # Build minimal context for executor
+  CONTEXT_FOR_EXECUTOR="## Phase Context
+${PHASE_SECTION}
+
+## Current Position
+${CURRENT_POS}
+
+## Relevant Decisions
+${GLOBAL_DECISIONS}
+${PHASE_DECISIONS}"
+
+  # Extract task-mapped requirements if plan specifies them
+  TASK_REQS=$(grep "^requirements:" "{plan_path}" 2>/dev/null | sed 's/requirements:[[:space:]]*//' || true)
+  if [ -n "$TASK_REQS" ] && [ -f .planning/REQUIREMENTS.md ]; then
+    REQ_HEADER=$(head -3 .planning/REQUIREMENTS.md)
+    REQ_ROWS=""
+    for ID in $(echo "$TASK_REQS" | tr ',' '\n' | tr -d ' '); do
+      REQ_ROWS="${REQ_ROWS}$(grep "| ${ID} |" .planning/REQUIREMENTS.md 2>/dev/null || true)\n"
+    done
+    CONTEXT_FOR_EXECUTOR="${CONTEXT_FOR_EXECUTOR}
+
+## Task Requirements
+${REQ_HEADER}
+${REQ_ROWS}"
+  fi
+
+  # === VALIDATION: Verify delta extraction succeeded ===
+  # If critical sections are empty, fall back to full context for safety
+  if [ -z "$PHASE_SECTION" ] || [ -z "$CURRENT_POS" ]; then
+    echo "⚠️  Delta context extraction failed (empty PHASE_SECTION or CURRENT_POS)"
+    echo "    Falling back to full context mode for safety"
+    DELTA_CONTEXT="false"
+    STATE_CONTENT=$(cat .planning/STATE.md)
+    CONTEXT_FOR_EXECUTOR="## Project State
+${STATE_CONTENT}"
+  fi
+
+else
+  # === FULL CONTEXT MODE (backward compatible) ===
+  STATE_CONTENT=$(cat .planning/STATE.md)
+  CONTEXT_FOR_EXECUTOR="## Project State
+${STATE_CONTENT}"
+fi
+```
+
+**Build subagent prompt with conditional references:**
 
 ```
-Task(prompt="Execute plan at {plan_01_path}\n\nPlan:\n{plan_01_content}\n\nProject state:\n{state_content}", subagent_type="gsd-executor", model="{executor_model}")
-Task(prompt="Execute plan at {plan_02_path}\n\nPlan:\n{plan_02_content}\n\nProject state:\n{state_content}", subagent_type="gsd-executor", model="{executor_model}")
-Task(prompt="Execute plan at {plan_03_path}\n\nPlan:\n{plan_03_content}\n\nProject state:\n{state_content}", subagent_type="gsd-executor", model="{executor_model}")
+# Base prompt template (uses CONTEXT_FOR_EXECUTOR instead of raw STATE)
+EXECUTOR_PROMPT="Execute plan at {plan_path}
+
+Execution workflow: @~/.claude/get-shit-done/workflows/${WORKFLOW_FILE}
+
+Plan:
+{plan_content}
+
+{context_for_executor}"
+
+# Add checkpoint reference based on lazy_references flag
+if [ "$LAZY_REFERENCES" = "false" ] || [ "$PLAN_AUTONOMOUS" = "false" ]; then
+  # Include checkpoint reference for non-autonomous plans or when lazy_references disabled
+  EXECUTOR_PROMPT="${EXECUTOR_PROMPT}
+
+Checkpoint reference: @~/.claude/get-shit-done/references/checkpoints-minimal.md"
+fi
+# Note: autonomous plans with lazy_references=true skip checkpoint reference entirely
+```
+
+Spawn all plans in a wave with a single message containing multiple Task calls:
+
+```
+Task(prompt="{executor_prompt_01}", subagent_type="{EXECUTOR_TYPE}", model="{executor_model}")
+Task(prompt="{executor_prompt_02}", subagent_type="{EXECUTOR_TYPE}", model="{executor_model}")
+Task(prompt="{executor_prompt_03}", subagent_type="{EXECUTOR_TYPE}", model="{executor_model}")
 ```
 
 All three run in parallel. Task tool blocks until all complete.
 
 **No polling.** No background agents. No TaskOutput loops.
+
+**Token savings with optimizations enabled:**
+- `compact_workflows: true` → ~12,500 tokens saved per executor (execute-plan-compact.md vs full)
+- `lazy_references: true` + autonomous → ~8,700 tokens saved per executor (no checkpoints.md)
+- `tiered_instructions: true` → ~2,200 tokens saved per executor (gsd-executor-core vs full)
+- `delta_context: true` → ~1,000-2,600 tokens saved per executor (selective context loading)
 </wave_execution>
 
 <checkpoint_handling>

@@ -64,9 +64,26 @@ Default to "balanced" if not set.
 |-------|---------|----------|--------|
 | gsd-phase-researcher | opus | sonnet | haiku |
 | gsd-planner | opus | opus | sonnet |
+| gsd-planner-core | opus | opus | sonnet |
 | gsd-plan-checker | sonnet | sonnet | haiku |
 
 Store resolved models for use in Task calls below.
+
+**Read optimization flags:**
+```bash
+TIERED_INSTRUCTIONS=$(cat .planning/config.json 2>/dev/null | grep -o '"tiered_instructions"[[:space:]]*:[[:space:]]*[^,}]*' | grep -o 'true\|false' || echo "false")
+```
+
+**Determine planner type:**
+```bash
+if [ "$TIERED_INSTRUCTIONS" = "true" ]; then
+  PLANNER_TYPE="gsd-planner-core"
+else
+  PLANNER_TYPE="gsd-planner"
+fi
+```
+
+Store for use when spawning planner subagent.
 
 ## 2. Parse and Normalize Arguments
 
@@ -315,12 +332,16 @@ Before returning PLANNING COMPLETE:
 
 ```
 Task(
-  prompt="First, read ~/.claude/agents/gsd-planner.md for your role and instructions.\n\n" + filled_prompt,
+  prompt="First, read ~/.claude/agents/${PLANNER_TYPE}.md for your role and instructions.\n\n" + filled_prompt,
   subagent_type="general-purpose",
   model="{planner_model}",
   description="Plan Phase {phase}"
 )
 ```
+
+**Note:** Uses `PLANNER_TYPE` determined in step 1 based on `optimization.tiered_instructions` flag.
+- `tiered_instructions: true` → loads `gsd-planner-core.md` (~50% smaller)
+- `tiered_instructions: false` → loads `gsd-planner.md` (full)
 
 ## 9. Handle Planner Return
 
@@ -445,12 +466,14 @@ Return what changed.
 
 ```
 Task(
-  prompt="First, read ~/.claude/agents/gsd-planner.md for your role and instructions.\n\n" + revision_prompt,
+  prompt="First, read ~/.claude/agents/${PLANNER_TYPE}.md for your role and instructions.\n\n" + revision_prompt,
   subagent_type="general-purpose",
   model="{planner_model}",
   description="Revise Phase {phase} plans"
 )
 ```
+
+**Note:** Uses same `PLANNER_TYPE` as step 8 for consistency.
 
 - After planner returns → spawn checker again (step 10)
 - Increment iteration_count
