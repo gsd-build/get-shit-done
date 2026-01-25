@@ -115,6 +115,151 @@ If "wait": Stop, user will return when ready.
 
 </step>
 
+<step name="integration_check">
+
+**Verify cross-phase integration before archiving milestone.**
+
+This step catches broken connections between phases (orphaned exports, unused APIs, incomplete E2E flows) that individual phase verification might miss.
+
+**Read integration check configuration:**
+
+```bash
+# Try jq first (robust), fallback to grep (compatible)
+if command -v jq >/dev/null 2>&1; then
+  INTEGRATION_CHECK_ENABLED=$(jq -r '.workflow.integration_check.enabled // true' .planning/config.json 2>/dev/null || echo "true")
+  INTEGRATION_MIN_PHASES=$(jq -r '.workflow.integration_check.min_phases // 4' .planning/config.json 2>/dev/null || echo "4")
+else
+  INTEGRATION_CHECK_ENABLED=$(cat .planning/config.json 2>/dev/null | grep -o '"enabled"[[:space:]]*:[[:space:]]*[^,}]*' | grep -o 'true\|false' | head -1 || echo "true")
+  INTEGRATION_MIN_PHASES=$(cat .planning/config.json 2>/dev/null | grep -o '"min_phases"[[:space:]]*:[[:space:]]*[0-9]*' | grep -o '[0-9]*' || echo "4")
+fi
+```
+
+**Count phases in milestone:**
+
+```bash
+PHASE_COUNT=$(ls -d .planning/phases/*/ 2>/dev/null | wc -l | tr -d ' ')
+echo "Phases in milestone: $PHASE_COUNT"
+```
+
+<if integration_check="disabled">
+
+```
+ℹ️ Integration check disabled in config (workflow.integration_check.enabled: false)
+
+Proceeding to stats gathering...
+```
+
+Skip to gather_stats step.
+
+</if>
+
+<if phases="< min_phases">
+
+```
+ℹ️ Small milestone ($PHASE_COUNT phases, threshold: $INTEGRATION_MIN_PHASES) — skipping integration check
+
+Integration verification is most valuable for milestones with ${INTEGRATION_MIN_PHASES}+ phases
+where cross-phase wiring complexity increases.
+
+Proceeding to stats gathering...
+```
+
+Skip to gather_stats step.
+
+</if>
+
+<if phases="= min_phases OR = min_phases + 1">
+
+**Borderline case - ask user:**
+
+Present using AskUserQuestion:
+
+```
+Integration check threshold reached ($PHASE_COUNT phases)
+
+Your config sets integration_check.min_phases to $INTEGRATION_MIN_PHASES.
+This milestone has $PHASE_COUNT phases (borderline case).
+
+Run integration check? This verifies cross-phase connections, API usage,
+and E2E flows before archiving.
+```
+
+Options:
+- "Yes - run integration check" → Proceed to integration check below
+- "No - skip for speed" → Skip to gather_stats step
+
+</if>
+
+<if phases="> min_phases + 1">
+
+```
+🔗 Running integration check ($PHASE_COUNT phases)
+
+Verifying cross-phase connections before archiving...
+```
+
+**Spawn integration checker:**
+
+```
+Task(
+  prompt="Check integration for milestone completion.
+
+Phases to verify: [list phase directories in milestone]
+
+Focus on:
+1. Exports from earlier phases imported by later phases
+2. API routes called by UI components
+3. Data flows completing end-to-end
+4. No orphaned code (created but never used)
+
+Read phase SUMMARYs for what each phase provides/consumes.
+Report any broken connections found.",
+  subagent_type="gsd-integration-checker",
+  model="sonnet",
+  description="Milestone integration check"
+)
+```
+
+**Present results:**
+
+<if integration="passes">
+
+```
+✅ Integration check passed
+
+Cross-phase connections verified:
+- [N] exports verified as imported
+- [N] API routes verified as called
+- [N] E2E flows complete
+
+Proceeding to stats gathering...
+```
+
+</if>
+
+<if integration="issues found">
+
+```
+⚠️ Integration issues found
+
+[List issues from checker]
+
+Options:
+1. Continue anyway — archive milestone with known issues
+2. Fix first — address issues before completing milestone
+3. Review details — see full integration report
+```
+
+If "Continue anyway": Log issues in milestone notes, proceed.
+If "Fix first": Stop workflow, user addresses issues.
+If "Review details": Show full checker output, re-ask.
+
+</if>
+
+</if>
+
+</step>
+
 <step name="gather_stats">
 
 Calculate milestone statistics:
@@ -740,6 +885,7 @@ If yes → milestone. If no → keep working.
 
 Milestone completion is successful when:
 
+- [ ] Integration check passed (or skipped per config/threshold) for milestones with ≥min_phases
 - [ ] MILESTONES.md entry created with stats and accomplishments
 - [ ] PROJECT.md full evolution review completed
 - [ ] All shipped requirements moved to Validated in PROJECT.md
