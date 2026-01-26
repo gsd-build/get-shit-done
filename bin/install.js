@@ -960,25 +960,33 @@ function install(isGlobal, runtime = 'claude') {
     failures.push('VERSION');
   }
 
-  // Copy hooks from dist/ (bundled with dependencies)
-  const hooksSrc = path.join(src, 'hooks', 'dist');
-  if (fs.existsSync(hooksSrc)) {
-    const hooksDest = path.join(targetDir, 'hooks');
-    fs.mkdirSync(hooksDest, { recursive: true });
-    const hookEntries = fs.readdirSync(hooksSrc);
-    for (const entry of hookEntries) {
-      const srcFile = path.join(hooksSrc, entry);
-      // Only copy files, not directories
-      if (fs.statSync(srcFile).isFile()) {
-        const destFile = path.join(hooksDest, entry);
-        fs.copyFileSync(srcFile, destFile);
-      }
+  // Copy hooks - try dist/ first (published), fall back to source hooks/ (development)
+  const hooksDistSrc = path.join(src, 'hooks', 'dist');
+  const hooksSourceDir = path.join(src, 'hooks');
+  const hooksSrc = fs.existsSync(hooksDistSrc) ? hooksDistSrc : hooksSourceDir;
+
+  const hooksDest = path.join(targetDir, 'hooks');
+  fs.mkdirSync(hooksDest, { recursive: true });
+
+  // Hook files to copy (must match scripts/build-hooks.js HOOKS_TO_COPY list)
+  const hookFiles = ['gsd-check-update.js', 'gsd-statusline.js'];
+  let copiedCount = 0;
+
+  for (const hookFile of hookFiles) {
+    const srcFile = path.join(hooksSrc, hookFile);
+    if (fs.existsSync(srcFile)) {
+      const destFile = path.join(hooksDest, hookFile);
+      fs.copyFileSync(srcFile, destFile);
+      copiedCount++;
     }
-    if (verifyInstalled(hooksDest, 'hooks')) {
-      console.log(`  ${green}✓${reset} Installed hooks (bundled)`);
-    } else {
-      failures.push('hooks');
-    }
+  }
+
+  if (copiedCount > 0) {
+    const sourceLabel = hooksSrc === hooksDistSrc ? 'dist' : 'source';
+    console.log(`  ${green}✓${reset} Installed hooks (${copiedCount} files from ${sourceLabel})`);
+  } else {
+    console.warn(`  ${yellow}⚠${reset} Warning: No hook files found in ${hooksSrc}`);
+    failures.push('hooks');
   }
 
   // If critical components failed, exit with error
