@@ -68,16 +68,16 @@ Extract only decisions relevant to current phase execution.
 
 **Input:** Full STATE.md content, phase number
 
-**Output:** Current position + phase-relevant decisions + global decisions:
+**Output:** Current position + phase-relevant decisions + roadmap decisions:
 ```
 ## Current Position
 Phase: 03-authentication
 Status: executing
 
 ## Relevant Decisions
-- [Global] All API responses use JSON format
-- [Phase 03] Use bcrypt for password hashing (security requirement)
-- [Phase 03] JWT expiry set to 1 hour (from AUTH-02)
+- [Roadmap] All API responses use JSON format
+- [03-01] Use bcrypt for password hashing (security requirement)
+- [03-02] JWT expiry set to 1 hour (from AUTH-02)
 ```
 
 **Bash implementation:**
@@ -98,15 +98,11 @@ extract_relevant_decisions() {
   echo ""
   echo "## Relevant Decisions"
 
-  # Extract Global decisions
-  grep -E "^- \[Global\]" "$STATE_FILE" 2>/dev/null || true
+  # Extract global decisions (Roadmap-level)
+  grep -E "^- \[Roadmap\]" "$STATE_FILE" 2>/dev/null || true
 
-  # Extract phase-specific decisions (match both padded and unpadded)
-  grep -E "^- \[Phase ${PADDED_PHASE}\]|^- \[Phase ${PHASE_PATTERN}\]" "$STATE_FILE" 2>/dev/null || true
-
-  # Extract previous phase decisions if marked as dependencies
-  # (decisions tagged with "→ affects Phase XX" where XX is current phase)
-  grep -E "→ affects Phase ${PADDED_PHASE}|→ affects Phase ${PHASE_PATTERN}" "$STATE_FILE" 2>/dev/null || true
+  # Extract phase-specific decisions (pattern: [XX-YY] where XX is current phase)
+  grep -E "^- \[${PADDED_PHASE}-[0-9]+\]" "$STATE_FILE" 2>/dev/null || true
 }
 ```
 
