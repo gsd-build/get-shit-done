@@ -30,6 +30,21 @@ Default to "balanced" if not set.
 | gsd-verifier | sonnet | sonnet | haiku |
 | general-purpose | — | — | — |
 
+**Custom profile resolution:**
+
+If profile is "custom", read from custom_profile_models:
+
+```bash
+if [ "$MODEL_PROFILE" = "custom" ]; then
+  EXECUTOR_MODEL=$(cat .planning/config.json | grep -A20 '"custom_profile_models"' | grep -o '"gsd-executor"[[:space:]]*:[[:space:]]*"[^"]*"' | grep -o '"[^"]*"$' | tr -d '"')
+  VERIFIER_MODEL=$(cat .planning/config.json | grep -A20 '"custom_profile_models"' | grep -o '"gsd-verifier"[[:space:]]*:[[:space:]]*"[^"]*"' | grep -o '"[^"]*"$' | tr -d '"')
+
+  # Fallback to balanced if not in custom config
+  [ -z "$EXECUTOR_MODEL" ] && EXECUTOR_MODEL="sonnet"
+  [ -z "$VERIFIER_MODEL" ] && VERIFIER_MODEL="sonnet"
+fi
+```
+
 Store resolved models for use in Task calls below.
 </step>
 

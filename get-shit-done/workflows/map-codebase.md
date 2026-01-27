@@ -37,6 +37,19 @@ Default to "balanced" if not set.
 |-------|---------|----------|--------|
 | gsd-codebase-mapper | sonnet | haiku | haiku |
 
+**Custom profile resolution:**
+
+If profile is "custom", read from custom_profile_models:
+
+```bash
+if [ "$MODEL_PROFILE" = "custom" ]; then
+  MAPPER_MODEL=$(cat .planning/config.json | grep -A20 '"custom_profile_models"' | grep -o '"gsd-codebase-mapper"[[:space:]]*:[[:space:]]*"[^"]*"' | grep -o '"[^"]*"$' | tr -d '"')
+
+  # Fallback to balanced if not in custom config
+  [ -z "$MAPPER_MODEL" ] && MAPPER_MODEL="haiku"
+fi
+```
+
 Store resolved model for use in Task calls below.
 </step>
 
