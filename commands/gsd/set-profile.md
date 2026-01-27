@@ -31,6 +31,92 @@ if $ARGUMENTS.profile not in ["quality", "balanced", "budget", "custom"]:
   STOP
 ```
 
+## 1.5. Handle Custom Profile
+
+If `$ARGUMENTS.profile` is "custom":
+
+### Read existing custom config (if any)
+
+```bash
+# Check for existing custom_profile_models
+EXISTING_CUSTOM=$(cat .planning/config.json 2>/dev/null | grep -o '"custom_profile_models"' || echo "")
+```
+
+### Prompt for each agent
+
+Use AskUserQuestion for sequential single-select prompts. The 5 agents to configure (in this order):
+
+1. **Planner (gsd-planner)** - default: opus (from balanced)
+2. **Plan Checker (gsd-plan-checker)** - default: sonnet (from balanced)
+3. **Executor (gsd-executor)** - default: sonnet (from balanced)
+4. **Verifier (gsd-verifier)** - default: sonnet (from balanced)
+5. **Codebase Mapper (gsd-codebase-mapper)** - default: haiku (from balanced)
+
+For each agent, prompt:
+
+```
+AskUserQuestion([
+  {
+    question: "What model for {Friendly Name} ({gsd-agent-name})?",
+    header: "Custom Profile",
+    multiSelect: false,
+    options: [
+      { label: "Opus", description: "Maximum reasoning power" },
+      { label: "Sonnet", description: "Balanced quality/speed (default)" },
+      { label: "Haiku", description: "Fast and economical" }
+    ]
+  }
+])
+```
+
+Store each selection (convert label to lowercase: "Opus" -> "opus").
+
+### Show summary table
+
+After all 5 agents configured, display:
+
+```
+Configuration summary:
+
+| Agent | Model |
+|-------|-------|
+| Planner (gsd-planner) | {selection} |
+| Plan Checker (gsd-plan-checker) | {selection} |
+| Executor (gsd-executor) | {selection} |
+| Verifier (gsd-verifier) | {selection} |
+| Codebase Mapper (gsd-codebase-mapper) | {selection} |
+
+Save this configuration?
+```
+
+Use AskUserQuestion with Yes/No options.
+
+### Handle confirmation
+
+If "Yes": Continue to step 3 to save config.
+If "No": Display "Custom configuration cancelled." and STOP (do not update config).
+
+### Prepare config update
+
+If confirmed, set:
+- `model_profile` = "custom"
+- `custom_profile_models` = map of agent name -> model selection
+
+```json
+{
+  "model_profile": "custom",
+  "custom_profile_models": {
+    "gsd-planner": "{selection}",
+    "gsd-plan-checker": "{selection}",
+    "gsd-executor": "{selection}",
+    "gsd-verifier": "{selection}",
+    "gsd-codebase-mapper": "{selection}"
+  }
+}
+```
+
+Then proceed to step 3 (Update config.json).
+
 ## 2. Check for project
 
 ```bash
