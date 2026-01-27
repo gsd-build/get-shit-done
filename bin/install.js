@@ -25,6 +25,7 @@ const hasBoth = args.includes('--both');
 const hasUninstall = args.includes('--uninstall') || args.includes('-u');
 
 // Runtime selection - can be set by flags or interactive prompt
+/** @type {string[]} */
 let selectedRuntimes = [];
 if (hasBoth) {
   selectedRuntimes = ['claude', 'opencode'];
@@ -34,7 +35,10 @@ if (hasBoth) {
   selectedRuntimes = ['claude'];
 }
 
-// Helper to get directory name for a runtime (used for local/project installs)
+/**
+ * Helper to get directory name for a runtime (used for local/project installs)
+ * @param {string} runtime - Target runtime ('claude' or 'opencode')
+ */
 function getDirName(runtime) {
   return runtime === 'opencode' ? '.opencode' : '.claude';
 }
@@ -181,6 +185,7 @@ if (hasHelp) {
 
 /**
  * Expand ~ to home directory (shell doesn't expand in env vars passed to node)
+ * @param {string} filePath
  */
 function expandTilde(filePath) {
   if (filePath && filePath.startsWith('~/')) {
@@ -192,6 +197,8 @@ function expandTilde(filePath) {
 /**
  * Build a hook command path using forward slashes for cross-platform compatibility.
  * On Windows, $HOME is not expanded by cmd.exe/PowerShell, so we use the actual path.
+ * @param {string} claudeDir
+ * @param {string} hookName
  */
 function buildHookCommand(claudeDir, hookName) {
   // Use forward slashes for Node.js compatibility on all platforms
@@ -201,6 +208,7 @@ function buildHookCommand(claudeDir, hookName) {
 
 /**
  * Read and parse settings.json, returning empty object if it doesn't exist
+ * @param {string} settingsPath
  */
 function readSettings(settingsPath) {
   if (fs.existsSync(settingsPath)) {
@@ -215,6 +223,8 @@ function readSettings(settingsPath) {
 
 /**
  * Write settings.json with proper formatting
+ * @param {string} settingsPath
+ * @param {object} settings
  */
 function writeSettings(settingsPath, settings) {
   fs.writeFileSync(settingsPath, JSON.stringify(settings, null, 2) + '\n');
@@ -257,6 +267,7 @@ const claudeToOpencodeTools = {
  * Convert a Claude Code tool name to OpenCode format
  * - Applies special mappings (AskUserQuestion -> question, etc.)
  * - Converts to lowercase (except MCP tools which keep their format)
+ * @param {string} claudeTool
  */
 function convertToolName(claudeTool) {
   // Check for special mapping first
@@ -271,6 +282,9 @@ function convertToolName(claudeTool) {
   return claudeTool.toLowerCase();
 }
 
+/**
+ * @param {string} content
+ */
 function convertClaudeToOpencodeFrontmatter(content) {
   // Replace tool name references in content (applies to all files)
   let convertedContent = content;
@@ -381,8 +395,9 @@ function convertClaudeToOpencodeFrontmatter(content) {
  * @param {string} prefix - Prefix for filenames (e.g., 'gsd')
  * @param {string} pathPrefix - Path prefix for file references
  * @param {string} runtime - Target runtime ('claude' or 'opencode')
+ * @param {boolean} isGlobal
  */
-function copyFlattenedCommands(srcDir, destDir, prefix, pathPrefix, runtime) {
+function copyFlattenedCommands(srcDir, destDir, prefix, pathPrefix, runtime, isGlobal) {
   if (!fs.existsSync(srcDir)) {
     return;
   }
@@ -406,7 +421,7 @@ function copyFlattenedCommands(srcDir, destDir, prefix, pathPrefix, runtime) {
     if (entry.isDirectory()) {
       // Recurse into subdirectories, adding to prefix
       // e.g., commands/gsd/debug/start.md -> command/gsd-debug-start.md
-      copyFlattenedCommands(srcPath, destDir, `${prefix}-${entry.name}`, pathPrefix, runtime);
+      copyFlattenedCommands(srcPath, destDir, `${prefix}-${entry.name}`, pathPrefix, runtime, isGlobal);
     } else if (entry.name.endsWith('.md')) {
       // Flatten: help.md -> gsd-help.md
       const baseName = entry.name.replace('.md', '');
@@ -421,7 +436,7 @@ function copyFlattenedCommands(srcDir, destDir, prefix, pathPrefix, runtime) {
       content = content.replace(claudeDirRegex, pathPrefix);
       content = content.replace(opencodeDirRegex, pathPrefix);
       // Replace GSD-specific placeholders (for update.md, etc.)
-      content = replaceGsdPlaceholders(content, pathPrefix, runtime);
+      content = replaceGsdPlaceholders(content, pathPrefix, runtime, isGlobal);
       // Convert frontmatter for opencode compatibility
       content = convertClaudeToOpencodeFrontmatter(content);
 
@@ -437,14 +452,10 @@ function copyFlattenedCommands(srcDir, destDir, prefix, pathPrefix, runtime) {
  * @param {string} content - File content
  * @param {string} pathPrefix - Path prefix (e.g., '~/.claude/' or './.claude/')
  * @param {string} runtime - 'claude' or 'opencode'
+ * @param {boolean} isGlobal
  * @returns {string} - Content with placeholders replaced
  */
-function replaceGsdPlaceholders(content, pathPrefix, runtime) {
-  // Determine if global based on pathPrefix
-  // Global paths start with ~, / (Unix absolute), or drive letter (Windows)
-  const isGlobal = pathPrefix.startsWith('~') ||
-                   pathPrefix.startsWith('/') ||
-                   /^[A-Z]:/i.test(pathPrefix);
+function replaceGsdPlaceholders(content, pathPrefix, runtime, isGlobal) {
   const dirName = runtime === 'opencode' ? '.opencode' : '.claude';
   const runtimeName = runtime === 'opencode' ? 'OpenCode' : 'Claude Code';
 
@@ -489,8 +500,9 @@ function replaceGsdPlaceholders(content, pathPrefix, runtime) {
  * @param {string} destDir - Destination directory
  * @param {string} pathPrefix - Path prefix for file references
  * @param {string} runtime - Target runtime ('claude' or 'opencode')
+ * @param {boolean} isGlobal
  */
-function copyWithPathReplacement(srcDir, destDir, pathPrefix, runtime) {
+function copyWithPathReplacement(srcDir, destDir, pathPrefix, runtime, isGlobal) {
   const isOpencode = runtime === 'opencode';
   const dirName = getDirName(runtime);
 
@@ -507,14 +519,14 @@ function copyWithPathReplacement(srcDir, destDir, pathPrefix, runtime) {
     const destPath = path.join(destDir, entry.name);
 
     if (entry.isDirectory()) {
-      copyWithPathReplacement(srcPath, destPath, pathPrefix, runtime);
+      copyWithPathReplacement(srcPath, destPath, pathPrefix, runtime, isGlobal);
     } else if (entry.name.endsWith('.md')) {
       // Replace ~/.claude/ with the appropriate prefix in Markdown files
       let content = fs.readFileSync(srcPath, 'utf8');
       const claudeDirRegex = new RegExp(`~/${dirName.replace('.', '\\.')}/`, 'g');
       content = content.replace(claudeDirRegex, pathPrefix);
       // Replace GSD-specific placeholders (for update.md, etc.)
-      content = replaceGsdPlaceholders(content, pathPrefix, runtime);
+      content = replaceGsdPlaceholders(content, pathPrefix, runtime, isGlobal);
       // Convert frontmatter for opencode compatibility
       if (isOpencode) {
         content = convertClaudeToOpencodeFrontmatter(content);
@@ -528,6 +540,7 @@ function copyWithPathReplacement(srcDir, destDir, pathPrefix, runtime) {
 
 /**
  * Clean up orphaned files from previous GSD versions
+ * @param {string} claudeDir
  */
 function cleanupOrphanedFiles(claudeDir) {
   const orphanedFiles = [
@@ -546,6 +559,7 @@ function cleanupOrphanedFiles(claudeDir) {
 
 /**
  * Clean up orphaned hook registrations from settings.json
+ * @param {*} settings
  */
 function cleanupOrphanedHooks(settings) {
   const orphanedHookPatterns = [
@@ -852,6 +866,8 @@ function configureOpencodePermissions() {
 
 /**
  * Verify a directory exists and contains files
+ * @param {string} dirPath
+ * @param {string} description
  */
 function verifyInstalled(dirPath, description) {
   if (!fs.existsSync(dirPath)) {
@@ -873,6 +889,8 @@ function verifyInstalled(dirPath, description) {
 
 /**
  * Verify a file exists
+ * @param {string} filePath
+ * @param {string} description
  */
 function verifyFileInstalled(filePath, description) {
   if (!fs.existsSync(filePath)) {
@@ -926,7 +944,7 @@ function install(isGlobal, runtime = 'claude') {
     
     // Copy commands/gsd/*.md as command/gsd-*.md (flatten structure)
     const gsdSrc = path.join(src, 'commands', 'gsd');
-    copyFlattenedCommands(gsdSrc, commandDir, 'gsd', pathPrefix, runtime);
+    copyFlattenedCommands(gsdSrc, commandDir, 'gsd', pathPrefix, runtime, isGlobal);
     if (verifyInstalled(commandDir, 'command/gsd-*')) {
       const count = fs.readdirSync(commandDir).filter(f => f.startsWith('gsd-')).length;
       console.log(`  ${green}✓${reset} Installed ${count} commands to command/`);
@@ -940,7 +958,7 @@ function install(isGlobal, runtime = 'claude') {
     
     const gsdSrc = path.join(src, 'commands', 'gsd');
     const gsdDest = path.join(commandsDir, 'gsd');
-    copyWithPathReplacement(gsdSrc, gsdDest, pathPrefix, runtime);
+    copyWithPathReplacement(gsdSrc, gsdDest, pathPrefix, runtime, isGlobal);
     if (verifyInstalled(gsdDest, 'commands/gsd')) {
       console.log(`  ${green}✓${reset} Installed commands/gsd`);
     } else {
@@ -951,7 +969,7 @@ function install(isGlobal, runtime = 'claude') {
   // Copy get-shit-done skill with path replacement
   const skillSrc = path.join(src, 'get-shit-done');
   const skillDest = path.join(targetDir, 'get-shit-done');
-  copyWithPathReplacement(skillSrc, skillDest, pathPrefix, runtime);
+  copyWithPathReplacement(skillSrc, skillDest, pathPrefix, runtime, isGlobal);
   if (verifyInstalled(skillDest, 'get-shit-done')) {
     console.log(`  ${green}✓${reset} Installed get-shit-done`);
   } else {
