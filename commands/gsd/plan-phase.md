@@ -58,6 +58,25 @@ MODEL_PROFILE=$(cat .planning/config.json 2>/dev/null | grep -o '"model_profile"
 
 Default to "balanced" if not set.
 
+**If MODEL_PROFILE is "custom":**
+
+Read agent-specific models from custom_profile_models:
+
+```bash
+if [ "$MODEL_PROFILE" = "custom" ]; then
+  PLANNER_MODEL=$(cat .planning/config.json | grep -A20 '"custom_profile_models"' | grep -o '"gsd-planner"[[:space:]]*:[[:space:]]*"[^"]*"' | grep -o '"[^"]*"$' | tr -d '"')
+  CHECKER_MODEL=$(cat .planning/config.json | grep -A20 '"custom_profile_models"' | grep -o '"gsd-plan-checker"[[:space:]]*:[[:space:]]*"[^"]*"' | grep -o '"[^"]*"$' | tr -d '"')
+
+  # Fallback to balanced if agent not in custom config
+  # gsd-phase-researcher not in custom profile, use balanced default
+  RESEARCHER_MODEL="sonnet"
+  [ -z "$PLANNER_MODEL" ] && PLANNER_MODEL="opus"
+  [ -z "$CHECKER_MODEL" ] && CHECKER_MODEL="sonnet"
+fi
+```
+
+**Otherwise (quality/balanced/budget):**
+
 **Model lookup table:**
 
 | Agent | quality | balanced | budget |
