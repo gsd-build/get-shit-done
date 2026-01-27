@@ -386,6 +386,19 @@ MODEL_PROFILE=$(cat .planning/config.json 2>/dev/null | grep -o '"model_profile"
 
 Default to "balanced" if not set.
 
+**If MODEL_PROFILE is "custom":**
+
+```bash
+if [ "$MODEL_PROFILE" = "custom" ]; then
+  # These agents not in custom profile, use balanced defaults
+  RESEARCHER_MODEL="sonnet"
+  SYNTHESIZER_MODEL="sonnet"
+  ROADMAPPER_MODEL="sonnet"
+fi
+```
+
+**Otherwise (quality/balanced/budget):**
+
 **Model lookup table:**
 
 | Agent | quality | balanced | budget |
