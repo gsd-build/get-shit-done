@@ -151,8 +151,24 @@ Write updated config back to `.planning/config.json`.
 ✓ Model profile set to: $ARGUMENTS.profile
 
 Agents will now use:
-[Show table from model-profiles.md for selected profile]
+```
 
+If profile is "custom":
+  Show the custom_profile_models map as a table:
+  ```
+  | Agent | Model |
+  |-------|-------|
+  | gsd-planner | {custom value} |
+  | gsd-plan-checker | {custom value} |
+  | gsd-executor | {custom value} |
+  | gsd-verifier | {custom value} |
+  | gsd-codebase-mapper | {custom value} |
+  ```
+
+Otherwise (quality/balanced/budget):
+  Show table from model-profiles.md for selected profile (existing behavior)
+
+```
 Next spawned agents will use the new profile.
 ```
 
@@ -188,6 +204,36 @@ Agents will now use:
 | gsd-executor | opus |
 | gsd-verifier | sonnet |
 | ... | ... |
+```
+
+**Configure custom profile:**
+```
+/gsd:set-profile custom
+
+[Interactive prompts for each agent...]
+
+Configuration summary:
+
+| Agent | Model |
+|-------|-------|
+| Planner (gsd-planner) | opus |
+| Plan Checker (gsd-plan-checker) | haiku |
+| Executor (gsd-executor) | sonnet |
+| Verifier (gsd-verifier) | haiku |
+| Codebase Mapper (gsd-codebase-mapper) | haiku |
+
+Save this configuration? [Yes]
+
+✓ Model profile set to: custom
+
+Agents will now use:
+| Agent | Model |
+|-------|-------|
+| gsd-planner | opus |
+| gsd-plan-checker | haiku |
+| gsd-executor | sonnet |
+| gsd-verifier | haiku |
+| gsd-codebase-mapper | haiku |
 ```
 
 </examples>
