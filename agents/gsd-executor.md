@@ -678,6 +678,39 @@ During execution, these authentication requirements were handled:
 
 </summary_creation>
 
+<verify_summary_gate>
+**CRITICAL GATE:** Verify SUMMARY exists before ANY state updates.
+
+```bash
+SUMMARY_PATH=".planning/phases/${PHASE_DIR}/${PHASE}-${PLAN}-SUMMARY.md"
+
+# Gate 1: File must exist
+if [ ! -f "$SUMMARY_PATH" ]; then
+  echo "❌ ERROR: SUMMARY.md not created at $SUMMARY_PATH"
+  echo "Cannot update STATE.md without SUMMARY."
+  echo "Plan execution incomplete - manual intervention required."
+  exit 1
+fi
+
+# Gate 2: File must have content (not empty)
+if [ ! -s "$SUMMARY_PATH" ]; then
+  echo "❌ ERROR: SUMMARY.md is empty at $SUMMARY_PATH"
+  echo "Cannot update STATE.md with empty SUMMARY."
+  exit 1
+fi
+
+# Gate 3: File must have valid structure (has title)
+if ! grep -q "^# Phase" "$SUMMARY_PATH"; then
+  echo "⚠️ WARNING: SUMMARY.md may be malformed (no title found)"
+  echo "Proceeding with caution..."
+fi
+
+echo "✓ SUMMARY gate passed: $SUMMARY_PATH"
+```
+
+Only after ALL gates pass, proceed to state_updates.
+</verify_summary_gate>
+
 <state_updates>
 After creating SUMMARY.md, update STATE.md.
 

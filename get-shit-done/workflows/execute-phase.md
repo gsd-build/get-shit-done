@@ -120,6 +120,52 @@ Build plan inventory:
 If all plans filtered out, report "No matching incomplete plans" and exit.
 </step>
 
+<step name="validate_plan_state_consistency">
+**CRITICAL:** Check for STATE/SUMMARY inconsistencies before proceeding.
+
+```bash
+# Count actual files
+PLAN_COUNT=$(ls -1 "$PHASE_DIR"/*-PLAN.md 2>/dev/null | wc -l | tr -d ' ')
+SUMMARY_COUNT=$(ls -1 "$PHASE_DIR"/*-SUMMARY.md 2>/dev/null | wc -l | tr -d ' ')
+
+# Find missing SUMMARYs
+MISSING_SUMMARIES=""
+for plan in "$PHASE_DIR"/*-PLAN.md; do
+  plan_id=$(basename "$plan" | sed 's/-PLAN.md//')
+  summary="$PHASE_DIR/${plan_id}-SUMMARY.md"
+  if [ ! -f "$summary" ]; then
+    MISSING_SUMMARIES="$MISSING_SUMMARIES\n  - ${plan_id}-SUMMARY.md"
+  fi
+done
+```
+
+**If inconsistencies found (plans > summaries):**
+
+```
+⚠️ STATE/SUMMARY INCONSISTENCY DETECTED
+
+Plans found: {PLAN_COUNT}
+Summaries found: {SUMMARY_COUNT}
+
+Missing SUMMARYs:
+{MISSING_SUMMARIES}
+
+Possible causes:
+1. Session interrupted after code commits but before SUMMARY creation
+2. STATE.md manually edited
+3. Subagent failed silently
+```
+
+**Action on inconsistency:**
+
+Use AskUserQuestion:
+- Question: "How should I handle missing SUMMARYs?"
+- Options:
+  - "Generate SUMMARYs from commits" - Use /gsd:recover-summary for each
+  - "Re-execute incomplete plans" - Treat as incomplete, execute normally
+  - "Ignore and continue" - Skip consistency check (not recommended)
+</step>
+
 <step name="group_by_wave">
 Read `wave` from each plan's frontmatter and group by wave number:
 

@@ -17,7 +17,13 @@ current_plan: null
 phase_status: not_started
 next_action: /gsd:plan-phase 1
 last_checkpoint: null
+plan_summary_exists: false  # CRITICAL: Only true when SUMMARY.md verified
+plans_in_phase: 0
+summaries_in_phase: 0
+next_action: /gsd:plan-phase 1
+last_checkpoint: null
 scope_version: 1
+last_verified: null  # Timestamp of last consistency check
 ---
 
 # Project State
@@ -143,6 +149,12 @@ The frontmatter contains machine-readable fields parsed by GSD workflows:
 | `next_action` | string | Suggested next GSD command |
 | `last_checkpoint` | string | Path to .continue-here.md or `null` |
 | `scope_version` | int | Incremented when phase scope changes |
+| `plan_summary_exists` | bool | **CRITICAL:** Only true when SUMMARY.md verified to exist |
+| `plans_in_phase` | int | Count of PLAN.md files in current phase |
+| `summaries_in_phase` | int | Count of SUMMARY.md files (should match plans when complete) |
+| `last_verified` | string | Timestamp of last STATE/SUMMARY consistency check |
+
+**Consistency Invariant:** `summaries_in_phase` should always match actual SUMMARY.md count. If mismatch detected, use `/gsd:recover-summary` to fix.
 
 **Important:** Workflows should parse these fields instead of regex-matching prose text.
 
