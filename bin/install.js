@@ -1144,6 +1144,17 @@ function install(isGlobal, runtime = 'claude') {
     ? buildHookCommand(targetDir, 'gsd-check-update.js')
     : 'node ' + dirName + '/hooks/gsd-check-update.js';
 
+  // Enable experimental agents for Gemini CLI (required for custom sub-agents)
+  if (isGemini) {
+    if (!settings.experimental) {
+      settings.experimental = {};
+    }
+    if (!settings.experimental.enableAgents) {
+      settings.experimental.enableAgents = true;
+      console.log(`  ${green}✓${reset} Enabled experimental agents`);
+    }
+  }
+
   // Configure SessionStart hook for update checking (skip for opencode)
   if (!isOpencode) {
     if (!settings.hooks) {
