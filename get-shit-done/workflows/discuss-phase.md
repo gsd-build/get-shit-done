@@ -287,9 +287,24 @@ PADDED_PHASE=$(printf "%02d" ${PHASE})
 PHASE_DIR=$(ls -d .planning/phases/${PADDED_PHASE}-* .planning/phases/${PHASE}-* 2>/dev/null | head -1)
 if [ -z "$PHASE_DIR" ]; then
   # Create from roadmap name (lowercase, hyphens)
-  PHASE_NAME=$(grep "Phase ${PHASE}:" .planning/ROADMAP.md | sed 's/.*Phase [0-9]*: //' | tr '[:upper:]' '[:lower:]' | tr ' ' '-')
+  # Support flexible heading formats: "Phase X:", "## Phase X:", "### Phase X:"
+  PHASE_NAME=$(grep -E "^#*\s*\**Phase ${PHASE}:" .planning/ROADMAP.md | sed 's/.*Phase [0-9]*:[[:space:]]*//' | sed 's/\*//g' | tr '[:upper:]' '[:lower:]' | tr ' ' '-' | tr -d '\r')
+
+  # Validate PHASE_NAME was extracted successfully
+  if [ -z "$PHASE_NAME" ]; then
+    echo "ERROR: Could not extract phase name from ROADMAP.md for Phase ${PHASE}"
+    echo "Ensure ROADMAP.md contains a line like '## Phase ${PHASE}: Phase Name'"
+    exit 1
+  fi
+
   mkdir -p ".planning/phases/${PADDED_PHASE}-${PHASE_NAME}"
   PHASE_DIR=".planning/phases/${PADDED_PHASE}-${PHASE_NAME}"
+fi
+
+# Final validation: ensure PHASE_DIR is set and valid
+if [ -z "$PHASE_DIR" ]; then
+  echo "ERROR: Could not determine phase directory for Phase ${PHASE}"
+  exit 1
 fi
 ```
 

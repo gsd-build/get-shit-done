@@ -20,7 +20,7 @@ Extract implementation decisions that downstream agents need — researcher and 
 3. Deep-dive each selected area until satisfied
 4. Create CONTEXT.md with decisions that guide research and planning
 
-**Output:** `{phase}-CONTEXT.md` — decisions clear enough that downstream agents can act without asking the user again
+**Output:** `.planning/phases/{XX-name}/{phase}-CONTEXT.md` — decisions clear enough that downstream agents can act without asking the user again
 </objective>
 
 <execution_context>
