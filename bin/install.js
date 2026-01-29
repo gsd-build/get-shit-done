@@ -285,6 +285,15 @@ function convertGeminiToolName(claudeTool) {
 }
 
 /**
+ * Strip HTML <sub> tags for Gemini CLI output
+ * Terminals don't support subscript — Gemini renders these as raw HTML.
+ * Converts <sub>text</sub> to italic *(text)* for readable terminal output.
+ */
+function stripSubTags(content) {
+  return content.replace(/<sub>(.*?)<\/sub>/g, '*($1)*');
+}
+
+/**
  * Convert Claude Code agent frontmatter to Gemini CLI format
  * Gemini agents use .md files with YAML frontmatter, same as Claude,
  * but with different field names and formats:
@@ -360,7 +369,7 @@ function convertClaudeToGeminiAgent(content) {
   }
 
   const newFrontmatter = newLines.join('\n').trim();
-  return `---\n${newFrontmatter}\n---${body}`;
+  return `---\n${newFrontmatter}\n---${stripSubTags(body)}`;
 }
 
 function convertClaudeToOpencodeFrontmatter(content) {
@@ -595,7 +604,8 @@ function copyWithPathReplacement(srcDir, destDir, pathPrefix, runtime) {
         content = convertClaudeToOpencodeFrontmatter(content);
         fs.writeFileSync(destPath, content);
       } else if (runtime === 'gemini') {
-        // Convert to TOML for Gemini
+        // Convert to TOML for Gemini (strip <sub> tags — terminals can't render subscript)
+        content = stripSubTags(content);
         const tomlContent = convertClaudeToGeminiToml(content);
         // Replace extension with .toml
         const tomlPath = destPath.replace(/\.md$/, '.toml');
