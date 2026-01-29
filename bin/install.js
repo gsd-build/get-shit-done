@@ -227,6 +227,21 @@ const claudeToOpencodeTools = {
   WebSearch: 'websearch',  // Plugin/MCP - keep for compatibility
 };
 
+// Tool name mapping from Claude Code to Gemini CLI
+// Gemini CLI uses snake_case built-in tool names
+const claudeToGeminiTools = {
+  Read: 'read_file',
+  Write: 'write_file',
+  Edit: 'replace',
+  Bash: 'run_shell_command',
+  Glob: 'glob',
+  Grep: 'search_file_content',
+  WebSearch: 'google_web_search',
+  WebFetch: 'web_fetch',
+  TodoWrite: 'write_todos',
+  AskUserQuestion: 'ask_user',
+};
+
 /**
  * Convert a Claude Code tool name to OpenCode format
  * - Applies special mappings (AskUserQuestion -> question, etc.)
@@ -243,6 +258,109 @@ function convertToolName(claudeTool) {
   }
   // Default: convert to lowercase
   return claudeTool.toLowerCase();
+}
+
+/**
+ * Convert a Claude Code tool name to Gemini CLI format
+ * - Applies Claude→Gemini mapping (Read→read_file, Bash→run_shell_command, etc.)
+ * - Filters out MCP tools (mcp__*) — they are auto-discovered at runtime in Gemini
+ * - Filters out Task — agents are auto-registered as tools in Gemini
+ * @returns {string|null} Gemini tool name, or null if tool should be excluded
+ */
+function convertGeminiToolName(claudeTool) {
+  // MCP tools: exclude — auto-discovered from mcpServers config at runtime
+  if (claudeTool.startsWith('mcp__')) {
+    return null;
+  }
+  // Task: exclude — agents are auto-registered as callable tools
+  if (claudeTool === 'Task') {
+    return null;
+  }
+  // Check for explicit mapping
+  if (claudeToGeminiTools[claudeTool]) {
+    return claudeToGeminiTools[claudeTool];
+  }
+  // Default: lowercase
+  return claudeTool.toLowerCase();
+}
+
+/**
+ * Convert Claude Code agent frontmatter to Gemini CLI format
+ * Gemini agents use .md files with YAML frontmatter, same as Claude,
+ * but with different field names and formats:
+ * - tools: must be a YAML array (not comma-separated string)
+ * - tool names: must use Gemini built-in names (read_file, not Read)
+ * - color: must be removed (causes validation error)
+ * - mcp__* tools: must be excluded (auto-discovered at runtime)
+ */
+function convertClaudeToGeminiAgent(content) {
+  if (!content.startsWith('---')) return content;
+
+  const endIndex = content.indexOf('---', 3);
+  if (endIndex === -1) return content;
+
+  const frontmatter = content.substring(3, endIndex).trim();
+  const body = content.substring(endIndex + 3);
+
+  const lines = frontmatter.split('\n');
+  const newLines = [];
+  let inAllowedTools = false;
+  const tools = [];
+
+  for (const line of lines) {
+    const trimmed = line.trim();
+
+    // Convert allowed-tools YAML array to tools list
+    if (trimmed.startsWith('allowed-tools:')) {
+      inAllowedTools = true;
+      continue;
+    }
+
+    // Handle inline tools: field (comma-separated string)
+    if (trimmed.startsWith('tools:')) {
+      const toolsValue = trimmed.substring(6).trim();
+      if (toolsValue) {
+        const parsed = toolsValue.split(',').map(t => t.trim()).filter(t => t);
+        for (const t of parsed) {
+          const mapped = convertGeminiToolName(t);
+          if (mapped) tools.push(mapped);
+        }
+      } else {
+        // tools: with no value means YAML array follows
+        inAllowedTools = true;
+      }
+      continue;
+    }
+
+    // Strip color field (not supported by Gemini CLI, causes validation error)
+    if (trimmed.startsWith('color:')) continue;
+
+    // Collect allowed-tools/tools array items
+    if (inAllowedTools) {
+      if (trimmed.startsWith('- ')) {
+        const mapped = convertGeminiToolName(trimmed.substring(2).trim());
+        if (mapped) tools.push(mapped);
+        continue;
+      } else if (trimmed && !trimmed.startsWith('-')) {
+        inAllowedTools = false;
+      }
+    }
+
+    if (!inAllowedTools) {
+      newLines.push(line);
+    }
+  }
+
+  // Add tools as YAML array (Gemini requires array format)
+  if (tools.length > 0) {
+    newLines.push('tools:');
+    for (const tool of tools) {
+      newLines.push(`  - ${tool}`);
+    }
+  }
+
+  const newFrontmatter = newLines.join('\n').trim();
+  return `---\n${newFrontmatter}\n---${body}`;
 }
 
 function convertClaudeToOpencodeFrontmatter(content) {
@@ -953,9 +1071,11 @@ function install(isGlobal, runtime = 'claude') {
         // Always replace ~/.claude/ as it is the source of truth in the repo
         const dirRegex = /~\/\.claude\//g;
         content = content.replace(dirRegex, pathPrefix);
-        // Convert frontmatter for opencode compatibility
+        // Convert frontmatter for runtime compatibility
         if (isOpencode) {
           content = convertClaudeToOpencodeFrontmatter(content);
+        } else if (isGemini) {
+          content = convertClaudeToGeminiAgent(content);
         }
         fs.writeFileSync(path.join(agentsDest, entry.name), content);
       }
