@@ -51,11 +51,58 @@ Check for .planning/STATE.md - loads context if project already initialized
 <process>
 1. Check if .planning/codebase/ already exists (offer to refresh or skip)
 2. Create .planning/codebase/ directory structure
-3. Spawn 4 parallel gsd-codebase-mapper agents:
+2.5. Match notes for codebase mapping
+   ```bash
+   # Use focus area if provided, otherwise use general project context
+   if [ -n "$ARGUMENTS" ]; then
+     FOCUS_AREA="$ARGUMENTS"
+     MAPPING_CONTEXT="Codebase mapping focused on: $FOCUS_AREA"
+   else
+     FOCUS_AREA="full codebase"
+     MAPPING_CONTEXT="Full codebase analysis"
+   fi
+
+   # Get project name if available
+   PROJECT_NAME=$(grep -A2 "## What This Is" .planning/PROJECT.md 2>/dev/null | tail -1 | head -c 50)
+
+   # Call match-notes
+   MATCHED_OUTPUT=$(PHASE_NAME="$FOCUS_AREA codebase mapping" PHASE_GOAL="$MAPPING_CONTEXT $PROJECT_NAME" \
+     bash commands/gsd/match-notes.md 2>/dev/null)
+
+   # Build notes section if matches exist
+   NOTES_SECTION=""
+   if [ -n "$MATCHED_OUTPUT" ]; then
+     NOTES_SECTION="<matched_notes>
+
+Notes relevant to this codebase analysis:
+
+"
+     in_content=false
+     while IFS= read -r line; do
+       if [ "$line" = "CONTENT_START" ]; then
+         in_content=true
+       elif [ "$line" = "CONTENT_END" ]; then
+         in_content=false
+         NOTES_SECTION="$NOTES_SECTION
+---
+"
+       elif [ "$in_content" = "true" ]; then
+         NOTES_SECTION="$NOTES_SECTION$line
+"
+       fi
+     done <<< "$MATCHED_OUTPUT"
+
+     NOTES_SECTION="$NOTES_SECTION
+</matched_notes>"
+   fi
+   ```
+3. Spawn 4 parallel gsd-codebase-mapper agents (all receive `${NOTES_SECTION}`):
    - Agent 1: tech focus → writes STACK.md, INTEGRATIONS.md
    - Agent 2: arch focus → writes ARCHITECTURE.md, STRUCTURE.md
    - Agent 3: quality focus → writes CONVENTIONS.md, TESTING.md
    - Agent 4: concerns focus → writes CONCERNS.md
+
+   Note: Include `${NOTES_SECTION}` in each mapper's prompt after focus area description
 4. Wait for agents to complete, collect confirmations (NOT document contents)
 5. Verify all 7 documents exist with line counts
 6. Commit codebase map
