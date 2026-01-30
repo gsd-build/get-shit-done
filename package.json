@@ -1,6 +1,6 @@
 {
   "name": "get-shit-done-cc",
-  "version": "1.10.0",
+  "version": "1.10.1",
   "description": "A meta-prompting, context engineering and spec-driven development system for Claude Code, OpenCode and Gemini by TÂCHES.",
   "bin": {
     "get-shit-done-cc": "bin/install.js"
@@ -38,10 +38,19 @@
   },
   "dependencies": {},
   "devDependencies": {
-    "esbuild": "^0.24.0"
+    "@types/node": "^25.1.0",
+    "@types/react": "^19.2.10",
+    "esbuild": "^0.24.0",
+    "ts-morph": "^27.0.2",
+    "tsx": "^4.21.0",
+    "typescript": "^5.9.3",
+    "react-agentic": "^0.0.3"
   },
   "scripts": {
     "build:hooks": "node scripts/build-hooks.js",
+    "generate:commands": "rm -rf generated/commands && rm -rf generated/runtime && npx react-agentic build 'tsx/commands/**/*.tsx' --out generated/commands/gsd",
+    "generate:agents": "rm -rf generated/agents && npx react-agentic build 'tsx/agents/**/*.tsx' --out generated/agents",
+    "generate:tsx": "rm -rf generated && npm run generate:commands && npm run generate:agents",
     "prepublishOnly": "npm run build:hooks"
   }
 }
