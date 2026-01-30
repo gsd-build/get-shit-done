@@ -87,6 +87,46 @@ grep -A30 "### Decisions Made" .planning/STATE.md 2>/dev/null
 
 Present summary with phase description, requirements, prior decisions.
 
+## 3.5. Match Relevant Notes
+
+```bash
+# Match notes for this phase
+PHASE_NAME=$(grep "Phase ${PHASE}:" .planning/ROADMAP.md | sed 's/.*Phase [0-9]*: //')
+PHASE_GOAL=$(grep -A3 "Phase ${PHASE}:" .planning/ROADMAP.md | grep "Goal:" | sed 's/.*Goal: //')
+
+# Call match-notes (no target files yet - keyword matching only)
+MATCHED_OUTPUT=$(PHASE_NAME="$PHASE_NAME" PHASE_GOAL="$PHASE_GOAL" \
+  bash commands/gsd/match-notes.md 2>/dev/null)
+
+# Build notes section if matches exist
+NOTES_SECTION=""
+if [ -n "$MATCHED_OUTPUT" ]; then
+  NOTES_SECTION="<matched_notes>
+
+Notes relevant to this phase:
+
+"
+  # Parse all matches
+  in_content=false
+  while IFS= read -r line; do
+    if [ "$line" = "CONTENT_START" ]; then
+      in_content=true
+    elif [ "$line" = "CONTENT_END" ]; then
+      in_content=false
+      NOTES_SECTION="$NOTES_SECTION
+---
+"
+    elif [ "$in_content" = "true" ]; then
+      NOTES_SECTION="$NOTES_SECTION$line
+"
+    fi
+  done <<< "$MATCHED_OUTPUT"
+
+  NOTES_SECTION="$NOTES_SECTION
+</matched_notes>"
+fi
+```
+
 ## 4. Spawn gsd-phase-researcher Agent
 
 Research modes: ecosystem (default), feasibility, implementation, comparison.
@@ -120,6 +160,8 @@ Mode: ecosystem
 **Prior decisions:** {decisions_if_any}
 **Phase context:** {context_md_content}
 </context>
+
+{notes_section}
 
 <downstream_consumer>
 Your RESEARCH.md will be loaded by `/gsd:plan-phase` which uses specific sections:
@@ -173,6 +215,8 @@ Continue research for Phase {phase_number}: {phase_name}
 <prior_state>
 Research file: @.planning/phases/${PHASE}-{slug}/${PHASE}-RESEARCH.md
 </prior_state>
+
+{notes_section}
 
 <checkpoint_response>
 **Type:** {checkpoint_type}
