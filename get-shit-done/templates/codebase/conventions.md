@@ -46,7 +46,7 @@ Template for `.planning/codebase/CONVENTIONS.md` - captures coding style and pat
 **Linting:**
 - [Tool: e.g., "ESLint with eslint.config.js"]
 - [Rules: e.g., "extends airbnb-base, no console in production"]
-- [Run: e.g., "npm run lint"]
+- [Run: e.g., "pnpm run lint"]
 
 ## Import Organization
 
@@ -171,7 +171,7 @@ Template for `.planning/codebase/CONVENTIONS.md` - captures coding style and pat
 - ESLint with eslint.config.js
 - Extends @typescript-eslint/recommended
 - No console.log in production code (use logger)
-- Run: npm run lint
+- Run: pnpm run lint
 
 ## Import Organization
 

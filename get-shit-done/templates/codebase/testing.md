@@ -25,10 +25,10 @@ Template for `.planning/codebase/TESTING.md` - captures test framework and patte
 
 **Run Commands:**
 ```bash
-[e.g., "npm test" or "npm run test"]              # Run all tests
-[e.g., "npm test -- --watch"]                     # Watch mode
-[e.g., "npm test -- path/to/file.test.ts"]       # Single file
-[e.g., "npm run test:coverage"]                   # Coverage report
+[e.g., "pnpm test" or "pnpm run test"]            # Run all tests
+[e.g., "pnpm test -- --watch"]                    # Watch mode
+[e.g., "pnpm test -- path/to/file.test.ts"]      # Single file
+[e.g., "pnpm run test:coverage"]                  # Coverage report
 ```
 
 ## Test File Organization
@@ -150,7 +150,7 @@ export const mockUsers = [/* ... */];
 
 **View Coverage:**
 ```bash
-[e.g., "npm run test:coverage"]
+[e.g., "pnpm run test:coverage"]
 [e.g., "open coverage/index.html"]
 ```
 
@@ -227,10 +227,10 @@ it('should reject on failure', async () => {
 
 **Run Commands:**
 ```bash
-npm test                              # Run all tests
-npm test -- --watch                   # Watch mode
-npm test -- path/to/file.test.ts     # Single file
-npm run test:coverage                 # Coverage report
+pnpm test                              # Run all tests
+pnpm test -- --watch                   # Watch mode
+pnpm test -- path/to/file.test.ts     # Single file
+pnpm run test:coverage                 # Coverage report
 ```
 
 ## Test File Organization
@@ -371,7 +371,7 @@ Content here`;
 
 **View Coverage:**
 ```bash
-npm run test:coverage
+pnpm run test:coverage
 open coverage/index.html
 ```
 

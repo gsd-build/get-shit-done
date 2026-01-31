@@ -711,7 +711,7 @@ issues:
 
 **DO NOT check code existence.** That's gsd-verifier's job after execution. You verify plans, not codebase.
 
-**DO NOT run the application.** This is static plan analysis. No `npm start`, no `curl` to running server.
+**DO NOT run the application.** This is static plan analysis. No `pnpm start`, no `curl` to running server.
 
 **DO NOT accept vague tasks.** "Implement auth" is not specific enough. Tasks need concrete files, actions, verification.
 

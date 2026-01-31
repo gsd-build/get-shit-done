@@ -40,13 +40,13 @@ Template for `.planning/research/STACK.md` — recommended technologies for the 
 
 ```bash
 # Core
-npm install [packages]
+pnpm add [packages]
 
 # Supporting
-npm install [packages]
+pnpm add [packages]
 
 # Dev dependencies
-npm install -D [packages]
+pnpm add -D [packages]
 ```
 
 ## Alternatives Considered

@@ -439,10 +439,10 @@ Recommended technologies with versions and rationale.
 
 \`\`\`bash
 # Core
-npm install [packages]
+pnpm add [packages]
 
 # Dev dependencies
-npm install -D [packages]
+pnpm add -D [packages]
 \`\`\`
 
 ## Sources

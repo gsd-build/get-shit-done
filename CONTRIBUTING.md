@@ -150,7 +150,7 @@ Users opt-in: `pnpm install get-shit-done-together@1.10.0-alpha.1`
 
 ```bash
 # Update version
-npm version minor  # or patch, or major
+pnpm version minor  # or patch, or major
 
 # Update CHANGELOG.md (already follows Keep a Changelog format)
 
@@ -163,7 +163,7 @@ git tag -a v1.10.0 -m "Release v1.10.0"
 git push origin main --tags
 
 # Publish
-npm publish
+pnpm publish
 ```
 
 ### GitHub Releases
@@ -202,10 +202,10 @@ git commit -m "fix(install): handle Windows UNC paths"
 git push origin hotfix/1.9.4-windows-crash
 
 # PR → merge → tag
-npm version patch
+pnpm version patch
 git tag -a v1.9.5 -m "Hotfix: Windows UNC paths"
 git push origin main --tags
-npm publish
+pnpm publish
 ```
 
 ---
@@ -291,8 +291,8 @@ Exception: CHANGELOG.md, MIGRATION.md, git commits
 | Add a feature | Branch `feat/x` → PR → merge |
 | Fix a bug | Branch `fix/x` → PR → merge |
 | Fix production NOW | Branch `hotfix/version-x` → PR → merge → tag |
-| Release features | `npm version minor` → tag → publish |
-| Release fixes | Batch weekly, or `npm version patch` for critical |
+| Release features | `pnpm version minor` → tag → publish |
+| Release fixes | Batch weekly, or `pnpm version patch` for critical |
 | Try experimental feature | Tag as `v1.X.0-alpha.1` |
 | Revert a mistake | `git revert` → PR → merge |
 
@@ -313,14 +313,14 @@ pnpm link --global
 npx get-shit-done-together
 
 # Run tests
-npm test
+pnpm test
 
 # Using Git Worktrees?
-If you use worktrees, remember that `npm link` is global. If you link Worktree A, 
+If you use worktrees, remember that `pnpm link` is global. If you link Worktree A,
 then switch to Worktree B's directory, the global command still runs Worktree A's code.
 
 To test the current worktree:
-1. Run `npm link` again inside this directory (steals the global link).
+1. Run `pnpm link` again inside this directory (steals the global link).
 2. Or run the binary directly: `node ./bin/cli.js` (check package.json for exact path).
 ```
 

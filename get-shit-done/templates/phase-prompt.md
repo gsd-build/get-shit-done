@@ -337,7 +337,7 @@ Output: User model, API endpoints, and UI components.
 </tasks>
 
 <verification>
-- [ ] npm run build succeeds
+- [ ] pnpm run build succeeds
 - [ ] API endpoints respond correctly
 </verification>
 
@@ -389,14 +389,14 @@ Output: Working dashboard component.
   <name>Task 1: Build Dashboard layout</name>
   <files>src/components/Dashboard.tsx</files>
   <action>Create responsive grid with UserList and ProductList components. Use Tailwind for styling.</action>
-  <verify>npm run build succeeds</verify>
+  <verify>pnpm run build succeeds</verify>
   <done>Dashboard renders without errors</done>
 </task>
 
 <!-- Checkpoint pattern: Claude starts server, user visits URL. See checkpoints.md for full patterns. -->
 <task type="auto">
   <name>Start dev server</name>
-  <action>Run `npm run dev` in background, wait for ready</action>
+  <action>Run `pnpm run dev` in background, wait for ready</action>
   <verify>curl localhost:3000 returns 200</verify>
 </task>
 

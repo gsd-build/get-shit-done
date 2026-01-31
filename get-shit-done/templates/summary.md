@@ -209,7 +209,7 @@ The one-liner should tell someone what actually shipped.
 **2. [Rule 3 - Blocking] Installed missing jose dependency**
 - **Found during:** Task 4 (JWT token generation)
 - **Issue:** jose package not in package.json, import failing
-- **Fix:** Ran `npm install jose`
+- **Fix:** Ran `pnpm add jose`
 - **Files modified:** package.json, package-lock.json
 - **Verification:** Import succeeds, build passes
 - **Committed in:** def456g (Task 4 commit)

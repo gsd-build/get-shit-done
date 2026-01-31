@@ -156,8 +156,8 @@ if [ -f Cargo.toml ]; then echo "rust"; fi
 **2. Install minimal framework:**
 | Project | Framework | Install |
 |---------|-----------|---------|
-| Node.js | Jest | `npm install -D jest @types/jest ts-jest` |
-| Node.js (Vite) | Vitest | `npm install -D vitest` |
+| Node.js | Jest | `pnpm add -D jest @types/jest ts-jest` |
+| Node.js (Vite) | Vitest | `pnpm add -D vitest` |
 | Python | pytest | `pip install pytest` |
 | Go | testing | Built-in |
 | Rust | cargo test | Built-in |
@@ -170,7 +170,7 @@ if [ -f Cargo.toml ]; then echo "rust"; fi
 **4. Verify setup:**
 ```bash
 # Run empty test suite - should pass with 0 tests
-npm test  # Node
+pnpm test  # Node
 pytest    # Python
 go test ./...  # Go
 cargo test    # Rust

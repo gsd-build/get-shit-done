@@ -28,8 +28,8 @@ Template for `.planning/codebase/STACK.md` - captures the technology foundation.
 - [Additional requirements if any]
 
 **Package Manager:**
-- [Manager] [Version] - [e.g., "npm 10.x"]
-- Lockfile: [e.g., "package-lock.json present"]
+- [Manager] [Version] - [e.g., "pnpm 9.x"]
+- Lockfile: [e.g., "pnpm-lock.yaml present"]
 
 ## Frameworks
 
@@ -102,8 +102,8 @@ Template for `.planning/codebase/STACK.md` - captures the technology foundation.
 - No browser runtime (CLI tool only)
 
 **Package Manager:**
-- npm 10.x
-- Lockfile: `package-lock.json` present
+- pnpm 9.x
+- Lockfile: `pnpm-lock.yaml` present
 
 ## Frameworks
 
@@ -146,7 +146,7 @@ Template for `.planning/codebase/STACK.md` - captures the technology foundation.
 
 **Production:**
 - Distributed as npm package
-- Installed globally via npm install -g
+- Installed globally via pnpm add -g
 - Runs on user's Node.js installation
 
 ---

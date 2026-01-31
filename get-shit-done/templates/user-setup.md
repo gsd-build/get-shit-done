@@ -101,7 +101,7 @@ user_setup:
 
 | Claude CAN Do (not in USER-SETUP) | Claude CANNOT Do (→ USER-SETUP) |
 |-----------------------------------|--------------------------------|
-| `npm install stripe` | Create Stripe account |
+| `pnpm add stripe` | Create Stripe account |
 | Write webhook handler code | Get API keys from dashboard |
 | Create `.env.local` file structure | Copy actual secret values |
 | Run `stripe listen` | Authenticate Stripe CLI (browser OAuth) |
@@ -175,7 +175,7 @@ After completing setup:
 grep STRIPE .env.local
 
 # Verify build passes
-npm run build
+pnpm run build
 
 # Test webhook endpoint (should return 400 bad signature, not 500 crash)
 curl -X POST http://localhost:3000/api/webhooks/stripe \

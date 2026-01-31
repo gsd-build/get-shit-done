@@ -334,7 +334,7 @@ The established libraries/tools for this domain:
 
 **Installation:**
 \`\`\`bash
-npm install [packages]
+pnpm add [packages]
 \`\`\`
 
 ## Architecture Patterns

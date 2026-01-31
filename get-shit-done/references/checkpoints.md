@@ -69,13 +69,13 @@ Plans execute autonomously. Checkpoints formalize the interaction points where h
   <name>Build responsive dashboard layout</name>
   <files>src/components/Dashboard.tsx, src/app/dashboard/page.tsx</files>
   <action>Create dashboard with sidebar, header, and content area. Use Tailwind responsive classes for mobile.</action>
-  <verify>npm run build succeeds, no TypeScript errors</verify>
+  <verify>pnpm run build succeeds, no TypeScript errors</verify>
   <done>Dashboard component builds without errors</done>
 </task>
 
 <task type="auto">
   <name>Start dev server for verification</name>
-  <action>Run `npm run dev` in background, wait for "ready" message, capture port</action>
+  <action>Run `pnpm run dev` in background, wait for "ready" message, capture port</action>
   <verify>curl http://localhost:3000 returns 200</verify>
   <done>Dev server running at http://localhost:3000</done>
 </task>
@@ -348,7 +348,7 @@ Task: Responsive dashboard layout
 Built: Responsive dashboard at /dashboard
 
 How to verify:
-  1. Run: npm run dev
+  1. Run: pnpm run dev
   2. Visit: http://localhost:3000/dashboard
   3. Desktop (>1024px): Sidebar visible, content fills remaining space
   4. Tablet (768px): Sidebar collapses to icons
@@ -492,7 +492,7 @@ Task 3 complete. Continuing to task 4...
 | Upstash | `upstash` | `redis create`, `redis get` | `upstash auth login` |
 | PlanetScale | `pscale` | `database create`, `branch create` | `pscale auth login` |
 | GitHub | `gh` | `repo create`, `pr create`, `secret set` | `gh auth login` |
-| Node | `npm`/`pnpm` | `install`, `run build`, `test`, `run dev` | N/A |
+| Node | `pnpm` | `install`, `run build`, `test`, `run dev` | N/A |
 | Xcode | `xcodebuild` | `-project`, `-scheme`, `build`, `test` | N/A |
 | Convex | `npx convex` | `dev`, `deploy`, `env set`, `env get` | `npx convex login` |
 
@@ -543,10 +543,10 @@ Task 3 complete. Continuing to task 4...
 
 | Framework | Start Command | Ready Signal | Default URL |
 |-----------|---------------|--------------|-------------|
-| Next.js | `npm run dev` | "Ready in" or "started server" | http://localhost:3000 |
-| Vite | `npm run dev` | "ready in" | http://localhost:5173 |
+| Next.js | `pnpm run dev` | "Ready in" or "started server" | http://localhost:3000 |
+| Vite | `pnpm run dev` | "ready in" | http://localhost:5173 |
 | Convex | `npx convex dev` | "Convex functions ready" | N/A (backend only) |
-| Express | `npm start` | "listening on port" | http://localhost:3000 |
+| Express | `pnpm start` | "listening on port" | http://localhost:3000 |
 | Django | `python manage.py runserver` | "Starting development server" | http://localhost:8000 |
 
 ### Server Lifecycle Protocol
@@ -554,7 +554,7 @@ Task 3 complete. Continuing to task 4...
 **Starting servers:**
 ```bash
 # Run in background, capture PID for cleanup
-npm run dev &
+pnpm run dev &
 DEV_SERVER_PID=$!
 
 # Wait for ready signal (max 30s)
@@ -564,7 +564,7 @@ timeout 30 bash -c 'until curl -s localhost:3000 > /dev/null 2>&1; do sleep 1; d
 **Port conflicts:**
 If default port is in use, check what's running and either:
 1. Kill the existing process if it's stale: `lsof -ti:3000 | xargs kill`
-2. Use alternate port: `npm run dev -- --port 3001`
+2. Use alternate port: `pnpm run dev -- --port 3001`
 
 **Server stays running** for the duration of the checkpoint. After user approves, server continues running for subsequent tasks. Only kill explicitly if:
 - Plan is complete and no more verification needed
@@ -576,7 +576,7 @@ If default port is in use, check what's running and either:
 <!-- Claude starts server before checkpoint -->
 <task type="auto">
   <name>Start dev server</name>
-  <action>Run `npm run dev` in background, wait for ready signal</action>
+  <action>Run `pnpm run dev` in background, wait for ready signal</action>
   <verify>curl http://localhost:3000 returns 200</verify>
   <done>Dev server running</done>
 </task>
@@ -599,13 +599,13 @@ If default port is in use, check what's running and either:
 | CLI | Auto-install? | Command |
 |-----|---------------|---------|
 | npm/pnpm/yarn | No - ask user | User chooses package manager |
-| vercel | Yes | `npm i -g vercel` |
+| vercel | Yes | `pnpm add -g vercel` |
 | gh (GitHub) | Yes | `brew install gh` (macOS) or `apt install gh` (Linux) |
-| stripe | Yes | `npm i -g stripe` |
-| supabase | Yes | `npm i -g supabase` |
+| stripe | Yes | `pnpm add -g stripe` |
+| supabase | Yes | `pnpm add -g supabase` |
 | convex | No - use npx | `npx convex` (no install needed) |
 | fly | Yes | `brew install flyctl` or curl installer |
-| railway | Yes | `npm i -g @railway/cli` |
+| railway | Yes | `pnpm add -g @railway/cli` |
 
 **Protocol:**
 1. Try the command
@@ -617,7 +617,7 @@ If default port is in use, check what's running and either:
 <!-- Example: vercel not found -->
 <task type="auto">
   <name>Install Vercel CLI</name>
-  <action>Run `npm i -g vercel`</action>
+  <action>Run `pnpm add -g vercel`</action>
   <verify>`vercel --version` succeeds</verify>
   <done>Vercel CLI installed</done>
 </task>
@@ -631,7 +631,7 @@ If default port is in use, check what's running and either:
 |---------|----------|
 | Server won't start | Check error output, fix issue, retry (don't proceed to checkpoint) |
 | Port in use | Kill stale process or use alternate port |
-| Missing dependency | Run `npm install`, retry |
+| Missing dependency | Run `pnpm install`, retry |
 | Build error | Fix the error first (this is a bug, not a checkpoint issue) |
 | Auth error | Create auth gate checkpoint |
 | Network timeout | Retry with backoff, then checkpoint if persistent |
@@ -667,8 +667,8 @@ If default port is in use, check what's running and either:
 | Create Stripe webhook | Yes (API) | YES |
 | Write .env file | Yes (Write tool) | YES |
 | Create Upstash DB | Yes (`upstash`) | YES |
-| Run tests | Yes (`npm test`) | YES |
-| Start dev server | Yes (`npm run dev`) | YES |
+| Run tests | Yes (`pnpm test`) | YES |
+| Start dev server | Yes (`pnpm run dev`) | YES |
 | Add env vars to Convex | Yes (`npx convex env set`) | YES |
 | Add env vars to Vercel | Yes (`vercel env add`) | YES |
 | Seed database | Yes (CLI/API) | YES |
@@ -809,7 +809,7 @@ If default port is in use, check what's running and either:
   <name>Create user schema</name>
   <files>src/db/schema.ts</files>
   <action>Define User, Session, Account tables with Drizzle ORM</action>
-  <verify>npm run db:generate succeeds</verify>
+  <verify>pnpm run db:generate succeeds</verify>
 </task>
 
 <task type="auto">
@@ -823,12 +823,12 @@ If default port is in use, check what's running and either:
   <name>Create login UI</name>
   <files>src/app/login/page.tsx, src/components/LoginButton.tsx</files>
   <action>Create login page with GitHub OAuth button</action>
-  <verify>npm run build succeeds</verify>
+  <verify>pnpm run build succeeds</verify>
 </task>
 
 <task type="auto">
   <name>Start dev server for auth testing</name>
-  <action>Run `npm run dev` in background, wait for ready signal</action>
+  <action>Run `pnpm run dev` in background, wait for ready signal</action>
   <verify>curl http://localhost:3000 returns 200</verify>
   <done>Dev server running at http://localhost:3000</done>
 </task>
@@ -857,21 +857,21 @@ If default port is in use, check what's running and either:
 <task type="checkpoint:human-verify" gate="blocking">
   <what-built>Dashboard component</what-built>
   <how-to-verify>
-    1. Run: npm run dev
+    1. Run: pnpm run dev
     2. Visit: http://localhost:3000/dashboard
     3. Check layout is correct
   </how-to-verify>
 </task>
 ```
 
-**Why bad:** Claude can run `npm run dev`. User should only visit URLs, not execute commands.
+**Why bad:** Claude can run `pnpm run dev`. User should only visit URLs, not execute commands.
 
 ### ✅ GOOD: Claude starts server, user visits
 
 ```xml
 <task type="auto">
   <name>Start dev server</name>
-  <action>Run `npm run dev` in background</action>
+  <action>Run `pnpm run dev` in background</action>
   <verify>curl localhost:3000 returns 200</verify>
 </task>
 

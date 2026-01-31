@@ -131,7 +131,7 @@ Every task has four required fields:
 - Bad: "Add authentication", "Make login work"
 
 **<verify>:** How to prove the task is complete.
-- Good: `npm test` passes, `curl -X POST /api/auth/login` returns 200 with Set-Cookie header
+- Good: `pnpm test` passes, `curl -X POST /api/auth/login` returns 200 with Set-Cookie header
 - Bad: "It works", "Looks good"
 
 **<done>:** Acceptance criteria - measurable state of completion.

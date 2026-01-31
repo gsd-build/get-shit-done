@@ -483,7 +483,7 @@ A fix is verified when ALL of these are true:
 ```bash
 # Repeated execution
 for i in {1..100}; do
-  npm test -- specific-test.js || echo "Failed on run $i"
+  pnpm test -- specific-test.js || echo "Failed on run $i"
 done
 ```
 
