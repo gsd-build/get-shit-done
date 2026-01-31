@@ -245,14 +245,14 @@ Gather verification context from the phase directory and project state.
 
 ```bash
 # Normalize phase and find directory
-PADDED_PHASE=$(printf "%02d" ${PHASE_ARG} 2>/dev/null || echo "${PHASE_ARG}")
-PHASE_DIR=$(ls -d .planning/phases/${PADDED_PHASE}-* .planning/phases/${PHASE_ARG}-* 2>/dev/null | head -1)
+PADDED_PHASE=$(printf "%02d" $PHASE_ARG 2>/dev/null || echo "$PHASE_ARG")
+PHASE_DIR=$(ls -d .planning/phases/$PADDED_PHASE-* .planning/phases/$PHASE_ARG-* 2>/dev/null | head -1)
 
 # List all PLAN.md files
 ls "$PHASE_DIR"/*-PLAN.md 2>/dev/null
 
 # Get phase goal from ROADMAP
-grep -A 10 "Phase ${PHASE_NUM}" .planning/ROADMAP.md | head -15
+grep -A 10 "Phase $PHASE_NUM" .planning/ROADMAP.md | head -15
 
 # Get phase brief if exists
 ls "$PHASE_DIR"/*-BRIEF.md 2>/dev/null
@@ -384,10 +384,10 @@ Evaluate scope against context budget.
 **Metrics per plan:**
 ```bash
 # Count tasks
-grep -c "<task" "$PHASE_DIR"/${PHASE}-01-PLAN.md
+grep -c "<task" "$PHASE_DIR"/$PHASE-01-PLAN.md
 
 # Count files in files_modified
-grep "files_modified:" "$PHASE_DIR"/${PHASE}-01-PLAN.md
+grep "files_modified:" "$PHASE_DIR"/$PHASE-01-PLAN.md
 ```
 
 **Thresholds:**

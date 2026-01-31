@@ -804,8 +804,8 @@ Triggered by `--gaps` flag. Creates plans to address verification or UAT failure
 
 ```bash
 # Match both zero-padded (05-*) and unpadded (5-*) folders
-PADDED_PHASE=$(printf "%02d" ${PHASE_ARG} 2>/dev/null || echo "${PHASE_ARG}")
-PHASE_DIR=$(ls -d .planning/phases/${PADDED_PHASE}-* .planning/phases/${PHASE_ARG}-* 2>/dev/null | head -1)
+PADDED_PHASE=$(printf "%02d" $PHASE_ARG 2>/dev/null || echo "$PHASE_ARG")
+PHASE_DIR=$(ls -d .planning/phases/$PADDED_PHASE-* .planning/phases/$PHASE_ARG-* 2>/dev/null | head -1)
 
 # Check for VERIFICATION.md (code verification gaps)
 ls "$PHASE_DIR"/*-VERIFICATION.md 2>/dev/null
@@ -884,7 +884,7 @@ Triggered when orchestrator provides `<revision_context>` with checker issues. Y
 Read all PLAN.md files in the phase directory:
 
 ```bash
-cat .planning/phases/${PHASE}-*/*-PLAN.md
+cat .planning/phases/$PHASE-*/*-PLAN.md
 ```
 
 Build mental model of:
@@ -953,8 +953,8 @@ After making edits, self-check:
 **If `COMMIT_PLANNING_DOCS=true` (default):**
 
 ```bash
-git add .planning/phases/${PHASE}-*/${PHASE}-*-PLAN.md
-git commit -m "fix(${PHASE}): revise plans based on checker feedback"
+git add .planning/phases/$PHASE-*/$PHASE-*-PLAN.md
+git commit -m "fix($PHASE): revise plans based on checker feedback"
 ```
 
 ### Step 7: Return Revision Summary
@@ -1089,17 +1089,17 @@ Understand:
 
 ```bash
 # Match both zero-padded (05-*) and unpadded (5-*) folders
-PADDED_PHASE=$(printf "%02d" ${PHASE} 2>/dev/null || echo "${PHASE}")
-PHASE_DIR=$(ls -d .planning/phases/${PADDED_PHASE}-* .planning/phases/${PHASE}-* 2>/dev/null | head -1)
+PADDED_PHASE=$(printf "%02d" $PHASE 2>/dev/null || echo "$PHASE")
+PHASE_DIR=$(ls -d .planning/phases/$PADDED_PHASE-* .planning/phases/$PHASE-* 2>/dev/null | head -1)
 
 # Read CONTEXT.md if exists (from /gsd:discuss-phase)
-cat "${PHASE_DIR}"/*-CONTEXT.md 2>/dev/null
+cat "$PHASE_DIR"/*-CONTEXT.md 2>/dev/null
 
 # Read RESEARCH.md if exists (from /gsd:research-phase)
-cat "${PHASE_DIR}"/*-RESEARCH.md 2>/dev/null
+cat "$PHASE_DIR"/*-RESEARCH.md 2>/dev/null
 
 # Read DISCOVERY.md if exists (from mandatory discovery)
-cat "${PHASE_DIR}"/*-DISCOVERY.md 2>/dev/null
+cat "$PHASE_DIR"/*-DISCOVERY.md 2>/dev/null
 ```
 
 **If CONTEXT.md exists:** Honor user's vision, prioritize their essential features, respect stated boundaries. These are locked decisions - do not revisit.
@@ -1224,10 +1224,10 @@ Commit phase plan(s) and updated roadmap:
 **If `COMMIT_PLANNING_DOCS=true` (default):**
 
 ```bash
-git add .planning/phases/${PHASE}-*/${PHASE}-*-PLAN.md .planning/ROADMAP.md
-git commit -m "docs(${PHASE}): create phase plan
+git add .planning/phases/$PHASE-*/$PHASE-*-PLAN.md .planning/ROADMAP.md
+git commit -m "docs($PHASE): create phase plan
 
-Phase ${PHASE}: ${PHASE_NAME}
+Phase $PHASE: $PHASE_NAME
 - [N] plan(s) in [M] wave(s)
 - [X] parallel, [Y] sequential
 - Ready for execution"

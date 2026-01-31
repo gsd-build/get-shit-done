@@ -61,10 +61,10 @@ ls "$PHASE_DIR"/*-PLAN.md 2>/dev/null
 ls "$PHASE_DIR"/*-SUMMARY.md 2>/dev/null
 
 # Phase goal from ROADMAP
-grep -A 5 "Phase ${PHASE_NUM}" .planning/ROADMAP.md
+grep -A 5 "Phase $PHASE_NUM" .planning/ROADMAP.md
 
 # Requirements mapped to this phase
-grep -E "^| ${PHASE_NUM}" .planning/REQUIREMENTS.md 2>/dev/null
+grep -E "^| $PHASE_NUM" .planning/REQUIREMENTS.md 2>/dev/null
 ```
 
 Extract phase goal from ROADMAP.md. This is the outcome to verify, not the tasks.
@@ -372,7 +372,7 @@ verify_state_render_link() {
 If REQUIREMENTS.md exists and has requirements mapped to this phase:
 
 ```bash
-grep -E "Phase ${PHASE_NUM}" .planning/REQUIREMENTS.md 2>/dev/null
+grep -E "Phase $PHASE_NUM" .planning/REQUIREMENTS.md 2>/dev/null
 ```
 
 For each requirement:

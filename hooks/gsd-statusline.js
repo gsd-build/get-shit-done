@@ -18,22 +18,25 @@ process.stdin.on('end', () => {
     const session = data.session_id || '';
     const remaining = data.context_window?.remaining_percentage;
 
-    // Context window display (shows USED percentage)
+    // Context window display (shows USED percentage scaled to 80% limit)
+    // Claude Code enforces an 80% context limit, so we scale to show 100% at that point
     let ctx = '';
     if (remaining != null) {
       const rem = Math.round(remaining);
-      const used = Math.max(0, Math.min(100, 100 - rem));
+      const rawUsed = Math.max(0, Math.min(100, 100 - rem));
+      // Scale: 80% real usage = 100% displayed
+      const used = Math.min(100, Math.round((rawUsed / 80) * 100));
 
       // Build progress bar (10 segments)
       const filled = Math.floor(used / 10);
       const bar = '█'.repeat(filled) + '░'.repeat(10 - filled);
 
-      // Color based on usage
-      if (used < 50) {
+      // Color based on scaled usage (thresholds adjusted for new scale)
+      if (used < 63) {        // ~50% real
         ctx = ` \x1b[32m${bar} ${used}%\x1b[0m`;
-      } else if (used < 65) {
+      } else if (used < 81) { // ~65% real
         ctx = ` \x1b[33m${bar} ${used}%\x1b[0m`;
-      } else if (used < 80) {
+      } else if (used < 95) { // ~76% real
         ctx = ` \x1b[38;5;208m${bar} ${used}%\x1b[0m`;
       } else {
         ctx = ` \x1b[5;31m💀 ${bar} ${used}%\x1b[0m`;

@@ -445,11 +445,11 @@ Orchestrator provides:
 
 ```bash
 # Match both zero-padded (05-*) and unpadded (5-*) folders
-PADDED_PHASE=$(printf "%02d" ${PHASE} 2>/dev/null || echo "${PHASE}")
-PHASE_DIR=$(ls -d .planning/phases/${PADDED_PHASE}-* .planning/phases/${PHASE}-* 2>/dev/null | head -1)
+PADDED_PHASE=$(printf "%02d" $PHASE 2>/dev/null || echo "$PHASE")
+PHASE_DIR=$(ls -d .planning/phases/$PADDED_PHASE-* .planning/phases/$PHASE-* 2>/dev/null | head -1)
 
 # Read CONTEXT.md if exists (from /gsd:discuss-phase)
-cat "${PHASE_DIR}"/*-CONTEXT.md 2>/dev/null
+cat "$PHASE_DIR"/*-CONTEXT.md 2>/dev/null
 
 # Check if planning docs should be committed (default: true)
 COMMIT_PLANNING_DOCS=$(cat .planning/config.json 2>/dev/null | grep -o '"commit_docs"[[:space:]]*:[[:space:]]*[^,}]*' | grep -o 'true\|false' || echo "true")
@@ -525,7 +525,7 @@ Run through verification protocol checklist:
 
 Use the output format template. Populate all sections with verified findings.
 
-Write to: `${PHASE_DIR}/${PADDED_PHASE}-RESEARCH.md`
+Write to: `$PHASE_DIR/$PADDED_PHASE-RESEARCH.md`
 
 Where `PHASE_DIR` is the full path (e.g., `.planning/phases/01-foundation`)
 
@@ -536,10 +536,10 @@ Where `PHASE_DIR` is the full path (e.g., `.planning/phases/01-foundation`)
 **If `COMMIT_PLANNING_DOCS=true` (default):**
 
 ```bash
-git add "${PHASE_DIR}/${PADDED_PHASE}-RESEARCH.md"
-git commit -m "docs(${PHASE}): research phase domain
+git add "$PHASE_DIR/$PADDED_PHASE-RESEARCH.md"
+git commit -m "docs($PHASE): research phase domain
 
-Phase ${PHASE}: ${PHASE_NAME}
+Phase $PHASE: $PHASE_NAME
 - Standard stack identified
 - Architecture patterns documented
 - Pitfalls catalogued"
@@ -569,7 +569,7 @@ When research finishes successfully:
 
 ### File Created
 
-`${PHASE_DIR}/${PADDED_PHASE}-RESEARCH.md`
+`$PHASE_DIR/$PADDED_PHASE-RESEARCH.md`
 
 ### Confidence Assessment
 

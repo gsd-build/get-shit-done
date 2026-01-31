@@ -103,6 +103,81 @@ git check-ignore -q .planning 2>/dev/null && COMMIT_PLANNING_DOCS=false
 ```
 
 Store `COMMIT_PLANNING_DOCS` for use in git operations.
+
+**Load git branching config:**
+
+```bash
+# Get branching strategy (default: none)
+BRANCHING_STRATEGY=$(cat .planning/config.json 2>/dev/null | grep -o '"branching_strategy"[[:space:]]*:[[:space:]]*"[^"]*"' | sed 's/.*:.*"\([^"]*\)"/\1/' || echo "none")
+
+# Get templates
+PHASE_BRANCH_TEMPLATE=$(cat .planning/config.json 2>/dev/null | grep -o '"phase_branch_template"[[:space:]]*:[[:space:]]*"[^"]*"' | sed 's/.*:.*"\([^"]*\)"/\1/' || echo "gsd/phase-{phase}-{slug}")
+MILESTONE_BRANCH_TEMPLATE=$(cat .planning/config.json 2>/dev/null | grep -o '"milestone_branch_template"[[:space:]]*:[[:space:]]*"[^"]*"' | sed 's/.*:.*"\([^"]*\)"/\1/' || echo "gsd/{milestone}-{slug}")
+```
+
+Store `BRANCHING_STRATEGY` and templates for use in branch creation step.
+</step>
+
+<step name="handle_branching">
+Create or switch to appropriate branch based on branching strategy.
+
+**Skip if strategy is "none":**
+
+```bash
+if [ "$BRANCHING_STRATEGY" = "none" ]; then
+  # No branching, continue on current branch
+  exit 0
+fi
+```
+
+**For "phase" strategy — create phase branch:**
+
+```bash
+if [ "$BRANCHING_STRATEGY" = "phase" ]; then
+  # Get phase name from directory (e.g., "03-authentication" → "authentication")
+  PHASE_NAME=$(basename "$PHASE_DIR" | sed 's/^[0-9]*-//')
+
+  # Create slug from phase name
+  PHASE_SLUG=$(echo "$PHASE_NAME" | tr '[:upper:]' '[:lower:]' | sed 's/[^a-z0-9]/-/g' | sed 's/--*/-/g' | sed 's/^-//;s/-$//')
+
+  # Apply template
+  BRANCH_NAME=$(echo "$PHASE_BRANCH_TEMPLATE" | sed "s/{phase}/$PADDED_PHASE/g" | sed "s/{slug}/$PHASE_SLUG/g")
+
+  # Create or switch to branch
+  git checkout -b "$BRANCH_NAME" 2>/dev/null || git checkout "$BRANCH_NAME"
+
+  echo "Branch: $BRANCH_NAME (phase branching)"
+fi
+```
+
+**For "milestone" strategy — create/switch to milestone branch:**
+
+```bash
+if [ "$BRANCHING_STRATEGY" = "milestone" ]; then
+  # Get current milestone info from ROADMAP.md
+  MILESTONE_VERSION=$(grep -oE 'v[0-9]+\.[0-9]+' .planning/ROADMAP.md | head -1 || echo "v1.0")
+  MILESTONE_NAME=$(grep -A1 "## .*$MILESTONE_VERSION" .planning/ROADMAP.md | tail -1 | sed 's/.*- //' | cut -d'(' -f1 | tr -d ' ' || echo "milestone")
+
+  # Create slug
+  MILESTONE_SLUG=$(echo "$MILESTONE_NAME" | tr '[:upper:]' '[:lower:]' | sed 's/[^a-z0-9]/-/g' | sed 's/--*/-/g' | sed 's/^-//;s/-$//')
+
+  # Apply template
+  BRANCH_NAME=$(echo "$MILESTONE_BRANCH_TEMPLATE" | sed "s/{milestone}/$MILESTONE_VERSION/g" | sed "s/{slug}/$MILESTONE_SLUG/g")
+
+  # Create or switch to branch (same branch for all phases in milestone)
+  git checkout -b "$BRANCH_NAME" 2>/dev/null || git checkout "$BRANCH_NAME"
+
+  echo "Branch: $BRANCH_NAME (milestone branching)"
+fi
+```
+
+**Report branch status:**
+
+```
+Branching: {strategy} → {branch_name}
+```
+
+**Note:** All subsequent plan commits go to this branch. User handles merging based on their workflow.
 </step>
 
 <step name="validate_phase">

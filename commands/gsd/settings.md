@@ -43,6 +43,7 @@ Parse current values (default to `true` if not present):
 - `optimization.delta_context` — send only changed context (default: `true`)
 - `optimization.lazy_references` — lazy load file contents (default: `true`)
 - `optimization.compact_workflows` — compact workflow descriptions (default: `true`)
+- `git.branching_strategy` — branching approach (default: `"none"`)
 
 ## 3. Present Settings
 
@@ -141,6 +142,16 @@ AskUserQuestion([
       { label: "Yes", description: "Use streamlined workflow descriptions" },
       { label: "No", description: "Use verbose workflow descriptions" }
     ]
+  },
+  {
+    question: "Git branching strategy?",
+    header: "Branching",
+    multiSelect: false,
+    options: [
+      { label: "None (Recommended)", description: "Commit directly to current branch" },
+      { label: "Per Phase", description: "Create branch for each phase (gsd/phase-{N}-{name})" },
+      { label: "Per Milestone", description: "Create branch for entire milestone (gsd/{version}-{name})" }
+    ]
   }
 ])
 ```
@@ -174,6 +185,9 @@ Merge new settings into existing config.json:
     "delta_context": true/false,
     "lazy_references": true/false,
     "compact_workflows": true/false
+  },
+  "git": {
+    "branching_strategy": "none" | "phase" | "milestone"
   }
 }
 ```
@@ -201,6 +215,7 @@ Display:
 | Delta Context              | {On/Off} |
 | Lazy References            | {On/Off} |
 | Compact Workflows          | {On/Off} |
+| Git Branching              | {None/Per Phase/Per Milestone} |
 
 These settings apply to future /gsd:plan-phase and /gsd:execute-phase runs.
 
@@ -215,7 +230,7 @@ Quick commands:
 
 <success_criteria>
 - [ ] Current config read
-- [ ] User presented with 4 settings (profile + 3 toggles)
-- [ ] Config updated with model_profile and workflow section
+- [ ] User presented with 5 settings (profile + 3 workflow toggles + git branching)
+- [ ] Config updated with model_profile, workflow, and git sections
 - [ ] Changes confirmed to user
 </success_criteria>

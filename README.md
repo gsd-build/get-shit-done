@@ -2,7 +2,7 @@
 
 # GET SHIT DONE
 
-**A light-weight and powerful meta-prompting, context engineering and spec-driven development system for Claude Code and OpenCode.**
+**A light-weight and powerful meta-prompting, context engineering and spec-driven development system for Claude Code, OpenCode, and Gemini CLI.**
 
 **Solves context rot — the quality degradation that happens as Claude fills its context window.**
 
@@ -77,10 +77,10 @@ npx get-shit-done-cc
 ```
 
 The installer prompts you to choose:
-1. **Runtime** — Claude Code, OpenCode, or both
+1. **Runtime** — Claude Code, OpenCode, Gemini, or all
 2. **Location** — Global (all projects) or local (current project only)
 
-Verify with `/gsd:help` inside your Claude Code or OpenCode interface.
+Verify with `/gsd:help` inside your chosen runtime.
 
 ### Staying Updated
 
@@ -99,14 +99,17 @@ npx get-shit-done-cc --claude --global   # Install to ~/.claude/
 npx get-shit-done-cc --claude --local    # Install to ./.claude/
 
 # OpenCode (open source, free models)
-npx get-shit-done-cc --opencode --global # Install to ~/.opencode/
+npx get-shit-done-cc --opencode --global # Install to ~/.config/opencode/
 
-# Both runtimes
-npx get-shit-done-cc --both --global     # Install to both directories
+# Gemini CLI
+npx get-shit-done-cc --gemini --global   # Install to ~/.gemini/
+
+# All runtimes
+npx get-shit-done-cc --all --global      # Install to all directories
 ```
 
 Use `--global` (`-g`) or `--local` (`-l`) to skip the location prompt.
-Use `--claude`, `--opencode`, or `--both` to skip the runtime prompt.
+Use `--claude`, `--opencode`, `--gemini`, or `--all` to skip the runtime prompt.
 
 </details>
 
@@ -568,10 +571,14 @@ This removes all GSD commands, agents, hooks, and settings while preserving your
 
 ## Community Ports
 
+OpenCode and Gemini CLI are now natively supported via `npx get-shit-done-cc`.
+
+These community ports pioneered multi-runtime support:
+
 | Project | Platform | Description |
 |---------|----------|-------------|
-| [gsd-opencode](https://github.com/rokicool/gsd-opencode) | OpenCode | GSD adapted for OpenCode CLI |
-| [gsd-gemini](https://github.com/uberfuzzy/gsd-gemini) | Gemini CLI | GSD adapted for Google's Gemini CLI |
+| [gsd-opencode](https://github.com/rokicool/gsd-opencode) | OpenCode | Original OpenCode adaptation |
+| [gsd-gemini](https://github.com/uberfuzzy/gsd-gemini) | Gemini CLI | Original Gemini adaptation |
 
 ---
 
