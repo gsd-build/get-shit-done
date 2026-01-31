@@ -60,6 +60,12 @@ pnpm publish
 - `gsd-check-update.js` — Version check on session start
 - Built to `hooks/dist/` for installation
 
+**docs/** — User-facing documentation:
+- `concepts/` — Core concepts (projects, milestones, phases, plans)
+- `reference/` — Technical reference (commands, agents, templates)
+- `guides/` — How-to guides (getting-started, workflows)
+- `overview.md` — System overview and quick reference
+
 ### Key Patterns
 
 **Frontmatter Conversion** — The installer converts Claude Code frontmatter for other runtimes:
@@ -101,3 +107,13 @@ Keep CLAUDE.md updated when:
 - Updating development workflows or build processes
 
 This file is the primary onboarding context for AI assistants working on this codebase.
+
+## Documentation
+
+User-facing documentation lives in `docs/`. Keep docs updated when:
+- Adding or modifying commands → update `docs/reference/commands.md`
+- Adding or modifying agents → update `docs/reference/agents.md`
+- Adding or modifying templates → update `docs/reference/templates.md`
+- Changing workflows or concepts → update relevant `docs/concepts/` or `docs/guides/` files
+
+See `docs/README.md` for the full documentation structure.
