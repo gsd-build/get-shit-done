@@ -1,10 +1,10 @@
 /**
- * plan-phase.tsx - GSD Plan Phase Command
+ * plan-phase.tsx - GSD Plan Phase Command (Meta-Prompting)
  *
- * Creates detailed execution plan for a phase (PLAN.md) with verification loop.
- * Uses react-agentic patterns with TypeScript runtime functions.
+ * Pattern: Claude reads files directly and constructs prompts based on understanding.
+ * Runtime handles only mechanical operations (validation, parsing, file moves, stats).
  *
- * Flow: Research (if needed) → Plan → Verify → Done
+ * Flow: Init → Read Files → Triage → Research (if needed) → Plan → Verify → Done
  */
 
 import {
@@ -17,7 +17,6 @@ import {
   Break,
   Return,
   AskUser,
-  SpawnAgent,
   XmlBlock,
   ExecutionContext,
   Table,
@@ -26,112 +25,19 @@ import {
 // Import runtime functions
 import {
   init,
-  checkExistingPlans,
-  buildResearcherPrompt,
-  buildPlannerPrompt,
-  buildCheckerPrompt,
   parseAgentStatus,
-  generateSummary,
-  formatSummaryMarkdown,
   archiveExistingPlans,
-  readAndDisplayPlans,
 } from './plan-phase.runtime.js';
 
-// Import types
 import type {
-  PlanPhaseContext,
-  PlanSummary,
-  PromptResult,
+  PlanPhaseContext as Context,
   AgentStatus,
-  ExistingPlansResult,
 } from './plan-phase.runtime.js';
-import BannerUi from '../../components/ui/banner-ui';
-import SpawningAgentUi from '../../components/ui/spawning-agent-ui.js';
 
-// ============================================================================
-// Create typed runtime function components
-// ============================================================================
-
+// Register runtime functions for CLI access
 const Init = runtimeFn(init);
-const CheckExistingPlans = runtimeFn(checkExistingPlans);
-const BuildResearcherPrompt = runtimeFn(buildResearcherPrompt);
-const BuildPlannerPrompt = runtimeFn(buildPlannerPrompt);
-const BuildCheckerPrompt = runtimeFn(buildCheckerPrompt);
 const ParseAgentStatus = runtimeFn(parseAgentStatus);
-const GenerateSummary = runtimeFn(generateSummary);
-const FormatSummary = runtimeFn(formatSummaryMarkdown);
 const ArchiveExistingPlans = runtimeFn(archiveExistingPlans);
-const ReadAndDisplayPlans = runtimeFn(readAndDisplayPlans);
-
-// ============================================================================
-// Objective Component
-// ============================================================================
-
-const Objective = () => (
-  <XmlBlock name="objective">
-    <p>Create executable phase prompts (PLAN.md files) for a roadmap phase with integrated research and verification.</p>
-    <p><b>Default flow:</b> Research (if needed) → Plan → Verify → Done</p>
-    <p><b>Orchestrator role:</b> Parse arguments, validate phase, research domain (unless skipped or exists), spawn gsd-planner agent, verify plans with gsd-plan-checker, iterate until plans pass or max iterations reached, present results.</p>
-    <p><b>Why subagents:</b> Research and planning burn context fast. Verification uses fresh context. User sees the flow between agents in main context.</p>
-  </XmlBlock>
-);
-
-// ============================================================================
-// Context Component
-// ============================================================================
-
-const Context = () => (
-  <XmlBlock name="context">
-    <p>Phase number: $ARGUMENTS (optional - auto-detects next unplanned phase if not provided)</p>
-    <div>
-      <b>Flags:</b>
-      <ul>
-        <li><code>--research</code> — Force re-research even if RESEARCH.md exists</li>
-        <li><code>--skip-research</code> — Skip research entirely, go straight to planning</li>
-        <li><code>--gaps</code> — Gap closure mode (reads VERIFICATION.md, skips research)</li>
-        <li><code>--skip-verify</code> — Skip planner → checker verification loop</li>
-      </ul>
-    </div>
-    <p>Normalize phase input in step 2 before any directory lookups.</p>
-  </XmlBlock>
-);
-
-// ============================================================================
-// Model Profile Table
-// ============================================================================
-
-const ModelProfileTable = () => (
-  <>
-    <h3>Model Profile Lookup</h3>
-    <Table
-      headers={["Agent", "quality", "balanced", "budget"]}
-      rows={[
-        ["gsd-phase-researcher", "opus", "sonnet", "haiku"],
-        ["gsd-planner", "opus", "opus", "sonnet"],
-        ["gsd-plan-checker", "sonnet", "sonnet", "haiku"],
-      ]}
-    />
-    <p>Store resolved models for use in Task calls below.</p>
-  </>
-);
-
-// ============================================================================
-// Success Criteria Component
-// ============================================================================
-
-const SuccessCriteria = () => (
-  <XmlBlock name="success_criteria">
-    <ul>
-      <li>[] Init runtime: environment validated, arguments parsed, phase resolved, directory created</li>
-      <li>[] Research: gsd-phase-researcher spawned if needed (unless --skip-research, --gaps, or exists)</li>
-      <li>[] Existing plans: user consulted if plans exist (continue/view/replan)</li>
-      <li>[] Planner: gsd-planner spawned with runtime-built prompt (handles COMPLETE/CHECKPOINT/INCONCLUSIVE)</li>
-      <li>[] Verification: gsd-plan-checker in loop (unless --skip-verify or config disabled)</li>
-      <li>[] Revision: planner re-spawned with issues if checker finds problems (max 3 iterations)</li>
-      <li>[] Summary: runtime generates formatted output with next steps</li>
-    </ul>
-  </XmlBlock>
-);
 
 // ============================================================================
 // Command Export
@@ -146,37 +52,43 @@ export default (
     allowedTools={["Read", "Write", "Bash", "Glob", "Grep", "Task", "WebFetch", "mcp__context7__*"]}
   >
     {() => {
-      // Variable declarations with typed RuntimeVars
-      const ctx = useRuntimeVar<PlanPhaseContext>('CTX');
-      const existingPlans = useRuntimeVar<ExistingPlansResult>('EXISTING_PLANS');
-      const researcherPrompt = useRuntimeVar<PromptResult>('RESEARCHER_PROMPT');
-      const plannerPrompt = useRuntimeVar<PromptResult>('PLANNER_PROMPT');
-      const checkerPrompt = useRuntimeVar<{ prompt: string; phaseGoal: string }>('CHECKER_PROMPT');
-      const agentOutput = useRuntimeVar<string>('AGENT_OUTPUT');
+      // Runtime variables
+      const ctx = useRuntimeVar<Context>('CTX');
       const agentStatus = useRuntimeVar<AgentStatus>('AGENT_STATUS');
+
+      // Flow control
       const userChoice = useRuntimeVar<string>('USER_CHOICE');
       const iteration = useRuntimeVar<number>('ITERATION');
-      const summary = useRuntimeVar<PlanSummary>('SUMMARY');
-      const summaryMd = useRuntimeVar<string>('SUMMARY_MD');
-      const plansDisplay = useRuntimeVar<string>('PLANS_DISPLAY');
-      const _void = useRuntimeVar<void>('_VOID');
+      const archiveResult = useRuntimeVar<string>('ARCHIVE_RESULT');
 
       return (
         <>
           <ExecutionContext paths={["~/.claude/get-shit-done/references/ui-brand.md"]} />
 
-          <Objective />
-          <Context />
+          <XmlBlock name="objective">
+            <p>Create executable phase plans (PLAN.md files) for a roadmap phase with integrated research and verification.</p>
+            <p><b>Default flow:</b> Research (if needed) → Plan → Verify → Done</p>
+            <p><b>Orchestrator role:</b> Parse arguments, validate phase, read context files, construct prompts with understanding, spawn subagents, iterate until plans pass, present results.</p>
+            <p><b>Why subagents:</b> Research and planning burn context fast. Verification uses fresh context. User sees the flow between agents in main context.</p>
+          </XmlBlock>
+
+          <XmlBlock name="context">
+            <p>Phase number: $ARGUMENTS (optional - auto-detects next unplanned phase if not provided)</p>
+            <ul>
+              <li><code>--research</code> — Force re-research even if RESEARCH.md exists</li>
+              <li><code>--skip-research</code> — Skip research entirely</li>
+              <li><code>--gaps</code> — Gap closure mode (uses VERIFICATION.md, skips research)</li>
+              <li><code>--skip-verify</code> — Skip verification loop</li>
+            </ul>
+          </XmlBlock>
 
           <XmlBlock name="process">
 
             {/* ============================================================ */}
-            {/* STEP 1: Validate Environment and Initialize */}
+            {/* STEP 1: Initialize Environment */}
             {/* ============================================================ */}
 
-            <h2>Step 1: Validate Environment</h2>
-
-            <p>Initialize context, parse arguments, validate environment:</p>
+            <h2>Step 1: Validate Environment and Initialize</h2>
 
             <Init.Call
               args={{ arguments: "$ARGUMENTS" }}
@@ -189,62 +101,117 @@ export default (
               <Return status="ERROR" message="Initialization failed" />
             </If>
 
-            <p>Phase {ctx.phaseId}: {ctx.phaseName}</p>
-            <p>Directory: {ctx.phaseDir}</p>
+            <p>Phase directory: {ctx.phaseDir}</p>
             <p>Model profile: {ctx.modelProfile}</p>
 
-            <ModelProfileTable />
+            <h3>Model Profile Lookup</h3>
+            <Table
+              headers={["Agent", "quality", "balanced", "budget"]}
+              rows={[
+                ["gsd-phase-researcher", "opus", "sonnet", "haiku"],
+                ["gsd-planner", "opus", "opus", "sonnet"],
+                ["gsd-plan-checker", "sonnet", "sonnet", "haiku"],
+              ]}
+            />
 
             {/* ============================================================ */}
-            {/* STEP 2: Handle Research */}
+            {/* STEP 2: Read Context Files */}
             {/* ============================================================ */}
 
-            <h2>Step 2: Handle Research</h2>
+            <h2>Step 2: Read Context Files</h2>
+
+            <p>Read and store context file contents for prompt construction. The <code>@</code> syntax does not work across Task() boundaries — content must be inlined.</p>
+
+            <pre><code className="bash">
+{`# Read required files
+STATE_CONTENT=$(cat .planning/STATE.md)
+ROADMAP_CONTENT=$(cat .planning/ROADMAP.md)
+
+# Read optional files (empty string if missing)
+REQUIREMENTS_CONTENT=$(cat .planning/REQUIREMENTS.md 2>/dev/null)
+CONTEXT_CONTENT=$(cat ${ctx.phaseDir}/*-CONTEXT.md 2>/dev/null)
+RESEARCH_CONTENT=$(cat ${ctx.phaseDir}/*-RESEARCH.md 2>/dev/null)
+
+# Gap closure files (only if --gaps mode)
+VERIFICATION_CONTENT=$(cat ${ctx.phaseDir}/*-VERIFICATION.md 2>/dev/null)
+UAT_CONTENT=$(cat ${ctx.phaseDir}/*-UAT.md 2>/dev/null)`}</code></pre>
+
+            {/* ============================================================ */}
+            {/* STEP 3: Handle Research */}
+            {/* ============================================================ */}
+
+            <h2>Step 3: Handle Research</h2>
 
             <If condition={ctx.flags.gaps}>
-              <p>Gap closure mode — skipping research (using VERIFICATION.md instead)</p>
+              <p>Gap closure mode — skipping research (using VERIFICATION.md instead).</p>
             </If>
             <Else>
               <If condition={ctx.flags.skipResearch}>
-                <p>Research skipped (--skip-research flag)</p>
+                <p>Research skipped (--skip-research flag).</p>
               </If>
               <Else>
                 <If condition={ctx.needsResearch}>
-                  <BannerUi prefix="RESEARCHING" title={`PHASE ${ctx.phaseId}`} />
+                  <pre>{`━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+ GSD ► RESEARCHING PHASE ${ctx.phaseId}
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━`}</pre>
 
-                  <p>◆ Building researcher prompt...</p>
+                  <p>Gather context for research prompt:</p>
 
-                  <BuildResearcherPrompt.Call
-                    args={{
-                      phaseId: ctx.phaseId,
-                      phaseName: ctx.phaseName,
-                      phaseDir: ctx.phaseDir,
-                      phaseDescription: ctx.phaseDescription,
-                      agentPath: ctx.agentPaths.researcher,
-                    }}
-                    output={researcherPrompt}
-                  />
+                  <pre><code className="bash">
+{`# Get phase description from roadmap
+PHASE_DESC=$(grep -A3 "Phase ${ctx.phaseId}:" .planning/ROADMAP.md)
 
-                  <p>◆ Spawning researcher agent...</p>
-                  <SpawningAgentUi agent="researcher" />
+# Get requirements if they exist
+REQUIREMENTS=$(cat .planning/REQUIREMENTS.md 2>/dev/null | grep -A100 "## Requirements" | head -50)
 
-                  <SpawnAgent
-                    agent="gsd-phase-researcher"
-                    loadFromFile={ctx.agentPaths.researcher}
-                    model="sonnet"
-                    description={`Research Phase ${ctx.phaseId}`}
-                    input={{ prompt: researcherPrompt.prompt }}
-                    output={agentOutput}
-                  />
+# Get prior decisions from STATE.md
+DECISIONS=$(grep -A20 "### Decisions Made" .planning/STATE.md 2>/dev/null)
+
+# Get phase context if exists
+PHASE_CONTEXT=$(cat ${ctx.phaseDir}/*-CONTEXT.md 2>/dev/null)`}</code></pre>
+
+                  <p>Fill research prompt with context and spawn:</p>
+
+                  <pre>{`<objective>
+Research how to implement Phase ${ctx.phaseId}: ${ctx.phaseName}
+
+Answer: "What do I need to know to PLAN this phase well?"
+</objective>
+
+<context>
+**Phase description:**
+{phase_description}
+
+**Requirements (if any):**
+{requirements_content}
+
+**Prior decisions:**
+{decisions_content}
+
+**Phase context (if any):**
+{context_content}
+</context>
+
+<output>
+Write research findings to: ${ctx.phaseDir}/${ctx.phaseId}-RESEARCH.md
+</output>`}</pre>
+
+                  <p>◆ Spawning researcher...</p>
+
+                  <pre>{`Task(
+  prompt="First, read ${ctx.agentPaths.researcher} for your role and instructions.\\n\\n" + research_prompt,
+  subagent_type="gsd-phase-researcher",
+  model="${ctx.models.researcher}",
+  description="Research Phase ${ctx.phaseId}"
+)`}</pre>
 
                   <ParseAgentStatus.Call
-                    args={{ output: agentOutput }}
+                    args={{ output: "$AGENT_OUTPUT" }}
                     output={agentStatus}
                   />
 
                   <If condition={agentStatus.status === 'BLOCKED'}>
                     <p><b>Research blocked:</b> {agentStatus.message}</p>
-
                     <AskUser
                       question="Research encountered a blocker. How would you like to proceed?"
                       header="Blocker"
@@ -255,7 +222,6 @@ export default (
                       ]}
                       output={userChoice}
                     />
-
                     <If condition={userChoice === 'abort'}>
                       <Return status="BLOCKED" message="User aborted due to research blocker" />
                     </If>
@@ -278,19 +244,17 @@ export default (
             </Else>
 
             {/* ============================================================ */}
-            {/* STEP 3: Check Existing Plans */}
+            {/* STEP 4: Check Existing Plans */}
             {/* ============================================================ */}
 
-            <h2>Step 3: Check Existing Plans</h2>
+            <h2>Step 4: Check Existing Plans</h2>
 
-            <CheckExistingPlans.Call
-              args={{ phaseDir: ctx.phaseDir }}
-              output={existingPlans}
-            />
+            <pre><code className="bash">
+              {`ls ${ctx.phaseDir}/*-PLAN.md 2>/dev/null`}
+            </code></pre>
 
-            <If condition={existingPlans.hasPlans}>
-              <p>Found {existingPlans.planCount} existing plan(s):</p>
-              <pre>{existingPlans.planSummary}</pre>
+            <If condition={ctx.hasPlans}>
+              <p>Found existing plan(s) in {ctx.phaseDir}/</p>
 
               <AskUser
                 question="Plans already exist for this phase. What would you like to do?"
@@ -304,11 +268,9 @@ export default (
               />
 
               <If condition={userChoice === 'view'}>
-                <ReadAndDisplayPlans.Call
-                  args={{ phaseDir: ctx.phaseDir }}
-                  output={plansDisplay}
-                />
-                <pre>{plansDisplay}</pre>
+                <pre><code className="bash">
+{`cat ${ctx.phaseDir}/*-PLAN.md`}
+                </code></pre>
 
                 <AskUser
                   question="After reviewing the plans, how would you like to proceed?"
@@ -331,55 +293,86 @@ export default (
                 <p>Archiving existing plans...</p>
                 <ArchiveExistingPlans.Call
                   args={{ phaseDir: ctx.phaseDir }}
-                  output={_void}
+                  output={archiveResult}
                 />
-                <p>Existing plans archived. Starting fresh...</p>
+                <p>{archiveResult}</p>
               </If>
             </If>
 
             {/* ============================================================ */}
-            {/* STEP 4: Spawn gsd-planner Agent */}
+            {/* STEP 5: Spawn gsd-planner Agent */}
             {/* ============================================================ */}
 
-            <h2>Step 4: Spawn Planner</h2>
+            <h2>Step 5: Spawn gsd-planner Agent</h2>
 
             <pre>{`━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
  GSD ► PLANNING PHASE ${ctx.phaseId}
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━`}</pre>
 
-            <p>◆ Building planner prompt...</p>
+            <p>Fill prompt with inlined content and spawn:</p>
 
-            <BuildPlannerPrompt.Call
-              args={{
-                phaseId: ctx.phaseId,
-                phaseName: ctx.phaseName,
-                phaseDir: ctx.phaseDir,
-                agentPath: ctx.agentPaths.planner,
-                mode: ctx.flags.gaps ? 'gap_closure' : 'standard',
-              }}
-              output={plannerPrompt}
-            />
+            <pre>{`<planning_context>
 
-            <p>◆ Spawning planner agent...</p>
+**Phase:** ${ctx.phaseId}
+**Mode:** {mode}
 
-            <SpawnAgent
-              agent="gsd-planner"
-              loadFromFile={ctx.agentPaths.planner}
-              model="opus"
-              description={`Plan Phase ${ctx.phaseId}`}
-              input={{ prompt: plannerPrompt.prompt }}
-              output={agentOutput}
-            />
+**Project State:**
+{state_content}
+
+**Roadmap:**
+{roadmap_content}
+
+**Requirements (if exists):**
+{requirements_content}
+
+**Phase Context (if exists):**
+{context_content}
+
+**Research (if exists):**
+{research_content}
+
+**Gap Closure (if --gaps mode):**
+{verification_content}
+{uat_content}
+
+</planning_context>
+
+<downstream_consumer>
+Output consumed by /gsd:execute-phase
+Plans must be executable prompts with:
+- Frontmatter (wave, depends_on, files_modified, autonomous)
+- Tasks in XML format
+- Verification criteria
+- must_haves for goal-backward verification
+</downstream_consumer>
+
+<quality_gate>
+Before returning PLANNING COMPLETE:
+- [ ] PLAN.md files created in phase directory
+- [ ] Each plan has valid frontmatter
+- [ ] Tasks are specific and actionable
+- [ ] Dependencies correctly identified
+- [ ] Waves assigned for parallel execution
+- [ ] must_haves derived from phase goal
+</quality_gate>`}</pre>
+
+            <p>◆ Spawning planner...</p>
+
+            <pre>{`Task(
+  prompt="First, read ${ctx.agentPaths.planner} for your role and instructions.\\n\\n" + filled_prompt,
+  subagent_type="gsd-planner",
+  model="${ctx.models.planner}",
+  description="Plan Phase ${ctx.phaseId}"
+)`}</pre>
 
             <ParseAgentStatus.Call
-              args={{ output: agentOutput }}
+              args={{ output: "$AGENT_OUTPUT" }}
               output={agentStatus}
             />
 
             <If condition={agentStatus.status === 'CHECKPOINT'}>
               <p><b>Checkpoint reached:</b> {agentStatus.message}</p>
               <p>Planner needs user input to continue.</p>
-
               <AskUser
                 question="Planner reached a checkpoint. How would you like to proceed?"
                 header="Checkpoint"
@@ -389,7 +382,6 @@ export default (
                 ]}
                 output={userChoice}
               />
-
               <If condition={userChoice === 'pause'}>
                 <Return status="CHECKPOINT" message="Planning paused at checkpoint" />
               </If>
@@ -397,7 +389,6 @@ export default (
 
             <If condition={agentStatus.status === 'INCONCLUSIVE'}>
               <p><b>Planning inconclusive:</b> {agentStatus.message}</p>
-
               <AskUser
                 question="Planning was inconclusive. How would you like to proceed?"
                 header="Inconclusive"
@@ -408,7 +399,6 @@ export default (
                 ]}
                 output={userChoice}
               />
-
               <If condition={userChoice === 'manual'}>
                 <p>Create plans manually in {ctx.phaseDir}/, then run /gsd:execute-phase {ctx.phaseId}</p>
                 <Return status="CHECKPOINT" message="Manual planning requested" />
@@ -424,44 +414,61 @@ export default (
             </Else>
 
             {/* ============================================================ */}
-            {/* STEP 5: Verification Loop */}
+            {/* STEP 6: Verification Loop */}
             {/* ============================================================ */}
 
-            <h2>Step 5: Verification Loop</h2>
+            <h2>Step 6: Verification Loop</h2>
 
             <If condition={ctx.flags.skipVerify}>
-              <p>Verification skipped (--skip-verify flag)</p>
+              <p>Verification skipped (--skip-verify flag).</p>
             </If>
             <Else>
               <If condition={!ctx.config.workflowPlanCheck}>
-                <p>Verification disabled in config (workflow.plan_check: false)</p>
+                <p>Verification disabled in config (workflow.plan_check: false).</p>
               </If>
               <Else>
                 <pre>{`━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
  GSD ► VERIFYING PLANS
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━`}</pre>
 
+                <p>Read plans and requirements for the checker:</p>
+                <pre><code className="bash">
+{`PLANS_CONTENT=$(cat ${ctx.phaseDir}/*-PLAN.md 2>/dev/null)
+REQUIREMENTS_CONTENT=$(cat .planning/REQUIREMENTS.md 2>/dev/null)`}
+                </code></pre>
+
                 <Loop max={4} counter={iteration}>
                   <p>◆ Iteration {iteration}/3: Spawning plan checker...</p>
 
-                  <BuildCheckerPrompt.Call
-                    args={{
-                      phaseId: ctx.phaseId,
-                      phaseDir: ctx.phaseDir,
-                    }}
-                    output={checkerPrompt}
-                  />
+                  <p>Fill checker prompt with inlined content:</p>
+                  <pre>{`<verification_context>
 
-                  <SpawnAgent
-                    agent="gsd-plan-checker"
-                    model="sonnet"
-                    description={`Verify Phase ${ctx.phaseId} plans`}
-                    input={{ prompt: checkerPrompt.prompt }}
-                    output={agentOutput}
-                  />
+**Phase:** ${ctx.phaseId}
+**Phase Goal:** {phase_goal}
+
+**Plans to verify:**
+{plans_content}
+
+**Requirements (if exists):**
+{requirements_content}
+
+</verification_context>
+
+<expected_output>
+Return one of:
+- ## VERIFICATION PASSED — all checks pass
+- ## ISSUES FOUND — structured issue list
+</expected_output>`}</pre>
+
+                  <pre>{`Task(
+  prompt=checker_prompt,
+  subagent_type="gsd-plan-checker",
+  model="${ctx.models.checker}",
+  description="Verify Phase ${ctx.phaseId} plans"
+)`}</pre>
 
                   <ParseAgentStatus.Call
-                    args={{ output: agentOutput }}
+                    args={{ output: "$AGENT_OUTPUT" }}
                     output={agentStatus}
                   />
 
@@ -476,7 +483,6 @@ export default (
 
                     <If condition={iteration >= 3}>
                       <p><b>Max iterations reached.</b> {agentStatus.issues.length} issue(s) remain.</p>
-
                       <AskUser
                         question="Max verification iterations reached. How would you like to proceed?"
                         header="Max Iterations"
@@ -487,7 +493,6 @@ export default (
                         ]}
                         output={userChoice}
                       />
-
                       <If condition={userChoice === 'abandon'}>
                         <Return status="ERROR" message="Verification failed after max iterations" />
                       </If>
@@ -499,27 +504,37 @@ export default (
                     <Else>
                       <p>Sending back to planner for revision... (iteration {iteration}/3)</p>
 
-                      <BuildPlannerPrompt.Call
-                        args={{
-                          phaseId: ctx.phaseId,
-                          phaseName: ctx.phaseName,
-                          phaseDir: ctx.phaseDir,
-                          agentPath: ctx.agentPaths.planner,
-                          mode: 'revision',
-                          issues: agentStatus.issues,
-                        }}
-                        output={plannerPrompt}
-                      />
+                      <p>Fill revision prompt:</p>
+                      <pre>{`<revision_context>
 
-                      <SpawnAgent
-                        agent="gsd-planner"
-                        loadFromFile={ctx.agentPaths.planner}
-                        model="opus"
-                        description={`Revise Phase ${ctx.phaseId} plans`}
-                        input={{ prompt: plannerPrompt.prompt }}
-                        output={agentOutput}
-                      />
+**Phase:** ${ctx.phaseId}
+**Mode:** revision
 
+**Existing plans:**
+{plans_content}
+
+**Checker issues:**
+{checker_issues}
+
+</revision_context>
+
+<instructions>
+Make targeted updates to address checker issues.
+Do NOT replan from scratch unless issues are fundamental.
+Return what changed.
+</instructions>`}</pre>
+
+                      <pre>{`Task(
+  prompt="First, read ${ctx.agentPaths.planner} for your role and instructions.\\n\\n" + revision_prompt,
+  subagent_type="gsd-planner",
+  model="${ctx.models.planner}",
+  description="Revise Phase ${ctx.phaseId} plans"
+)`}</pre>
+
+                      <p>After planner returns, re-read plans:</p>
+                      <pre><code className="bash">
+{`PLANS_CONTENT=$(cat ${ctx.phaseDir}/*-PLAN.md 2>/dev/null)`}
+                      </code></pre>
                       <p>Plans revised. Re-checking...</p>
                     </Else>
                   </If>
@@ -528,38 +543,84 @@ export default (
             </Else>
 
             {/* ============================================================ */}
-            {/* STEP 6: Generate Final Summary */}
+            {/* STEP 7: Present Final Status */}
             {/* ============================================================ */}
 
-            <h2>Step 6: Final Summary</h2>
+            <h2>Step 7: Present Final Status</h2>
 
-            <GenerateSummary.Call
-              args={{
-                phaseId: ctx.phaseId,
-                phaseName: ctx.phaseName,
-                phaseDir: ctx.phaseDir,
-                checkerPassed: agentStatus.status === 'PASSED',
-                skipVerify: ctx.flags.skipVerify,
-                hasResearch: ctx.hasResearch,
-                forcedResearch: ctx.flags.research,
-                skippedResearch: ctx.flags.skipResearch || ctx.flags.gaps,
-              }}
-              output={summary}
-            />
+            <p>Gather plan statistics from phase directory:</p>
+            <pre><code className="bash">
+{`# Count plans and extract wave info
+PLAN_COUNT=$(ls ${ctx.phaseDir}/*-PLAN.md 2>/dev/null | wc -l | tr -d ' ')
+WAVE_COUNT=$(grep -h "^wave:" ${ctx.phaseDir}/*-PLAN.md 2>/dev/null | sort -u | wc -l | tr -d ' ')
+PLAN_NAMES=$(ls ${ctx.phaseDir}/*-PLAN.md 2>/dev/null | xargs -I{} basename {} -PLAN.md | tr '\\n' ', ')`}
+            </code></pre>
 
-            <FormatSummary.Call
-              args={{ summary: summary }}
-              output={summaryMd}
-            />
+            <p>Route to offer_next with filled values.</p>
 
           </XmlBlock>
 
           <XmlBlock name="offer_next">
-            <p>Output this markdown directly (not as a code block):</p>
-            <p>{summaryMd}</p>
+            <p>Output this summary directly (not as a code block), filling in values based on what happened:</p>
+
+            <pre>{`━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+ GSD ► PHASE ${ctx.phaseId} PLANNED ✓
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+**Phase ${ctx.phaseId}: ${ctx.phaseName}** — {plan_count} plan(s) in {wave_count} wave(s)
+
+| Wave | Plans | What it builds |
+|------|-------|----------------|
+| 1    | 01, 02 | [objectives from plans] |
+| 2    | 03     | [objective from plan]  |
+
+Research: {Completed | Used existing | Skipped}
+Verification: {Passed | Passed with override | Skipped}
+
+───────────────────────────────────────────────────────────────
+
+## ▶ Next Up
+
+**Execute Phase ${ctx.phaseId}** — run all {plan_count} plans
+
+/gsd:execute-phase ${ctx.phaseId}
+
+<sub>/clear first → fresh context window</sub>
+
+───────────────────────────────────────────────────────────────
+
+**Also available:**
+- cat ${ctx.phaseDir}/*-PLAN.md — review plans
+- /gsd:plan-phase ${ctx.phaseId} --research — re-research first
+
+───────────────────────────────────────────────────────────────`}</pre>
+
+            <p>Fill the placeholders:</p>
+            <ul>
+              <li><code>{`{plan_count}`}</code> — number of PLAN.md files created</li>
+              <li><code>{`{wave_count}`}</code> — number of unique waves across plans</li>
+              <li><code>Wave table</code> — actual plans grouped by wave with their objectives</li>
+              <li><code>Research</code> — based on what happened: Completed (spawned researcher), Used existing (had RESEARCH.md), Skipped (--skip-research or --gaps)</li>
+              <li><code>Verification</code> — based on what happened: Passed (checker approved), Passed with override (user forced), Skipped (--skip-verify or config disabled)</li>
+            </ul>
           </XmlBlock>
 
-          <SuccessCriteria />
+          <XmlBlock name="success_criteria">
+            <ul>
+              <li>[] .planning/ directory validated</li>
+              <li>[] Phase validated against roadmap</li>
+              <li>[] Phase directory created if needed</li>
+              <li>[] Research completed (unless --skip-research or --gaps or exists)</li>
+              <li>[] gsd-phase-researcher spawned if research needed</li>
+              <li>[] Existing plans checked</li>
+              <li>[] gsd-planner spawned with context (including RESEARCH.md if available)</li>
+              <li>[] Plans created (PLANNING COMPLETE or CHECKPOINT handled)</li>
+              <li>[] gsd-plan-checker spawned (unless --skip-verify)</li>
+              <li>[] Verification passed OR user override OR max iterations with user decision</li>
+              <li>[] User sees status between agent spawns</li>
+              <li>[] User knows next steps (execute or review)</li>
+            </ul>
+          </XmlBlock>
         </>
       );
     }}

@@ -658,7 +658,7 @@ export async function readAndDisplayPlans(args: { phaseDir: string }): Promise<s
 /**
  * Archive existing plans before replanning
  */
-export async function archiveExistingPlans(args: { phaseDir: string }): Promise<void> {
+export async function archiveExistingPlans(args: { phaseDir: string }): Promise<string> {
   const planFiles = await listPlanFiles(args.phaseDir);
   const archiveDir = `${args.phaseDir}/archive`;
   await fs.mkdir(archiveDir, { recursive: true });
@@ -668,6 +668,8 @@ export async function archiveExistingPlans(args: { phaseDir: string }): Promise<
     const basename = path.basename(file);
     await fs.rename(file, `${archiveDir}/${timestamp}-${basename}`);
   }
+
+  return `Archived ${planFiles.length} plan(s) to ${archiveDir}`;
 }
 
 /**

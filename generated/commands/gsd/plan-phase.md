@@ -19,11 +19,11 @@ allowed-tools:
 </execution_context>
 
 <objective>
-Create executable phase prompts (PLAN.md files) for a roadmap phase with integrated research and verification.
+Create executable phase plans (PLAN.md files) for a roadmap phase with integrated research and verification.
 
 **Default flow:** Research (if needed) → Plan → Verify → Done
 
-**Orchestrator role:** Parse arguments, validate phase, research domain (unless skipped or exists), spawn gsd-planner agent, verify plans with gsd-plan-checker, iterate until plans pass or max iterations reached, present results.
+**Orchestrator role:** Parse arguments, validate phase, read context files, construct prompts with understanding, spawn subagents, iterate until plans pass, present results.
 
 **Why subagents:** Research and planning burn context fast. Verification uses fresh context. User sees the flow between agents in main context.
 </objective>
@@ -32,20 +32,22 @@ Create executable phase prompts (PLAN.md files) for a roadmap phase with integra
 Phase number: $ARGUMENTS (optional - auto-detects next unplanned phase if not provided)
 
 - `--research` — Force re-research even if RESEARCH.md exists
-- `--skip-research` — Skip research entirely, go straight to planning
-- `--gaps` — Gap closure mode (reads VERIFICATION.md, skips research)
-- `--skip-verify` — Skip planner → checker verification loop
-
-Normalize phase input in step 2 before any directory lookups.
+- `--skip-research` — Skip research entirely
+- `--gaps` — Gap closure mode (uses VERIFICATION.md, skips research)
+- `--skip-verify` — Skip verification loop
 </context>
 
 <process>
-## Step 1: Validate Environment
+## Step 1: Validate Environment and Initialize
 
-Initialize context, parse arguments, validate environment:
+**Runtime Call**: `planPhase_init`
+
+| Argument | Source |
+|----------|--------|
+| arguments | "$ARGUMENTS" |
 
 ```bash
-CTX=$(node runtime.js planPhase_init '{"arguments":"$ARGUMENTS"}')
+CTX=$(node .claude/runtime/runtime.js planPhase_init '{"arguments": "$ARGUMENTS"}')
 ```
 
 **If ctx.error:**
@@ -56,9 +58,7 @@ Run `/gsd:new-project` first if .planning/ directory is missing.
 
 **End command (ERROR)**: Initialization failed
 
-Phase $(echo "$CTX" | jq -r '.phaseId'): $(echo "$CTX" | jq -r '.phaseName')
-
-Directory: $(echo "$CTX" | jq -r '.phaseDir')
+Phase directory: $(echo "$CTX" | jq -r '.phaseDir')
 
 Model profile: $(echo "$CTX" | jq -r '.modelProfile')
 
@@ -70,19 +70,36 @@ Model profile: $(echo "$CTX" | jq -r '.modelProfile')
 | gsd-planner | opus | opus | sonnet |
 | gsd-plan-checker | sonnet | sonnet | haiku |
 
-Store resolved models for use in Task calls below.
+## Step 2: Read Context Files
 
-## Step 2: Handle Research
+Read and store context file contents for prompt construction. The `@` syntax does not work across Task() boundaries — content must be inlined.
+
+```bash
+# Read required files
+STATE_CONTENT=$(cat .planning/STATE.md)
+ROADMAP_CONTENT=$(cat .planning/ROADMAP.md)
+
+# Read optional files (empty string if missing)
+REQUIREMENTS_CONTENT=$(cat .planning/REQUIREMENTS.md 2>/dev/null)
+CONTEXT_CONTENT=$(cat ${ctx.phaseDir}/*-CONTEXT.md 2>/dev/null)
+RESEARCH_CONTENT=$(cat ${ctx.phaseDir}/*-RESEARCH.md 2>/dev/null)
+
+# Gap closure files (only if --gaps mode)
+VERIFICATION_CONTENT=$(cat ${ctx.phaseDir}/*-VERIFICATION.md 2>/dev/null)
+UAT_CONTENT=$(cat ${ctx.phaseDir}/*-UAT.md 2>/dev/null)
+```
+
+## Step 3: Handle Research
 
 **If ctx.flags.gaps:**
 
-Gap closure mode — skipping research (using VERIFICATION.md instead)
+Gap closure mode — skipping research (using VERIFICATION.md instead).
 
 **Otherwise:**
 
 **If ctx.flags.skipResearch:**
 
-Research skipped (--skip-research flag)
+Research skipped (--skip-research flag).
 
 **Otherwise:**
 
@@ -90,35 +107,73 @@ Research skipped (--skip-research flag)
 
 ```
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
- GSD ► RESEARCHING `PHASE ${ctx.phaseId}`
+ GSD ► RESEARCHING PHASE ${ctx.phaseId}
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 ```
 
-◆ Building researcher prompt...
+Gather context for research prompt:
 
 ```bash
-RESEARCHER_PROMPT=$(node runtime.js planPhase_buildResearcherPrompt '{"phaseId":"ctx.phaseId","phaseName":"ctx.phaseName","phaseDir":"ctx.phaseDir","phaseDescription":"ctx.phaseDescription","agentPath":"ctx.agentPaths.researcher"}')
+# Get phase description from roadmap
+PHASE_DESC=$(grep -A3 "Phase ${ctx.phaseId}:" .planning/ROADMAP.md)
+
+# Get requirements if they exist
+REQUIREMENTS=$(cat .planning/REQUIREMENTS.md 2>/dev/null | grep -A100 "## Requirements" | head -50)
+
+# Get prior decisions from STATE.md
+DECISIONS=$(grep -A20 "### Decisions Made" .planning/STATE.md 2>/dev/null)
+
+# Get phase context if exists
+PHASE_CONTEXT=$(cat ${ctx.phaseDir}/*-CONTEXT.md 2>/dev/null)
 ```
 
-◆ Spawning researcher agent...
+Fill research prompt with context and spawn:
 
-◆ Spawning researcher agent...
+```
+<objective>
+Research how to implement Phase ${ctx.phaseId}: ${ctx.phaseName}
+
+Answer: "What do I need to know to PLAN this phase well?"
+</objective>
+
+<context>
+**Phase description:**
+{phase_description}
+
+**Requirements (if any):**
+{requirements_content}
+
+**Prior decisions:**
+{decisions_content}
+
+**Phase context (if any):**
+{context_content}
+</context>
+
+<output>
+Write research findings to: ${ctx.phaseDir}/${ctx.phaseId}-RESEARCH.md
+</output>
+```
+
+◆ Spawning researcher...
 
 ```
 Task(
-  prompt="<prompt>
-$(echo \"$RESEARCHER_PROMPT\" | jq -r '.prompt')
-</prompt>",
+  prompt="First, read ${ctx.agentPaths.researcher} for your role and instructions.\n\n" + research_prompt,
   subagent_type="gsd-phase-researcher",
-  model="sonnet",
+  model="${ctx.models.researcher}",
   description="Research Phase ${ctx.phaseId}"
 )
 ```
 
-Store the agent's result in `$AGENT_OUTPUT`.
+**Runtime Call**: `planPhase_parseAgentStatus`
+
+| Argument | Source |
+|----------|--------|
+| output | "$AGENT_OUTPUT" |
 
 ```bash
-AGENT_STATUS=$(node runtime.js planPhase_parseAgentStatus '{"output":"agentOutput"}')
+AGENT_STATUS=$(node .claude/runtime/runtime.js planPhase_parseAgentStatus '{"output": "$AGENT_OUTPUT"}')
 ```
 
 **If agent_status.status === "BLOCKED":**
@@ -158,19 +213,15 @@ Research complete. Proceeding to planning...
 
 Using existing research: $(echo "$CTX" | jq -r '.phaseDir')/$(echo "$CTX" | jq -r '.phaseId')-RESEARCH.md
 
-## Step 3: Check Existing Plans
+## Step 4: Check Existing Plans
 
 ```bash
-EXISTING_PLANS=$(node runtime.js planPhase_checkExistingPlans '{"phaseDir":"ctx.phaseDir"}')
+ls ${ctx.phaseDir}/*-PLAN.md 2>/dev/null
 ```
 
-**If existing_plans.hasPlans:**
+**If ctx.hasPlans:**
 
-Found $(echo "$EXISTING_PLANS" | jq -r '.planCount') existing plan(s):
-
-```
-existingPlans.planSummary
-```
+Found existing plan(s) in $(echo "$CTX" | jq -r '.phaseDir')/
 
 Use the AskUserQuestion tool:
 
@@ -186,11 +237,7 @@ Store the user's response in `$USER_CHOICE`.
 **If user_choice === "view":**
 
 ```bash
-PLANS_DISPLAY=$(node runtime.js planPhase_readAndDisplayPlans '{"phaseDir":"ctx.phaseDir"}')
-```
-
-```
-plansDisplay
+cat ${ctx.phaseDir}/*-PLAN.md
 ```
 
 Use the AskUserQuestion tool:
@@ -214,13 +261,19 @@ Keeping existing plans. Run /gsd:execute-phase $(echo "$CTX" | jq -r '.phaseId')
 
 Archiving existing plans...
 
+**Runtime Call**: `planPhase_archiveExistingPlans`
+
+| Argument | Source |
+|----------|--------|
+| phaseDir | CTX.phaseDir |
+
 ```bash
-_VOID=$(node runtime.js planPhase_archiveExistingPlans '{"phaseDir":"ctx.phaseDir"}')
+ARCHIVE_RESULT=$(node .claude/runtime/runtime.js planPhase_archiveExistingPlans '{"phaseDir": "$(echo "$CTX" | jq -r '.phaseDir')"}')
 ```
 
-Existing plans archived. Starting fresh...
+$(echo "$ARCHIVE_RESULT" | jq -r '.')
 
-## Step 4: Spawn Planner
+## Step 5: Spawn gsd-planner Agent
 
 ```
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
@@ -228,29 +281,74 @@ Existing plans archived. Starting fresh...
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 ```
 
-◆ Building planner prompt...
+Fill prompt with inlined content and spawn:
 
-```bash
-PLANNER_PROMPT=$(node runtime.js planPhase_buildPlannerPrompt '{"phaseId":"ctx.phaseId","phaseName":"ctx.phaseName","phaseDir":"ctx.phaseDir","agentPath":"ctx.agentPaths.planner","mode":"ctx.flags.gaps ? '"'"'gap_closure'"'"' : '"'"'standard'"'"'"}')
+```
+<planning_context>
+
+**Phase:** ${ctx.phaseId}
+**Mode:** {mode}
+
+**Project State:**
+{state_content}
+
+**Roadmap:**
+{roadmap_content}
+
+**Requirements (if exists):**
+{requirements_content}
+
+**Phase Context (if exists):**
+{context_content}
+
+**Research (if exists):**
+{research_content}
+
+**Gap Closure (if --gaps mode):**
+{verification_content}
+{uat_content}
+
+</planning_context>
+
+<downstream_consumer>
+Output consumed by /gsd:execute-phase
+Plans must be executable prompts with:
+- Frontmatter (wave, depends_on, files_modified, autonomous)
+- Tasks in XML format
+- Verification criteria
+- must_haves for goal-backward verification
+</downstream_consumer>
+
+<quality_gate>
+Before returning PLANNING COMPLETE:
+- [ ] PLAN.md files created in phase directory
+- [ ] Each plan has valid frontmatter
+- [ ] Tasks are specific and actionable
+- [ ] Dependencies correctly identified
+- [ ] Waves assigned for parallel execution
+- [ ] must_haves derived from phase goal
+</quality_gate>
 ```
 
-◆ Spawning planner agent...
+◆ Spawning planner...
 
 ```
 Task(
-  prompt="<prompt>
-$(echo \"$PLANNER_PROMPT\" | jq -r '.prompt')
-</prompt>",
+  prompt="First, read ${ctx.agentPaths.planner} for your role and instructions.\n\n" + filled_prompt,
   subagent_type="gsd-planner",
-  model="opus",
+  model="${ctx.models.planner}",
   description="Plan Phase ${ctx.phaseId}"
 )
 ```
 
-Store the agent's result in `$AGENT_OUTPUT`.
+**Runtime Call**: `planPhase_parseAgentStatus`
+
+| Argument | Source |
+|----------|--------|
+| output | "$AGENT_OUTPUT" |
 
 ```bash
-AGENT_STATUS=$(node runtime.js planPhase_parseAgentStatus '{"output":"agentOutput"}')
+AGENT_STATUS=$(node .claude/runtime/runtime.js planPhase_parseAgentStatus '{"output": "$AGENT_OUTPUT"}')
 ```
 
 **If agent_status.status === "CHECKPOINT":**
@@ -304,17 +402,17 @@ Please provide additional context, then run /gsd:plan-phase $(echo "$CTX" | jq -
 
 Planner completed. Plans created in $(echo "$CTX" | jq -r '.phaseDir')/
 
-## Step 5: Verification Loop
+## Step 6: Verification Loop
 
 **If ctx.flags.skipVerify:**
 
-Verification skipped (--skip-verify flag)
+Verification skipped (--skip-verify flag).
 
 **Otherwise:**
 
 **If !ctx.config.workflowPlanCheck:**
 
-Verification disabled in config (workflow.plan_check: false)
+Verification disabled in config (workflow.plan_check: false).
 
 **Otherwise:**
 
@@ -324,29 +422,57 @@ Verification disabled in config (workflow.plan_check: false)
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 ```
 
+Read plans and requirements for the checker:
+
+```bash
+PLANS_CONTENT=$(cat ${ctx.phaseDir}/*-PLAN.md 2>/dev/null)
+REQUIREMENTS_CONTENT=$(cat .planning/REQUIREMENTS.md 2>/dev/null)
+```
+
 **Loop up to 4 times (counter: $ITERATION):**
 
 ◆ Iteration $(echo "$ITERATION" | jq -r '.')/3: Spawning plan checker...
 
-```bash
-CHECKER_PROMPT=$(node runtime.js planPhase_buildCheckerPrompt '{"phaseId":"ctx.phaseId","phaseDir":"ctx.phaseDir"}')
+Fill checker prompt with inlined content:
+
+```
+<verification_context>
+
+**Phase:** ${ctx.phaseId}
+**Phase Goal:** {phase_goal}
+
+**Plans to verify:**
+{plans_content}
+
+**Requirements (if exists):**
+{requirements_content}
+
+</verification_context>
+
+<expected_output>
+Return one of:
+- ## VERIFICATION PASSED — all checks pass
+- ## ISSUES FOUND — structured issue list
+</expected_output>
 ```
 
 ```
 Task(
-  prompt="<prompt>
-$(echo \"$CHECKER_PROMPT\" | jq -r '.prompt')
-</prompt>",
+  prompt=checker_prompt,
   subagent_type="gsd-plan-checker",
-  model="sonnet",
+  model="${ctx.models.checker}",
   description="Verify Phase ${ctx.phaseId} plans"
 )
 ```
 
-Store the agent's result in `$AGENT_OUTPUT`.
+**Runtime Call**: `planPhase_parseAgentStatus`
+
+| Argument | Source |
+|----------|--------|
+| output | "$AGENT_OUTPUT" |
 
 ```bash
-AGENT_STATUS=$(node runtime.js planPhase_parseAgentStatus '{"output":"agentOutput"}')
+AGENT_STATUS=$(node .claude/runtime/runtime.js planPhase_parseAgentStatus '{"output": "$AGENT_OUTPUT"}')
 ```
 
 **If agent_status.status === "PASSED":**
@@ -392,48 +518,117 @@ Proceeding with issues. Consider fixing manually.
 
 Sending back to planner for revision... (iteration $(echo "$ITERATION" | jq -r '.')/3)
 
-```bash
-PLANNER_PROMPT=$(node runtime.js planPhase_buildPlannerPrompt '{"phaseId":"ctx.phaseId","phaseName":"ctx.phaseName","phaseDir":"ctx.phaseDir","agentPath":"ctx.agentPaths.planner","mode":"revision","issues":"agentStatus.issues"}')
+Fill revision prompt:
+
+```
+<revision_context>
+
+**Phase:** ${ctx.phaseId}
+**Mode:** revision
+
+**Existing plans:**
+{plans_content}
+
+**Checker issues:**
+{checker_issues}
+
+</revision_context>
+
+<instructions>
+Make targeted updates to address checker issues.
+Do NOT replan from scratch unless issues are fundamental.
+Return what changed.
+</instructions>
 ```
 
 ```
 Task(
-  prompt="<prompt>
-$(echo \"$PLANNER_PROMPT\" | jq -r '.prompt')
-</prompt>",
+  prompt="First, read ${ctx.agentPaths.planner} for your role and instructions.\n\n" + revision_prompt,
   subagent_type="gsd-planner",
-  model="opus",
+  model="${ctx.models.planner}",
   description="Revise Phase ${ctx.phaseId} plans"
 )
 ```
 
-Store the agent's result in `$AGENT_OUTPUT`.
+After planner returns, re-read plans:
+
+```bash
+PLANS_CONTENT=$(cat ${ctx.phaseDir}/*-PLAN.md 2>/dev/null)
+```
 
 Plans revised. Re-checking...
 
-## Step 6: Final Summary
+## Step 7: Present Final Status
+
+Gather plan statistics from phase directory:
 
 ```bash
-SUMMARY=$(node runtime.js planPhase_generateSummary '{"phaseId":"ctx.phaseId","phaseName":"ctx.phaseName","phaseDir":"ctx.phaseDir","checkerPassed":"agentStatus.status === '"'"'PASSED'"'"'","skipVerify":"ctx.flags.skipVerify","hasResearch":"ctx.hasResearch","forcedResearch":"ctx.flags.research","skippedResearch":"ctx.flags.skipResearch || ctx.flags.gaps"}')
+# Count plans and extract wave info
+PLAN_COUNT=$(ls ${ctx.phaseDir}/*-PLAN.md 2>/dev/null | wc -l | tr -d ' ')
+WAVE_COUNT=$(grep -h "^wave:" ${ctx.phaseDir}/*-PLAN.md 2>/dev/null | sort -u | wc -l | tr -d ' ')
+PLAN_NAMES=$(ls ${ctx.phaseDir}/*-PLAN.md 2>/dev/null | xargs -I{} basename {} -PLAN.md | tr '\n' ', ')
 ```
 
-```bash
-SUMMARY_MD=$(node runtime.js planPhase_formatSummaryMarkdown '{"summary":"summary"}')
-```
+Route to offer_next with filled values.
 </process>
 
 <offer_next>
-Output this markdown directly (not as a code block):
+Output this summary directly (not as a code block), filling in values based on what happened:
 
-$(echo "$SUMMARY_MD" | jq -r '.')
+```
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+ GSD ► PHASE ${ctx.phaseId} PLANNED ✓
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+**Phase ${ctx.phaseId}: ${ctx.phaseName}** — {plan_count} plan(s) in {wave_count} wave(s)
+
+| Wave | Plans | What it builds |
+|------|-------|----------------|
+| 1    | 01, 02 | [objectives from plans] |
+| 2    | 03     | [objective from plan]  |
+
+Research: {Completed | Used existing | Skipped}
+Verification: {Passed | Passed with override | Skipped}
+
+───────────────────────────────────────────────────────────────
+
+## ▶ Next Up
+
+**Execute Phase ${ctx.phaseId}** — run all {plan_count} plans
+
+/gsd:execute-phase ${ctx.phaseId}
+
+<sub>/clear first → fresh context window</sub>
+
+───────────────────────────────────────────────────────────────
+
+**Also available:**
+- cat ${ctx.phaseDir}/*-PLAN.md — review plans
+- /gsd:plan-phase ${ctx.phaseId} --research — re-research first
+
+───────────────────────────────────────────────────────────────
+```
+
+Fill the placeholders:
+
+- `{plan_count}` — number of PLAN.md files created
+- `{wave_count}` — number of unique waves across plans
+- `Wave table` — actual plans grouped by wave with their objectives
+- `Research` — based on what happened: Completed (spawned researcher), Used existing (had RESEARCH.md), Skipped (--skip-research or --gaps)
+- `Verification` — based on what happened: Passed (checker approved), Passed with override (user forced), Skipped (--skip-verify or config disabled)
 </offer_next>
 
 <success_criteria>
-- [] Init runtime: environment validated, arguments parsed, phase resolved, directory created
-- [] Research: gsd-phase-researcher spawned if needed (unless --skip-research, --gaps, or exists)
-- [] Existing plans: user consulted if plans exist (continue/view/replan)
-- [] Planner: gsd-planner spawned with runtime-built prompt (handles COMPLETE/CHECKPOINT/INCONCLUSIVE)
-- [] Verification: gsd-plan-checker in loop (unless --skip-verify or config disabled)
-- [] Revision: planner re-spawned with issues if checker finds problems (max 3 iterations)
-- [] Summary: runtime generates formatted output with next steps
+- [] .planning/ directory validated
+- [] Phase validated against roadmap
+- [] Phase directory created if needed
+- [] Research completed (unless --skip-research or --gaps or exists)
+- [] gsd-phase-researcher spawned if research needed
+- [] Existing plans checked
+- [] gsd-planner spawned with context (including RESEARCH.md if available)
+- [] Plans created (PLANNING COMPLETE or CHECKPOINT handled)
+- [] gsd-plan-checker spawned (unless --skip-verify)
+- [] Verification passed OR user override OR max iterations with user decision
+- [] User sees status between agent spawns
+- [] User knows next steps (execute or review)
 </success_criteria>

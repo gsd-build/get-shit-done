@@ -29,14 +29,14 @@ Output ONLY the reference content below. Do NOT add:
 
 GSD evolves fast. Update periodically:
 
-```
-
+```bash
+npx get-shit-done-cc@latest
 ```
 
 ## Core Workflow
 
 ```
-
+/gsd:new-project → /gsd:plan-phase → /gsd:execute-phase → repeat
 ```
 
 ### Project Initialization
@@ -352,7 +352,31 @@ Usage: `/gsd:join-discord`
 ## Files & Structure
 
 ```
-
+.planning/
+├── PROJECT.md            # Project vision
+├── ROADMAP.md            # Current phase breakdown
+├── STATE.md              # Project memory & context
+├── config.json           # Workflow mode & gates
+├── todos/                # Captured ideas and tasks
+│   ├── pending/          # Todos waiting to be worked on
+│   └── done/             # Completed todos
+├── debug/                # Active debug sessions
+│   └── resolved/         # Archived resolved issues
+├── codebase/             # Codebase map (brownfield projects)
+│   ├── STACK.md          # Languages, frameworks, dependencies
+│   ├── ARCHITECTURE.md   # Patterns, layers, data flow
+│   ├── STRUCTURE.md      # Directory layout, key files
+│   ├── CONVENTIONS.md    # Coding standards, naming
+│   ├── TESTING.md        # Test setup, patterns
+│   ├── INTEGRATIONS.md   # External services, APIs
+│   └── CONCERNS.md       # Tech debt, known issues
+└── phases/
+    ├── 01-foundation/
+    │   ├── 01-01-PLAN.md
+    │   └── 01-01-SUMMARY.md
+    └── 02-core-features/
+        ├── 02-01-PLAN.md
+        └── 02-01-SUMMARY.md
 ```
 
 ## Workflow Modes
@@ -395,8 +419,13 @@ When `commit_docs: false`:
 
 Example config:
 
-```
-
+```json
+{
+  "planning": {
+    "commit_docs": false,
+    "search_gitignored": true
+  }
+}
 ```
 
 ## Common Workflows
@@ -404,37 +433,51 @@ Example config:
 **Starting a new project:**
 
 ```
-
+/gsd:new-project        # Unified flow: questioning → research → requirements → roadmap
+/clear
+/gsd:plan-phase 1       # Create plans for first phase
+/clear
+/gsd:execute-phase 1    # Execute all plans in phase
 ```
 
 **Resuming work after a break:**
 
 ```
-
+/gsd:progress  # See where you left off and continue
 ```
 
 **Adding urgent mid-milestone work:**
 
 ```
-
+/gsd:insert-phase 5 "Critical security fix"
+/gsd:plan-phase 5.1
+/gsd:execute-phase 5.1
 ```
 
 **Completing a milestone:**
 
 ```
-
+/gsd:complete-milestone 1.0.0
+/clear
+/gsd:new-milestone  # Start next milestone (questioning → research → requirements → roadmap)
 ```
 
 **Capturing ideas during work:**
 
 ```
-
+/gsd:add-todo                    # Capture from conversation context
+/gsd:add-todo Fix modal z-index  # Capture with explicit description
+/gsd:check-todos                 # Review and work on todos
+/gsd:check-todos api             # Filter by area
 ```
 
 **Debugging an issue:**
 
 ```
-
+/gsd:debug "form submission fails silently"  # Start debug session
+# ... investigation happens, context fills up ...
+/clear
+/gsd:debug                                    # Resume from where you left off
 ```
 
 ## Getting Help

@@ -36,15 +36,14 @@
   "engines": {
     "node": ">=16.7.0"
   },
-  "dependencies": {},
   "devDependencies": {
     "@types/node": "^25.1.0",
     "@types/react": "^19.2.10",
     "esbuild": "^0.24.0",
+    "react-agentic": "^0.0.7",
     "ts-morph": "^27.0.2",
     "tsx": "^4.21.0",
-    "typescript": "^5.9.3",
-    "react-agentic": "^0.0.3"
+    "typescript": "^5.9.3"
   },
   "scripts": {
     "build:hooks": "node scripts/build-hooks.js",

@@ -672,6 +672,7 @@ async function archiveExistingPlans(args) {
     const basename3 = path4.basename(file);
     await fs4.rename(file, `${archiveDir}/${timestamp}-${basename3}`);
   }
+  return `Archived ${planFiles.length} plan(s) to ${archiveDir}`;
 }
 __name(archiveExistingPlans, "archiveExistingPlans");
 async function generateSummary(args) {
