@@ -218,6 +218,29 @@ After completing v1.0:
 
 This keeps current planning lean while preserving all history.
 
+## Git Branching for Milestones
+
+GSD supports branch-per-milestone workflows. Configure via `/gsd:settings`:
+
+```json
+{
+  "git": {
+    "branching_strategy": "milestone",
+    "milestone_branch_template": "gsd/{milestone}-{slug}"
+  }
+}
+```
+
+**Recommended workflow:**
+1. Create branch before planning: `git checkout -b gsd/v2.0-feature`
+2. Run `/gsd:new-milestone` on that branch
+3. Execute phases (all commits stay on milestone branch)
+4. `/gsd:complete-milestone` offers merge options
+
+**Why branch first?** Branch creation happens at `execute-phase`, not `new-milestone`. Branching before planning keeps all milestone artifacts (ROADMAP.md, REQUIREMENTS.md) on the feature branch.
+
+See [Workflows: Git Branching](../guides/workflows.md#git-branching-workflows) for complete details.
+
 ## Best Practices
 
 1. **Ship small, ship often** — Prefer more milestones over larger ones

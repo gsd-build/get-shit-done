@@ -51,6 +51,9 @@ Practical workflows:
 
 - [Getting Started](guides/getting-started.md) — First project
 - [Workflows](guides/workflows.md) — Common patterns
+  - Git branching strategies (none, phase, milestone)
+  - Branch-per-milestone workflow
+  - Git worktree workflows
 
 ## Quick Start
 

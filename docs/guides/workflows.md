@@ -351,6 +351,164 @@ Creates decimal phase between 5 and 6.
 
 ---
 
+## Git Branching Workflows
+
+GSD supports three branching strategies. Configure via `/gsd:settings` or `.planning/config.json`.
+
+### Branching Strategies
+
+| Strategy | Branch Pattern | Best For |
+|----------|---------------|----------|
+| `none` (default) | All work on current branch | Solo dev, simple projects |
+| `phase` | `gsd/phase-{phase}-{slug}` | Code review per phase, granular rollback |
+| `milestone` | `gsd/{milestone}-{slug}` | Release branches, PR per version |
+
+### Branch-Per-Milestone Workflow
+
+For teams wanting each milestone on a separate feature branch:
+
+```
+# 1. Configure branching strategy
+/gsd:settings
+# Select "Per Milestone" for branching
+
+# 2. Create branch BEFORE planning (recommended)
+git checkout -b gsd/v2.0-feature-name
+
+# 3. Run milestone setup on this branch
+/gsd:new-milestone "v2.0 Feature Name"
+
+# 4. Plan and execute phases (all commits stay on branch)
+/gsd:plan-phase 5
+/gsd:execute-phase 5
+... phases 6-N ...
+
+# 5. Complete milestone (offers merge options)
+/gsd:complete-milestone
+# Choose: squash merge, merge with history, or keep branch
+```
+
+**Why branch before `new-milestone`?**
+
+Branch creation only happens at `execute-phase`. If you run `new-milestone` on `main`, the planning docs (ROADMAP.md, REQUIREMENTS.md) will be committed to `main` before the milestone branch exists.
+
+| Workflow | Planning docs land on... |
+|----------|-------------------------|
+| `new-milestone` on main → `execute-phase` creates branch | `main` |
+| Branch first → `new-milestone` → `execute-phase` | Feature branch |
+
+### Branch-Per-Phase Workflow
+
+For granular code review and rollback:
+
+```
+# 1. Configure branching strategy
+/gsd:settings
+# Select "Per Phase" for branching
+
+# 2. Plan phase (still on main/current branch)
+/gsd:plan-phase 3
+
+# 3. Execute phase (creates gsd/phase-03-auth branch)
+/gsd:execute-phase 3
+
+# 4. Merge phase branch (manual or via PR)
+git checkout main
+git merge --squash gsd/phase-03-auth
+git commit -m "feat: phase 3 authentication"
+
+# 5. Repeat for next phase
+/gsd:plan-phase 4
+/gsd:execute-phase 4  # Creates gsd/phase-04-dashboard
+```
+
+### Merge Options at Milestone Completion
+
+`/gsd:complete-milestone` offers these merge strategies:
+
+| Option | Git Command | Result |
+|--------|-------------|--------|
+| Squash merge (recommended) | `git merge --squash` | Single clean commit |
+| Merge with history | `git merge --no-ff` | Preserves all commits |
+| Delete without merging | `git branch -D` | Discard branch work |
+| Keep branches | (none) | Manual handling later |
+
+### `.planning/` Across Branches
+
+| Config | Behavior |
+|--------|----------|
+| `commit_docs: true` (default) | `.planning/` is branch-specific, follows git history |
+| `.planning/` gitignored | Local-only, shared across branches in same worktree |
+
+When `.planning/` is committed, each branch has its own version of STATE.md, ROADMAP.md, etc. Merging branches also merges planning docs.
+
+---
+
+## Git Worktree Workflows
+
+Git worktrees allow parallel development on multiple branches simultaneously. Each worktree has its own working directory and `.planning/` folder.
+
+### Using Worktrees with GSD
+
+```bash
+# Create worktree for a new milestone
+git worktree add ../project-v2 -b gsd/v2.0-feature
+
+# Work in that directory
+cd ../project-v2
+/gsd:new-milestone "v2.0 Feature"
+/gsd:plan-phase 5
+/gsd:execute-phase 5
+
+# Meanwhile, in main worktree (../project)
+# Continue with bug fixes or different work
+```
+
+### Worktree Considerations
+
+1. **Separate `.planning/` directories** — Each worktree has its own `.planning/`. They don't sync automatically.
+
+2. **No built-in worktree management** — GSD doesn't create or manage worktrees. Use `git worktree` commands directly or the `/pando` skill if available.
+
+3. **Branch-per-milestone works well** — Create worktree with milestone branch, all planning stays isolated.
+
+4. **Merging brings planning together** — When you merge the milestone branch back to main, planning docs merge too (if committed).
+
+### Parallel Milestone Development
+
+```
+main-worktree/           # Production fixes, v1.x maintenance
+├── .planning/           # v1.2 hotfix milestone
+└── ...
+
+feature-worktree/        # New feature development
+├── .planning/           # v2.0 milestone (independent)
+└── ...
+```
+
+Each worktree operates independently. When v2.0 is ready:
+
+```bash
+cd main-worktree
+git merge --squash gsd/v2.0-feature
+git worktree remove ../feature-worktree
+```
+
+### When Worktrees Help
+
+- **Parallel milestones** — Work on v2.0 while maintaining v1.x
+- **Context switching** — Keep multiple features in progress without stashing
+- **Long-running experiments** — Isolate experimental work
+- **Code review** — Check out PR branches without disrupting main work
+
+### When to Avoid Worktrees
+
+- **Simple linear development** — One milestone at a time doesn't need worktrees
+- **Limited disk space** — Each worktree is a full checkout
+- **Shared dependencies** — `node_modules` aren't shared (disk usage multiplies)
+
+---
+
 ## Tips for Workflows
 
 ### When to Pause
