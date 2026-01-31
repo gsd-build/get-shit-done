@@ -100,7 +100,7 @@ The codebase intelligence system was removed partly because sql.js added 21MB.
 
 Within 72 hours:
 ```bash
-npm unpublish get-shit-done-cc@1.9.5
+npm unpublish get-shit-done-together@1.9.5
 ```
 
 After 72 hours: Publish a fix as new patch version.

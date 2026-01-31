@@ -11,6 +11,7 @@
       .prompt { fill: #7aa2f7; }
       .command { fill: #c0caf5; }
       .cyan { fill: #7dcfff; }
+      .blue { fill: #7aa2f7; }
       .green { fill: #9ece6a; }
       .dim { fill: #565f89; }
       .white { fill: #c0caf5; }
@@ -38,20 +39,20 @@
     <!-- Prompt line -->
     <text class="text prompt" font-size="15" y="0">~</text>
     <text class="text dim" font-size="15" x="16" y="0">$</text>
-    <text class="text command" font-size="15" x="36" y="0">npx get-shit-done-cc</text>
+    <text class="text command" font-size="15" x="36" y="0">npx get-shit-done-together</text>
 
     <!-- Banner -->
-    <text class="text cyan" font-size="14" y="48" xml:space="preserve">   ██████╗ ███████╗██████╗</text>
-    <text class="text cyan" font-size="14" y="68" xml:space="preserve">  ██╔════╝ ██╔════╝██╔══██╗</text>
-    <text class="text cyan" font-size="14" y="88" xml:space="preserve">  ██║  ███╗███████╗██║  ██║</text>
-    <text class="text cyan" font-size="14" y="108" xml:space="preserve">  ██║   ██║╚════██║██║  ██║</text>
-    <text class="text cyan" font-size="14" y="128" xml:space="preserve">  ╚██████╔╝███████║██████╔╝</text>
-    <text class="text cyan" font-size="14" y="148" xml:space="preserve">   ╚═════╝ ╚══════╝╚═════╝</text>
+    <text class="text" font-size="14" y="48" xml:space="preserve"><tspan class="cyan">   ██████╗ ███████╗██████╗</tspan><tspan class="blue">████████╗</tspan></text>
+    <text class="text" font-size="14" y="68" xml:space="preserve"><tspan class="cyan">  ██╔════╝ ██╔════╝██╔══██╗</tspan><tspan class="blue">══██╔══╝</tspan></text>
+    <text class="text" font-size="14" y="88" xml:space="preserve"><tspan class="cyan">  ██║  ███╗███████╗██║  ██║</tspan><tspan class="blue">  ██║</tspan></text>
+    <text class="text" font-size="14" y="108" xml:space="preserve"><tspan class="cyan">  ██║   ██║╚════██║██║  ██║</tspan><tspan class="blue">  ██║</tspan></text>
+    <text class="text" font-size="14" y="128" xml:space="preserve"><tspan class="cyan">  ╚██████╔╝███████║██████╔╝</tspan><tspan class="blue">  ██║</tspan></text>
+    <text class="text" font-size="14" y="148" xml:space="preserve"><tspan class="cyan">   ╚═════╝ ╚══════╝╚═════╝</tspan><tspan class="blue">   ╚═╝</tspan></text>
 
     <!-- Title and subtitle -->
-    <text class="text white" font-size="15" y="188">  Get Shit Done <tspan class="dim">v1.0.1</tspan></text>
+    <text class="text white" font-size="15" y="188">  Get Shit Done Together <tspan class="dim">v2.0.0</tspan></text>
     <text class="text white" font-size="15" y="212">  A meta-prompting, context engineering and spec-driven</text>
-    <text class="text white" font-size="15" y="232">  development system for Claude Code by TÂCHES.</text>
+    <text class="text white" font-size="15" y="232">  development system for Claude Code. Fork maintained by zpyoung.</text>
 
     <!-- Install output -->
     <text class="text" font-size="15" y="280"><tspan class="green">  ✓</tspan><tspan class="white"> Installed commands/gsd</tspan></text>

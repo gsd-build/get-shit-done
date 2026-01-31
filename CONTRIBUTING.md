@@ -32,7 +32,7 @@ main ═════════════════════════
 
 ### `main`
 
-Production. Always installable via `npx get-shit-done-cc`.
+Production. Always installable via `npx get-shit-done-together`.
 
 | Rule | Why |
 |------|-----|
@@ -142,7 +142,7 @@ git tag -a v1.10.0-beta.1 -m "Beta: codebase intelligence stabilized"
 git tag -a v1.10.0 -m "Release: codebase intelligence"
 ```
 
-Users opt-in: `npm install get-shit-done-cc@1.10.0-alpha.1`
+Users opt-in: `pnpm install get-shit-done-together@1.10.0-alpha.1`
 
 **If it doesn't work out:** Delete pre-release tags, no messy public revert on main.
 
@@ -171,7 +171,7 @@ npm publish
 Create formal releases for minor+ versions. Copy the CHANGELOG section.
 
 ```
-Go to: github.com/glittercowboy/get-shit-done/releases/new
+Go to: github.com/zpyoung/get-shit-done-together/releases/new
 Select tag: v1.10.0
 Title: v1.10.0
 Description: [paste from CHANGELOG.md]
@@ -302,18 +302,26 @@ Exception: CHANGELOG.md, MIGRATION.md, git commits
 
 ```bash
 # Clone
-git clone https://github.com/glittercowboy/get-shit-done.git
-cd get-shit-done
+git clone https://github.com/zpyoung/get-shit-done-together.git
+cd get-shit-done-together
 
 # Install
-npm install
+pnpm install
 
 # Test locally
-npm link
-npx get-shit-done-cc
+pnpm link --global
+npx get-shit-done-together
 
 # Run tests
 npm test
+
+# Using Git Worktrees?
+If you use worktrees, remember that `npm link` is global. If you link Worktree A, 
+then switch to Worktree B's directory, the global command still runs Worktree A's code.
+
+To test the current worktree:
+1. Run `npm link` again inside this directory (steals the global link).
+2. Or run the binary directly: `node ./bin/cli.js` (check package.json for exact path).
 ```
 
 ---

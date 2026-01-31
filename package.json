@@ -1,9 +1,9 @@
 {
-  "name": "get-shit-done-cc",
-  "version": "1.10.1",
-  "description": "A meta-prompting, context engineering and spec-driven development system for Claude Code, OpenCode and Gemini by TÂCHES.",
+  "name": "get-shit-done-together",
+  "version": "2.0.0",
+  "description": "A meta-prompting, context engineering and spec-driven development system for Claude Code, OpenCode and Gemini. Originally by TÂCHES, maintained by zpyoung.",
   "bin": {
-    "get-shit-done-cc": "bin/install.js"
+    "get-shit-done-together": "bin/install.js"
   },
   "files": [
     "bin",
@@ -27,11 +27,11 @@
   "license": "MIT",
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/glittercowboy/get-shit-done.git"
+    "url": "git+https://github.com/zpyoung/get-shit-done-together.git"
   },
-  "homepage": "https://github.com/glittercowboy/get-shit-done",
+  "homepage": "https://github.com/zpyoung/get-shit-done-together",
   "bugs": {
-    "url": "https://github.com/glittercowboy/get-shit-done/issues"
+    "url": "https://github.com/zpyoung/get-shit-done-together/issues"
   },
   "engines": {
     "node": ">=16.7.0"

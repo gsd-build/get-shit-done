@@ -6,12 +6,30 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ## [Unreleased]
 
+## [2.0.0] - 2025-01-31 (Fork Release)
+
+### Changed
+- **FORK:** Repository forked from [glittercowboy/get-shit-done](https://github.com/glittercowboy/get-shit-done)
+- Package renamed from `get-shit-done-cc` to `get-shit-done-together`
+- CLI command changed from `get-shit-done-cc` to `get-shit-done-together`
+- Repository moved to [zpyoung/get-shit-done-together](https://github.com/zpyoung/get-shit-done-together)
+
+### Added
+- FORK.md documenting fork relationship and upstream sync strategy
+- Dual attribution in LICENSE (original author + fork maintainer)
+
+---
+
+## Pre-Fork History
+
+The following changelog entries are from the original [glittercowboy/get-shit-done](https://github.com/glittercowboy/get-shit-done) repository.
+
 ## [1.10.1] - 2025-01-30
 
 ### Fixed
 - Gemini CLI agent loading errors that prevented commands from executing
 
-## [1.10.0] - 2026-01-29
+## [1.10.0] - 2025-01-29
 
 ### Added
 - Native Gemini CLI support — install with `--gemini` flag or select from interactive menu
@@ -28,7 +46,7 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 ### Fixed
 - Restored auto-release GitHub Actions workflow
 
-## [1.9.11] - 2026-01-23
+## [1.9.11] - 2025-01-23
 
 ### Changed
 - Switched to manual npm publish workflow (removed GitHub Actions CI/CD)
@@ -36,12 +54,12 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 ### Fixed
 - Discord badge now uses static format for reliable rendering
 
-## [1.9.10] - 2026-01-23
+## [1.9.10] - 2025-01-23
 
 ### Added
 - Discord community link shown in installer completion message
 
-## [1.9.9] - 2026-01-23
+## [1.9.9] - 2025-01-23
 
 ### Added
 - `/gsd:join-discord` command to quickly access the GSD Discord community invite link
@@ -54,14 +72,14 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 ### Fixed
 - Context file detection now matches filename variants (handles both `CONTEXT.md` and `{phase}-CONTEXT.md` patterns)
 
-## [1.9.7] - 2026-01-22
+## [1.9.7] - 2025-01-22
 
 ### Fixed
 - OpenCode installer now uses correct XDG-compliant config path (`~/.config/opencode/`) instead of `~/.opencode/`
 - OpenCode commands use flat structure (`command/gsd-help.md`) matching OpenCode's expected format
 - OpenCode permissions written to `~/.config/opencode/opencode.json`
 
-## [1.9.6] - 2026-01-22
+## [1.9.6] - 2025-01-22
 
 ### Added
 - Interactive runtime selection: installer now prompts to choose Claude Code, OpenCode, or both
@@ -1069,7 +1087,8 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 - YOLO mode for autonomous execution
 - Interactive mode with checkpoints
 
-[Unreleased]: https://github.com/glittercowboy/get-shit-done/compare/v1.10.1...HEAD
+[Unreleased]: https://github.com/zpyoung/get-shit-done-together/compare/v2.0.0...HEAD
+[2.0.0]: https://github.com/zpyoung/get-shit-done-together/releases/tag/v2.0.0
 [1.10.1]: https://github.com/glittercowboy/get-shit-done/releases/tag/v1.10.1
 [1.10.0]: https://github.com/glittercowboy/get-shit-done/releases/tag/v1.10.0
 [1.9.12]: https://github.com/glittercowboy/get-shit-done/releases/tag/v1.9.12
