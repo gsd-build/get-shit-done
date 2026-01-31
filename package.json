@@ -42,6 +42,7 @@
   },
   "scripts": {
     "build:hooks": "node scripts/build-hooks.js",
-    "prepublishOnly": "pnpm run build:hooks"
+    "prepublishOnly": "pnpm run build:hooks",
+    "dev:local": "pnpm install && pnpm link --global && npx get-shit-done-together"
   }
 }
