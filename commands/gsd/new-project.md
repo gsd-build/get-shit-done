@@ -68,18 +68,24 @@ This is the most leveraged moment in any project. Deep questioning here means be
 
 ## Phase 2: Brownfield Offer
 
-**If existing code detected and .planning/codebase/ doesn't exist:**
+**Check for existing code:**
 
-Check the results from setup step:
-- If `CODE_FILES` is non-empty OR `HAS_PACKAGE` is "yes"
-- AND `HAS_CODEBASE_MAP` is NOT "yes"
+If `CODE_FILES` is non-empty OR `HAS_PACKAGE` is "yes":
+- Set `IS_BROWNFIELD=true`
+
+If no existing code detected:
+- Set `IS_BROWNFIELD=false`
+- Continue to Phase 3.
+
+**If IS_BROWNFIELD=true:**
 
 Use AskUserQuestion:
 - header: "Existing Code"
-- question: "I detected existing code in this directory. Would you like to map the codebase first?"
+- question: "I detected existing code. How should we proceed?"
 - options:
-  - "Map codebase first" — Run /gsd:map-codebase to understand existing architecture (Recommended)
-  - "Skip mapping" — Proceed with project initialization
+  - "Initialize for this codebase (Recommended)" — Describe the whole system, then scope first milestone
+  - "Map codebase first" — Run /gsd:map-codebase to understand architecture first
+  - "Treat as new project" — Ignore existing code, start fresh (for monorepos, archived code, etc.)
 
 **If "Map codebase first":**
 ```
@@ -87,9 +93,19 @@ Run `/gsd:map-codebase` first, then return to `/gsd:new-project`
 ```
 Exit command.
 
-**If "Skip mapping":** Continue to Phase 3.
+**If "Treat as new project":**
+- Set `IS_BROWNFIELD=false`
+- Continue to Phase 3 with greenfield flow.
 
-**If no existing code detected OR codebase already mapped:** Continue to Phase 3.
+**If "Initialize for this codebase":**
+
+Display context message:
+```
+Let's first understand the whole system, then scope your next work as v1.0.
+Future features will be added via `/gsd:new-milestone`.
+```
+
+Continue to Phase 3 with `IS_BROWNFIELD=true`.
 
 ## Phase 3: Deep Questioning
 
@@ -103,6 +119,36 @@ Exit command.
 
 **Open the conversation:**
 
+**If IS_BROWNFIELD and codebase map exists (.planning/codebase/):**
+
+Read `.planning/codebase/ARCHITECTURE.md` and `.planning/codebase/STACK.md` first.
+
+Summarize what you learned:
+"Based on the codebase map, this appears to be [summary of what the system does, tech stack, architecture]. Is that accurate?"
+
+Wait for confirmation or corrections. Use this to seed your understanding of the existing system.
+
+**If IS_BROWNFIELD and no codebase map:**
+
+Ask inline (freeform, NOT AskUserQuestion):
+
+"Tell me about this codebase. What does it do?"
+
+Wait for their response. Follow threads to understand:
+- What problem it solves
+- Who uses it
+- Core capabilities (what's already built)
+- Known limitations or technical debt
+- What prompted GSD initialization now
+
+**Then transition (for all brownfield paths):**
+
+"Now that I understand the system, what's the next thing you want to build? This will be v1.0."
+
+The user's answer becomes the first milestone scope.
+
+**If IS_BROWNFIELD=false (greenfield):**
+
 Ask inline (freeform, NOT AskUserQuestion):
 
 "What do you want to build?"
@@ -114,7 +160,7 @@ Wait for their response. This gives you the context needed to ask intelligent fo
 Based on what they said, ask follow-up questions that dig into their response. Use AskUserQuestion with options that probe what they mentioned — interpretations, clarifications, concrete examples.
 
 Keep following threads. Each answer opens new threads to explore. Ask about:
-- What excited them
+- What excited them (greenfield) / what prompted this work (brownfield)
 - What problem sparked this
 - What they mean by vague terms
 - What it would actually look like
@@ -174,13 +220,32 @@ Initialize requirements as hypotheses:
 
 All Active requirements are hypotheses until shipped and validated.
 
-**For brownfield projects (codebase map exists):**
+**For brownfield projects (IS_BROWNFIELD=true):**
 
-Infer Validated requirements from existing code:
+**"What This Is"** should describe the existing system:
+- What the codebase does TODAY (not what we're adding)
+- The core problem it solves
+- Who it's for
 
+**"Core Value"** should reflect the system's primary purpose.
+
+**"Context"** should include:
+- Current architecture state
+- Known technical debt (if discussed)
+- What prompted this GSD initialization
+
+**Infer Validated requirements:**
+
+If codebase map exists:
 1. Read `.planning/codebase/ARCHITECTURE.md` and `STACK.md`
 2. Identify what the codebase already does
 3. These become the initial Validated set
+
+If no codebase map:
+- Use what the user described during questioning
+- Mark existing capabilities as `— existing`
+
+**Active requirements** = the user's next work (first milestone scope), NOT the entire system's feature set.
 
 ```markdown
 ## Requirements
@@ -200,6 +265,21 @@ Infer Validated requirements from existing code:
 
 - [Exclusion 1] — [why]
 ```
+
+**Add "Current Milestone" section for brownfield:**
+
+```markdown
+## Current Milestone: v1.0 [Name]
+
+**Goal:** [One sentence describing what user wants to build next]
+
+**Target features:**
+- [Feature 1]
+- [Feature 2]
+```
+
+This frames their immediate work as a milestone within the larger project.
+The v1.0 versioning ensures compatibility with `/gsd:new-milestone` which parses version numbers.
 
 **Key Decisions:**
 
