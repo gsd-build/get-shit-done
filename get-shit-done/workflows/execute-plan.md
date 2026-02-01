@@ -1379,6 +1379,8 @@ The one-liner must be SUBSTANTIVE:
   </step>
 
 <step name="update_current_position">
+**If `<parallel_context>` in prompt:** Skip this step. Include a "State Fragment" section in SUMMARY.md instead (see gsd-executor state_updates). Orchestrator consolidates state after wave.
+
 Update Current Position section in STATE.md to reflect plan completion.
 
 **Format:**
@@ -1437,6 +1439,8 @@ Progress: ███████░░░ 50%
       </step>
 
 <step name="extract_decisions_and_issues">
+**If `<parallel_context>` in prompt:** Skip this step. Decisions and issues go in SUMMARY.md's "State Fragment" section.
+
 Extract decisions, issues, and concerns from SUMMARY.md into STATE.md accumulated context.
 
 **Decisions Made:**
@@ -1454,6 +1458,8 @@ Extract decisions, issues, and concerns from SUMMARY.md into STATE.md accumulate
     </step>
 
 <step name="update_session_continuity">
+**If `<parallel_context>` in prompt:** Skip this step. Orchestrator updates session continuity after wave.
+
 Update Session Continuity section in STATE.md to enable resumption in future sessions.
 
 **Format:**
@@ -1528,10 +1534,16 @@ If `COMMIT_PLANNING_DOCS=true` (default):
 
 ```bash
 git add .planning/phases/XX-name/{phase}-{plan}-SUMMARY.md
+```
+
+**If NOT in parallel context** (no `<parallel_context>` in prompt):
+```bash
 git add .planning/STATE.md
 ```
 
-**2. Stage roadmap:**
+**If in parallel context:** Do NOT stage STATE.md or ROADMAP.md — orchestrator handles these after wave completion.
+
+**2. Stage roadmap (skip if in parallel context):**
 
 ```bash
 git add .planning/ROADMAP.md

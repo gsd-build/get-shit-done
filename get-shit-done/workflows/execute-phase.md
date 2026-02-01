@@ -227,6 +227,39 @@ waves = {
 
 **No dependency analysis needed.** Wave numbers are pre-computed during `/gsd:plan-phase`.
 
+**File conflict detection (safety check):**
+
+Before finalizing wave groups, check for `files_modified` overlap between plans in the same wave:
+
+```bash
+# For each wave with multiple plans, check files_modified frontmatter
+for wave_plans in same_wave_groups; do
+  if [ ${#wave_plans[@]} -gt 1 ]; then
+    # Extract files_modified from each plan's frontmatter
+    for plan in ${wave_plans[@]}; do
+      files=$(grep -A 20 "^files_modified:" "$plan" | grep "^  - " | sed 's/^  - //')
+      echo "$plan: $files"
+    done
+    # Check for overlapping files between any two plans
+  fi
+done
+```
+
+**If overlap detected:**
+
+```
+WARNING: File conflict detected in Wave {N}
+
+Plans {A} and {B} both modify: {overlapping_files}
+
+Parallel execution of these plans will cause race conditions.
+Bumping Plan {B} to Wave {N+1} to prevent conflicts.
+```
+
+Automatically move the later plan to the next wave. Parallel agents sharing files causes overwrite loops — one agent's commit silently replaces the other's changes, triggering cascading test failures.
+
+**If no `files_modified` in frontmatter:** Log warning but proceed — planner should include this field.
+
 Report wave structure with context:
 ```
 ## Execution Plan
@@ -288,17 +321,26 @@ Execute each wave in sequence. Autonomous plans within a wave run in parallel **
    ```
 
    **If `PARALLELIZATION=true` (default):** Use Task tool with multiple parallel calls.
-   
+
    **If `PARALLELIZATION=false`:** Spawn agents one at a time, waiting for each to complete before starting the next. This ensures no concurrent file modifications or build operations.
 
-   Each agent gets prompt with inlined content:
+   Each agent gets prompt with inlined content.
+
+   **Parallel safety:** When spawning multiple agents in the same wave (and `PARALLELIZATION=true`), instruct each agent to skip STATE.md updates. The orchestrator consolidates STATE.md after the wave completes (see step 4).
 
    ```
    <objective>
    Execute plan {plan_number} of phase {phase_number}-{phase_name}.
 
-   Commit each task atomically. Create SUMMARY.md. Update STATE.md.
+   Commit each task atomically. Create SUMMARY.md.
+   Do NOT update STATE.md — orchestrator consolidates state after this wave completes.
    </objective>
+
+   <parallel_context>
+   You are running in PARALLEL with other agents in Wave {N}.
+   - Do NOT read or write STATE.md (orchestrator owns state updates)
+   - Only modify files listed in your plan's files_modified frontmatter
+   </parallel_context>
 
    <execution_context>
    @~/.claude/get-shit-done/workflows/execute-plan.md
@@ -311,7 +353,7 @@ Execute each wave in sequence. Autonomous plans within a wave run in parallel **
    Plan:
    {plan_content}
 
-   Project state:
+   Project state (read-only snapshot — do not update):
    {state_content}
 
    Config (if exists):
@@ -322,9 +364,11 @@ Execute each wave in sequence. Autonomous plans within a wave run in parallel **
    - [ ] All tasks executed
    - [ ] Each task committed individually
    - [ ] SUMMARY.md created in plan directory
-   - [ ] STATE.md updated with position and decisions
+   - [ ] STATE.md left untouched (orchestrator consolidates)
    </success_criteria>
    ```
+
+   **For single-agent waves (only 1 plan in wave):** The parallel safety restriction does NOT apply. Single agents can update STATE.md normally. Only add `<parallel_context>` when spawning 2+ agents simultaneously.
 
 2. **Wait for all agents in wave to complete:**
 
@@ -359,7 +403,29 @@ Execute each wave in sequence. Autonomous plans within a wave run in parallel **
    - Bad: "Wave 2 complete. Proceeding to Wave 3."
    - Good: "Terrain system complete — 3 biome types, height-based texturing, physics collision meshes. Vehicle physics (Wave 3) can now reference ground surfaces."
 
-4. **Handle failures:**
+4. **Consolidate STATE.md after wave (orchestrator-owned):**
+
+   After all agents in a multi-agent wave complete, the orchestrator performs a single STATE.md update. Only the orchestrator writes STATE.md — parallel agents never touch it.
+
+   ```
+   For each completed plan in this wave:
+     1. Read its SUMMARY.md "State Fragment" section
+     2. Collect: plan completion status, decisions, blockers
+
+   Perform ONE STATE.md update:
+     - Update Current Position (advance plan count by plans completed in wave)
+     - Add decisions from all plans in this wave
+     - Update progress bar
+     - Update Session Continuity timestamp
+   ```
+
+   Commit the consolidated state:
+   ```bash
+   git add .planning/STATE.md
+   git commit -m "docs(phase-{X}): consolidate state after wave {N}"
+   ```
+
+5. **Handle failures:**
 
    If any agent in wave fails:
    - Report which plan failed and why
@@ -367,11 +433,11 @@ Execute each wave in sequence. Autonomous plans within a wave run in parallel **
    - If continue: proceed to next wave (dependent plans may also fail)
    - If stop: exit with partial completion report
 
-5. **Execute checkpoint plans between waves:**
+6. **Execute checkpoint plans between waves:**
 
    See `<checkpoint_handling>` for details.
 
-6. **Proceed to next wave**
+7. **Proceed to next wave**
 
 </step>
 

@@ -679,7 +679,25 @@ During execution, these authentication requirements were handled:
 </summary_creation>
 
 <state_updates>
-After creating SUMMARY.md, update STATE.md.
+After creating SUMMARY.md, update STATE.md — **unless running in parallel context**.
+
+**Parallel context check:**
+
+If your prompt includes a `<parallel_context>` section, you are running concurrently with other agents. In this case:
+- **Do NOT read or write STATE.md** — the orchestrator owns all state updates for parallel waves
+- Instead, include a "State Fragment" section at the end of your SUMMARY.md:
+
+```markdown
+## State Fragment (for orchestrator consolidation)
+
+**Plan completed:** {phase}-{plan}
+**Decisions made:** [list from Decisions Made section, or "None"]
+**Blockers/concerns:** [list, or "None"]
+```
+
+The orchestrator reads these fragments after the wave and performs one atomic STATE.md update.
+
+**If NOT in parallel context (single-agent wave or standalone execution):**
 
 **Update Current Position:**
 
@@ -717,7 +735,7 @@ Resume file: [path to .continue-here if exists, else "None"]
 </state_updates>
 
 <final_commit>
-After SUMMARY.md and STATE.md updates:
+After SUMMARY.md creation (and STATE.md updates if not in parallel context):
 
 **If `COMMIT_PLANNING_DOCS=false`:** Skip git operations for planning files, log "Skipping planning docs commit (commit_docs: false)"
 
@@ -727,8 +745,14 @@ After SUMMARY.md and STATE.md updates:
 
 ```bash
 git add .planning/phases/XX-name/{phase}-{plan}-SUMMARY.md
+```
+
+**If NOT in parallel context** (single-agent wave or standalone):
+```bash
 git add .planning/STATE.md
 ```
+
+**If in parallel context:** Do NOT stage STATE.md — orchestrator updates it after wave completes.
 
 **2. Commit metadata:**
 
