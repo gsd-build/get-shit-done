@@ -63,24 +63,24 @@ Which phases cover which requirements. Updated during roadmap creation.
 
 | Requirement | Phase | Status |
 |-------------|-------|--------|
-| AGENT-01 | Phase ? | Pending |
-| AGENT-02 | Phase ? | Pending |
-| AGENT-03 | Phase ? | Pending |
-| CONV-01 | Phase ? | Pending |
-| CONV-02 | Phase ? | Pending |
-| INTG-01 | Phase ? | Pending |
-| INTG-02 | Phase ? | Pending |
-| INTG-03 | Phase ? | Pending |
-| INTG-04 | Phase ? | Pending |
-| CONF-01 | Phase ? | Pending |
-| CONF-02 | Phase ? | Pending |
-| CONF-03 | Phase ? | Pending |
+| AGENT-01 | Phase 1 | Pending |
+| AGENT-02 | Phase 1 | Pending |
+| AGENT-03 | Phase 1 | Pending |
+| CONV-01 | Phase 3 | Pending |
+| CONV-02 | Phase 1 | Pending |
+| INTG-01 | Phase 3 | Pending |
+| INTG-02 | Phase 3 | Pending |
+| INTG-03 | Phase 4 | Pending |
+| INTG-04 | Phase 5 | Pending |
+| CONF-01 | Phase 2 | Pending |
+| CONF-02 | Phase 2 | Pending |
+| CONF-03 | Phase 2 | Pending |
 
 **Coverage:**
 - v1 requirements: 12 total
-- Mapped to phases: 0
-- Unmapped: 12
+- Mapped to phases: 12
+- Unmapped: 0
 
 ---
 *Requirements defined: 2026-01-31*
-*Last updated: 2026-01-31 after initial definition*
+*Last updated: 2026-01-31 after roadmap creation*
