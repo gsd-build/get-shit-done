@@ -1,10 +1,29 @@
-# Roadmap: GSD Adversary Agent
+# Roadmap: Get Shit Done Together
 
-## Overview
+## Milestones
 
-This roadmap delivers an adversarial review agent that challenges assumptions and stress-tests feasibility at four key checkpoints in the GSD workflow: requirements, roadmap, plans, and verification. The agent integrates into existing commands without disrupting workflows, enabled via configuration toggle. Research-backed patterns (structured critique, constructive stance, adaptive convergence) prevent common multi-agent debate failures.
+- ✅ **v2.0 MVP** - Core GSD workflow system (shipped 2026-01-31)
+- 🚧 **v2.1 Adversary Agent** - Phases 1-5 (in progress)
 
 ## Phases
+
+<details>
+<summary>✅ v2.0 MVP - SHIPPED 2026-01-31</summary>
+
+Development predates GSD workflow tracking. See `.planning/MILESTONES.md` for accomplishments.
+
+**Shipped features:**
+- 27 slash commands covering full project lifecycle
+- 11 specialized subagents
+- Multi-runtime support (Claude Code, OpenCode, Gemini CLI)
+- State-driven workflows with `.planning/` artifacts
+- Hooks for status display and update checks
+
+</details>
+
+### 🚧 v2.1 Adversary Agent (In Progress)
+
+**Milestone Goal:** Adversarial review agent that challenges assumptions and stress-tests feasibility at four key checkpoints in the GSD workflow: requirements, roadmap, plans, and verification. The agent integrates into existing commands without disrupting workflows, enabled via configuration toggle. Research-backed patterns (structured critique, constructive stance, adaptive convergence) prevent common multi-agent debate failures.
 
 **Phase Numbering:**
 - Integer phases (1, 2, 3, 4, 5): Planned milestone work
@@ -89,17 +108,17 @@ Plans:
 ## Progress
 
 **Execution Order:**
-Phases execute in numeric order: 1 -> 2 -> 3 -> 4 -> 5
+Phases execute in numeric order: 1 → 2 → 3 → 4 → 5
 
-| Phase | Plans Complete | Status | Completed |
-|-------|----------------|--------|-----------|
-| 1. Core Agent | 0/? | Not started | - |
-| 2. Configuration | 0/? | Not started | - |
-| 3. New-Project Integration | 0/? | Not started | - |
-| 4. Plan Integration | 0/? | Not started | - |
-| 5. Verification Integration | 0/? | Not started | - |
+| Phase | Milestone | Plans Complete | Status | Completed |
+|-------|-----------|----------------|--------|-----------|
+| 1. Core Agent | v2.1 | 0/? | Not started | - |
+| 2. Configuration | v2.1 | 0/? | Not started | - |
+| 3. New-Project Integration | v2.1 | 0/? | Not started | - |
+| 4. Plan Integration | v2.1 | 0/? | Not started | - |
+| 5. Verification Integration | v2.1 | 0/? | Not started | - |
 
 ---
 *Roadmap created: 2026-01-31*
 *Depth: comprehensive*
-*Coverage: 12/12 v1 requirements mapped*
+*Coverage: 12/12 v2.1 requirements mapped*

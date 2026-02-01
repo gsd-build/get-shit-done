@@ -1,11 +1,12 @@
-# Requirements: GSD Adversary Agent
+# Requirements: v2.1 Adversary Agent
 
 **Defined:** 2026-01-31
+**Milestone:** v2.1 Adversary Agent
 **Core Value:** Unchallenged assumptions get caught before they cause problems in execution
 
-## v1 Requirements
+## v2.1 Requirements
 
-Requirements for initial release. Each maps to roadmap phases.
+Requirements for this milestone. Each maps to roadmap phases.
 
 ### Agent Core
 
@@ -31,9 +32,9 @@ Requirements for initial release. Each maps to roadmap phases.
 - [ ] **CONF-02**: Max rounds is configurable in config.json
 - [ ] **CONF-03**: Individual checkpoints can be toggled on/off in config.json
 
-## v2 Requirements
+## Future Requirements (v2.2+)
 
-Deferred to future release. Tracked but not in current roadmap.
+Deferred to future releases. Tracked but not in current milestone.
 
 ### Advanced Critique
 
