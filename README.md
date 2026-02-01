@@ -180,7 +180,7 @@ If you prefer not to use that flag, add this to your project's `.claude/settings
 
 ### 1. Initialize Project
 
-```
+```text
 /gsd:new-project
 ```
 
@@ -199,7 +199,7 @@ You approve the roadmap. Now you're ready to build.
 
 ### 2. Discuss Phase
 
-```
+```text
 /gsd:discuss-phase 1
 ```
 
@@ -227,7 +227,7 @@ The deeper you go here, the more the system builds what you actually want. Skip 
 
 ### 3. Plan Phase
 
-```
+```text
 /gsd:plan-phase 1
 ```
 
@@ -245,7 +245,7 @@ Each plan is small enough to execute in a fresh context window. No degradation, 
 
 ### 4. Execute Phase
 
-```
+```text
 /gsd:execute-phase 1
 ```
 
@@ -264,7 +264,7 @@ Walk away, come back to completed work with clean git history.
 
 ### 5. Verify Work
 
-```
+```text
 /gsd:verify-work 1
 ```
 
@@ -287,7 +287,7 @@ If everything passes, you move on. If something's broken, you don't manually deb
 
 ### 6. Repeat → Complete → Next Milestone
 
-```
+```text
 /gsd:discuss-phase 2
 /gsd:plan-phase 2
 /gsd:execute-phase 2
@@ -309,7 +309,7 @@ Then `/gsd:new-milestone` starts the next version — same flow as `new-project`
 
 ### Quick Mode
 
-```
+```text
 /gsd:quick
 ```
 
@@ -323,12 +323,49 @@ Quick mode gives you GSD guarantees (atomic commits, state tracking) with a fast
 
 Use for: bug fixes, small features, config changes, one-off tasks.
 
-```
+```bash
 /gsd:quick
 > What do you want to do? "Add dark mode toggle to settings"
 ```
 
 **Creates:** `.planning/quick/001-add-dark-mode-toggle/PLAN.md`, `SUMMARY.md`
+
+---
+
+### Skill Integration
+
+GSD integrates with Claude Code skills to enhance planning and execution.
+
+```bash
+/gsd:suggest-skills     # Discover skills for entire project
+/gsd:suggest-skills 3   # Discover skills for specific phase
+```
+
+**What it does:**
+- Scans your system for installed skills (`~/.claude/commands/*/*.md` and `.claude/commands/*.md`)
+- Matches skills to your project's keywords (testing, deployment, database, etc.)
+- Recommends which skills to use during planning and execution
+- Skills are discovered dynamically — no assumptions about what's installed
+
+**Using skills in plans:**
+```xml
+<task type="auto">
+  <action>Use /test-gen to create unit tests for the auth module</action>
+</task>
+```
+
+Configure skill mappings in `.planning/config.json`:
+```json
+{
+  "skills": {
+    "enabled": true,
+    "discovery": "auto",
+    "skill_mappings": {}
+  }
+}
+```
+
+See `references/skill-integration.md` for full documentation.
 
 ---
 
@@ -468,6 +505,7 @@ You're never locked in. The system adapts.
 |---------|--------------|
 | `/gsd:settings` | Configure model profile and workflow agents |
 | `/gsd:set-profile <profile>` | Switch model profile (quality/balanced/budget) |
+| `/gsd:suggest-skills [N]` | Discover and recommend skills for project or phase |
 | `/gsd:add-todo [desc]` | Capture idea for later |
 | `/gsd:check-todos` | List pending todos |
 | `/gsd:debug [desc]` | Systematic debugging with persistent state |
@@ -499,7 +537,7 @@ Control which Claude model each agent uses. Balance quality vs token spend.
 | `budget` | Sonnet | Sonnet | Haiku |
 
 Switch profiles:
-```
+```text
 /gsd:set-profile budget
 ```
 

@@ -20,7 +20,7 @@ GSD optimizes for **solo developer + Claude workflow**. The release process foll
 
 Two branches. That's it.
 
-```
+```text
 main ════════════════════════════════════════════►
          ▲         ▲         ▲         ▲
          │         │         │         │
@@ -83,7 +83,7 @@ git push origin feat/model-profiles
 
 Use conventional commits. Claude already does this.
 
-```
+```sql
 feat(checkpoints): add rollback capability
 fix(install): use absolute paths on Windows (#207)
 docs(readme): update installation instructions
@@ -170,7 +170,7 @@ npm publish
 
 Create formal releases for minor+ versions. Copy the CHANGELOG section.
 
-```
+```bash
 Go to: github.com/glittercowboy/get-shit-done/releases/new
 Select tag: v1.10.0
 Title: v1.10.0
@@ -215,7 +215,7 @@ npm publish
 ### Title
 
 Use conventional commit format:
-```
+```text
 feat(checkpoints): add rollback capability
 fix(install): use absolute paths on Windows
 ```
@@ -270,7 +270,7 @@ Borrowed from GSD-STYLE.md:
 Exception: CHANGELOG.md, MIGRATION.md, git commits
 
 **Vague Contributions (Banned):**
-```
+```bash
 # BAD
 "Improve performance"
 "Fix bugs"
@@ -315,6 +315,24 @@ npx get-shit-done-cc
 # Run tests
 npm test
 ```
+
+---
+
+## Skill Integration
+
+GSD can integrate with Claude Code skills to enhance planning and execution. Skills are discovered dynamically from the user's system.
+
+**Key points for contributors:**
+- Skills are NOT hardcoded — GSD scans for them at runtime
+- Skill locations: `~/.claude/commands/*/*.md` (global) and `.claude/commands/*.md` (local)
+- The `/gsd:suggest-skills` command discovers and recommends skills
+- Skill mappings in `config.json` map categories to skill names
+- Reference documentation: `get-shit-done/references/skill-integration.md`
+
+**When modifying skill-related code:**
+- Never assume specific skills are installed
+- Always use dynamic discovery
+- Keep skill_mappings empty by default (users populate based on their skills)
 
 ---
 
