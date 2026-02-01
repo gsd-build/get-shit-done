@@ -46,20 +46,47 @@ To get skill recommendations:
 </step>
 
 <step name="discover_skills">
-Discover available skills:
+Discover available skills by scanning actual skill locations:
 
 ```bash
-# Check for project-local skills
-ls .claude/skills/*.md 2>/dev/null
+# Discover user-installed skills (global)
+USER_SKILLS=""
+if [ -d ~/.claude/commands ]; then
+  for dir in ~/.claude/commands/*/; do
+    if [ -d "$dir" ]; then
+      for skill in "$dir"*.md; do
+        if [ -f "$skill" ]; then
+          SKILL_NAME=$(basename "$skill" .md)
+          SKILL_DIR=$(basename "$(dirname "$skill")")
+          USER_SKILLS="$USER_SKILLS$SKILL_DIR:$SKILL_NAME\n"
+        fi
+      done
+    fi
+  done
+fi
+echo "User skills found:"
+echo -e "$USER_SKILLS" | grep -v '^$' | sort
 
-# List Claude Code skills (if accessible)
-# Skills are typically registered in Claude Code's skill registry
+# Discover project-local skills
+PROJECT_SKILLS=""
+if [ -d .claude/commands ]; then
+  for skill in .claude/commands/*.md; do
+    if [ -f "$skill" ]; then
+      SKILL_NAME=$(basename "$skill" .md)
+      PROJECT_SKILLS="$PROJECT_SKILLS$SKILL_NAME\n"
+    fi
+  done
+fi
+echo "Project skills found:"
+echo -e "$PROJECT_SKILLS" | grep -v '^$' | sort
 ```
 
-Build available skills inventory from:
-1. Claude Code built-in skills
-2. Project-local skills (`.claude/skills/`)
-3. User-installed skill packages
+Build available skills inventory from DISCOVERED skills only:
+1. **User-installed skills** - `~/.claude/commands/*/*.md` (global skills)
+2. **Project-local skills** - `.claude/commands/*.md` (project-specific)
+
+**Important:** Only recommend skills that actually exist on the user's system.
+Do NOT assume any specific skills are installed - discover them dynamically.
 </step>
 
 <step name="analyze_project">
@@ -71,20 +98,27 @@ If no phase specified, analyze entire project:
 - REQUIREMENTS.md (if exists)
 - Existing codebase patterns
 
-**Keyword categories:**
-| Category | Keywords | Relevant Skills |
-|----------|----------|-----------------|
-| Testing | test, coverage, TDD, unit | test-gen, test-coverage, unit-testing |
-| Deployment | deploy, k8s, kubernetes, docker | k8s-deploy, argocd-app, gke-cluster |
-| Database | database, sql, query, schema, bigquery | bq-schema, bq-query, bq-cost |
-| Code Quality | review, refactor, smell, lint | code-review, code-smell, refactor-code |
-| Documentation | docs, changelog, readme | changelog, doc-sync |
-| Release | release, version, tag, publish | release-prep, github-release |
-| Git | commit, pr, branch | github-pr, smart-commit |
-| Integration | jira, slack, confluence | jira-issue, slack-search, confluence-search |
-| Debugging | debug, error, trace, fix | debug-code, trace-error, gsd:debug |
-| Frontend | ui, component, react, vue | frontend-design |
-| API | api, endpoint, rest, graphql | api-validation |
+**Match discovered skills to keywords:**
+
+For each discovered skill, extract its purpose from:
+1. The skill filename (e.g., `test-gen` suggests testing)
+2. The skill's description in frontmatter (if readable)
+3. Common naming conventions
+
+**Keyword matching approach:**
+
+| Keywords in Project | Look for Skills Containing |
+|---------------------|---------------------------|
+| test, coverage, TDD, unit | test, spec, coverage |
+| deploy, k8s, kubernetes, docker | deploy, k8s, docker, infra |
+| database, sql, query, schema | db, sql, schema, query, bq |
+| review, refactor, quality | review, lint, refactor, quality |
+| docs, changelog, readme | doc, changelog, readme |
+| release, version, tag | release, version, tag, publish |
+| commit, pr, branch | commit, pr, git, branch |
+| debug, error, trace | debug, trace, error, fix |
+
+**Important:** Only match against DISCOVERED skills, not hypothetical ones.
 </step>
 
 <step name="analyze_phase">
@@ -107,31 +141,33 @@ Extract phase-specific keywords and match to skills.
 </step>
 
 <step name="generate_recommendations">
-Generate skill recommendations:
+Generate skill recommendations based on DISCOVERED skills:
 
 ```markdown
 ## Skill Recommendations
 
-Based on {project|phase} analysis, these skills are recommended:
+Based on {project|phase} analysis and discovered skills on your system:
 
-### High Relevance
+### Discovered Skills
+
+**User-installed skills (~/.claude/commands/):**
+{List discovered user skills, or "None found" if empty}
+
+**Project-local skills (.claude/commands/):**
+{List discovered project skills, or "None found" if empty}
+
+### Matched Skills
+
+Skills that match your project's keywords:
 
 | Skill | Match Reason | When to Use |
 |-------|--------------|-------------|
-| `/test-gen` | Phase involves new feature implementation | After implementing each feature |
-| `/code-review` | Code quality is a project priority | Before committing major changes |
-
-### Medium Relevance
-
-| Skill | Match Reason | When to Use |
-|-------|--------------|-------------|
-| `/changelog` | Project has release workflow | During release preparation |
+| `/{discovered-skill}` | {why it matched} | {when to use} |
 
 ### Available but Not Matched
 
-These skills are available but didn't match current context:
-- `/bq-query` - No BigQuery usage detected
-- `/k8s-deploy` - No Kubernetes configuration found
+These skills exist but didn't match current context:
+{List remaining discovered skills that didn't match}
 
 ---
 
@@ -144,9 +180,18 @@ To enable skill integration, add to `.planning/config.json`:
   "skills": {
     "enabled": true,
     "discovery": "auto",
+    "skill_mappings": {}
+  }
+}
+\`\`\`
+
+Then add mappings based on YOUR discovered skills:
+
+\`\`\`json
+{
+  "skills": {
     "skill_mappings": {
-      "testing": ["test-gen", "test-coverage"],
-      "code-quality": ["code-review", "code-smell"]
+      "category": ["your-discovered-skill-1", "your-discovered-skill-2"]
     }
   }
 }
@@ -154,11 +199,12 @@ To enable skill integration, add to `.planning/config.json`:
 
 ## Next Steps
 
-1. Review recommended skills above
-2. Add skill mappings to config.json
-3. Reference skills in plan task actions:
+1. Review discovered skills above
+2. Run `/gsd:suggest-skills` to discover what's available
+3. Add skill mappings to config.json based on YOUR skills
+4. Reference skills in plan task actions:
    \`\`\`xml
-   <action>Use /test-gen to create unit tests for UserService</action>
+   <action>Use /{your-skill} to accomplish the task</action>
    \`\`\`
 ```
 </step>
@@ -180,67 +226,50 @@ Select option or type skill name for details.
 
 </process>
 
-<skill_database>
-## Known Skills Reference
+<skill_discovery_notes>
+## Skill Discovery Notes
 
-### Workflow Skills
-| Skill | Purpose | Trigger Keywords |
-|-------|---------|------------------|
-| `changelog` | Generate changelogs from git | changelog, changes, history |
-| `release-prep` | Prepare releases | release, version, tag |
-| `github-pr` | Create pull requests | pr, pull request, merge |
-| `github-release` | Create GitHub releases | release, publish |
-| `smart-commit` | Intelligent commits | commit |
+Skills are discovered dynamically from the user's system. The following locations are scanned:
 
-### Testing Skills
-| Skill | Purpose | Trigger Keywords |
-|-------|---------|------------------|
-| `test-gen` | Generate unit tests | test, unit, coverage |
-| `test-coverage` | Analyze coverage gaps | coverage, untested |
-| `unit-testing` | TDD workflow | tdd, test-driven |
+### Skill Locations
 
-### Code Quality Skills
-| Skill | Purpose | Trigger Keywords |
-|-------|---------|------------------|
-| `code-review` | Review code | review, check, audit |
-| `code-smell` | Detect smells | smell, quality, clean |
-| `refactor-code` | Safe refactoring | refactor, restructure |
+| Location | Type | Example |
+|----------|------|---------|
+| `~/.claude/commands/*/*.md` | User-installed (global) | `~/.claude/commands/testing/test-gen.md` |
+| `.claude/commands/*.md` | Project-local | `.claude/commands/deploy.md` |
 
-### DevOps Skills
-| Skill | Purpose | Trigger Keywords |
-|-------|---------|------------------|
-| `k8s-deploy` | Kubernetes deploys | kubernetes, k8s, deploy |
-| `argocd-app` | ArgoCD apps | argocd, gitops |
-| `gke-cluster` | GKE clusters | gke, gcloud, cluster |
+### Skill Naming Convention
 
-### Data Skills
-| Skill | Purpose | Trigger Keywords |
-|-------|---------|------------------|
-| `bq-schema` | BigQuery schemas | bigquery, bq, schema |
-| `bq-query` | BigQuery queries | query, sql, bigquery |
-| `bq-cost` | Query cost analysis | cost, estimate, bigquery |
+Skills are named after their filename (without .md extension):
+- `~/.claude/commands/testing/test-gen.md` -> skill name: `test-gen`
+- `.claude/commands/deploy.md` -> skill name: `deploy`
 
-### Integration Skills
-| Skill | Purpose | Trigger Keywords |
-|-------|---------|------------------|
-| `slack-search` | Search Slack | slack, message, channel |
-| `jira-issue` | Manage Jira | jira, ticket, issue |
-| `confluence-search` | Search Confluence | confluence, wiki, docs |
+### Keyword Matching Heuristics
 
-### Debugging Skills
-| Skill | Purpose | Trigger Keywords |
-|-------|---------|------------------|
-| `debug-code` | Systematic debugging | debug, fix, error |
-| `trace-error` | Error tracing | trace, root cause, stack |
-| `gsd:debug` | GSD debug workflow | debug, investigate |
-</skill_database>
+Match discovered skill names against project keywords:
+
+| Skill Name Contains | Likely Category |
+|---------------------|-----------------|
+| test, spec, coverage | Testing |
+| deploy, k8s, docker, infra | Deployment |
+| db, sql, schema, query, bq | Database |
+| review, lint, refactor | Code Quality |
+| doc, changelog, readme | Documentation |
+| release, version, tag | Release |
+| commit, pr, git | Git/VCS |
+| debug, trace, error | Debugging |
+
+**Note:** This table helps categorize discovered skills. It does NOT assume any specific skills exist.
+</skill_discovery_notes>
 
 <success_criteria>
 - [ ] Project/phase context loaded
-- [ ] Available skills discovered
-- [ ] Keywords extracted from context
-- [ ] Skills matched to keywords
+- [ ] Available skills discovered from ~/.claude/commands/*/*.md
+- [ ] Available skills discovered from .claude/commands/*.md
+- [ ] Keywords extracted from project context
+- [ ] Only DISCOVERED skills matched to keywords (no assumptions)
 - [ ] Recommendations presented with relevance levels
-- [ ] Configuration guidance provided
+- [ ] Configuration guidance provided (empty skill_mappings as starting point)
+- [ ] User informed to populate skill_mappings based on THEIR skills
 - [ ] Next steps offered
 </success_criteria>

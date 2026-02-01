@@ -141,39 +141,42 @@ Execute each task in the plan.
 </execution_flow>
 
 <skill_invocation>
-**When task action references a skill (e.g., "Use /test-gen to..."):**
+**When task action references a skill (e.g., "Use /skill-name to..."):**
 
 Skills are Claude Code prompts that provide specialized capabilities. When a task action includes a skill reference:
 
 1. **Detect skill reference** - Look for `/skill-name` pattern in `<action>` text
 2. **Parse skill name** - Extract skill identifier (e.g., `test-gen` from `/test-gen`)
-3. **Invoke skill** - Use the Skill tool:
+3. **Verify skill exists** - Check if skill is available:
+   ```bash
+   # Check user-installed skills
+   ls ~/.claude/commands/*/$SKILL_NAME.md 2>/dev/null
+   # Check project-local skills
+   ls .claude/commands/$SKILL_NAME.md 2>/dev/null
+   ```
+
+4. **If skill exists, invoke it** - Use the Skill tool:
    ```text
    Skill(skill: "skill-name", args: "[relevant context]")
    ```
 
-4. **Apply skill output** - Incorporate skill results into task execution
-5. **Continue task** - Complete remaining task work
-
-**Common skill patterns:**
-
-| Skill Reference | Invocation | Use Case |
-|-----------------|------------|----------|
-| `/test-gen` | `Skill(skill: "test-gen")` | Generate unit tests |
-| `/code-review` | `Skill(skill: "code-review")` | Review implementation |
-| `/changelog` | `Skill(skill: "changelog")` | Generate changelog |
+5. **Apply skill output** - Incorporate skill results into task execution
+6. **Continue task** - Complete remaining task work
 
 **Skill output handling:**
 
-- **Code generation skills** (test-gen, scaffold) → Apply generated code to files
-- **Analysis skills** (code-review, code-smell) → Address findings in implementation
-- **Workflow skills** (changelog, release-prep) → Follow skill's process
+- **Code generation skills** → Apply generated code to files
+- **Analysis skills** → Address findings in implementation
+- **Workflow skills** → Follow skill's process
 
 **If skill not available:**
 
 1. Log warning: "Skill /X not found, continuing without"
-2. Complete task using standard approach
-3. Note in SUMMARY.md deviations: "Skill /X unavailable"
+2. **Complete task using standard approach** - Do not fail the task
+3. Note in SUMMARY.md deviations: "Skill /X unavailable - completed with standard approach"
+4. Suggest user run `/gsd:suggest-skills` to discover available skills
+
+**Important:** Skills referenced in plans may not exist on all systems. The executor should gracefully handle missing skills and complete tasks using standard capabilities.
 
 See @~/.claude/get-shit-done/references/skill-integration.md for full guidance.
 </skill_invocation>

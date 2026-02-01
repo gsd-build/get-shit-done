@@ -1115,7 +1115,7 @@ cat "$PHASE_DIR"/*-DISCOVERY.md 2>/dev/null
 </step>
 
 <step name="check_skill_integration">
-Check if skill integration is enabled and recommend relevant skills:
+Check if skill integration is enabled and discover available skills:
 
 ```bash
 # Check skill configuration
@@ -1124,29 +1124,52 @@ SKILLS_ENABLED=$(cat .planning/config.json 2>/dev/null | grep -o '"enabled"[[:sp
 
 **If skills enabled:**
 
-1. Extract phase keywords from goal and context
-2. Match keywords against skill_mappings in config.json
-3. Identify relevant skills for this phase
+1. **Discover available skills first (MANDATORY):**
 
-**Skill matching keywords:**
+```bash
+# Discover user-installed skills
+AVAILABLE_SKILLS=""
+for skill in ~/.claude/commands/*/*.md; do
+  [ -f "$skill" ] && AVAILABLE_SKILLS="$AVAILABLE_SKILLS $(basename "$skill" .md)"
+done
 
-| Phase Keywords | Relevant Skills |
-|----------------|-----------------|
-| test, coverage, TDD | test-gen, test-coverage, unit-testing |
-| deploy, k8s, kubernetes | k8s-deploy, argocd-app |
-| database, sql, query, bigquery | bq-schema, bq-query, bq-cost |
-| review, refactor, quality | code-review, code-smell, refactor-code |
-| release, version, changelog | release-prep, changelog, github-release |
-| debug, error, trace | debug-code, trace-error |
+# Discover project-local skills
+for skill in .claude/commands/*.md; do
+  [ -f "$skill" ] && AVAILABLE_SKILLS="$AVAILABLE_SKILLS $(basename "$skill" .md)"
+done
 
-**If relevant skills found:**
+echo "Available skills: $AVAILABLE_SKILLS"
+```
+
+2. Extract phase keywords from goal and context
+3. Match keywords against skill_mappings in config.json
+4. **Verify each mapped skill actually exists before suggesting**
+
+**Skill verification:**
+
+For each skill in skill_mappings that matches phase keywords:
+- Check if skill exists in AVAILABLE_SKILLS
+- Only include skills that are verified to exist
+- Log warning for mapped skills that don't exist
+
+**Fallback behavior if skill not found:**
+
+If a skill from skill_mappings doesn't exist:
+1. Log: "Skill /X configured but not found on system"
+2. Skip the skill in recommendations
+3. Suggest user run `/gsd:suggest-skills` to update mappings
+
+**If relevant AND EXISTING skills found:**
 
 Include skill references in task actions where appropriate:
-- Testing phases → suggest /test-gen for test creation
-- Release phases → suggest /changelog and /release-prep
-- Code quality phases → suggest /code-review before completion
+- Only reference skills verified to exist
+- Testing phases → suggest testing skills if available
+- Release phases → suggest release skills if available
+- Code quality phases → suggest review skills if available
 
-**Note:** Skills are suggestions, not requirements. Only include skill references when they genuinely enhance the task.
+**Note:** Skills are suggestions, not requirements. Only include skill references for skills that:
+1. Actually exist on the user's system
+2. Genuinely enhance the task
 
 See @~/.claude/get-shit-done/references/skill-integration.md for full skill integration guidance.
 </step>

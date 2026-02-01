@@ -9,6 +9,8 @@ Skills extend GSD's capabilities by providing:
 - Standardized workflows (commit conventions, PR creation)
 - Tool integrations (Jira, Slack, BigQuery, Kubernetes)
 
+**Important:** Skill availability varies by user. GSD discovers skills dynamically from your system - it does NOT assume any specific skills are installed.
+
 ## Configuration
 
 Enable skill integration in `.planning/config.json`:
@@ -24,6 +26,8 @@ Enable skill integration in `.planning/config.json`:
 }
 ```
 
+**Note:** `skill_mappings` starts empty. Run `/gsd:suggest-skills` to discover what skills are available on YOUR system, then populate mappings accordingly.
+
 ### Configuration Fields
 
 | Field | Type | Default | Description |
@@ -35,17 +39,21 @@ Enable skill integration in `.planning/config.json`:
 
 ## Skill Discovery
 
+GSD discovers skills dynamically from your filesystem. No skills are assumed to exist by default.
+
 ### Auto Discovery (`discovery: "auto"`)
 
-GSD automatically discovers available skills by checking:
+GSD automatically discovers available skills by scanning:
 
-1. **Claude Code Skills Registry** - Skills available via `/` command
-2. **Project Skills** - `.claude/skills/` in project root
+1. **User-installed skills** - `~/.claude/commands/*/*.md` (global skills)
+2. **Project-local skills** - `.claude/commands/*.md` (project-specific)
 3. **Custom Paths** - Paths in `skill_paths` configuration
+
+Run `/gsd:suggest-skills` to see what's available on your system.
 
 ### Manual Discovery (`discovery: "manual"`)
 
-Only use skills explicitly listed in `skill_mappings`.
+Only use skills explicitly listed in `skill_mappings`. You must ensure these skills actually exist.
 
 ### No Discovery (`discovery: "none"`)
 
@@ -53,24 +61,51 @@ Disable skill integration entirely.
 
 ## Skill Mappings
 
-Map phase keywords to relevant skills:
+Skill mappings are **user-customizable** based on what skills YOU have installed. The default is empty:
+
+```json
+{
+  "skills": {
+    "skill_mappings": {}
+  }
+}
+```
+
+### Configuring Your Mappings
+
+After running `/gsd:suggest-skills` to discover your available skills, add mappings:
 
 ```json
 {
   "skills": {
     "skill_mappings": {
-      "testing": ["test-gen", "test-coverage", "unit-testing"],
-      "deployment": ["k8s-deploy", "argocd-app", "gke-cluster"],
-      "database": ["bq-schema", "bq-query", "bq-cost"],
-      "code-quality": ["code-review", "code-smell", "refactor-code"],
-      "documentation": ["changelog", "doc-sync"],
-      "release": ["release-prep", "github-release", "github-pr"],
-      "debugging": ["debug-code", "trace-error", "gsd:debug"],
-      "integration": ["slack-search", "jira-issue", "confluence-search"]
+      "category-keyword": ["your-skill-1", "your-skill-2"]
     }
   }
 }
 ```
+
+### Example Configuration
+
+Below is an EXAMPLE showing how mappings MIGHT look if you had these skills installed. **This is NOT the default - populate based on YOUR discovered skills:**
+
+```json
+{
+  "skills": {
+    "skill_mappings": {
+      "testing": ["test-gen", "unit-testing"],
+      "deployment": ["k8s-deploy"],
+      "code-quality": ["code-review"]
+    }
+  }
+}
+```
+
+**Steps to configure:**
+1. Run `/gsd:suggest-skills` to discover available skills
+2. Note which skills exist on your system
+3. Map categories to YOUR available skills
+4. Only include skills that actually exist
 
 ## Usage in Planning
 
@@ -178,36 +213,32 @@ Skill outputs are incorporated into task execution:
 
 ## Skill Categories
 
-### Workflow Skills
-- `changelog` - Generate changelogs from git history
-- `release-prep` - Prepare releases with version bumps
-- `github-pr` - Create well-structured pull requests
-- `github-release` - Create GitHub releases
+Skills are organized by category based on naming conventions. The skills below are EXAMPLES of what might exist - your available skills depend on what's installed on your system.
 
-### Testing Skills
-- `test-gen` - Generate unit tests
-- `test-coverage` - Analyze coverage gaps
-- `unit-testing` - TDD workflow support
+### Common Skill Naming Patterns
 
-### Code Quality Skills
-- `code-review` - Comprehensive code review
-- `code-smell` - Detect code smells
-- `refactor-code` - Safe refactoring guidance
+| Category | Skill name might contain |
+|----------|--------------------------|
+| Workflow | changelog, release, pr, commit |
+| Testing | test, spec, coverage, tdd |
+| Code Quality | review, lint, refactor, smell |
+| DevOps | deploy, k8s, docker, infra |
+| Data | db, sql, schema, query, bq |
+| Integration | slack, jira, confluence |
 
-### DevOps Skills
-- `k8s-deploy` - Kubernetes deployments
-- `argocd-app` - ArgoCD applications
-- `gke-cluster` - GKE cluster management
+### Discovering Your Skills
 
-### Data Skills
-- `bq-schema` - BigQuery schema design
-- `bq-query` - BigQuery query execution
-- `bq-cost` - Query cost estimation
+Run these commands to see what's available:
 
-### Integration Skills
-- `slack-search` - Search Slack channels
-- `jira-issue` - Manage Jira issues
-- `confluence-search` - Search Confluence
+```bash
+# User-installed skills
+ls ~/.claude/commands/*/*.md 2>/dev/null
+
+# Project-local skills
+ls .claude/commands/*.md 2>/dev/null
+```
+
+Or use `/gsd:suggest-skills` for automated discovery and recommendations.
 
 ## Troubleshooting
 

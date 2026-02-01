@@ -214,35 +214,47 @@ GSD can integrate with Claude Code skills to enhance planning and execution.
 
 | Mode | Behavior |
 |------|----------|
-| `auto` | Discovers skills from Claude Code registry and project `.claude/skills/` |
+| `auto` | Discovers skills from `~/.claude/commands/*/*.md` and `.claude/commands/*.md` |
 | `manual` | Only uses skills explicitly listed in `skill_mappings` |
 | `none` | Disables skill discovery entirely |
 
 **Skill mappings:**
 
-Map phase keywords to relevant skills:
+Skill mappings are **user-customizable** and start empty by default:
+
+```json
+"skills": {
+  "enabled": true,
+  "skill_mappings": {}
+}
+```
+
+**Configuring mappings:**
+
+Run `/gsd:suggest-skills` to discover available skills on your system, then populate mappings based on YOUR discovered skills.
+
+**EXAMPLE configuration** (populate based on YOUR available skills):
 
 ```json
 "skills": {
   "enabled": true,
   "skill_mappings": {
-    "testing": ["test-gen", "test-coverage", "unit-testing"],
-    "deployment": ["k8s-deploy", "argocd-app"],
-    "database": ["bq-schema", "bq-query", "bq-cost"],
-    "code-quality": ["code-review", "code-smell", "refactor-code"],
-    "release": ["release-prep", "changelog", "github-release"],
-    "debugging": ["debug-code", "trace-error"]
+    "testing": ["your-test-skill"],
+    "deployment": ["your-deploy-skill"],
+    "code-quality": ["your-review-skill"]
   }
 }
 ```
 
+**Note:** The example above shows the structure. The actual skill names depend on what's installed on your system. Do NOT copy these examples directly - use `/gsd:suggest-skills` to find your available skills.
+
 **Usage in plans:**
 
-Reference skills in task actions:
+Reference skills in task actions (only skills that exist on your system):
 
 ```xml
 <task type="auto">
-  <action>Use /test-gen to create unit tests for UserService</action>
+  <action>Use /your-skill to accomplish the task</action>
 </task>
 ```
 
