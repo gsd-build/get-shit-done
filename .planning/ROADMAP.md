@@ -29,7 +29,7 @@ Development predates GSD workflow tracking. See `.planning/MILESTONES.md` for ac
 - Integer phases (1, 2, 3, 4, 5): Planned milestone work
 - Decimal phases (e.g., 2.1): Urgent insertions (marked with INSERTED)
 
-- [ ] **Phase 1: Core Agent** - Implement gsd-adversary agent with structured challenge generation
+- [x] **Phase 1: Core Agent** - Implement gsd-adversary agent with structured challenge generation ✓
 - [ ] **Phase 2: Configuration** - Add adversary settings to config.json schema
 - [ ] **Phase 3: New-Project Integration** - Adversary checkpoints for requirements and roadmap
 - [ ] **Phase 4: Plan Integration** - Adversary checkpoint for plan creation
@@ -50,7 +50,7 @@ Development predates GSD workflow tracking. See `.planning/MILESTONES.md` for ac
 **Plans:** 1 plan
 
 Plans:
-- [ ] 01-01-PLAN.md — Create gsd-adversary agent with challenge generation, convergence logic, and guardrails
+- [x] 01-01-PLAN.md — Create gsd-adversary agent with challenge generation, convergence logic, and guardrails ✓
 
 ### Phase 2: Configuration
 **Goal**: Users can control adversary behavior through config.json settings
@@ -112,7 +112,7 @@ Phases execute in numeric order: 1 → 2 → 3 → 4 → 5
 
 | Phase | Milestone | Plans Complete | Status | Completed |
 |-------|-----------|----------------|--------|-----------|
-| 1. Core Agent | v2.1 | 0/1 | Planned | - |
+| 1. Core Agent | v2.1 | 1/1 | ✓ Complete | 2026-02-02 |
 | 2. Configuration | v2.1 | 0/? | Not started | - |
 | 3. New-Project Integration | v2.1 | 0/? | Not started | - |
 | 4. Plan Integration | v2.1 | 0/? | Not started | - |

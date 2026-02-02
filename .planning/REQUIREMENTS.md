@@ -10,14 +10,14 @@ Requirements for this milestone. Each maps to roadmap phases.
 
 ### Agent Core
 
-- [ ] **AGENT-01**: Adversary uses constructive stance ("Potential risk..." not "This is wrong")
-- [ ] **AGENT-02**: Adversary classifies objections by severity (BLOCKING / MAJOR / MINOR)
-- [ ] **AGENT-03**: Adversary adapts focus based on checkpoint type (requirements vs roadmap vs plan vs verification)
+- [x] **AGENT-01**: Adversary uses constructive stance ("Potential risk..." not "This is wrong") ✓
+- [x] **AGENT-02**: Adversary classifies objections by severity (BLOCKING / MAJOR / MINOR) ✓
+- [x] **AGENT-03**: Adversary adapts focus based on checkpoint type (requirements vs roadmap vs plan vs verification) ✓
 
 ### Convergence
 
 - [ ] **CONV-01**: Debate terminates after max 3 rounds regardless of state
-- [ ] **CONV-02**: Debate uses adaptive convergence detection to exit early when stable
+- [x] **CONV-02**: Debate uses adaptive convergence detection to exit early when stable ✓
 
 ### Integration
 
@@ -64,11 +64,11 @@ Which phases cover which requirements. Updated during roadmap creation.
 
 | Requirement | Phase | Status |
 |-------------|-------|--------|
-| AGENT-01 | Phase 1 | Pending |
-| AGENT-02 | Phase 1 | Pending |
-| AGENT-03 | Phase 1 | Pending |
+| AGENT-01 | Phase 1 | Complete |
+| AGENT-02 | Phase 1 | Complete |
+| AGENT-03 | Phase 1 | Complete |
 | CONV-01 | Phase 3 | Pending |
-| CONV-02 | Phase 1 | Pending |
+| CONV-02 | Phase 1 | Complete |
 | INTG-01 | Phase 3 | Pending |
 | INTG-02 | Phase 3 | Pending |
 | INTG-03 | Phase 4 | Pending |
@@ -84,4 +84,4 @@ Which phases cover which requirements. Updated during roadmap creation.
 
 ---
 *Requirements defined: 2026-01-31*
-*Last updated: 2026-01-31 after roadmap creation*
+*Last updated: 2026-02-02 after Phase 1 completion*
