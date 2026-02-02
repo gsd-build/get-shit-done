@@ -1244,6 +1244,17 @@ function handleStatusline(settings, isInteractive, callback) {
     return;
   }
 
+  // Auto-migrate renamed GSD statusline (hooks/statusline.js -> hooks/gsd-statusline.js)
+  // Only migrate if it looks like GSD's statusline (node command with hooks/statusline.js path)
+  const existingCmd = settings.statusLine.command || '';
+  const isOldGsdStatusline = existingCmd.includes('node') &&
+    (existingCmd.includes('hooks/statusline.js') || existingCmd.includes('hooks\\statusline.js'));
+  if (isOldGsdStatusline) {
+    console.log(`  ${green}✓${reset} Migrating statusline.js → gsd-statusline.js`);
+    callback(true);
+    return;
+  }
+
   if (!isInteractive) {
     console.log(`  ${yellow}⚠${reset} Skipping statusline (already configured)`);
     console.log(`    Use ${cyan}--force-statusline${reset} to replace\n`);
@@ -1251,7 +1262,7 @@ function handleStatusline(settings, isInteractive, callback) {
     return;
   }
 
-  const existingCmd = settings.statusLine.command || settings.statusLine.url || '(custom)';
+  const displayCmd = settings.statusLine.command || settings.statusLine.url || '(custom)';
 
   const rl = readline.createInterface({
     input: process.stdin,
@@ -1261,7 +1272,7 @@ function handleStatusline(settings, isInteractive, callback) {
   console.log(`
   ${yellow}⚠${reset} Existing statusline detected\n
   Your current statusline:
-    ${dim}command: ${existingCmd}${reset}
+    ${dim}command: ${displayCmd}${reset}
 
   GSD includes a statusline showing:
     • Model name
