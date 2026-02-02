@@ -47,10 +47,10 @@ Development predates GSD workflow tracking. See `.planning/MILESTONES.md` for ac
   3. Adversary adapts challenge focus based on checkpoint type (requirements vs roadmap vs plan vs verification)
   4. Adversary uses constructive tone in all challenges ("Potential risk..." not "This is wrong")
   5. Adversary assesses previous defense rounds and recommends convergence or continuation
-**Plans**: TBD
+**Plans:** 1 plan
 
 Plans:
-- [ ] 01-01: TBD
+- [ ] 01-01-PLAN.md — Create gsd-adversary agent with challenge generation, convergence logic, and guardrails
 
 ### Phase 2: Configuration
 **Goal**: Users can control adversary behavior through config.json settings
@@ -112,7 +112,7 @@ Phases execute in numeric order: 1 → 2 → 3 → 4 → 5
 
 | Phase | Milestone | Plans Complete | Status | Completed |
 |-------|-----------|----------------|--------|-----------|
-| 1. Core Agent | v2.1 | 0/? | Not started | - |
+| 1. Core Agent | v2.1 | 0/1 | Planned | - |
 | 2. Configuration | v2.1 | 0/? | Not started | - |
 | 3. New-Project Integration | v2.1 | 0/? | Not started | - |
 | 4. Plan Integration | v2.1 | 0/? | Not started | - |
