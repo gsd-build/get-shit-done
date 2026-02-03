@@ -1,0 +1,25 @@
+{
+  "version": "1.0.0",
+  "services": [
+    {
+      "name": "Customer Service",
+      "repository": "https://github.com/company/customer-service",
+      "local_path": "~/workspace/customer-service"
+    },
+    {
+      "name": "Megamind Service",
+      "repository": "https://bitbucket.org/company/megamind",
+      "local_path": "~/workspace/megamind"
+    },
+    {
+      "name": "Garcon Order Service",
+      "repository": "https://github.com/company/garcon",
+      "local_path": "~/workspace/garcon-orders"
+    },
+    {
+      "name": "Payment API",
+      "repository": "https://github.com/company/payment-api"
+    }
+  ],
+  "standards_repo": "https://bitbucket.org/company/development-standards"
+}
