@@ -36,12 +36,20 @@
   "engines": {
     "node": ">=16.7.0"
   },
-  "dependencies": {},
   "devDependencies": {
-    "esbuild": "^0.24.0"
+    "@types/jest": "^30.0.0",
+    "@types/node": "^25.1.0",
+    "esbuild": "^0.24.0",
+    "jest": "^30.2.0",
+    "ts-jest": "^29.4.6",
+    "ts-node": "^10.9.2",
+    "typescript": "^5.9.3"
   },
   "scripts": {
     "build:hooks": "node scripts/build-hooks.js",
-    "prepublishOnly": "npm run build:hooks"
+    "prepublishOnly": "npm run build:hooks",
+    "test": "jest",
+    "test:watch": "jest --watch",
+    "test:coverage": "jest --coverage"
   }
 }
