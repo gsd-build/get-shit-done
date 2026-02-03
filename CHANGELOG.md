@@ -6,6 +6,14 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ## [Unreleased]
 
+### Added
+- **Company context support for codebase mappers** — Optional configuration in `~/.gsd/company.json` enables:
+  - Service matching with substring-based normalization for ownership tracking
+  - Tech mapper enrichment: INTEGRATIONS.md shows Repository and Local Path fields for matched services
+  - Centralized error handling with actionable guidance and graceful degradation
+  - Backward compatible: system works without configuration (returns null gracefully)
+  - Zero runtime dependencies: uses manual validation and substring matching
+
 ## [1.11.1] - 2026-01-31
 
 ### Added

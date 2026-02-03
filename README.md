@@ -545,6 +545,89 @@ At milestone completion, GSD offers squash merge (recommended) or merge with his
 
 ---
 
+## Company Context
+
+**Enrich codebase documentation with company-specific service information.**
+
+When GSD maps a codebase with `/gsd:map-codebase`, it discovers internal service dependencies (API calls, gRPC services, message queues). By default, these appear as service names in `INTEGRATIONS.md`.
+
+With company context configured, GSD automatically enriches these entries with:
+- **Repository URL** - Where the service code lives
+- **Local Path** - Where it's cloned on developer machines
+
+### Setup
+
+Create `~/.gsd/company.json`:
+
+```json
+{
+  "version": "1.0.0",
+  "services": [
+    {
+      "name": "Customer Service",
+      "repository": "https://github.com/company/customer-service",
+      "local_path": "~/workspace/customer-service"
+    },
+    {
+      "name": "Payment API",
+      "repository": "https://github.com/company/payment-api",
+      "local_path": "~/workspace/payment-api"
+    }
+  ]
+}
+```
+
+### How It Works
+
+**Without company.json:**
+```markdown
+**Customer Service:**
+- What it's used for: Customer data management
+- SDK/Client: gRPC CustomerServiceBlockingStub
+```
+
+**With company.json:**
+```markdown
+**Customer Service:**
+- What it's used for: Customer data management
+- SDK/Client: gRPC CustomerServiceBlockingStub
+- Repository: https://github.com/company/customer-service
+- Local Path: ~/workspace/customer-service
+```
+
+### Service Name Matching
+
+GSD uses fuzzy matching to link discovered services to your config:
+
+- **Case insensitive**: "customer service" matches "Customer Service"
+- **Suffix normalization**: "Customer" matches "Customer Service"
+- **Common separators**: "customer-service" matches "Customer Service"
+
+The system automatically enriches discovered services during codebase mapping — no additional configuration needed.
+
+### Use Cases
+
+**Cross-service development:**
+- Quickly find where a dependent service lives
+- Clone repos for local development
+- Navigate between related codebases
+
+**Onboarding:**
+- New developers see the full service topology
+- Repository links right in the integration docs
+- No separate service catalog needed
+
+**Architecture documentation:**
+- Generated docs include ownership info
+- Service relationships are explicit
+- Easy to trace integration points
+
+### Privacy
+
+The `company.json` file lives in your home directory (`~/.gsd/`), not in project repos. Add company-specific information without committing it to version control.
+
+---
+
 ## Troubleshooting
 
 **Commands not found after install?**
