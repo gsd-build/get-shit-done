@@ -138,11 +138,46 @@ Write document(s) to `.planning/codebase/` using the templates below.
 
 **Document naming:** UPPERCASE.md (e.g., STACK.md, ARCHITECTURE.md)
 
+**Service enrichment (for INTEGRATIONS.md) - MANDATORY STEP:**
+
+Before writing INTEGRATIONS.md, ALWAYS check if company context enrichment is available:
+```bash
+ls $(npm root -g)/get-shit-done-cc/dist/scripts/enrich-services.js 2>/dev/null
+```
+
+If the file exists (exit code 0), you MUST enrich ALL internal services with repository and local path information.
+
+For EVERY service you discover (e.g., "Customer Service", "Order Service", "Identity Service"), you MUST invoke:
+```bash
+node "$(npm root -g)/get-shit-done-cc/dist/scripts/enrich-services.js" "Service Name" 2>/dev/null
+```
+
+This returns JSON:
+- `{"found": true, "repository": "...", "local_path": "...", "confidence": 0.XX}` - Service matched
+- `{"found": false}` - Not matched (external service or not configured)
+
+**How to use enrichment - MANDATORY FORMAT:**
+
+For EVERY service, run the enrichment script and check the `found` field in the JSON response.
+
+If `found: true` (internal service), you MUST include these additional fields:
+```markdown
+**Service Name:**
+- What it's used for: [description]
+- SDK/Client: [package]
+- Auth: [env var name]
+- Repository: [repository value from JSON]
+- Local Path: [local_path value from JSON]
+```
+
+If `found: false` (external service or not configured), use standard format without Repository/Local Path fields.
+
 **Template filling:**
 1. Replace `[YYYY-MM-DD]` with current date
 2. Replace `[Placeholder text]` with findings from exploration
 3. If something is not found, use "Not detected" or "Not applicable"
 4. Always include file paths with backticks
+5. For internal services, enrich with repository/local_path if available
 
 Use the Write tool to create each document.
 </step>
