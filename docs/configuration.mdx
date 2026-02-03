@@ -1,0 +1,68 @@
+---
+title: "Configuration"
+description: "Configuring GSD settings"
+---
+
+GSD stores project settings in `.planning/config.json`. Configure during `/gsd:new-project` or update later with `/gsd:settings`.
+
+## Core Settings
+
+| Setting | Options | Default | What it controls |
+|---------|---------|---------|------------------|
+| `mode` | `yolo`, `interactive` | `interactive` | Auto-approve vs confirm at each step |
+| `depth` | `quick`, `standard`, `comprehensive` | `standard` | Planning thoroughness (phases × plans) |
+
+## Model Profiles
+
+Control which Claude model each agent uses. Balance quality vs token spend.
+
+| Profile | Planning | Execution | Verification |
+|---------|----------|-----------|--------------|
+| `quality` | Opus | Opus | Sonnet |
+| `balanced` (default) | Opus | Sonnet | Sonnet |
+| `budget` | Sonnet | Sonnet | Haiku |
+
+Switch profiles:
+```bash
+/gsd:set-profile budget
+```
+
+Or configure via `/gsd:settings`.
+
+## Workflow Agents
+
+These spawn additional agents during planning/execution. They improve quality but add tokens and time.
+
+| Setting | Default | What it does |
+|---------|---------|--------------|
+| `workflow.research` | `true` | Researches domain before planning each phase |
+| `workflow.plan_check` | `true` | Verifies plans achieve phase goals before execution |
+| `workflow.verifier` | `true` | Confirms must-haves were delivered after execution |
+
+Use `/gsd:settings` to toggle these, or override per-invocation:
+- `/gsd:plan-phase --skip-research`
+- `/gsd:plan-phase --skip-verify`
+
+## Execution
+
+| Setting | Default | What it controls |
+|---------|---------|------------------|
+| `parallelization.enabled` | `true` | Run independent plans simultaneously |
+| `planning.commit_docs` | `true` | Track `.planning/` in git |
+
+## Git Branching
+
+Control how GSD handles branches during execution.
+
+| Setting | Options | Default | What it does |
+|---------|---------|---------|--------------|
+| `git.branching_strategy` | `none`, `phase`, `milestone` | `none` | Branch creation strategy |
+| `git.phase_branch_template` | string | `gsd/phase-{phase}-{slug}` | Template for phase branches |
+| `git.milestone_branch_template` | string | `gsd/{milestone}-{slug}` | Template for milestone branches |
+
+**Strategies:**
+- **`none`** — Commits to current branch (default GSD behavior)
+- **`phase`** — Creates a branch per phase, merges at phase completion
+- **`milestone`** — Creates one branch for entire milestone, merges at completion
+
+At milestone completion, GSD offers squash merge (recommended) or merge with history.

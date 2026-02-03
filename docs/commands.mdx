@@ -1,0 +1,60 @@
+---
+title: "Commands"
+description: "Reference for GSD commands"
+---
+
+## Core Workflow
+
+| Command | What it does |
+|---------|--------------|
+| `/gsd:new-project` | Full initialization: questions → research → requirements → roadmap |
+| `/gsd:discuss-phase [N]` | Capture implementation decisions before planning |
+| `/gsd:plan-phase [N]` | Research + plan + verify for a phase |
+| `/gsd:execute-phase <N>` | Execute all plans in parallel waves, verify when complete |
+| `/gsd:verify-work [N]` | Manual user acceptance testing |
+| `/gsd:audit-milestone` | Verify milestone achieved its definition of done |
+| `/gsd:complete-milestone` | Archive milestone, tag release |
+| `/gsd:new-milestone [name]` | Start next version: questions → research → requirements → roadmap |
+
+## Navigation
+
+| Command | What it does |
+|---------|--------------|
+| `/gsd:progress` | Where am I? What's next? |
+| `/gsd:help` | Show all commands and usage guide |
+| `/gsd:update` | Update GSD with changelog preview |
+| `/gsd:join-discord` | Join the GSD Discord community |
+
+## Brownfield
+
+| Command | What it does |
+|---------|--------------|
+| `/gsd:map-codebase` | Analyze existing codebase before new-project |
+
+## Phase Management
+
+| Command | What it does |
+|---------|--------------|
+| `/gsd:add-phase` | Append phase to roadmap |
+| `/gsd:insert-phase [N]` | Insert urgent work between phases |
+| `/gsd:remove-phase [N]` | Remove future phase, renumber |
+| `/gsd:list-phase-assumptions [N]` | See Claude's intended approach before planning |
+| `/gsd:plan-milestone-gaps` | Create phases to close gaps from audit |
+
+## Session
+
+| Command | What it does |
+|---------|--------------|
+| `/gsd:pause-work` | Create handoff when stopping mid-phase |
+| `/gsd:resume-work` | Restore from last session |
+
+## Utilities
+
+| Command | What it does |
+|---------|--------------|
+| `/gsd:settings` | Configure model profile and workflow agents |
+| `/gsd:set-profile <profile>` | Switch model profile (quality/balanced/budget) |
+| `/gsd:add-todo [desc]` | Capture idea for later |
+| `/gsd:check-todos` | List pending todos |
+| `/gsd:debug [desc]` | Systematic debugging with persistent state |
+| `/gsd:quick` | Execute ad-hoc task with GSD guarantees |

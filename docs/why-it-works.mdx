@@ -1,0 +1,84 @@
+---
+title: "Why It Works"
+description: "The philosophy and mechanisms behind GSD"
+---
+
+## Context Engineering
+
+Claude Code is incredibly powerful *if* you give it the context it needs. Most people don't.
+
+GSD handles it for you:
+
+| File | What it does |
+|------|--------------|
+| `PROJECT.md` | Project vision, always loaded |
+| `research/` | Ecosystem knowledge (stack, features, architecture, pitfalls) |
+| `REQUIREMENTS.md` | Scoped v1/v2 requirements with phase traceability |
+| `ROADMAP.md` | Where you're going, what's done |
+| `STATE.md` | Decisions, blockers, position — memory across sessions |
+| `PLAN.md` | Atomic task with XML structure, verification steps |
+| `SUMMARY.md` | What happened, what changed, committed to history |
+| `todos/` | Captured ideas and tasks for later work |
+
+Size limits based on where Claude's quality degrades. Stay under, get consistent excellence.
+
+## XML Prompt Formatting
+
+Every plan is structured XML optimized for Claude:
+
+```xml
+<task type="auto">
+  <name>Create login endpoint</name>
+  <files>src/app/api/auth/login/route.ts</files>
+  <action>
+    Use jose for JWT (not jsonwebtoken - CommonJS issues).
+    Validate credentials against users table.
+    Return httpOnly cookie on success.
+  </action>
+  <verify>curl -X POST localhost:3000/api/auth/login returns 200 + Set-Cookie</verify>
+  <done>Valid credentials return cookie, invalid return 401</done>
+</task>
+```
+
+Precise instructions. No guessing. Verification built in.
+
+## Multi-Agent Orchestration
+
+Every stage uses the same pattern: a thin orchestrator spawns specialized agents, collects results, and routes to the next step.
+
+| Stage | Orchestrator does | Agents do |
+|-------|------------------|-----------|
+| Research | Coordinates, presents findings | 4 parallel researchers investigate stack, features, architecture, pitfalls |
+| Planning | Validates, manages iteration | Planner creates plans, checker verifies, loop until pass |
+| Execution | Groups into waves, tracks progress | Executors implement in parallel, each with fresh 200k context |
+| Verification | Presents results, routes next | Verifier checks codebase against goals, debuggers diagnose failures |
+
+The orchestrator never does heavy lifting. It spawns agents, waits, integrates results.
+
+**The result:** You can run an entire phase — deep research, multiple plans created and verified, thousands of lines of code written across parallel executors, automated verification against goals — and your main context window stays at 30-40%. The work happens in fresh subagent contexts. Your session stays fast and responsive.
+
+## Atomic Git Commits
+
+Each task gets its own commit immediately after completion:
+
+```bash
+abc123f docs(08-02): complete user registration plan
+def456g feat(08-02): add email confirmation flow
+hij789k feat(08-02): implement password hashing
+lmn012o feat(08-02): create registration endpoint
+```
+
+<Note>
+  **Benefits:** Git bisect finds exact failing task. Each task independently revertable. Clear history for Claude in future sessions. Better observability in AI-automated workflow.
+</Note>
+
+Every commit is surgical, traceable, and meaningful.
+
+## Modular by Design
+
+- Add phases to current milestone
+- Insert urgent work between phases
+- Complete milestones and start fresh
+- Adjust plans without rebuilding everything
+
+You're never locked in. The system adapts.

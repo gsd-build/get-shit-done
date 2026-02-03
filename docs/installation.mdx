@@ -1,0 +1,104 @@
+---
+title: "Installation"
+description: "Get started with Get Shit Done"
+---
+
+## Quick Start
+
+Run the following command to install and configure GSD:
+
+```bash
+npx get-shit-done-cc
+```
+
+The installer prompts you to choose:
+1. **Runtime** — Claude Code, OpenCode, Gemini, or all
+2. **Location** — Global (all projects) or local (current project only)
+
+Verify with `/gsd:help` inside your chosen runtime.
+
+### Staying Updated
+
+GSD evolves fast. Update periodically:
+
+```bash
+npx get-shit-done-cc@latest
+```
+
+## Advanced Installation
+
+<AccordionGroup>
+  <Accordion title="Non-interactive Install (Docker, CI, Scripts)">
+    ```bash
+    # Claude Code
+    npx get-shit-done-cc --claude --global   # Install to ~/.claude/
+    npx get-shit-done-cc --claude --local    # Install to ./.claude/
+
+    # OpenCode (open source, free models)
+    npx get-shit-done-cc --opencode --global # Install to ~/.config/opencode/
+
+    # Gemini CLI
+    npx get-shit-done-cc --gemini --global   # Install to ~/.gemini/
+
+    # All runtimes
+    npx get-shit-done-cc --all --global      # Install to all directories
+    ```
+
+    Use `--global` (`-g`) or `--local` (`-l`) to skip the location prompt.
+    Use `--claude`, `--opencode`, `--gemini`, or `--all` to skip the runtime prompt.
+  </Accordion>
+
+  <Accordion title="Development Installation">
+    Clone the repository and run the installer locally:
+
+    ```bash
+    git clone https://github.com/glittercowboy/get-shit-done.git
+    cd get-shit-done
+    node bin/install.js --claude --local
+    ```
+
+    Installs to `./.claude/` for testing modifications before contributing.
+  </Accordion>
+</AccordionGroup>
+
+### Recommended: Skip Permissions Mode
+
+GSD is designed for frictionless automation. Run Claude Code with:
+
+```bash
+claude --dangerously-skip-permissions
+```
+
+<Note>
+  This is how GSD is intended to be used — stopping to approve `date` and `git commit` 50 times defeats the purpose.
+</Note>
+
+<Accordion title="Alternative: Granular Permissions">
+  If you prefer not to use that flag, add this to your project's `.claude/settings.json`:
+
+  ```json
+  {
+    "permissions": {
+      "allow": [
+        "Bash(date:*)",
+        "Bash(echo:*)",
+        "Bash(cat:*)",
+        "Bash(ls:*)",
+        "Bash(mkdir:*)",
+        "Bash(wc:*)",
+        "Bash(head:*)",
+        "Bash(tail:*)",
+        "Bash(sort:*)",
+        "Bash(grep:*)",
+        "Bash(tr:*)",
+        "Bash(git add:*)",
+        "Bash(git commit:*)",
+        "Bash(git status:*)",
+        "Bash(git log:*)",
+        "Bash(git diff:*)",
+        "Bash(git tag:*)"
+      ]
+    }
+  }
+  ```
+</Accordion>
