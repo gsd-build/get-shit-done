@@ -1,15 +1,37 @@
 {
   "$schema": "https://mintlify.com/schema.json",
   "name": "Get Shit Done",
+  "theme": "prism",
+  "layout": "sidenav",
   "logo": {
     "light": "/logo/light.svg",
     "dark": "/logo/dark.svg"
   },
-  "favicon": "/favicon.png",
+  "favicon": "/favicon.svg",
+  "topbar": {
+    "style": "gradient"
+  },
+  "background": {
+    "style": "gradient"
+  },
+  "modeToggle": {
+    "default": "dark"
+  },
+  "rounded": "sharp",
+  "sidebar": {
+    "items": "border"
+  },
+  "codeBlock": {
+    "mode": "dark"
+  },
   "colors": {
-    "primary": "#629457",
-    "light": "#629457",
-    "dark": "#68ACD7",
+    "primary": "#1A1B26",
+    "light": "#68ACD7",
+    "dark": "#7FA1D1",
+    "background": {
+      "light": "#FFFFFF",
+      "dark": "#1A1B26"
+    },
     "anchors": {
       "from": "#68ACD7",
       "to": "#7FA1D1"
@@ -17,12 +39,14 @@
   },
   "font": {
     "headings": {
-      "family": "IBM Plex Sans",
-      "url": "https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@400;500;600;700&display=swap"
+      "family": "Hubot Sans",
+      "url": "https://mintlify-assets.b-cdn.net/fonts/Hubot-Sans.woff2",
+      "format": "woff2"
     },
     "body": {
-      "family": "IBM Plex Sans",
-      "url": "https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@400;500;600;700&display=swap"
+      "family": "Hubot Sans",
+      "url": "https://mintlify-assets.b-cdn.net/fonts/Hubot-Sans.woff2",
+      "format": "woff2"
     }
   },
   "navigation": [

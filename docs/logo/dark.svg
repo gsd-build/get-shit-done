@@ -1,0 +1,15 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="640" height="160" viewBox="0 0 640 160">
+  <rect width="640" height="160" fill="#1A1B26"/>
+  <g transform="translate(40 36)">
+    <rect x="0" y="0" width="88" height="88" rx="18" fill="#000000"/>
+    <path d="M18 58c10 10 42 10 52 0" fill="none" stroke="#7FA1D1" stroke-width="8" stroke-linecap="round"/>
+    <circle cx="30" cy="32" r="5" fill="#629457"/>
+    <circle cx="58" cy="32" r="5" fill="#629457"/>
+  </g>
+  <g font-family="ui-sans-serif, system-ui, -apple-system, Segoe UI, Roboto, Arial" font-weight="700" fill="#68ACD7">
+    <text x="152" y="92" font-size="48">Get Shit Done</text>
+  </g>
+  <g font-family="ui-sans-serif, system-ui, -apple-system, Segoe UI, Roboto, Arial" font-weight="500" fill="#AAB3C2">
+    <text x="154" y="124" font-size="20">Meta-prompting and spec-driven dev for AI coding</text>
+  </g>
+</svg>
