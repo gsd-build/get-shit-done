@@ -12,29 +12,30 @@
     "style": "gradient"
   },
   "background": {
-    "style": "gradient"
+    "style": "grid"
   },
+  "backgroundImage": "/bg.svg",
   "modeToggle": {
     "default": "dark"
   },
   "rounded": "sharp",
   "sidebar": {
-    "items": "border"
+    "items": "card"
   },
   "codeBlock": {
     "mode": "dark"
   },
   "colors": {
-    "primary": "#1A1B26",
-    "light": "#68ACD7",
-    "dark": "#7FA1D1",
+    "primary": "#68ACD7",
+    "light": "#7FA1D1",
+    "dark": "#68ACD7",
     "background": {
       "light": "#FFFFFF",
       "dark": "#1A1B26"
     },
     "anchors": {
       "from": "#68ACD7",
-      "to": "#7FA1D1"
+      "to": "#629457"
     }
   },
   "font": {
