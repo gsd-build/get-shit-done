@@ -716,7 +716,7 @@ function cleanupOrphanedHooks(settings) {
     'gsd-intel-prune.js',  // Removed in v1.9.2
   ];
 
-  let cleaned = false;
+  let cleanedHooks = false;
 
   // Check all hook event types (Stop, SessionStart, etc.)
   if (settings.hooks) {
@@ -731,7 +731,7 @@ function cleanupOrphanedHooks(settings) {
               h.command && orphanedHookPatterns.some(pattern => h.command.includes(pattern))
             );
             if (hasOrphaned) {
-              cleaned = true;
+              cleanedHooks = true;
               return false;  // Remove this entry
             }
           }
@@ -742,8 +742,20 @@ function cleanupOrphanedHooks(settings) {
     }
   }
 
-  if (cleaned) {
+  if (cleanedHooks) {
     console.log(`  ${green}✓${reset} Removed orphaned hook registrations`);
+  }
+
+  // Fix #330: Update statusLine if it points to old statusline.js path
+  if (settings.statusLine && settings.statusLine.command &&
+      settings.statusLine.command.includes('statusline.js') &&
+      !settings.statusLine.command.includes('gsd-statusline.js')) {
+    // Replace old path with new path
+    settings.statusLine.command = settings.statusLine.command.replace(
+      /statusline\.js/,
+      'gsd-statusline.js'
+    );
+    console.log(`  ${green}✓${reset} Updated statusline path (statusline.js → gsd-statusline.js)`);
   }
 
   return settings;
