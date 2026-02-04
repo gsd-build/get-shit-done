@@ -390,6 +390,23 @@ Created: .planning/phases/${PADDED_PHASE}-${SLUG}/${PADDED_PHASE}-CONTEXT.md
 ```
 </step>
 
+<step name="verify_context_depth">
+**Conditional:** Only run this step if the user provided extended text input during the discussion (chose "Other" and typed custom text, gave responses longer than ~50 words, or volunteered reasoning beyond what was asked). If the user only selected predefined options throughout, skip directly to git_commit.
+
+**When triggered:** Follow the verify-context-depth.md workflow:
+
+1. Collect all substantive user inputs from the discussion
+2. Audit CONTEXT.md against each input (CAPTURED / SHALLOW / MISSING / LOST VOICE / MISPLACED)
+3. Fix any gaps directly in CONTEXT.md
+4. Report result
+
+```
+Context Depth Verification: PASSED (or PASSED after N fixes)
+```
+
+@~/.claude/get-shit-done/workflows/verify-context-depth.md
+</step>
+
 <step name="git_commit">
 Commit phase context:
 
