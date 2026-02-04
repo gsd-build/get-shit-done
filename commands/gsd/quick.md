@@ -139,36 +139,34 @@ Store `$QUICK_DIR` for use in orchestration.
 
 Spawn gsd-planner with quick mode context:
 
-```
-Task(
-  prompt="
-<planning_context>
+```yaml
+Task:
+  subagent_type: gsd-planner
+  model: "{planner_model}"
+  description: Quick plan for task
+  prompt: |
+    <planning_context>
 
-**Mode:** quick
-**Directory:** ${QUICK_DIR}
-**Description:** ${DESCRIPTION}
+    **Mode:** quick
+    **Directory:** ${QUICK_DIR}
+    **Description:** ${DESCRIPTION}
 
-**Project State:**
-@.planning/STATE.md
+    **Project State:**
+    @.planning/STATE.md
 
-</planning_context>
+    </planning_context>
 
-<constraints>
-- Create a SINGLE plan with 1-3 focused tasks
-- Quick tasks should be atomic and self-contained
-- No research phase, no checker phase
-- Target ~30% context usage (simple, focused)
-</constraints>
+    <constraints>
+    - Create a SINGLE plan with 1-3 focused tasks
+    - Quick tasks should be atomic and self-contained
+    - No research phase, no checker phase
+    - Target ~30% context usage (simple, focused)
+    </constraints>
 
-<output>
-Write plan to: ${QUICK_DIR}/${next_num}-PLAN.md
-Return: ## PLANNING COMPLETE with plan path
-</output>
-",
-  subagent_type="gsd-planner",
-  model="{planner_model}",
-  description="Quick plan: ${DESCRIPTION}"
-)
+    <output>
+    Write plan to: ${QUICK_DIR}/${next_num}-PLAN.md
+    Return: ## PLANNING COMPLETE with plan path
+    </output>
 ```
 
 After planner returns:
@@ -184,25 +182,23 @@ If plan not found, error: "Planner failed to create ${next_num}-PLAN.md"
 
 Spawn gsd-executor with plan reference:
 
-```
-Task(
-  prompt="
-Execute quick task ${next_num}.
+```yaml
+Task:
+  subagent_type: gsd-executor
+  model: "{executor_model}"
+  description: Execute quick task
+  prompt: |
+    Execute quick task ${next_num}.
 
-Plan: @${QUICK_DIR}/${next_num}-PLAN.md
-Project state: @.planning/STATE.md
+    Plan: @${QUICK_DIR}/${next_num}-PLAN.md
+    Project state: @.planning/STATE.md
 
-<constraints>
-- Execute all tasks in the plan
-- Commit each task atomically
-- Create summary at: ${QUICK_DIR}/${next_num}-SUMMARY.md
-- Do NOT update ROADMAP.md (quick tasks are separate from planned phases)
-</constraints>
-",
-  subagent_type="gsd-executor",
-  model="{executor_model}",
-  description="Execute: ${DESCRIPTION}"
-)
+    <constraints>
+    - Execute all tasks in the plan
+    - Commit each task atomically
+    - Create summary at: ${QUICK_DIR}/${next_num}-SUMMARY.md
+    - Do NOT update ROADMAP.md (quick tasks are separate from planned phases)
+    </constraints>
 ```
 
 After executor returns:

@@ -221,13 +221,15 @@ Write research findings to: {phase_dir}/{phase}-RESEARCH.md
 </output>
 ```
 
-```
-Task(
-  prompt="First, read ~/.claude/agents/gsd-phase-researcher.md for your role and instructions.\n\n" + research_prompt,
-  subagent_type="general-purpose",
-  model="{researcher_model}",
-  description="Research Phase {phase}"
-)
+```yaml
+Task:
+  subagent_type: general-purpose
+  model: "{researcher_model}"
+  description: Research phase implementation approach
+  prompt: |
+    First, read ~/.claude/agents/gsd-phase-researcher.md for your role and instructions.
+
+    {research_prompt}
 ```
 
 ### Handle Researcher Return
@@ -336,13 +338,15 @@ Before returning PLANNING COMPLETE:
 </quality_gate>
 ```
 
-```
-Task(
-  prompt="First, read ~/.claude/agents/gsd-planner.md for your role and instructions.\n\n" + filled_prompt,
-  subagent_type="general-purpose",
-  model="{planner_model}",
-  description="Plan Phase {phase}"
-)
+```yaml
+Task:
+  subagent_type: general-purpose
+  model: "{planner_model}"
+  description: Create execution plans for phase
+  prompt: |
+    First, read ~/.claude/agents/gsd-planner.md for your role and instructions.
+
+    {filled_prompt}
 ```
 
 ## 9. Handle Planner Return
@@ -419,13 +423,13 @@ Return one of:
 </expected_output>
 ```
 
-```
-Task(
-  prompt=checker_prompt,
-  subagent_type="gsd-plan-checker",
-  model="{checker_model}",
-  description="Verify Phase {phase} plans"
-)
+```yaml
+Task:
+  subagent_type: gsd-plan-checker
+  model: "{checker_model}"
+  description: Verify phase plans meet requirements
+  prompt: |
+    {checker_prompt}
 ```
 
 ## 11. Handle Checker Return
@@ -485,13 +489,15 @@ Return what changed.
 </instructions>
 ```
 
-```
-Task(
-  prompt="First, read ~/.claude/agents/gsd-planner.md for your role and instructions.\n\n" + revision_prompt,
-  subagent_type="general-purpose",
-  model="{planner_model}",
-  description="Revise Phase {phase} plans"
-)
+```yaml
+Task:
+  subagent_type: general-purpose
+  model: "{planner_model}"
+  description: Revise plans based on checker feedback
+  prompt: |
+    First, read ~/.claude/agents/gsd-planner.md for your role and instructions.
+
+    {revision_prompt}
 ```
 
 - After planner returns → spawn checker again (step 10)

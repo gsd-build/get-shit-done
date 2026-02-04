@@ -96,13 +96,13 @@ Create: .planning/debug/{slug}.md
 </debug_file>
 ```
 
-```
-Task(
-  prompt=filled_prompt,
-  subagent_type="gsd-debugger",
-  model="{debugger_model}",
-  description="Debug {slug}"
-)
+```yaml
+Task:
+  subagent_type: gsd-debugger
+  model: "{debugger_model}"
+  description: Debug {slug}
+  prompt: |
+    {filled_prompt}
 ```
 
 ## 4. Handle Agent Return
@@ -149,13 +149,13 @@ goal: find_and_fix
 </mode>
 ```
 
-```
-Task(
-  prompt=continuation_prompt,
-  subagent_type="gsd-debugger",
-  model="{debugger_model}",
-  description="Continue debug {slug}"
-)
+```yaml
+Task:
+  subagent_type: gsd-debugger
+  model: "{debugger_model}"
+  description: Continue debug {slug}
+  prompt: |
+    {continuation_prompt}
 ```
 
 </process>

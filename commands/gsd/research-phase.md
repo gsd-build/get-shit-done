@@ -146,13 +146,15 @@ Write to: .planning/phases/${PHASE}-{slug}/${PHASE}-RESEARCH.md
 </output>
 ```
 
-```
-Task(
-  prompt="First, read ~/.claude/agents/gsd-phase-researcher.md for your role and instructions.\n\n" + filled_prompt,
-  subagent_type="general-purpose",
-  model="{researcher_model}",
-  description="Research Phase {phase}"
-)
+```yaml
+Task:
+  subagent_type: general-purpose
+  model: "{researcher_model}"
+  description: Research phase implementation approach
+  prompt: |
+    First, read ~/.claude/agents/gsd-phase-researcher.md for your role and instructions.
+
+    {filled_prompt}
 ```
 
 ## 5. Handle Agent Return
@@ -180,13 +182,15 @@ Research file: @.planning/phases/${PHASE}-{slug}/${PHASE}-RESEARCH.md
 </checkpoint_response>
 ```
 
-```
-Task(
-  prompt="First, read ~/.claude/agents/gsd-phase-researcher.md for your role and instructions.\n\n" + continuation_prompt,
-  subagent_type="general-purpose",
-  model="{researcher_model}",
-  description="Continue research Phase {phase}"
-)
+```yaml
+Task:
+  subagent_type: general-purpose
+  model: "{researcher_model}"
+  description: Continue phase research after checkpoint
+  prompt: |
+    First, read ~/.claude/agents/gsd-phase-researcher.md for your role and instructions.
+
+    {continuation_prompt}
 ```
 
 </process>

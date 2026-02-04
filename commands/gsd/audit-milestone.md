@@ -92,18 +92,19 @@ If a phase is missing VERIFICATION.md, flag it as "unverified phase" — this is
 
 With phase context collected:
 
-```
-Task(
-  prompt="Check cross-phase integration and E2E flows.
+```yaml
+Task:
+  subagent_type: gsd-integration-checker
+  model: "{integration_checker_model}"
+  description: Check cross-phase integration and E2E flows
+  prompt: |
+    Check cross-phase integration and E2E flows.
 
-Phases: {phase_dirs}
-Phase exports: {from SUMMARYs}
-API routes: {routes created}
+    Phases: {phase_dirs}
+    Phase exports: {from SUMMARYs}
+    API routes: {routes created}
 
-Verify cross-phase wiring and E2E user flows.",
-  subagent_type="gsd-integration-checker",
-  model="{integration_checker_model}"
-)
+    Verify cross-phase wiring and E2E user flows.
 ```
 
 ## 4. Collect Results

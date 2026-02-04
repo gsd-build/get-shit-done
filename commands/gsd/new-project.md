@@ -438,190 +438,210 @@ Display spawning indicator:
 
 Spawn 4 parallel gsd-project-researcher agents with rich context:
 
+```yaml
+Task:
+  subagent_type: general-purpose
+  model: "{researcher_model}"
+  description: Stack research for domain
+  prompt: |
+    First, read ~/.claude/agents/gsd-project-researcher.md for your role and instructions.
+
+    <research_type>
+    Project Research — Stack dimension for [domain].
+    </research_type>
+
+    <milestone_context>
+    [greenfield OR subsequent]
+
+    Greenfield: Research the standard stack for building [domain] from scratch.
+    Subsequent: Research what's needed to add [target features] to an existing [domain] app. Don't re-research the existing system.
+    </milestone_context>
+
+    <question>
+    What's the standard 2025 stack for [domain]?
+    </question>
+
+    <project_context>
+    [PROJECT.md summary - core value, constraints, what they're building]
+    </project_context>
+
+    <downstream_consumer>
+    Your STACK.md feeds into roadmap creation. Be prescriptive:
+    - Specific libraries with versions
+    - Clear rationale for each choice
+    - What NOT to use and why
+    </downstream_consumer>
+
+    <quality_gate>
+    - [ ] Versions are current (verify with Context7/official docs, not training data)
+    - [ ] Rationale explains WHY, not just WHAT
+    - [ ] Confidence levels assigned to each recommendation
+    </quality_gate>
+
+    <output>
+    Write to: .planning/research/STACK.md
+    Use template: ~/.claude/get-shit-done/templates/research-project/STACK.md
+    </output>
 ```
-Task(prompt="First, read ~/.claude/agents/gsd-project-researcher.md for your role and instructions.
 
-<research_type>
-Project Research — Stack dimension for [domain].
-</research_type>
+Task:
+  subagent_type: general-purpose
+  model: "{researcher_model}"
+  description: Features research for domain
+  prompt: |
+    First, read ~/.claude/agents/gsd-project-researcher.md for your role and instructions.
 
-<milestone_context>
-[greenfield OR subsequent]
+    <research_type>
+    Project Research — Features dimension for [domain].
+    </research_type>
 
-Greenfield: Research the standard stack for building [domain] from scratch.
-Subsequent: Research what's needed to add [target features] to an existing [domain] app. Don't re-research the existing system.
-</milestone_context>
+    <milestone_context>
+    [greenfield OR subsequent]
 
-<question>
-What's the standard 2025 stack for [domain]?
-</question>
+    Greenfield: What features do [domain] products have? What's table stakes vs differentiating?
+    Subsequent: How do [target features] typically work? What's expected behavior?
+    </milestone_context>
 
-<project_context>
-[PROJECT.md summary - core value, constraints, what they're building]
-</project_context>
+    <question>
+    What features do [domain] products have? What's table stakes vs differentiating?
+    </question>
 
-<downstream_consumer>
-Your STACK.md feeds into roadmap creation. Be prescriptive:
-- Specific libraries with versions
-- Clear rationale for each choice
-- What NOT to use and why
-</downstream_consumer>
+    <project_context>
+    [PROJECT.md summary]
+    </project_context>
 
-<quality_gate>
-- [ ] Versions are current (verify with Context7/official docs, not training data)
-- [ ] Rationale explains WHY, not just WHAT
-- [ ] Confidence levels assigned to each recommendation
-</quality_gate>
+    <downstream_consumer>
+    Your FEATURES.md feeds into requirements definition. Categorize clearly:
+    - Table stakes (must have or users leave)
+    - Differentiators (competitive advantage)
+    - Anti-features (things to deliberately NOT build)
+    </downstream_consumer>
 
-<output>
-Write to: .planning/research/STACK.md
-Use template: ~/.claude/get-shit-done/templates/research-project/STACK.md
-</output>
-", subagent_type="general-purpose", model="{researcher_model}", description="Stack research")
+    <quality_gate>
+    - [ ] Categories are clear (table stakes vs differentiators vs anti-features)
+    - [ ] Complexity noted for each feature
+    - [ ] Dependencies between features identified
+    </quality_gate>
 
-Task(prompt="First, read ~/.claude/agents/gsd-project-researcher.md for your role and instructions.
+    <output>
+    Write to: .planning/research/FEATURES.md
+    Use template: ~/.claude/get-shit-done/templates/research-project/FEATURES.md
+    </output>
 
-<research_type>
-Project Research — Features dimension for [domain].
-</research_type>
+Task:
+  subagent_type: general-purpose
+  model: "{researcher_model}"
+  description: Architecture research for domain
+  prompt: |
+    First, read ~/.claude/agents/gsd-project-researcher.md for your role and instructions.
 
-<milestone_context>
-[greenfield OR subsequent]
+    <research_type>
+    Project Research — Architecture dimension for [domain].
+    </research_type>
 
-Greenfield: What features do [domain] products have? What's table stakes vs differentiating?
-Subsequent: How do [target features] typically work? What's expected behavior?
-</milestone_context>
+    <milestone_context>
+    [greenfield OR subsequent]
 
-<question>
-What features do [domain] products have? What's table stakes vs differentiating?
-</question>
+    Greenfield: How are [domain] systems typically structured? What are major components?
+    Subsequent: How do [target features] integrate with existing [domain] architecture?
+    </milestone_context>
 
-<project_context>
-[PROJECT.md summary]
-</project_context>
+    <question>
+    How are [domain] systems typically structured? What are major components?
+    </question>
 
-<downstream_consumer>
-Your FEATURES.md feeds into requirements definition. Categorize clearly:
-- Table stakes (must have or users leave)
-- Differentiators (competitive advantage)
-- Anti-features (things to deliberately NOT build)
-</downstream_consumer>
+    <project_context>
+    [PROJECT.md summary]
+    </project_context>
 
-<quality_gate>
-- [ ] Categories are clear (table stakes vs differentiators vs anti-features)
-- [ ] Complexity noted for each feature
-- [ ] Dependencies between features identified
-</quality_gate>
+    <downstream_consumer>
+    Your ARCHITECTURE.md informs phase structure in roadmap. Include:
+    - Component boundaries (what talks to what)
+    - Data flow (how information moves)
+    - Suggested build order (dependencies between components)
+    </downstream_consumer>
 
-<output>
-Write to: .planning/research/FEATURES.md
-Use template: ~/.claude/get-shit-done/templates/research-project/FEATURES.md
-</output>
-", subagent_type="general-purpose", model="{researcher_model}", description="Features research")
+    <quality_gate>
+    - [ ] Components clearly defined with boundaries
+    - [ ] Data flow direction explicit
+    - [ ] Build order implications noted
+    </quality_gate>
 
-Task(prompt="First, read ~/.claude/agents/gsd-project-researcher.md for your role and instructions.
+    <output>
+    Write to: .planning/research/ARCHITECTURE.md
+    Use template: ~/.claude/get-shit-done/templates/research-project/ARCHITECTURE.md
+    </output>
 
-<research_type>
-Project Research — Architecture dimension for [domain].
-</research_type>
+Task:
+  subagent_type: general-purpose
+  model: "{researcher_model}"
+  description: Pitfalls research for domain
+  prompt: |
+    First, read ~/.claude/agents/gsd-project-researcher.md for your role and instructions.
 
-<milestone_context>
-[greenfield OR subsequent]
+    <research_type>
+    Project Research — Pitfalls dimension for [domain].
+    </research_type>
 
-Greenfield: How are [domain] systems typically structured? What are major components?
-Subsequent: How do [target features] integrate with existing [domain] architecture?
-</milestone_context>
+    <milestone_context>
+    [greenfield OR subsequent]
 
-<question>
-How are [domain] systems typically structured? What are major components?
-</question>
+    Greenfield: What do [domain] projects commonly get wrong? Critical mistakes?
+    Subsequent: What are common mistakes when adding [target features] to [domain]?
+    </milestone_context>
 
-<project_context>
-[PROJECT.md summary]
-</project_context>
+    <question>
+    What do [domain] projects commonly get wrong? Critical mistakes?
+    </question>
 
-<downstream_consumer>
-Your ARCHITECTURE.md informs phase structure in roadmap. Include:
-- Component boundaries (what talks to what)
-- Data flow (how information moves)
-- Suggested build order (dependencies between components)
-</downstream_consumer>
+    <project_context>
+    [PROJECT.md summary]
+    </project_context>
 
-<quality_gate>
-- [ ] Components clearly defined with boundaries
-- [ ] Data flow direction explicit
-- [ ] Build order implications noted
-</quality_gate>
+    <downstream_consumer>
+    Your PITFALLS.md prevents mistakes in roadmap/planning. For each pitfall:
+    - Warning signs (how to detect early)
+    - Prevention strategy (how to avoid)
+    - Which phase should address it
+    </downstream_consumer>
 
-<output>
-Write to: .planning/research/ARCHITECTURE.md
-Use template: ~/.claude/get-shit-done/templates/research-project/ARCHITECTURE.md
-</output>
-", subagent_type="general-purpose", model="{researcher_model}", description="Architecture research")
+    <quality_gate>
+    - [ ] Pitfalls are specific to this domain (not generic advice)
+    - [ ] Prevention strategies are actionable
+    - [ ] Phase mapping included where relevant
+    </quality_gate>
 
-Task(prompt="First, read ~/.claude/agents/gsd-project-researcher.md for your role and instructions.
-
-<research_type>
-Project Research — Pitfalls dimension for [domain].
-</research_type>
-
-<milestone_context>
-[greenfield OR subsequent]
-
-Greenfield: What do [domain] projects commonly get wrong? Critical mistakes?
-Subsequent: What are common mistakes when adding [target features] to [domain]?
-</milestone_context>
-
-<question>
-What do [domain] projects commonly get wrong? Critical mistakes?
-</question>
-
-<project_context>
-[PROJECT.md summary]
-</project_context>
-
-<downstream_consumer>
-Your PITFALLS.md prevents mistakes in roadmap/planning. For each pitfall:
-- Warning signs (how to detect early)
-- Prevention strategy (how to avoid)
-- Which phase should address it
-</downstream_consumer>
-
-<quality_gate>
-- [ ] Pitfalls are specific to this domain (not generic advice)
-- [ ] Prevention strategies are actionable
-- [ ] Phase mapping included where relevant
-</quality_gate>
-
-<output>
-Write to: .planning/research/PITFALLS.md
-Use template: ~/.claude/get-shit-done/templates/research-project/PITFALLS.md
-</output>
-", subagent_type="general-purpose", model="{researcher_model}", description="Pitfalls research")
+    <output>
+    Write to: .planning/research/PITFALLS.md
+    Use template: ~/.claude/get-shit-done/templates/research-project/PITFALLS.md
+    </output>
 ```
 
 After all 4 agents complete, spawn synthesizer to create SUMMARY.md:
 
-```
-Task(prompt="
-<task>
-Synthesize research outputs into SUMMARY.md.
-</task>
+```yaml
+Task:
+  subagent_type: gsd-research-synthesizer
+  model: "{synthesizer_model}"
+  description: Synthesize research findings
+  prompt: |
+    <task>
+    Synthesize research outputs into SUMMARY.md.
+    </task>
 
-<research_files>
-Read these files:
-- .planning/research/STACK.md
-- .planning/research/FEATURES.md
-- .planning/research/ARCHITECTURE.md
-- .planning/research/PITFALLS.md
-</research_files>
+    <research_files>
+    Read these files:
+    - .planning/research/STACK.md
+    - .planning/research/FEATURES.md
+    - .planning/research/ARCHITECTURE.md
+    - .planning/research/PITFALLS.md
+    </research_files>
 
-<output>
-Write to: .planning/research/SUMMARY.md
-Use template: ~/.claude/get-shit-done/templates/research-project/SUMMARY.md
-Commit after writing.
-</output>
-", subagent_type="gsd-research-synthesizer", model="{synthesizer_model}", description="Synthesize research")
+    <output>
+    Write to: .planning/research/SUMMARY.md
+    Use template: ~/.claude/get-shit-done/templates/research-project/SUMMARY.md
+    Commit after writing.
+    </output>
 ```
 
 Display research complete banner and key findings:
@@ -797,36 +817,39 @@ Display stage banner:
 
 Spawn gsd-roadmapper agent with context:
 
-```
-Task(prompt="
-<planning_context>
+```yaml
+Task:
+  subagent_type: gsd-roadmapper
+  model: "{roadmapper_model}"
+  description: Create project roadmap from requirements
+  prompt: |
+    <planning_context>
 
-**Project:**
-@.planning/PROJECT.md
+    **Project:**
+    @.planning/PROJECT.md
 
-**Requirements:**
-@.planning/REQUIREMENTS.md
+    **Requirements:**
+    @.planning/REQUIREMENTS.md
 
-**Research (if exists):**
-@.planning/research/SUMMARY.md
+    **Research (if exists):**
+    @.planning/research/SUMMARY.md
 
-**Config:**
-@.planning/config.json
+    **Config:**
+    @.planning/config.json
 
-</planning_context>
+    </planning_context>
 
-<instructions>
-Create roadmap:
-1. Derive phases from requirements (don't impose structure)
-2. Map every v1 requirement to exactly one phase
-3. Derive 2-5 success criteria per phase (observable user behaviors)
-4. Validate 100% coverage
-5. Write files immediately (ROADMAP.md, STATE.md, update REQUIREMENTS.md traceability)
-6. Return ROADMAP CREATED with summary
+    <instructions>
+    Create roadmap:
+    1. Derive phases from requirements (don't impose structure)
+    2. Map every v1 requirement to exactly one phase
+    3. Derive 2-5 success criteria per phase (observable user behaviors)
+    4. Validate 100% coverage
+    5. Write files immediately (ROADMAP.md, STATE.md, update REQUIREMENTS.md traceability)
+    6. Return ROADMAP CREATED with summary
 
-Write files first, then return. This ensures artifacts persist even if context is lost.
-</instructions>
-", subagent_type="gsd-roadmapper", model="{roadmapper_model}", description="Create roadmap")
+    Write files first, then return. This ensures artifacts persist even if context is lost.
+    </instructions>
 ```
 
 **Handle roadmapper return:**
@@ -891,18 +914,21 @@ Use AskUserQuestion:
 **If "Adjust phases":**
 - Get user's adjustment notes
 - Re-spawn roadmapper with revision context:
-  ```
-  Task(prompt="
-  <revision>
-  User feedback on roadmap:
-  [user's notes]
+  ```yaml
+  Task:
+    subagent_type: gsd-roadmapper
+    model: "{roadmapper_model}"
+    description: Revise roadmap based on feedback
+    prompt: |
+      <revision>
+      User feedback on roadmap:
+      [user's notes]
 
-  Current ROADMAP.md: @.planning/ROADMAP.md
+      Current ROADMAP.md: @.planning/ROADMAP.md
 
-  Update the roadmap based on feedback. Edit files in place.
-  Return ROADMAP REVISED with changes made.
-  </revision>
-  ", subagent_type="gsd-roadmapper", model="{roadmapper_model}", description="Revise roadmap")
+      Update the roadmap based on feedback. Edit files in place.
+      Return ROADMAP REVISED with changes made.
+      </revision>
   ```
 - Present revised roadmap
 - Loop until user approves

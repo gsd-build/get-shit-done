@@ -269,10 +269,45 @@ STATE_CONTENT=$(cat .planning/STATE.md)
 
 Spawn all plans in a wave with a single message containing multiple Task calls, with inlined content:
 
-```
-Task(prompt="Execute plan at {plan_01_path}\n\nPlan:\n{plan_01_content}\n\nProject state:\n{state_content}", subagent_type="gsd-executor", model="{executor_model}")
-Task(prompt="Execute plan at {plan_02_path}\n\nPlan:\n{plan_02_content}\n\nProject state:\n{state_content}", subagent_type="gsd-executor", model="{executor_model}")
-Task(prompt="Execute plan at {plan_03_path}\n\nPlan:\n{plan_03_content}\n\nProject state:\n{state_content}", subagent_type="gsd-executor", model="{executor_model}")
+```yaml
+Task:
+  subagent_type: gsd-executor
+  model: "{executor_model}"
+  description: Execute plan {plan_01_path}
+  prompt: |
+    Execute plan at {plan_01_path}
+
+    Plan:
+    {plan_01_content}
+
+    Project state:
+    {state_content}
+
+Task:
+  subagent_type: gsd-executor
+  model: "{executor_model}"
+  description: Execute plan {plan_02_path}
+  prompt: |
+    Execute plan at {plan_02_path}
+
+    Plan:
+    {plan_02_content}
+
+    Project state:
+    {state_content}
+
+Task:
+  subagent_type: gsd-executor
+  model: "{executor_model}"
+  description: Execute plan {plan_03_path}
+  prompt: |
+    Execute plan at {plan_03_path}
+
+    Plan:
+    {plan_03_content}
+
+    Project state:
+    {state_content}
 ```
 
 All three run in parallel. Task tool blocks until all complete.
