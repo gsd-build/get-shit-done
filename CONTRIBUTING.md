@@ -231,6 +231,25 @@ fix(install): use absolute paths on Windows
 
 [One sentence: why is this change needed?]
 
+## GSD Alignment
+
+[How does this change align with GSD philosophy? Reference specific principles:]
+- Solo developer + Claude workflow optimization
+- Context engineering (manages Claude's context window deliberately)
+- No enterprise patterns (no story points, sprint ceremonies, RACI matrices)
+- Imperative, brief, technical — no filler, no sycophancy
+- Plans as prompts (executable, not documents to transform)
+- Depth controls compression — derive from actual work
+
+## Deviation Note
+
+[If this PR deviates from GSD philosophy, explain:]
+- **What deviates:** [Specific principle or pattern this doesn't follow]
+- **Why it's justified:** [Concrete reason — e.g., upstream dependency requires it, platform constraint, user safety]
+- **Scope of deviation:** [Contained to specific files/modules, or systemic]
+
+[If no deviation, write "None — fully aligned."]
+
 ## Testing
 
 [How did you verify it works?]
@@ -243,6 +262,8 @@ fix(install): use absolute paths on Windows
 ### Review Checklist
 
 - [ ] Follows GSD style (no enterprise patterns, no filler)
+- [ ] GSD alignment stated — PR description explains how changes serve GSD goals
+- [ ] Deviations documented with justification (or marked "None")
 - [ ] Updates CHANGELOG.md for user-facing changes
 - [ ] Doesn't add unnecessary dependencies
 - [ ] Works on Windows (test paths with backslashes)
