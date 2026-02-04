@@ -208,6 +208,18 @@ Check project status and intelligently route to next action.
 
 Usage: `/gsd:progress`
 
+**`/gsd:health`**
+Validate .planning/ directory integrity and identify issues.
+
+- Checks core files exist (PROJECT.md, ROADMAP.md, STATE.md, config.json)
+- Validates config.json is parseable JSON
+- Checks phase directories match ROADMAP.md
+- Finds orphaned plans (PLAN.md without SUMMARY.md)
+- Validates STATE.md position accuracy
+- Read-only — reports issues with fix suggestions
+
+Usage: `/gsd:health`
+
 ### Session Management
 
 **`/gsd:resume-work`**
