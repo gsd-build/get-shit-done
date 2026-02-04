@@ -6,6 +6,9 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ## [Unreleased]
 
+### Added
+- `/gsd:discover-and-plan` command — searches local skills and skills.sh for relevant tools before planning a phase, then delegates to `/gsd:plan-phase`
+
 ## [1.11.1] - 2026-01-31
 
 ### Added
