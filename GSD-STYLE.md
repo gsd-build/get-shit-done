@@ -183,7 +183,7 @@ Build authentication system
 |------|------------|---------|
 | Files | kebab-case | `execute-phase.md` |
 | Commands | `gsd:kebab-case` | `gsd:execute-phase` |
-| XML tags | kebab-case | `<execution_context>` |
+| XML tags | kebab-case | `<execution-context>` |
 | Step names | snake_case | `name="load_project_state"` |
 | Bash variables | CAPS_UNDERSCORES | `PHASE_ARG`, `PLAN_START_TIME` |
 | Type attributes | colon separator | `type="checkpoint:human-verify"` |

@@ -6,6 +6,11 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ## [Unreleased]
 
+## [1.11.2] - 2026-02-01
+
+### Fixed
+- GSD-STYLE.md XML tags	kebab-case example
+
 ## [1.11.1] - 2026-01-31
 
 ### Added
