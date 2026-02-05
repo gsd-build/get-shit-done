@@ -142,6 +142,19 @@ Default to "balanced" if not set.
 
 Store resolved models for use in Task calls below.
 
+## Phase 6.7: Detect Agent Teams
+
+Check Agent Teams availability (both must be true):
+- Environment: `CLAUDE_CODE_EXPERIMENTAL_AGENT_TEAMS=1`
+- Config: `agent_teams: true` in config.json
+
+```bash
+AGENT_TEAMS_ENV=${CLAUDE_CODE_EXPERIMENTAL_AGENT_TEAMS:-0}
+AGENT_TEAMS_CONFIG=$(cat .planning/config.json 2>/dev/null | grep -o '"agent_teams"[[:space:]]*:[[:space:]]*[^,}]*' | grep -o 'true\|false' || echo "false")
+USE_AGENT_TEAMS=false
+[ "$AGENT_TEAMS_ENV" = "1" ] && [ "$AGENT_TEAMS_CONFIG" = "true" ] && USE_AGENT_TEAMS=true
+```
+
 ## Phase 7: Research Decision
 
 Use AskUserQuestion:
@@ -166,6 +179,36 @@ Create research directory:
 ```bash
 mkdir -p .planning/research
 ```
+
+**If USE_AGENT_TEAMS = true:**
+
+Display:
+```
+◆ Spawning research team (Agent Teams mode)...
+  → Stack, Features, Architecture, Pitfalls researchers
+  → Cross-pollination enabled
+```
+
+Use spawnTeam to create a 4-researcher team. Each researcher gets the SAME prompt as the existing Task() calls below but with an added `<team_protocol>` section appended to each prompt:
+
+```markdown
+<team_protocol>
+You are part of a 4-researcher team. Your teammates:
+- stack-researcher, features-researcher, architecture-researcher, pitfalls-researcher
+
+RULES:
+1. Complete your initial research first
+2. Send your top 3 findings to ALL teammates as: FINDING: [one-liner] | IMPLICATION: [cross-dimension impact]
+3. When you receive teammate findings, check for implications on YOUR dimension
+4. Integrate cross-references into your output: "(cross-ref: [teammate] found [X])"
+5. Add a ## Cross-References section at end of your output file
+6. Do NOT wait for all messages before starting. Research → share → integrate.
+</team_protocol>
+```
+
+After team completes, spawn gsd-research-synthesizer identically to the existing flow below.
+
+**Else (USE_AGENT_TEAMS = false):**
 
 Display spawning indicator:
 ```
