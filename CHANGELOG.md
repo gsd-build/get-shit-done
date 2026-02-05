@@ -6,6 +6,9 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ## [Unreleased]
 
+### Fixed
+- `/gsd:map-codebase` now explicitly uses TaskOutput tool to wait for background agents, preventing indefinite "Waiting for agents to complete..." state
+
 ## [1.11.1] - 2026-01-31
 
 ### Added

@@ -190,9 +190,19 @@ Continue to collect_confirmations.
 </step>
 
 <step name="collect_confirmations">
-Wait for all 4 agents to complete.
+Wait for all 4 agents to complete using TaskOutput tool.
 
-Read each agent's output file to collect confirmations.
+**For each agent task_id returned by the Task tool calls above:**
+```
+TaskOutput tool:
+  task_id: "{task_id from Task result}"
+  block: true
+  timeout: 300000
+```
+
+Call TaskOutput for all 4 agents in parallel (single message with 4 TaskOutput calls).
+
+Once all TaskOutput calls return, read each agent's output file to collect confirmations.
 
 **Expected confirmation format from each agent:**
 ```
