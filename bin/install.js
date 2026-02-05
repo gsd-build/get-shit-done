@@ -478,6 +478,131 @@ function convertClaudeToGeminiAgent(content) {
   return `---\n${newFrontmatter}\n---${stripSubTags(body)}`;
 }
 
+/**
+ * Convert Claude Code frontmatter to Cursor format
+ * - Converts allowed-tools array or tools string to tools object with boolean values
+ * - Converts color names to hex values
+ * - Replaces tool name references in body text
+ * - Replaces path references (~/.claude/ → ~/.cursor/)
+ * - Replaces command format (/gsd: → /gsd-)
+ * @param {string} content - Markdown file content with YAML frontmatter
+ * @returns {string} - Content with converted frontmatter
+ */
+function convertClaudeToCursorFrontmatter(content) {
+  // Replace tool name references in body text
+  let convertedContent = content;
+  
+  // Replace PascalCase tool names with snake_case equivalents
+  for (const [claude, cursor] of Object.entries(claudeToCursorTools)) {
+    // Use word boundaries to avoid partial replacements
+    const regex = new RegExp(`\\b${claude}\\b`, 'g');
+    convertedContent = convertedContent.replace(regex, cursor);
+  }
+  
+  // Replace /gsd: with /gsd- for Cursor command format
+  convertedContent = convertedContent.replace(/\/gsd:/g, '/gsd-');
+  
+  // Replace ~/.claude/ with ~/.cursor/
+  convertedContent = convertedContent.replace(/~\/\.claude\//g, '~/.cursor/');
+  
+  // Check if content has frontmatter
+  if (!convertedContent.startsWith('---')) {
+    return convertedContent;
+  }
+
+  // Find the end of frontmatter
+  const endIndex = convertedContent.indexOf('---', 3);
+  if (endIndex === -1) {
+    return convertedContent;
+  }
+
+  const frontmatter = convertedContent.substring(3, endIndex).trim();
+  const body = convertedContent.substring(endIndex + 3);
+
+  // Parse frontmatter line by line
+  const lines = frontmatter.split('\n');
+  const newLines = [];
+  let inAllowedTools = false;
+  const allowedTools = [];
+
+  for (const line of lines) {
+    const trimmed = line.trim();
+
+    // Detect start of allowed-tools array
+    if (trimmed.startsWith('allowed-tools:')) {
+      inAllowedTools = true;
+      continue;
+    }
+
+    // Detect inline tools: field (comma-separated string)
+    if (trimmed.startsWith('tools:')) {
+      const toolsValue = trimmed.substring(6).trim();
+      if (toolsValue) {
+        // Parse comma-separated tools
+        const tools = toolsValue.split(',').map(t => t.trim()).filter(t => t);
+        allowedTools.push(...tools);
+      } else {
+        // tools: with no value means YAML array follows
+        inAllowedTools = true;
+      }
+      continue;
+    }
+
+    // Remove name: field - Cursor uses filename for command name
+    if (trimmed.startsWith('name:')) {
+      continue;
+    }
+
+    // Convert color names to hex for Cursor
+    if (trimmed.startsWith('color:')) {
+      const colorValue = trimmed.substring(6).trim().replace(/['"]/g, '').toLowerCase();
+      const hexColor = colorNameToHex[colorValue];
+      if (hexColor) {
+        newLines.push(`color: "${hexColor}"`);
+      } else if (colorValue.startsWith('#')) {
+        // Validate hex color format (#RGB or #RRGGBB)
+        if (/^#[0-9a-f]{3}$|^#[0-9a-f]{6}$/i.test(colorValue)) {
+          newLines.push(`color: "${colorValue}"`);
+        }
+        // Skip invalid hex colors
+      }
+      // Skip unknown color names
+      continue;
+    }
+
+    // Collect allowed-tools items
+    if (inAllowedTools) {
+      if (trimmed.startsWith('- ')) {
+        allowedTools.push(trimmed.substring(2).trim());
+        continue;
+      } else if (trimmed && !trimmed.startsWith('-')) {
+        // End of array, new field started
+        inAllowedTools = false;
+      }
+    }
+
+    // Keep other fields
+    if (!inAllowedTools) {
+      newLines.push(line);
+    }
+  }
+
+  // Add tools object if we had allowed-tools or tools
+  if (allowedTools.length > 0) {
+    newLines.push('tools:');
+    for (const tool of allowedTools) {
+      const cursorTool = convertCursorToolName(tool);
+      if (cursorTool) {
+        newLines.push(`  ${cursorTool}: true`);
+      }
+    }
+  }
+
+  // Rebuild frontmatter
+  const newFrontmatter = newLines.join('\n').trim();
+  return `---\n${newFrontmatter}\n---${body}`;
+}
+
 function convertClaudeToOpencodeFrontmatter(content) {
   // Replace tool name references in content (applies to all files)
   let convertedContent = content;
