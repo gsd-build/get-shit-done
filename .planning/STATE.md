@@ -5,59 +5,46 @@
 
 ## Current Position
 
-**Phase:** 3 of 3 (Verification & Cleanup) - COMPLETE
-**Plan:** 2 of 2 complete
-**Status:** Milestone complete
-**Last activity:** 2026-02-05 - Completed Phase 3 (all plans)
+**Milestone:** v1.0 shipped
+**Phase:** Complete (3/3)
+**Status:** Ready for next milestone
+**Last activity:** 2026-02-05 — v1.0 milestone complete
 
-Progress: ██████████ 100% (5/5 plans total)
+Progress: ██████████ 100% (v1.0 shipped)
 
 ## Project Reference
 
 See: .planning/PROJECT.md (updated 2026-02-05)
 
 **Core value:** Single unified installer supporting all AI runtimes
-**Current focus:** Complete - v1 milestone achieved
+**Current focus:** Milestone complete — planning next milestone
 
-## Phase Status
+## Milestone Status
 
-| Phase | Status | Started | Completed |
-|-------|--------|---------|-----------|
-| 1. Core Implementation | Complete | 2026-02-05 | 2026-02-05 |
-| 2. Polish | Complete | 2026-02-05 | 2026-02-05 |
-| 3. Verification & Cleanup | Complete | 2026-02-05 | 2026-02-05 |
+| Milestone | Status | Shipped |
+|-----------|--------|---------|
+| v1.0 Cursor Integration | ✅ Shipped | 2026-02-05 |
 
-## Recent Decisions
+## Accumulated Context
+
+### Decisions (v1.0)
 
 | Decision | Date | Rationale |
 |----------|------|-----------|
-| 3 phases (consolidated) | 2026-02-05 | User preference for quick depth |
 | Global-only install | 2026-02-05 | Simplify initial implementation |
-| Remove cursor-gsd after | 2026-02-05 | Consolidate into main installer |
-| snake_case for Cursor tools | 2026-02-05 | Matches OpenCode pattern |
-| Exclude Task tool for Cursor | 2026-02-05 | Cursor uses subagent mechanism |
-| Cursor command format /gsd- | 2026-02-05 | Matches OpenCode flat structure |
 | Skip hooks for Cursor | 2026-02-05 | No statusline/notification API |
-| Replace /clear with new chat | 2026-02-05 | Cursor has no /clear command |
+| snake_case for Cursor tools | 2026-02-05 | Matches OpenCode pattern |
+| /gsd- command format | 2026-02-05 | Matches OpenCode flat structure |
 
-## Blockers
+### Blockers
 
 None
 
-## Milestone Summary
+## Session Continuity
 
-**v1 GSD Cursor Integration Complete**
-
-All 26 requirements addressed:
-- 14 Core Implementation (CONV, PATH, INST) - Complete
-- 6 Polish (HOOK skipped, UI complete)
-- 6 Verification & Cleanup (VER-03 N/A, rest complete)
-
-Key deliverables:
-- Unified installer supports `--cursor` flag
-- Files deploy to `~/.cursor/` with correct conversions
-- cursor-gsd/ folder removed (consolidated)
-- Human-verified working in Cursor IDE
+**Last session:** 2026-02-05
+**Completed:** v1.0 milestone (3 phases, 5 plans)
+**Next session:** `/gsd-new-milestone` to define v2 goals
 
 ---
-*State updated: 2026-02-05 after completing Phase 3*
+*State updated: 2026-02-05 after v1.0 milestone completion*

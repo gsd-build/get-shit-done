@@ -2,67 +2,70 @@
 
 ## What This Is
 
-Adding Cursor IDE support to the main GSD installer (`bin/install.js`) by consolidating the conversion logic from `cursor-gsd/scripts/migrate.sh`. This enables users to install GSD directly to `~/.cursor/` using `npx get-shit-done-cc --cursor --global`.
+Cursor IDE support for the GSD unified installer. Users can now install GSD directly to `~/.cursor/` using `npx get-shit-done-cc --cursor --global`. All commands, agents, and supporting files are automatically converted from Claude Code format to Cursor format during installation.
 
 ## Core Value
 
-Single unified installer that supports all AI runtimes (Claude Code, OpenCode, Gemini, Cursor) with consistent behavior and conversion logic.
+Single unified installer that supports all AI runtimes (Claude Code, OpenCode, Gemini, Cursor) with consistent behavior and automatic format conversion.
+
+## Current State
+
+**Shipped:** v1.0 (2026-02-05)
+
+The unified installer now supports Cursor as a first-class runtime:
+- `--cursor` CLI flag for targeted installation
+- Interactive prompt includes Cursor option
+- Automatic tool name conversion (PascalCase → snake_case)
+- Automatic frontmatter conversion (array → object format)
+- Automatic path conversion (`~/.claude/` → `~/.cursor/`)
+- Hook deployment correctly skipped (Cursor has no hook API)
 
 ## Requirements
 
 ### Validated
 
-- ✓ Multi-runtime installer supporting Claude Code, OpenCode, Gemini — existing
-- ✓ Path replacement during installation (`~/.claude/` → target path) — existing
-- ✓ Frontmatter conversion (`allowed-tools:` → `tools:` object) — existing
-- ✓ Tool name mapping per runtime — existing
-- ✓ Color name to hex conversion — existing
-- ✓ Global and local install modes — existing
-- ✓ Interactive and flag-based runtime selection — existing
-- ✓ Settings.json hook configuration — existing
-- ✓ Hooks bundling and deployment — existing
+- ✓ Multi-runtime installer supporting Claude Code, OpenCode, Gemini, Cursor — v1.0
+- ✓ Tool name mapping for Cursor (claudeToCursorTools) — v1.0
+- ✓ Frontmatter conversion for Cursor (array → object) — v1.0
+- ✓ Path reference conversion (~/.claude/ → ~/.cursor/) — v1.0
+- ✓ Command format conversion (/gsd: → /gsd-) — v1.0
+- ✓ --cursor CLI flag and interactive prompt — v1.0
+- ✓ Install/uninstall for Cursor runtime — v1.0
+- ✓ Hook skipping for Cursor (no hook API) — v1.0
+- ✓ Human-verified working in Cursor IDE — v1.0
 
 ### Active
 
-- [ ] Add `--cursor` flag to installer CLI
-- [ ] Add Cursor to runtime selection prompt
-- [ ] Implement Cursor-specific path conversion (`~/.claude/` → `~/.cursor/`)
-- [ ] Implement Cursor command format conversion (`/gsd:` → `/gsd-`)
-- [ ] Implement Cursor tool name mapping (same as existing snake_case pattern)
-- [ ] Configure Cursor install directory (`~/.cursor/` global only)
-- [ ] Remove `cursor-gsd/` subfolder after consolidation
+(No active requirements — milestone complete. Run `/gsd-new-milestone` to define next milestone requirements.)
 
 ### Out of Scope
 
-- Local install for Cursor — keeping global-only for simplicity
-- Cursor-specific hooks changes — reuse existing Claude Code hooks pattern
-- New UI for cursor-gsd standalone distribution — consolidating into main installer
+- Local install for Cursor — keeping global-only for simplicity (v2 candidate)
+- Runtime auto-detection — explicit flag required (v2 candidate)
+- Cursor-specific hooks — Cursor has no hook/notification API
+- Separate cursor-gsd distribution — consolidated into main installer
 
 ## Context
 
-The `cursor-gsd/` subfolder contains a separate adaptation of GSD for Cursor IDE, with its own migration and install scripts. The migration script (`migrate.sh`) performs these conversions:
-
-1. **Path references:** `~/.claude/` → `~/.cursor/`
-2. **Command references:** `/gsd:cmd` → `/gsd-cmd` (files) — Cursor displays as `/gsd/cmd`
-3. **Tool names:** PascalCase → snake_case (Read → read, Write → write)
-4. **Frontmatter:** `allowed-tools:` array → `tools:` object with booleans
-5. **Colors:** Named colors → hex values
-
-The main installer already handles most of these conversions for OpenCode and Gemini. The task is to add Cursor as another runtime option using the same patterns.
+**Tech stack:** Node.js installer (bin/install.js), zero runtime dependencies
+**Codebase:** ~1750 lines in bin/install.js with Cursor support
+**User feedback:** Human-verified working in Cursor IDE
 
 ## Constraints
 
 - **No new dependencies** — maintain zero runtime dependencies
-- **Reuse existing patterns** — Cursor conversion should follow OpenCode/Gemini approach
+- **Reuse existing patterns** — Cursor conversion follows OpenCode/Gemini approach
 - **Backward compatible** — existing Claude/OpenCode/Gemini installs unaffected
 
 ## Key Decisions
 
 | Decision | Rationale | Outcome |
 |----------|-----------|---------|
-| Global-only for Cursor | Simplify initial implementation, local installs less common | — Pending |
-| Reuse Claude Code hooks | Cursor shares similar hook system | — Pending |
-| Remove cursor-gsd after consolidation | Eliminate duplicate code and maintenance burden | — Pending |
+| Global-only for Cursor | Simplify initial implementation | ✓ Good — works well |
+| Skip hooks for Cursor | Cursor has no statusline/notification API | ✓ Good — correct behavior |
+| Remove cursor-gsd after consolidation | Eliminate duplicate code | ✓ Good — cleaner repo |
+| snake_case for Cursor tools | Matches OpenCode pattern | ✓ Good — consistent |
+| /gsd- command format | Matches OpenCode flat structure | ✓ Good — works in Cursor |
 
 ---
-*Last updated: 2026-02-05 after initialization*
+*Last updated: 2026-02-05 after v1.0 milestone*
