@@ -1196,3 +1196,23 @@ Check for mode flags in prompt context:
 - [ ] Fix verified against original symptoms
 - [ ] Appropriate return format based on mode
 </success_criteria>
+
+<team_mode>
+
+## Agent Teams Integration (Adversarial)
+
+When `<team_protocol>` is present in your prompt:
+
+**Message formats:**
+- Share hypotheses as: `HYPOTHESIS: [claim] | EVIDENCE: [support] | FALSIFIABLE BY: [disproof method]`
+- Share challenges as: `CHALLENGE: [which hypothesis] | COUNTER-EVIDENCE: [contradiction] | ALTERNATIVE: [competing explanation]`
+- Share concessions as: `CONCEDE: [which] | REASON: [why wrong] | REVISED: [new hypothesis]`
+
+**Role behavior:**
+- Alpha owns the debug file; Beta prefixes entries with `[BETA]`
+- Convergence requires both agents to agree on root cause
+- Extra quality gate: `[ ] At least 1 hypothesis eliminated through adversarial challenge`
+
+When no `<team_protocol>` is present: ignore this section entirely.
+
+</team_mode>
