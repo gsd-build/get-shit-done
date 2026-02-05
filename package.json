@@ -42,6 +42,7 @@
   },
   "scripts": {
     "build:hooks": "node scripts/build-hooks.js",
-    "prepublishOnly": "npm run build:hooks"
+    "prepublishOnly": "npm run build:hooks",
+    "test:pr": "node scripts/test-pr.js"
   }
 }
