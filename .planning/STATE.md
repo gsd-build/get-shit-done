@@ -5,12 +5,12 @@
 
 ## Current Position
 
-**Phase:** 1 of 3 (Core Implementation)
-**Plan:** 1 of 2 complete
-**Status:** In progress
-**Last activity:** 2026-02-05 - Completed 01-01-PLAN.md
+**Phase:** 1 of 3 (Core Implementation) - COMPLETE
+**Plan:** 2 of 2 complete
+**Status:** Phase complete
+**Last activity:** 2026-02-05 - Completed 01-02-PLAN.md
 
-Progress: █░░░░░░░░░ 17% (1/6 plans)
+Progress: ██░░░░░░░░ 33% (2/6 plans)
 
 ## Project Reference
 
@@ -23,7 +23,7 @@ See: .planning/PROJECT.md (updated 2026-02-05)
 
 | Phase | Status | Started | Completed |
 |-------|--------|---------|-----------|
-| 1. Core Implementation | In progress | 2026-02-05 | — |
+| 1. Core Implementation | Complete | 2026-02-05 | 2026-02-05 |
 | 2. Polish | Pending | — | — |
 | 3. Verification & Cleanup | Pending | — | — |
 
@@ -36,6 +36,8 @@ See: .planning/PROJECT.md (updated 2026-02-05)
 | Remove cursor-gsd after | 2026-02-05 | Consolidate into main installer |
 | snake_case for Cursor tools | 2026-02-05 | Matches OpenCode pattern |
 | Exclude Task tool for Cursor | 2026-02-05 | Cursor uses subagent mechanism |
+| Cursor command format /gsd- | 2026-02-05 | Matches OpenCode flat structure |
+| Cursor statusline support | 2026-02-05 | Uses hooks like Claude/Gemini |
 
 ## Blockers
 
@@ -44,8 +46,8 @@ None
 ## Session Continuity
 
 **Last session:** 2026-02-05
-**Completed:** Plan 01-01 (Cursor conversion functions)
-**Next session:** Execute Plan 01-02 (Cursor runtime detection and install)
+**Completed:** Phase 01 (Core Implementation) - Plans 01-01 and 01-02
+**Next session:** Execute Phase 02 (Polish)
 
 ---
-*State updated: 2026-02-05 after completing 01-01-PLAN.md*
+*State updated: 2026-02-05 after completing 01-02-PLAN.md*
