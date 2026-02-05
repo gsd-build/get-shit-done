@@ -93,7 +93,7 @@ timestamp=$(date "+%Y-%m-%dT%H:%M")
 date_prefix=$(date "+%Y-%m-%d")
 ```
 
-Generate slug from title (lowercase, hyphens, no special chars).
+Generate slug from title (lowercase, hyphens, no special chars in FILENAME only).
 
 Write to `.planning/todos/pending/${date_prefix}-${slug}.md`:
 

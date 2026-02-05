@@ -104,6 +104,15 @@ git check-ignore -q .planning 2>/dev/null && COMMIT_PLANNING_DOCS=false
 
 Store `COMMIT_PLANNING_DOCS` for use in git operations.
 
+**Load parallelization config:**
+
+```bash
+# Check if parallelization is enabled (default: true)
+PARALLELIZATION=$(cat .planning/config.json 2>/dev/null | grep -o '"parallelization"[[:space:]]*:[[:space:]]*[^,}]*' | grep -o 'true\|false' || echo "true")
+```
+
+Store `PARALLELIZATION` for use in wave execution step. When `false`, plans within a wave execute sequentially instead of in parallel.
+
 **Load git branching config:**
 
 ```bash
@@ -274,7 +283,9 @@ The "What it builds" column comes from skimming plan names/objectives. Keep it b
 </step>
 
 <step name="execute_waves">
-Execute each wave in sequence. Autonomous plans within a wave run in parallel.
+Execute each wave in sequence. Autonomous plans within a wave run in parallel **only if `PARALLELIZATION=true`**.
+
+**If `PARALLELIZATION=false`:** Execute plans within each wave sequentially (one at a time). This prevents side effects from concurrent operations like tests, linting, and code generation.
 
 **For each wave:**
 
@@ -303,7 +314,7 @@ Execute each wave in sequence. Autonomous plans within a wave run in parallel.
    - Bad: "Executing terrain generation plan"
    - Good: "Procedural terrain generator using Perlin noise — creates height maps, biome zones, and collision meshes. Required before vehicle physics can interact with ground."
 
-2. **Read files and spawn all autonomous agents in wave simultaneously:**
+2. **Read files and spawn agents:**
 
    Before spawning, read file contents. The `@` syntax does not work across Task() boundaries - content must be inlined.
 
@@ -352,7 +363,11 @@ Execute each wave in sequence. Autonomous plans within a wave run in parallel.
    fi
    ```
 
-   Use Task tool with multiple parallel calls. Each agent gets prompt with inlined content:
+   **If `PARALLELIZATION=true` (default):** Use Task tool with multiple parallel calls.
+   
+   **If `PARALLELIZATION=false`:** Spawn agents one at a time, waiting for each to complete before starting the next. This ensures no concurrent file modifications or build operations.
+
+   Each agent gets prompt with inlined content:
 
    ```
    <objective>

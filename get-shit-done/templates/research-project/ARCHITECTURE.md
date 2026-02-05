@@ -177,7 +177,7 @@ src/
 <guidelines>
 
 **System Overview:**
-- Use ASCII diagrams for clarity
+- Use ASCII box-drawing diagrams for clarity (├── └── │ ─ for structure visualization only)
 - Show major components and their relationships
 - Don't over-detail — this is conceptual, not implementation
 

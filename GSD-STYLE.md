@@ -216,6 +216,17 @@ Present: Factual statements, verification results, direct answers
 
 **Bad one-liner:** "Phase complete" or "Authentication implemented"
 
+### Character Preservation
+
+**ALWAYS preserve diacritics and special characters in text content.**
+
+- ą, ę, ć, ź, ż, ó, ł, ń, ś (Polish)
+- ü, ö, ä, ß (German)
+- é, è, ê, ç (French)
+- and all other language-specific characters
+
+**User's typing style ≠ output style.**
+
 ---
 
 ## Context Engineering

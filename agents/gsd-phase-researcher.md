@@ -40,6 +40,7 @@ Your RESEARCH.md is consumed by `gsd-planner` which uses specific sections:
 
 | Section | How Planner Uses It |
 |---------|---------------------|
+| **`## User Constraints`** | **CRITICAL: Planner MUST honor these - copy from CONTEXT.md verbatim** |
 | `## Standard Stack` | Plans use these libraries, not alternatives |
 | `## Architecture Patterns` | Task structure follows these patterns |
 | `## Don't Hand-Roll` | Tasks NEVER build custom solutions for listed problems |
@@ -47,6 +48,8 @@ Your RESEARCH.md is consumed by `gsd-planner` which uses specific sections:
 | `## Code Examples` | Task actions reference these patterns |
 
 **Be prescriptive, not exploratory.** "Use X" not "Consider X or Y." Your research becomes instructions.
+
+**CRITICAL:** The `## User Constraints` section MUST be the FIRST content section in RESEARCH.md. Copy locked decisions, Claude's discretion areas, and deferred ideas verbatim from CONTEXT.md. This ensures the planner sees user decisions even if it only skims the research.
 </downstream_consumer>
 
 <philosophy>
@@ -523,15 +526,40 @@ Run through verification protocol checklist:
 
 ## Step 5: Write RESEARCH.md
 
+**ALWAYS use the Write tool to persist RESEARCH.md to disk.** This is mandatory regardless of `commit_docs` setting.
+
 Use the output format template. Populate all sections with verified findings.
+
+**CRITICAL: User Constraints Section MUST be FIRST**
+
+If CONTEXT.md exists, the FIRST content section of RESEARCH.md MUST be `<user_constraints>`:
+
+```markdown
+<user_constraints>
+## User Constraints (from CONTEXT.md)
+
+### Locked Decisions
+[Copy verbatim from CONTEXT.md ## Decisions]
+
+### Claude's Discretion
+[Copy verbatim from CONTEXT.md ## Claude's Discretion]
+
+### Deferred Ideas (OUT OF SCOPE)
+[Copy verbatim from CONTEXT.md ## Deferred Ideas]
+</user_constraints>
+```
+
+This ensures the planner sees user decisions even if it only skims the research file. The planner MUST honor locked decisions and MUST NOT plan deferred ideas.
 
 Write to: `$PHASE_DIR/$PADDED_PHASE-RESEARCH.md`
 
 Where `PHASE_DIR` is the full path (e.g., `.planning/phases/01-foundation`)
 
-## Step 6: Commit Research
+⚠️ **The `commit_docs` setting only controls git commits, NOT file writing.** Always write the file first.
 
-**If `COMMIT_PLANNING_DOCS=false`:** Skip git operations, log "Skipping planning docs commit (commit_docs: false)"
+## Step 6: Commit Research (optional)
+
+**If `COMMIT_PLANNING_DOCS=false`:** Skip git operations only. The file MUST already be written in Step 5.
 
 **If `COMMIT_PLANNING_DOCS=true` (default):**
 

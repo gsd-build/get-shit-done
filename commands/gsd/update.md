@@ -12,11 +12,25 @@ Provides a better update experience than raw `npx get-shit-done-cc` by showing v
 <process>
 
 <step name="get_installed_version">
-Read installed version:
+Detect whether GSD is installed locally or globally by checking both locations:
 
 ```bash
-cat ~/.claude/get-shit-done/VERSION 2>/dev/null
+# Check local first (takes priority)
+if [ -f "./.claude/get-shit-done/VERSION" ]; then
+  cat "./.claude/get-shit-done/VERSION"
+  echo "LOCAL"
+elif [ -f ~/.claude/get-shit-done/VERSION ]; then
+  cat ~/.claude/get-shit-done/VERSION
+  echo "GLOBAL"
+else
+  echo "UNKNOWN"
+fi
 ```
+
+Parse output:
+- If last line is "LOCAL": installed version is first line, use `--local` flag for update
+- If last line is "GLOBAL": installed version is first line, use `--global` flag for update
+- If "UNKNOWN": proceed to install step (treat as version 0.0.0)
 
 **If VERSION file missing:**
 ```
@@ -106,12 +120,14 @@ STOP here if ahead.
 ────────────────────────────────────────────────────────────
 
 ⚠️  **Note:** The installer performs a clean install of GSD folders:
-- `~/.claude/commands/gsd/` will be wiped and replaced
-- `~/.claude/get-shit-done/` will be wiped and replaced
-- `~/.claude/agents/gsd-*` files will be replaced
+- `commands/gsd/` will be wiped and replaced
+- `get-shit-done/` will be wiped and replaced
+- `agents/gsd-*` files will be replaced
+
+(Paths are relative to your install location: `~/.claude/` for global, `./.claude/` for local)
 
 Your custom files in other locations are preserved:
-- Custom commands in `~/.claude/commands/your-stuff/` ✓
+- Custom commands not in `commands/gsd/` ✓
 - Custom agents not prefixed with `gsd-` ✓
 - Custom hooks ✓
 - Your CLAUDE.md files ✓
@@ -129,8 +145,14 @@ Use AskUserQuestion:
 </step>
 
 <step name="run_update">
-Run the update:
+Run the update using the install type detected in step 1:
 
+**If LOCAL install:**
+```bash
+npx get-shit-done-cc --local
+```
+
+**If GLOBAL install (or unknown):**
 ```bash
 npx get-shit-done-cc --global
 ```
@@ -139,6 +161,12 @@ Capture output. If install fails, show error and STOP.
 
 Clear the update cache so statusline indicator disappears:
 
+**If LOCAL install:**
+```bash
+rm -f ./.claude/cache/gsd-update-check.json
+```
+
+**If GLOBAL install:**
 ```bash
 rm -f ~/.claude/cache/gsd-update-check.json
 ```
