@@ -25,6 +25,7 @@ cat .planning/config.json
 ```
 
 Parse current values (default to `true` if not present):
+- `auto_mode` — continuous execution without manual intervention (default: `false`)
 - `workflow.research` — spawn researcher during plan-phase
 - `workflow.plan_check` — spawn plan checker during plan-phase
 - `workflow.verifier` — spawn verifier during execute-phase
@@ -38,6 +39,15 @@ Use AskUserQuestion with current values pre-selected:
 
 ```
 AskUserQuestion([
+  {
+    question: "Enable auto-mode? (chains plan → execute → next phase automatically)",
+    header: "Auto-Mode",
+    multiSelect: false,
+    options: [
+      { label: "Off (Recommended)", description: "Manual control — you decide when to plan, execute, and advance" },
+      { label: "On", description: "Continuous execution — only stops for checkpoints, errors, and milestone completion" }
+    ]
+  },
   {
     question: "Which model profile for agents?",
     header: "Model",
@@ -113,6 +123,7 @@ Merge new settings into existing config.json:
 ```json
 {
   ...existing_config,
+  "auto_mode": true/false,
   "model_profile": "quality" | "balanced" | "budget",
   "workflow": {
     "research": true/false,
@@ -183,6 +194,7 @@ Display:
 
 | Setting              | Value |
 |----------------------|-------|
+| Auto-Mode            | {On/Off} |
 | Model Profile        | {quality/balanced/budget} |
 | Plan Researcher      | {On/Off} |
 | Plan Checker         | {On/Off} |
@@ -195,6 +207,7 @@ Display:
 These settings apply to future /gsd:plan-phase and /gsd:execute-phase runs.
 
 Quick commands:
+- /gsd:auto — toggle auto-mode on/off
 - /gsd:set-profile <profile> — switch model profile
 - /gsd:plan-phase --research — force research
 - /gsd:plan-phase --skip-research — skip research
@@ -206,8 +219,8 @@ Quick commands:
 
 <success_criteria>
 - [ ] Current config read
-- [ ] User presented with 7 settings (profile + 5 workflow toggles + git branching)
-- [ ] Config updated with model_profile, workflow, and git sections
+- [ ] User presented with 8 settings (auto-mode + profile + 5 workflow toggles + git branching)
+- [ ] Config updated with auto_mode, model_profile, workflow, and git sections
 - [ ] User offered to save as global defaults (~/.gsd/defaults.json)
 - [ ] Changes confirmed to user
 </success_criteria>

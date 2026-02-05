@@ -1,5 +1,6 @@
 {
   "mode": "interactive",
+  "auto_mode": false,
   "depth": "standard",
   "workflow": {
     "research": true,
