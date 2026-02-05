@@ -154,6 +154,7 @@ Add new phases to current milestone:
 
 ```bash
 mkdir -p ".planning/phases/{NN}-{name}"
+touch ".planning/phases/{NN}-{name}/.gitkeep"
 ```
 
 ## 8. Commit Roadmap Update

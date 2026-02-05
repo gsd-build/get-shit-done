@@ -115,6 +115,7 @@ if [ -z "$PHASE_DIR" ]; then
   # Create phase directory from roadmap name
   PHASE_NAME=$(grep "Phase ${PHASE}:" .planning/ROADMAP.md | sed 's/.*Phase [0-9]*: //' | tr '[:upper:]' '[:lower:]' | tr ' ' '-')
   mkdir -p ".planning/phases/${PHASE}-${PHASE_NAME}"
+  touch ".planning/phases/${PHASE}-${PHASE_NAME}/.gitkeep"
   PHASE_DIR=".planning/phases/${PHASE}-${PHASE_NAME}"
 fi
 

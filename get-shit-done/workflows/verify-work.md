@@ -129,6 +129,7 @@ Skip internal/non-observable items (refactors, type changes, etc.).
 
 ```bash
 mkdir -p "$PHASE_DIR"
+touch "$PHASE_DIR/.gitkeep"
 ```
 
 Build test list from extracted deliverables.

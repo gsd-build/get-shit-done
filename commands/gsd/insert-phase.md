@@ -124,7 +124,10 @@ Create the phase directory structure:
 ```bash
 phase_dir=".planning/phases/${decimal_phase}-${slug}"
 mkdir -p "$phase_dir"
+touch "$phase_dir/.gitkeep"
 ```
+
+The `.gitkeep` file ensures Git tracks the directory even before plans are created. Without it, empty phase directories are lost when syncing across machines.
 
 Confirm: "Created directory: $phase_dir"
 </step>

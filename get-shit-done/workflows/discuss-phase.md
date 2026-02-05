@@ -289,6 +289,7 @@ if [ -z "$PHASE_DIR" ]; then
   # Create from roadmap name (lowercase, hyphens)
   PHASE_NAME=$(grep "Phase ${PHASE}:" .planning/ROADMAP.md | sed 's/.*Phase [0-9]*: //' | tr '[:upper:]' '[:lower:]' | tr ' ' '-')
   mkdir -p ".planning/phases/${PADDED_PHASE}-${PHASE_NAME}"
+  touch ".planning/phases/${PADDED_PHASE}-${PHASE_NAME}/.gitkeep"
   PHASE_DIR=".planning/phases/${PADDED_PHASE}-${PHASE_NAME}"
 fi
 ```
