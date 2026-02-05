@@ -8,9 +8,9 @@
 
 | # | Phase | Goal | Requirements | Status |
 |---|-------|------|--------------|--------|
-| 1 | Core Implementation | Installer deploys GSD to ~/.cursor/ with correct conversions | CONV-01..05, PATH-01..04, INST-01..05 | Pending |
-| 2 | Polish | Hooks work and UI is complete | HOOK-01..03, UI-01..03 | Pending |
-| 3 | Verification & Cleanup | All features verified, cursor-gsd removed | VER-01..04, CLN-01..02 | Pending |
+| 1 | Core Implementation | Installer deploys GSD to ~/.cursor/ with correct conversions | CONV-01..05, PATH-01..04, INST-01..05 | Complete |
+| 2 | Polish | Hooks work and UI is complete | HOOK-01..03, UI-01..03 | Complete |
+| 3 | Verification & Cleanup | All features verified, cursor-gsd removed | VER-01..04, CLN-01..02 | Complete |
 
 ---
 
@@ -90,8 +90,8 @@ Plans:
 **Plans:** 2 plans
 
 Plans:
-- [ ] 03-01-PLAN.md — Verification (install to Cursor, human checkpoint to verify commands/agents/paths)
-- [ ] 03-02-PLAN.md — Cleanup (remove cursor-gsd/ and GSD-CURSOR-ADAPTATION.md, commit)
+- [x] 03-01-PLAN.md — Verification (install to Cursor, human checkpoint to verify commands/agents/paths)
+- [x] 03-02-PLAN.md — Cleanup (remove cursor-gsd/ and GSD-CURSOR-ADAPTATION.md)
 
 **Success Criteria:**
 1. `/gsd-help` command loads and displays help in Cursor

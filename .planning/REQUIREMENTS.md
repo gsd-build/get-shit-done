@@ -81,12 +81,12 @@
 | UI-01 | 2 | Complete |
 | UI-02 | 2 | Complete |
 | UI-03 | 2 | Complete |
-| VER-01 | 3 | Pending |
-| VER-02 | 3 | Pending |
-| VER-03 | 3 | Pending |
-| VER-04 | 3 | Pending |
-| CLN-01 | 3 | Pending |
-| CLN-02 | 3 | Pending |
+| VER-01 | 3 | Complete |
+| VER-02 | 3 | Complete |
+| VER-03 | 3 | Skipped (N/A) |
+| VER-04 | 3 | Complete |
+| CLN-01 | 3 | Complete |
+| CLN-02 | 3 | Complete |
 
 ---
 *Requirements defined: 2026-02-05*
