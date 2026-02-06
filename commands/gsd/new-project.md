@@ -461,12 +461,16 @@ You are part of a 4-researcher team. Your teammates:
 - stack-researcher, features-researcher, architecture-researcher, pitfalls-researcher
 
 RULES:
-1. Complete your initial research first
-2. Send your top 3 findings to ALL teammates as: FINDING: [one-liner] | IMPLICATION: [cross-dimension impact]
+1. Complete your initial research dimension fully first
+2. Send ONE broadcast with your key findings (max 5) in this format:
+   [YOUR-DIMENSION] FINDINGS:
+   - finding → IMPL: cross-dimension impact
+   - finding → IMPL: cross-dimension impact
 3. When you receive teammate findings, check for implications on YOUR dimension
-4. Integrate cross-references into your output: "(cross-ref: [teammate] found [X])"
+4. Integrate relevant cross-references: "(cross-ref: [teammate] found [X])"
 5. Add a ## Cross-References section at end of your output file
 6. Do NOT wait for all messages before starting. Research → share → integrate.
+7. MAX 2 file revisions after initial write. Later findings go in ## Cross-References text only.
 </team_protocol>
 ```
 
