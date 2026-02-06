@@ -16,14 +16,14 @@ allowed-tools:
 Toggle auto-mode on/off. When on, a Stop hook chains plan-phase and execute-phase
 automatically — the developer only needs to start the first command.
 
-Auto-mode uses the `Stop` hook (`gsd-auto-continue.js`) to detect GSD completion
-patterns and inject the next command.
+Skills write a signal file (`.planning/.auto-next`) on completion. The Stop hook
+(`gsd-auto-continue.js`) reads and consumes it, then injects the next command.
 
-**Hard stops (auto-mode always pauses):**
+**Hard stops (no signal written):**
 - Milestone complete
 - Verifier returns `human_needed`
-- Error (error box pattern)
-- Gap closure attempted 3+ times
+- Errors during execution
+- Gap closure attempted 3+ times (hook safety check)
 </objective>
 
 <context>
@@ -38,8 +38,8 @@ Check if the Stop hook is configured:
 
 ```bash
 # Check project-level and global settings
-grep -rq "gsd-auto-continue" .claude/settings.json .claude/settings.local.json 2>/dev/null && echo "hook_found" || \
-grep -rq "gsd-auto-continue" ~/.claude/settings.json ~/.claude/settings.local.json 2>/dev/null && echo "hook_found" || \
+grep -q "gsd-auto-continue" .claude/settings.json .claude/settings.local.json 2>/dev/null && echo "hook_found" || \
+grep -q "gsd-auto-continue" ~/.claude/settings.json ~/.claude/settings.local.json 2>/dev/null && echo "hook_found" || \
 echo "hook_missing"
 ```
 
@@ -143,16 +143,16 @@ Write updated config.
 Continuous execution enabled.
 
 **How it works:**
-The Stop hook detects GSD completions and chains the next command.
-- plan-phase ✓ → auto-starts execute-phase
-- execute-phase ✓ → auto-starts plan-phase for next phase
-- Gaps found → auto-starts gap closure loop
+Skills write `.planning/.auto-next` with the next command.
+The Stop hook reads and consumes the signal, then chains automatically.
+- plan-phase ✓ → signal → auto-starts execute-phase
+- execute-phase ✓ → signal → auto-starts plan-phase for next phase
+- Gaps found → signal → auto-starts gap closure loop
 
 **Stops for:**
-- Milestone completion
-- Verifier `human_needed` status
-- Errors (error box pattern)
-- Gap closure after 3 attempts
+- Milestone completion (no signal written)
+- Verifier `human_needed` status (no signal written)
+- Gap closure after 3 attempts (hook safety check)
 
 **Start your workflow with any GSD command:**
 /gsd:plan-phase — plan next phase
@@ -161,6 +161,38 @@ The Stop hook detects GSD completions and chains the next command.
 
 /gsd:auto off — disable auto-mode
 ```
+
+## 7. Write Initial Auto-Next Signal (only when turning ON)
+
+Determine the next action from project state and write the signal file so the Stop hook can auto-continue immediately:
+
+```bash
+# Read current phase from STATE.md
+PHASE=$(grep 'Phase:' .planning/STATE.md 2>/dev/null | grep -o '[0-9]*' | head -1)
+```
+
+If `PHASE` is empty or not a number, skip signal file (user will start manually).
+
+If `PHASE` found, determine next action:
+
+```bash
+# Zero-pad phase number
+PADDED=$(printf "%02d" "$PHASE")
+
+# Check for plans and summaries
+PLAN_COUNT=$(ls .planning/phases/${PADDED}-*/*-PLAN.md 2>/dev/null | wc -l)
+SUMMARY_COUNT=$(ls .planning/phases/${PADDED}-*/*-SUMMARY.md 2>/dev/null | wc -l)
+```
+
+| Condition | Signal file content |
+|-----------|-------------------|
+| No plans (`PLAN_COUNT` = 0) | `plan-phase {PHASE}` |
+| Plans but not all executed (`SUMMARY_COUNT` < `PLAN_COUNT`) | `execute-phase {PHASE}` |
+| All executed (`SUMMARY_COUNT` >= `PLAN_COUNT`) | `plan-phase {PHASE+1}` |
+
+Write the determined content to `.planning/.auto-next`.
+
+---
 
 **If auto_mode turned OFF:**
 
@@ -182,4 +214,5 @@ Manual mode restored. Commands show "Next Up" suggestions and wait.
 - [ ] Hook installation verified
 - [ ] Status displayed with clear on/off indication
 - [ ] If hook missing: registration instructions shown
+- [ ] If turning ON: `.planning/.auto-next` written with correct next action from STATE.md
 </success_criteria>

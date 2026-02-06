@@ -283,6 +283,14 @@ Also: `cat {phase_dir}/{phase}-VERIFICATION.md` — full report
 Also: `/gsd:verify-work {X}` — manual testing first
 ```
 
+**Auto-mode signal (gaps found):** After displaying the banner, check auto-mode:
+
+```bash
+AUTO_MODE=$(cat .planning/config.json 2>/dev/null | grep -o '"auto_mode"[[:space:]]*:[[:space:]]*[^,}]*' | grep -o 'true\|false' || echo "false")
+```
+
+If `AUTO_MODE` is `true`: write the file `.planning/.auto-next` with the single line `plan-phase {X} --gaps` (where {X} is the current phase number). This signals the Stop hook to auto-continue to gap closure planning.
+
 Gap closure cycle: `/gsd:plan-phase {X} --gaps` reads VERIFICATION.md → creates gap plans with `gap_closure: true` → user runs `/gsd:execute-phase {X} --gaps-only` → verifier re-runs.
 </step>
 
@@ -306,6 +314,14 @@ node ~/.claude/get-shit-done/bin/gsd-tools.js commit "docs(phase-{X}): complete 
 
 <sub>`/clear` first for fresh context</sub>
 ```
+
+**Auto-mode signal (more phases):** After displaying the banner, check auto-mode:
+
+```bash
+AUTO_MODE=$(cat .planning/config.json 2>/dev/null | grep -o '"auto_mode"[[:space:]]*:[[:space:]]*[^,}]*' | grep -o 'true\|false' || echo "false")
+```
+
+If `AUTO_MODE` is `true`: write the file `.planning/.auto-next` with the single line `plan-phase {X+1}` (where {X+1} is the next phase number). This signals the Stop hook to auto-continue to planning.
 
 **If milestone complete:**
 ```

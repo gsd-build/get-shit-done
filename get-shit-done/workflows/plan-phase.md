@@ -357,6 +357,14 @@ Verification: {Passed | Passed with override | Skipped}
 - /gsd:plan-phase {X} --research — re-research first
 
 ───────────────────────────────────────────────────────────────
+
+**Auto-mode signal:** After displaying the banner, check auto-mode:
+
+```bash
+AUTO_MODE=$(cat .planning/config.json 2>/dev/null | grep -o '"auto_mode"[[:space:]]*:[[:space:]]*[^,}]*' | grep -o 'true\|false' || echo "false")
+```
+
+If `AUTO_MODE` is `true`: write the file `.planning/.auto-next` with the single line `execute-phase {X}` (where {X} is the phase number). This signals the Stop hook to auto-continue to execution.
 </offer_next>
 
 <success_criteria>
