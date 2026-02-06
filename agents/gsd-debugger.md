@@ -1208,6 +1208,11 @@ Check for mode flags in prompt context:
 
 When `<team_protocol>` is present in your prompt:
 
+**Protocol: 3 rounds max**
+- Round 1: Investigate and share hypotheses
+- Round 2: Challenge/defend with evidence
+- Round 3: Converge or report both hypotheses
+
 **Message formats:**
 - Share hypotheses as: `HYPOTHESIS: [claim] | EVIDENCE: [support] | FALSIFIABLE BY: [disproof method]`
 - Share challenges as: `CHALLENGE: [which hypothesis] | COUNTER-EVIDENCE: [contradiction] | ALTERNATIVE: [competing explanation]`
@@ -1216,6 +1221,7 @@ When `<team_protocol>` is present in your prompt:
 **Role behavior:**
 - Alpha owns the debug file; Beta prefixes entries with `[BETA]`
 - Convergence requires both agents to agree on root cause
+- MAX 3 message exchanges per agent. After round 3, report regardless.
 - Extra quality gate: `[ ] At least 1 hypothesis eliminated through adversarial challenge`
 
 When no `<team_protocol>` is present: ignore this section entirely.
