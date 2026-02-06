@@ -54,6 +54,69 @@ Milestone name: $ARGUMENTS (optional - will prompt if not provided)
 - Read STATE.md (pending todos, blockers)
 - Check for MILESTONE-CONTEXT.md (from /gsd:discuss-milestone)
 
+## Phase 1.5: Scan Seeds
+
+Check for planted seeds that should surface for this milestone:
+
+```bash
+ls .planning/seeds/SEED-*.md 2>/dev/null
+```
+
+**If no seeds directory or no seed files:** Skip to Phase 2.
+
+**If seeds exist:**
+
+1. Read all seed files with `status: dormant` in frontmatter
+2. For each dormant seed, read its `trigger_when` field and "When to Surface" trigger conditions
+3. Compare trigger conditions against:
+   - The milestone name/topic (from $ARGUMENTS or MILESTONE-CONTEXT.md)
+   - Keywords from the user's stated goals
+   - STATE.md "Next Up" section
+4. Collect seeds where ANY trigger condition matches
+
+**If matching seeds found:**
+
+Present them to the user:
+
+```
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+ GSD ► SEEDS FOUND
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+[N] planted seeds match this milestone:
+
+**Seed [NNN]: [Idea Summary]**
+Planted: [date] during [milestone/phase]
+Trigger: [trigger_when]
+Scope: [scope estimate]
+Why: [first line of Why This Matters]
+Breadcrumbs: [count] references
+
+[... repeat for each matching seed ...]
+```
+
+For each matching seed, use AskUserQuestion:
+- header: "Seed [NNN]"
+- question: "Include Seed [NNN] ([idea summary]) in this milestone?"
+- options:
+  - "Yes, fold into roadmap" — Seed's breadcrumbs and context feed into research/requirements
+  - "No, keep dormant" — Seed stays planted for a future milestone
+  - "Read full seed" — Show the complete seed file before deciding
+
+**If user accepts a seed:**
+- Update seed frontmatter: `status: harvested`
+- Add seed's "Why This Matters" and "Breadcrumbs" to the milestone context
+- The roadmapper will receive this context and can create phases/requirements from it
+
+**If user declines a seed:**
+- Leave seed as `status: dormant` (no changes)
+
+**If no matching seeds:** Display briefly and continue:
+```
+◆ Seed scan: [N] dormant seeds, none match this milestone scope.
+```
+
+
 ## Phase 2: Gather Milestone Goals
 
 **If MILESTONE-CONTEXT.md exists:**
@@ -703,6 +766,8 @@ Present completion with next steps:
 </process>
 
 <success_criteria>
+- [ ] Seeds scanned (if .planning/seeds/ exists) - matching seeds presented to user
+- [ ] Accepted seeds marked status: harvested, context folded into milestone
 - [ ] PROJECT.md updated with Current Milestone section
 - [ ] STATE.md reset for new milestone
 - [ ] MILESTONE-CONTEXT.md consumed and deleted (if existed)
