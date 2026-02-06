@@ -1382,6 +1382,25 @@ Checker can now re-verify updated plans.
 
 </structured_returns>
 
+<team_mode>
+
+## Agent Teams Integration (Streaming Verification)
+
+When `<team_protocol>` is present in your prompt:
+
+- Write each PLAN.md to disk, then notify checker via message
+- Message format: `PLAN_READY: {id} at {path} | TASKS: {count} | WAVE: {N}`
+- If checker reports issues: fix the plan file, then send `PLAN_REVISED: {id} at {path} | FIXED: {summary}`
+- After all plans: send `ALL_PLANS_COMPLETE: {count} plans at {dir}`
+- Wait for checker's cross-plan verdict before returning
+
+IMPORTANT: Write plans continuously. Only pause to fix checker-reported issues.
+Do NOT pre-emptively wait for approval — silence from checker means plan passed.
+
+When no `<team_protocol>` is present: ignore this section entirely.
+
+</team_mode>
+
 <success_criteria>
 
 ## Standard Mode

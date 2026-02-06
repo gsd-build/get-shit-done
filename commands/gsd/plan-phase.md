@@ -10,6 +10,11 @@ allowed-tools:
   - Glob
   - Grep
   - Task
+  - Teammate
+  - SendMessage
+  - TaskCreate
+  - TaskUpdate
+  - TaskList
   - WebFetch
   - mcp__context7__*
 ---
@@ -96,6 +101,19 @@ fi
 ```bash
 ls .planning/phases/${PHASE}-*/*-RESEARCH.md 2>/dev/null
 ls .planning/phases/${PHASE}-*/*-PLAN.md 2>/dev/null
+```
+
+## 2.5. Detect Agent Teams
+
+Check Agent Teams availability (both must be true):
+- Environment: `CLAUDE_CODE_EXPERIMENTAL_AGENT_TEAMS=1`
+- Config: `agent_teams: true` in config.json
+
+```bash
+AGENT_TEAMS_ENV=${CLAUDE_CODE_EXPERIMENTAL_AGENT_TEAMS:-0}
+AGENT_TEAMS_CONFIG=$(cat .planning/config.json 2>/dev/null | grep -o '"agent_teams"[[:space:]]*:[[:space:]]*[^,}]*' | grep -o 'true\|false' || echo "false")
+USE_AGENT_TEAMS=false
+[ "$AGENT_TEAMS_ENV" = "1" ] && [ "$AGENT_TEAMS_CONFIG" = "true" ] && USE_AGENT_TEAMS=true
 ```
 
 ## 3. Validate Phase
@@ -268,7 +286,16 @@ VERIFICATION_CONTENT=$(cat "${PHASE_DIR}"/*-VERIFICATION.md 2>/dev/null)
 UAT_CONTENT=$(cat "${PHASE_DIR}"/*-UAT.md 2>/dev/null)
 ```
 
-## 8. Spawn gsd-planner Agent
+## 8. Plan & Verify
+
+**Gate for streaming verification:**
+- `USE_AGENT_TEAMS = true`
+- `plan_check` enabled (not `--skip-verify`, config `workflow.plan_check` is true)
+- NOT `--gaps` mode (gap closure produces 1-2 plans — sequential is fine)
+
+**If all gate conditions met → use 8b (Streaming). Otherwise → use 8a (Sequential).**
+
+### 8a. Standard Sequential Planning
 
 Display stage banner:
 ```
@@ -345,7 +372,7 @@ Task(
 )
 ```
 
-## 9. Handle Planner Return
+#### Handle Planner Return
 
 Parse planner output:
 
@@ -354,17 +381,17 @@ Parse planner output:
 - If `--skip-verify`: Skip to step 13
 - Check config: `WORKFLOW_PLAN_CHECK=$(cat .planning/config.json 2>/dev/null | grep -o '"plan_check"[[:space:]]*:[[:space:]]*[^,}]*' | grep -o 'true\|false' || echo "true")`
 - If `workflow.plan_check` is `false`: Skip to step 13
-- Otherwise: Proceed to step 10
+- Otherwise: Proceed to verification
 
 **`## CHECKPOINT REACHED`:**
-- Present to user, get response, spawn continuation (see step 12)
+- Present to user, get response, spawn continuation (see revision loop)
 
 **`## PLANNING INCONCLUSIVE`:**
 - Show what was attempted
 - Offer: Add context, Retry, Manual
 - Wait for user response
 
-## 10. Spawn gsd-plan-checker Agent
+#### Spawn gsd-plan-checker Agent
 
 Display:
 ```
@@ -428,7 +455,7 @@ Task(
 )
 ```
 
-## 11. Handle Checker Return
+#### Handle Checker Return
 
 **If `## VERIFICATION PASSED`:**
 - Display: `Plans verified. Ready for execution.`
@@ -438,9 +465,9 @@ Task(
 - Display: `Checker found issues:`
 - List issues from checker output
 - Check iteration count
-- Proceed to step 12
+- Proceed to revision loop
 
-## 12. Revision Loop (Max 3 Iterations)
+#### Revision Loop (Max 3 Iterations)
 
 Track: `iteration_count` (starts at 1 after initial plan + check)
 
@@ -494,7 +521,7 @@ Task(
 )
 ```
 
-- After planner returns → spawn checker again (step 10)
+- After planner returns → spawn checker again (verification step above)
 - Increment iteration_count
 
 **If iteration_count >= 3:**
@@ -508,6 +535,124 @@ Offer options:
 3. Abandon (exit planning)
 
 Wait for user response.
+
+### 8b. Streaming Plan Verification (Agent Teams)
+
+Display:
+```
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+ GSD ► PLANNING PHASE {X} (streaming verification)
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+◆ Spawning planner + checker team...
+  → Planner writes plans, checker verifies incrementally
+  → Issues caught during planning, not after
+```
+
+Use `spawnTeam` to create a 2-agent team: `plan-phase-{N}`
+
+**Planner teammate** gets the standard planning prompt (same inlined context as 8a) with added `<team_protocol>`:
+
+```markdown
+<team_protocol>
+You are the PLANNER in a planner-checker team.
+
+Your teammate: checker (verifies your plans incrementally)
+
+PROTOCOL:
+1. Write each PLAN.md file to disk as normal
+2. After EACH plan file is written, message checker:
+   PLAN_READY: {plan-id} at {file-path} | TASKS: {count} | WAVE: {N}
+3. If checker sends back issues, fix them BEFORE writing the next plan:
+   - Read the issue message
+   - Edit the plan file on disk
+   - Message checker: PLAN_REVISED: {plan-id} at {file-path} | FIXED: {issue summary}
+4. After ALL plans written, message checker:
+   ALL_PLANS_COMPLETE: {total-count} plans at {phase-dir}
+5. Wait for checker's final cross-plan verdict before returning to orchestrator
+6. If you encounter a CHECKPOINT: message orchestrator directly with checkpoint details. Wait for response before continuing.
+
+IMPORTANT: Do not wait for checker between plans unless checker has sent an issue.
+Write continuously — only pause to fix reported issues.
+</team_protocol>
+```
+
+Planner prompt includes inlined context (same as 8a):
+- `<planning_context>` with STATE, ROADMAP, REQUIREMENTS, CONTEXT, RESEARCH content
+- `<downstream_consumer>` and `<quality_gate>` sections
+- Self-read prefix: `"First, read ~/.claude/agents/gsd-planner.md for your role and instructions.\n\n"`
+- Model: `{planner_model}` from profile
+
+**Checker teammate** gets the verification context with added `<team_protocol>`:
+
+```markdown
+<team_protocol>
+You are the CHECKER in a planner-checker team.
+
+Your teammate: planner (writes plans, you verify them)
+
+PROTOCOL:
+1. Wait for PLAN_READY messages from planner
+2. For each plan received, run PER-PLAN checks immediately:
+   - [ ] Valid frontmatter (wave, depends_on, files_modified, autonomous)
+   - [ ] Tasks have <action>, <verify>, <done> sections
+   - [ ] Scope aligns with phase goal
+   - [ ] Context/decisions honored (if CONTEXT.md exists)
+   - [ ] must_haves derived from phase goal
+3. If issues found, message planner immediately:
+   ISSUE: {plan-id} | SEVERITY: {blocker|warning} | DETAIL: {specific problem and fix suggestion}
+4. If plan passes per-plan checks: no message needed (silence = approval)
+5. After receiving ALL_PLANS_COMPLETE, run CROSS-PLAN checks:
+   - [ ] Full requirement coverage across all plans
+   - [ ] Dependency graph correctness (depends_on references valid plan IDs)
+   - [ ] No file overlap between same-wave plans
+   - [ ] Wave ordering makes sense for the dependency graph
+6. Return final verdict to orchestrator:
+   - ## VERIFICATION PASSED — all plans pass
+   - ## ISSUES FOUND — list remaining cross-plan issues
+
+IMPORTANT: Send issues AS SOON AS you find them. Don't batch. The planner can fix while writing later plans.
+</team_protocol>
+```
+
+Checker verification context includes:
+```markdown
+<verification_context>
+**Phase:** {phase_number}
+**Phase Goal:** {goal from ROADMAP}
+
+**Roadmap:**
+{roadmap_content}
+
+**Requirements (if exists):**
+{requirements_content}
+
+**Phase Context (if exists):**
+
+IMPORTANT: Plans MUST honor these decisions. Flag as issue if plans contradict user's stated vision.
+- **Decisions** = LOCKED — plans must implement these exactly
+- **Claude's Discretion** = Freedom areas — plans can choose approach
+- **Deferred Ideas** = Out of scope — plans must NOT include these
+
+{context_content}
+</verification_context>
+```
+
+Self-read prefix: `"First, read ~/.claude/agents/gsd-plan-checker.md for your role and instructions.\n\n"`
+Model: `{checker_model}` from profile
+
+**After team completes:**
+1. Call `Teammate.cleanup()` to remove team resources
+2. If checker returned `## VERIFICATION PASSED`: proceed to next step (display results)
+3. If checker returned `## ISSUES FOUND` (cross-plan issues only — per-plan issues already fixed):
+   - Display remaining issues
+   - These are cross-plan issues that couldn't be fixed inline
+   - Offer: 1) Force proceed, 2) Manual fix, 3) Spawn fresh revision subagent
+   - If option 3: spawn fresh gsd-planner subagent (NOT teammate) with cross-plan issues + plans inlined, then re-run checker as subagent (current sequential pattern for one final pass)
+4. If planner sent `## CHECKPOINT REACHED` via message:
+   - Present checkpoint details to user
+   - Get user response
+   - Send response back to planner teammate via SendMessage
 
 ## 13. Present Final Status
 
@@ -564,5 +709,7 @@ Verification: {Passed | Passed with override | Skipped}
 - [ ] gsd-plan-checker spawned with CONTEXT.md (verifies context compliance)
 - [ ] Verification passed OR user override OR max iterations with user decision
 - [ ] User sees status between agent spawns
+- [ ] Agent Teams detection (if enabled, streaming verification used)
+- [ ] Team cleanup after completion (if teams used)
 - [ ] User knows next steps (execute or review)
 </success_criteria>

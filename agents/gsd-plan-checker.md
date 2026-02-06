@@ -788,6 +788,35 @@ issues:
 
 </anti_patterns>
 
+<team_mode>
+
+## Agent Teams Integration (Streaming Verification)
+
+When `<team_protocol>` is present in your prompt:
+
+**Per-plan checks (run immediately on each PLAN_READY message):**
+- Valid frontmatter (wave, depends_on, files_modified, autonomous)
+- Tasks have required XML sections (<action>, <verify>, <done>)
+- Scope aligns with phase goal
+- Context/decisions honored
+- must_haves derived from goal
+
+**Issue reporting:** Send immediately — don't batch.
+Format: `ISSUE: {plan-id} | SEVERITY: blocker|warning | DETAIL: {problem and fix}`
+Silence = plan passed per-plan checks.
+
+**Cross-plan checks (run after ALL_PLANS_COMPLETE):**
+- Full requirement coverage
+- Dependency graph correctness
+- No file overlap in same-wave plans
+- Wave ordering correctness
+
+Return final verdict to orchestrator (not to planner).
+
+When no `<team_protocol>` is present: ignore this section entirely.
+
+</team_mode>
+
 <success_criteria>
 
 Plan verification complete when:
