@@ -823,6 +823,36 @@ function uninstall(isGlobal, runtime = 'claude') {
     }
   }
 
+  // 1b. Remove GSDF commands
+  if (isOpencode) {
+    const commandDir = path.join(targetDir, 'command');
+    if (fs.existsSync(commandDir)) {
+      const files = fs.readdirSync(commandDir);
+      for (const file of files) {
+        if (file.startsWith('gsdf-') && file.endsWith('.md')) {
+          fs.unlinkSync(path.join(commandDir, file));
+          removedCount++;
+        }
+      }
+      console.log(`  ${green}✓${reset} Removed GSDF commands from command/`);
+    }
+  } else {
+    const gsdfCommandsDir = path.join(targetDir, 'commands', 'gsdf');
+    if (fs.existsSync(gsdfCommandsDir)) {
+      fs.rmSync(gsdfCommandsDir, { recursive: true });
+      removedCount++;
+      console.log(`  ${green}✓${reset} Removed commands/gsdf/`);
+    }
+  }
+
+  // 1c. Remove skills directory
+  const skillsDir = path.join(targetDir, 'skills');
+  if (fs.existsSync(skillsDir)) {
+    fs.rmSync(skillsDir, { recursive: true });
+    removedCount++;
+    console.log(`  ${green}✓${reset} Removed skills/`);
+  }
+
   // 2. Remove get-shit-done directory
   const gsdDir = path.join(targetDir, 'get-shit-done');
   if (fs.existsSync(gsdDir)) {
@@ -1233,11 +1263,23 @@ function install(isGlobal, runtime = 'claude') {
     } else {
       failures.push('command/gsd-*');
     }
+
+    // Copy commands/gsdf/*.md as command/gsdf-*.md (flatten structure)
+    const gsdfSrc = path.join(src, 'commands', 'gsdf');
+    if (fs.existsSync(gsdfSrc)) {
+      copyFlattenedCommands(gsdfSrc, commandDir, 'gsdf', pathPrefix, runtime);
+      if (verifyInstalled(commandDir, 'command/gsdf-*')) {
+        const count = fs.readdirSync(commandDir).filter(f => f.startsWith('gsdf-')).length;
+        console.log(`  ${green}✓${reset} Installed ${count} GSDF commands to command/`);
+      } else {
+        failures.push('command/gsdf-*');
+      }
+    }
   } else {
     // Claude Code & Gemini: nested structure in commands/ directory
     const commandsDir = path.join(targetDir, 'commands');
     fs.mkdirSync(commandsDir, { recursive: true });
-    
+
     const gsdSrc = path.join(src, 'commands', 'gsd');
     const gsdDest = path.join(commandsDir, 'gsd');
     copyWithPathReplacement(gsdSrc, gsdDest, pathPrefix, runtime);
@@ -1245,6 +1287,18 @@ function install(isGlobal, runtime = 'claude') {
       console.log(`  ${green}✓${reset} Installed commands/gsd`);
     } else {
       failures.push('commands/gsd');
+    }
+
+    // Install GSDF commands (get-shit-done-faster)
+    const gsdfSrc = path.join(src, 'commands', 'gsdf');
+    if (fs.existsSync(gsdfSrc)) {
+      const gsdfDest = path.join(commandsDir, 'gsdf');
+      copyWithPathReplacement(gsdfSrc, gsdfDest, pathPrefix, runtime);
+      if (verifyInstalled(gsdfDest, 'commands/gsdf')) {
+        console.log(`  ${green}✓${reset} Installed commands/gsdf`);
+      } else {
+        failures.push('commands/gsdf');
+      }
     }
   }
 
@@ -1295,6 +1349,18 @@ function install(isGlobal, runtime = 'claude') {
       console.log(`  ${green}✓${reset} Installed agents`);
     } else {
       failures.push('agents');
+    }
+  }
+
+  // Copy GSDF skills directory
+  const skillsSrc = path.join(src, 'skills');
+  if (fs.existsSync(skillsSrc)) {
+    const skillsDest = path.join(targetDir, 'skills');
+    copyWithPathReplacement(skillsSrc, skillsDest, pathPrefix, runtime);
+    if (verifyInstalled(skillsDest, 'skills')) {
+      console.log(`  ${green}✓${reset} Installed skills`);
+    } else {
+      failures.push('skills');
     }
   }
 
