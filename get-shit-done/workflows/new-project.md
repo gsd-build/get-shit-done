@@ -12,39 +12,22 @@ Read all files referenced by the invoking prompt's execution_context before star
 
 **MANDATORY FIRST STEP — Execute these checks before ANY user interaction:**
 
-1. **Abort if project exists:**
-   ```bash
-   PROJECT_EXISTS=$(node ~/.claude/get-shit-done/bin/gsd-tools.js verify-path-exists .planning/PROJECT.md --raw)
-   [ "$PROJECT_EXISTS" = "true" ] && echo "ERROR: Project already initialized. Use /gsd:progress" && exit 1
-   ```
+```bash
+INIT=$(node ~/.claude/get-shit-done/bin/gsd-tools.js init new-project)
+```
 
-2. **Initialize git repo in THIS directory** (required even if inside a parent repo):
-   ```bash
-   if [ -d .git ] || [ -f .git ]; then
-       echo "Git repo exists in current directory"
-   else
-       git init
-       echo "Initialized new git repo"
-   fi
-   ```
+Parse JSON for: `researcher_model`, `synthesizer_model`, `roadmapper_model`, `commit_docs`, `project_exists`, `has_codebase_map`, `planning_exists`, `has_existing_code`, `has_package_file`, `is_brownfield`, `needs_codebase_map`, `has_git`.
 
-3. **Detect existing code (brownfield detection):**
-   ```bash
-   CODE_FILES=$(find . -name "*.ts" -o -name "*.js" -o -name "*.py" -o -name "*.go" -o -name "*.rs" -o -name "*.swift" -o -name "*.java" 2>/dev/null | grep -v node_modules | grep -v .git | head -20)
-   HAS_PACKAGE=$([ -f package.json ] || [ -f requirements.txt ] || [ -f Cargo.toml ] || [ -f go.mod ] || [ -f Package.swift ] && echo "yes")
-   HAS_CODEBASE_MAP=$(node ~/.claude/get-shit-done/bin/gsd-tools.js verify-path-exists .planning/codebase --raw)
-   [ "$HAS_CODEBASE_MAP" = "true" ] && HAS_CODEBASE_MAP="yes"
-   ```
+**If `project_exists` is true:** Error — project already initialized. Use `/gsd:progress`.
 
-   **You MUST run all bash commands above using the Bash tool before proceeding.**
+**If `has_git` is false:** Initialize git:
+```bash
+git init
+```
 
 ## 2. Brownfield Offer
 
-**If existing code detected and .planning/codebase/ doesn't exist:**
-
-Check the results from setup step:
-- If `CODE_FILES` is non-empty OR `HAS_PACKAGE` is "yes"
-- AND `HAS_CODEBASE_MAP` is NOT "yes"
+**If `needs_codebase_map` is true** (from init — existing code detected but no codebase map):
 
 Use AskUserQuestion:
 - header: "Existing Code"
@@ -59,9 +42,7 @@ Run `/gsd:map-codebase` first, then return to `/gsd:new-project`
 ```
 Exit command.
 
-**If "Skip mapping":** Continue to Step 3.
-
-**If no existing code detected OR codebase already mapped:** Continue to Step 3.
+**If "Skip mapping" OR `needs_codebase_map` is false:** Continue to Step 3.
 
 ## 3. Deep Questioning
 
@@ -335,13 +316,7 @@ node ~/.claude/get-shit-done/bin/gsd-tools.js commit "chore: add project config"
 
 ## 5.5. Resolve Model Profile
 
-Read model profile for agent spawning:
-
-```bash
-RESEARCHER_MODEL=$(node ~/.claude/get-shit-done/bin/gsd-tools.js resolve-model gsd-project-researcher --raw)
-SYNTHESIZER_MODEL=$(node ~/.claude/get-shit-done/bin/gsd-tools.js resolve-model gsd-research-synthesizer --raw)
-ROADMAPPER_MODEL=$(node ~/.claude/get-shit-done/bin/gsd-tools.js resolve-model gsd-roadmapper --raw)
-```
+Use models from init: `researcher_model`, `synthesizer_model`, `roadmapper_model`.
 
 ## 6. Research Decision
 

@@ -7,63 +7,34 @@ Orchestrator coordinates, not executes. Each subagent loads the full execute-pla
 </core_principle>
 
 <required_reading>
-Read STATE.md and config.json before any operation.
+Read STATE.md before any operation to load project context.
 </required_reading>
 
 <process>
 
-<step name="resolve_model_profile" priority="first">
+<step name="initialize" priority="first">
+Load all context in one call:
 
 ```bash
-EXECUTOR_MODEL=$(node ~/.claude/get-shit-done/bin/gsd-tools.js resolve-model gsd-executor --raw)
-VERIFIER_MODEL=$(node ~/.claude/get-shit-done/bin/gsd-tools.js resolve-model gsd-verifier --raw)
+INIT=$(node ~/.claude/get-shit-done/bin/gsd-tools.js init execute-phase "${PHASE_ARG}")
 ```
 
-</step>
+Parse JSON for: `executor_model`, `verifier_model`, `commit_docs`, `parallelization`, `branching_strategy`, `branch_name`, `phase_found`, `phase_dir`, `phase_number`, `phase_name`, `phase_slug`, `plans`, `incomplete_plans`, `plan_count`, `incomplete_count`, `state_exists`, `roadmap_exists`.
 
-<step name="load_project_state">
+**If `phase_found` is false:** Error — phase directory not found.
+**If `plan_count` is 0:** Error — no plans found in phase.
+**If `state_exists` is false but `.planning/` exists:** Offer reconstruct or continue.
 
-```bash
-cat .planning/STATE.md 2>/dev/null
-```
-
-**If exists:** Parse current position, accumulated decisions, blockers.
-**If missing but .planning/ exists:** Offer reconstruct from artifacts or continue without state.
-**If .planning/ missing:** Error — project not initialized.
-
-**Load configs:**
-
-```bash
-GSD_CONFIG=$(node ~/.claude/get-shit-done/bin/gsd-tools.js state load --raw)
-COMMIT_PLANNING_DOCS=$(echo "$GSD_CONFIG" | grep '^commit_docs=' | cut -d= -f2)
-PARALLELIZATION=$(echo "$GSD_CONFIG" | grep '^parallelization=' | cut -d= -f2)
-BRANCHING_STRATEGY=$(echo "$GSD_CONFIG" | grep '^branching_strategy=' | cut -d= -f2)
-PHASE_BRANCH_TEMPLATE=$(echo "$GSD_CONFIG" | grep '^phase_branch_template=' | cut -d= -f2)
-MILESTONE_BRANCH_TEMPLATE=$(echo "$GSD_CONFIG" | grep '^milestone_branch_template=' | cut -d= -f2)
-```
-
-When `PARALLELIZATION=false`, plans within a wave execute sequentially.
+When `parallelization` is false, plans within a wave execute sequentially.
 </step>
 
 <step name="handle_branching">
-Create or switch to branch based on `BRANCHING_STRATEGY`.
+Check `branching_strategy` from init:
 
 **"none":** Skip, continue on current branch.
 
-**"phase":**
+**"phase" or "milestone":** Use pre-computed `branch_name` from init:
 ```bash
-PHASE_NAME=$(basename "$PHASE_DIR" | sed 's/^[0-9]*-//')
-PHASE_SLUG=$(node ~/.claude/get-shit-done/bin/gsd-tools.js generate-slug "$PHASE_NAME" --raw)
-BRANCH_NAME=$(echo "$PHASE_BRANCH_TEMPLATE" | sed "s/{phase}/$PADDED_PHASE/g" | sed "s/{slug}/$PHASE_SLUG/g")
-git checkout -b "$BRANCH_NAME" 2>/dev/null || git checkout "$BRANCH_NAME"
-```
-
-**"milestone":**
-```bash
-MILESTONE_VERSION=$(grep -oE 'v[0-9]+\.[0-9]+' .planning/ROADMAP.md | head -1 || echo "v1.0")
-MILESTONE_NAME=$(grep -A1 "## .*$MILESTONE_VERSION" .planning/ROADMAP.md | tail -1 | sed 's/.*- //' | cut -d'(' -f1 | tr -d ' ' || echo "milestone")
-MILESTONE_SLUG=$(node ~/.claude/get-shit-done/bin/gsd-tools.js generate-slug "$MILESTONE_NAME" --raw)
-BRANCH_NAME=$(echo "$MILESTONE_BRANCH_TEMPLATE" | sed "s/{milestone}/$MILESTONE_VERSION/g" | sed "s/{slug}/$MILESTONE_SLUG/g")
 git checkout -b "$BRANCH_NAME" 2>/dev/null || git checkout "$BRANCH_NAME"
 ```
 
@@ -71,23 +42,9 @@ All subsequent commits go to this branch. User handles merging.
 </step>
 
 <step name="validate_phase">
+From init JSON: `phase_dir`, `plan_count`, `incomplete_count`.
 
-```bash
-PHASE_INFO=$(node ~/.claude/get-shit-done/bin/gsd-tools.js find-phase "${PHASE_ARG}")
-PHASE_DIR=$(echo "$PHASE_INFO" | grep -o '"directory":"[^"]*"' | cut -d'"' -f4)
-if [ -z "$PHASE_DIR" ]; then
-  echo "ERROR: No phase directory matching '${PHASE_ARG}'"
-  exit 1
-fi
-
-PLAN_COUNT=$(ls -1 "$PHASE_DIR"/*-PLAN.md 2>/dev/null | wc -l | tr -d ' ')
-if [ "$PLAN_COUNT" -eq 0 ]; then
-  echo "ERROR: No plans found in $PHASE_DIR"
-  exit 1
-fi
-```
-
-Report: "Found {N} plans in {phase_dir}"
+Report: "Found {plan_count} plans in {phase_dir} ({incomplete_count} incomplete)"
 </step>
 
 <step name="discover_plans">

@@ -7,35 +7,7 @@ Read all files referenced by the invoking prompt's execution_context before star
 </required_reading>
 
 <process>
-**Step 0: Resolve Model Profile**
-
-```bash
-PLANNER_MODEL=$(node ~/.claude/get-shit-done/bin/gsd-tools.js resolve-model gsd-planner --raw)
-EXECUTOR_MODEL=$(node ~/.claude/get-shit-done/bin/gsd-tools.js resolve-model gsd-executor --raw)
-```
-
----
-
-**Step 1: Pre-flight validation**
-
-Check that an active GSD project exists:
-
-```bash
-ROADMAP_EXISTS=$(node ~/.claude/get-shit-done/bin/gsd-tools.js verify-path-exists .planning/ROADMAP.md --raw)
-if [ "$ROADMAP_EXISTS" != "true" ]; then
-  echo "Quick mode requires an active project with ROADMAP.md."
-  echo "Run /gsd:new-project first."
-  exit 1
-fi
-```
-
-If validation fails, stop immediately with the error message.
-
-Quick tasks can run mid-phase - validation only checks ROADMAP.md exists, not phase status.
-
----
-
-**Step 2: Get task description**
+**Step 1: Get task description**
 
 Prompt user interactively for the task description:
 
@@ -51,29 +23,26 @@ Store response as `$DESCRIPTION`.
 
 If empty, re-prompt: "Please provide a task description."
 
-Generate slug from description:
+---
+
+**Step 2: Initialize**
+
 ```bash
-slug=$(node ~/.claude/get-shit-done/bin/gsd-tools.js generate-slug "$DESCRIPTION" --raw | cut -c1-40)
+INIT=$(node ~/.claude/get-shit-done/bin/gsd-tools.js init quick "$DESCRIPTION")
 ```
+
+Parse JSON for: `planner_model`, `executor_model`, `commit_docs`, `next_num`, `slug`, `date`, `timestamp`, `quick_dir`, `task_dir`, `roadmap_exists`, `planning_exists`.
+
+**If `roadmap_exists` is false:** Error — Quick mode requires an active project with ROADMAP.md. Run `/gsd:new-project` first.
+
+Quick tasks can run mid-phase - validation only checks ROADMAP.md exists, not phase status.
 
 ---
 
-**Step 3: Calculate next quick task number**
-
-Ensure `.planning/quick/` directory exists and find the next sequential number:
+**Step 3: Create task directory**
 
 ```bash
-# Ensure .planning/quick/ exists
-mkdir -p .planning/quick
-
-# Find highest existing number and increment
-last=$(ls -1d .planning/quick/[0-9][0-9][0-9]-* 2>/dev/null | sort -r | head -1 | xargs -I{} basename {} | grep -oE '^[0-9]+')
-
-if [ -z "$last" ]; then
-  next_num="001"
-else
-  next_num=$(printf "%03d" $((10#$last + 1)))
-fi
+mkdir -p "${task_dir}"
 ```
 
 ---
@@ -199,15 +168,16 @@ Insert after `### Blockers/Concerns` section:
 
 **7c. Append new row to table:**
 
+Use `date` from init:
 ```markdown
-| ${next_num} | ${DESCRIPTION} | $(node ~/.claude/get-shit-done/bin/gsd-tools.js current-timestamp date --raw) | ${commit_hash} | [${next_num}-${slug}](./quick/${next_num}-${slug}/) |
+| ${next_num} | ${DESCRIPTION} | ${date} | ${commit_hash} | [${next_num}-${slug}](./quick/${next_num}-${slug}/) |
 ```
 
 **7d. Update "Last activity" line:**
 
-Find and update the line:
+Use `date` from init:
 ```
-Last activity: $(node ~/.claude/get-shit-done/bin/gsd-tools.js current-timestamp date --raw) - Completed quick task ${next_num}: ${DESCRIPTION}
+Last activity: ${date} - Completed quick task ${next_num}: ${DESCRIPTION}
 ```
 
 Use Edit tool to make these changes atomically
