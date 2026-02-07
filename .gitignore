@@ -14,3 +14,9 @@ hooks/dist/
 # Animation assets
 animation/
 *.gif
+
+# Local Documentation (User specific)
+docker/AUDIT_CONTEXT.md
+docker/AUDIT_PROMPT.md
+docker/GUIDE_APPROVED.md
+docker/UPDATE_GUIDE.md
