@@ -814,32 +814,6 @@ Confirm: "Committed: chore: complete v[X.Y] milestone"
 
 </step>
 
-<step name="index_memory">
-
-Index the completed milestone with GSD Memory (if available).
-
-**Check if gsd_memory MCP tools are available:**
-
-If `gsd_memory_index` tool exists, trigger indexing:
-
-```
-gsd_memory_index({
-  path: process.cwd()
-})
-```
-
-This updates the project's searchable knowledge base with:
-- Milestone archive documents
-- Final phase summaries
-- Key decisions from PROJECT.md
-- Requirements validation outcomes
-
-**If tool not available:** Skip silently.
-
-Report (if indexed): "Indexed milestone in GSD Memory"
-
-</step>
-
 <step name="offer_next">
 
 ```

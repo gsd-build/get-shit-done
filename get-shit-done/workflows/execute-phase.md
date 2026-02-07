@@ -627,22 +627,6 @@ git commit -m "docs(phase-{X}): complete phase execution"
 ```
 </step>
 
-<step name="index_memory">
-**If gsd_memory MCP tools are available:**
-
-Check if `gsd_memory_index` tool exists. If available, trigger indexing:
-
-```
-gsd_memory_index({
-  path: process.cwd()
-})
-```
-
-This updates the project's searchable knowledge base with new summaries and verification results.
-
-**If tool not available:** Skip silently.
-</step>
-
 <step name="offer_next">
 Present next steps based on milestone status:
 

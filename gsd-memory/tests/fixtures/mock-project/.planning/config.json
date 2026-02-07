@@ -1,9 +1,0 @@
-{
-  "project": "MockProject",
-  "version": "1.0.0",
-  "created": "2025-01-20",
-  "settings": {
-    "parallelization": true,
-    "atomicCommits": true
-  }
-}

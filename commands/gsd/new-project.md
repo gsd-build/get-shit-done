@@ -926,26 +926,6 @@ EOF
 )"
 ```
 
-## Phase 9.5: Register with Memory (Optional)
-
-**If gsd_memory MCP tools are available:**
-
-Check if `gsd_memory_register` tool exists. If available, register this project with GSD memory for cross-project knowledge:
-
-```
-gsd_memory_register({
-  path: process.cwd(),
-  name: "[project name from PROJECT.md]"
-})
-```
-
-Display confirmation:
-```
-Memory: Project registered ✓
-```
-
-**If tool not available:** Skip silently. GSD memory is optional.
-
 ## Phase 10: Done
 
 Present completion with next steps:

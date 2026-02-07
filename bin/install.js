@@ -907,34 +907,13 @@ function uninstall(isGlobal, runtime = 'claude') {
       }
     }
 
-    // Remove GSD Memory MCP server config
-    if (settings.mcpServers && settings.mcpServers['gsd-memory']) {
-      delete settings.mcpServers['gsd-memory'];
-      settingsModified = true;
-      console.log(`  ${green}✓${reset} Removed GSD Memory MCP config from settings`);
-      // Clean up empty mcpServers object
-      if (Object.keys(settings.mcpServers).length === 0) {
-        delete settings.mcpServers;
-      }
-    }
-
     if (settingsModified) {
       writeSettings(settingsPath, settings);
       removedCount++;
     }
   }
 
-  // 6. Remove MCP server from ~/.gsd/ (Claude Code only)
-  if (runtime === 'claude') {
-    const mcpServerDir = path.join(os.homedir(), '.gsd', 'mcp-server');
-    if (fs.existsSync(mcpServerDir)) {
-      fs.rmSync(mcpServerDir, { recursive: true });
-      removedCount++;
-      console.log(`  ${green}✓${reset} Removed GSD Memory MCP server`);
-    }
-  }
-
-  // 7. For OpenCode, clean up permissions from opencode.json
+  // 6. For OpenCode, clean up permissions from opencode.json
   if (isOpencode) {
     const opencodeConfigDir = getOpencodeGlobalDir();
     const configPath = path.join(opencodeConfigDir, 'opencode.json');
@@ -1048,102 +1027,6 @@ function configureOpencodePermissions() {
   // Write config back
   fs.writeFileSync(configPath, JSON.stringify(config, null, 2) + '\n');
   console.log(`  ${green}✓${reset} Configured read permission for GSD docs`);
-}
-
-/**
- * Install the GSD Memory MCP server
- * - Copies gsd-memory/ to ~/.gsd/mcp-server/
- * - Runs npm install in that directory
- * - Returns the path for MCP config
- * @returns {{ success: boolean, serverPath?: string, error?: string }}
- */
-function installMcpServer() {
-  const src = path.join(__dirname, '..', 'gsd-memory');
-
-  // Check if gsd-memory exists in the package
-  if (!fs.existsSync(src)) {
-    return { success: false, error: 'gsd-memory not found in package' };
-  }
-
-  const gsdDir = path.join(os.homedir(), '.gsd');
-  const destDir = path.join(gsdDir, 'mcp-server');
-
-  // Ensure ~/.gsd exists
-  fs.mkdirSync(gsdDir, { recursive: true });
-
-  // Clean install: remove existing mcp-server
-  if (fs.existsSync(destDir)) {
-    fs.rmSync(destDir, { recursive: true });
-  }
-
-  // Copy gsd-memory to ~/.gsd/mcp-server
-  copyDirectory(src, destDir);
-
-  // Run npm install in the mcp-server directory
-  try {
-    const { execSync } = require('child_process');
-    execSync('npm install --production', {
-      cwd: destDir,
-      stdio: 'pipe',
-      timeout: 60000
-    });
-  } catch (err) {
-    return {
-      success: false,
-      error: `npm install failed: ${err.message}`,
-      serverPath: destDir
-    };
-  }
-
-  return {
-    success: true,
-    serverPath: destDir
-  };
-}
-
-/**
- * Configure the GSD Memory MCP server in Claude Code settings
- * @param {string} settingsPath - Path to settings.json
- * @param {object} settings - Settings object
- * @param {string} serverPath - Path to the MCP server
- */
-function configureMcpServer(settingsPath, settings, serverPath) {
-  if (!settings.mcpServers) {
-    settings.mcpServers = {};
-  }
-
-  // Add gsd-memory MCP server config
-  settings.mcpServers['gsd-memory'] = {
-    command: 'node',
-    args: [path.join(serverPath, 'dist', 'index.js')]
-  };
-
-  return settings;
-}
-
-/**
- * Copy a directory recursively
- */
-function copyDirectory(src, dest) {
-  fs.mkdirSync(dest, { recursive: true });
-
-  const entries = fs.readdirSync(src, { withFileTypes: true });
-
-  for (const entry of entries) {
-    const srcPath = path.join(src, entry.name);
-    const destPath = path.join(dest, entry.name);
-
-    // Skip node_modules, .git, and test directories
-    if (entry.name === 'node_modules' || entry.name === '.git' || entry.name === 'tests') {
-      continue;
-    }
-
-    if (entry.isDirectory()) {
-      copyDirectory(srcPath, destPath);
-    } else {
-      fs.copyFileSync(srcPath, destPath);
-    }
-  }
 }
 
 /**
@@ -1344,18 +1227,6 @@ function install(isGlobal, runtime = 'claude') {
     process.exit(1);
   }
 
-  // Install GSD Memory MCP server (Claude Code only, global installs only)
-  let mcpServerPath = null;
-  if (runtime === 'claude' && isGlobal) {
-    const mcpResult = installMcpServer();
-    if (mcpResult.success) {
-      mcpServerPath = mcpResult.serverPath;
-      console.log(`  ${green}✓${reset} Installed GSD Memory MCP server`);
-    } else if (mcpResult.error) {
-      console.log(`  ${yellow}⚠${reset} MCP server install skipped: ${mcpResult.error}`);
-    }
-  }
-
   // Configure statusline and hooks in settings.json
   // Gemini shares same hook system as Claude Code for now
   const settingsPath = path.join(targetDir, 'settings.json');
@@ -1402,12 +1273,6 @@ function install(isGlobal, runtime = 'claude') {
       });
       console.log(`  ${green}✓${reset} Configured update check hook`);
     }
-  }
-
-  // Configure MCP server if installed (Claude Code only)
-  if (mcpServerPath && runtime === 'claude') {
-    configureMcpServer(settingsPath, settings, mcpServerPath);
-    console.log(`  ${green}✓${reset} Configured GSD Memory MCP server`);
   }
 
   return { settingsPath, settings, statuslineCommand, runtime };

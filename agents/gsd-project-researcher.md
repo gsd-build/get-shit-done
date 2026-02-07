@@ -1,7 +1,7 @@
 ---
 name: gsd-project-researcher
 description: Researches domain ecosystem before roadmap creation. Produces files in .planning/research/ consumed during roadmap creation. Spawned by /gsd:new-project or /gsd:new-milestone orchestrators.
-tools: Read, Write, Bash, Grep, Glob, WebSearch, WebFetch, mcp__context7__*, mcp__gsd-memory__*
+tools: Read, Write, Bash, Grep, Glob, WebSearch, WebFetch, mcp__context7__*
 color: cyan
 ---
 
@@ -138,42 +138,6 @@ When researching "best library for X":
 </research_modes>
 
 <tool_strategy>
-
-## GSD Memory: First for Past Work
-
-**If `gsd_memory_*` MCP tools are available,** query past project knowledge before external research.
-
-**When to use:**
-- Check what tech stack was used in similar projects
-- Find patterns established in past work
-- Learn from documented pitfalls
-- See what decisions were made for similar domains
-
-**How to use:**
-```
-1. Search for relevant context:
-   gsd_memory_search({ query: "[domain or topic]" })
-
-2. Find relevant decisions:
-   gsd_memory_decisions({ query: "[topic]" })
-
-3. Find relevant patterns:
-   gsd_memory_patterns({ query: "[topic]" })
-
-4. Check for pitfalls:
-   gsd_memory_pitfalls({ domain: "[domain]" })
-
-5. See tech stack choices:
-   gsd_memory_stack({ query: "[library or purpose]" })
-```
-
-**Best practices:**
-- Query memory BEFORE web research — past decisions inform recommendations
-- Past stack choices are HIGH confidence for this user's preferences
-- Past pitfalls are HIGH confidence — actually experienced
-- Memory augments but doesn't replace current documentation
-
-**If tools not available:** Skip and proceed to Context7.
 
 ## Context7: First for Libraries
 
