@@ -16,8 +16,8 @@ function gsd-secure {
     # 1. Build Image (if missing)
     if (-not (docker images -q $ImageName)) {
         Write-Host "Building GSD Sandbox image... (First run only)" -ForegroundColor Cyan
-        # Use Repo Root as context to include 'agents/' folder
-        docker build -t $ImageName -f "$PSScriptRoot\Dockerfile" "$PSScriptRoot\.."
+        # Build with --no-cache to ensure updates are picked up
+        docker build --no-cache -t $ImageName -f "$PSScriptRoot\Dockerfile" "$PSScriptRoot\.."
     }
 
     # 2. Get Context

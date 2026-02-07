@@ -14,16 +14,15 @@ RUN apt-get update && apt-get install -y \
     nano \
     && rm -rf /var/lib/apt/lists/*
 
-# Global GSD installation
-# We install the package from npm (as per standard usage)
-# Global GSD installation
-# We install from the LOCAL source context, ensuring the container
-# runs the exact code from this repository (not an old NPM version).
+# Global GSD installation from LOCAL source
+# We use npm pack to create a tarball, then install from it.
+# This avoids the symlink issue that occurs with direct local installs.
 COPY . /tmp/gsd-source
-RUN npm install -g /tmp/gsd-source && rm -rf /tmp/gsd-source
+WORKDIR /tmp/gsd-source
+RUN npm pack && npm install -g get-shit-done-cc-*.tgz && rm -rf /tmp/gsd-source
 
-# Copy entrypoint script
-COPY entrypoint.sh /usr/local/bin/
+# Copy entrypoint script (path relative to repo root context)
+COPY docker/entrypoint.sh /usr/local/bin/
 RUN chmod +x /usr/local/bin/entrypoint.sh
 
 # Set working directory to /app

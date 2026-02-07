@@ -4,4 +4,3 @@ node_modules
 .work
 ralph_analysis
 *.log
-docker
