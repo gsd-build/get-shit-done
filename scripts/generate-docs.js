@@ -83,14 +83,31 @@ function saveHashCache(cache) {
 function escapeMDX(content) {
   const lines = content.split('\n');
   let inCodeBlock = false;
+  let codeBlockFence = null; // Track which fence style opened the block
   const escaped = [];
 
   for (const line of lines) {
-    // Detect code block boundaries (lines starting with triple backticks)
-    if (line.trimStart().startsWith('```')) {
-      inCodeBlock = !inCodeBlock;
-      escaped.push(line);
-      continue;
+    const trimmed = line.trimStart();
+
+    // Detect code block boundaries
+    if (trimmed.startsWith('```') || trimmed.startsWith('~~~')) {
+      const fence = trimmed.startsWith('```') ? '```' : '~~~';
+
+      if (!inCodeBlock) {
+        // Opening a code block
+        inCodeBlock = true;
+        codeBlockFence = fence;
+        escaped.push(line);
+        continue;
+      } else if (inCodeBlock && fence === codeBlockFence && trimmed === fence) {
+        // Closing the code block (must match opening fence and be bare)
+        inCodeBlock = false;
+        codeBlockFence = null;
+        escaped.push(line);
+        continue;
+      }
+      // Otherwise it's a fence inside a code block (like ```bash inside ```markdown)
+      // Fall through to regular handling
     }
 
     if (inCodeBlock) {
@@ -141,9 +158,11 @@ function transformFrontMatter(content, title, sidebarPosition) {
   }
 
   // Generate Docusaurus-compatible front matter
+  // Quote title to handle special YAML characters (colons, etc.)
+  const quotedTitle = title.replace(/"/g, '\\"');
   const newFrontMatter = [
     '---',
-    `title: ${title}`,
+    `title: "${quotedTitle}"`,
     `sidebar_position: ${sidebarPosition}`,
     '---',
     ''
