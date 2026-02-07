@@ -198,6 +198,7 @@ Answer: "What do I need to know to PLAN this phase well?"
 <phase_context>
 **IMPORTANT:** If CONTEXT.md exists below, it contains user decisions from /gsd:discuss-phase.
 
+- **`<domain>` section** = Phase scope boundary. Defines what this phase delivers and what is NOT in scope. If domain includes mandates (e.g., "critical analysis"), research must address those mandates.
 - **`<decisions>` section** = Locked choices. Each "**Core Principle:**" statement is the WHY behind decisions in that area — use it to focus your research direction. Research THESE decisions deeply, don't explore alternatives. Quality constraints (e.g., "output must be proportional to data") need implementation research, not just library recommendations. Anti-patterns listed are hard constraints — research how to prevent them.
 - **`<specifics>` section** = Design-intent context that carries the user's voice. "Founder Terminology" terms carry design intent and must be understood by researchers (they inform WHAT to research). "Guiding Principles" are cross-cutting constraints. "Critical Analysis Mandate" (if present) means research must also evaluate whether current infrastructure can deliver what the phase demands.
 - **`<deferred>` section** = Out of scope — ignore completely
@@ -303,6 +304,7 @@ IMPORTANT: If phase context exists below, it contains USER DECISIONS from /gsd:d
 
 **Section Guide for Planning:**
 
+- **`<domain>` section** = Phase scope boundary. Defines WHAT this phase delivers, what it changes, and what is NOT in scope. Use this to derive plan objectives and reject tasks outside the boundary. If domain states a mandate (e.g., "critical analysis"), that mandate is as binding as any locked decision.
 - **`<decisions>` section** = LOCKED decisions. Honor these exactly, do not revisit or suggest alternatives.
   - Each "**Core Principle:**" defines the WHY behind decisions in that area — preserve these in plan objectives so executors understand intent, not just tasks.
   - **Binary decisions** (use X, not Y) → implement exactly as specified
@@ -418,6 +420,7 @@ Plans MUST honor these decisions. Flag as issue if plans contradict OR fail to c
 
 **Verification Guide:**
 
+- **`<domain>` section** = Phase scope boundary. Verify plans stay within this boundary. If domain includes mandates (e.g., "critical analysis"), verify plans have tasks addressing them.
 - **`<decisions>` section** = LOCKED. Verify plans implement these exactly.
   - Each "**Core Principle:**" is the WHY — verify it appears in the plan's objective or must_haves, not just implementation details.
   - **Binary decisions** → check plan implements the chosen option, not an alternative
