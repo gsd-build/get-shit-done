@@ -119,6 +119,7 @@
 const fs = require('fs');
 const path = require('path');
 const { execSync } = require('child_process');
+const readline = require('readline');
 
 // ─── Model Profile Table ─────────────────────────────────────────────────────
 
@@ -527,6 +528,82 @@ function useColor() {
 
 function c(color, text) {
   return useColor() ? COLORS[color] + text + COLORS.reset : text;
+}
+
+// ─── Git Adapter & Classification ─────────────────────────────────────────────
+
+function resolveBaseBranch(cwd, config, flagBase) {
+  const candidates = [];
+  if (flagBase) candidates.push(flagBase);
+  if (config.pr_branch_base) candidates.push(config.pr_branch_base);
+  candidates.push('main', 'master');
+
+  for (const branch of candidates) {
+    const r = execGit(cwd, ['rev-parse', '--verify', branch]);
+    if (r.exitCode === 0) return branch;
+  }
+  return null;
+}
+
+function getMergeBase(cwd, baseBranch) {
+  const r = execGit(cwd, ['merge-base', baseBranch, 'HEAD']);
+  if (r.exitCode !== 0) return null;
+  return r.stdout;
+}
+
+function listCommits(cwd, mergeBase) {
+  const r = execGit(cwd, ['log', '--format=%h%x00%s%x00%p', mergeBase + '..HEAD']);
+  if (r.exitCode !== 0 || !r.stdout) return [];
+  return r.stdout.split('\n').map(line => {
+    const [hash, subject, parents] = line.split('\0');
+    return { hash, subject, isMerge: parents.includes(' ') };
+  });
+}
+
+function getCommitFiles(cwd, hash, isMerge) {
+  const args = isMerge
+    ? ['diff', '--name-only', hash + '^1', hash]
+    : ['diff-tree', '--no-commit-id', '-r', '--name-only', hash];
+  const r = execGit(cwd, args);
+  if (r.exitCode !== 0 || !r.stdout) return [];
+  return r.stdout.split('\n').filter(Boolean);
+}
+
+function classifyCommit(files, filterPatterns) {
+  const planningFiles = [];
+  const codeFiles = [];
+  for (const file of files) {
+    if (filterPatterns.some(re => re.test(file))) {
+      planningFiles.push(file);
+    } else {
+      codeFiles.push(file);
+    }
+  }
+  const type = planningFiles.length > 0 && codeFiles.length > 0 ? 'mixed'
+    : planningFiles.length > 0 ? 'planning'
+    : 'code';
+  return { type, planningFiles, codeFiles };
+}
+
+function promptForBranch() {
+  return new Promise((resolve, reject) => {
+    if (!process.stdin.isTTY) {
+      reject(new Error(
+        'Cannot auto-detect base branch. Use --base <branch> or set pr_branch.base_branch in config.'
+      ));
+      return;
+    }
+    const rl = readline.createInterface({
+      input: process.stdin,
+      output: process.stderr,
+    });
+    rl.question('Enter base branch name: ', (answer) => {
+      rl.close();
+      const branch = answer.trim();
+      if (!branch) reject(new Error('No branch name provided'));
+      else resolve(branch);
+    });
+  });
 }
 
 // ─── Commands ─────────────────────────────────────────────────────────────────
