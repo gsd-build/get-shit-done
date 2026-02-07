@@ -28,13 +28,6 @@ CLI_PACKAGES=""
 if [ -d "/root/.gemini" ]; then
     echo -e "\033[0;36m  Detected ~/.gemini -> Installing @google/gemini-cli\033[0m"
     CLI_PACKAGES="$CLI_PACKAGES @google/gemini-cli"
-    
-    # Fix Windows paths in settings.json for Docker environment
-    GEMINI_SETTINGS="/root/.gemini/settings.json"
-    if [ -f "$GEMINI_SETTINGS" ] && grep -q "C:/Users" "$GEMINI_SETTINGS" 2>/dev/null; then
-        echo -e "\033[0;36m  Fixing Windows paths in settings.json for Docker...\033[0m"
-        sed -i 's|C:/Users/[^/]*/\.gemini|/root/.gemini|g' "$GEMINI_SETTINGS"
-    fi
 fi
 
 # 2. Detect Claude Preference (Folder mounted at /root/.claude)
