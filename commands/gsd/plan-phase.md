@@ -295,7 +295,8 @@ UAT_CONTENT=$(cat "${PHASE_DIR}"/*-UAT.md 2>/dev/null)
 - `plan_check` enabled (not `--skip-verify`, config `workflow.plan_check` is true)
 - NOT `--gaps` mode (gap closure produces 1-2 plans — sequential is fine)
 
-**If all gate conditions met → use 8b (Streaming). Otherwise → use 8a (Sequential).**
+**MANDATORY: If all gate conditions met → MUST use 8b (Streaming). Otherwise → use 8a (Sequential).**
+**Do NOT override this gate. Do NOT fall back to 8a when gates pass. The user explicitly enabled Agent Teams to use streaming verification — respect that choice regardless of phase complexity.**
 
 ### 8a. Standard Sequential Planning
 
