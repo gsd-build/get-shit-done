@@ -129,7 +129,7 @@ Your custom files in other locations are preserved:
 - Custom hooks ✓
 - Your CLAUDE.md files ✓
 
-If you've modified any GSD files directly, back them up first.
+If you've modified any GSD files directly, they'll be automatically backed up to `gsd-local-patches/` and can be reapplied with `/gsd:reapply-patches` after the update.
 ```
 
 Use AskUserQuestion:
@@ -183,6 +183,21 @@ Format completion message (changelog was already shown in confirmation step):
 ```
 </step>
 
+
+<step name="check_local_patches">
+After update completes, check if the installer detected and backed up any locally modified files:
+
+Check for gsd-local-patches/backup-meta.json in the config directory.
+
+**If patches found:**
+
+```
+Local patches were backed up before the update.
+Run /gsd:reapply-patches to merge your modifications into the new version.
+```
+
+**If no patches:** Continue normally.
+</step>
 </process>
 
 <success_criteria>
