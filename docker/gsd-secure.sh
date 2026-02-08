@@ -7,6 +7,19 @@ function gsd-secure() {
     local DOCKER_DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" && pwd )"
     local IMAGE_NAME="gsd-sandbox"
     
+    # Network Mode: "host" (default, full access) or "strict" (isolated with DNS fix)
+    local NETWORK_MODE="host"
+    
+    # Parse arguments
+    for arg in "$@"; do
+        case $arg in
+            --strict)
+                NETWORK_MODE="strict"
+                echo -e "\033[0;36m [Network] Strict mode enabled (isolated network + DNS fix)\033[0m"
+                ;;
+        esac
+    done
+    
     # 0. Check if Docker is running
     if ! docker info >/dev/null 2>&1; then
         echo -e "\033[0;31mERROR: Docker is not running!\033[0m"
@@ -60,16 +73,34 @@ function gsd-secure() {
     echo -e "\033[0;37m  Project: $CURRENT_DIR\033[0m"
     echo -e "\033[0;37m  Identity: $GIT_NAME <$GIT_EMAIL>\033[0m"
 
-    # Run Container
-    docker run --rm -it \
-        -v "$CURRENT_DIR:/app" \
-        -v "gsd-npm-cache:/root/.npm" \
-        $MOUNT_ARGS \
-        -e "GIT_AUTHOR_NAME=$GIT_NAME" \
-        -e "GIT_AUTHOR_EMAIL=$GIT_EMAIL" \
-        -e "GIT_COMMITTER_NAME=$GIT_NAME" \
-        -e "GIT_COMMITTER_EMAIL=$GIT_EMAIL" \
-        $IMAGE_NAME
+    # Run Container with appropriate network mode
+    if [ "$NETWORK_MODE" = "host" ]; then
+        # Full network access (less isolated, but works everywhere)
+        docker run --rm -it \
+            --network host \
+            -v "$CURRENT_DIR:/app" \
+            -v "gsd-npm-cache:/root/.npm" \
+            $MOUNT_ARGS \
+            -e "GIT_AUTHOR_NAME=$GIT_NAME" \
+            -e "GIT_AUTHOR_EMAIL=$GIT_EMAIL" \
+            -e "GIT_COMMITTER_NAME=$GIT_NAME" \
+            -e "GIT_COMMITTER_EMAIL=$GIT_EMAIL" \
+            $IMAGE_NAME
+    else
+        # Strict mode: isolated network with reliable DNS
+        # Use host.docker.internal to access localhost services
+        docker run --rm -it \
+            --dns 8.8.8.8 \
+            --dns 1.1.1.1 \
+            -v "$CURRENT_DIR:/app" \
+            -v "gsd-npm-cache:/root/.npm" \
+            $MOUNT_ARGS \
+            -e "GIT_AUTHOR_NAME=$GIT_NAME" \
+            -e "GIT_AUTHOR_EMAIL=$GIT_EMAIL" \
+            -e "GIT_COMMITTER_NAME=$GIT_NAME" \
+            -e "GIT_COMMITTER_EMAIL=$GIT_EMAIL" \
+            $IMAGE_NAME
+    fi
 }
 
 # Add alias for convenience

@@ -1,6 +1,10 @@
 # Function to build and run GSD in Docker
 
 function gsd-secure {
+    param(
+        [switch]$Strict  # Use isolated network + DNS fix for extra security
+    )
+    
     # [REPO VERSION] Uses the script's own directory as Docker context
     $DockerDir = $PSScriptRoot
     $ImageName = "gsd-sandbox"
@@ -63,17 +67,35 @@ function gsd-secure {
     Write-Host "  Project: $CurrentDir" -ForegroundColor Gray
     Write-Host "  Identity: $GitName <$GitEmail>" -ForegroundColor Gray
 
-    # Run Container
-    # -v gsd-npm-cache:/root/.npm : Persists NPM cache to avoid re-downloading packages
-    docker run --rm -it `
-        -v "${CurrentDir}:/app" `
-        -v "gsd-npm-cache:/root/.npm" `
-        $MountArgs `
-        -e "GIT_AUTHOR_NAME=$GitName" `
-        -e "GIT_AUTHOR_EMAIL=$GitEmail" `
-        -e "GIT_COMMITTER_NAME=$GitName" `
-        -e "GIT_COMMITTER_EMAIL=$GitEmail" `
-        $ImageName
+    # Run Container with appropriate network mode
+    if ($Strict) {
+        # Strict mode: isolated network with reliable DNS
+        # Use host.docker.internal to access localhost services
+        Write-Host " [Network] Strict mode enabled (isolated network + DNS fix)" -ForegroundColor Cyan
+        docker run --rm -it `
+            --dns 8.8.8.8 `
+            --dns 1.1.1.1 `
+            -v "${CurrentDir}:/app" `
+            -v "gsd-npm-cache:/root/.npm" `
+            $MountArgs `
+            -e "GIT_AUTHOR_NAME=$GitName" `
+            -e "GIT_AUTHOR_EMAIL=$GitEmail" `
+            -e "GIT_COMMITTER_NAME=$GitName" `
+            -e "GIT_COMMITTER_EMAIL=$GitEmail" `
+            $ImageName
+    } else {
+        # Default: Full network access (works with localhost)
+        docker run --rm -it `
+            --network host `
+            -v "${CurrentDir}:/app" `
+            -v "gsd-npm-cache:/root/.npm" `
+            $MountArgs `
+            -e "GIT_AUTHOR_NAME=$GitName" `
+            -e "GIT_AUTHOR_EMAIL=$GitEmail" `
+            -e "GIT_COMMITTER_NAME=$GitName" `
+            -e "GIT_COMMITTER_EMAIL=$GitEmail" `
+            $ImageName
+    }
 }
 
 # Add alias for convenience

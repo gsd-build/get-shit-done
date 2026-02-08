@@ -55,3 +55,117 @@ The GSD Secure environment consists of three layers:
 1.  **Zero Host Pollution**: `npm install` runs inside. `apt-get` runs inside. Your host remains untouched.
 2.  **Scope Containment**: The agent can only see the folder you mounted (`/app`). It cannot access your Documents, Desktop, or System files.
 3.  **Supply Chain Firewall**: If an agent downloads a malicious package, it infects only the disposable container. Restarting the sandbox eradicates the threat.
+
+## 5. Network Mode: The Conscious Trade-off
+
+GSD Secure offers two network modes. We made a deliberate choice about the default based on real-world developer needs.
+
+---
+
+### The Problem We Found
+
+During testing, we discovered that Docker's default bridge network blocks access to localhost services. This caused major friction:
+
+```
+# Inside container with bridge network:
+curl localhost:5432      # ❌ Connection refused
+psql -h localhost        # ❌ Could not connect
+```
+
+Developers expected their local Postgres, Redis, and dev servers to "just work." Instead, they got cryptic errors and had to learn Docker networking workarounds.
+
+---
+
+### Default Mode: `gsd-secure`
+
+**Uses Docker's `--network host` option.**
+
+This means the container shares your computer's network interface. From the container's perspective, `localhost` is the same as your host machine's `localhost`.
+
+#### What Works:
+| Service | Example | Status |
+|---------|---------|--------|
+| Local PostgreSQL | `localhost:5432` | ✅ Works |
+| Local Redis | `localhost:6379` | ✅ Works |
+| Local dev server | `localhost:3000` | ✅ Works |
+| Cloud APIs | `api.supabase.com` | ✅ Works |
+| External databases | `db.example.com` | ✅ Works |
+
+#### What's Still Protected:
+- ✅ **File system**: Agent can only access `/app` (your mounted project folder)
+- ✅ **Malware persistence**: Container is ephemeral, destroyed on exit
+- ✅ **Host system files**: Cannot read `~/.ssh`, `~/.env`, other projects
+
+#### What's NOT Protected:
+- ⚠️ **Local network visibility**: Container can reach other machines on your LAN
+- ⚠️ **Localhost services**: Container can connect to any localhost port
+- ⚠️ **VPN access**: If you're on VPN, container sees that network too
+
+---
+
+### Strict Mode: `gsd-secure --strict`
+
+**Uses Docker's bridge network with external DNS (Google/Cloudflare).**
+
+This creates a fully isolated network. The container has its own network namespace and cannot see your localhost directly.
+
+#### What Works:
+| Service | Example | Status |
+|---------|---------|--------|
+| Cloud APIs | `api.supabase.com` | ✅ Works |
+| External databases | `db.example.com` | ✅ Works |
+| Local PostgreSQL | `localhost:5432` | ❌ Blocked |
+| Local Redis | `localhost:6379` | ❌ Blocked |
+
+#### How to Access Localhost in Strict Mode:
+Use the special hostname `host.docker.internal`:
+
+```bash
+# Instead of:
+psql -h localhost -p 5432
+
+# Use:
+psql -h host.docker.internal -p 5432
+```
+
+#### What's Protected:
+- ✅ **File system**: Agent can only access `/app`
+- ✅ **Malware persistence**: Container is ephemeral
+- ✅ **Host system files**: Cannot read outside `/app`
+- ✅ **Local network**: Cannot see other machines on your LAN
+- ✅ **Localhost services**: Cannot connect unless explicitly using `host.docker.internal`
+
+---
+
+### Security Comparison Table
+
+| Threat Vector | Default Mode | Strict Mode |
+|---------------|--------------|-------------|
+| Read files outside project | 🛡️ **Blocked** | 🛡️ **Blocked** |
+| Persist malware after exit | 🛡️ **Blocked** (ephemeral) | 🛡️ **Blocked** (ephemeral) |
+| Access localhost:5432 | ⚠️ Allowed | 🛡️ **Blocked** |
+| Scan local network (LAN) | ⚠️ Allowed | 🛡️ **Blocked** |
+| Access VPN resources | ⚠️ Allowed | 🛡️ **Blocked** |
+| Connect to cloud APIs | ✅ Allowed | ✅ Allowed |
+
+---
+
+### When to Use Each Mode
+
+| Scenario | Recommended Mode |
+|----------|------------------|
+| Normal development with local DB | `gsd-secure` (default) |
+| Working with cloud-only services | `gsd-secure` (default) |
+| Running untrusted code/dependencies | `gsd-secure --strict` |
+| Security-sensitive environment | `gsd-secure --strict` |
+| Corporate network with sensitive resources | `gsd-secure --strict` |
+
+---
+
+### Our Philosophy
+
+> **Remove friction for the common case. Provide strict isolation for those who need it.**
+
+99% of developers need localhost access during development. The previous bridge-network default created confusion and frustration. By making `--network host` the default, we prioritize developer experience while keeping all file system protections intact.
+
+For security-conscious users and sensitive environments, `--strict` mode provides full network isolation with explicit opt-in for localhost access via `host.docker.internal`.

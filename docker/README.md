@@ -22,17 +22,143 @@ This directory contains the "Space Suit" for running GSD agents without risking 
     *   First fun: Downloads internet.
     *   Second run: Instant install from cache.
 
-## 🤖 The "Intelligent" Agent
-This PR modifies the **Project Researcher Agent** (`agents/gsd-project-researcher.md`).
+## 🌐 Network Configuration
 
-**How it works:**
-1.  **Detection**: During the `gsd:new-project` research phase, the Agent analyzes requirements to find missing system tools (e.g., "This project needs `ffmpeg` for video processing").
-2.  **Structuring**: Instead of just mentioning it in text, it appends a machine-readable block to `STACK.md`:
-    ```markdown
-    \`\`\`gsd-stack
-    ffmpeg
-    \`\`\`
-3.  **Execution**: When you start `gsd-secure`, the container reads `STACK.md`, finds this block, and runs `apt-get install ffmpeg` automatically before giving you control.
+GSD Secure runs in a container. **By default, it works exactly like your local machine** — localhost, APIs, cloud services, everything just works.
+
+### ✅ Default Mode: It Just Works
+
+No configuration needed! Your container:
+
+- 🏠 **Access localhost** - Connect to local databases, dev servers, APIs
+- 🌍 **Access internet** - Connect to any cloud service, external API, database
+- ⚡ **Zero friction** - `localhost:5432` works exactly as expected
+
+> **This is the recommended mode for development.** It works for 99% of use cases.
+
+### 🛡️ Strict Mode: Extra Security
+
+For maximum isolation, use `--strict`. This isolates your container from localhost.
+
+| Platform | Command |
+|----------|---------|
+| **Linux/Mac** | `gsd-secure --strict` |
+| **Windows** | `gsd-secure -Strict` |
+
+**What changes in strict mode:**
+
+| Aspect | Default | `--strict` |
+|--------|---------|------------|
+| Access internet | ✅ Yes | ✅ Yes |
+| Access localhost | ✅ Yes | ❌ No (use `host.docker.internal`) |
+| Security | Standard | 🛡️ High (isolated) |
+
+**When to use `--strict`:**
+- You're running **untrusted code** inside the container
+- You want the AI **completely isolated** from your local services
+- You're in a **security-sensitive environment**
+
+### 📖 Using Strict Mode with Local Services
+
+In strict mode, `localhost` doesn't work. Use `host.docker.internal` instead — it's a special hostname that Docker provides to reach your host machine.
+
+**The simple rule:** Replace `localhost` → `host.docker.internal`
+
+#### Common Examples
+
+**PostgreSQL / MySQL Database:**
+```bash
+# Outside container (normal)
+DATABASE_URL=postgresql://user:pass@localhost:5432/mydb
+
+# Inside strict mode container
+DATABASE_URL=postgresql://user:pass@host.docker.internal:5432/mydb
+```
+
+**Redis:**
+```bash
+# Outside container
+REDIS_URL=redis://localhost:6379
+
+# Inside strict mode container
+REDIS_URL=redis://host.docker.internal:6379
+```
+
+**Local API Server:**
+```bash
+# Outside container
+API_URL=http://localhost:3000/api
+
+# Inside strict mode container
+API_URL=http://host.docker.internal:3000/api
+```
+
+**In your code (JavaScript/TypeScript):**
+```javascript
+// Detect if running in Docker and use the right host
+const DB_HOST = process.env.DOCKER_ENV ? 'host.docker.internal' : 'localhost';
+const db = `postgresql://user:pass@${DB_HOST}:5432/mydb`;
+```
+
+**Environment file (.env):**
+```env
+# Option 1: Always use host.docker.internal (works everywhere)
+DB_HOST=host.docker.internal
+
+# Option 2: Use a variable that you change for Docker
+# DB_HOST=localhost        # For running outside Docker
+# DB_HOST=host.docker.internal  # For running inside Docker
+```
+
+> 💡 **Tip:** `host.docker.internal` also works in **default mode**, so you can use it everywhere without issues.
+
+### 🔍 Quick Comparison
+
+| Aspect | `gsd-secure` (default) | `gsd-secure --strict` |
+|--------|------------------------|----------------------|
+| Connect to localhost:5432 | ✅ Works | Use `host.docker.internal` |
+| Connect to cloud APIs | ✅ Works | ✅ Works |
+| AI can access local network | ⚠️ Yes | ❌ No |
+| Recommended for | 🛠️ **Development** | 🔒 Security-sensitive work |
+
+## 🤖 Auto-Stack™: The Intelligent Dependency System
+
+GSD Secure includes an intelligent system that automatically detects and installs the tools your project needs.
+
+### How It Works
+
+1. **Detection**: During the `gsd:new-project` research phase, the GSD Agent analyzes your project requirements and identifies missing system tools (e.g., "This project needs `ffmpeg` for video processing").
+
+2. **Structuring**: Instead of just mentioning the dependency in text, the Agent writes it to `STACK.md` in a machine-readable format:
+
+   ```markdown
+   ```gsd-stack
+   ffmpeg
+   imagemagick
+   ```
+   ```
+
+3. **Auto-Installation**: When you launch `gsd-secure`, the container reads `STACK.md`, finds these blocks, and runs `apt-get install` automatically before giving you control.
+
+### Why This Matters
+
+- **Zero manual setup** — The Agent knows what you need before you do
+- **Reproducible environments** — `STACK.md` is committed to your repo, so other developers get the same tools
+- **No host pollution** — Dependencies install inside the container, not on your machine
+
+### Manual Usage
+
+You can also add tools manually to `STACK.md`:
+
+```markdown
+```gsd-stack
+ffmpeg
+python3-pip
+```
+```
+
+Then restart `gsd-secure` — the new tools will be installed automatically.
+
 
 ## Usage
 
