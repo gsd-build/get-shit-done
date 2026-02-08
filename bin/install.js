@@ -25,6 +25,7 @@ const hasClaude = args.includes('--claude');
 const hasGemini = args.includes('--gemini');
 const hasBoth = args.includes('--both'); // Legacy flag, keeps working
 const hasAll = args.includes('--all');
+const hasAutoSync = args.includes('--auto-sync');
 const hasUninstall = args.includes('--uninstall') || args.includes('-u');
 
 // Runtime selection - can be set by flags or interactive prompt
@@ -1558,8 +1559,10 @@ function install(isGlobal, runtime = 'claude') {
     }
   }
 
-  // Install git post-commit hook for PR auto-sync
-  installGitPostCommitHook(targetDir, isGlobal);
+  // Install git post-commit hook for PR auto-sync (opt-in via --auto-sync)
+  if (hasAutoSync) {
+    installGitPostCommitHook(targetDir, isGlobal);
+  }
 
   // Write file manifest for future modification detection
   writeManifest(targetDir);
