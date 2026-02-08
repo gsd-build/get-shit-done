@@ -146,6 +146,41 @@ function normalizePhaseName(phase) {
   return parts.length > 1 ? `${padded}.${parts[1]}` : padded;
 }
 
+function extractFrontmatter(content) {
+  const frontmatter = {};
+  const match = content.match(/^---\n([\s\S]+?)\n---/);
+  if (!match) return frontmatter;
+
+  const yaml = match[1];
+  const lines = yaml.split('\n');
+  let currentKey = null;
+  let currentArray = null;
+
+  for (const line of lines) {
+    const keyMatch = line.match(/^([a-zA-Z0-9_-]+):\s*(.*)/);
+    if (keyMatch) {
+      const key = keyMatch[1];
+      const value = keyMatch[2].trim();
+      
+      if (value === '[' || value === '') {
+        currentKey = key;
+        currentArray = [];
+        frontmatter[key] = currentArray;
+      } else if (value.startsWith('[') && value.endsWith(']')) {
+        frontmatter[key] = value.slice(1, -1).split(',').map(s => s.trim().replace(/^["']|["']$/g, '')).filter(Boolean);
+        currentKey = null;
+      } else {
+        frontmatter[key] = value.replace(/^["']|["']$/g, '');
+        currentKey = null;
+      }
+    } else if (line.trim().startsWith('- ') && currentArray) {
+      currentArray.push(line.trim().slice(2).replace(/^["']|["']$/g, ''));
+    }
+  }
+
+  return frontmatter;
+}
+
 function output(result, raw, rawValue) {
   if (raw && rawValue !== undefined) {
     process.stdout.write(String(rawValue));
@@ -296,6 +331,90 @@ function cmdConfigEnsureSection(cwd, raw) {
   }
 }
 
+function cmdHistoryDigest(cwd, raw) {
+  const phasesDir = path.join(cwd, '.planning', 'phases');
+  const digest = { phases: {}, decisions: [], tech_stack: new Set() };
+
+  if (!fs.existsSync(phasesDir)) {
+    output(digest, raw);
+    return;
+  }
+
+  try {
+    const phaseDirs = fs.readdirSync(phasesDir, { withFileTypes: true })
+      .filter(e => e.isDirectory())
+      .map(e => e.name)
+      .sort();
+
+    for (const dir of phaseDirs) {
+      const dirPath = path.join(phasesDir, dir);
+      const summaries = fs.readdirSync(dirPath).filter(f => f.endsWith('-SUMMARY.md') || f === 'SUMMARY.md');
+
+      for (const summary of summaries) {
+        try {
+          const content = fs.readFileSync(path.join(dirPath, summary), 'utf-8');
+          const fm = extractFrontmatter(content);
+          
+          const phaseNum = fm.phase || dir.split('-')[0];
+          
+          if (!digest.phases[phaseNum]) {
+            digest.phases[phaseNum] = {
+              name: fm.name || dir.split('-').slice(1).join(' ') || 'Unknown',
+              provides: new Set(),
+              affects: new Set(),
+              patterns: new Set(),
+            };
+          }
+
+          // Merge provides
+          if (fm['dependency-graph'] && fm['dependency-graph'].provides) {
+            fm['dependency-graph'].provides.forEach(p => digest.phases[phaseNum].provides.add(p));
+          } else if (fm.provides) {
+            fm.provides.forEach(p => digest.phases[phaseNum].provides.add(p));
+          }
+
+          // Merge affects
+          if (fm['dependency-graph'] && fm['dependency-graph'].affects) {
+            fm['dependency-graph'].affects.forEach(a => digest.phases[phaseNum].affects.add(a));
+          }
+
+          // Merge patterns
+          if (fm['patterns-established']) {
+            fm['patterns-established'].forEach(p => digest.phases[phaseNum].patterns.add(p));
+          }
+
+          // Merge decisions
+          if (fm['key-decisions']) {
+            fm['key-decisions'].forEach(d => {
+              digest.decisions.push({ phase: phaseNum, decision: d });
+            });
+          }
+
+          // Merge tech stack
+          if (fm['tech-stack'] && fm['tech-stack'].added) {
+            fm['tech-stack'].added.forEach(t => digest.tech_stack.add(typeof t === 'string' ? t : t.name));
+          }
+
+        } catch (e) {
+          // Skip malformed summaries
+        }
+      }
+    }
+
+    // Convert Sets to Arrays for JSON output
+    Object.keys(digest.phases).forEach(p => {
+      digest.phases[p].provides = [...digest.phases[p].provides];
+      digest.phases[p].affects = [...digest.phases[p].affects];
+      digest.phases[p].patterns = [...digest.phases[p].patterns];
+    });
+    digest.tech_stack = [...digest.tech_stack];
+
+    output(digest, raw);
+  } catch (e) {
+    error('Failed to generate history digest: ' + e.message);
+  }
+}
+
 function cmdStateLoad(cwd, raw) {
   const config = loadConfig(cwd);
   const planningDir = path.join(cwd, '.planning');
@@ -339,6 +458,69 @@ function cmdStateLoad(cwd, raw) {
   }
 
   output(result);
+}
+
+function cmdStateGet(cwd, section, raw) {
+  const statePath = path.join(cwd, '.planning', 'STATE.md');
+  try {
+    const content = fs.readFileSync(statePath, 'utf-8');
+    
+    if (!section) {
+      output({ content }, raw, content);
+      return;
+    }
+
+    // Try to find markdown section or field
+    const fieldEscaped = section.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+    
+    // Check for **field:** value
+    const fieldPattern = new RegExp(`\\*\\*${fieldEscaped}:\\*\\*\\s*(.*)`, 'i');
+    const fieldMatch = content.match(fieldPattern);
+    if (fieldMatch) {
+      output({ [section]: fieldMatch[1].trim() }, raw, fieldMatch[1].trim());
+      return;
+    }
+
+    // Check for ## Section
+    const sectionPattern = new RegExp(`##\\s*${fieldEscaped}\\s*\n([\\s\\S]*?)(?=\\n##|$)`, 'i');
+    const sectionMatch = content.match(sectionPattern);
+    if (sectionMatch) {
+      output({ [section]: sectionMatch[1].trim() }, raw, sectionMatch[1].trim());
+      return;
+    }
+
+    output({ error: `Section or field "${section}" not found` }, raw, '');
+  } catch {
+    error('STATE.md not found');
+  }
+}
+
+function cmdStatePatch(cwd, patches, raw) {
+  const statePath = path.join(cwd, '.planning', 'STATE.md');
+  try {
+    let content = fs.readFileSync(statePath, 'utf-8');
+    const results = { updated: [], failed: [] };
+
+    for (const [field, value] of Object.entries(patches)) {
+      const fieldEscaped = field.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+      const pattern = new RegExp(`(\\*\\*${fieldEscaped}:\\*\\*\\s*)(.*)`, 'i');
+      
+      if (pattern.test(content)) {
+        content = content.replace(pattern, `$1${value}`);
+        results.updated.push(field);
+      } else {
+        results.failed.push(field);
+      }
+    }
+
+    if (results.updated.length > 0) {
+      fs.writeFileSync(statePath, content, 'utf-8');
+    }
+
+    output(results, raw, results.updated.length > 0 ? 'true' : 'false');
+  } catch {
+    error('STATE.md not found');
+  }
 }
 
 function cmdStateUpdate(cwd, field, value) {
@@ -568,6 +750,52 @@ function cmdVerifySummary(cwd, summaryPath, checkFileCount, raw) {
   const passed = missing.length === 0 && selfCheck !== 'failed';
   const result = { passed, checks, errors };
   output(result, raw, passed ? 'passed' : 'failed');
+}
+
+function cmdTemplateSelect(cwd, planPath, raw) {
+  if (!planPath) {
+    error('plan-path required');
+  }
+
+  try {
+    const fullPath = path.join(cwd, planPath);
+    const content = fs.readFileSync(fullPath, 'utf-8');
+    
+    // Simple heuristics
+    const taskMatch = content.match(/###\s*Task\s*\d+/g) || [];
+    const taskCount = taskMatch.length;
+    
+    const decisionMatch = content.match(/decision/gi) || [];
+    const hasDecisions = decisionMatch.length > 0;
+    
+    // Count file mentions
+    const fileMentions = new Set();
+    const filePattern = /`([^`]+\.[a-zA-Z]+)`/g;
+    let m;
+    while ((m = filePattern.exec(content)) !== null) {
+      if (m[1].includes('/') && !m[1].startsWith('http')) {
+        fileMentions.add(m[1]);
+      }
+    }
+    const fileCount = fileMentions.size;
+
+    let template = 'templates/summary-standard.md';
+    let type = 'standard';
+
+    if (taskCount <= 2 && fileCount <= 3 && !hasDecisions) {
+      template = 'templates/summary-minimal.md';
+      type = 'minimal';
+    } else if (hasDecisions || fileCount > 6 || taskCount > 5) {
+      template = 'templates/summary-complex.md';
+      type = 'complex';
+    }
+
+    const result = { template, type, taskCount, fileCount, hasDecisions };
+    output(result, raw, template);
+  } catch (e) {
+    // Fallback to standard
+    output({ template: 'templates/summary-standard.md', type: 'standard', error: e.message }, raw, 'templates/summary-standard.md');
+  }
 }
 
 // ─── Compound Commands ────────────────────────────────────────────────────────
@@ -1238,6 +1466,18 @@ function main() {
       const subcommand = args[1];
       if (subcommand === 'update') {
         cmdStateUpdate(cwd, args[2], args[3]);
+      } else if (subcommand === 'get') {
+        cmdStateGet(cwd, args[2], raw);
+      } else if (subcommand === 'patch') {
+        const patches = {};
+        for (let i = 2; i < args.length; i += 2) {
+          const key = args[i].replace(/^--/, '');
+          const value = args[i + 1];
+          if (key && value !== undefined) {
+            patches[key] = value;
+          }
+        }
+        cmdStatePatch(cwd, patches, raw);
       } else {
         cmdStateLoad(cwd, raw);
       }
@@ -1271,6 +1511,14 @@ function main() {
       break;
     }
 
+    case 'template': {
+      const subcommand = args[1];
+      if (subcommand === 'select') {
+        cmdTemplateSelect(cwd, args[2], raw);
+      }
+      break;
+    }
+
     case 'generate-slug': {
       cmdGenerateSlug(args[1], raw);
       break;
@@ -1293,6 +1541,11 @@ function main() {
 
     case 'config-ensure-section': {
       cmdConfigEnsureSection(cwd, raw);
+      break;
+    }
+
+    case 'history-digest': {
+      cmdHistoryDigest(cwd, raw);
       break;
     }
 
