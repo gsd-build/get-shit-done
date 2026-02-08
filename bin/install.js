@@ -966,6 +966,67 @@ function uninstall(isGlobal, runtime = 'claude') {
 }
 
 /**
+ * Parse JSONC (JSON with Comments) by stripping comments and trailing commas.
+ * OpenCode supports JSONC format via jsonc-parser, so users may have comments.
+ * This is a lightweight inline parser to avoid adding dependencies.
+ */
+function parseJsonc(content) {
+  // Strip BOM if present
+  if (content.charCodeAt(0) === 0xFEFF) {
+    content = content.slice(1);
+  }
+
+  // Remove single-line and block comments while preserving strings
+  let result = '';
+  let inString = false;
+  let i = 0;
+  while (i < content.length) {
+    const char = content[i];
+    const next = content[i + 1];
+
+    if (inString) {
+      result += char;
+      // Handle escape sequences
+      if (char === '\\' && i + 1 < content.length) {
+        result += next;
+        i += 2;
+        continue;
+      }
+      if (char === '"') {
+        inString = false;
+      }
+      i++;
+    } else {
+      if (char === '"') {
+        inString = true;
+        result += char;
+        i++;
+      } else if (char === '/' && next === '/') {
+        // Skip single-line comment until end of line
+        while (i < content.length && content[i] !== '\n') {
+          i++;
+        }
+      } else if (char === '/' && next === '*') {
+        // Skip block comment
+        i += 2;
+        while (i < content.length - 1 && !(content[i] === '*' && content[i + 1] === '/')) {
+          i++;
+        }
+        i += 2; // Skip closing */
+      } else {
+        result += char;
+        i++;
+      }
+    }
+  }
+
+  // Remove trailing commas before } or ]
+  result = result.replace(/,(\s*[}\]])/g, '$1');
+
+  return JSON.parse(result);
+}
+
+/**
  * Configure OpenCode permissions to allow reading GSD reference docs
  * This prevents permission prompts when GSD accesses the get-shit-done directory
  */
@@ -981,10 +1042,14 @@ function configureOpencodePermissions() {
   let config = {};
   if (fs.existsSync(configPath)) {
     try {
-      config = JSON.parse(fs.readFileSync(configPath, 'utf8'));
+      const content = fs.readFileSync(configPath, 'utf8');
+      config = parseJsonc(content);
     } catch (e) {
-      // Invalid JSON - start fresh but warn user
-      console.log(`  ${yellow}⚠${reset} opencode.json had invalid JSON, recreating`);
+      // Cannot parse - DO NOT overwrite user's config
+      console.log(`  ${yellow}⚠${reset} Could not parse opencode.json - skipping permission config`);
+      console.log(`    ${dim}Reason: ${e.message}${reset}`);
+      console.log(`    ${dim}Your config was NOT modified. Fix the syntax manually if needed.${reset}`);
+      return;
     }
   }
 

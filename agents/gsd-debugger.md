@@ -979,11 +979,11 @@ mkdir -p .planning/debug/resolved
 mv .planning/debug/{slug}.md .planning/debug/resolved/
 ```
 
-**Check planning config:**
+**Check planning config using state load (commit_docs is available from the output):**
 
 ```bash
-COMMIT_PLANNING_DOCS=$(cat .planning/config.json 2>/dev/null | grep -o '"commit_docs"[[:space:]]*:[[:space:]]*[^,}]*' | grep -o 'true\|false' || echo "true")
-git check-ignore -q .planning 2>/dev/null && COMMIT_PLANNING_DOCS=false
+INIT=$(node ~/.claude/get-shit-done/bin/gsd-tools.js state load)
+# commit_docs is in the JSON output
 ```
 
 **Commit the fix:**
