@@ -356,10 +356,6 @@ const claudeToCursorTools = {
  * @returns {string|null} Cursor tool name, or null if tool should be excluded
  */
 function convertCursorToolName(claudeTool) {
-  // Task: exclude — Cursor uses subagent mechanism, not Task tool
-  if (claudeTool === 'Task') {
-    return null;
-  }
   // MCP tools: keep format as-is
   if (claudeTool.startsWith('mcp__')) {
     return claudeTool;
@@ -504,11 +500,11 @@ function convertClaudeToGeminiAgent(content) {
 
 /**
  * Convert Claude Code frontmatter to Cursor format
- * - Converts allowed-tools array or tools string to tools object with boolean values
- * - Converts color names to hex values
+ * - Keeps only name and description fields in frontmatter
+ * - Strips color, tools, allowed-tools, and other fields
  * - Replaces tool name references in body text
  * - Replaces path references (~/.claude/ → ~/.cursor/)
- * - Replaces command format (/gsd: → /gsd-)
+ * - Replaces command format (/gsd: → /gsd/)
  * @param {string} content - Markdown file content with YAML frontmatter
  * @returns {string} - Content with converted frontmatter
  */
@@ -518,19 +514,17 @@ function convertClaudeToCursorFrontmatter(content) {
   
   // Replace PascalCase tool names with snake_case equivalents
   for (const [claude, cursor] of Object.entries(claudeToCursorTools)) {
-    // Use word boundaries to avoid partial replacements
     const regex = new RegExp(`\\b${claude}\\b`, 'g');
     convertedContent = convertedContent.replace(regex, cursor);
   }
   
-  // Replace /gsd: with /gsd- for Cursor command format
-  convertedContent = convertedContent.replace(/\/gsd:/g, '/gsd-');
+  // Replace /gsd: with /gsd/ for Cursor command format
+  convertedContent = convertedContent.replace(/\/gsd:/g, '/gsd/');
   
   // Replace ~/.claude/ with ~/.cursor/
   convertedContent = convertedContent.replace(/~\/\.claude\//g, '~/.cursor/');
   
   // Replace /clear with Cursor-appropriate instruction
-  // Cursor has no /clear command - users click "+" button for new chat
   convertedContent = convertedContent.replace(
     /`\/clear`\s*(?:first\s*)?→?\s*fresh context window/gi,
     'Click "+" (new chat) → fresh context window'
@@ -554,87 +548,48 @@ function convertClaudeToCursorFrontmatter(content) {
   const frontmatter = convertedContent.substring(3, endIndex).trim();
   const body = convertedContent.substring(endIndex + 3);
 
-  // Parse frontmatter line by line
+  // Parse frontmatter - keep only name and description
   const lines = frontmatter.split('\n');
   const newLines = [];
-  let inAllowedTools = false;
-  const allowedTools = [];
+  let inMultilineField = false;
 
   for (const line of lines) {
     const trimmed = line.trim();
 
-    // Detect start of allowed-tools array
-    if (trimmed.startsWith('allowed-tools:')) {
-      inAllowedTools = true;
-      continue;
+    // Skip empty lines
+    if (!trimmed) continue;
+
+    // Detect YAML array items (part of a field we're skipping)
+    if (trimmed.startsWith('- ')) {
+      if (inMultilineField) continue;
     }
 
-    // Detect inline tools: field (comma-separated string)
-    if (trimmed.startsWith('tools:')) {
-      const toolsValue = trimmed.substring(6).trim();
-      if (toolsValue) {
-        // Parse comma-separated tools
-        const tools = toolsValue.split(',').map(t => t.trim()).filter(t => t);
-        allowedTools.push(...tools);
-      } else {
-        // tools: with no value means YAML array follows
-        inAllowedTools = true;
-      }
-      continue;
-    }
-
-    // Remove name: field - Cursor uses filename for command name
+    // Check if this is a field we want to keep
     if (trimmed.startsWith('name:')) {
-      continue;
-    }
-
-    // Convert color names to hex for Cursor
-    if (trimmed.startsWith('color:')) {
-      const colorValue = trimmed.substring(6).trim().replace(/['"]/g, '').toLowerCase();
-      const hexColor = colorNameToHex[colorValue];
-      if (hexColor) {
-        newLines.push(`color: "${hexColor}"`);
-      } else if (colorValue.startsWith('#')) {
-        // Validate hex color format (#RGB or #RRGGBB)
-        if (/^#[0-9a-f]{3}$|^#[0-9a-f]{6}$/i.test(colorValue)) {
-          newLines.push(`color: "${colorValue}"`);
-        }
-        // Skip invalid hex colors
-      }
-      // Skip unknown color names
-      continue;
-    }
-
-    // Collect allowed-tools items
-    if (inAllowedTools) {
-      if (trimmed.startsWith('- ')) {
-        allowedTools.push(trimmed.substring(2).trim());
-        continue;
-      } else if (trimmed && !trimmed.startsWith('-')) {
-        // End of array, new field started
-        inAllowedTools = false;
-      }
-    }
-
-    // Keep other fields
-    if (!inAllowedTools) {
       newLines.push(line);
+      inMultilineField = false;
+      continue;
+    }
+
+    if (trimmed.startsWith('description:')) {
+      newLines.push(line);
+      inMultilineField = false;
+      continue;
+    }
+
+    // All other top-level fields get stripped
+    if (trimmed.includes(':') && !trimmed.startsWith('-')) {
+      inMultilineField = true;
+      continue;
     }
   }
 
-  // Add tools object if we had allowed-tools or tools
-  if (allowedTools.length > 0) {
-    newLines.push('tools:');
-    for (const tool of allowedTools) {
-      const cursorTool = convertCursorToolName(tool);
-      if (cursorTool) {
-        newLines.push(`  ${cursorTool}: true`);
-      }
-    }
-  }
-
-  // Rebuild frontmatter
+  // Rebuild frontmatter (may be empty if no name/description)
   const newFrontmatter = newLines.join('\n').trim();
+  if (!newFrontmatter) {
+    // No frontmatter fields kept, return body only
+    return body.trim();
+  }
   return `---\n${newFrontmatter}\n---${body}`;
 }
 
