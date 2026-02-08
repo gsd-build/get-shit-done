@@ -885,27 +885,40 @@ Apply discovery level protocol (see discovery_levels section).
 </step>
 
 <step name="read_project_history">
-**Extract context from history digest (not full SUMMARYs):**
+**Two-step context assembly: digest for selection, full read for understanding.**
 
-1. Generate history digest:
+**Step 1 — Generate digest index:**
 ```bash
 node ~/.claude/get-shit-done/bin/gsd-tools.js history-digest
 ```
 
-2. From digest extract:
-- `phases[X].provides`: What each phase created
-- `phases[X].affects`: What subsystems each phase touched
-- `phases[X].patterns`: Conventions to follow
-- `digest.decisions`: Prior decisions constraining approach
-- `digest.tech_stack`: Available libraries
+**Step 2 — Select relevant phases (typically 2-4):**
 
-3. Build dependency graph for current phase:
-- `affects` field: Which prior phases affect current?
-- `subsystem`: Which prior phases share same subsystem?
-- `requires` chains: Transitive dependencies
-- Roadmap: Any phases marked as dependencies?
+Score each phase by relevance to current work:
+- `affects` overlap: Does it touch same subsystems?
+- `provides` dependency: Does current phase need what it created?
+- `patterns`: Are its patterns applicable?
+- Roadmap: Marked as explicit dependency?
 
-4. Use digest fields directly — only read full SUMMARY if digest missing critical implementation detail (rare).
+Select top 2-4 phases. Skip phases with no relevance signal.
+
+**Step 3 — Read full SUMMARYs for selected phases:**
+```bash
+cat .planning/phases/{selected-phase}/*-SUMMARY.md
+```
+
+From full SUMMARYs extract:
+- How things were implemented (file patterns, code structure)
+- Why decisions were made (context, tradeoffs)
+- What problems were solved (avoid repeating)
+- Actual artifacts created (realistic expectations)
+
+**Step 4 — Keep digest-level context for unselected phases:**
+
+For phases not selected, retain from digest:
+- `tech_stack`: Available libraries
+- `decisions`: Constraints on approach
+- `patterns`: Conventions to follow
 
 **From STATE.md:** Decisions → constrain approach. Pending todos → candidates.
 </step>
