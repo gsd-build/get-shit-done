@@ -173,6 +173,7 @@ function loadConfig(cwd) {
     brave_search: false,
     pr_branch_base: null,
     pr_branch_filter_paths: ['.planning/'],
+    pr_branch_auto_sync: false,
   };
 
   try {
@@ -208,6 +209,7 @@ function loadConfig(cwd) {
       brave_search: get('brave_search') ?? defaults.brave_search,
       pr_branch_base: get('pr_branch_base', { section: 'pr_branch', field: 'base_branch' }) ?? defaults.pr_branch_base,
       pr_branch_filter_paths: get('pr_branch_filter_paths', { section: 'pr_branch', field: 'filter_paths' }) ?? defaults.pr_branch_filter_paths,
+      pr_branch_auto_sync: get('pr_branch_auto_sync', { section: 'pr_branch', field: 'auto_sync' }) ?? defaults.pr_branch_auto_sync,
     };
   } catch {
     return defaults;
