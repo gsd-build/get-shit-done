@@ -13,15 +13,13 @@ Read STATE.md before any operation to load project context.
 <process>
 
 <step name="initialize" priority="first">
-Load all context in one call (include file contents to avoid redundant reads):
+Load all context in one call:
 
 ```bash
-INIT=$(node ~/.claude/get-shit-done/bin/gsd-tools.js init execute-phase "${PHASE_ARG}" --include state,config)
+INIT=$(node ~/.claude/get-shit-done/bin/gsd-tools.js init execute-phase "${PHASE_ARG}")
 ```
 
 Parse JSON for: `executor_model`, `verifier_model`, `commit_docs`, `parallelization`, `branching_strategy`, `branch_name`, `phase_found`, `phase_dir`, `phase_number`, `phase_name`, `phase_slug`, `plans`, `incomplete_plans`, `plan_count`, `incomplete_count`, `state_exists`, `roadmap_exists`.
-
-**File contents (from --include):** `state_content`, `config_content`. These are null if files don't exist.
 
 **If `phase_found` is false:** Error — phase directory not found.
 **If `plan_count` is 0:** Error — no plans found in phase.
@@ -96,17 +94,10 @@ Execute each wave in sequence. Within a wave: parallel if `PARALLELIZATION=true`
    - Bad: "Executing terrain generation plan"
    - Good: "Procedural terrain generator using Perlin noise — creates height maps, biome zones, and collision meshes. Required before vehicle physics can interact with ground."
 
-2. **Read files and spawn agents:**
+2. **Spawn agents with file paths (not content):**
 
-   Content must be inlined — `@` syntax doesn't work across Task() boundaries.
-   STATE and CONFIG are already loaded via `--include` in initialize step.
-
-   ```bash
-   PLAN_CONTENT=$(cat "{plan_path}")
-   # Use state_content and config_content from INIT (no need to re-read)
-   STATE_CONTENT=$(echo "$INIT" | jq -r '.state_content // empty')
-   CONFIG_CONTENT=$(echo "$INIT" | jq -r '.config_content // empty')
-   ```
+   Pass paths only — executors read files themselves with their fresh 200k context.
+   This keeps orchestrator context lean (~10-15%).
 
    Each agent prompt:
 
@@ -123,16 +114,12 @@ Execute each wave in sequence. Within a wave: parallel if `PARALLELIZATION=true`
    @~/.claude/get-shit-done/references/tdd.md
    </execution_context>
 
-   <context>
-   Plan:
-   {plan_content}
-
-   Project state:
-   {state_content}
-
-   Config (if exists):
-   {config_content}
-   </context>
+   <files_to_read>
+   Read these files at execution start using the Read tool:
+   - Plan: {phase_dir}/{plan_file}
+   - State: .planning/STATE.md
+   - Config: .planning/config.json (if exists)
+   </files_to_read>
 
    <success_criteria>
    - [ ] All tasks executed
