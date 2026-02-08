@@ -327,9 +327,7 @@ Track deferred ideas internally.
 </step>
 
 <step name="verify_depth">
-Before writing CONTEXT.md, verify all substantive user inputs will be captured.
-
-**This step prevents the need for manual /verify-depth after discuss-phase.**
+Before writing CONTEXT.md, enumerate all substantive user inputs for the write step AND for the external depth check after writing.
 
 **Process:**
 
@@ -339,26 +337,25 @@ Before writing CONTEXT.md, verify all substantive user inputs will be captured.
    - Every verbal input (voice transcription) the user provided
    - Tag each with category: Architecture Decision, Philosophy/Principle, Constraint/Anti-Pattern, Reasoning, Terminology, Reference, Preference
 
-2. **Self-check against planned CONTEXT.md content:**
-   For each substantive input, verify:
-   - [ ] Will it appear in CONTEXT.md? (Which section?)
-   - [ ] Will the WHY/reasoning be preserved? (Not just the WHAT)
-   - [ ] Will the user's exact terminology be used? (Not paraphrased)
-   - [ ] Is it in the right section? (Decisions vs Specifics vs Deferred)
+2. **Number each input** (INPUT-1, INPUT-2, ...) with:
+   - The input content (user's exact words, abbreviated if long)
+   - The category tag
+   - The planned CONTEXT.md section (Decisions / Specifics / Deferred / Intent Chain)
 
-3. **Identify gaps:**
-   - MISSING: Input that I'm about to NOT capture → must add
-   - SHALLOW: Input where I'd only capture the decision, not the reasoning → must deepen
-   - LOST_VOICE: Input where I'd paraphrase instead of preserving user's words → must fix
+3. **Quick self-check for critical gaps:**
+   - MISSING: Input that would NOT be captured → flag for write_context
+   - SHALLOW: Input where only the decision would be captured, not the reasoning → flag
+   - LOST_VOICE: Input where user's exact words would be paraphrased → flag
 
-4. **If critical gaps found (MISSING or SHALLOW):**
-   - Briefly note to user: "Before writing context, I noticed I should clarify [specific point]"
+4. **If critical gaps (MISSING):**
    - Ask 1-2 targeted follow-up questions to fill the gap
    - Then proceed to write_context
 
 5. **If no critical gaps:** Proceed directly to write_context
 
-**This step should take 10-30 seconds of analysis, not a lengthy process.** It's a quality gate, not a full audit.
+**Store the numbered input list internally** — it will be passed to the external depth checker after write_context.
+
+**This step should take 10-30 seconds.** Extraction, not audit. The real verification comes after writing.
 </step>
 
 <step name="write_context">
@@ -456,6 +453,99 @@ fi
 Write file.
 </step>
 
+<step name="external_depth_check">
+Spawn a lightweight sub-agent to verify the written CONTEXT.md against the enumerated user inputs.
+
+**Why external:** Self-verification has confirmation bias — the same context window that wrote the document fills in gaps mentally. A separate agent with ONLY the document + input list catches what the writer missed.
+
+**Prepare the payload (inline — @ syntax doesn't work across Task boundaries):**
+
+```bash
+CONTEXT_CONTENT=$(cat "${PHASE_DIR}/${PADDED_PHASE}-CONTEXT.md")
+```
+
+Build the numbered input list from the verify_depth step as a markdown block:
+
+```markdown
+## User Inputs from Discussion
+
+INPUT-1: [content] | Category: [tag]
+INPUT-2: [content] | Category: [tag]
+...
+INPUT-N: [content] | Category: [tag]
+```
+
+**Spawn sub-agent:**
+
+```
+Task(
+  prompt=depth_check_prompt,
+  subagent_type="general-purpose",
+  model="haiku",
+  description="Depth check Phase {phase}"
+)
+```
+
+The prompt:
+
+```markdown
+## Depth Cross-Reference Check
+
+You verify that a CONTEXT.md document captures all user inputs from a discussion.
+You have NO access to the original discussion — only the document and the input list below.
+This is intentional: you catch what the document writer missed.
+
+### CONTEXT.md Content
+
+{context_content}
+
+### User Inputs to Verify
+
+{numbered_input_list}
+
+### Instructions
+
+For EACH numbered input, check:
+
+1. **Present?** Is this input reflected in CONTEXT.md? (Which section?)
+2. **Deep enough?** Is the WHY/reasoning preserved, not just the decision?
+3. **Voice preserved?** Are the user's exact terms used, or were they paraphrased into generic language?
+
+### Output Format
+
+Return ONLY this format:
+
+```
+## Depth Check: [N] inputs verified
+
+### Gaps Found: [X]
+
+[If gaps found:]
+| Input | Gap Type | Detail |
+|-------|----------|--------|
+| INPUT-3 | MISSING | Not reflected anywhere in document |
+| INPUT-7 | SHALLOW | Decision captured but reasoning ("because X") is missing |
+| INPUT-11 | LOST_VOICE | User said "Hardening-Fact", document says "validation signal" |
+
+### Suggested Fixes
+
+[For each gap, one line: what to add/change and where in CONTEXT.md]
+
+[If no gaps:]
+All inputs verified. No gaps found.
+```
+
+Do NOT explain your process. Do NOT list what passed. ONLY gaps.
+```
+
+**Handle sub-agent return:**
+
+- **No gaps:** Proceed to confirm_creation
+- **Gaps found:** Apply fixes directly to CONTEXT.md (edit the file), then proceed to confirm_creation. Note in the confirmation: "External depth check found {N} gaps — fixed."
+
+**Cost:** ~10-15k tokens with Haiku. ~15-25 seconds. Much cheaper than the full /verify-depth (70k tokens).
+</step>
+
 <step name="confirm_creation">
 Present summary and next steps:
 
@@ -535,6 +625,8 @@ Confirm: "Committed: docs(${PADDED_PHASE}): capture phase context"
 - Deferred ideas preserved for future phases
 - User knows next steps
 - Depth signals detected and followed (rich responses explored, terminology probed)
-- Verify-depth self-check completed before writing CONTEXT.md
+- Verify-depth self-extraction completed before writing CONTEXT.md (numbered input list)
+- External depth check spawned after writing CONTEXT.md (separate agent, no confirmation bias)
+- Gaps from external check applied to CONTEXT.md before commit
 - No substantive user input lost or shallow in final CONTEXT.md
 </success_criteria>
