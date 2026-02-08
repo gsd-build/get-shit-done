@@ -84,6 +84,8 @@ function gsd-secure() {
     local OS_TYPE="linux"
     if [[ "$OSTYPE" == "darwin"* ]]; then
         OS_TYPE="macos"
+    elif [[ "$OSTYPE" == "msys"* || "$OSTYPE" == "cygwin"* ]]; then
+        OS_TYPE="windows_bash"
     fi
     
     # Default ports covering 99% of dev use cases
@@ -153,7 +155,7 @@ function gsd-secure() {
             -e "GIT_COMMITTER_EMAIL=$GIT_EMAIL" \
             $IMAGE_NAME
     else
-        # macOS: requires port mapping (like Windows)
+        # macOS / Windows (Bash): requires port mapping
         local DETECTED_PORTS=$(detect_project_ports "$CURRENT_DIR")
         local ALL_PORTS=(${DEFAULT_PORTS[@]} ${DETECTED_PORTS[@]})
         # Remove duplicates
@@ -168,7 +170,7 @@ function gsd-secure() {
         if [ -n "$DETECTED_PORTS" ]; then
             echo -e "\033[0;90m [Ports] Auto-detected: $DETECTED_PORTS\033[0m"
         fi
-        echo -e "\033[0;90m [Ports] Mapped: ${#ALL_PORTS[@]} ports ready (macOS mode)\033[0m"
+        echo -e "\033[0;90m [Ports] Mapped: ${#ALL_PORTS[@]} ports ready (Intelligent Mapping Mode)\033[0m"
         
         docker run --rm -it \
             "${PORT_ARGS[@]}" \
