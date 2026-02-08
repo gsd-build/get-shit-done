@@ -169,3 +169,44 @@ psql -h host.docker.internal -p 5432
 99% of developers need localhost access during development. The previous bridge-network default created confusion and frustration. By making `--network host` the default, we prioritize developer experience while keeping all file system protections intact.
 
 For security-conscious users and sensitive environments, `--strict` mode provides full network isolation with explicit opt-in for localhost access via `host.docker.internal`.
+
+---
+
+## 6. Why Not Docker Sandboxes?
+
+Docker recently introduced [Docker Sandboxes](https://docs.docker.com/ai/sandboxes/), a feature that runs AI agents in microVMs with private Docker daemons. We evaluated this approach and decided **it's not suitable for GSD Secure**.
+
+### What Docker Sandboxes Offers
+
+| Feature | Status |
+|---------|--------|
+| MicroVM isolation (Hyper-V/Virtualization.framework) | ✅ |
+| Private Docker daemon per sandbox | ✅ |
+| Filesystem isolation | ✅ |
+| Multi-agent support (Claude, Gemini, Codex) | ✅ |
+
+### The Deal-Breaker: No Localhost Access
+
+From Docker's official documentation:
+> *"Sandboxes also cannot access your host's localhost services. The VM boundary prevents direct access to services running on your host machine."*
+
+This is a fundamental architectural limitation. Docker Sandboxes **cannot** connect to:
+- ❌ Local PostgreSQL (`localhost:5432`)
+- ❌ Local Redis (`localhost:6379`)
+- ❌ Local dev servers (`localhost:3000`)
+
+### Why This Matters
+
+99% of developers run databases and services locally during development. Requiring them to migrate to cloud services or reconfigure everything just to use a sandbox is unacceptable friction.
+
+Our philosophy is **"Remove friction for the common case."** Docker Sandboxes violates this by making the common case (local dev) impossible.
+
+### Our Approach
+
+GSD Secure uses **container isolation** instead of microVMs:
+- ✅ Localhost access works out-of-the-box (default mode)
+- ✅ Full network isolation available when needed (`--strict` mode)
+- ✅ Same file system protections as Docker Sandboxes
+- ✅ Works on Linux, macOS, and Windows
+
+We trade some isolation (container vs VM) for **practical developer experience**.
