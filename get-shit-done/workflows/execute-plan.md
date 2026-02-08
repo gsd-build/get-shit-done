@@ -364,12 +364,9 @@ git diff --name-only ${FIRST_TASK}^..HEAD 2>/dev/null
 
 Update only structural changes: new src/ dir → STRUCTURE.md | deps → STACK.md | file pattern → CONVENTIONS.md | API client → INTEGRATIONS.md | config → STACK.md | renamed → update paths. Skip code-only/bugfix/content changes.
 
-If `commit_docs` is `true` (from init JSON):
 ```bash
-git add .planning/codebase/*.md && git commit --amend --no-edit
+node ~/.claude/get-shit-done/bin/gsd-tools.js commit "" --files .planning/codebase/*.md --amend
 ```
-
-If `commit_docs` is `false`: skip — do not stage or commit .planning/ files.
 </step>
 
 <step name="offer_next">

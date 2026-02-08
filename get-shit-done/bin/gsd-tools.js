@@ -865,8 +865,8 @@ function cmdFindPhase(cwd, phase, raw) {
   }
 }
 
-function cmdCommit(cwd, message, files, raw) {
-  if (!message) {
+function cmdCommit(cwd, message, files, raw, amend) {
+  if (!message && !amend) {
     error('commit message required');
   }
 
@@ -893,7 +893,8 @@ function cmdCommit(cwd, message, files, raw) {
   }
 
   // Commit
-  const commitResult = execGit(cwd, ['commit', '-m', message]);
+  const commitArgs = amend ? ['commit', '--amend', '--no-edit'] : ['commit', '-m', message];
+  const commitResult = execGit(cwd, commitArgs);
   if (commitResult.exitCode !== 0) {
     if (commitResult.stdout.includes('nothing to commit') || commitResult.stderr.includes('nothing to commit')) {
       const result = { committed: false, hash: null, reason: 'nothing_to_commit' };
@@ -2095,11 +2096,12 @@ function main() {
     }
 
     case 'commit': {
+      const amend = args.includes('--amend');
       const message = args[1];
-      // Parse --files flag
+      // Parse --files flag (collect args after --files, stopping at other flags)
       const filesIndex = args.indexOf('--files');
-      const files = filesIndex !== -1 ? args.slice(filesIndex + 1) : [];
-      cmdCommit(cwd, message, files, raw);
+      const files = filesIndex !== -1 ? args.slice(filesIndex + 1).filter(a => !a.startsWith('--')) : [];
+      cmdCommit(cwd, message, files, raw, amend);
       break;
     }
 
