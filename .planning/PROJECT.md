@@ -49,6 +49,7 @@ Complex phases currently start agents at 15-25% context from prompt loading alon
 - **Adaptive intelligence**: Agents must still handle mid-execution surprises
 - **Maintainability**: Clear separation between core and extensions
 - **Debuggability**: Easy to trace which modules loaded for any execution
+- **TDD**: Use test-driven development for gsd-tools.js changes — write tests first, then implementation
 
 ## Key Decisions
 
