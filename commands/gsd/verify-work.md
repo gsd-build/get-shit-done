@@ -14,9 +14,9 @@ allowed-tools:
 <objective>
 Validate built features through conversational testing with persistent state.
 
-Purpose: Confirm what Claude built actually works from user's perspective. One test at a time, plain text responses, no interrogation. When issues are found, automatically diagnose, plan fixes, and prepare for execution.
+Purpose: Confirm what Claude built actually works from user's perspective. One test at a time, plain text responses, no interrogation. When issues are found, record them in UAT.md and route user to /gsd:plan-phase --gaps in a fresh context.
 
-Output: {phase}-UAT.md tracking all test results. If issues found: diagnosed gaps, verified fix plans ready for /gsd:execute-phase
+Output: {phase}-UAT.md tracking all test results. If issues found: structured gaps ready for /gsd:plan-phase --gaps
 </objective>
 
 <execution_context>
@@ -35,5 +35,5 @@ Phase: $ARGUMENTS (optional)
 
 <process>
 Execute the verify-work workflow from @~/.claude/get-shit-done/workflows/verify-work.md end-to-end.
-Preserve all workflow gates (session management, test presentation, diagnosis, fix planning, routing).
+Preserve all workflow gates (session management, test presentation, gap recording, routing).
 </process>

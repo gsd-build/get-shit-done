@@ -311,7 +311,31 @@ Present summary:
 [List from Issues section]
 ```
 
-**If issues > 0:** Proceed to `diagnose_issues`
+**If issues > 0:**
+
+```
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+ GSD ► ISSUES RECORDED
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+{N} issue(s) recorded in UAT.md with structured gaps.
+
+| # | Test | Severity | Issue |
+|---|------|----------|-------|
+[table of issues from Gaps section]
+
+───────────────────────────────────────────────────────────────
+
+## ▶ Next Up
+
+**Plan fixes** in a fresh context (saves tokens):
+
+`/clear` then `/gsd:plan-phase {phase} --gaps`
+
+This will read the UAT gaps and create targeted fix plans.
+
+───────────────────────────────────────────────────────────────
+```
 
 **If issues == 0:**
 ```
@@ -320,203 +344,6 @@ All tests passed. Ready to continue.
 - `/gsd:plan-phase {next}` — Plan next phase
 - `/gsd:execute-phase {next}` — Execute next phase
 ```
-</step>
-
-<step name="diagnose_issues">
-**Diagnose root causes before planning fixes:**
-
-```
----
-
-{N} issues found. Diagnosing root causes...
-
-Spawning parallel debug agents to investigate each issue.
-```
-
-- Load diagnose-issues workflow
-- Follow @~/.claude/get-shit-done/workflows/diagnose-issues.md
-- Spawn parallel debug agents for each issue
-- Collect root causes
-- Update UAT.md with root causes
-- Proceed to `plan_gap_closure`
-
-Diagnosis runs automatically - no user prompt. Parallel agents investigate simultaneously, so overhead is minimal and fixes are more accurate.
-</step>
-
-<step name="plan_gap_closure">
-**Auto-plan fixes from diagnosed gaps:**
-
-Display:
-```
-━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
- GSD ► PLANNING FIXES
-━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-
-◆ Spawning planner for gap closure...
-```
-
-Spawn gsd-planner in --gaps mode:
-
-```
-Task(
-  prompt="""
-<planning_context>
-
-**Phase:** {phase_number}
-**Mode:** gap_closure
-
-**UAT with diagnoses:**
-@.planning/phases/{phase_dir}/{phase}-UAT.md
-
-**Project State:**
-@.planning/STATE.md
-
-**Roadmap:**
-@.planning/ROADMAP.md
-
-</planning_context>
-
-<downstream_consumer>
-Output consumed by /gsd:execute-phase
-Plans must be executable prompts.
-</downstream_consumer>
-""",
-  subagent_type="gsd-planner",
-  model="{planner_model}",
-  description="Plan gap fixes for Phase {phase}"
-)
-```
-
-On return:
-- **PLANNING COMPLETE:** Proceed to `verify_gap_plans`
-- **PLANNING INCONCLUSIVE:** Report and offer manual intervention
-</step>
-
-<step name="verify_gap_plans">
-**Verify fix plans with checker:**
-
-Display:
-```
-━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
- GSD ► VERIFYING FIX PLANS
-━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-
-◆ Spawning plan checker...
-```
-
-Initialize: `iteration_count = 1`
-
-Spawn gsd-plan-checker:
-
-```
-Task(
-  prompt="""
-<verification_context>
-
-**Phase:** {phase_number}
-**Phase Goal:** Close diagnosed gaps from UAT
-
-**Plans to verify:**
-@.planning/phases/{phase_dir}/*-PLAN.md
-
-</verification_context>
-
-<expected_output>
-Return one of:
-- ## VERIFICATION PASSED — all checks pass
-- ## ISSUES FOUND — structured issue list
-</expected_output>
-""",
-  subagent_type="gsd-plan-checker",
-  model="{checker_model}",
-  description="Verify Phase {phase} fix plans"
-)
-```
-
-On return:
-- **VERIFICATION PASSED:** Proceed to `present_ready`
-- **ISSUES FOUND:** Proceed to `revision_loop`
-</step>
-
-<step name="revision_loop">
-**Iterate planner ↔ checker until plans pass (max 3):**
-
-**If iteration_count < 3:**
-
-Display: `Sending back to planner for revision... (iteration {N}/3)`
-
-Spawn gsd-planner with revision context:
-
-```
-Task(
-  prompt="""
-<revision_context>
-
-**Phase:** {phase_number}
-**Mode:** revision
-
-**Existing plans:**
-@.planning/phases/{phase_dir}/*-PLAN.md
-
-**Checker issues:**
-{structured_issues_from_checker}
-
-</revision_context>
-
-<instructions>
-Read existing PLAN.md files. Make targeted updates to address checker issues.
-Do NOT replan from scratch unless issues are fundamental.
-</instructions>
-""",
-  subagent_type="gsd-planner",
-  model="{planner_model}",
-  description="Revise Phase {phase} plans"
-)
-```
-
-After planner returns → spawn checker again (verify_gap_plans logic)
-Increment iteration_count
-
-**If iteration_count >= 3:**
-
-Display: `Max iterations reached. {N} issues remain.`
-
-Offer options:
-1. Force proceed (execute despite issues)
-2. Provide guidance (user gives direction, retry)
-3. Abandon (exit, user runs /gsd:plan-phase manually)
-
-Wait for user response.
-</step>
-
-<step name="present_ready">
-**Present completion and next steps:**
-
-```
-━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
- GSD ► FIXES READY ✓
-━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-
-**Phase {X}: {Name}** — {N} gap(s) diagnosed, {M} fix plan(s) created
-
-| Gap | Root Cause | Fix Plan |
-|-----|------------|----------|
-| {truth 1} | {root_cause} | {phase}-04 |
-| {truth 2} | {root_cause} | {phase}-04 |
-
-Plans verified and ready for execution.
-
-───────────────────────────────────────────────────────────────
-
-## ▶ Next Up
-
-**Execute fixes** — run fix plans
-
-`/clear` then `/gsd:execute-phase {phase} --gaps-only`
-
-───────────────────────────────────────────────────────────────
-```
-</step>
 
 </process>
 
@@ -562,9 +389,7 @@ Default to **major** if unclear. User can correct if needed.
 - [ ] Severity inferred from description (never asked)
 - [ ] Batched writes: on issue, every 5 passes, or completion
 - [ ] Committed on completion
-- [ ] If issues: parallel debug agents diagnose root causes
-- [ ] If issues: gsd-planner creates fix plans (gap_closure mode)
-- [ ] If issues: gsd-plan-checker verifies fix plans
-- [ ] If issues: revision loop until plans pass (max 3 iterations)
-- [ ] Ready for `/gsd:execute-phase --gaps-only` when complete
+- [ ] If issues: gaps recorded in structured YAML in UAT.md
+- [ ] If issues: user routed to `/gsd:plan-phase {N} --gaps` in fresh context
+- [ ] If no issues: user routed to next phase
 </success_criteria>
