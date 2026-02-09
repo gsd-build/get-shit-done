@@ -151,6 +151,15 @@ Task(
 )
 ```
 
+## 6. Close Debug Session
+
+After fix is complete (or user chooses "Plan fix" / "Manual fix"), move debug file to resolved if the agent didn't already:
+
+```bash
+mkdir -p .planning/debug/resolved
+mv .planning/debug/{slug}.md .planning/debug/resolved/ 2>/dev/null
+```
+
 </process>
 
 <success_criteria>
@@ -159,4 +168,5 @@ Task(
 - [ ] gsd-debugger spawned with context
 - [ ] Checkpoints handled correctly
 - [ ] Root cause confirmed before fixing
+- [ ] Resolved sessions moved to .planning/debug/resolved/
 </success_criteria>
