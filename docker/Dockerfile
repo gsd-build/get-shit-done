@@ -1,5 +1,5 @@
 # Stage 1: Packer - Create a clean tarball of the source
-FROM node:20-slim as packer
+FROM node:20-slim AS packer
 COPY . /tmp/gsd-source
 WORKDIR /tmp/gsd-source
 RUN npm pack

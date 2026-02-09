@@ -38,8 +38,8 @@ fi
 
 # 3. Detect OpenCode Preference (Folder mounted at /root/.config/opencode)
 if [ -d "/root/.config/opencode" ]; then
-    echo -e "\033[0;36m  Detected ~/.config/opencode -> Installing opencode\033[0m"
-    CLI_PACKAGES="$CLI_PACKAGES opencode"
+    echo -e "\033[0;36m  Detected ~/.config/opencode -> Installing opencode-ai\033[0m"
+    CLI_PACKAGES="$CLI_PACKAGES opencode-ai"
 fi
 
 if [ -n "$CLI_PACKAGES" ]; then
