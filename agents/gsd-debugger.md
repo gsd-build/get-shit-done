@@ -1019,18 +1019,19 @@ mkdir -p .planning/debug/resolved
 mv .planning/debug/{slug}.md .planning/debug/resolved/
 ```
 
-**Check planning config:**
+**Check planning config using state load (commit_docs is available from the output):**
 
 ```bash
-COMMIT_PLANNING_DOCS=$(cat .planning/config.json 2>/dev/null | grep -o '"commit_docs"[[:space:]]*:[[:space:]]*[^,}]*' | grep -o 'true\|false' || echo "true")
-git check-ignore -q .planning 2>/dev/null && COMMIT_PLANNING_DOCS=false
+INIT=$(node ~/.claude/get-shit-done/bin/gsd-tools.js state load)
+# commit_docs is in the JSON output
 ```
 
 **Commit the fix:**
 
-If `COMMIT_PLANNING_DOCS=true` (default):
+Stage and commit code changes (NEVER `git add -A` or `git add .`):
 ```bash
-git add -A
+git add src/path/to/fixed-file.ts
+git add src/path/to/test-file.ts
 git commit -m "fix: {brief description}
 
 Root cause: {root_cause}
@@ -1043,12 +1044,18 @@ Debug session: .planning/debug/resolved/{slug}.md"
 If `COMMIT_PLANNING_DOCS=false`:
 ```bash
 # Only commit code changes, exclude .planning/
-git add -A
+git add src/path/to/fixed-file.ts
+git add src/path/to/test-file.ts
 git reset .planning/
 git commit -m "fix: {brief description}
 
 Root cause: {root_cause}
 Test: {test_file}"
+```
+
+Then commit planning docs via CLI (respects `commit_docs` config automatically):
+```bash
+node ~/.claude/get-shit-done/bin/gsd-tools.js commit "docs: resolve debug {slug}" --files .planning/debug/resolved/{slug}.md
 ```
 
 Report completion and offer next steps.

@@ -31,40 +31,26 @@ Normalize phase input in step 1 before any directory lookups.
 
 <process>
 
-## 0. Resolve Model Profile
-
-Read model profile for agent spawning:
+## 0. Initialize Context
 
 ```bash
-MODEL_PROFILE=$(cat .planning/config.json 2>/dev/null | grep -o '"model_profile"[[:space:]]*:[[:space:]]*"[^"]*"' | grep -o '"[^"]*"$' | tr -d '"' || echo "balanced")
+INIT=$(node ~/.claude/get-shit-done/bin/gsd-tools.js init phase-op "$ARGUMENTS")
 ```
 
-Default to "balanced" if not set.
+Extract from init JSON: `phase_dir`, `phase_number`, `phase_name`, `phase_found`, `commit_docs`, `has_research`.
 
-**Model lookup table:**
+Resolve researcher model:
+```bash
+RESEARCHER_MODEL=$(node ~/.claude/get-shit-done/bin/gsd-tools.js resolve-model gsd-phase-researcher --raw)
+```
 
-| Agent | quality | balanced | budget |
-|-------|---------|----------|--------|
-| gsd-phase-researcher | opus | sonnet | haiku |
-
-Store resolved model for use in Task calls below.
-
-## 1. Normalize and Validate Phase
+## 1. Validate Phase
 
 ```bash
-# Normalize phase number (8 → 08, but preserve decimals like 2.1 → 02.1)
-if [[ "$ARGUMENTS" =~ ^[0-9]+$ ]]; then
-  PHASE=$(printf "%02d" "$ARGUMENTS")
-elif [[ "$ARGUMENTS" =~ ^([0-9]+)\.([0-9]+)$ ]]; then
-  PHASE=$(printf "%02d.%s" "${BASH_REMATCH[1]}" "${BASH_REMATCH[2]}")
-else
-  PHASE="$ARGUMENTS"
-fi
-
-grep -A5 "Phase ${PHASE}:" .planning/ROADMAP.md 2>/dev/null
+PHASE_INFO=$(node ~/.claude/get-shit-done/bin/gsd-tools.js roadmap get-phase "${phase_number}")
 ```
 
-**If not found:** Error and exit. **If found:** Extract phase number, name, description.
+**If `found` is false:** Error and exit. **If `found` is true:** Extract `phase_number`, `phase_name`, `goal` from JSON.
 
 ## 2. Check Existing Research
 
@@ -79,7 +65,8 @@ ls .planning/phases/${PHASE}-*/RESEARCH.md 2>/dev/null
 ## 3. Gather Phase Context
 
 ```bash
-grep -A20 "Phase ${PHASE}:" .planning/ROADMAP.md
+# Phase section already loaded in PHASE_INFO
+echo "$PHASE_INFO" | jq -r '.section'
 cat .planning/REQUIREMENTS.md 2>/dev/null
 cat .planning/phases/${PHASE}-*/*-CONTEXT.md 2>/dev/null
 grep -A30 "### Decisions Made" .planning/STATE.md 2>/dev/null

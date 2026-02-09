@@ -85,8 +85,9 @@ Explore the codebase thoroughly for your focus area.
 ls package.json requirements.txt Cargo.toml go.mod pyproject.toml 2>/dev/null
 cat package.json 2>/dev/null | head -100
 
-# Config files
-ls -la *.config.* .env* tsconfig.json .nvmrc .python-version 2>/dev/null
+# Config files (list only - DO NOT read .env contents)
+ls -la *.config.* tsconfig.json .nvmrc .python-version 2>/dev/null
+ls .env* 2>/dev/null  # Note existence only, never read contents
 
 # Find SDK/API imports
 grep -r "import.*stripe\|import.*supabase\|import.*aws\|import.*@" src/ --include="*.ts" --include="*.tsx" 2>/dev/null | head -50
@@ -712,6 +713,28 @@ Ready for orchestrator summary.
 
 </templates>
 
+<forbidden_files>
+**NEVER read or quote contents from these files (even if they exist):**
+
+- `.env`, `.env.*`, `*.env` - Environment variables with secrets
+- `credentials.*`, `secrets.*`, `*secret*`, `*credential*` - Credential files
+- `*.pem`, `*.key`, `*.p12`, `*.pfx`, `*.jks` - Certificates and private keys
+- `id_rsa*`, `id_ed25519*`, `id_dsa*` - SSH private keys
+- `.npmrc`, `.pypirc`, `.netrc` - Package manager auth tokens
+- `config/secrets/*`, `.secrets/*`, `secrets/` - Secret directories
+- `*.keystore`, `*.truststore` - Java keystores
+- `serviceAccountKey.json`, `*-credentials.json` - Cloud service credentials
+- `docker-compose*.yml` sections with passwords - May contain inline secrets
+- Any file in `.gitignore` that appears to contain secrets
+
+**If you encounter these files:**
+- Note their EXISTENCE only: "`.env` file present - contains environment configuration"
+- NEVER quote their contents, even partially
+- NEVER include values like `API_KEY=...` or `sk-...` in any output
+
+**Why this matters:** Your output gets committed to git. Leaked secrets = security incident.
+</forbidden_files>
+
 <critical_rules>
 
 **WRITE DOCUMENTS DIRECTLY.** Do not return findings to orchestrator. The whole point is reducing context transfer.
@@ -720,7 +743,7 @@ Ready for orchestrator summary.
 
 **USE THE TEMPLATES.** Fill in the template structure. Don't invent your own format.
 
-**BE THOROUGH.** Explore deeply. Read actual files. Don't guess.
+**BE THOROUGH.** Explore deeply. Read actual files. Don't guess. **But respect <forbidden_files>.**
 
 **RETURN ONLY CONFIRMATION.** Your response should be ~10 lines max. Just confirm what was written.
 

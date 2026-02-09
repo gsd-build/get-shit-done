@@ -14,3 +14,7 @@ hooks/dist/
 # Animation assets
 animation/
 *.gif
+
+# Internal planning documents
+reports/
+RAILROAD_ARCHITECTURE.md

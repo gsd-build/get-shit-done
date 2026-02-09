@@ -22,29 +22,22 @@ Documents are reference material for Claude when planning/executing. Always incl
 
 <process>
 
-<step name="resolve_model_profile" priority="first">
-Read model profile for agent spawning:
+<step name="init_context" priority="first">
+Load codebase mapping context:
 
 ```bash
-MODEL_PROFILE=$(cat .planning/config.json 2>/dev/null | grep -o '"model_profile"[[:space:]]*:[[:space:]]*"[^"]*"' | grep -o '"[^"]*"$' | tr -d '"' || echo "balanced")
+INIT=$(node ~/.claude/get-shit-done/bin/gsd-tools.js init map-codebase)
 ```
 
-Default to "balanced" if not set.
-
-**Model lookup table:**
-
-| Agent | quality | balanced | budget |
-|-------|---------|----------|--------|
-| gsd-codebase-mapper | sonnet | haiku | haiku |
-
-Store resolved model for use in Task calls below.
+Extract from init JSON: `mapper_model`, `commit_docs`, `codebase_dir`, `existing_maps`, `has_maps`, `codebase_dir_exists`.
 </step>
 
 <step name="check_existing">
-Check if .planning/codebase/ already exists:
+Check if .planning/codebase/ already exists using `has_maps` from init context.
 
+If `codebase_dir_exists` is true:
 ```bash
-ls -la .planning/codebase/ 2>/dev/null
+ls -la .planning/codebase/
 ```
 
 **If exists:**
@@ -227,37 +220,49 @@ wc -l .planning/codebase/*.md
 
 If any documents missing or empty, note which agents may have failed.
 
+Continue to scan_for_secrets.
+</step>
+
+<step name="scan_for_secrets">
+**CRITICAL SECURITY CHECK:** Scan output files for accidentally leaked secrets before committing.
+
+Run secret pattern detection:
+
+```bash
+# Check for common API key patterns in generated docs
+grep -E '(sk-[a-zA-Z0-9]{20,}|sk_live_[a-zA-Z0-9]+|sk_test_[a-zA-Z0-9]+|ghp_[a-zA-Z0-9]{36}|gho_[a-zA-Z0-9]{36}|glpat-[a-zA-Z0-9_-]+|AKIA[A-Z0-9]{16}|xox[baprs]-[a-zA-Z0-9-]+|-----BEGIN.*PRIVATE KEY|eyJ[a-zA-Z0-9_-]+\.eyJ[a-zA-Z0-9_-]+\.)' .planning/codebase/*.md 2>/dev/null && SECRETS_FOUND=true || SECRETS_FOUND=false
+```
+
+**If SECRETS_FOUND=true:**
+
+```
+⚠️  SECURITY ALERT: Potential secrets detected in codebase documents!
+
+Found patterns that look like API keys or tokens in:
+[show grep output]
+
+This would expose credentials if committed.
+
+**Action required:**
+1. Review the flagged content above
+2. If these are real secrets, they must be removed before committing
+3. Consider adding sensitive files to Claude Code "Deny" permissions
+
+Pausing before commit. Reply "safe to proceed" if the flagged content is not actually sensitive, or edit the files first.
+```
+
+Wait for user confirmation before continuing to commit_codebase_map.
+
+**If SECRETS_FOUND=false:**
+
 Continue to commit_codebase_map.
 </step>
 
 <step name="commit_codebase_map">
 Commit the codebase map:
 
-**Check planning config:**
-
 ```bash
-COMMIT_PLANNING_DOCS=$(cat .planning/config.json 2>/dev/null | grep -o '"commit_docs"[[:space:]]*:[[:space:]]*[^,}]*' | grep -o 'true\|false' || echo "true")
-git check-ignore -q .planning 2>/dev/null && COMMIT_PLANNING_DOCS=false
-```
-
-**If `COMMIT_PLANNING_DOCS=false`:** Skip git operations
-
-**If `COMMIT_PLANNING_DOCS=true` (default):**
-
-```bash
-git add .planning/codebase/*.md
-git commit -m "$(cat <<'EOF'
-docs: map existing codebase
-
-- STACK.md - Technologies and dependencies
-- ARCHITECTURE.md - System design and patterns
-- STRUCTURE.md - Directory layout
-- CONVENTIONS.md - Code style and patterns
-- TESTING.md - Test structure
-- INTEGRATIONS.md - External services
-- CONCERNS.md - Technical debt and issues
-EOF
-)"
+node ~/.claude/get-shit-done/bin/gsd-tools.js commit "docs: map existing codebase" --files .planning/codebase/*.md
 ```
 
 Continue to offer_next.

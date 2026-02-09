@@ -118,39 +118,22 @@ If found, delete them — phase is complete, handoffs are stale.
 
 </step>
 
-<step name="update_roadmap">
+<step name="update_roadmap_and_state">
 
-Update the roadmap file:
+**Delegate ROADMAP.md and STATE.md updates to gsd-tools:**
 
 ```bash
-ROADMAP_FILE=".planning/ROADMAP.md"
+TRANSITION=$(node ~/.claude/get-shit-done/bin/gsd-tools.js phase complete "${current_phase}")
 ```
 
-Update the file:
+The CLI handles:
+- Marking the phase checkbox as `[x]` complete with today's date
+- Updating plan count to final (e.g., "3/3 plans complete")
+- Updating the Progress table (Status → Complete, adding date)
+- Advancing STATE.md to next phase (Current Phase, Status → Ready to plan, Current Plan → Not started)
+- Detecting if this is the last phase in the milestone
 
-- Mark current phase: `[x] Complete`
-- Add completion date
-- Update plan count to final (e.g., "3/3 plans complete")
-- Update Progress table
-- Keep next phase as `[ ] Not started`
-
-**Example:**
-
-```markdown
-## Phases
-
-- [x] Phase 1: Foundation (completed 2025-01-15)
-- [ ] Phase 2: Authentication ← Next
-- [ ] Phase 3: Core Features
-
-## Progress
-
-| Phase             | Plans Complete | Status      | Completed  |
-| ----------------- | -------------- | ----------- | ---------- |
-| 1. Foundation     | 3/3            | Complete    | 2025-01-15 |
-| 2. Authentication | 0/2            | Not started | -          |
-| 3. Core Features  | 0/1            | Not started | -          |
-```
+Extract from result: `completed_phase`, `plans_executed`, `next_phase`, `next_phase_name`, `is_last_phase`.
 
 </step>
 
@@ -250,61 +233,21 @@ After (Phase 2 shipped JWT auth, discovered rate limiting needed):
 
 <step name="update_current_position_after_transition">
 
-Update Current Position section in STATE.md to reflect phase completion and transition.
+**Note:** Basic position updates (Current Phase, Status, Current Plan, Last Activity) were already handled by `gsd-tools phase complete` in the update_roadmap_and_state step.
 
-**Format:**
+Verify the updates are correct by reading STATE.md. If the progress bar needs updating, use:
 
-```markdown
-Phase: [next] of [total] ([Next phase name])
-Plan: Not started
-Status: Ready to plan
-Last activity: [today] — Phase [X] complete, transitioned to Phase [X+1]
-
-Progress: [updated progress bar]
+```bash
+PROGRESS=$(node ~/.claude/get-shit-done/bin/gsd-tools.js progress bar --raw)
 ```
 
-**Instructions:**
-
-- Increment phase number to next phase
-- Reset plan to "Not started"
-- Set status to "Ready to plan"
-- Update last activity to describe transition
-- Recalculate progress bar based on completed plans
-
-**Example — transitioning from Phase 2 to Phase 3:**
-
-Before:
-
-```markdown
-## Current Position
-
-Phase: 2 of 4 (Authentication)
-Plan: 2 of 2 in current phase
-Status: Phase complete
-Last activity: 2025-01-20 — Completed 02-02-PLAN.md
-
-Progress: ███████░░░ 60%
-```
-
-After:
-
-```markdown
-## Current Position
-
-Phase: 3 of 4 (Core Features)
-Plan: Not started
-Status: Ready to plan
-Last activity: 2025-01-20 — Phase 2 complete, transitioned to Phase 3
-
-Progress: ███████░░░ 60%
-```
+Update the progress bar line in STATE.md with the result.
 
 **Step complete when:**
 
-- [ ] Phase number incremented to next phase
-- [ ] Plan status reset to "Not started"
-- [ ] Status shows "Ready to plan"
-- [ ] Last activity describes the transition
+- [ ] Phase number incremented to next phase (done by phase complete)
+- [ ] Plan status reset to "Not started" (done by phase complete)
+- [ ] Status shows "Ready to plan" (done by phase complete)
 - [ ] Progress bar reflects total completed plans
 
 </step>
@@ -394,26 +337,20 @@ Resume file: None
 
 **MANDATORY: Verify milestone status before presenting next steps.**
 
-**Step 1: Read ROADMAP.md and identify phases in current milestone**
+**Use the transition result from `gsd-tools phase complete`:**
 
-Read the ROADMAP.md file and extract:
-1. Current phase number (the phase just transitioned from)
-2. All phase numbers in the current milestone section
+The `is_last_phase` field from the phase complete result tells you directly:
+- `is_last_phase: false` → More phases remain → Go to **Route A**
+- `is_last_phase: true` → Milestone complete → Go to **Route B**
 
-To find phases, look for:
-- Phase headers: lines starting with `### Phase` or `#### Phase`
-- Phase list items: lines like `- [ ] **Phase X:` or `- [x] **Phase X:`
+The `next_phase` and `next_phase_name` fields give you the next phase details.
 
-Count total phases and identify the highest phase number in the milestone.
+If you need additional context, use:
+```bash
+ROADMAP=$(node ~/.claude/get-shit-done/bin/gsd-tools.js roadmap analyze)
+```
 
-State: "Current phase is {X}. Milestone has {N} phases (highest: {Y})."
-
-**Step 2: Route based on milestone status**
-
-| Condition | Meaning | Action |
-|-----------|---------|--------|
-| current phase < highest phase | More phases remain | Go to **Route A** |
-| current phase = highest phase | Milestone complete | Go to **Route B** |
+This returns all phases with goals, disk status, and completion info.
 
 ---
 
