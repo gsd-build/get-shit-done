@@ -50,9 +50,9 @@ Check for .planning/STATE.md - loads context if project already initialized
 1. Check .planning/ exists (error if missing)
 2. Parse --force flag from arguments
 3. Run: node scripts/generate-docs.js [--force]
-4. If docs/node_modules doesn't exist: npm install --prefix docs
+4. If docs/node_modules doesn't exist: pnpm install --dir docs
 5. Verify output files created
-6. Offer next steps: dev server (npm run start --prefix docs) or build (npm run build --prefix docs)
+6. Offer next steps: dev server (pnpm --dir docs start) or build (pnpm --dir docs build)
 </process>
 
 <success_criteria>

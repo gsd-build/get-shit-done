@@ -139,15 +139,15 @@ if [ ! -d docs/node_modules ]; then
   echo "Installing Docusaurus dependencies..."
   echo "(This may take 1-2 minutes on first run)"
   echo ""
-  npm install --prefix docs
+  pnpm install --dir docs
 
   if [ $? -ne 0 ]; then
     echo ""
-    echo "Error: npm install failed"
+    echo "Error: pnpm install failed"
     echo ""
     echo "Try:"
     echo "  1. cd docs"
-    echo "  2. npm install"
+    echo "  2. pnpm install"
     echo "  3. Check for Node.js version compatibility"
     exit 1
   fi
@@ -229,7 +229,7 @@ Production build test
 
 Test the production build now? This catches MDX preprocessing errors.
 
-Run: npm run build --prefix docs
+Run: pnpm --dir docs build
 
 Reply:
   - "yes" to test build now
@@ -244,7 +244,7 @@ Wait for user response.
 echo ""
 echo "Testing production build..."
 echo ""
-npm run build --prefix docs
+pnpm --dir docs build
 
 if [ $? -ne 0 ]; then
   echo ""
@@ -281,13 +281,13 @@ Documentation generated successfully.
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
 Option 1: Start development server
-  npm run start --prefix docs
+  pnpm --dir docs start
 
   Opens browser at http://localhost:3000
   Hot reload on file changes
 
 Option 2: Build for production
-  npm run build --prefix docs
+  pnpm --dir docs build
 
   Creates static site in docs/build/
   Deploy to any static host (Vercel, Netlify, GitHub Pages)

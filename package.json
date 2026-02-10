@@ -44,7 +44,7 @@
     "build:hooks": "node scripts/build-hooks.js",
     "prepublishOnly": "npm run build:hooks",
     "docs:generate": "node scripts/generate-docs.js",
-    "docs:dev": "node scripts/generate-docs.js && npm run start --prefix docs",
-    "docs:build": "node scripts/generate-docs.js && npm run build --prefix docs"
+    "docs:dev": "node scripts/generate-docs.js && pnpm --dir docs start",
+    "docs:build": "node scripts/generate-docs.js && pnpm --dir docs build"
   }
 }
