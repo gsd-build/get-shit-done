@@ -132,6 +132,7 @@ Quick commands:
 - /gsd:plan-phase --research — force research
 - /gsd:plan-phase --skip-research — skip research
 - /gsd:plan-phase --skip-verify — skip plan check
+- /gsd:setup-quality — configure quality enforcement
 ```
 </step>
 
