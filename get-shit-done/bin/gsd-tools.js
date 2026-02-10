@@ -3652,6 +3652,7 @@ function cmdInitPlanPhase(cwd, phase, includes, raw) {
     research_enabled: config.research,
     plan_checker_enabled: config.plan_checker,
     commit_docs: config.commit_docs,
+    branching_strategy: config.branching_strategy,
 
     // Phase info
     phase_found: !!phaseInfo,
@@ -3660,6 +3661,17 @@ function cmdInitPlanPhase(cwd, phase, includes, raw) {
     phase_name: phaseInfo?.phase_name || null,
     phase_slug: phaseInfo?.phase_slug || null,
     padded_phase: phaseInfo?.phase_number?.padStart(2, '0') || null,
+
+    // Branch name (pre-computed) — ensures early branching before first commit
+    branch_name: config.branching_strategy === 'phase' && phaseInfo
+      ? config.phase_branch_template
+          .replace('{phase}', phaseInfo.phase_number)
+          .replace('{slug}', phaseInfo.phase_slug || 'phase')
+      : config.branching_strategy === 'milestone'
+        ? config.milestone_branch_template
+            .replace('{milestone}', getMilestoneInfo(cwd).version)
+            .replace('{slug}', generateSlugInternal(getMilestoneInfo(cwd).name) || 'milestone')
+        : null,
 
     // Existing artifacts
     has_research: phaseInfo?.has_research || false,
@@ -3919,11 +3931,13 @@ function cmdInitVerifyWork(cwd, phase, raw) {
 function cmdInitPhaseOp(cwd, phase, raw) {
   const config = loadConfig(cwd);
   const phaseInfo = findPhaseInternal(cwd, phase);
+  const milestone = getMilestoneInfo(cwd);
 
   const result = {
     // Config
     commit_docs: config.commit_docs,
     brave_search: config.brave_search,
+    branching_strategy: config.branching_strategy,
 
     // Phase info
     phase_found: !!phaseInfo,
@@ -3932,6 +3946,17 @@ function cmdInitPhaseOp(cwd, phase, raw) {
     phase_name: phaseInfo?.phase_name || null,
     phase_slug: phaseInfo?.phase_slug || null,
     padded_phase: phaseInfo?.phase_number?.padStart(2, '0') || null,
+
+    // Branch name (pre-computed) — ensures early branching before first commit
+    branch_name: config.branching_strategy === 'phase' && phaseInfo
+      ? config.phase_branch_template
+          .replace('{phase}', phaseInfo.phase_number)
+          .replace('{slug}', phaseInfo.phase_slug || 'phase')
+      : config.branching_strategy === 'milestone'
+        ? config.milestone_branch_template
+            .replace('{milestone}', milestone.version)
+            .replace('{slug}', generateSlugInternal(milestone.name) || 'milestone')
+        : null,
 
     // Existing artifacts
     has_research: phaseInfo?.has_research || false,

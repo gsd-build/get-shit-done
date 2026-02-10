@@ -114,7 +114,7 @@ Phase number from argument (required).
 INIT=$(node ~/.claude/get-shit-done/bin/gsd-tools.js init phase-op "${PHASE}")
 ```
 
-Parse JSON for: `commit_docs`, `phase_found`, `phase_dir`, `phase_number`, `phase_name`, `phase_slug`, `padded_phase`, `has_research`, `has_context`, `has_plans`, `has_verification`, `plan_count`, `roadmap_exists`, `planning_exists`.
+Parse JSON for: `commit_docs`, `branching_strategy`, `branch_name`, `phase_found`, `phase_dir`, `phase_number`, `phase_name`, `phase_slug`, `padded_phase`, `has_research`, `has_context`, `has_plans`, `has_verification`, `plan_count`, `roadmap_exists`, `planning_exists`.
 
 **If `phase_found` is false:**
 ```
@@ -124,7 +124,22 @@ Use /gsd:progress to see available phases.
 ```
 Exit workflow.
 
-**If `phase_found` is true:** Continue to check_existing.
+**If `phase_found` is true:** Continue to handle_branching.
+</step>
+
+<step name="handle_branching">
+Check `branching_strategy` from init:
+
+**"none":** Skip, continue on current branch.
+
+**"phase" or "milestone":** Use pre-computed `branch_name` from init:
+```bash
+git checkout -b "$BRANCH_NAME" 2>/dev/null || git checkout "$BRANCH_NAME"
+```
+
+This ensures all phase documentation commits (context, research, plans) go to the feature branch, not main.
+
+Continue to check_existing.
 </step>
 
 <step name="check_existing">

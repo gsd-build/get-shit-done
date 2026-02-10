@@ -18,11 +18,24 @@ Load all context in one call (include file contents to avoid redundant reads):
 INIT=$(node ~/.claude/get-shit-done/bin/gsd-tools.js init plan-phase "$PHASE" --include state,roadmap,requirements,context,research,verification,uat)
 ```
 
-Parse JSON for: `researcher_model`, `planner_model`, `checker_model`, `research_enabled`, `plan_checker_enabled`, `commit_docs`, `phase_found`, `phase_dir`, `phase_number`, `phase_name`, `phase_slug`, `padded_phase`, `has_research`, `has_context`, `has_plans`, `plan_count`, `planning_exists`, `roadmap_exists`.
+Parse JSON for: `researcher_model`, `planner_model`, `checker_model`, `research_enabled`, `plan_checker_enabled`, `commit_docs`, `branching_strategy`, `branch_name`, `phase_found`, `phase_dir`, `phase_number`, `phase_name`, `phase_slug`, `padded_phase`, `has_research`, `has_context`, `has_plans`, `plan_count`, `planning_exists`, `roadmap_exists`.
 
 **File contents (from --include):** `state_content`, `roadmap_content`, `requirements_content`, `context_content`, `research_content`, `verification_content`, `uat_content`. These are null if files don't exist.
 
 **If `planning_exists` is false:** Error — run `/gsd:new-project` first.
+
+## 1.5. Handle Branching
+
+Check `branching_strategy` from init:
+
+**"none":** Skip, continue on current branch.
+
+**"phase" or "milestone":** Use pre-computed `branch_name` from init:
+```bash
+git checkout -b "$BRANCH_NAME" 2>/dev/null || git checkout "$BRANCH_NAME"
+```
+
+This ensures research and planning commits go to the feature branch, not main. If `/gsd:discuss-phase` already created the branch, the `git checkout` fallback switches to it.
 
 ## 2. Parse and Normalize Arguments
 
