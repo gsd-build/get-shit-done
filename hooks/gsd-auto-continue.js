@@ -1,16 +1,21 @@
 #!/usr/bin/env node
 // GSD Auto-Mode — Stop Hook
 // Reads .planning/.auto-next signal file to chain commands automatically.
-// Skills write the signal; hook consumes it. No transcript parsing needed.
+// Skills write the signal on completion; hook consumes it. No transcript parsing.
 
 const fs = require('fs');
 const path = require('path');
+
+// Timeout guard — kill ourselves if stdin never closes (prevents orphaned processes)
+const timeout = setTimeout(() => process.exit(0), 8000);
+timeout.unref();
 
 // Read JSON from stdin (Claude Code passes context on stop)
 let input = '';
 process.stdin.setEncoding('utf8');
 process.stdin.on('data', chunk => input += chunk);
 process.stdin.on('end', () => {
+  clearTimeout(timeout);
   try {
     main(JSON.parse(input));
   } catch (e) {
@@ -27,7 +32,7 @@ function main(data) {
   try { config = JSON.parse(fs.readFileSync(configPath, 'utf8')); } catch (e) { return; }
   if (!config.auto_mode) return;
 
-  // 2. Read and consume signal file (consuming = loop protection)
+  // 2. Read and consume signal file (consuming = one-shot loop protection)
   const signalPath = path.join(process.cwd(), '.planning', '.auto-next');
   if (!fs.existsSync(signalPath)) return;
 
@@ -46,17 +51,16 @@ function main(data) {
       const phase = parseInt(phaseMatch[1], 10);
       const phaseDir = findPhaseDir(phase);
       if (phaseDir && countGapClosurePlans(phaseDir) >= 3) {
-        block('Auto-mode: Gap closure attempted 3+ times for phase ' + phase + '. Stopping for manual review.');
+        block('Auto-mode paused: gap closure attempted 3+ times for phase ' + phase + '. Review gaps manually.');
         return;
       }
     }
   }
 
   // 4. Block stop and inject next command
-  block(
-    'Auto-mode is enabled. You MUST now run /gsd:' + signal +
-    ' — do not ask the user, just invoke the skill immediately.'
-  );
+  //    Note: Claude Code prefixes block reasons with "Stop hook error:" in the UI,
+  //    so we phrase the reason as a neutral continuation to avoid alarm.
+  block('[GSD auto-mode] Workflow continuing. Run /gsd:' + signal + ' — proceed without asking the user.');
 }
 
 // --- Helpers ---
