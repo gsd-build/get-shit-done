@@ -531,6 +531,11 @@ fi
 
 <step name="git_tag">
 
+<config-check>
+Read `planning.git_tag` from `.planning/config.json` (default: `true` if not set).
+If `git_tag` is `false` → skip this step entirely, proceed to `git_commit_milestone`.
+</config-check>
+
 Create git tag:
 
 ```bash

@@ -30,6 +30,7 @@ Parse current values (default to `true` if not present):
 - `workflow.verifier` — spawn verifier during execute-phase
 - `model_profile` — which model each agent uses (default: `balanced`)
 - `git.branching_strategy` — branching approach (default: `"none"`)
+- `planning.git_tag` — create git tags on milestone completion (default: `true`)
 </step>
 
 <step name="present_settings">
@@ -83,6 +84,15 @@ AskUserQuestion([
       { label: "Per Phase", description: "Create branch for each phase (gsd/phase-{N}-{name})" },
       { label: "Per Milestone", description: "Create branch for entire milestone (gsd/{version}-{name})" }
     ]
+  },
+  {
+    question: "Create git tags on milestone completion?",
+    header: "Git Tagging",
+    multiSelect: false,
+    options: [
+      { label: "Yes (Recommended)", description: "Tag releases with version (e.g., v1.0) on milestone completion" },
+      { label: "No", description: "Skip git tagging — use if your project doesn't use tags or uses a different convention" }
+    ]
   }
 ])
 ```
@@ -99,6 +109,10 @@ Merge new settings into existing config.json:
     "research": true/false,
     "plan_check": true/false,
     "verifier": true/false
+  },
+  "planning": {
+    ...existing_planning,
+    "git_tag": true/false
   },
   "git": {
     "branching_strategy": "none" | "phase" | "milestone"
@@ -124,6 +138,7 @@ Display:
 | Plan Checker         | {On/Off} |
 | Execution Verifier   | {On/Off} |
 | Git Branching        | {None/Per Phase/Per Milestone} |
+| Git Tagging          | {On/Off} |
 
 These settings apply to future /gsd:plan-phase and /gsd:execute-phase runs.
 
@@ -139,7 +154,7 @@ Quick commands:
 
 <success_criteria>
 - [ ] Current config read
-- [ ] User presented with 5 settings (profile + 3 workflow toggles + git branching)
+- [ ] User presented with 6 settings (profile + 3 workflow toggles + git branching + git tagging)
 - [ ] Config updated with model_profile, workflow, and git sections
 - [ ] Changes confirmed to user
 </success_criteria>
