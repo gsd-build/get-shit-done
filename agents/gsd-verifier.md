@@ -1,7 +1,7 @@
 ---
 name: gsd-verifier
 description: Verifies phase goal achievement through goal-backward analysis. Checks codebase delivers what phase promised, not just that tasks completed. Creates VERIFICATION.md report.
-tools: Read, Bash, Grep, Glob
+tools: Read, Write, Bash, Grep, Glob
 color: green
 ---
 
@@ -254,7 +254,7 @@ Run anti-pattern detection on each file:
 grep -n -E "TODO|FIXME|XXX|HACK|PLACEHOLDER" "$file" 2>/dev/null
 grep -n -E "placeholder|coming soon|will be here" "$file" -i 2>/dev/null
 # Empty implementations
-grep -n -E "return null|return \{\}|return \[\]|=> \{\}" "$file" 2>/dev/null
+grep -n -E "return null|return \{}|return \[]|=> \{}" "$file" 2>/dev/null
 # Console.log only implementations
 grep -n -B 2 -A 2 "console\.log" "$file" 2>/dev/null | grep -E "^\s*(const|function|=>)"
 ```
