@@ -25,6 +25,7 @@ Context budget: ~15% orchestrator, 100% fresh per subagent.
 <execution_context>
 @~/.claude/get-shit-done/references/ui-brand.md
 @~/.claude/get-shit-done/workflows/execute-phase.md
+@~/.claude/get-shit-done/references/planning-config.md
 </execution_context>
 
 <context>
@@ -53,6 +54,7 @@ Phase: $ARGUMENTS
    |-------|---------|----------|--------|
    | gsd-executor | opus | sonnet | sonnet |
    | gsd-verifier | sonnet | sonnet | haiku |
+   | gsd-adversary | sonnet | sonnet | haiku |
 
    Store resolved models for use in Task calls below.
 
@@ -99,16 +101,14 @@ Phase: $ARGUMENTS
 7. **Verify phase goal**
    Check config: `WORKFLOW_VERIFIER=$(cat .planning/config.json 2>/dev/null | grep -o '"verifier"[[:space:]]*:[[:space:]]*[^,}]*' | grep -o 'true\|false' || echo "true")`
 
-   **If `workflow.verifier` is `false`:** Skip to step 8 (treat as passed).
+   **If `workflow.verifier` is `false`:** Skip to step 8 (treat as passed). This skips both verification and adversary review, since there is no VERIFICATION.md to challenge.
 
    **Otherwise:**
    - Spawn `gsd-verifier` subagent with phase directory and goal
    - Verifier checks must_haves against actual codebase (not SUMMARY claims)
    - Creates VERIFICATION.md with detailed report
-   - Route by status:
-     - `passed` → continue to step 8
-     - `human_needed` → present items, get approval or feedback
-     - `gaps_found` → present gaps, offer `/gsd:plan-phase {X} --gaps`
+
+   Continue to step 7.5 (adversary review). Status routing happens after adversary review.
 
 8. **Update roadmap and state**
    - Update ROADMAP.md, STATE.md
