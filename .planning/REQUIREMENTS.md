@@ -16,13 +16,13 @@ Requirements for this milestone. Each maps to roadmap phases.
 
 ### Convergence
 
-- [ ] **CONV-01**: Debate terminates after max 3 rounds regardless of state
+- [x] **CONV-01**: Debate terminates after max 3 rounds regardless of state ✓
 - [x] **CONV-02**: Debate uses adaptive convergence detection to exit early when stable ✓
 
 ### Integration
 
-- [ ] **INTG-01**: Adversary challenges REQUIREMENTS.md after creation in /gsd:new-project
-- [ ] **INTG-02**: Adversary challenges ROADMAP.md after creation in /gsd:new-project
+- [x] **INTG-01**: Adversary challenges REQUIREMENTS.md after creation in /gsd:new-project ✓
+- [x] **INTG-02**: Adversary challenges ROADMAP.md after creation in /gsd:new-project ✓
 - [ ] **INTG-03**: Adversary challenges PLAN.md after creation in /gsd:plan-phase
 - [ ] **INTG-04**: Adversary challenges verification conclusions in /gsd:verify-work
 
@@ -67,10 +67,10 @@ Which phases cover which requirements. Updated during roadmap creation.
 | AGENT-01 | Phase 1 | Complete |
 | AGENT-02 | Phase 1 | Complete |
 | AGENT-03 | Phase 1 | Complete |
-| CONV-01 | Phase 3 | Pending |
+| CONV-01 | Phase 3 | Complete |
 | CONV-02 | Phase 1 | Complete |
-| INTG-01 | Phase 3 | Pending |
-| INTG-02 | Phase 3 | Pending |
+| INTG-01 | Phase 3 | Complete |
+| INTG-02 | Phase 3 | Complete |
 | INTG-03 | Phase 4 | Pending |
 | INTG-04 | Phase 5 | Pending |
 | CONF-01 | Phase 2 | Complete |
@@ -84,4 +84,4 @@ Which phases cover which requirements. Updated during roadmap creation.
 
 ---
 *Requirements defined: 2026-01-31*
-*Last updated: 2026-02-13 after Phase 2 completion*
+*Last updated: 2026-02-13 after Phase 3 completion*
