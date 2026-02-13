@@ -10,8 +10,8 @@ body:
   - type: input
     id: version
     attributes:
-      label: GSD Version
-      description: "Run: npm list -g get-shit-done-cc"
+      label: GID Version
+      description: "Run: npm list -g get-it-done-cc"
       placeholder: "e.g., 1.18.0"
     validations:
       required: true
@@ -45,7 +45,7 @@ body:
       label: Steps to reproduce
       description: How can we reproduce this?
       placeholder: |
-        1. Run /gsd:...
+        1. Run /gid:...
         2. ...
     validations:
       required: true

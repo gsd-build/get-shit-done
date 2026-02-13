@@ -14,7 +14,7 @@
 
 ## Checklist
 
-- [ ] Follows GSD style (no enterprise patterns, no filler)
+- [ ] Follows GID style (no enterprise patterns, no filler)
 - [ ] Updates CHANGELOG.md for user-facing changes
 - [ ] No unnecessary dependencies added
 - [ ] Works on Windows (backslash paths tested)

@@ -38,27 +38,27 @@
     <!-- Prompt line -->
     <text class="text prompt" font-size="15" y="0">~</text>
     <text class="text dim" font-size="15" x="16" y="0">$</text>
-    <text class="text command" font-size="15" x="36" y="0">npx get-shit-done-cc</text>
+    <text class="text command" font-size="15" x="36" y="0">npx get-it-done-cc</text>
 
     <!-- Banner -->
-    <text class="text cyan" font-size="14" y="48" xml:space="preserve">   ██████╗ ███████╗██████╗</text>
-    <text class="text cyan" font-size="14" y="68" xml:space="preserve">  ██╔════╝ ██╔════╝██╔══██╗</text>
-    <text class="text cyan" font-size="14" y="88" xml:space="preserve">  ██║  ███╗███████╗██║  ██║</text>
-    <text class="text cyan" font-size="14" y="108" xml:space="preserve">  ██║   ██║╚════██║██║  ██║</text>
-    <text class="text cyan" font-size="14" y="128" xml:space="preserve">  ╚██████╔╝███████║██████╔╝</text>
-    <text class="text cyan" font-size="14" y="148" xml:space="preserve">   ╚═════╝ ╚══════╝╚═════╝</text>
+    <text class="text cyan" font-size="14" y="48" xml:space="preserve">   ██████╗  ██╗  ██████╗</text>
+    <text class="text cyan" font-size="14" y="68" xml:space="preserve">  ██╔════╝  ██║  ██╔══██╗</text>
+    <text class="text cyan" font-size="14" y="88" xml:space="preserve">  ██║  ███╗ ██║  ██║  ██║</text>
+    <text class="text cyan" font-size="14" y="108" xml:space="preserve">  ██║   ██║ ██║  ██║  ██║</text>
+    <text class="text cyan" font-size="14" y="128" xml:space="preserve">  ╚██████╔╝ ██║  ██████╔╝</text>
+    <text class="text cyan" font-size="14" y="148" xml:space="preserve">   ╚═════╝  ╚═╝  ╚═════╝</text>
 
     <!-- Title and subtitle -->
-    <text class="text white" font-size="15" y="188">  Get Shit Done <tspan class="dim">v1.0.1</tspan></text>
+    <text class="text white" font-size="15" y="188">  Get It Done <tspan class="dim">v1.0.1</tspan></text>
     <text class="text white" font-size="15" y="212">  A meta-prompting, context engineering and spec-driven</text>
     <text class="text white" font-size="15" y="232">  development system for Claude Code by TÂCHES.</text>
 
     <!-- Install output -->
-    <text class="text" font-size="15" y="280"><tspan class="green">  ✓</tspan><tspan class="white"> Installed commands/gsd</tspan></text>
-    <text class="text" font-size="15" y="304"><tspan class="green">  ✓</tspan><tspan class="white"> Installed get-shit-done</tspan></text>
+    <text class="text" font-size="15" y="280"><tspan class="green">  ✓</tspan><tspan class="white"> Installed commands/gid</tspan></text>
+    <text class="text" font-size="15" y="304"><tspan class="green">  ✓</tspan><tspan class="white"> Installed get-it-done</tspan></text>
 
     <!-- Done message -->
-    <text class="text" font-size="15" y="352"><tspan class="green">  Done!</tspan><tspan class="white"> Run </tspan><tspan class="cyan">/gsd:help</tspan><tspan class="white"> to get started.</tspan></text>
+    <text class="text" font-size="15" y="352"><tspan class="green">  Done!</tspan><tspan class="white"> Run </tspan><tspan class="cyan">/gid:help</tspan><tspan class="white"> to get started.</tspan></text>
 
     <!-- New prompt -->
     <text class="text prompt" font-size="15" y="400">~</text>
