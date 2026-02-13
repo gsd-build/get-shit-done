@@ -65,7 +65,8 @@ Recent decisions affecting current work:
 
 ### Pending Todos
 
-None yet.
+1 pending todo(s) in `.planning/todos/pending/`:
+- **Add --auto flag to verify phase** (area: commands)
 
 ### Blockers/Concerns
 
