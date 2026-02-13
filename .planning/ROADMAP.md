@@ -32,7 +32,7 @@ Development predates GSD workflow tracking. See `.planning/MILESTONES.md` for ac
 - [x] **Phase 1: Core Agent** - Implement gsd-adversary agent with structured challenge generation ✓
 - [x] **Phase 2: Configuration** - Add adversary settings to config.json schema ✓
 - [x] **Phase 3: New-Project Integration** - Adversary checkpoints for requirements and roadmap ✓
-- [ ] **Phase 4: Plan Integration** - Adversary checkpoint for plan creation
+- [x] **Phase 4: Plan Integration** - Adversary checkpoint for plan creation ✓
 - [ ] **Phase 5: Verification Integration** - Adversary checkpoint for verification conclusions
 
 ## Phase Details
@@ -90,7 +90,7 @@ Plans:
 **Plans:** 1 plan
 
 Plans:
-- [ ] 04-01-PLAN.md — Integrate per-plan adversary review loop with planner-as-defender pattern
+- [x] 04-01-PLAN.md — Integrate per-plan adversary review loop with planner-as-defender pattern ✓
 
 ### Phase 5: Verification Integration
 **Goal**: /gsd:verify-work invokes adversary to challenge verification conclusions
@@ -116,7 +116,7 @@ Phases execute in numeric order: 1 → 2 → 3 → 4 → 5
 | 1. Core Agent | v2.1 | 1/1 | ✓ Complete | 2026-02-02 |
 | 2. Configuration | v2.1 | 2/2 | ✓ Complete | 2026-02-13 |
 | 3. New-Project Integration | v2.1 | 1/1 | ✓ Complete | 2026-02-13 |
-| 4. Plan Integration | v2.1 | 0/? | Not started | - |
+| 4. Plan Integration | v2.1 | 1/1 | ✓ Complete | 2026-02-13 |
 | 5. Verification Integration | v2.1 | 0/? | Not started | - |
 
 ---
