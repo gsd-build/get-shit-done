@@ -2031,3 +2031,266 @@ describe('scaffold command', () => {
     assert.strictEqual(output.reason, 'already_exists');
   });
 });
+
+// ─────────────────────────────────────────────────────────────────────────────
+// seed commands
+// ─────────────────────────────────────────────────────────────────────────────
+
+describe('seed list command', () => {
+  let tmpDir;
+
+  beforeEach(() => {
+    tmpDir = createTempProject();
+  });
+
+  afterEach(() => {
+    cleanup(tmpDir);
+  });
+
+  test('empty or missing seeds directory returns empty list', () => {
+    const result = runGsdTools('seed list', tmpDir);
+    assert.ok(result.success, `Command failed: ${result.error}`);
+
+    const output = JSON.parse(result.output);
+    assert.strictEqual(output.count, 0, 'count should be 0');
+    assert.deepStrictEqual(output.seeds, [], 'seeds should be empty');
+  });
+
+  test('lists seeds with metadata extracted from frontmatter', () => {
+    const seedsDir = path.join(tmpDir, '.planning', 'seeds');
+    fs.mkdirSync(seedsDir, { recursive: true });
+
+    fs.writeFileSync(
+      path.join(seedsDir, 'seed-add-caching.md'),
+      `---
+title: "Add Caching Layer"
+trigger: "performance"
+scope: medium
+created: "2024-03-15"
+status: planted
+---
+
+## Context
+Need caching for API responses.
+`
+    );
+
+    fs.writeFileSync(
+      path.join(seedsDir, 'seed-dark-mode.md'),
+      `---
+title: "Dark Mode Support"
+trigger: "ui-polish"
+scope: small
+created: "2024-03-16"
+status: planted
+---
+
+## Context
+Users want dark mode.
+`
+    );
+
+    const result = runGsdTools('seed list', tmpDir);
+    assert.ok(result.success, `Command failed: ${result.error}`);
+
+    const output = JSON.parse(result.output);
+    assert.strictEqual(output.count, 2, 'should have 2 seeds');
+    assert.strictEqual(output.seeds[0].title, 'Add Caching Layer', 'first seed title');
+    assert.strictEqual(output.seeds[0].trigger, 'performance', 'first seed trigger');
+    assert.strictEqual(output.seeds[0].scope, 'medium', 'first seed scope');
+    assert.strictEqual(output.seeds[1].title, 'Dark Mode Support', 'second seed title');
+    assert.strictEqual(output.seeds[1].scope, 'small', 'second seed scope');
+  });
+});
+
+describe('seed read-for-phase command', () => {
+  let tmpDir;
+
+  beforeEach(() => {
+    tmpDir = createTempProject();
+  });
+
+  afterEach(() => {
+    cleanup(tmpDir);
+  });
+
+  test('filters seeds by phase trigger', () => {
+    const seedsDir = path.join(tmpDir, '.planning', 'seeds');
+    fs.mkdirSync(seedsDir, { recursive: true });
+
+    fs.writeFileSync(
+      path.join(seedsDir, 'seed-cache.md'),
+      `---
+title: "Add Caching"
+trigger: "performance"
+scope: medium
+status: planted
+---
+`
+    );
+
+    fs.writeFileSync(
+      path.join(seedsDir, 'seed-dark-mode.md'),
+      `---
+title: "Dark Mode"
+trigger: "ui-polish"
+scope: small
+status: planted
+---
+`
+    );
+
+    fs.writeFileSync(
+      path.join(seedsDir, 'seed-perf-monitor.md'),
+      `---
+title: "Performance Monitor"
+trigger: "performance"
+scope: large
+status: planted
+---
+`
+    );
+
+    const result = runGsdTools('seed read-for-phase performance', tmpDir);
+    assert.ok(result.success, `Command failed: ${result.error}`);
+
+    const output = JSON.parse(result.output);
+    assert.strictEqual(output.phase, 'performance', 'phase slug returned');
+    assert.strictEqual(output.count, 2, 'should match 2 seeds');
+    assert.ok(
+      output.seeds.some(s => s.title === 'Add Caching'),
+      'should include caching seed'
+    );
+    assert.ok(
+      output.seeds.some(s => s.title === 'Performance Monitor'),
+      'should include perf monitor seed'
+    );
+  });
+
+  test('returns empty when no seeds match phase', () => {
+    const seedsDir = path.join(tmpDir, '.planning', 'seeds');
+    fs.mkdirSync(seedsDir, { recursive: true });
+
+    fs.writeFileSync(
+      path.join(seedsDir, 'seed-cache.md'),
+      `---
+title: "Add Caching"
+trigger: "performance"
+scope: medium
+status: planted
+---
+`
+    );
+
+    const result = runGsdTools('seed read-for-phase security', tmpDir);
+    assert.ok(result.success, `Command failed: ${result.error}`);
+
+    const output = JSON.parse(result.output);
+    assert.strictEqual(output.count, 0, 'no seeds should match');
+    assert.deepStrictEqual(output.seeds, [], 'seeds should be empty');
+  });
+
+  test('case-insensitive substring matching on trigger', () => {
+    const seedsDir = path.join(tmpDir, '.planning', 'seeds');
+    fs.mkdirSync(seedsDir, { recursive: true });
+
+    fs.writeFileSync(
+      path.join(seedsDir, 'seed-test.md'),
+      `---
+title: "Test Seed"
+trigger: "UI-Polish"
+scope: small
+status: planted
+---
+`
+    );
+
+    const result = runGsdTools('seed read-for-phase ui-polish', tmpDir);
+    assert.ok(result.success, `Command failed: ${result.error}`);
+
+    const output = JSON.parse(result.output);
+    assert.strictEqual(output.count, 1, 'should match case-insensitively');
+  });
+});
+
+describe('seed create command', () => {
+  let tmpDir;
+
+  beforeEach(() => {
+    tmpDir = createTempProject();
+  });
+
+  afterEach(() => {
+    cleanup(tmpDir);
+  });
+
+  test('creates seed file with correct content', () => {
+    const result = runGsdTools(
+      'seed create --title "Add Rate Limiting" --trigger "api-security" --scope large --context "API needs protection" --approach "Use express-rate-limit" --deps "Express middleware"',
+      tmpDir
+    );
+    assert.ok(result.success, `Command failed: ${result.error}`);
+
+    const output = JSON.parse(result.output);
+    assert.strictEqual(output.created, true, 'should report created');
+    assert.strictEqual(output.file, 'seed-add-rate-limiting.md', 'filename should be slugified');
+    assert.ok(output.path.includes('.planning/seeds/'), 'path should include seeds dir');
+
+    // Verify file contents
+    const content = fs.readFileSync(
+      path.join(tmpDir, '.planning', 'seeds', 'seed-add-rate-limiting.md'),
+      'utf-8'
+    );
+    assert.ok(content.includes('title: "Add Rate Limiting"'), 'title in frontmatter');
+    assert.ok(content.includes('trigger: "api-security"'), 'trigger in frontmatter');
+    assert.ok(content.includes('scope: large'), 'scope in frontmatter');
+    assert.ok(content.includes('status: planted'), 'status in frontmatter');
+    assert.ok(content.includes('API needs protection'), 'context in body');
+    assert.ok(content.includes('Use express-rate-limit'), 'approach in body');
+    assert.ok(content.includes('Express middleware'), 'deps in body');
+  });
+
+  test('creates seeds directory if it does not exist', () => {
+    assert.ok(
+      !fs.existsSync(path.join(tmpDir, '.planning', 'seeds')),
+      'seeds dir should not exist yet'
+    );
+
+    const result = runGsdTools(
+      'seed create --title "Test Seed" --trigger "test-phase"',
+      tmpDir
+    );
+    assert.ok(result.success, `Command failed: ${result.error}`);
+
+    assert.ok(
+      fs.existsSync(path.join(tmpDir, '.planning', 'seeds')),
+      'seeds dir should be created'
+    );
+  });
+
+  test('defaults scope to medium when not provided', () => {
+    const result = runGsdTools(
+      'seed create --title "Default Scope" --trigger "test"',
+      tmpDir
+    );
+    assert.ok(result.success, `Command failed: ${result.error}`);
+
+    const content = fs.readFileSync(
+      path.join(tmpDir, '.planning', 'seeds', 'seed-default-scope.md'),
+      'utf-8'
+    );
+    assert.ok(content.includes('scope: medium'), 'should default to medium scope');
+  });
+
+  test('fails without required --title', () => {
+    const result = runGsdTools('seed create --trigger "test"', tmpDir);
+    assert.ok(!result.success, 'should fail without title');
+    assert.ok(result.error.includes('--title required'), 'error mentions title');
+  });
+
+  test('fails without required --trigger', () => {
+    const result = runGsdTools('seed create --title "Test"', tmpDir);
+    assert.ok(!result.success, 'should fail without trigger');
+    assert.ok(result.error.includes('--trigger required'), 'error mentions trigger');
+  });
+});
