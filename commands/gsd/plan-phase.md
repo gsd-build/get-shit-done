@@ -400,7 +400,7 @@ Task(
 
 **If `## VERIFICATION PASSED`:**
 - Display: `Plans verified. Ready for execution.`
-- Proceed to step 13
+- Proceed to step 12.5 (adversary review)
 
 **If `## ISSUES FOUND`:**
 - Display: `Checker found issues:`
