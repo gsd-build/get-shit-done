@@ -6,34 +6,34 @@ See: .planning/PROJECT.md (updated 2026-01-31)
 
 **Core value:** Quality doesn't degrade as context grows
 **Current milestone:** v2.1 Adversary Agent
-**Current focus:** Phase 2 - Configuration
+**Current focus:** Phase 3 - Orchestrator Integration
 
 ## Current Position
 
-Phase: 2 of 5 (Configuration)
-Plan: 1 of 2 in current phase
-Status: In progress
-Last activity: 2026-02-13 — Completed 02-01-PLAN.md
+Phase: 2 of 5 (Configuration) - COMPLETE
+Plan: 2 of 2 in current phase
+Status: Phase complete
+Last activity: 2026-02-13 — Completed 02-02-PLAN.md
 
-Progress: [███-------] 30% of milestone (plan 2 of ~7 total)
+Progress: [████------] 43% of milestone (plan 3 of ~7 total)
 
 ## Performance Metrics
 
 **Velocity:**
-- Total plans completed: 2
-- Average duration: 10 min
-- Total execution time: 0.35 hours
+- Total plans completed: 3
+- Average duration: 7 min
+- Total execution time: 0.37 hours
 
 **By Phase:**
 
 | Phase | Plans | Total | Avg/Plan |
 |-------|-------|-------|----------|
 | 01-core-agent | 1 | 19 min | 19 min |
-| 02-configuration | 1 | 1 min | 1 min |
+| 02-configuration | 2 | 3 min | 1.5 min |
 
 **Recent Trend:**
-- Last 5 plans: 19 min, 1 min
-- Trend: Accelerating (config-only plans are fast)
+- Last 5 plans: 19 min, 1 min, 2 min
+- Trend: Accelerating (config/command plans are fast)
 
 *Updated after each plan completion*
 
@@ -53,6 +53,8 @@ Recent decisions affecting current work:
 | Adversary opt-out | 02-01 | Missing config = system defaults; adversary always runs unless explicitly disabled |
 | Node-e config parsing | 02-01 | Polymorphic checkpoint values (boolean/object) need real JSON parser, not grep |
 | Three-tier precedence | 02-01 | checkpoint max_rounds > adversary max_rounds > system default (3) |
+| Simple toggle in new-project | 02-02 | Keep onboarding simple; granular settings available via /gsd:settings |
+| Preserve defaults when disabled | 02-02 | Both paths write full adversary section so re-enabling keeps preferences |
 
 ### Pending Todos
 
@@ -65,5 +67,5 @@ None yet.
 ## Session Continuity
 
 Last session: 2026-02-13
-Stopped at: Completed 02-01-PLAN.md, ready for 02-02
+Stopped at: Completed 02-02-PLAN.md, Phase 2 complete, ready for Phase 3
 Resume file: None
