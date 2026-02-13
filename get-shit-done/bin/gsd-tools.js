@@ -101,6 +101,15 @@
  *     --stopped-at "..."
  *     [--resume-file path]
  *
+ * Event Logging:
+ *   event log <category> <name>       Append event to events.jsonl
+ *     [--details '{json}']
+ *   event list [--category <cat>]     List recent events
+ *     [--limit N]
+ *   event session-start               Record session start
+ *   event session-end                 Record session end + duration
+ *   event clear <log>                 Clear log (hooks|events|sessions)
+ *
  * Compound Commands (workflow-specific initialization):
  *   init execute-phase <phase>         All context for execute-phase workflow
  *   init plan-phase <phase>            All context for plan-phase workflow
@@ -4209,6 +4218,101 @@ function cmdInitProgress(cwd, includes, raw) {
   output(result, raw);
 }
 
+// ─── Event Logging ───────────────────────────────────────────────────────────
+
+const LOG_LIMITS = { hooks: 200, events: 1000, sessions: 100 };
+
+function ensureLogsDir(cwd) {
+  const logsDir = path.join(cwd, '.planning', 'logs');
+  if (!fs.existsSync(logsDir)) { fs.mkdirSync(logsDir, { recursive: true }); }
+  return logsDir;
+}
+
+function appendJsonl(filePath, entry, maxEntries) {
+  fs.appendFileSync(filePath, JSON.stringify(entry) + '\n');
+  try {
+    const content = fs.readFileSync(filePath, 'utf8').trim();
+    if (!content) return;
+    const lines = content.split('\n');
+    if (lines.length > maxEntries) {
+      fs.writeFileSync(filePath, lines.slice(-maxEntries).join('\n') + '\n');
+    }
+  } catch (e) { /* rotation failure is non-fatal */ }
+}
+
+function cmdEventLog(cwd, category, name, details, raw) {
+  if (!category) { error('category required for event log'); }
+  if (!name) { error('event name required for event log'); }
+  const logsDir = ensureLogsDir(cwd);
+  const entry = {
+    timestamp: new Date().toISOString(),
+    category,
+    event: name,
+    details: details || {}
+  };
+  appendJsonl(path.join(logsDir, 'events.jsonl'), entry, LOG_LIMITS.events);
+  output({ logged: true, entry }, raw, `Event logged: [${category}] ${name}`);
+}
+
+function cmdEventList(cwd, category, limit, raw) {
+  const eventsPath = path.join(cwd, '.planning', 'logs', 'events.jsonl');
+  if (!fs.existsSync(eventsPath)) {
+    output({ events: [] }, raw, 'No events logged');
+    return;
+  }
+  let events = fs.readFileSync(eventsPath, 'utf8').trim().split('\n')
+    .filter(l => l.trim())
+    .map(l => { try { return JSON.parse(l); } catch (e) { return null; } })
+    .filter(Boolean);
+  if (category) { events = events.filter(e => e.category === category); }
+  if (limit) { events = events.slice(-limit); }
+  if (events.length === 0) {
+    output({ events: [] }, raw, 'No events found');
+  } else {
+    const text = events.map(e => `${e.timestamp} [${e.category}] ${e.event}`).join('\n');
+    output({ events }, raw, text);
+  }
+}
+
+function cmdEventSessionStart(cwd, raw) {
+  const logsDir = ensureLogsDir(cwd);
+  const entry = {
+    session_start: new Date().toISOString(),
+    session_end: null,
+    duration_minutes: null,
+    agents_spawned: 0,
+    commits_created: 0,
+    commands_run: 0
+  };
+  const activePath = path.join(logsDir, '.active-session');
+  fs.writeFileSync(activePath, JSON.stringify(entry));
+  output({ started: true, session: entry }, raw, `Session started: ${entry.session_start}`);
+}
+
+function cmdEventSessionEnd(cwd, raw) {
+  const logsDir = ensureLogsDir(cwd);
+  const activePath = path.join(logsDir, '.active-session');
+  let entry = { session_start: new Date().toISOString(), agents_spawned: 0, commits_created: 0, commands_run: 0 };
+  if (fs.existsSync(activePath)) {
+    try { entry = JSON.parse(fs.readFileSync(activePath, 'utf8')); } catch (e) { /* use default */ }
+    fs.unlinkSync(activePath);
+  }
+  entry.session_end = new Date().toISOString();
+  const startMs = new Date(entry.session_start).getTime();
+  const endMs = new Date(entry.session_end).getTime();
+  entry.duration_minutes = Math.round((endMs - startMs) / 60000);
+  appendJsonl(path.join(logsDir, 'sessions.jsonl'), entry, LOG_LIMITS.sessions);
+  output({ ended: true, session: entry }, raw, `Session ended: ${entry.duration_minutes}m`);
+}
+
+function cmdEventClear(cwd, logName, raw) {
+  const validLogs = ['hooks', 'events', 'sessions'];
+  if (!validLogs.includes(logName)) { error(`Invalid log: ${logName}. Valid: ${validLogs.join(', ')}`); }
+  const logPath = path.join(cwd, '.planning', 'logs', `${logName}.jsonl`);
+  if (fs.existsSync(logPath)) { fs.unlinkSync(logPath); }
+  output({ cleared: logName }, raw, `Cleared ${logName} log`);
+}
+
 // ─── CLI Router ───────────────────────────────────────────────────────────────
 
 async function main() {
@@ -4586,6 +4690,36 @@ async function main() {
         limit: limitIdx !== -1 ? parseInt(args[limitIdx + 1], 10) : 10,
         freshness: freshnessIdx !== -1 ? args[freshnessIdx + 1] : null,
       }, raw);
+      break;
+    }
+
+    case 'event': {
+      const subCmd = args[1];
+      switch (subCmd) {
+        case 'log': {
+          const detailsIdx = args.indexOf('--details');
+          const details = detailsIdx !== -1 ? JSON.parse(args[detailsIdx + 1]) : {};
+          cmdEventLog(cwd, args[2], args[3], details, raw);
+          break;
+        }
+        case 'list': {
+          const catIdx = args.indexOf('--category');
+          const limIdx = args.indexOf('--limit');
+          cmdEventList(cwd, catIdx !== -1 ? args[catIdx + 1] : null, limIdx !== -1 ? parseInt(args[limIdx + 1]) : null, raw);
+          break;
+        }
+        case 'session-start':
+          cmdEventSessionStart(cwd, raw);
+          break;
+        case 'session-end':
+          cmdEventSessionEnd(cwd, raw);
+          break;
+        case 'clear':
+          cmdEventClear(cwd, args[2], raw);
+          break;
+        default:
+          error(`Unknown event subcommand: ${subCmd}\nAvailable: log, list, session-start, session-end, clear`);
+      }
       break;
     }
 

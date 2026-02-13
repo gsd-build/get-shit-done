@@ -6,18 +6,28 @@ const { test, describe, beforeEach, afterEach } = require('node:test');
 const assert = require('node:assert');
 const fs = require('fs');
 const path = require('path');
-const { execSync } = require('child_process');
+const { execSync, execFileSync } = require('child_process');
 
 const TOOLS_PATH = path.join(__dirname, 'gsd-tools.js');
 
 // Helper to run gsd-tools command
+// args can be a string (passed through shell) or an array (passed directly, no shell escaping issues)
 function runGsdTools(args, cwd = process.cwd()) {
   try {
-    const result = execSync(`node "${TOOLS_PATH}" ${args}`, {
-      cwd,
-      encoding: 'utf-8',
-      stdio: ['pipe', 'pipe', 'pipe'],
-    });
+    let result;
+    if (Array.isArray(args)) {
+      result = execFileSync('node', [TOOLS_PATH, ...args], {
+        cwd,
+        encoding: 'utf-8',
+        stdio: ['pipe', 'pipe', 'pipe'],
+      });
+    } else {
+      result = execSync(`node "${TOOLS_PATH}" ${args}`, {
+        cwd,
+        encoding: 'utf-8',
+        stdio: ['pipe', 'pipe', 'pipe'],
+      });
+    }
     return { success: true, output: result.trim() };
   } catch (err) {
     return {
@@ -2029,5 +2039,329 @@ describe('scaffold command', () => {
     const output = JSON.parse(result.output);
     assert.strictEqual(output.created, false, 'should not overwrite');
     assert.strictEqual(output.reason, 'already_exists');
+  });
+});
+
+// ─── Event Logging Tests ─────────────────────────────────────────────────────
+
+describe('event log command', () => {
+  let tmpDir;
+
+  beforeEach(() => {
+    tmpDir = createTempProject();
+  });
+
+  afterEach(() => {
+    cleanup(tmpDir);
+  });
+
+  test('writes entry to events.jsonl', () => {
+    const result = runGsdTools('event log workflow plan-started --raw', tmpDir);
+    assert.ok(result.success, `Command failed: ${result.error}`);
+    assert.match(result.output, /Event logged: \[workflow\] plan-started/);
+
+    const eventsPath = path.join(tmpDir, '.planning', 'logs', 'events.jsonl');
+    assert.ok(fs.existsSync(eventsPath), 'events.jsonl should exist');
+
+    const lines = fs.readFileSync(eventsPath, 'utf8').trim().split('\n');
+    assert.strictEqual(lines.length, 1);
+    const entry = JSON.parse(lines[0]);
+    assert.strictEqual(entry.category, 'workflow');
+    assert.strictEqual(entry.event, 'plan-started');
+    assert.ok(entry.timestamp, 'should have timestamp');
+  });
+
+  test('writes entry with --details JSON', () => {
+    // Use escaped JSON that survives Windows cmd.exe shell expansion
+    const details = '{"phase":1,"plan":2}';
+    const result = runGsdTools(['event', 'log', 'execution', 'task-done', '--details', details, '--raw'], tmpDir);
+    assert.ok(result.success, `Command failed: ${result.error}`);
+
+    const eventsPath = path.join(tmpDir, '.planning', 'logs', 'events.jsonl');
+    const entry = JSON.parse(fs.readFileSync(eventsPath, 'utf8').trim());
+    assert.strictEqual(entry.category, 'execution');
+    assert.strictEqual(entry.event, 'task-done');
+    assert.deepStrictEqual(entry.details, { phase: 1, plan: 2 });
+  });
+
+  test('appends multiple events', () => {
+    runGsdTools('event log cat1 evt1 --raw', tmpDir);
+    runGsdTools('event log cat2 evt2 --raw', tmpDir);
+    runGsdTools('event log cat1 evt3 --raw', tmpDir);
+
+    const eventsPath = path.join(tmpDir, '.planning', 'logs', 'events.jsonl');
+    const lines = fs.readFileSync(eventsPath, 'utf8').trim().split('\n');
+    assert.strictEqual(lines.length, 3);
+  });
+
+  test('errors without category', () => {
+    const result = runGsdTools('event log --raw', tmpDir);
+    assert.ok(!result.success);
+    assert.match(result.error, /category required/i);
+  });
+
+  test('errors without event name', () => {
+    const result = runGsdTools('event log mycategory --raw', tmpDir);
+    assert.ok(!result.success);
+    assert.match(result.error, /event name required/i);
+  });
+});
+
+describe('event list command', () => {
+  let tmpDir;
+
+  beforeEach(() => {
+    tmpDir = createTempProject();
+  });
+
+  afterEach(() => {
+    cleanup(tmpDir);
+  });
+
+  test('returns empty when no events exist', () => {
+    const result = runGsdTools('event list --raw', tmpDir);
+    assert.ok(result.success, `Command failed: ${result.error}`);
+    assert.match(result.output, /No events logged/);
+  });
+
+  test('lists all events', () => {
+    runGsdTools('event log cat1 evt1 --raw', tmpDir);
+    runGsdTools('event log cat2 evt2 --raw', tmpDir);
+
+    const result = runGsdTools('event list --raw', tmpDir);
+    assert.ok(result.success, `Command failed: ${result.error}`);
+    assert.match(result.output, /\[cat1\] evt1/);
+    assert.match(result.output, /\[cat2\] evt2/);
+  });
+
+  test('filters by category', () => {
+    runGsdTools('event log workflow start --raw', tmpDir);
+    runGsdTools('event log execution done --raw', tmpDir);
+    runGsdTools('event log workflow end --raw', tmpDir);
+
+    const result = runGsdTools('event list --category workflow --raw', tmpDir);
+    assert.ok(result.success, `Command failed: ${result.error}`);
+    assert.match(result.output, /\[workflow\] start/);
+    assert.match(result.output, /\[workflow\] end/);
+    assert.ok(!result.output.includes('[execution]'), 'should not include execution events');
+  });
+
+  test('respects --limit', () => {
+    runGsdTools('event log cat evt1 --raw', tmpDir);
+    runGsdTools('event log cat evt2 --raw', tmpDir);
+    runGsdTools('event log cat evt3 --raw', tmpDir);
+
+    const result = runGsdTools('event list --limit 2 --raw', tmpDir);
+    assert.ok(result.success, `Command failed: ${result.error}`);
+    // Should return last 2 events
+    assert.ok(!result.output.includes('evt1'), 'should not include oldest event');
+    assert.match(result.output, /evt2/);
+    assert.match(result.output, /evt3/);
+  });
+
+  test('JSON mode returns structured data', () => {
+    runGsdTools('event log cat1 evt1 --raw', tmpDir);
+    runGsdTools('event log cat2 evt2 --raw', tmpDir);
+
+    const result = runGsdTools('event list', tmpDir);
+    assert.ok(result.success, `Command failed: ${result.error}`);
+    const parsed = JSON.parse(result.output);
+    assert.ok(Array.isArray(parsed.events));
+    assert.strictEqual(parsed.events.length, 2);
+    assert.strictEqual(parsed.events[0].category, 'cat1');
+    assert.strictEqual(parsed.events[1].category, 'cat2');
+  });
+});
+
+describe('event session-start/session-end lifecycle', () => {
+  let tmpDir;
+
+  beforeEach(() => {
+    tmpDir = createTempProject();
+  });
+
+  afterEach(() => {
+    cleanup(tmpDir);
+  });
+
+  test('session-start creates active session file', () => {
+    const result = runGsdTools('event session-start --raw', tmpDir);
+    assert.ok(result.success, `Command failed: ${result.error}`);
+    assert.match(result.output, /Session started:/);
+
+    const activePath = path.join(tmpDir, '.planning', 'logs', '.active-session');
+    assert.ok(fs.existsSync(activePath), '.active-session should exist');
+
+    const session = JSON.parse(fs.readFileSync(activePath, 'utf8'));
+    assert.ok(session.session_start, 'should have session_start');
+    assert.strictEqual(session.session_end, null);
+    assert.strictEqual(session.agents_spawned, 0);
+  });
+
+  test('session-end writes to sessions.jsonl and removes active session', () => {
+    runGsdTools('event session-start --raw', tmpDir);
+    const result = runGsdTools('event session-end --raw', tmpDir);
+    assert.ok(result.success, `Command failed: ${result.error}`);
+    assert.match(result.output, /Session ended: \d+m/);
+
+    const activePath = path.join(tmpDir, '.planning', 'logs', '.active-session');
+    assert.ok(!fs.existsSync(activePath), '.active-session should be removed');
+
+    const sessionsPath = path.join(tmpDir, '.planning', 'logs', 'sessions.jsonl');
+    assert.ok(fs.existsSync(sessionsPath), 'sessions.jsonl should exist');
+
+    const entry = JSON.parse(fs.readFileSync(sessionsPath, 'utf8').trim());
+    assert.ok(entry.session_start, 'should have session_start');
+    assert.ok(entry.session_end, 'should have session_end');
+    assert.strictEqual(typeof entry.duration_minutes, 'number');
+  });
+
+  test('session-end without prior session-start still works', () => {
+    const result = runGsdTools('event session-end --raw', tmpDir);
+    assert.ok(result.success, `Command failed: ${result.error}`);
+    assert.match(result.output, /Session ended:/);
+
+    const sessionsPath = path.join(tmpDir, '.planning', 'logs', 'sessions.jsonl');
+    assert.ok(fs.existsSync(sessionsPath), 'sessions.jsonl should exist');
+  });
+
+  test('session-start JSON mode returns structured data', () => {
+    const result = runGsdTools('event session-start', tmpDir);
+    assert.ok(result.success, `Command failed: ${result.error}`);
+    const parsed = JSON.parse(result.output);
+    assert.strictEqual(parsed.started, true);
+    assert.ok(parsed.session.session_start);
+  });
+
+  test('session-end JSON mode returns structured data', () => {
+    runGsdTools('event session-start --raw', tmpDir);
+    const result = runGsdTools('event session-end', tmpDir);
+    assert.ok(result.success, `Command failed: ${result.error}`);
+    const parsed = JSON.parse(result.output);
+    assert.strictEqual(parsed.ended, true);
+    assert.ok(parsed.session.session_end);
+    assert.strictEqual(typeof parsed.session.duration_minutes, 'number');
+  });
+});
+
+describe('event clear command', () => {
+  let tmpDir;
+
+  beforeEach(() => {
+    tmpDir = createTempProject();
+  });
+
+  afterEach(() => {
+    cleanup(tmpDir);
+  });
+
+  test('clears events log', () => {
+    runGsdTools('event log cat evt --raw', tmpDir);
+    const eventsPath = path.join(tmpDir, '.planning', 'logs', 'events.jsonl');
+    assert.ok(fs.existsSync(eventsPath), 'events.jsonl should exist before clear');
+
+    const result = runGsdTools('event clear events --raw', tmpDir);
+    assert.ok(result.success, `Command failed: ${result.error}`);
+    assert.match(result.output, /Cleared events log/);
+    assert.ok(!fs.existsSync(eventsPath), 'events.jsonl should be removed');
+  });
+
+  test('clears sessions log', () => {
+    runGsdTools('event session-start --raw', tmpDir);
+    runGsdTools('event session-end --raw', tmpDir);
+    const sessionsPath = path.join(tmpDir, '.planning', 'logs', 'sessions.jsonl');
+    assert.ok(fs.existsSync(sessionsPath));
+
+    const result = runGsdTools('event clear sessions --raw', tmpDir);
+    assert.ok(result.success, `Command failed: ${result.error}`);
+    assert.ok(!fs.existsSync(sessionsPath));
+  });
+
+  test('clears hooks log', () => {
+    // Create hooks.jsonl manually since hook logging is separate
+    const logsDir = path.join(tmpDir, '.planning', 'logs');
+    fs.mkdirSync(logsDir, { recursive: true });
+    fs.writeFileSync(path.join(logsDir, 'hooks.jsonl'), '{"test": true}\n');
+
+    const result = runGsdTools('event clear hooks --raw', tmpDir);
+    assert.ok(result.success, `Command failed: ${result.error}`);
+    assert.ok(!fs.existsSync(path.join(logsDir, 'hooks.jsonl')));
+  });
+
+  test('errors on invalid log name', () => {
+    const result = runGsdTools('event clear invalid --raw', tmpDir);
+    assert.ok(!result.success);
+    assert.match(result.error, /Invalid log/);
+  });
+
+  test('succeeds even if log does not exist', () => {
+    const result = runGsdTools('event clear events --raw', tmpDir);
+    assert.ok(result.success, `Command failed: ${result.error}`);
+  });
+
+  test('JSON mode returns cleared log name', () => {
+    const result = runGsdTools('event clear events', tmpDir);
+    assert.ok(result.success, `Command failed: ${result.error}`);
+    const parsed = JSON.parse(result.output);
+    assert.strictEqual(parsed.cleared, 'events');
+  });
+});
+
+describe('JSONL rotation', () => {
+  let tmpDir;
+
+  beforeEach(() => {
+    tmpDir = createTempProject();
+  });
+
+  afterEach(() => {
+    cleanup(tmpDir);
+  });
+
+  test('events.jsonl rotates at limit', () => {
+    // Write 1005 events (limit is 1000)
+    const logsDir = path.join(tmpDir, '.planning', 'logs');
+    fs.mkdirSync(logsDir, { recursive: true });
+    const eventsPath = path.join(logsDir, 'events.jsonl');
+
+    // Seed with 999 events directly to avoid spawning 1000 processes
+    const lines = [];
+    for (let i = 0; i < 999; i++) {
+      lines.push(JSON.stringify({ timestamp: new Date().toISOString(), category: 'test', event: `evt-${i}`, details: {} }));
+    }
+    fs.writeFileSync(eventsPath, lines.join('\n') + '\n');
+
+    // Add 5 more via the CLI to trigger rotation
+    for (let i = 0; i < 5; i++) {
+      runGsdTools(`event log test overflow-${i} --raw`, tmpDir);
+    }
+
+    const finalContent = fs.readFileSync(eventsPath, 'utf8').trim();
+    const finalLines = finalContent.split('\n').filter(l => l.trim());
+    assert.ok(finalLines.length <= 1000, `Expected <= 1000 lines, got ${finalLines.length}`);
+    // Last entry should be the most recent
+    const lastEntry = JSON.parse(finalLines[finalLines.length - 1]);
+    assert.strictEqual(lastEntry.event, 'overflow-4');
+  });
+
+  test('sessions.jsonl rotates at limit', () => {
+    const logsDir = path.join(tmpDir, '.planning', 'logs');
+    fs.mkdirSync(logsDir, { recursive: true });
+    const sessionsPath = path.join(logsDir, 'sessions.jsonl');
+
+    // Seed with 100 sessions (at limit)
+    const lines = [];
+    for (let i = 0; i < 100; i++) {
+      lines.push(JSON.stringify({ session_start: new Date().toISOString(), session_end: new Date().toISOString(), duration_minutes: i }));
+    }
+    fs.writeFileSync(sessionsPath, lines.join('\n') + '\n');
+
+    // Add one more via session lifecycle
+    runGsdTools('event session-start --raw', tmpDir);
+    runGsdTools('event session-end --raw', tmpDir);
+
+    const finalContent = fs.readFileSync(sessionsPath, 'utf8').trim();
+    const finalLines = finalContent.split('\n').filter(l => l.trim());
+    assert.ok(finalLines.length <= 100, `Expected <= 100 lines, got ${finalLines.length}`);
   });
 });
