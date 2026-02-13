@@ -35,6 +35,9 @@ Parse current values (default to `true` if not present):
 - `workflow.verifier` — spawn verifier during execute-phase
 - `model_profile` — which model each agent uses (default: `balanced`)
 - `git.branching_strategy` — branching approach (default: `"none"`)
+- `adversary.enabled` — global adversary toggle (default: `true`)
+- `adversary.checkpoints.*` — per-checkpoint toggles (default: all `true`)
+- `adversary.max_rounds` — global max debate rounds (default: `3`)
 
 ## 3. Present Settings
 
@@ -88,6 +91,39 @@ AskUserQuestion([
       { label: "Per Phase", description: "Create branch for each phase (gsd/phase-{N}-{name})" },
       { label: "Per Milestone", description: "Create branch for entire milestone (gsd/{version}-{name})" }
     ]
+  },
+  {
+    question: "Enable adversarial review? (challenges artifacts before execution)",
+    header: "Adversary",
+    multiSelect: false,
+    options: [
+      { label: "Yes (Recommended)", description: "Challenge requirements, roadmaps, plans, and verification" },
+      { label: "No", description: "Skip adversarial review at all checkpoints" }
+    ]
+  },
+  // ONLY show if adversary = "Yes":
+  {
+    question: "Which checkpoints should trigger adversarial review?",
+    header: "Adversary Checkpoints",
+    multiSelect: true,
+    options: [
+      { label: "Requirements", description: "Challenge REQUIREMENTS.md after creation" },
+      { label: "Roadmap", description: "Challenge ROADMAP.md after creation" },
+      { label: "Plan", description: "Challenge PLAN.md after creation" },
+      { label: "Verification", description: "Challenge verification conclusions" }
+    ]
+  },
+  // ONLY show if adversary = "Yes":
+  {
+    question: "Maximum debate rounds per checkpoint?",
+    header: "Max Rounds",
+    multiSelect: false,
+    options: [
+      { label: "1", description: "Single challenge only (fastest)" },
+      { label: "2", description: "Challenge + defense" },
+      { label: "3 (Recommended)", description: "Challenge + defense + final assessment" },
+      { label: "5", description: "Extended debate (most thorough)" }
+    ]
   }
 ])
 ```
@@ -109,9 +145,26 @@ Merge new settings into existing config.json:
   },
   "git": {
     "branching_strategy": "none" | "phase" | "milestone"
+  },
+  "adversary": {
+    "enabled": true/false,
+    "max_rounds": 1/2/3/5,
+    "checkpoints": {
+      "requirements": true/false,
+      "roadmap": true/false,
+      "plan": true/false,
+      "verification": true/false
+    }
   }
 }
 ```
+
+**Adversary merge rules:**
+- Read existing `adversary` section from config first (preserve existing values)
+- When toggling `enabled: false`, preserve existing checkpoint and max_rounds values
+- When toggling checkpoints, write `true` for selected and `false` for unselected
+- When changing max_rounds, write the numeric value (1, 2, 3, or 5)
+- If no existing adversary section, use defaults: `enabled: true`, `max_rounds: 3`, all checkpoints `true`
 
 Write updated config to `.planning/config.json`.
 
@@ -131,6 +184,9 @@ Display:
 | Plan Checker         | {On/Off} |
 | Execution Verifier   | {On/Off} |
 | Git Branching        | {None/Per Phase/Per Milestone} |
+| Adversary            | {On/Off} |
+| Adversary Checkpoints| {list of enabled checkpoints} |
+| Max Rounds           | {1/2/3/5} |
 
 These settings apply to future /gsd:plan-phase and /gsd:execute-phase runs.
 
@@ -145,7 +201,7 @@ Quick commands:
 
 <success_criteria>
 - [ ] Current config read
-- [ ] User presented with 5 settings (profile + 3 workflow toggles + git branching)
-- [ ] Config updated with model_profile, workflow, and git sections
+- [ ] User presented with 8 settings (profile + 3 workflow + branching + 3 adversary)
+- [ ] Config updated with model_profile, workflow, git, and adversary sections
 - [ ] Changes confirmed to user
 </success_criteria>
