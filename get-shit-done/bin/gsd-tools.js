@@ -101,6 +101,9 @@
  *     --stopped-at "..."
  *     [--resume-file path]
  *
+ * Diagnostics:
+ *   health                              Run project health diagnostics
+ *
  * Compound Commands (workflow-specific initialization):
  *   init execute-phase <phase>         All context for execute-phase workflow
  *   init plan-phase <phase>            All context for plan-phase workflow
@@ -4209,6 +4212,428 @@ function cmdInitProgress(cwd, includes, raw) {
   output(result, raw);
 }
 
+// ─── Health Diagnostics ──────────────────────────────────────────────────────
+
+function cmdHealth(cwd, raw) {
+  const planningDir = path.join(cwd, '.planning');
+  const phasesDir = path.join(planningDir, 'phases');
+  const checks = [];
+
+  // ── Check 1: Structure check ───────────────────────────────────────────────
+  (() => {
+    const check = { id: 'structure', name: 'structure', title: 'Project structure', status: 'PASS', issues: [], suggestions: [] };
+    if (!fs.existsSync(planningDir)) {
+      check.status = 'FAIL';
+      check.issues.push('.planning/ directory not found');
+      checks.push(check);
+      return;
+    }
+    const keyFiles = [
+      { name: 'PROJECT.md or CLAUDE.md', paths: ['PROJECT.md', 'CLAUDE.md'] },
+      { name: 'ROADMAP.md', paths: ['ROADMAP.md'] },
+      { name: 'STATE.md', paths: ['STATE.md'] },
+      { name: 'config.json', paths: ['config.json'] },
+    ];
+    for (const kf of keyFiles) {
+      const found = kf.paths.some(p => fs.existsSync(path.join(planningDir, p)));
+      if (!found) {
+        check.status = 'WARN';
+        check.issues.push(`Missing ${kf.name}`);
+        check.suggestions.push(`Create .planning/${kf.paths[0]}`);
+      }
+    }
+    if (!fs.existsSync(phasesDir)) {
+      check.status = 'WARN';
+      check.issues.push('Missing phases/ directory');
+      check.suggestions.push('Create .planning/phases/');
+    }
+    checks.push(check);
+  })();
+
+  // ── Check 2: Config validity ───────────────────────────────────────────────
+  (() => {
+    const check = { id: 'config-validity', name: 'config-validity', title: 'Config validity', status: 'PASS', issues: [], suggestions: [] };
+    const configPath = path.join(planningDir, 'config.json');
+    const content = safeReadFile(configPath);
+    if (!content) {
+      check.status = 'WARN';
+      check.issues.push('config.json not found');
+      check.suggestions.push('Run: gsd-tools config-ensure-section');
+      checks.push(check);
+      return;
+    }
+    let parsed;
+    try {
+      parsed = JSON.parse(content);
+    } catch (e) {
+      check.status = 'FAIL';
+      check.issues.push('config.json is not valid JSON: ' + e.message);
+      checks.push(check);
+      return;
+    }
+    // Validate model_profile
+    const validProfiles = ['quality', 'balanced', 'budget'];
+    const mp = parsed.model_profile;
+    if (mp !== undefined && !validProfiles.includes(mp)) {
+      check.status = 'FAIL';
+      check.issues.push(`Invalid model_profile: "${mp}". Must be one of: ${validProfiles.join(', ')}`);
+    }
+    // Validate branching_strategy
+    const bs = parsed.branching_strategy || (parsed.git && parsed.git.branching_strategy);
+    const validStrategies = ['none', 'phase', 'plan'];
+    if (bs !== undefined && !validStrategies.includes(bs)) {
+      check.status = 'WARN';
+      check.issues.push(`Unrecognized branching_strategy: "${bs}"`);
+      check.suggestions.push(`Valid values: ${validStrategies.join(', ')}`);
+    }
+    // Check boolean fields
+    const boolFields = ['commit_docs', 'research', 'plan_checker', 'verifier', 'parallelization', 'brave_search'];
+    for (const bf of boolFields) {
+      let val = parsed[bf];
+      // Check nested locations
+      if (val === undefined && parsed.planning && parsed.planning[bf] !== undefined) val = parsed.planning[bf];
+      if (val === undefined && parsed.workflow && parsed.workflow[bf] !== undefined) val = parsed.workflow[bf];
+      if (val !== undefined && typeof val !== 'boolean') {
+        // parallelization can be an object with .enabled
+        if (bf === 'parallelization' && typeof val === 'object' && val !== null) continue;
+        check.status = check.status === 'FAIL' ? 'FAIL' : 'WARN';
+        check.issues.push(`Field "${bf}" should be boolean, got ${typeof val}`);
+      }
+    }
+    checks.push(check);
+  })();
+
+  // ── Check 3: Phase consistency ─────────────────────────────────────────────
+  (() => {
+    const check = { id: 'phase-consistency', name: 'phase-consistency', title: 'Phase consistency', status: 'PASS', issues: [], suggestions: [] };
+    const roadmapPath = path.join(planningDir, 'ROADMAP.md');
+    const roadmapContent = safeReadFile(roadmapPath);
+
+    // Extract phases from ROADMAP
+    const roadmapPhases = new Set();
+    if (roadmapContent) {
+      const phasePattern = /###\s*Phase\s+(\d+(?:\.\d+)?)\s*:/gi;
+      let m;
+      while ((m = phasePattern.exec(roadmapContent)) !== null) {
+        roadmapPhases.add(m[1]);
+      }
+    }
+
+    // Get phases on disk
+    const diskPhases = new Set();
+    try {
+      const entries = fs.readdirSync(phasesDir, { withFileTypes: true });
+      const dirs = entries.filter(e => e.isDirectory()).map(e => e.name);
+      for (const dir of dirs) {
+        const dm = dir.match(/^(\d+(?:\.\d+)?)/);
+        if (dm) diskPhases.add(dm[1]);
+      }
+    } catch {}
+
+    if (!roadmapContent && diskPhases.size === 0) {
+      check.status = 'WARN';
+      check.issues.push('No ROADMAP.md and no phase directories found');
+      checks.push(check);
+      return;
+    }
+
+    // Phases in ROADMAP but not on disk
+    for (const p of roadmapPhases) {
+      if (!diskPhases.has(p) && !diskPhases.has(normalizePhaseName(p))) {
+        check.status = 'WARN';
+        check.issues.push(`Phase ${p} in ROADMAP.md but no directory on disk`);
+        check.suggestions.push(`Create directory: .planning/phases/${normalizePhaseName(p)}-<name>/`);
+      }
+    }
+
+    // Phases on disk but not in ROADMAP
+    for (const p of diskPhases) {
+      const unpadded = String(parseInt(p, 10));
+      if (!roadmapPhases.has(p) && !roadmapPhases.has(unpadded)) {
+        check.status = 'WARN';
+        check.issues.push(`Phase ${p} on disk but not in ROADMAP.md`);
+      }
+    }
+
+    // Check for gaps in integer phase numbering
+    const integerPhases = [...diskPhases]
+      .filter(p => !p.includes('.'))
+      .map(p => parseInt(p, 10))
+      .sort((a, b) => a - b);
+
+    for (let i = 1; i < integerPhases.length; i++) {
+      if (integerPhases[i] !== integerPhases[i - 1] + 1) {
+        check.status = 'WARN';
+        check.issues.push(`Gap in phase numbering: ${integerPhases[i - 1]} -> ${integerPhases[i]}`);
+      }
+    }
+
+    checks.push(check);
+  })();
+
+  // ── Check 4: Plan/summary pairing ─────────────────────────────────────────
+  (() => {
+    const check = { id: 'plan-summary-pairing', name: 'plan-summary-pairing', title: 'Plan/summary pairing', status: 'PASS', issues: [], suggestions: [] };
+    try {
+      const entries = fs.readdirSync(phasesDir, { withFileTypes: true });
+      const dirs = entries.filter(e => e.isDirectory()).map(e => e.name).sort();
+
+      for (const dir of dirs) {
+        const phaseFiles = fs.readdirSync(path.join(phasesDir, dir));
+        const plans = phaseFiles.filter(f => f.endsWith('-PLAN.md'));
+        const summaries = phaseFiles.filter(f => f.endsWith('-SUMMARY.md'));
+
+        const planIds = new Set(plans.map(p => p.replace('-PLAN.md', '')));
+        const summaryIds = new Set(summaries.map(s => s.replace('-SUMMARY.md', '')));
+
+        // Orphaned summaries (SUMMARY without matching PLAN)
+        for (const sid of summaryIds) {
+          if (!planIds.has(sid)) {
+            check.status = 'WARN';
+            check.issues.push(`Orphaned summary: ${dir}/${sid}-SUMMARY.md has no matching PLAN`);
+          }
+        }
+
+        // Validate PLAN files have required frontmatter
+        for (const plan of plans) {
+          const content = safeReadFile(path.join(phasesDir, dir, plan));
+          if (!content) continue;
+          const fm = extractFrontmatter(content);
+          const missing = [];
+          if (fm.phase === undefined) missing.push('phase');
+          if (fm.plan === undefined) missing.push('plan');
+          if (missing.length > 0) {
+            check.status = 'WARN';
+            check.issues.push(`${dir}/${plan}: missing frontmatter fields: ${missing.join(', ')}`);
+          }
+        }
+      }
+    } catch {}
+    checks.push(check);
+  })();
+
+  // ── Check 5: STATE.md accuracy ─────────────────────────────────────────────
+  (() => {
+    const check = { id: 'state-accuracy', name: 'state-accuracy', title: 'STATE.md accuracy', status: 'PASS', issues: [], suggestions: [] };
+    const statePath = path.join(planningDir, 'STATE.md');
+    const stateContent = safeReadFile(statePath);
+    if (!stateContent) {
+      check.status = 'FAIL';
+      check.issues.push('STATE.md not found');
+      check.suggestions.push('Create .planning/STATE.md');
+      checks.push(check);
+      return;
+    }
+
+    const hasCurrentPhase = /Current Phase/i.test(stateContent) || /Phase:/i.test(stateContent);
+    const hasStatus = /Status:/i.test(stateContent);
+
+    if (!hasCurrentPhase) {
+      check.status = 'WARN';
+      check.issues.push('STATE.md missing "Current Phase" or "Phase:" field');
+    }
+    if (!hasStatus) {
+      check.status = 'WARN';
+      check.issues.push('STATE.md missing "Status:" field');
+    }
+
+    // Check that referenced phase exists on disk
+    const phaseMatch = stateContent.match(/Phase:\s*(\d+(?:\.\d+)?)/i);
+    if (phaseMatch) {
+      const phaseNum = phaseMatch[1];
+      const normalized = normalizePhaseName(phaseNum);
+      let found = false;
+      try {
+        const entries = fs.readdirSync(phasesDir, { withFileTypes: true });
+        const dirs = entries.filter(e => e.isDirectory()).map(e => e.name);
+        found = dirs.some(d => {
+          const dm = d.match(/^(\d+(?:\.\d+)?)/);
+          return dm && (dm[1] === phaseNum || dm[1] === normalized);
+        });
+      } catch {}
+      if (!found) {
+        check.status = 'WARN';
+        check.issues.push(`STATE.md references phase ${phaseNum} but no matching directory found`);
+      }
+    }
+
+    checks.push(check);
+  })();
+
+  // ── Check 6: Frontmatter validity ─────────────────────────────────────────
+  (() => {
+    const check = { id: 'frontmatter-validity', name: 'frontmatter-validity', title: 'Frontmatter validity', status: 'PASS', issues: [], suggestions: [] };
+    try {
+      const entries = fs.readdirSync(phasesDir, { withFileTypes: true });
+      const dirs = entries.filter(e => e.isDirectory()).map(e => e.name);
+
+      for (const dir of dirs) {
+        const phaseFiles = fs.readdirSync(path.join(phasesDir, dir));
+
+        // Check PLAN files against plan schema
+        const plans = phaseFiles.filter(f => f.endsWith('-PLAN.md'));
+        for (const plan of plans) {
+          const content = safeReadFile(path.join(phasesDir, dir, plan));
+          if (!content) continue;
+          const fm = extractFrontmatter(content);
+          const schema = FRONTMATTER_SCHEMAS.plan;
+          const missing = schema.required.filter(f => fm[f] === undefined);
+          if (missing.length > 0) {
+            check.status = 'WARN';
+            check.issues.push(`${dir}/${plan}: missing plan frontmatter: ${missing.join(', ')}`);
+          }
+        }
+
+        // Check SUMMARY files against summary schema
+        const summaries = phaseFiles.filter(f => f.endsWith('-SUMMARY.md'));
+        for (const summary of summaries) {
+          const content = safeReadFile(path.join(phasesDir, dir, summary));
+          if (!content) continue;
+          const fm = extractFrontmatter(content);
+          const schema = FRONTMATTER_SCHEMAS.summary;
+          const missing = schema.required.filter(f => fm[f] === undefined);
+          if (missing.length > 0) {
+            check.status = 'WARN';
+            check.issues.push(`${dir}/${summary}: missing summary frontmatter: ${missing.join(', ')}`);
+          }
+        }
+      }
+    } catch {}
+    checks.push(check);
+  })();
+
+  // ── Check 7: ROADMAP/STATE sync ────────────────────────────────────────────
+  (() => {
+    const check = { id: 'roadmap-state-sync', name: 'roadmap-state-sync', title: 'ROADMAP/STATE sync', status: 'PASS', issues: [], suggestions: [] };
+    const roadmapContent = safeReadFile(path.join(planningDir, 'ROADMAP.md'));
+    const stateContent = safeReadFile(path.join(planningDir, 'STATE.md'));
+
+    if (!roadmapContent || !stateContent) {
+      if (!roadmapContent) check.issues.push('ROADMAP.md not found');
+      if (!stateContent) check.issues.push('STATE.md not found');
+      check.status = check.issues.length > 0 ? 'WARN' : 'PASS';
+      checks.push(check);
+      return;
+    }
+
+    // Count phases in ROADMAP
+    const roadmapPhases = [];
+    const phasePattern = /###\s*Phase\s+(\d+(?:\.\d+)?)\s*:/gi;
+    let m;
+    while ((m = phasePattern.exec(roadmapContent)) !== null) {
+      roadmapPhases.push(m[1]);
+    }
+
+    // Extract total from STATE.md (e.g., "Phase: 2 of 5" or "2 of 5")
+    const totalMatch = stateContent.match(/(\d+)\s+of\s+(\d+)/i);
+    if (totalMatch) {
+      const stateTotal = parseInt(totalMatch[2], 10);
+      // Only count integer phases for total comparison
+      const roadmapIntegerCount = roadmapPhases.filter(p => !p.includes('.')).length;
+      if (stateTotal !== roadmapIntegerCount && roadmapIntegerCount > 0) {
+        check.status = 'WARN';
+        check.issues.push(`STATE.md total phases (${stateTotal}) differs from ROADMAP.md (${roadmapIntegerCount})`);
+      }
+    }
+
+    // Verify current phase exists in ROADMAP
+    const phaseMatch = stateContent.match(/Phase:\s*(\d+(?:\.\d+)?)/i);
+    if (phaseMatch) {
+      const currentPhase = phaseMatch[1];
+      const unpadded = String(parseInt(currentPhase, 10));
+      if (!roadmapPhases.includes(currentPhase) && !roadmapPhases.includes(unpadded)) {
+        check.status = 'WARN';
+        check.issues.push(`Current phase ${currentPhase} from STATE.md not found in ROADMAP.md`);
+      }
+    }
+
+    checks.push(check);
+  })();
+
+  // ── Check 8: Hook execution health ─────────────────────────────────────────
+  (() => {
+    const check = { id: 'hook-health', name: 'hook-health', title: 'Hook execution health', status: 'PASS', issues: [], suggestions: [] };
+    try {
+      const entries = fs.readdirSync(planningDir);
+      const lockFiles = entries.filter(f => f.endsWith('.lock'));
+      const now = Date.now();
+      const staleThreshold = 30 * 60 * 1000; // 30 minutes
+
+      for (const lockFile of lockFiles) {
+        const lockPath = path.join(planningDir, lockFile);
+        const stat = fs.statSync(lockPath);
+        const age = now - stat.mtimeMs;
+        if (age > staleThreshold) {
+          check.status = 'WARN';
+          check.issues.push(`Stale lock file: ${lockFile} (age: ${Math.round(age / 60000)} min)`);
+          check.suggestions.push(`Remove stale lock: rm .planning/${lockFile}`);
+        }
+      }
+    } catch {}
+    checks.push(check);
+  })();
+
+  // ── Check 9: Config completeness ───────────────────────────────────────────
+  (() => {
+    const check = { id: 'config-completeness', name: 'config-completeness', title: 'Config completeness', status: 'PASS', issues: [], suggestions: [] };
+    const configPath = path.join(planningDir, 'config.json');
+    const content = safeReadFile(configPath);
+    if (!content) {
+      check.status = 'WARN';
+      check.issues.push('config.json not found');
+      checks.push(check);
+      return;
+    }
+    let parsed;
+    try {
+      parsed = JSON.parse(content);
+    } catch {
+      check.status = 'FAIL';
+      check.issues.push('config.json is not valid JSON');
+      checks.push(check);
+      return;
+    }
+
+    // Check recommended fields, handling nested locations
+    const recommended = [
+      { field: 'model_profile', nested: null },
+      { field: 'commit_docs', nested: { section: 'planning', field: 'commit_docs' } },
+      { field: 'branching_strategy', nested: { section: 'git', field: 'branching_strategy' } },
+    ];
+
+    for (const rec of recommended) {
+      let found = parsed[rec.field] !== undefined;
+      if (!found && rec.nested) {
+        const section = parsed[rec.nested.section];
+        if (section && section[rec.nested.field] !== undefined) found = true;
+      }
+      if (!found) {
+        check.status = 'WARN';
+        check.issues.push(`Recommended field missing: ${rec.field}`);
+        check.suggestions.push(`Add "${rec.field}" to config.json`);
+      }
+    }
+    checks.push(check);
+  })();
+
+  // ── Aggregate results ──────────────────────────────────────────────────────
+  const pass = checks.filter(c => c.status === 'PASS').length;
+  const warn = checks.filter(c => c.status === 'WARN').length;
+  const fail = checks.filter(c => c.status === 'FAIL').length;
+
+  let overall = 'PASS';
+  if (warn > 0) overall = 'WARN';
+  if (fail > 0) overall = 'FAIL';
+
+  const result = {
+    overall,
+    summary: { pass, warn, fail, total: checks.length },
+    checks,
+  };
+
+  output(result, raw);
+}
+
 // ─── CLI Router ───────────────────────────────────────────────────────────────
 
 async function main() {
@@ -4586,6 +5011,11 @@ async function main() {
         limit: limitIdx !== -1 ? parseInt(args[limitIdx + 1], 10) : 10,
         freshness: freshnessIdx !== -1 ? args[freshnessIdx + 1] : null,
       }, raw);
+      break;
+    }
+
+    case 'health': {
+      cmdHealth(cwd, raw);
       break;
     }
 

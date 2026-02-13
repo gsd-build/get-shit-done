@@ -2031,3 +2031,189 @@ describe('scaffold command', () => {
     assert.strictEqual(output.reason, 'already_exists');
   });
 });
+
+describe('health command', () => {
+  let tmpDir;
+
+  beforeEach(() => {
+    tmpDir = createTempProject();
+  });
+
+  afterEach(() => {
+    cleanup(tmpDir);
+  });
+
+  test('reports FAIL when .planning directory is missing', () => {
+    // Use a dir without .planning
+    const emptyDir = fs.mkdtempSync(path.join(require('os').tmpdir(), 'gsd-health-'));
+    try {
+      const result = runGsdTools('health', emptyDir);
+      assert.ok(result.success, `Command failed: ${result.error}`);
+      const report = JSON.parse(result.output);
+      assert.strictEqual(report.overall, 'FAIL', 'overall should be FAIL');
+      assert.ok(report.summary.fail > 0, 'should have at least one FAIL check');
+      // structure check should fail
+      const structureCheck = report.checks.find(c => c.id === 'structure');
+      assert.strictEqual(structureCheck.status, 'FAIL');
+      assert.ok(structureCheck.issues.some(i => i.includes('.planning/')));
+    } finally {
+      fs.rmSync(emptyDir, { recursive: true, force: true });
+    }
+  });
+
+  test('reports PASS with fully valid project structure', () => {
+    // Create a complete valid project
+    const planningDir = path.join(tmpDir, '.planning');
+    const phasesDir = path.join(planningDir, 'phases');
+
+    // Key files
+    fs.writeFileSync(path.join(planningDir, 'PROJECT.md'), '# Project\n');
+    fs.writeFileSync(path.join(planningDir, 'ROADMAP.md'), '# Roadmap\n\n### Phase 1: Foundation\nDetails\n');
+    fs.writeFileSync(path.join(planningDir, 'STATE.md'), '# State\n\nPhase: 1 of 1\nStatus: In progress\n');
+    fs.writeFileSync(path.join(planningDir, 'config.json'), JSON.stringify({
+      model_profile: 'balanced',
+      commit_docs: true,
+      branching_strategy: 'none',
+    }));
+
+    // Phase directory with plan + summary
+    const phaseDir = path.join(phasesDir, '01-foundation');
+    fs.mkdirSync(phaseDir, { recursive: true });
+    fs.writeFileSync(path.join(phaseDir, '01-01-PLAN.md'), `---
+phase: "01"
+plan: "01"
+type: execute
+wave: 1
+depends_on: []
+files_modified: []
+autonomous: true
+must_haves:
+  artifacts: []
+  key_links: []
+---
+# Plan
+`);
+    fs.writeFileSync(path.join(phaseDir, '01-01-SUMMARY.md'), `---
+phase: "01"
+plan: "01"
+subsystem: foundation
+tags: [setup]
+duration: 30min
+completed: 2025-01-01
+---
+# Summary
+`);
+
+    const result = runGsdTools('health', tmpDir);
+    assert.ok(result.success, `Command failed: ${result.error}`);
+    const report = JSON.parse(result.output);
+    assert.strictEqual(report.overall, 'PASS', 'overall should be PASS with valid structure');
+    assert.strictEqual(report.summary.fail, 0, 'should have no FAIL checks');
+    assert.strictEqual(report.summary.warn, 0, 'should have no WARN checks');
+    assert.strictEqual(report.summary.total, 9, 'should run all 9 checks');
+  });
+
+  test('validates config with invalid model_profile', () => {
+    const planningDir = path.join(tmpDir, '.planning');
+    fs.writeFileSync(path.join(planningDir, 'config.json'), JSON.stringify({
+      model_profile: 'turbo',
+      commit_docs: true,
+      branching_strategy: 'none',
+    }));
+
+    const result = runGsdTools('health', tmpDir);
+    assert.ok(result.success, `Command failed: ${result.error}`);
+    const report = JSON.parse(result.output);
+
+    const configCheck = report.checks.find(c => c.id === 'config-validity');
+    assert.strictEqual(configCheck.status, 'FAIL');
+    assert.ok(configCheck.issues.some(i => i.includes('model_profile')));
+  });
+
+  test('detects orphaned summaries', () => {
+    const phaseDir = path.join(tmpDir, '.planning', 'phases', '01-foundation');
+    fs.mkdirSync(phaseDir, { recursive: true });
+
+    // Summary without matching plan
+    fs.writeFileSync(path.join(phaseDir, '01-01-SUMMARY.md'), '---\nphase: "01"\n---\n# Summary\n');
+
+    const result = runGsdTools('health', tmpDir);
+    assert.ok(result.success, `Command failed: ${result.error}`);
+    const report = JSON.parse(result.output);
+
+    const pairingCheck = report.checks.find(c => c.id === 'plan-summary-pairing');
+    assert.strictEqual(pairingCheck.status, 'WARN');
+    assert.ok(pairingCheck.issues.some(i => i.includes('Orphaned summary')));
+  });
+
+  test('detects missing STATE.md', () => {
+    // tmpDir has .planning but no STATE.md by default
+    const result = runGsdTools('health', tmpDir);
+    assert.ok(result.success, `Command failed: ${result.error}`);
+    const report = JSON.parse(result.output);
+
+    const stateCheck = report.checks.find(c => c.id === 'state-accuracy');
+    assert.strictEqual(stateCheck.status, 'FAIL');
+    assert.ok(stateCheck.issues.some(i => i.includes('STATE.md not found')));
+  });
+
+  test('detects stale lock files', () => {
+    const lockPath = path.join(tmpDir, '.planning', 'commit.lock');
+    fs.writeFileSync(lockPath, 'locked');
+    // Set mtime to 60 minutes ago
+    const pastTime = new Date(Date.now() - 60 * 60 * 1000);
+    fs.utimesSync(lockPath, pastTime, pastTime);
+
+    const result = runGsdTools('health', tmpDir);
+    assert.ok(result.success, `Command failed: ${result.error}`);
+    const report = JSON.parse(result.output);
+
+    const hookCheck = report.checks.find(c => c.id === 'hook-health');
+    assert.strictEqual(hookCheck.status, 'WARN');
+    assert.ok(hookCheck.issues.some(i => i.includes('Stale lock file')));
+  });
+
+  test('detects missing recommended config fields', () => {
+    const planningDir = path.join(tmpDir, '.planning');
+    // Config with no recommended fields
+    fs.writeFileSync(path.join(planningDir, 'config.json'), JSON.stringify({ some_other_field: true }));
+
+    const result = runGsdTools('health', tmpDir);
+    assert.ok(result.success, `Command failed: ${result.error}`);
+    const report = JSON.parse(result.output);
+
+    const completenessCheck = report.checks.find(c => c.id === 'config-completeness');
+    assert.strictEqual(completenessCheck.status, 'WARN');
+    assert.ok(completenessCheck.issues.some(i => i.includes('model_profile')));
+    assert.ok(completenessCheck.issues.some(i => i.includes('branching_strategy')));
+  });
+
+  test('returns correct summary counts', () => {
+    const result = runGsdTools('health', tmpDir);
+    assert.ok(result.success, `Command failed: ${result.error}`);
+    const report = JSON.parse(result.output);
+
+    assert.strictEqual(report.summary.total, 9, 'should always run 9 checks');
+    assert.strictEqual(
+      report.summary.pass + report.summary.warn + report.summary.fail,
+      report.summary.total,
+      'pass + warn + fail should equal total'
+    );
+  });
+
+  test('detects phase consistency issues between ROADMAP and disk', () => {
+    const planningDir = path.join(tmpDir, '.planning');
+    // ROADMAP mentions phases 1 and 2
+    fs.writeFileSync(path.join(planningDir, 'ROADMAP.md'), '### Phase 1: Foundation\n\n### Phase 2: API\n');
+    // But only phase 1 exists on disk
+    fs.mkdirSync(path.join(planningDir, 'phases', '01-foundation'), { recursive: true });
+
+    const result = runGsdTools('health', tmpDir);
+    assert.ok(result.success, `Command failed: ${result.error}`);
+    const report = JSON.parse(result.output);
+
+    const phaseCheck = report.checks.find(c => c.id === 'phase-consistency');
+    assert.strictEqual(phaseCheck.status, 'WARN');
+    assert.ok(phaseCheck.issues.some(i => i.includes('Phase 2') && i.includes('no directory')));
+  });
+});
