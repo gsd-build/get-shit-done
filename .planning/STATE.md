@@ -65,9 +65,10 @@ Recent decisions affecting current work:
 
 ### Pending Todos
 
-2 pending todo(s) in `.planning/todos/pending/`:
+3 pending todo(s) in `.planning/todos/pending/`:
 - **Add --auto flag to verify phase** (area: commands)
 - **Automate full phase lifecycle with agents** (area: commands)
+- **Replace "Claude decides" with recommended option in discuss phase** (area: commands)
 
 ### Blockers/Concerns
 
