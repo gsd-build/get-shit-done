@@ -110,6 +110,194 @@ Phase: $ARGUMENTS
 
    Continue to step 7.5 (adversary review). Status routing happens after adversary review.
 
+7.5. **Adversary Review — Verification**
+
+   **Read adversary config:**
+
+   ```bash
+   CHECKPOINT_NAME="verification"
+   CHECKPOINT_CONFIG=$(node -e "
+     try {
+       const c = JSON.parse(require('fs').readFileSync('.planning/config.json', 'utf8'));
+       const adv = c.adversary || {};
+       if (adv.enabled === false) { console.log('false|3'); process.exit(0); }
+       const cp = adv.checkpoints?.[process.argv[1]];
+       let enabled, rounds;
+       if (typeof cp === 'boolean') { enabled = cp; rounds = adv.max_rounds ?? 3; }
+       else if (typeof cp === 'object' && cp !== null) { enabled = cp.enabled ?? true; rounds = cp.max_rounds ?? adv.max_rounds ?? 3; }
+       else { enabled = true; rounds = adv.max_rounds ?? 3; }
+       console.log(enabled + '|' + rounds);
+     } catch(e) { console.log('true|3'); }
+   " "$CHECKPOINT_NAME" 2>/dev/null || echo "true|3")
+
+   CHECKPOINT_ENABLED=$(echo "$CHECKPOINT_CONFIG" | cut -d'|' -f1)
+   MAX_ROUNDS=$(echo "$CHECKPOINT_CONFIG" | cut -d'|' -f2)
+
+   # Apply CONV-01 hard cap: debate never exceeds 3 rounds
+   EFFECTIVE_MAX_ROUNDS=$((MAX_ROUNDS > 3 ? 3 : MAX_ROUNDS))
+   ```
+
+   **Skip conditions** (skip to status routing below):
+   - `CHECKPOINT_ENABLED = "false"` — adversary disabled for verification checkpoint
+   - VERIFICATION.md has `re_verification:` metadata — gap-closure re-check, not initial verification. Adversary adds friction without proportional value for targeted re-checks.
+   - Verification status is already `gaps_found` — verifier already found problems, adversary redundant. The gaps speak for themselves.
+
+   **If CHECKPOINT_ENABLED = "true" AND initial verification AND status is `passed` or `human_needed`:**
+
+   Display banner:
+   ```
+   ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+    GSD ► ADVERSARY REVIEW
+   ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+   ◆ Reviewing verification conclusions...
+   ```
+
+   Set `ADVERSARY_RAN_VERIFICATION=true`.
+
+   **Debate loop:**
+
+   Initialize: `ROUND=1`, `CONVERGED=false`, `VERIFICATION_REVISED=false`
+
+   While ROUND <= EFFECTIVE_MAX_ROUNDS AND not CONVERGED:
+
+   1. **Read artifact from disk** (re-read each round to get latest after verifier revision):
+      ```bash
+      ARTIFACT_CONTENT=$(cat "$PHASE_DIR"/*-VERIFICATION.md)
+      PROJECT_CONTEXT=$(head -50 .planning/PROJECT.md)
+      ```
+
+   2. **Spawn adversary:**
+
+      **Round 1:**
+      ```
+      Task(prompt="First, read ~/.claude/agents/gsd-adversary.md for your role and instructions.
+
+      <artifact_type>verification</artifact_type>
+
+      <artifact_content>
+      {ARTIFACT_CONTENT}
+      </artifact_content>
+
+      <round>1</round>
+      <max_rounds>{EFFECTIVE_MAX_ROUNDS}</max_rounds>
+
+      <project_context>
+      {PROJECT_CONTEXT}
+      </project_context>
+      ", subagent_type="gsd-adversary", model="{adversary_model}", description="Adversary review: verification (round 1)")
+      ```
+
+      **Round > 1:**
+      ```
+      Task(prompt="First, read ~/.claude/agents/gsd-adversary.md for your role and instructions.
+
+      <artifact_type>verification</artifact_type>
+
+      <artifact_content>
+      {ARTIFACT_CONTENT — re-read from disk after verifier revision}
+      </artifact_content>
+
+      <round>{ROUND}</round>
+      <max_rounds>{EFFECTIVE_MAX_ROUNDS}</max_rounds>
+
+      <defense>
+      {DEFENSE — built from verifier's re-analysis return}
+      </defense>
+
+      <previous_challenges>
+      {PREV_CHALLENGES — adversary's challenges from previous round}
+      </previous_challenges>
+
+      <project_context>
+      {PROJECT_CONTEXT}
+      </project_context>
+      ", subagent_type="gsd-adversary", model="{adversary_model}", description="Adversary review: verification (round {ROUND})")
+      ```
+
+   3. **Parse adversary response:**
+      - Extract challenges (title, severity, concern, evidence, affected)
+      - Extract convergence recommendation (CONTINUE/CONVERGE)
+
+   4. **Check convergence:** If adversary recommends CONVERGE and ROUND > 1:
+      - Set `CONVERGED=true`
+      - Break
+
+   5. **Handle challenges** (if ROUND < EFFECTIVE_MAX_ROUNDS):
+
+      **If BLOCKING challenges exist — Verifier-as-defender pattern:**
+
+      Re-spawn gsd-verifier in adversary_revision mode to re-examine specific conclusions. Do NOT edit VERIFICATION.md inline as the orchestrator — the verifier has verification domain knowledge for higher-quality re-analysis.
+
+      ```
+      Task(prompt="First, read ~/.claude/agents/gsd-verifier.md for your role and instructions.
+
+      <revision_context>
+
+      **Phase:** {phase_number}
+      **Phase directory:** {phase_dir}
+      **Mode:** adversary_revision
+
+      **Current VERIFICATION.md:**
+      {current VERIFICATION.md content from disk}
+
+      **Adversary challenges:**
+      {adversary's full challenge output — not a summary}
+
+      **Challenge handling instructions:**
+      - BLOCKING: Re-examine the specific truths/artifacts/links challenged. Update conclusions if evidence supports the challenge.
+      - MAJOR: Re-examine if warranted, note rationale if not.
+      - MINOR: Note without re-examination (typically).
+
+      </revision_context>
+
+      <instructions>
+      Re-examine specific verification conclusions challenged by the adversary.
+      Focus on the truths/artifacts/links cited in BLOCKING challenges.
+      Update VERIFICATION.md with revised conclusions where evidence supports the challenge.
+      Return what changed: which conclusions were revised and why, which challenges were rejected with evidence.
+      Do NOT re-run full verification. Target only challenged conclusions.
+      </instructions>
+      ", subagent_type="gsd-verifier", model="{verifier_model}", description="Re-examine verification conclusions (adversary feedback)")
+      ```
+
+      After verifier returns:
+      - Build `DEFENSE` text from verifier's return (which conclusions revised + which maintained with evidence)
+      - Store `PREV_CHALLENGES` = adversary's full challenge output from this round
+      - Set `VERIFICATION_REVISED=true`
+
+      **If MAJOR/MINOR only (no BLOCKING):** At Claude's discretion, may note without re-spawning verifier. Build defense text noting the rationale. Store `PREV_CHALLENGES`.
+
+   6. Increment ROUND
+
+   **Display summary:**
+
+   After loop completes, display adversary review summary:
+
+   ```
+   ✓ Adversary review complete
+
+   **Challenges:**
+   - ✓ **[SEVERITY]** {challenge title} — Addressed: {what changed}
+   - ○ **[SEVERITY]** {challenge title} — Noted: {rationale}
+   - ⚠ **[SEVERITY]** {challenge title} — Unresolved: {why}
+   ```
+
+   Use `✓` for addressed challenges, `○` for noted/minor challenges, `⚠` for unresolved challenges remaining at max rounds.
+
+   **Status routing (re-read after adversary review):**
+
+   Re-read verification status from disk — it may have changed during adversary review if the verifier re-examined and downgraded conclusions:
+
+   ```bash
+   VERIFICATION_STATUS=$(grep "^status:" "$PHASE_DIR"/*-VERIFICATION.md | cut -d: -f2 | tr -d ' ')
+   ```
+
+   Route by VERIFICATION_STATUS:
+   - `passed` → continue to step 8
+   - `human_needed` → present items needing human verification, get approval or feedback
+   - `gaps_found` → present gaps, offer `/gsd:plan-phase {X} --gaps`
+
 8. **Update roadmap and state**
    - Update ROADMAP.md, STATE.md
 
@@ -155,6 +343,7 @@ Output this markdown directly (not as a code block). Route based on status:
 
 {Y} plans executed
 Goal verified ✓
+Adversary reviewed: verification    *(only if adversary ran)*
 
 ───────────────────────────────────────────────────────────────
 
@@ -186,6 +375,7 @@ Goal verified ✓
 
 {N} phases completed
 All phase goals verified ✓
+Adversary reviewed: verification    *(only if adversary ran)*
 
 ───────────────────────────────────────────────────────────────
 
@@ -332,6 +522,8 @@ After all plans in phase complete (step 7):
 - [ ] Each plan has SUMMARY.md
 - [ ] Phase goal verified (must_haves checked against codebase)
 - [ ] VERIFICATION.md created in phase directory
+- [ ] Adversary reviewed verification conclusions (if enabled)
+- [ ] Verification status re-read after adversary review for accurate routing
 - [ ] STATE.md reflects phase completion
 - [ ] ROADMAP.md updated
 - [ ] REQUIREMENTS.md updated (phase requirements marked Complete)
