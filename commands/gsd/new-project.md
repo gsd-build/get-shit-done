@@ -31,6 +31,7 @@ This is the most leveraged moment in any project. Deep questioning here means be
 
 @~/.claude/get-shit-done/references/questioning.md
 @~/.claude/get-shit-done/references/ui-brand.md
+@~/.claude/get-shit-done/references/planning-config.md
 @~/.claude/get-shit-done/templates/project.md
 @~/.claude/get-shit-done/templates/requirements.md
 
@@ -499,6 +500,7 @@ Default to "balanced" if not set.
 | gsd-project-researcher | opus | sonnet | haiku |
 | gsd-research-synthesizer | sonnet | sonnet | haiku |
 | gsd-roadmapper | opus | sonnet | sonnet |
+| gsd-adversary | sonnet | sonnet | haiku |
 
 Store resolved models for use in Task calls below.
 
@@ -852,6 +854,168 @@ Reject vague requirements. Push for specificity:
 - "Handle authentication" → "User can log in with email/password and stay logged in across sessions"
 - "Support sharing" → "User can share post via link that opens in recipient's browser"
 
+**Commit requirements:**
+
+```bash
+git add .planning/REQUIREMENTS.md
+git commit -m "$(cat <<'EOF'
+docs: define v1 requirements
+
+[X] requirements across [N] categories
+[Y] requirements deferred to v2
+EOF
+)"
+```
+
+## Phase 7.5: Adversary Review — Requirements
+
+**Read adversary config:**
+
+```bash
+CHECKPOINT_NAME="requirements"
+CHECKPOINT_CONFIG=$(node -e "
+  try {
+    const c = JSON.parse(require('fs').readFileSync('.planning/config.json', 'utf8'));
+    const adv = c.adversary || {};
+    if (adv.enabled === false) { console.log('false|3'); process.exit(0); }
+    const cp = adv.checkpoints?.[process.argv[1]];
+    let enabled, rounds;
+    if (typeof cp === 'boolean') { enabled = cp; rounds = adv.max_rounds ?? 3; }
+    else if (typeof cp === 'object' && cp !== null) { enabled = cp.enabled ?? true; rounds = cp.max_rounds ?? adv.max_rounds ?? 3; }
+    else { enabled = true; rounds = adv.max_rounds ?? 3; }
+    console.log(enabled + '|' + rounds);
+  } catch(e) { console.log('true|3'); }
+" "$CHECKPOINT_NAME" 2>/dev/null || echo "true|3")
+
+CHECKPOINT_ENABLED=$(echo "$CHECKPOINT_CONFIG" | cut -d'|' -f1)
+MAX_ROUNDS=$(echo "$CHECKPOINT_CONFIG" | cut -d'|' -f2)
+
+# Apply CONV-01 hard cap: debate never exceeds 3 rounds
+EFFECTIVE_MAX_ROUNDS=$((MAX_ROUNDS > 3 ? 3 : MAX_ROUNDS))
+```
+
+**If CHECKPOINT_ENABLED = "false":** Skip to presenting requirements for user approval.
+
+**If CHECKPOINT_ENABLED = "true":**
+
+Display banner:
+```
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+ GSD ► ADVERSARY REVIEW
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+◆ Reviewing requirements...
+```
+
+Set `ADVERSARY_RAN_REQUIREMENTS=true`.
+
+**Debate loop:**
+
+Initialize: `ROUND=1`, `CONVERGED=false`, `ARTIFACT_REVISED=false`
+
+While ROUND <= EFFECTIVE_MAX_ROUNDS AND not CONVERGED:
+
+1. **Read artifact from disk** (re-read each round to get latest after revisions):
+   ```bash
+   ARTIFACT_CONTENT=$(cat .planning/REQUIREMENTS.md)
+   PROJECT_CONTEXT=$(head -50 .planning/PROJECT.md)
+   ```
+
+2. **Spawn adversary:**
+
+   **Round 1:**
+   ```
+   Task(prompt="First, read ~/.claude/agents/gsd-adversary.md for your role and instructions.
+
+   <artifact_type>requirements</artifact_type>
+
+   <artifact_content>
+   {ARTIFACT_CONTENT}
+   </artifact_content>
+
+   <round>1</round>
+   <max_rounds>{EFFECTIVE_MAX_ROUNDS}</max_rounds>
+
+   <project_context>
+   {PROJECT_CONTEXT}
+   </project_context>
+   ", subagent_type="gsd-adversary", model="{adversary_model}", description="Adversary review: requirements (round 1)")
+   ```
+
+   **Round > 1:**
+   ```
+   Task(prompt="First, read ~/.claude/agents/gsd-adversary.md for your role and instructions.
+
+   <artifact_type>requirements</artifact_type>
+
+   <artifact_content>
+   {ARTIFACT_CONTENT}
+   </artifact_content>
+
+   <round>{ROUND}</round>
+   <max_rounds>{EFFECTIVE_MAX_ROUNDS}</max_rounds>
+
+   <defense>
+   {DEFENSE}
+   </defense>
+
+   <previous_challenges>
+   {PREV_CHALLENGES}
+   </previous_challenges>
+
+   <project_context>
+   {PROJECT_CONTEXT}
+   </project_context>
+   ", subagent_type="gsd-adversary", model="{adversary_model}", description="Adversary review: requirements (round {ROUND})")
+   ```
+
+3. **Parse adversary response:**
+   - Extract challenges (title, severity, concern, evidence, affected)
+   - Extract convergence recommendation (CONTINUE/CONVERGE)
+
+4. **Check convergence:** If adversary recommends CONVERGE and ROUND > 1:
+   - Set `CONVERGED=true`
+   - Break
+
+5. **Generate defense** (if ROUND < EFFECTIVE_MAX_ROUNDS):
+   - For **BLOCKING** challenges: revise REQUIREMENTS.md on disk using Edit tool. Set `ARTIFACT_REVISED=true`.
+   - For **MAJOR** challenges: at Claude's discretion — may revise or note with rationale.
+   - For **MINOR** challenges: typically note without revision.
+   - Build `DEFENSE` text describing:
+     - Which challenges were addressed and what changed in the artifact
+     - Which challenges were rejected and why (with evidence from PROJECT.md constraints)
+   - Store `PREV_CHALLENGES` = adversary's full challenge output from this round
+
+6. Increment ROUND
+
+**Display summary:**
+
+After loop completes, display adversary review summary:
+
+```
+✓ Adversary review complete
+
+**Challenges:**
+- ✓ **[SEVERITY]** {challenge title} — Addressed: {what changed}
+- ○ **[SEVERITY]** {challenge title} — Noted: {rationale}
+- ⚠ **[SEVERITY]** {challenge title} — Unresolved: {why}
+```
+
+Use `✓` for addressed challenges, `○` for noted/minor challenges, `⚠` for unresolved challenges remaining at max rounds.
+
+**Conditional revision commit:**
+
+If `ARTIFACT_REVISED = true`:
+```bash
+git add .planning/REQUIREMENTS.md
+git commit -m "$(cat <<'EOF'
+docs: incorporate adversary review feedback (requirements)
+EOF
+)"
+```
+
+Only commit if actual revisions were made during the debate. Do not commit if all challenges were noted without artifact changes.
+
 **Present full requirements list:**
 
 Show every requirement (not counts) for user confirmation:
@@ -876,19 +1040,6 @@ Does this capture what you're building? (yes / adjust)
 ```
 
 If "adjust": Return to scoping.
-
-**Commit requirements:**
-
-```bash
-git add .planning/REQUIREMENTS.md
-git commit -m "$(cat <<'EOF'
-docs: define v1 requirements
-
-[X] requirements across [N] categories
-[Y] requirements deferred to v2
-EOF
-)"
-```
 
 ## Phase 8: Create Roadmap
 
