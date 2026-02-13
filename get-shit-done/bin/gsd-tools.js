@@ -863,12 +863,28 @@ function cmdRoadmapGetPhase(cwd, phaseNum, raw) {
     const goalMatch = section.match(/\*\*Goal:\*\*\s*([^\n]+)/i);
     const goal = goalMatch ? goalMatch[1].trim() : null;
 
+    // Extract Success Criteria as structured array
+    const successCriteria = [];
+    // Match Success Criteria block — terminate at next field (**Key:** pattern at line start) or next section
+    // Match Success Criteria block — terminate at next field header, next section, or end of string
+    const scMatch = section.match(/\*\*Success Criteria\*\*[^:]*:\s*\n([\s\S]*?)(?=\n\*\*[A-Z][^*]+\*\*|\n###|$)/i);
+    if (scMatch) {
+      const lines = scMatch[1].split('\n');
+      for (const line of lines) {
+        const itemMatch = line.match(/^\s*(?:\d+[.)]\s*|-\s*|\*\s*)(.+)/);
+        if (itemMatch) {
+          successCriteria.push(itemMatch[1].trim());
+        }
+      }
+    }
+
     output(
       {
         found: true,
         phase_number: phaseNum,
         phase_name: phaseName,
         goal,
+        success_criteria: successCriteria,
         section,
       },
       raw,

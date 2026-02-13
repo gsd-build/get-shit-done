@@ -44,7 +44,13 @@ Extract **phase goal** from ROADMAP.md (the outcome to verify, not tasks) and **
 </step>
 
 <step name="establish_must_haves">
-**Option A: Must-haves in PLAN frontmatter**
+**Step 1: ROADMAP Success Criteria (mandatory baseline)**
+
+The `roadmap get-phase` result includes `success_criteria` — an array of observable behaviors that must be TRUE for the phase to pass. These are **non-negotiable truths**. Each criterion becomes a mandatory verification item.
+
+If `success_criteria` is non-empty, use each item as a truth to verify. These take priority over derived truths.
+
+**Step 2: PLAN frontmatter must_haves (supplemental)**
 
 Use gsd-tools to extract must_haves from each PLAN:
 
@@ -57,11 +63,11 @@ done
 
 Returns JSON: `{ truths: [...], artifacts: [...], key_links: [...] }`
 
-Aggregate all must_haves across plans for phase-level verification.
+Aggregate all must_haves across plans. These supplement the ROADMAP Success Criteria — they add detail but do not replace them.
 
-**Option B: Derive from phase goal**
+**Step 3: Derive from phase goal (fallback only)**
 
-If no must_haves in frontmatter (MUST_HAVES returns error or empty):
+If BOTH `success_criteria` is empty AND no must_haves in frontmatter:
 1. State the goal from ROADMAP.md
 2. Derive **truths** (3-7 observable behaviors, each testable)
 3. Derive **artifacts** (concrete file paths for each truth)
@@ -212,7 +218,7 @@ Orchestrator routes: `passed` → update_roadmap | `gaps_found` → create/execu
 </process>
 
 <success_criteria>
-- [ ] Must-haves established (from frontmatter or derived)
+- [ ] Must-haves established (from ROADMAP Success Criteria, PLAN frontmatter, or derived)
 - [ ] All truths verified with status and evidence
 - [ ] All artifacts checked at all three levels
 - [ ] All key links verified

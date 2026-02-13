@@ -520,6 +520,78 @@ This phase covers:
     assert.strictEqual(output.found, false, 'should return not found');
     assert.strictEqual(output.error, 'ROADMAP.md not found', 'should explain why');
   });
+
+  test('extracts success criteria as structured array', () => {
+    fs.writeFileSync(
+      path.join(tmpDir, '.planning', 'ROADMAP.md'),
+      `# Roadmap
+
+### Phase 1: Health API
+**Goal:** Health endpoint for all dependencies
+**Success Criteria** (what must be TRUE):
+  1. Health endpoint returns status for DB
+  2. Health endpoint returns status for Redis
+  3. Health endpoint returns status for R2
+**Plans:** 2 plans
+
+### Phase 2: Dashboard
+**Goal:** Build dashboard
+`
+    );
+
+    const result = runGsdTools('roadmap get-phase 1', tmpDir);
+    assert.ok(result.success, `Command failed: ${result.error}`);
+
+    const output = JSON.parse(result.output);
+    assert.ok(Array.isArray(output.success_criteria), 'success_criteria should be array');
+    assert.strictEqual(output.success_criteria.length, 3, 'should extract 3 criteria');
+    assert.strictEqual(output.success_criteria[0], 'Health endpoint returns status for DB');
+    assert.strictEqual(output.success_criteria[2], 'Health endpoint returns status for R2');
+  });
+
+  test('returns empty success_criteria when none present', () => {
+    fs.writeFileSync(
+      path.join(tmpDir, '.planning', 'ROADMAP.md'),
+      `# Roadmap
+
+### Phase 1: Setup
+**Goal:** Initialize everything
+**Plans:** 1 plan
+
+### Phase 2: Build
+**Goal:** Build features
+`
+    );
+
+    const result = runGsdTools('roadmap get-phase 1', tmpDir);
+    assert.ok(result.success, `Command failed: ${result.error}`);
+
+    const output = JSON.parse(result.output);
+    assert.ok(Array.isArray(output.success_criteria), 'success_criteria should be array');
+    assert.strictEqual(output.success_criteria.length, 0, 'should be empty when no criteria');
+  });
+
+  test('extracts bullet-style success criteria', () => {
+    fs.writeFileSync(
+      path.join(tmpDir, '.planning', 'ROADMAP.md'),
+      `# Roadmap
+
+### Phase 1: Auth
+**Goal:** User authentication
+**Success Criteria** (what must be TRUE):
+  - Users can sign up with email
+  - Users can log in with password
+**Plans:** 1 plan
+`
+    );
+
+    const result = runGsdTools('roadmap get-phase 1', tmpDir);
+    assert.ok(result.success, `Command failed: ${result.error}`);
+
+    const output = JSON.parse(result.output);
+    assert.strictEqual(output.success_criteria.length, 2, 'should extract bullet criteria');
+    assert.strictEqual(output.success_criteria[0], 'Users can sign up with email');
+  });
 });
 
 // ─────────────────────────────────────────────────────────────────────────────
