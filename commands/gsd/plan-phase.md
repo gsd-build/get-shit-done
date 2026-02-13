@@ -330,9 +330,9 @@ Parse planner output:
 
 **`## PLANNING COMPLETE`:**
 - Display: `Planner created {N} plan(s). Files on disk.`
-- If `--skip-verify`: Skip to step 13
+- If `--skip-verify`: Skip to step 12.5 (adversary review, which has its own skip logic)
 - Check config: `WORKFLOW_PLAN_CHECK=$(cat .planning/config.json 2>/dev/null | grep -o '"plan_check"[[:space:]]*:[[:space:]]*[^,}]*' | grep -o 'true\|false' || echo "true")`
-- If `workflow.plan_check` is `false`: Skip to step 13
+- If `workflow.plan_check` is `false`: Skip to step 12.5
 - Otherwise: Proceed to step 10
 
 **`## CHECKPOINT REACHED`:**
@@ -725,6 +725,7 @@ Output this markdown directly (not as a code block):
 
 Research: {Completed | Used existing | Skipped}
 Verification: {Passed | Passed with override | Skipped}
+Adversary: {Reviewed N plan(s) | Skipped (disabled) | Skipped (gap closure)}
 
 ───────────────────────────────────────────────────────────────
 
@@ -756,6 +757,9 @@ Verification: {Passed | Passed with override | Skipped}
 - [ ] Plans created (PLANNING COMPLETE or CHECKPOINT handled)
 - [ ] gsd-plan-checker spawned (unless --skip-verify)
 - [ ] Verification passed OR user override OR max iterations with user decision
+- [ ] Adversary review completed (unless disabled or --gaps)
+- [ ] Adversary runs independently of --skip-verify and plan_check config
+- [ ] Per-plan adversary challenges displayed with severity markers
 - [ ] User sees status between agent spawns
 - [ ] User knows next steps (execute or review)
 </success_criteria>
