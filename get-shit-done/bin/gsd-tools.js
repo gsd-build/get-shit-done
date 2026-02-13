@@ -36,6 +36,9 @@
  *   phase remove <phase> [--force]     Remove phase, renumber all subsequent
  *   phase complete <phase>             Mark phase done, update state + roadmap
  *
+ * Requirements Operations:
+ *   requirements update <phase>        Mark phase requirements Complete in REQUIREMENTS.md
+ *
  * Roadmap Operations:
  *   roadmap get-phase <phase>          Extract phase section from ROADMAP.md
  *   roadmap analyze                    Full roadmap parse with disk status
@@ -2925,6 +2928,81 @@ function cmdPhaseRemove(cwd, targetPhase, options, raw) {
   output(result, raw);
 }
 
+// ─── Requirements Update ──────────────────────────────────────────────────────
+
+function cmdRequirementsUpdate(cwd, phaseNum, raw, { silent = false } = {}) {
+  if (!phaseNum) {
+    error('phase number required for requirements update');
+  }
+
+  const reqPath = path.join(cwd, '.planning', 'REQUIREMENTS.md');
+  if (!fs.existsSync(reqPath)) {
+    // Graceful: not all projects have REQUIREMENTS.md
+    const result = { phase: phaseNum, updated: 0, skipped: true, reason: 'REQUIREMENTS.md not found' };
+    if (!silent) output(result, raw, `No REQUIREMENTS.md found — skipped`);
+    return result;
+  }
+
+  let content;
+  try {
+    content = fs.readFileSync(reqPath, 'utf-8');
+  } catch (e) {
+    error(`Failed to read REQUIREMENTS.md: ${e.message}`);
+  }
+
+  const phaseEscaped = phaseNum.replace('.', '\\.');
+  let updatedCount = 0;
+
+  // Update traceability table rows: | REQ-ID | Phase N | Status |
+  // Match rows where the Phase column contains this phase number
+  const tableRowPattern = new RegExp(
+    `^(\\|[^|]+\\|\\s*Phase\\s+${phaseEscaped}\\s*\\|)\\s*[^|]*(\\|)`,
+    'gim'
+  );
+  content = content.replace(tableRowPattern, (match, prefix, suffix) => {
+    // Only update if not already Complete
+    if (/Complete/i.test(match)) return match;
+    updatedCount++;
+    return `${prefix} Complete ${suffix}`;
+  });
+
+  // Flip checkboxes for requirements that appear in updated rows
+  // Extract requirement IDs from the traceability table for this phase
+  const idPattern = new RegExp(
+    `^\\|\\s*([A-Z][A-Z0-9_-]+\\d+)\\s*\\|\\s*Phase\\s+${phaseEscaped}\\s*\\|\\s*Complete\\s*\\|`,
+    'gim'
+  );
+  const reqIds = [];
+  let idMatch;
+  while ((idMatch = idPattern.exec(content)) !== null) {
+    reqIds.push(idMatch[1]);
+  }
+
+  // Flip checkboxes: - [ ] REQ-ID: ... → - [x] REQ-ID: ...
+  for (const reqId of reqIds) {
+    const checkboxPattern = new RegExp(
+      `^(\\s*-\\s*\\[) (\\]\\s*${reqId.replace('-', '\\-')}[:\\s])`,
+      'gm'
+    );
+    content = content.replace(checkboxPattern, '$1x$2');
+  }
+
+  try {
+    fs.writeFileSync(reqPath, content, 'utf-8');
+  } catch (e) {
+    error(`Failed to write REQUIREMENTS.md: ${e.message}`);
+  }
+
+  const result = {
+    phase: phaseNum,
+    updated: updatedCount,
+    requirement_ids: reqIds,
+    skipped: false,
+  };
+  if (!silent) output(result, raw, `${updatedCount} requirements marked Complete for Phase ${phaseNum}`);
+  return result;
+}
+
 // ─── Phase Complete (Transition) ──────────────────────────────────────────────
 
 function cmdPhaseComplete(cwd, phaseNum, raw) {
@@ -2981,6 +3059,9 @@ function cmdPhaseComplete(cwd, phaseNum, raw) {
 
     fs.writeFileSync(roadmapPath, roadmapContent, 'utf-8');
   }
+
+  // Update REQUIREMENTS.md traceability for this phase
+  cmdRequirementsUpdate(cwd, phaseNum, true, { silent: true });
 
   // Find next phase
   let nextPhaseNum = null;
@@ -4429,6 +4510,16 @@ async function main() {
         cmdPhasesList(cwd, options, raw);
       } else {
         error('Unknown phases subcommand. Available: list');
+      }
+      break;
+    }
+
+    case 'requirements': {
+      const subcommand = args[1];
+      if (subcommand === 'update') {
+        cmdRequirementsUpdate(cwd, args[2], raw);
+      } else {
+        error('Unknown requirements subcommand. Available: update <phase>');
       }
       break;
     }
