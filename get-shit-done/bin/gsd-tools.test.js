@@ -2041,6 +2041,33 @@ describe('atomicWrite (via state update)', () => {
 // ─────────────────────────────────────────────────────────────────────────────
 
 describe('hook configuration', () => {
+=======
+// ─────────────────────────────────────────────────────────────────────────────
+// Context Budget Hooks
+// ─────────────────────────────────────────────────────────────────────────────
+
+// Hooks are in the repo root hooks/ directory
+const hooksDir = path.join(__dirname, '..', '..', 'hooks');
+
+// Helper to run a hook script via stdin pipe
+// Uses spawnSync to capture both stdout and stderr regardless of exit code
+const { spawnSync } = require('child_process');
+
+function runHook(hookName, hookInput) {
+  const input = JSON.stringify(hookInput);
+  const result = spawnSync(process.execPath, [path.join(hooksDir, hookName)], {
+    input: input,
+    encoding: 'utf8',
+    timeout: 5000,
+  });
+  return {
+    stdout: result.stdout || '',
+    stderr: result.stderr || '',
+    exitCode: result.status,
+  };
+}
+
+describe('track-context-budget hook', () => {
   let tmpDir;
 
   beforeEach(() => {
@@ -2151,6 +2178,124 @@ describe('hook configuration', () => {
 // ─── Lockfile Protection Tests ────────────────────────────────────────────────
 
 describe('lockedFileUpdate (via state mutation commands)', () => {
+=======
+  test('tracks Read tool calls and creates context tracker file', () => {
+    const result = runHook('track-context-budget.js', {
+      tool_name: 'Read',
+      tool_input: { file_path: '/some/file.js' },
+      tool_result: 'a'.repeat(500),
+      cwd: tmpDir,
+    });
+
+    assert.strictEqual(result.exitCode, 0, 'hook should exit cleanly');
+
+    const trackerPath = path.join(tmpDir, '.planning', '.context-tracker');
+    assert.ok(fs.existsSync(trackerPath), 'tracker file should be created');
+
+    const tracker = JSON.parse(fs.readFileSync(trackerPath, 'utf8'));
+    assert.strictEqual(tracker.reads, 1, 'should have 1 read');
+    assert.strictEqual(tracker.chars, 500, 'should have 500 chars');
+    assert.deepStrictEqual(tracker.files, ['/some/file.js'], 'should track file path');
+  });
+
+  test('ignores non-Read tool calls', () => {
+    const result = runHook('track-context-budget.js', {
+      tool_name: 'Write',
+      tool_input: { file_path: '/some/file.js' },
+      tool_result: 'content',
+      cwd: tmpDir,
+    });
+
+    assert.strictEqual(result.exitCode, 0, 'hook should exit cleanly');
+
+    const trackerPath = path.join(tmpDir, '.planning', '.context-tracker');
+    assert.ok(!fs.existsSync(trackerPath), 'tracker file should not be created for non-Read calls');
+  });
+
+  test('accumulates reads and warns at threshold', () => {
+    // Write a tracker that is just below threshold
+    const trackerPath = path.join(tmpDir, '.planning', '.context-tracker');
+    fs.writeFileSync(trackerPath, JSON.stringify({
+      reads: 14,
+      chars: 25000,
+      files: ['/a.js', '/b.js'],
+      skill: '',
+    }));
+
+    const result = runHook('track-context-budget.js', {
+      tool_name: 'Read',
+      tool_input: { file_path: '/c.js' },
+      tool_result: 'a'.repeat(100),
+      cwd: tmpDir,
+    });
+
+    assert.strictEqual(result.exitCode, 0, 'hook should exit cleanly');
+
+    // Should warn because reads >= 15
+    assert.ok(
+      result.stderr.includes('Context budget warning'),
+      'should emit warning when threshold reached'
+    );
+    assert.ok(
+      result.stderr.includes('Task() subagent'),
+      'warning should suggest delegation'
+    );
+
+    const tracker = JSON.parse(fs.readFileSync(trackerPath, 'utf8'));
+    assert.strictEqual(tracker.reads, 15, 'should have 15 reads');
+    assert.strictEqual(tracker.files.length, 3, 'should have 3 unique files');
+  });
+
+  test('resets tracker when active skill changes', () => {
+    // Write tracker with old skill
+    const trackerPath = path.join(tmpDir, '.planning', '.context-tracker');
+    fs.writeFileSync(trackerPath, JSON.stringify({
+      reads: 10,
+      chars: 20000,
+      files: ['/a.js'],
+      skill: 'old-skill',
+    }));
+
+    // Write new active skill
+    const skillPath = path.join(tmpDir, '.planning', '.active-skill');
+    fs.writeFileSync(skillPath, 'new-skill');
+
+    const result = runHook('track-context-budget.js', {
+      tool_name: 'Read',
+      tool_input: { file_path: '/b.js' },
+      tool_result: 'content',
+      cwd: tmpDir,
+    });
+
+    assert.strictEqual(result.exitCode, 0, 'hook should exit cleanly');
+
+    const tracker = JSON.parse(fs.readFileSync(trackerPath, 'utf8'));
+    assert.strictEqual(tracker.reads, 1, 'reads should reset to 1');
+    assert.strictEqual(tracker.skill, 'new-skill', 'skill should be updated');
+  });
+
+  test('respects config disable flag', () => {
+    // Write config disabling the hook
+    fs.writeFileSync(
+      path.join(tmpDir, '.planning', 'config.json'),
+      JSON.stringify({ hooks: { trackContextBudget: false } })
+    );
+
+    const result = runHook('track-context-budget.js', {
+      tool_name: 'Read',
+      tool_input: { file_path: '/some/file.js' },
+      tool_result: 'content',
+      cwd: tmpDir,
+    });
+
+    assert.strictEqual(result.exitCode, 0, 'hook should exit cleanly');
+
+    const trackerPath = path.join(tmpDir, '.planning', '.context-tracker');
+    assert.ok(!fs.existsSync(trackerPath), 'tracker should not be created when disabled');
+  });
+});
+
+describe('suggest-compact hook', () => {
   let tmpDir;
 
   beforeEach(() => {
@@ -2643,5 +2788,248 @@ describe('safety hooks', () => {
       });
       assert.strictEqual(result.exitCode, 0, 'should exit with code 0 for non-Write/Edit tools');
     });
+=======
+  test('counts tool calls and creates counter file', () => {
+    const result = runHook('suggest-compact.js', {
+      tool_name: 'Read',
+      cwd: tmpDir,
+    });
+
+    assert.strictEqual(result.exitCode, 0, 'hook should exit cleanly');
+
+    const counterPath = path.join(tmpDir, '.planning', '.compact-counter');
+    assert.ok(fs.existsSync(counterPath), 'counter file should be created');
+
+    const counter = JSON.parse(fs.readFileSync(counterPath, 'utf8'));
+    assert.strictEqual(counter.calls, 1, 'should have 1 call');
+    assert.strictEqual(counter.lastSuggested, 0, 'should not have suggested yet');
+  });
+
+  test('suggests compact at threshold', () => {
+    // Write counter just below threshold
+    const counterPath = path.join(tmpDir, '.planning', '.compact-counter');
+    fs.writeFileSync(counterPath, JSON.stringify({ calls: 49, lastSuggested: 0 }));
+
+    const result = runHook('suggest-compact.js', {
+      tool_name: 'Read',
+      cwd: tmpDir,
+    });
+
+    assert.strictEqual(result.exitCode, 0, 'hook should exit cleanly');
+    assert.ok(
+      result.stderr.includes('Tool call count: 50'),
+      'should suggest compact at threshold'
+    );
+    assert.ok(
+      result.stderr.includes('/compact'),
+      'should mention /compact command'
+    );
+
+    const counter = JSON.parse(fs.readFileSync(counterPath, 'utf8'));
+    assert.strictEqual(counter.calls, 50, 'should have 50 calls');
+    assert.strictEqual(counter.lastSuggested, 50, 'lastSuggested should be updated');
+  });
+
+  test('re-suggests after re-remind interval', () => {
+    // Counter at 74 (suggested at 50, re-remind every 25)
+    const counterPath = path.join(tmpDir, '.planning', '.compact-counter');
+    fs.writeFileSync(counterPath, JSON.stringify({ calls: 74, lastSuggested: 50 }));
+
+    const result = runHook('suggest-compact.js', {
+      tool_name: 'Bash',
+      cwd: tmpDir,
+    });
+
+    assert.strictEqual(result.exitCode, 0, 'hook should exit cleanly');
+    assert.ok(
+      result.stderr.includes('Tool call count: 75'),
+      'should re-suggest at 75'
+    );
+  });
+
+  test('does not suggest between intervals', () => {
+    // Counter at 59 (suggested at 50, not yet at 75)
+    const counterPath = path.join(tmpDir, '.planning', '.compact-counter');
+    fs.writeFileSync(counterPath, JSON.stringify({ calls: 59, lastSuggested: 50 }));
+
+    const result = runHook('suggest-compact.js', {
+      tool_name: 'Read',
+      cwd: tmpDir,
+    });
+
+    assert.strictEqual(result.exitCode, 0, 'hook should exit cleanly');
+    assert.strictEqual(result.stderr, '', 'should not suggest between intervals');
+  });
+
+  test('respects config disable flag', () => {
+    fs.writeFileSync(
+      path.join(tmpDir, '.planning', 'config.json'),
+      JSON.stringify({ hooks: { suggestCompact: false } })
+    );
+
+    const counterPath = path.join(tmpDir, '.planning', '.compact-counter');
+    fs.writeFileSync(counterPath, JSON.stringify({ calls: 49, lastSuggested: 0 }));
+
+    const result = runHook('suggest-compact.js', {
+      tool_name: 'Read',
+      cwd: tmpDir,
+    });
+
+    assert.strictEqual(result.exitCode, 0, 'hook should exit cleanly');
+    // Counter should not have been updated since hook exited early
+    const counter = JSON.parse(fs.readFileSync(counterPath, 'utf8'));
+    assert.strictEqual(counter.calls, 49, 'calls should not increment when disabled');
+  });
+});
+
+describe('context-budget-check hook (PreCompact)', () => {
+  let tmpDir;
+
+  beforeEach(() => {
+    tmpDir = createTempProject();
+  });
+
+  afterEach(() => {
+    cleanup(tmpDir);
+  });
+
+  test('preserves session continuity in STATE.md', () => {
+    fs.writeFileSync(
+      path.join(tmpDir, '.planning', 'STATE.md'),
+      `# Project State
+
+Phase: 03 of 5 (API Layer)
+Plan: 03-02 of 3
+Status: In progress
+`
+    );
+
+    const result = runHook('context-budget-check.js', {
+      cwd: tmpDir,
+    });
+
+    assert.strictEqual(result.exitCode, 0, 'hook should exit cleanly');
+
+    const state = fs.readFileSync(path.join(tmpDir, '.planning', 'STATE.md'), 'utf8');
+    assert.ok(state.includes('## Session Continuity'), 'should add Session Continuity section');
+    assert.ok(state.includes('Context compaction'), 'should mention compaction');
+    assert.ok(state.includes('Active phase: 03 of 5 (API Layer)'), 'should preserve current phase');
+    assert.ok(state.includes('Active plan: 03-02 of 3'), 'should preserve current plan');
+    assert.ok(state.includes('Resume action:'), 'should include resume guidance');
+  });
+
+  test('includes roadmap progress when available', () => {
+    fs.writeFileSync(
+      path.join(tmpDir, '.planning', 'STATE.md'),
+      `# State\nPhase: 01\nPlan: 01-01\n`
+    );
+    fs.writeFileSync(
+      path.join(tmpDir, '.planning', 'ROADMAP.md'),
+      `# Roadmap\n\n## Phase 1\n[x] complete\n\n## Phase 2\nIn progress\n`
+    );
+
+    const result = runHook('context-budget-check.js', {
+      cwd: tmpDir,
+    });
+
+    assert.strictEqual(result.exitCode, 0, 'hook should exit cleanly');
+
+    const state = fs.readFileSync(path.join(tmpDir, '.planning', 'STATE.md'), 'utf8');
+    assert.ok(state.includes('Roadmap progress:'), 'should include roadmap summary');
+    assert.ok(state.includes('phases'), 'should mention phase count');
+  });
+
+  test('includes context tracker stats when available', () => {
+    fs.writeFileSync(
+      path.join(tmpDir, '.planning', 'STATE.md'),
+      `# State\nPhase: 02\nPlan: 02-01\n`
+    );
+    fs.writeFileSync(
+      path.join(tmpDir, '.planning', '.context-tracker'),
+      JSON.stringify({ reads: 8, chars: 15000, files: ['/a.js', '/b.js'] })
+    );
+
+    const result = runHook('context-budget-check.js', {
+      cwd: tmpDir,
+    });
+
+    assert.strictEqual(result.exitCode, 0, 'hook should exit cleanly');
+
+    const state = fs.readFileSync(path.join(tmpDir, '.planning', 'STATE.md'), 'utf8');
+    assert.ok(state.includes('Context consumption:'), 'should include context stats');
+    assert.ok(state.includes('8 reads'), 'should show read count');
+    assert.ok(state.includes('15k chars'), 'should show char count');
+  });
+
+  test('resets compact counter after compaction', () => {
+    fs.writeFileSync(
+      path.join(tmpDir, '.planning', 'STATE.md'),
+      `# State\nPhase: 01\nPlan: 01-01\n`
+    );
+    fs.writeFileSync(
+      path.join(tmpDir, '.planning', '.compact-counter'),
+      JSON.stringify({ calls: 75, lastSuggested: 75 })
+    );
+
+    const result = runHook('context-budget-check.js', {
+      cwd: tmpDir,
+    });
+
+    assert.strictEqual(result.exitCode, 0, 'hook should exit cleanly');
+
+    const counter = JSON.parse(
+      fs.readFileSync(path.join(tmpDir, '.planning', '.compact-counter'), 'utf8')
+    );
+    assert.strictEqual(counter.calls, 0, 'calls should be reset to 0');
+    assert.strictEqual(counter.lastSuggested, 0, 'lastSuggested should be reset to 0');
+  });
+
+  test('outputs additionalContext JSON for post-compaction recovery', () => {
+    fs.writeFileSync(
+      path.join(tmpDir, '.planning', 'STATE.md'),
+      `# State\nPhase: 03\nPlan: 03-02\n`
+    );
+
+    const result = runHook('context-budget-check.js', {
+      cwd: tmpDir,
+    });
+
+    assert.strictEqual(result.exitCode, 0, 'hook should exit cleanly');
+    assert.ok(result.stdout, 'should output JSON to stdout');
+
+    const output = JSON.parse(result.stdout);
+    assert.ok(output.additionalContext, 'should have additionalContext field');
+    assert.ok(output.additionalContext.includes('compacted'), 'should mention compaction');
+    assert.ok(output.additionalContext.includes('Resume from STATE.md'), 'should mention STATE.md');
+  });
+
+  test('replaces existing Session Continuity section', () => {
+    fs.writeFileSync(
+      path.join(tmpDir, '.planning', 'STATE.md'),
+      `# State\nPhase: 02\nPlan: 02-01\n\n## Session Continuity\n\nLast session: 2025-01-01\nStopped at: old content\n`
+    );
+
+    const result = runHook('context-budget-check.js', {
+      cwd: tmpDir,
+    });
+
+    assert.strictEqual(result.exitCode, 0, 'hook should exit cleanly');
+
+    const state = fs.readFileSync(path.join(tmpDir, '.planning', 'STATE.md'), 'utf8');
+    assert.ok(!state.includes('old content'), 'old content should be replaced');
+    assert.ok(state.includes('Context compaction'), 'new content should be present');
+    // Should only have one Session Continuity section
+    const matches = state.match(/## Session Continuity/g);
+    assert.strictEqual(matches.length, 1, 'should have exactly one Session Continuity section');
+  });
+
+  test('exits silently when STATE.md does not exist', () => {
+    // Remove the .planning directory's STATE.md (it wasn't created)
+    const result = runHook('context-budget-check.js', {
+      cwd: tmpDir,
+    });
+
+    assert.strictEqual(result.exitCode, 0, 'hook should exit cleanly even without STATE.md');
+    assert.strictEqual(result.stdout, '', 'should not output anything');
   });
 });

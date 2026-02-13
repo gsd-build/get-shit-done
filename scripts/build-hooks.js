@@ -21,6 +21,10 @@ const HOOKS_TO_COPY = [
   'check-dangerous-commands.js',
   'validate-commit.js',
   'check-skill-workflow.js'
+=======
+  'track-context-budget.js',
+  'suggest-compact.js',
+  'context-budget-check.js'
 ];
 
 function build() {
