@@ -831,6 +831,40 @@ Each phase involves file reads, test runs, output analysis. The back-and-forth i
 
 </tdd_integration>
 
+<knowledge_retrieval>
+
+## On-Demand Knowledge Retrieval
+
+You may receive pre-queried past learnings from the orchestrator in a `<past_learnings>` block.
+This covers common cases. For deeper investigation, use the `gsd_memory_vector_query` MCP tool directly.
+
+**When to query on-demand:**
+- Solving a problem similar to past work (check for existing solutions before reinventing)
+- Choosing between implementation alternatives (check for past decisions and rationale)
+- Implementing infrastructure that prior phases may have established patterns for
+- Current `<past_learnings>` block references a learning you want more detail on
+
+**When NOT to query:**
+- Orchestrator already provided relevant learnings in `<past_learnings>` (avoid duplicate queries)
+- Working on purely new domain with no project history
+- Simple tasks with no prior art to reference
+
+**MCP tool parameters:**
+- `project`: Use project ID from cwd SHA256 hash (first 16 chars) — same as extract-learnings.js
+- `query`: Natural language describing what you need to know
+- `type`: Filter by "decision", "pattern", or "anti-pattern" (omit for all types)
+- `topK`: Default 5, use 3 for narrow topics, 7 for broad exploration
+- `minScore`: Default 0.35, lower to 0.25 for exploratory search
+
+**Citation format:** When reusing retrieved knowledge, cite:
+"Per [milestone] Phase [N] [type]: [brief description]"
+
+Example: "Per v1.12.0 Phase 1 decision: Type filtering applied in query tool layer, not vector store"
+
+**Important:** On-demand query supplements orchestrator context — do not re-query what the orchestrator already provided.
+
+</knowledge_retrieval>
+
 <gap_closure_mode>
 
 ## Planning from Verification Gaps
