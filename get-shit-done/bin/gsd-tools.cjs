@@ -22,6 +22,7 @@
  *   list-todos [area]                  Count and enumerate pending todos
  *   verify-path-exists <path>          Check file/directory existence
  *   config-ensure-section              Initialize .planning/config.json
+ *   config validate                    Validate config.json against schema
  *   history-digest                     Aggregate all SUMMARY.md data
  *   summary-extract <path> [--fields]  Extract structured data from SUMMARY.md
  *   state-snapshot                     Structured parse of STATE.md
@@ -398,9 +399,10 @@ function loadConfig(cwd) {
       parallelization,
       brave_search: get('brave_search') ?? defaults.brave_search,
       hooks: parsed.hooks || {},
+      models: (typeof parsed.models === 'object' && parsed.models !== null && !Array.isArray(parsed.models)) ? parsed.models : {},
     };
   } catch {
-    return defaults;
+    return { ...defaults, models: {} };
   }
 }
 
@@ -968,6 +970,90 @@ function cmdConfigGet(cwd, keyPath, raw) {
   }
 
   output(current, raw, String(current));
+}
+
+function validateField(value, schemaDef, fieldPath, errors) {
+  if (schemaDef.oneOf) {
+    const anyMatch = schemaDef.oneOf.some(sub => {
+      if (sub.type === 'boolean' && typeof value === 'boolean') return true;
+      if (sub.type === 'object' && typeof value === 'object' && value !== null && !Array.isArray(value)) return true;
+      return false;
+    });
+    if (!anyMatch) {
+      errors.push(`"${fieldPath}": expected one of [${schemaDef.oneOf.map(s => s.type).join(', ')}], got ${typeof value}`);
+    }
+    return;
+  }
+
+  if (schemaDef.type === 'string') {
+    if (typeof value !== 'string') {
+      errors.push(`"${fieldPath}": expected string, got ${typeof value}`);
+      return;
+    }
+    if (schemaDef.enum && !schemaDef.enum.includes(value)) {
+      errors.push(`"${fieldPath}": value "${value}" not in allowed values [${schemaDef.enum.join(', ')}]`);
+    }
+  } else if (schemaDef.type === 'boolean') {
+    if (typeof value !== 'boolean') {
+      errors.push(`"${fieldPath}": expected boolean, got ${typeof value}`);
+    }
+  } else if (schemaDef.type === 'object') {
+    if (typeof value !== 'object' || value === null || Array.isArray(value)) {
+      errors.push(`"${fieldPath}": expected object, got ${Array.isArray(value) ? 'array' : typeof value}`);
+      return;
+    }
+    // Validate additionalProperties if defined (e.g., models)
+    if (schemaDef.additionalProperties && typeof schemaDef.additionalProperties === 'object') {
+      for (const [k, v] of Object.entries(value)) {
+        validateField(v, schemaDef.additionalProperties, `${fieldPath}.${k}`, errors);
+      }
+    }
+  }
+}
+
+function cmdConfigValidate(cwd, raw) {
+  const configPath = path.join(cwd, '.planning', 'config.json');
+  if (!fs.existsSync(configPath)) {
+    error('No config.json found in .planning/');
+  }
+
+  const errors = [];
+  const warnings = [];
+
+  try {
+    const content = fs.readFileSync(configPath, 'utf-8');
+    const config = JSON.parse(content);
+
+    // Load schema
+    const schemaPath = path.join(__dirname, '..', 'schemas', 'config-schema.json');
+    const schema = JSON.parse(fs.readFileSync(schemaPath, 'utf-8'));
+
+    // Validate each field
+    for (const [key, schemaDef] of Object.entries(schema.properties || {})) {
+      if (config[key] === undefined) continue; // optional fields
+      validateField(config[key], schemaDef, key, errors);
+    }
+
+    // Check for unknown top-level keys
+    const knownKeys = new Set(Object.keys(schema.properties || {}));
+    for (const key of Object.keys(config)) {
+      if (!knownKeys.has(key)) {
+        warnings.push(`Unknown config key: "${key}"`);
+      }
+    }
+
+  } catch (e) {
+    if (e.message && e.message.startsWith('No config.json')) throw e;
+    errors.push(`Failed to parse config.json: ${e.message}`);
+  }
+
+  output({
+    valid: errors.length === 0,
+    errors,
+    warnings,
+    error_count: errors.length,
+    warning_count: warnings.length,
+  }, raw, errors.length === 0 ? 'valid' : 'invalid');
 }
 
 function cmdHistoryDigest(cwd, raw) {
@@ -1765,6 +1851,16 @@ function cmdResolveModel(cwd, agentType, raw) {
 
   const config = loadConfig(cwd);
   const profile = config.model_profile || 'balanced';
+
+  // Check for per-agent model override
+  const agentOverride = config.models && config.models[agentType];
+  if (agentOverride && agentOverride !== 'inherit') {
+    const validModels = ['opus', 'sonnet', 'haiku'];
+    if (validModels.includes(agentOverride)) {
+      output({ model: agentOverride, profile, override: true }, raw, agentOverride);
+      return;
+    }
+  }
 
   const agentModels = MODEL_PROFILES[agentType];
   if (!agentModels) {
@@ -4886,6 +4982,14 @@ function resolveModelInternal(cwd, agentType) {
 
   // Fall back to profile lookup
   const profile = config.model_profile || 'balanced';
+
+  // Check for per-agent model override
+  const agentOverride = config.models && config.models[agentType];
+  if (agentOverride && agentOverride !== 'inherit') {
+    const validModels = ['opus', 'sonnet', 'haiku'];
+    if (validModels.includes(agentOverride)) return agentOverride;
+  }
+
   const agentModels = MODEL_PROFILES[agentType];
   if (!agentModels) return 'sonnet';
   const resolved = agentModels[profile] || agentModels['balanced'] || 'sonnet';
@@ -6689,6 +6793,16 @@ async function main() {
 
     case 'config-get': {
       cmdConfigGet(cwd, args[1], raw);
+      break;
+    }
+
+    case 'config': {
+      const subcommand = args[1];
+      if (subcommand === 'validate') {
+        cmdConfigValidate(cwd, raw);
+      } else {
+        error('Unknown config subcommand. Available: validate');
+      }
       break;
     }
 

@@ -5565,3 +5565,258 @@ describe('integration-score command', () => {
     assert.strictEqual(outputF.grade, 'F', '50% should be F');
   });
 });
+
+// ─────────────────────────────────────────────────────────────────────────────
+// config validate command
+// ─────────────────────────────────────────────────────────────────────────────
+
+describe('config validate command', () => {
+  let tmpDir;
+
+  beforeEach(() => {
+    tmpDir = createTempProject();
+  });
+
+  afterEach(() => {
+    cleanup(tmpDir);
+  });
+
+  test('validates valid config successfully', () => {
+    fs.writeFileSync(
+      path.join(tmpDir, '.planning', 'config.json'),
+      JSON.stringify({
+        model_profile: 'balanced',
+        commit_docs: true,
+        search_gitignored: false,
+        brave_search: false,
+        models: {
+          'gsd-executor': 'opus',
+          'gsd-planner': 'inherit',
+        },
+      })
+    );
+
+    const result = runGsdTools('config validate', tmpDir);
+    assert.ok(result.success, `Command failed: ${result.error}`);
+
+    const output = JSON.parse(result.output);
+    assert.strictEqual(output.valid, true, 'should be valid');
+    assert.strictEqual(output.error_count, 0, 'no errors');
+    assert.strictEqual(output.warning_count, 0, 'no warnings');
+  });
+
+  test('detects invalid model_profile value', () => {
+    fs.writeFileSync(
+      path.join(tmpDir, '.planning', 'config.json'),
+      JSON.stringify({ model_profile: 'turbo' })
+    );
+
+    const result = runGsdTools('config validate', tmpDir);
+    assert.ok(result.success, `Command failed: ${result.error}`);
+
+    const output = JSON.parse(result.output);
+    assert.strictEqual(output.valid, false, 'should be invalid');
+    assert.ok(output.errors.length > 0, 'should have errors');
+    assert.ok(
+      output.errors[0].includes('turbo'),
+      'error should mention the invalid value'
+    );
+    assert.ok(
+      output.errors[0].includes('model_profile'),
+      'error should mention the field'
+    );
+  });
+
+  test('detects invalid field types', () => {
+    fs.writeFileSync(
+      path.join(tmpDir, '.planning', 'config.json'),
+      JSON.stringify({
+        commit_docs: 'yes',
+        brave_search: 123,
+      })
+    );
+
+    const result = runGsdTools('config validate', tmpDir);
+    assert.ok(result.success, `Command failed: ${result.error}`);
+
+    const output = JSON.parse(result.output);
+    assert.strictEqual(output.valid, false, 'should be invalid');
+    assert.ok(output.errors.length >= 2, 'should have at least 2 errors');
+    assert.ok(
+      output.errors.some(e => e.includes('commit_docs') && e.includes('boolean')),
+      'should flag commit_docs type error'
+    );
+    assert.ok(
+      output.errors.some(e => e.includes('brave_search') && e.includes('boolean')),
+      'should flag brave_search type error'
+    );
+  });
+
+  test('warns about unknown config keys', () => {
+    fs.writeFileSync(
+      path.join(tmpDir, '.planning', 'config.json'),
+      JSON.stringify({
+        model_profile: 'balanced',
+        custom_setting: true,
+        another_unknown: 'value',
+      })
+    );
+
+    const result = runGsdTools('config validate', tmpDir);
+    assert.ok(result.success, `Command failed: ${result.error}`);
+
+    const output = JSON.parse(result.output);
+    assert.strictEqual(output.valid, true, 'unknown keys are warnings, not errors');
+    assert.ok(output.warning_count >= 2, 'should have at least 2 warnings');
+    assert.ok(
+      output.warnings.some(w => w.includes('custom_setting')),
+      'should warn about custom_setting'
+    );
+  });
+
+  test('validates models entries against allowed values', () => {
+    fs.writeFileSync(
+      path.join(tmpDir, '.planning', 'config.json'),
+      JSON.stringify({
+        models: {
+          'gsd-executor': 'turbo',
+        },
+      })
+    );
+
+    const result = runGsdTools('config validate', tmpDir);
+    assert.ok(result.success, `Command failed: ${result.error}`);
+
+    const output = JSON.parse(result.output);
+    assert.strictEqual(output.valid, false, 'should be invalid');
+    assert.ok(
+      output.errors.some(e => e.includes('models.gsd-executor') && e.includes('turbo')),
+      'should flag invalid model override'
+    );
+  });
+
+  test('missing config.json returns error', () => {
+    const result = runGsdTools('config validate', tmpDir);
+    assert.ok(!result.success, 'should fail when no config.json');
+    assert.ok(result.error.includes('No config.json'), 'error should mention missing file');
+  });
+
+  test('accepts parallelization as boolean', () => {
+    fs.writeFileSync(
+      path.join(tmpDir, '.planning', 'config.json'),
+      JSON.stringify({ parallelization: true })
+    );
+
+    const result = runGsdTools('config validate', tmpDir);
+    assert.ok(result.success, `Command failed: ${result.error}`);
+
+    const output = JSON.parse(result.output);
+    assert.strictEqual(output.valid, true, 'boolean parallelization should be valid');
+  });
+
+  test('accepts parallelization as object', () => {
+    fs.writeFileSync(
+      path.join(tmpDir, '.planning', 'config.json'),
+      JSON.stringify({ parallelization: { enabled: true } })
+    );
+
+    const result = runGsdTools('config validate', tmpDir);
+    assert.ok(result.success, `Command failed: ${result.error}`);
+
+    const output = JSON.parse(result.output);
+    assert.strictEqual(output.valid, true, 'object parallelization should be valid');
+  });
+});
+
+// ─────────────────────────────────────────────────────────────────────────────
+// resolve-model with per-agent overrides
+// ─────────────────────────────────────────────────────────────────────────────
+
+describe('resolve-model with per-agent overrides', () => {
+  let tmpDir;
+
+  beforeEach(() => {
+    tmpDir = createTempProject();
+  });
+
+  afterEach(() => {
+    cleanup(tmpDir);
+  });
+
+  test('per-agent override takes precedence over profile', () => {
+    fs.writeFileSync(
+      path.join(tmpDir, '.planning', 'config.json'),
+      JSON.stringify({
+        model_profile: 'budget',
+        models: {
+          'gsd-executor': 'opus',
+        },
+      })
+    );
+
+    const result = runGsdTools('resolve-model gsd-executor', tmpDir);
+    assert.ok(result.success, `Command failed: ${result.error}`);
+
+    const output = JSON.parse(result.output);
+    assert.strictEqual(output.model, 'opus', 'should use override model');
+    assert.strictEqual(output.override, true, 'should flag as override');
+    assert.strictEqual(output.profile, 'budget', 'should still report profile');
+  });
+
+  test('inherit uses profile default', () => {
+    fs.writeFileSync(
+      path.join(tmpDir, '.planning', 'config.json'),
+      JSON.stringify({
+        model_profile: 'budget',
+        models: {
+          'gsd-executor': 'inherit',
+        },
+      })
+    );
+
+    const result = runGsdTools('resolve-model gsd-executor', tmpDir);
+    assert.ok(result.success, `Command failed: ${result.error}`);
+
+    const output = JSON.parse(result.output);
+    assert.strictEqual(output.model, 'sonnet', 'inherit should use profile default (budget executor = sonnet)');
+    assert.strictEqual(output.override, undefined, 'should not have override flag');
+  });
+
+  test('agent without override uses profile', () => {
+    fs.writeFileSync(
+      path.join(tmpDir, '.planning', 'config.json'),
+      JSON.stringify({
+        model_profile: 'quality',
+        models: {
+          'gsd-executor': 'haiku',
+        },
+      })
+    );
+
+    const result = runGsdTools('resolve-model gsd-planner', tmpDir);
+    assert.ok(result.success, `Command failed: ${result.error}`);
+
+    const output = JSON.parse(result.output);
+    assert.strictEqual(output.model, 'opus', 'planner on quality profile should be opus');
+    assert.strictEqual(output.override, undefined, 'should not have override flag');
+  });
+
+  test('invalid override value falls through to profile', () => {
+    fs.writeFileSync(
+      path.join(tmpDir, '.planning', 'config.json'),
+      JSON.stringify({
+        model_profile: 'balanced',
+        models: {
+          'gsd-executor': 'turbo',
+        },
+      })
+    );
+
+    const result = runGsdTools('resolve-model gsd-executor', tmpDir);
+    assert.ok(result.success, `Command failed: ${result.error}`);
+
+    const output = JSON.parse(result.output);
+    assert.strictEqual(output.model, 'sonnet', 'invalid override should fall through to profile');
+    assert.strictEqual(output.override, undefined, 'should not have override flag');
+  });
+});

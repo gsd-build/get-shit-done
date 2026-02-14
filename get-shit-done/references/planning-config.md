@@ -193,4 +193,100 @@ Squash merge is recommended — keeps main branch history clean while preserving
 
 </branching_strategy_behavior>
 
+<model_overrides>
+
+## Per-Agent Model Overrides
+
+The `models` config section allows overriding the model used by specific agents, regardless of the active `model_profile`.
+
+**Config format:**
+```json
+"models": {
+  "gsd-planner": "inherit",
+  "gsd-roadmapper": "inherit",
+  "gsd-executor": "opus",
+  "gsd-phase-researcher": "inherit",
+  "gsd-project-researcher": "inherit",
+  "gsd-research-synthesizer": "inherit",
+  "gsd-debugger": "inherit",
+  "gsd-codebase-mapper": "inherit",
+  "gsd-verifier": "inherit",
+  "gsd-plan-checker": "inherit",
+  "gsd-integration-checker": "inherit"
+}
+```
+
+| Value | Behavior |
+|-------|----------|
+| `"inherit"` | Use the model from `model_profile` (default behavior) |
+| `"opus"` | Always use opus for this agent |
+| `"sonnet"` | Always use sonnet for this agent |
+| `"haiku"` | Always use haiku for this agent |
+
+**Example use case:** Running on a `budget` profile but forcing the executor to use opus for complex implementation work:
+
+```json
+{
+  "model_profile": "budget",
+  "models": {
+    "gsd-executor": "opus"
+  }
+}
+```
+
+Only agents with explicit overrides are affected. All other agents follow the `model_profile` mapping.
+
+**Checking resolved models:**
+```bash
+node ~/.claude/get-shit-done/bin/gsd-tools.js resolve-model gsd-executor
+# Returns JSON with model, profile, and override flag
+```
+
+</model_overrides>
+
+<config_validate>
+
+## Config Validation
+
+Use `config validate` to check your `.planning/config.json` against the GSD config schema.
+
+```bash
+node ~/.claude/get-shit-done/bin/gsd-tools.js config validate
+```
+
+**Output (JSON):**
+```json
+{
+  "valid": true,
+  "errors": [],
+  "warnings": [],
+  "error_count": 0,
+  "warning_count": 0
+}
+```
+
+**What it checks:**
+- Field types match schema (string, boolean, object)
+- Enum fields contain allowed values (e.g., `model_profile` must be `quality`, `balanced`, or `budget`)
+- `models` entries contain valid values (`opus`, `sonnet`, `haiku`, `inherit`)
+- Unknown top-level keys produce warnings
+- `parallelization` accepts both boolean and object forms
+
+**Example error output:**
+```json
+{
+  "valid": false,
+  "errors": [
+    "\"model_profile\": value \"turbo\" not in allowed values [quality, balanced, budget]"
+  ],
+  "warnings": [
+    "Unknown config key: \"custom_setting\""
+  ],
+  "error_count": 1,
+  "warning_count": 1
+}
+```
+
+</config_validate>
+
 </planning_config>

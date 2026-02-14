@@ -1,0 +1,38 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "GSD Config",
+  "type": "object",
+  "properties": {
+    "mode": { "type": "string", "enum": ["interactive", "autonomous", "supervised"] },
+    "depth": { "type": "string", "enum": ["minimal", "standard", "thorough"] },
+    "model_profile": { "type": "string", "enum": ["quality", "balanced", "budget"] },
+    "commit_docs": { "type": "boolean" },
+    "search_gitignored": { "type": "boolean" },
+    "branching_strategy": { "type": "string", "enum": ["none", "phase", "milestone"] },
+    "phase_branch_template": { "type": "string" },
+    "milestone_branch_template": { "type": "string" },
+    "research": { "type": "boolean" },
+    "plan_checker": { "type": "boolean" },
+    "verifier": { "type": "boolean" },
+    "parallelization": {
+      "oneOf": [
+        { "type": "boolean" },
+        { "type": "object", "properties": { "enabled": { "type": "boolean" } } }
+      ]
+    },
+    "brave_search": { "type": "boolean" },
+    "models": {
+      "type": "object",
+      "description": "Per-agent model overrides",
+      "additionalProperties": {
+        "type": "string",
+        "enum": ["opus", "sonnet", "haiku", "inherit"]
+      }
+    },
+    "workflow": { "type": "object" },
+    "planning": { "type": "object" },
+    "gates": { "type": "object" },
+    "safety": { "type": "object" },
+    "git": { "type": "object" }
+  }
+}
