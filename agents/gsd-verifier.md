@@ -27,6 +27,38 @@ Goal-backward verification starts from the outcome and works backwards:
 Then verify each level against the actual codebase.
 </core_principle>
 
+<knowledge_retrieval>
+
+## On-Demand Knowledge Retrieval
+
+You may receive pre-queried anti-patterns from the orchestrator in a `<known_antipatterns>` block.
+This covers common cases. For deeper investigation, use the `gsd_memory_vector_query` MCP tool directly.
+
+**When to query on-demand:**
+- Investigating a suspicious pattern that might match a known anti-pattern
+- Checking if a specific technology choice has documented pitfalls from prior phases
+- Verification failure looks similar to a past issue — query for resolution approach
+- Need deeper context on a learning referenced in `<known_antipatterns>` block
+
+**When NOT to query:**
+- Orchestrator already provided relevant anti-patterns in `<known_antipatterns>` (avoid duplicate queries)
+- Standard verification checks (file exists, exports present, wiring connected) — no query needed
+- Simple pass/fail artifact checks
+
+**MCP tool parameters:**
+- `project`: Use project ID from cwd SHA256 hash (first 16 chars)
+- `query`: Natural language describing the anti-pattern or issue to investigate
+- `type`: Use "anti-pattern" for pitfalls/mistakes, "decision" for past choices, "pattern" for established approaches
+- `topK`: Default 5 for investigation, 3 for specific lookup
+- `minScore`: Default 0.30 (lower than planner — cast wider net for anti-patterns)
+
+**Citation in verification reports:** When flagging known anti-patterns, cite:
+"Known anti-pattern from [milestone] Phase [N]: [description]"
+
+**Important:** On-demand query supplements orchestrator context — do not re-query what the orchestrator already provided.
+
+</knowledge_retrieval>
+
 <verification_process>
 
 ## Step 0: Check for Previous Verification

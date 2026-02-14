@@ -145,6 +145,70 @@ UAT_CONTENT=$(echo "$INIT" | jq -r '.uat_content // empty')
 CONTEXT_CONTENT=$(echo "$INIT" | jq -r '.context_content // empty')
 ```
 
+## 7.5. Query Past Learnings
+
+**If `--gaps` flag is set:** Skip this step (gap closure uses verification data, not general learnings).
+
+Query the vector knowledge base for relevant past decisions and patterns that inform planning for this phase.
+
+```bash
+# Get phase goal for semantic query
+PHASE_NAME=$(grep "Phase ${PHASE}:" .planning/ROADMAP.md | sed 's/.*Phase [0-9]*: //')
+PHASE_GOAL=$(node ~/.claude/get-shit-done/bin/gsd-tools.js roadmap get-phase "${PHASE}" 2>/dev/null | jq -r '.goal // empty')
+
+# Query past decisions
+PAST_DECISIONS=$(node scripts/query-learnings.js \
+  --query "Phase: ${PHASE_NAME}. Goal: ${PHASE_GOAL}" \
+  --type decision \
+  --top-k 5 \
+  --min-score 0.35 \
+  --format context-block 2>&1 | grep -v "mutex\|libc")
+
+# Query past patterns
+PAST_PATTERNS=$(node scripts/query-learnings.js \
+  --query "Phase: ${PHASE_NAME}. Goal: ${PHASE_GOAL}" \
+  --type pattern \
+  --top-k 3 \
+  --min-score 0.35 \
+  --format context-block 2>&1 | grep -v "mutex\|libc")
+```
+
+Build context block only if results are non-empty:
+
+```bash
+PAST_LEARNINGS=""
+if [ -n "$PAST_DECISIONS" ] || [ -n "$PAST_PATTERNS" ]; then
+  if echo "$PAST_DECISIONS" | grep -q "DECISION\|PATTERN" || echo "$PAST_PATTERNS" | grep -q "DECISION\|PATTERN"; then
+    PAST_LEARNINGS="<past_learnings>
+## Past Decisions (Semantic Relevance > 0.35)
+${PAST_DECISIONS}
+
+## Past Patterns (Semantic Relevance > 0.35)
+${PAST_PATTERNS}
+
+**How to use this context:**
+- Check if similar problems were solved before (avoid reinventing)
+- Follow established patterns unless research suggests better approach
+- Flag conflicts between past decisions and current research
+- Cite learnings when reusing: \"Per v1.12.0 Phase N decision...\"
+</past_learnings>"
+  fi
+fi
+```
+
+Display status:
+
+```bash
+if [ -n "$PAST_LEARNINGS" ]; then
+  DECISION_COUNT=$(echo "$PAST_DECISIONS" | grep -c "**DECISION**" 2>/dev/null || echo "0")
+  PATTERN_COUNT=$(echo "$PAST_PATTERNS" | grep -c "**PATTERN**" 2>/dev/null || echo "0")
+  echo "◆ Querying past learnings for phase context..."
+  echo "  Found: ${DECISION_COUNT} decisions, ${PATTERN_COUNT} patterns"
+else
+  echo "◆ No past learnings found (knowledge base may be empty)"
+fi
+```
+
 ## 8. Spawn gsd-planner Agent
 
 Display banner:
@@ -178,6 +242,8 @@ IMPORTANT: If context exists below, it contains USER DECISIONS from /gsd:discuss
 **Research:** {research_content}
 **Gap Closure (if --gaps):** {verification_content} {uat_content}
 </planning_context>
+
+{past_learnings}
 
 <downstream_consumer>
 Output consumed by /gsd:execute-phase. Plans need:

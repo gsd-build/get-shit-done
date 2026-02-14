@@ -403,6 +403,185 @@ rm .planning/REQUIREMENTS.md
 
 </step>
 
+<step name="generate_documentation">
+
+Optionally regenerate documentation from current .planning/ state before tagging the milestone.
+This step is controlled by `docs.auto_generate` in `.planning/config.json` (default: false).
+Users who prefer to generate docs manually can run `/gsd:docs` at any time.
+
+**Check if auto-generation is enabled:**
+
+```bash
+AUTO_GENERATE_DOCS=$(cat .planning/config.json 2>/dev/null | grep -o '"auto_generate"[[:space:]]*:[[:space:]]*[^,}]*' | grep -o 'true\|false' || echo "false")
+
+if [ "$AUTO_GENERATE_DOCS" != "true" ]; then
+  echo "Documentation auto-generation not enabled (set docs.auto_generate: true in .planning/config.json)"
+  echo "Run /gsd:docs manually to generate documentation"
+  # Continue to next step
+elif [ ! -f scripts/generate-docs.js ]; then
+  echo "Skipping documentation generation (scripts/generate-docs.js not found)"
+  # Continue to next step - docs setup is optional
+else
+  echo "Generating documentation..."
+
+  # Run documentation generation
+  node scripts/generate-docs.js
+
+  if [ $? -ne 0 ]; then
+    echo "Warning: Documentation generation failed. Continuing with milestone completion..."
+    # Non-blocking - continue even if docs fail
+  else
+    echo "Documentation generated successfully"
+
+    # Install dependencies if needed
+    if [ ! -d docs/node_modules ]; then
+      echo "Installing Docusaurus dependencies..."
+      pnpm install --dir docs
+
+      if [ $? -ne 0 ]; then
+        echo "Warning: Failed to install docs dependencies. Continuing..."
+      fi
+    fi
+
+    # Check deployment configuration
+    DEPLOY_DOCS=$(cat .planning/config.json 2>/dev/null | grep -o '"deploy_to_github_pages"[[:space:]]*:[[:space:]]*[^,}]*' | grep -o 'true\|false' || echo "false")
+
+    if [ "$DEPLOY_DOCS" = "true" ]; then
+      echo "Deployment enabled - preparing GitHub Pages deployment..."
+
+      if [ -f scripts/prepare-gh-pages-deployment.js ]; then
+        node scripts/prepare-gh-pages-deployment.js
+
+        if [ $? -ne 0 ]; then
+          echo "Warning: Deployment preparation failed. Continuing..."
+        else
+          echo "Deployment configured successfully"
+        fi
+      else
+        echo "Warning: scripts/prepare-gh-pages-deployment.js not found. Skipping deployment preparation."
+      fi
+    fi
+  fi
+fi
+```
+
+Continue to extract_learnings step.
+
+</step>
+
+<step name="extract_learnings">
+
+Extract knowledge from completed phases and embed into vector database.
+This step is controlled by `learning.auto_extract_on_milestone` in `.planning/config.json` (default: true).
+
+**Check if extraction is enabled:**
+
+```bash
+EXTRACT_LEARNINGS=$(cat .planning/config.json 2>/dev/null | grep -o '"auto_extract_on_milestone"[[:space:]]*:[[:space:]]*[^,}]*' | grep -o 'true\|false' || echo "true")
+
+if [ "$EXTRACT_LEARNINGS" = "false" ]; then
+  echo "Knowledge extraction not enabled (set learning.auto_extract_on_milestone: true in .planning/config.json)"
+  # Continue to next step
+fi
+```
+
+**Check if extraction script exists:**
+
+```bash
+if [ ! -f scripts/extract-learnings.js ]; then
+  echo "Skipping knowledge extraction (scripts/extract-learnings.js not found)"
+  # Continue to next step
+fi
+```
+
+**If enabled and script exists, extract learnings:**
+
+```bash
+echo ""
+echo "Extracting knowledge from completed phases..."
+echo ""
+
+# Get milestone version from context
+# The variable should already be set from earlier steps (verify_readiness)
+# If not set, extract from MILESTONES.md or ask user
+MILESTONE_VERSION="${MILESTONE_VERSION:-v1.0}"
+
+node scripts/extract-learnings.js --milestone "$MILESTONE_VERSION"
+
+if [ $? -ne 0 ]; then
+  echo ""
+  echo "⚠️  Warning: Knowledge extraction encountered errors"
+  echo "   Continuing with milestone completion..."
+  echo ""
+  echo "   To retry later: node scripts/extract-learnings.js --milestone $MILESTONE_VERSION"
+  echo ""
+else
+  echo ""
+  echo "✓ Knowledge extracted and embedded into vector database"
+  echo "✓ Learnings saved to .planning/learnings/$MILESTONE_VERSION/"
+  echo ""
+fi
+```
+
+Continue to surface_critical_learnings step.
+
+</step>
+
+<step name="surface_critical_learnings">
+
+Surface critical (recurring) learnings into project CLAUDE.md for zero-query-overhead context.
+This step is controlled by `learning.auto_surface_critical` in `.planning/config.json` (default: false).
+Runs AFTER extract_learnings to ensure the latest learnings are in the vector DB.
+
+**Check if surfacing is enabled:**
+
+```bash
+SURFACE_CRITICAL=$(cat .planning/config.json 2>/dev/null | grep -o '"auto_surface_critical"[[:space:]]*:[[:space:]]*[^,}]*' | grep -o 'true\|false' || echo "false")
+
+if [ "$SURFACE_CRITICAL" = "false" ]; then
+  echo "Critical learnings surfacing not enabled (set learning.auto_surface_critical: true in .planning/config.json)"
+  # Continue to next step
+fi
+```
+
+**Check if surfacing script exists:**
+
+```bash
+if [ ! -f scripts/surface-critical-learnings.js ]; then
+  echo "Skipping critical learnings surfacing (scripts/surface-critical-learnings.js not found)"
+  # Continue to next step
+fi
+```
+
+**If enabled and script exists, surface critical learnings:**
+
+```bash
+echo ""
+echo "Surfacing critical learnings to CLAUDE.md..."
+echo ""
+
+MILESTONE_VERSION="${MILESTONE_VERSION:-v1.0}"
+
+node scripts/surface-critical-learnings.js --milestone "$MILESTONE_VERSION"
+
+if [ $? -ne 0 ]; then
+  echo ""
+  echo "Warning: Critical learnings surfacing encountered errors"
+  echo "   Continuing with milestone completion..."
+  echo ""
+  echo "   To retry later: node scripts/surface-critical-learnings.js --milestone $MILESTONE_VERSION"
+  echo ""
+else
+  echo ""
+  echo "Critical learnings surfaced to CLAUDE.md"
+  echo ""
+fi
+```
+
+Continue to update_state step.
+
+</step>
+
 <step name="update_state">
 
 Most STATE.md updates were handled by `milestone complete`, but verify and update remaining fields:
@@ -564,6 +743,56 @@ Commit milestone completion.
 ```bash
 node ~/.claude/get-shit-done/bin/gsd-tools.js commit "chore: complete v[X.Y] milestone" --files .planning/milestones/v[X.Y]-ROADMAP.md .planning/milestones/v[X.Y]-REQUIREMENTS.md .planning/milestones/v[X.Y]-MILESTONE-AUDIT.md .planning/MILESTONES.md .planning/PROJECT.md .planning/STATE.md
 ```
+
+**If `COMMIT_PLANNING_DOCS=false`:** Skip git operations
+
+**If `COMMIT_PLANNING_DOCS=true` (default):**
+
+```bash
+# Stage archive files (new)
+git add .planning/milestones/v[X.Y]-ROADMAP.md
+git add .planning/milestones/v[X.Y]-REQUIREMENTS.md
+git add .planning/milestones/v[X.Y]-MILESTONE-AUDIT.md 2>/dev/null || true
+
+# Stage updated files
+git add .planning/MILESTONES.md
+git add .planning/PROJECT.md
+git add .planning/STATE.md
+
+# Stage docs/ if documentation was generated
+if [ -d docs/docs ]; then
+  git add docs/
+fi
+
+# Stage CLAUDE.md if critical learnings were surfaced
+if [ -f CLAUDE.md ]; then
+  git add CLAUDE.md
+fi
+
+# Stage deletions
+git add -u .planning/
+
+# Commit with descriptive message
+git commit -m "$(cat <<'EOF'
+chore: complete v[X.Y] milestone
+
+Archived:
+- milestones/v[X.Y]-ROADMAP.md
+- milestones/v[X.Y]-REQUIREMENTS.md
+- milestones/v[X.Y]-MILESTONE-AUDIT.md (if audit was run)
+
+Deleted (fresh for next milestone):
+- ROADMAP.md
+- REQUIREMENTS.md
+
+Updated:
+- MILESTONES.md (new entry)
+- PROJECT.md (requirements → Validated)
+- STATE.md (reset for next milestone)
+
+Tagged: v[X.Y]
+EOF
+)"
 ```
 
 Confirm: "Committed: chore: complete v[X.Y] milestone"
