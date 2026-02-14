@@ -316,6 +316,7 @@ function loadConfig(cwd) {
     verifier: true,
     parallelization: true,
     brave_search: false,
+    hooks: {},
   };
 
   try {
@@ -349,6 +350,7 @@ function loadConfig(cwd) {
       verifier: get('verifier', { section: 'workflow', field: 'verifier' }) ?? defaults.verifier,
       parallelization,
       brave_search: get('brave_search') ?? defaults.brave_search,
+      hooks: parsed.hooks || {},
     };
   } catch {
     return defaults;
@@ -756,6 +758,18 @@ function cmdConfigEnsureSection(cwd, raw) {
     },
     parallelization: true,
     brave_search: hasBraveSearch,
+    hooks: {
+      blockDangerousCommands: true,
+      validateCommits: true,
+      enforceWorkflowOrder: true,
+      checkPlanFormat: true,
+      checkRoadmapSync: true,
+      enforcePhaseBoundaries: false,
+      checkSubagentOutput: true,
+      trackContextBudget: true,
+      suggestCompact: true,
+      compactThreshold: 50,
+    },
   };
 
   try {

@@ -852,7 +852,10 @@ function uninstall(isGlobal, runtime = 'claude') {
   // 4. Remove GSD hooks
   const hooksDir = path.join(targetDir, 'hooks');
   if (fs.existsSync(hooksDir)) {
-    const gsdHooks = ['gsd-statusline.js', 'gsd-check-update.js', 'gsd-check-update.sh'];
+    const gsdHooks = [
+      'gsd-statusline.js', 'gsd-check-update.js', 'gsd-check-update.sh',
+      'hook-logger.js', 'pre-bash-dispatch.js', 'pre-write-dispatch.js', 'post-write-dispatch.js'
+    ];
     let hookCount = 0;
     for (const hook of gsdHooks) {
       const hookPath = path.join(hooksDir, hook);
@@ -881,31 +884,39 @@ function uninstall(isGlobal, runtime = 'claude') {
       console.log(`  ${green}✓${reset} Removed GSD statusline from settings`);
     }
 
-    // Remove GSD hooks from SessionStart
-    if (settings.hooks && settings.hooks.SessionStart) {
-      const before = settings.hooks.SessionStart.length;
-      settings.hooks.SessionStart = settings.hooks.SessionStart.filter(entry => {
-        if (entry.hooks && Array.isArray(entry.hooks)) {
-          // Filter out GSD hooks
-          const hasGsdHook = entry.hooks.some(h =>
-            h.command && (h.command.includes('gsd-check-update') || h.command.includes('gsd-statusline'))
-          );
-          return !hasGsdHook;
+    // Remove GSD hooks from all hook event types
+    const gsdHookPatterns = [
+      'gsd-check-update', 'gsd-statusline',
+      'pre-bash-dispatch', 'pre-write-dispatch', 'post-write-dispatch'
+    ];
+    const hookEventTypes = ['SessionStart', 'PreToolUse', 'PostToolUse'];
+
+    for (const eventType of hookEventTypes) {
+      if (settings.hooks && settings.hooks[eventType]) {
+        const before = settings.hooks[eventType].length;
+        settings.hooks[eventType] = settings.hooks[eventType].filter(entry => {
+          if (entry.hooks && Array.isArray(entry.hooks)) {
+            const hasGsdHook = entry.hooks.some(h =>
+              h.command && gsdHookPatterns.some(pattern => h.command.includes(pattern))
+            );
+            return !hasGsdHook;
+          }
+          return true;
+        });
+        if (settings.hooks[eventType].length < before) {
+          settingsModified = true;
+          console.log(`  ${green}✓${reset} Removed GSD ${eventType} hooks from settings`);
         }
-        return true;
-      });
-      if (settings.hooks.SessionStart.length < before) {
-        settingsModified = true;
-        console.log(`  ${green}✓${reset} Removed GSD hooks from settings`);
+        // Clean up empty array
+        if (settings.hooks[eventType].length === 0) {
+          delete settings.hooks[eventType];
+        }
       }
-      // Clean up empty array
-      if (settings.hooks.SessionStart.length === 0) {
-        delete settings.hooks.SessionStart;
-      }
-      // Clean up empty hooks object
-      if (Object.keys(settings.hooks).length === 0) {
-        delete settings.hooks;
-      }
+    }
+
+    // Clean up empty hooks object
+    if (settings.hooks && Object.keys(settings.hooks).length === 0) {
+      delete settings.hooks;
     }
 
     if (settingsModified) {
@@ -1475,6 +1486,83 @@ function install(isGlobal, runtime = 'claude') {
         ]
       });
       console.log(`  ${green}✓${reset} Configured update check hook`);
+    }
+  }
+
+  // Configure PreToolUse dispatchers (skip for opencode)
+  if (!isOpencode) {
+    if (!settings.hooks) {
+      settings.hooks = {};
+    }
+
+    // PreToolUse(Bash) dispatcher
+    if (!settings.hooks.PreToolUse) {
+      settings.hooks.PreToolUse = [];
+    }
+
+    const preBashCommand = isGlobal
+      ? buildHookCommand(targetDir, 'pre-bash-dispatch.js')
+      : 'node ' + dirName + '/hooks/pre-bash-dispatch.js';
+    const preWriteCommand = isGlobal
+      ? buildHookCommand(targetDir, 'pre-write-dispatch.js')
+      : 'node ' + dirName + '/hooks/pre-write-dispatch.js';
+
+    const hasPreBashHook = settings.hooks.PreToolUse.some(entry =>
+      entry.hooks && entry.hooks.some(h => h.command && h.command.includes('pre-bash-dispatch'))
+    );
+    if (!hasPreBashHook) {
+      settings.hooks.PreToolUse.push({
+        matcher: 'Bash',
+        hooks: [
+          {
+            type: 'command',
+            command: preBashCommand
+          }
+        ]
+      });
+      console.log(`  ${green}✓${reset} Configured PreToolUse(Bash) dispatcher`);
+    }
+
+    // PreToolUse(Write/Edit) dispatcher
+    const hasPreWriteHook = settings.hooks.PreToolUse.some(entry =>
+      entry.hooks && entry.hooks.some(h => h.command && h.command.includes('pre-write-dispatch'))
+    );
+    if (!hasPreWriteHook) {
+      settings.hooks.PreToolUse.push({
+        matcher: 'Write|Edit',
+        hooks: [
+          {
+            type: 'command',
+            command: preWriteCommand
+          }
+        ]
+      });
+      console.log(`  ${green}✓${reset} Configured PreToolUse(Write/Edit) dispatcher`);
+    }
+
+    // PostToolUse(Write/Edit) dispatcher
+    if (!settings.hooks.PostToolUse) {
+      settings.hooks.PostToolUse = [];
+    }
+
+    const postWriteCommand = isGlobal
+      ? buildHookCommand(targetDir, 'post-write-dispatch.js')
+      : 'node ' + dirName + '/hooks/post-write-dispatch.js';
+
+    const hasPostWriteHook = settings.hooks.PostToolUse.some(entry =>
+      entry.hooks && entry.hooks.some(h => h.command && h.command.includes('post-write-dispatch'))
+    );
+    if (!hasPostWriteHook) {
+      settings.hooks.PostToolUse.push({
+        matcher: 'Write|Edit',
+        hooks: [
+          {
+            type: 'command',
+            command: postWriteCommand
+          }
+        ]
+      });
+      console.log(`  ${green}✓${reset} Configured PostToolUse(Write/Edit) dispatcher`);
     }
   }
 

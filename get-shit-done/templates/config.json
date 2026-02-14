@@ -31,5 +31,17 @@
   "safety": {
     "always_confirm_destructive": true,
     "always_confirm_external_services": true
+  },
+  "hooks": {
+    "blockDangerousCommands": true,
+    "validateCommits": true,
+    "enforceWorkflowOrder": true,
+    "checkPlanFormat": true,
+    "checkRoadmapSync": true,
+    "enforcePhaseBoundaries": false,
+    "checkSubagentOutput": true,
+    "trackContextBudget": true,
+    "suggestCompact": true,
+    "compactThreshold": 50
   }
 }

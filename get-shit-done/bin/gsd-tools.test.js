@@ -2261,3 +2261,106 @@ describe('lockedFileUpdate (via state mutation commands)', () => {
     );
   });
 });
+
+// ─────────────────────────────────────────────────────────────────────────────
+// hook configuration tests
+// ─────────────────────────────────────────────────────────────────────────────
+
+describe('hook configuration', () => {
+  let tmpDir;
+
+  beforeEach(() => {
+    tmpDir = createTempProject();
+  });
+
+  afterEach(() => {
+    cleanup(tmpDir);
+  });
+
+  test('config-ensure-section creates hooks section with defaults', () => {
+    const result = runGsdTools('config-ensure-section', tmpDir);
+    assert.ok(result.success, `Command failed: ${result.error}`);
+
+    const output = JSON.parse(result.output);
+    assert.strictEqual(output.created, true, 'config should be created');
+
+    // Verify hooks section exists in created config
+    const configPath = path.join(tmpDir, '.planning', 'config.json');
+    const config = JSON.parse(fs.readFileSync(configPath, 'utf-8'));
+
+    assert.ok(config.hooks, 'hooks section should exist');
+    assert.strictEqual(config.hooks.blockDangerousCommands, true, 'blockDangerousCommands default');
+    assert.strictEqual(config.hooks.validateCommits, true, 'validateCommits default');
+    assert.strictEqual(config.hooks.enforceWorkflowOrder, true, 'enforceWorkflowOrder default');
+    assert.strictEqual(config.hooks.checkPlanFormat, true, 'checkPlanFormat default');
+    assert.strictEqual(config.hooks.checkRoadmapSync, true, 'checkRoadmapSync default');
+    assert.strictEqual(config.hooks.enforcePhaseBoundaries, false, 'enforcePhaseBoundaries default (off)');
+    assert.strictEqual(config.hooks.checkSubagentOutput, true, 'checkSubagentOutput default');
+    assert.strictEqual(config.hooks.trackContextBudget, true, 'trackContextBudget default');
+    assert.strictEqual(config.hooks.suggestCompact, true, 'suggestCompact default');
+    assert.strictEqual(config.hooks.compactThreshold, 50, 'compactThreshold default');
+  });
+
+  test('state load returns hooks config from config.json', () => {
+    // Create config with hooks section
+    fs.writeFileSync(
+      path.join(tmpDir, '.planning', 'config.json'),
+      JSON.stringify({
+        model_profile: 'balanced',
+        hooks: {
+          blockDangerousCommands: true,
+          validateCommits: false,
+          compactThreshold: 75
+        }
+      })
+    );
+    fs.writeFileSync(
+      path.join(tmpDir, '.planning', 'STATE.md'),
+      '# State\n\n**Current Phase:** 01\n**Status:** In progress\n**Last Activity:** 2025-01-01\n**Last Activity Description:** Working\n'
+    );
+
+    const result = runGsdTools('state load', tmpDir);
+    assert.ok(result.success, `Command failed: ${result.error}`);
+
+    const output = JSON.parse(result.output);
+    assert.ok(output.config, 'config should be present');
+    assert.ok(output.config.hooks, 'hooks config should be in state load output');
+    assert.strictEqual(output.config.hooks.blockDangerousCommands, true, 'hook config preserved');
+    assert.strictEqual(output.config.hooks.validateCommits, false, 'hook config override preserved');
+    assert.strictEqual(output.config.hooks.compactThreshold, 75, 'hook threshold preserved');
+  });
+
+  test('loadConfig returns empty hooks when config has no hooks section', () => {
+    // Create config without hooks section
+    fs.writeFileSync(
+      path.join(tmpDir, '.planning', 'config.json'),
+      JSON.stringify({ model_profile: 'quality' })
+    );
+    fs.writeFileSync(
+      path.join(tmpDir, '.planning', 'STATE.md'),
+      '# State\n\n**Current Phase:** 01\n**Status:** In progress\n**Last Activity:** 2025-01-01\n**Last Activity Description:** Working\n'
+    );
+
+    const result = runGsdTools('state load', tmpDir);
+    assert.ok(result.success, `Command failed: ${result.error}`);
+
+    const output = JSON.parse(result.output);
+    assert.ok(output.config, 'config should be present');
+    assert.deepStrictEqual(output.config.hooks, {}, 'hooks should default to empty object');
+  });
+
+  test('loadConfig returns empty hooks when config.json is missing', () => {
+    // No config.json exists (createTempProject does not create it)
+    fs.writeFileSync(
+      path.join(tmpDir, '.planning', 'STATE.md'),
+      '# State\n\n**Current Phase:** 01\n**Status:** In progress\n**Last Activity:** 2025-01-01\n**Last Activity Description:** Working\n'
+    );
+
+    const result = runGsdTools('state load', tmpDir);
+    assert.ok(result.success, `Command failed: ${result.error}`);
+
+    const output = JSON.parse(result.output);
+    assert.ok(output.config, 'config should be present');
+    assert.deepStrictEqual(output.config.hooks, {}, 'hooks should default to empty object when config missing');
+  });
+});
