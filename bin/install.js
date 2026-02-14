@@ -920,6 +920,10 @@ function uninstall(isGlobal, runtime = 'claude') {
         }
       }
     }
+    // Clean up empty hooks object
+    if (settings.hooks && Object.keys(settings.hooks).length === 0) {
+      delete settings.hooks;
+    }
 
     if (settingsModified) {
       writeSettings(settingsPath, settings);
@@ -1491,6 +1495,63 @@ function install(isGlobal, runtime = 'claude') {
         ]
       });
       console.log(`  ${green}✓${reset} Configured update check hook`);
+    }
+
+    // Configure PreCompact hook for context budget preservation
+    if (!settings.hooks.PreCompact) {
+      settings.hooks.PreCompact = [];
+    }
+
+    const contextBudgetCheckCommand = isGlobal
+      ? buildHookCommand(targetDir, 'context-budget-check.js')
+      : 'node ' + dirName + '/hooks/context-budget-check.js';
+
+    const hasContextBudgetCheck = settings.hooks.PreCompact.some(entry =>
+      entry.hooks && entry.hooks.some(h => h.command && h.command.includes('context-budget-check'))
+    );
+
+    if (!hasContextBudgetCheck) {
+      settings.hooks.PreCompact.push({
+        hooks: [
+          {
+            type: 'command',
+            command: contextBudgetCheckCommand
+          }
+        ]
+      });
+      console.log(`  ${green}✓${reset} Configured context budget PreCompact hook`);
+    }
+
+    // Configure PostToolUse hooks for context tracking and compact suggestion
+    if (!settings.hooks.PostToolUse) {
+      settings.hooks.PostToolUse = [];
+    }
+
+    const trackContextCommand = isGlobal
+      ? buildHookCommand(targetDir, 'track-context-budget.js')
+      : 'node ' + dirName + '/hooks/track-context-budget.js';
+    const suggestCompactCommand = isGlobal
+      ? buildHookCommand(targetDir, 'suggest-compact.js')
+      : 'node ' + dirName + '/hooks/suggest-compact.js';
+
+    const hasTrackContext = settings.hooks.PostToolUse.some(entry =>
+      entry.hooks && entry.hooks.some(h => h.command && h.command.includes('track-context-budget'))
+    );
+
+    if (!hasTrackContext) {
+      settings.hooks.PostToolUse.push({
+        hooks: [
+          {
+            type: 'command',
+            command: trackContextCommand
+          },
+          {
+            type: 'command',
+            command: suggestCompactCommand
+          }
+        ]
+      });
+      console.log(`  ${green}✓${reset} Configured context budget PostToolUse hooks`);
     }
   }
 
