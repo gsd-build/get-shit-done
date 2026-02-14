@@ -100,14 +100,21 @@ Output: Milestone archived (roadmap + requirements), PROJECT.md evolved, git tag
    - Add "Next Milestone Goals" section
    - Archive previous content in `<details>` (if v1.1+)
 
-7. **Commit and tag:**
+7. **Generate documentation:**
+   - Run `node scripts/generate-docs.js` to regenerate docs from updated .planning/ artifacts
+   - Install Docusaurus dependencies if needed (`pnpm install --dir docs`)
+   - If deployment enabled in `.planning/config.json` (`docs.deploy_to_github_pages: true`), run deployment preparation
+   - Non-blocking: warns on failure, does not prevent milestone completion
+
+8. **Commit and tag:**
 
    - Stage: MILESTONES.md, PROJECT.md, ROADMAP.md, STATE.md, archive files
+   - Stage docs/ directory if documentation was generated
    - Commit: `chore: archive v{{version}} milestone`
    - Tag: `git tag -a v{{version}} -m "[milestone summary]"`
    - Ask about pushing tag
 
-8. **Offer next steps:**
+9. **Offer next steps:**
    - `/gsd:new-milestone` — start next milestone (questioning → research → requirements → roadmap)
 
 </process>
@@ -119,6 +126,7 @@ Output: Milestone archived (roadmap + requirements), PROJECT.md evolved, git tag
 - `.planning/REQUIREMENTS.md` deleted (fresh for next milestone)
 - ROADMAP.md collapsed to one-line entry
 - PROJECT.md updated with current state
+- Documentation regenerated from current .planning/ state (if scripts/generate-docs.js exists)
 - Git tag v{{version}} created
 - Commit successful
 - User knows next steps (including need for fresh requirements)
