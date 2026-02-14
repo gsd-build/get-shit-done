@@ -394,6 +394,22 @@ node ~/.claude/get-shit-done/bin/gsd-tools.js commit "docs(${padded_phase}): cap
 Confirm: "Committed: docs(${padded_phase}): capture phase context"
 </step>
 
+<step name="update_state">
+Update STATE.md to reflect context gathering completion:
+
+```bash
+node ~/.claude/get-shit-done/bin/gsd-tools.js state record-session \
+  --stopped-at "Captured context for Phase ${padded_phase}-${phase_slug}" \
+  --resume-file "None"
+```
+
+Commit the state update:
+
+```bash
+node ~/.claude/get-shit-done/bin/gsd-tools.js commit "docs(${padded_phase}): update state after context gathering" --files .planning/STATE.md
+```
+</step>
+
 </process>
 
 <success_criteria>
@@ -404,5 +420,6 @@ Confirm: "Committed: docs(${padded_phase}): capture phase context"
 - Scope creep redirected to deferred ideas
 - CONTEXT.md captures actual decisions, not vague vision
 - Deferred ideas preserved for future phases
+- STATE.md updated (session continuity recorded)
 - User knows next steps
 </success_criteria>
