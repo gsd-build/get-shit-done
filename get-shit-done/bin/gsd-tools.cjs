@@ -112,6 +112,16 @@
  *   signal cleanup                     Remove all signal/tracker files
  *   signal check-stale                 Warn about signals >10 minutes old
  *
+ * Seeds:
+ *   seed list                          List all seed files with metadata
+ *   seed read-for-phase <phase>        Return seeds matching a phase slug
+ *   seed create --title "..."          Create a new seed file
+ *     --trigger "phase-slug"
+ *     [--scope small|medium|large]
+ *     [--context "..."]
+ *     [--approach "..."]
+ *     [--deps "..."]
+ *
  * Compound Commands (workflow-specific initialization):
  *   init execute-phase <phase>         All context for execute-phase workflow
  *   init plan-phase <phase>            All context for plan-phase workflow
@@ -5213,6 +5223,121 @@ function cmdSignalCheckStale(cwd, raw) {
   }
 }
 
+// ─── Seed Commands ───────────────────────────────────────────────────────────
+
+function cmdSeedList(cwd, raw) {
+  const seedsDir = path.join(cwd, '.planning', 'seeds');
+
+  if (!fs.existsSync(seedsDir)) {
+    output({ count: 0, seeds: [] }, raw);
+    return;
+  }
+
+  const files = fs.readdirSync(seedsDir).filter(f => f.endsWith('.md'));
+  const seeds = [];
+
+  for (const file of files) {
+    const content = safeReadFile(path.join(seedsDir, file));
+    if (!content) continue;
+
+    const fm = extractFrontmatter(content);
+    seeds.push({
+      file,
+      title: fm.title || file.replace(/\.md$/, ''),
+      trigger: fm.trigger || '',
+      scope: fm.scope || 'medium',
+      status: fm.status || 'planted',
+      created: fm.created || '',
+    });
+  }
+
+  output({ count: seeds.length, seeds }, raw);
+}
+
+function cmdSeedReadForPhase(cwd, phaseSlug, raw) {
+  if (!phaseSlug) {
+    error('phase slug required for seed read-for-phase');
+  }
+
+  const seedsDir = path.join(cwd, '.planning', 'seeds');
+
+  if (!fs.existsSync(seedsDir)) {
+    output({ phase: phaseSlug, count: 0, seeds: [] }, raw);
+    return;
+  }
+
+  const files = fs.readdirSync(seedsDir).filter(f => f.endsWith('.md'));
+  const seeds = [];
+  const needle = phaseSlug.toLowerCase();
+
+  for (const file of files) {
+    const content = safeReadFile(path.join(seedsDir, file));
+    if (!content) continue;
+
+    const fm = extractFrontmatter(content);
+    const trigger = (fm.trigger || '').toLowerCase();
+
+    if (trigger && trigger.includes(needle)) {
+      seeds.push({
+        file,
+        title: fm.title || file.replace(/\.md$/, ''),
+        trigger: fm.trigger || '',
+        scope: fm.scope || 'medium',
+        status: fm.status || 'planted',
+        created: fm.created || '',
+      });
+    }
+  }
+
+  output({ phase: phaseSlug, count: seeds.length, seeds }, raw);
+}
+
+function cmdSeedCreate(cwd, options, raw) {
+  const { title, trigger, scope, context, approach, deps } = options;
+
+  if (!title) {
+    error('--title required for seed create');
+  }
+  if (!trigger) {
+    error('--trigger required for seed create');
+  }
+
+  const seedsDir = path.join(cwd, '.planning', 'seeds');
+  fs.mkdirSync(seedsDir, { recursive: true });
+
+  const slug = title
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, '-')
+    .replace(/^-+|-+$/g, '');
+  const filename = `seed-${slug}.md`;
+  const filePath = path.join(seedsDir, filename);
+
+  const today = new Date().toISOString().split('T')[0];
+  const seedScope = scope || 'medium';
+
+  const content = `---
+title: "${title}"
+trigger: "${trigger}"
+scope: ${seedScope}
+created: "${today}"
+status: planted
+---
+
+## Context
+${context || '_Why this seed exists_'}
+
+## Approach
+${approach || '_Suggested implementation approach_'}
+
+## Dependencies
+${deps || '_What this depends on_'}
+`;
+
+  fs.writeFileSync(filePath, content, 'utf-8');
+
+  output({ created: true, file: filename, path: `.planning/seeds/${filename}` }, raw);
+}
+
 // ─── CLI Router ───────────────────────────────────────────────────────────────
 
 async function main() {
@@ -5523,6 +5648,33 @@ async function main() {
         cmdTodoComplete(cwd, args[2], raw);
       } else {
         error('Unknown todo subcommand. Available: complete');
+      }
+      break;
+    }
+
+    case 'seed': {
+      const subcommand = args[1];
+      if (subcommand === 'list') {
+        cmdSeedList(cwd, raw);
+      } else if (subcommand === 'read-for-phase') {
+        cmdSeedReadForPhase(cwd, args[2], raw);
+      } else if (subcommand === 'create') {
+        const titleIdx = args.indexOf('--title');
+        const triggerIdx = args.indexOf('--trigger');
+        const scopeIdx = args.indexOf('--scope');
+        const contextIdx = args.indexOf('--context');
+        const approachIdx = args.indexOf('--approach');
+        const depsIdx = args.indexOf('--deps');
+        cmdSeedCreate(cwd, {
+          title: titleIdx !== -1 ? args[titleIdx + 1] : null,
+          trigger: triggerIdx !== -1 ? args[triggerIdx + 1] : null,
+          scope: scopeIdx !== -1 ? args[scopeIdx + 1] : null,
+          context: contextIdx !== -1 ? args[contextIdx + 1] : null,
+          approach: approachIdx !== -1 ? args[approachIdx + 1] : null,
+          deps: depsIdx !== -1 ? args[depsIdx + 1] : null,
+        }, raw);
+      } else {
+        error('Unknown seed subcommand. Available: list, read-for-phase, create');
       }
       break;
     }
