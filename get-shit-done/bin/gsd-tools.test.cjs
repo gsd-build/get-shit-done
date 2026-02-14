@@ -4595,3 +4595,212 @@ completed: 2025-01-01
     assert.ok(phaseCheck.issues.some(i => i.includes('Phase 2') && i.includes('no directory')));
   });
 });
+
+
+// ─────────────────────────────────────────────────────────────────────────────
+// note commands
+// ─────────────────────────────────────────────────────────────────────────────
+
+describe('note append command', () => {
+  let tmpDir;
+
+  beforeEach(() => {
+    tmpDir = createTempProject();
+  });
+
+  afterEach(() => {
+    cleanup(tmpDir);
+  });
+
+  test('creates note file with correct frontmatter', () => {
+    const result = runGsdTools('note append This is a test observation', tmpDir);
+    assert.ok(result.success, `Command failed: ${result.error}`);
+
+    const output = JSON.parse(result.output);
+    assert.strictEqual(output.created, true, 'should report created');
+    assert.ok(output.file.startsWith('note-'), 'filename should start with note-');
+    assert.ok(output.file.endsWith('.md'), 'filename should end with .md');
+    assert.ok(output.path.startsWith('.planning/notes/'), 'path should be in .planning/notes/');
+    assert.ok(output.timestamp, 'should have timestamp');
+
+    // Verify file exists and has correct content
+    const filePath = path.join(tmpDir, output.path);
+    assert.ok(fs.existsSync(filePath), 'note file should exist');
+
+    const content = fs.readFileSync(filePath, 'utf-8');
+    assert.ok(content.includes('created:'), 'should have created frontmatter');
+    assert.ok(content.includes('source: gsd-note'), 'should have source frontmatter');
+    assert.ok(content.includes('This is a test observation'), 'should contain note content');
+  });
+
+  test('creates notes directory if missing', () => {
+    const notesDir = path.join(tmpDir, '.planning', 'notes');
+    assert.ok(!fs.existsSync(notesDir), 'notes dir should not exist initially');
+
+    const result = runGsdTools('note append Quick thought', tmpDir);
+    assert.ok(result.success, `Command failed: ${result.error}`);
+    assert.ok(fs.existsSync(notesDir), 'notes dir should be created');
+  });
+
+  test('errors when no content provided', () => {
+    const result = runGsdTools('note append', tmpDir);
+    assert.strictEqual(result.success, false, 'should fail without content');
+    assert.ok(result.error.includes('content required'), 'should mention content required');
+  });
+});
+
+describe('note list command', () => {
+  let tmpDir;
+
+  beforeEach(() => {
+    tmpDir = createTempProject();
+  });
+
+  afterEach(() => {
+    cleanup(tmpDir);
+  });
+
+  test('returns empty list when no notes exist', () => {
+    const result = runGsdTools('note list', tmpDir);
+    assert.ok(result.success, `Command failed: ${result.error}`);
+
+    const output = JSON.parse(result.output);
+    assert.strictEqual(output.count, 0, 'count should be 0');
+    assert.deepStrictEqual(output.notes, [], 'notes should be empty');
+  });
+
+  test('lists notes with correct structure', () => {
+    const notesDir = path.join(tmpDir, '.planning', 'notes');
+    fs.mkdirSync(notesDir, { recursive: true });
+
+    fs.writeFileSync(path.join(notesDir, 'note-20250101-120000.md'), `---
+created: 2025-01-01T12:00:00.000Z
+source: gsd-note
+---
+
+First observation here
+`, 'utf-8');
+
+    fs.writeFileSync(path.join(notesDir, 'note-20250102-130000.md'), `---
+created: 2025-01-02T13:00:00.000Z
+source: gsd-note
+---
+
+Second observation here
+`, 'utf-8');
+
+    const result = runGsdTools('note list', tmpDir);
+    assert.ok(result.success, `Command failed: ${result.error}`);
+
+    const output = JSON.parse(result.output);
+    assert.strictEqual(output.count, 2, 'should have 2 notes');
+    assert.strictEqual(output.notes[0].file, 'note-20250101-120000.md');
+    assert.strictEqual(output.notes[0].created, '2025-01-01T12:00:00.000Z');
+    assert.strictEqual(output.notes[0].preview, 'First observation here');
+    assert.strictEqual(output.notes[0].promoted, null, 'should not be promoted');
+    assert.strictEqual(output.notes[1].file, 'note-20250102-130000.md');
+    assert.strictEqual(output.notes[1].preview, 'Second observation here');
+  });
+
+  test('shows promoted status for promoted notes', () => {
+    const notesDir = path.join(tmpDir, '.planning', 'notes');
+    fs.mkdirSync(notesDir, { recursive: true });
+
+    fs.writeFileSync(path.join(notesDir, 'note-20250101-120000.md'), `---
+promoted: 2025-01-05T10:00:00.000Z
+todo: todo-20250105-100000.md
+created: 2025-01-01T12:00:00.000Z
+source: gsd-note
+---
+
+Promoted observation
+`, 'utf-8');
+
+    const result = runGsdTools('note list', tmpDir);
+    assert.ok(result.success, `Command failed: ${result.error}`);
+
+    const output = JSON.parse(result.output);
+    assert.strictEqual(output.count, 1);
+    assert.strictEqual(output.notes[0].promoted, '2025-01-05T10:00:00.000Z');
+  });
+});
+
+describe('note promote command', () => {
+  let tmpDir;
+
+  beforeEach(() => {
+    tmpDir = createTempProject();
+  });
+
+  afterEach(() => {
+    cleanup(tmpDir);
+  });
+
+  test('promotes note to todo', () => {
+    const notesDir = path.join(tmpDir, '.planning', 'notes');
+    fs.mkdirSync(notesDir, { recursive: true });
+
+    const noteFilename = 'note-20250101-120000.md';
+    fs.writeFileSync(path.join(notesDir, noteFilename), `---
+created: 2025-01-01T12:00:00.000Z
+source: gsd-note
+---
+
+Important observation to act on
+`, 'utf-8');
+
+    const result = runGsdTools(`note promote ${noteFilename}`, tmpDir);
+    assert.ok(result.success, `Command failed: ${result.error}`);
+
+    const output = JSON.parse(result.output);
+    assert.strictEqual(output.promoted, true, 'should report promoted');
+    assert.strictEqual(output.note, noteFilename, 'should reference original note');
+    assert.ok(output.todo.startsWith('todo-'), 'todo filename should start with todo-');
+    assert.ok(output.todo_path.startsWith('.planning/todos/pending/'), 'todo path should be in pending');
+
+    // Verify todo file was created
+    const todoPath = path.join(tmpDir, output.todo_path);
+    assert.ok(fs.existsSync(todoPath), 'todo file should exist');
+
+    const todoContent = fs.readFileSync(todoPath, 'utf-8');
+    assert.ok(todoContent.includes('Important observation to act on'), 'todo should contain note content');
+    assert.ok(todoContent.includes(`note: ${noteFilename}`), 'todo should reference source note');
+
+    // Verify original note was updated
+    const updatedNote = fs.readFileSync(path.join(notesDir, noteFilename), 'utf-8');
+    assert.ok(updatedNote.includes('promoted:'), 'note should have promoted field');
+    assert.ok(updatedNote.includes(`todo: ${output.todo}`), 'note should reference todo');
+  });
+
+  test('errors when note not found', () => {
+    const result = runGsdTools('note promote nonexistent.md', tmpDir);
+    assert.strictEqual(result.success, false, 'should fail for missing note');
+    assert.ok(result.error.includes('Note not found'), 'should mention not found');
+  });
+
+  test('errors when note already promoted', () => {
+    const notesDir = path.join(tmpDir, '.planning', 'notes');
+    fs.mkdirSync(notesDir, { recursive: true });
+
+    const noteFilename = 'note-20250101-120000.md';
+    fs.writeFileSync(path.join(notesDir, noteFilename), `---
+promoted: 2025-01-05T10:00:00.000Z
+todo: todo-20250105-100000.md
+created: 2025-01-01T12:00:00.000Z
+source: gsd-note
+---
+
+Already promoted observation
+`, 'utf-8');
+
+    const result = runGsdTools(`note promote ${noteFilename}`, tmpDir);
+    assert.strictEqual(result.success, false, 'should fail for already promoted note');
+    assert.ok(result.error.includes('already promoted'), 'should mention already promoted');
+  });
+
+  test('errors when no filename provided', () => {
+    const result = runGsdTools('note promote', tmpDir);
+    assert.strictEqual(result.success, false, 'should fail without filename');
+    assert.ok(result.error.includes('filename required'), 'should mention filename required');
+  });
+});

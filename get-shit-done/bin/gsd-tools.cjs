@@ -56,6 +56,11 @@
  * Todos:
  *   todo complete <filename>           Move todo from pending to completed
  *
+ * Notes:
+ *   note append <words...>             Create timestamped note in .planning/notes/
+ *   note list                          List all notes with previews
+ *   note promote <filename>            Convert note to todo in .planning/todos/pending/
+ *
  * Scaffolding:
  *   scaffold context --phase <N>       Create CONTEXT.md template
  *   scaffold uat --phase <N>           Create UAT.md template
@@ -4189,6 +4194,127 @@ function cmdTodoComplete(cwd, filename, raw) {
   output({ completed: true, file: filename, date: today }, raw, 'completed');
 }
 
+// ─── Notes ────────────────────────────────────────────────────────────────────
+
+function cmdNoteAppend(cwd, contentWords, raw) {
+  if (!contentWords || contentWords.length === 0) {
+    error('content required for note append');
+  }
+
+  const notesDir = path.join(cwd, '.planning', 'notes');
+  fs.mkdirSync(notesDir, { recursive: true });
+
+  const now = new Date();
+  const pad = (n, len = 2) => String(n).padStart(len, '0');
+  const ts = `${now.getFullYear()}${pad(now.getMonth() + 1)}${pad(now.getDate())}-${pad(now.getHours())}${pad(now.getMinutes())}${pad(now.getSeconds())}`;
+  const filename = `note-${ts}.md`;
+  const filePath = path.join(notesDir, filename);
+  const created = now.toISOString();
+  const content = contentWords.join(' ');
+
+  const fileContent = `---\ncreated: ${created}\nsource: gsd-note\n---\n\n${content}\n`;
+  fs.writeFileSync(filePath, fileContent, 'utf-8');
+
+  output({
+    created: true,
+    file: filename,
+    path: `.planning/notes/${filename}`,
+    timestamp: created,
+  }, raw, filename);
+}
+
+function cmdNoteList(cwd, raw) {
+  const notesDir = path.join(cwd, '.planning', 'notes');
+  const notes = [];
+
+  try {
+    const files = fs.readdirSync(notesDir).filter(f => f.endsWith('.md')).sort();
+
+    for (const file of files) {
+      try {
+        const content = fs.readFileSync(path.join(notesDir, file), 'utf-8');
+        const createdMatch = content.match(/^created:\s*(.+)$/m);
+        const promotedMatch = content.match(/^promoted:\s*(.+)$/m);
+
+        // Extract first non-frontmatter, non-empty line as preview
+        let preview = '';
+        const fmEnd = content.indexOf('---', content.indexOf('---') + 3);
+        if (fmEnd !== -1) {
+          const body = content.slice(fmEnd + 3).trim();
+          const firstLine = body.split('\n').find(l => l.trim().length > 0);
+          if (firstLine) {
+            preview = firstLine.trim().slice(0, 100);
+          }
+        }
+
+        notes.push({
+          file,
+          created: createdMatch ? createdMatch[1].trim() : 'unknown',
+          preview,
+          promoted: promotedMatch ? promotedMatch[1].trim() : null,
+        });
+      } catch {}
+    }
+  } catch {}
+
+  output({ count: notes.length, notes }, raw, notes.length.toString());
+}
+
+function cmdNotePromote(cwd, filename, raw) {
+  if (!filename) {
+    error('filename required for note promote');
+  }
+
+  const notesDir = path.join(cwd, '.planning', 'notes');
+  const notePath = path.join(notesDir, filename);
+
+  if (!fs.existsSync(notePath)) {
+    error(`Note not found: ${filename}`);
+  }
+
+  const noteContent = fs.readFileSync(notePath, 'utf-8');
+
+  // Check if already promoted
+  if (/^promoted:\s*.+$/m.test(noteContent)) {
+    error(`Note already promoted: ${filename}`);
+  }
+
+  // Extract body content (after frontmatter)
+  let body = '';
+  const fmEnd = noteContent.indexOf('---', noteContent.indexOf('---') + 3);
+  if (fmEnd !== -1) {
+    body = noteContent.slice(fmEnd + 3).trim();
+  }
+
+  // Create todo
+  const pendingDir = path.join(cwd, '.planning', 'todos', 'pending');
+  fs.mkdirSync(pendingDir, { recursive: true });
+
+  const now = new Date();
+  const pad = (n, len = 2) => String(n).padStart(len, '0');
+  const ts = `${now.getFullYear()}${pad(now.getMonth() + 1)}${pad(now.getDate())}-${pad(now.getHours())}${pad(now.getMinutes())}${pad(now.getSeconds())}`;
+  const todoFilename = `todo-${ts}.md`;
+  const todoPath = path.join(pendingDir, todoFilename);
+  const promoted = now.toISOString();
+
+  const todoContent = `---\ncreated: ${promoted}\ntitle: ${body.split('\n')[0] || 'Promoted note'}\narea: general\nsource: note-promote\nnote: ${filename}\n---\n\n## Problem\n\n${body}\n\n## Solution\n\nTBD\n`;
+  fs.writeFileSync(todoPath, todoContent, 'utf-8');
+
+  // Update original note with promoted reference
+  const updatedNote = noteContent.replace(
+    /^---\n/,
+    `---\npromoted: ${promoted}\ntodo: ${todoFilename}\n`
+  );
+  fs.writeFileSync(notePath, updatedNote, 'utf-8');
+
+  output({
+    promoted: true,
+    note: filename,
+    todo: todoFilename,
+    todo_path: `.planning/todos/pending/${todoFilename}`,
+  }, raw, todoFilename);
+}
+
 // ─── Scaffold ─────────────────────────────────────────────────────────────────
 
 function cmdScaffold(cwd, type, options, raw) {
@@ -6100,6 +6226,20 @@ async function main() {
         }, raw);
       } else {
         error('Unknown seed subcommand. Available: list, read-for-phase, create');
+      }
+      break;
+    }
+
+    case 'note': {
+      const noteSubcommand = args[1];
+      if (noteSubcommand === 'append') {
+        cmdNoteAppend(cwd, args.slice(2), raw);
+      } else if (noteSubcommand === 'list') {
+        cmdNoteList(cwd, raw);
+      } else if (noteSubcommand === 'promote') {
+        cmdNotePromote(cwd, args[2], raw);
+      } else {
+        error('Unknown note subcommand. Available: append, list, promote');
       }
       break;
     }
