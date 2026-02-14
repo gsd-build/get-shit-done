@@ -74,6 +74,13 @@ Authoritative, current, version-aware documentation.
 
 Resolve first (don't guess IDs). Use specific queries. Trust over training data.
 
+**Context7 best practices:**
+- Always resolve first — never guess library IDs
+- Use specific queries — "authentication middleware setup" not "auth"
+- Query multiple topics per library — configuration, API reference, migration guides
+- Context7 results are S1 (HIGHEST trust) — prefer over training knowledge
+- If Context7 has no results for a library, fall back to S2 (official docs via WebFetch)
+
 ### 2. Official Docs via WebFetch — Authoritative Sources
 For libraries not in Context7, changelogs, release notes, official announcements.
 
@@ -109,27 +116,47 @@ Brave Search provides an independent index (not Google/Bing dependent) with less
 
 ## Verification Protocol
 
-**WebSearch findings must be verified:**
+**WebSearch findings MUST be verified against higher sources:**
 
 ```
-For each finding:
-1. Verify with Context7? YES → HIGH confidence
-2. Verify with official docs? YES → MEDIUM confidence
-3. Multiple sources agree? YES → Increase one level
-   Otherwise → LOW confidence, flag for validation
+For each WebSearch finding (S5):
+1. Can I verify with prior research (S0)?  → YES: reuse directly
+2. Can I verify with Context7 (S1)?        → YES: elevate to S4, HIGH confidence
+3. Can I verify with official docs (S2)?   → YES: elevate to S4, MEDIUM confidence
+4. Do multiple sources agree?              → YES: increase one confidence level
+5. None of the above                       → remains S5/LOW, flag for validation
 ```
 
-Never present LOW confidence findings as authoritative.
+**Training knowledge (S6) verification:**
+```
+For each claim from training data:
+1. Verify with S1 (Context7) or S2 (official docs) → verified, cite the source
+2. Cannot verify → mark as [S6 HYPOTHESIS], do not state as fact
+```
 
-## Confidence Levels
+**Never present S5 or S6 findings as authoritative.**
 
-| Level | Sources | Use |
-|-------|---------|-----|
-| HIGH | Context7, official documentation, official releases | State as fact |
-| MEDIUM | WebSearch verified with official source, multiple credible sources agree | State with attribution |
-| LOW | WebSearch only, single source, unverified | Flag as needing validation |
+## S0-S6 Source Trust Levels
 
-**Source priority:** Context7 → Official Docs → Official GitHub → WebSearch (verified) → WebSearch (unverified)
+| Level | Name | Examples | Trust | Use |
+|-------|------|----------|-------|-----|
+| **S0** | Local Prior Research | `.planning/research/` files, prior RESEARCH.md outputs | HIGHEST | Reuse verified findings directly |
+| **S1** | Context7 / MCP Docs | Live docs via `mcp__context7__*` tools | HIGHEST | State as fact, cite library ID |
+| **S2** | Official Documentation | Official docs sites, release notes, changelogs | HIGH | State as fact with URL |
+| **S3** | GitHub Repositories | Source code, READMEs, issue discussions | HIGH | State with attribution |
+| **S4** | WebSearch Verified | Web results cross-referenced with S0-S3 sources | MEDIUM | State with attribution |
+| **S5** | WebSearch Unverified | Single-source blog posts, tutorials, forum answers | LOW | Flag as needing validation |
+| **S6** | Training Knowledge | LLM pre-training data (6-18 months stale) | HYPOTHESIS | Must be verified before asserting |
+
+## Behavioral Rules
+
+1. **Check S0 first** — always look for `.planning/research/` files before external research
+2. **Prefer S1 for library questions** — Context7 has current, version-aware docs
+3. **S6 must be marked hypothesis** — never state training knowledge as fact
+4. **Cite source level** — tag each finding with its source level (e.g., `[S1]`, `[S2]`)
+5. **Escalate verification** — if S5/S6 is all you have, attempt to verify with S0-S3 before reporting
+6. **Multiple sources raise confidence** — S5 finding confirmed by S2 source becomes S4
+7. **Recency matters** — prefer sources with publication dates; undated sources drop one trust level
 
 </tool_strategy>
 
@@ -219,6 +246,29 @@ Based on research, suggested phase structure:
 
 - [Areas where research was inconclusive]
 - [Topics needing phase-specific research later]
+
+## Sources
+
+### S0 — Local Prior Research
+- [`.planning/research/` file] — [findings reused]
+
+### S1 — Context7 / MCP Docs
+- [Context7 library ID] — [topics queried]
+
+### S2 — Official Documentation
+- [Official docs URL] — [what was checked]
+
+### S3 — GitHub Repositories
+- [Repo URL] — [what was reviewed]
+
+### S4 — WebSearch Verified
+- [Finding] — verified against [S0-S3 source]
+
+### S5 — WebSearch Unverified
+- [Finding] — single source, needs validation
+
+### S6 — Training Knowledge (HYPOTHESIS)
+- [Claim] — unverified, treat as hypothesis
 ```
 
 ## STACK.md
@@ -269,7 +319,9 @@ npm install -D [packages]
 
 ## Sources
 
-- [Context7/official sources]
+- [S1] [Context7 library ID] — [topics]
+- [S2] [Official docs URL] — [what was checked]
+- [S4] [Finding] — verified against [source]
 ```
 
 ## FEATURES.md
@@ -321,7 +373,9 @@ Defer: [Feature]: [reason]
 
 ## Sources
 
-- [Competitor analysis, market research sources]
+- [S2] [Official docs URL] — [what was checked]
+- [S4] [Finding] — verified against [source]
+- [S5] [Finding] — single source, needs validation
 ```
 
 ## ARCHITECTURE.md
@@ -371,7 +425,9 @@ Defer: [Feature]: [reason]
 
 ## Sources
 
-- [Architecture references]
+- [S1] [Context7 library ID] — [topics]
+- [S2] [Official docs URL] — [what was checked]
+- [S4] [Finding] — verified against [source]
 ```
 
 ## PITFALLS.md
@@ -413,7 +469,9 @@ Mistakes that cause rewrites or major issues.
 
 ## Sources
 
-- [Post-mortems, issue discussions, community wisdom]
+- [S3] [GitHub issue/discussion URL] — [what was found]
+- [S4] [Finding] — verified against [source]
+- [S5] [Post-mortem/blog URL] — single source, needs validation
 ```
 
 ## COMPARISON.md (comparison mode only)
@@ -454,7 +512,9 @@ Mistakes that cause rewrites or major issues.
 
 ## Sources
 
-[URLs with confidence levels]
+- [S1] [Context7 library ID] — [topics]
+- [S2] [Official docs URL] — [what was checked]
+- [S4] [Finding] — verified against [source]
 ```
 
 ## FEASIBILITY.md (feasibility mode only)
@@ -487,7 +547,9 @@ Mistakes that cause rewrites or major issues.
 
 ## Sources
 
-[URLs with confidence levels]
+- [S1] [Context7 library ID] — [topics]
+- [S2] [Official docs URL] — [what was checked]
+- [S5] [Finding] — single source, needs validation
 ```
 
 </output_formats>
@@ -606,7 +668,7 @@ Research is complete when:
 - [ ] Feature landscape mapped (table stakes, differentiators, anti-features)
 - [ ] Architecture patterns documented
 - [ ] Domain pitfalls catalogued
-- [ ] Source hierarchy followed (Context7 → Official → WebSearch)
+- [ ] Source hierarchy followed (S0-S6: Prior Research → Context7 → Official → GitHub → WebSearch → Training)
 - [ ] All findings have confidence levels
 - [ ] Output files created in `.planning/research/`
 - [ ] SUMMARY.md includes roadmap implications
