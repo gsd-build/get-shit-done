@@ -23,6 +23,7 @@ const hasLocal = args.includes('--local') || args.includes('-l');
 const hasOpencode = args.includes('--opencode');
 const hasClaude = args.includes('--claude');
 const hasGemini = args.includes('--gemini');
+const hasCodex = args.includes('--codex');
 const hasBoth = args.includes('--both'); // Legacy flag, keeps working
 const hasAll = args.includes('--all');
 const hasUninstall = args.includes('--uninstall') || args.includes('-u');
@@ -30,19 +31,21 @@ const hasUninstall = args.includes('--uninstall') || args.includes('-u');
 // Runtime selection - can be set by flags or interactive prompt
 let selectedRuntimes = [];
 if (hasAll) {
-  selectedRuntimes = ['claude', 'opencode', 'gemini'];
+  selectedRuntimes = ['claude', 'opencode', 'gemini', 'codex'];
 } else if (hasBoth) {
   selectedRuntimes = ['claude', 'opencode'];
 } else {
   if (hasOpencode) selectedRuntimes.push('opencode');
   if (hasClaude) selectedRuntimes.push('claude');
   if (hasGemini) selectedRuntimes.push('gemini');
+  if (hasCodex) selectedRuntimes.push('codex');
 }
 
 // Helper to get directory name for a runtime (used for local/project installs)
 function getDirName(runtime) {
   if (runtime === 'opencode') return '.opencode';
   if (runtime === 'gemini') return '.gemini';
+  if (runtime === 'codex') return '.codex';
   return '.claude';
 }
 
@@ -73,7 +76,7 @@ function getOpencodeGlobalDir() {
 
 /**
  * Get the global config directory for a runtime
- * @param {string} runtime - 'claude', 'opencode', or 'gemini'
+ * @param {string} runtime - 'claude', 'opencode', 'gemini', or 'codex'
  * @param {string|null} explicitDir - Explicit directory from --config-dir flag
  */
 function getGlobalDir(runtime, explicitDir = null) {
@@ -94,6 +97,17 @@ function getGlobalDir(runtime, explicitDir = null) {
       return expandTilde(process.env.GEMINI_CONFIG_DIR);
     }
     return path.join(os.homedir(), '.gemini');
+  }
+
+  if (runtime === 'codex') {
+    // Codex: --config-dir > CODEX_HOME > ~/.codex
+    if (explicitDir) {
+      return expandTilde(explicitDir);
+    }
+    if (process.env.CODEX_HOME) {
+      return expandTilde(process.env.CODEX_HOME);
+    }
+    return path.join(os.homedir(), '.codex');
   }
   
   // Claude Code: --config-dir > CLAUDE_CONFIG_DIR > ~/.claude
@@ -116,7 +130,7 @@ const banner = '\n' +
   '\n' +
   '  Get Shit Done ' + dim + 'v' + pkg.version + reset + '\n' +
   '  A meta-prompting, context engineering and spec-driven\n' +
-  '  development system for Claude Code, OpenCode, and Gemini by TÂCHES.\n';
+  '  development system for Claude Code, OpenCode, Gemini, and Codex by TÂCHES.\n';
 
 // Parse --config-dir argument
 function parseConfigDirArg() {
@@ -150,7 +164,7 @@ console.log(banner);
 
 // Show help if requested
 if (hasHelp) {
-  console.log(`  ${yellow}Usage:${reset} npx get-shit-done-cc [options]\n\n  ${yellow}Options:${reset}\n    ${cyan}-g, --global${reset}              Install globally (to config directory)\n    ${cyan}-l, --local${reset}               Install locally (to current directory)\n    ${cyan}--claude${reset}                  Install for Claude Code only\n    ${cyan}--opencode${reset}                Install for OpenCode only\n    ${cyan}--gemini${reset}                  Install for Gemini only\n    ${cyan}--all${reset}                     Install for all runtimes\n    ${cyan}-u, --uninstall${reset}           Uninstall GSD (remove all GSD files)\n    ${cyan}-c, --config-dir <path>${reset}   Specify custom config directory\n    ${cyan}-h, --help${reset}                Show this help message\n    ${cyan}--force-statusline${reset}        Replace existing statusline config\n\n  ${yellow}Examples:${reset}\n    ${dim}# Interactive install (prompts for runtime and location)${reset}\n    npx get-shit-done-cc\n\n    ${dim}# Install for Claude Code globally${reset}\n    npx get-shit-done-cc --claude --global\n\n    ${dim}# Install for Gemini globally${reset}\n    npx get-shit-done-cc --gemini --global\n\n    ${dim}# Install for all runtimes globally${reset}\n    npx get-shit-done-cc --all --global\n\n    ${dim}# Install to custom config directory${reset}\n    npx get-shit-done-cc --claude --global --config-dir ~/.claude-bc\n\n    ${dim}# Install to current project only${reset}\n    npx get-shit-done-cc --claude --local\n\n    ${dim}# Uninstall GSD from Claude Code globally${reset}\n    npx get-shit-done-cc --claude --global --uninstall\n\n  ${yellow}Notes:${reset}\n    The --config-dir option is useful when you have multiple configurations.\n    It takes priority over CLAUDE_CONFIG_DIR / GEMINI_CONFIG_DIR environment variables.\n`);
+  console.log(`  ${yellow}Usage:${reset} npx get-shit-done-cc [options]\n\n  ${yellow}Options:${reset}\n    ${cyan}-g, --global${reset}              Install globally (to config directory)\n    ${cyan}-l, --local${reset}               Install locally (to current directory)\n    ${cyan}--claude${reset}                  Install for Claude Code only\n    ${cyan}--opencode${reset}                Install for OpenCode only\n    ${cyan}--gemini${reset}                  Install for Gemini only\n    ${cyan}--codex${reset}                   Install for Codex only\n    ${cyan}--all${reset}                     Install for all runtimes\n    ${cyan}-u, --uninstall${reset}           Uninstall GSD (remove all GSD files)\n    ${cyan}-c, --config-dir <path>${reset}   Specify custom config directory\n    ${cyan}-h, --help${reset}                Show this help message\n    ${cyan}--force-statusline${reset}        Replace existing statusline config\n\n  ${yellow}Examples:${reset}\n    ${dim}# Interactive install (prompts for runtime and location)${reset}\n    npx get-shit-done-cc\n\n    ${dim}# Install for Claude Code globally${reset}\n    npx get-shit-done-cc --claude --global\n\n    ${dim}# Install for Gemini globally${reset}\n    npx get-shit-done-cc --gemini --global\n\n    ${dim}# Install for Codex globally${reset}\n    npx get-shit-done-cc --codex --global\n\n    ${dim}# Install for all runtimes globally${reset}\n    npx get-shit-done-cc --all --global\n\n    ${dim}# Install to custom config directory${reset}\n    npx get-shit-done-cc --codex --global --config-dir ~/.codex-alt\n\n    ${dim}# Install to current project only${reset}\n    npx get-shit-done-cc --codex --local\n\n    ${dim}# Uninstall GSD from Claude Code globally${reset}\n    npx get-shit-done-cc --claude --global --uninstall\n\n  ${yellow}Notes:${reset}\n    The --config-dir option is useful when you have multiple configurations.\n    It takes priority over CLAUDE_CONFIG_DIR / GEMINI_CONFIG_DIR / CODEX_HOME environment variables.\n`);
   process.exit(0);
 }
 
@@ -200,7 +214,7 @@ const attributionCache = new Map();
 
 /**
  * Get commit attribution setting for a runtime
- * @param {string} runtime - 'claude', 'opencode', or 'gemini'
+ * @param {string} runtime - 'claude', 'opencode', 'gemini', or 'codex'
  * @returns {null|undefined|string} null = remove, undefined = keep default, string = custom
  */
 function getCommitAttribution(runtime) {
@@ -224,6 +238,9 @@ function getCommitAttribution(runtime) {
     } else {
       result = settings.attribution.commit;
     }
+  } else if (runtime === 'codex') {
+    // Codex does not use Claude/Gemini commit attribution config
+    result = undefined;
   } else {
     // Claude Code
     const settings = readSettings(path.join(getGlobalDir('claude', explicitConfigDir), 'settings.json'));
@@ -584,6 +601,42 @@ function convertClaudeToGeminiToml(content) {
 }
 
 /**
+ * Strip YAML frontmatter from markdown.
+ * Codex custom prompts are plain markdown files in ~/.codex/prompts.
+ */
+function stripFrontmatter(content) {
+  if (!content.startsWith('---')) return content;
+  const endIndex = content.indexOf('---', 3);
+  if (endIndex === -1) return content;
+  return content.substring(endIndex + 3).trimStart();
+}
+
+/**
+ * Convert command markdown into Codex prompt markdown.
+ */
+function convertCommandToCodexPrompt(content, baseName) {
+  let out = stripFrontmatter(content);
+
+  // Codex prompt command namespace differs from Claude/OpenCode.
+  out = out.replace(/\/gsd:/g, '/prompts:gsd-');
+  out = out.replace(/\/gsd-help\b/g, '/prompts:gsd-help');
+
+  const compatibilityLines = [
+    'In Codex prompt mode, treat command flags as enabled ONLY when the user explicitly includes them in this invocation.',
+    'Do not infer flags from examples or documentation text inside this prompt.'
+  ];
+  // Guard against false auto-mode activation in new-project.
+  if (baseName === 'new-project') {
+    compatibilityLines.push('If --auto is not explicit, run interactive mode and start by asking: "What do you want to build?"');
+  }
+
+  const compatibilityNote = `<codex_compatibility>\n${compatibilityLines.join('\n')}\n</codex_compatibility>\n\n`;
+  out = compatibilityNote + out;
+
+  return out;
+}
+
+/**
  * Copy commands to a flat structure for OpenCode
  * OpenCode expects: command/gsd-help.md (invoked as /gsd-help)
  * Source structure: commands/gsd/help.md
@@ -639,12 +692,54 @@ function copyFlattenedCommands(srcDir, destDir, prefix, pathPrefix, runtime) {
 }
 
 /**
+ * Copy commands to flat prompt files for Codex.
+ * Output: prompts/gsd-help.md, prompts/gsd-plan-phase.md, ...
+ */
+function copyFlattenedPromptsForCodex(srcDir, destDir, prefix, pathPrefix, runtime) {
+  if (!fs.existsSync(srcDir)) {
+    return;
+  }
+
+  if (fs.existsSync(destDir)) {
+    for (const file of fs.readdirSync(destDir)) {
+      if (file.startsWith(`${prefix}-`) && file.endsWith('.md')) {
+        fs.unlinkSync(path.join(destDir, file));
+      }
+    }
+  } else {
+    fs.mkdirSync(destDir, { recursive: true });
+  }
+
+  const entries = fs.readdirSync(srcDir, { withFileTypes: true });
+  for (const entry of entries) {
+    const srcPath = path.join(srcDir, entry.name);
+    if (entry.isDirectory()) {
+      copyFlattenedPromptsForCodex(srcPath, destDir, `${prefix}-${entry.name}`, pathPrefix, runtime);
+      continue;
+    }
+
+    if (!entry.name.endsWith('.md') || entry.name.endsWith('.bak')) continue;
+
+    const baseName = entry.name.replace('.md', '');
+    const destName = `${prefix}-${baseName}.md`;
+    const destPath = path.join(destDir, destName);
+
+    let content = fs.readFileSync(srcPath, 'utf8');
+    const claudeDirRegex = /~\/\.claude\//g;
+    content = content.replace(claudeDirRegex, pathPrefix);
+    content = processAttribution(content, getCommitAttribution(runtime));
+    content = convertCommandToCodexPrompt(content, baseName);
+    fs.writeFileSync(destPath, content);
+  }
+}
+
+/**
  * Recursively copy directory, replacing paths in .md files
  * Deletes existing destDir first to remove orphaned files from previous versions
  * @param {string} srcDir - Source directory
  * @param {string} destDir - Destination directory
  * @param {string} pathPrefix - Path prefix for file references
- * @param {string} runtime - Target runtime ('claude', 'opencode', 'gemini')
+ * @param {string} runtime - Target runtime ('claude', 'opencode', 'gemini', 'codex')
  */
 function copyWithPathReplacement(srcDir, destDir, pathPrefix, runtime) {
   const isOpencode = runtime === 'opencode';
@@ -770,10 +865,11 @@ function cleanupOrphanedHooks(settings) {
  * Uninstall GSD from the specified directory for a specific runtime
  * Removes only GSD-specific files/directories, preserves user content
  * @param {boolean} isGlobal - Whether to uninstall from global or local
- * @param {string} runtime - Target runtime ('claude', 'opencode', 'gemini')
+ * @param {string} runtime - Target runtime ('claude', 'opencode', 'gemini', 'codex')
  */
 function uninstall(isGlobal, runtime = 'claude') {
   const isOpencode = runtime === 'opencode';
+  const isCodex = runtime === 'codex';
   const dirName = getDirName(runtime);
 
   // Get the target directory based on runtime and install type
@@ -788,6 +884,7 @@ function uninstall(isGlobal, runtime = 'claude') {
   let runtimeLabel = 'Claude Code';
   if (runtime === 'opencode') runtimeLabel = 'OpenCode';
   if (runtime === 'gemini') runtimeLabel = 'Gemini';
+  if (runtime === 'codex') runtimeLabel = 'Codex';
 
   console.log(`  Uninstalling GSD from ${cyan}${runtimeLabel}${reset} at ${cyan}${locationLabel}${reset}\n`);
 
@@ -800,8 +897,25 @@ function uninstall(isGlobal, runtime = 'claude') {
 
   let removedCount = 0;
 
-  // 1. Remove GSD commands directory
-  if (isOpencode) {
+  // 1. Remove GSD commands/prompt files
+  if (isCodex) {
+    // Codex: remove prompts/gsd-*.md files
+    const promptsDir = path.join(targetDir, 'prompts');
+    if (fs.existsSync(promptsDir)) {
+      const files = fs.readdirSync(promptsDir);
+      let promptCount = 0;
+      for (const file of files) {
+        if (file.startsWith('gsd-') && file.endsWith('.md')) {
+          fs.unlinkSync(path.join(promptsDir, file));
+          promptCount++;
+        }
+      }
+      if (promptCount > 0) {
+        removedCount++;
+        console.log(`  ${green}✓${reset} Removed ${promptCount} GSD prompts from prompts/`);
+      }
+    }
+  } else if (isOpencode) {
     // OpenCode: remove command/gsd-*.md files
     const commandDir = path.join(targetDir, 'command');
     if (fs.existsSync(commandDir)) {
@@ -849,27 +963,29 @@ function uninstall(isGlobal, runtime = 'claude') {
     }
   }
 
-  // 4. Remove GSD hooks
-  const hooksDir = path.join(targetDir, 'hooks');
-  if (fs.existsSync(hooksDir)) {
-    const gsdHooks = ['gsd-statusline.js', 'gsd-check-update.js', 'gsd-check-update.sh'];
-    let hookCount = 0;
-    for (const hook of gsdHooks) {
-      const hookPath = path.join(hooksDir, hook);
-      if (fs.existsSync(hookPath)) {
-        fs.unlinkSync(hookPath);
-        hookCount++;
+  // 4. Remove GSD hooks (not used by Codex)
+  if (!isCodex) {
+    const hooksDir = path.join(targetDir, 'hooks');
+    if (fs.existsSync(hooksDir)) {
+      const gsdHooks = ['gsd-statusline.js', 'gsd-check-update.js', 'gsd-check-update.sh'];
+      let hookCount = 0;
+      for (const hook of gsdHooks) {
+        const hookPath = path.join(hooksDir, hook);
+        if (fs.existsSync(hookPath)) {
+          fs.unlinkSync(hookPath);
+          hookCount++;
+        }
       }
-    }
-    if (hookCount > 0) {
-      removedCount++;
-      console.log(`  ${green}✓${reset} Removed ${hookCount} GSD hooks`);
+      if (hookCount > 0) {
+        removedCount++;
+        console.log(`  ${green}✓${reset} Removed ${hookCount} GSD hooks`);
+      }
     }
   }
 
   // 5. Clean up settings.json (remove GSD hooks and statusline)
   const settingsPath = path.join(targetDir, 'settings.json');
-  if (fs.existsSync(settingsPath)) {
+  if (!isCodex && fs.existsSync(settingsPath)) {
     let settings = readSettings(settingsPath);
     let settingsModified = false;
 
@@ -1130,7 +1246,7 @@ function verifyFileInstalled(filePath, description) {
 /**
  * Install to the specified directory for a specific runtime
  * @param {boolean} isGlobal - Whether to install globally or locally
- * @param {string} runtime - Target runtime ('claude', 'opencode', 'gemini')
+ * @param {string} runtime - Target runtime ('claude', 'opencode', 'gemini', 'codex')
  */
 
 // ──────────────────────────────────────────────────────
@@ -1174,6 +1290,7 @@ function generateManifest(dir, baseDir) {
 function writeManifest(configDir) {
   const gsdDir = path.join(configDir, 'get-shit-done');
   const commandsDir = path.join(configDir, 'commands', 'gsd');
+  const promptsDir = path.join(configDir, 'prompts');
   const agentsDir = path.join(configDir, 'agents');
   const manifest = { version: pkg.version, timestamp: new Date().toISOString(), files: {} };
 
@@ -1185,6 +1302,13 @@ function writeManifest(configDir) {
     const cmdHashes = generateManifest(commandsDir);
     for (const [rel, hash] of Object.entries(cmdHashes)) {
       manifest.files['commands/gsd/' + rel] = hash;
+    }
+  }
+  if (fs.existsSync(promptsDir)) {
+    for (const file of fs.readdirSync(promptsDir)) {
+      if (file.startsWith('gsd-') && file.endsWith('.md')) {
+        manifest.files['prompts/' + file] = fileHash(path.join(promptsDir, file));
+      }
     }
   }
   if (fs.existsSync(agentsDir)) {
@@ -1269,6 +1393,7 @@ function reportLocalPatches(configDir) {
 function install(isGlobal, runtime = 'claude') {
   const isOpencode = runtime === 'opencode';
   const isGemini = runtime === 'gemini';
+  const isCodex = runtime === 'codex';
   const dirName = getDirName(runtime);
   const src = path.join(__dirname, '..');
 
@@ -1291,6 +1416,7 @@ function install(isGlobal, runtime = 'claude') {
   let runtimeLabel = 'Claude Code';
   if (isOpencode) runtimeLabel = 'OpenCode';
   if (isGemini) runtimeLabel = 'Gemini';
+  if (isCodex) runtimeLabel = 'Codex';
 
   console.log(`  Installing for ${cyan}${runtimeLabel}${reset} to ${cyan}${locationLabel}${reset}\n`);
 
@@ -1304,8 +1430,21 @@ function install(isGlobal, runtime = 'claude') {
   cleanupOrphanedFiles(targetDir);
 
   // OpenCode uses 'command/' (singular) with flat structure
+  // Codex uses 'prompts/' with flat markdown custom prompts
   // Claude Code & Gemini use 'commands/' (plural) with nested structure
-  if (isOpencode) {
+  if (isCodex) {
+    const promptsDir = path.join(targetDir, 'prompts');
+    fs.mkdirSync(promptsDir, { recursive: true });
+
+    const gsdSrc = path.join(src, 'commands', 'gsd');
+    copyFlattenedPromptsForCodex(gsdSrc, promptsDir, 'gsd', pathPrefix, runtime);
+    const count = fs.readdirSync(promptsDir).filter(f => f.startsWith('gsd-') && f.endsWith('.md')).length;
+    if (count > 0) {
+      console.log(`  ${green}✓${reset} Installed ${count} prompts to prompts/`);
+    } else {
+      failures.push('prompts/gsd-*');
+    }
+  } else if (isOpencode) {
     // OpenCode: flat structure in command/ directory
     const commandDir = path.join(targetDir, 'command');
     fs.mkdirSync(commandDir, { recursive: true });
@@ -1406,8 +1545,9 @@ function install(isGlobal, runtime = 'claude') {
   }
 
   // Copy hooks from dist/ (bundled with dependencies)
+  // Codex does not use Claude/Gemini hook integration
   const hooksSrc = path.join(src, 'hooks', 'dist');
-  if (fs.existsSync(hooksSrc)) {
+  if (!isCodex && fs.existsSync(hooksSrc)) {
     const hooksDest = path.join(targetDir, 'hooks');
     fs.mkdirSync(hooksDest, { recursive: true });
     const hookEntries = fs.readdirSync(hooksSrc);
@@ -1428,6 +1568,14 @@ function install(isGlobal, runtime = 'claude') {
   if (failures.length > 0) {
     console.error(`\n  ${yellow}Installation incomplete!${reset} Failed: ${failures.join(', ')}`);
     process.exit(1);
+  }
+
+  // Codex install: skip Claude/Gemini settings and hooks integration
+  if (isCodex) {
+    writeManifest(targetDir);
+    console.log(`  ${green}✓${reset} Wrote file manifest (${MANIFEST_NAME})`);
+    reportLocalPatches(targetDir);
+    return { settingsPath: null, settings: null, statuslineCommand: null, runtime, targetDir };
   }
 
   // Configure statusline and hooks in settings.json
@@ -1485,16 +1633,17 @@ function install(isGlobal, runtime = 'claude') {
   // Report any backed-up local patches
   reportLocalPatches(targetDir);
 
-  return { settingsPath, settings, statuslineCommand, runtime };
+  return { settingsPath, settings, statuslineCommand, runtime, targetDir };
 }
 
 /**
  * Apply statusline config, then print completion message
  */
-function finishInstall(settingsPath, settings, statuslineCommand, shouldInstallStatusline, runtime = 'claude') {
+function finishInstall(settingsPath, settings, statuslineCommand, shouldInstallStatusline, runtime = 'claude', targetDir = null) {
   const isOpencode = runtime === 'opencode';
+  const isCodex = runtime === 'codex';
 
-  if (shouldInstallStatusline && !isOpencode) {
+  if (shouldInstallStatusline && !isOpencode && !isCodex) {
     settings.statusLine = {
       type: 'command',
       command: statuslineCommand
@@ -1502,8 +1651,10 @@ function finishInstall(settingsPath, settings, statuslineCommand, shouldInstallS
     console.log(`  ${green}✓${reset} Configured statusline`);
   }
 
-  // Always write settings
-  writeSettings(settingsPath, settings);
+  // Write settings for runtimes that use settings.json
+  if (!isCodex) {
+    writeSettings(settingsPath, settings);
+  }
 
   // Configure OpenCode permissions
   if (isOpencode) {
@@ -1513,6 +1664,21 @@ function finishInstall(settingsPath, settings, statuslineCommand, shouldInstallS
   let program = 'Claude Code';
   if (runtime === 'opencode') program = 'OpenCode';
   if (runtime === 'gemini') program = 'Gemini';
+  if (runtime === 'codex') program = 'Codex';
+
+  if (isCodex) {
+    const targetLabel = targetDir ? targetDir.replace(os.homedir(), '~') : '~/.codex';
+    const helpPath = targetDir
+      ? path.join(targetDir, 'prompts', 'gsd-help.md').replace(/\\/g, '/')
+      : '~/.codex/prompts/gsd-help.md';
+    console.log(`
+  ${green}Done!${reset} GSD has been installed for ${program} at ${cyan}${targetLabel}${reset}.
+  Start with ${cyan}/prompts:gsd-help${reset} (source: ${cyan}${helpPath}${reset}).
+
+  ${cyan}Join the community:${reset} https://discord.gg/5JJgD5svVS
+`);
+    return;
+  }
 
   const command = isOpencode ? '/gsd-help' : '/gsd:help';
   console.log(`
@@ -1595,15 +1761,18 @@ function promptRuntime(callback) {
   console.log(`  ${yellow}Which runtime(s) would you like to install for?${reset}\n\n  ${cyan}1${reset}) Claude Code ${dim}(~/.claude)${reset}
   ${cyan}2${reset}) OpenCode    ${dim}(~/.config/opencode)${reset} - open source, free models
   ${cyan}3${reset}) Gemini      ${dim}(~/.gemini)${reset}
-  ${cyan}4${reset}) All
+  ${cyan}4${reset}) Codex       ${dim}(~/.codex)${reset}
+  ${cyan}5${reset}) All
 `);
 
   rl.question(`  Choice ${dim}[1]${reset}: `, (answer) => {
     answered = true;
     rl.close();
     const choice = answer.trim() || '1';
-    if (choice === '4') {
-      callback(['claude', 'opencode', 'gemini']);
+    if (choice === '5') {
+      callback(['claude', 'opencode', 'gemini', 'codex']);
+    } else if (choice === '4') {
+      callback(['codex']);
     } else if (choice === '3') {
       callback(['gemini']);
     } else if (choice === '2') {
@@ -1682,22 +1851,32 @@ function installAllRuntimes(runtimes, isGlobal, isInteractive) {
     const primaryResult = claudeResult || geminiResult;
     
     handleStatusline(primaryResult.settings, isInteractive, (shouldInstallStatusline) => {
-      if (claudeResult) {
-        finishInstall(claudeResult.settingsPath, claudeResult.settings, claudeResult.statuslineCommand, shouldInstallStatusline, 'claude');
-      }
-      if (geminiResult) {
-         finishInstall(geminiResult.settingsPath, geminiResult.settings, geminiResult.statuslineCommand, shouldInstallStatusline, 'gemini');
-      }
-      
-      const opencodeResult = results.find(r => r.runtime === 'opencode');
-      if (opencodeResult) {
-        finishInstall(opencodeResult.settingsPath, opencodeResult.settings, opencodeResult.statuslineCommand, false, 'opencode');
+      for (const result of results) {
+        const applyStatusline = result.runtime === 'claude' || result.runtime === 'gemini'
+          ? shouldInstallStatusline
+          : false;
+        finishInstall(
+          result.settingsPath,
+          result.settings,
+          result.statuslineCommand,
+          applyStatusline,
+          result.runtime,
+          result.targetDir
+        );
       }
     });
   } else {
-    // Only OpenCode
-    const opencodeResult = results[0];
-    finishInstall(opencodeResult.settingsPath, opencodeResult.settings, opencodeResult.statuslineCommand, false, 'opencode');
+    // Runtimes without statusline integration (OpenCode/Codex)
+    for (const result of results) {
+      finishInstall(
+        result.settingsPath,
+        result.settings,
+        result.statuslineCommand,
+        false,
+        result.runtime,
+        result.targetDir
+      );
+    }
   }
 }
 
