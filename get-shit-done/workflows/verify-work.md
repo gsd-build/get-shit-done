@@ -555,6 +555,27 @@ Default to **major** if unclear. User can correct if needed.
 **Never ask "how severe is this?"** - just infer and move on.
 </severity_inference>
 
+<integration_health>
+## Integration Health Score
+
+After UAT testing completes, calculate integration health to quantify system quality:
+
+```bash
+SCORE=$(node ~/.claude/get-shit-done/bin/gsd-tools.js integration-score --raw)
+```
+
+The integration score uses the **5-state export model** (CONNECTED, IMPORTED_NOT_USED, ORPHANED, MISMATCHED, MISSING_EXPORT) to classify every export and calculates per-category scores for:
+- **Exports** -- percentage of exports in CONNECTED state
+- **API Coverage** -- percentage of routes with active consumers
+- **Auth Protection** -- percentage of sensitive routes with auth checks
+- **E2E Flows** -- percentage of user flows completing end-to-end
+
+Include the score in the UAT completion summary when a VERIFICATION.md exists.
+
+For CRUD entity verification, use the 10-step template:
+@~/.claude/get-shit-done/templates/crud-flow-verification.md
+</integration_health>
+
 <success_criteria>
 - [ ] UAT file created with all tests from SUMMARY.md
 - [ ] Tests presented one at a time with expected behavior
@@ -566,5 +587,6 @@ Default to **major** if unclear. User can correct if needed.
 - [ ] If issues: gsd-planner creates fix plans (gap_closure mode)
 - [ ] If issues: gsd-plan-checker verifies fix plans
 - [ ] If issues: revision loop until plans pass (max 3 iterations)
+- [ ] Integration health score calculated when VERIFICATION.md available
 - [ ] Ready for `/gsd:execute-phase --gaps-only` when complete
 </success_criteria>

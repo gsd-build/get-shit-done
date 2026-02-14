@@ -5100,3 +5100,225 @@ files-modified:
     assert.ok(result.error.includes('not found'), 'error mentions not found');
   });
 });
+
+// ─────────────────────────────────────────────────────────────────────────────
+// integration-score command
+// ─────────────────────────────────────────────────────────────────────────────
+
+describe('integration-score command', () => {
+  let tmpDir;
+
+  beforeEach(() => {
+    tmpDir = createTempProject();
+  });
+
+  afterEach(() => {
+    cleanup(tmpDir);
+  });
+
+  test('returns error when no report file found', () => {
+    const result = runGsdTools('integration-score', tmpDir);
+    assert.ok(result.success, `Command should succeed: ${result.error}`);
+
+    const output = JSON.parse(result.output);
+    assert.strictEqual(output.error, 'No integration report found');
+  });
+
+  test('returns error for non-existent explicit path', () => {
+    const result = runGsdTools('integration-score nonexistent.md', tmpDir);
+    assert.ok(result.success, `Command should succeed: ${result.error}`);
+
+    const output = JSON.parse(result.output);
+    assert.strictEqual(output.error, 'File not found');
+  });
+
+  test('parses 5-state export model from report', () => {
+    const phaseDir = path.join(tmpDir, '.planning', 'phases', '03-api');
+    fs.mkdirSync(phaseDir, { recursive: true });
+
+    fs.writeFileSync(
+      path.join(phaseDir, '03-VERIFICATION.md'),
+      `# Integration Check Complete
+
+### Wiring Summary (5-State Model)
+
+**CONNECTED:** 20 exports properly used
+**IMPORTED_NOT_USED:** 3 exports imported but never called
+**ORPHANED:** 2 exports created but unused
+**MISMATCHED:** 1 exports with signature mismatches
+**MISSING_EXPORT:** 1 imports referencing non-existent exports
+
+### API Coverage
+
+**Consumed:** 10 routes have callers
+**Orphaned:** 2 routes with no callers
+
+### Auth Protection
+
+**Protected:** 7 sensitive areas check auth
+**Unprotected:** 1 sensitive areas missing auth
+
+### E2E Flows
+
+**Complete:** 4 flows work end-to-end
+**Broken:** 1 flows have breaks
+`
+    );
+
+    const result = runGsdTools('integration-score', tmpDir);
+    assert.ok(result.success, `Command failed: ${result.error}`);
+
+    const output = JSON.parse(result.output);
+
+    // Check exports category
+    assert.strictEqual(output.categories.exports.total, 27, 'total exports');
+    assert.strictEqual(output.categories.exports.connected, 20, 'connected exports');
+    assert.strictEqual(output.categories.exports.imported_not_used, 3, 'imported_not_used');
+    assert.strictEqual(output.categories.exports.orphaned, 2, 'orphaned exports');
+    assert.strictEqual(output.categories.exports.mismatched, 1, 'mismatched');
+    assert.strictEqual(output.categories.exports.missing_export, 1, 'missing_export');
+    assert.strictEqual(output.categories.exports.score, 74, 'exports score = 20/27 = 74%');
+
+    // Check API coverage
+    assert.strictEqual(output.categories.api_coverage.total, 12, 'total APIs');
+    assert.strictEqual(output.categories.api_coverage.consumed, 10, 'consumed APIs');
+    assert.strictEqual(output.categories.api_coverage.score, 83, 'API score = 10/12 = 83%');
+
+    // Check auth protection
+    assert.strictEqual(output.categories.auth_protection.total, 8, 'total auth');
+    assert.strictEqual(output.categories.auth_protection.protected, 7, 'protected');
+    assert.strictEqual(output.categories.auth_protection.score, 88, 'auth score = 7/8 = 88%');
+
+    // Check E2E flows
+    assert.strictEqual(output.categories.e2e_flows.total, 5, 'total flows');
+    assert.strictEqual(output.categories.e2e_flows.complete, 4, 'complete flows');
+    assert.strictEqual(output.categories.e2e_flows.score, 80, 'flows score = 4/5 = 80%');
+
+    // Check overall
+    assert.strictEqual(output.category_count, 4, '4 categories');
+    // Overall = (74 + 83 + 88 + 80) / 4 = 81.25 => 81
+    assert.strictEqual(output.overall_score, 81, 'overall score');
+    assert.strictEqual(output.grade, 'B', 'grade B for 81%');
+  });
+
+  test('accepts explicit file path', () => {
+    const reportPath = path.join(tmpDir, 'report.md');
+    fs.writeFileSync(
+      reportPath,
+      `# Integration Report
+
+**CONNECTED:** 8 exports properly used
+**ORPHANED:** 2 exports created but unused
+
+**Consumed:** 5 routes have callers
+**Orphaned:** 0 routes with no callers
+
+**Complete:** 3 flows work end-to-end
+**Broken:** 0 flows have breaks
+`
+    );
+
+    const result = runGsdTools(`integration-score report.md`, tmpDir);
+    assert.ok(result.success, `Command failed: ${result.error}`);
+
+    const output = JSON.parse(result.output);
+    assert.strictEqual(output.categories.exports.connected, 8, 'connected from explicit path');
+    assert.strictEqual(output.categories.exports.orphaned, 2, 'orphaned from explicit path');
+    // exports: 8/10 = 80%, api: 5/5 = 100%, flows: 3/3 = 100%  => (80+100+100)/3 = 93.33 => 93
+    assert.strictEqual(output.overall_score, 93, 'overall score = (80+100+100)/3 = 93');
+  });
+
+  test('returns raw score with --raw flag', () => {
+    const reportPath = path.join(tmpDir, 'report.md');
+    fs.writeFileSync(
+      reportPath,
+      `# Report
+
+**CONNECTED:** 9 exports properly used
+**ORPHANED:** 1 exports unused
+
+**Complete:** 5 flows work end-to-end
+**Broken:** 0 flows have breaks
+`
+    );
+
+    const result = runGsdTools(`integration-score report.md --raw`, tmpDir);
+    assert.ok(result.success, `Command failed: ${result.error}`);
+    // Raw output should be just the score number
+    assert.ok(/^\d+$/.test(result.output), `raw output should be a number, got: ${result.output}`);
+  });
+
+  test('auto-discovers VERIFICATION.md in latest phase', () => {
+    // Create two phases, score should come from the latest
+    const phase02 = path.join(tmpDir, '.planning', 'phases', '02-api');
+    fs.mkdirSync(phase02, { recursive: true });
+    fs.writeFileSync(
+      path.join(phase02, '02-VERIFICATION.md'),
+      `# Old Report
+**CONNECTED:** 5 exports
+**ORPHANED:** 5 exports
+`
+    );
+
+    const phase03 = path.join(tmpDir, '.planning', 'phases', '03-ui');
+    fs.mkdirSync(phase03, { recursive: true });
+    fs.writeFileSync(
+      path.join(phase03, '03-VERIFICATION.md'),
+      `# Latest Report
+**CONNECTED:** 15 exports
+**ORPHANED:** 5 exports
+`
+    );
+
+    const result = runGsdTools('integration-score', tmpDir);
+    assert.ok(result.success, `Command failed: ${result.error}`);
+
+    const output = JSON.parse(result.output);
+    // Should find 03-ui (latest phase in reverse order)
+    assert.ok(output.path.includes('03-ui'), 'should use latest phase');
+    assert.strictEqual(output.categories.exports.connected, 15, 'connected from latest phase');
+  });
+
+  test('handles report with no parseable data', () => {
+    const reportPath = path.join(tmpDir, 'empty-report.md');
+    fs.writeFileSync(reportPath, '# Empty Report\n\nNo structured data here.\n');
+
+    const result = runGsdTools('integration-score empty-report.md', tmpDir);
+    assert.ok(result.success, `Command failed: ${result.error}`);
+
+    const output = JSON.parse(result.output);
+    assert.strictEqual(output.category_count, 0, 'no categories parsed');
+    assert.strictEqual(output.overall_score, 0, 'score is 0 with no data');
+    assert.strictEqual(output.grade, 'F', 'grade F for 0%');
+  });
+
+  test('grade boundaries are correct', () => {
+    // Test grade A (>= 90)
+    const reportA = path.join(tmpDir, 'a.md');
+    fs.writeFileSync(reportA, '**CONNECTED:** 95 exports\n**ORPHANED:** 5 exports\n');
+    const resultA = runGsdTools('integration-score a.md', tmpDir);
+    const outputA = JSON.parse(resultA.output);
+    assert.strictEqual(outputA.grade, 'A', '95% should be A');
+
+    // Test grade C (70-79)
+    const reportC = path.join(tmpDir, 'c.md');
+    fs.writeFileSync(reportC, '**CONNECTED:** 75 exports\n**ORPHANED:** 25 exports\n');
+    const resultC = runGsdTools('integration-score c.md', tmpDir);
+    const outputC = JSON.parse(resultC.output);
+    assert.strictEqual(outputC.grade, 'C', '75% should be C');
+
+    // Test grade D (60-69)
+    const reportD = path.join(tmpDir, 'd.md');
+    fs.writeFileSync(reportD, '**CONNECTED:** 65 exports\n**ORPHANED:** 35 exports\n');
+    const resultD = runGsdTools('integration-score d.md', tmpDir);
+    const outputD = JSON.parse(resultD.output);
+    assert.strictEqual(outputD.grade, 'D', '65% should be D');
+
+    // Test grade F (< 60)
+    const reportF = path.join(tmpDir, 'f.md');
+    fs.writeFileSync(reportF, '**CONNECTED:** 50 exports\n**ORPHANED:** 50 exports\n');
+    const resultF = runGsdTools('integration-score f.md', tmpDir);
+    const outputF = JSON.parse(resultF.output);
+    assert.strictEqual(outputF.grade, 'F', '50% should be F');
+  });
+});

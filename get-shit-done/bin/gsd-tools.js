@@ -26,6 +26,8 @@
  *   summary-extract <path> [--fields]  Extract structured data from SUMMARY.md
  *   state-snapshot                     Structured parse of STATE.md
  *   phase-plan-index <phase>           Index plans with waves and status
+ *   integration-score [path]             Calculate integration health score
+ *     [--raw]                            from VERIFICATION.md or integration report
  *   websearch <query>                  Search web via Brave API (if configured)
  *     [--limit N] [--freshness day|week|month]
  *
@@ -2324,6 +2326,215 @@ function cmdSummaryExtract(cwd, summaryPath, fields, raw) {
   }
 
   output(fullResult, raw);
+}
+
+// ─── Integration Score ───────────────────────────────────────────────────────
+
+function cmdIntegrationScore(cwd, filePath, raw) {
+  // Find the integration report file
+  let reportPath;
+  if (filePath) {
+    reportPath = path.isAbsolute(filePath) ? filePath : path.join(cwd, filePath);
+  } else {
+    // Auto-discover: look for VERIFICATION.md files in .planning/phases
+    const phasesDir = path.join(cwd, '.planning', 'phases');
+    let found = null;
+    try {
+      const phaseDirs = fs.readdirSync(phasesDir).filter(d => {
+        try { return fs.statSync(path.join(phasesDir, d)).isDirectory(); } catch { return false; }
+      });
+      // Search in reverse order (latest phase first)
+      for (const dir of phaseDirs.reverse()) {
+        const dirPath = path.join(phasesDir, dir);
+        const files = fs.readdirSync(dirPath);
+        const verFile = files.find(f => f.endsWith('-VERIFICATION.md') || f === 'VERIFICATION.md');
+        if (verFile) {
+          found = path.join(dirPath, verFile);
+          break;
+        }
+      }
+    } catch {
+      // phasesDir doesn't exist
+    }
+    if (!found) {
+      output({ error: 'No integration report found', hint: 'Provide a path or create a VERIFICATION.md' }, raw);
+      return;
+    }
+    reportPath = found;
+  }
+
+  if (!fs.existsSync(reportPath)) {
+    output({ error: 'File not found', path: filePath || reportPath }, raw);
+    return;
+  }
+
+  const content = fs.readFileSync(reportPath, 'utf-8');
+
+  // Parse integration categories from markdown content
+  const categories = {};
+
+  // Split content into sections by markdown headings for context-aware parsing
+  const lines = content.split('\n');
+
+  // Helper: extract a bold-label count from a line, e.g. **CONNECTED:** 20
+  // Handles **KEY:** N, **KEY**: N, **KEY** N patterns
+  // Also extracts the context text after the number for disambiguation
+  const extractBoldCount = (line) => {
+    const m = line.match(/\*\*([^*]+?):?\*\*:?\s*(\d+)\s*(.*)/);
+    if (m) return { label: m[1].trim().toUpperCase(), count: parseInt(m[2], 10), context: m[3].trim().toLowerCase() };
+    return null;
+  };
+
+  // Build a map of { label: count } per section
+  // Sections are delimited by ### headings
+  // When duplicate labels appear in same section, use context to create qualified keys
+  let currentSection = '';
+  const sectionData = {};
+
+  for (const line of lines) {
+    const headingMatch = line.match(/^#{1,4}\s+(.+)/);
+    if (headingMatch) {
+      currentSection = headingMatch[1].trim().toLowerCase();
+      if (!sectionData[currentSection]) sectionData[currentSection] = {};
+      continue;
+    }
+    const extracted = extractBoldCount(line);
+    if (extracted) {
+      if (!sectionData[currentSection]) sectionData[currentSection] = {};
+      const key = extracted.label;
+      if (sectionData[currentSection][key] !== undefined) {
+        // Duplicate label in same section -- qualify with context
+        // e.g., ORPHANED appearing twice: once for exports, once for routes
+        if (extracted.context.includes('route') || extracted.context.includes('call') || extracted.context.includes('api')) {
+          sectionData[currentSection][key + '_API'] = extracted.count;
+        } else {
+          sectionData[currentSection][key + '_DUP'] = extracted.count;
+        }
+      } else {
+        sectionData[currentSection][key] = extracted.count;
+      }
+    }
+  }
+
+  // Helper to find data in any section matching a keyword
+  const findInSection = (sectionKeyword, label) => {
+    for (const [section, data] of Object.entries(sectionData)) {
+      if (section.includes(sectionKeyword) && data[label] !== undefined) {
+        return data[label];
+      }
+    }
+    return 0;
+  };
+
+  // Helper to find data across all sections (fallback for flat reports)
+  const findAnywhere = (label) => {
+    for (const data of Object.values(sectionData)) {
+      if (data[label] !== undefined) return data[label];
+    }
+    return 0;
+  };
+
+  // --- Exports category ---
+  // Look in "wiring" or "export" sections first, then fall back to anywhere
+  const connectedCount = findInSection('wiring', 'CONNECTED') || findInSection('export', 'CONNECTED') || findAnywhere('CONNECTED');
+  const importedNotUsedCount = findInSection('wiring', 'IMPORTED_NOT_USED') || findInSection('export', 'IMPORTED_NOT_USED') || findAnywhere('IMPORTED_NOT_USED');
+  const mismatchedCount = findInSection('wiring', 'MISMATCHED') || findInSection('export', 'MISMATCHED') || findAnywhere('MISMATCHED');
+  const missingExportCount = findInSection('wiring', 'MISSING_EXPORT') || findInSection('export', 'MISSING_EXPORT') || findAnywhere('MISSING_EXPORT');
+
+  // For ORPHANED in exports: prefer wiring/export section to avoid counting API orphans
+  const orphanedExports = findInSection('wiring', 'ORPHANED') || findInSection('export', 'ORPHANED') || (() => {
+    // Fallback: if no API section exists, use the global ORPHANED count
+    const hasApiSection = Object.keys(sectionData).some(s => s.includes('api'));
+    if (!hasApiSection) return findAnywhere('ORPHANED');
+    return 0;
+  })();
+
+  const totalExports = connectedCount + importedNotUsedCount + orphanedExports + mismatchedCount + missingExportCount;
+
+  if (totalExports > 0) {
+    categories.exports = {
+      total: totalExports,
+      connected: connectedCount,
+      imported_not_used: importedNotUsedCount,
+      orphaned: orphanedExports,
+      mismatched: mismatchedCount,
+      missing_export: missingExportCount,
+      score: Math.round((connectedCount / totalExports) * 100),
+    };
+  }
+
+  // --- API Coverage category ---
+  const consumedApis = findInSection('api', 'CONSUMED') || findAnywhere('CONSUMED');
+  const orphanedApis = findInSection('api', 'ORPHANED') || findAnywhere('ORPHANED_API') || 0;
+
+  const totalApis = consumedApis + orphanedApis;
+  if (totalApis > 0) {
+    categories.api_coverage = {
+      total: totalApis,
+      consumed: consumedApis,
+      orphaned: orphanedApis,
+      score: Math.round((consumedApis / totalApis) * 100),
+    };
+  }
+
+  // --- Auth Protection category ---
+  const protectedRoutes = findInSection('auth', 'PROTECTED') || findAnywhere('PROTECTED');
+  const unprotectedRoutes = findInSection('auth', 'UNPROTECTED') || findAnywhere('UNPROTECTED');
+
+  const totalAuth = protectedRoutes + unprotectedRoutes;
+  if (totalAuth > 0) {
+    categories.auth_protection = {
+      total: totalAuth,
+      protected: protectedRoutes,
+      unprotected: unprotectedRoutes,
+      score: Math.round((protectedRoutes / totalAuth) * 100),
+    };
+  }
+
+  // --- E2E Flows category ---
+  const completeFlows = findInSection('e2e', 'COMPLETE') || findInSection('flow', 'COMPLETE') || findAnywhere('COMPLETE');
+  const brokenFlows = findInSection('e2e', 'BROKEN') || findInSection('flow', 'BROKEN') || findAnywhere('BROKEN');
+
+  const totalFlows = completeFlows + brokenFlows;
+  if (totalFlows > 0) {
+    categories.e2e_flows = {
+      total: totalFlows,
+      complete: completeFlows,
+      broken: brokenFlows,
+      score: Math.round((completeFlows / totalFlows) * 100),
+    };
+  }
+
+  // --- Also try to parse explicit score table ---
+  // Matches: | Exports | 80% | 20/25 connected |
+  const scoreTablePattern = /\|\s*(\w[\w\s]*?)\s*\|\s*(\d+)%\s*\|/g;
+  let tableMatch;
+  while ((tableMatch = scoreTablePattern.exec(content)) !== null) {
+    const catName = tableMatch[1].trim().toLowerCase().replace(/\s+/g, '_');
+    const catScore = parseInt(tableMatch[2], 10);
+    if (!categories[catName]) {
+      categories[catName] = { score: catScore };
+    }
+  }
+
+  // Calculate overall score
+  const catKeys = Object.keys(categories);
+  let overallScore = 0;
+
+  if (catKeys.length > 0) {
+    const totalScore = catKeys.reduce((sum, key) => sum + (categories[key].score || 0), 0);
+    overallScore = Math.round(totalScore / catKeys.length);
+  }
+
+  const result = {
+    path: path.relative(cwd, reportPath),
+    categories,
+    category_count: catKeys.length,
+    overall_score: overallScore,
+    grade: overallScore >= 90 ? 'A' : overallScore >= 80 ? 'B' : overallScore >= 70 ? 'C' : overallScore >= 60 ? 'D' : 'F',
+  };
+
+  output(result, raw, raw ? String(overallScore) : undefined);
 }
 
 // ─── Web Search (Brave API) ──────────────────────────────────────────────────
@@ -6086,6 +6297,11 @@ async function main() {
       const fieldsIndex = args.indexOf('--fields');
       const fields = fieldsIndex !== -1 ? args[fieldsIndex + 1].split(',') : null;
       cmdSummaryExtract(cwd, summaryPath, fields, raw);
+      break;
+    }
+
+    case 'integration-score': {
+      cmdIntegrationScore(cwd, args[1], raw);
       break;
     }
 
