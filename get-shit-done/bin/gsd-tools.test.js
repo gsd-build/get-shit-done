@@ -4891,3 +4891,215 @@ describe('JSONL rotation', () => {
     assert.ok(finalLines.length <= 100, `Expected <= 100 lines, got ${finalLines.length}`);
   });
 });
+
+// ─────────────────────────────────────────────────────────────────────────────
+// verify cross-plan-conflicts command
+// ─────────────────────────────────────────────────────────────────────────────
+
+describe('verify cross-plan-conflicts command', () => {
+  let tmpDir;
+
+  beforeEach(() => {
+    tmpDir = createTempProject();
+  });
+
+  afterEach(() => {
+    cleanup(tmpDir);
+  });
+
+  test('empty phase directory returns clean with zero plans', () => {
+    const phaseDir = path.join(tmpDir, '.planning', 'phases', '03-api');
+    fs.mkdirSync(phaseDir, { recursive: true });
+
+    const result = runGsdTools(`verify cross-plan-conflicts "${phaseDir}"`, tmpDir);
+    assert.ok(result.success, `Command failed: ${result.error}`);
+
+    const output = JSON.parse(result.output);
+    assert.strictEqual(output.plans_checked, 0, 'no plans to check');
+    assert.strictEqual(output.conflict_count, 0, 'no conflicts');
+    assert.strictEqual(output.warning_count, 0, 'no warnings');
+    assert.strictEqual(output.files_analyzed, 0, 'no files analyzed');
+  });
+
+  test('single plan has no conflicts', () => {
+    const phaseDir = path.join(tmpDir, '.planning', 'phases', '03-api');
+    fs.mkdirSync(phaseDir, { recursive: true });
+
+    fs.writeFileSync(
+      path.join(phaseDir, '03-01-PLAN.md'),
+      `---
+wave: 1
+autonomous: true
+---
+
+## Task 1: Create schema
+
+Modify \`src/lib/db.ts\` and \`prisma/schema.prisma\`.
+`
+    );
+
+    const result = runGsdTools(`verify cross-plan-conflicts "${phaseDir}"`, tmpDir);
+    assert.ok(result.success, `Command failed: ${result.error}`);
+
+    const output = JSON.parse(result.output);
+    assert.strictEqual(output.plans_checked, 1, 'one plan checked');
+    assert.strictEqual(output.conflict_count, 0, 'no conflicts with single plan');
+  });
+
+  test('detects file overlap between two plans', () => {
+    const phaseDir = path.join(tmpDir, '.planning', 'phases', '03-api');
+    fs.mkdirSync(phaseDir, { recursive: true });
+
+    fs.writeFileSync(
+      path.join(phaseDir, '03-01-PLAN.md'),
+      `---
+wave: 1
+---
+
+## Task 1: Setup auth
+
+Modify \`src/lib/auth.ts\` and \`src/middleware.ts\`.
+`
+    );
+
+    fs.writeFileSync(
+      path.join(phaseDir, '03-02-PLAN.md'),
+      `---
+wave: 2
+---
+
+## Task 1: Add session handling
+
+Modify \`src/lib/auth.ts\` and \`src/lib/session.ts\`.
+`
+    );
+
+    const result = runGsdTools(`verify cross-plan-conflicts "${phaseDir}"`, tmpDir);
+    assert.ok(result.success, `Command failed: ${result.error}`);
+
+    const output = JSON.parse(result.output);
+    assert.strictEqual(output.plans_checked, 2, 'two plans checked');
+    assert.strictEqual(output.conflict_count, 1, 'one file overlap');
+    assert.strictEqual(output.conflicts[0].file, 'src/lib/auth.ts', 'conflicting file identified');
+    assert.deepStrictEqual(
+      output.conflicts[0].plans.sort(),
+      ['03-01-PLAN.md', '03-02-PLAN.md'],
+      'both plans listed'
+    );
+    assert.strictEqual(output.conflicts[0].type, 'file_overlap', 'correct conflict type');
+  });
+
+  test('two plans with no overlapping files report clean', () => {
+    const phaseDir = path.join(tmpDir, '.planning', 'phases', '03-api');
+    fs.mkdirSync(phaseDir, { recursive: true });
+
+    fs.writeFileSync(
+      path.join(phaseDir, '03-01-PLAN.md'),
+      `---
+wave: 1
+---
+
+## Task 1: Database setup
+
+Modify \`prisma/schema.prisma\` and \`src/lib/db.ts\`.
+`
+    );
+
+    fs.writeFileSync(
+      path.join(phaseDir, '03-02-PLAN.md'),
+      `---
+wave: 1
+---
+
+## Task 1: UI components
+
+Modify \`src/components/Header.tsx\` and \`src/components/Footer.tsx\`.
+`
+    );
+
+    const result = runGsdTools(`verify cross-plan-conflicts "${phaseDir}"`, tmpDir);
+    assert.ok(result.success, `Command failed: ${result.error}`);
+
+    const output = JSON.parse(result.output);
+    assert.strictEqual(output.plans_checked, 2, 'two plans checked');
+    assert.strictEqual(output.conflict_count, 0, 'no conflicts');
+    assert.strictEqual(output.files_analyzed, 4, 'four unique files analyzed');
+  });
+
+  test('detects duplicate task descriptions across plans', () => {
+    const phaseDir = path.join(tmpDir, '.planning', 'phases', '03-api');
+    fs.mkdirSync(phaseDir, { recursive: true });
+
+    fs.writeFileSync(
+      path.join(phaseDir, '03-01-PLAN.md'),
+      `---
+wave: 1
+---
+
+## Task 1: Create user authentication
+`
+    );
+
+    fs.writeFileSync(
+      path.join(phaseDir, '03-02-PLAN.md'),
+      `---
+wave: 2
+---
+
+## Task 1: Create user authentication
+`
+    );
+
+    const result = runGsdTools(`verify cross-plan-conflicts "${phaseDir}"`, tmpDir);
+    assert.ok(result.success, `Command failed: ${result.error}`);
+
+    const output = JSON.parse(result.output);
+    assert.ok(output.warning_count > 0, 'should detect duplicate task');
+    assert.strictEqual(output.warnings[0].type, 'duplicate_task', 'correct warning type');
+  });
+
+  test('extracts file refs from YAML arrays and path: fields', () => {
+    const phaseDir = path.join(tmpDir, '.planning', 'phases', '03-api');
+    fs.mkdirSync(phaseDir, { recursive: true });
+
+    fs.writeFileSync(
+      path.join(phaseDir, '03-01-PLAN.md'),
+      `---
+wave: 1
+must_haves:
+  artifacts:
+    - path: "src/app/api/auth/route.ts"
+      provides: "Auth endpoint"
+---
+
+## Task 1: Auth endpoint
+`
+    );
+
+    fs.writeFileSync(
+      path.join(phaseDir, '03-02-PLAN.md'),
+      `---
+wave: 2
+files-modified:
+  - src/app/api/auth/route.ts
+  - src/lib/session.ts
+---
+
+## Task 1: Session handling
+`
+    );
+
+    const result = runGsdTools(`verify cross-plan-conflicts "${phaseDir}"`, tmpDir);
+    assert.ok(result.success, `Command failed: ${result.error}`);
+
+    const output = JSON.parse(result.output);
+    assert.strictEqual(output.conflict_count, 1, 'should detect overlap from path: and YAML array');
+    assert.strictEqual(output.conflicts[0].file, 'src/app/api/auth/route.ts', 'correct file');
+  });
+
+  test('errors on missing directory', () => {
+    const result = runGsdTools('verify cross-plan-conflicts nonexistent/path', tmpDir);
+    assert.ok(!result.success, 'should fail for missing directory');
+    assert.ok(result.error.includes('not found'), 'error mentions not found');
+  });
+});

@@ -87,6 +87,7 @@
  *   verify commits <h1> [h2] ...      Batch verify commit hashes
  *   verify artifacts <plan-file>       Check must_haves.artifacts
  *   verify key-links <plan-file>       Check must_haves.key_links
+ *   verify cross-plan-conflicts <dir>  Check for conflicts between plans
  *
  * Template Fill:
  *   template fill summary --phase N    Create pre-filled SUMMARY.md
@@ -2743,6 +2744,125 @@ function cmdVerifyKeyLinks(cwd, planFilePath, raw) {
     total: results.length,
     links: results,
   }, raw, verified === results.length ? 'valid' : 'invalid');
+}
+
+function cmdVerifyCrossPlanConflicts(cwd, phaseDirPath, raw) {
+  if (!phaseDirPath) { error('phase-dir path required'); }
+
+  const phaseDir = path.isAbsolute(phaseDirPath) ? phaseDirPath : path.resolve(cwd, phaseDirPath);
+  if (!fs.existsSync(phaseDir)) { error(`Phase directory not found: ${phaseDirPath}`); }
+
+  // Find all PLAN.md files
+  let dirEntries;
+  try { dirEntries = fs.readdirSync(phaseDir); } catch { error(`Cannot read directory: ${phaseDirPath}`); }
+  const planFiles = dirEntries.filter(f => f.endsWith('-PLAN.md')).sort();
+
+  // For each plan, extract file references and task descriptions
+  const planData = planFiles.map(f => {
+    const content = fs.readFileSync(path.join(phaseDir, f), 'utf-8');
+    const fileRefs = extractPlanFileReferences(content);
+    const tasks = extractPlanTasks(content);
+    return { file: f, fileRefs, tasks };
+  });
+
+  // Build map: referenced file -> list of plans that reference it
+  const fileMap = {};
+  for (const plan of planData) {
+    for (const ref of plan.fileRefs) {
+      if (!fileMap[ref]) fileMap[ref] = [];
+      fileMap[ref].push(plan.file);
+    }
+  }
+
+  // Detect conflicts: files referenced by multiple plans
+  const conflicts = [];
+  for (const [file, plans] of Object.entries(fileMap)) {
+    if (plans.length > 1) {
+      conflicts.push({ file, plans, type: 'file_overlap' });
+    }
+  }
+
+  // Detect duplicate task descriptions across plans
+  const warnings = [];
+  for (let i = 0; i < planData.length; i++) {
+    for (let j = i + 1; j < planData.length; j++) {
+      for (const taskA of planData[i].tasks) {
+        for (const taskB of planData[j].tasks) {
+          const a = taskA.toLowerCase().trim();
+          const b = taskB.toLowerCase().trim();
+          if (a === b || (a.length > 10 && b.length > 10 && (a.includes(b) || b.includes(a)))) {
+            warnings.push({
+              type: 'duplicate_task',
+              task: taskA,
+              plans: [planData[i].file, planData[j].file],
+            });
+          }
+        }
+      }
+    }
+  }
+
+  output({
+    conflicts,
+    conflict_count: conflicts.length,
+    warnings,
+    warning_count: warnings.length,
+    plans_checked: planFiles.length,
+    files_analyzed: Object.keys(fileMap).length,
+  }, raw, conflicts.length === 0 && warnings.length === 0 ? 'clean' : `${conflicts.length} conflicts, ${warnings.length} warnings`);
+}
+
+// Extract file path references from plan content
+function extractPlanFileReferences(content) {
+  const refs = new Set();
+
+  // Match backtick-quoted paths with extensions (e.g., `src/lib/db.ts`)
+  const backtickPaths = content.match(/`([^`\s]+\/[^`\s]+\.[a-zA-Z]{1,10})`/g) || [];
+  for (const m of backtickPaths) {
+    const p = m.slice(1, -1);
+    if (!p.startsWith('http') && !p.includes('${') && !p.includes('{{')) {
+      refs.add(p);
+    }
+  }
+
+  // Match paths in YAML arrays: - path/to/file.ext or - "path/to/file.ext"
+  const yamlPaths = content.match(/^\s*-\s+["']?([^\s"'\n]+\/[^\s"'\n]+\.[a-zA-Z]{1,10})["']?\s*$/gm) || [];
+  for (const m of yamlPaths) {
+    const p = m.replace(/^\s*-\s+["']?/, '').replace(/["']?\s*$/, '');
+    if (!p.startsWith('http') && !p.startsWith('#') && !p.includes('${')) {
+      refs.add(p);
+    }
+  }
+
+  // Match path: "..." in YAML (artifact definitions)
+  const pathYaml = content.match(/path:\s*["']?([^\s"'\n]+\/[^\s"'\n]+\.[a-zA-Z]{1,10})["']?/g) || [];
+  for (const m of pathYaml) {
+    const p = m.replace(/^path:\s*["']?/, '').replace(/["']?\s*$/, '');
+    refs.add(p);
+  }
+
+  return [...refs];
+}
+
+// Extract task names/descriptions from plan content
+function extractPlanTasks(content) {
+  const tasks = [];
+
+  // Match <task name="..."> elements
+  const taskElements = content.match(/<task\s+[^>]*name=["']([^"']+)["'][^>]*>/g) || [];
+  for (const m of taskElements) {
+    const nameMatch = m.match(/name=["']([^"']+)["']/);
+    if (nameMatch) tasks.push(nameMatch[1]);
+  }
+
+  // Match ## Task N: Description headings
+  const taskHeadings = content.match(/^##\s+Task\s+\d+[:.]\s*(.+)$/gm) || [];
+  for (const m of taskHeadings) {
+    const desc = m.replace(/^##\s+Task\s+\d+[:.]\s*/, '').trim();
+    if (desc) tasks.push(desc);
+  }
+
+  return tasks;
 }
 
 // ─── Roadmap Analysis ─────────────────────────────────────────────────────────
@@ -5693,8 +5813,10 @@ async function main() {
         cmdVerifyArtifacts(cwd, args[2], raw);
       } else if (subcommand === 'key-links') {
         cmdVerifyKeyLinks(cwd, args[2], raw);
+      } else if (subcommand === 'cross-plan-conflicts') {
+        cmdVerifyCrossPlanConflicts(cwd, args[2], raw);
       } else {
-        error('Unknown verify subcommand. Available: plan-structure, phase-completeness, references, commits, artifacts, key-links');
+        error('Unknown verify subcommand. Available: plan-structure, phase-completeness, references, commits, artifacts, key-links, cross-plan-conflicts');
       }
       break;
     }

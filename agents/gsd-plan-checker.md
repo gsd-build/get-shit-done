@@ -291,6 +291,43 @@ issue:
   fix_hint: "Remove search task - belongs in future phase per user decision"
 ```
 
+## Dimension 8: Cross-Plan Conflict Detection
+
+**Question:** Do plans within the same phase conflict with each other?
+
+**Process:**
+1. Run `verify cross-plan-conflicts` on the phase directory
+2. Check for file modification overlaps between plans
+3. Verify task ordering does not create circular dependencies
+4. Check that plans within the same phase do not duplicate work
+
+```bash
+node ~/.claude/get-shit-done/bin/gsd-tools.js verify cross-plan-conflicts "$phase_dir"
+```
+
+Returns JSON: `{ conflicts, conflict_count, warnings, warning_count, plans_checked, files_analyzed }`
+
+**Red flags:**
+- Two plans modify the same file (merge conflicts during execution)
+- Duplicate task descriptions across plans (redundant work)
+- Plans with circular `depends_on` references (deadlock during execution)
+
+**Conflict resolution guidance:**
+- File overlap is acceptable if plans operate on different sections (e.g., adding different exports to an index file)
+- File overlap is a blocker if plans modify the same functions/sections
+- Duplicate tasks always need resolution (consolidate into one plan or differentiate)
+
+**Example issue:**
+```yaml
+issue:
+  dimension: cross_plan_conflicts
+  severity: warning
+  description: "Plans 01 and 03 both modify src/lib/auth.ts"
+  plans: ["01", "03"]
+  file: "src/lib/auth.ts"
+  fix_hint: "Consolidate auth changes into plan 01 or ensure non-overlapping modifications"
+```
+
 </verification_dimensions>
 
 <verification_process>
@@ -427,7 +464,21 @@ grep "files_modified:" "$PHASE_DIR"/$PHASE-01-PLAN.md
 
 Thresholds: 2-3 tasks/plan good, 4 warning, 5+ blocker (split required).
 
-## Step 9: Verify must_haves Derivation
+## Step 9: Check Cross-Plan Conflicts
+
+```bash
+CONFLICTS=$(node ~/.claude/get-shit-done/bin/gsd-tools.js verify cross-plan-conflicts "$phase_dir")
+echo "$CONFLICTS"
+```
+
+Parse JSON result for `conflict_count` and `warning_count`:
+- If `conflict_count > 0`: Review each file overlap. Determine if plans modify overlapping sections (blocker) or different sections (acceptable).
+- If `warning_count > 0`: Check for duplicate tasks across plans. Recommend consolidation.
+- If both are 0: Cross-plan verification passed.
+
+Map issues to dimension `cross_plan_conflicts` with appropriate severity.
+
+## Step 10: Verify must_haves Derivation
 
 **Truths:** user-observable (not "bcrypt installed" but "passwords are secure"), testable, specific.
 
@@ -435,9 +486,9 @@ Thresholds: 2-3 tasks/plan good, 4 warning, 5+ blocker (split required).
 
 **Key_links:** connect dependent artifacts, specify method (fetch, Prisma, import), cover critical wiring.
 
-## Step 10: Determine Overall Status
+## Step 11: Determine Overall Status
 
-**passed:** All requirements covered, all tasks complete, dependency graph valid, key links planned, scope within budget, must_haves properly derived.
+**passed:** All requirements covered, all tasks complete, dependency graph valid, key links planned, scope within budget, must_haves properly derived, no cross-plan conflicts.
 
 **issues_found:** One or more blockers or warnings. Plans need revision.
 
@@ -610,6 +661,7 @@ Plan verification complete when:
 - [ ] Dependency graph verified (no cycles, valid references)
 - [ ] Key links checked (wiring planned, not just artifacts)
 - [ ] Scope assessed (within context budget)
+- [ ] Cross-plan conflicts checked (no file overlaps or duplicate tasks)
 - [ ] must_haves derivation verified (user-observable truths)
 - [ ] Context compliance checked (if CONTEXT.md provided):
   - [ ] Locked decisions have implementing tasks
