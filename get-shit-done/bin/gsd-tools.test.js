@@ -2031,3 +2031,476 @@ describe('scaffold command', () => {
     assert.strictEqual(output.reason, 'already_exists');
   });
 });
+
+// ─────────────────────────────────────────────────────────────────────────────
+// tdd config schema
+// ─────────────────────────────────────────────────────────────────────────────
+
+describe('tdd config schema', () => {
+  // These tests read the ACTUAL config files in the repo (not temp copies)
+  // to validate the TDD integration added in Phase 2.
+
+  test('templates/config.json has tdd section with correct structure', () => {
+    const configPath = path.join(__dirname, '..', 'templates', 'config.json');
+    const config = JSON.parse(fs.readFileSync(configPath, 'utf-8'));
+
+    // tdd section exists
+    assert.ok(config.tdd, 'tdd section must exist');
+    assert.strictEqual(typeof config.tdd.enabled, 'boolean', 'tdd.enabled must be boolean');
+    assert.strictEqual(config.tdd.enabled, true, 'tdd.enabled defaults to true (opt-out model)');
+
+    // python subsection
+    assert.ok(config.tdd.python, 'tdd.python section must exist');
+    assert.strictEqual(typeof config.tdd.python.auto_activate, 'boolean', 'auto_activate must be boolean');
+    assert.strictEqual(config.tdd.python.auto_activate, true, 'auto_activate defaults to true');
+    assert.strictEqual(typeof config.tdd.python.coverage_threshold, 'number', 'coverage_threshold must be number');
+    assert.strictEqual(config.tdd.python.coverage_threshold, 80, 'coverage_threshold defaults to 80');
+    assert.strictEqual(typeof config.tdd.python.test_directory, 'string', 'test_directory must be string');
+    assert.strictEqual(config.tdd.python.test_directory, 'tests', 'test_directory defaults to tests');
+  });
+
+  test('.planning/config.json has tdd section with correct structure', () => {
+    const configPath = path.join(__dirname, '..', '.planning', 'config.json');
+    const config = JSON.parse(fs.readFileSync(configPath, 'utf-8'));
+
+    // tdd section exists
+    assert.ok(config.tdd, 'tdd section must exist');
+    assert.strictEqual(typeof config.tdd.enabled, 'boolean', 'tdd.enabled must be boolean');
+    assert.strictEqual(config.tdd.enabled, true, 'tdd.enabled defaults to true');
+
+    // python subsection
+    assert.ok(config.tdd.python, 'tdd.python section must exist');
+    assert.strictEqual(config.tdd.python.auto_activate, true, 'auto_activate matches template');
+    assert.strictEqual(config.tdd.python.coverage_threshold, 80, 'coverage_threshold matches template');
+    assert.strictEqual(config.tdd.python.test_directory, 'tests', 'test_directory matches template');
+  });
+
+  test('both config files have identical tdd sections', () => {
+    const templateConfig = JSON.parse(
+      fs.readFileSync(path.join(__dirname, '..', 'templates', 'config.json'), 'utf-8')
+    );
+    const projectConfig = JSON.parse(
+      fs.readFileSync(path.join(__dirname, '..', '.planning', 'config.json'), 'utf-8')
+    );
+
+    assert.deepStrictEqual(
+      projectConfig.tdd,
+      templateConfig.tdd,
+      'tdd sections must be identical between template and project config'
+    );
+  });
+
+  test('tdd section has exactly the expected keys (no extras)', () => {
+    const config = JSON.parse(
+      fs.readFileSync(path.join(__dirname, '..', 'templates', 'config.json'), 'utf-8')
+    );
+
+    const tddKeys = Object.keys(config.tdd).sort();
+    assert.deepStrictEqual(tddKeys, ['enabled', 'python'], 'tdd has only enabled and python keys');
+
+    const pythonKeys = Object.keys(config.tdd.python).sort();
+    assert.deepStrictEqual(
+      pythonKeys,
+      ['auto_activate', 'coverage_threshold', 'test_directory'],
+      'tdd.python has exactly auto_activate, coverage_threshold, test_directory'
+    );
+  });
+});
+
+// ─────────────────────────────────────────────────────────────────────────────
+// tdd plan template structure
+// ─────────────────────────────────────────────────────────────────────────────
+
+describe('tdd plan template structure', () => {
+  // Validates templates/tdd-plan.md has all required sections
+  // for RED-GREEN-REFACTOR TDD execution (Phase 2 deliverable).
+
+  let templateContent;
+
+  beforeEach(() => {
+    templateContent = fs.readFileSync(
+      path.join(__dirname, '..', 'templates', 'tdd-plan.md'),
+      'utf-8'
+    );
+  });
+
+  test('template has RED-GREEN-REFACTOR sections in tdd_cycle', () => {
+    assert.ok(templateContent.includes('## RED: Write Failing Test'), 'RED section must exist');
+    assert.ok(templateContent.includes('## GREEN: Write Minimal Implementation'), 'GREEN section must exist');
+    assert.ok(templateContent.includes('## REFACTOR: Clean Up'), 'REFACTOR section must exist');
+  });
+
+  test('each phase has a GATE check', () => {
+    // Count GATE occurrences -- at least 3 (RED, GREEN, REFACTOR)
+    const gateMatches = templateContent.match(/\*\*GATE.*?\*\*/g);
+    assert.ok(gateMatches, 'GATE checks must exist');
+    assert.ok(gateMatches.length >= 3, `Expected at least 3 GATE checks, found ${gateMatches.length}`);
+
+    // Verify specific gate conditions
+    assert.ok(templateContent.includes('Test MUST fail'), 'RED gate: test must fail');
+    assert.ok(templateContent.includes('Test MUST pass'), 'GREEN gate: test must pass');
+    assert.ok(templateContent.includes('ALL tests MUST still pass'), 'REFACTOR gate: all tests must pass');
+  });
+
+  test('template includes required skill references in execution_context', () => {
+    assert.ok(templateContent.includes('references/tdd.md'), 'must reference tdd.md');
+    assert.ok(templateContent.includes('pytest-writer/SKILL.md'), 'must reference pytest-writer skill');
+    assert.ok(
+      templateContent.includes('test-driven-development/SKILL.md'),
+      'must reference test-driven-development skill'
+    );
+  });
+
+  test('template has infrastructure section for first-time setup', () => {
+    assert.ok(templateContent.includes('<infrastructure>'), 'infrastructure section must exist');
+    assert.ok(templateContent.includes('conftest.py'), 'infrastructure must mention conftest.py');
+    assert.ok(templateContent.includes('pyproject.toml'), 'infrastructure must mention pyproject.toml');
+    assert.ok(
+      templateContent.includes('uv pip install pytest pytest-cov'),
+      'infrastructure must include install command'
+    );
+  });
+
+  test('template has feature and tdd_cycle structure', () => {
+    assert.ok(templateContent.includes('<feature>'), 'feature section must exist');
+    assert.ok(templateContent.includes('</feature>'), 'feature section must close');
+    assert.ok(templateContent.includes('<tdd_cycle>'), 'tdd_cycle section must exist');
+    assert.ok(templateContent.includes('</tdd_cycle>'), 'tdd_cycle section must close');
+    assert.ok(templateContent.includes('<behavior>'), 'behavior section must exist inside feature');
+    assert.ok(templateContent.includes('<implementation>'), 'implementation section must exist inside feature');
+  });
+
+  test('template frontmatter specifies type: tdd', () => {
+    assert.ok(templateContent.includes('type: tdd'), 'frontmatter must specify type: tdd');
+  });
+
+  test('template has verification and success_criteria sections', () => {
+    assert.ok(templateContent.includes('<verification>'), 'verification section must exist');
+    assert.ok(templateContent.includes('<success_criteria>'), 'success_criteria section must exist');
+    assert.ok(templateContent.includes('<output>'), 'output section must exist');
+  });
+
+  test('template references commit patterns for each TDD phase', () => {
+    assert.ok(
+      templateContent.includes('test({phase}-{plan})'),
+      'RED phase commit pattern must exist'
+    );
+    assert.ok(
+      templateContent.includes('feat({phase}-{plan})'),
+      'GREEN phase commit pattern must exist'
+    );
+    assert.ok(
+      templateContent.includes('refactor({phase}-{plan})'),
+      'REFACTOR phase commit pattern must exist'
+    );
+  });
+});
+
+// ─────────────────────────────────────────────────────────────────────────────
+// init commands load tdd config
+// ─────────────────────────────────────────────────────────────────────────────
+
+describe('init commands load tdd config', () => {
+  let tmpDir;
+
+  beforeEach(() => {
+    tmpDir = createTempProject();
+  });
+
+  afterEach(() => {
+    cleanup(tmpDir);
+  });
+
+  test('init execute-phase includes tdd config when config requested', () => {
+    const phaseDir = path.join(tmpDir, '.planning', 'phases', '03-api');
+    fs.mkdirSync(phaseDir, { recursive: true });
+    fs.writeFileSync(path.join(phaseDir, '03-01-PLAN.md'), '# Plan');
+    fs.writeFileSync(
+      path.join(tmpDir, '.planning', 'config.json'),
+      JSON.stringify({
+        mode: 'yolo',
+        tdd: {
+          enabled: true,
+          python: { auto_activate: true, coverage_threshold: 80, test_directory: 'tests' }
+        }
+      })
+    );
+
+    const result = runGsdTools('init execute-phase 03 --include config', tmpDir);
+    assert.ok(result.success, `Command failed: ${result.error}`);
+
+    const output = JSON.parse(result.output);
+    assert.ok(output.config_content, 'config_content should be included');
+    assert.ok(output.config_content.includes('"tdd"'), 'config must contain tdd section');
+    assert.ok(output.config_content.includes('"coverage_threshold"'), 'config must contain coverage_threshold');
+  });
+
+  test('init plan-phase includes config with tdd section', () => {
+    const phaseDir = path.join(tmpDir, '.planning', 'phases', '03-api');
+    fs.mkdirSync(phaseDir, { recursive: true });
+    fs.writeFileSync(
+      path.join(tmpDir, '.planning', 'config.json'),
+      JSON.stringify({
+        mode: 'interactive',
+        tdd: {
+          enabled: false,
+          python: { auto_activate: false, coverage_threshold: 90, test_directory: 'test' }
+        }
+      })
+    );
+
+    const result = runGsdTools('init plan-phase 03 --include config', tmpDir);
+    assert.ok(result.success, `Command failed: ${result.error}`);
+
+    const output = JSON.parse(result.output);
+    assert.ok(output.config_content, 'config_content should be included');
+
+    // Verify the tdd config is faithfully loaded (not overridden)
+    const loadedConfig = JSON.parse(output.config_content);
+    assert.strictEqual(loadedConfig.tdd.enabled, false, 'tdd.enabled should be false as configured');
+    assert.strictEqual(loadedConfig.tdd.python.coverage_threshold, 90, 'threshold should be 90 as configured');
+    assert.strictEqual(loadedConfig.tdd.python.test_directory, 'test', 'test_directory should be test as configured');
+  });
+
+  test('init execute-phase without tdd in config still works', () => {
+    const phaseDir = path.join(tmpDir, '.planning', 'phases', '03-api');
+    fs.mkdirSync(phaseDir, { recursive: true });
+    fs.writeFileSync(path.join(phaseDir, '03-01-PLAN.md'), '# Plan');
+    fs.writeFileSync(
+      path.join(tmpDir, '.planning', 'config.json'),
+      JSON.stringify({ mode: 'interactive' })
+    );
+
+    const result = runGsdTools('init execute-phase 03 --include config', tmpDir);
+    assert.ok(result.success, `Command failed: ${result.error}`);
+
+    const output = JSON.parse(result.output);
+    assert.ok(output.config_content, 'config_content should be included');
+    // Config without tdd section should still load successfully
+    const loadedConfig = JSON.parse(output.config_content);
+    assert.strictEqual(loadedConfig.tdd, undefined, 'tdd section should not exist in legacy config');
+  });
+});
+
+// ─────────────────────────────────────────────────────────────────────────────
+// execute-plan.md tdd execution block
+// ─────────────────────────────────────────────────────────────────────────────
+
+describe('execute-plan.md tdd execution block', () => {
+  let content;
+
+  beforeEach(() => {
+    content = fs.readFileSync(
+      path.join(__dirname, '..', 'workflows', 'execute-plan.md'),
+      'utf-8'
+    );
+  });
+
+  test('has tdd_plan_execution section', () => {
+    assert.ok(content.includes('<tdd_plan_execution>'), 'tdd_plan_execution section must exist');
+    assert.ok(content.includes('</tdd_plan_execution>'), 'tdd_plan_execution section must close');
+  });
+
+  test('has Language Detection step', () => {
+    assert.ok(content.includes('### 1. Language Detection'), 'Language Detection step must exist');
+    assert.ok(content.includes('*.py'), 'must detect Python files');
+    assert.ok(content.includes('Python TDD mode'), 'must mention Python TDD mode');
+  });
+
+  test('has RED phase with GATE CHECK', () => {
+    assert.ok(content.includes('### 3. RED Phase'), 'RED Phase step must exist');
+    assert.ok(content.includes('GATE CHECK'), 'RED phase must have GATE CHECK');
+    // Decision [03-01]: GATE distinguishes FAIL from ERROR
+    assert.ok(content.includes('Test FAILS (assertion failure)'), 'must distinguish assertion failure');
+    assert.ok(content.includes('Test ERRORS (import/syntax error)'), 'must distinguish import/syntax error');
+    assert.ok(content.includes('Test PASSES -> STOP'), 'must stop if test passes prematurely');
+  });
+
+  test('has GREEN phase with GATE CHECK', () => {
+    assert.ok(content.includes('### 4. GREEN Phase'), 'GREEN Phase step must exist');
+    assert.ok(content.includes('MINIMUM code'), 'GREEN must enforce minimal implementation');
+    assert.ok(content.includes('Debug the IMPLEMENTATION, not the test'), 'must debug implementation not test');
+  });
+
+  test('has REFACTOR phase with GATE CHECK', () => {
+    assert.ok(content.includes('### 5. REFACTOR Phase'), 'REFACTOR Phase step must exist');
+    assert.ok(content.includes('ALL tests'), 'REFACTOR must run ALL tests');
+    assert.ok(content.includes('Undo the refactor change'), 'must undo broken refactors');
+  });
+
+  test('has TDD Cycle Evidence section for SUMMARY.md', () => {
+    assert.ok(content.includes('TDD Cycle Evidence'), 'TDD Cycle Evidence section must exist');
+    assert.ok(content.includes('RED:'), 'must document RED evidence');
+    assert.ok(content.includes('GREEN:'), 'must document GREEN evidence');
+    assert.ok(content.includes('REFACTOR:'), 'must document REFACTOR evidence');
+  });
+
+  test('references pytest commands for Python TDD', () => {
+    assert.ok(content.includes('uv run pytest'), 'must reference uv run pytest command');
+  });
+});
+
+// ─────────────────────────────────────────────────────────────────────────────
+// verify-phase.md run_tests and gap classification
+// ─────────────────────────────────────────────────────────────────────────────
+
+describe('verify-phase.md run_tests and gap classification', () => {
+  let content;
+
+  beforeEach(() => {
+    content = fs.readFileSync(
+      path.join(__dirname, '..', 'workflows', 'verify-phase.md'),
+      'utf-8'
+    );
+  });
+
+  test('has run_tests step', () => {
+    assert.ok(content.includes('<step name="run_tests">'), 'run_tests step must exist');
+  });
+
+  test('run_tests detects Python test files', () => {
+    assert.ok(content.includes('tests/test_*.py'), 'must detect test_*.py files');
+  });
+
+  test('run_tests reads coverage threshold from config', () => {
+    assert.ok(content.includes('coverage_threshold'), 'must read coverage_threshold from config');
+    assert.ok(content.includes('THRESHOLD=${CONFIG_THRESHOLD:-80}'), 'must default to 80');
+  });
+
+  test('run_tests runs pytest with coverage flags', () => {
+    assert.ok(content.includes('pytest --cov --cov-branch --cov-report=term-missing'), 'must run pytest with cov flags');
+    // Decision [04-01]: no --cov-fail-under
+    assert.ok(content.includes('do NOT use --cov-fail-under'), 'must NOT use --cov-fail-under (decision 04-01)');
+  });
+
+  test('run_tests has three test execution statuses', () => {
+    assert.ok(content.includes('**PASS**'), 'must have PASS status');
+    assert.ok(content.includes('**BELOW_THRESHOLD**'), 'must have BELOW_THRESHOLD status');
+    assert.ok(content.includes('**FAILED**'), 'must have FAILED status');
+  });
+
+  test('run_tests includes gap classification table', () => {
+    assert.ok(content.includes('Untested behavior'), 'must classify untested behavior');
+    assert.ok(content.includes('Untested error path'), 'must classify untested error path');
+    assert.ok(content.includes('Untested branch'), 'must classify untested branch');
+    assert.ok(content.includes('Dead code'), 'must classify dead code');
+    assert.ok(content.includes('Infrastructure code'), 'must classify infrastructure code');
+  });
+
+  test('run_tests tracks coverage trend in STATE.md', () => {
+    assert.ok(content.includes('## Coverage Trend'), 'must include Coverage Trend section template');
+    assert.ok(content.includes('STATE.md'), 'must reference STATE.md for trend tracking');
+  });
+
+  test('determine_status has gap_type sub-classification', () => {
+    assert.ok(content.includes('gap_type'), 'must mention gap_type');
+    // Four gap_type values
+    assert.ok(content.includes('**coverage:**'), 'must define coverage gap_type');
+    assert.ok(content.includes('**structural:**'), 'must define structural gap_type');
+    assert.ok(content.includes('**both:**'), 'must define both gap_type');
+    assert.ok(content.includes('**none:**'), 'must define none gap_type');
+  });
+
+  test('gap_type routing documented for orchestrator', () => {
+    assert.ok(content.includes('coverage_gap_closure_loop'), 'coverage routes to closure loop');
+    assert.ok(content.includes('/gsd:plan-phase --gaps'), 'structural routes to manual gap closure');
+  });
+});
+
+// ─────────────────────────────────────────────────────────────────────────────
+// execute-phase.md coverage gap closure loop
+// ─────────────────────────────────────────────────────────────────────────────
+
+describe('execute-phase.md coverage gap closure loop', () => {
+  let content;
+
+  beforeEach(() => {
+    content = fs.readFileSync(
+      path.join(__dirname, '..', 'workflows', 'execute-phase.md'),
+      'utf-8'
+    );
+  });
+
+  test('has coverage_gap_closure_loop step', () => {
+    assert.ok(
+      content.includes('<step name="coverage_gap_closure_loop">'),
+      'coverage_gap_closure_loop step must exist'
+    );
+  });
+
+  test('loop has correct constants', () => {
+    // Decision [05-02]: max_iterations=3, min_delta=2
+    assert.ok(content.includes('max_iterations = 3'), 'max_iterations must be 3');
+    assert.ok(content.includes('min_delta = 2'), 'min_delta must be 2');
+  });
+
+  test('loop filters to actionable gaps only', () => {
+    assert.ok(content.includes('"untested behavior"'), 'must filter untested behavior');
+    assert.ok(content.includes('"untested error path"'), 'must filter untested error path');
+    assert.ok(content.includes('"untested branch"'), 'must filter untested branch');
+  });
+
+  test('loop has all five exit reasons', () => {
+    // Decision [05-02]: five exit reasons
+    assert.ok(content.includes('"threshold met"'), 'must have threshold met exit');
+    assert.ok(content.includes('"convergence stall"'), 'must have convergence stall exit');
+    assert.ok(content.includes('"no actionable gaps remain"'), 'must have no actionable gaps exit');
+    assert.ok(content.includes('"planner produced no plans"'), 'must have planner produced no plans exit');
+    assert.ok(content.includes('"max iterations reached"'), 'must have max iterations exit');
+  });
+
+  test('loop appends Feedback Loop Summary to VERIFICATION.md', () => {
+    assert.ok(content.includes('## Feedback Loop Summary'), 'must append Feedback Loop Summary');
+    assert.ok(content.includes('### Coverage Progression'), 'must include Coverage Progression table');
+    assert.ok(content.includes('### Remaining Gaps (post-loop)'), 'must include Remaining Gaps table');
+  });
+
+  test('loop spawns planner in gap_closure mode', () => {
+    assert.ok(content.includes('gap_closure'), 'must mention gap_closure mode');
+    assert.ok(content.includes('type:tdd'), 'must create type:tdd plans');
+  });
+
+  test('loop has convergence detection logic', () => {
+    assert.ok(content.includes('delta < min_delta'), 'must check delta against min_delta');
+    assert.ok(content.includes('new_coverage >= threshold'), 'must check coverage against threshold');
+  });
+
+  test('loop tracks coverage_history', () => {
+    assert.ok(content.includes('coverage_history'), 'must track coverage_history array');
+    assert.ok(content.includes('previous_coverage'), 'must track previous_coverage for delta');
+  });
+});
+
+// ─────────────────────────────────────────────────────────────────────────────
+// phase-prompt.md tdd cross-reference
+// ─────────────────────────────────────────────────────────────────────────────
+
+describe('phase-prompt.md tdd cross-reference', () => {
+  let content;
+
+  beforeEach(() => {
+    content = fs.readFileSync(
+      path.join(__dirname, '..', 'templates', 'phase-prompt.md'),
+      'utf-8'
+    );
+  });
+
+  test('references TDD plan template', () => {
+    assert.ok(content.includes('tdd-plan.md'), 'must reference tdd-plan.md template');
+  });
+
+  test('mentions type: tdd for TDD plans', () => {
+    assert.ok(content.includes('type: tdd'), 'must document type: tdd plan type');
+    // Should not claim all plans are type: execute
+    assert.ok(content.includes('type: execute'), 'must also document type: execute for standard plans');
+  });
+
+  test('references TDD methodology', () => {
+    assert.ok(content.includes('references/tdd.md'), 'must reference tdd.md methodology');
+  });
+
+  test('mentions Python auto-activation', () => {
+    assert.ok(content.includes('*.py'), 'must mention Python file detection');
+    assert.ok(content.includes('tdd.enabled'), 'must mention tdd.enabled config check');
+  });
+});

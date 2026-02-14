@@ -18,8 +18,9 @@ Then verify each level against the actual codebase.
 </core_principle>
 
 <required_reading>
-@~/.claude/get-shit-done/references/verification-patterns.md
-@~/.claude/get-shit-done/templates/verification-report.md
+@C:/Users/connessn/.claude/get-shit-done/references/verification-patterns.md
+@C:/Users/connessn/.claude/get-shit-done/templates/verification-report.md
+@C:/Users/connessn/.claude/skills/pytest-cov/SKILL.md
 </required_reading>
 
 <process>
@@ -28,14 +29,14 @@ Then verify each level against the actual codebase.
 Load phase operation context:
 
 ```bash
-INIT=$(node ~/.claude/get-shit-done/bin/gsd-tools.js init phase-op "${PHASE_ARG}")
+INIT=$(node C:/Users/connessn/.claude/get-shit-done/bin/gsd-tools.js init phase-op "${PHASE_ARG}")
 ```
 
 Extract from init JSON: `phase_dir`, `phase_number`, `phase_name`, `has_plans`, `plan_count`.
 
 Then load phase details and list plans/summaries:
 ```bash
-node ~/.claude/get-shit-done/bin/gsd-tools.js roadmap get-phase "${phase_number}"
+node C:/Users/connessn/.claude/get-shit-done/bin/gsd-tools.js roadmap get-phase "${phase_number}"
 grep -E "^| ${phase_number}" .planning/REQUIREMENTS.md 2>/dev/null
 ls "$phase_dir"/*-SUMMARY.md "$phase_dir"/*-PLAN.md 2>/dev/null
 ```
@@ -50,7 +51,7 @@ Use gsd-tools to extract must_haves from each PLAN:
 
 ```bash
 for plan in "$PHASE_DIR"/*-PLAN.md; do
-  MUST_HAVES=$(node ~/.claude/get-shit-done/bin/gsd-tools.js frontmatter get "$plan" --field must_haves)
+  MUST_HAVES=$(node C:/Users/connessn/.claude/get-shit-done/bin/gsd-tools.js frontmatter get "$plan" --field must_haves)
   echo "=== $plan ===" && echo "$MUST_HAVES"
 done
 ```
@@ -84,7 +85,7 @@ Use gsd-tools for artifact verification against must_haves in each PLAN:
 
 ```bash
 for plan in "$PHASE_DIR"/*-PLAN.md; do
-  ARTIFACT_RESULT=$(node ~/.claude/get-shit-done/bin/gsd-tools.js verify artifacts "$plan")
+  ARTIFACT_RESULT=$(node C:/Users/connessn/.claude/get-shit-done/bin/gsd-tools.js verify artifacts "$plan")
   echo "=== $plan ===" && echo "$ARTIFACT_RESULT"
 done
 ```
@@ -116,7 +117,7 @@ Use gsd-tools for key link verification against must_haves in each PLAN:
 
 ```bash
 for plan in "$PHASE_DIR"/*-PLAN.md; do
-  LINKS_RESULT=$(node ~/.claude/get-shit-done/bin/gsd-tools.js verify key-links "$plan")
+  LINKS_RESULT=$(node C:/Users/connessn/.claude/get-shit-done/bin/gsd-tools.js verify key-links "$plan")
   echo "=== $plan ===" && echo "$LINKS_RESULT"
 done
 ```
@@ -162,6 +163,89 @@ Extract files modified in this phase from SUMMARY.md, scan each:
 Categorize: 🛑 Blocker (prevents goal) | ⚠️ Warning (incomplete) | ℹ️ Info (notable).
 </step>
 
+<step name="run_tests">
+Check if Python tests exist, run coverage measurement, classify gaps, and track trend.
+
+**1. Detect Python test files:**
+
+~~~bash
+ls tests/test_*.py tests/**/test_*.py 2>/dev/null | head -20
+~~~
+
+**If no test files found:** Skip this step. Record in verification report:
+~~~markdown
+## Test Execution
+No Python test files found. Test execution skipped.
+~~~
+
+**If Python test files exist, proceed with steps 2-8:**
+
+**2. Read coverage threshold from config:**
+
+~~~bash
+CONFIG_THRESHOLD=$(cat .planning/config.json 2>/dev/null | grep -A5 '"python"' | grep 'coverage_threshold' | grep -oE '[0-9]+')
+THRESHOLD=${CONFIG_THRESHOLD:-80}
+echo "THRESHOLD=$THRESHOLD"
+~~~
+
+**3. Run pytest with coverage (do NOT use --cov-fail-under):**
+
+~~~bash
+uv run pytest --cov --cov-branch --cov-report=term-missing tests/ 2>&1
+echo "EXIT_CODE=$?"
+~~~
+
+The `--cov` without `=PATH` defers to pyproject.toml `[tool.coverage.run] source` (configured by Phase 2 scaffolding). Do NOT use `--cov-fail-under` -- it changes the exit code on low coverage, conflating test failure with low coverage.
+
+**4. Parse output for:**
+- Test results: N passed, M failed, K errors
+- Statement coverage percentage (from the TOTAL line)
+- Branch coverage percentage (from the branch coverage summary)
+- Uncovered lines per file (from term-missing output, the "Missing" column)
+
+**5. Determine test execution status:**
+- EXIT_CODE=0 AND branch coverage >= threshold -> **PASS**
+- EXIT_CODE=0 AND branch coverage < threshold -> **BELOW_THRESHOLD**
+- EXIT_CODE!=0 -> **FAILED** (tests themselves failed, regardless of coverage)
+
+**6. If BELOW_THRESHOLD -- run gap analysis:**
+
+Use the pytest-cov skill methodology (loaded via required_reading `@C:/Users/connessn/.claude/skills/pytest-cov/SKILL.md`):
+
+- Group uncovered lines by file from the term-missing output
+- For each group: read the source code at those lines, identify the BEHAVIOR (not just line numbers)
+- Classify each gap:
+
+| Classification | Description | Recommended Action |
+|---------------|-------------|-------------------|
+| Untested behavior | Feature code with no test exercising it | TDD RED plan (Phase 5 gap closure) |
+| Untested error path | Exception/error handler never triggered | TDD RED plan targeting exception |
+| Untested branch | if/else with only one path tested | Parametrized test for other path |
+| Dead code | Code that can never be reached | Remove (no test needed) |
+| Infrastructure code | `__main__`, CLI entry points, debug code | `pragma: no cover` or omit config |
+
+Record results in an "Uncovered Behaviors" table for the verification report.
+
+**7. Record coverage in STATE.md for trend tracking:**
+
+- Read STATE.md
+- Find or create `## Coverage Trend` section (insert before `## Session Continuity` if creating)
+- Append row with: phase name, statement coverage %, branch coverage %, threshold, delta from previous entry (or "-" if first entry)
+- Write updated STATE.md
+
+~~~markdown
+## Coverage Trend
+
+| Phase | Statement | Branch | Threshold | Delta |
+|-------|-----------|--------|-----------|-------|
+| {phase_name} | {stmt}% | {branch}% | {threshold}% | {delta or "-"} |
+~~~
+
+**8. Include results in VERIFICATION.md:**
+
+Use the "Test Execution" section format from the verification-report.md template. The section includes: Framework, Command, Result, Statement Coverage, Branch Coverage, Threshold, Status, Coverage Trend table, Uncovered Behaviors table (if BELOW_THRESHOLD), and Gap Summary (if BELOW_THRESHOLD).
+</step>
+
 <step name="identify_human_verification">
 **Always needs human:** Visual appearance, user flow completion, real-time behavior (WebSocket/SSE), external service integration, performance feel, error message clarity.
 
@@ -178,6 +262,23 @@ Format each as: Test Name → What to do → Expected result → Why can't verif
 **human_needed:** All automated checks pass but human verification items remain.
 
 **Score:** `verified_truths / total_truths`
+
+**Gap type sub-classification (when status is `gaps_found`):**
+
+When status is `gaps_found`, additionally determine `gap_type`:
+
+- **coverage:** The "## Test Execution" section exists with Status: BELOW_THRESHOLD AND at least one Uncovered Behavior is classified as "untested behavior", "untested error path", or "untested branch". No structural gaps (MISSING/STUB/NOT_WIRED) found.
+- **structural:** Any truth FAILED, artifact MISSING/STUB, or key link NOT_WIRED. No coverage gaps or Test Execution status is not BELOW_THRESHOLD.
+- **both:** Coverage gaps AND structural gaps coexist.
+- **none:** Status is `passed` or `human_needed` (no gaps to classify).
+
+Include `gap_type` in the return to orchestrator alongside status and score.
+
+The orchestrator uses gap_type for routing:
+- `coverage` -> automated coverage_gap_closure_loop
+- `structural` -> manual `/gsd:plan-phase --gaps`
+- `both` -> run coverage loop first, then prompt for structural gap closure
+- `none` -> proceed normally
 </step>
 
 <step name="generate_fix_plans">
@@ -197,13 +298,13 @@ REPORT_PATH="$PHASE_DIR/${PHASE_NUM}-VERIFICATION.md"
 
 Fill template sections: frontmatter (phase/timestamp/status/score), goal achievement, artifact table, wiring table, requirements coverage, anti-patterns, human verification, gaps summary, fix plans (if gaps_found), metadata.
 
-See ~/.claude/get-shit-done/templates/verification-report.md for complete template.
+See C:/Users/connessn/.claude/get-shit-done/templates/verification-report.md for complete template.
 </step>
 
 <step name="return_to_orchestrator">
-Return status (`passed` | `gaps_found` | `human_needed`), score (N/M must-haves), report path.
+Return status (`passed` | `gaps_found` | `human_needed`), score (N/M must-haves), report path, AND gap_type (`coverage` | `structural` | `both` | `none`).
 
-If gaps_found: list gaps + recommended fix plan names.
+If gaps_found: list gaps + recommended fix plan names. Include gap_type in gap summary. If gap_type is `coverage` or `both`, note that automated gap closure is available.
 If human_needed: list items requiring human testing.
 
 Orchestrator routes: `passed` → update_roadmap | `gaps_found` → create/execute fixes, re-verify | `human_needed` → present to user.

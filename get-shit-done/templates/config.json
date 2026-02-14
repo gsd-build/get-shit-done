@@ -31,5 +31,13 @@
   "safety": {
     "always_confirm_destructive": true,
     "always_confirm_external_services": true
+  },
+  "tdd": {
+    "enabled": true,
+    "python": {
+      "auto_activate": true,
+      "coverage_threshold": 80,
+      "test_directory": "tests"
+    }
   }
 }

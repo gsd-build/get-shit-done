@@ -26,8 +26,6 @@
  *   summary-extract <path> [--fields]  Extract structured data from SUMMARY.md
  *   state-snapshot                     Structured parse of STATE.md
  *   phase-plan-index <phase>           Index plans with waves and status
- *   websearch <query>                  Search web via Brave API (if configured)
- *     [--limit N] [--freshness day|week|month]
  *
  * Phase Operations:
  *   phase next-decimal <phase>         Calculate next decimal phase number
@@ -167,7 +165,6 @@ function loadConfig(cwd) {
     plan_checker: true,
     verifier: true,
     parallelization: true,
-    brave_search: false,
   };
 
   try {
@@ -200,7 +197,6 @@ function loadConfig(cwd) {
       plan_checker: get('plan_checker', { section: 'workflow', field: 'plan_check' }) ?? defaults.plan_checker,
       verifier: get('verifier', { section: 'workflow', field: 'verifier' }) ?? defaults.verifier,
       parallelization,
-      brave_search: get('brave_search') ?? defaults.brave_search,
     };
   } catch {
     return defaults;
@@ -588,11 +584,6 @@ function cmdConfigEnsureSection(cwd, raw) {
     return;
   }
 
-  // Detect Brave Search API key availability
-  const homedir = require('os').homedir();
-  const braveKeyFile = path.join(homedir, '.gsd', 'brave_api_key');
-  const hasBraveSearch = !!(process.env.BRAVE_API_KEY || fs.existsSync(braveKeyFile));
-
   // Create default config
   const defaults = {
     model_profile: 'balanced',
@@ -607,7 +598,6 @@ function cmdConfigEnsureSection(cwd, raw) {
       verifier: true,
     },
     parallelization: true,
-    brave_search: hasBraveSearch,
   };
 
   try {
@@ -1995,70 +1985,6 @@ function cmdSummaryExtract(cwd, summaryPath, fields, raw) {
   }
 
   output(fullResult, raw);
-}
-
-// ─── Web Search (Brave API) ──────────────────────────────────────────────────
-
-async function cmdWebsearch(query, options, raw) {
-  const apiKey = process.env.BRAVE_API_KEY;
-
-  if (!apiKey) {
-    // No key = silent skip, agent falls back to built-in WebSearch
-    output({ available: false, reason: 'BRAVE_API_KEY not set' }, raw, '');
-    return;
-  }
-
-  if (!query) {
-    output({ available: false, error: 'Query required' }, raw, '');
-    return;
-  }
-
-  const params = new URLSearchParams({
-    q: query,
-    count: String(options.limit || 10),
-    country: 'us',
-    search_lang: 'en',
-    text_decorations: 'false'
-  });
-
-  if (options.freshness) {
-    params.set('freshness', options.freshness);
-  }
-
-  try {
-    const response = await fetch(
-      `https://api.search.brave.com/res/v1/web/search?${params}`,
-      {
-        headers: {
-          'Accept': 'application/json',
-          'X-Subscription-Token': apiKey
-        }
-      }
-    );
-
-    if (!response.ok) {
-      output({ available: false, error: `API error: ${response.status}` }, raw, '');
-      return;
-    }
-
-    const data = await response.json();
-
-    const results = (data.web?.results || []).map(r => ({
-      title: r.title,
-      url: r.url,
-      description: r.description,
-      age: r.age || null
-    }));
-
-    output({
-      available: true,
-      query,
-      count: results.length,
-      results
-    }, raw, results.map(r => `${r.title}\n${r.url}\n${r.description}`).join('\n\n'));
-  } catch (err) {
-    output({ available: false, error: err.message }, raw, '');
-  }
 }
 
 // ─── Frontmatter CRUD ────────────────────────────────────────────────────────
@@ -3726,17 +3652,15 @@ function cmdInitPlanPhase(cwd, phase, includes, raw) {
       }
     } catch {}
   }
+  if (includes.has('config')) {
+    result.config_content = safeReadFile(path.join(cwd, '.planning', 'config.json'));
+  }
 
   output(result, raw);
 }
 
 function cmdInitNewProject(cwd, raw) {
   const config = loadConfig(cwd);
-
-  // Detect Brave Search API key availability
-  const homedir = require('os').homedir();
-  const braveKeyFile = path.join(homedir, '.gsd', 'brave_api_key');
-  const hasBraveSearch = !!(process.env.BRAVE_API_KEY || fs.existsSync(braveKeyFile));
 
   // Detect existing code
   let hasCode = false;
@@ -3778,9 +3702,6 @@ function cmdInitNewProject(cwd, raw) {
 
     // Git state
     has_git: pathExistsInternal(cwd, '.git'),
-
-    // Enhanced search
-    brave_search_available: hasBraveSearch,
   };
 
   output(result, raw);
@@ -3923,7 +3844,6 @@ function cmdInitPhaseOp(cwd, phase, raw) {
   const result = {
     // Config
     commit_docs: config.commit_docs,
-    brave_search: config.brave_search,
 
     // Phase info
     phase_found: !!phaseInfo,
@@ -4209,9 +4129,150 @@ function cmdInitProgress(cwd, includes, raw) {
   output(result, raw);
 }
 
+function cmdInitDiscussCurrent(cwd, includes, raw) {
+  const planningDir = path.join(cwd, '.planning');
+  const planningExists = pathExistsInternal(cwd, '.planning');
+
+  if (!planningExists) {
+    const result = {
+      project_exists: false,
+      codebase_maps: { exists: false, files: [], missing: [] },
+      phase_summaries: [],
+      requirements: { exists: false, path: null },
+      project_md: { exists: false, path: null },
+      roadmap: { exists: false, path: null },
+      state: { exists: false, path: null },
+      stats: {
+        total_phases: 0,
+        completed_phases: 0,
+        total_plans: 0,
+        total_summaries: 0,
+        codebase_map_count: 0,
+      },
+    };
+    output(result, raw);
+    return;
+  }
+
+  // Codebase maps
+  const expectedMaps = [
+    'ARCHITECTURE.md', 'STACK.md', 'CONVENTIONS.md', 'STRUCTURE.md',
+    'TESTING.md', 'INTEGRATIONS.md', 'CONCERNS.md',
+  ];
+  const codebaseDir = path.join(planningDir, 'codebase');
+  const existingMaps = [];
+  const missingMaps = [];
+  for (const mapFile of expectedMaps) {
+    if (pathExistsInternal(cwd, path.join('.planning', 'codebase', mapFile))) {
+      existingMaps.push(mapFile);
+    } else {
+      missingMaps.push(mapFile);
+    }
+  }
+
+  // Phase summaries
+  const phasesDir = path.join(planningDir, 'phases');
+  const phaseSummaries = [];
+  let totalPlans = 0;
+  let totalSummaries = 0;
+  let completedPhases = 0;
+
+  try {
+    const entries = fs.readdirSync(phasesDir, { withFileTypes: true });
+    const dirs = entries.filter(e => e.isDirectory()).map(e => e.name).sort();
+
+    for (const dir of dirs) {
+      const match = dir.match(/^(\d+(?:\.\d+)?)-?(.*)/);
+      const phaseNumber = match ? match[1] : dir;
+      const phaseName = match && match[2] ? match[2] : null;
+
+      const phasePath = path.join(phasesDir, dir);
+      const phaseFiles = fs.readdirSync(phasePath);
+
+      const plans = phaseFiles.filter(f => f.endsWith('-PLAN.md') || f === 'PLAN.md');
+      const summaries = phaseFiles.filter(f => f.endsWith('-SUMMARY.md') || f === 'SUMMARY.md');
+      const verifications = phaseFiles.filter(f => f.endsWith('-VERIFICATION.md') || f === 'VERIFICATION.md');
+
+      const status = summaries.length >= plans.length && plans.length > 0 ? 'complete' :
+                     plans.length > 0 ? 'in_progress' : 'pending';
+
+      if (status === 'complete') completedPhases++;
+      totalPlans += plans.length;
+      totalSummaries += summaries.length;
+
+      phaseSummaries.push({
+        phase: phaseName ? `${phaseNumber}-${phaseName}` : phaseNumber,
+        directory: path.join('.planning', 'phases', dir),
+        summaries: summaries,
+        verifications: verifications,
+        status,
+      });
+    }
+  } catch {}
+
+  const result = {
+    project_exists: true,
+    codebase_maps: {
+      exists: existingMaps.length > 0,
+      files: existingMaps,
+      missing: missingMaps,
+    },
+    phase_summaries: phaseSummaries,
+    requirements: {
+      exists: pathExistsInternal(cwd, '.planning/REQUIREMENTS.md'),
+      path: pathExistsInternal(cwd, '.planning/REQUIREMENTS.md') ? '.planning/REQUIREMENTS.md' : null,
+    },
+    project_md: {
+      exists: pathExistsInternal(cwd, '.planning/PROJECT.md'),
+      path: pathExistsInternal(cwd, '.planning/PROJECT.md') ? '.planning/PROJECT.md' : null,
+    },
+    roadmap: {
+      exists: pathExistsInternal(cwd, '.planning/ROADMAP.md'),
+      path: pathExistsInternal(cwd, '.planning/ROADMAP.md') ? '.planning/ROADMAP.md' : null,
+    },
+    state: {
+      exists: pathExistsInternal(cwd, '.planning/STATE.md'),
+      path: pathExistsInternal(cwd, '.planning/STATE.md') ? '.planning/STATE.md' : null,
+    },
+    stats: {
+      total_phases: phaseSummaries.length,
+      completed_phases: completedPhases,
+      total_plans: totalPlans,
+      total_summaries: totalSummaries,
+      codebase_map_count: existingMaps.length,
+    },
+  };
+
+  // Include file contents if requested via --include
+  if (includes.has('codebase')) {
+    const codebaseContents = {};
+    for (const mapFile of existingMaps) {
+      const content = safeReadFile(path.join(codebaseDir, mapFile));
+      if (content !== null) {
+        codebaseContents[mapFile] = content;
+      }
+    }
+    result.codebase_contents = codebaseContents;
+  }
+  if (includes.has('requirements')) {
+    result.requirements_content = safeReadFile(path.join(planningDir, 'REQUIREMENTS.md'));
+  }
+  if (includes.has('project')) {
+    result.project_content = safeReadFile(path.join(planningDir, 'PROJECT.md'));
+  }
+  if (includes.has('roadmap')) {
+    result.roadmap_content = safeReadFile(path.join(planningDir, 'ROADMAP.md'));
+  }
+  if (includes.has('state')) {
+    result.state_content = safeReadFile(path.join(planningDir, 'STATE.md'));
+  }
+
+  output(result, raw);
+}
+
 // ─── CLI Router ───────────────────────────────────────────────────────────────
 
-async function main() {
+function main() {
   const args = process.argv.slice(2);
   const rawIndex = args.indexOf('--raw');
   const raw = rawIndex !== -1;
@@ -4554,8 +4615,11 @@ async function main() {
         case 'progress':
           cmdInitProgress(cwd, includes, raw);
           break;
+        case 'discuss-current':
+          cmdInitDiscussCurrent(cwd, includes, raw);
+          break;
         default:
-          error(`Unknown init workflow: ${workflow}\nAvailable: execute-phase, plan-phase, new-project, new-milestone, quick, resume, verify-work, phase-op, todos, milestone-op, map-codebase, progress`);
+          error(`Unknown init workflow: ${workflow}\nAvailable: execute-phase, plan-phase, new-project, new-milestone, quick, resume, verify-work, phase-op, todos, milestone-op, map-codebase, progress, discuss-current`);
       }
       break;
     }
@@ -4575,17 +4639,6 @@ async function main() {
       const fieldsIndex = args.indexOf('--fields');
       const fields = fieldsIndex !== -1 ? args[fieldsIndex + 1].split(',') : null;
       cmdSummaryExtract(cwd, summaryPath, fields, raw);
-      break;
-    }
-
-    case 'websearch': {
-      const query = args[1];
-      const limitIdx = args.indexOf('--limit');
-      const freshnessIdx = args.indexOf('--freshness');
-      await cmdWebsearch(query, {
-        limit: limitIdx !== -1 ? parseInt(args[limitIdx + 1], 10) : 10,
-        freshness: freshnessIdx !== -1 ? args[freshnessIdx + 1] : null,
-      }, raw);
       break;
     }
 

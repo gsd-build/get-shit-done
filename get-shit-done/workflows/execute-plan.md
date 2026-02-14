@@ -6,7 +6,7 @@ Execute a phase prompt (PLAN.md) and create the outcome summary (SUMMARY.md).
 Read STATE.md before any operation to load project context.
 Read config.json for planning behavior settings.
 
-@~/.claude/get-shit-done/references/git-integration.md
+@C:/Users/connessn/.claude/get-shit-done/references/git-integration.md
 </required_reading>
 
 <process>
@@ -15,7 +15,7 @@ Read config.json for planning behavior settings.
 Load execution context (uses `init execute-phase` for full context, including file contents):
 
 ```bash
-INIT=$(node ~/.claude/get-shit-done/bin/gsd-tools.js init execute-phase "${PHASE}" --include state,config)
+INIT=$(node C:/Users/connessn/.claude/get-shit-done/bin/gsd-tools.js init execute-phase "${PHASE}" --include state,config)
 ```
 
 Extract from init JSON: `executor_model`, `commit_docs`, `phase_dir`, `phase_number`, `plans`, `summaries`, `incomplete_plans`.
@@ -216,16 +216,95 @@ End with: **Total deviations:** N auto-fixed (breakdown). **Impact:** assessment
 <tdd_plan_execution>
 ## TDD Execution
 
-For `type: tdd` plans — RED-GREEN-REFACTOR:
+For `type: tdd` plans -- RED-GREEN-REFACTOR with discipline enforcement.
 
-1. **Infrastructure** (first TDD plan only): detect project, install framework, config, verify empty suite
-2. **RED:** Read `<behavior>` → failing test(s) → run (MUST fail) → commit: `test({phase}-{plan}): add failing test for [feature]`
-3. **GREEN:** Read `<implementation>` → minimal code → run (MUST pass) → commit: `feat({phase}-{plan}): implement [feature]`
-4. **REFACTOR:** Clean up → tests MUST pass → commit: `refactor({phase}-{plan}): clean up [feature]`
+### 1. Language Detection
+Check the plan's `<files>` elements or `files_modified` frontmatter:
+- `*.py` files present -> Python TDD mode (skill-guided)
+- `*.ts/*.js` files -> JS/TS TDD mode (existing behavior)
+- Other -> Generic TDD
 
-Errors: RED doesn't fail → investigate test/existing feature. GREEN doesn't pass → debug, iterate. REFACTOR breaks → undo.
+### 2. Infrastructure (first TDD plan only)
+If plan contains an `<infrastructure>` section:
+- Follow its instructions exactly
+- Python: see references/tdd.md `<framework_setup>` Python section
+- Verify: empty test suite runs (`uv run pytest --co` or `npm test`)
+- Commit: `chore({phase}-{plan}): scaffold test infrastructure`
 
-See `~/.claude/get-shit-done/references/tdd.md` for structure.
+If plan has NO `<infrastructure>` section, skip this step.
+
+### 3. RED Phase: Write Failing Test
+1. Read `<behavior>` from the plan's `<feature>` section
+2. Write test file following pytest-writer patterns (available in execution_context)
+3. Run tests: `uv run pytest tests/test_{module}.py -v`
+4. **GATE CHECK (non-negotiable):**
+   - Test FAILS (assertion failure) -> Record failure output as evidence -> Proceed to GREEN
+   - Test ERRORS (import/syntax error) -> Fix the error, re-run. Must FAIL, not ERROR.
+   - Test PASSES -> STOP. Do NOT proceed. Investigate:
+     a. Feature already exists? Do not duplicate.
+     b. Test is wrong (not testing intended behavior)? Fix test, re-run.
+     c. Only proceed to GREEN after test fails for the correct reason.
+5. Commit: `test({phase}-{plan}): add failing test for [feature]`
+
+### 4. GREEN Phase: Write Minimal Implementation
+1. Read `<implementation>` guidance from plan
+2. Write MINIMUM code to make the test pass (no extras, no cleverness)
+3. Run tests: `uv run pytest tests/test_{module}.py -v`
+4. **GATE CHECK (non-negotiable):**
+   - Test PASSES -> Record pass output as evidence -> Proceed to REFACTOR
+   - Test FAILS -> Debug the IMPLEMENTATION, not the test.
+     The test defines correct behavior; the code must conform.
+     Iterate until passing. Do NOT proceed to REFACTOR.
+5. Commit: `feat({phase}-{plan}): implement [feature]`
+
+### 5. REFACTOR Phase (if cleanup needed)
+1. Improve code quality: naming, structure, duplication removal
+2. Run ALL tests: `uv run pytest tests/ -v` (full suite, not just this feature)
+3. **GATE CHECK (non-negotiable):**
+   - ALL tests pass -> Record confirmation -> Done
+   - ANY test fails -> Undo the refactor change, try smaller step
+   Do NOT commit broken refactors.
+4. Commit (only if changes made): `refactor({phase}-{plan}): clean up [feature]`
+
+Even if no refactoring is performed, run `uv run pytest tests/ -v` after GREEN
+to confirm no regressions. Record the result.
+
+### 6. SUMMARY.md TDD Metadata
+For `type: tdd` plans, SUMMARY.md MUST include a TDD Cycle Evidence section:
+
+```
+## TDD Cycle Evidence
+
+**RED:**
+- Test file: tests/test_{module}.py
+- Test count: N test functions
+- Failure evidence: [pytest output line showing expected assertion failure]
+- Commit: test({phase}-{plan}): ...
+
+**GREEN:**
+- Implementation: src/{module}.py
+- Pass evidence: [pytest output showing N passed]
+- Commit: feat({phase}-{plan}): ...
+
+**REFACTOR:** [if applicable]
+- Changes: [what was improved]
+- All tests pass: [confirmation from full suite run]
+- Commit: refactor({phase}-{plan}): ...
+
+**Test Metadata:**
+- test_files_created: [list of test files]
+- test_count: [total test functions]
+- all_tests_pass: true/false
+```
+
+### Error Handling
+- RED does not fail -> Investigate (see GATE CHECK above)
+- GREEN does not pass -> Debug implementation, iterate
+- REFACTOR breaks tests -> Undo, try smaller step
+- Unrelated tests break -> Stop, investigate coupling issue before proceeding
+
+See references/tdd.md for methodology.
+Skills available in execution_context: pytest-writer (test patterns), test-driven-development (TDD discipline).
 </tdd_plan_execution>
 
 <task_commit>
@@ -277,7 +356,7 @@ Display: `CHECKPOINT: [Type]` box → Progress {X}/{Y} → Task name → type-sp
 
 After response: verify if specified. Pass → continue. Fail → inform, wait. WAIT for user — do NOT hallucinate completion.
 
-See ~/.claude/get-shit-done/references/checkpoints.md for details.
+See C:/Users/connessn/.claude/get-shit-done/references/checkpoints.md for details.
 </step>
 
 <step name="checkpoint_return_for_orchestrator">
@@ -315,11 +394,11 @@ fi
 grep -A 50 "^user_setup:" .planning/phases/XX-name/{phase}-{plan}-PLAN.md | head -50
 ```
 
-If user_setup exists: create `{phase}-USER-SETUP.md` using template `~/.claude/get-shit-done/templates/user-setup.md`. Per service: env vars table, account setup checklist, dashboard config, local dev notes, verification commands. Status "Incomplete". Set `USER_SETUP_CREATED=true`. If empty/missing: skip.
+If user_setup exists: create `{phase}-USER-SETUP.md` using template `C:/Users/connessn/.claude/get-shit-done/templates/user-setup.md`. Per service: env vars table, account setup checklist, dashboard config, local dev notes, verification commands. Status "Incomplete". Set `USER_SETUP_CREATED=true`. If empty/missing: skip.
 </step>
 
 <step name="create_summary">
-Create `{phase}-{plan}-SUMMARY.md` at `.planning/phases/XX-name/`. Use `~/.claude/get-shit-done/templates/summary.md`.
+Create `{phase}-{plan}-SUMMARY.md` at `.planning/phases/XX-name/`. Use `C:/Users/connessn/.claude/get-shit-done/templates/summary.md`.
 
 **Frontmatter:** phase, plan, subsystem, tags | requires/provides/affects | tech-stack.added/patterns | key-files.created/modified | key-decisions | duration ($DURATION), completed ($PLAN_END_TIME date).
 
@@ -337,13 +416,13 @@ Update STATE.md using gsd-tools:
 
 ```bash
 # Advance plan counter (handles last-plan edge case)
-node ~/.claude/get-shit-done/bin/gsd-tools.js state advance-plan
+node C:/Users/connessn/.claude/get-shit-done/bin/gsd-tools.js state advance-plan
 
 # Recalculate progress bar from disk state
-node ~/.claude/get-shit-done/bin/gsd-tools.js state update-progress
+node C:/Users/connessn/.claude/get-shit-done/bin/gsd-tools.js state update-progress
 
 # Record execution metrics
-node ~/.claude/get-shit-done/bin/gsd-tools.js state record-metric \
+node C:/Users/connessn/.claude/get-shit-done/bin/gsd-tools.js state record-metric \
   --phase "${PHASE}" --plan "${PLAN}" --duration "${DURATION}" \
   --tasks "${TASK_COUNT}" --files "${FILE_COUNT}"
 ```
@@ -354,11 +433,11 @@ From SUMMARY: Extract decisions and add to STATE.md:
 
 ```bash
 # Add each decision from SUMMARY key-decisions
-node ~/.claude/get-shit-done/bin/gsd-tools.js state add-decision \
+node C:/Users/connessn/.claude/get-shit-done/bin/gsd-tools.js state add-decision \
   --phase "${PHASE}" --summary "${DECISION_TEXT}" --rationale "${RATIONALE}"
 
 # Add blockers if any found
-node ~/.claude/get-shit-done/bin/gsd-tools.js state add-blocker "Blocker description"
+node C:/Users/connessn/.claude/get-shit-done/bin/gsd-tools.js state add-blocker "Blocker description"
 ```
 </step>
 
@@ -366,7 +445,7 @@ node ~/.claude/get-shit-done/bin/gsd-tools.js state add-blocker "Blocker descrip
 Update session info using gsd-tools:
 
 ```bash
-node ~/.claude/get-shit-done/bin/gsd-tools.js state record-session \
+node C:/Users/connessn/.claude/get-shit-done/bin/gsd-tools.js state record-session \
   --stopped-at "Completed ${PHASE}-${PLAN}-PLAN.md" \
   --resume-file "None"
 ```
@@ -386,7 +465,7 @@ More plans → update plan count, keep "In progress". Last plan → mark phase "
 Task code already committed per-task. Commit plan metadata:
 
 ```bash
-node ~/.claude/get-shit-done/bin/gsd-tools.js commit "docs({phase}-{plan}): complete [plan-name] plan" --files .planning/phases/XX-name/{phase}-{plan}-SUMMARY.md .planning/STATE.md .planning/ROADMAP.md
+node C:/Users/connessn/.claude/get-shit-done/bin/gsd-tools.js commit "docs({phase}-{plan}): complete [plan-name] plan" --files .planning/phases/XX-name/{phase}-{plan}-SUMMARY.md .planning/STATE.md .planning/ROADMAP.md
 ```
 </step>
 
@@ -401,7 +480,7 @@ git diff --name-only ${FIRST_TASK}^..HEAD 2>/dev/null
 Update only structural changes: new src/ dir → STRUCTURE.md | deps → STACK.md | file pattern → CONVENTIONS.md | API client → INTEGRATIONS.md | config → STACK.md | renamed → update paths. Skip code-only/bugfix/content changes.
 
 ```bash
-node ~/.claude/get-shit-done/bin/gsd-tools.js commit "" --files .planning/codebase/*.md --amend
+node C:/Users/connessn/.claude/get-shit-done/bin/gsd-tools.js commit "" --files .planning/codebase/*.md --amend
 ```
 </step>
 
