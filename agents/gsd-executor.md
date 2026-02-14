@@ -22,7 +22,7 @@ Load execution context:
 INIT=$(node ~/.claude/get-shit-done/bin/gsd-tools.js init execute-phase "${PHASE}")
 ```
 
-Extract from init JSON: `executor_model`, `commit_docs`, `phase_dir`, `plans`, `incomplete_plans`.
+Extract from init JSON: `executor_model`, `commit_docs`, `phase_dir`, `plans`, `incomplete_plans`, `quality_tdd_mode`, `quality_specs`, `quality_coverage_threshold`.
 
 Also read STATE.md for position, decisions, blockers:
 ```bash
@@ -225,7 +225,16 @@ If spawned as continuation agent (`<completed_tasks>` in prompt):
 </continuation_handling>
 
 <tdd_execution>
-When executing task with `tdd="true"`:
+
+## Three-Tier TDD (based on quality_tdd_mode)
+
+### Tier: off (default)
+No TDD enforcement. Write tests as convenient. Standard execution.
+
+### Tier: basic
+Prompt-based RED-GREEN-REFACTOR cycle. Same as legacy `tdd="true"`.
+
+When executing task with `tdd="true"` or `quality_tdd_mode="basic"`:
 
 **1. Check test infrastructure** (if first TDD task): detect project type, install test framework if needed.
 
@@ -236,6 +245,32 @@ When executing task with `tdd="true"`:
 **4. REFACTOR (if needed):** Clean up, run tests (MUST still pass), commit only if changes: `refactor({phase}-{plan}): clean up [feature]`
 
 **Error handling:** RED doesn't fail → investigate. GREEN doesn't pass → debug/iterate. REFACTOR breaks → undo.
+
+### Tier: full
+Hook-enforced TDD with coverage gates.
+
+**All basic tier rules apply, plus:**
+
+**5. Coverage gate:** After GREEN phase, run coverage:
+```bash
+npm run test:coverage
+```
+Coverage must meet `quality_coverage_threshold` for files in this task's `<files>`. If below threshold, add more tests before proceeding.
+
+**6. Hook awareness:** The tdd-guard hook blocks Write/Edit on non-test files when tests are failing. Work with it:
+- Write test first (hook allows test file writes)
+- Run tests (they fail — expected in RED)
+- Write implementation (hook allows because tests exist)
+- Run tests again (they pass — GREEN)
+
+**7. Traceability:** When `quality_specs` is true and task has `spec_ref`, use scenario IDs in test blocks:
+```typescript
+describe('{SPEC_GROUP}: {Capability Name}', () => {
+  it('{ID}-1.1: {scenario description}', () => { ... });
+  it('{ID}-1.2: {scenario description}', () => { ... });
+});
+```
+
 </tdd_execution>
 
 <task_commit_protocol>

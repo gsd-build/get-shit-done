@@ -134,6 +134,7 @@ const MODEL_PROFILES = {
   'gsd-verifier':             { quality: 'sonnet', balanced: 'sonnet', budget: 'haiku' },
   'gsd-plan-checker':         { quality: 'sonnet', balanced: 'sonnet', budget: 'haiku' },
   'gsd-integration-checker':  { quality: 'sonnet', balanced: 'sonnet', budget: 'haiku' },
+  'gsd-test-deriver':         { quality: 'opus',   balanced: 'sonnet', budget: 'sonnet' },
 };
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
@@ -168,6 +169,11 @@ function loadConfig(cwd) {
     verifier: true,
     parallelization: true,
     brave_search: false,
+    quality_tdd_mode: 'off',
+    quality_specs: false,
+    quality_feedback: false,
+    quality_checkpoints: false,
+    quality_coverage_threshold: 80,
   };
 
   try {
@@ -201,6 +207,11 @@ function loadConfig(cwd) {
       verifier: get('verifier', { section: 'workflow', field: 'verifier' }) ?? defaults.verifier,
       parallelization,
       brave_search: get('brave_search') ?? defaults.brave_search,
+      quality_tdd_mode: (parsed.quality && parsed.quality.tdd_mode) || defaults.quality_tdd_mode,
+      quality_specs: (parsed.quality && parsed.quality.specs) || defaults.quality_specs,
+      quality_feedback: (parsed.quality && parsed.quality.feedback) || defaults.quality_feedback,
+      quality_checkpoints: (parsed.quality && parsed.quality.checkpoints) || defaults.quality_checkpoints,
+      quality_coverage_threshold: (parsed.quality && parsed.quality.coverage_threshold) ?? defaults.quality_coverage_threshold,
     };
   } catch {
     return defaults;
@@ -608,6 +619,13 @@ function cmdConfigEnsureSection(cwd, raw) {
     },
     parallelization: true,
     brave_search: hasBraveSearch,
+    quality: {
+      tdd_mode: 'off',
+      specs: false,
+      feedback: false,
+      checkpoints: false,
+      coverage_threshold: 80,
+    },
   };
 
   try {
@@ -985,6 +1003,11 @@ function cmdStateLoad(cwd, raw) {
       `config_exists=${configExists}`,
       `roadmap_exists=${roadmapExists}`,
       `state_exists=${stateExists}`,
+      `quality_tdd_mode=${c.quality_tdd_mode}`,
+      `quality_specs=${c.quality_specs}`,
+      `quality_feedback=${c.quality_feedback}`,
+      `quality_checkpoints=${c.quality_checkpoints}`,
+      `quality_coverage_threshold=${c.quality_coverage_threshold}`,
     ];
     process.stdout.write(lines.join('\n'));
     process.exit(0);
@@ -3618,6 +3641,14 @@ function cmdInitExecutePhase(cwd, phase, includes, raw) {
     state_exists: pathExistsInternal(cwd, '.planning/STATE.md'),
     roadmap_exists: pathExistsInternal(cwd, '.planning/ROADMAP.md'),
     config_exists: pathExistsInternal(cwd, '.planning/config.json'),
+
+    // Quality config
+    quality_tdd_mode: config.quality_tdd_mode,
+    quality_specs: config.quality_specs,
+    quality_feedback: config.quality_feedback,
+    quality_checkpoints: config.quality_checkpoints,
+    quality_coverage_threshold: config.quality_coverage_threshold,
+    test_deriver_model: resolveModelInternal(cwd, 'gsd-test-deriver'),
   };
 
   // Include file contents if requested via --include
@@ -3670,6 +3701,12 @@ function cmdInitPlanPhase(cwd, phase, includes, raw) {
     // Environment
     planning_exists: pathExistsInternal(cwd, '.planning'),
     roadmap_exists: pathExistsInternal(cwd, '.planning/ROADMAP.md'),
+
+    // Quality config
+    quality_specs: config.quality_specs,
+    quality_tdd_mode: config.quality_tdd_mode,
+    quality_checkpoints: config.quality_checkpoints,
+    quality_coverage_threshold: config.quality_coverage_threshold,
   };
 
   // Include file contents if requested via --include

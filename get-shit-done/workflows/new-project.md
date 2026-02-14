@@ -347,6 +347,27 @@ node ~/.claude/get-shit-done/bin/gsd-tools.js commit "chore: add project config"
 
 **Note:** Run `/gsd:settings` anytime to update these preferences.
 
+**Round 3 — Quality enforcement (optional):**
+
+```
+questions: [
+  {
+    header: "Quality",
+    question: "Enable quality enforcement features?",
+    multiSelect: false,
+    options: [
+      { label: "Skip", description: "No quality enforcement — standard GSD behavior" },
+      { label: "Minimal", description: "Basic TDD + feedback tracking" },
+      { label: "Standard", description: "TDD + specs + feedback + checkpoints" },
+      { label: "Full", description: "Hook-enforced TDD + specs + feedback + checkpoints" }
+    ]
+  }
+]
+```
+
+If not "Skip", apply the selected preset to config.json quality section.
+Run `/gsd:setup-quality` later to change these settings.
+
 ## 5.5. Resolve Model Profile
 
 Use models from init: `researcher_model`, `synthesizer_model`, `roadmapper_model`.

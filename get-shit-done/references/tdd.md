@@ -4,6 +4,20 @@ TDD is about design quality, not coverage metrics. The red-green-refactor cycle 
 **Principle:** If you can describe the behavior as `expect(fn(input)).toBe(output)` before writing `fn`, TDD improves the result.
 
 **Key insight:** TDD work is fundamentally heavier than standard tasks—it requires 2-3 execution cycles (RED → GREEN → REFACTOR), each with file reads, test runs, and potential debugging. TDD features get dedicated plans to ensure full context is available throughout the cycle.
+
+## Three-Tier TDD (quality.tdd_mode)
+
+GSD supports three TDD enforcement levels via `quality.tdd_mode` in `.planning/config.json`:
+
+| Tier | Behavior | Use when |
+|------|----------|----------|
+| `off` | No enforcement. Tests optional. | Default — existing GSD behavior |
+| `basic` | Prompt-based RED-GREEN-REFACTOR. Same as legacy `tdd="true"`. | Standard projects |
+| `full` | Hook-enforced TDD with coverage gates. | High-reliability projects |
+
+**Full tier adds:** `tdd-guard` hook that blocks writes when tests fail, coverage threshold enforcement. See `quality-enforcement.md` for details.
+
+Configure: `/gsd:setup-quality` or edit `.planning/config.json` directly.
 </overview>
 
 <when_to_use_tdd>

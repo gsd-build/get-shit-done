@@ -191,4 +191,66 @@ Squash merge is recommended — keeps main branch history clean while preserving
 
 </branching_strategy_behavior>
 
+<quality_config>
+
+## Quality Enforcement
+
+Optional quality features that extend GSD's execution model. All features default to off — enable via `/gsd:setup-quality` or edit `.planning/config.json`.
+
+<quality_schema>
+```json
+"quality": {
+  "tdd_mode": "off",
+  "specs": false,
+  "feedback": false,
+  "checkpoints": false,
+  "coverage_threshold": 80
+}
+```
+
+| Option | Default | Values | Description |
+|--------|---------|--------|-------------|
+| `tdd_mode` | `"off"` | `"off"`, `"basic"`, `"full"` | TDD enforcement level |
+| `specs` | `false` | `true/false` | Enable structured spec → Gherkin → test traceability |
+| `feedback` | `false` | `true/false` | Track issues in `.feedback/` with lifecycle management |
+| `checkpoints` | `false` | `true/false` | Pre/post implementation quality gates |
+| `coverage_threshold` | `80` | `0-100` | Minimum test coverage % (enforced in `tdd_mode: "full"`) |
+</quality_schema>
+
+<tdd_tiers>
+
+### TDD Mode: off (default)
+No enforcement. Tests optional. Existing GSD behavior unchanged.
+
+### TDD Mode: basic
+Prompt-based RED-GREEN-REFACTOR. Extends existing `tdd="true"` task attribute.
+- Executor follows red/green/refactor cycle for TDD tasks
+- 2-3 atomic commits per TDD feature (test, impl, refactor)
+- Advisory — not hook-enforced
+
+### TDD Mode: full
+Hook-enforced TDD with coverage gates.
+- Everything from basic, plus:
+- `tdd-guard` hook blocks writes when tests fail
+- Coverage must meet `coverage_threshold` after GREEN phase
+- Install hooks: `/gsd:setup-tdd-hooks`
+
+</tdd_tiers>
+
+<quality_presets>
+
+### Quick Setup Presets
+
+| Preset | tdd_mode | specs | feedback | checkpoints |
+|--------|----------|-------|----------|-------------|
+| minimal | basic | false | true | false |
+| standard | basic | true | true | true |
+| full | full | true | true | true |
+
+Configure: `/gsd:setup-quality` or `/gsd:setup-quality --standard`
+
+</quality_presets>
+
+</quality_config>
+
 </planning_config>
