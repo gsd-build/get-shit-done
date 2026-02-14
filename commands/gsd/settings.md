@@ -14,7 +14,7 @@ Interactive configuration of GSD workflow agents and model profile via multi-que
 Routes to the settings workflow which handles:
 - Config existence ensuring
 - Current settings reading and parsing
-- Interactive 5-question prompt (model, research, plan_check, verifier, branching)
+- Interactive 6-question prompt (model, research, plan_check, verifier, branching, agent_teams)
 - Config merging and writing
 - Confirmation display with quick command references
 </objective>
