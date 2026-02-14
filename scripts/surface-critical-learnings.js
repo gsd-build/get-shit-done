@@ -19,8 +19,8 @@ function parseArgs() {
   const args = process.argv.slice(2);
   const parsed = {
     milestone: null,
-    similarityThreshold: 0.75,
-    minClusterSize: 3,
+    similarityThreshold: 0.55,
+    minClusterSize: 2,
     maxLearnings: 15,
     dryRun: false,
     help: false
@@ -66,8 +66,8 @@ them to project CLAUDE.md with marker-delimited sections.
 
 Options:
   --milestone <version>     Milestone version for reporting (required)
-  --similarity <n>          Similarity threshold for clustering (default: 0.75)
-  --min-cluster <n>         Minimum cluster size for criticality (default: 3)
+  --similarity <n>          Similarity threshold for clustering (default: 0.55)
+  --min-cluster <n>         Minimum cluster size for criticality (default: 2)
   --max <n>                 Maximum learnings to surface (default: 15)
   --dry-run                 Show what would be appended without writing
   --help, -h                Show this help message

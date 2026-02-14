@@ -49,8 +49,8 @@ function cosineSimilarity(vecA, vecB) {
  */
 async function detectCriticalLearnings(projectId, options = {}) {
   const {
-    similarityThreshold = 0.75,
-    minClusterSize = 3,
+    similarityThreshold = 0.55,
+    minClusterSize = 2,
     maxLearnings = 15
   } = options;
 
@@ -91,18 +91,8 @@ async function detectCriticalLearnings(projectId, options = {}) {
       return [];
     }
 
-    // Extract vectors and metadata
-    const items = [];
-    for (const item of allItems) {
-      const itemData = await index.getItem(item);
-      if (itemData && itemData.vector && itemData.metadata) {
-        items.push({
-          id: item,
-          vector: itemData.vector,
-          metadata: itemData.metadata
-        });
-      }
-    }
+    // listItems() returns full objects with { id, metadata, vector, norm }
+    const items = allItems.filter(item => item && item.vector && item.metadata);
 
     if (items.length === 0) {
       return [];
