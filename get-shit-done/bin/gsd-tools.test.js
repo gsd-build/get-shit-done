@@ -4595,10 +4595,13 @@ describe('event log command', () => {
   });
 
   test('writes entry with --details JSON', () => {
-    // Use escaped JSON that survives Windows cmd.exe shell expansion
-    const details = '{"phase":1,"plan":2}';
-    const result = runGsdTools(['event', 'log', 'execution', 'task-done', '--details', details, '--raw'], tmpDir);
-    assert.ok(result.success, `Command failed: ${result.error}`);
+    // Use spawnSync with array args to avoid shell quoting issues with JSON
+    const { spawnSync: spawnTool } = require('child_process');
+    const res = spawnTool(process.execPath, [
+      TOOLS_PATH, 'event', 'log', 'execution', 'task-done',
+      '--details', '{"phase":1,"plan":2}', '--raw'
+    ], { cwd: tmpDir, encoding: 'utf8', timeout: 10000 });
+    assert.strictEqual(res.status, 0, `Command failed: ${res.stderr}`);
 
     const eventsPath = path.join(tmpDir, '.planning', 'logs', 'events.jsonl');
     const entry = JSON.parse(fs.readFileSync(eventsPath, 'utf8').trim());
