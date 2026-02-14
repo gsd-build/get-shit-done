@@ -362,6 +362,22 @@ Read ROADMAP.md to get the next phase's name and goal.
 
 <if mode="yolo">
 
+Check if `*-CONTEXT.md` exists in the next phase's directory.
+
+**If CONTEXT.md does NOT exist:**
+
+```
+Phase [X] marked complete.
+
+Next: Phase [X+1] — [Name]
+
+⚡ Auto-continuing: Gather context for Phase [X+1]
+```
+
+Exit skill and invoke SlashCommand("/gsd:discuss-phase [X+1]")
+
+**If CONTEXT.md exists:**
+
 ```
 Phase [X] marked complete.
 
@@ -376,6 +392,10 @@ Exit skill and invoke SlashCommand("/gsd:plan-phase [X+1]")
 
 <if mode="interactive" OR="custom with gates.confirm_transition true">
 
+Check if `*-CONTEXT.md` exists in the next phase's directory.
+
+**If CONTEXT.md does NOT exist:**
+
 ```
 ## ✓ Phase [X] Complete
 
@@ -385,6 +405,32 @@ Exit skill and invoke SlashCommand("/gsd:plan-phase [X+1]")
 
 **Phase [X+1]: [Name]** — [Goal from ROADMAP.md]
 
+`/gsd:discuss-phase [X+1]` — gather context and clarify approach
+
+<sub>`/clear` first → fresh context window</sub>
+
+---
+
+**Also available:**
+- `/gsd:plan-phase [X+1]` — skip discussion, plan directly
+- `/gsd:research-phase [X+1]` — investigate unknowns
+- Review roadmap
+
+---
+```
+
+**If CONTEXT.md exists:**
+
+```
+## ✓ Phase [X] Complete
+
+---
+
+## ▶ Next Up
+
+**Phase [X+1]: [Name]** — [Goal from ROADMAP.md]
+<sub>✓ Context gathered, ready to plan</sub>
+
 `/gsd:plan-phase [X+1]`
 
 <sub>`/clear` first → fresh context window</sub>
@@ -392,7 +438,7 @@ Exit skill and invoke SlashCommand("/gsd:plan-phase [X+1]")
 ---
 
 **Also available:**
-- `/gsd:discuss-phase [X+1]` — gather context first
+- `/gsd:discuss-phase [X+1]` — update existing context
 - `/gsd:research-phase [X+1]` — investigate unknowns
 - Review roadmap
 
