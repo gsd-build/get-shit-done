@@ -99,8 +99,66 @@ If no must_haves in frontmatter, derive using goal-backward process:
 <!-- Goal-backward derivation expertise is baked into the gsd-verifier agent -->
 </step>
 
+<step name="query_past_antipatterns">
+**Query knowledge base for known anti-patterns relevant to this phase.**
+
+Get phase goal for semantic query:
+
+```bash
+PHASE_GOAL=$(node /Users/gshah/.claude/get-shit-done/bin/gsd-tools.js roadmap get-phase "${PHASE_NUM}" 2>/dev/null | jq -r '.goal // empty')
+```
+
+Query anti-patterns:
+
+```bash
+PAST_ANTIPATTERNS=$(node scripts/query-learnings.js \
+  --query "Common mistakes and anti-patterns for: ${PHASE_GOAL}" \
+  --type anti-pattern \
+  --top-k 5 \
+  --min-score 0.30 \
+  --format checklist 2>&1 | grep -v "mutex\|libc")
+```
+
+Build anti-pattern context block:
+
+```bash
+ANTIPATTERN_CONTEXT=""
+if [ -n "$PAST_ANTIPATTERNS" ]; then
+  # Check if results are not just "No past learnings found" message
+  if echo "$PAST_ANTIPATTERNS" | grep -q "Pitfall"; then
+    ANTIPATTERN_CONTEXT="<known_antipatterns>
+## Check These Anti-Patterns FIRST (From Past Phases)
+
+${PAST_ANTIPATTERNS}
+
+**Verification priority:**
+1. Check for each anti-pattern listed above
+2. If found: mark as FAILED with reference to source phase
+3. If not found: note as 'avoided known anti-pattern'
+</known_antipatterns>"
+  fi
+fi
+```
+
+Display status:
+
+```bash
+if [ -n "$ANTIPATTERN_CONTEXT" ]; then
+  ANTIPATTERN_COUNT=$(echo "$PAST_ANTIPATTERNS" | grep -c "^[0-9]" 2>/dev/null || echo "0")
+  echo "◆ Querying past anti-patterns..."
+  echo "  Found: ${ANTIPATTERN_COUNT} known anti-patterns to check"
+else
+  echo "◆ No past anti-patterns found (possibly first implementation in this domain)"
+fi
+```
+
+**Note:** `ANTIPATTERN_CONTEXT` is available to `scan_antipatterns` and `verify_truths` steps for enhanced verification.
+</step>
+
 <step name="verify_truths">
 **For each observable truth, determine if codebase enables it.**
+
+**NOTE:** If `ANTIPATTERN_CONTEXT` is available from previous step, be aware of known failure modes when verifying truths.
 
 A truth is achievable if the supporting artifacts exist, are substantive, and are wired correctly.
 
@@ -396,6 +454,8 @@ For each requirement:
 
 <step name="scan_antipatterns">
 **Scan for anti-patterns across phase files.**
+
+**NOTE:** If `ANTIPATTERN_CONTEXT` is available, prioritize checking for those known anti-patterns in addition to the generic scan below.
 
 Identify files modified in this phase:
 ```bash
