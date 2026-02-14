@@ -296,24 +296,14 @@ node ~/.claude/get-shit-done/bin/gsd-tools.js commit "docs(phase-{X}): complete 
 
 <step name="offer_next">
 
-**If more phases:**
+Delegate post-completion routing to the transition workflow, which handles CONTEXT.md-aware routing, PROJECT.md evolution, and milestone detection:
+
 ```
-## Next Up
+## ▶ Next Up
 
-**Phase {X+1}: {Name}** — {Goal}
-
-`/gsd:plan-phase {X+1}`
+`/gsd:transition`
 
 <sub>`/clear` first for fresh context</sub>
-```
-
-**If milestone complete:**
-```
-MILESTONE COMPLETE!
-
-All {N} phases executed.
-
-`/gsd:complete-milestone`
 ```
 </step>
 
