@@ -850,6 +850,11 @@ git add .planning/MILESTONES.md
 git add .planning/PROJECT.md
 git add .planning/STATE.md
 
+# Stage docs/ if documentation was generated
+if [ -d docs/docs ]; then
+  git add docs/
+fi
+
 # Stage deletions
 git add -u .planning/
 
