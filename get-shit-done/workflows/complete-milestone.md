@@ -607,6 +607,64 @@ else
 fi
 ```
 
+Continue to extract_learnings step.
+
+</step>
+
+<step name="extract_learnings">
+
+Extract knowledge from completed phases and embed into vector database.
+This step is controlled by `learning.auto_extract_on_milestone` in `.planning/config.json` (default: true).
+
+**Check if extraction is enabled:**
+
+```bash
+EXTRACT_LEARNINGS=$(cat .planning/config.json 2>/dev/null | grep -o '"auto_extract_on_milestone"[[:space:]]*:[[:space:]]*[^,}]*' | grep -o 'true\|false' || echo "true")
+
+if [ "$EXTRACT_LEARNINGS" = "false" ]; then
+  echo "Knowledge extraction not enabled (set learning.auto_extract_on_milestone: true in .planning/config.json)"
+  # Continue to next step
+fi
+```
+
+**Check if extraction script exists:**
+
+```bash
+if [ ! -f scripts/extract-learnings.js ]; then
+  echo "Skipping knowledge extraction (scripts/extract-learnings.js not found)"
+  # Continue to next step
+fi
+```
+
+**If enabled and script exists, extract learnings:**
+
+```bash
+echo ""
+echo "Extracting knowledge from completed phases..."
+echo ""
+
+# Get milestone version from context
+# The variable should already be set from earlier steps (verify_readiness)
+# If not set, extract from MILESTONES.md or ask user
+MILESTONE_VERSION="${MILESTONE_VERSION:-v1.0}"
+
+node scripts/extract-learnings.js --milestone "$MILESTONE_VERSION"
+
+if [ $? -ne 0 ]; then
+  echo ""
+  echo "⚠️  Warning: Knowledge extraction encountered errors"
+  echo "   Continuing with milestone completion..."
+  echo ""
+  echo "   To retry later: node scripts/extract-learnings.js --milestone $MILESTONE_VERSION"
+  echo ""
+else
+  echo ""
+  echo "✓ Knowledge extracted and embedded into vector database"
+  echo "✓ Learnings saved to .planning/learnings/$MILESTONE_VERSION/"
+  echo ""
+fi
+```
+
 Continue to update_state step.
 
 </step>
