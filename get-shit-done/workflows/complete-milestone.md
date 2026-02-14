@@ -547,12 +547,20 @@ Confirm:
 
 <step name="generate_documentation">
 
-Regenerate documentation from current .planning/ state before tagging the milestone.
+Optionally regenerate documentation from current .planning/ state before tagging the milestone.
+This step is controlled by `docs.auto_generate` in `.planning/config.json` (default: false).
+Users who prefer to generate docs manually can run `/gsd:docs` at any time.
 
-**Check if docs infrastructure exists:**
+**Check if auto-generation is enabled:**
 
 ```bash
-if [ ! -f scripts/generate-docs.js ]; then
+AUTO_GENERATE_DOCS=$(cat .planning/config.json 2>/dev/null | grep -o '"auto_generate"[[:space:]]*:[[:space:]]*[^,}]*' | grep -o 'true\|false' || echo "false")
+
+if [ "$AUTO_GENERATE_DOCS" != "true" ]; then
+  echo "Documentation auto-generation not enabled (set docs.auto_generate: true in .planning/config.json)"
+  echo "Run /gsd:docs manually to generate documentation"
+  # Continue to next step
+elif [ ! -f scripts/generate-docs.js ]; then
   echo "Skipping documentation generation (scripts/generate-docs.js not found)"
   # Continue to next step - docs setup is optional
 else

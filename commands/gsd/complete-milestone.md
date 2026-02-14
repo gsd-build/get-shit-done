@@ -100,11 +100,13 @@ Output: Milestone archived (roadmap + requirements), PROJECT.md evolved, git tag
    - Add "Next Milestone Goals" section
    - Archive previous content in `<details>` (if v1.1+)
 
-7. **Generate documentation:**
+7. **Generate documentation (optional):**
+   - Only runs if `docs.auto_generate: true` in `.planning/config.json` (default: false)
    - Run `node scripts/generate-docs.js` to regenerate docs from updated .planning/ artifacts
    - Install Docusaurus dependencies if needed (`pnpm install --dir docs`)
-   - If deployment enabled in `.planning/config.json` (`docs.deploy_to_github_pages: true`), run deployment preparation
+   - If deployment enabled (`docs.deploy_to_github_pages: true`), run deployment preparation
    - Non-blocking: warns on failure, does not prevent milestone completion
+   - Users can always run `/gsd:docs` manually instead
 
 8. **Commit and tag:**
 
