@@ -38,7 +38,11 @@
   },
   "dependencies": {},
   "devDependencies": {
-    "esbuild": "^0.24.0"
+    "@anthropic-ai/sdk": "^0.30.0",
+    "esbuild": "^0.24.0",
+    "fast-glob": "^3.3.0",
+    "gray-matter": "^4.0.3",
+    "zod": "^3.23.0"
   },
   "scripts": {
     "build:hooks": "node scripts/build-hooks.js",
@@ -46,6 +50,7 @@
     "docs:generate": "node scripts/generate-docs.js",
     "docs:dev": "node scripts/generate-docs.js && pnpm --dir docs start",
     "docs:build": "node scripts/generate-docs.js && pnpm --dir docs build",
-    "docs:deploy-prepare": "node scripts/prepare-gh-pages-deployment.js"
+    "docs:deploy-prepare": "node scripts/prepare-gh-pages-deployment.js",
+    "learn:extract": "node scripts/extract-learnings.js"
   }
 }
