@@ -1,0 +1,19 @@
+{
+  "name": "family-savings",
+  "version": "1.0.0",
+  "description": "Family savings and budgeting app with real-time transfers and WhatsApp notifications",
+  "main": "server.js",
+  "scripts": {
+    "start": "node server.js",
+    "dev": "node server.js"
+  },
+  "keywords": [
+    "savings",
+    "budget",
+    "family",
+    "finance",
+    "whatsapp"
+  ],
+  "author": "",
+  "license": "MIT"
+}
