@@ -5580,3 +5580,260 @@ describe('resolve-model with per-agent overrides', () => {
     assert.strictEqual(output.override, undefined, 'should not have override flag');
   });
 });
+
+// ─────────────────────────────────────────────────────────────────────────────
+// resolve-context command
+// ─────────────────────────────────────────────────────────────────────────────
+
+describe('resolve-context command', () => {
+  let tmpDir;
+
+  beforeEach(() => {
+    tmpDir = createTempProject();
+  });
+
+  afterEach(() => {
+    cleanup(tmpDir);
+  });
+
+  test('returns dev by default', () => {
+    const result = runGsdTools('resolve-context', tmpDir);
+    assert.ok(result.success, `Command failed: ${result.error}`);
+
+    const output = JSON.parse(result.output);
+    assert.strictEqual(output.context, 'dev', 'default context should be dev');
+    assert.strictEqual(output.risk_tolerance, 'medium', 'dev risk tolerance is medium');
+    assert.strictEqual(output.verbosity, 'low', 'dev verbosity is low');
+    assert.strictEqual(output.focus, 'shipping', 'dev focus is shipping');
+  });
+
+  test('reads explicit context from config', () => {
+    fs.writeFileSync(
+      path.join(tmpDir, '.planning', 'config.json'),
+      JSON.stringify({ behavioral_context: 'research' })
+    );
+
+    const result = runGsdTools('resolve-context', tmpDir);
+    assert.ok(result.success, `Command failed: ${result.error}`);
+
+    const output = JSON.parse(result.output);
+    assert.strictEqual(output.context, 'research', 'should use config context');
+    assert.strictEqual(output.risk_tolerance, 'low', 'research risk tolerance is low');
+    assert.strictEqual(output.verbosity, 'high', 'research verbosity is high');
+    assert.strictEqual(output.focus, 'thoroughness', 'research focus is thoroughness');
+  });
+
+  test('reads review context from config', () => {
+    fs.writeFileSync(
+      path.join(tmpDir, '.planning', 'config.json'),
+      JSON.stringify({ behavioral_context: 'review' })
+    );
+
+    const result = runGsdTools('resolve-context', tmpDir);
+    assert.ok(result.success, `Command failed: ${result.error}`);
+
+    const output = JSON.parse(result.output);
+    assert.strictEqual(output.context, 'review', 'should use review context');
+    assert.strictEqual(output.risk_tolerance, 'very_low', 'review risk tolerance is very_low');
+    assert.strictEqual(output.verbosity, 'medium', 'review verbosity is medium');
+    assert.strictEqual(output.focus, 'accuracy', 'review focus is accuracy');
+  });
+
+  test('auto-detects context from active skill file', () => {
+    fs.writeFileSync(
+      path.join(tmpDir, '.planning', 'config.json'),
+      JSON.stringify({ behavioral_context: 'auto' })
+    );
+    fs.writeFileSync(
+      path.join(tmpDir, '.planning', '.active-skill'),
+      'verify-work'
+    );
+
+    const result = runGsdTools('resolve-context', tmpDir);
+    assert.ok(result.success, `Command failed: ${result.error}`);
+
+    const output = JSON.parse(result.output);
+    assert.strictEqual(output.context, 'review', 'verify-work should map to review');
+  });
+
+  test('auto-detects dev from execute-phase skill', () => {
+    fs.writeFileSync(
+      path.join(tmpDir, '.planning', '.active-skill'),
+      'execute-phase'
+    );
+
+    const result = runGsdTools('resolve-context', tmpDir);
+    assert.ok(result.success, `Command failed: ${result.error}`);
+
+    const output = JSON.parse(result.output);
+    assert.strictEqual(output.context, 'dev', 'execute-phase should map to dev');
+  });
+
+  test('auto-detects research from plan-phase skill', () => {
+    fs.writeFileSync(
+      path.join(tmpDir, '.planning', '.active-skill'),
+      'plan-phase'
+    );
+
+    const result = runGsdTools('resolve-context', tmpDir);
+    assert.ok(result.success, `Command failed: ${result.error}`);
+
+    const output = JSON.parse(result.output);
+    assert.strictEqual(output.context, 'research', 'plan-phase should map to research');
+  });
+
+  test('explicit config overrides active skill', () => {
+    fs.writeFileSync(
+      path.join(tmpDir, '.planning', 'config.json'),
+      JSON.stringify({ behavioral_context: 'review' })
+    );
+    fs.writeFileSync(
+      path.join(tmpDir, '.planning', '.active-skill'),
+      'execute-phase'
+    );
+
+    const result = runGsdTools('resolve-context', tmpDir);
+    assert.ok(result.success, `Command failed: ${result.error}`);
+
+    const output = JSON.parse(result.output);
+    assert.strictEqual(output.context, 'review', 'explicit config should override skill detection');
+  });
+
+  test('invalid config context falls back to auto-detect', () => {
+    fs.writeFileSync(
+      path.join(tmpDir, '.planning', 'config.json'),
+      JSON.stringify({ behavioral_context: 'nonexistent' })
+    );
+    fs.writeFileSync(
+      path.join(tmpDir, '.planning', '.active-skill'),
+      'research-phase'
+    );
+
+    const result = runGsdTools('resolve-context', tmpDir);
+    assert.ok(result.success, `Command failed: ${result.error}`);
+
+    const output = JSON.parse(result.output);
+    assert.strictEqual(output.context, 'research', 'should fall back to auto-detect from skill');
+  });
+
+  test('raw mode returns human-readable string', () => {
+    const result = runGsdTools('resolve-context --raw', tmpDir);
+    assert.ok(result.success, `Command failed: ${result.error}`);
+
+    assert.ok(result.output.includes('Context: dev'), 'raw output should include context name');
+    assert.ok(result.output.includes('risk: medium'), 'raw output should include risk');
+    assert.ok(result.output.includes('verbosity: low'), 'raw output should include verbosity');
+  });
+});
+
+// ─────────────────────────────────────────────────────────────────────────────
+// override command
+// ─────────────────────────────────────────────────────────────────────────────
+
+describe('override command', () => {
+  let tmpDir;
+
+  beforeEach(() => {
+    tmpDir = createTempProject();
+  });
+
+  afterEach(() => {
+    cleanup(tmpDir);
+  });
+
+  test('override add creates override entry', () => {
+    const result = runGsdTools('override add --must-have "Unit tests for auth" --reason "Tested via integration"', tmpDir);
+    assert.ok(result.success, `Command failed: ${result.error}`);
+
+    const output = JSON.parse(result.output);
+    assert.strictEqual(output.must_have, 'Unit tests for auth', 'must_have should match');
+    assert.strictEqual(output.reason, 'Tested via integration', 'reason should match');
+    assert.strictEqual(output.accepted_by, 'user', 'accepted_by should be user');
+    assert.ok(output.accepted_at, 'should have accepted_at timestamp');
+
+    // Verify file was created
+    const overrides = JSON.parse(fs.readFileSync(path.join(tmpDir, '.planning', 'overrides.json'), 'utf8'));
+    assert.strictEqual(overrides.length, 1, 'should have 1 override');
+    assert.strictEqual(overrides[0].must_have, 'Unit tests for auth');
+  });
+
+  test('override list with no overrides', () => {
+    const result = runGsdTools('override list --raw', tmpDir);
+    assert.ok(result.success, `Command failed: ${result.error}`);
+
+    const output = JSON.parse(result.output);
+    assert.deepStrictEqual(output.overrides, [], 'should return empty array');
+  });
+
+  test('override add/list/remove lifecycle', () => {
+    // Add first override
+    const addResult1 = runGsdTools('override add --must-have "Test A" --reason "Reason A"', tmpDir);
+    assert.ok(addResult1.success, `Add 1 failed: ${addResult1.error}`);
+
+    // Add second override
+    const addResult2 = runGsdTools('override add --must-have "Test B" --reason "Reason B"', tmpDir);
+    assert.ok(addResult2.success, `Add 2 failed: ${addResult2.error}`);
+
+    // List should show both
+    const listResult = runGsdTools('override list --raw', tmpDir);
+    assert.ok(listResult.success, `List failed: ${listResult.error}`);
+    const listOutput = JSON.parse(listResult.output);
+    assert.strictEqual(listOutput.overrides.length, 2, 'should have 2 overrides');
+
+    // Remove first
+    const removeResult = runGsdTools('override remove --must-have "Test A"', tmpDir);
+    assert.ok(removeResult.success, `Remove failed: ${removeResult.error}`);
+    const removeOutput = JSON.parse(removeResult.output);
+    assert.strictEqual(removeOutput.removed, true, 'should report removed');
+
+    // List should show only second
+    const listResult2 = runGsdTools('override list --raw', tmpDir);
+    assert.ok(listResult2.success, `List 2 failed: ${listResult2.error}`);
+    const listOutput2 = JSON.parse(listResult2.output);
+    assert.strictEqual(listOutput2.overrides.length, 1, 'should have 1 override remaining');
+    assert.strictEqual(listOutput2.overrides[0].must_have, 'Test B', 'remaining should be Test B');
+  });
+
+  test('override add blocks duplicates', () => {
+    // Add first
+    runGsdTools('override add --must-have "Test A" --reason "Reason A"', tmpDir);
+
+    // Add duplicate should fail
+    const result = runGsdTools('override add --must-have "Test A" --reason "Different reason"', tmpDir);
+    assert.ok(!result.success, 'duplicate should fail');
+    assert.ok(result.error.includes('already exists'), 'error should mention already exists');
+  });
+
+  test('override remove nonexistent returns false', () => {
+    const result = runGsdTools('override remove --must-have "Nonexistent"', tmpDir);
+    assert.ok(result.success, `Command failed: ${result.error}`);
+
+    const output = JSON.parse(result.output);
+    assert.strictEqual(output.removed, false, 'should report not removed');
+  });
+
+  test('override add without required args fails', () => {
+    const result = runGsdTools('override add', tmpDir);
+    assert.ok(!result.success, 'should fail without args');
+  });
+
+  test('override remove without required args fails', () => {
+    const result = runGsdTools('override remove', tmpDir);
+    assert.ok(!result.success, 'should fail without args');
+  });
+
+  test('override list without overrides.json returns empty', () => {
+    // No overrides.json file exists
+    const result = runGsdTools('override list --raw', tmpDir);
+    assert.ok(result.success, `Command failed: ${result.error}`);
+
+    const output = JSON.parse(result.output);
+    assert.deepStrictEqual(output.overrides, [], 'should be empty with no file');
+  });
+
+  test('unknown override subcommand returns error', () => {
+    const result = runGsdTools('override unknown', tmpDir);
+    assert.ok(!result.success, 'should fail for unknown subcommand');
+    assert.ok(result.error.includes('Unknown override subcommand'), 'error should mention unknown subcommand');
+  });
+});

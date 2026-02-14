@@ -47,6 +47,15 @@
  *   milestone complete <version>       Archive milestone, create MILESTONES.md
  *     [--name <name>]
  *
+ * Behavioral Contexts:
+ *   resolve-context                    Get active behavioral context + settings
+ *
+ * Verification Overrides:
+ *   override add --must-have <text>    Add a verification override
+ *     --reason <text>
+ *   override list                      List all verification overrides
+ *   override remove --must-have <text> Remove a verification override
+ *
  * Validation:
  *   validate consistency               Check phase numbering, disk/roadmap sync
  *
@@ -5961,6 +5970,116 @@ function cmdEventClear(cwd, logName, raw) {
   output({ cleared: logName }, raw, `Cleared ${logName} log`);
 }
 
+// ─── Behavioral Contexts ─────────────────────────────────────────────────────
+
+const BEHAVIORAL_CONTEXTS = {
+  dev: { risk_tolerance: 'medium', verbosity: 'low', focus: 'shipping' },
+  research: { risk_tolerance: 'low', verbosity: 'high', focus: 'thoroughness' },
+  review: { risk_tolerance: 'very_low', verbosity: 'medium', focus: 'accuracy' }
+};
+
+const SKILL_CONTEXT_MAP = {
+  'execute-phase': 'dev',
+  'quick': 'dev',
+  'plan-phase': 'research',
+  'research-phase': 'research',
+  'verify-work': 'review',
+  'code-review': 'review'
+};
+
+function cmdResolveContext(cwd, raw) {
+  // Check config for explicit behavioral_context setting
+  let configContext = 'auto';
+  try {
+    const configPath = path.join(cwd, '.planning', 'config.json');
+    if (fs.existsSync(configPath)) {
+      const config = JSON.parse(fs.readFileSync(configPath, 'utf8'));
+      if (config.behavioral_context) { configContext = config.behavioral_context; }
+    }
+  } catch (e) { /* ignore parse errors */ }
+
+  let context = 'dev'; // default
+  if (configContext !== 'auto' && BEHAVIORAL_CONTEXTS[configContext]) {
+    context = configContext;
+  } else {
+    // Auto-detect from active skill file
+    const skillPath = path.join(cwd, '.planning', '.active-skill');
+    if (fs.existsSync(skillPath)) {
+      try {
+        const skill = fs.readFileSync(skillPath, 'utf8').trim();
+        for (const [key, ctx] of Object.entries(SKILL_CONTEXT_MAP)) {
+          if (skill.includes(key)) { context = ctx; break; }
+        }
+      } catch (e) { /* ignore read errors */ }
+    }
+  }
+
+  const settings = BEHAVIORAL_CONTEXTS[context];
+  output({ context, ...settings }, raw, `Context: ${context} (risk: ${settings.risk_tolerance}, verbosity: ${settings.verbosity})`);
+}
+
+// ─── Verification Overrides ──────────────────────────────────────────────────
+
+function cmdOverrideAdd(cwd, mustHave, reason, raw) {
+  if (!mustHave || !reason) { error('Usage: override add --must-have <text> --reason <text>'); }
+  const overridesPath = path.join(cwd, '.planning', 'overrides.json');
+  let overrides = [];
+  if (fs.existsSync(overridesPath)) {
+    try { overrides = JSON.parse(fs.readFileSync(overridesPath, 'utf8')); } catch (e) { /* ignore */ }
+  }
+  // Check for duplicate
+  if (overrides.some(o => o.must_have === mustHave)) {
+    error(`Override already exists for: ${mustHave}`);
+  }
+  const entry = {
+    must_have: mustHave,
+    reason,
+    accepted_by: 'user',
+    accepted_at: new Date().toISOString()
+  };
+  overrides.push(entry);
+  // Ensure .planning directory exists
+  const planningDir = path.join(cwd, '.planning');
+  if (!fs.existsSync(planningDir)) { fs.mkdirSync(planningDir, { recursive: true }); }
+  fs.writeFileSync(overridesPath, JSON.stringify(overrides, null, 2));
+  output(entry, raw, `Override added: "${mustHave}"`);
+}
+
+function cmdOverrideList(cwd, raw) {
+  const overridesPath = path.join(cwd, '.planning', 'overrides.json');
+  let overrides = [];
+  if (fs.existsSync(overridesPath)) {
+    try { overrides = JSON.parse(fs.readFileSync(overridesPath, 'utf8')); } catch (e) { /* ignore */ }
+  }
+  if (raw) {
+    output({ overrides });
+  } else {
+    if (overrides.length === 0) {
+      output({ overrides: [] }, false, 'No verification overrides');
+    } else {
+      const lines = overrides.map(o => `- "${o.must_have}" -- ${o.reason} (${o.accepted_by}, ${o.accepted_at})`);
+      output({ overrides }, false, lines.join('\n'));
+    }
+  }
+}
+
+function cmdOverrideRemove(cwd, mustHave, raw) {
+  if (!mustHave) { error('Usage: override remove --must-have <text>'); }
+  const overridesPath = path.join(cwd, '.planning', 'overrides.json');
+  let overrides = [];
+  if (fs.existsSync(overridesPath)) {
+    try { overrides = JSON.parse(fs.readFileSync(overridesPath, 'utf8')); } catch (e) { /* ignore */ }
+  }
+  const before = overrides.length;
+  overrides = overrides.filter(o => o.must_have !== mustHave);
+  const removed = before > overrides.length;
+  // Ensure .planning directory exists
+  const planningDir = path.join(cwd, '.planning');
+  if (!fs.existsSync(planningDir)) { fs.mkdirSync(planningDir, { recursive: true }); }
+  fs.writeFileSync(overridesPath, JSON.stringify(overrides, null, 2));
+  output({ removed }, raw, removed ? `Override removed: "${mustHave}"` : `No override found for: "${mustHave}"`);
+}
+
 // ─── CLI Router ───────────────────────────────────────────────────────────────
 
 async function main() {
@@ -6475,6 +6594,31 @@ async function main() {
           break;
         default:
           error(`Unknown event subcommand: ${subCmd}\nAvailable: log, list, session-start, session-end, clear`);
+      }
+      break;
+    }
+
+    case 'resolve-context': {
+      cmdResolveContext(cwd, raw);
+      break;
+    }
+
+    case 'override': {
+      const subCmd = args[1];
+      switch (subCmd) {
+        case 'add': {
+          const mhIdx = args.indexOf('--must-have');
+          const rIdx = args.indexOf('--reason');
+          cmdOverrideAdd(cwd, mhIdx !== -1 ? args[mhIdx + 1] : '', rIdx !== -1 ? args[rIdx + 1] : '', raw);
+          break;
+        }
+        case 'list': cmdOverrideList(cwd, raw); break;
+        case 'remove': {
+          const mhIdx2 = args.indexOf('--must-have');
+          cmdOverrideRemove(cwd, mhIdx2 !== -1 ? args[mhIdx2 + 1] : '', raw);
+          break;
+        }
+        default: error(`Unknown override subcommand: ${subCmd}\nAvailable: add, list, remove`);
       }
       break;
     }

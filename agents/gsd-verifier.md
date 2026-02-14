@@ -96,6 +96,23 @@ If no must_haves in frontmatter:
 4. **Derive key links:** For each artifact, "What must be CONNECTED?" — this is where stubs hide
 5. **Document derived must-haves** before proceeding
 
+## Step 2.5: Load Verification Overrides
+
+Before verifying, check for overrides that allow specific must_have items to pass despite not meeting standard checks.
+
+```bash
+OVERRIDES=$(node ~/.claude/get-shit-done/bin/gsd-tools.js override list --raw)
+```
+
+Parse the JSON result. For each `must_have` item in the overrides list, if a matching truth or artifact check would otherwise FAIL, mark it as `PASSED (override)` instead, noting the reason from the override.
+
+**Override matching:** Compare the override's `must_have` text against each truth being verified. Use substring matching — if the override text appears within the truth text (case-insensitive), consider it a match.
+
+**Override in output:** When an item passes via override, show it as:
+```
+| 3 | Unit tests for auth | PASSED (override) | Auth uses external OAuth, tested via integration |
+```
+
 ## Step 3: Verify Observable Truths
 
 For each truth, determine if codebase enables it.
@@ -105,6 +122,7 @@ For each truth, determine if codebase enables it.
 - ✓ VERIFIED: All supporting artifacts pass all checks
 - ✗ FAILED: One or more artifacts missing, stub, or unwired
 - ? UNCERTAIN: Can't verify programmatically (needs human)
+- ✓ PASSED (override): Override accepted for this item
 
 For each truth:
 
