@@ -101,6 +101,14 @@
  *     --stopped-at "..."
  *     [--resume-file path]
  *
+ * Signal Files (inter-process coordination):
+ *   signal write <name> <value>        Write a signal file
+ *   signal read <name>                 Read a signal file value
+ *   signal delete <name>               Delete a signal file
+ *   signal list                        List active signals with ages
+ *   signal cleanup                     Remove all signal/tracker files
+ *   signal check-stale                 Warn about signals >10 minutes old
+ *
  * Compound Commands (workflow-specific initialization):
  *   init execute-phase <phase>         All context for execute-phase workflow
  *   init plan-phase <phase>            All context for plan-phase workflow
@@ -4472,6 +4480,114 @@ function cmdInitProgress(cwd, includes, raw) {
   output(result, raw);
 }
 
+// ─── Signal File Management ──────────────────────────────────────────────────
+
+const VALID_SIGNALS = ['active-agent', 'active-skill', 'active-operation', 'active-plan', 'auto-next'];
+
+function cmdSignalWrite(cwd, name, value, raw) {
+  if (!VALID_SIGNALS.includes(name)) {
+    error(`Invalid signal name: ${name}. Valid: ${VALID_SIGNALS.join(', ')}`);
+  }
+  const planningDir = path.join(cwd, '.planning');
+  if (!fs.existsSync(planningDir)) {
+    error('.planning directory not found');
+  }
+  const signalPath = path.join(planningDir, `.${name}`);
+  fs.writeFileSync(signalPath, value);
+  output({ signal: name, value, path: signalPath }, raw, `Signal ${name} = ${value}`);
+}
+
+function cmdSignalRead(cwd, name, raw) {
+  if (!VALID_SIGNALS.includes(name)) {
+    error(`Invalid signal name: ${name}. Valid: ${VALID_SIGNALS.join(', ')}`);
+  }
+  const signalPath = path.join(cwd, '.planning', `.${name}`);
+  let value = '';
+  if (fs.existsSync(signalPath)) {
+    value = fs.readFileSync(signalPath, 'utf8').trim();
+  }
+  output({ signal: name, value, exists: value !== '' }, raw, value);
+}
+
+function cmdSignalDelete(cwd, name, raw) {
+  if (!VALID_SIGNALS.includes(name)) {
+    error(`Invalid signal name: ${name}. Valid: ${VALID_SIGNALS.join(', ')}`);
+  }
+  const signalPath = path.join(cwd, '.planning', `.${name}`);
+  if (fs.existsSync(signalPath)) {
+    fs.unlinkSync(signalPath);
+  }
+  output({ signal: name, deleted: true }, raw, `Signal ${name} deleted`);
+}
+
+function cmdSignalList(cwd, raw) {
+  const planningDir = path.join(cwd, '.planning');
+  if (!fs.existsSync(planningDir)) { error('.planning directory not found'); }
+  const signals = [];
+  for (const name of VALID_SIGNALS) {
+    const signalPath = path.join(planningDir, `.${name}`);
+    if (fs.existsSync(signalPath)) {
+      const stat = fs.statSync(signalPath);
+      const ageMs = Date.now() - stat.mtimeMs;
+      const ageMins = Math.round(ageMs / 60000);
+      signals.push({ name, value: fs.readFileSync(signalPath, 'utf8').trim(), age_minutes: ageMins });
+    }
+  }
+  if (raw) {
+    output({ signals }, raw);
+  } else {
+    if (signals.length === 0) {
+      output({ signals: [] }, false, 'No active signals');
+    } else {
+      const text = signals.map(s => `${s.name} = ${s.value} (${s.age_minutes}m ago)`).join('\n');
+      output({ signals }, false, text);
+    }
+  }
+}
+
+function cmdSignalCleanup(cwd, raw) {
+  const planningDir = path.join(cwd, '.planning');
+  if (!fs.existsSync(planningDir)) { error('.planning directory not found'); }
+  let removed = 0;
+  for (const name of VALID_SIGNALS) {
+    const signalPath = path.join(planningDir, `.${name}`);
+    if (fs.existsSync(signalPath)) { fs.unlinkSync(signalPath); removed++; }
+  }
+  // Also clean up .context-tracker and .compact-counter
+  for (const f of ['.context-tracker', '.compact-counter']) {
+    const p = path.join(planningDir, f);
+    if (fs.existsSync(p)) { fs.unlinkSync(p); removed++; }
+  }
+  output({ removed }, raw, `Cleaned up ${removed} signal/tracker files`);
+}
+
+function cmdSignalCheckStale(cwd, raw) {
+  const planningDir = path.join(cwd, '.planning');
+  if (!fs.existsSync(planningDir)) { error('.planning directory not found'); }
+  const staleMinutes = 10;
+  const stale = [];
+  for (const name of VALID_SIGNALS) {
+    const signalPath = path.join(planningDir, `.${name}`);
+    if (fs.existsSync(signalPath)) {
+      const stat = fs.statSync(signalPath);
+      const ageMins = Math.round((Date.now() - stat.mtimeMs) / 60000);
+      if (ageMins >= staleMinutes) {
+        stale.push({ name, age_minutes: ageMins });
+      }
+    }
+  }
+  if (raw) {
+    output({ stale }, raw);
+  } else {
+    if (stale.length === 0) {
+      output({ stale: [] }, false, 'No stale signals');
+    } else {
+      const text = stale.map(s => `WARNING: ${s.name} is ${s.age_minutes}m old (stale > ${staleMinutes}m)`).join('\n');
+      output({ stale }, false, text);
+    }
+  }
+}
+
 // ─── CLI Router ───────────────────────────────────────────────────────────────
 
 async function main() {
@@ -4484,7 +4600,7 @@ async function main() {
   const cwd = process.cwd();
 
   if (!command) {
-    error('Usage: gsd-tools <command> [args] [--raw]\nCommands: state, resolve-model, find-phase, commit, verify-summary, verify, frontmatter, template, generate-slug, current-timestamp, list-todos, verify-path-exists, config-ensure-section, init');
+    error('Usage: gsd-tools <command> [args] [--raw]\nCommands: state, resolve-model, find-phase, commit, verify-summary, verify, frontmatter, template, generate-slug, current-timestamp, list-todos, verify-path-exists, config-ensure-section, signal, init');
   }
 
   switch (command) {
@@ -4849,6 +4965,20 @@ async function main() {
         limit: limitIdx !== -1 ? parseInt(args[limitIdx + 1], 10) : 10,
         freshness: freshnessIdx !== -1 ? args[freshnessIdx + 1] : null,
       }, raw);
+      break;
+    }
+
+    case 'signal': {
+      const subCmd = args[1];
+      switch (subCmd) {
+        case 'write': cmdSignalWrite(cwd, args[2], args[3] || '', raw); break;
+        case 'read': cmdSignalRead(cwd, args[2], raw); break;
+        case 'delete': cmdSignalDelete(cwd, args[2], raw); break;
+        case 'list': cmdSignalList(cwd, raw); break;
+        case 'cleanup': cmdSignalCleanup(cwd, raw); break;
+        case 'check-stale': cmdSignalCheckStale(cwd, raw); break;
+        default: error(`Unknown signal subcommand: ${subCmd}\nAvailable: write, read, delete, list, cleanup, check-stale`);
+      }
       break;
     }
 

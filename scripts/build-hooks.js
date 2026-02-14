@@ -26,7 +26,9 @@ const HOOKS_TO_COPY = [
   'check-plan-format.js',
   'check-roadmap-sync.js',
   'check-phase-boundary.js',
-  'check-subagent-output.js'
+  'check-subagent-output.js',
+  'session-cleanup.js',
+  'log-subagent.js'
 ];
 
 function build() {

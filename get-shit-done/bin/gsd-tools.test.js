@@ -3501,3 +3501,218 @@ describe('check-subagent-output hook', () => {
     assert.strictEqual(result.stderr, '', 'no warnings when disabled');
   });
 });
+
+
+// ─── Signal File Management Tests ────────────────────────────────────────────
+
+describe('signal write/read/delete cycle', () => {
+  let tmpDir;
+
+  beforeEach(() => {
+    tmpDir = createTempProject();
+  });
+
+  afterEach(() => {
+    cleanup(tmpDir);
+  });
+
+  test('write and read a signal', () => {
+    const writeResult = runGsdTools('signal write active-agent gsd-executor', tmpDir);
+    assert.ok(writeResult.success, `Write failed: ${writeResult.error}`);
+
+    const readResult = runGsdTools('signal read active-agent', tmpDir);
+    assert.ok(readResult.success, `Read failed: ${readResult.error}`);
+    const data = JSON.parse(readResult.output);
+    assert.strictEqual(data.signal, 'active-agent');
+    assert.strictEqual(data.value, 'gsd-executor');
+    assert.strictEqual(data.exists, true);
+  });
+
+  test('delete removes a signal', () => {
+    runGsdTools('signal write active-plan 01-02', tmpDir);
+    const deleteResult = runGsdTools('signal delete active-plan', tmpDir);
+    assert.ok(deleteResult.success, `Delete failed: ${deleteResult.error}`);
+    const data = JSON.parse(deleteResult.output);
+    assert.strictEqual(data.deleted, true);
+
+    // Verify signal is gone
+    const readResult = runGsdTools('signal read active-plan', tmpDir);
+    assert.ok(readResult.success);
+    const readData = JSON.parse(readResult.output);
+    assert.strictEqual(readData.exists, false);
+    assert.strictEqual(readData.value, '');
+  });
+
+  test('read returns empty for missing signal', () => {
+    const result = runGsdTools('signal read auto-next', tmpDir);
+    assert.ok(result.success, `Read failed: ${result.error}`);
+    const data = JSON.parse(result.output);
+    assert.strictEqual(data.value, '');
+    assert.strictEqual(data.exists, false);
+  });
+});
+
+describe('signal list', () => {
+  let tmpDir;
+
+  beforeEach(() => {
+    tmpDir = createTempProject();
+  });
+
+  afterEach(() => {
+    cleanup(tmpDir);
+  });
+
+  test('shows active signals', () => {
+    runGsdTools('signal write active-agent executor', tmpDir);
+    runGsdTools('signal write active-plan 01-03', tmpDir);
+
+    const result = runGsdTools('signal list --raw', tmpDir);
+    assert.ok(result.success, `List failed: ${result.error}`);
+    const data = JSON.parse(result.output);
+    assert.strictEqual(data.signals.length, 2);
+    const names = data.signals.map(s => s.name);
+    assert.ok(names.includes('active-agent'));
+    assert.ok(names.includes('active-plan'));
+  });
+
+  test('shows empty list when no signals', () => {
+    const result = runGsdTools('signal list --raw', tmpDir);
+    assert.ok(result.success, `List failed: ${result.error}`);
+    const data = JSON.parse(result.output);
+    assert.strictEqual(data.signals.length, 0);
+  });
+});
+
+describe('signal cleanup', () => {
+  let tmpDir;
+
+  beforeEach(() => {
+    tmpDir = createTempProject();
+  });
+
+  afterEach(() => {
+    cleanup(tmpDir);
+  });
+
+  test('removes all signals and trackers', () => {
+    // Write some signals
+    runGsdTools('signal write active-agent test', tmpDir);
+    runGsdTools('signal write auto-next proceed', tmpDir);
+    // Write tracker files directly
+    fs.writeFileSync(path.join(tmpDir, '.planning', '.context-tracker'), '42');
+    fs.writeFileSync(path.join(tmpDir, '.planning', '.compact-counter'), '3');
+
+    const result = runGsdTools('signal cleanup', tmpDir);
+    assert.ok(result.success, `Cleanup failed: ${result.error}`);
+    const data = JSON.parse(result.output);
+    assert.strictEqual(data.removed, 4);
+
+    // Verify all files are gone
+    assert.ok(!fs.existsSync(path.join(tmpDir, '.planning', '.active-agent')));
+    assert.ok(!fs.existsSync(path.join(tmpDir, '.planning', '.auto-next')));
+    assert.ok(!fs.existsSync(path.join(tmpDir, '.planning', '.context-tracker')));
+    assert.ok(!fs.existsSync(path.join(tmpDir, '.planning', '.compact-counter')));
+  });
+});
+
+describe('signal check-stale', () => {
+  let tmpDir;
+
+  beforeEach(() => {
+    tmpDir = createTempProject();
+  });
+
+  afterEach(() => {
+    cleanup(tmpDir);
+  });
+
+  test('warns on old signals', () => {
+    // Write a signal and backdate it
+    const signalPath = path.join(tmpDir, '.planning', '.active-operation');
+    fs.writeFileSync(signalPath, 'some-op');
+    // Set mtime to 15 minutes ago
+    const fifteenMinAgo = new Date(Date.now() - 15 * 60 * 1000);
+    fs.utimesSync(signalPath, fifteenMinAgo, fifteenMinAgo);
+
+    const result = runGsdTools('signal check-stale --raw', tmpDir);
+    assert.ok(result.success, `Check-stale failed: ${result.error}`);
+    const data = JSON.parse(result.output);
+    assert.strictEqual(data.stale.length, 1);
+    assert.strictEqual(data.stale[0].name, 'active-operation');
+    assert.ok(data.stale[0].age_minutes >= 14);
+  });
+
+  test('no stale signals when all fresh', () => {
+    runGsdTools('signal write active-agent fresh', tmpDir);
+
+    const result = runGsdTools('signal check-stale --raw', tmpDir);
+    assert.ok(result.success, `Check-stale failed: ${result.error}`);
+    const data = JSON.parse(result.output);
+    assert.strictEqual(data.stale.length, 0);
+  });
+});
+
+describe('signal validation', () => {
+  let tmpDir;
+
+  beforeEach(() => {
+    tmpDir = createTempProject();
+  });
+
+  afterEach(() => {
+    cleanup(tmpDir);
+  });
+
+  test('rejects invalid signal names', () => {
+    const result = runGsdTools('signal write bogus-name value', tmpDir);
+    assert.ok(!result.success, 'Should reject invalid signal name');
+    assert.ok(result.error.includes('Invalid signal name'));
+  });
+
+  test('rejects invalid signal names for read', () => {
+    const result = runGsdTools('signal read not-a-signal', tmpDir);
+    assert.ok(!result.success, 'Should reject invalid signal name');
+    assert.ok(result.error.includes('Invalid signal name'));
+  });
+
+  test('rejects invalid signal names for delete', () => {
+    const result = runGsdTools('signal delete fake', tmpDir);
+    assert.ok(!result.success, 'Should reject invalid signal name');
+    assert.ok(result.error.includes('Invalid signal name'));
+  });
+});
+
+describe('session-cleanup hook', () => {
+  let tmpDir;
+  const { spawnSync } = require('child_process');
+
+  beforeEach(() => {
+    tmpDir = createTempProject();
+  });
+
+  afterEach(() => {
+    cleanup(tmpDir);
+  });
+
+  test('removes signal files on session end', () => {
+    const planningDir = path.join(tmpDir, '.planning');
+    // Create signal files
+    fs.writeFileSync(path.join(planningDir, '.active-agent'), 'test-agent');
+    fs.writeFileSync(path.join(planningDir, '.active-plan'), '01-01');
+    fs.writeFileSync(path.join(planningDir, '.context-tracker'), '50');
+
+    // Run session-cleanup hook via stdin using spawnSync
+    const hookPath = path.join(__dirname, '..', '..', 'hooks', 'session-cleanup.js');
+    const stdinData = JSON.stringify({ cwd: tmpDir });
+    spawnSync(process.execPath, [hookPath], {
+      input: stdinData,
+      encoding: 'utf-8',
+    });
+
+    // Verify files are removed
+    assert.ok(!fs.existsSync(path.join(planningDir, '.active-agent')));
+    assert.ok(!fs.existsSync(path.join(planningDir, '.active-plan')));
+    assert.ok(!fs.existsSync(path.join(planningDir, '.context-tracker')));
+  });
+});
