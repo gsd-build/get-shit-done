@@ -51,6 +51,7 @@
     "docs:dev": "node scripts/generate-docs.js && pnpm --dir docs start",
     "docs:build": "node scripts/generate-docs.js && pnpm --dir docs build",
     "docs:deploy-prepare": "node scripts/prepare-gh-pages-deployment.js",
-    "learn:extract": "node scripts/extract-learnings.js"
+    "learn:extract": "node scripts/extract-learnings.js",
+    "learn:surface": "node scripts/surface-critical-learnings.js"
   }
 }
