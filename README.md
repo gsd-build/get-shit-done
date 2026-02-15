@@ -2,7 +2,11 @@
 
 # GET SHIT DONE
 
-**A light-weight and powerful meta-prompting, context engineering and spec-driven development system for Claude Code, OpenCode, and Gemini CLI.**
+**A light-weight and powerful meta-prompting, context engineering and spec-driven development system for Claude Code, OpenCode, Gemini CLI, and Codex (fork preview).**
+
+This fork adds a Codex-native command surface:
+- `.codex/prompts/gsd-*.md`
+- `.codex/skills/get-shit-done-codex/*`
 
 **Solves context rot — the quality degradation that happens as Claude fills its context window.**
 
@@ -627,6 +631,7 @@ These community ports pioneered multi-runtime support:
 
 | Project | Platform | Description |
 |---------|----------|-------------|
+| `get-shit-done-codex` | Codex | Codex-specific prompts and orchestration under `.codex/` |
 | [gsd-opencode](https://github.com/rokicool/gsd-opencode) | OpenCode | Original OpenCode adaptation |
 | gsd-gemini (archived) | Gemini CLI | Original Gemini adaptation by uberfuzzy |
 
