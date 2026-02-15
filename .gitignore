@@ -15,6 +15,15 @@ hooks/dist/
 animation/
 *.gif
 
+# Local Documentation (User specific)
+docker/*_LOCAL.md
+docker/*_DRAFT.md
+docker/*_NOTES.md
+
+# Internal planning documents
+reports/
+*_ARCHITECTURE.md
+*_PLANNING.md
 # Internal planning documents
 reports/
 RAILROAD_ARCHITECTURE.md
