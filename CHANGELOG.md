@@ -6,6 +6,9 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ## [Unreleased]
 
+### Added
+- `/gsd:checkpoint` command — quick state serialization to prevent context compaction loss during long sessions
+- `verify-gsd-state.js` script — cross-platform artifact verification for all phases
 ## [1.18.0] - 2026-02-08
 
 ### Added
