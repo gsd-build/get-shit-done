@@ -77,7 +77,7 @@ function createSchema(db) {
   // Main knowledge table
   db.exec(`
     CREATE TABLE IF NOT EXISTS knowledge (
-      id INTEGER PRIMARY KEY,
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
       content TEXT NOT NULL,
       type TEXT NOT NULL,
       scope TEXT NOT NULL,

@@ -100,9 +100,16 @@ function insertKnowledge(db, {
     const id = info.lastInsertRowid
 
     // 6. Insert embedding if provided (FTS5 handled by trigger)
+    // Note: vec0 auto-assigns rowid sequentially, so it will match knowledge.id
+    // as long as we insert in same transaction immediately after knowledge insert
     if (embedding && db.vectorEnabled) {
       const normalized = normalizeEmbedding(embedding)
-      db.prepare('INSERT INTO knowledge_vec (rowid, embedding) VALUES (?, ?)').run(id, normalized)
+      const vecResult = db.prepare('INSERT INTO knowledge_vec (embedding) VALUES (?)').run(normalized)
+
+      // Verify rowid matches (sanity check)
+      if (vecResult.lastInsertRowid !== id) {
+        throw new Error(`Rowid mismatch: knowledge=${id}, vec=${vecResult.lastInsertRowid}`)
+      }
     }
 
     return id
@@ -226,10 +233,11 @@ function updateKnowledge(db, id, updates) {
     }
 
     // Update embedding if provided
+    // Note: sqlite-vec 0.1.6 vec0 tables don't support rowid specification on INSERT
+    // So we can't safely update embeddings (delete + reinsert may get different rowid)
+    // For now, embedding updates are not supported - delete and reinsert the entry instead
     if (updates.embedding && db.vectorEnabled) {
-      const normalized = normalizeEmbedding(updates.embedding)
-      db.prepare('DELETE FROM knowledge_vec WHERE rowid = ?').run(id)
-      db.prepare('INSERT INTO knowledge_vec (rowid, embedding) VALUES (?, ?)').run(id, normalized)
+      throw new Error('Embedding updates not supported with sqlite-vec 0.1.6. Delete and reinsert the knowledge entry instead.')
     }
   })()
 
