@@ -10,6 +10,7 @@
     "commands",
     "get-shit-done",
     "agents",
+    "skills",
     "hooks/dist",
     "scripts"
   ],
