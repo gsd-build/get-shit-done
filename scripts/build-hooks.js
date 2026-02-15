@@ -12,7 +12,23 @@ const DIST_DIR = path.join(HOOKS_DIR, 'dist');
 // Hooks to copy (pure Node.js, no bundling needed)
 const HOOKS_TO_COPY = [
   'gsd-check-update.js',
-  'gsd-statusline.js'
+  'gsd-statusline.js',
+  'hook-logger.js',
+  'pre-bash-dispatch.js',
+  'pre-write-dispatch.js',
+  'post-write-dispatch.js',
+  'check-dangerous-commands.js',
+  'validate-commit.js',
+  'check-skill-workflow.js',
+  'track-context-budget.js',
+  'suggest-compact.js',
+  'context-budget-check.js',
+  'check-plan-format.js',
+  'check-roadmap-sync.js',
+  'check-phase-boundary.js',
+  'check-subagent-output.js',
+  'session-cleanup.js',
+  'log-subagent.js'
 ];
 
 function build() {
