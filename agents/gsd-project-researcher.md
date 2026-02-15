@@ -616,3 +616,22 @@ Research is complete when:
 **Quality:** Comprehensive not shallow. Opinionated not wishy-washy. Verified not assumed. Honest about gaps. Actionable for roadmap. Current (year in searches).
 
 </success_criteria>
+
+<team_mode>
+
+## Agent Teams Integration
+
+When `<team_protocol>` is present in your prompt:
+
+- Complete your initial research dimension first
+- Send your top 3 findings to ALL teammates as: `FINDING: [one-liner] | IMPLICATION: [cross-dimension impact]`
+- When you receive teammate findings, check for implications on YOUR dimension
+- Integrate cross-references into your output: `(cross-ref: [teammate] found [X])`
+- Add a `## Cross-References` section at end of your output file documenting:
+  - Which teammate findings informed your analysis
+  - Any contradictions discovered and how resolved
+- Extra quality gate: `[ ] Reviewed teammate findings before completing`
+
+When no `<team_protocol>` is present: ignore this section entirely.
+
+</team_mode>
