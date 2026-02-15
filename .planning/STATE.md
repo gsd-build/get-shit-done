@@ -10,18 +10,18 @@ See: .planning/PROJECT.md (updated 2026-02-15)
 ## Current Position
 
 Phase: 3 of 8 (Knowledge System Foundation)
-Plan: 02 of 05
+Plan: 03 of 05
 Status: In Progress
-Last activity: 2026-02-15 — Completed plan 03-02 (Knowledge CRUD operations)
+Last activity: 2026-02-16 — Completed plan 03-03 (Multi-phase search pipeline)
 
 Progress: [█████████-] 20%
 
 ## Performance Metrics
 
 **Velocity:**
-- Total plans completed: 14
-- Average duration: 3.6 min
-- Total execution time: 0.9 hours
+- Total plans completed: 15
+- Average duration: 3.9 min
+- Total execution time: 1.0 hours
 
 **By Phase:**
 
@@ -29,7 +29,7 @@ Progress: [█████████-] 20%
 |-------|-------|--------|----------|
 | 01    | 6     | 20 min | 3.3 min  |
 | 02    | 6     | 28 min | 4.7 min  |
-| 03    | 2     | 4 min  | 1.5 min  |
+| 03    | 3     | 11 min | 3.7 min  |
 
 **Recent Completions:**
 
@@ -45,6 +45,7 @@ Progress: [█████████-] 20%
 | 02    | 06   | 6 min    | 3     | 2     |
 | 03    | 01   | 2 min    | 3     | 2     |
 | 03    | 02   | 2 min    | 3     | 1     |
+| 03    | 03   | 7 min    | 3     | 3     |
 
 ## Accumulated Context
 
@@ -111,6 +112,12 @@ Recent decisions affecting current work:
 - [Phase 03-01]: PRAGMA user_version for schema migration tracking
 - [Phase 03-02]: TTL categories: permanent (null), long_term (90d), short_term (7d), ephemeral (24h)
 - [Phase 03-02]: Type defaults: lesson=permanent, decision=long_term, summary=short_term, temp_note=ephemeral
+- [Phase 03-03]: RRF (Reciprocal Rank Fusion) with k=60 for hybrid search ranking
+- [Phase 03-03]: Type weights for relevance: decisions/lessons 2.0x, summaries 0.5x, temp_notes 0.3x
+- [Phase 03-03]: Access boost uses logarithmic scale (1 + log(1 + count)) to prevent dominance
+- [Phase 03-03]: AUTOINCREMENT required for knowledge.id to match vec0 auto-assigned rowid
+- [Phase 03-03]: sqlite-vec 0.1.6 doesn't support explicit rowid in vec0 tables (auto-assign only)
+- [Phase 03-03]: Embedding updates disabled due to vec0 limitation (delete and reinsert instead)
 - [Phase 03-02]: SHA-256 for content hash (supports future deduplication queries)
 - [Phase 03-02]: L2 normalization for embeddings (cosine similarity ready)
 - [Phase 03-02]: refreshTTL extends expiration for frequently-accessed knowledge
@@ -125,6 +132,6 @@ None yet.
 
 ## Session Continuity
 
-Last session: 2026-02-15T23:47:29Z (plan execution)
-Stopped at: Completed 03-02-PLAN.md (Knowledge CRUD operations)
+Last session: 2026-02-15T23:54:17Z (plan execution)
+Stopped at: Completed 03-03-PLAN.md (Multi-phase search pipeline)
 Resume file: None
