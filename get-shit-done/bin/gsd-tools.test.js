@@ -1791,6 +1791,128 @@ describe('milestone complete command', () => {
 });
 
 // ─────────────────────────────────────────────────────────────────────────────
+// requirements update command
+// ─────────────────────────────────────────────────────────────────────────────
+
+describe('requirements update command', () => {
+  let tmpDir;
+
+  beforeEach(() => {
+    tmpDir = createTempProject();
+  });
+
+  afterEach(() => {
+    cleanup(tmpDir);
+  });
+
+  test('marks matching traceability rows Complete and flips checkboxes', () => {
+    const reqPath = path.join(tmpDir, '.planning', 'REQUIREMENTS.md');
+    fs.writeFileSync(reqPath, [
+      '# Requirements',
+      '',
+      '## v1 Requirements',
+      '- [ ] AUTH-01: User login',
+      '- [ ] AUTH-02: Password reset',
+      '- [ ] DATA-01: Export data',
+      '',
+      '## Traceability',
+      '',
+      '| Requirement | Phase | Status |',
+      '|-------------|-------|--------|',
+      '| AUTH-01 | Phase 1 | Pending |',
+      '| AUTH-02 | Phase 1 | Pending |',
+      '| DATA-01 | Phase 2 | Pending |',
+    ].join('\n'));
+
+    // Need phase dir to exist
+    const phaseDir = path.join(tmpDir, '.planning', 'phases', '01-auth');
+    fs.mkdirSync(phaseDir, { recursive: true });
+
+    const result = runGsdTools('requirements update 1', tmpDir);
+    assert.ok(result.success, `Command failed: ${result.error}`);
+
+    const output = JSON.parse(result.output);
+    assert.strictEqual(output.updated, 2);
+    assert.deepStrictEqual(output.requirement_ids, ['AUTH-01', 'AUTH-02']);
+    assert.strictEqual(output.skipped, false);
+
+    const content = fs.readFileSync(reqPath, 'utf-8');
+    assert.ok(content.includes('| AUTH-01 | Phase 1 | Complete |'), 'AUTH-01 should be Complete');
+    assert.ok(content.includes('| AUTH-02 | Phase 1 | Complete |'), 'AUTH-02 should be Complete');
+    assert.ok(content.includes('| DATA-01 | Phase 2 | Pending |'), 'DATA-01 should remain Pending');
+    assert.ok(content.includes('- [x] AUTH-01:'), 'AUTH-01 checkbox should be checked');
+    assert.ok(content.includes('- [x] AUTH-02:'), 'AUTH-02 checkbox should be checked');
+    assert.ok(content.includes('- [ ] DATA-01:'), 'DATA-01 checkbox should remain unchecked');
+  });
+
+  test('skips gracefully when REQUIREMENTS.md does not exist', () => {
+    const reqPath = path.join(tmpDir, '.planning', 'REQUIREMENTS.md');
+    if (fs.existsSync(reqPath)) fs.unlinkSync(reqPath);
+
+    const phaseDir = path.join(tmpDir, '.planning', 'phases', '01-auth');
+    fs.mkdirSync(phaseDir, { recursive: true });
+
+    const result = runGsdTools('requirements update 1', tmpDir);
+    assert.ok(result.success, `Command failed: ${result.error}`);
+
+    const output = JSON.parse(result.output);
+    assert.strictEqual(output.skipped, true);
+  });
+
+  test('does not double-update already Complete rows', () => {
+    const reqPath = path.join(tmpDir, '.planning', 'REQUIREMENTS.md');
+    fs.writeFileSync(reqPath, [
+      '# Requirements',
+      '',
+      '## Traceability',
+      '',
+      '| Requirement | Phase | Status |',
+      '|-------------|-------|--------|',
+      '| AUTH-01 | Phase 1 | Complete |',
+      '| AUTH-02 | Phase 1 | Pending |',
+    ].join('\n'));
+
+    const phaseDir = path.join(tmpDir, '.planning', 'phases', '01-auth');
+    fs.mkdirSync(phaseDir, { recursive: true });
+
+    const result = runGsdTools('requirements update 1', tmpDir);
+    assert.ok(result.success, `Command failed: ${result.error}`);
+
+    const output = JSON.parse(result.output);
+    assert.strictEqual(output.updated, 1, 'should only update AUTH-02');
+  });
+
+  test('handles no matching rows for phase', () => {
+    const reqPath = path.join(tmpDir, '.planning', 'REQUIREMENTS.md');
+    fs.writeFileSync(reqPath, [
+      '# Requirements',
+      '',
+      '## Traceability',
+      '',
+      '| Requirement | Phase | Status |',
+      '|-------------|-------|--------|',
+      '| AUTH-01 | Phase 2 | Pending |',
+    ].join('\n'));
+
+    const phaseDir = path.join(tmpDir, '.planning', 'phases', '01-auth');
+    fs.mkdirSync(phaseDir, { recursive: true });
+
+    const result = runGsdTools('requirements update 1', tmpDir);
+    assert.ok(result.success, `Command failed: ${result.error}`);
+
+    const output = JSON.parse(result.output);
+    assert.strictEqual(output.updated, 0);
+    assert.deepStrictEqual(output.requirement_ids, []);
+  });
+
+  test('fails when phase argument is missing', () => {
+    const result = runGsdTools('requirements update', tmpDir);
+    assert.ok(!result.success, 'should fail');
+    assert.ok(result.error.includes('phase number required'), 'error mentions phase number required');
+  });
+});
+
+// ─────────────────────────────────────────────────────────────────────────────
 // validate consistency command
 // ─────────────────────────────────────────────────────────────────────────────
 
