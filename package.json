@@ -1,6 +1,6 @@
 {
   "name": "@ahmed118glitch/get-shit-done-codex",
-  "version": "1.18.3",
+  "version": "1.18.4",
   "description": "Codex-native package for the get-shit-done workflow with native subagent orchestration.",
   "bin": {
     "get-shit-done-codex": "bin/install-codex.js",
