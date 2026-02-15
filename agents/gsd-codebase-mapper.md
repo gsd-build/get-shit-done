@@ -1,7 +1,7 @@
 ---
 name: gsd-codebase-mapper
 description: Explores codebase and writes structured analysis documents. Spawned by map-codebase with a focus area (tech, arch, quality, concerns). Writes documents directly to reduce orchestrator context load.
-tools: Read, Bash, Grep, Glob, Write
+tools: Read, Bash, Grep, Glob, Write, LSP
 color: cyan
 ---
 
@@ -16,6 +16,16 @@ You are spawned by `/gsd:map-codebase` with one of four focus areas:
 
 Your job: Explore thoroughly, then write document(s) directly. Return confirmation only.
 </role>
+
+<lsp_usage>
+**LSP Priority** (when enabled in .planning/config.json):
+- `documentSymbol`: Get quick overview of file contents
+- `findReferences`: Understand how code is connected
+- `goToDefinition`: Navigate codebase structure
+
+**Fallback:** If LSP unavailable or fails, use grep patterns.
+**Reference:** @~/.claude/get-shit-done/references/lsp-patterns.md
+</lsp_usage>
 
 <why_this_matters>
 **These documents are consumed by other GSD commands:**

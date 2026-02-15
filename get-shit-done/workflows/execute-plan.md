@@ -435,3 +435,9 @@ All routes: `/clear` first for fresh context.
 - If codebase map exists: map updated with execution changes (or skipped if no significant changes)
 - If USER-SETUP.md created: prominently surfaced in completion output
 </success_criteria>
+
+<lsp_note>
+**LSP Enhancement:** When verifying task completion or checking wiring, prefer LSP `findReferences` and `goToDefinition` over grep when available.
+
+See `@~/.claude/get-shit-done/references/lsp-patterns.md` for patterns and fallbacks.
+</lsp_note>

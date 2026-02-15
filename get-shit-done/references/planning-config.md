@@ -191,4 +191,41 @@ Squash merge is recommended — keeps main branch history clean while preserving
 
 </branching_strategy_behavior>
 
+<lsp_config>
+
+## LSP Configuration
+
+Enable Language Server Protocol for enhanced code navigation.
+
+**Schema:**
+```json
+"lsp": {
+  "enabled": false,
+  "languages": []
+}
+```
+
+| Option | Default | Description |
+|--------|---------|-------------|
+| `enabled` | `false` | Whether LSP is enabled for GSD agents |
+| `languages` | `[]` | Languages configured (e.g., `["typescript", "python"]`) |
+
+**Setup:** Run `/gsd:setup-lsp` to configure LSP support interactively.
+
+**Requirements:**
+1. Language server binaries installed (tsserver, pyright, etc.)
+2. Claude Code LSP plugins enabled (`typescript-lsp@claude-plugins-official`, etc.)
+3. `ENABLE_LSP_TOOL=1` environment variable set
+
+**Behavior when enabled:**
+- Agents prefer `findReferences` over grep for "is this used?" queries
+- Agents prefer `goToDefinition` over grep for "where is this defined?" queries
+- Call hierarchy operations (`incomingCalls`, `outgoingCalls`) available
+
+**Fallback:** If LSP fails or is unavailable, agents automatically fall back to grep patterns.
+
+**Reference:** See `@~/.claude/get-shit-done/references/lsp-patterns.md` for detailed usage patterns.
+
+</lsp_config>
+
 </planning_config>

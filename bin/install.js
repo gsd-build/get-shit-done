@@ -1546,6 +1546,39 @@ function install(isGlobal, runtime = 'claude') {
 }
 
 /**
+ * Detect project languages for LSP suggestion
+ */
+function detectProjectLanguages() {
+  const langs = [];
+  const cwd = process.cwd();
+
+  // TypeScript/JavaScript
+  if (fs.existsSync(path.join(cwd, 'tsconfig.json')) ||
+      fs.existsSync(path.join(cwd, 'package.json'))) {
+    langs.push('TypeScript/JavaScript');
+  }
+
+  // Python
+  if (fs.existsSync(path.join(cwd, 'pyproject.toml')) ||
+      fs.existsSync(path.join(cwd, 'requirements.txt')) ||
+      fs.existsSync(path.join(cwd, 'setup.py'))) {
+    langs.push('Python');
+  }
+
+  // Rust
+  if (fs.existsSync(path.join(cwd, 'Cargo.toml'))) {
+    langs.push('Rust');
+  }
+
+  // Go
+  if (fs.existsSync(path.join(cwd, 'go.mod'))) {
+    langs.push('Go');
+  }
+
+  return langs;
+}
+
+/**
  * Apply statusline config, then print completion message
  */
 function finishInstall(settingsPath, settings, statuslineCommand, shouldInstallStatusline, runtime = 'claude') {
@@ -1567,6 +1600,9 @@ function finishInstall(settingsPath, settings, statuslineCommand, shouldInstallS
     configureOpencodePermissions();
   }
 
+  // Detect project languages and suggest LSP setup
+  const detectedLangs = detectProjectLanguages();
+
   let program = 'Claude Code';
   if (runtime === 'opencode') program = 'OpenCode';
   if (runtime === 'gemini') program = 'Gemini';
@@ -1577,6 +1613,14 @@ function finishInstall(settingsPath, settings, statuslineCommand, shouldInstallS
 
   ${cyan}Join the community:${reset} https://discord.gg/5JJgD5svVS
 `);
+
+  // Always show LSP tip for Claude Code users
+  if (!isOpencode) {
+    if (detectedLangs.length > 0) {
+      console.log(`  ${yellow}LSP Support${reset}: Detected ${detectedLangs.join(', ')}.`);
+    }
+    console.log(`  Run ${cyan}/gsd:setup-lsp${reset} in Claude Code to enable enhanced code navigation.\n`);
+  }
 }
 
 /**

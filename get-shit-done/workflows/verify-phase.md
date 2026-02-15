@@ -224,3 +224,9 @@ Orchestrator routes: `passed` → update_roadmap | `gaps_found` → create/execu
 - [ ] VERIFICATION.md created with complete report
 - [ ] Results returned to orchestrator
 </success_criteria>
+
+<lsp_note>
+**LSP Enhancement:** For "is this used?" and "is this wired?" verification queries, prefer LSP `findReferences` over grep when available.
+
+See `@~/.claude/get-shit-done/references/lsp-patterns.md` for patterns and fallbacks.
+</lsp_note>

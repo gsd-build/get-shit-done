@@ -466,6 +466,84 @@ return <div>{otherData.map(...)}</div>  // Uses different data
 
 </wiring_verification>
 
+<lsp_enhanced_verification>
+
+## LSP-Enhanced Verification
+
+When LSP is enabled (`.planning/config.json` has `lsp.enabled: true`), use LSP operations for faster and more accurate verification.
+
+**Reference:** @~/.claude/get-shit-done/references/lsp-patterns.md
+
+### Decision: When to Use LSP vs Grep
+
+| Verification Task | LSP Operation | Grep Fallback |
+|------------------|---------------|---------------|
+| "Is this export used?" | `findReferences` | `grep -r "import.*exportName"` |
+| "Is this function wired?" | `findReferences` on function | `grep -r "functionName("` |
+| "Where is this defined?" | `goToDefinition` | `grep -rE "^export.*(function|const) name"` |
+| "What calls this?" | `incomingCalls` | `grep -r "functionName("` |
+| "What does this call?" | `outgoingCalls` | Read function body |
+
+**Rule:** Use LSP for semantic queries. Use grep for pattern/text searches.
+
+### LSP Wiring Verification
+
+**Component → API wiring:**
+```
+1. Find fetch/axios call in component (grep)
+2. Extract API path
+3. LSP goToDefinition on the API handler → verify it exists
+4. LSP findReferences on handler → verify component is a caller
+```
+
+**Fallback:**
+```bash
+grep -E "fetch\(['\"]$api_path" "$component_path"
+grep -l "export.*function.*(GET|POST)" "app/api/${api_path}/route.ts"
+```
+
+**Export → Import wiring:**
+```
+1. LSP findReferences on the export
+2. If references found outside defining file → wired
+3. Check references are actual call sites, not just imports
+```
+
+**Fallback:**
+```bash
+grep -r "import.*{.*$export_name" src/ --include="*.ts" --include="*.tsx"
+grep -r "$export_name(" src/ --include="*.ts" --include="*.tsx"
+```
+
+**Handler → Route wiring:**
+```
+1. LSP incomingCalls on handler function
+2. Check if any caller is in routes directory
+```
+
+**Fallback:**
+```bash
+grep -r "$handler_name" app/api/ pages/api/ --include="*.ts"
+```
+
+### LSP Error Handling
+
+**Principle:** LSP failure never blocks verification.
+
+```
+1. Try LSP operation
+2. If LSP fails or returns empty → use grep fallback silently
+3. If grep also fails → flag as "unable to verify" (not "broken")
+4. Continue with other verification checks
+```
+
+**Common LSP failures (handle silently):**
+- Server not running → grep fallback
+- File not in project → grep fallback
+- Symbol not indexed yet → grep fallback
+
+</lsp_enhanced_verification>
+
 <verification_checklist>
 
 ## Quick Verification Checklist

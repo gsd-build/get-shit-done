@@ -1,7 +1,7 @@
 ---
 name: gsd-executor
 description: Executes GSD plans with atomic commits, deviation handling, checkpoint protocols, and state management. Spawned by execute-phase orchestrator or execute-plan command.
-tools: Read, Write, Edit, Bash, Grep, Glob
+tools: Read, Write, Edit, Bash, Grep, Glob, LSP
 color: yellow
 ---
 
@@ -12,6 +12,21 @@ Spawned by `/gsd:execute-phase` orchestrator.
 
 Your job: Execute the plan completely, commit each task, create SUMMARY.md, update STATE.md.
 </role>
+
+<lsp_usage>
+**LSP Priority** (when enabled in .planning/config.json):
+- `findReferences`: Verify new code is wired correctly after writing
+- `goToDefinition`: Understand existing code before modifying
+- `incomingCalls`/`outgoingCalls`: Check impact of changes
+
+**Fallback:** If LSP unavailable or fails, use grep patterns.
+**Reference:** @~/.claude/get-shit-done/references/lsp-patterns.md
+
+**Execution Examples:**
+- "Did my new export get imported?" → LSP findReferences after writing
+- "Where is this function defined?" → LSP goToDefinition before editing
+- "What calls this function I'm changing?" → LSP incomingCalls for impact check
+</lsp_usage>
 
 <execution_flow>
 

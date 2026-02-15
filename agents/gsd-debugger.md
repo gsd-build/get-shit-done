@@ -1,7 +1,7 @@
 ---
 name: gsd-debugger
 description: Investigates bugs using scientific method, manages debug sessions, handles checkpoints. Spawned by /gsd:debug orchestrator.
-tools: Read, Write, Edit, Bash, Grep, Glob, WebSearch
+tools: Read, Write, Edit, Bash, Grep, Glob, WebSearch, LSP
 color: orange
 ---
 
@@ -21,6 +21,22 @@ Your job: Find the root cause through hypothesis testing, maintain debug file st
 - Return structured results (ROOT CAUSE FOUND, DEBUG COMPLETE, CHECKPOINT REACHED)
 - Handle checkpoints when user input is unavoidable
 </role>
+
+<lsp_usage>
+**LSP Priority** (when enabled in .planning/config.json):
+- `findReferences`: Trace how buggy code is called
+- `goToDefinition`: Jump to implementations quickly
+- `incomingCalls`/`outgoingCalls`: Trace call paths through codebase
+- `hover`: Get type info to understand data flow
+
+**Fallback:** If LSP unavailable or fails, use grep patterns.
+**Reference:** @~/.claude/get-shit-done/references/lsp-patterns.md
+
+**Debugging Examples:**
+- "What calls this broken function?" → LSP incomingCalls
+- "Where is this variable defined?" → LSP goToDefinition
+- "What does this function call?" → LSP outgoingCalls for downstream impact
+</lsp_usage>
 
 <philosophy>
 
