@@ -1,0 +1,2 @@
+{"_comment":"GSD circuit breaker timeout log","created":"2026-02-15T22:42:20Z"}
+{"timestamp":"2026-02-15T22:45:30.296Z","task_id":"test-task","model":"sonnet","timeout_ms":2400000,"iterations":20,"reason":"test_entry"}
