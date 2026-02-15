@@ -80,6 +80,36 @@ For each task:
 
 </execution_flow>
 
+<crash_recovery>
+## Crash Recovery Protocol
+
+Per-task `.PROGRESS-{plan_id}` files act as breadcrumbs for mid-execution crash recovery. These are JSON files written to `.planning/` after each task commit and deleted when SUMMARY.md is written.
+
+**When resuming a plan execution:**
+1. Check for progress file: `node gsd-tools.js progress read {plan_id} --raw`
+2. If progress exists (`"exists": true`), skip tasks up to `last_completed_task`
+3. Verify `last_commit` exists in git history: `git log --oneline | grep {hash}`
+4. Continue from `last_completed_task + 1`
+
+**After each task commit:**
+```bash
+node gsd-tools.js progress write {plan_id} --task N --total T --commit <hash>
+```
+
+**On plan completion (SUMMARY.md written):**
+```bash
+node gsd-tools.js progress delete {plan_id}
+```
+
+**Detecting stale progress from crashes:**
+```bash
+node gsd-tools.js progress check-orphaned
+```
+Returns `.PROGRESS` files older than 1 hour that likely indicate a crashed execution.
+
+**Git retry logic:** Git commit operations use `execGitRetry()` which automatically retries on `index.lock` contention with exponential backoff (1s, 2s, 4s). This handles cases where concurrent git operations or crash artifacts leave stale lock files.
+</crash_recovery>
+
 <deviation_rules>
 **While executing, you WILL discover work not in the plan.** Apply these rules automatically. Track all deviations for Summary.
 

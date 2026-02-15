@@ -52,9 +52,20 @@
  *
  * Progress:
  *   progress [json|table|bar]          Render progress in various formats
+ *   progress write <plan_id>           Write a .PROGRESS-{plan_id} breadcrumb
+ *     --task N --total T [--commit h]
+ *   progress read <plan_id>            Read a progress file, return JSON
+ *   progress delete <plan_id>          Delete a progress file
+ *   progress list                      List all .PROGRESS files with contents
+ *   progress check-orphaned            Find .PROGRESS files older than 1 hour
  *
  * Todos:
  *   todo complete <filename>           Move todo from pending to completed
+ *
+ * Notes:
+ *   note append <words...>             Create timestamped note in .planning/notes/
+ *   note list                          List all notes with previews
+ *   note promote <filename>            Convert note to todo in .planning/todos/pending/
  *
  * Scaffolding:
  *   scaffold context --phase <N>       Create CONTEXT.md template
@@ -103,6 +114,36 @@
  *   state record-session               Update session continuity
  *     --stopped-at "..."
  *     [--resume-file path]
+ *
+ * Signal Files (inter-process coordination):
+ *   signal write <name> <value>        Write a signal file
+ *   signal read <name>                 Read a signal file value
+ *   signal delete <name>               Delete a signal file
+ *   signal list                        List active signals with ages
+ *   signal cleanup                     Remove all signal/tracker files
+ *   signal check-stale                 Warn about signals >10 minutes old
+ *
+ * Seeds:
+ *   seed list                          List all seed files with metadata
+ *   seed read-for-phase <phase>        Return seeds matching a phase slug
+ *   seed create --title "..."          Create a new seed file
+ *     --trigger "phase-slug"
+ *     [--scope small|medium|large]
+ *     [--context "..."]
+ *     [--approach "..."]
+ *     [--deps "..."]
+ *
+ * Diagnostics:
+ *   health                              Run project health diagnostics
+ *
+ * Event Logging:
+ *   event log <category> <name>       Append event to events.jsonl
+ *     [--details '{json}']
+ *   event list [--category <cat>]     List recent events
+ *     [--limit N]
+ *   event session-start               Record session start
+ *   event session-end                 Record session end + duration
+ *   event clear <log>                 Clear log (hooks|events|sessions)
  *
  * Compound Commands (workflow-specific initialization):
  *   init execute-phase <phase>         All context for execute-phase workflow
@@ -157,6 +198,154 @@ function safeReadFile(filePath) {
   }
 }
 
+/**
+ * Write content to a file atomically: write to .tmp, backup original to .bak,
+ * rename .tmp over original. On failure, restore from .bak if available.
+ *
+ * @param {string} filePath - Target file path
+ * @param {string} content - Content to write
+ * @returns {{success: boolean, error?: string}} Result
+ */
+function atomicWrite(filePath, content) {
+  const tmpPath = filePath + '.tmp';
+  const bakPath = filePath + '.bak';
+
+  try {
+    // 1. Write to temp file
+    fs.writeFileSync(tmpPath, content, 'utf-8');
+
+    // 2. Backup original if it exists
+    if (fs.existsSync(filePath)) {
+      try {
+        fs.copyFileSync(filePath, bakPath);
+      } catch (_e) {
+        // Backup failure is non-fatal — proceed with rename
+      }
+    }
+
+    // 3. Rename temp over original (atomic on most filesystems)
+    fs.renameSync(tmpPath, filePath);
+
+    return { success: true };
+  } catch (e) {
+    // Rename failed — try to restore from backup
+    try {
+      if (fs.existsSync(bakPath)) {
+        fs.copyFileSync(bakPath, filePath);
+      }
+    } catch (_restoreErr) {
+      // Restore also failed — nothing more we can do
+    }
+
+    // Clean up temp file if it still exists
+    try {
+      if (fs.existsSync(tmpPath)) {
+        fs.unlinkSync(tmpPath);
+      }
+    } catch (_cleanupErr) {
+      // Best-effort cleanup
+    }
+
+    return { success: false, error: e.message };
+  }
+}
+
+/**
+ * Locked file update: read-modify-write with exclusive lockfile.
+ * Prevents concurrent writes to critical shared files (STATE.md, ROADMAP.md).
+ *
+ * @param {string} filePath - Absolute path to the file to update
+ * @param {function} updateFn - Receives current content, returns new content
+ * @param {object} opts - Options: { retries: 3, retryDelayMs: 100, timeoutMs: 5000 }
+ * @returns {object} { success, content?, error? }
+ */
+function lockedFileUpdate(filePath, updateFn, opts = {}) {
+  const retries = opts.retries || 3;
+  const retryDelayMs = opts.retryDelayMs || 100;
+  const timeoutMs = opts.timeoutMs || 5000;
+  const lockPath = filePath + '.lock';
+
+  let lockFd = null;
+  let lockAcquired = false;
+
+  try {
+    // Acquire lock with retries
+    for (let attempt = 0; attempt < retries; attempt++) {
+      try {
+        lockFd = fs.openSync(lockPath, 'wx');
+        lockAcquired = true;
+        break;
+      } catch (e) {
+        if (e.code === 'EEXIST') {
+          // Lock exists — check if stale (older than timeoutMs)
+          try {
+            const stats = fs.statSync(lockPath);
+            if (Date.now() - stats.mtimeMs > timeoutMs) {
+              // Stale lock — remove and retry
+              fs.unlinkSync(lockPath);
+              continue;
+            }
+          } catch (_statErr) {
+            // Lock disappeared between check — retry
+            continue;
+          }
+
+          if (attempt < retries - 1) {
+            // Wait and retry with exponential backoff
+            const waitMs = retryDelayMs * (attempt + 1);
+            const start = Date.now();
+            while (Date.now() - start < waitMs) {
+              // Busy wait (synchronous context)
+            }
+            continue;
+          }
+          return { success: false, error: `Could not acquire lock for ${path.basename(filePath)} after ${retries} attempts` };
+        }
+        throw e;
+      }
+    }
+
+    if (!lockAcquired) {
+      return { success: false, error: `Could not acquire lock for ${path.basename(filePath)}` };
+    }
+
+    // Write PID to lock file for debugging
+    fs.writeSync(lockFd, `${process.pid}`);
+    fs.closeSync(lockFd);
+    lockFd = null;
+
+    // Read current content
+    let content = '';
+    if (fs.existsSync(filePath)) {
+      content = fs.readFileSync(filePath, 'utf-8');
+    }
+
+    // Apply update
+    const newContent = updateFn(content);
+
+    // Write back atomically
+    const writeResult = atomicWrite(filePath, newContent);
+    if (!writeResult.success) {
+      return { success: false, error: writeResult.error };
+    }
+
+    return { success: true, content: newContent };
+  } catch (e) {
+    return { success: false, error: e.message };
+  } finally {
+    // Close fd if still open
+    try {
+      if (lockFd !== null) fs.closeSync(lockFd);
+    } catch (_e) { /* ignore */ }
+    // Only release lock if we acquired it
+    if (lockAcquired) {
+      try {
+        fs.unlinkSync(lockPath);
+      } catch (_e) { /* ignore — may already be cleaned up */ }
+    }
+  }
+}
+
 function loadConfig(cwd) {
   const configPath = path.join(cwd, '.planning', 'config.json');
   const defaults = {
@@ -171,6 +360,7 @@ function loadConfig(cwd) {
     verifier: true,
     parallelization: true,
     brave_search: false,
+    hooks: {},
   };
 
   try {
@@ -204,6 +394,7 @@ function loadConfig(cwd) {
       verifier: get('verifier', { section: 'workflow', field: 'verifier' }) ?? defaults.verifier,
       parallelization,
       brave_search: get('brave_search') ?? defaults.brave_search,
+      hooks: parsed.hooks || {},
     };
   } catch {
     return defaults;
@@ -240,6 +431,34 @@ function execGit(cwd, args) {
       stdout: (err.stdout ?? '').toString().trim(),
       stderr: (err.stderr ?? '').toString().trim(),
     };
+  }
+}
+
+/**
+ * Wraps execGit with retry logic for git lock contention.
+ * When git operations fail due to index.lock conflicts (common during
+ * concurrent operations or mid-crash recovery), retries with exponential
+ * backoff: 1s, 2s, 4s.
+ *
+ * @param {string} cwd - Working directory
+ * @param {string[]} args - Git command arguments
+ * @param {number} [maxRetries=3] - Maximum retry attempts
+ * @returns {object} Same shape as execGit: { exitCode, stdout, stderr }
+ */
+function execGitRetry(cwd, args, maxRetries = 3) {
+  for (let attempt = 1; attempt <= maxRetries; attempt++) {
+    const result = execGit(cwd, args);
+    if (result.exitCode === 0) return result;
+
+    const isLockError = result.stderr.includes('.lock') || result.stderr.includes('index.lock');
+    if (attempt < maxRetries && isLockError) {
+      // Exponential backoff: 1s, 2s, 4s
+      const waitMs = Math.pow(2, attempt - 1) * 1000;
+      const start = Date.now();
+      while (Date.now() - start < waitMs) { /* busy wait for synchronous backoff */ }
+      continue;
+    }
+    return result;
   }
 }
 
@@ -631,6 +850,18 @@ function cmdConfigEnsureSection(cwd, raw) {
     },
     parallelization: true,
     brave_search: hasBraveSearch,
+    hooks: {
+      blockDangerousCommands: true,
+      validateCommits: true,
+      enforceWorkflowOrder: true,
+      checkPlanFormat: true,
+      checkRoadmapSync: true,
+      enforcePhaseBoundaries: false,
+      checkSubagentOutput: true,
+      trackContextBudget: true,
+      suggestCompact: true,
+      compactThreshold: 50,
+    },
   };
   const defaults = {
     ...hardcoded,
@@ -639,7 +870,11 @@ function cmdConfigEnsureSection(cwd, raw) {
   };
 
   try {
-    fs.writeFileSync(configPath, JSON.stringify(defaults, null, 2), 'utf-8');
+    const writeResult = atomicWrite(configPath, JSON.stringify(defaults, null, 2));
+    if (!writeResult.success) {
+      error('Failed to create config.json: ' + writeResult.error);
+      return;
+    }
     const result = { created: true, path: '.planning/config.json' };
     output(result, raw, 'created');
   } catch (err) {
@@ -684,7 +919,11 @@ function cmdConfigSet(cwd, keyPath, value, raw) {
 
   // Write back
   try {
-    fs.writeFileSync(configPath, JSON.stringify(config, null, 2), 'utf-8');
+    const writeResult = atomicWrite(configPath, JSON.stringify(config, null, 2));
+    if (!writeResult.success) {
+      error('Failed to write config.json: ' + writeResult.error);
+      return;
+    }
     const result = { updated: true, key: keyPath, value: parsedValue };
     output(result, raw, `${keyPath}=${parsedValue}`);
   } catch (err) {
@@ -1145,23 +1384,26 @@ function cmdStateGet(cwd, section, raw) {
 function cmdStatePatch(cwd, patches, raw) {
   const statePath = path.join(cwd, '.planning', 'STATE.md');
   try {
-    let content = fs.readFileSync(statePath, 'utf-8');
     const results = { updated: [], failed: [] };
 
-    for (const [field, value] of Object.entries(patches)) {
-      const fieldEscaped = field.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
-      const pattern = new RegExp(`(\\*\\*${fieldEscaped}:\\*\\*\\s*)(.*)`, 'i');
-      
-      if (pattern.test(content)) {
-        content = content.replace(pattern, `$1${value}`);
-        results.updated.push(field);
-      } else {
-        results.failed.push(field);
+    const lockResult = lockedFileUpdate(statePath, (content) => {
+      for (const [field, value] of Object.entries(patches)) {
+        const fieldEscaped = field.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+        const pattern = new RegExp(`(\\*\\*${fieldEscaped}:\\*\\*\\s*)(.*)`, 'i');
+        
+        if (pattern.test(content)) {
+          content = content.replace(pattern, `$1${value}`);
+          results.updated.push(field);
+        } else {
+          results.failed.push(field);
+        }
       }
-    }
+      return content;
+    });
 
-    if (results.updated.length > 0) {
-      fs.writeFileSync(statePath, content, 'utf-8');
+    if (!lockResult.success) {
+      error(`Failed to update STATE.md: ${lockResult.error}`);
+      return;
     }
 
     output(results, raw, results.updated.length > 0 ? 'true' : 'false');
@@ -1177,12 +1419,23 @@ function cmdStateUpdate(cwd, field, value) {
 
   const statePath = path.join(cwd, '.planning', 'STATE.md');
   try {
-    let content = fs.readFileSync(statePath, 'utf-8');
-    const fieldEscaped = field.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
-    const pattern = new RegExp(`(\\*\\*${fieldEscaped}:\\*\\*\\s*)(.*)`, 'i');
-    if (pattern.test(content)) {
-      content = content.replace(pattern, `$1${value}`);
-      fs.writeFileSync(statePath, content, 'utf-8');
+    let found = false;
+    const lockResult = lockedFileUpdate(statePath, (content) => {
+      const fieldEscaped = field.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+      const pattern = new RegExp(`(\\*\\*${fieldEscaped}:\\*\\*\\s*)(.*)`, 'i');
+      if (pattern.test(content)) {
+        found = true;
+        return content.replace(pattern, `$1${value}`);
+      }
+      return content;
+    });
+
+    if (!lockResult.success) {
+      error(`Failed to update STATE.md: ${lockResult.error}`);
+      return;
+    }
+
+    if (found) {
       output({ updated: true });
     } else {
       output({ updated: false, reason: `Field "${field}" not found in STATE.md` });
@@ -1213,28 +1466,40 @@ function cmdStateAdvancePlan(cwd, raw) {
   const statePath = path.join(cwd, '.planning', 'STATE.md');
   if (!fs.existsSync(statePath)) { output({ error: 'STATE.md not found' }, raw); return; }
 
-  let content = fs.readFileSync(statePath, 'utf-8');
-  const currentPlan = parseInt(stateExtractField(content, 'Current Plan'), 10);
-  const totalPlans = parseInt(stateExtractField(content, 'Total Plans in Phase'), 10);
   const today = new Date().toISOString().split('T')[0];
+  let outputData = null;
 
-  if (isNaN(currentPlan) || isNaN(totalPlans)) {
-    output({ error: 'Cannot parse Current Plan or Total Plans in Phase from STATE.md' }, raw);
+  const lockResult = lockedFileUpdate(statePath, (content) => {
+    const currentPlan = parseInt(stateExtractField(content, 'Current Plan'), 10);
+    const totalPlans = parseInt(stateExtractField(content, 'Total Plans in Phase'), 10);
+
+    if (isNaN(currentPlan) || isNaN(totalPlans)) {
+      outputData = { error: 'Cannot parse Current Plan or Total Plans in Phase from STATE.md' };
+      return content;
+    }
+
+    if (currentPlan >= totalPlans) {
+      content = stateReplaceField(content, 'Status', 'Phase complete — ready for verification') || content;
+      content = stateReplaceField(content, 'Last Activity', today) || content;
+      outputData = { advanced: false, reason: 'last_plan', current_plan: currentPlan, total_plans: totalPlans, status: 'ready_for_verification' };
+    } else {
+      const newPlan = currentPlan + 1;
+      content = stateReplaceField(content, 'Current Plan', String(newPlan)) || content;
+      content = stateReplaceField(content, 'Status', 'Ready to execute') || content;
+      content = stateReplaceField(content, 'Last Activity', today) || content;
+      outputData = { advanced: true, previous_plan: currentPlan, current_plan: newPlan, total_plans: totalPlans };
+    }
+    return content;
+  });
+
+  if (!lockResult.success) {
+    error(`Failed to update STATE.md: ${lockResult.error}`);
     return;
   }
 
-  if (currentPlan >= totalPlans) {
-    content = stateReplaceField(content, 'Status', 'Phase complete — ready for verification') || content;
-    content = stateReplaceField(content, 'Last Activity', today) || content;
-    fs.writeFileSync(statePath, content, 'utf-8');
-    output({ advanced: false, reason: 'last_plan', current_plan: currentPlan, total_plans: totalPlans, status: 'ready_for_verification' }, raw, 'false');
-  } else {
-    const newPlan = currentPlan + 1;
-    content = stateReplaceField(content, 'Current Plan', String(newPlan)) || content;
-    content = stateReplaceField(content, 'Status', 'Ready to execute') || content;
-    content = stateReplaceField(content, 'Last Activity', today) || content;
-    fs.writeFileSync(statePath, content, 'utf-8');
-    output({ advanced: true, previous_plan: currentPlan, current_plan: newPlan, total_plans: totalPlans }, raw, 'true');
+  if (outputData) {
+    const rawVal = outputData.advanced === true ? 'true' : (outputData.advanced === false ? 'false' : undefined);
+    output(outputData, raw, rawVal);
   }
 }
 
@@ -1242,7 +1507,6 @@ function cmdStateRecordMetric(cwd, options, raw) {
   const statePath = path.join(cwd, '.planning', 'STATE.md');
   if (!fs.existsSync(statePath)) { output({ error: 'STATE.md not found' }, raw); return; }
 
-  let content = fs.readFileSync(statePath, 'utf-8');
   const { phase, plan, duration, tasks, files } = options;
 
   if (!phase || !plan || !duration) {
@@ -1250,23 +1514,36 @@ function cmdStateRecordMetric(cwd, options, raw) {
     return;
   }
 
-  // Find Performance Metrics section and its table
-  const metricsPattern = /(##\s*Performance Metrics[\s\S]*?\n\|[^\n]+\n\|[-|\s]+\n)([\s\S]*?)(?=\n##|\n$|$)/i;
-  const metricsMatch = content.match(metricsPattern);
+  let recorded = false;
 
-  if (metricsMatch) {
-    const tableHeader = metricsMatch[1];
-    let tableBody = metricsMatch[2].trimEnd();
-    const newRow = `| Phase ${phase} P${plan} | ${duration} | ${tasks || '-'} tasks | ${files || '-'} files |`;
+  const lockResult = lockedFileUpdate(statePath, (content) => {
+    // Find Performance Metrics section and its table
+    const metricsPattern = /(##\s*Performance Metrics[\s\S]*?\n\|[^\n]+\n\|[-|\s]+\n)([\s\S]*?)(?=\n##|\n$|$)/i;
+    const metricsMatch = content.match(metricsPattern);
 
-    if (tableBody.trim() === '' || tableBody.includes('None yet')) {
-      tableBody = newRow;
-    } else {
-      tableBody = tableBody + '\n' + newRow;
+    if (metricsMatch) {
+      const tableHeader = metricsMatch[1];
+      let tableBody = metricsMatch[2].trimEnd();
+      const newRow = `| Phase ${phase} P${plan} | ${duration} | ${tasks || '-'} tasks | ${files || '-'} files |`;
+
+      if (tableBody.trim() === '' || tableBody.includes('None yet')) {
+        tableBody = newRow;
+      } else {
+        tableBody = tableBody + '\n' + newRow;
+      }
+
+      recorded = true;
+      return content.replace(metricsPattern, `${tableHeader}${tableBody}\n`);
     }
+    return content;
+  });
 
-    content = content.replace(metricsPattern, `${tableHeader}${tableBody}\n`);
-    fs.writeFileSync(statePath, content, 'utf-8');
+  if (!lockResult.success) {
+    error(`Failed to update STATE.md: ${lockResult.error}`);
+    return;
+  }
+
+  if (recorded) {
     output({ recorded: true, phase, plan, duration }, raw, 'true');
   } else {
     output({ recorded: false, reason: 'Performance Metrics section not found in STATE.md' }, raw, 'false');
@@ -1277,9 +1554,7 @@ function cmdStateUpdateProgress(cwd, raw) {
   const statePath = path.join(cwd, '.planning', 'STATE.md');
   if (!fs.existsSync(statePath)) { output({ error: 'STATE.md not found' }, raw); return; }
 
-  let content = fs.readFileSync(statePath, 'utf-8');
-
-  // Count summaries across all phases
+  // Count summaries across all phases (read-only scan, outside lock)
   const phasesDir = path.join(cwd, '.planning', 'phases');
   let totalPlans = 0;
   let totalSummaries = 0;
@@ -1300,10 +1575,23 @@ function cmdStateUpdateProgress(cwd, raw) {
   const bar = '\u2588'.repeat(filled) + '\u2591'.repeat(barWidth - filled);
   const progressStr = `[${bar}] ${percent}%`;
 
-  const progressPattern = /(\*\*Progress:\*\*\s*).*/i;
-  if (progressPattern.test(content)) {
-    content = content.replace(progressPattern, `$1${progressStr}`);
-    fs.writeFileSync(statePath, content, 'utf-8');
+  let updated = false;
+
+  const lockResult = lockedFileUpdate(statePath, (content) => {
+    const progressPattern = /(\*\*Progress:\*\*\s*).*/i;
+    if (progressPattern.test(content)) {
+      updated = true;
+      return content.replace(progressPattern, `$1${progressStr}`);
+    }
+    return content;
+  });
+
+  if (!lockResult.success) {
+    error(`Failed to update STATE.md: ${lockResult.error}`);
+    return;
+  }
+
+  if (updated) {
     output({ updated: true, percent, completed: totalSummaries, total: totalPlans, bar: progressStr }, raw, progressStr);
   } else {
     output({ updated: false, reason: 'Progress field not found in STATE.md' }, raw, 'false');
@@ -1317,20 +1605,31 @@ function cmdStateAddDecision(cwd, options, raw) {
   const { phase, summary, rationale } = options;
   if (!summary) { output({ error: 'summary required' }, raw); return; }
 
-  let content = fs.readFileSync(statePath, 'utf-8');
   const entry = `- [Phase ${phase || '?'}]: ${summary}${rationale ? ` — ${rationale}` : ''}`;
+  let added = false;
 
-  // Find Decisions section (various heading patterns)
-  const sectionPattern = /(###?\s*(?:Decisions|Decisions Made|Accumulated.*Decisions)\s*\n)([\s\S]*?)(?=\n###?|\n##[^#]|$)/i;
-  const match = content.match(sectionPattern);
+  const lockResult = lockedFileUpdate(statePath, (content) => {
+    // Find Decisions section (various heading patterns)
+    const sectionPattern = /(###?\s*(?:Decisions|Decisions Made|Accumulated.*Decisions)\s*\n)([\s\S]*?)(?=\n###?|\n##[^#]|$)/i;
+    const match = content.match(sectionPattern);
 
-  if (match) {
-    let sectionBody = match[2];
-    // Remove placeholders
-    sectionBody = sectionBody.replace(/None yet\.?\s*\n?/gi, '').replace(/No decisions yet\.?\s*\n?/gi, '');
-    sectionBody = sectionBody.trimEnd() + '\n' + entry + '\n';
-    content = content.replace(sectionPattern, `${match[1]}${sectionBody}`);
-    fs.writeFileSync(statePath, content, 'utf-8');
+    if (match) {
+      let sectionBody = match[2];
+      // Remove placeholders
+      sectionBody = sectionBody.replace(/None yet\.?\s*\n?/gi, '').replace(/No decisions yet\.?\s*\n?/gi, '');
+      sectionBody = sectionBody.trimEnd() + '\n' + entry + '\n';
+      added = true;
+      return content.replace(sectionPattern, `${match[1]}${sectionBody}`);
+    }
+    return content;
+  });
+
+  if (!lockResult.success) {
+    error(`Failed to update STATE.md: ${lockResult.error}`);
+    return;
+  }
+
+  if (added) {
     output({ added: true, decision: entry }, raw, 'true');
   } else {
     output({ added: false, reason: 'Decisions section not found in STATE.md' }, raw, 'false');
@@ -1342,18 +1641,29 @@ function cmdStateAddBlocker(cwd, text, raw) {
   if (!fs.existsSync(statePath)) { output({ error: 'STATE.md not found' }, raw); return; }
   if (!text) { output({ error: 'text required' }, raw); return; }
 
-  let content = fs.readFileSync(statePath, 'utf-8');
   const entry = `- ${text}`;
+  let added = false;
 
-  const sectionPattern = /(###?\s*(?:Blockers|Blockers\/Concerns|Concerns)\s*\n)([\s\S]*?)(?=\n###?|\n##[^#]|$)/i;
-  const match = content.match(sectionPattern);
+  const lockResult = lockedFileUpdate(statePath, (content) => {
+    const sectionPattern = /(###?\s*(?:Blockers|Blockers\/Concerns|Concerns)\s*\n)([\s\S]*?)(?=\n###?|\n##[^#]|$)/i;
+    const match = content.match(sectionPattern);
 
-  if (match) {
-    let sectionBody = match[2];
-    sectionBody = sectionBody.replace(/None\.?\s*\n?/gi, '').replace(/None yet\.?\s*\n?/gi, '');
-    sectionBody = sectionBody.trimEnd() + '\n' + entry + '\n';
-    content = content.replace(sectionPattern, `${match[1]}${sectionBody}`);
-    fs.writeFileSync(statePath, content, 'utf-8');
+    if (match) {
+      let sectionBody = match[2];
+      sectionBody = sectionBody.replace(/None\.?\s*\n?/gi, '').replace(/None yet\.?\s*\n?/gi, '');
+      sectionBody = sectionBody.trimEnd() + '\n' + entry + '\n';
+      added = true;
+      return content.replace(sectionPattern, `${match[1]}${sectionBody}`);
+    }
+    return content;
+  });
+
+  if (!lockResult.success) {
+    error(`Failed to update STATE.md: ${lockResult.error}`);
+    return;
+  }
+
+  if (added) {
     output({ added: true, blocker: text }, raw, 'true');
   } else {
     output({ added: false, reason: 'Blockers section not found in STATE.md' }, raw, 'false');
@@ -1365,27 +1675,38 @@ function cmdStateResolveBlocker(cwd, text, raw) {
   if (!fs.existsSync(statePath)) { output({ error: 'STATE.md not found' }, raw); return; }
   if (!text) { output({ error: 'text required' }, raw); return; }
 
-  let content = fs.readFileSync(statePath, 'utf-8');
+  let resolved = false;
 
-  const sectionPattern = /(###?\s*(?:Blockers|Blockers\/Concerns|Concerns)\s*\n)([\s\S]*?)(?=\n###?|\n##[^#]|$)/i;
-  const match = content.match(sectionPattern);
+  const lockResult = lockedFileUpdate(statePath, (content) => {
+    const sectionPattern = /(###?\s*(?:Blockers|Blockers\/Concerns|Concerns)\s*\n)([\s\S]*?)(?=\n###?|\n##[^#]|$)/i;
+    const match = content.match(sectionPattern);
 
-  if (match) {
-    const sectionBody = match[2];
-    const lines = sectionBody.split('\n');
-    const filtered = lines.filter(line => {
-      if (!line.startsWith('- ')) return true;
-      return !line.toLowerCase().includes(text.toLowerCase());
-    });
+    if (match) {
+      const sectionBody = match[2];
+      const lines = sectionBody.split('\n');
+      const filtered = lines.filter(line => {
+        if (!line.startsWith('- ')) return true;
+        return !line.toLowerCase().includes(text.toLowerCase());
+      });
 
-    let newBody = filtered.join('\n');
-    // If section is now empty, add placeholder
-    if (!newBody.trim() || !newBody.includes('- ')) {
-      newBody = 'None\n';
+      let newBody = filtered.join('\n');
+      // If section is now empty, add placeholder
+      if (!newBody.trim() || !newBody.includes('- ')) {
+        newBody = 'None\n';
+      }
+
+      resolved = true;
+      return content.replace(sectionPattern, `${match[1]}${newBody}`);
     }
+    return content;
+  });
 
-    content = content.replace(sectionPattern, `${match[1]}${newBody}`);
-    fs.writeFileSync(statePath, content, 'utf-8');
+  if (!lockResult.success) {
+    error(`Failed to update STATE.md: ${lockResult.error}`);
+    return;
+  }
+
+  if (resolved) {
     output({ resolved: true, blocker: text }, raw, 'true');
   } else {
     output({ resolved: false, reason: 'Blockers section not found in STATE.md' }, raw, 'false');
@@ -1396,31 +1717,38 @@ function cmdStateRecordSession(cwd, options, raw) {
   const statePath = path.join(cwd, '.planning', 'STATE.md');
   if (!fs.existsSync(statePath)) { output({ error: 'STATE.md not found' }, raw); return; }
 
-  let content = fs.readFileSync(statePath, 'utf-8');
   const now = new Date().toISOString();
   const updated = [];
 
-  // Update Last session / Last Date
-  let result = stateReplaceField(content, 'Last session', now);
-  if (result) { content = result; updated.push('Last session'); }
-  result = stateReplaceField(content, 'Last Date', now);
-  if (result) { content = result; updated.push('Last Date'); }
+  const lockResult = lockedFileUpdate(statePath, (content) => {
+    // Update Last session / Last Date
+    let result = stateReplaceField(content, 'Last session', now);
+    if (result) { content = result; updated.push('Last session'); }
+    result = stateReplaceField(content, 'Last Date', now);
+    if (result) { content = result; updated.push('Last Date'); }
 
-  // Update Stopped at
-  if (options.stopped_at) {
-    result = stateReplaceField(content, 'Stopped At', options.stopped_at);
-    if (!result) result = stateReplaceField(content, 'Stopped at', options.stopped_at);
-    if (result) { content = result; updated.push('Stopped At'); }
+    // Update Stopped at
+    if (options.stopped_at) {
+      result = stateReplaceField(content, 'Stopped At', options.stopped_at);
+      if (!result) result = stateReplaceField(content, 'Stopped at', options.stopped_at);
+      if (result) { content = result; updated.push('Stopped At'); }
+    }
+
+    // Update Resume file
+    const resumeFile = options.resume_file || 'None';
+    result = stateReplaceField(content, 'Resume File', resumeFile);
+    if (!result) result = stateReplaceField(content, 'Resume file', resumeFile);
+    if (result) { content = result; updated.push('Resume File'); }
+
+    return content;
+  });
+
+  if (!lockResult.success) {
+    error(`Failed to update STATE.md: ${lockResult.error}`);
+    return;
   }
 
-  // Update Resume file
-  const resumeFile = options.resume_file || 'None';
-  result = stateReplaceField(content, 'Resume File', resumeFile);
-  if (!result) result = stateReplaceField(content, 'Resume file', resumeFile);
-  if (result) { content = result; updated.push('Resume File'); }
-
   if (updated.length > 0) {
-    fs.writeFileSync(statePath, content, 'utf-8');
     output({ recorded: true, updated }, raw, 'true');
   } else {
     output({ recorded: false, reason: 'No session fields found in STATE.md' }, raw, 'false');
@@ -1513,15 +1841,15 @@ function cmdCommit(cwd, message, files, raw, amend) {
     return;
   }
 
-  // Stage files
+  // Stage files (with retry for lock contention)
   const filesToStage = files && files.length > 0 ? files : ['.planning/'];
   for (const file of filesToStage) {
-    execGit(cwd, ['add', file]);
+    execGitRetry(cwd, ['add', file]);
   }
 
-  // Commit
+  // Commit (with retry for lock contention)
   const commitArgs = amend ? ['commit', '--amend', '--no-edit'] : ['commit', '-m', message];
-  const commitResult = execGit(cwd, commitArgs);
+  const commitResult = execGitRetry(cwd, commitArgs);
   if (commitResult.exitCode !== 0) {
     if (commitResult.stdout.includes('nothing to commit') || commitResult.stderr.includes('nothing to commit')) {
       const result = { committed: false, hash: null, reason: 'nothing_to_commit' };
@@ -1843,7 +2171,7 @@ function cmdTemplateFill(cwd, templateType, options, raw) {
     return;
   }
 
-  fs.writeFileSync(outPath, fullContent, 'utf-8');
+  atomicWrite(outPath, fullContent);
   const relPath = path.relative(cwd, outPath);
   output({ created: true, path: relPath, template: templateType }, raw, relPath);
 }
@@ -2203,7 +2531,7 @@ function cmdFrontmatterSet(cwd, filePath, field, value, raw) {
   try { parsedValue = JSON.parse(value); } catch { parsedValue = value; }
   fm[field] = parsedValue;
   const newContent = spliceFrontmatter(content, fm);
-  fs.writeFileSync(fullPath, newContent, 'utf-8');
+  atomicWrite(fullPath, newContent);
   output({ updated: true, field, value: parsedValue }, raw, 'true');
 }
 
@@ -2217,7 +2545,7 @@ function cmdFrontmatterMerge(cwd, filePath, data, raw) {
   try { mergeData = JSON.parse(data); } catch { error('Invalid JSON for --data'); return; }
   Object.assign(fm, mergeData);
   const newContent = spliceFrontmatter(content, fm);
-  fs.writeFileSync(fullPath, newContent, 'utf-8');
+  atomicWrite(fullPath, newContent);
   output({ merged: true, fields: Object.keys(mergeData) }, raw, 'true');
 }
 
@@ -2706,7 +3034,7 @@ function cmdPhaseAdd(cwd, description, raw) {
     updatedContent = content + phaseEntry;
   }
 
-  fs.writeFileSync(roadmapPath, updatedContent, 'utf-8');
+  atomicWrite(roadmapPath, updatedContent);
 
   const result = {
     phase_number: newPhaseNum,
@@ -2789,7 +3117,7 @@ function cmdPhaseInsert(cwd, afterPhase, description, raw) {
   }
 
   const updatedContent = content.slice(0, insertIdx) + phaseEntry + content.slice(insertIdx);
-  fs.writeFileSync(roadmapPath, updatedContent, 'utf-8');
+  atomicWrite(roadmapPath, updatedContent);
 
   const result = {
     phase_number: decimalPhase,
@@ -3020,27 +3348,30 @@ function cmdPhaseRemove(cwd, targetPhase, options, raw) {
     }
   }
 
-  fs.writeFileSync(roadmapPath, roadmapContent, 'utf-8');
+  atomicWrite(roadmapPath, roadmapContent);
 
   // Update STATE.md phase count
   const statePath = path.join(cwd, '.planning', 'STATE.md');
+  let stateUpdated = false;
   if (fs.existsSync(statePath)) {
-    let stateContent = fs.readFileSync(statePath, 'utf-8');
-    // Update "Total Phases" field
-    const totalPattern = /(\*\*Total Phases:\*\*\s*)(\d+)/;
-    const totalMatch = stateContent.match(totalPattern);
-    if (totalMatch) {
-      const oldTotal = parseInt(totalMatch[2], 10);
-      stateContent = stateContent.replace(totalPattern, `$1${oldTotal - 1}`);
-    }
-    // Update "Phase: X of Y" pattern
-    const ofPattern = /(\bof\s+)(\d+)(\s*(?:\(|phases?))/i;
-    const ofMatch = stateContent.match(ofPattern);
-    if (ofMatch) {
-      const oldTotal = parseInt(ofMatch[2], 10);
-      stateContent = stateContent.replace(ofPattern, `$1${oldTotal - 1}$3`);
-    }
-    fs.writeFileSync(statePath, stateContent, 'utf-8');
+    lockedFileUpdate(statePath, (stateContent) => {
+      // Update "Total Phases" field
+      const totalPattern = /(\*\*Total Phases:\*\*\s*)(\d+)/;
+      const totalMatch = stateContent.match(totalPattern);
+      if (totalMatch) {
+        const oldTotal = parseInt(totalMatch[2], 10);
+        stateContent = stateContent.replace(totalPattern, `$1${oldTotal - 1}`);
+      }
+      // Update "Phase: X of Y" pattern
+      const ofPattern = /(\bof\s+)(\d+)(\s*(?:\(|phases?))/i;
+      const ofMatch = stateContent.match(ofPattern);
+      if (ofMatch) {
+        const oldTotal = parseInt(ofMatch[2], 10);
+        stateContent = stateContent.replace(ofPattern, `$1${oldTotal - 1}$3`);
+      }
+      return stateContent;
+    });
+    stateUpdated = true;
   }
 
   const result = {
@@ -3049,7 +3380,7 @@ function cmdPhaseRemove(cwd, targetPhase, options, raw) {
     renamed_directories: renamedDirs,
     renamed_files: renamedFiles,
     roadmap_updated: true,
-    state_updated: fs.existsSync(statePath),
+    state_updated: stateUpdated,
   };
 
   output(result, raw);
@@ -3185,7 +3516,7 @@ function cmdPhaseComplete(cwd, phaseNum, raw) {
       `$1${summaryCount}/${planCount} plans complete`
     );
 
-    fs.writeFileSync(roadmapPath, roadmapContent, 'utf-8');
+    atomicWrite(roadmapPath, roadmapContent);
 
     // Update REQUIREMENTS.md traceability for this phase's requirements
     const reqPath = path.join(cwd, '.planning', 'REQUIREMENTS.md');
@@ -3212,7 +3543,7 @@ function cmdPhaseComplete(cwd, phaseNum, raw) {
           );
         }
 
-        fs.writeFileSync(reqPath, reqContent, 'utf-8');
+        atomicWrite(reqPath, reqContent);
       }
     }
   }
@@ -3244,47 +3575,47 @@ function cmdPhaseComplete(cwd, phaseNum, raw) {
 
   // Update STATE.md
   if (fs.existsSync(statePath)) {
-    let stateContent = fs.readFileSync(statePath, 'utf-8');
-
-    // Update Current Phase
-    stateContent = stateContent.replace(
-      /(\*\*Current Phase:\*\*\s*).*/,
-      `$1${nextPhaseNum || phaseNum}`
-    );
-
-    // Update Current Phase Name
-    if (nextPhaseName) {
+    lockedFileUpdate(statePath, (stateContent) => {
+      // Update Current Phase
       stateContent = stateContent.replace(
-        /(\*\*Current Phase Name:\*\*\s*).*/,
-        `$1${nextPhaseName.replace(/-/g, ' ')}`
+        /(\*\*Current Phase:\*\*\s*).*/,
+        `$1${nextPhaseNum || phaseNum}`
       );
-    }
 
-    // Update Status
-    stateContent = stateContent.replace(
-      /(\*\*Status:\*\*\s*).*/,
-      `$1${isLastPhase ? 'Milestone complete' : 'Ready to plan'}`
-    );
+      // Update Current Phase Name
+      if (nextPhaseName) {
+        stateContent = stateContent.replace(
+          /(\*\*Current Phase Name:\*\*\s*).*/,
+          `$1${nextPhaseName.replace(/-/g, ' ')}`
+        );
+      }
 
-    // Update Current Plan
-    stateContent = stateContent.replace(
-      /(\*\*Current Plan:\*\*\s*).*/,
-      `$1Not started`
-    );
+      // Update Status
+      stateContent = stateContent.replace(
+        /(\*\*Status:\*\*\s*).*/,
+        `$1${isLastPhase ? 'Milestone complete' : 'Ready to plan'}`
+      );
 
-    // Update Last Activity
-    stateContent = stateContent.replace(
-      /(\*\*Last Activity:\*\*\s*).*/,
-      `$1${today}`
-    );
+      // Update Current Plan
+      stateContent = stateContent.replace(
+        /(\*\*Current Plan:\*\*\s*).*/,
+        `$1Not started`
+      );
 
-    // Update Last Activity Description
-    stateContent = stateContent.replace(
-      /(\*\*Last Activity Description:\*\*\s*).*/,
-      `$1Phase ${phaseNum} complete${nextPhaseNum ? `, transitioned to Phase ${nextPhaseNum}` : ''}`
-    );
+      // Update Last Activity
+      stateContent = stateContent.replace(
+        /(\*\*Last Activity:\*\*\s*).*/,
+        `$1${today}`
+      );
 
-    fs.writeFileSync(statePath, stateContent, 'utf-8');
+      // Update Last Activity Description
+      stateContent = stateContent.replace(
+        /(\*\*Last Activity Description:\*\*\s*).*/,
+        `$1Phase ${phaseNum} complete${nextPhaseNum ? `, transitioned to Phase ${nextPhaseNum}` : ''}`
+      );
+
+      return stateContent;
+    });
   }
 
   const result = {
@@ -3357,14 +3688,14 @@ function cmdMilestoneComplete(cwd, version, options, raw) {
   // Archive ROADMAP.md
   if (fs.existsSync(roadmapPath)) {
     const roadmapContent = fs.readFileSync(roadmapPath, 'utf-8');
-    fs.writeFileSync(path.join(archiveDir, `${version}-ROADMAP.md`), roadmapContent, 'utf-8');
+    atomicWrite(path.join(archiveDir, `${version}-ROADMAP.md`), roadmapContent);
   }
 
   // Archive REQUIREMENTS.md
   if (fs.existsSync(reqPath)) {
     const reqContent = fs.readFileSync(reqPath, 'utf-8');
     const archiveHeader = `# Requirements Archive: ${version} ${milestoneName}\n\n**Archived:** ${today}\n**Status:** SHIPPED\n\nFor current requirements, see \`.planning/REQUIREMENTS.md\`.\n\n---\n\n`;
-    fs.writeFileSync(path.join(archiveDir, `${version}-REQUIREMENTS.md`), archiveHeader + reqContent, 'utf-8');
+    atomicWrite(path.join(archiveDir, `${version}-REQUIREMENTS.md`), archiveHeader + reqContent);
   }
 
   // Archive audit file if exists
@@ -3379,27 +3710,28 @@ function cmdMilestoneComplete(cwd, version, options, raw) {
 
   if (fs.existsSync(milestonesPath)) {
     const existing = fs.readFileSync(milestonesPath, 'utf-8');
-    fs.writeFileSync(milestonesPath, existing + '\n' + milestoneEntry, 'utf-8');
+    atomicWrite(milestonesPath, existing + '\n' + milestoneEntry);
   } else {
-    fs.writeFileSync(milestonesPath, `# Milestones\n\n${milestoneEntry}`, 'utf-8');
+    atomicWrite(milestonesPath, `# Milestones\n\n${milestoneEntry}`);
   }
 
   // Update STATE.md
   if (fs.existsSync(statePath)) {
-    let stateContent = fs.readFileSync(statePath, 'utf-8');
-    stateContent = stateContent.replace(
-      /(\*\*Status:\*\*\s*).*/,
-      `$1${version} milestone complete`
-    );
-    stateContent = stateContent.replace(
-      /(\*\*Last Activity:\*\*\s*).*/,
-      `$1${today}`
-    );
-    stateContent = stateContent.replace(
-      /(\*\*Last Activity Description:\*\*\s*).*/,
-      `$1${version} milestone completed and archived`
-    );
-    fs.writeFileSync(statePath, stateContent, 'utf-8');
+    lockedFileUpdate(statePath, (stateContent) => {
+      stateContent = stateContent.replace(
+        /(\*\*Status:\*\*\s*).*/,
+        `$1${version} milestone complete`
+      );
+      stateContent = stateContent.replace(
+        /(\*\*Last Activity:\*\*\s*).*/,
+        `$1${today}`
+      );
+      stateContent = stateContent.replace(
+        /(\*\*Last Activity Description:\*\*\s*).*/,
+        `$1${version} milestone completed and archived`
+      );
+      return stateContent;
+    });
   }
 
   // Archive phase directories if requested
@@ -3802,6 +4134,130 @@ function cmdValidateHealth(cwd, options, raw) {
   }, raw);
 }
 
+// ─── Progress Tracking (Crash Recovery) ──────────────────────────────────────
+
+function cmdProgressWrite(cwd, planId, taskNum, totalTasks, commitHash, raw) {
+  const planningDir = path.join(cwd, '.planning');
+  if (!fs.existsSync(planningDir)) {
+    error('.planning directory not found');
+  }
+  if (!planId) {
+    error('plan_id required');
+  }
+  if (taskNum === undefined || totalTasks === undefined) {
+    error('--task and --total are required');
+  }
+
+  const progressPath = path.join(planningDir, `.PROGRESS-${planId}`);
+  const data = {
+    plan_id: planId,
+    last_completed_task: parseInt(taskNum, 10),
+    total_tasks: parseInt(totalTasks, 10),
+    last_commit: commitHash || '',
+    timestamp: new Date().toISOString(),
+  };
+  fs.writeFileSync(progressPath, JSON.stringify(data, null, 2));
+  output(data, raw, `Progress: ${planId} task ${taskNum}/${totalTasks}`);
+}
+
+function cmdProgressRead(cwd, planId, raw) {
+  if (!planId) {
+    error('plan_id required');
+  }
+  const progressPath = path.join(cwd, '.planning', `.PROGRESS-${planId}`);
+  if (!fs.existsSync(progressPath)) {
+    const data = { exists: false };
+    output(data, raw, 'No progress file found');
+    return;
+  }
+  try {
+    const data = JSON.parse(fs.readFileSync(progressPath, 'utf8'));
+    data.exists = true;
+    output(data, raw, `Progress: ${data.plan_id} task ${data.last_completed_task}/${data.total_tasks} (${data.timestamp})`);
+  } catch {
+    const data = { exists: true, error: 'parse_error' };
+    output(data, raw, 'Progress file exists but is corrupted');
+  }
+}
+
+function cmdProgressDelete(cwd, planId, raw) {
+  if (!planId) {
+    error('plan_id required');
+  }
+  const progressPath = path.join(cwd, '.planning', `.PROGRESS-${planId}`);
+  const existed = fs.existsSync(progressPath);
+  if (existed) {
+    fs.unlinkSync(progressPath);
+  }
+  const data = { deleted: true, existed };
+  output(data, raw, `Progress file for ${planId} deleted`);
+}
+
+function cmdProgressList(cwd, raw) {
+  const planningDir = path.join(cwd, '.planning');
+  if (!fs.existsSync(planningDir)) {
+    error('.planning directory not found');
+  }
+  const files = fs.readdirSync(planningDir).filter(f => f.startsWith('.PROGRESS-'));
+  const progress = files.map(f => {
+    try {
+      return JSON.parse(fs.readFileSync(path.join(planningDir, f), 'utf8'));
+    } catch {
+      return { file: f, error: 'parse_error' };
+    }
+  });
+  if (raw) {
+    const data = { progress };
+    output(data, raw, JSON.stringify(data));
+  } else {
+    if (progress.length === 0) {
+      output({ progress: [] }, false, 'No active progress files');
+    } else {
+      const lines = progress.map(p =>
+        p.error
+          ? `${p.file}: parse error`
+          : `${p.plan_id}: task ${p.last_completed_task}/${p.total_tasks} (${p.timestamp})`
+      );
+      output({ progress }, false, lines.join('\n'));
+    }
+  }
+}
+
+function cmdProgressCheckOrphaned(cwd, raw) {
+  const planningDir = path.join(cwd, '.planning');
+  if (!fs.existsSync(planningDir)) {
+    error('.planning directory not found');
+  }
+  const files = fs.readdirSync(planningDir).filter(f => f.startsWith('.PROGRESS-'));
+  const orphaned = [];
+  const oneHour = 60 * 60 * 1000;
+  for (const f of files) {
+    const filePath = path.join(planningDir, f);
+    const stat = fs.statSync(filePath);
+    const ageMs = Date.now() - stat.mtimeMs;
+    if (ageMs > oneHour) {
+      try {
+        const data = JSON.parse(fs.readFileSync(filePath, 'utf8'));
+        orphaned.push({ ...data, age_minutes: Math.round(ageMs / 60000), file: f });
+      } catch {
+        orphaned.push({ file: f, age_minutes: Math.round(ageMs / 60000), error: 'parse_error' });
+      }
+    }
+  }
+  if (raw) {
+    output({ orphaned }, raw, JSON.stringify({ orphaned }));
+  } else {
+    if (orphaned.length === 0) {
+      output({ orphaned: [] }, false, 'No orphaned progress files');
+    } else {
+      const lines = orphaned.map(o =>
+        `ORPHANED: ${o.file} (${o.age_minutes}m old) — task ${o.last_completed_task || '?'}/${o.total_tasks || '?'}`
+      );
+      output({ orphaned }, false, lines.join('\n'));
+    }
+  }
+}
+
 // ─── Progress Render ──────────────────────────────────────────────────────────
 
 function cmdProgressRender(cwd, format, raw) {
@@ -3899,10 +4355,131 @@ function cmdTodoComplete(cwd, filename, raw) {
   const today = new Date().toISOString().split('T')[0];
   content = `completed: ${today}\n` + content;
 
-  fs.writeFileSync(path.join(completedDir, filename), content, 'utf-8');
+  atomicWrite(path.join(completedDir, filename), content);
   fs.unlinkSync(sourcePath);
 
   output({ completed: true, file: filename, date: today }, raw, 'completed');
+}
+
+// ─── Notes ────────────────────────────────────────────────────────────────────
+
+function cmdNoteAppend(cwd, contentWords, raw) {
+  if (!contentWords || contentWords.length === 0) {
+    error('content required for note append');
+  }
+
+  const notesDir = path.join(cwd, '.planning', 'notes');
+  fs.mkdirSync(notesDir, { recursive: true });
+
+  const now = new Date();
+  const pad = (n, len = 2) => String(n).padStart(len, '0');
+  const ts = `${now.getFullYear()}${pad(now.getMonth() + 1)}${pad(now.getDate())}-${pad(now.getHours())}${pad(now.getMinutes())}${pad(now.getSeconds())}`;
+  const filename = `note-${ts}.md`;
+  const filePath = path.join(notesDir, filename);
+  const created = now.toISOString();
+  const content = contentWords.join(' ');
+
+  const fileContent = `---\ncreated: ${created}\nsource: gsd-note\n---\n\n${content}\n`;
+  fs.writeFileSync(filePath, fileContent, 'utf-8');
+
+  output({
+    created: true,
+    file: filename,
+    path: `.planning/notes/${filename}`,
+    timestamp: created,
+  }, raw, filename);
+}
+
+function cmdNoteList(cwd, raw) {
+  const notesDir = path.join(cwd, '.planning', 'notes');
+  const notes = [];
+
+  try {
+    const files = fs.readdirSync(notesDir).filter(f => f.endsWith('.md')).sort();
+
+    for (const file of files) {
+      try {
+        const content = fs.readFileSync(path.join(notesDir, file), 'utf-8');
+        const createdMatch = content.match(/^created:\s*(.+)$/m);
+        const promotedMatch = content.match(/^promoted:\s*(.+)$/m);
+
+        // Extract first non-frontmatter, non-empty line as preview
+        let preview = '';
+        const fmEnd = content.indexOf('---', content.indexOf('---') + 3);
+        if (fmEnd !== -1) {
+          const body = content.slice(fmEnd + 3).trim();
+          const firstLine = body.split('\n').find(l => l.trim().length > 0);
+          if (firstLine) {
+            preview = firstLine.trim().slice(0, 100);
+          }
+        }
+
+        notes.push({
+          file,
+          created: createdMatch ? createdMatch[1].trim() : 'unknown',
+          preview,
+          promoted: promotedMatch ? promotedMatch[1].trim() : null,
+        });
+      } catch {}
+    }
+  } catch {}
+
+  output({ count: notes.length, notes }, raw, notes.length.toString());
+}
+
+function cmdNotePromote(cwd, filename, raw) {
+  if (!filename) {
+    error('filename required for note promote');
+  }
+
+  const notesDir = path.join(cwd, '.planning', 'notes');
+  const notePath = path.join(notesDir, filename);
+
+  if (!fs.existsSync(notePath)) {
+    error(`Note not found: ${filename}`);
+  }
+
+  const noteContent = fs.readFileSync(notePath, 'utf-8');
+
+  // Check if already promoted
+  if (/^promoted:\s*.+$/m.test(noteContent)) {
+    error(`Note already promoted: ${filename}`);
+  }
+
+  // Extract body content (after frontmatter)
+  let body = '';
+  const fmEnd = noteContent.indexOf('---', noteContent.indexOf('---') + 3);
+  if (fmEnd !== -1) {
+    body = noteContent.slice(fmEnd + 3).trim();
+  }
+
+  // Create todo
+  const pendingDir = path.join(cwd, '.planning', 'todos', 'pending');
+  fs.mkdirSync(pendingDir, { recursive: true });
+
+  const now = new Date();
+  const pad = (n, len = 2) => String(n).padStart(len, '0');
+  const ts = `${now.getFullYear()}${pad(now.getMonth() + 1)}${pad(now.getDate())}-${pad(now.getHours())}${pad(now.getMinutes())}${pad(now.getSeconds())}`;
+  const todoFilename = `todo-${ts}.md`;
+  const todoPath = path.join(pendingDir, todoFilename);
+  const promoted = now.toISOString();
+
+  const todoContent = `---\ncreated: ${promoted}\ntitle: ${body.split('\n')[0] || 'Promoted note'}\narea: general\nsource: note-promote\nnote: ${filename}\n---\n\n## Problem\n\n${body}\n\n## Solution\n\nTBD\n`;
+  fs.writeFileSync(todoPath, todoContent, 'utf-8');
+
+  // Update original note with promoted reference
+  const updatedNote = noteContent.replace(
+    /^---\n/,
+    `---\npromoted: ${promoted}\ntodo: ${todoFilename}\n`
+  );
+  fs.writeFileSync(notePath, updatedNote, 'utf-8');
+
+  output({
+    promoted: true,
+    note: filename,
+    todo: todoFilename,
+    todo_path: `.planning/todos/pending/${todoFilename}`,
+  }, raw, todoFilename);
 }
 
 // ─── Scaffold ─────────────────────────────────────────────────────────────────
@@ -3960,7 +4537,7 @@ function cmdScaffold(cwd, type, options, raw) {
     return;
   }
 
-  fs.writeFileSync(filePath, content, 'utf-8');
+  atomicWrite(filePath, content);
   const relPath = path.relative(cwd, filePath);
   output({ created: true, path: relPath }, raw, relPath);
 }
@@ -4834,6 +5411,746 @@ function cmdInitProgress(cwd, includes, raw) {
   output(result, raw);
 }
 
+// ─── Signal File Management ──────────────────────────────────────────────────
+
+const VALID_SIGNALS = ['active-agent', 'active-skill', 'active-operation', 'active-plan', 'auto-next'];
+
+function cmdSignalWrite(cwd, name, value, raw) {
+  if (!VALID_SIGNALS.includes(name)) {
+    error(`Invalid signal name: ${name}. Valid: ${VALID_SIGNALS.join(', ')}`);
+  }
+  const planningDir = path.join(cwd, '.planning');
+  if (!fs.existsSync(planningDir)) {
+    error('.planning directory not found');
+  }
+  const signalPath = path.join(planningDir, `.${name}`);
+  fs.writeFileSync(signalPath, value);
+  output({ signal: name, value, path: signalPath }, raw, `Signal ${name} = ${value}`);
+}
+
+function cmdSignalRead(cwd, name, raw) {
+  if (!VALID_SIGNALS.includes(name)) {
+    error(`Invalid signal name: ${name}. Valid: ${VALID_SIGNALS.join(', ')}`);
+  }
+  const signalPath = path.join(cwd, '.planning', `.${name}`);
+  let value = '';
+  if (fs.existsSync(signalPath)) {
+    value = fs.readFileSync(signalPath, 'utf8').trim();
+  }
+  output({ signal: name, value, exists: value !== '' }, raw, value);
+}
+
+function cmdSignalDelete(cwd, name, raw) {
+  if (!VALID_SIGNALS.includes(name)) {
+    error(`Invalid signal name: ${name}. Valid: ${VALID_SIGNALS.join(', ')}`);
+  }
+  const signalPath = path.join(cwd, '.planning', `.${name}`);
+  if (fs.existsSync(signalPath)) {
+    fs.unlinkSync(signalPath);
+  }
+  output({ signal: name, deleted: true }, raw, `Signal ${name} deleted`);
+}
+
+function cmdSignalList(cwd, raw) {
+  const planningDir = path.join(cwd, '.planning');
+  if (!fs.existsSync(planningDir)) { error('.planning directory not found'); }
+  const signals = [];
+  for (const name of VALID_SIGNALS) {
+    const signalPath = path.join(planningDir, `.${name}`);
+    if (fs.existsSync(signalPath)) {
+      const stat = fs.statSync(signalPath);
+      const ageMs = Date.now() - stat.mtimeMs;
+      const ageMins = Math.round(ageMs / 60000);
+      signals.push({ name, value: fs.readFileSync(signalPath, 'utf8').trim(), age_minutes: ageMins });
+    }
+  }
+  if (raw) {
+    output({ signals }, raw);
+  } else {
+    if (signals.length === 0) {
+      output({ signals: [] }, false, 'No active signals');
+    } else {
+      const text = signals.map(s => `${s.name} = ${s.value} (${s.age_minutes}m ago)`).join('\n');
+      output({ signals }, false, text);
+    }
+  }
+}
+
+function cmdSignalCleanup(cwd, raw) {
+  const planningDir = path.join(cwd, '.planning');
+  if (!fs.existsSync(planningDir)) { error('.planning directory not found'); }
+  let removed = 0;
+  for (const name of VALID_SIGNALS) {
+    const signalPath = path.join(planningDir, `.${name}`);
+    if (fs.existsSync(signalPath)) { fs.unlinkSync(signalPath); removed++; }
+  }
+  // Also clean up .context-tracker and .compact-counter
+  for (const f of ['.context-tracker', '.compact-counter']) {
+    const p = path.join(planningDir, f);
+    if (fs.existsSync(p)) { fs.unlinkSync(p); removed++; }
+  }
+  output({ removed }, raw, `Cleaned up ${removed} signal/tracker files`);
+}
+
+function cmdSignalCheckStale(cwd, raw) {
+  const planningDir = path.join(cwd, '.planning');
+  if (!fs.existsSync(planningDir)) { error('.planning directory not found'); }
+  const staleMinutes = 10;
+  const stale = [];
+  for (const name of VALID_SIGNALS) {
+    const signalPath = path.join(planningDir, `.${name}`);
+    if (fs.existsSync(signalPath)) {
+      const stat = fs.statSync(signalPath);
+      const ageMins = Math.round((Date.now() - stat.mtimeMs) / 60000);
+      if (ageMins >= staleMinutes) {
+        stale.push({ name, age_minutes: ageMins });
+      }
+    }
+  }
+  if (raw) {
+    output({ stale }, raw);
+  } else {
+    if (stale.length === 0) {
+      output({ stale: [] }, false, 'No stale signals');
+    } else {
+      const text = stale.map(s => `WARNING: ${s.name} is ${s.age_minutes}m old (stale > ${staleMinutes}m)`).join('\n');
+      output({ stale }, false, text);
+    }
+  }
+}
+
+// ─── Seed Commands ───────────────────────────────────────────────────────────
+
+function cmdSeedList(cwd, raw) {
+  const seedsDir = path.join(cwd, '.planning', 'seeds');
+
+  if (!fs.existsSync(seedsDir)) {
+    output({ count: 0, seeds: [] }, raw);
+    return;
+  }
+
+  const files = fs.readdirSync(seedsDir).filter(f => f.endsWith('.md'));
+  const seeds = [];
+
+  for (const file of files) {
+    const content = safeReadFile(path.join(seedsDir, file));
+    if (!content) continue;
+
+    const fm = extractFrontmatter(content);
+    seeds.push({
+      file,
+      title: fm.title || file.replace(/\.md$/, ''),
+      trigger: fm.trigger || '',
+      scope: fm.scope || 'medium',
+      status: fm.status || 'planted',
+      created: fm.created || '',
+    });
+  }
+
+  output({ count: seeds.length, seeds }, raw);
+}
+
+function cmdSeedReadForPhase(cwd, phaseSlug, raw) {
+  if (!phaseSlug) {
+    error('phase slug required for seed read-for-phase');
+  }
+
+  const seedsDir = path.join(cwd, '.planning', 'seeds');
+
+  if (!fs.existsSync(seedsDir)) {
+    output({ phase: phaseSlug, count: 0, seeds: [] }, raw);
+    return;
+  }
+
+  const files = fs.readdirSync(seedsDir).filter(f => f.endsWith('.md'));
+  const seeds = [];
+  const needle = phaseSlug.toLowerCase();
+
+  for (const file of files) {
+    const content = safeReadFile(path.join(seedsDir, file));
+    if (!content) continue;
+
+    const fm = extractFrontmatter(content);
+    const trigger = (fm.trigger || '').toLowerCase();
+
+    if (trigger && trigger.includes(needle)) {
+      seeds.push({
+        file,
+        title: fm.title || file.replace(/\.md$/, ''),
+        trigger: fm.trigger || '',
+        scope: fm.scope || 'medium',
+        status: fm.status || 'planted',
+        created: fm.created || '',
+      });
+    }
+  }
+
+  output({ phase: phaseSlug, count: seeds.length, seeds }, raw);
+}
+
+function cmdSeedCreate(cwd, options, raw) {
+  const { title, trigger, scope, context, approach, deps } = options;
+
+  if (!title) {
+    error('--title required for seed create');
+  }
+  if (!trigger) {
+    error('--trigger required for seed create');
+  }
+
+  const seedsDir = path.join(cwd, '.planning', 'seeds');
+  fs.mkdirSync(seedsDir, { recursive: true });
+
+  const slug = title
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, '-')
+    .replace(/^-+|-+$/g, '');
+  const filename = `seed-${slug}.md`;
+  const filePath = path.join(seedsDir, filename);
+
+  const today = new Date().toISOString().split('T')[0];
+  const seedScope = scope || 'medium';
+
+  const content = `---
+title: "${title}"
+trigger: "${trigger}"
+scope: ${seedScope}
+created: "${today}"
+status: planted
+---
+
+## Context
+${context || '_Why this seed exists_'}
+
+## Approach
+${approach || '_Suggested implementation approach_'}
+
+## Dependencies
+${deps || '_What this depends on_'}
+`;
+
+  fs.writeFileSync(filePath, content, 'utf-8');
+
+  output({ created: true, file: filename, path: `.planning/seeds/${filename}` }, raw);
+}
+
+// ─── Health Diagnostics ──────────────────────────────────────────────────────
+
+function cmdHealth(cwd, raw) {
+  const planningDir = path.join(cwd, '.planning');
+  const phasesDir = path.join(planningDir, 'phases');
+  const checks = [];
+
+  // ── Check 1: Structure check ───────────────────────────────────────────────
+  (() => {
+    const check = { id: 'structure', name: 'structure', title: 'Project structure', status: 'PASS', issues: [], suggestions: [] };
+    if (!fs.existsSync(planningDir)) {
+      check.status = 'FAIL';
+      check.issues.push('.planning/ directory not found');
+      checks.push(check);
+      return;
+    }
+    const keyFiles = [
+      { name: 'PROJECT.md or CLAUDE.md', paths: ['PROJECT.md', 'CLAUDE.md'] },
+      { name: 'ROADMAP.md', paths: ['ROADMAP.md'] },
+      { name: 'STATE.md', paths: ['STATE.md'] },
+      { name: 'config.json', paths: ['config.json'] },
+    ];
+    for (const kf of keyFiles) {
+      const found = kf.paths.some(p => fs.existsSync(path.join(planningDir, p)));
+      if (!found) {
+        check.status = 'WARN';
+        check.issues.push(`Missing ${kf.name}`);
+        check.suggestions.push(`Create .planning/${kf.paths[0]}`);
+      }
+    }
+    if (!fs.existsSync(phasesDir)) {
+      check.status = 'WARN';
+      check.issues.push('Missing phases/ directory');
+      check.suggestions.push('Create .planning/phases/');
+    }
+    checks.push(check);
+  })();
+
+  // ── Check 2: Config validity ───────────────────────────────────────────────
+  (() => {
+    const check = { id: 'config-validity', name: 'config-validity', title: 'Config validity', status: 'PASS', issues: [], suggestions: [] };
+    const configPath = path.join(planningDir, 'config.json');
+    const content = safeReadFile(configPath);
+    if (!content) {
+      check.status = 'WARN';
+      check.issues.push('config.json not found');
+      check.suggestions.push('Run: gsd-tools config-ensure-section');
+      checks.push(check);
+      return;
+    }
+    let parsed;
+    try {
+      parsed = JSON.parse(content);
+    } catch (e) {
+      check.status = 'FAIL';
+      check.issues.push('config.json is not valid JSON: ' + e.message);
+      checks.push(check);
+      return;
+    }
+    // Validate model_profile
+    const validProfiles = ['quality', 'balanced', 'budget'];
+    const mp = parsed.model_profile;
+    if (mp !== undefined && !validProfiles.includes(mp)) {
+      check.status = 'FAIL';
+      check.issues.push(`Invalid model_profile: "${mp}". Must be one of: ${validProfiles.join(', ')}`);
+    }
+    // Validate branching_strategy
+    const bs = parsed.branching_strategy || (parsed.git && parsed.git.branching_strategy);
+    const validStrategies = ['none', 'phase', 'plan'];
+    if (bs !== undefined && !validStrategies.includes(bs)) {
+      check.status = 'WARN';
+      check.issues.push(`Unrecognized branching_strategy: "${bs}"`);
+      check.suggestions.push(`Valid values: ${validStrategies.join(', ')}`);
+    }
+    // Check boolean fields
+    const boolFields = ['commit_docs', 'research', 'plan_checker', 'verifier', 'parallelization', 'brave_search'];
+    for (const bf of boolFields) {
+      let val = parsed[bf];
+      // Check nested locations
+      if (val === undefined && parsed.planning && parsed.planning[bf] !== undefined) val = parsed.planning[bf];
+      if (val === undefined && parsed.workflow && parsed.workflow[bf] !== undefined) val = parsed.workflow[bf];
+      if (val !== undefined && typeof val !== 'boolean') {
+        // parallelization can be an object with .enabled
+        if (bf === 'parallelization' && typeof val === 'object' && val !== null) continue;
+        check.status = check.status === 'FAIL' ? 'FAIL' : 'WARN';
+        check.issues.push(`Field "${bf}" should be boolean, got ${typeof val}`);
+      }
+    }
+    checks.push(check);
+  })();
+
+  // ── Check 3: Phase consistency ─────────────────────────────────────────────
+  (() => {
+    const check = { id: 'phase-consistency', name: 'phase-consistency', title: 'Phase consistency', status: 'PASS', issues: [], suggestions: [] };
+    const roadmapPath = path.join(planningDir, 'ROADMAP.md');
+    const roadmapContent = safeReadFile(roadmapPath);
+
+    // Extract phases from ROADMAP
+    const roadmapPhases = new Set();
+    if (roadmapContent) {
+      const phasePattern = /###\s*Phase\s+(\d+(?:\.\d+)?)\s*:/gi;
+      let m;
+      while ((m = phasePattern.exec(roadmapContent)) !== null) {
+        roadmapPhases.add(m[1]);
+      }
+    }
+
+    // Get phases on disk
+    const diskPhases = new Set();
+    try {
+      const entries = fs.readdirSync(phasesDir, { withFileTypes: true });
+      const dirs = entries.filter(e => e.isDirectory()).map(e => e.name);
+      for (const dir of dirs) {
+        const dm = dir.match(/^(\d+(?:\.\d+)?)/);
+        if (dm) diskPhases.add(dm[1]);
+      }
+    } catch {}
+
+    if (!roadmapContent && diskPhases.size === 0) {
+      check.status = 'WARN';
+      check.issues.push('No ROADMAP.md and no phase directories found');
+      checks.push(check);
+      return;
+    }
+
+    // Phases in ROADMAP but not on disk
+    for (const p of roadmapPhases) {
+      if (!diskPhases.has(p) && !diskPhases.has(normalizePhaseName(p))) {
+        check.status = 'WARN';
+        check.issues.push(`Phase ${p} in ROADMAP.md but no directory on disk`);
+        check.suggestions.push(`Create directory: .planning/phases/${normalizePhaseName(p)}-<name>/`);
+      }
+    }
+
+    // Phases on disk but not in ROADMAP
+    for (const p of diskPhases) {
+      const unpadded = String(parseInt(p, 10));
+      if (!roadmapPhases.has(p) && !roadmapPhases.has(unpadded)) {
+        check.status = 'WARN';
+        check.issues.push(`Phase ${p} on disk but not in ROADMAP.md`);
+      }
+    }
+
+    // Check for gaps in integer phase numbering
+    const integerPhases = [...diskPhases]
+      .filter(p => !p.includes('.'))
+      .map(p => parseInt(p, 10))
+      .sort((a, b) => a - b);
+
+    for (let i = 1; i < integerPhases.length; i++) {
+      if (integerPhases[i] !== integerPhases[i - 1] + 1) {
+        check.status = 'WARN';
+        check.issues.push(`Gap in phase numbering: ${integerPhases[i - 1]} -> ${integerPhases[i]}`);
+      }
+    }
+
+    checks.push(check);
+  })();
+
+  // ── Check 4: Plan/summary pairing ─────────────────────────────────────────
+  (() => {
+    const check = { id: 'plan-summary-pairing', name: 'plan-summary-pairing', title: 'Plan/summary pairing', status: 'PASS', issues: [], suggestions: [] };
+    try {
+      const entries = fs.readdirSync(phasesDir, { withFileTypes: true });
+      const dirs = entries.filter(e => e.isDirectory()).map(e => e.name).sort();
+
+      for (const dir of dirs) {
+        const phaseFiles = fs.readdirSync(path.join(phasesDir, dir));
+        const plans = phaseFiles.filter(f => f.endsWith('-PLAN.md'));
+        const summaries = phaseFiles.filter(f => f.endsWith('-SUMMARY.md'));
+
+        const planIds = new Set(plans.map(p => p.replace('-PLAN.md', '')));
+        const summaryIds = new Set(summaries.map(s => s.replace('-SUMMARY.md', '')));
+
+        // Orphaned summaries (SUMMARY without matching PLAN)
+        for (const sid of summaryIds) {
+          if (!planIds.has(sid)) {
+            check.status = 'WARN';
+            check.issues.push(`Orphaned summary: ${dir}/${sid}-SUMMARY.md has no matching PLAN`);
+          }
+        }
+
+        // Validate PLAN files have required frontmatter
+        for (const plan of plans) {
+          const content = safeReadFile(path.join(phasesDir, dir, plan));
+          if (!content) continue;
+          const fm = extractFrontmatter(content);
+          const missing = [];
+          if (fm.phase === undefined) missing.push('phase');
+          if (fm.plan === undefined) missing.push('plan');
+          if (missing.length > 0) {
+            check.status = 'WARN';
+            check.issues.push(`${dir}/${plan}: missing frontmatter fields: ${missing.join(', ')}`);
+          }
+        }
+      }
+    } catch {}
+    checks.push(check);
+  })();
+
+  // ── Check 5: STATE.md accuracy ─────────────────────────────────────────────
+  (() => {
+    const check = { id: 'state-accuracy', name: 'state-accuracy', title: 'STATE.md accuracy', status: 'PASS', issues: [], suggestions: [] };
+    const statePath = path.join(planningDir, 'STATE.md');
+    const stateContent = safeReadFile(statePath);
+    if (!stateContent) {
+      check.status = 'FAIL';
+      check.issues.push('STATE.md not found');
+      check.suggestions.push('Create .planning/STATE.md');
+      checks.push(check);
+      return;
+    }
+
+    const hasCurrentPhase = /Current Phase/i.test(stateContent) || /Phase:/i.test(stateContent);
+    const hasStatus = /Status:/i.test(stateContent);
+
+    if (!hasCurrentPhase) {
+      check.status = 'WARN';
+      check.issues.push('STATE.md missing "Current Phase" or "Phase:" field');
+    }
+    if (!hasStatus) {
+      check.status = 'WARN';
+      check.issues.push('STATE.md missing "Status:" field');
+    }
+
+    // Check that referenced phase exists on disk
+    const phaseMatch = stateContent.match(/Phase:\s*(\d+(?:\.\d+)?)/i);
+    if (phaseMatch) {
+      const phaseNum = phaseMatch[1];
+      const normalized = normalizePhaseName(phaseNum);
+      let found = false;
+      try {
+        const entries = fs.readdirSync(phasesDir, { withFileTypes: true });
+        const dirs = entries.filter(e => e.isDirectory()).map(e => e.name);
+        found = dirs.some(d => {
+          const dm = d.match(/^(\d+(?:\.\d+)?)/);
+          return dm && (dm[1] === phaseNum || dm[1] === normalized);
+        });
+      } catch {}
+      if (!found) {
+        check.status = 'WARN';
+        check.issues.push(`STATE.md references phase ${phaseNum} but no matching directory found`);
+      }
+    }
+
+    checks.push(check);
+  })();
+
+  // ── Check 6: Frontmatter validity ─────────────────────────────────────────
+  (() => {
+    const check = { id: 'frontmatter-validity', name: 'frontmatter-validity', title: 'Frontmatter validity', status: 'PASS', issues: [], suggestions: [] };
+    try {
+      const entries = fs.readdirSync(phasesDir, { withFileTypes: true });
+      const dirs = entries.filter(e => e.isDirectory()).map(e => e.name);
+
+      for (const dir of dirs) {
+        const phaseFiles = fs.readdirSync(path.join(phasesDir, dir));
+
+        // Check PLAN files against plan schema
+        const plans = phaseFiles.filter(f => f.endsWith('-PLAN.md'));
+        for (const plan of plans) {
+          const content = safeReadFile(path.join(phasesDir, dir, plan));
+          if (!content) continue;
+          const fm = extractFrontmatter(content);
+          const schema = FRONTMATTER_SCHEMAS.plan;
+          const missing = schema.required.filter(f => fm[f] === undefined);
+          if (missing.length > 0) {
+            check.status = 'WARN';
+            check.issues.push(`${dir}/${plan}: missing plan frontmatter: ${missing.join(', ')}`);
+          }
+        }
+
+        // Check SUMMARY files against summary schema
+        const summaries = phaseFiles.filter(f => f.endsWith('-SUMMARY.md'));
+        for (const summary of summaries) {
+          const content = safeReadFile(path.join(phasesDir, dir, summary));
+          if (!content) continue;
+          const fm = extractFrontmatter(content);
+          const schema = FRONTMATTER_SCHEMAS.summary;
+          const missing = schema.required.filter(f => fm[f] === undefined);
+          if (missing.length > 0) {
+            check.status = 'WARN';
+            check.issues.push(`${dir}/${summary}: missing summary frontmatter: ${missing.join(', ')}`);
+          }
+        }
+      }
+    } catch {}
+    checks.push(check);
+  })();
+
+  // ── Check 7: ROADMAP/STATE sync ────────────────────────────────────────────
+  (() => {
+    const check = { id: 'roadmap-state-sync', name: 'roadmap-state-sync', title: 'ROADMAP/STATE sync', status: 'PASS', issues: [], suggestions: [] };
+    const roadmapContent = safeReadFile(path.join(planningDir, 'ROADMAP.md'));
+    const stateContent = safeReadFile(path.join(planningDir, 'STATE.md'));
+
+    if (!roadmapContent || !stateContent) {
+      if (!roadmapContent) check.issues.push('ROADMAP.md not found');
+      if (!stateContent) check.issues.push('STATE.md not found');
+      check.status = check.issues.length > 0 ? 'WARN' : 'PASS';
+      checks.push(check);
+      return;
+    }
+
+    // Count phases in ROADMAP
+    const roadmapPhases = [];
+    const phasePattern = /###\s*Phase\s+(\d+(?:\.\d+)?)\s*:/gi;
+    let m;
+    while ((m = phasePattern.exec(roadmapContent)) !== null) {
+      roadmapPhases.push(m[1]);
+    }
+
+    // Extract total from STATE.md (e.g., "Phase: 2 of 5" or "2 of 5")
+    const totalMatch = stateContent.match(/(\d+)\s+of\s+(\d+)/i);
+    if (totalMatch) {
+      const stateTotal = parseInt(totalMatch[2], 10);
+      // Only count integer phases for total comparison
+      const roadmapIntegerCount = roadmapPhases.filter(p => !p.includes('.')).length;
+      if (stateTotal !== roadmapIntegerCount && roadmapIntegerCount > 0) {
+        check.status = 'WARN';
+        check.issues.push(`STATE.md total phases (${stateTotal}) differs from ROADMAP.md (${roadmapIntegerCount})`);
+      }
+    }
+
+    // Verify current phase exists in ROADMAP
+    const phaseMatch = stateContent.match(/Phase:\s*(\d+(?:\.\d+)?)/i);
+    if (phaseMatch) {
+      const currentPhase = phaseMatch[1];
+      const unpadded = String(parseInt(currentPhase, 10));
+      if (!roadmapPhases.includes(currentPhase) && !roadmapPhases.includes(unpadded)) {
+        check.status = 'WARN';
+        check.issues.push(`Current phase ${currentPhase} from STATE.md not found in ROADMAP.md`);
+      }
+    }
+
+    checks.push(check);
+  })();
+
+  // ── Check 8: Hook execution health ─────────────────────────────────────────
+  (() => {
+    const check = { id: 'hook-health', name: 'hook-health', title: 'Hook execution health', status: 'PASS', issues: [], suggestions: [] };
+    try {
+      const entries = fs.readdirSync(planningDir);
+      const lockFiles = entries.filter(f => f.endsWith('.lock'));
+      const now = Date.now();
+      const staleThreshold = 30 * 60 * 1000; // 30 minutes
+
+      for (const lockFile of lockFiles) {
+        const lockPath = path.join(planningDir, lockFile);
+        const stat = fs.statSync(lockPath);
+        const age = now - stat.mtimeMs;
+        if (age > staleThreshold) {
+          check.status = 'WARN';
+          check.issues.push(`Stale lock file: ${lockFile} (age: ${Math.round(age / 60000)} min)`);
+          check.suggestions.push(`Remove stale lock: rm .planning/${lockFile}`);
+        }
+      }
+    } catch {}
+    checks.push(check);
+  })();
+
+  // ── Check 9: Config completeness ───────────────────────────────────────────
+  (() => {
+    const check = { id: 'config-completeness', name: 'config-completeness', title: 'Config completeness', status: 'PASS', issues: [], suggestions: [] };
+    const configPath = path.join(planningDir, 'config.json');
+    const content = safeReadFile(configPath);
+    if (!content) {
+      check.status = 'WARN';
+      check.issues.push('config.json not found');
+      checks.push(check);
+      return;
+    }
+    let parsed;
+    try {
+      parsed = JSON.parse(content);
+    } catch {
+      check.status = 'FAIL';
+      check.issues.push('config.json is not valid JSON');
+      checks.push(check);
+      return;
+    }
+
+    // Check recommended fields, handling nested locations
+    const recommended = [
+      { field: 'model_profile', nested: null },
+      { field: 'commit_docs', nested: { section: 'planning', field: 'commit_docs' } },
+      { field: 'branching_strategy', nested: { section: 'git', field: 'branching_strategy' } },
+    ];
+
+    for (const rec of recommended) {
+      let found = parsed[rec.field] !== undefined;
+      if (!found && rec.nested) {
+        const section = parsed[rec.nested.section];
+        if (section && section[rec.nested.field] !== undefined) found = true;
+      }
+      if (!found) {
+        check.status = 'WARN';
+        check.issues.push(`Recommended field missing: ${rec.field}`);
+        check.suggestions.push(`Add "${rec.field}" to config.json`);
+      }
+    }
+    checks.push(check);
+  })();
+
+  // ── Aggregate results ──────────────────────────────────────────────────────
+  const pass = checks.filter(c => c.status === 'PASS').length;
+  const warn = checks.filter(c => c.status === 'WARN').length;
+  const fail = checks.filter(c => c.status === 'FAIL').length;
+
+  let overall = 'PASS';
+  if (warn > 0) overall = 'WARN';
+  if (fail > 0) overall = 'FAIL';
+
+  const result = {
+    overall,
+    summary: { pass, warn, fail, total: checks.length },
+    checks,
+  };
+
+  output(result, raw);
+}
+
+// ─── Event Logging ───────────────────────────────────────────────────────────
+
+const LOG_LIMITS = { hooks: 200, events: 1000, sessions: 100 };
+
+function ensureLogsDir(cwd) {
+  const logsDir = path.join(cwd, '.planning', 'logs');
+  if (!fs.existsSync(logsDir)) { fs.mkdirSync(logsDir, { recursive: true }); }
+  return logsDir;
+}
+
+function appendJsonl(filePath, entry, maxEntries) {
+  fs.appendFileSync(filePath, JSON.stringify(entry) + '\n');
+  try {
+    const content = fs.readFileSync(filePath, 'utf8').trim();
+    if (!content) return;
+    const lines = content.split('\n');
+    if (lines.length > maxEntries) {
+      fs.writeFileSync(filePath, lines.slice(-maxEntries).join('\n') + '\n');
+    }
+  } catch (e) { /* rotation failure is non-fatal */ }
+}
+
+function cmdEventLog(cwd, category, name, details, raw) {
+  if (!category) { error('category required for event log'); }
+  if (!name) { error('event name required for event log'); }
+  const logsDir = ensureLogsDir(cwd);
+  const entry = {
+    timestamp: new Date().toISOString(),
+    category,
+    event: name,
+    details: details || {}
+  };
+  appendJsonl(path.join(logsDir, 'events.jsonl'), entry, LOG_LIMITS.events);
+  output({ logged: true, entry }, raw, `Event logged: [${category}] ${name}`);
+}
+
+function cmdEventList(cwd, category, limit, raw) {
+  const eventsPath = path.join(cwd, '.planning', 'logs', 'events.jsonl');
+  if (!fs.existsSync(eventsPath)) {
+    output({ events: [] }, raw, 'No events logged');
+    return;
+  }
+  let events = fs.readFileSync(eventsPath, 'utf8').trim().split('\n')
+    .filter(l => l.trim())
+    .map(l => { try { return JSON.parse(l); } catch (e) { return null; } })
+    .filter(Boolean);
+  if (category) { events = events.filter(e => e.category === category); }
+  if (limit) { events = events.slice(-limit); }
+  if (events.length === 0) {
+    output({ events: [] }, raw, 'No events found');
+  } else {
+    const text = events.map(e => `${e.timestamp} [${e.category}] ${e.event}`).join('\n');
+    output({ events }, raw, text);
+  }
+}
+
+function cmdEventSessionStart(cwd, raw) {
+  const logsDir = ensureLogsDir(cwd);
+  const entry = {
+    session_start: new Date().toISOString(),
+    session_end: null,
+    duration_minutes: null,
+    agents_spawned: 0,
+    commits_created: 0,
+    commands_run: 0
+  };
+  const activePath = path.join(logsDir, '.active-session');
+  fs.writeFileSync(activePath, JSON.stringify(entry));
+  output({ started: true, session: entry }, raw, `Session started: ${entry.session_start}`);
+}
+
+function cmdEventSessionEnd(cwd, raw) {
+  const logsDir = ensureLogsDir(cwd);
+  const activePath = path.join(logsDir, '.active-session');
+  let entry = { session_start: new Date().toISOString(), agents_spawned: 0, commits_created: 0, commands_run: 0 };
+  if (fs.existsSync(activePath)) {
+    try { entry = JSON.parse(fs.readFileSync(activePath, 'utf8')); } catch (e) { /* use default */ }
+    fs.unlinkSync(activePath);
+  }
+  entry.session_end = new Date().toISOString();
+  const startMs = new Date(entry.session_start).getTime();
+  const endMs = new Date(entry.session_end).getTime();
+  entry.duration_minutes = Math.round((endMs - startMs) / 60000);
+  appendJsonl(path.join(logsDir, 'sessions.jsonl'), entry, LOG_LIMITS.sessions);
+  output({ ended: true, session: entry }, raw, `Session ended: ${entry.duration_minutes}m`);
+}
+
+function cmdEventClear(cwd, logName, raw) {
+  const validLogs = ['hooks', 'events', 'sessions'];
+  if (!validLogs.includes(logName)) { error(`Invalid log: ${logName}. Valid: ${validLogs.join(', ')}`); }
+  const logPath = path.join(cwd, '.planning', 'logs', `${logName}.jsonl`);
+  if (fs.existsSync(logPath)) { fs.unlinkSync(logPath); }
+  output({ cleared: logName }, raw, `Cleared ${logName} log`);
+}
+
 // ─── CLI Router ───────────────────────────────────────────────────────────────
 
 async function main() {
@@ -4846,7 +6163,7 @@ async function main() {
   const cwd = process.cwd();
 
   if (!command) {
-    error('Usage: gsd-tools <command> [args] [--raw]\nCommands: state, resolve-model, find-phase, commit, verify-summary, verify, frontmatter, template, generate-slug, current-timestamp, list-todos, verify-path-exists, config-ensure-section, init');
+    error('Usage: gsd-tools <command> [args] [--raw]\nCommands: state, resolve-model, find-phase, commit, verify-summary, verify, frontmatter, template, generate-slug, current-timestamp, list-todos, verify-path-exists, config-ensure-section, signal, init');
   }
 
   switch (command) {
@@ -5134,7 +6451,38 @@ async function main() {
 
     case 'progress': {
       const subcommand = args[1] || 'json';
-      cmdProgressRender(cwd, subcommand, raw);
+      // New progress tracking subcommands (crash recovery)
+      if (['write', 'read', 'delete', 'list', 'check-orphaned'].includes(subcommand)) {
+        switch (subcommand) {
+          case 'write': {
+            const planId = args[2];
+            const taskIdx = args.indexOf('--task');
+            const totalIdx = args.indexOf('--total');
+            const commitIdx = args.indexOf('--commit');
+            if (!planId || taskIdx === -1 || totalIdx === -1) {
+              error('Usage: progress write <plan_id> --task N --total T [--commit hash]');
+            }
+            cmdProgressWrite(cwd, planId, args[taskIdx + 1], args[totalIdx + 1],
+              commitIdx !== -1 ? args[commitIdx + 1] : '', raw);
+            break;
+          }
+          case 'read':
+            cmdProgressRead(cwd, args[2], raw);
+            break;
+          case 'delete':
+            cmdProgressDelete(cwd, args[2], raw);
+            break;
+          case 'list':
+            cmdProgressList(cwd, raw);
+            break;
+          case 'check-orphaned':
+            cmdProgressCheckOrphaned(cwd, raw);
+            break;
+        }
+      } else {
+        // Existing progress render: json|table|bar
+        cmdProgressRender(cwd, subcommand, raw);
+      }
       break;
     }
 
@@ -5144,6 +6492,47 @@ async function main() {
         cmdTodoComplete(cwd, args[2], raw);
       } else {
         error('Unknown todo subcommand. Available: complete');
+      }
+      break;
+    }
+
+    case 'seed': {
+      const subcommand = args[1];
+      if (subcommand === 'list') {
+        cmdSeedList(cwd, raw);
+      } else if (subcommand === 'read-for-phase') {
+        cmdSeedReadForPhase(cwd, args[2], raw);
+      } else if (subcommand === 'create') {
+        const titleIdx = args.indexOf('--title');
+        const triggerIdx = args.indexOf('--trigger');
+        const scopeIdx = args.indexOf('--scope');
+        const contextIdx = args.indexOf('--context');
+        const approachIdx = args.indexOf('--approach');
+        const depsIdx = args.indexOf('--deps');
+        cmdSeedCreate(cwd, {
+          title: titleIdx !== -1 ? args[titleIdx + 1] : null,
+          trigger: triggerIdx !== -1 ? args[triggerIdx + 1] : null,
+          scope: scopeIdx !== -1 ? args[scopeIdx + 1] : null,
+          context: contextIdx !== -1 ? args[contextIdx + 1] : null,
+          approach: approachIdx !== -1 ? args[approachIdx + 1] : null,
+          deps: depsIdx !== -1 ? args[depsIdx + 1] : null,
+        }, raw);
+      } else {
+        error('Unknown seed subcommand. Available: list, read-for-phase, create');
+      }
+      break;
+    }
+
+    case 'note': {
+      const noteSubcommand = args[1];
+      if (noteSubcommand === 'append') {
+        cmdNoteAppend(cwd, args.slice(2), raw);
+      } else if (noteSubcommand === 'list') {
+        cmdNoteList(cwd, raw);
+      } else if (noteSubcommand === 'promote') {
+        cmdNotePromote(cwd, args[2], raw);
+      } else {
+        error('Unknown note subcommand. Available: append, list, promote');
       }
       break;
     }
@@ -5232,6 +6621,55 @@ async function main() {
         limit: limitIdx !== -1 ? parseInt(args[limitIdx + 1], 10) : 10,
         freshness: freshnessIdx !== -1 ? args[freshnessIdx + 1] : null,
       }, raw);
+      break;
+    }
+
+    case 'signal': {
+      const subCmd = args[1];
+      switch (subCmd) {
+        case 'write': cmdSignalWrite(cwd, args[2], args[3] || '', raw); break;
+        case 'read': cmdSignalRead(cwd, args[2], raw); break;
+        case 'delete': cmdSignalDelete(cwd, args[2], raw); break;
+        case 'list': cmdSignalList(cwd, raw); break;
+        case 'cleanup': cmdSignalCleanup(cwd, raw); break;
+        case 'check-stale': cmdSignalCheckStale(cwd, raw); break;
+        default: error(`Unknown signal subcommand: ${subCmd}\nAvailable: write, read, delete, list, cleanup, check-stale`);
+      }
+      break;
+    }
+
+    case 'health': {
+      cmdHealth(cwd, raw);
+      break;
+    }
+
+    case 'event': {
+      const subCmd = args[1];
+      switch (subCmd) {
+        case 'log': {
+          const detailsIdx = args.indexOf('--details');
+          const details = detailsIdx !== -1 ? JSON.parse(args[detailsIdx + 1]) : {};
+          cmdEventLog(cwd, args[2], args[3], details, raw);
+          break;
+        }
+        case 'list': {
+          const catIdx = args.indexOf('--category');
+          const limIdx = args.indexOf('--limit');
+          cmdEventList(cwd, catIdx !== -1 ? args[catIdx + 1] : null, limIdx !== -1 ? parseInt(args[limIdx + 1]) : null, raw);
+          break;
+        }
+        case 'session-start':
+          cmdEventSessionStart(cwd, raw);
+          break;
+        case 'session-end':
+          cmdEventSessionEnd(cwd, raw);
+          break;
+        case 'clear':
+          cmdEventClear(cwd, args[2], raw);
+          break;
+        default:
+          error(`Unknown event subcommand: ${subCmd}\nAvailable: log, list, session-start, session-end, clear`);
+      }
       break;
     }
 
