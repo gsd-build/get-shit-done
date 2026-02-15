@@ -1,0 +1,3 @@
+{"_comment":"GSD rule merge log - conflict resolution decisions","created":"2026-02-15T23:04:47Z"}
+{"pattern":"test, unit, integration","conflict_type":"insufficient","old_model":"haiku","new_model":"sonnet","evidence_count":2,"timestamp":"2026-02-15T23:05:21.468Z"}
+{"pattern":"test, unit, integration","conflict_type":"override","old_model":"haiku","new_model":"sonnet","evidence_count":5,"timestamp":"2026-02-15T23:05:21.468Z"}
