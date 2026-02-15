@@ -517,9 +517,13 @@ must_haves:
     - path: "src/components/Chat.tsx"
       provides: "Message list rendering"
       min_lines: 30
+      exports: ["Chat", "ChatProps"]
     - path: "src/app/api/chat/route.ts"
       provides: "Message CRUD operations"
       exports: ["GET", "POST"]
+    - path: "src/lib/messages.ts"
+      provides: "Message service layer"
+      exports: ["getMessages", "createMessage", "deleteMessage"]
     - path: "prisma/schema.prisma"
       provides: "Message model"
       contains: "model Message"
@@ -543,13 +547,35 @@ must_haves:
 | `artifacts[].path` | File path relative to project root. |
 | `artifacts[].provides` | What this artifact delivers. |
 | `artifacts[].min_lines` | Optional. Minimum lines to be considered substantive. |
-| `artifacts[].exports` | Optional. Expected exports to verify. |
+| `artifacts[].exports` | Optional. Actual exported identifiers (function names, component names, types). |
 | `artifacts[].contains` | Optional. Pattern that must exist in file. |
 | `key_links` | Critical connections between artifacts. |
 | `key_links[].from` | Source artifact. |
 | `key_links[].to` | Target artifact or endpoint. |
 | `key_links[].via` | How they connect (description). |
 | `key_links[].pattern` | Optional. Regex to verify connection exists. |
+
+**Exports field guidance:**
+
+List actual exported identifiers, not descriptions. This enables gsd-verifier to grep for specific exports.
+
+```yaml
+# GOOD - Specific, verifiable exports
+exports: ["login", "logout", "refreshToken"]
+exports: ["Button", "ButtonProps", "ButtonVariant"]
+exports: ["useAuth", "AuthProvider", "AuthContext"]
+exports: ["GET", "POST", "DELETE"]  # For API routes, HTTP methods are acceptable
+
+# BAD - Generic descriptions
+exports: ["auth functions"]
+exports: ["main component"]
+exports: ["CRUD operations"]
+```
+
+**Why specific exports matter:**
+- gsd-verifier can grep for `export.*login` to verify
+- Documents the public API surface
+- Catches when implementation exists but isn't exported
 
 **Why this matters:**
 
