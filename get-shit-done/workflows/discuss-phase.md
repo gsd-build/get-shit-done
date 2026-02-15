@@ -107,15 +107,16 @@ Phase: "API documentation"
 
 <process>
 
-<step name="validate_phase" priority="first">
+<step name="initialize" priority="first">
 Phase number from argument (required).
 
-Load and validate:
-- Read `.planning/ROADMAP.md`
-- Find phase entry
-- Extract: number, name, description, status
+```bash
+INIT=$(node ~/.claude/get-shit-done/bin/gsd-tools.js init phase-op "${PHASE}")
+```
 
-**If phase not found:**
+Parse JSON for: `commit_docs`, `phase_found`, `phase_dir`, `phase_number`, `phase_name`, `phase_slug`, `padded_phase`, `has_research`, `has_context`, `has_plans`, `has_verification`, `plan_count`, `roadmap_exists`, `planning_exists`.
+
+**If `phase_found` is false:**
 ```
 Phase [X] not found in roadmap.
 
@@ -123,16 +124,14 @@ Use /gsd:progress to see available phases.
 ```
 Exit workflow.
 
-**If phase found:** Continue to analyze_phase.
+**If `phase_found` is true:** Continue to check_existing.
 </step>
 
 <step name="check_existing">
-Check if CONTEXT.md already exists:
+Check if CONTEXT.md already exists using `has_context` from init.
 
 ```bash
-# Match both zero-padded (05-*) and unpadded (5-*) folders
-PADDED_PHASE=$(printf "%02d" ${PHASE})
-ls .planning/phases/${PADDED_PHASE}-*/*-CONTEXT.md .planning/phases/${PHASE}-*/*-CONTEXT.md 2>/dev/null
+ls ${phase_dir}/*-CONTEXT.md 2>/dev/null
 ```
 
 **If exists:**
@@ -281,19 +280,14 @@ Create CONTEXT.md capturing decisions made.
 
 **Find or create phase directory:**
 
+Use values from init: `phase_dir`, `phase_slug`, `padded_phase`.
+
+If `phase_dir` is null (phase exists in roadmap but no directory):
 ```bash
-# Match existing directory (padded or unpadded)
-PADDED_PHASE=$(printf "%02d" ${PHASE})
-PHASE_DIR=$(ls -d .planning/phases/${PADDED_PHASE}-* .planning/phases/${PHASE}-* 2>/dev/null | head -1)
-if [ -z "$PHASE_DIR" ]; then
-  # Create from roadmap name (lowercase, hyphens)
-  PHASE_NAME=$(grep "Phase ${PHASE}:" .planning/ROADMAP.md | sed 's/.*Phase [0-9]*: //' | tr '[:upper:]' '[:lower:]' | tr ' ' '-')
-  mkdir -p ".planning/phases/${PADDED_PHASE}-${PHASE_NAME}"
-  PHASE_DIR=".planning/phases/${PADDED_PHASE}-${PHASE_NAME}"
-fi
+mkdir -p ".planning/phases/${padded_phase}-${phase_slug}"
 ```
 
-**File location:** `${PHASE_DIR}/${PADDED_PHASE}-CONTEXT.md`
+**File location:** `${phase_dir}/${padded_phase}-CONTEXT.md`
 
 **Structure the content by what was discussed:**
 
@@ -391,32 +385,13 @@ Created: .planning/phases/${PADDED_PHASE}-${SLUG}/${PADDED_PHASE}-CONTEXT.md
 </step>
 
 <step name="git_commit">
-Commit phase context:
-
-**Check planning config:**
+Commit phase context (uses `commit_docs` from init internally):
 
 ```bash
-COMMIT_PLANNING_DOCS=$(cat .planning/config.json 2>/dev/null | grep -o '"commit_docs"[[:space:]]*:[[:space:]]*[^,}]*' | grep -o 'true\|false' || echo "true")
-git check-ignore -q .planning 2>/dev/null && COMMIT_PLANNING_DOCS=false
+node ~/.claude/get-shit-done/bin/gsd-tools.js commit "docs(${padded_phase}): capture phase context" --files "${phase_dir}/${padded_phase}-CONTEXT.md"
 ```
 
-**If `COMMIT_PLANNING_DOCS=false`:** Skip git operations
-
-**If `COMMIT_PLANNING_DOCS=true` (default):**
-
-```bash
-git add "${PHASE_DIR}/${PADDED_PHASE}-CONTEXT.md"
-git commit -m "$(cat <<'EOF'
-docs(${PADDED_PHASE}): capture phase context
-
-Phase ${PADDED_PHASE}: ${PHASE_NAME}
-- Implementation decisions documented
-- Phase boundary established
-EOF
-)"
-```
-
-Confirm: "Committed: docs(${PADDED_PHASE}): capture phase context"
+Confirm: "Committed: docs(${padded_phase}): capture phase context"
 </step>
 
 </process>

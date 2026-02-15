@@ -4,6 +4,7 @@ const fs = require('fs');
 const path = require('path');
 const os = require('os');
 const readline = require('readline');
+const crypto = require('crypto');
 
 // Colors
 const cyan = '\x1b[36m';
@@ -907,34 +908,13 @@ function uninstall(isGlobal, runtime = 'claude') {
       }
     }
 
-    // Remove GSD Memory MCP server config
-    if (settings.mcpServers && settings.mcpServers['gsd-memory']) {
-      delete settings.mcpServers['gsd-memory'];
-      settingsModified = true;
-      console.log(`  ${green}✓${reset} Removed GSD Memory MCP config from settings`);
-      // Clean up empty mcpServers object
-      if (Object.keys(settings.mcpServers).length === 0) {
-        delete settings.mcpServers;
-      }
-    }
-
     if (settingsModified) {
       writeSettings(settingsPath, settings);
       removedCount++;
     }
   }
 
-  // 6. Remove MCP server from ~/.gsd/ (Claude Code only)
-  if (runtime === 'claude') {
-    const mcpServerDir = path.join(os.homedir(), '.gsd', 'mcp-server');
-    if (fs.existsSync(mcpServerDir)) {
-      fs.rmSync(mcpServerDir, { recursive: true });
-      removedCount++;
-      console.log(`  ${green}✓${reset} Removed GSD Memory MCP server`);
-    }
-  }
-
-  // 7. For OpenCode, clean up permissions from opencode.json
+  // 6. For OpenCode, clean up permissions from opencode.json
   if (isOpencode) {
     const opencodeConfigDir = getOpencodeGlobalDir();
     const configPath = path.join(opencodeConfigDir, 'opencode.json');
@@ -987,6 +967,67 @@ function uninstall(isGlobal, runtime = 'claude') {
 }
 
 /**
+ * Parse JSONC (JSON with Comments) by stripping comments and trailing commas.
+ * OpenCode supports JSONC format via jsonc-parser, so users may have comments.
+ * This is a lightweight inline parser to avoid adding dependencies.
+ */
+function parseJsonc(content) {
+  // Strip BOM if present
+  if (content.charCodeAt(0) === 0xFEFF) {
+    content = content.slice(1);
+  }
+
+  // Remove single-line and block comments while preserving strings
+  let result = '';
+  let inString = false;
+  let i = 0;
+  while (i < content.length) {
+    const char = content[i];
+    const next = content[i + 1];
+
+    if (inString) {
+      result += char;
+      // Handle escape sequences
+      if (char === '\\' && i + 1 < content.length) {
+        result += next;
+        i += 2;
+        continue;
+      }
+      if (char === '"') {
+        inString = false;
+      }
+      i++;
+    } else {
+      if (char === '"') {
+        inString = true;
+        result += char;
+        i++;
+      } else if (char === '/' && next === '/') {
+        // Skip single-line comment until end of line
+        while (i < content.length && content[i] !== '\n') {
+          i++;
+        }
+      } else if (char === '/' && next === '*') {
+        // Skip block comment
+        i += 2;
+        while (i < content.length - 1 && !(content[i] === '*' && content[i + 1] === '/')) {
+          i++;
+        }
+        i += 2; // Skip closing */
+      } else {
+        result += char;
+        i++;
+      }
+    }
+  }
+
+  // Remove trailing commas before } or ]
+  result = result.replace(/,(\s*[}\]])/g, '$1');
+
+  return JSON.parse(result);
+}
+
+/**
  * Configure OpenCode permissions to allow reading GSD reference docs
  * This prevents permission prompts when GSD accesses the get-shit-done directory
  */
@@ -1002,10 +1043,14 @@ function configureOpencodePermissions() {
   let config = {};
   if (fs.existsSync(configPath)) {
     try {
-      config = JSON.parse(fs.readFileSync(configPath, 'utf8'));
+      const content = fs.readFileSync(configPath, 'utf8');
+      config = parseJsonc(content);
     } catch (e) {
-      // Invalid JSON - start fresh but warn user
-      console.log(`  ${yellow}⚠${reset} opencode.json had invalid JSON, recreating`);
+      // Cannot parse - DO NOT overwrite user's config
+      console.log(`  ${yellow}⚠${reset} Could not parse opencode.json - skipping permission config`);
+      console.log(`    ${dim}Reason: ${e.message}${reset}`);
+      console.log(`    ${dim}Your config was NOT modified. Fix the syntax manually if needed.${reset}`);
+      return;
     }
   }
 
@@ -1019,7 +1064,7 @@ function configureOpencodePermissions() {
   const defaultConfigDir = path.join(os.homedir(), '.config', 'opencode');
   const gsdPath = opencodeConfigDir === defaultConfigDir
     ? '~/.config/opencode/get-shit-done/*'
-    : `${opencodeConfigDir}/get-shit-done/*`;
+    : `${opencodeConfigDir.replace(/\\/g, '/')}/get-shit-done/*`;
   
   let modified = false;
 
@@ -1048,102 +1093,6 @@ function configureOpencodePermissions() {
   // Write config back
   fs.writeFileSync(configPath, JSON.stringify(config, null, 2) + '\n');
   console.log(`  ${green}✓${reset} Configured read permission for GSD docs`);
-}
-
-/**
- * Install the GSD Memory MCP server
- * - Copies gsd-memory/ to ~/.gsd/mcp-server/
- * - Runs npm install in that directory
- * - Returns the path for MCP config
- * @returns {{ success: boolean, serverPath?: string, error?: string }}
- */
-function installMcpServer() {
-  const src = path.join(__dirname, '..', 'gsd-memory');
-
-  // Check if gsd-memory exists in the package
-  if (!fs.existsSync(src)) {
-    return { success: false, error: 'gsd-memory not found in package' };
-  }
-
-  const gsdDir = path.join(os.homedir(), '.gsd');
-  const destDir = path.join(gsdDir, 'mcp-server');
-
-  // Ensure ~/.gsd exists
-  fs.mkdirSync(gsdDir, { recursive: true });
-
-  // Clean install: remove existing mcp-server
-  if (fs.existsSync(destDir)) {
-    fs.rmSync(destDir, { recursive: true });
-  }
-
-  // Copy gsd-memory to ~/.gsd/mcp-server
-  copyDirectory(src, destDir);
-
-  // Run npm install in the mcp-server directory
-  try {
-    const { execSync } = require('child_process');
-    execSync('npm install --production', {
-      cwd: destDir,
-      stdio: 'pipe',
-      timeout: 60000
-    });
-  } catch (err) {
-    return {
-      success: false,
-      error: `npm install failed: ${err.message}`,
-      serverPath: destDir
-    };
-  }
-
-  return {
-    success: true,
-    serverPath: destDir
-  };
-}
-
-/**
- * Configure the GSD Memory MCP server in Claude Code settings
- * @param {string} settingsPath - Path to settings.json
- * @param {object} settings - Settings object
- * @param {string} serverPath - Path to the MCP server
- */
-function configureMcpServer(settingsPath, settings, serverPath) {
-  if (!settings.mcpServers) {
-    settings.mcpServers = {};
-  }
-
-  // Add gsd-memory MCP server config
-  settings.mcpServers['gsd-memory'] = {
-    command: 'node',
-    args: [path.join(serverPath, 'dist', 'index.js')]
-  };
-
-  return settings;
-}
-
-/**
- * Copy a directory recursively
- */
-function copyDirectory(src, dest) {
-  fs.mkdirSync(dest, { recursive: true });
-
-  const entries = fs.readdirSync(src, { withFileTypes: true });
-
-  for (const entry of entries) {
-    const srcPath = path.join(src, entry.name);
-    const destPath = path.join(dest, entry.name);
-
-    // Skip node_modules, .git, and test directories
-    if (entry.name === 'node_modules' || entry.name === '.git' || entry.name === 'tests') {
-      continue;
-    }
-
-    if (entry.isDirectory()) {
-      copyDirectory(srcPath, destPath);
-    } else {
-      fs.copyFileSync(srcPath, destPath);
-    }
-  }
 }
 
 /**
@@ -1183,6 +1132,140 @@ function verifyFileInstalled(filePath, description) {
  * @param {boolean} isGlobal - Whether to install globally or locally
  * @param {string} runtime - Target runtime ('claude', 'opencode', 'gemini')
  */
+
+// ──────────────────────────────────────────────────────
+// Local Patch Persistence
+// ──────────────────────────────────────────────────────
+
+const PATCHES_DIR_NAME = 'gsd-local-patches';
+const MANIFEST_NAME = 'gsd-file-manifest.json';
+
+/**
+ * Compute SHA256 hash of file contents
+ */
+function fileHash(filePath) {
+  const content = fs.readFileSync(filePath);
+  return crypto.createHash('sha256').update(content).digest('hex');
+}
+
+/**
+ * Recursively collect all files in dir with their hashes
+ */
+function generateManifest(dir, baseDir) {
+  if (!baseDir) baseDir = dir;
+  const manifest = {};
+  if (!fs.existsSync(dir)) return manifest;
+  const entries = fs.readdirSync(dir, { withFileTypes: true });
+  for (const entry of entries) {
+    const fullPath = path.join(dir, entry.name);
+    const relPath = path.relative(baseDir, fullPath).replace(/\\/g, '/');
+    if (entry.isDirectory()) {
+      Object.assign(manifest, generateManifest(fullPath, baseDir));
+    } else {
+      manifest[relPath] = fileHash(fullPath);
+    }
+  }
+  return manifest;
+}
+
+/**
+ * Write file manifest after installation for future modification detection
+ */
+function writeManifest(configDir) {
+  const gsdDir = path.join(configDir, 'get-shit-done');
+  const commandsDir = path.join(configDir, 'commands', 'gsd');
+  const agentsDir = path.join(configDir, 'agents');
+  const manifest = { version: pkg.version, timestamp: new Date().toISOString(), files: {} };
+
+  const gsdHashes = generateManifest(gsdDir);
+  for (const [rel, hash] of Object.entries(gsdHashes)) {
+    manifest.files['get-shit-done/' + rel] = hash;
+  }
+  if (fs.existsSync(commandsDir)) {
+    const cmdHashes = generateManifest(commandsDir);
+    for (const [rel, hash] of Object.entries(cmdHashes)) {
+      manifest.files['commands/gsd/' + rel] = hash;
+    }
+  }
+  if (fs.existsSync(agentsDir)) {
+    for (const file of fs.readdirSync(agentsDir)) {
+      if (file.startsWith('gsd-') && file.endsWith('.md')) {
+        manifest.files['agents/' + file] = fileHash(path.join(agentsDir, file));
+      }
+    }
+  }
+
+  fs.writeFileSync(path.join(configDir, MANIFEST_NAME), JSON.stringify(manifest, null, 2));
+  return manifest;
+}
+
+/**
+ * Detect user-modified GSD files by comparing against install manifest.
+ * Backs up modified files to gsd-local-patches/ for reapply after update.
+ */
+function saveLocalPatches(configDir) {
+  const manifestPath = path.join(configDir, MANIFEST_NAME);
+  if (!fs.existsSync(manifestPath)) return [];
+
+  let manifest;
+  try { manifest = JSON.parse(fs.readFileSync(manifestPath, 'utf8')); } catch { return []; }
+
+  const patchesDir = path.join(configDir, PATCHES_DIR_NAME);
+  const modified = [];
+
+  for (const [relPath, originalHash] of Object.entries(manifest.files || {})) {
+    const fullPath = path.join(configDir, relPath);
+    if (!fs.existsSync(fullPath)) continue;
+    const currentHash = fileHash(fullPath);
+    if (currentHash !== originalHash) {
+      const backupPath = path.join(patchesDir, relPath);
+      fs.mkdirSync(path.dirname(backupPath), { recursive: true });
+      fs.copyFileSync(fullPath, backupPath);
+      modified.push(relPath);
+    }
+  }
+
+  if (modified.length > 0) {
+    const meta = {
+      backed_up_at: new Date().toISOString(),
+      from_version: manifest.version,
+      files: modified
+    };
+    fs.writeFileSync(path.join(patchesDir, 'backup-meta.json'), JSON.stringify(meta, null, 2));
+    console.log('  ' + yellow + 'i' + reset + '  Found ' + modified.length + ' locally modified GSD file(s) — backed up to ' + PATCHES_DIR_NAME + '/');
+    for (const f of modified) {
+      console.log('     ' + dim + f + reset);
+    }
+  }
+  return modified;
+}
+
+/**
+ * After install, report backed-up patches for user to reapply.
+ */
+function reportLocalPatches(configDir) {
+  const patchesDir = path.join(configDir, PATCHES_DIR_NAME);
+  const metaPath = path.join(patchesDir, 'backup-meta.json');
+  if (!fs.existsSync(metaPath)) return [];
+
+  let meta;
+  try { meta = JSON.parse(fs.readFileSync(metaPath, 'utf8')); } catch { return []; }
+
+  if (meta.files && meta.files.length > 0) {
+    console.log('');
+    console.log('  ' + yellow + 'Local patches detected' + reset + ' (from v' + meta.from_version + '):');
+    for (const f of meta.files) {
+      console.log('     ' + cyan + f + reset);
+    }
+    console.log('');
+    console.log('  Your modifications are saved in ' + cyan + PATCHES_DIR_NAME + '/' + reset);
+    console.log('  Run ' + cyan + '/gsd:reapply-patches' + reset + ' to merge them into the new version.');
+    console.log('  Or manually compare and merge the files.');
+    console.log('');
+  }
+  return meta.files || [];
+}
+
 function install(isGlobal, runtime = 'claude') {
   const isOpencode = runtime === 'opencode';
   const isGemini = runtime === 'gemini';
@@ -1202,7 +1285,7 @@ function install(isGlobal, runtime = 'claude') {
   // For global installs: use full path
   // For local installs: use relative
   const pathPrefix = isGlobal
-    ? `${targetDir}/`
+    ? `${targetDir.replace(/\\/g, '/')}/`
     : `./${dirName}/`;
 
   let runtimeLabel = 'Claude Code';
@@ -1213,6 +1296,9 @@ function install(isGlobal, runtime = 'claude') {
 
   // Track installation failures
   const failures = [];
+
+  // Save any locally modified GSD files before they get wiped
+  saveLocalPatches(targetDir);
 
   // Clean up orphaned files from previous versions
   cleanupOrphanedFiles(targetDir);
@@ -1344,18 +1430,6 @@ function install(isGlobal, runtime = 'claude') {
     process.exit(1);
   }
 
-  // Install GSD Memory MCP server (Claude Code only, global installs only)
-  let mcpServerPath = null;
-  if (runtime === 'claude' && isGlobal) {
-    const mcpResult = installMcpServer();
-    if (mcpResult.success) {
-      mcpServerPath = mcpResult.serverPath;
-      console.log(`  ${green}✓${reset} Installed GSD Memory MCP server`);
-    } else if (mcpResult.error) {
-      console.log(`  ${yellow}⚠${reset} MCP server install skipped: ${mcpResult.error}`);
-    }
-  }
-
   // Configure statusline and hooks in settings.json
   // Gemini shares same hook system as Claude Code for now
   const settingsPath = path.join(targetDir, 'settings.json');
@@ -1404,11 +1478,12 @@ function install(isGlobal, runtime = 'claude') {
     }
   }
 
-  // Configure MCP server if installed (Claude Code only)
-  if (mcpServerPath && runtime === 'claude') {
-    configureMcpServer(settingsPath, settings, mcpServerPath);
-    console.log(`  ${green}✓${reset} Configured GSD Memory MCP server`);
-  }
+  // Write file manifest for future modification detection
+  writeManifest(targetDir);
+  console.log(`  ${green}✓${reset} Wrote file manifest (${MANIFEST_NAME})`);
+
+  // Report any backed-up local patches
+  reportLocalPatches(targetDir);
 
   return { settingsPath, settings, statuslineCommand, runtime };
 }

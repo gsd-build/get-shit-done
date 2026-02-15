@@ -22,29 +22,22 @@ Documents are reference material for Claude when planning/executing. Always incl
 
 <process>
 
-<step name="resolve_model_profile" priority="first">
-Read model profile for agent spawning:
+<step name="init_context" priority="first">
+Load codebase mapping context:
 
 ```bash
-MODEL_PROFILE=$(cat .planning/config.json 2>/dev/null | grep -o '"model_profile"[[:space:]]*:[[:space:]]*"[^"]*"' | grep -o '"[^"]*"$' | tr -d '"' || echo "balanced")
+INIT=$(node ~/.claude/get-shit-done/bin/gsd-tools.js init map-codebase)
 ```
 
-Default to "balanced" if not set.
-
-**Model lookup table:**
-
-| Agent | quality | balanced | budget |
-|-------|---------|----------|--------|
-| gsd-codebase-mapper | sonnet | haiku | haiku |
-
-Store resolved model for use in Task calls below.
+Extract from init JSON: `mapper_model`, `commit_docs`, `codebase_dir`, `existing_maps`, `has_maps`, `codebase_dir_exists`.
 </step>
 
 <step name="check_existing">
-Check if .planning/codebase/ already exists:
+Check if .planning/codebase/ already exists using `has_maps` from init context.
 
+If `codebase_dir_exists` is true:
 ```bash
-ls -la .planning/codebase/ 2>/dev/null
+ls -la .planning/codebase/
 ```
 
 **If exists:**
@@ -268,31 +261,8 @@ Continue to commit_codebase_map.
 <step name="commit_codebase_map">
 Commit the codebase map:
 
-**Check planning config:**
-
 ```bash
-COMMIT_PLANNING_DOCS=$(cat .planning/config.json 2>/dev/null | grep -o '"commit_docs"[[:space:]]*:[[:space:]]*[^,}]*' | grep -o 'true\|false' || echo "true")
-git check-ignore -q .planning 2>/dev/null && COMMIT_PLANNING_DOCS=false
-```
-
-**If `COMMIT_PLANNING_DOCS=false`:** Skip git operations
-
-**If `COMMIT_PLANNING_DOCS=true` (default):**
-
-```bash
-git add .planning/codebase/*.md
-git commit -m "$(cat <<'EOF'
-docs: map existing codebase
-
-- STACK.md - Technologies and dependencies
-- ARCHITECTURE.md - System design and patterns
-- STRUCTURE.md - Directory layout
-- CONVENTIONS.md - Code style and patterns
-- TESTING.md - Test structure
-- INTEGRATIONS.md - External services
-- CONCERNS.md - Technical debt and issues
-EOF
-)"
+node ~/.claude/get-shit-done/bin/gsd-tools.js commit "docs: map existing codebase" --files .planning/codebase/*.md
 ```
 
 Continue to offer_next.

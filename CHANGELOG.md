@@ -9,6 +9,109 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 ### Added
 - `/gsd:checkpoint` command — quick state serialization to prevent context compaction loss during long sessions
 - `verify-gsd-state.js` script — cross-platform artifact verification for all phases
+## [1.18.0] - 2026-02-08
+
+### Added
+- `--auto` flag for `/gsd:new-project` — runs research → requirements → roadmap automatically after config questions. Expects idea document via @ reference (e.g., `/gsd:new-project --auto @prd.md`)
+
+### Fixed
+- Windows: SessionStart hook now spawns detached process correctly
+- Windows: Replaced HEREDOC with literal newlines for git commit compatibility
+- Research decision from `/gsd:new-milestone` now persists to config.json
+
+## [1.17.0] - 2026-02-08
+
+### Added
+- **gsd-tools verification suite**: `verify plan-structure`, `verify phase-completeness`, `verify references`, `verify commits`, `verify artifacts`, `verify key-links` — deterministic structural checks
+- **gsd-tools frontmatter CRUD**: `frontmatter get/set/merge/validate` — safe YAML frontmatter operations with schema validation
+- **gsd-tools template fill**: `template fill summary/plan/verification` — pre-filled document skeletons
+- **gsd-tools state progression**: `state advance-plan`, `state update-progress`, `state record-metric`, `state add-decision`, `state add-blocker`, `state resolve-blocker`, `state record-session` — automates STATE.md updates
+- **Local patch preservation**: Installer now detects locally modified GSD files, backs them up to `gsd-local-patches/`, and creates a manifest for restoration
+- `/gsd:reapply-patches` command to merge local modifications back after GSD updates
+
+### Changed
+- Agents (executor, planner, plan-checker, verifier) now use gsd-tools for state updates and verification instead of manual markdown parsing
+- `/gsd:update` workflow now notifies about backed-up local patches and suggests `/gsd:reapply-patches`
+
+### Fixed
+- Added workaround for Claude Code `classifyHandoffIfNeeded` bug that causes false agent failures — execute-phase and quick workflows now spot-check actual output before reporting failure
+
+## [1.16.0] - 2026-02-08
+
+### Added
+- 10 new gsd-tools CLI commands that replace manual AI orchestration of mechanical operations:
+  - `phase add <desc>` — append phase to roadmap + create directory
+  - `phase insert <after> <desc>` — insert decimal phase
+  - `phase remove <N> [--force]` — remove phase with full renumbering
+  - `phase complete <N>` — mark done, update state + roadmap, detect milestone end
+  - `roadmap analyze` — unified roadmap parser with disk status
+  - `milestone complete <ver> [--name]` — archive roadmap/requirements/audit
+  - `validate consistency` — check phase numbering and disk/roadmap sync
+  - `progress [json|table|bar]` — render progress in various formats
+  - `todo complete <file>` — move todo from pending to completed
+  - `scaffold [context|uat|verification|phase-dir]` — template generation
+
+### Changed
+- Workflows now delegate deterministic operations to gsd-tools CLI, reducing token usage and errors:
+  - `remove-phase.md`: 13 manual steps → 1 CLI call + confirm + commit
+  - `add-phase.md`: 6 manual steps → 1 CLI call + state update
+  - `insert-phase.md`: 7 manual steps → 1 CLI call + state update
+  - `complete-milestone.md`: archival delegated to `milestone complete`
+  - `progress.md`: roadmap parsing delegated to `roadmap analyze`
+
+### Fixed
+- Execute-phase now correctly spawns `gsd-executor` subagents instead of generic task agents
+- `commit_docs=false` setting now respected in all `.planning/` commit paths (execute-plan, debugger, reference docs all route through gsd-tools CLI)
+- Execute-phase orchestrator no longer bloats context by embedding file content — passes paths instead, letting subagents read in their fresh context
+- Windows: Normalized backslash paths in gsd-tools invocations (contributed by @rmindel)
+
+## [1.15.0] - 2026-02-08
+
+### Changed
+- Optimized workflow context loading to eliminate redundant file reads, reducing token usage by ~5,000-10,000 tokens per workflow execution
+
+## [1.14.0] - 2026-02-08
+
+### Added
+- Context-optimizing parsing commands in gsd-tools (`phase-plan-index`, `state-snapshot`, `summary-extract`) — reduces agent context usage by returning structured JSON instead of raw file content
+
+### Fixed
+- Installer no longer deletes opencode.json on JSONC parse errors — now handles comments, trailing commas, and BOM correctly (#474)
+
+## [1.13.0] - 2026-02-08
+
+### Added
+- `gsd-tools history-digest` — Compiles phase summaries into structured JSON for faster context loading
+- `gsd-tools phases list` — Lists phase directories with filtering (replaces fragile `ls | sort -V` patterns)
+- `gsd-tools roadmap get-phase` — Extracts phase sections from ROADMAP.md
+- `gsd-tools phase next-decimal` — Calculates next decimal phase number for insert operations
+- `gsd-tools state get/patch` — Atomic STATE.md field operations
+- `gsd-tools template select` — Chooses summary template based on plan complexity
+- Summary template variants: minimal (~30 lines), standard (~60 lines), complex (~100 lines)
+- Test infrastructure with 22 tests covering new commands
+
+### Changed
+- Planner uses two-step context assembly: digest for selection, full SUMMARY for understanding
+- Agents migrated from bash patterns to structured gsd-tools commands
+- Nested YAML frontmatter parsing now handles `dependency-graph.provides`, `tech-stack.added` correctly
+
+## [1.12.1] - 2026-02-08
+
+### Changed
+- Consolidated workflow initialization into compound `init` commands, reducing token usage and improving startup performance
+- Updated 24 workflow and agent files to use single-call context gathering instead of multiple atomic calls
+
+## [1.12.0] - 2026-02-07
+
+### Changed
+- **Architecture: Thin orchestrator pattern** — Commands now delegate to workflows, reducing command file size by ~75% and improving maintainability
+- **Centralized utilities** — New `gsd-tools.js` (11 functions) replaces repetitive bash patterns across 50+ files
+- **Token reduction** — ~22k characters removed from affected command/workflow/agent files
+- **Condensed agent prompts** — Same behavior with fewer words (executor, planner, verifier, researcher agents)
+
+### Added
+- `gsd-tools.js` CLI utility with functions: state load/update, resolve-model, find-phase, commit, verify-summary, generate-slug, current-timestamp, list-todos, verify-path-exists, config-ensure-section
+
 ## [1.11.2] - 2026-02-05
 
 ### Added
@@ -1106,7 +1209,15 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 - YOLO mode for autonomous execution
 - Interactive mode with checkpoints
 
-[Unreleased]: https://github.com/glittercowboy/get-shit-done/compare/v1.11.2...HEAD
+[Unreleased]: https://github.com/glittercowboy/get-shit-done/compare/v1.18.0...HEAD
+[1.18.0]: https://github.com/glittercowboy/get-shit-done/releases/tag/v1.18.0
+[1.17.0]: https://github.com/glittercowboy/get-shit-done/releases/tag/v1.17.0
+[1.16.0]: https://github.com/glittercowboy/get-shit-done/releases/tag/v1.16.0
+[1.15.0]: https://github.com/glittercowboy/get-shit-done/releases/tag/v1.15.0
+[1.14.0]: https://github.com/glittercowboy/get-shit-done/releases/tag/v1.14.0
+[1.13.0]: https://github.com/glittercowboy/get-shit-done/releases/tag/v1.13.0
+[1.12.1]: https://github.com/glittercowboy/get-shit-done/releases/tag/v1.12.1
+[1.12.0]: https://github.com/glittercowboy/get-shit-done/releases/tag/v1.12.0
 [1.11.2]: https://github.com/glittercowboy/get-shit-done/releases/tag/v1.11.2
 [1.11.1]: https://github.com/glittercowboy/get-shit-done/releases/tag/v1.11.0
 [1.10.1]: https://github.com/glittercowboy/get-shit-done/releases/tag/v1.10.1
