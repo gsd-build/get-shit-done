@@ -23,6 +23,7 @@ const hasLocal = args.includes('--local') || args.includes('-l');
 const hasOpencode = args.includes('--opencode');
 const hasClaude = args.includes('--claude');
 const hasGemini = args.includes('--gemini');
+const hasCursor = args.includes('--cursor');
 const hasBoth = args.includes('--both'); // Legacy flag, keeps working
 const hasAll = args.includes('--all');
 const hasUninstall = args.includes('--uninstall') || args.includes('-u');
@@ -30,19 +31,21 @@ const hasUninstall = args.includes('--uninstall') || args.includes('-u');
 // Runtime selection - can be set by flags or interactive prompt
 let selectedRuntimes = [];
 if (hasAll) {
-  selectedRuntimes = ['claude', 'opencode', 'gemini'];
+  selectedRuntimes = ['claude', 'opencode', 'gemini', 'cursor'];
 } else if (hasBoth) {
   selectedRuntimes = ['claude', 'opencode'];
 } else {
   if (hasOpencode) selectedRuntimes.push('opencode');
   if (hasClaude) selectedRuntimes.push('claude');
   if (hasGemini) selectedRuntimes.push('gemini');
+  if (hasCursor) selectedRuntimes.push('cursor');
 }
 
 // Helper to get directory name for a runtime (used for local/project installs)
 function getDirName(runtime) {
   if (runtime === 'opencode') return '.opencode';
   if (runtime === 'gemini') return '.gemini';
+  if (runtime === 'cursor') return '.cursor';
   return '.claude';
 }
 
@@ -96,6 +99,17 @@ function getGlobalDir(runtime, explicitDir = null) {
     return path.join(os.homedir(), '.gemini');
   }
   
+  if (runtime === 'cursor') {
+    // Cursor: --config-dir > CURSOR_CONFIG_DIR > ~/.cursor
+    if (explicitDir) {
+      return expandTilde(explicitDir);
+    }
+    if (process.env.CURSOR_CONFIG_DIR) {
+      return expandTilde(process.env.CURSOR_CONFIG_DIR);
+    }
+    return path.join(os.homedir(), '.cursor');
+  }
+  
   // Claude Code: --config-dir > CLAUDE_CONFIG_DIR > ~/.claude
   if (explicitDir) {
     return expandTilde(explicitDir);
@@ -116,7 +130,7 @@ const banner = '\n' +
   '\n' +
   '  Get Shit Done ' + dim + 'v' + pkg.version + reset + '\n' +
   '  A meta-prompting, context engineering and spec-driven\n' +
-  '  development system for Claude Code, OpenCode, and Gemini by TÂCHES.\n';
+  '  development system for Claude Code, OpenCode, Gemini, and Cursor by TÂCHES.\n';
 
 // Parse --config-dir argument
 function parseConfigDirArg() {
@@ -150,7 +164,7 @@ console.log(banner);
 
 // Show help if requested
 if (hasHelp) {
-  console.log(`  ${yellow}Usage:${reset} npx get-shit-done-cc [options]\n\n  ${yellow}Options:${reset}\n    ${cyan}-g, --global${reset}              Install globally (to config directory)\n    ${cyan}-l, --local${reset}               Install locally (to current directory)\n    ${cyan}--claude${reset}                  Install for Claude Code only\n    ${cyan}--opencode${reset}                Install for OpenCode only\n    ${cyan}--gemini${reset}                  Install for Gemini only\n    ${cyan}--all${reset}                     Install for all runtimes\n    ${cyan}-u, --uninstall${reset}           Uninstall GSD (remove all GSD files)\n    ${cyan}-c, --config-dir <path>${reset}   Specify custom config directory\n    ${cyan}-h, --help${reset}                Show this help message\n    ${cyan}--force-statusline${reset}        Replace existing statusline config\n\n  ${yellow}Examples:${reset}\n    ${dim}# Interactive install (prompts for runtime and location)${reset}\n    npx get-shit-done-cc\n\n    ${dim}# Install for Claude Code globally${reset}\n    npx get-shit-done-cc --claude --global\n\n    ${dim}# Install for Gemini globally${reset}\n    npx get-shit-done-cc --gemini --global\n\n    ${dim}# Install for all runtimes globally${reset}\n    npx get-shit-done-cc --all --global\n\n    ${dim}# Install to custom config directory${reset}\n    npx get-shit-done-cc --claude --global --config-dir ~/.claude-bc\n\n    ${dim}# Install to current project only${reset}\n    npx get-shit-done-cc --claude --local\n\n    ${dim}# Uninstall GSD from Claude Code globally${reset}\n    npx get-shit-done-cc --claude --global --uninstall\n\n  ${yellow}Notes:${reset}\n    The --config-dir option is useful when you have multiple configurations.\n    It takes priority over CLAUDE_CONFIG_DIR / GEMINI_CONFIG_DIR environment variables.\n`);
+  console.log(`  ${yellow}Usage:${reset} npx get-shit-done-cc [options]\n\n  ${yellow}Options:${reset}\n    ${cyan}-g, --global${reset}              Install globally (to config directory)\n    ${cyan}-l, --local${reset}               Install locally (to current directory)\n    ${cyan}--claude${reset}                  Install for Claude Code only\n    ${cyan}--opencode${reset}                Install for OpenCode only\n    ${cyan}--gemini${reset}                  Install for Gemini only\n    ${cyan}--cursor${reset}                  Install for Cursor only\n    ${cyan}--all${reset}                     Install for all runtimes\n    ${cyan}-u, --uninstall${reset}           Uninstall GSD (remove all GSD files)\n    ${cyan}-c, --config-dir <path>${reset}   Specify custom config directory\n    ${cyan}-h, --help${reset}                Show this help message\n    ${cyan}--force-statusline${reset}        Replace existing statusline config\n\n  ${yellow}Examples:${reset}\n    ${dim}# Interactive install (prompts for runtime and location)${reset}\n    npx get-shit-done-cc\n\n    ${dim}# Install for Claude Code globally${reset}\n    npx get-shit-done-cc --claude --global\n\n    ${dim}# Install for Gemini globally${reset}\n    npx get-shit-done-cc --gemini --global\n\n    ${dim}# Install for Cursor globally${reset}\n    npx get-shit-done-cc --cursor --global\n\n    ${dim}# Install for all runtimes globally${reset}\n    npx get-shit-done-cc --all --global\n\n    ${dim}# Install to custom config directory${reset}\n    npx get-shit-done-cc --claude --global --config-dir ~/.claude-bc\n\n    ${dim}# Install to current project only${reset}\n    npx get-shit-done-cc --claude --local\n\n    ${dim}# Uninstall GSD from Claude Code globally${reset}\n    npx get-shit-done-cc --claude --global --uninstall\n\n  ${yellow}Notes:${reset}\n    The --config-dir option is useful when you have multiple configurations.\n    It takes priority over CLAUDE_CONFIG_DIR / GEMINI_CONFIG_DIR / CURSOR_CONFIG_DIR environment variables.\n`);
   process.exit(0);
 }
 
@@ -217,6 +231,16 @@ function getCommitAttribution(runtime) {
   } else if (runtime === 'gemini') {
     // Gemini: check gemini settings.json for attribution config
     const settings = readSettings(path.join(getGlobalDir('gemini', explicitConfigDir), 'settings.json'));
+    if (!settings.attribution || settings.attribution.commit === undefined) {
+      result = undefined;
+    } else if (settings.attribution.commit === '') {
+      result = null;
+    } else {
+      result = settings.attribution.commit;
+    }
+  } else if (runtime === 'cursor') {
+    // Cursor: check settings.json for attribution config (same pattern as Claude Code)
+    const settings = readSettings(path.join(getGlobalDir('cursor', explicitConfigDir), 'settings.json'));
     if (!settings.attribution || settings.attribution.commit === undefined) {
       result = undefined;
     } else if (settings.attribution.commit === '') {
@@ -307,6 +331,43 @@ const claudeToGeminiTools = {
   TodoWrite: 'write_todos',
   AskUserQuestion: 'ask_user',
 };
+
+// Tool name mapping from Claude Code to Cursor
+// Cursor uses snake_case tool names like OpenCode
+const claudeToCursorTools = {
+  Read: 'read',
+  Write: 'write',
+  Edit: 'edit',
+  Bash: 'bash',
+  Glob: 'glob',
+  Grep: 'grep',
+  LS: 'ls',
+  MultiEdit: 'multi_edit',
+  AskUserQuestion: 'ask_question',
+  TodoWrite: 'todo_write',
+  WebFetch: 'web_fetch',
+  WebSearch: 'web_search',
+};
+
+/**
+ * Convert a Claude Code tool name to Cursor format
+ * - Applies Claude→Cursor mapping (AskUserQuestion→ask_question, etc.)
+ * - Excludes Task tool — Cursor uses subagent mechanism
+ * - MCP tools (mcp__*) keep their format
+ * @returns {string|null} Cursor tool name, or null if tool should be excluded
+ */
+function convertCursorToolName(claudeTool) {
+  // MCP tools: keep format as-is
+  if (claudeTool.startsWith('mcp__')) {
+    return claudeTool;
+  }
+  // Check for explicit mapping first
+  if (claudeToCursorTools[claudeTool]) {
+    return claudeToCursorTools[claudeTool];
+  }
+  // Default: convert PascalCase to snake_case
+  return claudeTool.replace(/([a-z])([A-Z])/g, '$1_$2').toLowerCase();
+}
 
 /**
  * Convert a Claude Code tool name to OpenCode format
@@ -436,6 +497,101 @@ function convertClaudeToGeminiAgent(content) {
 
   const newFrontmatter = newLines.join('\n').trim();
   return `---\n${newFrontmatter}\n---${stripSubTags(body)}`;
+}
+
+/**
+ * Convert Claude Code frontmatter to Cursor format
+ * - Keeps only name and description fields in frontmatter
+ * - Strips color, tools, allowed-tools, and other fields
+ * - Replaces tool name references in body text
+ * - Replaces path references (~/.claude/ → ~/.cursor/)
+ * - Replaces command format (/gsd: → /gsd/)
+ * @param {string} content - Markdown file content with YAML frontmatter
+ * @returns {string} - Content with converted frontmatter
+ */
+function convertClaudeToCursorFrontmatter(content) {
+  // Replace tool name references in body text
+  let convertedContent = content;
+  
+  // Replace PascalCase tool names with snake_case equivalents
+  for (const [claude, cursor] of Object.entries(claudeToCursorTools)) {
+    const regex = new RegExp(`\\b${claude}\\b`, 'g');
+    convertedContent = convertedContent.replace(regex, cursor);
+  }
+  
+  // Replace /gsd: with /gsd/ for Cursor command format
+  convertedContent = convertedContent.replace(/\/gsd:/g, '/gsd/');
+  
+  // Replace ~/.claude/ with ~/.cursor/
+  convertedContent = convertedContent.replace(/~\/\.claude\//g, '~/.cursor/');
+  
+  // Replace /clear with Cursor-appropriate instruction
+  convertedContent = convertedContent.replace(
+    /`\/clear`\s*(?:first\s*)?→?\s*fresh context window/gi,
+    'Click "+" (new chat) → fresh context window'
+  );
+  convertedContent = convertedContent.replace(
+    /<sub>`\/clear`/gi,
+    '<sub>Click "+" (new chat)'
+  );
+  
+  // Check if content has frontmatter
+  if (!convertedContent.startsWith('---')) {
+    return convertedContent;
+  }
+
+  // Find the end of frontmatter
+  const endIndex = convertedContent.indexOf('---', 3);
+  if (endIndex === -1) {
+    return convertedContent;
+  }
+
+  const frontmatter = convertedContent.substring(3, endIndex).trim();
+  const body = convertedContent.substring(endIndex + 3);
+
+  // Parse frontmatter - keep only name and description
+  const lines = frontmatter.split('\n');
+  const newLines = [];
+  let inMultilineField = false;
+
+  for (const line of lines) {
+    const trimmed = line.trim();
+
+    // Skip empty lines
+    if (!trimmed) continue;
+
+    // Detect YAML array items (part of a field we're skipping)
+    if (trimmed.startsWith('- ')) {
+      if (inMultilineField) continue;
+    }
+
+    // Check if this is a field we want to keep
+    if (trimmed.startsWith('name:')) {
+      newLines.push(line);
+      inMultilineField = false;
+      continue;
+    }
+
+    if (trimmed.startsWith('description:')) {
+      newLines.push(line);
+      inMultilineField = false;
+      continue;
+    }
+
+    // All other top-level fields get stripped
+    if (trimmed.includes(':') && !trimmed.startsWith('-')) {
+      inMultilineField = true;
+      continue;
+    }
+  }
+
+  // Rebuild frontmatter (may be empty if no name/description)
+  const newFrontmatter = newLines.join('\n').trim();
+  if (!newFrontmatter) {
+    // No frontmatter fields kept, return body only
+    return body.trim();
+  }
+  return `---\n${newFrontmatter}\n---${body}`;
 }
 
 function convertClaudeToOpencodeFrontmatter(content) {
@@ -682,6 +838,9 @@ function copyWithPathReplacement(srcDir, destDir, pathPrefix, runtime) {
         // Replace extension with .toml
         const tomlPath = destPath.replace(/\.md$/, '.toml');
         fs.writeFileSync(tomlPath, tomlContent);
+      } else if (runtime === 'cursor') {
+        content = convertClaudeToCursorFrontmatter(content);
+        fs.writeFileSync(destPath, content);
       } else {
         fs.writeFileSync(destPath, content);
       }
@@ -788,6 +947,7 @@ function uninstall(isGlobal, runtime = 'claude') {
   let runtimeLabel = 'Claude Code';
   if (runtime === 'opencode') runtimeLabel = 'OpenCode';
   if (runtime === 'gemini') runtimeLabel = 'Gemini';
+  if (runtime === 'cursor') runtimeLabel = 'Cursor';
 
   console.log(`  Uninstalling GSD from ${cyan}${runtimeLabel}${reset} at ${cyan}${locationLabel}${reset}\n`);
 
@@ -1269,6 +1429,7 @@ function reportLocalPatches(configDir) {
 function install(isGlobal, runtime = 'claude') {
   const isOpencode = runtime === 'opencode';
   const isGemini = runtime === 'gemini';
+  const isCursor = runtime === 'cursor';
   const dirName = getDirName(runtime);
   const src = path.join(__dirname, '..');
 
@@ -1291,6 +1452,7 @@ function install(isGlobal, runtime = 'claude') {
   let runtimeLabel = 'Claude Code';
   if (isOpencode) runtimeLabel = 'OpenCode';
   if (isGemini) runtimeLabel = 'Gemini';
+  if (isCursor) runtimeLabel = 'Cursor';
 
   console.log(`  Installing for ${cyan}${runtimeLabel}${reset} to ${cyan}${locationLabel}${reset}\n`);
 
@@ -1373,6 +1535,8 @@ function install(isGlobal, runtime = 'claude') {
           content = convertClaudeToOpencodeFrontmatter(content);
         } else if (isGemini) {
           content = convertClaudeToGeminiAgent(content);
+        } else if (isCursor) {
+          content = convertClaudeToCursorFrontmatter(content);
         }
         fs.writeFileSync(path.join(agentsDest, entry.name), content);
       }
@@ -1406,22 +1570,25 @@ function install(isGlobal, runtime = 'claude') {
   }
 
   // Copy hooks from dist/ (bundled with dependencies)
-  const hooksSrc = path.join(src, 'hooks', 'dist');
-  if (fs.existsSync(hooksSrc)) {
-    const hooksDest = path.join(targetDir, 'hooks');
-    fs.mkdirSync(hooksDest, { recursive: true });
-    const hookEntries = fs.readdirSync(hooksSrc);
-    for (const entry of hookEntries) {
-      const srcFile = path.join(hooksSrc, entry);
-      if (fs.statSync(srcFile).isFile()) {
-        const destFile = path.join(hooksDest, entry);
-        fs.copyFileSync(srcFile, destFile);
+  // Skip for Cursor - no statusline or notification support
+  if (!isCursor) {
+    const hooksSrc = path.join(src, 'hooks', 'dist');
+    if (fs.existsSync(hooksSrc)) {
+      const hooksDest = path.join(targetDir, 'hooks');
+      fs.mkdirSync(hooksDest, { recursive: true });
+      const hookEntries = fs.readdirSync(hooksSrc);
+      for (const entry of hookEntries) {
+        const srcFile = path.join(hooksSrc, entry);
+        if (fs.statSync(srcFile).isFile()) {
+          const destFile = path.join(hooksDest, entry);
+          fs.copyFileSync(srcFile, destFile);
+        }
       }
-    }
-    if (verifyInstalled(hooksDest, 'hooks')) {
-      console.log(`  ${green}✓${reset} Installed hooks (bundled)`);
-    } else {
-      failures.push('hooks');
+      if (verifyInstalled(hooksDest, 'hooks')) {
+        console.log(`  ${green}✓${reset} Installed hooks (bundled)`);
+      } else {
+        failures.push('hooks');
+      }
     }
   }
 
@@ -1452,8 +1619,8 @@ function install(isGlobal, runtime = 'claude') {
     }
   }
 
-  // Configure SessionStart hook for update checking (skip for opencode)
-  if (!isOpencode) {
+  // Configure SessionStart hook for update checking (skip for opencode and cursor)
+  if (!isOpencode && !isCursor) {
     if (!settings.hooks) {
       settings.hooks = {};
     }
@@ -1513,8 +1680,9 @@ function finishInstall(settingsPath, settings, statuslineCommand, shouldInstallS
   let program = 'Claude Code';
   if (runtime === 'opencode') program = 'OpenCode';
   if (runtime === 'gemini') program = 'Gemini';
+  if (runtime === 'cursor') program = 'Cursor';
 
-  const command = isOpencode ? '/gsd-help' : '/gsd:help';
+  const command = (isOpencode || runtime === 'cursor') ? '/gsd-help' : '/gsd:help';
   console.log(`
   ${green}Done!${reset} Launch ${program} and run ${cyan}${command}${reset}.
 
@@ -1595,15 +1763,18 @@ function promptRuntime(callback) {
   console.log(`  ${yellow}Which runtime(s) would you like to install for?${reset}\n\n  ${cyan}1${reset}) Claude Code ${dim}(~/.claude)${reset}
   ${cyan}2${reset}) OpenCode    ${dim}(~/.config/opencode)${reset} - open source, free models
   ${cyan}3${reset}) Gemini      ${dim}(~/.gemini)${reset}
-  ${cyan}4${reset}) All
+  ${cyan}4${reset}) Cursor      ${dim}(~/.cursor)${reset}
+  ${cyan}5${reset}) All
 `);
 
   rl.question(`  Choice ${dim}[1]${reset}: `, (answer) => {
     answered = true;
     rl.close();
     const choice = answer.trim() || '1';
-    if (choice === '4') {
-      callback(['claude', 'opencode', 'gemini']);
+    if (choice === '5') {
+      callback(['claude', 'opencode', 'gemini', 'cursor']);
+    } else if (choice === '4') {
+      callback(['cursor']);
     } else if (choice === '3') {
       callback(['gemini']);
     } else if (choice === '2') {
@@ -1670,15 +1841,14 @@ function installAllRuntimes(runtimes, isGlobal, isInteractive) {
     results.push(result);
   }
 
-  // Handle statusline for Claude & Gemini (OpenCode uses themes)
+  // Handle statusline for Claude & Gemini only (OpenCode uses themes, Cursor has no statusline)
   const claudeResult = results.find(r => r.runtime === 'claude');
   const geminiResult = results.find(r => r.runtime === 'gemini');
+  const cursorResult = results.find(r => r.runtime === 'cursor');
+  const opencodeResult = results.find(r => r.runtime === 'opencode');
 
-  // Logic: if both are present, ask once if interactive? Or ask for each?
-  // Simpler: Ask once and apply to both if applicable.
-  
   if (claudeResult || geminiResult) {
-    // Use whichever settings exist to check for existing statusline
+    // Statusline prompt for Claude/Gemini
     const primaryResult = claudeResult || geminiResult;
     
     handleStatusline(primaryResult.settings, isInteractive, (shouldInstallStatusline) => {
@@ -1686,18 +1856,22 @@ function installAllRuntimes(runtimes, isGlobal, isInteractive) {
         finishInstall(claudeResult.settingsPath, claudeResult.settings, claudeResult.statuslineCommand, shouldInstallStatusline, 'claude');
       }
       if (geminiResult) {
-         finishInstall(geminiResult.settingsPath, geminiResult.settings, geminiResult.statuslineCommand, shouldInstallStatusline, 'gemini');
+        finishInstall(geminiResult.settingsPath, geminiResult.settings, geminiResult.statuslineCommand, shouldInstallStatusline, 'gemini');
       }
-      
-      const opencodeResult = results.find(r => r.runtime === 'opencode');
+      // Cursor: no statusline support
+      if (cursorResult) {
+        finishInstall(cursorResult.settingsPath, cursorResult.settings, cursorResult.statuslineCommand, false, 'cursor');
+      }
+      // OpenCode: no statusline support
       if (opencodeResult) {
         finishInstall(opencodeResult.settingsPath, opencodeResult.settings, opencodeResult.statuslineCommand, false, 'opencode');
       }
     });
   } else {
-    // Only OpenCode
-    const opencodeResult = results[0];
-    finishInstall(opencodeResult.settingsPath, opencodeResult.settings, opencodeResult.statuslineCommand, false, 'opencode');
+    // Only OpenCode and/or Cursor - no statusline prompt needed
+    for (const result of results) {
+      finishInstall(result.settingsPath, result.settings, result.statuslineCommand, false, result.runtime);
+    }
   }
 }
 
