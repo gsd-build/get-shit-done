@@ -47,14 +47,14 @@ Proceed to install step (treat as version 0.0.0 for comparison).
 Check npm for latest version:
 
 ```bash
-npm view get-shit-done-cc version 2>/dev/null
+npm view @ahmed118glitch/get-shit-done-codex version 2>/dev/null
 ```
 
 **If npm check fails:**
 ```
 Couldn't check for updates (offline or npm unavailable).
 
-To update manually: `npx get-shit-done-cc --global`
+To update manually: `npx --yes --package=@ahmed118glitch/get-shit-done-codex@latest get-shit-done-cc --global`
 ```
 
 Exit.
@@ -146,12 +146,12 @@ Run the update using the install type detected in step 1:
 
 **If LOCAL install:**
 ```bash
-npx get-shit-done-cc --local
+npx --yes --package=@ahmed118glitch/get-shit-done-codex@latest get-shit-done-cc --local
 ```
 
 **If GLOBAL install (or unknown):**
 ```bash
-npx get-shit-done-cc --global
+npx --yes --package=@ahmed118glitch/get-shit-done-codex@latest get-shit-done-cc --global
 ```
 
 Capture output. If install fails, show error and exit.

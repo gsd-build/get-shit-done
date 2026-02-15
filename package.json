@@ -1,37 +1,42 @@
 {
-  "name": "get-shit-done-cc",
-  "version": "1.18.0",
-  "description": "A meta-prompting, context engineering and spec-driven development system for Claude Code, OpenCode and Gemini by TÂCHES.",
+  "name": "@ahmed118glitch/get-shit-done-codex",
+  "version": "1.18.2",
+  "description": "Codex-native package for the get-shit-done workflow with native subagent orchestration.",
   "bin": {
+    "get-shit-done-codex": "bin/install-codex.js",
     "get-shit-done-cc": "bin/install.js"
   },
   "files": [
     "bin",
+    ".codex",
     "commands",
     "get-shit-done",
     "agents",
     "hooks/dist",
-    "scripts"
+    "scripts",
+    "README.md",
+    "LICENSE",
+    "CHANGELOG.md",
+    "!**/*.bak"
   ],
   "keywords": [
+    "codex",
     "claude",
     "claude-code",
     "ai",
     "meta-prompting",
     "context-engineering",
-    "spec-driven-development",
-    "gemini",
-    "gemini-cli"
+    "spec-driven-development"
   ],
-  "author": "TÂCHES",
+  "author": "TÂCHES / Codex port by ahmed118-glitch",
   "license": "MIT",
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/glittercowboy/get-shit-done.git"
+    "url": "git+https://github.com/ahmed118-glitch/get-shit-done-codex.git"
   },
-  "homepage": "https://github.com/glittercowboy/get-shit-done",
+  "homepage": "https://github.com/ahmed118-glitch/get-shit-done-codex",
   "bugs": {
-    "url": "https://github.com/glittercowboy/get-shit-done/issues"
+    "url": "https://github.com/ahmed118-glitch/get-shit-done-codex/issues"
   },
   "engines": {
     "node": ">=16.7.0"

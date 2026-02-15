@@ -18,25 +18,23 @@ Get Shit Done is a planning-first workflow system for AI coding agents. This rep
 Prerequisite: Node.js `>=16.7.0`.
 
 ```bash
-npx get-shit-done-cc
+npx @ahmed118glitch/get-shit-done-codex@latest --path .
 ```
 
 Common examples:
 
 ```bash
-# Global install
-npx get-shit-done-cc --all --global
+# Install Codex files into the current project directory
+npx @ahmed118glitch/get-shit-done-codex@latest --path .
 
-# Single runtime installs
-npx get-shit-done-cc --claude --global
-npx get-shit-done-cc --opencode --global
-npx get-shit-done-cc --gemini --global
+# Install into an explicit target folder:
+npx @ahmed118glitch/get-shit-done-codex@latest --path /path/to/project
 
-# Local install in current project
-npx get-shit-done-cc --claude --local
+# Install shared copy under your home directory as well:
+npx @ahmed118glitch/get-shit-done-codex@latest --global
 
-# Uninstall
-npx get-shit-done-cc --claude --global --uninstall
+# Run the runtime installer (Claude/OpenCode/Gemini) from this scoped package:
+npx --yes --package=@ahmed118glitch/get-shit-done-codex@latest get-shit-done-cc --help
 ```
 
 ## Runtime Command Surface
