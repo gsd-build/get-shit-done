@@ -25,6 +25,28 @@ Use this skill to run `gsd-*` prompts under `Codex` while preserving upstream GS
 - Replace Bash/JQ patterns with PowerShell and `ConvertFrom-Json`.
 - Replace AskUserQuestion interactions with direct user prompts in chat.
 
+## Subagent lifecycle (required)
+- Spawn only when the upstream workflow explicitly defines a `Task(...)` role.
+- For each spawned subagent:
+  - Start with `spawn_agent` and provide the role source from `.claude/agents/gsd-*.md`.
+  - Wait for completion before proceeding: `wait`.
+  - Explicitly close the agent after it finishes (`close_agent`) to release resources.
+- Keep prompt-level sequencing intact; do not continue to subsequent steps until waiting + closure are complete.
+- If an agent fails or exceeds retry policy, stop that phase of workflow and surface a clear remediation step.
+
+## Required GSD roles (must map by name)
+- `gsd-project-researcher`
+- `gsd-research-synthesizer`
+- `gsd-roadmapper`
+- `gsd-phase-researcher`
+- `gsd-planner`
+- `gsd-plan-checker`
+- `gsd-executor`
+- `gsd-verifier`
+- `gsd-debugger`
+- `gsd-integration-checker`
+- `gsd-codebase-mapper`
+
 ## Standard execution order
 1. Parse user input from `$ARGUMENTS`.
 2. Run required `gsd-tools init ...` if the workflow defines it.
