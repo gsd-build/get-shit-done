@@ -359,7 +359,19 @@ Extract from result: `version`, `date`, `phases`, `plans`, `tasks`, `accomplishm
 
 Verify: `✅ Milestone archived to .planning/milestones/`
 
-**Note:** Phase directories (`.planning/phases/`) are NOT deleted — they accumulate across milestones as raw execution history. Phase numbering continues (v1.0 phases 1-4, v1.1 phases 5-8, etc.).
+**Phase archival (optional):** After archival completes, ask the user:
+
+AskUserQuestion(header="Archive Phases", question="Archive phase directories to milestones/?", options: "Yes — move to milestones/v[X.Y]-phases/" | "Skip — keep phases in place")
+
+If "Yes": move phase directories to the milestone archive:
+```bash
+mkdir -p .planning/milestones/v[X.Y]-phases
+# For each phase directory in .planning/phases/:
+mv .planning/phases/{phase-dir} .planning/milestones/v[X.Y]-phases/
+```
+Verify: `✅ Phase directories archived to .planning/milestones/v[X.Y]-phases/`
+
+If "Skip": Phase directories remain in `.planning/phases/` as raw execution history. Use `/gsd:cleanup` later to archive retroactively.
 
 After archival, the AI still handles:
 - Reorganizing ROADMAP.md with milestone grouping (requires judgment)

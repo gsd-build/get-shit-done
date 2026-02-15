@@ -38,9 +38,10 @@ node ~/.claude/get-shit-done/bin/gsd-tools.cjs phases list
 For each phase directory, read the VERIFICATION.md:
 
 ```bash
-cat .planning/phases/01-*/*-VERIFICATION.md
-cat .planning/phases/02-*/*-VERIFICATION.md
-# etc.
+# For each phase, use find-phase to resolve the directory (handles archived phases)
+PHASE_INFO=$(node ~/.claude/get-shit-done/bin/gsd-tools.cjs find-phase 01 --raw)
+# Extract directory from JSON, then read VERIFICATION.md from that directory
+# Repeat for each phase number from ROADMAP.md
 ```
 
 From each VERIFICATION.md, extract:

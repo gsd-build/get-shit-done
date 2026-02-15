@@ -241,7 +241,8 @@ fi
 
 **2. Find parent UAT file:**
 ```bash
-find .planning/phases -path "*${PARENT_PHASE}*/*-UAT.md" -type f 2>/dev/null
+PARENT_INFO=$(node ~/.claude/get-shit-done/bin/gsd-tools.cjs find-phase "${PARENT_PHASE}" --raw)
+# Extract directory from PARENT_INFO JSON, then find UAT file in that directory
 ```
 
 **If no parent UAT found:** Skip this step (gap-closure may have been triggered by VERIFICATION.md instead).
