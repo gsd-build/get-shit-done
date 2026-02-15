@@ -310,6 +310,22 @@ Quick switch model profile for GSD agents.
 
 Usage: `/gsd:set-profile budget`
 
+### PR Management
+
+**`/gsd:pr-branch`**
+Create a clean PR branch without `.planning/` files.
+
+- Classifies commits as code-only, planning-only, or mixed
+- Cherry-picks code-only commits onto a `{branch}-pr` branch
+- Incremental updates — run again after new commits, no force-push needed
+- Mixed commits warned and skipped (use `--dry-run` to preview)
+- Conflict detection with safe abort — working branch untouched
+- Auto-sync option: set `pr_branch.auto_sync: true` in config for automatic updates after every commit
+
+Usage: `/gsd:pr-branch`
+Usage: `/gsd:pr-branch --dry-run`
+Usage: `/gsd:pr-branch --base main`
+
 ### Utility Commands
 
 **`/gsd:help`**

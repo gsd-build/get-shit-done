@@ -464,6 +464,12 @@ You're never locked in. The system adapts.
 | `/gsd:pause-work` | Create handoff when stopping mid-phase |
 | `/gsd:resume-work` | Restore from last session |
 
+### PR Management
+
+| Command | What it does |
+|---------|--------------|
+| `/gsd:pr-branch` | Create clean PR branch without `.planning/` files |
+
 ### Utilities
 
 | Command | What it does |
