@@ -30,6 +30,10 @@ Decimal phases appear between their surrounding integers in numeric order.
 **Goal**: [What this phase delivers]
 **Depends on**: Nothing (first phase)
 **Requirements**: [REQ-01, REQ-02, REQ-03]
+**Data Flow:** *(optional)*
+- Receives: Nothing (first phase)
+- Produces: [Key artifacts for downstream phases]
+- Internal: [Major internal data transformations]
 **Success Criteria** (what must be TRUE):
   1. [Observable behavior from user perspective]
   2. [Observable behavior from user perspective]
@@ -45,6 +49,10 @@ Plans:
 **Goal**: [What this phase delivers]
 **Depends on**: Phase 1
 **Requirements**: [REQ-04, REQ-05]
+**Data Flow:**
+- Receives: DatabaseSchema, AuthMiddleware from Phase 1
+- Produces: UserService, ProductService for Phase 3
+- Internal: Model → Repository → Service → Controller
 **Success Criteria** (what must be TRUE):
   1. [Observable behavior from user perspective]
   2. [Observable behavior from user perspective]
@@ -112,6 +120,13 @@ Phases execute in numeric order: 2 → 2.1 → 2.2 → 3 → 3.1 → 4
 - No time estimates (this isn't enterprise PM)
 - Progress table updated by execute workflow
 - Plan count can be "TBD" initially, refined during planning
+
+**Data Flow guidelines:**
+- Receives: List artifacts from upstream phases (use semantic names like "UserModel", not file paths)
+- Produces: List artifacts downstream phases will need
+- Internal: Show major transformations within the phase (Model → Service → API)
+- This section is optional but recommended for phases with complex dependencies
+- Keep entries brief — this is documentation, not specification
 
 **Success criteria:**
 - 2-5 observable behaviors per phase (from user's perspective)
