@@ -177,7 +177,7 @@ Priority: Context7 > Official Docs > Official GitHub > Verified WebSearch > Unve
 
 ## RESEARCH.md Structure
 
-**Location:** `.planning/phases/XX-name/{phase}-RESEARCH.md`
+**Location:** `.planning/phases/XX-name/{phase_num}-RESEARCH.md`
 
 ```markdown
 # Phase [X]: [Name] - Research

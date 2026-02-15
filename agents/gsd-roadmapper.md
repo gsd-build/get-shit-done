@@ -286,12 +286,46 @@ After roadmap creation, REQUIREMENTS.md gets updated with phase mappings:
 
 ## ROADMAP.md Structure
 
-Use template from `~/.claude/get-shit-done/templates/roadmap.md`.
+**CRITICAL: ROADMAP.md requires TWO phase representations. Both are mandatory.**
 
-Key sections:
-- Overview (2-3 sentences)
-- Phases with Goal, Dependencies, Requirements, Success Criteria
-- Progress table
+### 1. Summary Checklist (under `## Phases`)
+
+```markdown
+- [ ] **Phase 1: Name** - One-line description
+- [ ] **Phase 2: Name** - One-line description
+- [ ] **Phase 3: Name** - One-line description
+```
+
+### 2. Detail Sections (under `## Phase Details`)
+
+```markdown
+### Phase 1: Name
+**Goal**: What this phase delivers
+**Depends on**: Nothing (first phase)
+**Requirements**: REQ-01, REQ-02
+**Success Criteria** (what must be TRUE):
+  1. Observable behavior from user perspective
+  2. Observable behavior from user perspective
+**Plans**: TBD
+
+### Phase 2: Name
+**Goal**: What this phase delivers
+**Depends on**: Phase 1
+...
+```
+
+**The `### Phase X:` headers are parsed by downstream tools.** If you only write the summary checklist, phase lookups will fail.
+
+### 3. Progress Table
+
+```markdown
+| Phase | Plans Complete | Status | Completed |
+|-------|----------------|--------|-----------|
+| 1. Name | 0/3 | Not started | - |
+| 2. Name | 0/2 | Not started | - |
+```
+
+Reference full template: `~/.claude/get-shit-done/templates/roadmap.md`
 
 ## STATE.md Structure
 

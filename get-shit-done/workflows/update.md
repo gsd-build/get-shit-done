@@ -13,8 +13,9 @@ Detect whether GSD is installed locally or globally by checking both locations:
 
 ```bash
 # Check local first (takes priority)
-if [ -f "./.claude/get-shit-done/VERSION" ]; then
-  cat "./.claude/get-shit-done/VERSION"
+# Paths templated at install time for runtime compatibility
+if [ -f ./.claude/get-shit-done/VERSION ]; then
+  cat ./.claude/get-shit-done/VERSION
   echo "LOCAL"
 elif [ -f ~/.claude/get-shit-done/VERSION ]; then
   cat ~/.claude/get-shit-done/VERSION
@@ -167,6 +168,7 @@ rm -f ./.claude/cache/gsd-update-check.json
 ```bash
 rm -f ~/.claude/cache/gsd-update-check.json
 ```
+(Paths are templated at install time for runtime compatibility)
 </step>
 
 <step name="display_result">

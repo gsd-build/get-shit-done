@@ -520,6 +520,50 @@ This phase covers:
     assert.strictEqual(output.found, false, 'should return not found');
     assert.strictEqual(output.error, 'ROADMAP.md not found', 'should explain why');
   });
+
+  test('accepts ## phase headers (two hashes)', () => {
+    fs.writeFileSync(
+      path.join(tmpDir, '.planning', 'ROADMAP.md'),
+      `# Roadmap v1.0
+
+## Phase 1: Foundation
+**Goal:** Set up project infrastructure
+**Plans:** 2 plans
+
+## Phase 2: API
+**Goal:** Build REST API
+`
+    );
+
+    const result = runGsdTools('roadmap get-phase 1', tmpDir);
+    assert.ok(result.success, `Command failed: ${result.error}`);
+
+    const output = JSON.parse(result.output);
+    assert.strictEqual(output.found, true, 'phase with ## header should be found');
+    assert.strictEqual(output.phase_name, 'Foundation', 'phase name extracted');
+    assert.strictEqual(output.goal, 'Set up project infrastructure', 'goal extracted');
+  });
+
+  test('detects malformed ROADMAP with summary list but no detail sections', () => {
+    fs.writeFileSync(
+      path.join(tmpDir, '.planning', 'ROADMAP.md'),
+      `# Roadmap v1.0
+
+## Phases
+
+- [ ] **Phase 1: Foundation** - Set up project
+- [ ] **Phase 2: API** - Build REST API
+`
+    );
+
+    const result = runGsdTools('roadmap get-phase 1', tmpDir);
+    assert.ok(result.success, `Command failed: ${result.error}`);
+
+    const output = JSON.parse(result.output);
+    assert.strictEqual(output.found, false, 'phase should not be found');
+    assert.strictEqual(output.error, 'malformed_roadmap', 'should identify malformed roadmap');
+    assert.ok(output.message.includes('missing'), 'should explain the issue');
+  });
 });
 
 // ─────────────────────────────────────────────────────────────────────────────

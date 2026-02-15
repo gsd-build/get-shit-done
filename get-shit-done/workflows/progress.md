@@ -194,7 +194,7 @@ Read its `<objective>` section.
 
 **Route B: Phase needs planning**
 
-Check if `{phase}-CONTEXT.md` exists in phase directory.
+Check if `{phase_num}-CONTEXT.md` exists in phase directory.
 
 **If CONTEXT.md exists:**
 
@@ -246,7 +246,7 @@ UAT.md exists with gaps (diagnosed issues). User needs to plan fixes.
 
 ## ⚠ UAT Gaps Found
 
-**{phase}-UAT.md** has {N} gaps requiring fixes.
+**{phase_num}-UAT.md** has {N} gaps requiring fixes.
 
 `/gsd:plan-phase {phase} --gaps`
 

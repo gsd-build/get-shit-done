@@ -104,7 +104,7 @@ IMPORTANT: If CONTEXT.md exists below, it contains user decisions from /gsd:disc
 </additional_context>
 
 <output>
-Write to: {phase_dir}/{phase}-RESEARCH.md
+Write to: {phase_dir}/{phase_num}-RESEARCH.md
 </output>
 ```
 

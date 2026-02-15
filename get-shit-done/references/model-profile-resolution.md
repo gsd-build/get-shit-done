@@ -20,13 +20,15 @@ Look up the agent in the table for the resolved profile. Pass the model paramete
 Task(
   prompt="...",
   subagent_type="gsd-planner",
-  model="{resolved_model}"  # e.g., "opus" for quality profile
+  model="{resolved_model}"  # "inherit", "sonnet", or "haiku"
 )
 ```
+
+**Note:** Opus-tier agents resolve to `"inherit"` (not `"opus"`). This causes the agent to use the parent session's model, avoiding conflicts with organization policies that may block specific opus versions.
 
 ## Usage
 
 1. Resolve once at orchestration start
 2. Store the profile value
 3. Look up each agent's model from the table when spawning
-4. Pass model parameter to each Task call
+4. Pass model parameter to each Task call (values: `"inherit"`, `"sonnet"`, `"haiku"`)

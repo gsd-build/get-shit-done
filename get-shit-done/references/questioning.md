@@ -79,6 +79,7 @@ Use AskUserQuestion to help users think by presenting concrete options to react 
 - Generic categories ("Technical", "Business", "Other")
 - Leading options that presume an answer
 - Too many options (2-4 is ideal)
+- Headers longer than 12 characters (hard limit — validation will reject them)
 
 **Example — vague answer:**
 User says "it should be fast"

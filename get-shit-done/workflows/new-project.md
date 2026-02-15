@@ -59,7 +59,7 @@ git init
 **If `needs_codebase_map` is true** (from init — existing code detected but no codebase map):
 
 Use AskUserQuestion:
-- header: "Existing Code"
+- header: "Codebase"
 - question: "I detected existing code in this directory. Would you like to map the codebase first?"
 - options:
   - "Map codebase first" — Run /gsd:map-codebase to understand existing architecture (Recommended)
@@ -303,7 +303,7 @@ questions: [
     ]
   },
   {
-    header: "Model Profile",
+    header: "AI Models",
     question: "Which AI models for planning agents?",
     multiSelect: false,
     options: [
@@ -663,7 +663,7 @@ For each capability mentioned:
 
 For each category, use AskUserQuestion:
 
-- header: "[Category name]"
+- header: "[Category]" (max 12 chars)
 - question: "Which [category] features are in v1?"
 - multiSelect: true
 - options:

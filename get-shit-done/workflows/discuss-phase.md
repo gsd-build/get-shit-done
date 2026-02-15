@@ -136,7 +136,7 @@ ls ${phase_dir}/*-CONTEXT.md 2>/dev/null
 
 **If exists:**
 Use AskUserQuestion:
-- header: "Existing context"
+- header: "Context"
 - question: "Phase [X] already has context. What do you want to do?"
 - options:
   - "Update it" — Review and revise existing context
@@ -240,13 +240,13 @@ Ask 4 questions per area before offering to continue or move on. Each answer oft
    ```
 
 2. **Ask 4 questions using AskUserQuestion:**
-   - header: "[Area]"
+   - header: "[Area]" (max 12 chars — abbreviate if needed)
    - question: Specific decision for this area
    - options: 2-3 concrete choices (AskUserQuestion adds "Other" automatically)
    - Include "You decide" as an option when reasonable — captures Claude discretion
 
 3. **After 4 questions, check:**
-   - header: "[Area]"
+   - header: "[Area]" (max 12 chars)
    - question: "More questions about [area], or move to next?"
    - options: "More questions" / "Next area"
 

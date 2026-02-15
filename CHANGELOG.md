@@ -6,6 +6,22 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ## [Unreleased]
 
+## [1.19.0] - 2026-02-15
+
+### Added
+- Brave Search integration for researchers (requires BRAVE_API_KEY environment variable)
+- GitHub issue templates for bug reports and feature requests
+- Security policy for responsible disclosure
+- Auto-labeling workflow for new issues
+
+### Fixed
+- UAT gaps and debug sessions now auto-resolve after gap-closure phase execution (#580)
+- Fall back to ROADMAP.md when phase directory missing (#521)
+- Template hook paths for OpenCode/Gemini runtimes (#585)
+- Accept both `##` and `###` phase headers, detect malformed ROADMAPs (#598, #599)
+- Use `{phase_num}` instead of ambiguous `{phase}` for filenames (#601)
+- Add package.json to prevent ESM inheritance issues (#602)
+
 ## [1.18.0] - 2026-02-08
 
 ### Added
@@ -1206,7 +1222,8 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 - YOLO mode for autonomous execution
 - Interactive mode with checkpoints
 
-[Unreleased]: https://github.com/glittercowboy/get-shit-done/compare/v1.18.0...HEAD
+[Unreleased]: https://github.com/glittercowboy/get-shit-done/compare/v1.19.0...HEAD
+[1.19.0]: https://github.com/glittercowboy/get-shit-done/releases/tag/v1.19.0
 [1.18.0]: https://github.com/glittercowboy/get-shit-done/releases/tag/v1.18.0
 [1.17.0]: https://github.com/glittercowboy/get-shit-done/releases/tag/v1.17.0
 [1.16.0]: https://github.com/glittercowboy/get-shit-done/releases/tag/v1.16.0

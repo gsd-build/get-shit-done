@@ -216,7 +216,7 @@ After creating DISCOVERY.md, check confidence level.
 If confidence is LOW:
 Use AskUserQuestion:
 
-- header: "Low Confidence"
+- header: "Low Conf."
 - question: "Discovery confidence is LOW: [reason]. How would you like to proceed?"
 - options:
   - "Dig deeper" - Do more research before planning

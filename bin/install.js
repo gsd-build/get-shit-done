@@ -47,6 +47,27 @@ function getDirName(runtime) {
 }
 
 /**
+ * Get the config directory path relative to home directory for a runtime
+ * Used for templating hooks that use path.join(homeDir, '<configDir>', ...)
+ * @param {string} runtime - 'claude', 'opencode', or 'gemini'
+ * @param {boolean} isGlobal - Whether this is a global install
+ */
+function getConfigDirFromHome(runtime, isGlobal) {
+  if (!isGlobal) {
+    // Local installs use the same dir name pattern
+    return getDirName(runtime);
+  }
+  // Global installs - OpenCode uses XDG path structure
+  if (runtime === 'opencode') {
+    // OpenCode: ~/.config/opencode -> '.config', 'opencode'
+    // Return as comma-separated for path.join() replacement
+    return "'.config', 'opencode'";
+  }
+  if (runtime === 'gemini') return "'.gemini'";
+  return "'.claude'";
+}
+
+/**
  * Get the global config directory for OpenCode
  * OpenCode follows XDG Base Directory spec and uses ~/.config/opencode/
  * Priority: OPENCODE_CONFIG_DIR > dirname(OPENCODE_CONFIG) > XDG_CONFIG_HOME/opencode > ~/.config/opencode
@@ -626,9 +647,11 @@ function copyFlattenedCommands(srcDir, destDir, prefix, pathPrefix, runtime) {
       const destPath = path.join(destDir, destName);
 
       let content = fs.readFileSync(srcPath, 'utf8');
-      const claudeDirRegex = /~\/\.claude\//g;
+      const globalClaudeRegex = /~\/\.claude\//g;
+      const localClaudeRegex = /\.\/\.claude\//g;
       const opencodeDirRegex = /~\/\.opencode\//g;
-      content = content.replace(claudeDirRegex, pathPrefix);
+      content = content.replace(globalClaudeRegex, pathPrefix);
+      content = content.replace(localClaudeRegex, `./${getDirName(runtime)}/`);
       content = content.replace(opencodeDirRegex, pathPrefix);
       content = processAttribution(content, getCommitAttribution(runtime));
       content = convertClaudeToOpencodeFrontmatter(content);
@@ -665,10 +688,12 @@ function copyWithPathReplacement(srcDir, destDir, pathPrefix, runtime) {
     if (entry.isDirectory()) {
       copyWithPathReplacement(srcPath, destPath, pathPrefix, runtime);
     } else if (entry.name.endsWith('.md')) {
-      // Always replace ~/.claude/ as it is the source of truth in the repo
+      // Replace ~/.claude/ and ./.claude/ with runtime-appropriate paths
       let content = fs.readFileSync(srcPath, 'utf8');
-      const claudeDirRegex = /~\/\.claude\//g;
-      content = content.replace(claudeDirRegex, pathPrefix);
+      const globalClaudeRegex = /~\/\.claude\//g;
+      const localClaudeRegex = /\.\/\.claude\//g;
+      content = content.replace(globalClaudeRegex, pathPrefix);
+      content = content.replace(localClaudeRegex, `./${dirName}/`);
       content = processAttribution(content, getCommitAttribution(runtime));
 
       // Convert frontmatter for opencode compatibility
@@ -867,7 +892,23 @@ function uninstall(isGlobal, runtime = 'claude') {
     }
   }
 
-  // 5. Clean up settings.json (remove GSD hooks and statusline)
+  // 5. Remove GSD package.json (CommonJS mode marker)
+  const pkgJsonPath = path.join(targetDir, 'package.json');
+  if (fs.existsSync(pkgJsonPath)) {
+    try {
+      const content = fs.readFileSync(pkgJsonPath, 'utf8').trim();
+      // Only remove if it's our minimal CommonJS marker
+      if (content === '{"type":"commonjs"}') {
+        fs.unlinkSync(pkgJsonPath);
+        removedCount++;
+        console.log(`  ${green}✓${reset} Removed GSD package.json`);
+      }
+    } catch (e) {
+      // Ignore read errors
+    }
+  }
+
+  // 6. Clean up settings.json (remove GSD hooks and statusline)
   const settingsPath = path.join(targetDir, 'settings.json');
   if (fs.existsSync(settingsPath)) {
     let settings = readSettings(settingsPath);
@@ -1405,17 +1446,33 @@ function install(isGlobal, runtime = 'claude') {
     failures.push('VERSION');
   }
 
+  // Write package.json to force CommonJS mode for GSD scripts
+  // Prevents "require is not defined" errors when project has "type": "module"
+  // Node.js walks up looking for package.json - this stops inheritance from project
+  const pkgJsonDest = path.join(targetDir, 'package.json');
+  fs.writeFileSync(pkgJsonDest, '{"type":"commonjs"}\n');
+  console.log(`  ${green}✓${reset} Wrote package.json (CommonJS mode)`);
+
   // Copy hooks from dist/ (bundled with dependencies)
+  // Template paths for the target runtime (replaces '.claude' with correct config dir)
   const hooksSrc = path.join(src, 'hooks', 'dist');
   if (fs.existsSync(hooksSrc)) {
     const hooksDest = path.join(targetDir, 'hooks');
     fs.mkdirSync(hooksDest, { recursive: true });
     const hookEntries = fs.readdirSync(hooksSrc);
+    const configDirReplacement = getConfigDirFromHome(runtime, isGlobal);
     for (const entry of hookEntries) {
       const srcFile = path.join(hooksSrc, entry);
       if (fs.statSync(srcFile).isFile()) {
         const destFile = path.join(hooksDest, entry);
-        fs.copyFileSync(srcFile, destFile);
+        // Template .js files to replace '.claude' with runtime-specific config dir
+        if (entry.endsWith('.js')) {
+          let content = fs.readFileSync(srcFile, 'utf8');
+          content = content.replace(/'\.claude'/g, configDirReplacement);
+          fs.writeFileSync(destFile, content);
+        } else {
+          fs.copyFileSync(srcFile, destFile);
+        }
       }
     }
     if (verifyInstalled(hooksDest, 'hooks')) {
