@@ -1,0 +1,98 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 960 540" class="terminal-svg">
+  <style>
+    /* Light theme (default) - matches site's --accent: #0ea5e9 */
+    .terminal-svg {
+      --term-bg: #f8fafc;
+      --term-border: #e2e8f0;
+      --term-title-bar: #f1f5f9;
+      --term-btn-red: #ef4444;
+      --term-btn-yellow: #f59e0b;
+      --term-btn-green: #22c55e;
+      --term-prompt: #3b82f6;
+      --term-command: #1e293b;
+      --term-cyan: #0ea5e9;
+      --term-green: #16a34a;
+      --term-dim: #94a3b8;
+      --term-white: #334155;
+    }
+
+    /* Dark theme - matches site's --accent: #7dcfff */
+    html[data-theme="dark"] .terminal-svg {
+      --term-bg: #1a1b26;
+      --term-border: #24283b;
+      --term-title-bar: #1f2335;
+      --term-btn-red: #f7768e;
+      --term-btn-yellow: #e0af68;
+      --term-btn-green: #9ece6a;
+      --term-prompt: #7aa2f7;
+      --term-command: #c0caf5;
+      --term-cyan: #7dcfff;
+      --term-green: #9ece6a;
+      --term-dim: #565f89;
+      --term-white: #c0caf5;
+    }
+
+    .terminal-svg .t-bg { fill: var(--term-bg); }
+    .terminal-svg .t-border { fill: var(--term-border); }
+    .terminal-svg .t-title-bar { fill: var(--term-title-bar); }
+    .terminal-svg .t-btn-red { fill: var(--term-btn-red); }
+    .terminal-svg .t-btn-yellow { fill: var(--term-btn-yellow); }
+    .terminal-svg .t-btn-green { fill: var(--term-btn-green); }
+    .terminal-svg .t-text { font-family: 'SF Mono', 'Fira Code', 'JetBrains Mono', Consolas, monospace; }
+    .terminal-svg .t-prompt { fill: var(--term-prompt); }
+    .terminal-svg .t-command { fill: var(--term-command); }
+    .terminal-svg .t-cyan { fill: var(--term-cyan); }
+    .terminal-svg .t-green { fill: var(--term-green); }
+    .terminal-svg .t-dim { fill: var(--term-dim); }
+    .terminal-svg .t-white { fill: var(--term-white); }
+  </style>
+
+  <!-- Window -->
+  <rect class="t-border" width="960" height="540" rx="12"/>
+  <rect class="t-bg" x="1" y="1" width="958" height="538" rx="11"/>
+
+  <!-- Title bar -->
+  <rect class="t-title-bar" x="1" y="1" width="958" height="44" rx="11"/>
+  <rect class="t-bg" x="1" y="32" width="958" height="14"/>
+
+  <!-- Window buttons -->
+  <circle class="t-btn-red" cx="20" cy="16" r="6"/>
+  <circle class="t-btn-yellow" cx="40" cy="16" r="6"/>
+  <circle class="t-btn-green" cx="60" cy="16" r="6"/>
+
+  <!-- Title -->
+  <text x="480" y="21" text-anchor="middle" class="t-text t-dim" font-size="12">Terminal</text>
+
+  <!-- Content -->
+  <g transform="translate(32, 72)">
+    <!-- Prompt line -->
+    <text class="t-text t-prompt" font-size="15" y="0">~</text>
+    <text class="t-text t-dim" font-size="15" x="16" y="0">$</text>
+    <text class="t-text t-command" font-size="15" x="36" y="0">npx get-shit-done-cc</text>
+
+    <!-- ASCII Art Banner - same as sidebar -->
+    <text class="t-text t-cyan" font-size="14" y="48" xml:space="preserve">   ██████╗ ███████╗██████╗</text>
+    <text class="t-text t-cyan" font-size="14" y="68" xml:space="preserve">  ██╔════╝ ██╔════╝██╔══██╗</text>
+    <text class="t-text t-cyan" font-size="14" y="88" xml:space="preserve">  ██║  ███╗███████╗██║  ██║</text>
+    <text class="t-text t-cyan" font-size="14" y="108" xml:space="preserve">  ██║   ██║╚════██║██║  ██║</text>
+    <text class="t-text t-cyan" font-size="14" y="128" xml:space="preserve">  ╚██████╔╝███████║██████╔╝</text>
+    <text class="t-text t-cyan" font-size="14" y="148" xml:space="preserve">   ╚═════╝ ╚══════╝╚═════╝</text>
+
+    <!-- Title and subtitle -->
+    <text class="t-text t-white" font-size="15" y="188">  Get Shit Done <tspan class="t-dim">v1.0.1</tspan></text>
+    <text class="t-text t-white" font-size="15" y="212">  A meta-prompting, context engineering and spec-driven</text>
+    <text class="t-text t-white" font-size="15" y="232">  development system for Claude Code by TÂCHES.</text>
+
+    <!-- Install output -->
+    <text class="t-text" font-size="15" y="280"><tspan class="t-green">  ✓</tspan><tspan class="t-white"> Installed commands/gsd</tspan></text>
+    <text class="t-text" font-size="15" y="304"><tspan class="t-green">  ✓</tspan><tspan class="t-white"> Installed get-shit-done</tspan></text>
+
+    <!-- Done message -->
+    <text class="t-text" font-size="15" y="352"><tspan class="t-green">  Done!</tspan><tspan class="t-white"> Run </tspan><tspan class="t-cyan">/gsd:help</tspan><tspan class="t-white"> to get started.</tspan></text>
+
+    <!-- New prompt -->
+    <text class="t-text t-prompt" font-size="15" y="400">~</text>
+    <text class="t-text t-dim" font-size="15" x="16" y="400">$</text>
+    <text class="t-text t-white" font-size="15" x="36" y="400">▌</text>
+  </g>
+</svg>
