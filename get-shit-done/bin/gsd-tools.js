@@ -101,6 +101,17 @@
  *     --stopped-at "..."
  *     [--resume-file path]
  *
+ * Quota Operations:
+ *   quota status                       Show current quota usage
+ *   quota status-bar [--json]          Format status bar string
+ *   quota stats [--table]              Show detailed session statistics
+ *   quota record <id> <model>          Record task usage
+ *     <tokens_in> <tokens_out>
+ *   quota reset                        Reset quota state
+ *   quota update-from-headers <json>   Update from API headers
+ *   quota check                        Check warnings and wait status
+ *   quota wait                         Check if should wait for quota
+ *
  * Compound Commands (workflow-specific initialization):
  *   init execute-phase <phase>         All context for execute-phase workflow
  *   init plan-phase <phase>            All context for plan-phase workflow
@@ -475,6 +486,269 @@ function output(result, raw, rawValue) {
 function error(message) {
   process.stderr.write('Error: ' + message + '\n');
   process.exit(1);
+}
+
+// ─── Quota Tracking ───────────────────────────────────────────────────────────
+
+const DEFAULT_QUOTA_STATE = {
+  session: {
+    tokens_used: 0,
+    tokens_limit: 2000000, // Default ITPM limit
+    reset_time: null,
+    last_updated: null
+  },
+  weekly: {
+    tokens_used: 0,
+    tokens_limit: 100000000, // Default weekly estimate
+    reset_time: null,
+    last_updated: null
+  },
+  tasks: [],  // Array of { task_id, model, tokens_in, tokens_out, timestamp }
+  warnings_shown: {
+    session_80: false,
+    weekly_80: false
+  }
+};
+
+function getQuotaPath(cwd) {
+  return path.join(cwd, '.planning', 'quota', 'session-usage.json');
+}
+
+function loadQuotaState(cwd) {
+  const quotaPath = getQuotaPath(cwd);
+  if (!fs.existsSync(quotaPath)) {
+    return { ...DEFAULT_QUOTA_STATE };
+  }
+  try {
+    return JSON.parse(fs.readFileSync(quotaPath, 'utf-8'));
+  } catch {
+    return { ...DEFAULT_QUOTA_STATE };
+  }
+}
+
+function saveQuotaState(cwd, state) {
+  const quotaPath = getQuotaPath(cwd);
+  fs.mkdirSync(path.dirname(quotaPath), { recursive: true });
+  fs.writeFileSync(quotaPath, JSON.stringify(state, null, 2));
+}
+
+function parseQuotaHeaders(headers) {
+  // Headers from Claude API (as documented)
+  // Note: In practice, headers may come as object or need parsing
+  return {
+    input: {
+      remaining: parseInt(headers['anthropic-ratelimit-input-tokens-remaining'] || '0'),
+      limit: parseInt(headers['anthropic-ratelimit-input-tokens-limit'] || '2000000'),
+      reset: headers['anthropic-ratelimit-input-tokens-reset'] || null
+    },
+    output: {
+      remaining: parseInt(headers['anthropic-ratelimit-output-tokens-remaining'] || '0'),
+      limit: parseInt(headers['anthropic-ratelimit-output-tokens-limit'] || '500000'),
+      reset: headers['anthropic-ratelimit-output-tokens-reset'] || null
+    }
+  };
+}
+
+function recordTaskUsage(cwd, taskId, model, tokensIn, tokensOut) {
+  const state = loadQuotaState(cwd);
+
+  // Add to tasks array
+  state.tasks.push({
+    task_id: taskId,
+    model: model,
+    tokens_in: tokensIn,
+    tokens_out: tokensOut,
+    timestamp: new Date().toISOString()
+  });
+
+  // Update session totals
+  state.session.tokens_used += tokensIn + tokensOut;
+  state.session.last_updated = new Date().toISOString();
+
+  // Update weekly totals
+  state.weekly.tokens_used += tokensIn + tokensOut;
+  state.weekly.last_updated = new Date().toISOString();
+
+  saveQuotaState(cwd, state);
+  return state;
+}
+
+function checkQuotaWarning(cwd) {
+  const state = loadQuotaState(cwd);
+  const warnings = [];
+
+  const sessionPercent = state.session.tokens_limit > 0
+    ? (state.session.tokens_used / state.session.tokens_limit) * 100
+    : 0;
+  const weeklyPercent = state.weekly.tokens_limit > 0
+    ? (state.weekly.tokens_used / state.weekly.tokens_limit) * 100
+    : 0;
+
+  // 80% session warning (only show once per session)
+  if (sessionPercent >= 80 && !state.warnings_shown.session_80) {
+    warnings.push({
+      type: 'session',
+      level: 'warning',
+      message: `Session quota at ${sessionPercent.toFixed(1)}%`,
+      percent: sessionPercent
+    });
+    state.warnings_shown.session_80 = true;
+    saveQuotaState(cwd, state);
+  }
+
+  // 80% weekly warning
+  if (weeklyPercent >= 80 && !state.warnings_shown.weekly_80) {
+    warnings.push({
+      type: 'weekly',
+      level: 'warning',
+      message: `Weekly quota at ${weeklyPercent.toFixed(1)}%`,
+      percent: weeklyPercent
+    });
+    state.warnings_shown.weekly_80 = true;
+    saveQuotaState(cwd, state);
+  }
+
+  return warnings;
+}
+
+function checkQuotaAndWait(cwd) {
+  const state = loadQuotaState(cwd);
+
+  const sessionPercent = state.session.tokens_limit > 0
+    ? (state.session.tokens_used / state.session.tokens_limit) * 100
+    : 0;
+  const weeklyPercent = state.weekly.tokens_limit > 0
+    ? (state.weekly.tokens_used / state.weekly.tokens_limit) * 100
+    : 0;
+
+  const result = {
+    should_wait: false,
+    wait_type: null,
+    wait_until: null,
+    wait_seconds: 0,
+    percent: 0
+  };
+
+  // Check session quota (98-99% threshold per user decision)
+  if (sessionPercent >= 98 && state.session.reset_time) {
+    const resetTime = new Date(state.session.reset_time);
+    const waitMs = Math.max(0, resetTime.getTime() - Date.now());
+    result.should_wait = true;
+    result.wait_type = 'session';
+    result.wait_until = state.session.reset_time;
+    result.wait_seconds = Math.ceil(waitMs / 1000) + 5; // +5s buffer
+    result.percent = sessionPercent;
+  }
+
+  // Check weekly quota
+  if (weeklyPercent >= 98 && state.weekly.reset_time) {
+    const resetTime = new Date(state.weekly.reset_time);
+    const waitMs = Math.max(0, resetTime.getTime() - Date.now());
+    // If weekly wait is longer than session wait, use weekly
+    if (!result.should_wait || waitMs > result.wait_seconds * 1000) {
+      result.should_wait = true;
+      result.wait_type = 'weekly';
+      result.wait_until = state.weekly.reset_time;
+      result.wait_seconds = Math.ceil(waitMs / 1000) + 5;
+      result.percent = weeklyPercent;
+    }
+  }
+
+  return result;
+}
+
+function formatStatusBar(quotaState) {
+  // Calculate tokens delegated to smaller models
+  const tasks = quotaState.tasks || [];
+  const totalTokens = tasks.reduce((sum, t) => sum + t.tokens_in + t.tokens_out, 0);
+
+  // Calculate model distribution
+  const modelCounts = { haiku: 0, sonnet: 0, opus: 0 };
+  for (const task of tasks) {
+    const model = task.model.toLowerCase();
+    if (modelCounts[model] !== undefined) {
+      modelCounts[model] += task.tokens_in + task.tokens_out;
+    }
+  }
+
+  const total = modelCounts.haiku + modelCounts.sonnet + modelCounts.opus || 1;
+  const hPercent = Math.round((modelCounts.haiku / total) * 100);
+  const sPercent = Math.round((modelCounts.sonnet / total) * 100);
+  const oPercent = Math.round((modelCounts.opus / total) * 100);
+
+  // Format token count (K for thousands)
+  const tokensK = totalTokens >= 1000 ? `${Math.round(totalTokens / 1000)}K` : totalTokens;
+
+  // Determine most recent model (for "→ Haiku" part)
+  const lastTask = tasks[tasks.length - 1];
+  const lastModel = lastTask ? lastTask.model : 'none';
+
+  // Estimate time extension (rough: 1K tokens = ~30 seconds saved vs Opus)
+  // Using haiku is ~10x cheaper than Opus, sonnet ~5x cheaper
+  const haikuSavings = modelCounts.haiku * 0.9; // 90% savings vs opus
+  const sonnetSavings = modelCounts.sonnet * 0.5; // 50% savings vs opus
+  const savedTokenValue = haikuSavings + sonnetSavings;
+  const savedMinutes = Math.round(savedTokenValue / 2000); // Rough estimate
+
+  return `Tokens: ${tokensK} → ${lastModel} | +${savedMinutes} min | H:${hPercent}% S:${sPercent}% O:${oPercent}%`;
+}
+
+function getUsageStats(quotaState) {
+  const tasks = quotaState.tasks || [];
+
+  // Calculate per-model breakdown
+  const models = { haiku: { tokens: 0, tasks: 0 }, sonnet: { tokens: 0, tasks: 0 }, opus: { tokens: 0, tasks: 0 } };
+  for (const task of tasks) {
+    const model = task.model.toLowerCase();
+    if (models[model]) {
+      models[model].tokens += task.tokens_in + task.tokens_out;
+      models[model].tasks += 1;
+    }
+  }
+
+  // Calculate estimated cost savings (rough estimates)
+  // Opus: $15/M input, $75/M output
+  // Sonnet: $3/M input, $15/M output
+  // Haiku: $0.25/M input, $1.25/M output
+  const opusCost = (models.opus.tokens / 1000000) * 45; // Avg of input/output
+  const sonnetCost = (models.sonnet.tokens / 1000000) * 9;
+  const haikuCost = (models.haiku.tokens / 1000000) * 0.75;
+
+  // If all tasks were Opus
+  const totalTokens = models.haiku.tokens + models.sonnet.tokens + models.opus.tokens;
+  const allOpusCost = (totalTokens / 1000000) * 45;
+  const actualCost = opusCost + sonnetCost + haikuCost;
+  const savings = allOpusCost - actualCost;
+  const savingsPercent = allOpusCost > 0 ? (savings / allOpusCost) * 100 : 0;
+
+  return {
+    session_total: {
+      tokens: totalTokens,
+      tasks: tasks.length,
+      duration_minutes: tasks.length > 0
+        ? Math.round((new Date() - new Date(tasks[0].timestamp)) / 60000)
+        : 0
+    },
+    per_model: {
+      haiku: models.haiku,
+      sonnet: models.sonnet,
+      opus: models.opus
+    },
+    cost_estimate: {
+      actual_cost: `$${actualCost.toFixed(4)}`,
+      if_all_opus: `$${allOpusCost.toFixed(4)}`,
+      savings: `$${savings.toFixed(4)}`,
+      savings_percent: `${savingsPercent.toFixed(1)}%`
+    },
+    quota: {
+      session_used: quotaState.session.tokens_used,
+      session_limit: quotaState.session.tokens_limit,
+      session_percent: ((quotaState.session.tokens_used / quotaState.session.tokens_limit) * 100).toFixed(1) + '%',
+      weekly_used: quotaState.weekly.tokens_used,
+      weekly_limit: quotaState.weekly.tokens_limit,
+      weekly_percent: ((quotaState.weekly.tokens_used / quotaState.weekly.tokens_limit) * 100).toFixed(1) + '%'
+    }
+  };
 }
 
 // ─── Commands ─────────────────────────────────────────────────────────────────
@@ -4586,6 +4860,137 @@ async function main() {
         limit: limitIdx !== -1 ? parseInt(args[limitIdx + 1], 10) : 10,
         freshness: freshnessIdx !== -1 ? args[freshnessIdx + 1] : null,
       }, raw);
+      break;
+    }
+
+    case 'quota': {
+      const subCommand = args[1];
+
+      if (subCommand === 'status') {
+        const state = loadQuotaState(cwd);
+        const sessionPercent = state.session.tokens_limit > 0
+          ? ((state.session.tokens_used / state.session.tokens_limit) * 100).toFixed(1)
+          : 0;
+        const weeklyPercent = state.weekly.tokens_limit > 0
+          ? ((state.weekly.tokens_used / state.weekly.tokens_limit) * 100).toFixed(1)
+          : 0;
+
+        const result = {
+          session: {
+            used: state.session.tokens_used,
+            limit: state.session.tokens_limit,
+            percent: parseFloat(sessionPercent),
+            reset_time: state.session.reset_time
+          },
+          weekly: {
+            used: state.weekly.tokens_used,
+            limit: state.weekly.tokens_limit,
+            percent: parseFloat(weeklyPercent),
+            reset_time: state.weekly.reset_time
+          },
+          task_count: state.tasks.length
+        };
+        output(result, raw);
+      } else if (subCommand === 'status-bar') {
+        const state = loadQuotaState(cwd);
+
+        if (args.includes('--json')) {
+          const tasks = state.tasks || [];
+          const modelCounts = { haiku: 0, sonnet: 0, opus: 0 };
+          for (const task of tasks) {
+            const model = task.model.toLowerCase();
+            if (modelCounts[model] !== undefined) {
+              modelCounts[model] += task.tokens_in + task.tokens_out;
+            }
+          }
+          output({
+            total_tokens: tasks.reduce((sum, t) => sum + t.tokens_in + t.tokens_out, 0),
+            model_distribution: modelCounts,
+            task_count: tasks.length,
+            last_model: tasks[tasks.length - 1]?.model || null
+          }, raw);
+        } else {
+          const statusBar = formatStatusBar(state);
+          output({ status_bar: statusBar }, raw, statusBar);
+        }
+      } else if (subCommand === 'stats') {
+        const state = loadQuotaState(cwd);
+        const stats = getUsageStats(state);
+
+        if (args.includes('--table')) {
+          // Print as formatted table
+          const totalTokens = stats.session_total.tokens;
+          const tasks = state.tasks || [];
+          const models = stats.per_model;
+
+          console.log('\n=== GSD Auto Mode Session Stats ===\n');
+          console.log(`Total: ${totalTokens.toLocaleString()} tokens across ${stats.session_total.tasks} tasks\n`);
+          console.log('Model Distribution:');
+          console.log(`  Haiku:  ${models.haiku.tokens.toLocaleString()} tokens (${models.haiku.tasks} tasks)`);
+          console.log(`  Sonnet: ${models.sonnet.tokens.toLocaleString()} tokens (${models.sonnet.tasks} tasks)`);
+          console.log(`  Opus:   ${models.opus.tokens.toLocaleString()} tokens (${models.opus.tasks} tasks)`);
+          console.log('\nCost Savings:');
+          console.log(`  Actual:    ${stats.cost_estimate.actual_cost}`);
+          console.log(`  If Opus:   ${stats.cost_estimate.if_all_opus}`);
+          console.log(`  Saved:     ${stats.cost_estimate.savings} (${stats.cost_estimate.savings_percent})`);
+          console.log('\nQuota:');
+          console.log(`  Session:   ${stats.quota.session_percent} used`);
+          console.log(`  Weekly:    ${stats.quota.weekly_percent} used`);
+          process.exit(0);
+        } else {
+          output(stats, raw);
+        }
+      } else if (subCommand === 'reset') {
+        saveQuotaState(cwd, { ...DEFAULT_QUOTA_STATE });
+        output({ reset: true }, raw);
+      } else if (subCommand === 'record') {
+        const [taskId, model, tokensIn, tokensOut] = args.slice(2);
+        const state = recordTaskUsage(cwd, taskId, model, parseInt(tokensIn), parseInt(tokensOut));
+        output({
+          recorded: true,
+          session_total: state.session.tokens_used,
+          task_count: state.tasks.length
+        }, raw);
+      } else if (subCommand === 'update-from-headers') {
+        const headersJson = args.slice(2).join(' ');
+        const headers = JSON.parse(headersJson);
+        const parsed = parseQuotaHeaders(headers);
+
+        const state = loadQuotaState(cwd);
+
+        // Update limits and reset times from actual API headers
+        state.session.tokens_limit = parsed.input.limit;
+        state.session.reset_time = parsed.input.reset;
+        state.session.tokens_used = parsed.input.limit - parsed.input.remaining;
+
+        saveQuotaState(cwd, state);
+        output({
+          updated: true,
+          session_percent: ((state.session.tokens_used / state.session.tokens_limit) * 100).toFixed(1)
+        }, raw);
+      } else if (subCommand === 'check') {
+        const warnings = checkQuotaWarning(cwd);
+        const waitCheck = checkQuotaAndWait(cwd);
+        output({
+          warnings,
+          wait: waitCheck
+        }, raw);
+      } else if (subCommand === 'wait') {
+        const waitCheck = checkQuotaAndWait(cwd);
+
+        if (!waitCheck.should_wait) {
+          output({ waited: false, reason: 'quota_ok' }, raw);
+        } else {
+          output({
+            waiting: true,
+            type: waitCheck.wait_type,
+            seconds: waitCheck.wait_seconds,
+            until: waitCheck.wait_until
+          }, raw);
+        }
+      } else {
+        error('Unknown quota subcommand. Available: status, reset, record, update-from-headers, check, wait, status-bar, stats');
+      }
       break;
     }
 
