@@ -12,6 +12,7 @@
 
 const fs = require('fs');
 const path = require('path');
+const { logHookExecution, loadHookConfig } = require('./hook-logger');
 
 let input = '';
 process.stdin.setEncoding('utf8');
@@ -32,24 +33,25 @@ process.stdin.on('end', () => {
       process.exit(0);
     }
 
-    // Get the task result (may be string or object)
+    // Extract structured agent type from tool_input (preferred) or fall back to text matching
+    const toolInput = data.tool_input || {};
+    const subagentType = (typeof toolInput === 'object' && toolInput.subagent_type) || '';
+    const prompt = (typeof toolInput === 'object' && toolInput.prompt) || (typeof toolInput === 'string' ? toolInput : '');
     const result = typeof data.tool_result === 'string'
       ? data.tool_result
       : JSON.stringify(data.tool_result || '');
 
-    // Also check tool_input for agent type hints
-    const taskInput = typeof data.tool_input === 'string'
-      ? data.tool_input
-      : JSON.stringify(data.tool_input || '');
-
-    const combinedText = (result + ' ' + taskInput).toLowerCase();
+    // Use structured subagent_type for reliable detection, fall back to text search
+    const isExecutor = subagentType === 'gsd-executor' || prompt.toLowerCase().includes('execute-plan');
+    const isPlanner = subagentType === 'gsd-planner' || prompt.toLowerCase().includes('plan-phase');
+    const isVerifier = subagentType === 'gsd-verifier' || prompt.toLowerCase().includes('verify-phase');
 
     const warnings = [];
 
     // Detect agent type and check for expected artifacts
     const phasesDir = path.join(cwd, '.planning', 'phases');
 
-    if (combinedText.includes('gsd-executor') || combinedText.includes('execute-plan')) {
+    if (isExecutor) {
       // Executor should produce SUMMARY*.md
       if (!hasArtifact(phasesDir, /SUMMARY.*\.md$/i)) {
         warnings.push(
@@ -58,7 +60,7 @@ process.stdin.on('end', () => {
       }
     }
 
-    if (combinedText.includes('gsd-planner') || combinedText.includes('plan-phase')) {
+    if (isPlanner) {
       // Planner should produce PLAN*.md
       if (!hasArtifact(phasesDir, /PLAN.*\.md$/i)) {
         warnings.push(
@@ -67,7 +69,7 @@ process.stdin.on('end', () => {
       }
     }
 
-    if (combinedText.includes('gsd-verifier') || combinedText.includes('verify-phase')) {
+    if (isVerifier) {
       // Verifier should produce VERIFICATION.md
       if (!hasArtifact(phasesDir, /VERIFICATION.*\.md$/i)) {
         warnings.push(
@@ -85,7 +87,9 @@ process.stdin.on('end', () => {
     }
 
     // Log event
-    logEvent(cwd, warnings);
+    logHookExecution(cwd, 'check-subagent-output', 'PostToolUse',
+      warnings.length > 0 ? 'warn' : 'allow',
+      warnings.length > 0 ? { warnings } : {});
 
   } catch (e) {
     // Silent fail — never block on hook bugs
@@ -116,34 +120,4 @@ function hasArtifact(phasesDir, pattern) {
   }
 }
 
-function loadHookConfig(cwd) {
-  try {
-    const configPath = path.join(cwd, '.planning', 'config.json');
-    if (fs.existsSync(configPath)) {
-      const config = JSON.parse(fs.readFileSync(configPath, 'utf8'));
-      return config.hooks || {};
-    }
-  } catch (e) { /* ignore parse errors */ }
-  return {};
-}
-
-function logEvent(cwd, warnings) {
-  try {
-    const logsDir = path.join(cwd, '.planning', 'logs');
-    const logFile = path.join(logsDir, 'hooks.jsonl');
-
-    if (!fs.existsSync(logsDir)) {
-      fs.mkdirSync(logsDir, { recursive: true });
-    }
-
-    const entry = {
-      timestamp: new Date().toISOString(),
-      hook: 'check-subagent-output',
-      event: 'PostToolUse',
-      decision: warnings.length > 0 ? 'warn' : 'allow',
-      warnings: warnings.length > 0 ? warnings : undefined,
-    };
-
-    fs.appendFileSync(logFile, JSON.stringify(entry) + '\n');
-  } catch (e) { /* ignore logging errors */ }
-}
+// loadHookConfig and logEvent replaced by shared imports from hook-logger.js

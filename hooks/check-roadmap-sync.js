@@ -13,6 +13,7 @@
 
 const fs = require('fs');
 const path = require('path');
+const { logHookExecution, loadHookConfig } = require('./hook-logger');
 
 let input = '';
 process.stdin.setEncoding('utf8');
@@ -134,7 +135,9 @@ process.stdin.on('end', () => {
     }
 
     // Log event
-    logEvent(cwd, warnings);
+    logHookExecution(cwd, 'check-roadmap-sync', 'PostToolUse',
+      warnings.length > 0 ? 'warn' : 'allow',
+      warnings.length > 0 ? { warnings } : {});
 
   } catch (e) {
     // Silent fail — never block on hook bugs
@@ -146,34 +149,4 @@ function escapeRegex(str) {
   return str.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
 }
 
-function loadHookConfig(cwd) {
-  try {
-    const configPath = path.join(cwd, '.planning', 'config.json');
-    if (fs.existsSync(configPath)) {
-      const config = JSON.parse(fs.readFileSync(configPath, 'utf8'));
-      return config.hooks || {};
-    }
-  } catch (e) { /* ignore parse errors */ }
-  return {};
-}
-
-function logEvent(cwd, warnings) {
-  try {
-    const logsDir = path.join(cwd, '.planning', 'logs');
-    const logFile = path.join(logsDir, 'hooks.jsonl');
-
-    if (!fs.existsSync(logsDir)) {
-      fs.mkdirSync(logsDir, { recursive: true });
-    }
-
-    const entry = {
-      timestamp: new Date().toISOString(),
-      hook: 'check-roadmap-sync',
-      event: 'PostToolUse',
-      decision: warnings.length > 0 ? 'warn' : 'allow',
-      warnings: warnings.length > 0 ? warnings : undefined,
-    };
-
-    fs.appendFileSync(logFile, JSON.stringify(entry) + '\n');
-  } catch (e) { /* ignore logging errors */ }
-}
+// loadHookConfig and logEvent replaced by shared imports from hook-logger.js

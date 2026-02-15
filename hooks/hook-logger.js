@@ -33,11 +33,21 @@ function logHookExecution(cwd, hookName, eventType, decision, details = {}) {
 
   fs.appendFileSync(logFile, JSON.stringify(entry) + '\n');
 
-  // Rotate: keep last 200 entries
+  // Rotate: keep last N entries (configurable via config.thresholds.log_rotation, default 200)
   try {
+    let maxEntries = 200;
+    try {
+      const configPath = path.join(cwd, '.planning', 'config.json');
+      if (fs.existsSync(configPath)) {
+        const config = JSON.parse(fs.readFileSync(configPath, 'utf8'));
+        if (config.thresholds && config.thresholds.log_rotation) {
+          maxEntries = config.thresholds.log_rotation;
+        }
+      }
+    } catch (e) { /* use default */ }
     const lines = fs.readFileSync(logFile, 'utf8').trim().split('\n');
-    if (lines.length > 200) {
-      fs.writeFileSync(logFile, lines.slice(-200).join('\n') + '\n');
+    if (lines.length > maxEntries) {
+      fs.writeFileSync(logFile, lines.slice(-maxEntries).join('\n') + '\n');
     }
   } catch (e) { /* ignore rotation errors */ }
 }

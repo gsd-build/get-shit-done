@@ -42,6 +42,28 @@ process.stdin.on('end', () => {
       } catch (e) { /* ignore */ }
     }
 
+    // Read active plan signal (which plan is currently executing)
+    let activePlan = 'none';
+    const activePlanPath = path.join(planningDir, '.active-plan');
+    if (fs.existsSync(activePlanPath)) {
+      try {
+        activePlan = fs.readFileSync(activePlanPath, 'utf8').trim();
+      } catch (e) { /* ignore */ }
+    }
+
+    // Read latest .PROGRESS file for task-level position
+    let taskPosition = 'unknown';
+    try {
+      const entries = fs.readdirSync(planningDir);
+      const progressFiles = entries.filter(e => e.startsWith('.PROGRESS-')).sort();
+      if (progressFiles.length > 0) {
+        const latest = progressFiles[progressFiles.length - 1];
+        const progressData = JSON.parse(fs.readFileSync(path.join(planningDir, latest), 'utf8'));
+        taskPosition = `task ${progressData.task || '?'}/${progressData.total || '?'}`;
+        if (progressData.commit) taskPosition += ` (last commit: ${progressData.commit})`;
+      }
+    } catch (e) { /* ignore */ }
+
     // Read roadmap progress summary
     let roadmapSummary = 'unavailable';
     const roadmapPath = path.join(planningDir, 'ROADMAP.md');
@@ -71,6 +93,8 @@ Stopped at: Context compaction
 Active phase: ${currentPhase}
 Active plan: ${currentPlan}
 Active operation: ${activeOperation}
+Executing plan: ${activePlan}
+Task position: ${taskPosition}
 Roadmap progress: ${roadmapSummary}
 Context consumption: ${contextStats}
 Resume action: Check STATE.md and continue from current phase/plan`;
@@ -91,9 +115,17 @@ Resume action: Check STATE.md and continue from current phase/plan`;
       fs.writeFileSync(counterPath, JSON.stringify({ calls: 0, lastSuggested: 0 }));
     }
 
+    // Reset context tracker to zero (not delete) to prevent false budget warnings
+    // after compaction. Previous session's accumulated reads should not count
+    // against the new post-compaction context budget.
+    const trackerResetPath = path.join(planningDir, '.context-tracker');
+    if (fs.existsSync(trackerResetPath)) {
+      fs.writeFileSync(trackerResetPath, JSON.stringify({ reads: 0, chars: 0, files: [], resetAt: now }));
+    }
+
     // Output additionalContext for post-compaction recovery
     const additional = {
-      additionalContext: `GSD session was compacted. Active: phase ${currentPhase}, plan ${currentPlan}. Operation: ${activeOperation}. ${roadmapSummary}. Resume from STATE.md.`
+      additionalContext: `GSD session was compacted. Active: phase ${currentPhase}, plan ${currentPlan}. Operation: ${activeOperation}. Executing: ${activePlan}. Position: ${taskPosition}. ${roadmapSummary}. Resume from STATE.md.`
     };
     process.stdout.write(JSON.stringify(additional));
   } catch (e) {

@@ -14,6 +14,7 @@
 
 const fs = require('fs');
 const path = require('path');
+const { logHookExecution, loadHookConfig } = require('./hook-logger');
 
 let input = '';
 process.stdin.setEncoding('utf8');
@@ -50,7 +51,7 @@ process.stdin.on('end', () => {
     // Planning files are always allowed
     if (normalizedFile.includes('.planning/')) {
       process.stdout.write(JSON.stringify({ decision: 'allow' }));
-      logEvent(cwd, filePath, 'allow', 'planning-file');
+      logHookExecution(cwd, 'check-phase-boundary', 'PreToolUse', 'allow', { file: path.basename(filePath), reason: 'planning-file' });
       process.exit(0);
     }
 
@@ -73,7 +74,10 @@ process.stdin.on('end', () => {
     }
 
     const currentPhase = phaseMatch[1].replace(/^0+/, '') || '0';
-    const paddedPhase = currentPhase.padStart(2, '0');
+    // Handle decimal phases (e.g., "1.1" → "01.1"): pad only the integer part
+    const parts = currentPhase.split('.');
+    parts[0] = parts[0].padStart(2, '0');
+    const paddedPhase = parts.join('.');
 
     // Find the current phase directory
     const phasesDir = path.join(cwd, '.planning', 'phases');
@@ -107,7 +111,7 @@ process.stdin.on('end', () => {
 
     if (absoluteFile.startsWith(phaseDir + '/') || absoluteFile === phaseDir) {
       process.stdout.write(JSON.stringify({ decision: 'allow' }));
-      logEvent(cwd, filePath, 'allow', 'in-phase');
+      logHookExecution(cwd, 'check-phase-boundary', 'PreToolUse', 'allow', { file: path.basename(filePath), reason: 'in-phase' });
       process.exit(0);
     }
 
@@ -117,7 +121,7 @@ process.stdin.on('end', () => {
     if (enforce) {
       const reason = `File "${path.basename(filePath)}" is outside the current phase directory (phase ${currentPhase}). Phase boundary enforcement is enabled.`;
       process.stdout.write(JSON.stringify({ decision: 'block', reason }));
-      logEvent(cwd, filePath, 'block', 'out-of-phase');
+      logHookExecution(cwd, 'check-phase-boundary', 'PreToolUse', 'block', { file: path.basename(filePath), reason: 'out-of-phase' });
       process.exit(0);
     }
 
@@ -126,7 +130,7 @@ process.stdin.on('end', () => {
       `[check-phase-boundary] Warning: "${path.basename(filePath)}" is outside the current phase ${currentPhase} directory\n`
     );
     process.stdout.write(JSON.stringify({ decision: 'allow' }));
-    logEvent(cwd, filePath, 'warn', 'out-of-phase');
+    logHookExecution(cwd, 'check-phase-boundary', 'PreToolUse', 'warn', { file: path.basename(filePath), reason: 'out-of-phase' });
 
   } catch (e) {
     // Silent fail — never block on hook bugs
@@ -135,35 +139,4 @@ process.stdin.on('end', () => {
   process.exit(0);
 });
 
-function loadHookConfig(cwd) {
-  try {
-    const configPath = path.join(cwd, '.planning', 'config.json');
-    if (fs.existsSync(configPath)) {
-      const config = JSON.parse(fs.readFileSync(configPath, 'utf8'));
-      return config.hooks || {};
-    }
-  } catch (e) { /* ignore parse errors */ }
-  return {};
-}
-
-function logEvent(cwd, filePath, decision, reason) {
-  try {
-    const logsDir = path.join(cwd, '.planning', 'logs');
-    const logFile = path.join(logsDir, 'hooks.jsonl');
-
-    if (!fs.existsSync(logsDir)) {
-      fs.mkdirSync(logsDir, { recursive: true });
-    }
-
-    const entry = {
-      timestamp: new Date().toISOString(),
-      hook: 'check-phase-boundary',
-      event: 'PreToolUse',
-      decision,
-      file: path.basename(filePath),
-      reason,
-    };
-
-    fs.appendFileSync(logFile, JSON.stringify(entry) + '\n');
-  } catch (e) { /* ignore logging errors */ }
-}
+// loadHookConfig and logEvent replaced by shared imports from hook-logger.js

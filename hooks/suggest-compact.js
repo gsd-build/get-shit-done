@@ -29,6 +29,8 @@ process.stdin.on('end', () => {
         }
         if (config.hooks && config.hooks.compactThreshold) {
           threshold = config.hooks.compactThreshold;
+        } else if (config.thresholds && config.thresholds.compact_threshold) {
+          threshold = config.thresholds.compact_threshold;
         }
         if (config.hooks && config.hooks.compactReRemindEvery) {
           reRemindEvery = config.hooks.compactReRemindEvery;

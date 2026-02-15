@@ -6,6 +6,7 @@
 // Output: JSON on stdout with { decision: "allow" } or { decision: "block", reason: "..." }
 
 const path = require('path');
+const { execFileSync } = require('child_process');
 const { logHookExecution, loadHookConfig } = require('./hook-logger');
 
 let input = '';
@@ -29,10 +30,24 @@ process.stdin.on('end', () => {
     // Each check returns { decision, reason } or null (allow)
     const checks = [];
 
-    // --- Check registrations ---
-    // Branch 3 will add: dangerous command blocking (config.blockDangerousCommands)
-    // Branch 5 will add: workflow enforcement (config.enforceWorkflowOrder)
-    // Future hooks register here by pushing check functions to the array
+    // --- Check registrations (config-gated) ---
+
+    // Dangerous command blocking
+    if (config.blockDangerousCommands !== false) {
+      checks.push((cmd, cfg, dir, hookData) => {
+        try {
+          const hookPath = path.join(__dirname, 'check-dangerous-commands.js');
+          const result = execFileSync(process.execPath, [hookPath], {
+            input: JSON.stringify(hookData),
+            encoding: 'utf8',
+            timeout: 3000
+          });
+          const parsed = JSON.parse(result);
+          if (parsed.decision === 'block') return parsed;
+        } catch (e) { /* allow on error */ }
+        return null;
+      });
+    }
 
     // Run all checks — first block wins
     for (const check of checks) {

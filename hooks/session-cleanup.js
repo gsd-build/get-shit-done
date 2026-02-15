@@ -26,14 +26,74 @@ process.stdin.on('end', () => {
       }
     }
 
-    // Detect orphaned .PROGRESS files (from crashed executions)
+    // Detect and recover orphaned .PROGRESS files (from crashed executions)
     try {
       const entries = fs.readdirSync(planningDir);
       const orphaned = entries.filter(e => e.startsWith('.PROGRESS-'));
       if (orphaned.length > 0) {
-        process.stderr.write(`WARNING: Found ${orphaned.length} orphaned .PROGRESS file(s) from crashed execution. Run /gsd:health to investigate.`);
+        const recoveryInfo = [];
+        for (const progressFile of orphaned) {
+          try {
+            const progressData = JSON.parse(fs.readFileSync(path.join(planningDir, progressFile), 'utf8'));
+            const planId = progressFile.replace('.PROGRESS-', '');
+            recoveryInfo.push(`${planId}: task ${progressData.task || '?'}/${progressData.total || '?'}${progressData.commit ? ` (last commit: ${progressData.commit})` : ''}`);
+          } catch (e) {
+            recoveryInfo.push(`${progressFile}: unreadable`);
+          }
+        }
+
+        // Update STATE.md with recovery info if it exists
+        const statePath = path.join(planningDir, 'STATE.md');
+        if (fs.existsSync(statePath)) {
+          try {
+            let stateContent = fs.readFileSync(statePath, 'utf8');
+            const now = new Date().toISOString().replace('T', ' ').replace(/\.\d+Z$/, '');
+            const recoverySection = `\n\n### Recovery Info\n\nOrphaned progress detected (${now}):\n${recoveryInfo.map(r => `- ${r}`).join('\n')}\nRun \`/gsd:resume-work\` or \`/gsd:execute-phase\` to continue.\n`;
+
+            // Append to Session Continuity section or end of file
+            const sessionIdx = stateContent.indexOf('## Session Continuity');
+            if (sessionIdx !== -1) {
+              // Find end of session section
+              const nextSection = stateContent.indexOf('\n## ', sessionIdx + 1);
+              const insertPos = nextSection !== -1 ? nextSection : stateContent.length;
+              stateContent = stateContent.slice(0, insertPos) + recoverySection + stateContent.slice(insertPos);
+            } else {
+              stateContent = stateContent.trimEnd() + recoverySection;
+            }
+            fs.writeFileSync(statePath, stateContent);
+          } catch (e) { /* non-fatal */ }
+        }
+
+        // Clean up orphaned files after recording recovery info
+        for (const progressFile of orphaned) {
+          try { fs.unlinkSync(path.join(planningDir, progressFile)); } catch (e) { }
+        }
+
+        process.stderr.write(`RECOVERED: Found ${orphaned.length} orphaned .PROGRESS file(s). Recovery info written to STATE.md. Progress: ${recoveryInfo.join('; ')}`);
       }
     } catch (e) { }
+
+    // Fix agent-history.json entries stuck at "spawned"
+    try {
+      const historyPath = path.join(planningDir, 'agent-history.json');
+      if (fs.existsSync(historyPath)) {
+        const history = JSON.parse(fs.readFileSync(historyPath, 'utf8'));
+        let fixed = 0;
+        const now = new Date().toISOString();
+        for (const entry of (history.entries || [])) {
+          if (entry.status === 'spawned') {
+            entry.status = 'unknown_completion';
+            entry.completion_timestamp = now;
+            entry.note = 'Status inferred during session cleanup — agent may have completed or crashed';
+            fixed++;
+          }
+        }
+        if (fixed > 0) {
+          fs.writeFileSync(historyPath, JSON.stringify(history, null, 2));
+          process.stderr.write(` Fixed ${fixed} stuck agent-history entries.`);
+        }
+      }
+    } catch (e) { /* non-fatal */ }
 
   } catch (e) { }
   process.exit(0);

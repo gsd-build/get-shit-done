@@ -72,9 +72,19 @@ process.stdin.on('end', () => {
     // Save tracker
     fs.writeFileSync(trackerPath, JSON.stringify(tracker, null, 2));
 
-    // Check thresholds
-    const READ_LIMIT = 15;
-    const CHAR_LIMIT = 30000;
+    // Check thresholds (configurable via config.thresholds)
+    let READ_LIMIT = 15;
+    let CHAR_LIMIT = 30000;
+    try {
+      const configPath = path.join(cwd, '.planning', 'config.json');
+      if (fs.existsSync(configPath)) {
+        const config = JSON.parse(fs.readFileSync(configPath, 'utf8'));
+        if (config.thresholds) {
+          if (config.thresholds.read_limit) READ_LIMIT = config.thresholds.read_limit;
+          if (config.thresholds.char_limit) CHAR_LIMIT = config.thresholds.char_limit;
+        }
+      }
+    } catch (e) { /* use defaults */ }
     if (tracker.reads >= READ_LIMIT || tracker.chars >= CHAR_LIMIT) {
       const warning = `Context budget warning: ${tracker.reads} reads, ${Math.round(tracker.chars / 1000)}k chars, ${tracker.files.length} unique files. Consider delegating to Task() subagent to protect orchestrator context.`;
       process.stderr.write(warning);

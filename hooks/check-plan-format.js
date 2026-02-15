@@ -17,6 +17,7 @@
 
 const fs = require('fs');
 const path = require('path');
+const { logHookExecution, loadHookConfig } = require('./hook-logger');
 
 let input = '';
 process.stdin.setEncoding('utf8');
@@ -92,7 +93,9 @@ process.stdin.on('end', () => {
     }
 
     // Log event
-    logEvent(cwd, isPlan ? 'plan' : 'summary', basename, warnings);
+    logHookExecution(cwd, 'check-plan-format', 'PostToolUse',
+      warnings.length > 0 ? 'warn' : 'allow',
+      { fileType: isPlan ? 'plan' : 'summary', file: basename, warnings: warnings.length > 0 ? warnings : undefined });
 
   } catch (e) {
     // Silent fail — never block on hook bugs
@@ -163,36 +166,4 @@ function validateSummary(frontmatter, basename, warnings) {
   }
 }
 
-function loadHookConfig(cwd) {
-  try {
-    const configPath = path.join(cwd, '.planning', 'config.json');
-    if (fs.existsSync(configPath)) {
-      const config = JSON.parse(fs.readFileSync(configPath, 'utf8'));
-      return config.hooks || {};
-    }
-  } catch (e) { /* ignore parse errors */ }
-  return {};
-}
-
-function logEvent(cwd, fileType, filename, warnings) {
-  try {
-    const logsDir = path.join(cwd, '.planning', 'logs');
-    const logFile = path.join(logsDir, 'hooks.jsonl');
-
-    if (!fs.existsSync(logsDir)) {
-      fs.mkdirSync(logsDir, { recursive: true });
-    }
-
-    const entry = {
-      timestamp: new Date().toISOString(),
-      hook: 'check-plan-format',
-      event: 'PostToolUse',
-      decision: warnings.length > 0 ? 'warn' : 'allow',
-      fileType,
-      file: filename,
-      warnings: warnings.length > 0 ? warnings : undefined,
-    };
-
-    fs.appendFileSync(logFile, JSON.stringify(entry) + '\n');
-  } catch (e) { /* ignore logging errors */ }
-}
+// loadHookConfig and logEvent replaced by shared imports from hook-logger.js
