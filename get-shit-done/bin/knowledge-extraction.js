@@ -110,8 +110,100 @@ function extractFromResponse(responseText) {
   return matches;
 }
 
+// Technical signal detection
+const TECHNICAL_SIGNALS = [
+  /`[^`]+`/,                    // Backticks (code references)
+  /\/[a-zA-Z0-9_\-./]+/,        // Paths (slashes)
+  /\berror\b/i,                 // Error mentions
+  /\b(?:npm|git|node|bash|python|rust|javascript|typescript|react|vue|angular)\b/i,
+  /\b(?:API|HTTP|JSON|SQL|CLI|URL|HTML|CSS)\b/,
+  /\b(?:function|class|const|let|var|import|export|require|module)\b/,
+  /\b(?:async|await|promise|callback)\b/i,
+  /\b(?:database|schema|model|table|query)\b/i,
+  /\b(?:file|directory|path|folder)\b/i,
+  /\.[a-z]{2,4}\b/,             // File extensions (.js, .ts, .md)
+  /[A-Z][a-z]+[A-Z]/,           // CamelCase identifiers
+  /[a-z]+_[a-z]+/,              // snake_case identifiers
+  /\b[A-Z]{2,}\b/               // All-caps technical terms (AUTOINCREMENT, WAL, FTS5, etc)
+];
+
+const GENERIC_PHRASES = [
+  'sounds good', 'looks good', 'that works', 'makes sense',
+  'got it', 'understood', 'okay', 'alright', 'sure',
+  'yes', 'no', 'maybe', 'I think so', 'I agree',
+  'thank you', 'thanks', 'great', 'perfect', 'awesome'
+];
+
+/**
+ * Check if content passes quality gates
+ * @param {string} content - Extracted content to check
+ * @returns {Object} { passed: boolean, reason?: string, threshold?: number, actual?: number }
+ */
+function passesQualityGate(content) {
+  // Minimum length check (HOOK-04: 20 chars)
+  if (!content || content.length < 20) {
+    return { passed: false, reason: 'too_short', threshold: 20, actual: content?.length || 0 };
+  }
+
+  // Avoid generic phrases
+  const lowerContent = content.toLowerCase();
+  const isGeneric = GENERIC_PHRASES.some(phrase =>
+    lowerContent.includes(phrase) && content.length < 50
+  );
+  if (isGeneric) {
+    return { passed: false, reason: 'generic_phrase' };
+  }
+
+  // Technical signal detection
+  const hasTechnicalSignal = TECHNICAL_SIGNALS.some(regex => regex.test(content));
+  if (!hasTechnicalSignal) {
+    return { passed: false, reason: 'no_technical_signal' };
+  }
+
+  return { passed: true };
+}
+
+/**
+ * Filter extractions with quality gates
+ * @param {Array} extractions - Array of extraction objects
+ * @param {Object} options - Options { debug: boolean }
+ * @returns {Array} Filtered extractions
+ */
+function filterWithQualityGates(extractions, options = {}) {
+  const { debug = false } = options;
+
+  return extractions.filter(ext => {
+    const check = passesQualityGate(ext.content);
+
+    if (!check.passed) {
+      if (debug || process.env.GSD_DEBUG) {
+        console.log(`[extraction] Filtered: "${ext.content.slice(0, 40)}..." - ${check.reason}`);
+      }
+      return false;
+    }
+
+    return true;
+  });
+}
+
+/**
+ * Combined extraction with filtering
+ * @param {string} responseText - Claude response text
+ * @param {Object} options - Options { debug: boolean }
+ * @returns {Array} Filtered extractions
+ */
+function extractAndFilter(responseText, options = {}) {
+  const raw = extractFromResponse(responseText);
+  return filterWithQualityGates(raw, options);
+}
+
 module.exports = {
   DECISION_PATTERNS,
   LESSON_PATTERNS,
-  extractFromResponse
+  TECHNICAL_SIGNALS,
+  GENERIC_PHRASES,
+  extractFromResponse,
+  passesQualityGate,
+  filterWithQualityGates,
+  extractAndFilter
 };
