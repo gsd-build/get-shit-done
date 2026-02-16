@@ -1,5 +1,5 @@
 ---
-status: retesting
+status: testing
 phase: 08-notifications-and-observability
 source: [08-01-SUMMARY.md, 08-02-SUMMARY.md, 08-03-SUMMARY.md, 08-04-SUMMARY.md, 08-05-SUMMARY.md, 08-06-SUMMARY.md, 08-07-SUMMARY.md]
 started: 2026-02-16T19:00:00Z
@@ -8,7 +8,11 @@ updated: 2026-02-16T19:10:00Z
 
 ## Current Test
 
-[testing complete - stopped early due to foundational issues]
+number: 4
+name: Status Button
+expected: |
+  Click "📊 Status" button in Telegram. Bot responds with current GSD project status showing phase progress and last update time.
+awaiting: user response
 
 ## Tests
 
@@ -22,7 +26,9 @@ result: pass
 
 ### 3. Telegram Bot Welcome Menu
 expected: Open Telegram app, send `/start` to bot. Receive welcome message with 3 inline keyboard buttons: "📊 Status", "❓ Pending Questions", "✨ New Requirements". Buttons are clickable.
-result: [pending]
+result: issue
+reported: "I see buttons, they are clickable, all return popup message \"Question not found or already answered\""
+severity: major
 
 ### 4. Status Button
 expected: Click "📊 Status" button in Telegram. Bot responds with current GSD project status showing phase progress and last update time.
@@ -88,8 +94,8 @@ result: [pending]
 
 total: 18
 passed: 2
-issues: 0
-pending: 16
+issues: 1
+pending: 15
 skipped: 0
 
 ## Gaps (Fixed)
@@ -125,3 +131,12 @@ skipped: 0
       issue: "Required whisper-node at top level, causing cwd corruption"
   debug_session: ".planning/debug/telegram-session-logs-wrong-dir.md"
   retest_result: "PASS - Session logs now created in correct directory: .planning/telegram-sessions/"
+
+- truth: "Menu buttons route to their respective handlers (Status, Pending Questions, New Requirements)"
+  status: failed
+  reason: "User reported: I see buttons, they are clickable, all return popup message \"Question not found or already answered\""
+  severity: major
+  test: 3
+  root_cause: ""
+  artifacts: []
+  missing: []
