@@ -81,11 +81,11 @@ Plans:
   1. User can trace any action through its milestones to its source declaration (answering "why am I doing this?")
   2. System displays an ASCII/text-based visualization of the full derivation structure
   3. Actions are ordered by causal contribution to declarations, not arbitrary sequence
-**Plans**: TBD
+**Plans**: 2 plans
 
 Plans:
-- [ ] 03-01: TBD
-- [ ] 03-02: TBD
+- [ ] 03-01-PLAN.md -- Shared buildDagFromDisk, trace command (why-chains), prioritize command (dependency-weight ranking)
+- [ ] 03-02-PLAN.md -- Visualize command (ASCII tree), slash commands (/declare:trace, /declare:visualize, /declare:prioritize)
 
 ### Phase 4: Execution Pipeline
 **Goal**: The system executes actions respecting topological order, with parallel scheduling and upward verification
@@ -141,7 +141,7 @@ Phases execute in numeric order: 1 → 2 → 3 → 4 → 5 → 6
 | 1. Foundation | 3/3 | Complete | 2026-02-15 |
 | 2. Future Declaration + Backward Derivation | 2/2 | Complete | 2026-02-15 |
 | 02.1. Artifact Separation + Command Split | 3/3 | Complete | 2026-02-16 |
-| 3. Traceability + Navigation | 0/2 | Not started | - |
+| 3. Traceability + Navigation | 0/2 | Planned | - |
 | 4. Execution Pipeline | 0/2 | Not started | - |
 | 5. Integrity System | 0/2 | Not started | - |
 | 6. Alignment + Performance | 0/2 | Not started | - |
