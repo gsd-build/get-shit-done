@@ -1,4 +1,5 @@
-const whisper = require('whisper-node');
+// Lazy-load whisper-node to avoid cwd corruption at module load time
+// (whisper-node changes process.cwd() when imported, breaking path resolution)
 const ffmpeg = require('fluent-ffmpeg');
 const fs = require('fs').promises;
 const https = require('https');
@@ -48,6 +49,9 @@ async function convertToWav(inputPath, outputPath) {
  * @returns {string} - Transcribed text
  */
 async function transcribeAudio(audioUrl) {
+  // Lazy-load whisper-node here to avoid cwd corruption at module load time
+  const whisper = require('whisper-node');
+
   const tempDir = os.tmpdir();
   const timestamp = Date.now();
   const tempOga = path.join(tempDir, `telegram_${timestamp}.oga`);
