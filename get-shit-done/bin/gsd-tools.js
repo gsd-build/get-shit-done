@@ -3739,6 +3739,62 @@ async function cmdTelegram(args, raw) {
   }
 }
 
+// ─── Observability Commands ──────────────────────────────────────────────────
+
+async function cmdObservability(args, raw) {
+  const subcommand = args[0];
+
+  switch (subcommand) {
+    case 'init': {
+      const obs = require('./observability.js');
+      obs.initTracing({ serviceName: 'gsd-cli' });
+      break;
+    }
+
+    case 'status': {
+      const obs = require('./observability.js');
+      output({
+        enabled: obs.isTracingEnabled(),
+        endpoint: process.env.OTEL_EXPORTER_OTLP_ENDPOINT || 'not configured'
+      }, raw);
+      break;
+    }
+
+    case 'cost': {
+      const llm = require('./llm-metrics.js');
+      const model = args[1] || 'opus';
+      const input = parseInt(args[2]) || 0;
+      const output_tokens = parseInt(args[3]) || 0;
+      const cachedIdx = args.indexOf('--cached');
+      const cached = cachedIdx > -1 ? parseInt(args[cachedIdx + 1]) : 0;
+
+      const cost = llm.calculateCost(model, {
+        input_tokens: input,
+        output_tokens: output_tokens,
+        cache_read_input_tokens: cached
+      });
+
+      output({
+        model,
+        input_tokens: input,
+        output_tokens: output_tokens,
+        cached_tokens: cached,
+        ...cost
+      }, raw);
+      break;
+    }
+
+    case 'shutdown': {
+      const obs = require('./observability.js');
+      await obs.shutdownTracing();
+      break;
+    }
+
+    default:
+      error('Usage: observability init|status|cost|shutdown');
+  }
+}
+
 // ─── Parallel Execution ───────────────────────────────────────────────────────
 
 async function cmdParallel(cwd, args, raw) {
@@ -6631,7 +6687,7 @@ async function main() {
   const cwd = process.cwd();
 
   if (!command) {
-    error('Usage: gsd-tools <command> [args] [--raw]\nCommands: state, resolve-model, find-phase, commit, verify-summary, verify, frontmatter, template, generate-slug, current-timestamp, list-todos, verify-path-exists, config-ensure-section, telegram, init');
+    error('Usage: gsd-tools <command> [args] [--raw]\nCommands: state, resolve-model, find-phase, commit, verify-summary, verify, frontmatter, template, generate-slug, current-timestamp, list-todos, verify-path-exists, config-ensure-section, telegram, observability, init');
   }
 
   switch (command) {
@@ -7262,6 +7318,11 @@ async function main() {
 
     case 'telegram': {
       await cmdTelegram(args.slice(1), raw);
+      break;
+    }
+
+    case 'observability': {
+      await cmdObservability(args.slice(1), raw);
       break;
     }
 
