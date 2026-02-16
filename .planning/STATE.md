@@ -10,9 +10,9 @@ See: .planning/PROJECT.md (updated 2026-02-15)
 ## Current Position
 
 Phase: 9 of 12 (Hook-based Documentation Compression)
-Plan: 04 of 04
+Plan: 05 of 05
 Status: Complete
-Last activity: 2026-02-16 — Completed plan 09-04 (Circuit Breaker Safety and CLI Controls)
+Last activity: 2026-02-16 — Completed plan 09-05 (Token Budget Monitoring with Compression Integration)
 
 Progress: [████████████████████████████████████] 96%
 
@@ -58,6 +58,7 @@ Progress: [███████████████████████
 | 09    | 02   | 5 min    | 3     | 2     |
 | 09    | 03   | 5 min    | 4     | 3     |
 | 09    | 04   | 5 min    | 3     | 3     |
+| 09    | 05   | 3 min    | 4     | 2     |
 
 ## Accumulated Context
 
@@ -177,6 +178,10 @@ Recent decisions affecting current work:
 - [Phase 09-04]: 5-minute auto-reset timeout for circuit recovery
 - [Phase 09-04]: Half-open state allows one test request before full recovery
 - [Phase 09-04]: Separate state file (compression-state.json) from config for runtime state
+- [Phase 09-05]: At 80% utilization, reserve() includes exact command to enable compression
+- [Phase 09-05]: Existing token_budget.json state preserved on load (not reset)
+- [Phase 09-05]: Five graduated alert thresholds (50/65/80/90/95%) for progressive warnings
+- [Phase 09-05]: Recommendation includes full command path for immediate execution
 - [Phase 08]: Use __dirname for dotenv path resolution (stable, script-relative)
 - [Phase 08]: Capture PROJECT_ROOT at module load time (before any cwd changes)
 - [Phase 08]: Replace process.cwd() with PROJECT_ROOT in session logger paths
@@ -191,6 +196,6 @@ None yet.
 
 ## Session Continuity
 
-Last session: 2026-02-16T19:18:47Z (plan execution)
-Stopped at: Completed 09-04-PLAN.md (Circuit Breaker Safety and CLI Controls) - Phase 9 complete
+Last session: 2026-02-16T19:48:13Z (plan execution)
+Stopped at: Completed 09-05-PLAN.md (Token Budget Monitoring with Compression Integration) - Phase 9 complete
 Resume file: None
