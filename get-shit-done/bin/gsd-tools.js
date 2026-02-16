@@ -144,6 +144,7 @@ const fs = require('fs');
 const path = require('path');
 const { execSync } = require('child_process');
 const { EVENT_TYPES, initLog, appendEvent, getHistory, getCurrentPhase, getLastCheckpoint, getExecutionStats, needsResume, getResumeContext, markResumed, getPhaseTimeline } = require('./execution-log.js');
+const { parseRoadmap, buildDAG, getExecutionOrder, detectParallelOpportunities } = require('./roadmap-parser.js');
 
 // ─── Model Profile Table ─────────────────────────────────────────────────────
 
@@ -2693,6 +2694,191 @@ function cmdPendingReplacements(cwd, args, raw) {
   }
 }
 
+// ─── Checkpoint Operations ───────────────────────────────────────────────────
+
+function cmdCheckpoint(cwd, args, raw) {
+  const subcommand = args[0];
+
+  if (!subcommand) {
+    error('checkpoint: subcommand required (create|search|latest|cleanup)');
+  }
+
+  const checkpoint = require('./knowledge-checkpoint.js');
+
+  switch (subcommand) {
+    case 'create': {
+      // Parse args
+      const phase = parseInt(args[args.indexOf('--phase') + 1]);
+      const planId = args.includes('--plan-id') ? args[args.indexOf('--plan-id') + 1] : null;
+      const taskTitle = args.includes('--task') ? args[args.indexOf('--task') + 1] : null;
+      const planStr = args.includes('--plan') ? args[args.indexOf('--plan') + 1] : '';
+      const completedStr = args.includes('--completed') ? args[args.indexOf('--completed') + 1] : '';
+      const current = args.includes('--current') ? args[args.indexOf('--current') + 1] : null;
+      const keyContext = args.includes('--key-context') ? args[args.indexOf('--key-context') + 1] : '';
+      const filesStr = args.includes('--files') ? args[args.indexOf('--files') + 1] : '';
+      const decisionsStr = args.includes('--decisions') ? args[args.indexOf('--decisions') + 1] : '';
+      const nextStepsStr = args.includes('--next-steps') ? args[args.indexOf('--next-steps') + 1] : '';
+
+      if (isNaN(phase) || !taskTitle) {
+        error('checkpoint create: --phase and --task are required');
+      }
+
+      // Parse comma-separated arrays
+      const plan = planStr ? planStr.split(',').map(s => s.trim()).filter(Boolean) : [];
+      const completed = completedStr ? completedStr.split(',').map(s => s.trim()).filter(Boolean) : [];
+      const files = filesStr ? filesStr.split(',').map(s => s.trim()).filter(Boolean) : [];
+      const decisions = decisionsStr ? decisionsStr.split(',').map(s => s.trim()).filter(Boolean) : [];
+      const nextSteps = nextStepsStr ? nextStepsStr.split(',').map(s => s.trim()).filter(Boolean) : [];
+
+      // Calculate remaining steps
+      const remaining = plan.filter(step => !completed.includes(step) && step !== current);
+
+      const checkpointData = {
+        task_title: taskTitle,
+        plan,
+        progress: {
+          completed,
+          current: current || (plan.length > 0 ? plan[0] : 'not started'),
+          remaining
+        },
+        files_touched: files,
+        decisions,
+        key_context: keyContext,
+        next_steps: nextSteps,
+        phase,
+        plan_id: planId
+      };
+
+      checkpoint.createCheckpoint(checkpointData)
+        .then(result => {
+          output(result, raw);
+        })
+        .catch(err => {
+          error(`Failed to create checkpoint: ${err.message}`);
+        });
+      break;
+    }
+
+    case 'search': {
+      const query = args.includes('--query') ? args[args.indexOf('--query') + 1] : '';
+      const phase = args.includes('--phase') ? parseInt(args[args.indexOf('--phase') + 1]) : undefined;
+      const limit = args.includes('--limit') ? parseInt(args[args.indexOf('--limit') + 1]) : 10;
+
+      if (!query && phase === undefined) {
+        error('checkpoint search: --query or --phase required');
+      }
+
+      const searchQuery = query || `phase ${phase}`;
+
+      checkpoint.searchCheckpoints(searchQuery, { phase, limit })
+        .then(results => {
+          if (raw) {
+            output({ results }, raw);
+          } else {
+            console.log(`\n=== Checkpoint Search Results (${results.length}) ===\n`);
+            for (const result of results) {
+              const cp = result.checkpoint;
+              console.log(`ID: ${result.id}`);
+              console.log(`Task: ${cp.task_title}`);
+              console.log(`Phase: ${cp.phase} - Plan: ${cp.plan_id || 'N/A'}`);
+              console.log(`Progress: ${cp.progress.completed.length}/${cp.plan.length}`);
+              console.log(`Current: ${cp.progress.current}`);
+              console.log(`Similarity: ${(result.similarity * 100).toFixed(1)}%`);
+              console.log('---');
+            }
+          }
+        })
+        .catch(err => {
+          error(`Failed to search checkpoints: ${err.message}`);
+        });
+      break;
+    }
+
+    case 'latest': {
+      const phase = parseInt(args[args.indexOf('--phase') + 1]);
+      const planId = args.includes('--plan-id') ? args[args.indexOf('--plan-id') + 1] : null;
+
+      if (isNaN(phase)) {
+        error('checkpoint latest: --phase required');
+      }
+
+      checkpoint.getLatestCheckpoint(phase, planId)
+        .then(result => {
+          if (!result) {
+            if (raw) {
+              output({ found: false }, raw);
+            } else {
+              console.log('No checkpoint found.');
+            }
+            return;
+          }
+
+          if (raw) {
+            output({ found: true, checkpoint: result }, raw);
+          } else {
+            const cp = result.checkpoint;
+            console.log('\n=== Latest Checkpoint ===\n');
+            console.log(`ID: ${result.id}`);
+            console.log(`Task: ${cp.task_title}`);
+            console.log(`Phase: ${cp.phase} - Plan: ${cp.plan_id || 'N/A'}`);
+            console.log(`Progress: ${cp.progress.completed.length}/${cp.plan.length}`);
+            console.log(`Current: ${cp.progress.current}`);
+            console.log(`Created: ${new Date(result.created_at).toISOString()}`);
+            console.log(`\nNext Steps:`);
+            for (const step of cp.next_steps || []) {
+              console.log(`  - ${step}`);
+            }
+          }
+        })
+        .catch(err => {
+          error(`Failed to get latest checkpoint: ${err.message}`);
+        });
+      break;
+    }
+
+    case 'cleanup': {
+      const phase = args.includes('--phase') ? parseInt(args[args.indexOf('--phase') + 1]) : undefined;
+      const all = args.includes('--all');
+      const olderThanStr = args.includes('--older-than') ? args[args.indexOf('--older-than') + 1] : null;
+
+      let olderThan = null;
+      if (olderThanStr) {
+        // Parse duration (e.g., "24h", "7d")
+        const match = olderThanStr.match(/^(\d+)(h|d)$/);
+        if (!match) {
+          error('checkpoint cleanup: --older-than must be in format "24h" or "7d"');
+        }
+        const value = parseInt(match[1]);
+        const unit = match[2];
+        const hours = unit === 'h' ? value : value * 24;
+        olderThan = Date.now() - (hours * 60 * 60 * 1000);
+      }
+
+      if (!all && phase === undefined && !olderThan) {
+        error('checkpoint cleanup: specify --phase, --older-than, or --all');
+      }
+
+      const options = {
+        phase: all ? undefined : phase,
+        older_than: olderThan,
+        completed_only: false
+      };
+
+      checkpoint.cleanupCheckpoints(options)
+        .then(result => {
+          output(result, raw);
+        })
+        .catch(err => {
+          error(`Failed to cleanup checkpoints: ${err.message}`);
+        });
+      break;
+    }
+
+    default:
+      error(`Unknown checkpoint subcommand: ${subcommand}`);
+  }
+}
+
 // ─── Execution Log ───────────────────────────────────────────────────────────
 
 function cmdExecutionLog(cwd, args, raw) {
@@ -3340,6 +3526,169 @@ function cmdRoadmapAnalyze(cwd, raw) {
     progress_percent: totalPlans > 0 ? Math.round((totalSummaries / totalPlans) * 100) : 0,
     current_phase: currentPhase ? currentPhase.number : null,
     next_phase: nextPhase ? nextPhase.number : null,
+  };
+
+  output(result, raw);
+}
+
+// ─── Roadmap Parse ────────────────────────────────────────────────────────────
+
+async function cmdRoadmapParse(cwd, raw) {
+  const roadmapPath = path.join(cwd, '.planning', 'ROADMAP.md');
+  const result = await parseRoadmap(roadmapPath);
+  output(result, raw);
+}
+
+// ─── Roadmap DAG ──────────────────────────────────────────────────────────────
+
+async function cmdRoadmapDAG(cwd, raw) {
+  const roadmapPath = path.join(cwd, '.planning', 'ROADMAP.md');
+  const parsed = await parseRoadmap(roadmapPath);
+
+  if (parsed.error) {
+    output({ error: parsed.error }, raw);
+    return;
+  }
+
+  const { graph, inDegree } = buildDAG(parsed.phases);
+  const executionResult = getExecutionOrder(parsed.phases);
+  const parallelOpportunities = detectParallelOpportunities(graph, executionResult.execution_order);
+
+  const result = {
+    execution_order: executionResult.execution_order,
+    has_cycle: executionResult.has_cycle,
+    cycle_phases: executionResult.cycle_phases,
+    parallel_opportunities: parallelOpportunities
+  };
+
+  output(result, raw);
+}
+
+// ─── Roadmap Status ───────────────────────────────────────────────────────────
+
+async function cmdRoadmapStatus(cwd, phaseArg, raw) {
+  const roadmapPath = path.join(cwd, '.planning', 'ROADMAP.md');
+  const parsed = await parseRoadmap(roadmapPath);
+
+  if (parsed.error) {
+    output({ error: parsed.error }, raw);
+    return;
+  }
+
+  // Update phase statuses based on disk
+  const phasesDir = path.join(cwd, '.planning', 'phases');
+
+  for (const phase of parsed.phases) {
+    if (!fs.existsSync(phasesDir)) {
+      phase.status = 'pending';
+      continue;
+    }
+
+    // Check for phase directory
+    const phasePattern = new RegExp(`^${phase.number.toString().padStart(2, '0')}-`);
+    const dirs = fs.readdirSync(phasesDir).filter(d => phasePattern.test(d));
+
+    if (dirs.length === 0) {
+      phase.status = 'pending';
+      continue;
+    }
+
+    const phaseDir = path.join(phasesDir, dirs[0]);
+    const files = fs.readdirSync(phaseDir);
+
+    // Check VERIFICATION.md
+    const verificationFile = `${phase.number.toString().padStart(2, '0')}-VERIFICATION.md`;
+    if (files.includes(verificationFile)) {
+      const verificationPath = path.join(phaseDir, verificationFile);
+      const content = fs.readFileSync(verificationPath, 'utf-8');
+      if (content.match(/status:\s*passed/i)) {
+        phase.status = 'complete';
+        continue;
+      }
+    }
+
+    // Check for SUMMARYs
+    const summaries = files.filter(f => f.endsWith('-SUMMARY.md'));
+    const plans = files.filter(f => f.endsWith('-PLAN.md'));
+
+    if (summaries.length > 0) {
+      phase.status = 'in_progress';
+    } else if (plans.length > 0) {
+      phase.status = 'in_progress';
+    } else {
+      phase.status = 'pending';
+    }
+  }
+
+  // If phase arg provided, return single phase status
+  if (phaseArg) {
+    const targetPhase = parsed.phases.find(p => p.number === parseInt(phaseArg));
+    if (targetPhase) {
+      output({ phase: targetPhase.number, status: targetPhase.status }, raw, targetPhase.status);
+    } else {
+      output({ error: `Phase ${phaseArg} not found` }, raw);
+    }
+    return;
+  }
+
+  // Return all phases with statuses
+  const result = {
+    phases: parsed.phases.map(p => ({
+      number: p.number,
+      name: p.name,
+      status: p.status
+    }))
+  };
+
+  output(result, raw);
+}
+
+// ─── Roadmap Validate ─────────────────────────────────────────────────────────
+
+async function cmdRoadmapValidate(cwd, raw) {
+  const roadmapPath = path.join(cwd, '.planning', 'ROADMAP.md');
+  const parsed = await parseRoadmap(roadmapPath);
+
+  if (parsed.error) {
+    output({ valid: false, errors: [parsed.error], warnings: [] }, raw);
+    return;
+  }
+
+  const errors = [];
+  const warnings = [];
+
+  // Validate all phases have Goal
+  for (const phase of parsed.phases) {
+    if (!phase.goal || phase.goal.length === 0) {
+      errors.push(`Phase ${phase.number}: Missing Goal`);
+    }
+
+    // Validate dependencies reference valid phases
+    for (const depNum of phase.depends_on) {
+      const dep = parsed.phases.find(p => p.number === depNum);
+      if (!dep) {
+        errors.push(`Phase ${phase.number}: Dependency Phase ${depNum} not found`);
+      }
+    }
+
+    // Validate requirements IDs format (e.g., REQ-01, AUTO-01)
+    for (const req of phase.requirements) {
+      if (!req.match(/^[A-Z]+-\d+$/)) {
+        warnings.push(`Phase ${phase.number}: Requirement "${req}" doesn't match standard format (XXX-NN)`);
+      }
+    }
+  }
+
+  // Check for circular dependencies
+  const executionResult = getExecutionOrder(parsed.phases);
+  if (executionResult.has_cycle) {
+    errors.push(`Circular dependency detected in phases: ${executionResult.cycle_phases.join(', ')}`);
+  }
+
+  const result = {
+    valid: errors.length === 0,
+    errors,
+    warnings
   };
 
   output(result, raw);
@@ -5249,8 +5598,16 @@ async function main() {
         cmdRoadmapGetPhase(cwd, args[2], raw);
       } else if (subcommand === 'analyze') {
         cmdRoadmapAnalyze(cwd, raw);
+      } else if (subcommand === 'parse') {
+        cmdRoadmapParse(cwd, raw);
+      } else if (subcommand === 'dag') {
+        cmdRoadmapDAG(cwd, raw);
+      } else if (subcommand === 'status') {
+        cmdRoadmapStatus(cwd, args[2], raw);
+      } else if (subcommand === 'validate') {
+        cmdRoadmapValidate(cwd, raw);
       } else {
-        error('Unknown roadmap subcommand. Available: get-phase, analyze');
+        error('Unknown roadmap subcommand. Available: get-phase, analyze, parse, dag, status, validate');
       }
       break;
     }
@@ -5608,6 +5965,11 @@ async function main() {
 
     case 'pending-replacements': {
       cmdPendingReplacements(cwd, args.slice(1), raw);
+      break;
+    }
+
+    case 'checkpoint': {
+      cmdCheckpoint(cwd, args.slice(1), raw);
       break;
     }
 
