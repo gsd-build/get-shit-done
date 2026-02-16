@@ -64,8 +64,79 @@ async function isEmbeddingsAvailable() {
   }
 }
 
+/**
+ * Generate embeddings for multiple texts in batches
+ * @param {string[]} texts - Array of texts to embed
+ * @returns {Promise<Array<Float32Array|null>>} Array of 512-dim embeddings
+ */
+async function generateEmbeddingBatch(texts) {
+  if (!texts || texts.length === 0) return [];
+
+  try {
+    const pipe = await initEmbeddings();
+    const results = [];
+
+    // Process in batches of 10 to avoid memory issues
+    const batchSize = 10;
+    for (let i = 0; i < texts.length; i += batchSize) {
+      const batch = texts.slice(i, i + batchSize);
+
+      for (const text of batch) {
+        const output = await pipe(text, {
+          pooling: 'mean',
+          normalize: true
+        });
+
+        let embedding = output.data;
+        if (embedding.length > 512) {
+          embedding = new Float32Array(embedding.slice(0, 512));
+        }
+        results.push(embedding);
+      }
+    }
+
+    return results;
+  } catch (err) {
+    console.warn('Batch embedding failed:', err.message);
+    return texts.map(() => null);
+  }
+}
+
+// Simple in-memory cache for repeated queries
+const embeddingCache = new Map();
+const CACHE_MAX_SIZE = 1000;
+
+/**
+ * Generate embedding with caching for repeated text
+ * @param {string} text - Text to embed
+ * @returns {Promise<Float32Array|null>} Cached or newly generated 512-dim embedding
+ */
+async function generateEmbeddingCached(text) {
+  if (embeddingCache.has(text)) {
+    return embeddingCache.get(text);
+  }
+
+  const embedding = await generateEmbedding(text);
+
+  if (embedding && embeddingCache.size < CACHE_MAX_SIZE) {
+    embeddingCache.set(text, embedding);
+  }
+
+  return embedding;
+}
+
+/**
+ * Clear the embedding cache
+ */
+function clearEmbeddingCache() {
+  embeddingCache.clear();
+}
+
 module.exports = {
   generateEmbedding,
   initEmbeddings,
-  isEmbeddingsAvailable
+  isEmbeddingsAvailable,
+  generateEmbeddingBatch,
+  generateEmbeddingCached,
+  clearEmbeddingCache
 };
