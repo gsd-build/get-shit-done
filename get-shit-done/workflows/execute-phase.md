@@ -152,10 +152,10 @@ Execute each wave in sequence. Within a wave: parallel if `PARALLELIZATION=true`
    If `deep_debug_on_failure` is true:
    ```
    Task(
-     prompt="Debug failing plan: {plan_id}\n\nSUMMARY.md self-check FAILED. Investigate root cause and fix.",
+     prompt="Read ~/.claude/commands/custom/deep-debug.md for protocol.\n\nDebug failing plan: {plan_id}\n\nSUMMARY.md self-check FAILED. Investigate root cause and fix.",
      subagent_type="general-purpose",
      model="{executor_model}",
-     description="Deep debug {plan_id}"
+     description="deep-debug {plan_id}"
    )
    ```
    After debug: re-run spot-check. If still fails: route to failure handler.
