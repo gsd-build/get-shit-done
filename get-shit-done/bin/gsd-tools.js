@@ -2652,7 +2652,7 @@ function cmdPrincipleHistory(cwd, args, raw) {
       console.log('No feedback recorded.');
     } else {
       for (const event of history) {
-        console.log(`Type: ${event.feedback_type}`);
+        console.log(`Type: ${event.event_type}`);
         console.log(`Date: ${new Date(event.created_at).toISOString()}`);
         console.log(`Severity: ${event.severity || 'N/A'}`);
         console.log(`Reason: ${event.reason || 'N/A'}`);
