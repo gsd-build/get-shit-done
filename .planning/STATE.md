@@ -186,6 +186,10 @@ Recent decisions affecting current work:
 - [Phase 08]: Capture PROJECT_ROOT at module load time (before any cwd changes)
 - [Phase 08]: Replace process.cwd() with PROJECT_ROOT in session logger paths
 
+### Roadmap Evolution
+
+- Phase 08.1 inserted after Phase 08: Telegram MCP Server - Replace standalone bot with MCP integration using subscription tokens (URGENT)
+
 ### Pending Todos
 
 None yet.

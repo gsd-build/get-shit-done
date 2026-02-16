@@ -243,6 +243,15 @@ Phase 7 (Autonomous Optimization) --> Phase 8 (Notifications & Observability)
 | 7. Autonomous Execution Optimization | 6 | Complete | 2026-02-16 |
 | 8. Notifications & Observability | 7 | Complete | 2026-02-16 |
 
+### Phase 08.1: Telegram MCP Server - Replace standalone bot with MCP integration using subscription tokens (INSERTED)
+
+**Goal:** [Urgent work - to be planned]
+**Depends on:** Phase 8
+**Plans:** 0 plans
+
+Plans:
+- [ ] TBD (run /gsd:plan-phase 08.1 to break down)
+
 ### Phase 9: Hook-based documentation compression - Optimize context injection by extracting AI-friendly headers from docs and injecting only summaries with absolute links instead of full content
 
 **Goal:** Documentation files (RESEARCH.md, PLAN.md, STATE.md) are automatically compressed via PreToolUse hooks, achieving 60-70% token reduction while preserving access to full content through absolute file links
