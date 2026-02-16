@@ -69,23 +69,23 @@ Which phases cover which requirements. Updated during roadmap creation.
 
 | Requirement | Phase | Status |
 |-------------|-------|--------|
-| INFRA-01 | — | Pending |
-| INFRA-02 | — | Pending |
-| CORE-01 | — | Pending |
-| CORE-02 | — | Pending |
-| CORE-03 | — | Pending |
-| CORE-04 | — | Pending |
-| CFG-01 | — | Pending |
-| UX-01 | — | Pending |
-| UX-02 | — | Pending |
-| MULTI-01 | — | Pending |
-| MULTI-02 | — | Pending |
+| INFRA-01 | Phase 6 | Pending |
+| INFRA-02 | Phase 6 | Pending |
+| CORE-01 | Phase 8 | Pending |
+| CORE-02 | Phase 8 | Pending |
+| CORE-03 | Phase 6 | Pending |
+| CORE-04 | Phase 8 | Pending |
+| CFG-01 | Phase 7 | Pending |
+| UX-01 | Phase 8 | Pending |
+| UX-02 | Phase 8 | Pending |
+| MULTI-01 | Phase 9 | Pending |
+| MULTI-02 | Phase 9 | Pending |
 
 **Coverage:**
 - v2.2 requirements: 11 total
-- Mapped to phases: 0
-- Unmapped: 11 ⚠️
+- Mapped to phases: 11
+- Unmapped: 0
 
 ---
 *Requirements defined: 2026-02-16*
-*Last updated: 2026-02-16 after initial definition*
+*Last updated: 2026-02-16 after roadmap creation*
