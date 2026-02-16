@@ -4009,6 +4009,117 @@ async function cmdDashboard(args) {
   }
 }
 
+// ─── Health Check ─────────────────────────────────────────────────────────────
+
+async function cmdHealth(args) {
+  console.log('GSD Phase 8 Health Check\n');
+  console.log('='.repeat(50));
+
+  const checks = [];
+
+  // Check 1: Telegram credentials
+  const telegramToken = process.env.TELEGRAM_BOT_TOKEN;
+  const telegramOwner = process.env.TELEGRAM_OWNER_ID;
+  checks.push({
+    name: 'Telegram Credentials',
+    status: telegramToken && telegramOwner ? 'PASS' : 'FAIL',
+    message: telegramToken && telegramOwner ?
+      'Bot token and owner ID configured' :
+      'Missing TELEGRAM_BOT_TOKEN or TELEGRAM_OWNER_ID in .env'
+  });
+
+  // Check 2: Anthropic API key
+  const anthropicKey = process.env.ANTHROPIC_API_KEY;
+  checks.push({
+    name: 'Anthropic API Key',
+    status: anthropicKey ? 'PASS' : 'FAIL',
+    message: anthropicKey ?
+      'API key configured for Haiku' :
+      'Missing ANTHROPIC_API_KEY in .env'
+  });
+
+  // Check 3: Whisper model
+  const { checkWhisperModel } = require('./whisper-transcribe.js');
+  const whisperStatus = await checkWhisperModel();
+  checks.push({
+    name: 'Whisper Model',
+    status: whisperStatus.available ? 'PASS' : 'WARN',
+    message: whisperStatus.available ?
+      `Model ready: ${whisperStatus.path}` :
+      'Model not downloaded (voice messages disabled)'
+  });
+
+  // Check 4: OpenTelemetry
+  const otelEndpoint = process.env.OTEL_EXPORTER_OTLP_ENDPOINT;
+  checks.push({
+    name: 'OpenTelemetry',
+    status: otelEndpoint ? 'PASS' : 'WARN',
+    message: otelEndpoint ?
+      `Exporting to: ${otelEndpoint}` :
+      'No endpoint configured (tracing disabled)'
+  });
+
+  // Check 5: Session logs directory
+  const fs = require('fs');
+  const logsDir = '.planning/telegram-sessions';
+  const logsDirExists = fs.existsSync(logsDir);
+  checks.push({
+    name: 'Session Logs',
+    status: logsDirExists ? 'PASS' : 'WARN',
+    message: logsDirExists ?
+      `Directory exists: ${logsDir}` :
+      `Directory will be created on first session`
+  });
+
+  // Check 6: Dashboard ports
+  const net = require('net');
+  const isDashboardPortFree = await checkPort(8765);
+  checks.push({
+    name: 'Dashboard Port 8765',
+    status: isDashboardPortFree ? 'PASS' : 'WARN',
+    message: isDashboardPortFree ?
+      'Port available' :
+      'Port in use (use --http flag for custom port)'
+  });
+
+  // Print results
+  let allPass = true;
+  checks.forEach(check => {
+    const symbol = check.status === 'PASS' ? '✓' :
+                    check.status === 'WARN' ? '⚠' : '✗';
+    const color = check.status === 'PASS' ? '\x1b[32m' :
+                   check.status === 'WARN' ? '\x1b[33m' : '\x1b[31m';
+    console.log(`${color}${symbol}\x1b[0m ${check.name}: ${check.message}`);
+
+    if (check.status === 'FAIL') allPass = false;
+  });
+
+  console.log('\n' + '='.repeat(50));
+
+  if (allPass) {
+    console.log('\x1b[32m✓ All critical checks passed!\x1b[0m\n');
+    console.log('Ready to use:');
+    console.log('  /gsd:telegram start    - Start bot with Haiku monitor');
+    console.log('  dashboard start        - Launch real-time dashboard');
+  } else {
+    console.log('\x1b[31m✗ Some checks failed\x1b[0m\n');
+    console.log('See SETUP.md for configuration instructions');
+  }
+}
+
+async function checkPort(port) {
+  return new Promise((resolve) => {
+    const net = require('net');
+    const server = net.createServer();
+    server.once('error', () => resolve(false));
+    server.once('listening', () => {
+      server.close();
+      resolve(true);
+    });
+    server.listen(port);
+  });
+}
+
 // ─── Savings Report ───────────────────────────────────────────────────────────
 
 function cmdSavings(args, raw) {
@@ -6943,7 +7054,7 @@ async function main() {
   const cwd = process.cwd();
 
   if (!command) {
-    error('Usage: gsd-tools <command> [args] [--raw]\nCommands: state, resolve-model, find-phase, commit, verify-summary, verify, frontmatter, template, generate-slug, current-timestamp, list-todos, verify-path-exists, config-ensure-section, telegram, observability, init');
+    error('Usage: gsd-tools <command> [args] [--raw]\nCommands: state, resolve-model, find-phase, commit, verify-summary, verify, frontmatter, template, generate-slug, current-timestamp, list-todos, verify-path-exists, config-ensure-section, telegram, observability, health, init');
   }
 
   switch (command) {
@@ -7594,6 +7705,11 @@ async function main() {
 
     case 'dashboard': {
       await cmdDashboard(args.slice(1));
+      break;
+    }
+
+    case 'health': {
+      await cmdHealth(args.slice(1));
       break;
     }
 
