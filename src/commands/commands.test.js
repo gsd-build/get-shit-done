@@ -14,6 +14,8 @@ const { runAddAction } = require('./add-action');
 const { runLoadGraph } = require('./load-graph');
 const { parseFutureFile } = require('../artifacts/future');
 const { parseMilestonesFile } = require('../artifacts/milestones');
+const { writePlanFile } = require('../artifacts/plan');
+const { ensureMilestoneFolder } = require('../artifacts/milestone-folders');
 
 /**
  * Create a temp directory with git init and .planning/ for testing.
@@ -163,48 +165,12 @@ describe('add-milestone', () => {
 // add-action
 // =============================================================================
 
-describe('add-action', () => {
-  it('returns error when --title missing', () => {
+describe('add-action (deprecated)', () => {
+  it('returns deprecation error for any call', () => {
     const dir = createTempDir();
-    const result = runAddAction(dir, ['--causes', 'M-01']);
+    const result = runAddAction(dir, ['--title', 'Test', '--causes', 'M-01']);
     assert.ok('error' in result);
-    assert.match(result.error, /--title/);
-  });
-
-  it('returns error when --causes missing', () => {
-    const dir = createTempDir();
-    const result = runAddAction(dir, ['--title', 'My Action']);
-    assert.ok('error' in result);
-    assert.match(result.error, /--causes/);
-  });
-
-  it('returns error when causes references non-existent milestone', () => {
-    const dir = createTempDir();
-    const result = runAddAction(dir, ['--title', 'Bad Action', '--causes', 'M-99']);
-    assert.ok('error' in result);
-    assert.match(result.error, /M-99/);
-  });
-
-  it('creates A-01 linked to M-01', () => {
-    const dir = createTempDir();
-    runAddDeclaration(dir, ['--title', 'Future', '--statement', 'Truth']);
-    runAddMilestone(dir, ['--title', 'MS', '--realizes', 'D-01']);
-    const result = runAddAction(dir, ['--title', 'First Action', '--causes', 'M-01']);
-    assert.equal(result.id, 'A-01');
-    assert.equal(result.title, 'First Action');
-    assert.deepEqual(result.causes, ['M-01']);
-    assert.equal(result.status, 'PENDING');
-  });
-
-  it('updates MILESTONES.md causedBy field on the caused milestone', () => {
-    const dir = createTempDir();
-    runAddDeclaration(dir, ['--title', 'Future', '--statement', 'Truth']);
-    runAddMilestone(dir, ['--title', 'MS', '--realizes', 'D-01']);
-    runAddAction(dir, ['--title', 'Action', '--causes', 'M-01']);
-
-    const msContent = readFileSync(join(dir, '.planning', 'MILESTONES.md'), 'utf-8');
-    const { milestones } = parseMilestonesFile(msContent);
-    assert.ok(milestones[0].causedBy.includes('A-01'));
+    assert.match(result.error, /create-plan/);
   });
 });
 
@@ -237,7 +203,14 @@ describe('load-graph', () => {
     const dir = createTempDir();
     runAddDeclaration(dir, ['--title', 'Future', '--statement', 'Truth']);
     runAddMilestone(dir, ['--title', 'MS', '--realizes', 'D-01']);
-    runAddAction(dir, ['--title', 'Action', '--causes', 'M-01']);
+
+    // Create action via PLAN.md in milestone folder (new pattern)
+    const planningDir = join(dir, '.planning');
+    const folder = ensureMilestoneFolder(planningDir, 'M-01', 'MS');
+    const planContent = writePlanFile('M-01', 'MS', ['D-01'], [
+      { id: 'A-01', title: 'Action', status: 'PENDING', produces: 'thing' },
+    ]);
+    writeFileSync(join(folder, 'PLAN.md'), planContent, 'utf-8');
 
     const result = runLoadGraph(dir);
     assert.ok(!('error' in result));
@@ -259,8 +232,7 @@ describe('load-graph', () => {
     // Manually write a milestone with no realizes (orphan)
     const { writeMilestonesFile } = require('../artifacts/milestones');
     const msContent = writeMilestonesFile(
-      [{ id: 'M-01', title: 'Orphan', status: 'PENDING', realizes: [], causedBy: [] }],
-      [],
+      [{ id: 'M-01', title: 'Orphan', status: 'PENDING', realizes: [], hasPlan: false }],
       'test'
     );
     writeFileSync(join(dir, '.planning', 'MILESTONES.md'), msContent, 'utf-8');

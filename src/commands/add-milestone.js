@@ -58,7 +58,7 @@ function runAddMilestone(cwd, args) {
     : '';
 
   const declarations = parseFutureFile(futureContent);
-  const { milestones, actions } = parseMilestonesFile(milestonesContent);
+  const { milestones } = parseMilestonesFile(milestonesContent);
 
   // Build DAG from all nodes to get next ID and validate
   const dag = new DeclareDag();
@@ -67,9 +67,6 @@ function runAddMilestone(cwd, args) {
   }
   for (const m of milestones) {
     dag.addNode(m.id, 'milestone', m.title, m.status || 'PENDING');
-  }
-  for (const a of actions) {
-    dag.addNode(a.id, 'action', a.title, a.status || 'PENDING');
   }
 
   // Validate that all declaration IDs in --realizes exist
@@ -87,7 +84,7 @@ function runAddMilestone(cwd, args) {
     title,
     status: 'PENDING',
     realizes,
-    causedBy: [],
+    hasPlan: false,
   });
 
   // Update FUTURE.md: add new milestone ID to each realized declaration's milestones array
@@ -102,7 +99,7 @@ function runAddMilestone(cwd, args) {
   const futureOutput = writeFutureFile(declarations, projectName);
   writeFileSync(futurePath, futureOutput, 'utf-8');
 
-  const milestonesOutput = writeMilestonesFile(milestones, actions, projectName);
+  const milestonesOutput = writeMilestonesFile(milestones, projectName);
   writeFileSync(milestonesPath, milestonesOutput, 'utf-8');
 
   // Commit if configured

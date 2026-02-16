@@ -4,17 +4,54 @@
 /**
  * load-graph command logic.
  *
- * Loads the full Declare graph from FUTURE.md and MILESTONES.md,
- * reconstructs the DAG, and returns structured JSON with stats and validation.
+ * Loads the full Declare graph from FUTURE.md, MILESTONES.md, and
+ * milestone folder PLAN.md files. Reconstructs the DAG and returns
+ * structured JSON with stats and validation.
  *
  * Zero runtime dependencies. CJS module.
  */
 
-const { existsSync, readFileSync } = require('node:fs');
+const { existsSync, readFileSync, readdirSync } = require('node:fs');
 const { join } = require('node:path');
 const { parseFutureFile } = require('../artifacts/future');
 const { parseMilestonesFile } = require('../artifacts/milestones');
+const { parsePlanFile } = require('../artifacts/plan');
 const { DeclareDag } = require('../graph/engine');
+
+/**
+ * Load actions from all milestone folder PLAN.md files.
+ *
+ * @param {string} planningDir - Path to .planning directory
+ * @returns {Array<{id: string, title: string, status: string, produces: string, causes: string[]}>}
+ */
+function loadActionsFromFolders(planningDir) {
+  const milestonesDir = join(planningDir, 'milestones');
+  if (!existsSync(milestonesDir)) return [];
+
+  const allActions = [];
+  const entries = readdirSync(milestonesDir, { withFileTypes: true });
+
+  for (const entry of entries) {
+    if (!entry.isDirectory() || entry.name.startsWith('_')) continue;
+    const planPath = join(milestonesDir, entry.name, 'PLAN.md');
+    if (!existsSync(planPath)) continue;
+
+    const content = readFileSync(planPath, 'utf-8');
+    const { milestone, actions } = parsePlanFile(content);
+
+    for (const action of actions) {
+      allActions.push({
+        id: action.id,
+        title: action.title,
+        status: action.status,
+        produces: action.produces,
+        causes: milestone ? [milestone] : [],
+      });
+    }
+  }
+
+  return allActions;
+}
 
 /**
  * Run the load-graph command.
@@ -40,7 +77,8 @@ function runLoadGraph(cwd) {
     : '';
 
   const declarations = parseFutureFile(futureContent);
-  const { milestones, actions } = parseMilestonesFile(milestonesContent);
+  const { milestones } = parseMilestonesFile(milestonesContent);
+  const actions = loadActionsFromFolders(planningDir);
 
   // Reconstruct the DAG
   const dag = new DeclareDag();
@@ -55,20 +93,16 @@ function runLoadGraph(cwd) {
     dag.addNode(a.id, 'action', a.title, a.status || 'PENDING');
   }
 
-  // Add edges: milestone->declaration (realizes), action->milestone (causes)
+  // Add edges: milestone->declaration (realizes)
   for (const m of milestones) {
     for (const declId of m.realizes) {
       if (dag.getNode(declId)) {
         dag.addEdge(m.id, declId);
       }
     }
-    for (const actionId of m.causedBy) {
-      if (dag.getNode(actionId)) {
-        dag.addEdge(actionId, m.id);
-      }
-    }
   }
 
+  // Add edges: action->milestone (causes)
   for (const a of actions) {
     for (const milestoneId of a.causes) {
       if (dag.getNode(milestoneId)) {
@@ -86,4 +120,4 @@ function runLoadGraph(cwd) {
   };
 }
 
-module.exports = { runLoadGraph };
+module.exports = { runLoadGraph, loadActionsFromFolders };

@@ -4,7 +4,7 @@
 /**
  * MILESTONES.md parser and writer.
  *
- * Parses markdown table format for milestones and actions.
+ * Parses markdown table format for milestones (no actions -- actions live in PLAN.md files).
  * Writes back to canonical aligned-column format.
  *
  * Permissive on input (handles hand-edited files), strict on output.
@@ -52,45 +52,36 @@ function splitMultiValue(value) {
 }
 
 /**
- * Parse a MILESTONES.md file into milestone and action objects.
+ * Parse a MILESTONES.md file into milestone objects.
  *
  * Handles hand-edited files permissively:
  * - Extra whitespace in table cells
  * - Misaligned columns
  * - Case-insensitive status
  * - Missing columns default to empty
+ * - Backward compatible: parses both old format (Caused By column) and new format (Plan column)
  *
  * @param {string} content - Raw markdown content of MILESTONES.md
- * @returns {{ milestones: Array<{id: string, title: string, status: string, realizes: string[], causedBy: string[]}>, actions: Array<{id: string, title: string, status: string, causes: string[]}> }}
+ * @returns {{ milestones: Array<{id: string, title: string, status: string, realizes: string[], hasPlan: boolean}> }}
  */
 function parseMilestonesFile(content) {
   if (!content || !content.trim()) {
-    return { milestones: [], actions: [] };
+    return { milestones: [] };
   }
 
-  // Split on ## sections
-  const milestonesMatch = content.match(/## Milestones\s*\n([\s\S]*?)(?=## Actions|$)/i);
-  const actionsMatch = content.match(/## Actions\s*\n([\s\S]*?)$/i);
-
+  // Match ## Milestones section (stop at any other ## or end of file)
+  const milestonesMatch = content.match(/## Milestones\s*\n([\s\S]*?)(?=## |$)/i);
   const milestoneRows = milestonesMatch ? parseMarkdownTable(milestonesMatch[1]) : [];
-  const actionRows = actionsMatch ? parseMarkdownTable(actionsMatch[1]) : [];
 
   const milestones = milestoneRows.map(row => ({
     id: (row['ID'] || '').trim(),
     title: (row['Title'] || '').trim(),
     status: (row['Status'] || 'PENDING').trim().toUpperCase(),
     realizes: splitMultiValue(row['Realizes'] || ''),
-    causedBy: splitMultiValue(row['Caused By'] || ''),
+    hasPlan: (row['Plan'] || '').trim().toUpperCase() === 'YES',
   })).filter(m => m.id);
 
-  const actions = actionRows.map(row => ({
-    id: (row['ID'] || '').trim(),
-    title: (row['Title'] || '').trim(),
-    status: (row['Status'] || 'PENDING').trim().toUpperCase(),
-    causes: splitMultiValue(row['Causes'] || ''),
-  })).filter(a => a.id);
-
-  return { milestones, actions };
+  return { milestones };
 }
 
 /**
@@ -104,44 +95,37 @@ function pad(str, width) {
 }
 
 /**
- * Write milestones and actions to canonical MILESTONES.md format.
+ * Write milestones to canonical MILESTONES.md format.
  * Columns are aligned for readability.
  *
- * @param {Array<{id: string, title: string, status: string, realizes: string[], causedBy: string[]}>} milestones
- * @param {Array<{id: string, title: string, status: string, causes: string[]}>} actions
- * @param {string} projectName
+ * Backward compatibility: accepts 2-arg (milestones, projectName) or
+ * 3-arg (milestones, actions, projectName) signature. If 3 args and
+ * second is an array, treats as old signature and ignores actions.
+ *
+ * @param {Array<{id: string, title: string, status: string, realizes: string[], hasPlan?: boolean}>} milestones
+ * @param {string | Array} projectNameOrActions - Project name string, or actions array (backward compat)
+ * @param {string} [maybeProjectName] - Project name when using old 3-arg signature
  * @returns {string} Canonical markdown content
  */
-function writeMilestonesFile(milestones, actions, projectName) {
-  const lines = [`# Milestones & Actions: ${projectName}`, ''];
+function writeMilestonesFile(milestones, projectNameOrActions, maybeProjectName) {
+  // Backward compat: old signature was (milestones, actions, projectName)
+  const projectName = maybeProjectName || (typeof projectNameOrActions === 'string' ? projectNameOrActions : 'Project');
+
+  const lines = [`# Milestones: ${projectName}`, ''];
 
   // -- Milestones table --
   lines.push('## Milestones', '');
 
-  const mHeaders = ['ID', 'Title', 'Status', 'Realizes', 'Caused By'];
+  const mHeaders = ['ID', 'Title', 'Status', 'Realizes', 'Plan'];
   const mRows = milestones.map(m => [
     m.id,
     m.title,
     m.status,
     m.realizes.join(', '),
-    m.causedBy.join(', '),
+    m.hasPlan ? 'YES' : 'NO',
   ]);
 
   lines.push(...formatTable(mHeaders, mRows));
-  lines.push('');
-
-  // -- Actions table --
-  lines.push('## Actions', '');
-
-  const aHeaders = ['ID', 'Title', 'Status', 'Causes'];
-  const aRows = actions.map(a => [
-    a.id,
-    a.title,
-    a.status,
-    a.causes.join(', '),
-  ]);
-
-  lines.push(...formatTable(aHeaders, aRows));
   lines.push('');
 
   return lines.join('\n');

@@ -139,53 +139,39 @@ describe('FUTURE.md round-trip', () => {
 // ---------------------------------------------------------------------------
 
 describe('parseMilestonesFile', () => {
-  it('parses canonical format correctly', () => {
-    const content = `# Milestones & Actions: Test Project
+  it('parses new format with Plan column', () => {
+    const content = `# Milestones: Test Project
 
 ## Milestones
 
-| ID   | Title         | Status  | Realizes | Caused By |
-|------|---------------|---------|----------|-----------|
-| M-01 | First MS      | PENDING | D-01     | A-01, A-02 |
-| M-02 | Second MS     | ACTIVE  | D-01     | A-03       |
-
-## Actions
-
-| ID   | Title         | Status  | Causes |
-|------|---------------|---------|--------|
-| A-01 | First action  | PENDING | M-01   |
-| A-02 | Second action | DONE    | M-01   |
-| A-03 | Third action  | ACTIVE  | M-01, M-02 |
+| ID   | Title         | Status  | Realizes | Plan |
+|------|---------------|---------|----------|------|
+| M-01 | First MS      | PENDING | D-01     | YES  |
+| M-02 | Second MS     | ACTIVE  | D-01     | NO   |
 `;
 
     const result = parseMilestonesFile(content);
     assert.equal(result.milestones.length, 2);
-    assert.equal(result.actions.length, 3);
+    assert.ok(!('actions' in result), 'should not have actions property');
 
     assert.equal(result.milestones[0].id, 'M-01');
     assert.equal(result.milestones[0].title, 'First MS');
     assert.equal(result.milestones[0].status, 'PENDING');
     assert.deepEqual(result.milestones[0].realizes, ['D-01']);
-    assert.deepEqual(result.milestones[0].causedBy, ['A-01', 'A-02']);
+    assert.equal(result.milestones[0].hasPlan, true);
 
-    assert.equal(result.actions[2].id, 'A-03');
-    assert.deepEqual(result.actions[2].causes, ['M-01', 'M-02']);
+    assert.equal(result.milestones[1].id, 'M-02');
+    assert.equal(result.milestones[1].hasPlan, false);
   });
 
   it('parses hand-edited table permissively', () => {
-    const content = `# Milestones & Actions: Test
+    const content = `# Milestones: Test
 
 ## Milestones
 
-| ID | Title | Status | Realizes | Caused By |
+| ID | Title | Status | Realizes | Plan |
 |---|---|---|---|---|
-|  M-01  |  Loose title  |  pending  |  D-01  |  A-01 |
-
-## Actions
-
-| ID | Title | Status | Causes |
-|---|---|---|---|
-| A-01 | Loose action |active| M-01 |
+|  M-01  |  Loose title  |  pending  |  D-01  |  yes |
 `;
 
     const result = parseMilestonesFile(content);
@@ -193,86 +179,73 @@ describe('parseMilestonesFile', () => {
     assert.equal(result.milestones[0].id, 'M-01');
     assert.equal(result.milestones[0].title, 'Loose title');
     assert.equal(result.milestones[0].status, 'PENDING');
-
-    assert.equal(result.actions[0].status, 'ACTIVE');
+    assert.equal(result.milestones[0].hasPlan, true);
   });
 
-  it('returns empty arrays for empty tables', () => {
-    const content = `# Milestones & Actions: Test
+  it('returns empty milestones for empty tables', () => {
+    const content = `# Milestones: Test
 
 ## Milestones
 
-| ID | Title | Status | Realizes | Caused By |
-|----|-------|--------|----------|-----------|
-
-## Actions
-
-| ID | Title | Status | Causes |
-|----|-------|--------|--------|
+| ID | Title | Status | Realizes | Plan |
+|----|-------|--------|----------|------|
 `;
 
     const result = parseMilestonesFile(content);
     assert.deepEqual(result.milestones, []);
-    assert.deepEqual(result.actions, []);
   });
 
-  it('returns empty arrays for empty/missing content', () => {
+  it('returns empty milestones for empty/missing content', () => {
     const result = parseMilestonesFile('');
     assert.deepEqual(result.milestones, []);
-    assert.deepEqual(result.actions, []);
   });
 });
 
 describe('writeMilestonesFile', () => {
   it('produces canonical format with aligned columns', () => {
     const milestones = [
-      { id: 'M-01', title: 'First', status: 'PENDING', realizes: ['D-01'], causedBy: ['A-01'] },
-    ];
-    const actions = [
-      { id: 'A-01', title: 'Do thing', status: 'ACTIVE', causes: ['M-01'] },
+      { id: 'M-01', title: 'First', status: 'PENDING', realizes: ['D-01'], hasPlan: true },
     ];
 
-    const output = writeMilestonesFile(milestones, actions, 'Test');
-    assert.ok(output.includes('# Milestones & Actions: Test'));
+    const output = writeMilestonesFile(milestones, 'Test');
+    assert.ok(output.includes('# Milestones: Test'));
     assert.ok(output.includes('## Milestones'));
-    assert.ok(output.includes('## Actions'));
+    assert.ok(!output.includes('## Actions'), 'should not have Actions section');
     assert.ok(output.includes('M-01'));
-    assert.ok(output.includes('A-01'));
+    assert.ok(output.includes('YES'));
     assert.ok(output.includes('| ID'));
+  });
+
+  it('backward compat: accepts old 3-arg signature', () => {
+    const milestones = [
+      { id: 'M-01', title: 'First', status: 'PENDING', realizes: ['D-01'], hasPlan: false },
+    ];
+    const actions = []; // old signature passed actions array
+
+    const output = writeMilestonesFile(milestones, actions, 'Test');
+    assert.ok(output.includes('# Milestones: Test'));
+    assert.ok(!output.includes('## Actions'));
   });
 });
 
 describe('MILESTONES.md round-trip', () => {
   it('preserves data through write -> parse cycle', () => {
     const originalMs = [
-      { id: 'M-01', title: 'Milestone one', status: 'ACTIVE', realizes: ['D-01'], causedBy: ['A-01', 'A-02'] },
-      { id: 'M-02', title: 'Milestone two', status: 'PENDING', realizes: ['D-01', 'D-02'], causedBy: ['A-03'] },
-    ];
-    const originalAs = [
-      { id: 'A-01', title: 'Action one', status: 'DONE', causes: ['M-01'] },
-      { id: 'A-02', title: 'Action two', status: 'PENDING', causes: ['M-01'] },
-      { id: 'A-03', title: 'Action three', status: 'ACTIVE', causes: ['M-01', 'M-02'] },
+      { id: 'M-01', title: 'Milestone one', status: 'ACTIVE', realizes: ['D-01'], hasPlan: true },
+      { id: 'M-02', title: 'Milestone two', status: 'PENDING', realizes: ['D-01', 'D-02'], hasPlan: false },
     ];
 
-    const written = writeMilestonesFile(originalMs, originalAs, 'Round Trip');
+    const written = writeMilestonesFile(originalMs, 'Round Trip');
     const parsed = parseMilestonesFile(written);
 
     assert.equal(parsed.milestones.length, originalMs.length);
-    assert.equal(parsed.actions.length, originalAs.length);
 
     for (let i = 0; i < originalMs.length; i++) {
       assert.equal(parsed.milestones[i].id, originalMs[i].id);
       assert.equal(parsed.milestones[i].title, originalMs[i].title);
       assert.equal(parsed.milestones[i].status, originalMs[i].status);
       assert.deepEqual(parsed.milestones[i].realizes, originalMs[i].realizes);
-      assert.deepEqual(parsed.milestones[i].causedBy, originalMs[i].causedBy);
-    }
-
-    for (let i = 0; i < originalAs.length; i++) {
-      assert.equal(parsed.actions[i].id, originalAs[i].id);
-      assert.equal(parsed.actions[i].title, originalAs[i].title);
-      assert.equal(parsed.actions[i].status, originalAs[i].status);
-      assert.deepEqual(parsed.actions[i].causes, originalAs[i].causes);
+      assert.equal(parsed.milestones[i].hasPlan, originalMs[i].hasPlan);
     }
   });
 });
@@ -282,46 +255,32 @@ describe('MILESTONES.md round-trip', () => {
 // ---------------------------------------------------------------------------
 
 describe('multi-value field parsing', () => {
-  it('parses comma-separated with spaces', () => {
-    const content = `# Milestones & Actions: Test
+  it('parses comma-separated realizes with spaces', () => {
+    const content = `# Milestones: Test
 
 ## Milestones
 
-| ID | Title | Status | Realizes | Caused By |
-|----|-------|--------|----------|-----------|
-| M-01 | Test | PENDING | D-01, D-02 | A-01, A-02 |
-
-## Actions
-
-| ID | Title | Status | Causes |
-|----|-------|--------|--------|
-| A-01 | Test | PENDING | M-01, M-02 |
+| ID | Title | Status | Realizes | Plan |
+|----|-------|--------|----------|------|
+| M-01 | Test | PENDING | D-01, D-02 | YES |
 `;
 
     const result = parseMilestonesFile(content);
     assert.deepEqual(result.milestones[0].realizes, ['D-01', 'D-02']);
-    assert.deepEqual(result.milestones[0].causedBy, ['A-01', 'A-02']);
-    assert.deepEqual(result.actions[0].causes, ['M-01', 'M-02']);
   });
 
-  it('parses comma-separated without spaces', () => {
-    const content = `# Milestones & Actions: Test
+  it('parses comma-separated realizes without spaces', () => {
+    const content = `# Milestones: Test
 
 ## Milestones
 
-| ID | Title | Status | Realizes | Caused By |
-|----|-------|--------|----------|-----------|
-| M-01 | Test | PENDING | D-01,D-02 | A-01,A-02 |
-
-## Actions
-
-| ID | Title | Status | Causes |
-|----|-------|--------|--------|
+| ID | Title | Status | Realizes | Plan |
+|----|-------|--------|----------|------|
+| M-01 | Test | PENDING | D-01,D-02 | NO |
 `;
 
     const result = parseMilestonesFile(content);
     assert.deepEqual(result.milestones[0].realizes, ['D-01', 'D-02']);
-    assert.deepEqual(result.milestones[0].causedBy, ['A-01', 'A-02']);
   });
 });
 
@@ -548,7 +507,7 @@ describe('milestone folder operations', () => {
 // ---------------------------------------------------------------------------
 
 describe('full integration round-trip', () => {
-  it('creates graph, writes to files, parses back, loads into new graph -- graph is equivalent', () => {
+  it('creates graph, writes to files (FUTURE.md + MILESTONES.md + PLAN.md), parses back, loads into new graph -- graph is equivalent', () => {
     // Create original graph
     const dag1 = new DeclareDag();
     dag1.addNode('D-01', 'declaration', 'Users can declare futures', 'ACTIVE', { statement: 'Users declare future truth statements' });
@@ -566,7 +525,7 @@ describe('full integration round-trip', () => {
     dag1.addEdge('M-02', 'D-01');
     dag1.addEdge('M-02', 'D-02');
 
-    // Write to markdown
+    // Write to markdown -- declarations to FUTURE.md
     const declarations = dag1.getDeclarations().map(d => ({
       id: d.id,
       title: d.title,
@@ -575,27 +534,51 @@ describe('full integration round-trip', () => {
       milestones: [...dag1.downEdges.get(d.id) || []].filter(id => id.startsWith('M-')),
     }));
 
+    // Milestones to MILESTONES.md (no actions, hasPlan indicates plan exists)
     const milestones = dag1.getMilestones().map(m => ({
       id: m.id,
       title: m.title,
       status: m.status,
       realizes: [...dag1.upEdges.get(m.id) || []].filter(id => id.startsWith('D-')),
-      causedBy: [...dag1.downEdges.get(m.id) || []].filter(id => id.startsWith('A-')),
+      hasPlan: true, // all milestones have plans in this test
     }));
 
-    const actions = dag1.getActions().map(a => ({
-      id: a.id,
-      title: a.title,
-      status: a.status,
-      causes: [...dag1.upEdges.get(a.id) || []].filter(id => id.startsWith('M-')),
-    }));
+    // Actions grouped by milestone for PLAN.md files
+    const actionsByMilestone = new Map();
+    for (const a of dag1.getActions()) {
+      const milestoneIds = [...dag1.upEdges.get(a.id) || []].filter(id => id.startsWith('M-'));
+      for (const msId of milestoneIds) {
+        if (!actionsByMilestone.has(msId)) actionsByMilestone.set(msId, []);
+        actionsByMilestone.get(msId).push({
+          id: a.id,
+          title: a.title,
+          status: a.status,
+          produces: '',
+        });
+      }
+    }
 
     const futureContent = writeFutureFile(declarations, 'Integration Test');
-    const msContent = writeMilestonesFile(milestones, actions, 'Integration Test');
+    const msContent = writeMilestonesFile(milestones, 'Integration Test');
+
+    // Write PLAN.md files to temp milestone folders
+    const tmpDir = mkdtempSync(join(tmpdir(), 'gsd-integ-'));
+    const planningDir = join(tmpDir, '.planning');
+    for (const [msId, actions] of actionsByMilestone) {
+      const msNode = dag1.getNode(msId);
+      const realizes = [...dag1.upEdges.get(msId) || []].filter(id => id.startsWith('D-'));
+      const planContent = writePlanFile(msId, msNode.title, realizes, actions);
+      const folderPath = ensureMilestoneFolder(planningDir, msId, msNode.title);
+      writeFileSync(join(folderPath, 'PLAN.md'), planContent);
+    }
 
     // Parse back
     const parsedDecls = parseFutureFile(futureContent);
     const parsedMs = parseMilestonesFile(msContent);
+
+    // Load actions from milestone folders (simulates load-graph)
+    const { loadActionsFromFolders } = require('../commands/load-graph');
+    const parsedActions = loadActionsFromFolders(planningDir);
 
     // Reconstruct graph
     const dag2 = new DeclareDag();
@@ -609,7 +592,7 @@ describe('full integration round-trip', () => {
         dag2.addEdge(m.id, declId);
       }
     }
-    for (const a of parsedMs.actions) {
+    for (const a of parsedActions) {
       dag2.addNode(a.id, 'action', a.title, a.status);
       for (const msId of a.causes) {
         dag2.addEdge(a.id, msId);
@@ -633,5 +616,8 @@ describe('full integration round-trip', () => {
     // Both should validate
     assert.ok(dag1.validate().valid);
     assert.ok(dag2.validate().valid);
+
+    // Clean up
+    rmSync(tmpDir, { recursive: true, force: true });
   });
 });
