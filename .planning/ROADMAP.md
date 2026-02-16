@@ -243,12 +243,24 @@ Phase 7 (Autonomous Optimization) --> Phase 8 (Notifications & Observability)
 
 ### Phase 9: Hook-based documentation compression - Optimize context injection by extracting AI-friendly headers from docs and injecting only summaries with absolute links instead of full content
 
-**Goal:** [To be planned]
+**Goal:** Documentation files (RESEARCH.md, PLAN.md, STATE.md) are automatically compressed via PreToolUse hooks, achieving 60-70% token reduction while preserving access to full content through absolute file links
 **Depends on:** Phase 8
-**Plans:** 0 plans
+**Requirements:** Context optimization via header extraction, PreToolUse hook integration, caching with content-hash invalidation, circuit breaker safety, CLI controls
+**Success Criteria** (what must be TRUE):
+  1. PreToolUse hook intercepts Read calls for documentation files matching GSD patterns
+  2. Header extraction compresses markdown to 60-70% token reduction
+  3. Compressed summaries include absolute file links for full content access
+  4. Cache prevents redundant compression using content hash + mtime keys
+  5. Circuit breaker disables compression after 3 consecutive failures (auto-resets in 5 min)
+  6. gsd-tools provides compression commands (status, enable, disable, metrics, clear-cache)
+  7. TokenBudgetMonitor triggers compression recommendations at 80% utilization
+**Plans:** 4 plans
 
 Plans:
-- [ ] TBD (run /gsd:plan-phase 9 to break down)
+- [ ] 09-01-PLAN.md - Header extraction core (markdown-it, gray-matter, token counting)
+- [ ] 09-02-PLAN.md - PreToolUse hook integration (cache, settings.json, additionalContext)
+- [ ] 09-03-PLAN.md - CLI commands and TokenBudgetMonitor integration
+- [ ] 09-04-PLAN.md - Circuit breaker safety and hook registration
 
 ### Phase 10: Module repository consolidation - Move external modules (validator, circuit-breaker, escalation, feedback, learning) into repo with installation script and proper structure
 
