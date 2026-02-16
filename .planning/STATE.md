@@ -67,6 +67,10 @@ Recent decisions affecting current work:
 
 - [ ] **Monaco file browser plugin** — Localhost-based web editor (Monaco + file tree) for quick file viewing/editing from Claude Code. Should be a Mesh plugin but run standalone. Easy to invoke with a specific file path. Avoids needing Cursor/VS Code for quick checks and small adjustments. (Plan separately)
 
+### Roadmap Evolution
+
+- Phase 02.1 inserted after Phase 2: Artifact Separation and Command Split (URGENT) — separate ACTIONS.md from MILESTONES.md, split /declare:milestones into milestones-only + new /declare:actions, checkbox milestone UI
+
 ### Blockers/Concerns
 
 - [Research]: Backward derivation prompting patterns (Phase 2) are novel territory -- no standard patterns exist. May need dedicated research before planning Phase 2.

@@ -54,6 +54,22 @@ Plans:
 - [ ] 02-01-PLAN.md -- Tooling subcommands (add-declaration, add-milestone, add-action, load-graph) with TDD and bundle rebuild
 - [ ] 02-02-PLAN.md -- Slash commands (/declare:future, /declare:milestones), workflow prompts, and command installation
 
+### Phase 02.1: Artifact Separation and Command Split (INSERTED)
+
+**Goal:** Actions live in ACTIONS.md (not MILESTONES.md), /declare:milestones only derives milestones with checkbox UI, new /declare:actions derives action plans per milestone in batch
+**Depends on:** Phase 2
+**Success Criteria** (what must be TRUE):
+  1. ACTIONS.md exists as a separate artifact with its own parser/writer
+  2. MILESTONES.md contains only milestones (no actions)
+  3. /declare:milestones presents milestones as checkboxes for batch confirmation per declaration
+  4. /declare:actions derives action plans per milestone and presents complete plans for review
+  5. load-graph reads from FUTURE.md + MILESTONES.md + ACTIONS.md
+  6. All cross-references remain intact across the three files
+**Plans:** 0 plans
+
+Plans:
+- [ ] TBD (run /gsd:plan-phase 02.1 to break down)
+
 ### Phase 3: Traceability + Navigation
 **Goal**: Users can understand, trace, and prioritize the structure the system has built
 **Depends on**: Phase 2
