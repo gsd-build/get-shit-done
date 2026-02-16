@@ -31,12 +31,12 @@ Decimal phases appear between their surrounding integers in numeric order.
   3. Graph engine can create, persist, and reload a three-layer graph (declarations, milestones, actions) with upward causation edges
   4. All state changes produce atomic git commits
   5. FORK-BOUNDARY.md exists defining exactly which GSD modules are kept, extended, or replaced
-**Plans**: TBD
+**Plans**: 3 plans
 
 Plans:
-- [ ] 01-01: TBD
-- [ ] 01-02: TBD
-- [ ] 01-03: TBD
+- [ ] 01-01-PLAN.md -- Fork boundary, project scaffolding, and DeclareDag graph engine with tests
+- [ ] 01-02-PLAN.md -- Artifact persistence (FUTURE.md + MILESTONES.md parsers/writers) and declare-tools.js CLI entry point
+- [ ] 01-03-PLAN.md -- Slash commands (/declare:init, /declare:status, /declare:help), esbuild bundle, and integration verification
 
 ### Phase 2: Future Declaration + Backward Derivation
 **Goal**: Users can declare a set of futures and the system derives milestones and actions backward from those declarations
@@ -120,7 +120,7 @@ Phases execute in numeric order: 1 → 2 → 3 → 4 → 5 → 6
 
 | Phase | Plans Complete | Status | Completed |
 |-------|----------------|--------|-----------|
-| 1. Foundation | 0/3 | Not started | - |
+| 1. Foundation | 0/3 | Planned | - |
 | 2. Future Declaration + Backward Derivation | 0/3 | Not started | - |
 | 3. Traceability + Navigation | 0/2 | Not started | - |
 | 4. Execution Pipeline | 0/2 | Not started | - |
