@@ -5418,6 +5418,148 @@ function cmdInitProgress(cwd, includes, raw) {
   output(result, raw);
 }
 
+function cmdInitExecuteRoadmap(cwd, raw) {
+  const roadmapPath = path.join(cwd, '.planning', 'ROADMAP.md');
+
+  if (!fs.existsSync(roadmapPath)) {
+    output({
+      error: 'ROADMAP.md not found',
+      roadmap_exists: false
+    }, raw);
+    return;
+  }
+
+  // Use existing cmdRoadmapAnalyze logic to get phase data
+  const content = fs.readFileSync(roadmapPath, 'utf-8');
+  const phasesDir = path.join(cwd, '.planning', 'phases');
+
+  // Extract all phase headings: ### Phase N: Name
+  const phasePattern = /###\s*Phase\s+(\d+(?:\.\d+)?)\s*:\s*([^\n]+)/gi;
+  const phases = [];
+  let match;
+
+  while ((match = phasePattern.exec(content)) !== null) {
+    const phaseNum = match[1];
+    const phaseName = match[2].replace(/\(INSERTED\)/i, '').trim();
+
+    // Extract goal from the section
+    const sectionStart = match.index;
+    const restOfContent = content.slice(sectionStart);
+    const nextHeader = restOfContent.match(/\n###\s+Phase\s+\d/i);
+    const sectionEnd = nextHeader ? sectionStart + nextHeader.index : content.length;
+    const section = content.slice(sectionStart, sectionEnd);
+
+    const goalMatch = section.match(/\*\*Goal:\*\*\s*([^\n]+)/i);
+    const goal = goalMatch ? goalMatch[1].trim() : null;
+
+    const dependsMatch = section.match(/\*\*Depends on:\*\*\s*([^\n]+)/i);
+    const depends_on = dependsMatch ? dependsMatch[1].trim() : null;
+
+    // Check completion on disk
+    const normalized = normalizePhaseName(phaseNum);
+    let diskStatus = 'no_directory';
+    let planCount = 0;
+    let summaryCount = 0;
+
+    try {
+      const entries = fs.readdirSync(phasesDir, { withFileTypes: true });
+      const dirs = entries.filter(e => e.isDirectory()).map(e => e.name);
+      const dirMatch = dirs.find(d => d.startsWith(normalized + '-') || d === normalized);
+
+      if (dirMatch) {
+        const phaseFiles = fs.readdirSync(path.join(phasesDir, dirMatch));
+        planCount = phaseFiles.filter(f => f.endsWith('-PLAN.md') || f === 'PLAN.md').length;
+        summaryCount = phaseFiles.filter(f => f.endsWith('-SUMMARY.md') || f === 'SUMMARY.md').length;
+
+        if (summaryCount >= planCount && planCount > 0) diskStatus = 'complete';
+        else if (summaryCount > 0) diskStatus = 'partial';
+        else if (planCount > 0) diskStatus = 'planned';
+        else diskStatus = 'empty';
+      }
+    } catch {}
+
+    phases.push({
+      number: phaseNum,
+      name: phaseName,
+      goal,
+      depends_on,
+      disk_status: diskStatus,
+    });
+  }
+
+  // Build execution order (simple sequential for now - no DAG parallel support yet)
+  const executionOrder = phases.map(p => p.number);
+
+  // Find next executable phases (phases that are not complete and dependencies are met)
+  const completePhases = new Set(phases.filter(p => p.disk_status === 'complete').map(p => p.number));
+  const executable = [];
+  const blocked = [];
+
+  for (const phase of phases) {
+    if (phase.disk_status === 'complete') continue;
+
+    // Check dependencies
+    if (phase.depends_on && phase.depends_on !== 'None') {
+      const deps = phase.depends_on.split(',').map(d => d.trim());
+      const allDepsMet = deps.every(dep => completePhases.has(dep));
+
+      if (allDepsMet) {
+        executable.push(phase.number);
+      } else {
+        blocked.push({ phase: phase.number, missing_deps: deps.filter(d => !completePhases.has(d)) });
+      }
+    } else {
+      // No dependencies, executable
+      executable.push(phase.number);
+    }
+  }
+
+  // Check for execution log
+  const executionLogPath = path.join(cwd, '.planning', 'EXECUTION_LOG.md');
+  const hasExecutionLog = fs.existsSync(executionLogPath);
+
+  // Check for incomplete execution (resume capability)
+  let resumeState = null;
+  if (hasExecutionLog) {
+    try {
+      const logContent = fs.readFileSync(executionLogPath, 'utf-8');
+      const lines = logContent.split('\n').filter(l => l.trim() && !l.startsWith('#'));
+      const events = lines.map(l => {
+        try { return JSON.parse(l); } catch { return null; }
+      }).filter(Boolean);
+
+      const lastComplete = events.filter(e => e.type === 'phase_complete').pop();
+      const lastStart = events.filter(e => e.type === 'phase_start').pop();
+      const roadmapComplete = events.some(e => e.type === 'roadmap_complete');
+
+      if (!roadmapComplete && lastStart && (!lastComplete || lastStart.phase > lastComplete.phase)) {
+        resumeState = {
+          phase: lastStart.phase,
+          phase_name: lastStart.name,
+          status: 'in_progress'
+        };
+      } else if (!roadmapComplete && lastComplete) {
+        resumeState = {
+          last_complete_phase: lastComplete.phase,
+          status: 'can_resume'
+        };
+      }
+    } catch {}
+  }
+
+  output({
+    roadmap_exists: true,
+    total_phases: phases.length,
+    execution_order: executionOrder,
+    parallel_opportunities: [], // Future enhancement
+    next_executable: executable,
+    blocked_phases: blocked,
+    has_execution_log: hasExecutionLog,
+    resume_state: resumeState,
+    coordinator_model: 'opus'
+  }, raw);
+}
+
 // ─── CLI Router ───────────────────────────────────────────────────────────────
 
 async function main() {
@@ -5777,8 +5919,11 @@ async function main() {
         case 'progress':
           cmdInitProgress(cwd, includes, raw);
           break;
+        case 'execute-roadmap':
+          cmdInitExecuteRoadmap(cwd, raw);
+          break;
         default:
-          error(`Unknown init workflow: ${workflow}\nAvailable: execute-phase, plan-phase, new-project, new-milestone, quick, resume, verify-work, phase-op, todos, milestone-op, map-codebase, progress`);
+          error(`Unknown init workflow: ${workflow}\nAvailable: execute-phase, plan-phase, new-project, new-milestone, quick, resume, verify-work, phase-op, todos, milestone-op, map-codebase, progress, execute-roadmap`);
       }
       break;
     }
