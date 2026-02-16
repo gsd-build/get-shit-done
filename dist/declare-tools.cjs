@@ -1524,6 +1524,165 @@ var require_prioritize = __commonJS({
   }
 });
 
+// src/commands/visualize.js
+var require_visualize = __commonJS({
+  "src/commands/visualize.js"(exports2, module2) {
+    "use strict";
+    var { writeFileSync } = require("node:fs");
+    var { resolve } = require("node:path");
+    var { parseFlag } = require_parse_args();
+    var { buildDagFromDisk } = require_build_dag();
+    function getSubtreeNodeIds(dag, rootId) {
+      const visited = /* @__PURE__ */ new Set();
+      const queue = [rootId];
+      while (queue.length > 0) {
+        const current = (
+          /** @type {string} */
+          queue.shift()
+        );
+        if (visited.has(current)) continue;
+        visited.add(current);
+        const downstream = dag.getDownstream(current);
+        for (const child of downstream) {
+          if (!visited.has(child.id)) {
+            queue.push(child.id);
+          }
+        }
+      }
+      return visited;
+    }
+    function statusMarker(dag, node) {
+      if (node.status === "DONE") return "[\u2713]";
+      if (node.status === "ACTIVE") return "[>]";
+      const children = dag.getDownstream(node.id);
+      if (children.length > 0) {
+        const hasNonDoneChild = children.some((c) => c.status !== "DONE");
+        if (hasNonDoneChild) return "[!]";
+      }
+      return "[\u25CB]";
+    }
+    function sortById(nodes) {
+      return [...nodes].sort((a, b) => a.id.localeCompare(b.id));
+    }
+    function buildTreeData(dag, scopeFilter) {
+      const declarations = sortById(dag.getDeclarations());
+      const tree = [];
+      for (const decl of declarations) {
+        if (scopeFilter && !scopeFilter.has(decl.id)) continue;
+        const declEntry = {
+          node: { id: decl.id, type: decl.type, title: decl.title, status: decl.status, marker: statusMarker(dag, decl) },
+          children: []
+        };
+        const milestones = sortById(dag.getDownstream(decl.id));
+        for (const ms of milestones) {
+          if (scopeFilter && !scopeFilter.has(ms.id)) continue;
+          const msEntry = {
+            node: { id: ms.id, type: ms.type, title: ms.title, status: ms.status, marker: statusMarker(dag, ms) },
+            children: []
+          };
+          const actions = sortById(dag.getDownstream(ms.id));
+          for (const act of actions) {
+            if (scopeFilter && !scopeFilter.has(act.id)) continue;
+            msEntry.children.push({
+              node: { id: act.id, type: act.type, title: act.title, status: act.status, marker: statusMarker(dag, act) },
+              children: []
+            });
+          }
+          declEntry.children.push(msEntry);
+        }
+        tree.push(declEntry);
+      }
+      if (tree.length === 0 && scopeFilter) {
+        const milestones = sortById(dag.getMilestones());
+        for (const ms of milestones) {
+          if (!scopeFilter.has(ms.id)) continue;
+          const msEntry = {
+            node: { id: ms.id, type: ms.type, title: ms.title, status: ms.status, marker: statusMarker(dag, ms) },
+            children: []
+          };
+          const actions = sortById(dag.getDownstream(ms.id));
+          for (const act of actions) {
+            if (scopeFilter && !scopeFilter.has(act.id)) continue;
+            msEntry.children.push({
+              node: { id: act.id, type: act.type, title: act.title, status: act.status, marker: statusMarker(dag, act) },
+              children: []
+            });
+          }
+          tree.push(msEntry);
+        }
+      }
+      return tree;
+    }
+    function formatTree(tree) {
+      const lines = [];
+      for (const root of tree) {
+        lines.push(`${root.node.id}: ${root.node.title} ${root.node.marker}`);
+        renderChildren(root.children, "", lines);
+        lines.push("");
+      }
+      while (lines.length > 0 && lines[lines.length - 1] === "") {
+        lines.pop();
+      }
+      return lines.join("\n") + "\n";
+    }
+    function renderChildren(children, prefix, lines) {
+      for (let i = 0; i < children.length; i++) {
+        const child = children[i];
+        const isLast = i === children.length - 1;
+        const connector = isLast ? "\u2514\u2500\u2500" : "\u251C\u2500\u2500";
+        const childPrefix = isLast ? `${prefix}    ` : `${prefix}\u2502   `;
+        lines.push(`${prefix}${connector} ${child.node.id}: ${child.node.title} ${child.node.marker}`);
+        if (child.children.length > 0) {
+          renderChildren(child.children, childPrefix, lines);
+        }
+      }
+    }
+    function runVisualize2(cwd, args) {
+      const graphResult = buildDagFromDisk(cwd);
+      if (graphResult.error) return graphResult;
+      const { dag } = graphResult;
+      const scopeId = args[0] && !args[0].startsWith("--") ? args[0] : null;
+      const outputFile = parseFlag(args, "output");
+      let scopeFilter = null;
+      if (scopeId) {
+        const scopeNode = dag.getNode(scopeId);
+        if (!scopeNode) {
+          return { error: `Node not found: ${scopeId}. Use a valid D-XX or M-XX ID.` };
+        }
+        scopeFilter = getSubtreeNodeIds(dag, scopeId);
+      }
+      const tree = buildTreeData(dag, scopeFilter);
+      const formatted = formatTree(tree);
+      let declCount = 0;
+      let msCount = 0;
+      let actCount = 0;
+      function countNodes(nodes) {
+        for (const entry of nodes) {
+          const type = entry.node.type;
+          if (type === "declaration") declCount++;
+          else if (type === "milestone") msCount++;
+          else if (type === "action") actCount++;
+          countNodes(entry.children);
+        }
+      }
+      countNodes(tree);
+      const result = {
+        scope: scopeId || "full",
+        tree,
+        formatted,
+        stats: { declarations: declCount, milestones: msCount, actions: actCount }
+      };
+      if (outputFile) {
+        const resolvedOutput = resolve(cwd, outputFile);
+        writeFileSync(resolvedOutput, formatted, "utf-8");
+        result.outputFile = resolvedOutput;
+      }
+      return result;
+    }
+    module2.exports = { runVisualize: runVisualize2, getSubtreeNodeIds, buildTreeData, formatTree, statusMarker };
+  }
+});
+
 // src/declare-tools.js
 var { commitPlanningDocs } = require_commit();
 var { runInit } = require_init();
@@ -1536,6 +1695,7 @@ var { runCreatePlan } = require_create_plan();
 var { runLoadGraph } = require_load_graph();
 var { runTrace } = require_trace();
 var { runPrioritize } = require_prioritize();
+var { runVisualize } = require_visualize();
 function parseCwdFlag(argv) {
   const idx = argv.indexOf("--cwd");
   if (idx === -1 || idx + 1 >= argv.length) return null;
@@ -1573,7 +1733,7 @@ function main() {
   const args = process.argv.slice(2);
   const command = args[0];
   if (!command) {
-    console.log(JSON.stringify({ error: "No command specified. Use: commit, init, status, add-declaration, add-milestone, create-plan, load-graph, trace, prioritize, help" }));
+    console.log(JSON.stringify({ error: "No command specified. Use: commit, init, status, add-declaration, add-milestone, create-plan, load-graph, trace, prioritize, visualize, help" }));
     process.exit(1);
   }
   try {
@@ -1659,8 +1819,15 @@ function main() {
         if (result.error) process.exit(1);
         break;
       }
+      case "visualize": {
+        const cwdVisualize = parseCwdFlag(args) || process.cwd();
+        const result = runVisualize(cwdVisualize, args.slice(1));
+        console.log(JSON.stringify(result));
+        if (result.error) process.exit(1);
+        break;
+      }
       default:
-        console.log(JSON.stringify({ error: `Unknown command: ${command}. Use: commit, init, status, add-declaration, add-milestone, create-plan, load-graph, trace, prioritize, help` }));
+        console.log(JSON.stringify({ error: `Unknown command: ${command}. Use: commit, init, status, add-declaration, add-milestone, create-plan, load-graph, trace, prioritize, visualize, help` }));
         process.exit(1);
     }
   } catch (err) {

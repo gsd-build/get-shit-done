@@ -32,6 +32,7 @@ const { runCreatePlan } = require('./commands/create-plan');
 const { runLoadGraph } = require('./commands/load-graph');
 const { runTrace } = require('./commands/trace');
 const { runPrioritize } = require('./commands/prioritize');
+const { runVisualize } = require('./commands/visualize');
 
 /**
  * Parse --cwd flag from argv.
@@ -95,7 +96,7 @@ function main() {
   const command = args[0];
 
   if (!command) {
-    console.log(JSON.stringify({ error: 'No command specified. Use: commit, init, status, add-declaration, add-milestone, create-plan, load-graph, trace, prioritize, help' }));
+    console.log(JSON.stringify({ error: 'No command specified. Use: commit, init, status, add-declaration, add-milestone, create-plan, load-graph, trace, prioritize, visualize, help' }));
     process.exit(1);
   }
 
@@ -193,8 +194,16 @@ function main() {
         break;
       }
 
+      case 'visualize': {
+        const cwdVisualize = parseCwdFlag(args) || process.cwd();
+        const result = runVisualize(cwdVisualize, args.slice(1));
+        console.log(JSON.stringify(result));
+        if (result.error) process.exit(1);
+        break;
+      }
+
       default:
-        console.log(JSON.stringify({ error: `Unknown command: ${command}. Use: commit, init, status, add-declaration, add-milestone, create-plan, load-graph, trace, prioritize, help` }));
+        console.log(JSON.stringify({ error: `Unknown command: ${command}. Use: commit, init, status, add-declaration, add-milestone, create-plan, load-graph, trace, prioritize, visualize, help` }));
         process.exit(1);
     }
   } catch (err) {
