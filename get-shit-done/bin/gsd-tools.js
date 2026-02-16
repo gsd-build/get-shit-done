@@ -6532,6 +6532,11 @@ async function main() {
       break;
     }
 
+    case 'completion': {
+      cmdCompletion(cwd, args.slice(1), raw);
+      break;
+    }
+
     default:
       error(`Unknown command: ${command}`);
   }
