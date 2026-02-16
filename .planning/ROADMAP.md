@@ -174,13 +174,15 @@ Plans:
   9. Task chunking splits large tasks into batches (e.g., "update 350 tests" -> multiple runs)
   10. Phase size limits trigger splitting when too many requirements exceed safe handling
   11. Batch processing optimizes repetitive operations (tests, migrations, refactors)
-**Plans**: TBD
+**Plans:** 6 plans
 
 Plans:
-- [ ] 07-01: TBD
-- [ ] 07-02: TBD
-- [ ] 07-03: TBD
-- [ ] 07-04: TBD
+- [x] 07-01-PLAN.md - Token budget monitoring with 80% alert thresholds
+- [x] 07-02-PLAN.md - Failure handling with retry/skip/escalate options
+- [x] 07-03-PLAN.md - Structured completion signals for sub-coordinators
+- [ ] 07-04-PLAN.md - Task chunker with large task detection and batch processing (gap closure)
+- [ ] 07-05-PLAN.md - Phase size limits with split recommendations (gap closure)
+- [ ] 07-06-PLAN.md - Parallel executor with worker pool (gap closure)
 
 ### Phase 8: Notifications & Observability
 **Goal**: Production-ready deployment with Telegram notifications for blocking questions and comprehensive observability for cost control and progress tracking
@@ -233,10 +235,10 @@ Phase 7 (Autonomous Optimization) --> Phase 8 (Notifications & Observability)
 | 3. Knowledge System Foundation | 5 | Planning complete | - |
 | 4. Knowledge Extraction & Hooks | 6 | Planning complete | - |
 | 5. Knowledge Permissions & Safety | 6 | Planning complete | - |
-| 6. Autonomous Execution Core | 5 | Planning complete | - |
-| 7. Autonomous Execution Optimization | TBD | Not started | - |
+| 6. Autonomous Execution Core | 6 | In progress | - |
+| 7. Autonomous Execution Optimization | 6 | Gap closure planned | - |
 | 8. Notifications & Observability | TBD | Not started | - |
 
 ---
 *Roadmap created: 2026-02-15*
-*Last updated: 2026-02-16 after Phase 6 planning*
+*Last updated: 2026-02-16 after Phase 7 gap closure planning*
