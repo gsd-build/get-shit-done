@@ -172,6 +172,9 @@ Recent decisions affecting current work:
 - [Phase 09-03]: Match both full path and basename for flexible glob pattern matching
 - [Phase 09-03]: 5-minute default cache TTL balances freshness and performance
 - [Phase 09-03]: Pass-through on error (don't block reads) for resilience
+- [Phase 08]: Use __dirname for dotenv path resolution (stable, script-relative)
+- [Phase 08]: Capture PROJECT_ROOT at module load time (before any cwd changes)
+- [Phase 08]: Replace process.cwd() with PROJECT_ROOT in session logger paths
 
 ### Pending Todos
 
@@ -183,6 +186,6 @@ None yet.
 
 ## Session Continuity
 
-Last session: 2026-02-16T19:05:41Z (plan execution)
-Stopped at: Completed 09-03-PLAN.md (PreToolUse Hook with Compression Cache)
+Last session: 2026-02-16T19:16:30Z (plan execution)
+Stopped at: Completed 08-08-PLAN.md (UAT Gap Closure - Environment and Path Fixes)
 Resume file: None
