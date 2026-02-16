@@ -18,6 +18,45 @@
  */
 
 const { commitPlanningDocs } = require('./git/commit');
+const { runInit } = require('./commands/init');
+const { runStatus } = require('./commands/status');
+const { runHelp } = require('./commands/help');
+
+/**
+ * Parse --cwd flag from argv.
+ * @param {string[]} argv
+ * @returns {string | null}
+ */
+function parseCwdFlag(argv) {
+  const idx = argv.indexOf('--cwd');
+  if (idx === -1 || idx + 1 >= argv.length) return null;
+  return argv[idx + 1];
+}
+
+/**
+ * Extract positional arguments from argv, stripping known flags and their values.
+ * Strips: --cwd <value>, --files <values...>
+ * @param {string[]} argv - Arguments after the subcommand (e.g., args.slice(1))
+ * @returns {string[]}
+ */
+function parsePositionalArgs(argv) {
+  const positional = [];
+  let i = 0;
+  while (i < argv.length) {
+    if (argv[i] === '--cwd') {
+      i += 2; // skip flag and value
+    } else if (argv[i] === '--files') {
+      i++; // skip flag
+      while (i < argv.length && !argv[i].startsWith('--')) i++; // skip file values
+    } else if (argv[i].startsWith('--')) {
+      i++; // skip unknown flag
+    } else {
+      positional.push(argv[i]);
+      i++;
+    }
+  }
+  return positional;
+}
 
 /**
  * Parse --files flag from argv.
@@ -65,17 +104,27 @@ function main() {
         break;
       }
 
-      case 'init':
-        console.log(JSON.stringify({ status: 'not_implemented', command: 'init', message: 'Init command not yet implemented (Plan 03)' }));
+      case 'init': {
+        const cwdInit = parseCwdFlag(args) || process.cwd();
+        const initArgs = parsePositionalArgs(args.slice(1));
+        const result = runInit(cwdInit, initArgs);
+        console.log(JSON.stringify(result));
         break;
+      }
 
-      case 'status':
-        console.log(JSON.stringify({ status: 'not_implemented', command: 'status', message: 'Status command not yet implemented (Plan 03)' }));
+      case 'status': {
+        const cwdStatus = parseCwdFlag(args) || process.cwd();
+        const result = runStatus(cwdStatus);
+        console.log(JSON.stringify(result));
+        if (result.error) process.exit(1);
         break;
+      }
 
-      case 'help':
-        console.log(JSON.stringify({ status: 'not_implemented', command: 'help', message: 'Help command not yet implemented (Plan 03)' }));
+      case 'help': {
+        const result = runHelp();
+        console.log(JSON.stringify(result));
         break;
+      }
 
       default:
         console.log(JSON.stringify({ error: `Unknown command: ${command}. Use: commit, init, status, help` }));
