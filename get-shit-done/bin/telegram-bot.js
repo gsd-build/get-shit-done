@@ -32,6 +32,7 @@ if (!process.env.TELEGRAM_BOT_TOKEN) {
 
 const { Telegraf } = require('telegraf');
 const conversation = require('./telegram-conversation.js');
+const { transcribeAudio, checkWhisperModel } = require('./whisper-transcribe.js');
 
 // Initialize bot
 const bot = new Telegraf(process.env.TELEGRAM_BOT_TOKEN);
@@ -53,8 +54,11 @@ bot.command('start', (ctx) => {
     'Commands:\n' +
     '/status - Show pending questions count\n' +
     '/pending - List all pending questions\n' +
-    '/cancel <questionId> - Cancel a pending question\n\n' +
-    'To respond to a question, just send the question ID followed by your answer.'
+    '/cancel <questionId> - Cancel a pending question\n' +
+    '/whisper - Check voice transcription status\n\n' +
+    'To respond to a question:\n' +
+    '- Type: <questionId> <your answer>\n' +
+    '- Or send a voice message (transcribed locally via Whisper)'
   );
 });
 
@@ -196,6 +200,127 @@ bot.on('callback_query', (ctx) => {
     ctx.reply(`✓ Selected: ${choice}`);
   } else {
     ctx.answerCbQuery('Question not found or already answered');
+  }
+});
+
+/**
+ * Voice message handler: Transcribe voice and respond to pending questions
+ */
+bot.on('voice', async (ctx) => {
+  const pending = conversation.getPendingQuestions();
+
+  if (pending.length === 0) {
+    await ctx.reply('No pending question. Voice message ignored.');
+    return;
+  }
+
+  // Get most recent pending question
+  const latestQuestion = pending[pending.length - 1];
+
+  try {
+    // Check model availability
+    const modelStatus = await checkWhisperModel();
+    if (!modelStatus.available) {
+      await ctx.reply(`Cannot process voice: ${modelStatus.message}`);
+      return;
+    }
+
+    // Notify user we're processing
+    await ctx.reply('Processing voice message...');
+
+    // Get file download URL
+    const fileId = ctx.message.voice.file_id;
+    const fileSize = ctx.message.voice.file_size;
+
+    // Check file size limit (20MB)
+    if (fileSize > 20 * 1024 * 1024) {
+      await ctx.reply('Voice message too large (>20MB). Please send a shorter clip.');
+      return;
+    }
+
+    const fileLink = await ctx.telegram.getFileLink(fileId);
+
+    // Transcribe
+    const transcription = await transcribeAudio(fileLink.href);
+
+    // Confirm transcription to user
+    await ctx.reply(`Transcribed: "${transcription}"\n\nResuming execution...`);
+
+    // Resolve the pending question
+    conversation.handleResponse(latestQuestion.questionId, {
+      type: 'voice',
+      content: transcription,
+      original_duration: ctx.message.voice.duration
+    });
+  } catch (error) {
+    await ctx.reply(`Transcription error: ${error.message}`);
+  }
+});
+
+/**
+ * Audio message handler: Transcribe audio and respond to pending questions
+ */
+bot.on('audio', async (ctx) => {
+  const pending = conversation.getPendingQuestions();
+
+  if (pending.length === 0) {
+    await ctx.reply('No pending question. Audio message ignored.');
+    return;
+  }
+
+  // Get most recent pending question
+  const latestQuestion = pending[pending.length - 1];
+
+  try {
+    // Check model availability
+    const modelStatus = await checkWhisperModel();
+    if (!modelStatus.available) {
+      await ctx.reply(`Cannot process audio: ${modelStatus.message}`);
+      return;
+    }
+
+    // Notify user we're processing
+    await ctx.reply('Processing audio message...');
+
+    // Get file download URL
+    const fileId = ctx.message.audio.file_id;
+    const fileSize = ctx.message.audio.file_size;
+
+    // Check file size limit (20MB)
+    if (fileSize > 20 * 1024 * 1024) {
+      await ctx.reply('Audio message too large (>20MB). Please send a shorter clip.');
+      return;
+    }
+
+    const fileLink = await ctx.telegram.getFileLink(fileId);
+
+    // Transcribe
+    const transcription = await transcribeAudio(fileLink.href);
+
+    // Confirm transcription to user
+    await ctx.reply(`Transcribed: "${transcription}"\n\nResuming execution...`);
+
+    // Resolve the pending question
+    conversation.handleResponse(latestQuestion.questionId, {
+      type: 'audio',
+      content: transcription,
+      original_duration: ctx.message.audio.duration
+    });
+  } catch (error) {
+    await ctx.reply(`Transcription error: ${error.message}`);
+  }
+});
+
+/**
+ * Command: /whisper
+ * Check Whisper model status
+ */
+bot.command('whisper', async (ctx) => {
+  const status = await checkWhisperModel();
+  if (status.available) {
+    await ctx.reply(`Whisper model ready: ${status.path}`);
+  } else {
+    await ctx.reply(`Whisper not available: ${status.message}`);
   }
 });
 
