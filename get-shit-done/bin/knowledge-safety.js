@@ -87,13 +87,43 @@ function estimateActionCost(action, context = {}) {
   const lowerAction = action.toLowerCase();
 
   // AWS/cloud resources
-  if (lowerAction.includes('aws:') || lowerAction.includes('cloud_resource')) {
+  if (lowerAction.includes('aws') || lowerAction.includes('cloud_resource')) {
     return 0.10; // Conservative estimate
+  }
+
+  // GCP resources
+  if (lowerAction.includes('gcp')) {
+    return 0.10;
+  }
+
+  // Azure resources
+  if (lowerAction.includes('azure')) {
+    return 0.10;
   }
 
   // API calls with token estimates
   if (lowerAction.includes('api_call') && context.estimated_tokens) {
     return (context.estimated_tokens / 1000000) * 0.50;
+  }
+
+  // OpenAI API calls
+  if (lowerAction.includes('openai')) {
+    return 0.05;
+  }
+
+  // Anthropic API calls
+  if (lowerAction.includes('anthropic')) {
+    return 0.05;
+  }
+
+  // Stripe charges
+  if (lowerAction.includes('stripe_charge')) {
+    return 0.05;
+  }
+
+  // Deploy to production
+  if (lowerAction.includes('deploy_to')) {
+    return 0.10;
   }
 
   // Paid APIs

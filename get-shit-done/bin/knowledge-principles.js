@@ -19,7 +19,9 @@ const ACTION_TYPES = {
     'sms', 'push_notification'
   ],
   costly: [
-    'cloud_resource', 'paid_api', 'large_compute'
+    'cloud_resource', 'paid_api', 'large_compute',
+    'aws_', 'gcp_', 'azure_', 'stripe_charge',
+    'openai_', 'anthropic_', 'deploy_to'
   ]
 };
 
