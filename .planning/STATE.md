@@ -5,23 +5,23 @@
 See: .planning/PROJECT.md (updated 2026-02-15)
 
 **Core value:** Performance is the product of alignment and integrity. Declare makes both structurally enforced and visibly measured.
-**Current focus:** Phase 04 in progress -- Execution Pipeline
+**Current focus:** Phase 04 complete -- Execution Pipeline
 
 ## Current Position
 
-Phase: 04 of 6 (Execution Pipeline)
-Plan: 1 of 2 in current phase
-Status: Plan 04-01 complete
-Last activity: 2026-02-16 — Completed 04-01 (execution pipeline engine modules)
+Phase: 04 of 6 (Execution Pipeline) -- COMPLETE
+Plan: 2 of 2 in current phase
+Status: Phase 04 complete
+Last activity: 2026-02-16 — Completed 04-02 (execution pipeline wiring and slash command)
 
-Progress: [███████░░░] 60%
+Progress: [████████░░] 67%
 
 ## Performance Metrics
 
 **Velocity:**
-- Total plans completed: 11
+- Total plans completed: 12
 - Average duration: 4min
-- Total execution time: 0.68 hours
+- Total execution time: 0.73 hours
 
 **By Phase:**
 
@@ -31,10 +31,10 @@ Progress: [███████░░░] 60%
 | 02-future-declaration-backward-derivation | 2/2 | 6min | 3min |
 | 02.1-artifact-separation-and-command-split | 3/3 | 11min | 4min |
 | 03-traceability-navigation | 2/2 | 7min | 4min |
-| 04-execution-pipeline | 1/2 | 2min | 2min |
+| 04-execution-pipeline | 2/2 | 5min | 3min |
 
 **Recent Trend:**
-- Last 5 plans: 02.1-03 (3min), 03-01 (4min), 03-02 (3min), 04-01 (2min)
+- Last 5 plans: 02.1-03 (3min), 03-01 (4min), 03-02 (3min), 04-01 (2min), 04-02 (3min)
 - Trend: Consistent
 
 *Updated after each plan completion*
@@ -82,6 +82,9 @@ Recent decisions affecting current work:
 - [04-01]: generateExecPlan is pure function (no I/O) in artifacts/; runGenerateExecPlan is I/O wrapper in commands/
 - [04-01]: verify-wave uses looksLikeFilePath heuristic for produces field (descriptions auto-pass)
 - [04-01]: v1 wave model: all sibling actions within a milestone form a single wave (no inter-action edges)
+- [04-02]: execute.js returns milestone picker (not error) when no --milestone flag (interactive mode)
+- [04-02]: Exec plans generated on-demand per wave, not upfront (reduces wasted work on early failures)
+- [04-02]: /declare:execute uses Task tool for parallel agent spawning, two-layer verification (CJS + AI review)
 
 ### Pending Todos
 
@@ -99,5 +102,5 @@ Recent decisions affecting current work:
 ## Session Continuity
 
 Last session: 2026-02-16
-Stopped at: Completed 04-01-PLAN.md
-Resume file: .planning/phases/04-execution-pipeline/04-01-SUMMARY.md
+Stopped at: Completed 04-02-PLAN.md (Phase 04 complete)
+Resume file: .planning/phases/04-execution-pipeline/04-02-SUMMARY.md
