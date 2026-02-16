@@ -149,6 +149,7 @@ const { TokenBudgetMonitor, estimatePhaseTokens } = require('./token-monitor.js'
 const { FailureHandler, executeWithRetry } = require('./failure-handler.js');
 const { CompletionSignal, COMPLETION_STATUS } = require('./completion-signal.js');
 const { TaskChunker, BatchCoordinator, analyzeTask, estimateTaskTokens } = require('./task-chunker.js');
+const { estimatePhaseSize, detectOversizedPhases, recommendSplit, validateSplitPreservesDependencies, LIMITS: PHASE_LIMITS } = require('./phase-sizer.js');
 
 // ─── Model Profile Table ─────────────────────────────────────────────────────
 
@@ -4878,6 +4879,159 @@ function cmdPhaseComplete(cwd, phaseNum, raw) {
   output(result, raw);
 }
 
+// ─── Phase Size ───────────────────────────────────────────────────────────────
+
+async function cmdPhaseSize(cwd, args, raw) {
+  const subcommand = args[0];
+  const roadmapPath = path.join(cwd, '.planning', 'ROADMAP.md');
+
+  // Helper to get phases from roadmap
+  const getPhases = async () => {
+    if (!fs.existsSync(roadmapPath)) {
+      error('ROADMAP.md not found');
+    }
+    const { phases } = await parseRoadmap(roadmapPath);
+    return phases;
+  };
+
+  switch (subcommand) {
+    case 'limits': {
+      // Display current limits
+      output(PHASE_LIMITS, raw, Object.entries(PHASE_LIMITS)
+        .map(([k, v]) => `${k}: ${v}`)
+        .join('\n'));
+      break;
+    }
+
+    case 'estimate': {
+      // Estimate size for a specific phase
+      const phaseNum = parseInt(args[1]);
+      if (!phaseNum) {
+        error('phase size estimate: phase number required');
+      }
+
+      const phases = await getPhases();
+      const phase = phases.find(p => p.number === phaseNum);
+      if (!phase) {
+        error(`Phase ${phaseNum} not found`);
+      }
+
+      const estimate = estimatePhaseSize(phase);
+      output({
+        phase: phaseNum,
+        name: phase.name,
+        ...estimate
+      }, raw);
+      break;
+    }
+
+    case 'check': {
+      // Check all phases for size issues
+      const phases = await getPhases();
+      const oversized = detectOversizedPhases(phases);
+
+      const result = {
+        total_phases: phases.length,
+        oversized_count: oversized.length,
+        oversized: oversized.map(o => ({
+          phase: o.phase,
+          name: o.name,
+          reasons: o.reasons
+        }))
+      };
+
+      if (raw) {
+        output(result, raw);
+      } else {
+        if (oversized.length === 0) {
+          console.log('All phases within size limits');
+        } else {
+          console.log(`Found ${oversized.length} oversized phase(s):`);
+          for (const o of oversized) {
+            console.log(`\n  Phase ${o.phase}: ${o.name}`);
+            for (const reason of o.reasons) {
+              console.log(`    - ${reason}`);
+            }
+          }
+        }
+      }
+
+      // Exit code: 0 if none oversized, 1 if any oversized
+      process.exit(oversized.length > 0 ? 1 : 0);
+    }
+
+    case 'split-recommend': {
+      // Get split recommendations for a phase
+      const phaseNum = parseInt(args[1]);
+      if (!phaseNum) {
+        error('phase size split-recommend: phase number required');
+      }
+
+      const phases = await getPhases();
+      const phase = phases.find(p => p.number === phaseNum);
+      if (!phase) {
+        error(`Phase ${phaseNum} not found`);
+      }
+
+      const recommendation = recommendSplit(phase);
+      const validation = validateSplitPreservesDependencies(phase, recommendation.recommendations, phases);
+
+      output({
+        phase: phaseNum,
+        name: phase.name,
+        ...recommendation,
+        dependency_validation: validation
+      }, raw);
+      break;
+    }
+
+    default: {
+      // Show size estimates for all phases (table format)
+      const phases = await getPhases();
+      const phaseNum = subcommand ? parseInt(subcommand) : null;
+
+      if (phaseNum) {
+        // Single phase
+        const phase = phases.find(p => p.number === phaseNum);
+        if (!phase) {
+          error(`Phase ${phaseNum} not found`);
+        }
+        const estimate = estimatePhaseSize(phase);
+        output({
+          phase: phaseNum,
+          name: phase.name,
+          ...estimate
+        }, raw);
+      } else {
+        // All phases table
+        const results = phases.map(p => {
+          const est = estimatePhaseSize(p);
+          return {
+            phase: p.number,
+            name: p.name.substring(0, 30),
+            requirements: est.requirements,
+            criteria: est.successCriteria,
+            plans: est.estimatedPlans,
+            tokens: est.estimatedTokens,
+            risk: est.riskLevel
+          };
+        });
+
+        if (raw) {
+          output({ phases: results }, raw);
+        } else {
+          console.log('Phase | Name                           | Reqs | Criteria | Plans | Tokens  | Risk');
+          console.log('------|--------------------------------|------|----------|-------|---------|------');
+          for (const r of results) {
+            console.log(`${String(r.phase).padEnd(5)} | ${r.name.padEnd(30)} | ${String(r.requirements).padStart(4)} | ${String(r.criteria).padStart(8)} | ${String(r.plans).padStart(5)} | ${String(r.tokens).padStart(7)} | ${r.risk}`);
+          }
+        }
+      }
+      break;
+    }
+  }
+}
+
 // ─── Phase Archive ────────────────────────────────────────────────────────────
 
 async function cmdPhaseArchive(cwd, phaseNum, raw) {
@@ -6475,8 +6629,10 @@ async function main() {
         await cmdPhaseInjectContext(cwd, args[2], raw);
       } else if (subcommand === 'cleanup-checkpoints') {
         await cmdPhaseCleanupCheckpoints(cwd, args[2], raw);
+      } else if (subcommand === 'size' || subcommand === 'limits' || subcommand === 'check' || subcommand === 'split-recommend') {
+        await cmdPhaseSize(cwd, args.slice(1), raw);
       } else {
-        error('Unknown phase subcommand. Available: next-decimal, add, insert, remove, complete, archive, inject-context, cleanup-checkpoints');
+        error('Unknown phase subcommand. Available: next-decimal, add, insert, remove, complete, archive, inject-context, cleanup-checkpoints, size, limits, check, split-recommend');
       }
       break;
     }
