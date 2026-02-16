@@ -142,7 +142,25 @@ Execute each wave in sequence. Within a wave: parallel if `PARALLELIZATION=true`
    - Check `git log --oneline --all --grep="{phase}-{plan}"` returns ≥1 commit
    - Check for `## Self-Check: FAILED` marker
 
-   If ANY spot-check fails: report which plan failed, route to failure handler — ask "Retry plan?" or "Continue with remaining waves?"
+   If ANY spot-check fails:
+
+   **Auto-debug (if enabled):**
+   ```bash
+   DEEP_DEBUG=$(node ~/.claude/get-shit-done/bin/gsd-tools.cjs config get workflow.deep_debug_on_failure 2>/dev/null || echo "true")
+   ```
+
+   If `deep_debug_on_failure` is true:
+   ```
+   Task(
+     prompt="Debug failing plan: {plan_id}\n\nSUMMARY.md self-check FAILED. Investigate root cause and fix.",
+     subagent_type="general-purpose",
+     model="{executor_model}",
+     description="Deep debug {plan_id}"
+   )
+   ```
+   After debug: re-run spot-check. If still fails: route to failure handler.
+
+   If `deep_debug_on_failure` is false: report which plan failed, route to failure handler — ask "Retry plan?" or "Continue with remaining waves?"
 
    If pass:
    ```
