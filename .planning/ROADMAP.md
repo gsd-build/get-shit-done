@@ -96,11 +96,11 @@ Plans:
   2. Independent branches execute in parallel via wave-based scheduling
   3. Each action has a PLAN.md created using forked GSD planner patterns
   4. After each action completes, system verifies the action advanced its parent milestone (upward causation check)
-**Plans**: TBD
+**Plans**: 2 plans
 
 Plans:
-- [ ] 04-01: TBD
-- [ ] 04-02: TBD
+- [ ] 04-01-PLAN.md -- Core engine modules: compute-waves, exec-plan generator, verify-wave (data layer)
+- [ ] 04-02-PLAN.md -- Execute command, declare-tools wiring, bundle rebuild, /declare:execute slash command (orchestration layer)
 
 ### Phase 5: Integrity System
 **Goal**: Commitments are explicit, tracked, and when broken, the system guides restoration rather than punishment
