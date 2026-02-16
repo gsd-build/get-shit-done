@@ -2,21 +2,15 @@
 
 ## What This Is
 
-A meta-prompting, context engineering, and spec-driven development system for Claude Code, OpenCode, and Gemini CLI. GSD solves "context rot" — quality degradation as Claude fills its context window — through structured planning, multi-agent orchestration, and atomic execution.
+A meta-prompting, context engineering, and spec-driven development system for Claude Code, OpenCode, and Gemini CLI. GSD solves "context rot" — quality degradation as Claude fills its context window — through structured planning, multi-agent orchestration, and atomic execution. Includes adversarial review at key workflow checkpoints to catch unchallenged assumptions before they reach execution.
 
 ## Core Value
 
 Quality doesn't degrade as context grows. Every session starts fresh with full project context.
 
-## Current Milestone: v2.1 Adversary Agent
+## Current Milestone
 
-**Goal:** Add adversarial review agent that challenges assumptions and stress-tests feasibility at key workflow checkpoints.
-
-**Target features:**
-- Constructive adversary challenges at requirements, roadmap, plan, and verification checkpoints
-- Iterative debate loop until convergence or max rounds
-- Configurable per-checkpoint toggles
-- Advisory-only (Claude makes final decisions)
+Planning next milestone. Run `/gsd:new-milestone` to begin.
 
 ## Requirements
 
@@ -29,28 +23,32 @@ Quality doesn't degrade as context grows. Every session starts fresh with full p
 - ✓ 11 specialized subagents — research, planning, execution, verification, debugging
 - ✓ State-driven workflows with `.planning/` artifacts — PROJECT.md, ROADMAP.md, STATE.md, REQUIREMENTS.md
 - ✓ Hooks for status display and update checks — gsd-statusline.js, gsd-check-update.js
-- ✓ Frontmatter conversion between runtimes — YAML ↔ TOML, permission mapping
+- ✓ Frontmatter conversion between runtimes — YAML <-> TOML, permission mapping
 - ✓ Path replacement for global/local installs — `~/.claude/` → actual paths
 - ✓ Model profiles for agent spawning — quality, balanced, budget
 - ✓ Orchestrator-agent architecture with parallel execution
 - ✓ Plan checker agent for plan verification
 - ✓ Verification agents for post-execution checks
 
+*v2.1 Adversary Agent — shipped 2026-02-13*
+
+- ✓ Single gsd-adversary agent with checkpoint adaptation — v2.1
+- ✓ Adversary challenges after requirements definition — v2.1
+- ✓ Adversary challenges after roadmap creation — v2.1
+- ✓ Adversary challenges after each plan creation — v2.1
+- ✓ Adversary challenges after verification conclusions — v2.1
+- ✓ Iterative debate loop until adversary signals "no objections" — v2.1
+- ✓ Claude makes final decision after max rounds if no convergence — v2.1
+- ✓ Dynamic challenge style adapting to artifact type — v2.1
+- ✓ Global toggle enables/disables adversary in config.json — v2.1
+- ✓ Max rounds configurable in config.json — v2.1
+- ✓ Individual checkpoints can be toggled on/off — v2.1
+
 ### Active
 
-*v2.1 Adversary Agent*
+*Next milestone — TBD*
 
-- [ ] Single `gsd-adversary` agent that handles all checkpoint types
-- [ ] Adversary challenges after requirements definition
-- [ ] Adversary challenges after roadmap creation
-- [ ] Adversary challenges after each plan creation
-- [ ] Adversary challenges after verification conclusions
-- [ ] Iterative debate loop until adversary signals "no objections"
-- [ ] Claude makes final decision after max rounds if no convergence
-- [ ] Dynamic challenge style adapting to artifact type
-- [ ] Global toggle enables/disables adversary in config.json
-- [ ] Max rounds configurable in config.json
-- [ ] Individual checkpoints can be toggled on/off
+(Run `/gsd:new-milestone` to define requirements for next milestone)
 
 ### Out of Scope
 
@@ -62,24 +60,15 @@ Quality doesn't degrade as context grows. Every session starts fresh with full p
 
 ## Context
 
-GSD already has verification agents (gsd-verifier, gsd-plan-checker) but these validate structure and completeness — they don't actively challenge assumptions or argue against decisions. The adversary agent is different: it takes an oppositional stance, forcing Claude to defend choices.
+GSD v2.1 ships with 12 specialized subagents including gsd-adversary, 27+ slash commands, and adversarial review at four workflow checkpoints. The adversary integration uses consistent patterns across commands: config reading via node -e, debate loops with CONV-01 hard cap, and agent-as-defender revision for complex artifacts.
 
-The existing architecture supports this well:
-- Commands can spawn the adversary as another parallel agent
-- Agent receives artifact + type, returns challenges or "no objections"
-- Iterative loops already exist (plan-checker iterates up to 3 times)
-
-Integration points are clear:
-- `/gsd:new-project` → after REQUIREMENTS.md creation
-- `/gsd:new-project` → after ROADMAP.md creation
-- `/gsd:plan-phase` → after PLAN.md creation
-- `/gsd:verify-work` → after verification
+Tech stack: Node.js installer, Markdown prompts with YAML frontmatter, JSON configuration, bash hooks.
 
 ## Constraints
 
 - **Architecture**: Must fit existing orchestrator-agent pattern — agent spawned via Task tool
 - **Context**: Agent must work with fresh context window (no conversation history)
-- **Convergence**: Max rounds before Claude decides (prevent infinite loops)
+- **Convergence**: Max 3 rounds before Claude decides (prevent infinite loops)
 - **Style**: Adversary adapts tone — rigorous on feasibility, constructive on completeness, devil's advocate on assumptions
 - **Runtime**: Must work across Claude Code, OpenCode, and Gemini CLI
 
@@ -87,10 +76,16 @@ Integration points are clear:
 
 | Decision | Rationale | Outcome |
 |----------|-----------|---------|
-| Single agent vs specialized | Reduces maintenance, patterns apply universally | — Pending |
-| Advisory vs blocking | Prevents workflow deadlock, Claude owns final call | — Pending |
-| Dynamic style | Different challenges need different approaches | — Pending |
-| zpyoung community fork | Original TÂCHES project evolved to community-maintained | ✓ Good |
+| Single agent vs specialized | Reduces maintenance, patterns apply universally | ✓ Good |
+| Advisory vs blocking | Prevents workflow deadlock, Claude owns final call | ✓ Good |
+| Dynamic style | Different challenges need different approaches | ✓ Good |
+| zpyoung community fork | Original TACHES project evolved to community-maintained | ✓ Good |
+| Stateless rounds | Simpler implementation, forces context to be self-contained | ✓ Good |
+| Planner-as-defender | Re-spawn planner for revisions with plan-level knowledge | ✓ Good |
+| Verifier-as-defender | Re-spawn verifier for targeted re-examination | ✓ Good |
+| Node-e config parsing | Polymorphic values need real JSON parser, not grep | ✓ Good |
+| Post-adversary status re-read | Catches status downgrades from verifier re-examination | ✓ Good |
+| Adversary opt-out | Enabled by default, missing config = system defaults | ✓ Good |
 
 ---
-*Last updated: 2026-01-31 after v2.1 milestone initialization*
+*Last updated: 2026-02-13 after v2.1 milestone completion*
