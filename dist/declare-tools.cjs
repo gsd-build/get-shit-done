@@ -747,9 +747,9 @@ var require_engine = __commonJS({
   }
 });
 
-// src/commands/load-graph.js
-var require_load_graph = __commonJS({
-  "src/commands/load-graph.js"(exports2, module2) {
+// src/commands/build-dag.js
+var require_build_dag = __commonJS({
+  "src/commands/build-dag.js"(exports2, module2) {
     "use strict";
     var { existsSync, readFileSync, readdirSync } = require("node:fs");
     var { join } = require("node:path");
@@ -780,7 +780,7 @@ var require_load_graph = __commonJS({
       }
       return allActions;
     }
-    function runLoadGraph2(cwd) {
+    function buildDagFromDisk(cwd) {
       const planningDir = join(cwd, ".planning");
       if (!existsSync(planningDir)) {
         return { error: "No Declare project found. Run /declare:init first." };
@@ -816,15 +816,9 @@ var require_load_graph = __commonJS({
           }
         }
       }
-      return {
-        declarations,
-        milestones,
-        actions,
-        stats: dag.stats(),
-        validation: dag.validate()
-      };
+      return { dag, declarations, milestones, actions };
     }
-    module2.exports = { runLoadGraph: runLoadGraph2, loadActionsFromFolders };
+    module2.exports = { buildDagFromDisk, loadActionsFromFolders };
   }
 });
 
@@ -835,12 +829,9 @@ var require_status = __commonJS({
     var { existsSync, readFileSync } = require("node:fs");
     var { join, basename } = require("node:path");
     var { execFileSync } = require("node:child_process");
-    var { parseFutureFile } = require_future();
-    var { parseMilestonesFile } = require_milestones();
     var { parsePlanFile } = require_plan();
     var { findMilestoneFolder } = require_milestone_folders();
-    var { loadActionsFromFolders } = require_load_graph();
-    var { DeclareDag } = require_engine();
+    var { buildDagFromDisk } = require_build_dag();
     function detectStaleness(cwd, planningDir, milestones) {
       const indicators = [];
       for (const m of milestones) {
@@ -880,41 +871,10 @@ var require_status = __commonJS({
     }
     function runStatus2(cwd) {
       const planningDir = join(cwd, ".planning");
-      if (!existsSync(planningDir)) {
-        return { error: "No Declare project found. Run /declare:init first." };
-      }
+      const graphResult = buildDagFromDisk(cwd);
+      if (graphResult.error) return graphResult;
+      const { dag, declarations, milestones, actions } = graphResult;
       const projectName = basename(cwd);
-      const futurePath = join(planningDir, "FUTURE.md");
-      const milestonesPath = join(planningDir, "MILESTONES.md");
-      const futureContent = existsSync(futurePath) ? readFileSync(futurePath, "utf-8") : "";
-      const milestonesContent = existsSync(milestonesPath) ? readFileSync(milestonesPath, "utf-8") : "";
-      const declarations = parseFutureFile(futureContent);
-      const { milestones } = parseMilestonesFile(milestonesContent);
-      const actions = loadActionsFromFolders(planningDir);
-      const dag = new DeclareDag();
-      for (const d of declarations) {
-        dag.addNode(d.id, "declaration", d.title, d.status || "PENDING");
-      }
-      for (const m of milestones) {
-        dag.addNode(m.id, "milestone", m.title, m.status || "PENDING");
-      }
-      for (const a of actions) {
-        dag.addNode(a.id, "action", a.title, a.status || "PENDING");
-      }
-      for (const m of milestones) {
-        for (const declId of m.realizes) {
-          if (dag.getNode(declId)) {
-            dag.addEdge(m.id, declId);
-          }
-        }
-      }
-      for (const a of actions) {
-        for (const milestoneId of a.causes) {
-          if (dag.getNode(milestoneId)) {
-            dag.addEdge(a.id, milestoneId);
-          }
-        }
-      }
       const validation = dag.validate();
       const stats = dag.stats();
       let lastActivity = "No activity recorded";
@@ -1194,6 +1154,27 @@ var require_add_action = __commonJS({
   }
 });
 
+// src/commands/load-graph.js
+var require_load_graph = __commonJS({
+  "src/commands/load-graph.js"(exports2, module2) {
+    "use strict";
+    var { buildDagFromDisk, loadActionsFromFolders } = require_build_dag();
+    function runLoadGraph2(cwd) {
+      const graphResult = buildDagFromDisk(cwd);
+      if (graphResult.error) return graphResult;
+      const { dag, declarations, milestones, actions } = graphResult;
+      return {
+        declarations,
+        milestones,
+        actions,
+        stats: dag.stats(),
+        validation: dag.validate()
+      };
+    }
+    module2.exports = { runLoadGraph: runLoadGraph2, loadActionsFromFolders };
+  }
+});
+
 // src/commands/create-plan.js
 var require_create_plan = __commonJS({
   "src/commands/create-plan.js"(exports2, module2) {
@@ -1298,6 +1279,251 @@ var require_create_plan = __commonJS({
   }
 });
 
+// src/commands/trace.js
+var require_trace = __commonJS({
+  "src/commands/trace.js"(exports2, module2) {
+    "use strict";
+    var { writeFileSync } = require("node:fs");
+    var { resolve } = require("node:path");
+    var { parseFlag } = require_parse_args();
+    var { buildDagFromDisk } = require_build_dag();
+    function traceUpward(dag, startId) {
+      const startNode = dag.getNode(startId);
+      if (!startNode) return [];
+      if (startNode.type === "declaration") {
+        return [[{ id: startNode.id, type: startNode.type, title: startNode.title, status: startNode.status }]];
+      }
+      const upstream = dag.getUpstream(startId);
+      if (upstream.length === 0) {
+        return [[{ id: startNode.id, type: startNode.type, title: startNode.title, status: startNode.status }]];
+      }
+      const paths = [];
+      const startEntry = { id: startNode.id, type: startNode.type, title: startNode.title, status: startNode.status };
+      for (const parent of upstream) {
+        const parentPaths = traceUpward(dag, parent.id);
+        for (const parentPath of parentPaths) {
+          paths.push([startEntry, ...parentPath]);
+        }
+      }
+      return paths;
+    }
+    function formatTracePaths(nodeId, node, paths) {
+      if (paths.length === 0) {
+        return `${nodeId}: (not found)
+`;
+      }
+      const lines = [];
+      lines.push(`${node.id}: ${node.title} [${node.status}]`);
+      if (paths.length === 1 && paths[0].length === 1) {
+        lines.push("  (no upstream connections)");
+        return lines.join("\n") + "\n";
+      }
+      const byFirstUpstream = /* @__PURE__ */ new Map();
+      for (const path of paths) {
+        if (path.length < 2) continue;
+        const firstUp = path[1];
+        if (!byFirstUpstream.has(firstUp.id)) {
+          byFirstUpstream.set(firstUp.id, []);
+        }
+        byFirstUpstream.get(firstUp.id).push(path);
+      }
+      const upstreamIds = [...byFirstUpstream.keys()];
+      for (let i = 0; i < upstreamIds.length; i++) {
+        const upId = upstreamIds[i];
+        const groupPaths = byFirstUpstream.get(upId);
+        const isLast = i === upstreamIds.length - 1;
+        const connector = isLast ? "\u2514\u2500\u2500" : "\u251C\u2500\u2500";
+        const indent = isLast ? "    " : "\u2502   ";
+        const upNode = groupPaths[0][1];
+        lines.push(`${connector} ${upNode.id}: ${upNode.title} [${upNode.status}]`);
+        const declNodes = /* @__PURE__ */ new Map();
+        for (const path of groupPaths) {
+          if (path.length > 2) {
+            const decl = path[2];
+            declNodes.set(decl.id, decl);
+          }
+        }
+        const declList = [...declNodes.values()];
+        for (let j = 0; j < declList.length; j++) {
+          const decl = declList[j];
+          const declIsLast = j === declList.length - 1;
+          const declConnector = declIsLast ? "\u2514\u2500\u2500" : "\u251C\u2500\u2500";
+          lines.push(`${indent}${declConnector} ${decl.id}: ${decl.title} [${decl.status}]`);
+        }
+      }
+      return lines.join("\n") + "\n";
+    }
+    function runTrace2(cwd, args) {
+      const graphResult = buildDagFromDisk(cwd);
+      if (graphResult.error) return graphResult;
+      const { dag } = graphResult;
+      const nodeId = parseFlag(args, "node") || (args[0] && !args[0].startsWith("--") ? args[0] : null);
+      const outputFile = parseFlag(args, "output");
+      if (!nodeId) {
+        const declarations = dag.getDeclarations().map((n) => ({ id: n.id, title: n.title, status: n.status }));
+        const milestones = dag.getMilestones().map((n) => ({ id: n.id, title: n.title, status: n.status }));
+        const actions = dag.getActions().map((n) => ({ id: n.id, title: n.title, status: n.status }));
+        return {
+          nodes: {
+            declarations,
+            milestones,
+            actions,
+            total: declarations.length + milestones.length + actions.length
+          }
+        };
+      }
+      const node = dag.getNode(nodeId);
+      if (!node) {
+        return { error: `Node not found: ${nodeId}. Use 'trace' without arguments to see available nodes.` };
+      }
+      let paths = traceUpward(dag, nodeId);
+      let truncated = false;
+      let totalPaths = paths.length;
+      if (paths.length > 20) {
+        paths = paths.slice(0, 20);
+        truncated = true;
+      }
+      const nodeInfo = { id: node.id, type: node.type, title: node.title, status: node.status };
+      const formatted = formatTracePaths(nodeId, nodeInfo, paths);
+      let resolvedOutput;
+      if (outputFile) {
+        resolvedOutput = resolve(cwd, outputFile);
+        writeFileSync(resolvedOutput, formatted, "utf-8");
+      }
+      const result = {
+        nodeId,
+        node: nodeInfo,
+        paths,
+        pathCount: paths.length,
+        formatted
+      };
+      if (truncated) {
+        result.truncated = true;
+        result.totalPaths = totalPaths;
+      }
+      if (resolvedOutput) {
+        result.outputFile = resolvedOutput;
+      }
+      return result;
+    }
+    module2.exports = { runTrace: runTrace2, traceUpward, formatTracePaths };
+  }
+});
+
+// src/commands/prioritize.js
+var require_prioritize = __commonJS({
+  "src/commands/prioritize.js"(exports2, module2) {
+    "use strict";
+    var { writeFileSync } = require("node:fs");
+    var { resolve } = require("node:path");
+    var { parseFlag } = require_parse_args();
+    var { buildDagFromDisk } = require_build_dag();
+    function dependencyWeight(dag, nodeId) {
+      const visited = /* @__PURE__ */ new Set();
+      const queue = [nodeId];
+      while (queue.length > 0) {
+        const current = (
+          /** @type {string} */
+          queue.shift()
+        );
+        if (visited.has(current)) continue;
+        visited.add(current);
+        const upstream = dag.getUpstream(current);
+        for (const parent of upstream) {
+          if (!visited.has(parent.id)) {
+            queue.push(parent.id);
+          }
+        }
+      }
+      return visited.size - 1;
+    }
+    function getSubtreeNodeIds(dag, rootId) {
+      const visited = /* @__PURE__ */ new Set();
+      const queue = [rootId];
+      while (queue.length > 0) {
+        const current = (
+          /** @type {string} */
+          queue.shift()
+        );
+        if (visited.has(current)) continue;
+        visited.add(current);
+        const downstream = dag.getDownstream(current);
+        for (const child of downstream) {
+          if (!visited.has(child.id)) {
+            queue.push(child.id);
+          }
+        }
+      }
+      return visited;
+    }
+    function rankActions(dag, filterDeclarationId) {
+      let actions = dag.getActions();
+      if (filterDeclarationId) {
+        const subtreeNodes = getSubtreeNodeIds(dag, filterDeclarationId);
+        actions = actions.filter((a) => subtreeNodes.has(a.id));
+      }
+      const ranked = actions.map((a) => ({
+        id: a.id,
+        title: a.title,
+        score: dependencyWeight(dag, a.id)
+      }));
+      ranked.sort((a, b) => b.score - a.score || a.id.localeCompare(b.id));
+      return ranked.map((item, index) => ({
+        rank: index + 1,
+        ...item
+      }));
+    }
+    function formatRanking(ranking, filter) {
+      const lines = [];
+      if (filter) {
+        lines.push(`Priority ranking (filtered by ${filter}):`);
+      } else {
+        lines.push("Priority ranking (all actions):");
+      }
+      lines.push("");
+      if (ranking.length === 0) {
+        lines.push("  No actions found.");
+        return lines.join("\n") + "\n";
+      }
+      for (const item of ranking) {
+        lines.push(`  ${item.rank}. ${item.id}: ${item.title} (score: ${item.score})`);
+      }
+      return lines.join("\n") + "\n";
+    }
+    function runPrioritize2(cwd, args) {
+      const graphResult = buildDagFromDisk(cwd);
+      if (graphResult.error) return graphResult;
+      const { dag } = graphResult;
+      const filterDeclaration = parseFlag(args, "declaration");
+      const outputFile = parseFlag(args, "output");
+      if (filterDeclaration) {
+        const filterNode = dag.getNode(filterDeclaration);
+        if (!filterNode) {
+          return { error: `Declaration not found: ${filterDeclaration}. Use a valid D-XX ID.` };
+        }
+        if (filterNode.type !== "declaration") {
+          return { error: `${filterDeclaration} is a ${filterNode.type}, not a declaration. Use --declaration with a D-XX ID.` };
+        }
+      }
+      const ranking = rankActions(dag, filterDeclaration || void 0);
+      const formatted = formatRanking(ranking, filterDeclaration);
+      const result = {
+        ranking,
+        filter: filterDeclaration || null,
+        totalActions: ranking.length,
+        formatted
+      };
+      if (outputFile) {
+        const resolvedOutput = resolve(cwd, outputFile);
+        writeFileSync(resolvedOutput, formatted, "utf-8");
+        result.outputFile = resolvedOutput;
+      }
+      return result;
+    }
+    module2.exports = { runPrioritize: runPrioritize2, dependencyWeight, getSubtreeNodeIds, rankActions };
+  }
+});
+
 // src/declare-tools.js
 var { commitPlanningDocs } = require_commit();
 var { runInit } = require_init();
@@ -1308,6 +1534,8 @@ var { runAddMilestone } = require_add_milestone();
 var { runAddAction } = require_add_action();
 var { runCreatePlan } = require_create_plan();
 var { runLoadGraph } = require_load_graph();
+var { runTrace } = require_trace();
+var { runPrioritize } = require_prioritize();
 function parseCwdFlag(argv) {
   const idx = argv.indexOf("--cwd");
   if (idx === -1 || idx + 1 >= argv.length) return null;
@@ -1345,7 +1573,7 @@ function main() {
   const args = process.argv.slice(2);
   const command = args[0];
   if (!command) {
-    console.log(JSON.stringify({ error: "No command specified. Use: commit, init, status, add-declaration, add-milestone, create-plan, load-graph, help" }));
+    console.log(JSON.stringify({ error: "No command specified. Use: commit, init, status, add-declaration, add-milestone, create-plan, load-graph, trace, prioritize, help" }));
     process.exit(1);
   }
   try {
@@ -1417,8 +1645,22 @@ function main() {
         if (result.error) process.exit(1);
         break;
       }
+      case "trace": {
+        const cwdTrace = parseCwdFlag(args) || process.cwd();
+        const result = runTrace(cwdTrace, args.slice(1));
+        console.log(JSON.stringify(result));
+        if (result.error) process.exit(1);
+        break;
+      }
+      case "prioritize": {
+        const cwdPrioritize = parseCwdFlag(args) || process.cwd();
+        const result = runPrioritize(cwdPrioritize, args.slice(1));
+        console.log(JSON.stringify(result));
+        if (result.error) process.exit(1);
+        break;
+      }
       default:
-        console.log(JSON.stringify({ error: `Unknown command: ${command}. Use: commit, init, status, add-declaration, add-milestone, create-plan, load-graph, help` }));
+        console.log(JSON.stringify({ error: `Unknown command: ${command}. Use: commit, init, status, add-declaration, add-milestone, create-plan, load-graph, trace, prioritize, help` }));
         process.exit(1);
     }
   } catch (err) {
