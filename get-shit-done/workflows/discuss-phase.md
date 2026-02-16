@@ -295,15 +295,13 @@ For each selected area, conduct adaptive discussion using Tracking Model.
 3. **Ask questions** via AskUserQuestion:
    - header: "[Area]"
    - question: Specific decision
-   - **Before each question:** Analyze the options, form a recommendation, and show rationale:
-     ```
-     I'd recommend [option] — [brief reason based on phase context].
-     ```
-   - header: "[Area]"
-   - question: Specific decision
-   - options: 2-3 concrete choices. Place recommended option FIRST with "(Recommended)" suffix in label.
+   - options: 2-3 concrete choices as `{ label, description }` objects:
+     - Place recommended option FIRST with "(Recommended)" suffix in label
+     - Put the recommendation rationale in the recommended option's `description` (e.g., "Best for this phase because [reason]")
+     - Give non-recommended options a brief `description` explaining their tradeoff
    - AskUserQuestion adds "Other" automatically
    - NEVER include "You decide", "Claude decides", "Let Claude choose", or any delegation option
+   - Do NOT output recommendation text before the question — rationale must be IN the option descriptions so it remains visible while the user is selecting
 
 4. **After each answer:**
    - Update clarity/coverage per Tracking Model
