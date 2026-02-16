@@ -3359,7 +3359,16 @@ function cmdToken(cwd, args, raw) {
     case 'init': {
       // Initialize token budget file
       const model = args[1] || 'opus';
-      const monitor = new TokenBudgetMonitor(model, 200000);
+      const graduated = args.includes('--graduated');
+      const telegramEnabled = args.includes('--telegram');
+
+      let monitor;
+      if (graduated) {
+        const { GraduatedBudgetMonitor } = require('./graduated-alerts.js');
+        monitor = new GraduatedBudgetMonitor(model, 200000, { telegramEnabled });
+      } else {
+        monitor = new TokenBudgetMonitor(model, 200000);
+      }
 
       // Ensure .planning directory exists
       const planningDir = path.join(cwd, '.planning');
@@ -3368,7 +3377,7 @@ function cmdToken(cwd, args, raw) {
       }
 
       fs.writeFileSync(budgetPath, JSON.stringify(monitor.toJSON(), null, 2));
-      output({ initialized: true, model, max_tokens: 200000 }, raw, `Token budget initialized for ${model} (200k limit)`);
+      output({ initialized: true, model, max_tokens: 200000, graduated, telegram: telegramEnabled }, raw, `Token budget initialized for ${model} (200k limit, graduated=${graduated}, telegram=${telegramEnabled})`);
       break;
     }
 
@@ -3893,6 +3902,75 @@ async function cmdObservability(args, raw) {
 
     default:
       error('Usage: observability init|status|cost|shutdown');
+  }
+}
+
+// ─── Dashboard ────────────────────────────────────────────────────────────────
+
+async function cmdDashboard(args) {
+  const subcommand = args[0];
+  const { startDashboard, stopDashboard } = require('./dashboard-server.js');
+
+  switch (subcommand) {
+    case 'start': {
+      const httpPort = parseInt(args[args.indexOf('--http') + 1]) || 3000;
+      const wsPort = parseInt(args[args.indexOf('--ws') + 1]) || 8080;
+      startDashboard({ httpPort, wsPort });
+      console.log('Dashboard server running. Press Ctrl+C to stop.');
+      // Keep process alive
+      await new Promise(() => {}); // Never resolves
+      break;
+    }
+
+    case 'stop': {
+      stopDashboard();
+      break;
+    }
+
+    default:
+      error('Usage: dashboard start [--http PORT] [--ws PORT] | stop');
+  }
+}
+
+// ─── Savings Report ───────────────────────────────────────────────────────────
+
+function cmdSavings(args, raw) {
+  const subcommand = args[0] || 'report';
+  const { generateReport, formatReportTable, calculateSavings } = require('./savings-report.js');
+
+  switch (subcommand) {
+    case 'report': {
+      const report = generateReport();
+      if (args.includes('--json')) {
+        output(report, raw);
+      } else {
+        console.log(formatReportTable(report));
+      }
+      break;
+    }
+
+    case 'calculate': {
+      // Manual calculation: savings calculate --haiku 50000 --sonnet 100000 --opus 20000
+      const haikuIdx = args.indexOf('--haiku');
+      const sonnetIdx = args.indexOf('--sonnet');
+      const opusIdx = args.indexOf('--opus');
+
+      const haiku = haikuIdx > -1 ? parseInt(args[haikuIdx + 1]) : 0;
+      const sonnet = sonnetIdx > -1 ? parseInt(args[sonnetIdx + 1]) : 0;
+      const opus = opusIdx > -1 ? parseInt(args[opusIdx + 1]) : 0;
+
+      const result = calculateSavings({
+        haiku: { input: Math.floor(haiku * 0.7), output: Math.floor(haiku * 0.3) },
+        sonnet: { input: Math.floor(sonnet * 0.7), output: Math.floor(sonnet * 0.3) },
+        opus: { input: Math.floor(opus * 0.7), output: Math.floor(opus * 0.3) }
+      });
+
+      output(result, raw);
+      break;
+    }
+
+    default:
+      error('Usage: savings report [--json] | calculate --haiku N --sonnet N --opus N');
   }
 }
 
@@ -7434,6 +7512,16 @@ async function main() {
 
     case 'parallel': {
       await cmdParallel(cwd, args.slice(1), raw);
+      break;
+    }
+
+    case 'dashboard': {
+      await cmdDashboard(args.slice(1));
+      break;
+    }
+
+    case 'savings': {
+      cmdSavings(args.slice(1), raw);
       break;
     }
 
