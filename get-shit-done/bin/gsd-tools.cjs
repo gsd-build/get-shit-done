@@ -117,6 +117,12 @@
  *   init milestone-op                  All context for milestone operations
  *   init map-codebase                  All context for map-codebase workflow
  *   init progress                      All context for progress workflow
+ *
+ * Co-Planner Operations:
+ *   coplanner detect [--raw]           Detect installed CLIs (JSON default, table with --raw)
+ *   coplanner invoke <cli> --prompt    Invoke a CLI adapter with prompt
+ *     [--timeout N] [--model name]
+ *   coplanner enabled                  Check kill switch status and source
  */
 
 const fs = require('fs');
@@ -241,6 +247,42 @@ function execGit(cwd, args) {
       stderr: (err.stderr ?? '').toString().trim(),
     };
   }
+}
+
+// ─── Co-Planner Helpers ──────────────────────────────────────────────────────
+
+const SUPPORTED_CLIS = ['codex', 'gemini', 'opencode'];
+
+function loadAdapter(cliName) {
+  const adapterPath = path.join(__dirname, 'adapters', cliName + '.cjs');
+  try {
+    if (!fs.existsSync(adapterPath)) return null;
+    return require(adapterPath);
+  } catch {
+    return null;
+  }
+}
+
+function checkKillSwitch(cwd) {
+  // Precedence: env var > config.json > default (false)
+  const envVal = process.env.GSD_CO_PLANNERS;
+  if (envVal !== undefined && envVal !== '') {
+    const enabled = envVal === 'true' || envVal === '1';
+    return { enabled, source: 'env' };
+  }
+
+  try {
+    const configPath = path.join(cwd, '.planning', 'config.json');
+    const raw = fs.readFileSync(configPath, 'utf-8');
+    const parsed = JSON.parse(raw);
+    if (parsed.co_planners && parsed.co_planners.enabled !== undefined) {
+      return { enabled: !!parsed.co_planners.enabled, source: 'config' };
+    }
+  } catch {
+    // Config not found or invalid — fall through to default
+  }
+
+  return { enabled: false, source: 'default' };
 }
 
 function normalizePhaseName(phase) {
@@ -4834,6 +4876,79 @@ function cmdInitProgress(cwd, includes, raw) {
   output(result, raw);
 }
 
+// ─── Co-Planner Commands ─────────────────────────────────────────────────────
+
+function cmdCoplannerDetect(cwd, raw) {
+  const results = {};
+  for (const cli of SUPPORTED_CLIS) {
+    const adapter = loadAdapter(cli);
+    if (!adapter) {
+      results[cli] = { available: false, version: null, error: 'NO_ADAPTER' };
+    } else {
+      results[cli] = adapter.detect();
+    }
+  }
+
+  if (raw) {
+    const lines = ['CLI        Available  Version'];
+    for (const [cli, info] of Object.entries(results)) {
+      const avail = info.available ? 'yes' : 'no';
+      const version = info.available ? (info.version || 'unknown') : (info.error || 'NOT_FOUND');
+      lines.push(`${cli.padEnd(10)} ${avail.padEnd(10)} ${version}`);
+    }
+    output(results, true, lines.join('\n') + '\n');
+  } else {
+    output(results, false);
+  }
+}
+
+function cmdCoplannerInvoke(cwd, cliName, prompt, options, raw) {
+  // Check kill switch first
+  const killSwitch = checkKillSwitch(cwd);
+  if (!killSwitch.enabled) {
+    const result = { skipped: true, reason: 'co-planners disabled', source: killSwitch.source };
+    if (raw) {
+      output(result, true, 'skipped: co-planners disabled (source: ' + killSwitch.source + ')\n');
+    } else {
+      output(result, false);
+    }
+    return;
+  }
+
+  // Load adapter
+  const adapter = loadAdapter(cliName);
+  if (!adapter) {
+    const result = { text: '', cli: cliName, duration: 0, exitCode: 1, error: 'Unknown CLI', errorType: 'NO_ADAPTER' };
+    if (raw) {
+      output(result, true, 'error: Unknown CLI "' + cliName + '". Supported: ' + SUPPORTED_CLIS.join(', ') + '\n');
+    } else {
+      output(result, false);
+    }
+    return;
+  }
+
+  // Invoke adapter
+  const result = adapter.invoke(prompt, { timeout: options.timeout, model: options.model });
+  if (raw) {
+    if (result.error) {
+      output(result, true, 'error [' + result.errorType + ']: ' + result.error + '\n');
+    } else {
+      output(result, true, result.text + '\n');
+    }
+  } else {
+    output(result, false);
+  }
+}
+
+function cmdCoplannerEnabled(cwd, raw) {
+  const result = checkKillSwitch(cwd);
+  if (raw) {
+    output(result, true, (result.enabled ? 'enabled' : 'disabled') + ' (source: ' + result.source + ')\n');
+  } else {
+    output(result, false);
+  }
+}
+
 // ─── CLI Router ───────────────────────────────────────────────────────────────
 
 async function main() {
@@ -5232,6 +5347,36 @@ async function main() {
         limit: limitIdx !== -1 ? parseInt(args[limitIdx + 1], 10) : 10,
         freshness: freshnessIdx !== -1 ? args[freshnessIdx + 1] : null,
       }, raw);
+      break;
+    }
+
+    case 'coplanner': {
+      const subCmd = args[1];
+      switch (subCmd) {
+        case 'detect': {
+          cmdCoplannerDetect(cwd, raw);
+          break;
+        }
+        case 'invoke': {
+          const cliName = args[2];
+          if (!cliName) error('CLI name required: codex, gemini, or opencode');
+          const promptIdx = args.indexOf('--prompt');
+          const prompt = promptIdx !== -1 ? args[promptIdx + 1] : null;
+          if (!prompt) error('--prompt required');
+          const timeoutIdx = args.indexOf('--timeout');
+          const timeout = timeoutIdx !== -1 ? parseInt(args[timeoutIdx + 1], 10) : undefined;
+          const modelIdx = args.indexOf('--model');
+          const model = modelIdx !== -1 ? args[modelIdx + 1] : undefined;
+          cmdCoplannerInvoke(cwd, cliName, prompt, { timeout, model }, raw);
+          break;
+        }
+        case 'enabled': {
+          cmdCoplannerEnabled(cwd, raw);
+          break;
+        }
+        default:
+          error('Unknown coplanner subcommand: ' + subCmd + '. Use: detect, invoke, enabled');
+      }
       break;
     }
 
