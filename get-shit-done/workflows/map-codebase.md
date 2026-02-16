@@ -26,7 +26,8 @@ Documents are reference material for Claude when planning/executing. Always incl
 Load codebase mapping context:
 
 ```bash
-INIT=$(node ~/.claude/get-shit-done/bin/gsd-tools.js init map-codebase)
+INIT_FILE="/tmp/gsd-init-$$.json"
+node ~/.claude/get-shit-done/bin/gsd-tools.js init map-codebase > "$INIT_FILE"
 ```
 
 Extract from init JSON: `mapper_model`, `commit_docs`, `codebase_dir`, `existing_maps`, `has_maps`, `codebase_dir_exists`.

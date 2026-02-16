@@ -111,10 +111,17 @@ Phase: "API documentation"
 Phase number from argument (required).
 
 ```bash
-INIT=$(node ~/.claude/get-shit-done/bin/gsd-tools.js init phase-op "${PHASE}")
+# Use temp file to avoid bash command substitution buffer limits
+INIT_FILE="/tmp/gsd-init-$$.json"
+node ~/.claude/get-shit-done/bin/gsd-tools.js init phase-op "${PHASE}" > "$INIT_FILE"
 ```
 
 Parse JSON for: `commit_docs`, `phase_found`, `phase_dir`, `phase_number`, `phase_name`, `phase_slug`, `padded_phase`, `has_research`, `has_context`, `has_plans`, `has_verification`, `plan_count`, `roadmap_exists`, `planning_exists`.
+
+```bash
+PHASE_FOUND=$(jq -r '.phase_found' < "$INIT_FILE")
+PHASE_DIR=$(jq -r '.phase_dir' < "$INIT_FILE")
+```
 
 **If `phase_found` is false:**
 ```

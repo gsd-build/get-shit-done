@@ -34,7 +34,8 @@ Validate first argument is an integer.
 Load phase operation context:
 
 ```bash
-INIT=$(node ~/.claude/get-shit-done/bin/gsd-tools.js init phase-op "${after_phase}")
+INIT_FILE="/tmp/gsd-init-$$.json"
+node ~/.claude/get-shit-done/bin/gsd-tools.js init phase-op "${after_phase}" > "$INIT_FILE"
 ```
 
 Check `roadmap_exists` from init JSON. If false:

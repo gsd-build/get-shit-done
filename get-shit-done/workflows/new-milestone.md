@@ -77,7 +77,8 @@ node ~/.claude/get-shit-done/bin/gsd-tools.js commit "docs: start milestone v[X.
 ## 7. Load Context and Resolve Models
 
 ```bash
-INIT=$(node ~/.claude/get-shit-done/bin/gsd-tools.js init new-milestone)
+INIT_FILE="/tmp/gsd-init-$$.json"
+node ~/.claude/get-shit-done/bin/gsd-tools.js init new-milestone > "$INIT_FILE"
 ```
 
 Extract from init JSON: `researcher_model`, `synthesizer_model`, `roadmapper_model`, `commit_docs`, `research_enabled`, `current_milestone`, `project_exists`, `roadmap_exists`.

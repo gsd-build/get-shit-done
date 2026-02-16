@@ -28,16 +28,24 @@ Then verify each level against the actual codebase.
 Load phase operation context:
 
 ```bash
-INIT=$(node ~/.claude/get-shit-done/bin/gsd-tools.js init phase-op "${PHASE_ARG}")
+# Use temp file to avoid bash command substitution buffer limits
+INIT_FILE="/tmp/gsd-init-$$.json"
+node ~/.claude/get-shit-done/bin/gsd-tools.js init phase-op "${PHASE_ARG}" > "$INIT_FILE"
 ```
 
 Extract from init JSON: `phase_dir`, `phase_number`, `phase_name`, `has_plans`, `plan_count`.
 
+```bash
+PHASE_DIR=$(jq -r '.phase_dir' < "$INIT_FILE")
+PHASE_NUMBER=$(jq -r '.phase_number' < "$INIT_FILE")
+PHASE_NAME=$(jq -r '.phase_name' < "$INIT_FILE")
+```
+
 Then load phase details and list plans/summaries:
 ```bash
-node ~/.claude/get-shit-done/bin/gsd-tools.js roadmap get-phase "${phase_number}"
-grep -E "^| ${phase_number}" .planning/REQUIREMENTS.md 2>/dev/null
-ls "$phase_dir"/*-SUMMARY.md "$phase_dir"/*-PLAN.md 2>/dev/null
+node ~/.claude/get-shit-done/bin/gsd-tools.js roadmap get-phase "${PHASE_NUMBER}"
+grep -E "^| ${PHASE_NUMBER}" .planning/REQUIREMENTS.md 2>/dev/null
+ls "$PHASE_DIR"/*-SUMMARY.md "$PHASE_DIR"/*-PLAN.md 2>/dev/null
 ```
 
 Extract **phase goal** from ROADMAP.md (the outcome to verify, not tasks) and **requirements** from REQUIREMENTS.md if it exists.

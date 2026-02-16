@@ -34,10 +34,18 @@ Normalize phase input in step 1 before any directory lookups.
 ## 0. Initialize Context
 
 ```bash
-INIT=$(node ~/.claude/get-shit-done/bin/gsd-tools.js init phase-op "$ARGUMENTS")
+# Use temp file to avoid bash command substitution buffer limits
+INIT_FILE="/tmp/gsd-init-$$.json"
+node ~/.claude/get-shit-done/bin/gsd-tools.js init phase-op "$ARGUMENTS" > "$INIT_FILE"
 ```
 
 Extract from init JSON: `phase_dir`, `phase_number`, `phase_name`, `phase_found`, `commit_docs`, `has_research`.
+
+```bash
+PHASE_DIR=$(jq -r '.phase_dir' < "$INIT_FILE")
+PHASE_NUMBER=$(jq -r '.phase_number' < "$INIT_FILE")
+PHASE_FOUND=$(jq -r '.phase_found' < "$INIT_FILE")
+```
 
 Resolve researcher model:
 ```bash

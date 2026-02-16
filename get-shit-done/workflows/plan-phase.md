@@ -15,12 +15,20 @@ Read all files referenced by the invoking prompt's execution_context before star
 Load all context in one call (include file contents to avoid redundant reads):
 
 ```bash
-INIT=$(node ~/.claude/get-shit-done/bin/gsd-tools.js init plan-phase "$PHASE" --include state,roadmap,requirements,context,research,verification,uat)
+# Use temp file to avoid bash command substitution buffer limits (2-3MB)
+INIT_FILE="/tmp/gsd-init-$$.json"
+node ~/.claude/get-shit-done/bin/gsd-tools.js init plan-phase "$PHASE" --include state,roadmap,requirements,context,research,verification,uat > "$INIT_FILE"
 ```
 
 Parse JSON for: `researcher_model`, `planner_model`, `checker_model`, `research_enabled`, `plan_checker_enabled`, `commit_docs`, `phase_found`, `phase_dir`, `phase_number`, `phase_name`, `phase_slug`, `padded_phase`, `has_research`, `has_context`, `has_plans`, `plan_count`, `planning_exists`, `roadmap_exists`.
 
 **File contents (from --include):** `state_content`, `roadmap_content`, `requirements_content`, `context_content`, `research_content`, `verification_content`, `uat_content`. These are null if files don't exist.
+
+**Extract from temp file using jq:**
+```bash
+# Example: get phase_found status
+PHASE_FOUND=$(jq -r '.phase_found' < "$INIT_FILE")
+```
 
 **If `planning_exists` is false:** Error — run `/gsd:new-project` first.
 
@@ -49,9 +57,15 @@ PHASE_INFO=$(node ~/.claude/get-shit-done/bin/gsd-tools.js roadmap get-phase "${
 
 Use `context_content` from init JSON (already loaded via `--include context`).
 
-**CRITICAL:** Use `context_content` from INIT — pass to researcher, planner, checker, and revision agents.
+**CRITICAL:** Use `context_content` from INIT_FILE — pass to researcher, planner, checker, and revision agents.
 
-If `context_content` is not null, display: `Using phase context from: ${PHASE_DIR}/*-CONTEXT.md`
+```bash
+CONTEXT_CONTENT=$(jq -r '.context_content // empty' < "$INIT_FILE")
+if [ -n "$CONTEXT_CONTENT" ]; then
+  PHASE_DIR=$(jq -r '.phase_dir' < "$INIT_FILE")
+  echo "Using phase context from: ${PHASE_DIR}/*-CONTEXT.md"
+fi
+```
 
 ## 5. Handle Research
 
@@ -74,8 +88,8 @@ Display banner:
 
 ```bash
 PHASE_DESC=$(node ~/.claude/get-shit-done/bin/gsd-tools.js roadmap get-phase "${PHASE}" | jq -r '.section')
-# Use requirements_content from INIT (already loaded via --include requirements)
-REQUIREMENTS=$(echo "$INIT" | jq -r '.requirements_content // empty' | grep -A100 "## Requirements" | head -50)
+# Use requirements_content from INIT_FILE (already loaded via --include requirements)
+REQUIREMENTS=$(jq -r '.requirements_content // empty' < "$INIT_FILE" | grep -A100 "## Requirements" | head -50)
 STATE_SNAP=$(node ~/.claude/get-shit-done/bin/gsd-tools.js state-snapshot)
 # Extract decisions from state-snapshot JSON: jq '.decisions[] | "\(.phase): \(.summary) - \(.rationale)"'
 ```
@@ -135,14 +149,14 @@ ls "${PHASE_DIR}"/*-PLAN.md 2>/dev/null
 All file contents are already loaded via `--include` in step 1 (`@` syntax doesn't work across Task() boundaries):
 
 ```bash
-# Extract from INIT JSON (no need to re-read files)
-STATE_CONTENT=$(echo "$INIT" | jq -r '.state_content // empty')
-ROADMAP_CONTENT=$(echo "$INIT" | jq -r '.roadmap_content // empty')
-REQUIREMENTS_CONTENT=$(echo "$INIT" | jq -r '.requirements_content // empty')
-RESEARCH_CONTENT=$(echo "$INIT" | jq -r '.research_content // empty')
-VERIFICATION_CONTENT=$(echo "$INIT" | jq -r '.verification_content // empty')
-UAT_CONTENT=$(echo "$INIT" | jq -r '.uat_content // empty')
-CONTEXT_CONTENT=$(echo "$INIT" | jq -r '.context_content // empty')
+# Extract from INIT_FILE (no need to re-read files)
+STATE_CONTENT=$(jq -r '.state_content // empty' < "$INIT_FILE")
+ROADMAP_CONTENT=$(jq -r '.roadmap_content // empty' < "$INIT_FILE")
+REQUIREMENTS_CONTENT=$(jq -r '.requirements_content // empty' < "$INIT_FILE")
+RESEARCH_CONTENT=$(jq -r '.research_content // empty' < "$INIT_FILE")
+VERIFICATION_CONTENT=$(jq -r '.verification_content // empty' < "$INIT_FILE")
+UAT_CONTENT=$(jq -r '.uat_content // empty' < "$INIT_FILE")
+CONTEXT_CONTENT=$(jq -r '.context_content // empty' < "$INIT_FILE")
 ```
 
 ## 8. Spawn gsd-planner Agent

@@ -12,12 +12,21 @@ Read all files referenced by the invoking prompt's execution_context before star
 **Load progress context (with file contents to avoid redundant reads):**
 
 ```bash
-INIT=$(node ~/.claude/get-shit-done/bin/gsd-tools.js init progress --include state,roadmap,project,config)
+# Use temp file to avoid bash command substitution buffer limits
+INIT_FILE="/tmp/gsd-init-$$.json"
+node ~/.claude/get-shit-done/bin/gsd-tools.js init progress --include state,roadmap,project,config > "$INIT_FILE"
 ```
 
 Extract from init JSON: `project_exists`, `roadmap_exists`, `state_exists`, `phases`, `current_phase`, `next_phase`, `milestone_version`, `completed_count`, `phase_count`, `paused_at`.
 
 **File contents (from --include):** `state_content`, `roadmap_content`, `project_content`, `config_content`. These are null if files don't exist.
+
+**Extract values using jq:**
+```bash
+PROJECT_EXISTS=$(jq -r '.project_exists' < "$INIT_FILE")
+STATE_CONTENT=$(jq -r '.state_content // empty' < "$INIT_FILE")
+ROADMAP_CONTENT=$(jq -r '.roadmap_content // empty' < "$INIT_FILE")
+```
 
 If `project_exists` is false (no `.planning/` directory):
 

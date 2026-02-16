@@ -15,15 +15,17 @@ Read config.json for planning behavior settings.
 Load execution context (uses `init execute-phase` for full context, including file contents):
 
 ```bash
-INIT=$(node ~/.claude/get-shit-done/bin/gsd-tools.js init execute-phase "${PHASE}" --include state,config)
+# Use temp file to avoid bash command substitution buffer limits
+INIT_FILE="/tmp/gsd-init-$$.json"
+node ~/.claude/get-shit-done/bin/gsd-tools.js init execute-phase "${PHASE}" --include state,config > "$INIT_FILE"
 ```
 
 Extract from init JSON: `executor_model`, `commit_docs`, `phase_dir`, `phase_number`, `plans`, `summaries`, `incomplete_plans`.
 
 **File contents (from --include):** `state_content`, `config_content`. Access with:
 ```bash
-STATE_CONTENT=$(echo "$INIT" | jq -r '.state_content // empty')
-CONFIG_CONTENT=$(echo "$INIT" | jq -r '.config_content // empty')
+STATE_CONTENT=$(jq -r '.state_content // empty' < "$INIT_FILE")
+CONFIG_CONTENT=$(jq -r '.config_content // empty' < "$INIT_FILE")
 ```
 
 If `.planning/` missing: error.

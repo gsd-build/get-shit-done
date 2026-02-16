@@ -432,10 +432,18 @@ Check branching strategy and offer merge options.
 Use `init milestone-op` for context, or load config directly:
 
 ```bash
-INIT=$(node ~/.claude/get-shit-done/bin/gsd-tools.js init execute-phase "1")
+# Use temp file to avoid bash command substitution buffer limits
+INIT_FILE="/tmp/gsd-init-$$.json"
+node ~/.claude/get-shit-done/bin/gsd-tools.js init execute-phase "1" > "$INIT_FILE"
 ```
 
 Extract `branching_strategy`, `phase_branch_template`, `milestone_branch_template` from init JSON.
+
+```bash
+BRANCHING_STRATEGY=$(jq -r '.branching_strategy' < "$INIT_FILE")
+PHASE_BRANCH_TEMPLATE=$(jq -r '.phase_branch_template' < "$INIT_FILE")
+MILESTONE_BRANCH_TEMPLATE=$(jq -r '.milestone_branch_template' < "$INIT_FILE")
+```
 
 **If "none":** Skip to git_tag.
 

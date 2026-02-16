@@ -16,10 +16,20 @@ Read STATE.md before any operation to load project context.
 Load all context in one call:
 
 ```bash
-INIT=$(node ~/.claude/get-shit-done/bin/gsd-tools.js init execute-phase "${PHASE_ARG}")
+# Use temp file to avoid bash command substitution buffer limits
+INIT_FILE="/tmp/gsd-init-$$.json"
+node ~/.claude/get-shit-done/bin/gsd-tools.js init execute-phase "${PHASE_ARG}" > "$INIT_FILE"
 ```
 
 Parse JSON for: `executor_model`, `verifier_model`, `commit_docs`, `parallelization`, `branching_strategy`, `branch_name`, `phase_found`, `phase_dir`, `phase_number`, `phase_name`, `phase_slug`, `plans`, `incomplete_plans`, `plan_count`, `incomplete_count`, `state_exists`, `roadmap_exists`.
+
+**Extract values using jq:**
+```bash
+PHASE_FOUND=$(jq -r '.phase_found' < "$INIT_FILE")
+PLAN_COUNT=$(jq -r '.plan_count' < "$INIT_FILE")
+STATE_EXISTS=$(jq -r '.state_exists' < "$INIT_FILE")
+PARALLELIZATION=$(jq -r '.parallelization' < "$INIT_FILE")
+```
 
 **If `phase_found` is false:** Error — phase directory not found.
 **If `plan_count` is 0:** Error — no plans found in phase.
@@ -35,7 +45,11 @@ Check `branching_strategy` from init:
 
 **"phase" or "milestone":** Use pre-computed `branch_name` from init:
 ```bash
-git checkout -b "$BRANCH_NAME" 2>/dev/null || git checkout "$BRANCH_NAME"
+BRANCHING_STRATEGY=$(jq -r '.branching_strategy' < "$INIT_FILE")
+if [ "$BRANCHING_STRATEGY" != "none" ]; then
+  BRANCH_NAME=$(jq -r '.branch_name' < "$INIT_FILE")
+  git checkout -b "$BRANCH_NAME" 2>/dev/null || git checkout "$BRANCH_NAME"
+fi
 ```
 
 All subsequent commits go to this branch. User handles merging.
@@ -43,6 +57,12 @@ All subsequent commits go to this branch. User handles merging.
 
 <step name="validate_phase">
 From init JSON: `phase_dir`, `plan_count`, `incomplete_count`.
+
+```bash
+PHASE_DIR=$(jq -r '.phase_dir' < "$INIT_FILE")
+PLAN_COUNT=$(jq -r '.plan_count' < "$INIT_FILE")
+INCOMPLETE_COUNT=$(jq -r '.incomplete_count' < "$INIT_FILE")
+```
 
 Report: "Found {plan_count} plans in {phase_dir} ({incomplete_count} incomplete)"
 </step>

@@ -24,10 +24,18 @@ No Pass/Fail buttons. No severity questions. Just: "Here's what should happen. D
 If $ARGUMENTS contains a phase number, load context:
 
 ```bash
-INIT=$(node ~/.claude/get-shit-done/bin/gsd-tools.js init verify-work "${PHASE_ARG}")
+# Use temp file to avoid bash command substitution buffer limits
+INIT_FILE="/tmp/gsd-init-$$.json"
+node ~/.claude/get-shit-done/bin/gsd-tools.js init verify-work "${PHASE_ARG}" > "$INIT_FILE"
 ```
 
 Parse JSON for: `planner_model`, `checker_model`, `commit_docs`, `phase_found`, `phase_dir`, `phase_number`, `phase_name`, `has_verification`.
+
+**Extract values using jq:**
+```bash
+PHASE_FOUND=$(jq -r '.phase_found' < "$INIT_FILE")
+PHASE_DIR=$(jq -r '.phase_dir' < "$INIT_FILE")
+```
 </step>
 
 <step name="check_active_session">

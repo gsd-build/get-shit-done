@@ -12,7 +12,8 @@ Read all files referenced by the invoking prompt's execution_context before star
 Load todo context:
 
 ```bash
-INIT=$(node ~/.claude/get-shit-done/bin/gsd-tools.js init todos)
+INIT_FILE="/tmp/gsd-init-$$.json"
+node ~/.claude/get-shit-done/bin/gsd-tools.js init todos > "$INIT_FILE"
 ```
 
 Extract from init JSON: `todo_count`, `todos`, `pending_dir`.

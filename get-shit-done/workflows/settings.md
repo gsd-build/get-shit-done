@@ -13,7 +13,8 @@ Ensure config exists and load current state:
 
 ```bash
 node ~/.claude/get-shit-done/bin/gsd-tools.js config-ensure-section
-INIT=$(node ~/.claude/get-shit-done/bin/gsd-tools.js state load)
+INIT_FILE="/tmp/gsd-init-$$.json"
+node ~/.claude/get-shit-done/bin/gsd-tools.js state load > "$INIT_FILE"
 ```
 
 Creates `.planning/config.json` with defaults if missing and loads current config values.

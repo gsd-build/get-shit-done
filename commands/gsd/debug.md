@@ -31,11 +31,14 @@ ls .planning/debug/*.md 2>/dev/null | grep -v resolved | head -5
 ## 0. Initialize Context
 
 ```bash
-INIT=$(node ~/.claude/get-shit-done/bin/gsd-tools.js state load)
+# Use temp file to avoid bash command substitution buffer limits
+INIT_FILE="/tmp/gsd-init-$$.json"
+node ~/.claude/get-shit-done/bin/gsd-tools.js state load > "$INIT_FILE"
 ```
 
 Extract `commit_docs` from init JSON. Resolve debugger model:
 ```bash
+COMMIT_DOCS=$(jq -r '.commit_docs' < "$INIT_FILE")
 DEBUGGER_MODEL=$(node ~/.claude/get-shit-done/bin/gsd-tools.js resolve-model gsd-debugger --raw)
 ```
 
