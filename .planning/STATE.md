@@ -10,18 +10,18 @@ See: .planning/PROJECT.md (updated 2026-02-15)
 ## Current Position
 
 Phase: 8 of 8 (Notifications & Observability)
-Plan: 4 of 5
+Plan: 6 of 7
 Status: In Progress
-Last activity: 2026-02-16 — Completed Plan 08-04 (Graduated Budget Alerts)
+Last activity: 2026-02-16 — Completed Plan 08-06 (AI-Powered Telegram Bot with Haiku Monitor)
 
-Progress: [████████████████████] 51%
+Progress: [████████████████████] 53%
 
 ## Performance Metrics
 
 **Velocity:**
-- Total plans completed: 45
-- Average duration: 4.1 min
-- Total execution time: 3.0 hours
+- Total plans completed: 46
+- Average duration: 4.0 min
+- Total execution time: 3.1 hours
 
 **By Phase:**
 
@@ -34,7 +34,7 @@ Progress: [████████████████████] 51%
 | 05    | 5     | 16 min | 3.2 min  |
 | 06    | 6     | 41 min | 6.8 min  |
 | 07    | 6     | 15 min | 2.5 min  |
-| 08    | 5     | 19 min | 3.8 min  |
+| 08    | 6     | 23 min | 3.8 min  |
 
 **Recent Completions:**
 
@@ -55,7 +55,8 @@ Progress: [████████████████████] 51%
 | 08    | 03   | 5 min    | 3     | 4     |
 | 08    | 02   | 2 min    | 3     | 3     |
 | 08    | 05   | 4 min    | 3     | 4     |
-| Phase 08 P04 | 4 | 3 tasks | 2 files |
+| 08    | 04   | 4 min    | 3     | 2     |
+| 08    | 06   | 4 min    | 7     | 7     |
 
 ## Accumulated Context
 
@@ -37148,6 +37149,11 @@ Recent decisions affecting current work:
 - [Phase 08-05]: Use WebSocket for real-time event streaming instead of polling
 - [Phase 08-05]: Savings baseline is all-Opus execution for maximum impact visibility
 - [Phase 08]: Four-tier graduated threshold system (50/80/90/100%) for progressive token budget monitoring
+- [Phase 08-06]: Haiku for requirement gathering provides fast, cost-effective conversational routing decisions
+- [Phase 08-06]: JSONL session logging enables streaming append and easy analytics
+- [Phase 08-06]: Auto-match single pending question for UX optimization (no ID needed)
+- [Phase 08-06]: Dashboard ports 8765/8766 avoid conflicts with common dev servers (3000/8080)
+- [Phase 08-06]: Fail-fast on missing credentials rather than silent stubs to avoid confusion
 
 ### Roadmap Evolution
 
