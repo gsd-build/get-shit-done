@@ -152,6 +152,9 @@ const { TaskChunker, BatchCoordinator, analyzeTask, estimateTaskTokens } = requi
 const { estimatePhaseSize, detectOversizedPhases, recommendSplit, validateSplitPreservesDependencies, LIMITS: PHASE_LIMITS } = require('./phase-sizer.js');
 const { ParallelPhaseExecutor, analyzeParallelOpportunities: analyzeParallel, CONFIG: PARALLEL_CONFIG } = require('./parallel-executor.js');
 
+// Load environment variables from project root .env
+require('dotenv').config({ path: path.join(__dirname, '../../.env') });
+
 // ─── Model Profile Table ─────────────────────────────────────────────────────
 
 const MODEL_PROFILES = {
