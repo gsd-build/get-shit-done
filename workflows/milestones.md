@@ -64,45 +64,53 @@ Persist each confirmed milestone via add-milestone immediately after confirmatio
 
 After all milestones for one declaration are confirmed and persisted, move to the next declaration.
 
-## Per-Milestone Derivation Loop
+## Action Derivation (Batch)
 
-After all declarations have their milestones, go deeper. For each confirmed milestone M:
+After all declarations have their milestones, derive actions for ALL milestones in one pass. Do NOT ask for confirmation on each individual action -- this is tedious. Instead: derive everything, persist it, then present the full picture for review.
 
-### a. State the action question
+### a. Derive and persist all actions silently
 
-> For "[M title]" to be true, what must be done?
+For each confirmed milestone M:
 
-### b. Propose items
-
-Propose 2-4 items. For each, assess atomicity:
-
-**Atomicity check (use your judgment):**
-- Can this be completed in a single focused session by one agent or person?
-- Does it produce a verifiable artifact?
-- Is it clear what "done" means without further decomposition?
-
-If YES to all three: it's an **action**. Persist via add-action.
-If NO to any: it's a **sub-milestone**. Persist via add-milestone, then recurse (derive its sub-items in the next round).
-
-Present each item clearly:
-
-> To make "[M title]" true:
->
-> 1. **[Item A]** (action) -- [what this produces, why it's needed]
-> 2. **[Item B]** (action) -- [what this produces, why it's needed]
-> 3. **[Item C]** (sub-milestone) -- this needs further breakdown
->
-> Sound right?
-
-### c. User confirms each item
-
-Wait for the user to confirm, adjust, add, or remove. Persist each confirmed item immediately.
-
-### d. Recurse for sub-milestones
-
-If any items were persisted as sub-milestones, repeat this per-milestone derivation loop for those sub-milestones. Continue until all leaf nodes are atomic actions.
+1. Ask yourself: "For [M title] to be true, what must be done?"
+2. Assess atomicity for each item:
+   - Can this be completed in a single focused session? Does it produce a verifiable artifact? Is "done" clear?
+   - If YES: persist as action via add-action.
+   - If NO: persist as sub-milestone via add-milestone, then derive its actions too.
+3. Persist each item immediately via tool calls. Do NOT show each result to the user.
 
 Err on the side of "atomic enough" -- over-decomposition creates graph bloat. If something is borderline, treat it as an action.
+
+### b. Present the complete derivation for review
+
+After ALL actions are derived and persisted, show the full structure:
+
+> Here's the complete derivation:
+>
+> **D-01: [statement]**
+> - M-01: [title]
+>   - A-01: [action title]
+>   - A-02: [action title]
+> - M-02: [title]
+>   - A-03: [action title]
+>
+> **D-02: [statement]**
+> - M-03: [title]
+>   - A-04: [action title]
+>   - A-05: [action title]
+>
+> **Totals:** [X] milestones, [Y] actions
+>
+> Want to adjust anything? Or does this look right?
+
+### c. Handle adjustments
+
+If the user wants changes:
+- Add/remove/rename actions or milestones as requested
+- Persist changes via the appropriate tool calls
+- Show the updated structure
+
+If the user approves: proceed to Milestone Merge Detection.
 
 ## Milestone Merge Detection
 
@@ -156,7 +164,7 @@ After derivation is complete:
 Follow these throughout the conversation:
 
 - **Make the backward logic visible and teachable.** Always state the question being asked ("For X to be true, what must be true?"). This teaches the user the thinking pattern.
-- **Collaborative, not batch.** Never auto-derive a full tree. Stop for confirmation at each level. The user has domain knowledge you don't.
+- **Milestones are collaborative, actions are batched.** Milestones are structural decisions -- confirm each one. Actions are implementation details -- derive them all, then review the full picture. Don't make the user confirm every small item individually.
 - **Propose, don't dictate.** Present milestones and actions as proposals. The user may have better ideas.
 - **Err toward atomic enough.** Over-decomposition creates graph bloat. If something could be one action or two, lean toward one.
 - **Show your reasoning.** For each proposed milestone, explain why it must be true. For each action, explain what it produces.
