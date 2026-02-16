@@ -10,11 +10,11 @@ See: .planning/PROJECT.md (updated 2026-02-16)
 ## Current Position
 
 Phase: 6 of 9 (Foundation)
-Plan: 1 of 2 complete
-Status: Executing
-Last activity: 2026-02-16 - Completed 06-01: CLI Adapters
+Plan: 2 of 2 complete
+Status: Phase Complete
+Last activity: 2026-02-16 - Completed 06-02: CLI Integration
 
-Progress: [█████░░░░░] 50%
+Progress: [██████████] 100%
 
 ## Performance Metrics
 
@@ -25,13 +25,14 @@ Progress: [█████░░░░░] 50%
 - Timeline: 12 days (Feb 2 -> Feb 13, 2026)
 
 **v2.2:**
-- Total plans completed: 1
-- Average duration: 2 min/plan
-- Total execution time: 2 min
+- Total plans completed: 2
+- Average duration: 3 min/plan
+- Total execution time: 6 min
 
 | Phase | Plan | Duration | Tasks | Files |
 |-------|------|----------|-------|-------|
 | 06    | 01   | 2min     | 2     | 4     |
+| 06    | 02   | 4min     | 2     | 2     |
 
 ## Accumulated Context
 
@@ -50,6 +51,11 @@ Key decisions from 06-01:
 - Each adapter embeds classifyError inline -- self-contained with zero cross-dependencies
 - Default timeout 120000ms matches config co_planners.timeout_ms -- single source of truth
 - Zero new npm dependencies -- Node.js stdlib only (child_process, fs, path, os)
+
+Key decisions from 06-02:
+- Used existing --raw convention instead of new --json flag -- consistent with all gsd-tools.cjs commands
+- Kill switch defaults to false (disabled) -- co-planners are opt-in until workflows explicitly enable
+- No install.js changes needed -- existing recursive copyWithPathReplacement handles adapters/ subdirectory
 
 ### Pending Todos
 
@@ -70,5 +76,5 @@ None.
 ## Session Continuity
 
 Last session: 2026-02-16
-Stopped at: Completed 06-01-PLAN.md (CLI Adapters)
+Stopped at: Completed 06-02-PLAN.md (CLI Integration) -- Phase 06 complete
 Resume file: None
