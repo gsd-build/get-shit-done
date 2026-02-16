@@ -12,15 +12,23 @@
  *
  * Commands:
  *   commit <message> --files <file1> [file2...]  - Atomic git commit for planning docs
- *   init                                          - (stub) Initialize project
- *   status                                        - (stub) Show graph status
- *   help                                          - (stub) Show help
+ *   init [project-name]                           - Initialize Declare project
+ *   status                                        - Show graph status and health
+ *   add-declaration --title "..." --statement "." - Add declaration to FUTURE.md
+ *   add-milestone --title "..." --realizes D-01   - Add milestone to MILESTONES.md
+ *   add-action --title "..." --causes M-01        - Add action to MILESTONES.md
+ *   load-graph                                    - Load full graph as JSON
+ *   help                                          - Show available commands
  */
 
 const { commitPlanningDocs } = require('./git/commit');
 const { runInit } = require('./commands/init');
 const { runStatus } = require('./commands/status');
 const { runHelp } = require('./commands/help');
+const { runAddDeclaration } = require('./commands/add-declaration');
+const { runAddMilestone } = require('./commands/add-milestone');
+const { runAddAction } = require('./commands/add-action');
+const { runLoadGraph } = require('./commands/load-graph');
 
 /**
  * Parse --cwd flag from argv.
@@ -84,7 +92,7 @@ function main() {
   const command = args[0];
 
   if (!command) {
-    console.log(JSON.stringify({ error: 'No command specified. Use: commit, init, status, help' }));
+    console.log(JSON.stringify({ error: 'No command specified. Use: commit, init, status, add-declaration, add-milestone, add-action, load-graph, help' }));
     process.exit(1);
   }
 
@@ -126,8 +134,40 @@ function main() {
         break;
       }
 
+      case 'add-declaration': {
+        const cwdAddDecl = parseCwdFlag(args) || process.cwd();
+        const result = runAddDeclaration(cwdAddDecl, args.slice(1));
+        console.log(JSON.stringify(result));
+        if (result.error) process.exit(1);
+        break;
+      }
+
+      case 'add-milestone': {
+        const cwdAddMs = parseCwdFlag(args) || process.cwd();
+        const result = runAddMilestone(cwdAddMs, args.slice(1));
+        console.log(JSON.stringify(result));
+        if (result.error) process.exit(1);
+        break;
+      }
+
+      case 'add-action': {
+        const cwdAddAct = parseCwdFlag(args) || process.cwd();
+        const result = runAddAction(cwdAddAct, args.slice(1));
+        console.log(JSON.stringify(result));
+        if (result.error) process.exit(1);
+        break;
+      }
+
+      case 'load-graph': {
+        const cwdLoadGraph = parseCwdFlag(args) || process.cwd();
+        const result = runLoadGraph(cwdLoadGraph);
+        console.log(JSON.stringify(result));
+        if (result.error) process.exit(1);
+        break;
+      }
+
       default:
-        console.log(JSON.stringify({ error: `Unknown command: ${command}. Use: commit, init, status, help` }));
+        console.log(JSON.stringify({ error: `Unknown command: ${command}. Use: commit, init, status, add-declaration, add-milestone, add-action, load-graph, help` }));
         process.exit(1);
     }
   } catch (err) {
