@@ -6,6 +6,30 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ## [Unreleased]
 
+## [2.1.0] - 2026-02-16
+
+### Added
+- **Adversarial Review System** — new `gsd-adversary` agent that challenges artifacts at configurable checkpoints before they proceed to execution
+  - Severity-classified feedback (S0-S4) with evidence requirements and category tagging
+  - Multi-round debate loop protocol (challenge → defense → assessment) with automatic convergence detection
+  - Configurable max rounds (1-5) per checkpoint
+- **Adversary checkpoints** wired into four workflow stages:
+  - Requirements checkpoint after REQUIREMENTS.md creation (`/gsd:new-project`)
+  - Roadmap checkpoint after ROADMAP.md creation (`/gsd:new-project`)
+  - Plan checkpoint with per-plan review loop (`/gsd:plan-phase`)
+  - Verification checkpoint challenging verifier conclusions (`/gsd:execute-phase`)
+- **Adversary configuration** in `config.json` — global toggle, per-checkpoint toggles, and max rounds
+- `/gsd:settings` updated with adversary toggle, checkpoint selection, and max debate rounds
+- `/gsd:new-project` collects adversary preferences during initial setup
+- Comprehensive user-facing documentation (`docs/`)
+- Enhanced `/gsd:discuss-phase` with research capabilities and adaptive questioning
+
+### Changed
+- `/gsd:plan-phase` now routes checker results through adversary review before approval
+- `/gsd:execute-phase` inserts adversary review at step 7.5 in verification flow
+- `config.json` template includes `adversary` section with defaults (enabled, 3 rounds, all checkpoints on)
+- Completion banners updated to show adversary review status
+
 ## [2.0.0] - 2025-01-31 (Fork Release)
 
 ### Changed
@@ -1087,7 +1111,8 @@ The following changelog entries are from the original [glittercowboy/get-shit-do
 - YOLO mode for autonomous execution
 - Interactive mode with checkpoints
 
-[Unreleased]: https://github.com/zpyoung/get-shit-done-together/compare/v2.0.0...HEAD
+[Unreleased]: https://github.com/zpyoung/get-shit-done-together/compare/v2.1.0...HEAD
+[2.1.0]: https://github.com/zpyoung/get-shit-done-together/compare/v2.0.0...v2.1.0
 [2.0.0]: https://github.com/zpyoung/get-shit-done-together/releases/tag/v2.0.0
 [1.10.1]: https://github.com/glittercowboy/get-shit-done/releases/tag/v1.10.1
 [1.10.0]: https://github.com/glittercowboy/get-shit-done/releases/tag/v1.10.0
