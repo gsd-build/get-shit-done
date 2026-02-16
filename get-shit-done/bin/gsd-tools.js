@@ -4226,6 +4226,56 @@ function cmdPhaseComplete(cwd, phaseNum, raw) {
   output(result, raw);
 }
 
+// ─── Phase Archive ────────────────────────────────────────────────────────────
+
+async function cmdPhaseArchive(cwd, phaseNum, raw) {
+  if (!phaseNum) {
+    error('phase number required for phase archive');
+  }
+
+  const phaseNumber = parseInt(phaseNum);
+  const archive = require('./phase-archive.js');
+
+  try {
+    const result = await archive.archivePhase(phaseNumber);
+    output(result, raw);
+  } catch (err) {
+    error(`Failed to archive phase ${phaseNumber}: ${err.message}`);
+  }
+}
+
+async function cmdPhaseInjectContext(cwd, targetPhaseNum, raw) {
+  if (!targetPhaseNum) {
+    error('target phase number required for inject-context');
+  }
+
+  const targetPhase = parseInt(targetPhaseNum);
+  const archive = require('./phase-archive.js');
+
+  try {
+    const context = await archive.injectRelevantContext(targetPhase);
+    output(context, raw);
+  } catch (err) {
+    error(`Failed to inject context for phase ${targetPhase}: ${err.message}`);
+  }
+}
+
+async function cmdPhaseCleanupCheckpoints(cwd, phaseNum, raw) {
+  if (!phaseNum) {
+    error('phase number required for cleanup-checkpoints');
+  }
+
+  const phaseNumber = parseInt(phaseNum);
+  const archive = require('./phase-archive.js');
+
+  try {
+    const result = await archive.cleanupEphemeralCheckpoints(phaseNumber);
+    output(result, raw);
+  } catch (err) {
+    error(`Failed to cleanup checkpoints for phase ${phaseNumber}: ${err.message}`);
+  }
+}
+
 // ─── Milestone Complete ───────────────────────────────────────────────────────
 
 function cmdMilestoneComplete(cwd, version, options, raw) {
@@ -5625,8 +5675,14 @@ async function main() {
         cmdPhaseRemove(cwd, args[2], { force: forceFlag }, raw);
       } else if (subcommand === 'complete') {
         cmdPhaseComplete(cwd, args[2], raw);
+      } else if (subcommand === 'archive') {
+        await cmdPhaseArchive(cwd, args[2], raw);
+      } else if (subcommand === 'inject-context') {
+        await cmdPhaseInjectContext(cwd, args[2], raw);
+      } else if (subcommand === 'cleanup-checkpoints') {
+        await cmdPhaseCleanupCheckpoints(cwd, args[2], raw);
       } else {
-        error('Unknown phase subcommand. Available: next-decimal, add, insert, remove, complete');
+        error('Unknown phase subcommand. Available: next-decimal, add, insert, remove, complete, archive, inject-context, cleanup-checkpoints');
       }
       break;
     }
