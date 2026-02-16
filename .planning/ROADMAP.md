@@ -180,9 +180,9 @@ Plans:
 - [x] 07-01-PLAN.md - Token budget monitoring with 80% alert thresholds
 - [x] 07-02-PLAN.md - Failure handling with retry/skip/escalate options
 - [x] 07-03-PLAN.md - Structured completion signals for sub-coordinators
-- [ ] 07-04-PLAN.md - Task chunker with large task detection and batch processing (gap closure)
-- [ ] 07-05-PLAN.md - Phase size limits with split recommendations (gap closure)
-- [ ] 07-06-PLAN.md - Parallel executor with worker pool (gap closure)
+- [x] 07-04-PLAN.md - Task chunker with large task detection and batch processing (gap closure)
+- [x] 07-05-PLAN.md - Phase size limits with split recommendations (gap closure)
+- [x] 07-06-PLAN.md - Parallel executor with worker pool (gap closure)
 
 ### Phase 8: Notifications & Observability
 **Goal**: Production-ready deployment with Telegram notifications for blocking questions and comprehensive observability for cost control and progress tracking
@@ -235,9 +235,45 @@ Phase 7 (Autonomous Optimization) --> Phase 8 (Notifications & Observability)
 | 3. Knowledge System Foundation | 5 | Planning complete | - |
 | 4. Knowledge Extraction & Hooks | 6 | Planning complete | - |
 | 5. Knowledge Permissions & Safety | 6 | Planning complete | - |
-| 6. Autonomous Execution Core | 6 | In progress | - |
-| 7. Autonomous Execution Optimization | 6 | Gap closure planned | - |
+| 6. Autonomous Execution Core | 6 | Complete | 2026-02-16 |
+| 7. Autonomous Execution Optimization | 6 | Complete | 2026-02-16 |
 | 8. Notifications & Observability | TBD | Not started | - |
+
+### Phase 9: Hook-based documentation compression - Optimize context injection by extracting AI-friendly headers from docs and injecting only summaries with absolute links instead of full content
+
+**Goal:** [To be planned]
+**Depends on:** Phase 8
+**Plans:** 0 plans
+
+Plans:
+- [ ] TBD (run /gsd:plan-phase 9 to break down)
+
+### Phase 10: Module repository consolidation - Move external modules (validator, circuit-breaker, escalation, feedback, learning) into repo with installation script and proper structure
+
+**Goal:** [To be planned]
+**Depends on:** Phase 9
+**Plans:** 0 plans
+
+Plans:
+- [ ] TBD (run /gsd:plan-phase 10 to break down)
+
+### Phase 11: Session-end knowledge extraction - Implement Haiku-based analysis of completed sessions to extract reasoning patterns and decisions beyond keyword matching
+
+**Goal:** [To be planned]
+**Depends on:** Phase 10
+**Plans:** 0 plans
+
+Plans:
+- [ ] TBD (run /gsd:plan-phase 11 to break down)
+
+### Phase 12: Historical conversation mining - Analyze Claude Code project conversations and planning documents to extract meta-knowledge, reasoning patterns, and decision context for enhanced context building
+
+**Goal:** [To be planned]
+**Depends on:** Phase 11
+**Plans:** 0 plans
+
+Plans:
+- [ ] TBD (run /gsd:plan-phase 12 to break down)
 
 ---
 *Roadmap created: 2026-02-15*
