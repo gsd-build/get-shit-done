@@ -10,17 +10,17 @@ See: .planning/PROJECT.md (updated 2026-02-15)
 ## Current Position
 
 Phase: 3 of 8 (Knowledge System Foundation)
-Plan: 03 of 05
+Plan: 04 of 05
 Status: In Progress
-Last activity: 2026-02-16 — Completed plan 03-03 (Multi-phase search pipeline)
+Last activity: 2026-02-16 — Completed plan 03-04 (Knowledge lifecycle management)
 
 Progress: [█████████-] 20%
 
 ## Performance Metrics
 
 **Velocity:**
-- Total plans completed: 15
-- Average duration: 3.9 min
+- Total plans completed: 16
+- Average duration: 3.8 min
 - Total execution time: 1.0 hours
 
 **By Phase:**
@@ -29,7 +29,7 @@ Progress: [█████████-] 20%
 |-------|-------|--------|----------|
 | 01    | 6     | 20 min | 3.3 min  |
 | 02    | 6     | 28 min | 4.7 min  |
-| 03    | 3     | 11 min | 3.7 min  |
+| 03    | 4     | 13 min | 3.3 min  |
 
 **Recent Completions:**
 
@@ -46,6 +46,7 @@ Progress: [█████████-] 20%
 | 03    | 01   | 2 min    | 3     | 2     |
 | 03    | 02   | 2 min    | 3     | 1     |
 | 03    | 03   | 7 min    | 3     | 3     |
+| 03    | 04   | 2 min    | 3     | 1     |
 
 ## Accumulated Context
 
@@ -121,6 +122,11 @@ Recent decisions affecting current work:
 - [Phase 03-02]: SHA-256 for content hash (supports future deduplication queries)
 - [Phase 03-02]: L2 normalization for embeddings (cosine similarity ready)
 - [Phase 03-02]: refreshTTL extends expiration for frequently-accessed knowledge
+- [Phase 03-04]: Type volatility: temp_note=0.9, summary=0.7, decision=0.3, lesson=0.1 for staleness scoring
+- [Phase 03-04]: Staleness threshold default: 0.7 (70%) to identify stale knowledge
+- [Phase 03-04]: Staleness formula: (dormant_days/30) * volatility * (1/(1 + log(1 + access_count)))
+- [Phase 03-04]: WAL checkpoint threshold: 100+ deleted entries to prevent unbounded WAL growth
+- [Phase 03-04]: Cleanup uses atomic transactions across main, vec, and FTS tables to prevent orphans
 
 ### Pending Todos
 
@@ -132,6 +138,6 @@ None yet.
 
 ## Session Continuity
 
-Last session: 2026-02-15T23:54:17Z (plan execution)
-Stopped at: Completed 03-03-PLAN.md (Multi-phase search pipeline)
+Last session: 2026-02-16T00:00:00Z (plan execution)
+Stopped at: Completed 03-04-PLAN.md (Knowledge lifecycle management)
 Resume file: None
