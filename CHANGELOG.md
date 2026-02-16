@@ -11,9 +11,6 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 - Skills-first Codex installation path that transpiles GSD commands to `skills/gsd-*/SKILL.md` (no custom-prompt dependency)
 - Codex-specific install/uninstall + manifest support for skill layout tracking and cleanup
 
-### Fixed
-- `gsd-tools state-snapshot` supports `--cwd <path>` so tooling can target a project directory when invoked from outside the repo
-
 ### Changed
 - Codex-installed content rewrites slash-command references to skill mentions (`/gsd:*` → `$gsd-*`) and normalizes command arguments (`$ARGUMENTS` → `{{GSD_ARGS}}`)
 - README/package metadata updated to document Codex install, invocation (`$gsd-help`), and uninstall flow
@@ -21,9 +18,7 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ### Fixed
 - `gsd-tools state-snapshot` supports `--cwd <path>` so tooling can target a project directory when invoked from outside the repo
-
-### Changed
-- `/gsd:debug` flow now requires a `human-verify` checkpoint after self-verification before marking debug sessions `resolved` and moving files to `.planning/debug/resolved/`
+- `/gsd:update` now installs with `npx get-shit-done-cc@latest` (instead of unpinned `npx get-shit-done-cc`) to prevent stale project-local versions from shadowing updates
 
 ## [1.20.6] - 2025-02-23
 

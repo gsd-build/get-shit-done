@@ -147,12 +147,12 @@ Run the update using the install type detected in step 1:
 
 **If LOCAL install:**
 ```bash
-npx get-shit-done-cc --local
+npx -y get-shit-done-cc@latest --local
 ```
 
 **If GLOBAL install (or unknown):**
 ```bash
-npx get-shit-done-cc --global
+npx -y get-shit-done-cc@latest --global
 ```
 
 Capture output. If install fails, show error and exit.
