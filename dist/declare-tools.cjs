@@ -383,7 +383,11 @@ var require_engine = __commonJS({
     "use strict";
     var PREFIX_TO_TYPE = { D: "declaration", M: "milestone", A: "action" };
     var TYPE_TO_PREFIX = { declaration: "D", milestone: "M", action: "A" };
-    var VALID_STATUSES = /* @__PURE__ */ new Set(["PENDING", "ACTIVE", "DONE"]);
+    var VALID_STATUSES = /* @__PURE__ */ new Set(["PENDING", "ACTIVE", "DONE", "KEPT", "BROKEN", "HONORED", "RENEGOTIATED"]);
+    var COMPLETED_STATUSES = /* @__PURE__ */ new Set(["DONE", "KEPT", "HONORED", "RENEGOTIATED"]);
+    function isCompleted(status) {
+      return COMPLETED_STATUSES.has(status);
+    }
     var VALID_TYPES = /* @__PURE__ */ new Set(["declaration", "milestone", "action"]);
     var VALID_EDGE_DIRECTIONS = {
       action: "milestone",
@@ -726,7 +730,8 @@ var require_engine = __commonJS({
        * @returns {{ declarations: number, milestones: number, actions: number, edges: number, byStatus: {PENDING: number, ACTIVE: number, DONE: number} }}
        */
       stats() {
-        const byStatus = { PENDING: 0, ACTIVE: 0, DONE: 0 };
+        const byStatus = {};
+        for (const s of VALID_STATUSES) byStatus[s] = 0;
         let declarations = 0;
         let milestones = 0;
         let actions = 0;
@@ -743,7 +748,7 @@ var require_engine = __commonJS({
         return { declarations, milestones, actions, edges, byStatus };
       }
     };
-    module2.exports = { DeclareDag };
+    module2.exports = { DeclareDag, COMPLETED_STATUSES, isCompleted };
   }
 });
 
@@ -832,6 +837,7 @@ var require_status = __commonJS({
     var { parsePlanFile } = require_plan();
     var { findMilestoneFolder } = require_milestone_folders();
     var { buildDagFromDisk } = require_build_dag();
+    var { isCompleted } = require_engine();
     function detectStaleness(cwd, planningDir, milestones) {
       const indicators = [];
       for (const m of milestones) {
@@ -860,11 +866,11 @@ var require_status = __commonJS({
         } catch {
         }
         const plan = parsePlanFile(readFileSync(planPath, "utf-8"));
-        if (m.status === "ACTIVE" && plan.actions.length > 0 && plan.actions.every((a) => a.status === "DONE")) {
+        if (m.status === "ACTIVE" && plan.actions.length > 0 && plan.actions.every((a) => isCompleted(a.status))) {
           indicators.push({ milestone: m.id, issue: "COMPLETABLE", detail: "All actions done, milestone still ACTIVE" });
         }
-        if (m.status === "DONE" && plan.actions.some((a) => a.status !== "DONE")) {
-          indicators.push({ milestone: m.id, issue: "INCONSISTENT", detail: "Milestone marked DONE but has incomplete actions" });
+        if (isCompleted(m.status) && plan.actions.some((a) => !isCompleted(a.status))) {
+          indicators.push({ milestone: m.id, issue: "INCONSISTENT", detail: "Milestone marked completed but has incomplete actions" });
         }
       }
       return indicators;
@@ -896,6 +902,39 @@ var require_status = __commonJS({
         percentage: milestones.length > 0 ? Math.round(withPlan / milestones.length * 100) : 100
       };
       const staleness = detectStaleness(cwd, planningDir, milestones);
+      const integrity = {
+        total: milestones.length,
+        verified: 0,
+        // KEPT + HONORED + RENEGOTIATED
+        kept: 0,
+        honored: 0,
+        renegotiated: 0,
+        broken: 0,
+        pending: 0
+        // PENDING + ACTIVE + DONE (not yet verified)
+      };
+      for (const m of milestones) {
+        switch (m.status) {
+          case "KEPT":
+            integrity.kept++;
+            integrity.verified++;
+            break;
+          case "HONORED":
+            integrity.honored++;
+            integrity.verified++;
+            break;
+          case "RENEGOTIATED":
+            integrity.renegotiated++;
+            integrity.verified++;
+            break;
+          case "BROKEN":
+            integrity.broken++;
+            break;
+          default:
+            integrity.pending++;
+            break;
+        }
+      }
       let health = "healthy";
       if (!validation.valid) {
         const hasCycle = validation.errors.some((e) => e.type === "cycle");
@@ -903,6 +942,9 @@ var require_status = __commonJS({
         health = hasCycle || hasBroken ? "errors" : "warnings";
       }
       if (staleness.length > 0 && health === "healthy") {
+        health = "warnings";
+      }
+      if (integrity.broken > 0 && health === "healthy") {
         health = "warnings";
       }
       return {
@@ -921,7 +963,8 @@ var require_status = __commonJS({
         lastActivity,
         health,
         coverage,
-        staleness
+        staleness,
+        integrity
       };
     }
     module2.exports = { runStatus: runStatus2 };
@@ -1787,6 +1830,7 @@ var require_compute_waves = __commonJS({
     "use strict";
     var { parseFlag } = require_parse_args();
     var { buildDagFromDisk } = require_build_dag();
+    var { isCompleted } = require_engine();
     function runComputeWaves2(cwd, args) {
       const milestoneId = parseFlag(args, "milestone");
       if (!milestoneId) {
@@ -1802,7 +1846,7 @@ var require_compute_waves = __commonJS({
       if (milestone.type !== "milestone") {
         return { error: `${milestoneId} is not a milestone (type: ${milestone.type})` };
       }
-      const actions = dag.getDownstream(milestoneId).filter((n) => n.type === "action" && n.status !== "DONE");
+      const actions = dag.getDownstream(milestoneId).filter((n) => n.type === "action" && !isCompleted(n.status));
       if (actions.length === 0) {
         return {
           milestoneId,
@@ -2000,6 +2044,7 @@ var require_verify_wave = __commonJS({
     var { parseFlag } = require_parse_args();
     var { buildDagFromDisk } = require_build_dag();
     var { traceUpward } = require_trace();
+    var { isCompleted } = require_engine();
     function looksLikeFilePath(produces) {
       if (!produces || produces.trim() === "") return false;
       return /[/\\]/.test(produces) || /\.\w{1,10}$/.test(produces);
@@ -2058,7 +2103,7 @@ var require_verify_wave = __commonJS({
       }
       const allMilestoneActions = dag.getDownstream(milestoneId).filter((n) => n.type === "action");
       const milestoneCompletable = allMilestoneActions.every(
-        (a) => a.status === "DONE" || completedActionIds.includes(a.id)
+        (a) => isCompleted(a.status) || completedActionIds.includes(a.id)
       );
       const paths = traceUpward(dag, milestoneId);
       const declMap = /* @__PURE__ */ new Map();
@@ -2098,6 +2143,7 @@ var require_execute = __commonJS({
     var { parseFlag } = require_parse_args();
     var { buildDagFromDisk } = require_build_dag();
     var { findMilestoneFolder } = require_milestone_folders();
+    var { isCompleted } = require_engine();
     function runExecute2(cwd, args) {
       const milestoneId = parseFlag(args, "milestone");
       const graphResult = buildDagFromDisk(cwd);
@@ -2106,7 +2152,7 @@ var require_execute = __commonJS({
       if (!milestoneId) {
         const milestonePicker = milestones.map((m) => {
           const actions = dag.getDownstream(m.id).filter((n) => n.type === "action");
-          const doneCount2 = actions.filter((a) => a.status === "DONE").length;
+          const doneCount2 = actions.filter((a) => isCompleted(a.status)).length;
           return {
             id: m.id,
             title: m.title,
@@ -2131,7 +2177,7 @@ var require_execute = __commonJS({
         status: a.status,
         produces: a.metadata.produces || ""
       })).sort((a, b) => a.id.localeCompare(b.id));
-      const pendingActions = allActions.filter((a) => a.status !== "DONE");
+      const pendingActions = allActions.filter((a) => !isCompleted(a.status));
       const doneCount = allActions.length - pendingActions.length;
       const waves = [];
       if (pendingActions.length > 0) {
@@ -2160,6 +2206,142 @@ var require_execute = __commonJS({
   }
 });
 
+// src/commands/verify-milestone.js
+var require_verify_milestone = __commonJS({
+  "src/commands/verify-milestone.js"(exports2, module2) {
+    "use strict";
+    var { existsSync, readFileSync, statSync } = require("node:fs");
+    var { resolve, join } = require("node:path");
+    var { execFileSync } = require("node:child_process");
+    var { parseFlag } = require_parse_args();
+    var { buildDagFromDisk } = require_build_dag();
+    var { findMilestoneFolder } = require_milestone_folders();
+    var { parsePlanFile } = require_plan();
+    var { traceUpward } = require_trace();
+    function looksLikeFilePath(produces) {
+      if (!produces || produces.trim() === "") return false;
+      return /[/\\]/.test(produces) || /\.\w{1,10}$/.test(produces);
+    }
+    function runVerifyMilestone2(cwd, args) {
+      const milestoneId = parseFlag(args, "milestone");
+      if (!milestoneId) {
+        return { error: "Missing --milestone flag. Usage: verify-milestone --milestone M-XX" };
+      }
+      const graphResult = buildDagFromDisk(cwd);
+      if ("error" in graphResult) return graphResult;
+      const { dag } = graphResult;
+      const milestone = dag.getNode(milestoneId);
+      if (!milestone) {
+        return { error: `Milestone not found: ${milestoneId}` };
+      }
+      if (milestone.type !== "milestone") {
+        return { error: `${milestoneId} is not a milestone (type: ${milestone.type})` };
+      }
+      const planningDir = join(cwd, ".planning");
+      const milestoneFolder = findMilestoneFolder(planningDir, milestoneId);
+      const criteria = [];
+      let scCounter = 1;
+      if (milestoneFolder) {
+        const planPath = join(milestoneFolder, "PLAN.md");
+        if (existsSync(planPath)) {
+          const planContent = readFileSync(planPath, "utf-8");
+          const plan = parsePlanFile(planContent);
+          for (const action of plan.actions) {
+            if (!action.produces) continue;
+            if (looksLikeFilePath(action.produces)) {
+              const filePath = resolve(cwd, action.produces);
+              const exists = existsSync(filePath);
+              let evidence = exists ? `File exists` : `File not found: ${action.produces}`;
+              if (exists) {
+                try {
+                  const stats = statSync(filePath);
+                  evidence = `File exists (${stats.size} bytes)`;
+                } catch {
+                }
+              }
+              criteria.push({
+                id: `SC-${String(scCounter).padStart(2, "0")}`,
+                type: "artifact",
+                passed: exists,
+                description: `${action.id} produces ${action.produces}`,
+                evidence,
+                actionId: action.id
+              });
+              scCounter++;
+            }
+          }
+        }
+      }
+      const packagePath = join(cwd, "package.json");
+      if (existsSync(packagePath)) {
+        try {
+          const pkg = JSON.parse(readFileSync(packagePath, "utf-8"));
+          if (pkg.scripts && pkg.scripts.test) {
+            let testPassed = false;
+            let testEvidence = "";
+            try {
+              const result = execFileSync("npm", ["test"], {
+                cwd,
+                timeout: 6e4,
+                stdio: "pipe"
+              });
+              testPassed = true;
+              testEvidence = "npm test exited with code 0";
+            } catch (err) {
+              testPassed = false;
+              const stderr = err.stderr ? err.stderr.toString().slice(0, 200) : "";
+              testEvidence = `npm test failed (exit code ${err.status || "unknown"}): ${stderr}`;
+            }
+            criteria.push({
+              id: `SC-${String(scCounter).padStart(2, "0")}`,
+              type: "test",
+              passed: testPassed,
+              description: "npm test passes",
+              evidence: testEvidence
+            });
+            scCounter++;
+          }
+        } catch {
+        }
+      }
+      criteria.push({
+        id: `SC-${String(scCounter).padStart(2, "0")}`,
+        type: "ai",
+        passed: null,
+        description: "AI assessment of milestone truth alignment",
+        evidence: null
+      });
+      const programmaticCriteria = criteria.filter((c) => c.type !== "ai");
+      const programmaticPassed = programmaticCriteria.length === 0 || programmaticCriteria.every((c) => c.passed === true);
+      const paths = traceUpward(dag, milestoneId);
+      const declMap = /* @__PURE__ */ new Map();
+      for (const path of paths) {
+        for (const node of path) {
+          if (node.type === "declaration") {
+            declMap.set(node.id, node.title);
+          }
+        }
+      }
+      const declarations = [...declMap.entries()].map(([id, title]) => ({ id, title }));
+      const declStrings = declarations.map((d) => `${d.id}: ${d.title}`);
+      const whyChain = declStrings.length > 0 ? `${milestoneId} ("${milestone.title}") realizes ${declStrings.join(", ")}` : `${milestoneId} ("${milestone.title}")`;
+      return {
+        milestoneId,
+        milestoneTitle: milestone.title,
+        milestoneFolder,
+        criteria,
+        programmaticPassed,
+        aiAssessmentNeeded: true,
+        traceContext: {
+          declarations,
+          whyChain
+        }
+      };
+    }
+    module2.exports = { runVerifyMilestone: runVerifyMilestone2 };
+  }
+});
+
 // src/declare-tools.js
 var { commitPlanningDocs } = require_commit();
 var { runInit } = require_init();
@@ -2178,6 +2360,7 @@ var { runComputeWaves } = require_compute_waves();
 var { runGenerateExecPlan } = require_generate_exec_plan();
 var { runVerifyWave } = require_verify_wave();
 var { runExecute } = require_execute();
+var { runVerifyMilestone } = require_verify_milestone();
 function parseCwdFlag(argv) {
   const idx = argv.indexOf("--cwd");
   if (idx === -1 || idx + 1 >= argv.length) return null;
@@ -2215,7 +2398,7 @@ function main() {
   const args = process.argv.slice(2);
   const command = args[0];
   if (!command) {
-    console.log(JSON.stringify({ error: "No command specified. Use: commit, init, status, add-declaration, add-milestone, add-milestones, create-plan, load-graph, trace, prioritize, visualize, compute-waves, generate-exec-plan, verify-wave, execute, help" }));
+    console.log(JSON.stringify({ error: "No command specified. Use: commit, init, status, add-declaration, add-milestone, add-milestones, create-plan, load-graph, trace, prioritize, visualize, compute-waves, generate-exec-plan, verify-wave, verify-milestone, execute, help" }));
     process.exit(1);
   }
   try {
@@ -2343,8 +2526,15 @@ function main() {
         if (result.error) process.exit(1);
         break;
       }
+      case "verify-milestone": {
+        const cwdVerifyMs = parseCwdFlag(args) || process.cwd();
+        const result = runVerifyMilestone(cwdVerifyMs, args.slice(1));
+        console.log(JSON.stringify(result));
+        if (result.error) process.exit(1);
+        break;
+      }
       default:
-        console.log(JSON.stringify({ error: `Unknown command: ${command}. Use: commit, init, status, add-declaration, add-milestone, add-milestones, create-plan, load-graph, trace, prioritize, visualize, compute-waves, generate-exec-plan, verify-wave, execute, help` }));
+        console.log(JSON.stringify({ error: `Unknown command: ${command}. Use: commit, init, status, add-declaration, add-milestone, add-milestones, create-plan, load-graph, trace, prioritize, visualize, compute-waves, generate-exec-plan, verify-wave, verify-milestone, execute, help` }));
         process.exit(1);
     }
   } catch (err) {

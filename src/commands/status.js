@@ -115,6 +115,26 @@ function runStatus(cwd) {
   // Detect staleness
   const staleness = detectStaleness(cwd, planningDir, milestones);
 
+  // Compute integrity aggregation
+  const integrity = {
+    total: milestones.length,
+    verified: 0,   // KEPT + HONORED + RENEGOTIATED
+    kept: 0,
+    honored: 0,
+    renegotiated: 0,
+    broken: 0,
+    pending: 0,    // PENDING + ACTIVE + DONE (not yet verified)
+  };
+  for (const m of milestones) {
+    switch (m.status) {
+      case 'KEPT': integrity.kept++; integrity.verified++; break;
+      case 'HONORED': integrity.honored++; integrity.verified++; break;
+      case 'RENEGOTIATED': integrity.renegotiated++; integrity.verified++; break;
+      case 'BROKEN': integrity.broken++; break;
+      default: integrity.pending++; break;
+    }
+  }
+
   // Determine health
   let health = 'healthy';
   if (!validation.valid) {
@@ -123,6 +143,10 @@ function runStatus(cwd) {
     health = (hasCycle || hasBroken) ? 'errors' : 'warnings';
   }
   if (staleness.length > 0 && health === 'healthy') {
+    health = 'warnings';
+  }
+  // BROKEN milestones are a state (in remediation), not an error per INTG-03
+  if (integrity.broken > 0 && health === 'healthy') {
     health = 'warnings';
   }
 
@@ -143,6 +167,7 @@ function runStatus(cwd) {
     health,
     coverage,
     staleness,
+    integrity,
   };
 }
 
