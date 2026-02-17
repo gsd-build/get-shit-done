@@ -5,16 +5,16 @@
 See: .planning/PROJECT.md (updated 2026-02-16)
 
 **Core value:** Quality doesn't degrade as context grows
-**Current focus:** Phase 10 - Settings Fix & Integration Polish (v2.2 Collaborative Design)
+**Current focus:** Phase 11 - Async Error Classification Fix (v2.2 Collaborative Design)
 
 ## Current Position
 
-Phase: 10 of 11 (Settings Fix & Integration Polish)
+Phase: 11 of 11 (Async Error Classification Fix)
 Plan: 1 of 1
 Status: Plan complete
-Last activity: 2026-02-17 - Completed 10-01 (settings detection badges, docstring expansion, config defaults)
+Last activity: 2026-02-17 - Completed 11-01 (classifyError async error shape fix + TDD tests)
 
-Progress: [██████████] 95%
+Progress: [██████████] 100%
 
 ## Performance Metrics
 
@@ -25,9 +25,9 @@ Progress: [██████████] 95%
 - Timeline: 12 days (Feb 2 -> Feb 13, 2026)
 
 **v2.2:**
-- Total plans completed: 9
+- Total plans completed: 10
 - Average duration: 3 min/plan
-- Total execution time: 23 min
+- Total execution time: 25 min
 
 | Phase | Plan | Duration | Tasks | Files |
 |-------|------|----------|-------|-------|
@@ -40,6 +40,7 @@ Progress: [██████████] 95%
 | 09    | 01   | 2min     | 2     | 4     |
 | 09    | 02   | 3min     | 2     | 3     |
 | 10    | 01   | 2min     | 2     | 2     |
+| 11    | 01   | 2min     | 2     | 4     |
 
 ## Accumulated Context
 
@@ -103,6 +104,10 @@ Key decisions from 10-01:
 - Minimal co_planners defaults (enabled: false, timeout_ms: 120000) -- no agents/checkpoints keys in default config
 - Deep merge for co_planners follows established workflow merge convention in cmdConfigEnsureSection
 
+Key decisions from 11-01:
+- Unified exitCode extraction via typeof guard: err.status || (typeof err.code === 'number' ? err.code : undefined)
+- classifyError exported from all 3 adapters for direct unit testing
+
 ### Pending Todos
 
 5 pending todo(s) in `.planning/todos/pending/`:
@@ -126,5 +131,5 @@ None.
 ## Session Continuity
 
 Last session: 2026-02-17
-Stopped at: Completed 10-01-PLAN.md (settings detection badges, docstring expansion, config defaults)
+Stopped at: Completed 11-01-PLAN.md (classifyError async error shape fix + TDD tests)
 Resume file: None
