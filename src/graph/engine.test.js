@@ -314,7 +314,13 @@ describe('DeclareDag', () => {
     assert.equal(s.milestones, 1);
     assert.equal(s.actions, 2);
     assert.equal(s.edges, 3);
-    assert.deepEqual(s.byStatus, { PENDING: 2, ACTIVE: 2, DONE: 1 });
+    assert.equal(s.byStatus.PENDING, 2);
+    assert.equal(s.byStatus.ACTIVE, 2);
+    assert.equal(s.byStatus.DONE, 1);
+    assert.equal(s.byStatus.KEPT, 0);
+    assert.equal(s.byStatus.BROKEN, 0);
+    assert.equal(s.byStatus.HONORED, 0);
+    assert.equal(s.byStatus.RENEGOTIATED, 0);
   });
 
   // --------------------------------------------------------------------------

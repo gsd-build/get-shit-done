@@ -17,7 +17,29 @@ const PREFIX_TO_TYPE = { D: 'declaration', M: 'milestone', A: 'action' };
 /** @type {Record<string, string>} */
 const TYPE_TO_PREFIX = { declaration: 'D', milestone: 'M', action: 'A' };
 
-const VALID_STATUSES = new Set(['PENDING', 'ACTIVE', 'DONE']);
+/**
+ * Status state machine (convention, not enforced by engine):
+ *
+ *   PENDING -> ACTIVE -> DONE -> KEPT          (happy path: verified true)
+ *   PENDING -> ACTIVE -> DONE -> BROKEN -> HONORED       (remediation succeeds)
+ *   PENDING -> ACTIVE -> DONE -> BROKEN -> RENEGOTIATED  (user adjusts)
+ *
+ * Orchestration logic follows transitions; engine only validates membership.
+ */
+const VALID_STATUSES = new Set(['PENDING', 'ACTIVE', 'DONE', 'KEPT', 'BROKEN', 'HONORED', 'RENEGOTIATED']);
+
+/** Statuses that indicate a node's work is completed (BROKEN means verification failed, remediation in progress). */
+const COMPLETED_STATUSES = new Set(['DONE', 'KEPT', 'HONORED', 'RENEGOTIATED']);
+
+/**
+ * Check if a status represents a completed state.
+ * @param {string} status
+ * @returns {boolean}
+ */
+function isCompleted(status) {
+  return COMPLETED_STATUSES.has(status);
+}
+
 const VALID_TYPES = new Set(['declaration', 'milestone', 'action']);
 
 /**
@@ -437,7 +459,9 @@ class DeclareDag {
    * @returns {{ declarations: number, milestones: number, actions: number, edges: number, byStatus: {PENDING: number, ACTIVE: number, DONE: number} }}
    */
   stats() {
-    const byStatus = { PENDING: 0, ACTIVE: 0, DONE: 0 };
+    /** @type {Record<string, number>} */
+    const byStatus = {};
+    for (const s of VALID_STATUSES) byStatus[s] = 0;
     let declarations = 0;
     let milestones = 0;
     let actions = 0;
@@ -458,4 +482,4 @@ class DeclareDag {
   }
 }
 
-module.exports = { DeclareDag };
+module.exports = { DeclareDag, COMPLETED_STATUSES, isCompleted };
