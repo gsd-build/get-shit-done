@@ -7533,6 +7533,7 @@ async function cmdMineConversations(cwd, args, raw) {
         sessionPath: fileInfo.path,
         mtime: fileInfo.mtime,
         chunkCount: prepared.chunkCount,
+        contentHash: prepared.contentHash,
         extractionRequests: prepared.extractionRequests
       });
     }
