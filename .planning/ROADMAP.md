@@ -319,14 +319,13 @@ Plans:
   5. Telegram messages clearly identify which session asked
   6. Works seamlessly when only one instance runs (no overhead)
   7. Backward compatible with existing questions using session_id
-**Plans:** 0 plans (run /gsd:discuss-phase 10.1 then /gsd:plan-phase 10.1)
+**Plans:** 4 plans
 
 Plans:
-- [ ] TBD - Options to evaluate during discuss-phase:
-  - Per-session JSONL vs global with session index
-  - File locking strategy (flock vs lockfile vs database)
-  - Session lifecycle (cleanup triggers, TTL)
-  - Answer routing architecture (session-local vs coordinator)
+- [ ] 10.1-01-PLAN.md - Session infrastructure (file-lock.ts, session-manager.ts, dependencies)
+- [ ] 10.1-02-PLAN.md - Question queue refactor to per-session JSONL storage
+- [ ] 10.1-03-PLAN.md - MCP tools and server lifecycle (session-aware tools, heartbeat, cleanup)
+- [ ] 10.1-04-PLAN.md - Telegram bot multi-session UI and gitignore configuration
 
 ### Phase 11: Session-end knowledge extraction - Implement Haiku-based analysis of completed sessions to extract reasoning patterns and decisions beyond keyword matching
 
