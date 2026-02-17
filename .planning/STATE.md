@@ -10,11 +10,11 @@ See: .planning/PROJECT.md (updated 2026-02-15)
 ## Current Position
 
 Phase: 12 of 12 (Historical Conversation Mining)
-Plan: 02 of 03
-Status: In Progress
-Last activity: 2026-02-17 — Completed plan 12-02 (Mine Conversations CLI Commands)
+Plan: 03 of 03
+Status: Complete
+Last activity: 2026-02-17 — Completed plan 12-03 (Mine Conversations Workflow)
 
-Progress: [███████████████████████              ] 64%
+Progress: [█████████████████████████████████████] 100%
 
 ## Performance Metrics
 
@@ -82,6 +82,7 @@ Progress: [███████████████████████
 | Phase 11 P04 | 4 | 3 tasks | 3 files |
 | Phase 12 P01 | 2 | 2 tasks | 1 files |
 | Phase 12 P02 | 2 | 1 tasks | 1 files |
+| Phase 12 P03 | 3 | 2 tasks | 2 files |
 
 ## Accumulated Context
 
@@ -278,6 +279,8 @@ Recent decisions affecting current work:
 - [Phase 12]: Lazy-require Phase 11 modules inside prepareConversationForMining() body to match gsd-tools.js lazy-loading pattern
 - [Phase 12-02]: Separate conversation analysis log at .planning/knowledge/.conversation-analysis-log.jsonl — never writes to telegram-sessions log to prevent cross-domain contamination
 - [Phase 12-02]: filteredArgs conditional guard: only filter when --content-hash flag present (contentHashIdx !== -1) to avoid off-by-one dropping sessionId at index 0 when flag absent
+- [Phase 12-03]: mine-conversations.md follows analyze-pending-sessions.md pattern: purpose, constraints, process steps, success_criteria — consistent UX for both session and conversation mining
+- [Phase 12-03]: contentHash propagated from prepareConversationForMining through cmdMineConversations output — workflow passes --content-hash to store-conversation-result for correct re-analysis prevention
 
 ### Roadmap Evolution
 
@@ -293,6 +296,6 @@ None yet.
 
 ## Session Continuity
 
-Last session: 2026-02-17T22:09:36Z (plan execution)
-Stopped at: Completed 12-02-PLAN.md (Mine Conversations CLI Commands) - Phase 12 Plan 02 of 03
+Last session: 2026-02-17T22:14:45Z (plan execution)
+Stopped at: Completed 12-03-PLAN.md (Mine Conversations Workflow) - Phase 12 Plan 03 of 03 - PHASE COMPLETE
 Resume file: None
