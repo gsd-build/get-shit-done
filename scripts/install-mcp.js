@@ -33,6 +33,7 @@ function installMcp(options = {}) {
       command: 'node',
       args: [path.join(projectRoot, 'mcp-servers/telegram-mcp/dist/index.js')],
       env: {
+        PROJECT_ROOT: projectRoot,
         TELEGRAM_BOT_TOKEN: '${TELEGRAM_BOT_TOKEN}',
         TELEGRAM_OWNER_ID: '${TELEGRAM_OWNER_ID}'
       }
