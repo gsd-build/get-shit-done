@@ -10,9 +10,9 @@ See: .planning/PROJECT.md (updated 2026-02-15)
 ## Current Position
 
 Phase: 11 of 12 (Session-End Knowledge Extraction)
-Plan: 01 of 04
+Plan: 02 of 04
 Status: In Progress
-Last activity: 2026-02-17 — Completed plan 11-01 (Session Analysis Infrastructure)
+Last activity: 2026-02-17 — Completed plan 11-02 (Session Quality Gates and Chunking)
 
 Progress: [████████████████████                ] 59%
 
@@ -77,6 +77,7 @@ Progress: [████████████████████         
 | 10.1  | 03   | 4 min    | 2     | 6     |
 | 10.1  | 04   | 3 min    | 2     | 2     |
 | Phase 11 P01 | 4 | 2 tasks | 5 files |
+| Phase 11 P02 | 4 | 2 tasks | 2 files |
 
 ## Accumulated Context
 
@@ -257,6 +258,9 @@ Recent decisions affecting current work:
 - [Phase 11-01]: All Haiku analysis via Task() subagent - analyzeSession() returns extraction request objects, caller invokes Task() - zero @anthropic-ai/sdk usage
 - [Phase 11-01]: context_snippet required for grounding: parseExtractionResult filters any item with empty/short context_snippet to prevent hallucinated knowledge
 - [Phase 11-01]: conversation_id optional for backward compat: existing PendingQuestion entries without conversation_id grouped under 'ungrouped' key
+- [Phase 11]: shouldAnalyzeSession() AND logic for all three thresholds (2+ questions AND 2+ answers AND 10+ total entries) - each catches different trivial-session case
+- [Phase 11]: Content hash covers substantive entries only sorted by timestamp - metadata/heartbeat excluded to avoid false cache misses on unchanged conversations
+- [Phase 11]: chunkSession() measures via formatEntriesForPrompt() (not raw JSON) - chunk size matches what Haiku actually sees in prompt
 
 ### Roadmap Evolution
 
@@ -272,6 +276,6 @@ None yet.
 
 ## Session Continuity
 
-Last session: 2026-02-17T21:00:00Z (plan execution)
-Stopped at: Completed 11-01-PLAN.md (Session Analysis Infrastructure) - Phase 11 Plan 01 of 04
+Last session: 2026-02-17T21:06:00Z (plan execution)
+Stopped at: Completed 11-02-PLAN.md (Session Quality Gates and Chunking) - Phase 11 Plan 02 of 04
 Resume file: None
