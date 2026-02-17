@@ -1,0 +1,4 @@
+aiogram>=3.7
+openai>=1.30
+pdfplumber>=0.11
+python-dotenv>=1.0
