@@ -17,7 +17,7 @@ const path = require('path');
 const os = require('os');
 const https = require('https');
 
-const MODELS = ['base.en']; // Start with English only
+const MODELS = ['base']; // Multilingual (includes English and Russian)
 const WHISPER_CACHE_DIR = path.join(os.homedir(), '.cache', 'whisper');
 const MAX_RETRIES = 3;
 const RETRY_DELAY_BASE = 2000; // 2 seconds, exponential backoff
