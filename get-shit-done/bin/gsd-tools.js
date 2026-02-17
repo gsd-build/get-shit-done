@@ -125,6 +125,13 @@
  *   knowledge cleanup [--scope project|global]  Remove expired entries
  *   knowledge stats [--scope project|global]    Show access statistics
  *
+ * Session Analysis:
+ *   analyze-session <path>                      Prepare session for Haiku analysis
+ *   historical-extract <path>                   Extract knowledge from existing project
+ *   analysis-status                             Show analysis statistics
+ *   list-pending-sessions                       Find sessions awaiting Haiku analysis
+ *   store-analysis-result <id> <json>           Store Haiku extraction results
+ *
  * Compound Commands (workflow-specific initialization):
  *   init execute-phase <phase>         All context for execute-phase workflow
  *   init plan-phase <phase>            All context for plan-phase workflow
@@ -7068,6 +7075,406 @@ function cmdInitExecuteRoadmap(cwd, raw) {
   }, raw);
 }
 
+// ─── Session Analysis Commands ────────────────────────────────────────────────
+
+/**
+ * analyze-session <session-file-path>
+ *
+ * Prepares a session JSONL file for Haiku analysis.
+ * Returns extraction requests for the calling GSD workflow to pass to Task().
+ */
+async function cmdAnalyzeSession(cwd, args, raw) {
+  const sessionFilePath = args[0];
+
+  if (!sessionFilePath) {
+    output({ status: 'error', reason: 'Usage: analyze-session <session-file-path>' }, raw);
+    return;
+  }
+
+  // Resolve the path (absolute or relative to cwd)
+  const resolvedPath = path.isAbsolute(sessionFilePath)
+    ? sessionFilePath
+    : path.join(cwd, sessionFilePath);
+
+  // Check if file exists
+  if (!fs.existsSync(resolvedPath)) {
+    output({ status: 'error', reason: `Session file not found: ${resolvedPath}` }, raw);
+    return;
+  }
+
+  // Lazy-require modules
+  let shouldAnalyzeSession, isAlreadyAnalyzed, getSessionContentHash;
+  try {
+    const gates = require(path.join(__dirname, 'session-quality-gates.js'));
+    shouldAnalyzeSession = gates.shouldAnalyzeSession;
+    isAlreadyAnalyzed = gates.isAlreadyAnalyzed;
+    getSessionContentHash = gates.getSessionContentHash;
+  } catch (err) {
+    output({ status: 'error', reason: 'Failed to load session-quality-gates.js: ' + err.message }, raw);
+    return;
+  }
+
+  let prepareSessionForAnalysis;
+  try {
+    const chunker = require(path.join(__dirname, 'session-chunker.js'));
+    prepareSessionForAnalysis = chunker.prepareSessionForAnalysis;
+  } catch (err) {
+    output({ status: 'error', reason: 'Failed to load session-chunker.js: ' + err.message }, raw);
+    return;
+  }
+
+  let analyzeSession;
+  try {
+    const analyzer = require(path.join(__dirname, 'session-analyzer.js'));
+    analyzeSession = analyzer.analyzeSession;
+  } catch (err) {
+    output({ status: 'error', reason: 'Failed to load session-analyzer.js: ' + err.message }, raw);
+    return;
+  }
+
+  // Load session JSONL entries
+  let entries = [];
+  try {
+    const rawContent = fs.readFileSync(resolvedPath, 'utf8');
+    const lines = rawContent.split('\n').filter(l => l.trim());
+    for (const line of lines) {
+      try {
+        entries.push(JSON.parse(line));
+      } catch {
+        // Skip malformed lines
+      }
+    }
+  } catch (err) {
+    output({ status: 'error', reason: 'Failed to read session file: ' + err.message }, raw);
+    return;
+  }
+
+  // Run quality gates
+  const qualityCheck = shouldAnalyzeSession(entries);
+  if (!qualityCheck.analyze) {
+    output({ status: 'skipped', reason: qualityCheck.reason }, raw);
+    return;
+  }
+
+  // Check re-analysis prevention
+  const contentHash = getSessionContentHash(entries);
+  const sessionId = path.basename(resolvedPath, '.jsonl');
+
+  if (isAlreadyAnalyzed(sessionId, contentHash)) {
+    output({ status: 'already_analyzed', sessionId, contentHash }, raw);
+    return;
+  }
+
+  // Prepare session (voice resolution + chunking)
+  const prepared = prepareSessionForAnalysis(entries);
+
+  // For each chunk, get extraction requests
+  const allExtractionRequests = [];
+  for (const chunk of prepared.chunks) {
+    const requests = analyzeSession(chunk);
+    allExtractionRequests.push(...requests);
+  }
+
+  output({
+    status: 'ready',
+    sessionId,
+    sessionPath: resolvedPath,
+    chunkCount: prepared.chunkCount,
+    totalChars: prepared.totalChars,
+    contentHash,
+    extractionRequests: allExtractionRequests
+  }, raw);
+}
+
+/**
+ * historical-extract <planning-path>
+ *
+ * Extracts knowledge from an existing GSD project's completed phases.
+ * Returns extraction requests for the calling GSD workflow to pass to Task().
+ */
+async function cmdHistoricalExtract(cwd, args, raw) {
+  const planningPath = args[0];
+
+  if (!planningPath) {
+    output({ status: 'error', reason: 'Usage: historical-extract <planning-path>' }, raw);
+    return;
+  }
+
+  const resolvedPath = path.isAbsolute(planningPath)
+    ? planningPath
+    : path.join(cwd, planningPath);
+
+  if (!fs.existsSync(resolvedPath)) {
+    output({ status: 'error', reason: `Planning path does not exist: ${resolvedPath}`, phasesFound: 0 }, raw);
+    return;
+  }
+
+  const roadmapPath = path.join(resolvedPath, 'ROADMAP.md');
+  if (!fs.existsSync(roadmapPath)) {
+    output({ status: 'error', reason: `ROADMAP.md not found in: ${resolvedPath}`, phasesFound: 0 }, raw);
+    return;
+  }
+
+  let extractFromProject;
+  try {
+    const extractor = require(path.join(__dirname, 'historical-extract.js'));
+    extractFromProject = extractor.extractFromProject;
+  } catch (err) {
+    output({ status: 'error', reason: 'Failed to load historical-extract.js: ' + err.message }, raw);
+    return;
+  }
+
+  const result = extractFromProject(resolvedPath);
+  output(result, raw);
+}
+
+/**
+ * analysis-status
+ *
+ * Reports statistics on analyzed sessions.
+ */
+function cmdAnalysisStatus(cwd, args, raw) {
+  let getAnalysisStats;
+  try {
+    const gates = require(path.join(__dirname, 'session-quality-gates.js'));
+    getAnalysisStats = gates.getAnalysisStats;
+  } catch (err) {
+    output({
+      totalAnalyzed: 0,
+      totalInsights: 0,
+      lastAnalysis: null,
+      error: 'Failed to load session-quality-gates.js: ' + err.message
+    }, raw);
+    return;
+  }
+
+  const stats = getAnalysisStats();
+  const analysisLogPath = path.join(cwd, '.planning', 'telegram-sessions', '.analysis-log.jsonl');
+
+  output({
+    totalAnalyzed: stats.totalSessions || 0,
+    totalInsights: stats.totalInsights || 0,
+    lastAnalysis: stats.lastAnalyzedAt || null,
+    analysisLogPath
+  }, raw);
+}
+
+/**
+ * list-pending-sessions
+ *
+ * Scans .planning/telegram-sessions/ for session JSONL files with
+ * session_analysis_pending entries that have not yet been processed.
+ */
+async function cmdListPendingSessions(cwd, args, raw) {
+  const sessionsDir = path.join(cwd, '.planning', 'telegram-sessions');
+
+  if (!fs.existsSync(sessionsDir)) {
+    output({ pending: [], count: 0 }, raw);
+    return;
+  }
+
+  let isAlreadyAnalyzed;
+  try {
+    const gates = require(path.join(__dirname, 'session-quality-gates.js'));
+    isAlreadyAnalyzed = gates.isAlreadyAnalyzed;
+  } catch (err) {
+    output({ pending: [], count: 0, error: 'Failed to load session-quality-gates.js: ' + err.message }, raw);
+    return;
+  }
+
+  // Read all JSONL files in the sessions directory
+  let sessionFiles = [];
+  try {
+    sessionFiles = fs.readdirSync(sessionsDir)
+      .filter(f => f.endsWith('.jsonl') && !f.startsWith('.'))
+      .map(f => path.join(sessionsDir, f));
+  } catch (err) {
+    output({ pending: [], count: 0, error: 'Failed to read sessions directory: ' + err.message }, raw);
+    return;
+  }
+
+  const pending = [];
+
+  for (const sessionPath of sessionFiles) {
+    let entries = [];
+    try {
+      const rawContent = fs.readFileSync(sessionPath, 'utf8');
+      const lines = rawContent.split('\n').filter(l => l.trim());
+      for (const line of lines) {
+        try {
+          entries.push(JSON.parse(line));
+        } catch {
+          // Skip malformed lines
+        }
+      }
+    } catch {
+      continue;
+    }
+
+    // Check if there's a session_analysis_pending entry
+    const pendingEntryIdx = entries.findIndex(e => e && e.type === 'session_analysis_pending');
+    if (pendingEntryIdx === -1) continue;
+
+    // Check if a session_analysis_complete entry exists AFTER the pending entry
+    const hasComplete = entries
+      .slice(pendingEntryIdx + 1)
+      .some(e => e && e.type === 'session_analysis_complete');
+
+    if (hasComplete) continue;
+
+    // Get the pending entry to retrieve extraction requests
+    const pendingEntry = entries[pendingEntryIdx];
+    const sessionId = pendingEntry.session_id || path.basename(sessionPath, '.jsonl');
+
+    // Secondary guard: check analysis log
+    if (pendingEntry.content_hash && isAlreadyAnalyzed(sessionId, pendingEntry.content_hash)) {
+      continue;
+    }
+
+    pending.push({
+      sessionId,
+      sessionPath,
+      extractionRequests: pendingEntry.extraction_requests || [],
+      timestamp: pendingEntry.timestamp || null
+    });
+  }
+
+  output({ pending, count: pending.length }, raw);
+}
+
+/**
+ * store-analysis-result <session-id> <results-json>
+ *
+ * Accepts Haiku extraction results and persists them to the knowledge DB.
+ * Marks the session as analyzed to prevent re-analysis.
+ */
+async function cmdStoreAnalysisResult(cwd, args, raw) {
+  const sessionId = args[0];
+  const resultsArg = args.slice(1).join(' ');
+
+  if (!sessionId) {
+    output({ status: 'error', reason: 'Usage: store-analysis-result <session-id> <results-json>' }, raw);
+    return;
+  }
+
+  if (!resultsArg) {
+    output({ stored: 0, skipped: 0, evolved: 0, errors: ['No results JSON provided'] }, raw);
+    return;
+  }
+
+  // Parse the results JSON (may be a JSON string or path to JSON file)
+  let results = [];
+  try {
+    // First try as a JSON string
+    results = JSON.parse(resultsArg);
+  } catch {
+    // Try as a file path
+    const resolvedPath = path.isAbsolute(resultsArg)
+      ? resultsArg
+      : path.join(cwd, resultsArg);
+    try {
+      const fileContent = fs.readFileSync(resolvedPath, 'utf8');
+      results = JSON.parse(fileContent);
+    } catch (err) {
+      output({ stored: 0, skipped: 0, evolved: 0, errors: ['Failed to parse results JSON: ' + err.message] }, raw);
+      return;
+    }
+  }
+
+  // Handle empty results
+  if (!Array.isArray(results) || results.length === 0) {
+    output({ stored: 0, skipped: 0, evolved: 0, errors: [] }, raw);
+    return;
+  }
+
+  // Lazy-require modules
+  let parseExtractionResult;
+  try {
+    const analyzer = require(path.join(__dirname, 'session-analyzer.js'));
+    parseExtractionResult = analyzer.parseExtractionResult;
+  } catch (err) {
+    output({ stored: 0, skipped: 0, evolved: 0, errors: ['Failed to load session-analyzer.js: ' + err.message] }, raw);
+    return;
+  }
+
+  let storeInsights;
+  try {
+    const writer = require(path.join(__dirname, 'knowledge-writer.js'));
+    storeInsights = writer.storeInsights;
+  } catch (err) {
+    output({ stored: 0, skipped: 0, evolved: 0, errors: ['Failed to load knowledge-writer.js: ' + err.message] }, raw);
+    return;
+  }
+
+  let markSessionAnalyzed, getSessionContentHash;
+  try {
+    const gates = require(path.join(__dirname, 'session-quality-gates.js'));
+    markSessionAnalyzed = gates.markSessionAnalyzed;
+    getSessionContentHash = gates.getSessionContentHash;
+  } catch (err) {
+    output({ stored: 0, skipped: 0, evolved: 0, errors: ['Failed to load session-quality-gates.js: ' + err.message] }, raw);
+    return;
+  }
+
+  // Collect all insights from all result objects
+  const allInsights = [];
+  const parseErrors = [];
+
+  for (const resultObj of results) {
+    if (!resultObj || typeof resultObj.type !== 'string' || typeof resultObj.result !== 'string') {
+      parseErrors.push('Invalid result object (missing type or result field)');
+      continue;
+    }
+
+    const { insights, errors } = parseExtractionResult(resultObj.type, resultObj.result);
+    allInsights.push(...insights);
+    parseErrors.push(...errors);
+  }
+
+  // Store all insights in knowledge DB
+  let storeResult = { stored: 0, skipped: 0, evolved: 0, errors: [] };
+  if (allInsights.length > 0) {
+    try {
+      storeResult = await storeInsights(allInsights, { sessionId, scope: 'project' });
+    } catch (err) {
+      storeResult.errors.push('storeInsights failed: ' + err.message);
+    }
+  }
+
+  // Mark session as analyzed
+  const totalInsights = storeResult.stored + storeResult.evolved;
+  const contentHash = getSessionContentHash([]); // We use a placeholder hash here since entries may not be available
+  try {
+    markSessionAnalyzed(sessionId, contentHash, totalInsights);
+  } catch (err) {
+    storeResult.errors.push('markSessionAnalyzed failed: ' + err.message);
+  }
+
+  // Append session_analysis_complete entry to the session JSONL file
+  const sessionsDir = path.join(cwd, '.planning', 'telegram-sessions');
+  const sessionFilePath = path.join(sessionsDir, sessionId + '.jsonl');
+  if (fs.existsSync(sessionFilePath)) {
+    try {
+      const completeEntry = JSON.stringify({
+        type: 'session_analysis_complete',
+        session_id: sessionId,
+        insight_count: totalInsights,
+        timestamp: new Date().toISOString()
+      }) + '\n';
+      fs.appendFileSync(sessionFilePath, completeEntry, 'utf8');
+    } catch (err) {
+      storeResult.errors.push('Failed to append session_analysis_complete: ' + err.message);
+    }
+  }
+
+  output({
+    stored: storeResult.stored,
+    skipped: storeResult.skipped,
+    evolved: storeResult.evolved,
+    errors: [...parseErrors, ...storeResult.errors]
+  }, raw);
+}
+
 // ─── CLI Router ───────────────────────────────────────────────────────────────
 
 async function main() {
@@ -7752,6 +8159,31 @@ async function main() {
 
     case 'savings': {
       cmdSavings(args.slice(1), raw);
+      break;
+    }
+
+    case 'analyze-session': {
+      await cmdAnalyzeSession(cwd, args.slice(1), raw);
+      break;
+    }
+
+    case 'historical-extract': {
+      await cmdHistoricalExtract(cwd, args.slice(1), raw);
+      break;
+    }
+
+    case 'analysis-status': {
+      cmdAnalysisStatus(cwd, args.slice(1), raw);
+      break;
+    }
+
+    case 'list-pending-sessions': {
+      await cmdListPendingSessions(cwd, args.slice(1), raw);
+      break;
+    }
+
+    case 'store-analysis-result': {
+      await cmdStoreAnalysisResult(cwd, args.slice(1), raw);
       break;
     }
 
