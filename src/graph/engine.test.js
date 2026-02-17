@@ -3,7 +3,7 @@
 
 const { describe, it } = require('node:test');
 const assert = require('node:assert/strict');
-const { DeclareDag } = require('./engine');
+const { DeclareDag, isCompleted, COMPLETED_STATUSES } = require('./engine');
 
 describe('DeclareDag', () => {
 
@@ -413,6 +413,64 @@ describe('DeclareDag', () => {
     // D-01 has no upstream (it's top-level)
     const d01Up = dag.getUpstream('D-01');
     assert.equal(d01Up.length, 0);
+  });
+
+  // --------------------------------------------------------------------------
+  // Test 21: addNode accepts all 7 statuses (including integrity statuses)
+  // --------------------------------------------------------------------------
+  it('addNode accepts all 7 statuses including integrity statuses', () => {
+    const dag = new DeclareDag();
+    dag.addNode('D-01', 'declaration', 'Dec 1', 'PENDING');
+    dag.addNode('D-02', 'declaration', 'Dec 2', 'ACTIVE');
+    dag.addNode('D-03', 'declaration', 'Dec 3', 'DONE');
+    dag.addNode('D-04', 'declaration', 'Dec 4', 'KEPT');
+    dag.addNode('D-05', 'declaration', 'Dec 5', 'BROKEN');
+    dag.addNode('D-06', 'declaration', 'Dec 6', 'HONORED');
+    dag.addNode('D-07', 'declaration', 'Dec 7', 'RENEGOTIATED');
+
+    assert.equal(dag.size, 7);
+    assert.equal(dag.getNode('D-04').status, 'KEPT');
+    assert.equal(dag.getNode('D-05').status, 'BROKEN');
+    assert.equal(dag.getNode('D-06').status, 'HONORED');
+    assert.equal(dag.getNode('D-07').status, 'RENEGOTIATED');
+  });
+
+  // --------------------------------------------------------------------------
+  // Test 22: addNode rejects invalid statuses
+  // --------------------------------------------------------------------------
+  it('addNode rejects invalid statuses', () => {
+    const dag = new DeclareDag();
+    assert.throws(
+      () => dag.addNode('D-01', 'declaration', 'Test', 'INVALID'),
+      /Invalid status/
+    );
+    assert.throws(
+      () => dag.addNode('D-01', 'declaration', 'Test', 'COMPLETED'),
+      /Invalid status/
+    );
+    assert.throws(
+      () => dag.addNode('D-01', 'declaration', 'Test', 'kept'),
+      /Invalid status/
+    );
+  });
+
+  // --------------------------------------------------------------------------
+  // Test 23: isCompleted returns true for DONE, KEPT, HONORED, RENEGOTIATED
+  // --------------------------------------------------------------------------
+  it('isCompleted returns true for completed statuses', () => {
+    assert.equal(isCompleted('DONE'), true);
+    assert.equal(isCompleted('KEPT'), true);
+    assert.equal(isCompleted('HONORED'), true);
+    assert.equal(isCompleted('RENEGOTIATED'), true);
+  });
+
+  // --------------------------------------------------------------------------
+  // Test 24: isCompleted returns false for PENDING, ACTIVE, BROKEN
+  // --------------------------------------------------------------------------
+  it('isCompleted returns false for non-completed statuses', () => {
+    assert.equal(isCompleted('PENDING'), false);
+    assert.equal(isCompleted('ACTIVE'), false);
+    assert.equal(isCompleted('BROKEN'), false);
   });
 
 });
