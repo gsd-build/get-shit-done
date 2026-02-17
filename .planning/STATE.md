@@ -10,11 +10,11 @@ See: .planning/PROJECT.md (updated 2026-02-15)
 ## Current Position
 
 Phase: 10 of 12 (Installation System)
-Plan: 03 of 04
+Plan: 02 of 04
 Status: In Progress
-Last activity: 2026-02-17 — Completed plan 10-03 (Claude Code Hooks & MCP Configuration)
+Last activity: 2026-02-17 — Completed plan 10-02 (Whisper Models & Health Check)
 
-Progress: [█████████░░░░░░░░░░░░░░░░░░░░░░░░░░░] 75%
+Progress: [████████░░░░░░░░░░░░░░░░░░░░░░░░░░] 50%
 
 ## Performance Metrics
 
@@ -65,8 +65,7 @@ Progress: [█████████░░░░░░░░░░░░░░
 | 08.1  | 05   | 5 min    | 3     | 5     |
 | 08.1  | 06   | 3 min    | 3     | 4     |
 | 10    | 01   | 2 min    | 3     | 13    |
-| 10    | 03   | 2 min    | 2     | 2     |
-| Phase 10 P02 | 3 | 2 tasks | 2 files |
+| 10    | 02   | 3 min    | 2     | 2     |
 
 ## Accumulated Context
 
@@ -215,6 +214,8 @@ Recent decisions affecting current work:
 - [Phase 10-01]: Create module stubs with placeholder exports to enable workspace config without implementation
 - [Phase 10-01]: Detect npx github:user/repo scenario and delegate to bin/install.js for different installation contexts
 - [Phase 10-01]: Gracefully skip missing installers (whisper, hooks, MCP, env, health-check) to allow Plan 01 to work independently
+- [Phase 10-02]: Use direct HTTPS download instead of npx whisper-node download (bypasses interactive TTY)
+- [Phase 10-02]: Skip .env.template check if .env exists (user has configured environment)
 - [Phase 10-03]: Prefer hooks/dist/ over hooks/ source for bundled hook distribution
 - [Phase 10-03]: Skip statusLine configuration if already set (preserve user customization)
 - [Phase 10-03]: Merge GSD MCP servers with existing .mcp.json, user servers take precedence
@@ -237,6 +238,6 @@ None yet.
 
 ## Session Continuity
 
-Last session: 2026-02-17T11:41:45Z (plan execution)
-Stopped at: Completed 10-03-PLAN.md (Claude Code Hooks & MCP Configuration) - Phase 10 Plan 03 complete
+Last session: 2026-02-17T11:46:00Z (plan execution)
+Stopped at: Completed 10-02-PLAN.md (Whisper Models & Health Check) - Phase 10 Plan 02 complete
 Resume file: None
