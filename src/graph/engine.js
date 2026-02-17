@@ -482,4 +482,23 @@ class DeclareDag {
   }
 }
 
-module.exports = { DeclareDag, COMPLETED_STATUSES, isCompleted };
+/**
+ * Find orphan nodes in a DAG (milestones/actions with no upward connection).
+ * Convenience wrapper around validate() that filters for orphan-type errors.
+ *
+ * @param {DeclareDag} dag
+ * @returns {Array<{id: string, type: string, title: string, status: string}>}
+ */
+function findOrphans(dag) {
+  const { errors } = dag.validate();
+  return errors
+    .filter(e => e.type === 'orphan' && e.node)
+    .map(e => {
+      const node = dag.getNode(e.node);
+      return node
+        ? { id: node.id, type: node.type, title: node.title, status: node.status }
+        : { id: e.node, type: 'unknown', title: '', status: '' };
+    });
+}
+
+module.exports = { DeclareDag, COMPLETED_STATUSES, isCompleted, findOrphans };
