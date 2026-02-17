@@ -101,14 +101,127 @@ Phase: $ARGUMENTS
 7. **Verify phase goal**
    Check config: `WORKFLOW_VERIFIER=$(cat .planning/config.json 2>/dev/null | grep -o '"verifier"[[:space:]]*:[[:space:]]*[^,}]*' | grep -o 'true\|false' || echo "true")`
 
-   **If `workflow.verifier` is `false`:** Skip to step 8 (treat as passed). This skips both verification and adversary review, since there is no VERIFICATION.md to challenge.
+   **If `workflow.verifier` is `false`:** Skip to step 8 (treat as passed). This skips verification, co-planner review, and adversary review, since there is no VERIFICATION.md to review or challenge.
 
    **Otherwise:**
    - Spawn `gsd-verifier` subagent with phase directory and goal
    - Verifier checks must_haves against actual codebase (not SUMMARY claims)
    - Creates VERIFICATION.md with detailed report
 
-   Continue to step 7.5 (adversary review). Status routing happens after adversary review.
+   Continue to step 7.3 (co-planner review). Status routing happens after adversary review.
+
+7.3. **Co-Planner Review — Verification**
+
+   **Resolve co-planner agents:**
+
+   ```bash
+   CO_AGENTS_JSON=$(node ~/.claude/get-shit-done/bin/gsd-tools.cjs coplanner agents "verification")
+   ```
+
+   Parse JSON: extract `agents` array and `warnings` array.
+
+   **Skip conditions** (skip to step 7.5):
+   - Agents array is empty (no co-planners configured for verification checkpoint)
+   - Verification status is already `gaps_found` — verifier already found problems, external review is redundant
+   - VERIFICATION.md has `re_verification:` metadata — gap-closure re-check, not initial verification
+
+   **If agents array is non-empty AND status is `passed` or `human_needed` AND initial verification:**
+
+   Display banner:
+   ```
+   ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+    GSD ► CO-PLANNER REVIEW
+   ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+   ◆ Reviewing verification with {N} co-planner(s)...
+   ```
+
+   Set `CO_PLANNER_RAN_VERIFICATION=true`.
+
+   **For each agent in agents array:**
+
+   1. **Read artifact from disk:**
+      ```bash
+      ARTIFACT_CONTENT=$(cat "${PHASE_DIR}"/*-VERIFICATION.md)
+      ROADMAP_CONTEXT=$(cat .planning/ROADMAP.md 2>/dev/null)
+      ```
+
+   2. **Construct review prompt and invoke:**
+      ```bash
+      REVIEW_PROMPT=$(cat <<'PROMPT_EOF'
+      Review this verification report for a completed implementation phase. Focus on:
+      1. COVERAGE: Were all must-haves actually verified with evidence?
+      2. BLIND SPOTS: What wasn't checked that should have been?
+      3. FALSE POSITIVES: Could passing checks hide real issues?
+      4. CONCLUSION VALIDITY: Are the conclusions justified by the evidence?
+
+      Organize your response into three sections:
+      - **Suggestions:** Specific improvements or additions you recommend
+      - **Challenges:** Concerns or potential problems you see
+      - **Endorsements:** What looks good and is well-thought-out
+
+      Roadmap context (phase goals):
+      {ROADMAP_CONTEXT}
+
+      Verification report to review:
+      {ARTIFACT_CONTENT}
+      PROMPT_EOF
+      )
+
+      RESULT=$(node ~/.claude/get-shit-done/bin/gsd-tools.cjs coplanner invoke {agent} --prompt "$REVIEW_PROMPT")
+      ```
+
+   3. **Check for errors:**
+      Parse `RESULT` JSON. If `errorType` is non-null:
+      ```
+      ⚠ {agent} failed ({errorType}): {error}
+      Continuing with remaining agents...
+      ```
+      Skip to next agent.
+
+   4. **Display attributed feedback block:**
+      ```
+      ─── {Agent Name} Feedback ───
+
+      **Suggestions:**
+      - {extracted from response}
+
+      **Challenges:**
+      - {extracted from response}
+
+      **Endorsements:**
+      - {extracted from response}
+
+      ──────────────────────────────
+      ```
+
+   **After all agents reviewed:**
+
+   Synthesize: Review all suggestions and challenges. For each:
+   - Accept: apply change to VERIFICATION.md via Edit tool
+   - Reject: note with brief reasoning
+
+   Display accept/reject log:
+   ```
+   ### Co-Planner Synthesis
+
+   | # | Source | Feedback | Decision | Reasoning |
+   |---|--------|----------|----------|-----------|
+   | 1 | {agent} | {feedback summary} | Accepted | {why} |
+   | 2 | {agent} | {feedback summary} | Rejected | {why} |
+
+   {N} suggestions accepted, {M} rejected
+   ```
+
+   **Conditional commit:**
+   If artifact was revised (`CO_PLANNER_REVISED_VERIFICATION = true`):
+   ```bash
+   git add "${PHASE_DIR}"/*-VERIFICATION.md
+   git commit -m "$(cat <<'EOF'
+   docs(08): incorporate co-planner feedback (verification)
+   EOF
+   )"
+   ```
 
 7.5. **Adversary Review — Verification**
 
