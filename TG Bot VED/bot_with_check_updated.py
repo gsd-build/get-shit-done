@@ -19,7 +19,14 @@ from aiogram.filters import Command, CommandObject
 from aiogram.fsm.context import FSMContext
 from aiogram.fsm.state import State, StatesGroup
 from aiogram.fsm.storage.memory import MemoryStorage
-from aiogram.types import KeyboardButton, Message, ReplyKeyboardMarkup
+from aiogram.types import (
+    CallbackQuery,
+    InlineKeyboardButton,
+    InlineKeyboardMarkup,
+    KeyboardButton,
+    Message,
+    ReplyKeyboardMarkup,
+)
 
 # =========================
 # CONFIG / CONSTANTS
@@ -77,12 +84,9 @@ class ClassificationResult:
 
 
 class LightStates(StatesGroup):
-    check_code = State()   # "знаете код?"
-    code_input = State()   # ввод кода
-    name = State()         # наименование товара
-    category = State()     # категория
-    purpose = State()      # назначение
-    additional = State()   # доп. сведения
+    category = State()   # шаг 1: группа товара (кнопки)
+    usage = State()      # шаг 2: сфера применения (кнопки)
+    params = State()     # шаг 3: технические параметры (свободный текст)
 
 
 # =========================
@@ -371,19 +375,6 @@ def chunk_message(text: str, chunk_size: int = 3500) -> list[str]:
     return [text[i : i + chunk_size] for i in range(0, len(text), chunk_size)]
 
 
-# =========================
-# Light-mode helpers
-# =========================
-
-def build_light_profile(data: dict[str, Any]) -> str:
-    parts: list[str] = []
-    for key in ("name", "category", "purpose", "additional"):
-        v = data.get(key)
-        if v:
-            parts.append(str(v))
-    return " ".join(parts).strip()
-
-
 async def suggest_codes_flow(message: Message, user_text: str) -> None:
     """
     1) достаём кандидатов из БД
@@ -418,6 +409,48 @@ async def suggest_codes_flow(message: Message, user_text: str) -> None:
 # =========================
 # UI helpers
 # =========================
+
+def _inline(rows: list[list[tuple[str, str]]]) -> InlineKeyboardMarkup:
+    """Строит InlineKeyboardMarkup из списка рядов [(label, callback_data), ...]."""
+    return InlineKeyboardMarkup(
+        inline_keyboard=[
+            [InlineKeyboardButton(text=label, callback_data=data) for label, data in row]
+            for row in rows
+        ]
+    )
+
+
+def category_keyboard() -> InlineKeyboardMarkup:
+    return _inline([
+        [("Двигатель внутреннего сгорания (гр. 8408)", "cat:8408")],
+        [("Холодильное / морозильное оборудование (гр. 8418)", "cat:8418")],
+        [("Другой товар / не знаю", "cat:other")],
+    ])
+
+
+def usage_keyboard_8408() -> InlineKeyboardMarkup:
+    return _inline([
+        [("Промышленное оборудование", "use:industrial"), ("Морское / речное судно", "use:marine")],
+        [("Транспортное средство", "use:transport"), ("Сельхозтехника", "use:agriculture")],
+        [("Другое / не знаю", "use:other")],
+    ])
+
+
+def usage_keyboard_8418() -> InlineKeyboardMarkup:
+    return _inline([
+        [("Бытовой холодильник / морозильник", "use:household")],
+        [("Промышленное / торговое оборудование", "use:commercial")],
+        [("Транспортный рефрижератор", "use:transport")],
+        [("Другое / не знаю", "use:other")],
+    ])
+
+
+def usage_keyboard_other() -> InlineKeyboardMarkup:
+    return _inline([
+        [("Промышленное", "use:industrial"), ("Бытовое", "use:household")],
+        [("Другое / не знаю", "use:other")],
+    ])
+
 
 def mode_keyboard() -> ReplyKeyboardMarkup:
     return ReplyKeyboardMarkup(
@@ -468,8 +501,7 @@ async def set_mode(message: Message, state: FSMContext) -> None:
     user_modes[message.chat.id] = selected_mode
     await message.answer(f"Режим установлен: {message.text}.")
     if selected_mode == "light":
-        await state.set_state(LightStates.check_code)
-        await message.answer("Знаете 10-значный код ТН ВЭД (8408… или 8418…)? (Да/Нет)")
+        await light_start(message, state)
 
 
 @router.message(Command("analysis"))
@@ -545,8 +577,7 @@ async def classify_command(message: Message, state: FSMContext, command: Command
         return
 
     if mode == "light":
-        await state.set_state(LightStates.check_code)
-        await message.answer("Знаете 10-значный код ТН ВЭД (8408… или 8418…)? (Да/Нет)")
+        await light_start(message, state)
         return
 
     if mode is None:
@@ -561,80 +592,85 @@ async def classify_command(message: Message, state: FSMContext, command: Command
 # Light flow
 # =========================
 
-@router.message(LightStates.check_code)
-async def light_check_code(message: Message, state: FSMContext) -> None:
-    answer = (message.text or "").strip().lower()
-    if answer in {"да", "yes", "y"}:
-        await state.set_state(LightStates.code_input)
-        await message.answer("Введите код ТН ВЭД (10 цифр, начинается на 8408 или 8418).")
-        return
+# --- Шаг 1: категория (запускается из /classify или set_mode) ---
 
-    # если кода нет — начинаем подбор по описанию
-    await state.set_state(LightStates.name)
-    await message.answer("Опишите товар (например: 'двигатель дизельный для морского судна' или 'холодильник бытовой').")
-
-
-@router.message(LightStates.code_input)
-async def light_code_input(message: Message, state: FSMContext) -> None:
-    code = (message.text or "").strip()
-    if not (code.isdigit() and len(code) == 10 and code.startswith(("8408", "8418"))):
-        await message.answer("Код должен быть 10 цифр и начинаться на 8408 или 8418. Попробуйте ещё раз.")
-        return
-
-    title = await asyncio.to_thread(tnved_get_by_code, DB_PATH, code)
-    if title:
-        results = [ClassificationResult(code, title, 0.92, "Код найден в классификаторе (БД)")]
-        response = format_results(results)
-        risk = assess_risk(results[0].confidence)
-        await asyncio.to_thread(save_query, DB_PATH, message.chat.id, "light_check", f"Проверка кода {code}", response)
-        await message.answer(f"{response}\n\nОценка риска неверной классификации: {risk}.")
-        await state.clear()
-        return
-
-    # если в БД нет — попросим описание, чтобы подсказать возможные варианты
-    await state.update_data(code_input=code)
-    await state.set_state(LightStates.name)
-    await message.answer("Код не найден в вашей БД. Опишите товар текстом — я предложу близкие коды.")
-
-
-@router.message(LightStates.name)
-async def light_name(message: Message, state: FSMContext) -> None:
-    await state.update_data(name=message.text)
+async def light_start(message: Message, state: FSMContext) -> None:
+    """Точка входа в Light-режим: показываем выбор группы товара."""
     await state.set_state(LightStates.category)
-    await message.answer("Это скорее: 1) двигатель/часть двигателя или 2) холодильное/охладительное оборудование? Опишите.")
+    await message.answer(
+        "Шаг 1 из 3 — Группа товара.\nВыберите, что ближе всего описывает ваш товар:",
+        reply_markup=category_keyboard(),
+    )
 
 
-@router.message(LightStates.category)
-async def light_category(message: Message, state: FSMContext) -> None:
-    await state.update_data(category=message.text)
-    await state.set_state(LightStates.purpose)
-    await message.answer("Назначение/сфера применения? (например: морское судно / промышленное / бытовое / транспорт и т.п.)")
+@router.callback_query(LightStates.category, F.data.startswith("cat:"))
+async def light_category_cb(callback: CallbackQuery, state: FSMContext) -> None:
+    cat = callback.data.split(":", 1)[1]  # "8408" / "8418" / "other"
+
+    labels = {"8408": "Двигатель внутреннего сгорания (гр. 8408)",
+               "8418": "Холодильное/морозильное оборудование (гр. 8418)",
+               "other": "Другой товар"}
+    await state.update_data(category=labels.get(cat, cat))
+    await callback.answer()
+
+    await state.set_state(LightStates.usage)
+
+    if cat == "8408":
+        kb = usage_keyboard_8408()
+    elif cat == "8418":
+        kb = usage_keyboard_8418()
+    else:
+        kb = usage_keyboard_other()
+
+    await callback.message.answer(  # type: ignore[union-attr]
+        "Шаг 2 из 3 — Сфера применения.\nДля чего предназначен товар?",
+        reply_markup=kb,
+    )
 
 
-@router.message(LightStates.purpose)
-async def light_purpose(message: Message, state: FSMContext) -> None:
-    await state.update_data(purpose=message.text)
-    await state.set_state(LightStates.additional)
-    await message.answer("Дополнительные сведения: тип, мощность/объём, комплектность, ключевые параметры (что знаете).")
+@router.callback_query(LightStates.usage, F.data.startswith("use:"))
+async def light_usage_cb(callback: CallbackQuery, state: FSMContext) -> None:
+    use = callback.data.split(":", 1)[1]
+
+    labels = {
+        "industrial": "промышленное применение",
+        "marine": "морское/речное судно",
+        "transport": "транспортное средство",
+        "agriculture": "сельскохозяйственная техника",
+        "household": "бытовое использование",
+        "commercial": "промышленное/торговое оборудование",
+        "other": "иное применение",
+    }
+    await state.update_data(usage=labels.get(use, use))
+    await callback.answer()
+
+    await state.set_state(LightStates.params)
+    await callback.message.answer(  # type: ignore[union-attr]
+        "Шаг 3 из 3 — Технические параметры.\n"
+        "Укажите характеристики, которые знаете:\n"
+        "• для двигателей: мощность (кВт/л.с.), тип топлива, рабочий объём\n"
+        "• для холодильного оборудования: объём камеры (л), тип (компрессорный/абсорбционный), температурный режим\n"
+        "• для других товаров: любые технические детали, материал, назначение\n\n"
+        "Можно написать коротко — главное, что знаете."
+    )
 
 
-@router.message(LightStates.additional)
-async def light_additional(message: Message, state: FSMContext) -> None:
-    await state.update_data(additional=message.text)
+@router.message(LightStates.params)
+async def light_params(message: Message, state: FSMContext) -> None:
+    await state.update_data(params=message.text)
     data = await state.get_data()
-    profile = build_light_profile(data)
 
-    # Сначала проверим: вдруг пользователь всё же вставил код в тексте
-    results = await asyncio.to_thread(classify_text_with_db, DB_PATH, profile)
-    response = format_results(results)
-    risk = assess_risk(results[0].confidence)
+    # Собираем профиль из всех шагов
+    parts = [
+        data.get("category", ""),
+        data.get("usage", ""),
+        data.get("params", ""),
+    ]
+    profile = " ".join(p for p in parts if p).strip()
 
-    await asyncio.to_thread(save_query, DB_PATH, message.chat.id, "light", profile, response)
-    await message.answer(f"{response}\n\nОценка риска неверной классификации: {risk}.")
-
-    # Если точного кода нет — подскажем варианты из БД + (опционально) OpenAI
-    if results[0].code == "0000000000" or results[0].confidence < 0.8:
-        await suggest_codes_flow(message, profile)
+    await message.answer("Анализирую данные, подбираю коды ТН ВЭД…")
+    await suggest_codes_flow(message, profile)
+    await asyncio.to_thread(save_query, DB_PATH, message.chat.id, "light", profile, "suggest_codes_flow")
 
     await state.clear()
 
