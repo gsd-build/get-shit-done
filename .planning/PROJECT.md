@@ -2,22 +2,11 @@
 
 ## What This Is
 
-A meta-prompting, context engineering, and spec-driven development system for Claude Code, OpenCode, and Gemini CLI. GSD solves "context rot" — quality degradation as Claude fills its context window — through structured planning, multi-agent orchestration, and atomic execution. Includes adversarial review at key workflow checkpoints to catch unchallenged assumptions before they reach execution.
+A meta-prompting, context engineering, and spec-driven development system for Claude Code, OpenCode, and Gemini CLI. GSD solves "context rot" — quality degradation as Claude fills its context window — through structured planning, multi-agent orchestration, and atomic execution. Includes adversarial review and external AI co-planning at key workflow checkpoints.
 
 ## Core Value
 
 Quality doesn't degrade as context grows. Every session starts fresh with full project context.
-
-## Current Milestone: v2.2 Collaborative Design
-
-**Goal:** Integrate external AI agents (Codex CLI, Gemini CLI, OpenCode CLI) as co-planners throughout GSD workflows, complementing the existing adversary system.
-
-**Target features:**
-- External agent integration via bash CLI invocation (codex, gemini, opencode)
-- Per-checkpoint configuration — user picks which agent(s) at each touchpoint
-- Co-planning at all workflow stages: research, planning, roadmap, execution review, verification
-- Claude remains orchestrator and final decision-maker — external input is advisory
-- Coexists with adversary system (different roles: co-plan vs challenge)
 
 ## Requirements
 
@@ -51,15 +40,18 @@ Quality doesn't degrade as context grows. Every session starts fresh with full p
 - ✓ Max rounds configurable in config.json — v2.1
 - ✓ Individual checkpoints can be toggled on/off — v2.1
 
+*v2.2 Collaborative Design — shipped 2026-02-17*
+
+- ✓ External agent CLI integration (codex, gemini, opencode) via bash invocation — v2.2
+- ✓ Per-checkpoint agent configuration in config.json — v2.2
+- ✓ Co-planning integration at requirements, roadmap, plan, and verification checkpoints — v2.2
+- ✓ Claude-as-orchestrator synthesis pattern — external input advisory — v2.2
+- ✓ Parallel multi-agent review with merged synthesis and source attribution — v2.2
+- ✓ Graceful degradation when external CLIs fail, timeout, or are unavailable — v2.2
+
 ### Active
 
-*v2.2 Collaborative Design*
-
-- [ ] External agent CLI integration (codex, gemini, opencode) via bash invocation
-- [ ] Per-checkpoint agent configuration in config.json
-- [ ] Co-planning integration at research, planning, roadmap, execution review, and verification stages
-- [ ] Claude-as-orchestrator synthesis pattern — external input advisory
-- [ ] Coexistence with adversary system at shared checkpoints
+(None — run `/gsd:new-milestone` to define next milestone)
 
 ### Out of Scope
 
@@ -68,12 +60,19 @@ Quality doesn't degrade as context grows. Every session starts fresh with full p
 - Specialized per-checkpoint agents — Single agent adapts to context
 - Blocking on adversary objections — Advisory only, Claude decides
 - Different model for adversary — Adds complexity; advisory-only design mitigates same-model collusion risk
+- External agents writing files directly — 41-86.7% failure rates in multi-agent shared-state systems
+- Real-time streaming debate between agents — Requires WebSocket/IPC infrastructure
+- Democratic voting between agents — One decision-maker prevents gridlock
+- Nested agent-to-agent delegation — Exponential complexity
+- Requiring external agent approval to proceed — Transforms advisory input into a blocker
 
 ## Context
 
-GSD v2.1 ships with 12 specialized subagents including gsd-adversary, 27+ slash commands, and adversarial review at four workflow checkpoints. The adversary integration uses consistent patterns across commands: config reading via node -e, debate loops with CONV-01 hard cap, and agent-as-defender revision for complex artifacts.
+GSD v2.2 ships with 12 specialized subagents, 27+ slash commands, adversarial review at four workflow checkpoints, and external AI co-planning with Codex, Gemini CLI, and OpenCode. Co-planners use a draft-review-synthesize pattern at requirements, roadmap, plan, and verification checkpoints. Multiple agents can review artifacts in parallel via async invocation with theme-based merged synthesis.
 
-Tech stack: Node.js installer, Markdown prompts with YAML frontmatter, JSON configuration, bash hooks.
+Tech stack: Node.js installer, Markdown prompts with YAML frontmatter, JSON configuration, bash hooks. Co-planner infrastructure uses Node.js child_process (zero new dependencies).
+
+109 tests across 22 suites.
 
 ## Constraints
 
@@ -82,6 +81,8 @@ Tech stack: Node.js installer, Markdown prompts with YAML frontmatter, JSON conf
 - **Convergence**: Max 3 rounds before Claude decides (prevent infinite loops)
 - **Style**: Adversary adapts tone — rigorous on feasibility, constructive on completeness, devil's advocate on assumptions
 - **Runtime**: Must work across Claude Code, OpenCode, and Gemini CLI
+- **Co-planners**: External process invocations via bash, not subagents — zero new npm dependencies
+- **Advisory**: External agent input is advisory — Claude synthesizes and makes final decisions
 
 ## Key Decisions
 
@@ -97,6 +98,12 @@ Tech stack: Node.js installer, Markdown prompts with YAML frontmatter, JSON conf
 | Node-e config parsing | Polymorphic values need real JSON parser, not grep | ✓ Good |
 | Post-adversary status re-read | Catches status downgrades from verifier re-examination | ✓ Good |
 | Adversary opt-out | Enabled by default, missing config = system defaults | ✓ Good |
+| CLI adapters with inline classifyError | Self-contained with zero cross-dependencies | ✓ Good |
+| child_process.exec for async | True parallelism requires non-blocking I/O, not execSync-in-Promise | ✓ Good |
+| Theme-based synthesis over per-agent sections | Prevents redundant info when agents raise the same concern | ✓ Good |
+| Temp file for prompt construction | Avoids shell quoting issues with embedded artifact content | ✓ Good |
+| Kill switch defaults to false | Co-planners are opt-in until workflows explicitly enable | ✓ Good |
+| Checkpoint-specific config with global fallback | Flexible granularity without requiring per-checkpoint setup | ✓ Good |
 
 ---
-*Last updated: 2026-02-16 after v2.2 milestone started*
+*Last updated: 2026-02-17 after v2.2 milestone completed*

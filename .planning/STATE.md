@@ -2,32 +2,33 @@
 
 ## Project Reference
 
-See: .planning/PROJECT.md (updated 2026-02-16)
+See: .planning/PROJECT.md (updated 2026-02-17)
 
 **Core value:** Quality doesn't degrade as context grows
-**Current focus:** Phase 11 - Async Error Classification Fix (v2.2 Collaborative Design)
+**Current focus:** Planning next milestone
 
 ## Current Position
 
-Phase: 11 of 11 (Async Error Classification Fix)
-Plan: 1 of 1
-Status: Plan complete
-Last activity: 2026-02-17 - Completed 11-01 (classifyError async error shape fix + TDD tests)
-
-Progress: [██████████] 100%
+Phase: None (between milestones)
+Plan: N/A
+Status: v2.2 complete, awaiting next milestone
+Last activity: 2026-02-17 - Completed v2.2 Collaborative Design milestone
 
 ## Performance Metrics
 
-**v2.1 Milestone Summary:**
+**v2.0 MVP:** Shipped 2026-01-31 (predates phase tracking)
+
+**v2.1 Adversary Agent:**
 - Total plans completed: 6
 - Total execution time: 35 min
 - Average duration: 6 min/plan
 - Timeline: 12 days (Feb 2 -> Feb 13, 2026)
 
-**v2.2:**
+**v2.2 Collaborative Design:**
 - Total plans completed: 10
 - Average duration: 3 min/plan
 - Total execution time: 25 min
+- Timeline: 17 days (Jan 31 -> Feb 17, 2026)
 
 | Phase | Plan | Duration | Tasks | Files |
 |-------|------|----------|-------|-------|
@@ -48,74 +49,17 @@ Progress: [██████████] 100%
 
 Decisions are logged in PROJECT.md Key Decisions table.
 See `.planning/milestones/v2.1-ROADMAP.md` for v2.1-specific decisions.
-
-Key research findings for v2.2:
-- Co-planners are external process invocations, not subagents (bash, not Task tool)
-- Zero new npm dependencies -- child_process.execSync in gsd-tools.cjs
-- Co-planners run first (refine), adversary runs second (challenge) at shared checkpoints
-- All 3 CLIs support non-interactive JSON output
-
-Key decisions from 06-01:
-- Each adapter embeds classifyError inline -- self-contained with zero cross-dependencies
-- Default timeout 120000ms matches config co_planners.timeout_ms -- single source of truth
-- Zero new npm dependencies -- Node.js stdlib only (child_process, fs, path, os)
-
-Key decisions from 06-02:
-- Used existing --raw convention instead of new --json flag -- consistent with all gsd-tools.cjs commands
-- Kill switch defaults to false (disabled) -- co-planners are opt-in until workflows explicitly enable
-- No install.js changes needed -- existing recursive copyWithPathReplacement handles adapters/ subdirectory
-
-Key decisions from 07-01:
-- VALID_CHECKPOINTS matches adversary checkpoints: requirements, roadmap, plan, verification
-- Null checkpoint = global query (no warning); invalid checkpoint = warning + empty agents
-- filterValidAgents uses warn-and-continue pattern (invalid names skipped with warning, not error)
-
-Key decisions from 08-01:
-- Temp file approach for prompt construction -- avoids shell quoting issues with embedded artifact content
-- Write tool (not Edit) for artifact modification -- consistent with new-project.md allowed-tools
-- Display name mapping for agent attribution: codex->Codex, gemini->Gemini CLI, opencode->OpenCode
-- Same acceptance criteria framework for both checkpoints: accept/reject/note with clear thresholds
-
-Key decisions from 08-03:
-- plan-phase.md uses ${PHASE} for dynamic co-planner commit scope (matches step 2 variable)
-- execute-phase.md uses {phase} for dynamic co-planner commit scope (matches existing template pattern)
-- Domain-specific acceptance criteria: plan-phase checks logical gaps/dependency conflicts; execute-phase checks missed cases/false positives
-
-Key decisions from 08-02:
-- Plan checkpoint synthesis uses Write tool (Edit not in plan-phase.md allowed-tools)
-- Verification checkpoint synthesis uses Edit tool (Edit is in execute-phase.md allowed-tools)
-- Verification co-planner section skips on gaps_found and re_verification, matching adversary skip conditions
-
-Key decisions from 09-02:
-- Replaced per-agent sequential loops with single invoke-all calls -- reduces invocation complexity from O(N) sequential to one parallel batch
-- Synthesis organized by theme not by agent -- prevents redundant information when multiple agents raise the same concern
-- Bracket-tag attribution inline [Agent1, Agent2] -- preserves source traceability without per-agent sections
-- Source(s) column added to synthesis table -- enables at-a-glance attribution tracking
-
-Key decisions from 09-01:
-- Used child_process.exec (callback-based async) not execSync-in-Promise -- true parallelism requires non-blocking I/O
-- invokeAsync always resolves (never rejects) -- consistent with sync invoke error schema
-- Temp file includes CLI_NAME + Date.now() + random suffix to prevent collisions during parallel execution
-- invoke-all reads prompt from --prompt-file to avoid shell quoting issues with large artifacts
-
-Key decisions from 10-01:
-- Detection runs once when co-planners toggled to Yes, cached results reused for all 5 agent option blocks
-- Badge text: "(installed)", "(not installed)", "(status unknown)" -- three-state mapping from detect JSON
-- Minimal co_planners defaults (enabled: false, timeout_ms: 120000) -- no agents/checkpoints keys in default config
-- Deep merge for co_planners follows established workflow merge convention in cmdConfigEnsureSection
-
-Key decisions from 11-01:
-- Unified exitCode extraction via typeof guard: err.status || (typeof err.code === 'number' ? err.code : undefined)
-- classifyError exported from all 3 adapters for direct unit testing
+See `.planning/milestones/v2.2-ROADMAP.md` for v2.2-specific decisions.
 
 ### Pending Todos
 
-5 pending todo(s) in `.planning/todos/pending/`:
+6 pending todo(s) in `.planning/todos/pending/`:
 - **Automate full phase lifecycle with agents** (area: commands)
 - **Add phase-specific context files to GSD workflow** (area: workflows)
 - **Update CLAUDE.md / memory after key steps in the pipeline** (area: workflows)
 - **Add worktree support** (area: general)
 - **Incorporate agent swarms into the process** (area: workflows)
+- **v2.2 tech debt deferred** (area: testing, docs, config)
 
 ### Blockers/Concerns
 
@@ -131,5 +75,5 @@ None.
 ## Session Continuity
 
 Last session: 2026-02-17
-Stopped at: Completed 11-01-PLAN.md (classifyError async error shape fix + TDD tests)
+Stopped at: Completed v2.2 milestone
 Resume file: None
