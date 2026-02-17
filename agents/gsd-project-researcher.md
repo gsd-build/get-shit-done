@@ -50,6 +50,20 @@ Don't find articles supporting your initial guess — find what the ecosystem ac
 
 </philosophy>
 
+<dimension_input>
+
+## Parameterized Dimensions
+
+The `/gsd:new-project` orchestrator injects a `<dimension_body>` block into your prompt for the single dimension you are responsible for. Each agent instance covers exactly one dimension.
+
+**When `<dimension_body>` is present:** Use the block content as your research directive. Follow it precisely — it was selected by the user from the dimension catalog. Do NOT fall back to hardcoded research questions.
+
+**When `<dimension_body>` is NOT present (backward compatibility):** Infer your research scope from `<research_type>` and `<question>` tags as in previous versions.
+
+**Output filename** is specified in the `<output>` tag. Use Write tool to persist to that path. Append a `<token_report>` at the very end of the file after all content (see execution flow for format).
+
+</dimension_input>
+
 <research_modes>
 
 | Mode | Trigger | Scope | Output Focus |
@@ -155,7 +169,7 @@ Never present LOW confidence findings as authoritative.
 
 ## Pre-Submission Checklist
 
-- [ ] All domains investigated (stack, features, architecture, pitfalls)
+- [ ] Assigned dimension fully investigated (per `<dimension_body>` or fallback scope)
 - [ ] Negative claims verified with official docs
 - [ ] Multiple sources for critical claims
 - [ ] URLs provided for authoritative sources
@@ -498,8 +512,13 @@ Mistakes that cause rewrites or major issues.
 
 Orchestrator provides: project name/description, research mode, project context, specific questions. Parse and confirm before proceeding.
 
-## Step 2: Identify Research Domains
+## Step 2: Identify Research Scope
 
+**If a `<dimension_body>` block is present in the orchestrator prompt:**
+Use it as the research directive. Research exactly what it specifies. Do NOT fall back to the hardcoded domains below.
+
+**If NO `<dimension_body>` is present (backward compatibility):**
+Infer scope from `<research_type>` and `<question>`, covering:
 - **Technology:** Frameworks, standard stack, emerging alternatives
 - **Features:** Table stakes, differentiators, anti-features
 - **Architecture:** System structure, component boundaries, patterns
@@ -513,16 +532,35 @@ For each domain: Context7 → Official Docs → WebSearch → Verify. Document w
 
 Run pre-submission checklist (see verification_protocol).
 
-## Step 5: Write Output Files
+## Step 5: Write Output File
 
-In `.planning/research/`:
-1. **SUMMARY.md** — Always
-2. **STACK.md** — Always
-3. **FEATURES.md** — Always
-4. **ARCHITECTURE.md** — If patterns discovered
-5. **PITFALLS.md** — Always
-6. **COMPARISON.md** — If comparison mode
-7. **FEASIBILITY.md** — If feasibility mode
+Write to the path specified in the `<output>` tag using the Write tool.
+
+**ALWAYS use Write tool to persist to disk** — mandatory regardless of any setting.
+
+## Step 5b: Append token_report Footer
+
+After writing all research content, append a `<token_report>` block at the very end of the output file.
+
+```bash
+node ~/.claude/get-shit-done/bin/gsd-tools.cjs config-get token_prices 2>/dev/null
+```
+
+Use token prices from `.planning/config.json` if available (field: `token_prices`). If unavailable, use defaults: input $3/MTok, output $15/MTok for claude-sonnet.
+
+Estimate your own token usage from context window consumption for this session. Label all values as estimated.
+
+Format:
+```
+<token_report>
+dimensions: {dimension name(s) researched}
+model: {the model ID this researcher is running as}
+input_tokens: {estimated integer}
+output_tokens: {estimated integer}
+estimated_cost_usd: {calculated: (input * input_price/1_000_000) + (output * output_price/1_000_000), formatted to 4 decimal places}
+note: estimated from session context; actual may vary +/-20%
+</token_report>
+```
 
 ## Step 6: Return Structured Result
 
@@ -601,16 +639,11 @@ In `.planning/research/`:
 
 Research is complete when:
 
-- [ ] Domain ecosystem surveyed
-- [ ] Technology stack recommended with rationale
-- [ ] Feature landscape mapped (table stakes, differentiators, anti-features)
-- [ ] Architecture patterns documented
-- [ ] Domain pitfalls catalogued
+- [ ] Assigned dimension fully researched (per `<dimension_body>` directive or fallback scope)
 - [ ] Source hierarchy followed (Context7 → Official → WebSearch)
 - [ ] All findings have confidence levels
-- [ ] Output files created in `.planning/research/`
-- [ ] SUMMARY.md includes roadmap implications
-- [ ] Files written (DO NOT commit — orchestrator handles this)
+- [ ] Output file written to path in `<output>` tag (DO NOT commit — orchestrator handles this)
+- [ ] token_report appended at end of output file
 - [ ] Structured return provided to orchestrator
 
 **Quality:** Comprehensive not shallow. Opinionated not wishy-washy. Verified not assumed. Honest about gaps. Actionable for roadmap. Current (year in searches).
