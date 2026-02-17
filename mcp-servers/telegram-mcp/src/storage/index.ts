@@ -8,3 +8,9 @@ export * from './question-queue.js';
 
 // Message queue exports
 export * from './message-queue.js';
+
+// Session manager exports
+export * from './session-manager.js';
+
+// File lock exports
+export * from './file-lock.js';
