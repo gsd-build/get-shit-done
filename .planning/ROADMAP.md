@@ -28,7 +28,7 @@ See `.planning/milestones/v2.1-ROADMAP.md` for full details.
 - [x] **Phase 8: Workflow Integration** - Draft-review-synthesize pattern at all workflow checkpoints (completed 2026-02-17)
 - [ ] **Phase 9: Multi-Agent Orchestration** - Parallel review and merged synthesis with attribution
 - [x] **Phase 10: Settings Fix & Integration Polish** - Wire settings CLI detection, fix stale docs and config init (gap closure) (completed 2026-02-17)
-- [ ] **Phase 11: Async Error Classification Fix** - Fix classifyError async-path misclassification (gap closure)
+- [x] **Phase 11: Async Error Classification Fix** - Fix classifyError async-path misclassification (gap closure) (completed 2026-02-17)
 
 ## Phase Details
 
@@ -129,4 +129,4 @@ Phases execute in numeric order: 6 -> 7 -> 8 -> 9
 | 8. Workflow Integration | v2.2 | 3/3 | Complete | 2026-02-17 |
 | 9. Multi-Agent Orchestration | v2.2 | 0/? | Not started | - |
 | 10. Settings Fix & Integration Polish | v2.2 | Complete    | 2026-02-17 | - |
-| 11. Async Error Classification Fix | v2.2 | 0/1 | Not started | - |
+| 11. Async Error Classification Fix | v2.2 | Complete    | 2026-02-17 | - |
