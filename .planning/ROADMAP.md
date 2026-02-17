@@ -260,6 +260,7 @@ Phase 8 (Notifications & Observability) --> Phase 08.1 (Telegram MCP Server)
 | 8. Notifications & Observability | 7 | Complete | 2026-02-16 |
 | 08.1. Telegram MCP Server | 6 | Planning complete | - |
 | 10. GSD Installation System | 4 | Complete | 2026-02-17 |
+| 10.1. Multi-Instance MCP Safety | 4 | Complete | 2026-02-17 |
 
 ### Phase 9: Hook-based documentation compression - Optimize context injection by extracting AI-friendly headers from docs and injecting only summaries with absolute links instead of full content
 
@@ -322,10 +323,10 @@ Plans:
 **Plans:** 4 plans
 
 Plans:
-- [ ] 10.1-01-PLAN.md - Session infrastructure (file-lock.ts, session-manager.ts, dependencies)
-- [ ] 10.1-02-PLAN.md - Question queue refactor to per-session JSONL storage
-- [ ] 10.1-03-PLAN.md - MCP tools and server lifecycle (session-aware tools, heartbeat, cleanup)
-- [ ] 10.1-04-PLAN.md - Telegram bot multi-session UI and gitignore configuration
+- [x] 10.1-01-PLAN.md - Session infrastructure (file-lock.ts, session-manager.ts, dependencies)
+- [x] 10.1-02-PLAN.md - Question queue refactor to per-session JSONL storage
+- [x] 10.1-03-PLAN.md - MCP tools and server lifecycle (session-aware tools, heartbeat, cleanup)
+- [x] 10.1-04-PLAN.md - Telegram bot multi-session UI and gitignore configuration
 
 ### Phase 11: Session-end knowledge extraction - Implement Haiku-based analysis of completed sessions to extract reasoning patterns and decisions beyond keyword matching
 
@@ -347,4 +348,4 @@ Plans:
 
 ---
 *Roadmap created: 2026-02-15*
-*Last updated: 2026-02-17 after Phase 10 execution*
+*Last updated: 2026-02-17 after Phase 10.1 execution*
