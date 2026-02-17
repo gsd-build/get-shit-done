@@ -53,10 +53,10 @@ Plans:
   1. User can configure different agents for different checkpoints (e.g., codex for planning, gemini for verification) in config.json
   2. User can see sensible defaults when no per-checkpoint configuration exists (global agent list applies everywhere)
   3. Commands read checkpoint-specific agent configuration and invoke only the configured agents
-**Plans**: TBD
+**Plans**: 1 plan
 
 Plans:
-- [ ] 07-01: TBD
+- [ ] 07-01-PLAN.md -- Config resolution function, config template schema, and settings command extension
 
 ### Phase 8: Workflow Integration
 **Goal**: External agents participate as co-planners at workflow checkpoints with clear, attributed feedback that Claude synthesizes
@@ -96,6 +96,6 @@ Phases execute in numeric order: 6 -> 7 -> 8 -> 9
 | Phase | Milestone | Plans Complete | Status | Completed |
 |-------|-----------|----------------|--------|-----------|
 | 6. Foundation | v2.2 | 2/2 | Complete | 2026-02-17 |
-| 7. Configuration | v2.2 | 0/? | Not started | - |
+| 7. Configuration | v2.2 | 0/1 | Planned | - |
 | 8. Workflow Integration | v2.2 | 0/? | Not started | - |
 | 9. Multi-Agent Orchestration | v2.2 | 0/? | Not started | - |
