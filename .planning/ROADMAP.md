@@ -261,6 +261,7 @@ Phase 8 (Notifications & Observability) --> Phase 08.1 (Telegram MCP Server)
 | 08.1. Telegram MCP Server | 6 | Planning complete | - |
 | 10. GSD Installation System | 4 | Complete | 2026-02-17 |
 | 10.1. Multi-Instance MCP Safety | 4 | Complete | 2026-02-17 |
+| 11. Session-End Knowledge Extraction | 4 | Complete | 2026-02-17 |
 
 ### Phase 9: Hook-based documentation compression - Optimize context injection by extracting AI-friendly headers from docs and injecting only summaries with absolute links instead of full content
 
@@ -335,10 +336,10 @@ Plans:
 **Plans:** 4 plans
 
 Plans:
-- [ ] 11-01-PLAN.md - Core session analyzer with Task() subagent prompts and conversation_id grouping
-- [ ] 11-02-PLAN.md - Session quality gates, chunking, and re-analysis prevention
-- [ ] 11-03-PLAN.md - Knowledge storage integration with dedup and MCP session-end hook
-- [ ] 11-04-PLAN.md - CLI commands for manual analysis, historical extraction, and status reporting
+- [x] 11-01-PLAN.md - Core session analyzer with Task() subagent prompts and conversation_id grouping
+- [x] 11-02-PLAN.md - Session quality gates, chunking, and re-analysis prevention
+- [x] 11-03-PLAN.md - Knowledge storage integration with dedup and MCP session-end hook
+- [x] 11-04-PLAN.md - CLI commands for manual analysis, historical extraction, and status reporting
 
 ### Phase 12: Historical conversation mining - Analyze Claude Code project conversations and planning documents to extract meta-knowledge, reasoning patterns, and decision context for enhanced context building
 
