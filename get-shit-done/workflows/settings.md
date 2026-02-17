@@ -92,9 +92,38 @@ AskUserQuestion([
       { label: "Per Phase", description: "Create branch for each phase (gsd/phase-{N}-{name})" },
       { label: "Per Milestone", description: "Create branch for entire milestone (gsd/{version}-{name})" }
     ]
+  },
+  {
+    question: "Run quality gate commands after execution? (e.g., npm test, npm run check)",
+    header: "Gates",
+    multiSelect: false,
+    options: [
+      { label: "Off", description: "No automated quality gates (default)" },
+      { label: "Warn", description: "Run commands, report results but don't block" },
+      { label: "Block", description: "Run commands, block phase completion on failure" }
+    ]
   }
 ])
 ```
+
+**If user selected "Warn" or "Block" for quality gates:**
+
+Follow up with:
+
+```
+AskUserQuestion([
+  {
+    question: "Which commands should run as quality gates? (comma-separated)",
+    header: "Commands",
+    multiSelect: false,
+    options: [
+      { label: "Other", description: "Type your commands (e.g., npm test, npm run check, npm run lint)" }
+    ]
+  }
+])
+```
+
+Parse the comma-separated response into an array of trimmed command strings.
 </step>
 
 <step name="update_config">
@@ -112,9 +141,18 @@ Merge new settings into existing config.json:
   },
   "git": {
     "branching_strategy": "none" | "phase" | "milestone"
+  },
+  "quality_gates": {
+    "enabled": true/false,
+    "commands": ["cmd1", "cmd2", ...],
+    "fail_action": "warn" | "block"
   }
 }
 ```
+
+- If user selected "Off": `enabled: false`, `commands: []`, `fail_action: "warn"`
+- If user selected "Warn": `enabled: true`, `commands: [parsed commands]`, `fail_action: "warn"`
+- If user selected "Block": `enabled: true`, `commands: [parsed commands]`, `fail_action: "block"`
 
 Write updated config to `.planning/config.json`.
 </step>
@@ -177,6 +215,8 @@ Display:
 | Execution Verifier   | {On/Off} |
 | Auto-Advance         | {On/Off} |
 | Git Branching        | {None/Per Phase/Per Milestone} |
+| Quality Gates        | {Off/Warn/Block} |
+| Gate Commands        | {comma-separated list or "—"} |
 | Saved as Defaults    | {Yes/No} |
 
 These settings apply to future /gsd:plan-phase and /gsd:execute-phase runs.
@@ -193,8 +233,8 @@ Quick commands:
 
 <success_criteria>
 - [ ] Current config read
-- [ ] User presented with 6 settings (profile + 4 workflow toggles + git branching)
-- [ ] Config updated with model_profile, workflow, and git sections
+- [ ] User presented with 7 settings (profile + 4 workflow toggles + git branching + quality gates)
+- [ ] Config updated with model_profile, workflow, git, and quality_gates sections
 - [ ] User offered to save as global defaults (~/.gsd/defaults.json)
 - [ ] Changes confirmed to user
 </success_criteria>

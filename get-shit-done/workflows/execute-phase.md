@@ -309,6 +309,66 @@ Create VERIFICATION.md.",
 )
 ```
 
+**Quality Gates (if configured):**
+
+```bash
+QG_ENABLED=$(node ~/.claude/get-shit-done/bin/gsd-tools.cjs config-get quality_gates.enabled 2>/dev/null || echo "false")
+QG_FAIL_ACTION=$(node ~/.claude/get-shit-done/bin/gsd-tools.cjs config-get quality_gates.fail_action 2>/dev/null || echo "warn")
+```
+
+If `QG_ENABLED` is `"true"`:
+
+Display banner:
+```
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+ GSD ► RUNNING QUALITY GATES
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+```
+
+Read commands from config:
+```bash
+QG_COMMANDS=$(node ~/.claude/get-shit-done/bin/gsd-tools.cjs config-get quality_gates.commands 2>/dev/null)
+```
+
+For each command in the `QG_COMMANDS` array:
+1. Display: `Running: {command}...`
+2. Execute the command via Bash, capturing start time
+3. Capture exit code
+4. Calculate duration
+5. Display: `✓ Passed` or `✗ Failed (exit code N)`
+
+Track all results (command, pass/fail, duration, exit code).
+
+Present results table:
+```
+## Quality Gate Results
+
+| Command | Status | Duration |
+|---------|--------|----------|
+| npm run test | ✓ Passed | 12s |
+| npm run check | ✗ Failed | 3s |
+```
+
+**If any failed and `QG_FAIL_ACTION` is `"block"`:**
+```
+⚠ Quality gates failed. Phase cannot be marked complete.
+Fix the issues and re-run /gsd:execute-phase {phase}
+```
+
+**If any failed and `QG_FAIL_ACTION` is `"warn"`:**
+```
+⚠ Quality gates failed but configured as warn-only. Continuing.
+```
+
+**If all passed:**
+```
+✓ All quality gates passed.
+```
+
+Append a `## Quality Gates` section to the VERIFICATION.md output with the results table and overall status.
+
+If `QG_FAIL_ACTION` is `"block"` and any command failed, override the verification status to `gaps_found` regardless of the verifier's result.
+
 Read status:
 ```bash
 grep "^status:" "$PHASE_DIR"/*-VERIFICATION.md | cut -d: -f2 | tr -d ' '
