@@ -135,13 +135,13 @@ function defineChecks() {
     // Category 4: MCP Configuration
     {
       category: 'MCP Configuration',
-      name: '.claude/.mcp.json exists',
+      name: '~/.claude.json exists',
       skip: () => {
-        const mcpConfig = path.join(projectRoot, '.claude', '.mcp.json');
+        const mcpConfig = path.join(os.homedir(), '.claude.json');
         return !fs.existsSync(mcpConfig);
       },
       test: () => {
-        const mcpConfig = path.join(projectRoot, '.claude', '.mcp.json');
+        const mcpConfig = path.join(os.homedir(), '.claude.json');
         if (!fs.existsSync(mcpConfig)) return false;
 
         try {
@@ -157,11 +157,11 @@ function defineChecks() {
       category: 'MCP Configuration',
       name: 'Telegram MCP server entry',
       skip: () => {
-        const mcpConfig = path.join(projectRoot, '.claude', '.mcp.json');
+        const mcpConfig = path.join(os.homedir(), '.claude.json');
         return !fs.existsSync(mcpConfig);
       },
       test: () => {
-        const mcpConfig = path.join(projectRoot, '.claude', '.mcp.json');
+        const mcpConfig = path.join(os.homedir(), '.claude.json');
         if (!fs.existsSync(mcpConfig)) return false;
 
         try {
