@@ -10,16 +10,16 @@ See: .planning/PROJECT.md (updated 2026-02-15)
 ## Current Position
 
 Phase: 08.1 of 12 (Telegram MCP Server)
-Plan: 03 of 06
+Plan: 04 of 06
 Status: In Progress
-Last activity: 2026-02-17 — Completed plan 08.1-03 (MCP Tool Handlers)
+Last activity: 2026-02-17 — Completed plan 08.1-04 (Telegram Bot Integration)
 
 Progress: [████████████████████████████████████] 96%
 
 ## Performance Metrics
 
 **Velocity:**
-- Total plans completed: 26
+- Total plans completed: 27
 - Average duration: 3.3 min
 - Total execution time: 1.6 hours
 
@@ -61,6 +61,7 @@ Progress: [███████████████████████
 | 09    | 05   | 3 min    | 4     | 2     |
 | 08.1  | 02   | 4 min    | 3     | 5     |
 | 08.1  | 03   | 3 min    | 3     | 5     |
+| 08.1  | 04   | 4 min    | 3     | 4     |
 
 ## Accumulated Context
 
@@ -197,6 +198,10 @@ Recent decisions affecting current work:
 - [Phase 08.1-03]: Centralized tool exports via tools/index.ts for cleaner server imports
 - [Phase 08.1-03]: Error handling in CallToolRequestSchema returns errors in MCP format rather than throwing
 - [Phase 08.1-03]: MCP tool handler pattern exports both handler function and tool definition for registration
+- [Phase 08.1-04]: Use session middleware instead of .once() listeners to fix Phase 8 bug where menu buttons only work once
+- [Phase 08.1-04]: Daily JSONL logs (YYYY-MM-DD.jsonl) instead of per-session timestamp files for unified session tracking
+- [Phase 08.1-04]: Lazy-load whisper-node to avoid cwd corruption on import
+- [Phase 08.1-04]: New Requirements button DISABLED per user decision (conversational flow not compatible with Telegraf)
 
 ### Roadmap Evolution
 
@@ -212,6 +217,6 @@ None yet.
 
 ## Session Continuity
 
-Last session: 2026-02-17T10:31:09Z (plan execution)
-Stopped at: Completed 08.1-03-PLAN.md (MCP Tool Handlers) - Phase 08.1 Plan 03 complete
+Last session: 2026-02-17T10:35:18Z (plan execution)
+Stopped at: Completed 08.1-04-PLAN.md (Telegram Bot Integration) - Phase 08.1 Plan 04 complete
 Resume file: None
