@@ -14,3 +14,6 @@ export * from './session-manager.js';
 
 // File lock exports
 export * from './file-lock.js';
+
+// Session state exports
+export * from './session-state.js';

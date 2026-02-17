@@ -1,4 +1,6 @@
-import { archiveQuestion, getPendingById, PendingQuestion } from '../storage/question-queue.js';
+import { getPendingById, PendingQuestion } from '../storage/question-queue.js';
+import { getCurrentSessionId } from '../storage/session-state.js';
+import { getSessionPath } from '../storage/session-manager.js';
 import path from 'path';
 
 /**
@@ -21,7 +23,7 @@ export interface MarkAnsweredOutput {
  */
 export const MARK_ANSWERED_TOOL_DEF = {
   name: "mark_question_answered",
-  description: "Archive an answered question to daily log and remove from pending queue.",
+  description: "Confirm receipt of an answered question (answer already in session file).",
   inputSchema: {
     type: "object",
     properties: {
@@ -37,9 +39,10 @@ export const MARK_ANSWERED_TOOL_DEF = {
 /**
  * Handler for mark_question_answered tool
  *
- * Archives an answered question to the daily log file.
+ * Confirms Claude has received an answered question.
  * Note: The question must already have status="answered" and answer populated
  * (typically set by the Telegram bot when user responds).
+ * The answer stays in the session file (no separate archiving).
  *
  * @param args Input arguments conforming to MarkAnsweredInput
  * @returns Output conforming to MarkAnsweredOutput
@@ -65,10 +68,13 @@ export async function markQuestionAnsweredHandler(
     throw new Error('Invalid input: question_id cannot be empty');
   }
 
-  // Get the question from pending queue
-  const question = await getPendingById(questionId);
+  // Get current session ID
+  const sessionId = getCurrentSessionId();
+
+  // Get the question from this session
+  const question = await getPendingById(questionId, sessionId);
   if (!question) {
-    throw new Error(`Question not found: ${questionId}`);
+    throw new Error(`Question not found in current session: ${questionId}`);
   }
 
   // Verify question has been answered
@@ -80,15 +86,11 @@ export async function markQuestionAnsweredHandler(
     throw new Error(`Question ${questionId} is marked answered but has no answer text`);
   }
 
-  // Archive the question
-  await archiveQuestion(question);
-
-  // Build archive path (YYYY-MM-DD.jsonl)
-  const today = new Date().toISOString().split('T')[0];
-  const archivePath = path.join('.planning/telegram-sessions', `${today}.jsonl`);
+  // Return session file path (where the answer is stored)
+  const sessionPath = getSessionPath(sessionId);
 
   return {
     success: true,
-    archived_to: archivePath
+    archived_to: sessionPath
   };
 }
