@@ -330,12 +330,15 @@ Plans:
 
 ### Phase 11: Session-end knowledge extraction - Implement Haiku-based analysis of completed sessions to extract reasoning patterns and decisions beyond keyword matching
 
-**Goal:** [To be planned]
+**Goal:** Completed Telegram MCP sessions are automatically analyzed by Haiku 4.5 at session close to extract decisions, reasoning patterns, and meta-knowledge beyond regex matching, storing structured insights in the Phase 3 knowledge system with deduplication, quality gates, and cost controls
 **Depends on:** Phase 10.1
-**Plans:** 0 plans
+**Plans:** 4 plans
 
 Plans:
-- [ ] TBD (run /gsd:plan-phase 11 to break down)
+- [ ] 11-01-PLAN.md - Core session analyzer with Haiku API and prompt templates
+- [ ] 11-02-PLAN.md - Session quality gates, chunking, and re-analysis prevention
+- [ ] 11-03-PLAN.md - Knowledge storage integration and MCP session-end hook
+- [ ] 11-04-PLAN.md - CLI commands for manual analysis and status reporting
 
 ### Phase 12: Historical conversation mining - Analyze Claude Code project conversations and planning documents to extract meta-knowledge, reasoning patterns, and decision context for enhanced context building
 
