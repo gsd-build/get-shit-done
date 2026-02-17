@@ -6,7 +6,8 @@ CLAUDE.md
 commands.html
 
 # Local test installs
-.claude/
+.claude/*
+!.claude/.mcp.json
 
 # Build artifacts (committed to npm, not git)
 hooks/dist/
@@ -18,3 +19,4 @@ animation/
 # Internal planning documents
 reports/
 RAILROAD_ARCHITECTURE.md
+.env

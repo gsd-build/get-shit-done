@@ -13,5 +13,10 @@
   "feedback_enabled": false,
   "feedback_mode": "human",
   "feedback_frequency": "escalations",
-  "sample_rate": 0.1
+  "sample_rate": 0.1,
+  "telegram": {
+    "polling_interval_minutes": 30,
+    "long_poll_timeout_seconds": 60,
+    "session_log_retention_days": 90
+  }
 }
