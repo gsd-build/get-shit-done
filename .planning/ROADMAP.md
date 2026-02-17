@@ -208,6 +208,20 @@ Plans:
 - [x] 08-06-PLAN.md - AI-Powered Telegram Bot with Haiku Monitor (gap closure)
 - [x] 08-07-PLAN.md - Documentation and Setup Guide (gap closure)
 
+### Phase 08.1: Telegram MCP Server - Replace standalone bot with MCP integration using subscription tokens (INSERTED)
+
+**Goal:** Replace standalone Telegram bot (Phase 8) with MCP server that auto-loads with Claude Code, uses subscription tokens instead of external API keys, and fixes architectural issues from Phase 8's standalone approach
+**Depends on:** Phase 8
+**Plans:** 6 plans
+
+Plans:
+- [ ] 08.1-01-PLAN.md - MCP server foundation (stdio transport, tool/resource registration)
+- [ ] 08.1-02-PLAN.md - JSONL persistence layer (question queues, requirements messages)
+- [ ] 08.1-03-PLAN.md - MCP tools implementation (ask_blocking_question, check_answers, mark_answered)
+- [ ] 08.1-04-PLAN.md - Telegram bot integration (Telegraf with middleware pattern, transcription, logging)
+- [ ] 08.1-05-PLAN.md - MCP server integration (bot lifecycle, resource handlers, tool wiring)
+- [ ] 08.1-06-PLAN.md - Claude Code configuration and orchestrator integration
+
 ## Progress
 
 **Execution Order:**
@@ -226,6 +240,8 @@ Phase 3 (Knowledge Foundation) --> Phase 4 (Extraction & Hooks) --> Phase 5 (Per
 Phase 6 (Autonomous Core) --> Phase 7 (Autonomous Optimization)
 
 Phase 7 (Autonomous Optimization) --> Phase 8 (Notifications & Observability)
+
+Phase 8 (Notifications & Observability) --> Phase 08.1 (Telegram MCP Server)
 ```
 
 **Parallel Execution Opportunities:**
@@ -242,15 +258,7 @@ Phase 7 (Autonomous Optimization) --> Phase 8 (Notifications & Observability)
 | 6. Autonomous Execution Core | 6 | Complete | 2026-02-16 |
 | 7. Autonomous Execution Optimization | 6 | Complete | 2026-02-16 |
 | 8. Notifications & Observability | 7 | Complete | 2026-02-16 |
-
-### Phase 08.1: Telegram MCP Server - Replace standalone bot with MCP integration using subscription tokens (INSERTED)
-
-**Goal:** [Urgent work - to be planned]
-**Depends on:** Phase 8
-**Plans:** 0 plans
-
-Plans:
-- [ ] TBD (run /gsd:plan-phase 08.1 to break down)
+| 08.1. Telegram MCP Server | 6 | Planning complete | - |
 
 ### Phase 9: Hook-based documentation compression - Optimize context injection by extracting AI-friendly headers from docs and injecting only summaries with absolute links instead of full content
 
@@ -302,4 +310,4 @@ Plans:
 
 ---
 *Roadmap created: 2026-02-15*
-*Last updated: 2026-02-16 after Phase 8 planning*
+*Last updated: 2026-02-17 after Phase 08.1 planning*
