@@ -9,8 +9,10 @@ const CLI_NAME = 'gemini';
 
 function classifyError(err) {
   if (err.signal === 'SIGTERM') return 'TIMEOUT';
-  if (err.code === 'ENOENT' || err.status === 127) return 'NOT_FOUND';
-  if (err.status === 126) return 'PERMISSION';
+  // err.status = exit code from execSync; err.code = exit code (number) from exec
+  const exitCode = err.status || (typeof err.code === 'number' ? err.code : undefined);
+  if (err.code === 'ENOENT' || exitCode === 127) return 'NOT_FOUND';
+  if (exitCode === 126) return 'PERMISSION';
   return 'EXIT_ERROR';
 }
 
