@@ -281,10 +281,22 @@ Plans:
 - [ ] 09-03-PLAN.md - PreToolUse hook integration (config, doc-compression-hook, settings.json)
 - [ ] 09-04-PLAN.md - Circuit breaker safety and CLI commands (enable/disable/status/metrics)
 
-### Phase 10: Module repository consolidation - Move external modules (validator, circuit-breaker, escalation, feedback, learning) into repo with installation script and proper structure
+### Phase 10: GSD Installation System - Comprehensive installer that sets up all dependencies, external modules, Whisper models (en+ru), Claude Code hooks, and MCP servers with zero manual configuration
 
-**Goal:** [To be planned]
+**Goal:** Users can run a single installation command that: (1) installs all NPM dependencies across modules, (2) downloads and configures Whisper models for English and Russian, (3) installs Claude Code hooks to ~/.claude/, (4) configures MCP servers in .claude/.mcp.json, (5) consolidates external modules (validator, circuit-breaker, escalation, feedback, learning) into repo, (6) verifies installation and provides health check, (7) creates .env template with required variables
 **Depends on:** Phase 9
+**Requirements:** Installation orchestrator, dependency resolution, Whisper model download (base.en + base.ru or base multilingual), hook installation to ~/.claude/, MCP server configuration, external module consolidation, health check validation
+**Success Criteria** (what must be TRUE):
+  1. Single install command handles all setup: `npm run install:gsd` or `./scripts/install.sh`
+  2. NPM dependencies installed for all modules (get-shit-done/, mcp-servers/telegram-mcp/, external modules)
+  3. Whisper models downloaded and verified (base.en + base.ru or base multilingual covering both)
+  4. Claude Code hooks installed to ~/.claude/hooks/ (SessionStart, PreToolUse, PostToolUse)
+  5. MCP server configuration added to ~/.claude/.mcp.json (or .claude/.mcp.json for project-specific)
+  6. External modules moved into repo at get-shit-done/modules/ with proper structure
+  7. .env.template created with all required variables (TELEGRAM_BOT_TOKEN, TELEGRAM_OWNER_ID, etc.)
+  8. Health check validates: NPM packages, Whisper models, hooks, MCP servers, module imports
+  9. Uninstall script available for clean removal
+  10. Installation works on macOS, Linux (Ubuntu/Debian), and reports unsupported platforms gracefully
 **Plans:** 0 plans
 
 Plans:
