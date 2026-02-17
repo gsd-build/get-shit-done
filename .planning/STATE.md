@@ -10,11 +10,11 @@ See: .planning/PROJECT.md (updated 2026-02-16)
 ## Current Position
 
 Phase: 8 of 9 (Workflow Integration)
-Plan: — (not yet planned)
-Status: Ready to plan
-Last activity: 2026-02-17 - Completed Phase 7: Configuration
+Plan: 1 of 2
+Status: Executing
+Last activity: 2026-02-17 - Completed 08-01 (co-planner review in new-project.md)
 
-Progress: [█████░░░░░] 50%
+Progress: [██████░░░░] 55%
 
 ## Performance Metrics
 
@@ -25,15 +25,16 @@ Progress: [█████░░░░░] 50%
 - Timeline: 12 days (Feb 2 -> Feb 13, 2026)
 
 **v2.2:**
-- Total plans completed: 3
+- Total plans completed: 4
 - Average duration: 3 min/plan
-- Total execution time: 9 min
+- Total execution time: 11 min
 
 | Phase | Plan | Duration | Tasks | Files |
 |-------|------|----------|-------|-------|
 | 06    | 01   | 2min     | 2     | 4     |
 | 06    | 02   | 4min     | 2     | 2     |
 | 07    | 01   | 3min     | 3     | 3     |
+| 08    | 01   | 2min     | 2     | 1     |
 
 ## Accumulated Context
 
@@ -63,6 +64,12 @@ Key decisions from 07-01:
 - Null checkpoint = global query (no warning); invalid checkpoint = warning + empty agents
 - filterValidAgents uses warn-and-continue pattern (invalid names skipped with warning, not error)
 
+Key decisions from 08-01:
+- Temp file approach for prompt construction -- avoids shell quoting issues with embedded artifact content
+- Write tool (not Edit) for artifact modification -- consistent with new-project.md allowed-tools
+- Display name mapping for agent attribution: codex->Codex, gemini->Gemini CLI, opencode->OpenCode
+- Same acceptance criteria framework for both checkpoints: accept/reject/note with clear thresholds
+
 ### Pending Todos
 
 3 pending todo(s) in `.planning/todos/pending/`:
@@ -84,5 +91,5 @@ None.
 ## Session Continuity
 
 Last session: 2026-02-17
-Stopped at: Completed Phase 7 (Configuration). Ready for Phase 8 planning.
+Stopped at: Completed 08-01-PLAN.md (co-planner review in new-project.md). Ready for 08-02.
 Resume file: None
