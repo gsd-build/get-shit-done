@@ -60,7 +60,6 @@ Progress: [███████████████████████
 | 09    | 04   | 5 min    | 3     | 3     |
 | 09    | 05   | 3 min    | 4     | 2     |
 | 08.1  | 02   | 4 min    | 3     | 5     |
-| Phase 08.1 P01 | 4 | 3 tasks | 3 files |
 
 ## Accumulated Context
 
