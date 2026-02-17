@@ -114,7 +114,45 @@ var require_future = __commonJS({
       }
       return lines.join("\n");
     }
-    module2.exports = { parseFutureFile, writeFutureFile };
+    function parseFutureArchive(content) {
+      if (!content || !content.trim()) return [];
+      const entries = [];
+      const sections = content.split(/^## /m).slice(1);
+      for (const section of sections) {
+        const lines = section.trim().split("\n");
+        const headerMatch = lines[0].match(/^Archived:\s*(D-\d+)\s*--\s*(.+)/);
+        if (!headerMatch) continue;
+        const [, id, title] = headerMatch;
+        const statement = extractField(lines, "Statement") || "";
+        const archivedAt = extractField(lines, "Archived") || "";
+        const reason = extractField(lines, "Reason") || "";
+        const replacedBy = extractField(lines, "Replaced By") || "";
+        const statusAtArchive = extractField(lines, "Status at Archive") || "";
+        entries.push({ id, title: title.trim(), statement, archivedAt, reason, replacedBy, statusAtArchive });
+      }
+      return entries;
+    }
+    function writeFutureArchive(entries) {
+      const lines = ["# Future Archive", ""];
+      for (let i = 0; i < entries.length; i++) {
+        const e = entries[i];
+        if (i > 0) lines.push("---", "");
+        lines.push(`## Archived: ${e.id} -- ${e.title}`);
+        lines.push(`**Statement:** ${e.statement}`);
+        lines.push(`**Archived:** ${e.archivedAt}`);
+        lines.push(`**Reason:** ${e.reason}`);
+        lines.push(`**Replaced By:** ${e.replacedBy}`);
+        lines.push(`**Status at Archive:** ${e.statusAtArchive}`);
+        lines.push("");
+      }
+      return lines.join("\n");
+    }
+    function appendToArchive(existingContent, entry) {
+      const entries = parseFutureArchive(existingContent || "");
+      entries.push(entry);
+      return writeFutureArchive(entries);
+    }
+    module2.exports = { parseFutureFile, writeFutureFile, parseFutureArchive, writeFutureArchive, appendToArchive };
   }
 });
 
@@ -748,7 +786,14 @@ var require_engine = __commonJS({
         return { declarations, milestones, actions, edges, byStatus };
       }
     };
-    module2.exports = { DeclareDag, COMPLETED_STATUSES, isCompleted };
+    function findOrphans(dag) {
+      const { errors } = dag.validate();
+      return errors.filter((e) => e.type === "orphan" && e.node).map((e) => {
+        const node = dag.getNode(e.node);
+        return node ? { id: node.id, type: node.type, title: node.title, status: node.status } : { id: e.node, type: "unknown", title: "", status: "" };
+      });
+    }
+    module2.exports = { DeclareDag, COMPLETED_STATUSES, isCompleted, findOrphans };
   }
 });
 
@@ -2342,6 +2387,327 @@ var require_verify_milestone = __commonJS({
   }
 });
 
+// src/commands/check-drift.js
+var require_check_drift = __commonJS({
+  "src/commands/check-drift.js"(exports2, module2) {
+    "use strict";
+    var { buildDagFromDisk } = require_build_dag();
+    var { findOrphans } = require_engine();
+    function findNearestConnections(dag, orphanId) {
+      const node = dag.getNode(orphanId);
+      if (!node) return [];
+      const suggestions = [];
+      if (node.type === "action") {
+        const milestones = dag.getMilestones();
+        for (const m of milestones) {
+          const downstream = dag.getDownstream(m.id);
+          const hasActions = downstream.some((d) => d.type === "action");
+          if (hasActions) {
+            suggestions.push({
+              type: "connect",
+              target: m.id,
+              targetTitle: m.title,
+              reason: `Milestone already has ${downstream.filter((d) => d.type === "action").length} action(s)`
+            });
+          }
+          if (suggestions.length >= 3) break;
+        }
+        if (suggestions.length === 0) {
+          for (const m of milestones) {
+            suggestions.push({
+              type: "connect",
+              target: m.id,
+              targetTitle: m.title,
+              reason: "Available milestone"
+            });
+            if (suggestions.length >= 3) break;
+          }
+        }
+      } else if (node.type === "milestone") {
+        const declarations = dag.getDeclarations();
+        for (const d of declarations) {
+          if (d.status === "ACTIVE" || d.status === "PENDING") {
+            suggestions.push({
+              type: "connect",
+              target: d.id,
+              targetTitle: d.title,
+              reason: `Declaration is ${d.status}`
+            });
+          }
+          if (suggestions.length >= 3) break;
+        }
+        if (suggestions.length === 0) {
+          for (const d of declarations) {
+            suggestions.push({
+              type: "connect",
+              target: d.id,
+              targetTitle: d.title,
+              reason: "Available declaration"
+            });
+            if (suggestions.length >= 3) break;
+          }
+        }
+      }
+      return suggestions.slice(0, 3);
+    }
+    function runCheckDrift2(cwd) {
+      const graphResult = buildDagFromDisk(cwd);
+      if ("error" in graphResult) return graphResult;
+      const { dag } = graphResult;
+      const orphans = findOrphans(dag);
+      const driftedNodes = orphans.map((orphan) => ({
+        id: orphan.id,
+        type: orphan.type,
+        title: orphan.title,
+        status: orphan.status,
+        suggestions: findNearestConnections(dag, orphan.id)
+      }));
+      return {
+        hasDrift: driftedNodes.length > 0,
+        driftedNodes
+      };
+    }
+    module2.exports = { runCheckDrift: runCheckDrift2 };
+  }
+});
+
+// src/commands/check-occurrence.js
+var require_check_occurrence = __commonJS({
+  "src/commands/check-occurrence.js"(exports2, module2) {
+    "use strict";
+    var { parseFlag } = require_parse_args();
+    var { buildDagFromDisk } = require_build_dag();
+    var { isCompleted } = require_engine();
+    function runCheckOccurrence2(cwd, args) {
+      const targetDecl = parseFlag(args || [], "declaration");
+      const graphResult = buildDagFromDisk(cwd);
+      if ("error" in graphResult) return graphResult;
+      const { dag } = graphResult;
+      const allDeclarations = dag.getDeclarations();
+      const declarations = targetDecl ? allDeclarations.filter((d) => d.id === targetDecl) : allDeclarations;
+      if (targetDecl && declarations.length === 0) {
+        return { error: `Declaration not found: ${targetDecl}` };
+      }
+      const result = declarations.map((decl) => {
+        const downstream = dag.getDownstream(decl.id);
+        const milestones = downstream.filter((n) => n.type === "milestone");
+        let totalActions = 0;
+        let completedActions = 0;
+        for (const m of milestones) {
+          const mDownstream = dag.getDownstream(m.id);
+          const actions = mDownstream.filter((n) => n.type === "action");
+          totalActions += actions.length;
+          completedActions += actions.filter((a) => isCompleted(a.status)).length;
+        }
+        return {
+          declarationId: decl.id,
+          statement: decl.metadata?.statement || decl.title,
+          status: decl.status,
+          milestoneCount: milestones.length,
+          milestones: milestones.map((m) => ({
+            id: m.id,
+            title: m.title,
+            status: m.status
+          })),
+          actionSummary: {
+            total: totalActions,
+            completed: completedActions
+          }
+        };
+      });
+      return { declarations: result };
+    }
+    module2.exports = { runCheckOccurrence: runCheckOccurrence2 };
+  }
+});
+
+// src/commands/compute-performance.js
+var require_compute_performance = __commonJS({
+  "src/commands/compute-performance.js"(exports2, module2) {
+    "use strict";
+    var { buildDagFromDisk } = require_build_dag();
+    var { isCompleted } = require_engine();
+    function ratioToLabel(ratio, highThreshold, medThreshold) {
+      if (ratio >= highThreshold) return "HIGH";
+      if (ratio >= medThreshold) return "MEDIUM";
+      return "LOW";
+    }
+    function combineLabels(alignment, integrity) {
+      if (alignment === "LOW" || integrity === "LOW") return "LOW";
+      if (alignment === "HIGH" && integrity === "HIGH") return "HIGH";
+      return "MEDIUM";
+    }
+    function runComputePerformance2(cwd) {
+      const graphResult = buildDagFromDisk(cwd);
+      if ("error" in graphResult) return graphResult;
+      const { dag } = graphResult;
+      const declarations = dag.getDeclarations();
+      if (declarations.length === 0) {
+        return {
+          perDeclaration: [],
+          rollup: { alignment: "HIGH", integrity: "HIGH", performance: "HIGH" }
+        };
+      }
+      const perDeclaration = declarations.map((decl) => {
+        const downstream = dag.getDownstream(decl.id);
+        const milestones = downstream.filter((n) => n.type === "milestone");
+        let milestonesWithActions = 0;
+        for (const m of milestones) {
+          const mDownstream = dag.getDownstream(m.id);
+          if (mDownstream.some((n) => n.type === "action")) {
+            milestonesWithActions++;
+          }
+        }
+        const alignmentRatio = milestones.length > 0 ? milestonesWithActions / milestones.length : 0;
+        const alignmentLevel = milestones.length === 0 ? "LOW" : ratioToLabel(alignmentRatio, 0.8, 0.5);
+        let verified = 0;
+        let broken = 0;
+        let pending = 0;
+        for (const m of milestones) {
+          const status = m.status;
+          if (status === "KEPT" || status === "HONORED" || status === "RENEGOTIATED") {
+            verified++;
+          } else if (status === "BROKEN") {
+            broken++;
+          } else {
+            pending++;
+          }
+        }
+        let integrityLevel;
+        if (milestones.length === 0) {
+          integrityLevel = "HIGH";
+        } else {
+          const brokenRatio = broken / milestones.length;
+          const verifiedRatio = verified / milestones.length;
+          if (brokenRatio > 0.3) {
+            integrityLevel = "LOW";
+          } else if (verifiedRatio >= 0.7 && broken === 0) {
+            integrityLevel = "HIGH";
+          } else if (verifiedRatio >= 0.4) {
+            integrityLevel = "MEDIUM";
+          } else {
+            integrityLevel = "LOW";
+          }
+        }
+        const performance = combineLabels(alignmentLevel, integrityLevel);
+        return {
+          declarationId: decl.id,
+          declarationTitle: decl.title,
+          statement: decl.metadata?.statement || decl.title,
+          alignment: {
+            level: alignmentLevel,
+            milestonesTotal: milestones.length,
+            milestonesWithActions
+          },
+          integrity: {
+            level: integrityLevel,
+            verified,
+            broken,
+            pending,
+            total: milestones.length
+          },
+          performance
+        };
+      });
+      const hasAnyLowAlignment = perDeclaration.some((d) => d.alignment.level === "LOW");
+      const hasAnyLowIntegrity = perDeclaration.some((d) => d.integrity.level === "LOW");
+      const allHighAlignment = perDeclaration.every((d) => d.alignment.level === "HIGH");
+      const allHighIntegrity = perDeclaration.every((d) => d.integrity.level === "HIGH");
+      const rollupAlignment = hasAnyLowAlignment ? "LOW" : allHighAlignment ? "HIGH" : "MEDIUM";
+      const rollupIntegrity = hasAnyLowIntegrity ? "LOW" : allHighIntegrity ? "HIGH" : "MEDIUM";
+      const rollupPerformance = combineLabels(rollupAlignment, rollupIntegrity);
+      return {
+        perDeclaration,
+        rollup: {
+          alignment: rollupAlignment,
+          integrity: rollupIntegrity,
+          performance: rollupPerformance
+        }
+      };
+    }
+    module2.exports = { runComputePerformance: runComputePerformance2 };
+  }
+});
+
+// src/commands/renegotiate.js
+var require_renegotiate = __commonJS({
+  "src/commands/renegotiate.js"(exports2, module2) {
+    "use strict";
+    var { existsSync, readFileSync, writeFileSync, mkdirSync } = require("node:fs");
+    var { join } = require("node:path");
+    var { parseFlag } = require_parse_args();
+    var { buildDagFromDisk } = require_build_dag();
+    var { parseFutureFile, writeFutureFile, appendToArchive } = require_future();
+    var { isCompleted } = require_engine();
+    function runRenegotiate2(cwd, args) {
+      const declId = parseFlag(args || [], "declaration");
+      const reason = parseFlag(args || [], "reason");
+      if (!declId) {
+        return { error: 'Missing --declaration flag. Usage: renegotiate --declaration D-XX --reason "..."' };
+      }
+      if (!reason) {
+        return { error: 'Missing --reason flag. Usage: renegotiate --declaration D-XX --reason "..."' };
+      }
+      const graphResult = buildDagFromDisk(cwd);
+      if ("error" in graphResult) return graphResult;
+      const { dag } = graphResult;
+      const declNode = dag.getNode(declId);
+      if (!declNode || declNode.type !== "declaration") {
+        return { error: `Declaration not found: ${declId}` };
+      }
+      const planningDir = join(cwd, ".planning");
+      const futurePath = join(planningDir, "FUTURE.md");
+      const archivePath = join(planningDir, "FUTURE-ARCHIVE.md");
+      const futureContent = existsSync(futurePath) ? readFileSync(futurePath, "utf-8") : "";
+      const declarations = parseFutureFile(futureContent);
+      const declEntry = declarations.find((d) => d.id === declId);
+      if (!declEntry) {
+        return { error: `Declaration ${declId} not found in FUTURE.md` };
+      }
+      declEntry.status = "RENEGOTIATED";
+      const headerMatch = futureContent.match(/^# Future: (.+)/m);
+      const projectName = headerMatch ? headerMatch[1].trim() : "Project";
+      writeFileSync(futurePath, writeFutureFile(declarations, projectName));
+      const archivedAt = (/* @__PURE__ */ new Date()).toISOString();
+      const existingArchive = existsSync(archivePath) ? readFileSync(archivePath, "utf-8") : "";
+      const updatedArchive = appendToArchive(existingArchive, {
+        id: declId,
+        title: declEntry.title,
+        statement: declEntry.statement,
+        archivedAt,
+        reason,
+        replacedBy: "",
+        statusAtArchive: "RENEGOTIATED"
+      });
+      writeFileSync(archivePath, updatedArchive);
+      const downstream = dag.getDownstream(declId);
+      const milestones = downstream.filter((n) => n.type === "milestone");
+      const orphanedMilestones = [];
+      for (const m of milestones) {
+        const upstream = dag.getUpstream(m.id);
+        const realizesOnlyThis = upstream.length === 1 && upstream[0].id === declId;
+        if (realizesOnlyThis) {
+          const mDownstream = dag.getDownstream(m.id);
+          const actions = mDownstream.filter((n) => n.type === "action").map((a) => ({ id: a.id, title: a.title, status: a.status }));
+          orphanedMilestones.push({
+            id: m.id,
+            title: m.title,
+            status: m.status,
+            actions
+          });
+        }
+      }
+      return {
+        archived: { id: declId, title: declEntry.title, archivedAt },
+        orphanedMilestones,
+        archivePath,
+        nextStep: "Create replacement declaration or reassign milestones"
+      };
+    }
+    module2.exports = { runRenegotiate: runRenegotiate2 };
+  }
+});
+
 // src/declare-tools.js
 var { commitPlanningDocs } = require_commit();
 var { runInit } = require_init();
@@ -2361,6 +2727,10 @@ var { runGenerateExecPlan } = require_generate_exec_plan();
 var { runVerifyWave } = require_verify_wave();
 var { runExecute } = require_execute();
 var { runVerifyMilestone } = require_verify_milestone();
+var { runCheckDrift } = require_check_drift();
+var { runCheckOccurrence } = require_check_occurrence();
+var { runComputePerformance } = require_compute_performance();
+var { runRenegotiate } = require_renegotiate();
 function parseCwdFlag(argv) {
   const idx = argv.indexOf("--cwd");
   if (idx === -1 || idx + 1 >= argv.length) return null;
@@ -2398,7 +2768,7 @@ function main() {
   const args = process.argv.slice(2);
   const command = args[0];
   if (!command) {
-    console.log(JSON.stringify({ error: "No command specified. Use: commit, init, status, add-declaration, add-milestone, add-milestones, create-plan, load-graph, trace, prioritize, visualize, compute-waves, generate-exec-plan, verify-wave, verify-milestone, execute, help" }));
+    console.log(JSON.stringify({ error: "No command specified. Use: commit, init, status, add-declaration, add-milestone, add-milestones, create-plan, load-graph, trace, prioritize, visualize, compute-waves, generate-exec-plan, verify-wave, verify-milestone, execute, check-drift, check-occurrence, compute-performance, renegotiate, help" }));
     process.exit(1);
   }
   try {
@@ -2533,8 +2903,36 @@ function main() {
         if (result.error) process.exit(1);
         break;
       }
+      case "check-drift": {
+        const cwdCheckDrift = parseCwdFlag(args) || process.cwd();
+        const result = runCheckDrift(cwdCheckDrift);
+        console.log(JSON.stringify(result));
+        if (result.error) process.exit(1);
+        break;
+      }
+      case "check-occurrence": {
+        const cwdCheckOcc = parseCwdFlag(args) || process.cwd();
+        const result = runCheckOccurrence(cwdCheckOcc, args.slice(1));
+        console.log(JSON.stringify(result));
+        if (result.error) process.exit(1);
+        break;
+      }
+      case "compute-performance": {
+        const cwdCompPerf = parseCwdFlag(args) || process.cwd();
+        const result = runComputePerformance(cwdCompPerf);
+        console.log(JSON.stringify(result));
+        if (result.error) process.exit(1);
+        break;
+      }
+      case "renegotiate": {
+        const cwdReneg = parseCwdFlag(args) || process.cwd();
+        const result = runRenegotiate(cwdReneg, args.slice(1));
+        console.log(JSON.stringify(result));
+        if (result.error) process.exit(1);
+        break;
+      }
       default:
-        console.log(JSON.stringify({ error: `Unknown command: ${command}. Use: commit, init, status, add-declaration, add-milestone, add-milestones, create-plan, load-graph, trace, prioritize, visualize, compute-waves, generate-exec-plan, verify-wave, verify-milestone, execute, help` }));
+        console.log(JSON.stringify({ error: `Unknown command: ${command}. Use: commit, init, status, add-declaration, add-milestone, add-milestones, create-plan, load-graph, trace, prioritize, visualize, compute-waves, generate-exec-plan, verify-wave, verify-milestone, execute, check-drift, check-occurrence, compute-performance, renegotiate, help` }));
         process.exit(1);
     }
   } catch (err) {

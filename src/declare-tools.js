@@ -39,6 +39,10 @@ const { runGenerateExecPlan } = require('./commands/generate-exec-plan');
 const { runVerifyWave } = require('./commands/verify-wave');
 const { runExecute } = require('./commands/execute');
 const { runVerifyMilestone } = require('./commands/verify-milestone');
+const { runCheckDrift } = require('./commands/check-drift');
+const { runCheckOccurrence } = require('./commands/check-occurrence');
+const { runComputePerformance } = require('./commands/compute-performance');
+const { runRenegotiate } = require('./commands/renegotiate');
 
 /**
  * Parse --cwd flag from argv.
@@ -102,7 +106,7 @@ function main() {
   const command = args[0];
 
   if (!command) {
-    console.log(JSON.stringify({ error: 'No command specified. Use: commit, init, status, add-declaration, add-milestone, add-milestones, create-plan, load-graph, trace, prioritize, visualize, compute-waves, generate-exec-plan, verify-wave, verify-milestone, execute, help' }));
+    console.log(JSON.stringify({ error: 'No command specified. Use: commit, init, status, add-declaration, add-milestone, add-milestones, create-plan, load-graph, trace, prioritize, visualize, compute-waves, generate-exec-plan, verify-wave, verify-milestone, execute, check-drift, check-occurrence, compute-performance, renegotiate, help' }));
     process.exit(1);
   }
 
@@ -256,8 +260,40 @@ function main() {
         break;
       }
 
+      case 'check-drift': {
+        const cwdCheckDrift = parseCwdFlag(args) || process.cwd();
+        const result = runCheckDrift(cwdCheckDrift);
+        console.log(JSON.stringify(result));
+        if (result.error) process.exit(1);
+        break;
+      }
+
+      case 'check-occurrence': {
+        const cwdCheckOcc = parseCwdFlag(args) || process.cwd();
+        const result = runCheckOccurrence(cwdCheckOcc, args.slice(1));
+        console.log(JSON.stringify(result));
+        if (result.error) process.exit(1);
+        break;
+      }
+
+      case 'compute-performance': {
+        const cwdCompPerf = parseCwdFlag(args) || process.cwd();
+        const result = runComputePerformance(cwdCompPerf);
+        console.log(JSON.stringify(result));
+        if (result.error) process.exit(1);
+        break;
+      }
+
+      case 'renegotiate': {
+        const cwdReneg = parseCwdFlag(args) || process.cwd();
+        const result = runRenegotiate(cwdReneg, args.slice(1));
+        console.log(JSON.stringify(result));
+        if (result.error) process.exit(1);
+        break;
+      }
+
       default:
-        console.log(JSON.stringify({ error: `Unknown command: ${command}. Use: commit, init, status, add-declaration, add-milestone, add-milestones, create-plan, load-graph, trace, prioritize, visualize, compute-waves, generate-exec-plan, verify-wave, verify-milestone, execute, help` }));
+        console.log(JSON.stringify({ error: `Unknown command: ${command}. Use: commit, init, status, add-declaration, add-milestone, add-milestones, create-plan, load-graph, trace, prioritize, visualize, compute-waves, generate-exec-plan, verify-wave, verify-milestone, execute, check-drift, check-occurrence, compute-performance, renegotiate, help` }));
         process.exit(1);
     }
   } catch (err) {
