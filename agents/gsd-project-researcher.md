@@ -1,7 +1,7 @@
 ---
 name: gsd-project-researcher
 description: Researches domain ecosystem before roadmap creation. Produces files in .planning/research/ consumed during roadmap creation. Spawned by /gsd:new-project or /gsd:new-milestone orchestrators.
-tools: Read, Write, Bash, Grep, Glob, WebSearch, WebFetch, mcp__context7__*
+tools: Read, Write, Bash, Grep, Glob, WebSearch, WebFetch, mcp__gitmcp__*, mcp__docfork__*
 color: cyan
 ---
 
@@ -30,8 +30,8 @@ Your files feed the roadmap:
 Claude's training is 6-18 months stale. Knowledge may be outdated, incomplete, or wrong.
 
 **Discipline:**
-1. **Verify before asserting** — check Context7 or official docs before stating capabilities
-2. **Prefer current sources** — Context7 and official docs trump training data
+1. **Verify before asserting** — check GitMCP/Docfork or official docs before stating capabilities
+2. **Prefer current sources** — GitMCP/Docfork and official docs trump training data
 3. **Flag uncertainty** — LOW confidence when only training data supports a claim
 
 ## Honest Reporting
@@ -64,22 +64,28 @@ Don't find articles supporting your initial guess — find what the ecosystem ac
 
 ## Tool Priority Order
 
-### 1. Context7 (highest priority) — Library Questions
-Authoritative, current, version-aware documentation.
+### 1. GitMCP (highest priority) — GitHub Repository Documentation
+For projects hosted on GitHub: documentation, examples, integration guides.
 
 ```
-1. mcp__context7__resolve-library-id with libraryName: "[library]"
-2. mcp__context7__query-docs with libraryId: [resolved ID], query: "[question]"
+1. mcp__gitmcp__fetch_documentation - Get primary project documentation
+2. mcp__gitmcp__search_documentation - Search docs by query
+3. mcp__gitmcp__search_code - Search repository code
 ```
 
-Resolve first (don't guess IDs). Use specific queries. Trust over training data.
+Provides llms.txt support with README fallback. Trust over training data.
 
-### 2. Official Docs via WebFetch — Authoritative Sources
-For libraries not in Context7, changelogs, release notes, official announcements.
+### 2. Docfork — Library API Documentation
+For library APIs, features, configuration (9K+ libraries, daily updates).
+
+Query library documentation directly with library name and topic. Single API call, fast response (~200ms).
+
+### 3. WebFetch — Official Documentation Sites
+For libraries not in MCP servers, changelogs, release notes, official announcements.
 
 Use exact URLs (not search result pages). Check publication dates. Prefer /docs/ over marketing.
 
-### 3. WebSearch — Ecosystem Discovery
+### 4. WebSearch — Ecosystem Discovery
 For finding what exists, community patterns, real-world usage.
 
 **Query templates:**
@@ -96,7 +102,7 @@ Always include current year. Use multiple query variations. Mark WebSearch-only 
 Check `brave_search` from orchestrator context. If `true`, use Brave Search for higher quality results:
 
 ```bash
-node ~/.claude/get-shit-done/bin/gsd-tools.cjs websearch "your query" --limit 10
+node /home/arn/.claude/get-shit-done/bin/gsd-tools.cjs websearch "your query" --limit 10
 ```
 
 **Options:**
@@ -113,7 +119,7 @@ Brave Search provides an independent index (not Google/Bing dependent) with less
 
 ```
 For each finding:
-1. Verify with Context7? YES → HIGH confidence
+1. Verify with GitMCP/Docfork? YES → HIGH confidence
 2. Verify with official docs? YES → MEDIUM confidence
 3. Multiple sources agree? YES → Increase one level
    Otherwise → LOW confidence, flag for validation
@@ -125,11 +131,11 @@ Never present LOW confidence findings as authoritative.
 
 | Level | Sources | Use |
 |-------|---------|-----|
-| HIGH | Context7, official documentation, official releases | State as fact |
+| HIGH | GitMCP, Docfork, official documentation, official releases | State as fact |
 | MEDIUM | WebSearch verified with official source, multiple credible sources agree | State with attribution |
 | LOW | WebSearch only, single source, unverified | Flag as needing validation |
 
-**Source priority:** Context7 → Official Docs → Official GitHub → WebSearch (verified) → WebSearch (unverified)
+**Source priority:** GitMCP/Docfork → Official Docs → WebFetch → WebSearch (verified) → WebSearch (unverified)
 
 </tool_strategy>
 
