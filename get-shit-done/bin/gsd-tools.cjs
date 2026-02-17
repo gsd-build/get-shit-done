@@ -121,8 +121,15 @@
  * Co-Planner Operations:
  *   coplanner detect [--raw]           Detect installed CLIs (JSON default, table with --raw)
  *   coplanner invoke <cli> --prompt    Invoke a CLI adapter with prompt
- *     [--timeout N] [--model name]
- *   coplanner enabled                  Check kill switch status and source
+ *     [--timeout N] [--model name]     Reads co_planners.timeout_ms from config
+ *   coplanner invoke-all               Invoke all resolved agents in parallel
+ *     --prompt-file <path>             Reads prompt from file (avoids shell quoting)
+ *     [--checkpoint name]              Resolve agents from co_planners.checkpoints config
+ *     [--agents a,b] [--timeout N]     Override agent list; supports --raw
+ *     [--model name]
+ *   coplanner enabled [--raw]          Check kill switch status and source
+ *   coplanner agents [checkpoint]      List agents for checkpoint (from co_planners.agents/checkpoints)
+ *     [--raw]                          Supports --raw for comma-separated output
  */
 
 const fs = require('fs');
@@ -731,6 +738,10 @@ function cmdConfigEnsureSection(cwd, raw) {
       plan_check: true,
       verifier: true,
     },
+    co_planners: {
+      enabled: false,
+      timeout_ms: 120000,
+    },
     parallelization: true,
     brave_search: hasBraveSearch,
   };
@@ -738,6 +749,7 @@ function cmdConfigEnsureSection(cwd, raw) {
     ...hardcoded,
     ...userDefaults,
     workflow: { ...hardcoded.workflow, ...(userDefaults.workflow || {}) },
+    co_planners: { ...hardcoded.co_planners, ...(userDefaults.co_planners || {}) },
   };
 
   try {
