@@ -124,6 +124,8 @@ Pattern B only (verify-only checkpoints). Skip for A/C.
 cat .planning/phases/XX-name/{phase}-{plan}-PLAN.md
 ```
 This IS the execution instructions. Follow exactly. If plan references CONTEXT.md: honor user's vision throughout.
+
+**If plan contains `<interfaces>` block:** These are pre-extracted type definitions and contracts. Use them directly — do NOT re-read the source files to discover types. The planner already extracted what you need.
 </step>
 
 <step name="previous_phase_check">

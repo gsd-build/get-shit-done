@@ -107,6 +107,8 @@ Phase: "API documentation"
 
 <process>
 
+**Express path available:** If you already have a PRD or acceptance criteria document, use `/gsd:plan-phase {phase} --prd path/to/prd.md` to skip this discussion and go straight to planning.
+
 <step name="initialize" priority="first">
 Phase number from argument (required).
 

@@ -438,6 +438,67 @@ rm .planning/REQUIREMENTS.md
 
 </step>
 
+<step name="write_retrospective">
+
+**Append to living retrospective:**
+
+Check for existing retrospective:
+```bash
+ls .planning/RETROSPECTIVE.md 2>/dev/null
+```
+
+**If exists:** Read the file, append new milestone section before the "## Cross-Milestone Trends" section.
+
+**If doesn't exist:** Create from template at `~/.claude/get-shit-done/templates/retrospective.md`.
+
+**Gather retrospective data:**
+
+1. From SUMMARY.md files: Extract key deliverables, one-liners, tech decisions
+2. From VERIFICATION.md files: Extract verification scores, gaps found
+3. From UAT.md files: Extract test results, issues found
+4. From git log: Count commits, calculate timeline
+5. From the milestone work: Reflect on what worked and what didn't
+
+**Write the milestone section:**
+
+```markdown
+## Milestone: v{version} — {name}
+
+**Shipped:** {date}
+**Phases:** {phase_count} | **Plans:** {plan_count}
+
+### What Was Built
+{Extract from SUMMARY.md one-liners}
+
+### What Worked
+{Patterns that led to smooth execution}
+
+### What Was Inefficient
+{Missed opportunities, rework, bottlenecks}
+
+### Patterns Established
+{New conventions discovered during this milestone}
+
+### Key Lessons
+{Specific, actionable takeaways}
+
+### Cost Observations
+- Model mix: {X}% opus, {Y}% sonnet, {Z}% haiku
+- Sessions: {count}
+- Notable: {efficiency observation}
+```
+
+**Update cross-milestone trends:**
+
+If the "## Cross-Milestone Trends" section exists, update the tables with new data from this milestone.
+
+**Commit:**
+```bash
+node ~/.claude/get-shit-done/bin/gsd-tools.cjs commit "docs: update retrospective for v${VERSION}" --files .planning/RETROSPECTIVE.md
+```
+
+</step>
+
 <step name="update_state">
 
 Most STATE.md updates were handled by `milestone complete`, but verify and update remaining fields:
@@ -695,6 +756,8 @@ Milestone completion is successful when:
 - [ ] Requirements completion checked against REQUIREMENTS.md traceability table
 - [ ] Incomplete requirements surfaced with proceed/audit/abort options
 - [ ] Known gaps recorded in MILESTONES.md if user proceeded with incomplete requirements
+- [ ] RETROSPECTIVE.md updated with milestone section
+- [ ] Cross-milestone trends updated
 - [ ] User knows next step (/gsd:new-milestone)
 
 </success_criteria>
