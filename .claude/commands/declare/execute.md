@@ -167,16 +167,211 @@ If `milestoneCompletable` is true from the final verify-wave result:
 2. Find the row for M-XX in the milestones table.
 3. Change its Status from PENDING or ACTIVE to DONE.
 4. Write the updated MILESTONES.md back.
-5. Display: "Milestone M-XX marked as DONE."
+5. Display: "Milestone M-XX marked as DONE (pending verification)."
 
-Display completion banner:
+Proceed to Step 5. Do NOT display a completion banner yet -- that happens in Step 8 after verification.
+
+**Step 5: Milestone truth verification.**
+
+After marking the milestone DONE in Step 4, verify whether the milestone truth actually holds.
+
+**5a. Run programmatic verification:**
+
+```bash
+node dist/declare-tools.cjs verify-milestone --milestone M-XX
+```
+
+Parse the JSON result. It contains `criteria` (array of `{id, type, passed, description, evidence}`), `programmaticPassed`, `aiAssessmentNeeded`, and `traceContext`.
+
+**5b. Display programmatic check results:**
 
 ```
-## Execution Complete: M-XX — [milestoneTitle]
+### Milestone Verification: M-XX
 
-**Actions completed:** [pendingCount]
-**Waves executed:** [waves.length]
-**Milestone status:** [DONE or current status]
+| Criterion | Type | Result | Evidence |
+| --------- | ---- | ------ | -------- |
+| SC-01     | artifact | PASS | File found at path (NNN bytes) |
+| SC-02     | test | PASS | npm test exited with code 0 |
+| SC-03     | ai   | (pending) | |
+```
+
+For each criterion in the result, show its id, type, result (PASS if `passed === true`, NOT YET MET if `passed === false`, `(pending)` if `passed === null`), and evidence.
+
+**5c. Perform AI assessment:**
+
+If `programmaticPassed` is false, skip AI assessment -- programmatic criteria not yet met are definitive. Proceed directly to remediation (Step 6).
+
+If `programmaticPassed` is true, perform the AI assessment for the criterion with `type: "ai"`:
+
+- Read the milestone title and the trace context (`traceContext.declarations` and `traceContext.whyChain`) from the verify-milestone result.
+- Review the work completed across all waves (the actions executed, their produces, the wave verification results).
+- Assess: "Given that all actions for this milestone have completed, does the milestone truth statement hold? Is '[milestone title]' actually true?"
+- If the AI assessment is positive: mark the AI criterion as passed with a 1-2 sentence evidence summary.
+- If the AI assessment is negative: mark the AI criterion as not yet met with evidence explaining what is missing.
+
+Use restoration-focused language throughout: "criterion met" / "criterion not yet met" (never "passed" / "failed" in user-facing output).
+
+**5d. Determine verification outcome:**
+
+- ALL criteria met (including AI): proceed to mark KEPT (Step 5e).
+- ANY criterion not yet met: proceed to remediation loop (Step 6).
+
+**5e. All criteria met -- mark milestone KEPT:**
+
+1. Read `.planning/MILESTONES.md`, change M-XX status from DONE to KEPT.
+2. Write the updated MILESTONES.md back.
+3. Write VERIFICATION.md to the milestone folder using the `writeVerificationFile` format:
+   - State: `KEPT`
+   - Criteria: all criteria with their pass/fail status, descriptions, and evidence
+   - History: one attempt entry with `passed: true`, `remediationTriggered: false`, `stateTransition: "DONE -> KEPT"`
+4. Display (3-5 lines):
+
+```
+Milestone M-XX verified as KEPT -- "[milestone title]" holds true.
+[Brief summary of what was verified: N artifact checks, test suite, AI assessment all met.]
+```
+
+5. Skip to completion banner (Step 8).
+
+**Step 6: Remediation loop (max 2 attempts).**
+
+If verification in Step 5 found criteria not yet met:
+
+**6a. Update MILESTONES.md status to BROKEN for M-XX.**
+
+Read `.planning/MILESTONES.md`, change M-XX status from DONE to BROKEN, write back.
+
+**6b. Write initial VERIFICATION.md to the milestone folder.**
+
+Write VERIFICATION.md with:
+- State: `BROKEN`
+- Criteria: all criteria with current results
+- History: one attempt entry with `passed: false`, `remediationTriggered: true`, `stateTransition: "DONE -> BROKEN"`, checks summary (which criteria not yet met)
+
+**6c. For each remediation attempt (max 2):**
+
+**i. Derive remediation actions.** Analyze the criteria not yet met. For each criterion not yet met, derive 1-3 targeted remediation actions using AI reasoning:
+
+```
+Given these verification results for milestone M-XX ("[milestone title]"):
+
+Criteria not yet met:
+- SC-XX: [description] -- Evidence: [evidence]
+
+Derive remediation actions. Rules:
+- Each action targets exactly one criterion not yet met
+- Do not modify code that already meets its criteria
+- Maximum 3 actions per remediation attempt
+- Each action needs: title, produces field, description
+```
+
+**ii. Append remediation actions to PLAN.md.** For each derived action:
+- Read the existing PLAN.md from the milestone folder (use `milestoneFolderPath` from Step 2).
+- Add a new action section at the bottom with the next available A-XX ID.
+- Mark it with `**Derived:** remediation (attempt N)` instead of a creation date.
+- Write the updated PLAN.md.
+
+**iii. Generate exec plans for remediation actions:**
+
+```bash
+node dist/declare-tools.cjs generate-exec-plan --action A-XX --milestone M-XX --wave remediation
+```
+
+**iv. Display remediation banner:**
+
+```
+--- Remediation Attempt N ---
+**Criteria not yet met:** SC-XX, SC-YY
+**Actions:** A-XX ([title]), A-YY ([title])
+Spawning [count] agent(s)...
+```
+
+**v. Spawn executor agents for remediation actions using the Task tool** (same pattern as Step 3c).
+
+**vi. After remediation agents complete, re-run verification:**
+
+```bash
+node dist/declare-tools.cjs verify-milestone --milestone M-XX
+```
+
+Re-perform AI assessment for the AI criterion (same process as Step 5c).
+
+**vii. If ALL criteria now met:**
+- Read `.planning/MILESTONES.md`, change M-XX status from BROKEN to HONORED.
+- Write the updated MILESTONES.md back.
+- Update VERIFICATION.md: use `appendAttempt` to add the successful attempt with `passed: true`, `remediationTriggered: false`, `stateTransition: "BROKEN -> HONORED"`, and update the header state to HONORED.
+- Display (3-5 lines):
+
+```
+Milestone M-XX verified as HONORED -- "[milestone title]" now holds true.
+Remediation: [brief description of what was fixed]. [N] criteria now met.
+```
+
+- Skip to completion banner (Step 8).
+
+**viii. If criteria still not met after attempt 2:** proceed to escalation (Step 7).
+
+**Step 7: Escalation.**
+
+After 2 remediation attempts with criteria still not met:
+
+**7a. Update VERIFICATION.md** with the final attempt (attempt 2) results using `appendAttempt`.
+
+**7b. Display diagnosis report:**
+
+```
+## Verification: M-XX requires attention
+
+**Milestone:** [milestone title]
+**Remediation attempts:** 2 (criteria still not yet met)
+
+### What was tried
+
+**Attempt 1:** [actions taken] -- [which criteria still not yet met]
+**Attempt 2:** [actions taken] -- [which criteria still not yet met]
+
+### Criteria still not yet met
+
+| Criterion | Evidence |
+| --------- | -------- |
+| SC-XX     | [latest evidence] |
+
+### Suggestions
+
+- [Specific suggestion per criterion not yet met, e.g., "Consider narrowing SC-02 to check only the main export" or "The test in SC-03 may need a mock for external service X"]
+
+### Options
+
+1. **Adjust** the milestone statement or success criteria, then I will retry verification
+2. **Accept** the current state and continue to the next milestone
+```
+
+**7c. Wait for user response.**
+
+If user chooses to **adjust**:
+- Apply the user's adjustments to the milestone statement or success criteria.
+- Re-run verification (Step 5).
+- If all criteria now met: change M-XX status from BROKEN to RENEGOTIATED in MILESTONES.md.
+- Update VERIFICATION.md with a new attempt entry with `stateTransition: "BROKEN -> RENEGOTIATED"`.
+- Display: "Milestone M-XX renegotiated and verified -- adjusted criteria now hold."
+- Proceed to Step 8.
+
+If user chooses to **accept**:
+- Leave M-XX status as BROKEN in MILESTONES.md.
+- Add a note to VERIFICATION.md: "User accepted current state. Milestone remains BROKEN."
+- Proceed to Step 8.
+
+**Step 8: Completion banner.**
+
+Display the final execution summary:
+
+```
+## Execution Complete: M-XX -- [milestoneTitle]
+
+**Actions completed:** [count of actions executed, including remediation actions]
+**Waves executed:** [count of waves]
+**Verification:** [KEPT | HONORED | RENEGOTIATED | BROKEN (user accepted)]
+**Milestone status:** [final status in MILESTONES.md]
 ```
 
 **Error handling:**
@@ -195,4 +390,9 @@ Display completion banner:
 - Atomic commits per task (handled by executor agents).
 - Two-layer verification: automated checks (CJS tool) then AI review (this slash command).
 - Max 2 retries on verification failure before escalating to user.
-- Milestone auto-DONE when all actions complete and verify.
+- Milestone truth verification after all waves: DONE is intermediate, KEPT/HONORED/RENEGOTIATED are final.
+- Auto-remediation derives targeted actions, appends to PLAN.md, executes, and re-verifies.
+- Escalation provides diagnosis with specific suggestions, never judgment.
+- Language is restoration-focused: "criterion not yet met" not "failed", "requires attention" not "broken".
+- State transitions: DONE -> KEPT (all criteria met first try), DONE -> BROKEN -> HONORED (remediated), DONE -> BROKEN -> RENEGOTIATED (user adjusted criteria).
+- VERIFICATION.md written to milestone folder with full attempt history and audit trail.
