@@ -161,6 +161,7 @@ if (require.main === module) {
     }
     process.exit(1);
   }
+} else {
+  // Called via require() from install-orchestrator
+  module.exports = installHooks;
 }
-
-module.exports = { installHooks, configureSettings };
