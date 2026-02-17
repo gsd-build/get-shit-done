@@ -1969,6 +1969,73 @@ describe('phase complete command', () => {
     const result = runGsdTools('phase complete 1', tmpDir);
     assert.ok(result.success, `Command should succeed even without REQUIREMENTS.md: ${result.error}`);
   });
+
+  test('handles multi-level decimal phase without regex crash', () => {
+    fs.writeFileSync(
+      path.join(tmpDir, '.planning', 'ROADMAP.md'),
+      `# Roadmap
+
+- [x] Phase 3: Lorem
+- [x] Phase 3.2: Ipsum
+- [ ] Phase 3.2.1: Dolor Sit
+- [ ] Phase 4: Amet
+
+### Phase 3: Lorem
+**Goal:** Setup
+**Plans:** 1/1 plans complete
+**Requirements:** LOR-01
+
+### Phase 3.2: Ipsum
+**Goal:** Build
+**Plans:** 1/1 plans complete
+**Requirements:** IPS-01
+
+### Phase 03.2.1: Dolor Sit Polish (INSERTED)
+**Goal:** Polish
+**Plans:** 1/1 plans complete
+
+### Phase 4: Amet
+**Goal:** Deliver
+**Requirements:** AMT-01: Filter items by category with AND logic (items matching ALL selected categories)
+`
+    );
+
+    fs.writeFileSync(
+      path.join(tmpDir, '.planning', 'REQUIREMENTS.md'),
+      `# Requirements
+
+- [ ] **LOR-01**: Lorem database schema
+- [ ] **IPS-01**: Ipsum rendering engine
+- [ ] **AMT-01**: Filter items by category
+`
+    );
+
+    fs.writeFileSync(
+      path.join(tmpDir, '.planning', 'STATE.md'),
+      `# State
+
+**Current Phase:** 03.2.1
+**Current Phase Name:** Dolor Sit Polish
+**Status:** Execution complete
+**Current Plan:** 03.2.1-01
+`
+    );
+
+    const p32 = path.join(tmpDir, '.planning', 'phases', '03.2-ipsum');
+    const p321 = path.join(tmpDir, '.planning', 'phases', '03.2.1-dolor-sit');
+    const p4 = path.join(tmpDir, '.planning', 'phases', '04-amet');
+    fs.mkdirSync(p32, { recursive: true });
+    fs.mkdirSync(p321, { recursive: true });
+    fs.mkdirSync(p4, { recursive: true });
+    fs.writeFileSync(path.join(p321, '03.2.1-01-PLAN.md'), '# Plan');
+    fs.writeFileSync(path.join(p321, '03.2.1-01-SUMMARY.md'), '# Summary');
+
+    const result = runGsdTools('phase complete 03.2.1', tmpDir);
+    assert.ok(result.success, `Command should not crash on regex metacharacters: ${result.error}`);
+
+    const req = fs.readFileSync(path.join(tmpDir, '.planning', 'REQUIREMENTS.md'), 'utf-8');
+    assert.ok(req.includes('- [ ] **AMT-01**'), 'AMT-01 should remain unchanged');
+  });
 });
 
 // ─────────────────────────────────────────────────────────────────────────────

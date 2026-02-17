@@ -244,12 +244,29 @@ function execGit(cwd, args) {
 }
 
 function normalizePhaseName(phase) {
-  const match = phase.match(/^(\d+(?:\.\d+)?)/);
+  const match = String(phase).match(/^(\d+(?:\.\d+)*)/);
   if (!match) return phase;
   const num = match[1];
   const parts = num.split('.');
   const padded = parts[0].padStart(2, '0');
-  return parts.length > 1 ? `${padded}.${parts[1]}` : padded;
+  return parts.length > 1 ? `${padded}.${parts.slice(1).join('.')}` : padded;
+}
+
+function escapeRegex(value) {
+  return String(value).replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+}
+
+function comparePhaseNumbers(a, b) {
+  const aParts = String(a).split('.').map(p => parseInt(p, 10));
+  const bParts = String(b).split('.').map(p => parseInt(p, 10));
+  const maxLen = Math.max(aParts.length, bParts.length);
+
+  for (let i = 0; i < maxLen; i++) {
+    const av = Number.isFinite(aParts[i]) ? aParts[i] : 0;
+    const bv = Number.isFinite(bParts[i]) ? bParts[i] : 0;
+    if (av !== bv) return av - bv;
+  }
+  return 0;
 }
 
 function extractFrontmatter(content) {
@@ -858,9 +875,9 @@ function cmdPhasesList(cwd, options, raw) {
 
     // Sort numerically (handles decimals: 01, 02, 02.1, 02.2, 03)
     dirs.sort((a, b) => {
-      const aNum = parseFloat(a.match(/^(\d+(?:\.\d+)?)/)?.[1] || '0');
-      const bNum = parseFloat(b.match(/^(\d+(?:\.\d+)?)/)?.[1] || '0');
-      return aNum - bNum;
+      const aNum = a.match(/^(\d+(?:\.\d+)*)/)?.[1] || '0';
+      const bNum = b.match(/^(\d+(?:\.\d+)*)/)?.[1] || '0';
+      return comparePhaseNumbers(aNum, bNum);
     });
 
     // If filtering by phase number
@@ -2597,7 +2614,7 @@ function cmdRoadmapAnalyze(cwd, raw) {
     } catch {}
 
     // Check ROADMAP checkbox status
-    const checkboxPattern = new RegExp(`-\\s*\\[(x| )\\]\\s*.*Phase\\s+${phaseNum.replace('.', '\\.')}`, 'i');
+    const checkboxPattern = new RegExp(`-\\s*\\[(x| )\\]\\s*.*Phase\\s+${escapeRegex(phaseNum)}`, 'i');
     const checkboxMatch = content.match(checkboxPattern);
     const roadmapComplete = checkboxMatch ? checkboxMatch[1] === 'x' : false;
 
@@ -3087,7 +3104,7 @@ function cmdRoadmapUpdatePlanProgress(cwd, phaseNum, raw) {
   }
 
   let roadmapContent = fs.readFileSync(roadmapPath, 'utf-8');
-  const phaseEscaped = phaseNum.replace('.', '\\.');
+  const phaseEscaped = escapeRegex(phaseNum);
 
   // Progress table row: update Plans column (summaries/plans) and Status column
   const tablePattern = new RegExp(
@@ -3158,14 +3175,14 @@ function cmdPhaseComplete(cwd, phaseNum, raw) {
     let roadmapContent = fs.readFileSync(roadmapPath, 'utf-8');
 
     // Checkbox: - [ ] Phase N: → - [x] Phase N: (...completed DATE)
+    const phaseEscaped = escapeRegex(phaseNum);
     const checkboxPattern = new RegExp(
-      `(-\\s*\\[)[ ](\\]\\s*.*Phase\\s+${phaseNum.replace('.', '\\.')}[:\\s][^\\n]*)`,
+      `(-\\s*\\[)[ ](\\]\\s*.*Phase\\s+${phaseEscaped}[:\\s][^\\n]*)`,
       'i'
     );
     roadmapContent = roadmapContent.replace(checkboxPattern, `$1x$2 (completed ${today})`);
 
     // Progress table: update Status to Complete, add date
-    const phaseEscaped = phaseNum.replace('.', '\\.');
     const tablePattern = new RegExp(
       `(\\|\\s*${phaseEscaped}\\.?\\s[^|]*\\|[^|]*\\|)\\s*[^|]*(\\|)\\s*[^|]*(\\|)`,
       'i'
@@ -3192,7 +3209,7 @@ function cmdPhaseComplete(cwd, phaseNum, raw) {
     if (fs.existsSync(reqPath)) {
       // Extract Requirements line from roadmap for this phase
       const reqMatch = roadmapContent.match(
-        new RegExp(`Phase\\s+${phaseNum.replace('.', '\\.')}[\\s\\S]*?\\*\\*Requirements:\\*\\*\\s*([^\\n]+)`, 'i')
+        new RegExp(`Phase\\s+${phaseEscaped}[\\s\\S]*?\\*\\*Requirements:\\*\\*\\s*([^\\n]+)`, 'i')
       );
 
       if (reqMatch) {
@@ -3200,14 +3217,15 @@ function cmdPhaseComplete(cwd, phaseNum, raw) {
         let reqContent = fs.readFileSync(reqPath, 'utf-8');
 
         for (const reqId of reqIds) {
+          const reqEscaped = escapeRegex(reqId);
           // Update checkbox: - [ ] **REQ-ID** → - [x] **REQ-ID**
           reqContent = reqContent.replace(
-            new RegExp(`(-\\s*\\[)[ ](\\]\\s*\\*\\*${reqId}\\*\\*)`, 'gi'),
+            new RegExp(`(-\\s*\\[)[ ](\\]\\s*\\*\\*${reqEscaped}\\*\\*)`, 'gi'),
             '$1x$2'
           );
           // Update traceability table: | REQ-ID | Phase N | Pending | → | REQ-ID | Phase N | Complete |
           reqContent = reqContent.replace(
-            new RegExp(`(\\|\\s*${reqId}\\s*\\|[^|]+\\|)\\s*Pending\\s*(\\|)`, 'gi'),
+            new RegExp(`(\\|\\s*${reqEscaped}\\s*\\|[^|]+\\|)\\s*Pending\\s*(\\|)`, 'gi'),
             '$1 Complete $2'
           );
         }
@@ -3224,15 +3242,21 @@ function cmdPhaseComplete(cwd, phaseNum, raw) {
 
   try {
     const entries = fs.readdirSync(phasesDir, { withFileTypes: true });
-    const dirs = entries.filter(e => e.isDirectory()).map(e => e.name).sort();
-    const currentFloat = parseFloat(phaseNum);
+    const dirs = entries
+      .filter(e => e.isDirectory())
+      .map(e => e.name)
+      .sort((a, b) => {
+        const aPhase = a.match(/^(\d+(?:\.\d+)*)/)?.[1] || '0';
+        const bPhase = b.match(/^(\d+(?:\.\d+)*)/)?.[1] || '0';
+        return comparePhaseNumbers(aPhase, bPhase);
+      });
+    const currentPhase = normalizePhaseName(phaseNum);
 
     // Find the next phase directory after current
     for (const dir of dirs) {
-      const dm = dir.match(/^(\d+(?:\.\d+)?)-?(.*)/);
+      const dm = dir.match(/^(\d+(?:\.\d+)*)-?(.*)/);
       if (dm) {
-        const dirFloat = parseFloat(dm[1]);
-        if (dirFloat > currentFloat) {
+        if (comparePhaseNumbers(dm[1], currentPhase) > 0) {
           nextPhaseNum = dm[1];
           nextPhaseName = dm[2] || null;
           isLastPhase = false;
@@ -3816,13 +3840,13 @@ function cmdProgressRender(cwd, format, raw) {
   try {
     const entries = fs.readdirSync(phasesDir, { withFileTypes: true });
     const dirs = entries.filter(e => e.isDirectory()).map(e => e.name).sort((a, b) => {
-      const aNum = parseFloat(a.match(/^(\d+(?:\.\d+)?)/)?.[1] || '0');
-      const bNum = parseFloat(b.match(/^(\d+(?:\.\d+)?)/)?.[1] || '0');
-      return aNum - bNum;
+      const aNum = a.match(/^(\d+(?:\.\d+)*)/)?.[1] || '0';
+      const bNum = b.match(/^(\d+(?:\.\d+)*)/)?.[1] || '0';
+      return comparePhaseNumbers(aNum, bNum);
     });
 
     for (const dir of dirs) {
-      const dm = dir.match(/^(\d+(?:\.\d+)?)-?(.*)/);
+      const dm = dir.match(/^(\d+(?:\.\d+)*)-?(.*)/);
       const phaseNum = dm ? dm[1] : dir;
       const phaseName = dm && dm[2] ? dm[2].replace(/-/g, ' ') : '';
       const phaseFiles = fs.readdirSync(path.join(phasesDir, dir));
@@ -4026,7 +4050,7 @@ function searchPhaseInDir(baseDir, relBase, normalized) {
     const match = dirs.find(d => d.startsWith(normalized));
     if (!match) return null;
 
-    const dirMatch = match.match(/^(\d+(?:\.\d+)?)-?(.*)/);
+    const dirMatch = match.match(/^(\d+(?:\.\d+)*)-?(.*)/);
     const phaseNumber = dirMatch ? dirMatch[1] : normalized;
     const phaseName = dirMatch && dirMatch[2] ? dirMatch[2] : null;
     const phaseDir = path.join(baseDir, match);

@@ -6,6 +6,9 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ## [Unreleased]
 
+### Fixed
+- `gsd-tools phase complete` now handles multi-level decimal phases (e.g. `03.2.1`) and safely escapes requirement IDs when building regex patterns, preventing `Invalid regular expression` crashes
+
 ## [1.20.3] - 2026-02-16
 
 ### Fixed
