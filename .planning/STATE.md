@@ -5,16 +5,16 @@
 See: .planning/PROJECT.md (updated 2026-02-16)
 
 **Core value:** Quality doesn't degrade as context grows
-**Current focus:** Phase 9 - Multi-Agent Orchestration (v2.2 Collaborative Design)
+**Current focus:** Phase 10 - Settings Fix & Integration Polish (v2.2 Collaborative Design)
 
 ## Current Position
 
-Phase: 9 of 9 (Multi-Agent Orchestration)
-Plan: 2 of 3
-Status: In progress
-Last activity: 2026-02-17 - Completed 09-02 (parallel invoke-all workflow integration)
+Phase: 10 of 11 (Settings Fix & Integration Polish)
+Plan: 1 of 1
+Status: Plan complete
+Last activity: 2026-02-17 - Completed 10-01 (settings detection badges, docstring expansion, config defaults)
 
-Progress: [█████████░] 90%
+Progress: [██████████] 95%
 
 ## Performance Metrics
 
@@ -25,9 +25,9 @@ Progress: [█████████░] 90%
 - Timeline: 12 days (Feb 2 -> Feb 13, 2026)
 
 **v2.2:**
-- Total plans completed: 8
+- Total plans completed: 9
 - Average duration: 3 min/plan
-- Total execution time: 21 min
+- Total execution time: 23 min
 
 | Phase | Plan | Duration | Tasks | Files |
 |-------|------|----------|-------|-------|
@@ -39,6 +39,7 @@ Progress: [█████████░] 90%
 | 08    | 03   | 2min     | 2     | 2     |
 | 09    | 01   | 2min     | 2     | 4     |
 | 09    | 02   | 3min     | 2     | 3     |
+| 10    | 01   | 2min     | 2     | 2     |
 
 ## Accumulated Context
 
@@ -96,6 +97,12 @@ Key decisions from 09-01:
 - Temp file includes CLI_NAME + Date.now() + random suffix to prevent collisions during parallel execution
 - invoke-all reads prompt from --prompt-file to avoid shell quoting issues with large artifacts
 
+Key decisions from 10-01:
+- Detection runs once when co-planners toggled to Yes, cached results reused for all 5 agent option blocks
+- Badge text: "(installed)", "(not installed)", "(status unknown)" -- three-state mapping from detect JSON
+- Minimal co_planners defaults (enabled: false, timeout_ms: 120000) -- no agents/checkpoints keys in default config
+- Deep merge for co_planners follows established workflow merge convention in cmdConfigEnsureSection
+
 ### Pending Todos
 
 3 pending todo(s) in `.planning/todos/pending/`:
@@ -117,5 +124,5 @@ None.
 ## Session Continuity
 
 Last session: 2026-02-17
-Stopped at: Completed 09-02-PLAN.md (parallel invoke-all workflow integration)
+Stopped at: Completed 10-01-PLAN.md (settings detection badges, docstring expansion, config defaults)
 Resume file: None
