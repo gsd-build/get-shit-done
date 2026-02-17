@@ -573,7 +573,7 @@ Your STACK.md feeds into roadmap creation. Be prescriptive:
 </downstream_consumer>
 
 <quality_gate>
-- [ ] Versions are current (verify with Context7/official docs, not training data)
+- [ ] Versions are current (verify with GitMCP/Docfork/official docs, not training data)
 - [ ] Rationale explains WHY, not just WHAT
 - [ ] Confidence levels assigned to each recommendation
 </quality_gate>
