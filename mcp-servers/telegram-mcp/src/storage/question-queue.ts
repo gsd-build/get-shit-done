@@ -15,6 +15,7 @@ export interface PendingQuestion {
   session_id: string;      // Session UUID (changed from number PID)
   question: string;        // Question text
   context?: string;        // Execution context
+  conversation_id?: string; // UUID grouping related messages in one conversation (Decision #2)
   status: "pending" | "answered";
   created_at: string;      // ISO timestamp
   answer?: string;         // User's answer (when answered)
@@ -52,7 +53,7 @@ async function writeAtomic(filePath: string, content: string): Promise<void> {
  */
 export async function appendQuestion(
   sessionId: string,
-  question: { question: string; context?: string }
+  question: { question: string; context?: string; conversation_id?: string }
 ): Promise<PendingQuestion> {
   const fullQuestion: PendingQuestion = {
     type: 'question' as any, // Add type field for session entry
@@ -60,6 +61,7 @@ export async function appendQuestion(
     session_id: sessionId,
     question: question.question,
     context: question.context,
+    conversation_id: question.conversation_id,
     status: 'pending',
     created_at: new Date().toISOString(),
   };
@@ -165,6 +167,62 @@ export async function getPendingById(questionId: string, sessionId?: string): Pr
   // Search all sessions
   const allPending = await loadAllPendingQuestions();
   return allPending.find(q => q.id === questionId) || null;
+}
+
+/**
+ * Load all session entries with a matching conversation_id, sorted chronologically.
+ * Used to reconstruct multi-message conversations for Haiku analysis.
+ * @param sessionId Session UUID
+ * @param conversationId Conversation UUID to filter by
+ * @returns Sorted array of matching session entries
+ */
+export async function loadConversationMessages(sessionId: string, conversationId: string): Promise<import('./session-manager.js').SessionEntry[]> {
+  const sessionPath = getSessionPath(sessionId);
+  const entries = await loadSessionJSONL(sessionPath);
+
+  const matching = entries.filter((entry: any) => entry.conversation_id === conversationId);
+
+  // Sort chronologically by timestamp (use created_at, answered_at, or timestamp)
+  matching.sort((a: any, b: any) => {
+    const aTime = a.created_at || a.answered_at || a.timestamp || '';
+    const bTime = b.created_at || b.answered_at || b.timestamp || '';
+    return aTime.localeCompare(bTime);
+  });
+
+  return matching;
+}
+
+/**
+ * Group all session entries by conversation_id.
+ * Entries without a conversation_id are grouped under the key "ungrouped".
+ * @param sessionId Session UUID
+ * @returns Map of conversationId -> entries[] sorted chronologically
+ */
+export async function getConversationEntries(sessionId: string): Promise<Map<string, import('./session-manager.js').SessionEntry[]>> {
+  const sessionPath = getSessionPath(sessionId);
+  const entries = await loadSessionJSONL(sessionPath);
+
+  const grouped = new Map<string, import('./session-manager.js').SessionEntry[]>();
+
+  for (const entry of entries) {
+    const key = (entry as any).conversation_id || 'ungrouped';
+    if (!grouped.has(key)) {
+      grouped.set(key, []);
+    }
+    grouped.get(key)!.push(entry);
+  }
+
+  // Sort each group chronologically
+  for (const [key, group] of grouped) {
+    group.sort((a: any, b: any) => {
+      const aTime = a.created_at || a.answered_at || a.timestamp || '';
+      const bTime = b.created_at || b.answered_at || b.timestamp || '';
+      return aTime.localeCompare(bTime);
+    });
+    grouped.set(key, group);
+  }
+
+  return grouped;
 }
 
 /**

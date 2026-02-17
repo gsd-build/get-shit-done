@@ -1,7 +1,8 @@
 import fs from 'fs/promises';
-import { existsSync } from 'fs';
 import path from 'path';
 import { randomUUID } from 'crypto';
+import { getSessionPath, loadSessionJSONL, appendToSession, discoverSessions } from './session-manager.js';
+import { withLock } from './file-lock.js';
 // Base directory for question storage
 // Use PROJECT_ROOT env var or traverse up to find project root
 function getProjectRoot() {
@@ -15,21 +16,6 @@ function getProjectRoot() {
     }
     return currentDir;
 }
-const PROJECT_ROOT = getProjectRoot();
-const QUESTIONS_DIR = path.join(PROJECT_ROOT, '.planning/telegram-questions');
-const PENDING_FILE = path.join(QUESTIONS_DIR, 'pending.jsonl');
-const SESSIONS_DIR = path.join(PROJECT_ROOT, '.planning/telegram-sessions');
-/**
- * Ensure storage directories exist
- */
-async function ensureDirectories() {
-    if (!existsSync(QUESTIONS_DIR)) {
-        await fs.mkdir(QUESTIONS_DIR, { recursive: true });
-    }
-    if (!existsSync(SESSIONS_DIR)) {
-        await fs.mkdir(SESSIONS_DIR, { recursive: true });
-    }
-}
 /**
  * Atomic write using temp file + rename
  */
@@ -39,102 +25,219 @@ async function writeAtomic(filePath, content) {
     await fs.rename(tempPath, filePath);
 }
 /**
- * Load all pending questions from JSONL
- * @returns Array of pending questions
- */
-export async function loadPendingQuestions() {
-    await ensureDirectories();
-    if (!existsSync(PENDING_FILE)) {
-        await fs.writeFile(PENDING_FILE, '', 'utf8');
-        return [];
-    }
-    const content = await fs.readFile(PENDING_FILE, 'utf8');
-    if (!content.trim()) {
-        return [];
-    }
-    return content
-        .trim()
-        .split('\n')
-        .filter(line => line.trim())
-        .map(line => {
-        try {
-            return JSON.parse(line);
-        }
-        catch (err) {
-            console.error('[question-queue] Malformed JSON line, skipping:', line);
-            return null;
-        }
-    })
-        .filter((q) => q !== null && q.status === 'pending');
-}
-/**
- * Append new question to queue
- * @param question Question details (without id, session_id, created_at, status - auto-generated)
+ * Append new question to session queue
+ * @param sessionId Session UUID
+ * @param question Question details (question text and optional context)
  * @returns Full question object with generated fields
  */
-export async function appendQuestion(question) {
-    await ensureDirectories();
+export async function appendQuestion(sessionId, question) {
     const fullQuestion = {
+        type: 'question', // Add type field for session entry
         id: randomUUID(),
-        session_id: process.pid,
+        session_id: sessionId,
         question: question.question,
         context: question.context,
+        conversation_id: question.conversation_id,
         status: 'pending',
         created_at: new Date().toISOString(),
     };
-    // Append to JSONL (atomic on POSIX)
-    await fs.appendFile(PENDING_FILE, JSON.stringify(fullQuestion) + '\n', 'utf8');
+    // Use appendToSession which already handles locking
+    await appendToSession(sessionId, fullQuestion);
     return fullQuestion;
 }
 /**
+ * Load pending questions for specific session
+ * @param sessionId Session UUID
+ * @returns Array of pending questions
+ */
+export async function loadPendingQuestions(sessionId) {
+    const sessionPath = getSessionPath(sessionId);
+    const entries = await loadSessionJSONL(sessionPath);
+    return entries
+        .filter((entry) => entry.type === 'question' && entry.status === 'pending')
+        .map((entry) => entry);
+}
+/**
+ * Load all pending questions across all sessions
+ * Used by Telegram bot to show all pending questions
+ * @returns Array of pending questions with session_id attached
+ */
+export async function loadAllPendingQuestions() {
+    const sessions = await discoverSessions();
+    const allPending = [];
+    for (const session of sessions) {
+        const pending = await loadPendingQuestions(session.id);
+        allPending.push(...pending.map(q => ({ ...q, session_id: session.id })));
+    }
+    return allPending;
+}
+/**
  * Mark question as answered
+ * Updates question in-place within session file and appends answer event
+ * @param sessionId Session UUID
  * @param questionId Question UUID
  * @param answer User's answer
  */
-export async function markAnswered(questionId, answer) {
-    const questions = await loadPendingQuestions();
-    // Find and update the question
-    let updatedQuestion = null;
-    const updatedQuestions = questions.map(q => {
-        if (q.id === questionId) {
-            updatedQuestion = {
-                ...q,
-                status: 'answered',
-                answer,
-                answered_at: new Date().toISOString(),
-            };
-            return updatedQuestion;
+export async function markAnswered(sessionId, questionId, answer) {
+    const sessionPath = getSessionPath(sessionId);
+    await withLock(sessionPath, async () => {
+        // Load all entries from session
+        const entries = await loadSessionJSONL(sessionPath);
+        // Find and update the question entry
+        let updated = false;
+        const updatedEntries = entries.map((entry) => {
+            if (entry.type === 'question' && entry.id === questionId) {
+                updated = true;
+                return {
+                    ...entry,
+                    status: 'answered',
+                    answer,
+                    answered_at: new Date().toISOString()
+                };
+            }
+            return entry;
+        });
+        if (!updated) {
+            throw new Error(`Question not found in session ${sessionId}: ${questionId}`);
         }
-        return q;
+        // Append answer event
+        const answerEvent = {
+            type: 'answer',
+            question_id: questionId,
+            answer,
+            answered_at: new Date().toISOString()
+        };
+        updatedEntries.push(answerEvent);
+        // Atomic rewrite of session file
+        const content = updatedEntries.map(e => JSON.stringify(e)).join('\n') + '\n';
+        await writeAtomic(sessionPath, content);
     });
-    if (!updatedQuestion) {
-        throw new Error(`Question not found: ${questionId}`);
-    }
-    // Filter out answered question, keep only pending
-    const stillPending = updatedQuestions.filter(q => q.status === 'pending');
-    // Atomic rewrite
-    const content = stillPending.map(q => JSON.stringify(q)).join('\n');
-    await writeAtomic(PENDING_FILE, content ? content + '\n' : '');
-    // Archive the answered question
-    await archiveQuestion(updatedQuestion);
-}
-/**
- * Archive answered question to daily log
- * @param question Answered question to archive
- */
-export async function archiveQuestion(question) {
-    await ensureDirectories();
-    const today = new Date().toISOString().split('T')[0]; // YYYY-MM-DD
-    const archivePath = path.join(SESSIONS_DIR, `${today}.jsonl`);
-    // Append to daily log
-    await fs.appendFile(archivePath, JSON.stringify(question) + '\n', 'utf8');
 }
 /**
  * Get single pending question by ID
  * @param questionId Question UUID
+ * @param sessionId Optional session UUID to search in specific session
  * @returns Question or null if not found
  */
-export async function getPendingById(questionId) {
-    const questions = await loadPendingQuestions();
-    return questions.find(q => q.id === questionId) || null;
+export async function getPendingById(questionId, sessionId) {
+    if (sessionId) {
+        // Search only in specified session
+        const pending = await loadPendingQuestions(sessionId);
+        return pending.find(q => q.id === questionId) || null;
+    }
+    // Search all sessions
+    const allPending = await loadAllPendingQuestions();
+    return allPending.find(q => q.id === questionId) || null;
+}
+/**
+ * Load all session entries with a matching conversation_id, sorted chronologically.
+ * Used to reconstruct multi-message conversations for Haiku analysis.
+ * @param sessionId Session UUID
+ * @param conversationId Conversation UUID to filter by
+ * @returns Sorted array of matching session entries
+ */
+export async function loadConversationMessages(sessionId, conversationId) {
+    const sessionPath = getSessionPath(sessionId);
+    const entries = await loadSessionJSONL(sessionPath);
+    const matching = entries.filter((entry) => entry.conversation_id === conversationId);
+    // Sort chronologically by timestamp (use created_at, answered_at, or timestamp)
+    matching.sort((a, b) => {
+        const aTime = a.created_at || a.answered_at || a.timestamp || '';
+        const bTime = b.created_at || b.answered_at || b.timestamp || '';
+        return aTime.localeCompare(bTime);
+    });
+    return matching;
+}
+/**
+ * Group all session entries by conversation_id.
+ * Entries without a conversation_id are grouped under the key "ungrouped".
+ * @param sessionId Session UUID
+ * @returns Map of conversationId -> entries[] sorted chronologically
+ */
+export async function getConversationEntries(sessionId) {
+    const sessionPath = getSessionPath(sessionId);
+    const entries = await loadSessionJSONL(sessionPath);
+    const grouped = new Map();
+    for (const entry of entries) {
+        const key = entry.conversation_id || 'ungrouped';
+        if (!grouped.has(key)) {
+            grouped.set(key, []);
+        }
+        grouped.get(key).push(entry);
+    }
+    // Sort each group chronologically
+    for (const [key, group] of grouped) {
+        group.sort((a, b) => {
+            const aTime = a.created_at || a.answered_at || a.timestamp || '';
+            const bTime = b.created_at || b.answered_at || b.timestamp || '';
+            return aTime.localeCompare(bTime);
+        });
+        grouped.set(key, group);
+    }
+    return grouped;
+}
+/**
+ * TEMPORARY BACKWARD COMPATIBILITY LAYER
+ * These functions will be removed in plan 10.1-03 when proper session management is added
+ * to the MCP server and tools.
+ */
+// Get temporary session ID based on process PID (for compatibility until 10.1-03)
+function getTempSessionId() {
+    // Use PID as temporary session identifier
+    // This maintains single-instance behavior until proper session management is added
+    return `pid-${process.pid}`;
+}
+/**
+ * DEPRECATED: Load all pending questions (backward compat wrapper)
+ * Use loadPendingQuestions(sessionId) or loadAllPendingQuestions() instead
+ * @deprecated Will be removed in 10.1-03
+ */
+export async function loadPendingQuestionsLegacy() {
+    // For now, return all pending questions across all sessions
+    // This maintains bot compatibility until 10.1-03 implements proper session filtering
+    const allPending = await loadAllPendingQuestions();
+    return allPending;
+}
+/**
+ * DEPRECATED: Append question without explicit session (backward compat wrapper)
+ * Use appendQuestion(sessionId, question) instead
+ * @deprecated Will be removed in 10.1-03
+ */
+export async function appendQuestionLegacy(question) {
+    const sessionId = getTempSessionId();
+    // Create session if it doesn't exist
+    const { createSession } = await import('./session-manager.js');
+    const sessions = await discoverSessions();
+    const sessionExists = sessions.some(s => s.id === sessionId);
+    if (!sessionExists) {
+        // Create temporary session for this process
+        const actualSessionId = await createSession(`MCP Server PID ${process.pid}`);
+        // Note: we can't easily rename it to match pid-${process.pid}, so we'll just use it
+        return appendQuestion(actualSessionId, question);
+    }
+    return appendQuestion(sessionId, question);
+}
+/**
+ * DEPRECATED: Mark answered without explicit session (backward compat wrapper)
+ * Use markAnswered(sessionId, questionId, answer) instead
+ * @deprecated Will be removed in 10.1-03
+ */
+export async function markAnsweredLegacy(questionId, answer) {
+    // Find the question across all sessions
+    const question = await getPendingById(questionId);
+    if (!question) {
+        throw new Error(`Question not found: ${questionId}`);
+    }
+    // Use the question's session_id
+    await markAnswered(question.session_id, questionId, answer);
+}
+/**
+ * DEPRECATED: Archive answered question (backward compat - now a no-op)
+ * Answered questions now stay in session files, not archived separately
+ * @deprecated Will be removed in 10.1-03
+ */
+export async function archiveQuestion(question) {
+    // No-op: questions are now kept in session files after being answered
+    // The markAnswered function updates them in-place
+    console.warn('[question-queue] archiveQuestion is deprecated - questions stay in session files');
 }
