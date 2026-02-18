@@ -9,16 +9,21 @@ Read all files referenced by the invoking prompt's execution_context before star
 <process>
 
 <step name="get_installed_version">
-Detect whether GSD is installed locally or globally by checking both locations:
+Detect whether GSD is installed locally or globally by checking both locations and validating install integrity:
 
 ```bash
-# Check local first (takes priority)
+# Check local first (takes priority only if valid)
 # Paths templated at install time for runtime compatibility
-if [ -f ./.claude/get-shit-done/VERSION ]; then
-  cat ./.claude/get-shit-done/VERSION
+LOCAL_VERSION_FILE="./.claude/get-shit-done/VERSION"
+LOCAL_MARKER_FILE="./.claude/get-shit-done/workflows/update.md"
+GLOBAL_VERSION_FILE="$HOME/.claude/get-shit-done/VERSION"
+GLOBAL_MARKER_FILE="$HOME/.claude/get-shit-done/workflows/update.md"
+
+if [ -f "$LOCAL_VERSION_FILE" ] && [ -f "$LOCAL_MARKER_FILE" ] && grep -Eq '^[0-9]+\.[0-9]+\.[0-9]+' "$LOCAL_VERSION_FILE"; then
+  cat "$LOCAL_VERSION_FILE"
   echo "LOCAL"
-elif [ -f ~/.claude/get-shit-done/VERSION ]; then
-  cat ~/.claude/get-shit-done/VERSION
+elif [ -f "$GLOBAL_VERSION_FILE" ] && [ -f "$GLOBAL_MARKER_FILE" ] && grep -Eq '^[0-9]+\.[0-9]+\.[0-9]+' "$GLOBAL_VERSION_FILE"; then
+  cat "$GLOBAL_VERSION_FILE"
   echo "GLOBAL"
 else
   echo "UNKNOWN"
@@ -26,8 +31,8 @@ fi
 ```
 
 Parse output:
-- If last line is "LOCAL": installed version is first line, use `--local` flag for update
-- If last line is "GLOBAL": installed version is first line, use `--global` flag for update
+- If last line is "LOCAL": local install is valid; installed version is first line; use `--local`
+- If last line is "GLOBAL": local missing/invalid, global install is valid; installed version is first line; use `--global`
 - If "UNKNOWN": proceed to install step (treat as version 0.0.0)
 
 **If VERSION file missing:**

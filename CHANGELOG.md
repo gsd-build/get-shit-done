@@ -9,6 +9,7 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 ### Fixed
 - `/gsd:update` now installs with `npx get-shit-done-cc@latest` (instead of unpinned `npx get-shit-done-cc`) to prevent stale project-local versions from shadowing updates
 - `/gsd:update` now uses strict package safety checks: only `get-shit-done-cc` is allowed, scoped/user-derived package names are rejected, and install command execution is allowlisted to trusted forms
+- `/gsd:update` install detection now validates local integrity and falls back to global install when local metadata is missing or invalid
 
 ## [1.20.4] - 2026-02-17
 
