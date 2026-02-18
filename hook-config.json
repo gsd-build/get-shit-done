@@ -1,0 +1,32 @@
+{
+  "enabled": true,
+  "compression": {
+    "enabled": false,
+    "strategy": "header-extraction",
+    "min_file_lines": 500,
+    "target_reduction": 65,
+    "cache_ttl": 300,
+    "patterns": [
+      "**/*-RESEARCH.md",
+      "**/*-PLAN.md",
+      "**/*-CONTEXT.md",
+      "**/STATE.md",
+      "**/ROADMAP.md",
+      "**/PROJECT.md"
+    ],
+    "exclude": [
+      "**/*-SUMMARY.md",
+      "**/README.md"
+    ],
+    "fallback": "pass-through",
+    "circuit_breaker": {
+      "enabled": true,
+      "failure_threshold": 3,
+      "reset_timeout": 300,
+      "state": "closed",
+      "failure_count": 0,
+      "last_failure": null,
+      "opened_at": null
+    }
+  }
+}

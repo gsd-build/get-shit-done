@@ -7748,6 +7748,20 @@ function matchContextDocs(taskDesc, index, topN = 3) {
     .slice(0, topN);
 }
 
+function extractClaudeInstructions(claudeMdPath) {
+  const content = safeReadFile(claudeMdPath);
+  if (!content) return { keywords: [], instructions: [] };
+
+  const keywords = extractKeywords(content);
+  const instructions = content
+    .split('\n')
+    .filter(l => l.match(/^[-*]\s+/) || l.match(/^\d+\.\s+/))
+    .map(l => l.replace(/^[-*\d.]+\s+/, '').trim())
+    .filter(l => l.length > 10);
+
+  return { keywords: [...new Set(keywords)], instructions };
+}
+
 function loadContextIndex(cwd) {
   const HOME = require('os').homedir();
   const cachePath = path.join(cwd, '.planning', '.context-index-cache.json');
@@ -7813,22 +7827,15 @@ function cmdRoutingFull(cwd, taskDesc, raw) {
   } catch (e) { /* compression optional */ }
 
   // Extract CLAUDE.md keywords
-  const claudeMdPath = path.join(HOME, '.claude', 'CLAUDE.md');
+  const claudeMdPath = path.join(cwd, 'CLAUDE.md');
   let claudeMd = { has_instructions: false, relevant_keywords: [] };
-  if (fs.existsSync(claudeMdPath)) {
-    const content = fs.readFileSync(claudeMdPath, 'utf-8');
-    const listItems = content.match(/^[\s]*[-*]\s+(.+)$/mg) || [];
-    const numberedItems = content.match(/^[\s]*\d+\.\s+(.+)$/mg) || [];
-    const allItems = [...listItems, ...numberedItems].map(item =>
-      item.replace(/^[\s]*[-*\d.]+\s+/, '').trim()
-    );
+  const claudeInstructions = extractClaudeInstructions(claudeMdPath);
+  if (claudeInstructions.instructions.length > 0 || claudeInstructions.keywords.length > 0) {
     const taskKws = new Set(extractKeywords(taskDesc));
-    const relevant = allItems.filter(item =>
-      extractKeywords(item).some(kw => taskKws.has(kw))
-    );
+    const relevant = claudeInstructions.keywords.filter(k => taskKws.has(k));
     claudeMd = {
-      has_instructions: allItems.length > 0,
-      relevant_keywords: relevant.slice(0, 5)
+      has_instructions: claudeInstructions.instructions.length > 0,
+      relevant_keywords: relevant.slice(0, 10)
     };
   }
 
