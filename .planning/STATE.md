@@ -10,9 +10,9 @@ See: .planning/PROJECT.md (updated 2026-02-15)
 ## Current Position
 
 Phase: 14 of 14 (Telegram MCP and Bot Audit and Rework)
-Plan: 02 of 06
+Plan: 03 of 06
 Status: In Progress
-Last activity: 2026-02-18 — Completed plan 14-02 (IPC Server and Daemon Process with Session Service)
+Last activity: 2026-02-18 — Completed plan 14-03 (Telegram Bot Module: webhook/polling, forum threads, Status/Questions panels, voice transcription)
 
 Progress: [████████████████████████████████████░] 97%
 
@@ -90,6 +90,7 @@ Progress: [███████████████████████
 | Phase 13 P01 | 2min | 3 tasks | 3 files |
 | Phase 14 P01 | 9min | 2 tasks | 8 files |
 | Phase 14 P02 | 2min | 2 tasks | 4 files |
+| Phase 14 P03 | 6min | 3 tasks | 5 files |
 
 ## Accumulated Context
 
@@ -316,6 +317,10 @@ Recent decisions affecting current work:
 - [Phase 14-02]: IPCServer extends EventEmitter so daemon can listen for client_disconnected without coupling to bot logic
 - [Phase 14-02]: clientId -> sessionId reverse map in SessionService for O(1) disconnect lookup
 - [Phase 14-02]: Plan 04 stubs return { status: 'not_implemented' } to keep daemon startable before question service exists
+- [Phase 14-03]: initializeBot() creates Telegraf + session middleware only; setupHandlers not called until startBot() has sessionService in scope
+- [Phase 14-03]: Webhook mode uses Node built-in http module — no express dependency (not in package.json)
+- [Phase 14-03]: handlerEvents named EventEmitter exported from handlers.ts — explicit import avoids emitter/listener mismatch
+- [Phase 14-03]: Whisper cwd guard uses finally block to guarantee restore even on transcription failure
 
 ### Roadmap Evolution
 
@@ -323,6 +328,7 @@ Recent decisions affecting current work:
 - Phase 14 added: Telegram MCP and bot audit and rework — pending questions not found by bot, buttons not working, full end-to-end review needed
 - Phase 14 Plan 01 complete: AUDIT.md written, standalone bot deleted, shared foundation modules created
 - Phase 14 Plan 02 complete: IPC server (NDJSON Unix socket) and SessionService (in-memory registry with events) created; daemon entry point bootstraps full IPC method routing
+- Phase 14 Plan 03 complete: Daemon bot module created — webhook/polling auto-detect, forum thread support, Status/Questions panels, voice transcription with cwd fix, handlerEvents EventEmitter for Plan 04 wiring
 
 ### Pending Todos
 
@@ -334,6 +340,6 @@ None yet.
 
 ## Session Continuity
 
-Last session: 2026-02-18T13:56:46Z (plan execution)
-Stopped at: Completed 14-02-PLAN.md (IPC Server and Daemon) - Phase 14 Plan 02 - daemon/ipc-server.ts, daemon/session-service.ts, daemon/index.ts created
+Last session: 2026-02-18T14:05:51Z (plan execution)
+Stopped at: Completed 14-03-PLAN.md (Bot Module) - Phase 14 Plan 03 - daemon/bot/index.ts, handlers.ts, menu.ts, whisper.ts created
 Resume file: None
