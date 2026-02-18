@@ -12,7 +12,7 @@ See: .planning/PROJECT.md (updated 2026-02-15)
 Phase: 12 of 12 (Historical Conversation Mining)
 Plan: 03 of 03
 Status: Complete
-Last activity: 2026-02-17 — Completed plan 12-03 (Mine Conversations Workflow)
+Last activity: 2026-02-18 — Completed plan 01-07 (Multi-Signal Complexity Scoring)
 
 Progress: [█████████████████████████████████████] 100%
 
@@ -84,6 +84,7 @@ Progress: [███████████████████████
 | Phase 12 P02 | 2 | 1 tasks | 1 files |
 | Phase 12 P03 | 3 | 2 tasks | 2 files |
 | Phase 06 P02 | 4min | 3 tasks | 3 files |
+| Phase 01 P07 | 5min | 1 task | 2 files |
 
 ## Accumulated Context
 
@@ -286,6 +287,11 @@ Recent decisions affecting current work:
 - [Phase 06]: User confirmation gate required before autonomous roadmap execution
 - [Phase 06]: Sequential phase execution by default, parallel execution requires explicit user opt-in
 - [Phase 06]: JSONL format for EXECUTION_LOG.md enables streaming append and resume state tracking
+- [Phase 01-07]: Multi-signal routing: keyword (0-50) + length (0-25) + structural (0-25) = 0-100 complexity score
+- [Phase 01-07]: Tier boundaries: score <=30 → haiku, 31-70 → sonnet, 71+ → opus
+- [Phase 01-07]: No-match default: 25 pts keyword signal (unknown tasks land in sonnet territory)
+- [Phase 01-07]: Length buckets refined: <=5 words=3pts, 6-20=8pts, 21-50=15pts for haiku/sonnet differentiation
+- [Phase 01-07]: loadRoutingRules filter bug fixed: removed overly-aggressive 'architecture'/'testing' pattern filter that stripped real patterns
 
 ### Roadmap Evolution
 
@@ -301,6 +307,6 @@ None yet.
 
 ## Session Continuity
 
-Last session: 2026-02-17T22:14:45Z (plan execution)
-Stopped at: Completed 12-03-PLAN.md (Mine Conversations Workflow) - Phase 12 Plan 03 of 03 - PHASE COMPLETE
+Last session: 2026-02-18T08:23:21Z (plan execution)
+Stopped at: Completed 01-07-PLAN.md (Multi-Signal Complexity Scoring) - Phase 01 Plan 07 - gap closure
 Resume file: None
