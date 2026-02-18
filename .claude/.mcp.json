@@ -2,12 +2,11 @@
   "mcpServers": {
     "telegram": {
       "command": "node",
-      "args": [
-        "mcp-servers/telegram-mcp/dist/index.js"
-      ],
+      "args": ["/Users/ollorin/get-shit-done/mcp-servers/telegram-mcp/dist/adapter/index.js"],
       "env": {
         "TELEGRAM_BOT_TOKEN": "${TELEGRAM_BOT_TOKEN}",
-        "TELEGRAM_OWNER_ID": "${TELEGRAM_OWNER_ID}"
+        "TELEGRAM_OWNER_ID": "${TELEGRAM_OWNER_ID}",
+        "TELEGRAM_GROUP_CHAT_ID": "${TELEGRAM_GROUP_CHAT_ID}"
       }
     }
   }

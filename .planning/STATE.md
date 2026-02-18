@@ -10,9 +10,9 @@ See: .planning/PROJECT.md (updated 2026-02-15)
 ## Current Position
 
 Phase: 14 of 14 (Telegram MCP and Bot Audit and Rework)
-Plan: 04 of 06
+Plan: 05 of 06
 Status: In Progress
-Last activity: 2026-02-18 — Completed plan 14-04 (Question Service: forum thread lifecycle, EventEmitter blocking delivery, all IPC stubs replaced)
+Last activity: 2026-02-18 — Completed plan 14-05 (MCP Adapter: thin stdio adapter, IPC client, daemon launcher, 6-tool proxy)
 
 Progress: [████████████████████████████████████░] 97%
 
@@ -92,6 +92,7 @@ Progress: [███████████████████████
 | Phase 14 P02 | 2min | 2 tasks | 4 files |
 | Phase 14 P03 | 6min | 3 tasks | 5 files |
 | Phase 14 P04 | 2min | 2 tasks | 2 files |
+| Phase 14 P05 | 2min | 2 tasks | 4 files |
 
 ## Accumulated Context
 
@@ -326,6 +327,10 @@ Recent decisions affecting current work:
 - [Phase 14-04]: Thread reuse uses 5-minute window on most recently answered question per session for follow-up conversations
 - [Phase 14-04]: sendToThread failure is non-fatal for ask() — question still blocks for answer, logged as error
 - [Phase 14-04]: mark_question_answered delivers via deliverAnswer(threadId) when thread exists, emits answer:questionId directly for threadless questions
+- [Phase 14-05]: IPCClient.methodTimeout() static helper: ask_blocking_question uses timeoutMinutes*60+60s, check_question_answers uses wait_seconds+10s, default 30s
+- [Phase 14-05]: isDaemonRunning() uses connect+disconnect (not socket stat) to confirm daemon is actually accepting connections
+- [Phase 14-05]: Reconnect-once pattern on unexpected daemon disconnect — re-registers session; second disconnect triggers process.exit(1)
+- [Phase 14-05]: ask_blocking_question adapter unpacks { answer } response to plain string for MCP text content
 
 ### Roadmap Evolution
 
@@ -335,6 +340,7 @@ Recent decisions affecting current work:
 - Phase 14 Plan 02 complete: IPC server (NDJSON Unix socket) and SessionService (in-memory registry with events) created; daemon entry point bootstraps full IPC method routing
 - Phase 14 Plan 03 complete: Daemon bot module created — webhook/polling auto-detect, forum thread support, Status/Questions panels, voice transcription with cwd fix, handlerEvents EventEmitter for Plan 04 wiring
 - Phase 14 Plan 04 complete: QuestionService created with forum thread lifecycle and EventEmitter blocking delivery; all 5 IPC stubs replaced with full implementations; bot thread:text_reply/voice_reply events wired to question answer delivery
+- Phase 14 Plan 05 complete: Thin MCP stdio adapter created — IPCClient (NDJSON Unix socket, UUID correlation, per-method timeouts), daemon-launcher (ensureDaemon with detached spawn + socket poll), adapter/index.ts (6 tools proxied via IPC, session register/unregister, reconnect-once); package.json start script updated
 
 ### Pending Todos
 
@@ -346,6 +352,6 @@ None yet.
 
 ## Session Continuity
 
-Last session: 2026-02-18T14:11:00Z (plan execution)
-Stopped at: Completed 14-04-PLAN.md (Question Service) - Phase 14 Plan 04 - question-service.ts created, daemon/index.ts fully wired
+Last session: 2026-02-18T14:15:52Z (plan execution)
+Stopped at: Completed 14-05-PLAN.md (MCP Adapter) - Phase 14 Plan 05 - adapter/ipc-client.ts, adapter/daemon-launcher.ts, adapter/index.ts created; package.json start script updated
 Resume file: None
