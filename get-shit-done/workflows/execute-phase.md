@@ -18,7 +18,7 @@ Load all context in one call:
 ```bash
 # Use temp file to avoid bash command substitution buffer limits
 INIT_FILE="/tmp/gsd-init-$$.json"
-node ~/.claude/get-shit-done/bin/gsd-tools.js init execute-phase "${PHASE_ARG}" > "$INIT_FILE"
+node /Users/ollorin/.claude/get-shit-done/bin/gsd-tools.js init execute-phase "${PHASE_ARG}" > "$INIT_FILE"
 ```
 
 Parse JSON for: `executor_model`, `verifier_model`, `commit_docs`, `parallelization`, `branching_strategy`, `branch_name`, `phase_found`, `phase_dir`, `phase_number`, `phase_name`, `phase_slug`, `plans`, `incomplete_plans`, `plan_count`, `incomplete_count`, `state_exists`, `roadmap_exists`.
@@ -71,7 +71,7 @@ Report: "Found {plan_count} plans in {phase_dir} ({incomplete_count} incomplete)
 Load plan inventory with wave grouping in one call:
 
 ```bash
-PLAN_INDEX=$(node ~/.claude/get-shit-done/bin/gsd-tools.js phase-plan-index "${PHASE_NUMBER}")
+PLAN_INDEX=$(node /Users/ollorin/.claude/get-shit-done/bin/gsd-tools.js phase-plan-index "${PHASE_NUMBER}")
 ```
 
 Parse JSON for: `phase`, `plans[]` (each with `id`, `wave`, `autonomous`, `objective`, `files_modified`, `task_count`, `has_summary`), `waves` (map of wave number → plan IDs), `incomplete`, `has_checkpoints`.
@@ -130,10 +130,10 @@ Execute each wave in sequence. Within a wave: parallel if `PARALLELIZATION=true`
        </objective>
 
        <execution_context>
-       @~/.claude/get-shit-done/workflows/execute-plan.md
-       @~/.claude/get-shit-done/templates/summary.md
-       @~/.claude/get-shit-done/references/checkpoints.md
-       @~/.claude/get-shit-done/references/tdd.md
+       @/Users/ollorin/.claude/get-shit-done/workflows/execute-plan.md
+       @/Users/ollorin/.claude/get-shit-done/templates/summary.md
+       @/Users/ollorin/.claude/get-shit-done/references/checkpoints.md
+       @/Users/ollorin/.claude/get-shit-done/references/tdd.md
        </execution_context>
 
        <files_to_read>
@@ -310,7 +310,7 @@ Gap closure cycle: `/gsd:plan-phase {X} --gaps` reads VERIFICATION.md → create
 Mark phase complete in ROADMAP.md (date, status).
 
 ```bash
-node ~/.claude/get-shit-done/bin/gsd-tools.js commit "docs(phase-{X}): complete phase execution" --files .planning/ROADMAP.md .planning/STATE.md .planning/phases/{phase_dir}/*-VERIFICATION.md .planning/REQUIREMENTS.md
+node /Users/ollorin/.claude/get-shit-done/bin/gsd-tools.js commit "docs(phase-{X}): complete phase execution" --files .planning/ROADMAP.md .planning/STATE.md .planning/phases/{phase_dir}/*-VERIFICATION.md .planning/REQUIREMENTS.md
 ```
 </step>
 

@@ -8,6 +8,7 @@ import { Telegraf, Markup } from 'telegraf';
 import type { Context } from 'telegraf';
 interface SessionData {
     awaitingQuestionResponse: string | null;
+    awaitingSessionId: string | null;
 }
 interface BotContext extends Context {
     session: SessionData;
@@ -22,10 +23,13 @@ export declare const MAIN_MENU: Markup.Markup<import("@telegraf/types").InlineKe
 export declare function sendMessage(text: string, extra?: any): Promise<void>;
 /**
  * Send blocking question to owner
+ * NOTE: This function is deprecated in favor of MCP tools (ask-question).
+ * Kept for backward compatibility but should not be used in new code.
  */
 export declare function sendBlockingQuestion(question: string, options?: {
     context?: string;
     timeout?: number;
+    sessionId?: string;
 }): Promise<string>;
 /**
  * Start bot in polling mode

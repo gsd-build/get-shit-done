@@ -15,7 +15,7 @@ No Pass/Fail buttons. No severity questions. Just: "Here's what should happen. D
 </philosophy>
 
 <template>
-@~/.claude/get-shit-done/templates/UAT.md
+@/Users/ollorin/.claude/get-shit-done/templates/UAT.md
 </template>
 
 <process>
@@ -26,7 +26,7 @@ If $ARGUMENTS contains a phase number, load context:
 ```bash
 # Use temp file to avoid bash command substitution buffer limits
 INIT_FILE="/tmp/gsd-init-$$.json"
-node ~/.claude/get-shit-done/bin/gsd-tools.js init verify-work "${PHASE_ARG}" > "$INIT_FILE"
+node /Users/ollorin/.claude/get-shit-done/bin/gsd-tools.js init verify-work "${PHASE_ARG}" > "$INIT_FILE"
 ```
 
 Parse JSON for: `planner_model`, `checker_model`, `commit_docs`, `phase_found`, `phase_dir`, `phase_number`, `phase_name`, `has_verification`.
@@ -300,7 +300,7 @@ Clear Current Test section:
 
 Commit the UAT file:
 ```bash
-node ~/.claude/get-shit-done/bin/gsd-tools.js commit "test({phase}): complete UAT - {passed} passed, {issues} issues" --files ".planning/phases/XX-name/{phase}-UAT.md"
+node /Users/ollorin/.claude/get-shit-done/bin/gsd-tools.js commit "test({phase}): complete UAT - {passed} passed, {issues} issues" --files ".planning/phases/XX-name/{phase}-UAT.md"
 ```
 
 Present summary:
@@ -342,7 +342,7 @@ Spawning parallel debug agents to investigate each issue.
 ```
 
 - Load diagnose-issues workflow
-- Follow @~/.claude/get-shit-done/workflows/diagnose-issues.md
+- Follow @/Users/ollorin/.claude/get-shit-done/workflows/diagnose-issues.md
 - Spawn parallel debug agents for each issue
 - Collect root causes
 - Update UAT.md with root causes

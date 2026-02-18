@@ -1,4 +1,5 @@
 import { appendQuestion } from '../storage/question-queue.js';
+import { getCurrentSessionId } from '../storage/session-state.js';
 import { sendMessage } from '../bot/telegram-bot.js';
 /**
  * MCP tool definition for ask_blocking_question
@@ -30,9 +31,11 @@ export const ASK_QUESTION_TOOL_DEF = {
  * Format question for Telegram message
  */
 function formatQuestionMessage(question) {
-    let msg = `❓ **[Session ${question.session_id}] Question from Claude:**\n\n${question.question}\n\n`;
+    // Use first 8 characters of session ID for compact display
+    const sessionLabel = question.session_id.slice(0, 8);
+    let msg = `❓ **[Session ${sessionLabel}] Question from Claude:**\n\n${question.question}\n\n`;
     msg += `ID: \`${question.id}\`\n`;
-    msg += `Session: ${question.session_id}\n`;
+    msg += `Session: ${sessionLabel}\n`;
     if (question.context) {
         msg += `Context: ${question.context}\n`;
     }
@@ -67,8 +70,10 @@ export async function askBlockingQuestionHandler(args) {
             throw new Error('Invalid input: timeout_minutes must be a positive number');
         }
     }
+    // Get current session ID
+    const sessionId = getCurrentSessionId();
     // Create question in storage
-    const question = await appendQuestion({
+    const question = await appendQuestion(sessionId, {
         question: input.question.trim(),
         context: input.context?.trim()
     });

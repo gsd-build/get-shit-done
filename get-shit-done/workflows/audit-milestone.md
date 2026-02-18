@@ -12,21 +12,21 @@ Read all files referenced by the invoking prompt's execution_context before star
 
 ```bash
 INIT_FILE="/tmp/gsd-init-$$.json"
-node ~/.claude/get-shit-done/bin/gsd-tools.js init milestone-op > "$INIT_FILE"
+node /Users/ollorin/.claude/get-shit-done/bin/gsd-tools.js init milestone-op > "$INIT_FILE"
 ```
 
 Extract from init JSON: `milestone_version`, `milestone_name`, `phase_count`, `completed_phases`, `commit_docs`.
 
 Resolve integration checker model:
 ```bash
-CHECKER_MODEL=$(node ~/.claude/get-shit-done/bin/gsd-tools.js resolve-model gsd-integration-checker --raw)
+CHECKER_MODEL=$(node /Users/ollorin/.claude/get-shit-done/bin/gsd-tools.js resolve-model gsd-integration-checker --raw)
 ```
 
 ## 1. Determine Milestone Scope
 
 ```bash
 # Get phases in milestone (sorted numerically, handles decimals)
-node ~/.claude/get-shit-done/bin/gsd-tools.js phases list
+node /Users/ollorin/.claude/get-shit-done/bin/gsd-tools.js phases list
 ```
 
 - Parse version from arguments or detect current from ROADMAP.md

@@ -31,9 +31,10 @@ export declare const MARK_ANSWERED_TOOL_DEF: {
 /**
  * Handler for mark_question_answered tool
  *
- * Archives an answered question to the daily log file.
+ * Confirms Claude has received an answered question.
  * Note: The question must already have status="answered" and answer populated
  * (typically set by the Telegram bot when user responds).
+ * The answer stays in the session file (no separate archiving).
  *
  * @param args Input arguments conforming to MarkAnsweredInput
  * @returns Output conforming to MarkAnsweredOutput

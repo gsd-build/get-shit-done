@@ -13,7 +13,7 @@ Load todo context:
 
 ```bash
 INIT_FILE="/tmp/gsd-init-$$.json"
-node ~/.claude/get-shit-done/bin/gsd-tools.js init todos > "$INIT_FILE"
+node /Users/ollorin/.claude/get-shit-done/bin/gsd-tools.js init todos > "$INIT_FILE"
 ```
 
 Extract from init JSON: `commit_docs`, `date`, `timestamp`, `todo_count`, `todos`, `pending_dir`, `todos_dir_exists`.
@@ -84,7 +84,7 @@ Use values from init context: `timestamp` and `date` are already available.
 
 Generate slug for the title:
 ```bash
-slug=$(node ~/.claude/get-shit-done/bin/gsd-tools.js generate-slug "$title" --raw)
+slug=$(node /Users/ollorin/.claude/get-shit-done/bin/gsd-tools.js generate-slug "$title" --raw)
 ```
 
 Write to `.planning/todos/pending/${date}-${slug}.md`:
@@ -119,7 +119,7 @@ If `.planning/STATE.md` exists:
 Commit the todo and any updated state:
 
 ```bash
-node ~/.claude/get-shit-done/bin/gsd-tools.js commit "docs: capture todo - [title]" --files .planning/todos/pending/[filename] .planning/STATE.md
+node /Users/ollorin/.claude/get-shit-done/bin/gsd-tools.js commit "docs: capture todo - [title]" --files .planning/todos/pending/[filename] .planning/STATE.md
 ```
 
 Tool respects `commit_docs` config and gitignore automatically.

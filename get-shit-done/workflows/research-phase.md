@@ -8,17 +8,17 @@ Standalone research command. For most workflows, use `/gsd:plan-phase` which int
 
 ## Step 0: Resolve Model Profile
 
-@~/.claude/get-shit-done/references/model-profile-resolution.md
+@/Users/ollorin/.claude/get-shit-done/references/model-profile-resolution.md
 
 Resolve model for:
 - `gsd-phase-researcher`
 
 ## Step 1: Normalize and Validate Phase
 
-@~/.claude/get-shit-done/references/phase-argument-parsing.md
+@/Users/ollorin/.claude/get-shit-done/references/phase-argument-parsing.md
 
 ```bash
-PHASE_INFO=$(node ~/.claude/get-shit-done/bin/gsd-tools.js roadmap get-phase "${PHASE}")
+PHASE_INFO=$(node /Users/ollorin/.claude/get-shit-done/bin/gsd-tools.js roadmap get-phase "${PHASE}")
 ```
 
 If `found` is false: Error and exit.
@@ -39,7 +39,7 @@ echo "$PHASE_INFO" | jq -r '.section'
 cat .planning/REQUIREMENTS.md 2>/dev/null
 cat .planning/phases/${PHASE}-*/*-CONTEXT.md 2>/dev/null
 # Decisions from state-snapshot (structured JSON)
-node ~/.claude/get-shit-done/bin/gsd-tools.js state-snapshot | jq '.decisions'
+node /Users/ollorin/.claude/get-shit-done/bin/gsd-tools.js state-snapshot | jq '.decisions'
 ```
 
 ## Step 4: Spawn Researcher

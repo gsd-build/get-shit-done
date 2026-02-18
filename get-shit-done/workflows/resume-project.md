@@ -11,7 +11,7 @@ Instantly restore full project context so "Where were we?" has an immediate, com
 </purpose>
 
 <required_reading>
-@~/.claude/get-shit-done/references/continuation-format.md
+@/Users/ollorin/.claude/get-shit-done/references/continuation-format.md
 </required_reading>
 
 <process>
@@ -21,7 +21,7 @@ Load all context in one call:
 
 ```bash
 INIT_FILE="/tmp/gsd-init-$$.json"
-node ~/.claude/get-shit-done/bin/gsd-tools.js init resume > "$INIT_FILE"
+node /Users/ollorin/.claude/get-shit-done/bin/gsd-tools.js init resume > "$INIT_FILE"
 ```
 
 Parse JSON for: `state_exists`, `roadmap_exists`, `project_exists`, `planning_exists`, `has_interrupted_agent`, `interrupted_agent_id`, `commit_docs`.

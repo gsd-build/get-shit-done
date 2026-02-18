@@ -6,7 +6,7 @@ Calculate the next decimal phase number for urgent insertions.
 
 ```bash
 # Get next decimal phase after phase 6
-node ~/.claude/get-shit-done/bin/gsd-tools.js phase next-decimal 6
+node /Users/ollorin/.claude/get-shit-done/bin/gsd-tools.js phase next-decimal 6
 ```
 
 Output:
@@ -32,14 +32,14 @@ With existing decimals:
 ## Extract Values
 
 ```bash
-DECIMAL_INFO=$(node ~/.claude/get-shit-done/bin/gsd-tools.js phase next-decimal "${AFTER_PHASE}")
+DECIMAL_INFO=$(node /Users/ollorin/.claude/get-shit-done/bin/gsd-tools.js phase next-decimal "${AFTER_PHASE}")
 DECIMAL_PHASE=$(echo "$DECIMAL_INFO" | jq -r '.next')
 BASE_PHASE=$(echo "$DECIMAL_INFO" | jq -r '.base_phase')
 ```
 
 Or with --raw flag:
 ```bash
-DECIMAL_PHASE=$(node ~/.claude/get-shit-done/bin/gsd-tools.js phase next-decimal "${AFTER_PHASE}" --raw)
+DECIMAL_PHASE=$(node /Users/ollorin/.claude/get-shit-done/bin/gsd-tools.js phase next-decimal "${AFTER_PHASE}" --raw)
 # Returns just: 06.1
 ```
 
@@ -57,7 +57,7 @@ DECIMAL_PHASE=$(node ~/.claude/get-shit-done/bin/gsd-tools.js phase next-decimal
 Decimal phase directories use the full decimal number:
 
 ```bash
-SLUG=$(node ~/.claude/get-shit-done/bin/gsd-tools.js generate-slug "$DESCRIPTION" --raw)
+SLUG=$(node /Users/ollorin/.claude/get-shit-done/bin/gsd-tools.js generate-slug "$DESCRIPTION" --raw)
 PHASE_DIR=".planning/phases/${DECIMAL_PHASE}-${SLUG}"
 mkdir -p "$PHASE_DIR"
 ```

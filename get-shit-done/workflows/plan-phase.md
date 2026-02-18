@@ -5,7 +5,7 @@ Create executable phase prompts (PLAN.md files) for a roadmap phase with integra
 <required_reading>
 Read all files referenced by the invoking prompt's execution_context before starting.
 
-@~/.claude/get-shit-done/references/ui-brand.md
+@/Users/ollorin/.claude/get-shit-done/references/ui-brand.md
 </required_reading>
 
 <process>
@@ -17,7 +17,7 @@ Load all context in one call (include file contents to avoid redundant reads):
 ```bash
 # Use temp file to avoid bash command substitution buffer limits (2-3MB)
 INIT_FILE="/tmp/gsd-init-$$.json"
-node ~/.claude/get-shit-done/bin/gsd-tools.js init plan-phase "$PHASE" --include state,roadmap,requirements,context,research,verification,uat > "$INIT_FILE"
+node /Users/ollorin/.claude/get-shit-done/bin/gsd-tools.js init plan-phase "$PHASE" --include state,roadmap,requirements,context,research,verification,uat > "$INIT_FILE"
 ```
 
 Parse JSON for: `researcher_model`, `planner_model`, `checker_model`, `research_enabled`, `plan_checker_enabled`, `commit_docs`, `phase_found`, `phase_dir`, `phase_number`, `phase_name`, `phase_slug`, `padded_phase`, `has_research`, `has_context`, `has_plans`, `plan_count`, `planning_exists`, `roadmap_exists`.
@@ -48,7 +48,7 @@ mkdir -p ".planning/phases/${padded_phase}-${phase_slug}"
 ## 3. Validate Phase
 
 ```bash
-PHASE_INFO=$(node ~/.claude/get-shit-done/bin/gsd-tools.js roadmap get-phase "${PHASE}")
+PHASE_INFO=$(node /Users/ollorin/.claude/get-shit-done/bin/gsd-tools.js roadmap get-phase "${PHASE}")
 ```
 
 **If `found` is false:** Error with available phases. **If `found` is true:** Extract `phase_number`, `phase_name`, `goal` from JSON.
@@ -87,10 +87,10 @@ Display banner:
 ### Spawn gsd-phase-researcher
 
 ```bash
-PHASE_DESC=$(node ~/.claude/get-shit-done/bin/gsd-tools.js roadmap get-phase "${PHASE}" | jq -r '.section')
+PHASE_DESC=$(node /Users/ollorin/.claude/get-shit-done/bin/gsd-tools.js roadmap get-phase "${PHASE}" | jq -r '.section')
 # Use requirements_content from INIT_FILE (already loaded via --include requirements)
 REQUIREMENTS=$(jq -r '.requirements_content // empty' < "$INIT_FILE" | grep -A100 "## Requirements" | head -50)
-STATE_SNAP=$(node ~/.claude/get-shit-done/bin/gsd-tools.js state-snapshot)
+STATE_SNAP=$(node /Users/ollorin/.claude/get-shit-done/bin/gsd-tools.js state-snapshot)
 # Extract decisions from state-snapshot JSON: jq '.decisions[] | "\(.phase): \(.summary) - \(.rationale)"'
 ```
 
@@ -124,7 +124,7 @@ Write to: {phase_dir}/{phase}-RESEARCH.md
 
 ```
 Task(
-  prompt="First, read ~/.claude/agents/gsd-phase-researcher.md for your role and instructions.\n\n" + research_prompt,
+  prompt="First, read /Users/ollorin/.claude/agents/gsd-phase-researcher.md for your role and instructions.\n\n" + research_prompt,
   subagent_type="general-purpose",
   model="{researcher_model}",
   description="Research Phase {phase}"
@@ -213,7 +213,7 @@ Output consumed by /gsd:execute-phase. Plans need:
 
 ```
 Task(
-  prompt="First, read ~/.claude/agents/gsd-planner.md for your role and instructions.\n\n" + filled_prompt,
+  prompt="First, read /Users/ollorin/.claude/agents/gsd-planner.md for your role and instructions.\n\n" + filled_prompt,
   subagent_type="general-purpose",
   model="{planner_model}",
   description="Plan Phase {phase}"
@@ -316,7 +316,7 @@ Return what changed.
 
 ```
 Task(
-  prompt="First, read ~/.claude/agents/gsd-planner.md for your role and instructions.\n\n" + revision_prompt,
+  prompt="First, read /Users/ollorin/.claude/agents/gsd-planner.md for your role and instructions.\n\n" + revision_prompt,
   subagent_type="general-purpose",
   model="{planner_model}",
   description="Revise Phase {phase} plans"

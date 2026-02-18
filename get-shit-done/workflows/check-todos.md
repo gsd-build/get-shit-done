@@ -13,7 +13,7 @@ Load todo context:
 
 ```bash
 INIT_FILE="/tmp/gsd-init-$$.json"
-node ~/.claude/get-shit-done/bin/gsd-tools.js init todos > "$INIT_FILE"
+node /Users/ollorin/.claude/get-shit-done/bin/gsd-tools.js init todos > "$INIT_FILE"
 ```
 
 Extract from init JSON: `todo_count`, `todos`, `pending_dir`.
@@ -155,7 +155,7 @@ If todo was moved to done/, commit the change:
 
 ```bash
 git rm --cached .planning/todos/pending/[filename] 2>/dev/null || true
-node ~/.claude/get-shit-done/bin/gsd-tools.js commit "docs: start work on todo - [title]" --files .planning/todos/done/[filename] .planning/STATE.md
+node /Users/ollorin/.claude/get-shit-done/bin/gsd-tools.js commit "docs: start work on todo - [title]" --files .planning/todos/done/[filename] .planning/STATE.md
 ```
 
 Tool respects `commit_docs` config and gitignore automatically.

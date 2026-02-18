@@ -123,7 +123,7 @@ If found, delete them — phase is complete, handoffs are stale.
 **Delegate ROADMAP.md and STATE.md updates to gsd-tools:**
 
 ```bash
-TRANSITION=$(node ~/.claude/get-shit-done/bin/gsd-tools.js phase complete "${current_phase}")
+TRANSITION=$(node /Users/ollorin/.claude/get-shit-done/bin/gsd-tools.js phase complete "${current_phase}")
 ```
 
 The CLI handles:
@@ -238,7 +238,7 @@ After (Phase 2 shipped JWT auth, discovered rate limiting needed):
 Verify the updates are correct by reading STATE.md. If the progress bar needs updating, use:
 
 ```bash
-PROGRESS=$(node ~/.claude/get-shit-done/bin/gsd-tools.js progress bar --raw)
+PROGRESS=$(node /Users/ollorin/.claude/get-shit-done/bin/gsd-tools.js progress bar --raw)
 ```
 
 Update the progress bar line in STATE.md with the result.
@@ -347,7 +347,7 @@ The `next_phase` and `next_phase_name` fields give you the next phase details.
 
 If you need additional context, use:
 ```bash
-ROADMAP=$(node ~/.claude/get-shit-done/bin/gsd-tools.js roadmap analyze)
+ROADMAP=$(node /Users/ollorin/.claude/get-shit-done/bin/gsd-tools.js roadmap analyze)
 ```
 
 This returns all phases with goals, disk status, and completion info.

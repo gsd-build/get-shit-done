@@ -1,4 +1,5 @@
-import { loadPendingQuestions } from '../storage/question-queue.js';
+import { loadSessionJSONL, getSessionPath } from '../storage/session-manager.js';
+import { getCurrentSessionId } from '../storage/session-state.js';
 /**
  * MCP tool definition for check_question_answers
  */
@@ -31,22 +32,27 @@ function sleep(ms) {
 /**
  * Poll for answered questions with timeout
  *
+ * @param sessionId Current session ID
  * @param questionIds Filter by specific IDs (empty = all)
  * @param timeoutMs Maximum time to poll in milliseconds
  * @returns Array of answered questions (only from this session)
  */
-async function pollForAnswers(questionIds, timeoutMs) {
+async function pollForAnswers(sessionId, questionIds, timeoutMs) {
     const startTime = Date.now();
     const pollInterval = 5000; // 5 seconds
-    const mySessionId = process.pid;
     while (Date.now() - startTime < timeoutMs) {
-        const questions = await loadPendingQuestions();
-        // Find answered questions FROM THIS SESSION ONLY
-        const answered = questions.filter(q => {
-            const matchesSession = q.session_id === mySessionId;
-            const matchesFilter = questionIds.length === 0 || questionIds.includes(q.id);
-            return q.status === 'answered' && matchesSession && matchesFilter;
-        });
+        // Load all entries from this session's JSONL file
+        const sessionPath = getSessionPath(sessionId);
+        const entries = await loadSessionJSONL(sessionPath);
+        // Filter to answered questions
+        const answered = entries
+            .filter((entry) => {
+            const isQuestion = entry.type === 'question';
+            const isAnswered = entry.status === 'answered';
+            const matchesFilter = questionIds.length === 0 || questionIds.includes(entry.id);
+            return isQuestion && isAnswered && matchesFilter;
+        })
+            .map((entry) => entry);
         // If we found answers, return immediately
         if (answered.length > 0) {
             return answered;
@@ -57,13 +63,16 @@ async function pollForAnswers(questionIds, timeoutMs) {
         // If less than poll interval remaining, do one final check after waiting
         if (remaining > 0 && remaining < pollInterval) {
             await sleep(remaining);
-            // Final check (only this session's questions)
-            const finalQuestions = await loadPendingQuestions();
-            return finalQuestions.filter(q => {
-                const matchesSession = q.session_id === mySessionId;
-                const matchesFilter = questionIds.length === 0 || questionIds.includes(q.id);
-                return q.status === 'answered' && matchesSession && matchesFilter;
-            });
+            // Final check
+            const finalEntries = await loadSessionJSONL(sessionPath);
+            return finalEntries
+                .filter((entry) => {
+                const isQuestion = entry.type === 'question';
+                const isAnswered = entry.status === 'answered';
+                const matchesFilter = questionIds.length === 0 || questionIds.includes(entry.id);
+                return isQuestion && isAnswered && matchesFilter;
+            })
+                .map((entry) => entry);
         }
         // Wait before next poll
         if (remaining >= pollInterval) {
@@ -99,25 +108,31 @@ export async function checkQuestionAnswersHandler(args) {
         waitSeconds = 60;
     }
     waitSeconds = Math.min(waitSeconds, 300);
-    // Load pending questions
+    // Get current session ID
+    const sessionId = getCurrentSessionId();
+    // Load pending questions from this session
     let answeredQuestions;
-    const mySessionId = process.pid;
     if (waitSeconds > 0) {
         // Long polling mode
-        answeredQuestions = await pollForAnswers(questionIds, waitSeconds * 1000);
+        answeredQuestions = await pollForAnswers(sessionId, questionIds, waitSeconds * 1000);
     }
     else {
         // Immediate check (no polling, only this session's questions)
-        const questions = await loadPendingQuestions();
-        answeredQuestions = questions.filter(q => {
-            const matchesSession = q.session_id === mySessionId;
-            const matchesFilter = questionIds.length === 0 || questionIds.includes(q.id);
-            return q.status === 'answered' && matchesSession && matchesFilter;
-        });
+        const sessionPath = getSessionPath(sessionId);
+        const entries = await loadSessionJSONL(sessionPath);
+        answeredQuestions = entries
+            .filter((entry) => {
+            const isQuestion = entry.type === 'question';
+            const isAnswered = entry.status === 'answered';
+            const matchesFilter = questionIds.length === 0 || questionIds.includes(entry.id);
+            return isQuestion && isAnswered && matchesFilter;
+        })
+            .map((entry) => entry);
     }
-    // Get count of remaining pending questions
-    const allQuestions = await loadPendingQuestions();
-    const pendingCount = allQuestions.filter(q => q.status === 'pending').length;
+    // Get count of remaining pending questions in this session
+    const sessionPath = getSessionPath(sessionId);
+    const allEntries = await loadSessionJSONL(sessionPath);
+    const pendingCount = allEntries.filter((entry) => entry.type === 'question' && entry.status === 'pending').length;
     // Format answers
     const answers = answeredQuestions
         .filter(q => q.answer && q.answered_at) // Safety check

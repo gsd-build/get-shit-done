@@ -1,7 +1,7 @@
 <purpose>
 Mine Claude Code project conversations to extract decisions, reasoning patterns, and meta-knowledge.
 
-This workflow discovers conversation JSONL files at ~/.claude/projects/{slug}/, converts them to
+This workflow discovers conversation JSONL files at /Users/ollorin/.claude/projects/{slug}/, converts them to
 session-like entries, spawns Haiku subagents for knowledge extraction, and stores results in the
 project's knowledge database.
 

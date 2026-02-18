@@ -27,7 +27,7 @@ Load codebase mapping context:
 
 ```bash
 INIT_FILE="/tmp/gsd-init-$$.json"
-node ~/.claude/get-shit-done/bin/gsd-tools.js init map-codebase > "$INIT_FILE"
+node /Users/ollorin/.claude/get-shit-done/bin/gsd-tools.js init map-codebase > "$INIT_FILE"
 ```
 
 Extract from init JSON: `mapper_model`, `commit_docs`, `codebase_dir`, `existing_maps`, `has_maps`, `codebase_dir_exists`.
@@ -263,7 +263,7 @@ Continue to commit_codebase_map.
 Commit the codebase map:
 
 ```bash
-node ~/.claude/get-shit-done/bin/gsd-tools.js commit "docs: map existing codebase" --files .planning/codebase/*.md
+node /Users/ollorin/.claude/get-shit-done/bin/gsd-tools.js commit "docs: map existing codebase" --files .planning/codebase/*.md
 ```
 
 Continue to offer_next.

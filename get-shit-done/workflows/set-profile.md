@@ -23,9 +23,9 @@ if $ARGUMENTS.profile not in ["quality", "balanced", "budget", "auto"]:
 Ensure config exists and load current state:
 
 ```bash
-node ~/.claude/get-shit-done/bin/gsd-tools.js config-ensure-section
+node /Users/ollorin/.claude/get-shit-done/bin/gsd-tools.js config-ensure-section
 INIT_FILE="/tmp/gsd-init-$$.json"
-node ~/.claude/get-shit-done/bin/gsd-tools.js state load > "$INIT_FILE"
+node /Users/ollorin/.claude/get-shit-done/bin/gsd-tools.js state load > "$INIT_FILE"
 ```
 
 This creates `.planning/config.json` with defaults if missing and loads current config.
@@ -81,7 +81,7 @@ For auto profile, instead of model table, show:
 Auto mode routes each task to the most appropriate model based on:
 - Task description keyword matching against routing rules
 - Project-specific overrides in `.planning/routing/project-rules.md`
-- Global rules in `~/.claude/routing-rules.md`
+- Global rules in `/Users/ollorin/.claude/routing-rules.md`
 
 When auto is active:
 - Tasks are analyzed before spawning via gsd-task-router
@@ -92,8 +92,8 @@ When auto is active:
 **Fallback behavior:** Sonnet when no patterns match (safety over savings)
 
 To view stats:
-- Quick status: `node ~/.claude/get-shit-done/bin/gsd-tools.js quota status-bar`
-- Full breakdown: `node ~/.claude/get-shit-done/bin/gsd-tools.js quota stats --table`
+- Quick status: `node /Users/ollorin/.claude/get-shit-done/bin/gsd-tools.js quota status-bar`
+- Full breakdown: `node /Users/ollorin/.claude/get-shit-done/bin/gsd-tools.js quota stats --table`
 ```
 </step>
 

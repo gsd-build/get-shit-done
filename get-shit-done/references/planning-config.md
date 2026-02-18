@@ -40,14 +40,14 @@ Configuration options for `.planning/` directory behavior.
 
 ```bash
 # Commit with automatic commit_docs + gitignore checks:
-node ~/.claude/get-shit-done/bin/gsd-tools.js commit "docs: update state" --files .planning/STATE.md
+node /Users/ollorin/.claude/get-shit-done/bin/gsd-tools.js commit "docs: update state" --files .planning/STATE.md
 
 # Load config via state load (returns JSON):
-INIT=$(node ~/.claude/get-shit-done/bin/gsd-tools.js state load)
+INIT=$(node /Users/ollorin/.claude/get-shit-done/bin/gsd-tools.js state load)
 # commit_docs is available in the JSON output
 
 # Or use init commands which include commit_docs:
-INIT=$(node ~/.claude/get-shit-done/bin/gsd-tools.js init execute-phase "1")
+INIT=$(node /Users/ollorin/.claude/get-shit-done/bin/gsd-tools.js init execute-phase "1")
 # commit_docs is included in all init command outputs
 ```
 
@@ -56,7 +56,7 @@ INIT=$(node ~/.claude/get-shit-done/bin/gsd-tools.js init execute-phase "1")
 **Commit via CLI (handles checks automatically):**
 
 ```bash
-node ~/.claude/get-shit-done/bin/gsd-tools.js commit "docs: update state" --files .planning/STATE.md
+node /Users/ollorin/.claude/get-shit-done/bin/gsd-tools.js commit "docs: update state" --files .planning/STATE.md
 ```
 
 The CLI checks `commit_docs` config and gitignore status internally — no manual conditionals needed.
@@ -142,13 +142,13 @@ To use uncommitted mode:
 
 Use `init execute-phase` which returns all config as JSON:
 ```bash
-INIT=$(node ~/.claude/get-shit-done/bin/gsd-tools.js init execute-phase "1")
+INIT=$(node /Users/ollorin/.claude/get-shit-done/bin/gsd-tools.js init execute-phase "1")
 # JSON output includes: branching_strategy, phase_branch_template, milestone_branch_template
 ```
 
 Or use `state load` for the config values:
 ```bash
-INIT=$(node ~/.claude/get-shit-done/bin/gsd-tools.js state load)
+INIT=$(node /Users/ollorin/.claude/get-shit-done/bin/gsd-tools.js state load)
 # Parse branching_strategy, phase_branch_template, milestone_branch_template from JSON
 ```
 

@@ -40,7 +40,7 @@ When a milestone completes:
 **Use `roadmap analyze` for comprehensive readiness check:**
 
 ```bash
-ROADMAP=$(node ~/.claude/get-shit-done/bin/gsd-tools.js roadmap analyze)
+ROADMAP=$(node /Users/ollorin/.claude/get-shit-done/bin/gsd-tools.js roadmap analyze)
 ```
 
 This returns all phases with plan/summary counts and disk status. Use this to verify:
@@ -131,7 +131,7 @@ Extract one-liners from SUMMARY.md files using summary-extract:
 ```bash
 # For each phase in milestone, extract one-liner
 for summary in .planning/phases/*-*/*-SUMMARY.md; do
-  node ~/.claude/get-shit-done/bin/gsd-tools.js summary-extract "$summary" --fields one_liner | jq -r '.one_liner'
+  node /Users/ollorin/.claude/get-shit-done/bin/gsd-tools.js summary-extract "$summary" --fields one_liner | jq -r '.one_liner'
 done
 ```
 
@@ -344,7 +344,7 @@ Update `.planning/ROADMAP.md` — group completed milestone phases:
 **Delegate archival to gsd-tools:**
 
 ```bash
-ARCHIVE=$(node ~/.claude/get-shit-done/bin/gsd-tools.js milestone complete "v[X.Y]" --name "[Milestone Name]")
+ARCHIVE=$(node /Users/ollorin/.claude/get-shit-done/bin/gsd-tools.js milestone complete "v[X.Y]" --name "[Milestone Name]")
 ```
 
 The CLI handles:
@@ -434,7 +434,7 @@ Use `init milestone-op` for context, or load config directly:
 ```bash
 # Use temp file to avoid bash command substitution buffer limits
 INIT_FILE="/tmp/gsd-init-$$.json"
-node ~/.claude/get-shit-done/bin/gsd-tools.js init execute-phase "1" > "$INIT_FILE"
+node /Users/ollorin/.claude/get-shit-done/bin/gsd-tools.js init execute-phase "1" > "$INIT_FILE"
 ```
 
 Extract `branching_strategy`, `phase_branch_template`, `milestone_branch_template` from init JSON.
@@ -570,7 +570,7 @@ git push origin v[X.Y]
 Commit milestone completion.
 
 ```bash
-node ~/.claude/get-shit-done/bin/gsd-tools.js commit "chore: complete v[X.Y] milestone" --files .planning/milestones/v[X.Y]-ROADMAP.md .planning/milestones/v[X.Y]-REQUIREMENTS.md .planning/milestones/v[X.Y]-MILESTONE-AUDIT.md .planning/MILESTONES.md .planning/PROJECT.md .planning/STATE.md
+node /Users/ollorin/.claude/get-shit-done/bin/gsd-tools.js commit "chore: complete v[X.Y] milestone" --files .planning/milestones/v[X.Y]-ROADMAP.md .planning/milestones/v[X.Y]-REQUIREMENTS.md .planning/milestones/v[X.Y]-MILESTONE-AUDIT.md .planning/MILESTONES.md .planning/PROJECT.md .planning/STATE.md
 ```
 ```
 
