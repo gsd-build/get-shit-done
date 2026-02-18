@@ -96,6 +96,8 @@ npx get-shit-done-cc --claude --local --uninstall
 
 Verify: `/gsd:help` inside Claude Code.
 
+> **Security note:** `--dangerously-skip-permissions` disables Claude Code's interactive permission prompts (file writes, shell commands, etc.). Only use this flag in isolated, automated environments (e.g., CI pipelines, sandboxed VMs) where you fully control and trust all executed code. Do not use it in production environments or when running untrusted workflows.
+
 > Run Claude Code with `claude --dangerously-skip-permissions` — GSD is designed for frictionless automation.
 
 ---

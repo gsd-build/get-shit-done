@@ -10,8 +10,9 @@
 const fs = require('fs');
 const path = require('path');
 
-// Capture project root at module load time (before any cwd changes)
-const PROJECT_ROOT = process.cwd();
+// Resolve project root relative to this module's location (__dirname is stable,
+// process.cwd() can change if the caller switches directories before requiring this module)
+const PROJECT_ROOT = path.resolve(__dirname, '../..');
 
 let currentSessionPath = null;
 let sessionStartTime = null;

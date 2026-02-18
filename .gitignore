@@ -16,6 +16,10 @@ hooks/dist/
 animation/
 *.gif
 
+# SQLite WAL/SHM files (should never be committed)
+*.db-shm
+*.db-wal
+
 # Internal planning documents
 reports/
 RAILROAD_ARCHITECTURE.md
