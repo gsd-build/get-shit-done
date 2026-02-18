@@ -10,9 +10,9 @@ See: .planning/PROJECT.md (updated 2026-02-15)
 ## Current Position
 
 Phase: 14 of 14 (Telegram MCP and Bot Audit and Rework)
-Plan: 01 of 06
+Plan: 02 of 06
 Status: In Progress
-Last activity: 2026-02-18 — Completed plan 14-01 (Telegram Audit, Standalone Bot Deletion, Shared Modules)
+Last activity: 2026-02-18 — Completed plan 14-02 (IPC Server and Daemon Process with Session Service)
 
 Progress: [████████████████████████████████████░] 97%
 
@@ -89,6 +89,7 @@ Progress: [███████████████████████
 | Phase 01 P09 | 3min | 2 tasks | 4 files |
 | Phase 13 P01 | 2min | 3 tasks | 3 files |
 | Phase 14 P01 | 9min | 2 tasks | 8 files |
+| Phase 14 P02 | 2min | 2 tasks | 4 files |
 
 ## Accumulated Context
 
@@ -312,12 +313,16 @@ Recent decisions affecting current work:
 - [Phase 14-01]: Socket path uses SHA-1 of PROJECT_ROOT (first 8 hex chars) for project-scoped collision avoidance at /tmp/telegram-mcp-{hash}.sock
 - [Phase 14-01]: IPCMethod as union type (not enum) for ESM/NodeNext moduleResolution compatibility
 - [Phase 14-01]: graduated-alerts.js --telegram flag deprecated silently with comment (standalone bot deleted, feature was never in production use)
+- [Phase 14-02]: IPCServer extends EventEmitter so daemon can listen for client_disconnected without coupling to bot logic
+- [Phase 14-02]: clientId -> sessionId reverse map in SessionService for O(1) disconnect lookup
+- [Phase 14-02]: Plan 04 stubs return { status: 'not_implemented' } to keep daemon startable before question service exists
 
 ### Roadmap Evolution
 
 - Phase 08.1 inserted after Phase 08: Telegram MCP Server - Replace standalone bot with MCP integration using subscription tokens (URGENT)
 - Phase 14 added: Telegram MCP and bot audit and rework — pending questions not found by bot, buttons not working, full end-to-end review needed
 - Phase 14 Plan 01 complete: AUDIT.md written, standalone bot deleted, shared foundation modules created
+- Phase 14 Plan 02 complete: IPC server (NDJSON Unix socket) and SessionService (in-memory registry with events) created; daemon entry point bootstraps full IPC method routing
 
 ### Pending Todos
 
@@ -329,6 +334,6 @@ None yet.
 
 ## Session Continuity
 
-Last session: 2026-02-18T13:43:29Z (plan execution)
-Stopped at: Completed 14-01-PLAN.md (Telegram Audit, Standalone Bot Deletion, Shared Modules) - Phase 14 Plan 01 - AUDIT.md written, 5 bot files deleted, 3 shared modules created
+Last session: 2026-02-18T13:56:46Z (plan execution)
+Stopped at: Completed 14-02-PLAN.md (IPC Server and Daemon) - Phase 14 Plan 02 - daemon/ipc-server.ts, daemon/session-service.ts, daemon/index.ts created
 Resume file: None
