@@ -7750,7 +7750,7 @@ function matchContextDocs(taskDesc, index, topN = 3) {
 
 function loadContextIndex(cwd) {
   const HOME = require('os').homedir();
-  const cachePath = path.join(HOME, '.claude', 'cache', 'context-index.json');
+  const cachePath = path.join(cwd, '.planning', '.context-index-cache.json');
 
   if (fs.existsSync(cachePath)) {
     const stat = fs.statSync(cachePath);
@@ -7837,7 +7837,7 @@ function cmdRoutingFull(cwd, taskDesc, raw) {
 
 function cmdRoutingIndexBuild(cwd, args, raw) {
   const HOME = require('os').homedir();
-  const cachePath = path.join(HOME, '.claude', 'cache', 'context-index.json');
+  const cachePath = path.join(cwd, '.planning', '.context-index-cache.json');
   const withSummaries = args.includes('--with-summaries');
   const force = args.includes('--force');
 
@@ -7865,8 +7865,7 @@ function cmdRoutingIndexBuild(cwd, args, raw) {
 }
 
 function cmdRoutingIndexRefresh(cwd, raw) {
-  const HOME = require('os').homedir();
-  const cachePath = path.join(HOME, '.claude', 'cache', 'context-index.json');
+  const cachePath = path.join(cwd, '.planning', '.context-index-cache.json');
 
   if (!fs.existsSync(cachePath)) {
     output({ stale: true, reason: 'Cache does not exist', entries: 0 }, raw);
