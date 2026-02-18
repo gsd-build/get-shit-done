@@ -106,10 +106,16 @@ node /Users/ollorin/.claude/get-shit-done/bin/gsd-tools.js execution-log event \
 ```
 
 **4. Spawn sub-coordinator (fresh context window):**
+
+Read coordinator model from config (fallback to sonnet):
+```bash
+COORDINATOR_MODEL=$(jq -r '.coordinator_model // "sonnet"' .planning/config.json 2>/dev/null || echo "sonnet")
+```
+
 ```
 Task(
   subagent_type="gsd-phase-coordinator",
-  model="opus",
+  model="{COORDINATOR_MODEL}",
   prompt="Execute Phase {N}: {name}
 
   Phase directory: .planning/phases/{phase_dir}/

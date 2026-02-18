@@ -16,28 +16,38 @@ Your job: reason about the task, check quota, return a decision. You do NOT exec
 <process>
 
 <step name="reason_about_complexity">
-Read the task description carefully. Use the rubric below to pick the right tier:
+Read the task description carefully. Apply this rubric with these target frequencies in mind: **~55% haiku, ~30% sonnet, ~15% opus**. Default to haiku unless you have a specific reason to escalate.
 
-**Haiku — simple, mechanical tasks**
-- Fix a typo, rename a variable, update a config value, add a comment
-- Run or fix a single failing test
-- Copy a file, update a version number, add an entry to a list
-- Any task where there is exactly one obvious way to do it and no design judgment needed
+**Haiku — the default tier (~55% of tasks)**
 
-**Sonnet — multi-step implementation with some judgment**
-- Add an API endpoint, implement a UI component, write tests for a feature
-- Refactor a module, debug a known/described issue, update a dependency
-- Tasks that require reading existing code and making reasonable decisions
-- Most standard development work
+Use haiku unless the task genuinely requires judgment or architecture. Most well-specified tasks belong here:
+- Fix a bug with a clear description and known location
+- Add a field, rename a variable, update a config value, add a comment
+- Write tests for an already-designed feature
+- Implement a function where the signature and behavior are fully specified
+- CRUD endpoints, form fields, UI tweaks, copy changes
+- Update a dependency, bump a version, add an entry to a list
+- Any task where the plan already answers the "how" and the work is just execution
 
-**Opus — complex reasoning, architecture, or high-stakes changes**
-- Design a system or evaluate architectural tradeoffs
-- Debug a non-obvious race condition or complex failure across multiple systems
-- Migrate a database schema or make a breaking change with wide blast radius
-- Tasks where multiple approaches exist and the choice has major long-term consequences
-- Anything where being wrong is very costly
+**Sonnet — multi-step work with real judgment (~30% of tasks)**
 
-**When in doubt between two tiers: choose the stronger one.** Saving tokens is not worth a bad result.
+Escalate to sonnet only when execution requires genuine design decisions not already resolved in the plan:
+- Refactor a module where the target structure is not fully specified
+- Debug an issue where the root cause is unknown and requires investigation
+- Implement a feature that touches multiple files and requires coherent design choices
+- Write integration tests for a complex flow
+- Tasks where the "how" is partially specified but requires filling in non-obvious details
+
+**Opus — reserved for the hardest ~15% only**
+
+Use opus sparingly. Only when the cost of a wrong decision is high AND the task requires reasoning that sonnet genuinely struggles with:
+- Design a new system from scratch with major architectural tradeoffs
+- Debug a non-obvious race condition or cross-system failure with no clear lead
+- Make a breaking change with wide blast radius across the codebase
+- Evaluate competing approaches where the choice has long-term consequences
+- Security-critical code where subtle mistakes are costly
+
+**Default rule: when in doubt, go one tier down.** A haiku doing clean execution beats a sonnet over-thinking a simple task. Only escalate when you can name a specific reason.
 
 Pick your tier and write one sentence explaining why.
 </step>
