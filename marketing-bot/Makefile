@@ -1,4 +1,4 @@
-.PHONY: up down run docker-up logs shell redis stop reset install lint
+.PHONY: up down run docker-up logs shell redis stop reset fresh install lint
 
 # ─── Инфраструктура (без бота) ──────────────────────────────────────────────
 
@@ -16,7 +16,9 @@ stop:
 
 reset:
 	docker compose down -v
-	@echo "⚠️  Все данные удалены"
+	@echo "✅ Тома удалены. Запусти: make docker-up"
+
+fresh: reset docker-up
 
 # ─── Бот локально (polling) ─────────────────────────────────────────────────
 
