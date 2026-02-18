@@ -48,6 +48,8 @@
     "better-sqlite3": "^12.0.0",
     "dotenv": "^17.3.1",
     "fluent-ffmpeg": "^2.1.3",
+    "gray-matter": "^4.0.3",
+    "markdown-it": "^14.1.1",
     "sqlite-vec": "^0.1.0",
     "telegraf": "^4.16.3",
     "whisper-node": "^1.1.1",

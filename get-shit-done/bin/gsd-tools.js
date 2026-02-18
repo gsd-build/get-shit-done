@@ -163,6 +163,14 @@ const { TaskChunker, BatchCoordinator, analyzeTask, estimateTaskTokens } = requi
 const { estimatePhaseSize, detectOversizedPhases, recommendSplit, validateSplitPreservesDependencies, LIMITS: PHASE_LIMITS } = require('./phase-sizer.js');
 const { ParallelPhaseExecutor, analyzeParallelOpportunities: analyzeParallel, CONFIG: PARALLEL_CONFIG } = require('./parallel-executor.js');
 
+// Phase 2: Auto Mode safety modules (lazy — gracefully absent if not installed)
+let circuitBreaker, validator, escalation, feedback, learning;
+try { circuitBreaker = require('./gsd-circuit-breaker'); } catch (e) { circuitBreaker = null; }
+try { validator = require('./gsd-validator'); } catch (e) { validator = null; }
+try { escalation = require('./gsd-escalation'); } catch (e) { escalation = null; }
+try { feedback = require('./gsd-feedback'); } catch (e) { feedback = null; }
+try { learning = require('./gsd-learning'); } catch (e) { learning = null; }
+
 // Load environment variables from project root .env
 require('dotenv').config({ path: path.join(__dirname, '../../.env') });
 
@@ -7480,6 +7488,35 @@ async function cmdStoreAnalysisResult(cwd, args, raw) {
 }
 
 // ============================================================
+// Compression: doc header extraction (Phase 09)
+// ============================================================
+
+function cmdCompressSummary(filePath, raw) {
+  if (!filePath) { error('file path required'); return; }
+  const absolutePath = path.resolve(filePath);
+  if (!fs.existsSync(absolutePath)) { error('file not found: ' + absolutePath); return; }
+
+  const { HeaderExtractor } = require('./compression/header-extractor');
+  const extractor = new HeaderExtractor();
+  const content = fs.readFileSync(absolutePath, 'utf-8');
+  const result = extractor.extractSummary(content, absolutePath);
+
+  if (raw) {
+    console.log(result.summary);
+  } else {
+    const reductionPercent = ((1 - result.summary.length / content.length) * 100).toFixed(1);
+    output({ ...result, originalLength: content.length, reductionPercent }, false);
+  }
+}
+
+function cmdCompressStats(raw) {
+  output({
+    message: 'Compression stats tracking not yet implemented',
+    suggestion: 'Use "compress summary" command to compress individual files'
+  }, raw);
+}
+
+// ============================================================
 // Routing: model selection + context injection (Phase 01)
 // ============================================================
 
@@ -8772,7 +8809,954 @@ async function main() {
       break;
     }
 
-    case 'routing': {
+    case 'compress': {
+      const subcommand = args[1];
+      if (subcommand === 'summary') {
+        const filePath = args[2];
+        const rawFlag = args.includes('--raw');
+        cmdCompressSummary(filePath, rawFlag);
+      } else if (subcommand === 'stats') {
+        cmdCompressStats(raw);
+      } else if (subcommand === 'status') {
+        // Show compression configuration and circuit breaker state
+        const { loadHookConfig, getCircuitBreakerStatus } = require(path.join(process.env.HOME, '.claude/get-shit-done/bin/hooks/config'));
+        const config = loadHookConfig();
+        const cbStatus = getCircuitBreakerStatus();
+
+        output({
+          enabled: config.compression.enabled,
+          strategy: config.compression.strategy,
+          min_file_lines: config.compression.min_file_lines,
+          cache_ttl: config.compression.cache_ttl,
+          circuit_breaker: cbStatus
+        }, raw);
+
+      } else if (subcommand === 'enable') {
+        // Enable compression
+        const { loadHookConfig, saveHookConfig } = require(path.join(process.env.HOME, '.claude/get-shit-done/bin/hooks/config'));
+        const config = loadHookConfig();
+        config.compression.enabled = true;
+        saveHookConfig(config);
+        output({ enabled: true, message: 'Compression enabled' }, raw);
+
+      } else if (subcommand === 'disable') {
+        // Disable compression
+        const { loadHookConfig, saveHookConfig } = require(path.join(process.env.HOME, '.claude/get-shit-done/bin/hooks/config'));
+        const config = loadHookConfig();
+        config.compression.enabled = false;
+        saveHookConfig(config);
+        output({ enabled: false, message: 'Compression disabled' }, raw);
+
+      } else if (subcommand === 'reset') {
+        // Reset circuit breaker
+        const { resetCircuitBreaker } = require(path.join(process.env.HOME, '.claude/get-shit-done/bin/hooks/config'));
+        resetCircuitBreaker();
+        output({ message: 'Circuit breaker reset to closed state' }, raw);
+
+      } else if (subcommand === 'metrics') {
+        // Show compression statistics
+        const metricsPath = path.join(process.env.HOME, '.claude', 'get-shit-done', 'compression-metrics.jsonl');
+        if (!fs.existsSync(metricsPath)) {
+          output({ count: 0, message: 'No compression metrics yet' }, raw);
+        } else {
+          const lines = fs.readFileSync(metricsPath, 'utf-8').trim().split('\n').filter(l => l.trim());
+          if (lines.length === 0) {
+            output({ count: 0, message: 'No compression metrics yet' }, raw);
+          } else {
+            const records = lines.map(l => {
+              try {
+                return JSON.parse(l);
+              } catch (e) {
+                return null;
+              }
+            }).filter(r => r !== null);
+
+            const avgReduction = records.length > 0
+              ? records.reduce((sum, r) => sum + parseFloat(r.reductionPercent || 0), 0) / records.length
+              : 0;
+
+            const totalTokensSaved = records.reduce((sum, r) =>
+              sum + ((r.originalTokens || 0) - (r.compressedTokens || 0)), 0);
+
+            output({
+              count: records.length,
+              avgReduction: avgReduction.toFixed(1) + '%',
+              totalTokensSaved
+            }, raw);
+          }
+        }
+
+      } else if (subcommand === 'clear-cache') {
+        // Clear compression cache
+        const { CompressionCache } = require(path.join(process.env.HOME, '.claude/get-shit-done/bin/hooks/compression-cache'));
+        const cache = new CompressionCache();
+        const statsBefore = cache.stats();
+        cache.clear();
+        output({
+          message: 'Compression cache cleared',
+          entriesCleared: statsBefore.entries,
+          bytesFreed: statsBefore.totalSize
+        }, raw);
+
+      } else {
+        error('Unknown compress subcommand. Available: summary, stats, status, enable, disable, reset, metrics, clear-cache');
+      }
+      break;
+    }
+
+    case 'circuit-breaker': {
+      const subCommand = args[1];
+
+      if (subCommand === 'thresholds') {
+        const modelIdx = args.indexOf('--model');
+        const taskIdx = args.indexOf('--task');
+
+        const model = modelIdx !== -1 ? args[modelIdx + 1] : 'sonnet';
+        const task = taskIdx !== -1 ? args.slice(taskIdx + 1).join(' ') : '';
+
+        const thresholds = circuitBreaker.getAdaptiveThresholds(task, model);
+        output(thresholds, raw);
+
+      } else if (subCommand === 'update-threshold') {
+        const patternIdx = args.indexOf('--pattern');
+        const multiplierIdx = args.indexOf('--multiplier');
+
+        if (patternIdx === -1 || multiplierIdx === -1) {
+          error('update-threshold requires --pattern and --multiplier');
+          break;
+        }
+
+        const pattern = args[patternIdx + 1];
+        const multiplier = parseFloat(args[multiplierIdx + 1]);
+
+        const thresholds = circuitBreaker.loadThresholds();
+        if (!thresholds.learned) {
+          thresholds.learned = {};
+        }
+        thresholds.learned[pattern] = multiplier;
+        circuitBreaker.saveThresholds(thresholds);
+
+        output({ updated: true, pattern, multiplier }, raw);
+
+      } else if (subCommand === 'log') {
+        const modelIdx = args.indexOf('--model');
+        const limitIdx = args.indexOf('--limit');
+
+        const modelFilter = modelIdx !== -1 ? args[modelIdx + 1] : null;
+        const limit = limitIdx !== -1 ? parseInt(args[limitIdx + 1], 10) : 20;
+
+        const logPath = path.join(cwd, '.planning', 'circuit-breaker', 'timeout-log.jsonl');
+
+        if (!fs.existsSync(logPath)) {
+          output({ entries: [] }, raw);
+          break;
+        }
+
+        const lines = fs.readFileSync(logPath, 'utf-8').split('\n').filter(l => l.trim());
+        const entries = [];
+
+        for (const line of lines) {
+          try {
+            const entry = JSON.parse(line);
+            if (entry._comment) continue; // Skip header
+            if (modelFilter && entry.model !== modelFilter) continue;
+            entries.push(entry);
+          } catch (e) {
+            // Skip invalid lines
+          }
+        }
+
+        const result = entries.slice(-limit);
+        output({ entries: result, total: entries.length }, raw);
+
+      } else if (subCommand === 'stats') {
+        const logPath = path.join(cwd, '.planning', 'circuit-breaker', 'timeout-log.jsonl');
+
+        if (!fs.existsSync(logPath)) {
+          output({
+            total_timeouts: 0,
+            by_model: {},
+            average_time_to_timeout: null
+          }, raw);
+          break;
+        }
+
+        const lines = fs.readFileSync(logPath, 'utf-8').split('\n').filter(l => l.trim());
+        const entries = [];
+
+        for (const line of lines) {
+          try {
+            const entry = JSON.parse(line);
+            if (entry._comment) continue;
+            entries.push(entry);
+          } catch (e) {
+            // Skip invalid lines
+          }
+        }
+
+        const byModel = {};
+        let totalTimeoutMs = 0;
+
+        for (const entry of entries) {
+          const model = entry.model || 'unknown';
+          if (!byModel[model]) {
+            byModel[model] = { count: 0, total_timeout_ms: 0 };
+          }
+          byModel[model].count++;
+
+          if (entry.timeout_ms) {
+            byModel[model].total_timeout_ms += entry.timeout_ms;
+            totalTimeoutMs += entry.timeout_ms;
+          }
+        }
+
+        const avgTimeToTimeout = entries.length > 0
+          ? Math.floor(totalTimeoutMs / entries.length)
+          : null;
+
+        output({
+          total_timeouts: entries.length,
+          by_model: byModel,
+          average_time_to_timeout: avgTimeToTimeout
+        }, raw);
+
+      } else {
+        error('Unknown circuit-breaker subcommand. Available: thresholds, update-threshold, log, stats');
+      }
+      break;
+    }
+
+    case 'validation': {
+      const subCommand = args[1];
+
+      if (subCommand === 'validate') {
+        const taskIdIdx = args.indexOf('--task-id');
+        const outputIdx = args.indexOf('--output');
+        const reasoningIdx = args.indexOf('--reasoning');
+
+        const taskId = taskIdIdx !== -1 ? args[taskIdIdx + 1] : 'unknown';
+        let taskOutput = outputIdx !== -1 ? args[outputIdx + 1] : '';
+        let taskReasoning = reasoningIdx !== -1 ? args[reasoningIdx + 1] : '';
+
+        // Check if output/reasoning are file paths
+        if (taskOutput.startsWith('/') || taskOutput.startsWith('./')) {
+          try {
+            taskOutput = fs.readFileSync(taskOutput, 'utf-8');
+          } catch (e) {
+            // If not a file, treat as literal string
+          }
+        }
+        if (taskReasoning.startsWith('/') || taskReasoning.startsWith('./')) {
+          try {
+            taskReasoning = fs.readFileSync(taskReasoning, 'utf-8');
+          } catch (e) {
+            // If not a file, treat as literal string
+          }
+        }
+
+        // Run validation
+        const task = args.slice(2).filter(a => !a.startsWith('--') && a !== taskId && a !== taskOutput && a !== taskReasoning).join(' ');
+        const result = await validator.validateTask(task, taskOutput, taskReasoning, { task_id: taskId });
+
+        output(result, raw);
+
+      } else if (subCommand === 'depth') {
+        const task = args.slice(2).join(' ');
+        const result = validator.selectValidationDepth(task);
+        output(result, raw);
+
+      } else if (subCommand === 'log') {
+        const taskIdIdx = args.indexOf('--task-id');
+        const limitIdx = args.indexOf('--limit');
+
+        const taskIdFilter = taskIdIdx !== -1 ? args[taskIdIdx + 1] : null;
+        const limit = limitIdx !== -1 ? parseInt(args[limitIdx + 1], 10) : 20;
+
+        const logFile = path.join(cwd, '.planning', 'validation', 'validation-log.jsonl');
+        let entries = [];
+
+        if (fs.existsSync(logFile)) {
+          const content = fs.readFileSync(logFile, 'utf-8');
+          entries = content
+            .trim()
+            .split('\n')
+            .filter(line => line.trim())
+            .map(line => JSON.parse(line))
+            .filter(entry => !entry._comment); // Skip header comments
+
+          if (taskIdFilter) {
+            entries = entries.filter(e => e.task_id === taskIdFilter);
+          }
+
+          entries = entries.slice(-limit); // Get last N entries
+        }
+
+        output({ entries, count: entries.length }, raw);
+
+      } else if (subCommand === 'stats') {
+        const logFile = path.join(cwd, '.planning', 'validation', 'validation-log.jsonl');
+        let entries = [];
+
+        if (fs.existsSync(logFile)) {
+          const content = fs.readFileSync(logFile, 'utf-8');
+          entries = content
+            .trim()
+            .split('\n')
+            .filter(line => line.trim())
+            .map(line => JSON.parse(line))
+            .filter(entry => !entry._comment && entry.result);
+        }
+
+        const total = entries.length;
+        const passed = entries.filter(e => e.result && e.result.valid).length;
+        const passRate = total > 0 ? ((passed / total) * 100).toFixed(1) : 0;
+
+        const avgCorrectness = total > 0
+          ? (entries.reduce((sum, e) => sum + (e.result.correctness_score || 0), 0) / total).toFixed(1)
+          : 0;
+        const avgReasoning = total > 0
+          ? (entries.reduce((sum, e) => sum + (e.result.reasoning_score || 0), 0) / total).toFixed(1)
+          : 0;
+
+        const byDepth = {
+          light: entries.filter(e => e.depth === 'light').length,
+          standard: entries.filter(e => e.depth === 'standard').length,
+          thorough: entries.filter(e => e.depth === 'thorough').length
+        };
+
+        const stats = {
+          total_validations: total,
+          passed: passed,
+          failed: total - passed,
+          pass_rate: parseFloat(passRate),
+          average_correctness: parseFloat(avgCorrectness),
+          average_reasoning: parseFloat(avgReasoning),
+          by_depth: byDepth
+        };
+
+        output(stats, raw);
+
+      } else {
+        error('Unknown validation subcommand. Available: validate, depth, log, stats');
+      }
+      break;
+    }
+
+    case 'escalation': {
+      const subCommand = args[1];
+
+      if (subCommand === 'weights') {
+        // Show error weight configuration
+        output(escalation.ERROR_WEIGHTS, raw);
+
+      } else if (subCommand === 'threshold') {
+        // Show escalation threshold
+        output({
+          threshold: escalation.ESCALATION_THRESHOLD,
+          description: '1-2 errors trigger escalation'
+        }, raw);
+
+      } else if (subCommand === 'log') {
+        // Read escalation log
+        const taskIdIdx = args.indexOf('--task-id');
+        const limitIdx = args.indexOf('--limit');
+
+        const taskIdFilter = taskIdIdx !== -1 ? args[taskIdIdx + 1] : null;
+        const limit = limitIdx !== -1 ? parseInt(args[limitIdx + 1], 10) : 20;
+
+        const logFile = path.join(cwd, '.planning', 'validation', 'escalation-log.jsonl');
+        let entries = [];
+
+        if (fs.existsSync(logFile)) {
+          const content = fs.readFileSync(logFile, 'utf-8');
+          entries = content
+            .trim()
+            .split('\n')
+            .filter(line => line.trim())
+            .map(line => {
+              try {
+                return JSON.parse(line);
+              } catch {
+                return null;
+              }
+            })
+            .filter(entry => entry && !entry._comment); // Skip header comments and parse errors
+
+          if (taskIdFilter) {
+            entries = entries.filter(e => e.task_id === taskIdFilter);
+          }
+
+          entries = entries.slice(-limit); // Get last N entries
+        }
+
+        output({ entries, count: entries.length }, raw);
+
+      } else if (subCommand === 'stats') {
+        // Escalation statistics
+        const logFile = path.join(cwd, '.planning', 'validation', 'escalation-log.jsonl');
+        let entries = [];
+
+        if (fs.existsSync(logFile)) {
+          const content = fs.readFileSync(logFile, 'utf-8');
+          entries = content
+            .trim()
+            .split('\n')
+            .filter(line => line.trim())
+            .map(line => {
+              try {
+                return JSON.parse(line);
+              } catch {
+                return null;
+              }
+            })
+            .filter(entry => entry && !entry._comment);
+        }
+
+        const total = entries.length;
+        const byModel = {};
+        let totalErrors = 0;
+
+        entries.forEach(entry => {
+          const from = entry.from_model || 'unknown';
+          const to = entry.to_model || 'unknown';
+          const key = `${from} → ${to}`;
+
+          if (!byModel[key]) {
+            byModel[key] = { count: 0, total_score: 0 };
+          }
+
+          byModel[key].count++;
+          byModel[key].total_score += entry.cumulative_score || 0;
+          totalErrors++;
+        });
+
+        const avgErrorsBeforeEscalation = total > 0
+          ? (totalErrors / total).toFixed(2)
+          : 0;
+
+        const stats = {
+          total_escalations: total,
+          by_model: byModel,
+          avg_errors_before_escalation: avgErrorsBeforeEscalation
+        };
+
+        output(stats, raw);
+
+      } else if (subCommand === 'simulate') {
+        // Simulate error scoring
+        const errorsIdx = args.indexOf('--errors');
+        if (errorsIdx === -1) {
+          error('Missing --errors argument. Usage: escalation simulate --errors "RETRY,VALIDATION_FIX,COMPLETE_REJECTION"');
+        }
+
+        const errorsStr = args[errorsIdx + 1];
+        const errorTypes = errorsStr.split(',').map(s => s.trim());
+
+        const tracker = new escalation.ErrorTracker({ id: 'simulation' });
+
+        errorTypes.forEach(errorType => {
+          if (escalation.ERROR_WEIGHTS[errorType] !== undefined) {
+            tracker.recordError(errorType, `Simulated ${errorType} error`);
+          } else {
+            error(`Unknown error type: ${errorType}. Valid types: ${Object.keys(escalation.ERROR_WEIGHTS).join(', ')}`);
+          }
+        });
+
+        output({
+          cumulative_score: tracker.cumulativeScore,
+          should_escalate: tracker.shouldEscalate(),
+          errors: tracker.errors.length
+        }, raw);
+
+      } else {
+        error('Unknown escalation subcommand. Available: weights, threshold, log, stats, simulate');
+      }
+      break;
+    }
+
+    case 'feedback': {
+      const subCommand = args[1];
+
+      if (subCommand === 'config') {
+        // Show current feedback configuration
+        const config = feedback.loadConfig();
+        const feedbackConfig = {
+          feedback_enabled: config.feedback_enabled,
+          feedback_mode: config.feedback_mode,
+          feedback_frequency: config.feedback_frequency,
+          sample_rate: config.sample_rate
+        };
+        output(feedbackConfig, raw);
+
+      } else if (subCommand === 'enable') {
+        // Enable feedback collection
+        const modeIdx = args.indexOf('--mode');
+        const frequencyIdx = args.indexOf('--frequency');
+
+        const mode = modeIdx !== -1 ? args[modeIdx + 1] : 'human';
+        const frequency = frequencyIdx !== -1 ? args[frequencyIdx + 1] : 'escalations';
+
+        // Validate mode
+        if (!['human', 'opus'].includes(mode)) {
+          error('Invalid mode. Must be: human or opus');
+        }
+
+        // Validate frequency
+        if (!['all', 'escalations', 'sample'].includes(frequency)) {
+          error('Invalid frequency. Must be: all, escalations, or sample');
+        }
+
+        const config = feedback.loadConfig();
+        config.feedback_enabled = true;
+        config.feedback_mode = mode;
+        config.feedback_frequency = frequency;
+        feedback.saveConfig(config);
+
+        output({
+          message: 'Feedback collection enabled',
+          feedback_enabled: true,
+          feedback_mode: mode,
+          feedback_frequency: frequency
+        }, raw);
+
+      } else if (subCommand === 'disable') {
+        // Disable feedback collection
+        const config = feedback.loadConfig();
+        config.feedback_enabled = false;
+        feedback.saveConfig(config);
+
+        output({
+          message: 'Feedback collection disabled',
+          feedback_enabled: false
+        }, raw);
+
+      } else if (subCommand === 'log') {
+        // Read feedback log
+        const correctIdx = args.indexOf('--correct');
+        const modelIdx = args.indexOf('--model');
+        const limitIdx = args.indexOf('--limit');
+
+        const options = {};
+
+        if (correctIdx !== -1) {
+          const correctVal = args[correctIdx + 1];
+          options.correct = correctVal === 'true';
+        }
+
+        if (modelIdx !== -1) {
+          options.model = args[modelIdx + 1];
+        }
+
+        if (limitIdx !== -1) {
+          options.limit = parseInt(args[limitIdx + 1], 10);
+        } else {
+          options.limit = 20;
+        }
+
+        const entries = feedback.readFeedbackLog(options);
+        output({ entries, count: entries.length }, raw);
+
+      } else if (subCommand === 'stats') {
+        // Feedback statistics
+        const stats = feedback.calculateFeedbackStats();
+        output(stats, raw);
+
+      } else if (subCommand === 'prompt') {
+        // Generate feedback prompt (for testing)
+        const taskIdx = args.indexOf('--task');
+        const modelIdx = args.indexOf('--model');
+
+        if (taskIdx === -1 || modelIdx === -1) {
+          error('Missing required arguments. Usage: feedback prompt --task "description" --model MODEL');
+        }
+
+        const taskDescription = args[taskIdx + 1];
+        const model = args[modelIdx + 1];
+
+        const prompt = `
+Task: ${taskDescription}
+Model used: ${model}
+
+Was ${model} the right choice for this task? (y/n): `;
+
+        if (raw) {
+          output({ prompt, task: taskDescription, model }, raw);
+        } else {
+          console.log(prompt);
+        }
+
+      } else {
+        error('Unknown feedback subcommand. Available: config, enable, disable, log, stats, prompt');
+      }
+      break;
+    }
+
+    case 'learning': {
+      const subCommand = args[1];
+
+      if (subCommand === 'extract') {
+        // Extract patterns from feedback
+        const feedbackLog = learning.readFeedbackLog();
+        const patterns = learning.extractPatterns(feedbackLog);
+        output({ patterns, count: patterns.length }, raw);
+
+      } else if (subCommand === 'merge') {
+        // Merge learned rules with built-in
+        const builtInRules = learning.loadBuiltInRules();
+        const feedbackLog = learning.readFeedbackLog();
+        const learnedPatterns = learning.extractPatterns(feedbackLog);
+        const result = learning.mergeRules(builtInRules, learnedPatterns);
+
+        // Write learned rules to markdown
+        learning.writeLearnedRules(learnedPatterns);
+
+        output({
+          total_rules: result.rules.length,
+          learned_count: learnedPatterns.length,
+          overrides: result.stats.overrides,
+          conflicts_insufficient: result.stats.insufficient,
+          new_rules: result.stats.new
+        }, raw);
+
+      } else if (subCommand === 'rules') {
+        // Show current learned rules
+        const rulesPath = path.join(process.env.HOME, '.claude/skills/gsd-task-router/learned-rules.md');
+
+        if (!fs.existsSync(rulesPath)) {
+          output({ rules: [], message: 'No learned rules file found' }, raw);
+        } else {
+          const content = fs.readFileSync(rulesPath, 'utf8');
+
+          // Parse markdown table
+          const lines = content.split('\n');
+          const rules = [];
+          let inTable = false;
+
+          for (const line of lines) {
+            if (line.startsWith('| Pattern |')) {
+              inTable = true;
+              continue;
+            }
+            if (line.startsWith('|---')) {
+              continue;
+            }
+            if (inTable && line.startsWith('|')) {
+              const parts = line.split('|').map(s => s.trim()).filter(s => s);
+              if (parts.length >= 3 && parts[0] !== '(no learned rules yet)') {
+                rules.push({
+                  pattern: parts[0],
+                  model: parts[1],
+                  evidence_count: parseInt(parts[2], 10)
+                });
+              }
+            }
+            if (inTable && !line.startsWith('|')) {
+              break;
+            }
+          }
+
+          output({ rules, count: rules.length }, raw);
+        }
+
+      } else if (subCommand === 'clear') {
+        // Clear learned rules
+        learning.writeLearnedRules([]);
+        output({ message: 'Learned rules cleared' }, raw);
+
+      } else if (subCommand === 'status') {
+        // Learning system status
+        const feedbackLog = learning.readFeedbackLog();
+        const patterns = learning.extractPatterns(feedbackLog);
+
+        // Get merge log stats
+        const mergeLogPath = path.join(process.cwd(), '.planning/feedback/rule-merge-log.jsonl');
+        let lastMerge = null;
+        let mergeCount = 0;
+
+        if (fs.existsSync(mergeLogPath)) {
+          const lines = fs.readFileSync(mergeLogPath, 'utf8')
+            .split('\n')
+            .filter(line => line.trim() && !line.startsWith('{"_comment"'));
+
+          mergeCount = lines.length;
+
+          if (lines.length > 0) {
+            try {
+              const lastEntry = JSON.parse(lines[lines.length - 1]);
+              lastMerge = lastEntry.timestamp;
+            } catch (e) {
+              // Ignore parse errors
+            }
+          }
+        }
+
+        // Get all feedback count
+        const allFeedbackPath = path.join(process.cwd(), '.planning/feedback/human-feedback.jsonl');
+        let totalFeedback = 0;
+
+        if (fs.existsSync(allFeedbackPath)) {
+          const lines = fs.readFileSync(allFeedbackPath, 'utf8')
+            .split('\n')
+            .filter(line => line.trim() && !line.startsWith('{"_comment"'));
+          totalFeedback = lines.length;
+        }
+
+        output({
+          feedback_count: totalFeedback,
+          incorrect_count: feedbackLog.length,
+          learned_rules_count: patterns.length,
+          last_merge: lastMerge,
+          merge_count: mergeCount
+        }, raw);
+
+      } else {
+        error('Unknown learning subcommand. Available: extract, merge, rules, clear, status');
+      }
+      break;
+    }
+
+    case 'auto-task': {
+      const subCommand = args[1];
+
+      if (subCommand === 'status') {
+        // Show Phase 2 system status
+        const cwd = process.cwd();
+
+        // Validation status
+        const validationLogPath = path.join(cwd, '.planning/validation/validation-log.jsonl');
+        let validationEntries = 0;
+        if (fs.existsSync(validationLogPath)) {
+          validationEntries = fs.readFileSync(validationLogPath, 'utf8')
+            .split('\n')
+            .filter(line => line.trim() && !line.startsWith('{"_comment"')).length;
+        }
+
+        // Circuit breaker status
+        const thresholdsPath = path.join(cwd, '.planning/circuit-breaker/thresholds.json');
+        let thresholds = { haiku: {}, sonnet: {}, opus: {} };
+        if (fs.existsSync(thresholdsPath)) {
+          try {
+            thresholds = JSON.parse(fs.readFileSync(thresholdsPath, 'utf8'));
+          } catch (e) {
+            // Use defaults
+          }
+        }
+
+        // Escalation status
+        const escalationLogPath = path.join(cwd, '.planning/escalation/escalation-log.jsonl');
+        let totalEscalations = 0;
+        const byModel = { haiku_to_sonnet: 0, sonnet_to_opus: 0, opus_to_fail: 0 };
+        if (fs.existsSync(escalationLogPath)) {
+          const lines = fs.readFileSync(escalationLogPath, 'utf8')
+            .split('\n')
+            .filter(line => line.trim() && !line.startsWith('{"_comment"'));
+
+          totalEscalations = lines.length;
+
+          lines.forEach(line => {
+            try {
+              const entry = JSON.parse(line);
+              const from = entry.from_model || 'unknown';
+              const to = entry.to_model || 'unknown';
+              const key = `${from}_to_${to}`;
+              if (byModel[key] !== undefined) byModel[key]++;
+            } catch (e) {
+              // Ignore parse errors
+            }
+          });
+        }
+
+        // Feedback status
+        const feedbackConfig = feedback.loadConfig();
+        const feedbackLogPath = path.join(cwd, '.planning/feedback/human-feedback.jsonl');
+        let feedbackEntries = 0;
+        if (fs.existsSync(feedbackLogPath)) {
+          feedbackEntries = fs.readFileSync(feedbackLogPath, 'utf8')
+            .split('\n')
+            .filter(line => line.trim() && !line.startsWith('{"_comment"')).length;
+        }
+
+        // Learning status
+        const learnedRulesPath = path.join(process.env.HOME, '.claude/skills/gsd-task-router/learned-rules.md');
+        let rulesCount = 0;
+        if (fs.existsSync(learnedRulesPath)) {
+          const content = fs.readFileSync(learnedRulesPath, 'utf8');
+          const lines = content.split('\n');
+          rulesCount = lines.filter(line =>
+            line.startsWith('|') &&
+            !line.includes('Pattern |') &&
+            !line.includes('---') &&
+            !line.includes('(no learned rules yet)')
+          ).length;
+        }
+
+        const mergeLogPath = path.join(cwd, '.planning/feedback/rule-merge-log.jsonl');
+        let lastMerge = null;
+        if (fs.existsSync(mergeLogPath)) {
+          const lines = fs.readFileSync(mergeLogPath, 'utf8')
+            .split('\n')
+            .filter(line => line.trim() && !line.startsWith('{"_comment"'));
+
+          if (lines.length > 0) {
+            try {
+              const lastEntry = JSON.parse(lines[lines.length - 1]);
+              lastMerge = lastEntry.timestamp;
+            } catch (e) {
+              // Ignore parse errors
+            }
+          }
+        }
+
+        output({
+          validation: {
+            enabled: true,
+            log_entries: validationEntries
+          },
+          circuit_breaker: {
+            thresholds: thresholds,
+            configured: Object.keys(thresholds).length > 0
+          },
+          escalation: {
+            total: totalEscalations,
+            by_model: byModel
+          },
+          feedback: {
+            enabled: feedbackConfig.enabled,
+            entries: feedbackEntries
+          },
+          learning: {
+            rules_count: rulesCount,
+            last_merge: lastMerge
+          }
+        }, raw);
+
+      } else if (subCommand === 'report') {
+        // Generate end-of-execution report
+        const cwd = process.cwd();
+        const jsonFlag = args.includes('--json');
+
+        // Aggregate validation stats (inline implementation)
+        const validationLogPath = path.join(cwd, '.planning/validation/validation-log.jsonl');
+        let validationStats = { total: 0, passed: 0, pass_rate: 0, by_depth: {} };
+
+        if (fs.existsSync(validationLogPath)) {
+          const lines = fs.readFileSync(validationLogPath, 'utf8')
+            .split('\n')
+            .filter(line => line.trim() && !line.startsWith('{"_comment"'));
+
+          const entries = lines.map(line => {
+            try {
+              return JSON.parse(line);
+            } catch (e) {
+              return null;
+            }
+          }).filter(e => e !== null);
+
+          const total = entries.length;
+          const passed = entries.filter(e => e.recommendation === 'PASS').length;
+          const passRate = total > 0 ? (passed / total) : 0;
+
+          const byDepth = {};
+          ['light', 'standard', 'thorough'].forEach(depth => {
+            const depthEntries = entries.filter(e => e.depth === depth);
+            const depthPassed = depthEntries.filter(e => e.recommendation === 'PASS').length;
+            if (depthEntries.length > 0) {
+              byDepth[depth] = {
+                total: depthEntries.length,
+                passed: depthPassed,
+                pass_rate: depthPassed / depthEntries.length
+              };
+            }
+          });
+
+          validationStats = { total, passed, pass_rate: passRate, by_depth: byDepth };
+        }
+
+        // Aggregate escalation history (inline implementation)
+        const escalationLogPath = path.join(cwd, '.planning/escalation/escalation-log.jsonl');
+        let escalationLog = [];
+
+        if (fs.existsSync(escalationLogPath)) {
+          const lines = fs.readFileSync(escalationLogPath, 'utf8')
+            .split('\n')
+            .filter(line => line.trim() && !line.startsWith('{"_comment"'));
+
+          escalationLog = lines.map(line => {
+            try {
+              return JSON.parse(line);
+            } catch (e) {
+              return null;
+            }
+          }).filter(e => e !== null);
+        }
+
+        // Aggregate feedback summary
+        const feedbackStats = feedback.calculateFeedbackStats();
+
+        const report = {
+          validation: validationStats,
+          escalation: {
+            total: escalationLog.length,
+            history: escalationLog.map(e => ({
+              task_id: e.task_id,
+              from_model: e.from_model,
+              to_model: e.to_model,
+              reason: e.reason,
+              timestamp: e.timestamp
+            }))
+          },
+          feedback: feedbackStats
+        };
+
+        if (jsonFlag || raw) {
+          output(report, true);
+        } else {
+          // Format as readable text
+          console.log('=== Phase 2 Execution Report ===\n');
+
+          console.log('VALIDATION SUMMARY:');
+          console.log(`  Total: ${report.validation.total}`);
+          console.log(`  Passed: ${report.validation.passed}`);
+          console.log(`  Pass Rate: ${(report.validation.pass_rate * 100).toFixed(1)}%`);
+          if (Object.keys(report.validation.by_depth).length > 0) {
+            console.log('  By Depth:');
+            Object.entries(report.validation.by_depth).forEach(([depth, stats]) => {
+              console.log(`    ${depth}: ${stats.passed}/${stats.total} (${(stats.pass_rate * 100).toFixed(1)}%)`);
+            });
+          }
+          console.log('');
+
+          console.log('ESCALATION HISTORY:');
+          console.log(`  Total: ${report.escalation.total}`);
+          if (report.escalation.history.length > 0) {
+            report.escalation.history.forEach(e => {
+              console.log(`  - ${e.task_id}: ${e.from_model} → ${e.to_model} (${e.reason})`);
+            });
+          } else {
+            console.log('  (none)');
+          }
+          console.log('');
+
+          console.log('FEEDBACK SUMMARY:');
+          console.log(`  Total: ${report.feedback.total_feedback}`);
+          console.log(`  Correct: ${report.feedback.correct_selections || 0}`);
+          console.log(`  Incorrect: ${report.feedback.incorrect_selections || 0}`);
+          console.log(`  Correct Rate: ${report.feedback.correct_rate}%`);
+          if (Object.keys(report.feedback.incorrect_by_model).length > 0) {
+            console.log('  Incorrect by Model:');
+            Object.entries(report.feedback.incorrect_by_model).forEach(([model, count]) => {
+              console.log(`    ${model}: ${count}`);
+            });
+          }
+        }
+
+      } else {
+        error('Unknown auto-task subcommand. Available: status, report');
+      }
+      break;
+    }
+
+        case 'routing': {
       const subcommand = args[1];
       if (subcommand === 'match') {
         cmdRoutingMatch(cwd, args.slice(2).join(' '), raw);
