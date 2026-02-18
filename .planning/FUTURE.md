@@ -19,3 +19,8 @@
 **Statement:** A localhost web dashboard renders the live DAG — declarations, milestones, actions, integrity status, performance scores — browsable and interactive in a browser.
 **Status:** PENDING
 **Milestones:** 
+
+## D-05: Full Declare Namespace
+**Statement:** Every GSD utility exists in Declare's namespace — quick tasks, todos, session pause/resume, settings, health checks — so the full workflow runs without ever touching a /gsd:* command.
+**Status:** PENDING
+**Milestones:** 
