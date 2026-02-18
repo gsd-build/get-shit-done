@@ -15,7 +15,7 @@ Derive action plans for milestones by working backward from what must be done.
 **Step 1: Load current graph state.**
 
 ```bash
-node /Users/guilherme/Projects/get-shit-done/dist/declare-tools.cjs load-graph
+node dist/declare-tools.cjs load-graph
 ```
 
 Parse the JSON output. If the output contains an `error` field, tell the user to run `/declare:init` first and stop.
@@ -36,7 +36,7 @@ If all milestones already have plans and no specific milestone was requested, te
 
 Read and follow the workflow:
 
-@/Users/guilherme/Projects/get-shit-done/workflows/actions.md
+@workflows/actions.md
 
 For each milestone, derive and present the plan, then ask for approval using AskUserQuestion:
 
@@ -53,7 +53,7 @@ If the user wants adjustments, adjust and re-present. If they skip, move to the 
 After approval, persist:
 
 ```bash
-node /Users/guilherme/Projects/get-shit-done/dist/declare-tools.cjs create-plan --milestone "M-XX" --actions '[{"title":"Action Title","produces":"what it creates"}]'
+node dist/declare-tools.cjs create-plan --milestone "M-XX" --actions '[{"title":"Action Title","produces":"what it creates"}]'
 ```
 
 **Step 3b: Auto mode (`--auto`) — derive all, present once, persist all.**
@@ -92,7 +92,7 @@ After all milestones processed:
 
 1. Reload the graph to get final counts:
 ```bash
-node /Users/guilherme/Projects/get-shit-done/dist/declare-tools.cjs load-graph
+node dist/declare-tools.cjs load-graph
 ```
 
 2. Show summary: milestones processed, plans created, total actions derived.

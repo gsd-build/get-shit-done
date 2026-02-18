@@ -398,23 +398,9 @@ If user chooses to **accept**:
 - Add a note to VERIFICATION.md: "User accepted current state. Milestone remains BROKEN."
 - Proceed to Step 8.
 
-**Step 8: Completion banner.**
+**Step 8: Occurrence check at milestone completion.**
 
-Display the final execution summary:
-
-```
-## Execution Complete: M-XX -- [milestoneTitle]
-
-**Actions completed:** [count of actions executed, including remediation actions]
-**Waves executed:** [count of waves]
-**Verification:** [KEPT | HONORED | RENEGOTIATED | BROKEN (user accepted)]
-**Milestone status:** [final status in MILESTONES.md]
-**Occurrence check:** [Performed / Skipped (if no declarations affected)]
-```
-
-**Step 9: Occurrence check at milestone completion.**
-
-After displaying the completion banner, check whether declarations still occur as declared.
+After execution and verification, check whether declarations still occur as declared.
 
 Run:
 
@@ -489,6 +475,20 @@ If user provides IDs, guide them through reassignment (edit MILESTONES.md to upd
 Then prompt: "Would you like to create a replacement declaration now? (yes/no)"
 - If "yes": suggest running `/declare:future` to add a new declaration
 - If "no": continue
+
+**Step 9: Completion banner.**
+
+Display the final execution summary:
+
+```
+## Execution Complete: M-XX -- [milestoneTitle]
+
+**Actions completed:** [count of actions executed, including remediation actions]
+**Waves executed:** [count of waves]
+**Verification:** [KEPT | HONORED | RENEGOTIATED | BROKEN (user accepted)]
+**Milestone status:** [final status in MILESTONES.md]
+**Occurrence check:** [Performed — X declarations assessed / Skipped (if no declarations affected)]
+```
 
 **Error handling:**
 

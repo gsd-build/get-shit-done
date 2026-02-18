@@ -15,7 +15,7 @@ Derive milestones by working backward from declared futures.
 **Step 1: Load current graph state.**
 
 ```bash
-node /Users/guilherme/Projects/get-shit-done/dist/declare-tools.cjs load-graph
+node dist/declare-tools.cjs load-graph
 ```
 
 Parse the JSON output. If the output contains an `error` field, tell the user to run `/declare:init` first and stop.
@@ -33,7 +33,7 @@ Note all declarations and milestones from the graph -- the workflow needs full c
 
 Read and follow the full workflow instructions:
 
-@/Users/guilherme/Projects/get-shit-done/workflows/milestones.md
+@workflows/milestones.md
 
 Pass the loaded graph state into the workflow so it knows about existing declarations and milestones.
 
@@ -55,7 +55,7 @@ Which of these milestones should we create for D-XX?
 Build a JSON array of the checked milestones, then create them all at once:
 
 ```bash
-node /Users/guilherme/Projects/get-shit-done/dist/declare-tools.cjs add-milestones --json '[{"title":"Milestone A","realizes":"D-XX"},{"title":"Milestone B","realizes":"D-XX"}]'
+node dist/declare-tools.cjs add-milestones --json '[{"title":"Milestone A","realizes":"D-XX"},{"title":"Milestone B","realizes":"D-XX"}]'
 ```
 
 This creates all milestones and makes a single git commit. Parse the JSON output — it returns `{ milestones: [{ id, title, realizes, status }], committed, hash }`.
@@ -74,7 +74,7 @@ After all declarations processed:
 
 1. Reload the graph to get final counts:
 ```bash
-node /Users/guilherme/Projects/get-shit-done/dist/declare-tools.cjs load-graph
+node dist/declare-tools.cjs load-graph
 ```
 
 2. Show summary: declarations processed, milestones derived.
