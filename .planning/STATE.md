@@ -12,7 +12,7 @@ See: .planning/PROJECT.md (updated 2026-02-15)
 Phase: 12 of 12 (Historical Conversation Mining)
 Plan: 03 of 03
 Status: Complete
-Last activity: 2026-02-18 — Completed plan 01-07 (Multi-Signal Complexity Scoring)
+Last activity: 2026-02-18 — Completed plan 01-08 (Quota-Aware Model Selection)
 
 Progress: [█████████████████████████████████████] 100%
 
@@ -85,6 +85,7 @@ Progress: [███████████████████████
 | Phase 12 P03 | 3 | 2 tasks | 2 files |
 | Phase 06 P02 | 4min | 3 tasks | 3 files |
 | Phase 01 P07 | 5min | 1 task | 2 files |
+| Phase 01 P08 | 2 | 1 tasks | 2 files |
 
 ## Accumulated Context
 
@@ -292,6 +293,9 @@ Recent decisions affecting current work:
 - [Phase 01-07]: No-match default: 25 pts keyword signal (unknown tasks land in sonnet territory)
 - [Phase 01-07]: Length buckets refined: <=5 words=3pts, 6-20=8pts, 21-50=15pts for haiku/sonnet differentiation
 - [Phase 01-07]: loadRoutingRules filter bug fixed: removed overly-aggressive 'architecture'/'testing' pattern filter that stripped real patterns
+- [Phase 01-08]: quota-aware routing wraps selectModelFromRules() without modifying it — clean separation of concerns
+- [Phase 01-08]: Downgrade ladder: >80% quota downgrades opus to sonnet; >95% downgrades opus/sonnet to haiku
+- [Phase 01-08]: quota_adjusted bool + quota_percent included in all responses for coordinator observability
 
 ### Roadmap Evolution
 
@@ -307,6 +311,6 @@ None yet.
 
 ## Session Continuity
 
-Last session: 2026-02-18T08:23:21Z (plan execution)
-Stopped at: Completed 01-07-PLAN.md (Multi-Signal Complexity Scoring) - Phase 01 Plan 07 - gap closure
+Last session: 2026-02-18T08:28:38Z (plan execution)
+Stopped at: Completed 01-08-PLAN.md (Quota-Aware Model Selection) - Phase 01 Plan 08 - gap closure
 Resume file: None
