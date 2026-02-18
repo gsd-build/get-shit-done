@@ -239,6 +239,90 @@ After all waves:
 ```
 </step>
 
+<step name="code_review_autofix">
+Automatically review and fix code quality issues in files changed during phase execution, before verification runs.
+
+**1. Check config gate:**
+
+```bash
+CODE_REVIEW_CFG=$(node ~/.claude/get-shit-done/bin/gsd-tools.cjs config-get workflow.code_review 2>/dev/null || echo "true")
+```
+
+If `CODE_REVIEW_CFG` is `"false"`: skip with `Skipping code review (workflow.code_review=false)` → proceed to next step.
+
+**2. Identify changed source files:**
+
+```bash
+PHASE_FIRST_COMMIT=$(git log --oneline --all --grep="${PHASE_NUMBER}-" --format="%H" | tail -1)
+CHANGED_FILES=$(git diff --name-only ${PHASE_FIRST_COMMIT}^..HEAD 2>/dev/null | grep -v '\.planning/' | grep -v 'SUMMARY\.md' | grep -v 'ROADMAP\.md' | grep -v 'STATE\.md' | grep -v 'REQUIREMENTS\.md')
+```
+
+If `CHANGED_FILES` is empty: skip with `No source files changed in phase — skipping code review` → proceed to next step.
+
+**3. Spawn code review agent:**
+
+```
+Task(
+  subagent_type="code-reviewer",
+  model="{executor_model}",
+  prompt="
+    <objective>
+    Review and auto-fix code quality issues in files changed during phase {PHASE_NUMBER}-{PHASE_NAME} execution.
+    </objective>
+
+    <changed_files>
+    {CHANGED_FILES}
+    </changed_files>
+
+    <instructions>
+    1. Read all changed files listed above
+    2. Review for these categories (in priority order):
+       - Critical: Security vulnerabilities (SQL injection, SSRF, auth bypass)
+       - Critical: Data loss risks (unhandled errors, race conditions)
+       - High: Logic errors (off-by-one, null/None checks, type coercion)
+       - High: Silent failures (swallowed exceptions, bare except, missing error handling)
+       - Medium: Performance issues (N+1 queries, memory leaks)
+       - Low: Code quality (DRY violations, dead code, unclear naming)
+    3. For each issue found: fix it directly in the source file
+    4. After all fixes applied, re-read the modified files and do a verification pass
+    5. If verification finds new issues, fix and re-verify (max 3 total iterations)
+    6. When clean, stage and commit all changes:
+       git add {specific files with fixes}
+       git commit with message: fix(phase-{PHASE_NUMBER}): code review autofix
+       Include a bullet list of each fix applied in the commit body
+    7. If no issues found on first pass, report 'Clean review — no fixes needed' and exit without committing
+    </instructions>
+
+    <constraints>
+    - Do NOT rebuild Docker containers
+    - Do NOT update documentation files (CLAUDE.md, SYSTEM_CHANGES.md, DATABASE_SCHEMA.md, etc.)
+    - Do NOT modify test files unless fixing a genuine bug in the test itself
+    - Do NOT change formatting/style only — only fix functional issues
+    - Do NOT add new dependencies
+    - Limit scope to the listed changed files only
+    </constraints>
+  "
+)
+```
+
+**4. Report results:**
+
+```
+---
+## Code Review
+
+{If fixes applied:}
+**Status:** {N} issues fixed and committed
+**Commit:** fix(phase-{X}): code review autofix
+
+{If clean:}
+**Status:** Clean review — no fixes needed
+
+Proceeding to verification...
+---
+```
+</step>
+
 <step name="close_parent_artifacts">
 **For decimal/polish phases only (X.Y pattern):** Close the feedback loop by resolving parent UAT and debug artifacts.
 
