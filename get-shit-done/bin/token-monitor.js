@@ -82,6 +82,24 @@ class TokenBudgetMonitor {
           phase,
           timestamp: new Date().toISOString()
         });
+
+        // Auto-enable compression at 80% threshold (Gap 2: token monitor -> compression wiring)
+        if (alert.threshold === 0.80) {
+          try {
+            const hookConfigPath = require('path').join(
+              process.env.HOME, '.claude', 'get-shit-done', 'bin', 'hooks', 'config'
+            );
+            const { loadHookConfig, saveHookConfig } = require(hookConfigPath);
+            const cfg = loadHookConfig();
+            if (!cfg.compression.enabled) {
+              cfg.compression.enabled = true;
+              saveHookConfig(cfg);
+              process.stderr.write('[token-monitor] Auto-enabled compression at 80% token threshold\n');
+            }
+          } catch (_) {
+            // hooks not installed or config unavailable - skip silently
+          }
+        }
       }
     }
   }
