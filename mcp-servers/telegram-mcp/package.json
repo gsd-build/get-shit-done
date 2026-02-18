@@ -7,6 +7,7 @@
   "scripts": {
     "build": "tsc",
     "start": "node dist/index.js",
+    "start:daemon": "node dist/daemon/index.js",
     "dev": "tsc --watch"
   },
   "dependencies": {
