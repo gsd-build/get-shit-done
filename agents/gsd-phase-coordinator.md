@@ -69,15 +69,53 @@ Execute all plans in the phase:
 node /Users/ollorin/.claude/get-shit-done/bin/gsd-tools.js phase-plan-index {phase_number}
 ```
 
+Check the model profile setting to determine if auto routing is active:
+
+```bash
+CONFIG_FILE=".planning/config.json"
+if [ -f "$CONFIG_FILE" ]; then
+  MODEL_PROFILE=$(jq -r '.model_profile // "quality"' "$CONFIG_FILE")
+else
+  MODEL_PROFILE="quality"
+fi
+echo "Model profile: $MODEL_PROFILE"
+```
+
+If MODEL_PROFILE is "auto", auto routing is active. Otherwise use sonnet as default.
+
 For each incomplete plan (no SUMMARY.md):
 
 1. **Describe what this plan builds** (read objective from PLAN.md)
 
-2. **Spawn executor agent:**
+2. **Determine executor model:**
+
+   **If auto profile active:** Get model recommendation from task router.
+
+   Read the plan objective (first line of `<objective>` tag in PLAN.md) as the task description for routing:
+
+   ```bash
+   PLAN_OBJECTIVE=$(grep -A1 '<objective>' {plan_file} | tail -1 | tr -d '\n')
+   ```
+
+   Spawn routing agent to get model recommendation:
+   ```
+   Task(
+     subagent_type="gsd-task-router",
+     prompt="Route this task: {PLAN_OBJECTIVE}"
+   )
+   ```
+
+   Parse the ROUTING DECISION response to extract the `Model:` line.
+   Set EXECUTOR_MODEL to the returned model tier (haiku/sonnet/opus).
+   Also capture ROUTING_SCORE and ROUTING_CONTEXT from the response.
+
+   **If auto profile NOT active:** Set EXECUTOR_MODEL="sonnet" (unchanged default behavior).
+
+3. **Spawn executor agent:**
 ```
 Task(
   subagent_type="gsd-executor",
-  model="sonnet",
+  model="{EXECUTOR_MODEL}",
   prompt="
     <objective>
     Execute plan {plan_number} of phase {phase_number}-{phase_name}.
@@ -96,16 +134,24 @@ Task(
     - State: .planning/STATE.md
     - Config: .planning/config.json (if exists)
     </files_to_read>
+
+    {IF_AUTO_PROFILE_ACTIVE:
+    <routing_context>
+    Auto mode active. Routed to {EXECUTOR_MODEL} (score: {ROUTING_SCORE}).
+    Relevant context injected by router:
+    {ROUTING_CONTEXT}
+    </routing_context>
+    }
   "
 )
 ```
 
-3. **Spot-check result:**
+4. **Spot-check result:**
    - SUMMARY.md exists for this plan
    - Git commit present with phase-plan reference
    - No `## Self-Check: FAILED` in SUMMARY.md
 
-4. **Create checkpoint after each wave:**
+5. **Create checkpoint after each wave:**
 ```json
 {
   "phase": {N},
