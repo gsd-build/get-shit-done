@@ -5,8 +5,9 @@ CLAUDE.md
 /research.claude/
 commands.html
 
-# Local test installs
-.claude/
+# Local test installs (except declare commands which are part of the project)
+.claude/*
+!.claude/commands/
 
 # Build artifacts (committed to npm, not git)
 hooks/dist/

@@ -1,16 +1,15 @@
 {
-  "name": "get-shit-done-cc",
-  "version": "1.20.4",
-  "description": "A meta-prompting, context engineering and spec-driven development system for Claude Code, OpenCode and Gemini by TÂCHES.",
+  "name": "declare-cc",
+  "version": "0.1.0",
+  "description": "A future-driven meta-prompting engine for agentic development, rooted in declared futures and causal graph structure.",
   "bin": {
-    "get-shit-done-cc": "bin/install.js"
+    "declare-cc": "bin/install.js"
   },
   "files": [
     "bin",
     "commands",
-    "get-shit-done",
     "agents",
-    "hooks/dist",
+    "dist",
     "scripts"
   ],
   "keywords": [
@@ -19,9 +18,9 @@
     "ai",
     "meta-prompting",
     "context-engineering",
-    "spec-driven-development",
-    "gemini",
-    "gemini-cli"
+    "declarative",
+    "dag",
+    "future-driven"
   ],
   "author": "TÂCHES",
   "license": "MIT",
@@ -34,15 +33,13 @@
     "url": "https://github.com/glittercowboy/get-shit-done/issues"
   },
   "engines": {
-    "node": ">=16.7.0"
+    "node": ">=18.0.0"
   },
-  "dependencies": {},
   "devDependencies": {
-    "esbuild": "^0.24.0"
+    "esbuild": "^0.24.2"
   },
   "scripts": {
-    "build:hooks": "node scripts/build-hooks.js",
-    "prepublishOnly": "npm run build:hooks",
-    "test": "node --test get-shit-done/bin/gsd-tools.test.js"
+    "test": "node --test src/graph/engine.test.js",
+    "build": "node esbuild.config.js"
   }
 }
