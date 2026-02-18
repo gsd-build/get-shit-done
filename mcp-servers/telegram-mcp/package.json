@@ -14,6 +14,7 @@
     "@modelcontextprotocol/sdk": "^1.0.0",
     "dotenv": "^16.0.0",
     "fluent-ffmpeg": "^2.1.0",
+    "pino": "^9.0.0",
     "proper-lockfile": "^4.1.2",
     "telegraf": "^4.16.0",
     "uuid": "^13.0.0"
