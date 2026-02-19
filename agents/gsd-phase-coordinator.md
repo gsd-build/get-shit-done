@@ -158,7 +158,63 @@ sufficient_answers = answers where evaluation == "sufficient"
 escalation_needed = answers where evaluation == "needs-escalation"
 ```
 
-{ESCALATION: Phase 23 replaces this block — for now, log needs-escalation items but do not block}
+**Sensitivity check for escalation:**
+
+Before escalating any needs-escalation item to Telegram, evaluate it against six sensitivity criteria. Only escalate if ANY criterion is true:
+
+1. **Irreversible change** — Would implementing this answer result in a change that cannot be undone without significant effort? (e.g., deleting data, migrating schema, public API contract)
+2. **>1 phase rework risk** — If wrong, would this require reworking more than one future phase?
+3. **Major architectural decision** — Does this affect the overall system design, component boundaries, or data model in a non-trivial way?
+4. **Money/data loss potential** — Could a wrong decision lead to loss of user data, financial charges, or security breach?
+5. **Conflicting KB signals** — Do the knowledge DB results for this question directly contradict each other (different answers with similar confidence)?
+6. **Always-ask topic** — Does the question involve a topic the user has previously indicated they always want to decide personally?
+
+For each item in `escalation_needed`:
+- Apply the six criteria above based on the question text, gray_area, and answer.confidence
+- If NO criterion matches → move to Claude's Discretion (confidence >= 0.4 already handled by existing logic)
+- If ANY criterion matches → mark as `sensitive_escalation: true`
+
+Produce:
+```
+sensitive_items = escalation_needed items where sensitive_escalation == true
+discretion_items = escalation_needed items where sensitive_escalation == false
+```
+
+**Escalate sensitive items via Telegram:**
+
+For each item in `sensitive_items`, call `mcp__telegram__ask_blocking_question`:
+
+```
+Update session status to 'waiting' (call mcp__telegram__update_session_status with status: "waiting", question_title: first 50 chars of question):
+mcp__telegram__update_session_status({ status: "waiting", question_title: item.question.slice(0, 50) })
+
+Call ask_blocking_question — this BLOCKS until the user replies:
+reply = mcp__telegram__ask_blocking_question({
+  question: item.question,
+  context: "Phase {phase_number} — {phase_name}\nGray area: {item.gray_area}\nMeta-answerer confidence: {item.confidence}\nSensitivity reason: {which criterion triggered}",
+  timeout_minutes: 30
+})
+
+Update session status back to 'busy':
+mcp__telegram__update_session_status({ status: "busy" })
+
+Store reply:
+escalated_answers.push({
+  gray_area: item.gray_area,
+  question: item.question,
+  answer: reply,
+  source: "telegram_escalation",
+  confidence: 1.0
+})
+```
+
+After all sensitive_items processed, `escalated_answers` holds human-provided answers.
+
+**Merge escalated answers with sufficient answers for CONTEXT.md:**
+
+The CONTEXT.md writer below uses `sufficient_answers` to populate the Implementation Decisions section. Append `escalated_answers` to `sufficient_answers` before writing CONTEXT.md, so all answered questions (autonomous + human-escalated) appear in the decisions section.
+
+The `discretion_items` array goes into the Claude's Discretion subsection (unchanged from Phase 22 behavior for non-sensitive items).
 
 Log needs-escalation items to the checkpoint:
 ```json
@@ -205,7 +261,10 @@ mkdir -p ".planning/phases/{phase_dir}"
 - {answer.question}: {answer.answer} (confidence: {answer.confidence})
 
 ### Claude's Discretion
-{List questions from needs-escalation that Claude can decide autonomously — i.e., escalation_needed items with confidence >= 0.4 that are not sensitive decisions. Phase 23 handles the truly sensitive ones via Telegram.}
+{List questions from discretion_items (needs-escalation items with confidence >= 0.4 that did not trigger any sensitivity criterion). Claude decides these autonomously.}
+
+### Escalated Decisions (Human-Answered)
+{If escalated_answers.length > 0: list each item with format "- {answer.question}: {answer.answer} (answered via Telegram)". If none: omit this subsection.}
 
 </decisions>
 
@@ -228,7 +287,7 @@ mkdir -p ".planning/phases/{phase_dir}"
 
 *Phase: {padded_phase}-{phase_slug}*
 *Context gathered: {current_date}*
-*Autonomous answers: {sufficient_count} | Needs escalation: {escalation_count}*
+*Autonomous answers: {sufficient_count} | Needs escalation: {escalation_count} | Escalated: {escalated_count}*
 ```
 
 3. Write the file.
