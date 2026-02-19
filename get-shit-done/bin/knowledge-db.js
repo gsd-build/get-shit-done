@@ -18,24 +18,30 @@ const crypto = require('crypto')
 
 // ─── Constants ─────────────────────────────────────────────────────────────
 
-const SCHEMA_VERSION = 3
+const SCHEMA_VERSION = 4
 const DB_CONNECTIONS = new Map()
 
 // ─── Path Resolution ───────────────────────────────────────────────────────
 
 /**
  * Get database file path for given scope
- * @param {string} scope - 'global' or 'project'
+ *
+ * As of schema v4, all scopes resolve to the global DB at ~/.claude/knowledge/<user>.db.
+ * The 'legacy' scope returns the old per-project path for use by the migration command only.
+ *
+ * @param {string} scope - 'global', 'project', or 'legacy'
  * @returns {string} Absolute path to database file
  */
 function getDBPath(scope) {
   const username = os.userInfo().username
 
-  if (scope === 'global') {
-    return path.join(os.homedir(), '.claude', 'knowledge', `${username}.db`)
-  } else {
+  if (scope === 'legacy') {
+    // Old per-project path — only used by migrate-knowledge command
     return path.join(process.cwd(), '.planning', 'knowledge', `${username}.db`)
   }
+
+  // Both 'global' and 'project' resolve to the same global DB
+  return path.join(os.homedir(), '.claude', 'knowledge', `${username}.db`)
 }
 
 // ─── Availability Check ────────────────────────────────────────────────────
@@ -86,7 +92,8 @@ function createSchema(db) {
       access_count INTEGER DEFAULT 0,
       last_accessed INTEGER,
       content_hash TEXT,
-      metadata TEXT
+      metadata TEXT,
+      project_slug TEXT
     );
   `)
 
@@ -133,6 +140,11 @@ function createSchema(db) {
   db.exec(`
     CREATE INDEX IF NOT EXISTS idx_knowledge_hash
     ON knowledge(content_hash);
+  `)
+
+  db.exec(`
+    CREATE INDEX IF NOT EXISTS idx_knowledge_project_slug
+    ON knowledge(project_slug);
   `)
 
   // Permissions table
@@ -348,6 +360,19 @@ function migrateDatabase(db) {
     `)
 
     setVersion(db, 3)
+  }
+
+  // Migration from version 3 to version 4: Add project_slug column for global DB tagging
+  if (getCurrentVersion(db) === 3) {
+    db.exec(`
+      ALTER TABLE knowledge ADD COLUMN project_slug TEXT;
+    `)
+
+    db.exec(`
+      CREATE INDEX IF NOT EXISTS idx_knowledge_project_slug ON knowledge(project_slug);
+    `)
+
+    setVersion(db, 4)
   }
 
   return getCurrentVersion(db)
