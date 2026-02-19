@@ -139,6 +139,7 @@
  *     [--max-age-days N] [--include-subagents] [--limit N]
  *   store-conversation-result <id> <json>       Store conversation mining results
  *     [--content-hash <hash>]
+ *   migrate-knowledge                           Migrate per-project DBs to global DB
  *
  * Compound Commands (workflow-specific initialization):
  *   init execute-phase <phase>         All context for execute-phase workflow
@@ -7488,7 +7489,7 @@ async function cmdStoreAnalysisResult(cwd, args, raw) {
   let storeResult = { stored: 0, skipped: 0, evolved: 0, errors: [] };
   if (allInsights.length > 0) {
     try {
-      storeResult = await storeInsights(allInsights, { sessionId, scope: 'project' });
+      storeResult = await storeInsights(allInsights, { sessionId, scope: 'global' });
     } catch (err) {
       storeResult.errors.push('storeInsights failed: ' + err.message);
     }
@@ -8244,7 +8245,7 @@ async function cmdStoreConversationResult(cwd, args, raw) {
       storeResult = await storeInsights(allInsights, {
         sessionId,
         conversationId: sessionId,
-        scope: 'project'
+        scope: 'global'
       });
     } catch (err) {
       storeResult.errors.push('storeInsights failed: ' + err.message);
@@ -8253,7 +8254,7 @@ async function cmdStoreConversationResult(cwd, args, raw) {
 
   // Mark conversation as analyzed in the conversation-specific analysis log
   const totalInsights = storeResult.stored + storeResult.evolved;
-  const conversationLogPath = path.join(cwd, '.planning', 'knowledge', '.conversation-analysis-log.jsonl');
+  const conversationLogPath = path.join(require('os').homedir(), '.claude', 'knowledge', '.conversation-analysis-log.jsonl');
   try {
     // Ensure parent directory exists
     const logDir = path.dirname(conversationLogPath);
@@ -8277,6 +8278,173 @@ async function cmdStoreConversationResult(cwd, args, raw) {
     skipped: storeResult.skipped,
     evolved: storeResult.evolved,
     errors: [...parseErrors, ...storeResult.errors]
+  }, raw);
+}
+
+// ─── Knowledge Migration ──────────────────────────────────────────────────────
+
+/**
+ * migrate-knowledge
+ *
+ * Scans ~/.claude/projects/ for all project directories, finds any per-project
+ * .planning/knowledge/<user>.db files, copies all entries to the global DB,
+ * and reports results. Does NOT delete old DBs.
+ */
+async function cmdMigrateKnowledge(cwd, args, raw) {
+  const os = require('os');
+  const homedir = os.homedir();
+  const username = os.userInfo().username;
+
+  // Load better-sqlite3 directly (knowledge-db.js is not used for legacy path)
+  let Database;
+  try {
+    Database = require('better-sqlite3');
+  } catch (err) {
+    output({ status: 'error', reason: 'better-sqlite3 not installed: ' + err.message }, raw);
+    return;
+  }
+
+  // Open the global DB via knowledge-db.js
+  let knowledgeDb;
+  try {
+    knowledgeDb = require(path.join(__dirname, 'knowledge-db.js'));
+  } catch (err) {
+    output({ status: 'error', reason: 'Failed to load knowledge-db.js: ' + err.message }, raw);
+    return;
+  }
+
+  let globalConn;
+  try {
+    globalConn = knowledgeDb.openKnowledgeDB('global');
+  } catch (err) {
+    output({ status: 'error', reason: 'Failed to open global knowledge DB: ' + err.message }, raw);
+    return;
+  }
+
+  const globalDB = globalConn.db;
+
+  // Scan ~/.claude/projects/ for slug directories
+  const projectsDir = path.join(homedir, '.claude', 'projects');
+  let slugDirs = [];
+  try {
+    slugDirs = fs.readdirSync(projectsDir).filter(entry => {
+      return fs.statSync(path.join(projectsDir, entry)).isDirectory();
+    });
+  } catch (err) {
+    // ~/.claude/projects/ may not exist — that's fine
+    output({
+      status: 'ok',
+      migrated: 0,
+      projects: [],
+      total_entries: 0,
+      message: 'No projects directory found at ' + projectsDir
+    }, raw);
+    return;
+  }
+
+  const results = [];
+  let totalMigrated = 0;
+
+  for (const slug of slugDirs) {
+    // Reverse slug to filesystem path: leading - means leading /, all - are /
+    const reversed = slug.replace(/-/g, '/');
+    const projectPath = reversed; // Already starts with /
+
+    const legacyDbPath = path.join(projectPath, '.planning', 'knowledge', `${username}.db`);
+
+    // Check if legacy DB exists
+    if (!fs.existsSync(legacyDbPath)) {
+      continue;
+    }
+
+    // Open the legacy DB directly
+    let legacyDB;
+    try {
+      legacyDB = new Database(legacyDbPath, { readonly: true });
+    } catch (err) {
+      results.push({ project: projectPath, status: 'error', reason: 'Failed to open legacy DB: ' + err.message });
+      continue;
+    }
+
+    let rows = [];
+    try {
+      // Check if knowledge table exists in legacy DB
+      const tableExists = legacyDB.prepare(
+        "SELECT name FROM sqlite_master WHERE type='table' AND name='knowledge'"
+      ).get();
+
+      if (!tableExists) {
+        legacyDB.close();
+        results.push({ project: projectPath, status: 'skipped', reason: 'No knowledge table in legacy DB' });
+        continue;
+      }
+
+      rows = legacyDB.prepare('SELECT * FROM knowledge').all();
+    } catch (err) {
+      legacyDB.close();
+      results.push({ project: projectPath, status: 'error', reason: 'Failed to read legacy DB: ' + err.message });
+      continue;
+    }
+
+    legacyDB.close();
+
+    if (rows.length === 0) {
+      results.push({ project: projectPath, status: 'ok', migrated: 0 });
+      continue;
+    }
+
+    // Get the column list from the global DB (may have project_slug, legacy won't)
+    const globalColumns = globalDB.prepare("PRAGMA table_info(knowledge)").all().map(c => c.name);
+    // Determine which columns exist in the legacy rows
+    const legacyColumns = Object.keys(rows[0]);
+    // Only copy columns that exist in both
+    const sharedColumns = legacyColumns.filter(c => globalColumns.includes(c));
+
+    // Prepare the insert statement
+    const placeholders = sharedColumns.map(() => '?').join(', ');
+    const columnList = sharedColumns.join(', ');
+    const insertStmt = globalDB.prepare(
+      `INSERT OR IGNORE INTO knowledge (${columnList}) VALUES (${placeholders})`
+    );
+
+    // Use transaction for bulk insert
+    let copiedCount = 0;
+    try {
+      const insertMany = globalDB.transaction((rows) => {
+        for (const row of rows) {
+          const values = sharedColumns.map(c => row[c]);
+          insertStmt.run(values);
+          copiedCount++;
+        }
+      });
+      insertMany(rows);
+    } catch (err) {
+      results.push({ project: projectPath, status: 'error', reason: 'Transaction failed: ' + err.message, migrated: copiedCount });
+      continue;
+    }
+
+    // Verify: global DB count >= rows copied from this source
+    const globalCount = globalDB.prepare('SELECT COUNT(*) as cnt FROM knowledge').get().cnt;
+    if (globalCount < copiedCount) {
+      results.push({
+        project: projectPath,
+        status: 'warning',
+        reason: `Global count (${globalCount}) less than copied (${copiedCount}) — possible duplicates filtered`,
+        migrated: copiedCount
+      });
+    } else {
+      results.push({ project: projectPath, status: 'ok', migrated: copiedCount });
+    }
+
+    totalMigrated += copiedCount;
+  }
+
+  output({
+    status: 'ok',
+    migrated: totalMigrated,
+    projects: results,
+    total_entries: totalMigrated,
+    note: 'Old per-project DBs were NOT deleted. Remove .planning/knowledge/ manually when satisfied.'
   }, raw);
 }
 
@@ -8988,6 +9156,11 @@ async function main() {
 
     case 'store-conversation-result': {
       await cmdStoreConversationResult(cwd, args.slice(1), raw);
+      break;
+    }
+
+    case 'migrate-knowledge': {
+      await cmdMigrateKnowledge(cwd, args.slice(1), raw);
       break;
     }
 
