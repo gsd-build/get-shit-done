@@ -86,6 +86,13 @@ export function setupHandlers(bot, sessionService, getQuestions) {
             try {
                 const fileLink = await ctx.telegram.getFileLink(msg.voice.file_id);
                 const transcript = await transcribeVoice(fileLink.href);
+                // transcribeVoice never throws — it returns an error string on failure.
+                // Don't deliver a failed transcription as a question answer.
+                if (transcript.startsWith('[Transcription failed:')) {
+                    log.warn({ threadId }, 'Transcription failed — prompting user to retry with text');
+                    await ctx.reply(`Could not transcribe voice message. Please reply with text instead.\n${transcript}`);
+                    return;
+                }
                 // Confirm transcription in the thread
                 const preview = transcript.slice(0, 50);
                 const suffix = transcript.length > 50 ? '...' : '';

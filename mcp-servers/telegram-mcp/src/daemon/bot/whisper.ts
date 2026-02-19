@@ -1,13 +1,16 @@
 /**
- * Voice transcription via whisper-node with cwd bug fix.
+ * Voice transcription by running whisper.cpp directly.
  *
- * whisper-node changes process.cwd() when imported, corrupting path resolution.
- * Fix: save and restore cwd around the whisper call, and lazy-load the module.
+ * Bypasses whisper-node's broken tsToArray parser (which calls lines.shift()
+ * and drops the first — often only — transcript line). Instead we:
+ *   1. Resolve the whisper.cpp binary path via the whisper-node package location
+ *   2. Run the binary with child_process.exec (explicit cwd, no chdir needed)
+ *   3. Parse stdout ourselves with a simple regex
  *
  * Audio pipeline:
  *   Telegram .oga file → /tmp/voice-{uuid}.oga
  *   ffmpeg convert     → /tmp/voice-{uuid}.wav (16kHz mono, whisper requirement)
- *   whisper-node       → transcript string
+ *   whisper.cpp/main   → transcript string
  */
 
 import { createWriteStream } from 'fs';
@@ -15,6 +18,9 @@ import fs from 'fs/promises';
 import https from 'https';
 import os from 'os';
 import path from 'path';
+import { exec } from 'child_process';
+import { promisify } from 'util';
+import { createRequire } from 'module';
 import { randomUUID } from 'crypto';
 import { createLogger } from '../../shared/logger.js';
 
@@ -25,6 +31,24 @@ import ffmpegInstaller from '@ffmpeg-installer/ffmpeg';
 ffmpeg.setFfmpegPath(ffmpegInstaller.path);
 
 const log = createLogger('whisper');
+const execAsync = promisify(exec);
+
+// ─── Binary path resolution ─────────────────────────────────────────────────
+
+/**
+ * Resolve the absolute path to the whisper.cpp directory bundled inside
+ * the whisper-node npm package.
+ *
+ * whisper-node's shell.js is at: <pkg>/dist/shell.js
+ * The whisper.cpp binary is at: <pkg>/lib/whisper.cpp/main
+ */
+function getWhisperCppDir(): string {
+  const require = createRequire(import.meta.url);
+  const shellPath = require.resolve('whisper-node/dist/shell.js');
+  // shellPath: …/node_modules/whisper-node/dist/shell.js
+  // binary:    …/node_modules/whisper-node/lib/whisper.cpp/
+  return path.join(path.dirname(shellPath), '..', 'lib', 'whisper.cpp');
+}
 
 // ─── Helpers ───────────────────────────────────────────────────────────────────
 
@@ -66,25 +90,22 @@ async function convertToWav(inputPath: string, outputPath: string): Promise<void
 }
 
 /**
- * Lazy-load whisper-node to avoid cwd corruption at import time.
- * whisper-node calls process.chdir() internally during module initialization.
+ * Parse whisper.cpp stdout into a transcript string.
  *
- * whisper-node is a CJS module exporting { whisper: fn }.
- * When imported via ESM dynamic import():
- *   mod.whisper  — named export (Node CJS interop, preferred)
- *   mod.default  — the whole CJS exports object { whisper: fn }
- * So mod.default is NOT callable; we must use mod.whisper or mod.default.whisper.
+ * whisper.cpp outputs lines like:
+ *   [00:00:00.000 --> 00:00:02.500]   Hello world.
+ *
+ * We extract the text after the timestamp bracket on EVERY line (not skipping
+ * the first, which whisper-node's tsToArray incorrectly discards).
  */
-async function getWhisperFn(): Promise<(filePath: string, opts: object) => Promise<unknown>> {
-  // @ts-ignore — whisper-node ships no TypeScript types
-  const mod = await import('whisper-node');
-  const fn = (mod as any).whisper ?? (mod as any).default?.whisper;
-  if (typeof fn !== 'function') {
-    throw new TypeError(
-      `whisper-node did not export a callable 'whisper' function (got ${typeof fn})`
-    );
+function parseWhisperOutput(stdout: string): string {
+  const matches = stdout.matchAll(/\[\d+:\d+:\d+\.\d+\s*-->\s*\d+:\d+:\d+\.\d+\]\s+(.*)/g);
+  const parts: string[] = [];
+  for (const match of matches) {
+    const text = match[1]?.trim();
+    if (text) parts.push(text);
   }
-  return fn;
+  return parts.join(' ').trim();
 }
 
 // ─── Public API ────────────────────────────────────────────────────────────────
@@ -92,8 +113,8 @@ async function getWhisperFn(): Promise<(filePath: string, opts: object) => Promi
 /**
  * Transcribe a Telegram voice message (OGA format) to text.
  *
- * Downloads the file, converts it with ffmpeg, transcribes with whisper-node
- * using a cwd save/restore guard to prevent path corruption, then cleans up.
+ * Downloads the file, converts it with ffmpeg, then runs whisper.cpp/main
+ * directly to avoid whisper-node's broken output parser.
  *
  * @param fileLink  HTTPS URL returned by bot.telegram.getFileLink()
  * @returns Transcript text, or an error message string (never throws)
@@ -110,59 +131,30 @@ export async function transcribeVoice(fileLink: string): Promise<string> {
     await downloadFile(fileLink, tempOga);
     log.info('Voice file downloaded');
 
-    // 2. Convert to 16kHz mono WAV
+    // 2. Convert to 16kHz mono WAV (whisper.cpp requirement)
     await convertToWav(tempOga, tempWav);
     log.info('Voice file converted to WAV');
 
-    // 3. Transcribe with cwd save/restore (whisper-node cwd bug fix)
-    const savedCwd = process.cwd();
-    process.chdir(os.tmpdir());
+    // 3. Run whisper.cpp binary directly with explicit cwd (no process.chdir needed)
+    const whisperCppDir = getWhisperCppDir();
+    const modelPath = path.join(os.homedir(), '.cache', 'whisper', 'ggml-base.bin');
 
-    let transcript: string;
-    try {
-      const whisper = await getWhisperFn();
+    log.info({ whisperCppDir, modelPath }, 'Running whisper.cpp binary');
 
-      // Use modelPath (absolute) instead of modelName to bypass whisper-node's
-      // relative-path existsSync check, which always fails because:
-      //   - whisper-node looks for ./models/ggml-base.bin relative to process.cwd()
-      //   - we set process.cwd() to /tmp above, so it checks /tmp/models/ggml-base.bin
-      //   - that file doesn't exist; whisper-node throws, catches silently, returns undefined
-      // The actual model lives at ~/.cache/whisper/ggml-base.bin (downloaded separately).
-      const modelPath = path.join(os.homedir(), '.cache', 'whisper', 'ggml-base.bin');
+    const { stdout, stderr } = await execAsync(
+      `./main -l auto -m "${modelPath}" -f "${tempWav}"`,
+      { cwd: whisperCppDir }
+    );
 
-      const result = await whisper(tempWav, {
-        modelPath,
-        whisperOptions: {
-          language: 'auto',
-          word_timestamps: false,
-        },
-      });
-
-      // Guard: whisper-node silently swallows errors and returns undefined.
-      // If result is undefined, the binary failed (model not found, exec error, etc.).
-      if (result === undefined || result === null) {
-        throw new Error(
-          'whisper-node returned undefined — binary execution likely failed. ' +
-          'Check that the model file exists and whisper.cpp/main is compiled.'
-        );
-      }
-
-      // whisper-node returns an array of { speech: string } segment objects
-      transcript = Array.isArray(result)
-        ? (result as Array<{ speech?: string }>)
-            .map((seg) => seg.speech ?? '')
-            .join(' ')
-            .trim()
-        : String(result).trim();
-
-      transcript = transcript || '[No speech detected]';
-    } finally {
-      // Always restore cwd — even if transcription fails
-      process.chdir(savedCwd);
+    if (stderr) {
+      log.debug({ stderr: stderr.slice(0, 200) }, 'whisper.cpp stderr (usually progress info)');
     }
 
-    log.info({ transcriptLength: transcript.length }, 'Transcription complete');
+    // 4. Parse output
+    const transcript = parseWhisperOutput(stdout) || '[No speech detected]';
+    log.info({ transcriptLength: transcript.length, transcript: transcript.slice(0, 80) }, 'Transcription complete');
     return transcript;
+
   } catch (err: any) {
     const message = `[Transcription failed: ${err.message}]`;
     log.error({ err: err.message }, 'Voice transcription error');

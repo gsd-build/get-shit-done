@@ -1,7 +1,7 @@
 {
   "enabled": true,
   "compression": {
-    "enabled": false,
+    "enabled": true,
     "strategy": "header-extraction",
     "min_file_lines": 500,
     "target_reduction": 65,
@@ -12,7 +12,8 @@
       "**/*-CONTEXT.md",
       "**/STATE.md",
       "**/ROADMAP.md",
-      "**/PROJECT.md"
+      "**/PROJECT.md",
+      "/Users/ollorin/igaming-platform/docs/**/*.md"
     ],
     "exclude": [
       "**/*-SUMMARY.md",

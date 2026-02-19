@@ -19,7 +19,8 @@
     "pino": "^9.0.0",
     "proper-lockfile": "^4.1.2",
     "telegraf": "^4.16.0",
-    "uuid": "^13.0.0"
+    "uuid": "^13.0.0",
+    "whisper-node": "^1.1.1"
   },
   "devDependencies": {
     "@types/fluent-ffmpeg": "^2.1.0",

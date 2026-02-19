@@ -114,7 +114,7 @@ async function main(): Promise<void> {
 
   handlers.set('ask_blocking_question', async (params, _clientId) => {
     if (!questionService) {
-      return { error: 'Question service not available — TELEGRAM_BOT_TOKEN not set' };
+      throw new Error('Question service not available — TELEGRAM_BOT_TOKEN not set');
     }
 
     const sessionId = params['sessionId'] as string;
@@ -133,7 +133,7 @@ async function main(): Promise<void> {
 
   handlers.set('check_question_answers', async (params, _clientId) => {
     if (!questionService) {
-      return { error: 'Question service not available — TELEGRAM_BOT_TOKEN not set' };
+      throw new Error('Question service not available — TELEGRAM_BOT_TOKEN not set');
     }
 
     const questionIds =
@@ -172,7 +172,7 @@ async function main(): Promise<void> {
 
   handlers.set('mark_question_answered', async (params, _clientId) => {
     if (!questionService) {
-      return { error: 'Question service not available — TELEGRAM_BOT_TOKEN not set' };
+      throw new Error('Question service not available — TELEGRAM_BOT_TOKEN not set');
     }
 
     const questionId = params['question_id'] as string;
@@ -199,6 +199,9 @@ async function main(): Promise<void> {
   });
 
   handlers.set('send_message', async (params, _clientId) => {
+    if (!questionService) {
+      throw new Error('Bot not available — TELEGRAM_BOT_TOKEN not set');
+    }
     const text = params['text'] as string;
     const threadId =
       typeof params['threadId'] === 'number' ? params['threadId'] : undefined;
@@ -213,6 +216,9 @@ async function main(): Promise<void> {
   });
 
   handlers.set('send_status_update', async (params, _clientId) => {
+    if (!questionService) {
+      throw new Error('Bot not available — TELEGRAM_BOT_TOKEN not set');
+    }
     const message =
       typeof params['message'] === 'string'
         ? params['message']

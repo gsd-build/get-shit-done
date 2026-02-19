@@ -83,7 +83,7 @@ async function main() {
     // ─── Question service handlers ────────────────────────────────────────────
     handlers.set('ask_blocking_question', async (params, _clientId) => {
         if (!questionService) {
-            return { error: 'Question service not available — TELEGRAM_BOT_TOKEN not set' };
+            throw new Error('Question service not available — TELEGRAM_BOT_TOKEN not set');
         }
         const sessionId = params['sessionId'];
         const question = params['question'];
@@ -97,7 +97,7 @@ async function main() {
     });
     handlers.set('check_question_answers', async (params, _clientId) => {
         if (!questionService) {
-            return { error: 'Question service not available — TELEGRAM_BOT_TOKEN not set' };
+            throw new Error('Question service not available — TELEGRAM_BOT_TOKEN not set');
         }
         const questionIds = Array.isArray(params['question_ids']) ? params['question_ids'] : undefined;
         const waitSeconds = typeof params['wait_seconds'] === 'number' ? params['wait_seconds'] : 0;
@@ -127,7 +127,7 @@ async function main() {
     });
     handlers.set('mark_question_answered', async (params, _clientId) => {
         if (!questionService) {
-            return { error: 'Question service not available — TELEGRAM_BOT_TOKEN not set' };
+            throw new Error('Question service not available — TELEGRAM_BOT_TOKEN not set');
         }
         const questionId = params['question_id'];
         const answerText = typeof params['answer'] === 'string' ? params['answer'] : '[Manually marked as answered]';
@@ -149,6 +149,9 @@ async function main() {
         }
     });
     handlers.set('send_message', async (params, _clientId) => {
+        if (!questionService) {
+            throw new Error('Bot not available — TELEGRAM_BOT_TOKEN not set');
+        }
         const text = params['text'];
         const threadId = typeof params['threadId'] === 'number' ? params['threadId'] : undefined;
         if (threadId !== undefined) {
@@ -161,6 +164,9 @@ async function main() {
         }
     });
     handlers.set('send_status_update', async (params, _clientId) => {
+        if (!questionService) {
+            throw new Error('Bot not available — TELEGRAM_BOT_TOKEN not set');
+        }
         const message = typeof params['message'] === 'string'
             ? params['message']
             : '';

@@ -39,7 +39,7 @@ export declare function startBot(sessionService: SessionService, getQuestions: (
 /**
  * Stop the bot gracefully (polling or webhook mode).
  */
-export declare function stopBot(): void;
+export declare function stopBot(): Promise<void>;
 /**
  * Return the current bot instance, or null if not yet initialized.
  */
