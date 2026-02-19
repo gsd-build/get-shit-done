@@ -8,6 +8,11 @@ Configuration options for `.planning/` directory behavior.
   "commit_docs": true,
   "search_gitignored": false
 },
+"workflow": {
+  "tdd_enforce": true,
+  "deep_debug_on_failure": true,
+  "gap_validate_on_milestone": true
+},
 "git": {
   "branching_strategy": "none",
   "phase_branch_template": "gsd/phase-{phase}-{slug}",

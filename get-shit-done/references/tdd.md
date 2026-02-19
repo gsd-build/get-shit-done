@@ -31,6 +31,47 @@ TDD is about design quality, not coverage metrics. The red-green-refactor cycle 
 → No: Use standard plan, add tests after if needed
 </when_to_use_tdd>
 
+<tdd_enforcement>
+## TDD Enforcement on Standard Plans
+
+Beyond dedicated TDD plans (`type: tdd`), GSD enforces TDD at the **task level** within standard `type: execute` plans.
+
+**Two levels of TDD:**
+
+| Level | Scope | When |
+|-------|-------|------|
+| Dedicated TDD plan | `type: tdd` | Complex business logic, algorithms, state machines |
+| Task-level TDD | `tdd="true"` attribute | Any code-producing task in standard plans |
+
+**Task-level TDD format:**
+```xml
+<task type="auto" tdd="true">
+  <name>Task: [name]</name>
+  <files>src/feature.ts, src/feature.test.ts</files>
+  <behavior>
+    - Test 1: [expected behavior]
+    - Test 2: [edge case]
+  </behavior>
+  <action>[Implementation after tests pass]</action>
+  <verify>npm test -- --filter=feature</verify>
+  <done>[Criteria]</done>
+</task>
+```
+
+**Exceptions (NO `tdd="true"` needed):**
+- `type="checkpoint:*"` tasks
+- Configuration-only: package.json, tsconfig, .env
+- Documentation-only: .md files
+- Migration/seed scripts
+- Glue code (wiring existing tested components)
+- Styling-only (Tailwind classes, CSS)
+
+**Config toggle:** `workflow.tdd_enforce` (default: `true`)
+- When true: `/gsd:plan-phase` auto-runs TDD enforcement after planning
+- When false: TDD enforcement skipped
+- Change via `/gsd:settings` → TDD Enforcement
+</tdd_enforcement>
+
 <tdd_plan_structure>
 ## TDD Plan Structure
 

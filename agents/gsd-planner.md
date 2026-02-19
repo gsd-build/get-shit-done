@@ -202,17 +202,39 @@ Each task: **15-60 minutes** Claude execution time.
 
 **Test:** Could a different Claude instance execute without asking clarifying questions? If not, add specificity.
 
-## TDD Detection
+## TDD Enforcement (MANDATORY)
 
-**Heuristic:** Can you write `expect(fn(input)).toBe(output)` before writing `fn`?
-- Yes → Create a dedicated TDD plan (type: tdd)
-- No → Standard task in standard plan
+**Rule:** Every `type="auto"` task that creates or modifies production code MUST include `tdd="true"` attribute and `<behavior>` block.
 
-**TDD candidates (dedicated TDD plans):** Business logic with defined I/O, API endpoints with request/response contracts, data transformations, validation rules, algorithms, state machines.
+**Code-producing task signals:**
+- `<action>` mentions: "create", "add", "implement", "build", "generate", "write"
+- `<files>` includes source files (.ts, .tsx, .py, .js, .jsx — not config-only)
+- Not a checkpoint, configuration, documentation, or migration task
 
-**Standard tasks:** UI layout/styling, configuration, glue code, one-off scripts, simple CRUD with no business logic.
+**Task format with TDD:**
+```xml
+<task type="auto" tdd="true">
+  <name>Task: [name]</name>
+  <files>src/feature.ts, src/feature.test.ts</files>
+  <behavior>
+    - Test 1: [expected behavior]
+    - Test 2: [edge case]
+  </behavior>
+  <action>[Implementation after tests pass]</action>
+  <verify>npm test -- --filter=feature</verify>
+  <done>[Criteria]</done>
+</task>
+```
 
-**Why TDD gets own plan:** TDD requires RED→GREEN→REFACTOR cycles consuming 40-50% context. Embedding in multi-task plans degrades quality.
+**Exceptions (NO `tdd="true"` needed):**
+- `type="checkpoint:*"` tasks
+- Configuration-only: package.json, tsconfig, .env
+- Documentation-only: .md files
+- Migration/seed scripts
+- Glue code (wiring existing tested components)
+- Styling-only (Tailwind classes, CSS)
+
+**Dedicated TDD plans:** For complex business logic (algorithms, state machines), create `type: tdd` plans instead. TDD requires RED→GREEN→REFACTOR cycles consuming 40-50% context.
 
 ## User Setup Detection
 
@@ -395,9 +417,13 @@ Output: [Artifacts created]
 
 <tasks>
 
-<task type="auto">
+<task type="auto" tdd="true">
   <name>Task 1: [Action-oriented name]</name>
-  <files>path/to/file.ext</files>
+  <files>path/to/file.ext, path/to/file.test.ext</files>
+  <behavior>
+    - Test 1: [expected behavior]
+    - Test 2: [edge case]
+  </behavior>
   <action>[Specific implementation]</action>
   <verify>[Command or check]</verify>
   <done>[Acceptance criteria]</done>

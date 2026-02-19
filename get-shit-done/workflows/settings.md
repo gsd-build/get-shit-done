@@ -84,6 +84,33 @@ AskUserQuestion([
     ]
   },
   {
+    question: "TDD Enforcement? (auto-check plans for test-first compliance)",
+    header: "TDD",
+    multiSelect: false,
+    options: [
+      { label: "Strict (Recommended)", description: "Every code task must have tdd=true and behavior block" },
+      { label: "Off", description: "No automatic TDD enforcement" }
+    ]
+  },
+  {
+    question: "Auto Debug on Fail? (spawn deep-debug on self-check failure)",
+    header: "Debug",
+    multiSelect: false,
+    options: [
+      { label: "Yes (Recommended)", description: "Automatically route failures to deep-debug" },
+      { label: "No", description: "Manual debug only" }
+    ]
+  },
+  {
+    question: "Gap Analysis on Milestone? (validate requirements vs codebase)",
+    header: "Gap",
+    multiSelect: false,
+    options: [
+      { label: "Yes (Recommended)", description: "Run gap validation on new milestones (v1.0+)" },
+      { label: "No", description: "Skip gap analysis" }
+    ]
+  },
+  {
     question: "Git branching strategy?",
     header: "Branching",
     multiSelect: false,
@@ -108,7 +135,10 @@ Merge new settings into existing config.json:
     "research": true/false,
     "plan_check": true/false,
     "verifier": true/false,
-    "auto_advance": true/false
+    "auto_advance": true/false,
+    "tdd_enforce": true/false,
+    "deep_debug_on_failure": true/false,
+    "gap_validate_on_milestone": true/false
   },
   "git": {
     "branching_strategy": "none" | "phase" | "milestone"
@@ -176,6 +206,9 @@ Display:
 | Plan Checker         | {On/Off} |
 | Execution Verifier   | {On/Off} |
 | Auto-Advance         | {On/Off} |
+| TDD Enforcement      | {Strict/Off} |
+| Auto Debug on Fail   | {On/Off} |
+| Gap Analysis         | {On/Off} |
 | Git Branching        | {None/Per Phase/Per Milestone} |
 | Saved as Defaults    | {Yes/No} |
 
@@ -193,7 +226,7 @@ Quick commands:
 
 <success_criteria>
 - [ ] Current config read
-- [ ] User presented with 6 settings (profile + 4 workflow toggles + git branching)
+- [ ] User presented with 9 settings (profile + 4 workflow toggles + 3 enhanced toggles + git branching)
 - [ ] Config updated with model_profile, workflow, and git sections
 - [ ] User offered to save as global defaults (~/.gsd/defaults.json)
 - [ ] Changes confirmed to user

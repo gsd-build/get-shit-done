@@ -290,6 +290,14 @@ Create phases to close gaps identified by audit.
 
 Usage: `/gsd:plan-milestone-gaps`
 
+### Custom Commands (Auto-triggered by workflows)
+
+| Command | Auto-trigger | Manual use |
+|---------|-------------|------------|
+| `tdd-enforce` | After plan-phase (if `tdd_enforce: true`) | Manual TDD check on phase |
+| `deep-debug` | On self-check FAILED (if `deep_debug_on_failure: true`) | Manual deep debugging |
+| `validate-gap` | On new-milestone (if `gap_validate_on_milestone: true`) | Manual gap validation |
+
 ### Configuration
 
 **`/gsd:settings`**

@@ -333,6 +333,36 @@ Success criteria:
 node ~/.claude/get-shit-done/bin/gsd-tools.cjs commit "docs: create milestone v[X.Y] roadmap ([N] phases)" --files .planning/ROADMAP.md .planning/STATE.md .planning/REQUIREMENTS.md
 ```
 
+## 10.5. Gap Validation (if enabled)
+
+**Skip if:** `gap_validate_on_milestone` is false in config, OR this is v1.0 (fresh project — nothing to validate against).
+
+```bash
+GAP_VALIDATE=$(node ~/.claude/get-shit-done/bin/gsd-tools.cjs config get workflow.gap_validate_on_milestone 2>/dev/null || echo "true")
+MILESTONE_VERSION=$(echo "$INIT" | jq -r '.current_milestone // "v1.0"')
+```
+
+**If enabled AND NOT v1.0:**
+
+Display banner:
+```
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+ GSD ► VALIDATING GAPS
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+◆ Analyzing requirements vs existing codebase...
+```
+
+```
+Task(
+  prompt="Validate gap for milestone ${MILESTONE_VERSION}.\n\nAnalyze implementation gap between requirements and existing codebase.\nCreate .planning/GAP-REPORT-${MILESTONE_VERSION}.md",
+  subagent_type="general-purpose",
+  model="{roadmapper_model}",
+  description="Validate gaps for ${MILESTONE_VERSION}"
+)
+```
+
+Present summary: `Gap Analysis: {N} requirements | {covered} covered | {partial} partial | {missing} missing`
+
 ## 11. Done
 
 ```

@@ -5,7 +5,10 @@
     "research": true,
     "plan_check": true,
     "verifier": true,
-    "auto_advance": false
+    "auto_advance": false,
+    "tdd_enforce": true,
+    "deep_debug_on_failure": true,
+    "gap_validate_on_milestone": true
   },
   "planning": {
     "commit_docs": true,

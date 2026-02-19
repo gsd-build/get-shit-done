@@ -167,6 +167,9 @@ function loadConfig(cwd) {
     verifier: true,
     parallelization: true,
     brave_search: false,
+    tdd_enforce: true,
+    deep_debug_on_failure: true,
+    gap_validate_on_milestone: true,
   };
 
   try {
@@ -200,6 +203,9 @@ function loadConfig(cwd) {
       verifier: get('verifier', { section: 'workflow', field: 'verifier' }) ?? defaults.verifier,
       parallelization,
       brave_search: get('brave_search') ?? defaults.brave_search,
+      tdd_enforce: get('tdd_enforce', { section: 'workflow', field: 'tdd_enforce' }) ?? defaults.tdd_enforce,
+      deep_debug_on_failure: get('deep_debug_on_failure', { section: 'workflow', field: 'deep_debug_on_failure' }) ?? defaults.deep_debug_on_failure,
+      gap_validate_on_milestone: get('gap_validate_on_milestone', { section: 'workflow', field: 'gap_validate_on_milestone' }) ?? defaults.gap_validate_on_milestone,
     };
   } catch {
     return defaults;
@@ -4257,6 +4263,7 @@ function cmdInitExecutePhase(cwd, phase, raw) {
     phase_branch_template: config.phase_branch_template,
     milestone_branch_template: config.milestone_branch_template,
     verifier_enabled: config.verifier,
+    deep_debug_on_failure: config.deep_debug_on_failure,
 
     // Phase info
     phase_found: !!phaseInfo,
@@ -4319,6 +4326,7 @@ function cmdInitPlanPhase(cwd, phase, raw) {
     research_enabled: config.research,
     plan_checker_enabled: config.plan_checker,
     commit_docs: config.commit_docs,
+    tdd_enforce: config.tdd_enforce,
 
     // Phase info
     phase_found: !!phaseInfo,
@@ -4443,6 +4451,7 @@ function cmdInitNewMilestone(cwd, raw) {
     // Config
     commit_docs: config.commit_docs,
     research_enabled: config.research,
+    gap_validate_on_milestone: config.gap_validate_on_milestone,
 
     // Current milestone
     current_milestone: milestone.version,

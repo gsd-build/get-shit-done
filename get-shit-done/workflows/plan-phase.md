@@ -217,6 +217,35 @@ Task(
 - **`## CHECKPOINT REACHED`:** Present to user, get response, spawn continuation (step 12)
 - **`## PLANNING INCONCLUSIVE`:** Show attempts, offer: Add context / Retry / Manual
 
+## 9.5. TDD Enforcement (if enabled)
+
+**Skip if:** `tdd_enforce` is false in config (from init JSON).
+
+```bash
+TDD_ENFORCE=$(echo "$INIT" | jq -r '.tdd_enforce // true')
+```
+
+**If `tdd_enforce` is true:**
+
+```
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+ GSD ► TDD ENFORCEMENT CHECK
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+◆ Checking plans for TDD compliance...
+```
+
+```
+Task(
+  prompt="Read ~/.claude/commands/custom/tdd-enforce.md for protocol.\n\nEnforce TDD on all plans in: ${PHASE_DIR}\n\nCheck every type='auto' task that produces code has tdd='true' and <behavior> block.",
+  subagent_type="general-purpose",
+  model="{checker_model}",
+  description="TDD enforce check"
+)
+```
+
+**If issues found:** Display issues, auto-fix plans (add missing `tdd="true"` and `<behavior>` blocks), re-commit.
+
 ## 10. Spawn gsd-plan-checker Agent
 
 Display banner:
