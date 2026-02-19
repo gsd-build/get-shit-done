@@ -27,6 +27,25 @@ telegram_topic_id = {value from prompt if provided, else null}
 // Parent coordinator passes telegram_topic_id in the prompt:
 // "telegram_topic_id: {telegram_topic_id}" or "telegram_topic_id: null"
 
+// Helper: append_notification_log(event, data)
+// After EVERY mcp__telegram__send_message call that is a lifecycle notification
+// (NOT escalation calls — those already log via the escalation block):
+//   Append JSON line to .planning/telegram-sessions/{YYYY-MM-DD}.jsonl
+//   Format: {"type":"notification","event":"{event}","timestamp":"{ISO}","phase":{N},...extra_data}
+//   Create the file if it does not exist. Use current date for filename.
+
+**Notification 1 — Phase start** (fires immediately after initialization, before any step):
+
+```
+if telegram_topic_id is not null:
+  mcp__telegram__send_message({
+    text: "Phase {phase_number} started: {phase_name}",
+    ...(telegram_topic_id ? { thread_id: telegram_topic_id } : {})
+  })
+  // JSONL: {"type":"notification","event":"phase_start","timestamp":"{ISO}","phase":{N},"phase_name":"{name}"}
+  // Append above line to .planning/telegram-sessions/{YYYY-MM-DD}.jsonl
+```
+
 <step name="discuss">
 Check if phase already has a CONTEXT.md (meaning discussion was already done):
 
@@ -46,6 +65,18 @@ ls .planning/phases/{phase_dir}/*-CONTEXT.md 2>/dev/null || echo "NO_CONTEXT"
   "files_created": [],
   "context_file": null
 }
+```
+
+After creating the skipped checkpoint, send context_ready notification (skip variant):
+
+```
+if telegram_topic_id is not null:
+  mcp__telegram__send_message({
+    text: "Phase {phase_number} context ready — CONTEXT.md already exists (discuss step skipped)",
+    ...(telegram_topic_id ? { thread_id: telegram_topic_id } : {})
+  })
+  // JSONL: {"type":"notification","event":"context_ready","timestamp":"{ISO}","phase":{N},"autonomous_count":0,"escalated_count":0,"skipped":true}
+  // Append above line to .planning/telegram-sessions/{YYYY-MM-DD}.jsonl
 ```
 
 <!-- RUN PATH: No CONTEXT.md — run gray-area identification -->
@@ -365,7 +396,21 @@ node /Users/ollorin/.claude/get-shit-done/bin/gsd-tools.js commit "docs({padded_
 }
 ```
 
-6. Log the discuss completion, then the execution cycle proceeds to the `research` step.
+6. Log the discuss completion.
+
+**Notification 2 — Context ready** (fires after discuss step completes — CONTEXT.md written and committed):
+
+```
+if telegram_topic_id is not null:
+  mcp__telegram__send_message({
+    text: "Phase {phase_number} context ready — {sufficient_count} autonomous answers, {escalated_count} Telegram-escalated answers",
+    ...(telegram_topic_id ? { thread_id: telegram_topic_id } : {})
+  })
+  // JSONL: {"type":"notification","event":"context_ready","timestamp":"{ISO}","phase":{N},"autonomous_count":{sufficient_count},"escalated_count":{escalated_count}}
+  // Append above line to .planning/telegram-sessions/{YYYY-MM-DD}.jsonl
+```
+
+The execution cycle then proceeds to the `research` step.
 </step>
 
 <step name="research">
@@ -394,6 +439,18 @@ ls .planning/phases/{phase_dir}/*-RESEARCH.md 2>/dev/null || echo "NO_RESEARCH"
   "key_findings": "..."
 }
 ```
+
+**Notification 3 — Research done** (fires only when status is "complete" — NOT when skipped):
+
+```
+if telegram_topic_id is not null AND research_status == "complete":
+  mcp__telegram__send_message({
+    text: "Phase {phase_number} research done",
+    ...(telegram_topic_id ? { thread_id: telegram_topic_id } : {})
+  })
+  // JSONL: {"type":"notification","event":"research_done","timestamp":"{ISO}","phase":{N}}
+  // Append above line to .planning/telegram-sessions/{YYYY-MM-DD}.jsonl
+```
 </step>
 
 <step name="plan">
@@ -412,6 +469,18 @@ ls .planning/phases/{phase_dir}/*-PLAN.md 2>/dev/null || echo "NO_PLANS"
 4. Create checkpoint: `{ step: "plan", status: "complete", plan_count: N }`
 
 **Skip rationale:** Plans may already exist from a previous partial execution. Always prefer existing plans over re-planning to preserve prior decisions.
+
+**Notification 4 — Plans ready** (fires only when status is "complete" — NOT when skipped):
+
+```
+if telegram_topic_id is not null AND plan_status == "complete":
+  mcp__telegram__send_message({
+    text: "Phase {phase_number} plans ready — {plan_count} plan(s)",
+    ...(telegram_topic_id ? { thread_id: telegram_topic_id } : {})
+  })
+  // JSONL: {"type":"notification","event":"plans_ready","timestamp":"{ISO}","phase":{N},"plan_count":{N}}
+  // Append above line to .planning/telegram-sessions/{YYYY-MM-DD}.jsonl
+```
 </step>
 
 <step name="execute">
@@ -546,9 +615,22 @@ grep "^status:" .planning/phases/{phase_dir}/*-VERIFICATION.md
 ```
 
 **Status routing:**
-- `passed` → return success state
+- `passed` → send phase_complete notification, then return success state
 - `gaps_found` → return gaps_found state with details from VERIFICATION.md
 - `human_needed` → return human_needed state with items requiring human testing
+
+**Notification 5 — Phase complete** (fires when verification status is "passed"):
+
+```
+if telegram_topic_id is not null:
+  duration_minutes = calculate from phase start timestamp to now (round to nearest minute)
+  mcp__telegram__send_message({
+    text: "Phase {phase_number} complete ({duration_minutes}m) — {phase_name}",
+    ...(telegram_topic_id ? { thread_id: telegram_topic_id } : {})
+  })
+  // JSONL: {"type":"notification","event":"phase_complete","timestamp":"{ISO}","phase":{N},"duration_minutes":{N}}
+  // Append above line to .planning/telegram-sessions/{YYYY-MM-DD}.jsonl
+```
 
 **Create final checkpoint:**
 ```json
@@ -632,4 +714,18 @@ Return structured JSON as final response:
 - **All plans fail:** Return `{ status: "failed", step: "execute" }` immediately
 - **Verification gaps:** Return `{ status: "gaps_found", gaps: [...] }` — parent offers gap closure
 - **Human verification needed:** Return `{ status: "human_needed", human_items: [...] }` — parent presents to user
+
+**Notification 6 — Phase failure** (fires for every failed/blocked outcome before returning failure state):
+
+```
+if telegram_topic_id is not null:
+  mcp__telegram__send_message({
+    text: "Phase {phase_number} failed at {step} step\n\nError: {error}\n\nOptions: reply 'retry', 'skip', or 'stop'",
+    ...(telegram_topic_id ? { thread_id: telegram_topic_id } : {})
+  })
+  // JSONL: {"type":"notification","event":"phase_failed","timestamp":"{ISO}","phase":{N},"step":"{step}","error":"{error}"}
+  // Append above line to .planning/telegram-sessions/{YYYY-MM-DD}.jsonl
+```
+
+Note: The failure notification in execute-roadmap.md handles roadmap-level failure reporting. This notification (Notification 6) is the phase-level failure report. Both can coexist — they fire in different contexts (phase coordinator vs roadmap coordinator).
 </error_handling>
