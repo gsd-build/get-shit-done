@@ -1275,20 +1275,19 @@ function reportLocalPatches(configDir) {
 function installHookDependencies(gsdDir) {
   const packageJsonPath = path.join(gsdDir, 'package.json');
 
-  // Only write package.json if one doesn't already exist
-  if (!fs.existsSync(packageJsonPath)) {
-    fs.writeFileSync(packageJsonPath, JSON.stringify({
-      name: 'gsd-hooks',
-      version: '1.0.0',
-      private: true,
-      description: 'Dependencies for GSD hooks',
-      dependencies: {
-        'markdown-it': '^14.0.0',
-        'gray-matter': '^4.0.3',
-        'minimatch': '^9.0.0'
-      }
-    }, null, 2));
-  }
+  // Always write package.json so updates add new dependencies
+  fs.writeFileSync(packageJsonPath, JSON.stringify({
+    name: 'gsd-hooks',
+    version: '1.0.0',
+    private: true,
+    description: 'Dependencies for GSD hooks',
+    dependencies: {
+      'dotenv': '^17.0.0',
+      'markdown-it': '^14.0.0',
+      'gray-matter': '^4.0.3',
+      'minimatch': '^9.0.0'
+    }
+  }, null, 2));
 
   try {
     execSync('npm install --prefer-offline --silent', {
