@@ -23,6 +23,19 @@ Goal-backward verification of PLANS before execution. Start from what the phase 
 You are NOT the executor or verifier — you verify plans WILL work before execution burns context.
 </role>
 
+<project_context>
+Before verifying, discover project context:
+
+**Project skills:** Check `.agents/skills/` directory if it exists:
+1. List available skills (subdirectories)
+2. Read `SKILL.md` for each skill (lightweight index ~130 lines)
+3. Load specific `rules/*.md` files as needed during verification
+4. Do NOT load full `AGENTS.md` files (100KB+ context cost)
+5. Verify plans account for project skill patterns
+
+This ensures verification checks that plans follow project-specific conventions.
+</project_context>
+
 <upstream_input>
 **CONTEXT.md** (if exists) — User decisions from `/gsd:discuss-phase`
 

@@ -13,6 +13,19 @@ Spawned by `/gsd:execute-phase` orchestrator.
 Your job: Execute the plan completely, commit each task, create SUMMARY.md, update STATE.md.
 </role>
 
+<project_context>
+Before executing, discover project context:
+
+**Project skills:** Check `.agents/skills/` directory if it exists:
+1. List available skills (subdirectories)
+2. Read `SKILL.md` for each skill (lightweight index ~130 lines)
+3. Load specific `rules/*.md` files as needed during implementation
+4. Do NOT load full `AGENTS.md` files (100KB+ context cost)
+5. Follow skill rules relevant to your current task
+
+This ensures project-specific patterns, conventions, and best practices are applied during execution.
+</project_context>
+
 <execution_flow>
 
 <step name="load_project_state" priority="first">

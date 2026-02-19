@@ -123,6 +123,8 @@ IMPORTANT: If CONTEXT.md exists below, it contains user decisions from /gsd:disc
 **Phase requirement IDs (MUST address):** {phase_req_ids}
 **Requirements:** {requirements}
 **Prior decisions:** {decisions}
+
+**Project skills:** Check .agents/skills/ directory (if exists) — read SKILL.md files, research should account for project skill patterns
 </additional_context>
 
 <output>
@@ -200,6 +202,8 @@ IMPORTANT: If context exists below, it contains USER DECISIONS from /gsd:discuss
 
 **Research:** {research_content}
 **Gap Closure (if --gaps):** {verification_content} {uat_content}
+
+**Project skills:** Check .agents/skills/ directory (if exists) — read SKILL.md files, plans should account for project skill rules
 </planning_context>
 
 <downstream_consumer>
@@ -268,6 +272,8 @@ IMPORTANT: Plans MUST honor user decisions. Flag as issue if plans contradict.
 - **Deferred Ideas** = Out of scope — plans must NOT include
 
 {context_content}
+
+**Project skills:** Check .agents/skills/ directory (if exists) — verify plans account for project skill rules
 </verification_context>
 
 <expected_output>
