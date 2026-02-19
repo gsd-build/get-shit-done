@@ -12,21 +12,21 @@ Read all files referenced by the invoking prompt's execution_context before star
 
 ```bash
 INIT_FILE="/tmp/gsd-init-$$.json"
-node /Users/ollorin/.claude/get-shit-done/bin/gsd-tools.js init milestone-op > "$INIT_FILE"
+node ~/.claude/get-shit-done/bin/gsd-tools.js init milestone-op > "$INIT_FILE"
 ```
 
 Extract from init JSON: `milestone_version`, `milestone_name`, `phase_count`, `completed_phases`, `commit_docs`.
 
 Resolve integration checker model:
 ```bash
-CHECKER_MODEL=$(node /Users/ollorin/.claude/get-shit-done/bin/gsd-tools.js resolve-model gsd-integration-checker --raw)
+CHECKER_MODEL=$(node ~/.claude/get-shit-done/bin/gsd-tools.js resolve-model gsd-integration-checker --raw)
 ```
 
 ## 1. Determine Milestone Scope
 
 ```bash
 # Get phases in milestone (sorted numerically, handles decimals)
-node /Users/ollorin/.claude/get-shit-done/bin/gsd-tools.js phases list
+node ~/.claude/get-shit-done/bin/gsd-tools.js phases list
 ```
 
 - Parse version from arguments or detect current from ROADMAP.md
@@ -77,12 +77,50 @@ Combine:
 - Phase-level gaps and tech debt (from step 2)
 - Integration checker's report (wiring gaps, broken flows)
 
-## 5. Check Requirements Coverage
+## 5. Check Requirements Coverage (3-Source Cross-Reference)
 
-For each requirement in REQUIREMENTS.md mapped to this milestone:
-- Find owning phase
-- Check phase verification status
-- Determine: satisfied | partial | unsatisfied
+For each requirement in REQUIREMENTS.md mapped to this milestone, perform 3-source cross-reference:
+
+**Source 1:** VERIFICATION.md must-haves — is the requirement's truth verified?
+**Source 2:** SUMMARY.md `requirements-completed` frontmatter — does any plan claim it complete?
+**Source 3:** REQUIREMENTS.md traceability table — is the checkbox checked?
+
+```bash
+# Source 1: VERIFICATION.md requirements table
+for verif in .planning/phases/*/*-VERIFICATION.md; do
+  grep -A 20 "Requirements Coverage" "$verif" 2>/dev/null
+done
+
+# Source 2: SUMMARY.md requirements-completed fields
+for summary in .planning/phases/*/*-SUMMARY.md; do
+  node ~/.claude/get-shit-done/bin/gsd-tools.js frontmatter get "$summary" --field requirements-completed 2>/dev/null
+done
+
+# Source 3: REQUIREMENTS.md traceability table
+grep -E "^\|" .planning/REQUIREMENTS.md 2>/dev/null
+```
+
+Build per-requirement status:
+
+| REQ-ID | Phase | VERIFICATION Status | Claimed by Plans | Completed by Plans | Checkbox | Overall |
+|--------|-------|--------------------|-----------------|--------------------|----------|---------|
+| REQ-01 | 03 | SATISFIED | 03-01 | 03-01 | [x] | SATISFIED |
+| REQ-02 | 04 | BLOCKED | 04-02 | none | [ ] | UNSATISFIED |
+
+**Gap objects** (for any UNSATISFIED requirement):
+```yaml
+gaps:
+  requirements:
+    - id: REQ-02
+      status: unsatisfied
+      phase: "04-dashboard"
+      claimed_by_plans: ["04-02"]
+      completed_by_plans: []
+      verification_status: "BLOCKED"
+      evidence: "VERIFICATION.md shows artifact missing"
+```
+
+**FAIL gate:** If ANY requirement is UNSATISFIED after 3-source check, status MUST be `gaps_found` — no exceptions. Unsatisfied requirements block milestone completion.
 
 ## 6. Aggregate into v{version}-MILESTONE-AUDIT.md
 
