@@ -143,6 +143,15 @@ const MODEL_PROFILES = {
   'gsd-integration-checker':  { quality: 'sonnet', balanced: 'sonnet', budget: 'haiku' },
 };
 
+const CODEX_MODEL_MAP = {
+  // Opus-tier aliases resolve to `inherit` in GSD, then map to Codex 5.3 at xhigh effort.
+  inherit: { model: 'gpt-5.3-codex', reasoning_effort: 'xhigh' },
+  // Sonnet-tier aliases map to Spark 5.3 at xhigh effort.
+  sonnet: { model: 'gpt-5.3-spark', reasoning_effort: 'xhigh' },
+  // Haiku-tier aliases map to codex-mini at high effort.
+  haiku: { model: 'gpt-5.1-codex-mini', reasoning_effort: 'high' },
+};
+
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
 function parseIncludeFlag(args) {
@@ -151,6 +160,23 @@ function parseIncludeFlag(args) {
   const includeValue = args[includeIndex + 1];
   if (!includeValue) return new Set();
   return new Set(includeValue.split(',').map(s => s.trim()));
+}
+
+function codexModelSpecFromAlias(alias) {
+  if (!alias) return null;
+  const normalized = String(alias).toLowerCase() === 'opus' ? 'inherit' : String(alias).toLowerCase();
+  return CODEX_MODEL_MAP[normalized] || null;
+}
+
+function withCodexModelHints(result) {
+  for (const [key, value] of Object.entries(result)) {
+    if (!key.endsWith('_model') || typeof value !== 'string') continue;
+    const spec = codexModelSpecFromAlias(value);
+    if (!spec) continue;
+    result[`${key}_codex`] = spec.model;
+    result[`${key}_reasoning_effort`] = spec.reasoning_effort;
+  }
+  return result;
 }
 
 function safeReadFile(filePath) {
@@ -1482,14 +1508,27 @@ function cmdResolveModel(cwd, agentType, raw) {
 
   const agentModels = MODEL_PROFILES[agentType];
   if (!agentModels) {
-    const result = { model: 'sonnet', profile, unknown_agent: true };
+    const codexSpec = codexModelSpecFromAlias('sonnet');
+    const result = {
+      model: 'sonnet',
+      profile,
+      unknown_agent: true,
+      codex_model: codexSpec?.model || null,
+      codex_reasoning_effort: codexSpec?.reasoning_effort || null,
+    };
     output(result, raw, 'sonnet');
     return;
   }
 
   const resolved = agentModels[profile] || agentModels['balanced'] || 'sonnet';
   const model = resolved === 'opus' ? 'inherit' : resolved;
-  const result = { model, profile };
+  const codexSpec = codexModelSpecFromAlias(model);
+  const result = {
+    model,
+    profile,
+    codex_model: codexSpec?.model || null,
+    codex_reasoning_effort: codexSpec?.reasoning_effort || null,
+  };
   output(result, raw, model);
 }
 
@@ -1998,6 +2037,7 @@ function cmdPhasePlanIndex(cwd, phase, raw) {
     has_checkpoints: hasCheckpoints,
   };
 
+  withCodexModelHints(result);
   output(result, raw);
 }
 
@@ -2099,6 +2139,7 @@ function cmdStateSnapshot(cwd, raw) {
     session,
   };
 
+  withCodexModelHints(result);
   output(result, raw);
 }
 
@@ -2703,6 +2744,7 @@ function cmdRoadmapAnalyze(cwd, raw) {
     missing_phase_details: missingDetails.length > 0 ? missingDetails : null,
   };
 
+  withCodexModelHints(result);
   output(result, raw);
 }
 
@@ -3118,6 +3160,7 @@ function cmdPhaseRemove(cwd, targetPhase, options, raw) {
     state_updated: fs.existsSync(statePath),
   };
 
+  withCodexModelHints(result);
   output(result, raw);
 }
 
@@ -3365,6 +3408,7 @@ function cmdPhaseComplete(cwd, phaseNum, raw) {
     state_updated: fs.existsSync(statePath),
   };
 
+  withCodexModelHints(result);
   output(result, raw);
 }
 
@@ -3502,6 +3546,7 @@ function cmdMilestoneComplete(cwd, version, options, raw) {
     state_updated: fs.existsSync(statePath),
   };
 
+  withCodexModelHints(result);
   output(result, raw);
 }
 
@@ -4299,6 +4344,7 @@ function cmdInitExecutePhase(cwd, phase, includes, raw) {
     result.roadmap_content = safeReadFile(path.join(cwd, '.planning', 'ROADMAP.md'));
   }
 
+  withCodexModelHints(result);
   output(result, raw);
 }
 
@@ -4395,6 +4441,7 @@ function cmdInitPlanPhase(cwd, phase, includes, raw) {
     } catch {}
   }
 
+  withCodexModelHints(result);
   output(result, raw);
 }
 
@@ -4451,6 +4498,7 @@ function cmdInitNewProject(cwd, raw) {
     brave_search_available: hasBraveSearch,
   };
 
+  withCodexModelHints(result);
   output(result, raw);
 }
 
@@ -4478,6 +4526,7 @@ function cmdInitNewMilestone(cwd, raw) {
     state_exists: pathExistsInternal(cwd, '.planning/STATE.md'),
   };
 
+  withCodexModelHints(result);
   output(result, raw);
 }
 
@@ -4527,6 +4576,7 @@ function cmdInitQuick(cwd, description, raw) {
     planning_exists: pathExistsInternal(cwd, '.planning'),
   };
 
+  withCodexModelHints(result);
   output(result, raw);
 }
 
@@ -4583,6 +4633,7 @@ function cmdInitVerifyWork(cwd, phase, raw) {
     has_verification: phaseInfo?.has_verification || false,
   };
 
+  withCodexModelHints(result);
   output(result, raw);
 }
 
@@ -4790,6 +4841,7 @@ function cmdInitMapCodebase(cwd, raw) {
     codebase_dir_exists: pathExistsInternal(cwd, '.planning/codebase'),
   };
 
+  withCodexModelHints(result);
   output(result, raw);
 }
 
@@ -4897,6 +4949,7 @@ function cmdInitProgress(cwd, includes, raw) {
     result.config_content = safeReadFile(path.join(cwd, '.planning', 'config.json'));
   }
 
+  withCodexModelHints(result);
   output(result, raw);
 }
 

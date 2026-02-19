@@ -12,7 +12,7 @@ const helpText = `
 ${pkg.name} v${pkg.version}
 
 Usage:
-  ${pkg.name} [--path <target-dir>] [--help]
+  ${pkg.name} [--path <target-dir>] [--global] [--help]
 
 Options:
   --path <target-dir>   Install into this directory (defaults to current directory)
@@ -87,21 +87,28 @@ function copyCodexToDirectory(baseDir) {
   fs.writeFileSync(codexVersionDest, `${pkg.version}\n`);
 }
 
-copyCodexToDirectory(targetDir);
+async function main() {
+  copyCodexToDirectory(targetDir);
 
-if (installGlobal) {
-  // Global installs should place prompts at ~/.codex/prompts (not ~/.codex/.codex/prompts).
-  const globalBase = os.homedir();
-  copyCodexToDirectory(globalBase);
+  if (installGlobal) {
+    // Global installs should place prompts at ~/.codex/prompts (not ~/.codex/.codex/prompts).
+    const globalBase = os.homedir();
+    copyCodexToDirectory(globalBase);
+  }
+
+  console.log(`\n${pkg.name}@${pkg.version} installed to:`);
+  console.log(`  local: ${targetDir}`);
+  if (installGlobal) {
+    console.log('  global: ~/.codex');
+  }
+  console.log('\nNext steps:');
+  console.log('  1) Open your project in Codex');
+  console.log('  2) Run /prompts:gsd-new-project, then /prompts:gsd-discuss-phase, /prompts:gsd-plan-phase, /prompts:gsd-execute-phase');
+  console.log('  3) If something looks off, run /prompts:gsd-doctor');
+  console.log('  4) Use .codex/prompts/* for all GSD commands in this fork');
 }
 
-console.log(`\n${pkg.name}@${pkg.version} installed to:`);
-console.log(`  local: ${targetDir}`);
-if (installGlobal) {
-  console.log('  global: ~/.codex');
-}
-console.log('\nNext steps:');
-console.log('  1) Open your project in Codex');
-console.log('  2) Run /prompts:gsd-new-project, then /prompts:gsd-discuss-phase, /prompts:gsd-plan-phase, /prompts:gsd-execute-phase');
-console.log('  3) If something looks off, run /prompts:gsd-doctor');
-console.log('  4) Use .codex/prompts/* for all GSD commands in this fork');
+main().catch((error) => {
+  console.error(error instanceof Error ? error.message : error);
+  process.exit(1);
+});

@@ -53,9 +53,17 @@ npx gsd-codex-cli@latest --path . --global
 ## CLI Options
 
 ```
---path <dir>   Install into a specific directory (defaults to current directory)
---global       Also install to your home directory (~/.codex and ~/.claude)
---help         Show help
+--path <target-dir>   Install into this directory (defaults to current directory)
+--global              Also install to your home directory
+--help                Show help
+```
+
+## Examples
+
+```bash
+npx gsd-codex-cli@latest --path .
+npx gsd-codex-cli@latest --global
+npx gsd-codex-cli@latest --path . --global
 ```
 
 ## Development

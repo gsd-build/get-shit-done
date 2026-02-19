@@ -25,6 +25,10 @@ Use this skill to run `gsd-*` prompts under `Codex` while preserving upstream GS
 - Replace each `Task(...)` with: `spawn_agent` + `wait`.
 - Replace Bash/JQ patterns with PowerShell and `ConvertFrom-Json`.
 - Replace AskUserQuestion interactions with direct user prompts in chat.
+- Translate resolved model aliases before Codex subagent spawn:
+  - `inherit` (opus tier) -> `gpt-5.3-codex` (`xhigh`)
+  - `sonnet` -> `gpt-5.3-spark` (`xhigh`)
+  - `haiku` -> `gpt-5.1-codex-mini` (`high`)
 
 ## Subagent lifecycle (required)
 - Spawn only when the upstream workflow explicitly defines a `Task(...)` role.

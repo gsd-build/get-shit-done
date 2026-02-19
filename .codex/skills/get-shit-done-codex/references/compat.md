@@ -20,6 +20,10 @@
 - `subagent_type=gsd-*` maps to equivalent role contract in `.claude/agents/gsd-*.md`.
 - Unspecified `subagent_type` values default to command-context Codex agent behavior.
 - Do not pass `agent_type=gsd-*` to `spawn_agent`. Codex only accepts `default`, `explorer`, or `worker` (or omit `agent_type`).
+- Translate GSD model aliases to Codex models when spawning:
+  - `inherit` (opus tier) -> `gpt-5.3-codex` with `xhigh` reasoning effort
+  - `sonnet` -> `gpt-5.3-spark` with `xhigh` reasoning effort
+  - `haiku` -> `gpt-5.1-codex-mini` with `high` reasoning effort
 
 ## Required GSD subagents
 - `gsd-project-researcher`
