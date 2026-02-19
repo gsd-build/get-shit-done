@@ -9,10 +9,10 @@ See: .planning/PROJECT.md (updated 2026-02-19)
 
 ## Current Position
 
-Phase: 21 of 25 (Knowledge Global Migration) — in progress
-Plan: 1 of 3
-Status: Executing
-Last activity: 2026-02-19 — Plan 21-01 complete (DB path global, project_slug schema, migrate-knowledge command)
+Phase: 21 of 25 (Knowledge Global Migration) — complete
+Plan: 3 of 3
+Status: Phase complete — ready for Phase 22
+Last activity: 2026-02-19 — Plan 21-03 complete (cross-project mining, query-knowledge command)
 
 Progress: [░░░░░░░░░░░░░░░░░░░░] 0% (v1.10.0)
 
@@ -30,7 +30,7 @@ Progress: [░░░░░░░░░░░░░░░░░░░░] 0% (v1.
 | 18    | 1     | 15 min | 15.0 min |
 | 19    | 2     | 55 min | 27.5 min |
 | 20    | 2     | 30 min | 15.0 min |
-| 21    | 1/3   | 3 min  | 3.0 min  |
+| 21    | 3/3   | 10 min  | 3.3 min  |
 
 **Recent Trend:**
 - Last 5 plans: 2, 15, 27, 15, 15 min
@@ -53,6 +53,11 @@ Recent decisions affecting current work:
 - [Phase 21-01]: getDBPath('legacy') added for migrate-knowledge command only, not general use
 - [Phase 21-01]: Old per-project DBs NOT auto-deleted by migrate-knowledge — user deletes manually
 - [Phase 21-01]: Migrated entries left with null project_slug (untagged — acceptable per locked decision)
+- [Phase 21-02]: resolveProjectSlug() uses config.json project.slug → path.basename(cwd) fallback — no mandatory config required
+- [Phase 21-02]: CLI flag is --project (not --project-slug) to avoid confusion with existing --scope flag
+- [Phase 21-03]: getConversationAnalysisLogPath() updated to ~/.claude/knowledge/ (global) matching Plan 01 migration
+- [Phase 21-03]: Slug reversal lossy but acceptable — reverseSlugToCwd() only used for .planning/ existence check
+- [Phase 21-03]: query-knowledge top 5 results, no confidence threshold filtering (per locked decision)
 
 ### Pending Todos
 
@@ -64,11 +69,10 @@ None.
 
 ### Next Steps
 
-- Execute Plan 21-02 (project tagging on writes — populating project_slug column)
-- Execute Plan 21-03 (cross-project mining on global DB)
+- Phase 21 complete — Execute Phase 22 (gsd-meta-answerer)
 
 ## Session Continuity
 
 Last session: 2026-02-19
-Stopped at: Completed 21-01-PLAN.md — global DB path, schema v4, migrate-knowledge command
+Stopped at: Completed 21-03-PLAN.md — cross-project mining, query-knowledge command, Phase 21 complete
 Resume file: None

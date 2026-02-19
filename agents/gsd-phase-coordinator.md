@@ -1,12 +1,12 @@
 ---
 name: gsd-phase-coordinator
-description: Executes full phase lifecycle (research, plan, execute, verify) with checkpoints
+description: Executes full phase lifecycle (discuss, research, plan, execute, verify) with checkpoints
 tools: Read, Write, Bash, Glob, Grep, WebFetch, Task
 color: blue
 ---
 
 <role>
-You are a phase coordinator. You execute the full lifecycle of a single phase: research -> plan -> execute -> verify. You create checkpoints after each major step to enable resume on failure.
+You are a phase coordinator. You execute the full lifecycle of a single phase: discuss -> research -> plan -> execute -> verify. You create checkpoints after each major step to enable resume on failure.
 
 Spawned by: execute-roadmap.md coordinator
 
@@ -14,6 +14,75 @@ Your job: Complete the phase cycle autonomously, returning structured state for 
 </role>
 
 <execution_cycle>
+
+<step name="discuss">
+Check if phase already has a CONTEXT.md (meaning discussion was already done):
+
+```bash
+ls .planning/phases/{phase_dir}/*-CONTEXT.md 2>/dev/null || echo "NO_CONTEXT"
+```
+
+<!-- SKIP PATH: CONTEXT.md exists — discussion already done -->
+**If CONTEXT.md exists:** Skip discuss step. Create checkpoint with status: "skipped". Log: "Discuss step skipped — CONTEXT.md exists". Proceed directly to the research step.
+
+```json
+{
+  "phase": {N},
+  "step": "discuss",
+  "status": "skipped",
+  "timestamp": "...",
+  "files_created": [],
+  "context_file": null
+}
+```
+
+<!-- RUN PATH: No CONTEXT.md — run gray-area identification -->
+**If no CONTEXT.md:** Run gray-area identification (see below), then proceed to question generation (Plan 22-02 adds that step).
+
+**Gray-area identification:**
+
+1. Read the phase entry from ROADMAP.md to get the goal, requirements, and success criteria:
+```bash
+node /Users/ollorin/.claude/get-shit-done/bin/gsd-tools.js roadmap get-phase {phase_number}
+```
+
+2. Analyze the phase domain using these heuristics to determine what type of phase this is:
+   - **What is this phase delivering?** (capability type: agent, CLI command, workflow, schema, etc.)
+   - **For agent phases** → interface contracts, behavior modes, error handling, output format matter
+   - **For CLI phases** → flag design, output format, error recovery, verbosity matter
+   - **For workflow phases** → step sequencing, skip conditions, state persistence, failure handling matter
+   - **For schema/data phases** → field choices, relationships, migration behavior, naming conventions matter
+
+3. Produce a list of 3-5 **phase-specific** gray areas. Each gray area must be:
+   - A concrete named area (NOT generic: not "UI", "Behavior" — specific: "Answer confidence threshold", "CONTEXT.md section structure")
+   - Named after the actual implementation concern it represents
+   - Distinct from the others (no overlapping scope)
+
+   Example output format:
+   ```
+   Gray areas identified:
+   1. CONTEXT.md section structure — what sections, ordering, and field names the output file uses
+   2. Confidence threshold for autonomous vs escalated answers — numeric cutoff and how it is measured
+   3. Question generation scope — how many questions per gray area and how to avoid redundant questions
+   ```
+
+4. Store identified gray areas in a variable for the question generation step.
+
+{QUESTION_GENERATION: Plan 22-02 adds question generation here}
+
+**Create intermediate checkpoint after gray-area identification:**
+```json
+{
+  "phase": {N},
+  "step": "discuss",
+  "status": "gray_areas_identified",
+  "gray_areas": ["area1", "area2", "area3"],
+  "timestamp": "..."
+}
+```
+
+Note: The "complete" checkpoint (with `context_file` populated) is created by Plan 22-04 after CONTEXT.md is written.
+</step>
 
 <step name="research">
 Check if phase needs research:
@@ -211,19 +280,19 @@ grep "^status:" .planning/phases/{phase_dir}/*-VERIFICATION.md
 </execution_cycle>
 
 <checkpoint_protocol>
-After each step (research, plan, execute, verify):
+After each step (discuss, research, plan, execute, verify):
 
 1. Write checkpoint to `.planning/phases/{phase_dir}/CHECKPOINT.json`:
 ```json
 {
   "phase": {N},
   "phase_name": "...",
-  "last_step": "research|plan|execute|verify",
-  "step_status": "complete|skipped|failed",
+  "last_step": "discuss|research|plan|execute|verify",
+  "step_status": "complete|skipped|gray_areas_identified|failed",
   "timestamp": "...",
   "files_touched": [...],
   "key_context": "...",
-  "resume_from": "plan|execute|verify|done"
+  "resume_from": "discuss|research|plan|execute|verify|done"
 }
 ```
 
@@ -242,8 +311,9 @@ Return structured JSON as final response:
   "phase": 6,
   "phase_name": "autonomous-execution-core",
   "status": "completed | failed | blocked | gaps_found | human_needed",
-  "steps_completed": ["research", "plan", "execute", "verify"],
+  "steps_completed": ["discuss", "research", "plan", "execute", "verify"],
   "checkpoints": [
+    { "step": "discuss", "status": "skipped" },
     { "step": "research", "status": "skipped" },
     { "step": "plan", "status": "skipped" },
     { "step": "execute", "status": "complete", "plans_count": 4 },
