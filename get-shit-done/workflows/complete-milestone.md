@@ -37,10 +37,26 @@ When a milestone completes:
 
 <step name="verify_readiness">
 
+**Requirements completion gate:**
+
+Before proceeding, verify all milestone requirements are marked complete in REQUIREMENTS.md:
+
+```bash
+# Count checked requirements
+CHECKED=$(grep -c '^\- \[x\]' .planning/REQUIREMENTS.md 2>/dev/null || echo "0")
+TOTAL=$(grep -c '^\- \[' .planning/REQUIREMENTS.md 2>/dev/null || echo "0")
+echo "Requirements complete: $CHECKED/$TOTAL"
+```
+
+If any requirement is unchecked (`[ ]`), list them and block completion:
+- Show: "Requirements not complete: {list of unchecked REQ-IDs}"
+- Offer: "Mark remaining requirements complete? (y/n)" or "Run audit-milestone first?"
+- In yolo mode: log warning but continue if user previously accepted
+
 **Use `roadmap analyze` for comprehensive readiness check:**
 
 ```bash
-ROADMAP=$(node /Users/ollorin/.claude/get-shit-done/bin/gsd-tools.js roadmap analyze)
+ROADMAP=$(node ~/.claude/get-shit-done/bin/gsd-tools.js roadmap analyze)
 ```
 
 This returns all phases with plan/summary counts and disk status. Use this to verify:
@@ -131,7 +147,7 @@ Extract one-liners from SUMMARY.md files using summary-extract:
 ```bash
 # For each phase in milestone, extract one-liner
 for summary in .planning/phases/*-*/*-SUMMARY.md; do
-  node /Users/ollorin/.claude/get-shit-done/bin/gsd-tools.js summary-extract "$summary" --fields one_liner | jq -r '.one_liner'
+  node ~/.claude/get-shit-done/bin/gsd-tools.js summary-extract "$summary" --fields one_liner | jq -r '.one_liner'
 done
 ```
 
@@ -344,7 +360,7 @@ Update `.planning/ROADMAP.md` — group completed milestone phases:
 **Delegate archival to gsd-tools:**
 
 ```bash
-ARCHIVE=$(node /Users/ollorin/.claude/get-shit-done/bin/gsd-tools.js milestone complete "v[X.Y]" --name "[Milestone Name]")
+ARCHIVE=$(node ~/.claude/get-shit-done/bin/gsd-tools.js milestone complete "v[X.Y]" --name "[Milestone Name]")
 ```
 
 The CLI handles:
@@ -360,6 +376,16 @@ Extract from result: `version`, `date`, `phases`, `plans`, `tasks`, `accomplishm
 Verify: `✅ Milestone archived to .planning/milestones/`
 
 **Note:** Phase directories (`.planning/phases/`) are NOT deleted — they accumulate across milestones as raw execution history. Phase numbering continues (v1.0 phases 1-4, v1.1 phases 5-8, etc.).
+
+**Optional phase archival:** If the user wants to archive phase directories to reduce clutter:
+```bash
+# Move completed milestone phases to milestones/v[X.Y]-phases/
+mkdir -p .planning/milestones/v[X.Y]-phases/
+mv .planning/phases/01-* .planning/milestones/v[X.Y]-phases/ 2>/dev/null
+mv .planning/phases/02-* .planning/milestones/v[X.Y]-phases/ 2>/dev/null
+# etc. for all phases in milestone scope
+```
+Only do this if user explicitly requests it. Phase directories in `.planning/phases/` are NOT automatically archived.
 
 After archival, the AI still handles:
 - Reorganizing ROADMAP.md with milestone grouping (requires judgment)
@@ -434,7 +460,7 @@ Use `init milestone-op` for context, or load config directly:
 ```bash
 # Use temp file to avoid bash command substitution buffer limits
 INIT_FILE="/tmp/gsd-init-$$.json"
-node /Users/ollorin/.claude/get-shit-done/bin/gsd-tools.js init execute-phase "1" > "$INIT_FILE"
+node ~/.claude/get-shit-done/bin/gsd-tools.js init execute-phase "1" > "$INIT_FILE"
 ```
 
 Extract `branching_strategy`, `phase_branch_template`, `milestone_branch_template` from init JSON.
@@ -570,7 +596,7 @@ git push origin v[X.Y]
 Commit milestone completion.
 
 ```bash
-node /Users/ollorin/.claude/get-shit-done/bin/gsd-tools.js commit "chore: complete v[X.Y] milestone" --files .planning/milestones/v[X.Y]-ROADMAP.md .planning/milestones/v[X.Y]-REQUIREMENTS.md .planning/milestones/v[X.Y]-MILESTONE-AUDIT.md .planning/MILESTONES.md .planning/PROJECT.md .planning/STATE.md
+node ~/.claude/get-shit-done/bin/gsd-tools.js commit "chore: complete v[X.Y] milestone" --files .planning/milestones/v[X.Y]-ROADMAP.md .planning/milestones/v[X.Y]-REQUIREMENTS.md .planning/milestones/v[X.Y]-MILESTONE-AUDIT.md .planning/MILESTONES.md .planning/PROJECT.md .planning/STATE.md
 ```
 ```
 
