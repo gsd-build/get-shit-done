@@ -68,15 +68,57 @@ node /Users/ollorin/.claude/get-shit-done/bin/gsd-tools.js roadmap get-phase {ph
 
 4. Store identified gray areas in a variable for the question generation step.
 
-{QUESTION_GENERATION: Plan 22-02 adds question generation here}
+**Question generation:**
 
-**Create intermediate checkpoint after gray-area identification:**
+For each gray area identified above, generate 10-20 concrete, answerable questions. These questions will be used to query the knowledge DB — they must be specific enough to retrieve relevant stored decisions and context.
+
+**Question generation strategy (Claude reasoning inline — no subagent spawn):**
+
+For each gray area:
+1. Start from the gray area name and the phase goal/requirements read in step 1 above
+2. Ask internally: "What specific implementation decision within this gray area could go multiple ways?"
+3. Generate questions at 3 specificity levels:
+   - **high**: Pattern/approach question — "Should X run inline in the coordinator or spawn a subagent?"
+   - **mid**: Specific parameters question — "What is the minimum confidence score to mark an answer as sufficient?"
+   - **low**: Edge case question — "What happens when the knowledge DB has no results for a question?"
+4. Target scale: simple gray areas → 10 questions, complex gray areas → 20 questions
+
+**Question output format:**
+
+Produce a `questions` array in this structure:
+```
+questions = [
+  {
+    gray_area: "Answer confidence threshold",
+    question: "What confidence score threshold should mark a meta-answerer response as sufficient vs needs-escalation?",
+    specificity: "mid"
+  },
+  {
+    gray_area: "Answer confidence threshold",
+    question: "Should the confidence threshold be a fixed value or configurable per phase type?",
+    specificity: "high"
+  },
+  {
+    gray_area: "Answer confidence threshold",
+    question: "What happens when all questions for a gray area score below the confidence threshold?",
+    specificity: "low"
+  },
+  ...
+]
+```
+
+Store the full `questions` array in a variable for the meta-answerer invocation step.
+
+{META_ANSWERER_SPAWN: Plan 22-04 inserts meta-answerer invocation here}
+
+**Create checkpoint after question generation:**
 ```json
 {
   "phase": {N},
   "step": "discuss",
-  "status": "gray_areas_identified",
+  "status": "questions_generated",
   "gray_areas": ["area1", "area2", "area3"],
+  "question_count": 47,
   "timestamp": "..."
 }
 ```
