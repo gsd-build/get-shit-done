@@ -346,12 +346,63 @@ flows:
 
 </verification_process>
 
+## Step 7: Build Requirements Integration Map
+
+For each milestone requirement, trace wiring across phases:
+
+```bash
+# Read requirements from REQUIREMENTS.md
+cat .planning/REQUIREMENTS.md 2>/dev/null
+
+# Check requirement coverage across phase SUMMARYs
+for summary in .planning/phases/*/*-SUMMARY.md; do
+  grep -A 5 "requirements-completed" "$summary" 2>/dev/null
+done
+```
+
+Output requirements integration map:
+
+```yaml
+requirements_integration:
+  - id: REQ-01
+    description: "requirement description"
+    status: WIRED       # WIRED | PARTIAL | UNWIRED
+    owning_phase: "03-features"
+    evidence: "found in 03-01-SUMMARY.md requirements-completed"
+
+  - id: REQ-02
+    description: "requirement description"
+    status: PARTIAL
+    owning_phase: "04-dashboard"
+    evidence: "partially addressed in 04-02, wiring incomplete"
+
+  - id: REQ-03
+    description: "requirement description"
+    status: UNWIRED
+    owning_phase: null
+    evidence: "no phase claims this requirement in requirements-completed"
+```
+
+- **WIRED**: Requirement appears in a plan's requirements-completed field AND verification passed
+- **PARTIAL**: Requirement claimed in a summary but verification shows gaps or incomplete
+- **UNWIRED**: No phase claims this requirement — milestone gap
+
+</verification_process>
+
 <output>
 
 Return structured report to milestone auditor:
 
 ```markdown
 ## Integration Check Complete
+
+### Requirements Integration Map
+
+| REQ-ID | Description | Status | Evidence |
+|--------|-------------|--------|---------|
+| [id] | [desc] | WIRED/PARTIAL/UNWIRED | [evidence] |
+
+**Unsatisfied requirements** (PARTIAL or UNWIRED): {list or "None"}
 
 ### Wiring Summary
 
