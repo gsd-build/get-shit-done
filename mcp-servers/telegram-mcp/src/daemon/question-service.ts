@@ -283,7 +283,31 @@ export class QuestionService extends EventEmitter {
    * @param savedQuestions Array of Question objects loaded from the state file
    */
   public restoreState(savedQuestions: Question[]): void {
+    const now = Date.now();
+    let staleCount = 0;
+
     for (const q of savedQuestions) {
+      // Filter out pending questions that expired while the daemon was down
+      if (q.answer === undefined) {
+        const expiresAt = new Date(q.createdAt).getTime() + q.timeoutMinutes * 60 * 1000;
+        if (expiresAt < now) {
+          staleCount++;
+          // Notify the user in the original thread (reusing timeout notification pattern)
+          const timeoutMsg = `Question timed out after ${q.timeoutMinutes} minutes (daemon was restarted): "${q.title}"`;
+          const notification = q.threadId !== undefined
+            ? this.sendToThread(q.threadId, timeoutMsg)
+            : this.sendToGroup(timeoutMsg);
+          notification.catch((err: any) => {
+            log.warn({ questionId: q.id, err: err.message }, 'Failed to send stale-question timeout notification');
+          });
+          log.info(
+            { questionId: q.id, expiresAt: new Date(expiresAt).toISOString() },
+            'Dropped stale question — expired while daemon was down'
+          );
+          continue; // Do not restore to live maps
+        }
+      }
+
       this.questions.set(q.id, q);
 
       if (q.threadId !== undefined && q.answer === undefined) {
@@ -297,7 +321,16 @@ export class QuestionService extends EventEmitter {
       }
       this.sessionQuestions.set(q.sessionId, sessionList);
     }
-    log.info({ count: savedQuestions.length }, 'Question state restored from file');
+
+    const restored = savedQuestions.length - staleCount;
+    if (staleCount > 0) {
+      log.info(
+        { restored, stale: staleCount },
+        `Question state restored — dropped ${staleCount} stale question(s) expired while daemon was down`
+      );
+    } else {
+      log.info({ count: savedQuestions.length }, 'Question state restored from file');
+    }
   }
 
   // ─── Private helpers ─────────────────────────────────────────────────────────
