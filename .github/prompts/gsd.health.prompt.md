@@ -2,7 +2,7 @@
 name: gsd.health
 description: "Diagnose planning directory health and optionally repair issues"
 argument-hint: "[--repair]"
-tools: ['agent', 'search', 'read', 'vscode/askQuestions', 'execute', 'edit']
+tools: ['edit', 'execute', 'read', 'vscode/askQuestions']
 agent: agent
 ---
 

@@ -1,0 +1,14 @@
+{
+  "Read": "read",
+  "Write": "edit",
+  "Edit": "edit",
+  "Bash": "execute",
+  "Glob": "search",
+  "Grep": "search",
+  "Task": "agent",
+  "AskUserQuestion": "vscode/askQuestions",
+  "TodoWrite": "todo",
+  "WebSearch": "web",
+  "WebFetch": "web",
+  "slashcommand": "UNMAPPED"
+}

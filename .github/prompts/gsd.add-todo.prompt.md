@@ -2,7 +2,7 @@
 name: gsd.add-todo
 description: "Capture idea or task as todo from current conversation context"
 argument-hint: "[optional description]"
-tools: ['agent', 'search', 'read', 'vscode/askQuestions', 'execute', 'edit']
+tools: ['edit', 'execute', 'read', 'vscode/askQuestions']
 agent: agent
 ---
 

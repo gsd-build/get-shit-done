@@ -2,7 +2,7 @@
 name: gsd.execute-phase
 description: "Execute all plans in a phase with wave-based parallelization"
 argument-hint: "<phase-number> [--gaps-only]"
-tools: ['agent', 'search', 'read', 'vscode/askQuestions', 'execute', 'edit']
+tools: ['agent', 'edit', 'execute', 'read', 'search', 'todo', 'vscode/askQuestions']
 agent: agent
 ---
 

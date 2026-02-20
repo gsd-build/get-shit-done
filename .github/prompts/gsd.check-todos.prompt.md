@@ -2,7 +2,7 @@
 name: gsd.check-todos
 description: "List pending todos and select one to work on"
 argument-hint: "[area filter]"
-tools: ['agent', 'search', 'read', 'vscode/askQuestions', 'execute', 'edit']
+tools: ['edit', 'execute', 'read', 'vscode/askQuestions']
 agent: agent
 ---
 

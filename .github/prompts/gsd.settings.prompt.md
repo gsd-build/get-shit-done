@@ -2,7 +2,7 @@
 name: gsd.settings
 description: "Configure GSD workflow toggles and model profile"
 argument-hint: ""
-tools: ['agent', 'search', 'read', 'vscode/askQuestions', 'execute', 'edit']
+tools: ['edit', 'execute', 'read', 'vscode/askQuestions']
 agent: agent
 ---
 

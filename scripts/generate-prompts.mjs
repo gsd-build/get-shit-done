@@ -150,6 +150,53 @@ export function parseFrontmatterTools(content, filePath = "<unknown>") {
   return tools; // [] if block was present but had no valid list items
 }
 
+function loadToolMap() {
+  const p = path.join(ROOT, 'scripts', 'tools.json');
+  if (!fs.existsSync(p)) {
+    console.warn('[loadToolMap] scripts/tools.json not found — using empty map');
+    return {};
+  }
+  try {
+    return JSON.parse(fs.readFileSync(p, 'utf8'));
+  } catch (e) {
+    console.error(`[loadToolMap] Failed to parse scripts/tools.json: ${e.message}`);
+    process.exitCode = 1;
+    return {};
+  }
+}
+
+function mapTools(upstreamTools, filePath, toolMap, pendingStubs) {
+  if (!upstreamTools || upstreamTools.length === 0) {
+    return { tools: [], omitted: [] };
+  }
+  const result = new Set();
+  const omitted = [];
+  const cmdBase = path.basename(filePath);
+
+  for (const tool of upstreamTools) {
+    if (tool.startsWith('mcp__')) {
+      result.add(tool);
+      continue;
+    }
+    // Bridge: parseFrontmatterTools() outputs lowercase; tools.json keys are Title-Case
+    const originalKey = Object.keys(toolMap).find(k => k.toLowerCase() === tool);
+    if (!originalKey) {
+      omitted.push(tool);
+      if (!(tool in pendingStubs)) pendingStubs[tool] = 'UNMAPPED';
+      console.warn(`WARN: unknown tool "${tool}" in ${cmdBase} — omitted`);
+      continue;
+    }
+    const mapped = toolMap[originalKey];
+    if (mapped === 'UNMAPPED') {
+      omitted.push(tool);
+      console.warn(`WARN: unknown tool "${tool}" in ${cmdBase} — omitted (UNMAPPED in tools.json)`);
+      continue;
+    }
+    result.add(mapped);
+  }
+  return { tools: [...result].sort(), omitted };
+}
+
 function normalizeName(name) {
   // upstream uses gsd:new-project; VS Code prompt uses gsd.new-project
   return String(name).replace(/^gsd:/, "gsd.").replace(/:/g, ".");
@@ -227,7 +274,7 @@ function escapeYamlString(s) {
   return String(s ?? "").replace(/\\/g, "\\\\").replace(/"/g, '\\"');
 }
 
-function buildPrompt({ cmdFile, fm, body, upstreamTools }) {
+function buildPrompt({ cmdFile, fm, body, upstreamTools, tools, omitted }) {
   const upstreamName = fm.name || "";
   const cmdName = upstreamName
     ? normalizeName(upstreamName)
@@ -244,8 +291,8 @@ function buildPrompt({ cmdFile, fm, body, upstreamTools }) {
   // Normalize newlines
   converted = converted.replace(/\r\n/g, "\n");
 
-  // Detect if upstream body references AskUserQuestion — if so, declare the tool
-  const needsAskTool = /AskUserQuestion/i.test(converted);
+  // Adapter shim is conditional: only emit when vscode/askQuestions is in the mapped tools list
+  const needsAskTool = tools.includes('vscode/askQuestions');
 
   const sourceRel = path.posix.join(
     "commands",
@@ -257,12 +304,14 @@ function buildPrompt({ cmdFile, fm, body, upstreamTools }) {
     ? "<!-- upstream-tools: null (field absent in upstream command) -->"
     : `<!-- upstream-tools: ${JSON.stringify(upstreamTools)} -->`;
 
-  // Build tools array: always include base tools, conditionally add askQuestions
-  const tools = ["agent", "search", "read", "vscode/askQuestions", "execute", "edit"];
-  /*if (needsAskTool) {
-    tools.push("vscode/askQuestions");
-  }*/
-  const toolsYaml = `[${tools.map((t) => `'${t}'`).join(", ")}]`;
+  // tools and omitted come from mapTools() — passed in as parameters
+  const toolsYaml = tools.length > 0
+    ? `[${tools.map((t) => `'${t}'`).join(', ')}]`
+    : '[]';
+
+  const omittedComment = omitted.length > 0
+    ? `<!-- omitted-tools: ${JSON.stringify(omitted)} — no Copilot equivalent found -->`
+    : '';
 
   return `---
 name: ${cmdName}
@@ -274,14 +323,21 @@ agent: agent
 
 ${generatedBanner(sourceRel)}
 ${toolsAnnotation}
-
+${omittedComment ? omittedComment + '\n' : ''}
 ${preflightBlock(cmdName)}
-${adapterBlock()}
+${needsAskTool ? adapterBlock() : ''}
 ${converted.trimEnd()}
 `;
 }
 
 function main() {
+  const strict = process.argv.includes('--strict');
+  const toolMap = loadToolMap();
+  const toolsJsonPath = path.join(ROOT, 'scripts', 'tools.json');
+  const pendingStubs = {};
+  let totalOmitted = 0;
+  const allOmittedNames = new Set();
+
   const files = listMarkdownFiles(COMMANDS_DIR);
   if (!files.length) {
     console.error(`No command files found at ${COMMANDS_DIR}`);
@@ -294,15 +350,35 @@ function main() {
     const md = readFile(f);
     const { data, body } = parseFrontmatter(md);
     const upstreamTools = parseFrontmatterTools(md, f);
-    const prompt = buildPrompt({ cmdFile: f, fm: data, body, upstreamTools });
+    const { tools, omitted } = mapTools(upstreamTools, f, toolMap, pendingStubs);
 
-    const base = path.basename(f, ".md"); // e.g., new-project
+    totalOmitted += omitted.length;
+    for (const t of omitted) allOmittedNames.add(t);
+
+    const prompt = buildPrompt({ cmdFile: f, fm: data, body, upstreamTools, tools, omitted });
+
+    const base = path.basename(f, '.md'); // e.g., new-project
     const outName = `gsd.${base}.prompt.md`;
     const outPath = path.join(OUT_DIR, outName);
 
     writeFile(outPath, prompt);
   }
 
+  // auto-stub write-back — one batch write AFTER all files processed
+  if (Object.keys(pendingStubs).length > 0) {
+    const updated = { ...toolMap, ...pendingStubs };
+    fs.writeFileSync(toolsJsonPath, JSON.stringify(updated, null, 2) + '\n', 'utf8');
+    console.warn(`\nWARN: auto-stubbed ${Object.keys(pendingStubs).length} unknown tools as UNMAPPED:`);
+    for (const t of Object.keys(pendingStubs)) console.warn(`  "${t}": "UNMAPPED"`);
+    console.warn('  Fill in Copilot equivalents before next run.\n');
+  }
+
+  if (totalOmitted > 0) {
+    const hint = strict ? '' : ' (run with --strict to fail on unknown tools)';
+    console.log(`\n⚠ ${totalOmitted} unknown tool occurrences omitted: ${[...allOmittedNames].join(', ')}${hint}`);
+  }
+
+  if (strict && totalOmitted > 0) process.exitCode = 1;
   console.log(`Generated ${files.length} prompt files into ${OUT_DIR}`);
 }
 

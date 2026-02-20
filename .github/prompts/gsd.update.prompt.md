@@ -2,7 +2,7 @@
 name: gsd.update
 description: "Update GSD to latest version with changelog display"
 argument-hint: ""
-tools: ['agent', 'search', 'read', 'vscode/askQuestions', 'execute', 'edit']
+tools: ['execute', 'vscode/askQuestions']
 agent: agent
 ---
 

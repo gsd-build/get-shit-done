@@ -2,7 +2,7 @@
 name: gsd.debug
 description: "Systematic debugging with persistent state across context resets"
 argument-hint: "[issue description]"
-tools: ['agent', 'search', 'read', 'vscode/askQuestions', 'execute', 'edit']
+tools: ['agent', 'execute', 'read', 'vscode/askQuestions']
 agent: agent
 ---
 

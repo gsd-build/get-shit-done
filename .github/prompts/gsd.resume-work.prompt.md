@@ -2,7 +2,7 @@
 name: gsd.resume-work
 description: "Resume work from previous session with full context restoration"
 argument-hint: ""
-tools: ['agent', 'search', 'read', 'vscode/askQuestions', 'execute', 'edit']
+tools: ['edit', 'execute', 'read', 'vscode/askQuestions']
 agent: agent
 ---
 
@@ -11,6 +11,7 @@ Source: commands/gsd/resume-work.md
 Regenerate: node scripts/generate-prompts.mjs
 -->
 <!-- upstream-tools: ["read","bash","write","askuserquestion","slashcommand"] -->
+<!-- omitted-tools: ["slashcommand"] — no Copilot equivalent found -->
 
 ## Preflight (required)
 

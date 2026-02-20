@@ -2,7 +2,7 @@
 name: gsd.discuss-phase
 description: "Gather phase context through adaptive questioning before planning"
 argument-hint: "<phase> [--auto]"
-tools: ['agent', 'search', 'read', 'vscode/askQuestions', 'execute', 'edit']
+tools: ['agent', 'edit', 'execute', 'read', 'search', 'vscode/askQuestions']
 agent: agent
 ---
 

@@ -2,7 +2,7 @@
 name: gsd.progress
 description: "Check project progress, show context, and route to next action (execute or plan)"
 argument-hint: ""
-tools: ['agent', 'search', 'read', 'vscode/askQuestions', 'execute', 'edit']
+tools: ['execute', 'read', 'search']
 agent: agent
 ---
 
@@ -11,6 +11,7 @@ Source: commands/gsd/progress.md
 Regenerate: node scripts/generate-prompts.mjs
 -->
 <!-- upstream-tools: ["read","bash","grep","glob","slashcommand"] -->
+<!-- omitted-tools: ["slashcommand"] — no Copilot equivalent found -->
 
 ## Preflight (required)
 
@@ -27,24 +28,6 @@ npx get-shit-done-cc --claude --local
 
 ---
 
-## Copilot Runtime Adapter (important)
-
-Upstream GSD command sources may reference an `AskUserQuestion` tool (Claude/OpenCode runtime concept).
-
-In VS Code Copilot, **do not attempt to call a tool named `AskUserQuestion`**.
-Instead, whenever the upstream instructions say "Use AskUserQuestion", use **#tool:vscode/askQuestions** with:
-
-- Combine the **Header** and **Question** into a single clear question string.
-- If the upstream instruction specifies **Options**, present them as numbered choices.
-- If no options are specified, ask as a freeform question.
-
-**Rules:**
-1. If the options include "Other", "Something else", or "Let me explain", and the user selects it, follow up with a freeform question via #tool:vscode/askQuestions.
-2. Follow the upstream branching and loop rules exactly as written (e.g., "if X selected, do Y; otherwise continue").
-3. If the upstream flow says to **exit/stop** and run another command, tell the user to run that slash command next, then stop.
-4. Use #tool:vscode/askQuestions freely — do not guess or assume user intent.
-
----
 
 <objective>
 Check project progress, summarize recent work and what's ahead, then intelligently route to the next action - either executing an existing plan or creating the next one.
