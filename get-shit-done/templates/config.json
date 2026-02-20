@@ -1,10 +1,12 @@
 {
   "mode": "interactive",
   "depth": "standard",
+  "security_compliance": "none",
   "workflow": {
     "research": true,
     "plan_check": true,
     "verifier": true,
+    "tdd": true,
     "auto_advance": false
   },
   "planning": {

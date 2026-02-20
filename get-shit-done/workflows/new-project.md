@@ -463,6 +463,25 @@ questions: [
 ]
 ```
 
+**Round 3 — Security compliance (1 question):**
+
+```
+questions: [
+  {
+    header: "Security",
+    question: "What security compliance level does this project need?",
+    multiSelect: false,
+    options: [
+      { label: "none (Recommended)", description: "Basic security best practices (internal tools, prototypes)" },
+      { label: "soc2", description: "SOC 2 Type II (B2B SaaS, enterprise customers)" },
+      { label: "hipaa", description: "HIPAA (healthcare, PHI data)" },
+      { label: "pci-dss", description: "PCI-DSS (payments, card data)" },
+      { label: "iso27001", description: "ISO 27001 (enterprise ISMS)" }
+    ]
+  }
+]
+```
+
 Create `.planning/config.json` with all settings:
 
 ```json
@@ -471,6 +490,7 @@ Create `.planning/config.json` with all settings:
   "depth": "quick|standard|comprehensive",
   "parallelization": true|false,
   "commit_docs": true|false,
+  "security_compliance": "none|soc2|hipaa|pci-dss|iso27001",
   "model_profile": "quality|balanced|budget",
   "workflow": {
     "research": true|false,
@@ -479,6 +499,11 @@ Create `.planning/config.json` with all settings:
   }
 }
 ```
+
+**Security compliance** affects:
+- TDD plans include security tests matching compliance level
+- Verifier checks security must_haves
+- Reference: @~/.claude/get-shit-done/references/security-compliance.md
 
 **If commit_docs = No:**
 - Set `commit_docs: false` in config.json
@@ -489,8 +514,16 @@ Create `.planning/config.json` with all settings:
 
 **Commit config.json:**
 
+**Commit config.json:**
+
 ```bash
-node ~/.claude/get-shit-done/bin/gsd-tools.cjs commit "chore: add project config" --files .planning/config.json
+node ~/.claude/get-shit-done/bin/gsd-tools.cjs commit "chore: add project config
+
+Mode: [chosen mode]
+Depth: [chosen depth]
+Parallelization: [enabled/disabled]
+Security: [chosen security level]
+Workflow agents: research=[on/off], plan_check=[on/off], verifier=[on/off]" --files .planning/config.json
 ```
 
 **Note:** Run `/gsd:settings` anytime to update these preferences.

@@ -202,7 +202,17 @@ Each task: **15-60 minutes** Claude execution time.
 
 **Test:** Could a different Claude instance execute without asking clarifying questions? If not, add specificity.
 
-## TDD Detection
+## TDD Detection Heuristic
+
+**First, check if TDD is enabled:**
+
+```bash
+TDD_ENABLED=$(cat .planning/config.json 2>/dev/null | grep -oE '"tdd"\s*:\s*(true|false)' | grep -oE 'true|false' || echo "true")
+```
+
+**If `TDD_ENABLED=false`:** Skip TDD entirely. Create all plans with `type: execute`.
+
+**If `TDD_ENABLED=true`:** For each potential task, evaluate TDD fit:
 
 **Heuristic:** Can you write `expect(fn(input)).toBe(output)` before writing `fn`?
 - Yes → Create a dedicated TDD plan (type: tdd)
@@ -695,6 +705,99 @@ Each TDD plan produces 2-3 atomic commits.
 ## Context Budget for TDD
 
 TDD plans target ~40% context (lower than standard 50%). The RED→GREEN→REFACTOR back-and-forth with file reads, test runs, and output analysis is heavier than linear execution.
+
+## TDD-First Enforcement
+
+### Rule: Logic Plans Must Be TDD
+
+For any plan with testable business logic, you MUST:
+- Set `type: tdd` in frontmatter
+- Include `<tests>` section with 4 categories
+
+### Required Test Categories
+
+All TDD plans must include tests in 4 categories. Write ALL tests in RED phase before implementation.
+
+```xml
+<tests>
+  <acceptance>
+    - From must_haves.truths — prove feature does what it should
+  </acceptance>
+  <edge_cases>
+    - Null, empty, overflow, malformed input
+    - Boundary conditions
+  </edge_cases>
+  <security>
+    - Based on project's security_compliance level
+    - Reference: @~/.claude/get-shit-done/references/security-compliance.md
+  </security>
+  <performance>
+    - Response time thresholds
+    - Memory limits
+    - Throughput requirements
+  </performance>
+</tests>
+```
+
+### Security Test Selection
+
+Read `security_compliance` from `.planning/config.json`:
+
+```bash
+SECURITY_LEVEL=$(cat .planning/config.json 2>/dev/null | grep -oE '"security_compliance"\s*:\s*"[^"]*"' | grep -oE '"[^"]*"$' | tr -d '"' || echo "none")
+
+# Validate against allowed values
+case "$SECURITY_LEVEL" in
+  none|soc2|hipaa|pci-dss|iso27001) ;;
+  *) echo "Warning: Invalid security_compliance '$SECURITY_LEVEL', using 'none'" >&2; SECURITY_LEVEL="none" ;;
+esac
+
+# Verify security reference exists
+test -f "$HOME/.claude/get-shit-done/references/security-compliance.md" || echo "Warning: Security reference not found" >&2
+```
+
+| Level | Security Tests |
+|-------|----------------|
+| none | Input validation, output encoding, no hardcoded secrets |
+| soc2 | + Access control, audit logging, encryption at rest |
+| hipaa | + PHI masking, minimum necessary access, 6-year retention |
+| pci-dss | + PAN never logged, CVV never stored, MFA for admin |
+| iso27001 | + Least privilege, key rotation, incident detection |
+
+### Refactor Plan Decision
+
+Add a refactor plan (wave N+1) when:
+- 3+ feature plans in phase
+- Feature plans share files (technical debt likely)
+- Security compliance >= soc2 (stricter code quality)
+
+```yaml
+---
+phase: XX-name
+plan: NN
+type: execute
+refactor: true    # Marks as refactor plan
+wave: N+1         # After feature plans
+depends_on: [all feature plans]
+---
+```
+
+### Quality in must_haves
+
+TDD plans should include quality section:
+
+```yaml
+must_haves:
+  truths: [...]
+  artifacts: [...]
+  key_links: [...]
+  quality:
+    test_coverage_min: 80
+    security_compliance: soc2    # MUST match SECURITY_LEVEL from config.json
+    no_critical_vulnerabilities: true
+```
+
+**Validation:** `quality.security_compliance` MUST equal `SECURITY_LEVEL` read from config.json. Mismatch is an error.
 
 </tdd_integration>
 

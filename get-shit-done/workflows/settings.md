@@ -1,5 +1,5 @@
 <purpose>
-Interactive configuration of GSD workflow agents (research, plan_check, verifier) and model profile selection via multi-question prompt. Updates .planning/config.json with user preferences. Optionally saves settings as global defaults (~/.gsd/defaults.json) for future projects.
+Interactive configuration of GSD workflow agents (research, plan_check, verifier), TDD, security compliance, auto-advance, and model profile selection via multi-question prompt. Updates .planning/config.json with user preferences. Optionally saves settings as global defaults (~/.gsd/defaults.json) for future projects.
 </purpose>
 
 <required_reading>
@@ -28,11 +28,15 @@ Parse current values (default to `true` if not present):
 - `workflow.research` — spawn researcher during plan-phase
 - `workflow.plan_check` — spawn plan checker during plan-phase
 - `workflow.verifier` — spawn verifier during execute-phase
+- `workflow.tdd` — enforce TDD for all plans (default: `true`)
 - `model_profile` — which model each agent uses (default: `balanced`)
+- `security_compliance` — security compliance level (default: `"none"`)
 - `git.branching_strategy` — branching approach (default: `"none"`)
 </step>
 
-<step name="present_settings">
+<step name="present_settings_round1">
+**Round 1 — Model profile and workflow agents (4 questions max):**
+
 Use AskUserQuestion with current values pre-selected:
 
 ```
@@ -73,6 +77,36 @@ AskUserQuestion([
       { label: "Yes", description: "Verify must-haves after execution" },
       { label: "No", description: "Skip post-execution verification" }
     ]
+  }
+])
+```
+
+**Pre-select based on current config values.**
+</step>
+
+<step name="present_settings_round2">
+**Round 2 — TDD, security, and branching (3 questions):**
+
+```
+AskUserQuestion([
+  {
+    question: "Enforce TDD workflow? (write tests before code)",
+    header: "TDD",
+    multiSelect: false,
+    options: [
+      { label: "Yes (Recommended)", description: "All plans use RED-GREEN-REFACTOR cycle" },
+      { label: "No", description: "Standard execution without mandatory tests" }
+    ]
+  },
+  {
+    question: "Security compliance level? (Other: iso27001, pci-dss)",
+    header: "Security",
+    multiSelect: false,
+    options: [
+      { label: "none", description: "Basic security best practices only" },
+      { label: "soc2", description: "SOC 2 Type II (B2B SaaS)" },
+      { label: "hipaa", description: "HIPAA (healthcare, PHI protection)" }
+    ]
   },
   {
     question: "Auto-advance pipeline? (discuss → plan → execute automatically)",
@@ -95,6 +129,8 @@ AskUserQuestion([
   }
 ])
 ```
+
+**Pre-select based on current config values.**
 </step>
 
 <step name="update_config">
@@ -104,10 +140,12 @@ Merge new settings into existing config.json:
 {
   ...existing_config,
   "model_profile": "quality" | "balanced" | "budget",
+  "security_compliance": "none" | "soc2" | "hipaa" | "pci-dss" | "iso27001",
   "workflow": {
     "research": true/false,
     "plan_check": true/false,
     "verifier": true/false,
+    "tdd": true/false,
     "auto_advance": true/false
   },
   "git": {
@@ -175,11 +213,16 @@ Display:
 | Plan Researcher      | {On/Off} |
 | Plan Checker         | {On/Off} |
 | Execution Verifier   | {On/Off} |
+| TDD Workflow         | {On/Off} |
+| Security Compliance  | {none/soc2/hipaa/pci-dss/iso27001} |
 | Auto-Advance         | {On/Off} |
 | Git Branching        | {None/Per Phase/Per Milestone} |
 | Saved as Defaults    | {Yes/No} |
 
 These settings apply to future /gsd:plan-phase and /gsd:execute-phase runs.
+
+**TDD Workflow:** When enabled, all plans use RED-GREEN-REFACTOR cycle with 4 test categories.
+**Security Compliance:** Determines which security tests are required. See @~/.claude/get-shit-done/references/security-compliance.md
 
 Quick commands:
 - /gsd:set-profile <profile> — switch model profile
@@ -193,8 +236,8 @@ Quick commands:
 
 <success_criteria>
 - [ ] Current config read
-- [ ] User presented with 6 settings (profile + 4 workflow toggles + git branching)
-- [ ] Config updated with model_profile, workflow, and git sections
+- [ ] User presented with 8 settings across 2 rounds (4 + 4, respecting AskUserQuestion limit)
+- [ ] Config updated with model_profile, security_compliance, workflow, and git sections
 - [ ] User offered to save as global defaults (~/.gsd/defaults.json)
 - [ ] Changes confirmed to user
 </success_criteria>
