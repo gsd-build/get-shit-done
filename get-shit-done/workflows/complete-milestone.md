@@ -395,6 +395,52 @@ After archival, the AI still handles:
 
 </step>
 
+<step name="generate_milestone_summary">
+
+Generate the milestone summary document using the `milestone summarize` command:
+
+```bash
+SUMMARY_FILE=".planning/milestones/v[X.Y]-SUMMARY.md"
+if [ -f "$SUMMARY_FILE" ]; then
+  echo "Note: $SUMMARY_FILE already exists — regenerating"
+fi
+node ~/.claude/get-shit-done/bin/gsd-tools.js milestone summarize "v[X.Y]"
+```
+
+This produces `.planning/milestones/{version}-SUMMARY.md` containing:
+- One-liner per phase (from SUMMARY.md frontmatter or first H2 heading)
+- Total plan count and duration
+- Key decisions extracted from STATE.md
+
+**Idempotent:** always overwrites if the file already exists.
+
+If the command succeeds, confirm: "✅ Milestone summary generated: .planning/milestones/v[X.Y]-SUMMARY.md"
+
+If the file already existed, show: "(Note: summary regenerated from current phase data)"
+
+**Must run BEFORE archive_phase_dirs** — the summarize command reads phase SUMMARY.md files from `.planning/phases/`, which are moved by the next step.
+
+</step>
+
+<step name="archive_phase_dirs">
+
+Move completed phase directories into the milestone archive folder:
+
+```bash
+node ~/.claude/get-shit-done/bin/gsd-tools.js milestone archive-phases "v[X.Y]"
+```
+
+This moves each completed phase directory (those containing VERIFICATION.md) from `.planning/phases/` to `.planning/milestones/v[X.Y]/phases/`. Idempotent — phases already at the archive path are skipped.
+
+To preview without moving:
+```bash
+node ~/.claude/get-shit-done/bin/gsd-tools.js milestone archive-phases "v[X.Y]" --dry-run
+```
+
+If the command succeeds, confirm with the count from output: "✅ Archived N phase directories to .planning/milestones/v[X.Y]/phases/"
+
+</step>
+
 <step name="reorganize_roadmap_and_delete_originals">
 
 After `milestone complete` has archived, reorganize ROADMAP.md with milestone groupings, then delete originals:
@@ -596,7 +642,7 @@ git push origin v[X.Y]
 Commit milestone completion.
 
 ```bash
-node ~/.claude/get-shit-done/bin/gsd-tools.js commit "chore: complete v[X.Y] milestone" --files .planning/milestones/v[X.Y]-ROADMAP.md .planning/milestones/v[X.Y]-REQUIREMENTS.md .planning/milestones/v[X.Y]-MILESTONE-AUDIT.md .planning/MILESTONES.md .planning/PROJECT.md .planning/STATE.md
+node ~/.claude/get-shit-done/bin/gsd-tools.js commit "chore: complete v[X.Y] milestone" --files .planning/milestones/v[X.Y]-ROADMAP.md .planning/milestones/v[X.Y]-REQUIREMENTS.md .planning/milestones/v[X.Y]-MILESTONE-AUDIT.md .planning/milestones/v[X.Y]-SUMMARY.md .planning/MILESTONES.md .planning/PROJECT.md .planning/STATE.md
 ```
 ```
 
@@ -669,6 +715,8 @@ Milestone completion is successful when:
 - [ ] ROADMAP.md reorganized with milestone grouping
 - [ ] Roadmap archive created (milestones/v[X.Y]-ROADMAP.md)
 - [ ] Requirements archive created (milestones/v[X.Y]-REQUIREMENTS.md)
+- [ ] Milestone summary generated (milestones/v[X.Y]-SUMMARY.md)
+- [ ] Completed phase directories archived to milestones/v[X.Y]/phases/
 - [ ] REQUIREMENTS.md deleted (fresh for next milestone)
 - [ ] STATE.md updated with fresh project reference
 - [ ] Git tag created (v[X.Y])
