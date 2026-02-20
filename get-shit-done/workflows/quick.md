@@ -281,6 +281,88 @@ Note: For quick tasks producing multiple plans (rare), spawn executors in parall
 
 ---
 
+**Step 6.25: Code Review Autofix**
+
+Automatically review and fix code quality issues in files changed by the executor.
+
+**1. Check config gate:**
+
+```bash
+CODE_REVIEW_CFG=$(node ~/.claude/get-shit-done/bin/gsd-tools.cjs config-get workflow.code_review 2>/dev/null || echo "true")
+```
+
+If `CODE_REVIEW_CFG` is `"false"`: skip with `Skipping code review (workflow.code_review=false)`.
+
+**2. Identify changed source files:**
+
+```bash
+TASK_FIRST_COMMIT=$(git log --oneline --grep="(${next_num}" --grep="quick-${next_num}" --format="%H" | tail -1)
+CHANGED_FILES=$(git diff --name-only ${TASK_FIRST_COMMIT}^..HEAD 2>/dev/null | grep -v '\.planning/' | grep -v 'SUMMARY\.md' | grep -v 'ROADMAP\.md' | grep -v 'STATE\.md' | grep -v 'REQUIREMENTS\.md')
+```
+
+If `CHANGED_FILES` is empty: skip with `No source files changed — skipping code review`.
+
+**3. Spawn code review agent:**
+
+```
+Task(
+  subagent_type="code-reviewer",
+  model="{executor_model}",
+  prompt="
+    <objective>
+    Review and auto-fix code quality issues in files changed during quick task ${next_num}: ${DESCRIPTION}.
+    </objective>
+
+    <changed_files>
+    ${CHANGED_FILES}
+    </changed_files>
+
+    <instructions>
+    1. Read all changed files listed above
+    2. Review for these categories (in priority order):
+       - Critical: Security vulnerabilities (SQL injection, SSRF, auth bypass)
+       - Critical: Data loss risks (unhandled errors, race conditions)
+       - High: Logic errors (off-by-one, null/None checks, type coercion)
+       - High: Silent failures (swallowed exceptions, bare except, missing error handling)
+       - Medium: Performance issues (N+1 queries, memory leaks)
+       - Low: Code quality (DRY violations, dead code, unclear naming)
+    3. For each issue found: fix it directly in the source file
+    4. After all fixes applied, re-read the modified files and do a verification pass
+    5. If verification finds new issues, fix and re-verify (max 3 total iterations)
+    6. When clean, stage and commit all changes:
+       git add {specific files with fixes}
+       git commit with message: fix(quick-${next_num}): code review autofix
+       Include a bullet list of each fix applied in the commit body
+    7. If no issues found on first pass, report 'Clean review — no fixes needed' and exit without committing
+    </instructions>
+
+    <constraints>
+    - Do NOT rebuild Docker containers
+    - Do NOT update documentation files (CLAUDE.md, SYSTEM_CHANGES.md, DATABASE_SCHEMA.md, etc.)
+    - Do NOT modify test files unless fixing a genuine bug in the test itself
+    - Do NOT change formatting/style only — only fix functional issues
+    - Do NOT add new dependencies
+    - Limit scope to the listed changed files only
+    </constraints>
+  ",
+  description="Code review: ${DESCRIPTION}"
+)
+```
+
+**4. Report results:**
+
+```
+## Code Review
+
+{If fixes applied:}
+**Status:** {N} issues fixed and committed
+
+{If clean:}
+**Status:** Clean review — no fixes needed
+```
+
+---
+
 **Step 6.5: Verification (only when `$FULL_MODE`)**
 
 Skip this step entirely if NOT `$FULL_MODE`.
