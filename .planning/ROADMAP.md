@@ -5,7 +5,8 @@
 - ✅ **v1.9.0 GSD Enhancements** — Phases 1-14 (shipped 2026-02-19)
 - ✅ **v1.9.1 Upstream Sync** — Phases 18-20 (completed 2026-02-19)
 - ✅ **v1.10.0 Autonomous Phase Discussion** — Phases 21-25 (completed 2026-02-19)
-- 🚧 **v1.11.0 System Hardening** — Phases 26-30 (in progress)
+- ✅ **v1.11.0 System Hardening** — Phases 26-30 (completed 2026-02-20)
+  - 26: Telegram MCP Reliability · 27: Knowledge Quality · 28: Compression Observability · 29: Session Fix · 30: Milestone Archival
 
 ## Phases
 
@@ -165,23 +166,9 @@ Plans:
 - [ ] 25-03-PLAN.md — Execute live discuss step on Phase 26 (requires Telegram reply from user)
 - [ ] 25-04-PLAN.md — Artifact verification and phase closure (VERIFICATION.md + STATE.md + ROADMAP.md update)
 
-#### Phase 26: Milestone Summary & Archival
-**Goal**: After a milestone completes, an automated step generates a structured milestone summary (what was built, decisions made, plan count, duration) and archives completed phase artifacts to a milestone subfolder for fast future reference
-**Depends on**: Phase 25 (validation complete)
-**Requirements**: ARCH-01, ARCH-02, ARCH-03
-**Success Criteria** (what must be TRUE):
-  1. Running `/gsd:complete-milestone` after a milestone produces a milestone summary document written to `.planning/milestones/{version}-SUMMARY.md` containing a one-liner per phase, total plan count, total duration, and key decisions
-  2. Completed phase directories are moved (not copied) to `.planning/milestones/{version}/phases/` on archival, leaving only the milestone summary in `.planning/milestones/`
-  3. The milestone summary is committed to the repo as a readable artifact and optionally broadcast via Telegram if a telegram_topic_id is active
-  4. Re-running `/gsd:complete-milestone` on an already-archived milestone is idempotent — no duplicate moves or overwrites
-**Plans**: TBD
-
-Plans:
-- [ ] 26-01: Design and execute milestone summary & archival validation scenario
-
-#### Phase 27: Telegram MCP Reliability
+#### Phase 26: Telegram MCP Reliability
 **Goal**: Fix three silent failure modes in the Telegram MCP daemon that cause polling callers to always wait full timeouts, questions to be lost on daemon restart, and timed-out questions to disappear without user notification
-**Depends on**: Phase 26
+**Depends on**: Phase 25 (validation complete)
 **Requirements**: TREL-01, TREL-02, TREL-03
 **Success Criteria** (what must be TRUE):
   1. `check_question_answers` with `wait_seconds` wakes immediately when an answer arrives — confirmed by timing a reply that arrives before the timeout
@@ -190,11 +177,11 @@ Plans:
 **Plans**: 3 plans
 
 Plans:
-- [ ] 27-01: Fix EventEmitter glob listener — add `anyAnswer` event to `QuestionService.deliverAnswer()`, replace `once('answer:*')` with `once('anyAnswer')` in `daemon/index.ts`
-- [ ] 27-02: Daemon restart question persistence — serialize `questions` map to `~/.claude/knowledge/question-state.jsonl` on every `ask()`/`deliverAnswer()`, restore on startup in `daemon/index.ts`
-- [ ] 27-03: Timeout notification — send thread message before `cleanUpQuestion()` fires, with DM-mode fallback via `sendToGroup()`
+- [x] 26-01: Fix EventEmitter glob listener — add `anyAnswer` event to `QuestionService.deliverAnswer()`, replace `once('answer:*')` with `once('anyAnswer')` in `daemon/index.ts`
+- [x] 26-02: Daemon restart question persistence — serialize `questions` map to `~/.claude/knowledge/question-state.jsonl` on every `ask()`/`deliverAnswer()`, restore on startup in `daemon/index.ts`
+- [x] 26-03: Timeout notification — send thread message before `cleanUpQuestion()` fires, with DM-mode fallback via `sendToGroup()`
 
-#### Phase 28: Knowledge System Quality
+#### Phase 27: Knowledge System Quality
 **Goal**: Close three gaps in the knowledge pipeline: near-duplicate entries accumulating due to skipped embedding dedup, meta-answerer escalating to Telegram on questions it could answer with broader queries, and no mechanism to prune stale low-utility entries
 **Depends on**: Phase 26
 **Requirements**: KQUAL-01, KQUAL-02, KQUAL-03
@@ -205,11 +192,11 @@ Plans:
 **Plans**: 3 plans
 
 Plans:
-- [ ] 28-01: Stage-3 embedding dedup — call `generateEmbeddingCached()` with `Promise.race` 2s timeout in `knowledge-writer.js` before `checkDuplicate()`, pass result as third argument
-- [ ] 28-02: Meta-answerer multi-pass fallback — add `--type decision` pass and keyword-broadened pass in `agents/gsd-meta-answerer.md` before conceding confidence 0.0
-- [ ] 28-03: Knowledge DB pruning — add `pruneStaleEntries()` to `knowledge-lifecycle.js`, `knowledge prune [--dry-run]` CLI command, auto-trigger at 10MB from `knowledge-checkpoint.js`
+- [x] 27-01: Stage-3 embedding dedup — call `generateEmbeddingCached()` with `Promise.race` 2s timeout in `knowledge-writer.js` before `checkDuplicate()`, pass result as third argument — completed 2026-02-20
+- [x] 27-02: Meta-answerer multi-pass fallback — add `--type decision` pass and keyword-broadened pass in `agents/gsd-meta-answerer.md` before conceding confidence 0.0 — completed 2026-02-20
+- [x] 27-03: Knowledge DB pruning — add `pruneStaleEntries()` to `knowledge-lifecycle.js`, `knowledge prune [--dry-run]` CLI command, auto-trigger at 10MB from `knowledge-checkpoint.js` — completed 2026-02-20
 
-#### Phase 29: Compression & Observability
+#### Phase 28: Compression & Observability
 **Goal**: Make the doc compression pipeline actually observable — write the metrics it was designed to track, measure token reduction instead of char reduction, and add query-context-aware paragraph scoring to improve coverage on long prose files
 **Depends on**: Phase 26
 **Requirements**: COBS-01, COBS-02, COBS-03
@@ -220,13 +207,13 @@ Plans:
 **Plans**: 3 plans
 
 Plans:
-- [ ] 29-01: Write compression metrics JSONL — add `fs.appendFileSync` to `compression-metrics.jsonl` after `recordSuccess()` in `doc-compression-hook.js` with `{timestamp, file, originalChars, compressedChars, reductionPercent}`
-- [ ] 29-02: Token-based metrics — add `estimateTokens(text)` helper, log `originalTokensEst`/`compressedTokensEst` in metrics JSONL and `compress metrics` CLI output
-- [ ] 29-03: Semantic paragraph scoring — add `selectiveExtract(content, queryContext)` to `header-extractor.js` scoring paragraphs by term overlap; fall back to structural extraction when no query context
+- [x] 28-01: Write compression metrics JSONL — add `fs.appendFileSync` to `compression-metrics.jsonl` after `recordSuccess()` in `doc-compression-hook.js` with `{timestamp, file, originalChars, compressedChars, reductionPercent}`
+- [x] 28-02: Token-based metrics — add `estimateTokens(text)` helper, log `originalTokensEst`/`compressedTokensEst` in metrics JSONL and `compress metrics` CLI output
+- [x] 28-03: Semantic paragraph scoring — add `selectiveExtract(content, queryContext)` to `header-extractor.js` scoring paragraphs by term overlap; fall back to structural extraction when no query context
 
-#### Phase 30: Session Extraction Fix
+#### Phase 29: Session Extraction Fix
 **Goal**: Fix the session-end knowledge extraction hook so it actually fires when Claude Code sessions end — currently wired to SIGTERM which Claude Code does not send, meaning the entire Phase 11/12 session extraction pipeline is silently inactive
-**Depends on**: Phase 26
+**Depends on**: Phase 28
 **Requirements**: SFIX-01
 **Success Criteria** (what must be TRUE):
   1. After a Claude Code session ends, a new entry appears in the knowledge DB extracted from that session's responses — confirmed by checking DB before/after a session that contains a decision
@@ -234,7 +221,21 @@ Plans:
 **Plans**: 1 plan
 
 Plans:
-- [ ] 30-01: Session-end Stop hook — create `bin/hooks/session-end-standalone.js` reading from Claude Code hook JSON on stdin, accumulate via temp file keyed on `CLAUDE_SESSION_ID`, register as `Stop` hook in `install.js`
+- [x] 29-01: Session-end Stop hook — create `bin/hooks/session-end-standalone.js` reading from Claude Code hook JSON on stdin, accumulate via temp file keyed on `CLAUDE_SESSION_ID`, register as `Stop` hook in `install.js` — completed 2026-02-20
+
+#### Phase 30: Milestone Summary & Archival
+**Goal**: After a milestone completes, an automated step generates a structured milestone summary (what was built, decisions made, plan count, duration) and archives completed phase artifacts to a milestone subfolder for fast future reference
+**Depends on**: Phase 29
+**Requirements**: ARCH-01, ARCH-02, ARCH-03
+**Success Criteria** (what must be TRUE):
+  1. Running `/gsd:complete-milestone` after a milestone produces a milestone summary document written to `.planning/milestones/{version}-SUMMARY.md` containing a one-liner per phase, total plan count, total duration, and key decisions
+  2. Completed phase directories are moved (not copied) to `.planning/milestones/{version}/phases/` on archival, leaving only the milestone summary in `.planning/milestones/`
+  3. The milestone summary is committed to the repo as a readable artifact and optionally broadcast via Telegram if a telegram_topic_id is active
+  4. Re-running `/gsd:complete-milestone` on an already-archived milestone is idempotent — no duplicate moves or overwrites
+**Plans**: 1 plan
+
+Plans:
+- [x] 30-01: Milestone summarize & archive-phases commands — completed 2026-02-20
 
 ## Progress
 
@@ -264,11 +265,22 @@ Plans:
 | 23. Telegram Escalation | v1.10.0 | 2/2 | Complete | 2026-02-19 |
 | 24. Telegram Notifications | v1.10.0 | 4/4 | Complete | 2026-02-19 |
 | 25. End-to-End Validation | v1.10.0 | 4/4 | Complete | 2026-02-19 |
-| 26. Milestone Summary & Archival | v1.11.0 | 0/1 | Not started | - |
-| 27. Telegram MCP Reliability | v1.11.0 | 0/3 | Not started | - |
-| 28. Knowledge System Quality | v1.11.0 | 0/3 | Not started | - |
-| 29. Compression & Observability | v1.11.0 | 0/3 | Not started | - |
-| 30. Session Extraction Fix | v1.11.0 | 0/1 | Not started | - |
+| 26. Telegram MCP Reliability | v1.11.0 | 3/3 | Complete | 2026-02-20 |
+| 27. Knowledge System Quality | v1.11.0 | 3/3 | Complete | 2026-02-20 |
+| 28. Compression & Observability | v1.11.0 | 3/3 | Complete | 2026-02-20 |
+| 29. Session Extraction Fix | v1.11.0 | 1/1 | Complete | 2026-02-20 |
+| 30. Milestone Summary & Archival | v1.11.0 | 1/1 | Complete | 2026-02-20 |
+
+### Phase 31: Per-task model routing — executor becomes mini-orchestrator (Option A)
+
+**Goal:** When model_profile is "auto", each task in a PLAN.md gets assigned an optimal model tier (haiku/sonnet/opus) by the planner's post-draft routing pass, and the coordinator spawns per-task executors at those tiers with lightweight runtime quota downgrade — making the executor a mini-orchestrator rather than a single-tier runner
+**Depends on:** Phase 30
+**Plans:** 3 plans
+
+Plans:
+- [ ] 31-01-PLAN.md — Add routing pass to gsd-planner: post-draft tier tagging of task names when model_profile="auto"
+- [ ] 31-02-PLAN.md — Update gsd-phase-coordinator: parse per-task tier tags, apply quota downgrade, spawn per-task executors, add routing stats to Telegram notification
+- [ ] 31-03-PLAN.md — Update gsd-executor: haiku→sonnet escalation on retry, routing tier tracking in SUMMARY.md
 
 ---
-*Roadmap created: 2026-02-15 | Last updated: 2026-02-20 — Phases 27-30 added to v1.11.0: Telegram reliability, knowledge quality, compression observability, session extraction fix (10 improvements from post-v1.10.0 audit)*
+*Roadmap created: 2026-02-15 | Last updated: 2026-02-20 — v1.11.0 complete (5/5 phases: Telegram MCP reliability, knowledge quality, compression observability, session extraction fix, milestone archival)*

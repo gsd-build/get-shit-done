@@ -79,6 +79,11 @@ Parse: frontmatter (phase, plan, type, autonomous, wave, depends_on, requirement
 ```bash
 REQUIREMENTS=$(node ~/.claude/get-shit-done/bin/gsd-tools.js frontmatter get {plan_path} --field requirements 2>/dev/null || echo "[]")
 ```
+
+**Extract routing context if present:**
+If the prompt contains a `<routing_context>` block:
+  ROUTED_TIER = parse the tier from "This task routed to {tier}" line (haiku|sonnet|opus)
+  If no routing_context or parse fails: ROUTED_TIER = null
 </step>
 
 <step name="record_start_time">
@@ -107,6 +112,15 @@ For each task:
    - Check for `tdd="true"` → follow TDD execution flow
    - Execute task, apply deviation rules as needed
    - Handle auth errors as authentication gates
+   - **Failure signaling for coordinator escalation (routing active only):**
+     If ROUTED_TIER is set AND a task fails with an error/exception AND all retries are exhausted:
+       Return failure with structured signal:
+         "TASK FAILED: {task_name} [tier: {ROUTED_TIER}] — {error_summary}"
+       This format allows the coordinator to parse the tier and decide whether to re-spawn at a higher tier.
+       If ROUTED_TIER is null (routing not active): return failure using existing behavior (no structured tag).
+
+     Note: The executor does NOT switch tiers mid-execution. Model tier is fixed at spawn time. The coordinator (not the executor) is responsible for deciding to re-spawn at sonnet when it receives a haiku-tier failure signal.
+     Failure signaling only applies to errors/exceptions. Output quality issues do not trigger this signal.
    - Run verification, confirm done criteria
    - Commit (see task_commit_protocol)
    - Track completion + commit hash for Summary
@@ -313,6 +327,13 @@ git commit -m "{type}({phase}-{plan}): {concise task description}
 
 **5. Record hash:** `TASK_COMMIT=$(git rev-parse --short HEAD)` — track for SUMMARY.
 
+```bash
+# Track routing tier for SUMMARY
+TASK_ROUTING_TIER="${ROUTED_TIER:-unrouted}"
+ROUTING_TIERS_USED+=("$TASK_ROUTING_TIER")  # append to running list
+RETRY_ESCALATED=false  # set to true if task was escalated to sonnet from haiku
+```
+
 **ALWAYS use Write tool** for file creation — never use `Bash(cat << 'EOF')` heredoc patterns for file creation.
 </task_commit_protocol>
 
@@ -349,6 +370,23 @@ After all tasks complete, create `{phase}-{plan}-SUMMARY.md` at `.planning/phase
 Or: "None - plan executed exactly as written."
 
 **Auth gates section** (if any occurred): Document which task, what was needed, outcome.
+
+**Routing summary (include when ROUTED_TIER is set for any task):**
+
+```markdown
+## Routing
+
+| Task | Routed Tier | Escalated |
+|------|-------------|-----------|
+| 1    | haiku       | no        |
+| 2    | sonnet      | no        |
+| 3    | haiku       | yes → sonnet |
+
+**Distribution:** {haiku_count} haiku / {sonnet_count} sonnet / {opus_count} opus
+**Escalations:** {escalation_count} (haiku → sonnet on retry)
+```
+
+Omit this section entirely if ROUTED_TIER was null for all tasks (routing not active — non-auto profile).
 </summary_creation>
 
 <self_check>
