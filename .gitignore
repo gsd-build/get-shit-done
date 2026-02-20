@@ -18,3 +18,6 @@ animation/
 # Internal planning documents
 reports/
 RAILROAD_ARCHITECTURE.md
+
+# Worktree directories (created by phase-worktree.sh)
+.worktrees/
