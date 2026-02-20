@@ -6608,12 +6608,15 @@ function generateSlugInternal(text) {
 function getMilestoneInfo(cwd) {
   try {
     const roadmap = fs.readFileSync(path.join(cwd, '.planning', 'ROADMAP.md'), 'utf-8');
-    const versionMatch = roadmap.match(/v(\d+\.\d+)/);
-    const nameMatch = roadmap.match(/## .*v\d+\.\d+[:\s]+([^\n(]+)/);
-    return {
-      version: versionMatch ? versionMatch[0] : 'v1.0',
-      name: nameMatch ? nameMatch[1].trim() : 'milestone',
-    };
+    // Match all "**vX.Y.Z Name**" entries (from the ## Milestones bullet list)
+    const entries = [...roadmap.matchAll(/\*\*v([\d.]+)\s+([^*()\n]+?)\s*\*\*/g)];
+    if (entries.length > 0) {
+      const last = entries[entries.length - 1];
+      return { version: 'v' + last[1], name: last[2].trim() };
+    }
+    // Fallback: version only
+    const versionMatch = roadmap.match(/v(\d+\.\d+[\d.]*)/);
+    return { version: versionMatch ? versionMatch[0] : 'v1.0', name: 'milestone' };
   } catch {
     return { version: 'v1.0', name: 'milestone' };
   }

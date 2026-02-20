@@ -47,8 +47,14 @@ Check `branching_strategy` from init:
 ```bash
 BRANCHING_STRATEGY=$(jq -r '.branching_strategy' < "$INIT_FILE")
 if [ "$BRANCHING_STRATEGY" != "none" ]; then
-  BRANCH_NAME=$(jq -r '.branch_name' < "$INIT_FILE")
-  git checkout -b "$BRANCH_NAME" 2>/dev/null || git checkout "$BRANCH_NAME"
+  CURRENT_BRANCH=$(git branch --show-current)
+  MAIN_BRANCHES="main master develop trunk"
+  if echo "$MAIN_BRANCHES" | grep -qw "$CURRENT_BRANCH"; then
+    BRANCH_NAME=$(jq -r '.branch_name' < "$INIT_FILE")
+    git checkout -b "$BRANCH_NAME" 2>/dev/null || git checkout "$BRANCH_NAME"
+  else
+    echo "Already on branch '$CURRENT_BRANCH' — skipping branch creation"
+  fi
 fi
 ```
 
