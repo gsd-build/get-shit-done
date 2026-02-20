@@ -406,7 +406,52 @@ Read and follow `~/.claude/get-shit-done/workflows/transition.md`, passing throu
 
 **If neither `--auto` nor `AUTO_CFG` is true:**
 
-The workflow ends. The user runs `/gsd:progress` or invokes the transition workflow manually.
+Probe next phase state to determine routing:
+```bash
+NEXT_INFO=$(node ~/.claude/get-shit-done/bin/gsd-tools.cjs init phase-op "${next_phase}")
+```
+
+Parse `has_context`, `has_plans`, `is_last_phase` from result.
+
+**If `is_last_phase` is true (milestone complete):**
+```
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+ GSD ► MILESTONE COMPLETE
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+All {N} phases executed.
+
+`/gsd:complete-milestone`
+```
+
+**If more phases remain**, select primary command based on state:
+- `has_plans: true` → primary = `/gsd:execute-phase {next_phase}`
+- `has_context: true` AND `has_plans: false` → primary = `/gsd:plan-phase {next_phase}`
+- `has_context: false` → primary = `/gsd:discuss-phase {next_phase}`
+
+Present:
+```
+## ▶ Next Up
+
+**Phase {next_phase}: {next_phase_name}** — {goal from ROADMAP.md}
+
+`{primary command}`
+
+<sub>`/clear` first → fresh context window</sub>
+
+---
+
+**Also available:**
+- `{alt command 1}` — {description}
+- `{alt command 2}` — {description}
+
+---
+```
+
+Where `{alt command 1}` and `{alt command 2}` are the two commands NOT selected as primary:
+- `/gsd:discuss-phase {next_phase}` — gather context first
+- `/gsd:plan-phase {next_phase}` — create execution plans
+- `/gsd:execute-phase {next_phase}` — run existing plans
 </step>
 
 </process>
