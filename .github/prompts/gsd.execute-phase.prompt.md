@@ -10,7 +10,8 @@ agent: agent
 Source: commands/gsd/execute-phase.md
 Regenerate: node scripts/generate-prompts.mjs
 -->
-<!-- upstream-tools: ["read","write","edit","glob","grep","bash","task","todowrite","askuserquestion"] -->
+
+<!-- upstream-tools: ["Read","Write","Edit","Glob","Grep","Bash","Task","TodoWrite","AskUserQuestion"] -->
 
 ## Preflight (required)
 
@@ -54,14 +55,18 @@ Orchestrator stays lean: discover plans, analyze dependencies, group into waves,
 Context budget: ~15% orchestrator, 100% fresh per subagent.
 </objective>
 
-<execution_context>- Read file at: ../.claude/get-shit-done/workflows/execute-phase.md- Read file at: ../.claude/get-shit-done/references/ui-brand.md
+<execution_context>
+- Read file at: ../.claude/get-shit-done/workflows/execute-phase.md
+- Read file at: ../.claude/get-shit-done/references/ui-brand.md
 </execution_context>
 
 <context>
 Phase: $ARGUMENTS
 
 **Flags:**
-- `--gaps-only` — Execute only gap closure plans (plans with `gap_closure: true` in frontmatter). Use after verify-work creates fix plans.- Read file at: .planning/ROADMAP.md- Read file at: .planning/STATE.md
+- `--gaps-only` — Execute only gap closure plans (plans with `gap_closure: true` in frontmatter). Use after verify-work creates fix plans.
+- Read file at: .planning/ROADMAP.md
+- Read file at: .planning/STATE.md
 </context>
 
 <process>

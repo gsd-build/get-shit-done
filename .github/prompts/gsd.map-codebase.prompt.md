@@ -10,7 +10,8 @@ agent: agent
 Source: commands/gsd/map-codebase.md
 Regenerate: node scripts/generate-prompts.mjs
 -->
-<!-- upstream-tools: ["read","bash","glob","grep","write","task"] -->
+
+<!-- upstream-tools: ["Read","Bash","Glob","Grep","Write","Task"] -->
 
 ## Preflight (required)
 
@@ -27,7 +28,6 @@ npx get-shit-done-cc --claude --local
 
 ---
 
-
 <objective>
 Analyze existing codebase using parallel gsd-codebase-mapper agents to produce structured codebase documents.
 
@@ -36,7 +36,8 @@ Each mapper agent explores a focus area and **writes documents directly** to `.p
 Output: .planning/codebase/ folder with 7 structured documents about the codebase state.
 </objective>
 
-<execution_context>- Read file at: ../.claude/get-shit-done/workflows/map-codebase.md
+<execution_context>
+- Read file at: ../.claude/get-shit-done/workflows/map-codebase.md
 </execution_context>
 
 <context>

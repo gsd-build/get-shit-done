@@ -10,7 +10,8 @@ agent: agent
 Source: commands/gsd/audit-milestone.md
 Regenerate: node scripts/generate-prompts.mjs
 -->
-<!-- upstream-tools: ["read","glob","grep","bash","task","write"] -->
+
+<!-- upstream-tools: ["Read","Glob","Grep","Bash","Task","Write"] -->
 
 ## Preflight (required)
 
@@ -27,21 +28,25 @@ npx get-shit-done-cc --claude --local
 
 ---
 
-
 <objective>
 Verify milestone achieved its definition of done. Check requirements coverage, cross-phase integration, and end-to-end flows.
 
 **This command IS the orchestrator.** Reads existing VERIFICATION.md files (phases already verified during execute-phase), aggregates tech debt and deferred gaps, then spawns integration checker for cross-phase wiring.
 </objective>
 
-<execution_context>- Read file at: ../.claude/get-shit-done/workflows/audit-milestone.md
+<execution_context>
+- Read file at: ../.claude/get-shit-done/workflows/audit-milestone.md
 </execution_context>
 
 <context>
 Version: $ARGUMENTS (optional — defaults to current milestone)
 
-**Original Intent:**- Read file at: .planning/PROJECT.md- Read file at: .planning/REQUIREMENTS.md
-**Planned Work:**- Read file at: .planning/ROADMAP.md- Read file at: .planning/config.json (if exists)
+**Original Intent:**
+- Read file at: .planning/PROJECT.md
+- Read file at: .planning/REQUIREMENTS.md
+**Planned Work:**
+- Read file at: .planning/ROADMAP.md
+- Read file at: .planning/config.json (if exists)
 **Completed Work:**
 Glob: .planning/phases/*/*-SUMMARY.md
 Glob: .planning/phases/*/*-VERIFICATION.md

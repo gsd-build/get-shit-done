@@ -10,7 +10,8 @@ agent: agent
 Source: commands/gsd/add-todo.md
 Regenerate: node scripts/generate-prompts.mjs
 -->
-<!-- upstream-tools: ["read","write","bash","askuserquestion"] -->
+
+<!-- upstream-tools: ["Read","Write","Bash","AskUserQuestion"] -->
 
 ## Preflight (required)
 
@@ -59,7 +60,9 @@ Routes to the add-todo workflow which handles:
 - Git commits
 </objective>
 
-<execution_context>- Read file at: .planning/STATE.md- Read file at: ../.claude/get-shit-done/workflows/add-todo.md
+<execution_context>
+- Read file at: .planning/STATE.md
+- Read file at: ../.claude/get-shit-done/workflows/add-todo.md
 </execution_context>
 
 <process>

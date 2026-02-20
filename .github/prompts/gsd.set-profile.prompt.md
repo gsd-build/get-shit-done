@@ -10,7 +10,8 @@ agent: agent
 Source: commands/gsd/set-profile.md
 Regenerate: node scripts/generate-prompts.mjs
 -->
-<!-- upstream-tools: ["read","write","bash"] -->
+
+<!-- upstream-tools: ["Read","Write","Bash"] -->
 
 ## Preflight (required)
 
@@ -27,7 +28,6 @@ npx get-shit-done-cc --claude --local
 
 ---
 
-
 <objective>
 Switch the model profile used by GSD agents. Controls which Claude model each agent uses, balancing quality vs token spend.
 
@@ -38,7 +38,8 @@ Routes to the set-profile workflow which handles:
 - Confirmation with model table display
 </objective>
 
-<execution_context>- Read file at: ../.claude/get-shit-done/workflows/set-profile.md
+<execution_context>
+- Read file at: ../.claude/get-shit-done/workflows/set-profile.md
 </execution_context>
 
 <process>

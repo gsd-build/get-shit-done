@@ -10,7 +10,8 @@ agent: agent
 Source: commands/gsd/discuss-phase.md
 Regenerate: node scripts/generate-prompts.mjs
 -->
-<!-- upstream-tools: ["read","write","bash","glob","grep","askuserquestion","task"] -->
+
+<!-- upstream-tools: ["Read","Write","Bash","Glob","Grep","AskUserQuestion","Task"] -->
 
 ## Preflight (required)
 
@@ -58,14 +59,18 @@ Extract implementation decisions that downstream agents need — researcher and 
 **Output:** `{phase_num}-CONTEXT.md` — decisions clear enough that downstream agents can act without asking the user again
 </objective>
 
-<execution_context>- Read file at: ../.claude/get-shit-done/workflows/discuss-phase.md- Read file at: ../.claude/get-shit-done/templates/context.md
+<execution_context>
+- Read file at: ../.claude/get-shit-done/workflows/discuss-phase.md
+- Read file at: ../.claude/get-shit-done/templates/context.md
 </execution_context>
 
 <context>
 Phase number: $ARGUMENTS (required)
 
-**Load project state:**- Read file at: .planning/STATE.md
-**Load roadmap:**- Read file at: .planning/ROADMAP.md
+**Load project state:**
+- Read file at: .planning/STATE.md
+**Load roadmap:**
+- Read file at: .planning/ROADMAP.md
 </context>
 
 <process>

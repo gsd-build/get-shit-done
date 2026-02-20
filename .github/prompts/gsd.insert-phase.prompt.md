@@ -10,7 +10,8 @@ agent: agent
 Source: commands/gsd/insert-phase.md
 Regenerate: node scripts/generate-prompts.mjs
 -->
-<!-- upstream-tools: ["read","write","bash"] -->
+
+<!-- upstream-tools: ["Read","Write","Bash"] -->
 
 ## Preflight (required)
 
@@ -27,7 +28,6 @@ npx get-shit-done-cc --claude --local
 
 ---
 
-
 <objective>
 Insert a decimal phase for urgent work discovered mid-milestone that must be completed between existing integer phases.
 
@@ -36,11 +36,14 @@ Uses decimal numbering (72.1, 72.2, etc.) to preserve the logical sequence of pl
 Purpose: Handle urgent work discovered during execution without renumbering entire roadmap.
 </objective>
 
-<execution_context>- Read file at: ../.claude/get-shit-done/workflows/insert-phase.md
+<execution_context>
+- Read file at: ../.claude/get-shit-done/workflows/insert-phase.md
 </execution_context>
 
 <context>
-Arguments: $ARGUMENTS (format: <after-phase-number> <description>)- Read file at: .planning/ROADMAP.md- Read file at: .planning/STATE.md
+Arguments: $ARGUMENTS (format: <after-phase-number> <description>)
+- Read file at: .planning/ROADMAP.md
+- Read file at: .planning/STATE.md
 </context>
 
 <process>

@@ -10,7 +10,8 @@ agent: agent
 Source: commands/gsd/remove-phase.md
 Regenerate: node scripts/generate-prompts.mjs
 -->
-<!-- upstream-tools: ["read","write","bash","glob"] -->
+
+<!-- upstream-tools: ["Read","Write","Bash","Glob"] -->
 
 ## Preflight (required)
 
@@ -27,7 +28,6 @@ npx get-shit-done-cc --claude --local
 
 ---
 
-
 <objective>
 Remove an unstarted future phase from the roadmap and renumber all subsequent phases to maintain a clean, linear sequence.
 
@@ -35,11 +35,14 @@ Purpose: Clean removal of work you've decided not to do, without polluting conte
 Output: Phase deleted, all subsequent phases renumbered, git commit as historical record.
 </objective>
 
-<execution_context>- Read file at: ../.claude/get-shit-done/workflows/remove-phase.md
+<execution_context>
+- Read file at: ../.claude/get-shit-done/workflows/remove-phase.md
 </execution_context>
 
 <context>
-Phase: $ARGUMENTS- Read file at: .planning/ROADMAP.md- Read file at: .planning/STATE.md
+Phase: $ARGUMENTS
+- Read file at: .planning/ROADMAP.md
+- Read file at: .planning/STATE.md
 </context>
 
 <process>

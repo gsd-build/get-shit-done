@@ -10,7 +10,8 @@ agent: agent
 Source: commands/gsd/settings.md
 Regenerate: node scripts/generate-prompts.mjs
 -->
-<!-- upstream-tools: ["read","write","bash","askuserquestion"] -->
+
+<!-- upstream-tools: ["Read","Write","Bash","AskUserQuestion"] -->
 
 ## Preflight (required)
 
@@ -57,7 +58,8 @@ Routes to the settings workflow which handles:
 - Confirmation display with quick command references
 </objective>
 
-<execution_context>- Read file at: ../.claude/get-shit-done/workflows/settings.md
+<execution_context>
+- Read file at: ../.claude/get-shit-done/workflows/settings.md
 </execution_context>
 
 <process>

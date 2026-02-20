@@ -10,7 +10,8 @@ agent: agent
 Source: commands/gsd/check-todos.md
 Regenerate: node scripts/generate-prompts.mjs
 -->
-<!-- upstream-tools: ["read","write","bash","askuserquestion"] -->
+
+<!-- upstream-tools: ["Read","Write","Bash","AskUserQuestion"] -->
 
 ## Preflight (required)
 
@@ -57,7 +58,10 @@ Routes to the check-todos workflow which handles:
 - STATE.md updates and git commits
 </objective>
 
-<execution_context>- Read file at: .planning/STATE.md- Read file at: .planning/ROADMAP.md- Read file at: ../.claude/get-shit-done/workflows/check-todos.md
+<execution_context>
+- Read file at: .planning/STATE.md
+- Read file at: .planning/ROADMAP.md
+- Read file at: ../.claude/get-shit-done/workflows/check-todos.md
 </execution_context>
 
 <process>

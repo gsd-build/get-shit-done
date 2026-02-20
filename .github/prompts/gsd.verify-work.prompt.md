@@ -10,7 +10,8 @@ agent: agent
 Source: commands/gsd/verify-work.md
 Regenerate: node scripts/generate-prompts.mjs
 -->
-<!-- upstream-tools: ["read","bash","glob","grep","edit","write","task"] -->
+
+<!-- upstream-tools: ["Read","Bash","Glob","Grep","Edit","Write","Task"] -->
 
 ## Preflight (required)
 
@@ -27,7 +28,6 @@ npx get-shit-done-cc --claude --local
 
 ---
 
-
 <objective>
 Validate built features through conversational testing with persistent state.
 
@@ -36,13 +36,17 @@ Purpose: Confirm what Claude built actually works from user's perspective. One t
 Output: {phase_num}-UAT.md tracking all test results. If issues found: diagnosed gaps, verified fix plans ready for /gsd:execute-phase
 </objective>
 
-<execution_context>- Read file at: ../.claude/get-shit-done/workflows/verify-work.md- Read file at: ../.claude/get-shit-done/templates/UAT.md
+<execution_context>
+- Read file at: ../.claude/get-shit-done/workflows/verify-work.md
+- Read file at: ../.claude/get-shit-done/templates/UAT.md
 </execution_context>
 
 <context>
 Phase: $ARGUMENTS (optional)
 - If provided: Test specific phase (e.g., "4")
-- If not provided: Check for active sessions or prompt for phase- Read file at: .planning/STATE.md- Read file at: .planning/ROADMAP.md
+- If not provided: Check for active sessions or prompt for phase
+- Read file at: .planning/STATE.md
+- Read file at: .planning/ROADMAP.md
 </context>
 
 <process>

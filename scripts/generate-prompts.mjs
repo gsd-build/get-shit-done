@@ -274,60 +274,258 @@ function escapeYamlString(s) {
   return String(s ?? "").replace(/\\/g, "\\\\").replace(/"/g, '\\"');
 }
 
-function buildPrompt({ cmdFile, fm, body, upstreamTools, tools, omitted }) {
-  const upstreamName = fm.name || "";
-  const cmdName = upstreamName
-    ? normalizeName(upstreamName)
-    : "gsd." + path.basename(cmdFile, ".md");
+/**
+ * Join non-empty string blocks with exactly one blank line between them.
+ * Filters out empty/whitespace-only blocks. No leading or trailing blank lines.
+ */
+function joinBlocks(...blocks) {
+  return blocks
+    .map(b => (typeof b === 'string' ? b.trimEnd() : ''))
+    .filter(b => b.length > 0)
+    .join('\n\n');
+}
 
-  const description = fm.description || `GSD command ${cmdName}`;
-  const argumentHint = fm["argument-hint"] || "";
+// ─── Pipeline Steps ──────────────────────────────────────────────────────────
 
-  // Transform body with minimal changes
-  let converted = body;
-  converted = convertIncludes(converted);
-  converted = normalizeRuntimePathsForLocalInstall(converted);
+function stepParseFrontmatter(ctx) {
+  const { data, body } = parseFrontmatter(ctx.source);
+  ctx.fm = data;
+  ctx.body = body;
+  return ctx;
+}
 
-  // Normalize newlines
-  converted = converted.replace(/\r\n/g, "\n");
+function stepNormalizeEol(ctx) {
+  if (ctx.source.includes('\r\n')) {
+    ctx._sourceEol = 'CRLF';
+    ctx.body = ctx.body.replace(/\r\n/g, '\n');
+  } else {
+    ctx._sourceEol = 'LF';
+  }
+  return ctx;
+}
 
-  // Adapter shim is conditional: only emit when vscode/askQuestions is in the mapped tools list
-  const needsAskTool = tools.includes('vscode/askQuestions');
+function stepParseTools(ctx) {
+  // Capture original-cased tool list BEFORE parseFrontmatterTools lowercases them.
+  const fmMatch = ctx.source.replace(/\r\n/g, '\n').match(/^---[ \t]*\n([\s\S]*?)\n---[ \t]*(?:\n|$)/);
+  let originals = null;
+  if (fmMatch) {
+    const fmText = fmMatch[1];
+    const KEY_LINE = /^allowed-tools\s*:\s*(.*)$/;
+    const LIST_ITEM = /^\s+-\s+(.+)\s*$/;
+    const NEW_KEY = /^[A-Za-z0-9_-]+\s*:/;
+    let state = 'SCANNING';
+    const items = [];
+    let found = false;
+    for (const line of fmText.split('\n')) {
+      if (state === 'SCANNING') {
+        const m = line.match(KEY_LINE);
+        if (!m) continue;
+        found = true;
+        const inline = m[1].trim();
+        if (inline) {
+          const stripped = inline.replace(/^\[/, '').replace(/\]$/, '');
+          originals = stripped.split(/\s*,\s*/).map(s => s.trim()).filter(Boolean);
+          break;
+        }
+        state = 'COLLECTING';
+        continue;
+      }
+      if (state === 'COLLECTING') {
+        if (line.trim() === '' || NEW_KEY.test(line)) break;
+        const itemMatch = line.match(LIST_ITEM);
+        if (itemMatch) items.push(itemMatch[1].trim());
+      }
+    }
+    if (state === 'COLLECTING') originals = items;
+    if (!found) originals = null;
+  }
+  ctx.upstreamToolsOriginal = originals; // original casing, may be null
+  ctx.upstreamTools = parseFrontmatterTools(ctx.source, ctx.cmdFile); // lowercased or null
+  return ctx;
+}
 
-  const sourceRel = path.posix.join(
-    "commands",
-    "gsd",
-    path.basename(cmdFile)
+function stepMapTools(ctx) {
+  const { tools, omitted } = mapTools(ctx.upstreamTools, ctx.cmdFile, ctx.toolMap, ctx.pendingStubs);
+  ctx.tools = tools;
+  ctx.omitted = omitted;
+  ctx.totalOmitted = (ctx.totalOmitted || 0) + omitted.length;
+  for (const t of omitted) ctx.allOmittedNames.add(t);
+  return ctx;
+}
+
+function stepConvertIncludes(ctx) {
+  ctx.body = convertIncludes(ctx.body);
+  return ctx;
+}
+
+function stepNormalizeRuntimePaths(ctx) {
+  ctx.body = normalizeRuntimePathsForLocalInstall(ctx.body);
+  return ctx;
+}
+
+/**
+ * Rewrite relative path references in body to workspace-relative paths.
+ *
+ * Handles:
+ * 1. Relative paths like ../foo/bar.md — resolved from source file's directory
+ * 2. @-prefixed file paths like @.planning/STATE.md — only when file exists
+ *
+ * Does NOT rewrite:
+ * - URLs (guarded by (?<![:/]) lookbehind)
+ * - @username tokens (require a / in the path portion to qualify)
+ * - Paths that cannot resolve to within ROOT (warns, leaves unchanged)
+ */
+function stepRewritePaths(ctx) {
+  const sourceDir = path.dirname(ctx.cmdFile);
+
+  // 1. Rewrite ../relative paths
+  ctx.body = ctx.body.replace(
+    /(?<![:/])(\.\.\/[^\s"')>\]]+)/g,
+    (match, relPath) => {
+      try {
+        const abs = path.resolve(sourceDir, relPath);
+        // Only rewrite if the file actually exists at the resolved location.
+        // Without this guard, ../foo from commands/gsd/ rewrites to commands/foo
+        // even when the real file lives at the workspace root (e.g. .claude/...).
+        if (!fs.existsSync(abs)) return match;
+        const rel = path.relative(ROOT, abs).replace(/\\/g, '/');
+        if (rel.startsWith('..')) {
+          console.warn(`WARN: [stepRewritePaths] ${path.basename(ctx.cmdFile)}: path resolves outside workspace root: ${relPath}`);
+          return match;
+        }
+        return rel;
+      } catch (e) {
+        console.warn(`WARN: [stepRewritePaths] ${path.basename(ctx.cmdFile)}: could not resolve path ${relPath}: ${e.message}`);
+        return match;
+      }
+    }
   );
 
-  const toolsAnnotation = upstreamTools === null
-    ? "<!-- upstream-tools: null (field absent in upstream command) -->"
-    : `<!-- upstream-tools: ${JSON.stringify(upstreamTools)} -->`;
+  // 2. Rewrite @-prefixed file references (only if they contain a / and the file exists)
+  ctx.body = ctx.body.replace(
+    /(?<![A-Za-z0-9_-])@([\w./][^\s"')>\]]*\/[^\s"')>\]]*)/g,
+    (match, refPath) => {
+      try {
+        const absFromRoot = path.resolve(ROOT, refPath);
+        const absFromSource = path.resolve(sourceDir, refPath);
+        let resolved = null;
+        if (fs.existsSync(absFromRoot)) {
+          resolved = path.relative(ROOT, absFromRoot).replace(/\\/g, '/');
+        } else if (fs.existsSync(absFromSource)) {
+          resolved = path.relative(ROOT, absFromSource).replace(/\\/g, '/');
+        }
+        if (resolved === null) return match;
+        return '@' + resolved;
+      } catch (e) {
+        return match;
+      }
+    }
+  );
 
-  // tools and omitted come from mapTools() — passed in as parameters
-  const toolsYaml = tools.length > 0
-    ? `[${tools.map((t) => `'${t}'`).join(', ')}]`
-    : '[]';
+  return ctx;
+}
 
-  const omittedComment = omitted.length > 0
-    ? `<!-- omitted-tools: ${JSON.stringify(omitted)} — no Copilot equivalent found -->`
+function stepAssemble(ctx) {
+  const upstreamName = ctx.fm.name || '';
+  const cmdName = upstreamName
+    ? normalizeName(upstreamName)
+    : 'gsd.' + path.basename(ctx.cmdFile, '.md');
+
+  const description = ctx.fm.description || `GSD command ${cmdName}`;
+  const argumentHint = ctx.fm['argument-hint'] || '';
+
+  const needsAskTool = ctx.tools.includes('vscode/askQuestions');
+
+  const sourceRel = path.posix.join('commands', 'gsd', path.basename(ctx.cmdFile));
+
+  // upstream-tools comment: use original casing
+  const toolsAnnotation = ctx.upstreamToolsOriginal === null
+    ? '<!-- upstream-tools: null (field absent in upstream command) -->'
+    : `<!-- upstream-tools: ${JSON.stringify(ctx.upstreamToolsOriginal)} -->`;
+
+  const omittedComment = ctx.omitted.length > 0
+    ? `<!-- omitted-tools: ${JSON.stringify(ctx.omitted)} — no Copilot equivalent found -->`
     : '';
 
-  return `---
-name: ${cmdName}
-description: "${escapeYamlString(description)}"
-argument-hint: "${escapeYamlString(argumentHint)}"
-tools: ${toolsYaml}
-agent: agent
----
+  // tools frontmatter: omit field entirely when no upstream tools declared
+  const toolsYamlLine = ctx.upstreamTools === null
+    ? '' // omit
+    : `tools: [${ctx.tools.map(t => `'${t}'`).join(', ')}]`;
 
-${generatedBanner(sourceRel)}
-${toolsAnnotation}
-${omittedComment ? omittedComment + '\n' : ''}
-${preflightBlock(cmdName)}
-${needsAskTool ? adapterBlock() : ''}
-${converted.trimEnd()}
-`;
+  const frontmatterLines = [
+    `name: ${cmdName}`,
+    `description: "${escapeYamlString(description)}"`,
+    `argument-hint: "${escapeYamlString(argumentHint)}"`,
+    toolsYamlLine,
+    `agent: agent`,
+  ].filter(l => l.length > 0);
+
+  const frontmatter = `---\n${frontmatterLines.join('\n')}\n---`;
+
+  const banner = generatedBanner(sourceRel);
+  const annotations = [toolsAnnotation, omittedComment].filter(Boolean).join('\n');
+
+  ctx.output = joinBlocks(
+    frontmatter,
+    banner,
+    annotations,
+    preflightBlock(cmdName).trimEnd(),
+    needsAskTool ? adapterBlock().trimEnd() : '',
+    ctx.body.trimEnd()
+  ) + '\n';
+
+  ctx.cmdName = cmdName;
+  return ctx;
+}
+
+function stepRestoreEol(ctx) {
+  if (ctx._sourceEol === 'CRLF') {
+    ctx.output = ctx.output.replace(/\n/g, '\r\n');
+  }
+  return ctx;
+}
+
+/**
+ * Validate that triple-backtick fences in ctx.output are balanced.
+ * Uses a line-scanning state machine (not regex) to avoid false positives.
+ *
+ * Sets ctx.skipWrite = true and emits an error to stderr if unbalanced.
+ */
+function stepValidateFences(ctx) {
+  const lines = ctx.output.split('\n');
+  let depth = 0;
+
+  for (let i = 0; i < lines.length; i++) {
+    const trimmed = lines[i].trimStart();
+    if (/^`{3,}/.test(trimmed)) {
+      depth = depth === 0 ? 1 : 0;
+    }
+  }
+
+  if (depth !== 0) {
+    console.error(
+      `ERROR: [stepValidateFences] ${path.basename(ctx.cmdFile)}: unbalanced fenced code block in output — file NOT written`
+    );
+    ctx.skipWrite = true;
+  }
+  return ctx;
+}
+
+function runPipeline(ctx) {
+  const steps = [
+    stepParseFrontmatter,
+    stepNormalizeEol,
+    stepParseTools,
+    stepMapTools,
+    stepConvertIncludes,
+    stepNormalizeRuntimePaths,
+    stepRewritePaths,
+    stepAssemble,
+    stepRestoreEol,
+    stepValidateFences,
+  ];
+  for (const step of steps) step(ctx);
+  return ctx;
 }
 
 function main() {
@@ -337,6 +535,8 @@ function main() {
   const pendingStubs = {};
   let totalOmitted = 0;
   const allOmittedNames = new Set();
+  let fenceErrors = 0;
+  const expectedFiles = new Set();
 
   const files = listMarkdownFiles(COMMANDS_DIR);
   if (!files.length) {
@@ -348,20 +548,41 @@ function main() {
 
   for (const f of files) {
     const md = readFile(f);
-    const { data, body } = parseFrontmatter(md);
-    const upstreamTools = parseFrontmatterTools(md, f);
-    const { tools, omitted } = mapTools(upstreamTools, f, toolMap, pendingStubs);
-
-    totalOmitted += omitted.length;
-    for (const t of omitted) allOmittedNames.add(t);
-
-    const prompt = buildPrompt({ cmdFile: f, fm: data, body, upstreamTools, tools, omitted });
+    const ctx = runPipeline({
+      source: md,
+      cmdFile: f,
+      toolMap,
+      pendingStubs,
+      allOmittedNames,
+      totalOmitted: 0,
+    });
+    totalOmitted += ctx.totalOmitted;
+    const prompt = ctx.output;
 
     const base = path.basename(f, '.md'); // e.g., new-project
     const outName = `gsd.${base}.prompt.md`;
     const outPath = path.join(OUT_DIR, outName);
 
-    writeFile(outPath, prompt);
+    expectedFiles.add(outName);
+
+    if (!ctx.skipWrite) {
+      writeFile(outPath, prompt);
+    } else {
+      fenceErrors++;
+    }
+  }
+
+  // ─── Orphan Cleanup (GEN-09) ─────────────────────────────────────────────
+  // Remove .github/prompts/*.prompt.md files whose source command no longer exists.
+  if (fs.existsSync(OUT_DIR)) {
+    const existing = fs.readdirSync(OUT_DIR).filter(n => n.endsWith('.prompt.md'));
+    for (const name of existing) {
+      if (!expectedFiles.has(name)) {
+        const orphanPath = path.join(OUT_DIR, name);
+        fs.unlinkSync(orphanPath);
+        console.log(`Removed orphan: ${name}`);
+      }
+    }
   }
 
   // auto-stub write-back — one batch write AFTER all files processed
@@ -371,6 +592,11 @@ function main() {
     console.warn(`\nWARN: auto-stubbed ${Object.keys(pendingStubs).length} unknown tools as UNMAPPED:`);
     for (const t of Object.keys(pendingStubs)) console.warn(`  "${t}": "UNMAPPED"`);
     console.warn('  Fill in Copilot equivalents before next run.\n');
+  }
+
+  if (fenceErrors > 0) {
+    console.error(`\nERROR: ${fenceErrors} file(s) skipped due to unbalanced fences.`);
+    process.exitCode = 1;
   }
 
   if (totalOmitted > 0) {

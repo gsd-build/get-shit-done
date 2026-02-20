@@ -10,7 +10,8 @@ agent: agent
 Source: commands/gsd/list-phase-assumptions.md
 Regenerate: node scripts/generate-prompts.mjs
 -->
-<!-- upstream-tools: ["read","bash","grep","glob"] -->
+
+<!-- upstream-tools: ["Read","Bash","Grep","Glob"] -->
 
 ## Preflight (required)
 
@@ -27,7 +28,6 @@ npx get-shit-done-cc --claude --local
 
 ---
 
-
 <objective>
 Analyze a phase and present Claude's assumptions about technical approach, implementation order, scope boundaries, risk areas, and dependencies.
 
@@ -35,14 +35,17 @@ Purpose: Help users see what Claude thinks BEFORE planning begins - enabling cou
 Output: Conversational output only (no file creation) - ends with "What do you think?" prompt
 </objective>
 
-<execution_context>- Read file at: ../.claude/get-shit-done/workflows/list-phase-assumptions.md
+<execution_context>
+- Read file at: ../.claude/get-shit-done/workflows/list-phase-assumptions.md
 </execution_context>
 
 <context>
 Phase number: $ARGUMENTS (required)
 
-**Load project state first:**- Read file at: .planning/STATE.md
-**Load roadmap:**- Read file at: .planning/ROADMAP.md
+**Load project state first:**
+- Read file at: .planning/STATE.md
+**Load roadmap:**
+- Read file at: .planning/ROADMAP.md
 </context>
 
 <process>

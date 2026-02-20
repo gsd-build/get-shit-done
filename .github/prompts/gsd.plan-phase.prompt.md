@@ -10,7 +10,8 @@ agent: agent
 Source: commands/gsd/plan-phase.md
 Regenerate: node scripts/generate-prompts.mjs
 -->
-<!-- upstream-tools: ["read","write","bash","glob","grep","task","webfetch","mcp__context7__*"] -->
+
+<!-- upstream-tools: ["Read","Write","Bash","Glob","Grep","Task","WebFetch","mcp__context7__*"] -->
 
 ## Preflight (required)
 
@@ -27,7 +28,6 @@ npx get-shit-done-cc --claude --local
 
 ---
 
-
 <objective>
 Create executable phase prompts (PLAN.md files) for a roadmap phase with integrated research and verification.
 
@@ -36,7 +36,9 @@ Create executable phase prompts (PLAN.md files) for a roadmap phase with integra
 **Orchestrator role:** Parse arguments, validate phase, research domain (unless skipped), spawn gsd-planner, verify with gsd-plan-checker, iterate until pass or max iterations, present results.
 </objective>
 
-<execution_context>- Read file at: ../.claude/get-shit-done/workflows/plan-phase.md- Read file at: ../.claude/get-shit-done/references/ui-brand.md
+<execution_context>
+- Read file at: ../.claude/get-shit-done/workflows/plan-phase.md
+- Read file at: ../.claude/get-shit-done/references/ui-brand.md
 </execution_context>
 
 <context>

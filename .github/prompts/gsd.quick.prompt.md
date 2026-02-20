@@ -10,7 +10,8 @@ agent: agent
 Source: commands/gsd/quick.md
 Regenerate: node scripts/generate-prompts.mjs
 -->
-<!-- upstream-tools: ["read","write","edit","glob","grep","bash","task","askuserquestion"] -->
+
+<!-- upstream-tools: ["Read","Write","Edit","Glob","Grep","Bash","Task","AskUserQuestion"] -->
 
 ## Preflight (required)
 
@@ -59,10 +60,12 @@ Quick mode is the same system with a shorter path:
 **`--full` flag:** Enables plan-checking (max 2 iterations) and post-execution verification. Use when you want quality guarantees without full milestone ceremony.
 </objective>
 
-<execution_context>- Read file at: ../.claude/get-shit-done/workflows/quick.md
+<execution_context>
+- Read file at: ../.claude/get-shit-done/workflows/quick.md
 </execution_context>
 
-<context>- Read file at: .planning/STATE.md
+<context>
+- Read file at: .planning/STATE.md
 $ARGUMENTS
 </context>
 

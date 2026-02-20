@@ -10,7 +10,8 @@ agent: agent
 Source: commands/gsd/complete-milestone.md
 Regenerate: node scripts/generate-prompts.mjs
 -->
-<!-- upstream-tools: ["read","write","bash"] -->
+
+<!-- upstream-tools: ["Read","Write","Bash"] -->
 
 ## Preflight (required)
 
@@ -26,7 +27,6 @@ npx get-shit-done-cc --claude --local
 3. Then re-run the slash command: `/gsd.complete-milestone`
 
 ---
-
 
 <objective>
 Mark milestone {{version}} complete, archive to milestones/, and update ROADMAP.md and REQUIREMENTS.md.

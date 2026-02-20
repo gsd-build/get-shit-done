@@ -10,7 +10,8 @@ agent: agent
 Source: commands/gsd/plan-milestone-gaps.md
 Regenerate: node scripts/generate-prompts.mjs
 -->
-<!-- upstream-tools: ["read","write","bash","glob","grep","askuserquestion"] -->
+
+<!-- upstream-tools: ["Read","Write","Bash","Glob","Grep","AskUserQuestion"] -->
 
 ## Preflight (required)
 
@@ -54,15 +55,20 @@ Reads MILESTONE-AUDIT.md, groups gaps into logical phases, creates phase entries
 One command creates all fix phases — no manual `/gsd:add-phase` per gap.
 </objective>
 
-<execution_context>- Read file at: ../.claude/get-shit-done/workflows/plan-milestone-gaps.md
+<execution_context>
+- Read file at: ../.claude/get-shit-done/workflows/plan-milestone-gaps.md
 </execution_context>
 
 <context>
 **Audit results:**
 Glob: .planning/v*-MILESTONE-AUDIT.md (use most recent)
 
-**Original intent (for prioritization):**- Read file at: .planning/PROJECT.md- Read file at: .planning/REQUIREMENTS.md
-**Current state:**- Read file at: .planning/ROADMAP.md- Read file at: .planning/STATE.md
+**Original intent (for prioritization):**
+- Read file at: .planning/PROJECT.md
+- Read file at: .planning/REQUIREMENTS.md
+**Current state:**
+- Read file at: .planning/ROADMAP.md
+- Read file at: .planning/STATE.md
 </context>
 
 <process>

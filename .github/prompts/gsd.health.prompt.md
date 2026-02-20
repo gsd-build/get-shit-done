@@ -10,7 +10,8 @@ agent: agent
 Source: commands/gsd/health.md
 Regenerate: node scripts/generate-prompts.mjs
 -->
-<!-- upstream-tools: ["read","bash","write","askuserquestion"] -->
+
+<!-- upstream-tools: ["Read","Bash","Write","AskUserQuestion"] -->
 
 ## Preflight (required)
 
@@ -50,7 +51,8 @@ Instead, whenever the upstream instructions say "Use AskUserQuestion", use **#to
 Validate `.planning/` directory integrity and report actionable issues. Checks for missing files, invalid configurations, inconsistent state, and orphaned plans.
 </objective>
 
-<execution_context>- Read file at: ../.claude/get-shit-done/workflows/health.md
+<execution_context>
+- Read file at: ../.claude/get-shit-done/workflows/health.md
 </execution_context>
 
 <process>

@@ -10,7 +10,8 @@ agent: agent
 Source: commands/gsd/new-milestone.md
 Regenerate: node scripts/generate-prompts.mjs
 -->
-<!-- upstream-tools: ["read","write","bash","task","askuserquestion"] -->
+
+<!-- upstream-tools: ["Read","Write","Bash","Task","AskUserQuestion"] -->
 
 ## Preflight (required)
 
@@ -61,14 +62,24 @@ Brownfield equivalent of new-project. Project exists, PROJECT.md has history. Ga
 **After:** `/gsd:plan-phase [N]` to start execution.
 </objective>
 
-<execution_context>- Read file at: ../.claude/get-shit-done/workflows/new-milestone.md- Read file at: ../.claude/get-shit-done/references/questioning.md- Read file at: ../.claude/get-shit-done/references/ui-brand.md- Read file at: ../.claude/get-shit-done/templates/project.md- Read file at: ../.claude/get-shit-done/templates/requirements.md
+<execution_context>
+- Read file at: ../.claude/get-shit-done/workflows/new-milestone.md
+- Read file at: ../.claude/get-shit-done/references/questioning.md
+- Read file at: ../.claude/get-shit-done/references/ui-brand.md
+- Read file at: ../.claude/get-shit-done/templates/project.md
+- Read file at: ../.claude/get-shit-done/templates/requirements.md
 </execution_context>
 
 <context>
 Milestone name: $ARGUMENTS (optional - will prompt if not provided)
 
-**Load project context:**- Read file at: .planning/PROJECT.md- Read file at: .planning/STATE.md- Read file at: .planning/MILESTONES.md- Read file at: .planning/config.json
-**Load milestone context (if exists, from /gsd:discuss-milestone):**- Read file at: .planning/MILESTONE-CONTEXT.md
+**Load project context:**
+- Read file at: .planning/PROJECT.md
+- Read file at: .planning/STATE.md
+- Read file at: .planning/MILESTONES.md
+- Read file at: .planning/config.json
+**Load milestone context (if exists, from /gsd:discuss-milestone):**
+- Read file at: .planning/MILESTONE-CONTEXT.md
 </context>
 
 <process>

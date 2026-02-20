@@ -2,7 +2,6 @@
 name: gsd.join-discord
 description: "Join the GSD Discord community"
 argument-hint: ""
-tools: []
 agent: agent
 ---
 
@@ -10,6 +9,7 @@ agent: agent
 Source: commands/gsd/join-discord.md
 Regenerate: node scripts/generate-prompts.mjs
 -->
+
 <!-- upstream-tools: null (field absent in upstream command) -->
 
 ## Preflight (required)
@@ -26,7 +26,6 @@ npx get-shit-done-cc --claude --local
 3. Then re-run the slash command: `/gsd.join-discord`
 
 ---
-
 
 <objective>
 Display the Discord invite link for the GSD community server.

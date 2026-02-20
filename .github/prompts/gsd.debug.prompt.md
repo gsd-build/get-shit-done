@@ -10,7 +10,8 @@ agent: agent
 Source: commands/gsd/debug.md
 Regenerate: node scripts/generate-prompts.mjs
 -->
-<!-- upstream-tools: ["read","bash","task","askuserquestion"] -->
+
+<!-- upstream-tools: ["Read","Bash","Task","AskUserQuestion"] -->
 
 ## Preflight (required)
 

@@ -10,7 +10,8 @@ agent: agent
 Source: commands/gsd/new-project.md
 Regenerate: node scripts/generate-prompts.mjs
 -->
-<!-- upstream-tools: ["read","bash","write","task","askuserquestion"] -->
+
+<!-- upstream-tools: ["Read","Bash","Write","Task","AskUserQuestion"] -->
 
 ## Preflight (required)
 
@@ -65,7 +66,12 @@ Initialize a new project through unified flow: questioning → research (optiona
 **After this command:** Run `/gsd:plan-phase 1` to start execution.
 </objective>
 
-<execution_context>- Read file at: ../.claude/get-shit-done/workflows/new-project.md- Read file at: ../.claude/get-shit-done/references/questioning.md- Read file at: ../.claude/get-shit-done/references/ui-brand.md- Read file at: ../.claude/get-shit-done/templates/project.md- Read file at: ../.claude/get-shit-done/templates/requirements.md
+<execution_context>
+- Read file at: ../.claude/get-shit-done/workflows/new-project.md
+- Read file at: ../.claude/get-shit-done/references/questioning.md
+- Read file at: ../.claude/get-shit-done/references/ui-brand.md
+- Read file at: ../.claude/get-shit-done/templates/project.md
+- Read file at: ../.claude/get-shit-done/templates/requirements.md
 </execution_context>
 
 <process>

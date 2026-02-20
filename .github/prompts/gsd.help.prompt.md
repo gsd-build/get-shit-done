@@ -2,7 +2,6 @@
 name: gsd.help
 description: "Show available GSD commands and usage guide"
 argument-hint: ""
-tools: []
 agent: agent
 ---
 
@@ -10,6 +9,7 @@ agent: agent
 Source: commands/gsd/help.md
 Regenerate: node scripts/generate-prompts.mjs
 -->
+
 <!-- upstream-tools: null (field absent in upstream command) -->
 
 ## Preflight (required)
@@ -27,7 +27,6 @@ npx get-shit-done-cc --claude --local
 
 ---
 
-
 <objective>
 Display the complete GSD command reference.
 
@@ -38,7 +37,8 @@ Output ONLY the reference content below. Do NOT add:
 - Any commentary beyond the reference
 </objective>
 
-<execution_context>- Read file at: ../.claude/get-shit-done/workflows/help.md
+<execution_context>
+- Read file at: ../.claude/get-shit-done/workflows/help.md
 </execution_context>
 
 <process>

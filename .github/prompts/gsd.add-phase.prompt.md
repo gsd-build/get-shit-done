@@ -10,7 +10,8 @@ agent: agent
 Source: commands/gsd/add-phase.md
 Regenerate: node scripts/generate-prompts.mjs
 -->
-<!-- upstream-tools: ["read","write","bash"] -->
+
+<!-- upstream-tools: ["Read","Write","Bash"] -->
 
 ## Preflight (required)
 
@@ -27,7 +28,6 @@ npx get-shit-done-cc --claude --local
 
 ---
 
-
 <objective>
 Add a new integer phase to the end of the current milestone in the roadmap.
 
@@ -38,7 +38,10 @@ Routes to the add-phase workflow which handles:
 - STATE.md roadmap evolution tracking
 </objective>
 
-<execution_context>- Read file at: .planning/ROADMAP.md- Read file at: .planning/STATE.md- Read file at: ../.claude/get-shit-done/workflows/add-phase.md
+<execution_context>
+- Read file at: .planning/ROADMAP.md
+- Read file at: .planning/STATE.md
+- Read file at: ../.claude/get-shit-done/workflows/add-phase.md
 </execution_context>
 
 <process>

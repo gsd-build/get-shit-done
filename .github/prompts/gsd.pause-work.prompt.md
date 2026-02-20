@@ -10,7 +10,8 @@ agent: agent
 Source: commands/gsd/pause-work.md
 Regenerate: node scripts/generate-prompts.mjs
 -->
-<!-- upstream-tools: ["read","write","bash"] -->
+
+<!-- upstream-tools: ["Read","Write","Bash"] -->
 
 ## Preflight (required)
 
@@ -27,7 +28,6 @@ npx get-shit-done-cc --claude --local
 
 ---
 
-
 <objective>
 Create `.continue-here.md` handoff file to preserve complete work state across sessions.
 
@@ -39,7 +39,9 @@ Routes to the pause-work workflow which handles:
 - Resume instructions
 </objective>
 
-<execution_context>- Read file at: .planning/STATE.md- Read file at: ../.claude/get-shit-done/workflows/pause-work.md
+<execution_context>
+- Read file at: .planning/STATE.md
+- Read file at: ../.claude/get-shit-done/workflows/pause-work.md
 </execution_context>
 
 <process>

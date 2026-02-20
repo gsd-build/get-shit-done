@@ -10,7 +10,8 @@ agent: agent
 Source: commands/gsd/update.md
 Regenerate: node scripts/generate-prompts.mjs
 -->
-<!-- upstream-tools: ["bash","askuserquestion"] -->
+
+<!-- upstream-tools: ["Bash","AskUserQuestion"] -->
 
 ## Preflight (required)
 
@@ -58,7 +59,8 @@ Routes to the update workflow which handles:
 - Restart reminder
 </objective>
 
-<execution_context>- Read file at: ../.claude/get-shit-done/workflows/update.md
+<execution_context>
+- Read file at: ../.claude/get-shit-done/workflows/update.md
 </execution_context>
 
 <process>

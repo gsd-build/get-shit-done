@@ -10,7 +10,8 @@ agent: agent
 Source: commands/gsd/resume-work.md
 Regenerate: node scripts/generate-prompts.mjs
 -->
-<!-- upstream-tools: ["read","bash","write","askuserquestion","slashcommand"] -->
+
+<!-- upstream-tools: ["Read","Bash","Write","AskUserQuestion","SlashCommand"] -->
 <!-- omitted-tools: ["slashcommand"] — no Copilot equivalent found -->
 
 ## Preflight (required)
@@ -59,7 +60,8 @@ Routes to the resume-project workflow which handles:
 - Context-aware next action routing
   </objective>
 
-<execution_context>- Read file at: ../.claude/get-shit-done/workflows/resume-project.md
+<execution_context>
+- Read file at: ../.claude/get-shit-done/workflows/resume-project.md
 </execution_context>
 
 <process>
