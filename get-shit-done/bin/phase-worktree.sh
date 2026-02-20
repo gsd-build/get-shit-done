@@ -226,6 +226,91 @@ _test_lock_atomicity() {
     return 0
 }
 
+# ============================================================================
+# Worktree Lifecycle Functions
+# ============================================================================
+
+# Create worktree for a phase with existing detection (TREE-01, TREE-05)
+create_worktree() {
+    local phase="$1"
+    local slug="${2:-}"
+
+    # Auto-detect slug if not provided
+    if [ -z "$slug" ]; then
+        slug=$(get_phase_slug "$phase") || slug="unknown"
+    fi
+
+    local worktree_dir
+    local branch
+    local repo_root
+
+    worktree_dir=$(get_worktree_dir "$phase")
+    branch=$(get_branch_name "$phase" "$slug")
+    repo_root=$(get_repo_root)
+
+    # Prune stale references first (TREE-06)
+    prune_stale
+
+    # Check if worktree already exists (TREE-05)
+    local existing
+    existing=$(node "$GSD_TOOLS" worktree get "$phase" 2>/dev/null) || true
+
+    if [ -n "$existing" ]; then
+        local existing_path
+        existing_path=$(echo "$existing" | grep -o '"path": *"[^"]*"' | cut -d'"' -f4)
+        if [ -d "$existing_path" ]; then
+            echo "Worktree already exists for phase $phase: $existing_path" >&2
+            echo "$existing_path"
+            return 0
+        else
+            # Registry says it exists but path is gone - clean up
+            echo "Cleaning up stale registry entry for phase $phase" >&2
+            node "$GSD_TOOLS" worktree remove "$phase" 2>/dev/null || true
+        fi
+    fi
+
+    # Check if directory already exists on disk
+    if [ -d "$worktree_dir" ]; then
+        echo "Warning: Directory $worktree_dir exists but not in registry" >&2
+        echo "Use 'git worktree list' to check status" >&2
+        return 1
+    fi
+
+    # Acquire lock (LOCK-01, LOCK-03)
+    if ! acquire_lock "$phase"; then
+        return 1
+    fi
+
+    # Ensure .worktrees/ parent exists and is gitignored
+    mkdir -p "$(dirname "$worktree_dir")"
+    ensure_gitignore
+
+    # Check if branch already exists
+    if git show-ref --verify --quiet "refs/heads/$branch" 2>/dev/null; then
+        echo "Warning: Branch $branch already exists" >&2
+        # Use -B to reset existing branch instead of -b
+        if ! git worktree add "$worktree_dir" -B "$branch" HEAD --lock 2>&1; then
+            release_lock "$phase"
+            echo "Error: Failed to create worktree" >&2
+            return 1
+        fi
+    else
+        # Create new branch (TREE-01)
+        if ! git worktree add "$worktree_dir" -b "$branch" HEAD --lock 2>&1; then
+            release_lock "$phase"
+            echo "Error: Failed to create worktree" >&2
+            return 1
+        fi
+    fi
+
+    # Update registry
+    node "$GSD_TOOLS" worktree add "$phase" "$worktree_dir" \
+        --branch "$branch" --slug "$slug" 2>/dev/null || true
+
+    echo "$worktree_dir"
+    return 0
+}
+
 # Command dispatch
 case "${1:-}" in
     acquire-lock)
