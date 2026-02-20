@@ -11,6 +11,7 @@
 
 import fs from "node:fs";
 import path from "node:path";
+import { pathToFileURL } from "node:url";
 
 const ROOT = process.cwd();
 const COMMANDS_DIR = path.join(ROOT, "commands", "gsd");
@@ -150,7 +151,7 @@ export function parseFrontmatterTools(content, filePath = "<unknown>") {
   return tools; // [] if block was present but had no valid list items
 }
 
-function loadToolMap() {
+export function loadToolMap() {
   const p = path.join(ROOT, 'scripts', 'tools.json');
   if (!fs.existsSync(p)) {
     console.warn('[loadToolMap] scripts/tools.json not found — using empty map');
@@ -511,7 +512,7 @@ function stepValidateFences(ctx) {
   return ctx;
 }
 
-function runPipeline(ctx) {
+export function runPipeline(ctx) {
   const steps = [
     stepParseFrontmatter,
     stepNormalizeEol,
@@ -608,4 +609,5 @@ function main() {
   console.log(`Generated ${files.length} prompt files into ${OUT_DIR}`);
 }
 
-main();
+const isMain = process.argv[1] != null && import.meta.url === pathToFileURL(process.argv[1]).href;
+if (isMain) main();
