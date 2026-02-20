@@ -258,29 +258,52 @@ Branch ${PHASE_BRANCH} merged into main successfully.
 </step>
 
 <step name="cleanup_worktree">
-Remove the git worktree and release lock:
+Remove the git worktree and release lock **only if merge succeeded** (FLOW-05):
 
 ```bash
-# Check if worktree scripts exist (project-specific)
-if [ -f ".planning/scripts/phase-worktree.sh" ]; then
-  # Use project's worktree management
-  "${MAIN_REPO}/.planning/scripts/phase-worktree.sh" remove "${PHASE_NUMBER}"
-else
-  # Manual worktree cleanup
-  git worktree remove "${WORK_DIR}" --force 2>/dev/null || true
-
-  # Delete the branch (it's merged)
-  git branch -d "${PHASE_BRANCH}" 2>/dev/null || true
+# Skip cleanup if merge failed - don't delete worktree with uncommitted conflict resolution
+if [ "${MERGE_EXIT:-1}" != "0" ]; then
+  echo "Skipping cleanup: merge did not complete successfully"
+  echo "Worktree preserved at: ${WORK_DIR}"
+  echo "Resolve merge issues and re-run finalize"
+  exit 1
 fi
-```
 
-**Report cleanup:**
-```
-## ✓ Worktree Cleaned Up
+# Locate phase-worktree.sh script
+REPO_ROOT=$(git rev-parse --show-toplevel)
+PHASE_WORKTREE="${REPO_ROOT}/get-shit-done/bin/phase-worktree.sh"
 
-- Worktree removed: ${WORK_DIR}
-- Branch deleted: ${PHASE_BRANCH}
-- Lock released: phase-${PHASE_NUMBER}
+if [ ! -f "$PHASE_WORKTREE" ]; then
+  PHASE_WORKTREE="${HOME}/.claude/get-shit-done/bin/phase-worktree.sh"
+fi
+
+if [ -f "$PHASE_WORKTREE" ]; then
+  # Use phase-worktree.sh remove for proper cleanup (FLOW-05)
+  # Handles: git worktree unlock, git worktree remove, git branch -d, registry update
+  "$PHASE_WORKTREE" remove "${PHASE_NUMBER}"
+  CLEANUP_EXIT=$?
+else
+  # Manual worktree cleanup (fallback if script not available)
+  git worktree unlock "${WORK_DIR}" 2>/dev/null || true
+  git worktree remove "${WORK_DIR}" --force 2>/dev/null || true
+  git branch -d "${PHASE_BRANCH}" 2>/dev/null || true
+  CLEANUP_EXIT=0
+fi
+
+if [ "${CLEANUP_EXIT:-0}" = "0" ]; then
+  echo "## > Worktree Cleaned Up"
+  echo ""
+  echo "- Worktree removed: ${WORK_DIR}"
+  echo "- Branch deleted: ${PHASE_BRANCH}"
+  echo "- Lock released: phase-${PHASE_NUMBER}"
+else
+  echo "## ! Cleanup Warning"
+  echo ""
+  echo "Worktree cleanup had issues. Manual cleanup may be needed:"
+  echo "  cd ${MAIN_REPO}"
+  echo "  git worktree remove ${WORK_DIR} --force"
+  echo "  git branch -d ${PHASE_BRANCH}"
+fi
 ```
 </step>
 
