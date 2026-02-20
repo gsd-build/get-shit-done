@@ -68,6 +68,7 @@ async function main() {
 
   // --- Accumulate response in temp file ---
   const tempFile = TEMP_PREFIX + session_id + '.txt';
+  const doneFile = TEMP_PREFIX + session_id + '.done';
   try {
     fs.appendFileSync(tempFile, last_assistant_message + '\n\n---\n\n');
   } catch (err) {
@@ -82,6 +83,14 @@ async function main() {
   try {
     accumulated = fs.readFileSync(tempFile, 'utf8');
   } catch (_) {
+    process.exit(0);
+  }
+
+  // --- Session dedup guard ---
+  // If a .done flag exists, extraction already ran for this session_id in a
+  // prior restart or concurrent invocation. Skip to avoid double-extracting.
+  if (fs.existsSync(doneFile)) {
+    cleanupOldTempFiles();
     process.exit(0);
   }
 
@@ -115,6 +124,13 @@ async function main() {
             `created=${result.created} evolved=${result.evolved} skipped=${result.skipped}\n`
           );
         }
+
+        // --- Delete temp file after successful extraction ---
+        // Write a .done flag first so concurrent invocations don't double-extract,
+        // then remove both the accumulated text and the flag on next cleanup sweep.
+        try { fs.writeFileSync(doneFile, session_id); } catch (_) {}
+        try { fs.unlinkSync(tempFile); } catch (_) {}
+        try { fs.unlinkSync(doneFile); } catch (_) {}
       }
     } else if (process.env.GSD_DEBUG) {
       const reason = readiness ? readiness.reason : 'knowledge system unavailable';
@@ -141,7 +157,8 @@ function cleanupOldTempFiles() {
     const files = fs.readdirSync(tmpDir);
     const now = Date.now();
     for (const f of files) {
-      if (!f.startsWith('gsd-session-') || !f.endsWith('.txt')) continue;
+      if (!f.startsWith('gsd-session-')) continue;
+      if (!f.endsWith('.txt') && !f.endsWith('.done')) continue;
       const fp = path.join(tmpDir, f);
       try {
         const stat = fs.statSync(fp);
