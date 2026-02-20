@@ -293,6 +293,25 @@ escalated_answers.push({
 })
 ```
 
+// Write to KB immediately after each answer so the DB is updated even if later escalations fail or timeout
+**Write escalated answer to knowledge DB (inside loop — non-fatal):**
+
+```bash
+GSD_KB_CONTENT="{item.question}: {item.answer}" \
+GSD_KB_CONTEXT="Phase {phase_number} Telegram escalation — {item.gray_area}" \
+node -e "
+const { storeInsights } = require(process.env.HOME + '/.claude/get-shit-done/bin/knowledge-writer.js');
+storeInsights([{
+  type: 'decision',
+  decision: process.env.GSD_KB_CONTENT,
+  confidence: 1.0,
+  context_snippet: process.env.GSD_KB_CONTEXT
+}], { scope: 'global' })
+.then(r => process.stderr.write('[coordinator] KB write: ' + JSON.stringify(r) + '\n'))
+.catch(e => process.stderr.write('[coordinator] KB write failed: ' + e.message + '\n'));
+" || true
+```
+
 After all sensitive_items processed, `escalated_answers` holds human-provided answers.
 
 **Merge escalated answers with sufficient answers for CONTEXT.md:**
