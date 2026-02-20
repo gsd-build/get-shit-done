@@ -97,13 +97,13 @@ Which phases cover which requirements. Updated during roadmap creation.
 | LOCK-02 | Phase 1 | ✓ Verified |
 | LOCK-03 | Phase 1 | ✓ Verified |
 | LOCK-04 | Phase 1 | ✓ Verified |
-| FLOW-01 | Phase 2 | Pending |
-| FLOW-02 | Phase 2 | Pending |
-| FLOW-03 | Phase 2 | Pending |
-| FLOW-04 | Phase 2 | Pending |
-| FLOW-05 | Phase 2 | Pending |
-| FLOW-06 | Phase 2 | Pending |
-| FLOW-07 | Phase 2 | Pending |
+| FLOW-01 | Phase 2 | ✓ Verified |
+| FLOW-02 | Phase 2 | ✓ Verified |
+| FLOW-03 | Phase 2 | ✓ Verified |
+| FLOW-04 | Phase 2 | ✓ Verified |
+| FLOW-05 | Phase 2 | ✓ Verified |
+| FLOW-06 | Phase 2 | ✓ Verified |
+| FLOW-07 | Phase 2 | ✓ Verified |
 | STATE-01 | Phase 3 | Pending |
 | STATE-02 | Phase 3 | Pending |
 | STATE-03 | Phase 3 | Pending |
