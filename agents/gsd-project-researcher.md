@@ -272,8 +272,24 @@ npm install -D [packages]
 
 ## Sources
 
-- [Context7/official sources]
-```
+**CRITICAL AUTO-STACK STEP:**
+The Docker environment reads `STACK.md` automatically to install tools.
+You MUST include these specific code blocks at the end of the file if dependencies are needed.
+
+For **System Tools** (apt-get):
+\`\`\`gsd-stack
+ffmpeg
+imagemagick
+\`\`\`
+
+For **Global Node Packages** (npm -g):
+\`\`\`gsd-npm
+ts-node
+typescript
+\`\`\`
+
+**Rule:** ONE package per line. No comments inside the block.
+This allows the system to auto-configure itself without extra files.
 
 ## FEATURES.md
 
