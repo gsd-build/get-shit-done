@@ -97,11 +97,30 @@ try:
   node ~/.claude/get-shit-done/bin/gsd-tools.js execution-log event \
     --type telegram_topic_created \
     --data '{"thread_id": {telegram_topic_id}, "title": "GSD: {roadmap_name} — {current_date}"}'
-except (MCP not available / TELEGRAM_BOT_TOKEN not set / any error):
-  // Non-fatal — continue without topic, notifications will go to main group
+except (MCP not available / TELEGRAM_BOT_TOKEN not set):
+  // No Telegram configured — silent, expected case
   telegram_topic_id = null
-  log.info("Telegram topic creation skipped — MCP not available or bot not configured")
+
+except (any other error — e.g. bot not admin, group not found, API error):
+  // Telegram IS configured but create_topic failed — notify user visibly
+  telegram_topic_id = null
+  node ~/.claude/get-shit-done/bin/gsd-tools.js execution-log event \
+    --type telegram_topic_failed \
+    --data '{"reason": "{error.message}", "timestamp": "{ISO}"}'
+  // Write a visible warning to the execution output:
+  console.warn("WARNING: Telegram notifications disabled for this run — create_topic failed: {error.message}")
+  // Also attempt to send a plain group message (no thread) if bot token is set:
+  try:
+    mcp__telegram__send_message({
+      text: "WARNING: Failed to create forum topic for this roadmap run. Notifications are disabled.\nReason: {error.message}"
+    })
+  except: pass  // Best-effort only
 ```
+
+if telegram_topic_id is null AND TELEGRAM_BOT_TOKEN is set:
+  // Telegram is configured but not operational for this run
+  // All subsequent `if telegram_topic_id is not null:` guards will correctly suppress notifications
+  log.warn("Telegram topic creation failed — all thread-targeted notifications suppressed for this run")
 
 The `telegram_topic_id` variable persists in the coordinator's context for the duration of the execution. Pass `thread_id: telegram_topic_id` (when non-null) to all subsequent `mcp__telegram__send_message` calls.
 
