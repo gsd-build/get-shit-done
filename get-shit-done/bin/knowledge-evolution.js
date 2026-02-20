@@ -13,6 +13,12 @@
 const { checkDuplicate, findSimilarByEmbedding, computeCanonicalHash } = require('./knowledge-dedup.js');
 const { updateKnowledge, insertKnowledge } = require('./knowledge-crud.js');
 
+// In-process write serializer: ensures concurrent insertOrEvolve calls are
+// queued and executed sequentially, preventing check→write races where two
+// callers both decide to evolve the same entry and the second overwrites the first.
+// Note: this is per-process only — multi-process scenarios are not protected.
+let pendingWrites = Promise.resolve();
+
 // Similarity ranges from research
 const EVOLUTION_THRESHOLDS = {
   duplicate: 0.88,    // > 0.88: exact duplicate, skip
@@ -57,13 +63,32 @@ function mergeMemories(existing, newContent, options = {}) {
 }
 
 /**
- * Insert or evolve knowledge entry based on similarity
+ * Insert or evolve knowledge entry based on similarity.
+ * Serializes all calls through a per-process promise chain to prevent concurrent
+ * check→write races (two callers seeing "evolve entry #X" and overwriting each other).
  * @param {object} conn - Database connection object
  * @param {object} entry - Entry to insert { content, type, scope, embedding, metadata, project_slug }
  * @param {object} options - Options
  * @returns {Promise<object>} { action, id?, similarity?, ... }
  */
 async function insertOrEvolve(conn, entry, options = {}) {
+  // Serialize all writes through a promise chain to prevent concurrent
+  // check→write races (two callers seeing "evolve entry #X" and overwriting each other)
+  const result = await new Promise((resolve, reject) => {
+    pendingWrites = pendingWrites.then(() => _insertOrEvolveImpl(conn, entry, options))
+      .then(resolve, reject);
+  });
+  return result;
+}
+
+/**
+ * Internal implementation of insertOrEvolve. Called serially via the pendingWrites chain.
+ * @param {object} conn - Database connection object
+ * @param {object} entry - Entry to insert { content, type, scope, embedding, metadata, project_slug }
+ * @param {object} options - Options
+ * @returns {Promise<object>} { action, id?, similarity?, ... }
+ */
+async function _insertOrEvolveImpl(conn, entry, options = {}) {
   const { content, type, scope, embedding, metadata = {}, project_slug } = entry;
   const { db } = conn;
 
