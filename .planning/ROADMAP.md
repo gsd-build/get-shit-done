@@ -44,11 +44,12 @@ Plans:
   3. Finalize-phase blocks merge until verification gates pass (UAT, tests)
   4. Finalize-phase merges phase branch to main with --no-ff and cleans up worktree
   5. New worktrees have dependencies installed (npm install) and .env copied automatically
-**Plans**: TBD
+**Plans:** 3 plans
 
 Plans:
-- [ ] 02-01: TBD
-- [ ] 02-02: TBD
+- [ ] 02-01-PLAN.md — Add post-create hooks to phase-worktree.sh (FLOW-06, FLOW-07)
+- [ ] 02-02-PLAN.md — Update execute-phase.md workflow (FLOW-01, FLOW-02)
+- [ ] 02-03-PLAN.md — Update finalize-phase.md workflow (FLOW-03, FLOW-04, FLOW-05)
 
 ### Phase 3: State Reconciliation
 **Goal**: Implement STATE.md merge algorithm that preserves both phase-specific and global changes
@@ -85,7 +86,7 @@ Phases execute in numeric order: 1 -> 2 -> 3 -> 4
 | Phase | Plans Complete | Status | Completed |
 |-------|----------------|--------|-----------|
 | 1. Foundation | 3/3 | Complete | 2026-02-20 |
-| 2. Workflow Integration | 0/2 | Not started | - |
+| 2. Workflow Integration | 0/3 | Planning complete | - |
 | 3. State Reconciliation | 0/1 | Not started | - |
 | 4. Polish and Recovery | 0/1 | Not started | - |
 

@@ -9,16 +9,16 @@
 ## Current Position
 
 **Phase:** 2 - Workflow Integration
-**Plan:** Not started
-**Status:** Planning needed
+**Plan:** Planning complete, ready for execution
+**Status:** Ready to execute
 
 ```
-[####################] 100% - Plans 01-01, 01-02, 01-03 complete
+[####################] 100% - Plans 02-01, 02-02, 02-03 planned
 ```
 
 **Phases:**
 - [x] Phase 1: Foundation (10 requirements) - COMPLETE
-- [ ] Phase 2: Workflow Integration (7 requirements)
+- [ ] Phase 2: Workflow Integration (7 requirements) - PLANNED
 - [ ] Phase 3: State Reconciliation (4 requirements)
 - [ ] Phase 4: Polish and Recovery (3 requirements)
 
@@ -46,6 +46,7 @@
 | Mark removed worktrees | Preserve history with status: removed instead of deleting | 2026-02-20 |
 | Absolute paths in registry | Use path.resolve() for consistent worktree path storage | 2026-02-20 |
 | Unlock worktree before remove | Git requires unlock before removing --lock worktrees | 2026-02-20 |
+| Non-fatal post-create hooks | npm install and .env copy should warn, not fail worktree creation | 2026-02-20 |
 
 ### Implementation Notes
 
@@ -53,6 +54,8 @@
 - Use `git rev-parse --show-toplevel` for repo root (worktree .git is a file)
 - Never `rm -rf` worktree directories, always use `git worktree remove`
 - Post-create hooks must run before returning success
+- Script path is `get-shit-done/bin/phase-worktree.sh` (not `.planning/scripts/`)
+- Branch naming: `phase-{N}-{slug}` (no gsd/ prefix)
 
 ### Open Questions
 
@@ -66,7 +69,8 @@
 - [x] Implement phase-worktree.sh lock functions (01-02)
 - [x] Add worktree subcommands to gsd-tools.cjs (01-01)
 - [x] Implement worktree lifecycle operations (01-03)
-- [ ] Plan Phase 2 Workflow Integration
+- [x] Plan Phase 2 Workflow Integration
+- [ ] Execute Phase 2 with `/gsd:execute-phase 2`
 
 ### Blockers
 
@@ -75,11 +79,12 @@ None currently.
 ## Session Continuity
 
 **Last Session:** 2026-02-20
-**Context:** Phase 1 Foundation complete. All worktree lifecycle operations implemented in phase-worktree.sh.
+**Context:** Phase 2 planning complete. 3 plans created for workflow integration.
 
 **To Resume:**
-1. Plan Phase 2 - Workflow Integration
-2. Requirements completed: LOCK-01, LOCK-02, LOCK-03, LOCK-04, TREE-01, TREE-02, TREE-03, TREE-04, TREE-05, TREE-06, STATE-01
+1. Execute Phase 2 with `/gsd:execute-phase 2`
+2. Plans: 02-01 (hooks), 02-02 (execute-phase), 02-03 (finalize-phase)
+3. Wave structure: Wave 1 (02-01), Wave 2 (02-02, 02-03 in parallel)
 
 ---
 *State initialized: 2026-02-20*
