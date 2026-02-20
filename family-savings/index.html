@@ -1,0 +1,1480 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Family Savings</title>
+    <style>
+        :root {
+            --primary: #2563eb;
+            --primary-dark: #1d4ed8;
+            --success: #10b981;
+            --warning: #f59e0b;
+            --danger: #ef4444;
+            --bg: #f8fafc;
+            --card-bg: #ffffff;
+            --text: #1e293b;
+            --text-light: #64748b;
+            --border: #e2e8f0;
+            --shadow: 0 1px 3px rgba(0,0,0,0.1);
+            --shadow-lg: 0 10px 25px rgba(0,0,0,0.1);
+        }
+
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            background: var(--bg);
+            color: var(--text);
+            line-height: 1.6;
+        }
+
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+            padding: 20px;
+        }
+
+        header {
+            background: linear-gradient(135deg, var(--primary), var(--primary-dark));
+            color: white;
+            padding: 20px 0;
+            margin-bottom: 30px;
+        }
+
+        header .container {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            flex-wrap: wrap;
+            gap: 15px;
+        }
+
+        header h1 {
+            font-size: 1.8rem;
+            font-weight: 700;
+        }
+
+        .header-stats {
+            display: flex;
+            gap: 30px;
+        }
+
+        .header-stat {
+            text-align: center;
+        }
+
+        .header-stat .label {
+            font-size: 0.75rem;
+            opacity: 0.9;
+            text-transform: uppercase;
+        }
+
+        .header-stat .value {
+            font-size: 1.5rem;
+            font-weight: 700;
+        }
+
+        nav {
+            background: var(--card-bg);
+            border-bottom: 1px solid var(--border);
+            position: sticky;
+            top: 0;
+            z-index: 100;
+        }
+
+        nav .container {
+            display: flex;
+            gap: 5px;
+            overflow-x: auto;
+            padding: 10px 20px;
+        }
+
+        nav button {
+            padding: 10px 20px;
+            border: none;
+            background: transparent;
+            color: var(--text-light);
+            cursor: pointer;
+            border-radius: 8px;
+            font-size: 0.9rem;
+            font-weight: 500;
+            white-space: nowrap;
+            transition: all 0.2s;
+        }
+
+        nav button:hover {
+            background: var(--bg);
+            color: var(--text);
+        }
+
+        nav button.active {
+            background: var(--primary);
+            color: white;
+        }
+
+        .card {
+            background: var(--card-bg);
+            border-radius: 12px;
+            box-shadow: var(--shadow);
+            padding: 20px;
+            margin-bottom: 20px;
+        }
+
+        .card-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 20px;
+        }
+
+        .card-title {
+            font-size: 1.1rem;
+            font-weight: 600;
+        }
+
+        .grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+            gap: 20px;
+        }
+
+        .btn {
+            padding: 10px 20px;
+            border: none;
+            border-radius: 8px;
+            cursor: pointer;
+            font-size: 0.9rem;
+            font-weight: 500;
+            transition: all 0.2s;
+            display: inline-flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        .btn-primary {
+            background: var(--primary);
+            color: white;
+        }
+
+        .btn-primary:hover {
+            background: var(--primary-dark);
+        }
+
+        .btn-success {
+            background: var(--success);
+            color: white;
+        }
+
+        .btn-danger {
+            background: var(--danger);
+            color: white;
+        }
+
+        .btn-outline {
+            background: transparent;
+            border: 1px solid var(--border);
+            color: var(--text);
+        }
+
+        .btn-outline:hover {
+            background: var(--bg);
+        }
+
+        .btn-sm {
+            padding: 6px 12px;
+            font-size: 0.8rem;
+        }
+
+        input, select, textarea {
+            width: 100%;
+            padding: 12px;
+            border: 1px solid var(--border);
+            border-radius: 8px;
+            font-size: 1rem;
+            transition: border-color 0.2s;
+        }
+
+        input:focus, select:focus, textarea:focus {
+            outline: none;
+            border-color: var(--primary);
+        }
+
+        .form-group {
+            margin-bottom: 15px;
+        }
+
+        .form-group label {
+            display: block;
+            margin-bottom: 5px;
+            font-weight: 500;
+            font-size: 0.9rem;
+        }
+
+        .member-card {
+            background: var(--bg);
+            border-radius: 10px;
+            padding: 20px;
+            text-align: center;
+            position: relative;
+        }
+
+        .member-avatar {
+            width: 60px;
+            height: 60px;
+            border-radius: 50%;
+            background: linear-gradient(135deg, var(--primary), var(--primary-dark));
+            color: white;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 1.5rem;
+            font-weight: 700;
+            margin: 0 auto 10px;
+        }
+
+        .member-name {
+            font-weight: 600;
+            font-size: 1.1rem;
+        }
+
+        .member-balance {
+            font-size: 1.3rem;
+            font-weight: 700;
+            color: var(--success);
+            margin: 5px 0;
+        }
+
+        .member-balance.negative {
+            color: var(--danger);
+        }
+
+        .member-actions {
+            display: flex;
+            gap: 8px;
+            margin-top: 15px;
+            justify-content: center;
+        }
+
+        .progress-bar {
+            height: 8px;
+            background: var(--bg);
+            border-radius: 4px;
+            overflow: hidden;
+        }
+
+        .progress-fill {
+            height: 100%;
+            background: var(--primary);
+            border-radius: 4px;
+            transition: width 0.3s;
+        }
+
+        .progress-fill.warning {
+            background: var(--warning);
+        }
+
+        .progress-fill.danger {
+            background: var(--danger);
+        }
+
+        .progress-fill.success {
+            background: var(--success);
+        }
+
+        .budget-item, .goal-item {
+            display: flex;
+            align-items: center;
+            gap: 15px;
+            padding: 15px;
+            background: var(--bg);
+            border-radius: 10px;
+            margin-bottom: 10px;
+        }
+
+        .budget-icon, .goal-icon {
+            width: 45px;
+            height: 45px;
+            border-radius: 10px;
+            background: var(--primary);
+            color: white;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 1.2rem;
+        }
+
+        .budget-info, .goal-info {
+            flex: 1;
+        }
+
+        .budget-name, .goal-name {
+            font-weight: 600;
+        }
+
+        .budget-amount, .goal-amount {
+            font-size: 0.85rem;
+            color: var(--text-light);
+        }
+
+        .transaction-item {
+            display: flex;
+            align-items: center;
+            gap: 15px;
+            padding: 15px 0;
+            border-bottom: 1px solid var(--border);
+        }
+
+        .transaction-item:last-child {
+            border-bottom: none;
+        }
+
+        .transaction-icon {
+            width: 40px;
+            height: 40px;
+            border-radius: 10px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 1.1rem;
+        }
+
+        .transaction-icon.deposit {
+            background: #dcfce7;
+            color: var(--success);
+        }
+
+        .transaction-icon.expense {
+            background: #fee2e2;
+            color: var(--danger);
+        }
+
+        .transaction-icon.transfer {
+            background: #dbeafe;
+            color: var(--primary);
+        }
+
+        .transaction-icon.goal_contribution {
+            background: #fef3c7;
+            color: var(--warning);
+        }
+
+        .transaction-info {
+            flex: 1;
+        }
+
+        .transaction-desc {
+            font-weight: 500;
+        }
+
+        .transaction-meta {
+            font-size: 0.8rem;
+            color: var(--text-light);
+        }
+
+        .transaction-amount {
+            font-weight: 600;
+        }
+
+        .transaction-amount.positive {
+            color: var(--success);
+        }
+
+        .transaction-amount.negative {
+            color: var(--danger);
+        }
+
+        .modal {
+            display: none;
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(0,0,0,0.5);
+            z-index: 1000;
+            align-items: center;
+            justify-content: center;
+            padding: 20px;
+        }
+
+        .modal.active {
+            display: flex;
+        }
+
+        .modal-content {
+            background: var(--card-bg);
+            border-radius: 16px;
+            padding: 30px;
+            max-width: 450px;
+            width: 100%;
+            max-height: 90vh;
+            overflow-y: auto;
+            box-shadow: var(--shadow-lg);
+        }
+
+        .modal-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 20px;
+        }
+
+        .modal-title {
+            font-size: 1.3rem;
+            font-weight: 600;
+        }
+
+        .modal-close {
+            background: none;
+            border: none;
+            font-size: 1.5rem;
+            cursor: pointer;
+            color: var(--text-light);
+        }
+
+        .tab-content {
+            display: none;
+        }
+
+        .tab-content.active {
+            display: block;
+        }
+
+        .quick-actions {
+            display: flex;
+            gap: 10px;
+            flex-wrap: wrap;
+        }
+
+        .summary-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+            gap: 15px;
+        }
+
+        .summary-item {
+            background: var(--bg);
+            padding: 15px;
+            border-radius: 10px;
+            text-align: center;
+        }
+
+        .summary-value {
+            font-size: 1.4rem;
+            font-weight: 700;
+            color: var(--primary);
+        }
+
+        .summary-label {
+            font-size: 0.8rem;
+            color: var(--text-light);
+            margin-top: 5px;
+        }
+
+        .empty-state {
+            text-align: center;
+            padding: 40px 20px;
+            color: var(--text-light);
+        }
+
+        .empty-state svg {
+            width: 80px;
+            height: 80px;
+            margin-bottom: 15px;
+            opacity: 0.5;
+        }
+
+        .badge {
+            display: inline-block;
+            padding: 2px 8px;
+            border-radius: 12px;
+            font-size: 0.7rem;
+            font-weight: 600;
+            text-transform: uppercase;
+        }
+
+        .badge-admin {
+            background: #dbeafe;
+            color: var(--primary);
+        }
+
+        .badge-member {
+            background: var(--bg);
+            color: var(--text-light);
+        }
+
+        .notification {
+            position: fixed;
+            bottom: 20px;
+            right: 20px;
+            background: var(--card-bg);
+            padding: 15px 20px;
+            border-radius: 10px;
+            box-shadow: var(--shadow-lg);
+            display: none;
+            z-index: 1100;
+            max-width: 350px;
+        }
+
+        .notification.show {
+            display: block;
+            animation: slideIn 0.3s ease;
+        }
+
+        .notification.success {
+            border-left: 4px solid var(--success);
+        }
+
+        .notification.error {
+            border-left: 4px solid var(--danger);
+        }
+
+        @keyframes slideIn {
+            from {
+                transform: translateX(100%);
+                opacity: 0;
+            }
+            to {
+                transform: translateX(0);
+                opacity: 1;
+            }
+        }
+
+        .whatsapp-setup {
+            background: #dcfce7;
+            border-radius: 10px;
+            padding: 20px;
+            margin-bottom: 20px;
+        }
+
+        .whatsapp-setup h4 {
+            color: var(--success);
+            margin-bottom: 10px;
+        }
+
+        .whatsapp-setup ol {
+            margin-left: 20px;
+            color: var(--text);
+        }
+
+        .whatsapp-setup code {
+            background: white;
+            padding: 2px 6px;
+            border-radius: 4px;
+            font-family: monospace;
+        }
+
+        @media (max-width: 768px) {
+            .header-stats {
+                width: 100%;
+                justify-content: space-around;
+            }
+
+            .grid {
+                grid-template-columns: 1fr;
+            }
+
+            nav .container {
+                gap: 0;
+            }
+
+            nav button {
+                padding: 10px 12px;
+            }
+        }
+    </style>
+</head>
+<body>
+    <header>
+        <div class="container">
+            <h1 id="familyName">Family Savings</h1>
+            <div class="header-stats">
+                <div class="header-stat">
+                    <div class="label">Total Balance</div>
+                    <div class="value" id="totalBalance">$0.00</div>
+                </div>
+                <div class="header-stat">
+                    <div class="label">Total Saved</div>
+                    <div class="value" id="totalSaved">$0.00</div>
+                </div>
+                <div class="header-stat">
+                    <div class="label">Members</div>
+                    <div class="value" id="memberCount">0</div>
+                </div>
+            </div>
+        </div>
+    </header>
+
+    <nav>
+        <div class="container">
+            <button class="active" data-tab="dashboard">Dashboard</button>
+            <button data-tab="members">Members</button>
+            <button data-tab="transfer">Transfer</button>
+            <button data-tab="budgets">Budgets</button>
+            <button data-tab="goals">Goals</button>
+            <button data-tab="history">History</button>
+            <button data-tab="settings">Settings</button>
+        </div>
+    </nav>
+
+    <main class="container">
+        <!-- Dashboard Tab -->
+        <div id="dashboard" class="tab-content active">
+            <div class="card">
+                <div class="card-header">
+                    <h3 class="card-title">Quick Actions</h3>
+                </div>
+                <div class="quick-actions">
+                    <button class="btn btn-success" onclick="openModal('depositModal')">+ Add Money</button>
+                    <button class="btn btn-primary" onclick="switchTab('transfer')">Transfer</button>
+                    <button class="btn btn-outline" onclick="openModal('expenseModal')">Record Expense</button>
+                </div>
+            </div>
+
+            <div class="card">
+                <div class="card-header">
+                    <h3 class="card-title">Monthly Summary</h3>
+                </div>
+                <div class="summary-grid" id="summaryGrid">
+                    <!-- Filled by JS -->
+                </div>
+            </div>
+
+            <div class="grid">
+                <div class="card">
+                    <div class="card-header">
+                        <h3 class="card-title">Family Members</h3>
+                    </div>
+                    <div id="dashboardMembers">
+                        <!-- Filled by JS -->
+                    </div>
+                </div>
+
+                <div class="card">
+                    <div class="card-header">
+                        <h3 class="card-title">Recent Activity</h3>
+                    </div>
+                    <div id="recentActivity">
+                        <!-- Filled by JS -->
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Members Tab -->
+        <div id="members" class="tab-content">
+            <div class="card">
+                <div class="card-header">
+                    <h3 class="card-title">Family Members</h3>
+                    <button class="btn btn-primary" onclick="openModal('addMemberModal')">+ Add Member</button>
+                </div>
+                <div class="grid" id="membersGrid">
+                    <!-- Filled by JS -->
+                </div>
+            </div>
+        </div>
+
+        <!-- Transfer Tab -->
+        <div id="transfer" class="tab-content">
+            <div class="card" style="max-width: 500px; margin: 0 auto;">
+                <div class="card-header">
+                    <h3 class="card-title">Send Money</h3>
+                </div>
+                <form id="transferForm">
+                    <div class="form-group">
+                        <label>From</label>
+                        <select id="transferFrom" required>
+                            <option value="">Select sender</option>
+                        </select>
+                    </div>
+                    <div class="form-group">
+                        <label>To</label>
+                        <select id="transferTo" required>
+                            <option value="">Select recipient</option>
+                        </select>
+                    </div>
+                    <div class="form-group">
+                        <label>Amount</label>
+                        <input type="number" id="transferAmount" min="0.01" step="0.01" placeholder="0.00" required>
+                    </div>
+                    <div class="form-group">
+                        <label>Note (optional)</label>
+                        <input type="text" id="transferNote" placeholder="What's this for?">
+                    </div>
+                    <button type="submit" class="btn btn-primary" style="width: 100%;">Send Money</button>
+                </form>
+            </div>
+        </div>
+
+        <!-- Budgets Tab -->
+        <div id="budgets" class="tab-content">
+            <div class="card">
+                <div class="card-header">
+                    <h3 class="card-title">Monthly Budgets</h3>
+                    <button class="btn btn-primary" onclick="openModal('addBudgetModal')">+ Add Budget</button>
+                </div>
+                <div id="budgetsList">
+                    <!-- Filled by JS -->
+                </div>
+            </div>
+        </div>
+
+        <!-- Goals Tab -->
+        <div id="goals" class="tab-content">
+            <div class="card">
+                <div class="card-header">
+                    <h3 class="card-title">Savings Goals</h3>
+                    <button class="btn btn-primary" onclick="openModal('addGoalModal')">+ Add Goal</button>
+                </div>
+                <div id="goalsList">
+                    <!-- Filled by JS -->
+                </div>
+            </div>
+        </div>
+
+        <!-- History Tab -->
+        <div id="history" class="tab-content">
+            <div class="card">
+                <div class="card-header">
+                    <h3 class="card-title">Transaction History</h3>
+                    <select id="historyFilter" onchange="loadTransactions()">
+                        <option value="">All Members</option>
+                    </select>
+                </div>
+                <div id="transactionsList">
+                    <!-- Filled by JS -->
+                </div>
+            </div>
+        </div>
+
+        <!-- Settings Tab -->
+        <div id="settings" class="tab-content">
+            <div class="card">
+                <div class="card-header">
+                    <h3 class="card-title">Family Settings</h3>
+                </div>
+                <form id="settingsForm">
+                    <div class="form-group">
+                        <label>Family Name</label>
+                        <input type="text" id="settingFamilyName" placeholder="My Family">
+                    </div>
+                    <div class="form-group">
+                        <label>Currency Symbol</label>
+                        <select id="settingCurrency">
+                            <option value="$">$ (USD)</option>
+                            <option value="€">€ (EUR)</option>
+                            <option value="£">£ (GBP)</option>
+                            <option value="¥">¥ (JPY/CNY)</option>
+                            <option value="₹">₹ (INR)</option>
+                            <option value="R">R (ZAR)</option>
+                        </select>
+                    </div>
+                    <div class="form-group">
+                        <label>Budget Alert Threshold (%)</label>
+                        <input type="number" id="settingBudgetThreshold" min="50" max="100" value="80">
+                    </div>
+                    <button type="submit" class="btn btn-primary">Save Settings</button>
+                </form>
+            </div>
+
+            <div class="card">
+                <div class="card-header">
+                    <h3 class="card-title">WhatsApp Notifications</h3>
+                </div>
+                <div class="whatsapp-setup">
+                    <h4>Setup Instructions</h4>
+                    <ol>
+                        <li>Save the CallMeBot number: <code>+34 644 51 95 23</code></li>
+                        <li>Send them: <code>I allow callmebot to send me messages</code></li>
+                        <li>You'll receive an API key - enter it below for each member</li>
+                    </ol>
+                </div>
+                <div id="whatsappConfig">
+                    <!-- Filled by JS -->
+                </div>
+            </div>
+        </div>
+    </main>
+
+    <!-- Modals -->
+    <div class="modal" id="depositModal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h3 class="modal-title">Add Money</h3>
+                <button class="modal-close" onclick="closeModal('depositModal')">&times;</button>
+            </div>
+            <form id="depositForm">
+                <div class="form-group">
+                    <label>Member</label>
+                    <select id="depositMember" required></select>
+                </div>
+                <div class="form-group">
+                    <label>Amount</label>
+                    <input type="number" id="depositAmount" min="0.01" step="0.01" placeholder="0.00" required>
+                </div>
+                <div class="form-group">
+                    <label>Description</label>
+                    <input type="text" id="depositDesc" placeholder="e.g., Salary, Gift">
+                </div>
+                <button type="submit" class="btn btn-success" style="width: 100%;">Add Money</button>
+            </form>
+        </div>
+    </div>
+
+    <div class="modal" id="expenseModal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h3 class="modal-title">Record Expense</h3>
+                <button class="modal-close" onclick="closeModal('expenseModal')">&times;</button>
+            </div>
+            <form id="expenseForm">
+                <div class="form-group">
+                    <label>Member</label>
+                    <select id="expenseMember" required></select>
+                </div>
+                <div class="form-group">
+                    <label>Amount</label>
+                    <input type="number" id="expenseAmount" min="0.01" step="0.01" placeholder="0.00" required>
+                </div>
+                <div class="form-group">
+                    <label>Category</label>
+                    <select id="expenseCategory">
+                        <option value="food">Food & Groceries</option>
+                        <option value="transport">Transport</option>
+                        <option value="utilities">Utilities</option>
+                        <option value="entertainment">Entertainment</option>
+                        <option value="shopping">Shopping</option>
+                        <option value="health">Health</option>
+                        <option value="education">Education</option>
+                        <option value="other">Other</option>
+                    </select>
+                </div>
+                <div class="form-group">
+                    <label>Description</label>
+                    <input type="text" id="expenseDesc" placeholder="What was this for?">
+                </div>
+                <button type="submit" class="btn btn-danger" style="width: 100%;">Record Expense</button>
+            </form>
+        </div>
+    </div>
+
+    <div class="modal" id="addMemberModal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h3 class="modal-title">Add Family Member</h3>
+                <button class="modal-close" onclick="closeModal('addMemberModal')">&times;</button>
+            </div>
+            <form id="addMemberForm">
+                <div class="form-group">
+                    <label>Name</label>
+                    <input type="text" id="memberName" placeholder="Enter name" required>
+                </div>
+                <div class="form-group">
+                    <label>Email (optional)</label>
+                    <input type="email" id="memberEmail" placeholder="email@example.com">
+                </div>
+                <div class="form-group">
+                    <label>Role</label>
+                    <select id="memberRole">
+                        <option value="member">Member</option>
+                        <option value="admin">Admin</option>
+                    </select>
+                </div>
+                <button type="submit" class="btn btn-primary" style="width: 100%;">Add Member</button>
+            </form>
+        </div>
+    </div>
+
+    <div class="modal" id="addBudgetModal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h3 class="modal-title">Add Budget</h3>
+                <button class="modal-close" onclick="closeModal('addBudgetModal')">&times;</button>
+            </div>
+            <form id="addBudgetForm">
+                <div class="form-group">
+                    <label>Category</label>
+                    <select id="budgetCategory">
+                        <option value="food">Food & Groceries</option>
+                        <option value="transport">Transport</option>
+                        <option value="utilities">Utilities</option>
+                        <option value="entertainment">Entertainment</option>
+                        <option value="shopping">Shopping</option>
+                        <option value="health">Health</option>
+                        <option value="education">Education</option>
+                        <option value="other">Other</option>
+                    </select>
+                </div>
+                <div class="form-group">
+                    <label>Monthly Limit</label>
+                    <input type="number" id="budgetLimit" min="1" step="0.01" placeholder="0.00" required>
+                </div>
+                <button type="submit" class="btn btn-primary" style="width: 100%;">Create Budget</button>
+            </form>
+        </div>
+    </div>
+
+    <div class="modal" id="addGoalModal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h3 class="modal-title">Add Savings Goal</h3>
+                <button class="modal-close" onclick="closeModal('addGoalModal')">&times;</button>
+            </div>
+            <form id="addGoalForm">
+                <div class="form-group">
+                    <label>Goal Name</label>
+                    <input type="text" id="goalName" placeholder="e.g., Vacation, New Car" required>
+                </div>
+                <div class="form-group">
+                    <label>Target Amount</label>
+                    <input type="number" id="goalTarget" min="1" step="0.01" placeholder="0.00" required>
+                </div>
+                <div class="form-group">
+                    <label>Deadline (optional)</label>
+                    <input type="date" id="goalDeadline">
+                </div>
+                <button type="submit" class="btn btn-primary" style="width: 100%;">Create Goal</button>
+            </form>
+        </div>
+    </div>
+
+    <div class="modal" id="contributeModal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h3 class="modal-title">Contribute to Goal</h3>
+                <button class="modal-close" onclick="closeModal('contributeModal')">&times;</button>
+            </div>
+            <form id="contributeForm">
+                <input type="hidden" id="contributeGoalId">
+                <div class="form-group">
+                    <label>Member</label>
+                    <select id="contributeMember" required></select>
+                </div>
+                <div class="form-group">
+                    <label>Amount</label>
+                    <input type="number" id="contributeAmount" min="0.01" step="0.01" placeholder="0.00" required>
+                </div>
+                <button type="submit" class="btn btn-success" style="width: 100%;">Contribute</button>
+            </form>
+        </div>
+    </div>
+
+    <div class="notification" id="notification"></div>
+
+    <script>
+        let appData = null;
+        let currencySymbol = '$';
+
+        // API calls
+        async function api(endpoint, method = 'GET', body = null) {
+            const options = { method, headers: { 'Content-Type': 'application/json' } };
+            if (body) options.body = JSON.stringify(body);
+            const res = await fetch(`/api${endpoint}`, options);
+            return res.json();
+        }
+
+        // Show notification
+        function showNotification(message, type = 'success') {
+            const el = document.getElementById('notification');
+            el.textContent = message;
+            el.className = `notification show ${type}`;
+            setTimeout(() => el.classList.remove('show'), 3000);
+        }
+
+        // Format currency
+        function formatCurrency(amount) {
+            return `${currencySymbol}${parseFloat(amount || 0).toFixed(2)}`;
+        }
+
+        // Format date
+        function formatDate(dateStr) {
+            const date = new Date(dateStr);
+            return date.toLocaleDateString('en-US', { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' });
+        }
+
+        // Get initials
+        function getInitials(name) {
+            return name.split(' ').map(n => n[0]).join('').toUpperCase().slice(0, 2);
+        }
+
+        // Category icons
+        const categoryIcons = {
+            food: '🍔', transport: '🚗', utilities: '💡', entertainment: '🎬',
+            shopping: '🛍️', health: '💊', education: '📚', other: '📦',
+            deposit: '💰', transfer: '↔️', savings: '🎯'
+        };
+
+        // Load all data
+        async function loadData() {
+            appData = await api('/data');
+            currencySymbol = appData.currencySymbol || '$';
+            updateHeader();
+            updateMemberSelects();
+            loadDashboard();
+        }
+
+        // Update header
+        function updateHeader() {
+            document.getElementById('familyName').textContent = appData.familyName || 'Family Savings';
+            document.getElementById('memberCount').textContent = appData.members.length;
+
+            const totalBalance = appData.members.reduce((sum, m) => sum + (m.balance || 0), 0);
+            document.getElementById('totalBalance').textContent = formatCurrency(totalBalance);
+
+            const totalSaved = appData.savingsGoals.reduce((sum, g) => sum + g.currentAmount, 0);
+            document.getElementById('totalSaved').textContent = formatCurrency(totalSaved);
+        }
+
+        // Update member selects
+        function updateMemberSelects() {
+            const selects = ['transferFrom', 'transferTo', 'depositMember', 'expenseMember', 'contributeMember', 'historyFilter'];
+            selects.forEach(id => {
+                const el = document.getElementById(id);
+                if (!el) return;
+                const currentVal = el.value;
+                el.innerHTML = id === 'historyFilter' ? '<option value="">All Members</option>' : '<option value="">Select member</option>';
+                appData.members.forEach(m => {
+                    const opt = document.createElement('option');
+                    opt.value = m.id;
+                    opt.textContent = `${m.name} (${formatCurrency(m.balance)})`;
+                    el.appendChild(opt);
+                });
+                el.value = currentVal;
+            });
+        }
+
+        // Load dashboard
+        async function loadDashboard() {
+            // Summary
+            const summary = await api('/summary?period=month');
+            document.getElementById('summaryGrid').innerHTML = `
+                <div class="summary-item">
+                    <div class="summary-value">${formatCurrency(summary.totalDeposits)}</div>
+                    <div class="summary-label">Deposits</div>
+                </div>
+                <div class="summary-item">
+                    <div class="summary-value">${formatCurrency(summary.totalExpenses)}</div>
+                    <div class="summary-label">Expenses</div>
+                </div>
+                <div class="summary-item">
+                    <div class="summary-value">${formatCurrency(summary.totalTransfers)}</div>
+                    <div class="summary-label">Transfers</div>
+                </div>
+                <div class="summary-item">
+                    <div class="summary-value">${formatCurrency(summary.totalGoalContributions)}</div>
+                    <div class="summary-label">Saved</div>
+                </div>
+            `;
+
+            // Dashboard members
+            const membersHtml = appData.members.length ? appData.members.map(m => `
+                <div style="display: flex; align-items: center; justify-content: space-between; padding: 10px 0; border-bottom: 1px solid var(--border);">
+                    <div style="display: flex; align-items: center; gap: 10px;">
+                        <div class="member-avatar" style="width: 35px; height: 35px; font-size: 0.9rem;">${getInitials(m.name)}</div>
+                        <span>${m.name}</span>
+                    </div>
+                    <span class="member-balance ${m.balance < 0 ? 'negative' : ''}" style="font-size: 1rem;">${formatCurrency(m.balance)}</span>
+                </div>
+            `).join('') : '<div class="empty-state">No members yet. Add your first family member!</div>';
+            document.getElementById('dashboardMembers').innerHTML = membersHtml;
+
+            // Recent activity
+            const { transactions } = await api('/transactions?limit=5');
+            const activityHtml = transactions.length ? transactions.map(tx => `
+                <div class="transaction-item">
+                    <div class="transaction-icon ${tx.type}">${categoryIcons[tx.category] || '💵'}</div>
+                    <div class="transaction-info">
+                        <div class="transaction-desc">${tx.description}</div>
+                        <div class="transaction-meta">${tx.fromMemberName || tx.toMemberName || ''} • ${formatDate(tx.date)}</div>
+                    </div>
+                    <div class="transaction-amount ${tx.type === 'deposit' ? 'positive' : 'negative'}">
+                        ${tx.type === 'deposit' ? '+' : '-'}${formatCurrency(tx.amount)}
+                    </div>
+                </div>
+            `).join('') : '<div class="empty-state">No transactions yet</div>';
+            document.getElementById('recentActivity').innerHTML = activityHtml;
+        }
+
+        // Load members
+        function loadMembers() {
+            const html = appData.members.length ? appData.members.map(m => `
+                <div class="member-card">
+                    <span class="badge ${m.role === 'admin' ? 'badge-admin' : 'badge-member'}">${m.role}</span>
+                    <div class="member-avatar">${getInitials(m.name)}</div>
+                    <div class="member-name">${m.name}</div>
+                    <div class="member-balance ${m.balance < 0 ? 'negative' : ''}">${formatCurrency(m.balance)}</div>
+                    ${m.email ? `<div style="font-size: 0.8rem; color: var(--text-light);">${m.email}</div>` : ''}
+                    <div class="member-actions">
+                        <button class="btn btn-sm btn-outline" onclick="configureWhatsApp('${m.id}', '${m.name}')">WhatsApp</button>
+                        <button class="btn btn-sm btn-danger" onclick="deleteMember('${m.id}')">Remove</button>
+                    </div>
+                </div>
+            `).join('') : '<div class="empty-state" style="grid-column: 1/-1;"><p>No family members yet</p><button class="btn btn-primary" onclick="openModal(\'addMemberModal\')">+ Add First Member</button></div>';
+            document.getElementById('membersGrid').innerHTML = html;
+        }
+
+        // Load budgets
+        async function loadBudgets() {
+            const { budgets } = await api('/budgets');
+            const html = budgets.length ? budgets.map(b => {
+                const progressClass = b.percentage >= 100 ? 'danger' : b.percentage >= 80 ? 'warning' : '';
+                return `
+                    <div class="budget-item">
+                        <div class="budget-icon">${categoryIcons[b.category] || '📦'}</div>
+                        <div class="budget-info">
+                            <div class="budget-name">${b.category.charAt(0).toUpperCase() + b.category.slice(1)}</div>
+                            <div class="budget-amount">${formatCurrency(b.spent)} of ${formatCurrency(b.limit)}</div>
+                            <div class="progress-bar" style="margin-top: 8px;">
+                                <div class="progress-fill ${progressClass}" style="width: ${Math.min(b.percentage, 100)}%"></div>
+                            </div>
+                        </div>
+                        <div style="text-align: right;">
+                            <div style="font-weight: 600; ${b.percentage >= 100 ? 'color: var(--danger)' : ''}">${b.percentage}%</div>
+                            <button class="btn btn-sm btn-outline" onclick="deleteBudget('${b.id}')" style="margin-top: 5px;">Delete</button>
+                        </div>
+                    </div>
+                `;
+            }).join('') : '<div class="empty-state"><p>No budgets set</p><p style="font-size: 0.9rem;">Create budgets to track your spending by category</p></div>';
+            document.getElementById('budgetsList').innerHTML = html;
+        }
+
+        // Load goals
+        async function loadGoals() {
+            const { goals } = await api('/goals');
+            const html = goals.length ? goals.map(g => {
+                const progressClass = g.percentage >= 100 ? 'success' : '';
+                return `
+                    <div class="goal-item">
+                        <div class="goal-icon">🎯</div>
+                        <div class="goal-info">
+                            <div class="goal-name">${g.name}</div>
+                            <div class="goal-amount">${formatCurrency(g.currentAmount)} of ${formatCurrency(g.targetAmount)}</div>
+                            ${g.deadline ? `<div style="font-size: 0.75rem; color: var(--text-light);">Due: ${new Date(g.deadline).toLocaleDateString()}</div>` : ''}
+                            <div class="progress-bar" style="margin-top: 8px;">
+                                <div class="progress-fill ${progressClass}" style="width: ${Math.min(g.percentage, 100)}%"></div>
+                            </div>
+                        </div>
+                        <div style="text-align: right;">
+                            <div style="font-weight: 600; color: ${g.percentage >= 100 ? 'var(--success)' : 'var(--primary)'}">${g.percentage}%</div>
+                            <button class="btn btn-sm btn-success" onclick="openContribute('${g.id}')" style="margin-top: 5px;">+ Add</button>
+                            <button class="btn btn-sm btn-outline" onclick="deleteGoal('${g.id}')" style="margin-top: 5px;">Delete</button>
+                        </div>
+                    </div>
+                `;
+            }).join('') : '<div class="empty-state"><p>No savings goals yet</p><p style="font-size: 0.9rem;">Create goals to save for things that matter</p></div>';
+            document.getElementById('goalsList').innerHTML = html;
+        }
+
+        // Load transactions
+        async function loadTransactions() {
+            const memberId = document.getElementById('historyFilter').value;
+            const { transactions } = await api(`/transactions?limit=100${memberId ? `&memberId=${memberId}` : ''}`);
+
+            const html = transactions.length ? transactions.map(tx => {
+                const isPositive = tx.type === 'deposit' || (tx.type === 'transfer' && memberId === tx.toMemberId);
+                return `
+                    <div class="transaction-item">
+                        <div class="transaction-icon ${tx.type}">${categoryIcons[tx.category] || '💵'}</div>
+                        <div class="transaction-info">
+                            <div class="transaction-desc">${tx.description}</div>
+                            <div class="transaction-meta">
+                                ${tx.type === 'transfer' ? `${tx.fromMemberName} → ${tx.toMemberName}` : tx.fromMemberName || tx.toMemberName || ''}
+                                 • ${formatDate(tx.date)}
+                            </div>
+                        </div>
+                        <div class="transaction-amount ${tx.type === 'deposit' ? 'positive' : 'negative'}">
+                            ${tx.type === 'deposit' ? '+' : '-'}${formatCurrency(tx.amount)}
+                        </div>
+                    </div>
+                `;
+            }).join('') : '<div class="empty-state">No transactions found</div>';
+            document.getElementById('transactionsList').innerHTML = html;
+        }
+
+        // Load settings
+        function loadSettings() {
+            document.getElementById('settingFamilyName').value = appData.familyName || '';
+            document.getElementById('settingCurrency').value = appData.currencySymbol || '$';
+            document.getElementById('settingBudgetThreshold').value = appData.settings?.budgetAlertThreshold || 80;
+
+            // WhatsApp config
+            const configHtml = appData.members.map(m => {
+                const config = appData.whatsappConfig?.members?.[m.id];
+                return `
+                    <div style="padding: 15px; background: var(--bg); border-radius: 10px; margin-bottom: 10px;">
+                        <div style="font-weight: 600; margin-bottom: 10px;">${m.name}</div>
+                        <div class="form-group">
+                            <label>Phone (with country code)</label>
+                            <input type="text" id="waPhone_${m.id}" value="${config?.phone || ''}" placeholder="+1234567890">
+                        </div>
+                        <div class="form-group">
+                            <label>API Key</label>
+                            <input type="text" id="waKey_${m.id}" value="${config?.apiKey || ''}" placeholder="Your CallMeBot API key">
+                        </div>
+                        <div style="display: flex; gap: 10px;">
+                            <button class="btn btn-sm btn-primary" onclick="saveWhatsApp('${m.id}')">Save</button>
+                            <button class="btn btn-sm btn-outline" onclick="testWhatsApp('${m.id}')">Test</button>
+                        </div>
+                    </div>
+                `;
+            }).join('') || '<p style="color: var(--text-light);">Add family members first to configure WhatsApp notifications.</p>';
+            document.getElementById('whatsappConfig').innerHTML = configHtml;
+        }
+
+        // Tab switching
+        function switchTab(tabId) {
+            document.querySelectorAll('.tab-content').forEach(el => el.classList.remove('active'));
+            document.querySelectorAll('nav button').forEach(el => el.classList.remove('active'));
+            document.getElementById(tabId).classList.add('active');
+            document.querySelector(`nav button[data-tab="${tabId}"]`).classList.add('active');
+
+            // Load tab-specific data
+            switch (tabId) {
+                case 'dashboard': loadDashboard(); break;
+                case 'members': loadMembers(); break;
+                case 'budgets': loadBudgets(); break;
+                case 'goals': loadGoals(); break;
+                case 'history': loadTransactions(); break;
+                case 'settings': loadSettings(); break;
+            }
+        }
+
+        // Modal handling
+        function openModal(id) { document.getElementById(id).classList.add('active'); }
+        function closeModal(id) { document.getElementById(id).classList.remove('active'); }
+
+        function openContribute(goalId) {
+            document.getElementById('contributeGoalId').value = goalId;
+            openModal('contributeModal');
+        }
+
+        // Form handlers
+        document.getElementById('addMemberForm').addEventListener('submit', async (e) => {
+            e.preventDefault();
+            const result = await api('/members', 'POST', {
+                name: document.getElementById('memberName').value,
+                email: document.getElementById('memberEmail').value,
+                role: document.getElementById('memberRole').value
+            });
+            if (result.success) {
+                showNotification('Member added!');
+                closeModal('addMemberModal');
+                e.target.reset();
+                await loadData();
+                loadMembers();
+            } else {
+                showNotification(result.error, 'error');
+            }
+        });
+
+        document.getElementById('depositForm').addEventListener('submit', async (e) => {
+            e.preventDefault();
+            const result = await api('/deposit', 'POST', {
+                memberId: document.getElementById('depositMember').value,
+                amount: parseFloat(document.getElementById('depositAmount').value),
+                description: document.getElementById('depositDesc').value || 'Deposit'
+            });
+            if (result.success) {
+                showNotification(`Deposited ${formatCurrency(result.transaction.amount)}!`);
+                closeModal('depositModal');
+                e.target.reset();
+                await loadData();
+            } else {
+                showNotification(result.error, 'error');
+            }
+        });
+
+        document.getElementById('expenseForm').addEventListener('submit', async (e) => {
+            e.preventDefault();
+            const result = await api('/expense', 'POST', {
+                memberId: document.getElementById('expenseMember').value,
+                amount: parseFloat(document.getElementById('expenseAmount').value),
+                category: document.getElementById('expenseCategory').value,
+                description: document.getElementById('expenseDesc').value || 'Expense'
+            });
+            if (result.success) {
+                showNotification('Expense recorded!');
+                closeModal('expenseModal');
+                e.target.reset();
+                await loadData();
+            } else {
+                showNotification(result.error, 'error');
+            }
+        });
+
+        document.getElementById('transferForm').addEventListener('submit', async (e) => {
+            e.preventDefault();
+            const result = await api('/transfer', 'POST', {
+                fromMemberId: document.getElementById('transferFrom').value,
+                toMemberId: document.getElementById('transferTo').value,
+                amount: parseFloat(document.getElementById('transferAmount').value),
+                description: document.getElementById('transferNote').value || 'Transfer'
+            });
+            if (result.success) {
+                showNotification(`Sent ${formatCurrency(result.transaction.amount)}!`);
+                e.target.reset();
+                await loadData();
+            } else {
+                showNotification(result.error, 'error');
+            }
+        });
+
+        document.getElementById('addBudgetForm').addEventListener('submit', async (e) => {
+            e.preventDefault();
+            const result = await api('/budgets', 'POST', {
+                category: document.getElementById('budgetCategory').value,
+                limit: parseFloat(document.getElementById('budgetLimit').value)
+            });
+            if (result.success) {
+                showNotification('Budget created!');
+                closeModal('addBudgetModal');
+                e.target.reset();
+                loadBudgets();
+            } else {
+                showNotification(result.error, 'error');
+            }
+        });
+
+        document.getElementById('addGoalForm').addEventListener('submit', async (e) => {
+            e.preventDefault();
+            const result = await api('/goals', 'POST', {
+                name: document.getElementById('goalName').value,
+                targetAmount: parseFloat(document.getElementById('goalTarget').value),
+                deadline: document.getElementById('goalDeadline').value || null
+            });
+            if (result.success) {
+                showNotification('Goal created!');
+                closeModal('addGoalModal');
+                e.target.reset();
+                loadGoals();
+            } else {
+                showNotification(result.error, 'error');
+            }
+        });
+
+        document.getElementById('contributeForm').addEventListener('submit', async (e) => {
+            e.preventDefault();
+            const result = await api('/goals/contribute', 'POST', {
+                goalId: document.getElementById('contributeGoalId').value,
+                memberId: document.getElementById('contributeMember').value,
+                amount: parseFloat(document.getElementById('contributeAmount').value)
+            });
+            if (result.success) {
+                showNotification(`Contributed ${formatCurrency(result.transaction.amount)}!`);
+                closeModal('contributeModal');
+                e.target.reset();
+                await loadData();
+                loadGoals();
+            } else {
+                showNotification(result.error, 'error');
+            }
+        });
+
+        document.getElementById('settingsForm').addEventListener('submit', async (e) => {
+            e.preventDefault();
+            const result = await api('/settings', 'PUT', {
+                familyName: document.getElementById('settingFamilyName').value,
+                currencySymbol: document.getElementById('settingCurrency').value,
+                settings: {
+                    budgetAlertThreshold: parseInt(document.getElementById('settingBudgetThreshold').value)
+                }
+            });
+            if (result.success) {
+                showNotification('Settings saved!');
+                await loadData();
+            } else {
+                showNotification(result.error, 'error');
+            }
+        });
+
+        // Delete functions
+        async function deleteMember(id) {
+            if (!confirm('Remove this member? Their transaction history will be preserved.')) return;
+            const result = await api('/members', 'DELETE', { id });
+            if (result.success) {
+                showNotification('Member removed');
+                await loadData();
+                loadMembers();
+            } else {
+                showNotification(result.error, 'error');
+            }
+        }
+
+        async function deleteBudget(id) {
+            if (!confirm('Delete this budget?')) return;
+            const result = await api('/budgets', 'DELETE', { id });
+            if (result.success) {
+                showNotification('Budget deleted');
+                loadBudgets();
+            }
+        }
+
+        async function deleteGoal(id) {
+            if (!confirm('Delete this savings goal?')) return;
+            const result = await api('/goals', 'DELETE', { id });
+            if (result.success) {
+                showNotification('Goal deleted');
+                loadGoals();
+            }
+        }
+
+        // WhatsApp functions
+        async function saveWhatsApp(memberId) {
+            const phone = document.getElementById(`waPhone_${memberId}`).value;
+            const apiKey = document.getElementById(`waKey_${memberId}`).value;
+
+            const result = await api('/whatsapp/config', 'POST', { memberId, phone, apiKey });
+            if (result.success) {
+                showNotification('WhatsApp configured!');
+            } else {
+                showNotification(result.error, 'error');
+            }
+        }
+
+        async function testWhatsApp(memberId) {
+            const phone = document.getElementById(`waPhone_${memberId}`).value;
+            const apiKey = document.getElementById(`waKey_${memberId}`).value;
+
+            if (!phone || !apiKey) {
+                showNotification('Enter phone and API key first', 'error');
+                return;
+            }
+
+            const result = await api('/whatsapp/test', 'POST', { phone, apiKey });
+            if (result.success) {
+                showNotification('Test message sent!');
+            } else {
+                showNotification(result.error, 'error');
+            }
+        }
+
+        function configureWhatsApp(memberId, name) {
+            switchTab('settings');
+            setTimeout(() => {
+                const el = document.getElementById(`waPhone_${memberId}`);
+                if (el) el.scrollIntoView({ behavior: 'smooth' });
+            }, 100);
+        }
+
+        // Tab click handlers
+        document.querySelectorAll('nav button').forEach(btn => {
+            btn.addEventListener('click', () => switchTab(btn.dataset.tab));
+        });
+
+        // Close modal on background click
+        document.querySelectorAll('.modal').forEach(modal => {
+            modal.addEventListener('click', (e) => {
+                if (e.target === modal) closeModal(modal.id);
+            });
+        });
+
+        // Initial load
+        loadData();
+    </script>
+</body>
+</html>

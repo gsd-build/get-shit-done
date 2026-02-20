@@ -352,6 +352,17 @@ Derive plans from actual work. Depth determines compression tolerance, not a tar
 
 <plan_format>
 
+## Thinking Process (MANDATORY)
+
+Before generating the PLAN.md content, you MUST write a `<thinking>` block.
+Inside, explicitly list:
+1. **Dependency Analysis**: The mental graph you built and why.
+2. **Strategy**: Why you rejected "Horizontal Layers" in favor of "Vertical Slices" (or vice versa).
+3. **Context Budgeting**: Verification that tasks fit the 50% context rule (e.g., "Task A touches ~5 files, Task B touches ~2").
+4. **Goal-Backward Logic**: How you derived the "must_haves" from the phase goal.
+
+This block ensures you have solved the logic constraint *before* you commit to the XML structure.
+
 ## PLAN.md Structure
 
 ```markdown
@@ -1180,3 +1191,119 @@ Planning complete when:
 - [ ] User knows to run `/gsd:execute-phase {X}` next
 
 </success_criteria>
+
+<golden_example>
+
+## Perfect PLAN.md Reference
+
+Use this strictly for formatting and tone. Do not copy the content/domain.
+
+```markdown
+---
+phase: 01-auth
+plan: 02
+type: execute
+wave: 1
+depends_on: []
+files_modified:
+  - src/lib/auth.ts
+  - src/app/login/page.tsx
+  - src/app/api/auth/callback/route.ts
+autonomous: true
+user_setup:
+  - service: supabase
+    why: "User authentication"
+    env_vars:
+      - name: NEXT_PUBLIC_SUPABASE_URL
+        source: "Supabase -> Settings -> API"
+      - name: NEXT_PUBLIC_SUPABASE_ANON_KEY
+        source: "Supabase -> Settings -> API"
+must_haves:
+  truths:
+    - "User can sign in with GitHub"
+    - "User is redirected to dashboard after login"
+    - "Session persists on refresh"
+  artifacts:
+    - path: "src/lib/auth.ts"
+      provides: "Supabase client client"
+    - path: "src/app/login/page.tsx"
+      provides: "Login UI"
+  key_links:
+    - from: "src/app/login/page.tsx"
+      to: "src/lib/auth.ts"
+      via: "import { supabase }"
+---
+
+<objective>
+Implement GitHub OAuth login using Supabase Auth helpers.
+Purpose: Allow users to sign in without managing passwords.
+Output: Working login page + auth callback handler.
+</objective>
+
+<execution_context>
+@~/.claude/get-shit-done/workflows/execute-plan.md
+@~/.claude/get-shit-done/templates/summary.md
+</execution_context>
+
+<context>
+@.planning/PROJECT.md
+@.planning/ROADMAP.md
+@.planning/STATE.md
+@.planning/phases/01-auth/01-CONTEXT.md
+</context>
+
+<tasks>
+
+<task type="auto">
+  <name>Task 1: Setup Supabase Client</name>
+  <files>src/lib/auth.ts, .env.local</files>
+  <action>
+    Install @supabase/auth-helpers-nextjs.
+    Create Supabase client singleton in src/lib/auth.ts.
+    Add envar validation (throw error if missing).
+  </action>
+  <verify>npm run build checks types, node -e 'require("./src/lib/auth")' throws if env missing</verify>
+  <done>Client exports 'supabase' object, validates keys on init</done>
+</task>
+
+<task type="auto">
+  <name>Task 2: Create Login Page</name>
+  <files>src/app/login/page.tsx</files>
+  <action>
+    Create centered login card using standard UI components.
+    Add "Sign in with GitHub" button.
+    Wire onClick to supabase.auth.signInWithOAuth({ provider: 'github' }).
+  </action>
+  <verify>Render page, click button triggers network request to supabase.co</verify>
+  <done>Button initiates OAuth flow</done>
+</task>
+
+<task type="auto">
+  <name>Task 3: Handle Callback</name>
+  <files>src/app/api/auth/callback/route.ts</files>
+  <action>
+    Create Route Handler for PKCE auth code exchange.
+    Call supabase.auth.exchangeCodeForSession(code).
+    Redirect to /dashboard on success.
+  </action>
+  <verify>Mock request with code=123 triggers session exchange</verify>
+  <done>Auth loop completes, user lands on dashboard</done>
+</task>
+
+</tasks>
+
+<verification>
+Manual verify: Visit /login, click GitHub, confirm redirect to Dashboard.
+</verification>
+
+<success_criteria>
+- [ ] User can authenticate
+- [ ] Auth cookies set
+- [ ] Protected routes accessible
+</success_criteria>
+
+<output>
+After completion, create `.planning/phases/XX-name/{phase}-{plan}-SUMMARY.md`
+</output>
+```
+</golden_example>
