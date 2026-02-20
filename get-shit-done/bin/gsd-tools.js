@@ -231,7 +231,7 @@ function loadConfig(cwd) {
     commit_docs: true,
     search_gitignored: false,
     branching_strategy: 'none',
-    phase_branch_template: 'gsd/phase-{phase}-{slug}',
+    phase_branch_template: 'phase-{phase}-{slug}',
     milestone_branch_template: 'feature/{slug}',
     research: true,
     plan_checker: true,
@@ -956,7 +956,7 @@ function cmdConfigEnsureSection(cwd, raw) {
     commit_docs: true,
     search_gitignored: false,
     branching_strategy: 'none',
-    phase_branch_template: 'gsd/phase-{phase}-{slug}',
+    phase_branch_template: 'phase-{phase}-{slug}',
     milestone_branch_template: 'feature/{slug}',
     workflow: {
       research: true,
