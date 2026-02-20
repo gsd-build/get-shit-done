@@ -401,6 +401,19 @@ After completion, create `.planning/phases/XX-name/{phase}-{plan}-SUMMARY.md`
 </output>
 ```
 
+## Tier Tag Format (auto profile only)
+
+When `model_profile: "auto"` is active, each task `<name>` carries a tier prefix written by the routing pass:
+
+```xml
+<task type="auto">
+  <name>[haiku] Task 3: Add config field to settings.json</name>
+  ...
+</task>
+```
+
+Valid prefixes: `[haiku]`, `[sonnet]`, `[opus]`. If no prefix is present on a task, the coordinator defaults to sonnet (unchanged behavior). The prefix is written by the planner after drafting — it is NOT part of the human-authored task name.
+
 ## Frontmatter Fields
 
 | Field | Required | Purpose |
@@ -1018,6 +1031,60 @@ Use template structure for each PLAN.md.
 Write to `.planning/phases/XX-name/{phase}-{NN}-PLAN.md`
 
 Include all frontmatter fields.
+</step>
+
+<step name="routing_pass">
+Check model profile to determine if routing pass should run:
+
+```bash
+MODEL_PROFILE=$(node ~/.claude/get-shit-done/bin/gsd-tools.js config get model_profile 2>/dev/null || echo "quality")
+```
+
+**If MODEL_PROFILE is NOT "auto":** Skip this step entirely. Proceed to validate_plan.
+
+**If MODEL_PROFILE is "auto":** Run the routing pass for every PLAN.md just written.
+
+For each PLAN.md written in the write_phase_prompt step:
+
+1. **Extract all task names** — parse the `<name>` element from each `<task>` in the PLAN.md. Also read the `<action>` content for each task (the router needs the full task description for accurate routing). Build a list:
+   ```
+   tasks = [
+     { index: 1, name: "...", action: "..." },
+     { index: 2, name: "...", action: "..." },
+     ...
+   ]
+   ```
+
+2. **Spawn one gsd-task-router per task in parallel** — do NOT await each individually; spawn all at once:
+   ```
+   routing_results = await Promise.all(tasks.map(task =>
+     Task(
+       subagent_type="gsd-task-router",
+       prompt="Route this task: {task.name}\n\nTask action summary: {task.action}"
+     )
+   ))
+   ```
+
+3. **Parse each ROUTING DECISION response** — extract the `Model:` line from each result:
+   ```
+   tier = response.match(/^Model:\s*(haiku|sonnet|opus)/m)?.[1] ?? 'sonnet'
+   ```
+   If parsing fails or model is not one of haiku/sonnet/opus, default to sonnet.
+
+4. **Rewrite task <name> elements** — for each task, prepend `[{tier}] ` to the <name> content. Use Edit tool to update PLAN.md in-place. Only modify the `<name>` element — do not change any other task field.
+   - Before: `<name>Task 3: Add config field</name>`
+   - After: `<name>[haiku] Task 3: Add config field</name>`
+
+5. **Log routing decisions** — after all tasks are updated, write a brief summary to stdout:
+   ```
+   Routing pass complete: {haiku_count} haiku, {sonnet_count} sonnet, {opus_count} opus
+   ```
+
+**Important constraints:**
+- Routing pass runs AFTER the full plan is written to disk — never interleave with drafting
+- If gsd-task-router call fails for a task, default that task to sonnet and continue (don't abort the routing pass)
+- If MODEL_PROFILE check command fails, skip the routing pass entirely
+- The routing pass is a best-effort step — plan commits happen AFTER routing pass (in the git_commit step that follows)
 </step>
 
 <step name="validate_plan">
