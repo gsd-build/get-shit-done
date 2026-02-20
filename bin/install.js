@@ -172,7 +172,10 @@ function expandTilde(filePath) {
 function buildHookCommand(configDir, hookName) {
   // Use forward slashes for Node.js compatibility on all platforms
   const hooksPath = configDir.replace(/\\/g, '/') + '/hooks/' + hookName;
-  return `node "${hooksPath}"`;
+  // Use the absolute path to node so the command works in minimal shell environments
+  // (e.g. Claude Code's status line runner doesn't load ~/.zshrc, so bare 'node' fails)
+  const nodePath = process.execPath.replace(/\\/g, '/');
+  return `"${nodePath}" "${hooksPath}"`;
 }
 
 /**
@@ -720,6 +723,7 @@ function cleanupOrphanedHooks(settings) {
     'gsd-intel-index.js',  // Removed in v1.9.2
     'gsd-intel-session.js',  // Removed in v1.9.2
     'gsd-intel-prune.js',  // Removed in v1.9.2
+    'session-end.js',  // Removed in v1.11.0 (SIGTERM never fired — replaced by session-end-standalone.js)
   ];
 
   let cleanedHooks = false;
@@ -905,6 +909,30 @@ function uninstall(isGlobal, runtime = 'claude') {
       }
       // Clean up empty hooks object
       if (Object.keys(settings.hooks).length === 0) {
+        delete settings.hooks;
+      }
+    }
+
+    // Remove GSD Stop hooks (session extraction)
+    if (settings.hooks && settings.hooks.Stop) {
+      const before = settings.hooks.Stop.length;
+      settings.hooks.Stop = settings.hooks.Stop.filter(entry => {
+        if (entry.hooks && Array.isArray(entry.hooks)) {
+          const hasGsdHook = entry.hooks.some(h =>
+            h.command && h.command.includes('session-end-standalone')
+          );
+          return !hasGsdHook;
+        }
+        return true;
+      });
+      if (settings.hooks.Stop.length < before) {
+        settingsModified = true;
+        console.log(`  ${green}✓${reset} Removed GSD Stop hooks from settings`);
+      }
+      if (settings.hooks.Stop.length === 0) {
+        delete settings.hooks.Stop;
+      }
+      if (settings.hooks && Object.keys(settings.hooks).length === 0) {
         delete settings.hooks;
       }
     }
@@ -1285,7 +1313,9 @@ function installHookDependencies(gsdDir) {
       'dotenv': '^17.0.0',
       'markdown-it': '^14.0.0',
       'gray-matter': '^4.0.3',
-      'minimatch': '^9.0.0'
+      'minimatch': '^9.0.0',
+      'better-sqlite3': '^11.0.0',
+      'sqlite-vec': '^0.1.0'
     }
   }, null, 2));
 
@@ -1543,6 +1573,27 @@ function install(isGlobal, runtime = 'claude') {
         hooks: [{ type: 'command', command: compressionHookCommand }]
       });
       console.log(`  ${green}✓${reset} Configured doc compression hook`);
+    }
+
+    // Register Stop hook for session knowledge extraction
+    const sessionEndHookPath = isGlobal
+      ? path.join(targetDir, 'get-shit-done', 'bin', 'hooks', 'session-end-standalone.js').replace(/\\/g, '/')
+      : path.join(dirName, 'get-shit-done', 'bin', 'hooks', 'session-end-standalone.js').replace(/\\/g, '/');
+    const sessionEndHookCommand = `node "${sessionEndHookPath}"`;
+
+    if (!settings.hooks.Stop) {
+      settings.hooks.Stop = [];
+    }
+
+    const hasSessionEndHook = settings.hooks.Stop.some(entry =>
+      entry.hooks && entry.hooks.some(h => h.command && h.command.includes('session-end-standalone'))
+    );
+
+    if (!hasSessionEndHook) {
+      settings.hooks.Stop.push({
+        hooks: [{ type: 'command', command: sessionEndHookCommand }]
+      });
+      console.log(`  ${green}✓${reset} Configured session extraction Stop hook`);
     }
   }
 
