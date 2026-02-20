@@ -7,7 +7,7 @@ const path = require('path');
 // loading any npm dependencies. This prevents crashes when deps are not installed
 // (the default state) or when compression is disabled (also the default).
 try {
-  const configPath = path.join(__dirname, '..', '..', '..', 'hook-config.json');
+  const configPath = path.join(__dirname, '..', '..', 'hook-config.json');
   const cfg = JSON.parse(fs.readFileSync(configPath, 'utf8'));
   if (!cfg.enabled || !cfg.compression || !cfg.compression.enabled) {
     process.exit(0);
@@ -58,8 +58,8 @@ function appendMetrics(record) {
   try {
     const metricsPath = path.join(process.env.HOME, '.claude', 'get-shit-done', 'compression-metrics.jsonl');
     fs.appendFileSync(metricsPath, JSON.stringify(record) + '\n');
-  } catch (_) {
-    // Metrics write failure must not affect compression output
+  } catch (e) {
+    process.stderr.write('[doc-compression-hook] metrics write error: ' + e.message + '\n');
   }
 }
 
