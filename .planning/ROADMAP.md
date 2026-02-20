@@ -31,7 +31,7 @@ This roadmap delivers parallel phase execution through git worktree isolation. T
 
 Plans:
 - [ ] 01-01-PLAN.md — Add worktree/lock registry commands to gsd-tools.cjs
-- [ ] 01-02-PLAN.md — Create phase-worktree.sh with atomic lock functions
+- [x] 01-02-PLAN.md — Create phase-worktree.sh with atomic lock functions
 - [ ] 01-03-PLAN.md — Implement complete worktree lifecycle operations
 
 ### Phase 2: Workflow Integration
@@ -84,7 +84,7 @@ Phases execute in numeric order: 1 -> 2 -> 3 -> 4
 
 | Phase | Plans Complete | Status | Completed |
 |-------|----------------|--------|-----------|
-| 1. Foundation | 0/3 | Planning complete | - |
+| 1. Foundation | 1/3 | In progress | - |
 | 2. Workflow Integration | 0/2 | Not started | - |
 | 3. State Reconciliation | 0/1 | Not started | - |
 | 4. Polish and Recovery | 0/1 | Not started | - |
