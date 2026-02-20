@@ -8873,7 +8873,7 @@ async function cmdQueryKnowledge(cwd, args, raw) {
   // Lazy-require knowledge-search.js
   let searchKnowledge;
   try {
-    searchKnowledge = require(path.join(__dirname, 'knowledge-search.js')).searchKnowledge;
+    searchKnowledge = require(path.join(__dirname, 'knowledge-search.js')).searchKnowledgeAsync;
   } catch (err) {
     output({ results: [], no_results: true, query: questionString, error: 'Failed to load knowledge-search.js: ' + err.message }, raw);
     return;
@@ -8882,7 +8882,7 @@ async function cmdQueryKnowledge(cwd, args, raw) {
   // Execute search — top 5 results, no confidence threshold filtering
   let rawResults = [];
   try {
-    rawResults = searchKnowledge(conn, questionString, {
+    rawResults = await searchKnowledge(conn, questionString, {
       limit: 5,
       project_slug: projectSlug || null
     });

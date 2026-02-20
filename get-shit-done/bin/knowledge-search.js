@@ -380,7 +380,12 @@ function hybridSearch(conn, {
 }
 
 /**
- * Main search function (convenience wrapper)
+ * Main search function (synchronous convenience wrapper).
+ *
+ * Returns FTS-only results when no embedding is provided. If you are in an
+ * async context and want true RRF fusion (FTS + vector) without manually
+ * generating an embedding, use `searchKnowledgeAsync` instead.
+ *
  * @param {object} conn - Database connection object from openKnowledgeDB
  * @param {string} query - Search query
  * @param {object} options - Search options
@@ -405,10 +410,54 @@ function searchKnowledge(conn, query, options = {}) {
   })
 }
 
+/**
+ * Async variant of searchKnowledge that auto-generates an embedding from the query text
+ * when options.embedding is not provided, enabling true RRF fusion (FTS + vector).
+ *
+ * Use this instead of searchKnowledge when:
+ * - The caller is in an async context (can use await)
+ * - True hybrid RRF results are desired without manually generating an embedding
+ *
+ * Falls back to FTS-only search if embedding generation fails or times out.
+ *
+ * @param {object} conn - Database connection object
+ * @param {string} query - Search query text
+ * @param {object} options - Search options (same as searchKnowledge)
+ * @param {number} [options.embedTimeoutMs=2000] - Max ms to wait for embedding generation
+ * @returns {Promise<object[]>} Array of results with scoring metadata
+ */
+async function searchKnowledgeAsync(conn, query, options = {}) {
+  let embedding = options.embedding || null
+
+  // Auto-generate embedding for true hybrid RRF fusion when not provided by caller
+  if (!embedding && conn.vectorEnabled && typeof query === 'string' && query.trim().length > 0) {
+    try {
+      const { generateEmbeddingCached } = require('./embeddings.js')
+      const embedTimeoutMs = options.embedTimeoutMs || 2000
+      embedding = await Promise.race([
+        generateEmbeddingCached(query),
+        new Promise(resolve => setTimeout(() => resolve(null), embedTimeoutMs))
+      ])
+    } catch (_) {
+      // Embedding unavailable — degrade to FTS-only (still correct, just less ranked)
+    }
+  }
+
+  return hybridSearch(conn, {
+    query: typeof query === 'string' ? query : null,
+    embedding,
+    limit: options.limit || 10,
+    scope: options.scope || null,
+    types: options.types || null,
+    project_slug: options.project_slug || null
+  })
+}
+
 // ─── Exports ───────────────────────────────────────────────────────────────
 
 module.exports = {
   searchKnowledge,
+  searchKnowledgeAsync,
   ftsSearch,
   vectorSearch,
   hybridSearch,
