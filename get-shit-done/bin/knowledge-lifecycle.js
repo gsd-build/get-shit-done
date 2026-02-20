@@ -300,6 +300,52 @@ function getStaleKnowledge(db, { threshold = 0.7, limit = 100, scope = null } = 
 }
 
 /**
+ * Prune stale knowledge entries
+ *
+ * Deletes entries whose staleness score exceeds the threshold.
+ * Uses getStaleKnowledge internally to identify candidates, then
+ * deletes them from the main table (FTS5 trigger handles FTS cleanup,
+ * vec table handled explicitly when vectorEnabled is true).
+ *
+ * @param {Object} db - Database connection (the .db property from openKnowledgeDB)
+ * @param {Object} options - Prune options
+ * @param {number} [options.threshold=0.7] - Staleness score threshold
+ * @param {number} [options.limit=200] - Max entries to prune per run
+ * @param {string} [options.scope=null] - Filter by scope ('global' or 'project')
+ * @param {boolean} [options.dryRun=false] - If true, return candidates without deleting
+ * @param {boolean} [options.vectorEnabled=false] - Whether vec table exists (pass conn.vectorEnabled)
+ * @returns {Object} { deleted: number, candidates: number, entries: Array }
+ */
+function pruneStaleEntries(db, options = {}) {
+  const { threshold = 0.7, limit = 200, scope = null, dryRun = false, vectorEnabled = false } = options;
+
+  const candidates = getStaleKnowledge(db, { threshold, limit, scope });
+
+  if (dryRun || candidates.length === 0) {
+    return { deleted: 0, candidates: candidates.length, entries: candidates };
+  }
+
+  const ids = candidates.map(c => c.id);
+
+  const deleted = db.transaction(() => {
+    if (vectorEnabled) {
+      const placeholders = ids.map(() => '?').join(',');
+      db.prepare(`DELETE FROM knowledge_vec WHERE rowid IN (${placeholders})`).run(...ids);
+    }
+    const result = db.prepare(
+      `DELETE FROM knowledge WHERE id IN (${ids.map(() => '?').join(',')})`
+    ).run(...ids);
+    return result.changes;
+  })();
+
+  if (deleted > 100) {
+    checkpointWAL(db);
+  }
+
+  return { deleted, candidates: candidates.length, entries: candidates };
+}
+
+/**
  * Mark knowledge as refreshed
  *
  * Resets the dormancy timer by updating last_accessed.
@@ -328,5 +374,6 @@ module.exports = {
   getAccessStats,
   getStalenessScore,
   getStaleKnowledge,
+  pruneStaleEntries,
   markRefreshed
 };

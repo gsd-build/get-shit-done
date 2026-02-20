@@ -93,6 +93,29 @@ async function createCheckpoint(checkpoint) {
   // Generate embedding
   const embedding = await generateEmbedding(semanticContext);
 
+  // Auto-prune stale entries if DB exceeds 10MB
+  try {
+    const { getDBPath } = require('./knowledge-db.js');
+    const { pruneStaleEntries } = require('./knowledge-lifecycle.js');
+    const dbPath = getDBPath('global');
+    const dbStat = require('fs').statSync(dbPath);
+    if (dbStat.size > 10 * 1024 * 1024) {
+      const pruneConn = knowledge._getConnection('global');
+      if (pruneConn.available) {
+        const pruneResult = pruneStaleEntries(pruneConn.db, {
+          threshold: 0.7,
+          limit: 100,
+          vectorEnabled: pruneConn.vectorEnabled || false
+        });
+        if (pruneResult.deleted > 0) {
+          process.stderr.write('[knowledge-checkpoint] Auto-pruned ' + pruneResult.deleted + ' stale entries (DB > 10MB)\n');
+        }
+      }
+    }
+  } catch (_pruneErr) {
+    // Size check or prune failed — not fatal, continue with checkpoint
+  }
+
   // Insert as knowledge entry using high-level API
   const result = knowledge.add({
     content: JSON.stringify(checkpoint),

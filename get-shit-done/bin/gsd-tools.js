@@ -127,6 +127,9 @@
  *   knowledge delete <id>                       Delete knowledge entry
  *     [--scope project|global]
  *   knowledge cleanup [--scope project|global]  Remove expired entries
+ *   knowledge prune [--dry-run]                  Prune stale low-utility entries
+ *     [--scope project|global]
+ *     [--threshold N]                            Staleness threshold 0.0-1.0 (default 0.7)
  *   knowledge stats [--scope project|global]    Show access statistics
  *
  * Session Analysis:
@@ -2437,6 +2440,46 @@ function cmdKnowledgeCleanup(cwd, args, raw) {
   const result = knowledge.cleanup(scope);
 
   output(result, raw);
+}
+
+function cmdKnowledgePrune(cwd, args, raw) {
+  const scope = args.includes('--scope') ? args[args.indexOf('--scope') + 1] : 'global';
+  const dryRun = args.includes('--dry-run');
+  const threshold = args.includes('--threshold')
+    ? parseFloat(args[args.indexOf('--threshold') + 1])
+    : 0.7;
+
+  const { knowledge } = require('./knowledge.js');
+  const { pruneStaleEntries } = require('./knowledge-lifecycle.js');
+
+  const conn = knowledge._getConnection(scope);
+  if (conn.available === false) {
+    error('knowledge prune: DB unavailable — ' + (conn.reason || 'unknown'));
+  }
+
+  const result = pruneStaleEntries(conn.db, {
+    threshold,
+    scope,
+    dryRun,
+    vectorEnabled: conn.vectorEnabled || false
+  });
+
+  const summary = {
+    mode: dryRun ? 'dry-run' : 'live',
+    scope,
+    threshold,
+    candidates: result.candidates,
+    deleted: result.deleted,
+    entries: result.entries.map(e => ({
+      id: e.id,
+      type: e.type,
+      staleness_score: e.staleness_score,
+      dormant_days: Math.round(e.dormant_days),
+      access_count: e.access_count
+    }))
+  };
+
+  output(summary, raw);
 }
 
 function cmdKnowledgeStats(cwd, args, raw) {
@@ -9150,6 +9193,9 @@ async function main() {
           break;
         case 'cleanup':
           cmdKnowledgeCleanup(cwd, knowledgeArgs, raw);
+          break;
+        case 'prune':
+          cmdKnowledgePrune(cwd, knowledgeArgs, raw);
           break;
         case 'stats':
           cmdKnowledgeStats(cwd, knowledgeArgs, raw);
