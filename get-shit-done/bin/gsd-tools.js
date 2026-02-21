@@ -8944,7 +8944,7 @@ async function cmdQueryKnowledge(cwd, args, raw) {
   const results = rawResults.map(r => ({
     question: questionString,
     answer: r.content,
-    confidence: (r.metadata && r.metadata.confidence) ? r.metadata.confidence : 'medium',
+    confidence: (r.metadata && r.metadata.confidence) ? r.metadata.confidence : 0.7,
     project_slug: r.project_slug || null,
     source_type: r.type,
     created_at: r.created_at
