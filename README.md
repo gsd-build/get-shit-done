@@ -84,6 +84,7 @@ When setting up npm Trusted Publisher for this package, use:
 ```
 
 One command takes you from idea to ready-for-planning:
+
 - Deep questioning to understand what you're building
 - Optional domain research (spawns 4 parallel researcher agents)
 - Requirements definition with v1/v2/out-of-scope scoping
@@ -122,7 +123,7 @@ Manual user acceptance testing. The system walks you through testable deliverabl
 ## Commands
 
 | Command                             | Description                                                       |
-|-------------------------------------|-------------------------------------------------------------------|
+| ----------------------------------- | ----------------------------------------------------------------- |
 | `/prompts:gsd-new-project`          | Initialize project: questions → research → requirements → roadmap |
 | `/prompts:gsd-plan-phase [N]`       | Research + plan + verify for a phase                              |
 | `/prompts:gsd-execute-phase <N>`    | Execute all plans in parallel waves                               |
@@ -174,15 +175,18 @@ Git bisect finds exact failing task. Each task independently revertable.
 ## Troubleshooting
 
 **Commands not found?**
+
 - Restart Codex CLI to reload prompts
 - Check `~/.codex/prompts/gsd-*.md` (global) or `./prompts/gsd-*.md` (local)
 
 **Update to latest:**
+
 ```bash
 npx @undeemed/get-shit-done-codex@latest
 ```
 
 **Can users be notified when an update is available?**
+
 - Yes. The installer prints an update notice if a newer npm version exists.
 - In-Codex update checks are available via `/prompts:gsd-update`.
 - For release notifications outside the CLI, enable GitHub release watching on this repo.
@@ -192,16 +196,22 @@ npx @undeemed/get-shit-done-codex@latest
 For deeper guides, detailed workflows, and comprehensive documentation, see the [original get-shit-done README](https://github.com/taches/get-shit-done/blob/main/README.md).
 
 The original repository contains:
+
 - Detailed workflow explanations
 - Advanced usage patterns
 - Complete command reference
 - Best practices and examples
 - Architecture and design principles
 
-**Note:** The original README is written for Codex CLI. When following it, remember that this fork uses:
+**Note:** The original README is written for Claude Code. When following it, remember that this fork uses:
+
 - `/prompts:gsd-*` command format (instead of `/gsd:*`)
-- Codex CLI (instead of Codex CLI)
-- `~/.codex/` directory (instead of `~/.codex/`)
+- OpenAI Codex CLI & Desktop (instead of Claude Code)
+- `~/.codex/` directory (instead of `~/.claude/`)
+
+## Keywords
+
+`get-shit-done` `gsd` `openai` `codex` `codex-cli` `codex-desktop` `codex-app` `openai-codex` `ai` `ai-coding` `ai-agents` `meta-prompting` `context-engineering` `context-rot` `spec-driven-development` `prompt-engineering` `multi-agent` `subagent` `ai-workflow` `developer-tools` `dev-tools` `productivity` `code-generation`
 
 ## Credits
 
