@@ -1,7 +1,7 @@
 {
   "name": "get-shit-done-cc",
   "version": "1.20.5",
-  "description": "A meta-prompting, context engineering and spec-driven development system for Claude Code, OpenCode and Gemini by TÂCHES.",
+  "description": "A meta-prompting, context engineering and spec-driven development system for GitHub Copilot (VS Code), forked from get-shit-done by TÂCHES.",
   "bin": {
     "get-shit-done-cc": "bin/install.js"
   },
@@ -27,11 +27,11 @@
   "license": "MIT",
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/glittercowboy/get-shit-done.git"
+    "url": "git+https://github.com/darrylwisner/get-shit-done-github-copilot.git"
   },
-  "homepage": "https://github.com/glittercowboy/get-shit-done",
+  "homepage": "https://github.com/darrylwisner/get-shit-done-github-copilot",
   "bugs": {
-    "url": "https://github.com/glittercowboy/get-shit-done/issues"
+    "url": "https://github.com/darrylwisner/get-shit-done-github-copilot/issues"
   },
   "engines": {
     "node": ">=16.7.0"

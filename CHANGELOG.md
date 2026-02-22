@@ -1,4 +1,4 @@
-﻿# Changelog
+# Changelog
 
 All notable changes to GSD will be documented in this file.
 

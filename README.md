@@ -1,4 +1,4 @@
-﻿<div align="center">
+<div align="center">
 
 # GET SHIT DONE — VS Code GitHub Copilot Port
 
