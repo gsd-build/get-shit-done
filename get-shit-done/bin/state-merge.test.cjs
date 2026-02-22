@@ -1,5 +1,5 @@
-// state-merge.test.cjs - TDD tests for STATE.md parsing and merge strategies
-const { init, parseStateFile, extractSection, serializeSection, mergeSection, getStrategy, SECTION_STRATEGIES } = require('./state-merge.cjs');
+// state-merge.test.cjs - TDD tests for STATE.md parsing, merge strategies, and conflict detection
+const { init, parseStateFile, extractSection, serializeSection, mergeSection, getStrategy, SECTION_STRATEGIES, detectConflicts, applyResolution } = require('./state-merge.cjs');
 const assert = require('assert');
 
 // Test fixture - minimal STATE.md content
@@ -119,6 +119,45 @@ async function runTests() {
   for (const section of requiredSections) {
     assert(SECTION_STRATEGIES[section], `Missing strategy for ${section}`);
   }
+  console.log('  PASSED');
+
+  // Test 11: detectConflicts no conflict on identical
+  console.log('Test 11: detectConflicts no conflict on identical...');
+  const identicalResult = detectConflicts('same', 'same', 'same');
+  assert(!identicalResult.hasConflicts, 'No conflicts when all identical');
+  console.log('  PASSED');
+
+  // Test 12: detectConflicts conflict on divergent changes
+  console.log('Test 12: detectConflicts conflict on divergent changes...');
+  const conflictResult = detectConflicts('base', 'changed-main', 'changed-worktree');
+  assert(conflictResult.hasConflicts, 'Should detect conflict on divergent changes');
+  assert(conflictResult.conflicts.length > 0, 'Should have conflict entries');
+  console.log('  PASSED');
+
+  // Test 13: applyResolution with main choice
+  console.log('Test 13: applyResolution with main choice...');
+  const testConflict = { main: 'main-content', worktree: 'worktree-content' };
+  const mainResolution = applyResolution('main', testConflict, null);
+  assert(mainResolution === 'main-content', 'Should return main content');
+  console.log('  PASSED');
+
+  // Test 14: applyResolution with worktree choice
+  console.log('Test 14: applyResolution with worktree choice...');
+  const worktreeResolution = applyResolution('worktree', testConflict, null);
+  assert(worktreeResolution === 'worktree-content', 'Should return worktree content');
+  console.log('  PASSED');
+
+  // Test 15: applyResolution with suggestion choice
+  console.log('Test 15: applyResolution with suggestion choice...');
+  const suggestionResolution = applyResolution('suggestion', testConflict, 'custom-suggestion');
+  assert(suggestionResolution === 'custom-suggestion', 'Should return suggestion');
+  console.log('  PASSED');
+
+  // Test 16: applyResolution with numeric choices
+  console.log('Test 16: applyResolution with numeric choices...');
+  assert(applyResolution('1', testConflict, 'sugg') === 'sugg', 'Choice 1 = suggestion');
+  assert(applyResolution('2', testConflict, null) === 'main-content', 'Choice 2 = main');
+  assert(applyResolution('3', testConflict, null) === 'worktree-content', 'Choice 3 = worktree');
   console.log('  PASSED');
 
   console.log('\nAll tests passed!');
