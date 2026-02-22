@@ -150,7 +150,123 @@ describe('state-snapshot command', () => {
   });
 });
 
+describe('state mutation commands', () => {
+  let tmpDir;
+
+  beforeEach(() => {
+    tmpDir = createTempProject();
+  });
+
+  afterEach(() => {
+    cleanup(tmpDir);
+  });
+
+  test('add-decision preserves dollar amounts without corrupting Decisions section', () => {
+    fs.writeFileSync(
+      path.join(tmpDir, '.planning', 'STATE.md'),
+      `# Project State
+
+## Decisions
+No decisions yet.
+
+## Blockers
+None
+`
+    );
+
+    const result = runGsdTools(
+      "state add-decision --phase 11-01 --summary 'Benchmark prices moved from $0.50 to $2.00 to $5.00' --rationale 'track cost growth'",
+      tmpDir
+    );
+    assert.ok(result.success, `Command failed: ${result.error}`);
+
+    const state = fs.readFileSync(path.join(tmpDir, '.planning', 'STATE.md'), 'utf-8');
+    assert.match(
+      state,
+      /- \[Phase 11-01\]: Benchmark prices moved from \$0\.50 to \$2\.00 to \$5\.00 — track cost growth/,
+      'decision entry should preserve literal dollar values'
+    );
+    assert.strictEqual((state.match(/^## Decisions$/gm) || []).length, 1, 'Decisions heading should not be duplicated');
+    assert.ok(!state.includes('No decisions yet.'), 'placeholder should be removed');
+  });
+
+  test('add-blocker preserves dollar strings without corrupting Blockers section', () => {
+    fs.writeFileSync(
+      path.join(tmpDir, '.planning', 'STATE.md'),
+      `# Project State
+
+## Decisions
+None
+
+## Blockers
+None
+`
+    );
+
+    const result = runGsdTools("state add-blocker --text 'Waiting on vendor quote $1.00 before approval'", tmpDir);
+    assert.ok(result.success, `Command failed: ${result.error}`);
+
+    const state = fs.readFileSync(path.join(tmpDir, '.planning', 'STATE.md'), 'utf-8');
+    assert.match(state, /- Waiting on vendor quote \$1\.00 before approval/, 'blocker entry should preserve literal dollar values');
+    assert.strictEqual((state.match(/^## Blockers$/gm) || []).length, 1, 'Blockers heading should not be duplicated');
+  });
+
+  test('add-decision supports file inputs to preserve shell-sensitive dollar text', () => {
+    fs.writeFileSync(
+      path.join(tmpDir, '.planning', 'STATE.md'),
+      `# Project State
+
+## Decisions
+No decisions yet.
+
+## Blockers
+None
+`
+    );
+
+    const summaryPath = path.join(tmpDir, 'decision-summary.txt');
+    const rationalePath = path.join(tmpDir, 'decision-rationale.txt');
+    fs.writeFileSync(summaryPath, 'Price tiers: $0.50, $2.00, else $5.00\n');
+    fs.writeFileSync(rationalePath, 'Keep exact currency literals for budgeting\n');
+
+    const result = runGsdTools(
+      `state add-decision --phase 11-02 --summary-file "${summaryPath}" --rationale-file "${rationalePath}"`,
+      tmpDir
+    );
+    assert.ok(result.success, `Command failed: ${result.error}`);
+
+    const state = fs.readFileSync(path.join(tmpDir, '.planning', 'STATE.md'), 'utf-8');
+    assert.match(
+      state,
+      /- \[Phase 11-02\]: Price tiers: \$0\.50, \$2\.00, else \$5\.00 — Keep exact currency literals for budgeting/,
+      'file-based decision input should preserve literal dollar values'
+    );
+  });
+
+  test('add-blocker supports --text-file for shell-sensitive text', () => {
+    fs.writeFileSync(
+      path.join(tmpDir, '.planning', 'STATE.md'),
+      `# Project State
+
+## Decisions
+None
+
+## Blockers
+None
+`
+    );
+
+    const blockerPath = path.join(tmpDir, 'blocker.txt');
+    fs.writeFileSync(blockerPath, 'Vendor quote updated from $1.00 to $2.00 pending approval\n');
+
+    const result = runGsdTools(`state add-blocker --text-file "${blockerPath}"`, tmpDir);
+    assert.ok(result.success, `Command failed: ${result.error}`);
+
+    const state = fs.readFileSync(path.join(tmpDir, '.planning', 'STATE.md'), 'utf-8');
+    assert.match(state, /- Vendor quote updated from \$1\.00 to \$2\.00 pending approval/);
+  });
+});
+
 // ─────────────────────────────────────────────────────────────────────────────
 // summary-extract command
 // ─────────────────────────────────────────────────────────────────────────────
-

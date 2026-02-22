@@ -102,7 +102,9 @@
  *   state update-progress              Recalculate progress bar
  *   state add-decision --summary "..."  Add decision to STATE.md
  *     [--phase N] [--rationale "..."]
+ *     [--summary-file path] [--rationale-file path]
  *   state add-blocker --text "..."     Add blocker
+ *     [--text-file path]
  *   state resolve-blocker --text "..." Remove blocker
  *   state record-session               Update session continuity
  *     --stopped-at "..."
@@ -187,15 +189,23 @@ async function main() {
       } else if (subcommand === 'add-decision') {
         const phaseIdx = args.indexOf('--phase');
         const summaryIdx = args.indexOf('--summary');
+        const summaryFileIdx = args.indexOf('--summary-file');
         const rationaleIdx = args.indexOf('--rationale');
+        const rationaleFileIdx = args.indexOf('--rationale-file');
         state.cmdStateAddDecision(cwd, {
           phase: phaseIdx !== -1 ? args[phaseIdx + 1] : null,
           summary: summaryIdx !== -1 ? args[summaryIdx + 1] : null,
+          summary_file: summaryFileIdx !== -1 ? args[summaryFileIdx + 1] : null,
           rationale: rationaleIdx !== -1 ? args[rationaleIdx + 1] : '',
+          rationale_file: rationaleFileIdx !== -1 ? args[rationaleFileIdx + 1] : null,
         }, raw);
       } else if (subcommand === 'add-blocker') {
         const textIdx = args.indexOf('--text');
-        state.cmdStateAddBlocker(cwd, textIdx !== -1 ? args[textIdx + 1] : null, raw);
+        const textFileIdx = args.indexOf('--text-file');
+        state.cmdStateAddBlocker(cwd, {
+          text: textIdx !== -1 ? args[textIdx + 1] : null,
+          text_file: textFileIdx !== -1 ? args[textFileIdx + 1] : null,
+        }, raw);
       } else if (subcommand === 'resolve-blocker') {
         const textIdx = args.indexOf('--text');
         state.cmdStateResolveBlocker(cwd, textIdx !== -1 ? args[textIdx + 1] : null, raw);

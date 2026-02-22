@@ -86,6 +86,17 @@ function cmdStateGet(cwd, section, raw) {
   }
 }
 
+function readTextArgOrFile(cwd, value, filePath, label) {
+  if (!filePath) return value;
+
+  const resolvedPath = path.isAbsolute(filePath) ? filePath : path.join(cwd, filePath);
+  try {
+    return fs.readFileSync(resolvedPath, 'utf-8').trimEnd();
+  } catch {
+    throw new Error(`${label} file not found: ${filePath}`);
+  }
+}
+
 function cmdStatePatch(cwd, patches, raw) {
   const statePath = path.join(cwd, '.planning', 'STATE.md');
   try {
@@ -97,7 +108,7 @@ function cmdStatePatch(cwd, patches, raw) {
       const pattern = new RegExp(`(\\*\\*${fieldEscaped}:\\*\\*\\s*)(.*)`, 'i');
 
       if (pattern.test(content)) {
-        content = content.replace(pattern, `$1${value}`);
+        content = content.replace(pattern, (_match, prefix) => `${prefix}${value}`);
         results.updated.push(field);
       } else {
         results.failed.push(field);
@@ -125,7 +136,7 @@ function cmdStateUpdate(cwd, field, value) {
     const fieldEscaped = field.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
     const pattern = new RegExp(`(\\*\\*${fieldEscaped}:\\*\\*\\s*)(.*)`, 'i');
     if (pattern.test(content)) {
-      content = content.replace(pattern, `$1${value}`);
+      content = content.replace(pattern, (_match, prefix) => `${prefix}${value}`);
       fs.writeFileSync(statePath, content, 'utf-8');
       output({ updated: true });
     } else {
@@ -148,7 +159,7 @@ function stateReplaceField(content, fieldName, newValue) {
   const escaped = fieldName.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
   const pattern = new RegExp(`(\\*\\*${escaped}:\\*\\*\\s*)(.*)`, 'i');
   if (pattern.test(content)) {
-    return content.replace(pattern, `$1${newValue}`);
+    return content.replace(pattern, (_match, prefix) => `${prefix}${newValue}`);
   }
   return null;
 }
@@ -199,7 +210,6 @@ function cmdStateRecordMetric(cwd, options, raw) {
   const metricsMatch = content.match(metricsPattern);
 
   if (metricsMatch) {
-    const tableHeader = metricsMatch[1];
     let tableBody = metricsMatch[2].trimEnd();
     const newRow = `| Phase ${phase} P${plan} | ${duration} | ${tasks || '-'} tasks | ${files || '-'} files |`;
 
@@ -209,7 +219,7 @@ function cmdStateRecordMetric(cwd, options, raw) {
       tableBody = tableBody + '\n' + newRow;
     }
 
-    content = content.replace(metricsPattern, `${tableHeader}${tableBody}\n`);
+    content = content.replace(metricsPattern, (_match, header) => `${header}${tableBody}\n`);
     fs.writeFileSync(statePath, content, 'utf-8');
     output({ recorded: true, phase, plan, duration }, raw, 'true');
   } else {
@@ -246,7 +256,7 @@ function cmdStateUpdateProgress(cwd, raw) {
 
   const progressPattern = /(\*\*Progress:\*\*\s*).*/i;
   if (progressPattern.test(content)) {
-    content = content.replace(progressPattern, `$1${progressStr}`);
+    content = content.replace(progressPattern, (_match, prefix) => `${prefix}${progressStr}`);
     fs.writeFileSync(statePath, content, 'utf-8');
     output({ updated: true, percent, completed: totalSummaries, total: totalPlans, bar: progressStr }, raw, progressStr);
   } else {
@@ -258,11 +268,22 @@ function cmdStateAddDecision(cwd, options, raw) {
   const statePath = path.join(cwd, '.planning', 'STATE.md');
   if (!fs.existsSync(statePath)) { output({ error: 'STATE.md not found' }, raw); return; }
 
-  const { phase, summary, rationale } = options;
-  if (!summary) { output({ error: 'summary required' }, raw); return; }
+  const { phase, summary, summary_file, rationale, rationale_file } = options;
+  let summaryText = null;
+  let rationaleText = '';
+
+  try {
+    summaryText = readTextArgOrFile(cwd, summary, summary_file, 'summary');
+    rationaleText = readTextArgOrFile(cwd, rationale || '', rationale_file, 'rationale');
+  } catch (err) {
+    output({ added: false, reason: err.message }, raw, 'false');
+    return;
+  }
+
+  if (!summaryText) { output({ error: 'summary required' }, raw); return; }
 
   let content = fs.readFileSync(statePath, 'utf-8');
-  const entry = `- [Phase ${phase || '?'}]: ${summary}${rationale ? ` — ${rationale}` : ''}`;
+  const entry = `- [Phase ${phase || '?'}]: ${summaryText}${rationaleText ? ` — ${rationaleText}` : ''}`;
 
   // Find Decisions section (various heading patterns)
   const sectionPattern = /(###?\s*(?:Decisions|Decisions Made|Accumulated.*Decisions)\s*\n)([\s\S]*?)(?=\n###?|\n##[^#]|$)/i;
@@ -273,7 +294,7 @@ function cmdStateAddDecision(cwd, options, raw) {
     // Remove placeholders
     sectionBody = sectionBody.replace(/None yet\.?\s*\n?/gi, '').replace(/No decisions yet\.?\s*\n?/gi, '');
     sectionBody = sectionBody.trimEnd() + '\n' + entry + '\n';
-    content = content.replace(sectionPattern, `${match[1]}${sectionBody}`);
+    content = content.replace(sectionPattern, (_match, header) => `${header}${sectionBody}`);
     fs.writeFileSync(statePath, content, 'utf-8');
     output({ added: true, decision: entry }, raw, 'true');
   } else {
@@ -284,10 +305,20 @@ function cmdStateAddDecision(cwd, options, raw) {
 function cmdStateAddBlocker(cwd, text, raw) {
   const statePath = path.join(cwd, '.planning', 'STATE.md');
   if (!fs.existsSync(statePath)) { output({ error: 'STATE.md not found' }, raw); return; }
-  if (!text) { output({ error: 'text required' }, raw); return; }
+  const blockerOptions = typeof text === 'object' && text !== null ? text : { text };
+  let blockerText = null;
+
+  try {
+    blockerText = readTextArgOrFile(cwd, blockerOptions.text, blockerOptions.text_file, 'blocker');
+  } catch (err) {
+    output({ added: false, reason: err.message }, raw, 'false');
+    return;
+  }
+
+  if (!blockerText) { output({ error: 'text required' }, raw); return; }
 
   let content = fs.readFileSync(statePath, 'utf-8');
-  const entry = `- ${text}`;
+  const entry = `- ${blockerText}`;
 
   const sectionPattern = /(###?\s*(?:Blockers|Blockers\/Concerns|Concerns)\s*\n)([\s\S]*?)(?=\n###?|\n##[^#]|$)/i;
   const match = content.match(sectionPattern);
@@ -296,9 +327,9 @@ function cmdStateAddBlocker(cwd, text, raw) {
     let sectionBody = match[2];
     sectionBody = sectionBody.replace(/None\.?\s*\n?/gi, '').replace(/None yet\.?\s*\n?/gi, '');
     sectionBody = sectionBody.trimEnd() + '\n' + entry + '\n';
-    content = content.replace(sectionPattern, `${match[1]}${sectionBody}`);
+    content = content.replace(sectionPattern, (_match, header) => `${header}${sectionBody}`);
     fs.writeFileSync(statePath, content, 'utf-8');
-    output({ added: true, blocker: text }, raw, 'true');
+    output({ added: true, blocker: blockerText }, raw, 'true');
   } else {
     output({ added: false, reason: 'Blockers section not found in STATE.md' }, raw, 'false');
   }
@@ -328,7 +359,7 @@ function cmdStateResolveBlocker(cwd, text, raw) {
       newBody = 'None\n';
     }
 
-    content = content.replace(sectionPattern, `${match[1]}${newBody}`);
+    content = content.replace(sectionPattern, (_match, header) => `${header}${newBody}`);
     fs.writeFileSync(statePath, content, 'utf-8');
     output({ resolved: true, blocker: text }, raw, 'true');
   } else {
