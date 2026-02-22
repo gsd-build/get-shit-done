@@ -71,6 +71,56 @@ Report:
 ```
 </step>
 
+<step name="agent_teams_mode" optional="true">
+### Agent Teams Mode (Experimental)
+
+If the phase argument contains the "AGENT-TEAM:" prefix (e.g., `/gsd:execute-phase AGENT-TEAM: 12`):
+
+1. Strip "AGENT-TEAM:" from the phase argument before the init step — use remaining text as phase identifier
+2. In the execute_waves step, use the agent teams protocol below instead of individual Task() subagents
+3. All other steps (initialize, handle_branching, validate_phase, discover_and_group_plans, checkpoint_handling, verify_phase_goal, update_roadmap, offer_next) remain unchanged
+
+**Modified execute_waves protocol with Agent Teams:**
+
+The orchestrator follows all standard execute-phase steps EXCEPT `execute_waves`, which changes to:
+
+1. **Create team** (once, before first wave):
+   ```
+   TeamCreate(
+     team_name: "phase-{X}-execution",
+     description: "Executing phase {X}: {Name}"
+   )
+   ```
+
+2. **For each wave**, instead of individual Task() calls:
+   a. Create tasks in the team task list (TaskCreate) — one per plan in the wave
+   b. Spawn gsd-executor teammates with team context:
+      ```
+      Task(
+        subagent_type="gsd-executor",
+        team_name="phase-{X}-execution",
+        name="executor-plan-{NN}",
+        prompt="...same prompt as standard execute-phase..."
+      )
+      ```
+   c. Assign tasks via TaskUpdate (set owner to teammate name)
+   d. Monitor progress via TaskList — teammates signal completion via SendMessage
+   e. When all plans in wave complete, proceed to next wave
+
+3. **Checkpoint plans** (autonomous: false): Handle identically to standard execute-phase — present checkpoint to user, spawn continuation agent.
+
+4. **Shutdown** after all waves complete:
+   - SendMessage type "shutdown_request" to each active teammate
+   - TeamDelete to clean up team resources
+
+5. **Fallback:** If TeamCreate fails or teammates don't respond, fall back to standard Task() subagent execution and warn user.
+
+**Benefits over standard execution:**
+- Teammates can communicate issues to orchestrator and each other
+- Shared task list provides real-time progress visibility
+- More natural coordination pattern for complex phases with many plans
+</step>
+
 <step name="execute_waves">
 Execute each wave in sequence. Within a wave: parallel if `PARALLELIZATION=true`, sequential if `false`.
 
