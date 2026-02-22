@@ -1,5 +1,5 @@
 #!/usr/bin/env node
-// state-merge.cjs - STATE.md parsing and section extraction
+// state-merge.cjs - STATE.md parsing, section extraction, and merge strategies
 // Provides infrastructure for section-based state merging
 //
 // Note: Uses dynamic imports because remark ecosystem is ESM-only
@@ -7,7 +7,21 @@
 let processor = null;
 let stringifier = null;
 let headingRange = null;
+let toStringFn = null;
 let initialized = false;
+
+// Section strategy configuration per CONTEXT.md
+const SECTION_STRATEGIES = {
+  'Current Position': 'additive',
+  'Performance Metrics': 'additive',
+  'Key Decisions': 'union',
+  'Implementation Notes': 'union',
+  'TODOs': 'union-main-wins-removals',
+  'Blockers': 'union-main-wins-removals',
+  'Session Continuity': 'worktree-wins',
+  'Open Questions': 'union',
+  'Accumulated Context': 'additive'  // Parent of subsections
+};
 
 /**
  * Initialize the markdown processing libraries (ESM modules)
@@ -22,6 +36,8 @@ async function init() {
   const remarkGfm = (await import('remark-gfm')).default;
   const headingRangeModule = await import('mdast-util-heading-range');
   headingRange = headingRangeModule.headingRange;
+  const toStringModule = await import('mdast-util-to-string');
+  toStringFn = toStringModule.toString;
 
   // Create processor with GFM support for tables and task lists
   processor = unified()
@@ -107,4 +123,122 @@ function serializeSection(section) {
   return stringifier.stringify(tempTree);
 }
 
-module.exports = { init, parseStateFile, extractSection, serializeSection };
+/**
+ * Get text content of a node for comparison
+ */
+function getNodeText(node) {
+  if (!initialized) {
+    throw new Error('Call init() before using getNodeText');
+  }
+  return toStringFn(node);
+}
+
+/**
+ * Merge two sections using additive strategy
+ * Combines entries from both sides, deduping by text content
+ */
+function mergeAdditive(mainSection, worktreeSection) {
+  if (!mainSection) return worktreeSection;
+  if (!worktreeSection) return mainSection;
+
+  // Combine content nodes, deduping by text content
+  const mainTexts = new Set(mainSection.content.map(n => getNodeText(n)));
+  const combined = [...mainSection.content];
+
+  for (const node of worktreeSection.content) {
+    const text = getNodeText(node);
+    if (!mainTexts.has(text)) {
+      combined.push(node);
+    }
+  }
+
+  return { ...mainSection, content: combined };
+}
+
+/**
+ * Merge two sections using union strategy
+ * All entries combined, no conflicts
+ */
+function mergeUnion(mainSection, worktreeSection) {
+  // For tables (Key Decisions), merge rows by first column
+  // For lists, union all items
+  return mergeAdditive(mainSection, worktreeSection);
+}
+
+/**
+ * Merge with union + main wins removals
+ * Additions merge, completions from main stick (no resurrection)
+ */
+function mergeUnionMainWinsRemovals(mainSection, worktreeSection, baseSection) {
+  if (!baseSection) {
+    // No base = first time, just union
+    return mergeUnion(mainSection, worktreeSection);
+  }
+
+  // Find items removed from main (were in base, not in main)
+  const baseTexts = new Set((baseSection?.content || []).map(n => getNodeText(n)));
+  const mainTexts = new Set((mainSection?.content || []).map(n => getNodeText(n)));
+
+  // Items main removed (were in base but not in main)
+  const mainRemoved = [...baseTexts].filter(t => !mainTexts.has(t));
+
+  // Start with main's content
+  const result = mainSection ? [...mainSection.content] : [];
+
+  // Add worktree additions that main didn't remove
+  if (worktreeSection) {
+    for (const node of worktreeSection.content) {
+      const text = getNodeText(node);
+      // Skip if main removed it OR if main already has it
+      if (!mainRemoved.includes(text) && !mainTexts.has(text)) {
+        result.push(node);
+      }
+    }
+  }
+
+  return { ...(mainSection || worktreeSection), content: result };
+}
+
+/**
+ * Worktree wins for phase-specific sections
+ */
+function mergeWorktreeWins(mainSection, worktreeSection) {
+  return worktreeSection || mainSection;
+}
+
+/**
+ * Get merge strategy for section
+ */
+function getStrategy(sectionName) {
+  return SECTION_STRATEGIES[sectionName] || 'union';
+}
+
+/**
+ * Merge a single section using appropriate strategy
+ */
+function mergeSection(sectionName, mainSection, worktreeSection, baseSection) {
+  const strategy = getStrategy(sectionName);
+
+  switch (strategy) {
+    case 'additive':
+      return mergeAdditive(mainSection, worktreeSection);
+    case 'union':
+      return mergeUnion(mainSection, worktreeSection);
+    case 'union-main-wins-removals':
+      return mergeUnionMainWinsRemovals(mainSection, worktreeSection, baseSection);
+    case 'worktree-wins':
+      return mergeWorktreeWins(mainSection, worktreeSection);
+    default:
+      return mergeUnion(mainSection, worktreeSection);
+  }
+}
+
+module.exports = {
+  init,
+  parseStateFile,
+  extractSection,
+  serializeSection,
+  mergeSection,
+  getStrategy,
+  SECTION_STRATEGIES
+};

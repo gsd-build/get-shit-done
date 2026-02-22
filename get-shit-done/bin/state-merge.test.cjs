@@ -1,5 +1,5 @@
-// state-merge.test.cjs - TDD tests for STATE.md parsing
-const { init, parseStateFile, extractSection, serializeSection } = require('./state-merge.cjs');
+// state-merge.test.cjs - TDD tests for STATE.md parsing and merge strategies
+const { init, parseStateFile, extractSection, serializeSection, mergeSection, getStrategy, SECTION_STRATEGIES } = require('./state-merge.cjs');
 const assert = require('assert');
 
 // Test fixture - minimal STATE.md content
@@ -93,6 +93,32 @@ async function runTests() {
   const decisionsSerialized = serializeSection(decisionsSection);
   assert(decisionsSerialized.includes('| Decision |'), 'Should preserve table headers');
   assert(decisionsSerialized.includes('| Use JSON |'), 'Should preserve table data');
+  console.log('  PASSED');
+
+  // Test 7: Strategy lookup for TODOs
+  console.log('Test 7: Strategy lookup for TODOs...');
+  assert(getStrategy('TODOs') === 'union-main-wins-removals', 'TODOs should use union-main-wins-removals');
+  console.log('  PASSED');
+
+  // Test 8: Strategy lookup for Session Continuity
+  console.log('Test 8: Strategy lookup for Session Continuity...');
+  assert(getStrategy('Session Continuity') === 'worktree-wins', 'Session Continuity should use worktree-wins');
+  console.log('  PASSED');
+
+  // Test 9: Strategy defaults to union for unknown sections
+  console.log('Test 9: Strategy defaults to union for unknown sections...');
+  assert(getStrategy('Unknown Section') === 'union', 'Unknown sections should default to union');
+  console.log('  PASSED');
+
+  // Test 10: All CONTEXT.md sections have strategies
+  console.log('Test 10: All CONTEXT.md sections have strategies...');
+  const requiredSections = [
+    'Current Position', 'Performance Metrics', 'Key Decisions',
+    'Implementation Notes', 'TODOs', 'Blockers', 'Session Continuity', 'Open Questions'
+  ];
+  for (const section of requiredSections) {
+    assert(SECTION_STRATEGIES[section], `Missing strategy for ${section}`);
+  }
   console.log('  PASSED');
 
   console.log('\nAll tests passed!');
