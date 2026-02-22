@@ -7,6 +7,7 @@
 #   gh label create upstream-sync --color 0075ca --description "Upstream sync PR" --repo <fork>
 #   gh label create automated --color e4e669 --description "Automated workflow" --repo <fork>
 #   gh label create upstream-mirror --color d93f0b --description "Upstream release mirror" --repo <fork>
+#   gh label create escalation --color d93f0b --description "Escalation required: autonomous maintenance dead-end" --repo <fork>
 #   Enable: Settings → General → Pull Requests → Allow auto-merge: ON
 #   Verify: COPILOT_PAT secret has 'repo' scope (required for tag push to trigger release.yml)
 #
@@ -305,6 +306,25 @@ jobs:
         run: |
           git push --force-with-lease origin automated/upstream-sync
 
+      - name: Check open escalations
+        if: steps.detect.outputs.no_changes != 'true'
+        id: check_escalations
+        run: |
+          OPEN_COUNT=$(gh issue list \
+            --repo "$GITHUB_REPOSITORY" \
+            --label "escalation" \
+            --state open \
+            --json number \
+            --jq 'length' 2>/dev/null || echo "0")
+
+          if [ "$OPEN_COUNT" -gt 0 ]; then
+            echo "has_escalation=true" >> "$GITHUB_OUTPUT"
+            echo "::warning::${OPEN_COUNT} open escalation issue(s) found. Auto-merge will be blocked on this sync."
+          else
+            echo "has_escalation=false" >> "$GITHUB_OUTPUT"
+            echo "No open escalation issues."
+          fi
+
       - name: Build PR body
         if: steps.detect.outputs.no_changes != 'true'
         run: |
@@ -372,7 +392,10 @@ jobs:
       # clear correctly after merge. Squash would create a new SHA and main would always appear behind.)
       # This is a no-op when auto-merge is already enabled; safe to run on every sync.
       - name: Enable auto-merge on sync PR
-        if: steps.detect.outputs.no_changes != 'true' && steps.create_pr.outputs.pr_number != ''
+        if: >
+          steps.detect.outputs.no_changes != 'true' &&
+          steps.create_pr.outputs.pr_number != '' &&
+          steps.check_escalations.outputs.has_escalation != 'true'
         run: |
           gh pr merge "${{ steps.create_pr.outputs.pr_number }}" \
             --repo "$GITHUB_REPOSITORY" \
