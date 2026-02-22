@@ -41,6 +41,11 @@ jobs:
       pull-requests: write
       issues: write
 
+    outputs:
+      security_flagged: ${{ steps.analyze_delta.outputs.security_flagged }}
+      has_new_commands: ${{ steps.analyze_delta.outputs.has_new_commands }}
+      no_changes: ${{ steps.detect.outputs.no_changes }}
+
     env:
       GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
@@ -139,6 +144,79 @@ jobs:
               --label "upstream-sync"
             exit 1
           fi
+
+      - name: Analyze upstream delta
+        if: steps.detect.outputs.no_changes != 'true'
+        id: analyze_delta
+        run: |
+          FORK_HEAD="${{ steps.detect.outputs.fork_head }}"
+          UPSTREAM_HEAD="${{ steps.detect.outputs.upstream_head }}"
+
+          # Structural diff — what files changed in upstream-owned dirs
+          STRUCT_DIFF=$(git diff --name-status "$FORK_HEAD" "$UPSTREAM_HEAD" \
+            -- commands/gsd/ agents/ get-shit-done/ 2>/dev/null || echo "")
+
+          # Upstream commit log
+          UPSTREAM_LOG=$(git log --oneline "$FORK_HEAD..upstream/${{ env.UPSTREAM_BRANCH }}" 2>/dev/null || echo "(none)")
+
+          # Detect new commands (status A = Added) in commands/gsd/
+          NEW_COMMANDS=$(echo "$STRUCT_DIFF" | awk '$1=="A"{print $2}' | grep 'commands/gsd/' || echo "")
+          if [ -n "$NEW_COMMANDS" ]; then
+            echo "has_new_commands=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "has_new_commands=false" >> "$GITHUB_OUTPUT"
+          fi
+
+          # Detect new agents
+          NEW_AGENTS=$(echo "$STRUCT_DIFF" | awk '$1=="A"{print $2}' | grep 'agents/' || echo "")
+
+          # Security scan: YAML files only (avoids false positives on doc lines)
+          YAML_DIFF=$(git diff "$FORK_HEAD" "$UPSTREAM_HEAD" -- "*.yml" "*.yaml" 2>/dev/null || echo "")
+          SECURITY_HITS=$(echo "$YAML_DIFF" | \
+            grep -E "^[+-].*\b(GITHUB_TOKEN|secrets\.|permissions:|token:|auth:)\b" | \
+            grep -v "^---\|^+++" | head -20 || echo "")
+          if [ -n "$SECURITY_HITS" ]; then
+            echo "security_flagged=true" >> "$GITHUB_OUTPUT"
+            echo "::warning::Security-sensitive upstream YAML changes detected. Auto-merge will be blocked."
+          else
+            echo "security_flagged=false" >> "$GITHUB_OUTPUT"
+          fi
+
+          # Content diff of upstream dirs (truncated to 30k chars for agent context)
+          CONTENT_DIFF=$(git diff "$FORK_HEAD" "$UPSTREAM_HEAD" \
+            -- commands/gsd/ agents/ get-shit-done/ 2>/dev/null | head -c 30000 || echo "")
+
+          # Write structured analysis to /tmp for downstream consumption
+          cat > /tmp/delta-analysis.md << 'DELIM'
+          ## Upstream Delta Analysis
+          DELIM
+
+          cat >> /tmp/delta-analysis.md << DELIM
+          **Upstream commits:**
+          \`\`\`
+          ${UPSTREAM_LOG}
+          \`\`\`
+
+          **Structural changes (upstream-owned dirs):**
+          \`\`\`
+          ${STRUCT_DIFF:-"(none)"}
+          \`\`\`
+
+          **New commands detected:** ${NEW_COMMANDS:-"(none)"}
+          **New agents detected:** ${NEW_AGENTS:-"(none)"}
+          **Security-sensitive YAML lines:** ${SECURITY_HITS:-"(none)"}
+
+          **Content diff (truncated to 30k chars):**
+          \`\`\`diff
+          ${CONTENT_DIFF:-"(none)"}
+          \`\`\`
+          DELIM
+
+          echo "Delta analysis written to /tmp/delta-analysis.md"
+
+          # Write full analysis to workflow step summary
+          echo "## Upstream Delta Analysis (upstream@${{ steps.detect.outputs.short_sha }})" >> "$GITHUB_STEP_SUMMARY"
+          cat /tmp/delta-analysis.md >> "$GITHUB_STEP_SUMMARY"
 
       - name: Run prompt generator
         if: steps.detect.outputs.no_changes != 'true'
