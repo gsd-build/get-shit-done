@@ -307,23 +307,21 @@ Verified patterns from official sources:
 | Config file | {path or "none — see Wave 0"} |
 | Quick run command | `{command}` |
 | Full suite command | `{command}` |
-| Estimated runtime | ~{N} seconds |
 
 ### Phase Requirements → Test Map
 | Req ID | Behavior | Test Type | Automated Command | File Exists? |
 |--------|----------|-----------|-------------------|-------------|
-| REQ-XX | {behavior description} | unit | `pytest tests/test_{module}.py::test_{name} -x` | ✅ yes / ❌ Wave 0 gap |
+| REQ-XX | {behavior} | unit | `pytest tests/test_{module}.py::test_{name} -x` | ✅ / ❌ Wave 0 |
 
-### Nyquist Sampling Rate
-- **Minimum sample interval:** After every committed task → run: `{quick run command}`
-- **Full suite trigger:** Before merging final task of any plan wave
-- **Phase-complete gate:** Full suite green before `/gsd:verify-work` runs
-- **Estimated feedback latency per task:** ~{N} seconds
+### Sampling Rate
+- **Per task commit:** `{quick run command}`
+- **Per wave merge:** `{full suite command}`
+- **Phase gate:** Full suite green before `/gsd:verify-work`
 
-### Wave 0 Gaps (must be created before implementation)
+### Wave 0 Gaps
 - [ ] `{tests/test_file.py}` — covers REQ-{XX}
-- [ ] `{tests/conftest.py}` — shared fixtures for phase {N}
-- [ ] Framework install: `{command}` — if no framework detected
+- [ ] `{tests/conftest.py}` — shared fixtures
+- [ ] Framework install: `{command}` — if none detected
 
 *(If no gaps: "None — existing test infrastructure covers all phase requirements")*
 
@@ -366,7 +364,7 @@ INIT=$(node ~/.claude/get-shit-done/bin/gsd-tools.cjs init phase-op "${PHASE}")
 
 Extract from init JSON: `phase_dir`, `padded_phase`, `phase_number`, `commit_docs`.
 
-Also check Nyquist validation config — read `.planning/config.json` and check if `workflow.nyquist_validation` is `true`. If `true`, include the Validation Architecture section in RESEARCH.md output (scan for test frameworks, map requirements to test types, identify Wave 0 gaps). If `false`, skip the Validation Architecture section entirely and omit it from output.
+Also read `.planning/config.json` — if `workflow.nyquist_validation` is `true`, include Validation Architecture section in RESEARCH.md. If `false`, skip it.
 
 Then read CONTEXT.md if exists:
 ```bash
@@ -402,29 +400,16 @@ For each domain: Context7 first → Official docs → WebSearch → Cross-verify
 
 ## Step 4: Validation Architecture Research (if nyquist_validation enabled)
 
-**Skip this step if** workflow.nyquist_validation is false in config.
-
-This step answers: "How will Claude's executor know, within seconds of committing each task, whether the output is correct?"
+**Skip if** workflow.nyquist_validation is false.
 
 ### Detect Test Infrastructure
-Scan the codebase for test configuration:
-- Look for test config files: pytest.ini, pyproject.toml, jest.config.*, vitest.config.*, etc.
-- Look for test directories: test/, tests/, __tests__/
-- Look for test files: *.test.*, *.spec.*
-- Check package.json scripts for test commands
+Scan for: test config files (pytest.ini, jest.config.*, vitest.config.*), test directories (test/, tests/, __tests__/), test files (*.test.*, *.spec.*), package.json test scripts.
 
 ### Map Requirements to Tests
-For each requirement in <phase_requirements>:
-- Identify the behavior to verify
-- Determine test type: unit / integration / contract / smoke / e2e / manual-only
-- Specify the automated command to run that test in < 30 seconds
-- Flag if only verifiable manually (justify why)
+For each phase requirement: identify behavior, determine test type (unit/integration/smoke/e2e/manual-only), specify automated command runnable in < 30 seconds, flag manual-only with justification.
 
 ### Identify Wave 0 Gaps
-List test files, fixtures, or utilities that must be created BEFORE implementation:
-- Missing test files for phase requirements
-- Missing test framework configuration
-- Missing shared fixtures or test utilities
+List missing test files, framework config, or shared fixtures needed before implementation.
 
 ## Step 5: Quality Check
 
