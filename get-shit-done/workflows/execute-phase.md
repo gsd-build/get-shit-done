@@ -163,6 +163,76 @@ Execute each wave in sequence. Within a wave: parallel if `PARALLELIZATION=true`
    - Bad: "Wave 2 complete. Proceeding to Wave 3."
    - Good: "Terrain system complete — 3 biome types, height-based texturing, physics collision meshes. Vehicle physics (Wave 3) can now reference ground surfaces."
 
+4b. **Post-wave domain reviews (if configured):**
+
+   Check for `post_wave_reviews` in `.planning/config.json`:
+
+   ```bash
+   REVIEWS_CFG=$(node ~/.claude/get-shit-done/bin/gsd-tools.cjs config-get post_wave_reviews 2>/dev/null || echo "{}")
+   ```
+
+   **If not present or empty → skip this sub-step entirely** (backward compatible).
+
+   **If configured:**
+
+   For each completed SUMMARY.md in this wave:
+   - Extract `key-files.created` and `key-files.modified` from SUMMARY.md
+   - Match each file path against configured `trigger_glob` patterns
+
+   For each review entry where `enabled: true` and at least one file matches `trigger_glob`:
+
+   ```
+   Task(
+     subagent_type="general-purpose",
+     model="{review.model || 'sonnet'}",
+     prompt="
+       <objective>
+       You are acting as the '{review.agent}' review agent.
+       Review the following files that were created/modified in this wave.
+       Read .claude/agents/{review.agent}.md for your review instructions.
+       </objective>
+
+       <files_to_review>
+       {matched_file_paths}
+       </files_to_review>
+
+       <response_format>
+       Return exactly one of:
+       - APPROVED — no issues found
+       - APPROVED_WITH_CONDITIONS — minor issues noted but not blocking
+       - NEEDS_REVISION — issues that should be fixed before proceeding
+       Include a brief summary of findings.
+       </response_format>
+     "
+   )
+   ```
+
+   **Handling results:**
+
+   | Result | `blocking: true` | `blocking: false` |
+   |--------|-------------------|-------------------|
+   | APPROVED | Log, continue | Log, continue |
+   | APPROVED_WITH_CONDITIONS | Log findings, continue | Log findings, continue |
+   | NEEDS_REVISION | Route to fix cycle below | Log findings, continue |
+
+   **Fix cycle (NEEDS_REVISION + blocking):**
+
+   Read auto-advance config:
+   ```bash
+   AUTO_CFG=$(node ~/.claude/get-shit-done/bin/gsd-tools.cjs config-get workflow.auto_advance 2>/dev/null || echo "false")
+   ```
+
+   - **If `AUTO_CFG` is true:** Auto-spawn a general-purpose fix agent with the review findings (1 cycle max), then re-run the reviewer. If still NEEDS_REVISION after 2 cycles → present to user with findings.
+   - **If `AUTO_CFG` is false:** Present findings to user → ask "Fix issues?" or "Continue anyway?"
+     - If fix: spawn general-purpose agent with findings → re-run reviewer → max 2 cycles → present to user if still failing
+
+   **Include review results in wave completion output:**
+
+   ```
+   ### Domain Reviews
+   - {review_name}: {APPROVED | APPROVED_WITH_CONDITIONS | NEEDS_REVISION} — {summary}
+   ```
+
 5. **Handle failures:**
 
    **Known Claude Code bug (classifyHandoffIfNeeded):** If an agent reports "failed" with error containing `classifyHandoffIfNeeded is not defined`, this is a Claude Code runtime bug — not a GSD or agent issue. The error fires in the completion handler AFTER all tool calls finish. In this case: run the same spot-checks as step 4 (SUMMARY.md exists, git commits present, no Self-Check: FAILED). If spot-checks PASS → treat as **successful**. If spot-checks FAIL → treat as real failure below.

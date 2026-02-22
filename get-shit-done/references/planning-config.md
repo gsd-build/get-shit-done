@@ -193,4 +193,76 @@ Squash merge is recommended — keeps main branch history clean while preserving
 
 </branching_strategy_behavior>
 
+<post_wave_reviews_behavior>
+
+**Post-wave domain reviews** allow projects to define domain-specific review agents that run automatically after each execution wave.
+
+<config_schema>
+```json
+"post_wave_reviews": {
+  "review_name": {
+    "enabled": true,
+    "trigger_glob": "path/to/files/*.ext",
+    "agent": "agent-name",
+    "blocking": true,
+    "model": "sonnet"
+  }
+}
+```
+
+| Option | Default | Description |
+|--------|---------|-------------|
+| `enabled` | `true` | Whether this review is active |
+| `trigger_glob` | (required) | File pattern to match against SUMMARY.md `key-files` (created + modified) |
+| `agent` | (required) | Agent name to spawn — must exist in `.claude/agents/` |
+| `blocking` | `true` | If true, NEEDS_REVISION results pause execution and trigger fix cycle |
+| `model` | `"sonnet"` | Model to use for the review agent |
+</config_schema>
+
+**Behavior:**
+
+- If `post_wave_reviews` is absent or empty in config.json, the feature is skipped entirely (backward compatible)
+- After each wave's spot-checks pass, file paths from completed SUMMARY.md entries are matched against each review's `trigger_glob`
+- Reviews only run when at least one file matches the configured glob pattern
+- Review agents return one of: `APPROVED`, `APPROVED_WITH_CONDITIONS`, `NEEDS_REVISION`
+
+**Blocking vs non-blocking:**
+
+| Result | `blocking: true` | `blocking: false` |
+|--------|-------------------|-------------------|
+| APPROVED | Log, continue | Log, continue |
+| APPROVED_WITH_CONDITIONS | Log findings, continue | Log findings, continue |
+| NEEDS_REVISION | Trigger fix cycle | Log findings, continue |
+
+**Fix cycle (NEEDS_REVISION + blocking):**
+
+- With `workflow.auto_advance: true` — auto-spawn fix agent (1 cycle), re-run reviewer, present to user if still failing after 2 cycles
+- With `workflow.auto_advance: false` — present findings to user, ask "Fix issues?" or "Continue anyway?"
+
+**Example configuration:**
+
+```json
+{
+  "post_wave_reviews": {
+    "migration_review": {
+      "enabled": true,
+      "trigger_glob": "supabase/migrations/*.sql",
+      "agent": "sql-migration-reviewer",
+      "blocking": true,
+      "model": "sonnet"
+    },
+    "schema_validation": {
+      "enabled": true,
+      "trigger_glob": "api/schemas/**/*.json",
+      "agent": "schema-validator",
+      "blocking": false
+    }
+  }
+}
+```
+
+**Agent setup:** Review agents are defined in `.claude/agents/` as standard agent markdown files. They receive a list of matched file paths and must return a structured review result (APPROVED / APPROVED_WITH_CONDITIONS / NEEDS_REVISION) with findings.
+
+</post_wave_reviews_behavior>
+
 </planning_config>
