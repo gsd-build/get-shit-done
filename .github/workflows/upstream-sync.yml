@@ -446,8 +446,34 @@ PROMPT_EOF
       - name: Build PR body
         if: steps.detect.outputs.no_changes != 'true'
         run: |
+          NOTIFY="${{ vars.NOTIFY_MAINTAINER }}"
+          # Default: tag the user unless NOTIFY_MAINTAINER explicitly set to "false"
+          TAG_LINE=""
+          TAG_NOTE=""
+          if [ "${NOTIFY:-true}" != "false" ]; then
+            TAG_LINE="cc @dwisner — substantive adaptations were made autonomously."
+            TAG_NOTE="To disable maintainer tagging, set repository variable \`NOTIFY_MAINTAINER\` to \`false\` at: Settings → Secrets and variables → Actions → Variables tab."
+          fi
+
+          # Read runtime files (truncate to avoid 65k body limit)
+          DELTA_ANALYSIS=$(cat /tmp/delta-analysis.md 2>/dev/null | head -c 3000 || echo "(not available)")
+          ADAPTATIONS=$(cat /tmp/adaptations-summary.md 2>/dev/null | head -c 2000 || echo "(proactive adaptation step did not run or made no changes)")
           RANGE="${{ steps.detect.outputs.fork_head }}...${{ steps.detect.outputs.upstream_head }}"
-          CHANGED_FILES=$(git diff --name-only "${{ steps.detect.outputs.fork_head }}" "${{ steps.detect.outputs.upstream_head }}" -- commands/gsd/ get-shit-done/ agents/ 2>/dev/null | sed 's/^/- /' || echo "- (none detected)")
+
+          # Determine coverage gaps section
+          HAS_NEW_COMMANDS="${{ steps.analyze_delta.outputs.has_new_commands }}"
+          if [ "${HAS_NEW_COMMANDS}" = "true" ]; then
+            GAPS_SECTION="New upstream commands/agents were detected. The proactive adaptation agent was instructed to create wrapper prompts. See Fork adaptations section for details."
+          else
+            GAPS_SECTION="No new upstream commands or agents detected."
+          fi
+
+          # Determine security section for open issues
+          SECURITY_FLAGGED="${{ steps.analyze_delta.outputs.security_flagged }}"
+          OPEN_ISSUES_SECTION=""
+          if [ "${SECURITY_FLAGGED}" = "true" ]; then
+            OPEN_ISSUES_SECTION="⚠️ **Security-sensitive upstream YAML changes detected.** Auto-merge was blocked. Review the delta analysis above before merging."
+          fi
 
           cat > /tmp/pr-body.md << PR_EOF
           ## Upstream sync from \`gsd-build/get-shit-done\`
@@ -455,15 +481,42 @@ PROMPT_EOF
           **Upstream commit:** \`${{ steps.detect.outputs.short_sha }}\`
           **Commit range:** \`${RANGE}\`
 
-          ### Changed upstream files
-          ${CHANGED_FILES}
+          ---
 
-          ### Copilot wrapper layer
-          ✅ Generator and verifier passed. Wrapper files regenerated automatically.
+          ### 📥 Upstream changes
+
+          ${DELTA_ANALYSIS}
 
           ---
-          *This PR was created automatically by the upstream-sync workflow.*
-          *See [workflow run](${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}) for details.*
+
+          ### 🔧 Fork adaptations
+
+          ${ADAPTATIONS}
+
+          ---
+
+          ### 🆕 Coverage gaps filled
+
+          ${GAPS_SECTION}
+
+          ---
+
+          ### ✅ No action needed
+
+          Generator and verifier passed. Wrapper layer regenerated automatically.
+
+          ---
+
+          ### 🚨 Open issues
+
+          ${OPEN_ISSUES_SECTION:-"None detected on this run."}
+
+          ---
+
+          ${TAG_LINE}
+          ${TAG_NOTE}
+
+          *This PR was created automatically. [Workflow run](${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }})*
           PR_EOF
 
       # SYNC-01/02: Create (or update) the PR and immediately enable auto-merge so it lands on
@@ -817,86 +870,104 @@ PROMPT_EOF
 
       - name: Escalate — Create GitHub issue
         if: >
-          steps.preflight.outputs.skip != 'true' &&
-          (steps.repair_loop.outputs.attempts_exhausted == 'true' ||
-           steps.repair_loop.outputs.dead_end == 'true')
+          needs.sync.result == 'failure' ||
+          steps.repair_loop.outputs.attempts_exhausted == 'true' ||
+          steps.repair_loop.outputs.dead_end == 'true' ||
+          needs.sync.outputs.security_flagged == 'true'
         env:
           GH_TOKEN: ${{ secrets.COPILOT_PAT }}
         run: |
           set -euo pipefail
-          REPO_OWNER="${GITHUB_REPOSITORY%%/*}"
 
-          # Deduplicate: skip if open escalation issue already exists
-          EXISTING=$(gh issue list \
+          NOTIFY="${{ vars.NOTIFY_MAINTAINER }}"
+          USER_TAG=""
+          if [ "${NOTIFY:-true}" != "false" ]; then
+            USER_TAG="@dwisner — manual intervention required."
+          fi
+
+          # Determine trigger type for stable title
+          TRIGGER_TYPE="strategies-exhausted"
+          if [ "${{ steps.repair_loop.outputs.dead_end }}" = "true" ]; then
+            TRIGGER_TYPE="dead-end-sentinel"
+          fi
+
+          ISSUE_TITLE="sync-escalation: autonomous maintenance dead-end"
+
+          # Deduplication: check for existing open escalation issue
+          EXISTING_ISSUE=$(gh issue list \
             --repo "$GITHUB_REPOSITORY" \
             --label "escalation" \
-            --search "sync-escalation" \
             --state open \
+            --search '"sync-escalation: autonomous maintenance dead-end" in:title' \
             --json number \
-            --jq 'length' 2>/dev/null || echo "0")
-          if [ "$EXISTING" -gt 0 ]; then
-            echo "::warning::Open escalation issue already exists. Skipping duplicate creation."
-            exit 0
-          fi
+            --jq '.[0].number' 2>/dev/null || echo "")
 
-          # Build diagnostic dump (respecting 65,536 char limit)
-          UPSTREAM_DIFF=$(git diff HEAD upstream/main -- . \
+          # Diagnostic content (truncated to stay well under 65k limit)
+          VERIFY_LOG=$(cat /tmp/verify_attempt_4.log 2>/dev/null | head -c 3000 || \
+                       cat /tmp/verify_attempt_3.log 2>/dev/null | head -c 3000 || \
+                       cat /tmp/verify_initial.log 2>/dev/null | head -c 3000 || echo "(none)")
+          UPSTREAM_DIFF_EXCERPT=$(git diff HEAD upstream/main -- . \
             ':(exclude)commands/gsd' ':(exclude)get-shit-done' ':(exclude)agents' \
-            2>/dev/null | head -c 15000 || true)
+            2>/dev/null | head -c 8000 || echo "(none)")
 
-          # Collect all strategy patches (up to 4 strategies)
-          PATCHES=""
-          for i in 1 2 3 4; do
-            if [ -f "/tmp/patch_attempt_${i}.diff" ]; then
-              PATCHES="${PATCHES}\n\n## Patch — Attempt ${i}\n\`\`\`diff\n$(cat /tmp/patch_attempt_${i}.diff | head -c 6000)\n\`\`\`"
-            fi
-          done
+          # Build escalation body
+          cat > /tmp/escalation-body.md << ESC_EOF
+          ## Escalation: ${TRIGGER_TYPE}
 
-          # Find latest verifier log
-          VERIFY_LOG=""
-          for i in 4 3 2 1; do
-            if [ -f "/tmp/verify_attempt_${i}.log" ]; then
-              VERIFY_LOG=$(cat "/tmp/verify_attempt_${i}.log" | head -c 4000)
-              break
-            fi
-          done
-          VERIFY_LOG=${VERIFY_LOG:-$(cat /tmp/verify_initial.log 2>/dev/null | head -c 4000 || echo "(none)")}
+          The autonomous upstream-sync repair agent reached a dead-end on this run.
 
-          # Determine escalation reason
-          ESCALATION_REASON="strategies-exhausted (${STRATEGY_IDX} of ${#STRATEGIES[@]} tried)"
-          if [ -f /tmp/repair-dead-end.txt ]; then
-            ESCALATION_REASON="dead-end sentinel written by repair agent"
-          fi
+          **Trigger:** ${TRIGGER_TYPE}
+          **Workflow run:** ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
 
-          cat > /tmp/issue_body.md <<ISSUE
-          Self-repair agent escalated on run [#${{ github.run_number }}](${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}).
+          ${USER_TAG}
 
-          **Reason:** ${ESCALATION_REASON}
-
-          @${REPO_OWNER} — manual intervention required.
-
-          ## Summary
-          The upstream sync detected changes that broke the compatibility layer (generate-prompts / verify-prompts). The Copilot repair agent exhausted all available strategies without producing a passing verifier run.
-
-          ---
-
-          ## Verifier Output (last attempt)
+          ### Verifier Output (last attempt)
           \`\`\`
           ${VERIFY_LOG}
           \`\`\`
 
-          ## Upstream Diff (truncated)
+          ### Upstream Diff (excerpt)
           \`\`\`diff
-          ${UPSTREAM_DIFF}
+          ${UPSTREAM_DIFF_EXCERPT}
           \`\`\`
-          ${PATCHES}
-          ISSUE
+          ESC_EOF
 
-          gh issue create \
+          # --- Channel 1: GitHub Issue (create or comment on existing) ---
+          if [ -n "$EXISTING_ISSUE" ] && [ "$EXISTING_ISSUE" != "null" ]; then
+            echo "Open escalation issue #${EXISTING_ISSUE} already exists. Adding comment."
+            gh issue comment "$EXISTING_ISSUE" \
+              --repo "$GITHUB_REPOSITORY" \
+              --body-file /tmp/escalation-body.md
+            ISSUE_REF="$EXISTING_ISSUE"
+          else
+            echo "Creating new escalation issue..."
+            NEW_ISSUE_URL=$(gh issue create \
+              --repo "$GITHUB_REPOSITORY" \
+              --title "${ISSUE_TITLE}" \
+              --label "escalation" \
+              --body-file /tmp/escalation-body.md)
+            ISSUE_REF=$(basename "$NEW_ISSUE_URL")
+            echo "Created escalation issue #${ISSUE_REF}."
+          fi
+
+          # --- Channel 2: Comment on open sync PR (if one exists) ---
+          OPEN_PR=$(gh pr list \
             --repo "$GITHUB_REPOSITORY" \
-            --title "sync-escalation: autonomous maintenance dead-end" \
-            --label "escalation" \
-            --body-file /tmp/issue_body.md
+            --head "automated/upstream-sync" \
+            --state open \
+            --json number \
+            --jq '.[0].number' 2>/dev/null || echo "")
+
+          if [ -n "$OPEN_PR" ] && [ "$OPEN_PR" != "null" ]; then
+            echo "Posting escalation comment on sync PR #${OPEN_PR}..."
+            PR_COMMENT="🚨 **Escalation triggered:** \`${TRIGGER_TYPE}\`. See issue #${ISSUE_REF} for details. ${USER_TAG}"
+            gh pr comment "$OPEN_PR" \
+              --repo "$GITHUB_REPOSITORY" \
+              --body "$PR_COMMENT"
+            echo "Comment posted on sync PR #${OPEN_PR}."
+          else
+            echo "No open sync PR found. Skipping PR comment (issue created above)."
+          fi
 
   guard:
     # SAFETY: Always run the 'Assert fork context' step first. Add --repo "$GITHUB_REPOSITORY" to any new gh command you add here.
