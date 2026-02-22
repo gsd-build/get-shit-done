@@ -669,9 +669,7 @@ jobs:
             local prior_patches=""
             for i in $(seq 1 $((attempt - 1))); do
               if [ -f "/tmp/patch_attempt_${i}.diff" ]; then
-                prior_patches="${prior_patches}
-
-## Failed Patch — Attempt ${i} (strategy: ${STRATEGIES[$((i-1))]})"
+                prior_patches="${prior_patches}"$'\n\n'"## Failed Patch — Attempt ${i} (strategy: ${STRATEGIES[$((i-1))]})"
                 prior_patches="${prior_patches}"$'\n'"$(cat /tmp/patch_attempt_${i}.diff | head -c 4000)"
               fi
             done
