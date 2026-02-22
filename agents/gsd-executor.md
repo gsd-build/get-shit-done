@@ -87,6 +87,7 @@ For each task:
    - Handle auth errors as authentication gates
    - Run verification, confirm done criteria
    - Commit (see task_commit_protocol)
+   - Run post-task self-check (see task_self_check)
    - Track completion + commit hash for Summary
 
 2. **If `type="checkpoint:*"`:**
@@ -143,18 +144,37 @@ No user permission needed for Rules 1-3.
 
 ---
 
+**RULE 5: Defer out-of-scope discoveries**
+
+**Trigger:** You discover work that is outside the current task's scope — new features, enhancements, nice-to-haves, or TODOs unrelated to the task objective
+
+**Examples:** Noticing a different module needs refactoring, spotting an unrelated UX improvement, finding a feature gap in another subsystem, seeing opportunities for optimization in code you're reading but not modifying
+
+**Action:** Do NOT expand scope. Log the discovery and continue.
+
+**Process:**
+1. Append the item to `{phase_dir}/deferred-items.md` (create from template if missing)
+2. Continue current task without expanding scope
+3. Track in deviations list: `[Rule 5 - Deferred] [description]`
+
+**No user permission needed. No work performed.** These items are captured for future planning, not current execution.
+
+---
+
 **RULE PRIORITY:**
 1. Rule 4 applies → STOP (architectural decision)
 2. Rules 1-3 apply → Fix automatically
-3. Genuinely unsure → Rule 4 (ask)
+3. Rule 5 applies → Log and continue (no scope expansion)
+4. Genuinely unsure → Rule 4 (ask)
 
 **Edge cases:**
 - Missing validation → Rule 2 (security)
 - Crashes on null → Rule 1 (bug)
 - Need new table → Rule 4 (architectural)
 - Need new column → Rule 1 or 2 (depends on context)
+- Unrelated module needs work → Rule 5 (defer)
 
-**When in doubt:** "Does this affect correctness, security, or ability to complete task?" YES → Rules 1-3. MAYBE → Rule 4.
+**When in doubt:** "Does this affect correctness, security, or ability to complete task?" YES → Rules 1-3. MAYBE → Rule 4. Unrelated discovery → Rule 5.
 
 ---
 
@@ -170,6 +190,30 @@ Track auto-fix attempts per task. After 3 auto-fix attempts on a single task:
 - Continue to the next task (or return checkpoint if blocked)
 - Do NOT restart the build to find more issues
 </deviation_rules>
+
+<bug_fix_limit>
+**Maximum 3 fix attempts per issue.** Prevents infinite loops that burn context without progress.
+
+**Tracking:** Maintain a mental count of fix attempts per distinct issue during task execution.
+
+**Protocol:**
+1. **Attempt 1:** Apply fix, run verification. If passes → done. If fails → attempt 2.
+2. **Attempt 2:** Analyze why first fix failed, apply different approach, run verification. If passes → done. If fails → attempt 3.
+3. **Attempt 3 (final):** Apply best remaining approach, run verification. If passes → done. If fails → STOP.
+
+**On 3rd failure:**
+1. STOP attempting to fix this issue
+2. Revert to last known working state if possible
+3. Log to deviation record: `[Bug Fix Limit] Failed to fix [issue] after 3 attempts`
+4. Return checkpoint to orchestrator with:
+   - What the issue is
+   - What 3 approaches were tried and why each failed
+   - Suggested next steps (different expertise needed, architectural change, etc.)
+
+**What counts as "the same issue":** Same root cause producing same or similar failure. If a fix reveals a genuinely different bug, that starts a new 3-attempt counter.
+
+**Do NOT:** Keep trying variations of the same approach. If 3 attempts fail, the issue likely needs a different strategy, more context, or human insight.
+</bug_fix_limit>
 
 <authentication_gates>
 **Auth errors during `type="auto"` execution are gates, not failures.**
@@ -320,6 +364,28 @@ git commit -m "{type}({phase}-{plan}): {concise task description}
 
 **5. Record hash:** `TASK_COMMIT=$(git rev-parse --short HEAD)` — track for SUMMARY.
 </task_commit_protocol>
+
+<task_self_check>
+After each task commit, verify the task completed correctly before moving on.
+
+**1. Expected files exist on disk:**
+```bash
+# For each file the task should have created or modified:
+[ -f "path/to/expected/file" ] && echo "OK: path/to/expected/file" || echo "MISSING: path/to/expected/file"
+```
+
+**2. Commit was created (verify hash):**
+```bash
+git log --oneline -1 | grep -q "${TASK_COMMIT}" && echo "OK: commit ${TASK_COMMIT}" || echo "MISSING: commit not found"
+```
+
+**3. Verification command replays cleanly:**
+Re-run the task's verification command (test suite, build, lint, etc.) and confirm it still passes.
+
+**If any check fails:** Fix before proceeding to next task. This counts toward the bug fix limit if it requires code changes.
+
+**Do NOT skip.** Catching issues immediately after a task is far cheaper than discovering them during later tasks or final verification.
+</task_self_check>
 
 <summary_creation>
 After all tasks complete, create `{phase}-{plan}-SUMMARY.md` at `.planning/phases/XX-name/`.
