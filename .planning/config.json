@@ -8,5 +8,10 @@
     "research": true,
     "plan_check": true,
     "verifier": true
+  },
+  "git": {
+    "branching_strategy": "phase",
+    "phase_branch_template": "phase-{phase}-{slug}",
+    "milestone_branch_template": "{milestone}-{slug}"
   }
 }

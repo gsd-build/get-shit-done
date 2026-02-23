@@ -19,6 +19,11 @@
     "max_concurrent_agents": 3,
     "min_plans_for_parallel": 2
   },
+  "git": {
+    "branching_strategy": "phase",
+    "phase_branch_template": "phase-{phase}-{slug}",
+    "milestone_branch_template": "{milestone}-{slug}"
+  },
   "gates": {
     "confirm_project": true,
     "confirm_phases": true,
