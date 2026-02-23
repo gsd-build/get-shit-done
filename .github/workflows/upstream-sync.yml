@@ -404,7 +404,7 @@ jobs:
           PROMPT_EOF
 
           echo "Invoking Copilot proactive adaptation agent..."
-          gh agent-task create \
+          env -u GH_TOKEN -u GITHUB_TOKEN gh agent-task create \
             --repo "$GITHUB_REPOSITORY" \
             --base "automated/upstream-sync" \
             --follow \
@@ -780,7 +780,7 @@ jobs:
           #    the environment, so we must capture the token value and unset the
           #    env var before calling auth login.
           COPILOT_TOKEN="${GH_TOKEN:-}"
-          if echo "$COPILOT_TOKEN" | env -u GH_TOKEN gh auth login --with-token --hostname github.com 2>&1; then
+          if echo "$COPILOT_TOKEN" | env -u GH_TOKEN -u GITHUB_TOKEN gh auth login --with-token --hostname github.com 2>&1; then
             echo "Successfully logged in with COPILOT_PAT."
             echo "agent_auth_ok=true" >> "$GITHUB_OUTPUT"
           else
@@ -863,7 +863,7 @@ jobs:
           \`\`\`
           PROMPT_EOF
 
-          gh agent-task create \
+          env -u GH_TOKEN -u GITHUB_TOKEN gh agent-task create \
             --repo "$GITHUB_REPOSITORY" \
             --base "automated/upstream-sync" \
             --follow \
@@ -1057,9 +1057,11 @@ jobs:
             PRE_AGENT_SHA=$(git rev-parse HEAD 2>/dev/null || echo "")
 
             # Invoke Copilot coding agent
-            # Unset GH_TOKEN so gh agent-task uses the stored credential (from
-            # the 'Validate agent-task auth' step) rather than the env var.
-            AGENT_TASK_OUTPUT=$(env -u GH_TOKEN gh agent-task create \
+            # Unset GH_TOKEN and GITHUB_TOKEN so gh agent-task uses the stored
+            # credential (from 'Validate agent-task auth') rather than the env
+            # vars. GitHub Actions injects both; gh CLI prefers env vars over
+            # the credential store, so both must be cleared.
+            AGENT_TASK_OUTPUT=$(env -u GH_TOKEN -u GITHUB_TOKEN gh agent-task create \
               --repo "$GITHUB_REPOSITORY" \
               --base "automated/upstream-sync" \
               --follow \

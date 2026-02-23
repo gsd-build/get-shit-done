@@ -6,54 +6,12 @@ A detailed reference for workflows, troubleshooting, and configuration. For quic
 
 ## Table of Contents
 
-- [Prerequisites](#prerequisites)
 - [Workflow Diagrams](#workflow-diagrams)
 - [Command Reference](#command-reference)
 - [Configuration Reference](#configuration-reference)
 - [Usage Examples](#usage-examples)
 - [Troubleshooting](#troubleshooting)
 - [Recovery Quick Reference](#recovery-quick-reference)
-
----
-
-## Prerequisites
-
-### Workflow Labels (one-time setup)
-
-Before running the upstream sync workflow, create the required GitHub labels:
-
-```bash
-gh label create upstream-sync --color 0075ca --description "Upstream sync PR"
-gh label create automated --color e4e669 --description "Automated workflow"
-```
-
-### Self-Repair Agent Prerequisites (Phase 6)
-
-The automated self-repair feature requires the following one-time setup:
-
-#### 1. `COPILOT_PAT` Secret
-- Create a **Classic Personal Access Token** (not fine-grained) with the `repo` scope.
-- Go to your fork → **Settings → Secrets and variables → Actions → New repository secret**.
-- Name: `COPILOT_PAT`
-- Value: the token you created.
-
-> Without this secret, the repair job emits a warning and exits cleanly (no failure).
-
-#### 2. `sync-failed` Issue Label
-The escalation step applies the `sync-failed` label when creating GitHub issues. Create it before the first sync run:
-
-```bash
-gh label create sync-failed \
-  --repo <your-org>/<your-fork> \
-  --description "Upstream sync self-repair exhausted all retry attempts" \
-  --color "E11D48"
-```
-
-#### 3. gh CLI Version
-The repair job uses `gh agent-task create`, which requires **GitHub CLI ≥ v2.80.0**. The hosted runner (`ubuntu-latest`) ships a recent version; no action needed for GitHub-hosted runners. For self-hosted runners, upgrade manually.
-
-#### 4. `automated/upstream-sync` Branch
-The repair agent's PR targets the `automated/upstream-sync` branch (created by the upstream sync workflow). Ensure this branch exists before the first repair run by triggering a normal upstream sync.
 
 ---
 
