@@ -611,7 +611,7 @@ function cmdInitProgress(cwd, raw) {
     const dirs = entries.filter(e => e.isDirectory()).map(e => e.name).sort();
 
     for (const dir of dirs) {
-      const match = dir.match(/^(\d+(?:\.\d+)?)-?(.*)/);
+      const match = dir.match(/^(\d+(?:\.\d+)*)-?(.*)/);
       const phaseNumber = match ? match[1] : dir;
       const phaseName = match && match[2] ? match[2] : null;
 

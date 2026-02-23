@@ -17,6 +17,7 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 - `/gsd:debug` flow now requires a `human-verify` checkpoint after self-verification before marking debug sessions `resolved` and moving files to `.planning/debug/resolved/`
 
 ### Fixed
+- `gsd-tools phase complete` handles multi-level decimal phases (e.g. `03.2.1`) and safely escapes requirement IDs when building regex patterns, preventing `Invalid regular expression` crashes
 - `gsd-tools state-snapshot` supports `--cwd <path>` so tooling can target a project directory when invoked from outside the repo
 - `/gsd:update` now installs with `npx get-shit-done-cc@latest` (instead of unpinned `npx get-shit-done-cc`) to prevent stale project-local versions from shadowing updates
 - `/gsd:update` now uses strict package safety checks: only `get-shit-done-cc` is allowed, scoped/user-derived package names are rejected, and install command execution is allowlisted to trusted forms
