@@ -33,15 +33,25 @@ if [ "$MODE" = "pre-commit" ]; then
   fi
   echo "Filesystem guard (pre-commit): no violations."
 elif [ "$MODE" = "post-commit" ]; then
-  # Check files changed relative to origin/main
-  git diff --name-only origin/main HEAD | sort > /tmp/committed-files.txt
+  # Check files changed relative to upstream/main.
+  # Using upstream/main (not origin/main) as the baseline because the
+  # automated/upstream-sync branch legitimately diverges from origin/main for all
+  # upstream-owned files — that's by design. We only want to catch files the repair
+  # agent incorrectly modified relative to what upstream already has.
+  git diff --name-only upstream/main HEAD | sort > /tmp/committed-files.txt
   VIOLATIONS=$(comm -12 /tmp/upstream-owned-filtered.txt /tmp/committed-files.txt || true)
   if [ -n "$VIOLATIONS" ]; then
     echo "::error::Filesystem guard (post-commit): repair agent committed changes to upstream-owned files:"
     echo "$VIOLATIONS"
-    # Revert each violated file to origin/main and force-push
+    # Revert each violated file:
+    #   - If the file exists in upstream/main: restore it to that state.
+    #   - If the file was created by the agent (doesn't exist in upstream/main): delete it.
     echo "$VIOLATIONS" | while IFS= read -r f; do
-      git checkout origin/main -- "$f"
+      if git ls-tree -r --name-only upstream/main | grep -qxF "$f"; then
+        git checkout upstream/main -- "$f"
+      else
+        git rm -f -- "$f" 2>/dev/null || rm -f -- "$f"
+      fi
     done
     git commit --amend --no-edit || true
     git push --force-with-lease origin HEAD
