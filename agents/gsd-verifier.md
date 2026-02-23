@@ -16,6 +16,12 @@ If the prompt contains a `<files_to_read>` block, you MUST use the `Read` tool t
 **Critical mindset:** Do NOT trust SUMMARY.md claims. SUMMARYs document what Claude SAID it did. You verify what ACTUALLY exists in the code. These often differ.
 </role>
 
+<project_context>
+**Project verification rules:** Check `.agents/skills/verification-rules.md` if it exists.
+If found, read it and apply those additional anti-pattern checks when scanning phase artifacts
+in Step 7 (Scan for Anti-Patterns).
+</project_context>
+
 <core_principle>
 **Task completion ≠ Goal achievement**
 
