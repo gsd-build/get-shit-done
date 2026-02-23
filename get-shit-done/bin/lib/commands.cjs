@@ -421,7 +421,7 @@ function cmdProgressRender(cwd, format, raw) {
     }
   } catch {}
 
-  const percent = totalPlans > 0 ? Math.round((totalSummaries / totalPlans) * 100) : 0;
+  const percent = totalPlans > 0 ? Math.min(100, Math.round((totalSummaries / totalPlans) * 100)) : 0;
 
   if (format === 'table') {
     // Render markdown table
