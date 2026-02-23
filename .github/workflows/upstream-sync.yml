@@ -149,10 +149,16 @@ jobs:
 
           echo "Merge conflict detected. Attempting auto-resolution by file ownership..."
 
+          # Guard: if there are no unmerged files, the failure was not conflict-related.
+          # Emit merge_conflict=false and abort so the repair job handles it as a generic failure.
+          CONFLICT_FILES=$(git diff --name-only --diff-filter=U)
+          if [ -z "$CONFLICT_FILES" ]; then
+            echo "::error::git merge failed but no unmerged files detected — non-conflict merge failure."
+            exit 1
+          fi
+
           # Fork-owned files: --ours always wins
           FORK_OWNED_PATTERN="^(package\.json|README\.md|FORK-CHANGELOG\.md|AGENTS\.md|FUNDING\.yml|\.github/FUNDING\.yml|\.github/ISSUE_TEMPLATE/bug_report\.yml|\.github/workflows/[^/]+\.yml|\.github/prompts/.*|\.github/agents/.*|\.github/instructions/.*|\.github/copilot-instructions\.md|\.planning/.*)$"
-
-          CONFLICT_FILES=$(git diff --name-only --diff-filter=U)
 
           for f in $CONFLICT_FILES; do
             if echo "$f" | grep -qE "$FORK_OWNED_PATTERN"; then
@@ -737,6 +743,10 @@ jobs:
         run: |
           set -euo pipefail
 
+          # Emit safe defaults first so outputs are always defined even on early exit.
+          echo "conflict_resolved=false" >> "$GITHUB_OUTPUT"
+          echo "conflict_dead_end=false" >> "$GITHUB_OUTPUT"
+
           CONFLICT_FILES="${{ needs.sync.outputs.merge_conflict_files }}"
           UPSTREAM_SHA="${{ needs.sync.outputs.short_sha || 'unknown' }}"
 
@@ -809,25 +819,28 @@ jobs:
           # Check if agent resolved conflicts (dead-end sentinel)
           if [ -f /tmp/repair-dead-end.txt ]; then
             echo "Agent declared DEAD_END on conflict resolution."
-            echo "conflict_resolved=false" >> "$GITHUB_OUTPUT"
             echo "conflict_dead_end=true" >> "$GITHUB_OUTPUT"
           else
-            # Pull any commits the agent pushed
-            git pull origin automated/upstream-sync --rebase 2>/dev/null || true
-            REMAINING=$(git diff --name-only --diff-filter=U 2>/dev/null || echo "")
-            if [ -z "$REMAINING" ]; then
-              echo "Conflict resolution succeeded."
+            # Agent creates a copilot/* branch PR targeting automated/upstream-sync.
+            # Check for that PR's existence as the success signal — do NOT check local
+            # git state, which still reflects the unresolved merge from this runner.
+            AGENT_PR=$(gh pr list \
+              --repo "$GITHUB_REPOSITORY" \
+              --base "automated/upstream-sync" \
+              --state open \
+              --json number,headRefName \
+              --jq '.[] | select(.headRefName | startswith("copilot/")) | .number' \
+              2>/dev/null | head -1 || echo "")
+            if [ -n "$AGENT_PR" ]; then
+              echo "Agent created PR #${AGENT_PR} — conflict resolution submitted."
               echo "conflict_resolved=true" >> "$GITHUB_OUTPUT"
-              echo "conflict_dead_end=false" >> "$GITHUB_OUTPUT"
             else
-              echo "Conflicts still remain after agent run: $REMAINING"
-              echo "conflict_resolved=false" >> "$GITHUB_OUTPUT"
-              echo "conflict_dead_end=false" >> "$GITHUB_OUTPUT"
+              echo "Agent did not create a PR and no DEAD_END sentinel found — treating as unresolved."
             fi
           fi
 
       - name: Repair loop
-        if: steps.preflight.outputs.skip != 'true'
+        if: steps.preflight.outputs.skip != 'true' && needs.sync.outputs.merge_conflict != 'true'
         id: repair_loop
         run: |
           set -euo pipefail
