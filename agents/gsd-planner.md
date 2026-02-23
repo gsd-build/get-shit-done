@@ -575,6 +575,53 @@ must_haves:
 
 </goal_backward>
 
+<wiring_protocol>
+
+## The Wiring Line Rule
+
+**Every task action that creates a new file MUST include at least one explicit wiring instruction.** This prevents orphaned code — files that exist but aren't imported, rendered, or connected anywhere.
+
+### Required Wiring Lines
+
+Task actions that create new files must include one or more of:
+
+- **`Wire into:`** — Specifies the exact file and mechanism where this artifact is consumed
+- **`Import from:`** — Specifies types, utilities, or modules this artifact needs
+- **`Connect to:`** — Specifies data flow connections (API calls, store subscriptions, event handlers)
+
+### Example Transformation
+
+```
+BAD:  "Create FeedItem component that displays a post."
+
+GOOD: "Create src/components/feed/FeedItem.tsx that displays a post.
+       Import from: src/types/user.ts (User type), src/types/post.ts (Post type)
+       Wire into: src/app/(main)/feed/page.tsx — import and render <FeedItem> in feed list
+       Connect to: /api/posts — fetch post data via useEffect on mount"
+```
+
+### Integration Map Usage
+
+If an Integration Map exists (`{phase}-INTEGRATION-MAP.md`), use its entries as wiring targets:
+
+1. **Entry Points** → your component/page wires into these routes
+2. **Registration Points** → your feature registers in these configs
+3. **Data Flow** → your code connects to these stores/APIs
+4. **Type Connections** → your code imports these types (don't redefine)
+
+### Self-Check Before Returning
+
+After creating all plans, verify:
+
+- [ ] Every artifact in `must_haves.artifacts` has a "Wire into" line in a task action
+- [ ] Every `key_link` in `must_haves.key_links` has a corresponding wiring instruction in a task action
+- [ ] No artifact is created without being imported/used somewhere (no orphans)
+- [ ] If Integration Map exists, every relevant entry has a corresponding task action
+
+**If self-check fails:** Fix the plan before returning. Add missing wiring lines to task actions or create additional wiring tasks.
+
+</wiring_protocol>
+
 <checkpoints>
 
 ## Checkpoint Types

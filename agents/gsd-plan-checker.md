@@ -161,6 +161,27 @@ issue:
 - `depends_on: ["01"]` = Wave 2 minimum (must wait for 01)
 - Wave number = max(deps) + 1
 
+**Worktree Isolation File Overlap Guard:**
+
+Check if `parallelization.isolation` is `"worktree"` in `.planning/config.json`:
+
+```bash
+node ~/.claude/get-shit-done/bin/gsd-tools.cjs config-get parallelization.isolation 2>/dev/null || echo "none"
+```
+
+**If `"worktree"`:** Plans in the same wave MUST NOT share `files_modified` entries. Each executor gets an isolated git worktree — file overlaps within a wave would cause merge conflicts.
+
+For each wave, collect all `files_modified` from plans in that wave. If any file appears in multiple plans within the same wave → **blocker** (move overlapping plan to a later wave).
+
+```yaml
+issue:
+  dimension: dependency_correctness
+  severity: blocker
+  description: "Plans 01 and 02 (both Wave 1) share files_modified entry 'src/types/index.ts' — will conflict in worktree mode"
+  plans: ["01", "02"]
+  fix_hint: "Move plan 02 to Wave 2 with depends_on: ['01'], or consolidate shared file into one plan"
+```
+
 **Example issue:**
 ```yaml
 issue:
@@ -171,38 +192,84 @@ issue:
   fix_hint: "Plan 02 depends on 03, but 03 depends on 02"
 ```
 
-## Dimension 4: Key Links Planned
+## Dimension 4: Key Links & Wiring
 
 **Question:** Are artifacts wired together, not just created in isolation?
 
 **Process:**
 1. Identify artifacts in `must_haves.artifacts`
 2. Check that `must_haves.key_links` connects them
-3. Verify tasks actually implement the wiring (not just artifact creation)
+3. **Verify tasks include explicit wiring instructions** (Wire into / Import from / Connect to lines)
+4. If Integration Map exists, verify its entries are addressed in task actions
+5. Check for orphaned files in `files_modified` that aren't imported/used by any other task
+
+**Wiring Line Check (BLOCKING):**
+
+Every task action that creates a new file MUST include at least one of:
+- `Wire into:` — where the artifact is consumed
+- `Import from:` — types/modules the artifact needs
+- `Connect to:` — data flow connections
+
+A task action that creates `src/components/Feed.tsx` without any wiring line is a **blocker** — the component will be orphaned.
 
 **Red flags:**
-- Component created but not imported anywhere
-- API route created but component doesn't call it
+- Component created but no "Wire into" line specifying where it renders → **blocker**
+- API route created but no task has "Connect to" referencing it → **blocker**
+- `key_link` in must_haves without a corresponding wiring instruction in any task action → **blocker**
 - Database model created but API doesn't query it
 - Form created but submit handler is missing or stub
 
+**Integration Map Cross-Reference:**
+
+If `{phase}-INTEGRATION-MAP.md` exists in the verification context:
+1. For each entry in the Integration Map, check if a task action addresses it
+2. Unaddressed Integration Map entries → **warning** (the entry may not be relevant to all plans)
+
+**Orphan Detection:**
+
+For each file in `files_modified` across all plans:
+1. Check if any other task action references importing or using this file
+2. Files that appear in `files_modified` but are never referenced by another task's action → **warning** (potential orphan)
+
 **What to check:**
 ```
-Component -> API: Does action mention fetch/axios call?
-API -> Database: Does action mention Prisma/query?
-Form -> Handler: Does action mention onSubmit implementation?
-State -> Render: Does action mention displaying state?
+Component -> API: Does action include "Connect to: /api/..." or "Wire into: ...fetch..."?
+API -> Database: Does action include "Connect to: prisma..." or mention query?
+Form -> Handler: Does action include "Connect to: onSubmit handler"?
+State -> Render: Does action include "Wire into: ...renders state..."?
 ```
 
-**Example issue:**
+**Example issues:**
 ```yaml
 issue:
   dimension: key_links_planned
-  severity: warning
-  description: "Chat.tsx created but no task wires it to /api/chat"
+  severity: blocker
+  description: "Task creates src/components/Chat.tsx but has no wiring line — component will be orphaned"
+  plan: "01"
+  task: 2
+  fix_hint: "Add 'Wire into: src/app/chat/page.tsx — import and render <Chat>' to task action"
+
+issue:
+  dimension: key_links_planned
+  severity: blocker
+  description: "key_link Chat.tsx -> /api/chat has no corresponding wiring instruction in any task"
   plan: "01"
   artifacts: ["src/components/Chat.tsx", "src/app/api/chat/route.ts"]
-  fix_hint: "Add fetch call in Chat.tsx action or create wiring task"
+  fix_hint: "Add 'Connect to: /api/chat via fetch in useEffect' to Chat.tsx task action"
+
+issue:
+  dimension: key_links_planned
+  severity: warning
+  description: "Integration Map entry 'Nav config registration' not addressed by any task"
+  plan: null
+  fix_hint: "Add nav registration step to a task action or confirm it's not needed for this plan"
+
+issue:
+  dimension: key_links_planned
+  severity: warning
+  description: "src/utils/format.ts in files_modified but not imported by any other task"
+  plan: "02"
+  fix_hint: "Add import reference in consuming task or verify it's used by existing code"
 ```
 
 ## Dimension 5: Scope Sanity
@@ -430,11 +497,13 @@ Orchestrator provides CONTEXT.md content in the verification prompt. If provided
 ls "$phase_dir"/*-PLAN.md 2>/dev/null
 # Read research for Nyquist validation data
 cat "$phase_dir"/*-RESEARCH.md 2>/dev/null
+# Read Integration Map for wiring verification
+cat "$phase_dir"/*-INTEGRATION-MAP.md 2>/dev/null
 node ~/.claude/get-shit-done/bin/gsd-tools.cjs roadmap get-phase "$phase_number"
 ls "$phase_dir"/*-BRIEF.md 2>/dev/null
 ```
 
-**Extract:** Phase goal, requirements (decompose goal), locked decisions, deferred ideas.
+**Extract:** Phase goal, requirements (decompose goal), locked decisions, deferred ideas, integration map entries (if exists).
 
 ## Step 2: Load All Plans
 
@@ -530,15 +599,31 @@ done
 
 Validate: all referenced plans exist, no cycles, wave numbers consistent, no forward references. If A -> B -> C -> A, report cycle.
 
-## Step 7: Check Key Links
+## Step 7: Check Key Links & Wiring
 
-For each key_link in must_haves: find source artifact task, check if action mentions the connection, flag missing wiring.
+**7a. Wiring Line Check:**
+For each task that creates a new file (check `<files>` for new paths):
+- Scan `<action>` for wiring lines: `Wire into:`, `Import from:`, `Connect to:`
+- If no wiring line found → **blocker** issue
+
+**7b. Key Link Check:**
+For each key_link in must_haves: find source artifact task, check if action includes a corresponding wiring instruction, flag missing wiring as **blocker**.
 
 ```
 key_link: Chat.tsx -> /api/chat via fetch
+Task 2 action: "Create Chat component... Connect to: /api/chat via fetch in useEffect"
+✓ Wiring planned
+
+key_link: Chat.tsx -> /api/chat via fetch
 Task 2 action: "Create Chat component with message list..."
-Missing: No mention of fetch/API call → Issue: Key link not planned
+✗ No wiring instruction → blocker
 ```
+
+**7c. Integration Map Cross-Reference (if exists):**
+Load `{phase}-INTEGRATION-MAP.md`. For each entry, check if any task action addresses it. Unaddressed entries → **warning**.
+
+**7d. Orphan Detection:**
+Collect all files from `files_modified` across all plans. For each file, check if any other task's `<action>` references importing or using it. Unreferenced files → **warning**.
 
 ## Step 8: Assess Scope
 
@@ -627,11 +712,15 @@ issue:
 - Missing required task fields
 - Circular dependencies
 - Scope > 5 tasks per plan
+- New file created without wiring line in task action
+- key_link without corresponding wiring instruction
+- Same-wave file overlap in worktree mode
 
 **warning** - Should fix, execution may work
 - Scope 4 tasks (borderline)
 - Implementation-focused truths
-- Minor wiring missing
+- Integration Map entry unaddressed
+- Orphaned file in files_modified (not imported by any other task)
 
 **info** - Suggestions for improvement
 - Could split for better parallelization
