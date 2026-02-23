@@ -46,6 +46,9 @@ jobs:
       security_flagged: ${{ steps.analyze_delta.outputs.security_flagged }}
       has_new_commands: ${{ steps.analyze_delta.outputs.has_new_commands }}
       no_changes: ${{ steps.detect.outputs.no_changes }}
+      short_sha: ${{ steps.detect.outputs.short_sha }}
+      merge_conflict: ${{ steps.merge.outputs.merge_conflict }}
+      merge_conflict_files: ${{ steps.merge.outputs.merge_conflict_files }}
 
     env:
       GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
@@ -114,36 +117,131 @@ jobs:
         if: steps.detect.outputs.no_changes != 'true'
         id: merge
         run: |
-          if ! git merge "upstream/${{ env.UPSTREAM_BRANCH }}" --no-edit; then
-            CONFLICT_FILES=$(git diff --name-only --diff-filter=U | tr '\n' '\n- ' | sed 's/^/- /')
-            cat > /tmp/issue-body.md << 'ISSUE_EOF'
+          echo "merge_conflict=false" >> "$GITHUB_OUTPUT"
+          CONFLICT_SHA="${{ steps.detect.outputs.short_sha }}"
+
+          # Ensure upstream-sync label exists
+          gh label create "upstream-sync" \
+            --color "0075ca" \
+            --description "Upstream sync automation" \
+            --repo "$GITHUB_REPOSITORY" 2>/dev/null || true
+
+          if git merge "upstream/${{ env.UPSTREAM_BRANCH }}" --no-edit; then
+            echo "Merge succeeded cleanly."
+
+            # Close any open conflict issue for this upstream SHA
+            OPEN_CONFLICT=$(gh issue list \
+              --repo "$GITHUB_REPOSITORY" \
+              --label "upstream-sync" \
+              --state open \
+              --search "\"Upstream sync merge conflict (upstream@${CONFLICT_SHA})\" in:title" \
+              --json number \
+              --jq '.[0].number' 2>/dev/null || echo "")
+            if [ -n "$OPEN_CONFLICT" ] && [ "$OPEN_CONFLICT" != "null" ]; then
+              echo "Closing resolved conflict issue #${OPEN_CONFLICT}..."
+              gh issue close "$OPEN_CONFLICT" \
+                --repo "$GITHUB_REPOSITORY" \
+                --comment "Closed automatically: upstream@${CONFLICT_SHA} merged successfully in run ${{ github.run_id }}."
+            fi
+
+            exit 0
+          fi
+
+          echo "Merge conflict detected. Attempting auto-resolution by file ownership..."
+
+          # Fork-owned files: --ours always wins
+          FORK_OWNED_PATTERN="^(package\.json|README\.md|FORK-CHANGELOG\.md|AGENTS\.md|FUNDING\.yml|\.github/FUNDING\.yml|\.github/ISSUE_TEMPLATE/bug_report\.yml|\.github/workflows/[^/]+\.yml|\.github/prompts/.*|\.github/agents/.*|\.github/instructions/.*|\.github/copilot-instructions\.md|\.planning/.*)$"
+
+          CONFLICT_FILES=$(git diff --name-only --diff-filter=U)
+
+          for f in $CONFLICT_FILES; do
+            if echo "$f" | grep -qE "$FORK_OWNED_PATTERN"; then
+              echo "Auto-resolving (--ours): $f"
+              git checkout --ours "$f"
+              git add "$f"
+            elif [ "$f" = "CHANGELOG.md" ]; then
+              echo "Auto-resolving (--theirs): $f (upstream-owned)"
+              git checkout --theirs "$f"
+              git add "$f"
+            else
+              echo "Cannot auto-resolve: $f"
+            fi
+          done
+
+          REMAINING=$(git diff --name-only --diff-filter=U)
+
+          if [ -z "$REMAINING" ]; then
+            echo "All conflicts auto-resolved. Committing merge..."
+            git commit --no-edit -m "chore: merge upstream/main (auto-resolved fork-owned conflicts)"
+            echo "merge_conflict=false" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+
+          echo "Unresolvable conflicts remain: $REMAINING"
+          echo "merge_conflict=true" >> "$GITHUB_OUTPUT"
+          CONFLICT_LIST=$(echo "$REMAINING" | tr '\n' ',' | sed 's/,$//')
+          echo "merge_conflict_files=${CONFLICT_LIST}" >> "$GITHUB_OUTPUT"
+          exit 1
+
+      - name: Report merge conflict
+        if: steps.detect.outputs.no_changes != 'true' && steps.merge.outputs.merge_conflict == 'true'
+        run: |
+          CONFLICT_SHA="${{ steps.detect.outputs.short_sha }}"
+
+          # Ensure upstream-sync label exists
+          gh label create "upstream-sync" \
+            --color "0075ca" \
+            --description "Upstream sync automation" \
+            --repo "$GITHUB_REPOSITORY" 2>/dev/null || true
+
+          # Dedup check: existing open issue for this SHA?
+          EXISTING_ISSUE=$(gh issue list \
+            --repo "$GITHUB_REPOSITORY" \
+            --label "upstream-sync" \
+            --state open \
+            --search "\"Upstream sync merge conflict (upstream@${CONFLICT_SHA})\" in:title" \
+            --json number \
+            --jq '.[0].number' 2>/dev/null || echo "")
+
+          git diff --name-only --diff-filter=U > /tmp/conflict-files.txt
+
+          cat > /tmp/conflict-body.md << 'ISSUE_EOF'
           ## Upstream Sync Merge Conflict
 
-          The automated upstream sync encountered a merge conflict and could not complete.
+          The automated upstream sync encountered a merge conflict that could not be auto-resolved.
+          ISSUE_EOF
+
+          cat >> /tmp/conflict-body.md << ISSUE_EOF
 
           **Upstream commit:** ${{ steps.detect.outputs.short_sha }}
           **Upstream HEAD:** ${{ steps.detect.outputs.upstream_head }}
           **Fork HEAD (before merge):** ${{ steps.detect.outputs.fork_head }}
-
-          ### Conflicting files
           ISSUE_EOF
-            git diff --name-only --diff-filter=U | sed 's/^/- /' >> /tmp/issue-body.md
-            cat >> /tmp/issue-body.md << 'ISSUE_EOF'
 
-          ### Resolution steps
-          1. Check out the `automated/upstream-sync` branch locally
-          2. Resolve conflicts manually
-          3. Run `node scripts/generate-prompts.mjs && node scripts/verify-prompts.mjs`
-          4. Push and open PR manually
+          cat >> /tmp/conflict-body.md << 'ISSUE_EOF'
+
+          ### Conflicting files (not auto-resolvable)
+          ISSUE_EOF
+          cat /tmp/conflict-files.txt | sed 's/^/- /' >> /tmp/conflict-body.md
+          cat >> /tmp/conflict-body.md << ISSUE_EOF
+
+          The repair agent will attempt to resolve this. If it cannot, an escalation issue will be filed separately.
 
           **Workflow run:** ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
           ISSUE_EOF
+
+          if [ -n "$EXISTING_ISSUE" ] && [ "$EXISTING_ISSUE" != "null" ]; then
+            echo "Conflict issue #${EXISTING_ISSUE} already open. Appending comment."
+            gh issue comment "$EXISTING_ISSUE" \
+              --repo "$GITHUB_REPOSITORY" \
+              --body-file /tmp/conflict-body.md
+          else
+            echo "Creating new conflict issue..."
             gh issue create \
               --repo "$GITHUB_REPOSITORY" \
-              --title "Upstream sync merge conflict (upstream@${{ steps.detect.outputs.short_sha }})" \
-              --body-file /tmp/issue-body.md \
+              --title "Upstream sync merge conflict (upstream@${CONFLICT_SHA})" \
+              --body-file /tmp/conflict-body.md \
               --label "upstream-sync"
-            exit 1
           fi
 
       - name: Analyze upstream delta
