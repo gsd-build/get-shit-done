@@ -49,6 +49,9 @@ elif [ "$MODE" = "post-commit" ]; then
     echo "$VIOLATIONS" | while IFS= read -r f; do
       git checkout upstream/main -- "$f"
     done
+    # Ensure git identity is set before amending (runner may not have it configured)
+    git config user.email "github-actions[bot]@users.noreply.github.com" 2>/dev/null || true
+    git config user.name "github-actions[bot]" 2>/dev/null || true
     git commit --amend --no-edit || true
     git push --force-with-lease origin HEAD
     echo "::error::Upstream-owned files reverted and force-pushed. Failing."
