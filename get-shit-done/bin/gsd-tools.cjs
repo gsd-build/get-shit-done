@@ -4838,6 +4838,355 @@ function cmdHealthCheck(cwd, options, raw) {
   output(result, raw);
 }
 
+/**
+ * Check for uncommitted changes in a worktree path.
+ * Returns true if there are uncommitted changes (dirty).
+ */
+function hasUncommittedChanges(worktreePath) {
+  try {
+    const output = execSync(`git -C "${worktreePath}" status --porcelain`, {
+      encoding: 'utf-8',
+      stdio: ['pipe', 'pipe', 'pipe'],
+    });
+    return output.trim().length > 0;
+  } catch {
+    return true; // Assume dirty if check fails
+  }
+}
+
+/**
+ * Capture state before repair for rollback purposes.
+ */
+function captureRepairState(cwd, issue) {
+  const registry = loadRegistry(cwd);
+  return {
+    registry: registry ? JSON.parse(JSON.stringify(registry)) : null,
+    issue: JSON.parse(JSON.stringify(issue)),
+    timestamp: new Date().toISOString(),
+  };
+}
+
+/**
+ * Restore state from snapshot on repair failure.
+ */
+function restoreRepairState(cwd, snapshot) {
+  if (snapshot.registry) {
+    saveRegistry(cwd, snapshot.registry);
+  }
+}
+
+/**
+ * Repair a single health issue.
+ * Called from the /gsd:health interactive workflow.
+ *
+ * @param {string} cwd - Current working directory
+ * @param {string} issueJson - JSON string of the issue to repair
+ * @param {object} options - { force: boolean }
+ * @param {boolean} raw - Output as JSON
+ */
+function cmdHealthRepair(cwd, issueJson, options, raw) {
+  let issue;
+  try {
+    issue = JSON.parse(issueJson);
+  } catch (err) {
+    output({ repaired: false, reason: 'invalid_json', error: err.message }, raw);
+    return;
+  }
+
+  const registry = loadRegistry(cwd);
+  if (!registry) {
+    output({ repaired: false, reason: 'no_registry', error: 'Registry not found' }, raw);
+    return;
+  }
+
+  const snapshot = captureRepairState(cwd, issue);
+  const force = options?.force || false;
+
+  try {
+    let result;
+
+    switch (issue.type) {
+      case 'path_missing': {
+        // Registry entry points to deleted path - remove from registry
+        const key = issue.metadata?.registry_key || `phase-${issue.phase}`;
+        if (registry.worktrees[key]) {
+          registry.worktrees[key].status = 'removed';
+          registry.worktrees[key].removed = new Date().toISOString();
+        }
+        // Clear any associated lock
+        if (registry.locks && registry.locks[key]) {
+          delete registry.locks[key];
+        }
+        saveRegistry(cwd, registry);
+        result = { repaired: true, issue_type: issue.type, details: `Removed registry entry for ${key}` };
+        break;
+      }
+
+      case 'not_in_git': {
+        // Path exists but not tracked by git - run git worktree prune then update registry
+        try {
+          execSync('git worktree prune', { cwd, encoding: 'utf-8', stdio: ['pipe', 'pipe', 'pipe'] });
+        } catch {
+          // Prune may warn but not fail
+        }
+        // Mark as removed in registry since git doesn't know about it
+        const key = issue.metadata?.registry_key || `phase-${issue.phase}`;
+        if (registry.worktrees[key]) {
+          registry.worktrees[key].status = 'removed';
+          registry.worktrees[key].removed = new Date().toISOString();
+          registry.worktrees[key].removal_reason = 'not_in_git';
+        }
+        saveRegistry(cwd, registry);
+        result = { repaired: true, issue_type: issue.type, details: `Ran git worktree prune and marked ${key} as removed` };
+        break;
+      }
+
+      case 'not_in_registry': {
+        // Git worktree not in our registry - add it with status 'untracked'
+        const worktreePath = issue.path;
+        const branch = issue.branch || issue.metadata?.git_branch;
+
+        // Try to extract phase number from branch name
+        let phaseNum = null;
+        if (branch) {
+          const match = branch.match(/phase-(\d+)/);
+          if (match) {
+            phaseNum = match[1];
+          }
+        }
+
+        const key = phaseNum ? `phase-${phaseNum}` : `untracked-${Date.now()}`;
+        registry.worktrees[key] = {
+          path: worktreePath,
+          branch: branch,
+          phase_number: phaseNum,
+          status: 'untracked',
+          created: new Date().toISOString(),
+          note: 'Added by health repair - not originally in registry',
+        };
+        saveRegistry(cwd, registry);
+        result = { repaired: true, issue_type: issue.type, details: `Added ${key} to registry as untracked` };
+        break;
+      }
+
+      case 'stale_lock': {
+        // Lock from dead process - check hostname first
+        const key = `phase-${issue.phase}`;
+        const lock = registry.locks?.[key];
+
+        if (!lock) {
+          result = { repaired: true, issue_type: issue.type, details: 'Lock already cleared' };
+          break;
+        }
+
+        const isRemoteHost = lock.hostname !== os.hostname();
+
+        if (isRemoteHost && !force) {
+          result = {
+            repaired: false,
+            issue_type: issue.type,
+            reason: 'remote_host_lock',
+            error: `Lock is from different host (${lock.hostname}). Use --force to clear.`,
+          };
+          break;
+        }
+
+        // Release the lock
+        delete registry.locks[key];
+
+        // Also try to remove lock directory if it exists
+        const lockDir = path.join(cwd, '.planning', 'worktrees', 'locks', key);
+        if (fs.existsSync(lockDir)) {
+          try {
+            fs.rmSync(lockDir, { recursive: true });
+          } catch {
+            // Ignore removal errors
+          }
+        }
+
+        saveRegistry(cwd, registry);
+        result = { repaired: true, issue_type: issue.type, details: `Released stale lock for ${key}` };
+        break;
+      }
+
+      case 'age_exceeded': {
+        // Worktree older than threshold - check for uncommitted changes first
+        const worktreePath = issue.path;
+
+        if (!worktreePath || !fs.existsSync(worktreePath)) {
+          result = { repaired: false, issue_type: issue.type, reason: 'path_not_found', error: 'Worktree path does not exist' };
+          break;
+        }
+
+        if (hasUncommittedChanges(worktreePath)) {
+          result = {
+            repaired: false,
+            issue_type: issue.type,
+            reason: 'uncommitted_changes',
+            path: worktreePath,
+            error: 'Worktree has uncommitted changes. Commit or stash changes before cleanup.',
+          };
+          break;
+        }
+
+        // Safe to remove - use git worktree remove
+        const key = issue.metadata?.registry_key || `phase-${issue.phase}`;
+
+        try {
+          // Unlock first if locked
+          execSync(`git worktree unlock "${worktreePath}" 2>/dev/null || true`, {
+            cwd,
+            encoding: 'utf-8',
+            stdio: ['pipe', 'pipe', 'pipe'],
+          });
+
+          // Remove worktree
+          execSync(`git worktree remove "${worktreePath}" --force`, {
+            cwd,
+            encoding: 'utf-8',
+            stdio: ['pipe', 'pipe', 'pipe'],
+          });
+
+          // Update registry
+          if (registry.worktrees[key]) {
+            registry.worktrees[key].status = 'removed';
+            registry.worktrees[key].removed = new Date().toISOString();
+            registry.worktrees[key].removal_reason = 'age_exceeded';
+          }
+
+          // Release lock if exists
+          if (registry.locks && registry.locks[key]) {
+            delete registry.locks[key];
+          }
+
+          saveRegistry(cwd, registry);
+          result = { repaired: true, issue_type: issue.type, details: `Removed aged worktree: ${worktreePath}` };
+        } catch (err) {
+          result = { repaired: false, issue_type: issue.type, reason: 'removal_failed', error: err.message };
+        }
+        break;
+      }
+
+      case 'incomplete_finalization': {
+        // Marker file exists - resume from where it left off
+        const markerFile = issue.metadata?.marker_file;
+        const markerDir = path.join(cwd, '.planning', 'worktrees', 'finalization');
+        const markerPath = path.join(markerDir, markerFile);
+
+        if (!fs.existsSync(markerPath)) {
+          result = { repaired: true, issue_type: issue.type, details: 'Marker file already removed' };
+          break;
+        }
+
+        let marker;
+        try {
+          marker = JSON.parse(fs.readFileSync(markerPath, 'utf-8'));
+        } catch {
+          result = { repaired: false, issue_type: issue.type, reason: 'malformed_marker', error: 'Could not parse marker file' };
+          break;
+        }
+
+        const pendingSteps = issue.metadata?.pending_steps || [];
+        const worktreePath = marker.worktree_path;
+
+        // Check for uncommitted changes if worktree still exists
+        if (worktreePath && fs.existsSync(worktreePath)) {
+          if (hasUncommittedChanges(worktreePath)) {
+            result = {
+              repaired: false,
+              issue_type: issue.type,
+              reason: 'uncommitted_changes',
+              path: worktreePath,
+              error: 'Worktree has uncommitted changes. Complete finalization manually.',
+            };
+            break;
+          }
+        }
+
+        const key = `phase-${marker.phase}`;
+        let repairDetails = [];
+
+        try {
+          // Resume each pending step
+          if (pendingSteps.includes('worktree_removed') && worktreePath && fs.existsSync(worktreePath)) {
+            execSync(`git worktree unlock "${worktreePath}" 2>/dev/null || true`, { cwd, stdio: ['pipe', 'pipe', 'pipe'] });
+            execSync(`git worktree remove "${worktreePath}" --force`, { cwd, stdio: ['pipe', 'pipe', 'pipe'] });
+            marker.steps.worktree_removed = true;
+            repairDetails.push('worktree removed');
+          }
+
+          if (pendingSteps.includes('lock_released')) {
+            if (registry.locks && registry.locks[key]) {
+              delete registry.locks[key];
+            }
+            const lockDir = path.join(cwd, '.planning', 'worktrees', 'locks', key);
+            if (fs.existsSync(lockDir)) {
+              fs.rmSync(lockDir, { recursive: true });
+            }
+            marker.steps.lock_released = true;
+            repairDetails.push('lock released');
+          }
+
+          if (pendingSteps.includes('registry_updated')) {
+            if (registry.worktrees[key]) {
+              registry.worktrees[key].status = 'removed';
+              registry.worktrees[key].removed = new Date().toISOString();
+            }
+            marker.steps.registry_updated = true;
+            repairDetails.push('registry updated');
+          }
+
+          saveRegistry(cwd, registry);
+
+          // Mark as completed and remove marker
+          marker.completed = new Date().toISOString();
+          fs.writeFileSync(markerPath, JSON.stringify(marker, null, 2));
+          fs.unlinkSync(markerPath);
+
+          // Clean up empty finalization directory
+          const files = fs.readdirSync(markerDir);
+          if (files.length === 0) {
+            fs.rmdirSync(markerDir);
+          }
+
+          result = { repaired: true, issue_type: issue.type, details: `Completed finalization: ${repairDetails.join(', ')}` };
+        } catch (err) {
+          // Rollback on failure
+          restoreRepairState(cwd, snapshot);
+          result = { repaired: false, issue_type: issue.type, reason: 'repair_failed', error: err.message, rolled_back: true };
+        }
+        break;
+      }
+
+      case 'merge_in_progress': {
+        // Requires human decision - cannot auto-fix
+        result = {
+          repaired: false,
+          issue_type: issue.type,
+          reason: 'requires_manual_intervention',
+          suggestion: 'Run "git merge --abort" to cancel or resolve conflicts and run "git merge --continue"',
+        };
+        break;
+      }
+
+      default:
+        result = { repaired: false, issue_type: issue.type, reason: 'unknown_type', error: `Unknown issue type: ${issue.type}` };
+    }
+
+    output(result, raw);
+  } catch (err) {
+    // Global error handler with rollback
+    restoreRepairState(cwd, snapshot);
+    output({
+      repaired: false,
+      issue_type: issue.type,
+      reason: 'repair_exception',
+      error: err.message,
+      rolled_back: true,
+    }, raw);
+  }
+}
+
 // ─── Compound Commands ────────────────────────────────────────────────────────
 
 function resolveModelInternal(cwd, agentType) {
@@ -5843,8 +6192,12 @@ async function main() {
         const ageThresholdIdx = args.indexOf('--age-threshold');
         const ageThreshold = ageThresholdIdx !== -1 ? parseInt(args[ageThresholdIdx + 1], 10) : 7;
         cmdHealthCheck(cwd, { ageThreshold }, raw);
+      } else if (subcommand === 'repair') {
+        const issueJson = args[2];
+        const force = args.includes('--force');
+        cmdHealthRepair(cwd, issueJson, { force }, raw);
       } else {
-        error('Unknown health subcommand. Available: check');
+        error('Unknown health subcommand. Available: check, repair');
       }
       break;
     }
