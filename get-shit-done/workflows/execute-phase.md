@@ -181,6 +181,12 @@ Execute each wave in sequence. Within a wave: parallel if `PARALLELIZATION=true`
 
    For each review entry where `enabled: true` and at least one file matches `trigger_glob`:
 
+   **Verify agent file exists first:**
+   ```bash
+   ls .claude/agents/{review.agent}.md 2>/dev/null
+   ```
+   If missing → log `"Review '{name}' skipped: agent file .claude/agents/{review.agent}.md not found"` and skip this review entry.
+
    ```
    Task(
      subagent_type="general-purpose",
