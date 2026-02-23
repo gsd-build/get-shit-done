@@ -33,12 +33,22 @@ if [ "$MODE" = "pre-commit" ]; then
   fi
   echo "Filesystem guard (pre-commit): no violations."
 elif [ "$MODE" = "post-commit" ]; then
-  # Check files changed relative to upstream/main.
-  # Using upstream/main (not origin/main) as the baseline because the
-  # automated/upstream-sync branch legitimately diverges from origin/main for all
-  # upstream-owned files — that's by design. We only want to catch files the repair
-  # agent incorrectly modified relative to what upstream already has.
-  git diff --name-only upstream/main HEAD | sort > /tmp/committed-files.txt
+  # Determine the diff baseline.
+  # When called from the repair job, PRE_REPAIR_BASELINE contains the SHA recorded
+  # before any agent work ran. Using it means we only flag files the agent actually
+  # changed — not all files the fork legitimately diverges from upstream on.
+  # Fall back to upstream/main when no baseline is available (e.g. manual invocations).
+  if [ -n "${PRE_REPAIR_BASELINE:-}" ]; then
+    BASELINE="$PRE_REPAIR_BASELINE"
+    echo "Using pre-repair baseline: $BASELINE"
+  elif [ -f /tmp/pre-repair-sha ]; then
+    BASELINE=$(cat /tmp/pre-repair-sha)
+    echo "Using pre-repair baseline from file: $BASELINE"
+  else
+    BASELINE="upstream/main"
+    echo "No pre-repair baseline found; falling back to upstream/main."
+  fi
+  git diff --name-only "$BASELINE" HEAD | sort > /tmp/committed-files.txt
   VIOLATIONS=$(comm -12 /tmp/upstream-owned-filtered.txt /tmp/committed-files.txt || true)
   if [ -n "$VIOLATIONS" ]; then
     echo "::error::Filesystem guard (post-commit): repair agent committed changes to upstream-owned files:"
