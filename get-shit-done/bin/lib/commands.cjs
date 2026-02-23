@@ -304,6 +304,7 @@ function cmdSummaryExtract(cwd, summaryPath, fields, raw) {
     tech_added: (fm['tech-stack'] && fm['tech-stack'].added) || [],
     patterns: fm['patterns-established'] || [],
     decisions: parseDecisions(fm['key-decisions']),
+    requirements_completed: fm['requirements-completed'] || [],
   };
 
   // If fields specified, filter to only those fields

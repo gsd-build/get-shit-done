@@ -303,6 +303,9 @@ patterns-established:
 key-decisions:
   - Use Prisma over Drizzle: Better DX and ecosystem
   - Single database: Start simple, shard later
+requirements-completed:
+  - AUTH-01
+  - AUTH-02
 ---
 
 # Summary
@@ -321,6 +324,7 @@ Full summary content here.
     assert.deepStrictEqual(output.tech_added, ['prisma', 'zod'], 'tech added extracted');
     assert.deepStrictEqual(output.patterns, ['Repository pattern', 'Dependency injection'], 'patterns extracted');
     assert.strictEqual(output.decisions.length, 2, 'decisions extracted');
+    assert.deepStrictEqual(output.requirements_completed, ['AUTH-01', 'AUTH-02'], 'requirements completed extracted');
   });
 
   test('selective extraction with --fields', () => {
@@ -340,16 +344,19 @@ patterns-established:
   - Repository pattern
 key-decisions:
   - Use Prisma: Better DX
+requirements-completed:
+  - AUTH-01
 ---
 `
     );
 
-    const result = runGsdTools('summary-extract .planning/phases/01-foundation/01-01-SUMMARY.md --fields one_liner,key_files', tmpDir);
+    const result = runGsdTools('summary-extract .planning/phases/01-foundation/01-01-SUMMARY.md --fields one_liner,key_files,requirements_completed', tmpDir);
     assert.ok(result.success, `Command failed: ${result.error}`);
 
     const output = JSON.parse(result.output);
     assert.strictEqual(output.one_liner, 'Set up database', 'one_liner included');
     assert.deepStrictEqual(output.key_files, ['prisma/schema.prisma'], 'key_files included');
+    assert.deepStrictEqual(output.requirements_completed, ['AUTH-01'], 'requirements_completed included');
     assert.strictEqual(output.tech_added, undefined, 'tech_added excluded');
     assert.strictEqual(output.patterns, undefined, 'patterns excluded');
     assert.strictEqual(output.decisions, undefined, 'decisions excluded');
@@ -378,6 +385,7 @@ one-liner: Minimal summary
     assert.deepStrictEqual(output.tech_added, [], 'tech_added defaults to empty');
     assert.deepStrictEqual(output.patterns, [], 'patterns defaults to empty');
     assert.deepStrictEqual(output.decisions, [], 'decisions defaults to empty');
+    assert.deepStrictEqual(output.requirements_completed, [], 'requirements_completed defaults to empty');
   });
 
   test('parses key-decisions with rationale', () => {
