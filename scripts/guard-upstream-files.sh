@@ -53,6 +53,9 @@ elif [ "$MODE" = "post-commit" ]; then
         git rm -f -- "$f" 2>/dev/null || rm -f -- "$f"
       fi
     done
+    # Ensure git identity is set before amending (runner may not have it configured)
+    git config user.email "github-actions[bot]@users.noreply.github.com" 2>/dev/null || true
+    git config user.name "github-actions[bot]" 2>/dev/null || true
     git commit --amend --no-edit || true
     git push --force-with-lease origin HEAD
     echo "::error::Upstream-owned files reverted and force-pushed. Failing."

@@ -408,7 +408,7 @@ jobs:
             --repo "$GITHUB_REPOSITORY" \
             --base "automated/upstream-sync" \
             --follow \
-            --body-file /tmp/proactive_prompt.md \
+            -F /tmp/proactive_prompt.md \
             || true
 
           echo "proactive_adapt_invoked=true" >> "$GITHUB_OUTPUT"
@@ -832,7 +832,7 @@ jobs:
             --repo "$GITHUB_REPOSITORY" \
             --base "automated/upstream-sync" \
             --follow \
-            --body-file /tmp/conflict-resolve-prompt.md \
+            -F /tmp/conflict-resolve-prompt.md \
             || true
 
           # Check if agent resolved conflicts (dead-end sentinel)
@@ -863,6 +863,14 @@ jobs:
         id: repair_loop
         run: |
           set -euo pipefail
+
+          # Switch to the working branch that the sync job produced.
+          # The checkout step lands on main; the repair agent must operate on
+          # automated/upstream-sync so the verifier sees the sync-merged content
+          # and all merges/pushes go to the correct branch.
+          git fetch origin automated/upstream-sync 2>/dev/null || true
+          git checkout -B automated/upstream-sync origin/automated/upstream-sync 2>/dev/null || \
+            git checkout -B automated/upstream-sync origin/${{ env.DEFAULT_BRANCH }} 2>/dev/null || true
 
           STRATEGIES=("basic_verifier_fix" "contextual_generative_fix" "full_rewrite" "alt_approach")
           STRATEGY_IDX=0
@@ -997,7 +1005,7 @@ jobs:
               --repo "$GITHUB_REPOSITORY" \
               --base "automated/upstream-sync" \
               --follow \
-              --body-file /tmp/repair_prompt_${ATTEMPT}.txt \
+              -F /tmp/repair_prompt_${ATTEMPT}.txt \
               || true
 
             # Merge back any copilot/* PR the agent created
