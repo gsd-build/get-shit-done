@@ -774,7 +774,6 @@ jobs:
             echo "agent_auth_ok=false" >> "$GITHUB_OUTPUT"
           elif [ -z "$TOKEN_TYPE" ]; then
             echo "::warning::Could not determine COPILOT_PAT token type from gh auth status. Proceeding, but agent-task calls may fail."
-            echo "$AUTH_STATUS"
             echo "agent_auth_ok=unknown" >> "$GITHUB_OUTPUT"
           else
             echo "Token type looks OK (${TOKEN_TYPE:0:6}...). Proceeding."
