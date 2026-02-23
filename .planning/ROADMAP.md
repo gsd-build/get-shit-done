@@ -1,98 +1,94 @@
-# Roadmap: GSD Worktree Isolation
+# Roadmap: GSD v1.1 Upstream Sync
 
 ## Overview
 
-This roadmap delivers parallel phase execution through git worktree isolation. The journey progresses from foundational infrastructure (worktree lifecycle and lock management), through workflow integration (execute-phase and finalize-phase updates), to state reconciliation (STATE.md merge algorithm), and finally polish and recovery tooling. Each phase builds on the previous, enabling multiple AI sessions to work on different phases simultaneously without file conflicts.
+This roadmap delivers upstream sync tooling for GSD fork maintainers. The journey progresses from core infrastructure (configure, fetch, status, notifications), through analysis capabilities (commit grouping, conflict detection), to merge operations (atomic merge, rollback, state logging), then interactive features and integration (deep dive mode, worktree awareness), and finally documentation. Each phase builds on the previous, enabling fork maintainers to stay current with upstream while preserving custom enhancements through intelligent tooling.
 
 ## Phases
 
 **Phase Numbering:**
-- Integer phases (1, 2, 3, 4): Planned milestone work
-- Decimal phases (e.g., 2.1): Urgent insertions (marked with INSERTED)
+- v1.0 completed Phases 1-4 (Worktree Isolation)
+- v1.1 continues from Phase 5 (Upstream Sync)
+- Decimal phases (e.g., 5.1): Urgent insertions (marked with INSERTED)
 
-- [x] **Phase 1: Foundation** - Worktree lifecycle, lock mechanism, and registry infrastructure
-- [x] **Phase 2: Workflow Integration** - execute-phase and finalize-phase worktree operations
-- [x] **Phase 3: State Reconciliation** - STATE.md merge algorithm and conflict handling
-- [x] **Phase 4: Polish and Recovery** - Cleanup commands, orphan detection, and error recovery (completed 2026-02-23)
+- [ ] **Phase 5: Core Infrastructure** - Upstream configuration, fetch, status, and update notifications
+- [ ] **Phase 6: Analysis** - Commit grouping, conflict preview, and change detection
+- [ ] **Phase 7: Merge Operations** - Atomic merge with rollback and state logging
+- [ ] **Phase 8: Interactive & Integration** - Deep dive mode, worktree awareness, and health integration
+- [ ] **Phase 9: Documentation** - User guide, architecture docs, and troubleshooting
 
 ## Phase Details
 
-### Phase 1: Foundation
-**Goal**: Establish worktree lifecycle management with atomic locking and registry tracking
-**Depends on**: Nothing (first phase)
-**Requirements**: TREE-01, TREE-02, TREE-03, TREE-04, TREE-05, TREE-06, LOCK-01, LOCK-02, LOCK-03, LOCK-04
+### Phase 5: Core Infrastructure
+**Goal**: Establish upstream remote management with fetch, status, and proactive notifications
+**Depends on**: v1.0 complete (uses existing gsd-tools patterns)
+**Requirements**: SYNC-01, SYNC-02, SYNC-03, SYNC-04, NOTIF-01, NOTIF-02, NOTIF-03
 **Success Criteria** (what must be TRUE):
-  1. User can create a worktree for a phase and it appears in a sibling directory with unique branch name
-  2. User can list all active worktrees with their status, branch, and path information
-  3. User can retrieve the path for an existing worktree by phase number
-  4. Concurrent attempts to execute the same phase are blocked with clear error message
-  5. Existing worktree is detected and reused instead of failing on recreation attempt
-**Plans:** 3/3 plans executed
+  1. User can configure upstream remote URL and it persists in config.json
+  2. User can fetch upstream changes without modifying their local branches
+  3. User can see how many commits behind upstream they are with summary info
+  4. User can view upstream commit log with author, date, and message summaries
+  5. Starting a GSD session shows notification when upstream has new commits
+**Plans:** TBD
 
-Plans:
-- [x] 01-01-PLAN.md — Add worktree/lock registry commands to gsd-tools.cjs
-- [x] 01-02-PLAN.md — Create phase-worktree.sh with atomic lock functions
-- [x] 01-03-PLAN.md — Implement complete worktree lifecycle operations
-
-### Phase 2: Workflow Integration
-**Goal**: Update execute-phase and finalize-phase workflows to use worktree operations
-**Depends on**: Phase 1
-**Requirements**: FLOW-01, FLOW-02, FLOW-03, FLOW-04, FLOW-05, FLOW-06, FLOW-07
+### Phase 6: Analysis
+**Goal**: Provide visibility into upstream changes with grouping and conflict prediction
+**Depends on**: Phase 5
+**Requirements**: ANAL-01, ANAL-02, ANAL-03, ANAL-04
 **Success Criteria** (what must be TRUE):
-  1. Running execute-phase with `branching_strategy: "phase"` creates a worktree automatically
-  2. Running execute-phase when worktree exists switches to it without error
-  3. Finalize-phase blocks merge until verification gates pass (UAT, tests)
-  4. Finalize-phase merges phase branch to main with --no-ff and cleans up worktree
-  5. New worktrees have dependencies installed (npm install) and .env copied automatically
-**Plans:** 3/3 plans executed
+  1. User can see upstream commits grouped by feature/directory affected
+  2. User can preview which files would conflict before attempting merge
+  3. User receives warning about rename/delete conflicts that need manual attention
+  4. User is notified when upstream contains binary file changes
+**Plans:** TBD
 
-Plans:
-- [x] 02-01-PLAN.md — Add post-create hooks to phase-worktree.sh (FLOW-06, FLOW-07)
-- [x] 02-02-PLAN.md — Update execute-phase.md workflow (FLOW-01, FLOW-02)
-- [x] 02-03-PLAN.md — Update finalize-phase.md workflow (FLOW-03, FLOW-04, FLOW-05)
-
-### Phase 3: State Reconciliation
-**Goal**: Implement STATE.md merge algorithm that preserves both phase-specific and global changes
-**Depends on**: Phase 2
-**Requirements**: STATE-01, STATE-02, STATE-03, STATE-04
+### Phase 7: Merge Operations
+**Goal**: Enable safe upstream merges with automatic backup, atomic execution, and recovery
+**Depends on**: Phase 6
+**Requirements**: MERGE-01, MERGE-02, MERGE-03, MERGE-04
 **Success Criteria** (what must be TRUE):
-  1. Worktree registry accurately tracks all active worktrees in JSON format
-  2. STATE.md changes in worktree accumulate phase-specific progress without affecting main
-  3. Finalization merges STATE.md correctly (worktree wins for phase sections, main wins for global)
-  4. STATE.md conflicts are detected and user receives clear manual resolution steps
-**Plans:** 3/3 plans executed
+  1. User can merge upstream with automatic backup branch created before merge
+  2. Failed merge automatically rolls back to pre-merge state with clear message
+  3. User can abort an incomplete sync and restore to clean state
+  4. Sync events (fetch, merge, abort) are logged in STATE.md with timestamps
+**Plans:** TBD
 
-Plans:
-- [x] 03-01-PLAN.md — STATE.md parsing infrastructure with TDD (STATE-01, STATE-02)
-- [x] 03-02-PLAN.md — Section merge strategies and conflict detection (STATE-02, STATE-03, STATE-04)
-- [x] 03-03-PLAN.md — finalize-phase integration and end-to-end verification (STATE-03, STATE-04)
-
-### Phase 4: Polish and Recovery
-**Goal**: Provide recovery tools for orphaned worktrees and incomplete operations via /gsd:health command
-**Depends on**: Phase 3
-**Requirements**: RECV-01, RECV-02, RECV-03
+### Phase 8: Interactive & Integration
+**Goal**: Provide interactive exploration and integrate with existing GSD features
+**Depends on**: Phase 7
+**Requirements**: INTER-01, INTER-02, INTER-03, INTEG-01, INTEG-02
 **Success Criteria** (what must be TRUE):
-  1. Orphaned worktrees (path deleted but .git reference remains) are detected and reported
-  2. User can run cleanup command to remove stale worktrees safely
-  3. Incomplete finalization (merge succeeded but cleanup failed) can be recovered gracefully
-**Plans:** 2/2 plans complete
+  1. User can explore specific upstream commits interactively (view diffs, ask questions)
+  2. User receives refactoring suggestions before merge to minimize conflicts
+  3. Post-merge verification tests run automatically to confirm custom features work
+  4. User receives warning when attempting sync with active worktrees
+  5. Health check reports incomplete/stalled sync operations
+**Plans:** TBD
 
-Plans:
-- [ ] 04-01-PLAN.md — Health detection infrastructure (orphans, stale locks, incomplete finalization)
-- [ ] 04-02-PLAN.md — Interactive repair workflow and /gsd:health command
+### Phase 9: Documentation
+**Goal**: Document upstream sync features for users and developers
+**Depends on**: Phase 8
+**Requirements**: DOC-01, DOC-02, DOC-03, DOC-04
+**Success Criteria** (what must be TRUE):
+  1. User guide explains /gsd:sync-upstream command with examples
+  2. Architecture docs include mermaid diagrams showing sync flow
+  3. README documents upstream sync features under GSD Enhancements section
+  4. Troubleshooting guide covers common sync issues with recovery steps
+**Plans:** TBD
 
 ## Progress
 
 **Execution Order:**
-Phases execute in numeric order: 1 -> 2 -> 3 -> 4
+Phases execute in numeric order: 5 -> 6 -> 7 -> 8 -> 9
 
 | Phase | Plans Complete | Status | Completed |
 |-------|----------------|--------|-----------|
-| 1. Foundation | 3/3 | Complete | 2026-02-20 |
-| 2. Workflow Integration | 3/3 | Complete | 2026-02-20 |
-| 3. State Reconciliation | 3/3 | Complete | 2026-02-22 |
-| 4. Polish and Recovery | 2/2 | Complete   | 2026-02-23 |
+| 5. Core Infrastructure | 0/? | Not started | - |
+| 6. Analysis | 0/? | Not started | - |
+| 7. Merge Operations | 0/? | Not started | - |
+| 8. Interactive & Integration | 0/? | Not started | - |
+| 9. Documentation | 0/? | Not started | - |
 
 ---
-*Roadmap created: 2026-02-20*
+*Roadmap created: 2026-02-23*
 *Last updated: 2026-02-23*

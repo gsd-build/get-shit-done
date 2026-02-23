@@ -84,35 +84,36 @@ Which phases cover which requirements. Updated during roadmap creation.
 
 | Requirement | Phase | Plan | Status |
 |-------------|-------|------|--------|
-| SYNC-01 | — | — | Pending |
-| SYNC-02 | — | — | Pending |
-| SYNC-03 | — | — | Pending |
-| SYNC-04 | — | — | Pending |
-| NOTIF-01 | — | — | Pending |
-| NOTIF-02 | — | — | Pending |
-| NOTIF-03 | — | — | Pending |
-| ANAL-01 | — | — | Pending |
-| ANAL-02 | — | — | Pending |
-| ANAL-03 | — | — | Pending |
-| ANAL-04 | — | — | Pending |
-| MERGE-01 | — | — | Pending |
-| MERGE-02 | — | — | Pending |
-| MERGE-03 | — | — | Pending |
-| MERGE-04 | — | — | Pending |
-| INTER-01 | — | — | Pending |
-| INTER-02 | — | — | Pending |
-| INTER-03 | — | — | Pending |
-| INTEG-01 | — | — | Pending |
-| INTEG-02 | — | — | Pending |
-| DOC-01 | — | — | Pending |
-| DOC-02 | — | — | Pending |
-| DOC-03 | — | — | Pending |
-| DOC-04 | — | — | Pending |
+| SYNC-01 | Phase 5 | TBD | Pending |
+| SYNC-02 | Phase 5 | TBD | Pending |
+| SYNC-03 | Phase 5 | TBD | Pending |
+| SYNC-04 | Phase 5 | TBD | Pending |
+| NOTIF-01 | Phase 5 | TBD | Pending |
+| NOTIF-02 | Phase 5 | TBD | Pending |
+| NOTIF-03 | Phase 5 | TBD | Pending |
+| ANAL-01 | Phase 6 | TBD | Pending |
+| ANAL-02 | Phase 6 | TBD | Pending |
+| ANAL-03 | Phase 6 | TBD | Pending |
+| ANAL-04 | Phase 6 | TBD | Pending |
+| MERGE-01 | Phase 7 | TBD | Pending |
+| MERGE-02 | Phase 7 | TBD | Pending |
+| MERGE-03 | Phase 7 | TBD | Pending |
+| MERGE-04 | Phase 7 | TBD | Pending |
+| INTER-01 | Phase 8 | TBD | Pending |
+| INTER-02 | Phase 8 | TBD | Pending |
+| INTER-03 | Phase 8 | TBD | Pending |
+| INTEG-01 | Phase 8 | TBD | Pending |
+| INTEG-02 | Phase 8 | TBD | Pending |
+| DOC-01 | Phase 9 | TBD | Pending |
+| DOC-02 | Phase 9 | TBD | Pending |
+| DOC-03 | Phase 9 | TBD | Pending |
+| DOC-04 | Phase 9 | TBD | Pending |
 
 **Coverage:**
 - v1.1 requirements: 24 total
-- Mapped to phases: 0
-- Unmapped: 24 (pending roadmap)
+- Mapped to phases: 24
+- Unmapped: 0
 
 ---
 *Requirements defined: 2026-02-23*
+*Traceability updated: 2026-02-23*
