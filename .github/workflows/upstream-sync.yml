@@ -729,6 +729,103 @@ jobs:
           git remote add upstream https://github.com/gsd-build/get-shit-done.git 2>/dev/null || true
           git fetch upstream
 
+      - name: Resolve merge conflict via Copilot agent
+        if: steps.preflight.outputs.skip != 'true' && needs.sync.outputs.merge_conflict == 'true'
+        id: conflict_resolve
+        env:
+          GH_TOKEN: ${{ secrets.COPILOT_PAT }}
+        run: |
+          set -euo pipefail
+
+          CONFLICT_FILES="${{ needs.sync.outputs.merge_conflict_files }}"
+          UPSTREAM_SHA="${{ needs.sync.outputs.short_sha || 'unknown' }}"
+
+          echo "Attempting agent-assisted merge conflict resolution for: ${CONFLICT_FILES}"
+
+          # Re-establish the conflict state on the working branch
+          git checkout -B automated/upstream-sync origin/${{ env.DEFAULT_BRANCH }} 2>/dev/null || true
+          git merge "upstream/${{ env.UPSTREAM_BRANCH }}" --no-edit 2>/dev/null || true
+
+          # Capture the conflict diff (truncated to 15k)
+          CONFLICT_DIFF=$(git diff --diff-filter=U 2>/dev/null | head -c 15000 || echo "(conflict diff unavailable)")
+
+          cat > /tmp/conflict-resolve-prompt.md << PROMPT_EOF
+          You are the GSD upstream-sync merge conflict resolution agent.
+
+          A merge conflict occurred between the fork's main branch and upstream/main.
+          The following files have conflicts that could not be auto-resolved:
+
+          **Conflicting files:** ${CONFLICT_FILES}
+          **Upstream SHA:** ${UPSTREAM_SHA}
+
+          ## Your mission
+
+          Resolve the merge conflict to produce a clean, committable state.
+
+          ## Authority — what you MAY modify
+          - Any conflicting file listed above (to resolve the conflict)
+          - scripts/generate-prompts.mjs (if needed to handle upstream changes)
+          - scripts/verify-prompts.mjs (if needed)
+          - .github/prompts/**
+          - .github/agents/**
+          - .github/instructions/**
+          - README.md, FORK-CHANGELOG.md, AGENTS.md
+
+          ## Hard limit — NEVER modify
+          - commands/gsd/**
+          - agents/**
+          - get-shit-done/**
+
+          ## Fork identity rules for conflict resolution
+          - In fork-owned files (package.json, README.md, CHANGELOG.md, AGENTS.md):
+            the fork's content takes precedence. Accept upstream changes only where they
+            don't conflict with the fork's identity (e.g., accept upstream version bumps
+            to dependency fields, but keep fork-specific description/repository fields).
+          - In upstream-owned content that somehow drifted: accept --theirs.
+
+          ## Required steps
+          1. Resolve all conflicts in the listed files.
+          2. Run: git add -A && git commit --no-edit -m "chore: resolve merge conflict with upstream/${UPSTREAM_SHA}"
+          3. Run: node scripts/generate-prompts.mjs
+          4. Run: node scripts/verify-prompts.mjs
+          5. Both must pass.
+          6. Open a PR targeting branch: automated/upstream-sync (base: main).
+          7. PR title: "sync: upstream changes (conflict resolved by agent)"
+          8. If the conflict cannot be resolved autonomously, write "DEAD_END" to /tmp/repair-dead-end.txt and stop.
+
+          ## Conflict diff
+          \`\`\`diff
+          ${CONFLICT_DIFF}
+          \`\`\`
+          PROMPT_EOF
+
+          gh agent-task create \
+            --repo "$GITHUB_REPOSITORY" \
+            --base "automated/upstream-sync" \
+            --follow \
+            --body-file /tmp/conflict-resolve-prompt.md \
+            || true
+
+          # Check if agent resolved conflicts (dead-end sentinel)
+          if [ -f /tmp/repair-dead-end.txt ]; then
+            echo "Agent declared DEAD_END on conflict resolution."
+            echo "conflict_resolved=false" >> "$GITHUB_OUTPUT"
+            echo "conflict_dead_end=true" >> "$GITHUB_OUTPUT"
+          else
+            # Pull any commits the agent pushed
+            git pull origin automated/upstream-sync --rebase 2>/dev/null || true
+            REMAINING=$(git diff --name-only --diff-filter=U 2>/dev/null || echo "")
+            if [ -z "$REMAINING" ]; then
+              echo "Conflict resolution succeeded."
+              echo "conflict_resolved=true" >> "$GITHUB_OUTPUT"
+              echo "conflict_dead_end=false" >> "$GITHUB_OUTPUT"
+            else
+              echo "Conflicts still remain after agent run: $REMAINING"
+              echo "conflict_resolved=false" >> "$GITHUB_OUTPUT"
+              echo "conflict_dead_end=false" >> "$GITHUB_OUTPUT"
+            fi
+          fi
+
       - name: Repair loop
         if: steps.preflight.outputs.skip != 'true'
         id: repair_loop
@@ -974,6 +1071,7 @@ jobs:
           (needs.sync.result == 'failure' && needs.sync.outputs.merge_conflict != 'true') ||
           steps.repair_loop.outputs.attempts_exhausted == 'true' ||
           steps.repair_loop.outputs.dead_end == 'true' ||
+          steps.conflict_resolve.outputs.conflict_dead_end == 'true' ||
           needs.sync.outputs.security_flagged == 'true'
         env:
           GH_TOKEN: ${{ secrets.COPILOT_PAT }}
@@ -990,6 +1088,8 @@ jobs:
           TRIGGER_TYPE="strategies-exhausted"
           if [ "${{ steps.repair_loop.outputs.dead_end }}" = "true" ]; then
             TRIGGER_TYPE="dead-end-sentinel"
+          elif [ "${{ steps.conflict_resolve.outputs.conflict_dead_end }}" = "true" ]; then
+            TRIGGER_TYPE="merge-conflict-unresolvable"
           fi
 
           ISSUE_TITLE="sync-escalation: autonomous maintenance dead-end"
