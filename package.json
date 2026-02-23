@@ -1,6 +1,6 @@
 {
   "name": "@undeemed/get-shit-done-codex",
-  "version": "1.20.7",
+  "version": "1.20.8",
   "description": "A meta-prompting, context engineering and spec-driven development system for OpenAI Codex (CLI and Desktop). Fork of get-shit-done by TÂCHES, adapted for Codex by undeemed.",
   "bin": {
     "get-shit-done-codex": "bin/install.js"
@@ -18,13 +18,29 @@
     "AGENTS.md"
   ],
   "keywords": [
+    "get-shit-done",
+    "gsd",
     "openai",
     "codex",
     "codex-cli",
+    "codex-desktop",
+    "codex-app",
+    "openai-codex",
     "ai",
+    "ai-coding",
+    "ai-agents",
     "meta-prompting",
     "context-engineering",
+    "context-rot",
     "spec-driven-development",
+    "prompt-engineering",
+    "multi-agent",
+    "subagent",
+    "ai-workflow",
+    "developer-tools",
+    "dev-tools",
+    "productivity",
+    "code-generation",
     "agents"
   ],
   "author": "undeemed <jerry.x0930@gmail.com>",
