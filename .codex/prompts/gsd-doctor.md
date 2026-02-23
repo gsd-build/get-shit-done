@@ -28,6 +28,14 @@ Run these checks and then present a compact table: `check | status | details | f
 - `.claude/get-shit-done/bin/gsd-tools.cjs` OR `.claude/get-shit-done/bin/gsd-tools.js`
 - If only `gsd-tools.test.js` exists, treat engine as missing/incomplete.
 
+### Codex agent roles (recommended for model routing)
+- Role registrations exist (first match wins):
+  - `.codex/config.toml` contains `[agents.gsd-planner]`
+  - `~/.codex/config.toml` contains `[agents.gsd-planner]`
+- Role config layers exist (first match wins):
+  - `.codex/agents/gsd-planner.toml`
+  - `~/.codex/agents/gsd-planner.toml`
+
 ### Project state
 - `.planning/` exists (if missing, user hasn’t initialized a project).
 

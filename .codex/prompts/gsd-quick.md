@@ -38,6 +38,7 @@ node <gsd-tools-path> init quick "[argument]" --raw
 3. Load .claude/get-shit-done/workflows/quick.md and execute it step-by-step.
 4. Translate each Task(...) in workflow into:
    - spawn_agent with the matching role file context from .claude/agents/.
+   - Set `agent_type` to the matching GSD role (gsd-*).
    - wait for each spawned agent and apply returned output before moving forward.
 5. Preserve all gates and routing from upstream workflow.
 6. Preserve commit behavior using 

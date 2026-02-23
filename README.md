@@ -27,10 +27,13 @@ npx gsd-codex-cli@latest --path . --global
 The installer copies these directories into the target location:
 
 - `.codex/prompts` and `.codex/skills` for Codex commands
+- `.codex/agents` for Codex agent roles (model routing)
 - `.claude/get-shit-done` for workflow references
 - `.claude/agents` for agent definitions
 
 This fork is Codex-first, but the Claude assets are kept alongside for compatibility with the upstream workflow files.
+
+The installer also registers GSD agent roles under `[agents.gsd-*]` in your Codex config (`.codex/config.toml` for local installs and `~/.codex/config.toml` for global installs). It only appends missing sections.
 
 ## Using the Prompts
 

@@ -8,6 +8,20 @@ const args = process.argv.slice(2);
 const pkg = require('../package.json');
 const repoRoot = path.resolve(__dirname, '..');
 
+const GSD_AGENT_ROLES = [
+  { name: 'gsd-project-researcher', description: 'GSD role: project researcher.' },
+  { name: 'gsd-research-synthesizer', description: 'GSD role: research synthesizer.' },
+  { name: 'gsd-roadmapper', description: 'GSD role: roadmap planning.' },
+  { name: 'gsd-phase-researcher', description: 'GSD role: phase research.' },
+  { name: 'gsd-planner', description: 'GSD role: phase planning.' },
+  { name: 'gsd-plan-checker', description: 'GSD role: plan verification.' },
+  { name: 'gsd-executor', description: 'GSD role: plan execution.' },
+  { name: 'gsd-verifier', description: 'GSD role: execution verification.' },
+  { name: 'gsd-debugger', description: 'GSD role: debugging.' },
+  { name: 'gsd-integration-checker', description: 'GSD role: integration verification.' },
+  { name: 'gsd-codebase-mapper', description: 'GSD role: codebase mapping.' },
+];
+
 const helpText = `
 ${pkg.name} v${pkg.version}
 
@@ -54,6 +68,42 @@ function ensureDir(dirPath) {
   fs.mkdirSync(dirPath, { recursive: true });
 }
 
+function escapeRegExp(value) {
+  // Escape special regex characters.
+  return value.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+}
+
+function ensureCodexConfigHasGsdAgentRoles(codexDir) {
+  const configPath = path.join(codexDir, 'config.toml');
+  const existing = fs.existsSync(configPath) ? fs.readFileSync(configPath, 'utf8') : '';
+  const eol = existing.includes('\r\n') ? '\r\n' : '\n';
+
+  const blocks = [];
+  for (const role of GSD_AGENT_ROLES) {
+    const header = `[agents.${role.name}]`;
+    const headerRegex = new RegExp(`^\\s*\\[agents\\.${escapeRegExp(role.name)}\\]\\s*$`, 'm');
+    if (headerRegex.test(existing)) continue;
+
+    blocks.push([
+      header,
+      `description = "${role.description}"`,
+      `config_file = "./agents/${role.name}.toml"`,
+    ].join(eol));
+  }
+
+  if (blocks.length === 0) {
+    return { changed: false, added_roles: [] };
+  }
+
+  let next = existing;
+  if (next.length > 0 && !next.endsWith(eol)) next += eol;
+  if (next.length > 0 && !next.endsWith(eol + eol)) next += eol;
+  next += blocks.join(eol + eol) + eol;
+
+  fs.writeFileSync(configPath, next, 'utf8');
+  return { changed: true, added_roles: blocks.map(b => b.split(eol, 1)[0]) };
+}
+
 function resolveSourceDir(repoRelative, fallbackRelative) {
   const primary = path.join(repoRoot, repoRelative);
   const fallback = fallbackRelative ? path.join(repoRoot, fallbackRelative) : null;
@@ -81,6 +131,7 @@ function copyCodexToDirectory(baseDir) {
   copyRecursive(sourceCodex, targetCodex);
   copyRecursive(sourceGetShitDone, path.join(targetClaude, 'get-shit-done'));
   copyRecursive(sourceAgents, path.join(targetClaude, 'agents'));
+  ensureCodexConfigHasGsdAgentRoles(targetCodex);
   ensureDir(path.dirname(versionDest));
   fs.writeFileSync(versionDest, `${pkg.version}\n`);
   ensureDir(path.dirname(codexVersionDest));

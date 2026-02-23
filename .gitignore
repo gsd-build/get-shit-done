@@ -18,3 +18,7 @@ animation/
 # Internal planning documents
 reports/
 RAILROAD_ARCHITECTURE.md
+
+# Local scratch / install artifacts
+tmp_*.py
+.codex/gsd/

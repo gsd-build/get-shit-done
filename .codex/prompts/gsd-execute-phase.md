@@ -51,6 +51,7 @@ node <gsd-tools-path> init execute-phase <phase> --raw
 6. Load .claude/get-shit-done/workflows/execute-phase.md and execute it step-by-step.
 7. Translate each Task(...) in workflow into:
    - spawn_agent with the matching role file context from .claude/agents/.
+   - Set `agent_type` to the matching GSD role (gsd-*).
    - wait for each spawned agent and apply returned output before moving forward.
 8. Preserve all gates and routing from upstream workflow.
 9. Preserve commit behavior using

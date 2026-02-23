@@ -46,6 +46,7 @@ node <gsd-tools-path> init new-milestone --raw
    Then summarize the chosen direction and ask for confirmation.
 5. Translate each Task(...) in workflow into:
    - spawn_agent with the matching role file context from .claude/agents/.
+   - Set `agent_type` to the matching GSD role (gsd-*).
    - wait for each spawned agent and apply returned output before moving forward.
 6. Preserve all gates and routing from upstream workflow.
 7. Before reporting success, verify `.planning/ROADMAP.md` exists. If missing, treat as blocked and continue workflow remediation.

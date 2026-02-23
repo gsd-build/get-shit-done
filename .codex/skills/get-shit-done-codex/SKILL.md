@@ -25,16 +25,17 @@ Use this skill to run `gsd-*` prompts under `Codex` while preserving upstream GS
 - Replace each `Task(...)` with: `spawn_agent` + `wait`.
 - Replace Bash/JQ patterns with PowerShell and `ConvertFrom-Json`.
 - Replace AskUserQuestion interactions with direct user prompts in chat.
-- Translate resolved model aliases before Codex subagent spawn:
-  - `inherit` (opus tier) -> `gpt-5.3-codex` (`xhigh`)
-  - `sonnet` -> `gpt-5.3-spark` (`xhigh`)
-  - `haiku` -> `gpt-5.1-codex-mini` (`high`)
+- GSD Codex agent roles route models per role via `.codex/agents/gsd-*.toml`:
+  - Opus-tier work uses `gpt-5.3-codex` (`xhigh` reasoning effort)
+  - Sonnet-tier work uses `gpt-5.3-spark` (`xhigh` reasoning effort)
+  - Haiku-tier work uses `gpt-5.1-codex-mini` (`high` reasoning effort)
 
 ## Subagent lifecycle (required)
 - Spawn only when the upstream workflow explicitly defines a `Task(...)` role.
 - For each spawned subagent:
   - Start with `spawn_agent` and provide the role source from `.claude/agents/gsd-*.md`.
-  - Do not set `agent_type` to a GSD role. Codex only accepts `default`, `explorer`, or `worker` (or omit `agent_type`).
+  - Set `agent_type` to the matching GSD role name (for example: `gsd-planner`, `gsd-executor`).
+  - These roles are registered under `[agents.*]` in `.codex/config.toml` and map to per-role Codex model settings via `.codex/agents/*.toml`.
   - Wait for completion before proceeding: `wait`.
   - Explicitly close the agent after it finishes (`close_agent`) to release resources.
 - Keep prompt-level sequencing intact; do not continue to subsequent steps until waiting + closure are complete.

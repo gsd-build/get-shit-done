@@ -38,6 +38,7 @@ node <gsd-tools-path> state load --raw
 3. Execute the debug flow defined in this command (no separate workflow file exists in the gsd commands set).
 4. Translate each Task(...) in the debug flow into:
    - spawn_agent with the matching role file context from .claude/agents/.
+   - Set `agent_type` to the matching GSD role (gsd-*).
    - wait for each spawned agent and apply returned output before moving forward.
 5. Preserve all gates and routing from upstream workflow.
 6. Preserve commit behavior using 
