@@ -818,7 +818,7 @@ jobs:
           3. Run: node scripts/generate-prompts.mjs
           4. Run: node scripts/verify-prompts.mjs
           5. Both must pass.
-          6. Open a PR from your working branch targeting base: automated/upstream-sync (NOT main).
+          6. Open a PR from the copilot/* branch you created in this task targeting base: automated/upstream-sync (NOT main).
           7. PR title: "sync: upstream changes (conflict resolved by agent)"
           8. If the conflict cannot be resolved autonomously, write "DEAD_END" to /tmp/repair-dead-end.txt and stop.
 
