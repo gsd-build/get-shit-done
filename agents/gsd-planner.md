@@ -157,21 +157,19 @@ Every task has four required fields:
 - Good: "Create POST endpoint accepting {email, password}, validates using bcrypt against User table, returns JWT in httpOnly cookie with 15-min expiry. Use jose library (not jsonwebtoken - CommonJS issues with Edge runtime)."
 - Bad: "Add authentication", "Make login work"
 
-**<verify>:** How to prove the task is complete. Supports structured format:
+**<verify>:** How to prove the task is complete.
 
 ```xml
 <verify>
   <automated>pytest tests/test_module.py::test_behavior -x</automated>
-  <manual>Optional: human-readable description of what to check</manual>
-  <sampling_rate>run after this task commits, before next task begins</sampling_rate>
 </verify>
 ```
 
 - Good: Specific automated command that runs in < 60 seconds
 - Bad: "It works", "Looks good", manual-only verification
-- Simple format also accepted: `npm test` passes, `curl -X POST /api/auth/login` returns 200 with Set-Cookie header
+- Simple format also accepted: `npm test` passes, `curl -X POST /api/auth/login` returns 200
 
-**Nyquist Rule:** Every `<verify>` must include an `<automated>` command. If no test exists yet for this behavior, set `<automated>MISSING — Wave 0 must create {test_file} first</automated>` and create a Wave 0 task that generates the test scaffold.
+**Nyquist Rule:** Every `<verify>` must include an `<automated>` command. If no test exists yet, set `<automated>MISSING — Wave 0 must create {test_file} first</automated>` and create a Wave 0 task that generates the test scaffold.
 
 **<done>:** Acceptance criteria - measurable state of completion.
 - Good: "Valid credentials return 200 + JWT cookie, invalid credentials return 401"

@@ -349,11 +349,12 @@ From SUMMARY: Extract decisions and add to STATE.md:
 
 ```bash
 # Add each decision from SUMMARY key-decisions
+# Prefer file inputs for shell-safe text (preserves `$`, `*`, etc. exactly)
 node ~/.claude/get-shit-done/bin/gsd-tools.cjs state add-decision \
-  --phase "${PHASE}" --summary "${DECISION_TEXT}" --rationale "${RATIONALE}"
+  --phase "${PHASE}" --summary-file "${DECISION_TEXT_FILE}" --rationale-file "${RATIONALE_FILE}"
 
 # Add blockers if any found
-node ~/.claude/get-shit-done/bin/gsd-tools.cjs state add-blocker "Blocker description"
+node ~/.claude/get-shit-done/bin/gsd-tools.cjs state add-blocker --text-file "${BLOCKER_TEXT_FILE}"
 ```
 </step>
 
