@@ -9,23 +9,13 @@ Read all files referenced by the invoking prompt's execution_context before star
 <process>
 
 <step name="init_context">
-**Load progress context (with file contents to avoid redundant reads):**
+**Load progress context (paths only):**
 
 ```bash
-INIT_RAW=$(node ~/.claude/get-shit-done/bin/gsd-tools.cjs init progress --include state,roadmap,project,config)
-# Large payloads are written to a tmpfile — output starts with @file:/path
-if [[ "$INIT_RAW" == @file:* ]]; then
-  INIT_FILE="${INIT_RAW#@file:}"
-  INIT=$(cat "$INIT_FILE")
-  rm -f "$INIT_FILE"
-else
-  INIT="$INIT_RAW"
-fi
+INIT=$(node ~/.claude/get-shit-done/bin/gsd-tools.cjs init progress)
 ```
 
-Extract from init JSON: `project_exists`, `roadmap_exists`, `state_exists`, `phases`, `current_phase`, `next_phase`, `milestone_version`, `completed_count`, `phase_count`, `paused_at`.
-
-**File contents (from --include):** `state_content`, `roadmap_content`, `project_content`, `config_content`. These are null if files don't exist.
+Extract from init JSON: `project_exists`, `roadmap_exists`, `state_exists`, `phases`, `current_phase`, `next_phase`, `milestone_version`, `completed_count`, `phase_count`, `paused_at`, `state_path`, `roadmap_path`, `project_path`, `config_path`.
 
 If `project_exists` is false (no `.planning/` directory):
 
@@ -47,15 +37,13 @@ If missing both ROADMAP.md and PROJECT.md: suggest `/gsd:new-project`.
 </step>
 
 <step name="load">
-**Use project context from INIT:**
+**Use structured extraction from gsd-tools:**
 
-All file contents are already loaded via `--include` in init_context step:
-- `state_content` — living memory (position, decisions, issues)
-- `roadmap_content` — phase structure and objectives
-- `project_content` — current state (What This Is, Core Value, Requirements)
-- `config_content` — settings (model_profile, workflow toggles)
+Instead of reading full files, use targeted tools to get only the data needed for the report:
+- `ROADMAP=$(node ~/.claude/get-shit-done/bin/gsd-tools.cjs roadmap analyze)`
+- `STATE=$(node ~/.claude/get-shit-done/bin/gsd-tools.cjs state-snapshot)`
 
-No additional file reads needed.
+This minimizes orchestrator context usage.
 </step>
 
 <step name="analyze_roadmap">
@@ -89,9 +77,8 @@ Use this instead of manually reading/parsing ROADMAP.md.
 <step name="position">
 **Parse current position from init context and roadmap analysis:**
 
-- Use `current_phase` and `next_phase` from roadmap analyze
-- Use phase-level `has_context` and `has_research` flags from analyze
-- Note `paused_at` if work was paused (from init context)
+- Use `current_phase` and `next_phase` from `$ROADMAP`
+- Note `paused_at` if work was paused (from `$STATE`)
 - Count pending todos: use `init todos` or `list-todos`
 - Check for active debug sessions: `ls .planning/debug/*.md 2>/dev/null | grep -v resolved | wc -l`
   </step>
@@ -122,11 +109,12 @@ Plan [M] of [phase-total]: [status]
 CONTEXT: [✓ if has_context | - if not]
 
 ## Key Decisions Made
-- [decision 1 from STATE.md]
-- [decision 2]
+- [extract from $STATE.decisions[]]
+- [e.g. jq -r '.decisions[].decision' from state-snapshot]
 
 ## Blockers/Concerns
-- [any blockers or concerns from STATE.md]
+- [extract from $STATE.blockers[]]
+- [e.g. jq -r '.blockers[].text' from state-snapshot]
 
 ## Pending Todos
 - [count] pending — /gsd:check-todos to review

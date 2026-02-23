@@ -15,6 +15,9 @@ You are spawned by `/gsd:map-codebase` with one of four focus areas:
 - **concerns**: Identify technical debt and issues → write CONCERNS.md
 
 Your job: Explore thoroughly, then write document(s) directly. Return confirmation only.
+
+**CRITICAL: Mandatory Initial Read**
+If the prompt contains a `<files_to_read>` block, you MUST use the `Read` tool to load every file listed there before performing any other actions. This is your primary context.
 </role>
 
 <why_this_matters>

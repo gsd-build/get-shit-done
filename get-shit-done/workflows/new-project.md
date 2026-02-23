@@ -49,7 +49,7 @@ The document should describe what you want to build.
 INIT=$(node ~/.claude/get-shit-done/bin/gsd-tools.cjs init new-project)
 ```
 
-Parse JSON for: `researcher_model`, `synthesizer_model`, `roadmapper_model`, `commit_docs`, `project_exists`, `has_codebase_map`, `planning_exists`, `has_existing_code`, `has_package_file`, `is_brownfield`, `needs_codebase_map`, `has_git`.
+Parse JSON for: `researcher_model`, `synthesizer_model`, `roadmapper_model`, `commit_docs`, `project_exists`, `has_codebase_map`, `planning_exists`, `has_existing_code`, `has_package_file`, `is_brownfield`, `needs_codebase_map`, `has_git`, `project_path`.
 
 **If `project_exists` is true:** Error — project already initialized. Use `/gsd:progress`.
 
@@ -541,7 +541,7 @@ Display spawning indicator:
   → Pitfalls research
 ```
 
-Spawn 4 parallel gsd-project-researcher agents with rich context:
+Spawn 4 parallel gsd-project-researcher agents with path references:
 
 ```
 Task(prompt="First, read ~/.claude/agents/gsd-project-researcher.md for your role and instructions.
@@ -561,9 +561,9 @@ Subsequent: Research what's needed to add [target features] to an existing [doma
 What's the standard 2025 stack for [domain]?
 </question>
 
-<project_context>
-[PROJECT.md summary - core value, constraints, what they're building]
-</project_context>
+<files_to_read>
+- {project_path} (Project context and goals)
+</files_to_read>
 
 <downstream_consumer>
 Your STACK.md feeds into roadmap creation. Be prescriptive:
@@ -601,9 +601,9 @@ Subsequent: How do [target features] typically work? What's expected behavior?
 What features do [domain] products have? What's table stakes vs differentiating?
 </question>
 
-<project_context>
-[PROJECT.md summary]
-</project_context>
+<files_to_read>
+- {project_path} (Project context)
+</files_to_read>
 
 <downstream_consumer>
 Your FEATURES.md feeds into requirements definition. Categorize clearly:
@@ -641,9 +641,9 @@ Subsequent: How do [target features] integrate with existing [domain] architectu
 How are [domain] systems typically structured? What are major components?
 </question>
 
-<project_context>
-[PROJECT.md summary]
-</project_context>
+<files_to_read>
+- {project_path} (Project context)
+</files_to_read>
 
 <downstream_consumer>
 Your ARCHITECTURE.md informs phase structure in roadmap. Include:
@@ -681,9 +681,9 @@ Subsequent: What are common mistakes when adding [target features] to [domain]?
 What do [domain] projects commonly get wrong? Critical mistakes?
 </question>
 
-<project_context>
-[PROJECT.md summary]
-</project_context>
+<files_to_read>
+- {project_path} (Project context)
+</files_to_read>
 
 <downstream_consumer>
 Your PITFALLS.md prevents mistakes in roadmap/planning. For each pitfall:
@@ -713,13 +713,12 @@ Task(prompt="
 Synthesize research outputs into SUMMARY.md.
 </task>
 
-<research_files>
-Read these files:
+<files_to_read>
 - .planning/research/STACK.md
 - .planning/research/FEATURES.md
 - .planning/research/ARCHITECTURE.md
 - .planning/research/PITFALLS.md
-</research_files>
+</files_to_read>
 
 <output>
 Write to: .planning/research/SUMMARY.md
@@ -902,23 +901,18 @@ Display stage banner:
 ◆ Spawning roadmapper...
 ```
 
-Spawn gsd-roadmapper agent with context:
+Spawn gsd-roadmapper agent with path references:
 
 ```
 Task(prompt="
 <planning_context>
 
-**Project:**
-@.planning/PROJECT.md
-
-**Requirements:**
-@.planning/REQUIREMENTS.md
-
-**Research (if exists):**
-@.planning/research/SUMMARY.md
-
-**Config:**
-@.planning/config.json
+<files_to_read>
+- .planning/PROJECT.md (Project context)
+- .planning/REQUIREMENTS.md (v1 Requirements)
+- .planning/research/SUMMARY.md (Research findings - if exists)
+- .planning/config.json (Depth and mode settings)
+</files_to_read>
 
 </planning_context>
 
@@ -1006,7 +1000,9 @@ Use AskUserQuestion:
   User feedback on roadmap:
   [user's notes]
 
-  Current ROADMAP.md: @.planning/ROADMAP.md
+  <files_to_read>
+  - .planning/ROADMAP.md (Current roadmap to revise)
+  </files_to_read>
 
   Update the roadmap based on feedback. Edit files in place.
   Return ROADMAP REVISED with changes made.

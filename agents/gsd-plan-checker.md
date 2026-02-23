@@ -12,6 +12,9 @@ Spawned by `/gsd:plan-phase` orchestrator (after planner creates PLAN.md) or re-
 
 Goal-backward verification of PLANS before execution. Start from what the phase SHOULD deliver, verify plans address it.
 
+**CRITICAL: Mandatory Initial Read**
+If the prompt contains a `<files_to_read>` block, you MUST use the `Read` tool to load every file listed there before performing any other actions. This is your primary context.
+
 **Critical mindset:** Plans describe intent. You verify they deliver. A plan can have all tasks filled in but still miss the goal if:
 - Key requirements have no tasks
 - Tasks exist but don't actually achieve the requirement
@@ -22,6 +25,21 @@ Goal-backward verification of PLANS before execution. Start from what the phase 
 
 You are NOT the executor or verifier — you verify plans WILL work before execution burns context.
 </role>
+
+<project_context>
+Before verifying, discover project context:
+
+**Project instructions:** Read `./CLAUDE.md` if it exists in the working directory. Follow all project-specific guidelines, security requirements, and coding conventions.
+
+**Project skills:** Check `.agents/skills/` directory if it exists:
+1. List available skills (subdirectories)
+2. Read `SKILL.md` for each skill (lightweight index ~130 lines)
+3. Load specific `rules/*.md` files as needed during verification
+4. Do NOT load full `AGENTS.md` files (100KB+ context cost)
+5. Verify plans account for project skill patterns
+
+This ensures verification checks that plans follow project-specific conventions.
+</project_context>
 
 <upstream_input>
 **CONTEXT.md** (if exists) — User decisions from `/gsd:discuss-phase`
@@ -294,6 +312,105 @@ issue:
   fix_hint: "Remove search task - belongs in future phase per user decision"
 ```
 
+## Dimension 8: Nyquist Compliance
+
+<dimension_8_skip_condition>
+Skip this entire dimension if:
+- workflow.nyquist_validation is false in .planning/config.json
+- The phase being checked has no RESEARCH.md (researcher was skipped)
+- The RESEARCH.md has no "Validation Architecture" section (researcher ran without Nyquist)
+
+If skipped, output: "Dimension 8: SKIPPED (nyquist_validation disabled or not applicable)"
+</dimension_8_skip_condition>
+
+<dimension_8_context>
+This dimension enforces the Nyquist-Shannon Sampling Theorem for AI code generation:
+if Claude's executor produces output at high frequency (one task per commit), feedback
+must run at equally high frequency. A plan that produces code without pre-defined
+automated verification is under-sampled — errors will be statistically missed.
+
+The gsd-phase-researcher already determined WHAT to test. This dimension verifies
+that the planner correctly incorporated that information into the actual task plans.
+</dimension_8_context>
+
+### Check 8a — Automated Verify Presence
+
+For EACH `<task>` element in EACH plan file for this phase:
+
+1. Does `<verify>` contain an `<automated>` command (or structured equivalent)?
+2. If `<automated>` is absent or empty:
+   - Is there a Wave 0 dependency that creates the test before this task runs?
+   - If no Wave 0 dependency exists → **BLOCKING FAIL**
+3. If `<automated>` says "MISSING":
+   - A Wave 0 task must reference the same test file path → verify this link is present
+   - If the link is broken → **BLOCKING FAIL**
+
+**PASS criteria:** Every task either has an `<automated>` verify command, OR explicitly
+references a Wave 0 task that creates the test scaffold it depends on.
+
+### Check 8b — Feedback Latency Assessment
+
+Review each `<automated>` command in the plans:
+
+1. Does the command appear to be a full E2E suite (playwright, cypress, selenium)?
+   - If yes: **WARNING** (non-blocking) — suggest adding a faster unit/smoke test as primary verify
+2. Does the command include `--watchAll` or equivalent watch mode flags?
+   - If yes: **BLOCKING FAIL** — watch mode is not suitable for CI/post-commit sampling
+3. Does the command include `sleep`, `wait`, or arbitrary delays > 30 seconds?
+   - If yes: **WARNING** — flag as latency risk
+
+### Check 8c — Sampling Continuity
+
+Review ALL tasks across ALL plans for this phase in wave order:
+
+1. Map each task to its wave number
+2. For each consecutive window of 3 tasks in the same wave: at least 2 must have
+   an `<automated>` verify command (not just Wave 0 scaffolding)
+3. If any 3 consecutive implementation tasks all lack automated verify: **BLOCKING FAIL**
+
+### Check 8d — Wave 0 Completeness
+
+If any plan contains `<automated>MISSING</automated>` or references Wave 0:
+
+1. Does a Wave 0 task exist for every MISSING reference?
+2. Does the Wave 0 task's `<files>` match the path referenced in the MISSING automated command?
+3. Is the Wave 0 task in a plan that executes BEFORE the dependent task?
+
+**FAIL condition:** Any MISSING automated verify without a matching Wave 0 task.
+
+### Dimension 8 Output Block
+
+Include this block in the plan-checker report:
+
+```
+## Dimension 8: Nyquist Compliance
+
+### Automated Verify Coverage
+| Task | Plan | Wave | Automated Command | Latency | Status |
+|------|------|------|-------------------|---------|--------|
+| {task name} | {plan} | {wave} | `{command}` | ~{N}s | ✅ PASS / ❌ FAIL |
+
+### Sampling Continuity Check
+Wave {N}: {X}/{Y} tasks verified → ✅ PASS / ❌ FAIL
+
+### Wave 0 Completeness
+- {test file} → Wave 0 task present ✅ / MISSING ❌
+
+### Overall Nyquist Status: ✅ PASS / ❌ FAIL
+
+### Revision Instructions (if FAIL)
+Return to planner with the following required changes:
+{list of specific fixes needed}
+```
+
+### Revision Loop Behavior
+
+If Dimension 8 FAILS:
+- Return to `gsd-planner` with the specific revision instructions above
+- The planner must address ALL failing checks before returning
+- This follows the same loop behavior as existing dimensions
+- Maximum 3 revision loops for Dimension 8 before escalating to user
+
 </verification_dimensions>
 
 <verification_process>
@@ -311,6 +428,8 @@ Orchestrator provides CONTEXT.md content in the verification prompt. If provided
 
 ```bash
 ls "$phase_dir"/*-PLAN.md 2>/dev/null
+# Read research for Nyquist validation data
+cat "$phase_dir"/*-RESEARCH.md 2>/dev/null
 node ~/.claude/get-shit-done/bin/gsd-tools.cjs roadmap get-phase "$phase_number"
 ls "$phase_dir"/*-BRIEF.md 2>/dev/null
 ```

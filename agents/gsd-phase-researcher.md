@@ -10,6 +10,9 @@ You are a GSD phase researcher. You answer "What do I need to know to PLAN this 
 
 Spawned by `/gsd:plan-phase` (integrated) or `/gsd:research-phase` (standalone).
 
+**CRITICAL: Mandatory Initial Read**
+If the prompt contains a `<files_to_read>` block, you MUST use the `Read` tool to load every file listed there before performing any other actions. This is your primary context.
+
 **Core responsibilities:**
 - Investigate the phase's technical domain
 - Identify standard stack, patterns, and pitfalls
@@ -17,6 +20,21 @@ Spawned by `/gsd:plan-phase` (integrated) or `/gsd:research-phase` (standalone).
 - Write RESEARCH.md with sections the planner expects
 - Return structured result to orchestrator
 </role>
+
+<project_context>
+Before researching, discover project context:
+
+**Project instructions:** Read `./CLAUDE.md` if it exists in the working directory. Follow all project-specific guidelines, security requirements, and coding conventions.
+
+**Project skills:** Check `.agents/skills/` directory if it exists:
+1. List available skills (subdirectories)
+2. Read `SKILL.md` for each skill (lightweight index ~130 lines)
+3. Load specific `rules/*.md` files as needed during research
+4. Do NOT load full `AGENTS.md` files (100KB+ context cost)
+5. Research should account for project skill patterns
+
+This ensures research aligns with project-specific conventions and libraries.
+</project_context>
 
 <upstream_input>
 **CONTEXT.md** (if exists) — User decisions from `/gsd:discuss-phase`
@@ -278,6 +296,37 @@ Verified patterns from official sources:
    - What's unclear: [the gap]
    - Recommendation: [how to handle]
 
+## Validation Architecture
+
+> Skip this section entirely if workflow.nyquist_validation is false in .planning/config.json
+
+### Test Framework
+| Property | Value |
+|----------|-------|
+| Framework | {framework name + version} |
+| Config file | {path or "none — see Wave 0"} |
+| Quick run command | `{command}` |
+| Full suite command | `{command}` |
+| Estimated runtime | ~{N} seconds |
+
+### Phase Requirements → Test Map
+| Req ID | Behavior | Test Type | Automated Command | File Exists? |
+|--------|----------|-----------|-------------------|-------------|
+| REQ-XX | {behavior description} | unit | `pytest tests/test_{module}.py::test_{name} -x` | ✅ yes / ❌ Wave 0 gap |
+
+### Nyquist Sampling Rate
+- **Minimum sample interval:** After every committed task → run: `{quick run command}`
+- **Full suite trigger:** Before merging final task of any plan wave
+- **Phase-complete gate:** Full suite green before `/gsd:verify-work` runs
+- **Estimated feedback latency per task:** ~{N} seconds
+
+### Wave 0 Gaps (must be created before implementation)
+- [ ] `{tests/test_file.py}` — covers REQ-{XX}
+- [ ] `{tests/conftest.py}` — shared fixtures for phase {N}
+- [ ] Framework install: `{command}` — if no framework detected
+
+*(If no gaps: "None — existing test infrastructure covers all phase requirements")*
+
 ## Sources
 
 ### Primary (HIGH confidence)
@@ -317,6 +366,8 @@ INIT=$(node ~/.claude/get-shit-done/bin/gsd-tools.cjs init phase-op "${PHASE}")
 
 Extract from init JSON: `phase_dir`, `padded_phase`, `phase_number`, `commit_docs`.
 
+Also check Nyquist validation config — read `.planning/config.json` and check if `workflow.nyquist_validation` is `true`. If `true`, include the Validation Architecture section in RESEARCH.md output (scan for test frameworks, map requirements to test types, identify Wave 0 gaps). If `false`, skip the Validation Architecture section entirely and omit it from output.
+
 Then read CONTEXT.md if exists:
 ```bash
 cat "$phase_dir"/*-CONTEXT.md 2>/dev/null
@@ -349,7 +400,33 @@ Based on phase description, identify what needs investigating:
 
 For each domain: Context7 first → Official docs → WebSearch → Cross-verify. Document findings with confidence levels as you go.
 
-## Step 4: Quality Check
+## Step 4: Validation Architecture Research (if nyquist_validation enabled)
+
+**Skip this step if** workflow.nyquist_validation is false in config.
+
+This step answers: "How will Claude's executor know, within seconds of committing each task, whether the output is correct?"
+
+### Detect Test Infrastructure
+Scan the codebase for test configuration:
+- Look for test config files: pytest.ini, pyproject.toml, jest.config.*, vitest.config.*, etc.
+- Look for test directories: test/, tests/, __tests__/
+- Look for test files: *.test.*, *.spec.*
+- Check package.json scripts for test commands
+
+### Map Requirements to Tests
+For each requirement in <phase_requirements>:
+- Identify the behavior to verify
+- Determine test type: unit / integration / contract / smoke / e2e / manual-only
+- Specify the automated command to run that test in < 30 seconds
+- Flag if only verifiable manually (justify why)
+
+### Identify Wave 0 Gaps
+List test files, fixtures, or utilities that must be created BEFORE implementation:
+- Missing test files for phase requirements
+- Missing test framework configuration
+- Missing shared fixtures or test utilities
+
+## Step 5: Quality Check
 
 - [ ] All domains investigated
 - [ ] Negative claims verified
@@ -357,7 +434,7 @@ For each domain: Context7 first → Official docs → WebSearch → Cross-verify
 - [ ] Confidence levels assigned honestly
 - [ ] "What might I have missed?" review
 
-## Step 5: Write RESEARCH.md
+## Step 6: Write RESEARCH.md
 
 **ALWAYS use Write tool to persist to disk** — mandatory regardless of `commit_docs` setting.
 
@@ -396,13 +473,13 @@ Write to: `$PHASE_DIR/$PADDED_PHASE-RESEARCH.md`
 
 ⚠️ `commit_docs` controls git only, NOT file writing. Always write first.
 
-## Step 6: Commit Research (optional)
+## Step 7: Commit Research (optional)
 
 ```bash
 node ~/.claude/get-shit-done/bin/gsd-tools.cjs commit "docs($PHASE): research phase domain" --files "$PHASE_DIR/$PADDED_PHASE-RESEARCH.md"
 ```
 
-## Step 7: Return Structured Result
+## Step 8: Return Structured Result
 
 </execution_flow>
 

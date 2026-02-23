@@ -34,12 +34,8 @@ If exists: Offer update/view/skip options.
 ## Step 3: Gather Phase Context
 
 ```bash
-# Phase section from roadmap (already loaded in PHASE_INFO)
-echo "$PHASE_INFO" | jq -r '.section'
-cat .planning/REQUIREMENTS.md 2>/dev/null
-cat .planning/phases/${PHASE}-*/*-CONTEXT.md 2>/dev/null
-# Decisions from state-snapshot (structured JSON)
-node ~/.claude/get-shit-done/bin/gsd-tools.cjs state-snapshot | jq '.decisions'
+INIT=$(node ~/.claude/get-shit-done/bin/gsd-tools.cjs init phase-op "${PHASE}")
+# Extract: phase_dir, padded_phase, phase_number, state_path, requirements_path, context_path
 ```
 
 ## Step 4: Spawn Researcher
@@ -50,12 +46,15 @@ Task(
 Research implementation approach for Phase {phase}: {name}
 </objective>
 
-<context>
+<files_to_read>
+- {context_path} (USER DECISIONS from /gsd:discuss-phase)
+- {requirements_path} (Project requirements)
+- {state_path} (Project decisions and history)
+</files_to_read>
+
+<additional_context>
 Phase description: {description}
-Requirements: {requirements}
-Prior decisions: {decisions}
-Phase context: {context_md}
-</context>
+</additional_context>
 
 <output>
 Write to: .planning/phases/${PHASE}-{slug}/${PHASE}-RESEARCH.md

@@ -1,6 +1,6 @@
 {
   "name": "get-shit-done-cc",
-  "version": "1.20.4",
+  "version": "1.20.6",
   "description": "A meta-prompting, context engineering and spec-driven development system for Claude Code, OpenCode, Gemini and Codex by TÂCHES.",
   "bin": {
     "get-shit-done-cc": "bin/install.js"
@@ -45,6 +45,6 @@
   "scripts": {
     "build:hooks": "node scripts/build-hooks.js",
     "prepublishOnly": "npm run build:hooks",
-    "test": "node --test get-shit-done/bin/gsd-tools.test.js"
+    "test": "node --test tests/*.test.cjs"
   }
 }

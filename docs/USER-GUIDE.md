@@ -97,6 +97,24 @@ A detailed reference for workflows, troubleshooting, and configuration. For quic
          └── Done
 ```
 
+### Validation Architecture (Nyquist Layer)
+
+During plan-phase research, GSD now maps automated test coverage to each phase
+requirement before any code is written. This ensures that when Claude's executor
+commits a task, a feedback mechanism already exists to verify it within seconds.
+
+The researcher detects your existing test infrastructure, maps each requirement to
+a specific test command, and identifies any test scaffolding that must be created
+before implementation begins (Wave 0 tasks).
+
+The plan-checker enforces this as an 8th verification dimension: plans where tasks
+lack automated verify commands will not be approved.
+
+**Output:** `{phase}-VALIDATION.md` -- the feedback contract for the phase.
+
+**Disable:** Set `workflow.nyquist_validation: false` in `/gsd:settings` for
+rapid prototyping phases where test infrastructure isn't the focus.
+
 ### Execution Wave Coordination
 
 ```
@@ -206,7 +224,8 @@ GSD stores project settings in `.planning/config.json`. Configure during `/gsd:n
   "workflow": {
     "research": true,
     "plan_check": true,
-    "verifier": true
+    "verifier": true,
+    "nyquist_validation": true
   },
   "git": {
     "branching_strategy": "none",
@@ -240,6 +259,7 @@ GSD stores project settings in `.planning/config.json`. Configure during `/gsd:n
 | `workflow.research` | `true`, `false` | `true` | Domain investigation before planning |
 | `workflow.plan_check` | `true`, `false` | `true` | Plan verification loop (up to 3 iterations) |
 | `workflow.verifier` | `true`, `false` | `true` | Post-execution verification against phase goals |
+| `workflow.nyquist_validation` | `true`, `false` | `true` | Validation architecture research during plan-phase; 8th plan-check dimension |
 
 Disable these to speed up phases in familiar domains or when conserving tokens.
 
