@@ -407,6 +407,8 @@ jobs:
           _COPILOT_TOKEN="${GH_TOKEN:-}"
           echo "$_COPILOT_TOKEN" | env -u GH_TOKEN -u GITHUB_TOKEN \
             gh auth login --with-token --hostname github.com 2>&1 || true
+          echo "DEBUG — gh auth status (env vars cleared):"
+          env -u GH_TOKEN -u GITHUB_TOKEN gh auth status 2>&1 || true
           env -u GH_TOKEN -u GITHUB_TOKEN gh agent-task create \
             --repo "$GITHUB_REPOSITORY" \
             --base "automated/upstream-sync" \
@@ -869,6 +871,8 @@ jobs:
           _COPILOT_TOKEN="${GH_TOKEN:-}"
           echo "$_COPILOT_TOKEN" | env -u GH_TOKEN -u GITHUB_TOKEN \
             gh auth login --with-token --hostname github.com 2>&1 || true
+          echo "DEBUG — gh auth status (env vars cleared):"
+          env -u GH_TOKEN -u GITHUB_TOKEN gh auth status 2>&1 || true
           env -u GH_TOKEN -u GITHUB_TOKEN gh agent-task create \
             --repo "$GITHUB_REPOSITORY" \
             --base "automated/upstream-sync" \

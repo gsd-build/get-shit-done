@@ -16,6 +16,13 @@ function cmdInitExecutePhase(cwd, phase, raw) {
   const phaseInfo = findPhaseInternal(cwd, phase);
   const milestone = getMilestoneInfo(cwd);
 
+  const roadmapPhase = getRoadmapPhaseInternal(cwd, phase);
+  const reqMatch = roadmapPhase?.section?.match(/^\*\*Requirements\*\*:[^\S\n]*([^\n]*)$/m);
+  const reqExtracted = reqMatch
+    ? reqMatch[1].replace(/[\[\]]/g, '').split(',').map(s => s.trim()).filter(Boolean).join(', ')
+    : null;
+  const phase_req_ids = (reqExtracted && reqExtracted !== 'TBD') ? reqExtracted : null;
+
   const result = {
     // Models
     executor_model: resolveModelInternal(cwd, 'gsd-executor'),
@@ -35,6 +42,7 @@ function cmdInitExecutePhase(cwd, phase, raw) {
     phase_number: phaseInfo?.phase_number || null,
     phase_name: phaseInfo?.phase_name || null,
     phase_slug: phaseInfo?.phase_slug || null,
+    phase_req_ids,
 
     // Plan inventory
     plans: phaseInfo?.plans || [],
@@ -80,6 +88,13 @@ function cmdInitPlanPhase(cwd, phase, raw) {
   const config = loadConfig(cwd);
   const phaseInfo = findPhaseInternal(cwd, phase);
 
+  const roadmapPhase = getRoadmapPhaseInternal(cwd, phase);
+  const reqMatch = roadmapPhase?.section?.match(/^\*\*Requirements\*\*:[^\S\n]*([^\n]*)$/m);
+  const reqExtracted = reqMatch
+    ? reqMatch[1].replace(/[\[\]]/g, '').split(',').map(s => s.trim()).filter(Boolean).join(', ')
+    : null;
+  const phase_req_ids = (reqExtracted && reqExtracted !== 'TBD') ? reqExtracted : null;
+
   const result = {
     // Models
     researcher_model: resolveModelInternal(cwd, 'gsd-phase-researcher'),
@@ -99,6 +114,7 @@ function cmdInitPlanPhase(cwd, phase, raw) {
     phase_name: phaseInfo?.phase_name || null,
     phase_slug: phaseInfo?.phase_slug || null,
     padded_phase: phaseInfo?.phase_number?.padStart(2, '0') || null,
+    phase_req_ids,
 
     // Existing artifacts
     has_research: phaseInfo?.has_research || false,
@@ -595,7 +611,7 @@ function cmdInitProgress(cwd, raw) {
     const dirs = entries.filter(e => e.isDirectory()).map(e => e.name).sort();
 
     for (const dir of dirs) {
-      const match = dir.match(/^(\d+(?:\.\d+)?)-?(.*)/);
+      const match = dir.match(/^(\d+(?:\.\d+)*)-?(.*)/);
       const phaseNumber = match ? match[1] : dir;
       const phaseName = match && match[2] ? match[2] : null;
 

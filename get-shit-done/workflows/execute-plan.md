@@ -118,6 +118,8 @@ Pattern B only (verify-only checkpoints). Skip for A/C.
 cat .planning/phases/XX-name/{phase}-{plan}-PLAN.md
 ```
 This IS the execution instructions. Follow exactly. If plan references CONTEXT.md: honor user's vision throughout.
+
+**If plan contains `<interfaces>` block:** These are pre-extracted type definitions and contracts. Use them directly — do NOT re-read the source files to discover types. The planner already extracted what you need.
 </step>
 
 <step name="previous_phase_check">
@@ -349,11 +351,12 @@ From SUMMARY: Extract decisions and add to STATE.md:
 
 ```bash
 # Add each decision from SUMMARY key-decisions
+# Prefer file inputs for shell-safe text (preserves `$`, `*`, etc. exactly)
 node ~/.claude/get-shit-done/bin/gsd-tools.cjs state add-decision \
-  --phase "${PHASE}" --summary "${DECISION_TEXT}" --rationale "${RATIONALE}"
+  --phase "${PHASE}" --summary-file "${DECISION_TEXT_FILE}" --rationale-file "${RATIONALE_FILE}"
 
 # Add blockers if any found
-node ~/.claude/get-shit-done/bin/gsd-tools.cjs state add-blocker "Blocker description"
+node ~/.claude/get-shit-done/bin/gsd-tools.cjs state add-blocker --text-file "${BLOCKER_TEXT_FILE}"
 ```
 </step>
 

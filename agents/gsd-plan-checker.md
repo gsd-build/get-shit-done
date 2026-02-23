@@ -314,102 +314,48 @@ issue:
 
 ## Dimension 8: Nyquist Compliance
 
-<dimension_8_skip_condition>
-Skip this entire dimension if:
-- workflow.nyquist_validation is false in .planning/config.json
-- The phase being checked has no RESEARCH.md (researcher was skipped)
-- The RESEARCH.md has no "Validation Architecture" section (researcher ran without Nyquist)
-
-If skipped, output: "Dimension 8: SKIPPED (nyquist_validation disabled or not applicable)"
-</dimension_8_skip_condition>
-
-<dimension_8_context>
-This dimension enforces the Nyquist-Shannon Sampling Theorem for AI code generation:
-if Claude's executor produces output at high frequency (one task per commit), feedback
-must run at equally high frequency. A plan that produces code without pre-defined
-automated verification is under-sampled — errors will be statistically missed.
-
-The gsd-phase-researcher already determined WHAT to test. This dimension verifies
-that the planner correctly incorporated that information into the actual task plans.
-</dimension_8_context>
+Skip if: `workflow.nyquist_validation` is false, phase has no RESEARCH.md, or RESEARCH.md has no "Validation Architecture" section. Output: "Dimension 8: SKIPPED (nyquist_validation disabled or not applicable)"
 
 ### Check 8a — Automated Verify Presence
 
-For EACH `<task>` element in EACH plan file for this phase:
-
-1. Does `<verify>` contain an `<automated>` command (or structured equivalent)?
-2. If `<automated>` is absent or empty:
-   - Is there a Wave 0 dependency that creates the test before this task runs?
-   - If no Wave 0 dependency exists → **BLOCKING FAIL**
-3. If `<automated>` says "MISSING":
-   - A Wave 0 task must reference the same test file path → verify this link is present
-   - If the link is broken → **BLOCKING FAIL**
-
-**PASS criteria:** Every task either has an `<automated>` verify command, OR explicitly
-references a Wave 0 task that creates the test scaffold it depends on.
+For each `<task>` in each plan:
+- `<verify>` must contain `<automated>` command, OR a Wave 0 dependency that creates the test first
+- If `<automated>` is absent with no Wave 0 dependency → **BLOCKING FAIL**
+- If `<automated>` says "MISSING", a Wave 0 task must reference the same test file path → **BLOCKING FAIL** if link broken
 
 ### Check 8b — Feedback Latency Assessment
 
-Review each `<automated>` command in the plans:
-
-1. Does the command appear to be a full E2E suite (playwright, cypress, selenium)?
-   - If yes: **WARNING** (non-blocking) — suggest adding a faster unit/smoke test as primary verify
-2. Does the command include `--watchAll` or equivalent watch mode flags?
-   - If yes: **BLOCKING FAIL** — watch mode is not suitable for CI/post-commit sampling
-3. Does the command include `sleep`, `wait`, or arbitrary delays > 30 seconds?
-   - If yes: **WARNING** — flag as latency risk
+For each `<automated>` command:
+- Full E2E suite (playwright, cypress, selenium) → **WARNING** — suggest faster unit/smoke test
+- Watch mode flags (`--watchAll`) → **BLOCKING FAIL**
+- Delays > 30 seconds → **WARNING**
 
 ### Check 8c — Sampling Continuity
 
-Review ALL tasks across ALL plans for this phase in wave order:
-
-1. Map each task to its wave number
-2. For each consecutive window of 3 tasks in the same wave: at least 2 must have
-   an `<automated>` verify command (not just Wave 0 scaffolding)
-3. If any 3 consecutive implementation tasks all lack automated verify: **BLOCKING FAIL**
+Map tasks to waves. Per wave, any consecutive window of 3 implementation tasks must have ≥2 with `<automated>` verify. 3 consecutive without → **BLOCKING FAIL**.
 
 ### Check 8d — Wave 0 Completeness
 
-If any plan contains `<automated>MISSING</automated>` or references Wave 0:
+For each `<automated>MISSING</automated>` reference:
+- Wave 0 task must exist with matching `<files>` path
+- Wave 0 plan must execute before dependent task
+- Missing match → **BLOCKING FAIL**
 
-1. Does a Wave 0 task exist for every MISSING reference?
-2. Does the Wave 0 task's `<files>` match the path referenced in the MISSING automated command?
-3. Is the Wave 0 task in a plan that executes BEFORE the dependent task?
-
-**FAIL condition:** Any MISSING automated verify without a matching Wave 0 task.
-
-### Dimension 8 Output Block
-
-Include this block in the plan-checker report:
+### Dimension 8 Output
 
 ```
 ## Dimension 8: Nyquist Compliance
 
-### Automated Verify Coverage
-| Task | Plan | Wave | Automated Command | Latency | Status |
-|------|------|------|-------------------|---------|--------|
-| {task name} | {plan} | {wave} | `{command}` | ~{N}s | ✅ PASS / ❌ FAIL |
+| Task | Plan | Wave | Automated Command | Status |
+|------|------|------|-------------------|--------|
+| {task} | {plan} | {wave} | `{command}` | ✅ / ❌ |
 
-### Sampling Continuity Check
-Wave {N}: {X}/{Y} tasks verified → ✅ PASS / ❌ FAIL
-
-### Wave 0 Completeness
-- {test file} → Wave 0 task present ✅ / MISSING ❌
-
-### Overall Nyquist Status: ✅ PASS / ❌ FAIL
-
-### Revision Instructions (if FAIL)
-Return to planner with the following required changes:
-{list of specific fixes needed}
+Sampling: Wave {N}: {X}/{Y} verified → ✅ / ❌
+Wave 0: {test file} → ✅ present / ❌ MISSING
+Overall: ✅ PASS / ❌ FAIL
 ```
 
-### Revision Loop Behavior
-
-If Dimension 8 FAILS:
-- Return to `gsd-planner` with the specific revision instructions above
-- The planner must address ALL failing checks before returning
-- This follows the same loop behavior as existing dimensions
-- Maximum 3 revision loops for Dimension 8 before escalating to user
+If FAIL: return to planner with specific fixes. Same revision loop as other dimensions (max 3 loops).
 
 </verification_dimensions>
 

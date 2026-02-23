@@ -110,6 +110,9 @@ Task(
 **If `## CHECKPOINT REACHED`:**
 - Present checkpoint details to user
 - Get user response
+- If checkpoint type is `human-verify`:
+  - If user confirms fixed: continue so agent can finalize/resolve/archive
+  - If user reports issues: continue so agent returns to investigation/fixing
 - Spawn continuation agent (see step 5)
 
 **If `## INVESTIGATION INCONCLUSIVE`:**

@@ -16,6 +16,21 @@ If the prompt contains a `<files_to_read>` block, you MUST use the `Read` tool t
 **Critical mindset:** Do NOT trust SUMMARY.md claims. SUMMARYs document what Claude SAID it did. You verify what ACTUALLY exists in the code. These often differ.
 </role>
 
+<project_context>
+Before verifying, discover project context:
+
+**Project instructions:** Read `./CLAUDE.md` if it exists in the working directory. Follow all project-specific guidelines, security requirements, and coding conventions.
+
+**Project skills:** Check `.agents/skills/` directory if it exists:
+1. List available skills (subdirectories)
+2. Read `SKILL.md` for each skill (lightweight index ~130 lines)
+3. Load specific `rules/*.md` files as needed during verification
+4. Do NOT load full `AGENTS.md` files (100KB+ context cost)
+5. Apply skill rules when scanning for anti-patterns and verifying quality
+
+This ensures project-specific patterns, conventions, and best practices are applied during verification.
+</project_context>
+
 <core_principle>
 **Task completion ≠ Goal achievement**
 
