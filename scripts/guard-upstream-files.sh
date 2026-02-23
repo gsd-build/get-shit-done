@@ -43,15 +43,11 @@ elif [ "$MODE" = "post-commit" ]; then
   if [ -n "$VIOLATIONS" ]; then
     echo "::error::Filesystem guard (post-commit): repair agent committed changes to upstream-owned files:"
     echo "$VIOLATIONS"
-    # Revert each violated file:
-    #   - If the file exists in upstream/main: restore it to that state.
-    #   - If the file was created by the agent (doesn't exist in upstream/main): delete it.
+    # Restore each violated file to its upstream/main state.
+    # Every violation is guaranteed to exist in upstream/main because VIOLATIONS
+    # is the intersection of committed-files with the upstream-owned file list.
     echo "$VIOLATIONS" | while IFS= read -r f; do
-      if git cat-file -e "upstream/main:$f" 2>/dev/null; then
-        git checkout upstream/main -- "$f"
-      else
-        git rm -f -- "$f" 2>/dev/null || rm -f -- "$f"
-      fi
+      git checkout upstream/main -- "$f"
     done
     git commit --amend --no-edit || true
     git push --force-with-lease origin HEAD
