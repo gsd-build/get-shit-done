@@ -33,7 +33,7 @@ This roadmap delivers upstream sync tooling for GSD fork maintainers. The journe
 
 Plans:
 - [x] 5-01-PLAN.md — Create upstream.cjs module with configure and fetch operations
-- [ ] 5-02-PLAN.md — Add status and log commands to upstream.cjs
+- [x] 5-02-PLAN.md — Add status and log commands to upstream.cjs
 - [ ] 5-03-PLAN.md — Integrate upstream commands into gsd-tools.cjs CLI
 - [ ] 5-04-PLAN.md — Add notification check for session start integration
 
@@ -89,7 +89,7 @@ Phases execute in numeric order: 5 -> 6 -> 7 -> 8 -> 9
 
 | Phase | Plans Complete | Status | Completed |
 |-------|----------------|--------|-----------|
-| 5. Core Infrastructure | 1/4 | In progress | - |
+| 5. Core Infrastructure | 2/4 | In progress | - |
 | 6. Analysis | 0/? | Not started | - |
 | 7. Merge Operations | 0/? | Not started | - |
 | 8. Interactive & Integration | 0/? | Not started | - |

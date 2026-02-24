@@ -9,12 +9,12 @@
 ## Current Position
 
 **Phase:** 5 - Core Infrastructure
-**Plan:** 5-01 complete, 5-02 ready
+**Plan:** 5-02 complete, 5-03 ready
 **Status:** Executing plans
-**Last activity:** 2026-02-24 — Completed plan 5-01 (upstream.cjs module)
+**Last activity:** 2026-02-24 — Completed plan 5-02 (status and log commands)
 
 ```
-[##..................] 10% - Phase 5 plan 1 complete
+[####................] 20% - Phase 5 plan 2 complete
 ```
 
 **Phases:**
@@ -28,9 +28,9 @@
 
 | Metric | Value |
 |--------|-------|
-| Plans completed (v1.1) | 1 |
+| Plans completed (v1.1) | 2 |
 | Plans failed (v1.1) | 0 |
-| Current streak | 1 |
+| Current streak | 2 |
 | v1.0 plans completed | 11 |
 
 ## Accumulated Context
@@ -50,6 +50,8 @@
 | lib/upstream.cjs module | Follow worktree.cjs/health.cjs pattern; pure functions, testable | 2026-02-23 |
 | Auto-detect upstream URL | Check git remotes, use existing 'upstream' if present | 2026-02-24 |
 | Cache upstream fetch metadata | Store commits_behind, last_fetch, last_sha in config.json | 2026-02-24 |
+| Unicode escape for emojis | Use \uXXXX format for cross-platform compatibility | 2026-02-24 |
+| Conventional commit grouping | Group by COMMIT_TYPES order; fallback to flat list | 2026-02-24 |
 
 ### Implementation Notes
 
@@ -73,7 +75,8 @@
 - [x] Create roadmap
 - [x] Plan Phase 5
 - [x] Execute plan 5-01 (upstream.cjs with configure/fetch)
-- [ ] Execute plan 5-02 (status and log commands)
+- [x] Execute plan 5-02 (status and log commands)
+- [ ] Execute plan 5-03 (notifications)
 
 ### Blockers
 
@@ -82,10 +85,10 @@ None currently.
 ## Session Continuity
 
 **Last Session:** 2026-02-24
-**Context:** Completed plan 5-01 - created lib/upstream.cjs with configure and fetch commands. Module follows worktree.cjs patterns.
+**Context:** Completed plan 5-02 - added cmdUpstreamStatus and cmdUpstreamLog to upstream.cjs. Status shows commits behind with file summary; log groups by conventional commit type with emoji headers.
 
 **To Resume:**
-1. Execute plan 5-02 (status and log commands)
+1. Execute plan 5-03 (notifications integration)
 2. Continue through remaining Phase 5 plans
 
 ---
