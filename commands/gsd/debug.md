@@ -36,7 +36,7 @@ INIT=$(node ~/.claude/get-shit-done/bin/gsd-tools.cjs state load)
 
 Extract `commit_docs` from init JSON. Resolve debugger model:
 ```bash
-DEBUGGER_MODEL=$(node ~/.claude/get-shit-done/bin/gsd-tools.cjs resolve-model gsd-debugger --raw)
+debugger_model=$(node ~/.claude/get-shit-done/bin/gsd-tools.cjs resolve-model gsd-debugger --raw)
 ```
 
 ## 1. Check Active Sessions
