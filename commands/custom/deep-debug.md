@@ -24,6 +24,19 @@ If `$ARGUMENTS` is empty:
 - Print: "Usage: /custom:deep-debug <bug-description>. Example: /custom:deep-debug 'login fails intermittently after auth refactor'"
 - STOP. Do not proceed.
 
+## Limitations vs /gsd:debug
+
+This command runs inline in the current Claude session with **no persistent state across `/clear`**. The `/gsd:debug` command uses the `gsd-debugger` agent with session state files that survive context resets.
+
+| Capability | /custom:deep-debug | /gsd:debug |
+|-----------|-------------------|------------|
+| Structured 4-phase protocol | YES | YES |
+| Persistent state across /clear | NO | YES |
+| Session-isolated subagent | NO | YES |
+| Best for | Single-session deep dives | Multi-session hard bugs |
+
+For bugs that require multiple sessions or context resets, prefer `/gsd:debug`.
+
 ## When to Use This (Not /gsd:debug)
 
 | Situation | Use This | Use /gsd:debug |
@@ -33,8 +46,9 @@ If `$ARGUMENTS` is empty:
 | Regression (was working before) | YES | NO |
 | Root cause unclear | YES | NO |
 | 2+ failed fix attempts | YES | NO |
-| Simple, obvious, single-file bug | NO | YES |
-| Clear error message, obvious fix | NO | YES |
+| Multi-session / needs /clear | NO | YES |
+| Simple, obvious, single-file bug | NO | NO (just fix inline) |
+| Clear error message, obvious fix | NO | NO (just fix inline) |
 
 ## Bug Report: $ARGUMENTS
 
@@ -72,7 +86,7 @@ git log --oneline -20
 git diff HEAD~5 --stat
 
 # Any new dependencies?
-git diff HEAD~5 -- package.json
+git diff HEAD~5 -- package.json pnpm-lock.yaml yarn.lock Cargo.lock
 
 # Config changes?
 git diff HEAD~5 -- '*.config.*' '.env*' 'tsconfig*'
@@ -104,9 +118,9 @@ When bug is deep in call stack:
 
 ```
 Error appears at: [file:line]
-  ← called by: [file:line]
-    ← called by: [file:line]
-      ← called by: [file:line] ← ROOT CAUSE HERE
+  <- called by: [file:line]
+    <- called by: [file:line]
+      <- called by: [file:line] <- ROOT CAUSE HERE
 ```
 
 **NEVER fix just where the error appears.** Trace back to find the original trigger.
@@ -145,30 +159,41 @@ TEST: "[smallest change to verify]"
 - DON'T fix multiple things at once
 
 ### 3.3 Evaluate Result
-- Worked? → Phase 4
-- Didn't work? → Form NEW hypothesis from what you learned
+- Worked? -> Phase 4
+- Didn't work? -> Form NEW hypothesis from what you learned
 - DON'T add more fixes on top
 
 ### 3.4 The 3-Fix Rule
 
-**If 3+ fixes have failed: STOP. Question the architecture.**
+**If 3 full hypothesis-test cycles have failed (each = Phase 1 investigation -> single code change -> verify): STOP. Question the architecture.**
+
+A "fix attempt" is one complete Phase 1-3 cycle, not individual code changes within a single cycle.
 
 Pattern indicating architectural problem:
 - Each fix reveals new shared state/coupling/problem in different place
 - Fixes require "massive refactoring"
 - Each fix creates new symptoms elsewhere
 
-**→ Report findings to user. This is NOT a failed hypothesis - this is a wrong architecture.**
+**-> Report findings to user. This is NOT a failed hypothesis - this is a wrong architecture.**
 
 ## Phase 4: Fix and Verify
 
 ### 4.1 Create Failing Test
-```bash
-# Write test that reproduces the bug
-# This test MUST FAIL before fix
-npm test -- --filter="bug-reproduction"
-# Expected: FAIL (proves test catches the bug)
-```
+
+Detect the project's test runner (do NOT assume npm). Check for these lockfiles/configs in order:
+
+| Lockfile / Config | Test Command |
+|-------------------|-------------|
+| Cargo.toml | `cargo test` |
+| go.mod | `go test ./...` |
+| pnpm-lock.yaml | `pnpm test` |
+| yarn.lock | `yarn test` |
+| bun.lockb | `bun test` |
+| package.json | `npm test` |
+| pyproject.toml / pytest.ini | `pytest` |
+| None found | Ask user for test command |
+
+Use the detected test command throughout Phase 4. Then write a test that reproduces the bug — this test MUST FAIL before the fix.
 
 ### 4.2 Implement Single Fix
 - Address ROOT CAUSE (not symptom)
@@ -185,37 +210,39 @@ BEFORE claiming "fixed":
 2. RUN: Execute the FULL command (fresh, complete)
 3. READ: Full output, check exit code, count failures
 4. VERIFY: Does output confirm the claim?
-   - NO → State actual status with evidence
-   - YES → State claim WITH evidence
+   - NO -> State actual status with evidence
+   - YES -> State claim WITH evidence
 5. ONLY THEN: Claim it's fixed
 ```
 
 **NO "should work now." NO "looks correct." RUN THE COMMAND.**
 
-```bash
-# Regression test passes?
-npm test -- --filter="bug-reproduction"
-# Expected: PASS
-
-# All other tests still pass?
-npm test
-# Expected: ALL PASS
-
-# No new warnings/errors?
-npm run type-check
-# Expected: 0 errors
-```
+Run the project's test runner (detected in 4.1) to verify:
+1. Regression test passes
+2. All other tests still pass
+3. No new warnings/errors (type-check, lint, etc.)
 
 ### 4.4 Document Fix
 
-Update STATE.md (or relevant doc):
+Create the debug directory if it doesn't exist, then write the bug documentation:
+
+```bash
+mkdir -p .planning/debug
+```
+
+Create `.planning/debug/{slug}.md` (NOT STATE.md — STATE.md is read programmatically by gsd-tools.cjs):
+
 ```markdown
-### Bug Fix: [description]
+# Bug Fix: [description]
+
 - **Root cause:** [what actually caused it]
 - **Fix:** [what was changed]
 - **Regression test:** [test file/name]
 - **Phase/commit:** [reference]
+- **Date:** [date]
 ```
+
+Use `Task` tool to spawn a research agent if you need to investigate external dependencies or search for known issues. Use `WebSearch` to check if the bug matches a known framework/library issue.
 
 ### 4.5 Add Defense-in-Depth
 
@@ -246,9 +273,9 @@ Debug is COMPLETE only when ALL are true:
 - [ ] Fix implemented (at source, not symptom)
 - [ ] Regression test written and GREEN
 - [ ] All other tests still GREEN
-- [ ] Type check passes
+- [ ] Type check passes (if applicable)
 - [ ] Fix verified by running actual commands (not "should work")
-- [ ] STATE.md updated with bug documentation
+- [ ] `.planning/debug/{slug}.md` created with bug documentation
 - [ ] Defense-in-depth layers added where appropriate
 
 ## Output Format
@@ -263,8 +290,8 @@ Debug is COMPLETE only when ALL are true:
 [What was changed and why]
 
 ### Evidence
-- Regression test: [test name] → PASS
-- Full test suite: [N/N] → ALL PASS
+- Regression test: [test name] -> PASS
+- Full test suite: [N/N] -> ALL PASS
 - Type check: 0 errors
 
 ### Commits
@@ -274,4 +301,7 @@ Debug is COMPLETE only when ALL are true:
 ### Defense-in-Depth
 - Layer 1: [validation added]
 - Layer 2: [guard added]
+
+### Documentation
+- `.planning/debug/{slug}.md` created
 ```

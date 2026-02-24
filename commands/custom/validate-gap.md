@@ -14,7 +14,9 @@ allowed-tools: Read, Write, Edit, Bash, Glob, Grep, Task, WebSearch, WebFetch
 
 Analyze the gap between new requirements and existing codebase to inform implementation strategy. Run this BEFORE starting implementation, especially at milestone boundaries.
 
-## When to Run (MANDATORY)
+## When to Run (ADVISORY)
+
+There is no automated hook or enforcement that triggers this command. It runs only when you explicitly invoke it. The "mandatory" scenarios below are guidance for the human operator:
 
 1. After every `/gsd:new-milestone` or `/gsd:complete-milestone`
 2. Before major features that touch existing code
@@ -39,13 +41,12 @@ If `.planning/ROADMAP.md` does not exist:
 
 ### 1. Load Context
 
-```bash
-# Find project state
-cat .planning/STATE.md 2>/dev/null
-cat .planning/PROJECT.md 2>/dev/null
-cat .planning/ROADMAP.md 2>/dev/null
-cat .planning/REQUIREMENTS.md 2>/dev/null
-```
+Use the Read tool (not `cat` via Bash) to load project context:
+
+1. Read `.planning/STATE.md` — if missing, warn: "STATE.md not found — gap analysis will have incomplete project context"
+2. Read `.planning/PROJECT.md` — if missing, continue (optional context)
+3. Read `.planning/ROADMAP.md` — already validated in Step 0
+4. Read `.planning/REQUIREMENTS.md` — if missing, warn: "REQUIREMENTS.md not found — requirement mapping will be incomplete"
 
 Read the target milestone/feature requirements from ROADMAP.md or $ARGUMENTS context.
 
@@ -55,11 +56,14 @@ Read the target milestone/feature requirements from ROADMAP.md or $ARGUMENTS con
 
 **Scan for domain-related assets:**
 
-```bash
-# Project structure
-find . -type f -name "*.ts" -o -name "*.tsx" -o -name "*.js" -o -name "*.jsx" | head -50
+Use the Glob tool to scan for source files (preferred over `find` in bash):
 
-# Key modules and directory layout
+```
+Glob: **/*.{ts,tsx,js,jsx,py,rs,go}
+```
+
+For directory structure, use the Bash tool:
+```bash
 ls -la src/ 2>/dev/null || ls -la app/ 2>/dev/null || ls -la packages/ 2>/dev/null
 ```
 
@@ -192,14 +196,17 @@ Generated: [date]
 1. [AD-XXX]: [decision description] — blocking GAP-006
 ```
 
-### 8. Update GSD State
+### 8. Present Report and Update State
 
-```bash
-# If gaps require new phases, update ROADMAP
-# If gaps require architectural decisions, update STATE.md
-```
+**Do NOT make ROADMAP changes automatically.** Present the gap report to the user first.
 
-Present the gap report to the user for review before making ROADMAP changes.
+After user reviews and approves specific changes:
+
+1. **New phases approved:** Use `/gsd:add-phase` or manually append to ROADMAP.md's phase list
+2. **Architectural decisions made:** Document in STATE.md under `## Decisions`
+3. **Tasks to add to existing phases:** Note them for the next `/gsd:plan-phase` run
+
+**Note:** This command does not call `gsd-tools.cjs` and operates on files directly. Ensure you are in the project root directory (where `.planning/` lives) when invoking it.
 
 ## Principles
 
