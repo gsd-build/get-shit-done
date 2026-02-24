@@ -591,7 +591,9 @@ jobs:
       - name: Commit regenerated wrapper files
         if: steps.detect.outputs.no_changes != 'true' && steps.merge.outcome == 'success'
         run: |
-          git add --all .github/prompts/ .github/agents/ .github/instructions/ || true
+          git add --all .github/prompts/ 2>/dev/null || true
+          git add --all .github/agents/ 2>/dev/null || true
+          git add --all .github/instructions/ 2>/dev/null || true
           if ! git diff --cached --quiet; then
             git commit -m "chore: regenerate Copilot wrapper layer for upstream@${{ steps.detect.outputs.short_sha }}"
           else
@@ -1104,8 +1106,12 @@ jobs:
               echo "--- git status before add ---"
               git status --short .github/prompts/ scripts/ || true
               # Use --all to ensure new (untracked) files are included, not just modifications.
-              git add --all .github/prompts/ .github/agents/ .github/instructions/ || true
-              git add --all scripts/ || true
+              # Split into one call per directory — if a directory doesn't exist git add
+              # fails the entire multi-path invocation, staging nothing.
+              git add --all .github/prompts/ 2>/dev/null || true
+              git add --all .github/agents/ 2>/dev/null || true
+              git add --all .github/instructions/ 2>/dev/null || true
+              git add --all scripts/ 2>/dev/null || true
               echo "--- git diff --cached after add ---"
               git diff --cached --stat || true
               if ! git diff --cached --quiet; then
