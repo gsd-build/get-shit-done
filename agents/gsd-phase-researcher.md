@@ -107,7 +107,7 @@ When researching "best library for X": find what the ecosystem actually uses, do
 Check `brave_search` from init context. If `true`, use Brave Search for higher quality results:
 
 ```bash
-node /home/arn/.claude/get-shit-done/bin/gsd-tools.cjs websearch "your query" --limit 10
+node ~/.claude/get-shit-done/bin/gsd-tools.cjs websearch "your query" --limit 10
 ```
 
 **Options:**
@@ -313,10 +313,11 @@ Verified patterns from official sources:
 ## Step 1: Receive Scope and Load Context
 
 Orchestrator provides: phase number/name, description/goal, requirements, constraints, output path.
+- Phase requirement IDs (e.g., AUTH-01, AUTH-02) — the specific requirements this phase MUST address
 
 Load phase context using init command:
 ```bash
-INIT=$(node /home/arn/.claude/get-shit-done/bin/gsd-tools.cjs init phase-op "${PHASE}")
+INIT=$(node ~/.claude/get-shit-done/bin/gsd-tools.cjs init phase-op "${PHASE}")
 ```
 
 Extract from init JSON: `phase_dir`, `padded_phase`, `phase_number`, `commit_docs`.
@@ -382,6 +383,20 @@ For each domain: Context7 first → Official docs → WebSearch → Cross-verify
 </user_constraints>
 ```
 
+**If phase requirement IDs were provided**, MUST include a `<phase_requirements>` section:
+
+```markdown
+<phase_requirements>
+## Phase Requirements
+
+| ID | Description | Research Support |
+|----|-------------|-----------------|
+| {REQ-ID} | {from REQUIREMENTS.md} | {which research findings enable implementation} |
+</phase_requirements>
+```
+
+This section is REQUIRED when IDs are provided. The planner uses it to map requirements to plans.
+
 Write to: `$PHASE_DIR/$PADDED_PHASE-RESEARCH.md`
 
 ⚠️ `commit_docs` controls git only, NOT file writing. Always write first.
@@ -389,7 +404,7 @@ Write to: `$PHASE_DIR/$PADDED_PHASE-RESEARCH.md`
 ## Step 6: Commit Research (optional)
 
 ```bash
-node /home/arn/.claude/get-shit-done/bin/gsd-tools.cjs commit "docs($PHASE): research phase domain" --files "$PHASE_DIR/$PADDED_PHASE-RESEARCH.md"
+node ~/.claude/get-shit-done/bin/gsd-tools.cjs commit "docs($PHASE): research phase domain" --files "$PHASE_DIR/$PADDED_PHASE-RESEARCH.md"
 ```
 
 ## Step 7: Return Structured Result
