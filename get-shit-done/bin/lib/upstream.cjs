@@ -54,6 +54,29 @@ const COMMIT_TYPES = {
 // Pattern to match conventional commits: type(scope)?: description
 const CONVENTIONAL_PATTERN = /^(\w+)(?:\([^)]+\))?!?:\s*(.+)/;
 
+// Sync event types for logging to STATE.md
+const SYNC_EVENTS = {
+  FETCH: 'fetch',
+  MERGE_START: 'merge-start',
+  MERGE_COMPLETE: 'merge-complete',
+  MERGE_FAILED: 'merge-failed',
+  ABORT: 'abort',
+  UPSTREAM_CONFIGURED: 'upstream-configured',
+  UPSTREAM_URL_CHANGED: 'upstream-url-changed',
+  BACKUP_CREATED: 'backup-created',
+  ROLLBACK_EXECUTED: 'rollback-executed',
+  CONFLICT_DETECTED: 'conflict-detected',
+};
+
+// Header for Sync History section in STATE.md
+const SYNC_HISTORY_HEADER = `### Sync History
+
+| Date | Event | Details |
+|------|-------|---------|`;
+
+// Backup branch naming prefix
+const BACKUP_BRANCH_PREFIX = 'backup/pre-sync-';
+
 // ─── Helper Functions ─────────────────────────────────────────────────────────
 
 /**
@@ -688,6 +711,153 @@ function formatDate(date) {
     return date.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
   } catch {
     return date.toISOString().split('T')[0];
+  }
+}
+
+// ─── Sync History Logging ─────────────────────────────────────────────────────
+
+/**
+ * Format a date for sync history log entries.
+ * Format: "YYYY-MM-DD HH:MM"
+ * @param {Date} date - Date to format
+ * @returns {string}
+ */
+function formatSyncHistoryDate(date) {
+  const year = date.getFullYear();
+  const month = String(date.getMonth() + 1).padStart(2, '0');
+  const day = String(date.getDate()).padStart(2, '0');
+  const hours = String(date.getHours()).padStart(2, '0');
+  const minutes = String(date.getMinutes()).padStart(2, '0');
+  return `${year}-${month}-${day} ${hours}:${minutes}`;
+}
+
+/**
+ * Append an entry to the Sync History section in STATE.md.
+ * Creates the section if it doesn't exist (below Session Continuity).
+ *
+ * @param {string} cwd - Working directory
+ * @param {string} event - Event type (from SYNC_EVENTS)
+ * @param {string} details - Event details
+ * @returns {{ success: boolean, error?: string }}
+ */
+function appendSyncHistoryEntry(cwd, event, details) {
+  const statePath = path.join(cwd, '.planning', 'STATE.md');
+
+  try {
+    // Read existing STATE.md content
+    let content;
+    try {
+      content = fs.readFileSync(statePath, 'utf-8');
+    } catch {
+      return { success: false, error: 'STATE.md not found' };
+    }
+
+    // Format the new entry
+    const now = new Date();
+    const dateStr = formatSyncHistoryDate(now);
+    const entry = `| ${dateStr} | ${event} | ${details} |`;
+
+    // Check if Sync History section already exists
+    if (content.includes('### Sync History')) {
+      // Find the table header line ending with |---------|
+      const headerPattern = /\|------\|-------\|---------\|/;
+      const headerMatch = content.match(headerPattern);
+
+      if (headerMatch) {
+        // Insert new entry immediately after the header (newest first)
+        const headerEnd = content.indexOf(headerMatch[0]) + headerMatch[0].length;
+        content = content.slice(0, headerEnd) + '\n' + entry + content.slice(headerEnd);
+      } else {
+        // Malformed section - try to append after section header
+        const sectionStart = content.indexOf('### Sync History');
+        const nextSection = content.indexOf('\n## ', sectionStart + 1);
+        const insertPoint = nextSection > 0 ? nextSection : content.length;
+        content = content.slice(0, insertPoint) + '\n' + entry + content.slice(insertPoint);
+      }
+    } else {
+      // Section doesn't exist - create it
+      // Find the last --- separator in file
+      const lastSeparator = content.lastIndexOf('\n---');
+
+      if (lastSeparator > 0) {
+        // Insert new section before the final separator
+        content = content.slice(0, lastSeparator) +
+          '\n\n' + SYNC_HISTORY_HEADER + '\n' + entry +
+          content.slice(lastSeparator);
+      } else {
+        // No separator found - append to end
+        content += '\n\n' + SYNC_HISTORY_HEADER + '\n' + entry + '\n';
+      }
+    }
+
+    // Write updated STATE.md
+    fs.writeFileSync(statePath, content, 'utf-8');
+    return { success: true };
+
+  } catch (err) {
+    return { success: false, error: err.message };
+  }
+}
+
+/**
+ * Get sync history entries from STATE.md.
+ *
+ * @param {string} cwd - Working directory
+ * @param {object} options - { limit?: number }
+ * @returns {Array<{ date: string, event: string, details: string }>}
+ */
+function getSyncHistory(cwd, options = {}) {
+  const statePath = path.join(cwd, '.planning', 'STATE.md');
+
+  try {
+    const content = fs.readFileSync(statePath, 'utf-8');
+
+    // Check if Sync History section exists
+    if (!content.includes('### Sync History')) {
+      return [];
+    }
+
+    // Find the section
+    const sectionStart = content.indexOf('### Sync History');
+    const sectionEnd = content.indexOf('\n## ', sectionStart + 1);
+    const section = sectionEnd > 0
+      ? content.slice(sectionStart, sectionEnd)
+      : content.slice(sectionStart);
+
+    // Parse table rows (skip header rows)
+    const entries = [];
+    const lines = section.split('\n');
+    let inTable = false;
+
+    for (const line of lines) {
+      // Skip header rows
+      if (line.startsWith('| Date') || line.startsWith('|---')) {
+        inTable = true;
+        continue;
+      }
+
+      // Parse data rows
+      if (inTable && line.startsWith('|')) {
+        const parts = line.split('|').map(p => p.trim()).filter(Boolean);
+        if (parts.length >= 3) {
+          entries.push({
+            date: parts[0],
+            event: parts[1],
+            details: parts[2],
+          });
+        }
+      }
+    }
+
+    // Apply limit if specified
+    if (options.limit && options.limit > 0) {
+      return entries.slice(0, options.limit);
+    }
+
+    return entries;
+
+  } catch {
+    return [];
   }
 }
 
@@ -2331,6 +2501,8 @@ module.exports = {
   CONVENTIONAL_PATTERN,
   RISK_FACTORS,
   BINARY_CATEGORIES,
+  SYNC_EVENTS,
+  BACKUP_BRANCH_PREFIX,
 
   // Helper functions
   execGit,
@@ -2343,6 +2515,10 @@ module.exports = {
   parseConventionalCommit,
   groupCommitsByType,
   truncateSubject,
+
+  // Sync history logging functions
+  appendSyncHistoryEntry,
+  getSyncHistory,
 
   // Conflict preview functions
   checkGitVersion,
