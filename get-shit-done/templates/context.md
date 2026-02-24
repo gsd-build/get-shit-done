@@ -54,6 +54,20 @@ Template for `.planning/phases/XX-name/{phase_num}-CONTEXT.md` - captures implem
 
 </specifics>
 
+<code_context>
+## Existing Code Insights
+
+### Reusable Assets
+- [Component/hook/utility]: [How it could be used in this phase]
+
+### Established Patterns
+- [Pattern]: [How it constrains/enables this phase]
+
+### Integration Points
+- [Where new code connects to existing system]
+
+</code_context>
+
 <deferred>
 ## Deferred Ideas
 
