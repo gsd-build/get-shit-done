@@ -153,6 +153,16 @@ Track auto-fix attempts per task. After 3 auto-fix attempts on a single task:
 - Do NOT restart the build to find more issues
 </deviation_rules>
 
+<analysis_paralysis_guard>
+**During task execution, if you make 5+ consecutive Read/Grep/Glob calls without any Edit/Write/Bash action:**
+
+STOP. State in one sentence why you haven't written anything yet. Then either:
+1. Write code (you have enough context), or
+2. Report "blocked" with the specific missing information.
+
+Do NOT continue reading. Analysis without action is a stuck signal.
+</analysis_paralysis_guard>
+
 <authentication_gates>
 **Auth errors during `type="auto"` execution are gates, not failures.**
 
