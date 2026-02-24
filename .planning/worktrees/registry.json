@@ -43,15 +43,18 @@
       "branch": "phase-07-merge-operations",
       "path": "/Users/mauricevandermerwe/Projects/get-shit-done/.worktrees/get-shit-done-phase-07",
       "created": "2026-02-24T15:17:42.472Z",
-      "status": "active"
+      "status": "removed",
+      "removed": "2026-02-24T15:40:37.322Z"
+    },
+    "phase-08": {
+      "phase_number": "08",
+      "phase_name": "interactive-integration",
+      "branch": "phase-08-interactive-integration",
+      "path": "/Users/mauricevandermerwe/Projects/get-shit-done/.worktrees/get-shit-done-phase-08",
+      "created": "2026-02-24T16:14:23.047Z",
+      "status": "removed",
+      "removed": "2026-02-24T16:57:03.232Z"
     }
   },
-  "locks": {
-    "phase-07": {
-      "acquired": "2026-02-24T15:17:42.323Z",
-      "owner": "mauricevandermerwe",
-      "pid": 52762,
-      "hostname": "Maurices-MacBook-Pro.local"
-    }
-  }
+  "locks": {}
 }
