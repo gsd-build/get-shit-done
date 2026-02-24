@@ -857,24 +857,13 @@ jobs:
             exit 0
           fi
 
-          # Validate that the classic PAT has the required 'repo' scope.
-          # gh auth status -t prints the token scopes on a dedicated line, e.g.:
-          #   Token scopes: repo, read:org
-          if ! gh auth status -t >/tmp/gh_auth_status 2>&1; then
-            echo "::error::gh auth status failed for COPILOT_PAT. Ensure the token is valid and has 'repo' scope."
-            cat /tmp/gh_auth_status || true
-            echo "agent_auth_ok=false" >> "$GITHUB_OUTPUT"
-            exit 0
-          fi
-
-          if ! grep -E '^ *Token scopes: .*\brepo\b' /tmp/gh_auth_status >/dev/null 2>&1; then
-            echo "::error::COPILOT_PAT is a classic OAuth PAT but does not have the required 'repo' scope. Update the token at https://github.com/settings/tokens."
-            cat /tmp/gh_auth_status || true
-            echo "agent_auth_ok=false" >> "$GITHUB_OUTPUT"
-            exit 0
-          fi
-
-          echo "COPILOT_PAT is a valid classic OAuth PAT with 'repo' scope. Ready for issue-based Copilot agent invocation."
+          # ghp_... prefix is sufficient to confirm this is a classic OAuth PAT.
+          # Scope validation via 'gh auth status' is NOT used here: when GH_TOKEN
+          # is set as an env var (as it is in this job), gh reports 'Token scopes: none'
+          # because scope metadata is only stored when using 'gh auth login'.
+          # If the token lacks 'repo' scope, 'gh issue create' will fail with a
+          # clear API error at the point of use.
+          echo "COPILOT_PAT is a valid classic OAuth PAT. Ready for issue-based Copilot agent invocation."
           echo "agent_auth_ok=true" >> "$GITHUB_OUTPUT"
 
       - name: Resolve merge conflict via Copilot agent
