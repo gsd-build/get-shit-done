@@ -292,6 +292,189 @@ function cmdUpstreamFetch(cwd, options, output, error, raw) {
   }, raw, 'fetched');
 }
 
+// ─── Status Command ────────────────────────────────────────────────────────────
+
+/**
+ * Show upstream sync status with commits behind, file summary, and warnings.
+ *
+ * @param {string} cwd - Working directory
+ * @param {object} options - { branch?: string }
+ * @param {function} output - Output callback
+ * @param {function} error - Error callback
+ * @param {boolean} raw - Output as JSON
+ */
+function cmdUpstreamStatus(cwd, options, output, error, raw) {
+  const upstreamConfig = loadUpstreamConfig(cwd);
+
+  // Check if upstream is configured
+  if (!upstreamConfig.url) {
+    error('Upstream not configured. Run: gsd-tools upstream configure <url>');
+    return;
+  }
+
+  const remoteName = DEFAULT_REMOTE_NAME;
+  const branch = options?.branch || DEFAULT_BRANCH;
+
+  // Check if cache is stale (>24 hours since last fetch)
+  let cacheStale = false;
+  if (upstreamConfig.last_fetch) {
+    const lastFetchTime = new Date(upstreamConfig.last_fetch).getTime();
+    const now = Date.now();
+    cacheStale = (now - lastFetchTime) > CACHE_DURATION_MS;
+  } else {
+    cacheStale = true;
+  }
+
+  // Get commit count behind
+  const countResult = execGit(cwd, ['rev-list', '--count', `HEAD..${remoteName}/${branch}`]);
+  if (!countResult.success) {
+    error(`Failed to count commits: ${countResult.stderr}. Try running 'gsd-tools upstream fetch' first.`);
+    return;
+  }
+  const commitsBehind = parseInt(countResult.stdout, 10);
+
+  // Handle zero state - up to date
+  if (commitsBehind === 0) {
+    const lastFetchDate = upstreamConfig.last_fetch
+      ? formatDate(new Date(upstreamConfig.last_fetch))
+      : 'never';
+
+    const result = {
+      commits_behind: 0,
+      up_to_date: true,
+      last_synced: lastFetchDate,
+      cache_stale: cacheStale,
+      warnings: {},
+    };
+
+    if (raw) {
+      output(result, true);
+    } else {
+      output(result, false, `Up to date with upstream (last synced: ${lastFetchDate})`);
+    }
+    return;
+  }
+
+  // Get latest upstream commit date
+  const dateResult = execGit(cwd, ['log', '-1', '--format=%as', `${remoteName}/${branch}`]);
+  const latestDate = dateResult.success ? formatDate(new Date(dateResult.stdout)) : null;
+
+  // Get file change summary
+  const statResult = execGit(cwd, ['diff', '--stat', `HEAD..${remoteName}/${branch}`]);
+  let filesChanged = 0;
+  let statSummary = '';
+  if (statResult.success && statResult.stdout) {
+    const lines = statResult.stdout.split('\n');
+    const summaryLine = lines[lines.length - 1];
+    const fileMatch = summaryLine.match(/(\d+)\s+files?\s+changed/);
+    if (fileMatch) {
+      filesChanged = parseInt(fileMatch[1], 10);
+    }
+    statSummary = summaryLine.trim();
+  }
+
+  // Get directory breakdown
+  const dirstatResult = execGit(cwd, ['diff', '--dirstat=files', `HEAD..${remoteName}/${branch}`]);
+  const directories = [];
+  if (dirstatResult.success && dirstatResult.stdout) {
+    const lines = dirstatResult.stdout.split('\n');
+    for (const line of lines) {
+      const match = line.match(/\s*[\d.]+%\s+(.+)/);
+      if (match) {
+        directories.push(match[1].trim());
+      }
+    }
+  }
+
+  // Get file list if <=10 files changed
+  let fileList = [];
+  if (filesChanged > 0 && filesChanged <= 10) {
+    const nameOnlyResult = execGit(cwd, ['diff', '--name-only', `HEAD..${remoteName}/${branch}`]);
+    if (nameOnlyResult.success && nameOnlyResult.stdout) {
+      fileList = nameOnlyResult.stdout.split('\n').filter(Boolean);
+    }
+  }
+
+  // Check for uncommitted changes
+  const statusResult = execGit(cwd, ['status', '--porcelain']);
+  const hasUncommittedChanges = statusResult.success && statusResult.stdout.length > 0;
+
+  // Check for unpushed commits
+  const unpushedResult = execGit(cwd, ['rev-list', '--count', 'origin/main..HEAD']);
+  const unpushedCommits = unpushedResult.success ? parseInt(unpushedResult.stdout, 10) : 0;
+
+  // Build warnings
+  const warnings = {};
+  if (hasUncommittedChanges) {
+    warnings.uncommitted_changes = true;
+  }
+  if (unpushedCommits > 0) {
+    warnings.unpushed_commits = unpushedCommits;
+  }
+
+  // Build result
+  const result = {
+    commits_behind: commitsBehind,
+    latest_upstream_date: latestDate,
+    files_changed: filesChanged,
+    directories: directories.slice(0, 5), // Top 5 directories
+    file_list: fileList,
+    warnings,
+    cache_stale: cacheStale,
+  };
+
+  if (raw) {
+    output(result, true);
+  } else {
+    // Format human-readable output per CONTEXT.md
+    let text = `${commitsBehind} commits behind upstream`;
+    if (latestDate) {
+      text += ` (latest: ${latestDate})`;
+    }
+    text += '\n';
+
+    if (filesChanged > 0) {
+      if (filesChanged <= 10 && fileList.length > 0) {
+        text += `${filesChanged} files changed:\n`;
+        for (const file of fileList) {
+          text += `  ${file}\n`;
+        }
+      } else if (directories.length > 0) {
+        text += `${filesChanged} files changed in ${directories.slice(0, 3).join(', ')}`;
+        if (directories.length > 3) {
+          text += ` (+${directories.length - 3} more)`;
+        }
+        text += '\n';
+      } else {
+        text += `${filesChanged} files changed\n`;
+      }
+    }
+
+    // Add warnings
+    if (warnings.uncommitted_changes) {
+      text += '\n\u26A0 Local has uncommitted changes \u2014 commit before sync';
+    }
+    if (warnings.unpushed_commits) {
+      text += `\n\u26A0 ${warnings.unpushed_commits} unpushed commits to origin`;
+    }
+
+    output(result, false, text.trim());
+  }
+}
+
+/**
+ * Format a date for display (e.g., "Feb 24").
+ * @param {Date} date - Date to format
+ * @returns {string}
+ */
+function formatDate(date) {
+  try {
+    return date.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
+  } catch {
+    return date.toISOString().split('T')[0];
+  }
+}
+
 // ─── Exports ──────────────────────────────────────────────────────────────────
 
 module.exports = {
@@ -306,8 +489,10 @@ module.exports = {
   loadUpstreamConfig,
   saveUpstreamConfig,
   getRemotes,
+  formatDate,
 
   // Commands
   cmdUpstreamConfigure,
   cmdUpstreamFetch,
+  cmdUpstreamStatus,
 };
