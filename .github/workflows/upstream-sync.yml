@@ -419,6 +419,7 @@ jobs:
             --label "upstream-sync" \
             2>/dev/null || echo "")
           ADAPT_ISSUE=$(echo "$ADAPT_ISSUE_URL" | grep -oP '/issues/\K[0-9]+' || echo "")
+          [[ "$ADAPT_ISSUE" =~ ^[0-9]+$ ]] || ADAPT_ISSUE=""
 
           if [ -z "$ADAPT_ISSUE" ]; then
             echo "::warning::Failed to create Copilot adaptation issue. Copilot coding agent may not be enabled for this repository."
@@ -963,6 +964,7 @@ jobs:
             --label "upstream-sync" \
             2>/dev/null || echo "")
           CONFLICT_ISSUE=$(echo "$CONFLICT_ISSUE_URL" | grep -oP '/issues/\K[0-9]+' || echo "")
+          [[ "$CONFLICT_ISSUE" =~ ^[0-9]+$ ]] || CONFLICT_ISSUE=""
 
           if [ -n "$CONFLICT_ISSUE" ]; then
             CONFLICT_ISSUE_CREATED_AT=$(gh issue view "$CONFLICT_ISSUE" \
@@ -1220,6 +1222,7 @@ jobs:
               --label "upstream-sync" \
               2>/dev/null || echo "")
             REPAIR_ISSUE=$(echo "$REPAIR_ISSUE_URL" | grep -oP '/issues/\K[0-9]+' || echo "")
+            [[ "$REPAIR_ISSUE" =~ ^[0-9]+$ ]] || REPAIR_ISSUE=""
 
             if [ -z "$REPAIR_ISSUE" ]; then
               echo "::warning::Failed to create Copilot repair issue. Copilot coding agent may not be enabled for this repository, or COPILOT_PAT lacks 'repo' scope."
