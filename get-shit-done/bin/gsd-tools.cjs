@@ -52,6 +52,13 @@
  *   lock list                          List all locks from registry
  *   lock stale <phase>                 Check if lock is stale (pid dead, etc.)
  *
+ * Upstream Sync Operations:
+ *   upstream configure [url]           Configure upstream remote (auto-detect if no URL)
+ *   upstream fetch                     Fetch upstream changes, update cache
+ *   upstream status                    Show commits behind with file summary
+ *   upstream log                       Show grouped commit log
+ *   upstream notification [--refresh]  Check for upstream updates (for session banner)
+ *
  * Roadmap Operations:
  *   roadmap get-phase <phase>          Extract phase section from ROADMAP.md
  *   roadmap analyze                    Full roadmap parse with disk status
@@ -148,6 +155,7 @@ const { execSync } = require('child_process');
 
 const worktreeModule = require('./lib/worktree.cjs');
 const healthModule = require('./lib/health.cjs');
+const upstreamModule = require('./lib/upstream.cjs');
 
 // ─── Model Profile Table ─────────────────────────────────────────────────────
 
@@ -485,8 +493,14 @@ function parseMustHavesBlock(content, blockName) {
 }
 
 function output(result, raw, rawValue) {
+  // If raw mode with rawValue, output the rawValue string
   if (raw && rawValue !== undefined) {
     process.stdout.write(String(rawValue));
+  }
+  // If non-raw mode with rawValue (human-readable text), output that text
+  else if (!raw && rawValue !== undefined && typeof rawValue === 'string' && rawValue.length > 20) {
+    // Heuristic: if rawValue is longer than 20 chars, treat it as human-readable text
+    process.stdout.write(rawValue);
   } else {
     const json = JSON.stringify(result, null, 2);
     // Large payloads exceed Claude Code's Bash tool buffer (~50KB).
@@ -5075,6 +5089,35 @@ async function main() {
         healthModule.cmdHealthRepair(cwd, issueJson, { force }, output, raw);
       } else {
         error('Unknown health subcommand. Available: check, repair');
+      }
+      break;
+    }
+
+    case 'upstream': {
+      const subcommand = args[1];
+      if (subcommand === 'configure') {
+        const url = args[2]; // Optional - auto-detect if not provided
+        upstreamModule.cmdUpstreamConfigure(cwd, url, {}, output, error, raw);
+      } else if (subcommand === 'fetch') {
+        upstreamModule.cmdUpstreamFetch(cwd, {}, output, error, raw);
+      } else if (subcommand === 'status') {
+        upstreamModule.cmdUpstreamStatus(cwd, {}, output, error, raw);
+      } else if (subcommand === 'log') {
+        upstreamModule.cmdUpstreamLog(cwd, {}, output, error, raw);
+      } else if (subcommand === 'notification') {
+        const refresh = args.includes('--refresh');
+        const result = upstreamModule.checkUpstreamNotification(cwd, { fetch: refresh });
+
+        if (raw) {
+          output(result, raw);
+        } else {
+          const banner = upstreamModule.formatNotificationBanner(result);
+          if (banner) {
+            console.log(banner);
+          }
+        }
+      } else {
+        error('Unknown upstream subcommand. Available: configure, fetch, status, log, notification');
       }
       break;
     }

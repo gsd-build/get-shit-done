@@ -9,12 +9,12 @@
 ## Current Position
 
 **Phase:** 5 - Core Infrastructure
-**Plan:** Not started
-**Status:** Ready for planning
-**Last activity:** 2026-02-23 — Roadmap created for v1.1
+**Plan:** 5-04 complete, 5-05 ready
+**Status:** Milestone complete
+**Last activity:** 2026-02-24 — Completed plan 5-04 (notification check functions)
 
 ```
-[....................] 0% - Phase 5 ready for planning
+[########............] 40% - Phase 5 plan 4 complete
 ```
 
 **Phases:**
@@ -28,9 +28,9 @@
 
 | Metric | Value |
 |--------|-------|
-| Plans completed (v1.1) | 0 |
+| Plans completed (v1.1) | 4 |
 | Plans failed (v1.1) | 0 |
-| Current streak | 0 |
+| Current streak | 4 |
 | v1.0 plans completed | 11 |
 
 ## Accumulated Context
@@ -48,6 +48,14 @@
 | Merge strategy for upstream | Never use reset; auto-create backup branch; merge not rebase | 2026-02-23 |
 | Separate STATE.md strategy for upstream | Fork state wins for phase sections; don't reuse worktree merge code | 2026-02-23 |
 | lib/upstream.cjs module | Follow worktree.cjs/health.cjs pattern; pure functions, testable | 2026-02-23 |
+| Auto-detect upstream URL | Check git remotes, use existing 'upstream' if present | 2026-02-24 |
+| Cache upstream fetch metadata | Store commits_behind, last_fetch, last_sha in config.json | 2026-02-24 |
+| Unicode escape for emojis | Use \uXXXX format for cross-platform compatibility | 2026-02-24 |
+| Conventional commit grouping | Group by COMMIT_TYPES order; fallback to flat list | 2026-02-24 |
+| Cache-first notification check | Fast response for session start, no blocking network calls | 2026-02-24 |
+| Silent network errors for notifications | Session start should never fail due to network issues | 2026-02-24 |
+| Quote shell arguments in execGit | Prevent shell interpretation of special chars (%, |, etc.) | 2026-02-24 |
+| Human-readable output mode | Support text > 20 chars as human-readable in output function | 2026-02-24 |
 
 ### Implementation Notes
 
@@ -69,7 +77,12 @@
 
 - [x] Define v1.1 requirements
 - [x] Create roadmap
-- [ ] Plan Phase 5
+- [x] Plan Phase 5
+- [x] Execute plan 5-01 (upstream.cjs with configure/fetch)
+- [x] Execute plan 5-02 (status and log commands)
+- [x] Execute plan 5-03 (gsd-tools CLI routing)
+- [x] Execute plan 5-04 (notification check functions)
+- [ ] Execute plan 5-05 (session workflow integration)
 
 ### Blockers
 
@@ -77,13 +90,13 @@ None currently.
 
 ## Session Continuity
 
-**Last Session:** 2026-02-23
-**Context:** Created roadmap for v1.1 (Upstream Sync). 5 phases, 24 requirements mapped. Ready to plan Phase 5 (Core Infrastructure).
+**Last Session:** 2026-02-24
+**Context:** Completed plan 5-04 - added checkUpstreamNotification and formatNotificationBanner to upstream.cjs. Uses 24-hour cache, handles network errors silently. CLI command `upstream notification` available with --refresh flag.
 
 **To Resume:**
-1. Run `/gsd:plan-phase 5` to create plans for Core Infrastructure
-2. Phase 5 covers: SYNC-01, SYNC-02, SYNC-03, SYNC-04, NOTIF-01, NOTIF-02, NOTIF-03
+1. Execute plan 5-05 (session workflow integration)
+2. Continue through remaining Phase 5 plans
 
 ---
 *State initialized: 2026-02-23*
-*Last updated: 2026-02-23*
+*Last updated: 2026-02-24*

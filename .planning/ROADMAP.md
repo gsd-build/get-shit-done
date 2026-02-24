@@ -11,7 +11,7 @@ This roadmap delivers upstream sync tooling for GSD fork maintainers. The journe
 - v1.1 continues from Phase 5 (Upstream Sync)
 - Decimal phases (e.g., 5.1): Urgent insertions (marked with INSERTED)
 
-- [ ] **Phase 5: Core Infrastructure** - Upstream configuration, fetch, status, and update notifications
+- [x] **Phase 5: Core Infrastructure** - Upstream configuration, fetch, status, and update notifications (completed 2026-02-24)
 - [ ] **Phase 6: Analysis** - Commit grouping, conflict preview, and change detection
 - [ ] **Phase 7: Merge Operations** - Atomic merge with rollback and state logging
 - [ ] **Phase 8: Interactive & Integration** - Deep dive mode, worktree awareness, and health integration
@@ -29,11 +29,11 @@ This roadmap delivers upstream sync tooling for GSD fork maintainers. The journe
   3. User can see how many commits behind upstream they are with summary info
   4. User can view upstream commit log with author, date, and message summaries
   5. Starting a GSD session shows notification when upstream has new commits
-**Plans:** 4 plans
+**Plans:** 4/4 plans complete
 
 Plans:
-- [ ] 5-01-PLAN.md — Create upstream.cjs module with configure and fetch operations
-- [ ] 5-02-PLAN.md — Add status and log commands to upstream.cjs
+- [x] 5-01-PLAN.md — Create upstream.cjs module with configure and fetch operations
+- [x] 5-02-PLAN.md — Add status and log commands to upstream.cjs
 - [ ] 5-03-PLAN.md — Integrate upstream commands into gsd-tools.cjs CLI
 - [ ] 5-04-PLAN.md — Add notification check for session start integration
 
@@ -94,7 +94,7 @@ Phases execute in numeric order: 5 -> 6 -> 7 -> 8 -> 9
 
 | Phase | Plans Complete | Status | Completed |
 |-------|----------------|--------|-----------|
-| 5. Core Infrastructure | 0/4 | In progress | - |
+| 5. Core Infrastructure | 4/4 | Complete    | 2026-02-24 |
 | 6. Analysis | 0/? | Not started | - |
 | 7. Merge Operations | 0/3 | Planned | - |
 | 8. Interactive & Integration | 0/? | Not started | - |

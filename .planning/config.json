@@ -13,5 +13,13 @@
     "branching_strategy": "phase",
     "phase_branch_template": "phase-{phase}-{slug}",
     "milestone_branch_template": "{milestone}-{slug}"
+  },
+  "upstream_notifications": true,
+  "upstream": {
+    "url": "https://github.com/gsd-build/get-shit-done",
+    "last_fetch": "2026-02-24T10:35:29.349Z",
+    "commits_behind": 38,
+    "last_upstream_sha": "3fddd62d50ed8ec7abf15474cae924319be2c282",
+    "notifications_enabled": true
   }
 }
