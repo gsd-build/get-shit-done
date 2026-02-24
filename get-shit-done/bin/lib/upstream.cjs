@@ -54,6 +54,29 @@ const COMMIT_TYPES = {
 // Pattern to match conventional commits: type(scope)?: description
 const CONVENTIONAL_PATTERN = /^(\w+)(?:\([^)]+\))?!?:\s*(.+)/;
 
+// Sync event types for logging to STATE.md
+const SYNC_EVENTS = {
+  FETCH: 'fetch',
+  MERGE_START: 'merge-start',
+  MERGE_COMPLETE: 'merge-complete',
+  MERGE_FAILED: 'merge-failed',
+  ABORT: 'abort',
+  UPSTREAM_CONFIGURED: 'upstream-configured',
+  UPSTREAM_URL_CHANGED: 'upstream-url-changed',
+  BACKUP_CREATED: 'backup-created',
+  ROLLBACK_EXECUTED: 'rollback-executed',
+  CONFLICT_DETECTED: 'conflict-detected',
+};
+
+// Header for Sync History section in STATE.md
+const SYNC_HISTORY_HEADER = `### Sync History
+
+| Date | Event | Details |
+|------|-------|---------|`;
+
+// Backup branch naming prefix
+const BACKUP_BRANCH_PREFIX = 'backup/pre-sync-';
+
 // ─── Helper Functions ─────────────────────────────────────────────────────────
 
 /**
@@ -688,6 +711,681 @@ function formatDate(date) {
     return date.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
   } catch {
     return date.toISOString().split('T')[0];
+  }
+}
+
+// ─── Sync History Logging ─────────────────────────────────────────────────────
+
+/**
+ * Format a date for sync history log entries.
+ * Format: "YYYY-MM-DD HH:MM"
+ * @param {Date} date - Date to format
+ * @returns {string}
+ */
+function formatSyncHistoryDate(date) {
+  const year = date.getFullYear();
+  const month = String(date.getMonth() + 1).padStart(2, '0');
+  const day = String(date.getDate()).padStart(2, '0');
+  const hours = String(date.getHours()).padStart(2, '0');
+  const minutes = String(date.getMinutes()).padStart(2, '0');
+  return `${year}-${month}-${day} ${hours}:${minutes}`;
+}
+
+/**
+ * Append an entry to the Sync History section in STATE.md.
+ * Creates the section if it doesn't exist (below Session Continuity).
+ *
+ * @param {string} cwd - Working directory
+ * @param {string} event - Event type (from SYNC_EVENTS)
+ * @param {string} details - Event details
+ * @returns {{ success: boolean, error?: string }}
+ */
+function appendSyncHistoryEntry(cwd, event, details) {
+  const statePath = path.join(cwd, '.planning', 'STATE.md');
+
+  try {
+    // Read existing STATE.md content
+    let content;
+    try {
+      content = fs.readFileSync(statePath, 'utf-8');
+    } catch {
+      return { success: false, error: 'STATE.md not found' };
+    }
+
+    // Format the new entry
+    const now = new Date();
+    const dateStr = formatSyncHistoryDate(now);
+    const entry = `| ${dateStr} | ${event} | ${details} |`;
+
+    // Check if Sync History section already exists
+    if (content.includes('### Sync History')) {
+      // Find the table header line ending with |---------|
+      const headerPattern = /\|------\|-------\|---------\|/;
+      const headerMatch = content.match(headerPattern);
+
+      if (headerMatch) {
+        // Insert new entry immediately after the header (newest first)
+        const headerEnd = content.indexOf(headerMatch[0]) + headerMatch[0].length;
+        content = content.slice(0, headerEnd) + '\n' + entry + content.slice(headerEnd);
+      } else {
+        // Malformed section - try to append after section header
+        const sectionStart = content.indexOf('### Sync History');
+        const nextSection = content.indexOf('\n## ', sectionStart + 1);
+        const insertPoint = nextSection > 0 ? nextSection : content.length;
+        content = content.slice(0, insertPoint) + '\n' + entry + content.slice(insertPoint);
+      }
+    } else {
+      // Section doesn't exist - create it
+      // Find the last --- separator in file
+      const lastSeparator = content.lastIndexOf('\n---');
+
+      if (lastSeparator > 0) {
+        // Insert new section before the final separator
+        content = content.slice(0, lastSeparator) +
+          '\n\n' + SYNC_HISTORY_HEADER + '\n' + entry +
+          content.slice(lastSeparator);
+      } else {
+        // No separator found - append to end
+        content += '\n\n' + SYNC_HISTORY_HEADER + '\n' + entry + '\n';
+      }
+    }
+
+    // Write updated STATE.md
+    fs.writeFileSync(statePath, content, 'utf-8');
+    return { success: true };
+
+  } catch (err) {
+    return { success: false, error: err.message };
+  }
+}
+
+/**
+ * Get sync history entries from STATE.md.
+ *
+ * @param {string} cwd - Working directory
+ * @param {object} options - { limit?: number }
+ * @returns {Array<{ date: string, event: string, details: string }>}
+ */
+function getSyncHistory(cwd, options = {}) {
+  const statePath = path.join(cwd, '.planning', 'STATE.md');
+
+  try {
+    const content = fs.readFileSync(statePath, 'utf-8');
+
+    // Check if Sync History section exists
+    if (!content.includes('### Sync History')) {
+      return [];
+    }
+
+    // Find the section
+    const sectionStart = content.indexOf('### Sync History');
+    const sectionEnd = content.indexOf('\n## ', sectionStart + 1);
+    const section = sectionEnd > 0
+      ? content.slice(sectionStart, sectionEnd)
+      : content.slice(sectionStart);
+
+    // Parse table rows (skip header rows)
+    const entries = [];
+    const lines = section.split('\n');
+    let inTable = false;
+
+    for (const line of lines) {
+      // Skip header rows
+      if (line.startsWith('| Date') || line.startsWith('|---')) {
+        inTable = true;
+        continue;
+      }
+
+      // Parse data rows
+      if (inTable && line.startsWith('|')) {
+        const parts = line.split('|').map(p => p.trim()).filter(Boolean);
+        if (parts.length >= 3) {
+          entries.push({
+            date: parts[0],
+            event: parts[1],
+            details: parts[2],
+          });
+        }
+      }
+    }
+
+    // Apply limit if specified
+    if (options.limit && options.limit > 0) {
+      return entries.slice(0, options.limit);
+    }
+
+    return entries;
+
+  } catch {
+    return [];
+  }
+}
+
+// ─── Backup Branch Management ─────────────────────────────────────────────────
+
+/**
+ * Format a timestamp for backup branch naming.
+ * Format: "YYYY-MM-DD-HHMMSS" (UTC)
+ * @returns {string}
+ */
+function formatBackupTimestamp() {
+  const now = new Date();
+  const year = now.getUTCFullYear();
+  const month = String(now.getUTCMonth() + 1).padStart(2, '0');
+  const day = String(now.getUTCDate()).padStart(2, '0');
+  const hours = String(now.getUTCHours()).padStart(2, '0');
+  const minutes = String(now.getUTCMinutes()).padStart(2, '0');
+  const seconds = String(now.getUTCSeconds()).padStart(2, '0');
+  return `${year}-${month}-${day}-${hours}${minutes}${seconds}`;
+}
+
+/**
+ * Parse a backup branch timestamp from branch name.
+ * Extracts the date portion for display.
+ * @param {string} branchName - Full branch name (e.g., "backup/pre-sync-2026-02-24-143200")
+ * @returns {string} - Formatted date (e.g., "2026-02-24 14:32")
+ */
+function parseBackupTimestamp(branchName) {
+  // Extract timestamp part: YYYY-MM-DD-HHMMSS
+  const match = branchName.match(/backup\/pre-sync-(\d{4})-(\d{2})-(\d{2})-(\d{2})(\d{2})(\d{2})/);
+  if (match) {
+    const [, year, month, day, hours, minutes] = match;
+    return `${year}-${month}-${day} ${hours}:${minutes}`;
+  }
+  // Fallback - just return branch name suffix
+  return branchName.replace(BACKUP_BRANCH_PREFIX, '');
+}
+
+/**
+ * Create a backup branch with timestamped name.
+ * Fails if branch already exists (indicates incomplete previous sync).
+ * Logs to sync history automatically.
+ *
+ * @param {string} cwd - Working directory
+ * @returns {{ success: boolean, branch?: string, error?: string }}
+ */
+function createBackupBranch(cwd) {
+  // Generate timestamped branch name
+  const timestamp = formatBackupTimestamp();
+  const branchName = `${BACKUP_BRANCH_PREFIX}${timestamp}`;
+
+  // Create branch (fail if exists - indicates incomplete previous sync)
+  const result = execGit(cwd, ['branch', branchName]);
+
+  if (!result.success) {
+    // Check if it's a "already exists" error
+    if (result.stderr && result.stderr.includes('already exists')) {
+      return {
+        success: false,
+        error: `Backup branch ${branchName} already exists. This may indicate an incomplete previous sync.`,
+      };
+    }
+    return {
+      success: false,
+      error: result.stderr || 'Failed to create backup branch',
+    };
+  }
+
+  // Log to sync history
+  appendSyncHistoryEntry(cwd, SYNC_EVENTS.BACKUP_CREATED, branchName);
+
+  return {
+    success: true,
+    branch: branchName,
+  };
+}
+
+/**
+ * List all backup branches sorted by date (most recent first).
+ *
+ * @param {string} cwd - Working directory
+ * @returns {Array<{ name: string, date: string }>}
+ */
+function listBackupBranches(cwd) {
+  // Run: git branch --list 'backup/pre-sync-*' --format='%(refname:short)'
+  const result = execGit(cwd, ['branch', '--list', 'backup/pre-sync-*', "--format=%(refname:short)"]);
+
+  if (!result.success || !result.stdout) {
+    return [];
+  }
+
+  // Parse branch names
+  const branches = result.stdout
+    .split('\n')
+    .filter(Boolean)
+    .map(name => ({
+      name: name.trim(),
+      date: parseBackupTimestamp(name.trim()),
+    }));
+
+  // Sort by date descending (most recent first)
+  // The timestamp format YYYY-MM-DD-HHMMSS sorts lexicographically
+  branches.sort((a, b) => b.name.localeCompare(a.name));
+
+  return branches;
+}
+
+/**
+ * Get the most recent backup branch.
+ *
+ * @param {string} cwd - Working directory
+ * @returns {{ name: string, date: string } | null}
+ */
+function getLatestBackupBranch(cwd) {
+  const branches = listBackupBranches(cwd);
+  return branches.length > 0 ? branches[0] : null;
+}
+
+// ─── Abort Helpers ─────────────────────────────────────────────────────────────
+
+/**
+ * Get the .git directory path for the repository.
+ * Handles worktrees correctly (returns actual .git dir, not worktree .git file).
+ *
+ * @param {string} cwd - Working directory
+ * @returns {string | null} - Path to .git directory, or null if not a repo
+ */
+function getGitDir(cwd) {
+  const result = execGit(cwd, ['rev-parse', '--git-dir']);
+  if (!result.success || !result.stdout) {
+    return null;
+  }
+  const gitDir = result.stdout.trim();
+  // Make absolute if relative
+  if (!path.isAbsolute(gitDir)) {
+    return path.join(cwd, gitDir);
+  }
+  return gitDir;
+}
+
+/**
+ * Detect if a merge is in progress by checking for MERGE_HEAD file.
+ *
+ * @param {string} cwd - Working directory
+ * @returns {{ inProgress: boolean, merge_head?: string, type?: string, reason?: string }}
+ */
+function detectMergeInProgress(cwd) {
+  const gitDir = getGitDir(cwd);
+  if (!gitDir) {
+    return { inProgress: false, reason: 'not_a_repo' };
+  }
+
+  const mergeHeadPath = path.join(gitDir, 'MERGE_HEAD');
+  if (fs.existsSync(mergeHeadPath)) {
+    // Get the commit being merged
+    const mergeHead = fs.readFileSync(mergeHeadPath, 'utf-8').trim();
+    return {
+      inProgress: true,
+      merge_head: mergeHead.slice(0, 7),
+      type: 'merge',
+    };
+  }
+
+  return { inProgress: false };
+}
+
+/**
+ * Check if working tree is clean (no uncommitted changes).
+ *
+ * @param {string} cwd - Working directory
+ * @returns {{ clean: boolean, staged?: number, unstaged?: number, untracked?: number }}
+ */
+function checkWorkingTreeClean(cwd) {
+  const result = execGit(cwd, ['status', '--porcelain']);
+
+  if (!result.success) {
+    return { clean: false, error: 'Could not check working tree status' };
+  }
+
+  if (!result.stdout || result.stdout.trim() === '') {
+    return { clean: true };
+  }
+
+  // Parse status output
+  let staged = 0;
+  let unstaged = 0;
+  let untracked = 0;
+
+  for (const line of result.stdout.split('\n').filter(Boolean)) {
+    const index = line[0];
+    const worktree = line[1];
+
+    if (index === '?' && worktree === '?') {
+      untracked++;
+    } else if (index !== ' ' && index !== '?') {
+      staged++;
+    } else if (worktree !== ' ' && worktree !== '?') {
+      unstaged++;
+    }
+  }
+
+  return { clean: false, staged, unstaged, untracked };
+}
+
+/**
+ * Abort in-progress sync or restore from backup branch.
+ *
+ * @param {string} cwd - Working directory
+ * @param {object} options - Command options
+ * @param {string} [options.restore] - Backup branch name to restore from
+ * @param {function} output - Output function
+ * @param {function} error - Error function
+ * @param {boolean} raw - Raw JSON output mode
+ */
+function cmdUpstreamAbort(cwd, options, output, error, raw) {
+  const restore = options.restore;
+
+  // Step 1: Check if merge is in progress
+  const mergeState = detectMergeInProgress(cwd);
+
+  if (mergeState.inProgress) {
+    // Abort the in-progress merge
+    const abortResult = execGit(cwd, ['merge', '--abort']);
+
+    if (abortResult.success) {
+      appendSyncHistoryEntry(cwd, SYNC_EVENTS.ABORT, 'Aborted in-progress merge');
+
+      const result = {
+        aborted: true,
+        reason: 'merge_in_progress',
+        message: 'Aborted in-progress merge. Working tree restored to pre-merge state.',
+      };
+      const humanOutput = 'Aborted in-progress merge.\nWorking tree restored to pre-merge state.';
+
+      if (raw) {
+        output(result, raw);
+      } else {
+        output(result, false, humanOutput);
+      }
+      return;
+    } else {
+      error(`Failed to abort merge: ${abortResult.stderr}`);
+      return;
+    }
+  }
+
+  // Step 2: No merge in progress - check for backup branches
+  const backupBranches = listBackupBranches(cwd);
+
+  if (backupBranches.length === 0) {
+    const result = {
+      aborted: false,
+      reason: 'nothing_to_abort',
+      message: 'No sync in progress and no backup branches found.',
+    };
+    const humanOutput = 'No sync in progress and no backup branches found.\nNothing to abort.';
+
+    if (raw) {
+      output(result, raw);
+    } else {
+      output(result, false, humanOutput);
+    }
+    return;
+  }
+
+  // Step 3: If --restore specified, restore from that branch
+  if (restore) {
+    const targetBranch = backupBranches.find(b => b.name === restore || b.name.endsWith(restore));
+
+    if (!targetBranch) {
+      error(`Backup branch not found: ${restore}\nAvailable branches: ${backupBranches.map(b => b.name).join(', ')}`);
+      return;
+    }
+
+    // Check working tree is clean before restore
+    const workingTree = checkWorkingTreeClean(cwd);
+    if (!workingTree.clean) {
+      error('Working tree has uncommitted changes.\nCommit or stash changes before restore.');
+      return;
+    }
+
+    // Perform restore
+    const resetResult = execGit(cwd, ['reset', '--hard', targetBranch.name]);
+
+    if (resetResult.success) {
+      const newHeadResult = execGit(cwd, ['rev-parse', 'HEAD']);
+      const newHead = newHeadResult.success ? newHeadResult.stdout.trim() : 'unknown';
+      appendSyncHistoryEntry(cwd, SYNC_EVENTS.ABORT,
+        `Restored to ${targetBranch.name} (${newHead.slice(0, 7)})`);
+
+      const result = {
+        aborted: true,
+        restored: true,
+        restored_from: targetBranch.name,
+        restored_to: newHead.slice(0, 7),
+        message: `Restored to backup branch: ${targetBranch.name}`,
+      };
+      const humanOutput = `Restored to backup branch: ${targetBranch.name}\nCurrent HEAD: ${newHead.slice(0, 7)}`;
+
+      if (raw) {
+        output(result, raw);
+      } else {
+        output(result, false, humanOutput);
+      }
+      return;
+    } else {
+      error(`Failed to restore from backup: ${resetResult.stderr}`);
+      return;
+    }
+  }
+
+  // Step 4: No --restore flag - show available backup branches
+  const latestBackup = backupBranches[0];
+
+  const result = {
+    aborted: false,
+    restore_available: true,
+    backup_branches: backupBranches.slice(0, 5),
+    latest_backup: latestBackup.name,
+    suggestion: `To restore: gsd-tools upstream abort --restore ${latestBackup.name}`,
+    message: `No sync in progress. ${backupBranches.length} backup branch(es) available.`,
+  };
+
+  // Human-readable output with backup branch list
+  const lines = [
+    'No sync in progress.',
+    '',
+    'Available backup branches (most recent first):',
+  ];
+
+  backupBranches.slice(0, 5).forEach((branch, i) => {
+    lines.push(`  ${i + 1}. ${branch.name} (${branch.date})`);
+  });
+
+  if (backupBranches.length > 5) {
+    lines.push(`  ... and ${backupBranches.length - 5} more`);
+  }
+
+  lines.push('');
+  lines.push('To restore from a backup:');
+  lines.push(`  gsd-tools upstream abort --restore ${latestBackup.name}`);
+
+  const humanOutput = lines.join('\n');
+
+  if (raw) {
+    output(result, raw);
+  } else {
+    output(result, false, humanOutput);
+  }
+}
+
+// ─── Merge Command ────────────────────────────────────────────────────────────
+
+/**
+ * Rollback a failed merge to the pre-merge state.
+ *
+ * @param {string} cwd - Working directory
+ * @param {string} preMergeHead - SHA of HEAD before merge
+ * @param {string} backupBranch - Name of backup branch
+ * @returns {{ success: boolean, restored_to: string }}
+ */
+function rollbackMerge(cwd, preMergeHead, backupBranch) {
+  // Abort any in-progress merge (ignore errors if no merge in progress)
+  execGit(cwd, ['merge', '--abort']);
+
+  // Reset to pre-merge state
+  const resetResult = execGit(cwd, ['reset', '--hard', preMergeHead]);
+
+  if (!resetResult.success) {
+    // Log rollback failure - this is serious
+    appendSyncHistoryEntry(cwd, SYNC_EVENTS.ROLLBACK_EXECUTED,
+      `FAILED to restore to ${preMergeHead.slice(0, 7)}: ${resetResult.stderr}`);
+    return { success: false, restored_to: preMergeHead };
+  }
+
+  // Log successful rollback
+  appendSyncHistoryEntry(cwd, SYNC_EVENTS.ROLLBACK_EXECUTED,
+    `Restored to ${preMergeHead.slice(0, 7)} after merge failure`);
+
+  return { success: true, restored_to: preMergeHead };
+}
+
+/**
+ * Merge upstream changes with safety net (backup branch and automatic rollback).
+ *
+ * Pre-merge validation:
+ * 1. Upstream must be configured
+ * 2. Working tree must be clean
+ * 3. No merge already in progress
+ * 4. Must have commits to merge
+ *
+ * Safety:
+ * - Creates backup branch before merge
+ * - Automatic rollback on any failure
+ * - All events logged to STATE.md Sync History
+ *
+ * @param {string} cwd - Working directory
+ * @param {object} options - Reserved for future options
+ * @param {function} output - Output callback
+ * @param {function} error - Error callback
+ * @param {boolean} raw - Output as JSON
+ */
+function cmdUpstreamMerge(cwd, options, output, error, raw) {
+  // Step 1: Check upstream is configured
+  const config = loadUpstreamConfig(cwd);
+  if (!config.url) {
+    error('Upstream not configured. Run: gsd-tools upstream configure');
+    return;
+  }
+
+  // Step 2: Check working tree is clean
+  const workingTree = checkWorkingTreeClean(cwd);
+  if (!workingTree.clean) {
+    let msg = 'Working tree has uncommitted changes.';
+    if (workingTree.staged || workingTree.unstaged || workingTree.untracked) {
+      const parts = [];
+      if (workingTree.staged) parts.push(`${workingTree.staged} staged`);
+      if (workingTree.unstaged) parts.push(`${workingTree.unstaged} unstaged`);
+      if (workingTree.untracked) parts.push(`${workingTree.untracked} untracked`);
+      msg += ` (${parts.join(', ')})`;
+    }
+    msg += '\nCommit or stash your changes before merging:\n' +
+      '  git stash         # to stash temporarily\n' +
+      '  git commit -am "WIP"  # to commit';
+    error(msg);
+    return;
+  }
+
+  // Step 3: Check merge not already in progress
+  const gitDir = getGitDir(cwd);
+  if (gitDir) {
+    const mergeHeadPath = path.join(gitDir, 'MERGE_HEAD');
+    if (fs.existsSync(mergeHeadPath)) {
+      error('A merge is already in progress.\n' +
+        'To abort: git merge --abort\n' +
+        'To continue: resolve conflicts and run git merge --continue');
+      return;
+    }
+  }
+
+  // Step 4: Verify we have commits to merge
+  const remoteName = DEFAULT_REMOTE_NAME;
+  const branch = DEFAULT_BRANCH;
+  const countResult = execGit(cwd, ['rev-list', '--count', `HEAD..${remoteName}/${branch}`]);
+
+  if (!countResult.success) {
+    error(`Failed to check upstream commits: ${countResult.stderr}. Try running 'gsd-tools upstream fetch' first.`);
+    return;
+  }
+
+  const commitCount = parseInt(countResult.stdout.trim(), 10);
+  if (commitCount === 0) {
+    output({
+      merged: false,
+      reason: 'up_to_date',
+      message: 'Already up to date with upstream'
+    }, raw);
+    return;
+  }
+
+  // Step 5: Capture pre-merge HEAD
+  const headResult = execGit(cwd, ['rev-parse', 'HEAD']);
+  if (!headResult.success) {
+    error('Failed to get current HEAD');
+    return;
+  }
+  const preMergeHead = headResult.stdout.trim();
+
+  // Step 6: Create backup branch
+  const backup = createBackupBranch(cwd);
+  if (!backup.success) {
+    error(`Failed to create backup branch: ${backup.error}`);
+    return;
+  }
+
+  // Step 7: Log merge start
+  appendSyncHistoryEntry(cwd, SYNC_EVENTS.MERGE_START,
+    `Merging ${commitCount} commits from ${remoteName}/${branch}`);
+
+  // Step 8: Attempt merge
+  try {
+    const mergeResult = execGit(cwd, [
+      'merge', `${remoteName}/${branch}`, '--no-ff',
+      '-m', `sync: merge ${commitCount} upstream commits`
+    ]);
+
+    if (!mergeResult.success) {
+      // Check if it's a conflict
+      if (mergeResult.stderr && (
+        mergeResult.stderr.includes('Automatic merge failed') ||
+        mergeResult.stderr.includes('CONFLICT'))) {
+        appendSyncHistoryEntry(cwd, SYNC_EVENTS.CONFLICT_DETECTED,
+          `Conflicts in merge from ${remoteName}/${branch}`);
+      }
+
+      // Rollback
+      rollbackMerge(cwd, preMergeHead, backup.branch);
+      appendSyncHistoryEntry(cwd, SYNC_EVENTS.MERGE_FAILED,
+        `Merge failed: ${(mergeResult.stderr || '').split('\n')[0]}`);
+
+      error(`Merge failed due to conflicts.\n` +
+        `Rolled back to pre-merge state (${preMergeHead.slice(0, 7)}).\n` +
+        `Backup branch preserved: ${backup.branch}\n` +
+        `To view conflicts that would occur: gsd-tools upstream preview`);
+      return;
+    }
+
+    // Step 9: Log success
+    const newHeadResult = execGit(cwd, ['rev-parse', 'HEAD']);
+    const newHead = newHeadResult.success ? newHeadResult.stdout.trim() : 'unknown';
+
+    appendSyncHistoryEntry(cwd, SYNC_EVENTS.MERGE_COMPLETE,
+      `${preMergeHead.slice(0, 7)}..${newHead.slice(0, 7)} (${commitCount} commits)`);
+
+    output({
+      merged: true,
+      commits: commitCount,
+      from: preMergeHead.slice(0, 7),
+      to: newHead.slice(0, 7),
+      backup_branch: backup.branch,
+      message: `Merged ${commitCount} commits from upstream/${branch}.\nBackup branch: ${backup.branch}`
+    }, raw);
+
+  } catch (err) {
+    // Unexpected error - rollback
+    rollbackMerge(cwd, preMergeHead, backup.branch);
+    appendSyncHistoryEntry(cwd, SYNC_EVENTS.MERGE_FAILED, `Error: ${err.message}`);
+    error(`Merge failed unexpectedly: ${err.message}\nRolled back to ${preMergeHead.slice(0, 7)}`);
   }
 }
 
@@ -2331,6 +3029,8 @@ module.exports = {
   CONVENTIONAL_PATTERN,
   RISK_FACTORS,
   BINARY_CATEGORIES,
+  SYNC_EVENTS,
+  BACKUP_BRANCH_PREFIX,
 
   // Helper functions
   execGit,
@@ -2343,6 +3043,23 @@ module.exports = {
   parseConventionalCommit,
   groupCommitsByType,
   truncateSubject,
+
+  // Sync history logging functions
+  appendSyncHistoryEntry,
+  getSyncHistory,
+
+  // Backup branch management functions
+  createBackupBranch,
+  listBackupBranches,
+  getLatestBackupBranch,
+
+  // Abort helpers
+  getGitDir,
+  detectMergeInProgress,
+  checkWorkingTreeClean,
+
+  // Merge helpers
+  rollbackMerge,
 
   // Conflict preview functions
   checkGitVersion,
@@ -2373,6 +3090,8 @@ module.exports = {
   cmdUpstreamAnalyze,
   cmdUpstreamPreview,
   cmdUpstreamResolve,
+  cmdUpstreamAbort,
+  cmdUpstreamMerge,
 
   // Notification functions
   checkUpstreamNotification,
