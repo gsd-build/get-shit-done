@@ -15,7 +15,7 @@ This roadmap delivers upstream sync tooling for GSD fork maintainers. The journe
 - [x] **Phase 6: Analysis** - Commit grouping, conflict preview, and change detection (completed 2026-02-24)
 - [x] **Phase 6.1: Local Modifications Integration** - Path migration and finalize-phase command (INSERTED, completed 2026-02-24)
 - [x] **Phase 7: Merge Operations** - Atomic merge with rollback and state logging (completed 2026-02-24)
-- [ ] **Phase 8: Interactive & Integration** - Deep dive mode, worktree awareness, and health integration
+- [x] **Phase 8: Interactive & Integration** - Deep dive mode, worktree awareness, and health integration (completed 2026-02-24)
 - [ ] **Phase 9: Documentation** - User guide, architecture docs, and troubleshooting
 
 ## Phase Details
@@ -93,13 +93,13 @@ Plans:
   3. Post-merge verification tests run automatically to confirm custom features work
   4. User receives warning when attempting sync with active worktrees
   5. Health check reports incomplete/stalled sync operations
-**Plans:** 4 plans
+**Plans:** 4/4 plans complete
 
 Plans:
-- [ ] 8-01-PLAN.md — Interactive exploration mode (sync explore command with readline REPL)
-- [ ] 8-02-PLAN.md — Refactoring suggestions (semantic similarity detection + apply-suggestion)
-- [ ] 8-03-PLAN.md — Post-merge verification (test discovery + rollback prompt)
-- [ ] 8-04-PLAN.md — Worktree integration (sync guard + health check extension)
+- [x] 8-01-PLAN.md — Interactive exploration mode (sync explore command with readline REPL)
+- [x] 8-02-PLAN.md — Refactoring suggestions (semantic similarity detection + apply-suggestion)
+- [x] 8-03-PLAN.md — Post-merge verification (test discovery + rollback prompt)
+- [x] 8-04-PLAN.md — Worktree integration (sync guard + health check extension)
 
 ### Phase 9: Documentation
 **Goal**: Document upstream sync features for users and developers
@@ -122,8 +122,8 @@ Phases execute in numeric order: 5 -> 6 -> 6.1 -> 7 -> 8 -> 9
 | 5. Core Infrastructure | 4/4 | Complete | 2026-02-24 |
 | 6. Analysis | 4/4 | Complete | 2026-02-24 |
 | 6.1 Local Modifications Integration | 1/1 | Complete | 2026-02-24 |
-| 7. Merge Operations | 2/3 | Complete    | 2026-02-24 |
-| 8. Interactive & Integration | 0/4 | Planned | - |
+| 7. Merge Operations | 3/3 | Complete    | 2026-02-24 |
+| 8. Interactive & Integration | 4/4 | Complete | 2026-02-24 |
 | 9. Documentation | 0/? | Not started | - |
 
 ---
