@@ -13,6 +13,7 @@ This roadmap delivers upstream sync tooling for GSD fork maintainers. The journe
 
 - [x] **Phase 5: Core Infrastructure** - Upstream configuration, fetch, status, and update notifications (completed 2026-02-24)
 - [x] **Phase 6: Analysis** - Commit grouping, conflict preview, and change detection (completed 2026-02-24)
+- [ ] **Phase 6.1: Local Modifications Integration** - Path migration and finalize-phase command (INSERTED)
 - [ ] **Phase 7: Merge Operations** - Atomic merge with rollback and state logging
 - [ ] **Phase 8: Interactive & Integration** - Deep dive mode, worktree awareness, and health integration
 - [ ] **Phase 9: Documentation** - User guide, architecture docs, and troubleshooting
@@ -54,9 +55,23 @@ Plans:
 - [x] 6-03-PLAN.md — Structural conflict resolution workflow (cmdUpstreamResolve)
 - [x] 6-04-PLAN.md — gsd-tools CLI routing + workflow command integration
 
+### Phase 06.1: Local Modifications Integration (INSERTED)
+
+**Goal:** Migrate workflow paths from global to project-local and add finalize-phase command
+**Depends on:** Phase 6
+**Source:** Local modifications made to ~/Projects/OpenClaw/gsd (installed GSD v1.20.3)
+**Changes to integrate:**
+  1. New finalize-phase command file (merge to main, cleanup worktree)
+  2. Path updates from global (~/.claude/) to project-local (gsd/) installation
+**Plans:** 2 plans
+
+Plans:
+- [ ] 06.1-01-PLAN.md — Create finalize-phase command file
+- [ ] 06.1-02-PLAN.md — Update workflow paths from global to project-local
+
 ### Phase 7: Merge Operations
 **Goal**: Enable safe upstream merges with automatic backup, atomic execution, and recovery
-**Depends on**: Phase 6
+**Depends on**: Phase 6.1
 **Requirements**: MERGE-01, MERGE-02, MERGE-03, MERGE-04
 **Success Criteria** (what must be TRUE):
   1. User can merge upstream with automatic backup branch created before merge
@@ -102,12 +117,13 @@ Plans:
 ## Progress
 
 **Execution Order:**
-Phases execute in numeric order: 5 -> 6 -> 7 -> 8 -> 9
+Phases execute in numeric order: 5 -> 6 -> 6.1 -> 7 -> 8 -> 9
 
 | Phase | Plans Complete | Status | Completed |
 |-------|----------------|--------|-----------|
 | 5. Core Infrastructure | 4/4 | Complete | 2026-02-24 |
 | 6. Analysis | 4/4 | Complete | 2026-02-24 |
+| 6.1 Local Modifications Integration | 0/2 | Planned | - |
 | 7. Merge Operations | 0/3 | Ready | - |
 | 8. Interactive & Integration | 0/4 | Planned | - |
 | 9. Documentation | 0/? | Not started | - |
