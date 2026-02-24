@@ -9,12 +9,12 @@
 ## Current Position
 
 **Phase:** 6 - Analysis
-**Plan:** 6-02 complete, 6-03 ready
+**Plan:** 6-03 complete, 6-04 ready
 **Status:** In progress
-**Last activity:** 2026-02-24 — Completed plan 6-02 (conflict preview with risk scoring)
+**Last activity:** 2026-02-24 — Completed plan 6-03 (structural conflict resolution)
 
 ```
-[##########..........] 50% - Phase 6 plan 2 complete
+[###########.........] 55% - Phase 6 plan 3 complete
 ```
 
 **Phases:**
@@ -28,9 +28,9 @@
 
 | Metric | Value |
 |--------|-------|
-| Plans completed (v1.1) | 6 |
+| Plans completed (v1.1) | 7 |
 | Plans failed (v1.1) | 0 |
-| Current streak | 6 |
+| Current streak | 7 |
 | v1.0 plans completed | 11 |
 
 ## Accumulated Context
@@ -60,6 +60,8 @@
 | Risk scoring thresholds | easy (<2), moderate (<5), hard (>=5) with file type weights | 2026-02-24 |
 | Binary file categories | safe (images/fonts), review (archives), dangerous (executables) | 2026-02-24 |
 | Analysis state in config.json | Store analyzed_sha, conflict_count, binary_acknowledged | 2026-02-24 |
+| 90% rename similarity threshold | Reduces false positives from unrelated files | 2026-02-24 |
+| Fork modification check | Only flag conflicts where fork actually changed the file | 2026-02-24 |
 
 ### Implementation Notes
 
@@ -89,7 +91,7 @@
 - [ ] Execute plan 5-05 (session workflow integration)
 - [x] Execute plan 6-01 (commit grouping by directory)
 - [x] Execute plan 6-02 (conflict preview with risk scoring)
-- [ ] Execute plan 6-03 (structural conflict detection)
+- [x] Execute plan 6-03 (structural conflict detection)
 - [ ] Execute plan 6-04 (CLI routing for analysis commands)
 
 ### Blockers
@@ -99,10 +101,10 @@ None currently.
 ## Session Continuity
 
 **Last Session:** 2026-02-24
-**Context:** Completed plan 6-02 - added conflict preview via git merge-tree --write-tree with risk scoring. Binary detection categorizes files as safe/review/dangerous. cmdUpstreamPreview command with analysis state persistence.
+**Context:** Completed plan 6-03 - added structural conflict detection with acknowledgment workflow. detectStructuralConflicts identifies renames (M90 threshold) and delete conflicts where fork has modifications. cmdUpstreamResolve supports list/acknowledge/status modes. Acknowledgment state persists in config.json.
 
 **To Resume:**
-1. Execute plan 6-03 (structural conflict detection)
+1. Execute plan 6-04 (CLI routing for analysis commands)
 2. Continue through remaining Phase 6 plans
 
 ---
