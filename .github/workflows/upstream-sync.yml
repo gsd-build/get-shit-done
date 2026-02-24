@@ -406,16 +406,19 @@ jobs:
           # Trigger Copilot coding agent via issue assignment.
           # gh agent-task create cannot be used in CI — it requires an interactive
           # OAuth token (browser/device flow) regardless of PAT scopes.
-          # The documented automation path is: create a GitHub issue assigned to
-          # 'copilot'; the agent picks it up and opens a copilot/* PR.
+          # In this repository, we trigger the Copilot coding agent by creating a
+          # GitHub issue assigned to 'copilot'; when enabled, the agent should pick
+          # it up and open a copilot/* PR. This behavior depends on repository
+          # Copilot configuration and is not guaranteed by this workflow.
           echo "Creating Copilot adaptation issue..."
-          ADAPT_ISSUE=$(gh issue create \
+          ADAPT_ISSUE_URL=$(gh issue create \
             --repo "$GITHUB_REPOSITORY" \
             --title "adapt(upstream-sync): proactive fork adaptation [$(date -u +%Y-%m-%dT%H:%M)]" \
             --body-file /tmp/proactive_prompt.md \
             --assignee "copilot" \
             --label "upstream-sync" \
-            2>/dev/null | grep -oE '[0-9]+$' || echo "")
+            2>/dev/null || echo "")
+          ADAPT_ISSUE=$(echo "$ADAPT_ISSUE_URL" | grep -oP '/issues/\K[0-9]+' || echo "")
 
           if [ -z "$ADAPT_ISSUE" ]; then
             echo "::warning::Failed to create Copilot adaptation issue. Copilot coding agent may not be enabled for this repository."
@@ -423,17 +426,38 @@ jobs:
             exit 0
           fi
 
+          ISSUE_CREATED_AT=$(gh issue view "$ADAPT_ISSUE" \
+            --repo "$GITHUB_REPOSITORY" \
+            --json createdAt \
+            --jq '.createdAt' 2>/dev/null || echo "")
+
+          if [ -z "$ISSUE_CREATED_AT" ]; then
+            echo "::warning::Failed to retrieve creation time for issue #${ADAPT_ISSUE}. Proceeding without PR association filter."
+          fi
+
           echo "Created issue #${ADAPT_ISSUE}. Waiting up to 20 minutes for Copilot coding agent to open a PR..."
           POLL_MAX=24
           POLL_COUNT=0
+          ADAPT_PR=""
           while [ $POLL_COUNT -lt $POLL_MAX ]; do
-            ADAPT_PR=$(gh pr list \
-              --repo "$GITHUB_REPOSITORY" \
-              --base "automated/upstream-sync" \
-              --state open \
-              --json number,headRefName \
-              --jq '.[] | select(.headRefName | startswith("copilot/")) | .number' \
-              2>/dev/null | head -1 || echo "")
+            if [ -n "$ISSUE_CREATED_AT" ]; then
+              export ISSUE_CREATED_AT
+              ADAPT_PR=$(gh pr list \
+                --repo "$GITHUB_REPOSITORY" \
+                --base "automated/upstream-sync" \
+                --state open \
+                --json number,headRefName,createdAt \
+                --jq '.[] | select((.headRefName | startswith("copilot/")) and (.createdAt >= env.ISSUE_CREATED_AT)) | .number' \
+                2>/dev/null | head -1 || echo "")
+            else
+              ADAPT_PR=$(gh pr list \
+                --repo "$GITHUB_REPOSITORY" \
+                --base "automated/upstream-sync" \
+                --state open \
+                --json number,headRefName \
+                --jq '.[] | select(.headRefName | startswith("copilot/")) | .number' \
+                2>/dev/null | head -1 || echo "")
+            fi
             if [ -n "$ADAPT_PR" ]; then
               echo "Copilot PR #${ADAPT_PR} found after ~$((POLL_COUNT * 50))s."
               break
@@ -442,13 +466,13 @@ jobs:
             POLL_COUNT=$((POLL_COUNT + 1))
           done
 
-          gh issue close "$ADAPT_ISSUE" \
-            --repo "$GITHUB_REPOSITORY" \
-            --comment "Processed by upstream-sync proactive adaptation step." \
-            2>/dev/null || true
-
-          if [ -z "${ADAPT_PR:-}" ]; then
-            echo "::warning::Copilot coding agent did not open a PR within 20 minutes."
+          if [ -n "${ADAPT_PR:-}" ]; then
+            gh issue close "$ADAPT_ISSUE" \
+              --repo "$GITHUB_REPOSITORY" \
+              --comment "Processed by upstream-sync proactive adaptation step." \
+              2>/dev/null || true
+          else
+            echo "::warning::Copilot coding agent did not open a PR within 20 minutes. Leaving issue #${ADAPT_ISSUE} open."
           fi
 
           echo "proactive_adapt_invoked=true" >> "$GITHUB_OUTPUT"
@@ -832,7 +856,24 @@ jobs:
             exit 0
           fi
 
-          echo "COPILOT_PAT is a valid classic OAuth PAT. Ready for issue-based Copilot agent invocation."
+          # Validate that the classic PAT has the required 'repo' scope.
+          # gh auth status -t prints the token scopes on a dedicated line, e.g.:
+          #   Token scopes: repo, read:org
+          if ! gh auth status -t >/tmp/gh_auth_status 2>&1; then
+            echo "::error::gh auth status failed for COPILOT_PAT. Ensure the token is valid and has 'repo' scope."
+            cat /tmp/gh_auth_status || true
+            echo "agent_auth_ok=false" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+
+          if ! grep -E '^ *Token scopes: .*\brepo\b' /tmp/gh_auth_status >/dev/null 2>&1; then
+            echo "::error::COPILOT_PAT is a classic OAuth PAT but does not have the required 'repo' scope. Update the token at https://github.com/settings/tokens."
+            cat /tmp/gh_auth_status || true
+            echo "agent_auth_ok=false" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+
+          echo "COPILOT_PAT is a valid classic OAuth PAT with 'repo' scope. Ready for issue-based Copilot agent invocation."
           echo "agent_auth_ok=true" >> "$GITHUB_OUTPUT"
 
       - name: Resolve merge conflict via Copilot agent
@@ -914,26 +955,48 @@ jobs:
           # gh agent-task create cannot be used in CI — it requires an interactive
           # OAuth token (browser/device flow) regardless of PAT scopes.
           echo "Creating Copilot conflict-resolution issue..."
-          CONFLICT_ISSUE=$(gh issue create \
+          CONFLICT_ISSUE_URL=$(gh issue create \
             --repo "$GITHUB_REPOSITORY" \
             --title "fix(upstream-sync): resolve merge conflict [${{ needs.sync.outputs.short_sha || 'unknown' }}]" \
             --body-file /tmp/conflict-resolve-prompt.md \
             --assignee "copilot" \
             --label "upstream-sync" \
-            2>/dev/null | grep -oE '[0-9]+$' || echo "")
+            2>/dev/null || echo "")
+          CONFLICT_ISSUE=$(echo "$CONFLICT_ISSUE_URL" | grep -oP '/issues/\K[0-9]+' || echo "")
 
           if [ -n "$CONFLICT_ISSUE" ]; then
+            CONFLICT_ISSUE_CREATED_AT=$(gh issue view "$CONFLICT_ISSUE" \
+              --repo "$GITHUB_REPOSITORY" \
+              --json createdAt \
+              --jq '.createdAt' 2>/dev/null || echo "")
+
+            if [ -z "$CONFLICT_ISSUE_CREATED_AT" ]; then
+              echo "::warning::Failed to retrieve creation time for issue #${CONFLICT_ISSUE}. Proceeding without PR association filter."
+            fi
+
             echo "Created issue #${CONFLICT_ISSUE}. Waiting up to 20 minutes for Copilot to open a PR..."
             POLL_MAX=24
             POLL_COUNT=0
+            AGENT_PR=""
             while [ $POLL_COUNT -lt $POLL_MAX ]; do
-              AGENT_PR=$(gh pr list \
-                --repo "$GITHUB_REPOSITORY" \
-                --base "automated/upstream-sync" \
-                --state open \
-                --json number,headRefName \
-                --jq '.[] | select(.headRefName | startswith("copilot/")) | .number' \
-                2>/dev/null | head -1 || echo "")
+              if [ -n "$CONFLICT_ISSUE_CREATED_AT" ]; then
+                export CONFLICT_ISSUE_CREATED_AT
+                AGENT_PR=$(gh pr list \
+                  --repo "$GITHUB_REPOSITORY" \
+                  --base "automated/upstream-sync" \
+                  --state open \
+                  --json number,headRefName,createdAt \
+                  --jq '.[] | select((.headRefName | startswith("copilot/")) and (.createdAt >= env.CONFLICT_ISSUE_CREATED_AT)) | .number' \
+                  2>/dev/null | head -1 || echo "")
+              else
+                AGENT_PR=$(gh pr list \
+                  --repo "$GITHUB_REPOSITORY" \
+                  --base "automated/upstream-sync" \
+                  --state open \
+                  --json number,headRefName \
+                  --jq '.[] | select(.headRefName | startswith("copilot/")) | .number' \
+                  2>/dev/null | head -1 || echo "")
+              fi
               if [ -n "$AGENT_PR" ]; then
                 echo "Copilot PR #${AGENT_PR} found after ~$((POLL_COUNT * 50))s."
                 break
@@ -941,10 +1004,14 @@ jobs:
               sleep 50
               POLL_COUNT=$((POLL_COUNT + 1))
             done
-            gh issue close "$CONFLICT_ISSUE" \
-              --repo "$GITHUB_REPOSITORY" \
-              --comment "Processed by upstream-sync conflict resolution step." \
-              2>/dev/null || true
+            if [ -n "$AGENT_PR" ]; then
+              gh issue close "$CONFLICT_ISSUE" \
+                --repo "$GITHUB_REPOSITORY" \
+                --comment "Processed by upstream-sync conflict resolution step." \
+                2>/dev/null || true
+            else
+              echo "::warning::Copilot coding agent did not open a PR within 20 minutes. Leaving issue #${CONFLICT_ISSUE} open."
+            fi
           else
             echo "::warning::Failed to create conflict resolution issue."
           fi
@@ -1145,13 +1212,14 @@ jobs:
             # The supported CI/CD path is: create a GitHub issue assigned to
             # 'copilot'; the agent picks it up and opens a copilot/* PR.
             COPILOT_PR=""
-            REPAIR_ISSUE=$(gh issue create \
+            REPAIR_ISSUE_URL=$(gh issue create \
               --repo "$GITHUB_REPOSITORY" \
               --title "repair(upstream-sync): fix verifier [attempt ${ATTEMPT}, ${STRATEGY}]" \
               --body-file /tmp/repair_prompt_${ATTEMPT}.txt \
               --assignee "copilot" \
               --label "upstream-sync" \
-              2>/dev/null | grep -oE '[0-9]+$' || echo "")
+              2>/dev/null || echo "")
+            REPAIR_ISSUE=$(echo "$REPAIR_ISSUE_URL" | grep -oP '/issues/\K[0-9]+' || echo "")
 
             if [ -z "$REPAIR_ISSUE" ]; then
               echo "::warning::Failed to create Copilot repair issue. Copilot coding agent may not be enabled for this repository, or COPILOT_PAT lacks 'repo' scope."
@@ -1159,17 +1227,37 @@ jobs:
               continue
             fi
 
+            REPAIR_ISSUE_CREATED_AT=$(gh issue view "$REPAIR_ISSUE" \
+              --repo "$GITHUB_REPOSITORY" \
+              --json createdAt \
+              --jq '.createdAt' 2>/dev/null || echo "")
+
+            if [ -z "$REPAIR_ISSUE_CREATED_AT" ]; then
+              echo "::warning::Failed to retrieve creation time for issue #${REPAIR_ISSUE}. Proceeding without PR association filter."
+            fi
+
             echo "Created issue #${REPAIR_ISSUE}. Waiting up to 20 minutes for Copilot coding agent to open a PR..."
             POLL_MAX=24
             POLL_COUNT=0
             while [ $POLL_COUNT -lt $POLL_MAX ]; do
-              COPILOT_PR=$(gh pr list \
-                --repo "$GITHUB_REPOSITORY" \
-                --base "automated/upstream-sync" \
-                --state open \
-                --json number,headRefName \
-                --jq '.[] | select(.headRefName | startswith("copilot/")) | .number' \
-                2>/dev/null | head -1 || echo "")
+              if [ -n "$REPAIR_ISSUE_CREATED_AT" ]; then
+                export REPAIR_ISSUE_CREATED_AT
+                COPILOT_PR=$(gh pr list \
+                  --repo "$GITHUB_REPOSITORY" \
+                  --base "automated/upstream-sync" \
+                  --state open \
+                  --json number,headRefName,createdAt \
+                  --jq '.[] | select((.headRefName | startswith("copilot/")) and (.createdAt >= env.REPAIR_ISSUE_CREATED_AT)) | .number' \
+                  2>/dev/null | head -1 || echo "")
+              else
+                COPILOT_PR=$(gh pr list \
+                  --repo "$GITHUB_REPOSITORY" \
+                  --base "automated/upstream-sync" \
+                  --state open \
+                  --json number,headRefName \
+                  --jq '.[] | select(.headRefName | startswith("copilot/")) | .number' \
+                  2>/dev/null | head -1 || echo "")
+              fi
               if [ -n "$COPILOT_PR" ]; then
                 echo "Copilot PR #${COPILOT_PR} found after ~$((POLL_COUNT * 50))s."
                 break
@@ -1178,13 +1266,13 @@ jobs:
               POLL_COUNT=$((POLL_COUNT + 1))
             done
 
-            gh issue close "$REPAIR_ISSUE" \
-              --repo "$GITHUB_REPOSITORY" \
-              --comment "Processed by upstream-sync repair loop (attempt ${ATTEMPT}, strategy: ${STRATEGY})." \
-              2>/dev/null || true
-
-            if [ -z "$COPILOT_PR" ]; then
-              echo "::warning::Copilot coding agent did not open a PR within 20 minutes on strategy ${STRATEGY}."
+            if [ -n "$COPILOT_PR" ]; then
+              gh issue close "$REPAIR_ISSUE" \
+                --repo "$GITHUB_REPOSITORY" \
+                --comment "Processed by upstream-sync repair loop (attempt ${ATTEMPT}, strategy: ${STRATEGY})." \
+                2>/dev/null || true
+            else
+              echo "::warning::Copilot coding agent did not open a PR within 20 minutes on strategy ${STRATEGY}. Leaving issue #${REPAIR_ISSUE} open."
             fi
 
             if [ -n "$COPILOT_PR" ]; then
