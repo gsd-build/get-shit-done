@@ -990,7 +990,7 @@ function cleanupOrphanedHooks(settings) {
  */
 function uninstall(isGlobal, runtime = 'claude') {
   const isOpencode = runtime === 'opencode';
-  const isCodex = runtime === 'codex';
+  const isCodex = runtime === 'codex' || runtime === 'openclaw';
   const dirName = getDirName(runtime);
 
   // Get the target directory based on runtime and install type
@@ -1455,7 +1455,7 @@ function generateManifest(dir, baseDir) {
  */
 function writeManifest(configDir, runtime = 'claude') {
   const isOpencode = runtime === 'opencode';
-  const isCodex = runtime === 'codex';
+  const isCodex = runtime === 'codex' || runtime === 'openclaw';
   const gsdDir = path.join(configDir, 'get-shit-done');
   const commandsDir = path.join(configDir, 'commands', 'gsd');
   const opencodeCommandDir = path.join(configDir, 'command');
