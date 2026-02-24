@@ -99,10 +99,18 @@ Execute each wave in sequence. Within a wave: parallel if `PARALLELIZATION=true`
    Pass paths only — executors read files themselves with their fresh 200k context.
    This keeps orchestrator context lean (~10-15%).
 
+   **Worktree isolation (when configured):**
+   When `parallelization.isolation` is `"worktree"` AND there are multiple plans in the current wave,
+   add `isolation: "worktree"` to the Task call. This gives each executor an isolated copy of the repo,
+   preventing lint-staged cross-contamination and file conflicts between parallel agents.
+
+   Single-plan waves do NOT need isolation (no parallel conflict possible).
+
    ```
    Task(
      subagent_type="gsd-executor",
      model="{executor_model}",
+     isolation: (ISOLATION === "worktree" && wave_plan_count > 1) ? "worktree" : undefined,
      prompt="
        <objective>
        Execute plan {plan_number} of phase {phase_number}-{phase_name}.
@@ -137,6 +145,27 @@ Execute each wave in sequence. Within a wave: parallel if `PARALLELIZATION=true`
    ```
 
 3. **Wait for all agents in wave to complete.**
+
+   Store each Task result. When `isolation: "worktree"` was used,
+   the result includes the worktree branch name for post-wave merging.
+
+3.5. **Merge worktree branches (if isolation was used):**
+
+   When `parallelization.isolation` is `"worktree"` AND multiple agents ran in the wave,
+   each agent's work lives on a separate branch in a temporary worktree. After all agents
+   in the wave complete, merge their branches back:
+
+   ```bash
+   # For each completed worktree agent that returned a branch name:
+   for branch in $WAVE_BRANCHES; do
+     git merge "$branch" --no-edit
+   done
+   ```
+
+   If a merge conflict occurs (should not happen when plan-checker enforces no file overlap):
+   - Report the conflicting files to the user
+   - Ask: "Resolve manually?" or "Abort wave?"
+   - Do NOT auto-resolve — file ownership violation indicates a planning error
 
 4. **Report completion — spot-check claims first:**
 

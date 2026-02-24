@@ -193,4 +193,54 @@ Squash merge is recommended — keeps main branch history clean while preserving
 
 </branching_strategy_behavior>
 
+<parallelization_isolation>
+
+**Worktree Isolation for Parallel Execution:**
+
+When multiple executor agents run in parallel (same wave), they share the same git working tree by default. This can cause:
+- Lint-staged picking up changes from other agents
+- File write conflicts between concurrent agents
+- Test runners seeing partial changes from parallel work
+
+**Configuration:**
+
+```json
+"parallelization": {
+  "enabled": true,
+  "plan_level": true,
+  "isolation": "worktree",
+  "max_concurrent_agents": 3
+}
+```
+
+| Value | Behavior |
+|-------|----------|
+| `"none"` (default) | All agents share the same working tree (current behavior) |
+| `"worktree"` | Each parallel agent gets an isolated git worktree via Claude Code's `isolation: "worktree"` Task parameter |
+
+**How it works:**
+
+1. Plan-checker enforces no `files_modified` overlap between plans in the same wave (blocker severity)
+2. Execute-phase adds `isolation: "worktree"` to Task calls when spawning multiple agents in a wave
+3. Each agent works in an isolated copy of the repo
+4. After wave completes, worktree branches are merged back sequentially
+5. If merge conflict occurs (shouldn't with file overlap guard), user is prompted
+
+**Requirements:**
+- Git repository (worktrees require git)
+- Plans in same wave must NOT share `files_modified` entries
+- Sufficient disk space for temporary worktree copies
+
+**When to use:**
+- Projects with lint-staged or pre-commit hooks that scan all staged files
+- Large phases with 3+ parallel plans modifying many files
+- When experiencing flaky parallel execution due to file conflicts
+
+**When NOT to use:**
+- Single-plan waves (no benefit, adds overhead)
+- Small projects where parallel conflicts are rare
+- Non-git projects
+
+</parallelization_isolation>
+
 </planning_config>

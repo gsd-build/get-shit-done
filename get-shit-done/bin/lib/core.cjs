@@ -88,7 +88,10 @@ function loadConfig(cwd) {
     const parallelization = (() => {
       const val = get('parallelization');
       if (typeof val === 'boolean') return val;
-      if (typeof val === 'object' && val !== null && 'enabled' in val) return val.enabled;
+      if (typeof val === 'object' && val !== null) {
+        if ('enabled' in val && !val.enabled) return false;
+        return val;  // Preserve full object with sub-fields like isolation
+      }
       return defaults.parallelization;
     })();
 

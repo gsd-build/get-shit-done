@@ -161,6 +161,27 @@ issue:
 - `depends_on: ["01"]` = Wave 2 minimum (must wait for 01)
 - Wave number = max(deps) + 1
 
+**Worktree Isolation File Overlap Guard:**
+
+Check if `parallelization.isolation` is `"worktree"` in `.planning/config.json`:
+
+```bash
+node ~/.claude/get-shit-done/bin/gsd-tools.cjs config-get parallelization.isolation 2>/dev/null || echo "none"
+```
+
+**If `"worktree"`:** Plans in the same wave MUST NOT share `files_modified` entries. Each executor gets an isolated git worktree — file overlaps within a wave would cause merge conflicts.
+
+For each wave, collect all `files_modified` from plans in that wave. If any file appears in multiple plans within the same wave → **blocker** (move overlapping plan to a later wave).
+
+```yaml
+issue:
+  dimension: dependency_correctness
+  severity: blocker
+  description: "Plans 01 and 02 (both Wave 1) share files_modified entry 'src/types/index.ts' — will conflict in worktree mode"
+  plans: ["01", "02"]
+  fix_hint: "Move plan 02 to Wave 2 with depends_on: ['01'], or consolidate shared file into one plan"
+```
+
 **Example issue:**
 ```yaml
 issue:
@@ -627,6 +648,7 @@ issue:
 - Missing required task fields
 - Circular dependencies
 - Scope > 5 tasks per plan
+- Same-wave file overlap in worktree mode
 
 **warning** - Should fix, execution may work
 - Scope 4 tasks (borderline)

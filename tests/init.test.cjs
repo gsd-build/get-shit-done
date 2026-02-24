@@ -97,6 +97,87 @@ describe('init commands', () => {
     assert.strictEqual(output.context_path, undefined);
     assert.strictEqual(output.research_path, undefined);
   });
+  test('init execute-phase returns isolation mode from config', () => {
+    const phaseDir = path.join(tmpDir, '.planning', 'phases', '03-api');
+    fs.mkdirSync(phaseDir, { recursive: true });
+    fs.writeFileSync(path.join(phaseDir, '03-01-PLAN.md'), '# Plan');
+    fs.writeFileSync(path.join(tmpDir, '.planning', 'config.json'), JSON.stringify({
+      parallelization: { enabled: true, plan_level: true, isolation: 'worktree' }
+    }));
+
+    const result = runGsdTools('init execute-phase 03', tmpDir);
+    assert.ok(result.success, `Command failed: ${result.error}`);
+
+    const output = JSON.parse(result.output);
+    assert.strictEqual(output.isolation, 'worktree');
+  });
+
+  test('init execute-phase defaults isolation to none', () => {
+    const phaseDir = path.join(tmpDir, '.planning', 'phases', '03-api');
+    fs.mkdirSync(phaseDir, { recursive: true });
+    fs.writeFileSync(path.join(phaseDir, '03-01-PLAN.md'), '# Plan');
+
+    const result = runGsdTools('init execute-phase 03', tmpDir);
+    assert.ok(result.success, `Command failed: ${result.error}`);
+
+    const output = JSON.parse(result.output);
+    assert.strictEqual(output.isolation, 'none');
+  });
+});
+
+// ─────────────────────────────────────────────────────────────────────────────
+// loadConfig parallelization preservation
+// ─────────────────────────────────────────────────────────────────────────────
+
+describe('loadConfig parallelization', () => {
+  let tmpDir;
+
+  beforeEach(() => {
+    tmpDir = createTempProject();
+  });
+
+  afterEach(() => {
+    cleanup(tmpDir);
+  });
+
+  test('preserves parallelization object with isolation sub-field', () => {
+    fs.writeFileSync(path.join(tmpDir, '.planning', 'config.json'), JSON.stringify({
+      parallelization: { enabled: true, plan_level: true, isolation: 'worktree' }
+    }));
+
+    const result = runGsdTools('init execute-phase 03', tmpDir);
+    assert.ok(result.success, `Command failed: ${result.error}`);
+
+    const output = JSON.parse(result.output);
+    // parallelization should be the full object, not coerced to boolean
+    assert.strictEqual(typeof output.parallelization, 'object');
+    assert.strictEqual(output.parallelization.isolation, 'worktree');
+    assert.strictEqual(output.parallelization.enabled, true);
+  });
+
+  test('returns false when parallelization.enabled is false', () => {
+    fs.writeFileSync(path.join(tmpDir, '.planning', 'config.json'), JSON.stringify({
+      parallelization: { enabled: false, isolation: 'worktree' }
+    }));
+
+    const result = runGsdTools('init execute-phase 03', tmpDir);
+    assert.ok(result.success, `Command failed: ${result.error}`);
+
+    const output = JSON.parse(result.output);
+    assert.strictEqual(output.parallelization, false);
+  });
+
+  test('preserves boolean true/false unchanged', () => {
+    fs.writeFileSync(path.join(tmpDir, '.planning', 'config.json'), JSON.stringify({
+      parallelization: true
+    }));
+
+    const result = runGsdTools('init execute-phase 03', tmpDir);
+    assert.ok(result.success, `Command failed: ${result.error}`);
+
+    const output = JSON.parse(result.output);
+    assert.strictEqual(output.parallelization, true);
+  });
 });
 
 // ─────────────────────────────────────────────────────────────────────────────

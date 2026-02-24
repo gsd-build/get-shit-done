@@ -43,6 +43,9 @@ function cmdInitExecutePhase(cwd, phase, raw) {
     plan_count: phaseInfo?.plans?.length || 0,
     incomplete_count: phaseInfo?.incomplete_plans?.length || 0,
 
+    // Isolation mode
+    isolation: config.parallelization?.isolation || 'none',
+
     // Branch name (pre-computed)
     branch_name: config.branching_strategy === 'phase' && phaseInfo
       ? config.phase_branch_template

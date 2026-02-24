@@ -51,6 +51,21 @@ If STATE.md missing but .planning/ exists: offer to reconstruct or continue with
 If .planning/ missing: Error — project not initialized.
 </step>
 
+<step name="detect_worktree">
+Check if running in a git worktree:
+
+```bash
+COMMON_DIR=$(git rev-parse --git-common-dir 2>/dev/null)
+GIT_DIR=$(git rev-parse --git-dir 2>/dev/null)
+if [ "$COMMON_DIR" != "$GIT_DIR" ] && [ "$COMMON_DIR" != "." ]; then
+  IS_WORKTREE=true
+  WORKTREE_BRANCH=$(git branch --show-current)
+fi
+```
+
+If in worktree: note branch name, all commits go to worktree branch, do NOT switch branches.
+</step>
+
 <step name="load_plan">
 Read the plan file provided in your prompt context.
 
@@ -441,6 +456,7 @@ Separate from per-task commits — captures execution results only.
 ## PLAN COMPLETE
 
 **Plan:** {phase}-{plan}
+**Branch:** {WORKTREE_BRANCH if in worktree, otherwise omit}
 **Tasks:** {completed}/{total}
 **SUMMARY:** {path to SUMMARY.md}
 
