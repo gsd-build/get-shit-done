@@ -57,6 +57,7 @@
  *   upstream fetch                     Fetch upstream changes, update cache
  *   upstream status                    Show commits behind with file summary
  *   upstream log                       Show grouped commit log
+ *   upstream notification [--refresh]  Check for upstream updates (for session banner)
  *
  * Roadmap Operations:
  *   roadmap get-phase <phase>          Extract phase section from ROADMAP.md
@@ -5097,8 +5098,20 @@ async function main() {
         upstreamModule.cmdUpstreamStatus(cwd, {}, output, error, raw);
       } else if (subcommand === 'log') {
         upstreamModule.cmdUpstreamLog(cwd, {}, output, error, raw);
+      } else if (subcommand === 'notification') {
+        const refresh = args.includes('--refresh');
+        const result = upstreamModule.checkUpstreamNotification(cwd, { fetch: refresh });
+
+        if (raw) {
+          output(result, raw);
+        } else {
+          const banner = upstreamModule.formatNotificationBanner(result);
+          if (banner) {
+            console.log(banner);
+          }
+        }
       } else {
-        error('Unknown upstream subcommand. Available: configure, fetch, status, log');
+        error('Unknown upstream subcommand. Available: configure, fetch, status, log, notification');
       }
       break;
     }
