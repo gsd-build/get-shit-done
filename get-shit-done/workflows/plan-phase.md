@@ -60,8 +60,60 @@ Use AskUserQuestion:
   - "Continue without context" — Plan using research + requirements only
   - "Run discuss-phase first" — Capture design decisions before planning
 
-If "Continue without context": Proceed to step 5.
+If "Continue without context": Proceed to step 4.5.
 If "Run discuss-phase first": Display `/gsd:discuss-phase {X}` and exit workflow.
+
+## 4.5. Generate Integration Map
+
+**Purpose:** Scan the codebase for integration points BEFORE planning. Produces a concrete table of "to add feature X, wire into Y at Z" that prevents orphaned code.
+
+**Skip if:** `--gaps` flag (gap closure already knows what to wire).
+
+**Check for existing map:**
+```bash
+ls "${PHASE_DIR}"/*-INTEGRATION-MAP.md 2>/dev/null
+```
+
+**If exists and no `--research` flag:** Use existing, skip to step 5.
+
+**If missing OR `--research` flag:**
+
+Display: `◆ Scanning codebase for integration points...`
+
+Run targeted greps to discover file PATHS relevant to the phase goal. Only collect paths — keep orchestrator context lean (~10-15%).
+
+```bash
+# 1. Entry points — routing files, page files, layout files
+grep -rl "Route\|router\|page\|layout" src/ app/ --include="*.ts" --include="*.tsx" --include="*.js" --include="*.jsx" 2>/dev/null | head -10
+
+# 2. Registration points — nav configs, provider wrappers, barrel exports
+grep -rl "nav\|menu\|sidebar\|provider\|Provider\|export \*\|export {" src/ --include="*.ts" --include="*.tsx" 2>/dev/null | head -10
+
+# 3. Data flow — state stores, DB schema, API client
+grep -rl "createContext\|useContext\|zustand\|prisma\|schema\|model \|api/" src/ prisma/ --include="*.ts" --include="*.tsx" --include="*.prisma" 2>/dev/null | head -10
+
+# 4. Type connections — types relevant to phase goal keywords
+grep -rl "type \|interface \|export type" src/ --include="*.ts" --include="*.tsx" 2>/dev/null | head -10
+```
+
+**Filter by relevance:** Only include files related to the phase goal.
+
+**Write skeleton Integration Map** using template from `~/.claude/get-shit-done/templates/integration-map.md`. Populate the tables with discovered file paths and set "How to Wire" to TBD — the planner will fill in wiring details when reading the referenced files with its fresh 200k context.
+
+```bash
+# Write to phase directory
+INTEGRATION_MAP_PATH="${PHASE_DIR}/${PADDED_PHASE}-INTEGRATION-MAP.md"
+```
+
+**Commit (if commit_docs):**
+```bash
+node ~/.claude/get-shit-done/bin/gsd-tools.cjs commit "docs(${PADDED_PHASE}): generate integration map" --files "${INTEGRATION_MAP_PATH}"
+```
+
+**Store path for later steps:**
+```bash
+INTEGRATION_MAP_PATH="${PHASE_DIR}/${PADDED_PHASE}-INTEGRATION-MAP.md"
+```
 
 ## 5. Handle Research
 
@@ -199,6 +251,7 @@ Planner prompt:
 - {requirements_path} (Requirements)
 - {context_path} (USER DECISIONS from /gsd:discuss-phase)
 - {research_path} (Technical Research)
+- {integration_map_path} (Integration Map — wiring targets for new code)
 - {verification_path} (Verification Gaps - if --gaps)
 - {uat_path} (UAT Gaps - if --gaps)
 </files_to_read>
@@ -266,6 +319,7 @@ Checker prompt:
 - {requirements_path} (Requirements)
 - {context_path} (USER DECISIONS from /gsd:discuss-phase)
 - {research_path} (Technical Research — includes Validation Architecture)
+- {integration_map_path} (Integration Map — verify wiring coverage)
 </files_to_read>
 
 **Phase requirement IDs (MUST ALL be covered):** {phase_req_ids}
@@ -466,6 +520,7 @@ Verification: {Passed | Passed with override | Skipped}
 - [ ] Phase validated against roadmap
 - [ ] Phase directory created if needed
 - [ ] CONTEXT.md loaded early (step 4) and passed to ALL agents
+- [ ] Integration Map generated (step 4.5) and passed to planner + checker
 - [ ] Research completed (unless --skip-research or --gaps or exists)
 - [ ] gsd-phase-researcher spawned with CONTEXT.md
 - [ ] Existing plans checked

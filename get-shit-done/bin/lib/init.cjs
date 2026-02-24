@@ -137,6 +137,10 @@ function cmdInitPlanPhase(cwd, phase, raw) {
       if (uatFile) {
         result.uat_path = path.join(phaseInfo.directory, uatFile);
       }
+      const integrationMapFile = files.find(f => f.endsWith('-INTEGRATION-MAP.md') || f === 'INTEGRATION-MAP.md');
+      if (integrationMapFile) {
+        result.integration_map_path = path.join(phaseInfo.directory, integrationMapFile);
+      }
     } catch {}
   }
 
@@ -419,6 +423,10 @@ function cmdInitPhaseOp(cwd, phase, raw) {
       const uatFile = files.find(f => f.endsWith('-UAT.md') || f === 'UAT.md');
       if (uatFile) {
         result.uat_path = path.join(phaseInfo.directory, uatFile);
+      }
+      const integrationMapFile = files.find(f => f.endsWith('-INTEGRATION-MAP.md') || f === 'INTEGRATION-MAP.md');
+      if (integrationMapFile) {
+        result.integration_map_path = path.join(phaseInfo.directory, integrationMapFile);
       }
     } catch {}
   }

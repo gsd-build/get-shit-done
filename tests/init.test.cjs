@@ -97,6 +97,47 @@ describe('init commands', () => {
     assert.strictEqual(output.context_path, undefined);
     assert.strictEqual(output.research_path, undefined);
   });
+
+  test('init plan-phase discovers integration map when present', () => {
+    const phaseDir = path.join(tmpDir, '.planning', 'phases', '03-api');
+    fs.mkdirSync(phaseDir, { recursive: true });
+    fs.writeFileSync(path.join(phaseDir, '03-INTEGRATION-MAP.md'), '# Integration Map');
+
+    const result = runGsdTools('init plan-phase 03', tmpDir);
+    assert.ok(result.success, `Command failed: ${result.error}`);
+
+    const output = JSON.parse(result.output);
+    assert.strictEqual(
+      output.integration_map_path.replace(/\\/g, '/'),
+      '.planning/phases/03-api/03-INTEGRATION-MAP.md'
+    );
+  });
+
+  test('init plan-phase omits integration_map_path when file missing', () => {
+    const phaseDir = path.join(tmpDir, '.planning', 'phases', '03-api');
+    fs.mkdirSync(phaseDir, { recursive: true });
+
+    const result = runGsdTools('init plan-phase 03', tmpDir);
+    assert.ok(result.success, `Command failed: ${result.error}`);
+
+    const output = JSON.parse(result.output);
+    assert.strictEqual(output.integration_map_path, undefined);
+  });
+
+  test('init phase-op discovers integration map when present', () => {
+    const phaseDir = path.join(tmpDir, '.planning', 'phases', '03-api');
+    fs.mkdirSync(phaseDir, { recursive: true });
+    fs.writeFileSync(path.join(phaseDir, '03-INTEGRATION-MAP.md'), '# Integration Map');
+
+    const result = runGsdTools('init phase-op 03', tmpDir);
+    assert.ok(result.success, `Command failed: ${result.error}`);
+
+    const output = JSON.parse(result.output);
+    assert.strictEqual(
+      output.integration_map_path.replace(/\\/g, '/'),
+      '.planning/phases/03-api/03-INTEGRATION-MAP.md'
+    );
+  });
 });
 
 // ─────────────────────────────────────────────────────────────────────────────

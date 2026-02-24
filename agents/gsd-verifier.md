@@ -57,11 +57,14 @@ Set `is_re_verification = false`, proceed with Step 1.
 ```bash
 ls "$PHASE_DIR"/*-PLAN.md 2>/dev/null
 ls "$PHASE_DIR"/*-SUMMARY.md 2>/dev/null
+cat "$PHASE_DIR"/*-INTEGRATION-MAP.md 2>/dev/null
 node ~/.claude/get-shit-done/bin/gsd-tools.cjs roadmap get-phase "$PHASE_NUM"
 grep -E "^| $PHASE_NUM" .planning/REQUIREMENTS.md 2>/dev/null
 ```
 
 Extract phase goal from ROADMAP.md — this is the outcome to verify, not the tasks.
+
+**Integration Map:** If `{phase}-INTEGRATION-MAP.md` exists, load it as an additional verification reference. In Step 5 (Key Links), cross-check that every integration point from the map was addressed in the codebase. Unaddressed integration points should be flagged as gaps.
 
 ## Step 2: Establish Must-Haves (Initial Mode Only)
 
