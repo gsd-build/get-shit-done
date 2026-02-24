@@ -1099,7 +1099,7 @@ jobs:
               # Ensure a PR exists to merge automated/upstream-sync → main.
               # The sync job creates the PR when no verifier errors exist at sync time;
               # when repair is needed the sync job does NOT create a PR, so we must.
-              EXISTING_PR=$(gh pr list --repo "$GITHUB_REPOSITORY" \
+              EXISTING_PR=$(gh pr list --repo "$GITHUB_REPOSITORY" --state open \
                 --head "automated/upstream-sync" --json number --jq '.[0].number' 2>/dev/null || echo "")
               if [ -z "$EXISTING_PR" ]; then
                 echo "No existing PR for automated/upstream-sync — creating one..."
