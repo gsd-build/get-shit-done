@@ -12,7 +12,7 @@ This roadmap delivers upstream sync tooling for GSD fork maintainers. The journe
 - Decimal phases (e.g., 5.1): Urgent insertions (marked with INSERTED)
 
 - [x] **Phase 5: Core Infrastructure** - Upstream configuration, fetch, status, and update notifications (completed 2026-02-24)
-- [ ] **Phase 6: Analysis** - Commit grouping, conflict preview, and change detection
+- [x] **Phase 6: Analysis** - Commit grouping, conflict preview, and change detection (completed 2026-02-24)
 - [ ] **Phase 7: Merge Operations** - Atomic merge with rollback and state logging
 - [ ] **Phase 8: Interactive & Integration** - Deep dive mode, worktree awareness, and health integration
 - [ ] **Phase 9: Documentation** - User guide, architecture docs, and troubleshooting
@@ -46,13 +46,13 @@ Plans:
   2. User can preview which files would conflict before attempting merge
   3. User receives warning about rename/delete conflicts that need manual attention
   4. User is notified when upstream contains binary file changes
-**Plans:** 4 plans
+**Plans:** 4/4 plans complete
 
 Plans:
-- [ ] 6-01-PLAN.md — Commit grouping functions in upstream.cjs (cmdUpstreamAnalyze)
-- [ ] 6-02-PLAN.md — Conflict preview with risk scoring (cmdUpstreamPreview)
-- [ ] 6-03-PLAN.md — Structural conflict resolution workflow (cmdUpstreamResolve)
-- [ ] 6-04-PLAN.md — gsd-tools CLI routing + workflow command integration
+- [x] 6-01-PLAN.md — Commit grouping functions in upstream.cjs (cmdUpstreamAnalyze)
+- [x] 6-02-PLAN.md — Conflict preview with risk scoring (cmdUpstreamPreview)
+- [x] 6-03-PLAN.md — Structural conflict resolution workflow (cmdUpstreamResolve)
+- [x] 6-04-PLAN.md — gsd-tools CLI routing + workflow command integration
 
 ### Phase 7: Merge Operations
 **Goal**: Enable safe upstream merges with automatic backup, atomic execution, and recovery
@@ -100,9 +100,9 @@ Phases execute in numeric order: 5 -> 6 -> 7 -> 8 -> 9
 
 | Phase | Plans Complete | Status | Completed |
 |-------|----------------|--------|-----------|
-| 5. Core Infrastructure | 4/4 | Complete    | 2026-02-24 |
-| 6. Analysis | 0/4 | Planned | - |
-| 7. Merge Operations | 0/3 | Planned | - |
+| 5. Core Infrastructure | 4/4 | Complete | 2026-02-24 |
+| 6. Analysis | 4/4 | Complete | 2026-02-24 |
+| 7. Merge Operations | 0/3 | Ready | - |
 | 8. Interactive & Integration | 0/? | Not started | - |
 | 9. Documentation | 0/? | Not started | - |
 
