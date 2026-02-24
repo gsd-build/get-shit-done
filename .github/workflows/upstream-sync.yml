@@ -1096,6 +1096,24 @@ jobs:
                 git commit -m "chore(upstream-sync): regenerate prompts after upstream merge"
                 git push origin HEAD:automated/upstream-sync --force-with-lease
               fi
+              # Ensure a PR exists to merge automated/upstream-sync → main.
+              # The sync job creates the PR when no verifier errors exist at sync time;
+              # when repair is needed the sync job does NOT create a PR, so we must.
+              EXISTING_PR=$(gh pr list --repo "$GITHUB_REPOSITORY" \
+                --head "automated/upstream-sync" --json number --jq '.[0].number' 2>/dev/null || echo "")
+              if [ -z "$EXISTING_PR" ]; then
+                echo "No existing PR for automated/upstream-sync — creating one..."
+                gh pr create \
+                  --repo "$GITHUB_REPOSITORY" \
+                  --base main \
+                  --head "automated/upstream-sync" \
+                  --title "sync: upstream changes (self-heal)" \
+                  --body "Automated upstream sync. Verifier errors were resolved by the self-heal pass (generator re-run)." \
+                  --label "upstream-sync" \
+                  --label "automated" 2>&1 || echo "::warning::PR creation failed — branch is up to date or PR already exists."
+              else
+                echo "PR #${EXISTING_PR} already exists for automated/upstream-sync."
+              fi
               echo "repair_needed=true" >> "$GITHUB_OUTPUT"
               echo "repair_succeeded=true" >> "$GITHUB_OUTPUT"
               exit 0
@@ -1562,7 +1580,9 @@ jobs:
   release-mirror:
     name: Release Mirror
     runs-on: ubuntu-latest
-    needs: sync
+    # Must wait for repair: if repair is regenerating prompts and creating a PR,
+    # we don't want the release mirror to run against an inconsistent branch state.
+    needs: [sync, repair]
     if: github.event_name == 'schedule' || github.event_name == 'workflow_dispatch'
     timeout-minutes: 15
     permissions:
