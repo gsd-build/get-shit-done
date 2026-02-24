@@ -1058,9 +1058,20 @@ jobs:
           # The checkout step lands on main; the repair agent must operate on
           # automated/upstream-sync so the verifier sees the sync-merged content
           # and all merges/pushes go to the correct branch.
-          git fetch origin automated/upstream-sync 2>/dev/null || true
+          git fetch origin automated/upstream-sync ${{ env.DEFAULT_BRANCH }} 2>/dev/null || true
           git checkout -B automated/upstream-sync origin/automated/upstream-sync 2>/dev/null || \
             git checkout -B automated/upstream-sync origin/${{ env.DEFAULT_BRANCH }} 2>/dev/null || true
+
+          # If main is ahead of automated/upstream-sync (e.g. a prior repair PR was
+          # merged into main but automated/upstream-sync still points at an older commit),
+          # reset to main. Without this, the generator creates files that are already in
+          # main and git diff shows nothing new — so no commit is made and
+          # gh pr create fails with "no commits between main and automated/upstream-sync".
+          COMMITS_BEHIND=$(git rev-list HEAD..origin/${{ env.DEFAULT_BRANCH }} --count 2>/dev/null || echo "0")
+          if [ "$COMMITS_BEHIND" -gt 0 ]; then
+            echo "automated/upstream-sync is ${COMMITS_BEHIND} commit(s) behind ${{ env.DEFAULT_BRANCH }} — resetting to ${{ env.DEFAULT_BRANCH }} as new base."
+            git reset --hard origin/${{ env.DEFAULT_BRANCH }}
+          fi
 
           # Run initial verify to see if repair is needed.
           # Do this BEFORE the auth gate: if the verifier passes there is nothing
