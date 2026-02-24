@@ -9,12 +9,12 @@
 ## Current Position
 
 **Phase:** 5 - Core Infrastructure
-**Plan:** 5-02 complete, 5-03 ready
+**Plan:** 5-04 complete, 5-05 ready
 **Status:** Executing plans
-**Last activity:** 2026-02-24 — Completed plan 5-02 (status and log commands)
+**Last activity:** 2026-02-24 — Completed plan 5-04 (notification check functions)
 
 ```
-[####................] 20% - Phase 5 plan 2 complete
+[########............] 40% - Phase 5 plan 4 complete
 ```
 
 **Phases:**
@@ -28,9 +28,9 @@
 
 | Metric | Value |
 |--------|-------|
-| Plans completed (v1.1) | 2 |
+| Plans completed (v1.1) | 4 |
 | Plans failed (v1.1) | 0 |
-| Current streak | 2 |
+| Current streak | 4 |
 | v1.0 plans completed | 11 |
 
 ## Accumulated Context
@@ -52,6 +52,8 @@
 | Cache upstream fetch metadata | Store commits_behind, last_fetch, last_sha in config.json | 2026-02-24 |
 | Unicode escape for emojis | Use \uXXXX format for cross-platform compatibility | 2026-02-24 |
 | Conventional commit grouping | Group by COMMIT_TYPES order; fallback to flat list | 2026-02-24 |
+| Cache-first notification check | Fast response for session start, no blocking network calls | 2026-02-24 |
+| Silent network errors for notifications | Session start should never fail due to network issues | 2026-02-24 |
 
 ### Implementation Notes
 
@@ -76,7 +78,9 @@
 - [x] Plan Phase 5
 - [x] Execute plan 5-01 (upstream.cjs with configure/fetch)
 - [x] Execute plan 5-02 (status and log commands)
-- [ ] Execute plan 5-03 (notifications)
+- [x] Execute plan 5-03 (gsd-tools CLI routing)
+- [x] Execute plan 5-04 (notification check functions)
+- [ ] Execute plan 5-05 (session workflow integration)
 
 ### Blockers
 
@@ -85,10 +89,10 @@ None currently.
 ## Session Continuity
 
 **Last Session:** 2026-02-24
-**Context:** Completed plan 5-02 - added cmdUpstreamStatus and cmdUpstreamLog to upstream.cjs. Status shows commits behind with file summary; log groups by conventional commit type with emoji headers.
+**Context:** Completed plan 5-04 - added checkUpstreamNotification and formatNotificationBanner to upstream.cjs. Uses 24-hour cache, handles network errors silently. CLI command `upstream notification` available with --refresh flag.
 
 **To Resume:**
-1. Execute plan 5-03 (notifications integration)
+1. Execute plan 5-05 (session workflow integration)
 2. Continue through remaining Phase 5 plans
 
 ---
