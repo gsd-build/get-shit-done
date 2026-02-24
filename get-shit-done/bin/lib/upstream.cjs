@@ -976,6 +976,226 @@ function getLatestBackupBranch(cwd) {
   return branches.length > 0 ? branches[0] : null;
 }
 
+// ─── Abort Helpers ─────────────────────────────────────────────────────────────
+
+/**
+ * Get the .git directory path for the repository.
+ * Handles worktrees correctly (returns actual .git dir, not worktree .git file).
+ *
+ * @param {string} cwd - Working directory
+ * @returns {string | null} - Path to .git directory, or null if not a repo
+ */
+function getGitDir(cwd) {
+  const result = execGit(cwd, ['rev-parse', '--git-dir']);
+  if (!result.success || !result.stdout) {
+    return null;
+  }
+  const gitDir = result.stdout.trim();
+  // Make absolute if relative
+  if (!path.isAbsolute(gitDir)) {
+    return path.join(cwd, gitDir);
+  }
+  return gitDir;
+}
+
+/**
+ * Detect if a merge is in progress by checking for MERGE_HEAD file.
+ *
+ * @param {string} cwd - Working directory
+ * @returns {{ inProgress: boolean, merge_head?: string, type?: string, reason?: string }}
+ */
+function detectMergeInProgress(cwd) {
+  const gitDir = getGitDir(cwd);
+  if (!gitDir) {
+    return { inProgress: false, reason: 'not_a_repo' };
+  }
+
+  const mergeHeadPath = path.join(gitDir, 'MERGE_HEAD');
+  if (fs.existsSync(mergeHeadPath)) {
+    // Get the commit being merged
+    const mergeHead = fs.readFileSync(mergeHeadPath, 'utf-8').trim();
+    return {
+      inProgress: true,
+      merge_head: mergeHead.slice(0, 7),
+      type: 'merge',
+    };
+  }
+
+  return { inProgress: false };
+}
+
+/**
+ * Check if working tree is clean (no uncommitted changes).
+ *
+ * @param {string} cwd - Working directory
+ * @returns {{ clean: boolean, staged?: number, unstaged?: number, untracked?: number }}
+ */
+function checkWorkingTreeClean(cwd) {
+  const result = execGit(cwd, ['status', '--porcelain']);
+
+  if (!result.success) {
+    return { clean: false, error: 'Could not check working tree status' };
+  }
+
+  if (!result.stdout || result.stdout.trim() === '') {
+    return { clean: true };
+  }
+
+  // Parse status output
+  let staged = 0;
+  let unstaged = 0;
+  let untracked = 0;
+
+  for (const line of result.stdout.split('\n').filter(Boolean)) {
+    const index = line[0];
+    const worktree = line[1];
+
+    if (index === '?' && worktree === '?') {
+      untracked++;
+    } else if (index !== ' ' && index !== '?') {
+      staged++;
+    } else if (worktree !== ' ' && worktree !== '?') {
+      unstaged++;
+    }
+  }
+
+  return { clean: false, staged, unstaged, untracked };
+}
+
+/**
+ * Abort in-progress sync or restore from backup branch.
+ *
+ * @param {string} cwd - Working directory
+ * @param {object} options - Command options
+ * @param {string} [options.restore] - Backup branch name to restore from
+ * @param {function} output - Output function
+ * @param {function} error - Error function
+ * @param {boolean} raw - Raw JSON output mode
+ */
+function cmdUpstreamAbort(cwd, options, output, error, raw) {
+  const restore = options.restore;
+
+  // Step 1: Check if merge is in progress
+  const mergeState = detectMergeInProgress(cwd);
+
+  if (mergeState.inProgress) {
+    // Abort the in-progress merge
+    const abortResult = execGit(cwd, ['merge', '--abort']);
+
+    if (abortResult.success) {
+      appendSyncHistoryEntry(cwd, SYNC_EVENTS.ABORT, 'Aborted in-progress merge');
+
+      if (raw) {
+        output({
+          aborted: true,
+          reason: 'merge_in_progress',
+          message: 'Aborted in-progress merge. Working tree restored to pre-merge state.',
+        }, raw);
+      } else {
+        output('Aborted in-progress merge.\nWorking tree restored to pre-merge state.');
+      }
+      return;
+    } else {
+      error(`Failed to abort merge: ${abortResult.stderr}`);
+      return;
+    }
+  }
+
+  // Step 2: No merge in progress - check for backup branches
+  const backupBranches = listBackupBranches(cwd);
+
+  if (backupBranches.length === 0) {
+    if (raw) {
+      output({
+        aborted: false,
+        reason: 'nothing_to_abort',
+        message: 'No sync in progress and no backup branches found.',
+      }, raw);
+    } else {
+      output('No sync in progress and no backup branches found.\nNothing to abort.');
+    }
+    return;
+  }
+
+  // Step 3: If --restore specified, restore from that branch
+  if (restore) {
+    const targetBranch = backupBranches.find(b => b.name === restore || b.name.endsWith(restore));
+
+    if (!targetBranch) {
+      error(`Backup branch not found: ${restore}\nAvailable branches: ${backupBranches.map(b => b.name).join(', ')}`);
+      return;
+    }
+
+    // Check working tree is clean before restore
+    const workingTree = checkWorkingTreeClean(cwd);
+    if (!workingTree.clean) {
+      error('Working tree has uncommitted changes.\nCommit or stash changes before restore.');
+      return;
+    }
+
+    // Perform restore
+    const resetResult = execGit(cwd, ['reset', '--hard', targetBranch.name]);
+
+    if (resetResult.success) {
+      const newHeadResult = execGit(cwd, ['rev-parse', 'HEAD']);
+      const newHead = newHeadResult.success ? newHeadResult.stdout.trim() : 'unknown';
+      appendSyncHistoryEntry(cwd, SYNC_EVENTS.ABORT,
+        `Restored to ${targetBranch.name} (${newHead.slice(0, 7)})`);
+
+      if (raw) {
+        output({
+          aborted: true,
+          restored: true,
+          restored_from: targetBranch.name,
+          restored_to: newHead.slice(0, 7),
+          message: `Restored to backup branch: ${targetBranch.name}`,
+        }, raw);
+      } else {
+        output(`Restored to backup branch: ${targetBranch.name}\nCurrent HEAD: ${newHead.slice(0, 7)}`);
+      }
+      return;
+    } else {
+      error(`Failed to restore from backup: ${resetResult.stderr}`);
+      return;
+    }
+  }
+
+  // Step 4: No --restore flag - show available backup branches
+  const latestBackup = backupBranches[0];
+
+  if (raw) {
+    output({
+      aborted: false,
+      restore_available: true,
+      backup_branches: backupBranches.slice(0, 5),
+      latest_backup: latestBackup.name,
+      suggestion: `To restore: gsd-tools upstream abort --restore ${latestBackup.name}`,
+      message: `No sync in progress. ${backupBranches.length} backup branch(es) available.`,
+    }, raw);
+  } else {
+    // Human-readable output with backup branch list
+    const lines = [
+      'No sync in progress.',
+      '',
+      'Available backup branches (most recent first):',
+    ];
+
+    backupBranches.slice(0, 5).forEach((branch, i) => {
+      lines.push(`  ${i + 1}. ${branch.name} (${branch.date})`);
+    });
+
+    if (backupBranches.length > 5) {
+      lines.push(`  ... and ${backupBranches.length - 5} more`);
+    }
+
+    lines.push('');
+    lines.push('To restore from a backup:');
+    lines.push(`  gsd-tools upstream abort --restore ${latestBackup.name}`);
+
+    output(lines.join('\n'));
+  }
+}
+
 // ─── Conventional Commit Helpers ───────────────────────────────────────────────
 
 /**
@@ -2640,6 +2860,11 @@ module.exports = {
   listBackupBranches,
   getLatestBackupBranch,
 
+  // Abort helpers
+  getGitDir,
+  detectMergeInProgress,
+  checkWorkingTreeClean,
+
   // Conflict preview functions
   checkGitVersion,
   getConflictPreview,
@@ -2669,6 +2894,7 @@ module.exports = {
   cmdUpstreamAnalyze,
   cmdUpstreamPreview,
   cmdUpstreamResolve,
+  cmdUpstreamAbort,
 
   // Notification functions
   checkUpstreamNotification,
