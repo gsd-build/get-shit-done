@@ -591,7 +591,7 @@ jobs:
       - name: Commit regenerated wrapper files
         if: steps.detect.outputs.no_changes != 'true' && steps.merge.outcome == 'success'
         run: |
-          git add .github/prompts/ .github/agents/ .github/instructions/ || true
+          git add --all .github/prompts/ .github/agents/ .github/instructions/ || true
           if ! git diff --cached --quiet; then
             git commit -m "chore: regenerate Copilot wrapper layer for upstream@${{ steps.detect.outputs.short_sha }}"
           else
@@ -1076,7 +1076,7 @@ jobs:
           # Run initial verify to see if repair is needed.
           # Do this BEFORE the auth gate: if the verifier passes there is nothing
           # for the agent to do and a bad/missing auth token is irrelevant.
-          if node scripts/verify-prompts.mjs > /tmp/verify_initial.log 2>&1; then
+          if node scripts/verify-prompts.mjs 2>&1 | tee /tmp/verify_initial.log; then
             echo "Verifier passed — no repair needed."
             echo "repair_needed=false" >> "$GITHUB_OUTPUT"
             exit 0
@@ -1098,14 +1098,21 @@ jobs:
           # Most failures are simply stale generated prompts. Re-running the
           # generator and committing is enough — no agent needed.
           echo "Running generator self-heal pass..."
-          if node scripts/generate-prompts.mjs > /tmp/gen_selfheal.log 2>&1; then
-            if node scripts/verify-prompts.mjs > /tmp/verify_selfheal.log 2>&1; then
+          if node scripts/generate-prompts.mjs 2>&1 | tee /tmp/gen_selfheal.log; then
+            if node scripts/verify-prompts.mjs 2>&1 | tee /tmp/verify_selfheal.log; then
               echo "Self-heal succeeded — generator fixed the verifier errors."
-              git add .github/prompts/ .github/agents/ .github/instructions/ 2>/dev/null || true
-              git add scripts/ 2>/dev/null || true
+              echo "--- git status before add ---"
+              git status --short .github/prompts/ scripts/ || true
+              # Use --all to ensure new (untracked) files are included, not just modifications.
+              git add --all .github/prompts/ .github/agents/ .github/instructions/ || true
+              git add --all scripts/ || true
+              echo "--- git diff --cached after add ---"
+              git diff --cached --stat || true
               if ! git diff --cached --quiet; then
                 git commit -m "chore(upstream-sync): regenerate prompts after upstream merge"
                 git push origin HEAD:automated/upstream-sync --force-with-lease
+              else
+                echo "::warning::Generator ran and verifier passed, but no files were staged. The generated output may already match origin/main."
               fi
               # Ensure a PR exists to merge automated/upstream-sync → main.
               # The sync job creates the PR when no verifier errors exist at sync time;
@@ -1146,12 +1153,10 @@ jobs:
               exit 0
             else
               echo "Generator ran but verifier still fails — agent repair needed."
-              cat /tmp/verify_selfheal.log | head -c 3000
               CURRENT_ERRORS=$(cat /tmp/verify_selfheal.log | head -c 5000)
             fi
           else
             echo "Generator itself failed — agent repair needed."
-            cat /tmp/gen_selfheal.log | head -c 3000
           fi
           # ────────────────────────────────────────────────────────────────────────
 
