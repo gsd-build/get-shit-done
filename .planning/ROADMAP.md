@@ -13,7 +13,7 @@ This roadmap delivers upstream sync tooling for GSD fork maintainers. The journe
 
 - [x] **Phase 5: Core Infrastructure** - Upstream configuration, fetch, status, and update notifications (completed 2026-02-24)
 - [x] **Phase 6: Analysis** - Commit grouping, conflict preview, and change detection (completed 2026-02-24)
-- [ ] **Phase 6.1: Local Modifications Integration** - Path migration and finalize-phase command (INSERTED)
+- [x] **Phase 6.1: Local Modifications Integration** - Path migration and finalize-phase command (INSERTED, completed 2026-02-24)
 - [ ] **Phase 7: Merge Operations** - Atomic merge with rollback and state logging
 - [ ] **Phase 8: Interactive & Integration** - Deep dive mode, worktree awareness, and health integration
 - [ ] **Phase 9: Documentation** - User guide, architecture docs, and troubleshooting
@@ -65,7 +65,7 @@ Plans:
 **Plans:** 1 plan
 
 Plans:
-- [ ] 06.1-01-PLAN.md — Create finalize-phase command file
+- [x] 06.1-01-PLAN.md — Create finalize-phase command file
 
 ### Phase 7: Merge Operations
 **Goal**: Enable safe upstream merges with automatic backup, atomic execution, and recovery
@@ -121,7 +121,7 @@ Phases execute in numeric order: 5 -> 6 -> 6.1 -> 7 -> 8 -> 9
 |-------|----------------|--------|-----------|
 | 5. Core Infrastructure | 4/4 | Complete | 2026-02-24 |
 | 6. Analysis | 4/4 | Complete | 2026-02-24 |
-| 6.1 Local Modifications Integration | 0/1 | Planned | - |
+| 6.1 Local Modifications Integration | 1/1 | Complete | 2026-02-24 |
 | 7. Merge Operations | 0/3 | Ready | - |
 | 8. Interactive & Integration | 0/4 | Planned | - |
 | 9. Documentation | 0/? | Not started | - |
