@@ -1406,6 +1406,190 @@ function cmdUpstreamPreview(cwd, options, output, error, raw) {
   output(result, false, text.trim());
 }
 
+// ─── Acknowledgment State Management ──────────────────────────────────────────
+
+/**
+ * Load analysis state from config.json.
+ * Returns the upstream.analysis section with defaults if not exists.
+ * @param {string} cwd - Working directory
+ * @returns {{ structural_conflicts: Array, binary_acknowledged: boolean }}
+ */
+function loadAnalysisState(cwd) {
+  const configPath = path.join(cwd, CONFIG_PATH);
+  try {
+    const content = fs.readFileSync(configPath, 'utf-8');
+    const config = JSON.parse(content);
+    if (config.upstream && config.upstream.analysis) {
+      return config.upstream.analysis;
+    }
+  } catch {
+    // Config doesn't exist yet
+  }
+  return { structural_conflicts: [], binary_acknowledged: false };
+}
+
+/**
+ * Save analysis state to config.json.
+ * Updates upstream.analysis section, preserving other sections.
+ * @param {string} cwd - Working directory
+ * @param {object} analysisState - Analysis state to save
+ */
+function saveAnalysisState(cwd, analysisState) {
+  const configPath = path.join(cwd, CONFIG_PATH);
+  let config = {};
+
+  // Load existing config
+  try {
+    const content = fs.readFileSync(configPath, 'utf-8');
+    config = JSON.parse(content);
+  } catch {
+    // Start fresh if no config exists
+  }
+
+  // Ensure upstream section exists
+  if (!config.upstream) {
+    config.upstream = {};
+  }
+
+  // Update analysis section
+  config.upstream.analysis = analysisState;
+
+  // Ensure directory exists
+  const configDir = path.dirname(configPath);
+  if (!fs.existsSync(configDir)) {
+    fs.mkdirSync(configDir, { recursive: true });
+  }
+
+  fs.writeFileSync(configPath, JSON.stringify(config, null, 2) + '\n', 'utf-8');
+}
+
+/**
+ * Acknowledge a specific conflict or all conflicts.
+ * Updates upstream.analysis.structural_conflicts with acknowledgment state.
+ * @param {string} cwd - Working directory
+ * @param {number|null} conflictIndex - 1-based index of conflict to acknowledge (null for all)
+ * @param {boolean} ackAll - If true, acknowledge all conflicts
+ * @returns {{ success: boolean, acknowledged: number, message: string }}
+ */
+function acknowledgeConflict(cwd, conflictIndex, ackAll = false) {
+  const analysisState = loadAnalysisState(cwd);
+  const now = new Date().toISOString();
+
+  if (!analysisState.structural_conflicts || analysisState.structural_conflicts.length === 0) {
+    return { success: false, acknowledged: 0, message: 'No structural conflicts recorded' };
+  }
+
+  if (ackAll) {
+    // Acknowledge all conflicts
+    let count = 0;
+    for (const conflict of analysisState.structural_conflicts) {
+      if (!conflict.acknowledged) {
+        conflict.acknowledged = true;
+        conflict.acknowledged_at = now;
+        count++;
+      }
+    }
+    saveAnalysisState(cwd, analysisState);
+    return { success: true, acknowledged: count, message: `Acknowledged ${count} conflict(s)` };
+  }
+
+  // Acknowledge specific conflict by index
+  const index = conflictIndex - 1; // Convert to 0-based
+  if (index < 0 || index >= analysisState.structural_conflicts.length) {
+    return {
+      success: false,
+      acknowledged: 0,
+      message: `Invalid conflict index: ${conflictIndex}. Valid range: 1-${analysisState.structural_conflicts.length}`,
+    };
+  }
+
+  const conflict = analysisState.structural_conflicts[index];
+  if (conflict.acknowledged) {
+    return { success: true, acknowledged: 0, message: `Conflict ${conflictIndex} already acknowledged` };
+  }
+
+  conflict.acknowledged = true;
+  conflict.acknowledged_at = now;
+  saveAnalysisState(cwd, analysisState);
+
+  return { success: true, acknowledged: 1, message: `Conflict ${conflictIndex} acknowledged` };
+}
+
+/**
+ * Check if all conflicts have been acknowledged and merge is ready.
+ * @param {string} cwd - Working directory
+ * @returns {{ ready_to_merge: boolean, pending: string[], total_conflicts: number, acknowledged: number }}
+ */
+function checkAllAcknowledged(cwd) {
+  const analysisState = loadAnalysisState(cwd);
+  const pending = [];
+
+  if (!analysisState.structural_conflicts || analysisState.structural_conflicts.length === 0) {
+    // No conflicts recorded - check if there are any currently
+    const detected = detectStructuralConflicts(cwd);
+    if (detected.has_conflicts) {
+      // There are conflicts but none recorded - not ready
+      return {
+        ready_to_merge: false,
+        pending: ['Structural conflicts not analyzed yet'],
+        total_conflicts: detected.total,
+        acknowledged: 0,
+      };
+    }
+    // No conflicts at all
+    return { ready_to_merge: true, pending: [], total_conflicts: 0, acknowledged: 0 };
+  }
+
+  // Check structural conflicts
+  let acknowledged = 0;
+  for (let i = 0; i < analysisState.structural_conflicts.length; i++) {
+    const conflict = analysisState.structural_conflicts[i];
+    if (conflict.acknowledged) {
+      acknowledged++;
+    } else {
+      const desc = conflict.type === 'rename'
+        ? `Rename: ${conflict.from} -> ${conflict.to}`
+        : `Delete: ${conflict.file}`;
+      pending.push(`${i + 1}. ${desc}`);
+    }
+  }
+
+  // Check binary acknowledgment if binary files exist
+  if (analysisState.binary_files && analysisState.binary_files.length > 0) {
+    if (!analysisState.binary_acknowledged) {
+      pending.push(`Binary files (${analysisState.binary_files.length} files)`);
+    }
+  }
+
+  return {
+    ready_to_merge: pending.length === 0,
+    pending,
+    total_conflicts: analysisState.structural_conflicts.length,
+    acknowledged,
+  };
+}
+
+/**
+ * Clear analysis state after merge completes.
+ * Removes upstream.analysis section from config.json.
+ * @param {string} cwd - Working directory
+ */
+function clearAnalysisState(cwd) {
+  const configPath = path.join(cwd, CONFIG_PATH);
+
+  try {
+    const content = fs.readFileSync(configPath, 'utf-8');
+    const config = JSON.parse(content);
+
+    if (config.upstream && config.upstream.analysis) {
+      delete config.upstream.analysis;
+      fs.writeFileSync(configPath, JSON.stringify(config, null, 2) + '\n', 'utf-8');
+    }
+  } catch {
+    // Config doesn't exist, nothing to clear
+  }
+}
+
 // ─── Notification Functions ───────────────────────────────────────────────────
 
 /**
@@ -1563,6 +1747,13 @@ module.exports = {
 
   // Structural conflict detection
   detectStructuralConflicts,
+
+  // Acknowledgment state management
+  loadAnalysisState,
+  saveAnalysisState,
+  acknowledgeConflict,
+  checkAllAcknowledged,
+  clearAnalysisState,
 
   // Commands
   cmdUpstreamConfigure,
