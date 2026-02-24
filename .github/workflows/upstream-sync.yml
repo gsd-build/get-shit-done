@@ -404,12 +404,21 @@ jobs:
           PROMPT_EOF
 
           echo "Invoking Copilot proactive adaptation agent..."
-          env -u GH_TOKEN -u GITHUB_TOKEN gh agent-task create \
+          COPILOT_TOKEN="${GH_TOKEN:-}"
+          echo "$COPILOT_TOKEN" | env -u GH_TOKEN -u GITHUB_TOKEN \
+            gh auth login --with-token --hostname github.com 2>&1 || true
+          echo "DEBUG — gh auth status (env vars cleared):"
+          env -u GH_TOKEN -u GITHUB_TOKEN gh auth status 2>&1 || true
+          ADAPT_OUTPUT=$(env -u GH_TOKEN -u GITHUB_TOKEN gh agent-task create \
             --repo "$GITHUB_REPOSITORY" \
             --base "automated/upstream-sync" \
             --follow \
             -F /tmp/proactive_prompt.md \
-            || true
+            2>&1) || true
+          echo "$ADAPT_OUTPUT"
+          if echo "$ADAPT_OUTPUT" | grep -qi "requires an OAuth token\|re-authenticate\|auth login\|authentication failed\|invalid token\|HTTP 401\|HTTP 403"; then
+            echo "::warning::gh agent-task authentication failed for proactive adaptation. COPILOT_PAT must be a classic OAuth PAT (ghp_...)."
+          fi
 
           echo "proactive_adapt_invoked=true" >> "$GITHUB_OUTPUT"
 
@@ -863,12 +872,21 @@ jobs:
           \`\`\`
           PROMPT_EOF
 
-          env -u GH_TOKEN -u GITHUB_TOKEN gh agent-task create \
+          COPILOT_TOKEN="${GH_TOKEN:-}"
+          echo "$COPILOT_TOKEN" | env -u GH_TOKEN -u GITHUB_TOKEN \
+            gh auth login --with-token --hostname github.com 2>&1 || true
+          echo "DEBUG — gh auth status (env vars cleared):"
+          env -u GH_TOKEN -u GITHUB_TOKEN gh auth status 2>&1 || true
+          CONFLICT_OUTPUT=$(env -u GH_TOKEN -u GITHUB_TOKEN gh agent-task create \
             --repo "$GITHUB_REPOSITORY" \
             --base "automated/upstream-sync" \
             --follow \
             -F /tmp/conflict-resolve-prompt.md \
-            || true
+            2>&1) || true
+          echo "$CONFLICT_OUTPUT"
+          if echo "$CONFLICT_OUTPUT" | grep -qi "requires an OAuth token\|re-authenticate\|auth login\|authentication failed\|invalid token\|HTTP 401\|HTTP 403"; then
+            echo "::warning::gh agent-task authentication failed for conflict resolution. COPILOT_PAT must be a classic OAuth PAT (ghp_...)."
+          fi
 
           # Check if agent resolved conflicts (dead-end sentinel)
           if [ -f /tmp/repair-dead-end.txt ]; then
@@ -1057,10 +1075,20 @@ jobs:
             PRE_AGENT_SHA=$(git rev-parse HEAD 2>/dev/null || echo "")
 
             # Invoke Copilot coding agent
-            # Unset GH_TOKEN and GITHUB_TOKEN so gh agent-task uses the stored
-            # credential (from 'Validate agent-task auth') rather than the env
-            # vars. GitHub Actions injects both; gh CLI prefers env vars over
-            # the credential store, so both must be cleared.
+            # gh agent-task requires a classic OAuth PAT and relies on the
+            # standard gh CLI authentication mechanism. The gh CLI prefers
+            # GH_TOKEN/GITHUB_TOKEN env vars over the credential store, so we
+            # must ensure the env vars are cleared and the store contains the
+            # desired PAT. Re-authenticate inline (not just in a prior step)
+            # so the store is guaranteed fresh regardless of runner config or GH_CONFIG_DIR.
+            # Both GH_TOKEN and GITHUB_TOKEN must be cleared when calling
+            # gh auth login and gh agent-task — GitHub Actions Runner injects
+            # both and gh CLI prefers env vars over the credential store.
+            COPILOT_TOKEN="${GH_TOKEN:-}"
+            echo "$COPILOT_TOKEN" | env -u GH_TOKEN -u GITHUB_TOKEN \
+              gh auth login --with-token --hostname github.com 2>&1 || true
+            echo "DEBUG — gh auth status (env vars cleared):"
+            env -u GH_TOKEN -u GITHUB_TOKEN gh auth status 2>&1 || true
             AGENT_TASK_OUTPUT=$(env -u GH_TOKEN -u GITHUB_TOKEN gh agent-task create \
               --repo "$GITHUB_REPOSITORY" \
               --base "automated/upstream-sync" \
