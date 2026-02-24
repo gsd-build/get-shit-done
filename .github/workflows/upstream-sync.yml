@@ -1074,6 +1074,15 @@ jobs:
           REPAIR_NEEDED=true
           CURRENT_ERRORS=$(cat /tmp/verify_initial.log | head -c 5000)
 
+          # Record the branch state NOW — before any self-heal commit or agent work.
+          # The guard step uses this as the diff baseline to see only what this job
+          # changed, rather than diffing the entire branch vs upstream/main (which
+          # would flag legitimately-merged upstream files as violations).
+          PRE_REPAIR_SHA=$(git rev-parse HEAD)
+          echo "$PRE_REPAIR_SHA" > /tmp/pre-repair-sha
+          echo "pre_repair_sha=${PRE_REPAIR_SHA}" >> "$GITHUB_OUTPUT"
+          echo "Pre-repair SHA: ${PRE_REPAIR_SHA}"
+
           # ── Self-heal pass ──────────────────────────────────────────────────────
           # Most failures are simply stale generated prompts. Re-running the
           # generator and committing is enough — no agent needed.
@@ -1110,15 +1119,6 @@ jobs:
             echo "repair_succeeded=false" >> "$GITHUB_OUTPUT"
             exit 0
           fi
-
-          # Record the branch state BEFORE any agent work.
-          # The guard uses this to diff only what the agent actually changed,
-          # rather than comparing the whole branch to upstream/main (which would
-          # produce false positives for files the fork legitimately diverges on).
-          PRE_REPAIR_SHA=$(git rev-parse HEAD)
-          echo "$PRE_REPAIR_SHA" > /tmp/pre-repair-sha
-          echo "pre_repair_sha=${PRE_REPAIR_SHA}" >> "$GITHUB_OUTPUT"
-          echo "Pre-repair SHA: ${PRE_REPAIR_SHA}"
 
           STRATEGIES=("basic_verifier_fix" "contextual_generative_fix" "full_rewrite" "alt_approach")
           STRATEGY_IDX=0
