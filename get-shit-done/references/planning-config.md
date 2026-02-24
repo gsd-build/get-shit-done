@@ -9,7 +9,7 @@ Configuration options for `.planning/` directory behavior.
   "search_gitignored": false
 },
 "git": {
-  "branching_strategy": "none",
+  "branching_strategy": "phase",
   "phase_branch_template": "gsd/phase-{phase}-{slug}",
   "milestone_branch_template": "gsd/{milestone}-{slug}"
 }
@@ -19,7 +19,7 @@ Configuration options for `.planning/` directory behavior.
 |--------|---------|-------------|
 | `commit_docs` | `true` | Whether to commit planning artifacts to git |
 | `search_gitignored` | `false` | Add `--no-ignore` to broad rg searches |
-| `git.branching_strategy` | `"none"` | Git branching approach: `"none"`, `"phase"`, or `"milestone"` |
+| `git.branching_strategy` | `"phase"` | Git branching approach: `"none"`, `"phase"`, or `"milestone"`. Enables worktree isolation for parallel execution. |
 | `git.phase_branch_template` | `"gsd/phase-{phase}-{slug}"` | Branch template for phase strategy |
 | `git.milestone_branch_template` | `"gsd/{milestone}-{slug}"` | Branch template for milestone strategy |
 </config_schema>
@@ -115,12 +115,12 @@ To use uncommitted mode:
 | `phase` | At `execute-phase` start | Single phase | User merges after phase |
 | `milestone` | At first `execute-phase` of milestone | Entire milestone | At `complete-milestone` |
 
-**When `git.branching_strategy: "none"` (default):**
+**When `git.branching_strategy: "none"`:**
 - All work commits to current branch
-- Standard GSD behavior
+- No worktree isolation
 
-**When `git.branching_strategy: "phase"`:**
-- `execute-phase` creates/switches to a branch before execution
+**When `git.branching_strategy: "phase"` (default):**
+- `execute-phase` creates/switches to a worktree with isolated branch
 - Branch name from `phase_branch_template` (e.g., `gsd/phase-03-authentication`)
 - All plan commits go to that branch
 - User merges branches manually after phase completion

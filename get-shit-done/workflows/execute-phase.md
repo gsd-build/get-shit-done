@@ -79,6 +79,11 @@ Parallel sessions can work on other phases without conflicts.
 ```
 
 All subsequent commits go to this branch in the worktree. Use `/gsd:finalize-phase {N}` after completion to merge to main and cleanup.
+
+**CRITICAL: Track WORKTREE_PATH for executor spawning.**
+If a worktree was created, store `WORKTREE_PATH` (the absolute path returned by phase-worktree.sh).
+When spawning executor agents in `execute_waves`, include the `<working_directory>` section with this path.
+If no worktree (branching_strategy: "none"), omit the working_directory section.
 </step>
 
 <step name="validate_phase">
@@ -148,6 +153,12 @@ Execute each wave in sequence. Within a wave: parallel if `PARALLELIZATION=true`
        Execute plan {plan_number} of phase {phase_number}-{phase_name}.
        Commit each task atomically. Create SUMMARY.md. Update STATE.md and ROADMAP.md.
        </objective>
+
+       <working_directory>
+       {WORKTREE_PATH if worktree active, otherwise omit this section}
+       IMPORTANT: If a working_directory is specified, you MUST `cd` to it FIRST before any other operations.
+       All file paths are relative to this directory.
+       </working_directory>
 
        <execution_context>
        @~/.claude/get-shit-done/workflows/execute-plan.md

@@ -29,7 +29,7 @@ Parse current values (default to `true` if not present):
 - `workflow.plan_check` — spawn plan checker during plan-phase
 - `workflow.verifier` — spawn verifier during execute-phase
 - `model_profile` — which model each agent uses (default: `balanced`)
-- `git.branching_strategy` — branching approach (default: `"none"`)
+- `git.branching_strategy` — branching approach (default: `"phase"` for worktree isolation)
 </step>
 
 <step name="present_settings">

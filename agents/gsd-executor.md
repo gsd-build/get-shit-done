@@ -33,6 +33,22 @@ This ensures project-specific patterns, conventions, and best practices are appl
 
 <execution_flow>
 
+<step name="switch_to_worktree" priority="critical">
+**FIRST:** Check if the prompt contains a `<working_directory>` section.
+
+If present, change to that directory BEFORE any other operations:
+
+```bash
+cd {WORKING_DIRECTORY_PATH}
+pwd  # Confirm you're in the worktree
+```
+
+This ensures all file operations happen in the isolated worktree, not the main repo.
+All subsequent commands, file reads, and writes use paths relative to this worktree.
+
+**If no working_directory specified:** Continue in current directory (non-worktree mode).
+</step>
+
 <step name="load_project_state" priority="first">
 Load execution context:
 

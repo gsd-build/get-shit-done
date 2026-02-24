@@ -235,7 +235,7 @@ GSD stores project settings in `.planning/config.json`. Configure during `/gsd:n
     "verifier": true
   },
   "git": {
-    "branching_strategy": "none",
+    "branching_strategy": "phase",
     "phase_branch_template": "gsd/phase-{phase}-{slug}",
     "milestone_branch_template": "gsd/{milestone}-{slug}"
   }
@@ -273,7 +273,7 @@ Disable these to speed up phases in familiar domains or when conserving tokens.
 
 | Setting | Options | Default | What it Controls |
 |---------|---------|---------|------------------|
-| `git.branching_strategy` | `none`, `phase`, `milestone` | `none` | When and how branches are created |
+| `git.branching_strategy` | `none`, `phase`, `milestone` | `phase` | When and how branches are created (enables worktree isolation) |
 | `git.phase_branch_template` | Template string | `gsd/phase-{phase}-{slug}` | Branch name for phase strategy |
 | `git.milestone_branch_template` | Template string | `gsd/{milestone}-{slug}` | Branch name for milestone strategy |
 
@@ -281,8 +281,8 @@ Disable these to speed up phases in familiar domains or when conserving tokens.
 
 | Strategy | Creates Branch | Scope | Best For |
 |----------|---------------|-------|----------|
-| `none` | Never | N/A | Solo development, simple projects |
-| `phase` | At each `execute-phase` | One phase per branch | Code review per phase, granular rollback |
+| `none` | Never | N/A | Simple projects, when worktree isolation not needed |
+| `phase` | At each `execute-phase` | One phase per branch | **Default.** Parallel execution, code review per phase, granular rollback |
 | `milestone` | At first `execute-phase` | All phases share one branch | Release branches, PR per version |
 
 **Template variables:** `{phase}` = zero-padded number (e.g., "03"), `{slug}` = lowercase hyphenated name, `{milestone}` = version (e.g., "v1.0").

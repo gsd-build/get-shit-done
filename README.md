@@ -569,7 +569,7 @@ Control how GSD handles branches during execution.
 
 | Setting | Options | Default | What it does |
 |---------|---------|---------|--------------|
-| `git.branching_strategy` | `none`, `phase`, `milestone` | `none` | Branch creation strategy |
+| `git.branching_strategy` | `none`, `phase`, `milestone` | `phase` | Branch creation strategy (enables worktree isolation) |
 | `git.phase_branch_template` | string | `gsd/phase-{phase}-{slug}` | Template for phase branches |
 | `git.milestone_branch_template` | string | `gsd/{milestone}-{slug}` | Template for milestone branches |
 
