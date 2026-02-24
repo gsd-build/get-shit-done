@@ -52,6 +52,12 @@
  *   lock list                          List all locks from registry
  *   lock stale <phase>                 Check if lock is stale (pid dead, etc.)
  *
+ * Upstream Sync Operations:
+ *   upstream configure [url]           Configure upstream remote (auto-detect if no URL)
+ *   upstream fetch                     Fetch upstream changes, update cache
+ *   upstream status                    Show commits behind with file summary
+ *   upstream log                       Show grouped commit log
+ *
  * Roadmap Operations:
  *   roadmap get-phase <phase>          Extract phase section from ROADMAP.md
  *   roadmap analyze                    Full roadmap parse with disk status
@@ -148,6 +154,7 @@ const { execSync } = require('child_process');
 
 const worktreeModule = require('./lib/worktree.cjs');
 const healthModule = require('./lib/health.cjs');
+const upstreamModule = require('./lib/upstream.cjs');
 
 // ─── Model Profile Table ─────────────────────────────────────────────────────
 
@@ -5075,6 +5082,23 @@ async function main() {
         healthModule.cmdHealthRepair(cwd, issueJson, { force }, output, raw);
       } else {
         error('Unknown health subcommand. Available: check, repair');
+      }
+      break;
+    }
+
+    case 'upstream': {
+      const subcommand = args[1];
+      if (subcommand === 'configure') {
+        const url = args[2]; // Optional - auto-detect if not provided
+        upstreamModule.cmdUpstreamConfigure(cwd, url, {}, output, error, raw);
+      } else if (subcommand === 'fetch') {
+        upstreamModule.cmdUpstreamFetch(cwd, {}, output, error, raw);
+      } else if (subcommand === 'status') {
+        upstreamModule.cmdUpstreamStatus(cwd, {}, output, error, raw);
+      } else if (subcommand === 'log') {
+        upstreamModule.cmdUpstreamLog(cwd, {}, output, error, raw);
+      } else {
+        error('Unknown upstream subcommand. Available: configure, fetch, status, log');
       }
       break;
     }
