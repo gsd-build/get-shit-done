@@ -1103,6 +1103,7 @@ jobs:
                 --head "automated/upstream-sync" --json number --jq '.[0].number' 2>/dev/null || echo "")
               if [ -z "$EXISTING_PR" ]; then
                 echo "No existing PR for automated/upstream-sync — creating one..."
+                PR_CREATE_EXIT=0
                 CREATED_PR_URL=$(gh pr create \
                   --repo "$GITHUB_REPOSITORY" \
                   --base main \
@@ -1110,9 +1111,12 @@ jobs:
                   --title "sync: upstream changes (self-heal)" \
                   --body "Automated upstream sync. Verifier errors were resolved by the self-heal pass (generator re-run)." \
                   --label "upstream-sync" \
-                  --label "automated" 2>&1) || true
+                  --label "automated" 2>&1) || PR_CREATE_EXIT=$?
                 echo "gh pr create output: $CREATED_PR_URL"
                 SYNC_PR_NUMBER=$(echo "$CREATED_PR_URL" | grep -oP '/pull/\K[0-9]+' || echo "")
+                if [ "$PR_CREATE_EXIT" -ne 0 ] && [ -z "$SYNC_PR_NUMBER" ]; then
+                  echo "::warning::gh pr create failed (exit $PR_CREATE_EXIT) and no open PR could be resolved for automated/upstream-sync. Auto-merge will be skipped."
+                fi
               else
                 echo "PR #${EXISTING_PR} already exists for automated/upstream-sync."
                 SYNC_PR_NUMBER="$EXISTING_PR"
@@ -1396,6 +1400,7 @@ jobs:
               EXISTING_PR=$(gh pr list --repo "$GITHUB_REPOSITORY" --state open \
                 --head "automated/upstream-sync" --json number --jq '.[0].number' 2>/dev/null || echo "")
               if [ -z "$EXISTING_PR" ]; then
+                PR_CREATE_EXIT=0
                 CREATED_PR_URL=$(gh pr create \
                   --repo "$GITHUB_REPOSITORY" \
                   --base main \
@@ -1403,9 +1408,12 @@ jobs:
                   --title "sync: upstream changes (autonomous repair)" \
                   --body-file /tmp/pr-body.md \
                   --label "upstream-sync" \
-                  --label "automated" 2>&1) || true
+                  --label "automated" 2>&1) || PR_CREATE_EXIT=$?
                 echo "gh pr create output: $CREATED_PR_URL"
                 SYNC_PR_NUMBER=$(echo "$CREATED_PR_URL" | grep -oP '/pull/\K[0-9]+' || echo "")
+                if [ "$PR_CREATE_EXIT" -ne 0 ] && [ -z "$SYNC_PR_NUMBER" ]; then
+                  echo "::warning::gh pr create failed (exit $PR_CREATE_EXIT) and no open PR could be resolved for automated/upstream-sync. Auto-merge will be skipped."
+                fi
               else
                 SYNC_PR_NUMBER="$EXISTING_PR"
               fi
