@@ -409,23 +409,33 @@ jobs:
           # In this repository, we trigger the Copilot coding agent by creating a
           # GitHub issue assigned to 'copilot'; when enabled, the agent should pick
           # it up and open a copilot/* PR. This behavior depends on repository
-          # Copilot configuration and is not guaranteed by this workflow.
+          # Trigger Copilot coding agent via issue assignment.
+          # Issue is created first (no assignee) to guarantee the issue exists
+          # and the prompt is captured even if Copilot assignment fails.
+          # Assignment is attempted separately so the real API error is visible.
           echo "Creating Copilot adaptation issue..."
           ADAPT_ISSUE_URL=$(gh issue create \
             --repo "$GITHUB_REPOSITORY" \
             --title "adapt(upstream-sync): proactive fork adaptation [$(date -u +%Y-%m-%dT%H:%M)]" \
             --body-file /tmp/proactive_prompt.md \
-            --assignee "copilot" \
             --label "upstream-sync" \
-            2>/dev/null || echo "")
+            2>&1) || true
+          echo "gh issue create output: $ADAPT_ISSUE_URL"
           ADAPT_ISSUE=$(echo "$ADAPT_ISSUE_URL" | grep -oP '/issues/\K[0-9]+' || echo "")
           [[ "$ADAPT_ISSUE" =~ ^[0-9]+$ ]] || ADAPT_ISSUE=""
 
           if [ -z "$ADAPT_ISSUE" ]; then
-            echo "::warning::Failed to create Copilot adaptation issue. Copilot coding agent may not be enabled for this repository."
+            echo "::warning::Failed to create Copilot adaptation issue (see output above)."
             echo "proactive_adapt_invoked=false" >> "$GITHUB_OUTPUT"
             exit 0
           fi
+
+          echo "Assigning Copilot coding agent to issue #${ADAPT_ISSUE}..."
+          ASSIGN_OUT=$(gh issue edit "$ADAPT_ISSUE" \
+            --repo "$GITHUB_REPOSITORY" \
+            --add-assignee "Copilot" \
+            2>&1) || true
+          echo "gh issue edit (assignee) output: $ASSIGN_OUT"
 
           ISSUE_CREATED_AT=$(gh issue view "$ADAPT_ISSUE" \
             --repo "$GITHUB_REPOSITORY" \
@@ -943,19 +953,27 @@ jobs:
 
           # Trigger Copilot coding agent via issue assignment.
           # gh agent-task create cannot be used in CI — it requires an interactive
-          # OAuth token (browser/device flow) regardless of PAT scopes.
+          # Trigger Copilot coding agent via issue assignment.
+          # Issue is created first (no assignee) to guarantee the issue exists
+          # and the prompt is captured even if Copilot assignment fails.
           echo "Creating Copilot conflict-resolution issue..."
           CONFLICT_ISSUE_URL=$(gh issue create \
             --repo "$GITHUB_REPOSITORY" \
             --title "fix(upstream-sync): resolve merge conflict [${{ needs.sync.outputs.short_sha || 'unknown' }}]" \
             --body-file /tmp/conflict-resolve-prompt.md \
-            --assignee "copilot" \
             --label "upstream-sync" \
-            2>/dev/null || echo "")
+            2>&1) || true
+          echo "gh issue create output: $CONFLICT_ISSUE_URL"
           CONFLICT_ISSUE=$(echo "$CONFLICT_ISSUE_URL" | grep -oP '/issues/\K[0-9]+' || echo "")
           [[ "$CONFLICT_ISSUE" =~ ^[0-9]+$ ]] || CONFLICT_ISSUE=""
 
           if [ -n "$CONFLICT_ISSUE" ]; then
+            echo "Assigning Copilot coding agent to issue #${CONFLICT_ISSUE}..."
+            ASSIGN_OUT=$(gh issue edit "$CONFLICT_ISSUE" \
+              --repo "$GITHUB_REPOSITORY" \
+              --add-assignee "Copilot" \
+              2>&1) || true
+            echo "gh issue edit (assignee) output: $ASSIGN_OUT"
             CONFLICT_ISSUE_CREATED_AT=$(gh issue view "$CONFLICT_ISSUE" \
               --repo "$GITHUB_REPOSITORY" \
               --json createdAt \
@@ -1055,6 +1073,33 @@ jobs:
 
           REPAIR_NEEDED=true
           CURRENT_ERRORS=$(cat /tmp/verify_initial.log | head -c 5000)
+
+          # ── Self-heal pass ──────────────────────────────────────────────────────
+          # Most failures are simply stale generated prompts. Re-running the
+          # generator and committing is enough — no agent needed.
+          echo "Running generator self-heal pass..."
+          if node scripts/generate-prompts.mjs > /tmp/gen_selfheal.log 2>&1; then
+            if node scripts/verify-prompts.mjs > /tmp/verify_selfheal.log 2>&1; then
+              echo "Self-heal succeeded — generator fixed the verifier errors."
+              git add .github/prompts/ .github/agents/ .github/instructions/ 2>/dev/null || true
+              git add scripts/ 2>/dev/null || true
+              if ! git diff --cached --quiet; then
+                git commit -m "chore(upstream-sync): regenerate prompts after upstream merge"
+                git push origin HEAD:automated/upstream-sync --force-with-lease
+              fi
+              echo "repair_needed=true" >> "$GITHUB_OUTPUT"
+              echo "repair_succeeded=true" >> "$GITHUB_OUTPUT"
+              exit 0
+            else
+              echo "Generator ran but verifier still fails — agent repair needed."
+              cat /tmp/verify_selfheal.log | head -c 3000
+              CURRENT_ERRORS=$(cat /tmp/verify_selfheal.log | head -c 5000)
+            fi
+          else
+            echo "Generator itself failed — agent repair needed."
+            cat /tmp/gen_selfheal.log | head -c 3000
+          fi
+          # ────────────────────────────────────────────────────────────────────────
 
           # Verifier failed — we need the agent. Now check auth.
           if [ "${{ steps.agent_auth.outputs.agent_auth_ok }}" = "false" ]; then
@@ -1200,24 +1245,31 @@ jobs:
             # PAT with every required scope (codespace, repo, workflow) stored in
             # the gh credential store is still rejected with "this command requires
             # an OAuth token". This is a gh CLI design constraint with no workaround.
-            # The supported CI/CD path is: create a GitHub issue assigned to
-            # 'copilot'; the agent picks it up and opens a copilot/* PR.
+            # Issue is created first (no assignee) to guarantee the issue exists
+            # and the prompt is captured even if Copilot assignment fails.
             COPILOT_PR=""
             REPAIR_ISSUE_URL=$(gh issue create \
               --repo "$GITHUB_REPOSITORY" \
               --title "repair(upstream-sync): fix verifier [attempt ${ATTEMPT}, ${STRATEGY}]" \
               --body-file /tmp/repair_prompt_${ATTEMPT}.txt \
-              --assignee "copilot" \
               --label "upstream-sync" \
-              2>/dev/null || echo "")
+              2>&1) || true
+            echo "gh issue create output: $REPAIR_ISSUE_URL"
             REPAIR_ISSUE=$(echo "$REPAIR_ISSUE_URL" | grep -oP '/issues/\K[0-9]+' || echo "")
             [[ "$REPAIR_ISSUE" =~ ^[0-9]+$ ]] || REPAIR_ISSUE=""
 
             if [ -z "$REPAIR_ISSUE" ]; then
-              echo "::warning::Failed to create Copilot repair issue. Copilot coding agent may not be enabled for this repository, or COPILOT_PAT lacks 'repo' scope."
+              echo "::warning::Failed to create Copilot repair issue (see output above)."
               echo "::endgroup::"
               continue
             fi
+
+            echo "Assigning Copilot coding agent to issue #${REPAIR_ISSUE}..."
+            ASSIGN_OUT=$(gh issue edit "$REPAIR_ISSUE" \
+              --repo "$GITHUB_REPOSITORY" \
+              --add-assignee "Copilot" \
+              2>&1) || true
+            echo "gh issue edit (assignee) output: $ASSIGN_OUT"
 
             REPAIR_ISSUE_CREATED_AT=$(gh issue view "$REPAIR_ISSUE" \
               --repo "$GITHUB_REPOSITORY" \
