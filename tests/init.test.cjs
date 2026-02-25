@@ -197,6 +197,79 @@ describe('init commands', () => {
     const output = JSON.parse(result.output);
     assert.strictEqual(output.phase_req_ids, null);
   });
+
+  test('init execute-phase selects first non-shipped milestone from ROADMAP list', () => {
+    const phaseDir = path.join(tmpDir, '.planning', 'phases', '24-belgium');
+    fs.mkdirSync(phaseDir, { recursive: true });
+    fs.writeFileSync(path.join(phaseDir, '24-01-PLAN.md'), '# Plan');
+    fs.writeFileSync(
+      path.join(tmpDir, '.planning', 'ROADMAP.md'),
+      `# Roadmap
+
+- ✅ **v1.0 MVP** — Phases 1-6 (shipped 2026-01-01)
+- 📋 **v2.1 Belgium** — Phases 24-28 (planned)
+
+## Phase 24: Belgium kickoff
+**Goal:** Start Belgium rollout
+`
+    );
+
+    const result = runGsdTools('init execute-phase 24', tmpDir);
+    assert.ok(result.success, `Command failed: ${result.error}`);
+
+    const output = JSON.parse(result.output);
+    assert.strictEqual(output.milestone_version, 'v2.1');
+    assert.strictEqual(output.milestone_name, 'Belgium');
+  });
+
+  test('init execute-phase uses PROJECT current milestone when present', () => {
+    const phaseDir = path.join(tmpDir, '.planning', 'phases', '24-belgium');
+    fs.mkdirSync(phaseDir, { recursive: true });
+    fs.writeFileSync(path.join(phaseDir, '24-01-PLAN.md'), '# Plan');
+    fs.writeFileSync(
+      path.join(tmpDir, '.planning', 'ROADMAP.md'),
+      `# Roadmap
+
+- ✅ **v1.0 MVP** — Phases 1-6 (shipped 2026-01-01)
+- 🚧 **v2.1 Belgium** — Phases 24-28 (in progress)
+`
+    );
+    fs.writeFileSync(
+      path.join(tmpDir, '.planning', 'PROJECT.md'),
+      `# Project
+
+## Current Milestone: v3.0 Bulk Period Billing
+`
+    );
+
+    const result = runGsdTools('init execute-phase 24', tmpDir);
+    assert.ok(result.success, `Command failed: ${result.error}`);
+
+    const output = JSON.parse(result.output);
+    assert.strictEqual(output.milestone_version, 'v3.0');
+    assert.strictEqual(output.milestone_name, 'Bulk Period Billing');
+  });
+
+  test('init execute-phase falls back to most recent when all milestones are shipped', () => {
+    const phaseDir = path.join(tmpDir, '.planning', 'phases', '24-belgium');
+    fs.mkdirSync(phaseDir, { recursive: true });
+    fs.writeFileSync(path.join(phaseDir, '24-01-PLAN.md'), '# Plan');
+    fs.writeFileSync(
+      path.join(tmpDir, '.planning', 'ROADMAP.md'),
+      `# Roadmap
+
+- ✅ **v1.0 MVP** — Phases 1-6 (shipped 2025-09-01)
+- ✅ **v1.1 Security** — Phases 7-10 (shipped 2025-12-01)
+`
+    );
+
+    const result = runGsdTools('init execute-phase 24', tmpDir);
+    assert.ok(result.success, `Command failed: ${result.error}`);
+
+    const output = JSON.parse(result.output);
+    assert.strictEqual(output.milestone_version, 'v1.1');
+    assert.strictEqual(output.milestone_name, 'Security');
+  });
 });
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -846,4 +919,3 @@ describe('cmdInitNewMilestone', () => {
 // ─────────────────────────────────────────────────────────────────────────────
 // roadmap analyze command
 // ─────────────────────────────────────────────────────────────────────────────
-
