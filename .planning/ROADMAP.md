@@ -105,7 +105,7 @@ Phases execute in numeric order: 1 → 2 → 3 → 4 → 5 → 6
 |-------|----------------|--------|-----------|
 | 1. core.cjs Tests | 2/2 | Complete | 2026-02-25 |
 | 2. frontmatter.cjs Tests | 2/2 | Complete | 2026-02-25 |
-| 3. verify.cjs Tests | 0/3 | Planned | - |
+| 3. verify.cjs Tests | 2/3 | In Progress|  |
 | 4. config.cjs + template.cjs Tests | 0/TBD | Not started | - |
 | 5. milestone.cjs Tests | 0/TBD | Not started | - |
 | 6. CI Pipeline | 0/TBD | Not started | - |
