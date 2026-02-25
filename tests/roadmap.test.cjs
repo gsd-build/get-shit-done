@@ -510,6 +510,161 @@ describe('roadmap get-phase success criteria', () => {
 });
 
 // ─────────────────────────────────────────────────────────────────────────────
+// roadmap update-plan-progress command
+// ─────────────────────────────────────────────────────────────────────────────
+
+describe('roadmap update-plan-progress command', () => {
+  let tmpDir;
+
+  beforeEach(() => {
+    tmpDir = createTempProject();
+  });
+
+  afterEach(() => {
+    cleanup(tmpDir);
+  });
+
+  test('missing phase number returns error', () => {
+    const result = runGsdTools('roadmap update-plan-progress', tmpDir);
+    assert.strictEqual(result.success, false, 'should fail without phase number');
+    assert.ok(result.error.includes('phase number required'), 'error should mention phase number required');
+  });
+
+  test('nonexistent phase returns error', () => {
+    fs.writeFileSync(
+      path.join(tmpDir, '.planning', 'ROADMAP.md'),
+      `# Roadmap
+
+### Phase 1: Test
+**Goal:** Test goal
+`
+    );
+
+    const result = runGsdTools('roadmap update-plan-progress 99', tmpDir);
+    assert.strictEqual(result.success, false, 'should fail for nonexistent phase');
+    assert.ok(result.error.includes('not found'), 'error should mention not found');
+  });
+
+  test('no plans found returns updated false', () => {
+    fs.writeFileSync(
+      path.join(tmpDir, '.planning', 'ROADMAP.md'),
+      `# Roadmap
+
+### Phase 1: Test
+**Goal:** Test goal
+`
+    );
+
+    // Create phase dir with only a context file (no plans)
+    const p1 = path.join(tmpDir, '.planning', 'phases', '01-test');
+    fs.mkdirSync(p1, { recursive: true });
+    fs.writeFileSync(path.join(p1, '01-CONTEXT.md'), '# Context');
+
+    const result = runGsdTools('roadmap update-plan-progress 1', tmpDir);
+    assert.ok(result.success, `Command failed: ${result.error}`);
+
+    const output = JSON.parse(result.output);
+    assert.strictEqual(output.updated, false, 'should not update');
+    assert.ok(output.reason.includes('No plans'), 'reason should mention no plans');
+    assert.strictEqual(output.plan_count, 0, 'plan_count should be 0');
+  });
+
+  test('updates progress for partial completion', () => {
+    fs.writeFileSync(
+      path.join(tmpDir, '.planning', 'ROADMAP.md'),
+      `# Roadmap
+
+### Phase 1: Test
+**Goal:** Test goal
+**Plans:** TBD
+
+## Progress
+
+| Phase | Milestone | Plans Complete | Status | Completed |
+|-------|-----------|----------------|--------|-----------|
+| 1. Test | v1.0 | 0/2 | Planned | - |
+`
+    );
+
+    // Create phase dir with 2 plans, 1 summary
+    const p1 = path.join(tmpDir, '.planning', 'phases', '01-test');
+    fs.mkdirSync(p1, { recursive: true });
+    fs.writeFileSync(path.join(p1, '01-01-PLAN.md'), '# Plan 1');
+    fs.writeFileSync(path.join(p1, '01-02-PLAN.md'), '# Plan 2');
+    fs.writeFileSync(path.join(p1, '01-01-SUMMARY.md'), '# Summary 1');
+
+    const result = runGsdTools('roadmap update-plan-progress 1', tmpDir);
+    assert.ok(result.success, `Command failed: ${result.error}`);
+
+    const output = JSON.parse(result.output);
+    assert.strictEqual(output.updated, true, 'should update');
+    assert.strictEqual(output.plan_count, 2, 'plan_count should be 2');
+    assert.strictEqual(output.summary_count, 1, 'summary_count should be 1');
+    assert.strictEqual(output.status, 'In Progress', 'status should be In Progress');
+    assert.strictEqual(output.complete, false, 'should not be complete');
+
+    // Verify file was actually modified
+    const roadmapContent = fs.readFileSync(path.join(tmpDir, '.planning', 'ROADMAP.md'), 'utf-8');
+    assert.ok(roadmapContent.includes('1/2'), 'roadmap should contain updated plan count');
+  });
+
+  test('updates progress and checks checkbox on completion', () => {
+    fs.writeFileSync(
+      path.join(tmpDir, '.planning', 'ROADMAP.md'),
+      `# Roadmap
+
+- [ ] **Phase 1: Test** - description
+
+### Phase 1: Test
+**Goal:** Test goal
+**Plans:** TBD
+
+## Progress
+
+| Phase | Milestone | Plans Complete | Status | Completed |
+|-------|-----------|----------------|--------|-----------|
+| 1. Test | v1.0 | 0/1 | Planned | - |
+`
+    );
+
+    // Create phase dir with 1 plan, 1 summary (complete)
+    const p1 = path.join(tmpDir, '.planning', 'phases', '01-test');
+    fs.mkdirSync(p1, { recursive: true });
+    fs.writeFileSync(path.join(p1, '01-01-PLAN.md'), '# Plan 1');
+    fs.writeFileSync(path.join(p1, '01-01-SUMMARY.md'), '# Summary 1');
+
+    const result = runGsdTools('roadmap update-plan-progress 1', tmpDir);
+    assert.ok(result.success, `Command failed: ${result.error}`);
+
+    const output = JSON.parse(result.output);
+    assert.strictEqual(output.updated, true, 'should update');
+    assert.strictEqual(output.complete, true, 'should be complete');
+    assert.strictEqual(output.status, 'Complete', 'status should be Complete');
+
+    // Verify file was actually modified
+    const roadmapContent = fs.readFileSync(path.join(tmpDir, '.planning', 'ROADMAP.md'), 'utf-8');
+    assert.ok(roadmapContent.includes('[x]'), 'checkbox should be checked');
+    assert.ok(roadmapContent.includes('completed'), 'should contain completion date text');
+    assert.ok(roadmapContent.includes('1/1'), 'roadmap should contain updated plan count');
+  });
+
+  test('missing ROADMAP.md returns updated false', () => {
+    // Create phase dir with plans and summaries but NO ROADMAP.md
+    const p1 = path.join(tmpDir, '.planning', 'phases', '01-test');
+    fs.mkdirSync(p1, { recursive: true });
+    fs.writeFileSync(path.join(p1, '01-01-PLAN.md'), '# Plan 1');
+    fs.writeFileSync(path.join(p1, '01-01-SUMMARY.md'), '# Summary 1');
+
+    const result = runGsdTools('roadmap update-plan-progress 1', tmpDir);
+    assert.ok(result.success, `Command failed: ${result.error}`);
+
+    const output = JSON.parse(result.output);
+    assert.strictEqual(output.updated, false, 'should not update');
+    assert.ok(output.reason.includes('ROADMAP.md not found'), 'reason should mention missing ROADMAP.md');
+  });
+});
+
+// ─────────────────────────────────────────────────────────────────────────────
 // phase add command
 // ─────────────────────────────────────────────────────────────────────────────
 
