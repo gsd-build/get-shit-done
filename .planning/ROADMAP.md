@@ -12,8 +12,8 @@ Six phases, each a standalone PR: core.cjs tests (foundational), frontmatter.cjs
 
 Decimal phases appear between their surrounding integers in numeric order.
 
-- [ ] **Phase 1: core.cjs Tests** - Test the foundational module's 25 exports including known regression bugs
-- [ ] **Phase 2: frontmatter.cjs Tests** - Test the hand-rolled YAML parser including quoted comma edge case
+- [x] **Phase 1: core.cjs Tests** - Test the foundational module's 25 exports including known regression bugs
+- [x] **Phase 2: frontmatter.cjs Tests** - Test the hand-rolled YAML parser including quoted comma edge case
 - [ ] **Phase 3: verify.cjs Tests** - Comprehensive tests for the largest gap (772 lines, only 3 tests)
 - [ ] **Phase 4: config.cjs + template.cjs Tests** - Test config operations and template selection
 - [ ] **Phase 5: milestone.cjs Tests** - Extend existing minimal coverage with archiving and ID formats
@@ -32,8 +32,8 @@ Decimal phases appear between their surrounding integers in numeric order.
   4. Tests cover `resolveModelInternal` across all profiles including override precedence
   5. Tests cover `searchPhaseInDir`, `findPhaseInternal`, `escapeRegex`, and `generateSlugInternal`
 **Plans**: 2 plans
-  - [ ] 01-01-PLAN.md — loadConfig and resolveModelInternal tests (TEST-01, TEST-02, REG-01)
-  - [ ] 01-02-PLAN.md — Phase utilities and string helper tests (TEST-03, TEST-04, REG-02)
+  - [x] 01-01-PLAN.md — loadConfig and resolveModelInternal tests (TEST-01, TEST-02, REG-01)
+  - [x] 01-02-PLAN.md — Phase utilities and string helper tests (TEST-03, TEST-04, REG-02)
 
 ### Phase 2: frontmatter.cjs Tests
 **Goal**: The hand-rolled YAML parser's 8 exports are tested including the quoted comma edge case
@@ -45,8 +45,8 @@ Decimal phases appear between their surrounding integers in numeric order.
   3. A test confirms `reconstructFrontmatter` produces output that round-trips back to identical input
   4. CLI integration tests exercise the `get`, `set`, `merge`, and `validate` subcommands via `execSync`
 **Plans**: 2 plans
-  - [ ] 02-01-PLAN.md — Unit tests for extractFrontmatter, reconstructFrontmatter, spliceFrontmatter, parseMustHavesBlock, FRONTMATTER_SCHEMAS (TEST-05, TEST-06, TEST-07, REG-04)
-  - [ ] 02-02-PLAN.md — CLI integration tests for get/set/merge/validate subcommands (TEST-08)
+  - [x] 02-01-PLAN.md — Unit tests for extractFrontmatter, reconstructFrontmatter, spliceFrontmatter, parseMustHavesBlock, FRONTMATTER_SCHEMAS (TEST-05, TEST-06, TEST-07, REG-04)
+  - [x] 02-02-PLAN.md — CLI integration tests for get/set/merge/validate subcommands (TEST-08)
 
 ### Phase 3: verify.cjs Tests
 **Goal**: verify.cjs goes from 3 tests to comprehensive coverage of all 9 exports and the search(-1) regression
@@ -99,8 +99,8 @@ Phases execute in numeric order: 1 → 2 → 3 → 4 → 5 → 6
 
 | Phase | Plans Complete | Status | Completed |
 |-------|----------------|--------|-----------|
-| 1. core.cjs Tests | 0/2 | Planned | - |
-| 2. frontmatter.cjs Tests | 0/2 | Planned | - |
+| 1. core.cjs Tests | 2/2 | Complete | 2026-02-25 |
+| 2. frontmatter.cjs Tests | 2/2 | Complete | 2026-02-25 |
 | 3. verify.cjs Tests | 0/TBD | Not started | - |
 | 4. config.cjs + template.cjs Tests | 0/TBD | Not started | - |
 | 5. milestone.cjs Tests | 0/TBD | Not started | - |
