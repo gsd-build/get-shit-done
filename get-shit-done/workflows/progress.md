@@ -226,6 +226,7 @@ Check if `{phase_num}-CONTEXT.md` exists in phase directory.
 
 **Also available:**
 - `/gsd:plan-phase {phase}` — skip discussion, plan directly
+- `/gsd:autopilot` — run full pipeline automatically (discuss → plan → execute) for remaining phases
 - `/gsd:list-phase-assumptions {phase}` — see Claude's assumptions
 
 ---
@@ -299,6 +300,7 @@ Read ROADMAP.md to get the next phase's name and goal.
 
 **Also available:**
 - `/gsd:plan-phase {Z+1}` — skip discussion, plan directly
+- `/gsd:autopilot {Z+1}` — run full pipeline automatically for remaining phases
 - `/gsd:verify-work {Z}` — user acceptance test before continuing
 
 ---

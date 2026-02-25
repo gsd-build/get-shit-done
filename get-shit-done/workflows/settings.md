@@ -102,6 +102,36 @@ AskUserQuestion([
       { label: "Per Phase", description: "Create branch for each phase (gsd/phase-{N}-{name})" },
       { label: "Per Milestone", description: "Create branch for entire milestone (gsd/{version}-{name})" }
     ]
+  },
+  {
+    question: "Execution engine for parallel agents?",
+    header: "Engine",
+    multiSelect: false,
+    options: [
+      { label: "Subagents (Recommended)", description: "Standard Task() subagents — works in all IDEs" },
+      { label: "Agent Teams", description: "Claude Code Agent Teams — teammates can collaborate (Claude Code only)" }
+    ]
+  },
+  {
+    question: "How many agents for synthetic discuss in autopilot?",
+    header: "Discuss",
+    multiSelect: false,
+    options: [
+      { label: "3 agents", description: "UX Designer, Engineer, Product Owner — fastest" },
+      { label: "5 agents (Recommended)", description: "Adds QA/Edge Cases + Devil's Advocate" },
+      { label: "7 agents", description: "Adds Domain Expert + Accessibility" },
+      { label: "9 agents", description: "Adds Security + Performance — most thorough" }
+    ]
+  },
+  {
+    question: "Model for Agent Teams teammates / autopilot discuss agents?",
+    header: "Agent Model",
+    multiSelect: false,
+    options: [
+      { label: "Sonnet (Recommended)", description: "Best cost/quality balance for parallel agents" },
+      { label: "Opus", description: "Highest quality — significantly higher token cost with many agents" },
+      { label: "Haiku", description: "Fastest and cheapest — good for simple phases" }
+    ]
   }
 ])
 ```
@@ -123,6 +153,14 @@ Merge new settings into existing config.json:
   },
   "git": {
     "branching_strategy": "none" | "phase" | "milestone"
+  },
+  "execution": {
+    "engine": "subagents" | "agent-teams",
+    "teammate_model": "sonnet" | "opus" | "haiku"
+  },
+  "autopilot": {
+    "discuss_agents": 3 | 5 | 7 | 9,
+    "discuss_model": "sonnet" | "opus" | "haiku"
   }
 }
 ```
@@ -168,6 +206,14 @@ Write `~/.gsd/defaults.json` with:
     "verifier": <current>,
     "auto_advance": <current>,
     "nyquist_validation": <current>
+  },
+  "execution": {
+    "engine": <current>,
+    "teammate_model": <current>
+  },
+  "autopilot": {
+    "discuss_agents": <current>,
+    "discuss_model": <current>
   }
 }
 ```
@@ -190,6 +236,9 @@ Display:
 | Auto-Advance         | {On/Off} |
 | Nyquist Validation   | {On/Off} |
 | Git Branching        | {None/Per Phase/Per Milestone} |
+| Execution Engine     | {Subagents/Agent Teams} |
+| Discuss Agents       | {3/5/7/9} |
+| Agent Model          | {Sonnet/Opus/Haiku} |
 | Saved as Defaults    | {Yes/No} |
 
 These settings apply to future /gsd:plan-phase and /gsd:execute-phase runs.
@@ -206,8 +255,8 @@ Quick commands:
 
 <success_criteria>
 - [ ] Current config read
-- [ ] User presented with 7 settings (profile + 5 workflow toggles + git branching)
-- [ ] Config updated with model_profile, workflow, and git sections
+- [ ] User presented with 9 settings (profile + 5 workflow toggles + git branching + engine + discuss agents)
+- [ ] Config updated with model_profile, workflow, git, execution, and autopilot sections
 - [ ] User offered to save as global defaults (~/.gsd/defaults.json)
 - [ ] Changes confirmed to user
 </success_criteria>
