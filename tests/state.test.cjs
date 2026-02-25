@@ -603,5 +603,249 @@ describe('cmdStatePatch and cmdStateUpdate (state patch, state update)', () => {
 });
 
 // ─────────────────────────────────────────────────────────────────────────────
+// cmdStateAdvancePlan, cmdStateRecordMetric, cmdStateUpdateProgress
+// ─────────────────────────────────────────────────────────────────────────────
+
+describe('cmdStateAdvancePlan (state advance-plan)', () => {
+  let tmpDir;
+
+  const advanceFixture = [
+    '# Project State',
+    '',
+    '**Current Plan:** 1',
+    '**Total Plans in Phase:** 3',
+    '**Status:** Executing',
+    '**Last Activity:** 2024-01-10',
+  ].join('\n') + '\n';
+
+  beforeEach(() => {
+    tmpDir = createTempProject();
+  });
+
+  afterEach(() => {
+    cleanup(tmpDir);
+  });
+
+  test('advances plan counter when not on last plan', () => {
+    fs.writeFileSync(path.join(tmpDir, '.planning', 'STATE.md'), advanceFixture);
+
+    const result = runGsdTools('state advance-plan', tmpDir);
+    assert.ok(result.success, `Command failed: ${result.error}`);
+
+    const output = JSON.parse(result.output);
+    assert.strictEqual(output.advanced, true, 'advanced should be true');
+    assert.strictEqual(output.previous_plan, 1, 'previous_plan should be 1');
+    assert.strictEqual(output.current_plan, 2, 'current_plan should be 2');
+    assert.strictEqual(output.total_plans, 3, 'total_plans should be 3');
+
+    const updated = fs.readFileSync(path.join(tmpDir, '.planning', 'STATE.md'), 'utf-8');
+    assert.ok(updated.includes('**Current Plan:** 2'), 'Current Plan should be updated to 2');
+    assert.ok(updated.includes('**Status:** Ready to execute'), 'Status should be Ready to execute');
+    const today = new Date().toISOString().split('T')[0];
+    assert.ok(updated.includes(`**Last Activity:** ${today}`), 'Last Activity should be updated to today');
+  });
+
+  test('marks phase complete on last plan', () => {
+    const lastPlanFixture = advanceFixture.replace('**Current Plan:** 1', '**Current Plan:** 3');
+    fs.writeFileSync(path.join(tmpDir, '.planning', 'STATE.md'), lastPlanFixture);
+
+    const result = runGsdTools('state advance-plan', tmpDir);
+    assert.ok(result.success, `Command failed: ${result.error}`);
+
+    const output = JSON.parse(result.output);
+    assert.strictEqual(output.advanced, false, 'advanced should be false');
+    assert.strictEqual(output.reason, 'last_plan', 'reason should be last_plan');
+    assert.strictEqual(output.status, 'ready_for_verification', 'status should be ready_for_verification');
+
+    const updated = fs.readFileSync(path.join(tmpDir, '.planning', 'STATE.md'), 'utf-8');
+    assert.ok(updated.includes('Phase complete'), 'Status should contain Phase complete');
+  });
+
+  test('returns error when STATE.md missing', () => {
+    const result = runGsdTools('state advance-plan', tmpDir);
+    assert.ok(result.success, `Command should exit 0: ${result.error}`);
+
+    const output = JSON.parse(result.output);
+    assert.ok(output.error !== undefined, 'output should have error field');
+    assert.ok(output.error.includes('STATE.md'), 'error should mention STATE.md');
+  });
+
+  test('returns error when plan fields not parseable', () => {
+    fs.writeFileSync(
+      path.join(tmpDir, '.planning', 'STATE.md'),
+      '# Project State\n\n**Status:** Active\n'
+    );
+
+    const result = runGsdTools('state advance-plan', tmpDir);
+    assert.ok(result.success, `Command should exit 0: ${result.error}`);
+
+    const output = JSON.parse(result.output);
+    assert.ok(output.error !== undefined, 'output should have error field');
+    assert.ok(output.error.toLowerCase().includes('cannot parse'), 'error should mention Cannot parse');
+  });
+});
+
+describe('cmdStateRecordMetric (state record-metric)', () => {
+  let tmpDir;
+
+  const metricsFixture = [
+    '# Project State',
+    '',
+    '## Performance Metrics',
+    '',
+    '| Plan | Duration | Tasks | Files |',
+    '|------|----------|-------|-------|',
+    '| Phase 1 P1 | 3min | 2 tasks | 3 files |',
+    '',
+    '## Session Continuity',
+  ].join('\n') + '\n';
+
+  beforeEach(() => {
+    tmpDir = createTempProject();
+  });
+
+  afterEach(() => {
+    cleanup(tmpDir);
+  });
+
+  test('appends metric row to existing table', () => {
+    fs.writeFileSync(path.join(tmpDir, '.planning', 'STATE.md'), metricsFixture);
+
+    const result = runGsdTools('state record-metric --phase 2 --plan 1 --duration 5min --tasks 3 --files 4', tmpDir);
+    assert.ok(result.success, `Command failed: ${result.error}`);
+
+    const output = JSON.parse(result.output);
+    assert.strictEqual(output.recorded, true, 'recorded should be true');
+
+    const updated = fs.readFileSync(path.join(tmpDir, '.planning', 'STATE.md'), 'utf-8');
+    assert.ok(updated.includes('| Phase 2 P1 | 5min | 3 tasks | 4 files |'), 'new row should be present');
+    assert.ok(updated.includes('| Phase 1 P1 | 3min | 2 tasks | 3 files |'), 'existing row should still be present');
+  });
+
+  test('replaces None yet placeholder with first metric', () => {
+    const noneYetFixture = [
+      '# Project State',
+      '',
+      '## Performance Metrics',
+      '',
+      '| Plan | Duration | Tasks | Files |',
+      '|------|----------|-------|-------|',
+      'None yet',
+      '',
+      '## Session Continuity',
+    ].join('\n') + '\n';
+    fs.writeFileSync(path.join(tmpDir, '.planning', 'STATE.md'), noneYetFixture);
+
+    const result = runGsdTools('state record-metric --phase 1 --plan 1 --duration 2min --tasks 1 --files 2', tmpDir);
+    assert.ok(result.success, `Command failed: ${result.error}`);
+
+    const updated = fs.readFileSync(path.join(tmpDir, '.planning', 'STATE.md'), 'utf-8');
+    assert.ok(!updated.includes('None yet'), 'None yet placeholder should be removed');
+    assert.ok(updated.includes('| Phase 1 P1 | 2min | 1 tasks | 2 files |'), 'new row should be present');
+  });
+
+  test('returns error when required fields missing', () => {
+    fs.writeFileSync(path.join(tmpDir, '.planning', 'STATE.md'), metricsFixture);
+
+    const result = runGsdTools('state record-metric --phase 1', tmpDir);
+    assert.ok(result.success, `Command should exit 0: ${result.error}`);
+
+    const output = JSON.parse(result.output);
+    assert.ok(output.error !== undefined, 'output should have error field');
+    assert.ok(
+      output.error.includes('phase') || output.error.includes('plan') || output.error.includes('duration'),
+      'error should mention missing required fields'
+    );
+  });
+
+  test('returns error when STATE.md missing', () => {
+    const result = runGsdTools('state record-metric --phase 1 --plan 1 --duration 2min', tmpDir);
+    assert.ok(result.success, `Command should exit 0: ${result.error}`);
+
+    const output = JSON.parse(result.output);
+    assert.ok(output.error !== undefined, 'output should have error field');
+    assert.ok(output.error.includes('STATE.md'), 'error should mention STATE.md');
+  });
+});
+
+describe('cmdStateUpdateProgress (state update-progress)', () => {
+  let tmpDir;
+
+  beforeEach(() => {
+    tmpDir = createTempProject();
+  });
+
+  afterEach(() => {
+    cleanup(tmpDir);
+  });
+
+  test('calculates progress from plan/summary counts', () => {
+    fs.writeFileSync(
+      path.join(tmpDir, '.planning', 'STATE.md'),
+      '# Project State\n\n**Progress:** [░░░░░░░░░░] 0%\n'
+    );
+
+    // Phase 01: 1 PLAN + 1 SUMMARY = completed
+    const phase01Dir = path.join(tmpDir, '.planning', 'phases', '01');
+    fs.mkdirSync(phase01Dir, { recursive: true });
+    fs.writeFileSync(path.join(phase01Dir, '01-01-PLAN.md'), '# Plan\n');
+    fs.writeFileSync(path.join(phase01Dir, '01-01-SUMMARY.md'), '# Summary\n');
+
+    // Phase 02: 1 PLAN only = not completed
+    const phase02Dir = path.join(tmpDir, '.planning', 'phases', '02');
+    fs.mkdirSync(phase02Dir, { recursive: true });
+    fs.writeFileSync(path.join(phase02Dir, '02-01-PLAN.md'), '# Plan\n');
+
+    const result = runGsdTools('state update-progress', tmpDir);
+    assert.ok(result.success, `Command failed: ${result.error}`);
+
+    const output = JSON.parse(result.output);
+    assert.strictEqual(output.updated, true, 'updated should be true');
+    assert.strictEqual(output.percent, 50, 'percent should be 50');
+    assert.strictEqual(output.completed, 1, 'completed should be 1');
+    assert.strictEqual(output.total, 2, 'total should be 2');
+
+    const updated = fs.readFileSync(path.join(tmpDir, '.planning', 'STATE.md'), 'utf-8');
+    assert.ok(updated.includes('50%'), 'STATE.md Progress should contain 50%');
+  });
+
+  test('handles zero plans gracefully', () => {
+    fs.writeFileSync(
+      path.join(tmpDir, '.planning', 'STATE.md'),
+      '# Project State\n\n**Progress:** [░░░░░░░░░░] 0%\n'
+    );
+
+    const result = runGsdTools('state update-progress', tmpDir);
+    assert.ok(result.success, `Command failed: ${result.error}`);
+
+    const output = JSON.parse(result.output);
+    assert.strictEqual(output.percent, 0, 'percent should be 0 when no plans found');
+  });
+
+  test('returns error when Progress field missing', () => {
+    fs.writeFileSync(
+      path.join(tmpDir, '.planning', 'STATE.md'),
+      '# Project State\n\n**Status:** Active\n'
+    );
+
+    const result = runGsdTools('state update-progress', tmpDir);
+    assert.ok(result.success, `Command should exit 0: ${result.error}`);
+
+    const output = JSON.parse(result.output);
+    assert.strictEqual(output.updated, false, 'updated should be false');
+    assert.ok(output.reason !== undefined, 'should have a reason');
+  });
+
+  test('returns error when STATE.md missing', () => {
+    const result = runGsdTools('state update-progress', tmpDir);
+    assert.ok(result.success, `Command should exit 0: ${result.error}`);
+
+    const output = JSON.parse(result.output);
+    assert.ok(output.error !== undefined, 'output should have error field');
+    assert.ok(output.error.includes('STATE.md'), 'error should mention STATE.md');
+  });
+});
+
+// ─────────────────────────────────────────────────────────────────────────────
 // summary-extract command
 // ─────────────────────────────────────────────────────────────────────────────
