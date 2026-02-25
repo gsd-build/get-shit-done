@@ -120,15 +120,26 @@ Phases with standard patterns (skip research-phase):
 
 ## Sources
 
-### Primary (HIGH confidence)
-- [Context7 library ID] — [topics]
+### S0 — Local Prior Research
+- [`.planning/research/` file] — [findings reused]
+
+### S1 — Context7 / MCP Docs
+- [Context7 library ID] — [topics queried]
+
+### S2 — Official Documentation
 - [Official docs URL] — [what was checked]
 
-### Secondary (MEDIUM confidence)
-- [Source] — [finding]
+### S3 — GitHub Repositories
+- [Repo URL] — [what was reviewed]
 
-### Tertiary (LOW confidence)
-- [Source] — [finding, needs validation]
+### S4 — WebSearch Verified
+- [Finding] — verified against [S0-S3 source]
+
+### S5 — WebSearch Unverified
+- [Finding] — single source, needs validation
+
+### S6 — Training Knowledge (HYPOTHESIS)
+- [Claim] — unverified, treat as hypothesis
 
 ---
 *Research completed: [date]*
@@ -158,9 +169,10 @@ Phases with standard patterns (skip research-phase):
 **Confidence Assessment:**
 - Be honest about uncertainty
 - Note gaps that need resolution during planning
-- HIGH = verified with official sources
-- MEDIUM = community consensus, multiple sources agree
-- LOW = single source or inference
+- HIGH = verified with S0-S2 sources (prior research, Context7, official docs)
+- MEDIUM = S3-S4 sources (GitHub repos, verified web search)
+- LOW = S5 sources (unverified web search)
+- HYPOTHESIS = S6 only (training knowledge, must be verified)
 
 **Integration with roadmap creation:**
 - This file is loaded as context during roadmap creation
