@@ -7,11 +7,11 @@
 
 ### Commands Coverage
 
-- [ ] **CMD-01**: commands.cjs tests for cmdGenerateSlug and cmdCurrentTimestamp
-- [ ] **CMD-02**: commands.cjs tests for cmdListTodos and cmdVerifyPathExists
-- [ ] **CMD-03**: commands.cjs tests for cmdResolveModel
-- [ ] **CMD-04**: commands.cjs tests for cmdCommit (git repo scenarios)
-- [ ] **CMD-05**: commands.cjs tests for cmdWebsearch (async, API mocking)
+- [x] **CMD-01**: commands.cjs tests for cmdGenerateSlug and cmdCurrentTimestamp
+- [x] **CMD-02**: commands.cjs tests for cmdListTodos and cmdVerifyPathExists
+- [x] **CMD-03**: commands.cjs tests for cmdResolveModel
+- [x] **CMD-04**: commands.cjs tests for cmdCommit (git repo scenarios)
+- [x] **CMD-05**: commands.cjs tests for cmdWebsearch (async, API mocking)
 
 ### Init Coverage
 
@@ -67,11 +67,11 @@
 
 | Requirement | Phase | Status |
 |-------------|-------|--------|
-| CMD-01 | Phase 7 | Pending |
-| CMD-02 | Phase 7 | Pending |
-| CMD-03 | Phase 7 | Pending |
-| CMD-04 | Phase 7 | Pending |
-| CMD-05 | Phase 7 | Pending |
+| CMD-01 | Phase 7 | Complete |
+| CMD-02 | Phase 7 | Complete |
+| CMD-03 | Phase 7 | Complete |
+| CMD-04 | Phase 7 | Complete |
+| CMD-05 | Phase 7 | Complete |
 | INIT-01 | Phase 8 | Pending |
 | INIT-02 | Phase 8 | Pending |
 | INIT-03 | Phase 8 | Pending |
