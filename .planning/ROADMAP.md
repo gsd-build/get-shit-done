@@ -100,7 +100,9 @@ Plans:
   2. Pushing to main triggers the workflow and all matrix jobs appear in the GitHub Actions UI
   3. Opening a PR to main triggers the workflow and a failing test causes the check to fail (blocks merge)
   4. The matrix covers Ubuntu, macOS, and Windows on Node 18, 20, and 22 (9 jobs total)
-**Plans**: TBD
+**Plans**: 1 plan
+Plans:
+- [ ] 06-01-PLAN.md — GitHub Actions test workflow and CI badge
 
 ## Progress
 
