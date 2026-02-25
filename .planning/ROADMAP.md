@@ -58,7 +58,11 @@ Decimal phases appear between their surrounding integers in numeric order.
   3. A test confirms `verify summary` handles the case where `content.search()` returns -1 without producing wrong output (regression)
   4. A test confirms `verify-summary` handles a missing self-check section correctly
   5. `createTempGitProject` helper is added to `tests/helpers.cjs` and used by git-dependent verify tests
-**Plans**: TBD
+**Plans**: 3 plans
+Plans:
+- [ ] 03-01-PLAN.md — createTempGitProject helper + verify plan-structure and phase-completeness tests (INFRA-03, TEST-10)
+- [ ] 03-02-PLAN.md — validate-health tests covering all 8 checks and repair path (TEST-09)
+- [ ] 03-03-PLAN.md — verify-summary, references, commits, artifacts, key-links tests (TEST-11, TEST-12, REG-03)
 
 ### Phase 4: config.cjs + template.cjs Tests
 **Goal**: config.cjs and template.cjs each have a test file covering their exports
@@ -101,7 +105,7 @@ Phases execute in numeric order: 1 → 2 → 3 → 4 → 5 → 6
 |-------|----------------|--------|-----------|
 | 1. core.cjs Tests | 2/2 | Complete | 2026-02-25 |
 | 2. frontmatter.cjs Tests | 2/2 | Complete | 2026-02-25 |
-| 3. verify.cjs Tests | 0/TBD | Not started | - |
+| 3. verify.cjs Tests | 0/3 | Planned | - |
 | 4. config.cjs + template.cjs Tests | 0/TBD | Not started | - |
 | 5. milestone.cjs Tests | 0/TBD | Not started | - |
 | 6. CI Pipeline | 0/TBD | Not started | - |
