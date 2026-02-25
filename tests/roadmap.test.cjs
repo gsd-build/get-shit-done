@@ -260,6 +260,256 @@ describe('roadmap analyze command', () => {
 });
 
 // ─────────────────────────────────────────────────────────────────────────────
+// roadmap analyze disk status variants
+// ─────────────────────────────────────────────────────────────────────────────
+
+describe('roadmap analyze disk status variants', () => {
+  let tmpDir;
+
+  beforeEach(() => {
+    tmpDir = createTempProject();
+  });
+
+  afterEach(() => {
+    cleanup(tmpDir);
+  });
+
+  test('returns researched status for phase dir with only RESEARCH.md', () => {
+    fs.writeFileSync(
+      path.join(tmpDir, '.planning', 'ROADMAP.md'),
+      `# Roadmap
+
+### Phase 1: Exploration
+**Goal:** Research the domain
+`
+    );
+
+    const p1 = path.join(tmpDir, '.planning', 'phases', '01-exploration');
+    fs.mkdirSync(p1, { recursive: true });
+    fs.writeFileSync(path.join(p1, '01-RESEARCH.md'), '# Research notes');
+
+    const result = runGsdTools('roadmap analyze', tmpDir);
+    assert.ok(result.success, `Command failed: ${result.error}`);
+
+    const output = JSON.parse(result.output);
+    assert.strictEqual(output.phases[0].disk_status, 'researched', 'disk_status should be researched');
+    assert.strictEqual(output.phases[0].has_research, true, 'has_research should be true');
+  });
+
+  test('returns discussed status for phase dir with only CONTEXT.md', () => {
+    fs.writeFileSync(
+      path.join(tmpDir, '.planning', 'ROADMAP.md'),
+      `# Roadmap
+
+### Phase 1: Discussion
+**Goal:** Gather context
+`
+    );
+
+    const p1 = path.join(tmpDir, '.planning', 'phases', '01-discussion');
+    fs.mkdirSync(p1, { recursive: true });
+    fs.writeFileSync(path.join(p1, '01-CONTEXT.md'), '# Context notes');
+
+    const result = runGsdTools('roadmap analyze', tmpDir);
+    assert.ok(result.success, `Command failed: ${result.error}`);
+
+    const output = JSON.parse(result.output);
+    assert.strictEqual(output.phases[0].disk_status, 'discussed', 'disk_status should be discussed');
+    assert.strictEqual(output.phases[0].has_context, true, 'has_context should be true');
+  });
+
+  test('returns empty status for phase dir with no recognized files', () => {
+    fs.writeFileSync(
+      path.join(tmpDir, '.planning', 'ROADMAP.md'),
+      `# Roadmap
+
+### Phase 1: Empty
+**Goal:** Nothing yet
+`
+    );
+
+    const p1 = path.join(tmpDir, '.planning', 'phases', '01-empty');
+    fs.mkdirSync(p1, { recursive: true });
+
+    const result = runGsdTools('roadmap analyze', tmpDir);
+    assert.ok(result.success, `Command failed: ${result.error}`);
+
+    const output = JSON.parse(result.output);
+    assert.strictEqual(output.phases[0].disk_status, 'empty', 'disk_status should be empty');
+  });
+});
+
+// ─────────────────────────────────────────────────────────────────────────────
+// roadmap analyze milestone extraction
+// ─────────────────────────────────────────────────────────────────────────────
+
+describe('roadmap analyze milestone extraction', () => {
+  let tmpDir;
+
+  beforeEach(() => {
+    tmpDir = createTempProject();
+  });
+
+  afterEach(() => {
+    cleanup(tmpDir);
+  });
+
+  test('extracts milestone headings and version numbers', () => {
+    fs.writeFileSync(
+      path.join(tmpDir, '.planning', 'ROADMAP.md'),
+      `# Roadmap
+
+## v1.0 Test Infrastructure
+
+### Phase 1: Foundation
+**Goal:** Set up base
+
+## v1.1 Coverage Hardening
+
+### Phase 2: Coverage
+**Goal:** Add coverage
+`
+    );
+
+    const result = runGsdTools('roadmap analyze', tmpDir);
+    assert.ok(result.success, `Command failed: ${result.error}`);
+
+    const output = JSON.parse(result.output);
+    assert.ok(Array.isArray(output.milestones), 'milestones should be an array');
+    assert.strictEqual(output.milestones.length, 2, 'should find 2 milestones');
+    assert.strictEqual(output.milestones[0].version, 'v1.0', 'first milestone version');
+    assert.ok(output.milestones[0].heading.includes('v1.0'), 'first milestone heading contains v1.0');
+    assert.strictEqual(output.milestones[1].version, 'v1.1', 'second milestone version');
+    assert.ok(output.milestones[1].heading.includes('v1.1'), 'second milestone heading contains v1.1');
+  });
+});
+
+// ─────────────────────────────────────────────────────────────────────────────
+// roadmap analyze missing phase details
+// ─────────────────────────────────────────────────────────────────────────────
+
+describe('roadmap analyze missing phase details', () => {
+  let tmpDir;
+
+  beforeEach(() => {
+    tmpDir = createTempProject();
+  });
+
+  afterEach(() => {
+    cleanup(tmpDir);
+  });
+
+  test('detects checklist-only phases missing detail sections', () => {
+    fs.writeFileSync(
+      path.join(tmpDir, '.planning', 'ROADMAP.md'),
+      `# Roadmap
+
+- [ ] **Phase 1: Foundation** - Set up project
+- [ ] **Phase 2: API** - Build REST API
+
+### Phase 2: API
+**Goal:** Build REST API
+`
+    );
+
+    const result = runGsdTools('roadmap analyze', tmpDir);
+    assert.ok(result.success, `Command failed: ${result.error}`);
+
+    const output = JSON.parse(result.output);
+    assert.ok(Array.isArray(output.missing_phase_details), 'missing_phase_details should be an array');
+    assert.ok(output.missing_phase_details.includes('1'), 'phase 1 should be in missing details');
+    assert.ok(!output.missing_phase_details.includes('2'), 'phase 2 should not be in missing details');
+  });
+
+  test('returns null when all checklist phases have detail sections', () => {
+    fs.writeFileSync(
+      path.join(tmpDir, '.planning', 'ROADMAP.md'),
+      `# Roadmap
+
+- [ ] **Phase 1: Foundation** - Set up project
+- [ ] **Phase 2: API** - Build REST API
+
+### Phase 1: Foundation
+**Goal:** Set up project
+
+### Phase 2: API
+**Goal:** Build REST API
+`
+    );
+
+    const result = runGsdTools('roadmap analyze', tmpDir);
+    assert.ok(result.success, `Command failed: ${result.error}`);
+
+    const output = JSON.parse(result.output);
+    assert.strictEqual(output.missing_phase_details, null, 'missing_phase_details should be null');
+  });
+});
+
+// ─────────────────────────────────────────────────────────────────────────────
+// roadmap get-phase success criteria
+// ─────────────────────────────────────────────────────────────────────────────
+
+describe('roadmap get-phase success criteria', () => {
+  let tmpDir;
+
+  beforeEach(() => {
+    tmpDir = createTempProject();
+  });
+
+  afterEach(() => {
+    cleanup(tmpDir);
+  });
+
+  test('extracts success_criteria array from phase section', () => {
+    fs.writeFileSync(
+      path.join(tmpDir, '.planning', 'ROADMAP.md'),
+      `# Roadmap
+
+### Phase 1: Test
+**Goal:** Test goal
+**Success Criteria** (what must be TRUE):
+  1. First criterion
+  2. Second criterion
+  3. Third criterion
+
+### Phase 2: Other
+**Goal:** Other goal
+`
+    );
+
+    const result = runGsdTools('roadmap get-phase 1', tmpDir);
+    assert.ok(result.success, `Command failed: ${result.error}`);
+
+    const output = JSON.parse(result.output);
+    assert.strictEqual(output.found, true, 'phase should be found');
+    assert.ok(Array.isArray(output.success_criteria), 'success_criteria should be an array');
+    assert.strictEqual(output.success_criteria.length, 3, 'should have 3 criteria');
+    assert.ok(output.success_criteria[0].includes('First criterion'), 'first criterion matches');
+    assert.ok(output.success_criteria[1].includes('Second criterion'), 'second criterion matches');
+    assert.ok(output.success_criteria[2].includes('Third criterion'), 'third criterion matches');
+  });
+
+  test('returns empty array when no success criteria present', () => {
+    fs.writeFileSync(
+      path.join(tmpDir, '.planning', 'ROADMAP.md'),
+      `# Roadmap
+
+### Phase 1: Simple
+**Goal:** No criteria here
+`
+    );
+
+    const result = runGsdTools('roadmap get-phase 1', tmpDir);
+    assert.ok(result.success, `Command failed: ${result.error}`);
+
+    const output = JSON.parse(result.output);
+    assert.strictEqual(output.found, true, 'phase should be found');
+    assert.ok(Array.isArray(output.success_criteria), 'success_criteria should be an array');
+    assert.strictEqual(output.success_criteria.length, 0, 'should have empty criteria');
+  });
+});
+
+// ─────────────────────────────────────────────────────────────────────────────
 // phase add command
 // ─────────────────────────────────────────────────────────────────────────────
 
