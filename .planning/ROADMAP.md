@@ -112,7 +112,10 @@ Plans:
   2. The coverage report shows all target modules at or above their coverage targets
   3. CI workflow runs `npm run test:coverage` on every PR and fails the check if thresholds are not met
   4. A PR that intentionally drops coverage below 70% causes CI to fail with a clear threshold error
-**Plans**: TBD
+**Plans**: 2 plans
+Plans:
+- [ ] 12-01-PLAN.md — Install c8, add test:coverage script with 70% threshold, add coverage/ to .gitignore (COV-01, COV-02)
+- [ ] 12-02-PLAN.md — Update CI workflow to run coverage on PRs (COV-03)
 
 ## Progress
 
@@ -129,4 +132,4 @@ Plans:
 | 9. state.cjs Coverage | 2/2 | Complete    | 2026-02-25 | - |
 | 10. gsd-tools.cjs Coverage | 1/1 | Complete    | 2026-02-25 | - |
 | 11. roadmap.cjs Coverage | 2/2 | Complete    | 2026-02-25 | - |
-| 12. Coverage Tooling | v1.1 | 0/TBD | Not started | - |
+| 12. Coverage Tooling | v1.1 | 0/2 | Planned | - |

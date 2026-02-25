@@ -11,6 +11,9 @@ commands.html
 # Build artifacts (committed to npm, not git)
 hooks/dist/
 
+# Coverage artifacts
+coverage/
+
 # Animation assets
 animation/
 *.gif
