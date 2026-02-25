@@ -381,5 +381,227 @@ describe('stateExtractField and stateReplaceField helpers', () => {
 });
 
 // ─────────────────────────────────────────────────────────────────────────────
+// cmdStateLoad, cmdStateGet, cmdStatePatch, cmdStateUpdate CLI tests
+// ─────────────────────────────────────────────────────────────────────────────
+
+describe('cmdStateLoad (state load)', () => {
+  let tmpDir;
+
+  beforeEach(() => {
+    tmpDir = createTempProject();
+  });
+
+  afterEach(() => {
+    cleanup(tmpDir);
+  });
+
+  test('returns config and state when STATE.md exists', () => {
+    fs.writeFileSync(
+      path.join(tmpDir, '.planning', 'STATE.md'),
+      '# Project State\n\n**Status:** Active\n'
+    );
+    fs.writeFileSync(
+      path.join(tmpDir, '.planning', 'config.json'),
+      JSON.stringify({ mode: 'yolo' })
+    );
+    fs.writeFileSync(
+      path.join(tmpDir, '.planning', 'ROADMAP.md'),
+      '# Roadmap\n'
+    );
+
+    const result = runGsdTools('state load', tmpDir);
+    assert.ok(result.success, `Command failed: ${result.error}`);
+
+    const output = JSON.parse(result.output);
+    assert.strictEqual(output.state_exists, true, 'state_exists should be true');
+    assert.strictEqual(output.config_exists, true, 'config_exists should be true');
+    assert.strictEqual(output.roadmap_exists, true, 'roadmap_exists should be true');
+    assert.ok(output.state_raw.includes('**Status:** Active'), 'state_raw should contain STATE.md content');
+  });
+
+  test('returns state_exists false when STATE.md missing', () => {
+    const result = runGsdTools('state load', tmpDir);
+    assert.ok(result.success, `Command failed: ${result.error}`);
+
+    const output = JSON.parse(result.output);
+    assert.strictEqual(output.state_exists, false, 'state_exists should be false');
+    assert.strictEqual(output.state_raw, '', 'state_raw should be empty string');
+  });
+
+  test('returns raw key=value format with --raw flag', () => {
+    fs.writeFileSync(
+      path.join(tmpDir, '.planning', 'STATE.md'),
+      '# Project State\n\n**Status:** Active\n'
+    );
+    fs.writeFileSync(
+      path.join(tmpDir, '.planning', 'config.json'),
+      JSON.stringify({ mode: 'yolo' })
+    );
+
+    const result = runGsdTools('state load --raw', tmpDir);
+    assert.ok(result.success, `Command failed: ${result.error}`);
+
+    assert.ok(result.output.includes('state_exists=true'), 'raw output should include state_exists=true');
+    assert.ok(result.output.includes('config_exists=true'), 'raw output should include config_exists=true');
+  });
+});
+
+describe('cmdStateGet (state get)', () => {
+  let tmpDir;
+
+  beforeEach(() => {
+    tmpDir = createTempProject();
+  });
+
+  afterEach(() => {
+    cleanup(tmpDir);
+  });
+
+  test('returns full content when no section specified', () => {
+    const stateContent = '# Project State\n\n**Status:** Active\n**Phase:** 03\n';
+    fs.writeFileSync(path.join(tmpDir, '.planning', 'STATE.md'), stateContent);
+
+    const result = runGsdTools('state get', tmpDir);
+    assert.ok(result.success, `Command failed: ${result.error}`);
+
+    const output = JSON.parse(result.output);
+    assert.ok(output.content !== undefined, 'output should have content field');
+    assert.ok(output.content.includes('**Status:** Active'), 'content should include full STATE.md text');
+  });
+
+  test('extracts bold field value', () => {
+    fs.writeFileSync(
+      path.join(tmpDir, '.planning', 'STATE.md'),
+      '# Project State\n\n**Status:** Active\n'
+    );
+
+    const result = runGsdTools('state get Status', tmpDir);
+    assert.ok(result.success, `Command failed: ${result.error}`);
+
+    const output = JSON.parse(result.output);
+    assert.strictEqual(output['Status'], 'Active', 'should extract Status field value');
+  });
+
+  test('extracts markdown section content', () => {
+    fs.writeFileSync(
+      path.join(tmpDir, '.planning', 'STATE.md'),
+      '# Project State\n\n**Status:** Active\n\n## Blockers\n\n- item1\n- item2\n'
+    );
+
+    const result = runGsdTools('state get Blockers', tmpDir);
+    assert.ok(result.success, `Command failed: ${result.error}`);
+
+    const output = JSON.parse(result.output);
+    assert.ok(output['Blockers'] !== undefined, 'should have Blockers key in output');
+    assert.ok(output['Blockers'].includes('item1'), 'section content should include item1');
+    assert.ok(output['Blockers'].includes('item2'), 'section content should include item2');
+  });
+
+  test('returns error for nonexistent field', () => {
+    fs.writeFileSync(
+      path.join(tmpDir, '.planning', 'STATE.md'),
+      '# Project State\n\n**Status:** Active\n'
+    );
+
+    const result = runGsdTools('state get Missing', tmpDir);
+    assert.ok(result.success, `Command should exit 0 even for missing field: ${result.error}`);
+
+    const output = JSON.parse(result.output);
+    assert.ok(output.error !== undefined, 'output should have error field');
+    assert.ok(output.error.toLowerCase().includes('not found'), 'error should mention "not found"');
+  });
+
+  test('returns error when STATE.md missing', () => {
+    const result = runGsdTools('state get Status', tmpDir);
+    assert.ok(!result.success, 'command should fail when STATE.md is missing');
+    assert.ok(
+      result.error.includes('STATE.md') || result.output.includes('STATE.md'),
+      'error message should mention STATE.md'
+    );
+  });
+});
+
+describe('cmdStatePatch and cmdStateUpdate (state patch, state update)', () => {
+  let tmpDir;
+  const stateMd = [
+    '# Project State',
+    '',
+    '**Current Phase:** 03',
+    '**Status:** In progress',
+    '**Last Activity:** 2024-01-15',
+  ].join('\n') + '\n';
+
+  beforeEach(() => {
+    tmpDir = createTempProject();
+  });
+
+  afterEach(() => {
+    cleanup(tmpDir);
+  });
+
+  test('state patch updates multiple fields at once', () => {
+    fs.writeFileSync(path.join(tmpDir, '.planning', 'STATE.md'), stateMd);
+
+    const result = runGsdTools('state patch --Status Complete --"Current Phase" 04', tmpDir);
+    assert.ok(result.success, `Command failed: ${result.error}`);
+
+    const updated = fs.readFileSync(path.join(tmpDir, '.planning', 'STATE.md'), 'utf-8');
+    assert.ok(updated.includes('**Status:** Complete'), 'Status should be updated to Complete');
+    assert.ok(updated.includes('**Last Activity:** 2024-01-15'), 'Last Activity should be unchanged');
+  });
+
+  test('state patch reports failed fields that do not exist', () => {
+    fs.writeFileSync(path.join(tmpDir, '.planning', 'STATE.md'), stateMd);
+
+    const result = runGsdTools('state patch --Status Done --Missing value', tmpDir);
+    assert.ok(result.success, `Command failed: ${result.error}`);
+
+    const output = JSON.parse(result.output);
+    assert.ok(Array.isArray(output.updated), 'updated should be an array');
+    assert.ok(output.updated.includes('Status'), 'Status should be in updated list');
+    assert.ok(Array.isArray(output.failed), 'failed should be an array');
+    assert.ok(output.failed.includes('Missing'), 'Missing should be in failed list');
+  });
+
+  test('state update changes a single field', () => {
+    fs.writeFileSync(path.join(tmpDir, '.planning', 'STATE.md'), stateMd);
+
+    const result = runGsdTools('state update Status "Phase complete"', tmpDir);
+    assert.ok(result.success, `Command failed: ${result.error}`);
+
+    const output = JSON.parse(result.output);
+    assert.strictEqual(output.updated, true, 'updated should be true');
+
+    const updated = fs.readFileSync(path.join(tmpDir, '.planning', 'STATE.md'), 'utf-8');
+    assert.ok(updated.includes('**Status:** Phase complete'), 'Status should be updated');
+    assert.ok(updated.includes('**Current Phase:** 03'), 'Current Phase should be unchanged');
+    assert.ok(updated.includes('**Last Activity:** 2024-01-15'), 'Last Activity should be unchanged');
+  });
+
+  test('state update reports field not found', () => {
+    fs.writeFileSync(path.join(tmpDir, '.planning', 'STATE.md'), stateMd);
+
+    const result = runGsdTools('state update Missing value', tmpDir);
+    assert.ok(result.success, `Command should exit 0 for not-found field: ${result.error}`);
+
+    const output = JSON.parse(result.output);
+    assert.strictEqual(output.updated, false, 'updated should be false');
+    assert.ok(output.reason !== undefined, 'should include a reason');
+  });
+
+  test('state update returns error when STATE.md missing', () => {
+    const result = runGsdTools('state update Status value', tmpDir);
+    assert.ok(result.success, `Command should exit 0: ${result.error}`);
+
+    const output = JSON.parse(result.output);
+    assert.strictEqual(output.updated, false, 'updated should be false');
+    assert.ok(
+      output.reason.includes('STATE.md'),
+      'reason should mention STATE.md'
+    );
+  });
+});
+
+// ─────────────────────────────────────────────────────────────────────────────
 // summary-extract command
 // ─────────────────────────────────────────────────────────────────────────────
