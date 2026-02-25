@@ -74,6 +74,16 @@ Report:
 <step name="execute_waves">
 Execute each wave in sequence. Within a wave: parallel if `PARALLELIZATION=true`, sequential if `false`.
 
+**Execution engine selection:**
+
+```bash
+ENGINE=$(node ~/.claude/get-shit-done/bin/gsd-tools.cjs config-get execution.engine 2>/dev/null || echo "subagents")
+TEAMMATE_MODEL=$(node ~/.claude/get-shit-done/bin/gsd-tools.cjs config-get execution.teammate_model 2>/dev/null || echo "sonnet")
+```
+
+If `ENGINE` is `"agent-teams"`: use Agent Teams mode for wave execution (see below). Teammates use `${TEAMMATE_MODEL}`.
+If `ENGINE` is `"subagents"` (default): use current Task-based execution.
+
 **For each wave:**
 
 1. **Describe what's being built (BEFORE spawning):**
@@ -98,6 +108,8 @@ Execute each wave in sequence. Within a wave: parallel if `PARALLELIZATION=true`
 
    Pass paths only — executors read files themselves with their fresh 200k context.
    This keeps orchestrator context lean (~10-15%).
+
+   **Subagents mode (default):**
 
    ```
    Task(
@@ -134,6 +146,20 @@ Execute each wave in sequence. Within a wave: parallel if `PARALLELIZATION=true`
        </success_criteria>
      "
    )
+   ```
+
+   **Agent Teams mode (`ENGINE = "agent-teams"`):**
+
+   If the execution engine is set to `"agent-teams"`, create an Agent Team instead of individual Task() calls:
+   - Lead = this execute-phase orchestrator
+   - Teammates = one per plan in the current wave, using `${TEAMMATE_MODEL}` (e.g., "Use Sonnet for each teammate" or "Use Opus for each teammate")
+   - Each teammate gets the same prompt as the subagent executor above (plan file + state + config)
+   - Wave boundaries still enforced (wave 2 waits for wave 1 to complete)
+   - Lead handles STATE.md/ROADMAP.md updates after each wave (teammates don't touch shared state)
+
+   **Graceful degradation:** If Agent Teams is not available (IDE doesn't support it, or runtime error), fall back to subagents with a warning:
+   ```
+   ⚠ Agent Teams not available — falling back to subagent execution.
    ```
 
 3. **Wait for all agents in wave to complete.**
@@ -411,6 +437,8 @@ STOP. Do not proceed to auto-advance or transition.
    ```
 
 **If `--auto` flag present OR `AUTO_CFG` is true (AND verification passed with no gaps):**
+
+**Auto-chain verify-work:** If `config.workflow.verifier` is true and verification hasn't already run (no VERIFICATION.md), run the automated verification before transitioning. Skip the manual UAT portion — the automated `verify_phase_goal` step already checks that the codebase delivers what the phase promised.
 
 ```
 ╔══════════════════════════════════════════╗

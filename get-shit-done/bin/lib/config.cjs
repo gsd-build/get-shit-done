@@ -58,11 +58,21 @@ function cmdConfigEnsureSection(cwd, raw) {
     },
     parallelization: true,
     brave_search: hasBraveSearch,
+    execution: {
+      engine: 'subagents',
+      teammate_model: 'sonnet',
+    },
+    autopilot: {
+      discuss_agents: 5,
+      discuss_model: 'sonnet',
+    },
   };
   const defaults = {
     ...hardcoded,
     ...userDefaults,
     workflow: { ...hardcoded.workflow, ...(userDefaults.workflow || {}) },
+    execution: { ...hardcoded.execution, ...(userDefaults.execution || {}) },
+    autopilot: { ...hardcoded.autopilot, ...(userDefaults.autopilot || {}) },
   };
 
   try {
@@ -95,6 +105,28 @@ function cmdConfigSet(cwd, keyPath, value, raw) {
     }
   } catch (err) {
     error('Failed to read config.json: ' + err.message);
+  }
+
+  // Validate autopilot.discuss_agents must be odd
+  if (keyPath === 'autopilot.discuss_agents') {
+    if (typeof parsedValue !== 'number' || parsedValue % 2 === 0 || parsedValue < 3 || parsedValue > 9) {
+      error('discuss_agents must be odd (3/5/7/9) for consensus.');
+    }
+  }
+
+  // Validate execution.engine values
+  if (keyPath === 'execution.engine') {
+    if (parsedValue !== 'subagents' && parsedValue !== 'agent-teams') {
+      error('execution.engine must be "subagents" or "agent-teams".');
+    }
+  }
+
+  // Validate model values
+  const validModels = ['opus', 'sonnet', 'haiku'];
+  if (keyPath === 'execution.teammate_model' || keyPath === 'autopilot.discuss_model') {
+    if (!validModels.includes(parsedValue)) {
+      error(`${keyPath} must be one of: ${validModels.join(', ')}`);
+    }
   }
 
   // Set nested value using dot notation (e.g., "workflow.research")
