@@ -30,7 +30,7 @@
 - [x] **Phase 8: init.cjs Coverage** - Bring init.cjs from 42% to 75%+ via 6 targeted test groups
 - [x] **Phase 9: state.cjs Coverage** - Bring state.cjs from 40% to 75%+ via 6 targeted test groups (completed 2026-02-25)
 - [x] **Phase 10: gsd-tools.cjs Coverage** - Bring dispatcher from 76% to 85%+ via error and branch tests (completed 2026-02-25)
-- [ ] **Phase 11: roadmap.cjs Coverage** - Bring roadmap.cjs from 71% to 75%+ via branch and parsing tests
+- [x] **Phase 11: roadmap.cjs Coverage** - Bring roadmap.cjs from 71% to 75%+ via branch and parsing tests (completed 2026-02-25)
 - [ ] **Phase 12: Coverage Tooling** - Add c8 tooling and enforce thresholds in CI
 
 ## Phase Details
@@ -128,5 +128,5 @@ Plans:
 | 8. init.cjs Coverage | v1.1 | 2/2 | Complete | 2026-02-25 |
 | 9. state.cjs Coverage | 2/2 | Complete    | 2026-02-25 | - |
 | 10. gsd-tools.cjs Coverage | 1/1 | Complete    | 2026-02-25 | - |
-| 11. roadmap.cjs Coverage | 1/2 | In Progress|  | - |
+| 11. roadmap.cjs Coverage | 2/2 | Complete   | 2026-02-25 | - |
 | 12. Coverage Tooling | v1.1 | 0/TBD | Not started | - |
