@@ -205,15 +205,8 @@ function cmdResolveModel(cwd, agentType, raw) {
   const config = loadConfig(cwd);
   const profile = config.model_profile || 'balanced';
 
-  const agentModels = MODEL_PROFILES[agentType];
-  if (!agentModels) {
-    const result = { model: 'sonnet', profile, unknown_agent: true };
-    output(result, raw, 'sonnet');
-    return;
-  }
-
-  const resolved = agentModels[profile] || agentModels['balanced'] || 'sonnet';
-  const model = resolved === 'opus' ? 'inherit' : resolved;
+  // Delegate to resolveModelInternal which handles overrides and all profile types
+  const model = resolveModelInternal(cwd, agentType);
   const result = { model, profile };
   output(result, raw, model);
 }

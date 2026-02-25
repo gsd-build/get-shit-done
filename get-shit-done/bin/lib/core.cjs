@@ -347,15 +347,14 @@ function resolveModelInternal(cwd, agentType) {
   // Check per-agent override first
   const override = config.model_overrides?.[agentType];
   if (override) {
-    return override === 'opus' ? 'inherit' : override;
+    return override;
   }
 
   // Fall back to profile lookup
   const profile = config.model_profile || 'balanced';
   const agentModels = MODEL_PROFILES[agentType];
   if (!agentModels) return 'sonnet';
-  const resolved = agentModels[profile] || agentModels['balanced'] || 'sonnet';
-  return resolved === 'opus' ? 'inherit' : resolved;
+  return agentModels[profile] || agentModels['balanced'] || 'sonnet';
 }
 
 // ─── Misc utilities ───────────────────────────────────────────────────────────
