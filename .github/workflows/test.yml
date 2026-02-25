@@ -37,4 +37,9 @@ jobs:
         run: npm ci
 
       - name: Run tests
+        if: github.event_name != 'pull_request'
         run: npm test
+
+      - name: Run tests with coverage
+        if: github.event_name == 'pull_request'
+        run: npm run test:coverage
