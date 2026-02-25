@@ -58,9 +58,6 @@ function cmdConfigEnsureSection(cwd, raw) {
     },
     parallelization: true,
     brave_search: hasBraveSearch,
-    execution: {
-      agent_model: 'sonnet',
-    },
     autopilot: {
       discuss_agents: 5,
       discuss_model: 'sonnet',
@@ -70,7 +67,6 @@ function cmdConfigEnsureSection(cwd, raw) {
     ...hardcoded,
     ...userDefaults,
     workflow: { ...hardcoded.workflow, ...(userDefaults.workflow || {}) },
-    execution: { ...hardcoded.execution, ...(userDefaults.execution || {}) },
     autopilot: { ...hardcoded.autopilot, ...(userDefaults.autopilot || {}) },
   };
 
@@ -115,7 +111,7 @@ function cmdConfigSet(cwd, keyPath, value, raw) {
 
   // Validate model values
   const validModels = ['opus', 'sonnet', 'haiku'];
-  if (keyPath === 'execution.agent_model' || keyPath === 'autopilot.discuss_model') {
+  if (keyPath === 'autopilot.discuss_model') {
     if (!validModels.includes(parsedValue)) {
       error(`${keyPath} must be one of: ${validModels.join(', ')}`);
     }

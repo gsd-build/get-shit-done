@@ -115,8 +115,8 @@ AskUserQuestion([
     ]
   },
   {
-    question: "Model for execution and discuss subagents?",
-    header: "Agent Model",
+    question: "Model for autopilot discuss subagents?",
+    header: "Discuss Model",
     multiSelect: false,
     options: [
       { label: "Sonnet (Recommended)", description: "Best cost/quality balance for parallel agents" },
@@ -144,9 +144,6 @@ Merge new settings into existing config.json:
   },
   "git": {
     "branching_strategy": "none" | "phase" | "milestone"
-  },
-  "execution": {
-    "agent_model": "sonnet" | "opus" | "haiku"
   },
   "autopilot": {
     "discuss_agents": 3 | 5 | 7 | 9,
@@ -197,9 +194,6 @@ Write `~/.gsd/defaults.json` with:
     "auto_advance": <current>,
     "nyquist_validation": <current>
   },
-  "execution": {
-    "agent_model": <current>
-  },
   "autopilot": {
     "discuss_agents": <current>,
     "discuss_model": <current>
@@ -226,7 +220,7 @@ Display:
 | Nyquist Validation   | {On/Off} |
 | Git Branching        | {None/Per Phase/Per Milestone} |
 | Discuss Agents       | {3/5/7/9} |
-| Agent Model          | {Sonnet/Opus/Haiku} |
+| Discuss Model        | {Sonnet/Opus/Haiku} |
 | Saved as Defaults    | {Yes/No} |
 
 These settings apply to future /gsd:plan-phase and /gsd:execute-phase runs.
@@ -243,8 +237,8 @@ Quick commands:
 
 <success_criteria>
 - [ ] Current config read
-- [ ] User presented with 8 settings (profile + 5 workflow toggles + git branching + discuss agents)
-- [ ] Config updated with model_profile, workflow, git, execution, and autopilot sections
+- [ ] User presented with 8 settings (profile + 5 workflow toggles + git branching + discuss agents + discuss model)
+- [ ] Config updated with model_profile, workflow, git, and autopilot sections
 - [ ] User offered to save as global defaults (~/.gsd/defaults.json)
 - [ ] Changes confirmed to user
 </success_criteria>

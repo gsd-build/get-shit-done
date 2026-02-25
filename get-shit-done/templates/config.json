@@ -30,9 +30,6 @@
     "issues_review": true,
     "confirm_transition": true
   },
-  "execution": {
-    "agent_model": "sonnet"
-  },
   "autopilot": {
     "discuss_agents": 5,
     "discuss_model": "sonnet"
