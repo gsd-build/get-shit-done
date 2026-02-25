@@ -3,50 +3,50 @@
 **Defined:** 2026-02-25
 **Core Value:** Every module has tests that catch regressions before they reach users
 
-## v1 Requirements
+## v1.1 Requirements
 
-### Test Coverage — Critical Modules
+### Commands Coverage
 
-- [x] **TEST-01**: core.cjs has tests for loadConfig including model_overrides regression
-- [x] **TEST-02**: core.cjs has tests for resolveModelInternal across all profiles and overrides
-- [x] **TEST-03**: core.cjs has tests for escapeRegex, generateSlugInternal, and utility functions
-- [x] **TEST-04**: core.cjs has tests for searchPhaseInDir, findPhaseInternal, getRoadmapPhaseInternal
-- [x] **TEST-05**: frontmatter.cjs has tests for extractFrontmatter including quoted comma edge case
-- [x] **TEST-06**: frontmatter.cjs has tests for reconstructFrontmatter roundtrip identity
-- [x] **TEST-07**: frontmatter.cjs has tests for parseMustHavesBlock and spliceFrontmatter
-- [x] **TEST-08**: frontmatter.cjs has CLI integration tests for get/set/merge/validate commands
-- [x] **TEST-09**: verify.cjs has tests for validate-health (all 8 checks + repair)
-- [x] **TEST-10**: verify.cjs has tests for verify plan-structure and phase-completeness
-- [x] **TEST-11**: verify.cjs has tests for verify summary including search(-1) regression
-- [x] **TEST-12**: verify.cjs has tests for verify references, commits, artifacts, key-links
+- [ ] **CMD-01**: commands.cjs tests for cmdGenerateSlug and cmdCurrentTimestamp
+- [ ] **CMD-02**: commands.cjs tests for cmdListTodos and cmdVerifyPathExists
+- [ ] **CMD-03**: commands.cjs tests for cmdResolveModel
+- [ ] **CMD-04**: commands.cjs tests for cmdCommit (git repo scenarios)
+- [ ] **CMD-05**: commands.cjs tests for cmdWebsearch (async, API mocking)
 
-### Test Coverage — Medium Priority Modules
+### Init Coverage
 
-- [x] **TEST-13**: config.cjs has tests for config-ensure-section, config-set, config-get
-- [x] **TEST-14**: template.cjs has tests for template select heuristics and template fill
-- [x] **TEST-15**: milestone.cjs has extended tests for milestone complete with archiving
-- [x] **TEST-16**: milestone.cjs has tests for requirements mark-complete with all ID formats
+- [ ] **INIT-01**: init.cjs tests for cmdInitTodos (directory reading, filtering)
+- [ ] **INIT-02**: init.cjs tests for cmdInitMilestoneOp (phase counting, completion detection)
+- [ ] **INIT-03**: init.cjs tests for cmdInitProgress phase enumeration logic
+- [ ] **INIT-04**: init.cjs tests for cmdInitPhaseOp fallback path
+- [ ] **INIT-05**: init.cjs tests for cmdInitQuick and cmdInitMapCodebase
+- [ ] **INIT-06**: init.cjs tests for cmdInitNewProject and cmdInitNewMilestone
 
-### Bug Regressions
+### State Coverage
 
-- [x] **REG-01**: Test confirms loadConfig returns model_overrides when present
-- [x] **REG-02**: Test confirms getRoadmapPhaseInternal is exported from core.cjs
-- [x] **REG-03**: Test confirms verify-summary handles missing self-check section correctly
-- [x] **REG-04**: Test confirms frontmatter inline arrays handle quoted commas
+- [ ] **STATE-01**: state.cjs tests for stateExtractField and stateReplaceField helpers
+- [ ] **STATE-02**: state.cjs tests for cmdStateLoad and cmdStateGet
+- [ ] **STATE-03**: state.cjs tests for cmdStatePatch and cmdStateUpdate
+- [ ] **STATE-04**: state.cjs tests for cmdStateAdvancePlan
+- [ ] **STATE-05**: state.cjs tests for cmdStateRecordMetric and cmdStateUpdateProgress
+- [ ] **STATE-06**: state.cjs tests for cmdStateResolveBlocker and cmdStateRecordSession
 
-### Infrastructure
+### Dispatcher Coverage
 
-- [x] **INFRA-01**: GitHub Actions workflow runs tests on push/PR to main
-- [x] **INFRA-02**: CI matrix covers Ubuntu, macOS, Windows x Node 18, 20, 22
-- [x] **INFRA-03**: Test helper createTempGitProject added for git-dependent tests
+- [ ] **DISP-01**: gsd-tools.cjs tests for untested command dispatch branches
+- [ ] **DISP-02**: gsd-tools.cjs tests for error handling and unknown command paths
 
-## v2 Requirements
+### Roadmap Coverage
+
+- [ ] **ROAD-01**: roadmap.cjs tests for uncovered analysis and parsing branches
 
 ### Coverage Tooling
 
-- **COV-01**: c8 devDependency with npm run test:coverage script
-- **COV-02**: Coverage thresholds enforced at 70%+ line coverage
-- **COV-03**: Coverage badge in README
+- [ ] **COV-01**: c8 added as devDependency with npm run test:coverage script
+- [ ] **COV-02**: Coverage thresholds enforced at 70%+ line coverage
+- [ ] **COV-03**: CI workflow updated to run coverage check on PR
+
+## v2 Requirements
 
 ### Additional Testing
 
@@ -60,43 +60,42 @@
 |---------|--------|
 | Source code refactoring | Tests only — no production code changes |
 | Mocking frameworks | Follow existing convention of real filesystem isolation |
-| E2E workflow tests | Too complex, plan-phase->execute-phase spans multiple processes |
-| TypeScript migration | Different milestone entirely |
-| Snapshot testing | Existing assertion pattern is more maintainable |
+| 100% coverage target | Diminishing returns — 75% is practical minimum |
+| Coverage badges in README | Nice-to-have, defer to later |
 
 ## Traceability
 
 | Requirement | Phase | Status |
 |-------------|-------|--------|
-| TEST-01 | Phase 1 | Complete |
-| TEST-02 | Phase 1 | Complete |
-| TEST-03 | Phase 1 | Complete |
-| TEST-04 | Phase 1 | Complete |
-| REG-01 | Phase 1 | Complete |
-| REG-02 | Phase 1 | Complete |
-| TEST-05 | Phase 2 | Complete |
-| TEST-06 | Phase 2 | Complete |
-| TEST-07 | Phase 2 | Complete |
-| TEST-08 | Phase 2 | Complete |
-| REG-04 | Phase 2 | Complete |
-| TEST-09 | Phase 3 | Complete |
-| TEST-10 | Phase 3 | Complete |
-| TEST-11 | Phase 3 | Complete |
-| TEST-12 | Phase 3 | Complete |
-| REG-03 | Phase 3 | Complete |
-| INFRA-03 | Phase 3 | Complete |
-| TEST-13 | Phase 4 | Complete |
-| TEST-14 | Phase 4 | Complete |
-| TEST-15 | Phase 5 | Complete |
-| TEST-16 | Phase 5 | Complete |
-| INFRA-01 | Phase 6 | Complete |
-| INFRA-02 | Phase 6 | Complete |
+| CMD-01 | Phase 7 | Pending |
+| CMD-02 | Phase 7 | Pending |
+| CMD-03 | Phase 7 | Pending |
+| CMD-04 | Phase 7 | Pending |
+| CMD-05 | Phase 7 | Pending |
+| INIT-01 | Phase 8 | Pending |
+| INIT-02 | Phase 8 | Pending |
+| INIT-03 | Phase 8 | Pending |
+| INIT-04 | Phase 8 | Pending |
+| INIT-05 | Phase 8 | Pending |
+| INIT-06 | Phase 8 | Pending |
+| STATE-01 | Phase 9 | Pending |
+| STATE-02 | Phase 9 | Pending |
+| STATE-03 | Phase 9 | Pending |
+| STATE-04 | Phase 9 | Pending |
+| STATE-05 | Phase 9 | Pending |
+| STATE-06 | Phase 9 | Pending |
+| DISP-01 | Phase 10 | Pending |
+| DISP-02 | Phase 10 | Pending |
+| ROAD-01 | Phase 11 | Pending |
+| COV-01 | Phase 12 | Pending |
+| COV-02 | Phase 12 | Pending |
+| COV-03 | Phase 12 | Pending |
 
 **Coverage:**
-- v1 requirements: 23 total
+- v1.1 requirements: 23 total
 - Mapped to phases: 23
 - Unmapped: 0
 
 ---
 *Requirements defined: 2026-02-25*
-*Last updated: 2026-02-25 after roadmap creation*
+*Last updated: 2026-02-25 after v1.1 roadmap created*

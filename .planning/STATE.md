@@ -5,40 +5,27 @@
 See: .planning/PROJECT.md (updated 2026-02-25)
 
 **Core value:** Every module has tests that catch regressions before they reach users
-**Current focus:** Phase 6 — CI Pipeline
+**Current focus:** v1.1 Coverage Hardening — Phase 7: commands.cjs Coverage
 
 ## Current Position
 
-Phase: 6 of 6 (CI Pipeline)
-Plan: 1 of 1 in current phase (COMPLETE)
-Status: Phase 6 complete
-Last activity: 2026-02-25 — Phase 6 complete (GitHub Actions CI workflow, 3x3 matrix, CI badge in README)
+Phase: 7 of 12 (commands.cjs Coverage)
+Plan: Not started
+Status: Ready to plan
+Last activity: 2026-02-25 — v1.1 roadmap created, 23 requirements mapped to phases 7-12
 
-Progress: [██████████] 100%
+Progress: [░░░░░░░░░░] 0% (v1.1)
 
 ## Performance Metrics
 
-**Velocity:**
-- Total plans completed: 9
-- Average duration: 4 min
-- Total execution time: 0.64 hours
+**v1.0 Velocity:**
+- Total plans completed: 12
+- Total execution time: ~0.7 hours
+- Average duration: 3.5 min/plan
 
-**By Phase:**
-
-| Phase | Plans | Total | Avg/Plan |
-|-------|-------|-------|----------|
-| 1 | 2 | 16 min | 8 min |
-| 2 | 2 | 9 min | 5 min |
-| 3 | 3 | 10 min | 3 min |
-| 4 | 2 | 6 min | 3 min |
-| 5 | 2 | 2 min | 1 min |
-| 6 | 1 | 1 min | 1 min |
-
-**Recent Trend:**
-- Last 5 plans: 3 min, 3 min, 1 min, 1 min, 1 min
-- Trend: Consistent
-
-*Updated after each plan completion*
+**v1.1 Velocity:**
+- Total plans completed: 0
+- Average duration: TBD
 
 ## Accumulated Context
 
@@ -47,28 +34,21 @@ Progress: [██████████] 100%
 Decisions are logged in PROJECT.md Key Decisions table.
 Recent decisions affecting current work:
 
-- Use node:test + node:assert (no Jest/Vitest) — match existing convention, zero dependencies
-- Integration tests for cmd* functions — process.exit() prevents direct require()
-- Unit tests for pure functions — comparePhaseNum, extractFrontmatter etc. can be require()'d directly
-- One PR per module — keeps reviews focused, allows parallel submission
-- [Phase 03]: validPlanContent() factory in test file (not helpers.cjs) since it is verify-test-specific
-- [Phase 03-03]: parseMustHavesBlock requires 4/6/8 space indentation (not standard 2-space YAML) — test fixtures must match parser expectations
-- [Phase 03-03]: verify references @-refs do NOT skip http URLs — only backtick refs skip http; tests reflect actual behavior
-- [Phase 04-01]: config-ensure-section test checks types not exact values since ~/.gsd/defaults.json may override hardcoded defaults
-- [Phase 04-02]: template select boundary values match source exactly (taskCount=5 is standard, 6 is complex; fileCount=6 is standard, 7 is complex)
-- [Phase 06-01]: Concurrency group uses github.head_ref || github.run_id so PR runs cancel stale same-branch runs while each main push gets unique group
+- [v1.1 start]: c8 chosen for coverage (works natively with node:test via V8 coverage)
+- [v1.1 start]: One PR per module pattern continues from v1.0 (phases 7-11 = one PR each)
+- [v1.1 start]: CMD-05 (cmdWebsearch) requires async test pattern — may need mock or skip strategy
 
 ### Pending Todos
 
-None yet.
+None.
 
 ### Blockers/Concerns
 
-- createTempGitProject added (INFRA-03 resolved) — Phase 3 plan 01 delivered the helper
-- Four known bugs documented in PROJECT.md context section are test targets, not fixes — tests only, no production code changes
+- [Phase 7]: cmdWebsearch (CMD-05) calls external API — need decision on mocking vs. skipping in test
+- [Phase 12]: CI threshold enforcement may break if any existing module is below 70% — verify baselines first
 
 ## Session Continuity
 
 Last session: 2026-02-25
-Stopped at: Phase 6 complete — GitHub Actions CI workflow, CI badge in README
+Stopped at: v1.1 roadmap created, ready to plan Phase 7
 Resume file: None

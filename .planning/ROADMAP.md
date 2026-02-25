@@ -1,119 +1,121 @@
 # Roadmap: get-shit-done Test Infrastructure
 
-## Overview
+## Milestones
 
-Six phases, each a standalone PR: core.cjs tests (foundational), frontmatter.cjs tests (YAML parser), verify.cjs tests (largest gap), config.cjs + template.cjs tests (medium priority), milestone.cjs tests (extend existing), and GitHub Actions CI pipeline (automates everything). Every phase delivers independently reviewable test coverage. When all six phases ship, every module has tests and PRs are validated automatically on every push.
+- ✅ **v1.0 Test Infrastructure** — Phases 1-6 (shipped 2026-02-25)
+- 🚧 **v1.1 Coverage Hardening** — Phases 7-12 (in progress)
 
 ## Phases
 
-**Phase Numbering:**
-- Integer phases (1, 2, 3): Planned milestone work
-- Decimal phases (2.1, 2.2): Urgent insertions (marked with INSERTED)
+<details>
+<summary>✅ v1.0 Test Infrastructure (Phases 1-6) — SHIPPED 2026-02-25</summary>
 
-Decimal phases appear between their surrounding integers in numeric order.
+- [x] Phase 1: core.cjs Tests (2/2 plans) — completed 2026-02-25
+- [x] Phase 2: frontmatter.cjs Tests (2/2 plans) — completed 2026-02-25
+- [x] Phase 3: verify.cjs Tests (3/3 plans) — completed 2026-02-25
+- [x] Phase 4: config.cjs + template.cjs Tests (2/2 plans) — completed 2026-02-25
+- [x] Phase 5: milestone.cjs Tests (2/2 plans) — completed 2026-02-25
+- [x] Phase 6: CI Pipeline (1/1 plan) — completed 2026-02-25
 
-- [x] **Phase 1: core.cjs Tests** - Test the foundational module's 25 exports including known regression bugs
-- [x] **Phase 2: frontmatter.cjs Tests** - Test the hand-rolled YAML parser including quoted comma edge case
-- [x] **Phase 3: verify.cjs Tests** - Comprehensive tests for the largest gap (772 lines, only 3 tests) (completed 2026-02-25)
-- [x] **Phase 4: config.cjs + template.cjs Tests** - Test config operations and template selection (completed 2026-02-25)
-- [ ] **Phase 5: milestone.cjs Tests** - Extend existing minimal coverage with archiving and ID formats
-- [x] **Phase 6: CI Pipeline** - GitHub Actions matrix covering 3 OS × 3 Node versions (completed 2026-02-25)
+**Delivered:** 245 new tests (355 total), 6,715 lines of test code, GitHub Actions CI with 3x3 matrix
+**Archive:** `.planning/milestones/v1.0-ROADMAP.md`
+
+</details>
+
+### 🚧 v1.1 Coverage Hardening (In Progress)
+
+**Milestone Goal:** Bring all under-covered modules to 75%+ line coverage and enforce thresholds in CI
+
+- [ ] **Phase 7: commands.cjs Coverage** - Bring commands.cjs from 59% to 75%+ via 5 targeted test groups
+- [ ] **Phase 8: init.cjs Coverage** - Bring init.cjs from 42% to 75%+ via 6 targeted test groups
+- [ ] **Phase 9: state.cjs Coverage** - Bring state.cjs from 40% to 75%+ via 6 targeted test groups
+- [ ] **Phase 10: gsd-tools.cjs Coverage** - Bring dispatcher from 76% to 85%+ via error and branch tests
+- [ ] **Phase 11: roadmap.cjs Coverage** - Bring roadmap.cjs from 71% to 75%+ via branch and parsing tests
+- [ ] **Phase 12: Coverage Tooling** - Add c8 tooling and enforce thresholds in CI
 
 ## Phase Details
 
-### Phase 1: core.cjs Tests
-**Goal**: The foundational module's 25 exports are fully tested, including regressions for known bugs
-**Depends on**: Nothing (first phase)
-**Requirements**: TEST-01, TEST-02, TEST-03, TEST-04, REG-01, REG-02
+### Phase 7: commands.cjs Coverage
+**Goal**: commands.cjs reaches 75%+ line coverage with all major command functions tested
+**Depends on**: Phase 6 (CI pipeline exists to validate coverage)
+**Requirements**: CMD-01, CMD-02, CMD-03, CMD-04, CMD-05
 **Success Criteria** (what must be TRUE):
-  1. `npm test` runs a core.cjs test file and all tests pass
-  2. A test explicitly asserts `loadConfig` returns `model_overrides` when present in config
-  3. A test explicitly asserts `getRoadmapPhaseInternal` is exported from core.cjs (regression for missing export bug)
-  4. Tests cover `resolveModelInternal` across all profiles including override precedence
-  5. Tests cover `searchPhaseInDir`, `findPhaseInternal`, `escapeRegex`, and `generateSlugInternal`
-**Plans**: 2 plans
-  - [x] 01-01-PLAN.md — loadConfig and resolveModelInternal tests (TEST-01, TEST-02, REG-01)
-  - [x] 01-02-PLAN.md — Phase utilities and string helper tests (TEST-03, TEST-04, REG-02)
+  1. `npm test` runs new commands.cjs tests without failures
+  2. cmdGenerateSlug and cmdCurrentTimestamp produce correct output for known inputs
+  3. cmdListTodos and cmdVerifyPathExists behave correctly for existing and missing paths
+  4. cmdResolveModel returns expected model strings for valid and invalid inputs
+  5. cmdCommit handles both clean-repo and dirty-repo git scenarios without crashing
+**Plans**: TBD
 
-### Phase 2: frontmatter.cjs Tests
-**Goal**: The hand-rolled YAML parser's 8 exports are tested including the quoted comma edge case
-**Depends on**: Phase 1
-**Requirements**: TEST-05, TEST-06, TEST-07, TEST-08, REG-04
+### Phase 8: init.cjs Coverage
+**Goal**: init.cjs reaches 75%+ line coverage with all init command functions tested
+**Depends on**: Phase 7
+**Requirements**: INIT-01, INIT-02, INIT-03, INIT-04, INIT-05, INIT-06
 **Success Criteria** (what must be TRUE):
-  1. `npm test` runs a frontmatter.cjs test file and all tests pass
-  2. A test confirms `extractFrontmatter` correctly handles inline arrays with quoted commas (does not split on comma inside quotes)
-  3. A test confirms `reconstructFrontmatter` produces output that round-trips back to identical input
-  4. CLI integration tests exercise the `get`, `set`, `merge`, and `validate` subcommands via `execSync`
-**Plans**: 2 plans
-  - [x] 02-01-PLAN.md — Unit tests for extractFrontmatter, reconstructFrontmatter, spliceFrontmatter, parseMustHavesBlock, FRONTMATTER_SCHEMAS (TEST-05, TEST-06, TEST-07, REG-04)
-  - [x] 02-02-PLAN.md — CLI integration tests for get/set/merge/validate subcommands (TEST-08)
+  1. `npm test` runs new init.cjs tests without failures
+  2. cmdInitTodos correctly reads and filters directory contents in isolated temp dirs
+  3. cmdInitMilestoneOp counts phases and detects completion from real planning directories
+  4. cmdInitProgress enumerates phases and returns correct progress state
+  5. cmdInitNewProject and cmdInitNewMilestone create expected file structures in temp dirs
+**Plans**: TBD
 
-### Phase 3: verify.cjs Tests
-**Goal**: verify.cjs goes from 3 tests to comprehensive coverage of all 9 exports and the search(-1) regression
-**Depends on**: Phase 1
-**Requirements**: TEST-09, TEST-10, TEST-11, TEST-12, REG-03, INFRA-03
+### Phase 9: state.cjs Coverage
+**Goal**: state.cjs reaches 75%+ line coverage with all state management functions tested
+**Depends on**: Phase 8
+**Requirements**: STATE-01, STATE-02, STATE-03, STATE-04, STATE-05, STATE-06
 **Success Criteria** (what must be TRUE):
-  1. `npm test` runs a verify.cjs test file and all tests pass
-  2. `validate-health` is tested for all 8 health checks and the repair path
-  3. A test confirms `verify summary` handles the case where `content.search()` returns -1 without producing wrong output (regression)
-  4. A test confirms `verify-summary` handles a missing self-check section correctly
-  5. `createTempGitProject` helper is added to `tests/helpers.cjs` and used by git-dependent verify tests
-**Plans**: 3 plans
-Plans:
-- [x] 03-01-PLAN.md — createTempGitProject helper + verify plan-structure and phase-completeness tests (INFRA-03, TEST-10)
-- [x] 03-02-PLAN.md — validate-health tests covering all 8 checks and repair path (TEST-09)
-- [x] 03-03-PLAN.md — verify-summary, references, commits, artifacts, key-links tests (TEST-11, TEST-12, REG-03)
+  1. `npm test` runs new state.cjs tests without failures
+  2. stateExtractField and stateReplaceField round-trip correctly on STATE.md fixtures
+  3. cmdStateLoad and cmdStateGet return correct values for known STATE.md content
+  4. cmdStatePatch and cmdStateUpdate modify STATE.md fields without corrupting other fields
+  5. cmdStateAdvancePlan, cmdStateRecordMetric, cmdStateUpdateProgress, cmdStateResolveBlocker, and cmdStateRecordSession each update STATE.md as expected
+**Plans**: TBD
 
-### Phase 4: config.cjs + template.cjs Tests
-**Goal**: config.cjs and template.cjs each have a test file covering their exports
-**Depends on**: Phase 1
-**Requirements**: TEST-13, TEST-14
+### Phase 10: gsd-tools.cjs Coverage
+**Goal**: gsd-tools.cjs dispatcher reaches 85%+ line coverage with branch and error paths tested
+**Depends on**: Phase 9
+**Requirements**: DISP-01, DISP-02
 **Success Criteria** (what must be TRUE):
-  1. `npm test` runs config.cjs and template.cjs test files and all tests pass
-  2. Tests exercise `config-ensure-section`, `config-set`, and `config-get` via CLI integration
-  3. Tests confirm template selection heuristics choose the correct template for given inputs
-  4. Tests confirm `template fill` replaces all placeholders with provided values
-**Plans**: 2 plans
-Plans:
-- [x] 04-01-PLAN.md — config.cjs CLI integration tests (config-ensure-section, config-set, config-get) (TEST-13)
-- [x] 04-02-PLAN.md — template.cjs CLI integration tests (template select heuristics, template fill) (TEST-14)
+  1. `npm test` runs new gsd-tools.cjs tests without failures
+  2. All previously untested dispatch branches produce correct output when invoked via CLI
+  3. Unknown command names produce a clear error message and non-zero exit code
+  4. Error handling paths (bad args, missing files) return meaningful output rather than crashing silently
+**Plans**: TBD
 
-### Phase 5: milestone.cjs Tests
-**Goal**: milestone.cjs tests are extended beyond 2 tests to cover archiving and all requirement ID formats
-**Depends on**: Phase 1
-**Requirements**: TEST-15, TEST-16
+### Phase 11: roadmap.cjs Coverage
+**Goal**: roadmap.cjs reaches 75%+ line coverage with uncovered analysis and parsing branches tested
+**Depends on**: Phase 10
+**Requirements**: ROAD-01
 **Success Criteria** (what must be TRUE):
-  1. `npm test` runs extended milestone.cjs tests and all tests pass
-  2. A test confirms `milestone complete` archives completed phase files to the expected location
-  3. A test confirms `requirements mark-complete` handles all requirement ID formats (TEST-XX, REG-XX, INFRA-XX, bare IDs)
-**Plans**: 2 plans
-Plans:
-- [ ] 05-01-PLAN.md — milestone complete archiving and STATE.md update tests (TEST-15)
-- [ ] 05-02-PLAN.md — requirements mark-complete ID format and edge case tests (TEST-16)
+  1. `npm test` runs new roadmap.cjs tests without failures
+  2. Previously uncovered parsing branches produce correct output for edge-case inputs
+  3. Analysis functions handle missing or malformed ROADMAP.md sections without throwing
+**Plans**: TBD
 
-### Phase 6: CI Pipeline
-**Goal**: Every push and PR to main automatically runs the full test suite across 3 OS and 3 Node versions
-**Depends on**: Phase 1
-**Requirements**: INFRA-01, INFRA-02
+### Phase 12: Coverage Tooling
+**Goal**: c8 coverage tool is integrated and CI fails if any module drops below 70% line coverage
+**Depends on**: Phase 11
+**Requirements**: COV-01, COV-02, COV-03
 **Success Criteria** (what must be TRUE):
-  1. A `.github/workflows/test.yml` file exists and is syntactically valid
-  2. Pushing to main triggers the workflow and all matrix jobs appear in the GitHub Actions UI
-  3. Opening a PR to main triggers the workflow and a failing test causes the check to fail (blocks merge)
-  4. The matrix covers Ubuntu, macOS, and Windows on Node 18, 20, and 22 (9 jobs total)
-**Plans**: 1 plan
-Plans:
-- [ ] 06-01-PLAN.md — GitHub Actions test workflow and CI badge
+  1. `npm run test:coverage` runs the full test suite and prints a per-file coverage report
+  2. The coverage report shows all target modules at or above their coverage targets
+  3. CI workflow runs `npm run test:coverage` on every PR and fails the check if thresholds are not met
+  4. A PR that intentionally drops coverage below 70% causes CI to fail with a clear threshold error
+**Plans**: TBD
 
 ## Progress
 
-**Execution Order:**
-Phases execute in numeric order: 1 → 2 → 3 → 4 → 5 → 6
-
-| Phase | Plans Complete | Status | Completed |
-|-------|----------------|--------|-----------|
-| 1. core.cjs Tests | 2/2 | Complete | 2026-02-25 |
-| 2. frontmatter.cjs Tests | 2/2 | Complete | 2026-02-25 |
-| 3. verify.cjs Tests | 3/3 | Complete    | 2026-02-25 |
-| 4. config.cjs + template.cjs Tests | 2/2 | Complete | 2026-02-25 |
-| 5. milestone.cjs Tests | 0/2 | Planned | - |
-| 6. CI Pipeline | 1/1 | Complete   | 2026-02-25 |
+| Phase | Milestone | Plans Complete | Status | Completed |
+|-------|-----------|----------------|--------|-----------|
+| 1. core.cjs Tests | v1.0 | 2/2 | Complete | 2026-02-25 |
+| 2. frontmatter.cjs Tests | v1.0 | 2/2 | Complete | 2026-02-25 |
+| 3. verify.cjs Tests | v1.0 | 3/3 | Complete | 2026-02-25 |
+| 4. config.cjs + template.cjs Tests | v1.0 | 2/2 | Complete | 2026-02-25 |
+| 5. milestone.cjs Tests | v1.0 | 2/2 | Complete | 2026-02-25 |
+| 6. CI Pipeline | v1.0 | 1/1 | Complete | 2026-02-25 |
+| 7. commands.cjs Coverage | v1.1 | 0/TBD | Not started | - |
+| 8. init.cjs Coverage | v1.1 | 0/TBD | Not started | - |
+| 9. state.cjs Coverage | v1.1 | 0/TBD | Not started | - |
+| 10. gsd-tools.cjs Coverage | v1.1 | 0/TBD | Not started | - |
+| 11. roadmap.cjs Coverage | v1.1 | 0/TBD | Not started | - |
+| 12. Coverage Tooling | v1.1 | 0/TBD | Not started | - |
