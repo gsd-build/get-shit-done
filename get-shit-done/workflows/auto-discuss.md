@@ -101,22 +101,7 @@ Each agent gets a distinct expert role based on the configured count:
 <step name="spawn_debate">
 Spawn all agents in parallel. Each agent independently analyzes gray areas from their perspective.
 
-**Read execution engine config:**
-```bash
-ENGINE=$(node ~/.claude/get-shit-done/bin/gsd-tools.cjs config-get execution.engine 2>/dev/null || echo "subagents")
-```
-
-**Agent Teams mode (`ENGINE = "agent-teams"`):**
-
-Create an Agent Team where teammates can message each other for real debate:
-- Lead = this orchestrator (collects consensus)
-- Teammates = one per perspective role
-- Teammates debate gray areas, challenge each other, refine positions
-- Lead collects final positions after debate concludes
-
-**Subagents mode (`ENGINE = "subagents"`, default):**
-
-Spawn each agent via Task(). Each independently returns recommendations.
+**Spawn each agent via Task():**
 
 ```
 For each agent (1 to AGENT_COUNT):

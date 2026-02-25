@@ -35,8 +35,6 @@ function cmdInitExecutePhase(cwd, phase, raw) {
     phase_branch_template: config.phase_branch_template,
     milestone_branch_template: config.milestone_branch_template,
     verifier_enabled: config.verifier,
-    execution_engine: (config.execution && config.execution.engine) || 'subagents',
-
     // Phase info
     phase_found: !!phaseInfo,
     phase_dir: phaseInfo?.directory || null,
@@ -665,7 +663,6 @@ function cmdInitProgress(cwd, raw) {
     // Config
     commit_docs: config.commit_docs,
     auto_advance: (config.workflow && config.workflow.auto_advance) || false,
-    execution_engine: (config.execution && config.execution.engine) || 'subagents',
     discuss_agents: (config.autopilot && config.autopilot.discuss_agents) || 5,
 
     // Milestone

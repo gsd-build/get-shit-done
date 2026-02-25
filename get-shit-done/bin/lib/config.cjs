@@ -59,8 +59,7 @@ function cmdConfigEnsureSection(cwd, raw) {
     parallelization: true,
     brave_search: hasBraveSearch,
     execution: {
-      engine: 'subagents',
-      teammate_model: 'sonnet',
+      agent_model: 'sonnet',
     },
     autopilot: {
       discuss_agents: 5,
@@ -114,16 +113,9 @@ function cmdConfigSet(cwd, keyPath, value, raw) {
     }
   }
 
-  // Validate execution.engine values
-  if (keyPath === 'execution.engine') {
-    if (parsedValue !== 'subagents' && parsedValue !== 'agent-teams') {
-      error('execution.engine must be "subagents" or "agent-teams".');
-    }
-  }
-
   // Validate model values
   const validModels = ['opus', 'sonnet', 'haiku'];
-  if (keyPath === 'execution.teammate_model' || keyPath === 'autopilot.discuss_model') {
+  if (keyPath === 'execution.agent_model' || keyPath === 'autopilot.discuss_model') {
     if (!validModels.includes(parsedValue)) {
       error(`${keyPath} must be one of: ${validModels.join(', ')}`);
     }

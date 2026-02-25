@@ -104,15 +104,6 @@ AskUserQuestion([
     ]
   },
   {
-    question: "Execution engine for parallel agents?",
-    header: "Engine",
-    multiSelect: false,
-    options: [
-      { label: "Subagents (Recommended)", description: "Standard Task() subagents — works in all IDEs" },
-      { label: "Agent Teams", description: "Claude Code Agent Teams — teammates can collaborate (Claude Code only)" }
-    ]
-  },
-  {
     question: "How many agents for synthetic discuss in autopilot?",
     header: "Discuss",
     multiSelect: false,
@@ -124,7 +115,7 @@ AskUserQuestion([
     ]
   },
   {
-    question: "Model for Agent Teams teammates / autopilot discuss agents?",
+    question: "Model for execution and discuss subagents?",
     header: "Agent Model",
     multiSelect: false,
     options: [
@@ -155,8 +146,7 @@ Merge new settings into existing config.json:
     "branching_strategy": "none" | "phase" | "milestone"
   },
   "execution": {
-    "engine": "subagents" | "agent-teams",
-    "teammate_model": "sonnet" | "opus" | "haiku"
+    "agent_model": "sonnet" | "opus" | "haiku"
   },
   "autopilot": {
     "discuss_agents": 3 | 5 | 7 | 9,
@@ -208,8 +198,7 @@ Write `~/.gsd/defaults.json` with:
     "nyquist_validation": <current>
   },
   "execution": {
-    "engine": <current>,
-    "teammate_model": <current>
+    "agent_model": <current>
   },
   "autopilot": {
     "discuss_agents": <current>,
@@ -236,7 +225,6 @@ Display:
 | Auto-Advance         | {On/Off} |
 | Nyquist Validation   | {On/Off} |
 | Git Branching        | {None/Per Phase/Per Milestone} |
-| Execution Engine     | {Subagents/Agent Teams} |
 | Discuss Agents       | {3/5/7/9} |
 | Agent Model          | {Sonnet/Opus/Haiku} |
 | Saved as Defaults    | {Yes/No} |
@@ -255,7 +243,7 @@ Quick commands:
 
 <success_criteria>
 - [ ] Current config read
-- [ ] User presented with 9 settings (profile + 5 workflow toggles + git branching + engine + discuss agents)
+- [ ] User presented with 8 settings (profile + 5 workflow toggles + git branching + discuss agents)
 - [ ] Config updated with model_profile, workflow, git, execution, and autopilot sections
 - [ ] User offered to save as global defaults (~/.gsd/defaults.json)
 - [ ] Changes confirmed to user

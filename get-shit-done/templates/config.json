@@ -31,8 +31,7 @@
     "confirm_transition": true
   },
   "execution": {
-    "engine": "subagents",
-    "teammate_model": "sonnet"
+    "agent_model": "sonnet"
   },
   "autopilot": {
     "discuss_agents": 5,
