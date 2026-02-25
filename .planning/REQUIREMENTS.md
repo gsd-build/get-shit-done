@@ -33,8 +33,8 @@
 
 ### Dispatcher Coverage
 
-- [ ] **DISP-01**: gsd-tools.cjs tests for untested command dispatch branches
-- [ ] **DISP-02**: gsd-tools.cjs tests for error handling and unknown command paths
+- [x] **DISP-01**: gsd-tools.cjs tests for untested command dispatch branches
+- [x] **DISP-02**: gsd-tools.cjs tests for error handling and unknown command paths
 
 ### Roadmap Coverage
 
@@ -84,8 +84,8 @@
 | STATE-04 | Phase 9 | Complete |
 | STATE-05 | Phase 9 | Complete |
 | STATE-06 | Phase 9 | Complete |
-| DISP-01 | Phase 10 | Pending |
-| DISP-02 | Phase 10 | Pending |
+| DISP-01 | Phase 10 | Complete |
+| DISP-02 | Phase 10 | Complete |
 | ROAD-01 | Phase 11 | Pending |
 | COV-01 | Phase 12 | Pending |
 | COV-02 | Phase 12 | Pending |

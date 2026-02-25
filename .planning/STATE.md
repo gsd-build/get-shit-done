@@ -5,16 +5,16 @@
 See: .planning/PROJECT.md (updated 2026-02-25)
 
 **Core value:** Every module has tests that catch regressions before they reach users
-**Current focus:** v1.1 Coverage Hardening — Phase 9: state.cjs Coverage
+**Current focus:** v1.1 Coverage Hardening — Phase 10: gsd-tools.cjs Coverage
 
 ## Current Position
 
-Phase: 9 of 12 (state.cjs Coverage)
-Plan: 09-02 complete — phase 09 done
+Phase: 10 of 12 (gsd-tools.cjs Coverage)
+Plan: 10-01 complete — phase 10 done
 Status: Ready for next phase
-Last activity: 2026-02-25 — Plan 09-02 executed: 22 new state.cjs tests added (55 total, 412 suite)
+Last activity: 2026-02-25 — Plan 10-01 executed: 22 new dispatcher tests added (434 suite total)
 
-Progress: [██░░░░░░░░] 17% (v1.1)
+Progress: [██░░░░░░░░] 25% (v1.1)
 
 ## Performance Metrics
 
@@ -24,9 +24,9 @@ Progress: [██░░░░░░░░] 17% (v1.1)
 - Average duration: 3.5 min/plan
 
 **v1.1 Velocity:**
-- Total plans completed: 4
-- Total execution time: ~13 min
-- Average duration: 3.3 min/plan
+- Total plans completed: 5
+- Total execution time: ~15 min
+- Average duration: 3.0 min/plan
 
 ## Accumulated Context
 
@@ -46,6 +46,7 @@ Recent decisions affecting current work:
 - [Phase 9]: state patch tests use single-word fields to avoid shell quoting issues with spaces in flag names
 - [Phase 9-02]: resolve-blocker returns resolved:true even when no line matches (filter-only, not error)
 - [Phase 9-02]: record-session with no flags still updates Last session timestamp (idempotent)
+- [Phase 10]: summary-extract returns structured result (path, one_liner, requirements_completed), not raw frontmatter
 
 ### Pending Todos
 
@@ -58,5 +59,5 @@ None.
 ## Session Continuity
 
 Last session: 2026-02-25
-Stopped at: Phase 9, Plan 09-02 complete
+Stopped at: Phase 10, Plan 10-01 complete
 Resume file: None
