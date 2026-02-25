@@ -128,5 +128,5 @@ Plans:
 | 8. init.cjs Coverage | v1.1 | 2/2 | Complete | 2026-02-25 |
 | 9. state.cjs Coverage | 2/2 | Complete    | 2026-02-25 | - |
 | 10. gsd-tools.cjs Coverage | 1/1 | Complete    | 2026-02-25 | - |
-| 11. roadmap.cjs Coverage | 2/2 | Complete   | 2026-02-25 | - |
+| 11. roadmap.cjs Coverage | 2/2 | Complete    | 2026-02-25 | - |
 | 12. Coverage Tooling | v1.1 | 0/TBD | Not started | - |
