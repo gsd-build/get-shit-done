@@ -847,5 +847,199 @@ describe('cmdStateUpdateProgress (state update-progress)', () => {
 });
 
 // ─────────────────────────────────────────────────────────────────────────────
+// cmdStateResolveBlocker, cmdStateRecordSession
+// ─────────────────────────────────────────────────────────────────────────────
+
+describe('cmdStateResolveBlocker (state resolve-blocker)', () => {
+  let tmpDir;
+
+  const blockerFixture = [
+    '# Project State',
+    '',
+    '## Blockers',
+    '',
+    '- Waiting for API credentials',
+    '- Need design review for dashboard',
+    '- Pending vendor approval',
+    '',
+    '## Session Continuity',
+  ].join('\n') + '\n';
+
+  beforeEach(() => {
+    tmpDir = createTempProject();
+  });
+
+  afterEach(() => {
+    cleanup(tmpDir);
+  });
+
+  test('removes matching blocker line (case-insensitive substring match)', () => {
+    fs.writeFileSync(path.join(tmpDir, '.planning', 'STATE.md'), blockerFixture);
+
+    const result = runGsdTools('state resolve-blocker --text "api credentials"', tmpDir);
+    assert.ok(result.success, `Command failed: ${result.error}`);
+
+    const output = JSON.parse(result.output);
+    assert.strictEqual(output.resolved, true, 'resolved should be true');
+
+    const updated = fs.readFileSync(path.join(tmpDir, '.planning', 'STATE.md'), 'utf-8');
+    assert.ok(!updated.includes('Waiting for API credentials'), 'matched blocker should be removed');
+    assert.ok(updated.includes('Need design review for dashboard'), 'other blocker should still be present');
+    assert.ok(updated.includes('Pending vendor approval'), 'other blocker should still be present');
+  });
+
+  test('adds None placeholder when last blocker resolved', () => {
+    const singleBlockerFixture = [
+      '# Project State',
+      '',
+      '## Blockers',
+      '',
+      '- Single blocker',
+      '',
+      '## Session Continuity',
+    ].join('\n') + '\n';
+    fs.writeFileSync(path.join(tmpDir, '.planning', 'STATE.md'), singleBlockerFixture);
+
+    const result = runGsdTools('state resolve-blocker --text "single blocker"', tmpDir);
+    assert.ok(result.success, `Command failed: ${result.error}`);
+
+    const updated = fs.readFileSync(path.join(tmpDir, '.planning', 'STATE.md'), 'utf-8');
+    assert.ok(!updated.includes('- Single blocker'), 'resolved blocker should be removed');
+
+    // Section should contain "None" placeholder, not be empty
+    const sectionMatch = updated.match(/## Blockers\n([\s\S]*?)(?=\n##|$)/i);
+    assert.ok(sectionMatch, 'Blockers section should still exist');
+    assert.ok(sectionMatch[1].includes('None'), 'Blockers section should contain None placeholder');
+  });
+
+  test('returns error when text not provided', () => {
+    fs.writeFileSync(path.join(tmpDir, '.planning', 'STATE.md'), blockerFixture);
+
+    const result = runGsdTools('state resolve-blocker', tmpDir);
+    assert.ok(result.success, `Command should exit 0: ${result.error}`);
+
+    const output = JSON.parse(result.output);
+    assert.ok(output.error !== undefined, 'output should have error field');
+    assert.ok(
+      output.error.toLowerCase().includes('text'),
+      'error should mention text required'
+    );
+  });
+
+  test('returns error when STATE.md missing', () => {
+    const result = runGsdTools('state resolve-blocker --text "anything"', tmpDir);
+    assert.ok(result.success, `Command should exit 0: ${result.error}`);
+
+    const output = JSON.parse(result.output);
+    assert.ok(output.error !== undefined, 'output should have error field');
+    assert.ok(output.error.includes('STATE.md'), 'error should mention STATE.md');
+  });
+
+  test('returns resolved true even if no line matches', () => {
+    fs.writeFileSync(path.join(tmpDir, '.planning', 'STATE.md'), blockerFixture);
+
+    const result = runGsdTools('state resolve-blocker --text "nonexistent blocker text"', tmpDir);
+    assert.ok(result.success, `Command failed: ${result.error}`);
+
+    const output = JSON.parse(result.output);
+    assert.strictEqual(output.resolved, true, 'resolved should be true even when no line matches');
+  });
+});
+
+describe('cmdStateRecordSession (state record-session)', () => {
+  let tmpDir;
+
+  const sessionFixture = [
+    '# Project State',
+    '',
+    '## Session Continuity',
+    '',
+    '**Last session:** 2024-01-10',
+    '**Stopped at:** Phase 2, Plan 1',
+    '**Resume file:** None',
+  ].join('\n') + '\n';
+
+  beforeEach(() => {
+    tmpDir = createTempProject();
+  });
+
+  afterEach(() => {
+    cleanup(tmpDir);
+  });
+
+  test('updates session fields with stopped-at and resume-file', () => {
+    fs.writeFileSync(path.join(tmpDir, '.planning', 'STATE.md'), sessionFixture);
+
+    const result = runGsdTools(
+      'state record-session --stopped-at "Phase 3, Plan 2" --resume-file ".planning/phases/03/03-02-PLAN.md"',
+      tmpDir
+    );
+    assert.ok(result.success, `Command failed: ${result.error}`);
+
+    const output = JSON.parse(result.output);
+    assert.strictEqual(output.recorded, true, 'recorded should be true');
+    assert.ok(Array.isArray(output.updated), 'updated should be an array');
+
+    const updated = fs.readFileSync(path.join(tmpDir, '.planning', 'STATE.md'), 'utf-8');
+    assert.ok(updated.includes('Phase 3, Plan 2'), 'Stopped at should be updated');
+    assert.ok(updated.includes('.planning/phases/03/03-02-PLAN.md'), 'Resume file should be updated');
+
+    const today = new Date().toISOString().split('T')[0];
+    assert.ok(updated.includes(today), 'Last session should be updated to today');
+  });
+
+  test('updates Last session timestamp even with no other options', () => {
+    fs.writeFileSync(path.join(tmpDir, '.planning', 'STATE.md'), sessionFixture);
+
+    const result = runGsdTools('state record-session', tmpDir);
+    assert.ok(result.success, `Command failed: ${result.error}`);
+
+    const output = JSON.parse(result.output);
+    assert.strictEqual(output.recorded, true, 'recorded should be true');
+
+    const updated = fs.readFileSync(path.join(tmpDir, '.planning', 'STATE.md'), 'utf-8');
+    const today = new Date().toISOString().split('T')[0];
+    assert.ok(updated.includes(today), 'Last session should contain today\'s date');
+  });
+
+  test('sets Resume file to None when not specified', () => {
+    fs.writeFileSync(path.join(tmpDir, '.planning', 'STATE.md'), sessionFixture);
+
+    const result = runGsdTools('state record-session --stopped-at "Phase 1 complete"', tmpDir);
+    assert.ok(result.success, `Command failed: ${result.error}`);
+
+    const updated = fs.readFileSync(path.join(tmpDir, '.planning', 'STATE.md'), 'utf-8');
+    assert.ok(updated.includes('Phase 1 complete'), 'Stopped at should be updated');
+    // Resume file should be set to None (default)
+    const resumeMatch = updated.match(/\*\*Resume file:\*\*\s*(.*)/i);
+    assert.ok(resumeMatch, 'Resume file field should exist');
+    assert.ok(resumeMatch[1].trim() === 'None', 'Resume file should be None when not specified');
+  });
+
+  test('returns error when STATE.md missing', () => {
+    const result = runGsdTools('state record-session', tmpDir);
+    assert.ok(result.success, `Command should exit 0: ${result.error}`);
+
+    const output = JSON.parse(result.output);
+    assert.ok(output.error !== undefined, 'output should have error field');
+    assert.ok(output.error.includes('STATE.md'), 'error should mention STATE.md');
+  });
+
+  test('returns recorded false when no session fields found', () => {
+    fs.writeFileSync(
+      path.join(tmpDir, '.planning', 'STATE.md'),
+      '# Project State\n\n**Status:** Active\n**Phase:** 03\n'
+    );
+
+    const result = runGsdTools('state record-session', tmpDir);
+    assert.ok(result.success, `Command should exit 0: ${result.error}`);
+
+    const output = JSON.parse(result.output);
+    assert.strictEqual(output.recorded, false, 'recorded should be false when no session fields found');
+    assert.ok(output.reason !== undefined, 'should have a reason');
+  });
+});
+
+// ─────────────────────────────────────────────────────────────────────────────
 // summary-extract command
 // ─────────────────────────────────────────────────────────────────────────────
