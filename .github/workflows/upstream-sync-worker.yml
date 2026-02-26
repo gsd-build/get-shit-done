@@ -237,9 +237,10 @@ jobs:
           EOF
           )
 
-          PR_NUM=$(gh pr list --state open --head "${BRANCH}" --base "${BASE_BRANCH}" --json number --jq '.[0].number // empty')
+          PR_NUM=$(gh pr list --repo "$GITHUB_REPOSITORY" --state open --head "${BRANCH}" --base "${BASE_BRANCH}" --json number --jq '.[0].number // empty')
           if [ -z "$PR_NUM" ]; then
             gh pr create \
+              --repo "$GITHUB_REPOSITORY" \
               --base "${BASE_BRANCH}" \
               --head "${BRANCH}" \
               --title "$TITLE" \
@@ -248,7 +249,7 @@ jobs:
               --label "automated"
             PR_NUM=$(gh pr list --state open --head "${BRANCH}" --base "${BASE_BRANCH}" --json number --jq '.[0].number')
           else
-            gh pr edit "$PR_NUM" --title "$TITLE" --body "$BODY"
+            gh pr edit "$PR_NUM" --title "$TITLE" --body "$BODY" --repo "$GITHUB_REPOSITORY"
           fi
 
           echo "pr_number=$PR_NUM" >> "$GITHUB_OUTPUT"
