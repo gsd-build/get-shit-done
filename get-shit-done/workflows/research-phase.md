@@ -1,7 +1,7 @@
 <purpose>
 Research how to implement a phase. Spawns gsd-phase-researcher with phase context.
 
-Standalone research command. For most workflows, use `/gsd:plan-phase` which integrates research automatically.
+Standalone research command. For most workflows, use `$gsd-plan-phase` which integrates research automatically.
 </purpose>
 
 <process>
@@ -47,7 +47,7 @@ Research implementation approach for Phase {phase}: {name}
 </objective>
 
 <files_to_read>
-- {context_path} (USER DECISIONS from /gsd:discuss-phase)
+- {context_path} (USER DECISIONS from $gsd-discuss-phase)
 - {requirements_path} (Project requirements)
 - {state_path} (Project decisions and history)
 </files_to_read>
