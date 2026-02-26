@@ -90,6 +90,8 @@ safe-outputs:
     merge-clean-sync-pr:
       description: "Merge latest open upstream-sync PR when auto-merge is not armed and PR is already clean."
       runs-on: ubuntu-latest
+      needs:
+        - safe_outputs
       permissions:
         pull-requests: write
       inputs:
