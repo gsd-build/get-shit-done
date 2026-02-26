@@ -21,7 +21,7 @@ describe('roadmap get-phase command', () => {
 
   test('extracts phase section from ROADMAP.md', () => {
     fs.writeFileSync(
-      path.join(tmpDir, '.planning', 'ROADMAP.md'),
+      path.join(tmpDir, '.planning', 'ROADMAP.org'),
       `# Roadmap v1.0
 
 ## Phases
@@ -50,7 +50,7 @@ Some description here.
 
   test('returns not found for missing phase', () => {
     fs.writeFileSync(
-      path.join(tmpDir, '.planning', 'ROADMAP.md'),
+      path.join(tmpDir, '.planning', 'ROADMAP.org'),
       `# Roadmap v1.0
 
 ### Phase 1: Foundation
@@ -67,7 +67,7 @@ Some description here.
 
   test('handles decimal phase numbers', () => {
     fs.writeFileSync(
-      path.join(tmpDir, '.planning', 'ROADMAP.md'),
+      path.join(tmpDir, '.planning', 'ROADMAP.org'),
       `# Roadmap
 
 ### Phase 2: Main
@@ -89,7 +89,7 @@ Some description here.
 
   test('extracts full section content', () => {
     fs.writeFileSync(
-      path.join(tmpDir, '.planning', 'ROADMAP.md'),
+      path.join(tmpDir, '.planning', 'ROADMAP.org'),
       `# Roadmap
 
 ### Phase 1: Setup
@@ -120,12 +120,12 @@ This phase covers:
 
     const output = JSON.parse(result.output);
     assert.strictEqual(output.found, false, 'should return not found');
-    assert.strictEqual(output.error, 'ROADMAP.md not found', 'should explain why');
+    assert.strictEqual(output.error, 'ROADMAP.org not found', 'should explain why');
   });
 
   test('accepts ## phase headers (two hashes)', () => {
     fs.writeFileSync(
-      path.join(tmpDir, '.planning', 'ROADMAP.md'),
+      path.join(tmpDir, '.planning', 'ROADMAP.org'),
       `# Roadmap v1.0
 
 ## Phase 1: Foundation
@@ -148,7 +148,7 @@ This phase covers:
 
   test('detects malformed ROADMAP with summary list but no detail sections', () => {
     fs.writeFileSync(
-      path.join(tmpDir, '.planning', 'ROADMAP.md'),
+      path.join(tmpDir, '.planning', 'ROADMAP.org'),
       `# Roadmap v1.0
 
 ## Phases
@@ -189,12 +189,12 @@ describe('roadmap analyze command', () => {
     assert.ok(result.success, `Command should succeed: ${result.error}`);
 
     const output = JSON.parse(result.output);
-    assert.strictEqual(output.error, 'ROADMAP.md not found');
+    assert.strictEqual(output.error, 'ROADMAP.org not found');
   });
 
   test('parses phases with goals and disk status', () => {
     fs.writeFileSync(
-      path.join(tmpDir, '.planning', 'ROADMAP.md'),
+      path.join(tmpDir, '.planning', 'ROADMAP.org'),
       `# Roadmap v1.0
 
 ### Phase 1: Foundation
@@ -211,12 +211,12 @@ describe('roadmap analyze command', () => {
     // Create phase dirs with varying completion
     const p1 = path.join(tmpDir, '.planning', 'phases', '01-foundation');
     fs.mkdirSync(p1, { recursive: true });
-    fs.writeFileSync(path.join(p1, '01-01-PLAN.md'), '# Plan');
-    fs.writeFileSync(path.join(p1, '01-01-SUMMARY.md'), '# Summary');
+    fs.writeFileSync(path.join(p1, '01-01-PLAN.org'), '# Plan');
+    fs.writeFileSync(path.join(p1, '01-01-SUMMARY.org'), '# Summary');
 
     const p2 = path.join(tmpDir, '.planning', 'phases', '02-authentication');
     fs.mkdirSync(p2, { recursive: true });
-    fs.writeFileSync(path.join(p2, '02-01-PLAN.md'), '# Plan');
+    fs.writeFileSync(path.join(p2, '02-01-PLAN.org'), '# Plan');
 
     const result = runGsdTools('roadmap analyze', tmpDir);
     assert.ok(result.success, `Command failed: ${result.error}`);
@@ -235,7 +235,7 @@ describe('roadmap analyze command', () => {
 
   test('extracts goals and dependencies', () => {
     fs.writeFileSync(
-      path.join(tmpDir, '.planning', 'ROADMAP.md'),
+      path.join(tmpDir, '.planning', 'ROADMAP.org'),
       `# Roadmap
 
 ### Phase 1: Setup

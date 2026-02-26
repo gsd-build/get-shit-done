@@ -29,7 +29,7 @@ describe('state-snapshot command', () => {
 
   test('extracts basic fields from STATE.md', () => {
     fs.writeFileSync(
-      path.join(tmpDir, '.planning', 'STATE.md'),
+      path.join(tmpDir, '.planning', 'STATE.org'),
       `# Project State
 
 **Current Phase:** 03
@@ -40,7 +40,7 @@ describe('state-snapshot command', () => {
 **Status:** In progress
 **Progress:** 45%
 **Last Activity:** 2024-01-15
-**Last Activity Description:** Completed 03-01-PLAN.md
+**Last Activity Description:** Completed 03-01-PLAN.org
 `
     );
 
@@ -60,7 +60,7 @@ describe('state-snapshot command', () => {
 
   test('extracts decisions table', () => {
     fs.writeFileSync(
-      path.join(tmpDir, '.planning', 'STATE.md'),
+      path.join(tmpDir, '.planning', 'STATE.org'),
       `# Project State
 
 **Current Phase:** 01
@@ -86,7 +86,7 @@ describe('state-snapshot command', () => {
 
   test('extracts blockers list', () => {
     fs.writeFileSync(
-      path.join(tmpDir, '.planning', 'STATE.md'),
+      path.join(tmpDir, '.planning', 'STATE.org'),
       `# Project State
 
 **Current Phase:** 03
@@ -110,7 +110,7 @@ describe('state-snapshot command', () => {
 
   test('extracts session continuity info', () => {
     fs.writeFileSync(
-      path.join(tmpDir, '.planning', 'STATE.md'),
+      path.join(tmpDir, '.planning', 'STATE.org'),
       `# Project State
 
 **Current Phase:** 03
@@ -119,7 +119,7 @@ describe('state-snapshot command', () => {
 
 **Last Date:** 2024-01-15
 **Stopped At:** Phase 3, Plan 2, Task 1
-**Resume File:** .planning/phases/03-api/03-02-PLAN.md
+**Resume File:** .planning/phases/03-api/03-02-PLAN.org
 `
     );
 
@@ -129,12 +129,12 @@ describe('state-snapshot command', () => {
     const output = JSON.parse(result.output);
     assert.strictEqual(output.session.last_date, '2024-01-15', 'session date extracted');
     assert.strictEqual(output.session.stopped_at, 'Phase 3, Plan 2, Task 1', 'stopped at extracted');
-    assert.strictEqual(output.session.resume_file, '.planning/phases/03-api/03-02-PLAN.md', 'resume file extracted');
+    assert.strictEqual(output.session.resume_file, '.planning/phases/03-api/03-02-PLAN.org', 'resume file extracted');
   });
 
   test('handles paused_at field', () => {
     fs.writeFileSync(
-      path.join(tmpDir, '.planning', 'STATE.md'),
+      path.join(tmpDir, '.planning', 'STATE.org'),
       `# Project State
 
 **Current Phase:** 03
@@ -151,7 +151,7 @@ describe('state-snapshot command', () => {
 
   test('supports --cwd override when command runs outside project root', () => {
     fs.writeFileSync(
-      path.join(tmpDir, '.planning', 'STATE.md'),
+      path.join(tmpDir, '.planning', 'STATE.org'),
       `# Session State
 
 **Current Phase:** 03
@@ -193,7 +193,7 @@ describe('state mutation commands', () => {
 
   test('add-decision preserves dollar amounts without corrupting Decisions section', () => {
     fs.writeFileSync(
-      path.join(tmpDir, '.planning', 'STATE.md'),
+      path.join(tmpDir, '.planning', 'STATE.org'),
       `# Project State
 
 ## Decisions
@@ -210,7 +210,7 @@ None
     );
     assert.ok(result.success, `Command failed: ${result.error}`);
 
-    const state = fs.readFileSync(path.join(tmpDir, '.planning', 'STATE.md'), 'utf-8');
+    const state = fs.readFileSync(path.join(tmpDir, '.planning', 'STATE.org'), 'utf-8');
     assert.match(
       state,
       /- \[Phase 11-01\]: Benchmark prices moved from \$0\.50 to \$2\.00 to \$5\.00 — track cost growth/,
@@ -222,7 +222,7 @@ None
 
   test('add-blocker preserves dollar strings without corrupting Blockers section', () => {
     fs.writeFileSync(
-      path.join(tmpDir, '.planning', 'STATE.md'),
+      path.join(tmpDir, '.planning', 'STATE.org'),
       `# Project State
 
 ## Decisions
@@ -236,14 +236,14 @@ None
     const result = runGsdTools("state add-blocker --text 'Waiting on vendor quote $1.00 before approval'", tmpDir);
     assert.ok(result.success, `Command failed: ${result.error}`);
 
-    const state = fs.readFileSync(path.join(tmpDir, '.planning', 'STATE.md'), 'utf-8');
+    const state = fs.readFileSync(path.join(tmpDir, '.planning', 'STATE.org'), 'utf-8');
     assert.match(state, /- Waiting on vendor quote \$1\.00 before approval/, 'blocker entry should preserve literal dollar values');
     assert.strictEqual((state.match(/^## Blockers$/gm) || []).length, 1, 'Blockers heading should not be duplicated');
   });
 
   test('add-decision supports file inputs to preserve shell-sensitive dollar text', () => {
     fs.writeFileSync(
-      path.join(tmpDir, '.planning', 'STATE.md'),
+      path.join(tmpDir, '.planning', 'STATE.org'),
       `# Project State
 
 ## Decisions
@@ -265,7 +265,7 @@ None
     );
     assert.ok(result.success, `Command failed: ${result.error}`);
 
-    const state = fs.readFileSync(path.join(tmpDir, '.planning', 'STATE.md'), 'utf-8');
+    const state = fs.readFileSync(path.join(tmpDir, '.planning', 'STATE.org'), 'utf-8');
     assert.match(
       state,
       /- \[Phase 11-02\]: Price tiers: \$0\.50, \$2\.00, else \$5\.00 — Keep exact currency literals for budgeting/,
@@ -275,7 +275,7 @@ None
 
   test('add-blocker supports --text-file for shell-sensitive text', () => {
     fs.writeFileSync(
-      path.join(tmpDir, '.planning', 'STATE.md'),
+      path.join(tmpDir, '.planning', 'STATE.org'),
       `# Project State
 
 ## Decisions
@@ -292,7 +292,7 @@ None
     const result = runGsdTools(`state add-blocker --text-file "${blockerPath}"`, tmpDir);
     assert.ok(result.success, `Command failed: ${result.error}`);
 
-    const state = fs.readFileSync(path.join(tmpDir, '.planning', 'STATE.md'), 'utf-8');
+    const state = fs.readFileSync(path.join(tmpDir, '.planning', 'STATE.org'), 'utf-8');
     assert.match(state, /- Vendor quote updated from \$1\.00 to \$2\.00 pending approval/);
   });
 });
@@ -322,7 +322,7 @@ describe('state json command', () => {
 
   test('builds frontmatter on-the-fly from body when no frontmatter exists', () => {
     fs.writeFileSync(
-      path.join(tmpDir, '.planning', 'STATE.md'),
+      path.join(tmpDir, '.planning', 'STATE.org'),
       `# Project State
 
 **Current Phase:** 05
@@ -353,13 +353,13 @@ describe('state json command', () => {
 
   test('reads existing frontmatter when present', () => {
     fs.writeFileSync(
-      path.join(tmpDir, '.planning', 'STATE.md'),
-      `---
-gsd_state_version: 1.0
-current_phase: 03
-status: paused
-stopped_at: Plan 2 of Phase 3
----
+      path.join(tmpDir, '.planning', 'STATE.org'),
+      `:PROPERTIES:
+:gsd_state_version: 1.0
+:current_phase: 03
+:status: paused
+:stopped_at: Plan 2 of Phase 3
+:END:
 
 # Project State
 
@@ -390,7 +390,7 @@ stopped_at: Plan 2 of Phase 3
 
     for (const { input, expected } of statusTests) {
       fs.writeFileSync(
-        path.join(tmpDir, '.planning', 'STATE.md'),
+        path.join(tmpDir, '.planning', 'STATE.org'),
         `# State\n\n**Current Phase:** 01\n**Status:** ${input}\n`
       );
 
@@ -419,7 +419,7 @@ describe('STATE.md frontmatter sync', () => {
 
   test('state update adds frontmatter to STATE.md', () => {
     fs.writeFileSync(
-      path.join(tmpDir, '.planning', 'STATE.md'),
+      path.join(tmpDir, '.planning', 'STATE.org'),
       `# Project State
 
 **Current Phase:** 02
@@ -430,17 +430,17 @@ describe('STATE.md frontmatter sync', () => {
     const result = runGsdTools('state update Status "Executing Plan 1"', tmpDir);
     assert.ok(result.success, `Command failed: ${result.error}`);
 
-    const content = fs.readFileSync(path.join(tmpDir, '.planning', 'STATE.md'), 'utf-8');
-    assert.ok(content.startsWith('---\n'), 'should start with frontmatter delimiter');
-    assert.ok(content.includes('gsd_state_version: 1.0'), 'should have version field');
-    assert.ok(content.includes('current_phase: 02'), 'frontmatter should have current phase');
+    const content = fs.readFileSync(path.join(tmpDir, '.planning', 'STATE.org'), 'utf-8');
+    assert.ok(content.startsWith(':PROPERTIES:\n'), 'should start with property drawer');
+    assert.ok(content.includes(':gsd_state_version: 1.0'), 'should have version field');
+    assert.ok(content.includes(':current_phase: 02'), 'frontmatter should have current phase');
     assert.ok(content.includes('**Current Phase:** 02'), 'body field should be preserved');
     assert.ok(content.includes('**Status:** Executing Plan 1'), 'updated field in body');
   });
 
   test('state patch adds frontmatter', () => {
     fs.writeFileSync(
-      path.join(tmpDir, '.planning', 'STATE.md'),
+      path.join(tmpDir, '.planning', 'STATE.org'),
       `# Project State
 
 **Current Phase:** 04
@@ -452,13 +452,13 @@ describe('STATE.md frontmatter sync', () => {
     const result = runGsdTools('state patch --Status "In progress" --"Current Plan" 04-02', tmpDir);
     assert.ok(result.success, `Command failed: ${result.error}`);
 
-    const content = fs.readFileSync(path.join(tmpDir, '.planning', 'STATE.md'), 'utf-8');
-    assert.ok(content.startsWith('---\n'), 'should have frontmatter after patch');
+    const content = fs.readFileSync(path.join(tmpDir, '.planning', 'STATE.org'), 'utf-8');
+    assert.ok(content.startsWith(':PROPERTIES:\n'), 'should have property drawer after patch');
   });
 
   test('frontmatter is idempotent on multiple writes', () => {
     fs.writeFileSync(
-      path.join(tmpDir, '.planning', 'STATE.md'),
+      path.join(tmpDir, '.planning', 'STATE.org'),
       `# Project State
 
 **Current Phase:** 01
@@ -469,15 +469,17 @@ describe('STATE.md frontmatter sync', () => {
     runGsdTools('state update Status "In progress"', tmpDir);
     runGsdTools('state update Status "Paused"', tmpDir);
 
-    const content = fs.readFileSync(path.join(tmpDir, '.planning', 'STATE.md'), 'utf-8');
-    const delimiterCount = (content.match(/^---$/gm) || []).length;
-    assert.strictEqual(delimiterCount, 2, 'should have exactly one frontmatter block (2 delimiters)');
-    assert.ok(content.includes('status: paused'), 'frontmatter should reflect latest status');
+    const content = fs.readFileSync(path.join(tmpDir, '.planning', 'STATE.org'), 'utf-8');
+    const propsCount = (content.match(/^:PROPERTIES:$/gm) || []).length;
+    const endCount = (content.match(/^:END:$/gm) || []).length;
+    assert.strictEqual(propsCount, 1, 'should have exactly one :PROPERTIES: opener');
+    assert.strictEqual(endCount, 1, 'should have exactly one :END: closer');
+    assert.ok(content.includes(':status: paused'), 'frontmatter should reflect latest status');
   });
 
   test('round-trip: write then read via state json', () => {
     fs.writeFileSync(
-      path.join(tmpDir, '.planning', 'STATE.md'),
+      path.join(tmpDir, '.planning', 'STATE.org'),
       `# Project State
 
 **Current Phase:** 07

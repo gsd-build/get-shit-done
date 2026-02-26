@@ -35,31 +35,20 @@ describe('history-digest command', () => {
     const phaseDir = path.join(tmpDir, '.planning', 'phases', '01-foundation');
     fs.mkdirSync(phaseDir, { recursive: true });
 
-    const summaryContent = `---
-phase: "01"
-name: "Foundation Setup"
-dependency-graph:
-  provides:
-    - "Database schema"
-    - "Auth system"
-  affects:
-    - "API layer"
-tech-stack:
-  added:
-    - "prisma"
-    - "jose"
-patterns-established:
-  - "Repository pattern"
-  - "JWT auth flow"
-key-decisions:
-  - "Use Prisma over Drizzle"
-  - "JWT in httpOnly cookies"
----
+    const summaryContent = `:PROPERTIES:
+:phase: 01
+:name: Foundation Setup
+:dependency-graph.provides: [Database schema, Auth system]
+:dependency-graph.affects: [API layer]
+:tech-stack.added: [prisma, jose]
+:patterns-established: [Repository pattern, JWT auth flow]
+:key-decisions: [Use Prisma over Drizzle, JWT in httpOnly cookies]
+:END:
 
 # Summary content here
 `;
 
-    fs.writeFileSync(path.join(phaseDir, '01-01-SUMMARY.md'), summaryContent);
+    fs.writeFileSync(path.join(phaseDir, '01-01-SUMMARY.org'), summaryContent);
 
     const result = runGsdTools('history-digest', tmpDir);
     assert.ok(result.success, `Command failed: ${result.error}`);
@@ -108,17 +97,14 @@ key-decisions:
     const phase01Dir = path.join(tmpDir, '.planning', 'phases', '01-foundation');
     fs.mkdirSync(phase01Dir, { recursive: true });
     fs.writeFileSync(
-      path.join(phase01Dir, '01-01-SUMMARY.md'),
-      `---
-phase: "01"
-name: "Foundation"
-provides:
-  - "Database"
-patterns-established:
-  - "Pattern A"
-key-decisions:
-  - "Decision 1"
----
+      path.join(phase01Dir, '01-01-SUMMARY.org'),
+      `:PROPERTIES:
+:phase: 01
+:name: Foundation
+:provides: [Database]
+:patterns-established: [Pattern A]
+:key-decisions: [Decision 1]
+:END:
 `
     );
 
@@ -126,20 +112,15 @@ key-decisions:
     const phase02Dir = path.join(tmpDir, '.planning', 'phases', '02-api');
     fs.mkdirSync(phase02Dir, { recursive: true });
     fs.writeFileSync(
-      path.join(phase02Dir, '02-01-SUMMARY.md'),
-      `---
-phase: "02"
-name: "API"
-provides:
-  - "REST endpoints"
-patterns-established:
-  - "Pattern B"
-key-decisions:
-  - "Decision 2"
-tech-stack:
-  added:
-    - "zod"
----
+      path.join(phase02Dir, '02-01-SUMMARY.org'),
+      `:PROPERTIES:
+:phase: 02
+:name: API
+:provides: [REST endpoints]
+:patterns-established: [Pattern B]
+:key-decisions: [Decision 2]
+:tech-stack.added: [zod]
+:END:
 `
     );
 
@@ -165,29 +146,28 @@ tech-stack:
 
     // Valid summary
     fs.writeFileSync(
-      path.join(phaseDir, '01-01-SUMMARY.md'),
-      `---
-phase: "01"
-provides:
-  - "Valid feature"
----
+      path.join(phaseDir, '01-01-SUMMARY.org'),
+      `:PROPERTIES:
+:phase: 01
+:provides: [Valid feature]
+:END:
 `
     );
 
     // Malformed summary (no frontmatter)
     fs.writeFileSync(
-      path.join(phaseDir, '01-02-SUMMARY.md'),
+      path.join(phaseDir, '01-02-SUMMARY.org'),
       `# Just a heading
 No frontmatter here
 `
     );
 
-    // Another malformed summary (broken YAML)
+    // Another malformed summary (broken property drawer)
     fs.writeFileSync(
-      path.join(phaseDir, '01-03-SUMMARY.md'),
-      `---
-broken: [unclosed
----
+      path.join(phaseDir, '01-03-SUMMARY.org'),
+      `:PROPERTIES:
+:broken: [unclosed
+:END:
 `
     );
 
@@ -207,12 +187,11 @@ broken: [unclosed
     fs.mkdirSync(phaseDir, { recursive: true });
 
     fs.writeFileSync(
-      path.join(phaseDir, '01-01-SUMMARY.md'),
-      `---
-phase: "01"
-provides:
-  - "Direct provides"
----
+      path.join(phaseDir, '01-01-SUMMARY.org'),
+      `:PROPERTIES:
+:phase: 01
+:provides: [Direct provides]
+:END:
 `
     );
 
@@ -232,12 +211,12 @@ provides:
     fs.mkdirSync(phaseDir, { recursive: true });
 
     fs.writeFileSync(
-      path.join(phaseDir, '01-01-SUMMARY.md'),
-      `---
-phase: "01"
-provides: [Feature A, Feature B]
-patterns-established: ["Pattern X", "Pattern Y"]
----
+      path.join(phaseDir, '01-01-SUMMARY.org'),
+      `:PROPERTIES:
+:phase: 01
+:provides: [Feature A, Feature B]
+:patterns-established: [Pattern X, Pattern Y]
+:END:
 `
     );
 
@@ -275,7 +254,7 @@ describe('summary-extract command', () => {
   });
 
   test('missing file returns error', () => {
-    const result = runGsdTools('summary-extract .planning/phases/01-test/01-01-SUMMARY.md', tmpDir);
+    const result = runGsdTools('summary-extract .planning/phases/01-test/01-01-SUMMARY.org', tmpDir);
     assert.ok(result.success, `Command should succeed: ${result.error}`);
 
     const output = JSON.parse(result.output);
@@ -287,26 +266,15 @@ describe('summary-extract command', () => {
     fs.mkdirSync(phaseDir, { recursive: true });
 
     fs.writeFileSync(
-      path.join(phaseDir, '01-01-SUMMARY.md'),
-      `---
-one-liner: Set up Prisma with User and Project models
-key-files:
-  - prisma/schema.prisma
-  - src/lib/db.ts
-tech-stack:
-  added:
-    - prisma
-    - zod
-patterns-established:
-  - Repository pattern
-  - Dependency injection
-key-decisions:
-  - Use Prisma over Drizzle: Better DX and ecosystem
-  - Single database: Start simple, shard later
-requirements-completed:
-  - AUTH-01
-  - AUTH-02
----
+      path.join(phaseDir, '01-01-SUMMARY.org'),
+      `:PROPERTIES:
+:one-liner: Set up Prisma with User and Project models
+:key-files: [prisma/schema.prisma, src/lib/db.ts]
+:tech-stack.added: [prisma, zod]
+:patterns-established: [Repository pattern, Dependency injection]
+:key-decisions: ["Use Prisma over Drizzle: Better DX and ecosystem", "Single database: Start simple, shard later"]
+:requirements-completed: [AUTH-01, AUTH-02]
+:END:
 
 # Summary
 
@@ -314,11 +282,11 @@ Full summary content here.
 `
     );
 
-    const result = runGsdTools('summary-extract .planning/phases/01-foundation/01-01-SUMMARY.md', tmpDir);
+    const result = runGsdTools('summary-extract .planning/phases/01-foundation/01-01-SUMMARY.org', tmpDir);
     assert.ok(result.success, `Command failed: ${result.error}`);
 
     const output = JSON.parse(result.output);
-    assert.strictEqual(output.path, '.planning/phases/01-foundation/01-01-SUMMARY.md', 'path correct');
+    assert.strictEqual(output.path, '.planning/phases/01-foundation/01-01-SUMMARY.org', 'path correct');
     assert.strictEqual(output.one_liner, 'Set up Prisma with User and Project models', 'one-liner extracted');
     assert.deepStrictEqual(output.key_files, ['prisma/schema.prisma', 'src/lib/db.ts'], 'key files extracted');
     assert.deepStrictEqual(output.tech_added, ['prisma', 'zod'], 'tech added extracted');
@@ -332,25 +300,19 @@ Full summary content here.
     fs.mkdirSync(phaseDir, { recursive: true });
 
     fs.writeFileSync(
-      path.join(phaseDir, '01-01-SUMMARY.md'),
-      `---
-one-liner: Set up database
-key-files:
-  - prisma/schema.prisma
-tech-stack:
-  added:
-    - prisma
-patterns-established:
-  - Repository pattern
-key-decisions:
-  - Use Prisma: Better DX
-requirements-completed:
-  - AUTH-01
----
+      path.join(phaseDir, '01-01-SUMMARY.org'),
+      `:PROPERTIES:
+:one-liner: Set up database
+:key-files: [prisma/schema.prisma]
+:tech-stack.added: [prisma]
+:patterns-established: [Repository pattern]
+:key-decisions: [Use Prisma: Better DX]
+:requirements-completed: [AUTH-01]
+:END:
 `
     );
 
-    const result = runGsdTools('summary-extract .planning/phases/01-foundation/01-01-SUMMARY.md --fields one_liner,key_files,requirements_completed', tmpDir);
+    const result = runGsdTools('summary-extract .planning/phases/01-foundation/01-01-SUMMARY.org --fields one_liner,key_files,requirements_completed', tmpDir);
     assert.ok(result.success, `Command failed: ${result.error}`);
 
     const output = JSON.parse(result.output);
@@ -367,16 +329,16 @@ requirements-completed:
     fs.mkdirSync(phaseDir, { recursive: true });
 
     fs.writeFileSync(
-      path.join(phaseDir, '01-01-SUMMARY.md'),
-      `---
-one-liner: Minimal summary
----
+      path.join(phaseDir, '01-01-SUMMARY.org'),
+      `:PROPERTIES:
+:one-liner: Minimal summary
+:END:
 
 # Summary
 `
     );
 
-    const result = runGsdTools('summary-extract .planning/phases/01-foundation/01-01-SUMMARY.md', tmpDir);
+    const result = runGsdTools('summary-extract .planning/phases/01-foundation/01-01-SUMMARY.org', tmpDir);
     assert.ok(result.success, `Command failed: ${result.error}`);
 
     const output = JSON.parse(result.output);
@@ -393,16 +355,14 @@ one-liner: Minimal summary
     fs.mkdirSync(phaseDir, { recursive: true });
 
     fs.writeFileSync(
-      path.join(phaseDir, '01-01-SUMMARY.md'),
-      `---
-key-decisions:
-  - Use Prisma: Better DX than alternatives
-  - JWT tokens: Stateless auth for scalability
----
+      path.join(phaseDir, '01-01-SUMMARY.org'),
+      `:PROPERTIES:
+:key-decisions: [Use Prisma: Better DX than alternatives, JWT tokens: Stateless auth for scalability]
+:END:
 `
     );
 
-    const result = runGsdTools('summary-extract .planning/phases/01-foundation/01-01-SUMMARY.md', tmpDir);
+    const result = runGsdTools('summary-extract .planning/phases/01-foundation/01-01-SUMMARY.org', tmpDir);
     assert.ok(result.success, `Command failed: ${result.error}`);
 
     const output = JSON.parse(result.output);
@@ -431,14 +391,14 @@ describe('progress command', () => {
 
   test('renders JSON progress', () => {
     fs.writeFileSync(
-      path.join(tmpDir, '.planning', 'ROADMAP.md'),
+      path.join(tmpDir, '.planning', 'ROADMAP.org'),
       `# Roadmap v1.0 MVP\n`
     );
     const p1 = path.join(tmpDir, '.planning', 'phases', '01-foundation');
     fs.mkdirSync(p1, { recursive: true });
-    fs.writeFileSync(path.join(p1, '01-01-PLAN.md'), '# Plan');
-    fs.writeFileSync(path.join(p1, '01-01-SUMMARY.md'), '# Done');
-    fs.writeFileSync(path.join(p1, '01-02-PLAN.md'), '# Plan 2');
+    fs.writeFileSync(path.join(p1, '01-01-PLAN.org'), '# Plan');
+    fs.writeFileSync(path.join(p1, '01-01-SUMMARY.org'), '# Done');
+    fs.writeFileSync(path.join(p1, '01-02-PLAN.org'), '# Plan 2');
 
     const result = runGsdTools('progress json', tmpDir);
     assert.ok(result.success, `Command failed: ${result.error}`);
@@ -453,13 +413,13 @@ describe('progress command', () => {
 
   test('renders bar format', () => {
     fs.writeFileSync(
-      path.join(tmpDir, '.planning', 'ROADMAP.md'),
+      path.join(tmpDir, '.planning', 'ROADMAP.org'),
       `# Roadmap v1.0\n`
     );
     const p1 = path.join(tmpDir, '.planning', 'phases', '01-test');
     fs.mkdirSync(p1, { recursive: true });
-    fs.writeFileSync(path.join(p1, '01-01-PLAN.md'), '# Plan');
-    fs.writeFileSync(path.join(p1, '01-01-SUMMARY.md'), '# Done');
+    fs.writeFileSync(path.join(p1, '01-01-PLAN.org'), '# Plan');
+    fs.writeFileSync(path.join(p1, '01-01-SUMMARY.org'), '# Done');
 
     const result = runGsdTools('progress bar --raw', tmpDir);
     assert.ok(result.success, `Command failed: ${result.error}`);
@@ -469,12 +429,12 @@ describe('progress command', () => {
 
   test('renders table format', () => {
     fs.writeFileSync(
-      path.join(tmpDir, '.planning', 'ROADMAP.md'),
+      path.join(tmpDir, '.planning', 'ROADMAP.org'),
       `# Roadmap v1.0 MVP\n`
     );
     const p1 = path.join(tmpDir, '.planning', 'phases', '01-foundation');
     fs.mkdirSync(p1, { recursive: true });
-    fs.writeFileSync(path.join(p1, '01-01-PLAN.md'), '# Plan');
+    fs.writeFileSync(path.join(p1, '01-01-PLAN.org'), '# Plan');
 
     const result = runGsdTools('progress table --raw', tmpDir);
     assert.ok(result.success, `Command failed: ${result.error}`);
@@ -484,15 +444,15 @@ describe('progress command', () => {
 
   test('does not crash when summaries exceed plans (orphaned SUMMARY.md)', () => {
     fs.writeFileSync(
-      path.join(tmpDir, '.planning', 'ROADMAP.md'),
+      path.join(tmpDir, '.planning', 'ROADMAP.org'),
       `# Roadmap v1.0 MVP\n`
     );
     const p1 = path.join(tmpDir, '.planning', 'phases', '01-foundation');
     fs.mkdirSync(p1, { recursive: true });
     // 1 plan but 2 summaries (orphaned SUMMARY.md after PLAN.md deletion)
-    fs.writeFileSync(path.join(p1, '01-01-PLAN.md'), '# Plan');
-    fs.writeFileSync(path.join(p1, '01-01-SUMMARY.md'), '# Done');
-    fs.writeFileSync(path.join(p1, '01-02-SUMMARY.md'), '# Orphaned summary');
+    fs.writeFileSync(path.join(p1, '01-01-PLAN.org'), '# Plan');
+    fs.writeFileSync(path.join(p1, '01-01-SUMMARY.org'), '# Done');
+    fs.writeFileSync(path.join(p1, '01-02-SUMMARY.org'), '# Orphaned summary');
 
     // bar format - should not crash with RangeError
     const barResult = runGsdTools('progress bar --raw', tmpDir);
@@ -593,7 +553,7 @@ describe('scaffold command', () => {
 
     // Verify file content
     const content = fs.readFileSync(
-      path.join(tmpDir, '.planning', 'phases', '03-api', '03-CONTEXT.md'),
+      path.join(tmpDir, '.planning', 'phases', '03-api', '03-CONTEXT.org'),
       'utf-8'
     );
     assert.ok(content.includes('Phase 3'), 'should reference phase number');
@@ -611,7 +571,7 @@ describe('scaffold command', () => {
     assert.strictEqual(output.created, true);
 
     const content = fs.readFileSync(
-      path.join(tmpDir, '.planning', 'phases', '03-api', '03-UAT.md'),
+      path.join(tmpDir, '.planning', 'phases', '03-api', '03-UAT.org'),
       'utf-8'
     );
     assert.ok(content.includes('User Acceptance Testing'), 'should have UAT heading');
@@ -628,7 +588,7 @@ describe('scaffold command', () => {
     assert.strictEqual(output.created, true);
 
     const content = fs.readFileSync(
-      path.join(tmpDir, '.planning', 'phases', '03-api', '03-VERIFICATION.md'),
+      path.join(tmpDir, '.planning', 'phases', '03-api', '03-VERIFICATION.org'),
       'utf-8'
     );
     assert.ok(content.includes('Goal-Backward Verification'), 'should have verification heading');
@@ -649,7 +609,7 @@ describe('scaffold command', () => {
   test('does not overwrite existing files', () => {
     const phaseDir = path.join(tmpDir, '.planning', 'phases', '03-api');
     fs.mkdirSync(phaseDir, { recursive: true });
-    fs.writeFileSync(path.join(phaseDir, '03-CONTEXT.md'), '# Existing content');
+    fs.writeFileSync(path.join(phaseDir, '03-CONTEXT.org'), '# Existing content');
 
     const result = runGsdTools('scaffold context --phase 3', tmpDir);
     assert.ok(result.success, `Command failed: ${result.error}`);

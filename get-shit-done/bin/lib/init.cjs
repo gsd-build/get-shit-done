@@ -5,7 +5,7 @@
 const fs = require('fs');
 const path = require('path');
 const { execSync } = require('child_process');
-const { loadConfig, resolveModelInternal, findPhaseInternal, getRoadmapPhaseInternal, pathExistsInternal, generateSlugInternal, getMilestoneInfo, normalizePhaseName, output, error } = require('./core.cjs');
+const { loadConfig, resolveModelInternal, findPhaseInternal, getRoadmapPhaseInternal, pathExistsInternal, generateSlugInternal, getMilestoneInfo, normalizePhaseName, output, error, FILES, DOC_EXT } = require('./core.cjs');
 
 function cmdInitExecutePhase(cwd, phase, raw) {
   if (!phase) {
@@ -68,12 +68,12 @@ function cmdInitExecutePhase(cwd, phase, raw) {
     milestone_slug: generateSlugInternal(milestone.name),
 
     // File existence
-    state_exists: pathExistsInternal(cwd, '.planning/STATE.md'),
-    roadmap_exists: pathExistsInternal(cwd, '.planning/ROADMAP.md'),
+    state_exists: pathExistsInternal(cwd, `.planning/${FILES.STATE}`),
+    roadmap_exists: pathExistsInternal(cwd, `.planning/${FILES.ROADMAP}`),
     config_exists: pathExistsInternal(cwd, '.planning/config.json'),
     // File paths
-    state_path: '.planning/STATE.md',
-    roadmap_path: '.planning/ROADMAP.md',
+    state_path: `.planning/${FILES.STATE}`,
+    roadmap_path: `.planning/${FILES.ROADMAP}`,
     config_path: '.planning/config.json',
   };
 
@@ -124,12 +124,12 @@ function cmdInitPlanPhase(cwd, phase, raw) {
 
     // Environment
     planning_exists: pathExistsInternal(cwd, '.planning'),
-    roadmap_exists: pathExistsInternal(cwd, '.planning/ROADMAP.md'),
+    roadmap_exists: pathExistsInternal(cwd, `.planning/${FILES.ROADMAP}`),
 
     // File paths
-    state_path: '.planning/STATE.md',
-    roadmap_path: '.planning/ROADMAP.md',
-    requirements_path: '.planning/REQUIREMENTS.md',
+    state_path: `.planning/${FILES.STATE}`,
+    roadmap_path: `.planning/${FILES.ROADMAP}`,
+    requirements_path: `.planning/${FILES.REQUIREMENTS}`,
   };
 
   if (phaseInfo?.directory) {
@@ -137,19 +137,19 @@ function cmdInitPlanPhase(cwd, phase, raw) {
     const phaseDirFull = path.join(cwd, phaseInfo.directory);
     try {
       const files = fs.readdirSync(phaseDirFull);
-      const contextFile = files.find(f => f.endsWith('-CONTEXT.md') || f === 'CONTEXT.md');
+      const contextFile = files.find(f => f.endsWith(FILES.CONTEXT_SUFFIX) || f === `CONTEXT${DOC_EXT}`);
       if (contextFile) {
         result.context_path = path.join(phaseInfo.directory, contextFile);
       }
-      const researchFile = files.find(f => f.endsWith('-RESEARCH.md') || f === 'RESEARCH.md');
+      const researchFile = files.find(f => f.endsWith(FILES.RESEARCH_SUFFIX) || f === `RESEARCH${DOC_EXT}`);
       if (researchFile) {
         result.research_path = path.join(phaseInfo.directory, researchFile);
       }
-      const verificationFile = files.find(f => f.endsWith('-VERIFICATION.md') || f === 'VERIFICATION.md');
+      const verificationFile = files.find(f => f.endsWith(FILES.VERIFICATION_SUFFIX) || f === `VERIFICATION${DOC_EXT}`);
       if (verificationFile) {
         result.verification_path = path.join(phaseInfo.directory, verificationFile);
       }
-      const uatFile = files.find(f => f.endsWith('-UAT.md') || f === 'UAT.md');
+      const uatFile = files.find(f => f.endsWith(FILES.UAT_SUFFIX) || f === `UAT${DOC_EXT}`);
       if (uatFile) {
         result.uat_path = path.join(phaseInfo.directory, uatFile);
       }
@@ -195,7 +195,7 @@ function cmdInitNewProject(cwd, raw) {
     commit_docs: config.commit_docs,
 
     // Existing state
-    project_exists: pathExistsInternal(cwd, '.planning/PROJECT.md'),
+    project_exists: pathExistsInternal(cwd, `.planning/${FILES.PROJECT}`),
     has_codebase_map: pathExistsInternal(cwd, '.planning/codebase'),
     planning_exists: pathExistsInternal(cwd, '.planning'),
 
@@ -212,7 +212,7 @@ function cmdInitNewProject(cwd, raw) {
     brave_search_available: hasBraveSearch,
 
     // File paths
-    project_path: '.planning/PROJECT.md',
+    project_path: `.planning/${FILES.PROJECT}`,
   };
 
   output(result, raw);
@@ -237,14 +237,14 @@ function cmdInitNewMilestone(cwd, raw) {
     current_milestone_name: milestone.name,
 
     // File existence
-    project_exists: pathExistsInternal(cwd, '.planning/PROJECT.md'),
-    roadmap_exists: pathExistsInternal(cwd, '.planning/ROADMAP.md'),
-    state_exists: pathExistsInternal(cwd, '.planning/STATE.md'),
+    project_exists: pathExistsInternal(cwd, `.planning/${FILES.PROJECT}`),
+    roadmap_exists: pathExistsInternal(cwd, `.planning/${FILES.ROADMAP}`),
+    state_exists: pathExistsInternal(cwd, `.planning/${FILES.STATE}`),
 
     // File paths
-    project_path: '.planning/PROJECT.md',
-    roadmap_path: '.planning/ROADMAP.md',
-    state_path: '.planning/STATE.md',
+    project_path: `.planning/${FILES.PROJECT}`,
+    roadmap_path: `.planning/${FILES.ROADMAP}`,
+    state_path: `.planning/${FILES.STATE}`,
   };
 
   output(result, raw);
@@ -292,7 +292,7 @@ function cmdInitQuick(cwd, description, raw) {
     task_dir: slug ? `.planning/quick/${nextNum}-${slug}` : null,
 
     // File existence
-    roadmap_exists: pathExistsInternal(cwd, '.planning/ROADMAP.md'),
+    roadmap_exists: pathExistsInternal(cwd, `.planning/${FILES.ROADMAP}`),
     planning_exists: pathExistsInternal(cwd, '.planning'),
 
   };
@@ -311,15 +311,15 @@ function cmdInitResume(cwd, raw) {
 
   const result = {
     // File existence
-    state_exists: pathExistsInternal(cwd, '.planning/STATE.md'),
-    roadmap_exists: pathExistsInternal(cwd, '.planning/ROADMAP.md'),
-    project_exists: pathExistsInternal(cwd, '.planning/PROJECT.md'),
+    state_exists: pathExistsInternal(cwd, `.planning/${FILES.STATE}`),
+    roadmap_exists: pathExistsInternal(cwd, `.planning/${FILES.ROADMAP}`),
+    project_exists: pathExistsInternal(cwd, `.planning/${FILES.PROJECT}`),
     planning_exists: pathExistsInternal(cwd, '.planning'),
 
     // File paths
-    state_path: '.planning/STATE.md',
-    roadmap_path: '.planning/ROADMAP.md',
-    project_path: '.planning/PROJECT.md',
+    state_path: `.planning/${FILES.STATE}`,
+    roadmap_path: `.planning/${FILES.ROADMAP}`,
+    project_path: `.planning/${FILES.PROJECT}`,
 
     // Agent state
     has_interrupted_agent: !!interruptedAgentId,
@@ -407,32 +407,32 @@ function cmdInitPhaseOp(cwd, phase, raw) {
     plan_count: phaseInfo?.plans?.length || 0,
 
     // File existence
-    roadmap_exists: pathExistsInternal(cwd, '.planning/ROADMAP.md'),
+    roadmap_exists: pathExistsInternal(cwd, `.planning/${FILES.ROADMAP}`),
     planning_exists: pathExistsInternal(cwd, '.planning'),
 
     // File paths
-    state_path: '.planning/STATE.md',
-    roadmap_path: '.planning/ROADMAP.md',
-    requirements_path: '.planning/REQUIREMENTS.md',
+    state_path: `.planning/${FILES.STATE}`,
+    roadmap_path: `.planning/${FILES.ROADMAP}`,
+    requirements_path: `.planning/${FILES.REQUIREMENTS}`,
   };
 
   if (phaseInfo?.directory) {
     const phaseDirFull = path.join(cwd, phaseInfo.directory);
     try {
       const files = fs.readdirSync(phaseDirFull);
-      const contextFile = files.find(f => f.endsWith('-CONTEXT.md') || f === 'CONTEXT.md');
+      const contextFile = files.find(f => f.endsWith(FILES.CONTEXT_SUFFIX) || f === `CONTEXT${DOC_EXT}`);
       if (contextFile) {
         result.context_path = path.join(phaseInfo.directory, contextFile);
       }
-      const researchFile = files.find(f => f.endsWith('-RESEARCH.md') || f === 'RESEARCH.md');
+      const researchFile = files.find(f => f.endsWith(FILES.RESEARCH_SUFFIX) || f === `RESEARCH${DOC_EXT}`);
       if (researchFile) {
         result.research_path = path.join(phaseInfo.directory, researchFile);
       }
-      const verificationFile = files.find(f => f.endsWith('-VERIFICATION.md') || f === 'VERIFICATION.md');
+      const verificationFile = files.find(f => f.endsWith(FILES.VERIFICATION_SUFFIX) || f === `VERIFICATION${DOC_EXT}`);
       if (verificationFile) {
         result.verification_path = path.join(phaseInfo.directory, verificationFile);
       }
-      const uatFile = files.find(f => f.endsWith('-UAT.md') || f === 'UAT.md');
+      const uatFile = files.find(f => f.endsWith(FILES.UAT_SUFFIX) || f === `UAT${DOC_EXT}`);
       if (uatFile) {
         result.uat_path = path.join(phaseInfo.directory, uatFile);
       }
@@ -452,7 +452,7 @@ function cmdInitTodos(cwd, area, raw) {
   const todos = [];
 
   try {
-    const files = fs.readdirSync(pendingDir).filter(f => f.endsWith('.md'));
+    const files = fs.readdirSync(pendingDir).filter(f => f.endsWith(DOC_EXT));
     for (const file of files) {
       try {
         const content = fs.readFileSync(path.join(pendingDir, file), 'utf-8');
@@ -518,7 +518,7 @@ function cmdInitMilestoneOp(cwd, raw) {
     for (const dir of dirs) {
       try {
         const phaseFiles = fs.readdirSync(path.join(phasesDir, dir));
-        const hasSummary = phaseFiles.some(f => f.endsWith('-SUMMARY.md') || f === 'SUMMARY.md');
+        const hasSummary = phaseFiles.some(f => f.endsWith(FILES.SUMMARY_SUFFIX) || f === `SUMMARY${DOC_EXT}`);
         if (hasSummary) completedPhases++;
       } catch {}
     }
@@ -552,9 +552,9 @@ function cmdInitMilestoneOp(cwd, raw) {
     archive_count: archivedMilestones.length,
 
     // File existence
-    project_exists: pathExistsInternal(cwd, '.planning/PROJECT.md'),
-    roadmap_exists: pathExistsInternal(cwd, '.planning/ROADMAP.md'),
-    state_exists: pathExistsInternal(cwd, '.planning/STATE.md'),
+    project_exists: pathExistsInternal(cwd, `.planning/${FILES.PROJECT}`),
+    roadmap_exists: pathExistsInternal(cwd, `.planning/${FILES.ROADMAP}`),
+    state_exists: pathExistsInternal(cwd, `.planning/${FILES.STATE}`),
     archive_exists: pathExistsInternal(cwd, '.planning/archive'),
     phases_dir_exists: pathExistsInternal(cwd, '.planning/phases'),
   };
@@ -569,7 +569,7 @@ function cmdInitMapCodebase(cwd, raw) {
   const codebaseDir = path.join(cwd, '.planning', 'codebase');
   let existingMaps = [];
   try {
-    existingMaps = fs.readdirSync(codebaseDir).filter(f => f.endsWith('.md'));
+    existingMaps = fs.readdirSync(codebaseDir).filter(f => f.endsWith(DOC_EXT));
   } catch {}
 
   const result = {
@@ -618,9 +618,9 @@ function cmdInitProgress(cwd, raw) {
       const phasePath = path.join(phasesDir, dir);
       const phaseFiles = fs.readdirSync(phasePath);
 
-      const plans = phaseFiles.filter(f => f.endsWith('-PLAN.md') || f === 'PLAN.md');
-      const summaries = phaseFiles.filter(f => f.endsWith('-SUMMARY.md') || f === 'SUMMARY.md');
-      const hasResearch = phaseFiles.some(f => f.endsWith('-RESEARCH.md') || f === 'RESEARCH.md');
+      const plans = phaseFiles.filter(f => f.endsWith(FILES.PLAN_SUFFIX) || f === `PLAN${DOC_EXT}`);
+      const summaries = phaseFiles.filter(f => f.endsWith(FILES.SUMMARY_SUFFIX) || f === `SUMMARY${DOC_EXT}`);
+      const hasResearch = phaseFiles.some(f => f.endsWith(FILES.RESEARCH_SUFFIX) || f === `RESEARCH${DOC_EXT}`);
 
       const status = summaries.length >= plans.length && plans.length > 0 ? 'complete' :
                      plans.length > 0 ? 'in_progress' :
@@ -651,7 +651,7 @@ function cmdInitProgress(cwd, raw) {
   // Check for paused work
   let pausedAt = null;
   try {
-    const state = fs.readFileSync(path.join(cwd, '.planning', 'STATE.md'), 'utf-8');
+    const state = fs.readFileSync(path.join(cwd, '.planning', FILES.STATE), 'utf-8');
     const pauseMatch = state.match(/\*\*Paused At:\*\*\s*(.+)/);
     if (pauseMatch) pausedAt = pauseMatch[1].trim();
   } catch {}
@@ -681,13 +681,13 @@ function cmdInitProgress(cwd, raw) {
     has_work_in_progress: !!currentPhase,
 
     // File existence
-    project_exists: pathExistsInternal(cwd, '.planning/PROJECT.md'),
-    roadmap_exists: pathExistsInternal(cwd, '.planning/ROADMAP.md'),
-    state_exists: pathExistsInternal(cwd, '.planning/STATE.md'),
+    project_exists: pathExistsInternal(cwd, `.planning/${FILES.PROJECT}`),
+    roadmap_exists: pathExistsInternal(cwd, `.planning/${FILES.ROADMAP}`),
+    state_exists: pathExistsInternal(cwd, `.planning/${FILES.STATE}`),
     // File paths
-    state_path: '.planning/STATE.md',
-    roadmap_path: '.planning/ROADMAP.md',
-    project_path: '.planning/PROJECT.md',
+    state_path: `.planning/${FILES.STATE}`,
+    roadmap_path: `.planning/${FILES.ROADMAP}`,
+    project_path: `.planning/${FILES.PROJECT}`,
     config_path: '.planning/config.json',
   };
 

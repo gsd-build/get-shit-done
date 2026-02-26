@@ -4,7 +4,7 @@
 const fs = require('fs');
 const path = require('path');
 const { execSync } = require('child_process');
-const { safeReadFile, loadConfig, isGitIgnored, execGit, normalizePhaseName, comparePhaseNum, getArchivedPhaseDirs, generateSlugInternal, getMilestoneInfo, resolveModelInternal, MODEL_PROFILES, output, error, findPhaseInternal } = require('./core.cjs');
+const { safeReadFile, loadConfig, isGitIgnored, execGit, normalizePhaseName, comparePhaseNum, getArchivedPhaseDirs, generateSlugInternal, getMilestoneInfo, resolveModelInternal, MODEL_PROFILES, output, error, findPhaseInternal, FILES, DOC_EXT } = require('./core.cjs');
 const { extractFrontmatter } = require('./frontmatter.cjs');
 
 function cmdGenerateSlug(text, raw) {
@@ -48,7 +48,7 @@ function cmdListTodos(cwd, area, raw) {
   const todos = [];
 
   try {
-    const files = fs.readdirSync(pendingDir).filter(f => f.endsWith('.md'));
+    const files = fs.readdirSync(pendingDir).filter(f => f.endsWith(DOC_EXT));
 
     for (const file of files) {
       try {
@@ -130,7 +130,7 @@ function cmdHistoryDigest(cwd, raw) {
 
   try {
     for (const { name: dir, fullPath: dirPath } of allPhaseDirs) {
-      const summaries = fs.readdirSync(dirPath).filter(f => f.endsWith('-SUMMARY.md') || f === 'SUMMARY.md');
+      const summaries = fs.readdirSync(dirPath).filter(f => f.endsWith(FILES.SUMMARY_SUFFIX) || f === `SUMMARY${DOC_EXT}`);
 
       for (const summary of summaries) {
         try {
@@ -386,7 +386,7 @@ async function cmdWebsearch(query, options, raw) {
 
 function cmdProgressRender(cwd, format, raw) {
   const phasesDir = path.join(cwd, '.planning', 'phases');
-  const roadmapPath = path.join(cwd, '.planning', 'ROADMAP.md');
+  const roadmapPath = path.join(cwd, '.planning', FILES.ROADMAP);
   const milestone = getMilestoneInfo(cwd);
 
   const phases = [];
@@ -402,8 +402,8 @@ function cmdProgressRender(cwd, format, raw) {
       const phaseNum = dm ? dm[1] : dir;
       const phaseName = dm && dm[2] ? dm[2].replace(/-/g, ' ') : '';
       const phaseFiles = fs.readdirSync(path.join(phasesDir, dir));
-      const plans = phaseFiles.filter(f => f.endsWith('-PLAN.md') || f === 'PLAN.md').length;
-      const summaries = phaseFiles.filter(f => f.endsWith('-SUMMARY.md') || f === 'SUMMARY.md').length;
+      const plans = phaseFiles.filter(f => f.endsWith(FILES.PLAN_SUFFIX) || f === `PLAN${DOC_EXT}`).length;
+      const summaries = phaseFiles.filter(f => f.endsWith(FILES.SUMMARY_SUFFIX) || f === `SUMMARY${DOC_EXT}`).length;
 
       totalPlans += plans;
       totalSummaries += summaries;
@@ -496,18 +496,18 @@ function cmdScaffold(cwd, type, options, raw) {
 
   switch (type) {
     case 'context': {
-      filePath = path.join(phaseDir, `${padded}-CONTEXT.md`);
+      filePath = path.join(phaseDir, `${padded}${FILES.CONTEXT_SUFFIX}`);
       content = `---\nphase: "${padded}"\nname: "${name || phaseInfo?.phase_name || 'Unnamed'}"\ncreated: ${today}\n---\n\n# Phase ${phase}: ${name || phaseInfo?.phase_name || 'Unnamed'} — Context\n\n## Decisions\n\n_Decisions will be captured during /gsd:discuss-phase ${phase}_\n\n## Discretion Areas\n\n_Areas where the executor can use judgment_\n\n## Deferred Ideas\n\n_Ideas to consider later_\n`;
       break;
     }
     case 'uat': {
-      filePath = path.join(phaseDir, `${padded}-UAT.md`);
+      filePath = path.join(phaseDir, `${padded}${FILES.UAT_SUFFIX}`);
       content = `---\nphase: "${padded}"\nname: "${name || phaseInfo?.phase_name || 'Unnamed'}"\ncreated: ${today}\nstatus: pending\n---\n\n# Phase ${phase}: ${name || phaseInfo?.phase_name || 'Unnamed'} — User Acceptance Testing\n\n## Test Results\n\n| # | Test | Status | Notes |\n|---|------|--------|-------|\n\n## Summary\n\n_Pending UAT_\n`;
       break;
     }
     case 'verification': {
-      filePath = path.join(phaseDir, `${padded}-VERIFICATION.md`);
-      content = `---\nphase: "${padded}"\nname: "${name || phaseInfo?.phase_name || 'Unnamed'}"\ncreated: ${today}\nstatus: pending\n---\n\n# Phase ${phase}: ${name || phaseInfo?.phase_name || 'Unnamed'} — Verification\n\n## Goal-Backward Verification\n\n**Phase Goal:** [From ROADMAP.md]\n\n## Checks\n\n| # | Requirement | Status | Evidence |\n|---|------------|--------|----------|\n\n## Result\n\n_Pending verification_\n`;
+      filePath = path.join(phaseDir, `${padded}${FILES.VERIFICATION_SUFFIX}`);
+      content = `---\nphase: "${padded}"\nname: "${name || phaseInfo?.phase_name || 'Unnamed'}"\ncreated: ${today}\nstatus: pending\n---\n\n# Phase ${phase}: ${name || phaseInfo?.phase_name || 'Unnamed'} — Verification\n\n## Goal-Backward Verification\n\n**Phase Goal:** [From ${FILES.ROADMAP}]\n\n## Checks\n\n| # | Requirement | Status | Evidence |\n|---|------------|--------|----------|\n\n## Result\n\n_Pending verification_\n`;
       break;
     }
     case 'phase-dir': {

@@ -6,6 +6,25 @@ const fs = require('fs');
 const path = require('path');
 const { execSync } = require('child_process');
 
+// ─── Document Format Constants ───────────────────────────────────────────────
+
+const DOC_EXT = '.org';
+const FILES = {
+  PLAN_SUFFIX: `-PLAN${DOC_EXT}`,
+  SUMMARY_SUFFIX: `-SUMMARY${DOC_EXT}`,
+  RESEARCH_SUFFIX: `-RESEARCH${DOC_EXT}`,
+  CONTEXT_SUFFIX: `-CONTEXT${DOC_EXT}`,
+  VERIFICATION_SUFFIX: `-VERIFICATION${DOC_EXT}`,
+  UAT_SUFFIX: `-UAT${DOC_EXT}`,
+  STATE: `STATE${DOC_EXT}`,
+  ROADMAP: `ROADMAP${DOC_EXT}`,
+  PROJECT: `PROJECT${DOC_EXT}`,
+  REQUIREMENTS: `REQUIREMENTS${DOC_EXT}`,
+  MILESTONES: `MILESTONES${DOC_EXT}`,
+  DEBUG: `DEBUG${DOC_EXT}`,
+  MILESTONE_AUDIT_SUFFIX: `-MILESTONE-AUDIT${DOC_EXT}`,
+};
+
 // ─── Model Profile Table ─────────────────────────────────────────────────────
 
 const MODEL_PROFILES = {
@@ -201,17 +220,17 @@ function searchPhaseInDir(baseDir, relBase, normalized) {
     const phaseDir = path.join(baseDir, match);
     const phaseFiles = fs.readdirSync(phaseDir);
 
-    const plans = phaseFiles.filter(f => f.endsWith('-PLAN.md') || f === 'PLAN.md').sort();
-    const summaries = phaseFiles.filter(f => f.endsWith('-SUMMARY.md') || f === 'SUMMARY.md').sort();
-    const hasResearch = phaseFiles.some(f => f.endsWith('-RESEARCH.md') || f === 'RESEARCH.md');
-    const hasContext = phaseFiles.some(f => f.endsWith('-CONTEXT.md') || f === 'CONTEXT.md');
-    const hasVerification = phaseFiles.some(f => f.endsWith('-VERIFICATION.md') || f === 'VERIFICATION.md');
+    const plans = phaseFiles.filter(f => f.endsWith(FILES.PLAN_SUFFIX) || f === 'PLAN' + DOC_EXT).sort();
+    const summaries = phaseFiles.filter(f => f.endsWith(FILES.SUMMARY_SUFFIX) || f === 'SUMMARY' + DOC_EXT).sort();
+    const hasResearch = phaseFiles.some(f => f.endsWith(FILES.RESEARCH_SUFFIX) || f === 'RESEARCH' + DOC_EXT);
+    const hasContext = phaseFiles.some(f => f.endsWith(FILES.CONTEXT_SUFFIX) || f === 'CONTEXT' + DOC_EXT);
+    const hasVerification = phaseFiles.some(f => f.endsWith(FILES.VERIFICATION_SUFFIX) || f === 'VERIFICATION' + DOC_EXT);
 
     const completedPlanIds = new Set(
-      summaries.map(s => s.replace('-SUMMARY.md', '').replace('SUMMARY.md', ''))
+      summaries.map(s => s.replace(FILES.SUMMARY_SUFFIX, '').replace('SUMMARY' + DOC_EXT, ''))
     );
     const incompletePlans = plans.filter(p => {
-      const planId = p.replace('-PLAN.md', '').replace('PLAN.md', '');
+      const planId = p.replace(FILES.PLAN_SUFFIX, '').replace('PLAN' + DOC_EXT, '');
       return !completedPlanIds.has(planId);
     });
 
@@ -309,7 +328,7 @@ function getArchivedPhaseDirs(cwd) {
 
 function getRoadmapPhaseInternal(cwd, phaseNum) {
   if (!phaseNum) return null;
-  const roadmapPath = path.join(cwd, '.planning', 'ROADMAP.md');
+  const roadmapPath = path.join(cwd, '.planning', FILES.ROADMAP);
   if (!fs.existsSync(roadmapPath)) return null;
 
   try {
@@ -377,7 +396,7 @@ function generateSlugInternal(text) {
 
 function getMilestoneInfo(cwd) {
   try {
-    const roadmap = fs.readFileSync(path.join(cwd, '.planning', 'ROADMAP.md'), 'utf-8');
+    const roadmap = fs.readFileSync(path.join(cwd, '.planning', FILES.ROADMAP), 'utf-8');
     const versionMatch = roadmap.match(/v(\d+\.\d+)/);
     const nameMatch = roadmap.match(/## .*v\d+\.\d+[:\s]+([^\n(]+)/);
     return {
@@ -390,6 +409,8 @@ function getMilestoneInfo(cwd) {
 }
 
 module.exports = {
+  DOC_EXT,
+  FILES,
   MODEL_PROFILES,
   output,
   error,

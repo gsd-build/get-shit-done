@@ -4,7 +4,7 @@
 
 const fs = require('fs');
 const path = require('path');
-const { normalizePhaseName, findPhaseInternal, generateSlugInternal, output, error } = require('./core.cjs');
+const { normalizePhaseName, findPhaseInternal, generateSlugInternal, output, error, FILES, DOC_EXT } = require('./core.cjs');
 const { reconstructFrontmatter } = require('./frontmatter.cjs');
 
 function cmdTemplateSelect(cwd, planPath, raw) {
@@ -34,14 +34,14 @@ function cmdTemplateSelect(cwd, planPath, raw) {
     }
     const fileCount = fileMentions.size;
 
-    let template = 'templates/summary-standard.md';
+    let template = 'templates/summary-standard.org';
     let type = 'standard';
 
     if (taskCount <= 2 && fileCount <= 3 && !hasDecisions) {
-      template = 'templates/summary-minimal.md';
+      template = 'templates/summary-minimal.org';
       type = 'minimal';
     } else if (hasDecisions || fileCount > 6 || taskCount > 5) {
-      template = 'templates/summary-complex.md';
+      template = 'templates/summary-complex.org';
       type = 'complex';
     }
 
@@ -49,7 +49,7 @@ function cmdTemplateSelect(cwd, planPath, raw) {
     output(result, raw, template);
   } catch (e) {
     // Fallback to standard
-    output({ template: 'templates/summary-standard.md', type: 'standard', error: e.message }, raw, 'templates/summary-standard.md');
+    output({ template: 'templates/summary-standard.org', type: 'standard', error: e.message }, raw, 'templates/summary-standard.org');
   }
 }
 
@@ -113,7 +113,7 @@ function cmdTemplateFill(cwd, templateType, options, raw) {
         '## Next Phase Readiness',
         '[What\'s ready for next phase]',
       ].join('\n');
-      fileName = `${padded}-${planNum}-SUMMARY.md`;
+      fileName = `${padded}-${planNum}${FILES.SUMMARY_SUFFIX}`;
       break;
     }
     case 'plan': {
@@ -140,9 +140,9 @@ function cmdTemplateFill(cwd, templateType, options, raw) {
         '- **Output:** [Concrete deliverable]',
         '',
         '## Context',
-        '@.planning/PROJECT.md',
-        '@.planning/ROADMAP.md',
-        '@.planning/STATE.md',
+        `@.planning/${FILES.PROJECT}`,
+        `@.planning/${FILES.ROADMAP}`,
+        `@.planning/${FILES.STATE}`,
         '',
         '## Tasks',
         '',
@@ -161,7 +161,7 @@ function cmdTemplateFill(cwd, templateType, options, raw) {
         '- [ ] [Criterion 1]',
         '- [ ] [Criterion 2]',
       ].join('\n');
-      fileName = `${padded}-${planNum}-PLAN.md`;
+      fileName = `${padded}-${planNum}${FILES.PLAN_SUFFIX}`;
       break;
     }
     case 'verification': {
@@ -198,7 +198,7 @@ function cmdTemplateFill(cwd, templateType, options, raw) {
         '## Result',
         '[Pending verification]',
       ].join('\n');
-      fileName = `${padded}-VERIFICATION.md`;
+      fileName = `${padded}${FILES.VERIFICATION_SUFFIX}`;
       break;
     }
     default:
@@ -206,7 +206,7 @@ function cmdTemplateFill(cwd, templateType, options, raw) {
       return;
   }
 
-  const fullContent = `---\n${reconstructFrontmatter(frontmatter)}\n---\n\n${body}\n`;
+  const fullContent = `:PROPERTIES:\n${reconstructFrontmatter(frontmatter)}\n:END:\n\n${body}\n`;
   const outPath = path.join(cwd, phaseInfo.directory, fileName);
 
   if (fs.existsSync(outPath)) {

@@ -4,7 +4,7 @@
 
 const fs = require('fs');
 const path = require('path');
-const { escapeRegex, normalizePhaseName, comparePhaseNum, findPhaseInternal, getArchivedPhaseDirs, generateSlugInternal, output, error } = require('./core.cjs');
+const { escapeRegex, normalizePhaseName, comparePhaseNum, findPhaseInternal, getArchivedPhaseDirs, generateSlugInternal, output, error, FILES, DOC_EXT } = require('./core.cjs');
 const { extractFrontmatter } = require('./frontmatter.cjs');
 const { writeStateMd } = require('./state.cjs');
 
@@ -58,9 +58,9 @@ function cmdPhasesList(cwd, options, raw) {
 
         let filtered;
         if (type === 'plans') {
-          filtered = dirFiles.filter(f => f.endsWith('-PLAN.md') || f === 'PLAN.md');
+          filtered = dirFiles.filter(f => f.endsWith(FILES.PLAN_SUFFIX) || f === `PLAN${DOC_EXT}`);
         } else if (type === 'summaries') {
-          filtered = dirFiles.filter(f => f.endsWith('-SUMMARY.md') || f === 'SUMMARY.md');
+          filtered = dirFiles.filter(f => f.endsWith(FILES.SUMMARY_SUFFIX) || f === `SUMMARY${DOC_EXT}`);
         } else {
           filtered = dirFiles;
         }
@@ -175,8 +175,8 @@ function cmdFindPhase(cwd, phase, raw) {
 
     const phaseDir = path.join(phasesDir, match);
     const phaseFiles = fs.readdirSync(phaseDir);
-    const plans = phaseFiles.filter(f => f.endsWith('-PLAN.md') || f === 'PLAN.md').sort();
-    const summaries = phaseFiles.filter(f => f.endsWith('-SUMMARY.md') || f === 'SUMMARY.md').sort();
+    const plans = phaseFiles.filter(f => f.endsWith(FILES.PLAN_SUFFIX) || f === `PLAN${DOC_EXT}`).sort();
+    const summaries = phaseFiles.filter(f => f.endsWith(FILES.SUMMARY_SUFFIX) || f === `SUMMARY${DOC_EXT}`).sort();
 
     const result = {
       found: true,
@@ -223,12 +223,12 @@ function cmdPhasePlanIndex(cwd, phase, raw) {
 
   // Get all files in phase directory
   const phaseFiles = fs.readdirSync(phaseDir);
-  const planFiles = phaseFiles.filter(f => f.endsWith('-PLAN.md') || f === 'PLAN.md').sort();
-  const summaryFiles = phaseFiles.filter(f => f.endsWith('-SUMMARY.md') || f === 'SUMMARY.md');
+  const planFiles = phaseFiles.filter(f => f.endsWith(FILES.PLAN_SUFFIX) || f === `PLAN${DOC_EXT}`).sort();
+  const summaryFiles = phaseFiles.filter(f => f.endsWith(FILES.SUMMARY_SUFFIX) || f === `SUMMARY${DOC_EXT}`);
 
   // Build set of plan IDs with summaries
   const completedPlanIds = new Set(
-    summaryFiles.map(s => s.replace('-SUMMARY.md', '').replace('SUMMARY.md', ''))
+    summaryFiles.map(s => s.replace(FILES.SUMMARY_SUFFIX, '').replace(`SUMMARY${DOC_EXT}`, ''))
   );
 
   const plans = [];
@@ -237,7 +237,7 @@ function cmdPhasePlanIndex(cwd, phase, raw) {
   let hasCheckpoints = false;
 
   for (const planFile of planFiles) {
-    const planId = planFile.replace('-PLAN.md', '').replace('PLAN.md', '');
+    const planId = planFile.replace(FILES.PLAN_SUFFIX, '').replace(`PLAN${DOC_EXT}`, '');
     const planPath = path.join(phaseDir, planFile);
     const content = fs.readFileSync(planPath, 'utf-8');
     const fm = extractFrontmatter(content);
@@ -306,9 +306,9 @@ function cmdPhaseAdd(cwd, description, raw) {
     error('description required for phase add');
   }
 
-  const roadmapPath = path.join(cwd, '.planning', 'ROADMAP.md');
+  const roadmapPath = path.join(cwd, '.planning', FILES.ROADMAP);
   if (!fs.existsSync(roadmapPath)) {
-    error('ROADMAP.md not found');
+    error(`${FILES.ROADMAP} not found`);
   }
 
   const content = fs.readFileSync(roadmapPath, 'utf-8');
@@ -362,9 +362,9 @@ function cmdPhaseInsert(cwd, afterPhase, description, raw) {
     error('after-phase and description required for phase insert');
   }
 
-  const roadmapPath = path.join(cwd, '.planning', 'ROADMAP.md');
+  const roadmapPath = path.join(cwd, '.planning', FILES.ROADMAP);
   if (!fs.existsSync(roadmapPath)) {
-    error('ROADMAP.md not found');
+    error(`${FILES.ROADMAP} not found`);
   }
 
   const content = fs.readFileSync(roadmapPath, 'utf-8');
@@ -376,7 +376,7 @@ function cmdPhaseInsert(cwd, afterPhase, description, raw) {
   const afterPhaseEscaped = unpadded.replace(/\./g, '\\.');
   const targetPattern = new RegExp(`#{2,4}\\s*Phase\\s+0*${afterPhaseEscaped}:`, 'i');
   if (!targetPattern.test(content)) {
-    error(`Phase ${afterPhase} not found in ROADMAP.md`);
+    error(`Phase ${afterPhase} not found in ${FILES.ROADMAP}`);
   }
 
   // Calculate next decimal using existing logic
@@ -443,12 +443,12 @@ function cmdPhaseRemove(cwd, targetPhase, options, raw) {
     error('phase number required for phase remove');
   }
 
-  const roadmapPath = path.join(cwd, '.planning', 'ROADMAP.md');
+  const roadmapPath = path.join(cwd, '.planning', FILES.ROADMAP);
   const phasesDir = path.join(cwd, '.planning', 'phases');
   const force = options.force || false;
 
   if (!fs.existsSync(roadmapPath)) {
-    error('ROADMAP.md not found');
+    error(`${FILES.ROADMAP} not found`);
   }
 
   // Normalize the target
@@ -467,7 +467,7 @@ function cmdPhaseRemove(cwd, targetPhase, options, raw) {
   if (targetDir && !force) {
     const targetPath = path.join(phasesDir, targetDir);
     const files = fs.readdirSync(targetPath);
-    const summaries = files.filter(f => f.endsWith('-SUMMARY.md') || f === 'SUMMARY.md');
+    const summaries = files.filter(f => f.endsWith(FILES.SUMMARY_SUFFIX) || f === `SUMMARY${DOC_EXT}`);
     if (summaries.length > 0) {
       error(`Phase ${targetPhase} has ${summaries.length} executed plan(s). Use --force to remove anyway.`);
     }
@@ -659,7 +659,7 @@ function cmdPhaseRemove(cwd, targetPhase, options, raw) {
   fs.writeFileSync(roadmapPath, roadmapContent, 'utf-8');
 
   // Update STATE.md phase count
-  const statePath = path.join(cwd, '.planning', 'STATE.md');
+  const statePath = path.join(cwd, '.planning', FILES.STATE);
   if (fs.existsSync(statePath)) {
     let stateContent = fs.readFileSync(statePath, 'utf-8');
     // Update "Total Phases" field
@@ -696,8 +696,8 @@ function cmdPhaseComplete(cwd, phaseNum, raw) {
     error('phase number required for phase complete');
   }
 
-  const roadmapPath = path.join(cwd, '.planning', 'ROADMAP.md');
-  const statePath = path.join(cwd, '.planning', 'STATE.md');
+  const roadmapPath = path.join(cwd, '.planning', FILES.ROADMAP);
+  const statePath = path.join(cwd, '.planning', FILES.STATE);
   const phasesDir = path.join(cwd, '.planning', 'phases');
   const normalized = normalizePhaseName(phaseNum);
   const today = new Date().toISOString().split('T')[0];
@@ -746,7 +746,7 @@ function cmdPhaseComplete(cwd, phaseNum, raw) {
     fs.writeFileSync(roadmapPath, roadmapContent, 'utf-8');
 
     // Update REQUIREMENTS.md traceability for this phase's requirements
-    const reqPath = path.join(cwd, '.planning', 'REQUIREMENTS.md');
+    const reqPath = path.join(cwd, '.planning', FILES.REQUIREMENTS);
     if (fs.existsSync(reqPath)) {
       // Extract Requirements line from roadmap for this phase
       const reqMatch = roadmapContent.match(

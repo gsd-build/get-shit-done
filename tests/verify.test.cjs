@@ -21,7 +21,7 @@ describe('validate consistency command', () => {
 
   test('passes for consistent project', () => {
     fs.writeFileSync(
-      path.join(tmpDir, '.planning', 'ROADMAP.md'),
+      path.join(tmpDir, '.planning', 'ROADMAP.org'),
       `# Roadmap\n### Phase 1: A\n### Phase 2: B\n### Phase 3: C\n`
     );
     fs.mkdirSync(path.join(tmpDir, '.planning', 'phases', '01-a'), { recursive: true });
@@ -38,7 +38,7 @@ describe('validate consistency command', () => {
 
   test('warns about phase on disk but not in roadmap', () => {
     fs.writeFileSync(
-      path.join(tmpDir, '.planning', 'ROADMAP.md'),
+      path.join(tmpDir, '.planning', 'ROADMAP.org'),
       `# Roadmap\n### Phase 1: A\n`
     );
     fs.mkdirSync(path.join(tmpDir, '.planning', 'phases', '01-a'), { recursive: true });
@@ -57,7 +57,7 @@ describe('validate consistency command', () => {
 
   test('warns about gaps in phase numbering', () => {
     fs.writeFileSync(
-      path.join(tmpDir, '.planning', 'ROADMAP.md'),
+      path.join(tmpDir, '.planning', 'ROADMAP.org'),
       `# Roadmap\n### Phase 1: A\n### Phase 3: C\n`
     );
     fs.mkdirSync(path.join(tmpDir, '.planning', 'phases', '01-a'), { recursive: true });

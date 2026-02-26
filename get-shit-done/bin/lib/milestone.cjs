@@ -4,7 +4,7 @@
 
 const fs = require('fs');
 const path = require('path');
-const { output, error } = require('./core.cjs');
+const { output, error, FILES, DOC_EXT } = require('./core.cjs');
 const { extractFrontmatter } = require('./frontmatter.cjs');
 const { writeStateMd } = require('./state.cjs');
 
@@ -25,9 +25,9 @@ function cmdRequirementsMarkComplete(cwd, reqIdsRaw, raw) {
     error('no valid requirement IDs found');
   }
 
-  const reqPath = path.join(cwd, '.planning', 'REQUIREMENTS.md');
+  const reqPath = path.join(cwd, '.planning', FILES.REQUIREMENTS);
   if (!fs.existsSync(reqPath)) {
-    output({ updated: false, reason: 'REQUIREMENTS.md not found', ids: reqIds }, raw, 'no requirements file');
+    output({ updated: false, reason: `${FILES.REQUIREMENTS} not found`, ids: reqIds }, raw, 'no requirements file');
     return;
   }
 
@@ -80,10 +80,10 @@ function cmdMilestoneComplete(cwd, version, options, raw) {
     error('version required for milestone complete (e.g., v1.0)');
   }
 
-  const roadmapPath = path.join(cwd, '.planning', 'ROADMAP.md');
-  const reqPath = path.join(cwd, '.planning', 'REQUIREMENTS.md');
-  const statePath = path.join(cwd, '.planning', 'STATE.md');
-  const milestonesPath = path.join(cwd, '.planning', 'MILESTONES.md');
+  const roadmapPath = path.join(cwd, '.planning', FILES.ROADMAP);
+  const reqPath = path.join(cwd, '.planning', FILES.REQUIREMENTS);
+  const statePath = path.join(cwd, '.planning', FILES.STATE);
+  const milestonesPath = path.join(cwd, '.planning', FILES.MILESTONES);
   const archiveDir = path.join(cwd, '.planning', 'milestones');
   const phasesDir = path.join(cwd, '.planning', 'phases');
   const today = new Date().toISOString().split('T')[0];
@@ -105,8 +105,8 @@ function cmdMilestoneComplete(cwd, version, options, raw) {
     for (const dir of dirs) {
       phaseCount++;
       const phaseFiles = fs.readdirSync(path.join(phasesDir, dir));
-      const plans = phaseFiles.filter(f => f.endsWith('-PLAN.md') || f === 'PLAN.md');
-      const summaries = phaseFiles.filter(f => f.endsWith('-SUMMARY.md') || f === 'SUMMARY.md');
+      const plans = phaseFiles.filter(f => f.endsWith(FILES.PLAN_SUFFIX) || f === `PLAN${DOC_EXT}`);
+      const summaries = phaseFiles.filter(f => f.endsWith(FILES.SUMMARY_SUFFIX) || f === `SUMMARY${DOC_EXT}`);
       totalPlans += plans.length;
 
       // Extract one-liners from summaries
@@ -128,20 +128,20 @@ function cmdMilestoneComplete(cwd, version, options, raw) {
   // Archive ROADMAP.md
   if (fs.existsSync(roadmapPath)) {
     const roadmapContent = fs.readFileSync(roadmapPath, 'utf-8');
-    fs.writeFileSync(path.join(archiveDir, `${version}-ROADMAP.md`), roadmapContent, 'utf-8');
+    fs.writeFileSync(path.join(archiveDir, `${version}-${FILES.ROADMAP}`), roadmapContent, 'utf-8');
   }
 
   // Archive REQUIREMENTS.md
   if (fs.existsSync(reqPath)) {
     const reqContent = fs.readFileSync(reqPath, 'utf-8');
-    const archiveHeader = `# Requirements Archive: ${version} ${milestoneName}\n\n**Archived:** ${today}\n**Status:** SHIPPED\n\nFor current requirements, see \`.planning/REQUIREMENTS.md\`.\n\n---\n\n`;
-    fs.writeFileSync(path.join(archiveDir, `${version}-REQUIREMENTS.md`), archiveHeader + reqContent, 'utf-8');
+    const archiveHeader = `# Requirements Archive: ${version} ${milestoneName}\n\n**Archived:** ${today}\n**Status:** SHIPPED\n\nFor current requirements, see \`.planning/${FILES.REQUIREMENTS}\`.\n\n---\n\n`;
+    fs.writeFileSync(path.join(archiveDir, `${version}-${FILES.REQUIREMENTS}`), archiveHeader + reqContent, 'utf-8');
   }
 
   // Archive audit file if exists
-  const auditFile = path.join(cwd, '.planning', `${version}-MILESTONE-AUDIT.md`);
+  const auditFile = path.join(cwd, '.planning', `${version}${FILES.MILESTONE_AUDIT_SUFFIX}`);
   if (fs.existsSync(auditFile)) {
-    fs.renameSync(auditFile, path.join(archiveDir, `${version}-MILESTONE-AUDIT.md`));
+    fs.renameSync(auditFile, path.join(archiveDir, `${version}${FILES.MILESTONE_AUDIT_SUFFIX}`));
   }
 
   // Create/append MILESTONES.md entry
@@ -198,9 +198,9 @@ function cmdMilestoneComplete(cwd, version, options, raw) {
     tasks: totalTasks,
     accomplishments,
     archived: {
-      roadmap: fs.existsSync(path.join(archiveDir, `${version}-ROADMAP.md`)),
-      requirements: fs.existsSync(path.join(archiveDir, `${version}-REQUIREMENTS.md`)),
-      audit: fs.existsSync(path.join(archiveDir, `${version}-MILESTONE-AUDIT.md`)),
+      roadmap: fs.existsSync(path.join(archiveDir, `${version}-${FILES.ROADMAP}`)),
+      requirements: fs.existsSync(path.join(archiveDir, `${version}-${FILES.REQUIREMENTS}`)),
+      audit: fs.existsSync(path.join(archiveDir, `${version}${FILES.MILESTONE_AUDIT_SUFFIX}`)),
       phases: phasesArchived,
     },
     milestones_updated: true,
