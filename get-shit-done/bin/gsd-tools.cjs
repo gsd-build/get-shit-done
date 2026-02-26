@@ -10,6 +10,7 @@
  *
  * Atomic Commands:
  *   state load                         Load project config + state
+ *   state json                         Output STATE.md frontmatter as JSON
  *   state update <field> <value>       Update a STATE.md field
  *   state get [section]                Get STATE.md content or section
  *   state patch --field val ...        Batch update STATE.md fields
@@ -177,7 +178,9 @@ async function main() {
   switch (command) {
     case 'state': {
       const subcommand = args[1];
-      if (subcommand === 'update') {
+      if (subcommand === 'json') {
+        state.cmdStateJson(cwd, raw);
+      } else if (subcommand === 'update') {
         state.cmdStateUpdate(cwd, args[2], args[3]);
       } else if (subcommand === 'get') {
         state.cmdStateGet(cwd, args[2], raw);

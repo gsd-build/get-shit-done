@@ -6,22 +6,29 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ## [Unreleased]
 
+## [1.21.0] - 2026-02-25
+
 ### Added
-- Native Codex runtime support in installer via `--codex` and `--all` (Codex included), with config resolution precedence: `--config-dir` → `CODEX_HOME` → `~/.codex`
-- Skills-first Codex installation path that transpiles GSD commands to `skills/gsd-*/SKILL.md` (no custom-prompt dependency)
-- Codex-specific install/uninstall + manifest support for skill layout tracking and cleanup
+- YAML frontmatter sync to STATE.md for machine-readable status tracking
+- `/gsd:add-tests` command for post-phase test generation
+- Codex runtime support with skills-first installation
+- Standard `project_context` block in gsd-verifier output
+- Codex changelog and usage documentation
 
 ### Changed
-- Codex-installed content rewrites slash-command references to skill mentions (`/gsd:*` → `$gsd-*`) and normalizes command arguments (`$ARGUMENTS` → `{{GSD_ARGS}}`)
-- README/package metadata updated to document Codex install, invocation (`$gsd-help`), and uninstall flow
-- `/gsd:debug` flow now requires a `human-verify` checkpoint after self-verification before marking debug sessions `resolved` and moving files to `.planning/debug/resolved/`
+- Improved onboarding UX: installer now suggests `/gsd:new-project` instead of `/gsd:help`
+- Updated Discord invite to vanity URL (discord.gg/gsd)
+- Compressed Nyquist validation layer to align with GSD meta-prompt conventions
+- Requirements propagation now includes `phase_req_ids` from ROADMAP to workflow agents
+- Debug sessions require human verification before resolution
 
 ### Fixed
-- `gsd-tools phase complete` handles multi-level decimal phases (e.g. `03.2.1`) and safely escapes requirement IDs when building regex patterns, preventing `Invalid regular expression` crashes
-- `gsd-tools state-snapshot` supports `--cwd <path>` so tooling can target a project directory when invoked from outside the repo
-- `/gsd:update` now installs with `npx get-shit-done-cc@latest` (instead of unpinned `npx get-shit-done-cc`) to prevent stale project-local versions from shadowing updates
-- `/gsd:update` now uses strict package safety checks: only `get-shit-done-cc` is allowed, scoped/user-derived package names are rejected, and install command execution is allowlisted to trusted forms
-- `/gsd:update` install detection now validates local integrity and falls back to global install when local metadata is missing or invalid
+- Multi-level decimal phase handling (e.g., 72.1.1) with proper regex escaping
+- `/gsd:update` always installs latest package version
+- STATE.md decision corruption and dollar sign handling
+- STATE.md frontmatter mapping for requirements-completed status
+- Progress bar percent clamping to prevent RangeError crashes
+- `--cwd` override support in state-snapshot command
 
 ## [1.20.6] - 2025-02-23
 
@@ -1351,7 +1358,8 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 - YOLO mode for autonomous execution
 - Interactive mode with checkpoints
 
-[Unreleased]: https://github.com/glittercowboy/get-shit-done/compare/v1.20.6...HEAD
+[Unreleased]: https://github.com/glittercowboy/get-shit-done/compare/v1.21.0...HEAD
+[1.21.0]: https://github.com/glittercowboy/get-shit-done/releases/tag/v1.21.0
 [1.20.6]: https://github.com/glittercowboy/get-shit-done/releases/tag/v1.20.6
 [1.20.5]: https://github.com/glittercowboy/get-shit-done/releases/tag/v1.20.5
 [1.20.4]: https://github.com/glittercowboy/get-shit-done/releases/tag/v1.20.4

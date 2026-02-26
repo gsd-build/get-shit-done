@@ -6,6 +6,7 @@ const fs = require('fs');
 const path = require('path');
 const { escapeRegex, normalizePhaseName, comparePhaseNum, findPhaseInternal, getArchivedPhaseDirs, generateSlugInternal, output, error } = require('./core.cjs');
 const { extractFrontmatter } = require('./frontmatter.cjs');
+const { writeStateMd } = require('./state.cjs');
 
 function cmdPhasesList(cwd, options, raw) {
   const phasesDir = path.join(cwd, '.planning', 'phases');
@@ -675,7 +676,7 @@ function cmdPhaseRemove(cwd, targetPhase, options, raw) {
       const oldTotal = parseInt(ofMatch[2], 10);
       stateContent = stateContent.replace(ofPattern, `$1${oldTotal - 1}$3`);
     }
-    fs.writeFileSync(statePath, stateContent, 'utf-8');
+    writeStateMd(statePath, stateContent, cwd);
   }
 
   const result = {
@@ -840,7 +841,7 @@ function cmdPhaseComplete(cwd, phaseNum, raw) {
       `$1Phase ${phaseNum} complete${nextPhaseNum ? `, transitioned to Phase ${nextPhaseNum}` : ''}`
     );
 
-    fs.writeFileSync(statePath, stateContent, 'utf-8');
+    writeStateMd(statePath, stateContent, cwd);
   }
 
   const result = {

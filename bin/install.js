@@ -1867,13 +1867,13 @@ function finishInstall(settingsPath, settings, statuslineCommand, shouldInstallS
   if (runtime === 'gemini') program = 'Gemini';
   if (runtime === 'codex') program = 'Codex';
 
-  let command = '/gsd:help';
-  if (runtime === 'opencode') command = '/gsd-help';
-  if (runtime === 'codex') command = '$gsd-help';
+  let command = '/gsd:new-project';
+  if (runtime === 'opencode') command = '/gsd-new-project';
+  if (runtime === 'codex') command = '$gsd-new-project';
   console.log(`
-  ${green}Done!${reset} Launch ${program} and run ${cyan}${command}${reset}.
+  ${green}Done!${reset} Open a blank directory in ${program} and run ${cyan}${command}${reset}.
 
-  ${cyan}Join the community:${reset} https://discord.gg/5JJgD5svVS
+  ${cyan}Join the community:${reset} https://discord.gg/gsd
 `);
 }
 

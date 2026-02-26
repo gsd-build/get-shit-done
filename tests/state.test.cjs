@@ -298,5 +298,210 @@ None
 });
 
 // ─────────────────────────────────────────────────────────────────────────────
+// state json command (machine-readable STATE.md frontmatter)
+// ─────────────────────────────────────────────────────────────────────────────
+
+describe('state json command', () => {
+  let tmpDir;
+
+  beforeEach(() => {
+    tmpDir = createTempProject();
+  });
+
+  afterEach(() => {
+    cleanup(tmpDir);
+  });
+
+  test('missing STATE.md returns error', () => {
+    const result = runGsdTools('state json', tmpDir);
+    assert.ok(result.success, `Command should succeed: ${result.error}`);
+
+    const output = JSON.parse(result.output);
+    assert.strictEqual(output.error, 'STATE.md not found', 'should report missing file');
+  });
+
+  test('builds frontmatter on-the-fly from body when no frontmatter exists', () => {
+    fs.writeFileSync(
+      path.join(tmpDir, '.planning', 'STATE.md'),
+      `# Project State
+
+**Current Phase:** 05
+**Current Phase Name:** Deployment
+**Total Phases:** 8
+**Current Plan:** 05-03
+**Total Plans in Phase:** 4
+**Status:** In progress
+**Progress:** 60%
+**Last Activity:** 2026-01-20
+`
+    );
+
+    const result = runGsdTools('state json', tmpDir);
+    assert.ok(result.success, `Command failed: ${result.error}`);
+
+    const output = JSON.parse(result.output);
+    assert.strictEqual(output.gsd_state_version, '1.0', 'should have version 1.0');
+    assert.strictEqual(output.current_phase, '05', 'current phase extracted');
+    assert.strictEqual(output.current_phase_name, 'Deployment', 'phase name extracted');
+    assert.strictEqual(output.current_plan, '05-03', 'current plan extracted');
+    assert.strictEqual(output.status, 'executing', 'status normalized to executing');
+    assert.ok(output.last_updated, 'should have last_updated timestamp');
+    assert.strictEqual(output.last_activity, '2026-01-20', 'last activity extracted');
+    assert.ok(output.progress, 'should have progress object');
+    assert.strictEqual(output.progress.percent, 60, 'progress percent extracted');
+  });
+
+  test('reads existing frontmatter when present', () => {
+    fs.writeFileSync(
+      path.join(tmpDir, '.planning', 'STATE.md'),
+      `---
+gsd_state_version: 1.0
+current_phase: 03
+status: paused
+stopped_at: Plan 2 of Phase 3
+---
+
+# Project State
+
+**Current Phase:** 03
+**Status:** Paused
+`
+    );
+
+    const result = runGsdTools('state json', tmpDir);
+    assert.ok(result.success, `Command failed: ${result.error}`);
+
+    const output = JSON.parse(result.output);
+    assert.strictEqual(output.gsd_state_version, '1.0', 'version from frontmatter');
+    assert.strictEqual(output.current_phase, '03', 'phase from frontmatter');
+    assert.strictEqual(output.status, 'paused', 'status from frontmatter');
+    assert.strictEqual(output.stopped_at, 'Plan 2 of Phase 3', 'stopped_at from frontmatter');
+  });
+
+  test('normalizes various status values', () => {
+    const statusTests = [
+      { input: 'In progress', expected: 'executing' },
+      { input: 'Ready to execute', expected: 'executing' },
+      { input: 'Paused at Plan 3', expected: 'paused' },
+      { input: 'Ready to plan', expected: 'planning' },
+      { input: 'Phase complete — ready for verification', expected: 'verifying' },
+      { input: 'Milestone complete', expected: 'completed' },
+    ];
+
+    for (const { input, expected } of statusTests) {
+      fs.writeFileSync(
+        path.join(tmpDir, '.planning', 'STATE.md'),
+        `# State\n\n**Current Phase:** 01\n**Status:** ${input}\n`
+      );
+
+      const result = runGsdTools('state json', tmpDir);
+      assert.ok(result.success, `Command failed for status "${input}": ${result.error}`);
+      const output = JSON.parse(result.output);
+      assert.strictEqual(output.status, expected, `"${input}" should normalize to "${expected}"`);
+    }
+  });
+});
+
+// ─────────────────────────────────────────────────────────────────────────────
+// STATE.md frontmatter sync (write operations add frontmatter)
+// ─────────────────────────────────────────────────────────────────────────────
+
+describe('STATE.md frontmatter sync', () => {
+  let tmpDir;
+
+  beforeEach(() => {
+    tmpDir = createTempProject();
+  });
+
+  afterEach(() => {
+    cleanup(tmpDir);
+  });
+
+  test('state update adds frontmatter to STATE.md', () => {
+    fs.writeFileSync(
+      path.join(tmpDir, '.planning', 'STATE.md'),
+      `# Project State
+
+**Current Phase:** 02
+**Status:** Ready to execute
+`
+    );
+
+    const result = runGsdTools('state update Status "Executing Plan 1"', tmpDir);
+    assert.ok(result.success, `Command failed: ${result.error}`);
+
+    const content = fs.readFileSync(path.join(tmpDir, '.planning', 'STATE.md'), 'utf-8');
+    assert.ok(content.startsWith('---\n'), 'should start with frontmatter delimiter');
+    assert.ok(content.includes('gsd_state_version: 1.0'), 'should have version field');
+    assert.ok(content.includes('current_phase: 02'), 'frontmatter should have current phase');
+    assert.ok(content.includes('**Current Phase:** 02'), 'body field should be preserved');
+    assert.ok(content.includes('**Status:** Executing Plan 1'), 'updated field in body');
+  });
+
+  test('state patch adds frontmatter', () => {
+    fs.writeFileSync(
+      path.join(tmpDir, '.planning', 'STATE.md'),
+      `# Project State
+
+**Current Phase:** 04
+**Status:** Planning
+**Current Plan:** 04-01
+`
+    );
+
+    const result = runGsdTools('state patch --Status "In progress" --"Current Plan" 04-02', tmpDir);
+    assert.ok(result.success, `Command failed: ${result.error}`);
+
+    const content = fs.readFileSync(path.join(tmpDir, '.planning', 'STATE.md'), 'utf-8');
+    assert.ok(content.startsWith('---\n'), 'should have frontmatter after patch');
+  });
+
+  test('frontmatter is idempotent on multiple writes', () => {
+    fs.writeFileSync(
+      path.join(tmpDir, '.planning', 'STATE.md'),
+      `# Project State
+
+**Current Phase:** 01
+**Status:** Ready to execute
+`
+    );
+
+    runGsdTools('state update Status "In progress"', tmpDir);
+    runGsdTools('state update Status "Paused"', tmpDir);
+
+    const content = fs.readFileSync(path.join(tmpDir, '.planning', 'STATE.md'), 'utf-8');
+    const delimiterCount = (content.match(/^---$/gm) || []).length;
+    assert.strictEqual(delimiterCount, 2, 'should have exactly one frontmatter block (2 delimiters)');
+    assert.ok(content.includes('status: paused'), 'frontmatter should reflect latest status');
+  });
+
+  test('round-trip: write then read via state json', () => {
+    fs.writeFileSync(
+      path.join(tmpDir, '.planning', 'STATE.md'),
+      `# Project State
+
+**Current Phase:** 07
+**Current Phase Name:** Production
+**Total Phases:** 10
+**Status:** In progress
+**Current Plan:** 07-05
+**Progress:** 70%
+`
+    );
+
+    runGsdTools('state update Status "Executing Plan 5"', tmpDir);
+
+    const result = runGsdTools('state json', tmpDir);
+    assert.ok(result.success, `state json failed: ${result.error}`);
+
+    const output = JSON.parse(result.output);
+    assert.strictEqual(output.current_phase, '07', 'round-trip: phase preserved');
+    assert.strictEqual(output.current_phase_name, 'Production', 'round-trip: phase name preserved');
+    assert.strictEqual(output.status, 'executing', 'round-trip: status normalized');
+    assert.ok(output.last_updated, 'round-trip: timestamp present');
+  });
+});
+
+// ─────────────────────────────────────────────────────────────────────────────
 // summary-extract command
 // ─────────────────────────────────────────────────────────────────────────────
