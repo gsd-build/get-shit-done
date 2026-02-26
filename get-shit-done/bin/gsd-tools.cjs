@@ -10,6 +10,7 @@
  *
  * Atomic Commands:
  *   state load                         Load project config + state
+ *   state json                         Output STATE.md frontmatter as JSON
  *   state update <field> <value>       Update a STATE.md field
  *   state get [section]                Get STATE.md content or section
  *   state patch --field val ...        Batch update STATE.md fields
@@ -102,7 +103,9 @@
  *   state update-progress              Recalculate progress bar
  *   state add-decision --summary "..."  Add decision to STATE.md
  *     [--phase N] [--rationale "..."]
+ *     [--summary-file path] [--rationale-file path]
  *   state add-blocker --text "..."     Add blocker
+ *     [--text-file path]
  *   state resolve-blocker --text "..." Remove blocker
  *   state record-session               Update session continuity
  *     --stopped-at "..."
@@ -123,6 +126,8 @@
  *   init progress                      All context for progress workflow
  */
 
+const fs = require('fs');
+const path = require('path');
 const { error } = require('./lib/core.cjs');
 const state = require('./lib/state.cjs');
 const phase = require('./lib/phase.cjs');
@@ -139,21 +144,43 @@ const frontmatter = require('./lib/frontmatter.cjs');
 
 async function main() {
   const args = process.argv.slice(2);
+
+  // Optional cwd override for sandboxed subagents running outside project root.
+  let cwd = process.cwd();
+  const cwdEqArg = args.find(arg => arg.startsWith('--cwd='));
+  const cwdIdx = args.indexOf('--cwd');
+  if (cwdEqArg) {
+    const value = cwdEqArg.slice('--cwd='.length).trim();
+    if (!value) error('Missing value for --cwd');
+    args.splice(args.indexOf(cwdEqArg), 1);
+    cwd = path.resolve(value);
+  } else if (cwdIdx !== -1) {
+    const value = args[cwdIdx + 1];
+    if (!value || value.startsWith('--')) error('Missing value for --cwd');
+    args.splice(cwdIdx, 2);
+    cwd = path.resolve(value);
+  }
+
+  if (!fs.existsSync(cwd) || !fs.statSync(cwd).isDirectory()) {
+    error(`Invalid --cwd: ${cwd}`);
+  }
+
   const rawIndex = args.indexOf('--raw');
   const raw = rawIndex !== -1;
   if (rawIndex !== -1) args.splice(rawIndex, 1);
 
   const command = args[0];
-  const cwd = process.cwd();
 
   if (!command) {
-    error('Usage: gsd-tools <command> [args] [--raw]\nCommands: state, resolve-model, find-phase, commit, verify-summary, verify, frontmatter, template, generate-slug, current-timestamp, list-todos, verify-path-exists, config-ensure-section, init');
+    error('Usage: gsd-tools <command> [args] [--raw] [--cwd <path>]\nCommands: state, resolve-model, find-phase, commit, verify-summary, verify, frontmatter, template, generate-slug, current-timestamp, list-todos, verify-path-exists, config-ensure-section, init');
   }
 
   switch (command) {
     case 'state': {
       const subcommand = args[1];
-      if (subcommand === 'update') {
+      if (subcommand === 'json') {
+        state.cmdStateJson(cwd, raw);
+      } else if (subcommand === 'update') {
         state.cmdStateUpdate(cwd, args[2], args[3]);
       } else if (subcommand === 'get') {
         state.cmdStateGet(cwd, args[2], raw);
@@ -187,15 +214,23 @@ async function main() {
       } else if (subcommand === 'add-decision') {
         const phaseIdx = args.indexOf('--phase');
         const summaryIdx = args.indexOf('--summary');
+        const summaryFileIdx = args.indexOf('--summary-file');
         const rationaleIdx = args.indexOf('--rationale');
+        const rationaleFileIdx = args.indexOf('--rationale-file');
         state.cmdStateAddDecision(cwd, {
           phase: phaseIdx !== -1 ? args[phaseIdx + 1] : null,
           summary: summaryIdx !== -1 ? args[summaryIdx + 1] : null,
+          summary_file: summaryFileIdx !== -1 ? args[summaryFileIdx + 1] : null,
           rationale: rationaleIdx !== -1 ? args[rationaleIdx + 1] : '',
+          rationale_file: rationaleFileIdx !== -1 ? args[rationaleFileIdx + 1] : null,
         }, raw);
       } else if (subcommand === 'add-blocker') {
         const textIdx = args.indexOf('--text');
-        state.cmdStateAddBlocker(cwd, textIdx !== -1 ? args[textIdx + 1] : null, raw);
+        const textFileIdx = args.indexOf('--text-file');
+        state.cmdStateAddBlocker(cwd, {
+          text: textIdx !== -1 ? args[textIdx + 1] : null,
+          text_file: textFileIdx !== -1 ? args[textFileIdx + 1] : null,
+        }, raw);
       } else if (subcommand === 'resolve-blocker') {
         const textIdx = args.indexOf('--text');
         state.cmdStateResolveBlocker(cwd, textIdx !== -1 ? args[textIdx + 1] : null, raw);

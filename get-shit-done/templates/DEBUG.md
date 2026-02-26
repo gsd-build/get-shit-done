@@ -8,7 +8,7 @@ Template for `.planning/debug/[slug].md` — active debug session tracking.
 
 ```markdown
 ---
-status: gathering | investigating | fixing | verifying | resolved
+status: gathering | investigating | fixing | verifying | awaiting_human_verify | resolved
 trigger: "[verbatim user input]"
 created: [ISO timestamp]
 updated: [ISO timestamp]
@@ -127,9 +127,14 @@ files_changed: []
 - Update Resolution.verification with results
 - If verification fails: status → "investigating", try again
 
+**After self-verification passes:**
+- status -> "awaiting_human_verify"
+- Request explicit user confirmation in a checkpoint
+- Do NOT move file to resolved yet
+
 **On resolution:**
 - status → "resolved"
-- Move file to .planning/debug/resolved/
+- Move file to .planning/debug/resolved/ (only after user confirms fix)
 
 </lifecycle>
 

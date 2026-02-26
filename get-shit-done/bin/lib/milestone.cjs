@@ -6,6 +6,7 @@ const fs = require('fs');
 const path = require('path');
 const { output, error } = require('./core.cjs');
 const { extractFrontmatter } = require('./frontmatter.cjs');
+const { writeStateMd } = require('./state.cjs');
 
 function cmdRequirementsMarkComplete(cwd, reqIdsRaw, raw) {
   if (!reqIdsRaw || reqIdsRaw.length === 0) {
@@ -169,7 +170,7 @@ function cmdMilestoneComplete(cwd, version, options, raw) {
       /(\*\*Last Activity Description:\*\*\s*).*/,
       `$1${version} milestone completed and archived`
     );
-    fs.writeFileSync(statePath, stateContent, 'utf-8');
+    writeStateMd(statePath, stateContent, cwd);
   }
 
   // Archive phase directories if requested

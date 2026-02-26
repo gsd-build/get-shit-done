@@ -6,6 +6,30 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ## [Unreleased]
 
+## [1.21.0] - 2026-02-25
+
+### Added
+- YAML frontmatter sync to STATE.md for machine-readable status tracking
+- `/gsd:add-tests` command for post-phase test generation
+- Codex runtime support with skills-first installation
+- Standard `project_context` block in gsd-verifier output
+- Codex changelog and usage documentation
+
+### Changed
+- Improved onboarding UX: installer now suggests `/gsd:new-project` instead of `/gsd:help`
+- Updated Discord invite to vanity URL (discord.gg/gsd)
+- Compressed Nyquist validation layer to align with GSD meta-prompt conventions
+- Requirements propagation now includes `phase_req_ids` from ROADMAP to workflow agents
+- Debug sessions require human verification before resolution
+
+### Fixed
+- Multi-level decimal phase handling (e.g., 72.1.1) with proper regex escaping
+- `/gsd:update` always installs latest package version
+- STATE.md decision corruption and dollar sign handling
+- STATE.md frontmatter mapping for requirements-completed status
+- Progress bar percent clamping to prevent RangeError crashes
+- `--cwd` override support in state-snapshot command
+
 ## [1.20.6] - 2025-02-23
 
 ### Added
@@ -1334,7 +1358,8 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 - YOLO mode for autonomous execution
 - Interactive mode with checkpoints
 
-[Unreleased]: https://github.com/glittercowboy/get-shit-done/compare/v1.20.6...HEAD
+[Unreleased]: https://github.com/glittercowboy/get-shit-done/compare/v1.21.0...HEAD
+[1.21.0]: https://github.com/glittercowboy/get-shit-done/releases/tag/v1.21.0
 [1.20.6]: https://github.com/glittercowboy/get-shit-done/releases/tag/v1.20.6
 [1.20.5]: https://github.com/glittercowboy/get-shit-done/releases/tag/v1.20.5
 [1.20.4]: https://github.com/glittercowboy/get-shit-done/releases/tag/v1.20.4
