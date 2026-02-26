@@ -28,36 +28,47 @@ description = "General fallback role for GSD orchestration and ad-hoc subtasks."
 
 [agents."gsd-codebase-mapper"]
 description = "Map stack, architecture, conventions, testing, and concerns into .planning/codebase docs."
+developer_instructions = "Read and follow agents/gsd-codebase-mapper.md for your complete role definition."
 
 [agents."gsd-debugger"]
 description = "Investigate regressions with hypothesis testing, isolate root cause, and propose or apply fixes."
+developer_instructions = "Read and follow agents/gsd-debugger.md for your complete role definition."
 
 [agents."gsd-executor"]
 description = "Execute PLAN.md tasks with atomic commits, verification, and summary updates."
+developer_instructions = "Read and follow agents/gsd-executor.md for your complete role definition."
 
 [agents."gsd-integration-checker"]
 description = "Verify cross-phase wiring and end-to-end behavior across delivered milestones."
+developer_instructions = "Read and follow agents/gsd-integration-checker.md for your complete role definition."
 
 [agents."gsd-phase-researcher"]
 description = "Research phase implementation patterns and write RESEARCH.md artifacts for planners."
+developer_instructions = "Read and follow agents/gsd-phase-researcher.md for your complete role definition."
 
 [agents."gsd-plan-checker"]
 description = "Stress-test plan quality and requirement coverage before execution."
+developer_instructions = "Read and follow agents/gsd-plan-checker.md for your complete role definition."
 
 [agents."gsd-planner"]
 description = "Draft atomic PLAN.md files with objective, context, tasks, and success criteria."
+developer_instructions = "Read and follow agents/gsd-planner.md for your complete role definition."
 
 [agents."gsd-project-researcher"]
 description = "Research ecosystem and produce project-level research docs for roadmap creation."
+developer_instructions = "Read and follow agents/gsd-project-researcher.md for your complete role definition."
 
 [agents."gsd-research-synthesizer"]
 description = "Synthesize parallel research artifacts into actionable roadmap inputs."
+developer_instructions = "Read and follow agents/gsd-research-synthesizer.md for your complete role definition."
 
 [agents."gsd-roadmapper"]
 description = "Turn requirements into phased ROADMAP.md structure with clear success criteria."
+developer_instructions = "Read and follow agents/gsd-roadmapper.md for your complete role definition."
 
 [agents."gsd-verifier"]
 description = "Perform goal-backward verification that outcomes are actually delivered in code."
+developer_instructions = "Read and follow agents/gsd-verifier.md for your complete role definition."
 
 [mcp_servers.context7]
 url = "https://mcp.context7.com/mcp"
