@@ -371,6 +371,35 @@ Full summary content here.
     assert.strictEqual(output.decisions[1].summary, 'JWT tokens', 'second decision summary');
     assert.strictEqual(output.decisions[1].rationale, 'Stateless auth for scalability', 'second decision rationale');
   });
+
+  test('handles commas inside quoted array values', () => {
+    const phaseDir = path.join(tmpDir, '.planning', 'phases', '01-foundation');
+    fs.mkdirSync(phaseDir, { recursive: true });
+
+    fs.writeFileSync(
+      path.join(phaseDir, '01-01-SUMMARY.org'),
+      `:PROPERTIES:
+:key-decisions: ["Single database: Start simple, shard later", "Use Prisma over Drizzle: Better DX and ecosystem"]
+:patterns-established: ['Repository pattern, Unit of Work', 'CQRS']
+:END:
+`
+    );
+
+    const result = runGsdTools('summary-extract .planning/phases/01-foundation/01-01-SUMMARY.org', tmpDir);
+    assert.ok(result.success, `Command failed: ${result.error}`);
+
+    const output = JSON.parse(result.output);
+    assert.strictEqual(output.decisions.length, 2, 'should have exactly 2 decisions (comma inside quotes preserved)');
+    assert.ok(
+      output.decisions.some(d => d.rationale && d.rationale.includes('Start simple, shard later')),
+      'comma inside quoted value should be preserved'
+    );
+    assert.deepStrictEqual(
+      output.patterns.sort(),
+      ['CQRS', 'Repository pattern, Unit of Work'],
+      'single-quoted values with commas should be preserved'
+    );
+  });
 });
 
 // ─────────────────────────────────────────────────────────────────────────────

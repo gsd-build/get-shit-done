@@ -18,7 +18,36 @@ function parseInlineArray(value) {
     const parsed = JSON.parse(value);
     if (Array.isArray(parsed)) return parsed.map(s => String(s));
   } catch { /* fall through */ }
-  return value.slice(1, -1).split(',').map(s => s.trim().replace(/^["']|["']$/g, '')).filter(Boolean);
+
+  // Quote-aware comma splitter: respects single/double quotes so commas
+  // inside quoted values are not treated as delimiters.
+  const inner = value.slice(1, -1);
+  const items = [];
+  let current = '';
+  let quoteChar = null;
+
+  for (let i = 0; i < inner.length; i++) {
+    const ch = inner[i];
+    if (quoteChar) {
+      if (ch === quoteChar) {
+        quoteChar = null;
+      } else {
+        current += ch;
+      }
+    } else if (ch === '"' || ch === "'") {
+      quoteChar = ch;
+    } else if (ch === ',') {
+      const trimmed = current.trim();
+      if (trimmed) items.push(trimmed);
+      current = '';
+    } else {
+      current += ch;
+    }
+  }
+  const trimmed = current.trim();
+  if (trimmed) items.push(trimmed);
+
+  return items;
 }
 
 function extractFrontmatter(content) {

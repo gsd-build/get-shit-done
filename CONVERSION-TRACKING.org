@@ -81,4 +81,8 @@ This document tracks the conversion of [[https://github.com/glittercowboy/get-sh
 
 * Known Issues
 
-- Pre-existing comma-in-values bug in org property drawer array parser: ~[Start simple, shard later]~ splits into 2 items instead of 1 (would need delimiter escaping or quoting to fix)
+None. All previously tracked issues have been resolved.
+
+** Resolved
+
+- Comma-in-values bug in org property drawer array parser: ~parseInlineArray~ now uses a quote-aware tokenizer so ~["Start simple, shard later"]~ is correctly parsed as 1 item (128/128 tests passing)
