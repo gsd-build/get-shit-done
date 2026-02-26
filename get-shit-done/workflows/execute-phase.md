@@ -111,7 +111,7 @@ Execute each wave in sequence. Within a wave: parallel if `PARALLELIZATION=true`
 
        <execution_context>
        @~/.claude/get-shit-done/workflows/execute-plan.md
-       @~/.claude/get-shit-done/templates/summary.md
+       @~/.claude/get-shit-done/templates/summary.org
        @~/.claude/get-shit-done/references/checkpoints.md
        @~/.claude/get-shit-done/references/tdd.md
        </execution_context>

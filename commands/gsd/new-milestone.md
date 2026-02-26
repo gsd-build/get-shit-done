@@ -28,8 +28,8 @@ Brownfield equivalent of new-project. Project exists, PROJECT.md has history. Ga
 @~/.claude/get-shit-done/workflows/new-milestone.md
 @~/.claude/get-shit-done/references/questioning.md
 @~/.claude/get-shit-done/references/ui-brand.md
-@~/.claude/get-shit-done/templates/project.md
-@~/.claude/get-shit-done/templates/requirements.md
+@~/.claude/get-shit-done/templates/project.org
+@~/.claude/get-shit-done/templates/requirements.org
 </execution_context>
 
 <context>

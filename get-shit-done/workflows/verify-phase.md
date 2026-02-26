@@ -19,7 +19,7 @@ Then verify each level against the actual codebase.
 
 <required_reading>
 @~/.claude/get-shit-done/references/verification-patterns.md
-@~/.claude/get-shit-done/templates/verification-report.md
+@~/.claude/get-shit-done/templates/verification-report.org
 </required_reading>
 
 <process>
@@ -213,7 +213,7 @@ REPORT_PATH="$PHASE_DIR/${PHASE_NUM}-VERIFICATION.md"
 
 Fill template sections: frontmatter (phase/timestamp/status/score), goal achievement, artifact table, wiring table, requirements coverage, anti-patterns, human verification, gaps summary, fix plans (if gaps_found), metadata.
 
-See ~/.claude/get-shit-done/templates/verification-report.md for complete template.
+See ~/.claude/get-shit-done/templates/verification-report.org for complete template.
 </step>
 
 <step name="return_to_orchestrator">

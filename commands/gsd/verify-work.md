@@ -21,7 +21,7 @@ Output: {phase_num}-UAT.md tracking all test results. If issues found: diagnosed
 
 <execution_context>
 @~/.claude/get-shit-done/workflows/verify-work.md
-@~/.claude/get-shit-done/templates/UAT.md
+@~/.claude/get-shit-done/templates/UAT.org
 </execution_context>
 
 <context>
