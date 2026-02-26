@@ -5,7 +5,7 @@ Display the complete GMSD command reference. Output ONLY the reference content. 
 <reference>
 # GMSD Command Reference
 
-**GMSD** (Get Shit Done) creates hierarchical project plans optimized for solo agentic development with Claude Code.
+**GMSD** (Get My Shit Done) creates hierarchical project plans optimized for solo agentic development with Claude Code.
 
 ## Quick Start
 
@@ -100,6 +100,19 @@ Usage: `/gmsd:plan-phase 1`
 Result: Creates `.planning/phases/01-foundation/01-01-PLAN.md`
 
 **PRD Express Path:** Pass `--prd path/to/requirements.md` to skip discuss-phase entirely. Your PRD becomes locked decisions in CONTEXT.md. Useful when you already have clear acceptance criteria.
+
+### Architecture Decisions
+
+**`/gmsd:create-adr "<title>" [--phase <N>]`**
+Document an architectural decision using MADR 4.0 format.
+
+- Creates `.planning/decisions/NNN-title.org` (auto-numbered)
+- Walks through: context, drivers, options with pros/cons, outcome
+- Links to phase if `--phase` is specified
+- Records WHY you chose an approach for future reference
+
+Usage: `/gmsd:create-adr "Use PostgreSQL for primary storage" --phase 2`
+Result: Creates `.planning/decisions/001-use-postgresql-for-primary-storage.org`
 
 ### Execution
 

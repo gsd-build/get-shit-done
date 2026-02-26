@@ -405,10 +405,20 @@ Created: .planning/phases/${PADDED_PHASE}-${SLUG}/${PADDED_PHASE}-CONTEXT.md
 
 **Also available:**
 - `/gmsd:plan-phase ${PHASE} --skip-research` — plan without research
+- `/gmsd:create-adr "<decision title>" --phase ${PHASE}` — document a key architectural decision as an ADR
 - Review/edit CONTEXT.md before continuing
 
 ---
 ```
+
+**ADR prompt:** If any decisions captured above involve choosing between technologies, data models, API patterns, or system architecture, suggest:
+```
+💡 Some decisions above look architectural. Want to document them as ADRs?
+   ADRs record WHY you chose an approach — useful when revisiting later.
+
+   /gmsd:create-adr "<title>" --phase ${PHASE}
+```
+Only suggest if there are genuine architectural choices (not implementation details).
 </step>
 
 <step name="git_commit">

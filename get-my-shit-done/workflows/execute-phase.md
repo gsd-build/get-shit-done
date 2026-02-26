@@ -302,6 +302,7 @@ Phase goal: {goal from ROADMAP.md}
 Phase requirement IDs: {phase_req_ids}
 Check must_haves against actual codebase.
 Cross-reference requirement IDs from PLAN frontmatter against REQUIREMENTS.md — every ID MUST be accounted for.
+If .planning/decisions/ exists, check that any ADRs linked to this phase (`:phase: {phase_number}`) are consistent with the implementation.
 Create VERIFICATION.md.",
   subagent_type="gmsd-verifier",
   model="{verifier_model}"

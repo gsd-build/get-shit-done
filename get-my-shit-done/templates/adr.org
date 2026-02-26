@@ -1,0 +1,324 @@
+#+title: Architecture Decision Record
+#+startup: indent
+#+options: toc:2 num:nil ^:{}
+
+* Architecture Decision Record Template
+
+Template for ~.planning/decisions/NNN-decision-title.org~ — documents significant architectural decisions using MADR 4.0 format.
+
+*Purpose:* Capture the WHY behind architectural choices. Complements CONTEXT.org (which captures WHAT was decided during discussion) by recording the full decision process: drivers, alternatives considered, trade-offs evaluated, and consequences accepted.
+
+*MADR 4.0:* Based on [[https://adr.github.io/madr/][Markdown Any Decision Records]] v4.0.0, adapted to Org-mode.
+
+*Downstream consumers:*
+- ~gmsd-planner~ — Reads ADRs to understand constraints and rationale when creating tasks
+- ~gmsd-executor~ — References ADRs to ensure implementation aligns with decided architecture
+- ~gmsd-verifier~ — Checks implementation against ADR commitments
+- Future maintainers — Understands WHY the code is structured this way
+
+-----
+
+** File Template
+
+#+begin_src org
+:PROPERTIES:
+:adr-id: NNN
+:title: [Short title of solved problem and solution]
+:status: proposed
+:decision-makers: [list everyone involved in the decision]
+:date: [YYYY-MM-DD when the decision was last updated]
+:phase: [XX — phase number where this decision was made, if applicable]
+:supersedes: [ADR-NNN — if this replaces a previous decision]
+:superseded-by: [ADR-NNN — if this was replaced by a later decision]
+:END:
+
+* [Short title of solved problem and solution]
+
+** Context and Problem Statement
+
+[Describe the context and problem statement, e.g., in free form using two to three sentences or in the form of an illustrative story. You may want to articulate the problem in form of a question and add links to collaboration boards or issue management systems.]
+
+** Decision Drivers
+
+- [driver 1, e.g., a force, facing concern, ...]
+- [driver 2, e.g., a force, facing concern, ...]
+- ...
+
+** Considered Options
+
+- [title of option 1]
+- [title of option 2]
+- [title of option 3]
+- ...
+
+** Decision Outcome
+
+Chosen option: "[title of option N]", because [justification. e.g., only option which meets k.o. criterion decision driver | which resolves force {force} | ... | comes out best (see below)].
+
+*** Confirmation
+
+[Describe how the implementation of/compliance with the ADR can be confirmed. Are the design and implementation of the architecture consistent with the decision made? E.g., by a review, an ## architecture fitness function, a ## test, ...]
+
+*** Positive Consequences
+
+- [e.g., improvement of one or more desired qualities, ...]
+- ...
+
+*** Negative Consequences
+
+- [e.g., compromising one or more desired qualities, ...]
+- ...
+
+** Pros and Cons of the Options
+
+*** [title of option 1]
+
+[example | description | pointer to more information | ...]
+
+- Good, because [argument a]
+- Good, because [argument b]
+- Neutral, because [argument c]
+- Bad, because [argument d]
+- ...
+
+*** [title of option 2]
+
+[example | description | pointer to more information | ...]
+
+- Good, because [argument a]
+- Good, because [argument b]
+- Neutral, because [argument c]
+- Bad, because [argument d]
+- ...
+
+*** [title of option 3]
+
+[example | description | pointer to more information | ...]
+
+- Good, because [argument a]
+- Good, because [argument b]
+- Neutral, because [argument c]
+- Bad, because [argument d]
+- ...
+
+** More Information
+
+[You might want to provide additional evidence/confidence for the decision outcome here and/or document the team agreement on the decision and/or define when/how this decision should be realized and if/when it should be re-visited. Links to other decisions and resources might appear here as well.]
+#+end_src
+
+<good_examples>
+
+*Example 1: Data storage choice*
+
+#+begin_src org
+:PROPERTIES:
+:adr-id: 001
+:title: Use PostgreSQL for primary data storage
+:status: accepted
+:decision-makers: [team]
+:date: 2025-06-15
+:phase: 02
+:END:
+
+* Use PostgreSQL for primary data storage
+
+** Context and Problem Statement
+
+We need a primary database for the application. The data model includes users, posts, and relationships between them. We expect moderate write volume but heavy read patterns, especially for feed generation. We need ACID guarantees for financial transactions in the premium tier.
+
+** Decision Drivers
+
+- Must support complex relational queries (joins across 3+ tables)
+- Team has strong PostgreSQL experience
+- Need ACID transactions for payment processing
+- Should support full-text search without a separate service
+- Cost-effective at our expected scale (10K-100K users)
+
+** Considered Options
+
+- PostgreSQL
+- MongoDB
+- SQLite + separate search service
+
+** Decision Outcome
+
+Chosen option: "PostgreSQL", because it handles all our requirements (relational queries, ACID, full-text search) in a single service, the team has deep expertise, and it scales well within our expected range.
+
+*** Confirmation
+
+- Database schema review during Phase 2 planning
+- Load test with expected query patterns during Phase 4
+
+*** Positive Consequences
+
+- Single database service simplifies operations
+- Built-in full-text search via tsvector avoids Elasticsearch dependency
+- Strong ecosystem of tools (pgAdmin, pg_dump, logical replication)
+- Team can move fast — no learning curve
+
+*** Negative Consequences
+
+- Horizontal scaling is harder than MongoDB if we exceed expected growth
+- Schema migrations require more planning than schemaless options
+
+** Pros and Cons of the Options
+
+*** PostgreSQL
+
+Mature relational database with extensive feature set.
+
+- Good, because strong ACID compliance for payment transactions
+- Good, because built-in full-text search via ~tsvector~
+- Good, because team has 5+ years experience
+- Good, because excellent tooling ecosystem
+- Neutral, because requires schema migrations
+- Bad, because horizontal sharding is complex if needed later
+
+*** MongoDB
+
+Document-oriented NoSQL database.
+
+- Good, because flexible schema — no migrations
+- Good, because native horizontal scaling via sharding
+- Neutral, because eventual consistency model requires careful design
+- Bad, because no native ACID transactions across collections (pre-5.0)
+- Bad, because team has limited experience
+- Bad, because would need separate service for complex relational queries
+
+*** SQLite + separate search service
+
+Embedded database with external search.
+
+- Good, because zero-config deployment
+- Good, because excellent read performance for single-server setup
+- Bad, because single-writer limitation blocks concurrent writes
+- Bad, because requires separate Elasticsearch/Meilisearch for full-text search
+- Bad, because not suitable for multi-server deployment
+
+** More Information
+
+Start simple with single PostgreSQL instance. Revisit if we exceed 100K users — at that point, consider read replicas or Citus for horizontal scaling. See Phase 2 CONTEXT.org for related data modeling decisions.
+#+end_src
+
+*Example 2: Frontend framework choice*
+
+#+begin_src org
+:PROPERTIES:
+:adr-id: 002
+:title: Use SvelteKit for the web frontend
+:status: proposed
+:decision-makers: [team]
+:date: 2025-06-18
+:phase: 03
+:END:
+
+* Use SvelteKit for the web frontend
+
+** Context and Problem Statement
+
+We need a frontend framework for the web application. The app is primarily interactive (real-time feed, drag-and-drop organization) but also needs good SEO for public profiles. The team is small (2 developers) so developer experience and bundle size matter.
+
+** Decision Drivers
+
+- Small team — need high productivity per developer
+- Mix of SSR (public pages) and SPA (interactive features)
+- Bundle size matters — targeting mobile-first audience
+- Must integrate with our PostgreSQL API
+
+** Considered Options
+
+- SvelteKit
+- Next.js (React)
+- Nuxt (Vue)
+
+** Decision Outcome
+
+Chosen option: "SvelteKit", because it offers the best developer experience for a small team, produces the smallest bundles for mobile users, and handles SSR/SPA hybrid requirements natively.
+
+*** Confirmation
+
+- Prototype the feed component in Phase 3 to validate real-time performance
+- Measure Lighthouse scores against targets (>90 performance)
+
+*** Positive Consequences
+
+- Smaller bundle sizes — better mobile experience
+- Less boilerplate than React — faster development
+- Built-in SSR/SSG without configuration
+
+*** Negative Consequences
+
+- Smaller ecosystem than React — fewer third-party components
+- Harder to hire developers with Svelte experience
+- Less community support for edge cases
+
+** Pros and Cons of the Options
+
+*** SvelteKit
+
+Compiled framework with built-in SSR.
+
+- Good, because smallest bundle size (compiler-based, no runtime)
+- Good, because intuitive reactivity model — less boilerplate
+- Good, because built-in SSR, SSG, and SPA modes
+- Neutral, because newer ecosystem — growing but smaller
+- Bad, because smaller hiring pool for Svelte developers
+
+*** Next.js (React)
+
+React meta-framework with SSR/SSG.
+
+- Good, because largest ecosystem and community
+- Good, because easiest to hire React developers
+- Good, because mature SSR/ISR capabilities
+- Neutral, because React Server Components add complexity
+- Bad, because larger bundle sizes than compiled frameworks
+- Bad, because more boilerplate for state management
+
+*** Nuxt (Vue)
+
+Vue meta-framework with SSR/SSG.
+
+- Good, because good middle ground on bundle size
+- Good, because Vue's composition API is clean
+- Neutral, because moderate ecosystem size
+- Bad, because team has no Vue experience
+- Bad, because Vue 3 ecosystem still maturing
+
+** More Information
+
+This decision can be revisited after Phase 3 prototype. If SvelteKit proves limiting for our real-time requirements, Next.js is the fallback. The API is framework-agnostic so switching frontend frameworks doesn't affect backend.
+#+end_src
+
+</good_examples>
+
+<guidelines>
+*This template documents the REASONING behind architectural choices.*
+
+The output should answer: "Why did we choose this approach over the alternatives? What trade-offs did we accept?"
+
+*Good ADR content:*
+- Concrete problem statement tied to project requirements
+- 2-4 realistic options (not strawmen)
+- Specific pros/cons with project-relevant reasoning
+- Clear decision with justification tied back to drivers
+- Honest negative consequences acknowledged
+
+*Bad ADR content:*
+- Vague problem statements ("we need a database")
+- Only one option considered (decision already made, ADR is theater)
+- Generic pros/cons not tied to this project's context
+- Missing negative consequences (every decision has trade-offs)
+
+*Status values:*
+- ~proposed~ — Under discussion, not yet committed
+- ~accepted~ — Decision is in effect
+- ~deprecated~ — No longer relevant (project evolved)
+- ~superseded~ — Replaced by a newer ADR (set ~superseded-by~ property)
+
+*After creation:*
+- File lives in ~.planning/decisions/NNN-decision-title.org~
+- Numbering is sequential across the project (not per-phase)
+- Reference ADRs from PLAN.org and CONTEXT.org when relevant
+- Update status as decisions are confirmed or superseded
+</guidelines>

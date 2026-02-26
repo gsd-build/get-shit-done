@@ -488,7 +488,7 @@ function cmdScaffold(cwd, type, options, raw) {
   const phaseInfo = phase ? findPhaseInternal(cwd, phase) : null;
   const phaseDir = phaseInfo ? path.join(cwd, phaseInfo.directory) : null;
 
-  if (phase && !phaseDir && type !== 'phase-dir') {
+  if (phase && !phaseDir && type !== 'phase-dir' && type !== 'adr') {
     error(`Phase ${phase} directory not found`);
   }
 
@@ -523,8 +523,25 @@ function cmdScaffold(cwd, type, options, raw) {
       output({ created: true, directory: `.planning/phases/${dirName}`, path: dirPath }, raw, dirPath);
       return;
     }
+    case 'adr': {
+      const decisionsDir = path.join(cwd, '.planning', FILES.DECISIONS_DIR);
+      fs.mkdirSync(decisionsDir, { recursive: true });
+      // Auto-detect next ADR number from existing files
+      const existing = fs.readdirSync(decisionsDir)
+        .filter(f => /^\d{3}-/.test(f))
+        .map(f => parseInt(f.slice(0, 3), 10))
+        .filter(n => !isNaN(n));
+      const nextNum = existing.length > 0 ? Math.max(...existing) + 1 : 1;
+      const adrNum = String(nextNum).padStart(3, '0');
+      const slug = name ? generateSlugInternal(name) : 'untitled';
+      const adrFile = `${adrNum}-${slug}${DOC_EXT}`;
+      filePath = path.join(decisionsDir, adrFile);
+      const phaseRef = phase ? padded : '';
+      content = `:PROPERTIES:\n:adr-id: ${adrNum}\n:title: ${name || 'Untitled Decision'}\n:status: proposed\n:decision-makers: [team]\n:date: ${today}\n${phaseRef ? `:phase: ${phaseRef}\n` : ''}:END:\n\n* ${name || 'Untitled Decision'}\n\n** Context and Problem Statement\n\n[Describe the context and problem requiring a decision.]\n\n** Decision Drivers\n\n- [driver 1]\n- [driver 2]\n\n** Considered Options\n\n- [option 1]\n- [option 2]\n- [option 3]\n\n** Decision Outcome\n\nChosen option: "[option]", because [justification].\n\n*** Confirmation\n\n[How to verify the decision was implemented correctly.]\n\n*** Positive Consequences\n\n- [consequence 1]\n\n*** Negative Consequences\n\n- [consequence 1]\n\n** Pros and Cons of the Options\n\n*** [option 1]\n\n- Good, because [argument]\n- Bad, because [argument]\n\n*** [option 2]\n\n- Good, because [argument]\n- Bad, because [argument]\n\n** More Information\n\n[Links to related decisions, context files, or external resources.]\n`;
+      break;
+    }
     default:
-      error(`Unknown scaffold type: ${type}. Available: context, uat, verification, phase-dir`);
+      error(`Unknown scaffold type: ${type}. Available: context, uat, verification, phase-dir, adr`);
   }
 
   if (fs.existsSync(filePath)) {

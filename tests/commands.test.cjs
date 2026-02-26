@@ -618,4 +618,62 @@ describe('scaffold command', () => {
     assert.strictEqual(output.created, false, 'should not overwrite');
     assert.strictEqual(output.reason, 'already_exists');
   });
+
+  test('scaffolds ADR file in decisions directory', () => {
+    const result = runGsdTools('scaffold adr --name "Use PostgreSQL"', tmpDir);
+    assert.ok(result.success, `Command failed: ${result.error}`);
+
+    const output = JSON.parse(result.output);
+    assert.strictEqual(output.created, true);
+
+    const content = fs.readFileSync(
+      path.join(tmpDir, '.planning', 'decisions', '001-use-postgresql.org'),
+      'utf-8'
+    );
+    assert.ok(content.includes(':adr-id: 001'), 'should have ADR ID');
+    assert.ok(content.includes(':status: proposed'), 'should have proposed status');
+    assert.ok(content.includes('Use PostgreSQL'), 'should have title');
+    assert.ok(content.includes('Context and Problem Statement'), 'should have MADR sections');
+    assert.ok(content.includes('Considered Options'), 'should have options section');
+    assert.ok(content.includes('Decision Outcome'), 'should have outcome section');
+  });
+
+  test('ADR auto-increments number from existing files', () => {
+    const decisionsDir = path.join(tmpDir, '.planning', 'decisions');
+    fs.mkdirSync(decisionsDir, { recursive: true });
+    fs.writeFileSync(path.join(decisionsDir, '001-first-decision.org'), 'existing');
+    fs.writeFileSync(path.join(decisionsDir, '002-second-decision.org'), 'existing');
+
+    const result = runGsdTools('scaffold adr --name "Third Decision"', tmpDir);
+    assert.ok(result.success, `Command failed: ${result.error}`);
+
+    const output = JSON.parse(result.output);
+    assert.strictEqual(output.created, true);
+    assert.ok(output.path.includes('003-third-decision.org'), 'should be numbered 003');
+  });
+
+  test('ADR includes phase reference when --phase provided', () => {
+    const result = runGsdTools('scaffold adr --name "Auth Strategy" --phase 2', tmpDir);
+    assert.ok(result.success, `Command failed: ${result.output} ${result.error}`);
+
+    const output = JSON.parse(result.output);
+    assert.strictEqual(output.created, true);
+
+    const content = fs.readFileSync(
+      path.join(tmpDir, output.path),
+      'utf-8'
+    );
+    assert.ok(content.includes(':phase: 02'), 'should reference phase number');
+  });
+
+  test('ADR omits phase property when no --phase', () => {
+    const result = runGsdTools('scaffold adr --name "Global Decision"', tmpDir);
+    assert.ok(result.success, `Command failed: ${result.error}`);
+
+    const content = fs.readFileSync(
+      path.join(tmpDir, '.planning', 'decisions', '001-global-decision.org'),
+      'utf-8'
+    );
+    assert.ok(!content.includes(':phase:'), 'should not have phase property');
+  });
 });

@@ -23,6 +23,7 @@ const FILES = {
   MILESTONES: `MILESTONES${DOC_EXT}`,
   DEBUG: `DEBUG${DOC_EXT}`,
   MILESTONE_AUDIT_SUFFIX: `-MILESTONE-AUDIT${DOC_EXT}`,
+  DECISIONS_DIR: 'decisions',
 };
 
 // ─── Model Profile Table ─────────────────────────────────────────────────────

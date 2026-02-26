@@ -1,68 +1,60 @@
 <div align="center">
 
-# GET SHIT DONE
+# GET MY SHIT DONE (GMSD)
 
-**A light-weight and powerful meta-prompting, context engineering and spec-driven development system for Claude Code, OpenCode, Gemini CLI, and Codex.**
+**A customised fork of [Get Shit Done (GSD)](https://github.com/glittercowboy/get-shit-done) — the meta-prompting, context engineering, and spec-driven development system for Claude Code.**
 
-**Solves context rot — the quality degradation that happens as Claude fills its context window.**
-
-[![npm version](https://img.shields.io/npm/v/get-my-shit-done-cc?style=for-the-badge&logo=npm&logoColor=white&color=CB3837)](https://www.npmjs.com/package/get-my-shit-done-cc)
-[![npm downloads](https://img.shields.io/npm/dm/get-my-shit-done-cc?style=for-the-badge&logo=npm&logoColor=white&color=CB3837)](https://www.npmjs.com/package/get-my-shit-done-cc)
-[![Discord](https://img.shields.io/badge/Discord-Join-5865F2?style=for-the-badge&logo=discord&logoColor=white)](https://discord.gg/gsd)
-[![X (Twitter)](https://img.shields.io/badge/X-@gsd__foundation-000000?style=for-the-badge&logo=x&logoColor=white)](https://x.com/gsd_foundation)
-[![$GMSD Token](https://img.shields.io/badge/$GMSD-Dexscreener-1C1C1C?style=for-the-badge&logo=data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iMjQiIGhlaWdodD0iMjQiIHZpZXdCb3g9IjAgMCAyNCAyNCIgZmlsbD0ibm9uZSIgeG1sbnM9Imh0dHA6Ly93d3cudzMub3JnLzIwMDAvc3ZnIj48Y2lyY2xlIGN4PSIxMiIgY3k9IjEyIiByPSIxMCIgZmlsbD0iIzAwRkYwMCIvPjwvc3ZnPg==&logoColor=00FF00)](https://dexscreener.com/solana/dwudwjvan7bzkw9zwlbyv6kspdlvhwzrqy6ebk8xzxkv)
-[![GitHub stars](https://img.shields.io/github/stars/glittercowboy/get-my-shit-done?style=for-the-badge&logo=github&color=181717)](https://github.com/glittercowboy/get-my-shit-done)
 [![License](https://img.shields.io/badge/license-MIT-blue?style=for-the-badge)](LICENSE)
-
-<br>
-
-```bash
-npx get-my-shit-done-cc@latest
-```
-
-**Works on Mac, Windows, and Linux.**
-
-<br>
-
-![GMSD Install](assets/terminal.svg)
-
-<br>
-
-*"If you know clearly what you want, this WILL build it for you. No bs."*
-
-*"I've done SpecKit, OpenSpec and Taskmaster — this has produced the best results for me."*
-
-*"By far the most powerful addition to my Claude Code. Nothing over-engineered. Literally just gets shit done."*
-
-<br>
-
-**Trusted by engineers at Amazon, Google, Shopify, and Webflow.**
-
-[Why I Built This](#why-i-built-this) · [How It Works](#how-it-works) · [Commands](#commands) · [Why It Works](#why-it-works) · [User Guide](docs/USER-GUIDE.md)
+[![Upstream](https://img.shields.io/badge/upstream-GSD-181717?style=for-the-badge&logo=github)](https://github.com/glittercowboy/get-shit-done)
 
 </div>
 
 ---
 
-## Why I Built This
-
-I'm a solo developer. I don't write code — Claude Code does.
-
-Other spec-driven development tools exist; BMAD, Speckit... But they all seem to make things way more complicated than they need to be (sprint ceremonies, story points, stakeholder syncs, retrospectives, Jira workflows) or lack real big picture understanding of what you're building. I'm not a 50-person software company. I don't want to play enterprise theater. I'm just a creative person trying to build great things that work.
-
-So I built GMSD. The complexity is in the system, not in your workflow. Behind the scenes: context engineering, XML prompt formatting, subagent orchestration, state management. What you see: a few commands that just work.
-
-The system gives Claude everything it needs to do the work *and* verify it. I trust the workflow. It just does a good job.
-
-That's what this is. No enterprise roleplay bullshit. Just an incredibly effective system for building cool stuff consistently using Claude Code.
-
-— **TÂCHES**
+> **This is a personal fork.** The upstream project [GSD](https://github.com/glittercowboy/get-shit-done) by [@glittercowboy](https://github.com/glittercowboy) is the original — go there for the canonical version, community, and npm package. This fork reshapes GSD to fit a specific workflow: Emacs/Org-mode as the documentation format, Architecture Decision Records baked into the planning process, and a "learn software architecture" lens on top of the existing spec-driven development system.
 
 ---
 
-Vibecoding has a bad reputation. You describe what you want, AI generates code, and you get inconsistent garbage that falls apart at scale.
+## What Changed From Upstream GSD
 
-GMSD fixes that. It's the context engineering layer that makes Claude Code reliable. Describe your idea, let the system extract everything it needs to know, and let Claude Code get to work.
+| Area | Upstream GSD | This Fork (GMSD) |
+|------|-------------|-------------------|
+| **Document format** | Markdown (`.md`) with YAML frontmatter | Org-mode (`.org`) with `:PROPERTIES:` drawers |
+| **Commands** | `/gsd:*` | `/gmsd:*` |
+| **Architecture decisions** | Decisions captured informally in CONTEXT/SUMMARY | Full [MADR 4.0](https://adr.github.io/madr/) ADR workflow (`/gmsd:create-adr`) |
+| **Decisions storage** | Inline in phase files | Centralized `.planning/decisions/NNN-slug.org` |
+| **Package paths** | `get-shit-done/`, `commands/gsd/` | `get-my-shit-done/`, `commands/gmsd/` |
+| **Agent names** | `gsd-planner`, `gsd-executor`, etc. | `gmsd-planner`, `gmsd-executor`, etc. |
+| **Branch templates** | `gsd/phase-{N}-{slug}` | `gmsd/phase-{N}-{slug}` |
+| **Settings directory** | `~/.gsd/` | `~/.gmsd/` |
+
+### Why Org-mode?
+
+Org-mode is a plain-text markup format native to Emacs. Compared to Markdown:
+
+- **Property drawers** (`:PROPERTIES:` / `:END:`) give structured, machine-readable metadata without a separate YAML parser
+- **Heading hierarchy** (`*`, `**`, `***`) with folding makes large planning documents navigable
+- **Source blocks** (`#+begin_src` / `#+end_src`) with language-specific evaluation via Babel
+- **Native Emacs integration** — agenda views, TODO states, clocking, export to HTML/PDF/LaTeX
+
+If you use Emacs, Org-mode is the natural format for planning documents. If you don't, the upstream GSD with Markdown is probably a better fit.
+
+### Why ADRs?
+
+Architecture Decision Records document the *why* behind technical choices. GSD already captures decisions in CONTEXT and SUMMARY files, but informally — you know *what* was decided, not *why* it was chosen over alternatives, or *what trade-offs* were accepted.
+
+GMSD adds a full MADR 4.0 workflow:
+- `/gmsd:create-adr "Use PostgreSQL"` scaffolds a structured decision record
+- Each ADR documents: context, decision drivers, considered options with pros/cons, outcome, consequences
+- ADRs are auto-numbered and centralized in `.planning/decisions/`
+- The discuss-phase workflow suggests ADR creation for architectural choices
+- The verifier checks ADR consistency during phase execution
+
+---
+
+## Upstream GSD
+
+Everything below is adapted from the upstream GSD project. For the original documentation, community, and support, visit [github.com/glittercowboy/get-shit-done](https://github.com/glittercowboy/get-shit-done).
 
 ---
 
