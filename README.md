@@ -22,7 +22,7 @@ get-shit-done-codex (GSD) solves context rot — the quality degradation that ha
 ## What Changed In This Fork
 
 - **AGENTS-first for Codex:** `AGENTS.md` is the primary behavior contract. [Agent.md > Skills.md](https://vercel.com/blog/agents-md-outperforms-skills-in-our-agent-evals)
-- **Two command surfaces:** choose native skills (`$gsd-*`) or prompt aliases (`/prompts:gsd-*`).
+- **Native skills:** all commands use `$gsd-*` skill notation — no prompt aliases needed.
 - **Full config distribution:** installer ships `.codex/config.toml` (multi-agent, feature flags, MCP servers) and 11 rich `agents/*.md` sub-agent definitions — everything needed for multi-agent orchestration out of the box.
 - **Sub-agent linking:** each agent role in `config.toml` uses `developer_instructions` to load its full role definition from `agents/gsd-*.md` at runtime — no manual wiring needed.
 - **Overwrite protection:** `config.toml` is never overwritten on reinstall. `AGENTS.md` prompts for confirmation on global installs.
@@ -43,31 +43,15 @@ You can install globally (`~/.codex/`) or locally (`./`).
 npx @undeemed/get-shit-done-codex --global
 ```
 
-If you run this in an interactive terminal, the installer will prompt you to choose `skills` (`$`) or `prompts` (`/prompts`).
-In non-interactive runs, default is `skills` mode.
-
-For non-interactive installs:
-
 ```bash
 npx @undeemed/get-shit-done-codex --global   # Install to ~/.codex/
 npx @undeemed/get-shit-done-codex --local    # Install to current directory
-npx @undeemed/get-shit-done-codex --global --codex-mode skills   # Native skills only
-npx @undeemed/get-shit-done-codex --global --codex-mode prompts  # Prompt aliases only
-npx @undeemed/get-shit-done-codex --global --migrate             # Apply detected migration cleanup
-npx @undeemed/get-shit-done-codex --global --skip-migrate        # Keep legacy surface files
+npx @undeemed/get-shit-done-codex --global --migrate             # Clean up legacy prompts/
 npx @undeemed/get-shit-done-codex --verify --global              # Check install integrity
 npx @undeemed/get-shit-done-codex --verify --repair --global     # Auto-repair
 ```
 
-### Codex Modes
-
-| Mode               | Installs                | Use Commands Like                |
-| ------------------ | ----------------------- | -------------------------------- |
-| `skills` (default) | `skills/gsd-*/SKILL.md` | `$gsd-help`, `$gsd-plan-phase 1` |
-| `prompts`          | `prompts/gsd-*.md`      | `/prompts:gsd-help`              |
-
-After installation, run `codex` (CLI) or `codex app` (Desktop), then run `$gsd-help` (or `/prompts:gsd-help` in prompts mode).
-Single-surface policy: mixed `skills/` + `prompts/` installs are treated as drift and fail `--verify`.
+After installation, run `codex` (CLI) or `codex app` (Desktop), then run `$gsd-help`.
 
 ### What Gets Installed
 
@@ -76,7 +60,7 @@ The installer distributes everything GSD needs:
 - **`AGENTS.md`** — behavior contract and command reference for Codex
 - **`.codex/config.toml`** — multi-agent mode, feature flags, agent role registry, MCP servers
 - **`agents/gsd-*.md`** — rich agent definitions (700+ lines each) for sub-agent orchestration
-- **`skills/gsd-*/SKILL.md`** or **`prompts/gsd-*.md`** — command surfaces
+- **`skills/gsd-*/SKILL.md`** — native Codex skill commands
 - **`get-shit-done/`** — workflow files, templates, and references
 
 On first run, Codex will prompt you to **trust the project** so the config takes effect (one-time, one-click).
@@ -86,25 +70,12 @@ On first run, Codex will prompt you to **trust the project** so the config takes
 
 ### Installed File Structure
 
-`$` skills mode (`--codex-mode skills`, default):
-
 ```text
 ~/.codex/
 ├── AGENTS.md
 ├── .codex/config.toml
 ├── agents/gsd-*.md
 ├── skills/gsd-*/SKILL.md
-└── get-shit-done/
-```
-
-`/prompts` mode (`--codex-mode prompts`):
-
-```text
-~/.codex/
-├── AGENTS.md
-├── .codex/config.toml
-├── agents/gsd-*.md
-├── prompts/gsd-*.md
 └── get-shit-done/
 ```
 
@@ -125,20 +96,18 @@ This fork is intentionally **AGENTS.md-first** for Codex reliability:
 
 - `AGENTS.md` is the source of truth for behavior and workflow constraints
 - `$gsd-*` skills are lightweight command wrappers around the same workflow docs
-- `/prompts:gsd-*` are optional compatibility aliases (prompts mode)
 
 ## Staying Updated
 
 ```bash
 # Check for updates from inside Codex
 $gsd-update
-# or: /prompts:gsd-update
 
 # Update from terminal
 npx @undeemed/get-shit-done-codex@latest --global
 ```
 
-The installer writes a `get-shit-done/VERSION` file so `$gsd-update` (or `/prompts:gsd-update`) can detect installed vs latest and show changelog before updating.
+The installer writes a `get-shit-done/VERSION` file so `$gsd-update` can detect installed vs latest and show changelog before updating.
 
 ## npm Trusted Publisher (OIDC)
 
@@ -225,8 +194,6 @@ Manual user acceptance testing. The system walks you through testable deliverabl
 | `$gsd-verify-work [N]`   | Manual user acceptance testing                                    |
 | `$gsd-help`              | Show all commands                                                 |
 
-Use `/prompts:gsd-*` aliases when installed with `--codex-mode prompts`.
-
 ## Why It Works
 
 ### Context Engineering
@@ -289,7 +256,6 @@ Git bisect finds exact failing task. Each task independently revertable.
 
 - Restart Codex to reload installed command surfaces
 - Check `~/.codex/skills/gsd-*/SKILL.md` (global) or `./skills/gsd-*/SKILL.md` (local)
-- If using prompt aliases, check `~/.codex/prompts/gsd-*.md` (global) or `./prompts/gsd-*.md` (local)
 
 **Multi-agent / sub-agents not working?**
 
@@ -306,7 +272,7 @@ npx @undeemed/get-shit-done-codex@latest
 **Can users be notified when an update is available?**
 
 - Yes. The installer prints an update notice if a newer npm version exists.
-- In-Codex update checks are available via `$gsd-update` (or `/prompts:gsd-update`).
+- In-Codex update checks are available via `$gsd-update`.
 - For release notifications outside the CLI, enable GitHub release watching on this repo.
 
 ## More Documentation
@@ -323,8 +289,7 @@ The original repository contains:
 
 **Note:** The original README is written for Codex Code. When following it, remember that this fork uses:
 
-- Codex-native skills (`$gsd-*`) by default
-- Optional prompt aliases (`/prompts:gsd-*`) via `--codex-mode prompts`
+- Codex-native skills (`$gsd-*`)
 - OpenAI Codex CLI & Desktop
 
 ## Keywords
