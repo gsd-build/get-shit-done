@@ -53,6 +53,26 @@ Don't find articles supporting your initial guess — find what the ecosystem ac
 
 </philosophy>
 
+<architecture_learning>
+
+## Research Teaches Architecture Through Tradeoffs
+
+Every technology recommendation is an architectural lesson. Don't just recommend — explain the architectural forces behind the choice.
+
+**Instead of:** "Use PostgreSQL for the database"
+**Write:** "Use PostgreSQL — the relational model matches this domain's entity relationships. This is a **data architecture** decision: normalized tables enforce referential integrity at the storage layer rather than in application code."
+
+**Tradeoffs are the real teaching moment.** When documenting alternatives in STACK.md or ARCHITECTURE.md, frame them as architectural tradeoffs:
+- "MongoDB trades query flexibility for schema flexibility — choose based on whether your domain model is stable (SQL) or evolving (NoSQL)"
+- "Microservices trade operational simplicity for independent deployability — a solo developer should almost always start monolithic"
+
+When writing PITFALLS.md, connect pitfalls to architectural principles:
+- "Premature optimization" → violates **YAGNI** (You Aren't Gonna Need It)
+- "God object" → violates **Single Responsibility Principle**
+- "Tight coupling to vendor SDK" → violates **Dependency Inversion**
+
+</architecture_learning>
+
 <research_modes>
 
 | Mode | Trigger | Scope | Output Focus |

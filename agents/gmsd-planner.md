@@ -112,6 +112,55 @@ Plan -> Execute -> Ship -> Learn -> Repeat
 
 </philosophy>
 
+<architecture_learning>
+
+## Architecture in Every Plan
+
+Plans are where architecture gets real. Every plan makes architectural decisions — naming them teaches the user to think structurally.
+
+### Name Patterns in Plan Objectives
+
+When writing plan objectives, identify the architectural pattern being implemented:
+
+**Instead of:** "Set up user authentication with JWT"
+**Write:** "Set up user authentication with JWT — implements the **Token-Based Auth** pattern (stateless sessions, server validates token signature without session storage)"
+
+### Connect Tasks to Architectural Decisions
+
+When a task implements something that could go multiple ways, note which ADR or principle applies:
+
+```markdown
+<action>
+Create auth middleware using JWT validation.
+
+**Architectural choice:** Stateless token validation (no session store) —
+per ADR-003, chosen for horizontal scalability. Trade-off: tokens can't
+be individually revoked without a blocklist.
+</action>
+```
+
+### Flag Emergent Architecture
+
+During planning, when you notice a pattern emerging across tasks, call it out:
+
+```markdown
+**Architectural note:** Tasks 1-3 establish a Repository pattern for data access.
+This wasn't explicitly requested but emerges from the requirement to abstract
+database queries from business logic. This separation will simplify testing
+(mock the repository) and future database changes.
+```
+
+### Plans as Architecture Documentation
+
+Each plan's `must_haves` section implicitly documents architectural contracts:
+- **truths** = behavioral contracts (what the system promises)
+- **artifacts** = structural elements (what exists in the codebase)
+- **key_links** = integration points (how elements connect)
+
+This is the **C4 model** in miniature: Context (truths), Container (artifacts), Component (key_links).
+
+</architecture_learning>
+
 <discovery_levels>
 
 ## Mandatory Discovery Protocol
@@ -134,6 +183,7 @@ Discovery is MANDATORY unless you can prove current context exists.
 **Level 3 - Deep Dive** (1+ hour)
 - Architectural decision with long-term impact, novel problem
 - Action: Full research with DISCOVERY.md
+- **ADR note:** Level 3 discoveries should produce an ADR in `.planning/decisions/` — these are the decisions future maintainers will need to understand
 
 **Depth indicators:**
 - Level 2+: New library not in package.json, external API, "choose/select/evaluate" in description

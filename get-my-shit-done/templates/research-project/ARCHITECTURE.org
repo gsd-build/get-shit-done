@@ -100,7 +100,47 @@ src/
 
 ** Data Flow
 
+*** System Overview (MermaidJS)
+
+#+begin_src mermaid :file arch-system-overview.png :exports results
+flowchart TD
+    subgraph Presentation["[Layer Name]"]
+        C1["[Component]"]
+        C2["[Component]"]
+    end
+    subgraph Logic["[Layer Name]"]
+        S1["[Service]"]
+    end
+    subgraph Storage["[Layer Name]"]
+        D1["[Store]"]
+        D2["[Store]"]
+    end
+    C1 --> S1
+    C2 --> S1
+    S1 --> D1
+    S1 --> D2
+#+end_src
+
 *** Request Flow
+
+#+begin_src mermaid :file arch-request-flow.png :exports results
+sequenceDiagram
+    participant U as User
+    participant C as Component
+    participant H as Handler
+    participant S as Service
+    participant D as Data Store
+    U->>C: Action
+    C->>H: Request
+    H->>S: Process
+    S->>D: Query
+    D-->>S: Result
+    S-->>H: Transform
+    H-->>C: Response
+    C-->>U: Update
+#+end_src
+
+*** Request Flow (ASCII fallback)
 
 #+begin_src
 [User Action]
@@ -110,7 +150,20 @@ src/
 [Response] ← [Transform] ← [Query] ← [Database]
 #+end_src
 
-*** State Management
+*** State Flow
+
+#+begin_src mermaid :file arch-state-flow.png :exports results
+stateDiagram-v2
+    [*] --> Idle
+    Idle --> Loading: User Action
+    Loading --> Success: Data Received
+    Loading --> Error: Request Failed
+    Success --> Idle: Reset
+    Error --> Loading: Retry
+    Error --> Idle: Dismiss
+#+end_src
+
+*** State Management (ASCII fallback)
 
 #+begin_src
 [State Store]

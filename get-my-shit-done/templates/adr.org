@@ -101,6 +101,32 @@ Chosen option: "[title of option N]", because [justification. e.g., only option 
 - Bad, because [argument d]
 - ...
 
+** Decision Visualization (Optional)
+
+*** Option Comparison
+
+#+begin_src mermaid :file adr-NNN-options.png :exports results
+flowchart TD
+    Q{"Decision:\n[problem statement]"}
+    Q --> A["Option A\n[title]"]
+    Q --> B["Option B\n[title]"]
+    Q --> C["Option C\n[title]"]
+    A -->|"chosen"| R["Outcome:\n[key benefit]"]
+    B -.->|"rejected"| X1["[key drawback]"]
+    C -.->|"rejected"| X2["[key drawback]"]
+    style A fill:#2d6,stroke:#333
+    style R fill:#2d6,stroke:#333
+#+end_src
+
+*** Architecture Impact
+
+#+begin_src mermaid :file adr-NNN-impact.png :exports results
+flowchart LR
+    D["ADR-NNN\n[decision]"] --> C1["Component A\n[how affected]"]
+    D --> C2["Component B\n[how affected]"]
+    D --> C3["Component C\n[how affected]"]
+#+end_src
+
 ** More Information
 
 [You might want to provide additional evidence/confidence for the decision outcome here and/or document the team agreement on the decision and/or define when/how this decision should be realized and if/when it should be re-visited. Links to other decisions and resources might appear here as well.]

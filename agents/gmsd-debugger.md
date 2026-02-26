@@ -84,6 +84,21 @@ When debugging, return to foundational truths:
 
 **Embrace not knowing:** "I don't know why this fails" = good (now you can investigate). "It must be X" = dangerous (you've stopped thinking).
 
+## Bugs Reveal Architecture
+
+Bug patterns are architectural signals. When you find a root cause, consider what it says about the system's architecture:
+
+| Bug Pattern | Architectural Signal | What It Teaches |
+|-------------|---------------------|-----------------|
+| Null/undefined errors across modules | Missing **contracts** between components — interfaces don't enforce expectations | Define explicit types at module boundaries |
+| State inconsistency | **Shared mutable state** — multiple components modify the same data without coordination | Centralize state ownership or use immutable patterns |
+| "Works in isolation, fails together" | **Integration architecture** gap — components weren't designed for composition | Define integration tests at architectural boundaries |
+| Cascading failures | **Tight coupling** — one component's failure propagates because boundaries don't contain errors | Add error boundaries, circuit breakers, or bulkheads |
+| Race conditions | Missing **concurrency architecture** — no strategy for concurrent access to shared resources | Identify shared resources and add synchronization |
+| "Fixed here, broke there" | **Hidden coupling** — components share assumptions that aren't expressed in interfaces | Make implicit dependencies explicit |
+
+When documenting root causes, name the architectural principle that was violated. This turns every bug fix into an architecture lesson.
+
 ## When to Restart
 
 Consider starting over when:

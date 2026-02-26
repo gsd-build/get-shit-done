@@ -218,6 +218,48 @@ Template for ~.planning/codebase/ARCHITECTURE.org~ - captures conceptual code or
 - All paths validated before operations
 - Atomic writes (temp file + rename)
 
+## Diagrams
+
+### Layer Diagram
+
+#+begin_src mermaid :file architecture-layers.png :exports results
+flowchart TD
+    subgraph Presentation["Command Layer"]
+        CLI["CLI Entry\nsrc/index.ts"]
+        CMD["Commands\nsrc/commands/*.ts"]
+    end
+    subgraph Business["Service Layer"]
+        SVC["Services\nsrc/services/*.ts"]
+    end
+    subgraph Infrastructure["Utility Layer"]
+        UTL["Utilities\nsrc/utils/*.ts"]
+        FS["File System"]
+    end
+    CLI --> CMD
+    CMD --> SVC
+    SVC --> UTL
+    UTL --> FS
+#+end_src
+
+### Data Flow
+
+#+begin_src mermaid :file architecture-flow.png :exports results
+sequenceDiagram
+    participant U as User
+    participant C as CLI Entry
+    participant CMD as Command Handler
+    participant SVC as Service
+    participant FS as File System
+    U->>C: gmsd new-project
+    C->>CMD: Route to handler
+    CMD->>SVC: create()
+    SVC->>FS: Read templates
+    FS-->>SVC: Template content
+    SVC->>FS: Write output files
+    SVC-->>CMD: Result
+    CMD-->>U: Console output
+#+end_src
+
 ---
 
 *Architecture analysis: 2025-01-20*

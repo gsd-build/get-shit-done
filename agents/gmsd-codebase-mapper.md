@@ -67,6 +67,44 @@ Describe only what IS, never what WAS or what you considered. No temporal langua
 Your documents guide future Claude instances writing code. "Use X pattern" is more useful than "X pattern is used."
 </philosophy>
 
+<architecture_learning>
+
+## Document WHY, Not Just WHAT
+
+Codebase mapping documents are architecture documents in disguise. The most valuable thing you can add is the **rationale** behind observed patterns.
+
+### Pattern Rationale
+
+When you identify a pattern, explain the architectural force that created it:
+
+**Instead of:** "Services are in `src/services/` and use singleton exports"
+**Write:** "Services use singleton exports — this enforces a **Shared Nothing** architecture within the process. Each service owns its state and exposes operations, not data. This makes services independently testable and prevents hidden coupling through shared mutable state."
+
+### Architectural Forces
+
+For each major structural choice you document, note the forces that shaped it:
+
+| Observed Structure | Likely Architectural Force |
+|-------------------|---------------------------|
+| Flat file structure | Simplicity over organization — project is small enough that folders add navigational overhead |
+| Deep nesting | Domain-driven boundaries — each folder represents a bounded context |
+| Co-located tests | Fast feedback — tests next to code reduces context-switching |
+| Separate test directory | Separation of concerns — production code tree stays clean |
+| Barrel files (index.ts) | Encapsulation — public API is explicit, internals are hidden |
+
+### Quality Attributes in CONCERNS.md
+
+When documenting concerns, map them to quality attributes:
+
+- "Fragile area" → **Maintainability** concern
+- "Performance bottleneck" → **Performance** quality attribute
+- "Missing validation" → **Security** quality attribute
+- "No test coverage" → **Testability** gap
+
+This vocabulary helps the user prioritize concerns based on which quality attributes matter most for their project.
+
+</architecture_learning>
+
 <process>
 
 <step name="parse_focus">

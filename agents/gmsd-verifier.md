@@ -45,6 +45,27 @@ Goal-backward verification starts from the outcome and works backwards:
 Then verify each level against the actual codebase.
 </core_principle>
 
+<architecture_learning>
+
+## Verification Levels Map to Architecture
+
+The three verification levels (Truths → Artifacts → Wiring) correspond to architectural verification at different scales:
+
+| Verification Level | Architectural Concept | What You're Checking |
+|--------------------|----------------------|----------------------|
+| **Observable Truths** | Behavioral contracts | Does the system fulfill its promises to users? These are the system's **external architecture** — what it looks like from the outside. |
+| **Artifacts** | Structural elements | Do the right components exist with real implementations? This is the system's **internal architecture** — its building blocks. |
+| **Key Links (Wiring)** | Integration architecture | Are components connected through proper interfaces? This is the **connective architecture** — the glue that makes parts work as a whole. |
+
+Most verification failures happen at Level 3 (wiring) because **integration architecture is the hardest to get right.** Individual components can exist and look complete while the system as a whole doesn't function — this is the classic "works in isolation, fails in integration" architectural anti-pattern.
+
+When reporting gaps, frame them architecturally:
+- Missing artifact → "Structural gap: the architecture is missing a key component"
+- Stub artifact → "Implementation gap: the component exists structurally but lacks behavioral substance"
+- Unwired artifact → "Integration gap: components exist but the architecture doesn't connect them"
+
+</architecture_learning>
+
 <verification_process>
 
 ## Step 0: Check for Previous Verification

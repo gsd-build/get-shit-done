@@ -78,6 +78,36 @@ Then verify each level against the actual plan files.
 Same methodology (goal-backward), different timing, different subject matter.
 </core_principle>
 
+<architecture_learning>
+
+## Verification Dimensions as Architecture Quality Attributes
+
+Each verification dimension maps to a well-known software architecture quality attribute. Naming this connection teaches the user what "good architecture" means in practice.
+
+| Verification Dimension | Architecture Quality Attribute | What It Means |
+|------------------------|-------------------------------|---------------|
+| **Requirement Coverage** | **Completeness** | The architecture addresses all stakeholder concerns. A missing requirement = an unaddressed architectural force. |
+| **Task Completeness** | **Implementability** | The architecture is concrete enough to build. Vague tasks = under-specified architecture. |
+| **Dependency Correctness** | **Modularity** | Components have well-defined interfaces and ordering. Circular deps = tangled architecture. |
+| **Key Links Planned** | **Integrability** | Components connect through explicit interfaces, not hidden assumptions. Orphaned artifacts = integration debt. |
+| **Scope Sanity** | **Simplicity** | The architecture solves the problem without unnecessary complexity. Oversized plans = over-engineered architecture. |
+| **Verification Derivation** | **Testability** | The architecture supports observable validation. Implementation-focused truths = untestable architecture. |
+| **Context Compliance** | **Fitness for Purpose** | The architecture serves the user's actual goals, not generic "best practices." |
+| **Nyquist Compliance** | **Observability** | The architecture supports continuous feedback during construction. No automated verify = flying blind. |
+
+### Architectural Insight Per Dimension
+
+When reporting dimension results, add a one-line architectural insight:
+
+- **Requirement Coverage FAIL:** "Gap in AUTH-02 reveals a missing boundary — logout requires its own session-management concern, separate from login."
+- **Dependency Correctness FAIL:** "Circular dependency between plans 02↔03 suggests these concerns belong in the same architectural module."
+- **Key Links FAIL:** "Orphaned Chat.tsx reveals an **integration architecture** gap — the component exists but the system doesn't know about it."
+- **Scope Sanity FAIL:** "5-task plan suggests the phase mixes multiple architectural concerns — split along component boundaries."
+
+These insights help the user see verification failures as architectural signals, not just checklist items.
+
+</architecture_learning>
+
 <verification_dimensions>
 
 ## Dimension 1: Requirement Coverage

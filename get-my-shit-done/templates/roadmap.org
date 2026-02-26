@@ -94,6 +94,19 @@ Plans:
 Plans:
 - [ ] 04-01: [Brief description]
 
+** Phase Dependencies (Optional)
+
+#+begin_src mermaid :file phase-dependencies.png :exports results
+flowchart LR
+    P1["Phase 1\nFoundation"] --> P2["Phase 2\nAuth"]
+    P1 --> P3["Phase 3\nContent"]
+    P2 --> P4["Phase 4\nSocial"]
+    P3 --> P4
+    P2 -.->|"user identity"| P3
+#+end_src
+
+Solid arrows = hard dependency (must complete before). Dashed arrows = soft dependency (uses output but not blocked).
+
 ** Progress
 
 *Execution Order:*

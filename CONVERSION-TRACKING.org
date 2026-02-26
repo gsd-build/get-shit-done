@@ -68,6 +68,23 @@ This document tracks the conversion of [[https://github.com/glittercowboy/get-sh
 - Updated cross-references in templates, install script, workflow files
 - Created this conversion tracking document
 
+** Phase 7: Upstream Sync Codemod
+- Added ~bin/gsd-to-gmsd.cjs~ codemod tool for upstream sync
+
+** Phase 8: Architecture Learning Enhancements + MermaidJS Templates
+- Added ~<architecture_learning>~ sections to 8 agent files (6 Tier 1, 2 Tier 2)
+- Added architectural content to ~gmsd-debugger.md~ within ~<philosophy>~
+- Tier 1: roadmapper, project-researcher, phase-researcher, planner, plan-checker, codebase-mapper
+- Tier 2: verifier, executor, debugger
+- Added ~ob-mermaid~ org-babel source blocks to 5 templates:
+  - ~templates/codebase/architecture.org~ (layer + data flow diagrams)
+  - ~templates/roadmap.org~ (phase dependency flowchart)
+  - ~templates/adr.org~ (option comparison + architecture impact)
+  - ~templates/research.org~ (component interaction diagram)
+  - ~templates/research-project/ARCHITECTURE.org~ (system overview + request flow + state flow)
+- ASCII diagrams preserved alongside MermaidJS in research-project/ARCHITECTURE.org
+- All 128 tests still passing, no code changes
+
 * What Stays as Markdown
 
 | File | Reason |

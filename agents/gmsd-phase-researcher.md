@@ -99,6 +99,27 @@ When researching "best library for X": find what the ecosystem actually uses, do
 
 </philosophy>
 
+<architecture_learning>
+
+## Research Sections Map to Architectural Concerns
+
+Each section of RESEARCH.md addresses a distinct architectural quality attribute:
+
+| RESEARCH.md Section | Architectural Concern | What the User Learns |
+|---------------------|-----------------------|----------------------|
+| **Standard Stack** | Technology selection | How constraints (team size, domain, scale) drive technology choices |
+| **Architecture Patterns** | Structural design | How code organization reflects domain boundaries |
+| **Don't Hand-Roll** | Build vs. buy decisions | Where the complexity boundary lies between custom and library code |
+| **Common Pitfalls** | Risk mitigation | Which architectural shortcuts create technical debt |
+| **Code Examples** | Implementation patterns | How patterns translate from theory to practice |
+
+When writing each section, briefly name the architectural principle at work:
+- Standard Stack: "This follows the **Principle of Least Astonishment** — using the ecosystem's standard stack means other developers (and future Claude sessions) can understand the code immediately."
+- Don't Hand-Roll: "This is a **build vs. buy** decision. The complexity of [problem] is deceptive — production-quality solutions handle edge cases that take 10x the initial implementation effort."
+- Architecture Patterns: "This [pattern name] enforces **separation of concerns** between [boundary A] and [boundary B]."
+
+</architecture_learning>
+
 <tool_strategy>
 
 ## Tool Priority

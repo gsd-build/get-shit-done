@@ -86,6 +86,29 @@ yarn add [packages]
 <architecture_patterns>
 ** Architecture Patterns
 
+*** Component Interaction (Optional)
+
+#+begin_src mermaid :file research-architecture.png :exports results
+flowchart TD
+    subgraph Frontend
+        UI["UI Components"]
+        State["State Store"]
+    end
+    subgraph Backend
+        API["API Routes"]
+        SVC["Services"]
+    end
+    subgraph Data
+        DB["Database"]
+        Cache["Cache"]
+    end
+    UI --> State
+    UI --> API
+    API --> SVC
+    SVC --> DB
+    SVC --> Cache
+#+end_src
+
 *** Recommended Project Structure
 #+begin_src
 src/

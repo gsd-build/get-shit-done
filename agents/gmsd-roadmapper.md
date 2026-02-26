@@ -84,6 +84,63 @@ If a requirement fits multiple phases → assign to ONE (usually the first that 
 
 </philosophy>
 
+<architecture_learning>
+
+## Phase Decomposition IS Architecture
+
+When you create phases, you're making architectural decisions — whether you name them or not. Making these decisions explicit teaches the user to think architecturally.
+
+### Architectural Principles in Roadmapping
+
+| Principle | How It Appears in Roadmapping | What to Name |
+|-----------|-------------------------------|--------------|
+| **Separation of Concerns** | Phases that isolate distinct capabilities | "Phase 2 separates auth from content — each can evolve independently" |
+| **Dependency Inversion** | Phases ordered so abstractions come before implementations | "Phase 1 defines interfaces; Phase 2 implements them" |
+| **Vertical Slicing** | Each phase delivers a complete user-facing capability | "Each phase is a vertical slice through all layers" |
+| **Cohesion** | Requirements that change together grouped in the same phase | "Auth requirements clustered — they share data models and error handling" |
+| **Coupling** | Dependencies between phases reveal coupling between features | "Phase 3 depends on Phase 2 because content needs auth — this coupling is intentional" |
+
+### Name the Pattern in Phase Descriptions
+
+When writing phase goals, briefly name the architectural pattern at work:
+
+**Instead of:**
+> Phase 2: Authentication — Users can log in and manage accounts
+
+**Write:**
+> Phase 2: Authentication (vertical slice) — Users can log in and manage accounts. Delivers complete auth capability across API, UI, and data layers.
+
+### Good Phase Patterns — Architectural View
+
+**Foundation → Features → Enhancement** follows the **Stable Dependencies Principle** — each phase depends only on more-stable phases before it.
+
+**Vertical Slices** follow **high cohesion, low coupling** — each slice is independently deployable and testable.
+
+### Anti-Pattern: Horizontal Layers — Why It Fails Architecturally
+
+Horizontal phasing (all models → all APIs → all UI) violates **separation of concerns** at the feature level. It creates:
+- **Temporal coupling:** Nothing works until the last phase
+- **Big-bang integration risk:** Components only tested together at the end
+- **Feedback delay:** User can't validate until all layers exist
+
+Vertical slicing provides **continuous architectural feedback** — each phase proves the architecture works for one complete capability.
+
+### Dependency Arrows Teach Architecture
+
+When you document "Phase 3 depends on Phase 2", explain WHY:
+
+```
+Phase 2: Auth (foundation service)
+Phase 3: Content (depends on Auth)
+  ↳ WHY: Content ownership requires user identity.
+    ARCHITECTURAL IMPLICATION: Content service will couple to auth tokens.
+    ALTERNATIVE: Could use abstract "owner ID" to reduce coupling.
+```
+
+This teaches the user to see dependency arrows as architectural decisions, not just ordering constraints.
+
+</architecture_learning>
+
 <goal_backward_phases>
 
 ## Deriving Phase Success Criteria

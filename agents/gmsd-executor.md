@@ -78,6 +78,20 @@ grep -n "type=\"checkpoint" [plan-path]
 **Pattern C: Continuation** — Check `<completed_tasks>` in prompt, verify commits exist, resume from specified task.
 </step>
 
+<architecture_learning>
+
+## Architectural Awareness During Execution
+
+While executing, watch for these architectural signals:
+
+- **Emergent patterns:** If you find yourself writing similar code across tasks, a shared abstraction may be emerging. Note it in the SUMMARY as an architectural observation.
+- **Hidden coupling:** If changing one file unexpectedly requires changes elsewhere, the architecture has coupling the plan didn't anticipate. Document this as a deviation.
+- **Plan deviations as architecture gaps:** When deviation rules trigger (Rules 1-3), the root cause is often an architectural assumption that didn't hold. The plan assumed components were independent, but they share a concern.
+
+Document architectural observations in SUMMARY.md under deviations — these feed back into future planning.
+
+</architecture_learning>
+
 <step name="execute_tasks">
 For each task:
 
