@@ -1,0 +1,84 @@
+#+title: GSD → GMSD Fork Conversion Tracking
+#+startup: indent
+#+options: toc:2 num:nil ^:{}
+
+* Overview
+
+This document tracks the conversion of [[https://github.com/glittercowboy/get-shit-done][GSD (Get Shit Done)]] into *GMSD (Get My Shit Done)* — a personal fork oriented around Emacs/Org-mode, Architecture Decision Records (MADR 4.0), and software architecture learning.
+
+*Status:* COMPLETE (all phases finished)
+*Test suite:* 127/127 passing
+
+* Phase Summary
+
+** Phase 1: Core Infrastructure
+
+*** 1a: Constants and Core
+- Added ~DOC_EXT = '.org'~ and ~FILES~ constants to ~core.cjs~
+- Replaced all hardcoded ~.md~ references in ~core.cjs~ with constants
+
+*** 1b: Frontmatter Parser
+- Rewrote ~frontmatter.cjs~ — YAML ~---~ parser → Org ~:PROPERTIES:~ parser
+- Dot-notation for nested objects (e.g., ~:tech-stack.added: [val]~)
+
+*** 1c: Test Harness
+- All 7 test files updated: YAML ~---~ → ~:PROPERTIES:~ / ~:END:~, ~.md~ → ~.org~
+- ~state.test.cjs~: 20/20 tests pass immediately
+- Other tests: fail as expected (library code not yet updated — regression harness)
+- Markdown content /inside/ fixture strings stays as markdown (only frontmatter wrapper and file extensions changed)
+
+** Phase 2: Library Files
+- All 7 lib files updated to import ~FILES~, ~DOC_EXT~ from ~core.cjs~
+- 102/103 tests passing (1 pre-existing frontmatter bug: comma in ~key-decisions~ value)
+- ~config.cjs~ had no ~.md~ references — skipped
+- ~template.cjs~ template file paths deferred to Phase 3
+
+** Phase 3: Template Conversion (35 files)
+- All 35 template files renamed from ~.md~ to ~.org~
+- Outer markdown → org syntax: headings (~*~), bold (~*text*~), inline code (~\~code\~~), code blocks (~#+begin_src~)
+- Org file headers added: ~#+title:~, ~#+startup: indent~, ~#+options:~
+- Code block contents (embedded examples): YAML frontmatter → ~:PROPERTIES:~ drawers
+- ~.md~ references to generated files updated throughout templates
+- Template path references updated in ~template.cjs~ (4 refs), all workflow/agent/command files
+- 3 programmatic summary templates manually converted
+- 122/123 tests passing
+
+** Phase 4: GSD → GMSD Rename (161 files)
+- Directory renames: ~commands/gsd/~ → ~commands/gmsd/~, ~get-shit-done/~ → ~get-my-shit-done/~
+- File renames: 11 agents ~gsd-*.md~ → ~gmsd-*.md~, 3 hooks ~gsd-*.js~ → ~gmsd-*.js~, ~gsd-tools.cjs~ → ~gmsd-tools.cjs~
+- Content replacements: ~/gsd:~ → ~/gmsd:~, ~gsd-~ → ~gmsd-~, ~GSD~ → ~GMSD~
+- Branch templates ~gsd/phase-*~ → ~gmsd/phase-*~, settings dir =~/.gsd/= → =~/.gmsd/=
+- Data field ~gsd_state_version~ → ~gmsd_state_version~
+- 123/123 tests passing
+- Preserved as-is: SECURITY.md email, Twitter handle, discord URL, internal variable names
+
+** Phase 5: ADR Integration
+- Created ~templates/adr.org~ — full MADR 4.0 template with Org property drawers
+- Added ~DECISIONS_DIR~ to ~core.cjs~, ~adr~ scaffold to ~commands.cjs~ with auto-numbering
+- Created ~commands/gmsd/create-adr.md~ — interactive command
+- Integrated into discuss-phase (suggests ADR), execute-phase (verifier checks consistency)
+- ADR files centralized in ~.planning/decisions/NNN-slug.org~
+- 4 new tests added, 127/127 passing
+
+** Phase 6: Documentation Cleanup
+- Converted ~README.md~ → ~README.org~ (full org syntax conversion)
+- Converted ~CHANGELOG.md~ → ~CHANGELOG.org~ (programmatic conversion + fork entry)
+- Converted ~docs/USER-GUIDE.md~ → ~docs/USER-GUIDE.org~
+- Updated all generated file references (~PROJECT.org~, ~STATE.org~, etc.)
+- Updated cross-references in templates, install script, workflow files
+- Created this conversion tracking document
+
+* What Stays as Markdown
+
+| File | Reason |
+|------+--------|
+| ~CLAUDE.md~ | Claude Code convention — must be ~.md~ |
+| ~commands/gmsd/*.md~ | Claude Code prompt definitions (command format) |
+| ~agents/gmsd-*.md~ | Claude Code agent definitions |
+| ~workflows/*.md~ | Claude Code workflow definitions |
+| ~references/*.md~ | Claude Code reference documents |
+| ~.github/*.md~ | GitHub convention (PR template, etc.) |
+
+* Known Issues
+
+- Pre-existing comma-in-values bug in org property drawer array parser: ~[Start simple, shard later]~ splits into 2 items instead of 1 (would need delimiter escaping or quoting to fix)

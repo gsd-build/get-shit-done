@@ -138,7 +138,7 @@ get-my-shit-done/
 ├── src/               # Source code (if applicable)
 ├── tests/             # Test files
 ├── package.json       # Project manifest
-└── README.md          # User documentation
+└── README.org         # User documentation
 #+begin_src
 
 ## Directory Purposes
@@ -189,7 +189,7 @@ get-my-shit-done/
 - `tests/` - Test files (if present)
 
 **Documentation:**
-- `README.md` - User-facing installation and usage guide
+- `README.org` - User-facing installation and usage guide
 - `CLAUDE.md` - Instructions for Claude Code when working in this repo
 
 ## Naming Conventions
@@ -197,7 +197,8 @@ get-my-shit-done/
 **Files:**
 - kebab-case.md: Markdown documents
 - kebab-case.js: JavaScript source files
-- UPPERCASE.md: Important project files (README, CLAUDE, CHANGELOG)
+- UPPERCASE.org: Important project files (README, CHANGELOG)
+- UPPERCASE.md: Claude Code convention files (CLAUDE.md)
 
 **Directories:**
 - kebab-case: All directories
@@ -212,7 +213,7 @@ get-my-shit-done/
 **New Slash Command:**
 - Primary code: `commands/gmsd/{command-name}.md`
 - Tests: `tests/commands/{command-name}.test.js` (if testing implemented)
-- Documentation: Update `README.md` with new command
+- Documentation: Update `README.org` with new command
 
 **New Template:**
 - Implementation: `get-my-shit-done/templates/{name}.org`

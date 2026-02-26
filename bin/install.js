@@ -1687,15 +1687,15 @@ function install(isGlobal, runtime = 'claude') {
     }
   }
 
-  // Copy CHANGELOG.md
-  const changelogSrc = path.join(src, 'CHANGELOG.md');
-  const changelogDest = path.join(targetDir, 'get-my-shit-done', 'CHANGELOG.md');
+  // Copy CHANGELOG.org
+  const changelogSrc = path.join(src, 'CHANGELOG.org');
+  const changelogDest = path.join(targetDir, 'get-my-shit-done', 'CHANGELOG.org');
   if (fs.existsSync(changelogSrc)) {
     fs.copyFileSync(changelogSrc, changelogDest);
-    if (verifyFileInstalled(changelogDest, 'CHANGELOG.md')) {
-      console.log(`  ${green}✓${reset} Installed CHANGELOG.md`);
+    if (verifyFileInstalled(changelogDest, 'CHANGELOG.org')) {
+      console.log(`  ${green}✓${reset} Installed CHANGELOG.org`);
     } else {
-      failures.push('CHANGELOG.md');
+      failures.push('CHANGELOG.org');
     }
   }
 

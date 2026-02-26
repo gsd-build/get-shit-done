@@ -15,7 +15,7 @@
 ## Checklist
 
 - [ ] Follows GMSD style (no enterprise patterns, no filler)
-- [ ] Updates CHANGELOG.md for user-facing changes
+- [ ] Updates CHANGELOG.org for user-facing changes
 - [ ] No unnecessary dependencies added
 - [ ] Works on Windows (backslash paths tested)
 
