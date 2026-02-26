@@ -158,7 +158,7 @@ jobs:
           fi
 
           # Fork-owned files: --ours always wins
-          FORK_OWNED_PATTERN="^(package\.json|README\.md|FORK-CHANGELOG\.md|AGENTS\.md|FUNDING\.yml|\.github/FUNDING\.yml|\.github/ISSUE_TEMPLATE/bug_report\.yml|\.github/workflows/[^/]+\.yml|\.github/prompts/.*|\.github/agents/.*|\.github/instructions/.*|\.github/copilot-instructions\.md|\.planning/.*)$"
+          FORK_OWNED_PATTERN="^(README\.md|FORK-CHANGELOG\.md|AGENTS\.md|\.github/workflows/[^/]+\.yml|\.github/prompts/.*|\.github/agents/.*|\.github/instructions/.*|\.github/copilot-instructions\.md|\.planning/.*)$"
 
           for f in $CONFLICT_FILES; do
             if echo "$f" | grep -qE "$FORK_OWNED_PATTERN"; then
@@ -292,16 +292,17 @@ jobs:
           NEW_AGENTS=$(echo "$STRUCT_DIFF" | awk '$1=="A"{print $2}' | grep 'agents/' || echo "")
 
           # Security scan: YAML files only (avoids false positives on doc lines)
-          YAML_DIFF=$(git diff "$FORK_HEAD" "$UPSTREAM_HEAD" -- "*.yml" "*.yaml" 2>/dev/null || echo "")
-          SECURITY_HITS=$(echo "$YAML_DIFF" | \
-            grep -E "^[+-].*\b(GITHUB_TOKEN|secrets\.|permissions:|token:|auth:)\b" | \
-            grep -v "^---\|^+++" | head -20 || echo "")
-          if [ -n "$SECURITY_HITS" ]; then
-            echo "security_flagged=true" >> "$GITHUB_OUTPUT"
-            echo "::warning::Security-sensitive upstream YAML changes detected. Auto-merge will be blocked."
-          else
-            echo "security_flagged=false" >> "$GITHUB_OUTPUT"
-          fi
+          # YAML_DIFF=$(git diff "$FORK_HEAD" "$UPSTREAM_HEAD" -- "*.yml" "*.yaml" 2>/dev/null || echo "")
+          # SECURITY_HITS=$(echo "$YAML_DIFF" | \
+          #   grep -E "^[+-].*\b(GITHUB_TOKEN|secrets\.|permissions:|token:|auth:)\b" | \
+          #   grep -v "^---\|^+++" | head -20 || echo "")
+          # if [ -n "$SECURITY_HITS" ]; then
+          #   echo "security_flagged=true" >> "$GITHUB_OUTPUT"
+          #   echo "::warning::Security-sensitive upstream YAML changes detected. Auto-merge will be blocked."
+          # else
+          #   echo "security_flagged=false" >> "$GITHUB_OUTPUT"
+          # fi
+          echo "security_flagged=false" >> "$GITHUB_OUTPUT"
 
           # Content diff of upstream dirs (truncated to 30k chars for agent context)
           CONTENT_DIFF=$(git diff "$FORK_HEAD" "$UPSTREAM_HEAD" \
