@@ -4,6 +4,9 @@ A meta-prompting, context engineering and spec-driven development system for [Op
 
 Fork of [get-shit-done](https://github.com/taches/get-shit-done) by TÂCHES, adapted for Codex CLI by [undeemed](https://github.com/undeemed).
 
+> [!CAUTION]
+> As of February 25, 2026, Codex is supported upstream. This fork remains focused on Codex-specific UX and compatibility with extra goodies.
+
 [![npm version](https://img.shields.io/npm/v/%40undeemed%2Fget-shit-done-codex?style=flat-square)](https://www.npmjs.com/package/@undeemed/get-shit-done-codex)
 [![License](https://img.shields.io/badge/license-MIT-green?style=flat-square)](LICENSE)
 ![npm Downloads](https://img.shields.io/npm/dt/@undeemed/get-shit-done-codex?style=flat-square)
@@ -16,34 +19,106 @@ get-shit-done-codex (GSD) solves context rot — the quality degradation that ha
 
 **The solution:** Hierarchical planning with fresh context windows. Each task runs in isolation with exactly the context it needs—no degradation from accumulated garbage.
 
+## What Changed In This Fork
+
+- **AGENTS-first for Codex:** `AGENTS.md` is the primary behavior contract  . [Agent.md > Skills.md](https://vercel.com/blog/agents-md-outperforms-skills-in-our-agent-evals)
+- **Two command surfaces:** choose native skills (`$gsd-*`) or prompt aliases (`/prompts:gsd-*`).
+- **Installer integrity checks:** `--verify` audits installation health, `--repair` restores missing artifacts.
+- **Mode-aware installs:** installer adapts `AGENTS.md` and command guidance to your chosen mode.
+
 ## Installation
 
 ```bash
 npx @undeemed/get-shit-done-codex@latest
 ```
 
-You'll be prompted to install globally (`~/.codex/`) or locally (`./`).
+You can install globally (`~/.codex/`) or locally (`./`).
+
+### Recommended
+
+```bash
+npx @undeemed/get-shit-done-codex --global
+```
+
+If you run this in an interactive terminal, the installer will prompt you to choose `skills` (`$`) or `prompts` (`/prompts`).
+In non-interactive runs, default is `skills` mode.
 
 For non-interactive installs:
 
 ```bash
 npx @undeemed/get-shit-done-codex --global   # Install to ~/.codex/
 npx @undeemed/get-shit-done-codex --local    # Install to current directory
+npx @undeemed/get-shit-done-codex --global --codex-mode skills   # Native skills only
+npx @undeemed/get-shit-done-codex --global --codex-mode prompts  # Prompt aliases only
+npx @undeemed/get-shit-done-codex --global --migrate             # Apply detected migration cleanup
+npx @undeemed/get-shit-done-codex --global --skip-migrate        # Keep legacy surface files
+npx @undeemed/get-shit-done-codex --verify --global              # Check install integrity
+npx @undeemed/get-shit-done-codex --verify --repair --global     # Auto-repair
 ```
 
-After installation, run `codex` (CLI) or `codex app` (Desktop), then use `/prompts:gsd-help` to see all commands.
+### Codex Modes
+
+| Mode      | Installs                     | Use Commands Like           |
+| --------- | ---------------------------- | --------------------------- |
+| `skills` (default) | `skills/gsd-*/SKILL.md`      | `$gsd-help`, `$gsd-plan-phase 1` |
+| `prompts` | `prompts/gsd-*.md`           | `/prompts:gsd-help`         |
+
+After installation, run `codex` (CLI) or `codex app` (Desktop), then run `$gsd-help` (or `/prompts:gsd-help` in prompts mode).
+Single-surface policy: mixed `skills/` + `prompts/` installs are treated as drift and fail `--verify`.
+
+### Installed File Structure
+
+`$` skills mode (`--codex-mode skills`, default):
+
+```text
+~/.codex/
+├── AGENTS.md
+├── skills/
+│   └── gsd-*/SKILL.md
+└── get-shit-done/
+```
+
+`/prompts` mode (`--codex-mode prompts`):
+
+```text
+~/.codex/
+├── AGENTS.md
+├── prompts/
+│   └── gsd-*.md
+└── get-shit-done/
+```
+
+For local installs, replace `~/.codex/` with `./`.
+
+### Verify And Repair
+
+- `--verify`: checks `AGENTS.md`, command surfaces, workflow assets, and version metadata.
+- `--verify --repair`: reinstalls missing/broken artifacts and verifies again.
+- Migration is **detect-then-confirm**, not automatic:
+  - Interactive install asks before removing legacy surface files
+  - Non-interactive install skips cleanup unless `--migrate` is passed
+  - `--skip-migrate` keeps legacy files explicitly
+
+### AGENTS-First Reliability
+
+This fork is intentionally **AGENTS.md-first** for Codex reliability:
+
+- `AGENTS.md` is the source of truth for behavior and workflow constraints
+- `$gsd-*` skills are lightweight command wrappers around the same workflow docs
+- `/prompts:gsd-*` are optional compatibility aliases (prompts mode)
 
 ## Staying Updated
 
 ```bash
 # Check for updates from inside Codex
-/prompts:gsd-update
+$gsd-update
+# or: /prompts:gsd-update
 
 # Update from terminal
 npx @undeemed/get-shit-done-codex@latest --global
 ```
 
-The installer now writes a `get-shit-done/VERSION` file so `/prompts:gsd-update` can detect installed vs latest and show changelog before updating.
+The installer writes a `get-shit-done/VERSION` file so `$gsd-update` (or `/prompts:gsd-update`) can detect installed vs latest and show changelog before updating.
 
 ## npm Trusted Publisher (OIDC)
 
@@ -63,16 +138,16 @@ When setting up npm Trusted Publisher for this package, use:
 
 ```bash
 # 1. Initialize project (questions → research → requirements → roadmap)
-/prompts:gsd-new-project
+$gsd-new-project
 
 # 2. Plan the first phase
-/prompts:gsd-plan-phase 1
+$gsd-plan-phase 1
 
 # 3. Execute the phase
-/prompts:gsd-execute-phase 1
+$gsd-execute-phase 1
 
 # 4. Verify it works
-/prompts:gsd-verify-work 1
+$gsd-verify-work 1
 ```
 
 ## How It Works
@@ -80,7 +155,7 @@ When setting up npm Trusted Publisher for this package, use:
 ### 1. Initialize Project
 
 ```
-/prompts:gsd-new-project
+$gsd-new-project
 ```
 
 One command takes you from idea to ready-for-planning:
@@ -95,7 +170,7 @@ One command takes you from idea to ready-for-planning:
 ### 2. Plan Phase
 
 ```
-/prompts:gsd-plan-phase 1
+$gsd-plan-phase 1
 ```
 
 The system researches how to implement the phase, creates 2-3 atomic task plans, and verifies them against requirements.
@@ -105,7 +180,7 @@ The system researches how to implement the phase, creates 2-3 atomic task plans,
 ### 3. Execute Phase
 
 ```
-/prompts:gsd-execute-phase 1
+$gsd-execute-phase 1
 ```
 
 Runs all plans in parallel waves. Each plan executes in a fresh 200k context window. Every task gets its own atomic commit.
@@ -115,26 +190,22 @@ Runs all plans in parallel waves. Each plan executes in a fresh 200k context win
 ### 4. Verify Work
 
 ```
-/prompts:gsd-verify-work 1
+$gsd-verify-work 1
 ```
 
 Manual user acceptance testing. The system walks you through testable deliverables and creates fix plans if issues are found.
 
 ## Commands
 
-| Command                             | Description                                                       |
-| ----------------------------------- | ----------------------------------------------------------------- |
-| `/prompts:gsd-new-project`          | Initialize project: questions → research → requirements → roadmap |
-| `/prompts:gsd-plan-phase [N]`       | Research + plan + verify for a phase                              |
-| `/prompts:gsd-execute-phase <N>`    | Execute all plans in parallel waves                               |
-| `/prompts:gsd-verify-work [N]`      | Manual user acceptance testing                                    |
-| `/prompts:gsd-complete-milestone`   | Archive milestone, tag release                                    |
-| `/prompts:gsd-new-milestone [name]` | Start next version                                                |
-| `/prompts:gsd-progress`             | Show current status and what's next                               |
-| `/prompts:gsd-update`               | Check npm for a newer release and apply update                    |
-| `/prompts:gsd-help`                 | Show all commands                                                 |
+| Command                  | Description                                                       |
+| ------------------------ | ----------------------------------------------------------------- |
+| `$gsd-new-project`       | Initialize project: questions → research → requirements → roadmap |
+| `$gsd-plan-phase [N]`    | Research + plan + verify for a phase                              |
+| `$gsd-execute-phase <N>` | Execute all plans in parallel waves                               |
+| `$gsd-verify-work [N]`   | Manual user acceptance testing                                    |
+| `$gsd-help`              | Show all commands                                                 |
 
-See `/prompts:gsd-help` for the complete command reference.
+Use `/prompts:gsd-*` aliases when installed with `--codex-mode prompts`.
 
 ## Why It Works
 
@@ -176,8 +247,9 @@ Git bisect finds exact failing task. Each task independently revertable.
 
 **Commands not found?**
 
-- Restart Codex CLI to reload prompts
-- Check `~/.codex/prompts/gsd-*.md` (global) or `./prompts/gsd-*.md` (local)
+- Restart Codex to reload installed command surfaces
+- Check `~/.codex/skills/gsd-*/SKILL.md` (global) or `./skills/gsd-*/SKILL.md` (local)
+- If using prompt aliases, check `~/.codex/prompts/gsd-*.md` (global) or `./prompts/gsd-*.md` (local)
 
 **Update to latest:**
 
@@ -188,7 +260,7 @@ npx @undeemed/get-shit-done-codex@latest
 **Can users be notified when an update is available?**
 
 - Yes. The installer prints an update notice if a newer npm version exists.
-- In-Codex update checks are available via `/prompts:gsd-update`.
+- In-Codex update checks are available via `$gsd-update` (or `/prompts:gsd-update`).
 - For release notifications outside the CLI, enable GitHub release watching on this repo.
 
 ## More Documentation
@@ -205,9 +277,9 @@ The original repository contains:
 
 **Note:** The original README is written for Codex Code. When following it, remember that this fork uses:
 
-- `/prompts:gsd-*` command format (instead of `/gsd:*`)
-- OpenAI Codex CLI & Desktop (instead of Codex Code)
-- `~/.codex/` directory (instead of `~/.codex/`)
+- Codex-native skills (`$gsd-*`) by default
+- Optional prompt aliases (`/prompts:gsd-*`) via `--codex-mode prompts`
+- OpenAI Codex CLI & Desktop
 
 ## Keywords
 

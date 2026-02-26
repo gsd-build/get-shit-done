@@ -81,49 +81,49 @@ Each task gets its own commit immediately after completion:
 
 ## Commands
 
-The following commands are available. Invoke them with `/gsd:command-name`:
+The following commands are available. Invoke them with `$gsd-command-name`:
 
 | Command                           | Description                                 |
 | --------------------------------- | ------------------------------------------- |
-| `/gsd:new-project`                | Initialize project through deep questioning |
-| `/gsd:create-roadmap`             | Create roadmap and state tracking           |
-| `/gsd:map-codebase`               | Map existing codebase (brownfield projects) |
-| `/gsd:plan-phase [N]`             | Generate task plans for phase N             |
-| `/gsd:execute-plan [path]`        | Execute a PLAN.md file                      |
-| `/gsd:progress`                   | Show current position and what's next       |
-| `/gsd:verify-work [N]`            | User acceptance testing                     |
-| `/gsd:plan-fix [plan]`            | Plan fixes for UAT issues                   |
-| `/gsd:complete-milestone`         | Archive milestone, prep next version        |
-| `/gsd:discuss-milestone`          | Gather context for next milestone           |
-| `/gsd:new-milestone [name]`       | Create new milestone with phases            |
-| `/gsd:add-phase`                  | Append phase to roadmap                     |
-| `/gsd:insert-phase [N]`           | Insert urgent work                          |
-| `/gsd:remove-phase [N]`           | Remove future phase                         |
-| `/gsd:discuss-phase [N]`          | Gather context before planning              |
-| `/gsd:research-phase [N]`         | Deep ecosystem research                     |
-| `/gsd:list-phase-assumptions [N]` | Review assumptions before planning          |
-| `/gsd:pause-work`                 | Create handoff when stopping mid-phase      |
-| `/gsd:resume-work`                | Restore from last session                   |
-| `/gsd:consider-issues`            | Review deferred issues                      |
-| `/gsd:help`                       | Show all commands                           |
+| `$gsd-new-project`                | Initialize project through deep questioning |
+| `$gsd-create-roadmap`             | Create roadmap and state tracking           |
+| `$gsd-map-codebase`               | Map existing codebase (brownfield projects) |
+| `$gsd-plan-phase [N]`             | Generate task plans for phase N             |
+| `$gsd-execute-plan [path]`        | Execute a PLAN.md file                      |
+| `$gsd-progress`                   | Show current position and what's next       |
+| `$gsd-verify-work [N]`            | User acceptance testing                     |
+| `$gsd-plan-fix [plan]`            | Plan fixes for UAT issues                   |
+| `$gsd-complete-milestone`         | Archive milestone, prep next version        |
+| `$gsd-discuss-milestone`          | Gather context for next milestone           |
+| `$gsd-new-milestone [name]`       | Create new milestone with phases            |
+| `$gsd-add-phase`                  | Append phase to roadmap                     |
+| `$gsd-insert-phase [N]`           | Insert urgent work                          |
+| `$gsd-remove-phase [N]`           | Remove future phase                         |
+| `$gsd-discuss-phase [N]`          | Gather context before planning              |
+| `$gsd-research-phase [N]`         | Deep ecosystem research                     |
+| `$gsd-list-phase-assumptions [N]` | Review assumptions before planning          |
+| `$gsd-pause-work`                 | Create handoff when stopping mid-phase      |
+| `$gsd-resume-work`                | Restore from last session                   |
+| `$gsd-consider-issues`            | Review deferred issues                      |
+| `$gsd-help`                       | Show all commands                           |
 
 ## Workflow
 
 ### New Projects (Greenfield)
 
 ```bash
-/gsd:new-project       # Deep questioning → PROJECT.md
-/gsd:create-roadmap    # Create ROADMAP.md and STATE.md
-/gsd:plan-phase 1      # Create atomic task plans
-/gsd:execute-plan      # Subagent executes autonomously
+$gsd-new-project       # Deep questioning → PROJECT.md
+$gsd-create-roadmap    # Create ROADMAP.md and STATE.md
+$gsd-plan-phase 1      # Create atomic task plans
+$gsd-execute-plan      # Subagent executes autonomously
 ```
 
 ### Existing Projects (Brownfield)
 
 ```bash
-/gsd:map-codebase      # Analyze existing code → codebase/
-/gsd:new-project       # Questioning with codebase context
-/gsd:create-roadmap    # Continue as normal
+$gsd-map-codebase      # Analyze existing code → codebase/
+$gsd-new-project       # Questioning with codebase context
+$gsd-create-roadmap    # Continue as normal
 ```
 
 ## File References
