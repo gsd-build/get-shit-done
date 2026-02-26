@@ -305,6 +305,49 @@ function removeSkillAliases(skillsDir) {
   return removed;
 }
 
+function installConfig(src, codexDir, pathPrefix) {
+  const configSrc = path.join(src, '.codex', 'config.toml');
+  if (!fs.existsSync(configSrc)) return false;
+  const codexConfigDir = path.join(codexDir, '.codex');
+  const configDest = path.join(codexConfigDir, 'config.toml');
+  if (fs.existsSync(configDest)) return false;
+  fs.mkdirSync(codexConfigDir, { recursive: true });
+  const content = applyPathPrefixReplacements(fs.readFileSync(configSrc, 'utf8'), pathPrefix);
+  fs.writeFileSync(configDest, content, 'utf8');
+  return true;
+}
+
+function installAgentDefs(src, codexDir, pathPrefix, mode) {
+  const agentsSrc = path.join(src, 'agents');
+  if (!fs.existsSync(agentsSrc)) return 0;
+  const agentsDest = path.join(codexDir, 'agents');
+  fs.mkdirSync(agentsDest, { recursive: true });
+  const entries = fs.readdirSync(agentsSrc).filter((e) => /^gsd-.*\.md$/i.test(e));
+  for (const entry of entries) {
+    let content = fs.readFileSync(path.join(agentsSrc, entry), 'utf8');
+    content = applyReplacements(content, pathPrefix);
+    if (mode === 'skills') {
+      content = convertPromptRefsToSkillRefs(content);
+    } else if (mode === 'prompts') {
+      content = convertSkillRefsToPromptRefs(content);
+    }
+    fs.writeFileSync(path.join(agentsDest, entry), content, 'utf8');
+  }
+  return entries.length;
+}
+
+function countSourceAgentDefs(src) {
+  const agentsSrc = path.join(src, 'agents');
+  if (!fs.existsSync(agentsSrc)) return 0;
+  return fs.readdirSync(agentsSrc).filter((e) => /^gsd-.*\.md$/i.test(e)).length;
+}
+
+function countInstalledAgentDefs(codexDir) {
+  const agentsDest = path.join(codexDir, 'agents');
+  if (!fs.existsSync(agentsDest)) return 0;
+  return fs.readdirSync(agentsDest).filter((e) => /^gsd-.*\.md$/i.test(e)).length;
+}
+
 function detectMigrationPlan(codexDir, mode) {
   const promptsDir = path.join(codexDir, 'prompts');
   const skillsDir = path.join(codexDir, 'skills');
@@ -450,8 +493,15 @@ function verifyInstall(isGlobal, expectedMode, strictMode = false) {
   const checks = [];
   const addCheck = (ok, label, detail) => checks.push({ ok, label, detail });
 
+  const expectedAgentCount = countSourceAgentDefs(src);
+
   addCheck(fs.existsSync(codexDir), 'Config directory exists', codexDir);
   addCheck(fs.existsSync(path.join(codexDir, 'AGENTS.md')), 'AGENTS.md installed', path.join(codexDir, 'AGENTS.md'));
+  addCheck(fs.existsSync(path.join(codexDir, '.codex', 'config.toml')), 'config.toml installed', path.join(codexDir, '.codex', 'config.toml'));
+  if (expectedAgentCount > 0) {
+    const installedAgents = countInstalledAgentDefs(codexDir);
+    addCheck(installedAgents === expectedAgentCount, 'Agent definitions complete', `${installedAgents}/${expectedAgentCount}`);
+  }
   addCheck(fs.existsSync(workflowRoot), 'get-shit-done assets installed', workflowRoot);
   addCheck(fs.existsSync(path.join(workflowRoot, 'workflows')), 'Workflow directory installed', path.join(workflowRoot, 'workflows'));
   addCheck(fs.existsSync(path.join(workflowRoot, 'templates')), 'Template directory installed', path.join(workflowRoot, 'templates'));
@@ -496,7 +546,7 @@ function verifyInstall(isGlobal, expectedMode, strictMode = false) {
   return { ok, detectedMode, checkedMode: modeToCheck };
 }
 
-function installCore(isGlobal, mode, migrationPlan, applyMigration) {
+function installCore(isGlobal, mode, migrationPlan, applyMigration, done = () => {}) {
   const src = path.join(__dirname, '..');
   const { codexDir, locationLabel, pathPrefix } = getInstallContext(isGlobal);
   const installPromptsEnabled = mode === 'prompts';
@@ -508,43 +558,61 @@ function installCore(isGlobal, mode, migrationPlan, applyMigration) {
     applyMigrationPlan(migrationPlan);
   }
 
-  const agentsSrc = path.join(src, 'AGENTS.md');
+  const agentsSrc = path.join(src, 'get-shit-done', 'AGENTS.md');
   const agentsDest = path.join(codexDir, 'AGENTS.md');
-  let agentsContent = applyReplacements(fs.readFileSync(agentsSrc, 'utf8'), pathPrefix);
-  agentsContent = adaptAgentsForCodexMode(agentsContent, mode);
-  fs.writeFileSync(agentsDest, agentsContent, 'utf8');
-  console.log(`  ${green}✓${reset} Installed AGENTS.md`);
+  const agentsExisted = fs.existsSync(agentsDest);
 
-  const gsdSrc = path.join(src, 'commands', 'gsd');
-  const entries = fs.readdirSync(gsdSrc);
-  const markdownEntries = entries.filter((entry) => entry.endsWith('.md'));
+  const writeAgents = () => {
+    let agentsContent = applyReplacements(fs.readFileSync(agentsSrc, 'utf8'), pathPrefix);
+    agentsContent = adaptAgentsForCodexMode(agentsContent, mode);
+    fs.writeFileSync(agentsDest, agentsContent, 'utf8');
+  };
 
-  if (installPromptsEnabled) {
-    const promptsDir = path.join(codexDir, 'prompts');
-    installPrompts(gsdSrc, promptsDir, markdownEntries, pathPrefix);
-    console.log(`  ${green}✓${reset} Installed prompts/gsd-*.md (${markdownEntries.length} commands)`);
-  }
+  const continueAfterAgents = () => {
+    const configInstalled = installConfig(src, codexDir, pathPrefix);
+    if (configInstalled) {
+      console.log(`  ${green}✓${reset} Installed .codex/config.toml`);
+    } else {
+      console.log(`  ${dim}-${reset} Skipped .codex/config.toml (already exists or source missing)`);
+    }
 
-  if (installSkillsEnabled) {
-    const skillsDir = path.join(codexDir, 'skills');
-    installCodexSkills(gsdSrc, skillsDir, markdownEntries, pathPrefix);
-    console.log(`  ${green}✓${reset} Installed skills/gsd-*/SKILL.md (${markdownEntries.length} skills)`);
-  }
+    const agentCount = installAgentDefs(src, codexDir, pathPrefix, mode);
+    if (agentCount > 0) {
+      console.log(`  ${green}✓${reset} Installed agents/gsd-*.md (${agentCount} agent definitions)`);
+    }
 
-  const skillSrc = path.join(src, 'get-shit-done');
-  const skillDest = path.join(codexDir, 'get-shit-done');
-  copyWithPathReplacement(skillSrc, skillDest, pathPrefix);
-  writeVersionFile(skillDest, isGlobal);
-  console.log(`  ${green}✓${reset} Installed get-shit-done/ workflow files`);
-  console.log(`  ${green}✓${reset} Wrote get-shit-done/VERSION (${pkg.version})`);
+    const gsdSrc = path.join(src, 'commands', 'gsd');
+    const entries = fs.readdirSync(gsdSrc);
+    const markdownEntries = entries.filter((entry) => entry.endsWith('.md'));
 
-  console.log(`
+    if (installPromptsEnabled) {
+      const promptsDir = path.join(codexDir, 'prompts');
+      installPrompts(gsdSrc, promptsDir, markdownEntries, pathPrefix);
+      console.log(`  ${green}✓${reset} Installed prompts/gsd-*.md (${markdownEntries.length} commands)`);
+    }
+
+    if (installSkillsEnabled) {
+      const skillsDir = path.join(codexDir, 'skills');
+      installCodexSkills(gsdSrc, skillsDir, markdownEntries, pathPrefix);
+      console.log(`  ${green}✓${reset} Installed skills/gsd-*/SKILL.md (${markdownEntries.length} skills)`);
+    }
+
+    const skillSrc = path.join(src, 'get-shit-done');
+    const skillDest = path.join(codexDir, 'get-shit-done');
+    copyWithPathReplacement(skillSrc, skillDest, pathPrefix);
+    writeVersionFile(skillDest, isGlobal);
+    console.log(`  ${green}✓${reset} Installed get-shit-done/ workflow files`);
+    console.log(`  ${green}✓${reset} Wrote get-shit-done/VERSION (${pkg.version})`);
+
+    console.log(`
   ${green}Done!${reset}
 
   ${yellow}For Codex (CLI + Desktop):${reset}
   - AGENTS.md: ${cyan}${codexDir}/AGENTS.md${reset}
   ${installPromptsEnabled ? `- Prompt commands: ${cyan}${codexDir}/prompts/${reset}` : ''}
   ${installSkillsEnabled ? `- Native skills: ${cyan}${codexDir}/skills/gsd-*/SKILL.md${reset}` : ''}
+  - Config: ${cyan}${codexDir}/.codex/config.toml${reset}
+  - Agent defs: ${cyan}${codexDir}/agents/gsd-*.md${reset}
 
   ${yellow}Getting Started:${reset}
   1. Run ${cyan}codex${reset} (CLI) or ${cyan}codex app${reset} (Desktop)
@@ -554,7 +622,38 @@ function installCore(isGlobal, mode, migrationPlan, applyMigration) {
   ${yellow}Staying Updated:${reset}
   - In Codex: ${cyan}${installSkillsEnabled ? '$gsd-update' : '/prompts:gsd-update'}${reset}
   - In terminal: ${cyan}npx ${NPM_PACKAGE_LATEST}${reset}
+
+  ${dim}Note: Codex will prompt you to trust this project on first run
+  so that the config, agents, and MCP servers take effect.${reset}
 `);
+    done();
+  };
+
+  if (isGlobal && agentsExisted && isInteractiveTerminal) {
+    const rl = readline.createInterface({
+      input: process.stdin,
+      output: process.stdout
+    });
+    rl.question(`  ${yellow}⚠${reset} AGENTS.md already exists at ${dim}${agentsDest}${reset}. Overwrite? ${dim}[Y/n]${reset}: `, (answer) => {
+      rl.close();
+      const normalized = answer.trim().toLowerCase();
+      if (normalized === '' || normalized === 'y' || normalized === 'yes') {
+        writeAgents();
+        console.log(`  ${green}✓${reset} Overwrote AGENTS.md`);
+      } else {
+        console.log(`  ${yellow}⚠${reset} Kept existing AGENTS.md`);
+      }
+      continueAfterAgents();
+    });
+  } else {
+    writeAgents();
+    if (agentsExisted) {
+      console.log(`  ${yellow}⚠${reset} Overwrote existing AGENTS.md ${dim}(non-interactive)${reset}`);
+    } else {
+      console.log(`  ${green}✓${reset} Installed AGENTS.md`);
+    }
+    continueAfterAgents();
+  }
 }
 
 function install(isGlobal, mode = codexMode, done = () => {}) {
@@ -562,8 +661,7 @@ function install(isGlobal, mode = codexMode, done = () => {}) {
   const migrationPlan = detectMigrationPlan(codexDir, mode);
 
   if (!migrationPlan.hasChanges) {
-    installCore(isGlobal, mode, migrationPlan, false);
-    done();
+    installCore(isGlobal, mode, migrationPlan, false, done);
     return;
   }
 
@@ -572,23 +670,20 @@ function install(isGlobal, mode = codexMode, done = () => {}) {
 
   if (hasMigrate) {
     console.log(`  ${green}✓${reset} Migration approved by --migrate`);
-    installCore(isGlobal, mode, migrationPlan, true);
-    done();
+    installCore(isGlobal, mode, migrationPlan, true, done);
     return;
   }
 
   if (hasSkipMigrate) {
     console.log(`  ${yellow}Skipping migration due to --skip-migrate.${reset}`);
-    installCore(isGlobal, mode, migrationPlan, false);
-    done();
+    installCore(isGlobal, mode, migrationPlan, false, done);
     return;
   }
 
   if (!isInteractiveTerminal) {
     console.log(`  ${yellow}Skipping migration in non-interactive mode.${reset}`);
     console.log(`  ${dim}Re-run with --migrate to apply cleanup or --skip-migrate to keep legacy files explicitly.${reset}`);
-    installCore(isGlobal, mode, migrationPlan, false);
-    done();
+    installCore(isGlobal, mode, migrationPlan, false, done);
     return;
   }
 
@@ -604,8 +699,7 @@ function install(isGlobal, mode = codexMode, done = () => {}) {
     if (!applyMigration) {
       console.log(`  ${yellow}Keeping legacy files.${reset}`);
     }
-    installCore(isGlobal, mode, migrationPlan, applyMigration);
-    done();
+    installCore(isGlobal, mode, migrationPlan, applyMigration, done);
   });
 }
 

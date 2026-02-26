@@ -8,6 +8,9 @@ commands.html
 
 # Local test installs
 .codex/
+!.codex/
+.codex/*
+!.codex/config.toml
 
 # Build artifacts (committed to npm, not git)
 hooks/dist/

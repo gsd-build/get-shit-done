@@ -21,7 +21,7 @@ get-shit-done-codex (GSD) solves context rot — the quality degradation that ha
 
 ## What Changed In This Fork
 
-- **AGENTS-first for Codex:** `AGENTS.md` is the primary behavior contract  . [Agent.md > Skills.md](https://vercel.com/blog/agents-md-outperforms-skills-in-our-agent-evals)
+- **AGENTS-first for Codex:** `AGENTS.md` is the primary behavior contract . [Agent.md > Skills.md](https://vercel.com/blog/agents-md-outperforms-skills-in-our-agent-evals)
 - **Two command surfaces:** choose native skills (`$gsd-*`) or prompt aliases (`/prompts:gsd-*`).
 - **Installer integrity checks:** `--verify` audits installation health, `--repair` restores missing artifacts.
 - **Mode-aware installs:** installer adapts `AGENTS.md` and command guidance to your chosen mode.
@@ -58,13 +58,28 @@ npx @undeemed/get-shit-done-codex --verify --repair --global     # Auto-repair
 
 ### Codex Modes
 
-| Mode      | Installs                     | Use Commands Like           |
-| --------- | ---------------------------- | --------------------------- |
-| `skills` (default) | `skills/gsd-*/SKILL.md`      | `$gsd-help`, `$gsd-plan-phase 1` |
-| `prompts` | `prompts/gsd-*.md`           | `/prompts:gsd-help`         |
+| Mode               | Installs                | Use Commands Like                |
+| ------------------ | ----------------------- | -------------------------------- |
+| `skills` (default) | `skills/gsd-*/SKILL.md` | `$gsd-help`, `$gsd-plan-phase 1` |
+| `prompts`          | `prompts/gsd-*.md`      | `/prompts:gsd-help`              |
 
 After installation, run `codex` (CLI) or `codex app` (Desktop), then run `$gsd-help` (or `/prompts:gsd-help` in prompts mode).
 Single-surface policy: mixed `skills/` + `prompts/` installs are treated as drift and fail `--verify`.
+
+### What Gets Installed
+
+The installer distributes everything GSD needs:
+
+- **`AGENTS.md`** — behavior contract and command reference for Codex
+- **`.codex/config.toml`** — multi-agent mode, feature flags, agent role registry, MCP servers
+- **`agents/gsd-*.md`** — rich agent definitions (700+ lines each) for sub-agent orchestration
+- **`skills/gsd-*/SKILL.md`** or **`prompts/gsd-*.md`** — command surfaces
+- **`get-shit-done/`** — workflow files, templates, and references
+
+On first run, Codex will prompt you to **trust the project** so the config takes effect (one-time, one-click).
+
+> [!NOTE]
+> `.codex/config.toml` is non-destructive — the installer skips it if you already have one, so your customizations are preserved on updates.
 
 ### Installed File Structure
 
@@ -73,8 +88,9 @@ Single-surface policy: mixed `skills/` + `prompts/` installs are treated as drif
 ```text
 ~/.codex/
 ├── AGENTS.md
-├── skills/
-│   └── gsd-*/SKILL.md
+├── .codex/config.toml
+├── agents/gsd-*.md
+├── skills/gsd-*/SKILL.md
 └── get-shit-done/
 ```
 
@@ -83,8 +99,9 @@ Single-surface policy: mixed `skills/` + `prompts/` installs are treated as drif
 ```text
 ~/.codex/
 ├── AGENTS.md
-├── prompts/
-│   └── gsd-*.md
+├── .codex/config.toml
+├── agents/gsd-*.md
+├── prompts/gsd-*.md
 └── get-shit-done/
 ```
 
@@ -92,7 +109,7 @@ For local installs, replace `~/.codex/` with `./`.
 
 ### Verify And Repair
 
-- `--verify`: checks `AGENTS.md`, command surfaces, workflow assets, and version metadata.
+- `--verify`: checks `AGENTS.md`, `config.toml`, agent definitions, command surfaces, workflow assets, and version metadata.
 - `--verify --repair`: reinstalls missing/broken artifacts and verifies again.
 - Migration is **detect-then-confirm**, not automatic:
   - Interactive install asks before removing legacy surface files
@@ -250,6 +267,12 @@ Git bisect finds exact failing task. Each task independently revertable.
 - Restart Codex to reload installed command surfaces
 - Check `~/.codex/skills/gsd-*/SKILL.md` (global) or `./skills/gsd-*/SKILL.md` (local)
 - If using prompt aliases, check `~/.codex/prompts/gsd-*.md` (global) or `./prompts/gsd-*.md` (local)
+
+**Multi-agent / sub-agents not working?**
+
+- Check `.codex/config.toml` exists in your install directory
+- Ensure the project is **trusted** in Codex (it prompts on first run)
+- Run `--verify` to check all artifacts are present
 
 **Update to latest:**
 

@@ -1,6 +1,6 @@
 # get-shit-done-codex (GSD) - Agent Instructions
 
-A meta-prompting, context engineering and spec-driven development system for Codex CLI.
+A meta-prompting, context engineering and spec-driven development system for Codex CLI and Desktop.
 
 ## Overview
 

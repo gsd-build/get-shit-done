@@ -155,3 +155,87 @@ describe('installer codex modes', () => {
     assert.match(verify.output, /Single command surface required/, 'verify should explain mixed-surface policy');
   });
 });
+
+const AGENTS_DIR = path.join(REPO_ROOT, 'agents');
+
+function expectedAgentDefCount() {
+  if (!fs.existsSync(AGENTS_DIR)) return 0;
+  return fs.readdirSync(AGENTS_DIR).filter((e) => /^gsd-.*\.md$/i.test(e)).length;
+}
+
+function listInstalledAgentDefs(tmpDir) {
+  const agentsDir = path.join(tmpDir, 'agents');
+  if (!fs.existsSync(agentsDir)) return [];
+  return fs.readdirSync(agentsDir).filter((e) => /^gsd-.*\.md$/i.test(e));
+}
+
+describe('installer config.toml and agent definitions', () => {
+  let tmpDir;
+
+  beforeEach(() => {
+    tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), 'gsd-config-test-'));
+  });
+
+  afterEach(() => {
+    cleanup(tmpDir);
+  });
+
+  test('installs config.toml on fresh install', () => {
+    const install = runInstaller('--local --codex-mode skills', tmpDir);
+    assert.ok(install.success, `Install failed: ${install.error}`);
+
+    const configPath = path.join(tmpDir, '.codex', 'config.toml');
+    assert.ok(fs.existsSync(configPath), 'config.toml should be installed');
+
+    const content = fs.readFileSync(configPath, 'utf8');
+    assert.match(content, /multi_agent\s*=\s*true/, 'config.toml should contain multi_agent = true');
+    assert.match(content, /\[agents\./, 'config.toml should contain agent definitions');
+  });
+
+  test('skips config.toml when it already exists', () => {
+    const install1 = runInstaller('--local --codex-mode skills', tmpDir);
+    assert.ok(install1.success, `First install failed: ${install1.error}`);
+
+    const configPath = path.join(tmpDir, '.codex', 'config.toml');
+    fs.writeFileSync(configPath, '# user customized\n', 'utf8');
+
+    const install2 = runInstaller('--local --codex-mode skills', tmpDir);
+    assert.ok(install2.success, `Re-install failed: ${install2.error}`);
+
+    const content = fs.readFileSync(configPath, 'utf8');
+    assert.strictEqual(content, '# user customized\n', 'config.toml should not be overwritten');
+  });
+
+  test('installs agent definition files', () => {
+    const expected = expectedAgentDefCount();
+    if (expected === 0) return; // skip if no agents in source
+
+    const install = runInstaller('--local --codex-mode skills', tmpDir);
+    assert.ok(install.success, `Install failed: ${install.error}`);
+
+    const installed = listInstalledAgentDefs(tmpDir);
+    assert.strictEqual(installed.length, expected, `agent defs count should match source (${expected})`);
+  });
+
+  test('agent definitions use $ notation in skills mode', () => {
+    const install = runInstaller('--local --codex-mode skills', tmpDir);
+    assert.ok(install.success, `Install failed: ${install.error}`);
+
+    const installed = listInstalledAgentDefs(tmpDir);
+    if (installed.length === 0) return;
+
+    const sample = fs.readFileSync(path.join(tmpDir, 'agents', installed[0]), 'utf8');
+    assert.doesNotMatch(sample, /\/gsd:/, 'agent defs should not contain /gsd: notation in skills mode');
+  });
+
+  test('verify passes with config.toml and agents installed', () => {
+    const install = runInstaller('--local --codex-mode skills', tmpDir);
+    assert.ok(install.success, `Install failed: ${install.error}`);
+
+    const verify = runInstaller('--verify --local --codex-mode skills', tmpDir);
+    assert.ok(verify.success, `Verify failed: ${verify.error}`);
+    assert.match(verify.output, /config\.toml installed/, 'verify should check config.toml');
+    assert.match(verify.output, /Agent definitions complete/, 'verify should check agent definitions');
+    assert.match(verify.output, /Integrity check passed\./, 'verify should pass');
+  });
+});
