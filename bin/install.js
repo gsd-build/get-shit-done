@@ -312,7 +312,10 @@ function installConfig(src, codexDir, pathPrefix) {
   const configDest = path.join(codexConfigDir, 'config.toml');
   if (fs.existsSync(configDest)) return false;
   fs.mkdirSync(codexConfigDir, { recursive: true });
-  const content = applyPathPrefixReplacements(fs.readFileSync(configSrc, 'utf8'), pathPrefix);
+  let content = applyPathPrefixReplacements(fs.readFileSync(configSrc, 'utf8'), pathPrefix);
+  if (pathPrefix === '~/.codex/') {
+    content = content.replace(/agents\/gsd-/g, '~/.codex/agents/gsd-');
+  }
   fs.writeFileSync(configDest, content, 'utf8');
   return true;
 }
