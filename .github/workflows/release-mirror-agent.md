@@ -8,6 +8,8 @@ on:
       - upstream-sync-agent
     types:
       - completed
+    branches:
+      - main
 
   workflow_dispatch:
     inputs:

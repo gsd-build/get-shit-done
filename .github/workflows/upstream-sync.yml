@@ -14,14 +14,14 @@
 # Schedule: runs every 4 hours. Both sync and release-mirror jobs exit silently when nothing to do.
 
 on:
-  schedule:
-    - cron: '0 */4 * * *'  # Every 4 hours (00:00, 04:00, 08:00, 12:00, 16:00, 20:00 UTC)
+  #schedule:
+  #  - cron: '0 */4 * * *'  # Every 4 hours (00:00, 04:00, 08:00, 12:00, 16:00, 20:00 UTC)
   workflow_dispatch:
   push:
     branches:
       - 'copilot/**'
 
-name: Upstream Sync
+name: (DEPRECATED) Upstream Sync
 
 concurrency:
   group: upstream-sync

@@ -23,12 +23,13 @@
 #
 # Sync fork with upstream, regenerate wrapper layer, and open/update a PR safely.
 #
-# gh-aw-metadata: {"schema_version":"v1","frontmatter_hash":"99a6b2261fcf80122334da530e8a485a3c2fee04ebf92de27c8806451df7e8f5","compiler_version":"v0.50.4"}
+# gh-aw-metadata: {"schema_version":"v1","frontmatter_hash":"56f8868174e6b6cae735266164a0b20a66746e85ce2baea45ac6ced861ad5657","compiler_version":"v0.50.4"}
 
 name: "upstream-sync-agent"
 "on":
   schedule:
-  - cron: "0 */4 * * *"
+  - cron: "27 */4 * * *"
+    # Friendly format: every 4h (scattered)
   workflow_dispatch:
 
 permissions: {}
@@ -352,7 +353,7 @@ jobs:
           mkdir -p /tmp/gh-aw/safeoutputs
           mkdir -p /tmp/gh-aw/mcp-logs/safeoutputs
           cat > /opt/gh-aw/safeoutputs/config.json << 'GH_AW_SAFE_OUTPUTS_CONFIG_EOF'
-          {"add_comment":{"max":3,"target":"*"},"add_labels":{"max":3,"target":"*"},"add_reviewer":{"max":2},"close_issue":{"max":2,"target":"*"},"create_issue":{"max":3},"create_pull_request":{"auto_merge":true,"max":1},"missing_data":{},"missing_tool":{},"noop":{"max":1},"update_pull_request":{"max":3}}
+          {"add_comment":{"max":3,"target":"*"},"add_labels":{"max":3,"target":"*"},"add_reviewer":{"max":2},"close_issue":{"max":2,"target":"*"},"create_issue":{"max":3},"create_pull_request":{"auto_merge":true,"max":1},"merge-clean-sync-pr":{"description":"Merge latest open upstream-sync PR when auto-merge is not armed and PR is already clean.","inputs":{"base":{"default":"main","description":"Base branch to target","required":false,"type":"string"}}},"missing_data":{},"missing_tool":{},"noop":{"max":1},"update_pull_request":{"max":3}}
           GH_AW_SAFE_OUTPUTS_CONFIG_EOF
           cat > /opt/gh-aw/safeoutputs/tools.json << 'GH_AW_SAFE_OUTPUTS_TOOLS_EOF'
           [
@@ -657,6 +658,21 @@ jobs:
                 "type": "object"
               },
               "name": "missing_data"
+            },
+            {
+              "description": "Merge latest open upstream-sync PR when auto-merge is not armed and PR is already clean.",
+              "inputSchema": {
+                "additionalProperties": false,
+                "properties": {
+                  "base": {
+                    "default": "main",
+                    "description": "Base branch to target",
+                    "type": "string"
+                  }
+                },
+                "type": "object"
+              },
+              "name": "merge_clean_sync_pr"
             }
           ]
           GH_AW_SAFE_OUTPUTS_TOOLS_EOF
@@ -1285,6 +1301,7 @@ jobs:
     needs:
       - activation
       - agent
+      - merge_clean_sync_pr
       - safe_outputs
     if: (always()) && (needs.agent.result != 'skipped')
     runs-on: ubuntu-slim
@@ -1392,6 +1409,64 @@ jobs:
             setupGlobals(core, github, context, exec, io);
             const { main } = require('/opt/gh-aw/actions/handle_create_pr_error.cjs');
             await main();
+
+  merge_clean_sync_pr:
+    needs: agent
+    if: >
+      ((!cancelled()) && (needs.agent.result != 'skipped')) && (contains(needs.agent.outputs.output_types, 'merge_clean_sync_pr'))
+    runs-on: ubuntu-latest
+    permissions:
+      pull-requests: write
+    steps:
+      - name: Download agent output artifact
+        continue-on-error: true
+        uses: actions/download-artifact@018cc2cf5baa6db3ef3c5f8a56943fffe632ef53 # v6
+        with:
+          name: agent-output
+          path: /opt/gh-aw/safe-jobs/
+      - name: Setup Safe Job Environment Variables
+        run: |
+          find "/opt/gh-aw/safe-jobs/" -type f -print
+          echo "GH_AW_AGENT_OUTPUT=/opt/gh-aw/safe-jobs/agent_output.json" >> "$GITHUB_ENV"
+      - name: Merge clean sync PR fallback
+        run: |
+          set -euo pipefail
+
+          BASE="$BASE_INPUT"
+          PR_JSON=$(gh pr list \
+            --state open \
+            --base "$BASE" \
+            --json number,headRefName,autoMergeRequest,mergeStateStatus,url \
+            --jq 'map(select(.headRefName | startswith("automated/upstream-sync-"))) | sort_by(.number) | last')
+
+          if [ -z "$PR_JSON" ] || [ "$PR_JSON" = "null" ]; then
+            echo "No open upstream-sync PR found for fallback merge."
+            exit 0
+          fi
+
+          PR_NUMBER=$(echo "$PR_JSON" | jq -r '.number')
+          PR_URL=$(echo "$PR_JSON" | jq -r '.url')
+          PR_STATE=$(echo "$PR_JSON" | jq -r '.mergeStateStatus')
+          AUTO_MERGE_SET=$(echo "$PR_JSON" | jq -r '.autoMergeRequest != null')
+
+          echo "Found sync PR #$PR_NUMBER ($PR_URL), mergeStateStatus=$PR_STATE, autoMergeSet=$AUTO_MERGE_SET"
+
+          if [ "$AUTO_MERGE_SET" = "true" ]; then
+            echo "Auto-merge already configured."
+            exit 0
+          fi
+
+          if [ "$PR_STATE" = "CLEAN" ]; then
+            gh pr merge "$PR_NUMBER" --merge --delete-branch=false
+            echo "Merged clean sync PR #$PR_NUMBER directly."
+            exit 0
+          fi
+
+          gh pr merge "$PR_NUMBER" --auto --merge --delete-branch=false
+          echo "Enabled auto-merge for sync PR #$PR_NUMBER."
+        env:
+          BASE_INPUT: ${{ inputs.base }}
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
   safe_outputs:
     needs:

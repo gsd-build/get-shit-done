@@ -4,7 +4,7 @@ description: "Sync fork with upstream, regenerate wrapper layer, and open/update
 
 on:
   schedule:
-    - cron: "0 */4 * * *"
+    - cron: "every 4h"
   workflow_dispatch:
 
 # Agentic workflows are markdown + frontmatter, compiled to .lock.yml. [1](https://cicube.io/blog/github-actions-outputs/)
@@ -86,6 +86,59 @@ safe-outputs:
     draft: false
     auto-merge: true
 
+  jobs:
+    merge-clean-sync-pr:
+      description: "Merge latest open upstream-sync PR when auto-merge is not armed and PR is already clean."
+      runs-on: ubuntu-latest
+      permissions:
+        pull-requests: write
+      inputs:
+        base:
+          description: "Base branch to target"
+          required: false
+          type: string
+          default: "main"
+      steps:
+        - name: Merge clean sync PR fallback
+          env:
+            GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+            BASE_INPUT: ${{ inputs.base }}
+          run: |
+            set -euo pipefail
+
+            BASE="$BASE_INPUT"
+            PR_JSON=$(gh pr list \
+              --state open \
+              --base "$BASE" \
+              --json number,headRefName,autoMergeRequest,mergeStateStatus,url \
+              --jq 'map(select(.headRefName | startswith("automated/upstream-sync-"))) | sort_by(.number) | last')
+
+            if [ -z "$PR_JSON" ] || [ "$PR_JSON" = "null" ]; then
+              echo "No open upstream-sync PR found for fallback merge."
+              exit 0
+            fi
+
+            PR_NUMBER=$(echo "$PR_JSON" | jq -r '.number')
+            PR_URL=$(echo "$PR_JSON" | jq -r '.url')
+            PR_STATE=$(echo "$PR_JSON" | jq -r '.mergeStateStatus')
+            AUTO_MERGE_SET=$(echo "$PR_JSON" | jq -r '.autoMergeRequest != null')
+
+            echo "Found sync PR #$PR_NUMBER ($PR_URL), mergeStateStatus=$PR_STATE, autoMergeSet=$AUTO_MERGE_SET"
+
+            if [ "$AUTO_MERGE_SET" = "true" ]; then
+              echo "Auto-merge already configured."
+              exit 0
+            fi
+
+            if [ "$PR_STATE" = "CLEAN" ]; then
+              gh pr merge "$PR_NUMBER" --merge --delete-branch=false
+              echo "Merged clean sync PR #$PR_NUMBER directly."
+              exit 0
+            fi
+
+            gh pr merge "$PR_NUMBER" --auto --merge --delete-branch=false
+            echo "Enabled auto-merge for sync PR #$PR_NUMBER."
+
   update-pull-request:
     max: 3
     target: "*"
@@ -163,6 +216,8 @@ If generation + verification pass:
   - no modifications in upstream-owned paths
 - Use safe output `create-pull-request` if there is no open sync PR.
 - Otherwise use `update-pull-request` to refresh title/body.
+- After creating/updating the sync PR, invoke safe output `merge_clean_sync_pr` with `{ "base": "main" }`.
+  - This is required to handle the GitHub API edge case where auto-merge is not armed because the PR is already in clean state.
 - PR title format:
   `sync: upstream changes from <short_sha>`
 - PR body MUST include:
