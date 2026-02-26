@@ -1,5 +1,5 @@
 /**
- * GSD Tools Tests - Phase
+ * GMSD Tools Tests - Phase
  */
 
 const { test, describe, beforeEach, afterEach } = require('node:test');
@@ -1107,7 +1107,7 @@ describe('phase complete command', () => {
 // comparePhaseNum and normalizePhaseName (imported directly)
 // ─────────────────────────────────────────────────────────────────────────────
 
-const { comparePhaseNum, normalizePhaseName } = require('../get-shit-done/bin/lib/core.cjs');
+const { comparePhaseNum, normalizePhaseName } = require('../get-my-shit-done/bin/lib/core.cjs');
 
 describe('comparePhaseNum', () => {
   test('sorts integer phases numerically', () => {

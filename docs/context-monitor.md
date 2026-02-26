@@ -19,7 +19,7 @@ The statusline shows context usage to the **user**, but the **agent** has no awa
 |-------|-----------|----------------|
 | Normal | > 35% | No warning |
 | WARNING | <= 35% | Wrap up current task, avoid starting new complex work |
-| CRITICAL | <= 25% | Stop immediately, save state (`/gsd:pause-work`) |
+| CRITICAL | <= 25% | Stop immediately, save state (`/gmsd:pause-work`) |
 
 ## Debounce
 
@@ -31,13 +31,13 @@ To avoid spamming the agent with repeated warnings:
 ## Architecture
 
 ```
-Statusline Hook (gsd-statusline.js)
+Statusline Hook (gmsd-statusline.js)
     | writes
     v
 /tmp/claude-ctx-{session_id}.json
     ^ reads
     |
-Context Monitor (gsd-context-monitor.js, PostToolUse)
+Context Monitor (gmsd-context-monitor.js, PostToolUse)
     | injects
     v
 additionalContext -> Agent sees warning
@@ -54,13 +54,13 @@ The bridge file is a simple JSON object:
 }
 ```
 
-## Integration with GSD
+## Integration with GMSD
 
-GSD's `/gsd:pause-work` command saves execution state. The WARNING message suggests using it. The CRITICAL message instructs immediate state save.
+GMSD's `/gmsd:pause-work` command saves execution state. The WARNING message suggests using it. The CRITICAL message instructs immediate state save.
 
 ## Setup
 
-Both hooks are automatically registered during `npx get-shit-done-cc` installation:
+Both hooks are automatically registered during `npx get-my-shit-done-cc` installation:
 
 - **Statusline** (writes bridge file): Registered as `statusLine` in settings.json
 - **Context Monitor** (reads bridge file): Registered as `PostToolUse` hook in settings.json
@@ -71,7 +71,7 @@ Manual registration in `~/.claude/settings.json`:
 {
   "statusLine": {
     "type": "command",
-    "command": "node ~/.claude/hooks/gsd-statusline.js"
+    "command": "node ~/.claude/hooks/gmsd-statusline.js"
   },
   "hooks": {
     "PostToolUse": [
@@ -79,7 +79,7 @@ Manual registration in `~/.claude/settings.json`:
         "hooks": [
           {
             "type": "command",
-            "command": "node ~/.claude/hooks/gsd-context-monitor.js"
+            "command": "node ~/.claude/hooks/gmsd-context-monitor.js"
           }
         ]
       }

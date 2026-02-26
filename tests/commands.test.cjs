@@ -1,5 +1,5 @@
 /**
- * GSD Tools Tests - Commands
+ * GMSD Tools Tests - Commands
  */
 
 const { test, describe, beforeEach, afterEach } = require('node:test');

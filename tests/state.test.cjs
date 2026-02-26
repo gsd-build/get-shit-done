@@ -1,5 +1,5 @@
 /**
- * GSD Tools Tests - State
+ * GMSD Tools Tests - State
  */
 
 const { test, describe, beforeEach, afterEach } = require('node:test');
@@ -158,7 +158,7 @@ describe('state-snapshot command', () => {
 **Status:** Ready to plan
 `
     );
-    const outsideDir = fs.mkdtempSync(path.join(require('os').tmpdir(), 'gsd-test-outside-'));
+    const outsideDir = fs.mkdtempSync(path.join(require('os').tmpdir(), 'gmsd-test-outside-'));
 
     try {
       const result = runGsdTools(`state-snapshot --cwd "${tmpDir}"`, outsideDir);
@@ -340,7 +340,7 @@ describe('state json command', () => {
     assert.ok(result.success, `Command failed: ${result.error}`);
 
     const output = JSON.parse(result.output);
-    assert.strictEqual(output.gsd_state_version, '1.0', 'should have version 1.0');
+    assert.strictEqual(output.gmsd_state_version, '1.0', 'should have version 1.0');
     assert.strictEqual(output.current_phase, '05', 'current phase extracted');
     assert.strictEqual(output.current_phase_name, 'Deployment', 'phase name extracted');
     assert.strictEqual(output.current_plan, '05-03', 'current plan extracted');
@@ -355,7 +355,7 @@ describe('state json command', () => {
     fs.writeFileSync(
       path.join(tmpDir, '.planning', 'STATE.org'),
       `:PROPERTIES:
-:gsd_state_version: 1.0
+:gmsd_state_version: 1.0
 :current_phase: 03
 :status: paused
 :stopped_at: Plan 2 of Phase 3
@@ -372,7 +372,7 @@ describe('state json command', () => {
     assert.ok(result.success, `Command failed: ${result.error}`);
 
     const output = JSON.parse(result.output);
-    assert.strictEqual(output.gsd_state_version, '1.0', 'version from frontmatter');
+    assert.strictEqual(output.gmsd_state_version, '1.0', 'version from frontmatter');
     assert.strictEqual(output.current_phase, '03', 'phase from frontmatter');
     assert.strictEqual(output.status, 'paused', 'status from frontmatter');
     assert.strictEqual(output.stopped_at, 'Plan 2 of Phase 3', 'stopped_at from frontmatter');
@@ -432,7 +432,7 @@ describe('STATE.md frontmatter sync', () => {
 
     const content = fs.readFileSync(path.join(tmpDir, '.planning', 'STATE.org'), 'utf-8');
     assert.ok(content.startsWith(':PROPERTIES:\n'), 'should start with property drawer');
-    assert.ok(content.includes(':gsd_state_version: 1.0'), 'should have version field');
+    assert.ok(content.includes(':gmsd_state_version: 1.0'), 'should have version field');
     assert.ok(content.includes(':current_phase: 02'), 'frontmatter should have current phase');
     assert.ok(content.includes('**Current Phase:** 02'), 'body field should be preserved');
     assert.ok(content.includes('**Status:** Executing Plan 1'), 'updated field in body');

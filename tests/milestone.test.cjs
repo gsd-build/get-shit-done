@@ -1,5 +1,5 @@
 /**
- * GSD Tools Tests - Milestone
+ * GMSD Tools Tests - Milestone
  */
 
 const { test, describe, beforeEach, afterEach } = require('node:test');

@@ -1,5 +1,5 @@
 /**
- * GSD Tools Tests - Roadmap
+ * GMSD Tools Tests - Roadmap
  */
 
 const { test, describe, beforeEach, afterEach } = require('node:test');
