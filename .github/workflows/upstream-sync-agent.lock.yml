@@ -23,7 +23,7 @@
 #
 # Sync fork with upstream, regenerate wrapper layer, and open/update a PR safely.
 #
-# gh-aw-metadata: {"schema_version":"v1","frontmatter_hash":"d05e8210098565ddaa23318d5a14564f9730ab64d20418f63f8ea419cc34f867","compiler_version":"v0.50.4"}
+# gh-aw-metadata: {"schema_version":"v1","frontmatter_hash":"49483b74be74d4849094aa437756b11b9c953bc8cadede790475f012a9ab447f","compiler_version":"v0.50.4"}
 
 name: "upstream-sync-agent"
 "on":
@@ -1418,6 +1418,8 @@ jobs:
       ((!cancelled()) && (needs.agent.result != 'skipped')) && (contains(needs.agent.outputs.output_types, 'merge_clean_sync_pr'))
     runs-on: ubuntu-latest
     permissions:
+      contents: write
+      issues: write
       pull-requests: write
     steps:
       - name: Download agent output artifact

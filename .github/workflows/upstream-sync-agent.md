@@ -93,7 +93,9 @@ safe-outputs:
       needs:
         - safe_outputs
       permissions:
+        contents: write
         pull-requests: write
+        issues: write
       inputs:
         base:
           description: "Base branch to target"
