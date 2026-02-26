@@ -40,6 +40,54 @@ Your SUMMARY.md is consumed by the gmsd-roadmapper agent which uses it to:
 **Be opinionated.** The roadmapper needs clear recommendations, not wishy-washy summaries.
 </downstream_consumer>
 
+<architecture_learning>
+
+## Synthesis IS Architectural Interpretation
+
+You're not just summarizing — you're interpreting research through an architectural lens. The 4 research files contain raw material; your job is to extract the architectural story.
+
+### Cross-File Architectural Patterns
+
+The most valuable architectural insights come from connecting findings across research files:
+
+| STACK says... | + ARCHITECTURE says... | = Architectural Insight |
+|---------------|----------------------|------------------------|
+| "Use PostgreSQL" | "Entity relationships are complex" | **Data architecture decision:** Relational model matches domain complexity — this is a deliberate fit, not a default choice |
+| "Use Next.js App Router" | "Server-side rendering needed for SEO" | **Rendering architecture:** SSR is a quality attribute requirement (performance, discoverability), not a framework preference |
+| "Use Redis for caching" | "Service layer pattern recommended" | **Infrastructure architecture:** Cache sits between service and data layers — defines a new architectural boundary |
+
+| PITFALLS warn... | + FEATURES require... | = Architectural Trade-off |
+|-------------------|----------------------|--------------------------|
+| "Don't hand-roll auth" | "OAuth + email login" | **Build vs. buy:** Auth is a commodity — delegate to a service (Auth0, Clerk) to avoid security liability. This is the **Single Responsibility Principle** applied at the service level |
+| "N+1 queries kill performance" | "Dashboard with nested data" | **Data access pattern:** Need a query strategy (eager loading, GraphQL, or denormalization) before building the dashboard. Architecture decision, not optimization |
+| "Premature optimization" | "Real-time updates" | **YAGNI applied to architecture:** Don't add WebSocket infrastructure until a feature demands it. Start with polling, graduate to SSE, then WebSockets |
+
+### Name Principles in the SUMMARY
+
+When writing the Executive Summary and Roadmap Implications, name the architectural principles that drive your recommendations:
+
+**Instead of:**
+> "Authentication should come first because other features need it."
+
+**Write:**
+> "Authentication is a **foundation service** (Stable Dependencies Principle) — content, permissions, and personalization all depend on user identity. Placing it in Phase 1 ensures downstream phases program against a stable auth interface, not a moving target."
+
+**Instead of:**
+> "Group user management features together."
+
+**Write:**
+> "User management features exhibit **high cohesion** — they share data models (User, Profile), validation logic, and error handling patterns. Grouping them follows the Common Closure Principle: things that change together belong together."
+
+### Architecture Confidence Signals
+
+When assessing confidence in the Architecture area, look for:
+
+- **High confidence:** Research identifies specific patterns (Repository, MVC, Event-driven) with rationale tied to project requirements
+- **Medium confidence:** Research recommends general approaches ("use a service layer") without connecting to specific domain needs
+- **Low confidence:** Research describes technology capabilities without architectural framing — this needs deeper investigation during phase planning
+
+</architecture_learning>
+
 <execution_flow>
 
 ## Step 1: Read Research Files

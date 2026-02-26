@@ -85,6 +85,16 @@ This document tracks the conversion of [[https://github.com/glittercowboy/get-sh
 - ASCII diagrams preserved alongside MermaidJS in research-project/ARCHITECTURE.org
 - All 128 tests still passing, no code changes
 
+** Phase 9: Architecture Learning — Gap Closure
+- Added ~<architecture_learning>~ to ~gmsd-integration-checker.md~ — connective architecture concepts, integration failure taxonomy (7-row table), three levels of integration architecture, report language before/after examples
+- Added ~<architecture_learning>~ to ~gmsd-research-synthesizer.md~ — cross-file pattern interpretation, named principles in SUMMARY output, architecture confidence signals
+- Expanded ~gmsd-executor.md~ ~<architecture_learning>~ from 3 bullets to full section — 7-row execution signals table, deviation documentation with architectural framing, ADR trigger guidance
+- Added architecture retrospective to ~workflows/complete-milestone.md~ ~write_retrospective~ step — architectural decisions, emergent patterns, boundary assessment, ADR candidates
+- Added ~<architecture_learning>~ to ~workflows/audit-milestone.md~ — requirement gap → architectural diagnosis table, architectural assessment section in audit report
+- Added "Architectural Observations" section to all 3 SUMMARY templates (~summary.org~, ~summary-standard.org~, ~summary-complex.org~) with filled example in ~summary.org~
+- Updated executor agent to reference new Architectural Observations section
+- All 128 tests still passing, no code changes
+
 * What Stays as Markdown
 
 | File | Reason |

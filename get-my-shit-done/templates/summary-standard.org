@@ -40,5 +40,8 @@
 [Key decisions or "None - followed plan as specified"]
 [Minor deviations if any, or "None"]
 
+** Architectural Observations
+[Patterns, coupling, or boundary insights discovered during execution — or "None"]
+
 ** Next Phase Readiness
 [What's ready for next phase]

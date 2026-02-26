@@ -413,6 +413,52 @@ Return structured report to milestone auditor:
 
 </output>
 
+<architecture_learning>
+
+## Integration IS Connective Architecture
+
+Integration checking is architectural verification — you're testing whether the **connective architecture** (how components communicate) actually works. Individual phases verify internal architecture; you verify the architecture *between* phases.
+
+### Integration Failures as Architectural Signals
+
+When you find broken wiring, name the architectural principle at work:
+
+| Finding | Architectural Signal | What It Teaches |
+|---------|---------------------|-----------------|
+| Orphaned export (created, never imported) | **Speculative generality** — built capability nobody consumes | Design interfaces from consumer needs, not producer capabilities |
+| Import exists but never called | **Dead code at boundaries** — integration was started but not completed | Interfaces aren't done until they carry data end-to-end |
+| API route with no consumer | **Over-engineering** — capability without demand | API design should be driven by UI/consumer requirements |
+| Missing auth on protected route | **Broken security boundary** — the trust perimeter has a gap | Security is an architectural cross-cutting concern, not a per-feature afterthought |
+| "Works in isolation, fails together" | **Contract mismatch** — components agree on interface shape but not semantics (e.g., different date formats, null handling) | Define explicit contracts including edge cases, not just happy-path types |
+| Circular dependency between phases | **Misplaced boundary** — these concerns belong together or need a mediator | Boundaries should follow natural seams in the domain, not arbitrary grouping |
+| Data flows through but never displays | **Broken feedback loop** — the architecture carries data without closing the user-facing cycle | Every data path should complete: source → transport → transform → present |
+
+### Name the Architecture in Your Report
+
+**Instead of:**
+> **Orphaned:** `formatUserData` — Exported but never imported
+
+**Write:**
+> **Orphaned (speculative generality):** `formatUserData` from Phase 2 (Utils) — Exported but never imported. This suggests the API was designed producer-out rather than consumer-in. The downstream phase either doesn't need this transformation or handles it differently.
+
+**Instead of:**
+> **Missing:** Auth check in Dashboard
+
+**Write:**
+> **Missing (security boundary gap):** Dashboard (Phase 3) accesses user data without calling `useAuth` from Phase 1. The trust perimeter assumed by the auth phase doesn't extend to the dashboard — this is a cross-cutting concern that needs architectural enforcement (middleware, HOC, or route guard), not per-component discipline.
+
+### Three Levels of Integration Architecture
+
+Frame your findings using these levels — each is harder to get right:
+
+1. **Structural integration** (easiest) — Do the files, exports, and imports exist? *This is what most tools check.*
+2. **Behavioral integration** — Do the connected components exchange data correctly? Right formats, error handling, edge cases? *This is where most bugs hide.*
+3. **Architectural integration** — Do the connections express the intended system design? Are boundaries in the right places? Does the coupling match the domain's natural dependencies? *This is what makes systems maintainable.*
+
+When your report finds issues at Level 3, flag them for an ADR — they're architectural decisions that should be recorded.
+
+</architecture_learning>
+
 <critical_rules>
 
 **Check connections, not existence.** Files existing is phase-level. Files connecting is integration-level.

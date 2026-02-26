@@ -80,15 +80,51 @@ grep -n "type=\"checkpoint" [plan-path]
 
 <architecture_learning>
 
-## Architectural Awareness During Execution
+## Execution Reveals Architecture
 
-While executing, watch for these architectural signals:
+You are the only agent that directly encounters the gap between **planned architecture** and **actual code**. Every deviation rule trigger, every unexpected file change, every "this task is harder than it looks" moment is an architectural signal. Name them.
 
-- **Emergent patterns:** If you find yourself writing similar code across tasks, a shared abstraction may be emerging. Note it in the SUMMARY as an architectural observation.
-- **Hidden coupling:** If changing one file unexpectedly requires changes elsewhere, the architecture has coupling the plan didn't anticipate. Document this as a deviation.
-- **Plan deviations as architecture gaps:** When deviation rules trigger (Rules 1-3), the root cause is often an architectural assumption that didn't hold. The plan assumed components were independent, but they share a concern.
+### Execution Signals as Architectural Patterns
 
-Document architectural observations in SUMMARY.md under deviations — these feed back into future planning.
+| What You Encounter | Architectural Signal | Named Principle | What to Write in SUMMARY |
+|--------------------|---------------------|-----------------|--------------------------|
+| Same code pattern across 3+ tasks | **Emergent abstraction** — a shared concern the plan didn't anticipate | DRY / Common Closure Principle | "Tasks 3, 5, 7 all validate user input the same way → candidate for a shared validation module (Common Closure)" |
+| Changing file A forces changes in files B, C | **Hidden coupling** — components share assumptions not expressed in interfaces | Law of Demeter / Interface Segregation | "Modifying `UserService` required changes in `Dashboard` and `Settings` — these share an implicit user-shape contract that should be an explicit type" |
+| Rule 1-3 triggers (auto-fix) | **Plan-architecture mismatch** — the plan assumed a structure that doesn't hold | Dependency Inversion / Separation of Concerns | "Rule 2 triggered: missing auth check in API route — plan assumed auth was middleware-level but it's per-route (architectural boundary is wrong)" |
+| Rule 4 triggers (ask user) | **Architectural decision point** — the code needs structure the plan didn't define | Open-Closed Principle | "New DB table needed — the data model the plan assumed can't accommodate this feature without structural change" |
+| Task depends on another task's output unexpectedly | **Undeclared dependency** — the plan's task graph misses a real coupling | Stable Dependencies Principle | "Task 6 can't run until Task 4's types are committed — the plan listed them as independent but they share a data model" |
+| Existing code resists the planned approach | **Architectural inertia** — the codebase's current structure pushes back against the design | Conway's Law / Path Dependence | "Plan called for a new service module but existing code is organized by feature, not by layer — adapting to the existing structure" |
+| Tests pass individually but fail together | **Integration boundary gap** — unit boundaries don't match system boundaries | Contract Testing / Liskov Substitution | "Auth tests mock the user service, but the real service returns a different shape — the contract between them was never defined" |
+
+### Deviation Documentation with Architectural Framing
+
+When writing deviations in SUMMARY.md, add the architectural dimension:
+
+**Instead of:**
+```markdown
+**1. [Rule 1 - Bug] Fixed missing null check in user service**
+- Found during: Task 4
+- Issue: getUserById returned null for deleted users
+- Fix: Added null check and 404 response
+```
+
+**Write:**
+```markdown
+**1. [Rule 1 - Bug] Fixed missing null check in user service (contract violation)**
+- Found during: Task 4
+- Issue: getUserById returned null for deleted users — callers assumed non-null return
+- Fix: Added null check and 404 response
+- Architectural note: The contract between UserService and its consumers was implicit.
+  A typed return (`User | null`) or Result type would enforce this at the boundary.
+```
+
+### When to Suggest an ADR
+
+If you encounter a Rule 4 deviation or see a recurring pattern across 3+ deviations, suggest in your SUMMARY that this warrants an ADR. Patterns worth capturing:
+
+- Same boundary confusion appearing in multiple tasks → the module structure needs rethinking
+- Repeated auth/permission issues → the security architecture isn't expressed in code
+- Data model changes required by multiple features → the domain model needs explicit design
 
 </architecture_learning>
 
@@ -349,6 +385,18 @@ After all tasks complete, create `{phase}-{plan}-SUMMARY.md` at `.planning/phase
 **One-liner must be substantive:**
 - Good: "JWT auth with refresh rotation using jose library"
 - Bad: "Authentication implemented"
+
+**Architectural Observations section:**
+
+```markdown
+## Architectural Observations
+- **Emergent patterns:** [shared abstractions across tasks, with named principle]
+- **Coupling discovered:** [unexpected dependencies, with named principle]
+- **Boundary assessment:** [were boundaries in the right places?]
+- **ADR candidates:** [decisions worth recording]
+```
+
+Or: "None — architecture matched plan expectations."
 
 **Deviation documentation:**
 

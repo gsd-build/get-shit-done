@@ -94,6 +94,16 @@ Each task was committed atomically:
 
 [Note: "Deviations from Plan" documents unplanned work that was handled automatically via deviation rules. "Issues Encountered" documents problems during planned work that required problem-solving.]
 
+** Architectural Observations
+[Patterns, coupling, or boundary insights discovered during execution. Name the architectural principle.]
+
+- *Emergent patterns:* [Shared abstractions that appeared across tasks — e.g., "Repository pattern emerged in 3 data access tasks"]
+- *Coupling discovered:* [Unexpected dependencies between components — e.g., "UserService and Dashboard share an implicit user-shape contract"]
+- *Boundary assessment:* [Were module boundaries in the right places? — e.g., "Auth middleware belongs at the route level, not per-handler as planned"]
+- *ADR candidates:* [Decisions worth recording — e.g., "Chose jose over jsonwebtoken for Edge compatibility → ADR candidate"]
+
+[Or "None — architecture matched plan expectations" if no observations]
+
 ** User Setup Required
 
 [If USER-SETUP.org was generated:]
@@ -208,6 +218,12 @@ The one-liner should tell someone what actually shipped.
 
 ** Issues Encountered
 - jsonwebtoken CommonJS import failed in Edge runtime - switched to jose (planned library change, worked as expected)
+
+** Architectural Observations
+- *Emergent patterns:* Token validation logic repeated in middleware and API routes — candidate for a shared auth boundary module (DRY at architectural level)
+- *Coupling discovered:* Refresh token rotation couples auth service to database session management — this is intentional coupling (auth owns session state) but should be documented as a dependency boundary
+- *Boundary assessment:* Protected route middleware works at the right layer (Edge middleware) — auth decisions happen before route handlers execute, which is the correct architectural boundary (Separation of Concerns)
+- *ADR candidates:* jose over jsonwebtoken for Edge compatibility → ADR: "Use ESM-native cryptography libraries for Edge runtime support"
 
 ** Next Phase Readiness
 - Auth foundation complete, ready for feature development

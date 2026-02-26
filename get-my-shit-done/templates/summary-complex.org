@@ -47,6 +47,16 @@
 ** Issues Encountered
 [Problems during planned work and resolutions]
 
+** Architectural Observations
+[Patterns, coupling, or boundary insights discovered during execution. Name the architectural principle.]
+
+- *Emergent patterns:* [Shared abstractions that appeared across tasks — e.g., "Repository pattern emerged in 3 data access tasks"]
+- *Coupling discovered:* [Unexpected dependencies between components — e.g., "UserService and Dashboard share an implicit user-shape contract"]
+- *Boundary assessment:* [Were module boundaries in the right places? — e.g., "Auth middleware belongs at the route level, not per-handler as planned"]
+- *ADR candidates:* [Decisions worth recording — e.g., "Chose jose over jsonwebtoken for Edge compatibility → ADR candidate"]
+
+[Or "None — architecture matched plan expectations" if no observations]
+
 ** Next Phase Readiness
 [What's ready for next phase]
 [Blockers or concerns]

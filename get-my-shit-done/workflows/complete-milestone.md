@@ -482,6 +482,28 @@ ls .planning/RETROSPECTIVE.md 2>/dev/null
 ### Key Lessons
 {Specific, actionable takeaways}
 
+### Architecture Retrospective
+
+Review all phase SUMMARYs and VERIFICATION.md files for architectural observations, then assess:
+
+**Architectural Decisions Made:**
+{Extract from SUMMARY.md deviations and decisions — list each with outcome}
+- **Decision:** {what was decided} | **Outcome:** {good / revisit / too early to tell} | **Principle:** {named architectural principle}
+
+**Architectural Patterns That Emerged:**
+{From executor deviations and verifier findings — patterns that weren't planned but appeared}
+- {Pattern name}: {where it emerged, whether it should be formalized}
+
+**Architecture Lessons:**
+{What did this milestone teach about the system's architecture?}
+- **Boundary placement:** {Were module/service boundaries in the right places? Where did coupling surprise us?}
+- **Integration points:** {Which connections between components were harder than expected? Why?}
+- **Quality attributes:** {Which non-functional requirements (performance, security, maintainability) drove architectural decisions?}
+
+**ADR Candidates:**
+{Decisions from this milestone that should be captured as ADRs if they weren't already}
+- {decision} → suggested ADR: {title}
+
 ### Cost Observations
 - Model mix: {X}% opus, {Y}% sonnet, {Z}% haiku
 - Sessions: {count}

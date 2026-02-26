@@ -176,6 +176,43 @@ Route by status (see `<offer_next>`).
 
 </process>
 
+<architecture_learning>
+
+## Frame Audit Findings Architecturally
+
+When presenting audit results, name the architectural pattern behind each finding. The user learns more from "this is a contract mismatch" than from "these components don't work together."
+
+### Requirement Gaps → Architectural Diagnosis
+
+For each unsatisfied or partial requirement, diagnose the architectural root cause:
+
+| Gap Type | Architectural Diagnosis | What It Teaches |
+|----------|------------------------|-----------------|
+| Requirement implemented but not verified | **Observability gap** — the architecture lacks verification hooks at this boundary | Build verification into the architecture (health checks, integration tests at boundaries) |
+| Requirement partially implemented across phases | **Distributed responsibility** — the requirement crosses architectural boundaries without a clear owner | Cross-cutting concerns need explicit architectural treatment (middleware, shared services, aspect-oriented approach) |
+| Requirement orphaned (assigned but never built) | **Planning-architecture mismatch** — the roadmap assumed a structure that didn't accommodate this requirement | Requirements should map to architectural components, not just phases |
+| Integration wiring broken | **Contract violation** — components agreed on interface shape but not behavior | Define contracts explicitly (typed interfaces, API schemas, integration tests) |
+| E2E flow broken at step N | **Broken architectural chain** — the system's layers don't compose for this user journey | Trace user journeys through the architecture before building — each journey should have a clear architectural path |
+
+### In the Audit Report
+
+When writing the MILESTONE-AUDIT.md, add an "Architectural Assessment" section:
+
+```markdown
+## Architectural Assessment
+
+### Boundaries
+{Were phase boundaries aligned with architectural boundaries? Where did they diverge?}
+
+### Integration Architecture
+{How well did components connect? Which interfaces were clean vs. problematic?}
+
+### ADR Review
+{List ADRs created during this milestone. Were they followed? Any that need revision?}
+```
+
+</architecture_learning>
+
 <offer_next>
 Output this markdown directly (not as a code block). Route based on status:
 
