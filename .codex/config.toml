@@ -1,0 +1,66 @@
+:schema https://developers.openai.com/codex/config-schema.json
+
+# Project-scoped Codex config for get-shit-done-codex.
+# Loaded only when this project is trusted.
+# Docs:
+# - https://developers.openai.com/codex/config-basic
+# - https://developers.openai.com/codex/config-reference
+# - https://developers.openai.com/codex/multi-agent
+
+web_search = "live"
+
+[features]
+multi_agent = true
+collaboration_modes = true
+shell_tool = true
+shell_snapshot = true
+unified_exec = true
+apply_patch_freeform = true
+personality = true
+request_rule = true
+
+[agents]
+max_threads = 12
+max_depth = 3
+
+[agents."general-purpose"]
+description = "General fallback role for GSD orchestration and ad-hoc subtasks."
+
+[agents."gsd-codebase-mapper"]
+description = "Map stack, architecture, conventions, testing, and concerns into .planning/codebase docs."
+
+[agents."gsd-debugger"]
+description = "Investigate regressions with hypothesis testing, isolate root cause, and propose or apply fixes."
+
+[agents."gsd-executor"]
+description = "Execute PLAN.md tasks with atomic commits, verification, and summary updates."
+
+[agents."gsd-integration-checker"]
+description = "Verify cross-phase wiring and end-to-end behavior across delivered milestones."
+
+[agents."gsd-phase-researcher"]
+description = "Research phase implementation patterns and write RESEARCH.md artifacts for planners."
+
+[agents."gsd-plan-checker"]
+description = "Stress-test plan quality and requirement coverage before execution."
+
+[agents."gsd-planner"]
+description = "Draft atomic PLAN.md files with objective, context, tasks, and success criteria."
+
+[agents."gsd-project-researcher"]
+description = "Research ecosystem and produce project-level research docs for roadmap creation."
+
+[agents."gsd-research-synthesizer"]
+description = "Synthesize parallel research artifacts into actionable roadmap inputs."
+
+[agents."gsd-roadmapper"]
+description = "Turn requirements into phased ROADMAP.md structure with clear success criteria."
+
+[agents."gsd-verifier"]
+description = "Perform goal-backward verification that outcomes are actually delivered in code."
+
+[mcp_servers.context7]
+url = "https://mcp.context7.com/mcp"
+
+[mcp_servers.context7.env_http_headers]
+CONTEXT7_API_KEY = "CONTEXT7_API_KEY"

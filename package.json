@@ -16,7 +16,8 @@
     "agents",
     "hooks/dist",
     "scripts",
-    "AGENTS.md"
+    "AGENTS.md",
+    ".codex"
   ],
   "keywords": [
     "get-shit-done",

@@ -66,6 +66,25 @@ npx @undeemed/get-shit-done-codex --verify --repair --global     # Auto-repair
 After installation, run `codex` (CLI) or `codex app` (Desktop), then run `$gsd-help` (or `/prompts:gsd-help` in prompts mode).
 Single-surface policy: mixed `skills/` + `prompts/` installs are treated as drift and fail `--verify`.
 
+### Codex Feature Enablement (CLI + Desktop)
+
+This repo includes a project-scoped Codex config at `.codex/config.toml` that enables GSD-critical features:
+
+- Multi-agent/subagent tooling (`features.multi_agent = true`)
+- Unified exec + freeform patch workflows
+- Collaboration modes, shell tool, shell snapshot, smart approvals
+- Project agent role registry (`general-purpose` + all `gsd-*` roles used by workflows)
+- MCP servers for Context7
+
+To ensure this config is active:
+
+1. Mark this repository as **trusted** in Codex.
+2. Restart Codex CLI/App after first opening the project.
+
+Notes:
+- Multi-agent activity is currently surfaced in CLI first; Codex app support is improving over time.
+- Desktop-native features like worktrees, automations, integrated terminal, voice dictation, and notifications are app capabilities and do not require extra repo config.
+
 ### Installed File Structure
 
 `$` skills mode (`--codex-mode skills`, default):

@@ -305,6 +305,49 @@ function removeSkillAliases(skillsDir) {
   return removed;
 }
 
+function installConfig(src, codexDir, pathPrefix) {
+  const configSrc = path.join(src, '.codex', 'config.toml');
+  if (!fs.existsSync(configSrc)) return false;
+  const codexConfigDir = path.join(codexDir, '.codex');
+  const configDest = path.join(codexConfigDir, 'config.toml');
+  if (fs.existsSync(configDest)) return false;
+  fs.mkdirSync(codexConfigDir, { recursive: true });
+  const content = applyPathPrefixReplacements(fs.readFileSync(configSrc, 'utf8'), pathPrefix);
+  fs.writeFileSync(configDest, content, 'utf8');
+  return true;
+}
+
+function installAgentDefs(src, codexDir, pathPrefix, mode) {
+  const agentsSrc = path.join(src, 'agents');
+  if (!fs.existsSync(agentsSrc)) return 0;
+  const agentsDest = path.join(codexDir, 'agents');
+  fs.mkdirSync(agentsDest, { recursive: true });
+  const entries = fs.readdirSync(agentsSrc).filter((e) => /^gsd-.*\.md$/i.test(e));
+  for (const entry of entries) {
+    let content = fs.readFileSync(path.join(agentsSrc, entry), 'utf8');
+    content = applyReplacements(content, pathPrefix);
+    if (mode === 'skills') {
+      content = convertPromptRefsToSkillRefs(content);
+    } else if (mode === 'prompts') {
+      content = convertSkillRefsToPromptRefs(content);
+    }
+    fs.writeFileSync(path.join(agentsDest, entry), content, 'utf8');
+  }
+  return entries.length;
+}
+
+function countSourceAgentDefs(src) {
+  const agentsSrc = path.join(src, 'agents');
+  if (!fs.existsSync(agentsSrc)) return 0;
+  return fs.readdirSync(agentsSrc).filter((e) => /^gsd-.*\.md$/i.test(e)).length;
+}
+
+function countInstalledAgentDefs(codexDir) {
+  const agentsDest = path.join(codexDir, 'agents');
+  if (!fs.existsSync(agentsDest)) return 0;
+  return fs.readdirSync(agentsDest).filter((e) => /^gsd-.*\.md$/i.test(e)).length;
+}
+
 function detectMigrationPlan(codexDir, mode) {
   const promptsDir = path.join(codexDir, 'prompts');
   const skillsDir = path.join(codexDir, 'skills');
@@ -450,8 +493,15 @@ function verifyInstall(isGlobal, expectedMode, strictMode = false) {
   const checks = [];
   const addCheck = (ok, label, detail) => checks.push({ ok, label, detail });
 
+  const expectedAgentCount = countSourceAgentDefs(src);
+
   addCheck(fs.existsSync(codexDir), 'Config directory exists', codexDir);
   addCheck(fs.existsSync(path.join(codexDir, 'AGENTS.md')), 'AGENTS.md installed', path.join(codexDir, 'AGENTS.md'));
+  addCheck(fs.existsSync(path.join(codexDir, '.codex', 'config.toml')), 'config.toml installed', path.join(codexDir, '.codex', 'config.toml'));
+  if (expectedAgentCount > 0) {
+    const installedAgents = countInstalledAgentDefs(codexDir);
+    addCheck(installedAgents === expectedAgentCount, 'Agent definitions complete', `${installedAgents}/${expectedAgentCount}`);
+  }
   addCheck(fs.existsSync(workflowRoot), 'get-shit-done assets installed', workflowRoot);
   addCheck(fs.existsSync(path.join(workflowRoot, 'workflows')), 'Workflow directory installed', path.join(workflowRoot, 'workflows'));
   addCheck(fs.existsSync(path.join(workflowRoot, 'templates')), 'Template directory installed', path.join(workflowRoot, 'templates'));
@@ -515,6 +565,18 @@ function installCore(isGlobal, mode, migrationPlan, applyMigration) {
   fs.writeFileSync(agentsDest, agentsContent, 'utf8');
   console.log(`  ${green}✓${reset} Installed AGENTS.md`);
 
+  const configInstalled = installConfig(src, codexDir, pathPrefix);
+  if (configInstalled) {
+    console.log(`  ${green}✓${reset} Installed .codex/config.toml`);
+  } else {
+    console.log(`  ${dim}-${reset} Skipped .codex/config.toml (already exists or source missing)`);
+  }
+
+  const agentCount = installAgentDefs(src, codexDir, pathPrefix, mode);
+  if (agentCount > 0) {
+    console.log(`  ${green}✓${reset} Installed agents/gsd-*.md (${agentCount} agent definitions)`);
+  }
+
   const gsdSrc = path.join(src, 'commands', 'gsd');
   const entries = fs.readdirSync(gsdSrc);
   const markdownEntries = entries.filter((entry) => entry.endsWith('.md'));
@@ -545,6 +607,8 @@ function installCore(isGlobal, mode, migrationPlan, applyMigration) {
   - AGENTS.md: ${cyan}${codexDir}/AGENTS.md${reset}
   ${installPromptsEnabled ? `- Prompt commands: ${cyan}${codexDir}/prompts/${reset}` : ''}
   ${installSkillsEnabled ? `- Native skills: ${cyan}${codexDir}/skills/gsd-*/SKILL.md${reset}` : ''}
+  - Config: ${cyan}${codexDir}/.codex/config.toml${reset}
+  - Agent defs: ${cyan}${codexDir}/agents/gsd-*.md${reset}
 
   ${yellow}Getting Started:${reset}
   1. Run ${cyan}codex${reset} (CLI) or ${cyan}codex app${reset} (Desktop)
@@ -554,6 +618,9 @@ function installCore(isGlobal, mode, migrationPlan, applyMigration) {
   ${yellow}Staying Updated:${reset}
   - In Codex: ${cyan}${installSkillsEnabled ? '$gsd-update' : '/prompts:gsd-update'}${reset}
   - In terminal: ${cyan}npx ${NPM_PACKAGE_LATEST}${reset}
+
+  ${dim}Note: Codex will prompt you to trust this project on first run
+  so that the config, agents, and MCP servers take effect.${reset}
 `);
 }
 
