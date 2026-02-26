@@ -1,0 +1,145 @@
+#+title: Upstream Sync Playbook
+#+startup: indent
+#+options: toc:2 num:nil ^:{}
+
+* Overview
+
+GMSD is a fork of [[https://github.com/glittercowboy/get-shit-done][GSD]] with several transformation phases applied (renaming, org-mode conversion, property drawers, ADR integration). The =sync-upstream.js= script automates pulling upstream changes through the GMSD transformation pipeline.
+
+*Approach:* Whole-file transformation. For each file changed upstream, the script fetches its content at the target commit, runs it through every GMSD conversion step, and writes the result. Git computes the actual diff naturally.
+
+* Prerequisites
+
+- Node.js (same version as the project)
+- Clean git working tree (no uncommitted changes)
+- Internet access (to fetch from upstream)
+
+* Step-by-Step Workflow
+
+** 1. Check for upstream releases
+
+#+begin_src shell
+git fetch upstream --tags
+git log --oneline upstream/main --since="1 month ago"
+#+end_src
+
+Or check the [[https://github.com/glittercowboy/get-shit-done/releases][GSD releases page]] for tagged versions.
+
+** 2. Identify the range to sync
+
+Find the last synced version and the target version:
+
+#+begin_src shell
+# Example: sync from v1.21.0 to v1.22.0
+node scripts/sync-upstream.js v1.21.0..v1.22.0 --dry-run
+#+end_src
+
+The =--dry-run= flag shows what would happen without making changes.
+
+** 3. Run the sync
+
+#+begin_src shell
+node scripts/sync-upstream.js v1.21.0..v1.22.0
+#+end_src
+
+This will:
+1. Verify clean working tree
+2. Set up =upstream= remote if needed
+3. Fetch upstream tags
+4. Enumerate changed files in the range
+5. Map upstream paths to GMSD paths
+6. Transform content through the GMSD pipeline
+7. Create branch =gmsd/upstream-sync-YYYY-MM-DD=
+8. Write transformed files and commit
+
+** 4. Review the sync branch
+
+#+begin_src shell
+git diff main...gmsd/upstream-sync-2026-02-26
+#+end_src
+
+Check each changed file to ensure transformations are correct.
+
+** 5. Run the test suite
+
+#+begin_src shell
+node --test tests/*.test.cjs
+#+end_src
+
+All tests should pass. If any fail, investigate whether the upstream change broke an assumption.
+
+** 6. Handle manual-merge sidecars
+
+Files like =README.org= and =CHANGELOG.org= have GMSD-specific content that can't be auto-merged. The script writes =.upstream-sync= sidecar files instead:
+
+#+begin_src shell
+# Compare the sidecar with the current file
+diff README.org README.org.upstream-sync
+
+# Manually integrate changes, then clean up
+rm README.org.upstream-sync
+git add README.org
+git commit --amend --no-edit
+#+end_src
+
+** 7. Address warnings
+
+The script reports warnings for:
+- *Hardcoded .md references* in CJS files that should be =.org= — check if these are genuine (e.g., new upstream files referencing =STATE.md= instead of =STATE.org=)
+- Review each warning and fix as needed
+
+** 8. Merge when ready
+
+#+begin_src shell
+git checkout main
+git merge gmsd/upstream-sync-2026-02-26
+#+end_src
+
+* Handling Common Scenarios
+
+** New upstream files
+
+New files are automatically:
+1. Path-mapped (e.g., =get-shit-done/bin/lib/new.cjs= → =get-my-shit-done/bin/lib/new.cjs=)
+2. Content-transformed (all GSD→GMSD substitutions)
+3. Structurally converted if templates (markdown→org, YAML→property drawers)
+
+** Deleted upstream files
+
+If the upstream deletes a file and it exists at the mapped GMSD path, it will be =git rm='d. If it was already removed in GMSD, it's silently skipped.
+
+** Renamed upstream files
+
+Git reports renames as delete + add. The script handles both operations correctly.
+
+** Upstream changes to skipped files
+
+Files like =package.json=, =.github/=, =README.md=, and =CHANGELOG.md= are always skipped. Review the upstream changelog separately for relevant changes to these files.
+
+* Edge Cases
+
+** Multiple syncs on the same day
+
+The branch name includes the date (=gmsd/upstream-sync-YYYY-MM-DD=). If you need to re-run on the same day, delete the branch first:
+
+#+begin_src shell
+git branch -D gmsd/upstream-sync-2026-02-26
+#+end_src
+
+** Conflicting GMSD customizations
+
+If GMSD has diverged significantly from upstream in a file, the whole-file transformation will overwrite GMSD customizations. Review the diff carefully and restore any GMSD-specific changes.
+
+** Upstream adds a new =.md= file that should stay =.md=
+
+If upstream adds a file that should remain markdown in GMSD (e.g., a new Claude Code command), the path mapping rules already handle this — files under =commands/=, =agents/=, =workflows/= stay as =.md=.
+
+* Transformation Pipeline Reference
+
+The sync script applies these transformations in order:
+
+1. *Path mapping:* GSD paths → GMSD paths (directory renames, extension changes)
+2. *Text substitutions:* =get-shit-done= → =get-my-shit-done=, =gsd-= → =gmsd-=, etc.
+3. *Template structural conversion:* Markdown → Org-mode (headings, code blocks, bold)
+4. *Frontmatter conversion:* YAML =---= blocks → Org =:PROPERTIES:= drawers
+5. *Warning detection:* Scan for hardcoded =.md= references that should be =.org=
