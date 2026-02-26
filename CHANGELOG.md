@@ -6,6 +6,15 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ## [Unreleased]
 
+## [1.23.0] - 2026-02-26
+
+### Added
+
+- **`--path <dir>` installer flag** — install GSD into any arbitrary directory (e.g., `npx @undeemed/get-shit-done-codex --path /path/to/project`). Works with `--verify`, `--repair`, and `--migrate`. Conflicts with `--global`/`--local` are detected.
+- **GitHub Actions CI workflow** (`ci.yml`) — runs full test suite across Node 18/20/22 on every push and PR
+- **README comparison table** — feature-by-feature breakdown vs other Codex forks and upstream
+- **Badge row expansion** — CI status, test count (133), command count (31), agent count (11) badges
+
 ## [1.22.1] - 2026-02-26
 
 ### Fixed

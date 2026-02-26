@@ -41,6 +41,8 @@ const hasRepair = args.includes('--repair');
 const hasNoVersionCheck = args.includes('--no-version-check') || process.env.GSD_SKIP_VERSION_CHECK === '1';
 const hasMigrate = args.includes('--migrate');
 const hasSkipMigrate = args.includes('--skip-migrate') || args.includes('--no-migrate');
+const pathIdx = args.indexOf('--path');
+const customPath = pathIdx !== -1 && args[pathIdx + 1] ? args[pathIdx + 1] : null;
 const isInteractiveTerminal = Boolean(process.stdin.isTTY && process.stdout.isTTY);
 const codexMode = 'skills';
 
@@ -52,6 +54,7 @@ if (hasHelp) {
   ${yellow}Options:${reset}
     ${cyan}-g, --global${reset}              Install globally (to ~/.codex/)
     ${cyan}-l, --local${reset}               Install locally (to current directory)
+    ${cyan}--path <dir>${reset}              Install into a specific directory
     ${cyan}--migrate${reset}                 Apply detected legacy surface cleanup without prompting
     ${cyan}--skip-migrate${reset}            Keep legacy surface files when migration is detected
     ${cyan}--verify${reset}                  Verify current install integrity
@@ -65,6 +68,9 @@ if (hasHelp) {
 
     ${dim}# Install to current project only${reset}
     npx ${NPM_PACKAGE} --local
+
+    ${dim}# Install to a specific directory${reset}
+    npx ${NPM_PACKAGE} --path /path/to/project
 
     ${dim}# Verify global installation${reset}
     npx ${NPM_PACKAGE} --verify --global
@@ -357,13 +363,24 @@ function showCachedVersionWarning() {
   }
 }
 
-function getInstallContext(isGlobal) {
-  const codexDir = isGlobal ? path.join(os.homedir(), '.codex') : process.cwd();
-  return {
-    codexDir,
-    locationLabel: isGlobal ? '~/.codex' : '.',
-    pathPrefix: isGlobal ? '~/.codex/' : './',
-  };
+function getInstallContext(isGlobal, targetPath) {
+  let codexDir;
+  let locationLabel;
+  let pathPrefix;
+  if (targetPath) {
+    codexDir = path.resolve(targetPath);
+    locationLabel = targetPath;
+    pathPrefix = codexDir.endsWith(path.sep) ? codexDir : `${codexDir}${path.sep}`;
+  } else if (isGlobal) {
+    codexDir = path.join(os.homedir(), '.codex');
+    locationLabel = '~/.codex';
+    pathPrefix = '~/.codex/';
+  } else {
+    codexDir = process.cwd();
+    locationLabel = '.';
+    pathPrefix = './';
+  }
+  return { codexDir, locationLabel, pathPrefix };
 }
 
 function listPromptCommandFiles(promptsDir) {
@@ -388,9 +405,9 @@ function detectInstalledMode(promptCount, skillCount) {
   return 'none';
 }
 
-function verifyInstall(isGlobal) {
+function verifyInstall(isGlobal, targetPath) {
   const src = path.join(__dirname, '..');
-  const { codexDir, locationLabel } = getInstallContext(isGlobal);
+  const { codexDir, locationLabel } = getInstallContext(isGlobal, targetPath);
   const promptsDir = path.join(codexDir, 'prompts');
   const skillsDir = path.join(codexDir, 'skills');
   const workflowRoot = path.join(codexDir, 'get-shit-done');
@@ -447,9 +464,9 @@ function verifyInstall(isGlobal) {
   return { ok, detectedMode };
 }
 
-function installCore(isGlobal, migrationPlan, applyMigration, done = () => {}) {
+function installCore(isGlobal, migrationPlan, applyMigration, done = () => {}, targetPath) {
   const src = path.join(__dirname, '..');
-  const { codexDir, locationLabel, pathPrefix } = getInstallContext(isGlobal);
+  const { codexDir, locationLabel, pathPrefix } = getInstallContext(isGlobal, targetPath);
 
   console.log(`  Installing to ${cyan}${locationLabel}${reset}\n`);
   fs.mkdirSync(codexDir, { recursive: true });
@@ -546,12 +563,12 @@ function installCore(isGlobal, migrationPlan, applyMigration, done = () => {}) {
   }
 }
 
-function install(isGlobal, done = () => {}) {
-  const { codexDir } = getInstallContext(isGlobal);
+function install(isGlobal, done = () => {}, targetPath) {
+  const { codexDir } = getInstallContext(isGlobal, targetPath);
   const migrationPlan = detectMigrationPlan(codexDir);
 
   if (!migrationPlan.hasChanges) {
-    installCore(isGlobal, migrationPlan, false, done);
+    installCore(isGlobal, migrationPlan, false, done, targetPath);
     return;
   }
 
@@ -560,13 +577,13 @@ function install(isGlobal, done = () => {}) {
 
   if (hasMigrate) {
     console.log(`  ${green}✓${reset} Migration approved by --migrate`);
-    installCore(isGlobal, migrationPlan, true, done);
+    installCore(isGlobal, migrationPlan, true, done, targetPath);
     return;
   }
 
   if (hasSkipMigrate) {
     console.log(`  ${yellow}Skipping migration due to --skip-migrate.${reset}`);
-    installCore(isGlobal, migrationPlan, false, done);
+    installCore(isGlobal, migrationPlan, false, done, targetPath);
     return;
   }
 
@@ -589,7 +606,7 @@ function install(isGlobal, done = () => {}) {
     if (!applyMigration) {
       console.log(`  ${yellow}Keeping legacy files.${reset}`);
     }
-    installCore(isGlobal, migrationPlan, applyMigration, done);
+    installCore(isGlobal, migrationPlan, applyMigration, done, targetPath);
   });
 }
 
@@ -614,8 +631,14 @@ function promptLocation(done) {
   });
 }
 
-if (hasGlobal && hasLocal) {
-  console.error(`  ${yellow}Cannot specify both --global and --local${reset}`);
+const locationFlagCount = [hasGlobal, hasLocal, !!customPath].filter(Boolean).length;
+if (locationFlagCount > 1) {
+  console.error(`  ${yellow}Cannot specify more than one of --global, --local, and --path${reset}`);
+  process.exit(1);
+}
+
+if (pathIdx !== -1 && !customPath) {
+  console.error(`  ${yellow}--path requires a directory argument${reset}`);
   process.exit(1);
 }
 
@@ -634,21 +657,23 @@ if (!hasNoVersionCheck && !hasVerify) {
 }
 
 if (hasVerify) {
-  const isGlobal = hasLocal ? false : true;
-  let result = verifyInstall(isGlobal);
+  const isGlobal = customPath ? false : (hasLocal ? false : true);
+  let result = verifyInstall(isGlobal, customPath);
 
   if (!result.ok && hasRepair) {
     console.log(`\n  ${yellow}Repairing install...${reset}\n`);
     install(isGlobal, () => {
       console.log('');
-      const repaired = verifyInstall(isGlobal);
+      const repaired = verifyInstall(isGlobal, customPath);
       process.exit(repaired.ok ? 0 : 1);
-    });
+    }, customPath);
   } else {
     process.exit(result.ok ? 0 : 1);
   }
 } else {
-  if (hasGlobal) {
+  if (customPath) {
+    install(false, () => {}, customPath);
+  } else if (hasGlobal) {
     install(true);
   } else if (hasLocal) {
     install(false);

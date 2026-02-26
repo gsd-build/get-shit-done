@@ -5,11 +5,15 @@ A meta-prompting, context engineering and spec-driven development system for [Op
 Fork of [get-shit-done](https://github.com/taches/get-shit-done) by TÂCHES, adapted for Codex CLI by [undeemed](https://github.com/undeemed).
 
 > [!CAUTION]
-> As of February 25, 2026, Codex is supported upstream. This fork remains focused on Codex-specific UX, compatibility, and cutting-edge experimental features.
+> Codex is now supported upstream. This fork remains focused on Codex-specific UX, compatibility, and cutting-edge experimental features.
 
+[![CI](https://github.com/undeemed/get-shit-done-codex/actions/workflows/ci.yml/badge.svg)](https://github.com/undeemed/get-shit-done-codex/actions/workflows/ci.yml)
 [![npm version](https://img.shields.io/npm/v/%40undeemed%2Fget-shit-done-codex?style=flat-square)](https://www.npmjs.com/package/@undeemed/get-shit-done-codex)
 [![License](https://img.shields.io/badge/license-MIT-green?style=flat-square)](LICENSE)
 ![npm Downloads](https://img.shields.io/npm/dt/@undeemed/get-shit-done-codex?style=flat-square)
+![Tests](https://img.shields.io/badge/tests-133%20passing-brightgreen?style=flat-square)
+![Commands](https://img.shields.io/badge/commands-31-blue?style=flat-square)
+![Agents](https://img.shields.io/badge/agents-11-blue?style=flat-square)
 
 ## What This Does
 
@@ -46,6 +50,7 @@ npx @undeemed/get-shit-done-codex --global
 ```bash
 npx @undeemed/get-shit-done-codex --global   # Install to ~/.codex/
 npx @undeemed/get-shit-done-codex --local    # Install to current directory
+npx @undeemed/get-shit-done-codex --path .   # Install to a specific directory
 npx @undeemed/get-shit-done-codex --global --migrate             # Clean up legacy prompts/
 npx @undeemed/get-shit-done-codex --verify --global              # Check install integrity
 npx @undeemed/get-shit-done-codex --verify --repair --global     # Auto-repair
