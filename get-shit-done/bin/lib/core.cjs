@@ -386,26 +386,67 @@ function generateSlugInternal(text) {
 }
 
 function getMilestoneInfo(cwd) {
+  const fallback = { version: 'v1.0', name: 'milestone' };
+
   try {
+    // Preferred source: explicit current milestone in PROJECT.md
+    try {
+      const project = fs.readFileSync(path.join(cwd, '.planning', 'PROJECT.md'), 'utf-8');
+      const projectMatch = project.match(/^##\s*Current Milestone:\s*v(\d+\.\d+)\s+(.+)$/m);
+      if (projectMatch) {
+        return {
+          version: `v${projectMatch[1]}`,
+          name: projectMatch[2].trim(),
+        };
+      }
+    } catch {}
+
     const roadmap = fs.readFileSync(path.join(cwd, '.planning', 'ROADMAP.md'), 'utf-8');
-    // Strip <details>...</details> blocks so shipped milestones don't interfere
-    const cleaned = roadmap.replace(/<details>[\s\S]*?<\/details>/gi, '');
-    // Extract version and name from the same ## heading for consistency
-    const headingMatch = cleaned.match(/## .*v(\d+\.\d+)[:\s]+([^\n(]+)/);
-    if (headingMatch) {
+    // Milestone list format:
+    // - ✅ **v1.0 MVP** — ...
+    // - 🚧 **v1.1 Security** — ...
+    // - 📋 **v2.0 Redesign** — ...
+    const listMatches = [...roadmap.matchAll(/^\s*-\s*.*\*\*v(\d+\.\d+)\s+([^*]+?)\*\*(.*)$/gm)];
+    if (listMatches.length > 0) {
+      const entries = listMatches.map(match => ({
+        version: `v${match[1]}`,
+        name: match[2].trim(),
+        suffix: (match[3] || '').trim(),
+        line: match[0],
+      }));
+
+      // Current milestone: first entry not marked as shipped.
+      const current = entries.find(e => !/\(\s*shipped\b/i.test(e.suffix) && !/✅/.test(e.line));
+      if (current) {
+        return { version: current.version, name: current.name };
+      }
+
+      // If all listed milestones are shipped, use the most recent one.
+      const latest = entries[entries.length - 1];
+      return { version: latest.version, name: latest.name };
+    }
+
+    // Heading format fallback:
+    // ## Roadmap v1.2: Milestone Name
+    // Ignore content wrapped in <details> blocks, which are typically shipped milestones.
+    const roadmapWithoutDetails = roadmap.replace(/<details\b[^>]*>[\s\S]*?<\/details>/gi, '');
+    const headingMatches = [...roadmapWithoutDetails.matchAll(/^##\s*Roadmap\s*v(\d+\.\d+)\s*:\s*(.+)$/gm)];
+    if (headingMatches.length > 0) {
+      const latest = headingMatches[headingMatches.length - 1];
       return {
-        version: 'v' + headingMatch[1],
-        name: headingMatch[2].trim(),
+        version: `v${latest[1]}`,
+        name: latest[2].trim(),
       };
     }
-    // Fallback: try bare version match
-    const versionMatch = cleaned.match(/v(\d+\.\d+)/);
-    return {
-      version: versionMatch ? versionMatch[0] : 'v1.0',
-      name: 'milestone',
-    };
+
+    // Legacy fallback for non-standard ROADMAPs.
+    const allVersions = [...roadmap.matchAll(/v(\d+\.\d+)/g)];
+    const latestVersion = allVersions.length > 0
+      ? `v${allVersions[allVersions.length - 1][1]}`
+      : fallback.version;
+    return { version: latestVersion, name: fallback.name };
   } catch {
-    return { version: 'v1.0', name: 'milestone' };
+    return fallback;
   }
 }
 
