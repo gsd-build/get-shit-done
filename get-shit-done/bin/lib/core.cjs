@@ -426,6 +426,19 @@ function getMilestoneInfo(cwd) {
       return { version: latest.version, name: latest.name };
     }
 
+    // Heading format fallback:
+    // ## Roadmap v1.2: Milestone Name
+    // Ignore content wrapped in <details> blocks, which are typically shipped milestones.
+    const roadmapWithoutDetails = roadmap.replace(/<details\b[^>]*>[\s\S]*?<\/details>/gi, '');
+    const headingMatches = [...roadmapWithoutDetails.matchAll(/^##\s*Roadmap\s*v(\d+\.\d+)\s*:\s*(.+)$/gm)];
+    if (headingMatches.length > 0) {
+      const latest = headingMatches[headingMatches.length - 1];
+      return {
+        version: `v${latest[1]}`,
+        name: latest[2].trim(),
+      };
+    }
+
     // Legacy fallback for non-standard ROADMAPs.
     const allVersions = [...roadmap.matchAll(/v(\d+\.\d+)/g)];
     const latestVersion = allVersions.length > 0
