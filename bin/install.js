@@ -143,14 +143,14 @@ function getGlobalDir(runtime, explicitDir = null) {
 }
 
 const banner = '\n' +
-  cyan + '   ██████╗ ███████╗██████╗\n' +
-  '  ██╔════╝ ██╔════╝██╔══██╗\n' +
-  '  ██║  ███╗███████╗██║  ██║\n' +
-  '  ██║   ██║╚════██║██║  ██║\n' +
-  '  ╚██████╔╝███████║██████╔╝\n' +
-  '   ╚═════╝ ╚══════╝╚═════╝' + reset + '\n' +
+  cyan + '   ██████╗ ███╗   ███╗███████╗██████╗\n' +
+  '  ██╔════╝ ████╗ ████║██╔════╝██╔══██╗\n' +
+  '  ██║  ███╗██╔████╔██║███████╗██║  ██║\n' +
+  '  ██║   ██║██║╚██╔╝██║╚════██║██║  ██║\n' +
+  '  ╚██████╔╝██║ ╚═╝ ██║███████║██████╔╝\n' +
+  '   ╚═════╝ ╚═╝     ╚═╝╚══════╝╚═════╝' + reset + '\n' +
   '\n' +
-  '  Get Shit Done ' + dim + 'v' + pkg.version + reset + '\n' +
+  '  Get My Shit Done ' + dim + 'v' + pkg.version + reset + '\n' +
   '  A meta-prompting, context engineering and spec-driven\n' +
   '  development system for Claude Code, OpenCode, Gemini, and Codex by TÂCHES.\n';
 

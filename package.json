@@ -1,6 +1,6 @@
 {
   "name": "get-my-shit-done-cc",
-  "version": "1.21.0",
+  "version": "0.1.0",
   "description": "A meta-prompting, context engineering and spec-driven development system for Claude Code, OpenCode, Gemini and Codex by TÂCHES.",
   "bin": {
     "get-my-shit-done-cc": "bin/install.js"
