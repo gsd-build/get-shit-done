@@ -197,6 +197,20 @@ describe('init commands', () => {
     const output = JSON.parse(result.output);
     assert.strictEqual(output.phase_req_ids, null);
   });
+
+  test('init plan-phase resolves quality profile planner/researcher to opus', () => {
+    fs.writeFileSync(
+      path.join(tmpDir, '.planning', 'config.json'),
+      JSON.stringify({ model_profile: 'quality' }, null, 2)
+    );
+
+    const result = runGsdTools('init plan-phase 3', tmpDir);
+    assert.ok(result.success, `Command failed: ${result.error}`);
+
+    const output = JSON.parse(result.output);
+    assert.strictEqual(output.planner_model, 'opus');
+    assert.strictEqual(output.researcher_model, 'opus');
+  });
 });
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -846,4 +860,3 @@ describe('cmdInitNewMilestone', () => {
 // ─────────────────────────────────────────────────────────────────────────────
 // roadmap analyze command
 // ─────────────────────────────────────────────────────────────────────────────
-

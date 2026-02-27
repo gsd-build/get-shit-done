@@ -961,6 +961,28 @@ describe('resolve-model command', () => {
     assert.ok(output.model, 'should resolve a model');
   });
 
+  test('quality profile resolves planner to opus', () => {
+    fs.writeFileSync(
+      path.join(tmpDir, '.planning', 'config.json'),
+      JSON.stringify({ model_profile: 'quality' }, null, 2)
+    );
+
+    const result = runGsdTools('resolve-model gsd-planner --raw', tmpDir);
+    assert.ok(result.success, `Command failed: ${result.error}`);
+    assert.strictEqual(result.output, 'opus');
+  });
+
+  test('quality profile resolves phase researcher to opus', () => {
+    fs.writeFileSync(
+      path.join(tmpDir, '.planning', 'config.json'),
+      JSON.stringify({ model_profile: 'quality' }, null, 2)
+    );
+
+    const result = runGsdTools('resolve-model gsd-phase-researcher --raw', tmpDir);
+    assert.ok(result.success, `Command failed: ${result.error}`);
+    assert.strictEqual(result.output, 'opus');
+  });
+
   test('fails when no agent-type provided', () => {
     const result = runGsdTools('resolve-model', tmpDir);
     assert.ok(!result.success, 'should fail without agent-type');
