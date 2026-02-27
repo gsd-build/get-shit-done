@@ -40,10 +40,16 @@ export class RemoteSessionManager {
   async start(projectDir: string): Promise<string> {
     return new Promise((resolve, reject) => {
       // Spawn claude remote-control with shell on Windows for .cmd resolution
+      // Strip CLAUDECODE env var so the child process doesn't refuse to start
+      // (claude detects nested sessions via this env var and exits immediately)
+      const env = { ...process.env };
+      delete env.CLAUDECODE;
+
       const proc = spawn('claude', ['remote-control'], {
         cwd: projectDir,
         stdio: ['ignore', 'pipe', 'pipe'],
         shell: process.platform === 'win32',
+        env,
       });
 
       this.process = proc;
@@ -60,8 +66,10 @@ export class RemoteSessionManager {
       // Parse stdout line-by-line looking for session URL
       const rl = createInterface({ input: proc.stdout! });
       rl.on('line', (line: string) => {
-        // Match Claude Code session URL pattern
-        const match = line.match(/https:\/\/claude\.ai\/code\/sessions\/[a-zA-Z0-9_-]+/);
+        // Strip ANSI escape codes before matching (claude output uses terminal formatting)
+        const clean = line.replace(/\x1b\[[0-9;]*[A-Za-z]/g, '');
+        // Match Claude Code session URL pattern (claude.ai/code/session_... not sessions/)
+        const match = clean.match(/https:\/\/claude\.ai\/code\/session_[a-zA-Z0-9_-]+(?:\?[^\s]*)?/);
         if (match && !resolved) {
           resolved = true;
           clearTimeout(timeout);
