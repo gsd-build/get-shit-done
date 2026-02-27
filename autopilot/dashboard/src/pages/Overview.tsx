@@ -3,6 +3,7 @@
 
 import { useDashboardStore } from '../store/index.js';
 import { TunnelBanner } from '../components/TunnelBanner.js';
+import { RemoteSessionCard } from '../components/RemoteSessionCard.js';
 import { ProgressBar } from '../components/ProgressBar.js';
 import { PhaseCard } from '../components/PhaseCard.js';
 import { ActivityFeed } from '../components/ActivityFeed.js';
@@ -42,6 +43,9 @@ export function Overview() {
     <div className="flex flex-col gap-6">
       {/* Tunnel banner (top of page, before all content) */}
       <TunnelBanner />
+
+      {/* Remote session card (below tunnel banner) */}
+      <RemoteSessionCard />
 
       {/* Project description */}
       {projectDescription && (
