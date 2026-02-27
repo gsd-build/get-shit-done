@@ -23,7 +23,9 @@
     "gemini",
     "gemini-cli",
     "codex",
-    "codex-cli"
+    "codex-cli",
+    "pi",
+    "pi.dev"
   ],
   "author": "TÂCHES",
   "license": "MIT",

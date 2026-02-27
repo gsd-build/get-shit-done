@@ -14,6 +14,7 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 - Codex runtime support with skills-first installation
 - Standard `project_context` block in gsd-verifier output
 - Codex changelog and usage documentation
+- Pi coding agent support, with `--pi`, then access skills with `/skill:gsd-*`
 
 ### Changed
 - Improved onboarding UX: installer now suggests `/gsd:new-project` instead of `/gsd:help`

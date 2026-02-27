@@ -24,6 +24,7 @@ const hasOpencode = args.includes('--opencode');
 const hasClaude = args.includes('--claude');
 const hasGemini = args.includes('--gemini');
 const hasCodex = args.includes('--codex');
+const hasPi = args.includes('--pi');
 const hasBoth = args.includes('--both'); // Legacy flag, keeps working
 const hasAll = args.includes('--all');
 const hasUninstall = args.includes('--uninstall') || args.includes('-u');
@@ -31,7 +32,7 @@ const hasUninstall = args.includes('--uninstall') || args.includes('-u');
 // Runtime selection - can be set by flags or interactive prompt
 let selectedRuntimes = [];
 if (hasAll) {
-  selectedRuntimes = ['claude', 'opencode', 'gemini', 'codex'];
+  selectedRuntimes = ['claude', 'opencode', 'gemini', 'codex', 'pi'];
 } else if (hasBoth) {
   selectedRuntimes = ['claude', 'opencode'];
 } else {
@@ -39,6 +40,7 @@ if (hasAll) {
   if (hasClaude) selectedRuntimes.push('claude');
   if (hasGemini) selectedRuntimes.push('gemini');
   if (hasCodex) selectedRuntimes.push('codex');
+  if (hasPi) selectedRuntimes.push('pi');
 }
 
 // Helper to get directory name for a runtime (used for local/project installs)
@@ -46,6 +48,7 @@ function getDirName(runtime) {
   if (runtime === 'opencode') return '.opencode';
   if (runtime === 'gemini') return '.gemini';
   if (runtime === 'codex') return '.codex';
+  if (runtime === 'pi') return '.pi';
   return '.claude';
 }
 
@@ -68,6 +71,7 @@ function getConfigDirFromHome(runtime, isGlobal) {
   }
   if (runtime === 'gemini') return "'.gemini'";
   if (runtime === 'codex') return "'.codex'";
+  if (runtime === 'pi') return "'.pi', 'agent'";
   return "'.claude'";
 }
 
@@ -94,6 +98,20 @@ function getOpencodeGlobalDir() {
   
   // 4. Default: ~/.config/opencode (XDG default)
   return path.join(os.homedir(), '.config', 'opencode');
+}
+
+/**
+ * Get the global config directory for Pi
+ * Priority: PI_CONFIG_DIR > ~/.pi/agent
+ */
+function getPiGlobalDir() {
+  // 1. Explicit PI_CONFIG_DIR env var
+  if (process.env.PI_CONFIG_DIR) {
+    return expandTilde(process.env.PI_CONFIG_DIR);
+  }
+
+  // 2. Default: ~/.pi/agent
+  return path.join(os.homedir(), '.pi', 'agent');
 }
 
 /**
@@ -131,6 +149,14 @@ function getGlobalDir(runtime, explicitDir = null) {
     }
     return path.join(os.homedir(), '.codex');
   }
+
+  if (runtime === 'pi') {
+    // Pi: --config-dir > PI_CONFIG_DIR > ~/.pi/agent
+    if (explicitDir) {
+      return expandTilde(explicitDir);
+    }
+    return getPiGlobalDir();
+  }
   
   // Claude Code: --config-dir > CLAUDE_CONFIG_DIR > ~/.claude
   if (explicitDir) {
@@ -142,8 +168,8 @@ function getGlobalDir(runtime, explicitDir = null) {
   return path.join(os.homedir(), '.claude');
 }
 
-const banner = '\n' +
-  cyan + '   ██████╗ ███████╗██████╗\n' +
+const banner = '\n' + cyan +
+  '   ██████╗ ███████╗██████╗\n' +
   '  ██╔════╝ ██╔════╝██╔══██╗\n' +
   '  ██║  ███╗███████╗██║  ██║\n' +
   '  ██║   ██║╚════██║██║  ██║\n' +
@@ -186,7 +212,7 @@ console.log(banner);
 
 // Show help if requested
 if (hasHelp) {
-  console.log(`  ${yellow}Usage:${reset} npx get-shit-done-cc [options]\n\n  ${yellow}Options:${reset}\n    ${cyan}-g, --global${reset}              Install globally (to config directory)\n    ${cyan}-l, --local${reset}               Install locally (to current directory)\n    ${cyan}--claude${reset}                  Install for Claude Code only\n    ${cyan}--opencode${reset}                Install for OpenCode only\n    ${cyan}--gemini${reset}                  Install for Gemini only\n    ${cyan}--codex${reset}                   Install for Codex only\n    ${cyan}--all${reset}                     Install for all runtimes\n    ${cyan}-u, --uninstall${reset}           Uninstall GSD (remove all GSD files)\n    ${cyan}-c, --config-dir <path>${reset}   Specify custom config directory\n    ${cyan}-h, --help${reset}                Show this help message\n    ${cyan}--force-statusline${reset}        Replace existing statusline config\n\n  ${yellow}Examples:${reset}\n    ${dim}# Interactive install (prompts for runtime and location)${reset}\n    npx get-shit-done-cc\n\n    ${dim}# Install for Claude Code globally${reset}\n    npx get-shit-done-cc --claude --global\n\n    ${dim}# Install for Gemini globally${reset}\n    npx get-shit-done-cc --gemini --global\n\n    ${dim}# Install for Codex globally${reset}\n    npx get-shit-done-cc --codex --global\n\n    ${dim}# Install for all runtimes globally${reset}\n    npx get-shit-done-cc --all --global\n\n    ${dim}# Install to custom config directory${reset}\n    npx get-shit-done-cc --codex --global --config-dir ~/.codex-work\n\n    ${dim}# Install to current project only${reset}\n    npx get-shit-done-cc --claude --local\n\n    ${dim}# Uninstall GSD from Codex globally${reset}\n    npx get-shit-done-cc --codex --global --uninstall\n\n  ${yellow}Notes:${reset}\n    The --config-dir option is useful when you have multiple configurations.\n    It takes priority over CLAUDE_CONFIG_DIR / GEMINI_CONFIG_DIR / CODEX_HOME environment variables.\n`);
+  console.log(`  ${yellow}Usage:${reset} npx get-shit-done-cc [options]\n\n  ${yellow}Options:${reset}\n    ${cyan}-g, --global${reset}              Install globally (to config directory)\n    ${cyan}-l, --local${reset}               Install locally (to current directory)\n    ${cyan}--claude${reset}                  Install for Claude Code only\n    ${cyan}--opencode${reset}                Install for OpenCode only\n    ${cyan}--gemini${reset}                  Install for Gemini only\n    ${cyan}--codex${reset}                   Install for Codex only\n    ${cyan}--pi${reset}                      Install for Pi only\n    ${cyan}--all${reset}                     Install for all runtimes\n    ${cyan}-u, --uninstall${reset}           Uninstall GSD (remove all GSD files)\n    ${cyan}-c, --config-dir <path>${reset}   Specify custom config directory\n    ${cyan}-h, --help${reset}                Show this help message\n    ${cyan}--force-statusline${reset}        Replace existing statusline config\n\n  ${yellow}Examples:${reset}\n    ${dim}# Interactive install (prompts for runtime and location)${reset}\n    npx get-shit-done-cc\n\n    ${dim}# Install for Claude Code globally${reset}\n    npx get-shit-done-cc --claude --global\n\n    ${dim}# Install for Gemini globally${reset}\n    npx get-shit-done-cc --gemini --global\n\n    ${dim}# Install for Codex globally${reset}\n    npx get-shit-done-cc --codex --global\n\n    ${dim}# Install for Pi globally${reset}\n    npx get-shit-done-cc --pi --global\n\n    ${dim}# Install for all runtimes globally${reset}\n    npx get-shit-done-cc --all --global\n\n    ${dim}# Install to custom config directory${reset}\n    npx get-shit-done-cc --codex --global --config-dir ~/.codex-work\n\n    ${dim}# Install to current project only${reset}\n    npx get-shit-done-cc --claude --local\n\n    ${dim}# Uninstall GSD from Codex globally${reset}\n    npx get-shit-done-cc --codex --global --uninstall\n\n  ${yellow}Notes:${reset}\n    The --config-dir option is useful when you have multiple configurations.\n    It takes priority over CLAUDE_CONFIG_DIR / GEMINI_CONFIG_DIR / CODEX_HOME environment variables.\n`);
   process.exit(0);
 }
 
@@ -434,6 +460,85 @@ function convertClaudeToCodexMarkdown(content) {
   return converted;
 }
 
+/**
+ * Convert tool names from Claude's format (PascalCase) to pi's format (lowercase).
+ * Also handles special cases like Glob → find, and removes unsupported tools.
+ * @param {string[]} tools - Array of Claude tool names
+ * @returns {string[]} - Array of pi tool names
+ */
+function convertPiToolName(tools) {
+  const toolMapping = {
+    'read': 'read',
+    'write': 'write',
+    'edit': 'edit',
+    'bash': 'bash',
+    'grep': 'grep',
+    'glob': 'find'
+  };
+  
+  return tools
+    .map(tool => toolMapping[tool.toLowerCase()])
+    .filter(Boolean);
+}
+
+/**
+ * Convert Claude Code agent/skill markdown to pi coding agent format
+ * Converts tool names in frontmatter and updates paths/references.
+ */
+function convertClaudeToPiMarkdown(content) {
+  // Replace /gsd:command with /skill:gsd-command
+  let converted = content.replace(/\/gsd:([a-z0-9-]+)/gi, (_, commandName) => {
+    return `/skill:gsd-${String(commandName).toLowerCase()}`;
+  });
+  // Replace $gsd-command references with /skill:gsd-command
+  converted = converted.replace(/\$gsd-([a-z0-9-]+)/gi, (_, commandName) => {
+    return `/skill:gsd-${String(commandName).toLowerCase()}`;
+  });
+  // Replace $ARGUMENTS with {{GSD_ARGS}}
+  converted = converted.replace(/\$ARGUMENTS\b/g, '{{GSD_ARGS}}');
+  
+  // Replace path references
+  converted = converted.replace(/~\/\.claude\//g, '~/.pi/agent/');
+  converted = converted.replace(/\.\/\.claude\//g, './.pi/agent/');
+  
+  // Convert tools in frontmatter
+  if (converted.startsWith('---')) {
+    const endIndex = converted.indexOf('---', 3);
+    if (endIndex !== -1) {
+      const frontmatter = converted.substring(3, endIndex);
+      const body = converted.substring(endIndex + 3);
+      
+      // Handle inline tools: field (comma-separated string)
+      converted = converted.replace(/^tools:\s*([A-Za-z,\s]+)$/m, (match, toolsValue) => {
+        const tools = toolsValue.split(',').map(t => t.trim()).filter(t => t);
+        const piTools = convertPiToolName(tools);
+        if (piTools.length === 0) return '';
+        return 'tools: ' + piTools.join(', ');
+      });
+      
+      // Handle YAML array tools format
+      converted = converted.replace(/^tools:\s*\n((?:\s*-\s*[A-Za-z]+\n?)+)/m, (match, arrayContent) => {
+        const tools = [];
+        const lines = arrayContent.split('\n');
+        for (const line of lines) {
+          const trimmed = line.trim();
+          if (trimmed.startsWith('- ')) {
+            tools.push(trimmed.substring(2).trim());
+          }
+        }
+        const piTools = convertPiToolName(tools);
+        if (piTools.length === 0) return '';
+        if (piTools.length === 1) {
+          return 'tools: ' + piTools[0] + '\n';
+        }
+        return 'tools:\n' + piTools.map(t => '  - ' + t).join('\n') + '\n';
+      });
+    }
+  }
+  
+  return converted;
+}
+
 function getCodexSkillAdapterHeader(skillName) {
   const invocation = `$${skillName}`;
   return `<codex_skill_adapter>
@@ -464,6 +569,67 @@ function convertClaudeCommandToCodexSkill(content, skillName) {
   const adapter = getCodexSkillAdapterHeader(skillName);
 
   return `---\nname: ${yamlQuote(skillName)}\ndescription: ${yamlQuote(description)}\nmetadata:\n  short-description: ${yamlQuote(shortDescription)}\n---\n\n${adapter}\n\n${body.trimStart()}`;
+}
+
+/**
+ * Convert Claude Code command to Pi skill format
+ * Pi uses simpler skill format similar to Codex but without adapter blocks
+ */
+function convertClaudeToPiSkill(content, skillName) {
+  let converted = content;
+
+  // Replace /gsd:command with /skill:gsd-command
+  converted = converted.replace(/\/gsd:([a-z0-9-]+)/gi, (_, commandName) => {
+    return `/skill:gsd-${String(commandName).toLowerCase()}`;
+  });
+
+  // Replace command references in text ($gsd-command → /skill:gsd-command)
+  converted = converted.replace(/\$gsd-([a-z0-9-]+)/gi, (_, commandName) => {
+    return `/skill:gsd-${String(commandName).toLowerCase()}`;
+  });
+
+  // Replace $ARGUMENTS with {{GSD_ARGS}}
+  converted = converted.replace(/\$ARGUMENTS\b/g, '{{GSD_ARGS}}');
+
+  // Replace path references
+  converted = converted.replace(/~\/\.claude\//g, '~/.pi/agent/');
+  converted = converted.replace(/\.\/\.claude\//g, './.pi/agent/');
+
+  const { frontmatter, body } = extractFrontmatterAndBody(converted);
+  let description = `Run GSD workflow ${skillName}.`;
+  if (frontmatter) {
+    const maybeDescription = extractFrontmatterField(frontmatter, 'description');
+    if (maybeDescription) {
+      description = maybeDescription;
+    }
+  }
+  description = toSingleLine(description);
+  const shortDescription = description.length > 180 ? `${description.slice(0, 177)}...` : description;
+
+  // Extract and convert tools from frontmatter if present
+  let toolsLine = '';
+  if (frontmatter) {
+    const toolsMatch = frontmatter.match(/^tools:\s*(.+)$/m);
+    if (toolsMatch) {
+      const toolsValue = toolsMatch[1].trim();
+      let tools = [];
+      // Handle comma-separated or array format
+      if (toolsValue.includes(',')) {
+        tools = toolsValue.split(',').map(t => t.trim()).filter(t => t);
+      } else if (toolsValue.startsWith('[') && toolsValue.endsWith(']')) {
+        tools = toolsValue.slice(1, -1).split(',').map(t => t.trim()).filter(t => t);
+      } else {
+        tools = [toolsValue];
+      }
+      const piTools = convertPiToolName(tools);
+      if (piTools.length > 0) {
+        toolsLine = '\ntools: ' + piTools.join(', ');
+      }
+    }
+  }
+
+  // pi uses simpler frontmatter without adapter blocks
+  return `---\nname: ${skillName}\ndescription: ${yamlQuote(description)}${toolsLine}\nmetadata:\n  short-description: ${yamlQuote(shortDescription)}\n---\n\n${body.trimStart()}`;
 }
 
 /**
@@ -828,6 +994,57 @@ function copyCommandsAsCodexSkills(srcDir, skillsDir, prefix, pathPrefix, runtim
   recurse(srcDir, prefix);
 }
 
+function copyCommandsAsPiSkills(srcDir, skillsDir, prefix, pathPrefix, runtime) {
+  if (!fs.existsSync(srcDir)) {
+    return;
+  }
+
+  fs.mkdirSync(skillsDir, { recursive: true });
+
+  // Remove previous GSD pi skills to avoid stale command skills.
+  const existing = fs.readdirSync(skillsDir, { withFileTypes: true });
+  for (const entry of existing) {
+    if (entry.isDirectory() && entry.name.startsWith(`${prefix}-`)) {
+      fs.rmSync(path.join(skillsDir, entry.name), { recursive: true });
+    }
+  }
+
+  function recurse(currentSrcDir, currentPrefix) {
+    const entries = fs.readdirSync(currentSrcDir, { withFileTypes: true });
+
+    for (const entry of entries) {
+      const srcPath = path.join(currentSrcDir, entry.name);
+      if (entry.isDirectory()) {
+        recurse(srcPath, `${currentPrefix}-${entry.name}`);
+        continue;
+      }
+
+      if (!entry.name.endsWith('.md')) {
+        continue;
+      }
+
+      const baseName = entry.name.replace('.md', '');
+      const skillName = `${currentPrefix}-${baseName}`;
+      const skillDir = path.join(skillsDir, skillName);
+      fs.mkdirSync(skillDir, { recursive: true });
+
+      let content = fs.readFileSync(srcPath, 'utf8');
+      const globalClaudeRegex = /~\/\.claude\//g;
+      const localClaudeRegex = /\.\/\.claude\//g;
+      const piDirRegex = /~\/\.pi\//g;
+      content = content.replace(globalClaudeRegex, pathPrefix);
+      content = content.replace(localClaudeRegex, `./${getDirName(runtime)}/agent/`);
+      content = content.replace(piDirRegex, pathPrefix);
+      content = processAttribution(content, getCommitAttribution(runtime));
+      content = convertClaudeToPiSkill(content, skillName);
+
+      fs.writeFileSync(path.join(skillDir, 'SKILL.md'), content);
+    }
+  }
+
+  recurse(srcDir, prefix);
+}
+
 /**
  * Recursively copy directory, replacing paths in .md files
  * Deletes existing destDir first to remove orphaned files from previous versions
@@ -839,6 +1056,7 @@ function copyCommandsAsCodexSkills(srcDir, skillsDir, prefix, pathPrefix, runtim
 function copyWithPathReplacement(srcDir, destDir, pathPrefix, runtime, isCommand = false) {
   const isOpencode = runtime === 'opencode';
   const isCodex = runtime === 'codex';
+  const isPi = runtime === 'pi';
   const dirName = getDirName(runtime);
 
   // Clean install: remove existing destination to prevent orphaned files
@@ -881,6 +1099,9 @@ function copyWithPathReplacement(srcDir, destDir, pathPrefix, runtime, isCommand
         }
       } else if (isCodex) {
         content = convertClaudeToCodexMarkdown(content);
+        fs.writeFileSync(destPath, content);
+      } else if (isPi) {
+        content = convertClaudeToPiMarkdown(content);
         fs.writeFileSync(destPath, content);
       } else {
         fs.writeFileSync(destPath, content);
@@ -975,6 +1196,7 @@ function cleanupOrphanedHooks(settings) {
 function uninstall(isGlobal, runtime = 'claude') {
   const isOpencode = runtime === 'opencode';
   const isCodex = runtime === 'codex';
+  const isPi = runtime === 'pi';
   const dirName = getDirName(runtime);
 
   // Get the target directory based on runtime and install type
@@ -990,6 +1212,7 @@ function uninstall(isGlobal, runtime = 'claude') {
   if (runtime === 'opencode') runtimeLabel = 'OpenCode';
   if (runtime === 'gemini') runtimeLabel = 'Gemini';
   if (runtime === 'codex') runtimeLabel = 'Codex';
+  if (runtime === 'pi') runtimeLabel = 'Pi';
 
   console.log(`  Uninstalling GSD from ${cyan}${runtimeLabel}${reset} at ${cyan}${locationLabel}${reset}\n`);
 
@@ -1031,6 +1254,23 @@ function uninstall(isGlobal, runtime = 'claude') {
       if (skillCount > 0) {
         removedCount++;
         console.log(`  ${green}✓${reset} Removed ${skillCount} Codex skills`);
+      }
+    }
+  } else if (isPi) {
+    // Pi: remove skills/gsd-*/SKILL.md skill directories
+    const skillsDir = path.join(targetDir, 'skills');
+    if (fs.existsSync(skillsDir)) {
+      let skillCount = 0;
+      const entries = fs.readdirSync(skillsDir, { withFileTypes: true });
+      for (const entry of entries) {
+        if (entry.isDirectory() && entry.name.startsWith('gsd-')) {
+          fs.rmSync(path.join(skillsDir, entry.name), { recursive: true });
+          skillCount++;
+        }
+      }
+      if (skillCount > 0) {
+        removedCount++;
+        console.log(`  ${green}✓${reset} Removed ${skillCount} Pi skills`);
       }
     }
   } else {
@@ -1439,10 +1679,12 @@ function generateManifest(dir, baseDir) {
 function writeManifest(configDir, runtime = 'claude') {
   const isOpencode = runtime === 'opencode';
   const isCodex = runtime === 'codex';
+  const isPi = runtime === 'pi';
   const gsdDir = path.join(configDir, 'get-shit-done');
   const commandsDir = path.join(configDir, 'commands', 'gsd');
   const opencodeCommandDir = path.join(configDir, 'command');
   const codexSkillsDir = path.join(configDir, 'skills');
+  const piSkillsDir = path.join(configDir, 'skills');
   const agentsDir = path.join(configDir, 'agents');
   const manifest = { version: pkg.version, timestamp: new Date().toISOString(), files: {} };
 
@@ -1450,7 +1692,7 @@ function writeManifest(configDir, runtime = 'claude') {
   for (const [rel, hash] of Object.entries(gsdHashes)) {
     manifest.files['get-shit-done/' + rel] = hash;
   }
-  if (!isOpencode && !isCodex && fs.existsSync(commandsDir)) {
+  if (!isOpencode && !isCodex && !isPi && fs.existsSync(commandsDir)) {
     const cmdHashes = generateManifest(commandsDir);
     for (const [rel, hash] of Object.entries(cmdHashes)) {
       manifest.files['commands/gsd/' + rel] = hash;
@@ -1466,6 +1708,15 @@ function writeManifest(configDir, runtime = 'claude') {
   if (isCodex && fs.existsSync(codexSkillsDir)) {
     for (const skillName of listCodexSkillNames(codexSkillsDir)) {
       const skillRoot = path.join(codexSkillsDir, skillName);
+      const skillHashes = generateManifest(skillRoot);
+      for (const [rel, hash] of Object.entries(skillHashes)) {
+        manifest.files[`skills/${skillName}/${rel}`] = hash;
+      }
+    }
+  }
+  if (isPi && fs.existsSync(piSkillsDir)) {
+    for (const skillName of listCodexSkillNames(piSkillsDir)) {
+      const skillRoot = path.join(piSkillsDir, skillName);
       const skillHashes = generateManifest(skillRoot);
       for (const [rel, hash] of Object.entries(skillHashes)) {
         manifest.files[`skills/${skillName}/${rel}`] = hash;
@@ -1537,11 +1788,10 @@ function reportLocalPatches(configDir, runtime = 'claude') {
   try { meta = JSON.parse(fs.readFileSync(metaPath, 'utf8')); } catch { return []; }
 
   if (meta.files && meta.files.length > 0) {
-    const reapplyCommand = runtime === 'opencode'
-      ? '/gsd-reapply-patches'
-      : runtime === 'codex'
-        ? '$gsd-reapply-patches'
-        : '/gsd:reapply-patches';
+    let reapplyCommand = '/gsd:reapply-patches';
+    if (runtime === 'opencode') reapplyCommand = '/gsd-reapply-patches';
+    if (runtime === 'codex') reapplyCommand = '$gsd-reapply-patches';
+    if (runtime === 'pi') reapplyCommand = '/skill:gsd-reapply-patches';
     console.log('');
     console.log('  ' + yellow + 'Local patches detected' + reset + ' (from v' + meta.from_version + '):');
     for (const f of meta.files) {
@@ -1560,6 +1810,7 @@ function install(isGlobal, runtime = 'claude') {
   const isOpencode = runtime === 'opencode';
   const isGemini = runtime === 'gemini';
   const isCodex = runtime === 'codex';
+  const isPi = runtime === 'pi';
   const dirName = getDirName(runtime);
   const src = path.join(__dirname, '..');
 
@@ -1583,6 +1834,7 @@ function install(isGlobal, runtime = 'claude') {
   if (isOpencode) runtimeLabel = 'OpenCode';
   if (isGemini) runtimeLabel = 'Gemini';
   if (isCodex) runtimeLabel = 'Codex';
+  if (isPi) runtimeLabel = 'Pi';
 
   console.log(`  Installing for ${cyan}${runtimeLabel}${reset} to ${cyan}${locationLabel}${reset}\n`);
 
@@ -1614,6 +1866,16 @@ function install(isGlobal, runtime = 'claude') {
     const skillsDir = path.join(targetDir, 'skills');
     const gsdSrc = path.join(src, 'commands', 'gsd');
     copyCommandsAsCodexSkills(gsdSrc, skillsDir, 'gsd', pathPrefix, runtime);
+    const installedSkillNames = listCodexSkillNames(skillsDir);
+    if (installedSkillNames.length > 0) {
+      console.log(`  ${green}✓${reset} Installed ${installedSkillNames.length} skills to skills/`);
+    } else {
+      failures.push('skills/gsd-*');
+    }
+  } else if (isPi) {
+    const skillsDir = path.join(targetDir, 'skills');
+    const gsdSrc = path.join(src, 'commands', 'gsd');
+    copyCommandsAsPiSkills(gsdSrc, skillsDir, 'gsd', pathPrefix, runtime);
     const installedSkillNames = listCodexSkillNames(skillsDir);
     if (installedSkillNames.length > 0) {
       console.log(`  ${green}✓${reset} Installed ${installedSkillNames.length} skills to skills/`);
@@ -1676,6 +1938,8 @@ function install(isGlobal, runtime = 'claude') {
           content = convertClaudeToGeminiAgent(content);
         } else if (isCodex) {
           content = convertClaudeToCodexMarkdown(content);
+        } else if (isPi) {
+          content = convertClaudeToPiMarkdown(content);
         }
         fs.writeFileSync(path.join(agentsDest, entry.name), content);
       }
@@ -1708,7 +1972,7 @@ function install(isGlobal, runtime = 'claude') {
     failures.push('VERSION');
   }
 
-  if (!isCodex) {
+  if (!isCodex && !isPi) {
     // Write package.json to force CommonJS mode for GSD scripts
     // Prevents "require is not defined" errors when project has "type": "module"
     // Node.js walks up looking for package.json - this stops inheritance from project
@@ -1843,8 +2107,9 @@ function install(isGlobal, runtime = 'claude') {
 function finishInstall(settingsPath, settings, statuslineCommand, shouldInstallStatusline, runtime = 'claude', isGlobal = true) {
   const isOpencode = runtime === 'opencode';
   const isCodex = runtime === 'codex';
+  const isPi = runtime === 'pi';
 
-  if (shouldInstallStatusline && !isOpencode && !isCodex) {
+  if (shouldInstallStatusline && !isOpencode && !isCodex && !isPi) {
     settings.statusLine = {
       type: 'command',
       command: statuslineCommand
@@ -1853,7 +2118,7 @@ function finishInstall(settingsPath, settings, statuslineCommand, shouldInstallS
   }
 
   // Write settings when runtime supports settings.json
-  if (!isCodex) {
+  if (!isCodex && !isPi) {
     writeSettings(settingsPath, settings);
   }
 
@@ -1866,10 +2131,12 @@ function finishInstall(settingsPath, settings, statuslineCommand, shouldInstallS
   if (runtime === 'opencode') program = 'OpenCode';
   if (runtime === 'gemini') program = 'Gemini';
   if (runtime === 'codex') program = 'Codex';
+  if (runtime === 'pi') program = 'Pi';
 
   let command = '/gsd:new-project';
   if (runtime === 'opencode') command = '/gsd-new-project';
   if (runtime === 'codex') command = '$gsd-new-project';
+  if (runtime === 'pi') command = '/skill:gsd-new-project';
   console.log(`
   ${green}Done!${reset} Open a blank directory in ${program} and run ${cyan}${command}${reset}.
 
@@ -1951,15 +2218,18 @@ function promptRuntime(callback) {
   ${cyan}2${reset}) OpenCode    ${dim}(~/.config/opencode)${reset} - open source, free models
   ${cyan}3${reset}) Gemini      ${dim}(~/.gemini)${reset}
   ${cyan}4${reset}) Codex       ${dim}(~/.codex)${reset}
-  ${cyan}5${reset}) All
+  ${cyan}5${reset}) Pi          ${dim}(~/.pi/agent)${reset}
+  ${cyan}6${reset}) All
 `);
 
   rl.question(`  Choice ${dim}[1]${reset}: `, (answer) => {
     answered = true;
     rl.close();
     const choice = answer.trim() || '1';
-    if (choice === '5') {
-      callback(['claude', 'opencode', 'gemini', 'codex']);
+    if (choice === '6') {
+      callback(['claude', 'opencode', 'gemini', 'codex', 'pi']);
+    } else if (choice === '5') {
+      callback(['pi']);
     } else if (choice === '4') {
       callback(['codex']);
     } else if (choice === '3') {
