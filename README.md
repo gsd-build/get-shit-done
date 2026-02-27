@@ -2,7 +2,7 @@
 
 # GET SHIT DONE
 
-**A light-weight and powerful meta-prompting, context engineering and spec-driven development system for Claude Code, OpenCode, Gemini CLI, and Codex.**
+**A light-weight and powerful meta-prompting, context engineering and spec-driven development system for Claude Code, OpenCode, Gemini CLI, Codex, and GitHub Copilot CLI.**
 
 **Solves context rot — the quality degradation that happens as Claude fills its context window.**
 
@@ -80,16 +80,17 @@ npx get-shit-done-cc@latest
 ```
 
 The installer prompts you to choose:
-1. **Runtime** — Claude Code, OpenCode, Gemini, Codex, or all
+1. **Runtime** — Claude Code, OpenCode, Gemini, Codex, GitHub Copilot CLI, or all
 2. **Location** — Global (all projects) or local (current project only)
 
 Verify with:
 - Claude Code / Gemini: `/gsd:help`
 - OpenCode: `/gsd-help`
 - Codex: `$gsd-help`
+- GitHub Copilot CLI: ask Copilot to "run gsd-help"
 
 > [!NOTE]
-> Codex installation uses skills (`skills/gsd-*/SKILL.md`) rather than custom prompts.
+> Codex and GitHub Copilot CLI installations use skills (`skills/gsd-*/SKILL.md`) rather than custom prompts. After installing for Copilot CLI, run `/skills` inside a Copilot session to activate them.
 
 ### Staying Updated
 
@@ -117,12 +118,15 @@ npx get-shit-done-cc --gemini --global   # Install to ~/.gemini/
 npx get-shit-done-cc --codex --global    # Install to ~/.codex/
 npx get-shit-done-cc --codex --local     # Install to ./.codex/
 
+# GitHub Copilot CLI (skills-first)
+npx get-shit-done-cc --copilot --global  # Install to ~/.copilot/
+
 # All runtimes
 npx get-shit-done-cc --all --global      # Install to all directories
 ```
 
 Use `--global` (`-g`) or `--local` (`-l`) to skip the location prompt.
-Use `--claude`, `--opencode`, `--gemini`, `--codex`, or `--all` to skip the runtime prompt.
+Use `--claude`, `--opencode`, `--gemini`, `--codex`, `--copilot`, or `--all` to skip the runtime prompt.
 
 </details>
 
@@ -629,6 +633,7 @@ This prevents Claude from reading these files entirely, regardless of what comma
 - Restart your runtime to reload commands/skills
 - Verify files exist in `~/.claude/commands/gsd/` (global) or `./.claude/commands/gsd/` (local)
 - For Codex, verify skills exist in `~/.codex/skills/gsd-*/SKILL.md` (global) or `./.codex/skills/gsd-*/SKILL.md` (local)
+- For GitHub Copilot CLI, verify skills exist in `~/.copilot/skills/gsd-*/SKILL.md`, then run `/skills` in a Copilot session to activate them
 
 **Commands not working as expected?**
 - Run `/gsd:help` to verify installation
@@ -656,6 +661,7 @@ To remove GSD completely:
 npx get-shit-done-cc --claude --global --uninstall
 npx get-shit-done-cc --opencode --global --uninstall
 npx get-shit-done-cc --codex --global --uninstall
+npx get-shit-done-cc --copilot --global --uninstall
 
 # Local installs (current project)
 npx get-shit-done-cc --claude --local --uninstall
@@ -669,7 +675,7 @@ This removes all GSD commands, agents, hooks, and settings while preserving your
 
 ## Community Ports
 
-OpenCode, Gemini CLI, and Codex are now natively supported via `npx get-shit-done-cc`.
+OpenCode, Gemini CLI, Codex, and GitHub Copilot CLI are now natively supported via `npx get-shit-done-cc`.
 
 These community ports pioneered multi-runtime support:
 
