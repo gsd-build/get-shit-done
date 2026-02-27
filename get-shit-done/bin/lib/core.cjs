@@ -6,6 +6,13 @@ const fs = require('fs');
 const path = require('path');
 const { execSync } = require('child_process');
 
+// ─── Path helpers ────────────────────────────────────────────────────────────
+
+/** Normalize a relative path to always use forward slashes (cross-platform). */
+function toPosixPath(p) {
+  return p.split(path.sep).join('/');
+}
+
 // ─── Model Profile Table ─────────────────────────────────────────────────────
 
 const MODEL_PROFILES = {
@@ -69,6 +76,7 @@ function loadConfig(cwd) {
     research: true,
     plan_checker: true,
     verifier: true,
+    nyquist_validation: false,
     parallelization: true,
     brave_search: false,
   };
@@ -102,8 +110,10 @@ function loadConfig(cwd) {
       research: get('research', { section: 'workflow', field: 'research' }) ?? defaults.research,
       plan_checker: get('plan_checker', { section: 'workflow', field: 'plan_check' }) ?? defaults.plan_checker,
       verifier: get('verifier', { section: 'workflow', field: 'verifier' }) ?? defaults.verifier,
+      nyquist_validation: get('nyquist_validation', { section: 'workflow', field: 'nyquist_validation' }) ?? defaults.nyquist_validation,
       parallelization,
       brave_search: get('brave_search') ?? defaults.brave_search,
+      model_overrides: parsed.model_overrides || null,
     };
   } catch {
     return defaults;
@@ -217,7 +227,7 @@ function searchPhaseInDir(baseDir, relBase, normalized) {
 
     return {
       found: true,
-      directory: path.join(relBase, match),
+      directory: toPosixPath(path.join(relBase, match)),
       phase_number: phaseNumber,
       phase_name: phaseName,
       phase_slug: phaseName ? phaseName.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, '') : null,
@@ -240,7 +250,7 @@ function findPhaseInternal(cwd, phase) {
   const normalized = normalizePhaseName(phase);
 
   // Search current phases first
-  const current = searchPhaseInDir(phasesDir, path.join('.planning', 'phases'), normalized);
+  const current = searchPhaseInDir(phasesDir, '.planning/phases', normalized);
   if (current) return current;
 
   // Search archived milestone phases (newest first)
@@ -258,7 +268,7 @@ function findPhaseInternal(cwd, phase) {
     for (const archiveName of archiveDirs) {
       const version = archiveName.match(/^(v[\d.]+)-phases$/)[1];
       const archivePath = path.join(milestonesDir, archiveName);
-      const relBase = path.join('.planning', 'milestones', archiveName);
+      const relBase = '.planning/milestones/' + archiveName;
       const result = searchPhaseInDir(archivePath, relBase, normalized);
       if (result) {
         result.archived = version;
@@ -378,11 +388,21 @@ function generateSlugInternal(text) {
 function getMilestoneInfo(cwd) {
   try {
     const roadmap = fs.readFileSync(path.join(cwd, '.planning', 'ROADMAP.md'), 'utf-8');
-    const versionMatch = roadmap.match(/v(\d+\.\d+)/);
-    const nameMatch = roadmap.match(/## .*v\d+\.\d+[:\s]+([^\n(]+)/);
+    // Strip <details>...</details> blocks so shipped milestones don't interfere
+    const cleaned = roadmap.replace(/<details>[\s\S]*?<\/details>/gi, '');
+    // Extract version and name from the same ## heading for consistency
+    const headingMatch = cleaned.match(/## .*v(\d+\.\d+)[:\s]+([^\n(]+)/);
+    if (headingMatch) {
+      return {
+        version: 'v' + headingMatch[1],
+        name: headingMatch[2].trim(),
+      };
+    }
+    // Fallback: try bare version match
+    const versionMatch = cleaned.match(/v(\d+\.\d+)/);
     return {
       version: versionMatch ? versionMatch[0] : 'v1.0',
-      name: nameMatch ? nameMatch[1].trim() : 'milestone',
+      name: 'milestone',
     };
   } catch {
     return { version: 'v1.0', name: 'milestone' };
@@ -408,4 +428,5 @@ module.exports = {
   pathExistsInternal,
   generateSlugInternal,
   getMilestoneInfo,
+  toPosixPath,
 };

@@ -29,7 +29,7 @@ Exit.
 Load phase operation context:
 
 ```bash
-INIT=$(node ~/.claude/get-shit-done/bin/gsd-tools.cjs init phase-op "${target}")
+INIT=$(node "$HOME/.claude/get-shit-done/bin/gsd-tools.cjs" init phase-op "${target}")
 ```
 
 Extract: `phase_found`, `phase_dir`, `phase_number`, `commit_docs`, `roadmap_exists`.
@@ -79,13 +79,13 @@ Wait for confirmation.
 **Delegate the entire removal operation to gsd-tools:**
 
 ```bash
-RESULT=$(node ~/.claude/get-shit-done/bin/gsd-tools.cjs phase remove "${target}")
+RESULT=$(node "$HOME/.claude/get-shit-done/bin/gsd-tools.cjs" phase remove "${target}")
 ```
 
 If the phase has executed plans (SUMMARY.md files), gsd-tools will error. Use `--force` only if the user confirms:
 
 ```bash
-RESULT=$(node ~/.claude/get-shit-done/bin/gsd-tools.cjs phase remove "${target}" --force)
+RESULT=$(node "$HOME/.claude/get-shit-done/bin/gsd-tools.cjs" phase remove "${target}" --force)
 ```
 
 The CLI handles:
@@ -102,7 +102,7 @@ Extract from result: `removed`, `directory_deleted`, `renamed_directories`, `ren
 Stage and commit the removal:
 
 ```bash
-node ~/.claude/get-shit-done/bin/gsd-tools.cjs commit "chore: remove phase {target} ({original-phase-name})" --files .planning/
+node "$HOME/.claude/get-shit-done/bin/gsd-tools.cjs" commit "chore: remove phase {target} ({original-phase-name})" --files .planning/
 ```
 
 The commit message preserves the historical record of what was removed.

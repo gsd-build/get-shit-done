@@ -33,7 +33,7 @@ Before planning, discover project context:
 
 **Project instructions:** Read `./CLAUDE.md` if it exists in the working directory. Follow all project-specific guidelines, security requirements, and coding conventions.
 
-**Project skills:** Check `.agents/skills/` directory if it exists:
+**Project skills:** Check `.claude/skills/` or `.agents/skills/` directory if either exists:
 1. List available skills (subdirectories)
 2. Read `SKILL.md` for each skill (lightweight index ~130 lines)
 3. Load specific `rules/*.md` files as needed during planning
@@ -233,6 +233,26 @@ This prevents the "scavenger hunt" anti-pattern where executors explore the code
 **Standard tasks:** UI layout/styling, configuration, glue code, one-off scripts, simple CRUD with no business logic.
 
 **Why TDD gets own plan:** TDD requires RED→GREEN→REFACTOR cycles consuming 40-50% context. Embedding in multi-task plans degrades quality.
+
+**Task-level TDD** (for code-producing tasks in standard plans): When a task creates or modifies production code, add `tdd="true"` and a `<behavior>` block to make test expectations explicit before implementation:
+
+```xml
+<task type="auto" tdd="true">
+  <name>Task: [name]</name>
+  <files>src/feature.ts, src/feature.test.ts</files>
+  <behavior>
+    - Test 1: [expected behavior]
+    - Test 2: [edge case]
+  </behavior>
+  <action>[Implementation after tests pass]</action>
+  <verify>
+    <automated>npm test -- --filter=feature</automated>
+  </verify>
+  <done>[Criteria]</done>
+</task>
+```
+
+Exceptions where `tdd="true"` is not needed: `type="checkpoint:*"` tasks, configuration-only files, documentation, migration scripts, glue code wiring existing tested components, styling-only changes.
 
 ## User Setup Detection
 
@@ -900,7 +920,7 @@ Group by plan, dimension, severity.
 ### Step 6: Commit
 
 ```bash
-node ~/.claude/get-shit-done/bin/gsd-tools.cjs commit "fix($PHASE): revise plans based on checker feedback" --files .planning/phases/$PHASE-*/$PHASE-*-PLAN.md
+node "$HOME/.claude/get-shit-done/bin/gsd-tools.cjs" commit "fix($PHASE): revise plans based on checker feedback" --files .planning/phases/$PHASE-*/$PHASE-*-PLAN.md
 ```
 
 ### Step 7: Return Revision Summary
@@ -939,7 +959,7 @@ node ~/.claude/get-shit-done/bin/gsd-tools.cjs commit "fix($PHASE): revise plans
 Load planning context:
 
 ```bash
-INIT=$(node ~/.claude/get-shit-done/bin/gsd-tools.cjs init plan-phase "${PHASE}")
+INIT=$(node "$HOME/.claude/get-shit-done/bin/gsd-tools.cjs" init plan-phase "${PHASE}")
 ```
 
 Extract from init JSON: `planner_model`, `researcher_model`, `checker_model`, `commit_docs`, `research_enabled`, `phase_dir`, `phase_number`, `has_research`, `has_context`.
@@ -995,7 +1015,7 @@ Apply discovery level protocol (see discovery_levels section).
 
 **Step 1 — Generate digest index:**
 ```bash
-node ~/.claude/get-shit-done/bin/gsd-tools.cjs history-digest
+node "$HOME/.claude/get-shit-done/bin/gsd-tools.cjs" history-digest
 ```
 
 **Step 2 — Select relevant phases (typically 2-4):**
@@ -1123,7 +1143,7 @@ Include all frontmatter fields.
 Validate each created PLAN.md using gsd-tools:
 
 ```bash
-VALID=$(node ~/.claude/get-shit-done/bin/gsd-tools.cjs frontmatter validate "$PLAN_PATH" --schema plan)
+VALID=$(node "$HOME/.claude/get-shit-done/bin/gsd-tools.cjs" frontmatter validate "$PLAN_PATH" --schema plan)
 ```
 
 Returns JSON: `{ valid, missing, present, schema }`
@@ -1136,7 +1156,7 @@ Required plan frontmatter fields:
 Also validate plan structure:
 
 ```bash
-STRUCTURE=$(node ~/.claude/get-shit-done/bin/gsd-tools.cjs verify plan-structure "$PLAN_PATH")
+STRUCTURE=$(node "$HOME/.claude/get-shit-done/bin/gsd-tools.cjs" verify plan-structure "$PLAN_PATH")
 ```
 
 Returns JSON: `{ valid, errors, warnings, task_count, tasks }`
@@ -1173,7 +1193,7 @@ Plans:
 
 <step name="git_commit">
 ```bash
-node ~/.claude/get-shit-done/bin/gsd-tools.cjs commit "docs($PHASE): create phase plan" --files .planning/phases/$PHASE-*/$PHASE-*-PLAN.md .planning/ROADMAP.md
+node "$HOME/.claude/get-shit-done/bin/gsd-tools.cjs" commit "docs($PHASE): create phase plan" --files .planning/phases/$PHASE-*/$PHASE-*-PLAN.md .planning/ROADMAP.md
 ```
 </step>
 

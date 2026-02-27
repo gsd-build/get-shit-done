@@ -113,7 +113,7 @@ Phase: "API documentation"
 Phase number from argument (required).
 
 ```bash
-INIT=$(node ~/.claude/get-shit-done/bin/gsd-tools.cjs init phase-op "${PHASE}")
+INIT=$(node "$HOME/.claude/get-shit-done/bin/gsd-tools.cjs" init phase-op "${PHASE}")
 ```
 
 Parse JSON for: `commit_docs`, `phase_found`, `phase_dir`, `phase_number`, `phase_name`, `phase_slug`, `padded_phase`, `has_research`, `has_context`, `has_plans`, `has_verification`, `plan_count`, `roadmap_exists`, `planning_exists`.
@@ -165,30 +165,73 @@ If "Continue and replan after": Continue to analyze_phase.
 If "View existing plans": Display plan files, then offer "Continue" / "Cancel".
 If "Cancel": Exit workflow.
 
-**If `has_plans` is false:** Continue to analyze_phase.
+**If `has_plans` is false:** Continue to scout_codebase.
+</step>
+
+<step name="scout_codebase">
+Lightweight scan of existing code to inform gray area identification and discussion. Uses ~10% context — acceptable for an interactive session.
+
+**Step 1: Check for existing codebase maps**
+```bash
+ls .planning/codebase/*.md 2>/dev/null
+```
+
+**If codebase maps exist:** Read the most relevant ones (CONVENTIONS.md, STRUCTURE.md, STACK.md based on phase type). Extract:
+- Reusable components/hooks/utilities
+- Established patterns (state management, styling, data fetching)
+- Integration points (where new code would connect)
+
+Skip to Step 3 below.
+
+**Step 2: If no codebase maps, do targeted grep**
+
+Extract key terms from the phase goal (e.g., "feed" → "post", "card", "list"; "auth" → "login", "session", "token").
+
+```bash
+# Find files related to phase goal terms
+grep -rl "{term1}\|{term2}" src/ app/ --include="*.ts" --include="*.tsx" --include="*.js" --include="*.jsx" 2>/dev/null | head -10
+
+# Find existing components/hooks
+ls src/components/ 2>/dev/null
+ls src/hooks/ 2>/dev/null
+ls src/lib/ src/utils/ 2>/dev/null
+```
+
+Read the 3-5 most relevant files to understand existing patterns.
+
+**Step 3: Build internal codebase_context**
+
+From the scan, identify:
+- **Reusable assets** — existing components, hooks, utilities that could be used in this phase
+- **Established patterns** — how the codebase does state management, styling, data fetching
+- **Integration points** — where new code would connect (routes, nav, providers)
+- **Creative options** — approaches the existing architecture enables or constrains
+
+Store as internal `<codebase_context>` for use in analyze_phase and present_gray_areas. This is NOT written to a file — it's used within this session only.
 </step>
 
 <step name="analyze_phase">
-Analyze the phase to identify gray areas worth discussing.
+Analyze the phase to identify gray areas worth discussing. **Use codebase_context from scout step to ground the analysis.**
 
 **Read the phase description from ROADMAP.md and determine:**
 
 1. **Domain boundary** — What capability is this phase delivering? State it clearly.
 
-2. **Gray areas by category** — For each relevant category (UI, UX, Behavior, Empty States, Content), identify 1-2 specific ambiguities that would change implementation.
+2. **Gray areas by category** — For each relevant category (UI, UX, Behavior, Empty States, Content), identify 1-2 specific ambiguities that would change implementation. **Annotate with code context where relevant** (e.g., "You already have a Card component" or "No existing pattern for this").
 
 3. **Skip assessment** — If no meaningful gray areas exist (pure infrastructure, clear-cut implementation), the phase may not need discussion.
 
 **Output your analysis internally, then present to user.**
 
-Example analysis for "Post Feed" phase:
+Example analysis for "Post Feed" phase (with code context):
 ```
 Domain: Displaying posts from followed users
+Existing: Card component (src/components/ui/Card.tsx), useInfiniteQuery hook, Tailwind CSS
 Gray areas:
-- UI: Layout style (cards vs timeline vs grid)
-- UI: Information density (full posts vs previews)
-- Behavior: Loading pattern (infinite scroll vs pagination)
-- Empty State: What shows when no posts exist
+- UI: Layout style (cards vs timeline vs grid) — Card component exists with shadow/rounded variants
+- UI: Information density (full posts vs previews) — no existing density patterns
+- Behavior: Loading pattern (infinite scroll vs pagination) — useInfiniteQuery already set up
+- Empty State: What shows when no posts exist — EmptyState component exists in ui/
 - Content: What metadata displays (time, author, reactions count)
 ```
 </step>
@@ -210,17 +253,23 @@ We'll clarify HOW to implement this.
 - question: "Which areas do you want to discuss for [phase name]?"
 - options: Generate 3-4 phase-specific gray areas, each with:
   - "[Specific area]" (label) — concrete, not generic
-  - [1-2 questions this covers] (description)
+  - [1-2 questions this covers + code context annotation] (description)
   - **Highlight the recommended choice with brief explanation why**
+
+**Code context annotations:** When the scout found relevant existing code, annotate the gray area description:
+```
+☐ Layout style — Cards vs list vs timeline?
+  (You already have a Card component with shadow/rounded variants. Reusing it keeps the app consistent.)
+```
 
 **Do NOT include a "skip" or "you decide" option.** User ran this command to discuss — give them real choices.
 
-**Examples by domain:**
+**Examples by domain (with code context):**
 
 For "Post Feed" (visual feature):
 ```
-☐ Layout style — Cards vs list vs timeline? Information density?
-☐ Loading behavior — Infinite scroll or pagination? Pull to refresh?
+☐ Layout style — Cards vs list vs timeline? (Card component exists with variants)
+☐ Loading behavior — Infinite scroll or pagination? (useInfiniteQuery hook available)
 ☐ Content ordering — Chronological, algorithmic, or user choice?
 ☐ Post metadata — What info per post? Timestamps, reactions, author?
 ```
@@ -262,7 +311,15 @@ Ask 4 questions per area before offering to continue or move on. Each answer oft
    - header: "[Area]" (max 12 chars — abbreviate if needed)
    - question: Specific decision for this area
    - options: 2-3 concrete choices (AskUserQuestion adds "Other" automatically), with the recommended choice highlighted and brief explanation why
+   - **Annotate options with code context** when relevant:
+     ```
+     "How should posts be displayed?"
+     - Cards (reuses existing Card component — consistent with Messages)
+     - List (simpler, would be a new pattern)
+     - Timeline (needs new Timeline component — none exists yet)
+     ```
    - Include "You decide" as an option when reasonable — captures Claude discretion
+   - **Context7 for library choices:** When a gray area involves library selection (e.g., "magic links" → query next-auth docs) or API approach decisions, use `mcp__context7__*` tools to fetch current documentation and inform the options. Don't use Context7 for every question — only when library-specific knowledge improves the options.
 
 3. **After 4 questions, check:**
    - header: "[Area]" (max 12 chars)
@@ -346,6 +403,20 @@ mkdir -p ".planning/phases/${padded_phase}-${phase_slug}"
 
 </decisions>
 
+<code_context>
+## Existing Code Insights
+
+### Reusable Assets
+- [Component/hook/utility]: [How it could be used in this phase]
+
+### Established Patterns
+- [Pattern]: [How it constrains/enables this phase]
+
+### Integration Points
+- [Where new code connects to existing system]
+
+</code_context>
+
 <specifics>
 ## Specific Ideas
 
@@ -415,7 +486,7 @@ Created: .planning/phases/${PADDED_PHASE}-${SLUG}/${PADDED_PHASE}-CONTEXT.md
 Commit phase context (uses `commit_docs` from init internally):
 
 ```bash
-node ~/.claude/get-shit-done/bin/gsd-tools.cjs commit "docs(${padded_phase}): capture phase context" --files "${phase_dir}/${padded_phase}-CONTEXT.md"
+node "$HOME/.claude/get-shit-done/bin/gsd-tools.cjs" commit "docs(${padded_phase}): capture phase context" --files "${phase_dir}/${padded_phase}-CONTEXT.md"
 ```
 
 Confirm: "Committed: docs(${padded_phase}): capture phase context"
@@ -425,7 +496,7 @@ Confirm: "Committed: docs(${padded_phase}): capture phase context"
 Update STATE.md with session info:
 
 ```bash
-node ~/.claude/get-shit-done/bin/gsd-tools.cjs state record-session \
+node "$HOME/.claude/get-shit-done/bin/gsd-tools.cjs" state record-session \
   --stopped-at "Phase ${PHASE} context gathered" \
   --resume-file "${phase_dir}/${padded_phase}-CONTEXT.md"
 ```
@@ -433,7 +504,7 @@ node ~/.claude/get-shit-done/bin/gsd-tools.cjs state record-session \
 Commit STATE.md:
 
 ```bash
-node ~/.claude/get-shit-done/bin/gsd-tools.cjs commit "docs(state): record phase ${PHASE} context session" --files .planning/STATE.md
+node "$HOME/.claude/get-shit-done/bin/gsd-tools.cjs" commit "docs(state): record phase ${PHASE} context session" --files .planning/STATE.md
 ```
 </step>
 
@@ -443,12 +514,12 @@ Check for auto-advance trigger:
 1. Parse `--auto` flag from $ARGUMENTS
 2. Read `workflow.auto_advance` from config:
    ```bash
-   AUTO_CFG=$(node ~/.claude/get-shit-done/bin/gsd-tools.cjs config-get workflow.auto_advance 2>/dev/null || echo "false")
+   AUTO_CFG=$(node "$HOME/.claude/get-shit-done/bin/gsd-tools.cjs" config-get workflow.auto_advance 2>/dev/null || echo "false")
    ```
 
 **If `--auto` flag present AND `AUTO_CFG` is not true:** Persist auto-advance to config (handles direct `--auto` usage without new-project):
 ```bash
-node ~/.claude/get-shit-done/bin/gsd-tools.cjs config-set workflow.auto_advance true
+node "$HOME/.claude/get-shit-done/bin/gsd-tools.cjs" config-set workflow.auto_advance true
 ```
 
 **If `--auto` flag present OR `AUTO_CFG` is true:**
@@ -531,11 +602,13 @@ Route to `confirm_creation` step (existing behavior — show manual next steps).
 
 <success_criteria>
 - Phase validated against roadmap
-- Gray areas identified through intelligent analysis (not generic questions)
+- Codebase scouted for reusable assets, patterns, and integration points
+- Gray areas identified through intelligent analysis with code context annotations
 - User selected which areas to discuss
-- Each selected area explored until user satisfied
+- Each selected area explored until user satisfied (with code-informed options)
 - Scope creep redirected to deferred ideas
 - CONTEXT.md captures actual decisions, not vague vision
+- CONTEXT.md includes code_context section with reusable assets and patterns
 - Deferred ideas preserved for future phases
 - STATE.md updated with session info
 - User knows next steps
