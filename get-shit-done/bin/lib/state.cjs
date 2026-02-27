@@ -151,7 +151,8 @@ function cmdStateUpdate(cwd, field, value) {
 // ─── State Progression Engine ────────────────────────────────────────────────
 
 function stateExtractField(content, fieldName) {
-  const pattern = new RegExp(`\\*\\*${fieldName}:\\*\\*\\s*(.+)`, 'i');
+  const escaped = fieldName.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+  const pattern = new RegExp(`\\*\\*${escaped}:\\*\\*\\s*(.+)`, 'i');
   const match = content.match(pattern);
   return match ? match[1].trim() : null;
 }

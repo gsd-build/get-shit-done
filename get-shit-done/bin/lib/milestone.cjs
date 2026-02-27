@@ -92,7 +92,44 @@ function cmdMilestoneComplete(cwd, version, options, raw) {
   // Ensure archive directory exists
   fs.mkdirSync(archiveDir, { recursive: true });
 
-  // Gather stats from phases
+  // Extract milestone phase numbers from ROADMAP.md to scope stats.
+  // Only phases listed in the current ROADMAP are counted — phases from
+  // prior milestones that remain on disk are excluded.
+  //
+  // Related upstream PRs (getMilestoneInfo, not milestone complete):
+  //   #756 — fix(core): detect current milestone correctly in getMilestoneInfo
+  //   #783 — fix: getMilestoneInfo() returns wrong version after completion
+  // Those PRs fix *which* milestone is detected; this fix scopes *stats*
+  // and *accomplishments* to only the phases belonging to that milestone.
+  const milestonePhaseNums = new Set();
+  if (fs.existsSync(roadmapPath)) {
+    try {
+      const roadmapContent = fs.readFileSync(roadmapPath, 'utf-8');
+      const phasePattern = /#{2,4}\s*Phase\s+(\d+[A-Z]?(?:\.\d+)*)\s*:/gi;
+      let phaseMatch;
+      while ((phaseMatch = phasePattern.exec(roadmapContent)) !== null) {
+        milestonePhaseNums.add(phaseMatch[1]);
+      }
+    } catch {}
+  }
+
+  // Pre-normalize phase numbers for O(1) lookup — strip leading zeros
+  // and lowercase for case-insensitive matching of letter suffixes (e.g. 3A/3a).
+  const normalizedPhaseNums = new Set(
+    [...milestonePhaseNums].map(num => (num.replace(/^0+/, '') || '0').toLowerCase())
+  );
+
+  // Match a phase directory name to the milestone's phase set.
+  // Handles: "01-foo" → "1", "3A-bar" → "3a", "3.1-baz" → "3.1"
+  // Returns false for non-phase directories (no leading digit).
+  function isDirInMilestone(dirName) {
+    if (normalizedPhaseNums.size === 0) return true; // no scoping
+    const m = dirName.match(/^0*(\d+[A-Za-z]?(?:\.\d+)*)/);
+    if (!m) return false; // not a phase directory
+    return normalizedPhaseNums.has(m[1].toLowerCase());
+  }
+
+  // Gather stats from phases (scoped to current milestone only)
   let phaseCount = 0;
   let totalPlans = 0;
   let totalTasks = 0;
@@ -103,6 +140,8 @@ function cmdMilestoneComplete(cwd, version, options, raw) {
     const dirs = entries.filter(e => e.isDirectory()).map(e => e.name).sort();
 
     for (const dir of dirs) {
+      if (!isDirInMilestone(dir)) continue;
+
       phaseCount++;
       const phaseFiles = fs.readdirSync(path.join(phasesDir, dir));
       const plans = phaseFiles.filter(f => f.endsWith('-PLAN.md') || f === 'PLAN.md');
@@ -150,7 +189,16 @@ function cmdMilestoneComplete(cwd, version, options, raw) {
 
   if (fs.existsSync(milestonesPath)) {
     const existing = fs.readFileSync(milestonesPath, 'utf-8');
-    fs.writeFileSync(milestonesPath, existing + '\n' + milestoneEntry, 'utf-8');
+    // Insert after the header line(s) for reverse chronological order (newest first)
+    const headerMatch = existing.match(/^(#{1,3}\s+[^\n]*\n\n?)/);
+    if (headerMatch) {
+      const header = headerMatch[1];
+      const rest = existing.slice(header.length);
+      fs.writeFileSync(milestonesPath, header + milestoneEntry + rest, 'utf-8');
+    } else {
+      // No recognizable header — prepend the entry
+      fs.writeFileSync(milestonesPath, milestoneEntry + existing, 'utf-8');
+    }
   } else {
     fs.writeFileSync(milestonesPath, `# Milestones\n\n${milestoneEntry}`, 'utf-8');
   }
@@ -182,10 +230,13 @@ function cmdMilestoneComplete(cwd, version, options, raw) {
 
       const phaseEntries = fs.readdirSync(phasesDir, { withFileTypes: true });
       const phaseDirNames = phaseEntries.filter(e => e.isDirectory()).map(e => e.name);
+      let archivedCount = 0;
       for (const dir of phaseDirNames) {
+        if (!isDirInMilestone(dir)) continue;
         fs.renameSync(path.join(phasesDir, dir), path.join(phaseArchiveDir, dir));
+        archivedCount++;
       }
-      phasesArchived = phaseDirNames.length > 0;
+      phasesArchived = archivedCount > 0;
     } catch {}
   }
 

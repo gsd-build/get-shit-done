@@ -358,6 +358,228 @@ objective: Manual review needed
   });
 });
 
+
+// ─────────────────────────────────────────────────────────────────────────────
+// phase-plan-index — canonical XML format (template-aligned)
+// ─────────────────────────────────────────────────────────────────────────────
+
+describe('phase-plan-index canonical format', () => {
+  let tmpDir;
+
+  beforeEach(() => {
+    tmpDir = createTempProject();
+  });
+
+  afterEach(() => {
+    cleanup(tmpDir);
+  });
+
+  test('files_modified: underscore key is parsed correctly', () => {
+    const phaseDir = path.join(tmpDir, '.planning', 'phases', '04-ui');
+    fs.mkdirSync(phaseDir, { recursive: true });
+
+    fs.writeFileSync(
+      path.join(phaseDir, '04-01-PLAN.md'),
+      `---
+wave: 1
+autonomous: true
+files_modified: [src/App.tsx, src/index.ts]
+---
+
+<objective>
+Build main application shell
+
+Purpose: Entry point
+Output: App component
+</objective>
+
+<tasks>
+<task type="auto">
+  <name>Task 1: Create App component</name>
+  <files>src/App.tsx</files>
+  <action>Create component</action>
+  <verify>npm run build</verify>
+  <done>Component renders</done>
+</task>
+</tasks>
+`
+    );
+
+    const result = runGsdTools('phase-plan-index 04', tmpDir);
+    assert.ok(result.success, `Command failed: ${result.error}`);
+
+    const output = JSON.parse(result.output);
+    assert.deepStrictEqual(
+      output.plans[0].files_modified,
+      ['src/App.tsx', 'src/index.ts'],
+      'files_modified with underscore should be parsed'
+    );
+  });
+
+  test('objective: extracted from <objective> XML tag, not frontmatter', () => {
+    const phaseDir = path.join(tmpDir, '.planning', 'phases', '04-ui');
+    fs.mkdirSync(phaseDir, { recursive: true });
+
+    fs.writeFileSync(
+      path.join(phaseDir, '04-01-PLAN.md'),
+      `---
+wave: 1
+autonomous: true
+files_modified: []
+---
+
+<objective>
+Build main application shell
+
+Purpose: Entry point for the SPA
+Output: App.tsx with routing
+</objective>
+
+<tasks>
+<task type="auto">
+  <name>Task 1: Scaffold</name>
+  <files>src/App.tsx</files>
+  <action>Create shell</action>
+  <verify>build passes</verify>
+  <done>App renders</done>
+</task>
+</tasks>
+`
+    );
+
+    const result = runGsdTools('phase-plan-index 04', tmpDir);
+    assert.ok(result.success, `Command failed: ${result.error}`);
+
+    const output = JSON.parse(result.output);
+    assert.strictEqual(
+      output.plans[0].objective,
+      'Build main application shell',
+      'objective should come from <objective> XML tag first line'
+    );
+  });
+
+  test('task_count: counts <task> XML tags', () => {
+    const phaseDir = path.join(tmpDir, '.planning', 'phases', '04-ui');
+    fs.mkdirSync(phaseDir, { recursive: true });
+
+    fs.writeFileSync(
+      path.join(phaseDir, '04-01-PLAN.md'),
+      `---
+wave: 1
+autonomous: true
+files_modified: []
+---
+
+<objective>
+Create UI components
+</objective>
+
+<tasks>
+<task type="auto">
+  <name>Task 1: Header</name>
+  <files>src/Header.tsx</files>
+  <action>Create header</action>
+  <verify>build</verify>
+  <done>Header renders</done>
+</task>
+
+<task type="auto">
+  <name>Task 2: Footer</name>
+  <files>src/Footer.tsx</files>
+  <action>Create footer</action>
+  <verify>build</verify>
+  <done>Footer renders</done>
+</task>
+
+<task type="checkpoint:human-verify" gate="blocking">
+  <what-built>UI components</what-built>
+  <how-to-verify>Visit localhost:3000</how-to-verify>
+  <resume-signal>Type approved</resume-signal>
+</task>
+</tasks>
+`
+    );
+
+    const result = runGsdTools('phase-plan-index 04', tmpDir);
+    assert.ok(result.success, `Command failed: ${result.error}`);
+
+    const output = JSON.parse(result.output);
+    assert.strictEqual(
+      output.plans[0].task_count,
+      3,
+      'should count all 3 <task> XML tags'
+    );
+  });
+
+  test('all three fields work together in canonical plan format', () => {
+    const phaseDir = path.join(tmpDir, '.planning', 'phases', '04-ui');
+    fs.mkdirSync(phaseDir, { recursive: true });
+
+    fs.writeFileSync(
+      path.join(phaseDir, '04-01-PLAN.md'),
+      `---
+phase: 04-ui
+plan: 01
+type: execute
+wave: 1
+depends_on: []
+files_modified: [src/components/Chat.tsx, src/app/api/chat/route.ts]
+autonomous: true
+requirements: [R1, R2]
+---
+
+<objective>
+Implement complete Chat feature as vertical slice.
+
+Purpose: Self-contained chat that can run parallel to other features.
+Output: Chat component, API endpoints.
+</objective>
+
+<execution_context>
+@~/.claude/get-shit-done/workflows/execute-plan.md
+</execution_context>
+
+<context>
+@.planning/PROJECT.md
+@.planning/ROADMAP.md
+</context>
+
+<tasks>
+<task type="auto">
+  <name>Task 1: Create Chat component</name>
+  <files>src/components/Chat.tsx</files>
+  <action>Build chat UI with message list and input</action>
+  <verify>npm run build</verify>
+  <done>Chat component renders messages</done>
+</task>
+
+<task type="auto">
+  <name>Task 2: Create Chat API</name>
+  <files>src/app/api/chat/route.ts</files>
+  <action>GET /api/chat and POST /api/chat endpoints</action>
+  <verify>curl tests pass</verify>
+  <done>CRUD operations work</done>
+</task>
+</tasks>
+
+<verification>
+- [ ] npm run build succeeds
+- [ ] API endpoints respond correctly
+</verification>
+`
+    );
+
+    const result = runGsdTools('phase-plan-index 04', tmpDir);
+    assert.ok(result.success, `Command failed: ${result.error}`);
+
+    const output = JSON.parse(result.output);
+    const plan = output.plans[0];
+    assert.strictEqual(plan.objective, 'Implement complete Chat feature as vertical slice.', 'objective from XML tag');
+    assert.deepStrictEqual(plan.files_modified, ['src/components/Chat.tsx', 'src/app/api/chat/route.ts'], 'files_modified with underscore');
+    assert.strictEqual(plan.task_count, 2, 'task_count from <task> XML tags');
+  });
+});
+
 // ─────────────────────────────────────────────────────────────────────────────
 // state-snapshot command
 // ─────────────────────────────────────────────────────────────────────────────
