@@ -259,9 +259,11 @@ async function main() {
 
     case 'commit': {
       const amend = args.includes('--amend');
-      const message = args[1];
-      // Parse --files flag (collect args after --files, stopping at other flags)
       const filesIndex = args.indexOf('--files');
+      const endIndex = filesIndex !== -1 ? filesIndex : args.length;
+      const messageArgs = args.slice(1, endIndex).filter(a => !a.startsWith('--'));
+      const message = messageArgs.join(' ');
+      // Parse --files flag (collect args after --files, stopping at other flags)
       const files = filesIndex !== -1 ? args.slice(filesIndex + 1).filter(a => !a.startsWith('--')) : [];
       commands.cmdCommit(cwd, message, files, raw, amend);
       break;
@@ -344,7 +346,8 @@ async function main() {
     }
 
     case 'generate-slug': {
-      commands.cmdGenerateSlug(args[1], raw);
+      const text = args.slice(1).join(' ');
+      commands.cmdGenerateSlug(text || undefined, raw);
       break;
     }
 
@@ -570,9 +573,15 @@ async function main() {
     }
 
     case 'websearch': {
-      const query = args[1];
       const limitIdx = args.indexOf('--limit');
       const freshnessIdx = args.indexOf('--freshness');
+      const queryParts = [];
+      for (let i = 1; i < args.length; i++) {
+        if (args[i] === '--limit' || args[i] === '--freshness') { i++; continue; }
+        if (args[i].startsWith('--')) continue;
+        queryParts.push(args[i]);
+      }
+      const query = queryParts.join(' ') || null;
       await commands.cmdWebsearch(query, {
         limit: limitIdx !== -1 ? parseInt(args[limitIdx + 1], 10) : 10,
         freshness: freshnessIdx !== -1 ? args[freshnessIdx + 1] : null,
