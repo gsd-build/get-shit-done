@@ -6,6 +6,22 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ## [Unreleased]
 
+## [1.21.2] - 2026-02-27
+
+### Added
+- GitHub Copilot CLI runtime support: `--copilot` flag and auto-detection
+- `copyCommandsAsCopilotSkills()` — installs GSD commands as Copilot skills under `~/.copilot/skills/gsd-*/`
+- `convertClaudeCommandToCopilotSkill()` — converts slash commands to Copilot skill format with YAML frontmatter and adapter block
+- `convertSlashCommandsToCopilotSkillMentions()` — rewrites `/gsd:X` references to `@gsd-X`
+- Copilot-aware uninstall: removes `skills/gsd-*` directories
+- 15 E2E installer tests covering Copilot install, uninstall, and reinstall idempotency (`tests/installer.test.cjs`)
+- README documentation for Copilot CLI install, skill verification, and troubleshooting
+
+### Changed
+- `promptRuntime()` adds option 5 for GitHub Copilot (`~/.copilot`), renumbers All to option 6
+- `--all` flag now includes the Copilot runtime
+- Banner and help text updated to mention GitHub Copilot CLI
+
 ## [1.21.1] - 2026-02-27
 
 ### Added
