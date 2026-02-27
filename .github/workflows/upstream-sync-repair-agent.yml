@@ -160,6 +160,21 @@ jobs:
           export EXEMPTIONS_FILE="${EXEMPTIONS_FILE}"
           bash scripts/apply-guard-exemptions.sh
 
+      - name: Notice if workflows changed (fork-owned enforcement)
+        run: |
+          set -euo pipefail
+          WF_STATUS="$(git status --porcelain .github/workflows 2>/dev/null || true)"
+          if [ -n "$WF_STATUS" ]; then
+            echo "::notice::Workflow dir has changes in working tree (expected if exemptions removed upstream workflows):"
+            echo "$WF_STATUS"
+          fi
+
+          WF_STAGED="$(git diff --cached --name-status -- .github/workflows 2>/dev/null || true)"
+          if [ -n "$WF_STAGED" ]; then
+            echo "::notice::Workflow changes staged (should be fork-owned state):"
+            echo "$WF_STAGED"
+          fi
+
       - name: Final generate + verify pass (must be clean)
         run: |
           set -euo pipefail

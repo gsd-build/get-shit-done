@@ -200,6 +200,24 @@ jobs:
           else
             git commit -m "chore: regenerate prompts" || true
           fi
+      
+      - name: Notice if workflows changed (fork-owned enforcement)
+        if: steps.detect.outputs.behind != '0'
+        run: |
+          set -euo pipefail
+          # Shows current working tree changes under workflows (if any)
+          WF_STATUS="$(git status --porcelain .github/workflows 2>/dev/null || true)"
+          if [ -n "$WF_STATUS" ]; then
+            echo "::notice::Workflow dir has changes in working tree (expected if exemptions removed upstream workflows):"
+            echo "$WF_STATUS"
+          fi
+
+          # Shows staged changes under workflows (if any)
+          WF_STAGED="$(git diff --cached --name-status -- .github/workflows 2>/dev/null || true)"
+          if [ -n "$WF_STAGED" ]; then
+            echo "::notice::Workflow changes staged (should be fork-owned state):"
+            echo "$WF_STAGED"
+          fi
 
       - name: Push sync branch
         if: steps.detect.outputs.behind != '0'
