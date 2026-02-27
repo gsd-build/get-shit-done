@@ -34,6 +34,7 @@ jobs:
         uses: actions/checkout@v4
         with:
           fetch-depth: 0
+          fetch-tags: false
 
       - name: Configure git identity
         run: |
@@ -91,25 +92,26 @@ jobs:
           git remote add upstream "https://github.com/${UPSTREAM_REPO}.git" || true
           git remote set-url --push upstream DISABLED || true
 
+          # fork base
           git fetch origin "${BASE_BRANCH}" --prune --no-tags
 
-          # Fetch only the needed upstream tag into a namespaced tag to avoid clobbering
-          git fetch upstream "refs/tags/${UP_TAG}:refs/tags/upstream/${UP_TAG}" --prune
+          # Fetch only the needed upstream tag into a namespaced tag; prevent tag auto-follow spam.
+          git fetch upstream --no-tags "refs/tags/${UP_TAG}:refs/tags/upstream/${UP_TAG}" --prune
 
-      - name: Create release-align branch at upstream tag (namespaced)
+      - name: Create release-align branch at upstream tag (NO PUSH YET)
         if: steps.tag.outputs.upstream_tag != '' && steps.mirrored.outputs.needs_mirror == 'true'
         run: |
           set -euo pipefail
           UP_TAG="${{ steps.tag.outputs.upstream_tag }}"
           SAFE_TAG=$(echo "$UP_TAG" | sed 's/[^A-Za-z0-9._-]/-/g')
           BR="automated/release-align-${SAFE_TAG}"
+
           git rev-parse "refs/tags/upstream/${UP_TAG}" >/dev/null
           git checkout -B "$BR" "refs/tags/upstream/${UP_TAG}"
-          echo "BRANCH=$BR" >> "$GITHUB_ENV"
-          # Push baseline so repair agent can work even if verify fails
-          git push -u origin "$BR" --force-with-lease
 
-      - name: Apply guard exemptions (fork-owned; supports globs + recursive; lenient)
+          echo "BRANCH=$BR" >> "$GITHUB_ENV"
+
+      - name: Apply guard exemptions (fork-owned; globs+recursive; lenient)
         if: steps.tag.outputs.upstream_tag != '' && steps.mirrored.outputs.needs_mirror == 'true'
         run: |
           set -euo pipefail
@@ -122,6 +124,12 @@ jobs:
           else
             git commit -m "chore: enforce fork-owned files (release align)" || true
           fi
+
+      - name: Push safe baseline branch (after exemptions)
+        if: steps.tag.outputs.upstream_tag != '' && steps.mirrored.outputs.needs_mirror == 'true'
+        run: |
+          set -euo pipefail
+          git push -u origin "${BRANCH}" --force-with-lease
 
       - name: Setup Node
         if: steps.tag.outputs.upstream_tag != '' && steps.mirrored.outputs.needs_mirror == 'true'
