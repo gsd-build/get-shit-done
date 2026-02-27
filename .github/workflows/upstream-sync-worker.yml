@@ -1,5 +1,4 @@
 name: Upstream Sync Worker
-
 on:
   schedule:
     # scattered every 4h
@@ -41,8 +40,10 @@ jobs:
         run: |
           set -euo pipefail
           git remote add upstream "https://github.com/${UPSTREAM_REPO}.git" || true
+          # Safety: prevent accidental pushes to upstream
+          git remote set-url --push upstream DISABLED || true
           git fetch upstream "${UPSTREAM_BRANCH}" --prune --no-tags
-          git fetch origin "${BASE_BRANCH}" --prune
+          git fetch origin "${BASE_BRANCH}" --prune --no-tags
 
       - name: Detect upstream delta
         id: detect
@@ -80,27 +81,13 @@ jobs:
             echo "merge_ok=false" >> "$GITHUB_OUTPUT"
           fi
 
-      - name: Enforce guard exemptions (ALWAYS keep fork main versions)
+      - name: Apply guard exemptions (fork-owned; supports globs + recursive; lenient)
         if: steps.detect.outputs.behind != '0'
         run: |
           set -euo pipefail
-          if [ ! -f "${EXEMPTIONS_FILE}" ]; then
-            echo "No exemptions file at ${EXEMPTIONS_FILE}; continuing."
-            exit 0
-          fi
-
-          grep -vE '^\s*($|#)' "${EXEMPTIONS_FILE}" > /tmp/exemptions.txt || true
-
-          while IFS= read -r f; do
-            [ -z "$f" ] && continue
-            if git cat-file -e "origin/${BASE_BRANCH}:$f" 2>/dev/null; then
-              echo "Forcing fork-main version for exempt file: $f"
-              git checkout "origin/${BASE_BRANCH}" -- "$f"
-              git add "$f"
-            else
-              echo "WARN: $f not found on origin/${BASE_BRANCH} (skipping)"
-            fi
-          done < /tmp/exemptions.txt
+          export BASE_BRANCH="${BASE_BRANCH}"
+          export EXEMPTIONS_FILE="${EXEMPTIONS_FILE}"
+          bash scripts/apply-guard-exemptions.sh
 
       - name: If merge failed, check remaining conflicts
         if: steps.detect.outputs.behind != '0' && steps.merge.outputs.merge_ok == 'false'
@@ -128,6 +115,7 @@ jobs:
         run: |
           set -euo pipefail
           gh workflow run "${REPAIR_WORKFLOW}" \
+            --repo "$GITHUB_REPOSITORY" \
             -f branch="${BRANCH}" \
             -f reason="merge_conflicts" \
             -f upstream_repo="${UPSTREAM_REPO}" \
@@ -163,14 +151,11 @@ jobs:
         run: |
           set -euo pipefail
           rm -rf "${PROMPTS_DIR:?}/"* || true
-
           node scripts/generate-prompts.mjs 2>&1 | tee /tmp/generate.log
-
           set +e
           node scripts/verify-prompts.mjs 2>&1 | tee /tmp/verify.log
           VERIFY_EXIT=${PIPESTATUS[0]}
           set -e
-
           if [ "$VERIFY_EXIT" -eq 0 ]; then
             echo "verify_ok=true" >> "$GITHUB_OUTPUT"
             echo "Prompt verification passed."
@@ -195,6 +180,7 @@ jobs:
         run: |
           set -euo pipefail
           gh workflow run "${REPAIR_WORKFLOW}" \
+            --repo "$GITHUB_REPOSITORY" \
             -f branch="${BRANCH}" \
             -f reason="verify_failed" \
             -f upstream_repo="${UPSTREAM_REPO}" \
@@ -247,9 +233,9 @@ jobs:
               --body "$BODY" \
               --label "upstream-sync" \
               --label "automated"
-            PR_NUM=$(gh pr list --repo "$GITHUB_REPOSITORY" --state open --head "${BRANCH}" --base "${BASE_BRANCH}" --json number --jq '.[0].number')
+            PR_NUM=$(gh pr list --repo "$GITHUB_REPOSITORY" --state open --head "${BRANCH}" --base "${BASE_BRANCH}" --json number --jq '.[0].number // empty')
           else
-            gh pr edit "$PR_NUM" --title "$TITLE" --body "$BODY" --repo "$GITHUB_REPOSITORY"
+            gh pr edit "$PR_NUM" --repo "$GITHUB_REPOSITORY" --title "$TITLE" --body "$BODY"
           fi
 
           echo "pr_number=$PR_NUM" >> "$GITHUB_OUTPUT"
@@ -264,7 +250,6 @@ jobs:
         run: |
           set -euo pipefail
           PR="${{ steps.pr.outputs.pr_number }}"
-
           if [ -z "$PR" ]; then
             echo "No PR number available; skipping auto-merge."
             exit 0
@@ -272,7 +257,6 @@ jobs:
 
           gh pr merge "$PR" --repo "$GITHUB_REPOSITORY" --auto --merge --delete-branch=false || true
           STATE=$(gh pr view "$PR" --repo "$GITHUB_REPOSITORY" --json mergeStateStatus --jq '.mergeStateStatus')
-
           echo "mergeStateStatus=$STATE"
           if [ "$STATE" = "CLEAN" ]; then
             gh pr merge "$PR" --repo "$GITHUB_REPOSITORY" --merge --delete-branch=false || true
@@ -285,6 +269,7 @@ jobs:
         run: |
           set -euo pipefail
           gh workflow run "${REPAIR_WORKFLOW}" \
+            --repo "$GITHUB_REPOSITORY" \
             -f branch="${BRANCH}" \
             -f reason="pr_merge_failed" \
             -f pr_number="${{ steps.pr.outputs.pr_number }}" \

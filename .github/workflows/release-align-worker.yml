@@ -1,5 +1,4 @@
 name: Release Align Worker
-
 on:
   schedule:
     # check for new upstream releases hourly
@@ -24,8 +23,8 @@ env:
   BASE_BRANCH: main
   EXEMPTIONS_FILE: scripts/guard-exemptions.txt
   PROMPTS_DIR: .github/prompts
-  REPAIR_WORKFLOW: upstream-sync-repair-agent
-  MIRROR_WORKFLOW: release-mirror-worker
+  REPAIR_WORKFLOW: upstream-sync-repair-agent.yml
+  MIRROR_WORKFLOW: release-mirror-worker.yml
 
 jobs:
   align:
@@ -53,13 +52,11 @@ jobs:
           else
             UP_TAG=$(gh api "repos/${UPSTREAM_REPO}/releases/latest" --jq '.tag_name // empty' 2>/dev/null || true)
           fi
-
           if [ -z "$UP_TAG" ]; then
             echo "No upstream release tag found; exiting."
             echo "upstream_tag=" >> "$GITHUB_OUTPUT"
             exit 0
           fi
-
           echo "upstream_tag=$UP_TAG" >> "$GITHUB_OUTPUT"
           echo "Upstream release tag: $UP_TAG"
 
@@ -75,7 +72,7 @@ jobs:
         run: |
           set -euo pipefail
           UP_TAG="${{ steps.tag.outputs.upstream_tag }}"
-          if gh release list --limit 200 --json tagName --jq '.[].tagName' | grep -q "upstream-${UP_TAG}"; then
+          if gh release list --repo "$GITHUB_REPOSITORY" --limit 200 --json tagName --jq '.[].tagName' | grep -q "upstream-${UP_TAG}"; then
             echo "needs_mirror=false" >> "$GITHUB_OUTPUT"
             echo "Already mirrored upstream tag $UP_TAG."
           else
@@ -86,48 +83,39 @@ jobs:
         if: steps.tag.outputs.upstream_tag != '' && steps.mirrored.outputs.needs_mirror == 'false'
         run: echo "Release already mirrored."
 
-      - name: Add upstream remote + fetch tags
+      - name: Add upstream remote + fetch upstream tag (namespaced) + fetch fork base
         if: steps.tag.outputs.upstream_tag != '' && steps.mirrored.outputs.needs_mirror == 'true'
         run: |
           set -euo pipefail
+          UP_TAG="${{ steps.tag.outputs.upstream_tag }}"
           git remote add upstream "https://github.com/${UPSTREAM_REPO}.git" || true
-          git fetch upstream --tags --prune
-          git fetch origin "${BASE_BRANCH}" --prune
+          git remote set-url --push upstream DISABLED || true
 
-      - name: Create release-align branch at upstream tag
+          git fetch origin "${BASE_BRANCH}" --prune --no-tags
+
+          # Fetch only the needed upstream tag into a namespaced tag to avoid clobbering
+          git fetch upstream "refs/tags/${UP_TAG}:refs/tags/upstream/${UP_TAG}" --prune
+
+      - name: Create release-align branch at upstream tag (namespaced)
         if: steps.tag.outputs.upstream_tag != '' && steps.mirrored.outputs.needs_mirror == 'true'
         run: |
           set -euo pipefail
           UP_TAG="${{ steps.tag.outputs.upstream_tag }}"
           SAFE_TAG=$(echo "$UP_TAG" | sed 's/[^A-Za-z0-9._-]/-/g')
           BR="automated/release-align-${SAFE_TAG}"
-
-          git rev-parse "refs/tags/${UP_TAG}" >/dev/null
-          git checkout -B "$BR" "refs/tags/${UP_TAG}"
+          git rev-parse "refs/tags/upstream/${UP_TAG}" >/dev/null
+          git checkout -B "$BR" "refs/tags/upstream/${UP_TAG}"
           echo "BRANCH=$BR" >> "$GITHUB_ENV"
-
-          # Push baseline so agent can work even if verify fails
+          # Push baseline so repair agent can work even if verify fails
           git push -u origin "$BR" --force-with-lease
 
-      - name: Enforce guard exemptions (ALWAYS keep fork main versions)
+      - name: Apply guard exemptions (fork-owned; supports globs + recursive; lenient)
         if: steps.tag.outputs.upstream_tag != '' && steps.mirrored.outputs.needs_mirror == 'true'
         run: |
           set -euo pipefail
-          if [ ! -f "${EXEMPTIONS_FILE}" ]; then
-            echo "No exemptions file at ${EXEMPTIONS_FILE}; continuing."
-            exit 0
-          fi
-
-          grep -vE '^\s*($|#)' "${EXEMPTIONS_FILE}" > /tmp/exemptions.txt || true
-
-          while IFS= read -r f; do
-            [ -z "$f" ] && continue
-            if git cat-file -e "origin/${BASE_BRANCH}:$f" 2>/dev/null; then
-              echo "Forcing fork-main version for exempt file: $f"
-              git checkout "origin/${BASE_BRANCH}" -- "$f"
-              git add "$f"
-            fi
-          done < /tmp/exemptions.txt
+          export BASE_BRANCH="${BASE_BRANCH}"
+          export EXEMPTIONS_FILE="${EXEMPTIONS_FILE}"
+          bash scripts/apply-guard-exemptions.sh
 
           if git diff --cached --quiet; then
             echo "No exemptions staged."
@@ -152,12 +140,10 @@ jobs:
           set -euo pipefail
           rm -rf "${PROMPTS_DIR:?}/"* || true
           node scripts/generate-prompts.mjs 2>&1 | tee /tmp/generate.log
-
           set +e
           node scripts/verify-prompts.mjs 2>&1 | tee /tmp/verify.log
           VERIFY_EXIT=${PIPESTATUS[0]}
           set -e
-
           if [ "$VERIFY_EXIT" -eq 0 ]; then
             echo "verify_ok=true" >> "$GITHUB_OUTPUT"
             echo "Release snapshot prompt verification passed."
@@ -182,6 +168,7 @@ jobs:
         run: |
           set -euo pipefail
           gh workflow run "${REPAIR_WORKFLOW}" \
+            --repo "$GITHUB_REPOSITORY" \
             -f branch="${BRANCH}" \
             -f reason="release_verify_failed" \
             -f upstream_repo="${UPSTREAM_REPO}" \
@@ -214,6 +201,7 @@ jobs:
         run: |
           set -euo pipefail
           gh workflow run "${MIRROR_WORKFLOW}" \
+            --repo "$GITHUB_REPOSITORY" \
             -f upstream_repo="${UPSTREAM_REPO}" \
             -f upstream_tag="${{ steps.tag.outputs.upstream_tag }}" \
             -f target_ref="${BRANCH}" \

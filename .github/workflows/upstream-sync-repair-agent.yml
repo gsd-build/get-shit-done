@@ -1,5 +1,4 @@
 name: upstream-sync-repair-agent
-
 on:
   workflow_dispatch:
     inputs:
@@ -58,7 +57,6 @@ jobs:
   repair:
     runs-on: ubuntu-latest
     timeout-minutes: 25
-
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
@@ -70,12 +68,13 @@ jobs:
           git config user.name "github-actions[bot]"
           git config user.email "github-actions[bot]@users.noreply.github.com"
 
-      - name: Fetch remotes
+      - name: Fetch remotes (no tags)
         run: |
           set -euo pipefail
-          git fetch origin "${{ inputs.base_branch }}" --prune
+          git fetch origin "${{ inputs.base_branch }}" --prune --no-tags
           git remote add upstream "https://github.com/${{ inputs.upstream_repo }}.git" || true
-          git fetch upstream "${{ inputs.upstream_branch }}" --tags --prune
+          git remote set-url --push upstream DISABLED || true
+          git fetch upstream "${{ inputs.upstream_branch }}" --prune --no-tags
 
       - name: Checkout target branch
         run: |
@@ -84,7 +83,6 @@ jobs:
           if git show-ref --verify --quiet "refs/remotes/origin/${BR}"; then
             git checkout -B "$BR" "origin/${BR}"
           else
-            # If it somehow doesn't exist, create from base
             git checkout -B "$BR" "origin/${{ inputs.base_branch }}"
           fi
 
@@ -112,7 +110,6 @@ jobs:
           set -euo pipefail
           cat > /tmp/repair-prompt.txt <<'EOF'
           You are the autonomous repair agent for this repository.
-
           Context:
           - reason: ${{ inputs.reason }}
           - branch: ${{ inputs.branch }}
@@ -135,16 +132,15 @@ jobs:
 
           Required actions by reason:
           1) merge_conflicts:
-             - merge upstream/${{ inputs.upstream_branch }} into this branch
-             - resolve conflicts
-             - enforce exemptions from origin/${{ inputs.base_branch }}
-             - commit the merge
+            - merge upstream/${{ inputs.upstream_branch }} into this branch
+            - resolve conflicts
+            - enforce exemptions from origin/${{ inputs.base_branch }}
+            - commit the merge
           2) verify_failed or release_verify_failed:
-             - run the prompt regeneration + verify loop until clean
-             - if generator/verifier needs change, do so minimally
+            - run the prompt regeneration + verify loop until clean
+            - if generator/verifier needs change, do so minimally
           3) pr_merge_failed:
-             - if pr_number is provided, attempt to enable auto-merge; if CLEAN, merge directly.
-
+            - if pr_number is provided, attempt to enable auto-merge; if CLEAN, merge directly.
           EOF
 
       - name: Execute Copilot repair agent
@@ -157,20 +153,12 @@ jobs:
           sudo -E awf --env-all --container-workdir "${GITHUB_WORKSPACE}" --allow-domains "$ALLOW_DOMAINS" --log-level info --enable-host-access --image-tag 0.23.0 --enable-api-proxy \
             -- /bin/bash -c '/usr/local/bin/copilot --add-dir "${GITHUB_WORKSPACE}" --allow-all-tools --allow-all-paths --prompt "$(cat /tmp/repair-prompt.txt)"'
 
-      - name: Enforce exemptions from fork base branch (post-agent)
+      - name: Apply guard exemptions (post-agent; supports globs + recursive; lenient)
         run: |
           set -euo pipefail
-          BASE="${{ inputs.base_branch }}"
-          if [ -f "${EXEMPTIONS_FILE}" ]; then
-            grep -vE '^\s*($|#)' "${EXEMPTIONS_FILE}" > /tmp/exemptions.txt || true
-            while IFS= read -r f; do
-              [ -z "$f" ] && continue
-              if git cat-file -e "origin/${BASE}:$f" 2>/dev/null; then
-                git checkout "origin/${BASE}" -- "$f"
-                git add "$f"
-              fi
-            done < /tmp/exemptions.txt
-          fi
+          export BASE_BRANCH="${{ inputs.base_branch }}"
+          export EXEMPTIONS_FILE="${EXEMPTIONS_FILE}"
+          bash scripts/apply-guard-exemptions.sh
 
       - name: Final generate + verify pass (must be clean)
         run: |
@@ -202,8 +190,13 @@ jobs:
         run: |
           set -euo pipefail
           PR="${{ inputs.pr_number }}"
-          gh pr merge "$PR" --auto --merge --delete-branch=false || true
-          STATE=$(gh pr view "$PR" --json mergeStateStatus --jq '.mergeStateStatus')
+          if [ -z "$PR" ]; then
+            echo "No PR number provided; skipping."
+            exit 0
+          fi
+
+          gh pr merge "$PR" --repo "$GITHUB_REPOSITORY" --auto --merge --delete-branch=false || true
+          STATE=$(gh pr view "$PR" --repo "$GITHUB_REPOSITORY" --json mergeStateStatus --jq '.mergeStateStatus')
           if [ "$STATE" = "CLEAN" ]; then
-            gh pr merge "$PR" --merge --delete-branch=false || true
+            gh pr merge "$PR" --repo "$GITHUB_REPOSITORY" --merge --delete-branch=false || true
           fi

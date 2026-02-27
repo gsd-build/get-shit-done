@@ -17,3 +17,7 @@ CHANGELOG.md
 AGENTS.md
 .github/FUNDING.yml
 .github/ISSUE_TEMPLATE/bug_report.yml
+
+# Fork-owned workflows (recursive)
+.github/workflows/**
+
