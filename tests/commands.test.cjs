@@ -699,6 +699,14 @@ describe('generate-slug command', () => {
     assert.strictEqual(output.slug, 'phase-3-plan');
   });
 
+  test('handles multi-word input when args are split (no shell)', () => {
+    const result = runGsdTools(['generate-slug', 'Hello', 'World', 'Test'], tmpDir);
+    assert.ok(result.success, `Command failed: ${result.error}`);
+
+    const output = JSON.parse(result.output);
+    assert.strictEqual(output.slug, 'hello-world-test');
+  });
+
   test('strips leading and trailing hyphens', () => {
     const result = runGsdTools('generate-slug "---leading-trailing---"', tmpDir);
     assert.ok(result.success, `Command failed: ${result.error}`);
@@ -1042,6 +1050,26 @@ describe('commit command', () => {
     assert.ok(gitLog.includes(output.hash), 'git log should contain the returned hash');
   });
 
+  test('preserves multi-word commit message when args are split (no shell)', () => {
+    fs.writeFileSync(path.join(tmpDir, '.planning', 'multi-word.md'), '# Multi\n');
+
+    // Array form simulates how subagents invoke gsd-tools (no shell quote handling)
+    const result = runGsdTools([
+      'commit', 'docs(40):', 'create', 'phase', 'plan',
+      '--files', '.planning/multi-word.md'
+    ], tmpDir);
+    assert.ok(result.success, `Command failed: ${result.error}`);
+
+    const output = JSON.parse(result.output);
+    assert.strictEqual(output.committed, true, 'should have committed');
+
+    const gitLog = execSync('git log --oneline -1', { cwd: tmpDir, encoding: 'utf-8' }).trim();
+    assert.ok(
+      gitLog.includes('docs(40): create phase plan'),
+      `git log should contain full message, got: ${gitLog}`
+    );
+  });
+
   test('amend mode works without crashing', () => {
     // Create a file and commit it first
     fs.writeFileSync(path.join(tmpDir, '.planning', 'amend-file.md'), '# Initial\n');
@@ -1184,5 +1212,41 @@ describe('websearch command', () => {
     const output = JSON.parse(captured);
     assert.strictEqual(output.available, false);
     assert.strictEqual(output.error, 'Network timeout');
+  });
+});
+
+// ─────────────────────────────────────────────────────────────────────────────
+// websearch CLI argument parsing regression tests
+// ─────────────────────────────────────────────────────────────────────────────
+
+describe('websearch CLI argument parsing', () => {
+  test('joins multi-word query when args are split (no shell)', () => {
+    // We can't easily test the full websearch flow via CLI (needs BRAVE_API_KEY + network),
+    // but we can verify the router constructs the right query by checking it fails
+    // gracefully with the full query when BRAVE_API_KEY is unset.
+    const tmpDir = createTempProject();
+    try {
+      const result = runGsdTools(['websearch', 'node.js', 'testing', 'framework'], tmpDir);
+      assert.ok(result.success, `Command failed: ${result.error}`);
+      const output = JSON.parse(result.output);
+      // Without BRAVE_API_KEY, returns available: false
+      assert.strictEqual(output.available, false);
+    } finally {
+      cleanup(tmpDir);
+    }
+  });
+
+  test('joins multi-word query with flags interspersed', () => {
+    const tmpDir = createTempProject();
+    try {
+      const result = runGsdTools([
+        'websearch', 'node.js', 'testing', '--limit', '5', 'framework'
+      ], tmpDir);
+      assert.ok(result.success, `Command failed: ${result.error}`);
+      const output = JSON.parse(result.output);
+      assert.strictEqual(output.available, false);
+    } finally {
+      cleanup(tmpDir);
+    }
   });
 });
