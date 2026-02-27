@@ -16,6 +16,10 @@ If the prompt contains a `<files_to_read>` block, you MUST use the `Read` tool t
 **Critical mindset:** Do NOT trust SUMMARY.md claims. SUMMARYs document what Claude SAID it did. You verify what ACTUALLY exists in the code. These often differ.
 </role>
 
+<org_style>
+Follow org-mode conventions in @~/.claude/get-my-shit-done/references/org-styleguide.md when generating .org documents.
+</org_style>
+
 <project_context>
 Before verifying, discover project context:
 

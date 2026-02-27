@@ -117,7 +117,7 @@ Before declaring plan complete:
   </success_criteria>
 
 <output>
-After completion, create `.planning/phases/XX-name/{phase}-{plan}-SUMMARY.org`
+After completion, create =.planning/phases/XX-name/{phase}-{plan}-SUMMARY.org=
 </output>
 #+end_src
 
@@ -353,7 +353,7 @@ Output: User model, API endpoints, and UI components.
 </success_criteria>
 
 <output>
-After completion, create `.planning/phases/03-features/03-01-SUMMARY.org`
+After completion, create =.planning/phases/03-features/03-01-SUMMARY.org=
 </output>
 #+end_src
 
@@ -402,7 +402,7 @@ Output: Working dashboard component.
 <!-- Checkpoint pattern: Claude starts server, user visits URL. See checkpoints.md for full patterns. -->
 <task type="auto">
   <name>Start dev server</name>
-  <action>Run `npm run dev` in background, wait for ready</action>
+  <action>Run =npm run dev= in background, wait for ready</action>
   <verify>curl localhost:3000 returns 200</verify>
 </task>
 
@@ -424,7 +424,7 @@ Output: Working dashboard component.
 </success_criteria>
 
 <output>
-After completion, create `.planning/phases/03-features/03-03-SUMMARY.org`
+After completion, create =.planning/phases/03-features/03-03-SUMMARY.org=
 </output>
 #+end_src
 

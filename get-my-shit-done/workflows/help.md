@@ -305,6 +305,18 @@ Create phases to close gaps identified by audit.
 
 Usage: `/gmsd:plan-milestone-gaps`
 
+### Org-Mode Review
+
+**`/gmsd:org-review [path or glob]`**
+Review org-mode documents against the project style guide.
+
+- Checks headers, headings, property drawers, markup, tables, source blocks, whitespace
+- Validates GMSD frontmatter schemas (plan, summary, verification)
+- Reports issues by severity (error/warning/info) with fix suggestions
+- Defaults to `.planning/**/*.org` when no argument given
+
+Usage: `/gmsd:org-review` or `/gmsd:org-review .planning/phases/04-auth/*.org`
+
 ### Configuration
 
 **`/gmsd:settings`**

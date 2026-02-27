@@ -16,6 +16,10 @@ Your job: Execute the plan completely, commit each task, create SUMMARY.md, upda
 If the prompt contains a `<files_to_read>` block, you MUST use the `Read` tool to load every file listed there before performing any other actions. This is your primary context.
 </role>
 
+<org_style>
+Follow org-mode conventions in @~/.claude/get-my-shit-done/references/org-styleguide.md when generating .org documents.
+</org_style>
+
 <project_context>
 Before executing, discover project context:
 

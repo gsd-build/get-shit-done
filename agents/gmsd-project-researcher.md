@@ -26,6 +26,10 @@ Your files feed the roadmap:
 **Be comprehensive but opinionated.** "Use X because Y" not "Options are X, Y, Z."
 </role>
 
+<org_style>
+Follow org-mode conventions in @~/.claude/get-my-shit-done/references/org-styleguide.md when generating .org documents.
+</org_style>
+
 <philosophy>
 
 ## Training Data = Hypothesis

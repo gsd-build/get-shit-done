@@ -1,0 +1,569 @@
+#+title: Org-Mode Style Guide
+#+author: Reference Guide for Consistent Org Documents
+#+date: [2026-02-24]
+#+startup: indent
+#+options: toc:3 num:t
+
+* Introduction
+
+This style guide codifies conventions for writing clear, consistent,
+and maintainable Org-mode documents. It draws from the official Org
+syntax specification, community conventions, and practical experience.
+
+The goal is to produce documents that are readable as plain text,
+export cleanly to multiple formats (HTML, LaTeX/PDF, ODT), and remain
+easy to navigate and search.
+
+* File Header
+** Required Metadata
+
+Every org file should begin with a minimal set of in-buffer keywords
+(all lowercased):
+
+#+begin_src org
+,#+title: Document Title
+,#+author: Author Name
+,#+date: [2026-02-24]
+#+end_src
+
+** Recommended Optional Metadata
+
+#+begin_src org
+,#+options: toc:2 num:t
+,#+language: en
+,#+startup: indent
+#+end_src
+
+Common =#+OPTIONS= flags:
+
+| Flag    | Meaning                                      | Recommended                      |
+|---------+----------------------------------------------+----------------------------------|
+| =toc:N= | Table of contents to depth N                 | =toc:2= or =toc:3=               |
+| =num:t= | Number sections                              | =t= for reports, =nil= for notes |
+| =H:N=   | Headline export depth                        | Match =toc= depth                |
+| =':t=   | Smart quotes                                 | =t= for prose                    |
+| =^:{}=  | Only interpret =a_{b}= subscripts, not =a_b= | ={}= always                      |
+
+** File-Local Variables
+
+If you need Emacs-specific settings, place them at the very end of the file:
+
+#+begin_src org
+# Local Variables:
+# org-hide-emphasis-markers: t
+# End:
+#+end_src
+
+* Document Structure
+** Headline Conventions
+
+*** Depth
+
+- Limit headline nesting to 4 levels (=*= through =****=). Deeper
+  nesting signals that the document needs restructuring.
+- If you need deeper structure, consider splitting into multiple files
+  with =#+INCLUDE:= directives.
+
+*** Spacing
+
+- Leave exactly *one blank line* before each headline.
+- Do not leave blank lines between a headline and its first content line
+  (property drawers or planning lines are the exception -- they must
+  immediately follow the headline).
+
+#+begin_src org
+,* First Section
+
+Paragraph content here.
+
+,* Second Section
+
+More content.
+#+end_src
+
+*** Headline Text
+
+- Use title case for top-level (=*=) headings.
+- Use sentence case for level 2 and below.
+- Keep headlines concise -- ideally under 60 characters.
+- Do not end headlines with punctuation.
+
+*** TODO Keywords
+
+- Place TODO keywords immediately after the stars: =* TODO Task name=.
+- Use a consistent set of keywords. A common set:
+
+#+begin_src org
+,#+TODO: TODO(t) NEXT(n) WAITING(w) | DONE(d) CANCELLED(c)
+#+end_src
+
+*** Tags
+
+- Place tags flush to the right: =* Headline  :tag1:tag2:=.
+- Use lowercase for tags: =:project:=, =:urgent:=.
+- Keep tags short (one or two words) and use underscores for multi-word
+  tags: =:long_running:=.
+- Avoid more than 3 tags per headline.
+
+*** Priority
+
+- Use priority cookies sparingly: =* [#A] Urgent task=.
+- Reserve =[#A]= for truly urgent items, =[#B]= for normal, =[#C]= for low.
+
+** Sections and Content
+
+- Paragraphs are separated by blank lines. A single newline within a paragraph
+  does not create a line break in export.
+- Keep paragraphs focused. If a paragraph exceeds 5-7 sentences, consider
+  splitting.
+- Wrap lines at 78 characters for readability in plain text. Emacs users can
+  set =fill-column= to 78.
+
+* Text Markup
+** Emphasis
+
+| Markup        | Renders As      | Use For                              |
+|---------------+-----------------+--------------------------------------|
+| =*bold*=      | *bold*          | Key terms, strong emphasis           |
+| =/italic/=    | /italic/        | Titles, foreign words, soft emphasis |
+| =_underline_= | _underline_     | Sparingly; prefer bold or italic     |
+| =+strike+=    | +strikethrough+ | Deleted or deprecated content        |
+| ==verbatim==  | =verbatim=      | Inline code, commands, filenames     |
+| =~code~=      | ~code~          | Inline code (exported as =<code>=)   |
+
+*** Guidelines
+
+- Prefer =~code~= for code fragments and ==verbatim== for user-visible
+  strings, paths, and keystrokes.
+- Do not nest emphasis markers. =*bold /and italic/*= is not reliably
+  parsed.
+- Emphasis markers must be surrounded by whitespace or punctuation (the
+  =PRE= and =POST= rules from the Org syntax spec). Don't try to
+  emphasize part of a word.
+
+** Special Characters and Entities
+
+- Use Org entities for special characters: =\alpha{}= for \alpha, =\rarr{}=
+  for \rarr.
+- Append ={}= after entities when followed by text to prevent the entity
+  name from consuming subsequent characters.
+- Use =---= for em-dash, =--= for en-dash, =...= for ellipsis (when
+  =#+OPTIONS: -:t= is set).
+
+* Links
+** Internal Links
+
+- Use custom IDs for stable cross-references:
+
+#+begin_src org
+,* Target Heading
+  :PROPERTIES:
+  :CUSTOM_ID: target-heading
+  :END:
+
+See [[#target-heading][the target heading]].
+#+end_src
+
+- Prefer =CUSTOM_ID= over fuzzy text links (=[[*Heading]]=) for
+  resilience against headline renames.
+
+** External Links
+
+- Always provide a description: =[[https://example.com][Example Site]]=.
+- Never leave bare URLs in prose. Use angle links =<https://example.com>=
+  if a description is not needed.
+
+** File Links
+
+- Use relative paths when linking within a project: =[[file:./images/fig1.png]]=.
+- Use =::= for line-number or search links: =[[file:code.py::42]]=.
+
+* Lists
+** Unordered Lists
+
+- Use =-= (hyphen) as the bullet character consistently. Do not mix =-=,
+  =+=, and =*= within the same list.
+- Indent continuation lines to the start of the list item text (typically
+  2 spaces after the bullet).
+
+#+begin_src org
+- First item with a longer description that wraps to the next line and
+  is properly indented.
+- Second item.
+  - Nested item.
+#+end_src
+
+** Ordered Lists
+
+- Use =1.= for all items (Org renumbers automatically on export):
+
+#+begin_src org
+1. First step.
+2. Second step.
+3. Third step.
+#+end_src
+
+** Description Lists
+
+- Use =term ::= syntax. Keep terms short:
+
+#+begin_src org
+- Term :: Definition of the term that may span multiple lines and
+  is indented properly.
+- Another term :: Its definition.
+#+end_src
+
+** Checkboxes
+
+- Use =[ ]=, =[X]=, and =[-]= for unchecked, checked, and partial:
+
+#+begin_src org
+- [ ] Pending task
+- [X] Completed task
+- [-] Partially done
+#+end_src
+
+* Tables
+** Formatting
+
+- Align columns with =TAB= in Emacs (=org-table-align=).
+- Use a horizontal rule (=|---+---|=) after the header row.
+- Keep cell content concise; long text belongs in the surrounding prose.
+
+#+begin_src org
+  | Name    | Role        | Status   |
+  |---------+-------------+----------|
+  | Alice   | Engineer    | Active   |
+  | Bob     | Designer    | On leave |
+#+end_src
+
+** Guidelines
+
+- Prefer org-mode tables over =table.el= tables for better export support.
+- Use =#+CAPTION:= and =#+NAME:= for referenceable tables:
+
+#+begin_src org
+  ,#+CAPTION: Team roster
+  ,#+NAME: tab:roster
+  | Name  | Role     |
+  |-------+----------|
+  | Alice | Engineer |
+#+end_src
+
+* Source Code Blocks
+** Syntax
+
+#+name: unique name
+#+description: relevant description
+#+begin_src org
+,#+name: unique name
+,#+description: relevant description
+,#+begin_src pyhon
+def hello():
+    print("Hello, world!")
+,#+end_src
+#+end_src
+
+** Guidelines
+
+- Always specify the language after =begin_src=.
+- Use =:exports code= (default) for code-only, =:exports results= for
+  output-only, =:exports both= for both.
+- Keep code blocks short (under 30 lines). Extract longer code into
+  separate files with =:tangle= or reference with =#+INCLUDE:=.
+- Use =:noweb yes= for literate programming when composing blocks.
+- Name important code blocks with =#+NAME:= for cross-referencing.
+
+** Inline Code
+
+- Use ==verbatim== or =~code~= for inline code, not backticks.
+- Backticks have no special meaning in Org syntax.
+
+* Block Quotes and Examples
+
+** Quote Blocks
+
+#+begin_src org
+,#+BEGIN_QUOTE
+"Context engineering isn't just about cramming more stuff into the prompt."
+-- AI That Works
+,#+END_QUOTE
+#+end_src
+
+** Example Blocks
+
+Use =#+BEGIN_EXAMPLE= for preformatted text that is not code:
+
+#+begin_src org
+,#+BEGIN_EXAMPLE
+$ ls -la
+total 42
+drwxr-xr-x  5 user group 160 Feb 24 10:00 .
+,#+END_EXAMPLE
+#+end_src
+
+** Verse Blocks
+
+Use =#+BEGIN_VERSE= for poetry or text where line breaks matter.
+
+* Footnotes
+
+- Use labeled footnotes for clarity:
+
+#+begin_src org
+This claim needs a citation[fn:1].
+
+[fn:1] Source: Author, "Title", 2025.
+#+end_src
+
+- Place footnote definitions at the end of the document or the end of
+  the section where they are referenced.
+- Number footnotes sequentially. Use =fn:label= for named references
+  that are used multiple times.
+- Avoid inline footnotes (=[fn:: definition]=) except in short documents.
+
+* Properties and Drawers
+
+- Place =:PROPERTIES:= drawers immediately after the headline (or after
+  planning lines if present). No blank line between headline and drawer.
+
+#+begin_src org
+,* TODO Task
+  DEADLINE: <2026-03-01 Sun>
+  :PROPERTIES:
+  :EFFORT: 2h
+  :CUSTOM_ID: task-xyz
+  :END:
+#+end_src
+
+- Use =CUSTOM_ID= for every headline that may be linked to.
+- Keep property names uppercase: =:CUSTOM_ID:=, =:EFFORT:=.
+- Use project-specific custom properties sparingly and document them.
+
+* Timestamps and Planning
+
+** Active Timestamps
+
+- Active: =<2026-02-24 Tue>= -- appears in the agenda.
+- Inactive: =[2026-02-24 Tue]= -- does not appear in the agenda.
+
+** Planning Lines
+
+- =DEADLINE=, =SCHEDULED=, and =CLOSED= go on the line immediately after
+  the headline, before any property drawer.
+- Use =DEADLINE= for hard deadlines, =SCHEDULED= for planned start dates.
+- Include day-of-week: =<2026-02-24 Tue>= for readability.
+
+** Time Ranges
+
+- Use =<2026-02-24 Tue 09:00-10:30>= for same-day ranges.
+- Use =<2026-02-24 Tue>--<2026-02-25 Wed>= for multi-day ranges.
+
+* Export Considerations
+** Write for Multiple Outputs
+
+- Org documents should read well as plain text /and/ export cleanly.
+- Test export to your primary target format (HTML, PDF) regularly.
+
+** Backend-Specific Attributes
+
+- Use =#+ATTR_HTML:=, =#+ATTR_LATEX:= before elements for backend-specific
+  formatting:
+
+#+begin_src org
+,#+ATTR_HTML: :width 600px
+,#+ATTR_LATEX: :width 0.8\textwidth
+[[file:images/diagram.png]]
+#+end_src
+
+** Images
+
+- Always provide a =#+CAPTION:= for figures.
+- Use =#+NAME:= if the figure will be cross-referenced.
+- Store images in a dedicated subdirectory (e.g., =./images/= or =./fig/=).
+
+* File Organization
+** Single-File Documents
+
+Suitable for notes, articles, and documents under ~500 lines:
+- Header keywords at top.
+- Main content organized by headlines.
+- References/footnotes at bottom.
+
+** Multi-File Projects
+
+For books, large knowledge bases, or documentation suites:
+- Use one file per major section/chapter.
+- Create an index file that uses =#+INCLUDE:= directives.
+- Keep a shared =setup.org= file for common settings:
+
+#+begin_src org
+,#+SETUPFILE: ./setup.org
+#+end_src
+
+** Naming Conventions
+
+- Use lowercase with hyphens for filenames: =project-plan.org=,
+  =meeting-notes-2026-02-24.org=.
+- Prefix date-specific files with ISO dates: =2026-02-24-meeting.org=.
+- Avoid spaces in filenames.
+
+* Whitespace and Formatting
+** General Rules
+
+- Use spaces, not tabs, for indentation.
+- Use 2 spaces for list continuation indentation.
+- End files with a single newline.
+- Remove trailing whitespace.
+- One blank line between sections; two blank lines are never necessary.
+- No trailing blank lines at the end of sections.
+
+** Line Length
+
+- Wrap prose at 78 characters.
+- Do not wrap within tables, links, or source blocks.
+- Long keywords (=#+begin_src=, URLs) may exceed the limit.
+
+* Common Pitfalls
+
+- *Missing blank line before headline*: Org requires a blank line (or
+  start of file) before a headline for unambiguous parsing.
+- *Broken emphasis*: Emphasis markers like =*bold*= fail when directly
+  adjacent to word characters on the wrong side. Check PRE/POST rules.
+- *Tab vs spaces in lists*: Org computes list indentation assuming tabs
+  are 8 characters wide. Use spaces for predictable behavior.
+- *Forgetting language on source blocks*: An unlabeled =#+begin_src= block
+  will not get syntax highlighting.
+- *Nesting emphasis*: =*/bold italic/*= is unreliable. Use separate
+  markup on separate tokens instead.
+- *Subscript surprises*: =a_b= is interpreted as a subscript. Set
+  =#+OPTIONS: ^:{}= to require braces.
+
+* Linting and Validation
+** Built-in: =org-lint=
+
+Org-mode ships with a built-in linter since Emacs 26. Run it with:
+
+#+begin_src org
+M-x org-lint RET
+#+end_src
+
+It checks for common issues including:
+- Duplicate =CUSTOM_ID= values
+- Orphaned affiliated keywords
+- Invalid TODO keyword configurations
+- Broken footnote references
+- Mismatched =#+BEGIN= / =#+END= blocks
+- Incorrect planning or clock lines
+- Deprecated syntax usage
+- Duplicate targets
+
+Navigate results with =C-j= (display offending line), =RET= (go to line),
+=g= (re-check), =h= (hide checker), =S= (sort by column).
+
+You can invoke it programmatically:
+
+#+begin_src emacs-lisp
+(org-lint)
+;; Or check a specific file:
+(with-current-buffer (find-file-noselect "document.org")
+  (org-lint))
+#+end_src
+
+** Flycheck Integration
+
+For real-time linting, integrate =org-lint= with Flycheck:
+
+#+begin_src emacs-lisp
+;; flycheck-org-lint (community package)
+;; Provides real-time org-lint feedback in the buffer
+(use-package flycheck
+  :config
+  (flycheck-define-checker org-lint
+    "An Org-mode linter using org-lint."
+    :command ("emacs" "--batch"
+              "--eval" "(require 'org)"
+              "--eval" "(require 'org-lint)"
+              "--eval" "(setq org-lint-lightweight-checks t)"
+              "--visit" source
+              "--eval" "(org-lint)")
+    :error-patterns
+    ((warning line-start (one-or-more digit) " " (message) line-end))
+    :modes org-mode))
+#+end_src
+
+* Formatting and Beautification Tools
+** =org-indent-mode=
+
+Built into Emacs. Visually indents content under headlines without
+modifying the file. Enable globally:
+
+#+begin_src emacs-lisp
+(setq org-startup-indented t)
+#+end_src
+
+** =org-modern=
+
+Modern Org-mode UI enhancements (visual only, does not change file content):
+
+#+begin_src emacs-lisp
+(use-package org-modern
+  :hook (org-mode . org-modern-mode))
+#+end_src
+
+** Manual Formatting Functions
+
+Useful built-in commands for maintaining consistent formatting:
+
+| Command                  | Key           | Purpose                         |
+|--------------------------+---------------+---------------------------------|
+| =org-table-align=        | =TAB=         | Align table columns             |
+| =org-fill-paragraph=     | =M-q=         | Reflow paragraph at fill column |
+| =org-sort=               | =C-c ^=       | Sort entries, items, or table   |
+| =org-lint=               | n/a           | Run all lint checks             |
+| =org-update-all-dblocks= | =C-c C-x C-u= | Update all dynamic blocks       |
+
+* References
+** Official Documentation
+
+- Org Mode Manual: https://orgmode.org/manual/
+- Org Syntax (Formal Specification v2): https://orgmode.org/worg/org-syntax.html
+- Org Mode Compact Guide: https://orgmode.org/orgguide.html
+- Export Settings: https://orgmode.org/manual/Export-Settings.html
+- Markup for Rich Contents: https://orgmode.org/manual/Markup-for-Rich-Contents.html
+
+** Linting and Validation
+
+- =org-lint= (built-in since Emacs 26) -- invoked with =M-x org-lint=.
+  Part of Org-mode core, checks for structural and syntactic issues.
+  https://orgmode.org/manual/Org-Syntax.html
+- =flycheck-org-lint= -- Community integration of =org-lint= with Flycheck
+  for real-time buffer feedback.
+
+** Parsers (for CI/Toolchain Integration)
+
+- =org-parser= (Clojure/ClojureScript) -- EBNF-based parser that works on
+  JVM and JavaScript. Useful for validation pipelines outside Emacs.
+  https://github.com/200ok-ch/org-parser
+- =org-element.el= -- The canonical Emacs Lisp parser. Foundation for
+  =org-lint= and the export framework.
+  https://orgmode.org/worg/dev/org-element-api.html
+- =tree-sitter-org= -- Tree-sitter grammar for Org-mode. Enables Org
+  parsing in editors that support tree-sitter (Neovim, Helix, Zed).
+  https://github.com/milisims/tree-sitter-org
+
+** Visual Enhancements and Presentation
+
+- =org-modern= -- Modern Org-mode UI with prettier stars, tables, and
+  block delimiters. https://github.com/minad/org-modern
+- =org-superstar= -- Prettify headline bullets and list markers.
+  https://github.com/integral-dw/org-superstar-mode
+- =org-indent-mode= -- Built-in virtual indentation for cleaner view.
+
+** Related Style Guides and Community Resources
+
+- Worg (Org Mode Community Wiki): https://orgmode.org/worg/
+- Org Mode Mailing List: https://lists.gnu.org/mailman/listinfo/emacs-orgmode
+- Org-mode Subreddit: https://www.reddit.com/r/orgmode/
+- "Org Mode - Organize Your Life In Plain Text" (Bernt Hansen):
+  http://doc.norang.ca/org-mode.html

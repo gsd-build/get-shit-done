@@ -28,6 +28,10 @@ If the prompt contains a `<files_to_read>` block, you MUST use the `Read` tool t
 - Return structured results to orchestrator
 </role>
 
+<org_style>
+Follow org-mode conventions in @~/.claude/get-my-shit-done/references/org-styleguide.md when generating .org documents.
+</org_style>
+
 <project_context>
 Before planning, discover project context:
 

@@ -128,21 +128,21 @@ Template for ~.planning/codebase/ARCHITECTURE.org~ - captures conceptual code or
 **Command Layer:**
 - Purpose: Parse user input and route to appropriate handler
 - Contains: Command definitions, argument parsing, help text
-- Location: `src/commands/*.ts`
+- Location: =src/commands/*.ts=
 - Depends on: Service layer for business logic
-- Used by: CLI entry point (`src/index.ts`)
+- Used by: CLI entry point (=src/index.ts=)
 
 **Service Layer:**
 - Purpose: Core business logic
 - Contains: FileService, TemplateService, InstallService
-- Location: `src/services/*.ts`
+- Location: =src/services/*.ts=
 - Depends on: File system utilities, external tools
 - Used by: Command handlers
 
 **Utility Layer:**
 - Purpose: Shared helpers and abstractions
 - Contains: File I/O wrappers, path resolution, string formatting
-- Location: `src/utils/*.ts`
+- Location: =src/utils/*.ts=
 - Depends on: Node.js built-ins only
 - Used by: Service layer
 
@@ -150,16 +150,16 @@ Template for ~.planning/codebase/ARCHITECTURE.org~ - captures conceptual code or
 
 **CLI Command Execution:**
 
-1. User runs: `gmsd new-project`
+1. User runs: =gmsd new-project=
 2. Commander parses args and flags
-3. Command handler invoked (`src/commands/new-project.ts`)
-4. Handler calls service methods (`src/services/project.ts` → `create()`)
+3. Command handler invoked (=src/commands/new-project.ts=)
+4. Handler calls service methods (=src/services/project.ts= → ~create()~)
 5. Service reads templates, processes files, writes output
 6. Results logged to console
 7. Process exits with status code
 
 **State Management:**
-- File-based: All state lives in `.planning/` directory
+- File-based: All state lives in =.planning/= directory
 - No persistent in-memory state
 - Each command execution is independent
 
@@ -167,12 +167,12 @@ Template for ~.planning/codebase/ARCHITECTURE.org~ - captures conceptual code or
 
 **Service:**
 - Purpose: Encapsulate business logic for a domain
-- Examples: `src/services/file.ts`, `src/services/template.ts`, `src/services/project.ts`
+- Examples: =src/services/file.ts=, =src/services/template.ts=, =src/services/project.ts=
 - Pattern: Singleton-like (imported as modules, not instantiated)
 
 **Command:**
 - Purpose: CLI command definition
-- Examples: `src/commands/new-project.ts`, `src/commands/plan-phase.ts`
+- Examples: =src/commands/new-project.ts=, =src/commands/plan-phase.ts=
 - Pattern: Commander.js command registration
 
 **Template:**
@@ -183,12 +183,12 @@ Template for ~.planning/codebase/ARCHITECTURE.org~ - captures conceptual code or
 ## Entry Points
 
 **CLI Entry:**
-- Location: `src/index.ts`
-- Triggers: User runs `gmsd <command>`
+- Location: =src/index.ts=
+- Triggers: User runs =gmsd <command>=
 - Responsibilities: Register commands, parse args, display help
 
 **Commands:**
-- Location: `src/commands/*.ts`
+- Location: =src/commands/*.ts=
 - Triggers: Matched command from CLI
 - Responsibilities: Validate input, call services, format output
 

@@ -26,6 +26,10 @@ If the prompt contains a `<files_to_read>` block, you MUST use the `Read` tool t
 - Return structured draft for user approval
 </role>
 
+<org_style>
+Follow org-mode conventions in @~/.claude/get-my-shit-done/references/org-styleguide.md when generating .org documents.
+</org_style>
+
 <downstream_consumer>
 Your ROADMAP.md is consumed by `/gmsd:plan-phase` which uses it to:
 

@@ -176,21 +176,21 @@ get-my-shit-done/
 ## Key File Locations
 
 **Entry Points:**
-- `bin/install.js` - Installation script (npx entry)
+- =bin/install.js= - Installation script (npx entry)
 
 **Configuration:**
-- `package.json` - Project metadata, dependencies, bin entry
-- `.gitignore` - Excluded files
+- =package.json= - Project metadata, dependencies, bin entry
+- =.gitignore= - Excluded files
 
 **Core Logic:**
-- `bin/install.js` - All installation logic (file copying, path replacement)
+- =bin/install.js= - All installation logic (file copying, path replacement)
 
 **Testing:**
-- `tests/` - Test files (if present)
+- =tests/= - Test files (if present)
 
 **Documentation:**
-- `README.org` - User-facing installation and usage guide
-- `CLAUDE.md` - Instructions for Claude Code when working in this repo
+- =README.org= - User-facing installation and usage guide
+- =CLAUDE.md= - Instructions for Claude Code when working in this repo
 
 ## Naming Conventions
 
@@ -211,25 +211,25 @@ get-my-shit-done/
 ## Where to Add New Code
 
 **New Slash Command:**
-- Primary code: `commands/gmsd/{command-name}.md`
-- Tests: `tests/commands/{command-name}.test.js` (if testing implemented)
-- Documentation: Update `README.org` with new command
+- Primary code: =commands/gmsd/{command-name}.md=
+- Tests: =tests/commands/{command-name}.test.js= (if testing implemented)
+- Documentation: Update =README.org= with new command
 
 **New Template:**
-- Implementation: `get-my-shit-done/templates/{name}.org`
+- Implementation: =get-my-shit-done/templates/{name}.org=
 - Documentation: Template is self-documenting (includes guidelines)
 
 **New Workflow:**
-- Implementation: `get-my-shit-done/workflows/{name}.md`
-- Usage: Reference from command with `@~/.claude/get-my-shit-done/workflows/{name}.md`
+- Implementation: =get-my-shit-done/workflows/{name}.md=
+- Usage: Reference from command with =@~/.claude/get-my-shit-done/workflows/{name}.md=
 
 **New Reference Document:**
-- Implementation: `get-my-shit-done/references/{name}.md`
+- Implementation: =get-my-shit-done/references/{name}.md=
 - Usage: Reference from commands/workflows as needed
 
 **Utilities:**
-- No utilities yet (`install.js` is monolithic)
-- If extracted: `src/utils/`
+- No utilities yet (=install.js= is monolithic)
+- If extracted: =src/utils/=
 
 ## Special Directories
 
