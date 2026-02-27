@@ -1,6 +1,6 @@
 {
   "status": "complete",
-  "currentPhase": 11,
+  "currentPhase": 12,
   "currentStep": "done",
   "phases": [
     {
@@ -406,6 +406,7 @@
         "verify": "done"
       },
       "startedAt": "2026-02-25T16:10:45.762Z",
+      "completedAt": "2026-02-25T18:13:58.438Z",
       "commits": [
         {
           "hash": "03ee70b1ef02f4989dc820ba04f976dc42f6dd97",
@@ -454,8 +455,65 @@
       ],
       "gapIterations": 0,
       "inserted": false,
-      "dependsOn": "Phase 10",
-      "completedAt": "2026-02-25T18:13:58.438Z"
+      "dependsOn": "Phase 10"
+    },
+    {
+      "number": 12,
+      "name": "have gsd autopilot process create a claude code remote session and add the url to the dashboard so users can ask questions to claude code. The claude code session will stay open so users can ask questions or restart autopilot if nessessary.",
+      "status": "completed",
+      "steps": {
+        "discuss": "done",
+        "plan": "done",
+        "execute": "done",
+        "verify": "done"
+      },
+      "commits": [
+        {
+          "hash": "32f8c33ff052e4dba7e14d96cee3fd5333dbb31f",
+          "message": "docs(12): capture phase context"
+        },
+        {
+          "hash": "96de83749f806f99810ac15082d90dbb59990159",
+          "message": "docs(12): create phase plan"
+        },
+        {
+          "hash": "485b03459d30f1d4c4c3c6735d86462445c6e4f2",
+          "message": "docs(12): research Claude Code remote session integration"
+        },
+        {
+          "hash": "a5b1cd3fece1b8fc131b03bb226f6d7d35c7cca1",
+          "message": "docs(phase-12): complete phase execution"
+        },
+        {
+          "hash": "950eabfacb1085f177557181361fb40838e17ec1",
+          "message": "docs(12-02): complete remote session dashboard integration plan"
+        },
+        {
+          "hash": "d7ef28a84c9acc3e73d25415fa29d9d4c6822dee",
+          "message": "feat(12-02): add RemoteSessionCard component to dashboard"
+        },
+        {
+          "hash": "69a0c1be3f19db39aa7a016b8ef8dde617126fdd",
+          "message": "feat(12-02): extend API and dashboard with remoteSessionUrl"
+        },
+        {
+          "hash": "d8623215bdcded3cfd57caa1eb597bedcc572b0e",
+          "message": "docs(12-01): complete remote session manager plan"
+        },
+        {
+          "hash": "2225dab660120f39cb6f9891d4d0da5a300efb83",
+          "message": "feat(12-01): wire RemoteSessionManager into CLI with --no-remote flag"
+        },
+        {
+          "hash": "c343a88ce11f6b3839d7bd08bd08ddf5ceb62782",
+          "message": "feat(12-01): create RemoteSessionManager and extend state types"
+        }
+      ],
+      "gapIterations": 0,
+      "inserted": false,
+      "dependsOn": "Phase 11",
+      "startedAt": "2026-02-26T23:42:20.473Z",
+      "completedAt": "2026-02-27T00:27:46.163Z"
     }
   ],
   "pendingQuestions": [
@@ -708,6 +766,11 @@
       "questions": [
         "Phase 11 already has 3 complete plans (621 total lines). What would you like to do?"
       ],
+      "createdAt": "2026-02-25T17:39:28.917Z",
+      "answeredAt": "2026-02-25T17:39:53.878Z",
+      "answers": {
+        "Phase 11 already has 3 complete plans (621 total lines). What would you like to do?": "use the existing plans"
+      },
       "questionItems": [
         {
           "question": "Phase 11 already has 3 complete plans (621 total lines). What would you like to do?",
@@ -728,11 +791,688 @@
           ],
           "multiSelect": false
         }
+      ]
+    },
+    {
+      "id": "6b2dad5b-e584-41b0-83be-44f165418d5b",
+      "phase": 12,
+      "step": "discuss",
+      "questions": [
+        "Which areas do you want to discuss for Phase 12 (Claude Code Remote Session)?"
       ],
-      "createdAt": "2026-02-25T17:39:28.917Z",
-      "answeredAt": "2026-02-25T17:39:53.878Z",
+      "questionItems": [
+        {
+          "question": "Which areas do you want to discuss for Phase 12 (Claude Code Remote Session)?",
+          "header": "Discuss",
+          "options": [
+            {
+              "label": "Session purpose & scope",
+              "description": "What can users do in the remote session? Just ask questions? Give instructions? Restart autopilot? What's the boundary between the session and the dashboard?"
+            },
+            {
+              "label": "Session lifecycle",
+              "description": "When does the session start/stop? Always running or on-demand? What happens if the session dies? Auto-reconnect?"
+            },
+            {
+              "label": "Dashboard integration",
+              "description": "Where does the session URL appear? Embedded iframe vs external link? How prominent? Alongside or replacing existing UI?"
+            },
+            {
+              "label": "Session context",
+              "description": "Does the session know about the current project/phase? Pre-loaded with context? Or a blank Claude Code session?"
+            }
+          ],
+          "multiSelect": true
+        }
+      ],
+      "createdAt": "2026-02-26T23:42:44.746Z",
+      "answeredAt": "2026-02-26T23:42:52.677Z",
       "answers": {
-        "Phase 11 already has 3 complete plans (621 total lines). What would you like to do?": "use the existing plans"
+        "Which areas do you want to discuss for Phase 12 (Claude Code Remote Session)?": "Session purpose & scope, Session lifecycle, Session context, Dashboard integration"
+      }
+    },
+    {
+      "id": "6e5fe2c3-b7eb-4971-af5e-00a81ab400c5",
+      "phase": 12,
+      "step": "discuss",
+      "questions": [
+        "What's the primary reason a user would open the remote session?"
+      ],
+      "questionItems": [
+        {
+          "question": "What's the primary reason a user would open the remote session?",
+          "header": "Purpose",
+          "options": [
+            {
+              "label": "Ask questions about the build",
+              "description": "\"Why did you do X?\" \"What's the status of Y?\" — conversational Q&A about what autopilot is doing"
+            },
+            {
+              "label": "Give instructions to Claude",
+              "description": "\"Fix this bug\", \"Change the approach\" — actively directing Claude Code to do work"
+            },
+            {
+              "label": "Both equally",
+              "description": "Session serves as both a Q&A window and a way to give Claude hands-on instructions"
+            }
+          ],
+          "multiSelect": false
+        }
+      ],
+      "createdAt": "2026-02-26T23:42:58.638Z",
+      "answeredAt": "2026-02-26T23:43:23.881Z",
+      "answers": {
+        "What's the primary reason a user would open the remote session?": "Both equally"
+      }
+    },
+    {
+      "id": "685da0cc-fce0-4117-97a1-15f494388710",
+      "phase": 12,
+      "step": "discuss",
+      "questions": [
+        "Should the remote session be able to restart or control the autopilot process?"
+      ],
+      "questionItems": [
+        {
+          "question": "Should the remote session be able to restart or control the autopilot process?",
+          "header": "Control",
+          "options": [
+            {
+              "label": "Yes, restart autopilot",
+              "description": "User can say \"restart autopilot\" or \"stop autopilot\" in the session and it actually controls the process"
+            },
+            {
+              "label": "No, session is independent",
+              "description": "The session is a separate Claude Code instance — autopilot control stays in the dashboard/CLI only"
+            },
+            {
+              "label": "You decide",
+              "description": "Claude's discretion on whether to wire up process control"
+            }
+          ],
+          "multiSelect": false
+        }
+      ],
+      "createdAt": "2026-02-26T23:43:28.720Z",
+      "answeredAt": "2026-02-26T23:44:19.236Z",
+      "answers": {
+        "Should the remote session be able to restart or control the autopilot process?": "don't worry about claude code capability that is not your concern you should only be worried about creating the remote session and providing the URL through the dashboard.\n"
+      }
+    },
+    {
+      "id": "4b36a13f-0a76-4f10-a58b-77322d21d915",
+      "phase": 12,
+      "step": "discuss",
+      "questions": [
+        "Should the remote session be created using `claude code --remote` CLI command, or the Claude Agent SDK programmatically?"
+      ],
+      "questionItems": [
+        {
+          "question": "Should the remote session be created using `claude code --remote` CLI command, or the Claude Agent SDK programmatically?",
+          "header": "Creation",
+          "options": [
+            {
+              "label": "CLI command (claude --remote)",
+              "description": "Spawn `claude --remote` as a child process, capture the URL from stdout"
+            },
+            {
+              "label": "You decide",
+              "description": "Claude's discretion on the best approach to create the remote session"
+            }
+          ],
+          "multiSelect": false
+        }
+      ],
+      "createdAt": "2026-02-26T23:44:25.001Z",
+      "answeredAt": "2026-02-26T23:45:56.822Z",
+      "answers": {
+        "Should the remote session be created using `claude code --remote` CLI command, or the Claude Agent SDK programmatically?": "look at this https://code.claude.com/docs/en/remote-control#new-session\n\nIts actually \n\nclaude remote-control"
+      }
+    },
+    {
+      "id": "fa91bdf0-1a79-4f24-84e6-388b759f0c83",
+      "phase": 12,
+      "step": "discuss",
+      "questions": [
+        "So the approach is: autopilot spawns `claude remote-control` as a child process, captures the session URL from stdout, and stores it in state. Is there anything else you envision beyond that for session creation?"
+      ],
+      "questionItems": [
+        {
+          "question": "So the approach is: autopilot spawns `claude remote-control` as a child process, captures the session URL from stdout, and stores it in state. Is there anything else you envision beyond that for session creation?",
+          "header": "Confirm",
+          "options": [
+            {
+              "label": "That's it",
+              "description": "Spawn the process, capture URL, store it, show it in dashboard. Done."
+            },
+            {
+              "label": "Also pass project dir",
+              "description": "Make sure the remote-control session is started in the same project directory as the autopilot"
+            }
+          ],
+          "multiSelect": false
+        }
+      ],
+      "createdAt": "2026-02-26T23:46:07.402Z",
+      "answeredAt": "2026-02-26T23:46:33.030Z",
+      "answers": {
+        "So the approach is: autopilot spawns `claude remote-control` as a child process, captures the session URL from stdout, and stores it in state. Is there anything else you envision beyond that for session creation?": "Also pass project dir"
+      }
+    },
+    {
+      "id": "51da885c-8387-4e02-aa14-9baf8c74d1d1",
+      "phase": 12,
+      "step": "discuss",
+      "questions": [
+        "More questions about session purpose & scope, or move to next area?"
+      ],
+      "questionItems": [
+        {
+          "question": "More questions about session purpose & scope, or move to next area?",
+          "header": "Purpose",
+          "options": [
+            {
+              "label": "Next area",
+              "description": "Move on to Session Lifecycle"
+            },
+            {
+              "label": "More questions",
+              "description": "I have more to say about purpose & scope"
+            }
+          ],
+          "multiSelect": false
+        }
+      ],
+      "createdAt": "2026-02-26T23:46:36.537Z",
+      "answeredAt": "2026-02-26T23:46:43.081Z",
+      "answers": {
+        "More questions about session purpose & scope, or move to next area?": "Next area"
+      }
+    },
+    {
+      "id": "b4280e26-7e74-4f97-8521-dd8e3ba668eb",
+      "phase": 12,
+      "step": "discuss",
+      "questions": [
+        "When should the remote-control session start?"
+      ],
+      "questionItems": [
+        {
+          "question": "When should the remote-control session start?",
+          "header": "Start",
+          "options": [
+            {
+              "label": "When autopilot starts",
+              "description": "Automatically spawn `claude remote-control` alongside the autopilot process every time"
+            },
+            {
+              "label": "On-demand via dashboard",
+              "description": "User clicks a button in the dashboard to start the remote session"
+            },
+            {
+              "label": "You decide",
+              "description": "Claude's discretion on the best trigger"
+            }
+          ],
+          "multiSelect": false
+        }
+      ],
+      "createdAt": "2026-02-26T23:46:46.912Z",
+      "answeredAt": "2026-02-26T23:47:28.366Z",
+      "answers": {
+        "When should the remote-control session start?": "When autopilot starts"
+      }
+    },
+    {
+      "id": "efe18585-cac5-4375-9644-66adf9354f0b",
+      "phase": 12,
+      "step": "discuss",
+      "questions": [
+        "If the remote-control process dies unexpectedly, what should happen?"
+      ],
+      "questionItems": [
+        {
+          "question": "If the remote-control process dies unexpectedly, what should happen?",
+          "header": "Recovery",
+          "options": [
+            {
+              "label": "Auto-restart silently",
+              "description": "Detect the crash, respawn `claude remote-control`, capture new URL, update dashboard"
+            },
+            {
+              "label": "Notify and offer restart",
+              "description": "Show an error in dashboard with a 'Restart session' button"
+            },
+            {
+              "label": "You decide",
+              "description": "Claude's discretion on recovery strategy"
+            }
+          ],
+          "multiSelect": false
+        }
+      ],
+      "createdAt": "2026-02-26T23:47:32.962Z",
+      "answeredAt": "2026-02-26T23:47:54.612Z",
+      "answers": {
+        "If the remote-control process dies unexpectedly, what should happen?": "You decide"
+      }
+    },
+    {
+      "id": "f389eb88-51ce-4bb2-a509-525301d0f829",
+      "phase": 12,
+      "step": "discuss",
+      "questions": [
+        "When autopilot finishes (build complete), should the remote session stay alive or shut down?"
+      ],
+      "questionItems": [
+        {
+          "question": "When autopilot finishes (build complete), should the remote session stay alive or shut down?",
+          "header": "End",
+          "options": [
+            {
+              "label": "Stay alive",
+              "description": "Keep the session running so users can still ask questions about the completed build"
+            },
+            {
+              "label": "Shut down with autopilot",
+              "description": "Clean up the remote session when autopilot exits"
+            },
+            {
+              "label": "You decide",
+              "description": "Claude's discretion"
+            }
+          ],
+          "multiSelect": false
+        }
+      ],
+      "createdAt": "2026-02-26T23:47:58.469Z",
+      "answeredAt": "2026-02-26T23:48:24.867Z",
+      "answers": {
+        "When autopilot finishes (build complete), should the remote session stay alive or shut down?": "Stay alive"
+      }
+    },
+    {
+      "id": "5380c8e6-3bb2-4300-ab3d-3bd8b48bb74d",
+      "phase": 12,
+      "step": "discuss",
+      "questions": [
+        "Should the user be able to opt out of the remote session (like --no-tunnel for dev-tunnels)?"
+      ],
+      "questionItems": [
+        {
+          "question": "Should the user be able to opt out of the remote session (like --no-tunnel for dev-tunnels)?",
+          "header": "Opt-out",
+          "options": [
+            {
+              "label": "Yes, --no-remote flag",
+              "description": "Add a CLI flag to skip creating the remote session"
+            },
+            {
+              "label": "No, always create it",
+              "description": "Remote session is always spawned, no opt-out needed"
+            },
+            {
+              "label": "You decide",
+              "description": "Claude's discretion"
+            }
+          ],
+          "multiSelect": false
+        }
+      ],
+      "createdAt": "2026-02-26T23:48:29.027Z",
+      "answeredAt": "2026-02-26T23:48:46.001Z",
+      "answers": {
+        "Should the user be able to opt out of the remote session (like --no-tunnel for dev-tunnels)?": "Yes, --no-remote flag"
+      }
+    },
+    {
+      "id": "ff343e9f-fd86-4bc1-a4b9-decbc7f793c4",
+      "phase": 12,
+      "step": "discuss",
+      "questions": [
+        "More questions about session lifecycle, or move to next area?"
+      ],
+      "questionItems": [
+        {
+          "question": "More questions about session lifecycle, or move to next area?",
+          "header": "Lifecycle",
+          "options": [
+            {
+              "label": "Next area",
+              "description": "Move on to Session Context"
+            },
+            {
+              "label": "More questions",
+              "description": "I have more to say about lifecycle"
+            }
+          ],
+          "multiSelect": false
+        }
+      ],
+      "createdAt": "2026-02-26T23:48:49.057Z",
+      "answeredAt": "2026-02-26T23:48:53.042Z",
+      "answers": {
+        "More questions about session lifecycle, or move to next area?": "Next area"
+      }
+    },
+    {
+      "id": "abaf5238-a718-46d9-9f39-1078528a45df",
+      "phase": 12,
+      "step": "discuss",
+      "questions": [
+        "`claude remote-control` is run in the project directory, so it has filesystem access. Should the session be pre-loaded with any specific context (like a system prompt or CLAUDE.md)?"
+      ],
+      "questionItems": [
+        {
+          "question": "`claude remote-control` is run in the project directory, so it has filesystem access. Should the session be pre-loaded with any specific context (like a system prompt or CLAUDE.md)?",
+          "header": "Preload",
+          "options": [
+            {
+              "label": "Just the project directory",
+              "description": "Run `claude remote-control` in the project dir — Claude Code will pick up CLAUDE.md and project context naturally"
+            },
+            {
+              "label": "Custom system prompt",
+              "description": "Pass additional context like \"You are helping with GSD Autopilot build\" or current phase info"
+            },
+            {
+              "label": "You decide",
+              "description": "Claude's discretion on what context to provide"
+            }
+          ],
+          "multiSelect": false
+        }
+      ],
+      "createdAt": "2026-02-26T23:48:58.640Z",
+      "answeredAt": "2026-02-26T23:49:11.184Z",
+      "answers": {
+        "`claude remote-control` is run in the project directory, so it has filesystem access. Should the session be pre-loaded with any specific context (like a system prompt or CLAUDE.md)?": "Just the project directory"
+      }
+    },
+    {
+      "id": "6acca2a2-2e8d-4e3a-b0dc-e60f017ff737",
+      "phase": 12,
+      "step": "discuss",
+      "questions": [
+        "Should the remote session be tied to the same Claude authentication the autopilot uses, or can it use whatever auth the local `claude` CLI has?"
+      ],
+      "questionItems": [
+        {
+          "question": "Should the remote session be tied to the same Claude authentication the autopilot uses, or can it use whatever auth the local `claude` CLI has?",
+          "header": "Auth",
+          "options": [
+            {
+              "label": "Use local CLI auth",
+              "description": "Whatever `claude` is already logged in as — no special auth handling needed"
+            },
+            {
+              "label": "You decide",
+              "description": "Claude's discretion on auth approach"
+            }
+          ],
+          "multiSelect": false
+        }
+      ],
+      "createdAt": "2026-02-26T23:49:15.306Z",
+      "answeredAt": "2026-02-26T23:49:41.389Z",
+      "answers": {
+        "Should the remote session be tied to the same Claude authentication the autopilot uses, or can it use whatever auth the local `claude` CLI has?": "Use local CLI auth"
+      }
+    },
+    {
+      "id": "42331e59-af10-40d8-a24d-495e88c5168a",
+      "phase": 12,
+      "step": "discuss",
+      "questions": [
+        "If the user doesn't have a Max plan (required for remote-control), how should the autopilot handle it?"
+      ],
+      "questionItems": [
+        {
+          "question": "If the user doesn't have a Max plan (required for remote-control), how should the autopilot handle it?",
+          "header": "Fallback",
+          "options": [
+            {
+              "label": "Warn and skip",
+              "description": "Log a warning that remote session requires Max plan, continue autopilot without it (like tunnel graceful degradation)"
+            },
+            {
+              "label": "You decide",
+              "description": "Claude's discretion on handling auth/plan failures"
+            }
+          ],
+          "multiSelect": false
+        }
+      ],
+      "createdAt": "2026-02-26T23:49:45.765Z",
+      "answeredAt": "2026-02-26T23:49:55.473Z",
+      "answers": {
+        "If the user doesn't have a Max plan (required for remote-control), how should the autopilot handle it?": "Warn and skip"
+      }
+    },
+    {
+      "id": "b5c3d7bd-87c4-41a3-8fb8-8e9b26633e78",
+      "phase": 12,
+      "step": "discuss",
+      "questions": [
+        "Should the remote session name be set to something identifiable (e.g., \"GSD Autopilot - [project name]\")?"
+      ],
+      "questionItems": [
+        {
+          "question": "Should the remote session name be set to something identifiable (e.g., \"GSD Autopilot - [project name]\")?",
+          "header": "Naming",
+          "options": [
+            {
+              "label": "Yes, branded name",
+              "description": "Set a descriptive name so it's easy to find in the Claude session list"
+            },
+            {
+              "label": "Default name is fine",
+              "description": "Let `claude remote-control` use its default naming"
+            },
+            {
+              "label": "You decide",
+              "description": "Claude's discretion"
+            }
+          ],
+          "multiSelect": false
+        }
+      ],
+      "createdAt": "2026-02-26T23:50:00.564Z",
+      "answeredAt": "2026-02-26T23:50:12.581Z",
+      "answers": {
+        "Should the remote session name be set to something identifiable (e.g., \"GSD Autopilot - [project name]\")?": "Yes, branded name"
+      }
+    },
+    {
+      "id": "957515da-47cb-4e60-b9d1-ef068edf3df3",
+      "phase": 12,
+      "step": "discuss",
+      "questions": [
+        "More questions about session context, or move to next area?"
+      ],
+      "questionItems": [
+        {
+          "question": "More questions about session context, or move to next area?",
+          "header": "Context",
+          "options": [
+            {
+              "label": "Next area",
+              "description": "Move on to Dashboard Integration"
+            },
+            {
+              "label": "More questions",
+              "description": "I have more to say about session context"
+            }
+          ],
+          "multiSelect": false
+        }
+      ],
+      "createdAt": "2026-02-26T23:50:16.039Z",
+      "answeredAt": "2026-02-26T23:50:21.640Z",
+      "answers": {
+        "More questions about session context, or move to next area?": "Next area"
+      }
+    },
+    {
+      "id": "0b84d7f6-7c34-4bba-95e1-63fda23aa421",
+      "phase": 12,
+      "step": "discuss",
+      "questions": [
+        "How should the remote session URL be presented in the dashboard?"
+      ],
+      "questionItems": [
+        {
+          "question": "How should the remote session URL be presented in the dashboard?",
+          "header": "Placement",
+          "options": [
+            {
+              "label": "Prominent card on Overview",
+              "description": "A dedicated card on the Overview page with the URL, status indicator, and copy button — similar to the tunnel URL"
+            },
+            {
+              "label": "In the header/nav bar",
+              "description": "Always-visible link in the top navigation bar alongside other global info"
+            },
+            {
+              "label": "You decide",
+              "description": "Claude's discretion on placement"
+            }
+          ],
+          "multiSelect": false
+        }
+      ],
+      "createdAt": "2026-02-26T23:50:26.342Z",
+      "answeredAt": "2026-02-26T23:51:16.968Z",
+      "answers": {
+        "How should the remote session URL be presented in the dashboard?": "Prominent card on Overview"
+      }
+    },
+    {
+      "id": "467ebf01-7961-4701-b369-3b6b4caa8739",
+      "phase": 12,
+      "step": "discuss",
+      "questions": [
+        "Should clicking the URL open Claude Code in a new tab, or embed it in the dashboard (iframe)?"
+      ],
+      "questionItems": [
+        {
+          "question": "Should clicking the URL open Claude Code in a new tab, or embed it in the dashboard (iframe)?",
+          "header": "Interaction",
+          "options": [
+            {
+              "label": "New tab (external link)",
+              "description": "Click opens claude.ai/code in a new browser tab — simple, no iframe issues"
+            },
+            {
+              "label": "Embedded iframe",
+              "description": "Show the Claude Code session inside the dashboard page itself"
+            },
+            {
+              "label": "You decide",
+              "description": "Claude's discretion"
+            }
+          ],
+          "multiSelect": false
+        }
+      ],
+      "createdAt": "2026-02-26T23:51:21.075Z",
+      "answeredAt": "2026-02-26T23:52:24.416Z",
+      "answers": {
+        "Should clicking the URL open Claude Code in a new tab, or embed it in the dashboard (iframe)?": "New tab (external link)"
+      }
+    },
+    {
+      "id": "03fbedd1-91f3-4a15-89d8-a057240b3b6a",
+      "phase": 12,
+      "step": "discuss",
+      "questions": [
+        "Should the card show the session status (online/offline/reconnecting)?"
+      ],
+      "questionItems": [
+        {
+          "question": "Should the card show the session status (online/offline/reconnecting)?",
+          "header": "Status",
+          "options": [
+            {
+              "label": "Yes, live status",
+              "description": "Show green/red indicator based on whether the remote-control process is running"
+            },
+            {
+              "label": "Just the URL",
+              "description": "Show the URL and copy button, no real-time status"
+            },
+            {
+              "label": "You decide",
+              "description": "Claude's discretion"
+            }
+          ],
+          "multiSelect": false
+        }
+      ],
+      "createdAt": "2026-02-26T23:52:28.422Z",
+      "answeredAt": "2026-02-26T23:52:40.552Z",
+      "answers": {
+        "Should the card show the session status (online/offline/reconnecting)?": "Just the URL"
+      }
+    },
+    {
+      "id": "7c15b8ca-f3fe-4099-9225-22c3f61a5ab1",
+      "phase": 12,
+      "step": "discuss",
+      "questions": [
+        "Should the remote session URL also appear in terminal output when autopilot starts (like the dashboard URL and tunnel URL do)?"
+      ],
+      "questionItems": [
+        {
+          "question": "Should the remote session URL also appear in terminal output when autopilot starts (like the dashboard URL and tunnel URL do)?",
+          "header": "Terminal",
+          "options": [
+            {
+              "label": "Yes, show alongside others",
+              "description": "Print the remote session URL in the startup banner next to dashboard and tunnel URLs"
+            },
+            {
+              "label": "You decide",
+              "description": "Claude's discretion"
+            }
+          ],
+          "multiSelect": false
+        }
+      ],
+      "createdAt": "2026-02-26T23:52:44.241Z",
+      "answeredAt": "2026-02-26T23:52:58.673Z",
+      "answers": {
+        "Should the remote session URL also appear in terminal output when autopilot starts (like the dashboard URL and tunnel URL do)?": "Yes, show alongside others"
+      }
+    },
+    {
+      "id": "f7d51547-9b4b-41c4-9f32-38096e977d4a",
+      "phase": 12,
+      "step": "discuss",
+      "questions": [
+        "More questions about dashboard integration, or are we done?"
+      ],
+      "questionItems": [
+        {
+          "question": "More questions about dashboard integration, or are we done?",
+          "header": "Dashboard",
+          "options": [
+            {
+              "label": "Done, create context",
+              "description": "That covers all four areas — create the CONTEXT.md"
+            },
+            {
+              "label": "More questions",
+              "description": "I have more to say about dashboard integration"
+            }
+          ],
+          "multiSelect": false
+        }
+      ],
+      "createdAt": "2026-02-26T23:53:02.116Z",
+      "answeredAt": "2026-02-26T23:54:04.158Z",
+      "answers": {
+        "More questions about dashboard integration, or are we done?": "Done, create context"
       }
     }
   ],
@@ -753,11 +1493,12 @@
     }
   ],
   "startedAt": "2026-02-24T03:05:41.567Z",
-  "lastUpdatedAt": "2026-02-25T18:13:58.443Z",
+  "lastUpdatedAt": "2026-02-27T00:27:46.168Z",
   "branches": {
     "main": {
       "port": 4120,
       "assignedAt": "2026-02-24T03:07:28.110Z"
     }
-  }
+  },
+  "tunnelUrl": "https://q9mdtxl0-4120.use2.devtunnels.ms/"
 }
