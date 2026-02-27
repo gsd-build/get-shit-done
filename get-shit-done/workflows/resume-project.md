@@ -32,11 +32,12 @@ Parse JSON for: `state_exists`, `roadmap_exists`, `project_exists`, `planning_ex
 
 <step name="load_state">
 
-Read and parse STATE.md, then PROJECT.md:
+Read and parse STATE.md, PROJECT.md, and REQUIREMENTS.md:
 
 ```bash
 cat .planning/STATE.md
 cat .planning/PROJECT.md
+cat .planning/REQUIREMENTS.md 2>/dev/null
 ```
 
 **From STATE.md extract:**
@@ -55,6 +56,22 @@ cat .planning/PROJECT.md
 - **Requirements**: Validated, Active, Out of Scope
 - **Key Decisions**: Full decision log with outcomes
 - **Constraints**: Hard limits on implementation
+
+**From REQUIREMENTS.md extract (if exists):**
+
+- **Planned Features**: All features already scoped for future phases
+- **Feature IDs**: Reference codes (e.g., REQ-01, AUTH-03) for tracking
+- **Phase Mapping**: Which features are planned for which phases
+- **Dependencies**: Which features depend on others
+
+**CRITICAL — Feature Discussion Guard:**
+
+Before suggesting or planning ANY new feature in conversation, you MUST:
+1. Check REQUIREMENTS.md for existing plans matching the feature keywords
+2. If already planned → Reference the existing requirement and phase instead of proposing new work
+3. If NOT planned → Then suggest as new addition via `/gsd:add-phase` or todo
+
+See @~/.claude/get-shit-done/references/feature-discussion-guard.md for detailed guidance.
 
 </step>
 
