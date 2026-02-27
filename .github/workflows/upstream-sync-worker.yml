@@ -14,7 +14,6 @@ permissions:
   contents: write
   pull-requests: write
   actions: write
-  workflows: write
 
 env:
   UPSTREAM_REPO: gsd-build/get-shit-done
