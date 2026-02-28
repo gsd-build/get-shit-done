@@ -13,6 +13,23 @@ const yellow = '\x1b[33m';
 const dim = '\x1b[2m';
 const reset = '\x1b[0m';
 
+// Codex config.toml constants
+const GSD_CODEX_MARKER = '# GSD Agent Configuration \u2014 managed by get-shit-done installer';
+
+const CODEX_AGENT_SANDBOX = {
+  'gsd-executor': 'workspace-write',
+  'gsd-planner': 'workspace-write',
+  'gsd-phase-researcher': 'workspace-write',
+  'gsd-project-researcher': 'workspace-write',
+  'gsd-research-synthesizer': 'workspace-write',
+  'gsd-verifier': 'workspace-write',
+  'gsd-codebase-mapper': 'workspace-write',
+  'gsd-roadmapper': 'workspace-write',
+  'gsd-debugger': 'workspace-write',
+  'gsd-plan-checker': 'read-only',
+  'gsd-integration-checker': 'read-only',
+};
+
 // Get version from package.json
 const pkg = require('../package.json');
 
@@ -437,15 +454,43 @@ function convertClaudeToCodexMarkdown(content) {
 function getCodexSkillAdapterHeader(skillName) {
   const invocation = `$${skillName}`;
   return `<codex_skill_adapter>
-Codex skills-first mode:
+## A. Skill Invocation
 - This skill is invoked by mentioning \`${invocation}\`.
 - Treat all user text after \`${invocation}\` as \`{{GSD_ARGS}}\`.
 - If no arguments are present, treat \`{{GSD_ARGS}}\` as empty.
 
-Legacy orchestration compatibility:
-- Any \`Task(...)\` pattern in referenced workflow docs is legacy syntax.
-- Implement equivalent behavior with Codex collaboration tools: \`spawn_agent\`, \`wait\`, \`send_input\`, and \`close_agent\`.
-- Treat legacy \`subagent_type\` names as role hints in the spawned message.
+## B. AskUserQuestion → request_user_input Mapping
+GSD workflows use \`AskUserQuestion\` (Claude Code syntax). Translate to Codex \`request_user_input\`:
+
+Parameter mapping:
+- \`header\` → \`header\`
+- \`question\` → \`question\`
+- Options formatted as \`"Label" — description\` → \`{label: "Label", description: "description"}\`
+- Generate \`id\` from header: lowercase, replace spaces with underscores
+
+Batched calls:
+- \`AskUserQuestion([q1, q2])\` → single \`request_user_input\` with multiple entries in \`questions[]\`
+
+Multi-select workaround:
+- Codex has no \`multiSelect\`. Use sequential single-selects, or present a numbered freeform list asking the user to enter comma-separated numbers.
+
+Execute mode fallback:
+- When \`request_user_input\` is rejected (Execute mode), present a plain-text numbered list and pick a reasonable default.
+
+## C. Task() → spawn_agent Mapping
+GSD workflows use \`Task(...)\` (Claude Code syntax). Translate to Codex collaboration tools:
+
+Direct mapping:
+- \`Task(subagent_type="X", prompt="Y")\` → \`spawn_agent(agent_type="X", message="Y")\`
+- \`Task(model="...")\` → omit (Codex uses per-role config, not inline model selection)
+- \`fork_context: false\` by default — GSD agents load their own context via \`<files_to_read>\` blocks
+
+Parallel fan-out:
+- Spawn multiple agents → collect agent IDs → \`wait(ids)\` for all to complete
+
+Result parsing:
+- Look for structured markers in agent output: \`CHECKPOINT\`, \`PLAN COMPLETE\`, \`SUMMARY\`, etc.
+- \`close_agent(id)\` after collecting results from each agent
 </codex_skill_adapter>`;
 }
 
@@ -464,6 +509,191 @@ function convertClaudeCommandToCodexSkill(content, skillName) {
   const adapter = getCodexSkillAdapterHeader(skillName);
 
   return `---\nname: ${yamlQuote(skillName)}\ndescription: ${yamlQuote(description)}\nmetadata:\n  short-description: ${yamlQuote(shortDescription)}\n---\n\n${adapter}\n\n${body.trimStart()}`;
+}
+
+/**
+ * Convert Claude Code agent markdown to Codex agent format.
+ * Applies base markdown conversions, then adds a <codex_agent_role> header
+ * and cleans up frontmatter (removes tools/color fields).
+ */
+function convertClaudeAgentToCodexAgent(content) {
+  let converted = convertClaudeToCodexMarkdown(content);
+
+  const { frontmatter, body } = extractFrontmatterAndBody(converted);
+  if (!frontmatter) return converted;
+
+  const name = extractFrontmatterField(frontmatter, 'name') || 'unknown';
+  const description = extractFrontmatterField(frontmatter, 'description') || '';
+  const tools = extractFrontmatterField(frontmatter, 'tools') || '';
+
+  const roleHeader = `<codex_agent_role>
+role: ${name}
+tools: ${tools}
+purpose: ${toSingleLine(description)}
+</codex_agent_role>`;
+
+  const cleanFrontmatter = `---\nname: ${yamlQuote(name)}\ndescription: ${yamlQuote(toSingleLine(description))}\n---`;
+
+  return `${cleanFrontmatter}\n\n${roleHeader}\n${body}`;
+}
+
+/**
+ * Generate a per-agent .toml config file for Codex.
+ * Sets sandbox_mode and developer_instructions from the agent markdown body.
+ */
+function generateCodexAgentToml(agentName, agentContent) {
+  const sandboxMode = CODEX_AGENT_SANDBOX[agentName] || 'read-only';
+  const { body } = extractFrontmatterAndBody(agentContent);
+  const instructions = body.trim();
+
+  const lines = [
+    `sandbox_mode = "${sandboxMode}"`,
+    `developer_instructions = """`,
+    instructions,
+    `"""`,
+  ];
+  return lines.join('\n') + '\n';
+}
+
+/**
+ * Generate the GSD config block for Codex config.toml.
+ * @param {Array<{name: string, description: string}>} agents
+ */
+function generateCodexConfigBlock(agents) {
+  const lines = [
+    GSD_CODEX_MARKER,
+    '[features]',
+    'multi_agent = true',
+    'default_mode_request_user_input = true',
+    '',
+    '[agents]',
+    'max_threads = 4',
+    'max_depth = 2',
+    '',
+  ];
+
+  for (const { name, description } of agents) {
+    lines.push(`[agents.${name}]`);
+    lines.push(`description = ${JSON.stringify(description)}`);
+    lines.push(`config_file = "agents/${name}.toml"`);
+    lines.push('');
+  }
+
+  return lines.join('\n');
+}
+
+/**
+ * Strip GSD sections from Codex config.toml content.
+ * Returns cleaned content, or null if file would be empty.
+ */
+function stripGsdFromCodexConfig(content) {
+  const markerIndex = content.indexOf(GSD_CODEX_MARKER);
+
+  if (markerIndex !== -1) {
+    // Has GSD marker — remove everything from marker to EOF
+    let before = content.substring(0, markerIndex).trimEnd();
+    // Also strip GSD-injected feature keys above the marker (Case 3 inject)
+    before = before.replace(/^multi_agent\s*=\s*true\s*\n?/m, '');
+    before = before.replace(/^default_mode_request_user_input\s*=\s*true\s*\n?/m, '');
+    before = before.replace(/^\[features\]\s*\n(?=\[|$)/m, '');
+    before = before.replace(/\n{3,}/g, '\n\n').trim();
+    if (!before) return null;
+    return before + '\n';
+  }
+
+  // No marker but may have GSD-injected feature keys
+  let cleaned = content;
+  cleaned = cleaned.replace(/^multi_agent\s*=\s*true\s*\n?/m, '');
+  cleaned = cleaned.replace(/^default_mode_request_user_input\s*=\s*true\s*\n?/m, '');
+
+  // Remove [agents.gsd-*] sections (from header to next section or EOF)
+  cleaned = cleaned.replace(/^\[agents\.gsd-[^\]]+\]\n(?:(?!\[)[^\n]*\n?)*/gm, '');
+
+  // Remove [features] section if now empty (only header, no keys before next section)
+  cleaned = cleaned.replace(/^\[features\]\s*\n(?=\[|$)/m, '');
+
+  // Remove [agents] section if now empty
+  cleaned = cleaned.replace(/^\[agents\]\s*\n(?=\[|$)/m, '');
+
+  // Clean up excessive blank lines
+  cleaned = cleaned.replace(/\n{3,}/g, '\n\n').trim();
+
+  if (!cleaned) return null;
+  return cleaned + '\n';
+}
+
+/**
+ * Merge GSD config block into an existing or new config.toml.
+ * Three cases: new file, existing with GSD marker, existing without marker.
+ */
+function mergeCodexConfig(configPath, gsdBlock) {
+  // Case 1: No config.toml — create fresh
+  if (!fs.existsSync(configPath)) {
+    fs.writeFileSync(configPath, gsdBlock + '\n');
+    return;
+  }
+
+  const existing = fs.readFileSync(configPath, 'utf8');
+  const markerIndex = existing.indexOf(GSD_CODEX_MARKER);
+
+  // Case 2: Has GSD marker — truncate and re-append
+  if (markerIndex !== -1) {
+    const before = existing.substring(0, markerIndex).trimEnd();
+    const newContent = before ? before + '\n\n' + gsdBlock + '\n' : gsdBlock + '\n';
+    fs.writeFileSync(configPath, newContent);
+    return;
+  }
+
+  // Case 3: No marker — inject features if needed, append agents
+  let content = existing;
+  const featuresRegex = /^\[features\]\s*$/m;
+  const hasFeatures = featuresRegex.test(content);
+
+  if (hasFeatures) {
+    if (!content.includes('multi_agent')) {
+      content = content.replace(featuresRegex, '[features]\nmulti_agent = true');
+    }
+    if (!content.includes('default_mode_request_user_input')) {
+      content = content.replace(/^\[features\].*$/m, '$&\ndefault_mode_request_user_input = true');
+    }
+    // Append agents block (skip the [features] section from gsdBlock)
+    const agentsBlock = gsdBlock.substring(gsdBlock.indexOf('[agents]'));
+    content = content.trimEnd() + '\n\n' + GSD_CODEX_MARKER + '\n' + agentsBlock + '\n';
+  } else {
+    content = content.trimEnd() + '\n\n' + gsdBlock + '\n';
+  }
+
+  fs.writeFileSync(configPath, content);
+}
+
+/**
+ * Generate config.toml and per-agent .toml files for Codex.
+ * Reads agent .md files from source, extracts metadata, writes .toml configs.
+ */
+function installCodexConfig(targetDir, agentsSrc) {
+  const configPath = path.join(targetDir, 'config.toml');
+  const agentsTomlDir = path.join(targetDir, 'agents');
+  fs.mkdirSync(agentsTomlDir, { recursive: true });
+
+  const agentEntries = fs.readdirSync(agentsSrc).filter(f => f.startsWith('gsd-') && f.endsWith('.md'));
+  const agents = [];
+
+  for (const file of agentEntries) {
+    const content = fs.readFileSync(path.join(agentsSrc, file), 'utf8');
+    const { frontmatter } = extractFrontmatterAndBody(content);
+    const name = extractFrontmatterField(frontmatter, 'name') || file.replace('.md', '');
+    const description = extractFrontmatterField(frontmatter, 'description') || '';
+
+    agents.push({ name, description: toSingleLine(description) });
+
+    const tomlContent = generateCodexAgentToml(name, content);
+    fs.writeFileSync(path.join(agentsTomlDir, `${name}.toml`), tomlContent);
+  }
+
+  const gsdBlock = generateCodexConfigBlock(agents);
+  mergeCodexConfig(configPath, gsdBlock);
+
+  return agents.length;
 }
 
 /**
@@ -1031,6 +1261,40 @@ function uninstall(isGlobal, runtime = 'claude') {
       if (skillCount > 0) {
         removedCount++;
         console.log(`  ${green}✓${reset} Removed ${skillCount} Codex skills`);
+      }
+    }
+
+    // Codex: remove GSD agent .toml config files
+    const codexAgentsDir = path.join(targetDir, 'agents');
+    if (fs.existsSync(codexAgentsDir)) {
+      const tomlFiles = fs.readdirSync(codexAgentsDir);
+      let tomlCount = 0;
+      for (const file of tomlFiles) {
+        if (file.startsWith('gsd-') && file.endsWith('.toml')) {
+          fs.unlinkSync(path.join(codexAgentsDir, file));
+          tomlCount++;
+        }
+      }
+      if (tomlCount > 0) {
+        removedCount++;
+        console.log(`  ${green}✓${reset} Removed ${tomlCount} agent .toml configs`);
+      }
+    }
+
+    // Codex: clean GSD sections from config.toml
+    const configPath = path.join(targetDir, 'config.toml');
+    if (fs.existsSync(configPath)) {
+      const content = fs.readFileSync(configPath, 'utf8');
+      const cleaned = stripGsdFromCodexConfig(content);
+      if (cleaned === null) {
+        // File is empty after stripping — delete it
+        fs.unlinkSync(configPath);
+        removedCount++;
+        console.log(`  ${green}✓${reset} Removed config.toml (was GSD-only)`);
+      } else if (cleaned !== content) {
+        fs.writeFileSync(configPath, cleaned);
+        removedCount++;
+        console.log(`  ${green}✓${reset} Cleaned GSD sections from config.toml`);
       }
     }
   } else {
@@ -1675,7 +1939,7 @@ function install(isGlobal, runtime = 'claude') {
         } else if (isGemini) {
           content = convertClaudeToGeminiAgent(content);
         } else if (isCodex) {
-          content = convertClaudeToCodexMarkdown(content);
+          content = convertClaudeAgentToCodexAgent(content);
         }
         fs.writeFileSync(path.join(agentsDest, entry.name), content);
       }
@@ -1759,6 +2023,10 @@ function install(isGlobal, runtime = 'claude') {
   reportLocalPatches(targetDir, runtime);
 
   if (isCodex) {
+    // Generate Codex config.toml and per-agent .toml files
+    const agentCount = installCodexConfig(targetDir, agentsSrc);
+    console.log(`  ${green}✓${reset} Generated config.toml with ${agentCount} agent roles`);
+    console.log(`  ${green}✓${reset} Generated ${agentCount} agent .toml config files`);
     return { settingsPath: null, settings: null, statuslineCommand: null, runtime };
   }
 
@@ -2052,6 +2320,22 @@ function installAllRuntimes(runtimes, isGlobal, isInteractive) {
   }
 }
 
+// Test-only exports — skip main logic when loaded as a module for testing
+if (process.env.GSD_TEST_MODE) {
+  module.exports = {
+    getCodexSkillAdapterHeader,
+    convertClaudeAgentToCodexAgent,
+    generateCodexAgentToml,
+    generateCodexConfigBlock,
+    stripGsdFromCodexConfig,
+    mergeCodexConfig,
+    installCodexConfig,
+    convertClaudeCommandToCodexSkill,
+    GSD_CODEX_MARKER,
+    CODEX_AGENT_SANDBOX,
+  };
+} else {
+
 // Main logic
 if (hasGlobal && hasLocal) {
   console.error(`  ${yellow}Cannot specify both --global and --local${reset}`);
@@ -2088,3 +2372,5 @@ if (hasGlobal && hasLocal) {
     });
   }
 }
+
+} // end of else block for GSD_TEST_MODE
