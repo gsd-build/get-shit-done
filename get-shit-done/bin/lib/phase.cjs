@@ -4,7 +4,7 @@
 
 const fs = require('fs');
 const path = require('path');
-const { escapeRegex, normalizePhaseName, comparePhaseNum, findPhaseInternal, getArchivedPhaseDirs, generateSlugInternal, output, error } = require('./core.cjs');
+const { escapeRegex, normalizePhaseName, comparePhaseNum, findPhaseInternal, getArchivedPhaseDirs, getRoadmapPhaseNumbersInternal, generateSlugInternal, output, error } = require('./core.cjs');
 const { extractFrontmatter } = require('./frontmatter.cjs');
 const { writeStateMd } = require('./state.cjs');
 
@@ -805,6 +805,24 @@ function cmdPhaseComplete(cwd, phaseNum, raw) {
       }
     }
   } catch {}
+
+  if (isLastPhase) {
+    const roadmapNumbers = getRoadmapPhaseNumbersInternal(cwd);
+    for (const rmNum of roadmapNumbers) {
+      if (comparePhaseNum(rmNum, phaseNum) > 0) {
+        nextPhaseNum = rmNum;
+        try {
+          const rmPath = path.join(cwd, '.planning', 'ROADMAP.md');
+          const rmContent = fs.readFileSync(rmPath, 'utf-8');
+          const escaped = escapeRegex(rmNum);
+          const nameMatch = rmContent.match(new RegExp(`#{2,4}\\s*Phase\\s+${escaped}:\\s*([^\\n]+)`, 'i'));
+          if (nameMatch) nextPhaseName = nameMatch[1].replace(/\(INSERTED\)/i, '').trim();
+        } catch {}
+        isLastPhase = false;
+        break;
+      }
+    }
+  }
 
   // Update STATE.md
   if (fs.existsSync(statePath)) {

@@ -351,6 +351,22 @@ function getRoadmapPhaseInternal(cwd, phaseNum) {
   }
 }
 
+function getRoadmapPhaseNumbersInternal(cwd) {
+  const roadmapPath = path.join(cwd, '.planning', 'ROADMAP.md');
+  try {
+    const content = fs.readFileSync(roadmapPath, 'utf-8');
+    const pattern = /#{2,4}\s*Phase\s+(\d+[A-Z]?(?:\.\d+)*)\s*:/gi;
+    const numbers = [];
+    let m;
+    while ((m = pattern.exec(content)) !== null) {
+      numbers.push(m[1]);
+    }
+    return numbers.sort((a, b) => comparePhaseNum(a, b));
+  } catch {
+    return [];
+  }
+}
+
 function resolveModelInternal(cwd, agentType) {
   const config = loadConfig(cwd);
 
@@ -424,6 +440,7 @@ module.exports = {
   findPhaseInternal,
   getArchivedPhaseDirs,
   getRoadmapPhaseInternal,
+  getRoadmapPhaseNumbersInternal,
   resolveModelInternal,
   pathExistsInternal,
   generateSlugInternal,

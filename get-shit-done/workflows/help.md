@@ -113,6 +113,20 @@ Execute all plans in a phase.
 
 Usage: `/gsd:execute-phase 5`
 
+### Automation
+
+**`/gsd:autopilot [phase] [start-end]`**
+Run full pipeline for remaining phases automatically.
+
+- Chains discuss → plan → execute → verify for each phase
+- Runs from current phase through end of milestone by default
+- Pass a single phase number or range to limit scope
+- Stops on verification failure or checkpoint requiring human input
+
+Usage: `/gsd:autopilot` (all remaining phases)
+Usage: `/gsd:autopilot 5` (start from phase 5)
+Usage: `/gsd:autopilot 3-7` (phases 3 through 7)
+
 ### Quick Mode
 
 **`/gsd:quick`**
@@ -438,6 +452,13 @@ Example config:
 /gsd:plan-phase 1       # Create plans for first phase
 /clear
 /gsd:execute-phase 1    # Execute all plans in phase
+```
+
+**Running phases on autopilot:**
+
+```
+/gsd:autopilot          # All remaining phases
+/gsd:autopilot 3-7      # Specific range
 ```
 
 **Resuming work after a break:**

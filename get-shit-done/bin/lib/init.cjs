@@ -5,7 +5,7 @@
 const fs = require('fs');
 const path = require('path');
 const { execSync } = require('child_process');
-const { loadConfig, resolveModelInternal, findPhaseInternal, getRoadmapPhaseInternal, pathExistsInternal, generateSlugInternal, getMilestoneInfo, normalizePhaseName, toPosixPath, output, error } = require('./core.cjs');
+const { loadConfig, resolveModelInternal, findPhaseInternal, getRoadmapPhaseInternal, getRoadmapPhaseNumbersInternal, pathExistsInternal, generateSlugInternal, getMilestoneInfo, normalizePhaseName, toPosixPath, output, error } = require('./core.cjs');
 
 function cmdInitExecutePhase(cwd, phase, raw) {
   if (!phase) {
@@ -35,7 +35,6 @@ function cmdInitExecutePhase(cwd, phase, raw) {
     phase_branch_template: config.phase_branch_template,
     milestone_branch_template: config.milestone_branch_template,
     verifier_enabled: config.verifier,
-
     // Phase info
     phase_found: !!phaseInfo,
     phase_dir: phaseInfo?.directory || null,
@@ -648,6 +647,8 @@ function cmdInitProgress(cwd, raw) {
     }
   } catch {}
 
+  const roadmapPhaseCount = getRoadmapPhaseNumbersInternal(cwd).length;
+
   // Check for paused work
   let pausedAt = null;
   try {
@@ -663,6 +664,8 @@ function cmdInitProgress(cwd, raw) {
 
     // Config
     commit_docs: config.commit_docs,
+    auto_advance: (config.workflow && config.workflow.auto_advance) || false,
+    discuss_agents: (config.autopilot && config.autopilot.discuss_agents) || 5,
 
     // Milestone
     milestone_version: milestone.version,
@@ -673,6 +676,7 @@ function cmdInitProgress(cwd, raw) {
     phase_count: phases.length,
     completed_count: phases.filter(p => p.status === 'complete').length,
     in_progress_count: phases.filter(p => p.status === 'in_progress').length,
+    roadmap_phase_count: roadmapPhaseCount,
 
     // Current state
     current_phase: currentPhase,

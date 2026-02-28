@@ -58,11 +58,16 @@ function cmdConfigEnsureSection(cwd, raw) {
     },
     parallelization: true,
     brave_search: hasBraveSearch,
+    autopilot: {
+      discuss_agents: 5,
+      discuss_model: 'sonnet',
+    },
   };
   const defaults = {
     ...hardcoded,
     ...userDefaults,
     workflow: { ...hardcoded.workflow, ...(userDefaults.workflow || {}) },
+    autopilot: { ...hardcoded.autopilot, ...(userDefaults.autopilot || {}) },
   };
 
   try {
@@ -95,6 +100,21 @@ function cmdConfigSet(cwd, keyPath, value, raw) {
     }
   } catch (err) {
     error('Failed to read config.json: ' + err.message);
+  }
+
+  // Validate autopilot.discuss_agents must be odd
+  if (keyPath === 'autopilot.discuss_agents') {
+    if (typeof parsedValue !== 'number' || parsedValue % 2 === 0 || parsedValue < 3 || parsedValue > 9) {
+      error('discuss_agents must be odd (3/5/7/9) for consensus.');
+    }
+  }
+
+  // Validate model values
+  const validModels = ['opus', 'sonnet', 'haiku'];
+  if (keyPath === 'autopilot.discuss_model') {
+    if (!validModels.includes(parsedValue)) {
+      error(`${keyPath} must be one of: ${validModels.join(', ')}`);
+    }
   }
 
   // Set nested value using dot notation (e.g., "workflow.research")
