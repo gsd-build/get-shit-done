@@ -36,6 +36,18 @@ Read all files referenced by the invoking prompt's execution_context before star
 - Suggest next version (v1.0 → v1.1, or v2.0 for major)
 - Confirm with user
 
+## 3b. Initialize Multi-Milestone (if applicable)
+
+If the project already has an active milestone (check `ACTIVE_MILESTONE` file or milestones/ directory):
+
+```bash
+node "$HOME/.claude/get-shit-done/bin/gsd-tools.cjs" milestone create "${VERSION_SLUG}"
+```
+
+This creates the milestone directory structure and sets `ACTIVE_MILESTONE`. Subsequent path resolution will automatically scope to the new milestone directory.
+
+If this is the first milestone (no milestones/ directory yet), skip — legacy mode paths are fine.
+
 ## 4. Update PROJECT.md
 
 Add/update:
@@ -342,12 +354,12 @@ node "$HOME/.claude/get-shit-done/bin/gsd-tools.cjs" commit "docs: create milest
 
 **Milestone v[X.Y]: [Name]**
 
-| Artifact       | Location                    |
-|----------------|-----------------------------|
-| Project        | `.planning/PROJECT.md`      |
-| Research       | `.planning/research/`       |
-| Requirements   | `.planning/REQUIREMENTS.md` |
-| Roadmap        | `.planning/ROADMAP.md`      |
+| Artifact       | Location                          |
+|----------------|-----------------------------------|
+| Project        | `.planning/PROJECT.md`            |
+| Research       | `{planning_base}/research/`       |
+| Requirements   | `{planning_base}/REQUIREMENTS.md` |
+| Roadmap        | `{planning_base}/ROADMAP.md`      |
 
 **[N] phases** | **[X] requirements** | Ready to build ✓
 

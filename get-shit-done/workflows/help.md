@@ -184,6 +184,15 @@ Archive completed milestone and prepare for next version.
 
 Usage: `/gsd:complete-milestone 1.0.0`
 
+**`/gsd:switch-milestone <name>`**
+Switch active milestone for concurrent work.
+
+- Warns if current milestone has in-progress work
+- Updates ACTIVE_MILESTONE pointer
+- Shows status of target milestone
+
+Usage: `/gsd:switch-milestone v1.5-hotfix`
+
 ### Progress Tracking
 
 **`/gsd:progress`**
