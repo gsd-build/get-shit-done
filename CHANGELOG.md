@@ -6,6 +6,16 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ## [Unreleased]
 
+### Added
+- Concurrent milestone execution: work on multiple milestones in parallel with isolated state (#291)
+  - Milestone-scoped directories under `.planning/milestones/<name>/`
+  - `ACTIVE_MILESTONE` pointer file for switching context
+  - `/gsd:switch-milestone` command with in-progress work warnings
+  - `--milestone` CLI flag for explicit milestone targeting
+  - Statusline shows active milestone in multi-milestone mode
+  - All 28 workflow files updated for milestone-aware paths
+  - Zero behavioral change for single-milestone projects (legacy mode)
+
 ## [1.21.1] - 2026-02-27
 
 ### Added
