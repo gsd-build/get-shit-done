@@ -403,6 +403,25 @@ function cmdMilestoneSwitch(cwd, name, raw) {
     error(`milestone "${name}" not found in .planning/milestones/`);
   }
 
+  // Check current active milestone for in-progress work
+  let previousMilestone = null;
+  let previousStatus = null;
+  let hasInProgress = false;
+  try {
+    previousMilestone = fs.readFileSync(activeMilestonePath, 'utf-8').trim();
+    if (previousMilestone && previousMilestone !== name) {
+      const prevStatePath = path.join(planningRoot, 'milestones', previousMilestone, 'STATE.md');
+      if (fs.existsSync(prevStatePath)) {
+        const content = fs.readFileSync(prevStatePath, 'utf-8');
+        const statusMatch = content.match(/\*\*Status:\*\*\s*(.+)/);
+        if (statusMatch) {
+          previousStatus = statusMatch[1].trim();
+          hasInProgress = /executing|planning/i.test(previousStatus);
+        }
+      }
+    }
+  } catch {}
+
   // Write ACTIVE_MILESTONE
   fs.writeFileSync(activeMilestonePath, name, 'utf-8');
 
@@ -418,7 +437,15 @@ function cmdMilestoneSwitch(cwd, name, raw) {
   }
 
   const state_path = '.planning/milestones/' + name + '/STATE.md';
-  output({ switched: true, name, status, state_path }, raw, `switched to milestone "${name}" (${status})`);
+  output({
+    switched: true,
+    name,
+    status,
+    state_path,
+    previous_milestone: previousMilestone,
+    previous_status: previousStatus,
+    has_in_progress: hasInProgress,
+  }, raw, `switched to milestone "${name}" (${status})`);
 }
 
 function cmdMilestoneList(cwd, raw) {

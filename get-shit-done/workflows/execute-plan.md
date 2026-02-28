@@ -253,6 +253,9 @@ git add src/types/user.ts
 
 **4. Format:** `{type}({phase}-{plan}): {description}` with bullet points for key changes.
 
+**Multi-milestone mode** (when `is_multi_milestone` is true from init JSON): prefix scope with milestone name:
+`{type}({milestone}/{phase}-{plan}): {description}` — e.g., `feat(v2.0/08-02): create user registration endpoint`
+
 **5. Record hash:**
 ```bash
 TASK_COMMIT=$(git rev-parse --short HEAD)
@@ -397,7 +400,7 @@ Extract requirement IDs from the plan's frontmatter (e.g., `requirements: [AUTH-
 Task code already committed per-task. Commit plan metadata:
 
 ```bash
-node "$HOME/.claude/get-shit-done/bin/gsd-tools.cjs" commit "docs({phase}-{plan}): complete [plan-name] plan" --files {phase_dir}/{phase}-{plan}-SUMMARY.md {state_path} {roadmap_path} {planning_base}/REQUIREMENTS.md
+node "$HOME/.claude/get-shit-done/bin/gsd-tools.cjs" commit "docs({milestone_prefix}{phase}-{plan}): complete [plan-name] plan" --files {phase_dir}/{phase}-{plan}-SUMMARY.md {state_path} {roadmap_path} {planning_base}/REQUIREMENTS.md
 ```
 </step>
 
@@ -405,7 +408,7 @@ node "$HOME/.claude/get-shit-done/bin/gsd-tools.cjs" commit "docs({phase}-{plan}
 If .planning/codebase/ doesn't exist: skip.
 
 ```bash
-FIRST_TASK=$(git log --oneline --grep="feat({phase}-{plan}):" --grep="fix({phase}-{plan}):" --grep="test({phase}-{plan}):" --reverse | head -1 | cut -d' ' -f1)
+FIRST_TASK=$(git log --oneline --grep="({phase}-{plan}):" --reverse | head -1 | cut -d' ' -f1)
 git diff --name-only ${FIRST_TASK}^..HEAD 2>/dev/null
 ```
 
