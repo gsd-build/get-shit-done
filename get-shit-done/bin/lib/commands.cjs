@@ -6,6 +6,7 @@ const path = require('path');
 const { execSync } = require('child_process');
 const { safeReadFile, loadConfig, isGitIgnored, execGit, normalizePhaseName, comparePhaseNum, getArchivedPhaseDirs, generateSlugInternal, getMilestoneInfo, resolveModelInternal, MODEL_PROFILES, output, error, findPhaseInternal } = require('./core.cjs');
 const { extractFrontmatter } = require('./frontmatter.cjs');
+const { resolvePlanningPaths } = require('./paths.cjs');
 
 function cmdGenerateSlug(text, raw) {
   if (!text) {
@@ -42,7 +43,8 @@ function cmdCurrentTimestamp(format, raw) {
 }
 
 function cmdListTodos(cwd, area, raw) {
-  const pendingDir = path.join(cwd, '.planning', 'todos', 'pending');
+  const paths = resolvePlanningPaths(cwd);
+  const pendingDir = path.join(paths.abs.planningRoot, 'todos', 'pending');
 
   let count = 0;
   const todos = [];
@@ -68,7 +70,7 @@ function cmdListTodos(cwd, area, raw) {
           created: createdMatch ? createdMatch[1].trim() : 'unknown',
           title: titleMatch ? titleMatch[1].trim() : 'Untitled',
           area: todoArea,
-          path: path.join('.planning', 'todos', 'pending', file),
+          path: '.planning/todos/pending/' + file,
         });
       } catch {}
     }
@@ -97,7 +99,7 @@ function cmdVerifyPathExists(cwd, targetPath, raw) {
 }
 
 function cmdHistoryDigest(cwd, raw) {
-  const phasesDir = path.join(cwd, '.planning', 'phases');
+  const phasesDir = resolvePlanningPaths(cwd).abs.phases;
   const digest = { phases: {}, decisions: [], tech_stack: new Set() };
 
   // Collect all phase directories: archived + current
@@ -380,8 +382,9 @@ async function cmdWebsearch(query, options, raw) {
 }
 
 function cmdProgressRender(cwd, format, raw) {
-  const phasesDir = path.join(cwd, '.planning', 'phases');
-  const roadmapPath = path.join(cwd, '.planning', 'ROADMAP.md');
+  const paths = resolvePlanningPaths(cwd);
+  const phasesDir = paths.abs.phases;
+  const roadmapPath = paths.abs.roadmap;
   const milestone = getMilestoneInfo(cwd);
 
   const phases = [];
@@ -452,8 +455,9 @@ function cmdTodoComplete(cwd, filename, raw) {
     error('filename required for todo complete');
   }
 
-  const pendingDir = path.join(cwd, '.planning', 'todos', 'pending');
-  const completedDir = path.join(cwd, '.planning', 'todos', 'completed');
+  const planningRoot = resolvePlanningPaths(cwd).abs.planningRoot;
+  const pendingDir = path.join(planningRoot, 'todos', 'pending');
+  const completedDir = path.join(planningRoot, 'todos', 'completed');
   const sourcePath = path.join(pendingDir, filename);
 
   if (!fs.existsSync(sourcePath)) {
@@ -511,7 +515,7 @@ function cmdScaffold(cwd, type, options, raw) {
       }
       const slug = generateSlugInternal(name);
       const dirName = `${padded}-${slug}`;
-      const phasesParent = path.join(cwd, '.planning', 'phases');
+      const phasesParent = resolvePlanningPaths(cwd).abs.phases;
       fs.mkdirSync(phasesParent, { recursive: true });
       const dirPath = path.join(phasesParent, dirName);
       fs.mkdirSync(dirPath, { recursive: true });
