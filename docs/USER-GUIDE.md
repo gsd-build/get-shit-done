@@ -198,6 +198,7 @@ rapid prototyping phases where test infrastructure isn't the focus.
 |---------|---------|-------------|
 | `/gsd:map-codebase` | Analyze existing codebase | Before `/gsd:new-project` on existing code |
 | `/gsd:quick` | Ad-hoc task with GSD guarantees | Bug fixes, small features, config changes |
+| `/gsd:report-bug [desc]` | Report bug with severity tracking and GitHub issues | When you discover a bug |
 | `/gsd:debug [desc]` | Systematic debugging with persistent state | When something breaks |
 | `/gsd:add-todo [desc]` | Capture an idea for later | Think of something during a session |
 | `/gsd:check-todos` | List pending todos | Review captured ideas |

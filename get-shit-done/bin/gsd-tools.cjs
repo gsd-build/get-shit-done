@@ -61,12 +61,19 @@
  * Todos:
  *   todo complete <filename>           Move todo from pending to completed
  *
+ * Bugs:
+ *   bug list [--area X] [--severity Y] List/filter bug reports
+ *     [--status Z]
+ *   bug update <id> --status <status>  Update bug status
+ *   bug resolve <id>                   Mark bug as resolved
+ *
  * Scaffolding:
  *   scaffold context --phase <N>       Create CONTEXT.md template
  *   scaffold uat --phase <N>           Create UAT.md template
  *   scaffold verification --phase <N>  Create VERIFICATION.md template
  *   scaffold phase-dir --phase <N>     Create phase directory
  *     --name <name>
+ *   scaffold bugs                      Create bugs directories
  *
  * Frontmatter CRUD:
  *   frontmatter get <file> [--field k] Extract frontmatter as JSON
@@ -121,6 +128,7 @@
  *   init verify-work <phase>           All context for verify-work workflow
  *   init phase-op <phase>              Generic phase operation context
  *   init todos [area]                  All context for todo workflows
+ *   init bugs                          All context for bug reporting workflow
  *   init milestone-op                  All context for milestone operations
  *   init map-codebase                  All context for map-codebase workflow
  *   init progress                      All context for progress workflow
@@ -522,6 +530,28 @@ async function main() {
       break;
     }
 
+    case 'bug': {
+      const subcommand = args[1];
+      if (subcommand === 'list') {
+        const areaIdx = args.indexOf('--area');
+        const severityIdx = args.indexOf('--severity');
+        const statusIdx = args.indexOf('--status');
+        commands.cmdBugList(cwd, {
+          area: areaIdx !== -1 ? args[areaIdx + 1] : null,
+          severity: severityIdx !== -1 ? args[severityIdx + 1] : null,
+          status: statusIdx !== -1 ? args[statusIdx + 1] : null,
+        }, raw);
+      } else if (subcommand === 'update') {
+        const statusIdx = args.indexOf('--status');
+        commands.cmdBugUpdate(cwd, args[2], statusIdx !== -1 ? args[statusIdx + 1] : null, raw);
+      } else if (subcommand === 'resolve') {
+        commands.cmdBugResolve(cwd, args[2], raw);
+      } else {
+        error('Unknown bug subcommand. Available: list, update, resolve');
+      }
+      break;
+    }
+
     case 'scaffold': {
       const scaffoldType = args[1];
       const phaseIndex = args.indexOf('--phase');
@@ -564,6 +594,9 @@ async function main() {
         case 'todos':
           init.cmdInitTodos(cwd, args[2], raw);
           break;
+        case 'bugs':
+          init.cmdInitBugs(cwd, raw);
+          break;
         case 'milestone-op':
           init.cmdInitMilestoneOp(cwd, raw);
           break;
@@ -574,7 +607,7 @@ async function main() {
           init.cmdInitProgress(cwd, raw);
           break;
         default:
-          error(`Unknown init workflow: ${workflow}\nAvailable: execute-phase, plan-phase, new-project, new-milestone, quick, resume, verify-work, phase-op, todos, milestone-op, map-codebase, progress`);
+          error(`Unknown init workflow: ${workflow}\nAvailable: execute-phase, plan-phase, new-project, new-milestone, quick, resume, verify-work, phase-op, todos, bugs, milestone-op, map-codebase, progress`);
       }
       break;
     }

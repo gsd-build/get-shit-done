@@ -119,6 +119,10 @@ CONTEXT: [✓ if has_context | - if not]
 ## Pending Todos
 - [count] pending — /gsd:check-todos to review
 
+## Active Bugs
+- [count] active — /gsd:report-bug to file, gsd-tools bug list to review
+(Only show this section if count > 0)
+
 ## Active Debug Sessions
 - [count] active — /gsd:debug to continue
 (Only show this section if count > 0)
