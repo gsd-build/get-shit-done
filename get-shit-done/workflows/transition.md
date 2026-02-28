@@ -22,10 +22,18 @@ Mark current phase complete and advance to next. This is the natural point where
 
 <step name="load_project_state" priority="first">
 
+**Load milestone-aware paths:**
+
+```bash
+INIT=$(node "$HOME/.claude/get-shit-done/bin/gsd-tools.cjs" init transition)
+```
+
+Extract from init JSON: `state_path`, `roadmap_path`, `config_path`, `planning_base`.
+
 Before transition, read project state:
 
 ```bash
-cat .planning/STATE.md 2>/dev/null
+cat {state_path} 2>/dev/null
 cat .planning/PROJECT.md 2>/dev/null
 ```
 
@@ -39,8 +47,8 @@ Note accumulated context that may need updating after transition.
 Check current phase has all plan summaries:
 
 ```bash
-ls .planning/phases/XX-current/*-PLAN.md 2>/dev/null | sort
-ls .planning/phases/XX-current/*-SUMMARY.md 2>/dev/null | sort
+ls {planning_base}/phases/XX-current/*-PLAN.md 2>/dev/null | sort
+ls {planning_base}/phases/XX-current/*-SUMMARY.md 2>/dev/null | sort
 ```
 
 **Verification logic:**
@@ -53,7 +61,7 @@ ls .planning/phases/XX-current/*-SUMMARY.md 2>/dev/null | sort
 <config-check>
 
 ```bash
-cat .planning/config.json 2>/dev/null
+cat {config_path} 2>/dev/null
 ```
 
 </config-check>
@@ -111,7 +119,7 @@ Wait for user decision.
 Check for lingering handoffs:
 
 ```bash
-ls .planning/phases/XX-current/.continue-here*.md 2>/dev/null
+ls {planning_base}/phases/XX-current/.continue-here*.md 2>/dev/null
 ```
 
 If found, delete them — phase is complete, handoffs are stale.
@@ -151,7 +159,7 @@ Evolve PROJECT.md to reflect learnings from completed phase.
 **Read phase summaries:**
 
 ```bash
-cat .planning/phases/XX-current/*-SUMMARY.md
+cat {planning_base}/phases/XX-current/*-SUMMARY.md
 ```
 
 **Assess requirement changes:**
@@ -361,7 +369,7 @@ Read ROADMAP.md to get the next phase's name and goal.
 **Check if next phase has CONTEXT.md:**
 
 ```bash
-ls .planning/phases/*[X+1]*/*-CONTEXT.md 2>/dev/null
+ls {planning_base}/phases/*[X+1]*/*-CONTEXT.md 2>/dev/null
 ```
 
 **If next phase exists:**
