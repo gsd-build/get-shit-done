@@ -270,6 +270,20 @@ Validate built features through conversational UAT.
 
 Usage: `/gsd:verify-work 3`
 
+### Test Generation
+
+**`/gsd:add-tests <phase> [additional instructions]`**
+Generate unit and E2E tests for a completed phase.
+
+- Reads phase SUMMARY.md, CONTEXT.md, and VERIFICATION.md
+- Classifies changed files into TDD (unit), E2E (browser), or Skip
+- Presents classification for approval before generating
+- Runs tests after generation — flags bugs but doesn't fix them
+- Commits passing tests
+
+Usage: `/gsd:add-tests 3`
+Usage: `/gsd:add-tests 3 focus on edge cases for auth`
+
 ### Milestone Auditing
 
 **`/gsd:audit-milestone [version]`**
@@ -438,6 +452,7 @@ Example config:
 /gsd:plan-phase 1       # Create plans for first phase
 /clear
 /gsd:execute-phase 1    # Execute all plans in phase
+/gsd:add-tests 1        # Generate tests for completed phase
 ```
 
 **Resuming work after a break:**

@@ -516,6 +516,7 @@ You're never locked in. The system adapts.
 | `/gsd:add-todo [desc]` | Capture idea for later |
 | `/gsd:check-todos` | List pending todos |
 | `/gsd:debug [desc]` | Systematic debugging with persistent state |
+| `/gsd:add-tests <N> [instructions]` | Generate unit and E2E tests for completed phase |
 | `/gsd:quick [--full]` | Execute ad-hoc task with GSD guarantees (`--full` adds plan-checking and verification) |
 | `/gsd:health [--repair]` | Validate `.planning/` directory integrity, auto-repair with `--repair` |
 
