@@ -115,14 +115,17 @@ Proceed to gather_stats.
 
 <if mode="interactive" OR="custom with gates.confirm_milestone_scope true">
 
-```
-Ready to mark this milestone as shipped?
-(yes / wait / adjust scope)
-```
+Use AskUserQuestion:
 
-Wait for confirmation.
-- "adjust scope": Ask which phases to include.
-- "wait": Stop, user returns when ready.
+- header: "Ship"
+- question: "Ready to mark this milestone as shipped?"
+- options:
+  - "Yes — ship it" — Mark milestone as complete
+  - "Wait" — Not ready yet, I'll come back later
+  - "Adjust scope" — Change which phases to include
+
+- "Adjust scope": Ask which phases to include.
+- "Wait": Stop, user returns when ready.
 
 </if>
 
@@ -670,7 +673,13 @@ See .planning/MILESTONES.md for full details."
 
 Confirm: "Tagged: v[X.Y]"
 
-Ask: "Push tag to remote? (y/n)"
+Use AskUserQuestion:
+
+- header: "Push tag"
+- question: "Push tag v[X.Y] to remote?"
+- options:
+  - "Yes — push tag" — Push v[X.Y] to origin
+  - "No — keep local" — Tag stays local only
 
 If yes:
 ```bash

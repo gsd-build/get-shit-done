@@ -879,10 +879,17 @@ Show every requirement (not counts) for user confirmation:
 
 ---
 
-Does this capture what you're building? (yes / adjust)
 ```
 
-If "adjust": Return to scoping.
+Use AskUserQuestion:
+
+- header: "Requirements"
+- question: "Does this capture what you're building?"
+- options:
+  - "Yes — looks good" — Proceed with these requirements
+  - "Adjust" — Return to scoping to refine
+
+If "Adjust": Return to scoping.
 
 **Commit requirements:**
 

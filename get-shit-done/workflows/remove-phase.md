@@ -69,8 +69,15 @@ This will:
 - Renumber all subsequent phases
 - Update: ROADMAP.md, STATE.md
 
-Proceed? (y/n)
 ```
+
+Use AskUserQuestion:
+
+- header: "Confirm"
+- question: "Proceed with removing Phase {target}: {Name}?"
+- options:
+  - "Yes — remove it" — Delete the phase and renumber subsequent phases
+  - "Cancel" — Keep the phase, no changes
 
 Wait for confirmation.
 </step>

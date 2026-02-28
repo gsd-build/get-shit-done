@@ -112,8 +112,16 @@ These gaps are optional. Include them?
 
 ---
 
-Create these {X} phases? (yes / adjust / defer all optional)
 ```
+
+Use AskUserQuestion:
+
+- header: "Create"
+- question: "Create these {X} phases?"
+- options:
+  - "Yes — create all" — Add all proposed phases to the roadmap
+  - "Adjust" — Modify which phases to create
+  - "Defer optional" — Only create required phases, defer optional ones
 
 Wait for user confirmation.
 

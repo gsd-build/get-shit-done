@@ -258,10 +258,17 @@ Present FULL requirements list for confirmation:
 ### [Category 2]
 - [ ] **CAT2-01**: User can do Z
 
-Does this capture what you're building? (yes / adjust)
 ```
 
-If "adjust": Return to scoping.
+Use AskUserQuestion:
+
+- header: "Requirements"
+- question: "Does this capture what you're building?"
+- options:
+  - "Yes — looks good" — Proceed with these requirements
+  - "Adjust" — Return to scoping to refine
+
+If "Adjust": Return to scoping.
 
 **Commit requirements:**
 ```bash

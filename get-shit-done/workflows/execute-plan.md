@@ -189,8 +189,16 @@ Why needed: [rationale]
 Impact: [what this affects]
 Alternatives: [other approaches]
 
-Proceed with proposed change? (yes / different approach / defer)
 ```
+
+Use AskUserQuestion:
+
+- header: "Deviation"
+- question: "Proceed with proposed change?"
+- options:
+  - "Yes — apply proposed change" — Continue with the modification described above
+  - "Different approach" — Try an alternative approach
+  - "Defer" — Skip this for now and continue with the plan
 
 **Priority:** Rule 4 (STOP) > Rules 1-3 (auto) > unsure → Rule 4
 **Edge cases:** missing validation → R2 | null crash → R1 | new table → R4 | new column → R1/2
