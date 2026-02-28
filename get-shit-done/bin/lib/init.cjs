@@ -505,14 +505,29 @@ function cmdInitMilestoneOp(cwd, raw) {
   const config = loadConfig(cwd);
   const milestone = getMilestoneInfo(cwd);
 
-  // Count phases
+  // Count phases — use ROADMAP as source of truth, fall back to directories
   let phaseCount = 0;
   let completedPhases = 0;
   const phasesDir = path.join(cwd, '.planning', 'phases');
+
+  // First: count phases from ROADMAP (includes unplanned phases) (#754)
+  const roadmapPath = path.join(cwd, '.planning', 'ROADMAP.md');
+  let roadmapPhaseCount = 0;
+  if (fs.existsSync(roadmapPath)) {
+    try {
+      const roadmapContent = fs.readFileSync(roadmapPath, 'utf-8');
+      const phasePattern = /#{2,4}\s*Phase\s+\d+[A-Z]?(?:\.\d+)*\s*:/gi;
+      const matches = roadmapContent.match(phasePattern);
+      if (matches) roadmapPhaseCount = matches.length;
+    } catch {}
+  }
+
+  // Count directories and completed phases from disk
+  let dirCount = 0;
   try {
     const entries = fs.readdirSync(phasesDir, { withFileTypes: true });
     const dirs = entries.filter(e => e.isDirectory()).map(e => e.name);
-    phaseCount = dirs.length;
+    dirCount = dirs.length;
 
     // Count phases with summaries (completed)
     for (const dir of dirs) {
@@ -523,6 +538,9 @@ function cmdInitMilestoneOp(cwd, raw) {
       } catch {}
     }
   } catch {}
+
+  // Use the higher of ROADMAP count vs directory count
+  phaseCount = Math.max(roadmapPhaseCount, dirCount);
 
   // Check archive
   const archiveDir = path.join(cwd, '.planning', 'archive');

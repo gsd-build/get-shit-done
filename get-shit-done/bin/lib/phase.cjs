@@ -783,7 +783,7 @@ function cmdPhaseComplete(cwd, phaseNum, raw) {
     }
   }
 
-  // Find next phase
+  // Find next phase — check directories first, then fall back to ROADMAP
   let nextPhaseNum = null;
   let nextPhaseName = null;
   let isLastPhase = true;
@@ -805,6 +805,24 @@ function cmdPhaseComplete(cwd, phaseNum, raw) {
       }
     }
   } catch {}
+
+  // If no next directory found, check ROADMAP for unplanned phases (#754)
+  // Phases listed in the ROADMAP may not have directories yet
+  if (isLastPhase && fs.existsSync(roadmapPath)) {
+    try {
+      const roadmapContent = fs.readFileSync(roadmapPath, 'utf-8');
+      const phasePattern = /#{2,4}\s*Phase\s+(\d+[A-Z]?(?:\.\d+)*)\s*:\s*([^\n]+)/gi;
+      let rmMatch;
+      while ((rmMatch = phasePattern.exec(roadmapContent)) !== null) {
+        if (comparePhaseNum(rmMatch[1], phaseNum) > 0) {
+          nextPhaseNum = rmMatch[1];
+          nextPhaseName = rmMatch[2].replace(/\(INSERTED\)/i, '').trim();
+          isLastPhase = false;
+          break;
+        }
+      }
+    } catch {}
+  }
 
   // Update STATE.md
   if (fs.existsSync(statePath)) {
