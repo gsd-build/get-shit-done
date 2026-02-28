@@ -60,6 +60,12 @@ Recent decisions affecting current work:
 
 None yet.
 
+### Active Bugs
+
+[From .planning/bugs/ — reported via /gsd:report-bug]
+
+None yet.
+
 ### Blockers/Concerns
 
 [Issues that affect future work]
@@ -149,6 +155,11 @@ Updated after each plan completion.
 - Count of pending todos
 - Reference to .planning/todos/pending/
 - Brief list if few, count if many (e.g., "5 pending todos — see /gsd:check-todos")
+
+**Active Bugs:** Bugs reported via /gsd:report-bug
+- Count of active bugs by severity
+- Reference to .planning/bugs/
+- Brief list if few, count if many (e.g., "2 active bugs (1 high, 1 medium)")
 
 **Blockers/Concerns:** From "Next Phase Readiness" sections
 - Issues that affect future work

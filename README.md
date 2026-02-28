@@ -514,6 +514,7 @@ You're never locked in. The system adapts.
 |---------|--------------|
 | `/gsd:settings` | Configure model profile and workflow agents |
 | `/gsd:set-profile <profile>` | Switch model profile (quality/balanced/budget) |
+| `/gsd:report-bug [desc]` | Report bug with severity tracking and GitHub issue creation |
 | `/gsd:add-todo [desc]` | Capture idea for later |
 | `/gsd:check-todos` | List pending todos |
 | `/gsd:debug [desc]` | Systematic debugging with persistent state |

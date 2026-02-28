@@ -241,6 +241,26 @@ Systematic debugging with persistent state across context resets.
 Usage: `/gsd:debug "login button doesn't work"`
 Usage: `/gsd:debug` (resume active session)
 
+### Bug Tracking
+
+**`/gsd:report-bug [description]`**
+Report and track a bug with structured format and severity classification.
+
+- Gathers bug details (title, actual/expected behavior, repro steps)
+- Infers severity from keywords (critical/high/medium/low)
+- Captures diagnostic logs (git state, error output, log files)
+- Creates structured bug file in `.planning/bugs/`
+- Optionally creates GitHub issue via `gh` CLI
+- Routes to next action (investigate, plan fix, continue)
+
+Usage: `/gsd:report-bug "login button crashes on click"`
+Usage: `/gsd:report-bug` (infers from conversation)
+
+Manage bugs via CLI:
+- `gsd-tools bug list [--area X] [--severity Y] [--status Z]`
+- `gsd-tools bug update <id> --status <status>`
+- `gsd-tools bug resolve <id>`
+
 ### Todo Management
 
 **`/gsd:add-todo [description]`**
@@ -381,6 +401,8 @@ Usage: `/gsd:join-discord`
 ├── todos/                # Captured ideas and tasks
 │   ├── pending/          # Todos waiting to be worked on
 │   └── done/             # Completed todos
+├── bugs/                 # Active bug reports
+│   └── resolved/         # Resolved bugs
 ├── debug/                # Active debug sessions
 │   └── resolved/         # Archived resolved issues
 ├── milestones/
@@ -493,6 +515,13 @@ Example config:
 /gsd:add-todo Fix modal z-index  # Capture with explicit description
 /gsd:check-todos                 # Review and work on todos
 /gsd:check-todos api             # Filter by area
+```
+
+**Tracking bugs:**
+
+```
+/gsd:report-bug "login crashes on submit"   # Report a bug
+/gsd:report-bug                              # Report from conversation context
 ```
 
 **Debugging an issue:**

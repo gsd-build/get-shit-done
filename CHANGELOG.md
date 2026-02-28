@@ -6,6 +6,15 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ## [Unreleased]
 
+### Added
+- `/gsd:report-bug` command for structured bug reporting with severity tracking, diagnostic log capture, and GitHub issue creation
+  - `gsd-tools bug list/update/resolve` CLI commands for bug management
+  - `gsd-tools init bugs` and `scaffold bugs` for workflow bootstrapping
+  - Severity inference from keywords (critical/high/medium/low)
+  - Automatic diagnostic capture (git state, log files, error output)
+  - Optional GitHub issue creation via `gh` CLI
+  - Bug lifecycle: reported → investigating → fixing → resolved
+
 ## [1.22.0] - 2026-02-27
 
 ### Added
