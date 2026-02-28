@@ -19,7 +19,7 @@ Load all context in one call:
 INIT=$(node "$HOME/.claude/get-shit-done/bin/gsd-tools.cjs" init execute-phase "${PHASE_ARG}")
 ```
 
-Parse JSON for: `executor_model`, `verifier_model`, `commit_docs`, `parallelization`, `branching_strategy`, `branch_name`, `phase_found`, `phase_dir`, `phase_number`, `phase_name`, `phase_slug`, `plans`, `incomplete_plans`, `plan_count`, `incomplete_count`, `state_exists`, `roadmap_exists`, `phase_req_ids`.
+Parse JSON for: `executor_model`, `verifier_model`, `commit_docs`, `parallelization`, `branching_strategy`, `branch_name`, `phase_found`, `phase_dir`, `phase_number`, `phase_name`, `phase_slug`, `plans`, `incomplete_plans`, `plan_count`, `incomplete_count`, `state_exists`, `roadmap_exists`, `phase_req_ids`, `state_path`, `roadmap_path`, `config_path`, `planning_base`, `milestone`, `is_multi_milestone`.
 
 **If `phase_found` is false:** Error — phase directory not found.
 **If `plan_count` is 0:** Error — no plans found in phase.
@@ -119,8 +119,8 @@ Execute each wave in sequence. Within a wave: parallel if `PARALLELIZATION=true`
        <files_to_read>
        Read these files at execution start using the Read tool:
        - {phase_dir}/{plan_file} (Plan)
-       - .planning/STATE.md (State)
-       - .planning/config.json (Config, if exists)
+       - {state_path} (State)
+       - {config_path} (Config, if exists)
        - ./CLAUDE.md (Project instructions, if exists — follow project-specific guidelines and coding conventions)
        - .claude/skills/ or .agents/skills/ (Project skills, if either exists — list skills, read SKILL.md for each, follow relevant rules during implementation)
        </files_to_read>
@@ -371,7 +371,7 @@ The CLI handles:
 Extract from result: `next_phase`, `next_phase_name`, `is_last_phase`.
 
 ```bash
-node "$HOME/.claude/get-shit-done/bin/gsd-tools.cjs" commit "docs(phase-{X}): complete phase execution" --files .planning/ROADMAP.md .planning/STATE.md .planning/REQUIREMENTS.md {phase_dir}/*-VERIFICATION.md
+node "$HOME/.claude/get-shit-done/bin/gsd-tools.cjs" commit "docs(phase-{X}): complete phase execution" --files {roadmap_path} {state_path} {planning_base}/REQUIREMENTS.md {phase_dir}/*-VERIFICATION.md
 ```
 </step>
 

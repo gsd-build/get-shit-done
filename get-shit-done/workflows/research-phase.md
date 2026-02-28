@@ -25,8 +25,9 @@ If `found` is false: Error and exit.
 
 ## Step 2: Check Existing Research
 
+Use `directory` from `PHASE_INFO` (step 1):
 ```bash
-ls .planning/phases/${PHASE}-*/RESEARCH.md 2>/dev/null
+ls ${PHASE_INFO.directory}/RESEARCH.md 2>/dev/null
 ```
 
 If exists: Offer update/view/skip options.
@@ -35,7 +36,7 @@ If exists: Offer update/view/skip options.
 
 ```bash
 INIT=$(node "$HOME/.claude/get-shit-done/bin/gsd-tools.cjs" init phase-op "${PHASE}")
-# Extract: phase_dir, padded_phase, phase_number, state_path, requirements_path, context_path
+# Extract: phase_dir, padded_phase, phase_number, state_path, requirements_path, context_path, planning_base
 ```
 
 ## Step 4: Spawn Researcher
@@ -57,7 +58,7 @@ Phase description: {description}
 </additional_context>
 
 <output>
-Write to: .planning/phases/${PHASE}-{slug}/${PHASE}-RESEARCH.md
+Write to: ${phase_dir}/${PHASE}-RESEARCH.md
 </output>",
   subagent_type="gsd-phase-researcher",
   model="{researcher_model}"

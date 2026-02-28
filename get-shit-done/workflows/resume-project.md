@@ -23,7 +23,7 @@ Load all context in one call:
 INIT=$(node "$HOME/.claude/get-shit-done/bin/gsd-tools.cjs" init resume)
 ```
 
-Parse JSON for: `state_exists`, `roadmap_exists`, `project_exists`, `planning_exists`, `has_interrupted_agent`, `interrupted_agent_id`, `commit_docs`.
+Parse JSON for: `state_exists`, `roadmap_exists`, `project_exists`, `planning_exists`, `has_interrupted_agent`, `interrupted_agent_id`, `commit_docs`, `state_path`, `roadmap_path`, `project_path`, `planning_base`.
 
 **If `state_exists` is true:** Proceed to load_state
 **If `state_exists` is false but `roadmap_exists` or `project_exists` is true:** Offer to reconstruct STATE.md
@@ -35,8 +35,8 @@ Parse JSON for: `state_exists`, `roadmap_exists`, `project_exists`, `planning_ex
 Read and parse STATE.md, then PROJECT.md:
 
 ```bash
-cat .planning/STATE.md
-cat .planning/PROJECT.md
+cat "${state_path}"
+cat "${project_path}"
 ```
 
 **From STATE.md extract:**
@@ -63,10 +63,10 @@ Look for incomplete work that needs attention:
 
 ```bash
 # Check for continue-here files (mid-plan resumption)
-ls .planning/phases/*/.continue-here*.md 2>/dev/null
+ls "${planning_base}"/phases/*/.continue-here*.md 2>/dev/null
 
 # Check for plans without summaries (incomplete execution)
-for plan in .planning/phases/*/*-PLAN.md; do
+for plan in "${planning_base}"/phases/*/*-PLAN.md; do
   summary="${plan/PLAN/SUMMARY}"
   [ ! -f "$summary" ] && echo "Incomplete: $plan"
 done 2>/dev/null
@@ -196,7 +196,7 @@ What would you like to do?
 **Note:** When offering phase planning, check for CONTEXT.md existence first:
 
 ```bash
-ls .planning/phases/XX-name/*-CONTEXT.md 2>/dev/null
+ls "${planning_base}"/phases/XX-name/*-CONTEXT.md 2>/dev/null
 ```
 
 If missing, suggest discuss-phase before plan. If exists, offer plan directly.

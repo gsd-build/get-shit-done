@@ -11,6 +11,8 @@ const fs = require('fs');
 const path = require('path');
 const os = require('os');
 
+const { execSync } = require('child_process');
+
 const {
   loadConfig,
   resolveModelInternal,
@@ -21,6 +23,7 @@ const {
   comparePhaseNum,
   safeReadFile,
   pathExistsInternal,
+  isGitIgnored,
   getMilestoneInfo,
   getRoadmapPhaseInternal,
   searchPhaseInDir,
@@ -663,5 +666,46 @@ describe('getRoadmapPhaseInternal', () => {
     assert.ok(result.section.includes('Some details here'));
     // Should not include Phase 2 content
     assert.ok(!result.section.includes('Phase 2: API'));
+  });
+});
+
+// ─── isGitIgnored ──────────────────────────────────────────────────────────────
+
+// Regression test for https://github.com/gsd-build/get-shit-done/issues/703
+describe('isGitIgnored', () => {
+  let tmpDir;
+
+  beforeEach(() => {
+    tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), 'gsd-gitignore-test-'));
+    execSync('git init', { cwd: tmpDir, stdio: 'pipe' });
+    execSync('git config user.email "test@test.com"', { cwd: tmpDir, stdio: 'pipe' });
+    execSync('git config user.name "Test"', { cwd: tmpDir, stdio: 'pipe' });
+  });
+
+  afterEach(() => {
+    fs.rmSync(tmpDir, { recursive: true, force: true });
+  });
+
+  test('returns true for untracked file matching .gitignore', () => {
+    fs.writeFileSync(path.join(tmpDir, '.gitignore'), '.planning\n');
+    fs.mkdirSync(path.join(tmpDir, '.planning'));
+    assert.strictEqual(isGitIgnored(tmpDir, '.planning'), true);
+  });
+
+  test('returns false for untracked file not in .gitignore', () => {
+    fs.writeFileSync(path.join(tmpDir, '.gitignore'), '');
+    fs.mkdirSync(path.join(tmpDir, '.planning'));
+    assert.strictEqual(isGitIgnored(tmpDir, '.planning'), false);
+  });
+
+  test('returns true for tracked file that is in .gitignore (#703)', () => {
+    // Simulate: .planning was committed before being added to .gitignore
+    fs.mkdirSync(path.join(tmpDir, '.planning'));
+    fs.writeFileSync(path.join(tmpDir, '.planning', 'test.txt'), 'tracked');
+    execSync('git add .', { cwd: tmpDir, stdio: 'pipe' });
+    execSync('git commit -m "add planning"', { cwd: tmpDir, stdio: 'pipe' });
+    // Now add to .gitignore — without --no-index this would return false
+    fs.writeFileSync(path.join(tmpDir, '.gitignore'), '.planning\n');
+    assert.strictEqual(isGitIgnored(tmpDir, '.planning'), true);
   });
 });
