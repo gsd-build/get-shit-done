@@ -400,6 +400,45 @@ describe('cmdInitMilestoneOp', () => {
     assert.strictEqual(output.all_phases_complete, true);
   });
 
+  test('phase_count includes unplanned ROADMAP phases (#754)', () => {
+    // Bug #754: phase_count only counted directories, missing unplanned phases
+    fs.writeFileSync(
+      path.join(tmpDir, '.planning', 'ROADMAP.md'),
+      `# Roadmap
+
+### Phase 8: Format Confirmation
+**Goal:** Confirm formatting
+
+### Phase 9: Rules Re-evaluation
+**Goal:** Re-evaluate rules
+
+### Phase 10: Structure Analysis
+**Goal:** Analyze structure
+
+### Phase 11: Final Review
+**Goal:** Final review
+`
+    );
+
+    // Only 2 of 4 phases have directories
+    const p8 = path.join(tmpDir, '.planning', 'phases', '08-format-confirmation');
+    fs.mkdirSync(p8, { recursive: true });
+    fs.writeFileSync(path.join(p8, '08-01-PLAN.md'), '# Plan');
+    fs.writeFileSync(path.join(p8, '08-01-SUMMARY.md'), '# Summary');
+    const p9 = path.join(tmpDir, '.planning', 'phases', '09-rules-re-evaluation');
+    fs.mkdirSync(p9, { recursive: true });
+    fs.writeFileSync(path.join(p9, '09-01-PLAN.md'), '# Plan');
+    fs.writeFileSync(path.join(p9, '09-01-SUMMARY.md'), '# Summary');
+
+    const result = runGsdTools('init milestone-op', tmpDir);
+    assert.ok(result.success, `Command failed: ${result.error}`);
+
+    const output = JSON.parse(result.output);
+    assert.strictEqual(output.phase_count, 4, 'should count all 4 ROADMAP phases, not just 2 directories');
+    assert.strictEqual(output.completed_phases, 2);
+    assert.strictEqual(output.all_phases_complete, false, 'should NOT be all complete — 2 of 4 phases done');
+  });
+
   test('archive directory scanning', () => {
     fs.mkdirSync(path.join(tmpDir, '.planning', 'archive', 'v1.0'), { recursive: true });
     fs.mkdirSync(path.join(tmpDir, '.planning', 'archive', 'v0.9'), { recursive: true });

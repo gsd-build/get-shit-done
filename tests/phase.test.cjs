@@ -1037,6 +1037,61 @@ describe('phase complete command', () => {
     assert.ok(state.includes('Milestone complete'), 'status should be milestone complete');
   });
 
+  test('detects unplanned phases from ROADMAP — not last phase (#754)', () => {
+    // Bug #754: phases in ROADMAP but without directories were invisible,
+    // causing premature "milestone complete" after earlier phases
+    fs.writeFileSync(
+      path.join(tmpDir, '.planning', 'ROADMAP.md'),
+      `# Roadmap
+
+- [ ] Phase 8: Format Confirmation
+- [ ] Phase 9: Rules Re-evaluation
+- [ ] Phase 10: Structure Analysis
+- [ ] Phase 11: Final Review
+
+### Phase 8: Format Confirmation
+**Goal:** Confirm formatting
+**Plans:** 1 plans
+
+### Phase 9: Rules Re-evaluation
+**Goal:** Re-evaluate rules
+
+### Phase 10: Structure Analysis
+**Goal:** Analyze structure
+
+### Phase 11: Final Review
+**Goal:** Final review
+`
+    );
+    fs.writeFileSync(
+      path.join(tmpDir, '.planning', 'STATE.md'),
+      `# State\n\n**Current Phase:** 09\n**Current Phase Name:** Rules Re-evaluation\n**Status:** In progress\n**Current Plan:** 09-01\n**Last Activity:** 2025-01-01\n**Last Activity Description:** Working on phase 9\n`
+    );
+
+    // Only phases 8 and 9 have directories — 10 and 11 are unplanned
+    const p8 = path.join(tmpDir, '.planning', 'phases', '08-format-confirmation');
+    fs.mkdirSync(p8, { recursive: true });
+    fs.writeFileSync(path.join(p8, '08-01-PLAN.md'), '# Plan');
+    fs.writeFileSync(path.join(p8, '08-01-SUMMARY.md'), '# Summary');
+
+    const p9 = path.join(tmpDir, '.planning', 'phases', '09-rules-re-evaluation');
+    fs.mkdirSync(p9, { recursive: true });
+    fs.writeFileSync(path.join(p9, '09-01-PLAN.md'), '# Plan');
+    fs.writeFileSync(path.join(p9, '09-01-SUMMARY.md'), '# Summary');
+
+    const result = runGsdTools('phase complete 9', tmpDir);
+    assert.ok(result.success, `Command failed: ${result.error}`);
+
+    const output = JSON.parse(result.output);
+    assert.strictEqual(output.is_last_phase, false, 'should NOT be last phase — phases 10-11 exist in ROADMAP');
+    assert.strictEqual(output.next_phase, '10', 'next phase should be 10 from ROADMAP');
+    assert.strictEqual(output.next_phase_name, 'Structure Analysis', 'next phase name from ROADMAP');
+
+    const state = fs.readFileSync(path.join(tmpDir, '.planning', 'STATE.md'), 'utf-8');
+    assert.ok(state.includes('**Status:** Ready to plan'), 'status should be ready to plan, not milestone complete');
+    assert.ok(state.includes('**Current Phase:** 10'), 'should advance to phase 10');
+  });
+
   test('updates REQUIREMENTS.md traceability when phase completes', () => {
     fs.writeFileSync(
       path.join(tmpDir, '.planning', 'ROADMAP.md'),
