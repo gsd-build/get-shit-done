@@ -169,7 +169,7 @@ rm -f ./.claude/cache/gsd-update-check.json
 rm -f ~/.claude/cache/gsd-update-check.json
 ```
 
-The SessionStart hook (`gsd-check-update.js`) always writes to `~/.claude/cache/` via `os.homedir()` regardless of install type, so both paths must be cleared to prevent stale update indicators.
+The SessionStart hook (`gsd-check-update.cjs`) always writes to `~/.claude/cache/` via `os.homedir()` regardless of install type, so both paths must be cleared to prevent stale update indicators.
 </step>
 
 <step name="display_result">

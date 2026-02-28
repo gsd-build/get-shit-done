@@ -31,13 +31,13 @@ To avoid spamming the agent with repeated warnings:
 ## Architecture
 
 ```
-Statusline Hook (gsd-statusline.js)
+Statusline Hook (gsd-statusline.cjs)
     | writes
     v
 /tmp/claude-ctx-{session_id}.json
     ^ reads
     |
-Context Monitor (gsd-context-monitor.js, PostToolUse)
+Context Monitor (gsd-context-monitor.cjs, PostToolUse)
     | injects
     v
 additionalContext -> Agent sees warning
@@ -71,7 +71,7 @@ Manual registration in `~/.claude/settings.json`:
 {
   "statusLine": {
     "type": "command",
-    "command": "node ~/.claude/hooks/gsd-statusline.js"
+    "command": "node ~/.claude/hooks/gsd-statusline.cjs"
   },
   "hooks": {
     "PostToolUse": [
@@ -79,7 +79,7 @@ Manual registration in `~/.claude/settings.json`:
         "hooks": [
           {
             "type": "command",
-            "command": "node ~/.claude/hooks/gsd-context-monitor.js"
+            "command": "node ~/.claude/hooks/gsd-context-monitor.cjs"
           }
         ]
       }
