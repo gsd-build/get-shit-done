@@ -8,6 +8,97 @@ const fs = require('fs');
 const path = require('path');
 const { runGsdTools, createTempProject, cleanup } = require('./helpers.cjs');
 
+// ─── resolve-adaptive-model CLI ─────────────────────────────────────────────
+
+describe('resolve-adaptive-model command', () => {
+  let tmpDir;
+
+  beforeEach(() => {
+    tmpDir = createTempProject();
+  });
+
+  afterEach(() => {
+    cleanup(tmpDir);
+  });
+
+  test('returns model and complexity for adaptive profile', () => {
+    fs.writeFileSync(
+      path.join(tmpDir, '.planning', 'config.json'),
+      JSON.stringify({ model_profile: 'adaptive' })
+    );
+    const ctx = JSON.stringify({ files_modified: ['a.js'], task_count: 1, objective: 'fix typo' });
+    const result = runGsdTools(['resolve-adaptive-model', 'gsd-executor', '--context', ctx], tmpDir);
+    assert.ok(result.success, `Command failed: ${result.error}`);
+
+    const output = JSON.parse(result.output);
+    assert.strictEqual(output.model, 'haiku');
+    assert.strictEqual(output.profile, 'adaptive');
+    assert.ok(output.complexity);
+    assert.strictEqual(output.complexity.tier, 'simple');
+  });
+
+  test('falls back to balanced behavior when not adaptive', () => {
+    fs.writeFileSync(
+      path.join(tmpDir, '.planning', 'config.json'),
+      JSON.stringify({ model_profile: 'balanced' })
+    );
+    const ctx = JSON.stringify({ files_modified: ['a.js'], task_count: 1, objective: 'fix typo' });
+    const result = runGsdTools(['resolve-adaptive-model', 'gsd-executor', '--context', ctx], tmpDir);
+    assert.ok(result.success, `Command failed: ${result.error}`);
+
+    const output = JSON.parse(result.output);
+    assert.strictEqual(output.model, 'sonnet');
+    assert.strictEqual(output.profile, 'balanced');
+    assert.strictEqual(output.complexity, undefined);
+  });
+
+  test('adaptive with log_selections true creates usage log', () => {
+    fs.writeFileSync(
+      path.join(tmpDir, '.planning', 'config.json'),
+      JSON.stringify({ model_profile: 'adaptive', adaptive_settings: { log_selections: true } })
+    );
+    const ctx = JSON.stringify({ files_modified: ['a.js'], task_count: 1, objective: 'fix typo' });
+    const result = runGsdTools(['resolve-adaptive-model', 'gsd-executor', '--context', ctx], tmpDir);
+    assert.ok(result.success, `Command failed: ${result.error}`);
+
+    const logPath = path.join(tmpDir, '.planning', 'adaptive-usage.json');
+    assert.ok(fs.existsSync(logPath), 'adaptive-usage.json should exist');
+    const log = JSON.parse(fs.readFileSync(logPath, 'utf-8'));
+    assert.strictEqual(log.length, 1);
+    assert.strictEqual(log[0].agent, 'gsd-executor');
+    assert.strictEqual(log[0].tier, 'simple');
+    assert.strictEqual(typeof log[0].timestamp, 'string');
+    assert.strictEqual(log[0].model, 'haiku');
+  });
+
+  test('adaptive with log_selections false does not create log', () => {
+    fs.writeFileSync(
+      path.join(tmpDir, '.planning', 'config.json'),
+      JSON.stringify({ model_profile: 'adaptive', adaptive_settings: { log_selections: false } })
+    );
+    const ctx = JSON.stringify({ files_modified: ['a.js'], task_count: 1, objective: 'fix typo' });
+    const result = runGsdTools(['resolve-adaptive-model', 'gsd-executor', '--context', ctx], tmpDir);
+    assert.ok(result.success, `Command failed: ${result.error}`);
+
+    const logPath = path.join(tmpDir, '.planning', 'adaptive-usage.json');
+    assert.ok(!fs.existsSync(logPath), 'adaptive-usage.json should not exist');
+  });
+
+  test('non-adaptive profile does not create log regardless of settings', () => {
+    fs.writeFileSync(
+      path.join(tmpDir, '.planning', 'config.json'),
+      JSON.stringify({ model_profile: 'balanced', adaptive_settings: { log_selections: true } })
+    );
+    const ctx = JSON.stringify({ files_modified: ['a.js'], task_count: 1, objective: 'fix typo' });
+    const result = runGsdTools(['resolve-adaptive-model', 'gsd-executor', '--context', ctx], tmpDir);
+    assert.ok(result.success, `Command failed: ${result.error}`);
+
+    const logPath = path.join(tmpDir, '.planning', 'adaptive-usage.json');
+    assert.ok(!fs.existsSync(logPath), 'adaptive-usage.json should not exist for non-adaptive');
+  });
+});
+
+
 describe('history-digest command', () => {
   let tmpDir;
 

@@ -7,6 +7,15 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 ## [Unreleased]
 
 ### Added
+- **Adaptive model profile** — fourth model profile (`adaptive`) that auto-selects models per-plan based on complexity evaluation (#210)
+  - `evaluateComplexity()` scores plan metadata (files modified, task count, objective keywords, plan type, dependencies) on 0-10+ scale
+  - Three tiers: Simple (haiku/sonnet), Medium (sonnet/opus), Complex (opus/sonnet)
+  - `adaptive_settings` config: `min_model`/`max_model` clamping, `log_selections` usage logging
+  - `resolve-adaptive-model` CLI command with `--context` for per-plan resolution
+  - `init plan-phase` and `init quick` now return `model_profile` and `adaptive_settings` for workflow use
+  - Plan index includes `type` and `depends_on` for enriched complexity evaluation
+  - Verifier uses per-plan adaptive resolution when in adaptive mode
+  - Full backward compatibility — non-adaptive profiles unaffected
 - `/gsd:report-bug` command for structured bug reporting with severity tracking, diagnostic log capture, and GitHub issue creation
   - `gsd-tools bug list/update/resolve` CLI commands for bug management
   - `gsd-tools init bugs` and `scaffold bugs` for workflow bootstrapping

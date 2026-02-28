@@ -30,6 +30,136 @@ const MODEL_PROFILES = {
   'gsd-integration-checker':  { quality: 'sonnet', balanced: 'sonnet', budget: 'haiku' },
 };
 
+// ─── Adaptive Model Tiers ───────────────────────────────────────────────────
+
+const ADAPTIVE_TIERS = {
+  simple: {
+    'gsd-planner':              'sonnet',
+    'gsd-roadmapper':           'sonnet',
+    'gsd-executor':             'haiku',
+    'gsd-phase-researcher':     'haiku',
+    'gsd-project-researcher':   'haiku',
+    'gsd-research-synthesizer': 'haiku',
+    'gsd-debugger':             'sonnet',
+    'gsd-codebase-mapper':      'haiku',
+    'gsd-verifier':             'haiku',
+    'gsd-plan-checker':         'haiku',
+    'gsd-integration-checker':  'haiku',
+  },
+  medium: {
+    'gsd-planner':              'opus',
+    'gsd-roadmapper':           'sonnet',
+    'gsd-executor':             'sonnet',
+    'gsd-phase-researcher':     'sonnet',
+    'gsd-project-researcher':   'sonnet',
+    'gsd-research-synthesizer': 'sonnet',
+    'gsd-debugger':             'sonnet',
+    'gsd-codebase-mapper':      'haiku',
+    'gsd-verifier':             'sonnet',
+    'gsd-plan-checker':         'sonnet',
+    'gsd-integration-checker':  'sonnet',
+  },
+  complex: {
+    'gsd-planner':              'opus',
+    'gsd-roadmapper':           'opus',
+    'gsd-executor':             'sonnet',
+    'gsd-phase-researcher':     'opus',
+    'gsd-project-researcher':   'opus',
+    'gsd-research-synthesizer': 'sonnet',
+    'gsd-debugger':             'opus',
+    'gsd-codebase-mapper':      'sonnet',
+    'gsd-verifier':             'sonnet',
+    'gsd-plan-checker':         'sonnet',
+    'gsd-integration-checker':  'sonnet',
+  },
+};
+
+// ─── Complexity Evaluation ──────────────────────────────────────────────────
+
+const MODEL_RANK = { haiku: 0, sonnet: 1, opus: 2 };
+const RANK_MODEL = ['haiku', 'sonnet', 'opus'];
+
+function evaluateComplexity(context) {
+  if (!context) {
+    return { score: 5, tier: 'medium', factors: ['default (no context)'] };
+  }
+
+  let score = 0;
+  const factors = [];
+
+  // Files modified: 1pt each, max 5
+  const filesCount = Array.isArray(context.files_modified) ? context.files_modified.length : 0;
+  const filesPts = Math.min(filesCount, 5);
+  if (filesPts > 0) {
+    score += filesPts;
+    factors.push(`files_modified: ${filesCount} (+${filesPts})`);
+  }
+
+  // Task count: 3-5 = 1pt, 6+ = 2pts
+  const taskCount = typeof context.task_count === 'number' ? context.task_count : 0;
+  if (taskCount >= 6) {
+    score += 2;
+    factors.push(`task_count: ${taskCount} (+2)`);
+  } else if (taskCount >= 3) {
+    score += 1;
+    factors.push(`task_count: ${taskCount} (+1)`);
+  }
+
+  // Keyword scoring on objective
+  const obj = typeof context.objective === 'string' ? context.objective.toLowerCase() : '';
+
+  if (/architect|system[\s._-]design|data[\s._-]model/.test(obj)) {
+    score += 3;
+    factors.push('architecture keywords (+3)');
+  }
+  if (/integrat|external[\s._-]api|third[\s._-]party|webhook/.test(obj)) {
+    score += 2;
+    factors.push('integration keywords (+2)');
+  }
+  if (/cross[\s._-]cutting|multiple[\s._-]modules|refactor[\s._-]across/.test(obj)) {
+    score += 2;
+    factors.push('cross-cutting keywords (+2)');
+  }
+  if (/new[\s._-]library|unfamiliar|prototype/.test(obj)) {
+    score += 3;
+    factors.push('novel pattern keywords (+3)');
+  }
+  if (/refactor|restructure|migrate/.test(obj)) {
+    score += 1;
+    factors.push('refactoring keywords (+1)');
+  }
+
+  // Plan type: TDD plans are inherently more complex
+  if (context.plan_type === 'tdd') {
+    score += 2;
+    factors.push('tdd plan type (+2)');
+  }
+
+  // Dependencies: plans that integrate previous outputs
+  const depsCount = Array.isArray(context.depends_on) ? context.depends_on.length : 0;
+  if (depsCount > 0) {
+    score += 1;
+    factors.push(`depends_on: ${depsCount} deps (+1)`);
+  }
+
+  // Test files in modified list
+  const testFileCount = Array.isArray(context.files_modified)
+    ? context.files_modified.filter(f => /\.(test|spec)\.[tj]sx?$|__tests__/.test(f)).length
+    : 0;
+  if (testFileCount > 0) {
+    score += 1;
+    factors.push(`test_files: ${testFileCount} (+1)`);
+  }
+
+  // Determine tier
+  let tier;
+  if (score <= 3) tier = 'simple';
+  else if (score <= 7) tier = 'medium';
+  else tier = 'complex';
+
+  return { score, tier, factors };
+}
+
 // ─── Output helpers ───────────────────────────────────────────────────────────
 
 function output(result, raw, rawValue) {
@@ -116,6 +246,7 @@ function loadConfig(cwd, paths) {
       parallelization,
       brave_search: get('brave_search') ?? defaults.brave_search,
       model_overrides: parsed.model_overrides || null,
+      adaptive_settings: parsed.adaptive_settings || null,
     };
   } catch {
     return defaults;
@@ -360,7 +491,7 @@ function getRoadmapPhaseInternal(cwd, phaseNum, paths) {
   }
 }
 
-function resolveModelInternal(cwd, agentType) {
+function resolveModelInternal(cwd, agentType, context) {
   const config = loadConfig(cwd);
 
   // Check per-agent override first
@@ -371,6 +502,30 @@ function resolveModelInternal(cwd, agentType) {
 
   // Fall back to profile lookup
   const profile = config.model_profile || 'balanced';
+
+  // Adaptive profile: evaluate complexity and select from tier
+  if (profile === 'adaptive') {
+    const complexity = evaluateComplexity(context || null);
+    const tierModels = ADAPTIVE_TIERS[complexity.tier];
+    let resolved = (tierModels && tierModels[agentType]) || 'sonnet';
+
+    // Clamp to min_model / max_model bounds
+    const settings = config.adaptive_settings;
+    if (settings) {
+      const resolvedRank = MODEL_RANK[resolved] ?? 1;
+      if (settings.min_model && MODEL_RANK[settings.min_model] !== undefined) {
+        const minRank = MODEL_RANK[settings.min_model];
+        if (resolvedRank < minRank) resolved = RANK_MODEL[minRank];
+      }
+      if (settings.max_model && MODEL_RANK[settings.max_model] !== undefined) {
+        const maxRank = MODEL_RANK[settings.max_model];
+        if (resolvedRank > maxRank) resolved = RANK_MODEL[maxRank];
+      }
+    }
+
+    return resolved === 'opus' ? 'inherit' : resolved;
+  }
+
   const agentModels = MODEL_PROFILES[agentType];
   if (!agentModels) return 'sonnet';
   const resolved = agentModels[profile] || agentModels['balanced'] || 'sonnet';
@@ -467,6 +622,8 @@ function getMilestonePhaseFilter(cwd) {
 
 module.exports = {
   MODEL_PROFILES,
+  ADAPTIVE_TIERS,
+  evaluateComplexity,
   output,
   error,
   safeReadFile,

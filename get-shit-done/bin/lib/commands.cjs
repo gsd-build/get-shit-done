@@ -4,7 +4,7 @@
 const fs = require('fs');
 const path = require('path');
 const { execSync } = require('child_process');
-const { safeReadFile, loadConfig, isGitIgnored, execGit, normalizePhaseName, comparePhaseNum, getArchivedPhaseDirs, generateSlugInternal, getMilestoneInfo, resolveModelInternal, MODEL_PROFILES, output, error, findPhaseInternal } = require('./core.cjs');
+const { safeReadFile, loadConfig, isGitIgnored, execGit, normalizePhaseName, comparePhaseNum, getArchivedPhaseDirs, generateSlugInternal, getMilestoneInfo, resolveModelInternal, evaluateComplexity, MODEL_PROFILES, output, error, findPhaseInternal } = require('./core.cjs');
 const { extractFrontmatter } = require('./frontmatter.cjs');
 const { resolvePlanningPaths } = require('./paths.cjs');
 
@@ -212,6 +212,48 @@ function cmdResolveModel(cwd, agentType, raw) {
   const result = agentModels
     ? { model, profile }
     : { model, profile, unknown_agent: true };
+  output(result, raw, model);
+}
+
+function cmdResolveAdaptiveModel(cwd, agentType, context, raw) {
+  if (!agentType) {
+    error('agent-type required');
+  }
+
+  const config = loadConfig(cwd);
+  const profile = config.model_profile || 'balanced';
+  const model = resolveModelInternal(cwd, agentType, context);
+
+  const result = { model, profile };
+
+  if (profile === 'adaptive') {
+    const complexity = evaluateComplexity(context || null);
+    result.complexity = complexity;
+  }
+
+  const agentModels = MODEL_PROFILES[agentType];
+  if (!agentModels) result.unknown_agent = true;
+
+  // Usage logging
+  if (profile === 'adaptive') {
+    const settings = config.adaptive_settings;
+    if (settings?.log_selections) {
+      const logPath = path.join(cwd, '.planning', 'adaptive-usage.json');
+      try {
+        let log = [];
+        try { log = JSON.parse(fs.readFileSync(logPath, 'utf-8')); } catch {}
+        log.push({
+          timestamp: new Date().toISOString(),
+          agent: agentType,
+          tier: result.complexity?.tier || 'unknown',
+          score: result.complexity?.score ?? null,
+          model,
+        });
+        fs.writeFileSync(logPath, JSON.stringify(log, null, 2));
+      } catch {}
+    }
+  }
+
   output(result, raw, model);
 }
 
@@ -646,6 +688,7 @@ module.exports = {
   cmdVerifyPathExists,
   cmdHistoryDigest,
   cmdResolveModel,
+  cmdResolveAdaptiveModel,
   cmdCommit,
   cmdSummaryExtract,
   cmdWebsearch,

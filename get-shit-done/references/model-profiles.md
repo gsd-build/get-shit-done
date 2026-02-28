@@ -4,19 +4,21 @@ Model profiles control which Claude model each GSD agent uses. This allows balan
 
 ## Profile Definitions
 
-| Agent | `quality` | `balanced` | `budget` |
-|-------|-----------|------------|----------|
-| gsd-planner | opus | opus | sonnet |
-| gsd-roadmapper | opus | sonnet | sonnet |
-| gsd-executor | opus | sonnet | sonnet |
-| gsd-phase-researcher | opus | sonnet | haiku |
-| gsd-project-researcher | opus | sonnet | haiku |
-| gsd-research-synthesizer | sonnet | sonnet | haiku |
-| gsd-debugger | opus | sonnet | sonnet |
-| gsd-codebase-mapper | sonnet | haiku | haiku |
-| gsd-verifier | sonnet | sonnet | haiku |
-| gsd-plan-checker | sonnet | sonnet | haiku |
-| gsd-integration-checker | sonnet | sonnet | haiku |
+| Agent | `quality` | `balanced` | `budget` | `adaptive` |
+|-------|-----------|------------|----------|------------|
+| gsd-planner | opus | opus | sonnet | sonnet→opus |
+| gsd-roadmapper | opus | sonnet | sonnet | sonnet→opus |
+| gsd-executor | opus | sonnet | sonnet | haiku→sonnet |
+| gsd-phase-researcher | opus | sonnet | haiku | haiku→opus |
+| gsd-project-researcher | opus | sonnet | haiku | haiku→opus |
+| gsd-research-synthesizer | sonnet | sonnet | haiku | haiku→sonnet |
+| gsd-debugger | opus | sonnet | sonnet | sonnet→opus |
+| gsd-codebase-mapper | sonnet | haiku | haiku | haiku→sonnet |
+| gsd-verifier | sonnet | sonnet | haiku | haiku→sonnet |
+| gsd-plan-checker | sonnet | sonnet | haiku | haiku→sonnet |
+| gsd-integration-checker | sonnet | sonnet | haiku | haiku→sonnet |
+
+*Adaptive column shows the range: simple tier → complex tier. Actual model depends on per-plan complexity evaluation.*
 
 ## Profile Philosophy
 
@@ -36,6 +38,14 @@ Model profiles control which Claude model each GSD agent uses. This allows balan
 - Haiku for research and verification
 - Use when: conserving quota, high-volume work, less critical phases
 
+**adaptive** - Per-plan complexity-based selection
+- Evaluates plan metadata (files, tasks, objective keywords) to score complexity 0-10+
+- Simple plans (0-3): haiku for executors, sonnet for planners
+- Medium plans (4-7): sonnet across the board
+- Complex plans (8+): opus for planners/researchers, sonnet for executors
+- Use when: mixed-complexity projects, optimizing cost without manual profile switching
+- See `references/adaptive-model-selection.md` for full algorithm
+
 ## Resolution Logic
 
 Orchestrators resolve model before spawning:
@@ -43,8 +53,13 @@ Orchestrators resolve model before spawning:
 ```
 1. Read .planning/config.json
 2. Check model_overrides for agent-specific override
-3. If no override, look up agent in profile table
-4. Pass model parameter to Task call
+3. If adaptive profile:
+   a. Evaluate complexity from plan context (files, tasks, objective)
+   b. Map score to tier (simple/medium/complex)
+   c. Look up model from ADAPTIVE_TIERS[tier][agentType]
+   d. Clamp to adaptive_settings.min_model / max_model bounds
+4. If non-adaptive: look up agent in static profile table
+5. Pass model parameter to Task call
 ```
 
 ## Per-Agent Overrides

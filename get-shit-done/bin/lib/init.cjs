@@ -30,6 +30,10 @@ function cmdInitExecutePhase(cwd, phase, raw) {
     executor_model: resolveModelInternal(cwd, 'gsd-executor'),
     verifier_model: resolveModelInternal(cwd, 'gsd-verifier'),
 
+    // Model profile (for adaptive per-plan resolution)
+    model_profile: config.model_profile || 'balanced',
+    adaptive_settings: config.model_profile === 'adaptive' ? (config.adaptive_settings || null) : null,
+
     // Config flags
     commit_docs: config.commit_docs,
     parallelization: config.parallelization,
@@ -106,6 +110,10 @@ function cmdInitPlanPhase(cwd, phase, raw) {
     researcher_model: resolveModelInternal(cwd, 'gsd-phase-researcher'),
     planner_model: resolveModelInternal(cwd, 'gsd-planner'),
     checker_model: resolveModelInternal(cwd, 'gsd-plan-checker'),
+
+    // Model profile (for adaptive per-plan resolution)
+    model_profile: config.model_profile || 'balanced',
+    adaptive_settings: config.model_profile === 'adaptive' ? (config.adaptive_settings || null) : null,
 
     // Workflow flags
     research_enabled: config.research,
@@ -298,6 +306,10 @@ function cmdInitQuick(cwd, description, raw) {
     executor_model: resolveModelInternal(cwd, 'gsd-executor'),
     checker_model: resolveModelInternal(cwd, 'gsd-plan-checker'),
     verifier_model: resolveModelInternal(cwd, 'gsd-verifier'),
+
+    // Model profile (for adaptive per-plan resolution)
+    model_profile: config.model_profile || 'balanced',
+    adaptive_settings: config.model_profile === 'adaptive' ? (config.adaptive_settings || null) : null,
 
     // Config
     commit_docs: config.commit_docs,

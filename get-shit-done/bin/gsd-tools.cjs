@@ -15,6 +15,8 @@
  *   state get [section]                Get STATE.md content or section
  *   state patch --field val ...        Batch update STATE.md fields
  *   resolve-model <agent-type>         Get model for agent based on profile
+ *   resolve-adaptive-model <agent>     Resolve model with plan complexity context
+ *     [--context '<json>']
  *   find-phase <phase>                 Find phase directory by number
  *   commit <message> [--files f1 f2]   Commit planning docs
  *   verify-summary <path>              Verify a SUMMARY.md file
@@ -273,6 +275,16 @@ async function main() {
 
     case 'resolve-model': {
       commands.cmdResolveModel(cwd, args[1], raw);
+      break;
+    }
+
+    case 'resolve-adaptive-model': {
+      const contextIdx = args.indexOf('--context');
+      let context = null;
+      if (contextIdx !== -1 && args[contextIdx + 1]) {
+        try { context = JSON.parse(args[contextIdx + 1]); } catch { error('Invalid --context JSON'); }
+      }
+      commands.cmdResolveAdaptiveModel(cwd, args[1], context, raw);
       break;
     }
 
