@@ -33,6 +33,38 @@ describe('init commands', () => {
     assert.strictEqual(output.config_path, '.planning/config.json');
   });
 
+  test('init execute-phase rejects non-numeric phase argument', () => {
+    const result = runGsdTools('init execute-phase null', tmpDir);
+    assert.strictEqual(result.success, false, 'command should fail');
+    assert.match(result.error, /invalid phase for init execute-phase/i);
+  });
+
+  test('init execute-phase rejects when phase directory does not exist', () => {
+    const result = runGsdTools('init execute-phase 1', tmpDir);
+    assert.strictEqual(result.success, false, 'command should fail');
+    assert.match(result.error, /phase not found for init execute-phase/i);
+  });
+
+  test('init execute-phase rejects when phase exists but has no plans', () => {
+    fs.mkdirSync(path.join(tmpDir, '.planning', 'phases', '01-empty'), { recursive: true });
+    const result = runGsdTools('init execute-phase 1', tmpDir);
+    assert.strictEqual(result.success, false, 'command should fail');
+    assert.match(result.error, /no plans found for phase/i);
+  });
+
+  test('init execute-phase succeeds when phase has at least one plan', () => {
+    const phaseDir = path.join(tmpDir, '.planning', 'phases', '01-foundation');
+    fs.mkdirSync(phaseDir, { recursive: true });
+    fs.writeFileSync(path.join(phaseDir, '01-01-PLAN.md'), '# Plan');
+
+    const result = runGsdTools('init execute-phase 1', tmpDir);
+    assert.ok(result.success, `Command failed: ${result.error}`);
+
+    const output = JSON.parse(result.output);
+    assert.strictEqual(output.phase_found, true);
+    assert.strictEqual(output.plan_count, 1);
+  });
+
   test('init plan-phase returns file paths', () => {
     const phaseDir = path.join(tmpDir, '.planning', 'phases', '03-api');
     fs.mkdirSync(phaseDir, { recursive: true });

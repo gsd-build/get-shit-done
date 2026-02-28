@@ -7,14 +7,32 @@ const path = require('path');
 const { execSync } = require('child_process');
 const { loadConfig, resolveModelInternal, findPhaseInternal, getRoadmapPhaseInternal, pathExistsInternal, generateSlugInternal, getMilestoneInfo, normalizePhaseName, toPosixPath, output, error } = require('./core.cjs');
 
+function isValidPhaseArg(phase) {
+  if (phase === undefined || phase === null) return false;
+  const v = String(phase).trim();
+  return /^\d+(?:\.\d+)?$/.test(v);
+}
+
 function cmdInitExecutePhase(cwd, phase, raw) {
   if (!phase) {
     error('phase required for init execute-phase');
   }
 
+  if (!isValidPhaseArg(phase)) {
+    error(`invalid phase for init execute-phase: "${phase}" (expected numeric like 1 or 1.1)`);
+  }
+
   const config = loadConfig(cwd);
   const phaseInfo = findPhaseInternal(cwd, phase);
   const milestone = getMilestoneInfo(cwd);
+
+  if (!phaseInfo) {
+    error(`phase not found for init execute-phase: ${phase} (run plan-phase first or verify .planning/phases)`);
+  }
+
+  if (!phaseInfo.plans || phaseInfo.plans.length === 0) {
+    error(`no plans found for phase ${phaseInfo.phase_number || phase} (run plan-phase before execute-phase)`);
+  }
 
   const roadmapPhase = getRoadmapPhaseInternal(cwd, phase);
   const reqMatch = roadmapPhase?.section?.match(/^\*\*Requirements\*\*:[^\S\n]*([^\n]*)$/m);
