@@ -38,17 +38,45 @@ jobs:
         run: |
           echo "Repo: $GITHUB_REPOSITORY"
 
+      - name: Preflight safety + idempotency checks
+        id: precheck
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          set -euo pipefail
+          REF="${{ inputs.target_ref }}"
+          FORCE="${{ inputs.force }}"
+          UPSTREAM_TAG="${{ inputs.upstream_tag }}"
+
+          if [ "$FORCE" != "true" ] && [ "$REF" != "main" ]; then
+            echo "Ref '${REF}' is not allowed unless force=true. Skipping mirror run."
+            echo "should_mirror=false" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+
+          EXISTING=$(gh release list --repo "$GITHUB_REPOSITORY" --limit 400 --json tagName --jq '.[].tagName' | grep -E "upstream-${UPSTREAM_TAG}$" | head -n 1 || true)
+          if [ -n "$EXISTING" ]; then
+            echo "Upstream tag ${UPSTREAM_TAG} already mirrored as ${EXISTING}; skipping."
+            echo "should_mirror=false" >> "$GITHUB_OUTPUT"
+            echo "existing_tag=$EXISTING" >> "$GITHUB_OUTPUT"
+          else
+            echo "should_mirror=true" >> "$GITHUB_OUTPUT"
+          fi
+
       - name: Checkout
+        if: steps.precheck.outputs.should_mirror == 'true'
         uses: actions/checkout@v4
         with:
           fetch-depth: 0
 
       - name: Configure git identity
+        if: steps.precheck.outputs.should_mirror == 'true'
         run: |
           git config user.name "github-actions[bot]"
           git config user.email "github-actions[bot]@users.noreply.github.com"
 
       - name: Checkout target ref
+        if: steps.precheck.outputs.should_mirror == 'true'
         run: |
           set -euo pipefail
           REF="${{ inputs.target_ref }}"
@@ -62,6 +90,7 @@ jobs:
           echo "Tagging ref: $(git rev-parse --short HEAD) (ref=${REF})"
 
       - name: Compute fork mirror tag
+        if: steps.precheck.outputs.should_mirror == 'true'
         id: compute
         env:
           GH_TOKEN: ${{ secrets.COPILOT_PAT }}
@@ -69,21 +98,30 @@ jobs:
           set -euo pipefail
           UPSTREAM_TAG="${{ inputs.upstream_tag }}"
 
-          # Determine next v0.0.X patch from fork latest release tag
+          # Determine next v0.0.X patch from fork latest release tag (lenient parse)
           FORK_LATEST=$(gh api "repos/$GITHUB_REPOSITORY/releases/latest" --jq '.tag_name // empty' 2>/dev/null || true)
           if [ -z "$FORK_LATEST" ]; then
             NEXT_PATCH=1
           else
-            BASE_VER="${FORK_LATEST%%-*}"
-            FORK_PATCH="${BASE_VER##*.}"
-            NEXT_PATCH=$((FORK_PATCH + 1))
+            if echo "$FORK_LATEST" | grep -Eq '^v0\.0\.[0-9]+'; then
+              FORK_PATCH=$(echo "$FORK_LATEST" | sed -E 's/^v0\.0\.([0-9]+).*/\1/')
+              NEXT_PATCH=$((FORK_PATCH + 1))
+            else
+              NEXT_PATCH=1
+            fi
           fi
 
           NEW_TAG="v0.0.${NEXT_PATCH}-upstream-${UPSTREAM_TAG}"
+          while gh release view "$NEW_TAG" --repo "$GITHUB_REPOSITORY" >/dev/null 2>&1; do
+            NEXT_PATCH=$((NEXT_PATCH + 1))
+            NEW_TAG="v0.0.${NEXT_PATCH}-upstream-${UPSTREAM_TAG}"
+          done
+
           echo "new_tag=$NEW_TAG" >> "$GITHUB_OUTPUT"
           echo "New fork tag: $NEW_TAG"
 
       - name: Create and push tag (PAT required)
+        if: steps.precheck.outputs.should_mirror == 'true'
         env:
           COPILOT_PAT: ${{ secrets.COPILOT_PAT }}
         run: |
@@ -96,6 +134,7 @@ jobs:
           git push origin "$NEW_TAG"
 
       - name: Build release notes (copy upstream body)
+        if: steps.precheck.outputs.should_mirror == 'true'
         env:
           GH_TOKEN: ${{ secrets.COPILOT_PAT }}
         run: |
@@ -127,6 +166,7 @@ jobs:
 
             
       - name: Create release (or skip if exists)
+        if: steps.precheck.outputs.should_mirror == 'true'
         env:
           GH_TOKEN: ${{ secrets.COPILOT_PAT }}
         run: |
@@ -144,6 +184,7 @@ jobs:
           fi
 
       - name: Trigger zip build/upload (release.yml)
+        if: steps.precheck.outputs.should_mirror == 'true'
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |

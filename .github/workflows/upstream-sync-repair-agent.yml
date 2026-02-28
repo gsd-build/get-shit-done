@@ -198,15 +198,71 @@ jobs:
           set -euo pipefail
           git push -u origin "${{ inputs.branch }}" --force-with-lease
 
-      - name: (Optional) Re-arm PR auto-merge if requested
-        if: inputs.reason == 'pr_merge_failed' && inputs.pr_number != ''
+      - name: Create or update repair PR
+        id: pr
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
           set -euo pipefail
+          BR="${{ inputs.branch }}"
+          BASE="${{ inputs.base_branch }}"
+
           PR="${{ inputs.pr_number }}"
           if [ -z "$PR" ]; then
-            echo "No PR number provided; skipping."
+            PR=$(gh pr list \
+              --repo "$GITHUB_REPOSITORY" \
+              --state open \
+              --head "$BR" \
+              --base "$BASE" \
+              --json number \
+              --jq '.[0].number // empty')
+          fi
+
+          TITLE="repair: ${{ inputs.reason }} on ${BR}"
+          BODY=$(cat <<EOF
+          Automated repair workflow completed.
+
+          - Reason: ${{ inputs.reason }}
+          - Branch: ${BR}
+          - Base: ${BASE}
+          - Upstream repo: ${{ inputs.upstream_repo }}
+          - Upstream branch: ${{ inputs.upstream_branch }}
+          - Upstream tag: ${{ inputs.upstream_tag }}
+          - Upstream SHA: ${{ inputs.upstream_sha }}
+          EOF
+          )
+
+          if [ -z "$PR" ]; then
+            gh pr create \
+              --repo "$GITHUB_REPOSITORY" \
+              --base "$BASE" \
+              --head "$BR" \
+              --title "$TITLE" \
+              --body "$BODY" \
+              --label "automated" \
+              --label "upstream-sync"
+            PR=$(gh pr list \
+              --repo "$GITHUB_REPOSITORY" \
+              --state open \
+              --head "$BR" \
+              --base "$BASE" \
+              --json number \
+              --jq '.[0].number // empty')
+          else
+            gh pr edit "$PR" --repo "$GITHUB_REPOSITORY" --title "$TITLE" --body "$BODY"
+          fi
+
+          echo "pr_number=$PR" >> "$GITHUB_OUTPUT"
+          echo "Repair PR #$PR"
+
+      - name: Enable auto-merge for repair PR
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          set -euo pipefail
+          PR="${{ steps.pr.outputs.pr_number }}"
+          if [ -z "$PR" ]; then
+            echo "No PR available; skipping auto-merge."
             exit 0
           fi
 

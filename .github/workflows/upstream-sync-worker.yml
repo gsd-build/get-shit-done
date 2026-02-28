@@ -259,7 +259,7 @@ jobs:
           echo "pr_number=$PR_NUM" >> "$GITHUB_OUTPUT"
           echo "PR #$PR_NUM"
 
-      - name: Enable auto-merge (fallback if already CLEAN)
+      - name: Enable auto-merge and detect merged state
         if: steps.detect.outputs.behind != '0'
         id: pr_merge
         continue-on-error: true
@@ -270,6 +270,7 @@ jobs:
           PR="${{ steps.pr.outputs.pr_number }}"
           if [ -z "$PR" ]; then
             echo "No PR number available; skipping auto-merge."
+            echo "merged=false" >> "$GITHUB_OUTPUT"
             exit 0
           fi
 
@@ -280,8 +281,17 @@ jobs:
             gh pr merge "$PR" --repo "$GITHUB_REPOSITORY" --merge --delete-branch=false || true
           fi
 
+          MERGED_AT=$(gh pr view "$PR" --repo "$GITHUB_REPOSITORY" --json mergedAt --jq '.mergedAt // empty')
+          if [ -n "$MERGED_AT" ]; then
+            echo "merged=true" >> "$GITHUB_OUTPUT"
+            echo "PR #$PR merged at $MERGED_AT"
+          else
+            echo "merged=false" >> "$GITHUB_OUTPUT"
+            echo "PR #$PR remains open; dispatching repair agent."
+          fi
+
       - name: Dispatch repair agent if PR merge did not complete
-        if: steps.detect.outputs.behind != '0' && steps.pr_merge.outcome != 'success'
+        if: steps.detect.outputs.behind != '0' && steps.pr_merge.outputs.merged != 'true'
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
