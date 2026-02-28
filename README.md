@@ -4,7 +4,7 @@
 
 **A VS Code GitHub Copilot compatibility layer for the [Get Shit Done (GSD)](https://github.com/gsd-build/get-shit-done) spec-driven development system.**
 
-[![GitHub stars](https://img.shields.io/github/stars/gsd-build/get-shit-done?style=for-the-badge&logo=github&color=181717)](https://github.com/gsd-build/get-shit-done)
+[![GitHub stars](https://img.shields.io/github/stars/darrylwisner/get-shit-done?style=for-the-badge&logo=github&color=181717)](https://github.com/darrylwisner/get-shit-done)
 [![License](https://img.shields.io/badge/license-MIT-blue?style=for-the-badge)](LICENSE)
 
 </div>
