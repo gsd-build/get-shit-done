@@ -27,7 +27,7 @@ If $ARGUMENTS contains a phase number, load context:
 INIT=$(node "$HOME/.claude/get-shit-done/bin/gsd-tools.cjs" init verify-work "${PHASE_ARG}")
 ```
 
-Parse JSON for: `planner_model`, `checker_model`, `commit_docs`, `phase_found`, `phase_dir`, `phase_number`, `phase_name`, `has_verification`, `planning_base`.
+Parse JSON for: `planner_model`, `checker_model`, `commit_docs`, `phase_found`, `phase_dir`, `phase_number`, `phase_name`, `has_verification`, `planning_base`, `browser_enabled`, `browser_base_url`.
 </step>
 
 <step name="check_active_session">
@@ -110,6 +110,87 @@ Examples:
 Skip internal/non-observable items (refactors, type changes, etc.).
 </step>
 
+<step name="browser_pre_verify">
+**Browser pre-verification (opt-in):**
+
+Check `browser_enabled` from init JSON.
+
+**If `browser_enabled` is false (default):**
+
+```
+[Browser pre-verification: disabled — all tests go to human UAT]
+```
+
+Skip to `create_uat_file` with all tests as `needs_human`.
+
+**If `browser_enabled` is true:**
+
+1. Check if dev server is running:
+
+```bash
+curl -s -o /dev/null -w "%{http_code}" "$browser_base_url" 2>/dev/null
+```
+
+If not reachable, check if `startup_command` is configured in browser config. If so:
+
+```bash
+# Start the dev server in background (read from .planning/config.json browser.startup_command)
+nohup $startup_command > /dev/null 2>&1 &
+sleep $startup_wait_seconds
+```
+
+2. Spawn `gsd-browser-verifier` agent:
+
+```
+Task(
+  prompt="""
+<browser_verification_context>
+
+**Phase:** {phase_number} - {phase_name}
+**Base URL:** {browser_base_url}
+
+<test_list>
+{JSON array of { number, name, expected } objects from extract_tests}
+</test_list>
+
+<auth_config>
+{browser auth config from .planning/config.json, or "none" if not configured}
+</auth_config>
+
+</browser_verification_context>
+
+Verify each test against the running application. Return structured results.
+""",
+  subagent_type="gsd-browser-verifier",
+  description="Browser pre-verify Phase {phase}"
+)
+```
+
+3. Parse agent results. For each test:
+   - `auto_pass` → Mark test with `result: auto_pass` and `auto_evidence`
+   - `auto_fail` → Mark test with `result: [pending]` and `auto_note` containing failure details
+   - `needs_human` → Mark test with `result: [pending]` (no annotation)
+
+4. Display pre-verification summary:
+
+```
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+ GSD ► BROWSER PRE-VERIFICATION
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+| Result      | Count |
+|-------------|-------|
+| Auto-passed | {N}   |
+| Needs review| {N}   |
+| Issues found| {N}   |
+
+{N} tests auto-passed and will be skipped in human UAT.
+{N} tests need your manual verification.
+```
+
+5. Pass annotated test list to `create_uat_file`.
+</step>
+
 <step name="create_uat_file">
 **Create UAT file with all tests:**
 
@@ -128,6 +209,8 @@ phase: XX-name
 source: [list of SUMMARY.md files]
 started: [ISO timestamp]
 updated: [ISO timestamp]
+browser_pre_verified: true|false
+browser_auto_passed: [N]
 ---
 
 ## Current Test
@@ -147,7 +230,13 @@ result: [pending]
 
 ### 2. [Test Name]
 expected: [observable behavior]
+result: auto_pass
+auto_evidence: "[what browser agent observed]"
+
+### 3. [Test Name]
+expected: [observable behavior]
 result: [pending]
+auto_note: "[browser detection context for human reviewer]"
 
 ...
 
@@ -155,6 +244,7 @@ result: [pending]
 
 total: [N]
 passed: 0
+auto_passed: [N]
 issues: 0
 pending: [N]
 skipped: 0
@@ -163,6 +253,13 @@ skipped: 0
 
 [none yet]
 ```
+
+**Browser annotation rules:**
+- If `browser_pre_verify` ran: set `browser_pre_verified: true` and `browser_auto_passed: N`
+- If `browser_pre_verify` was skipped: set `browser_pre_verified: false` and `browser_auto_passed: 0`
+- Tests classified as `auto_pass` get `result: auto_pass` and `auto_evidence` field
+- Tests classified as `auto_fail` get `result: [pending]` and `auto_note` with failure context
+- Tests classified as `needs_human` get `result: [pending]` with no annotation
 
 Write to `.planning/phases/XX-name/{phase_num}-UAT.md`
 
@@ -174,6 +271,10 @@ Proceed to `present_test`.
 
 Read Current Test section from UAT file.
 
+**Skip auto-passed tests:** If the current test has `result: auto_pass`, skip it and advance to the next pending test. Do not present auto-passed tests to the user.
+
+**Show auto_note context:** If the current test has an `auto_note` field, include it in the presentation as additional context for the human reviewer.
+
 Display using checkpoint box format:
 
 ```
@@ -184,6 +285,9 @@ Display using checkpoint box format:
 **Test {number}: {name}**
 
 {expected}
+
+{If auto_note exists:}
+> Browser note: {auto_note}
 
 ──────────────────────────────────────────────────────────────
 → Type "pass" or describe what's wrong
@@ -299,11 +403,12 @@ Present summary:
 ```
 ## UAT Complete: Phase {phase}
 
-| Result | Count |
-|--------|-------|
-| Passed | {N}   |
-| Issues | {N}   |
-| Skipped| {N}   |
+| Result      | Count |
+|-------------|-------|
+| Passed      | {N}   |
+| Auto-passed | {N}   |
+| Issues      | {N}   |
+| Skipped     | {N}   |
 
 [If issues > 0:]
 ### Issues Found
@@ -556,6 +661,9 @@ Default to **major** if unclear. User can correct if needed.
 
 <success_criteria>
 - [ ] UAT file created with all tests from SUMMARY.md
+- [ ] If browser_enabled: browser pre-verification attempted, results annotated
+- [ ] If browser_enabled: auto_pass tests skipped in human UAT
+- [ ] If browser_enabled: auto_note context shown for browser-enriched tests
 - [ ] Tests presented one at a time with expected behavior
 - [ ] User responses processed as pass/issue/skip
 - [ ] Severity inferred from description (never asked)

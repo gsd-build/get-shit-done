@@ -14,6 +14,14 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
   - Automatic diagnostic capture (git state, log files, error output)
   - Optional GitHub issue creation via `gh` CLI
   - Bug lifecycle: reported → investigating → fixing → resolved
+- Browser pre-verification for `/gsd:verify-work` (#201)
+  - New `gsd-browser-verifier` agent uses Chrome DevTools MCP to auto-test UI deliverables
+  - Tests classified as `auto_pass` (skipped in human UAT), `auto_fail` (enriched with diagnostics), or `needs_human`
+  - Opt-in via `browser.enabled: true` in config; disabled by default
+  - Graceful degradation when chrome-devtools-mcp is not configured
+  - New `auto_pass`, `auto_evidence`, and `auto_note` fields in UAT.md template
+  - Browser toggle added to `/gsd:settings`
+  - Setup guide at `references/browser-setup.md`
 
 ## [1.22.0] - 2026-02-27
 

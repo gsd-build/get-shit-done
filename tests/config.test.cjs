@@ -61,6 +61,17 @@ describe('config-ensure-section command', () => {
     assert.ok('model_profile' in config, 'model_profile should exist');
     assert.ok('brave_search' in config, 'brave_search should exist');
     assert.ok('search_gitignored' in config, 'search_gitignored should exist');
+
+    // Browser config section
+    assert.ok(config.browser && typeof config.browser === 'object', 'browser should be an object');
+    assert.strictEqual(config.browser.enabled, false, 'browser.enabled should default to false');
+    assert.strictEqual(config.browser.base_url, 'http://localhost:3000', 'browser.base_url should default to localhost:3000');
+    assert.strictEqual(typeof config.browser.headless, 'boolean', 'browser.headless should be a boolean');
+    assert.strictEqual(typeof config.browser.port, 'number', 'browser.port should be a number');
+    assert.strictEqual(typeof config.browser.startup_wait_seconds, 'number', 'browser.startup_wait_seconds should be a number');
+    assert.ok(config.browser.auth && typeof config.browser.auth === 'object', 'browser.auth should be an object');
+    assert.strictEqual(typeof config.browser.auth.login_url, 'string', 'browser.auth.login_url should be a string');
+    assert.strictEqual(typeof config.browser.auth.username_field, 'string', 'browser.auth.username_field should be a string');
   });
 
   test('is idempotent — returns already_exists on second call', () => {
@@ -181,6 +192,46 @@ describe('config-ensure-section command', () => {
       assert.strictEqual(config.workflow.research, false, 'research should be overridden');
       assert.strictEqual(typeof config.workflow.plan_check, 'boolean', 'plan_check should be a boolean');
       assert.strictEqual(typeof config.workflow.verifier, 'boolean', 'verifier should be a boolean');
+    } finally {
+      if (existingDefaults !== null) {
+        fs.writeFileSync(defaultsFile, existingDefaults, 'utf-8');
+      } else {
+        try { fs.unlinkSync(defaultsFile); } catch { /* ignore */ }
+      }
+      if (!gsdDirExisted) {
+        try { fs.rmdirSync(gsdDir); } catch { /* ignore */ }
+      }
+    }
+  });
+
+  // NOTE: This test touches ~/.gsd/ on the real filesystem.
+  test('merges nested browser.auth keys from defaults.json preserving unset keys', () => {
+    const homedir = os.homedir();
+    const gsdDir = path.join(homedir, '.gsd');
+    const defaultsFile = path.join(gsdDir, 'defaults.json');
+
+    let existingDefaults = null;
+    const gsdDirExisted = fs.existsSync(gsdDir);
+    if (fs.existsSync(defaultsFile)) {
+      existingDefaults = fs.readFileSync(defaultsFile, 'utf-8');
+    }
+
+    try {
+      if (!gsdDirExisted) {
+        fs.mkdirSync(gsdDir, { recursive: true });
+      }
+      fs.writeFileSync(defaultsFile, JSON.stringify({
+        browser: { enabled: true, auth: { login_url: 'http://localhost:3000/login' } },
+      }), 'utf-8');
+
+      const result = runGsdTools('config-ensure-section', tmpDir);
+      assert.ok(result.success, `Command failed: ${result.error}`);
+
+      const config = readConfig(tmpDir);
+      assert.strictEqual(config.browser.enabled, true, 'browser.enabled should be overridden');
+      assert.strictEqual(config.browser.auth.login_url, 'http://localhost:3000/login', 'browser.auth.login_url should be overridden');
+      assert.strictEqual(config.browser.auth.username_field, '', 'browser.auth.username_field should preserve default');
+      assert.strictEqual(config.browser.base_url, 'http://localhost:3000', 'browser.base_url should preserve default');
     } finally {
       if (existingDefaults !== null) {
         fs.writeFileSync(defaultsFile, existingDefaults, 'utf-8');

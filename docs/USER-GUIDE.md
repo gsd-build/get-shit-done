@@ -234,6 +234,22 @@ GSD stores project settings in `.planning/config.json`. Configure during `/gsd:n
     "branching_strategy": "none",
     "phase_branch_template": "gsd/phase-{phase}-{slug}",
     "milestone_branch_template": "gsd/{milestone}-{slug}"
+  },
+  "browser": {
+    "enabled": false,
+    "base_url": "http://localhost:3000",
+    "headless": true,
+    "startup_command": "",
+    "startup_wait_seconds": 10,
+    "port": 9222,
+    "auth": {
+      "login_url": "",
+      "username_field": "",
+      "password_field": "",
+      "username": "",
+      "password_env_var": "",
+      "submit_selector": ""
+    }
   }
 }
 ```
@@ -283,6 +299,20 @@ Disable these to speed up phases in familiar domains or when conserving tokens.
 | `milestone` | At first `execute-phase` | All phases share one branch | Release branches, PR per version |
 
 **Template variables:** `{phase}` = zero-padded number (e.g., "03"), `{slug}` = lowercase hyphenated name, `{milestone}` = version (e.g., "v1.0").
+
+### Browser Pre-Verification
+
+| Setting | Options | Default | What it Controls |
+|---------|---------|---------|------------------|
+| `browser.enabled` | `true`, `false` | `false` | Enable automated browser testing before human UAT |
+| `browser.base_url` | URL string | `http://localhost:3000` | App URL for browser testing |
+| `browser.startup_command` | Shell command | `""` | Command to start dev server (e.g., `npm run dev`) |
+| `browser.startup_wait_seconds` | Number | `10` | Seconds to wait after starting dev server |
+| `browser.port` | Number | `9222` | Chrome DevTools Protocol port |
+
+Requires `chrome-devtools-mcp` in Claude Code settings. When enabled, `/gsd:verify-work` spawns a browser agent to pre-verify UI tests — auto-passed tests are skipped in human UAT. Degrades gracefully when MCP is unavailable.
+
+Configure auth for login-gated apps via `browser.auth` (see `references/browser-setup.md`).
 
 ### Model Profiles (Per-Agent Breakdown)
 

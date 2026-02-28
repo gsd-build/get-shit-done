@@ -60,11 +60,22 @@ function cmdConfigEnsureSection(cwd, raw) {
     },
     parallelization: true,
     brave_search: hasBraveSearch,
+    browser: {
+      enabled: false,
+      base_url: 'http://localhost:3000',
+      headless: true,
+      user_data_dir: '',
+      auth: { login_url: '', username_field: '', password_field: '', username: '', password_env_var: '', submit_selector: '' },
+      startup_command: '',
+      startup_wait_seconds: 10,
+      port: 9222,
+    },
   };
   const defaults = {
     ...hardcoded,
     ...userDefaults,
     workflow: { ...hardcoded.workflow, ...(userDefaults.workflow || {}) },
+    browser: { ...hardcoded.browser, ...(userDefaults.browser || {}), auth: { ...hardcoded.browser.auth, ...(userDefaults.browser?.auth || {}) } },
   };
 
   try {

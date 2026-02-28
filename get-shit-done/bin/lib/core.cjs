@@ -116,6 +116,7 @@ function loadConfig(cwd, paths) {
       parallelization,
       brave_search: get('brave_search') ?? defaults.brave_search,
       model_overrides: parsed.model_overrides || null,
+      browser: parsed.browser || null,
     };
   } catch {
     return defaults;

@@ -397,6 +397,10 @@ function cmdInitVerifyWork(cwd, phase, raw) {
 
     // Existing artifacts
     has_verification: phaseInfo?.has_verification || false,
+
+    // Browser verification
+    browser_enabled: config.browser?.enabled || false,
+    browser_base_url: config.browser?.base_url || 'http://localhost:3000',
   };
 
   output(result, raw);
