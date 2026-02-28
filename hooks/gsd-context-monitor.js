@@ -21,15 +21,25 @@ const fs = require('fs');
 const os = require('os');
 const path = require('path');
 
+// Never surface hook errors — exit cleanly on any unhandled crash
+process.on('uncaughtException', () => process.exit(0));
+process.on('unhandledRejection', () => process.exit(0));
+
 const WARNING_THRESHOLD = 35;  // remaining_percentage <= 35%
 const CRITICAL_THRESHOLD = 25; // remaining_percentage <= 25%
 const STALE_SECONDS = 60;      // ignore metrics older than 60s
 const DEBOUNCE_CALLS = 5;      // min tool uses between warnings
 
+// Safety timeout — exit cleanly if stdin never closes (e.g. spawn edge case)
+const safetyTimer = setTimeout(() => process.exit(0), 5000);
+safetyTimer.unref();
+
 let input = '';
 process.stdin.setEncoding('utf8');
 process.stdin.on('data', chunk => input += chunk);
+process.stdin.on('error', () => process.exit(0));
 process.stdin.on('end', () => {
+  clearTimeout(safetyTimer);
   try {
     const data = JSON.parse(input);
     const sessionId = data.session_id;

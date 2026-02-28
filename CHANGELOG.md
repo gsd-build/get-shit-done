@@ -6,6 +6,9 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ## [Unreleased]
 
+### Fixed
+- PostToolUse hook error noise on every Read/Grep/Glob tool call on Windows (#775)
+
 ## [1.21.1] - 2026-02-27
 
 ### Added
