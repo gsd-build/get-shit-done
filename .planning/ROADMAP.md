@@ -27,22 +27,20 @@ Phases 7-13 completed. 433 tests passing, 94.01% overall line coverage, all 11 m
 **Milestone Goal:** Respond to PR reviewer feedback on PR #762 by splitting the monolithic PR into focused branches, removing committed dev artifacts, and applying three targeted code fixes before resubmission.
 
 #### Phase 14: PR Restructure
-**Goal**: Three clean, independently reviewable branches exist — one for tests+CI, one for resolve-model, one for autopilot — with no .planning/ artifacts committed and PR #761 coordination confirmed
+**Goal**: Clean PR C branch (feat/autopilot-clean) submitted with only autopilot feature code, .planning/ artifacts removed from git index, PR #762 closed with split comment, and PR coordination confirmed (PR A=#763 merged, PR B=not needed since fix landed via #739)
 **Depends on**: Phase 13
 **Requirements**: PRS-01, PRS-02, PRS-03, PRS-04, CRD-01, CRD-02
 **Success Criteria** (what must be TRUE):
-  1. PR A branch (`feat/coverage-hardening`) contains only tests and CI changes — no autopilot code, no .planning/ files
-  2. PR B branch (`fix/resolve-model`) is scoped to resolve-model logic only — PR #761 status confirmed and no duplicate changes present
-  3. PR C branch (`feat/autopilot-clean`) contains autopilot feature code with .planning/ artifacts removed from git index (files still exist locally)
-  4. `.gitignore` includes `.planning/` so the artifacts cannot be re-committed on any future branch
-  5. All three branches are verifiably clean: `git diff main...{branch}` shows only the expected files
-**Plans**: TBD
+  1. PR C branch (`feat/autopilot-clean`) contains autopilot feature code with .planning/ artifacts removed from git index (files still exist locally)
+  2. `.gitignore` includes `.planning/` so the artifacts cannot be re-committed on any future branch
+  3. PR C diff against origin/main shows only autopilot feature files
+  4. PR #762 has closing comment explaining the split and linking to PR C, #763, #739
+  5. PR #761 status confirmed CLOSED, resolve-model fix documented as landed via #739
+**Plans**: 2 plans
 
 Plans:
-- [ ] 14-01: Confirm PR #761 status and scope resolve-model changes
-- [ ] 14-02: Create feat/coverage-hardening branch (cherry-pick tests+CI commits)
-- [ ] 14-03: Create fix/resolve-model branch (cherry-pick or stage resolve-model changes)
-- [ ] 14-04: Clean feat/autopilot branch (git rm --cached .planning/, update .gitignore, rebase to drop extracted commits)
+- [ ] 14-01-PLAN.md — Sync local main, rebase feat/autopilot onto origin/main, remove .planning/ from git index
+- [ ] 14-02-PLAN.md — Create PR C branch, open PR on GitHub, add closing comment to PR #762
 
 #### Phase 15: Auto-Advance Runtime Flag Fix
 **Goal**: Autopilot workflow no longer mutates config.json to drive auto-advance behavior — the --auto flag propagates through the existing call chain instead
@@ -95,7 +93,7 @@ Phases execute in numeric order: 14 → 15 → 16 → 17
 
 | Phase | Milestone | Plans Complete | Status | Completed |
 |-------|-----------|----------------|--------|-----------|
-| 14. PR Restructure | v1.3 | 0/4 | Not started | - |
+| 14. PR Restructure | v1.3 | 0/2 | Not started | - |
 | 15. Auto-Advance Fix | v1.3 | 0/1 | Not started | - |
 | 16. Validation Hardening | v1.3 | 0/1 | Not started | - |
 | 17. Module Fixes + Docs | v1.3 | 0/2 | Not started | - |
