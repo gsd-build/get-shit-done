@@ -50,23 +50,23 @@ Requirements for PR #762 review fixes. Each maps to roadmap phases.
 
 | Requirement | Phase | Status |
 |-------------|-------|--------|
-| PRS-01 | — | Pending |
-| PRS-02 | — | Pending |
-| PRS-03 | — | Pending |
-| PRS-04 | — | Pending |
-| CFG-01 | — | Pending |
-| CFG-02 | — | Pending |
-| CFG-03 | — | Pending |
-| CFG-04 | — | Pending |
-| CRD-01 | — | Pending |
-| CRD-02 | — | Pending |
-| CRD-03 | — | Pending |
+| PRS-01 | Phase 14 | Pending |
+| PRS-02 | Phase 14 | Pending |
+| PRS-03 | Phase 14 | Pending |
+| PRS-04 | Phase 14 | Pending |
+| CFG-01 | Phase 15 | Pending |
+| CFG-02 | Phase 16 | Pending |
+| CFG-03 | Phase 17 | Pending |
+| CFG-04 | Phase 17 | Pending |
+| CRD-01 | Phase 14 | Pending |
+| CRD-02 | Phase 14 | Pending |
+| CRD-03 | Phase 17 | Pending |
 
 **Coverage:**
 - v1.3 requirements: 11 total
-- Mapped to phases: 0
-- Unmapped: 11
+- Mapped to phases: 11
+- Unmapped: 0
 
 ---
 *Requirements defined: 2026-02-28*
-*Last updated: 2026-02-28 after initial definition*
+*Last updated: 2026-02-28 — traceability filled after roadmap creation*
