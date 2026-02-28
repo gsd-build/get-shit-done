@@ -1061,6 +1061,27 @@ describe('commit command', () => {
     const logCount = execSync('git log --oneline', { cwd: tmpDir, encoding: 'utf-8' }).trim().split('\n').length;
     assert.strictEqual(logCount, 2, 'should have 2 commits (initial + amended)');
   });
+
+  // Regression test for https://github.com/gsd-build/get-shit-done/issues/733
+  test('preserves multi-word commit message when args are split (#733)', () => {
+    fs.writeFileSync(path.join(tmpDir, '.planning', 'multi.md'), '# Multi\n');
+
+    // Use array form to simulate args arriving as separate words (no shell quoting)
+    const result = runGsdTools(
+      ['commit', 'docs(40):', 'create', 'phase', 'plan', '--files', '.planning/multi.md'],
+      tmpDir
+    );
+    assert.ok(result.success, `Command failed: ${result.error}`);
+
+    const output = JSON.parse(result.output);
+    assert.strictEqual(output.committed, true, 'should have committed');
+
+    const gitLog = execSync('git log --oneline -1', { cwd: tmpDir, encoding: 'utf-8' }).trim();
+    assert.ok(
+      gitLog.includes('docs(40): create phase plan'),
+      `Expected full message in log but got: ${gitLog}`
+    );
+  });
 });
 
 // ─────────────────────────────────────────────────────────────────────────────

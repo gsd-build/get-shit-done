@@ -129,6 +129,7 @@
 const fs = require('fs');
 const path = require('path');
 const { error } = require('./lib/core.cjs');
+const { setMilestoneOverride } = require('./lib/paths.cjs');
 const state = require('./lib/state.cjs');
 const phase = require('./lib/phase.cjs');
 const roadmap = require('./lib/roadmap.cjs');
@@ -163,6 +164,21 @@ async function main() {
 
   if (!fs.existsSync(cwd) || !fs.statSync(cwd).isDirectory()) {
     error(`Invalid --cwd: ${cwd}`);
+  }
+
+  // Optional --milestone override for multi-milestone support
+  const msEqArg = args.find(arg => arg.startsWith('--milestone='));
+  const msIdx = args.indexOf('--milestone');
+  if (msEqArg) {
+    const value = msEqArg.slice('--milestone='.length).trim();
+    if (!value) error('Missing value for --milestone');
+    args.splice(args.indexOf(msEqArg), 1);
+    setMilestoneOverride(value);
+  } else if (msIdx !== -1) {
+    const value = args[msIdx + 1];
+    if (!value || value.startsWith('--')) error('Missing value for --milestone');
+    args.splice(msIdx, 2);
+    setMilestoneOverride(value);
   }
 
   const rawIndex = args.indexOf('--raw');
@@ -259,9 +275,10 @@ async function main() {
 
     case 'commit': {
       const amend = args.includes('--amend');
-      const message = args[1];
-      // Parse --files flag (collect args after --files, stopping at other flags)
       const filesIndex = args.indexOf('--files');
+      // Collect all positional args between command and first flag as the message
+      const msgEnd = filesIndex !== -1 ? filesIndex : args.length;
+      const message = args.slice(1, msgEnd).filter(a => !a.startsWith('--')).join(' ');
       const files = filesIndex !== -1 ? args.slice(filesIndex + 1).filter(a => !a.startsWith('--')) : [];
       commands.cmdCommit(cwd, message, files, raw, amend);
       break;
@@ -459,8 +476,16 @@ async function main() {
           milestoneName = nameArgs.join(' ') || null;
         }
         milestone.cmdMilestoneComplete(cwd, args[2], { name: milestoneName, archivePhases }, raw);
+      } else if (subcommand === 'create') {
+        milestone.cmdMilestoneCreate(cwd, args[2], raw);
+      } else if (subcommand === 'switch') {
+        milestone.cmdMilestoneSwitch(cwd, args[2], raw);
+      } else if (subcommand === 'list') {
+        milestone.cmdMilestoneList(cwd, raw);
+      } else if (subcommand === 'status') {
+        milestone.cmdMilestoneStatus(cwd, raw);
       } else {
-        error('Unknown milestone subcommand. Available: complete');
+        error('Unknown milestone subcommand. Available: complete, create, switch, list, status');
       }
       break;
     }

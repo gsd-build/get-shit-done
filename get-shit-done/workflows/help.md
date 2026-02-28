@@ -184,6 +184,15 @@ Archive completed milestone and prepare for next version.
 
 Usage: `/gsd:complete-milestone 1.0.0`
 
+**`/gsd:switch-milestone <name>`**
+Switch active milestone for concurrent work.
+
+- Warns if current milestone has in-progress work
+- Updates ACTIVE_MILESTONE pointer
+- Shows status of target milestone
+
+Usage: `/gsd:switch-milestone v1.5-hotfix`
+
 ### Progress Tracking
 
 **`/gsd:progress`**
@@ -269,6 +278,20 @@ Validate built features through conversational UAT.
 - Ready for re-execution if issues found
 
 Usage: `/gsd:verify-work 3`
+
+### Test Generation
+
+**`/gsd:add-tests <phase> [additional instructions]`**
+Generate unit and E2E tests for a completed phase.
+
+- Reads phase SUMMARY.md, CONTEXT.md, and VERIFICATION.md
+- Classifies changed files into TDD (unit), E2E (browser), or Skip
+- Presents classification for approval before generating
+- Runs tests after generation — flags bugs but doesn't fix them
+- Commits passing tests
+
+Usage: `/gsd:add-tests 3`
+Usage: `/gsd:add-tests 3 focus on edge cases for auth`
 
 ### Milestone Auditing
 
@@ -438,6 +461,7 @@ Example config:
 /gsd:plan-phase 1       # Create plans for first phase
 /clear
 /gsd:execute-phase 1    # Execute all plans in phase
+/gsd:add-tests 1        # Generate tests for completed phase
 ```
 
 **Resuming work after a break:**
