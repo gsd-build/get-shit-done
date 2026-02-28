@@ -168,6 +168,7 @@ rapid prototyping phases where test infrastructure isn't the focus.
 | `/gsd:audit-milestone` | Verify milestone met its definition of done | Before completing milestone |
 | `/gsd:complete-milestone` | Archive milestone, tag release | All phases verified |
 | `/gsd:new-milestone [name]` | Start next version cycle | After completing a milestone |
+| `/gsd:switch-milestone <name>` | Switch active milestone for concurrent work | When working on multiple milestones |
 
 ### Navigation
 
@@ -381,6 +382,38 @@ claude --dangerously-skip-permissions
 /gsd:remove-phase 7         # Descope phase 7 and renumber
 ```
 
+### Concurrent Milestones
+
+Work on multiple milestones simultaneously (e.g., v2.0 features + v1.5.1 hotfix):
+
+```
+/gsd:new-milestone "v1.5.1 Hotfix"    # Creates milestone-scoped directory
+/gsd:switch-milestone v2.0-features    # Switch back to feature work
+/gsd:progress                          # See status of active milestone
+```
+
+Each milestone gets isolated state under `.planning/milestones/<name>/`:
+
+```
+.planning/
+├── PROJECT.md              # Global (shared)
+├── MILESTONES.md           # Global (shared)
+├── ACTIVE_MILESTONE        # Pointer: "v2.0"
+├── milestones/
+│   ├── v2.0/
+│   │   ├── STATE.md
+│   │   ├── ROADMAP.md
+│   │   ├── REQUIREMENTS.md
+│   │   ├── config.json
+│   │   └── phases/
+│   └── v1.5.1-hotfix/
+│       ├── STATE.md
+│       ├── ROADMAP.md
+│       └── phases/
+```
+
+When no second milestone exists, everything stays in `.planning/` as usual.
+
 ---
 
 ## Troubleshooting
@@ -450,11 +483,8 @@ For reference, here is what GSD creates in your project:
 ```
 .planning/
   PROJECT.md              # Project vision and context (always loaded)
-  REQUIREMENTS.md         # Scoped v1/v2 requirements with IDs
-  ROADMAP.md              # Phase breakdown with status tracking
-  STATE.md                # Decisions, blockers, session memory
-  config.json             # Workflow configuration
-  MILESTONES.md           # Completed milestone archive
+  MILESTONES.md           # Completed milestone archive (global, shared)
+  ACTIVE_MILESTONE        # Active milestone pointer (multi-milestone mode only)
   research/               # Domain research from /gsd:new-project
   todos/
     pending/              # Captured ideas awaiting work
@@ -462,6 +492,12 @@ For reference, here is what GSD creates in your project:
   debug/                  # Active debug sessions
     resolved/             # Archived debug sessions
   codebase/               # Brownfield codebase mapping (from /gsd:map-codebase)
+
+  # Single-milestone layout (default):
+  REQUIREMENTS.md         # Scoped v1/v2 requirements with IDs
+  ROADMAP.md              # Phase breakdown with status tracking
+  STATE.md                # Decisions, blockers, session memory
+  config.json             # Workflow configuration
   phases/
     XX-phase-name/
       XX-YY-PLAN.md       # Atomic execution plans
@@ -469,4 +505,17 @@ For reference, here is what GSD creates in your project:
       CONTEXT.md          # Your implementation preferences
       RESEARCH.md         # Ecosystem research findings
       VERIFICATION.md     # Post-execution verification results
+
+  # Multi-milestone layout (when concurrent milestones exist):
+  milestones/
+    v2.0/
+      STATE.md
+      ROADMAP.md
+      REQUIREMENTS.md
+      config.json
+      phases/
+    v1.5.1-hotfix/
+      STATE.md
+      ROADMAP.md
+      phases/
 ```

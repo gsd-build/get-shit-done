@@ -25,6 +25,14 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 - Analysis paralysis guard in agents to prevent over-deliberation during planning
 - Exhaustive cross-check and task-level TDD patterns in agent workflows
 - Code-aware discuss phase with codebase scouting — `/gsd:discuss-phase` now analyzes relevant source files before asking questions
+- Concurrent milestone execution: work on multiple milestones in parallel with isolated state (#291)
+  - Milestone-scoped directories under `.planning/milestones/<name>/`
+  - `ACTIVE_MILESTONE` pointer file for switching context
+  - `/gsd:switch-milestone` command with in-progress work warnings
+  - `--milestone` CLI flag for explicit milestone targeting
+  - Statusline shows active milestone in multi-milestone mode
+  - All 28 workflow files updated for milestone-aware paths
+  - Zero behavioral change for single-milestone projects (legacy mode)
 
 ### Fixed
 - Update checker clears both cache paths to prevent stale version notifications
