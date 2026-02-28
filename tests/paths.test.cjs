@@ -284,6 +284,60 @@ describe('milestone switch command', () => {
     ).trim();
     assert.strictEqual(active, 'v2.0');
   });
+
+  test('switch warns when current milestone has in-progress work', () => {
+    // beforeEach already created v1.0 and v2.0; recreate to get fresh STATE.md
+    runGsdTools('milestone create v1.0', tmpDir);
+
+    // Set v1.0 STATE.md to have in-progress status
+    const v1StatePath = path.join(tmpDir, '.planning', 'milestones', 'v1.0', 'STATE.md');
+    let stateContent = fs.readFileSync(v1StatePath, 'utf-8');
+    stateContent = stateContent.replace('**Status:** Ready to plan', '**Status:** Executing Phase 2');
+    fs.writeFileSync(v1StatePath, stateContent);
+
+    // Recreate second milestone (makes v2.0 active)
+    runGsdTools('milestone create v2.0', tmpDir);
+
+    // Switch back to v1.0 first (so v1.0 is active)
+    runGsdTools('milestone switch v1.0', tmpDir);
+
+    // Now set v1.0 to executing again and switch to v2.0
+    stateContent = fs.readFileSync(v1StatePath, 'utf-8');
+    stateContent = stateContent.replace(/\*\*Status:\*\*.*/, '**Status:** Executing Phase 3');
+    fs.writeFileSync(v1StatePath, stateContent);
+
+    const result = runGsdTools('milestone switch v2.0', tmpDir);
+    assert.ok(result.success, `Command failed: ${result.error}`);
+
+    const output = JSON.parse(result.output);
+    assert.strictEqual(output.switched, true);
+    assert.strictEqual(output.has_in_progress, true);
+    assert.strictEqual(output.previous_milestone, 'v1.0');
+    assert.ok(output.previous_status.includes('Executing'));
+  });
+
+  test('switch has no warning when current milestone is idle', () => {
+    // beforeEach created v1.0 then v2.0; v2.0 is active with "Ready to plan" status
+    // Switch to v1.0: previous=v2.0 with "Ready to plan" — not in-progress
+    const result = runGsdTools('milestone switch v1.0', tmpDir);
+    assert.ok(result.success, `Command failed: ${result.error}`);
+
+    const output = JSON.parse(result.output);
+    assert.strictEqual(output.switched, true);
+    assert.strictEqual(output.has_in_progress, false);
+    assert.strictEqual(output.previous_milestone, 'v2.0');
+  });
+
+  test('switch to same milestone has no in-progress warning', () => {
+    // beforeEach created v1.0 then v2.0; v2.0 is active
+    // Switch to v2.0 (same as current): previousMilestone === name, so no in-progress check
+    const result = runGsdTools('milestone switch v2.0', tmpDir);
+    assert.ok(result.success, `Command failed: ${result.error}`);
+
+    const output = JSON.parse(result.output);
+    assert.strictEqual(output.switched, true);
+    assert.strictEqual(output.has_in_progress, false);
+  });
 });
 
 // ─── milestone list command ─────────────────────────────────────────────────
