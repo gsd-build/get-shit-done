@@ -1199,10 +1199,14 @@ function convertCommandForRoo(content, pathPrefix) {
  */
 function replacePathsForRoo(content, pathPrefix) {
   const globalClaudeRegex = /~\/\.claude\//g;
+  const dollarHomeClaudeRegex = /\$HOME\/\.claude\//g;
   const localClaudeRegex = /\.\/\.claude\//g;
   
   // Replace global ~/.claude/ with Roo's global path
   content = content.replace(globalClaudeRegex, pathPrefix);
+  
+  // Replace global $HOME/.claude/ with Roo's global path
+  content = content.replace(dollarHomeClaudeRegex, pathPrefix);
   
   // Replace local ./.claude/ with ./.roo/
   content = content.replace(localClaudeRegex, `./.roo/`);
@@ -1281,9 +1285,11 @@ function copyFlattenedCommands(srcDir, destDir, prefix, pathPrefix, runtime) {
 
       let content = fs.readFileSync(srcPath, 'utf8');
       const globalClaudeRegex = /~\/\.claude\//g;
+      const dollarHomeClaudeRegex = /\$HOME\/\.claude\//g;
       const localClaudeRegex = /\.\/\.claude\//g;
       const opencodeDirRegex = /~\/\.opencode\//g;
       content = content.replace(globalClaudeRegex, pathPrefix);
+      content = content.replace(dollarHomeClaudeRegex, pathPrefix);
       content = content.replace(localClaudeRegex, `./${getDirName(runtime)}/`);
       content = content.replace(opencodeDirRegex, pathPrefix);
       content = processAttribution(content, getCommitAttribution(runtime));
@@ -1345,9 +1351,11 @@ function copyCommandsAsCodexSkills(srcDir, skillsDir, prefix, pathPrefix, runtim
 
       let content = fs.readFileSync(srcPath, 'utf8');
       const globalClaudeRegex = /~\/\.claude\//g;
+      const dollarHomeClaudeRegex = /\$HOME\/\.claude\//g;
       const localClaudeRegex = /\.\/\.claude\//g;
       const codexDirRegex = /~\/\.codex\//g;
       content = content.replace(globalClaudeRegex, pathPrefix);
+      content = content.replace(dollarHomeClaudeRegex, pathPrefix);
       content = content.replace(localClaudeRegex, `./${getDirName(runtime)}/`);
       content = content.replace(codexDirRegex, pathPrefix);
       content = processAttribution(content, getCommitAttribution(runtime));
@@ -1391,8 +1399,10 @@ function copyWithPathReplacement(srcDir, destDir, pathPrefix, runtime, isCommand
       // Replace ~/.claude/ and ./.claude/ with runtime-appropriate paths
       let content = fs.readFileSync(srcPath, 'utf8');
       const globalClaudeRegex = /~\/\.claude\//g;
+      const dollarHomeClaudeRegex = /\$HOME\/\.claude\//g;
       const localClaudeRegex = /\.\/\.claude\//g;
       content = content.replace(globalClaudeRegex, pathPrefix);
+      content = content.replace(dollarHomeClaudeRegex, pathPrefix);
       content = content.replace(localClaudeRegex, `./${dirName}/`);
       content = processAttribution(content, getCommitAttribution(runtime));
 
@@ -2721,7 +2731,11 @@ if (process.env.GSD_TEST_MODE) {
     stripGsdFromCodexConfig,
     mergeCodexConfig,
     installCodexConfig,
-    convertClaudeCommandToCodexSkill,
+    convertClaudeCommandToCodexSkill,    
+    replacePathsForRoo,
+    convertCommandForRoo,
+    installRooModes,
+    copyFlattenedCommands,
     GSD_CODEX_MARKER,
     CODEX_AGENT_SANDBOX,
   };
