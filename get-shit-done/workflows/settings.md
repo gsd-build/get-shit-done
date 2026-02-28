@@ -28,7 +28,7 @@ Parse current values (default to `true` if not present):
 - `workflow.research` — spawn researcher during plan-phase
 - `workflow.plan_check` — spawn plan checker during plan-phase
 - `workflow.verifier` — spawn verifier during execute-phase
-- `workflow.nyquist_validation` — validation architecture research during plan-phase
+- `workflow.nyquist_validation` — validation architecture research during plan-phase (default: true if absent)
 - `model_profile` — which model each agent uses (default: `balanced`)
 - `git.branching_strategy` — branching approach (default: `"none"`)
 </step>
@@ -89,8 +89,8 @@ AskUserQuestion([
     header: "Nyquist",
     multiSelect: false,
     options: [
-      { label: "Yes (Recommended)", description: "Research automated test coverage during plan-phase. Adds validation requirements to plans. Blocks approval if tasks lack automated verify." },
-      { label: "No", description: "Skip validation research. Good for rapid prototyping or no-test phases." }
+      { label: "Yes (Recommended)", description: "Research automated test coverage during plan-phase. Adds validation requirements to plans. Blocks approval if tasks lack automated verify. This is the default if the key is absent from config." },
+      { label: "No", description: "Skip validation research. Good for rapid prototyping or no-test phases. Explicitly sets workflow.nyquist_validation to false." }
     ]
   },
   {
