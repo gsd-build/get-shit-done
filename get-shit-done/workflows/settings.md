@@ -16,12 +16,14 @@ node "$HOME/.claude/get-shit-done/bin/gsd-tools.cjs" config-ensure-section
 INIT=$(node "$HOME/.claude/get-shit-done/bin/gsd-tools.cjs" state load)
 ```
 
-Creates `.planning/config.json` with defaults if missing and loads current config values.
+Creates `{planning_base}/config.json` with defaults if missing and loads current config values.
+
+Extract `planning_base` from init JSON (or derive from `state load` response).
 </step>
 
 <step name="read_current">
 ```bash
-cat .planning/config.json
+cat {planning_base}/config.json
 ```
 
 Parse current values (default to `true` if not present):
@@ -127,7 +129,7 @@ Merge new settings into existing config.json:
 }
 ```
 
-Write updated config to `.planning/config.json`.
+Write updated config to `{planning_base}/config.json`.
 </step>
 
 <step name="save_as_defaults">

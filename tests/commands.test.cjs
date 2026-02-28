@@ -482,6 +482,7 @@ describe('progress command', () => {
     assert.ok(result.output.includes('foundation'), 'should include phase name');
   });
 
+  // Regression test for https://github.com/gsd-build/get-shit-done/issues/760
   test('does not crash when summaries exceed plans (orphaned SUMMARY.md)', () => {
     fs.writeFileSync(
       path.join(tmpDir, '.planning', 'ROADMAP.md'),

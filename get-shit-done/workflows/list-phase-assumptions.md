@@ -21,10 +21,18 @@ Example: /gsd:list-phase-assumptions 3
 Exit workflow.
 
 **If argument provided:**
+Load context to get milestone-aware paths:
+
+```bash
+INIT=$(node "$HOME/.claude/get-shit-done/bin/gsd-tools.cjs" init phase-op "${PHASE}")
+```
+
+Extract from init JSON: `roadmap_path`, `state_path`, `phase_dir`, `requirements_path`, `planning_base`.
+
 Validate phase exists in roadmap:
 
 ```bash
-cat .planning/ROADMAP.md | grep -i "Phase ${PHASE}"
+cat ${roadmap_path} | grep -i "Phase ${PHASE}"
 ```
 
 **If phase not found:**
