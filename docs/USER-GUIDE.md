@@ -202,6 +202,7 @@ rapid prototyping phases where test infrastructure isn't the focus.
 | `/gsd:check-todos` | List pending todos | Review captured ideas |
 | `/gsd:settings` | Configure workflow toggles and model profile | Change model, toggle agents |
 | `/gsd:set-profile <profile>` | Quick profile switch | Change cost/quality tradeoff |
+| `/gsd:add-tests <N> [instructions]` | Generate unit and E2E tests for completed phase | After execution, before milestone completion |
 | `/gsd:reapply-patches` | Restore local modifications after update | After `/gsd:update` if you had local edits |
 
 ---
