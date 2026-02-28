@@ -283,6 +283,11 @@ function cmdPhasePlanIndex(cwd, phase, raw) {
       id: planId,
       wave,
       autonomous,
+      type: fm.type || 'execute',
+      depends_on: (() => {
+        const d = fm.depends_on || fm['depends-on'] || [];
+        return Array.isArray(d) ? d : [d];
+      })(),
       objective: extractObjective(content) || fm.objective || null,
       files_modified: filesModified,
       task_count: taskCount,

@@ -356,6 +356,52 @@ objective: Manual review needed
     const output = JSON.parse(result.output);
     assert.strictEqual(output.error, 'Phase not found', 'should report phase not found');
   });
+
+  test('plan with type and depends_on frontmatter', () => {
+    const phaseDir = path.join(tmpDir, '.planning', 'phases', '03-api');
+    fs.mkdirSync(phaseDir, { recursive: true });
+
+    fs.writeFileSync(
+      path.join(phaseDir, '03-01-PLAN.md'),
+      `---
+wave: 1
+type: tdd
+depends_on: ["03-01"]
+---
+
+## Task 1: Setup
+`
+    );
+
+    const result = runGsdTools('phase-plan-index 03', tmpDir);
+    assert.ok(result.success, `Command failed: ${result.error}`);
+
+    const output = JSON.parse(result.output);
+    assert.strictEqual(output.plans[0].type, 'tdd', 'type should be tdd');
+    assert.deepStrictEqual(output.plans[0].depends_on, ['03-01'], 'depends_on should be parsed');
+  });
+
+  test('plan without type/depends_on defaults correctly', () => {
+    const phaseDir = path.join(tmpDir, '.planning', 'phases', '03-api');
+    fs.mkdirSync(phaseDir, { recursive: true });
+
+    fs.writeFileSync(
+      path.join(phaseDir, '03-01-PLAN.md'),
+      `---
+wave: 1
+---
+
+## Task 1: Setup
+`
+    );
+
+    const result = runGsdTools('phase-plan-index 03', tmpDir);
+    assert.ok(result.success, `Command failed: ${result.error}`);
+
+    const output = JSON.parse(result.output);
+    assert.strictEqual(output.plans[0].type, 'execute', 'type should default to execute');
+    assert.deepStrictEqual(output.plans[0].depends_on, [], 'depends_on should default to empty array');
+  });
 });
 
 

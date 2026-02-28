@@ -12,6 +12,11 @@ Configuration options for `.planning/` directory behavior.
   "branching_strategy": "none",
   "phase_branch_template": "gsd/phase-{phase}-{slug}",
   "milestone_branch_template": "gsd/{milestone}-{slug}"
+},
+"adaptive_settings": {
+  "min_model": "sonnet",
+  "max_model": "opus",
+  "log_selections": false
 }
 ```
 
@@ -22,6 +27,9 @@ Configuration options for `.planning/` directory behavior.
 | `git.branching_strategy` | `"none"` | Git branching approach: `"none"`, `"phase"`, or `"milestone"` |
 | `git.phase_branch_template` | `"gsd/phase-{phase}-{slug}"` | Branch template for phase strategy |
 | `git.milestone_branch_template` | `"gsd/{milestone}-{slug}"` | Branch template for milestone strategy |
+| `adaptive_settings.min_model` | none | Floor model for adaptive profile (never select below) |
+| `adaptive_settings.max_model` | none | Ceiling model for adaptive profile (never select above) |
+| `adaptive_settings.log_selections` | `false` | When true, appends each model selection to `.planning/adaptive-usage.json` |
 </config_schema>
 
 <commit_docs_behavior>

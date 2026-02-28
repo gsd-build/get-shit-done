@@ -158,7 +158,8 @@ AskUserQuestion([
     options: [
       { label: "Balanced (Recommended)", description: "Sonnet for most agents — good quality/cost ratio" },
       { label: "Quality", description: "Opus for research/roadmap — higher cost, deeper analysis" },
-      { label: "Budget", description: "Haiku where possible — fastest, lowest cost" }
+      { label: "Budget", description: "Haiku where possible — fastest, lowest cost" },
+      { label: "Adaptive", description: "Auto-selects model per-plan based on complexity (35-65% savings)" }
     ]
   }
 ])
@@ -172,7 +173,7 @@ Create `.planning/config.json` with mode set to "yolo":
   "depth": "[selected]",
   "parallelization": true|false,
   "commit_docs": true|false,
-  "model_profile": "quality|balanced|budget",
+  "model_profile": "quality|balanced|budget|adaptive",
   "workflow": {
     "research": true|false,
     "plan_check": true|false,
@@ -457,7 +458,8 @@ questions: [
     options: [
       { label: "Balanced (Recommended)", description: "Sonnet for most agents — good quality/cost ratio" },
       { label: "Quality", description: "Opus for research/roadmap — higher cost, deeper analysis" },
-      { label: "Budget", description: "Haiku where possible — fastest, lowest cost" }
+      { label: "Budget", description: "Haiku where possible — fastest, lowest cost" },
+      { label: "Adaptive", description: "Auto-selects model per-plan based on complexity (35-65% savings)" }
     ]
   }
 ]
@@ -471,7 +473,7 @@ Create `.planning/config.json` with all settings:
   "depth": "quick|standard|comprehensive",
   "parallelization": true|false,
   "commit_docs": true|false,
-  "model_profile": "quality|balanced|budget",
+  "model_profile": "quality|balanced|budget|adaptive",
   "workflow": {
     "research": true|false,
     "plan_check": true|false,
