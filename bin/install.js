@@ -228,14 +228,18 @@ function buildHookCommand(configDir, hookName) {
 }
 
 /**
- * Read and parse settings.json, returning empty object if it doesn't exist
+ * Read and parse settings.json, returning empty object if it doesn't exist.
+ * Returns null if the file exists but contains invalid JSON, to prevent
+ * callers from overwriting corrupt files with empty settings (data loss).
  */
 function readSettings(settingsPath) {
   if (fs.existsSync(settingsPath)) {
     try {
       return JSON.parse(fs.readFileSync(settingsPath, 'utf8'));
     } catch (e) {
-      return {};
+      console.error(`  ${yellow}⚠${reset}  Failed to parse ${settingsPath}: ${e.message}`);
+      console.error(`  ${yellow}⚠${reset}  Skipping settings modifications to avoid data loss. Fix the file manually and re-run.`);
+      return null;
     }
   }
   return {};
@@ -266,11 +270,11 @@ function getCommitAttribution(runtime) {
 
   if (runtime === 'opencode') {
     const config = readSettings(path.join(getGlobalDir('opencode', null), 'opencode.json'));
-    result = config.disable_ai_attribution === true ? null : undefined;
+    result = config && config.disable_ai_attribution === true ? null : undefined;
   } else if (runtime === 'gemini') {
     // Gemini: check gemini settings.json for attribution config
     const settings = readSettings(path.join(getGlobalDir('gemini', explicitConfigDir), 'settings.json'));
-    if (!settings.attribution || settings.attribution.commit === undefined) {
+    if (!settings || !settings.attribution || settings.attribution.commit === undefined) {
       result = undefined;
     } else if (settings.attribution.commit === '') {
       result = null;
@@ -280,7 +284,7 @@ function getCommitAttribution(runtime) {
   } else if (runtime === 'claude') {
     // Claude Code
     const settings = readSettings(path.join(getGlobalDir('claude', explicitConfigDir), 'settings.json'));
-    if (!settings.attribution || settings.attribution.commit === undefined) {
+    if (!settings || !settings.attribution || settings.attribution.commit === undefined) {
       result = undefined;
     } else if (settings.attribution.commit === '') {
       result = null;
@@ -1370,6 +1374,9 @@ function uninstall(isGlobal, runtime = 'claude') {
   const settingsPath = path.join(targetDir, 'settings.json');
   if (fs.existsSync(settingsPath)) {
     let settings = readSettings(settingsPath);
+    if (settings === null) {
+      console.log(`  ${yellow}⚠${reset}  Skipping settings.json cleanup (file is corrupt)`);
+    } else {
     let settingsModified = false;
 
     // Remove GSD statusline if it references our hook
@@ -1433,6 +1440,7 @@ function uninstall(isGlobal, runtime = 'claude') {
       writeSettings(settingsPath, settings);
       removedCount++;
     }
+    } // end null-guard
   }
 
   // 6. For OpenCode, clean up permissions from opencode.json
@@ -2033,7 +2041,12 @@ function install(isGlobal, runtime = 'claude') {
   // Configure statusline and hooks in settings.json
   // Gemini shares same hook system as Claude Code for now
   const settingsPath = path.join(targetDir, 'settings.json');
-  const settings = cleanupOrphanedHooks(readSettings(settingsPath));
+  const rawSettings = readSettings(settingsPath);
+  if (rawSettings === null) {
+    // Corrupt settings.json — skip all settings modifications to avoid data loss
+    return { settingsPath: null, settings: null, statuslineCommand: null, runtime };
+  }
+  const settings = cleanupOrphanedHooks(rawSettings);
   const statuslineCommand = isGlobal
     ? buildHookCommand(targetDir, 'gsd-statusline.js')
     : 'node ' + dirName + '/hooks/gsd-statusline.js';
