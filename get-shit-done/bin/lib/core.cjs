@@ -64,7 +64,37 @@ function safeReadFile(filePath) {
   }
 }
 
-function loadConfig(cwd) {
+/**
+ * Read the Brave Search API key from the environment or the user-level key file.
+ *
+ * Resolution order:
+ *   1. BRAVE_API_KEY environment variable
+ *   2. <homedir>/.gsd/brave_api_key file (UTF-8 or UTF-16 LE with BOM)
+ *
+ * @param {string} [homedir] - Override the home directory (used in tests to avoid touching ~/.gsd).
+ *   Defaults to os.homedir().
+ * Returns the trimmed key string, or null if no key is found.
+ */
+function readBraveApiKey(homedir) {
+  if (process.env.BRAVE_API_KEY) return process.env.BRAVE_API_KEY;
+
+  try {
+    const os = require('os');
+    const keyFile = path.join(homedir || os.homedir(), '.gsd', 'brave_api_key');
+    if (!fs.existsSync(keyFile)) return null;
+
+    const raw = fs.readFileSync(keyFile);
+    // Detect UTF-16 LE BOM (FF FE) — produced by Windows Notepad / PowerShell Set-Content
+    if (raw.length >= 2 && raw[0] === 0xFF && raw[1] === 0xFE) {
+      return raw.slice(2).toString('utf16le').trim() || null;
+    }
+    return raw.toString('utf8').trim() || null;
+  } catch {
+    return null;
+  }
+}
+
+function loadConfig(cwd, opts) {
   const configPath = path.join(cwd, '.planning', 'config.json');
   const defaults = {
     model_profile: 'balanced',
@@ -112,7 +142,7 @@ function loadConfig(cwd) {
       verifier: get('verifier', { section: 'workflow', field: 'verifier' }) ?? defaults.verifier,
       nyquist_validation: get('nyquist_validation', { section: 'workflow', field: 'nyquist_validation' }) ?? defaults.nyquist_validation,
       parallelization,
-      brave_search: get('brave_search') ?? defaults.brave_search,
+      brave_search: get('brave_search') ?? !!readBraveApiKey(opts && opts.homedir),
       model_overrides: parsed.model_overrides || null,
     };
   } catch {
@@ -414,6 +444,7 @@ module.exports = {
   output,
   error,
   safeReadFile,
+  readBraveApiKey,
   loadConfig,
   isGitIgnored,
   execGit,

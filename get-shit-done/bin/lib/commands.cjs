@@ -4,7 +4,7 @@
 const fs = require('fs');
 const path = require('path');
 const { execSync } = require('child_process');
-const { safeReadFile, loadConfig, isGitIgnored, execGit, normalizePhaseName, comparePhaseNum, getArchivedPhaseDirs, generateSlugInternal, getMilestoneInfo, resolveModelInternal, MODEL_PROFILES, output, error, findPhaseInternal } = require('./core.cjs');
+const { safeReadFile, readBraveApiKey, loadConfig, isGitIgnored, execGit, normalizePhaseName, comparePhaseNum, getArchivedPhaseDirs, generateSlugInternal, getMilestoneInfo, resolveModelInternal, MODEL_PROFILES, output, error, findPhaseInternal } = require('./core.cjs');
 const { extractFrontmatter } = require('./frontmatter.cjs');
 
 function cmdGenerateSlug(text, raw) {
@@ -318,7 +318,7 @@ function cmdSummaryExtract(cwd, summaryPath, fields, raw) {
 }
 
 async function cmdWebsearch(query, options, raw) {
-  const apiKey = process.env.BRAVE_API_KEY;
+  const apiKey = readBraveApiKey();
 
   if (!apiKey) {
     // No key = silent skip, agent falls back to built-in WebSearch

@@ -13,6 +13,7 @@ const os = require('os');
 
 const {
   loadConfig,
+  readBraveApiKey,
   resolveModelInternal,
   MODEL_PROFILES,
   escapeRegex,
@@ -52,13 +53,23 @@ describe('loadConfig', () => {
   }
 
   test('returns defaults when config.json is missing', () => {
-    const config = loadConfig(tmpDir);
-    assert.strictEqual(config.model_profile, 'balanced');
-    assert.strictEqual(config.commit_docs, true);
-    assert.strictEqual(config.research, true);
-    assert.strictEqual(config.plan_checker, true);
-    assert.strictEqual(config.brave_search, false);
-    assert.strictEqual(config.parallelization, true);
+    // Pass an empty tmpDir as fake homedir so brave_search auto-detection is deterministic
+    const fakeHome = fs.mkdtempSync(path.join(os.tmpdir(), 'gsd-brave-home-'));
+    const origApiKey = process.env.BRAVE_API_KEY;
+    try {
+      delete process.env.BRAVE_API_KEY;
+      const config = loadConfig(tmpDir, { homedir: fakeHome });
+      assert.strictEqual(config.model_profile, 'balanced');
+      assert.strictEqual(config.commit_docs, true);
+      assert.strictEqual(config.research, true);
+      assert.strictEqual(config.plan_checker, true);
+      assert.strictEqual(config.parallelization, true);
+      assert.strictEqual(config.brave_search, false);
+    } finally {
+      if (origApiKey !== undefined) process.env.BRAVE_API_KEY = origApiKey;
+      else delete process.env.BRAVE_API_KEY;
+      fs.rmSync(fakeHome, { recursive: true, force: true });
+    }
   });
 
   test('reads model_profile from config.json', () => {
@@ -118,6 +129,114 @@ describe('loadConfig', () => {
     writeConfig({ commit_docs: false, planning: { commit_docs: true } });
     const config = loadConfig(tmpDir);
     assert.strictEqual(config.commit_docs, false);
+  });
+});
+
+// ─── readBraveApiKey ──────────────────────────────────────────────────────────
+//
+// All tests use an isolated tmpdir as the fake home directory so that the real
+// ~/.gsd/brave_api_key is never read, written, or deleted — even on test failure
+// or interruption.
+
+describe('readBraveApiKey', () => {
+  let origApiKey;
+  let fakeHome;
+
+  beforeEach(() => {
+    origApiKey = process.env.BRAVE_API_KEY;
+    fakeHome = fs.mkdtempSync(path.join(os.tmpdir(), 'gsd-brave-home-'));
+  });
+
+  afterEach(() => {
+    if (origApiKey !== undefined) {
+      process.env.BRAVE_API_KEY = origApiKey;
+    } else {
+      delete process.env.BRAVE_API_KEY;
+    }
+    fs.rmSync(fakeHome, { recursive: true, force: true });
+  });
+
+  // Env var takes priority over any file — no homedir needed.
+  test('returns env var when BRAVE_API_KEY is set', () => {
+    process.env.BRAVE_API_KEY = 'env-key-value';
+    assert.strictEqual(readBraveApiKey(fakeHome), 'env-key-value');
+  });
+
+  test('returns null when env var is unset and no key file exists', () => {
+    delete process.env.BRAVE_API_KEY;
+    // fakeHome has no .gsd/brave_api_key, so readBraveApiKey must return null
+    assert.strictEqual(readBraveApiKey(fakeHome), null);
+  });
+
+  test('reads key from <homedir>/.gsd/brave_api_key (UTF-8)', () => {
+    delete process.env.BRAVE_API_KEY;
+    const gsdDir = path.join(fakeHome, '.gsd');
+    fs.mkdirSync(gsdDir, { recursive: true });
+    fs.writeFileSync(path.join(gsdDir, 'brave_api_key'), 'my-utf8-key\n', 'utf-8');
+    assert.strictEqual(readBraveApiKey(fakeHome), 'my-utf8-key');
+  });
+
+  test('reads key from <homedir>/.gsd/brave_api_key with UTF-16 LE BOM', () => {
+    delete process.env.BRAVE_API_KEY;
+    const gsdDir = path.join(fakeHome, '.gsd');
+    fs.mkdirSync(gsdDir, { recursive: true });
+
+    // Mimic a file written by Windows Notepad / PowerShell Set-Content (UTF-16 LE + BOM)
+    const keyText = 'my-utf16-key';
+    const bom = Buffer.from([0xFF, 0xFE]);
+    const body = Buffer.from(keyText, 'utf16le');
+    fs.writeFileSync(path.join(gsdDir, 'brave_api_key'), Buffer.concat([bom, body]));
+
+    assert.strictEqual(readBraveApiKey(fakeHome), 'my-utf16-key');
+  });
+
+  test('returns null for a key file that contains only whitespace', () => {
+    delete process.env.BRAVE_API_KEY;
+    const gsdDir = path.join(fakeHome, '.gsd');
+    fs.mkdirSync(gsdDir, { recursive: true });
+    fs.writeFileSync(path.join(gsdDir, 'brave_api_key'), '   \n', 'utf-8');
+    assert.strictEqual(readBraveApiKey(fakeHome), null);
+  });
+
+  // loadConfig integration — uses homedir override so ~/.gsd is never touched
+  test('loadConfig auto-detects brave_search from key file when not set in config', () => {
+    delete process.env.BRAVE_API_KEY;
+    const gsdDir = path.join(fakeHome, '.gsd');
+    fs.mkdirSync(gsdDir, { recursive: true });
+    fs.writeFileSync(path.join(gsdDir, 'brave_api_key'), 'auto-detect-key', 'utf-8');
+
+    const projectDir = fs.mkdtempSync(path.join(os.tmpdir(), 'gsd-brave-proj-'));
+    try {
+      fs.mkdirSync(path.join(projectDir, '.planning'), { recursive: true });
+      fs.writeFileSync(
+        path.join(projectDir, '.planning', 'config.json'),
+        JSON.stringify({ model_profile: 'balanced' })
+      );
+      const config = loadConfig(projectDir, { homedir: fakeHome });
+      assert.strictEqual(config.brave_search, true, 'should auto-detect true when key file exists');
+    } finally {
+      fs.rmSync(projectDir, { recursive: true, force: true });
+    }
+  });
+
+  test('loadConfig respects explicit brave_search: false in config even when key file exists', () => {
+    delete process.env.BRAVE_API_KEY;
+    const gsdDir = path.join(fakeHome, '.gsd');
+    fs.mkdirSync(gsdDir, { recursive: true });
+    fs.writeFileSync(path.join(gsdDir, 'brave_api_key'), 'some-key', 'utf-8');
+
+    const projectDir = fs.mkdtempSync(path.join(os.tmpdir(), 'gsd-brave-proj-'));
+    try {
+      fs.mkdirSync(path.join(projectDir, '.planning'), { recursive: true });
+      fs.writeFileSync(
+        path.join(projectDir, '.planning', 'config.json'),
+        JSON.stringify({ brave_search: false })
+      );
+      const config = loadConfig(projectDir, { homedir: fakeHome });
+      assert.strictEqual(config.brave_search, false, 'explicit false in config must win');
+    } finally {
+      fs.rmSync(projectDir, { recursive: true, force: true });
+    }
   });
 });
 

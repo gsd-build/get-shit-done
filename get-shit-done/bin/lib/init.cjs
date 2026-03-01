@@ -5,7 +5,7 @@
 const fs = require('fs');
 const path = require('path');
 const { execSync } = require('child_process');
-const { loadConfig, resolveModelInternal, findPhaseInternal, getRoadmapPhaseInternal, pathExistsInternal, generateSlugInternal, getMilestoneInfo, normalizePhaseName, toPosixPath, output, error } = require('./core.cjs');
+const { loadConfig, readBraveApiKey, resolveModelInternal, findPhaseInternal, getRoadmapPhaseInternal, pathExistsInternal, generateSlugInternal, getMilestoneInfo, normalizePhaseName, toPosixPath, output, error } = require('./core.cjs');
 
 function cmdInitExecutePhase(cwd, phase, raw) {
   if (!phase) {
@@ -163,9 +163,7 @@ function cmdInitNewProject(cwd, raw) {
   const config = loadConfig(cwd);
 
   // Detect Brave Search API key availability
-  const homedir = require('os').homedir();
-  const braveKeyFile = path.join(homedir, '.gsd', 'brave_api_key');
-  const hasBraveSearch = !!(process.env.BRAVE_API_KEY || fs.existsSync(braveKeyFile));
+  const hasBraveSearch = !!readBraveApiKey();
 
   // Detect existing code
   let hasCode = false;
