@@ -83,7 +83,12 @@ function cmdVerifyPathExists(cwd, targetPath, raw) {
     error('path required for verification');
   }
 
-  const fullPath = path.isAbsolute(targetPath) ? targetPath : path.join(cwd, targetPath);
+  const fullPath = path.resolve(cwd, targetPath);
+
+  // Prevent path traversal — resolved path must stay within cwd
+  if (!fullPath.startsWith(path.resolve(cwd) + path.sep) && fullPath !== path.resolve(cwd)) {
+    error('path must be within the project directory');
+  }
 
   try {
     const stats = fs.statSync(fullPath);

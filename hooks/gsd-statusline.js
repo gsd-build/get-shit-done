@@ -18,6 +18,9 @@ process.stdin.on('end', () => {
     const session = data.session_id || '';
     const remaining = data.context_window?.remaining_percentage;
 
+    // Validate session_id to prevent path traversal in temp file paths
+    const safeSession = /^[a-f0-9-]+$/i.test(session) ? session : '';
+
     // Context window display (shows USED percentage scaled to 80% limit)
     // Claude Code enforces an 80% context limit, so we scale to show 100% at that point
     let ctx = '';
@@ -29,9 +32,9 @@ process.stdin.on('end', () => {
 
       // Write context metrics to bridge file for the context-monitor PostToolUse hook.
       // The monitor reads this file to inject agent-facing warnings when context is low.
-      if (session) {
+      if (safeSession) {
         try {
-          const bridgePath = path.join(os.tmpdir(), `claude-ctx-${session}.json`);
+          const bridgePath = path.join(os.tmpdir(), `claude-ctx-${safeSession}.json`);
           const bridgeData = JSON.stringify({
             session_id: session,
             remaining_percentage: remaining,

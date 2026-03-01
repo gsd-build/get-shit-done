@@ -34,7 +34,7 @@ process.stdin.on('end', () => {
     const data = JSON.parse(input);
     const sessionId = data.session_id;
 
-    if (!sessionId) {
+    if (!sessionId || !/^[a-f0-9-]+$/i.test(sessionId)) {
       process.exit(0);
     }
 
