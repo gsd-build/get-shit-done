@@ -307,10 +307,16 @@ Verified patterns from official sources:
 
 ## Open Questions
 
-1. **[Question]**
-   - What we know: [partial info]
-   - What's unclear: [the gap]
-   - Recommendation: [how to handle]
+### Resolved
+- {Question}: {How research answered it}
+
+### Genuine Gaps
+| Question | Criticality | Recommendation |
+|----------|-------------|----------------|
+| {Question} | Critical/Medium/Low | Spike/Defer/Accept-risk |
+
+### Still Open
+- {Questions that couldn't be resolved - flagged for attention}
 
 ## Sources
 
@@ -449,7 +455,7 @@ node ~/.claude/get-shit-done/bin/gsd-tools.js commit "docs($PHASE): research pha
 | Pitfalls | [level] | [why] |
 
 ### Open Questions
-[Gaps that couldn't be resolved]
+[Structured format: Resolved, Genuine Gaps (table), Still Open -- see output_format template]
 
 ### Ready for Planning
 Research complete. Planner can now create PLAN.md files.

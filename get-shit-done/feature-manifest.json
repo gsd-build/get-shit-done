@@ -247,6 +247,40 @@
           "skip_value": "skip"
         }
       ]
+    },
+    "spike": {
+      "scope": "project",
+      "introduced": "1.16.0",
+      "config_key": "spike",
+      "schema": {
+        "enabled": {
+          "type": "boolean",
+          "default": true,
+          "description": "Whether the spike system is active"
+        },
+        "sensitivity": {
+          "type": "string",
+          "enum": ["conservative", "balanced", "aggressive"],
+          "default": "balanced",
+          "description": "Which gap criticalities trigger spikes (conservative=Critical only, balanced=Critical+Medium, aggressive=all)"
+        },
+        "auto_trigger": {
+          "type": "boolean",
+          "default": false,
+          "description": "Whether plan-phase automatically triggers spikes for genuine gaps (false=advisory only)"
+        }
+      },
+      "init_prompts": [
+        {
+          "field": "_gate",
+          "question": "Configure spike experiment settings?",
+          "options": [
+            { "value": "skip", "label": "Skip (use defaults)" },
+            { "value": "configure", "label": "Configure now" }
+          ],
+          "skip_value": "skip"
+        }
+      ]
     }
   }
 }
