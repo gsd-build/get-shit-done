@@ -4,7 +4,7 @@
 
 const fs = require('fs');
 const path = require('path');
-const { execSync } = require('child_process');
+const { execSync, execFileSync } = require('child_process');
 
 // ─── Model Profile Table ─────────────────────────────────────────────────────
 
@@ -114,7 +114,7 @@ function loadConfig(cwd) {
 
 function isGitIgnored(cwd, targetPath) {
   try {
-    execSync('git check-ignore -q -- ' + targetPath.replace(/[^a-zA-Z0-9._\-/]/g, ''), {
+    execFileSync('git', ['check-ignore', '-q', '--', targetPath], {
       cwd,
       stdio: 'pipe',
     });
@@ -126,11 +126,7 @@ function isGitIgnored(cwd, targetPath) {
 
 function execGit(cwd, args) {
   try {
-    const escaped = args.map(a => {
-      if (/^[a-zA-Z0-9._\-/=:@]+$/.test(a)) return a;
-      return "'" + a.replace(/'/g, "'\\''") + "'";
-    });
-    const stdout = execSync('git ' + escaped.join(' '), {
+    const stdout = execFileSync('git', args, {
       cwd,
       stdio: 'pipe',
       encoding: 'utf-8',
