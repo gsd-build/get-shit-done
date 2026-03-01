@@ -172,6 +172,11 @@ Track:
 Find the first PLAN.md without matching SUMMARY.md.
 Read its `<objective>` section.
 
+Check auto-advance config:
+```bash
+AUTO_CFG=$(node "$HOME/.claude/get-shit-done/bin/gsd-tools.cjs" config-get workflow.auto_advance 2>/dev/null || echo "false")
+```
+
 ```
 ---
 
@@ -180,6 +185,8 @@ Read its `<objective>` section.
 **{phase}-{plan}: [Plan Name]** — [objective summary from PLAN.md]
 
 `/gsd:execute-phase {phase}`
+
+{If AUTO_CFG is true: `Autopilot: ON — add --auto to run through remaining phases automatically`}
 
 <sub>`/clear` first → fresh context window</sub>
 
@@ -227,6 +234,8 @@ Check if `{phase_num}-CONTEXT.md` exists in phase directory.
 **Also available:**
 - `/gsd:plan-phase {phase}` — skip discussion, plan directly
 - `/gsd:list-phase-assumptions {phase}` — see Claude's assumptions
+- `/gsd:discuss-phase {phase} --auto` — autopilot: discuss → plan → execute → next phase automatically
+- `/gsd:settings` — enable auto-advance for all future phases
 
 ---
 ```
@@ -300,6 +309,8 @@ Read ROADMAP.md to get the next phase's name and goal.
 **Also available:**
 - `/gsd:plan-phase {Z+1}` — skip discussion, plan directly
 - `/gsd:verify-work {Z}` — user acceptance test before continuing
+- `/gsd:discuss-phase {Z+1} --auto` — autopilot: discuss → plan → execute → next phase automatically
+- `/gsd:settings` — enable auto-advance for all future phases
 
 ---
 ```

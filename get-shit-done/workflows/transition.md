@@ -378,7 +378,39 @@ Next: Phase [X+1] — [Name]
 ⚡ Auto-continuing: Plan Phase [X+1] in detail
 ```
 
-Exit skill and invoke SlashCommand("/gsd:plan-phase [X+1] --auto")
+Spawn plan-phase as Task with direct workflow file reference (do NOT use Skill tool or SlashCommand — they don't resolve inside Task subagents):
+```
+Task(
+  prompt="
+    <objective>
+    You are the plan-phase orchestrator. Create executable plans for Phase ${NEXT_PHASE}: ${NEXT_PHASE_NAME}, then auto-advance to execution.
+    </objective>
+
+    <execution_context>
+    @~/.claude/get-shit-done/workflows/plan-phase.md
+    @~/.claude/get-shit-done/references/ui-brand.md
+    @~/.claude/get-shit-done/references/model-profile-resolution.md
+    </execution_context>
+
+    <arguments>
+    PHASE=${NEXT_PHASE}
+    ARGUMENTS='${NEXT_PHASE} --auto'
+    </arguments>
+
+    <instructions>
+    1. Read plan-phase.md from execution_context for your complete workflow
+    2. Follow ALL steps: initialize, validate, load context, research, plan, verify, auto-advance
+    3. The --auto flag means: after planning completes, spawn execute-phase as a Task
+    4. When spawning agents (gsd-phase-researcher, gsd-planner, gsd-plan-checker), use Task with specified subagent_type and model
+    5. For auto-advance to execute: spawn execute-phase as a Task with DIRECT file reference. Include @file refs to execute-phase.md, checkpoints.md, tdd.md, model-profile-resolution.md. Pass --auto flag (NOT --no-transition) so the chain continues after execution.
+    6. Do NOT use the Skill tool or /gsd: commands. Read workflow .md files directly.
+    7. Return: PHASE COMPLETE, PLANNING COMPLETE, PLANNING INCONCLUSIVE, or GAPS FOUND
+    </instructions>
+  ",
+  subagent_type="general-purpose",
+  description="Plan Phase ${NEXT_PHASE}"
+)
+```
 
 **If CONTEXT.md does NOT exist:**
 
@@ -390,7 +422,41 @@ Next: Phase [X+1] — [Name]
 ⚡ Auto-continuing: Discuss Phase [X+1] first
 ```
 
-Exit skill and invoke SlashCommand("/gsd:discuss-phase [X+1] --auto")
+Spawn discuss-phase as Task with direct workflow file reference (do NOT use Skill tool or SlashCommand — they don't resolve inside Task subagents):
+```
+Task(
+  prompt="
+    <objective>
+    You are the discuss-phase orchestrator. Gather implementation context for Phase ${NEXT_PHASE}: ${NEXT_PHASE_NAME}, then auto-advance to planning and execution.
+    </objective>
+
+    <execution_context>
+    @~/.claude/get-shit-done/workflows/discuss-phase.md
+    </execution_context>
+
+    <arguments>
+    PHASE=${NEXT_PHASE}
+    ARGUMENTS='${NEXT_PHASE} --auto'
+    </arguments>
+
+    <instructions>
+    1. Read discuss-phase.md from execution_context for your complete workflow
+    2. Follow ALL steps: initialize, check_existing, scout_codebase, analyze_phase, present_gray_areas, discuss_areas, write_context
+    3. The --auto flag means: after context is captured, spawn plan-phase as a Task (see auto_advance step in discuss-phase.md)
+    4. For checkpoint handling in auto mode: auto-approve human-verify checkpoints, auto-select first option for decision checkpoints, present human-action checkpoints to user
+    5. Do NOT use the Skill tool or /gsd: commands. Read workflow .md files directly.
+    6. Return: PHASE COMPLETE (full chain succeeded), CONTEXT CAPTURED (discuss done, downstream failed), or DISCUSSION BLOCKED
+    </instructions>
+  ",
+  subagent_type="general-purpose",
+  description="Discuss Phase ${NEXT_PHASE}"
+)
+```
+
+**Handle Task return:**
+- **PHASE COMPLETE** → Display: `Auto-advance pipeline finished for Phase ${NEXT_PHASE}. Next: /gsd:progress`
+- **PLANNING COMPLETE / CONTEXT CAPTURED** → Display partial status and manual next step
+- **GAPS FOUND** → Display gaps, stop chain: `/gsd:plan-phase ${NEXT_PHASE} --gaps`
 
 </if>
 
@@ -466,7 +532,37 @@ Phase {X} marked complete.
 ⚡ Auto-continuing: Complete milestone and archive
 ```
 
-Exit skill and invoke SlashCommand("/gsd:complete-milestone {version}")
+Spawn complete-milestone as Task with direct workflow file reference (do NOT use Skill tool or SlashCommand — they don't resolve inside Task subagents):
+```
+Task(
+  prompt="
+    <objective>
+    Complete milestone {version}. Archive planning artifacts and prepare for next milestone.
+    </objective>
+
+    <execution_context>
+    @~/.claude/get-shit-done/workflows/complete-milestone.md
+    </execution_context>
+
+    <arguments>
+    ARGUMENTS='{version}'
+    </arguments>
+
+    <instructions>
+    1. Read complete-milestone.md from execution_context for your complete workflow
+    2. Follow ALL steps to archive the milestone
+    3. Do NOT use the Skill tool or /gsd: commands. Read workflow .md files directly.
+    4. Return: MILESTONE COMPLETE or MILESTONE BLOCKED
+    </instructions>
+  ",
+  subagent_type="general-purpose",
+  description="Complete Milestone {version}"
+)
+```
+
+**Handle Task return:**
+- **MILESTONE COMPLETE** → Display: `Milestone {version} archived. Run /gsd:new-milestone to start the next cycle.`
+- **MILESTONE BLOCKED** → Display blocker and manual next step
 
 </if>
 
