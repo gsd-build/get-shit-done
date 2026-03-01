@@ -103,5 +103,10 @@ Verification requires goal-backward reasoning - checking if code *delivers* what
 **Why Haiku for gsd-codebase-mapper?**
 Read-only exploration and pattern extraction. No reasoning required, just structured output from file contents.
 
-**Why `inherit` instead of passing `opus` directly?**
-Claude Code's `"opus"` alias maps to a specific model version. Organizations may block older opus versions while allowing newer ones. GSD returns `"inherit"` for opus-tier agents, causing them to use whatever opus version the user has configured in their session. This avoids version conflicts and silent fallbacks to Sonnet.
+**Why `opus` and not `inherit`?**
+GSD passes `"opus"` directly to Claude Code's Task tool, which resolves it to the current
+Opus model version. Earlier versions used `"inherit"` to avoid org-policy version conflicts,
+but this silently downgraded agents to Sonnet when the parent session ran on Sonnet (the
+default). Passing `"opus"` explicitly ensures quality-profile agents actually run on Opus.
+If an org policy blocks Opus, the Task call will fail with a clear error rather than
+silently running on the wrong model.

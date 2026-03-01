@@ -160,7 +160,7 @@ describe('resolveModelInternal', () => {
     test('all known agents resolve to a valid string for each profile', () => {
       const knownAgents = ['gsd-planner', 'gsd-executor', 'gsd-phase-researcher', 'gsd-codebase-mapper'];
       const profiles = ['quality', 'balanced', 'budget'];
-      const validValues = ['inherit', 'sonnet', 'haiku', 'opus'];
+      const validValues = ['opus', 'sonnet', 'haiku'];
 
       for (const profile of profiles) {
         writeConfig({ model_profile: profile });
@@ -184,11 +184,11 @@ describe('resolveModelInternal', () => {
       assert.strictEqual(resolveModelInternal(tmpDir, 'gsd-executor'), 'haiku');
     });
 
-    test('opus override resolves to inherit', () => {
+    test('opus override resolves to opus', () => {
       writeConfig({
         model_overrides: { 'gsd-executor': 'opus' },
       });
-      assert.strictEqual(resolveModelInternal(tmpDir, 'gsd-executor'), 'inherit');
+      assert.strictEqual(resolveModelInternal(tmpDir, 'gsd-executor'), 'opus');
     });
 
     test('agents not in override fall back to profile', () => {
@@ -196,8 +196,8 @@ describe('resolveModelInternal', () => {
         model_profile: 'quality',
         model_overrides: { 'gsd-executor': 'haiku' },
       });
-      // gsd-planner not overridden, should use quality profile -> opus -> inherit
-      assert.strictEqual(resolveModelInternal(tmpDir, 'gsd-planner'), 'inherit');
+      // gsd-planner not overridden, should use quality profile -> opus
+      assert.strictEqual(resolveModelInternal(tmpDir, 'gsd-planner'), 'opus');
     });
   });
 
@@ -209,8 +209,8 @@ describe('resolveModelInternal', () => {
 
     test('defaults to balanced profile when model_profile missing', () => {
       writeConfig({});
-      // balanced profile, gsd-planner -> opus -> inherit
-      assert.strictEqual(resolveModelInternal(tmpDir, 'gsd-planner'), 'inherit');
+      // balanced profile, gsd-planner -> opus
+      assert.strictEqual(resolveModelInternal(tmpDir, 'gsd-planner'), 'opus');
     });
   });
 });
@@ -872,9 +872,9 @@ describe('resolveModelInternal (adaptive profile)', () => {
     // gsd-executor in medium tier = sonnet
     const result = resolveModelInternal(tmpDir, 'gsd-executor');
     assert.strictEqual(result, 'sonnet');
-    // gsd-planner in medium tier = opus -> inherit
+    // gsd-planner in medium tier = opus
     const plannerResult = resolveModelInternal(tmpDir, 'gsd-planner');
-    assert.strictEqual(plannerResult, 'inherit');
+    assert.strictEqual(plannerResult, 'opus');
   });
 
   test('medium tier codebase-mapper resolves to haiku', () => {
@@ -891,7 +891,7 @@ describe('resolveModelInternal (adaptive profile)', () => {
     assert.strictEqual(result, 'haiku');
   });
 
-  test('complex context returns inherit for planner (opus)', () => {
+  test('complex context returns opus for planner', () => {
     writeConfig({ model_profile: 'adaptive' });
     const ctx = {
       files_modified: ['a.js', 'b.js', 'c.js', 'd.js', 'e.js'],
@@ -899,7 +899,7 @@ describe('resolveModelInternal (adaptive profile)', () => {
       objective: 'architect new integration with external API',
     };
     const result = resolveModelInternal(tmpDir, 'gsd-planner', ctx);
-    assert.strictEqual(result, 'inherit'); // opus -> inherit
+    assert.strictEqual(result, 'opus');
   });
 
   test('min_model clamping upgrades haiku to sonnet', () => {
@@ -936,7 +936,7 @@ describe('resolveModelInternal (adaptive profile)', () => {
     const ctx = { files_modified: ['a.js'], task_count: 1, objective: 'fix typo' };
     // Override should win over adaptive
     const result = resolveModelInternal(tmpDir, 'gsd-executor', ctx);
-    assert.strictEqual(result, 'inherit'); // opus -> inherit
+    assert.strictEqual(result, 'opus');
   });
 
   test('context ignored for non-adaptive profiles', () => {

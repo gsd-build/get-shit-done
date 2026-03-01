@@ -493,7 +493,7 @@ function resolveModelInternal(cwd, agentType, context) {
   // Check per-agent override first
   const override = config.model_overrides?.[agentType];
   if (override) {
-    return override === 'opus' ? 'inherit' : override;
+    return override;
   }
 
   // Fall back to profile lookup
@@ -519,13 +519,13 @@ function resolveModelInternal(cwd, agentType, context) {
       }
     }
 
-    return resolved === 'opus' ? 'inherit' : resolved;
+    return resolved;
   }
 
   const agentModels = MODEL_PROFILES[agentType];
   if (!agentModels) return 'sonnet';
   const resolved = agentModels[profile] || agentModels['balanced'] || 'sonnet';
-  return resolved === 'opus' ? 'inherit' : resolved;
+  return resolved;
 }
 
 // ─── Misc utilities ───────────────────────────────────────────────────────────

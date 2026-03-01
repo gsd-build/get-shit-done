@@ -85,7 +85,7 @@ When adaptive is active but no plan context is available (e.g., during init), de
    a. Evaluate complexity from plan context
    b. Look up model from ADAPTIVE_TIERS[tier][agentType]
    c. Clamp to min_model / max_model bounds
-   d. Return result (opus → 'inherit')
+   d. Return result ('opus', 'sonnet', or 'haiku')
 3. Non-adaptive: standard profile table lookup
 ```
 
@@ -102,7 +102,7 @@ node gsd-tools.cjs resolve-adaptive-model gsd-executor \
 # Complex plan
 node gsd-tools.cjs resolve-adaptive-model gsd-planner \
   --context '{"files_modified":["a.js","b.js","c.js","d.js","e.js"],"task_count":8,"objective":"architect new integration with external API"}'
-# Returns: inherit (opus), complex tier
+# Returns: opus, complex tier
 ```
 
 ## Workflow Integration

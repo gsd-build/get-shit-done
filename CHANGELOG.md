@@ -6,6 +6,11 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ## [Unreleased]
 
+### Fixed
+- **Quality/balanced profiles now deliver Opus subagents** — `resolveModelInternal` previously
+  converted `opus` to `inherit`, causing agents to silently run on Sonnet when the parent
+  session used the default Sonnet 4.6 model. Opus is now passed directly to Task calls (#695)
+
 ### Added
 - **Adaptive model profile** — fourth model profile (`adaptive`) that auto-selects models per-plan based on complexity evaluation (#210)
   - `evaluateComplexity()` scores plan metadata (files modified, task count, objective keywords, plan type, dependencies) on 0-10+ scale

@@ -20,11 +20,11 @@ Look up the agent in the table for the resolved profile. Pass the model paramete
 Task(
   prompt="...",
   subagent_type="gsd-planner",
-  model="{resolved_model}"  # "inherit", "sonnet", or "haiku"
+  model="{resolved_model}"  # "opus", "sonnet", or "haiku"
 )
 ```
 
-**Note:** Opus-tier agents resolve to `"inherit"` (not `"opus"`). This causes the agent to use the parent session's model, avoiding conflicts with organization policies that may block specific opus versions.
+**Note:** Opus-tier agents resolve to `"opus"`, which Claude Code's Task tool maps to the current Opus model version. Earlier versions used `"inherit"` to avoid org-policy conflicts, but that silently downgraded agents to Sonnet when the parent session ran on Sonnet (the default). Passing `"opus"` directly ensures quality-profile agents actually run on Opus.
 
 ## Adaptive Profile
 
@@ -43,4 +43,4 @@ See `references/adaptive-model-selection.md` for full algorithm.
 1. Resolve once at orchestration start (or per-plan if adaptive)
 2. Store the profile value
 3. Look up each agent's model from the table when spawning
-4. Pass model parameter to each Task call (values: `"inherit"`, `"sonnet"`, `"haiku"`)
+4. Pass model parameter to each Task call (values: `"opus"`, `"sonnet"`, `"haiku"`)
