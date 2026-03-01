@@ -7,6 +7,10 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 ## [Unreleased]
 
 ### Fixed
+- **Statusline context bar** — corrected calculation to use Claude Code's actual 16.5% autocompact buffer instead of a hardcoded 80% ceiling, so the displayed percentage now reflects when compaction is truly imminent (#769)
+  - Color thresholds updated to intuitive levels: green < 50%, yellow < 65%, orange < 80%, red ≥ 80%
+  - Display now shows two decimal places (e.g. `42.37%`) so small context changes are visible
+- **Hooks not tracked in file manifest** — `gsd-statusline.js`, `gsd-check-update.js`, and `gsd-context-monitor.js` are now included in `gsd-file-manifest.json` so local modifications are detected and backed up before `/gsd:update` (#769)
 - **Quality/balanced profiles now deliver Opus subagents** — `resolveModelInternal` previously
   converted `opus` to `inherit`, causing agents to silently run on Sonnet when the parent
   session used the default Sonnet 4.6 model. Opus is now passed directly to Task calls (#695)
