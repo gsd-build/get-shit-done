@@ -133,8 +133,83 @@ Task(
 
 ### Handle Researcher Return
 
-- **`## RESEARCH COMPLETE`:** Display confirmation, continue to step 6
+- **`## RESEARCH COMPLETE`:** Display confirmation, continue to step 5.5
 - **`## RESEARCH BLOCKED`:** Display blocker, offer: 1) Provide context, 2) Skip research, 3) Abort
+
+## 5.5. Handle Spike Decision Point
+
+**Skip if:** `--gaps` flag is set (gap closure mode does not use spike integration) OR `--skip-research` flag is set (no RESEARCH.md to parse for gaps).
+
+**Fork-compatibility guard:** Check if `get-shit-done/references/spike-integration.md` exists. If not (upstream GSD), skip this step entirely and proceed to step 6.
+
+```bash
+if [ ! -f "get-shit-done/references/spike-integration.md" ]; then
+  # Upstream GSD -- skip spike decision point
+  # Proceed to step 6
+fi
+```
+
+**Check for genuine gaps:**
+
+Read `{PHASE_DIR}/*-RESEARCH.md`. Look for a "### Genuine Gaps" section.
+
+If no Genuine Gaps section or section is empty: proceed to step 6.
+
+If Genuine Gaps exist:
+
+1. **Parse gaps from the table:**
+   ```
+   For each gap in Genuine Gaps table:
+     - question: the question text
+     - criticality: Critical | Medium | Low
+     - recommendation: Spike | Defer | Accept-risk
+   ```
+
+2. **Read spike config from `.planning/config.json`:**
+   ```
+   spike.enabled    (default: true)   -- whether the spike system is active
+   spike.sensitivity (default: "balanced") -- which criticalities trigger spikes
+   spike.auto_trigger (default: false)  -- whether to auto-trigger or advise only
+   ```
+
+   If `spike.enabled` is false: skip spike processing, proceed to step 6.
+
+3. **Apply sensitivity filter:**
+   ```
+   sensitivity = config.spike.sensitivity OR derive from config.depth:
+     - depth: quick       -> conservative
+     - depth: standard    -> balanced
+     - depth: comprehensive -> aggressive
+
+   Explicit spike.sensitivity overrides derivation.
+
+   - conservative: only process Critical gaps with Spike recommendation
+   - balanced: process Critical + Medium gaps with Spike recommendation
+   - aggressive: process all gaps with Spike recommendation
+   ```
+
+4. **Apply auto_trigger setting:**
+
+   If `spike.auto_trigger` is **false** (default): Present gaps as advisory only.
+   ```
+   Display filtered gaps and suggest:
+   "These gaps could benefit from a spike investigation via /gsd:spike"
+   ```
+   Do NOT auto-execute spikes. Proceed to step 6.
+
+   If `spike.auto_trigger` is **true**: Apply autonomy mode:
+   ```
+   mode = config.mode
+
+   - interactive: present filtered gaps, ask user which to spike
+   - yolo: auto-spike all filtered gaps
+   ```
+
+   For each approved spike, invoke `get-shit-done/workflows/run-spike.md` with:
+   - question: gap.question
+   - phase: current phase number
+
+5. **Proceed to step 6** with RESEARCH.md updated (if spikes were run, "Resolved by Spike" entries added).
 
 ## 6. Check Existing Plans
 
@@ -433,6 +508,7 @@ Verification: {Passed | Passed with override | Skipped}
 - [ ] CONTEXT.md loaded early (step 4) and passed to ALL agents
 - [ ] Research completed (unless --skip-research or --gaps or exists)
 - [ ] gsd-phase-researcher spawned with CONTEXT.md
+- [ ] Spike decision point evaluated (step 5.5) if spike-integration.md exists
 - [ ] Existing plans checked
 - [ ] gsd-planner spawned with CONTEXT.md + RESEARCH.md
 - [ ] Plans created (PLANNING COMPLETE or CHECKPOINT handled)
