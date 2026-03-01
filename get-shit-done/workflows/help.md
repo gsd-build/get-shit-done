@@ -292,7 +292,38 @@ Create phases to close gaps identified by audit.
 
 Usage: `/gsd:plan-milestone-gaps`
 
-### Integrations
+### Management (PM/PO)
+
+Commands for product managers and product owners. Operate directly on Jira — no GSD project required.
+
+**`/gsd:define-requirements [PROJ-123 --enrich] [--project PROJ] [--epic EPIC-KEY]`**
+Define or enrich Jira tickets with structured requirements.
+
+- **Create mode:** Describe a feature conversationally, AI drafts structured ticket(s)
+- **Enrich mode:** Analyze existing ticket, identify gaps, improve in place
+- Creates acceptance criteria in standard format for developer handoff
+- Adds subtasks, story points, labels, epic links
+- Documents rationale as a Jira comment
+- Checks for duplicate/overlapping tickets
+
+Usage: `/gsd:define-requirements --project PROJ`
+Usage: `/gsd:define-requirements --project PROJ --epic PROJ-50`
+Usage: `/gsd:define-requirements PROJ-123 --enrich`
+
+**`/gsd:plan-sprint --project PROJ [--sprint 'Sprint Name'] [--validate] [--capacity N]`**
+AI-assisted sprint planning and validation.
+
+- **Suggest mode:** Analyze backlog, propose sprint composition by priority/dependencies/capacity
+- **Validate mode:** Check existing sprint for issues (dependency conflicts, missing estimates, scope)
+- Groups tickets by epic, flags missing acceptance criteria
+- Iterative — PM adjusts until satisfied, then applies to Jira
+- Suggests developer handoff via `/gsd:from-jira` when done
+
+Usage: `/gsd:plan-sprint --project PROJ`
+Usage: `/gsd:plan-sprint --project PROJ --sprint "Sprint 5" --capacity 40`
+Usage: `/gsd:plan-sprint --project PROJ --validate`
+
+### Integrations (Developer)
 
 **`/gsd:from-jira <key> [more-keys] [--jql '<query>']`**
 Import Jira tickets as GSD phases with auto-generated context.
@@ -488,7 +519,33 @@ Example config:
 /gsd:check-todos api             # Filter by area
 ```
 
-**Importing work from Jira:**
+**PM/PO workflow — define requirements and plan sprint:**
+
+```
+/gsd:define-requirements --project PROJ               # Define a new feature → Jira ticket
+/gsd:define-requirements PROJ-123 --enrich            # Improve existing ticket
+/gsd:plan-sprint --project PROJ --capacity 40         # Suggest sprint composition
+/gsd:plan-sprint --project PROJ --validate            # Validate existing sprint
+```
+
+**Full PM → Developer handoff:**
+
+```
+# PM defines requirements (creates Jira tickets)
+/gsd:define-requirements --project PROJ --epic PROJ-50
+
+# PM plans the sprint (selects tickets, validates)
+/gsd:plan-sprint --project PROJ --sprint "Sprint 5" --capacity 40
+
+# Developer imports sprint tickets into GSD
+/gsd:from-jira --jql 'sprint = "Sprint 5"'
+/clear
+/gsd:plan-phase 5
+/clear
+/gsd:execute-phase 5
+```
+
+**Importing work from Jira (developer):**
 
 ```
 /gsd:from-jira PROJ-123                              # Single ticket → phase
