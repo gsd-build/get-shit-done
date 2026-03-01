@@ -106,11 +106,13 @@ Plans:
   2. A lightweight research spike (question, research, decision -- no BUILD/RUN phases) can be completed end-to-end in a single session
   3. At least one spike is completed end-to-end (designed, executed, decision recorded) -- not just designed
   4. The reflect-to-spike pipeline is verified with a real spike candidate from the enhanced reflector, demonstrating the reflector-to-spike handoff works
-**Plans**: TBD
+**Plans:** 4 plans
 
 Plans:
-- [ ] 35-01: TBD
-- [ ] 35-02: TBD
+- [ ] 35-01-PLAN.md -- Spike wiring audit fixes: step 5.5 in plan-phase.md, researcher Genuine Gaps format, feature manifest spike section
+- [ ] 35-02-PLAN.md -- Lightweight research spike mode: option 4 in run-spike.md, research-only path in gsd-spike-runner.md
+- [ ] 35-03-PLAN.md -- End-to-end spike execution and pipeline verification: complete spike 002, verify reflect-to-spike pipeline
+- [ ] 35-04-PLAN.md -- Installer sync and human verification: sync .claude/ runtime, verify complete spike system
 
 ## Progress
 
@@ -123,7 +125,7 @@ Phases execute in numeric order: 31 -> 32 -> 33 -> 34 -> 35
 | 32. Multi-Sensor Orchestrator | v1.16 | 4/4 | Complete | 2026-02-28 |
 | 33. Enhanced Reflector | v1.16 | 4/4 | Complete | 2026-03-01 |
 | 34. Signal-Plan Linkage | v1.16 | 4/4 | Complete | 2026-03-01 |
-| 35. Spike Audit & Lightweight Mode | v1.16 | 0/TBD | Not started | - |
+| 35. Spike Audit & Lightweight Mode | v1.16 | 0/4 | Not started | - |
 
 ## Overall Progress
 
