@@ -4,7 +4,7 @@
 
 const fs = require('fs');
 const path = require('path');
-const { execSync } = require('child_process');
+const { execFileSync } = require('child_process');
 const { loadConfig, resolveModelInternal, findPhaseInternal, getRoadmapPhaseInternal, pathExistsInternal, generateSlugInternal, getMilestoneInfo, normalizePhaseName, output, error } = require('./core.cjs');
 
 function cmdInitExecutePhase(cwd, phase, raw) {
@@ -171,11 +171,18 @@ function cmdInitNewProject(cwd, raw) {
   let hasCode = false;
   let hasPackageFile = false;
   try {
-    const files = execSync('find . -maxdepth 3 \\( -name "*.ts" -o -name "*.js" -o -name "*.py" -o -name "*.go" -o -name "*.rs" -o -name "*.swift" -o -name "*.java" \\) 2>/dev/null | grep -v node_modules | grep -v .git | head -5', {
+    const files = execFileSync('find', [
+      '.', '-maxdepth', '3',
+      '(', '-name', '*.ts', '-o', '-name', '*.js', '-o', '-name', '*.py',
+      '-o', '-name', '*.go', '-o', '-name', '*.rs', '-o', '-name', '*.swift',
+      '-o', '-name', '*.java', ')',
+      '-not', '-path', '*/node_modules/*',
+      '-not', '-path', '*/.git/*',
+    ], {
       cwd,
       encoding: 'utf-8',
       stdio: ['pipe', 'pipe', 'pipe'],
-    });
+    }).split('\n').filter(Boolean).slice(0, 5).join('\n');
     hasCode = files.trim().length > 0;
   } catch {}
 
