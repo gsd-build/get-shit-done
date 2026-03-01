@@ -292,6 +292,23 @@ Create phases to close gaps identified by audit.
 
 Usage: `/gsd:plan-milestone-gaps`
 
+### Integrations
+
+**`/gsd:from-jira <key> [more-keys] [--jql '<query>']`**
+Import Jira tickets as GSD phases with auto-generated context.
+
+- Fetches ticket details via mcp-atlassian MCP server
+- Epics: child issues become individual phases
+- Stories/Tasks/Bugs: each becomes a phase with CONTEXT.md from acceptance criteria
+- JQL queries: matching issues become phases (max 20)
+- Read-only — does not write back to Jira
+
+Requires: existing `.planning/` project, `mcp-atlassian` MCP server configured.
+
+Usage: `/gsd:from-jira PROJ-123`
+Usage: `/gsd:from-jira PROJ-100 PROJ-101 PROJ-102`
+Usage: `/gsd:from-jira --jql 'sprint = "Sprint 5" AND assignee = currentUser()'`
+
 ### Configuration
 
 **`/gsd:settings`**
@@ -469,6 +486,16 @@ Example config:
 /gsd:add-todo Fix modal z-index  # Capture with explicit description
 /gsd:check-todos                 # Review and work on todos
 /gsd:check-todos api             # Filter by area
+```
+
+**Importing work from Jira:**
+
+```
+/gsd:from-jira PROJ-123                              # Single ticket → phase
+/gsd:from-jira PROJ-100                              # Epic → phases from children
+/gsd:from-jira --jql 'sprint = "Sprint 5"'           # Sprint → phases
+/clear
+/gsd:plan-phase 5                                     # Plan the imported phase
 ```
 
 **Debugging an issue:**
