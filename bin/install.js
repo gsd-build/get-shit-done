@@ -1743,6 +1743,16 @@ function writeManifest(configDir, runtime = 'claude') {
       }
     }
   }
+  if (!isCodex) {
+    const hooksDir = path.join(configDir, 'hooks');
+    const gsdHooks = ['gsd-statusline.js', 'gsd-check-update.js', 'gsd-context-monitor.js'];
+    for (const hook of gsdHooks) {
+      const hookPath = path.join(hooksDir, hook);
+      if (fs.existsSync(hookPath)) {
+        manifest.files['hooks/' + hook] = fileHash(hookPath);
+      }
+    }
+  }
 
   fs.writeFileSync(path.join(configDir, MANIFEST_NAME), JSON.stringify(manifest, null, 2));
   return manifest;
