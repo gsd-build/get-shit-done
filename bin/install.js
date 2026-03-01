@@ -1563,8 +1563,7 @@ function writeManifest(configDir, runtime = 'claude') {
   const gsdDir = path.join(configDir, 'get-shit-done');
   const commandsDir = path.join(configDir, 'commands', 'gsd');
   const opencodeCommandDir = path.join(configDir, 'command');
-  const codexSkillsDir = path.join(configDir, 'skills');
-  const copilotSkillsDir = path.join(configDir, 'skills');
+  const skillsDir = path.join(configDir, 'skills');
   const agentsDir = path.join(configDir, 'agents');
   const manifest = { version: pkg.version, timestamp: new Date().toISOString(), files: {} };
 
@@ -1585,18 +1584,18 @@ function writeManifest(configDir, runtime = 'claude') {
       }
     }
   }
-  if (isCodex && fs.existsSync(codexSkillsDir)) {
-    for (const skillName of listCodexSkillNames(codexSkillsDir)) {
-      const skillRoot = path.join(codexSkillsDir, skillName);
+  if (isCodex && fs.existsSync(skillsDir)) {
+    for (const skillName of listCodexSkillNames(skillsDir)) {
+      const skillRoot = path.join(skillsDir, skillName);
       const skillHashes = generateManifest(skillRoot);
       for (const [rel, hash] of Object.entries(skillHashes)) {
         manifest.files[`skills/${skillName}/${rel}`] = hash;
       }
     }
   }
-  if (isCopilot && fs.existsSync(copilotSkillsDir)) {
-    for (const skillName of listCopilotSkillNames(copilotSkillsDir)) {
-      const skillRoot = path.join(copilotSkillsDir, skillName);
+  if (isCopilot && fs.existsSync(skillsDir)) {
+    for (const skillName of listCopilotSkillNames(skillsDir)) {
+      const skillRoot = path.join(skillsDir, skillName);
       const skillHashes = generateManifest(skillRoot);
       for (const [rel, hash] of Object.entries(skillHashes)) {
         manifest.files[`skills/${skillName}/${rel}`] = hash;
@@ -2097,6 +2096,9 @@ function promptRuntime(callback) {
     }
   });
 
+  // NOTE: v1.22.0 introduced a breaking change: option 5 changed from "All" to "Copilot CLI"
+  // If you have scripts that use --all or programmatically select option 5, they will now
+  // install Copilot instead of all runtimes. Use --all or select option 6 for all runtimes.
   console.log(`  ${yellow}Which runtime(s) would you like to install for?${reset}\n\n  ${cyan}1${reset}) Claude Code     ${dim}(~/.claude)${reset}
   ${cyan}2${reset}) OpenCode        ${dim}(~/.config/opencode)${reset} - open source, free models
   ${cyan}3${reset}) Gemini          ${dim}(~/.gemini)${reset}
