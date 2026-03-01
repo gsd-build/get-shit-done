@@ -31,6 +31,24 @@
 - If answer is "what exists?" or "how does X work?" → Exploratory
 - If unsure → Open Inquiry (Claude adapts structure to question)
 
+### Spike Modes
+
+| Mode | Phases | Output | Use Case |
+|------|--------|--------|----------|
+| **full** (default) | Design -> Build -> Run -> Document | DESIGN.md, FINDINGS.md (optional), DECISION.md, experiments/ | Questions requiring empirical measurement |
+| **research** | Design -> Research -> Document | DESIGN.md, DECISION.md | Questions answerable through documentation and codebase analysis |
+
+**Research mode** skips BUILD and RUN phases entirely. Instead of running experiments, the spike investigates the question through codebase analysis, documentation lookup, and web research. The `mode: research` flag appears in DESIGN.md frontmatter. DECISION.md is produced from research findings rather than experimental data.
+
+**Research-mode spikes do NOT produce:**
+- `experiments/` directory
+- `FINDINGS.md`
+
+**Research-mode spikes still produce:**
+- `DESIGN.md` (documents the question)
+- `DECISION.md` (documents the answer with `Iterations: 0 (research-only)`)
+- KB entry (persists the finding)
+
 ---
 
 ## 3. Spike Phases

@@ -18,6 +18,7 @@ Orchestrates the full spike flow: workspace creation, Design phase (DESIGN.md), 
 | phase | /gsd:spike --phase argument | no |
 | mode | .planning/config.json "mode" field | no (default: interactive) |
 | sensitivity | .planning/config.json "spike_sensitivity" or derived from depth | no |
+| spike_mode | --mode argument or research-first advisory selection | no (default: full) |
 
 ## Execution Flow
 
@@ -70,13 +71,15 @@ Options:
 1. Proceed with spike (you know your intent best)
 2. Cancel -- try research first (/gsd:research-phase)
 3. Rephrase question to focus on the empirical aspect
+4. Run as lightweight research spike (Question -> Research -> Decision, no BUILD/RUN)
 
-Select [1/2/3]:
+Select [1/2/3/4]:
 ```
 
 If user selects 1: proceed to workspace creation.
 If user selects 2: exit workflow, suggest `/gsd:research-phase`.
 If user selects 3: prompt for rephrased question, restart from Step 1.
+If user selects 4: set SPIKE_MODE='research', proceed to workspace creation.
 
 **If mode == yolo OR question appears spike-suitable:**
 
@@ -156,6 +159,35 @@ Wait for user response. If option 2, allow edits, then re-present.
 
 Auto-approve DESIGN.md, proceed immediately.
 
+### 5b. Lightweight Research Mode
+
+**If SPIKE_MODE == "research":**
+
+Skip Step 6 (do NOT spawn gsd-spike-runner for BUILD/RUN phases).
+
+Instead, perform research inline:
+1. Add `mode: research` to DESIGN.md frontmatter
+2. Investigate the question using available tools:
+   - Codebase analysis (Grep, Glob, Read)
+   - Web research (WebSearch, WebFetch)
+   - Documentation lookup (Context7 if available)
+3. Gather evidence to answer the question
+4. Create DECISION.md in the spike workspace using the standard template from spike-execution.md Section 6
+   - Question, Answer, Summary, Findings (from research), Analysis, Decision, Confidence, Implications
+   - Set metadata: `Iterations: 0 (research-only)`
+5. Update DESIGN.md status to `complete`
+6. Proceed to KB persistence (same as Step 7 result handling, but with outcome from research)
+7. Continue to Step 8 (Update RESEARCH.md if phase-linked) and Step 9 (Report)
+
+**IMPORTANT:** The lightweight mode still creates:
+- DESIGN.md (documents the question)
+- DECISION.md (documents the answer)
+- KB entry (persists the finding)
+
+It does NOT create:
+- experiments/ directory
+- FINDINGS.md
+
 ### 6. Spawn Spike Runner Agent
 
 ```markdown
@@ -228,10 +260,17 @@ RESEARCH.md updated with spike resolution at:
 
 ## Mode Behaviors
 
-| Mode | Design Confirmation | Inconclusive Round 1 |
-|------|---------------------|----------------------|
-| interactive | User confirms | Checkpoint for narrowing approval |
-| yolo | Auto-approve | Auto-proceed with agent's narrowed hypothesis |
+| Mode | Design Confirmation | BUILD/RUN | DECISION.md |
+|------|---------------------|-----------|-------------|
+| full (default) | User confirms (interactive) / auto (yolo) | Yes | From experiments |
+| research | User confirms (interactive) / auto (yolo) | Skipped | From research |
+
+### Inconclusive Handling (Full Mode Only)
+
+| Mode | Inconclusive Round 1 |
+|------|----------------------|
+| interactive | Checkpoint for narrowing approval |
+| yolo | Auto-proceed with agent's narrowed hypothesis |
 
 ## Sensitivity Behaviors
 
