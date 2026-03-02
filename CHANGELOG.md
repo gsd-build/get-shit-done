@@ -6,6 +6,9 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ## [Unreleased]
 
+### Added
+- iFlow CLI support — install with `--iflow` flag or select from interactive menu
+
 ## [1.22.0] - 2026-02-27
 
 ### Added

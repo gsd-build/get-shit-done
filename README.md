@@ -2,7 +2,7 @@
 
 # GET SHIT DONE
 
-**A light-weight and powerful meta-prompting, context engineering and spec-driven development system for Claude Code, OpenCode, Gemini CLI, and Codex.**
+**A light-weight and powerful meta-prompting, context engineering and spec-driven development system for Claude Code, iFlow CLI, OpenCode, Gemini CLI, and Codex.**
 
 **Solves context rot — the quality degradation that happens as Claude fills its context window.**
 
@@ -80,7 +80,7 @@ npx get-shit-done-cc@latest
 ```
 
 The installer prompts you to choose:
-1. **Runtime** — Claude Code, OpenCode, Gemini, Codex, or all
+1. **Runtime** — Claude Code, iFlow CLI, OpenCode, Gemini, Codex, or all
 2. **Location** — Global (all projects) or local (current project only)
 
 Verify with:
