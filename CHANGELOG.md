@@ -6,6 +6,23 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ## [Unreleased]
 
+### Added
+- `/gsd:report-bug` command for structured bug reporting with severity tracking, diagnostic log capture, and GitHub issue creation
+  - `gsd-tools bug list/update/resolve` CLI commands for bug management
+  - `gsd-tools init bugs` and `scaffold bugs` for workflow bootstrapping
+  - Severity inference from keywords (critical/high/medium/low)
+  - Automatic diagnostic capture (git state, log files, error output)
+  - Optional GitHub issue creation via `gh` CLI
+  - Bug lifecycle: reported → investigating → fixing → resolved
+- Browser pre-verification for `/gsd:verify-work` (#201)
+  - New `gsd-browser-verifier` agent uses Chrome DevTools MCP to auto-test UI deliverables
+  - Tests classified as `auto_pass` (skipped in human UAT), `auto_fail` (enriched with diagnostics), or `needs_human`
+  - Opt-in via `browser.enabled: true` in config; disabled by default
+  - Graceful degradation when chrome-devtools-mcp is not configured
+  - New `auto_pass`, `auto_evidence`, and `auto_note` fields in UAT.md template
+  - Browser toggle added to `/gsd:settings`
+  - Setup guide at `references/browser-setup.md`
+
 ## [1.22.0] - 2026-02-27
 
 ### Added
@@ -13,6 +30,14 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 - Analysis paralysis guard in agents to prevent over-deliberation during planning
 - Exhaustive cross-check and task-level TDD patterns in agent workflows
 - Code-aware discuss phase with codebase scouting — `/gsd:discuss-phase` now analyzes relevant source files before asking questions
+- Concurrent milestone execution: work on multiple milestones in parallel with isolated state (#291)
+  - Milestone-scoped directories under `.planning/milestones/<name>/`
+  - `ACTIVE_MILESTONE` pointer file for switching context
+  - `/gsd:switch-milestone` command with in-progress work warnings
+  - `--milestone` CLI flag for explicit milestone targeting
+  - Statusline shows active milestone in multi-milestone mode
+  - All 28 workflow files updated for milestone-aware paths
+  - Zero behavioral change for single-milestone projects (legacy mode)
 
 ### Fixed
 - Update checker clears both cache paths to prevent stale version notifications

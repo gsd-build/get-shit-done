@@ -168,6 +168,7 @@ rapid prototyping phases where test infrastructure isn't the focus.
 | `/gsd:audit-milestone` | Verify milestone met its definition of done | Before completing milestone |
 | `/gsd:complete-milestone` | Archive milestone, tag release | All phases verified |
 | `/gsd:new-milestone [name]` | Start next version cycle | After completing a milestone |
+| `/gsd:switch-milestone <name>` | Switch active milestone for concurrent work | When working on multiple milestones |
 
 ### Navigation
 
@@ -197,11 +198,13 @@ rapid prototyping phases where test infrastructure isn't the focus.
 |---------|---------|-------------|
 | `/gsd:map-codebase` | Analyze existing codebase | Before `/gsd:new-project` on existing code |
 | `/gsd:quick` | Ad-hoc task with GSD guarantees | Bug fixes, small features, config changes |
+| `/gsd:report-bug [desc]` | Report bug with severity tracking and GitHub issues | When you discover a bug |
 | `/gsd:debug [desc]` | Systematic debugging with persistent state | When something breaks |
 | `/gsd:add-todo [desc]` | Capture an idea for later | Think of something during a session |
 | `/gsd:check-todos` | List pending todos | Review captured ideas |
 | `/gsd:settings` | Configure workflow toggles and model profile | Change model, toggle agents |
 | `/gsd:set-profile <profile>` | Quick profile switch | Change cost/quality tradeoff |
+| `/gsd:add-tests <N> [instructions]` | Generate unit and E2E tests for completed phase | After execution, before milestone completion |
 | `/gsd:reapply-patches` | Restore local modifications after update | After `/gsd:update` if you had local edits |
 
 ---
@@ -231,6 +234,22 @@ GSD stores project settings in `.planning/config.json`. Configure during `/gsd:n
     "branching_strategy": "none",
     "phase_branch_template": "gsd/phase-{phase}-{slug}",
     "milestone_branch_template": "gsd/{milestone}-{slug}"
+  },
+  "browser": {
+    "enabled": false,
+    "base_url": "http://localhost:3000",
+    "headless": true,
+    "startup_command": "",
+    "startup_wait_seconds": 10,
+    "port": 9222,
+    "auth": {
+      "login_url": "",
+      "username_field": "",
+      "password_field": "",
+      "username": "",
+      "password_env_var": "",
+      "submit_selector": ""
+    }
   }
 }
 ```
@@ -280,6 +299,20 @@ Disable these to speed up phases in familiar domains or when conserving tokens.
 | `milestone` | At first `execute-phase` | All phases share one branch | Release branches, PR per version |
 
 **Template variables:** `{phase}` = zero-padded number (e.g., "03"), `{slug}` = lowercase hyphenated name, `{milestone}` = version (e.g., "v1.0").
+
+### Browser Pre-Verification
+
+| Setting | Options | Default | What it Controls |
+|---------|---------|---------|------------------|
+| `browser.enabled` | `true`, `false` | `false` | Enable automated browser testing before human UAT |
+| `browser.base_url` | URL string | `http://localhost:3000` | App URL for browser testing |
+| `browser.startup_command` | Shell command | `""` | Command to start dev server (e.g., `npm run dev`) |
+| `browser.startup_wait_seconds` | Number | `10` | Seconds to wait after starting dev server |
+| `browser.port` | Number | `9222` | Chrome DevTools Protocol port |
+
+Requires `chrome-devtools-mcp` in Claude Code settings. When enabled, `/gsd:verify-work` spawns a browser agent to pre-verify UI tests — auto-passed tests are skipped in human UAT. Degrades gracefully when MCP is unavailable.
+
+Configure auth for login-gated apps via `browser.auth` (see `references/browser-setup.md`).
 
 ### Model Profiles (Per-Agent Breakdown)
 
@@ -380,6 +413,38 @@ claude --dangerously-skip-permissions
 /gsd:remove-phase 7         # Descope phase 7 and renumber
 ```
 
+### Concurrent Milestones
+
+Work on multiple milestones simultaneously (e.g., v2.0 features + v1.5.1 hotfix):
+
+```
+/gsd:new-milestone "v1.5.1 Hotfix"    # Creates milestone-scoped directory
+/gsd:switch-milestone v2.0-features    # Switch back to feature work
+/gsd:progress                          # See status of active milestone
+```
+
+Each milestone gets isolated state under `.planning/milestones/<name>/`:
+
+```
+.planning/
+├── PROJECT.md              # Global (shared)
+├── MILESTONES.md           # Global (shared)
+├── ACTIVE_MILESTONE        # Pointer: "v2.0"
+├── milestones/
+│   ├── v2.0/
+│   │   ├── STATE.md
+│   │   ├── ROADMAP.md
+│   │   ├── REQUIREMENTS.md
+│   │   ├── config.json
+│   │   └── phases/
+│   └── v1.5.1-hotfix/
+│       ├── STATE.md
+│       ├── ROADMAP.md
+│       └── phases/
+```
+
+When no second milestone exists, everything stays in `.planning/` as usual.
+
 ---
 
 ## Troubleshooting
@@ -449,11 +514,8 @@ For reference, here is what GSD creates in your project:
 ```
 .planning/
   PROJECT.md              # Project vision and context (always loaded)
-  REQUIREMENTS.md         # Scoped v1/v2 requirements with IDs
-  ROADMAP.md              # Phase breakdown with status tracking
-  STATE.md                # Decisions, blockers, session memory
-  config.json             # Workflow configuration
-  MILESTONES.md           # Completed milestone archive
+  MILESTONES.md           # Completed milestone archive (global, shared)
+  ACTIVE_MILESTONE        # Active milestone pointer (multi-milestone mode only)
   research/               # Domain research from /gsd:new-project
   todos/
     pending/              # Captured ideas awaiting work
@@ -461,6 +523,12 @@ For reference, here is what GSD creates in your project:
   debug/                  # Active debug sessions
     resolved/             # Archived debug sessions
   codebase/               # Brownfield codebase mapping (from /gsd:map-codebase)
+
+  # Single-milestone layout (default):
+  REQUIREMENTS.md         # Scoped v1/v2 requirements with IDs
+  ROADMAP.md              # Phase breakdown with status tracking
+  STATE.md                # Decisions, blockers, session memory
+  config.json             # Workflow configuration
   phases/
     XX-phase-name/
       XX-YY-PLAN.md       # Atomic execution plans
@@ -468,4 +536,17 @@ For reference, here is what GSD creates in your project:
       CONTEXT.md          # Your implementation preferences
       RESEARCH.md         # Ecosystem research findings
       VERIFICATION.md     # Post-execution verification results
+
+  # Multi-milestone layout (when concurrent milestones exist):
+  milestones/
+    v2.0/
+      STATE.md
+      ROADMAP.md
+      REQUIREMENTS.md
+      config.json
+      phases/
+    v1.5.1-hotfix/
+      STATE.md
+      ROADMAP.md
+      phases/
 ```

@@ -193,4 +193,66 @@ Squash merge is recommended — keeps main branch history clean while preserving
 
 </branching_strategy_behavior>
 
+<browser_verification>
+
+**Browser Pre-Verification** — opt-in automated UAT testing via Chrome DevTools MCP.
+
+When enabled, `/gsd:verify-work` spawns a browser agent to pre-verify UI tests before presenting them to the user. Tests that auto-pass are skipped in human UAT.
+
+<browser_config_schema>
+```json
+"browser": {
+  "enabled": false,
+  "base_url": "http://localhost:3000",
+  "headless": true,
+  "user_data_dir": "",
+  "auth": {
+    "login_url": "",
+    "username_field": "",
+    "password_field": "",
+    "username": "",
+    "password_env_var": "",
+    "submit_selector": ""
+  },
+  "startup_command": "",
+  "startup_wait_seconds": 10,
+  "port": 9222
+}
+```
+
+| Option | Default | Description |
+|--------|---------|-------------|
+| `browser.enabled` | `false` | Enable browser pre-verification in UAT |
+| `browser.base_url` | `"http://localhost:3000"` | App URL for browser testing |
+| `browser.headless` | `true` | Run browser in headless mode |
+| `browser.user_data_dir` | `""` | Chrome user data directory (for persistent sessions) |
+| `browser.auth.login_url` | `""` | Login page URL (empty = no auth needed) |
+| `browser.auth.username_field` | `""` | Username input label/selector |
+| `browser.auth.password_field` | `""` | Password input label/selector |
+| `browser.auth.username` | `""` | Username value |
+| `browser.auth.password_env_var` | `""` | Environment variable holding password |
+| `browser.auth.submit_selector` | `""` | Login submit button label/selector |
+| `browser.startup_command` | `""` | Command to start dev server (e.g., `npm run dev`) |
+| `browser.startup_wait_seconds` | `10` | Seconds to wait after starting dev server |
+| `browser.port` | `9222` | Chrome DevTools Protocol port |
+</browser_config_schema>
+
+**Requirements:**
+- `chrome-devtools-mcp` must be configured in Claude Code settings
+- Dev server must be running (or `startup_command` configured)
+- Feature degrades gracefully: if MCP unavailable, falls back to manual UAT
+
+**Quick setup:**
+
+```bash
+# Enable in project config
+node "$HOME/.claude/get-shit-done/bin/gsd-tools.cjs" config-set browser.enabled true
+
+# Or use /gsd:settings to toggle interactively
+```
+
+See `@~/.claude/get-shit-done/references/browser-setup.md` for full setup guide.
+
+</browser_verification>
+
 </planning_config>

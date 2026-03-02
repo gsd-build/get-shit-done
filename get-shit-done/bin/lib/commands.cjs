@@ -6,6 +6,7 @@ const path = require('path');
 const { execSync } = require('child_process');
 const { safeReadFile, loadConfig, isGitIgnored, execGit, normalizePhaseName, comparePhaseNum, getArchivedPhaseDirs, generateSlugInternal, getMilestoneInfo, resolveModelInternal, MODEL_PROFILES, output, error, findPhaseInternal } = require('./core.cjs');
 const { extractFrontmatter } = require('./frontmatter.cjs');
+const { resolvePlanningPaths } = require('./paths.cjs');
 
 function cmdGenerateSlug(text, raw) {
   if (!text) {
@@ -42,7 +43,8 @@ function cmdCurrentTimestamp(format, raw) {
 }
 
 function cmdListTodos(cwd, area, raw) {
-  const pendingDir = path.join(cwd, '.planning', 'todos', 'pending');
+  const paths = resolvePlanningPaths(cwd);
+  const pendingDir = path.join(paths.abs.planningRoot, 'todos', 'pending');
 
   let count = 0;
   const todos = [];
@@ -68,7 +70,7 @@ function cmdListTodos(cwd, area, raw) {
           created: createdMatch ? createdMatch[1].trim() : 'unknown',
           title: titleMatch ? titleMatch[1].trim() : 'Untitled',
           area: todoArea,
-          path: path.join('.planning', 'todos', 'pending', file),
+          path: '.planning/todos/pending/' + file,
         });
       } catch {}
     }
@@ -97,7 +99,7 @@ function cmdVerifyPathExists(cwd, targetPath, raw) {
 }
 
 function cmdHistoryDigest(cwd, raw) {
-  const phasesDir = path.join(cwd, '.planning', 'phases');
+  const phasesDir = resolvePlanningPaths(cwd).abs.phases;
   const digest = { phases: {}, decisions: [], tech_stack: new Set() };
 
   // Collect all phase directories: archived + current
@@ -380,8 +382,9 @@ async function cmdWebsearch(query, options, raw) {
 }
 
 function cmdProgressRender(cwd, format, raw) {
-  const phasesDir = path.join(cwd, '.planning', 'phases');
-  const roadmapPath = path.join(cwd, '.planning', 'ROADMAP.md');
+  const paths = resolvePlanningPaths(cwd);
+  const phasesDir = paths.abs.phases;
+  const roadmapPath = paths.abs.roadmap;
   const milestone = getMilestoneInfo(cwd);
 
   const phases = [];
@@ -452,8 +455,9 @@ function cmdTodoComplete(cwd, filename, raw) {
     error('filename required for todo complete');
   }
 
-  const pendingDir = path.join(cwd, '.planning', 'todos', 'pending');
-  const completedDir = path.join(cwd, '.planning', 'todos', 'completed');
+  const planningRoot = resolvePlanningPaths(cwd).abs.planningRoot;
+  const pendingDir = path.join(planningRoot, 'todos', 'pending');
+  const completedDir = path.join(planningRoot, 'todos', 'completed');
   const sourcePath = path.join(pendingDir, filename);
 
   if (!fs.existsSync(sourcePath)) {
@@ -472,6 +476,100 @@ function cmdTodoComplete(cwd, filename, raw) {
   fs.unlinkSync(sourcePath);
 
   output({ completed: true, file: filename, date: today }, raw, 'completed');
+}
+
+function cmdBugList(cwd, filters, raw) {
+  const planningRoot = resolvePlanningPaths(cwd).abs.planningRoot;
+  const bugsDir = path.join(planningRoot, 'bugs');
+
+  let count = 0;
+  const bugs = [];
+
+  try {
+    const files = fs.readdirSync(bugsDir).filter(f => /^BUG-\d+\.md$/.test(f));
+
+    for (const file of files) {
+      try {
+        const content = fs.readFileSync(path.join(bugsDir, file), 'utf-8');
+        const fm = extractFrontmatter(content);
+
+        const bugSeverity = fm.severity || 'medium';
+        const bugStatus = fm.status || 'reported';
+        const bugArea = fm.area || 'general';
+
+        if (filters.area && bugArea !== filters.area) continue;
+        if (filters.severity && bugSeverity !== filters.severity) continue;
+        if (filters.status && bugStatus !== filters.status) continue;
+
+        count++;
+        bugs.push({
+          id: fm.id || file.replace('.md', ''),
+          title: fm.title || 'Untitled',
+          severity: bugSeverity,
+          status: bugStatus,
+          area: bugArea,
+          created: fm.created || 'unknown',
+          file,
+        });
+      } catch {}
+    }
+  } catch {}
+
+  const result = { count, bugs };
+  output(result, raw, count.toString());
+}
+
+function cmdBugUpdate(cwd, bugId, newStatus, raw) {
+  if (!bugId) {
+    error('bug id required for bug update');
+  }
+  if (!newStatus) {
+    error('status required for bug update');
+  }
+
+  const validStatuses = ['reported', 'investigating', 'fixing', 'resolved'];
+  if (!validStatuses.includes(newStatus)) {
+    error(`Invalid status: ${newStatus}. Valid: ${validStatuses.join(', ')}`);
+  }
+
+  const planningRoot = resolvePlanningPaths(cwd).abs.planningRoot;
+  const bugsDir = path.join(planningRoot, 'bugs');
+  const resolvedDir = path.join(planningRoot, 'bugs', 'resolved');
+
+  // Normalize bugId to filename
+  const filename = bugId.endsWith('.md') ? bugId : `${bugId}.md`;
+  const sourcePath = path.join(bugsDir, filename);
+
+  if (!fs.existsSync(sourcePath)) {
+    error(`Bug not found: ${bugId}`);
+  }
+
+  let content = fs.readFileSync(sourcePath, 'utf-8');
+  const now = new Date().toISOString();
+
+  // Update status in frontmatter
+  content = content.replace(/^status:\s*.+$/m, `status: ${newStatus}`);
+  // Update updated timestamp
+  if (content.match(/^updated:\s*.+$/m)) {
+    content = content.replace(/^updated:\s*.+$/m, `updated: ${now}`);
+  } else {
+    // Insert updated after status line
+    content = content.replace(/^(status:\s*.+)$/m, `$1\nupdated: ${now}`);
+  }
+
+  if (newStatus === 'resolved') {
+    fs.mkdirSync(resolvedDir, { recursive: true });
+    fs.writeFileSync(path.join(resolvedDir, filename), content, 'utf-8');
+    fs.unlinkSync(sourcePath);
+    output({ updated: true, id: bugId, status: newStatus, moved: 'resolved' }, raw, 'resolved');
+  } else {
+    fs.writeFileSync(sourcePath, content, 'utf-8');
+    output({ updated: true, id: bugId, status: newStatus }, raw, newStatus);
+  }
+}
+
+function cmdBugResolve(cwd, bugId, raw) {
+  cmdBugUpdate(cwd, bugId, 'resolved', raw);
 }
 
 function cmdScaffold(cwd, type, options, raw) {
@@ -505,13 +603,22 @@ function cmdScaffold(cwd, type, options, raw) {
       content = `---\nphase: "${padded}"\nname: "${name || phaseInfo?.phase_name || 'Unnamed'}"\ncreated: ${today}\nstatus: pending\n---\n\n# Phase ${phase}: ${name || phaseInfo?.phase_name || 'Unnamed'} — Verification\n\n## Goal-Backward Verification\n\n**Phase Goal:** [From ROADMAP.md]\n\n## Checks\n\n| # | Requirement | Status | Evidence |\n|---|------------|--------|----------|\n\n## Result\n\n_Pending verification_\n`;
       break;
     }
+    case 'bugs': {
+      const planningRoot = resolvePlanningPaths(cwd).abs.planningRoot;
+      const bugsPath = path.join(planningRoot, 'bugs');
+      const resolvedPath = path.join(planningRoot, 'bugs', 'resolved');
+      fs.mkdirSync(bugsPath, { recursive: true });
+      fs.mkdirSync(resolvedPath, { recursive: true });
+      output({ created: true, directories: ['.planning/bugs', '.planning/bugs/resolved'] }, raw, 'created');
+      return;
+    }
     case 'phase-dir': {
       if (!phase || !name) {
         error('phase and name required for phase-dir scaffold');
       }
       const slug = generateSlugInternal(name);
       const dirName = `${padded}-${slug}`;
-      const phasesParent = path.join(cwd, '.planning', 'phases');
+      const phasesParent = resolvePlanningPaths(cwd).abs.phases;
       fs.mkdirSync(phasesParent, { recursive: true });
       const dirPath = path.join(phasesParent, dirName);
       fs.mkdirSync(dirPath, { recursive: true });
@@ -519,7 +626,7 @@ function cmdScaffold(cwd, type, options, raw) {
       return;
     }
     default:
-      error(`Unknown scaffold type: ${type}. Available: context, uat, verification, phase-dir`);
+      error(`Unknown scaffold type: ${type}. Available: context, uat, verification, phase-dir, bugs`);
   }
 
   if (fs.existsSync(filePath)) {
@@ -544,5 +651,8 @@ module.exports = {
   cmdWebsearch,
   cmdProgressRender,
   cmdTodoComplete,
+  cmdBugList,
+  cmdBugUpdate,
+  cmdBugResolve,
   cmdScaffold,
 };

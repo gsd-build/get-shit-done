@@ -61,12 +61,19 @@
  * Todos:
  *   todo complete <filename>           Move todo from pending to completed
  *
+ * Bugs:
+ *   bug list [--area X] [--severity Y] List/filter bug reports
+ *     [--status Z]
+ *   bug update <id> --status <status>  Update bug status
+ *   bug resolve <id>                   Mark bug as resolved
+ *
  * Scaffolding:
  *   scaffold context --phase <N>       Create CONTEXT.md template
  *   scaffold uat --phase <N>           Create UAT.md template
  *   scaffold verification --phase <N>  Create VERIFICATION.md template
  *   scaffold phase-dir --phase <N>     Create phase directory
  *     --name <name>
+ *   scaffold bugs                      Create bugs directories
  *
  * Frontmatter CRUD:
  *   frontmatter get <file> [--field k] Extract frontmatter as JSON
@@ -121,6 +128,7 @@
  *   init verify-work <phase>           All context for verify-work workflow
  *   init phase-op <phase>              Generic phase operation context
  *   init todos [area]                  All context for todo workflows
+ *   init bugs                          All context for bug reporting workflow
  *   init milestone-op                  All context for milestone operations
  *   init map-codebase                  All context for map-codebase workflow
  *   init progress                      All context for progress workflow
@@ -129,6 +137,7 @@
 const fs = require('fs');
 const path = require('path');
 const { error } = require('./lib/core.cjs');
+const { setMilestoneOverride } = require('./lib/paths.cjs');
 const state = require('./lib/state.cjs');
 const phase = require('./lib/phase.cjs');
 const roadmap = require('./lib/roadmap.cjs');
@@ -163,6 +172,21 @@ async function main() {
 
   if (!fs.existsSync(cwd) || !fs.statSync(cwd).isDirectory()) {
     error(`Invalid --cwd: ${cwd}`);
+  }
+
+  // Optional --milestone override for multi-milestone support
+  const msEqArg = args.find(arg => arg.startsWith('--milestone='));
+  const msIdx = args.indexOf('--milestone');
+  if (msEqArg) {
+    const value = msEqArg.slice('--milestone='.length).trim();
+    if (!value) error('Missing value for --milestone');
+    args.splice(args.indexOf(msEqArg), 1);
+    setMilestoneOverride(value);
+  } else if (msIdx !== -1) {
+    const value = args[msIdx + 1];
+    if (!value || value.startsWith('--')) error('Missing value for --milestone');
+    args.splice(msIdx, 2);
+    setMilestoneOverride(value);
   }
 
   const rawIndex = args.indexOf('--raw');
@@ -459,8 +483,16 @@ async function main() {
           milestoneName = nameArgs.join(' ') || null;
         }
         milestone.cmdMilestoneComplete(cwd, args[2], { name: milestoneName, archivePhases }, raw);
+      } else if (subcommand === 'create') {
+        milestone.cmdMilestoneCreate(cwd, args[2], raw);
+      } else if (subcommand === 'switch') {
+        milestone.cmdMilestoneSwitch(cwd, args[2], raw);
+      } else if (subcommand === 'list') {
+        milestone.cmdMilestoneList(cwd, raw);
+      } else if (subcommand === 'status') {
+        milestone.cmdMilestoneStatus(cwd, raw);
       } else {
-        error('Unknown milestone subcommand. Available: complete');
+        error('Unknown milestone subcommand. Available: complete, create, switch, list, status');
       }
       break;
     }
@@ -490,6 +522,28 @@ async function main() {
         commands.cmdTodoComplete(cwd, args[2], raw);
       } else {
         error('Unknown todo subcommand. Available: complete');
+      }
+      break;
+    }
+
+    case 'bug': {
+      const subcommand = args[1];
+      if (subcommand === 'list') {
+        const areaIdx = args.indexOf('--area');
+        const severityIdx = args.indexOf('--severity');
+        const statusIdx = args.indexOf('--status');
+        commands.cmdBugList(cwd, {
+          area: areaIdx !== -1 ? args[areaIdx + 1] : null,
+          severity: severityIdx !== -1 ? args[severityIdx + 1] : null,
+          status: statusIdx !== -1 ? args[statusIdx + 1] : null,
+        }, raw);
+      } else if (subcommand === 'update') {
+        const statusIdx = args.indexOf('--status');
+        commands.cmdBugUpdate(cwd, args[2], statusIdx !== -1 ? args[statusIdx + 1] : null, raw);
+      } else if (subcommand === 'resolve') {
+        commands.cmdBugResolve(cwd, args[2], raw);
+      } else {
+        error('Unknown bug subcommand. Available: list, update, resolve');
       }
       break;
     }
@@ -536,6 +590,9 @@ async function main() {
         case 'todos':
           init.cmdInitTodos(cwd, args[2], raw);
           break;
+        case 'bugs':
+          init.cmdInitBugs(cwd, raw);
+          break;
         case 'milestone-op':
           init.cmdInitMilestoneOp(cwd, raw);
           break;
@@ -546,7 +603,7 @@ async function main() {
           init.cmdInitProgress(cwd, raw);
           break;
         default:
-          error(`Unknown init workflow: ${workflow}\nAvailable: execute-phase, plan-phase, new-project, new-milestone, quick, resume, verify-work, phase-op, todos, milestone-op, map-codebase, progress`);
+          error(`Unknown init workflow: ${workflow}\nAvailable: execute-phase, plan-phase, new-project, new-milestone, quick, resume, verify-work, phase-op, todos, bugs, milestone-op, map-codebase, progress`);
       }
       break;
     }

@@ -13,6 +13,8 @@ phase: XX-name
 source: [list of SUMMARY.md files tested]
 started: [ISO timestamp]
 updated: [ISO timestamp]
+browser_pre_verified: true | false
+browser_auto_passed: [N]
 ---
 
 ## Current Test
@@ -45,12 +47,23 @@ expected: [observable behavior]
 result: skipped
 reason: [why skipped]
 
+### 5. [Test Name]
+expected: [observable behavior]
+result: auto_pass
+auto_evidence: "[what browser agent observed]"
+
+### 6. [Test Name]
+expected: [observable behavior]
+result: [pending]
+auto_note: "[browser detection context for human reviewer]"
+
 ...
 
 ## Summary
 
 total: [N]
 passed: [N]
+auto_passed: [N]
 issues: [N]
 pending: [N]
 skipped: [N]
@@ -79,21 +92,27 @@ skipped: [N]
 - `source`: IMMUTABLE - SUMMARY files being tested
 - `started`: IMMUTABLE - set on creation
 - `updated`: OVERWRITE - update on every change
+- `browser_pre_verified`: IMMUTABLE - whether browser pre-verification ran
+- `browser_auto_passed`: OVERWRITE - count of auto-passed tests
 
 **Current Test:**
 - OVERWRITE entirely on each test transition
 - Shows which test is active and what's awaited
 - On completion: "[testing complete]"
+- Skip tests with `result: auto_pass` — do not present to human
 
 **Tests:**
 - Each test: OVERWRITE result field when user responds
-- `result` values: [pending], pass, issue, skipped
+- `result` values: [pending], pass, issue, skipped, auto_pass
+- `auto_pass`: Set by browser pre-verification, skipped in human UAT
+- `auto_evidence`: Evidence from browser agent for auto_pass tests
+- `auto_note`: Browser context added to [pending] tests for human reviewer
 - If issue: add `reported` (verbatim) and `severity` (inferred)
 - If skipped: add `reason` if provided
 
 **Summary:**
 - OVERWRITE counts after each response
-- Tracks: total, passed, issues, pending, skipped
+- Tracks: total, passed, auto_passed, issues, pending, skipped
 
 **Gaps:**
 - APPEND only when issue found (YAML format)
@@ -187,6 +206,8 @@ phase: 04-comments
 source: 04-01-SUMMARY.md, 04-02-SUMMARY.md
 started: 2025-01-15T10:30:00Z
 updated: 2025-01-15T10:45:00Z
+browser_pre_verified: true
+browser_auto_passed: 2
 ---
 
 ## Current Test
@@ -197,7 +218,8 @@ updated: 2025-01-15T10:45:00Z
 
 ### 1. View Comments on Post
 expected: Comments section expands, shows count and comment list
-result: pass
+result: auto_pass
+auto_evidence: "Navigated to /posts/1, found 'Comments (3)' heading and 3 comment elements in accessibility tree"
 
 ### 2. Create Top-Level Comment
 expected: Submit comment via rich text editor, appears in list with author info
@@ -212,6 +234,7 @@ result: pass
 ### 4. Visual Nesting
 expected: 3+ level thread shows indentation, left borders, caps at reasonable depth
 result: pass
+auto_note: "Browser detected nested comment elements but visual indentation requires human judgment"
 
 ### 5. Delete Own Comment
 expected: Click delete on own comment, removed or shows [deleted] if has replies
@@ -219,12 +242,14 @@ result: pass
 
 ### 6. Comment Count
 expected: Post shows accurate count, increments when adding comment
-result: pass
+result: auto_pass
+auto_evidence: "Comment count element shows '3', added comment via form, count updated to '4'"
 
 ## Summary
 
 total: 6
-passed: 5
+passed: 3
+auto_passed: 2
 issues: 1
 pending: 0
 skipped: 0

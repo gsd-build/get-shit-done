@@ -474,6 +474,7 @@ You're never locked in. The system adapts.
 | `/gsd:audit-milestone` | Verify milestone achieved its definition of done |
 | `/gsd:complete-milestone` | Archive milestone, tag release |
 | `/gsd:new-milestone [name]` | Start next version: questions → research → requirements → roadmap |
+| `/gsd:switch-milestone <name>` | Switch active milestone for concurrent work |
 
 ### Navigation
 
@@ -513,13 +514,29 @@ You're never locked in. The system adapts.
 |---------|--------------|
 | `/gsd:settings` | Configure model profile and workflow agents |
 | `/gsd:set-profile <profile>` | Switch model profile (quality/balanced/budget) |
+| `/gsd:report-bug [desc]` | Report bug with severity tracking and GitHub issue creation |
 | `/gsd:add-todo [desc]` | Capture idea for later |
 | `/gsd:check-todos` | List pending todos |
 | `/gsd:debug [desc]` | Systematic debugging with persistent state |
+| `/gsd:add-tests <N> [instructions]` | Generate unit and E2E tests for completed phase |
 | `/gsd:quick [--full]` | Execute ad-hoc task with GSD guarantees (`--full` adds plan-checking and verification) |
 | `/gsd:health [--repair]` | Validate `.planning/` directory integrity, auto-repair with `--repair` |
 
 <sup>¹ Contributed by reddit user OracleGreyBeard</sup>
+
+### Concurrent Milestones
+
+Work on multiple milestones simultaneously — e.g., v2.0 features + v1.5.1 hotfix:
+
+```
+/gsd:new-milestone "v1.5.1 Hotfix"    # Creates milestone-scoped directory
+/gsd:switch-milestone v2.0-features    # Switch back to feature work
+/gsd:progress                          # See status of active milestone
+```
+
+Each milestone gets isolated state: `STATE.md`, `ROADMAP.md`, `REQUIREMENTS.md`, `phases/` — all scoped under `.planning/milestones/<name>/`. Switch freely without losing progress.
+
+When no second milestone exists, everything stays in `.planning/` as usual (zero behavioral change).
 
 ---
 

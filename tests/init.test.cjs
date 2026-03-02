@@ -844,6 +844,96 @@ describe('cmdInitNewMilestone', () => {
 });
 
 // ─────────────────────────────────────────────────────────────────────────────
+// cmdInitVerifyWork (INIT-07)
+// ─────────────────────────────────────────────────────────────────────────────
+
+describe('cmdInitVerifyWork', () => {
+  let tmpDir;
+
+  beforeEach(() => {
+    tmpDir = createTempProject();
+  });
+
+  afterEach(() => {
+    cleanup(tmpDir);
+  });
+
+  test('returns expected fields for existing phase', () => {
+    const phaseDir = path.join(tmpDir, '.planning', 'phases', '03-api');
+    fs.mkdirSync(phaseDir, { recursive: true });
+
+    const result = runGsdTools('init verify-work 03', tmpDir);
+    assert.ok(result.success, `Command failed: ${result.error}`);
+
+    const output = JSON.parse(result.output);
+    assert.strictEqual(output.phase_found, true);
+    assert.ok(output.phase_dir.includes('03-api'), 'phase_dir should contain 03-api');
+    assert.strictEqual(output.phase_number, '03');
+    assert.strictEqual(output.phase_name, 'api');
+    assert.strictEqual(typeof output.commit_docs, 'boolean');
+    assert.ok('planner_model' in output, 'Should have planner_model');
+    assert.ok('checker_model' in output, 'Should have checker_model');
+    assert.ok('planning_base' in output, 'Should have planning_base');
+  });
+
+  test('returns browser_enabled and browser_base_url', () => {
+    const phaseDir = path.join(tmpDir, '.planning', 'phases', '03-api');
+    fs.mkdirSync(phaseDir, { recursive: true });
+
+    const result = runGsdTools('init verify-work 03', tmpDir);
+    assert.ok(result.success, `Command failed: ${result.error}`);
+
+    const output = JSON.parse(result.output);
+    assert.strictEqual(output.browser_enabled, false, 'browser_enabled should default to false');
+    assert.strictEqual(output.browser_base_url, 'http://localhost:3000', 'browser_base_url should default to localhost:3000');
+  });
+
+  test('browser_enabled reflects config when set', () => {
+    const phaseDir = path.join(tmpDir, '.planning', 'phases', '03-api');
+    fs.mkdirSync(phaseDir, { recursive: true });
+
+    // Create config with browser enabled
+    fs.writeFileSync(
+      path.join(tmpDir, '.planning', 'config.json'),
+      JSON.stringify({ browser: { enabled: true, base_url: 'http://localhost:5173' } }, null, 2)
+    );
+
+    const result = runGsdTools('init verify-work 03', tmpDir);
+    assert.ok(result.success, `Command failed: ${result.error}`);
+
+    const output = JSON.parse(result.output);
+    assert.strictEqual(output.browser_enabled, true, 'browser_enabled should be true from config');
+    assert.strictEqual(output.browser_base_url, 'http://localhost:5173', 'browser_base_url should come from config');
+  });
+
+  test('has_verification detects VERIFICATION.md', () => {
+    const phaseDir = path.join(tmpDir, '.planning', 'phases', '03-api');
+    fs.mkdirSync(phaseDir, { recursive: true });
+    fs.writeFileSync(path.join(phaseDir, '03-VERIFICATION.md'), '# Verification');
+
+    const result = runGsdTools('init verify-work 03', tmpDir);
+    assert.ok(result.success, `Command failed: ${result.error}`);
+
+    const output = JSON.parse(result.output);
+    assert.strictEqual(output.has_verification, true);
+  });
+
+  test('nonexistent phase returns phase_found false', () => {
+    const result = runGsdTools('init verify-work 99', tmpDir);
+    assert.ok(result.success, `Command failed: ${result.error}`);
+
+    const output = JSON.parse(result.output);
+    assert.strictEqual(output.phase_found, false);
+    assert.strictEqual(output.phase_dir, null);
+  });
+
+  test('errors when no phase argument provided', () => {
+    const result = runGsdTools('init verify-work', tmpDir);
+    assert.strictEqual(result.success, false);
+  });
+});
+
+// ─────────────────────────────────────────────────────────────────────────────
 // roadmap analyze command
 // ─────────────────────────────────────────────────────────────────────────────
 

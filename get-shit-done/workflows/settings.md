@@ -16,12 +16,14 @@ node "$HOME/.claude/get-shit-done/bin/gsd-tools.cjs" config-ensure-section
 INIT=$(node "$HOME/.claude/get-shit-done/bin/gsd-tools.cjs" state load)
 ```
 
-Creates `.planning/config.json` with defaults if missing and loads current config values.
+Creates `{planning_base}/config.json` with defaults if missing and loads current config values.
+
+Extract `planning_base` from init JSON (or derive from `state load` response).
 </step>
 
 <step name="read_current">
 ```bash
-cat .planning/config.json
+cat {planning_base}/config.json
 ```
 
 Parse current values (default to `true` if not present):
@@ -102,6 +104,15 @@ AskUserQuestion([
       { label: "Per Phase", description: "Create branch for each phase (gsd/phase-{N}-{name})" },
       { label: "Per Milestone", description: "Create branch for entire milestone (gsd/{version}-{name})" }
     ]
+  },
+  {
+    question: "Enable browser pre-verification in UAT? (requires chrome-devtools-mcp)",
+    header: "Browser",
+    multiSelect: false,
+    options: [
+      { label: "Disabled (Default)", description: "All tests go to human UAT" },
+      { label: "Enabled", description: "Auto-verify UI tests with browser before human UAT" }
+    ]
   }
 ])
 ```
@@ -123,11 +134,14 @@ Merge new settings into existing config.json:
   },
   "git": {
     "branching_strategy": "none" | "phase" | "milestone"
+  },
+  "browser": {
+    "enabled": true/false
   }
 }
 ```
 
-Write updated config to `.planning/config.json`.
+Write updated config to `{planning_base}/config.json`.
 </step>
 
 <step name="save_as_defaults">
@@ -190,6 +204,7 @@ Display:
 | Auto-Advance         | {On/Off} |
 | Nyquist Validation   | {On/Off} |
 | Git Branching        | {None/Per Phase/Per Milestone} |
+| Browser Pre-Verify   | {On/Off} |
 | Saved as Defaults    | {Yes/No} |
 
 These settings apply to future /gsd:plan-phase and /gsd:execute-phase runs.
@@ -206,8 +221,8 @@ Quick commands:
 
 <success_criteria>
 - [ ] Current config read
-- [ ] User presented with 7 settings (profile + 5 workflow toggles + git branching)
-- [ ] Config updated with model_profile, workflow, and git sections
+- [ ] User presented with 8 settings (profile + 5 workflow toggles + git branching + browser)
+- [ ] Config updated with model_profile, workflow, git, and browser sections
 - [ ] User offered to save as global defaults (~/.gsd/defaults.json)
 - [ ] Changes confirmed to user
 </success_criteria>

@@ -5,10 +5,12 @@
 const fs = require('fs');
 const path = require('path');
 const { output, error } = require('./core.cjs');
+const { resolvePlanningPaths } = require('./paths.cjs');
 
 function cmdConfigEnsureSection(cwd, raw) {
-  const configPath = path.join(cwd, '.planning', 'config.json');
-  const planningDir = path.join(cwd, '.planning');
+  const paths = resolvePlanningPaths(cwd);
+  const configPath = paths.abs.config;
+  const planningDir = paths.abs.base;
 
   // Ensure .planning directory exists
   try {
@@ -58,16 +60,27 @@ function cmdConfigEnsureSection(cwd, raw) {
     },
     parallelization: true,
     brave_search: hasBraveSearch,
+    browser: {
+      enabled: false,
+      base_url: 'http://localhost:3000',
+      headless: true,
+      user_data_dir: '',
+      auth: { login_url: '', username_field: '', password_field: '', username: '', password_env_var: '', submit_selector: '' },
+      startup_command: '',
+      startup_wait_seconds: 10,
+      port: 9222,
+    },
   };
   const defaults = {
     ...hardcoded,
     ...userDefaults,
     workflow: { ...hardcoded.workflow, ...(userDefaults.workflow || {}) },
+    browser: { ...hardcoded.browser, ...(userDefaults.browser || {}), auth: { ...hardcoded.browser.auth, ...(userDefaults.browser?.auth || {}) } },
   };
 
   try {
     fs.writeFileSync(configPath, JSON.stringify(defaults, null, 2), 'utf-8');
-    const result = { created: true, path: '.planning/config.json' };
+    const result = { created: true, path: paths.rel.config };
     output(result, raw, 'created');
   } catch (err) {
     error('Failed to create config.json: ' + err.message);
@@ -75,7 +88,7 @@ function cmdConfigEnsureSection(cwd, raw) {
 }
 
 function cmdConfigSet(cwd, keyPath, value, raw) {
-  const configPath = path.join(cwd, '.planning', 'config.json');
+  const configPath = resolvePlanningPaths(cwd).abs.config;
 
   if (!keyPath) {
     error('Usage: config-set <key.path> <value>');
@@ -120,7 +133,7 @@ function cmdConfigSet(cwd, keyPath, value, raw) {
 }
 
 function cmdConfigGet(cwd, keyPath, raw) {
-  const configPath = path.join(cwd, '.planning', 'config.json');
+  const configPath = resolvePlanningPaths(cwd).abs.config;
 
   if (!keyPath) {
     error('Usage: config-get <key.path>');
