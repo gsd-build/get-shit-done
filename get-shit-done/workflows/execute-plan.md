@@ -213,14 +213,14 @@ End with: **Total deviations:** N auto-fixed (breakdown). **Impact:** assessment
 <tdd_plan_execution>
 ## TDD Execution
 
-For `type: tdd` plans — RED-GREEN-REFACTOR:
+For `type: tdd` plans — RED-GREEN:
 
 1. **Infrastructure** (first TDD plan only): detect project, install framework, config, verify empty suite
 2. **RED:** Read `<behavior>` → failing test(s) → run (MUST fail) → commit: `test({phase}-{plan}): add failing test for [feature]`
 3. **GREEN:** Read `<implementation>` → minimal code → run (MUST pass) → commit: `feat({phase}-{plan}): implement [feature]`
-4. **REFACTOR:** Clean up → tests MUST pass → commit: `refactor({phase}-{plan}): clean up [feature]`
+4. **REFACTOR (optional):** Skip unless obvious cleanup exists. Clean up → tests MUST pass → commit: `refactor({phase}-{plan}): clean up [feature]`
 
-Errors: RED doesn't fail → investigate test/existing feature. GREEN doesn't pass → debug, iterate. REFACTOR breaks → undo.
+Errors: RED doesn't fail → investigate test/existing feature. GREEN doesn't pass → debug, iterate.
 
 See `~/.claude/get-shit-done/references/tdd.md` for structure.
 </tdd_plan_execution>
@@ -245,7 +245,7 @@ git add src/types/user.ts
 | `feat` | New functionality | feat(08-02): create user registration endpoint |
 | `fix` | Bug fix | fix(08-02): correct email validation regex |
 | `test` | Test-only (TDD RED) | test(08-02): add failing test for password hashing |
-| `refactor` | No behavior change (TDD REFACTOR) | refactor(08-02): extract validation to helper |
+| `refactor` | No behavior change (optional TDD cleanup) | refactor(08-02): extract validation to helper |
 | `perf` | Performance | perf(08-02): add database index |
 | `docs` | Documentation | docs(08-02): add API docs |
 | `style` | Formatting | style(08-02): format auth module |

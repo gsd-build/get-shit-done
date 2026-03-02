@@ -222,7 +222,17 @@ This prevents the "scavenger hunt" anti-pattern where executors explore the code
 
 **Test:** Could a different Claude instance execute without asking clarifying questions? If not, add specificity.
 
-## TDD Detection
+## TDD Detection Heuristic
+
+**First, check if TDD is enabled:**
+
+```bash
+TDD_ENABLED=$(cat .planning/config.json 2>/dev/null | grep -oE '"tdd"\s*:\s*(true|false)' | grep -oE 'true|false' || echo "true")
+```
+
+**If `TDD_ENABLED=false`:** Skip TDD entirely. Create all plans with `type: execute`.
+
+**If `TDD_ENABLED=true`:** For each potential task, evaluate TDD fit:
 
 **Heuristic:** Can you write `expect(fn(input)).toBe(output)` before writing `fn`?
 - Yes → Create a dedicated TDD plan (type: tdd)
@@ -232,7 +242,7 @@ This prevents the "scavenger hunt" anti-pattern where executors explore the code
 
 **Standard tasks:** UI layout/styling, configuration, glue code, one-off scripts, simple CRUD with no business logic.
 
-**Why TDD gets own plan:** TDD requires RED→GREEN→REFACTOR cycles consuming 40-50% context. Embedding in multi-task plans degrades quality.
+**Why TDD gets own plan:** TDD requires RED→GREEN cycles consuming ~45% context. Embedding in multi-task plans degrades quality.
 
 **Task-level TDD** (for code-producing tasks in standard plans): When a task creates or modifies production code, add `tdd="true"` and a `<behavior>` block to make test expectations explicit before implementation:
 
@@ -785,19 +795,95 @@ Output: [Working, tested feature]
 </feature>
 ```
 
-## Red-Green-Refactor Cycle
+## Red-Green Cycle
 
 **RED:** Create test file → write test describing expected behavior → run test (MUST fail) → commit: `test({phase}-{plan}): add failing test for [feature]`
 
 **GREEN:** Write minimal code to pass → run test (MUST pass) → commit: `feat({phase}-{plan}): implement [feature]`
 
-**REFACTOR (if needed):** Clean up → run tests (MUST pass) → commit: `refactor({phase}-{plan}): clean up [feature]`
+**REFACTOR (optional):** Skip unless obvious cleanup exists. Clean up → run tests (MUST pass) → commit: `refactor({phase}-{plan}): clean up [feature]`
 
-Each TDD plan produces 2-3 atomic commits.
+Each TDD plan produces 2 commits (optional 3rd for refactor).
 
 ## Context Budget for TDD
 
-TDD plans target ~40% context (lower than standard 50%). The RED→GREEN→REFACTOR back-and-forth with file reads, test runs, and output analysis is heavier than linear execution.
+TDD plans target ~45% context (lower than standard 50%). The RED→GREEN back-and-forth with file reads, test runs, and output analysis is heavier than linear execution.
+
+## TDD-First Enforcement
+
+### Rule: Logic Plans Must Be TDD
+
+For any plan with testable business logic, you MUST:
+- Set `type: tdd` in frontmatter
+- Include `<tests>` with acceptance tests
+
+### Required: Acceptance Tests
+
+All TDD plans MUST include `<acceptance>` tests. Write them in RED phase before implementation.
+
+```xml
+<tests>
+  <acceptance>
+    - From must_haves.truths — prove feature does what it should
+  </acceptance>
+  <!-- Include <recommended_later> ONLY for tasks that benefit -->
+  <recommended_later>
+    - Edge: [only for parsers, validators, data transformations]
+    - Security: [only for auth, data access, input handling]
+    - Performance: [only for critical paths, heavy queries]
+  </recommended_later>
+</tests>
+```
+
+### Targeted Test Recommendations
+
+Include `<recommended_later>` ONLY on tasks that benefit — not blanket on every task:
+
+| Task Type | Recommended Tests | Example |
+|-----------|-------------------|---------|
+| Auth endpoints, data access | Security tests | Access control, audit logging |
+| Parsers, validators, transformations | Edge case tests | Null, empty, malformed input |
+| Critical paths, heavy queries | Performance tests | Response time, memory thresholds |
+| Simple business logic | None beyond acceptance | — |
+
+Users add these later via `/gsd:add-tests`. Security compliance level from config.json informs which security tests to recommend.
+
+Reference: @~/.claude/get-shit-done/references/security-compliance.md
+
+### Refactor Plan Decision
+
+Add a refactor plan (wave N+1) when:
+- 3+ feature plans in phase
+- Feature plans share files (technical debt likely)
+- Security compliance >= soc2 (stricter code quality)
+
+```yaml
+---
+phase: XX-name
+plan: NN
+type: execute
+refactor: true    # Marks as refactor plan
+wave: N+1         # After feature plans
+depends_on: [all feature plans]
+---
+```
+
+### Quality in must_haves
+
+TDD plans should include quality section:
+
+```yaml
+must_haves:
+  truths: [...]
+  artifacts: [...]
+  key_links: [...]
+  quality:
+    test_coverage_min: 80
+    security_compliance: soc2    # MUST match SECURITY_LEVEL from config.json
+    no_critical_vulnerabilities: true
+```
+
+**Validation:** `quality.security_compliance` MUST equal `SECURITY_LEVEL` read from config.json. Mismatch is an error.
 
 </tdd_integration>
 

@@ -14,7 +14,9 @@ Interactive configuration of GSD workflow agents and model profile via multi-que
 Routes to the settings workflow which handles:
 - Config existence ensuring
 - Current settings reading and parsing
-- Interactive 5-question prompt (model, research, plan_check, verifier, branching)
+- Interactive settings prompt in 2 rounds (respecting AskUserQuestion 4-question limit)
+- Round 1: model, research, plan_check, verifier (4 questions)
+- Round 2: TDD, security compliance, branching (3 questions)
 - Config merging and writing
 - Confirmation display with quick command references
 </objective>
@@ -29,7 +31,7 @@ Routes to the settings workflow which handles:
 The workflow handles all logic including:
 1. Config file creation with defaults if missing
 2. Current config reading
-3. Interactive settings presentation with pre-selection
+3. Interactive settings presentation in 2 rounds with pre-selection
 4. Answer parsing and config merging
 5. File writing
 6. Confirmation display

@@ -1,5 +1,7 @@
 <purpose>
-Generate unit and E2E tests for a completed phase based on its SUMMARY.md, CONTEXT.md, and implementation. Classifies each changed file into TDD (unit), E2E (browser), or Skip categories, presents a test plan for user approval, then generates tests following RED-GREEN conventions.
+Generate unit and E2E tests for a completed phase based on its SUMMARY.md, CONTEXT.md, and implementation. Also the recommended path for adding edge, security, and performance tests after TDD plans ship.
+
+Classifies each changed file into TDD (unit), E2E (browser), or Skip categories, presents a test plan for user approval, then generates tests following RED-GREEN conventions.
 
 Users currently hand-craft `/gsd:quick` prompts for test generation after each phase. This workflow standardizes the process with proper classification, quality gates, and gap reporting.
 </purpose>
@@ -167,7 +169,7 @@ AskUserQuestion(
 <step name="generate_test_plan">
 For each approved file, create a detailed test plan.
 
-**For TDD files**, plan tests following RED-GREEN-REFACTOR:
+**For TDD files**, plan tests following RED-GREEN:
 1. Identify testable functions/methods in the file
 2. For each function: list input scenarios, expected outputs, edge cases
 3. Note: since code already exists, tests may pass immediately — that's OK, but verify they test the RIGHT behavior

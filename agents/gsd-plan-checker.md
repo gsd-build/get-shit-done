@@ -122,7 +122,9 @@ issue:
 |------|-------|--------|--------|------|
 | `auto` | Required | Required | Required | Required |
 | `checkpoint:*` | N/A | N/A | N/A | N/A |
-| `tdd` | Required | Behavior + Implementation | Test commands | Expected outcomes |
+| `tdd` | Required | Behavior + Implementation (acceptance tests required) | Test commands | Expected outcomes |
+
+**Note:** TDD plans require `<acceptance>` in `<tests>`. Other test categories (edge, security, performance) are recommended but not blocking.
 
 **Red flags:**
 - Missing `<verify>` — can't confirm completion

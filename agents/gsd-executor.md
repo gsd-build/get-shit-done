@@ -67,11 +67,28 @@ PLAN_START_EPOCH=$(date +%s)
 </step>
 
 <step name="determine_execution_pattern">
+Check plan type, TDD setting, and checkpoints:
+
+
 ```bash
+# Check if TDD workflow is enabled in config (handles "tdd":true and "tdd": true)
+TDD_ENABLED=$(cat .planning/config.json 2>/dev/null | grep -oE '"tdd"\s*:\s*(true|false)' | grep -oE 'true|false' || echo "true")
+
+# Check plan type from frontmatter
+grep -E "^type:" [plan-path] | head -1
+# Check for checkpoints
 grep -n "type=\"checkpoint" [plan-path]
 ```
 
-**Pattern A: Fully autonomous (no checkpoints)** — Execute all tasks, create SUMMARY, commit.
+**Pattern T: TDD plan (`type: tdd` in frontmatter AND `workflow.tdd: true` in config)**
+
+- **If `TDD_ENABLED=false`:** Treat as Pattern A (standard execution, skip TDD)
+- Plan contains `<feature>` element instead of `<tasks>`
+- Execute using RED-GREEN cycle (see tdd_plan_execution)
+- Produces 2 commits per feature (optional 3rd for refactor)
+- Create SUMMARY.md with TDD phases documented
+
+**Pattern A: Fully autonomous (no checkpoints)**
 
 **Pattern B: Has checkpoints** — Execute until checkpoint, STOP, return structured message. You will NOT be resumed.
 
@@ -79,22 +96,39 @@ grep -n "type=\"checkpoint" [plan-path]
 </step>
 
 <step name="execute_tasks">
-For each task:
+Execute the plan based on its type.
 
-1. **If `type="auto"`:**
-   - Check for `tdd="true"` → follow TDD execution flow
-   - Execute task, apply deviation rules as needed
-   - Handle auth errors as authentication gates
-   - Run verification, confirm done criteria
-   - Commit (see task_commit_protocol)
-   - Track completion + commit hash for Summary
+**If Pattern T (TDD plan) AND `TDD_ENABLED=true`:** Skip to `<tdd_plan_execution>` section.
+**If Pattern T (TDD plan) AND `TDD_ENABLED=false`:** Treat as standard plan, execute `<implementation>` directly without tests.
+
+**For standard plans, execute each task:**
 
 2. **If `type="checkpoint:*"`:**
    - STOP immediately — return structured checkpoint message
    - A fresh agent will be spawned to continue
 
-3. After all tasks: run overall verification, confirm success criteria, document deviations
-</step>
+2. **If `type="auto"`:**
+
+   - Check if task has `tdd="true"` attribute → follow TDD task flow in `<tdd_execution>`
+   - Work toward task completion
+   - **If CLI/API returns authentication error:** Handle as authentication gate
+   - **When you discover additional work not in plan:** Apply deviation rules automatically
+   - Run the verification
+   - Confirm done criteria met
+   - **Commit the task** (see task_commit_protocol)
+   - Track task completion and commit hash for Summary
+   - Continue to next task
+
+3. **If `type="checkpoint:*"`:**
+
+   - STOP immediately (do not continue to next task)
+   - Return structured checkpoint message (see checkpoint_return_format)
+   - You will NOT continue - a fresh agent will be spawned
+
+4. Run overall verification checks from `<verification>` section
+5. Confirm all success criteria from `<success_criteria>` section met
+6. Document all deviations in Summary
+   </step>
 
 </execution_flow>
 
@@ -284,8 +318,110 @@ If spawned as continuation agent (`<completed_tasks>` in prompt):
 5. If another checkpoint hit → return with ALL completed tasks (previous + new)
 </continuation_handling>
 
+<tdd_plan_execution>
+When executing a plan with `type: tdd` in frontmatter, use this flow instead of standard task execution.
+
+**TDD Plan Structure:**
+
+TDD plans contain `<feature>` element (not `<tasks>`):
+
+```xml
+<feature>
+  <name>Feature name</name>
+  <files>source.ts, source.test.ts</files>
+  <behavior>
+    Expected behavior in testable terms
+    Cases: input → expected output
+  </behavior>
+  <tests>
+    <acceptance>...</acceptance>
+    <!-- Optional: <recommended_later> for edge/security/performance -->
+  </tests>
+  <implementation>How to implement once tests pass</implementation>
+</feature>
+```
+
+**Execution Flow:**
+
+**1. Setup test infrastructure (if needed):**
+
+Run this function before writing tests:
+
+```bash
+# Detect project type and ensure test framework exists
+detect_and_setup_tests() {
+  if [ -f "package.json" ]; then
+    # Node.js - check for test framework
+    grep -qE "(jest|vitest|mocha)" package.json || npm install -D vitest
+  elif [ -f "pyproject.toml" ] || [ -f "requirements.txt" ]; then
+    # Python - check for pytest
+    pip show pytest >/dev/null 2>&1 || pip install pytest
+  elif [ -f "go.mod" ]; then
+    # Go - testing is built-in, no setup needed
+    :
+  elif [ -f "Cargo.toml" ]; then
+    # Rust - testing is built-in, no setup needed
+    :
+  elif [ -f "build.gradle" ]; then
+    # Java/Gradle - JUnit usually included
+    :
+  elif [ -f "pom.xml" ]; then
+    # Java/Maven - JUnit usually included
+    :
+  fi
+}
+```
+
+**2. RED - Write failing acceptance tests:**
+
+Read `<tests>` section — `<acceptance>` tests are mandatory:
+1. Write tests describing expected behavior from must_haves.truths
+2. Run tests - ALL must fail (if any pass, investigate)
+3. Commit:
+   ```
+   test({phase}-{plan}): add failing tests for [feature]
+
+   - [N] acceptance tests
+   ```
+
+**3. GREEN - Implement to pass:**
+
+- Read `<implementation>` element for guidance
+- Write minimal code to make ALL tests pass
+- Run tests iteratively until green
+- Commit:
+   ```
+   feat({phase}-{plan}): implement [feature]
+
+   All acceptance tests passing: [N]/[N]
+   ```
+
+**4. REFACTOR (optional):** Skip unless obvious cleanup exists.
+
+- Clean up code if obvious improvements
+- Run tests - MUST still pass
+- Commit only if changes made:
+   ```
+   refactor({phase}-{plan}): clean up [feature]
+   ```
+
+**TDD Plan Commits:** Each TDD plan produces 2 commits (optional 3rd for refactor).
+
+**Error handling:**
+
+- If ANY test passes in RED phase: Feature may exist or test is wrong — investigate
+- If tests don't pass in GREEN phase: Debug, iterate until all green
+
+**Recommended later tests:**
+
+If the plan includes `<recommended_later>`, note those for `/gsd:add-tests`. Security tests are only relevant for tasks involving auth, data access, or input validation — not blanket on every task. Security compliance level from config.json informs which tests to recommend.
+
+Reference: `@~/.claude/get-shit-done/references/security-compliance.md`
+
+</tdd_plan_execution>
+
 <tdd_execution>
-When executing task with `tdd="true"`:
+When executing a task with `tdd="true"` attribute (within standard plans), follow RED-GREEN cycle.
 
 **1. Check test infrastructure** (if first TDD task): detect project type, install test framework if needed.
 
@@ -293,9 +429,9 @@ When executing task with `tdd="true"`:
 
 **3. GREEN:** Read `<implementation>`, write minimal code to pass, run (MUST pass), commit: `feat({phase}-{plan}): implement [feature]`
 
-**4. REFACTOR (if needed):** Clean up, run tests (MUST still pass), commit only if changes: `refactor({phase}-{plan}): clean up [feature]`
+**4. REFACTOR (optional):** Skip unless obvious cleanup exists. Clean up, run tests (MUST still pass), commit only if changes: `refactor({phase}-{plan}): clean up [feature]`
 
-**Error handling:** RED doesn't fail → investigate. GREEN doesn't pass → debug/iterate. REFACTOR breaks → undo.
+**Error handling:** RED doesn't fail → investigate. GREEN doesn't pass → debug/iterate.
 </tdd_execution>
 
 <task_commit_protocol>
