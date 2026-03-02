@@ -347,6 +347,103 @@ describe('validate health command', () => {
     );
   });
 
+  // ─── Check 5b: Nyquist validation key presence (W008) ─────────────────────
+
+  test('detects W008 when workflow.nyquist_validation absent from config', () => {
+    writeMinimalProjectMd(tmpDir);
+    writeMinimalRoadmap(tmpDir, ['1']);
+    writeMinimalStateMd(tmpDir, '# Session State\n\nPhase 1 in progress.\n');
+    // Config with workflow section but WITHOUT nyquist_validation key
+    fs.writeFileSync(
+      path.join(tmpDir, '.planning', 'config.json'),
+      JSON.stringify({ model_profile: 'balanced', workflow: { research: true } }, null, 2)
+    );
+    fs.mkdirSync(path.join(tmpDir, '.planning', 'phases', '01-a'), { recursive: true });
+
+    const result = runGsdTools('validate health', tmpDir);
+    assert.ok(result.success, `Command failed: ${result.error}`);
+
+    const output = JSON.parse(result.output);
+    assert.ok(
+      output.warnings.some(w => w.code === 'W008'),
+      `Expected W008 in warnings: ${JSON.stringify(output.warnings)}`
+    );
+  });
+
+  test('does not emit W008 when nyquist_validation is explicitly set', () => {
+    writeMinimalProjectMd(tmpDir);
+    writeMinimalRoadmap(tmpDir, ['1']);
+    writeMinimalStateMd(tmpDir, '# Session State\n\nPhase 1 in progress.\n');
+    // Config with workflow.nyquist_validation explicitly set
+    fs.writeFileSync(
+      path.join(tmpDir, '.planning', 'config.json'),
+      JSON.stringify({ model_profile: 'balanced', workflow: { research: true, nyquist_validation: true } }, null, 2)
+    );
+    fs.mkdirSync(path.join(tmpDir, '.planning', 'phases', '01-a'), { recursive: true });
+
+    const result = runGsdTools('validate health', tmpDir);
+    assert.ok(result.success, `Command failed: ${result.error}`);
+
+    const output = JSON.parse(result.output);
+    assert.ok(
+      !output.warnings.some(w => w.code === 'W008'),
+      `Should not have W008: ${JSON.stringify(output.warnings)}`
+    );
+  });
+
+  // ─── Check 7b: Nyquist VALIDATION.md consistency (W009) ──────────────────
+
+  test('detects W009 when RESEARCH.md has Validation Architecture but no VALIDATION.md', () => {
+    writeMinimalProjectMd(tmpDir);
+    writeMinimalRoadmap(tmpDir, ['1']);
+    writeMinimalStateMd(tmpDir, '# Session State\n\nPhase 1 in progress.\n');
+    writeValidConfigJson(tmpDir);
+    // Create phase dir with RESEARCH.md containing Validation Architecture
+    const phaseDir = path.join(tmpDir, '.planning', 'phases', '01-setup');
+    fs.mkdirSync(phaseDir, { recursive: true });
+    fs.writeFileSync(
+      path.join(phaseDir, '01-RESEARCH.md'),
+      '# Research\n\n## Validation Architecture\n\nSome validation content.\n'
+    );
+    // No VALIDATION.md
+
+    const result = runGsdTools('validate health', tmpDir);
+    assert.ok(result.success, `Command failed: ${result.error}`);
+
+    const output = JSON.parse(result.output);
+    assert.ok(
+      output.warnings.some(w => w.code === 'W009'),
+      `Expected W009 in warnings: ${JSON.stringify(output.warnings)}`
+    );
+  });
+
+  test('does not emit W009 when VALIDATION.md exists alongside RESEARCH.md', () => {
+    writeMinimalProjectMd(tmpDir);
+    writeMinimalRoadmap(tmpDir, ['1']);
+    writeMinimalStateMd(tmpDir, '# Session State\n\nPhase 1 in progress.\n');
+    writeValidConfigJson(tmpDir);
+    // Create phase dir with both RESEARCH.md and VALIDATION.md
+    const phaseDir = path.join(tmpDir, '.planning', 'phases', '01-setup');
+    fs.mkdirSync(phaseDir, { recursive: true });
+    fs.writeFileSync(
+      path.join(phaseDir, '01-RESEARCH.md'),
+      '# Research\n\n## Validation Architecture\n\nSome validation content.\n'
+    );
+    fs.writeFileSync(
+      path.join(phaseDir, '01-VALIDATION.md'),
+      '# Validation\n\nValidation content.\n'
+    );
+
+    const result = runGsdTools('validate health', tmpDir);
+    assert.ok(result.success, `Command failed: ${result.error}`);
+
+    const output = JSON.parse(result.output);
+    assert.ok(
+      !output.warnings.some(w => w.code === 'W009'),
+      `Should not have W009: ${JSON.stringify(output.warnings)}`
+    );
+  });
+
   // ─── Overall status ────────────────────────────────────────────────────────
 
   test("returns 'healthy' when all checks pass", () => {
@@ -507,6 +604,32 @@ describe('validate health --repair command', () => {
     // Verify backup contains the original content
     const backupContent = fs.readFileSync(path.join(planningDir, backupFile), 'utf-8');
     assert.ok(backupContent.includes('Phase 99'), 'backup should contain the original STATE.md content');
+  });
+
+  test('adds nyquist_validation key to config.json via addNyquistKey repair', () => {
+    writeMinimalStateMd(tmpDir, '# Session State\n\nPhase 1 in progress.\n');
+    // Config with workflow section but missing nyquist_validation
+    const configPath = path.join(tmpDir, '.planning', 'config.json');
+    fs.writeFileSync(
+      configPath,
+      JSON.stringify({ model_profile: 'balanced', workflow: { research: true } }, null, 2)
+    );
+
+    const result = runGsdTools('validate health --repair', tmpDir);
+    assert.ok(result.success, `Command failed: ${result.error}`);
+
+    const output = JSON.parse(result.output);
+    assert.ok(
+      Array.isArray(output.repairs_performed),
+      `Expected repairs_performed array: ${JSON.stringify(output)}`
+    );
+    const addKeyAction = output.repairs_performed.find(r => r.action === 'addNyquistKey');
+    assert.ok(addKeyAction, `Expected addNyquistKey action: ${JSON.stringify(output.repairs_performed)}`);
+    assert.strictEqual(addKeyAction.success, true, 'addNyquistKey should succeed');
+
+    // Read config.json and verify workflow.nyquist_validation is true
+    const diskConfig = JSON.parse(fs.readFileSync(configPath, 'utf-8'));
+    assert.strictEqual(diskConfig.workflow.nyquist_validation, true, 'nyquist_validation should be true');
   });
 
   test('reports repairable_count correctly', () => {
