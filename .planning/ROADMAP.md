@@ -109,10 +109,10 @@ Plans:
 **Plans:** 4 plans
 
 Plans:
-- [ ] 35-01-PLAN.md -- Spike wiring audit fixes: step 5.5 in plan-phase.md, researcher Genuine Gaps format, feature manifest spike section
-- [ ] 35-02-PLAN.md -- Lightweight research spike mode: option 4 in run-spike.md, research-only path in gsd-spike-runner.md
-- [ ] 35-03-PLAN.md -- End-to-end spike execution and pipeline verification: complete spike 002, verify reflect-to-spike pipeline
-- [ ] 35-04-PLAN.md -- Installer sync and human verification: sync .claude/ runtime, verify complete spike system
+- [x] 35-01-PLAN.md -- Spike wiring audit fixes: step 5.5 in plan-phase.md, researcher Genuine Gaps format, feature manifest spike section
+- [x] 35-02-PLAN.md -- Lightweight research spike mode: option 4 in run-spike.md, research-only path in gsd-spike-runner.md
+- [x] 35-03-PLAN.md -- End-to-end spike execution and pipeline verification: complete spike 002, verify reflect-to-spike pipeline
+- [x] 35-04-PLAN.md -- Installer sync and human verification: sync .claude/ runtime, verify complete spike system
 
 ## Progress
 
@@ -125,7 +125,7 @@ Phases execute in numeric order: 31 -> 32 -> 33 -> 34 -> 35
 | 32. Multi-Sensor Orchestrator | v1.16 | 4/4 | Complete | 2026-02-28 |
 | 33. Enhanced Reflector | v1.16 | 4/4 | Complete | 2026-03-01 |
 | 34. Signal-Plan Linkage | v1.16 | 4/4 | Complete | 2026-03-01 |
-| 35. Spike Audit & Lightweight Mode | v1.16 | 0/4 | Not started | - |
+| 35. Spike Audit & Lightweight Mode | v1.16 | 4/4 | Complete | 2026-03-02 |
 
 ## Overall Progress
 
@@ -135,6 +135,6 @@ Phases execute in numeric order: 31 -> 32 -> 33 -> 34 -> 35
 | 7-12 | v1.13 | 18/18 | Complete | 2026-02-11 |
 | 13-21 | v1.14 | 18/18 | Complete | 2026-02-16 |
 | 22-30 | v1.15 | 24/24 | Complete | 2026-02-23 |
-| 31-35 | v1.16 | 16/TBD | In progress | - |
+| 31-35 | v1.16 | 20/20 | Complete | 2026-03-02 |
 
-**Totals:** 5 milestones, 33 phases complete, 101 plans completed
+**Totals:** 5 milestones, 35 phases complete, 105 plans completed
