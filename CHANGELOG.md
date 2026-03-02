@@ -7,6 +7,7 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 ## [Unreleased]
 
 ### Fixed
+- `$HOME/.claude/` paths not replaced during local install, causing `MODULE_NOT_FOUND` on projects outside `$HOME` (#820)
 - **Quality/balanced profiles now deliver Opus subagents** — `resolveModelInternal` previously
   converted `opus` to `inherit`, causing agents to silently run on Sonnet when the parent
   session used the default Sonnet 4.6 model. Opus is now passed directly to Task calls (#695)

@@ -69,6 +69,21 @@ function getDirName(runtime) {
   return '.claude';
 }
 
+// Centralized path replacement for all install targets.
+// Handles ~/.claude/, $HOME/.claude/, ./.claude/, and runtime-specific variants.
+function replacePathPatterns(content, pathPrefix, runtime) {
+  const dirName = getDirName(runtime);
+  content = content.replace(/~\/\.claude\//g, pathPrefix);
+  content = content.replace(/\$HOME\/\.claude\//g, pathPrefix);
+  content = content.replace(/\.\/\.claude\//g, `./${dirName}/`);
+  if (runtime === 'opencode') {
+    content = content.replace(/~\/\.opencode\//g, pathPrefix);
+  } else if (runtime === 'codex') {
+    content = content.replace(/~\/\.codex\//g, pathPrefix);
+  }
+  return content;
+}
+
 /**
  * Get the config directory path relative to home directory for a runtime
  * Used for templating hooks that use path.join(homeDir, '<configDir>', ...)
@@ -1116,12 +1131,7 @@ function copyFlattenedCommands(srcDir, destDir, prefix, pathPrefix, runtime) {
       const destPath = path.join(destDir, destName);
 
       let content = fs.readFileSync(srcPath, 'utf8');
-      const globalClaudeRegex = /~\/\.claude\//g;
-      const localClaudeRegex = /\.\/\.claude\//g;
-      const opencodeDirRegex = /~\/\.opencode\//g;
-      content = content.replace(globalClaudeRegex, pathPrefix);
-      content = content.replace(localClaudeRegex, `./${getDirName(runtime)}/`);
-      content = content.replace(opencodeDirRegex, pathPrefix);
+      content = replacePathPatterns(content, pathPrefix, runtime);
       content = processAttribution(content, getCommitAttribution(runtime));
       content = convertClaudeToOpencodeFrontmatter(content);
 
@@ -1175,12 +1185,7 @@ function copyCommandsAsCodexSkills(srcDir, skillsDir, prefix, pathPrefix, runtim
       fs.mkdirSync(skillDir, { recursive: true });
 
       let content = fs.readFileSync(srcPath, 'utf8');
-      const globalClaudeRegex = /~\/\.claude\//g;
-      const localClaudeRegex = /\.\/\.claude\//g;
-      const codexDirRegex = /~\/\.codex\//g;
-      content = content.replace(globalClaudeRegex, pathPrefix);
-      content = content.replace(localClaudeRegex, `./${getDirName(runtime)}/`);
-      content = content.replace(codexDirRegex, pathPrefix);
+      content = replacePathPatterns(content, pathPrefix, runtime);
       content = processAttribution(content, getCommitAttribution(runtime));
       content = convertClaudeCommandToCodexSkill(content, skillName);
 
@@ -1220,8 +1225,7 @@ function copyCommandsAsKimiSkills(srcDir, skillsDir, prefix, pathPrefix, runtime
       fs.mkdirSync(skillDir, { recursive: true });
 
       let content = fs.readFileSync(srcPath, 'utf8');
-      content = content.replace(/~\/\.claude\//g, pathPrefix);
-      content = content.replace(/\.\/\.claude\//g, `./${getDirName(runtime)}/`);
+      content = replacePathPatterns(content, pathPrefix, runtime);
       content = processAttribution(content, getCommitAttribution(runtime));
       content = convertClaudeToKimiSkill(content, skillName);
 
@@ -1243,7 +1247,6 @@ function copyCommandsAsKimiSkills(srcDir, skillsDir, prefix, pathPrefix, runtime
 function copyWithPathReplacement(srcDir, destDir, pathPrefix, runtime, isCommand = false) {
   const isOpencode = runtime === 'opencode';
   const isCodex = runtime === 'codex';
-  const dirName = getDirName(runtime);
 
   // Clean install: remove existing destination to prevent orphaned files
   if (fs.existsSync(destDir)) {
@@ -1260,12 +1263,9 @@ function copyWithPathReplacement(srcDir, destDir, pathPrefix, runtime, isCommand
     if (entry.isDirectory()) {
       copyWithPathReplacement(srcPath, destPath, pathPrefix, runtime, isCommand);
     } else if (entry.name.endsWith('.md')) {
-      // Replace ~/.claude/ and ./.claude/ with runtime-appropriate paths
+      // Replace ~/.claude/, $HOME/.claude/, ./.claude/ with runtime-appropriate paths
       let content = fs.readFileSync(srcPath, 'utf8');
-      const globalClaudeRegex = /~\/\.claude\//g;
-      const localClaudeRegex = /\.\/\.claude\//g;
-      content = content.replace(globalClaudeRegex, pathPrefix);
-      content = content.replace(localClaudeRegex, `./${dirName}/`);
+      content = replacePathPatterns(content, pathPrefix, runtime);
       content = processAttribution(content, getCommitAttribution(runtime));
 
       // Convert frontmatter for opencode compatibility
@@ -2143,9 +2143,7 @@ function install(isGlobal, runtime = 'claude') {
     for (const entry of agentEntries) {
       if (entry.isFile() && entry.name.endsWith('.md')) {
         let content = fs.readFileSync(path.join(agentsSrc, entry.name), 'utf8');
-        // Always replace ~/.claude/ as it is the source of truth in the repo
-        const dirRegex = /~\/\.claude\//g;
-        content = content.replace(dirRegex, pathPrefix);
+        content = replacePathPatterns(content, pathPrefix, runtime);
         content = processAttribution(content, getCommitAttribution(runtime));
         // Convert frontmatter for runtime compatibility
         if (isOpencode) {
@@ -2574,6 +2572,7 @@ if (process.env.GSD_TEST_MODE) {
     convertClaudeToKimiAgent,
     convertKimiToolName,
     copyCommandsAsKimiSkills,
+    replacePathPatterns,
   };
 } else {
 
