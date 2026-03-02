@@ -36,12 +36,12 @@ Load phase operation context:
 INIT=$(node "$HOME/.claude/get-shit-done/bin/gsd-tools.cjs" init phase-op "${PHASE_ARG}")
 ```
 
-Extract from init JSON: `phase_dir`, `phase_number`, `phase_name`.
+Extract from init JSON: `phase_dir`, `phase_number`, `phase_name`, `planning_base`.
 
 Verify the phase directory exists. If not:
 ```
 ERROR: Phase directory not found for phase ${PHASE_ARG}
-Ensure the phase exists in .planning/phases/
+Ensure the phase exists in {planning_base}/phases/
 ```
 Exit.
 

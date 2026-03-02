@@ -356,6 +356,52 @@ objective: Manual review needed
     const output = JSON.parse(result.output);
     assert.strictEqual(output.error, 'Phase not found', 'should report phase not found');
   });
+
+  test('plan with type and depends_on frontmatter', () => {
+    const phaseDir = path.join(tmpDir, '.planning', 'phases', '03-api');
+    fs.mkdirSync(phaseDir, { recursive: true });
+
+    fs.writeFileSync(
+      path.join(phaseDir, '03-01-PLAN.md'),
+      `---
+wave: 1
+type: tdd
+depends_on: ["03-01"]
+---
+
+## Task 1: Setup
+`
+    );
+
+    const result = runGsdTools('phase-plan-index 03', tmpDir);
+    assert.ok(result.success, `Command failed: ${result.error}`);
+
+    const output = JSON.parse(result.output);
+    assert.strictEqual(output.plans[0].type, 'tdd', 'type should be tdd');
+    assert.deepStrictEqual(output.plans[0].depends_on, ['03-01'], 'depends_on should be parsed');
+  });
+
+  test('plan without type/depends_on defaults correctly', () => {
+    const phaseDir = path.join(tmpDir, '.planning', 'phases', '03-api');
+    fs.mkdirSync(phaseDir, { recursive: true });
+
+    fs.writeFileSync(
+      path.join(phaseDir, '03-01-PLAN.md'),
+      `---
+wave: 1
+---
+
+## Task 1: Setup
+`
+    );
+
+    const result = runGsdTools('phase-plan-index 03', tmpDir);
+    assert.ok(result.success, `Command failed: ${result.error}`);
+
+    const output = JSON.parse(result.output);
+    assert.strictEqual(output.plans[0].type, 'execute', 'type should default to execute');
+    assert.deepStrictEqual(output.plans[0].depends_on, [], 'depends_on should default to empty array');
+  });
 });
 
 
@@ -1322,6 +1368,44 @@ describe('phase complete command', () => {
 
     const req = fs.readFileSync(path.join(tmpDir, '.planning', 'REQUIREMENTS.md'), 'utf-8');
     assert.ok(req.includes('- [ ] **AMT-01**'), 'AMT-01 should remain unchanged');
+  });
+
+  test('detects next phase from ROADMAP.md when no directory exists', () => {
+    fs.writeFileSync(
+      path.join(tmpDir, '.planning', 'ROADMAP.md'),
+      `# Roadmap
+
+- [ ] Phase 1: Foundation
+- [ ] Phase 2: API Layer
+
+### Phase 1: Foundation
+**Goal:** Setup
+**Plans:** 1 plans
+
+### Phase 2: API Layer
+**Goal:** Build API
+`
+    );
+    fs.writeFileSync(
+      path.join(tmpDir, '.planning', 'STATE.md'),
+      `# State\n\n**Current Phase:** 01\n**Current Phase Name:** Foundation\n**Status:** In progress\n**Current Plan:** 01-01\n**Last Activity:** 2025-01-01\n**Last Activity Description:** Working\n`
+    );
+
+    // Only phase 1 directory exists; phase 2 has NO directory
+    const p1 = path.join(tmpDir, '.planning', 'phases', '01-foundation');
+    fs.mkdirSync(p1, { recursive: true });
+    fs.writeFileSync(path.join(p1, '01-01-PLAN.md'), '# Plan');
+    fs.writeFileSync(path.join(p1, '01-01-SUMMARY.md'), '# Summary');
+
+    const result = runGsdTools('phase complete 1', tmpDir);
+    assert.ok(result.success, `Command failed: ${result.error}`);
+
+    const output = JSON.parse(result.output);
+    assert.strictEqual(output.is_last_phase, false, 'should NOT be last phase — phase 2 exists in roadmap');
+    assert.strictEqual(output.next_phase, '2', 'next phase should be 2 from roadmap');
+
+    const state = fs.readFileSync(path.join(tmpDir, '.planning', 'STATE.md'), 'utf-8');
+    assert.ok(state.includes('**Status:** Ready to plan'), 'status should be ready to plan, not milestone complete');
   });
 });
 
