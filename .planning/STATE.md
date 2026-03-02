@@ -5,16 +5,16 @@
 See: .planning/PROJECT.md (updated 2026-02-27)
 
 **Core value:** The system never makes the same mistake twice -- signals capture what went wrong, spikes resolve uncertainty empirically, and the knowledge base surfaces relevant lessons before they're needed.
-**Current focus:** v1.16 Signal Lifecycle & Reflection -- Phase 35 (Spike Audit & Lightweight Mode)
+**Current focus:** v1.16 Signal Lifecycle & Reflection -- Phase 35 Complete (Spike Audit & Lightweight Mode)
 
 ## Current Position
 
 Phase: 35 of 35 (Spike Audit & Lightweight Mode)
-Plan: 3 of 4 in current phase
-Status: In Progress
-Last activity: 2026-03-01 -- Plan 35-03 complete (end-to-end spike execution)
+Plan: 4 of 4 in current phase
+Status: Complete
+Last activity: 2026-03-02 -- Plan 35-04 complete (installer sync + phase verification)
 
-Progress: [███████░░░] 75% (Phase 35)
+Progress: [██████████] 100% (Phase 35 -- v1.16 Complete)
 
 ## Performance Metrics
 
@@ -56,8 +56,9 @@ Progress: [███████░░░] 75% (Phase 35)
 | 34 | 03 | 3min | 2 | 2 |
 | 34 | 04 | 5min | 3 | 7 |
 | 35 | 02 | 2min | 2 | 3 |
+| 35 | 01 | 3min | 2 | 4 |
 | 35 | 03 | 4min | 2 | 4 |
-| Phase 35 P01 | 3min | 2 tasks | 4 files |
+| 35 | 04 | 2min | 2 | 7 |
 
 ## Accumulated Context
 
@@ -118,6 +119,7 @@ Recent decisions affecting current work:
 - [Phase 35]: Config keys use nested spike.sensitivity format (not flat spike_sensitivity) matching manifest schema
 - [Phase 35]: P35-03: Claude Code session data stored at ~/.claude/projects/{dash-encoded-path}/*.jsonl (JSONL) and ~/.claude/debug/*.txt (plain text)
 - [Phase 35]: P35-03: SENSOR-07 should be enabled with streaming reads for recent sessions; format treated as best-effort (no Anthropic stability guarantee)
+- [Phase 35]: P35-04: All 5 SPIKE requirements verified and approved; spike system fully operational in runtime
 
 ### Pending Todos
 
@@ -151,7 +153,7 @@ Recent decisions affecting current work:
 
 ### Roadmap Evolution
 
-v1.12 complete (Phases 0-6). v1.13 complete (Phases 7-12). v1.14 complete (Phases 13-21). v1.15 complete (Phases 22-30). All planned phases shipped. v1.16 roadmap created (Phases 31-35).
+v1.12 complete (Phases 0-6). v1.13 complete (Phases 7-12). v1.14 complete (Phases 13-21). v1.15 complete (Phases 22-30). v1.16 complete (Phases 31-35). All planned phases shipped.
 
 ### Key Artifacts
 
@@ -166,6 +168,6 @@ v1.12 complete (Phases 0-6). v1.13 complete (Phases 7-12). v1.14 complete (Phase
 
 ## Session Continuity
 
-Last session: 2026-03-01
-Stopped at: Completed 35-03-PLAN.md (end-to-end spike execution). Plans 01-03 done, plan 04 remaining.
+Last session: 2026-03-02
+Stopped at: Completed 35-04-PLAN.md (installer sync + phase verification). Phase 35 complete. v1.16 milestone complete (Phases 31-35).
 Resume file: None
