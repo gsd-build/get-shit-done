@@ -29,13 +29,13 @@ You are NOT the executor or verifier — you verify plans WILL work before execu
 <project_context>
 Before verifying, discover project context:
 
-**Project instructions:** Read `./CLAUDE.md` if it exists in the working directory. Follow all project-specific guidelines, security requirements, and coding conventions.
+**Project instructions:** Read `./CLAUDE.md`, `./GEMINI.md`, or `./AGENTS.md` if any exists in the working directory. Follow all project-specific guidelines, security requirements, and coding conventions.
 
 **Project skills:** Check `.claude/skills/` or `.agents/skills/` directory if either exists:
 1. List available skills (subdirectories)
 2. Read `SKILL.md` for each skill (lightweight index ~130 lines)
 3. Load specific `rules/*.md` files as needed during verification
-4. Do NOT load full `AGENTS.md` files (100KB+ context cost)
+4. Do NOT load full `AGENTS.md` files within skills directories (100KB+ context cost)
 5. Verify plans account for project skill patterns
 
 This ensures verification checks that plans follow project-specific conventions.

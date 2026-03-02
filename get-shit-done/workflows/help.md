@@ -184,6 +184,15 @@ Archive completed milestone and prepare for next version.
 
 Usage: `/gsd:complete-milestone 1.0.0`
 
+**`/gsd:switch-milestone <name>`**
+Switch active milestone for concurrent work.
+
+- Warns if current milestone has in-progress work
+- Updates ACTIVE_MILESTONE pointer
+- Shows status of target milestone
+
+Usage: `/gsd:switch-milestone v1.5-hotfix`
+
 ### Progress Tracking
 
 **`/gsd:progress`**
@@ -232,6 +241,26 @@ Systematic debugging with persistent state across context resets.
 Usage: `/gsd:debug "login button doesn't work"`
 Usage: `/gsd:debug` (resume active session)
 
+### Bug Tracking
+
+**`/gsd:report-bug [description]`**
+Report and track a bug with structured format and severity classification.
+
+- Gathers bug details (title, actual/expected behavior, repro steps)
+- Infers severity from keywords (critical/high/medium/low)
+- Captures diagnostic logs (git state, error output, log files)
+- Creates structured bug file in `.planning/bugs/`
+- Optionally creates GitHub issue via `gh` CLI
+- Routes to next action (investigate, plan fix, continue)
+
+Usage: `/gsd:report-bug "login button crashes on click"`
+Usage: `/gsd:report-bug` (infers from conversation)
+
+Manage bugs via CLI:
+- `gsd-tools bug list [--area X] [--severity Y] [--status Z]`
+- `gsd-tools bug update <id> --status <status>`
+- `gsd-tools bug resolve <id>`
+
 ### Todo Management
 
 **`/gsd:add-todo [description]`**
@@ -270,6 +299,20 @@ Validate built features through conversational UAT.
 
 Usage: `/gsd:verify-work 3`
 
+### Test Generation
+
+**`/gsd:add-tests <phase> [additional instructions]`**
+Generate unit and E2E tests for a completed phase.
+
+- Reads phase SUMMARY.md, CONTEXT.md, and VERIFICATION.md
+- Classifies changed files into TDD (unit), E2E (browser), or Skip
+- Presents classification for approval before generating
+- Runs tests after generation — flags bugs but doesn't fix them
+- Commits passing tests
+
+Usage: `/gsd:add-tests 3`
+Usage: `/gsd:add-tests 3 focus on edge cases for auth`
+
 ### Milestone Auditing
 
 **`/gsd:audit-milestone [version]`**
@@ -298,7 +341,7 @@ Usage: `/gsd:plan-milestone-gaps`
 Configure workflow toggles and model profile interactively.
 
 - Toggle researcher, plan checker, verifier agents
-- Select model profile (quality/balanced/budget)
+- Select model profile (quality/balanced/budget/adaptive)
 - Updates `.planning/config.json`
 
 Usage: `/gsd:settings`
@@ -309,6 +352,7 @@ Quick switch model profile for GSD agents.
 - `quality` — Opus everywhere except verification
 - `balanced` — Opus for planning, Sonnet for execution (default)
 - `budget` — Sonnet for writing, Haiku for research/verification
+- `adaptive` — Auto-selects model per-plan based on complexity
 
 Usage: `/gsd:set-profile budget`
 
@@ -358,6 +402,8 @@ Usage: `/gsd:join-discord`
 ├── todos/                # Captured ideas and tasks
 │   ├── pending/          # Todos waiting to be worked on
 │   └── done/             # Completed todos
+├── bugs/                 # Active bug reports
+│   └── resolved/         # Resolved bugs
 ├── debug/                # Active debug sessions
 │   └── resolved/         # Archived resolved issues
 ├── milestones/
@@ -438,6 +484,7 @@ Example config:
 /gsd:plan-phase 1       # Create plans for first phase
 /clear
 /gsd:execute-phase 1    # Execute all plans in phase
+/gsd:add-tests 1        # Generate tests for completed phase
 ```
 
 **Resuming work after a break:**
@@ -469,6 +516,13 @@ Example config:
 /gsd:add-todo Fix modal z-index  # Capture with explicit description
 /gsd:check-todos                 # Review and work on todos
 /gsd:check-todos api             # Filter by area
+```
+
+**Tracking bugs:**
+
+```
+/gsd:report-bug "login crashes on submit"   # Report a bug
+/gsd:report-bug                              # Report from conversation context
 ```
 
 **Debugging an issue:**
