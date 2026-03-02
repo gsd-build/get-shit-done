@@ -1092,8 +1092,19 @@ describe('websearch command', () => {
     process.stdout.write = origStdoutWrite;
   });
 
-  test('returns available=false when BRAVE_API_KEY is unset', async () => {
+  // File-based key fallback and UTF-16 LE decoding are tested exhaustively via
+  // readBraveApiKey() unit tests in core.test.cjs using isolated temp directories.
+  // cmdWebsearch delegates key resolution entirely to readBraveApiKey(), so those
+  // paths are already covered without touching ~/.gsd here.
+
+  test('returns available=false when no key is available', async () => {
     delete process.env.BRAVE_API_KEY;
+    // Only assert if we can be certain no key file is present on this machine.
+    // We avoid writing to ~/.gsd here — key-file paths are covered by readBraveApiKey tests.
+    const fs = require('fs');
+    const os = require('os');
+    const braveKeyFile = require('path').join(os.homedir(), '.gsd', 'brave_api_key');
+    if (fs.existsSync(braveKeyFile)) return; // key file present — skip rather than write
 
     await cmdWebsearch('test query', {}, false);
 

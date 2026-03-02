@@ -4,7 +4,7 @@
 
 const fs = require('fs');
 const path = require('path');
-const { output, error } = require('./core.cjs');
+const { output, error, readBraveApiKey } = require('./core.cjs');
 
 function cmdConfigEnsureSection(cwd, raw) {
   const configPath = path.join(cwd, '.planning', 'config.json');
@@ -27,11 +27,10 @@ function cmdConfigEnsureSection(cwd, raw) {
   }
 
   // Detect Brave Search API key availability
-  const homedir = require('os').homedir();
-  const braveKeyFile = path.join(homedir, '.gsd', 'brave_api_key');
-  const hasBraveSearch = !!(process.env.BRAVE_API_KEY || fs.existsSync(braveKeyFile));
+  const hasBraveSearch = !!readBraveApiKey();
 
   // Load user-level defaults from ~/.gsd/defaults.json if available
+  const homedir = require('os').homedir();
   const globalDefaultsPath = path.join(homedir, '.gsd', 'defaults.json');
   let userDefaults = {};
   try {
