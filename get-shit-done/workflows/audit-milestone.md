@@ -127,6 +127,48 @@ For each REQ-ID, determine status using all three sources:
 
 **Orphan detection:** Requirements present in REQUIREMENTS.md traceability table but absent from ALL phase VERIFICATION.md files MUST be flagged as orphaned. Orphaned requirements are treated as `unsatisfied` — they were assigned but never verified by any phase.
 
+## 5.5. Nyquist Compliance Discovery
+
+**Skip if:** `workflow.nyquist_validation` is explicitly `false` in config.json. If key is absent, treat as enabled.
+
+```bash
+NYQUIST_CONFIG=$(node "$HOME/.claude/get-shit-done/bin/gsd-tools.cjs" config get workflow.nyquist_validation --raw 2>/dev/null)
+```
+
+If `NYQUIST_CONFIG` is `false`: skip this step entirely.
+
+### 5.5a. Scan Phase VALIDATION.md Files
+
+For each phase directory in the milestone scope:
+
+```bash
+VALIDATION_FILE=$(ls "${PHASE_DIR}"/*-VALIDATION.md 2>/dev/null | head -1)
+```
+
+If VALIDATION_FILE exists, parse frontmatter for `nyquist_compliant`, `wave_0_complete`, `status`.
+
+### 5.5b. Classify Phase Compliance
+
+| Status | Condition |
+|--------|-----------|
+| COMPLIANT | `nyquist_compliant: true` in frontmatter AND all tasks green |
+| PARTIAL | VALIDATION.md exists but `nyquist_compliant: false` or has red/pending tasks |
+| MISSING | No VALIDATION.md exists for the phase |
+
+### 5.5c. Add to Audit Report Frontmatter
+
+Include in the milestone audit YAML:
+
+```yaml
+nyquist:
+  compliant_phases: {N}
+  partial_phases: {N}
+  missing_phases: {N}
+  overall: compliant | partial | missing
+```
+
+**IMPORTANT:** This step ONLY discovers and reports. It NEVER auto-calls `/gsd:validate-phase`. Gaps are surfaced for the user to act on.
+
 ## 6. Aggregate into v{version}-MILESTONE-AUDIT.md
 
 Create `.planning/v{version}-v{version}-MILESTONE-AUDIT.md` with:
@@ -227,6 +269,14 @@ All requirements covered. Cross-phase integration verified. E2E flows complete.
 {For each flow gap:}
 - **{flow name}:** breaks at {step}
 
+### Nyquist Coverage
+
+| Phase | VALIDATION.md | Compliant | Action |
+|-------|---------------|-----------|--------|
+| {phase} | exists/missing | true/false/partial | `/gsd:validate-phase {N}` |
+
+Phases needing validation: run `/gsd:validate-phase {N}` for each flagged phase.
+
 ───────────────────────────────────────────────────────────────
 
 ## ▶ Next Up
@@ -293,5 +343,7 @@ All requirements met. No critical blockers. Accumulated tech debt needs review.
 - [ ] Integration checker spawned with milestone requirement IDs
 - [ ] v{version}-MILESTONE-AUDIT.md created with structured requirement gap objects
 - [ ] FAIL gate enforced — any unsatisfied requirement forces gaps_found status
+- [ ] Nyquist compliance scanned for all milestone phases (if enabled)
+- [ ] Missing VALIDATION.md phases flagged with validate-phase suggestion
 - [ ] Results presented with actionable next steps
 </success_criteria>
