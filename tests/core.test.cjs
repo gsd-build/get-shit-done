@@ -59,6 +59,7 @@ describe('loadConfig', () => {
     assert.strictEqual(config.plan_checker, true);
     assert.strictEqual(config.brave_search, false);
     assert.strictEqual(config.parallelization, true);
+    assert.strictEqual(config.nyquist_validation, true);
   });
 
   test('reads model_profile from config.json', () => {

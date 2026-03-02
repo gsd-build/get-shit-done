@@ -6,7 +6,7 @@
     "plan_check": true,
     "verifier": true,
     "auto_advance": false,
-    "nyquist_validation": false
+    "nyquist_validation": true
   },
   "planning": {
     "commit_docs": true,

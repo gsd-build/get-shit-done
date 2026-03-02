@@ -76,7 +76,7 @@ function loadConfig(cwd) {
     research: true,
     plan_checker: true,
     verifier: true,
-    nyquist_validation: false,
+    nyquist_validation: true,
     parallelization: true,
     brave_search: false,
   };

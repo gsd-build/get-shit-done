@@ -177,6 +177,7 @@ Create `.planning/config.json` with mode set to "yolo":
     "research": true|false,
     "plan_check": true|false,
     "verifier": true|false,
+    "nyquist_validation": depth !== "quick",
     "auto_advance": true
   }
 }
@@ -475,7 +476,8 @@ Create `.planning/config.json` with all settings:
   "workflow": {
     "research": true|false,
     "plan_check": true|false,
-    "verifier": true|false
+    "verifier": true|false,
+    "nyquist_validation": depth !== "quick"
   }
 }
 ```

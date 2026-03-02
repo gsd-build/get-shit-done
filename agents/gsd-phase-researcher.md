@@ -298,7 +298,7 @@ Verified patterns from official sources:
 
 ## Validation Architecture
 
-> Skip this section entirely if workflow.nyquist_validation is false in .planning/config.json
+> Skip this section entirely if workflow.nyquist_validation is explicitly set to false in .planning/config.json. If the key is absent, treat as enabled.
 
 ### Test Framework
 | Property | Value |
@@ -364,7 +364,7 @@ INIT=$(node "$HOME/.claude/get-shit-done/bin/gsd-tools.cjs" init phase-op "${PHA
 
 Extract from init JSON: `phase_dir`, `padded_phase`, `phase_number`, `commit_docs`.
 
-Also read `.planning/config.json` — if `workflow.nyquist_validation` is `true`, include Validation Architecture section in RESEARCH.md. If `false`, skip it.
+Also read `.planning/config.json` — include Validation Architecture section in RESEARCH.md unless `workflow.nyquist_validation` is explicitly `false`. If the key is absent or `true`, include the section.
 
 Then read CONTEXT.md if exists:
 ```bash
@@ -400,7 +400,7 @@ For each domain: Context7 first → Official docs → WebSearch → Cross-verify
 
 ## Step 4: Validation Architecture Research (if nyquist_validation enabled)
 
-**Skip if** workflow.nyquist_validation is false.
+**Skip if** workflow.nyquist_validation is explicitly set to false. If absent, treat as enabled.
 
 ### Detect Test Infrastructure
 Scan for: test config files (pytest.ini, jest.config.*, vitest.config.*), test directories (test/, tests/, __tests__/), test files (*.test.*, *.spec.*), package.json test scripts.
