@@ -15,7 +15,7 @@ Read all files referenced by the invoking prompt's execution_context before star
 INIT=$(node "$HOME/.claude/get-shit-done/bin/gsd-tools.cjs" init progress)
 ```
 
-Extract from init JSON: `project_exists`, `roadmap_exists`, `state_exists`, `phases`, `current_phase`, `next_phase`, `milestone_version`, `completed_count`, `phase_count`, `paused_at`, `state_path`, `roadmap_path`, `project_path`, `config_path`.
+Extract from init JSON: `project_exists`, `roadmap_exists`, `state_exists`, `phases`, `current_phase`, `next_phase`, `milestone_version`, `completed_count`, `phase_count`, `paused_at`, `state_path`, `roadmap_path`, `project_path`, `config_path`, `planning_base`.
 
 If `project_exists` is false (no `.planning/` directory):
 
@@ -137,9 +137,9 @@ CONTEXT: [✓ if has_context | - if not]
 List files in the current phase directory:
 
 ```bash
-ls -1 .planning/phases/[current-phase-dir]/*-PLAN.md 2>/dev/null | wc -l
-ls -1 .planning/phases/[current-phase-dir]/*-SUMMARY.md 2>/dev/null | wc -l
-ls -1 .planning/phases/[current-phase-dir]/*-UAT.md 2>/dev/null | wc -l
+ls -1 {planning_base}/phases/[current-phase-dir]/*-PLAN.md 2>/dev/null | wc -l
+ls -1 {planning_base}/phases/[current-phase-dir]/*-SUMMARY.md 2>/dev/null | wc -l
+ls -1 {planning_base}/phases/[current-phase-dir]/*-UAT.md 2>/dev/null | wc -l
 ```
 
 State: "This phase has {X} plans, {Y} summaries."
@@ -150,7 +150,7 @@ Check for UAT.md files with status "diagnosed" (has gaps needing fixes).
 
 ```bash
 # Check for diagnosed UAT with gaps
-grep -l "status: diagnosed" .planning/phases/[current-phase-dir]/*-UAT.md 2>/dev/null
+grep -l "status: diagnosed" {planning_base}/phases/[current-phase-dir]/*-UAT.md 2>/dev/null
 ```
 
 Track:

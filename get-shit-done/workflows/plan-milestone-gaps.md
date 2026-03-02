@@ -8,6 +8,14 @@ Read all files referenced by the invoking prompt's execution_context before star
 
 <process>
 
+## 0. Initialize
+
+```bash
+INIT=$(node "$HOME/.claude/get-shit-done/bin/gsd-tools.cjs" init progress)
+```
+
+Parse JSON for: `planning_base`, `roadmap_path`, `config_path`.
+
 ## 1. Load Audit Results
 
 ```bash
@@ -104,8 +112,16 @@ These gaps are optional. Include them?
 
 ---
 
-Create these {X} phases? (yes / adjust / defer all optional)
 ```
+
+Use AskUserQuestion:
+
+- header: "Create"
+- question: "Create these {X} phases?"
+- options:
+  - "Yes — create all" — Add all proposed phases to the roadmap
+  - "Adjust" — Modify which phases to create
+  - "Defer optional" — Only create required phases, defer optional ones
 
 Wait for user confirmation.
 
@@ -135,19 +151,19 @@ Reset checked-off requirements the audit found unsatisfied:
 
 ```bash
 # Verify traceability table reflects gap closure assignments
-grep -c "Pending" .planning/REQUIREMENTS.md
+grep -c "Pending" "${planning_base}/REQUIREMENTS.md"
 ```
 
 ## 8. Create Phase Directories
 
 ```bash
-mkdir -p ".planning/phases/{NN}-{name}"
+mkdir -p "${planning_base}/phases/{NN}-{name}"
 ```
 
 ## 9. Commit Roadmap and Requirements Update
 
 ```bash
-node "$HOME/.claude/get-shit-done/bin/gsd-tools.cjs" commit "docs(roadmap): add gap closure phases {N}-{M}" --files .planning/ROADMAP.md .planning/REQUIREMENTS.md
+node "$HOME/.claude/get-shit-done/bin/gsd-tools.cjs" commit "docs(roadmap): add gap closure phases {N}-{M}" --files "${planning_base}/ROADMAP.md" "${planning_base}/REQUIREMENTS.md"
 ```
 
 ## 10. Offer Next Steps

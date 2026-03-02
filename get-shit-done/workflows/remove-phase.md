@@ -32,9 +32,9 @@ Load phase operation context:
 INIT=$(node "$HOME/.claude/get-shit-done/bin/gsd-tools.cjs" init phase-op "${target}")
 ```
 
-Extract: `phase_found`, `phase_dir`, `phase_number`, `commit_docs`, `roadmap_exists`.
+Extract: `phase_found`, `phase_dir`, `phase_number`, `commit_docs`, `roadmap_exists`, `state_path`, `roadmap_path`, `planning_base`.
 
-Also read STATE.md and ROADMAP.md content for parsing current position.
+Also read `{state_path}` and `{roadmap_path}` content for parsing current position.
 </step>
 
 <step name="validate_future_phase">
@@ -65,12 +65,19 @@ Present removal summary and confirm:
 Removing Phase {target}: {Name}
 
 This will:
-- Delete: .planning/phases/{target}-{slug}/
+- Delete: {planning_base}/phases/{target}-{slug}/
 - Renumber all subsequent phases
 - Update: ROADMAP.md, STATE.md
 
-Proceed? (y/n)
 ```
+
+Use AskUserQuestion:
+
+- header: "Confirm"
+- question: "Proceed with removing Phase {target}: {Name}?"
+- options:
+  - "Yes — remove it" — Delete the phase and renumber subsequent phases
+  - "Cancel" — Keep the phase, no changes
 
 Wait for confirmation.
 </step>
@@ -102,7 +109,7 @@ Extract from result: `removed`, `directory_deleted`, `renamed_directories`, `ren
 Stage and commit the removal:
 
 ```bash
-node "$HOME/.claude/get-shit-done/bin/gsd-tools.cjs" commit "chore: remove phase {target} ({original-phase-name})" --files .planning/
+node "$HOME/.claude/get-shit-done/bin/gsd-tools.cjs" commit "chore: remove phase {target} ({original-phase-name})" --files {planning_base}/
 ```
 
 The commit message preserves the historical record of what was removed.
@@ -115,7 +122,7 @@ Present completion summary:
 Phase {target} ({original-name}) removed.
 
 Changes:
-- Deleted: .planning/phases/{target}-{slug}/
+- Deleted: {planning_base}/phases/{target}-{slug}/
 - Renumbered: {N} directories and {M} files
 - Updated: ROADMAP.md, STATE.md
 - Committed: chore: remove phase {target} ({original-name})

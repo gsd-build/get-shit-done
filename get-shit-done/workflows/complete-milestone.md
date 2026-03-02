@@ -37,6 +37,14 @@ When a milestone completes:
 
 <step name="verify_readiness">
 
+**Load milestone-aware paths:**
+
+```bash
+INIT=$(node "$HOME/.claude/get-shit-done/bin/gsd-tools.cjs" init milestone-op)
+```
+
+Extract from init JSON: `state_path`, `roadmap_path`, `requirements_path`, `config_path`, `planning_base`.
+
 **Use `roadmap analyze` for comprehensive readiness check:**
 
 ```bash
@@ -88,7 +96,7 @@ If user selects "Proceed anyway": note incomplete requirements in MILESTONES.md 
 <config-check>
 
 ```bash
-cat .planning/config.json 2>/dev/null
+cat {config_path} 2>/dev/null
 ```
 
 </config-check>
@@ -107,14 +115,17 @@ Proceed to gather_stats.
 
 <if mode="interactive" OR="custom with gates.confirm_milestone_scope true">
 
-```
-Ready to mark this milestone as shipped?
-(yes / wait / adjust scope)
-```
+Use AskUserQuestion:
 
-Wait for confirmation.
-- "adjust scope": Ask which phases to include.
-- "wait": Stop, user returns when ready.
+- header: "Ship"
+- question: "Ready to mark this milestone as shipped?"
+- options:
+  - "Yes — ship it" — Mark milestone as complete
+  - "Wait" — Not ready yet, I'll come back later
+  - "Adjust scope" — Change which phases to include
+
+- "Adjust scope": Ask which phases to include.
+- "Wait": Stop, user returns when ready.
 
 </if>
 
@@ -153,7 +164,7 @@ Extract one-liners from SUMMARY.md files using summary-extract:
 
 ```bash
 # For each phase in milestone, extract one-liner
-for summary in .planning/phases/*-*/*-SUMMARY.md; do
+for summary in {planning_base}/phases/*-*/*-SUMMARY.md; do
   node "$HOME/.claude/get-shit-done/bin/gsd-tools.cjs" summary-extract "$summary" --fields one_liner | jq -r '.one_liner'
 done
 ```
@@ -186,7 +197,7 @@ Full PROJECT.md evolution review at milestone completion.
 Read all phase summaries:
 
 ```bash
-cat .planning/phases/*-*/*-SUMMARY.md
+cat {planning_base}/phases/*-*/*-SUMMARY.md
 ```
 
 **Full review checklist:**
@@ -389,8 +400,8 @@ AskUserQuestion(header="Archive Phases", question="Archive phase directories to 
 If "Yes": move phase directories to the milestone archive:
 ```bash
 mkdir -p .planning/milestones/v[X.Y]-phases
-# For each phase directory in .planning/phases/:
-mv .planning/phases/{phase-dir} .planning/milestones/v[X.Y]-phases/
+# For each phase directory in {planning_base}/phases/:
+mv {planning_base}/phases/{phase-dir} .planning/milestones/v[X.Y]-phases/
 ```
 Verify: `✅ Phase directories archived to .planning/milestones/v[X.Y]-phases/`
 
@@ -432,8 +443,8 @@ After `milestone complete` has archived, reorganize ROADMAP.md with milestone gr
 **Then delete originals:**
 
 ```bash
-rm .planning/ROADMAP.md
-rm .planning/REQUIREMENTS.md
+rm {roadmap_path}
+rm {requirements_path}
 ```
 
 </step>
@@ -662,7 +673,13 @@ See .planning/MILESTONES.md for full details."
 
 Confirm: "Tagged: v[X.Y]"
 
-Ask: "Push tag to remote? (y/n)"
+Use AskUserQuestion:
+
+- header: "Push tag"
+- question: "Push tag v[X.Y] to remote?"
+- options:
+  - "Yes — push tag" — Push v[X.Y] to origin
+  - "No — keep local" — Tag stays local only
 
 If yes:
 ```bash
@@ -676,7 +693,7 @@ git push origin v[X.Y]
 Commit milestone completion.
 
 ```bash
-node "$HOME/.claude/get-shit-done/bin/gsd-tools.cjs" commit "chore: complete v[X.Y] milestone" --files .planning/milestones/v[X.Y]-ROADMAP.md .planning/milestones/v[X.Y]-REQUIREMENTS.md .planning/milestones/v[X.Y]-MILESTONE-AUDIT.md .planning/MILESTONES.md .planning/PROJECT.md .planning/STATE.md
+node "$HOME/.claude/get-shit-done/bin/gsd-tools.cjs" commit "chore: complete v[X.Y] milestone" --files .planning/milestones/v[X.Y]-ROADMAP.md .planning/milestones/v[X.Y]-REQUIREMENTS.md .planning/milestones/v[X.Y]-MILESTONE-AUDIT.md .planning/MILESTONES.md .planning/PROJECT.md {state_path}
 ```
 ```
 

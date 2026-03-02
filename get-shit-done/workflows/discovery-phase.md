@@ -116,7 +116,7 @@ For: Choosing between options, new external integration.
 
 7. Return to plan-phase.md.
 
-**Output:** `.planning/phases/XX-name/DISCOVERY.md`
+**Output:** `{phase_dir}/DISCOVERY.md`
 </step>
 
 <step name="level_3_deep_dive">
@@ -169,7 +169,7 @@ For: Architectural decisions, novel problems, high-risk choices.
 
 8. Return to plan-phase.md.
 
-**Output:** `.planning/phases/XX-name/DISCOVERY.md` (comprehensive)
+**Output:** `{phase_dir}/DISCOVERY.md` (comprehensive)
 </step>
 
 <step name="identify_unknowns">
@@ -203,7 +203,7 @@ Run the discovery:
 </step>
 
 <step name="create_discovery_output">
-Write `.planning/phases/XX-name/DISCOVERY.md`:
+Write `{phase_dir}/DISCOVERY.md`:
 - Summary with recommendation
 - Key findings with sources
 - Code examples if applicable
@@ -224,7 +224,13 @@ Use AskUserQuestion:
   - "Pause" - I need to think about this
 
 If confidence is MEDIUM:
-Inline: "Discovery complete (medium confidence). [brief reason]. Proceed to planning?"
+Use AskUserQuestion:
+
+- header: "Med Conf."
+- question: "Discovery complete (medium confidence). [brief reason]. Proceed to planning?"
+- options:
+  - "Proceed to planning" — Confidence is good enough
+  - "Dig deeper" — Do more research first
 
 If confidence is HIGH:
 Proceed directly, just note: "Discovery complete (high confidence)."
@@ -233,20 +239,27 @@ Proceed directly, just note: "Discovery complete (high confidence)."
 <step name="open_questions_gate">
 If DISCOVERY.md has open_questions:
 
-Present them inline:
+Present them as context, then use AskUserQuestion:
+
 "Open questions from discovery:
 
 - [Question 1]
-- [Question 2]
+- [Question 2]"
 
-These may affect implementation. Acknowledge and proceed? (yes / address first)"
+Use AskUserQuestion:
 
-If "address first": Gather user input on questions, update discovery.
+- header: "Questions"
+- question: "These open questions may affect implementation. How do you want to proceed?"
+- options:
+  - "Proceed anyway" — Accept uncertainty, address during planning
+  - "Address first" — Discuss these questions before continuing
+
+If "Address first": Gather user input on questions, update discovery.
 </step>
 
 <step name="offer_next">
 ```
-Discovery complete: .planning/phases/XX-name/DISCOVERY.md
+Discovery complete: {phase_dir}/DISCOVERY.md
 Recommendation: [one-liner]
 Confidence: [level]
 
