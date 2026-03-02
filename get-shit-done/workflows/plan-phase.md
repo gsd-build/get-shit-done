@@ -219,9 +219,9 @@ Task(
 - **`## RESEARCH COMPLETE`:** Display confirmation, continue to step 6
 - **`## RESEARCH BLOCKED`:** Display blocker, offer: 1) Provide context, 2) Skip research, 3) Abort
 
-## 5.5. Create Validation Strategy (if Nyquist enabled)
+## 5.5. Create Validation Strategy (MANDATORY if Nyquist enabled)
 
-**Skip if:** `nyquist_validation_enabled` is false from INIT JSON.
+**Skip ONLY if:** `nyquist_validation_enabled` is false from INIT JSON. Otherwise this step is MANDATORY — do NOT skip under any circumstances.
 
 After researcher completes, check if RESEARCH.md contains a Validation Architecture section:
 
@@ -229,11 +229,16 @@ After researcher completes, check if RESEARCH.md contains a Validation Architect
 grep -l "## Validation Architecture" "${PHASE_DIR}"/*-RESEARCH.md 2>/dev/null
 ```
 
-**If found:**
+**If found — MUST execute ALL steps:**
 1. Read validation template from `~/.claude/get-shit-done/templates/VALIDATION.md`
-2. Write to `${PHASE_DIR}/${PADDED_PHASE}-VALIDATION.md`
+2. Write to `${PHASE_DIR}/${PADDED_PHASE}-VALIDATION.md` — MUST use Write tool
 3. Fill frontmatter: replace `{N}` with phase number, `{phase-slug}` with phase slug, `{date}` with current date
-4. If `commit_docs` is true:
+4. **Verify creation succeeded:**
+```bash
+test -f "${PHASE_DIR}/${PADDED_PHASE}-VALIDATION.md" && echo "VALIDATION_CREATED=true" || echo "VALIDATION_CREATED=false"
+```
+5. **If `VALIDATION_CREATED` is false:** STOP and report error — do not proceed to Step 6
+6. If `commit_docs` is true:
 ```bash
 node "$HOME/.claude/get-shit-done/bin/gsd-tools.cjs" commit-docs "docs(phase-${PHASE}): add validation strategy"
 ```
@@ -265,6 +270,25 @@ VERIFICATION_PATH=$(echo "$INIT" | jq -r '.verification_path // empty')
 UAT_PATH=$(echo "$INIT" | jq -r '.uat_path // empty')
 CONTEXT_PATH=$(echo "$INIT" | jq -r '.context_path // empty')
 ```
+
+## 7.5. Verify Nyquist Artifacts (if enabled)
+
+**Skip if:** `nyquist_validation_enabled` is false from INIT JSON.
+
+```bash
+VALIDATION_EXISTS=$(ls "${PHASE_DIR}"/*-VALIDATION.md 2>/dev/null | head -1)
+```
+
+**If `VALIDATION_EXISTS` is empty and `nyquist_validation_enabled` is true:**
+
+Display: "VALIDATION.md missing — Nyquist is enabled but VALIDATION.md was not created."
+
+Use AskUserQuestion with options:
+1. Re-run with research: `/gsd:plan-phase {PHASE} --research`
+2. Disable Nyquist: set `workflow.nyquist_validation` to false in config
+3. Continue anyway (plans will fail Dimension 8)
+
+Only proceed to Step 8 if user selects option 2 or 3.
 
 ## 8. Spawn gsd-planner Agent
 

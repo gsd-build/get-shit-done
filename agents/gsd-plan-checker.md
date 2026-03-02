@@ -316,6 +316,19 @@ issue:
 
 Skip if: `workflow.nyquist_validation` is explicitly set to `false` in config.json (absent key = enabled), phase has no RESEARCH.md, or RESEARCH.md has no "Validation Architecture" section. Output: "Dimension 8: SKIPPED (nyquist_validation disabled or not applicable)"
 
+### Check 8e — VALIDATION.md Existence (Gate)
+
+Before running checks 8a-8d, verify VALIDATION.md exists:
+
+```bash
+ls "${PHASE_DIR}"/*-VALIDATION.md 2>/dev/null
+```
+
+**If missing:** **BLOCKING FAIL** — "VALIDATION.md not found for phase {N}. Re-run `/gsd:plan-phase {N} --research` to regenerate."
+Skip checks 8a-8d entirely. Report Dimension 8 as FAIL with this single issue.
+
+**If exists:** Proceed to checks 8a-8d.
+
 ### Check 8a — Automated Verify Presence
 
 For each `<task>` in each plan:
