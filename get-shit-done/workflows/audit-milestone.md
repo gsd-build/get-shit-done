@@ -129,45 +129,27 @@ For each REQ-ID, determine status using all three sources:
 
 ## 5.5. Nyquist Compliance Discovery
 
-**Skip if:** `workflow.nyquist_validation` is explicitly `false` in config.json. If key is absent, treat as enabled.
+Skip if `workflow.nyquist_validation` is explicitly `false` (absent = enabled).
 
 ```bash
 NYQUIST_CONFIG=$(node "$HOME/.claude/get-shit-done/bin/gsd-tools.cjs" config get workflow.nyquist_validation --raw 2>/dev/null)
 ```
 
-If `NYQUIST_CONFIG` is `false`: skip this step entirely.
+If `false`: skip entirely.
 
-### 5.5a. Scan Phase VALIDATION.md Files
+For each phase directory, check `*-VALIDATION.md`. If exists, parse frontmatter (`nyquist_compliant`, `wave_0_complete`).
 
-For each phase directory in the milestone scope:
-
-```bash
-VALIDATION_FILE=$(ls "${PHASE_DIR}"/*-VALIDATION.md 2>/dev/null | head -1)
-```
-
-If VALIDATION_FILE exists, parse frontmatter for `nyquist_compliant`, `wave_0_complete`, `status`.
-
-### 5.5b. Classify Phase Compliance
+Classify per phase:
 
 | Status | Condition |
 |--------|-----------|
-| COMPLIANT | `nyquist_compliant: true` in frontmatter AND all tasks green |
-| PARTIAL | VALIDATION.md exists but `nyquist_compliant: false` or has red/pending tasks |
-| MISSING | No VALIDATION.md exists for the phase |
+| COMPLIANT | `nyquist_compliant: true` and all tasks green |
+| PARTIAL | VALIDATION.md exists, `nyquist_compliant: false` or red/pending |
+| MISSING | No VALIDATION.md |
 
-### 5.5c. Add to Audit Report Frontmatter
+Add to audit YAML: `nyquist: { compliant_phases, partial_phases, missing_phases, overall }`
 
-Include in the milestone audit YAML:
-
-```yaml
-nyquist:
-  compliant_phases: {N}
-  partial_phases: {N}
-  missing_phases: {N}
-  overall: compliant | partial | missing
-```
-
-**IMPORTANT:** This step ONLY discovers and reports. It NEVER auto-calls `/gsd:validate-phase`. Gaps are surfaced for the user to act on.
+Discovery only — never auto-calls `/gsd:validate-phase`.
 
 ## 6. Aggregate into v{version}-MILESTONE-AUDIT.md
 

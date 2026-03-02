@@ -13,11 +13,9 @@ allowed-tools:
   - AskUserQuestion
 ---
 <objective>
-Audit Nyquist validation coverage for a completed phase.
-
-Three input states:
-- (A) VALIDATION.md exists — audit existing coverage and fill gaps
-- (B) No VALIDATION.md but SUMMARY.md exists — reconstruct validation from artifacts
+Audit Nyquist validation coverage for a completed phase. Three states:
+- (A) VALIDATION.md exists — audit and fill gaps
+- (B) No VALIDATION.md, SUMMARY.md exists — reconstruct from artifacts
 - (C) Phase not executed — exit with guidance
 
 Output: updated VALIDATION.md + generated test files.
@@ -28,14 +26,10 @@ Output: updated VALIDATION.md + generated test files.
 </execution_context>
 
 <context>
-Phase: $ARGUMENTS (optional)
-- If provided: Validate specific phase (e.g., "4")
-- If not provided: Defaults to most recently completed phase via STATE.md
-
-Context files are resolved inside the workflow (`gsd-tools init phase-op`).
+Phase: $ARGUMENTS — optional, defaults to last completed phase.
 </context>
 
 <process>
-Execute the validate-phase workflow from @~/.claude/get-shit-done/workflows/validate-phase.md end-to-end.
-Preserve all workflow gates (state detection, gap analysis approval, auditor spawning, debug loop cap, VALIDATION.md generation, result routing).
+Execute @~/.claude/get-shit-done/workflows/validate-phase.md.
+Preserve all workflow gates.
 </process>
