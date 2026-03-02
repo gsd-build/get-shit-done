@@ -198,12 +198,14 @@ describe('wiring validation', () => {
       const broken = []
       for (const agentType of allTypes) {
         if (builtinTypes.has(agentType)) continue
-        const agentFile = path.join(REPO_ROOT, '.claude', 'agents', `${agentType}.md`)
-        try {
-          await fs.access(agentFile)
-        } catch {
-          broken.push(agentType)
-        }
+        // Check npm source (agents/) first, then installed (.claude/agents/)
+        // CI only has agents/ since .claude/ is gitignored and populated by installer
+        const npmSource = path.join(REPO_ROOT, 'agents', `${agentType}.md`)
+        const installed = path.join(REPO_ROOT, '.claude', 'agents', `${agentType}.md`)
+        let found = false
+        try { await fs.access(npmSource); found = true } catch {}
+        if (!found) { try { await fs.access(installed); found = true } catch {} }
+        if (!found) broken.push(agentType)
       }
 
       if (broken.length > 0) {
