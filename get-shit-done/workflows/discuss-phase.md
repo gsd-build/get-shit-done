@@ -165,7 +165,61 @@ If "Continue and replan after": Continue to analyze_phase.
 If "View existing plans": Display plan files, then offer "Continue" / "Cancel".
 If "Cancel": Exit workflow.
 
-**If `has_plans` is false:** Continue to scout_codebase.
+**If `has_plans` is false:** Continue to load_prior_context.
+</step>
+
+<step name="load_prior_context">
+Read project-level and prior phase context to avoid re-asking decided questions and maintain consistency.
+
+**Step 1: Read project-level files**
+```bash
+# Core project files
+cat .planning/PROJECT.md 2>/dev/null
+cat .planning/REQUIREMENTS.md 2>/dev/null
+cat .planning/STATE.md 2>/dev/null
+```
+
+Extract from these:
+- **PROJECT.md** — Vision, principles, non-negotiables, user preferences
+- **REQUIREMENTS.md** — Acceptance criteria, constraints, must-haves vs nice-to-haves
+- **STATE.md** — Current progress, any flags or session notes
+
+**Step 2: Read all prior CONTEXT.md files**
+```bash
+# Find all CONTEXT.md files from phases before current
+find .planning/phases -name "*-CONTEXT.md" 2>/dev/null | sort
+```
+
+For each CONTEXT.md where phase number < current phase:
+- Read the `<decisions>` section — these are locked preferences
+- Read `<specifics>` — particular references or "I want it like X" moments
+- Note any patterns (e.g., "user consistently prefers minimal UI", "user rejected single-key shortcuts")
+
+**Step 3: Build internal `<prior_decisions>` context**
+
+Structure the extracted information:
+```
+<prior_decisions>
+## Project-Level
+- [Key principle or constraint from PROJECT.md]
+- [Requirement that affects this phase from REQUIREMENTS.md]
+
+## From Prior Phases
+### Phase N: [Name]
+- [Decision that may be relevant to current phase]
+- [Preference that establishes a pattern]
+
+### Phase M: [Name]
+- [Another relevant decision]
+</prior_decisions>
+```
+
+**Usage in subsequent steps:**
+- `analyze_phase`: Skip gray areas already decided in prior phases
+- `present_gray_areas`: Annotate options with prior decisions ("You chose X in Phase 5")
+- `discuss_areas`: Pre-fill answers or flag conflicts ("This contradicts Phase 3 — same here or different?")
+
+**If no prior context exists:** Continue without — this is expected for early phases.
 </step>
 
 <step name="scout_codebase">
@@ -211,41 +265,52 @@ Store as internal `<codebase_context>` for use in analyze_phase and present_gray
 </step>
 
 <step name="analyze_phase">
-Analyze the phase to identify gray areas worth discussing. **Use codebase_context from scout step to ground the analysis.**
+Analyze the phase to identify gray areas worth discussing. **Use both `prior_decisions` and `codebase_context` to ground the analysis.**
 
 **Read the phase description from ROADMAP.md and determine:**
 
 1. **Domain boundary** — What capability is this phase delivering? State it clearly.
 
-2. **Gray areas by category** — For each relevant category (UI, UX, Behavior, Empty States, Content), identify 1-2 specific ambiguities that would change implementation. **Annotate with code context where relevant** (e.g., "You already have a Card component" or "No existing pattern for this").
+2. **Check prior decisions** — Before generating gray areas, check if any were already decided:
+   - Scan `<prior_decisions>` for relevant choices (e.g., "Ctrl+C only, no single-key shortcuts")
+   - These are **pre-answered** — don't re-ask unless this phase has conflicting needs
+   - Note applicable prior decisions for use in presentation
 
-3. **Skip assessment** — If no meaningful gray areas exist (pure infrastructure, clear-cut implementation), the phase may not need discussion.
+3. **Gray areas by category** — For each relevant category (UI, UX, Behavior, Empty States, Content), identify 1-2 specific ambiguities that would change implementation. **Annotate with code context where relevant** (e.g., "You already have a Card component" or "No existing pattern for this").
+
+4. **Skip assessment** — If no meaningful gray areas exist (pure infrastructure, clear-cut implementation, or all already decided in prior phases), the phase may not need discussion.
 
 **Output your analysis internally, then present to user.**
 
-Example analysis for "Post Feed" phase (with code context):
+Example analysis for "Post Feed" phase (with code and prior context):
 ```
 Domain: Displaying posts from followed users
 Existing: Card component (src/components/ui/Card.tsx), useInfiniteQuery hook, Tailwind CSS
+Prior decisions: "Minimal UI preferred" (Phase 2), "No pagination — always infinite scroll" (Phase 4)
 Gray areas:
 - UI: Layout style (cards vs timeline vs grid) — Card component exists with shadow/rounded variants
 - UI: Information density (full posts vs previews) — no existing density patterns
-- Behavior: Loading pattern (infinite scroll vs pagination) — useInfiniteQuery already set up
+- Behavior: Loading pattern — ALREADY DECIDED: infinite scroll (Phase 4)
 - Empty State: What shows when no posts exist — EmptyState component exists in ui/
 - Content: What metadata displays (time, author, reactions count)
 ```
 </step>
 
 <step name="present_gray_areas">
-Present the domain boundary and gray areas to user.
+Present the domain boundary, prior decisions, and gray areas to user.
 
-**First, state the boundary:**
+**First, state the boundary and any prior decisions that apply:**
 ```
 Phase [X]: [Name]
 Domain: [What this phase delivers — from your analysis]
 
 We'll clarify HOW to implement this.
 (New capabilities belong in other phases.)
+
+[If prior decisions apply:]
+**Carrying forward from earlier phases:**
+- [Decision from Phase N that applies here]
+- [Decision from Phase M that applies here]
 ```
 
 **Then use AskUserQuestion (multiSelect: true):**
@@ -256,10 +321,22 @@ We'll clarify HOW to implement this.
   - [1-2 questions this covers + code context annotation] (description)
   - **Highlight the recommended choice with brief explanation why**
 
+**Prior decision annotations:** When a gray area was already decided in a prior phase, annotate it:
+```
+☐ Exit shortcuts — How should users quit?
+  (You decided "Ctrl+C only, no single-key shortcuts" in Phase 5 — revisit or keep?)
+```
+
 **Code context annotations:** When the scout found relevant existing code, annotate the gray area description:
 ```
 ☐ Layout style — Cards vs list vs timeline?
   (You already have a Card component with shadow/rounded variants. Reusing it keeps the app consistent.)
+```
+
+**Combining both:** When both prior decisions and code context apply:
+```
+☐ Loading behavior — Infinite scroll or pagination?
+  (You chose infinite scroll in Phase 4. useInfiniteQuery hook already set up.)
 ```
 
 **Do NOT include a "skip" or "you decide" option.** User ran this command to discuss — give them real choices.
@@ -602,10 +679,12 @@ Route to `confirm_creation` step (existing behavior — show manual next steps).
 
 <success_criteria>
 - Phase validated against roadmap
+- Prior context loaded (PROJECT.md, REQUIREMENTS.md, STATE.md, prior CONTEXT.md files)
+- Already-decided questions not re-asked (carried forward from prior phases)
 - Codebase scouted for reusable assets, patterns, and integration points
-- Gray areas identified through intelligent analysis with code context annotations
+- Gray areas identified through intelligent analysis with code and prior decision annotations
 - User selected which areas to discuss
-- Each selected area explored until user satisfied (with code-informed options)
+- Each selected area explored until user satisfied (with code-informed and prior-decision-informed options)
 - Scope creep redirected to deferred ideas
 - CONTEXT.md captures actual decisions, not vague vision
 - CONTEXT.md includes code_context section with reusable assets and patterns
