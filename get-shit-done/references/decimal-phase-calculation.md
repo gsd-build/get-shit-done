@@ -33,8 +33,8 @@ With existing decimals:
 
 ```bash
 DECIMAL_INFO=$(node "$HOME/.claude/get-shit-done/bin/gsd-tools.cjs" phase next-decimal "${AFTER_PHASE}")
-DECIMAL_PHASE=$(echo "$DECIMAL_INFO" | jq -r '.next')
-BASE_PHASE=$(echo "$DECIMAL_INFO" | jq -r '.base_phase')
+DECIMAL_PHASE=$(printf '%s\n' "$DECIMAL_INFO" | jq -r '.next')
+BASE_PHASE=$(printf '%s\n' "$DECIMAL_INFO" | jq -r '.base_phase')
 ```
 
 Or with --raw flag:
