@@ -12,6 +12,14 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
   session used the default Sonnet 4.6 model. Opus is now passed directly to Task calls (#695)
 
 ### Added
+- **Kimi CLI support** — install GSD skills and agents to [Kimi](https://github.com/MoonshotAI/kimi-cli) via `--kimi --global`
+  - Skills install to XDG path `~/.config/agents/skills/gsd-<name>/SKILL.md` and are invoked with `/skill:gsd-<name>`
+  - Agents install as dual-file format: `~/.kimi/agents/gsd-<name>.yaml` + `gsd-<name>.md` system prompt
+  - Tool names translated to full module paths (`kimi_cli.tools.file:ReadFile`, `kimi_cli.tools.shell:Shell`, etc.)
+  - MCP tools excluded from agent tool lists (configured separately via Kimi's config)
+  - `${VAR}` patterns in agent bodies escaped for Kimi CLI compatibility
+  - Local install guard — Kimi's XDG skills path is always global; `--kimi --local` exits with a clear error
+  - `KIMI_CONFIG_DIR` and `KIMI_SKILLS_DIR` env overrides for custom paths
 - **Adaptive model profile** — fourth model profile (`adaptive`) that auto-selects models per-plan based on complexity evaluation (#210)
   - `evaluateComplexity()` scores plan metadata (files modified, task count, objective keywords, plan type, dependencies) on 0-10+ scale
   - Three tiers: Simple (haiku/sonnet), Medium (sonnet/opus), Complex (opus/sonnet)
