@@ -1,1 +1,5 @@
+# Intentional: this fork is a thin VS Code Copilot compatibility shim on top of
+# gsd-build/get-shit-done by TÂCHES / glittercowboy. The original author
+# should receive all funding credit. Pointing this to glittercowboy is
+# a deliberate choice, not an oversight.
 github: glittercowboy
