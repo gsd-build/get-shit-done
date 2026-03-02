@@ -775,4 +775,29 @@ describe('getMilestonePhaseFilter', () => {
     assert.strictEqual(filter('not-a-phase'), false);
     assert.strictEqual(filter('.gitkeep'), false);
   });
+
+  test('phaseCount reflects ROADMAP phase count', () => {
+    fs.writeFileSync(
+      path.join(tmpDir, '.planning', 'ROADMAP.md'),
+      '### Phase 5: Auth\n### Phase 6: Dashboard\n### Phase 7: Polish\n'
+    );
+
+    const filter = getMilestonePhaseFilter(tmpDir);
+    assert.strictEqual(filter.phaseCount, 3);
+  });
+
+  test('phaseCount is 0 when ROADMAP is missing', () => {
+    const filter = getMilestonePhaseFilter(tmpDir);
+    assert.strictEqual(filter.phaseCount, 0);
+  });
+
+  test('phaseCount is 0 when ROADMAP has no phase headings', () => {
+    fs.writeFileSync(
+      path.join(tmpDir, '.planning', 'ROADMAP.md'),
+      '# Roadmap\n\nSome content.\n'
+    );
+
+    const filter = getMilestonePhaseFilter(tmpDir);
+    assert.strictEqual(filter.phaseCount, 0);
+  });
 });

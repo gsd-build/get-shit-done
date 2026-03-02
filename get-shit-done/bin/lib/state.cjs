@@ -565,7 +565,9 @@ function buildStateFrontmatter(bodyContent, cwd) {
           diskTotalSummaries += summaries;
           if (plans > 0 && summaries >= plans) diskCompletedPhases++;
         }
-        totalPhases = phaseDirs.length;
+        totalPhases = isDirInMilestone.phaseCount > 0
+          ? Math.max(phaseDirs.length, isDirInMilestone.phaseCount)
+          : phaseDirs.length;
         completedPhases = diskCompletedPhases;
         totalPlans = diskTotalPlans;
         completedPlans = diskTotalSummaries;

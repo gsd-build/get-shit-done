@@ -425,17 +425,23 @@ function getMilestonePhaseFilter(cwd) {
     }
   } catch {}
 
-  if (milestonePhaseNums.size === 0) return () => true;
+  if (milestonePhaseNums.size === 0) {
+    const passAll = () => true;
+    passAll.phaseCount = 0;
+    return passAll;
+  }
 
   const normalized = new Set(
     [...milestonePhaseNums].map(n => (n.replace(/^0+/, '') || '0').toLowerCase())
   );
 
-  return function isDirInMilestone(dirName) {
+  function isDirInMilestone(dirName) {
     const m = dirName.match(/^0*(\d+[A-Za-z]?(?:\.\d+)*)/);
     if (!m) return false;
     return normalized.has(m[1].toLowerCase());
-  };
+  }
+  isDirInMilestone.phaseCount = milestonePhaseNums.size;
+  return isDirInMilestone;
 }
 
 module.exports = {
