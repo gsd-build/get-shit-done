@@ -196,7 +196,7 @@ Answer: "What do I need to know to PLAN this phase well?"
 **Phase description:** {phase_description}
 **Phase requirement IDs (MUST address):** {phase_req_ids}
 
-**Project instructions:** Read ./CLAUDE.md if exists — follow project-specific guidelines
+**Project instructions:** Read ./CLAUDE.md, ./GEMINI.md, or ./AGENTS.md if any exists — follow project-specific guidelines
 **Project skills:** Check .claude/skills/ or .agents/skills/ directory (if either exists) — read SKILL.md files, research should account for project skill patterns
 </additional_context>
 
@@ -296,7 +296,7 @@ Planner prompt:
 
 **Phase requirement IDs (every ID MUST appear in a plan's `requirements` field):** {phase_req_ids}
 
-**Project instructions:** Read ./CLAUDE.md if exists — follow project-specific guidelines
+**Project instructions:** Read ./CLAUDE.md, ./GEMINI.md, or ./AGENTS.md if any exists — follow project-specific guidelines
 **Project skills:** Check .claude/skills/ or .agents/skills/ directory (if either exists) — read SKILL.md files, plans should account for project skill rules
 </planning_context>
 
@@ -361,7 +361,7 @@ Checker prompt:
 
 **Phase requirement IDs (MUST ALL be covered):** {phase_req_ids}
 
-**Project instructions:** Read ./CLAUDE.md if exists — verify plans honor project guidelines
+**Project instructions:** Read ./CLAUDE.md, ./GEMINI.md, or ./AGENTS.md if any exists — verify plans honor project guidelines
 **Project skills:** Check .claude/skills/ or .agents/skills/ directory (if either exists) — verify plans account for project skill rules
 </verification_context>
 

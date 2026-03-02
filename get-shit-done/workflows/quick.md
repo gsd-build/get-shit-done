@@ -98,7 +98,7 @@ Task(
 
 <files_to_read>
 - {planning_base}/STATE.md (Project State)
-- ./CLAUDE.md (if exists — follow project-specific guidelines)
+- ./CLAUDE.md, ./GEMINI.md, or ./AGENTS.md (if any exists — follow project-specific guidelines)
 </files_to_read>
 
 **Project skills:** Check .claude/skills/ or .agents/skills/ directory (if either exists) — read SKILL.md files, plans should account for project skill rules
@@ -251,7 +251,7 @@ Execute quick task ${next_num}.
 <files_to_read>
 - ${QUICK_DIR}/${next_num}-PLAN.md (Plan)
 - {planning_base}/STATE.md (Project state)
-- ./CLAUDE.md (Project instructions, if exists)
+- ./CLAUDE.md, ./GEMINI.md, or ./AGENTS.md (Project instructions, if any exists)
 - .claude/skills/ or .agents/skills/ (Project skills, if either exists — list skills, read SKILL.md for each, follow relevant rules during implementation)
 </files_to_read>
 

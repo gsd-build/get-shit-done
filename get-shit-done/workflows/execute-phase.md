@@ -134,7 +134,7 @@ Execute each wave in sequence. Within a wave: parallel if `PARALLELIZATION=true`
        - {phase_dir}/{plan_file} (Plan)
        - {state_path} (State)
        - {config_path} (Config, if exists)
-       - ./CLAUDE.md (Project instructions, if exists — follow project-specific guidelines and coding conventions)
+       - ./CLAUDE.md, ./GEMINI.md, or ./AGENTS.md (Project instructions, if any exists — follow project-specific guidelines and coding conventions)
        - .claude/skills/ or .agents/skills/ (Project skills, if either exists — list skills, read SKILL.md for each, follow relevant rules during implementation)
        </files_to_read>
 
