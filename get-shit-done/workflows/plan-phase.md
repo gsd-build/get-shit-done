@@ -462,11 +462,12 @@ Spawn execute-phase as Task with direct workflow file reference (do NOT use Skil
 Task(
   prompt="
     <objective>
-    You are the execute-phase orchestrator. Execute all plans for Phase ${PHASE}: ${PHASE_NAME}.
+    You are the execute-phase orchestrator. Execute all plans for Phase ${PHASE}: ${PHASE_NAME}, then transition to the next phase automatically.
     </objective>
 
     <execution_context>
     @~/.claude/get-shit-done/workflows/execute-phase.md
+    @~/.claude/get-shit-done/workflows/transition.md
     @~/.claude/get-shit-done/references/checkpoints.md
     @~/.claude/get-shit-done/references/tdd.md
     @~/.claude/get-shit-done/references/model-profile-resolution.md
@@ -474,17 +475,18 @@ Task(
 
     <arguments>
     PHASE=${PHASE}
-    ARGUMENTS='${PHASE} --auto --no-transition'
+    ARGUMENTS='${PHASE} --auto'
     </arguments>
 
     <instructions>
     1. Read execute-phase.md from execution_context for your complete workflow
-    2. Follow ALL steps: initialize, handle_branching, validate_phase, discover_and_group_plans, execute_waves, aggregate_results, close_parent_artifacts, verify_phase_goal, update_roadmap
-    3. The --no-transition flag means: after verification + roadmap update, STOP and return status. Do NOT run transition.md.
+    2. Follow ALL steps: initialize, handle_branching, validate_phase, discover_and_group_plans, execute_waves, aggregate_results, close_parent_artifacts, verify_phase_goal, update_roadmap, offer_next
+    3. The --auto flag WITHOUT --no-transition means: after verification + roadmap update, run transition.md inline, which will spawn the next phase as a Task() automatically
     4. When spawning executor agents, use subagent_type='gsd-executor' with the existing @file pattern from the workflow
     5. When spawning verifier agents, use subagent_type='gsd-verifier'
     6. Preserve the classifyHandoffIfNeeded workaround (spot-check on that specific error)
-    7. Do NOT use the Skill tool or /gsd: commands
+    7. Do NOT use the Skill tool or /gsd: commands. Read workflow .md files directly.
+    8. The auto-advance chain continues through transition → discuss/plan next phase → execute next phase → ... until milestone completes or an error/gap stops it
     </instructions>
   ",
   subagent_type="general-purpose",
@@ -493,15 +495,15 @@ Task(
 ```
 
 **Handle execute-phase return:**
-- **PHASE COMPLETE** → Display final summary:
+- **PHASE COMPLETE** or **MILESTONE COMPLETE** → Display final summary:
   ```
   ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-   GSD ► PHASE ${PHASE} COMPLETE ✓
+   GSD ► AUTO-ADVANCE PIPELINE COMPLETE ✓
   ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
-  Auto-advance pipeline finished.
+  [Include details from execute-phase return]
 
-  Next: /gsd:discuss-phase ${NEXT_PHASE} --auto
+  Run /gsd:progress to see current status.
   ```
 - **GAPS FOUND / VERIFICATION FAILED** → Display result, stop chain:
   ```

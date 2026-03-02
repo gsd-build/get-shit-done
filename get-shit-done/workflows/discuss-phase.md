@@ -556,9 +556,9 @@ Task(
     1. Read plan-phase.md from execution_context for your complete workflow
     2. Follow ALL steps: initialize, validate, load context, research, plan, verify, auto-advance
     3. When spawning agents (gsd-phase-researcher, gsd-planner, gsd-plan-checker), use Task with specified subagent_type and model
-    4. For step 14 (auto-advance to execute): spawn execute-phase as a Task with DIRECT file reference — tell it to read execute-phase.md. Include @file refs to execute-phase.md, checkpoints.md, tdd.md, model-profile-resolution.md. Pass --no-transition flag so execute-phase returns results instead of chaining further.
+    4. For step 14 (auto-advance to execute): spawn execute-phase as a Task with DIRECT file reference — tell it to read execute-phase.md. Include @file refs to execute-phase.md, transition.md, checkpoints.md, tdd.md, model-profile-resolution.md. Pass --auto flag (NOT --no-transition) so the full chain continues: execute → transition → next phase discuss/plan/execute automatically.
     5. Do NOT use the Skill tool or /gsd: commands. Read workflow .md files directly.
-    6. Return: PHASE COMPLETE (full pipeline success), PLANNING COMPLETE (planning done but execute failed/skipped), PLANNING INCONCLUSIVE, or GAPS FOUND
+    6. Return: PHASE COMPLETE (current phase done), MILESTONE COMPLETE (all phases done), PLANNING COMPLETE (planning done but execute failed/skipped), PLANNING INCONCLUSIVE, or GAPS FOUND
     </instructions>
   ",
   subagent_type="general-purpose",
@@ -567,16 +567,16 @@ Task(
 ```
 
 **Handle plan-phase return:**
-- **PHASE COMPLETE** → Full chain succeeded. Display:
+- **PHASE COMPLETE** or **MILESTONE COMPLETE** → Full auto-advance chain succeeded. Display:
   ```
   ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-   GSD ► PHASE ${PHASE} COMPLETE
+   GSD ► AUTO-ADVANCE PIPELINE COMPLETE ✓
   ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
-  Auto-advance pipeline finished: discuss → plan → execute
+  [Include details from plan-phase return — which phases completed,
+   verification results, milestone status]
 
-  Next: /gsd:discuss-phase ${NEXT_PHASE} --auto
-  <sub>/clear first → fresh context window</sub>
+  Run /gsd:progress to see current status.
   ```
 - **PLANNING COMPLETE** → Planning done, execution didn't complete:
   ```

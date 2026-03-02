@@ -54,6 +54,7 @@ function cmdConfigEnsureSection(cwd, raw) {
       research: true,
       plan_check: true,
       verifier: true,
+      auto_advance: false,
       nyquist_validation: false,
     },
     parallelization: true,

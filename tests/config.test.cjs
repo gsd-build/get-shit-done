@@ -266,6 +266,25 @@ describe('config-set command', () => {
     assert.strictEqual(config.workflow.research, false);
   });
 
+  test('sets workflow.auto_advance to true', () => {
+    const result = runGsdTools('config-set workflow.auto_advance true', tmpDir);
+    assert.ok(result.success, `Command failed: ${result.error}`);
+
+    const config = readConfig(tmpDir);
+    assert.strictEqual(config.workflow.auto_advance, true);
+  });
+
+  test('sets workflow.auto_advance to false', () => {
+    // First enable it
+    runGsdTools('config-set workflow.auto_advance true', tmpDir);
+    // Then disable it
+    const result = runGsdTools('config-set workflow.auto_advance false', tmpDir);
+    assert.ok(result.success, `Command failed: ${result.error}`);
+
+    const config = readConfig(tmpDir);
+    assert.strictEqual(config.workflow.auto_advance, false);
+  });
+
   test('auto-creates nested objects for deep dot-notation', () => {
     // Start with empty config
     writeConfig(tmpDir, {});
@@ -310,6 +329,23 @@ describe('config-get command', () => {
 
   test('gets a nested value via dot-notation', () => {
     const result = runGsdTools('config-get workflow.research', tmpDir);
+    assert.ok(result.success, `Command failed: ${result.error}`);
+
+    const output = JSON.parse(result.output);
+    assert.strictEqual(output, true);
+  });
+
+  test('gets workflow.auto_advance default value (false)', () => {
+    const result = runGsdTools('config-get workflow.auto_advance', tmpDir);
+    assert.ok(result.success, `Command failed: ${result.error}`);
+
+    const output = JSON.parse(result.output);
+    assert.strictEqual(output, false);
+  });
+
+  test('gets workflow.auto_advance after setting to true', () => {
+    runGsdTools('config-set workflow.auto_advance true', tmpDir);
+    const result = runGsdTools('config-get workflow.auto_advance', tmpDir);
     assert.ok(result.success, `Command failed: ${result.error}`);
 
     const output = JSON.parse(result.output);
