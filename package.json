@@ -1,17 +1,14 @@
 {
-  "name": "get-shit-done-cc",
-  "version": "1.20.5",
-  "description": "A meta-prompting, context engineering and spec-driven development system for Claude Code, OpenCode and Gemini by TÂCHES.",
+  "name": "gsdd",
+  "version": "0.1.0",
+  "description": "A meta-prompting, lightweight context engineering and spec-driven development system for AI coding agents. Works with any agent.",
+  "type": "module",
   "bin": {
-    "get-shit-done-cc": "bin/install.js"
+    "gsdd": "./bin/gsdd.mjs"
   },
   "files": [
-    "bin",
-    "commands",
-    "get-shit-done",
-    "agents",
-    "hooks/dist",
-    "scripts"
+    "bin/",
+    "distilled/"
   ],
   "keywords": [
     "claude",
@@ -19,30 +16,19 @@
     "ai",
     "meta-prompting",
     "context-engineering",
+    "coding-agent",
     "spec-driven-development",
+    "sdd",
+    "workflow",
     "gemini",
-    "gemini-cli"
+    "gemini-cli",
+    "cursor",
+    "codex"
   ],
-  "author": "TÂCHES",
+  "author": "",
   "license": "MIT",
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/glittercowboy/get-shit-done.git"
-  },
-  "homepage": "https://github.com/glittercowboy/get-shit-done",
-  "bugs": {
-    "url": "https://github.com/glittercowboy/get-shit-done/issues"
-  },
-  "engines": {
-    "node": ">=16.7.0"
-  },
-  "dependencies": {},
-  "devDependencies": {
-    "esbuild": "^0.24.0"
-  },
-  "scripts": {
-    "build:hooks": "node scripts/build-hooks.js",
-    "prepublishOnly": "npm run build:hooks",
-    "test": "node --test tests/*.test.cjs"
+    "url": "https://github.com/PatrickSys/get-shit-done-distilled"
   }
 }
