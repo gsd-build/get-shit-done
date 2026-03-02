@@ -495,6 +495,39 @@ node "$HOME/.claude/get-shit-done/bin/gsd-tools.cjs" commit "chore: add project 
 
 **Note:** Run `/gsd:settings` anytime to update these preferences.
 
+## 5.1. Sub-Repo Detection
+
+**Detect multi-repo workspace:**
+
+Check for directories with their own `.git` folders (separate repos within the workspace):
+
+```bash
+find . -maxdepth 2 -type d -name ".git" -not -path "./.git"
+```
+
+**If sub-repos found:**
+
+Strip the `/.git` suffix and `./` prefix to get directory names (e.g., `./backend/.git` → `backend`).
+
+Use AskUserQuestion:
+- header: "Multi-Repo Workspace"
+- question: "I detected separate git repos in this workspace. Which directories contain code that GSD should commit to?"
+- multiSelect: true
+- options: one option per detected directory
+  - "[directory name]" — Separate git repo
+
+**If user selects one or more directories:**
+- Set `planning.sub_repos` in config.json to the selected directory names array (e.g., `["backend", "frontend"]`)
+- Auto-set `planning.commit_docs` to `false` (planning docs stay local in multi-repo workspaces)
+- Add `.planning/` to `.gitignore` if not already present
+
+Update the config file:
+```bash
+node ~/.claude/get-shit-done/bin/gsd-tools.cjs commit "chore: configure multi-repo workspace" --files .planning/config.json
+```
+
+**If no sub-repos found or user selects none:** Continue with no changes to config.
+
 ## 5.5. Resolve Model Profile
 
 Use models from init: `researcher_model`, `synthesizer_model`, `roadmapper_model`.
