@@ -12,7 +12,7 @@ Add GitHub Copilot CLI as the 5th supported runtime in the GSD installer. The wo
 
 Decimal phases appear between their surrounding integers in numeric order.
 
-- [ ] **Phase 1: Core Installer Plumbing** - Make Copilot selectable as a runtime via CLI flags, prompts, and directory resolution
+- [x] **Phase 1: Core Installer Plumbing** - Make Copilot selectable as a runtime via CLI flags, prompts, and directory resolution
 - [ ] **Phase 2: Content Conversion Engine** - Convert commands to skills, agents to `.agent.md`, with tool mapping and path replacement
 - [ ] **Phase 3: Instructions & Lifecycle** - Generate copilot-instructions.md with smart merging, add uninstall/manifest/patch support
 - [ ] **Phase 4: Integration Testing & Validation** - Verify installer output matches reference implementation, add post-install checks
@@ -32,7 +32,7 @@ Decimal phases appear between their surrounding integers in numeric order.
 **Plans**: 1 plan
 
 Plans:
-- [ ] 01-01-PLAN.md — Add Copilot as 5th runtime (arg parsing, directory resolution, prompt, install/uninstall, banner/help, tests)
+- [x] 01-01-PLAN.md — Add Copilot as 5th runtime (arg parsing, directory resolution, prompt, install/uninstall, banner/help, tests)
 
 ### Phase 2: Content Conversion Engine
 **Goal**: Copilot installation produces correctly formatted skills, agents, and supporting files in `.github/`
