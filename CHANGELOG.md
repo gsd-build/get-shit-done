@@ -6,6 +6,9 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ## [Unreleased]
 
+### Fixed
+- `$HOME/.claude/` paths not replaced during local install, causing `MODULE_NOT_FOUND` on projects outside `$HOME` (e.g., external drives)
+
 ## [1.22.0] - 2026-02-27
 
 ### Added
