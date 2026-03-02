@@ -185,6 +185,8 @@ Create `.planning/config.json` with mode set to "yolo":
 
 **If commit_docs = No:** Add `.planning/` to `.gitignore`.
 
+**If `commit_docs` is true:**
+
 **Commit config.json:**
 
 ```bash
@@ -334,6 +336,8 @@ Initialize with any decisions made during questioning:
 ```
 
 Do not compress. Capture everything gathered.
+
+**If `commit_docs` is true:**
 
 **Commit PROJECT.md:**
 
@@ -488,6 +492,8 @@ Create `.planning/config.json` with all settings:
 
 **If commit_docs = Yes:**
 - No additional gitignore entries needed
+
+**If `commit_docs` is true:**
 
 **Commit config.json:**
 
@@ -886,6 +892,8 @@ Does this capture what you're building? (yes / adjust)
 
 If "adjust": Return to scoping.
 
+**If `commit_docs` is true:**
+
 **Commit requirements:**
 
 ```bash
@@ -1015,6 +1023,8 @@ Use AskUserQuestion:
 - Loop until user approves
 
 **If "Review full file":** Display raw `cat {planning_base}/ROADMAP.md`, then re-ask.
+
+**If `commit_docs` is true:**
 
 **Commit roadmap (after approval or auto mode):**
 

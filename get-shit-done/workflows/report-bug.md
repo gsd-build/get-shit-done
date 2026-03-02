@@ -152,13 +152,13 @@ files:
 </step>
 
 <step name="git_commit">
+If `commit_docs` is true:
+
 Commit the bug report:
 
 ```bash
 node "$HOME/.claude/get-shit-done/bin/gsd-tools.cjs" commit "docs: report BUG-{next_id_padded} - {title}" --files .planning/bugs/BUG-{next_id_padded}.md
 ```
-
-Tool respects `commit_docs` config and gitignore automatically.
 </step>
 
 <step name="create_github_issue">

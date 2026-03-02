@@ -101,6 +101,7 @@ Extract from result: `removed`, `directory_deleted`, `renamed_directories`, `ren
 <step name="commit">
 Stage and commit the removal:
 
+If `commit_docs` is true:
 ```bash
 node "$HOME/.claude/get-shit-done/bin/gsd-tools.cjs" commit "chore: remove phase {target} ({original-phase-name})" --files {planning_base}/
 ```

@@ -7,6 +7,10 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 ## [Unreleased]
 
 ### Fixed
+- **`commit_docs: false` now fully respected** — three compounding bugs caused `.planning/` files
+  to be committed even when disabled: `isGitIgnored()` missed tracked files (added `--no-index`),
+  `loadConfig()` silently fell back to `commit_docs: true` on parse errors (now defaults to `false`),
+  and 33 workflow/agent commit calls lacked defense-in-depth guards (all now gated) (#790)
 - **Quality/balanced profiles now deliver Opus subagents** — `resolveModelInternal` previously
   converted `opus` to `inherit`, causing agents to silently run on Sonnet when the parent
   session used the default Sonnet 4.6 model. Opus is now passed directly to Task calls (#695)

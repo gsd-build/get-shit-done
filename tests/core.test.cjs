@@ -11,6 +11,8 @@ const fs = require('fs');
 const path = require('path');
 const os = require('os');
 
+const { execSync } = require('child_process');
+
 const {
   loadConfig,
   resolveModelInternal,
@@ -28,6 +30,7 @@ const {
   getRoadmapPhaseInternal,
   searchPhaseInDir,
   findPhaseInternal,
+  isGitIgnored,
 } = require('../get-shit-done/bin/lib/core.cjs');
 
 // ─── loadConfig ────────────────────────────────────────────────────────────────
@@ -95,14 +98,14 @@ describe('loadConfig', () => {
     assert.strictEqual(config.model_overrides, null);
   });
 
-  test('returns defaults when config.json contains invalid JSON', () => {
+  test('returns defaults with commit_docs false when config.json contains invalid JSON', () => {
     fs.writeFileSync(
       path.join(tmpDir, '.planning', 'config.json'),
       'not valid json {{{{'
     );
     const config = loadConfig(tmpDir);
     assert.strictEqual(config.model_profile, 'balanced');
-    assert.strictEqual(config.commit_docs, true);
+    assert.strictEqual(config.commit_docs, false);
   });
 
   test('handles parallelization as boolean', () => {
@@ -1101,5 +1104,46 @@ describe('ADAPTIVE_TIERS', () => {
         );
       }
     }
+  });
+});
+
+// ─── isGitIgnored ─────────────────────────────────────────────────────────────
+
+describe('isGitIgnored', () => {
+  let tmpDir;
+
+  beforeEach(() => {
+    tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), 'gsd-gitignore-test-'));
+    execSync('git init', { cwd: tmpDir, stdio: 'pipe' });
+    execSync('git config user.email "test@test.com"', { cwd: tmpDir, stdio: 'pipe' });
+    execSync('git config user.name "Test"', { cwd: tmpDir, stdio: 'pipe' });
+  });
+
+  afterEach(() => {
+    fs.rmSync(tmpDir, { recursive: true, force: true });
+  });
+
+  test('returns true when path is in .gitignore', () => {
+    fs.writeFileSync(path.join(tmpDir, '.gitignore'), '.planning/\n');
+    fs.mkdirSync(path.join(tmpDir, '.planning'), { recursive: true });
+    fs.writeFileSync(path.join(tmpDir, '.planning', 'test.md'), 'test');
+    assert.strictEqual(isGitIgnored(tmpDir, '.planning/test.md'), true);
+  });
+
+  test('returns false when path is not in .gitignore', () => {
+    fs.writeFileSync(path.join(tmpDir, '.gitignore'), '');
+    fs.mkdirSync(path.join(tmpDir, 'src'), { recursive: true });
+    fs.writeFileSync(path.join(tmpDir, 'src', 'index.js'), '');
+    assert.strictEqual(isGitIgnored(tmpDir, 'src/index.js'), false);
+  });
+
+  test('returns true even when path is already tracked (--no-index)', () => {
+    fs.mkdirSync(path.join(tmpDir, '.planning'), { recursive: true });
+    fs.writeFileSync(path.join(tmpDir, '.planning', 'test.md'), 'test');
+    execSync('git add .planning/test.md', { cwd: tmpDir, stdio: 'pipe' });
+    execSync('git commit -m "add planning"', { cwd: tmpDir, stdio: 'pipe' });
+    // Now add to .gitignore — without --no-index git check-ignore would say "not ignored"
+    fs.writeFileSync(path.join(tmpDir, '.gitignore'), '.planning/\n');
+    assert.strictEqual(isGitIgnored(tmpDir, '.planning/test.md'), true);
   });
 });

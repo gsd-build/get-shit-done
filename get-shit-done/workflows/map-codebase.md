@@ -247,6 +247,8 @@ Continue to commit_codebase_map.
 </step>
 
 <step name="commit_codebase_map">
+If `commit_docs` is true:
+
 Commit the codebase map:
 
 ```bash

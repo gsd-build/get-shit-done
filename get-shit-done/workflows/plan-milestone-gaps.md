@@ -154,6 +154,7 @@ mkdir -p "${planning_base}/phases/{NN}-{name}"
 
 ## 9. Commit Roadmap and Requirements Update
 
+If `commit_docs` is true:
 ```bash
 node "$HOME/.claude/get-shit-done/bin/gsd-tools.cjs" commit "docs(roadmap): add gap closure phases {N}-{M}" --files "${planning_base}/ROADMAP.md" "${planning_base}/REQUIREMENTS.md"
 ```

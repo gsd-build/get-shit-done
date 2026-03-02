@@ -439,6 +439,7 @@ node "$HOME/.claude/get-shit-done/bin/gsd-tools.cjs" state add-blocker "Blocker 
 </state_updates>
 
 <final_commit>
+If `commit_docs` is true:
 ```bash
 node "$HOME/.claude/get-shit-done/bin/gsd-tools.cjs" commit "docs({phase}-{plan}): complete [plan-name] plan" --files .planning/phases/XX-name/{phase}-{plan}-SUMMARY.md .planning/STATE.md .planning/ROADMAP.md .planning/REQUIREMENTS.md
 ```

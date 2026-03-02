@@ -501,6 +501,8 @@ ls .planning/RETROSPECTIVE.md 2>/dev/null
 If the "## Cross-Milestone Trends" section exists, update the tables with new data from this milestone.
 
 **Commit:**
+
+If `commit_docs` is true:
 ```bash
 node "$HOME/.claude/get-shit-done/bin/gsd-tools.cjs" commit "docs: update retrospective for v${VERSION}" --files .planning/RETROSPECTIVE.md
 ```
@@ -683,6 +685,7 @@ git push origin v[X.Y]
 
 Commit milestone completion.
 
+If `commit_docs` is true:
 ```bash
 node "$HOME/.claude/get-shit-done/bin/gsd-tools.cjs" commit "chore: complete v[X.Y] milestone" --files .planning/milestones/v[X.Y]-ROADMAP.md .planning/milestones/v[X.Y]-REQUIREMENTS.md .planning/milestones/v[X.Y]-MILESTONE-AUDIT.md .planning/MILESTONES.md .planning/PROJECT.md {state_path}
 ```

@@ -129,6 +129,7 @@ Repeat for all milestones in the cleanup set.
 
 Commit the changes:
 
+If `commit_docs` is true:
 ```bash
 node "$HOME/.claude/get-shit-done/bin/gsd-tools.cjs" commit "chore: archive phase directories from completed milestones" --files .planning/milestones/ {planning_base}/phases/
 ```

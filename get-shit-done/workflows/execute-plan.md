@@ -399,6 +399,8 @@ Extract requirement IDs from the plan's frontmatter (e.g., `requirements: [AUTH-
 <step name="git_commit_metadata">
 Task code already committed per-task. Commit plan metadata:
 
+If `commit_docs` is true:
+
 ```bash
 node "$HOME/.claude/get-shit-done/bin/gsd-tools.cjs" commit "docs({milestone_prefix}{phase}-{plan}): complete [plan-name] plan" --files {phase_dir}/{phase}-{plan}-SUMMARY.md {state_path} {roadmap_path} {planning_base}/REQUIREMENTS.md
 ```
@@ -413,6 +415,8 @@ git diff --name-only ${FIRST_TASK}^..HEAD 2>/dev/null
 ```
 
 Update only structural changes: new src/ dir → STRUCTURE.md | deps → STACK.md | file pattern → CONVENTIONS.md | API client → INTEGRATIONS.md | config → STACK.md | renamed → update paths. Skip code-only/bugfix/content changes.
+
+If `commit_docs` is true:
 
 ```bash
 node "$HOME/.claude/get-shit-done/bin/gsd-tools.cjs" commit "" --files .planning/codebase/*.md --amend

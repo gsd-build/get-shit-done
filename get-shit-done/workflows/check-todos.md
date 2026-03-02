@@ -152,12 +152,12 @@ Re-run `init todos` to get updated count, then update STATE.md "### Pending Todo
 <step name="git_commit">
 If todo was moved to done/, commit the change:
 
+If `commit_docs` is true:
+
 ```bash
 git rm --cached ${pending_dir}/[filename] 2>/dev/null || true
 node "$HOME/.claude/get-shit-done/bin/gsd-tools.cjs" commit "docs: start work on todo - [title]" --files ${completed_dir}/[filename] {planning_base}/STATE.md
 ```
-
-Tool respects `commit_docs` config and gitignore automatically.
 
 Confirm: "Committed: docs: start work on todo - [title]"
 </step>

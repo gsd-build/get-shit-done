@@ -213,44 +213,54 @@ function loadConfig(cwd, paths) {
     brave_search: false,
   };
 
+  let raw;
   try {
-    const raw = fs.readFileSync(configPath, 'utf-8');
-    const parsed = JSON.parse(raw);
-
-    const get = (key, nested) => {
-      if (parsed[key] !== undefined) return parsed[key];
-      if (nested && parsed[nested.section] && parsed[nested.section][nested.field] !== undefined) {
-        return parsed[nested.section][nested.field];
-      }
-      return undefined;
-    };
-
-    const parallelization = (() => {
-      const val = get('parallelization');
-      if (typeof val === 'boolean') return val;
-      if (typeof val === 'object' && val !== null && 'enabled' in val) return val.enabled;
-      return defaults.parallelization;
-    })();
-
-    return {
-      model_profile: get('model_profile') ?? defaults.model_profile,
-      commit_docs: get('commit_docs', { section: 'planning', field: 'commit_docs' }) ?? defaults.commit_docs,
-      search_gitignored: get('search_gitignored', { section: 'planning', field: 'search_gitignored' }) ?? defaults.search_gitignored,
-      branching_strategy: get('branching_strategy', { section: 'git', field: 'branching_strategy' }) ?? defaults.branching_strategy,
-      phase_branch_template: get('phase_branch_template', { section: 'git', field: 'phase_branch_template' }) ?? defaults.phase_branch_template,
-      milestone_branch_template: get('milestone_branch_template', { section: 'git', field: 'milestone_branch_template' }) ?? defaults.milestone_branch_template,
-      research: get('research', { section: 'workflow', field: 'research' }) ?? defaults.research,
-      plan_checker: get('plan_checker', { section: 'workflow', field: 'plan_check' }) ?? defaults.plan_checker,
-      verifier: get('verifier', { section: 'workflow', field: 'verifier' }) ?? defaults.verifier,
-      nyquist_validation: get('nyquist_validation', { section: 'workflow', field: 'nyquist_validation' }) ?? defaults.nyquist_validation,
-      parallelization,
-      brave_search: get('brave_search') ?? defaults.brave_search,
-      model_overrides: parsed.model_overrides || null,
-      adaptive_settings: parsed.adaptive_settings || null,
-    };
-  } catch {
-    return defaults;
+    raw = fs.readFileSync(configPath, 'utf-8');
+  } catch (err) {
+    if (err.code === 'ENOENT') return defaults;
+    process.stderr.write(`gsd: warning: could not read ${configPath}: ${err.message}\n`);
+    return { ...defaults, commit_docs: false };
   }
+
+  let parsed;
+  try {
+    parsed = JSON.parse(raw);
+  } catch (err) {
+    process.stderr.write(`gsd: warning: invalid JSON in ${configPath}: ${err.message}\n`);
+    return { ...defaults, commit_docs: false };
+  }
+
+  const get = (key, nested) => {
+    if (parsed[key] !== undefined) return parsed[key];
+    if (nested && parsed[nested.section] && parsed[nested.section][nested.field] !== undefined) {
+      return parsed[nested.section][nested.field];
+    }
+    return undefined;
+  };
+
+  const parallelization = (() => {
+    const val = get('parallelization');
+    if (typeof val === 'boolean') return val;
+    if (typeof val === 'object' && val !== null && 'enabled' in val) return val.enabled;
+    return defaults.parallelization;
+  })();
+
+  return {
+    model_profile: get('model_profile') ?? defaults.model_profile,
+    commit_docs: get('commit_docs', { section: 'planning', field: 'commit_docs' }) ?? defaults.commit_docs,
+    search_gitignored: get('search_gitignored', { section: 'planning', field: 'search_gitignored' }) ?? defaults.search_gitignored,
+    branching_strategy: get('branching_strategy', { section: 'git', field: 'branching_strategy' }) ?? defaults.branching_strategy,
+    phase_branch_template: get('phase_branch_template', { section: 'git', field: 'phase_branch_template' }) ?? defaults.phase_branch_template,
+    milestone_branch_template: get('milestone_branch_template', { section: 'git', field: 'milestone_branch_template' }) ?? defaults.milestone_branch_template,
+    research: get('research', { section: 'workflow', field: 'research' }) ?? defaults.research,
+    plan_checker: get('plan_checker', { section: 'workflow', field: 'plan_check' }) ?? defaults.plan_checker,
+    verifier: get('verifier', { section: 'workflow', field: 'verifier' }) ?? defaults.verifier,
+    nyquist_validation: get('nyquist_validation', { section: 'workflow', field: 'nyquist_validation' }) ?? defaults.nyquist_validation,
+    parallelization,
+    brave_search: get('brave_search') ?? defaults.brave_search,
+    model_overrides: parsed.model_overrides || null,
+    adaptive_settings: parsed.adaptive_settings || null,
+  };
 }
 
 // ─── Git utilities ────────────────────────────────────────────────────────────

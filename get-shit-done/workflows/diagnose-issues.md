@@ -156,7 +156,7 @@ For each gap in the Gaps section, add artifacts and missing fields:
 
 Update status in frontmatter to "diagnosed".
 
-Commit the updated UAT.md:
+If `commit_docs` is true, commit the updated UAT.md:
 ```bash
 node "$HOME/.claude/get-shit-done/bin/gsd-tools.cjs" commit "docs({phase_num}): add root causes from diagnosis" --files "{phase_dir}/{phase_num}-UAT.md"
 ```

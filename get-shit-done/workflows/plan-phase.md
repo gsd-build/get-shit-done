@@ -126,7 +126,7 @@ Generating CONTEXT.md from requirements...
 *Context gathered: [date] via PRD Express Path*
 ```
 
-5. Commit:
+5. If `commit_docs` is true:
 ```bash
 node "$HOME/.claude/get-shit-done/bin/gsd-tools.cjs" commit "docs(${padded_phase}): generate context from PRD" --files "${phase_dir}/${padded_phase}-CONTEXT.md"
 ```
