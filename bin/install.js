@@ -641,6 +641,24 @@ function stripGsdFromCodexConfig(content) {
  * Merge GSD config block into an existing or new config.toml.
  * Three cases: new file, existing with GSD marker, existing without marker.
  */
+function extractGsdAgentSubsections(gsdBlock) {
+  const agentsIndex = gsdBlock.indexOf('[agents]');
+  if (agentsIndex === -1) return '';
+
+  const agentLines = gsdBlock.substring(agentsIndex).split('\n');
+
+  // Skip [agents] plus its key/value lines (max_threads, max_depth, etc.)
+  let i = 1;
+  while (i < agentLines.length && agentLines[i] && !agentLines[i].startsWith('[')) {
+    i++;
+  }
+  while (i < agentLines.length && !agentLines[i]) {
+    i++;
+  }
+
+  return agentLines.slice(i).join('\n').trim();
+}
+
 function mergeCodexConfig(configPath, gsdBlock) {
   // Case 1: No config.toml — create fresh
   if (!fs.existsSync(configPath)) {
@@ -685,6 +703,8 @@ function mergeCodexConfig(configPath, gsdBlock) {
   let content = existing;
   const featuresRegex = /^\[features\]\s*$/m;
   const hasFeatures = featuresRegex.test(content);
+  const hasAgentsHeader = /^\[agents\]\s*$/m.test(content);
+  const agentSubsections = extractGsdAgentSubsections(gsdBlock);
 
   if (hasFeatures) {
     if (!content.includes('multi_agent')) {
@@ -693,11 +713,26 @@ function mergeCodexConfig(configPath, gsdBlock) {
     if (!content.includes('default_mode_request_user_input')) {
       content = content.replace(/^\[features\].*$/m, '$&\ndefault_mode_request_user_input = true');
     }
-    // Append agents block (skip the [features] section from gsdBlock)
-    const agentsBlock = gsdBlock.substring(gsdBlock.indexOf('[agents]'));
-    content = content.trimEnd() + '\n\n' + GSD_CODEX_MARKER + '\n' + agentsBlock + '\n';
+
+    if (hasAgentsHeader && agentSubsections) {
+      // Existing [agents] table present — append only per-agent subsections.
+      content = content.trimEnd() + '\n\n' + GSD_CODEX_MARKER + '\n' + agentSubsections + '\n';
+    } else {
+      // No [agents] table yet — append full [agents] block.
+      const agentsBlock = gsdBlock.substring(gsdBlock.indexOf('[agents]'));
+      content = content.trimEnd() + '\n\n' + GSD_CODEX_MARKER + '\n' + agentsBlock + '\n';
+    }
   } else {
-    content = content.trimEnd() + '\n\n' + gsdBlock + '\n';
+    if (hasAgentsHeader && agentSubsections) {
+      content = content.trimEnd() + '\n\n' +
+        GSD_CODEX_MARKER + '\n' +
+        '[features]\n' +
+        'multi_agent = true\n' +
+        'default_mode_request_user_input = true\n\n' +
+        agentSubsections + '\n';
+    } else {
+      content = content.trimEnd() + '\n\n' + gsdBlock + '\n';
+    }
   }
 
   fs.writeFileSync(configPath, content);
@@ -769,10 +804,27 @@ function convertClaudeToGeminiAgent(content) {
   const lines = frontmatter.split('\n');
   const newLines = [];
   let inAllowedTools = false;
+  let inSkills = false;
   const tools = [];
 
   for (const line of lines) {
     const trimmed = line.trim();
+    const indent = line.match(/^\s*/)?.[0]?.length || 0;
+    const isTopLevelKey = indent === 0 && /^[^-\s][^:]*:/.test(trimmed);
+
+    // Strip unsupported Gemini skills array entirely
+    if (!inSkills && indent === 0 && trimmed.startsWith('skills:')) {
+      inSkills = true;
+      continue;
+    }
+
+    if (inSkills) {
+      if (isTopLevelKey) {
+        inSkills = false;
+      } else {
+        continue;
+      }
+    }
 
     // Convert allowed-tools YAML array to tools list
     if (trimmed.startsWith('allowed-tools:')) {
@@ -2418,6 +2470,7 @@ if (process.env.GSD_TEST_MODE) {
     stripGsdFromCodexConfig,
     mergeCodexConfig,
     installCodexConfig,
+    convertClaudeToGeminiAgent,
     convertClaudeCommandToCodexSkill,
     GSD_CODEX_MARKER,
     CODEX_AGENT_SANDBOX,
