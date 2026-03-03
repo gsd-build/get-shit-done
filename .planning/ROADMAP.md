@@ -44,12 +44,11 @@ Plans:
   3. All path references in generated files use `.github/` instead of `~/.claude/` or `./.claude/`, and command references use `gsd-name` format instead of `gsd:name`
   4. Router skill exists at `.github/skills/get-shit-done/SKILL.md` providing `/gsd-*` command discovery
   5. Core engine files (bin, references, templates, workflows) plus CHANGELOG.md and VERSION exist in `.github/get-shit-done/`
-**Plans**: TBD
+**Plans:** 2 plans
 
 Plans:
-- [ ] 02-01: TBD
-- [ ] 02-02: TBD
-- [ ] 02-03: TBD
+- [ ] 02-01-PLAN.md — Copilot conversion functions + install() wiring (tool mapping, path/command conversion, skill/agent converters, folder-per-skill copy)
+- [ ] 02-02-PLAN.md — Copilot conversion tests (unit tests for all converters + integration tests with real source files)
 
 ### Phase 3: Instructions & Lifecycle
 **Goal**: Copilot installation is complete with system instructions, uninstall support, and safe reinstall capability
