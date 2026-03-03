@@ -973,3 +973,168 @@ describe('Copilot manifest and patches fixes', () => {
     }
   });
 });
+
+// ============================================================================
+// E2E Integration Tests — Copilot Install & Uninstall
+// ============================================================================
+
+const { execFileSync } = require('child_process');
+const crypto = require('crypto');
+
+const INSTALL_PATH = path.join(__dirname, '..', 'bin', 'install.js');
+const EXPECTED_SKILLS = 31;
+const EXPECTED_AGENTS = 11;
+
+function runCopilotInstall(cwd) {
+  const env = { ...process.env };
+  delete env.GSD_TEST_MODE;
+  return execFileSync(process.execPath, [INSTALL_PATH, '--copilot', '--local'], {
+    cwd,
+    encoding: 'utf-8',
+    stdio: ['pipe', 'pipe', 'pipe'],
+    env,
+  });
+}
+
+function runCopilotUninstall(cwd) {
+  const env = { ...process.env };
+  delete env.GSD_TEST_MODE;
+  return execFileSync(process.execPath, [INSTALL_PATH, '--copilot', '--local', '--uninstall'], {
+    cwd,
+    encoding: 'utf-8',
+    stdio: ['pipe', 'pipe', 'pipe'],
+    env,
+  });
+}
+
+describe('E2E: Copilot full install verification', () => {
+  let tmpDir;
+
+  beforeEach(() => {
+    tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), 'gsd-e2e-'));
+    runCopilotInstall(tmpDir);
+  });
+
+  afterEach(() => {
+    fs.rmSync(tmpDir, { recursive: true, force: true });
+  });
+
+  test('installs expected number of skill directories', () => {
+    const skillsDir = path.join(tmpDir, '.github', 'skills');
+    const entries = fs.readdirSync(skillsDir, { withFileTypes: true });
+    const gsdSkills = entries.filter(e => e.isDirectory() && e.name.startsWith('gsd-'));
+    assert.strictEqual(gsdSkills.length, EXPECTED_SKILLS,
+      `Expected ${EXPECTED_SKILLS} skill directories, got ${gsdSkills.length}`);
+  });
+
+  test('each skill directory contains SKILL.md', () => {
+    const skillsDir = path.join(tmpDir, '.github', 'skills');
+    const entries = fs.readdirSync(skillsDir, { withFileTypes: true });
+    const gsdSkills = entries.filter(e => e.isDirectory() && e.name.startsWith('gsd-'));
+    for (const skill of gsdSkills) {
+      const skillMdPath = path.join(skillsDir, skill.name, 'SKILL.md');
+      assert.ok(fs.existsSync(skillMdPath),
+        `Missing SKILL.md in ${skill.name}`);
+    }
+  });
+
+  test('installs expected number of agent files', () => {
+    const agentsDir = path.join(tmpDir, '.github', 'agents');
+    const files = fs.readdirSync(agentsDir);
+    const gsdAgents = files.filter(f => f.startsWith('gsd-') && f.endsWith('.agent.md'));
+    assert.strictEqual(gsdAgents.length, EXPECTED_AGENTS,
+      `Expected ${EXPECTED_AGENTS} agent files, got ${gsdAgents.length}`);
+  });
+
+  test('installs all expected agent files', () => {
+    const agentsDir = path.join(tmpDir, '.github', 'agents');
+    const files = fs.readdirSync(agentsDir);
+    const gsdAgents = files.filter(f => f.startsWith('gsd-') && f.endsWith('.agent.md')).sort();
+    const expected = [
+      'gsd-codebase-mapper.agent.md',
+      'gsd-debugger.agent.md',
+      'gsd-executor.agent.md',
+      'gsd-integration-checker.agent.md',
+      'gsd-phase-researcher.agent.md',
+      'gsd-plan-checker.agent.md',
+      'gsd-planner.agent.md',
+      'gsd-project-researcher.agent.md',
+      'gsd-research-synthesizer.agent.md',
+      'gsd-roadmapper.agent.md',
+      'gsd-verifier.agent.md',
+    ].sort();
+    assert.deepStrictEqual(gsdAgents, expected);
+  });
+
+  test('generates copilot-instructions.md with GSD markers', () => {
+    const instrPath = path.join(tmpDir, '.github', 'copilot-instructions.md');
+    assert.ok(fs.existsSync(instrPath), 'copilot-instructions.md should exist');
+    const content = fs.readFileSync(instrPath, 'utf-8');
+    assert.ok(content.includes('<!-- GSD Configuration'),
+      'Should contain GSD Configuration open marker');
+    assert.ok(content.includes('<!-- /GSD Configuration -->'),
+      'Should contain GSD Configuration close marker');
+  });
+
+  test('creates manifest with correct structure', () => {
+    const manifestPath = path.join(tmpDir, '.github', 'gsd-file-manifest.json');
+    assert.ok(fs.existsSync(manifestPath), 'gsd-file-manifest.json should exist');
+    const manifest = JSON.parse(fs.readFileSync(manifestPath, 'utf-8'));
+    assert.ok(manifest.version, 'manifest should have version');
+    assert.ok(manifest.timestamp, 'manifest should have timestamp');
+    assert.ok(manifest.files && typeof manifest.files === 'object',
+      'manifest should have files object');
+    assert.ok(Object.keys(manifest.files).length > 0,
+      'manifest files should not be empty');
+  });
+
+  test('manifest contains expected file categories', () => {
+    const manifestPath = path.join(tmpDir, '.github', 'gsd-file-manifest.json');
+    const manifest = JSON.parse(fs.readFileSync(manifestPath, 'utf-8'));
+    const keys = Object.keys(manifest.files);
+
+    const skillEntries = keys.filter(k => k.startsWith('skills/'));
+    const agentEntries = keys.filter(k => k.startsWith('agents/'));
+    const engineEntries = keys.filter(k => k.startsWith('get-shit-done/'));
+
+    assert.strictEqual(skillEntries.length, EXPECTED_SKILLS,
+      `Expected ${EXPECTED_SKILLS} skill manifest entries, got ${skillEntries.length}`);
+    assert.strictEqual(agentEntries.length, EXPECTED_AGENTS,
+      `Expected ${EXPECTED_AGENTS} agent manifest entries, got ${agentEntries.length}`);
+    assert.ok(engineEntries.length > 0,
+      'Should have get-shit-done/ engine manifest entries');
+  });
+
+  test('manifest SHA256 hashes match actual file contents', () => {
+    const manifestPath = path.join(tmpDir, '.github', 'gsd-file-manifest.json');
+    const manifest = JSON.parse(fs.readFileSync(manifestPath, 'utf-8'));
+    const githubDir = path.join(tmpDir, '.github');
+
+    for (const [relPath, expectedHash] of Object.entries(manifest.files)) {
+      const filePath = path.join(githubDir, relPath);
+      assert.ok(fs.existsSync(filePath),
+        `Manifest references ${relPath} but file does not exist`);
+      const content = fs.readFileSync(filePath);
+      const actualHash = crypto.createHash('sha256').update(content).digest('hex');
+      assert.strictEqual(actualHash, expectedHash,
+        `SHA256 mismatch for ${relPath}: expected ${expectedHash}, got ${actualHash}`);
+    }
+  });
+
+  test('engine directory contains required subdirectories and files', () => {
+    const engineDir = path.join(tmpDir, '.github', 'get-shit-done');
+    const requiredDirs = ['bin', 'references', 'templates', 'workflows'];
+    const requiredFiles = ['CHANGELOG.md', 'VERSION'];
+
+    for (const dir of requiredDirs) {
+      const dirPath = path.join(engineDir, dir);
+      assert.ok(fs.existsSync(dirPath) && fs.statSync(dirPath).isDirectory(),
+        `Engine should contain directory: ${dir}`);
+    }
+    for (const file of requiredFiles) {
+      const filePath = path.join(engineDir, file);
+      assert.ok(fs.existsSync(filePath) && fs.statSync(filePath).isFile(),
+        `Engine should contain file: ${file}`);
+    }
+  });
+});
