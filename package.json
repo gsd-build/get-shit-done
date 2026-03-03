@@ -1,6 +1,6 @@
 {
   "name": "get-shit-done-reflect-cc",
-  "version": "1.15.6",
+  "version": "1.16.0",
   "description": "A self-improving AI coding system that learns from its mistakes. Built on GSD by TACHES.",
   "bin": {
     "get-shit-done-reflect-cc": "bin/install.js"

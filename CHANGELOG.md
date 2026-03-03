@@ -6,6 +6,35 @@ For upstream GSD changelog, see [GSD Changelog](https://github.com/glittercowboy
 
 ## [Unreleased]
 
+## [1.16.0] - 2026-03-02
+
+### Added
+- Signal schema foundation with lifecycle fields (`status`, `severity`, `verified_by`, `verification_window`), four-tier severity, positive signal support, and epistemic gap tracking (Phase 31)
+- Signal schema validation with tiered validation in `FRONTMATTER_SCHEMAS` and `backward_compat` field for cross-version interop (Phase 31)
+- Multi-sensor signal collection architecture: artifact sensor, git sensor (fix-fix chains, file churn hotspots, scope creep detection), and signal synthesizer agent replace monolithic collector (Phase 32)
+- Enhanced reflector: lifecycle-aware `gsd-reflector` rewritten with all 8 REFLECT capabilities, confidence-weighted detection rules, counter-evidence seeking, and reflect-to-spike pipeline (Phase 33)
+- Lifecycle dashboard, triage UX, and remediation output in `/gsd:reflect` workflow (Phase 33)
+- Evidence snapshots and confidence fields in lesson template (Phase 33)
+- Signal-plan linkage: `signal_awareness` section in planner agent, triaged signal loading in plan-phase workflow, post-completion signal remediation in execute-plan, recurrence detection and passive verification in synthesizer (Phase 34)
+- Spike audit and lightweight mode: research-only spike execution path, spike decision point (step 5.5) in plan-phase, researcher format wiring to spike manifest config (Phase 35)
+- Reflection reports persisted to `~/.gsd/knowledge/reflections/`
+- DEV indicator for local dev installs with `+dev` version propagation to command descriptions
+
+### Changed
+- `/gsd:collect-signals` refactored from monolithic signal-collector to multi-sensor orchestrator (artifact + git sensors → synthesizer)
+- `gsd-reflector` rewritten as lifecycle-aware agent with all 8 REFLECT capabilities
+- Signal detection reference updated with four-tier severity, positive signals, and epistemic gaps
+- Reflection patterns reference updated with lifecycle-aware confidence scoring
+- `signal-collector` agent deprecated in favor of multi-sensor architecture
+- Mutability boundary references added to agent specs
+
+### Fixed
+- CI wiring validation now checks `agents/` npm source directory
+- Manifest test updated for 6 features (spike feature added in v1.16)
+- `+dev` version propagated to command descriptions in autocomplete
+- Agent-protocol references added to 5 agents, kb-templates copied to npm source
+- `@reference` paths corrected in artifact and log sensor agents
+
 ## [1.15.6] - 2026-02-26
 
 ### Changed
