@@ -821,3 +821,155 @@ describe('Copilot instructions merge/strip', () => {
     });
   });
 });
+
+// ─── Copilot uninstall skill removal ───────────────────────────────────────────
+
+describe('Copilot uninstall skill removal', () => {
+  let tmpDir;
+
+  beforeEach(() => {
+    tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), 'gsd-uninstall-'));
+  });
+
+  afterEach(() => {
+    fs.rmSync(tmpDir, { recursive: true, force: true });
+  });
+
+  test('identifies gsd-* skill directories for removal', () => {
+    // Create Copilot-like skills directory structure
+    const skillsDir = path.join(tmpDir, 'skills');
+    fs.mkdirSync(path.join(skillsDir, 'gsd-foo'), { recursive: true });
+    fs.writeFileSync(path.join(skillsDir, 'gsd-foo', 'SKILL.md'), '# Foo');
+    fs.mkdirSync(path.join(skillsDir, 'gsd-bar'), { recursive: true });
+    fs.writeFileSync(path.join(skillsDir, 'gsd-bar', 'SKILL.md'), '# Bar');
+    fs.mkdirSync(path.join(skillsDir, 'custom-skill'), { recursive: true });
+    fs.writeFileSync(path.join(skillsDir, 'custom-skill', 'SKILL.md'), '# Custom');
+
+    // Test the pattern: read skills, filter gsd-* entries
+    const entries = fs.readdirSync(skillsDir, { withFileTypes: true });
+    const gsdSkills = entries
+      .filter(e => e.isDirectory() && e.name.startsWith('gsd-'))
+      .map(e => e.name);
+    const nonGsdSkills = entries
+      .filter(e => e.isDirectory() && !e.name.startsWith('gsd-'))
+      .map(e => e.name);
+
+    assert.deepStrictEqual(gsdSkills.sort(), ['gsd-bar', 'gsd-foo'], 'identifies gsd-* skills');
+    assert.deepStrictEqual(nonGsdSkills, ['custom-skill'], 'preserves non-gsd skills');
+  });
+
+  test('cleans GSD section from copilot-instructions.md on uninstall', () => {
+    const content = '# My Setup\n\nMy custom rules.\n\n' +
+      GSD_COPILOT_INSTRUCTIONS_MARKER + '\n' +
+      '- GSD managed content\n' +
+      GSD_COPILOT_INSTRUCTIONS_CLOSE_MARKER + '\n';
+
+    const result = stripGsdFromCopilotInstructions(content);
+
+    assert.ok(result !== null, 'does not return null when user content exists');
+    assert.ok(result.includes('# My Setup'), 'user content preserved');
+    assert.ok(result.includes('My custom rules.'), 'user text preserved');
+    assert.ok(!result.includes('GSD managed content'), 'GSD content removed');
+    assert.ok(!result.includes(GSD_COPILOT_INSTRUCTIONS_MARKER), 'markers removed');
+  });
+
+  test('deletes copilot-instructions.md when GSD-only on uninstall', () => {
+    const content = GSD_COPILOT_INSTRUCTIONS_MARKER + '\n' +
+      '- Only GSD content\n' +
+      GSD_COPILOT_INSTRUCTIONS_CLOSE_MARKER + '\n';
+
+    const result = stripGsdFromCopilotInstructions(content);
+
+    assert.strictEqual(result, null, 'returns null signaling file deletion');
+  });
+});
+
+// ─── Copilot manifest and patches fixes ────────────────────────────────────────
+
+describe('Copilot manifest and patches fixes', () => {
+  let tmpDir;
+
+  beforeEach(() => {
+    tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), 'gsd-manifest-'));
+  });
+
+  afterEach(() => {
+    fs.rmSync(tmpDir, { recursive: true, force: true });
+  });
+
+  test('writeManifest hashes skills for Copilot runtime', () => {
+    // Create minimal get-shit-done dir (required by writeManifest)
+    const gsdDir = path.join(tmpDir, 'get-shit-done', 'bin');
+    fs.mkdirSync(gsdDir, { recursive: true });
+    fs.writeFileSync(path.join(gsdDir, 'verify.cjs'), '// verify stub');
+
+    // Create Copilot skills directory
+    const skillDir = path.join(tmpDir, 'skills', 'gsd-test');
+    fs.mkdirSync(skillDir, { recursive: true });
+    fs.writeFileSync(path.join(skillDir, 'SKILL.md'), '# Test Skill\n\nA test skill.');
+
+    const manifest = writeManifest(tmpDir, 'copilot');
+
+    // Check manifest file was written
+    const manifestPath = path.join(tmpDir, 'gsd-file-manifest.json');
+    assert.ok(fs.existsSync(manifestPath), 'manifest file created');
+
+    // Read and verify skills are hashed
+    const data = JSON.parse(fs.readFileSync(manifestPath, 'utf8'));
+    const skillKey = 'skills/gsd-test/SKILL.md';
+    assert.ok(data.files[skillKey], 'skill file hashed in manifest');
+    assert.ok(typeof data.files[skillKey] === 'string', 'hash is a string');
+    assert.ok(data.files[skillKey].length === 64, 'hash is SHA-256 (64 hex chars)');
+  });
+
+  test('reportLocalPatches shows /gsd-reapply-patches for Copilot', () => {
+    // Create patches directory with metadata
+    const patchesDir = path.join(tmpDir, 'gsd-local-patches');
+    fs.mkdirSync(patchesDir, { recursive: true });
+    fs.writeFileSync(path.join(patchesDir, 'backup-meta.json'), JSON.stringify({
+      from_version: '1.0',
+      files: ['skills/gsd-test/SKILL.md']
+    }));
+
+    // Capture console output
+    const logs = [];
+    const originalLog = console.log;
+    console.log = (...args) => logs.push(args.join(' '));
+
+    try {
+      const result = reportLocalPatches(tmpDir, 'copilot');
+
+      assert.ok(result.length > 0, 'returns patched files list');
+      const output = logs.join('\n');
+      assert.ok(output.includes('/gsd-reapply-patches'), 'uses dash format for Copilot');
+      assert.ok(!output.includes('/gsd:reapply-patches'), 'does not use colon format');
+    } finally {
+      console.log = originalLog;
+    }
+  });
+
+  test('reportLocalPatches shows /gsd:reapply-patches for Claude (unchanged)', () => {
+    // Create patches directory with metadata
+    const patchesDir = path.join(tmpDir, 'gsd-local-patches');
+    fs.mkdirSync(patchesDir, { recursive: true });
+    fs.writeFileSync(path.join(patchesDir, 'backup-meta.json'), JSON.stringify({
+      from_version: '1.0',
+      files: ['get-shit-done/bin/verify.cjs']
+    }));
+
+    // Capture console output
+    const logs = [];
+    const originalLog = console.log;
+    console.log = (...args) => logs.push(args.join(' '));
+
+    try {
+      const result = reportLocalPatches(tmpDir, 'claude');
+
+      assert.ok(result.length > 0, 'returns patched files list');
+      const output = logs.join('\n');
+      assert.ok(output.includes('/gsd:reapply-patches'), 'uses colon format for Claude');
+    } finally {
+      console.log = originalLog;
+    }
+  });
+});
