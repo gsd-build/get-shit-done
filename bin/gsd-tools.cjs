@@ -132,6 +132,9 @@
  *   workstream list                    List all workstreams with status
  *   workstream status <name>           Detailed status for one workstream
  *   workstream complete <name>         Archive a workstream to milestones/
+ *   workstream set <name>              Set active workstream (auto-detected when --ws omitted)
+ *   workstream get                     Show current active workstream
+ *   workstream progress                Progress summary across all workstreams
  */
 
 const fs = require('fs');
@@ -176,6 +179,7 @@ async function main() {
   }
 
   // Optional workstream override for multi-workstream support
+  // Priority: explicit --ws flag > .planning/active-workstream file > null (flat mode)
   let ws = null;
   const wsEqArg = args.find(arg => arg.startsWith('--ws='));
   const wsIdx = args.indexOf('--ws');
@@ -187,6 +191,9 @@ async function main() {
     ws = args[wsIdx + 1];
     if (!ws || ws.startsWith('--')) error('Missing value for --ws');
     args.splice(wsIdx, 2);
+  } else {
+    // Auto-detect from active-workstream file
+    ws = core.getActiveWorkstream(cwd);
   }
 
   const paths = core.buildPaths(cwd, ws);
@@ -289,7 +296,7 @@ async function main() {
       // Parse --files flag (collect args after --files, stopping at other flags)
       const filesIndex = args.indexOf('--files');
       const files = filesIndex !== -1 ? args.slice(filesIndex + 1).filter(a => !a.startsWith('--')) : [];
-      commands.cmdCommit(cwd, message, files, raw, amend, paths);
+      commands.cmdCommit(cwd, message, files, raw, amend, paths, ws);
       break;
     }
 
@@ -621,8 +628,14 @@ async function main() {
         workstream.cmdWorkstreamStatus(cwd, args[2], raw);
       } else if (subcommand === 'complete') {
         workstream.cmdWorkstreamComplete(cwd, args[2], {}, raw);
+      } else if (subcommand === 'set') {
+        workstream.cmdWorkstreamSet(cwd, args[2], raw);
+      } else if (subcommand === 'get') {
+        workstream.cmdWorkstreamGet(cwd, raw);
+      } else if (subcommand === 'progress') {
+        workstream.cmdWorkstreamProgress(cwd, raw);
       } else {
-        error('Unknown workstream subcommand. Available: create, list, status, complete');
+        error('Unknown workstream subcommand. Available: create, list, status, complete, set, get, progress');
       }
       break;
     }

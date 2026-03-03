@@ -359,10 +359,134 @@ function cmdWorkstreamComplete(cwd, name, options, raw) {
   }, raw);
 }
 
+// ─── Active Workstream Commands ──────────────────────────────────────────────
+
+function cmdWorkstreamSet(cwd, name, raw) {
+  const { setActiveWorkstream, getActiveWorkstream } = require('./core.cjs');
+
+  if (!name) {
+    // Clear active workstream
+    setActiveWorkstream(cwd, null);
+    output({ active: null, cleared: true }, raw);
+    return;
+  }
+
+  const wsDir = path.join(cwd, '.planning', 'workstreams', name);
+  if (!fs.existsSync(wsDir)) {
+    output({ active: null, error: 'not_found', workstream: name }, raw);
+    return;
+  }
+
+  setActiveWorkstream(cwd, name);
+  output({ active: name, set: true }, raw, name);
+}
+
+function cmdWorkstreamGet(cwd, raw) {
+  const { getActiveWorkstream } = require('./core.cjs');
+  const active = getActiveWorkstream(cwd);
+
+  // Also check if workstreams exist
+  const wsRoot = path.join(cwd, '.planning', 'workstreams');
+  const mode = fs.existsSync(wsRoot) ? 'workstream' : 'flat';
+
+  output({ active, mode }, raw, active || 'none');
+}
+
+function cmdWorkstreamProgress(cwd, raw) {
+  const wsRoot = path.join(cwd, '.planning', 'workstreams');
+  const { getActiveWorkstream } = require('./core.cjs');
+
+  if (!fs.existsSync(wsRoot)) {
+    output({
+      mode: 'flat',
+      workstreams: [],
+      message: 'No workstreams — operating in flat mode',
+    }, raw);
+    return;
+  }
+
+  const active = getActiveWorkstream(cwd);
+  const entries = fs.readdirSync(wsRoot, { withFileTypes: true });
+  const workstreams = [];
+
+  for (const entry of entries) {
+    if (!entry.isDirectory()) continue;
+
+    const wsDir = path.join(wsRoot, entry.name);
+    const phasesDir = path.join(wsDir, 'phases');
+
+    // Count phases and completion
+    let phaseCount = 0;
+    let completedCount = 0;
+    let totalPlans = 0;
+    let completedPlans = 0;
+
+    try {
+      const phaseEntries = fs.readdirSync(phasesDir, { withFileTypes: true });
+      const dirs = phaseEntries.filter(e => e.isDirectory());
+      phaseCount = dirs.length;
+
+      for (const d of dirs) {
+        const files = fs.readdirSync(path.join(phasesDir, d.name));
+        const plans = files.filter(f => f.endsWith('-PLAN.md') || f === 'PLAN.md');
+        const summaries = files.filter(f => f.endsWith('-SUMMARY.md') || f === 'SUMMARY.md');
+        totalPlans += plans.length;
+        completedPlans += Math.min(summaries.length, plans.length);
+        if (plans.length > 0 && summaries.length >= plans.length) {
+          completedCount++;
+        }
+      }
+    } catch {}
+
+    // Read roadmap for total phase count
+    let roadmapPhaseCount = phaseCount;
+    try {
+      const roadmapContent = fs.readFileSync(path.join(wsDir, 'ROADMAP.md'), 'utf-8');
+      const phaseMatches = roadmapContent.match(/^###?\s+Phase\s+\d/gm);
+      if (phaseMatches) roadmapPhaseCount = phaseMatches.length;
+    } catch {}
+
+    // Read status from STATE.md
+    let status = 'unknown';
+    let currentPhase = null;
+    try {
+      const stateContent = fs.readFileSync(path.join(wsDir, 'STATE.md'), 'utf-8');
+      const statusMatch = stateContent.match(/\*\*Status:\*\*\s*(.+)/);
+      if (statusMatch) status = statusMatch[1].trim();
+      const phaseMatch = stateContent.match(/\*\*Current Phase:\*\*\s*(.+)/);
+      if (phaseMatch) currentPhase = phaseMatch[1].trim();
+    } catch {}
+
+    const progressPct = roadmapPhaseCount > 0
+      ? Math.round((completedCount / roadmapPhaseCount) * 100)
+      : 0;
+
+    workstreams.push({
+      name: entry.name,
+      active: entry.name === active,
+      status,
+      current_phase: currentPhase,
+      phases: `${completedCount}/${roadmapPhaseCount}`,
+      plans: `${completedPlans}/${totalPlans}`,
+      progress_percent: progressPct,
+    });
+  }
+
+  output({
+    mode: 'workstream',
+    active,
+    workstreams,
+    count: workstreams.length,
+  }, raw);
+}
+
 module.exports = {
   migrateToWorkstreams,
   cmdWorkstreamCreate,
   cmdWorkstreamList,
   cmdWorkstreamStatus,
   cmdWorkstreamComplete,
+  cmdWorkstreamSet,
+  cmdWorkstreamGet,
+  cmdWorkstreamProgress,
 };
