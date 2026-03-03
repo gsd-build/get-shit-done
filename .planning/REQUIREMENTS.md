@@ -42,7 +42,7 @@ Requirements for Copilot CLI installation support. Each maps to roadmap phases.
 
 ### Quality
 
-- [ ] **QUAL-01**: Post-install verification confirms skills and agents exist in `.github/`
+- [x] **QUAL-01**: Post-install verification confirms skills and agents exist in `.github/`
 - [ ] **QUAL-02**: Warning if `.github/skills/` or `.github/agents/` contain non-GSD files that might conflict
 
 ## Future Requirements
@@ -88,8 +88,8 @@ Deferred to later milestones.
 | LIFE-01 | Phase 3 | Complete |
 | LIFE-02 | Phase 3 | Complete |
 | LIFE-03 | Phase 3 | Complete |
-| QUAL-01 | Phase 4 | Pending |
-| QUAL-02 | Phase 4 | Pending |
+| QUAL-01 | Phase 4 | Complete |
+| QUAL-02 | Phase 4 | Out of Scope |
 
 **Coverage:**
 - v1.23 requirements: 23 total
@@ -98,4 +98,4 @@ Deferred to later milestones.
 
 ---
 *Requirements defined: 2026-03-02*
-*Last updated: 2026-03-02 after roadmap creation*
+*Last updated: 2026-03-03 after Phase 4 completion*

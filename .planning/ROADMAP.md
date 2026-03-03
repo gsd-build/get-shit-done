@@ -15,7 +15,7 @@ Decimal phases appear between their surrounding integers in numeric order.
 - [x] **Phase 1: Core Installer Plumbing** - Make Copilot selectable as a runtime via CLI flags, prompts, and directory resolution
 - [ ] **Phase 2: Content Conversion Engine** - Convert commands to skills, agents to `.agent.md`, with tool mapping and path replacement
 - [ ] **Phase 3: Instructions & Lifecycle** - Generate copilot-instructions.md with smart merging, add uninstall/manifest/patch support
-- [ ] **Phase 4: Integration Testing & Validation** - Verify installer output matches reference implementation, add post-install checks
+- [x] **Phase 4: Integration Testing & Validation** - Verify installer output matches reference implementation, add post-install checks
 
 ## Phase Details
 
@@ -73,10 +73,10 @@ Plans:
   1. Post-install verification confirms all expected skills and agents exist in `.github/` and reports pass/fail
   2. Installer warns when `.github/skills/` or `.github/agents/` contain non-GSD files that might conflict
   3. Full install in `/tmp` test directory produces output that matches the reference implementation via diff comparison (skills, agents, instructions, manifest)
-**Plans:** 1 plan
+**Plans:** 1/1 plans executed
 
 Plans:
-- [ ] 04-01-PLAN.md — E2E integration tests for Copilot install/uninstall (skills, agents, instructions, manifest integrity, engine directory, clean uninstall)
+- [x] 04-01-PLAN.md — E2E integration tests for Copilot install/uninstall (skills, agents, instructions, manifest integrity, engine directory, clean uninstall)
 
 ## Progress
 
@@ -88,4 +88,4 @@ Phases execute in numeric order: 1 → 2 → 3 → 4
 | 1. Core Installer Plumbing | 0/? | Not started | - |
 | 2. Content Conversion Engine | 0/? | Not started | - |
 | 3. Instructions & Lifecycle | 0/? | Not started | - |
-| 4. Integration Testing & Validation | 0/? | Not started | - |
+| 4. Integration Testing & Validation | 1/1 | ✅ Complete | 2026-03-03 |
