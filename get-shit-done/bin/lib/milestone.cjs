@@ -125,9 +125,16 @@ function cmdMilestoneComplete(cwd, version, options, raw) {
           if (fm['one-liner']) {
             accomplishments.push(fm['one-liner']);
           }
-          // Count tasks
-          const taskMatches = content.match(/##\s*Task\s*\d+/gi) || [];
-          totalTasks += taskMatches.length;
+          // Count tasks: prefer **Tasks:** N from Performance section,
+          // then <task XML tags, then ## Task N markdown headers
+          const tasksFieldMatch = content.match(/\*\*Tasks:\*\*\s*(\d+)/);
+          if (tasksFieldMatch) {
+            totalTasks += parseInt(tasksFieldMatch[1], 10);
+          } else {
+            const xmlTaskMatches = content.match(/<task[\s>]/gi) || [];
+            const mdTaskMatches = content.match(/##\s*Task\s*\d+/gi) || [];
+            totalTasks += xmlTaskMatches.length || mdTaskMatches.length;
+          }
         } catch {}
       }
     }
