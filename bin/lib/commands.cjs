@@ -17,6 +17,10 @@ function cmdGenerateSlug(text, raw) {
     .replace(/[^a-z0-9]+/g, '-')
     .replace(/^-+|-+$/g, '');
 
+  if (!slug) {
+    error('text must contain at least one alphanumeric character');
+  }
+
   const result = { slug };
   output(result, raw, slug);
 }

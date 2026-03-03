@@ -10,7 +10,7 @@
 
 const fs = require('fs');
 const path = require('path');
-const { output, error, buildPaths, toPosixPath, getMilestoneInfo, generateSlugInternal, setActiveWorkstream } = require('./core.cjs');
+const { output, error, buildPaths, toPosixPath, getMilestoneInfo, generateSlugInternal, setActiveWorkstream, getActiveWorkstream } = require('./core.cjs');
 
 // ─── Migration ──────────────────────────────────────────────────────────────
 
@@ -23,6 +23,11 @@ const { output, error, buildPaths, toPosixPath, getMilestoneInfo, generateSlugIn
  * Returns { migrated: true, workstream, files_moved[] } or throws on error.
  */
 function migrateToWorkstreams(cwd, workstreamName) {
+  // Validate name to prevent path traversal
+  if (!workstreamName || /[/\\]/.test(workstreamName) || workstreamName === '.' || workstreamName === '..') {
+    throw new Error('Invalid workstream name for migration');
+  }
+
   const baseDir = path.join(cwd, '.planning');
   const wsDir = path.join(baseDir, 'workstreams', workstreamName);
 
@@ -41,14 +46,25 @@ function migrateToWorkstreams(cwd, workstreamName) {
   // Create workstream directory
   fs.mkdirSync(wsDir, { recursive: true });
 
+  // Move files with rollback on failure
   const filesMoved = [];
-  for (const item of toMove) {
-    const src = path.join(baseDir, item.name);
-    if (fs.existsSync(src)) {
-      const dest = path.join(wsDir, item.name);
-      fs.renameSync(src, dest);
-      filesMoved.push(item.name);
+  try {
+    for (const item of toMove) {
+      const src = path.join(baseDir, item.name);
+      if (fs.existsSync(src)) {
+        const dest = path.join(wsDir, item.name);
+        fs.renameSync(src, dest);
+        filesMoved.push(item.name);
+      }
     }
+  } catch (err) {
+    // Rollback: move everything back
+    for (const name of filesMoved) {
+      try { fs.renameSync(path.join(wsDir, name), path.join(baseDir, name)); } catch {}
+    }
+    try { fs.rmSync(wsDir, { recursive: true }); } catch {}
+    try { fs.rmdirSync(path.join(baseDir, 'workstreams')); } catch {}
+    throw err;
   }
 
   return { migrated: true, workstream: workstreamName, files_moved: filesMoved };
@@ -75,8 +91,8 @@ function cmdWorkstreamCreate(cwd, name, options, raw, paths) {
   const wsRoot = path.join(baseDir, 'workstreams');
   const wsDir = path.join(wsRoot, slug);
 
-  // Check if already exists
-  if (fs.existsSync(wsDir)) {
+  // Check if already exists (with STATE.md = fully created; dir-only = partial, allow retry)
+  if (fs.existsSync(wsDir) && fs.existsSync(path.join(wsDir, 'STATE.md'))) {
     output({ created: false, error: 'already_exists', workstream: slug, path: toPosixPath(path.relative(cwd, wsDir)) }, raw);
     return;
   }
@@ -325,10 +341,22 @@ function cmdWorkstreamComplete(cwd, name, options, raw) {
     return;
   }
 
+  // Clear active-workstream if completing the active one
+  const active = getActiveWorkstream(cwd);
+  if (active === name) {
+    setActiveWorkstream(cwd, null);
+  }
+
   const archiveDir = path.join(cwd, '.planning', 'milestones');
   const today = new Date().toISOString().split('T')[0];
-  const archiveName = `ws-${name}-${today}`;
-  const archivePath = path.join(archiveDir, archiveName);
+
+  // Avoid same-day archive collision
+  let archiveName = `ws-${name}-${today}`;
+  let archivePath = path.join(archiveDir, archiveName);
+  let suffix = 1;
+  while (fs.existsSync(archivePath)) {
+    archivePath = path.join(archiveDir, `${archiveName}-${suffix++}`);
+  }
 
   // Archive: move the entire workstream dir to milestones/
   fs.mkdirSync(archivePath, { recursive: true });
@@ -366,8 +394,6 @@ function cmdWorkstreamComplete(cwd, name, options, raw) {
 // ─── Active Workstream Commands ──────────────────────────────────────────────
 
 function cmdWorkstreamSet(cwd, name, raw) {
-  const { setActiveWorkstream, getActiveWorkstream } = require('./core.cjs');
-
   if (!name) {
     // Clear active workstream
     setActiveWorkstream(cwd, null);
@@ -386,7 +412,6 @@ function cmdWorkstreamSet(cwd, name, raw) {
 }
 
 function cmdWorkstreamGet(cwd, raw) {
-  const { getActiveWorkstream } = require('./core.cjs');
   const active = getActiveWorkstream(cwd);
 
   // Also check if workstreams exist
@@ -398,7 +423,6 @@ function cmdWorkstreamGet(cwd, raw) {
 
 function cmdWorkstreamProgress(cwd, raw) {
   const wsRoot = path.join(cwd, '.planning', 'workstreams');
-  const { getActiveWorkstream } = require('./core.cjs');
 
   if (!fs.existsSync(wsRoot)) {
     output({

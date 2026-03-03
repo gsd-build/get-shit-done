@@ -37,7 +37,15 @@ When a milestone completes:
 
 <step name="verify_readiness">
 
-Parse `--ws <name>` from $ARGUMENTS. If present, set `GSD_WS="--ws ${WS_NAME}"`, otherwise set `GSD_WS=""`. Append `${GSD_WS}` to all `gsd-tools.cjs` invocations in this workflow.
+```bash
+# Extract --ws flag from arguments
+WS_NAME=""
+GSD_WS=""
+if echo "$ARGUMENTS" | grep -qE '\-\-ws[= ]'; then
+  WS_NAME=$(echo "$ARGUMENTS" | grep -oE '\-\-ws[= ][^ ]+' | sed 's/--ws[= ]//')
+  GSD_WS="--ws $WS_NAME"
+fi
+```
 
 Load context and extract paths:
 
@@ -703,35 +711,43 @@ Confirm: "Committed: chore: complete v[X.Y] milestone"
 
 **If in workstream mode** (`GSD_WS` is set or `.planning/workstreams/` exists):
 
-Determine the active workstream:
+Extract the workstream name from `GSD_WS`:
+```bash
+WS_NAME=$(echo "${GSD_WS}" | sed 's/--ws //')
+```
+
+If `WS_NAME` is empty, check active-workstream:
 ```bash
 WS_INFO=$(node "$HOME/.claude/get-shit-done/bin/gsd-tools.cjs" workstream get --cwd .)
 ```
+Parse `active` from result. Use that as `WS_NAME`.
 
-Parse `active` and `mode` from result. **If mode is "workstream" and active is set:**
+**If `WS_NAME` is set:**
+
+Note: By this point, `archive_milestone` and `reorganize_roadmap_and_delete_originals` have already archived ROADMAP.md and REQUIREMENTS.md from the workstream directory and deleted the originals. The workstream dir now contains only STATE.md, phases/, and possibly empty dirs.
 
 AskUserQuestion:
-- header: "Archive WS?"
-- question: "Complete and archive workstream '${active}'? This moves it to milestones/ and clears the active workstream."
+- header: "Clean up WS?"
+- question: "Archive remaining workstream '${WS_NAME}' files and clear active workstream?"
 - options:
-  - "Yes — archive workstream (Recommended)" — Archive the workstream directory to milestones/, clear active
-  - "No — keep workstream" — Leave workstream in place for continued use
+  - "Yes — archive and clean up (Recommended)" — Archive remaining ws files to milestones/, clear active
+  - "No — keep workstream directory" — Leave as-is for manual handling
 
 **If "Yes":**
 
 ```bash
-node "$HOME/.claude/get-shit-done/bin/gsd-tools.cjs" workstream complete "${active}" --cwd .
+node "$HOME/.claude/get-shit-done/bin/gsd-tools.cjs" workstream complete "${WS_NAME}" --cwd .
 ```
 
 Parse result for `completed`, `archived_to`, `remaining_workstreams`, `reverted_to_flat`.
 
 Display:
 ```
-Workstream '${active}' archived to ${archived_to}
+Workstream '${WS_NAME}' cleaned up → ${archived_to}
 ${reverted_to_flat ? "No workstreams remain — reverted to flat mode" : remaining_workstreams + " workstream(s) still active"}
 ```
 
-**If "No":** Continue without archiving workstream.
+**If "No":** Continue without cleanup. User can run `workstream complete ${WS_NAME}` later.
 
 </step>
 

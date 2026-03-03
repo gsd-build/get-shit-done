@@ -22,7 +22,15 @@ Mark current phase complete and advance to next. This is the natural point where
 
 <step name="load_project_state" priority="first">
 
-Parse `--ws <name>` from $ARGUMENTS. If present, set `GSD_WS="--ws ${WS_NAME}"`, otherwise set `GSD_WS=""`. Append `${GSD_WS}` to all `gsd-tools.cjs` invocations in this workflow.
+```bash
+# Extract --ws flag from arguments
+WS_NAME=""
+GSD_WS=""
+if echo "$ARGUMENTS" | grep -qE '\-\-ws[= ]'; then
+  WS_NAME=$(echo "$ARGUMENTS" | grep -oE '\-\-ws[= ][^ ]+' | sed 's/--ws[= ]//')
+  GSD_WS="--ws $WS_NAME"
+fi
+```
 
 Load context and extract paths:
 

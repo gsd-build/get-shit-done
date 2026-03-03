@@ -23,8 +23,12 @@ function resolvePlanningDir(cwd, workstream) {
   if (!workstream && !fs.existsSync(path.join(base, 'workstreams'))) {
     return base;
   }
-  const ws = workstream || 'default';
-  return path.join(base, 'workstreams', ws);
+  if (!workstream) {
+    // Workstreams dir exists but no ws specified — stay in flat base
+    // Callers must pass an explicit ws name; we don't guess 'default'
+    return base;
+  }
+  return path.join(base, 'workstreams', workstream);
 }
 
 /**

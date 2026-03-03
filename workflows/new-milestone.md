@@ -151,7 +151,7 @@ node "$HOME/.claude/get-shit-done/bin/gsd-tools.cjs" commit "docs: start milesto
 
 ## 7. Load Context and Resolve Models
 
-Parse `--ws <name>` from $ARGUMENTS. If present, set `GSD_WS="--ws ${WS_NAME}"` and append it to all `gsd-tools.cjs` invocations. If not present, set `GSD_WS=""`.
+**Only if `GSD_WS` was not already set by Step 0:** Parse `--ws <name>` from $ARGUMENTS. If present, set `GSD_WS="--ws ${WS_NAME}"`. If not present, set `GSD_WS=""`. Skip this parsing entirely if Step 0 already assigned `GSD_WS`.
 
 ```bash
 INIT=$(node "$HOME/.claude/get-shit-done/bin/gsd-tools.cjs" init new-milestone ${GSD_WS})

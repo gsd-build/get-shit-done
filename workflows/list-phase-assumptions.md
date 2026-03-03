@@ -21,10 +21,25 @@ Example: /gsd:list-phase-assumptions 3
 Exit workflow.
 
 **If argument provided:**
+
+```bash
+# Extract --ws flag from arguments
+WS_NAME=""
+GSD_WS=""
+if echo "$ARGUMENTS" | grep -qE '\-\-ws[= ]'; then
+  WS_NAME=$(echo "$ARGUMENTS" | grep -oE '\-\-ws[= ][^ ]+' | sed 's/--ws[= ]//')
+  GSD_WS="--ws $WS_NAME"
+fi
+
+INIT=$(node "$HOME/.claude/get-shit-done/bin/gsd-tools.cjs" init phase-op "${PHASE_ARG}" ${GSD_WS})
+```
+
+Extract from init JSON: `phase_dir`, `phase_number`, `phase_name`, `roadmap_path`.
+
 Validate phase exists in roadmap:
 
 ```bash
-cat .planning/ROADMAP.md | grep -i "Phase ${PHASE}"
+node "$HOME/.claude/get-shit-done/bin/gsd-tools.cjs" roadmap get-phase "${phase_number}" ${GSD_WS}
 ```
 
 **If phase not found:**
