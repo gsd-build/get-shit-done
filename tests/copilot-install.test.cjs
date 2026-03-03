@@ -626,7 +626,7 @@ describe('copyCommandsAsCopilotSkills', () => {
       // Count gsd-* directories — should be 31
       const dirs = fs.readdirSync(tempDir, { withFileTypes: true })
         .filter(e => e.isDirectory() && e.name.startsWith('gsd-'));
-      assert.strictEqual(dirs.length, 31, `expected 31 skill folders, got ${dirs.length}`);
+      assert.strictEqual(dirs.length, 32, `expected 32 skill folders, got ${dirs.length}`);
     } finally {
       fs.rmSync(tempDir, { recursive: true });
     }
@@ -698,10 +698,10 @@ describe('Copilot agent conversion - real files', () => {
     assert.ok(toolsLine.includes("'read'"), 'Read mapped');
   });
 
-  test('all 11 agents convert without error', () => {
+  test('all 12 agents convert without error', () => {
     const agents = fs.readdirSync(agentsSrc)
       .filter(f => f.startsWith('gsd-') && f.endsWith('.md'));
-    assert.strictEqual(agents.length, 11, `expected 11 agents, got ${agents.length}`);
+    assert.strictEqual(agents.length, 12, `expected 12 agents, got ${agents.length}`);
 
     for (const agentFile of agents) {
       const content = fs.readFileSync(path.join(agentsSrc, agentFile), 'utf8');
@@ -1071,8 +1071,8 @@ const { execFileSync } = require('child_process');
 const crypto = require('crypto');
 
 const INSTALL_PATH = path.join(__dirname, '..', 'bin', 'install.js');
-const EXPECTED_SKILLS = 31;
-const EXPECTED_AGENTS = 11;
+const EXPECTED_SKILLS = 32;
+const EXPECTED_AGENTS = 12;
 
 function runCopilotInstall(cwd) {
   const env = { ...process.env };
@@ -1144,6 +1144,7 @@ describe('E2E: Copilot full install verification', () => {
       'gsd-debugger.agent.md',
       'gsd-executor.agent.md',
       'gsd-integration-checker.agent.md',
+      'gsd-nyquist-auditor.agent.md',
       'gsd-phase-researcher.agent.md',
       'gsd-plan-checker.agent.md',
       'gsd-planner.agent.md',
