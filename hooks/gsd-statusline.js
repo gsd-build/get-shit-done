@@ -18,14 +18,15 @@ process.stdin.on('end', () => {
     const session = data.session_id || '';
     const remaining = data.context_window?.remaining_percentage;
 
-    // Context window display (shows USED percentage scaled to 80% limit)
-    // Claude Code enforces an 80% context limit, so we scale to show 100% at that point
+    // Context window display (shows USED percentage scaled to usable context)
+    // Claude Code reserves ~16.5% for autocompact buffer, so usable context
+    // is 83.5% of the total window. We normalize to show 100% at that point.
+    const AUTO_COMPACT_BUFFER_PCT = 16.5;
     let ctx = '';
     if (remaining != null) {
-      const rem = Math.round(remaining);
-      const rawUsed = Math.max(0, Math.min(100, 100 - rem));
-      // Scale: 80% real usage = 100% displayed
-      const used = Math.min(100, Math.round((rawUsed / 80) * 100));
+      // Normalize: subtract buffer from remaining, scale to usable range
+      const usableRemaining = Math.max(0, ((remaining - AUTO_COMPACT_BUFFER_PCT) / (100 - AUTO_COMPACT_BUFFER_PCT)) * 100);
+      const used = Math.max(0, Math.min(100, Math.round(100 - usableRemaining)));
 
       // Write context metrics to bridge file for the context-monitor PostToolUse hook.
       // The monitor reads this file to inject agent-facing warnings when context is low.
@@ -48,12 +49,12 @@ process.stdin.on('end', () => {
       const filled = Math.floor(used / 10);
       const bar = '█'.repeat(filled) + '░'.repeat(10 - filled);
 
-      // Color based on scaled usage (thresholds adjusted for new scale)
-      if (used < 63) {        // ~50% real
+      // Color based on usable context thresholds
+      if (used < 50) {
         ctx = ` \x1b[32m${bar} ${used}%\x1b[0m`;
-      } else if (used < 81) { // ~65% real
+      } else if (used < 65) {
         ctx = ` \x1b[33m${bar} ${used}%\x1b[0m`;
-      } else if (used < 95) { // ~76% real
+      } else if (used < 80) {
         ctx = ` \x1b[38;5;208m${bar} ${used}%\x1b[0m`;
       } else {
         ctx = ` \x1b[5;31m💀 ${bar} ${used}%\x1b[0m`;
