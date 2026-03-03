@@ -422,7 +422,7 @@ Ask 4 questions per area before offering to continue or move on. Each answer oft
 **Question design:**
 - Options should be concrete, not abstract ("Cards" not "Option A")
 - Each answer should inform the next question
-- If user picks "Other", receive their input, reflect it back, confirm
+- If user picks "Other" to provide freeform input (e.g., "let me describe it", "something else", or an open-ended reply), ask your follow-up as plain text — NOT another AskUserQuestion. Wait for them to type at the normal prompt, then reflect their input back and confirm before resuming AskUserQuestion for the next question.
 
 **Scope creep handling:**
 If user mentions something outside the phase domain:
