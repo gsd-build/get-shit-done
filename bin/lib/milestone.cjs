@@ -4,14 +4,16 @@
 
 const fs = require('fs');
 const path = require('path');
-const { output, error } = require('./core.cjs');
+const { output, error, buildPaths } = require('./core.cjs');
 const { extractFrontmatter } = require('./frontmatter.cjs');
 const { writeStateMd } = require('./state.cjs');
 
-function cmdRequirementsMarkComplete(cwd, reqIdsRaw, raw) {
+function cmdRequirementsMarkComplete(cwd, reqIdsRaw, raw, paths) {
   if (!reqIdsRaw || reqIdsRaw.length === 0) {
     error('requirement IDs required. Usage: requirements mark-complete REQ-01,REQ-02 or REQ-01 REQ-02');
   }
+
+  const p = paths || buildPaths(cwd);
 
   // Accept comma-separated, space-separated, or bracket-wrapped: [REQ-01, REQ-02]
   const reqIds = reqIdsRaw
@@ -25,7 +27,7 @@ function cmdRequirementsMarkComplete(cwd, reqIdsRaw, raw) {
     error('no valid requirement IDs found');
   }
 
-  const reqPath = path.join(cwd, '.planning', 'REQUIREMENTS.md');
+  const reqPath = p.requirements;
   if (!fs.existsSync(reqPath)) {
     output({ updated: false, reason: 'REQUIREMENTS.md not found', ids: reqIds }, raw, 'no requirements file');
     return;
@@ -75,17 +77,18 @@ function cmdRequirementsMarkComplete(cwd, reqIdsRaw, raw) {
   }, raw, `${updated.length}/${reqIds.length} requirements marked complete`);
 }
 
-function cmdMilestoneComplete(cwd, version, options, raw) {
+function cmdMilestoneComplete(cwd, version, options, raw, paths) {
   if (!version) {
     error('version required for milestone complete (e.g., v1.0)');
   }
 
-  const roadmapPath = path.join(cwd, '.planning', 'ROADMAP.md');
-  const reqPath = path.join(cwd, '.planning', 'REQUIREMENTS.md');
-  const statePath = path.join(cwd, '.planning', 'STATE.md');
-  const milestonesPath = path.join(cwd, '.planning', 'MILESTONES.md');
-  const archiveDir = path.join(cwd, '.planning', 'milestones');
-  const phasesDir = path.join(cwd, '.planning', 'phases');
+  const p = paths || buildPaths(cwd);
+  const roadmapPath = p.roadmap;
+  const reqPath = p.requirements;
+  const statePath = p.state;
+  const milestonesPath = path.join(p.baseDir, 'MILESTONES.md');
+  const archiveDir = p.milestones;
+  const phasesDir = p.phases;
   const today = new Date().toISOString().split('T')[0];
   const milestoneName = options.name || version;
 
@@ -178,7 +181,7 @@ function cmdMilestoneComplete(cwd, version, options, raw) {
   }
 
   // Archive audit file if exists
-  const auditFile = path.join(cwd, '.planning', `${version}-MILESTONE-AUDIT.md`);
+  const auditFile = path.join(p.baseDir, `${version}-MILESTONE-AUDIT.md`);
   if (fs.existsSync(auditFile)) {
     fs.renameSync(auditFile, path.join(archiveDir, `${version}-MILESTONE-AUDIT.md`));
   }

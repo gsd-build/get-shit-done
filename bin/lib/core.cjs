@@ -13,6 +13,63 @@ function toPosixPath(p) {
   return p.split(path.sep).join('/');
 }
 
+/**
+ * Resolve the planning directory for a given workstream.
+ * In flat mode (no workstreams/ dir and no ws specified), returns `.planning/`.
+ * In workstream mode, returns `.planning/workstreams/{ws}/`.
+ */
+function resolvePlanningDir(cwd, workstream) {
+  const base = path.join(cwd, '.planning');
+  if (!workstream && !fs.existsSync(path.join(base, 'workstreams'))) {
+    return base;
+  }
+  const ws = workstream || 'default';
+  return path.join(base, 'workstreams', ws);
+}
+
+/**
+ * Build a full paths object for filesystem operations and relative output.
+ * All modules use this instead of hardcoded `.planning/` references.
+ */
+function buildPaths(cwd, workstream) {
+  const wsDir = resolvePlanningDir(cwd, workstream);
+  const baseDir = path.join(cwd, '.planning');
+  const relWsDir = path.relative(cwd, wsDir);
+
+  return {
+    // Per-workstream (scoped) — absolute
+    roadmap:      path.join(wsDir, 'ROADMAP.md'),
+    state:        path.join(wsDir, 'STATE.md'),
+    requirements: path.join(wsDir, 'REQUIREMENTS.md'),
+    phases:       path.join(wsDir, 'phases'),
+    wsResearch:   path.join(wsDir, 'research'),
+    wsConfig:     path.join(wsDir, 'config.json'),
+    wsDir,
+
+    // Per-workstream — relative (for JSON output)
+    roadmapRel:      toPosixPath(path.join(relWsDir, 'ROADMAP.md')),
+    stateRel:        toPosixPath(path.join(relWsDir, 'STATE.md')),
+    requirementsRel: toPosixPath(path.join(relWsDir, 'REQUIREMENTS.md')),
+    phasesRel:       toPosixPath(path.join(relWsDir, 'phases')),
+    wsDirRel:        toPosixPath(relWsDir),
+
+    // Shared (project-level, never scoped) — absolute
+    project:      path.join(baseDir, 'PROJECT.md'),
+    config:       path.join(baseDir, 'config.json'),
+    milestones:   path.join(baseDir, 'milestones'),
+    research:     path.join(baseDir, 'research'),
+    codebase:     path.join(baseDir, 'codebase'),
+    todos:        path.join(baseDir, 'todos'),
+    baseDir,
+
+    // Shared — relative
+    projectRel:   '.planning/PROJECT.md',
+    configRel:    '.planning/config.json',
+    milestonesRel:'.planning/milestones',
+    baseDirRel:   '.planning',
+  };
+}
+
 // ─── Model Profile Table ─────────────────────────────────────────────────────
 
 const MODEL_PROFILES = {
@@ -64,8 +121,8 @@ function safeReadFile(filePath) {
   }
 }
 
-function loadConfig(cwd) {
-  const configPath = path.join(cwd, '.planning', 'config.json');
+function loadConfig(cwd, paths) {
+  const configPath = paths ? paths.config : path.join(cwd, '.planning', 'config.json');
   const defaults = {
     model_profile: 'balanced',
     commit_docs: true,
@@ -243,18 +300,19 @@ function searchPhaseInDir(baseDir, relBase, normalized) {
   }
 }
 
-function findPhaseInternal(cwd, phase) {
+function findPhaseInternal(cwd, phase, paths) {
   if (!phase) return null;
 
-  const phasesDir = path.join(cwd, '.planning', 'phases');
+  const phasesDir = paths ? paths.phases : path.join(cwd, '.planning', 'phases');
   const normalized = normalizePhaseName(phase);
 
+  const relPhasesDir = paths ? paths.phasesRel : '.planning/phases';
   // Search current phases first
-  const current = searchPhaseInDir(phasesDir, '.planning/phases', normalized);
+  const current = searchPhaseInDir(phasesDir, relPhasesDir, normalized);
   if (current) return current;
 
   // Search archived milestone phases (newest first)
-  const milestonesDir = path.join(cwd, '.planning', 'milestones');
+  const milestonesDir = paths ? paths.milestones : path.join(cwd, '.planning', 'milestones');
   if (!fs.existsSync(milestonesDir)) return null;
 
   try {
@@ -280,8 +338,8 @@ function findPhaseInternal(cwd, phase) {
   return null;
 }
 
-function getArchivedPhaseDirs(cwd) {
-  const milestonesDir = path.join(cwd, '.planning', 'milestones');
+function getArchivedPhaseDirs(cwd, paths) {
+  const milestonesDir = paths ? paths.milestones : path.join(cwd, '.planning', 'milestones');
   const results = [];
 
   if (!fs.existsSync(milestonesDir)) return results;
@@ -317,9 +375,9 @@ function getArchivedPhaseDirs(cwd) {
 
 // ─── Roadmap & model utilities ────────────────────────────────────────────────
 
-function getRoadmapPhaseInternal(cwd, phaseNum) {
+function getRoadmapPhaseInternal(cwd, phaseNum, paths) {
   if (!phaseNum) return null;
-  const roadmapPath = path.join(cwd, '.planning', 'ROADMAP.md');
+  const roadmapPath = paths ? paths.roadmap : path.join(cwd, '.planning', 'ROADMAP.md');
   if (!fs.existsSync(roadmapPath)) return null;
 
   try {
@@ -385,9 +443,9 @@ function generateSlugInternal(text) {
   return text.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, '');
 }
 
-function getMilestoneInfo(cwd) {
+function getMilestoneInfo(cwd, paths) {
   try {
-    const roadmap = fs.readFileSync(path.join(cwd, '.planning', 'ROADMAP.md'), 'utf-8');
+    const roadmap = fs.readFileSync(paths ? paths.roadmap : path.join(cwd, '.planning', 'ROADMAP.md'), 'utf-8');
     // Strip <details>...</details> blocks so shipped milestones don't interfere
     const cleaned = roadmap.replace(/<details>[\s\S]*?<\/details>/gi, '');
     // Extract version and name from the same ## heading for consistency
@@ -429,4 +487,6 @@ module.exports = {
   generateSlugInternal,
   getMilestoneInfo,
   toPosixPath,
+  resolvePlanningDir,
+  buildPaths,
 };

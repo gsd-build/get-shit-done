@@ -4,11 +4,12 @@
 
 const fs = require('fs');
 const path = require('path');
-const { output, error } = require('./core.cjs');
+const { output, error, buildPaths } = require('./core.cjs');
 
-function cmdConfigEnsureSection(cwd, raw) {
-  const configPath = path.join(cwd, '.planning', 'config.json');
-  const planningDir = path.join(cwd, '.planning');
+function cmdConfigEnsureSection(cwd, raw, paths) {
+  const p = paths || buildPaths(cwd);
+  const configPath = p.config;
+  const planningDir = p.baseDir;
 
   // Ensure .planning directory exists
   try {
@@ -67,15 +68,16 @@ function cmdConfigEnsureSection(cwd, raw) {
 
   try {
     fs.writeFileSync(configPath, JSON.stringify(defaults, null, 2), 'utf-8');
-    const result = { created: true, path: '.planning/config.json' };
+    const result = { created: true, path: p.configRel };
     output(result, raw, 'created');
   } catch (err) {
     error('Failed to create config.json: ' + err.message);
   }
 }
 
-function cmdConfigSet(cwd, keyPath, value, raw) {
-  const configPath = path.join(cwd, '.planning', 'config.json');
+function cmdConfigSet(cwd, keyPath, value, raw, paths) {
+  const p = paths || buildPaths(cwd);
+  const configPath = p.config;
 
   if (!keyPath) {
     error('Usage: config-set <key.path> <value>');
@@ -119,8 +121,9 @@ function cmdConfigSet(cwd, keyPath, value, raw) {
   }
 }
 
-function cmdConfigGet(cwd, keyPath, raw) {
-  const configPath = path.join(cwd, '.planning', 'config.json');
+function cmdConfigGet(cwd, keyPath, raw, paths) {
+  const p = paths || buildPaths(cwd);
+  const configPath = p.config;
 
   if (!keyPath) {
     error('Usage: config-get <key.path>');
