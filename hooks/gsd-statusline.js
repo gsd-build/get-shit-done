@@ -8,9 +8,13 @@ const os = require('os');
 
 // Read JSON from stdin
 let input = '';
+// Timeout guard: if stdin doesn't close within 3s (e.g. pipe issues on
+// Windows/Git Bash), exit silently instead of hanging. See #775.
+const stdinTimeout = setTimeout(() => process.exit(0), 3000);
 process.stdin.setEncoding('utf8');
 process.stdin.on('data', chunk => input += chunk);
 process.stdin.on('end', () => {
+  clearTimeout(stdinTimeout);
   try {
     const data = JSON.parse(input);
     const model = data.model?.display_name || 'Claude';

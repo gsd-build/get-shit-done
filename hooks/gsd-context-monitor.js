@@ -27,9 +27,14 @@ const STALE_SECONDS = 60;      // ignore metrics older than 60s
 const DEBOUNCE_CALLS = 5;      // min tool uses between warnings
 
 let input = '';
+// Timeout guard: if stdin doesn't close within 3s (e.g. pipe issues on
+// Windows/Git Bash), exit silently instead of hanging until Claude Code
+// kills the process and reports "hook error". See #775.
+const stdinTimeout = setTimeout(() => process.exit(0), 3000);
 process.stdin.setEncoding('utf8');
 process.stdin.on('data', chunk => input += chunk);
 process.stdin.on('end', () => {
+  clearTimeout(stdinTimeout);
   try {
     const data = JSON.parse(input);
     const sessionId = data.session_id;
