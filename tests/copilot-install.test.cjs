@@ -1138,3 +1138,86 @@ describe('E2E: Copilot full install verification', () => {
     }
   });
 });
+
+describe('E2E: Copilot uninstall verification', () => {
+  let tmpDir;
+
+  beforeEach(() => {
+    tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), 'gsd-e2e-'));
+    runCopilotInstall(tmpDir);
+    runCopilotUninstall(tmpDir);
+  });
+
+  afterEach(() => {
+    fs.rmSync(tmpDir, { recursive: true, force: true });
+  });
+
+  test('removes engine directory', () => {
+    const engineDir = path.join(tmpDir, '.github', 'get-shit-done');
+    assert.ok(!fs.existsSync(engineDir),
+      'get-shit-done directory should not exist after uninstall');
+  });
+
+  test('removes copilot-instructions.md', () => {
+    const instrPath = path.join(tmpDir, '.github', 'copilot-instructions.md');
+    assert.ok(!fs.existsSync(instrPath),
+      'copilot-instructions.md should not exist after uninstall');
+  });
+
+  test('removes all GSD skill directories', () => {
+    const skillsDir = path.join(tmpDir, '.github', 'skills');
+    if (fs.existsSync(skillsDir)) {
+      const entries = fs.readdirSync(skillsDir, { withFileTypes: true });
+      const gsdSkills = entries.filter(e => e.isDirectory() && e.name.startsWith('gsd-'));
+      assert.strictEqual(gsdSkills.length, 0,
+        `Expected 0 GSD skill directories after uninstall, found: ${gsdSkills.map(e => e.name).join(', ')}`);
+    }
+  });
+
+  test('removes all GSD agent files', () => {
+    const agentsDir = path.join(tmpDir, '.github', 'agents');
+    if (fs.existsSync(agentsDir)) {
+      const files = fs.readdirSync(agentsDir);
+      const gsdAgents = files.filter(f => f.startsWith('gsd-') && f.endsWith('.agent.md'));
+      assert.strictEqual(gsdAgents.length, 0,
+        `Expected 0 GSD agent files after uninstall, found: ${gsdAgents.join(', ')}`);
+    }
+  });
+
+  test('preserves non-GSD content in skills directory', () => {
+    // Standalone lifecycle: install → add custom content → uninstall → verify
+    const td = fs.mkdtempSync(path.join(os.tmpdir(), 'gsd-e2e-preserve-skill-'));
+    try {
+      runCopilotInstall(td);
+      // Add non-GSD custom skill
+      const customSkillDir = path.join(td, '.github', 'skills', 'my-custom-skill');
+      fs.mkdirSync(customSkillDir, { recursive: true });
+      fs.writeFileSync(path.join(customSkillDir, 'SKILL.md'), '# My Custom Skill\n');
+      // Uninstall
+      runCopilotUninstall(td);
+      // Verify custom content preserved
+      assert.ok(fs.existsSync(path.join(customSkillDir, 'SKILL.md')),
+        'Non-GSD skill directory and SKILL.md should be preserved after uninstall');
+    } finally {
+      fs.rmSync(td, { recursive: true, force: true });
+    }
+  });
+
+  test('preserves non-GSD content in agents directory', () => {
+    // Standalone lifecycle: install → add custom content → uninstall → verify
+    const td = fs.mkdtempSync(path.join(os.tmpdir(), 'gsd-e2e-preserve-agent-'));
+    try {
+      runCopilotInstall(td);
+      // Add non-GSD custom agent
+      const customAgentPath = path.join(td, '.github', 'agents', 'my-agent.md');
+      fs.writeFileSync(customAgentPath, '# My Custom Agent\n');
+      // Uninstall
+      runCopilotUninstall(td);
+      // Verify custom content preserved
+      assert.ok(fs.existsSync(customAgentPath),
+        'Non-GSD agent file should be preserved after uninstall');
+    } finally {
+      fs.rmSync(td, { recursive: true, force: true });
+    }
+  });
+});
