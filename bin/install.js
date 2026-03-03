@@ -41,6 +41,7 @@ const hasOpencode = args.includes('--opencode');
 const hasClaude = args.includes('--claude');
 const hasGemini = args.includes('--gemini');
 const hasCodex = args.includes('--codex');
+const hasKimi = args.includes('--kimi');
 const hasBoth = args.includes('--both'); // Legacy flag, keeps working
 const hasAll = args.includes('--all');
 const hasUninstall = args.includes('--uninstall') || args.includes('-u');
@@ -48,7 +49,7 @@ const hasUninstall = args.includes('--uninstall') || args.includes('-u');
 // Runtime selection - can be set by flags or interactive prompt
 let selectedRuntimes = [];
 if (hasAll) {
-  selectedRuntimes = ['claude', 'opencode', 'gemini', 'codex'];
+  selectedRuntimes = ['claude', 'opencode', 'gemini', 'codex', 'kimi'];
 } else if (hasBoth) {
   selectedRuntimes = ['claude', 'opencode'];
 } else {
@@ -56,6 +57,7 @@ if (hasAll) {
   if (hasClaude) selectedRuntimes.push('claude');
   if (hasGemini) selectedRuntimes.push('gemini');
   if (hasCodex) selectedRuntimes.push('codex');
+  if (hasKimi) selectedRuntimes.push('kimi');
 }
 
 // Helper to get directory name for a runtime (used for local/project installs)
@@ -63,13 +65,14 @@ function getDirName(runtime) {
   if (runtime === 'opencode') return '.opencode';
   if (runtime === 'gemini') return '.gemini';
   if (runtime === 'codex') return '.codex';
+  if (runtime === 'kimi') return '.kimi';
   return '.claude';
 }
 
 /**
  * Get the config directory path relative to home directory for a runtime
  * Used for templating hooks that use path.join(homeDir, '<configDir>', ...)
- * @param {string} runtime - 'claude', 'opencode', 'gemini', or 'codex'
+ * @param {string} runtime - 'claude', 'opencode', 'gemini', 'codex', or 'kimi'
  * @param {boolean} isGlobal - Whether this is a global install
  */
 function getConfigDirFromHome(runtime, isGlobal) {
@@ -85,6 +88,7 @@ function getConfigDirFromHome(runtime, isGlobal) {
   }
   if (runtime === 'gemini') return "'.gemini'";
   if (runtime === 'codex') return "'.codex'";
+  if (runtime === 'kimi') return "'.kimi'";
   return "'.claude'";
 }
 
@@ -114,8 +118,23 @@ function getOpencodeGlobalDir() {
 }
 
 /**
+ * Get the Kimi global skills directory.
+ * Kimi follows XDG Base Directory spec: skills live in ~/.config/agents/skills/
+ * Priority: KIMI_SKILLS_DIR > XDG_CONFIG_HOME/agents/skills > ~/.config/agents/skills
+ */
+function getKimiSkillsDir() {
+  if (process.env.KIMI_SKILLS_DIR) {
+    return expandTilde(process.env.KIMI_SKILLS_DIR);
+  }
+  if (process.env.XDG_CONFIG_HOME) {
+    return path.join(expandTilde(process.env.XDG_CONFIG_HOME), 'agents', 'skills');
+  }
+  return path.join(os.homedir(), '.config', 'agents', 'skills');
+}
+
+/**
  * Get the global config directory for a runtime
- * @param {string} runtime - 'claude', 'opencode', 'gemini', or 'codex'
+ * @param {string} runtime - 'claude', 'opencode', 'gemini', 'codex', or 'kimi'
  * @param {string|null} explicitDir - Explicit directory from --config-dir flag
  */
 function getGlobalDir(runtime, explicitDir = null) {
@@ -148,7 +167,18 @@ function getGlobalDir(runtime, explicitDir = null) {
     }
     return path.join(os.homedir(), '.codex');
   }
-  
+
+  if (runtime === 'kimi') {
+    // Kimi: --config-dir > KIMI_CONFIG_DIR > ~/.kimi
+    if (explicitDir) {
+      return expandTilde(explicitDir);
+    }
+    if (process.env.KIMI_CONFIG_DIR) {
+      return expandTilde(process.env.KIMI_CONFIG_DIR);
+    }
+    return path.join(os.homedir(), '.kimi');
+  }
+
   // Claude Code: --config-dir > CLAUDE_CONFIG_DIR > ~/.claude
   if (explicitDir) {
     return expandTilde(explicitDir);
@@ -169,7 +199,7 @@ const banner = '\n' +
   '\n' +
   '  Get Shit Done ' + dim + 'v' + pkg.version + reset + '\n' +
   '  A meta-prompting, context engineering and spec-driven\n' +
-  '  development system for Claude Code, OpenCode, Gemini, and Codex by TÂCHES.\n';
+  '  development system for Claude Code, OpenCode, Gemini, Codex, and Kimi by TÂCHES.\n';
 
 // Parse --config-dir argument
 function parseConfigDirArg() {
@@ -203,7 +233,7 @@ console.log(banner);
 
 // Show help if requested
 if (hasHelp) {
-  console.log(`  ${yellow}Usage:${reset} npx get-shit-done-cc [options]\n\n  ${yellow}Options:${reset}\n    ${cyan}-g, --global${reset}              Install globally (to config directory)\n    ${cyan}-l, --local${reset}               Install locally (to current directory)\n    ${cyan}--claude${reset}                  Install for Claude Code only\n    ${cyan}--opencode${reset}                Install for OpenCode only\n    ${cyan}--gemini${reset}                  Install for Gemini only\n    ${cyan}--codex${reset}                   Install for Codex only\n    ${cyan}--all${reset}                     Install for all runtimes\n    ${cyan}-u, --uninstall${reset}           Uninstall GSD (remove all GSD files)\n    ${cyan}-c, --config-dir <path>${reset}   Specify custom config directory\n    ${cyan}-h, --help${reset}                Show this help message\n    ${cyan}--force-statusline${reset}        Replace existing statusline config\n\n  ${yellow}Examples:${reset}\n    ${dim}# Interactive install (prompts for runtime and location)${reset}\n    npx get-shit-done-cc\n\n    ${dim}# Install for Claude Code globally${reset}\n    npx get-shit-done-cc --claude --global\n\n    ${dim}# Install for Gemini globally${reset}\n    npx get-shit-done-cc --gemini --global\n\n    ${dim}# Install for Codex globally${reset}\n    npx get-shit-done-cc --codex --global\n\n    ${dim}# Install for all runtimes globally${reset}\n    npx get-shit-done-cc --all --global\n\n    ${dim}# Install to custom config directory${reset}\n    npx get-shit-done-cc --codex --global --config-dir ~/.codex-work\n\n    ${dim}# Install to current project only${reset}\n    npx get-shit-done-cc --claude --local\n\n    ${dim}# Uninstall GSD from Codex globally${reset}\n    npx get-shit-done-cc --codex --global --uninstall\n\n  ${yellow}Notes:${reset}\n    The --config-dir option is useful when you have multiple configurations.\n    It takes priority over CLAUDE_CONFIG_DIR / GEMINI_CONFIG_DIR / CODEX_HOME environment variables.\n`);
+  console.log(`  ${yellow}Usage:${reset} npx get-shit-done-cc [options]\n\n  ${yellow}Options:${reset}\n    ${cyan}-g, --global${reset}              Install globally (to config directory)\n    ${cyan}-l, --local${reset}               Install locally (to current directory)\n    ${cyan}--claude${reset}                  Install for Claude Code only\n    ${cyan}--opencode${reset}                Install for OpenCode only\n    ${cyan}--gemini${reset}                  Install for Gemini only\n    ${cyan}--codex${reset}                   Install for Codex only\n    ${cyan}--kimi${reset}                    Install for Kimi only\n    ${cyan}--all${reset}                     Install for all runtimes\n    ${cyan}-u, --uninstall${reset}           Uninstall GSD (remove all GSD files)\n    ${cyan}-c, --config-dir <path>${reset}   Specify custom config directory\n    ${cyan}-h, --help${reset}                Show this help message\n    ${cyan}--force-statusline${reset}        Replace existing statusline config\n\n  ${yellow}Examples:${reset}\n    ${dim}# Interactive install (prompts for runtime and location)${reset}\n    npx get-shit-done-cc\n\n    ${dim}# Install for Claude Code globally${reset}\n    npx get-shit-done-cc --claude --global\n\n    ${dim}# Install for Gemini globally${reset}\n    npx get-shit-done-cc --gemini --global\n\n    ${dim}# Install for Codex globally${reset}\n    npx get-shit-done-cc --codex --global\n\n    ${dim}# Install for Kimi globally${reset}\n    npx get-shit-done-cc --kimi --global\n\n    ${dim}# Install for all runtimes globally${reset}\n    npx get-shit-done-cc --all --global\n\n    ${dim}# Install to custom config directory${reset}\n    npx get-shit-done-cc --codex --global --config-dir ~/.codex-work\n\n    ${dim}# Install to current project only${reset}\n    npx get-shit-done-cc --claude --local\n\n    ${dim}# Uninstall GSD from Codex globally${reset}\n    npx get-shit-done-cc --codex --global --uninstall\n\n  ${yellow}Notes:${reset}\n    The --config-dir option is useful when you have multiple configurations.\n    It takes priority over CLAUDE_CONFIG_DIR / GEMINI_CONFIG_DIR / CODEX_HOME / KIMI_CONFIG_DIR environment variables.\n    Kimi only supports global install (skills go to XDG ~/.config/agents/skills/).\n`);
   process.exit(0);
 }
 
@@ -288,7 +318,7 @@ function getCommitAttribution(runtime) {
       result = settings.attribution.commit;
     }
   } else {
-    // Codex currently has no attribution setting equivalent
+    // Codex and Kimi have no attribution setting equivalent
     result = undefined;
   }
 
@@ -364,6 +394,34 @@ const claudeToGeminiTools = {
   AskUserQuestion: 'ask_user',
 };
 
+// Tool name mapping from Claude Code to Kimi CLI
+// Kimi CLI uses PascalCase tool names with full module paths
+const claudeToKimiTools = {
+  Read: 'kimi_cli.tools.file:ReadFile',
+  Write: 'kimi_cli.tools.file:WriteFile',
+  Edit: 'kimi_cli.tools.file:StrReplaceFile',
+  Glob: 'kimi_cli.tools.file:Glob',
+  Grep: 'kimi_cli.tools.file:Grep',
+  ReadMediaFile: 'kimi_cli.tools.file:ReadMediaFile',
+  Bash: 'kimi_cli.tools.shell:Shell',
+  WebSearch: 'kimi_cli.tools.web:SearchWeb',
+  WebFetch: 'kimi_cli.tools.web:FetchURL',
+  TodoWrite: 'kimi_cli.tools.todo:SetTodoList',
+  AskUserQuestion: 'kimi_cli.tools.ask_user:AskUserQuestion',
+  Task: 'kimi_cli.tools.multiagent:Task',
+};
+
+/**
+ * Convert a Claude Code tool name to Kimi CLI format.
+ * Returns the full module path (e.g. 'kimi_cli.tools.file:ReadFile'), or null to exclude.
+ * MCP tools are excluded — configured separately via Kimi's config.
+ * @returns {string|null}
+ */
+function convertKimiToolName(claudeTool) {
+  if (claudeTool.startsWith('mcp__')) return null;
+  return claudeToKimiTools[claudeTool] || null;
+}
+
 /**
  * Convert a Claude Code tool name to OpenCode format
  * - Applies special mappings (AskUserQuestion -> question, etc.)
@@ -404,6 +462,81 @@ function convertGeminiToolName(claudeTool) {
   }
   // Default: lowercase
   return claudeTool.toLowerCase();
+}
+
+/**
+ * Convert a Claude Code command to Kimi skill format.
+ * Kimi skills live in ~/.config/agents/skills/gsd-<name>/SKILL.md
+ * and are invoked via /skill:gsd-<name>.
+ * @param {string} content - Markdown file content
+ * @param {string} skillName - Skill name (e.g. 'gsd-new-project')
+ * @returns {string} Converted skill content
+ */
+function convertClaudeToKimiSkill(content, skillName) {
+  let converted = content;
+
+  // Replace /gsd:command with Kimi skill invocation syntax
+  converted = converted.replace(/\/gsd:([a-z0-9-]+)/gi, (_, cmd) => {
+    return `/skill:gsd-${cmd}`;
+  });
+
+  // Replace Claude tool names in body text so documentation is accurate
+  converted = converted.replace(/\bRead\b(?=\s*\(|\s*["'])/g, 'ReadFile');
+  converted = converted.replace(/\bWrite\b(?=\s*\(|\s*["'])/g, 'WriteFile');
+  converted = converted.replace(/\bEdit\b(?=\s*\(|\s*["'])/g, 'StrReplaceFile');
+  converted = converted.replace(/\bBash\b(?=\s*\(|\s*["'])/g, 'Shell');
+  converted = converted.replace(/\bTodoWrite\b(?=\s*\(|\s*["'])/g, 'SetTodoList');
+  converted = converted.replace(/\bWebSearch\b(?=\s*\(|\s*["'])/g, 'SearchWeb');
+  converted = converted.replace(/\bWebFetch\b(?=\s*\(|\s*["'])/g, 'FetchURL');
+
+  const { frontmatter, body } = extractFrontmatterAndBody(converted);
+
+  let skillFrontmatter = `---\nname: ${skillName}\n`;
+  if (frontmatter) {
+    const descMatch = frontmatter.match(/^description:\s*(.+)$/m);
+    if (descMatch) {
+      skillFrontmatter += `description: ${descMatch[1].trim()}\n`;
+    }
+  }
+  skillFrontmatter += `---\n`;
+
+  return skillFrontmatter + body;
+}
+
+/**
+ * Convert a Claude Code agent markdown to Kimi YAML agent format.
+ * Kimi agents use YAML with a separate system prompt file.
+ * @param {string} content - Agent markdown content
+ * @returns {{ yaml: string, systemPrompt: string } | null}
+ */
+function convertClaudeToKimiAgent(content) {
+  const { frontmatter, body } = extractFrontmatterAndBody(content);
+  if (!frontmatter) return null;
+
+  const name = extractFrontmatterField(frontmatter, 'name') || 'unknown';
+  const description = extractFrontmatterField(frontmatter, 'description') || '';
+  const toolsField = extractFrontmatterField(frontmatter, 'tools') || '';
+
+  const kimiTools = toolsField.split(',').map(t => t.trim()).filter(t => t)
+    .map(convertKimiToolName)
+    .filter(t => t !== null);
+
+  // Escape ${VAR} patterns for Kimi CLI compatibility (same as Gemini)
+  const escapedBody = body.replace(/\$\{(\w+)\}/g, '$$$1');
+
+  const lines = ['version: 1', 'agent:', `  name: ${name}`];
+  if (description) {
+    lines.push(`  description: ${toSingleLine(description)}`);
+  }
+  if (kimiTools.length > 0) {
+    lines.push('  tools:');
+    for (const tool of kimiTools) {
+      lines.push(`    - "${tool}"`);
+    }
+  }
+  lines.push(`  system_prompt_path: ./${name}.md`);
+
+  return { yaml: lines.join('\n') + '\n', systemPrompt: escapedBody };
 }
 
 function toSingleLine(value) {
@@ -1059,6 +1192,47 @@ function copyCommandsAsCodexSkills(srcDir, skillsDir, prefix, pathPrefix, runtim
 }
 
 /**
+ * Copy commands as Kimi skills to ~/.config/agents/skills/gsd-<name>/SKILL.md
+ */
+function copyCommandsAsKimiSkills(srcDir, skillsDir, prefix, pathPrefix, runtime) {
+  if (!fs.existsSync(srcDir)) return;
+
+  fs.mkdirSync(skillsDir, { recursive: true });
+
+  // Remove previous GSD Kimi skills to avoid stale entries
+  for (const entry of fs.readdirSync(skillsDir, { withFileTypes: true })) {
+    if (entry.isDirectory() && entry.name.startsWith(`${prefix}-`)) {
+      fs.rmSync(path.join(skillsDir, entry.name), { recursive: true });
+    }
+  }
+
+  function recurse(currentSrcDir, currentPrefix) {
+    for (const entry of fs.readdirSync(currentSrcDir, { withFileTypes: true })) {
+      const srcPath = path.join(currentSrcDir, entry.name);
+      if (entry.isDirectory()) {
+        recurse(srcPath, `${currentPrefix}-${entry.name}`);
+        continue;
+      }
+      if (!entry.name.endsWith('.md')) continue;
+
+      const skillName = `${currentPrefix}-${entry.name.replace('.md', '')}`;
+      const skillDir = path.join(skillsDir, skillName);
+      fs.mkdirSync(skillDir, { recursive: true });
+
+      let content = fs.readFileSync(srcPath, 'utf8');
+      content = content.replace(/~\/\.claude\//g, pathPrefix);
+      content = content.replace(/\.\/\.claude\//g, `./${getDirName(runtime)}/`);
+      content = processAttribution(content, getCommitAttribution(runtime));
+      content = convertClaudeToKimiSkill(content, skillName);
+
+      fs.writeFileSync(path.join(skillDir, 'SKILL.md'), content);
+    }
+  }
+
+  recurse(srcDir, prefix);
+}
+
+/**
  * Recursively copy directory, replacing paths in .md files
  * Deletes existing destDir first to remove orphaned files from previous versions
  * @param {string} srcDir - Source directory
@@ -1205,6 +1379,7 @@ function cleanupOrphanedHooks(settings) {
 function uninstall(isGlobal, runtime = 'claude') {
   const isOpencode = runtime === 'opencode';
   const isCodex = runtime === 'codex';
+  const isKimi = runtime === 'kimi';
   const dirName = getDirName(runtime);
 
   // Get the target directory based on runtime and install type
@@ -1220,11 +1395,13 @@ function uninstall(isGlobal, runtime = 'claude') {
   if (runtime === 'opencode') runtimeLabel = 'OpenCode';
   if (runtime === 'gemini') runtimeLabel = 'Gemini';
   if (runtime === 'codex') runtimeLabel = 'Codex';
+  if (runtime === 'kimi') runtimeLabel = 'Kimi';
 
   console.log(`  Uninstalling GSD from ${cyan}${runtimeLabel}${reset} at ${cyan}${locationLabel}${reset}\n`);
 
   // Check if target directory exists
-  if (!fs.existsSync(targetDir)) {
+  // For Kimi, skills live outside targetDir so we still proceed to clean them up
+  if (!fs.existsSync(targetDir) && !isKimi) {
     console.log(`  ${yellow}⚠${reset} Directory does not exist: ${locationLabel}`);
     console.log(`  Nothing to uninstall.\n`);
     return;
@@ -1297,6 +1474,22 @@ function uninstall(isGlobal, runtime = 'claude') {
         console.log(`  ${green}✓${reset} Cleaned GSD sections from config.toml`);
       }
     }
+  } else if (isKimi) {
+    // Kimi: remove skills from XDG skills directory (~/.config/agents/skills/gsd-*/)
+    const skillsDir = getKimiSkillsDir();
+    if (fs.existsSync(skillsDir)) {
+      let skillCount = 0;
+      for (const entry of fs.readdirSync(skillsDir, { withFileTypes: true })) {
+        if (entry.isDirectory() && entry.name.startsWith('gsd-')) {
+          fs.rmSync(path.join(skillsDir, entry.name), { recursive: true });
+          skillCount++;
+        }
+      }
+      if (skillCount > 0) {
+        removedCount++;
+        console.log(`  ${green}✓${reset} Removed ${skillCount} Kimi skills from ${skillsDir.replace(os.homedir(), '~')}/`);
+      }
+    }
   } else {
     // Claude Code & Gemini: remove commands/gsd/ directory
     const gsdCommandsDir = path.join(targetDir, 'commands', 'gsd');
@@ -1315,13 +1508,15 @@ function uninstall(isGlobal, runtime = 'claude') {
     console.log(`  ${green}✓${reset} Removed get-shit-done/`);
   }
 
-  // 3. Remove GSD agents (gsd-*.md files only)
+  // 3. Remove GSD agents (gsd-*.md; also gsd-*.yaml for Kimi)
   const agentsDir = path.join(targetDir, 'agents');
   if (fs.existsSync(agentsDir)) {
     const files = fs.readdirSync(agentsDir);
     let agentCount = 0;
     for (const file of files) {
-      if (file.startsWith('gsd-') && file.endsWith('.md')) {
+      const isAgentMd = file.startsWith('gsd-') && file.endsWith('.md');
+      const isAgentYaml = isKimi && file.startsWith('gsd-') && file.endsWith('.yaml');
+      if (isAgentMd || isAgentYaml) {
         fs.unlinkSync(path.join(agentsDir, file));
         agentCount++;
       }
@@ -1705,6 +1900,7 @@ function generateManifest(dir, baseDir) {
 function writeManifest(configDir, runtime = 'claude') {
   const isOpencode = runtime === 'opencode';
   const isCodex = runtime === 'codex';
+  const isKimi = runtime === 'kimi';
   const gsdDir = path.join(configDir, 'get-shit-done');
   const commandsDir = path.join(configDir, 'commands', 'gsd');
   const opencodeCommandDir = path.join(configDir, 'command');
@@ -1716,7 +1912,7 @@ function writeManifest(configDir, runtime = 'claude') {
   for (const [rel, hash] of Object.entries(gsdHashes)) {
     manifest.files['get-shit-done/' + rel] = hash;
   }
-  if (!isOpencode && !isCodex && fs.existsSync(commandsDir)) {
+  if (!isOpencode && !isCodex && !isKimi && fs.existsSync(commandsDir)) {
     const cmdHashes = generateManifest(commandsDir);
     for (const [rel, hash] of Object.entries(cmdHashes)) {
       manifest.files['commands/gsd/' + rel] = hash;
@@ -1742,6 +1938,19 @@ function writeManifest(configDir, runtime = 'claude') {
     for (const file of fs.readdirSync(agentsDir)) {
       if (file.startsWith('gsd-') && file.endsWith('.md')) {
         manifest.files['agents/' + file] = fileHash(path.join(agentsDir, file));
+      }
+      if (isKimi && file.startsWith('gsd-') && file.endsWith('.yaml')) {
+        manifest.files['agents/' + file] = fileHash(path.join(agentsDir, file));
+      }
+    }
+  }
+  if (!isCodex) {
+    const hooksDir = path.join(configDir, 'hooks');
+    const gsdHooks = ['gsd-statusline.js', 'gsd-check-update.js', 'gsd-context-monitor.js'];
+    for (const hook of gsdHooks) {
+      const hookPath = path.join(hooksDir, hook);
+      if (fs.existsSync(hookPath)) {
+        manifest.files['hooks/' + hook] = fileHash(hookPath);
       }
     }
   }
@@ -1807,7 +2016,9 @@ function reportLocalPatches(configDir, runtime = 'claude') {
       ? '/gsd-reapply-patches'
       : runtime === 'codex'
         ? '$gsd-reapply-patches'
-        : '/gsd:reapply-patches';
+        : runtime === 'kimi'
+          ? '/skill:gsd-reapply-patches'
+          : '/gsd:reapply-patches';
     console.log('');
     console.log('  ' + yellow + 'Local patches detected' + reset + ' (from v' + meta.from_version + '):');
     for (const f of meta.files) {
@@ -1826,6 +2037,7 @@ function install(isGlobal, runtime = 'claude') {
   const isOpencode = runtime === 'opencode';
   const isGemini = runtime === 'gemini';
   const isCodex = runtime === 'codex';
+  const isKimi = runtime === 'kimi';
   const dirName = getDirName(runtime);
   const src = path.join(__dirname, '..');
 
@@ -1849,6 +2061,7 @@ function install(isGlobal, runtime = 'claude') {
   if (isOpencode) runtimeLabel = 'OpenCode';
   if (isGemini) runtimeLabel = 'Gemini';
   if (isCodex) runtimeLabel = 'Codex';
+  if (isKimi) runtimeLabel = 'Kimi';
 
   console.log(`  Installing for ${cyan}${runtimeLabel}${reset} to ${cyan}${locationLabel}${reset}\n`);
 
@@ -1883,6 +2096,17 @@ function install(isGlobal, runtime = 'claude') {
     const installedSkillNames = listCodexSkillNames(skillsDir);
     if (installedSkillNames.length > 0) {
       console.log(`  ${green}✓${reset} Installed ${installedSkillNames.length} skills to skills/`);
+    } else {
+      failures.push('skills/gsd-*');
+    }
+  } else if (isKimi) {
+    // Kimi: skills go to XDG path (~/.config/agents/skills/), not under targetDir
+    const skillsDir = getKimiSkillsDir();
+    const gsdSrc = path.join(src, 'commands', 'gsd');
+    copyCommandsAsKimiSkills(gsdSrc, skillsDir, 'gsd', pathPrefix, runtime);
+    const installedSkillCount = fs.readdirSync(skillsDir).filter(d => d.startsWith('gsd-')).length;
+    if (installedSkillCount > 0) {
+      console.log(`  ${green}✓${reset} Installed ${installedSkillCount} skills to ${skillsDir.replace(os.homedir(), '~')}/`);
     } else {
       failures.push('skills/gsd-*');
     }
@@ -1938,12 +2162,24 @@ function install(isGlobal, runtime = 'claude') {
         // Convert frontmatter for runtime compatibility
         if (isOpencode) {
           content = convertClaudeToOpencodeFrontmatter(content);
+          fs.writeFileSync(path.join(agentsDest, entry.name), content);
         } else if (isGemini) {
           content = convertClaudeToGeminiAgent(content);
+          fs.writeFileSync(path.join(agentsDest, entry.name), content);
         } else if (isCodex) {
           content = convertClaudeAgentToCodexAgent(content);
+          fs.writeFileSync(path.join(agentsDest, entry.name), content);
+        } else if (isKimi) {
+          // Kimi: YAML agent definition + separate system prompt file
+          const kimiAgent = convertClaudeToKimiAgent(content);
+          if (kimiAgent) {
+            const baseName = entry.name.replace('.md', '');
+            fs.writeFileSync(path.join(agentsDest, `${baseName}.yaml`), kimiAgent.yaml);
+            fs.writeFileSync(path.join(agentsDest, `${baseName}.md`), kimiAgent.systemPrompt);
+          }
+        } else {
+          fs.writeFileSync(path.join(agentsDest, entry.name), content);
         }
-        fs.writeFileSync(path.join(agentsDest, entry.name), content);
       }
     }
     if (verifyInstalled(agentsDest, 'agents')) {
@@ -1974,7 +2210,7 @@ function install(isGlobal, runtime = 'claude') {
     failures.push('VERSION');
   }
 
-  if (!isCodex) {
+  if (!isCodex && !isKimi) {
     // Write package.json to force CommonJS mode for GSD scripts
     // Prevents "require is not defined" errors when project has "type": "module"
     // Node.js walks up looking for package.json - this stops inheritance from project
@@ -2032,6 +2268,11 @@ function install(isGlobal, runtime = 'claude') {
     return { settingsPath: null, settings: null, statuslineCommand: null, runtime };
   }
 
+  if (isKimi) {
+    // Kimi has no settings.json or hooks — installation complete
+    return { settingsPath: null, settings: null, statuslineCommand: null, runtime };
+  }
+
   // Configure statusline and hooks in settings.json
   // Gemini uses AfterTool instead of PostToolUse for post-tool hooks
   const postToolEvent = runtime === 'gemini' ? 'AfterTool' : 'PostToolUse';
@@ -2058,7 +2299,7 @@ function install(isGlobal, runtime = 'claude') {
     }
   }
 
-  // Configure SessionStart hook for update checking (skip for opencode)
+  // Configure SessionStart hook for update checking (skip for opencode and kimi)
   if (!isOpencode) {
     if (!settings.hooks) {
       settings.hooks = {};
@@ -2114,8 +2355,9 @@ function install(isGlobal, runtime = 'claude') {
 function finishInstall(settingsPath, settings, statuslineCommand, shouldInstallStatusline, runtime = 'claude', isGlobal = true) {
   const isOpencode = runtime === 'opencode';
   const isCodex = runtime === 'codex';
+  const isKimi = runtime === 'kimi';
 
-  if (shouldInstallStatusline && !isOpencode && !isCodex) {
+  if (shouldInstallStatusline && !isOpencode && !isCodex && !isKimi) {
     settings.statusLine = {
       type: 'command',
       command: statuslineCommand
@@ -2124,7 +2366,7 @@ function finishInstall(settingsPath, settings, statuslineCommand, shouldInstallS
   }
 
   // Write settings when runtime supports settings.json
-  if (!isCodex) {
+  if (!isCodex && !isKimi) {
     writeSettings(settingsPath, settings);
   }
 
@@ -2137,10 +2379,12 @@ function finishInstall(settingsPath, settings, statuslineCommand, shouldInstallS
   if (runtime === 'opencode') program = 'OpenCode';
   if (runtime === 'gemini') program = 'Gemini';
   if (runtime === 'codex') program = 'Codex';
+  if (runtime === 'kimi') program = 'Kimi';
 
   let command = '/gsd:new-project';
   if (runtime === 'opencode') command = '/gsd-new-project';
   if (runtime === 'codex') command = '$gsd-new-project';
+  if (runtime === 'kimi') command = '/skill:gsd-new-project';
   console.log(`
   ${green}Done!${reset} Open a blank directory in ${program} and run ${cyan}${command}${reset}.
 
@@ -2222,15 +2466,18 @@ function promptRuntime(callback) {
   ${cyan}2${reset}) OpenCode    ${dim}(~/.config/opencode)${reset} - open source, free models
   ${cyan}3${reset}) Gemini      ${dim}(~/.gemini)${reset}
   ${cyan}4${reset}) Codex       ${dim}(~/.codex)${reset}
-  ${cyan}5${reset}) All
+  ${cyan}5${reset}) Kimi        ${dim}(~/.config/agents/skills)${reset}
+  ${cyan}6${reset}) All
 `);
 
   rl.question(`  Choice ${dim}[1]${reset}: `, (answer) => {
     answered = true;
     rl.close();
     const choice = answer.trim() || '1';
-    if (choice === '5') {
-      callback(['claude', 'opencode', 'gemini', 'codex']);
+    if (choice === '6') {
+      callback(['claude', 'opencode', 'gemini', 'codex', 'kimi']);
+    } else if (choice === '5') {
+      callback(['kimi']);
     } else if (choice === '4') {
       callback(['codex']);
     } else if (choice === '3') {
@@ -2336,6 +2583,10 @@ if (process.env.GSD_TEST_MODE) {
     convertClaudeCommandToCodexSkill,
     GSD_CODEX_MARKER,
     CODEX_AGENT_SANDBOX,
+    convertClaudeToKimiSkill,
+    convertClaudeToKimiAgent,
+    convertKimiToolName,
+    copyCommandsAsKimiSkills,
   };
 } else {
 
@@ -2345,6 +2596,9 @@ if (hasGlobal && hasLocal) {
   process.exit(1);
 } else if (explicitConfigDir && hasLocal) {
   console.error(`  ${yellow}Cannot use --config-dir with --local${reset}`);
+  process.exit(1);
+} else if (hasKimi && hasLocal) {
+  console.error(`  ${yellow}Kimi only supports global install (skills go to XDG ~/.config/agents/skills/)${reset}`);
   process.exit(1);
 } else if (hasUninstall) {
   if (!hasGlobal && !hasLocal) {

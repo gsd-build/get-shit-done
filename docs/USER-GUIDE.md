@@ -168,6 +168,7 @@ rapid prototyping phases where test infrastructure isn't the focus.
 | `/gsd:audit-milestone` | Verify milestone met its definition of done | Before completing milestone |
 | `/gsd:complete-milestone` | Archive milestone, tag release | All phases verified |
 | `/gsd:new-milestone [name]` | Start next version cycle | After completing a milestone |
+| `/gsd:switch-milestone <name>` | Switch active milestone for concurrent work | When working on multiple milestones |
 
 ### Navigation
 
@@ -197,11 +198,13 @@ rapid prototyping phases where test infrastructure isn't the focus.
 |---------|---------|-------------|
 | `/gsd:map-codebase` | Analyze existing codebase | Before `/gsd:new-project` on existing code |
 | `/gsd:quick` | Ad-hoc task with GSD guarantees | Bug fixes, small features, config changes |
+| `/gsd:report-bug [desc]` | Report bug with severity tracking and GitHub issues | When you discover a bug |
 | `/gsd:debug [desc]` | Systematic debugging with persistent state | When something breaks |
 | `/gsd:add-todo [desc]` | Capture an idea for later | Think of something during a session |
 | `/gsd:check-todos` | List pending todos | Review captured ideas |
 | `/gsd:settings` | Configure workflow toggles and model profile | Change model, toggle agents |
 | `/gsd:set-profile <profile>` | Quick profile switch | Change cost/quality tradeoff |
+| `/gsd:add-tests <N> [instructions]` | Generate unit and E2E tests for completed phase | After execution, before milestone completion |
 | `/gsd:reapply-patches` | Restore local modifications after update | After `/gsd:update` if you had local edits |
 
 ---
@@ -241,7 +244,7 @@ GSD stores project settings in `.planning/config.json`. Configure during `/gsd:n
 |---------|---------|---------|------------------|
 | `mode` | `interactive`, `yolo` | `interactive` | `yolo` auto-approves decisions; `interactive` confirms at each step |
 | `depth` | `quick`, `standard`, `comprehensive` | `standard` | Planning thoroughness: 3-5, 5-8, or 8-12 phases |
-| `model_profile` | `quality`, `balanced`, `budget` | `balanced` | Model tier for each agent (see table below) |
+| `model_profile` | `quality`, `balanced`, `budget`, `adaptive` | `balanced` | Model tier for each agent (see table below). `adaptive` auto-selects per-plan based on complexity. |
 
 ### Planning Settings
 
@@ -283,24 +286,27 @@ Disable these to speed up phases in familiar domains or when conserving tokens.
 
 ### Model Profiles (Per-Agent Breakdown)
 
-| Agent | `quality` | `balanced` | `budget` |
-|-------|-----------|------------|----------|
-| gsd-planner | Opus | Opus | Sonnet |
-| gsd-roadmapper | Opus | Sonnet | Sonnet |
-| gsd-executor | Opus | Sonnet | Sonnet |
-| gsd-phase-researcher | Opus | Sonnet | Haiku |
-| gsd-project-researcher | Opus | Sonnet | Haiku |
-| gsd-research-synthesizer | Sonnet | Sonnet | Haiku |
-| gsd-debugger | Opus | Sonnet | Sonnet |
-| gsd-codebase-mapper | Sonnet | Haiku | Haiku |
-| gsd-verifier | Sonnet | Sonnet | Haiku |
-| gsd-plan-checker | Sonnet | Sonnet | Haiku |
-| gsd-integration-checker | Sonnet | Sonnet | Haiku |
+| Agent | `quality` | `balanced` | `budget` | `adaptive` |
+|-------|-----------|------------|----------|------------|
+| gsd-planner | Opus | Opus | Sonnet | Sonnet→Opus |
+| gsd-roadmapper | Opus | Sonnet | Sonnet | Sonnet→Opus |
+| gsd-executor | Opus | Sonnet | Sonnet | Haiku→Sonnet |
+| gsd-phase-researcher | Opus | Sonnet | Haiku | Haiku→Opus |
+| gsd-project-researcher | Opus | Sonnet | Haiku | Haiku→Opus |
+| gsd-research-synthesizer | Sonnet | Sonnet | Haiku | Haiku→Sonnet |
+| gsd-debugger | Opus | Sonnet | Sonnet | Sonnet→Opus |
+| gsd-codebase-mapper | Sonnet | Haiku | Haiku | Haiku→Sonnet |
+| gsd-verifier | Sonnet | Sonnet | Haiku | Haiku→Sonnet |
+| gsd-plan-checker | Sonnet | Sonnet | Haiku | Haiku→Sonnet |
+| gsd-integration-checker | Sonnet | Sonnet | Haiku | Haiku→Sonnet |
+
+*Adaptive column: range from simple→complex tier. Actual model depends on per-plan complexity scoring.*
 
 **Profile philosophy:**
 - **quality** -- Opus for all decision-making agents, Sonnet for read-only verification. Use when quota is available and the work is critical.
 - **balanced** -- Opus only for planning (where architecture decisions happen), Sonnet for everything else. The default for good reason.
 - **budget** -- Sonnet for anything that writes code, Haiku for research and verification. Use for high-volume work or less critical phases.
+- **adaptive** -- Auto-selects per-plan based on complexity scoring. Simple plans get Haiku/Sonnet, complex plans get Opus. Best cost-quality tradeoff for mixed-complexity milestones.
 
 ---
 
@@ -380,6 +386,38 @@ claude --dangerously-skip-permissions
 /gsd:remove-phase 7         # Descope phase 7 and renumber
 ```
 
+### Concurrent Milestones
+
+Work on multiple milestones simultaneously (e.g., v2.0 features + v1.5.1 hotfix):
+
+```
+/gsd:new-milestone "v1.5.1 Hotfix"    # Creates milestone-scoped directory
+/gsd:switch-milestone v2.0-features    # Switch back to feature work
+/gsd:progress                          # See status of active milestone
+```
+
+Each milestone gets isolated state under `.planning/milestones/<name>/`:
+
+```
+.planning/
+├── PROJECT.md              # Global (shared)
+├── MILESTONES.md           # Global (shared)
+├── ACTIVE_MILESTONE        # Pointer: "v2.0"
+├── milestones/
+│   ├── v2.0/
+│   │   ├── STATE.md
+│   │   ├── ROADMAP.md
+│   │   ├── REQUIREMENTS.md
+│   │   ├── config.json
+│   │   └── phases/
+│   └── v1.5.1-hotfix/
+│       ├── STATE.md
+│       ├── ROADMAP.md
+│       └── phases/
+```
+
+When no second milestone exists, everything stays in `.planning/` as usual.
+
 ---
 
 ## Troubleshooting
@@ -449,11 +487,8 @@ For reference, here is what GSD creates in your project:
 ```
 .planning/
   PROJECT.md              # Project vision and context (always loaded)
-  REQUIREMENTS.md         # Scoped v1/v2 requirements with IDs
-  ROADMAP.md              # Phase breakdown with status tracking
-  STATE.md                # Decisions, blockers, session memory
-  config.json             # Workflow configuration
-  MILESTONES.md           # Completed milestone archive
+  MILESTONES.md           # Completed milestone archive (global, shared)
+  ACTIVE_MILESTONE        # Active milestone pointer (multi-milestone mode only)
   research/               # Domain research from /gsd:new-project
   todos/
     pending/              # Captured ideas awaiting work
@@ -461,6 +496,12 @@ For reference, here is what GSD creates in your project:
   debug/                  # Active debug sessions
     resolved/             # Archived debug sessions
   codebase/               # Brownfield codebase mapping (from /gsd:map-codebase)
+
+  # Single-milestone layout (default):
+  REQUIREMENTS.md         # Scoped v1/v2 requirements with IDs
+  ROADMAP.md              # Phase breakdown with status tracking
+  STATE.md                # Decisions, blockers, session memory
+  config.json             # Workflow configuration
   phases/
     XX-phase-name/
       XX-YY-PLAN.md       # Atomic execution plans
@@ -468,4 +509,17 @@ For reference, here is what GSD creates in your project:
       CONTEXT.md          # Your implementation preferences
       RESEARCH.md         # Ecosystem research findings
       VERIFICATION.md     # Post-execution verification results
+
+  # Multi-milestone layout (when concurrent milestones exist):
+  milestones/
+    v2.0/
+      STATE.md
+      ROADMAP.md
+      REQUIREMENTS.md
+      config.json
+      phases/
+    v1.5.1-hotfix/
+      STATE.md
+      ROADMAP.md
+      phases/
 ```
