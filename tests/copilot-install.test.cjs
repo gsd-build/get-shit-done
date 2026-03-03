@@ -19,6 +19,12 @@ const {
   getDirName,
   getGlobalDir,
   getConfigDirFromHome,
+  claudeToCopilotTools,
+  convertCopilotToolName,
+  convertClaudeToCopilotContent,
+  convertClaudeCommandToCopilotSkill,
+  convertClaudeAgentToCopilotAgent,
+  copyCommandsAsCopilotSkills,
 } = require('../bin/install.js');
 
 // ─── getDirName ─────────────────────────────────────────────────────────────────
@@ -168,5 +174,355 @@ describe('Source code integration (Copilot)', () => {
     const bothSection = src.substring(bothUsage, bothUsage + 200);
     assert.ok(bothSection.includes("['claude', 'opencode']"), '--both maps to claude+opencode');
     assert.ok(!bothSection.includes('copilot'), '--both does NOT include copilot');
+  });
+});
+
+// ─── convertCopilotToolName ─────────────────────────────────────────────────────
+
+describe('convertCopilotToolName', () => {
+  test('maps Read to read', () => {
+    assert.strictEqual(convertCopilotToolName('Read'), 'read');
+  });
+
+  test('maps Write to edit', () => {
+    assert.strictEqual(convertCopilotToolName('Write'), 'edit');
+  });
+
+  test('maps Edit to edit (same as Write)', () => {
+    assert.strictEqual(convertCopilotToolName('Edit'), 'edit');
+  });
+
+  test('maps Bash to execute', () => {
+    assert.strictEqual(convertCopilotToolName('Bash'), 'execute');
+  });
+
+  test('maps Grep to search', () => {
+    assert.strictEqual(convertCopilotToolName('Grep'), 'search');
+  });
+
+  test('maps Glob to search (same as Grep)', () => {
+    assert.strictEqual(convertCopilotToolName('Glob'), 'search');
+  });
+
+  test('maps Task to agent', () => {
+    assert.strictEqual(convertCopilotToolName('Task'), 'agent');
+  });
+
+  test('maps WebSearch to web', () => {
+    assert.strictEqual(convertCopilotToolName('WebSearch'), 'web');
+  });
+
+  test('maps WebFetch to web (same as WebSearch)', () => {
+    assert.strictEqual(convertCopilotToolName('WebFetch'), 'web');
+  });
+
+  test('maps TodoWrite to todo', () => {
+    assert.strictEqual(convertCopilotToolName('TodoWrite'), 'todo');
+  });
+
+  test('maps AskUserQuestion to ask_user', () => {
+    assert.strictEqual(convertCopilotToolName('AskUserQuestion'), 'ask_user');
+  });
+
+  test('maps SlashCommand to skill', () => {
+    assert.strictEqual(convertCopilotToolName('SlashCommand'), 'skill');
+  });
+
+  test('maps mcp__context7__ prefix to io.github.upstash/context7/', () => {
+    assert.strictEqual(
+      convertCopilotToolName('mcp__context7__resolve-library-id'),
+      'io.github.upstash/context7/resolve-library-id'
+    );
+  });
+
+  test('maps mcp__context7__* wildcard', () => {
+    assert.strictEqual(
+      convertCopilotToolName('mcp__context7__*'),
+      'io.github.upstash/context7/*'
+    );
+  });
+
+  test('lowercases unknown tools as fallback', () => {
+    assert.strictEqual(convertCopilotToolName('SomeNewTool'), 'somenewtool');
+  });
+
+  test('mapping constant has 13 entries (12 direct + mcp handled separately)', () => {
+    assert.strictEqual(Object.keys(claudeToCopilotTools).length, 12);
+  });
+});
+
+// ─── convertClaudeToCopilotContent ──────────────────────────────────────────────
+
+describe('convertClaudeToCopilotContent', () => {
+  test('replaces ~/.claude/ with ~/.copilot/', () => {
+    assert.strictEqual(
+      convertClaudeToCopilotContent('see ~/.claude/foo'),
+      'see ~/.copilot/foo'
+    );
+  });
+
+  test('replaces ./.claude/ with ./.github/', () => {
+    assert.strictEqual(
+      convertClaudeToCopilotContent('at ./.claude/bar'),
+      'at ./.github/bar'
+    );
+  });
+
+  test('replaces bare .claude/ with .github/', () => {
+    assert.strictEqual(
+      convertClaudeToCopilotContent('in .claude/baz'),
+      'in .github/baz'
+    );
+  });
+
+  test('replaces $HOME/.claude/ with $HOME/.copilot/', () => {
+    assert.strictEqual(
+      convertClaudeToCopilotContent('"$HOME/.claude/config"'),
+      '"$HOME/.copilot/config"'
+    );
+  });
+
+  test('converts gsd: to gsd- in command names', () => {
+    assert.strictEqual(
+      convertClaudeToCopilotContent('run /gsd:health or gsd:progress'),
+      'run /gsd-health or gsd-progress'
+    );
+  });
+
+  test('handles mixed content with all patterns', () => {
+    const input = 'Config at ~/.claude/settings and $HOME/.claude/config.\n' +
+      'Local at ./.claude/data and .claude/commands.\n' +
+      'Run gsd:health and /gsd:progress.';
+    const result = convertClaudeToCopilotContent(input);
+    assert.ok(result.includes('~/.copilot/settings'), 'tilde path converted');
+    assert.ok(result.includes('$HOME/.copilot/config'), '$HOME path converted');
+    assert.ok(result.includes('./.github/data'), 'dot-slash path converted');
+    assert.ok(result.includes('.github/commands'), 'bare path converted');
+    assert.ok(result.includes('gsd-health'), 'command name converted');
+    assert.ok(result.includes('/gsd-progress'), 'slash command converted');
+  });
+
+  test('does not double-replace (no .copilot/.github/ artifacts)', () => {
+    const input = '~/.claude/foo and ./.claude/bar and .claude/baz';
+    const result = convertClaudeToCopilotContent(input);
+    assert.ok(!result.includes('.copilot/.github/'), 'no .copilot/.github/ artifact');
+    assert.ok(!result.includes('.github/.github/'), 'no .github/.github/ artifact');
+    assert.strictEqual(result, '~/.copilot/foo and ./.github/bar and .github/baz');
+  });
+
+  test('preserves content with no matches', () => {
+    assert.strictEqual(
+      convertClaudeToCopilotContent('hello world'),
+      'hello world'
+    );
+  });
+});
+
+// ─── convertClaudeCommandToCopilotSkill ─────────────────────────────────────────
+
+describe('convertClaudeCommandToCopilotSkill', () => {
+  test('converts frontmatter with all fields', () => {
+    const input = `---
+name: gsd:health
+description: Diagnose planning directory health
+argument-hint: [--repair]
+allowed-tools:
+  - Read
+  - Bash
+  - Write
+  - AskUserQuestion
+---
+
+Body content here referencing ~/.claude/foo and gsd:health.`;
+
+    const result = convertClaudeCommandToCopilotSkill(input, 'gsd-health');
+    assert.ok(result.startsWith('---\nname: gsd-health\n'), 'name uses param');
+    assert.ok(result.includes('description: Diagnose planning directory health'), 'description preserved');
+    assert.ok(result.includes("argument-hint: '[--repair]'"), 'argument-hint single-quoted');
+    assert.ok(result.includes('allowed-tools: Read, Bash, Write, AskUserQuestion'), 'tools comma-separated');
+    assert.ok(result.includes('~/.copilot/foo'), 'CONV-06 applied to body');
+    assert.ok(result.includes('gsd-health'), 'CONV-07 applied to body');
+    assert.ok(!result.includes('gsd:health'), 'no gsd: references remain');
+  });
+
+  test('handles skill without allowed-tools', () => {
+    const input = `---
+name: gsd:help
+description: Show available GSD commands
+---
+
+Help content.`;
+
+    const result = convertClaudeCommandToCopilotSkill(input, 'gsd-help');
+    assert.ok(result.includes('name: gsd-help'), 'name set');
+    assert.ok(result.includes('description: Show available GSD commands'), 'description preserved');
+    assert.ok(!result.includes('allowed-tools:'), 'no allowed-tools line');
+  });
+
+  test('handles skill without argument-hint', () => {
+    const input = `---
+name: gsd:progress
+description: Show project progress
+allowed-tools:
+  - Read
+  - Bash
+---
+
+Progress body.`;
+
+    const result = convertClaudeCommandToCopilotSkill(input, 'gsd-progress');
+    assert.ok(!result.includes('argument-hint:'), 'no argument-hint line');
+    assert.ok(result.includes('allowed-tools: Read, Bash'), 'tools present');
+  });
+
+  test('applies CONV-06 path conversion to body', () => {
+    const input = `---
+name: gsd:test
+description: Test skill
+---
+
+Check ~/.claude/settings and ./.claude/local and $HOME/.claude/global.`;
+
+    const result = convertClaudeCommandToCopilotSkill(input, 'gsd-test');
+    assert.ok(result.includes('~/.copilot/settings'), 'tilde path converted');
+    assert.ok(result.includes('./.github/local'), 'dot-slash path converted');
+    assert.ok(result.includes('$HOME/.copilot/global'), '$HOME path converted');
+  });
+
+  test('applies CONV-07 command name conversion to body', () => {
+    const input = `---
+name: gsd:test
+description: Test skill
+---
+
+Run gsd:health and /gsd:progress for diagnostics.`;
+
+    const result = convertClaudeCommandToCopilotSkill(input, 'gsd-test');
+    assert.ok(result.includes('gsd-health'), 'gsd:health converted');
+    assert.ok(result.includes('/gsd-progress'), '/gsd:progress converted');
+    assert.ok(!result.match(/gsd:[a-z]/), 'no gsd: command refs remain');
+  });
+
+  test('handles content without frontmatter', () => {
+    const input = 'Just some markdown with ~/.claude/path and gsd:health.';
+    const result = convertClaudeCommandToCopilotSkill(input, 'gsd-test');
+    assert.ok(result.includes('~/.copilot/path'), 'CONV-06 applied');
+    assert.ok(result.includes('gsd-health'), 'CONV-07 applied');
+    assert.ok(!result.includes('---'), 'no frontmatter added');
+  });
+
+  test('preserves agent field in frontmatter', () => {
+    const input = `---
+name: gsd:execute-phase
+description: Execute a phase
+agent: gsd-planner
+allowed-tools:
+  - Read
+  - Bash
+---
+
+Body.`;
+
+    const result = convertClaudeCommandToCopilotSkill(input, 'gsd-execute-phase');
+    assert.ok(result.includes('agent: gsd-planner'), 'agent field preserved');
+  });
+});
+
+// ─── convertClaudeAgentToCopilotAgent ───────────────────────────────────────────
+
+describe('convertClaudeAgentToCopilotAgent', () => {
+  test('maps and deduplicates tools', () => {
+    const input = `---
+name: gsd-executor
+description: Executes GSD plans
+tools: Read, Write, Edit, Bash, Grep, Glob
+color: yellow
+---
+
+Agent body.`;
+
+    const result = convertClaudeAgentToCopilotAgent(input);
+    assert.ok(result.includes("tools: ['read', 'edit', 'execute', 'search']"), 'tools mapped and deduped');
+  });
+
+  test('formats tools as JSON array', () => {
+    const input = `---
+name: gsd-test
+description: Test agent
+tools: Read, Bash
+---
+
+Body.`;
+
+    const result = convertClaudeAgentToCopilotAgent(input);
+    assert.ok(result.match(/tools: \['[a-z_]+'(, '[a-z_]+')*\]/), 'tools formatted as JSON array');
+  });
+
+  test('preserves name description and color', () => {
+    const input = `---
+name: gsd-executor
+description: Executes GSD plans with atomic commits
+tools: Read, Bash
+color: yellow
+---
+
+Body.`;
+
+    const result = convertClaudeAgentToCopilotAgent(input);
+    assert.ok(result.includes('name: gsd-executor'), 'name preserved');
+    assert.ok(result.includes('description: Executes GSD plans with atomic commits'), 'description preserved');
+    assert.ok(result.includes('color: yellow'), 'color preserved');
+  });
+
+  test('handles mcp__context7__ tools', () => {
+    const input = `---
+name: gsd-researcher
+description: Research agent
+tools: Read, Bash, mcp__context7__resolve-library-id
+color: cyan
+---
+
+Body.`;
+
+    const result = convertClaudeAgentToCopilotAgent(input);
+    assert.ok(result.includes('io.github.upstash/context7/resolve-library-id'), 'mcp tool mapped');
+    assert.ok(!result.includes('mcp__context7__'), 'no mcp__ prefix remains');
+  });
+
+  test('handles agent with no tools field', () => {
+    const input = `---
+name: gsd-empty
+description: Empty agent
+color: green
+---
+
+Body.`;
+
+    const result = convertClaudeAgentToCopilotAgent(input);
+    assert.ok(result.includes('tools: []'), 'missing tools produces []');
+  });
+
+  test('applies CONV-06 and CONV-07 to body', () => {
+    const input = `---
+name: gsd-test
+description: Test
+tools: Read
+---
+
+Check ~/.claude/settings and run gsd:health.`;
+
+    const result = convertClaudeAgentToCopilotAgent(input);
+    assert.ok(result.includes('~/.copilot/settings'), 'CONV-06 applied');
+    assert.ok(result.includes('gsd-health'), 'CONV-07 applied');
+    assert.ok(!result.includes('~/.claude/'), 'no ~/.claude/ remains');
+    assert.ok(!result.match(/gsd:[a-z]/), 'no gsd: command refs remain');
+  });
+
+  test('handles content without frontmatter', () => {
+    const input = 'Just markdown with ~/.claude/path and gsd:test.';
+    const result = convertClaudeAgentToCopilotAgent(input);
+    assert.ok(result.includes('~/.copilot/path'), 'CONV-06 applied');
+    assert.ok(result.includes('gsd-test'), 'CONV-07 applied');
+    assert.ok(!result.includes('---'), 'no frontmatter added');
   });
 });
