@@ -476,6 +476,23 @@ describe('milestone complete command', () => {
     );
   });
 
+  test('updates STATE.md with plain format fields', () => {
+    fs.writeFileSync(
+      path.join(tmpDir, '.planning', 'ROADMAP.md'),
+      `# Roadmap v1.0\n`
+    );
+    fs.writeFileSync(
+      path.join(tmpDir, '.planning', 'STATE.md'),
+      `# State\n\nStatus: In progress\nLast Activity: 2025-01-01\nLast Activity Description: Working\n`
+    );
+
+    const result = runGsdTools('milestone complete v1.0 --name Test', tmpDir);
+    assert.ok(result.success, `Command failed: ${result.error}`);
+
+    const state = fs.readFileSync(path.join(tmpDir, '.planning', 'STATE.md'), 'utf-8');
+    assert.ok(state.includes('v1.0 milestone complete'), 'plain Status field should be updated');
+  });
+
   test('handles empty phases directory', () => {
     fs.writeFileSync(
       path.join(tmpDir, '.planning', 'ROADMAP.md'),
