@@ -73,10 +73,10 @@ Plans:
   1. Post-install verification confirms all expected skills and agents exist in `.github/` and reports pass/fail
   2. Installer warns when `.github/skills/` or `.github/agents/` contain non-GSD files that might conflict
   3. Full install in `/tmp` test directory produces output that matches the reference implementation via diff comparison (skills, agents, instructions, manifest)
-**Plans**: TBD
+**Plans:** 1 plan
 
 Plans:
-- [ ] 04-01: TBD
+- [ ] 04-01-PLAN.md — E2E integration tests for Copilot install/uninstall (skills, agents, instructions, manifest integrity, engine directory, clean uninstall)
 
 ## Progress
 
