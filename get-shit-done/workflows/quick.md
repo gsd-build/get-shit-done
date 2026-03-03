@@ -171,7 +171,7 @@ AskUserQuestion(
 
 Rules:
 - Options must be concrete choices, not abstract categories
-- Highlight recommended choice where you have a clear opinion
+- If you have a recommendation, append "(Recommended)" to that option's label — but NEVER auto-select or answer for the user. Always wait for their response.
 - If user selects "Other" with freeform text, switch to plain text follow-up (per questioning.md freeform rule)
 - If user selects "You decide", capture as Claude's Discretion in CONTEXT.md
 - Max 2 questions per area — this is lightweight, not a deep dive

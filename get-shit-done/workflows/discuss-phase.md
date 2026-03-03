@@ -320,7 +320,7 @@ We'll clarify HOW to implement this.
 - options: Generate 3-4 phase-specific gray areas, each with:
   - "[Specific area]" (label) — concrete, not generic
   - [1-2 questions this covers + code context annotation] (description)
-  - **Highlight the recommended choice with brief explanation why**
+  - If you have a recommendation, append "(Recommended)" to that option's label — but NEVER auto-select it. Always wait for user response.
 
 **Prior decision annotations:** When a gray area was already decided in a prior phase, annotate it:
 ```
@@ -388,7 +388,7 @@ Ask 4 questions per area before offering to continue or move on. Each answer oft
 2. **Ask 4 questions using AskUserQuestion:**
    - header: "[Area]" (max 12 chars — abbreviate if needed)
    - question: Specific decision for this area
-   - options: 2-3 concrete choices (AskUserQuestion adds "Other" automatically), with the recommended choice highlighted and brief explanation why
+   - options: 2-3 concrete choices (AskUserQuestion adds "Other" automatically). If you have a recommendation, append "(Recommended)" to that option's label — but NEVER auto-select or answer on behalf of the user. Always wait for their response.
    - **Annotate options with code context** when relevant:
      ```
      "How should posts be displayed?"
