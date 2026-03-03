@@ -630,6 +630,10 @@ DIRTY=$(git status --porcelain 2>/dev/null | wc -l)
 if [ "$DIRTY" -gt 0 ]; then
   git add .planning/ src/ tests/ 2>/dev/null
   git status --porcelain | grep "^??" | cut -c4- | xargs -r git add
+  # Strip .planning/ from staging if commit_docs is false
+  if [ "$COMMIT_DOCS" = "false" ]; then
+    git reset HEAD .planning/ 2>/dev/null || true
+  fi
   git commit -m "fix(auto-advance): recover uncommitted changes from nested execution"
 fi
 ```
