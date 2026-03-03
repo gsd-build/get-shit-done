@@ -488,7 +488,7 @@ You're never locked in. The system adapts.
 
 | Command | What it does |
 |---------|--------------|
-| `/gsd:map-codebase` | Analyze existing codebase before new-project |
+| `/gsd:map-codebase [area]` | Analyze existing codebase before new-project |
 
 ### Phase Management
 
