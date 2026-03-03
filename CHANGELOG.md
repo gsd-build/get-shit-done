@@ -6,6 +6,9 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ## [Unreleased]
 
+### Fixed
+- `phase complete` and `milestone complete` now update STATE.md fields in both `**Bold:**` and plain `Field:` formats using `stateReplaceField`
+
 ## [1.22.4] - 2026-03-03
 
 ### Added

@@ -1323,6 +1323,31 @@ describe('phase complete command', () => {
     const req = fs.readFileSync(path.join(tmpDir, '.planning', 'REQUIREMENTS.md'), 'utf-8');
     assert.ok(req.includes('- [ ] **AMT-01**'), 'AMT-01 should remain unchanged');
   });
+
+  test('updates STATE.md with plain format fields (no bold)', () => {
+    fs.writeFileSync(
+      path.join(tmpDir, '.planning', 'ROADMAP.md'),
+      `# Roadmap\n\n### Phase 1: Only\n**Goal:** Test\n`
+    );
+    fs.writeFileSync(
+      path.join(tmpDir, '.planning', 'STATE.md'),
+      `# State\n\nPhase: 1 of 1 (Only)\nStatus: In progress\nPlan: 01-01\nLast Activity: 2025-01-01\nLast Activity Description: Working\n`
+    );
+
+    const p1 = path.join(tmpDir, '.planning', 'phases', '01-only');
+    fs.mkdirSync(p1, { recursive: true });
+    fs.writeFileSync(path.join(p1, '01-01-PLAN.md'), '# Plan');
+    fs.writeFileSync(path.join(p1, '01-01-SUMMARY.md'), '# Summary');
+
+    const result = runGsdTools('phase complete 1', tmpDir);
+    assert.ok(result.success, `Command failed: ${result.error}`);
+
+    const state = fs.readFileSync(path.join(tmpDir, '.planning', 'STATE.md'), 'utf-8');
+    assert.ok(state.includes('Milestone complete'), 'plain Status field should be updated');
+    assert.ok(state.includes('Not started'), 'plain Plan field should be updated');
+    // Verify compound format preserved
+    assert.ok(state.match(/Phase:.*of\s+1/), 'should preserve "of N" in compound Phase format');
+  });
 });
 
 // ─────────────────────────────────────────────────────────────────────────────

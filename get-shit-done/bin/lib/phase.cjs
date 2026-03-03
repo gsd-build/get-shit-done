@@ -6,7 +6,7 @@ const fs = require('fs');
 const path = require('path');
 const { escapeRegex, normalizePhaseName, comparePhaseNum, findPhaseInternal, getArchivedPhaseDirs, generateSlugInternal, getMilestonePhaseFilter, toPosixPath, output, error } = require('./core.cjs');
 const { extractFrontmatter } = require('./frontmatter.cjs');
-const { writeStateMd } = require('./state.cjs');
+const { writeStateMd, stateReplaceField, stateExtractField } = require('./state.cjs');
 
 function cmdPhasesList(cwd, options, raw) {
   const phasesDir = path.join(cwd, '.planning', 'phases');
@@ -829,47 +829,55 @@ function cmdPhaseComplete(cwd, phaseNum, raw) {
     } catch {}
   }
 
-  // Update STATE.md
+  // Update STATE.md — use stateReplaceField which handles both **bold:** and plain Field: formats
   if (fs.existsSync(statePath)) {
     let stateContent = fs.readFileSync(statePath, 'utf-8');
 
-    // Update Current Phase
-    stateContent = stateContent.replace(
-      /(\*\*Current Phase:\*\*\s*).*/,
-      `$1${nextPhaseNum || phaseNum}`
-    );
+    // Helper: try primary field name, then fallback
+    const replaceWithFallback = (content, primary, fallback, value) => {
+      let result = stateReplaceField(content, primary, value);
+      if (result) return result;
+      if (fallback) {
+        result = stateReplaceField(content, fallback, value);
+        if (result) return result;
+      }
+      return content;
+    };
+
+    // Update Current Phase — preserve "X of Y (Name)" compound format
+    const phaseValue = nextPhaseNum || phaseNum;
+    const existingPhaseField = stateExtractField(stateContent, 'Current Phase')
+      || stateExtractField(stateContent, 'Phase');
+    let newPhaseValue = phaseValue;
+    if (existingPhaseField) {
+      const totalMatch = existingPhaseField.match(/of\s+(\d+)/);
+      const nameMatch = existingPhaseField.match(/\(([^)]+)\)/);
+      if (totalMatch) {
+        const total = totalMatch[1];
+        const nameStr = nextPhaseName ? ` (${nextPhaseName.replace(/-/g, ' ')})` : (nameMatch ? ` (${nameMatch[1]})` : '');
+        newPhaseValue = `${phaseValue} of ${total}${nameStr}`;
+      }
+    }
+    stateContent = replaceWithFallback(stateContent, 'Current Phase', 'Phase', newPhaseValue);
 
     // Update Current Phase Name
     if (nextPhaseName) {
-      stateContent = stateContent.replace(
-        /(\*\*Current Phase Name:\*\*\s*).*/,
-        `$1${nextPhaseName.replace(/-/g, ' ')}`
-      );
+      stateContent = replaceWithFallback(stateContent, 'Current Phase Name', null, nextPhaseName.replace(/-/g, ' '));
     }
 
     // Update Status
-    stateContent = stateContent.replace(
-      /(\*\*Status:\*\*\s*).*/,
-      `$1${isLastPhase ? 'Milestone complete' : 'Ready to plan'}`
-    );
+    stateContent = replaceWithFallback(stateContent, 'Status', null,
+      isLastPhase ? 'Milestone complete' : 'Ready to plan');
 
     // Update Current Plan
-    stateContent = stateContent.replace(
-      /(\*\*Current Plan:\*\*\s*).*/,
-      `$1Not started`
-    );
+    stateContent = replaceWithFallback(stateContent, 'Current Plan', 'Plan', 'Not started');
 
     // Update Last Activity
-    stateContent = stateContent.replace(
-      /(\*\*Last Activity:\*\*\s*).*/,
-      `$1${today}`
-    );
+    stateContent = replaceWithFallback(stateContent, 'Last Activity', 'Last activity', today);
 
     // Update Last Activity Description
-    stateContent = stateContent.replace(
-      /(\*\*Last Activity Description:\*\*\s*).*/,
-      `$1Phase ${phaseNum} complete${nextPhaseNum ? `, transitioned to Phase ${nextPhaseNum}` : ''}`
-    );
+    stateContent = replaceWithFallback(stateContent, 'Last Activity Description', null,
+      `Phase ${phaseNum} complete${nextPhaseNum ? `, transitioned to Phase ${nextPhaseNum}` : ''}`);
 
     writeStateMd(statePath, stateContent, cwd);
   }
