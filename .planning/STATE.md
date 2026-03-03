@@ -3,12 +3,12 @@ gsd_state_version: 1.0
 milestone: v1.23
 milestone_name: milestone
 status: unknown
-last_updated: "2026-03-03T11:17:57.008Z"
+last_updated: "2026-03-03T13:43:38.358Z"
 progress:
-  total_phases: 2
-  completed_phases: 2
-  total_plans: 3
-  completed_plans: 3
+  total_phases: 3
+  completed_phases: 3
+  total_plans: 5
+  completed_plans: 5
 ---
 
 # Project State
@@ -23,11 +23,11 @@ See: .planning/PROJECT.md (updated 2026-03-02)
 ## Current Position
 
 Phase: 3 of 4 (Instructions & Lifecycle)
-Plan: 1 of 2 in current phase
-Status: Plan 03-01 complete — instructions lifecycle implemented
-Last activity: 2026-03-03 — Phase 3 Plan 1 executed (instructions merge/strip + lifecycle fixes)
+Plan: 2 of 2 in current phase
+Status: Phase 03 complete — all instructions lifecycle tests passing
+Last activity: 2026-03-03 — Phase 3 Plan 2 executed (16 tests for merge/strip/uninstall/manifest/patches)
 
-Progress: [████████░░] 80% (4/5 plans complete)
+Progress: [██████████] 100% (5/5 plans complete)
 
 ## Performance Metrics
 
@@ -47,6 +47,7 @@ Progress: [████████░░] 80% (4/5 plans complete)
 | Phase 02 P01 | 5min | 2 tasks | 1 files |
 | Phase 02 P02 | 5min | 2 tasks | 1 files |
 | Phase 03 P01 | 5min | 2 tasks | 2 files |
+| Phase 03 P02 | 3min | 2 tasks | 2 files |
 
 ## Accumulated Context
 
@@ -71,6 +72,8 @@ Recent decisions affecting current work:
 - [Phase 02]: extractFrontmatterField \s* regex crosses line boundaries on empty values — known edge case, not blocking
 - [Phase 03]: Copilot instructions use paired HTML comment markers (open + close) unlike Codex single-marker-to-EOF
 - [Phase 03]: Added !isCopilot to commands/gsd/ hashing exclusion in writeManifest for correctness
+- [Phase 03]: Added writeManifest and reportLocalPatches to GSD_TEST_MODE exports for direct testing
+- [Phase 03]: Used gsd-* directory filter pattern test to verify uninstall skill identification logic
 
 ### Pending Todos
 
@@ -84,5 +87,5 @@ None yet.
 ## Session Continuity
 
 Last session: 2026-03-03
-Stopped at: Completed 03-01-PLAN.md
-Resume file: .planning/phases/03-instructions-lifecycle/03-01-SUMMARY.md
+Stopped at: Completed 03-02-PLAN.md
+Resume file: .planning/phases/03-instructions-lifecycle/03-02-SUMMARY.md
