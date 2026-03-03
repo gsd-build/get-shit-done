@@ -18,16 +18,16 @@ Requirements for Copilot CLI installation support. Each maps to roadmap phases.
 
 ### Content Conversion
 
-- [ ] **CONV-01**: Commands (`commands/gsd/*.md`) converted to Copilot skills (`.github/skills/gsd-*/SKILL.md`)
-- [ ] **CONV-02**: `allowed-tools` YAML list converted to single comma-separated string in skills frontmatter
-- [ ] **CONV-03**: Agents (`agents/gsd-*.md`) copied to `.github/agents/gsd-*.agent.md` with extension rename
-- [ ] **CONV-04**: Agent `tools:` converted from comma-separated plain names to JSON array format (`['read', 'edit', 'execute', 'search']`)
-- [ ] **CONV-05**: Tool name mapping applied: Read→read, Write→edit, Edit→edit, Bash→execute, Grep→search, Glob→search, Task→agent, WebSearch→web, WebFetch→web, TodoWrite→todo, AskUserQuestion→(removed or mapped)
-- [ ] **CONV-06**: All `~/.claude/` and `./.claude/` path references replaced with `.github/`
-- [ ] **CONV-07**: Command name conversion: `gsd:name` → `gsd-name` in all content
-- [ ] **CONV-08**: Core `get-shit-done/` directory (bin, references, templates, workflows) copied to `.github/get-shit-done/`
-- [ ] **CONV-09**: Router skill generated at `.github/skills/get-shit-done/SKILL.md` (meta-skill for `/gsd-*` routing)
-- [ ] **CONV-10**: CHANGELOG.md and VERSION file written to `.github/get-shit-done/`
+- [x] **CONV-01**: Commands (`commands/gsd/*.md`) converted to Copilot skills (`.github/skills/gsd-*/SKILL.md`)
+- [x] **CONV-02**: `allowed-tools` YAML list converted to single comma-separated string in skills frontmatter
+- [x] **CONV-03**: Agents (`agents/gsd-*.md`) copied to `.github/agents/gsd-*.agent.md` with extension rename
+- [x] **CONV-04**: Agent `tools:` converted from comma-separated plain names to JSON array format (`['read', 'edit', 'execute', 'search']`)
+- [x] **CONV-05**: Tool name mapping applied: Read→read, Write→edit, Edit→edit, Bash→execute, Grep→search, Glob→search, Task→agent, WebSearch→web, WebFetch→web, TodoWrite→todo, AskUserQuestion→(removed or mapped)
+- [x] **CONV-06**: All `~/.claude/` and `./.claude/` path references replaced with `.github/`
+- [x] **CONV-07**: Command name conversion: `gsd:name` → `gsd-name` in all content
+- [x] **CONV-08**: Core `get-shit-done/` directory (bin, references, templates, workflows) copied to `.github/get-shit-done/`
+- [x] **CONV-09**: Router skill generated at `.github/skills/get-shit-done/SKILL.md` (meta-skill for `/gsd-*` routing)
+- [x] **CONV-10**: CHANGELOG.md and VERSION file written to `.github/get-shit-done/`
 
 ### Instructions
 
@@ -73,16 +73,16 @@ Deferred to later milestones.
 | CLI-04 | Phase 1 | Complete |
 | CLI-05 | Phase 1 | Complete |
 | CLI-06 | Phase 1 | Complete |
-| CONV-01 | Phase 2 | Pending |
-| CONV-02 | Phase 2 | Pending |
-| CONV-03 | Phase 2 | Pending |
-| CONV-04 | Phase 2 | Pending |
-| CONV-05 | Phase 2 | Pending |
-| CONV-06 | Phase 2 | Pending |
-| CONV-07 | Phase 2 | Pending |
-| CONV-08 | Phase 2 | Pending |
-| CONV-09 | Phase 2 | Pending |
-| CONV-10 | Phase 2 | Pending |
+| CONV-01 | Phase 2 | Complete |
+| CONV-02 | Phase 2 | Complete |
+| CONV-03 | Phase 2 | Complete |
+| CONV-04 | Phase 2 | Complete |
+| CONV-05 | Phase 2 | Complete |
+| CONV-06 | Phase 2 | Complete |
+| CONV-07 | Phase 2 | Complete |
+| CONV-08 | Phase 2 | Complete |
+| CONV-09 | Phase 2 | Complete |
+| CONV-10 | Phase 2 | Complete |
 | INST-01 | Phase 3 | Pending |
 | INST-02 | Phase 3 | Pending |
 | LIFE-01 | Phase 3 | Pending |

@@ -3,12 +3,12 @@ gsd_state_version: 1.0
 milestone: v1.23
 milestone_name: milestone
 status: unknown
-last_updated: "2026-03-02T23:53:00.978Z"
+last_updated: "2026-03-03T11:01:19.405Z"
 progress:
-  total_phases: 1
+  total_phases: 2
   completed_phases: 1
-  total_plans: 1
-  completed_plans: 1
+  total_plans: 3
+  completed_plans: 2
 ---
 
 # Project State
@@ -22,12 +22,12 @@ See: .planning/PROJECT.md (updated 2026-03-02)
 
 ## Current Position
 
-Phase: 1 of 4 (Core Installer Plumbing)
-Plan: 1 of 1 in current phase
-Status: Plan 01-01 complete
-Last activity: 2026-03-02 — Phase 1 Plan 1 executed (Copilot 5th runtime plumbing)
+Phase: 2 of 4 (Content Conversion Engine)
+Plan: 1 of 2 in current phase
+Status: Plan 02-01 complete
+Last activity: 2026-03-03 — Phase 2 Plan 1 executed (Copilot content conversion engine)
 
-Progress: [░░░░░░░░░░] 0%
+Progress: [██████░░░░] 67% (2/3 plans complete)
 
 ## Performance Metrics
 
@@ -44,6 +44,7 @@ Progress: [░░░░░░░░░░] 0%
 
 *Updated after each plan completion*
 | Phase 01 P01 | 6min | 2 tasks | 2 files |
+| Phase 02 P01 | 5min | 2 tasks | 1 files |
 
 ## Accumulated Context
 
@@ -60,6 +61,10 @@ Recent decisions affecting current work:
 - [Research]: Codex converter cannot be reused — dedicated Copilot conversion functions required
 - [Research]: `copilot-instructions.md` uses marker-based merging (`<!-- GSD Configuration -->`)
 - [Phase 01]: Copilot local=.github/ global=~/.copilot/ with COPILOT_CONFIG_DIR override, skip-hooks like Codex, /gsd-new-project command format
+- [Phase 02]: Copilot uses fixed path mappings (not pathPrefix) — ~/.copilot/ for global, .github/ for local
+- [Phase 02]: Skills keep original tool names — tool mapping applies ONLY to agents
+- [Phase 02]: CONV-09 (router skill) discarded — no code generated
+- [Phase 02]: .cjs/.js engine files also get CONV-06+CONV-07 transformation for Copilot
 
 ### Pending Todos
 
@@ -73,5 +78,5 @@ None yet.
 ## Session Continuity
 
 Last session: 2026-03-03
-Stopped at: Phase 2 context gathered, ready to plan Phase 2
-Resume file: .planning/phases/02-content-conversion-engine/02-CONTEXT.md
+Stopped at: Completed 02-01-PLAN.md — conversion engine implemented, ready for 02-02 tests
+Resume file: .planning/phases/02-content-conversion-engine/02-01-SUMMARY.md
