@@ -532,6 +532,123 @@ function cmdScaffold(cwd, type, options, raw) {
   output({ created: true, path: relPath }, raw, relPath);
 }
 
+function cmdStats(cwd, format, raw) {
+  const phasesDir = path.join(cwd, '.planning', 'phases');
+  const reqPath = path.join(cwd, '.planning', 'REQUIREMENTS.md');
+  const statePath = path.join(cwd, '.planning', 'STATE.md');
+  const milestone = getMilestoneInfo(cwd);
+
+  // Phase & plan stats (reuse progress pattern)
+  const phases = [];
+  let totalPlans = 0;
+  let totalSummaries = 0;
+
+  try {
+    const entries = fs.readdirSync(phasesDir, { withFileTypes: true });
+    const dirs = entries.filter(e => e.isDirectory()).map(e => e.name).sort((a, b) => comparePhaseNum(a, b));
+
+    for (const dir of dirs) {
+      const dm = dir.match(/^(\d+(?:\.\d+)*)-?(.*)/);
+      const phaseNum = dm ? dm[1] : dir;
+      const phaseName = dm && dm[2] ? dm[2].replace(/-/g, ' ') : '';
+      const phaseFiles = fs.readdirSync(path.join(phasesDir, dir));
+      const plans = phaseFiles.filter(f => f.endsWith('-PLAN.md') || f === 'PLAN.md').length;
+      const summaries = phaseFiles.filter(f => f.endsWith('-SUMMARY.md') || f === 'SUMMARY.md').length;
+
+      totalPlans += plans;
+      totalSummaries += summaries;
+
+      let status;
+      if (plans === 0) status = 'Pending';
+      else if (summaries >= plans) status = 'Complete';
+      else if (summaries > 0) status = 'In Progress';
+      else status = 'Planned';
+
+      phases.push({ number: phaseNum, name: phaseName, plans, summaries, status });
+    }
+  } catch {}
+
+  const percent = totalPlans > 0 ? Math.min(100, Math.round((totalSummaries / totalPlans) * 100)) : 0;
+
+  // Requirements stats
+  let requirementsTotal = 0;
+  let requirementsComplete = 0;
+  try {
+    if (fs.existsSync(reqPath)) {
+      const reqContent = fs.readFileSync(reqPath, 'utf-8');
+      const checked = reqContent.match(/^- \[x\] \*\*/gm);
+      const unchecked = reqContent.match(/^- \[ \] \*\*/gm);
+      requirementsComplete = checked ? checked.length : 0;
+      requirementsTotal = requirementsComplete + (unchecked ? unchecked.length : 0);
+    }
+  } catch {}
+
+  // Last activity from STATE.md
+  let lastActivity = null;
+  try {
+    if (fs.existsSync(statePath)) {
+      const stateContent = fs.readFileSync(statePath, 'utf-8');
+      const activityMatch = stateContent.match(/\*\*Last Activity:\*\*\s*(.+)/);
+      if (activityMatch) lastActivity = activityMatch[1].trim();
+    }
+  } catch {}
+
+  // Git stats
+  let gitCommits = 0;
+  let gitFirstCommitDate = null;
+  try {
+    const commitCount = execGit(cwd, ['rev-list', '--count', 'HEAD']);
+    gitCommits = parseInt(commitCount.trim(), 10) || 0;
+    const firstDate = execGit(cwd, ['log', '--reverse', '--format=%as', '--max-count=1']);
+    gitFirstCommitDate = firstDate.trim() || null;
+  } catch {}
+
+  const completedPhases = phases.filter(p => p.status === 'Complete').length;
+
+  const result = {
+    milestone_version: milestone.version,
+    milestone_name: milestone.name,
+    phases,
+    phases_completed: completedPhases,
+    phases_total: phases.length,
+    total_plans: totalPlans,
+    total_summaries: totalSummaries,
+    percent,
+    requirements_total: requirementsTotal,
+    requirements_complete: requirementsComplete,
+    git_commits: gitCommits,
+    git_first_commit_date: gitFirstCommitDate,
+    last_activity: lastActivity,
+  };
+
+  if (format === 'table') {
+    const barWidth = 10;
+    const filled = Math.round((percent / 100) * barWidth);
+    const bar = '\u2588'.repeat(filled) + '\u2591'.repeat(barWidth - filled);
+    let out = `# ${milestone.version} ${milestone.name} \u2014 Statistics\n\n`;
+    out += `**Progress:** [${bar}] ${totalSummaries}/${totalPlans} plans (${percent}%)\n`;
+    out += `**Phases:** ${completedPhases}/${phases.length} complete\n`;
+    if (requirementsTotal > 0) {
+      out += `**Requirements:** ${requirementsComplete}/${requirementsTotal} complete\n`;
+    }
+    out += '\n';
+    out += `| Phase | Name | Plans | Completed | Status |\n`;
+    out += `|-------|------|-------|-----------|--------|\n`;
+    for (const p of phases) {
+      out += `| ${p.number} | ${p.name} | ${p.plans} | ${p.summaries} | ${p.status} |\n`;
+    }
+    if (gitCommits > 0) {
+      out += `\n**Git:** ${gitCommits} commits`;
+      if (gitFirstCommitDate) out += ` (since ${gitFirstCommitDate})`;
+      out += '\n';
+    }
+    if (lastActivity) out += `**Last activity:** ${lastActivity}\n`;
+    output({ rendered: out }, raw, out);
+  } else {
+    output(result, raw);
+  }
+}
+
 module.exports = {
   cmdGenerateSlug,
   cmdCurrentTimestamp,
@@ -545,4 +662,5 @@ module.exports = {
   cmdProgressRender,
   cmdTodoComplete,
   cmdScaffold,
+  cmdStats,
 };

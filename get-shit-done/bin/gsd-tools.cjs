@@ -488,6 +488,12 @@ async function main() {
       break;
     }
 
+    case 'stats': {
+      const subcommand = args[1] || 'json';
+      commands.cmdStats(cwd, subcommand, raw);
+      break;
+    }
+
     case 'todo': {
       const subcommand = args[1];
       if (subcommand === 'complete') {
