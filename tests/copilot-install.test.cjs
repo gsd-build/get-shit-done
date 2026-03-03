@@ -375,7 +375,7 @@ Body content here referencing ~/.claude/foo and gsd:health.`;
     const result = convertClaudeCommandToCopilotSkill(input, 'gsd-health');
     assert.ok(result.startsWith('---\nname: gsd-health\n'), 'name uses param');
     assert.ok(result.includes('description: Diagnose planning directory health'), 'description preserved');
-    assert.ok(result.includes("argument-hint: '[--repair]'"), 'argument-hint single-quoted');
+    assert.ok(result.includes('argument-hint: "[--repair]"'), 'argument-hint double-quoted');
     assert.ok(result.includes('allowed-tools: Read, Bash, Write, AskUserQuestion'), 'tools comma-separated');
     assert.ok(result.includes('.github/foo'), 'CONV-06 applied to body (local mode default)');
     assert.ok(result.includes('gsd-health'), 'CONV-07 applied to body');
@@ -410,6 +410,21 @@ Progress body.`;
     const result = convertClaudeCommandToCopilotSkill(input, 'gsd-progress');
     assert.ok(!result.includes('argument-hint:'), 'no argument-hint line');
     assert.ok(result.includes('allowed-tools: Read, Bash'), 'tools present');
+  });
+
+  test('argument-hint with inner single quotes uses double-quote YAML delimiter', () => {
+    const input = `---
+name: gsd:new-milestone
+description: Start milestone
+argument-hint: "[milestone name, e.g., 'v1.1 Notifications']"
+allowed-tools:
+  - Read
+---
+
+Body.`;
+
+    const result = convertClaudeCommandToCopilotSkill(input, 'gsd-new-milestone');
+    assert.ok(result.includes(`argument-hint: "[milestone name, e.g., 'v1.1 Notifications']"`), 'inner single quotes preserved with double-quote delimiter');
   });
 
   test('applies CONV-06 path conversion to body (local mode)', () => {

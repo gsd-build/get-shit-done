@@ -528,7 +528,7 @@ function convertClaudeCommandToCopilotSkill(content, skillName, isGlobal = false
 
   // Reconstruct frontmatter in Copilot format
   let fm = `---\nname: ${skillName}\ndescription: ${description}\n`;
-  if (argumentHint) fm += `argument-hint: '${argumentHint}'\n`;
+  if (argumentHint) fm += `argument-hint: ${yamlQuote(argumentHint)}\n`;
   if (agent) fm += `agent: ${agent}\n`;
   if (toolsLine) fm += `allowed-tools: ${toolsLine}\n`;
   fm += '---';
