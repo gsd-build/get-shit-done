@@ -4,7 +4,7 @@
 
 const fs = require('fs');
 const path = require('path');
-const { safeReadFile, normalizePhaseName, execGit, findPhaseInternal, getMilestoneInfo, output, error } = require('./core.cjs');
+const { safeReadFile, normalizePhaseName, execGit, findPhaseInternal, getMilestoneInfo, output, error, buildPaths } = require('./core.cjs');
 const { extractFrontmatter, parseMustHavesBlock } = require('./frontmatter.cjs');
 const { writeStateMd } = require('./state.cjs');
 
@@ -394,9 +394,10 @@ function cmdVerifyKeyLinks(cwd, planFilePath, raw) {
   }, raw, verified === results.length ? 'valid' : 'invalid');
 }
 
-function cmdValidateConsistency(cwd, raw) {
-  const roadmapPath = path.join(cwd, '.planning', 'ROADMAP.md');
-  const phasesDir = path.join(cwd, '.planning', 'phases');
+function cmdValidateConsistency(cwd, raw, paths) {
+  const p = paths || buildPaths(cwd);
+  const roadmapPath = p.roadmap;
+  const phasesDir = p.phases;
   const errors = [];
   const warnings = [];
 
@@ -514,13 +515,14 @@ function cmdValidateConsistency(cwd, raw) {
   output({ passed, errors, warnings, warning_count: warnings.length }, raw, passed ? 'passed' : 'failed');
 }
 
-function cmdValidateHealth(cwd, options, raw) {
-  const planningDir = path.join(cwd, '.planning');
-  const projectPath = path.join(planningDir, 'PROJECT.md');
-  const roadmapPath = path.join(planningDir, 'ROADMAP.md');
-  const statePath = path.join(planningDir, 'STATE.md');
-  const configPath = path.join(planningDir, 'config.json');
-  const phasesDir = path.join(planningDir, 'phases');
+function cmdValidateHealth(cwd, options, raw, paths) {
+  const p = paths || buildPaths(cwd);
+  const planningDir = p.baseDir;
+  const projectPath = p.project;
+  const roadmapPath = p.roadmap;
+  const statePath = p.state;
+  const configPath = p.config;
+  const phasesDir = p.phases;
 
   const errors = [];
   const warnings = [];
@@ -716,7 +718,7 @@ function cmdValidateHealth(cwd, options, raw) {
               repairActions.push({ action: 'backupState', success: true, path: backupPath });
             }
             // Generate minimal STATE.md from ROADMAP.md structure
-            const milestone = getMilestoneInfo(cwd);
+            const milestone = getMilestoneInfo(cwd, p);
             let stateContent = `# Session State\n\n`;
             stateContent += `## Project Reference\n\n`;
             stateContent += `See: .planning/PROJECT.md\n\n`;

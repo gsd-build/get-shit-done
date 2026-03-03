@@ -128,7 +128,8 @@
 
 const fs = require('fs');
 const path = require('path');
-const { error } = require('./lib/core.cjs');
+const core = require('./lib/core.cjs');
+const { error } = core;
 const state = require('./lib/state.cjs');
 const phase = require('./lib/phase.cjs');
 const roadmap = require('./lib/roadmap.cjs');
@@ -165,6 +166,22 @@ async function main() {
     error(`Invalid --cwd: ${cwd}`);
   }
 
+  // Optional workstream override for multi-workstream support
+  let ws = null;
+  const wsEqArg = args.find(arg => arg.startsWith('--ws='));
+  const wsIdx = args.indexOf('--ws');
+  if (wsEqArg) {
+    ws = wsEqArg.slice('--ws='.length).trim();
+    if (!ws) error('Missing value for --ws');
+    args.splice(args.indexOf(wsEqArg), 1);
+  } else if (wsIdx !== -1) {
+    ws = args[wsIdx + 1];
+    if (!ws || ws.startsWith('--')) error('Missing value for --ws');
+    args.splice(wsIdx, 2);
+  }
+
+  const paths = core.buildPaths(cwd, ws);
+
   const rawIndex = args.indexOf('--raw');
   const raw = rawIndex !== -1;
   if (rawIndex !== -1) args.splice(rawIndex, 1);
@@ -179,11 +196,11 @@ async function main() {
     case 'state': {
       const subcommand = args[1];
       if (subcommand === 'json') {
-        state.cmdStateJson(cwd, raw);
+        state.cmdStateJson(cwd, raw, paths);
       } else if (subcommand === 'update') {
-        state.cmdStateUpdate(cwd, args[2], args[3]);
+        state.cmdStateUpdate(cwd, args[2], args[3], paths);
       } else if (subcommand === 'get') {
-        state.cmdStateGet(cwd, args[2], raw);
+        state.cmdStateGet(cwd, args[2], raw, paths);
       } else if (subcommand === 'patch') {
         const patches = {};
         for (let i = 2; i < args.length; i += 2) {
@@ -193,9 +210,9 @@ async function main() {
             patches[key] = value;
           }
         }
-        state.cmdStatePatch(cwd, patches, raw);
+        state.cmdStatePatch(cwd, patches, raw, paths);
       } else if (subcommand === 'advance-plan') {
-        state.cmdStateAdvancePlan(cwd, raw);
+        state.cmdStateAdvancePlan(cwd, raw, paths);
       } else if (subcommand === 'record-metric') {
         const phaseIdx = args.indexOf('--phase');
         const planIdx = args.indexOf('--plan');
@@ -208,9 +225,9 @@ async function main() {
           duration: durationIdx !== -1 ? args[durationIdx + 1] : null,
           tasks: tasksIdx !== -1 ? args[tasksIdx + 1] : null,
           files: filesIdx !== -1 ? args[filesIdx + 1] : null,
-        }, raw);
+        }, raw, paths);
       } else if (subcommand === 'update-progress') {
-        state.cmdStateUpdateProgress(cwd, raw);
+        state.cmdStateUpdateProgress(cwd, raw, paths);
       } else if (subcommand === 'add-decision') {
         const phaseIdx = args.indexOf('--phase');
         const summaryIdx = args.indexOf('--summary');
@@ -223,37 +240,37 @@ async function main() {
           summary_file: summaryFileIdx !== -1 ? args[summaryFileIdx + 1] : null,
           rationale: rationaleIdx !== -1 ? args[rationaleIdx + 1] : '',
           rationale_file: rationaleFileIdx !== -1 ? args[rationaleFileIdx + 1] : null,
-        }, raw);
+        }, raw, paths);
       } else if (subcommand === 'add-blocker') {
         const textIdx = args.indexOf('--text');
         const textFileIdx = args.indexOf('--text-file');
         state.cmdStateAddBlocker(cwd, {
           text: textIdx !== -1 ? args[textIdx + 1] : null,
           text_file: textFileIdx !== -1 ? args[textFileIdx + 1] : null,
-        }, raw);
+        }, raw, paths);
       } else if (subcommand === 'resolve-blocker') {
         const textIdx = args.indexOf('--text');
-        state.cmdStateResolveBlocker(cwd, textIdx !== -1 ? args[textIdx + 1] : null, raw);
+        state.cmdStateResolveBlocker(cwd, textIdx !== -1 ? args[textIdx + 1] : null, raw, paths);
       } else if (subcommand === 'record-session') {
         const stoppedIdx = args.indexOf('--stopped-at');
         const resumeIdx = args.indexOf('--resume-file');
         state.cmdStateRecordSession(cwd, {
           stopped_at: stoppedIdx !== -1 ? args[stoppedIdx + 1] : null,
           resume_file: resumeIdx !== -1 ? args[resumeIdx + 1] : 'None',
-        }, raw);
+        }, raw, paths);
       } else {
-        state.cmdStateLoad(cwd, raw);
+        state.cmdStateLoad(cwd, raw, paths);
       }
       break;
     }
 
     case 'resolve-model': {
-      commands.cmdResolveModel(cwd, args[1], raw);
+      commands.cmdResolveModel(cwd, args[1], raw, paths);
       break;
     }
 
     case 'find-phase': {
-      phase.cmdFindPhase(cwd, args[1], raw);
+      phase.cmdFindPhase(cwd, args[1], raw, paths);
       break;
     }
 
@@ -263,7 +280,7 @@ async function main() {
       // Parse --files flag (collect args after --files, stopping at other flags)
       const filesIndex = args.indexOf('--files');
       const files = filesIndex !== -1 ? args.slice(filesIndex + 1).filter(a => !a.startsWith('--')) : [];
-      commands.cmdCommit(cwd, message, files, raw, amend);
+      commands.cmdCommit(cwd, message, files, raw, amend, paths);
       break;
     }
 
@@ -271,14 +288,14 @@ async function main() {
       const summaryPath = args[1];
       const countIndex = args.indexOf('--check-count');
       const checkCount = countIndex !== -1 ? parseInt(args[countIndex + 1], 10) : 2;
-      verify.cmdVerifySummary(cwd, summaryPath, checkCount, raw);
+      verify.cmdVerifySummary(cwd, summaryPath, checkCount, raw, paths);
       break;
     }
 
     case 'template': {
       const subcommand = args[1];
       if (subcommand === 'select') {
-        template.cmdTemplateSelect(cwd, args[2], raw);
+        template.cmdTemplateSelect(cwd, args[2], raw, paths);
       } else if (subcommand === 'fill') {
         const templateType = args[2];
         const phaseIdx = args.indexOf('--phase');
@@ -294,7 +311,7 @@ async function main() {
           type: typeIdx !== -1 ? args[typeIdx + 1] : 'execute',
           wave: waveIdx !== -1 ? args[waveIdx + 1] : '1',
           fields: fieldsIdx !== -1 ? JSON.parse(args[fieldsIdx + 1]) : {},
-        }, raw);
+        }, raw, paths);
       } else {
         error('Unknown template subcommand. Available: select, fill');
       }
@@ -326,17 +343,17 @@ async function main() {
     case 'verify': {
       const subcommand = args[1];
       if (subcommand === 'plan-structure') {
-        verify.cmdVerifyPlanStructure(cwd, args[2], raw);
+        verify.cmdVerifyPlanStructure(cwd, args[2], raw, paths);
       } else if (subcommand === 'phase-completeness') {
-        verify.cmdVerifyPhaseCompleteness(cwd, args[2], raw);
+        verify.cmdVerifyPhaseCompleteness(cwd, args[2], raw, paths);
       } else if (subcommand === 'references') {
-        verify.cmdVerifyReferences(cwd, args[2], raw);
+        verify.cmdVerifyReferences(cwd, args[2], raw, paths);
       } else if (subcommand === 'commits') {
-        verify.cmdVerifyCommits(cwd, args.slice(2), raw);
+        verify.cmdVerifyCommits(cwd, args.slice(2), raw, paths);
       } else if (subcommand === 'artifacts') {
-        verify.cmdVerifyArtifacts(cwd, args[2], raw);
+        verify.cmdVerifyArtifacts(cwd, args[2], raw, paths);
       } else if (subcommand === 'key-links') {
-        verify.cmdVerifyKeyLinks(cwd, args[2], raw);
+        verify.cmdVerifyKeyLinks(cwd, args[2], raw, paths);
       } else {
         error('Unknown verify subcommand. Available: plan-structure, phase-completeness, references, commits, artifacts, key-links');
       }
@@ -354,7 +371,7 @@ async function main() {
     }
 
     case 'list-todos': {
-      commands.cmdListTodos(cwd, args[1], raw);
+      commands.cmdListTodos(cwd, args[1], raw, paths);
       break;
     }
 
@@ -364,22 +381,22 @@ async function main() {
     }
 
     case 'config-ensure-section': {
-      config.cmdConfigEnsureSection(cwd, raw);
+      config.cmdConfigEnsureSection(cwd, raw, paths);
       break;
     }
 
     case 'config-set': {
-      config.cmdConfigSet(cwd, args[1], args[2], raw);
+      config.cmdConfigSet(cwd, args[1], args[2], raw, paths);
       break;
     }
 
     case 'config-get': {
-      config.cmdConfigGet(cwd, args[1], raw);
+      config.cmdConfigGet(cwd, args[1], raw, paths);
       break;
     }
 
     case 'history-digest': {
-      commands.cmdHistoryDigest(cwd, raw);
+      commands.cmdHistoryDigest(cwd, raw, paths);
       break;
     }
 
@@ -393,7 +410,7 @@ async function main() {
           phase: phaseIndex !== -1 ? args[phaseIndex + 1] : null,
           includeArchived: args.includes('--include-archived'),
         };
-        phase.cmdPhasesList(cwd, options, raw);
+        phase.cmdPhasesList(cwd, options, raw, paths);
       } else {
         error('Unknown phases subcommand. Available: list');
       }
@@ -403,11 +420,11 @@ async function main() {
     case 'roadmap': {
       const subcommand = args[1];
       if (subcommand === 'get-phase') {
-        roadmap.cmdRoadmapGetPhase(cwd, args[2], raw);
+        roadmap.cmdRoadmapGetPhase(cwd, args[2], raw, paths);
       } else if (subcommand === 'analyze') {
-        roadmap.cmdRoadmapAnalyze(cwd, raw);
+        roadmap.cmdRoadmapAnalyze(cwd, raw, paths);
       } else if (subcommand === 'update-plan-progress') {
-        roadmap.cmdRoadmapUpdatePlanProgress(cwd, args[2], raw);
+        roadmap.cmdRoadmapUpdatePlanProgress(cwd, args[2], raw, paths);
       } else {
         error('Unknown roadmap subcommand. Available: get-phase, analyze, update-plan-progress');
       }
@@ -417,7 +434,7 @@ async function main() {
     case 'requirements': {
       const subcommand = args[1];
       if (subcommand === 'mark-complete') {
-        milestone.cmdRequirementsMarkComplete(cwd, args.slice(2), raw);
+        milestone.cmdRequirementsMarkComplete(cwd, args.slice(2), raw, paths);
       } else {
         error('Unknown requirements subcommand. Available: mark-complete');
       }
@@ -427,16 +444,16 @@ async function main() {
     case 'phase': {
       const subcommand = args[1];
       if (subcommand === 'next-decimal') {
-        phase.cmdPhaseNextDecimal(cwd, args[2], raw);
+        phase.cmdPhaseNextDecimal(cwd, args[2], raw, paths);
       } else if (subcommand === 'add') {
-        phase.cmdPhaseAdd(cwd, args.slice(2).join(' '), raw);
+        phase.cmdPhaseAdd(cwd, args.slice(2).join(' '), raw, paths);
       } else if (subcommand === 'insert') {
-        phase.cmdPhaseInsert(cwd, args[2], args.slice(3).join(' '), raw);
+        phase.cmdPhaseInsert(cwd, args[2], args.slice(3).join(' '), raw, paths);
       } else if (subcommand === 'remove') {
         const forceFlag = args.includes('--force');
-        phase.cmdPhaseRemove(cwd, args[2], { force: forceFlag }, raw);
+        phase.cmdPhaseRemove(cwd, args[2], { force: forceFlag }, raw, paths);
       } else if (subcommand === 'complete') {
-        phase.cmdPhaseComplete(cwd, args[2], raw);
+        phase.cmdPhaseComplete(cwd, args[2], raw, paths);
       } else {
         error('Unknown phase subcommand. Available: next-decimal, add, insert, remove, complete');
       }
@@ -458,7 +475,7 @@ async function main() {
           }
           milestoneName = nameArgs.join(' ') || null;
         }
-        milestone.cmdMilestoneComplete(cwd, args[2], { name: milestoneName, archivePhases }, raw);
+        milestone.cmdMilestoneComplete(cwd, args[2], { name: milestoneName, archivePhases }, raw, paths);
       } else {
         error('Unknown milestone subcommand. Available: complete');
       }
@@ -468,10 +485,10 @@ async function main() {
     case 'validate': {
       const subcommand = args[1];
       if (subcommand === 'consistency') {
-        verify.cmdValidateConsistency(cwd, raw);
+        verify.cmdValidateConsistency(cwd, raw, paths);
       } else if (subcommand === 'health') {
         const repairFlag = args.includes('--repair');
-        verify.cmdValidateHealth(cwd, { repair: repairFlag }, raw);
+        verify.cmdValidateHealth(cwd, { repair: repairFlag }, raw, paths);
       } else {
         error('Unknown validate subcommand. Available: consistency, health');
       }
@@ -480,14 +497,14 @@ async function main() {
 
     case 'progress': {
       const subcommand = args[1] || 'json';
-      commands.cmdProgressRender(cwd, subcommand, raw);
+      commands.cmdProgressRender(cwd, subcommand, raw, paths);
       break;
     }
 
     case 'todo': {
       const subcommand = args[1];
       if (subcommand === 'complete') {
-        commands.cmdTodoComplete(cwd, args[2], raw);
+        commands.cmdTodoComplete(cwd, args[2], raw, paths);
       } else {
         error('Unknown todo subcommand. Available: complete');
       }
@@ -502,7 +519,7 @@ async function main() {
         phase: phaseIndex !== -1 ? args[phaseIndex + 1] : null,
         name: nameIndex !== -1 ? args.slice(nameIndex + 1).join(' ') : null,
       };
-      commands.cmdScaffold(cwd, scaffoldType, scaffoldOptions, raw);
+      commands.cmdScaffold(cwd, scaffoldType, scaffoldOptions, raw, paths);
       break;
     }
 
@@ -510,40 +527,40 @@ async function main() {
       const workflow = args[1];
       switch (workflow) {
         case 'execute-phase':
-          init.cmdInitExecutePhase(cwd, args[2], raw);
+          init.cmdInitExecutePhase(cwd, args[2], raw, paths);
           break;
         case 'plan-phase':
-          init.cmdInitPlanPhase(cwd, args[2], raw);
+          init.cmdInitPlanPhase(cwd, args[2], raw, paths);
           break;
         case 'new-project':
-          init.cmdInitNewProject(cwd, raw);
+          init.cmdInitNewProject(cwd, raw, paths);
           break;
         case 'new-milestone':
-          init.cmdInitNewMilestone(cwd, raw);
+          init.cmdInitNewMilestone(cwd, raw, paths);
           break;
         case 'quick':
-          init.cmdInitQuick(cwd, args.slice(2).join(' '), raw);
+          init.cmdInitQuick(cwd, args.slice(2).join(' '), raw, paths);
           break;
         case 'resume':
-          init.cmdInitResume(cwd, raw);
+          init.cmdInitResume(cwd, raw, paths);
           break;
         case 'verify-work':
-          init.cmdInitVerifyWork(cwd, args[2], raw);
+          init.cmdInitVerifyWork(cwd, args[2], raw, paths);
           break;
         case 'phase-op':
-          init.cmdInitPhaseOp(cwd, args[2], raw);
+          init.cmdInitPhaseOp(cwd, args[2], raw, paths);
           break;
         case 'todos':
-          init.cmdInitTodos(cwd, args[2], raw);
+          init.cmdInitTodos(cwd, args[2], raw, paths);
           break;
         case 'milestone-op':
-          init.cmdInitMilestoneOp(cwd, raw);
+          init.cmdInitMilestoneOp(cwd, raw, paths);
           break;
         case 'map-codebase':
-          init.cmdInitMapCodebase(cwd, raw);
+          init.cmdInitMapCodebase(cwd, raw, paths);
           break;
         case 'progress':
-          init.cmdInitProgress(cwd, raw);
+          init.cmdInitProgress(cwd, raw, paths);
           break;
         default:
           error(`Unknown init workflow: ${workflow}\nAvailable: execute-phase, plan-phase, new-project, new-milestone, quick, resume, verify-work, phase-op, todos, milestone-op, map-codebase, progress`);
@@ -552,12 +569,12 @@ async function main() {
     }
 
     case 'phase-plan-index': {
-      phase.cmdPhasePlanIndex(cwd, args[1], raw);
+      phase.cmdPhasePlanIndex(cwd, args[1], raw, paths);
       break;
     }
 
     case 'state-snapshot': {
-      state.cmdStateSnapshot(cwd, raw);
+      state.cmdStateSnapshot(cwd, raw, paths);
       break;
     }
 

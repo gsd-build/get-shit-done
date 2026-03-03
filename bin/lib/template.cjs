@@ -4,7 +4,7 @@
 
 const fs = require('fs');
 const path = require('path');
-const { normalizePhaseName, findPhaseInternal, generateSlugInternal, output, error } = require('./core.cjs');
+const { normalizePhaseName, findPhaseInternal, generateSlugInternal, output, error, buildPaths } = require('./core.cjs');
 const { reconstructFrontmatter } = require('./frontmatter.cjs');
 
 function cmdTemplateSelect(cwd, planPath, raw) {
@@ -53,11 +53,12 @@ function cmdTemplateSelect(cwd, planPath, raw) {
   }
 }
 
-function cmdTemplateFill(cwd, templateType, options, raw) {
+function cmdTemplateFill(cwd, templateType, options, raw, paths) {
   if (!templateType) { error('template type required: summary, plan, or verification'); }
   if (!options.phase) { error('--phase required'); }
 
-  const phaseInfo = findPhaseInternal(cwd, options.phase);
+  const p = paths || buildPaths(cwd);
+  const phaseInfo = findPhaseInternal(cwd, options.phase, p);
   if (!phaseInfo || !phaseInfo.found) { output({ error: 'Phase not found', phase: options.phase }, raw); return; }
 
   const padded = normalizePhaseName(options.phase);
