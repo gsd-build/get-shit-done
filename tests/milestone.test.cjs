@@ -606,6 +606,39 @@ describe('requirements mark-complete command', () => {
 });
 
 // ─────────────────────────────────────────────────────────────────────────────
+// milestone create auto-migration
+// ─────────────────────────────────────────────────────────────────────────────
+
+describe('milestone create auto-migration', () => {
+  let tmpDir;
+
+  beforeEach(() => {
+    tmpDir = createTempProject();
+  });
+
+  afterEach(() => {
+    cleanup(tmpDir);
+  });
+
+  test('migrates legacy STATE.md to milestone directory on first create', () => {
+    // Write legacy STATE.md with content
+    const legacyStatePath = path.join(tmpDir, '.planning', 'STATE.md');
+    fs.writeFileSync(legacyStatePath, '---\nphase: 3\n---\n# State\n\n**Status:** Executing Phase 3\n');
+
+    // Create first milestone
+    const result = runGsdTools('milestone create v1.0', tmpDir);
+    assert.ok(result.success, `Command failed: ${result.error}`);
+
+    const output = JSON.parse(result.output);
+    assert.strictEqual(output.created, true);
+
+    // Check milestone STATE.md exists
+    const msStatePath = path.join(tmpDir, '.planning', 'milestones', 'v1.0', 'STATE.md');
+    assert.ok(fs.existsSync(msStatePath));
+  });
+});
+
+// ─────────────────────────────────────────────────────────────────────────────
 // validate consistency command
 // ─────────────────────────────────────────────────────────────────────────────
 

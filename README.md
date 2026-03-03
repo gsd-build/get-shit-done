@@ -2,7 +2,7 @@
 
 # GET SHIT DONE
 
-**A light-weight and powerful meta-prompting, context engineering and spec-driven development system for Claude Code, OpenCode, Gemini CLI, and Codex.**
+**A light-weight and powerful meta-prompting, context engineering and spec-driven development system for Claude Code, OpenCode, Gemini CLI, Codex, and Kimi.**
 
 **Solves context rot — the quality degradation that happens as Claude fills its context window.**
 
@@ -80,16 +80,18 @@ npx get-shit-done-cc@latest
 ```
 
 The installer prompts you to choose:
-1. **Runtime** — Claude Code, OpenCode, Gemini, Codex, or all
+1. **Runtime** — Claude Code, OpenCode, Gemini, Codex, Kimi, or all
 2. **Location** — Global (all projects) or local (current project only)
 
 Verify with:
 - Claude Code / Gemini: `/gsd:help`
 - OpenCode: `/gsd-help`
 - Codex: `$gsd-help`
+- Kimi: `/skill:gsd-help`
 
 > [!NOTE]
-> Codex installation uses skills (`skills/gsd-*/SKILL.md`) rather than custom prompts.
+> Codex and Kimi installations use skills (`skills/gsd-*/SKILL.md`) rather than custom prompts.
+> Kimi installs globally to `~/.config/agents/skills/` and does not support local install.
 
 ### Staying Updated
 
@@ -117,12 +119,15 @@ npx get-shit-done-cc --gemini --global   # Install to ~/.gemini/
 npx get-shit-done-cc --codex --global    # Install to ~/.codex/
 npx get-shit-done-cc --codex --local     # Install to ./.codex/
 
+# Kimi (skills-first, XDG global only)
+npx get-shit-done-cc --kimi --global     # Install to ~/.config/agents/skills/
+
 # All runtimes
 npx get-shit-done-cc --all --global      # Install to all directories
 ```
 
 Use `--global` (`-g`) or `--local` (`-l`) to skip the location prompt.
-Use `--claude`, `--opencode`, `--gemini`, `--codex`, or `--all` to skip the runtime prompt.
+Use `--claude`, `--opencode`, `--gemini`, `--codex`, `--kimi`, or `--all` to skip the runtime prompt.
 
 </details>
 
@@ -474,6 +479,7 @@ You're never locked in. The system adapts.
 | `/gsd:audit-milestone` | Verify milestone achieved its definition of done |
 | `/gsd:complete-milestone` | Archive milestone, tag release |
 | `/gsd:new-milestone [name]` | Start next version: questions → research → requirements → roadmap |
+| `/gsd:switch-milestone <name>` | Switch active milestone for concurrent work |
 
 ### Navigation
 
@@ -512,14 +518,30 @@ You're never locked in. The system adapts.
 | Command | What it does |
 |---------|--------------|
 | `/gsd:settings` | Configure model profile and workflow agents |
-| `/gsd:set-profile <profile>` | Switch model profile (quality/balanced/budget) |
+| `/gsd:set-profile <profile>` | Switch model profile (quality/balanced/budget/adaptive) |
+| `/gsd:report-bug [desc]` | Report bug with severity tracking and GitHub issue creation |
 | `/gsd:add-todo [desc]` | Capture idea for later |
 | `/gsd:check-todos` | List pending todos |
 | `/gsd:debug [desc]` | Systematic debugging with persistent state |
+| `/gsd:add-tests <N> [instructions]` | Generate unit and E2E tests for completed phase |
 | `/gsd:quick [--full]` | Execute ad-hoc task with GSD guarantees (`--full` adds plan-checking and verification) |
 | `/gsd:health [--repair]` | Validate `.planning/` directory integrity, auto-repair with `--repair` |
 
 <sup>¹ Contributed by reddit user OracleGreyBeard</sup>
+
+### Concurrent Milestones
+
+Work on multiple milestones simultaneously — e.g., v2.0 features + v1.5.1 hotfix:
+
+```
+/gsd:new-milestone "v1.5.1 Hotfix"    # Creates milestone-scoped directory
+/gsd:switch-milestone v2.0-features    # Switch back to feature work
+/gsd:progress                          # See status of active milestone
+```
+
+Each milestone gets isolated state: `STATE.md`, `ROADMAP.md`, `REQUIREMENTS.md`, `phases/` — all scoped under `.planning/milestones/<name>/`. Switch freely without losing progress.
+
+When no second milestone exists, everything stays in `.planning/` as usual (zero behavioral change).
 
 ---
 
@@ -629,9 +651,10 @@ This prevents Claude from reading these files entirely, regardless of what comma
 - Restart your runtime to reload commands/skills
 - Verify files exist in `~/.claude/commands/gsd/` (global) or `./.claude/commands/gsd/` (local)
 - For Codex, verify skills exist in `~/.codex/skills/gsd-*/SKILL.md` (global) or `./.codex/skills/gsd-*/SKILL.md` (local)
+- For Kimi, verify skills exist in `~/.config/agents/skills/gsd-*/SKILL.md`
 
 **Commands not working as expected?**
-- Run `/gsd:help` to verify installation
+- Run `/gsd:help` (or `/skill:gsd-help` for Kimi) to verify installation
 - Re-run `npx get-shit-done-cc` to reinstall
 
 **Updating to the latest version?**
@@ -656,6 +679,7 @@ To remove GSD completely:
 npx get-shit-done-cc --claude --global --uninstall
 npx get-shit-done-cc --opencode --global --uninstall
 npx get-shit-done-cc --codex --global --uninstall
+npx get-shit-done-cc --kimi --global --uninstall
 
 # Local installs (current project)
 npx get-shit-done-cc --claude --local --uninstall

@@ -95,12 +95,20 @@ process.stdin.on('end', () => {
       } catch (e) {}
     }
 
+    // Active milestone (multi-milestone mode)
+    let milestone = '';
+    const activeMilestonePath = path.join(dir, '.planning', 'ACTIVE_MILESTONE');
+    try {
+      const ms = fs.readFileSync(activeMilestonePath, 'utf-8').trim();
+      if (ms) milestone = `\x1b[36m[${ms}]\x1b[0m │ `;
+    } catch {}
+
     // Output
     const dirname = path.basename(dir);
     if (task) {
-      process.stdout.write(`${gsdUpdate}\x1b[2m${model}\x1b[0m │ \x1b[1m${task}\x1b[0m │ \x1b[2m${dirname}\x1b[0m${ctx}`);
+      process.stdout.write(`${gsdUpdate}\x1b[2m${model}\x1b[0m │ \x1b[1m${task}\x1b[0m │ ${milestone}\x1b[2m${dirname}\x1b[0m${ctx}`);
     } else {
-      process.stdout.write(`${gsdUpdate}\x1b[2m${model}\x1b[0m │ \x1b[2m${dirname}\x1b[0m${ctx}`);
+      process.stdout.write(`${gsdUpdate}\x1b[2m${model}\x1b[0m │ ${milestone}\x1b[2m${dirname}\x1b[0m${ctx}`);
     }
   } catch (e) {
     // Silent fail - don't break statusline on parse errors

@@ -8,6 +8,97 @@ const fs = require('fs');
 const path = require('path');
 const { runGsdTools, createTempProject, cleanup } = require('./helpers.cjs');
 
+// ─── resolve-adaptive-model CLI ─────────────────────────────────────────────
+
+describe('resolve-adaptive-model command', () => {
+  let tmpDir;
+
+  beforeEach(() => {
+    tmpDir = createTempProject();
+  });
+
+  afterEach(() => {
+    cleanup(tmpDir);
+  });
+
+  test('returns model and complexity for adaptive profile', () => {
+    fs.writeFileSync(
+      path.join(tmpDir, '.planning', 'config.json'),
+      JSON.stringify({ model_profile: 'adaptive' })
+    );
+    const ctx = JSON.stringify({ files_modified: ['a.js'], task_count: 1, objective: 'fix typo' });
+    const result = runGsdTools(['resolve-adaptive-model', 'gsd-executor', '--context', ctx], tmpDir);
+    assert.ok(result.success, `Command failed: ${result.error}`);
+
+    const output = JSON.parse(result.output);
+    assert.strictEqual(output.model, 'haiku');
+    assert.strictEqual(output.profile, 'adaptive');
+    assert.ok(output.complexity);
+    assert.strictEqual(output.complexity.tier, 'simple');
+  });
+
+  test('falls back to balanced behavior when not adaptive', () => {
+    fs.writeFileSync(
+      path.join(tmpDir, '.planning', 'config.json'),
+      JSON.stringify({ model_profile: 'balanced' })
+    );
+    const ctx = JSON.stringify({ files_modified: ['a.js'], task_count: 1, objective: 'fix typo' });
+    const result = runGsdTools(['resolve-adaptive-model', 'gsd-executor', '--context', ctx], tmpDir);
+    assert.ok(result.success, `Command failed: ${result.error}`);
+
+    const output = JSON.parse(result.output);
+    assert.strictEqual(output.model, 'sonnet');
+    assert.strictEqual(output.profile, 'balanced');
+    assert.strictEqual(output.complexity, undefined);
+  });
+
+  test('adaptive with log_selections true creates usage log', () => {
+    fs.writeFileSync(
+      path.join(tmpDir, '.planning', 'config.json'),
+      JSON.stringify({ model_profile: 'adaptive', adaptive_settings: { log_selections: true } })
+    );
+    const ctx = JSON.stringify({ files_modified: ['a.js'], task_count: 1, objective: 'fix typo' });
+    const result = runGsdTools(['resolve-adaptive-model', 'gsd-executor', '--context', ctx], tmpDir);
+    assert.ok(result.success, `Command failed: ${result.error}`);
+
+    const logPath = path.join(tmpDir, '.planning', 'adaptive-usage.json');
+    assert.ok(fs.existsSync(logPath), 'adaptive-usage.json should exist');
+    const log = JSON.parse(fs.readFileSync(logPath, 'utf-8'));
+    assert.strictEqual(log.length, 1);
+    assert.strictEqual(log[0].agent, 'gsd-executor');
+    assert.strictEqual(log[0].tier, 'simple');
+    assert.strictEqual(typeof log[0].timestamp, 'string');
+    assert.strictEqual(log[0].model, 'haiku');
+  });
+
+  test('adaptive with log_selections false does not create log', () => {
+    fs.writeFileSync(
+      path.join(tmpDir, '.planning', 'config.json'),
+      JSON.stringify({ model_profile: 'adaptive', adaptive_settings: { log_selections: false } })
+    );
+    const ctx = JSON.stringify({ files_modified: ['a.js'], task_count: 1, objective: 'fix typo' });
+    const result = runGsdTools(['resolve-adaptive-model', 'gsd-executor', '--context', ctx], tmpDir);
+    assert.ok(result.success, `Command failed: ${result.error}`);
+
+    const logPath = path.join(tmpDir, '.planning', 'adaptive-usage.json');
+    assert.ok(!fs.existsSync(logPath), 'adaptive-usage.json should not exist');
+  });
+
+  test('non-adaptive profile does not create log regardless of settings', () => {
+    fs.writeFileSync(
+      path.join(tmpDir, '.planning', 'config.json'),
+      JSON.stringify({ model_profile: 'balanced', adaptive_settings: { log_selections: true } })
+    );
+    const ctx = JSON.stringify({ files_modified: ['a.js'], task_count: 1, objective: 'fix typo' });
+    const result = runGsdTools(['resolve-adaptive-model', 'gsd-executor', '--context', ctx], tmpDir);
+    assert.ok(result.success, `Command failed: ${result.error}`);
+
+    const logPath = path.join(tmpDir, '.planning', 'adaptive-usage.json');
+    assert.ok(!fs.existsSync(logPath), 'adaptive-usage.json should not exist for non-adaptive');
+  });
+});
+
+
 describe('history-digest command', () => {
   let tmpDir;
 
@@ -1184,5 +1275,397 @@ describe('websearch command', () => {
     const output = JSON.parse(captured);
     assert.strictEqual(output.available, false);
     assert.strictEqual(output.error, 'Network timeout');
+  });
+});
+
+// ─────────────────────────────────────────────────────────────────────────────
+// bug list command
+// ─────────────────────────────────────────────────────────────────────────────
+
+describe('bug list command', () => {
+  let tmpDir;
+
+  beforeEach(() => {
+    tmpDir = createTempProject();
+  });
+
+  afterEach(() => {
+    cleanup(tmpDir);
+  });
+
+  test('empty directory returns zero count', () => {
+    const result = runGsdTools('bug list', tmpDir);
+    assert.ok(result.success, `Command failed: ${result.error}`);
+
+    const output = JSON.parse(result.output);
+    assert.strictEqual(output.count, 0, 'count should be 0');
+    assert.deepStrictEqual(output.bugs, [], 'bugs should be empty');
+  });
+
+  test('lists bugs with correct fields', () => {
+    const bugsDir = path.join(tmpDir, '.planning', 'bugs');
+    fs.mkdirSync(bugsDir, { recursive: true });
+
+    fs.writeFileSync(path.join(bugsDir, 'BUG-001.md'), `---
+id: BUG-001
+title: "Login button broken"
+severity: high
+status: reported
+area: auth
+created: 2026-02-01T00:00:00.000Z
+---
+
+# BUG-001: Login button broken
+`);
+
+    fs.writeFileSync(path.join(bugsDir, 'BUG-002.md'), `---
+id: BUG-002
+title: "Typo in footer"
+severity: low
+status: investigating
+area: ui
+created: 2026-02-02T00:00:00.000Z
+---
+
+# BUG-002: Typo in footer
+`);
+
+    const result = runGsdTools('bug list', tmpDir);
+    assert.ok(result.success, `Command failed: ${result.error}`);
+
+    const output = JSON.parse(result.output);
+    assert.strictEqual(output.count, 2, 'should have 2 bugs');
+
+    const bug1 = output.bugs.find(b => b.id === 'BUG-001');
+    assert.ok(bug1, 'BUG-001 should be listed');
+    assert.strictEqual(bug1.title, 'Login button broken');
+    assert.strictEqual(bug1.severity, 'high');
+    assert.strictEqual(bug1.status, 'reported');
+    assert.strictEqual(bug1.area, 'auth');
+  });
+
+  test('severity filter works', () => {
+    const bugsDir = path.join(tmpDir, '.planning', 'bugs');
+    fs.mkdirSync(bugsDir, { recursive: true });
+
+    fs.writeFileSync(path.join(bugsDir, 'BUG-001.md'), `---
+id: BUG-001
+title: "Critical crash"
+severity: critical
+status: reported
+area: core
+created: 2026-02-01T00:00:00.000Z
+---
+`);
+    fs.writeFileSync(path.join(bugsDir, 'BUG-002.md'), `---
+id: BUG-002
+title: "Minor typo"
+severity: low
+status: reported
+area: ui
+created: 2026-02-02T00:00:00.000Z
+---
+`);
+
+    const result = runGsdTools('bug list --severity critical', tmpDir);
+    assert.ok(result.success, `Command failed: ${result.error}`);
+
+    const output = JSON.parse(result.output);
+    assert.strictEqual(output.count, 1, 'should have 1 critical bug');
+    assert.strictEqual(output.bugs[0].severity, 'critical');
+  });
+
+  test('status filter works', () => {
+    const bugsDir = path.join(tmpDir, '.planning', 'bugs');
+    fs.mkdirSync(bugsDir, { recursive: true });
+
+    fs.writeFileSync(path.join(bugsDir, 'BUG-001.md'), `---
+id: BUG-001
+title: "Bug A"
+severity: medium
+status: investigating
+area: api
+created: 2026-02-01T00:00:00.000Z
+---
+`);
+    fs.writeFileSync(path.join(bugsDir, 'BUG-002.md'), `---
+id: BUG-002
+title: "Bug B"
+severity: medium
+status: reported
+area: api
+created: 2026-02-02T00:00:00.000Z
+---
+`);
+
+    const result = runGsdTools('bug list --status investigating', tmpDir);
+    assert.ok(result.success, `Command failed: ${result.error}`);
+
+    const output = JSON.parse(result.output);
+    assert.strictEqual(output.count, 1);
+    assert.strictEqual(output.bugs[0].status, 'investigating');
+  });
+
+  test('area filter works', () => {
+    const bugsDir = path.join(tmpDir, '.planning', 'bugs');
+    fs.mkdirSync(bugsDir, { recursive: true });
+
+    fs.writeFileSync(path.join(bugsDir, 'BUG-001.md'), `---
+id: BUG-001
+title: "Auth bug"
+severity: high
+status: reported
+area: auth
+created: 2026-02-01T00:00:00.000Z
+---
+`);
+    fs.writeFileSync(path.join(bugsDir, 'BUG-002.md'), `---
+id: BUG-002
+title: "API bug"
+severity: high
+status: reported
+area: api
+created: 2026-02-02T00:00:00.000Z
+---
+`);
+
+    const result = runGsdTools('bug list --area auth', tmpDir);
+    assert.ok(result.success, `Command failed: ${result.error}`);
+
+    const output = JSON.parse(result.output);
+    assert.strictEqual(output.count, 1);
+    assert.strictEqual(output.bugs[0].area, 'auth');
+  });
+});
+
+// ─────────────────────────────────────────────────────────────────────────────
+// bug update command
+// ─────────────────────────────────────────────────────────────────────────────
+
+describe('bug update command', () => {
+  let tmpDir;
+
+  beforeEach(() => {
+    tmpDir = createTempProject();
+  });
+
+  afterEach(() => {
+    cleanup(tmpDir);
+  });
+
+  test('updates status in frontmatter', () => {
+    const bugsDir = path.join(tmpDir, '.planning', 'bugs');
+    fs.mkdirSync(bugsDir, { recursive: true });
+
+    fs.writeFileSync(path.join(bugsDir, 'BUG-001.md'), `---
+id: BUG-001
+title: "Test bug"
+severity: high
+status: reported
+area: core
+created: 2026-02-01T00:00:00.000Z
+---
+
+# BUG-001: Test bug
+`);
+
+    const result = runGsdTools('bug update BUG-001 --status investigating', tmpDir);
+    assert.ok(result.success, `Command failed: ${result.error}`);
+
+    const output = JSON.parse(result.output);
+    assert.strictEqual(output.updated, true);
+    assert.strictEqual(output.status, 'investigating');
+
+    // Verify file was updated
+    const content = fs.readFileSync(path.join(bugsDir, 'BUG-001.md'), 'utf-8');
+    assert.ok(content.includes('status: investigating'), 'status should be updated in file');
+    assert.ok(content.match(/^updated:/m), 'should have updated timestamp');
+  });
+
+  test('resolve moves to bugs/resolved/', () => {
+    const bugsDir = path.join(tmpDir, '.planning', 'bugs');
+    fs.mkdirSync(bugsDir, { recursive: true });
+
+    fs.writeFileSync(path.join(bugsDir, 'BUG-001.md'), `---
+id: BUG-001
+title: "Resolved bug"
+severity: medium
+status: fixing
+area: api
+created: 2026-02-01T00:00:00.000Z
+---
+`);
+
+    const result = runGsdTools('bug resolve BUG-001', tmpDir);
+    assert.ok(result.success, `Command failed: ${result.error}`);
+
+    const output = JSON.parse(result.output);
+    assert.strictEqual(output.updated, true);
+    assert.strictEqual(output.status, 'resolved');
+    assert.strictEqual(output.moved, 'resolved');
+
+    // Verify moved
+    assert.ok(
+      !fs.existsSync(path.join(bugsDir, 'BUG-001.md')),
+      'should be removed from bugs dir'
+    );
+    assert.ok(
+      fs.existsSync(path.join(bugsDir, 'resolved', 'BUG-001.md')),
+      'should be in resolved dir'
+    );
+  });
+
+  test('fails for nonexistent bug', () => {
+    const result = runGsdTools('bug update BUG-999 --status investigating', tmpDir);
+    assert.ok(!result.success, 'should fail');
+    assert.ok(result.error.includes('not found'), 'error mentions not found');
+  });
+
+  test('fails for invalid status', () => {
+    const bugsDir = path.join(tmpDir, '.planning', 'bugs');
+    fs.mkdirSync(bugsDir, { recursive: true });
+
+    fs.writeFileSync(path.join(bugsDir, 'BUG-001.md'), `---
+id: BUG-001
+title: "Test"
+severity: low
+status: reported
+area: ui
+created: 2026-02-01T00:00:00.000Z
+---
+`);
+
+    const result = runGsdTools('bug update BUG-001 --status invalid-status', tmpDir);
+    assert.ok(!result.success, 'should fail for invalid status');
+    assert.ok(result.error.includes('Invalid status'), 'error mentions invalid status');
+  });
+});
+
+// ─────────────────────────────────────────────────────────────────────────────
+// init bugs command
+// ─────────────────────────────────────────────────────────────────────────────
+
+describe('init bugs command', () => {
+  let tmpDir;
+
+  beforeEach(() => {
+    tmpDir = createTempProject();
+  });
+
+  afterEach(() => {
+    cleanup(tmpDir);
+  });
+
+  test('returns correct schema when empty', () => {
+    const result = runGsdTools('init bugs', tmpDir);
+    assert.ok(result.success, `Command failed: ${result.error}`);
+
+    const output = JSON.parse(result.output);
+    assert.strictEqual(output.bug_count, 0, 'should have 0 bugs');
+    assert.deepStrictEqual(output.bugs, [], 'bugs should be empty');
+    assert.strictEqual(output.next_id, 1, 'next_id should be 1');
+    assert.strictEqual(output.next_id_padded, '001', 'next_id_padded should be 001');
+    assert.ok(output.date, 'should have date');
+    assert.ok(output.timestamp, 'should have timestamp');
+    assert.strictEqual(output.bugs_dir, '.planning/bugs');
+    assert.strictEqual(output.resolved_dir, '.planning/bugs/resolved');
+  });
+
+  test('calculates next_id from existing bugs', () => {
+    const bugsDir = path.join(tmpDir, '.planning', 'bugs');
+    fs.mkdirSync(bugsDir, { recursive: true });
+
+    fs.writeFileSync(path.join(bugsDir, 'BUG-003.md'), `---
+id: BUG-003
+title: "Test bug"
+severity: high
+status: reported
+area: core
+created: 2026-02-01T00:00:00.000Z
+---
+`);
+    fs.writeFileSync(path.join(bugsDir, 'BUG-007.md'), `---
+id: BUG-007
+title: "Another bug"
+severity: low
+status: investigating
+area: ui
+created: 2026-02-02T00:00:00.000Z
+---
+`);
+
+    const result = runGsdTools('init bugs', tmpDir);
+    assert.ok(result.success, `Command failed: ${result.error}`);
+
+    const output = JSON.parse(result.output);
+    assert.strictEqual(output.bug_count, 2, 'should have 2 bugs');
+    assert.strictEqual(output.next_id, 8, 'next_id should be 8');
+    assert.strictEqual(output.next_id_padded, '008', 'next_id_padded should be 008');
+  });
+
+  test('accounts for resolved bugs in next_id', () => {
+    const bugsDir = path.join(tmpDir, '.planning', 'bugs');
+    const resolvedDir = path.join(bugsDir, 'resolved');
+    fs.mkdirSync(resolvedDir, { recursive: true });
+
+    fs.writeFileSync(path.join(bugsDir, 'BUG-001.md'), `---
+id: BUG-001
+title: "Active bug"
+severity: medium
+status: reported
+area: api
+created: 2026-02-01T00:00:00.000Z
+---
+`);
+    fs.writeFileSync(path.join(resolvedDir, 'BUG-010.md'), `---
+id: BUG-010
+title: "Old resolved bug"
+severity: low
+status: resolved
+area: ui
+created: 2026-01-01T00:00:00.000Z
+---
+`);
+
+    const result = runGsdTools('init bugs', tmpDir);
+    assert.ok(result.success, `Command failed: ${result.error}`);
+
+    const output = JSON.parse(result.output);
+    assert.strictEqual(output.bug_count, 1, 'should only count active bugs');
+    assert.strictEqual(output.next_id, 11, 'next_id should account for resolved BUG-010');
+    assert.strictEqual(output.next_id_padded, '011');
+  });
+});
+
+// ─────────────────────────────────────────────────────────────────────────────
+// scaffold bugs command
+// ─────────────────────────────────────────────────────────────────────────────
+
+describe('scaffold bugs command', () => {
+  let tmpDir;
+
+  beforeEach(() => {
+    tmpDir = createTempProject();
+  });
+
+  afterEach(() => {
+    cleanup(tmpDir);
+  });
+
+  test('creates both directories', () => {
+    const result = runGsdTools('scaffold bugs', tmpDir);
+    assert.ok(result.success, `Command failed: ${result.error}`);
+
+    const output = JSON.parse(result.output);
+    assert.strictEqual(output.created, true);
+
+    assert.ok(
+      fs.existsSync(path.join(tmpDir, '.planning', 'bugs')),
+      'bugs directory should be created'
+    );
+    assert.ok(
+      fs.existsSync(path.join(tmpDir, '.planning', 'bugs', 'resolved')),
+      'bugs/resolved directory should be created'
+    );
   });
 });

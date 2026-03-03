@@ -6,17 +6,19 @@ const fs = require('fs');
 const path = require('path');
 const { execSync } = require('child_process');
 const { loadConfig, resolveModelInternal, findPhaseInternal, getRoadmapPhaseInternal, pathExistsInternal, generateSlugInternal, getMilestoneInfo, normalizePhaseName, toPosixPath, output, error } = require('./core.cjs');
+const { resolvePlanningPaths } = require('./paths.cjs');
 
 function cmdInitExecutePhase(cwd, phase, raw) {
   if (!phase) {
     error('phase required for init execute-phase');
   }
 
-  const config = loadConfig(cwd);
-  const phaseInfo = findPhaseInternal(cwd, phase);
-  const milestone = getMilestoneInfo(cwd);
+  const paths = resolvePlanningPaths(cwd);
+  const config = loadConfig(cwd, paths);
+  const phaseInfo = findPhaseInternal(cwd, phase, paths);
+  const milestone = getMilestoneInfo(cwd, paths);
 
-  const roadmapPhase = getRoadmapPhaseInternal(cwd, phase);
+  const roadmapPhase = getRoadmapPhaseInternal(cwd, phase, paths);
   const reqMatch = roadmapPhase?.section?.match(/^\*\*Requirements\*\*:[^\S\n]*([^\n]*)$/m);
   const reqExtracted = reqMatch
     ? reqMatch[1].replace(/[\[\]]/g, '').split(',').map(s => s.trim()).filter(Boolean).join(', ')
@@ -27,6 +29,10 @@ function cmdInitExecutePhase(cwd, phase, raw) {
     // Models
     executor_model: resolveModelInternal(cwd, 'gsd-executor'),
     verifier_model: resolveModelInternal(cwd, 'gsd-verifier'),
+
+    // Model profile (for adaptive per-plan resolution)
+    model_profile: config.model_profile || 'balanced',
+    adaptive_settings: config.model_profile === 'adaptive' ? (config.adaptive_settings || null) : null,
 
     // Config flags
     commit_docs: config.commit_docs,
@@ -66,15 +72,18 @@ function cmdInitExecutePhase(cwd, phase, raw) {
     milestone_version: milestone.version,
     milestone_name: milestone.name,
     milestone_slug: generateSlugInternal(milestone.name),
+    milestone: paths.milestone,
+    is_multi_milestone: paths.isMultiMilestone,
+    planning_base: paths.rel.base,
 
     // File existence
-    state_exists: pathExistsInternal(cwd, '.planning/STATE.md'),
-    roadmap_exists: pathExistsInternal(cwd, '.planning/ROADMAP.md'),
-    config_exists: pathExistsInternal(cwd, '.planning/config.json'),
+    state_exists: pathExistsInternal(cwd, paths.rel.state),
+    roadmap_exists: pathExistsInternal(cwd, paths.rel.roadmap),
+    config_exists: pathExistsInternal(cwd, paths.rel.config),
     // File paths
-    state_path: '.planning/STATE.md',
-    roadmap_path: '.planning/ROADMAP.md',
-    config_path: '.planning/config.json',
+    state_path: paths.rel.state,
+    roadmap_path: paths.rel.roadmap,
+    config_path: paths.rel.config,
   };
 
   output(result, raw);
@@ -85,10 +94,11 @@ function cmdInitPlanPhase(cwd, phase, raw) {
     error('phase required for init plan-phase');
   }
 
-  const config = loadConfig(cwd);
-  const phaseInfo = findPhaseInternal(cwd, phase);
+  const paths = resolvePlanningPaths(cwd);
+  const config = loadConfig(cwd, paths);
+  const phaseInfo = findPhaseInternal(cwd, phase, paths);
 
-  const roadmapPhase = getRoadmapPhaseInternal(cwd, phase);
+  const roadmapPhase = getRoadmapPhaseInternal(cwd, phase, paths);
   const reqMatch = roadmapPhase?.section?.match(/^\*\*Requirements\*\*:[^\S\n]*([^\n]*)$/m);
   const reqExtracted = reqMatch
     ? reqMatch[1].replace(/[\[\]]/g, '').split(',').map(s => s.trim()).filter(Boolean).join(', ')
@@ -100,6 +110,10 @@ function cmdInitPlanPhase(cwd, phase, raw) {
     researcher_model: resolveModelInternal(cwd, 'gsd-phase-researcher'),
     planner_model: resolveModelInternal(cwd, 'gsd-planner'),
     checker_model: resolveModelInternal(cwd, 'gsd-plan-checker'),
+
+    // Model profile (for adaptive per-plan resolution)
+    model_profile: config.model_profile || 'balanced',
+    adaptive_settings: config.model_profile === 'adaptive' ? (config.adaptive_settings || null) : null,
 
     // Workflow flags
     research_enabled: config.research,
@@ -124,12 +138,17 @@ function cmdInitPlanPhase(cwd, phase, raw) {
 
     // Environment
     planning_exists: pathExistsInternal(cwd, '.planning'),
-    roadmap_exists: pathExistsInternal(cwd, '.planning/ROADMAP.md'),
+    roadmap_exists: pathExistsInternal(cwd, paths.rel.roadmap),
+
+    // Milestone
+    milestone: paths.milestone,
+    is_multi_milestone: paths.isMultiMilestone,
+    planning_base: paths.rel.base,
 
     // File paths
-    state_path: '.planning/STATE.md',
-    roadmap_path: '.planning/ROADMAP.md',
-    requirements_path: '.planning/REQUIREMENTS.md',
+    state_path: paths.rel.state,
+    roadmap_path: paths.rel.roadmap,
+    requirements_path: paths.rel.requirements,
   };
 
   if (phaseInfo?.directory) {
@@ -160,7 +179,8 @@ function cmdInitPlanPhase(cwd, phase, raw) {
 }
 
 function cmdInitNewProject(cwd, raw) {
-  const config = loadConfig(cwd);
+  const paths = resolvePlanningPaths(cwd);
+  const config = loadConfig(cwd, paths);
 
   // Detect Brave Search API key availability
   const homedir = require('os').homedir();
@@ -211,6 +231,11 @@ function cmdInitNewProject(cwd, raw) {
     // Enhanced search
     brave_search_available: hasBraveSearch,
 
+    // Milestone
+    milestone: paths.milestone,
+    is_multi_milestone: paths.isMultiMilestone,
+    planning_base: paths.rel.base,
+
     // File paths
     project_path: '.planning/PROJECT.md',
   };
@@ -219,8 +244,9 @@ function cmdInitNewProject(cwd, raw) {
 }
 
 function cmdInitNewMilestone(cwd, raw) {
-  const config = loadConfig(cwd);
-  const milestone = getMilestoneInfo(cwd);
+  const paths = resolvePlanningPaths(cwd);
+  const config = loadConfig(cwd, paths);
+  const milestone = getMilestoneInfo(cwd, paths);
 
   const result = {
     // Models
@@ -236,22 +262,28 @@ function cmdInitNewMilestone(cwd, raw) {
     current_milestone: milestone.version,
     current_milestone_name: milestone.name,
 
+    // Milestone
+    milestone: paths.milestone,
+    is_multi_milestone: paths.isMultiMilestone,
+    planning_base: paths.rel.base,
+
     // File existence
     project_exists: pathExistsInternal(cwd, '.planning/PROJECT.md'),
-    roadmap_exists: pathExistsInternal(cwd, '.planning/ROADMAP.md'),
-    state_exists: pathExistsInternal(cwd, '.planning/STATE.md'),
+    roadmap_exists: pathExistsInternal(cwd, paths.rel.roadmap),
+    state_exists: pathExistsInternal(cwd, paths.rel.state),
 
     // File paths
     project_path: '.planning/PROJECT.md',
-    roadmap_path: '.planning/ROADMAP.md',
-    state_path: '.planning/STATE.md',
+    roadmap_path: paths.rel.roadmap,
+    state_path: paths.rel.state,
   };
 
   output(result, raw);
 }
 
 function cmdInitQuick(cwd, description, raw) {
-  const config = loadConfig(cwd);
+  const paths = resolvePlanningPaths(cwd);
+  const config = loadConfig(cwd, paths);
   const now = new Date();
   const slug = description ? generateSlugInternal(description)?.substring(0, 40) : null;
 
@@ -275,6 +307,10 @@ function cmdInitQuick(cwd, description, raw) {
     checker_model: resolveModelInternal(cwd, 'gsd-plan-checker'),
     verifier_model: resolveModelInternal(cwd, 'gsd-verifier'),
 
+    // Model profile (for adaptive per-plan resolution)
+    model_profile: config.model_profile || 'balanced',
+    adaptive_settings: config.model_profile === 'adaptive' ? (config.adaptive_settings || null) : null,
+
     // Config
     commit_docs: config.commit_docs,
 
@@ -291,8 +327,13 @@ function cmdInitQuick(cwd, description, raw) {
     quick_dir: '.planning/quick',
     task_dir: slug ? `.planning/quick/${nextNum}-${slug}` : null,
 
+    // Milestone
+    milestone: paths.milestone,
+    is_multi_milestone: paths.isMultiMilestone,
+    planning_base: paths.rel.base,
+
     // File existence
-    roadmap_exists: pathExistsInternal(cwd, '.planning/ROADMAP.md'),
+    roadmap_exists: pathExistsInternal(cwd, paths.rel.roadmap),
     planning_exists: pathExistsInternal(cwd, '.planning'),
 
   };
@@ -301,7 +342,8 @@ function cmdInitQuick(cwd, description, raw) {
 }
 
 function cmdInitResume(cwd, raw) {
-  const config = loadConfig(cwd);
+  const paths = resolvePlanningPaths(cwd);
+  const config = loadConfig(cwd, paths);
 
   // Check for interrupted agent
   let interruptedAgentId = null;
@@ -311,15 +353,20 @@ function cmdInitResume(cwd, raw) {
 
   const result = {
     // File existence
-    state_exists: pathExistsInternal(cwd, '.planning/STATE.md'),
-    roadmap_exists: pathExistsInternal(cwd, '.planning/ROADMAP.md'),
+    state_exists: pathExistsInternal(cwd, paths.rel.state),
+    roadmap_exists: pathExistsInternal(cwd, paths.rel.roadmap),
     project_exists: pathExistsInternal(cwd, '.planning/PROJECT.md'),
     planning_exists: pathExistsInternal(cwd, '.planning'),
 
     // File paths
-    state_path: '.planning/STATE.md',
-    roadmap_path: '.planning/ROADMAP.md',
+    state_path: paths.rel.state,
+    roadmap_path: paths.rel.roadmap,
     project_path: '.planning/PROJECT.md',
+
+    // Milestone
+    milestone: paths.milestone,
+    is_multi_milestone: paths.isMultiMilestone,
+    planning_base: paths.rel.base,
 
     // Agent state
     has_interrupted_agent: !!interruptedAgentId,
@@ -337,8 +384,9 @@ function cmdInitVerifyWork(cwd, phase, raw) {
     error('phase required for init verify-work');
   }
 
-  const config = loadConfig(cwd);
-  const phaseInfo = findPhaseInternal(cwd, phase);
+  const paths = resolvePlanningPaths(cwd);
+  const config = loadConfig(cwd, paths);
+  const phaseInfo = findPhaseInternal(cwd, phase, paths);
 
   const result = {
     // Models
@@ -354,6 +402,11 @@ function cmdInitVerifyWork(cwd, phase, raw) {
     phase_number: phaseInfo?.phase_number || null,
     phase_name: phaseInfo?.phase_name || null,
 
+    // Milestone
+    milestone: paths.milestone,
+    is_multi_milestone: paths.isMultiMilestone,
+    planning_base: paths.rel.base,
+
     // Existing artifacts
     has_verification: phaseInfo?.has_verification || false,
   };
@@ -362,12 +415,13 @@ function cmdInitVerifyWork(cwd, phase, raw) {
 }
 
 function cmdInitPhaseOp(cwd, phase, raw) {
-  const config = loadConfig(cwd);
-  let phaseInfo = findPhaseInternal(cwd, phase);
+  const paths = resolvePlanningPaths(cwd);
+  const config = loadConfig(cwd, paths);
+  let phaseInfo = findPhaseInternal(cwd, phase, paths);
 
   // Fallback to ROADMAP.md if no directory exists (e.g., Plans: TBD)
   if (!phaseInfo) {
-    const roadmapPhase = getRoadmapPhaseInternal(cwd, phase);
+    const roadmapPhase = getRoadmapPhaseInternal(cwd, phase, paths);
     if (roadmapPhase?.found) {
       const phaseName = roadmapPhase.phase_name;
       phaseInfo = {
@@ -406,14 +460,19 @@ function cmdInitPhaseOp(cwd, phase, raw) {
     has_verification: phaseInfo?.has_verification || false,
     plan_count: phaseInfo?.plans?.length || 0,
 
+    // Milestone
+    milestone: paths.milestone,
+    is_multi_milestone: paths.isMultiMilestone,
+    planning_base: paths.rel.base,
+
     // File existence
-    roadmap_exists: pathExistsInternal(cwd, '.planning/ROADMAP.md'),
+    roadmap_exists: pathExistsInternal(cwd, paths.rel.roadmap),
     planning_exists: pathExistsInternal(cwd, '.planning'),
 
     // File paths
-    state_path: '.planning/STATE.md',
-    roadmap_path: '.planning/ROADMAP.md',
-    requirements_path: '.planning/REQUIREMENTS.md',
+    state_path: paths.rel.state,
+    roadmap_path: paths.rel.roadmap,
+    requirements_path: paths.rel.requirements,
   };
 
   if (phaseInfo?.directory) {
@@ -443,7 +502,8 @@ function cmdInitPhaseOp(cwd, phase, raw) {
 }
 
 function cmdInitTodos(cwd, area, raw) {
-  const config = loadConfig(cwd);
+  const paths = resolvePlanningPaths(cwd);
+  const config = loadConfig(cwd, paths);
   const now = new Date();
 
   // List todos (reuse existing logic)
@@ -492,6 +552,11 @@ function cmdInitTodos(cwd, area, raw) {
     pending_dir: '.planning/todos/pending',
     completed_dir: '.planning/todos/completed',
 
+    // Milestone
+    milestone: paths.milestone,
+    is_multi_milestone: paths.isMultiMilestone,
+    planning_base: paths.rel.base,
+
     // File existence
     planning_exists: pathExistsInternal(cwd, '.planning'),
     todos_dir_exists: pathExistsInternal(cwd, '.planning/todos'),
@@ -501,14 +566,92 @@ function cmdInitTodos(cwd, area, raw) {
   output(result, raw);
 }
 
+function cmdInitBugs(cwd, raw) {
+  const paths = resolvePlanningPaths(cwd);
+  const config = loadConfig(cwd, paths);
+  const now = new Date();
+
+  const bugsDir = path.join(cwd, '.planning', 'bugs');
+  const resolvedDir = path.join(cwd, '.planning', 'bugs', 'resolved');
+
+  const bugs = [];
+  let maxId = 0;
+
+  // Scan active bugs
+  try {
+    const files = fs.readdirSync(bugsDir).filter(f => /^BUG-\d+\.md$/.test(f));
+    for (const file of files) {
+      const num = parseInt(file.match(/BUG-(\d+)\.md/)[1], 10);
+      if (num > maxId) maxId = num;
+      try {
+        const content = fs.readFileSync(path.join(bugsDir, file), 'utf-8');
+        const titleMatch = content.match(/^title:\s*"?(.+?)"?\s*$/m);
+        const severityMatch = content.match(/^severity:\s*(.+)$/m);
+        const statusMatch = content.match(/^status:\s*(.+)$/m);
+        const areaMatch = content.match(/^area:\s*(.+)$/m);
+        const createdMatch = content.match(/^created:\s*(.+)$/m);
+        bugs.push({
+          id: `BUG-${String(num).padStart(3, '0')}`,
+          title: titleMatch ? titleMatch[1].trim() : 'Untitled',
+          severity: severityMatch ? severityMatch[1].trim() : 'medium',
+          status: statusMatch ? statusMatch[1].trim() : 'reported',
+          area: areaMatch ? areaMatch[1].trim() : 'general',
+          created: createdMatch ? createdMatch[1].trim() : 'unknown',
+        });
+      } catch {}
+    }
+  } catch {}
+
+  // Scan resolved bugs for ID calculation
+  try {
+    const files = fs.readdirSync(resolvedDir).filter(f => /^BUG-\d+\.md$/.test(f));
+    for (const file of files) {
+      const num = parseInt(file.match(/BUG-(\d+)\.md/)[1], 10);
+      if (num > maxId) maxId = num;
+    }
+  } catch {}
+
+  const nextId = maxId + 1;
+
+  const result = {
+    // Config
+    commit_docs: config.commit_docs,
+
+    // Timestamps
+    date: now.toISOString().split('T')[0],
+    timestamp: now.toISOString(),
+
+    // Bug inventory
+    bug_count: bugs.length,
+    bugs,
+    next_id: nextId,
+    next_id_padded: String(nextId).padStart(3, '0'),
+
+    // Paths
+    bugs_dir: '.planning/bugs',
+    resolved_dir: '.planning/bugs/resolved',
+    planning_base: paths.rel.base,
+
+    // Milestone
+    milestone: paths.milestone,
+    is_multi_milestone: paths.isMultiMilestone,
+
+    // File existence
+    bugs_dir_exists: pathExistsInternal(cwd, '.planning/bugs'),
+  };
+
+  output(result, raw);
+}
+
 function cmdInitMilestoneOp(cwd, raw) {
-  const config = loadConfig(cwd);
-  const milestone = getMilestoneInfo(cwd);
+  const paths = resolvePlanningPaths(cwd);
+  const config = loadConfig(cwd, paths);
+  const milestone = getMilestoneInfo(cwd, paths);
 
   // Count phases
   let phaseCount = 0;
   let completedPhases = 0;
-  const phasesDir = path.join(cwd, '.planning', 'phases');
+  const phasesDir = paths.abs.phases;
   try {
     const entries = fs.readdirSync(phasesDir, { withFileTypes: true });
     const dirs = entries.filter(e => e.isDirectory()).map(e => e.name);
@@ -542,6 +685,11 @@ function cmdInitMilestoneOp(cwd, raw) {
     milestone_name: milestone.name,
     milestone_slug: generateSlugInternal(milestone.name),
 
+    // Milestone
+    milestone: paths.milestone,
+    is_multi_milestone: paths.isMultiMilestone,
+    planning_base: paths.rel.base,
+
     // Phase counts
     phase_count: phaseCount,
     completed_phases: completedPhases,
@@ -553,17 +701,18 @@ function cmdInitMilestoneOp(cwd, raw) {
 
     // File existence
     project_exists: pathExistsInternal(cwd, '.planning/PROJECT.md'),
-    roadmap_exists: pathExistsInternal(cwd, '.planning/ROADMAP.md'),
-    state_exists: pathExistsInternal(cwd, '.planning/STATE.md'),
+    roadmap_exists: pathExistsInternal(cwd, paths.rel.roadmap),
+    state_exists: pathExistsInternal(cwd, paths.rel.state),
     archive_exists: pathExistsInternal(cwd, '.planning/archive'),
-    phases_dir_exists: pathExistsInternal(cwd, '.planning/phases'),
+    phases_dir_exists: pathExistsInternal(cwd, paths.rel.base + '/phases'),
   };
 
   output(result, raw);
 }
 
 function cmdInitMapCodebase(cwd, raw) {
-  const config = loadConfig(cwd);
+  const paths = resolvePlanningPaths(cwd);
+  const config = loadConfig(cwd, paths);
 
   // Check for existing codebase maps
   const codebaseDir = path.join(cwd, '.planning', 'codebase');
@@ -588,6 +737,11 @@ function cmdInitMapCodebase(cwd, raw) {
     existing_maps: existingMaps,
     has_maps: existingMaps.length > 0,
 
+    // Milestone
+    milestone: paths.milestone,
+    is_multi_milestone: paths.isMultiMilestone,
+    planning_base: paths.rel.base,
+
     // File existence
     planning_exists: pathExistsInternal(cwd, '.planning'),
     codebase_dir_exists: pathExistsInternal(cwd, '.planning/codebase'),
@@ -597,11 +751,12 @@ function cmdInitMapCodebase(cwd, raw) {
 }
 
 function cmdInitProgress(cwd, raw) {
-  const config = loadConfig(cwd);
-  const milestone = getMilestoneInfo(cwd);
+  const paths = resolvePlanningPaths(cwd);
+  const config = loadConfig(cwd, paths);
+  const milestone = getMilestoneInfo(cwd, paths);
 
   // Analyze phases
-  const phasesDir = path.join(cwd, '.planning', 'phases');
+  const phasesDir = paths.abs.phases;
   const phases = [];
   let currentPhase = null;
   let nextPhase = null;
@@ -629,7 +784,7 @@ function cmdInitProgress(cwd, raw) {
       const phaseInfo = {
         number: phaseNumber,
         name: phaseName,
-        directory: '.planning/phases/' + dir,
+        directory: paths.rel.phases + '/' + dir,
         status,
         plan_count: plans.length,
         summary_count: summaries.length,
@@ -651,7 +806,7 @@ function cmdInitProgress(cwd, raw) {
   // Check for paused work
   let pausedAt = null;
   try {
-    const state = fs.readFileSync(path.join(cwd, '.planning', 'STATE.md'), 'utf-8');
+    const state = fs.readFileSync(paths.abs.state, 'utf-8');
     const pauseMatch = state.match(/\*\*Paused At:\*\*\s*(.+)/);
     if (pauseMatch) pausedAt = pauseMatch[1].trim();
   } catch {}
@@ -667,6 +822,9 @@ function cmdInitProgress(cwd, raw) {
     // Milestone
     milestone_version: milestone.version,
     milestone_name: milestone.name,
+    milestone: paths.milestone,
+    is_multi_milestone: paths.isMultiMilestone,
+    planning_base: paths.rel.base,
 
     // Phase overview
     phases,
@@ -682,13 +840,13 @@ function cmdInitProgress(cwd, raw) {
 
     // File existence
     project_exists: pathExistsInternal(cwd, '.planning/PROJECT.md'),
-    roadmap_exists: pathExistsInternal(cwd, '.planning/ROADMAP.md'),
-    state_exists: pathExistsInternal(cwd, '.planning/STATE.md'),
+    roadmap_exists: pathExistsInternal(cwd, paths.rel.roadmap),
+    state_exists: pathExistsInternal(cwd, paths.rel.state),
     // File paths
-    state_path: '.planning/STATE.md',
-    roadmap_path: '.planning/ROADMAP.md',
+    state_path: paths.rel.state,
+    roadmap_path: paths.rel.roadmap,
     project_path: '.planning/PROJECT.md',
-    config_path: '.planning/config.json',
+    config_path: paths.rel.config,
   };
 
   output(result, raw);
@@ -704,6 +862,7 @@ module.exports = {
   cmdInitVerifyWork,
   cmdInitPhaseOp,
   cmdInitTodos,
+  cmdInitBugs,
   cmdInitMilestoneOp,
   cmdInitMapCodebase,
   cmdInitProgress,
