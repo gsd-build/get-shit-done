@@ -729,16 +729,25 @@ function cmdPhaseComplete(cwd, phaseNum, raw) {
     );
     roadmapContent = roadmapContent.replace(checkboxPattern, `$1x$2 (completed ${today})`);
 
-    // Progress table: update Status to Complete, add date
+    // Progress table: update Status to Complete, add date (handles 4 or 5 column tables)
     const phaseEscaped = escapeRegex(phaseNum);
-    const tablePattern = new RegExp(
-      `(\\|\\s*${phaseEscaped}\\.?\\s[^|]*\\|[^|]*\\|)\\s*[^|]*(\\|)\\s*[^|]*(\\|)`,
-      'i'
+    const tableRowPattern = new RegExp(
+      `^(\\|\\s*${phaseEscaped}\\.?\\s[^|]*(?:\\|[^\\n]*))$`,
+      'im'
     );
-    roadmapContent = roadmapContent.replace(
-      tablePattern,
-      `$1 Complete    $2 ${today} $3`
-    );
+    roadmapContent = roadmapContent.replace(tableRowPattern, (fullRow) => {
+      const cells = fullRow.split('|').slice(1, -1);
+      if (cells.length === 5) {
+        // 5-col: Phase | Milestone | Plans | Status | Completed
+        cells[3] = ' Complete    ';
+        cells[4] = ` ${today} `;
+      } else if (cells.length === 4) {
+        // 4-col: Phase | Plans | Status | Completed
+        cells[2] = ' Complete    ';
+        cells[3] = ` ${today} `;
+      }
+      return '|' + cells.join('|') + '|';
+    });
 
     // Update plan count in phase section
     const planCountPattern = new RegExp(

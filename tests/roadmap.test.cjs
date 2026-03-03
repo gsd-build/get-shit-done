@@ -662,6 +662,38 @@ describe('roadmap update-plan-progress command', () => {
     assert.strictEqual(output.updated, false, 'should not update');
     assert.ok(output.reason.includes('ROADMAP.md not found'), 'reason should mention missing ROADMAP.md');
   });
+
+  test('preserves Milestone column in 5-column progress table', () => {
+    const roadmapContent = `# Roadmap
+
+### Phase 50: Build
+**Goal:** Build stuff
+**Plans:** 1 plans
+
+## Progress
+
+| Phase | Milestone | Plans Complete | Status | Completed |
+|-------|-----------|----------------|--------|-----------|
+| 50. Build | v2.0 | 0/1 | Planned |  |
+`;
+    fs.writeFileSync(path.join(tmpDir, '.planning', 'ROADMAP.md'), roadmapContent);
+
+    const p50 = path.join(tmpDir, '.planning', 'phases', '50-build');
+    fs.mkdirSync(p50, { recursive: true });
+    fs.writeFileSync(path.join(p50, '50-01-PLAN.md'), '# Plan');
+    fs.writeFileSync(path.join(p50, '50-01-SUMMARY.md'), '# Summary');
+
+    const result = runGsdTools('roadmap update-plan-progress 50', tmpDir);
+    assert.ok(result.success, `Command failed: ${result.error}`);
+
+    const roadmap = fs.readFileSync(path.join(tmpDir, '.planning', 'ROADMAP.md'), 'utf-8');
+    const rowMatch = roadmap.match(/^\|[^\n]*50\. Build[^\n]*$/m);
+    assert.ok(rowMatch, 'table row should exist');
+    const cells = rowMatch[0].split('|').slice(1, -1).map(c => c.trim());
+    assert.strictEqual(cells.length, 5, 'should have 5 columns');
+    assert.strictEqual(cells[1], 'v2.0', 'Milestone column should be preserved');
+    assert.ok(cells[3].includes('Complete'), 'Status column should show Complete');
+  });
 });
 
 // ─────────────────────────────────────────────────────────────────────────────

@@ -249,16 +249,27 @@ function cmdRoadmapUpdatePlanProgress(cwd, phaseNum, raw) {
   let roadmapContent = fs.readFileSync(roadmapPath, 'utf-8');
   const phaseEscaped = escapeRegex(phaseNum);
 
-  // Progress table row: update Plans column (summaries/plans) and Status column
-  const tablePattern = new RegExp(
-    `(\\|\\s*${phaseEscaped}\\.?\\s[^|]*\\|)[^|]*(\\|)\\s*[^|]*(\\|)\\s*[^|]*(\\|)`,
-    'i'
+  // Progress table row: update Plans/Status/Date columns (handles 4 or 5 column tables)
+  const tableRowPattern = new RegExp(
+    `^(\\|\\s*${phaseEscaped}\\.?\\s[^|]*(?:\\|[^\\n]*))$`,
+    'im'
   );
   const dateField = isComplete ? ` ${today} ` : '  ';
-  roadmapContent = roadmapContent.replace(
-    tablePattern,
-    `$1 ${summaryCount}/${planCount} $2 ${status.padEnd(11)}$3${dateField}$4`
-  );
+  roadmapContent = roadmapContent.replace(tableRowPattern, (fullRow) => {
+    const cells = fullRow.split('|').slice(1, -1); // drop leading/trailing empty from split
+    if (cells.length === 5) {
+      // 5-col: Phase | Milestone | Plans | Status | Completed
+      cells[2] = ` ${summaryCount}/${planCount} `;
+      cells[3] = ` ${status.padEnd(11)}`;
+      cells[4] = dateField;
+    } else if (cells.length === 4) {
+      // 4-col: Phase | Plans | Status | Completed
+      cells[1] = ` ${summaryCount}/${planCount} `;
+      cells[2] = ` ${status.padEnd(11)}`;
+      cells[3] = dateField;
+    }
+    return '|' + cells.join('|') + '|';
+  });
 
   // Update plan count in phase detail section
   const planCountPattern = new RegExp(

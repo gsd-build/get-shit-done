@@ -1323,6 +1323,46 @@ describe('phase complete command', () => {
     const req = fs.readFileSync(path.join(tmpDir, '.planning', 'REQUIREMENTS.md'), 'utf-8');
     assert.ok(req.includes('- [ ] **AMT-01**'), 'AMT-01 should remain unchanged');
   });
+
+  test('preserves Milestone column in 5-column progress table', () => {
+    fs.writeFileSync(
+      path.join(tmpDir, '.planning', 'ROADMAP.md'),
+      `# Roadmap
+
+- [ ] Phase 1: Foundation
+
+### Phase 1: Foundation
+**Goal:** Setup
+**Plans:** 1 plans
+
+## Progress
+
+| Phase | Milestone | Plans Complete | Status | Completed |
+|-------|-----------|----------------|--------|-----------|
+| 1. Foundation | v1.0 | 0/1 | Planned |  |
+`
+    );
+    fs.writeFileSync(
+      path.join(tmpDir, '.planning', 'STATE.md'),
+      `# State\n\n**Current Phase:** 01\n**Status:** In progress\n**Current Plan:** 01-01\n**Last Activity:** 2025-01-01\n**Last Activity Description:** Working\n`
+    );
+
+    const p1 = path.join(tmpDir, '.planning', 'phases', '01-foundation');
+    fs.mkdirSync(p1, { recursive: true });
+    fs.writeFileSync(path.join(p1, '01-01-PLAN.md'), '# Plan');
+    fs.writeFileSync(path.join(p1, '01-01-SUMMARY.md'), '# Summary');
+
+    const result = runGsdTools('phase complete 1', tmpDir);
+    assert.ok(result.success, `Command failed: ${result.error}`);
+
+    const roadmap = fs.readFileSync(path.join(tmpDir, '.planning', 'ROADMAP.md'), 'utf-8');
+    const rowMatch = roadmap.match(/^\|[^\n]*1\. Foundation[^\n]*$/m);
+    assert.ok(rowMatch, 'table row should exist');
+    const cells = rowMatch[0].split('|').slice(1, -1).map(c => c.trim());
+    assert.strictEqual(cells.length, 5, 'should have 5 columns');
+    assert.strictEqual(cells[1], 'v1.0', 'Milestone column should be preserved');
+    assert.ok(cells[3].includes('Complete'), 'Status column should be Complete');
+  });
 });
 
 // ─────────────────────────────────────────────────────────────────────────────
