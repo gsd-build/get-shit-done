@@ -79,6 +79,7 @@ function loadConfig(cwd) {
     nyquist_validation: false,
     parallelization: true,
     brave_search: false,
+    sub_repos: [],
   };
 
   try {
@@ -113,6 +114,7 @@ function loadConfig(cwd) {
       nyquist_validation: get('nyquist_validation', { section: 'workflow', field: 'nyquist_validation' }) ?? defaults.nyquist_validation,
       parallelization,
       brave_search: get('brave_search') ?? defaults.brave_search,
+      sub_repos: get('sub_repos', { section: 'planning', field: 'sub_repos' }) ?? defaults.sub_repos,
       model_overrides: parsed.model_overrides || null,
     };
   } catch {

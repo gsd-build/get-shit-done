@@ -18,7 +18,7 @@ Load execution context (paths only to minimize orchestrator context):
 INIT=$(node "$HOME/.claude/get-shit-done/bin/gsd-tools.cjs" init execute-phase "${PHASE}")
 ```
 
-Extract from init JSON: `executor_model`, `commit_docs`, `phase_dir`, `phase_number`, `plans`, `summaries`, `incomplete_plans`, `state_path`, `config_path`.
+Extract from init JSON: `executor_model`, `commit_docs`, `sub_repos`, `phase_dir`, `phase_number`, `plans`, `summaries`, `incomplete_plans`, `state_path`, `config_path`.
 
 If `.planning/` missing: error.
 </step>
@@ -252,6 +252,20 @@ git add src/types/user.ts
 | `chore` | Config/deps | chore(08-02): add bcrypt dependency |
 
 **4. Format:** `{type}({phase}-{plan}): {description}` with bullet points for key changes.
+
+<sub_repos_commit_flow>
+**Sub-repos mode:** If `sub_repos` is configured (non-empty array from init context), use `commit-to-subrepo` instead of standard git commit. This routes files to their correct sub-repo based on path prefix.
+
+```bash
+node ~/.claude/get-shit-done/bin/gsd-tools.cjs commit-to-subrepo "{type}({phase}-{plan}): {description}" --files file1 file2 ...
+```
+
+The command groups files by sub-repo prefix and commits atomically to each. Returns JSON: `{ committed: true, repos: { "backend": { hash: "abc", files: [...] }, ... } }`.
+
+Record hashes from each repo in the response for SUMMARY tracking.
+
+**If `sub_repos` is empty or not set:** Use standard git commit flow below.
+</sub_repos_commit_flow>
 
 **5. Record hash:**
 ```bash

@@ -48,7 +48,7 @@ Load execution context:
 INIT=$(node "$HOME/.claude/get-shit-done/bin/gsd-tools.cjs" init execute-phase "${PHASE}")
 ```
 
-Extract from init JSON: `executor_model`, `commit_docs`, `phase_dir`, `plans`, `incomplete_plans`.
+Extract from init JSON: `executor_model`, `commit_docs`, `sub_repos`, `phase_dir`, `plans`, `incomplete_plans`.
 
 Also read STATE.md for position, decisions, blockers:
 ```bash
@@ -329,6 +329,14 @@ git add src/types/user.ts
 | `chore`    | Config, tooling, dependencies                   |
 
 **4. Commit:**
+
+**If `sub_repos` is configured (non-empty array from init context):** Use `commit-to-subrepo` to route files to their correct sub-repo:
+```bash
+node ~/.claude/get-shit-done/bin/gsd-tools.cjs commit-to-subrepo "{type}({phase}-{plan}): {concise task description}" --files file1 file2 ...
+```
+Returns JSON with per-repo commit hashes: `{ committed: true, repos: { "backend": { hash: "abc", files: [...] }, ... } }`. Record all hashes for SUMMARY.
+
+**Otherwise (standard single-repo):**
 ```bash
 git commit -m "{type}({phase}-{plan}): {concise task description}
 
