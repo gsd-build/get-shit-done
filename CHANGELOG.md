@@ -6,6 +6,9 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ## [Unreleased]
 
+### Fixed
+- `summary-extract` and `milestone complete` now extract one-liner from summary body `**bold**` line when not present in frontmatter
+
 ## [1.22.4] - 2026-03-03
 
 ### Added
