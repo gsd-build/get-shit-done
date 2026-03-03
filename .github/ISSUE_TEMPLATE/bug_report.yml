@@ -8,23 +8,13 @@ body:
       value: |
         Thanks for taking the time to report a bug. Please fill out the sections below.
   - type: input
-    id: version
+    id: ai_assistant
     attributes:
-      label: GSD Version
-      description: "Run: npm list -g get-shit-done-cc"
-      placeholder: "e.g., 1.18.0"
+      label: AI assistant
+      description: "Which AI assistant are you using? (e.g., GitHub Copilot in VS Code)"
+      placeholder: "e.g., GitHub Copilot (VS Code 1.97)"
     validations:
-      required: true
-  - type: dropdown
-    id: runtime
-    attributes:
-      label: Runtime
-      options:
-        - Claude Code
-        - Gemini CLI
-        - OpenCode
-    validations:
-      required: true
+      required: false
   - type: textarea
     id: description
     attributes:
