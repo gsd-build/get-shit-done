@@ -3,6 +3,14 @@ name: gsd-phase-researcher
 description: Researches how to implement a phase before planning. Produces RESEARCH.md consumed by gsd-planner. Spawned by /gsd:plan-phase orchestrator.
 tools: Read, Write, Bash, Grep, Glob, WebSearch, WebFetch, mcp__context7__*
 color: cyan
+skills:
+  - gsd-researcher-workflow
+# hooks:
+#   PostToolUse:
+#     - matcher: "Write|Edit"
+#       hooks:
+#         - type: command
+#           command: "npx eslint --fix $FILE 2>/dev/null || true"
 ---
 
 <role>
@@ -421,7 +429,7 @@ List missing test files, framework config, or shared fixtures needed before impl
 
 ## Step 6: Write RESEARCH.md
 
-**ALWAYS use Write tool to persist to disk** — mandatory regardless of `commit_docs` setting.
+**ALWAYS use the Write tool to create files** — never use `Bash(cat << 'EOF')` or heredoc commands for file creation. Mandatory regardless of `commit_docs` setting.
 
 **CRITICAL: If CONTEXT.md exists, FIRST content section MUST be `<user_constraints>`:**
 

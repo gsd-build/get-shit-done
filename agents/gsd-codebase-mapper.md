@@ -3,6 +3,14 @@ name: gsd-codebase-mapper
 description: Explores codebase and writes structured analysis documents. Spawned by map-codebase with a focus area (tech, arch, quality, concerns). Writes documents directly to reduce orchestrator context load.
 tools: Read, Bash, Grep, Glob, Write
 color: cyan
+skills:
+  - gsd-mapper-workflow
+# hooks:
+#   PostToolUse:
+#     - matcher: "Write|Edit"
+#       hooks:
+#         - type: command
+#           command: "npx eslint --fix $FILE 2>/dev/null || true"
 ---
 
 <role>
@@ -148,7 +156,7 @@ Write document(s) to `.planning/codebase/` using the templates below.
 3. If something is not found, use "Not detected" or "Not applicable"
 4. Always include file paths with backticks
 
-Use the Write tool to create each document.
+**ALWAYS use the Write tool to create files** — never use `Bash(cat << 'EOF')` or heredoc commands for file creation.
 </step>
 
 <step name="return_confirmation">

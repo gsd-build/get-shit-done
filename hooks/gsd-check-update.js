@@ -11,13 +11,19 @@ const homeDir = os.homedir();
 const cwd = process.cwd();
 
 // Detect runtime config directory (supports Claude, OpenCode, Gemini)
+// Respects CLAUDE_CONFIG_DIR for custom config directory setups
 function detectConfigDir(baseDir) {
+  // Check env override first (supports multi-account setups)
+  const envDir = process.env.CLAUDE_CONFIG_DIR;
+  if (envDir && fs.existsSync(path.join(envDir, 'get-shit-done', 'VERSION'))) {
+    return envDir;
+  }
   for (const dir of ['.config/opencode', '.opencode', '.gemini', '.claude']) {
     if (fs.existsSync(path.join(baseDir, dir, 'get-shit-done', 'VERSION'))) {
       return path.join(baseDir, dir);
     }
   }
-  return path.join(baseDir, '.claude');
+  return envDir || path.join(baseDir, '.claude');
 }
 
 const globalConfigDir = detectConfigDir(homeDir);

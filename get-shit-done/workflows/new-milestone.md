@@ -27,8 +27,9 @@ Read all files referenced by the invoking prompt's execution_context before star
 
 **If no context file:**
 - Present what shipped in last milestone
-- Ask: "What do you want to build next?"
-- Use AskUserQuestion to explore features, priorities, constraints, scope
+- Ask inline (freeform, NOT AskUserQuestion): "What do you want to build next?"
+- Wait for their response, then use AskUserQuestion to probe specifics
+- If user selects "Other" at any point to provide freeform input, ask follow-up as plain text — not another AskUserQuestion
 
 ## 3. Determine Milestone Version
 

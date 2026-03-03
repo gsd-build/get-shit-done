@@ -3,6 +3,14 @@ name: gsd-project-researcher
 description: Researches domain ecosystem before roadmap creation. Produces files in .planning/research/ consumed during roadmap creation. Spawned by /gsd:new-project or /gsd:new-milestone orchestrators.
 tools: Read, Write, Bash, Grep, Glob, WebSearch, WebFetch, mcp__context7__*
 color: cyan
+skills:
+  - gsd-researcher-workflow
+# hooks:
+#   PostToolUse:
+#     - matcher: "Write|Edit"
+#       hooks:
+#         - type: command
+#           command: "npx eslint --fix $FILE 2>/dev/null || true"
 ---
 
 <role>
@@ -517,6 +525,8 @@ For each domain: Context7 → Official Docs → WebSearch → Verify. Document w
 Run pre-submission checklist (see verification_protocol).
 
 ## Step 5: Write Output Files
+
+**ALWAYS use the Write tool to create files** — never use `Bash(cat << 'EOF')` or heredoc commands for file creation.
 
 In `.planning/research/`:
 1. **SUMMARY.md** — Always

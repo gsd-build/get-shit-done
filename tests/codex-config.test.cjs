@@ -365,6 +365,84 @@ describe('mergeCodexConfig', () => {
 
     assert.strictEqual(first, second, 'idempotent merge');
   });
+
+  test('case 2 after case 3 with existing [features]: no duplicate sections', () => {
+    const configPath = path.join(tmpDir, 'config.toml');
+    fs.writeFileSync(configPath, '[features]\nother_feature = true\n\n[model]\nname = "o3"\n');
+    mergeCodexConfig(configPath, sampleBlock);
+
+    mergeCodexConfig(configPath, sampleBlock);
+
+    const content = fs.readFileSync(configPath, 'utf8');
+    const featuresCount = (content.match(/^\[features\]\s*$/gm) || []).length;
+    const agentsCount = (content.match(/^\[agents\]\s*$/gm) || []).length;
+    assert.strictEqual(featuresCount, 1, 'exactly one [features] section');
+    assert.strictEqual(agentsCount, 1, 'exactly one [agents] section');
+    assert.ok(content.includes('other_feature = true'), 'preserves user feature keys');
+    assert.ok(content.includes('multi_agent = true'), 'has GSD feature key');
+    assert.ok(content.includes('[agents.gsd-executor]'), 'has agent');
+  });
+
+  test('case 2 re-injects missing feature keys', () => {
+    const configPath = path.join(tmpDir, 'config.toml');
+    const manualContent = '[features]\nother_feature = true\n\n' + GSD_CODEX_MARKER + '\n[agents]\nmax_threads = 4\n';
+    fs.writeFileSync(configPath, manualContent);
+
+    mergeCodexConfig(configPath, sampleBlock);
+
+    const content = fs.readFileSync(configPath, 'utf8');
+    assert.ok(content.includes('multi_agent = true'), 're-injects multi_agent');
+    assert.ok(content.includes('default_mode_request_user_input = true'), 're-injects request_user_input');
+    assert.ok(content.includes('other_feature = true'), 'preserves user feature');
+  });
+
+  test('case 2 strips leaked [agents] from before content', () => {
+    const configPath = path.join(tmpDir, 'config.toml');
+    const brokenContent = [
+      '[features]',
+      'default_mode_request_user_input = true',
+      'multi_agent = true',
+      'child_agents_md = false',
+      '',
+      '[agents]',
+      'max_threads = 4',
+      'max_depth = 2',
+      '',
+      '[agents.gsd-executor]',
+      'description = "old"',
+      'config_file = "agents/gsd-executor.toml"',
+      '',
+      GSD_CODEX_MARKER,
+      '[agents]',
+      'max_threads = 4',
+      '',
+    ].join('\n');
+    fs.writeFileSync(configPath, brokenContent);
+
+    mergeCodexConfig(configPath, sampleBlock);
+
+    const content = fs.readFileSync(configPath, 'utf8');
+    const agentsCount = (content.match(/^\[agents\]\s*$/gm) || []).length;
+    assert.strictEqual(agentsCount, 1, 'exactly one [agents] section');
+    assert.ok(content.includes('child_agents_md = false'), 'preserves user feature keys');
+    assert.ok(content.includes('[agents.gsd-executor]'), 'has agent from fresh block');
+  });
+
+  test('case 2 idempotent after case 3 with existing [features]', () => {
+    const configPath = path.join(tmpDir, 'config.toml');
+    fs.writeFileSync(configPath, '[features]\nother_feature = true\n');
+    mergeCodexConfig(configPath, sampleBlock);
+    const first = fs.readFileSync(configPath, 'utf8');
+
+    mergeCodexConfig(configPath, sampleBlock);
+    const second = fs.readFileSync(configPath, 'utf8');
+
+    mergeCodexConfig(configPath, sampleBlock);
+    const third = fs.readFileSync(configPath, 'utf8');
+
+    assert.strictEqual(first, second, 'idempotent after 2nd merge');
+    assert.strictEqual(second, third, 'idempotent after 3rd merge');
+  });
 });
 
 // ─── Integration: installCodexConfig ────────────────────────────────────────────

@@ -4,7 +4,7 @@
 
 const fs = require('fs');
 const path = require('path');
-const { escapeRegex, normalizePhaseName, comparePhaseNum, findPhaseInternal, getArchivedPhaseDirs, generateSlugInternal, getMilestonePhaseFilter, output, error } = require('./core.cjs');
+const { escapeRegex, normalizePhaseName, comparePhaseNum, findPhaseInternal, getArchivedPhaseDirs, generateSlugInternal, getMilestonePhaseFilter, toPosixPath, output, error } = require('./core.cjs');
 const { extractFrontmatter } = require('./frontmatter.cjs');
 const { writeStateMd } = require('./state.cjs');
 
@@ -180,7 +180,7 @@ function cmdFindPhase(cwd, phase, raw) {
 
     const result = {
       found: true,
-      directory: path.join('.planning', 'phases', match),
+      directory: toPosixPath(path.join('.planning', 'phases', match)),
       phase_number: phaseNumber,
       phase_name: phaseName,
       plans,

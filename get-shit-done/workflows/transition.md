@@ -451,9 +451,9 @@ Exit skill and invoke SlashCommand("/gsd:discuss-phase [X+1] --auto")
 
 **Route B: Milestone complete (all phases done)**
 
-**Clear auto-advance** — milestone boundary is the natural stopping point:
+**Clear auto-advance chain flag** — milestone boundary is the natural stopping point:
 ```bash
-node "$HOME/.claude/get-shit-done/bin/gsd-tools.cjs" config-set workflow.auto_advance false
+node "$HOME/.claude/get-shit-done/bin/gsd-tools.cjs" config-set workflow._auto_chain_active false
 ```
 
 <if mode="yolo">

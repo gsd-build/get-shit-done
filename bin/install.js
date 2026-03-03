@@ -58,6 +58,21 @@ if (hasAll) {
   if (hasCodex) selectedRuntimes.push('codex');
 }
 
+/**
+ * Convert a pathPrefix (which uses absolute paths for global installs) to a
+ * $HOME-relative form for replacing $HOME/.claude/ references in bash code blocks.
+ * Preserves $HOME as a shell variable so paths remain portable across machines.
+ */
+function toHomePrefix(pathPrefix) {
+  const home = os.homedir().replace(/\\/g, '/');
+  const normalized = pathPrefix.replace(/\\/g, '/');
+  if (normalized.startsWith(home)) {
+    return '$HOME' + normalized.slice(home.length);
+  }
+  // For relative paths or paths not under $HOME, return as-is
+  return normalized;
+}
+
 // Helper to get directory name for a runtime (used for local/project installs)
 function getDirName(runtime) {
   if (runtime === 'opencode') return '.opencode';
@@ -638,9 +653,31 @@ function mergeCodexConfig(configPath, gsdBlock) {
 
   // Case 2: Has GSD marker — truncate and re-append
   if (markerIndex !== -1) {
-    const before = existing.substring(0, markerIndex).trimEnd();
-    const newContent = before ? before + '\n\n' + gsdBlock + '\n' : gsdBlock + '\n';
-    fs.writeFileSync(configPath, newContent);
+    let before = existing.substring(0, markerIndex).trimEnd();
+    if (before) {
+      // Strip any GSD-managed sections that leaked above the marker from previous installs
+      before = before.replace(/^\[agents\.gsd-[^\]]+\]\n(?:(?!\[)[^\n]*\n?)*/gm, '');
+      before = before.replace(/^\[agents\]\n(?:(?!\[)[^\n]*\n?)*/m, '');
+      before = before.replace(/\n{3,}/g, '\n\n').trimEnd();
+
+      // Re-inject feature keys if user has [features] above the marker
+      const hasFeatures = /^\[features\]\s*$/m.test(before);
+      if (hasFeatures) {
+        if (!before.includes('multi_agent')) {
+          before = before.replace(/^\[features\]\s*$/m, '[features]\nmulti_agent = true');
+        }
+        if (!before.includes('default_mode_request_user_input')) {
+          before = before.replace(/^\[features\].*$/m, '$&\ndefault_mode_request_user_input = true');
+        }
+      }
+      // Skip [features] from gsdBlock if user already has it
+      const block = hasFeatures
+        ? GSD_CODEX_MARKER + '\n' + gsdBlock.substring(gsdBlock.indexOf('[agents]'))
+        : gsdBlock;
+      fs.writeFileSync(configPath, before + '\n\n' + block + '\n');
+    } else {
+      fs.writeFileSync(configPath, gsdBlock + '\n');
+    }
     return;
   }
 
@@ -678,8 +715,14 @@ function installCodexConfig(targetDir, agentsSrc) {
   const agentEntries = fs.readdirSync(agentsSrc).filter(f => f.startsWith('gsd-') && f.endsWith('.md'));
   const agents = [];
 
+  // Compute the Codex pathPrefix for replacing .claude paths
+  const codexPathPrefix = `${targetDir.replace(/\\/g, '/')}/`;
+
   for (const file of agentEntries) {
-    const content = fs.readFileSync(path.join(agentsSrc, file), 'utf8');
+    let content = fs.readFileSync(path.join(agentsSrc, file), 'utf8');
+    // Replace .claude paths before generating TOML (source files use ~/.claude and $HOME/.claude)
+    content = content.replace(/~\/\.claude\//g, codexPathPrefix);
+    content = content.replace(/\$HOME\/\.claude\//g, toHomePrefix(codexPathPrefix));
     const { frontmatter } = extractFrontmatterAndBody(content);
     const name = extractFrontmatterField(frontmatter, 'name') || file.replace('.md', '');
     const description = extractFrontmatterField(frontmatter, 'description') || '';
@@ -801,8 +844,9 @@ function convertClaudeToOpencodeFrontmatter(content) {
   convertedContent = convertedContent.replace(/\bTodoWrite\b/g, 'todowrite');
   // Replace /gsd:command with /gsd-command for opencode (flat command structure)
   convertedContent = convertedContent.replace(/\/gsd:/g, '/gsd-');
-  // Replace ~/.claude with ~/.config/opencode (OpenCode's correct config location)
+  // Replace ~/.claude and $HOME/.claude with OpenCode's config location
   convertedContent = convertedContent.replace(/~\/\.claude\b/g, '~/.config/opencode');
+  convertedContent = convertedContent.replace(/\$HOME\/\.claude\b/g, '$HOME/.config/opencode');
   // Replace general-purpose subagent type with OpenCode's equivalent "general"
   convertedContent = convertedContent.replace(/subagent_type="general-purpose"/g, 'subagent_type="general"');
 
@@ -984,9 +1028,11 @@ function copyFlattenedCommands(srcDir, destDir, prefix, pathPrefix, runtime) {
 
       let content = fs.readFileSync(srcPath, 'utf8');
       const globalClaudeRegex = /~\/\.claude\//g;
+      const globalClaudeHomeRegex = /\$HOME\/\.claude\//g;
       const localClaudeRegex = /\.\/\.claude\//g;
       const opencodeDirRegex = /~\/\.opencode\//g;
       content = content.replace(globalClaudeRegex, pathPrefix);
+      content = content.replace(globalClaudeHomeRegex, toHomePrefix(pathPrefix));
       content = content.replace(localClaudeRegex, `./${getDirName(runtime)}/`);
       content = content.replace(opencodeDirRegex, pathPrefix);
       content = processAttribution(content, getCommitAttribution(runtime));
@@ -1043,9 +1089,11 @@ function copyCommandsAsCodexSkills(srcDir, skillsDir, prefix, pathPrefix, runtim
 
       let content = fs.readFileSync(srcPath, 'utf8');
       const globalClaudeRegex = /~\/\.claude\//g;
+      const globalClaudeHomeRegex = /\$HOME\/\.claude\//g;
       const localClaudeRegex = /\.\/\.claude\//g;
       const codexDirRegex = /~\/\.codex\//g;
       content = content.replace(globalClaudeRegex, pathPrefix);
+      content = content.replace(globalClaudeHomeRegex, toHomePrefix(pathPrefix));
       content = content.replace(localClaudeRegex, `./${getDirName(runtime)}/`);
       content = content.replace(codexDirRegex, pathPrefix);
       content = processAttribution(content, getCommitAttribution(runtime));
@@ -1086,11 +1134,13 @@ function copyWithPathReplacement(srcDir, destDir, pathPrefix, runtime, isCommand
     if (entry.isDirectory()) {
       copyWithPathReplacement(srcPath, destPath, pathPrefix, runtime, isCommand);
     } else if (entry.name.endsWith('.md')) {
-      // Replace ~/.claude/ and ./.claude/ with runtime-appropriate paths
+      // Replace ~/.claude/ and $HOME/.claude/ and ./.claude/ with runtime-appropriate paths
       let content = fs.readFileSync(srcPath, 'utf8');
       const globalClaudeRegex = /~\/\.claude\//g;
+      const globalClaudeHomeRegex = /\$HOME\/\.claude\//g;
       const localClaudeRegex = /\.\/\.claude\//g;
       content = content.replace(globalClaudeRegex, pathPrefix);
+      content = content.replace(globalClaudeHomeRegex, toHomePrefix(pathPrefix));
       content = content.replace(localClaudeRegex, `./${dirName}/`);
       content = processAttribution(content, getCommitAttribution(runtime));
 
@@ -1931,9 +1981,11 @@ function install(isGlobal, runtime = 'claude') {
     for (const entry of agentEntries) {
       if (entry.isFile() && entry.name.endsWith('.md')) {
         let content = fs.readFileSync(path.join(agentsSrc, entry.name), 'utf8');
-        // Always replace ~/.claude/ as it is the source of truth in the repo
+        // Replace ~/.claude/ and $HOME/.claude/ as they are the source of truth in the repo
         const dirRegex = /~\/\.claude\//g;
+        const homeDirRegex = /\$HOME\/\.claude\//g;
         content = content.replace(dirRegex, pathPrefix);
+        content = content.replace(homeDirRegex, toHomePrefix(pathPrefix));
         content = processAttribution(content, getCommitAttribution(runtime));
         // Convert frontmatter for runtime compatibility
         if (isOpencode) {
@@ -2023,6 +2075,39 @@ function install(isGlobal, runtime = 'claude') {
 
   // Report any backed-up local patches
   reportLocalPatches(targetDir, runtime);
+
+  // Verify no leaked .claude paths in non-Claude runtimes
+  if (runtime !== 'claude') {
+    const leakedPaths = [];
+    function scanForLeakedPaths(dir) {
+      if (!fs.existsSync(dir)) return;
+      const entries = fs.readdirSync(dir, { withFileTypes: true });
+      for (const entry of entries) {
+        const fullPath = path.join(dir, entry.name);
+        if (entry.isDirectory()) {
+          scanForLeakedPaths(fullPath);
+        } else if ((entry.name.endsWith('.md') || entry.name.endsWith('.toml')) && entry.name !== 'CHANGELOG.md') {
+          const content = fs.readFileSync(fullPath, 'utf8');
+          const matches = content.match(/(?:~|\$HOME)\/\.claude\b/g);
+          if (matches) {
+            leakedPaths.push({ file: fullPath.replace(targetDir + '/', ''), count: matches.length });
+          }
+        }
+      }
+    }
+    scanForLeakedPaths(targetDir);
+    if (leakedPaths.length > 0) {
+      const totalLeaks = leakedPaths.reduce((sum, l) => sum + l.count, 0);
+      console.warn(`\n  ${yellow}⚠${reset}  Found ${totalLeaks} unreplaced .claude path reference(s) in ${leakedPaths.length} file(s):`);
+      for (const leak of leakedPaths.slice(0, 5)) {
+        console.warn(`     ${dim}${leak.file}${reset} (${leak.count})`);
+      }
+      if (leakedPaths.length > 5) {
+        console.warn(`     ${dim}... and ${leakedPaths.length - 5} more file(s)${reset}`);
+      }
+      console.warn(`  ${dim}These paths may not resolve correctly for ${runtimeLabel}.${reset}`);
+    }
+  }
 
   if (isCodex) {
     // Generate Codex config.toml and per-agent .toml files

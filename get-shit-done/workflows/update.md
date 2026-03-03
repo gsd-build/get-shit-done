@@ -14,24 +14,34 @@ Detect whether GSD is installed locally or globally by checking both locations a
 ```bash
 # Check local first (takes priority only if valid)
 # Detect runtime config directory (supports Claude, OpenCode, Gemini)
-LOCAL_VERSION_FILE="" LOCAL_MARKER_FILE=""
+LOCAL_VERSION_FILE="" LOCAL_MARKER_FILE="" LOCAL_DIR=""
 for dir in .claude .config/opencode .opencode .gemini; do
   if [ -f "./$dir/get-shit-done/VERSION" ]; then
     LOCAL_VERSION_FILE="./$dir/get-shit-done/VERSION"
     LOCAL_MARKER_FILE="./$dir/get-shit-done/workflows/update.md"
+    LOCAL_DIR="$(cd "./$dir" 2>/dev/null && pwd)"
     break
   fi
 done
-GLOBAL_VERSION_FILE="" GLOBAL_MARKER_FILE=""
+GLOBAL_VERSION_FILE="" GLOBAL_MARKER_FILE="" GLOBAL_DIR=""
 for dir in .claude .config/opencode .opencode .gemini; do
   if [ -f "$HOME/$dir/get-shit-done/VERSION" ]; then
     GLOBAL_VERSION_FILE="$HOME/$dir/get-shit-done/VERSION"
     GLOBAL_MARKER_FILE="$HOME/$dir/get-shit-done/workflows/update.md"
+    GLOBAL_DIR="$(cd "$HOME/$dir" 2>/dev/null && pwd)"
     break
   fi
 done
 
+# Only treat as LOCAL if the resolved paths differ (prevents misdetection when CWD=$HOME)
+IS_LOCAL=false
 if [ -n "$LOCAL_VERSION_FILE" ] && [ -f "$LOCAL_VERSION_FILE" ] && [ -f "$LOCAL_MARKER_FILE" ] && grep -Eq '^[0-9]+\.[0-9]+\.[0-9]+' "$LOCAL_VERSION_FILE"; then
+  if [ -z "$GLOBAL_DIR" ] || [ "$LOCAL_DIR" != "$GLOBAL_DIR" ]; then
+    IS_LOCAL=true
+  fi
+fi
+
+if [ "$IS_LOCAL" = true ]; then
   cat "$LOCAL_VERSION_FILE"
   echo "LOCAL"
 elif [ -n "$GLOBAL_VERSION_FILE" ] && [ -f "$GLOBAL_VERSION_FILE" ] && [ -f "$GLOBAL_MARKER_FILE" ] && grep -Eq '^[0-9]+\.[0-9]+\.[0-9]+' "$GLOBAL_VERSION_FILE"; then
