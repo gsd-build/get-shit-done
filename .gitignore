@@ -21,7 +21,7 @@ animation/
 # Internal planning documents
 reports/
 RAILROAD_ARCHITECTURE.md
-# .planning/
+.planning/
 analysis/
 docs/GSD-MASTER-ARCHITECTURE.md
 docs/GSD-RUST-IMPLEMENTATION-GUIDE.md
