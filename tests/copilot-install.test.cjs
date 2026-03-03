@@ -9,7 +9,7 @@
 
 process.env.GSD_TEST_MODE = '1';
 
-const { test, describe } = require('node:test');
+const { test, describe, beforeEach, afterEach } = require('node:test');
 const assert = require('node:assert');
 const path = require('path');
 const os = require('os');
@@ -25,6 +25,12 @@ const {
   convertClaudeCommandToCopilotSkill,
   convertClaudeAgentToCopilotAgent,
   copyCommandsAsCopilotSkills,
+  GSD_COPILOT_INSTRUCTIONS_MARKER,
+  GSD_COPILOT_INSTRUCTIONS_CLOSE_MARKER,
+  mergeCopilotInstructions,
+  stripGsdFromCopilotInstructions,
+  writeManifest,
+  reportLocalPatches,
 } = require('../bin/install.js');
 
 // ─── getDirName ─────────────────────────────────────────────────────────────────
@@ -660,5 +666,158 @@ describe('Copilot content conversion - engine files', () => {
     assert.ok(!result.match(/gsd:[a-z]/), 'no gsd: references remain');
     assert.ok(result.includes('gsd-new-project'), 'gsd:new-project converted');
     assert.ok(result.includes('gsd-health'), 'gsd:health converted');
+  });
+});
+
+// ─── Copilot instructions merge/strip ──────────────────────────────────────────
+
+describe('Copilot instructions merge/strip', () => {
+  let tmpDir;
+
+  const gsdContent = '- Follow project conventions\n- Use structured workflows';
+
+  function makeGsdBlock(content) {
+    return GSD_COPILOT_INSTRUCTIONS_MARKER + '\n' + content.trim() + '\n' + GSD_COPILOT_INSTRUCTIONS_CLOSE_MARKER;
+  }
+
+  describe('mergeCopilotInstructions', () => {
+    let tmpMergeDir;
+
+    beforeEach(() => {
+      tmpMergeDir = fs.mkdtempSync(path.join(os.tmpdir(), 'gsd-merge-'));
+    });
+
+    afterEach(() => {
+      fs.rmSync(tmpMergeDir, { recursive: true, force: true });
+    });
+
+    test('creates file from scratch when none exists', () => {
+      const filePath = path.join(tmpMergeDir, 'copilot-instructions.md');
+      mergeCopilotInstructions(filePath, gsdContent);
+
+      assert.ok(fs.existsSync(filePath), 'file was created');
+      const result = fs.readFileSync(filePath, 'utf8');
+      assert.ok(result.includes(GSD_COPILOT_INSTRUCTIONS_MARKER), 'has opening marker');
+      assert.ok(result.includes(GSD_COPILOT_INSTRUCTIONS_CLOSE_MARKER), 'has closing marker');
+      assert.ok(result.includes('Follow project conventions'), 'has GSD content');
+    });
+
+    test('replaces GSD section when both markers present', () => {
+      const filePath = path.join(tmpMergeDir, 'copilot-instructions.md');
+      const oldContent = '# User Setup\n\n' +
+        makeGsdBlock('- Old GSD content') +
+        '\n\n# User Notes\n';
+      fs.writeFileSync(filePath, oldContent);
+
+      mergeCopilotInstructions(filePath, gsdContent);
+      const result = fs.readFileSync(filePath, 'utf8');
+
+      assert.ok(result.includes('# User Setup'), 'user content before preserved');
+      assert.ok(result.includes('# User Notes'), 'user content after preserved');
+      assert.ok(!result.includes('Old GSD content'), 'old GSD content removed');
+      assert.ok(result.includes('Follow project conventions'), 'new GSD content inserted');
+    });
+
+    test('appends to existing file when no markers present', () => {
+      const filePath = path.join(tmpMergeDir, 'copilot-instructions.md');
+      const userContent = '# My Custom Instructions\n\nDo things my way.\n';
+      fs.writeFileSync(filePath, userContent);
+
+      mergeCopilotInstructions(filePath, gsdContent);
+      const result = fs.readFileSync(filePath, 'utf8');
+
+      assert.ok(result.includes('# My Custom Instructions'), 'original content preserved');
+      assert.ok(result.includes('Do things my way.'), 'original text preserved');
+      assert.ok(result.includes(GSD_COPILOT_INSTRUCTIONS_MARKER), 'GSD block appended');
+      assert.ok(result.includes('Follow project conventions'), 'GSD content appended');
+      // Verify separator exists
+      assert.ok(result.includes('Do things my way.\n\n' + GSD_COPILOT_INSTRUCTIONS_MARKER),
+        'double newline separator before GSD block');
+    });
+
+    test('handles file that is GSD-only (re-creates cleanly)', () => {
+      const filePath = path.join(tmpMergeDir, 'copilot-instructions.md');
+      const gsdOnly = makeGsdBlock('- Old instructions') + '\n';
+      fs.writeFileSync(filePath, gsdOnly);
+
+      const newContent = '- Updated instructions';
+      mergeCopilotInstructions(filePath, newContent);
+      const result = fs.readFileSync(filePath, 'utf8');
+
+      assert.ok(!result.includes('Old instructions'), 'old content removed');
+      assert.ok(result.includes('Updated instructions'), 'new content present');
+      assert.ok(result.includes(GSD_COPILOT_INSTRUCTIONS_MARKER), 'has opening marker');
+      assert.ok(result.includes(GSD_COPILOT_INSTRUCTIONS_CLOSE_MARKER), 'has closing marker');
+    });
+
+    test('preserves user content before and after markers', () => {
+      const filePath = path.join(tmpMergeDir, 'copilot-instructions.md');
+      const content = '# My Setup\n\n' +
+        makeGsdBlock('- old content') +
+        '\n\n# My Notes\n';
+      fs.writeFileSync(filePath, content);
+
+      mergeCopilotInstructions(filePath, gsdContent);
+      const result = fs.readFileSync(filePath, 'utf8');
+
+      assert.ok(result.includes('# My Setup'), 'content before markers preserved');
+      assert.ok(result.includes('# My Notes'), 'content after markers preserved');
+      assert.ok(result.includes('Follow project conventions'), 'new GSD content between markers');
+      // Verify ordering: before → GSD → after
+      const setupIdx = result.indexOf('# My Setup');
+      const markerIdx = result.indexOf(GSD_COPILOT_INSTRUCTIONS_MARKER);
+      const notesIdx = result.indexOf('# My Notes');
+      assert.ok(setupIdx < markerIdx, 'user setup comes before GSD block');
+      assert.ok(markerIdx < notesIdx, 'GSD block comes before user notes');
+    });
+  });
+
+  describe('stripGsdFromCopilotInstructions', () => {
+    test('returns null when content is GSD-only', () => {
+      const content = makeGsdBlock('- GSD instructions only') + '\n';
+      const result = stripGsdFromCopilotInstructions(content);
+      assert.strictEqual(result, null, 'returns null for GSD-only content');
+    });
+
+    test('returns cleaned content when user content exists before markers', () => {
+      const content = '# My Setup\n\nCustom rules here.\n\n' +
+        makeGsdBlock('- GSD stuff') + '\n';
+      const result = stripGsdFromCopilotInstructions(content);
+
+      assert.ok(result !== null, 'does not return null');
+      assert.ok(result.includes('# My Setup'), 'user content preserved');
+      assert.ok(result.includes('Custom rules here.'), 'user text preserved');
+      assert.ok(!result.includes(GSD_COPILOT_INSTRUCTIONS_MARKER), 'opening marker removed');
+      assert.ok(!result.includes(GSD_COPILOT_INSTRUCTIONS_CLOSE_MARKER), 'closing marker removed');
+      assert.ok(!result.includes('GSD stuff'), 'GSD content removed');
+    });
+
+    test('returns cleaned content when user content exists after markers', () => {
+      const content = makeGsdBlock('- GSD stuff') + '\n\n# My Notes\n\nPersonal notes.\n';
+      const result = stripGsdFromCopilotInstructions(content);
+
+      assert.ok(result !== null, 'does not return null');
+      assert.ok(result.includes('# My Notes'), 'user content after preserved');
+      assert.ok(result.includes('Personal notes.'), 'user text after preserved');
+      assert.ok(!result.includes(GSD_COPILOT_INSTRUCTIONS_MARKER), 'opening marker removed');
+      assert.ok(!result.includes('GSD stuff'), 'GSD content removed');
+    });
+
+    test('returns cleaned content preserving both before and after', () => {
+      const content = '# Before\n\n' + makeGsdBlock('- GSD middle') + '\n\n# After\n';
+      const result = stripGsdFromCopilotInstructions(content);
+
+      assert.ok(result !== null, 'does not return null');
+      assert.ok(result.includes('# Before'), 'content before preserved');
+      assert.ok(result.includes('# After'), 'content after preserved');
+      assert.ok(!result.includes('GSD middle'), 'GSD content removed');
+      assert.ok(!result.includes(GSD_COPILOT_INSTRUCTIONS_MARKER), 'markers removed');
+    });
+
+    test('returns original content when no markers found', () => {
+      const content = '# Just user content\n\nNo GSD markers here.\n';
+      const result = stripGsdFromCopilotInstructions(content);
+      assert.strictEqual(result, content, 'returns content unchanged');
+    });
   });
 });

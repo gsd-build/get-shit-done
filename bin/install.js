@@ -2767,6 +2767,8 @@ if (process.env.GSD_TEST_MODE) {
     GSD_COPILOT_INSTRUCTIONS_CLOSE_MARKER,
     mergeCopilotInstructions,
     stripGsdFromCopilotInstructions,
+    writeManifest,
+    reportLocalPatches,
   };
 } else {
 
