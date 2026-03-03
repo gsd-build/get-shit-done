@@ -59,11 +59,11 @@ Plans:
   2. Running uninstall removes all GSD skills, agents, and `get-shit-done/` directory from `.github/` without touching non-GSD content
   3. `gsd-file-manifest.json` is written after installation listing all installed files with checksums for change detection
   4. Reinstall detects user-modified files and backs them up to `gsd-local-patches/` before overwriting
-**Plans**: TBD
+**Plans:** 2 plans
 
 Plans:
-- [ ] 03-01: TBD
-- [ ] 03-02: TBD
+- [ ] 03-01-PLAN.md — Instructions merge/strip functions + uninstall/manifest/patches lifecycle fixes
+- [ ] 03-02-PLAN.md — Tests for all Phase 3 changes (merge, strip, uninstall, manifest, patches)
 
 ### Phase 4: Integration Testing & Validation
 **Goal**: Copilot installer output is verified correct against the reference implementation in `.github/`
