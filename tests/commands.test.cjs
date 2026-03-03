@@ -1186,3 +1186,107 @@ describe('websearch command', () => {
     assert.strictEqual(output.error, 'Network timeout');
   });
 });
+
+describe('stats command', () => {
+  let tmpDir;
+
+  beforeEach(() => {
+    tmpDir = createTempProject();
+  });
+
+  afterEach(() => {
+    cleanup(tmpDir);
+  });
+
+  test('returns valid JSON with empty project', () => {
+    const result = runGsdTools('stats', tmpDir);
+    assert.ok(result.success, `Command failed: ${result.error}`);
+
+    const stats = JSON.parse(result.output);
+    assert.ok(Array.isArray(stats.phases), 'phases should be an array');
+    assert.strictEqual(stats.total_plans, 0);
+    assert.strictEqual(stats.total_summaries, 0);
+    assert.strictEqual(stats.percent, 0);
+    assert.strictEqual(stats.phases_completed, 0);
+    assert.strictEqual(stats.phases_total, 0);
+    assert.strictEqual(stats.requirements_total, 0);
+    assert.strictEqual(stats.requirements_complete, 0);
+  });
+
+  test('counts phases, plans, and summaries correctly', () => {
+    const p1 = path.join(tmpDir, '.planning', 'phases', '01-auth');
+    const p2 = path.join(tmpDir, '.planning', 'phases', '02-api');
+    fs.mkdirSync(p1, { recursive: true });
+    fs.mkdirSync(p2, { recursive: true });
+
+    // Phase 1: 2 plans, 2 summaries (complete)
+    fs.writeFileSync(path.join(p1, '01-01-PLAN.md'), '# Plan');
+    fs.writeFileSync(path.join(p1, '01-02-PLAN.md'), '# Plan');
+    fs.writeFileSync(path.join(p1, '01-01-SUMMARY.md'), '# Summary');
+    fs.writeFileSync(path.join(p1, '01-02-SUMMARY.md'), '# Summary');
+
+    // Phase 2: 1 plan, 0 summaries (planned)
+    fs.writeFileSync(path.join(p2, '02-01-PLAN.md'), '# Plan');
+
+    const result = runGsdTools('stats', tmpDir);
+    assert.ok(result.success, `Command failed: ${result.error}`);
+
+    const stats = JSON.parse(result.output);
+    assert.strictEqual(stats.phases_total, 2);
+    assert.strictEqual(stats.phases_completed, 1);
+    assert.strictEqual(stats.total_plans, 3);
+    assert.strictEqual(stats.total_summaries, 2);
+    assert.strictEqual(stats.percent, 67);
+  });
+
+  test('counts requirements from REQUIREMENTS.md', () => {
+    fs.writeFileSync(
+      path.join(tmpDir, '.planning', 'REQUIREMENTS.md'),
+      `# Requirements
+
+## v1 Requirements
+
+- [x] **AUTH-01**: User can sign up
+- [x] **AUTH-02**: User can log in
+- [ ] **API-01**: REST endpoints
+- [ ] **API-02**: GraphQL support
+`
+    );
+
+    const result = runGsdTools('stats', tmpDir);
+    assert.ok(result.success, `Command failed: ${result.error}`);
+
+    const stats = JSON.parse(result.output);
+    assert.strictEqual(stats.requirements_total, 4);
+    assert.strictEqual(stats.requirements_complete, 2);
+  });
+
+  test('reads last activity from STATE.md', () => {
+    fs.writeFileSync(
+      path.join(tmpDir, '.planning', 'STATE.md'),
+      `# State\n\n**Current Phase:** 01\n**Status:** In progress\n**Last Activity:** 2025-06-15\n**Last Activity Description:** Working\n`
+    );
+
+    const result = runGsdTools('stats', tmpDir);
+    assert.ok(result.success, `Command failed: ${result.error}`);
+
+    const stats = JSON.parse(result.output);
+    assert.strictEqual(stats.last_activity, '2025-06-15');
+  });
+
+  test('table format renders readable output', () => {
+    const p1 = path.join(tmpDir, '.planning', 'phases', '01-auth');
+    fs.mkdirSync(p1, { recursive: true });
+    fs.writeFileSync(path.join(p1, '01-01-PLAN.md'), '# Plan');
+    fs.writeFileSync(path.join(p1, '01-01-SUMMARY.md'), '# Summary');
+
+    const result = runGsdTools('stats table', tmpDir);
+    assert.ok(result.success, `Command failed: ${result.error}`);
+
+    const parsed = JSON.parse(result.output);
+    assert.ok(parsed.rendered, 'table format should include rendered field');
+    assert.ok(parsed.rendered.includes('Statistics'), 'should include Statistics header');
+    assert.ok(parsed.rendered.includes('| Phase |'), 'should include table header');
+    assert.ok(parsed.rendered.includes('| 1 |'), 'should include phase row');
+  });
+});
