@@ -41,6 +41,7 @@ const hasOpencode = args.includes('--opencode');
 const hasClaude = args.includes('--claude');
 const hasGemini = args.includes('--gemini');
 const hasCodex = args.includes('--codex');
+const hasKiro = args.includes('--kiro') || args.includes('--kiro-cli');
 const hasBoth = args.includes('--both'); // Legacy flag, keeps working
 const hasAll = args.includes('--all');
 const hasUninstall = args.includes('--uninstall') || args.includes('-u');
@@ -48,7 +49,7 @@ const hasUninstall = args.includes('--uninstall') || args.includes('-u');
 // Runtime selection - can be set by flags or interactive prompt
 let selectedRuntimes = [];
 if (hasAll) {
-  selectedRuntimes = ['claude', 'opencode', 'gemini', 'codex'];
+  selectedRuntimes = ['claude', 'opencode', 'gemini', 'kiro', 'codex'];
 } else if (hasBoth) {
   selectedRuntimes = ['claude', 'opencode'];
 } else {
@@ -56,6 +57,7 @@ if (hasAll) {
   if (hasClaude) selectedRuntimes.push('claude');
   if (hasGemini) selectedRuntimes.push('gemini');
   if (hasCodex) selectedRuntimes.push('codex');
+  if (hasKiro) selectedRuntimes.push('kiro');
 }
 
 /**
@@ -78,13 +80,14 @@ function getDirName(runtime) {
   if (runtime === 'opencode') return '.opencode';
   if (runtime === 'gemini') return '.gemini';
   if (runtime === 'codex') return '.codex';
+  if (runtime === 'kiro') return '.kiro';
   return '.claude';
 }
 
 /**
  * Get the config directory path relative to home directory for a runtime
  * Used for templating hooks that use path.join(homeDir, '<configDir>', ...)
- * @param {string} runtime - 'claude', 'opencode', 'gemini', or 'codex'
+ * @param {string} runtime - 'claude', 'opencode', 'gemini', 'codex', or 'kiro'
  * @param {boolean} isGlobal - Whether this is a global install
  */
 function getConfigDirFromHome(runtime, isGlobal) {
@@ -100,6 +103,7 @@ function getConfigDirFromHome(runtime, isGlobal) {
   }
   if (runtime === 'gemini') return "'.gemini'";
   if (runtime === 'codex') return "'.codex'";
+  if (runtime === 'kiro') return "'.kiro'";
   return "'.claude'";
 }
 
@@ -130,7 +134,7 @@ function getOpencodeGlobalDir() {
 
 /**
  * Get the global config directory for a runtime
- * @param {string} runtime - 'claude', 'opencode', 'gemini', or 'codex'
+ * @param {string} runtime - 'claude', 'opencode', 'gemini', 'codex', or 'kiro'
  * @param {string|null} explicitDir - Explicit directory from --config-dir flag
  */
 function getGlobalDir(runtime, explicitDir = null) {
@@ -162,6 +166,17 @@ function getGlobalDir(runtime, explicitDir = null) {
       return expandTilde(process.env.CODEX_HOME);
     }
     return path.join(os.homedir(), '.codex');
+  }
+
+  if (runtime === 'kiro') {
+    // Kiro: --config-dir > KIRO_CONFIG_DIR > ~/.kiro
+    if (explicitDir) {
+      return expandTilde(explicitDir);
+    }
+    if (process.env.KIRO_CONFIG_DIR) {
+      return expandTilde(process.env.KIRO_CONFIG_DIR);
+    }
+    return path.join(os.homedir(), '.kiro');
   }
   
   // Claude Code: --config-dir > CLAUDE_CONFIG_DIR > ~/.claude
@@ -213,12 +228,13 @@ function parseConfigDirArg() {
 const explicitConfigDir = parseConfigDirArg();
 const hasHelp = args.includes('--help') || args.includes('-h');
 const forceStatusline = args.includes('--force-statusline');
+const forceInteractive = process.env.GSD_FORCE_INTERACTIVE === '1';
 
 console.log(banner);
 
 // Show help if requested
 if (hasHelp) {
-  console.log(`  ${yellow}Usage:${reset} npx get-shit-done-cc [options]\n\n  ${yellow}Options:${reset}\n    ${cyan}-g, --global${reset}              Install globally (to config directory)\n    ${cyan}-l, --local${reset}               Install locally (to current directory)\n    ${cyan}--claude${reset}                  Install for Claude Code only\n    ${cyan}--opencode${reset}                Install for OpenCode only\n    ${cyan}--gemini${reset}                  Install for Gemini only\n    ${cyan}--codex${reset}                   Install for Codex only\n    ${cyan}--all${reset}                     Install for all runtimes\n    ${cyan}-u, --uninstall${reset}           Uninstall GSD (remove all GSD files)\n    ${cyan}-c, --config-dir <path>${reset}   Specify custom config directory\n    ${cyan}-h, --help${reset}                Show this help message\n    ${cyan}--force-statusline${reset}        Replace existing statusline config\n\n  ${yellow}Examples:${reset}\n    ${dim}# Interactive install (prompts for runtime and location)${reset}\n    npx get-shit-done-cc\n\n    ${dim}# Install for Claude Code globally${reset}\n    npx get-shit-done-cc --claude --global\n\n    ${dim}# Install for Gemini globally${reset}\n    npx get-shit-done-cc --gemini --global\n\n    ${dim}# Install for Codex globally${reset}\n    npx get-shit-done-cc --codex --global\n\n    ${dim}# Install for all runtimes globally${reset}\n    npx get-shit-done-cc --all --global\n\n    ${dim}# Install to custom config directory${reset}\n    npx get-shit-done-cc --codex --global --config-dir ~/.codex-work\n\n    ${dim}# Install to current project only${reset}\n    npx get-shit-done-cc --claude --local\n\n    ${dim}# Uninstall GSD from Codex globally${reset}\n    npx get-shit-done-cc --codex --global --uninstall\n\n  ${yellow}Notes:${reset}\n    The --config-dir option is useful when you have multiple configurations.\n    It takes priority over CLAUDE_CONFIG_DIR / GEMINI_CONFIG_DIR / CODEX_HOME environment variables.\n`);
+  console.log(`  ${yellow}Usage:${reset} npx get-shit-done-cc [options]\n\n  ${yellow}Options:${reset}\n    ${cyan}-g, --global${reset}              Install globally (to config directory)\n    ${cyan}-l, --local${reset}               Install locally (to current directory)\n    ${cyan}--claude${reset}                  Install for Claude Code only\n    ${cyan}--opencode${reset}                Install for OpenCode only\n    ${cyan}--gemini${reset}                  Install for Gemini only\n    ${cyan}--codex${reset}                   Install for Codex only\n    ${cyan}--kiro, --kiro-cli${reset}        Install for Kiro only\n    ${cyan}--all${reset}                     Install for all runtimes\n    ${cyan}-u, --uninstall${reset}           Uninstall GSD (remove all GSD files)\n    ${cyan}-c, --config-dir <path>${reset}   Specify custom config directory\n    ${cyan}-h, --help${reset}                Show this help message\n    ${cyan}--force-statusline${reset}        Replace existing statusline config\n\n  ${yellow}Examples:${reset}\n    ${dim}# Interactive install (prompts for runtime and location)${reset}\n    npx get-shit-done-cc\n\n    ${dim}# Install for Claude Code globally${reset}\n    npx get-shit-done-cc --claude --global\n\n    ${dim}# Install for Gemini globally${reset}\n    npx get-shit-done-cc --gemini --global\n\n    ${dim}# Install for Codex globally${reset}\n    npx get-shit-done-cc --codex --global\n\n    ${dim}# Install for Kiro globally${reset}\n    npx get-shit-done-cc --kiro --global\n\n    ${dim}# Install for all runtimes globally${reset}\n    npx get-shit-done-cc --all --global\n\n    ${dim}# Install to custom config directory${reset}\n    npx get-shit-done-cc --codex --global --config-dir ~/.codex-work\n\n    ${dim}# Install to current project only${reset}\n    npx get-shit-done-cc --claude --local\n\n    ${dim}# Uninstall GSD from Codex globally${reset}\n    npx get-shit-done-cc --codex --global --uninstall\n\n  ${yellow}Notes:${reset}\n    The --config-dir option is useful when you have multiple configurations.\n    It takes priority over CLAUDE_CONFIG_DIR / GEMINI_CONFIG_DIR / CODEX_HOME / KIRO_CONFIG_DIR environment variables.\n`);
   process.exit(0);
 }
 
@@ -1053,14 +1069,23 @@ function listCodexSkillNames(skillsDir, prefix = 'gsd-') {
     .sort();
 }
 
-function copyCommandsAsCodexSkills(srcDir, skillsDir, prefix, pathPrefix, runtime) {
+function copyCommandsAsRuntimeSkills({
+  srcDir,
+  skillsDir,
+  prefix,
+  pathPrefix,
+  runtime,
+  localSubdir,
+}) {
   if (!fs.existsSync(srcDir)) {
     return;
   }
 
+  const resolvedLocalSubdir = localSubdir || getDirName(runtime);
+
   fs.mkdirSync(skillsDir, { recursive: true });
 
-  // Remove previous GSD Codex skills to avoid stale command skills.
+  // Remove previous GSD runtime skills to avoid stale command skills.
   const existing = fs.readdirSync(skillsDir, { withFileTypes: true });
   for (const entry of existing) {
     if (entry.isDirectory() && entry.name.startsWith(`${prefix}-`)) {
@@ -1091,14 +1116,16 @@ function copyCommandsAsCodexSkills(srcDir, skillsDir, prefix, pathPrefix, runtim
       const globalClaudeRegex = /~\/\.claude\//g;
       const globalClaudeHomeRegex = /\$HOME\/\.claude\//g;
       const localClaudeRegex = /\.\/\.claude\//g;
-      const codexDirRegex = /~\/\.codex\//g;
       content = content.replace(globalClaudeRegex, pathPrefix);
       content = content.replace(globalClaudeHomeRegex, toHomePrefix(pathPrefix));
-      content = content.replace(localClaudeRegex, `./${getDirName(runtime)}/`);
-      content = content.replace(codexDirRegex, pathPrefix);
-      content = processAttribution(content, getCommitAttribution(runtime));
-      content = convertClaudeCommandToCodexSkill(content, skillName);
+      content = content.replace(localClaudeRegex, `./${resolvedLocalSubdir}/`);
+      content = content.replace(/~\/\.codex\//g, pathPrefix);
 
+      if (runtime === 'codex') {
+        content = convertClaudeCommandToCodexSkill(content, skillName);
+      }
+
+      content = processAttribution(content, getCommitAttribution(runtime));
       fs.writeFileSync(path.join(skillDir, 'SKILL.md'), content);
     }
   }
@@ -1250,11 +1277,12 @@ function cleanupOrphanedHooks(settings) {
  * Uninstall GSD from the specified directory for a specific runtime
  * Removes only GSD-specific files/directories, preserves user content
  * @param {boolean} isGlobal - Whether to uninstall from global or local
- * @param {string} runtime - Target runtime ('claude', 'opencode', 'gemini', 'codex')
+ * @param {string} runtime - Target runtime ('claude', 'opencode', 'gemini', 'codex', 'kiro')
  */
 function uninstall(isGlobal, runtime = 'claude') {
   const isOpencode = runtime === 'opencode';
   const isCodex = runtime === 'codex';
+  const isKiro = runtime === 'kiro';
   const dirName = getDirName(runtime);
 
   // Get the target directory based on runtime and install type
@@ -1270,6 +1298,7 @@ function uninstall(isGlobal, runtime = 'claude') {
   if (runtime === 'opencode') runtimeLabel = 'OpenCode';
   if (runtime === 'gemini') runtimeLabel = 'Gemini';
   if (runtime === 'codex') runtimeLabel = 'Codex';
+  if (isKiro) runtimeLabel = 'Kiro';
 
   console.log(`  Uninstalling GSD from ${cyan}${runtimeLabel}${reset} at ${cyan}${locationLabel}${reset}\n`);
 
@@ -1296,7 +1325,7 @@ function uninstall(isGlobal, runtime = 'claude') {
       }
       console.log(`  ${green}✓${reset} Removed GSD commands from command/`);
     }
-  } else if (isCodex) {
+  } else if (isCodex || isKiro) {
     // Codex: remove skills/gsd-*/SKILL.md skill directories
     const skillsDir = path.join(targetDir, 'skills');
     if (fs.existsSync(skillsDir)) {
@@ -1310,7 +1339,7 @@ function uninstall(isGlobal, runtime = 'claude') {
       }
       if (skillCount > 0) {
         removedCount++;
-        console.log(`  ${green}✓${reset} Removed ${skillCount} Codex skills`);
+        console.log(`  ${green}✓${reset} Removed ${skillCount} ${isKiro ? 'Kiro' : 'Codex'} skills`);
       }
     }
 
@@ -1755,6 +1784,7 @@ function generateManifest(dir, baseDir) {
 function writeManifest(configDir, runtime = 'claude') {
   const isOpencode = runtime === 'opencode';
   const isCodex = runtime === 'codex';
+  const isKiro = runtime === 'kiro';
   const gsdDir = path.join(configDir, 'get-shit-done');
   const commandsDir = path.join(configDir, 'commands', 'gsd');
   const opencodeCommandDir = path.join(configDir, 'command');
@@ -1766,7 +1796,7 @@ function writeManifest(configDir, runtime = 'claude') {
   for (const [rel, hash] of Object.entries(gsdHashes)) {
     manifest.files['get-shit-done/' + rel] = hash;
   }
-  if (!isOpencode && !isCodex && fs.existsSync(commandsDir)) {
+  if (!isOpencode && !isCodex && !isKiro && fs.existsSync(commandsDir)) {
     const cmdHashes = generateManifest(commandsDir);
     for (const [rel, hash] of Object.entries(cmdHashes)) {
       manifest.files['commands/gsd/' + rel] = hash;
@@ -1779,7 +1809,7 @@ function writeManifest(configDir, runtime = 'claude') {
       }
     }
   }
-  if (isCodex && fs.existsSync(codexSkillsDir)) {
+  if ((isCodex || isKiro) && fs.existsSync(codexSkillsDir)) {
     for (const skillName of listCodexSkillNames(codexSkillsDir)) {
       const skillRoot = path.join(codexSkillsDir, skillName);
       const skillHashes = generateManifest(skillRoot);
@@ -1876,6 +1906,7 @@ function install(isGlobal, runtime = 'claude') {
   const isOpencode = runtime === 'opencode';
   const isGemini = runtime === 'gemini';
   const isCodex = runtime === 'codex';
+  const isKiro = runtime === 'kiro';
   const dirName = getDirName(runtime);
   const src = path.join(__dirname, '..');
 
@@ -1899,6 +1930,7 @@ function install(isGlobal, runtime = 'claude') {
   if (isOpencode) runtimeLabel = 'OpenCode';
   if (isGemini) runtimeLabel = 'Gemini';
   if (isCodex) runtimeLabel = 'Codex';
+  if (isKiro) runtimeLabel = 'Kiro';
 
   console.log(`  Installing for ${cyan}${runtimeLabel}${reset} to ${cyan}${locationLabel}${reset}\n`);
 
@@ -1911,7 +1943,7 @@ function install(isGlobal, runtime = 'claude') {
   // Clean up orphaned files from previous versions
   cleanupOrphanedFiles(targetDir);
 
-  // OpenCode uses command/ (flat), Codex uses skills/, Claude/Gemini use commands/gsd/
+  // OpenCode uses command/ (flat), Codex/Kiro use skills/, Claude/Gemini use commands/gsd/
   if (isOpencode) {
     // OpenCode: flat structure in command/ directory
     const commandDir = path.join(targetDir, 'command');
@@ -1926,13 +1958,20 @@ function install(isGlobal, runtime = 'claude') {
     } else {
       failures.push('command/gsd-*');
     }
-  } else if (isCodex) {
+  } else if (isCodex || isKiro) {
     const skillsDir = path.join(targetDir, 'skills');
     const gsdSrc = path.join(src, 'commands', 'gsd');
-    copyCommandsAsCodexSkills(gsdSrc, skillsDir, 'gsd', pathPrefix, runtime);
+    copyCommandsAsRuntimeSkills({
+      srcDir: gsdSrc,
+      skillsDir,
+      prefix: 'gsd',
+      pathPrefix,
+      runtime,
+    });
     const installedSkillNames = listCodexSkillNames(skillsDir);
     if (installedSkillNames.length > 0) {
-      console.log(`  ${green}✓${reset} Installed ${installedSkillNames.length} skills to skills/`);
+      const runtimeLabel = isKiro ? 'Kiro' : 'Codex';
+      console.log(`  ${green}✓${reset} Installed ${installedSkillNames.length} ${runtimeLabel} skills to skills/`);
     } else {
       failures.push('skills/gsd-*');
     }
@@ -2026,7 +2065,7 @@ function install(isGlobal, runtime = 'claude') {
     failures.push('VERSION');
   }
 
-  if (!isCodex) {
+  if (!isCodex && !isKiro) {
     // Write package.json to force CommonJS mode for GSD scripts
     // Prevents "require is not defined" errors when project has "type": "module"
     // Node.js walks up looking for package.json - this stops inheritance from project
@@ -2287,35 +2326,44 @@ function handleStatusline(settings, isInteractive, callback) {
 /**
  * Prompt for runtime selection
  */
+let promptInterface = null;
+
+function getPromptInterface() {
+  if (!promptInterface) {
+    promptInterface = readline.createInterface({
+      input: process.stdin,
+      output: process.stdout,
+    });
+  }
+
+  return promptInterface;
+}
+
+function closePromptInterface() {
+  if (promptInterface) {
+    const rl = promptInterface;
+    promptInterface = null;
+    rl.close();
+  }
+}
+
 function promptRuntime(callback) {
-  const rl = readline.createInterface({
-    input: process.stdin,
-    output: process.stdout
-  });
-
-  let answered = false;
-
-  rl.on('close', () => {
-    if (!answered) {
-      answered = true;
-      console.log(`\n  ${yellow}Installation cancelled${reset}\n`);
-      process.exit(0);
-    }
-  });
+  const rl = getPromptInterface();
 
   console.log(`  ${yellow}Which runtime(s) would you like to install for?${reset}\n\n  ${cyan}1${reset}) Claude Code ${dim}(~/.claude)${reset}
   ${cyan}2${reset}) OpenCode    ${dim}(~/.config/opencode)${reset} - open source, free models
   ${cyan}3${reset}) Gemini      ${dim}(~/.gemini)${reset}
   ${cyan}4${reset}) Codex       ${dim}(~/.codex)${reset}
   ${cyan}5${reset}) All
+  ${cyan}6${reset}) Kiro        ${dim}(~/.kiro)${reset}
 `);
 
   rl.question(`  Choice ${dim}[1]${reset}: `, (answer) => {
-    answered = true;
-    rl.close();
     const choice = answer.trim() || '1';
     if (choice === '5') {
-      callback(['claude', 'opencode', 'gemini', 'codex']);
+      callback(['claude', 'opencode', 'gemini', 'kiro', 'codex']);
+    } else if (choice === '6') {
+      callback(['kiro']);
     } else if (choice === '4') {
       callback(['codex']);
     } else if (choice === '3') {
@@ -2332,26 +2380,13 @@ function promptRuntime(callback) {
  * Prompt for install location
  */
 function promptLocation(runtimes) {
-  if (!process.stdin.isTTY) {
+  if (!process.stdin.isTTY && !forceInteractive) {
     console.log(`  ${yellow}Non-interactive terminal detected, defaulting to global install${reset}\n`);
     installAllRuntimes(runtimes, true, false);
     return;
   }
 
-  const rl = readline.createInterface({
-    input: process.stdin,
-    output: process.stdout
-  });
-
-  let answered = false;
-
-  rl.on('close', () => {
-    if (!answered) {
-      answered = true;
-      console.log(`\n  ${yellow}Installation cancelled${reset}\n`);
-      process.exit(0);
-    }
-  });
+  const rl = getPromptInterface();
 
   const pathExamples = runtimes.map(r => {
     const globalPath = getGlobalDir(r, explicitConfigDir);
@@ -2365,10 +2400,9 @@ function promptLocation(runtimes) {
 `);
 
   rl.question(`  Choice ${dim}[1]${reset}: `, (answer) => {
-    answered = true;
-    rl.close();
     const choice = answer.trim() || '1';
     const isGlobal = choice !== '2';
+    closePromptInterface();
     installAllRuntimes(runtimes, isGlobal, true);
   });
 }
@@ -2451,7 +2485,7 @@ if (hasGlobal && hasLocal) {
   installAllRuntimes(['claude'], hasGlobal, false);
 } else {
   // Interactive
-  if (!process.stdin.isTTY) {
+  if (!process.stdin.isTTY && !forceInteractive) {
     console.log(`  ${yellow}Non-interactive terminal detected, defaulting to Claude Code global install${reset}\n`);
     installAllRuntimes(['claude'], true, false);
   } else {

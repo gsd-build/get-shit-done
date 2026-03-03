@@ -6,6 +6,10 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ## [Unreleased]
 
+### Added
+- Added Kiro CLI runtime installer support via `--kiro` and `--kiro-cli`.
+- Added deterministic installer coverage for Kiro local and global runtime installs.
+
 ## [1.22.4] - 2026-03-03
 
 ### Added
@@ -25,7 +29,6 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ### Fixed
 - Installer now replaces `$HOME/.claude/` paths (not just `~/.claude/`) for non-Claude runtimes — fixes broken commands on local installs and Gemini/OpenCode/Codex installs (#905, #909)
-
 ## [1.22.2] - 2026-03-03
 
 ### Fixed
@@ -65,7 +68,6 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ### Fixed
 - Shell snippets in workflows use `printf` instead of `echo` to prevent jq parse errors with special characters
-
 ## [1.22.0] - 2026-02-27
 
 ### Added

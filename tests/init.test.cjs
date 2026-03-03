@@ -5,8 +5,62 @@
 const { test, describe, beforeEach, afterEach } = require('node:test');
 const assert = require('node:assert');
 const fs = require('fs');
+const os = require('os');
 const path = require('path');
+const { execSync, spawnSync } = require('child_process');
 const { runGsdTools, createTempProject, cleanup } = require('./helpers.cjs');
+
+const INSTALL_SCRIPT_PATH = path.join(__dirname, '..', 'bin', 'install.js');
+
+function createInstallerTempDir(prefix) {
+  return fs.mkdtempSync(path.join(os.tmpdir(), prefix));
+}
+
+function stripAnsi(input) {
+  return input.replace(/\u001b\[[0-9;]*m/g, '');
+}
+
+function runInstallScript(args, cwd, env = {}) {
+  const quotedArgs = args.map((arg) => JSON.stringify(arg));
+  const runtimeEnv = { ...process.env };
+
+  if (env.HOME !== undefined) runtimeEnv.HOME = env.HOME;
+  if (env.KIRO_CONFIG_DIR !== undefined) runtimeEnv.KIRO_CONFIG_DIR = env.KIRO_CONFIG_DIR;
+  if (env.CLAUDE_CONFIG_DIR !== undefined) runtimeEnv.CLAUDE_CONFIG_DIR = env.CLAUDE_CONFIG_DIR;
+  if (env.GEMINI_CONFIG_DIR !== undefined) runtimeEnv.GEMINI_CONFIG_DIR = env.GEMINI_CONFIG_DIR;
+  if (env.CODEX_HOME !== undefined) runtimeEnv.CODEX_HOME = env.CODEX_HOME;
+
+  return execSync(`node ${JSON.stringify(INSTALL_SCRIPT_PATH)} ${quotedArgs.join(' ')}`, {
+    cwd,
+    env: runtimeEnv,
+    encoding: 'utf-8',
+    stdio: ['pipe', 'pipe', 'pipe'],
+  });
+}
+
+function runInstallScriptWithInput(args, input, cwd, env = {}) {
+  const runtimeEnv = { ...process.env };
+
+  if (env.HOME !== undefined) runtimeEnv.HOME = env.HOME;
+  if (env.KIRO_CONFIG_DIR !== undefined) runtimeEnv.KIRO_CONFIG_DIR = env.KIRO_CONFIG_DIR;
+  if (env.CLAUDE_CONFIG_DIR !== undefined) runtimeEnv.CLAUDE_CONFIG_DIR = env.CLAUDE_CONFIG_DIR;
+  if (env.GEMINI_CONFIG_DIR !== undefined) runtimeEnv.GEMINI_CONFIG_DIR = env.GEMINI_CONFIG_DIR;
+  if (env.CODEX_HOME !== undefined) runtimeEnv.CODEX_HOME = env.CODEX_HOME;
+  runtimeEnv.GSD_FORCE_INTERACTIVE = '1';
+
+  const result = spawnSync('node', [INSTALL_SCRIPT_PATH, ...args], {
+    cwd,
+    env: runtimeEnv,
+    encoding: 'utf-8',
+    input,
+  });
+
+  const output = `${result.stdout || ''}${result.stderr || ''}`;
+  if (result.status !== 0) {
+    throw new Error(`install failed with status ${result.status}: ${output}`);
+  }
+  return output;
+}
 
 describe('init commands', () => {
   let tmpDir;
@@ -847,3 +901,162 @@ describe('cmdInitNewMilestone', () => {
 // roadmap analyze command
 // ─────────────────────────────────────────────────────────────────────────────
 
+describe('install script Kiro runtime', () => {
+  let installTmpDir;
+  let installHomeDir;
+
+  beforeEach(() => {
+    installTmpDir = createInstallerTempDir('gsd-install-cwd-');
+    installHomeDir = createInstallerTempDir('gsd-install-home-');
+  });
+
+  afterEach(() => {
+    fs.rmSync(installTmpDir, { recursive: true, force: true });
+    fs.rmSync(installHomeDir, { recursive: true, force: true });
+  });
+
+  test('help output documents Kiro flags and env precedence', () => {
+    const output = runInstallScript(['--help'], installTmpDir, { HOME: installHomeDir });
+    assert.ok(output.includes('--kiro, --kiro-cli'));
+    assert.ok(output.includes('KIRO_CONFIG_DIR'));
+  });
+
+  test('global install with --kiro writes Kiro skill files to explicit config dir', () => {
+    const configDir = path.join(installHomeDir, '.kiro-global');
+    const output = runInstallScript(
+      ['--kiro', '--global', '--config-dir', configDir],
+      installTmpDir,
+      { HOME: installHomeDir },
+    );
+    const skillPath = path.join(configDir, 'skills', 'gsd-help', 'SKILL.md');
+    const manifestPath = path.join(configDir, 'gsd-file-manifest.json');
+
+    const cleanOutput = stripAnsi(output);
+    assert.ok(cleanOutput.includes('Installing for Kiro'));
+    assert.ok(/Installed \d+ Kiro skills to skills\//.test(cleanOutput));
+    assert.ok(fs.existsSync(skillPath), `Expected Kiro skill at ${skillPath}`);
+    assert.ok(fs.existsSync(manifestPath), `Expected manifest at ${manifestPath}`);
+
+    const manifest = JSON.parse(fs.readFileSync(manifestPath, 'utf-8'));
+    assert.ok(Object.keys(manifest.files || {}).some((file) => file.startsWith('skills/gsd-help/')));
+  });
+
+  test('global install uses KIRO_CONFIG_DIR when --config-dir is omitted', () => {
+    const configDir = path.join(installHomeDir, 'kiro-env-config');
+    const output = runInstallScript(
+      ['--kiro', '--global'],
+      installTmpDir,
+      { HOME: installHomeDir, KIRO_CONFIG_DIR: configDir },
+    );
+    const skillPath = path.join(configDir, 'skills', 'gsd-help', 'SKILL.md');
+    const cleanOutput = stripAnsi(output);
+
+    assert.ok(cleanOutput.includes('Installing for Kiro'));
+    assert.ok(fs.existsSync(skillPath), `Expected Kiro skill at ${skillPath}`);
+  });
+
+  test('global install with --kiro defaults to ~/.kiro when explicit env path is not set', () => {
+    const output = runInstallScript(
+      ['--kiro', '--global'],
+      installTmpDir,
+      { HOME: installHomeDir },
+    );
+    const defaultConfigDir = path.join(installHomeDir, '.kiro');
+    const skillPath = path.join(defaultConfigDir, 'skills', 'gsd-help', 'SKILL.md');
+    const cleanOutput = stripAnsi(output);
+
+    assert.ok(cleanOutput.includes('Installing for Kiro'));
+    assert.ok(fs.existsSync(defaultConfigDir), `Expected default ~/.kiro at ${defaultConfigDir}`);
+    assert.ok(fs.existsSync(skillPath), `Expected Kiro skill at ${skillPath}`);
+  });
+
+  test('explicit --config-dir takes precedence over KIRO_CONFIG_DIR for --kiro', () => {
+    const envConfigDir = path.join(installHomeDir, 'kiro-env-config');
+    const explicitConfigDir = path.join(installHomeDir, 'kiro-override-config');
+    const output = runInstallScript(
+      ['--kiro', '--global', '--config-dir', explicitConfigDir],
+      installTmpDir,
+      { HOME: installHomeDir, KIRO_CONFIG_DIR: envConfigDir },
+    );
+    const envPath = path.join(envConfigDir, 'skills', 'gsd-help', 'SKILL.md');
+    const explicitPath = path.join(explicitConfigDir, 'skills', 'gsd-help', 'SKILL.md');
+    const cleanOutput = stripAnsi(output);
+
+    assert.ok(cleanOutput.includes('Installing for Kiro'));
+    assert.ok(fs.existsSync(explicitPath), `Expected explicit config dir skill at ${explicitPath}`);
+    assert.ok(!fs.existsSync(envPath), `Did not expect env dir skill at ${envPath}`);
+  });
+
+  test('local install with --kiro is deterministic and non-interactive', () => {
+    const output = runInstallScript(['--kiro', '--local'], installTmpDir, { HOME: installHomeDir });
+    const skillPath = path.join(installTmpDir, '.kiro', 'skills', 'gsd-help', 'SKILL.md');
+    const cleanOutput = stripAnsi(output);
+
+    assert.ok(!cleanOutput.includes('Choice [1]'));
+    assert.ok(fs.existsSync(skillPath), `Expected local Kiro skill at ${skillPath}`);
+    assert.ok(cleanOutput.includes('Installing for Kiro'));
+  });
+
+  test('interactive runtime menu can select Kiro without postinstall prompts', () => {
+    const output = runInstallScriptWithInput(
+      [],
+      '6\n1\n',
+      installTmpDir,
+      { HOME: installHomeDir },
+    );
+    const skillPath = path.join(installHomeDir, '.kiro', 'skills', 'gsd-help', 'SKILL.md');
+    const cleanOutput = stripAnsi(output);
+
+    assert.ok(cleanOutput.includes('Which runtime(s) would you like to install for?'));
+    assert.ok(cleanOutput.includes('6) Kiro'));
+    assert.ok(cleanOutput.includes('Installing for Kiro'));
+    assert.ok(fs.existsSync(skillPath), `Expected Kiro skill at ${skillPath}`);
+  });
+
+  test('interactive --all installs all runtimes including Kiro deterministically', () => {
+    const output = runInstallScriptWithInput(
+      [],
+      '5\n1\n',
+      installTmpDir,
+      { HOME: installHomeDir },
+    );
+    const kiroSkillPath = path.join(installHomeDir, '.kiro', 'skills', 'gsd-help', 'SKILL.md');
+    const claudeCommandPath = path.join(installHomeDir, '.claude', 'commands', 'gsd', 'help.md');
+    const codexSkillPath = path.join(installHomeDir, '.codex', 'skills', 'gsd-help', 'SKILL.md');
+    const cleanOutput = stripAnsi(output);
+
+    assert.ok(cleanOutput.includes('Installing for Kiro'));
+    assert.ok(fs.existsSync(kiroSkillPath), `Expected Kiro skill at ${kiroSkillPath}`);
+    assert.ok(fs.existsSync(claudeCommandPath), `Expected Claude command at ${claudeCommandPath}`);
+    assert.ok(fs.existsSync(codexSkillPath), `Expected Codex skill at ${codexSkillPath}`);
+  });
+
+  test('kiro uninstall removes installed gsd skills', () => {
+    const configDir = path.join(installHomeDir, '.kiro-global-uninstall');
+    runInstallScript(
+      ['--kiro', '--global', '--config-dir', configDir],
+      installTmpDir,
+      { HOME: installHomeDir },
+    );
+
+    const keepDir = path.join(configDir, 'skills', 'other-keep');
+    fs.mkdirSync(keepDir, { recursive: true });
+    fs.writeFileSync(path.join(keepDir, 'SKILL.md'), 'preserve-me');
+
+    const uninstallOutput = runInstallScript(
+      ['--kiro', '--global', '--config-dir', configDir, '--uninstall'],
+      installTmpDir,
+      { HOME: installHomeDir },
+    );
+    const skillsDir = path.join(configDir, 'skills');
+    const remainingSkills = fs.existsSync(skillsDir)
+      ? fs.readdirSync(skillsDir).filter((entry) => entry.startsWith('gsd-'))
+      : [];
+    const remainingKeep = fs.existsSync(path.join(keepDir, 'SKILL.md'));
+    const cleanUninstallOutput = stripAnsi(uninstallOutput);
+
+    assert.ok(cleanUninstallOutput.includes('Uninstalling GSD from Kiro'));
+    assert.strictEqual(remainingSkills.length, 0, `Expected no remaining gsd-* skills in ${skillsDir}`);
+    assert.ok(remainingKeep, `Expected unrelated directory ${keepDir} to remain`);
+  });
+});
