@@ -17,20 +17,22 @@ Requirements for initial release. Each maps to roadmap phases.
 ### Authentication
 
 - [ ] **AUTH-01**: User can sign up with email and password
+  - *Motivation:* `[type]: [citation]`
 - [ ] **AUTH-02**: User receives email verification after signup
+  - *Motivation:* `[type]: [citation]`
 - [ ] **AUTH-03**: User can reset password via email link
+  - *Motivation:* `[type]: [citation]`
 - [ ] **AUTH-04**: User session persists across browser refresh
+  - *Motivation:* `[type]: [citation]`
 
 ### [Category 2]
 
 - [ ] **[CAT]-01**: [Requirement description]
+  - *Motivation:* `[type]: [citation]`
 - [ ] **[CAT]-02**: [Requirement description]
-- [ ] **[CAT]-03**: [Requirement description]
+  - *Motivation:* `[type]: [citation]`
 
-### [Category 3]
-
-- [ ] **[CAT]-01**: [Requirement description]
-- [ ] **[CAT]-02**: [Requirement description]
+Motivation types: `signal:` KB signal ID | `pattern:` reflection pattern | `lesson:` KB lesson ID | `research:` research finding | `deliberation:` design decision | `user:` direct user request
 
 ## v2 Requirements
 
