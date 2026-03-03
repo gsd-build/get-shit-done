@@ -717,6 +717,7 @@ function cmdPhaseComplete(cwd, phaseNum, raw) {
 
   const planCount = phaseInfo.plans.length;
   const summaryCount = phaseInfo.summaries.length;
+  let requirementsUpdated = false;
 
   // Update ROADMAP.md: mark phase complete
   if (fs.existsSync(roadmapPath)) {
@@ -755,10 +756,14 @@ function cmdPhaseComplete(cwd, phaseNum, raw) {
     // Update REQUIREMENTS.md traceability for this phase's requirements
     const reqPath = path.join(cwd, '.planning', 'REQUIREMENTS.md');
     if (fs.existsSync(reqPath)) {
-      // Extract Requirements line from roadmap for this phase
-      const reqMatch = roadmapContent.match(
-        new RegExp(`Phase\\s+${escapeRegex(phaseNum)}[\\s\\S]*?\\*\\*Requirements:\\*\\*\\s*([^\\n]+)`, 'i')
+      // Extract the current phase section from roadmap (scoped to avoid cross-phase matching)
+      const phaseEsc = escapeRegex(phaseNum);
+      const phaseSectionMatch = roadmapContent.match(
+        new RegExp(`(#{2,4}\\s*Phase\\s+${phaseEsc}[:\\s][\\s\\S]*?)(?=#{2,4}\\s*Phase\\s+|$)`, 'i')
       );
+
+      const sectionText = phaseSectionMatch ? phaseSectionMatch[1] : '';
+      const reqMatch = sectionText.match(/\*\*Requirements:\*\*\s*([^\n]+)/i);
 
       if (reqMatch) {
         const reqIds = reqMatch[1].replace(/[\[\]]/g, '').split(/[,\s]+/).map(r => r.trim()).filter(Boolean);
@@ -771,14 +776,15 @@ function cmdPhaseComplete(cwd, phaseNum, raw) {
             new RegExp(`(-\\s*\\[)[ ](\\]\\s*\\*\\*${reqEscaped}\\*\\*)`, 'gi'),
             '$1x$2'
           );
-          // Update traceability table: | REQ-ID | Phase N | Pending | → | REQ-ID | Phase N | Complete |
+          // Update traceability table: | REQ-ID | Phase N | Pending/In Progress | → | REQ-ID | Phase N | Complete |
           reqContent = reqContent.replace(
-            new RegExp(`(\\|\\s*${reqEscaped}\\s*\\|[^|]+\\|)\\s*Pending\\s*(\\|)`, 'gi'),
+            new RegExp(`(\\|\\s*${reqEscaped}\\s*\\|[^|]+\\|)\\s*(?:Pending|In Progress)\\s*(\\|)`, 'gi'),
             '$1 Complete $2'
           );
         }
 
         fs.writeFileSync(reqPath, reqContent, 'utf-8');
+        requirementsUpdated = true;
       }
     }
   }
@@ -884,6 +890,7 @@ function cmdPhaseComplete(cwd, phaseNum, raw) {
     date: today,
     roadmap_updated: fs.existsSync(roadmapPath),
     state_updated: fs.existsSync(statePath),
+    requirements_updated: requirementsUpdated,
   };
 
   output(result, raw);
