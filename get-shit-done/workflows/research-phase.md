@@ -8,17 +8,17 @@ Standalone research command. For most workflows, use `/gsd:plan-phase` which int
 
 ## Step 0: Resolve Model Profile
 
-@/Users/ollorin/.claude/get-shit-done/references/model-profile-resolution.md
+@~/.claude/get-shit-done/references/model-profile-resolution.md
 
 Resolve model for:
 - `gsd-phase-researcher`
 
 ## Step 1: Normalize and Validate Phase
 
-@/Users/ollorin/.claude/get-shit-done/references/phase-argument-parsing.md
+@~/.claude/get-shit-done/references/phase-argument-parsing.md
 
 ```bash
-PHASE_INFO=$(node ~/.claude/get-shit-done/bin/gsd-tools.js roadmap get-phase "${PHASE}")
+PHASE_INFO=$(node "$HOME/.claude/get-shit-done/bin/gsd-tools.cjs" roadmap get-phase "${PHASE}")
 ```
 
 If `found` is false: Error and exit.
@@ -34,12 +34,9 @@ If exists: Offer update/view/skip options.
 ## Step 3: Gather Phase Context
 
 ```bash
-# Phase section from roadmap (already loaded in PHASE_INFO)
-echo "$PHASE_INFO" | jq -r '.section'
-cat .planning/REQUIREMENTS.md 2>/dev/null
-cat .planning/phases/${PHASE}-*/*-CONTEXT.md 2>/dev/null
-# Decisions from state-snapshot (structured JSON)
-node ~/.claude/get-shit-done/bin/gsd-tools.js state-snapshot | jq '.decisions'
+INIT=$(node "$HOME/.claude/get-shit-done/bin/gsd-tools.cjs" init phase-op "${PHASE}")
+if [[ "$INIT" == @file:* ]]; then INIT=$(cat "${INIT#@file:}"); fi
+# Extract: phase_dir, padded_phase, phase_number, state_path, requirements_path, context_path
 ```
 
 ## Step 4: Spawn Researcher
@@ -50,12 +47,15 @@ Task(
 Research implementation approach for Phase {phase}: {name}
 </objective>
 
-<context>
+<files_to_read>
+- {context_path} (USER DECISIONS from /gsd:discuss-phase)
+- {requirements_path} (Project requirements)
+- {state_path} (Project decisions and history)
+</files_to_read>
+
+<additional_context>
 Phase description: {description}
-Requirements: {requirements}
-Prior decisions: {decisions}
-Phase context: {context_md}
-</context>
+</additional_context>
 
 <output>
 Write to: .planning/phases/${PHASE}-{slug}/${PHASE}-RESEARCH.md

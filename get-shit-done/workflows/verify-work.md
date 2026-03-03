@@ -15,7 +15,7 @@ No Pass/Fail buttons. No severity questions. Just: "Here's what should happen. D
 </philosophy>
 
 <template>
-@/Users/ollorin/.claude/get-shit-done/templates/UAT.md
+@~/.claude/get-shit-done/templates/UAT.md
 </template>
 
 <process>
@@ -24,18 +24,11 @@ No Pass/Fail buttons. No severity questions. Just: "Here's what should happen. D
 If $ARGUMENTS contains a phase number, load context:
 
 ```bash
-# Use temp file to avoid bash command substitution buffer limits
-INIT_FILE="/tmp/gsd-init-$$.json"
-node ~/.claude/get-shit-done/bin/gsd-tools.js init verify-work "${PHASE_ARG}" > "$INIT_FILE"
+INIT=$(node "$HOME/.claude/get-shit-done/bin/gsd-tools.cjs" init verify-work "${PHASE_ARG}")
+if [[ "$INIT" == @file:* ]]; then INIT=$(cat "${INIT#@file:}"); fi
 ```
 
 Parse JSON for: `planner_model`, `checker_model`, `commit_docs`, `phase_found`, `phase_dir`, `phase_number`, `phase_name`, `has_verification`.
-
-**Extract values using jq:**
-```bash
-PHASE_FOUND=$(jq -r '.phase_found' < "$INIT_FILE")
-PHASE_DIR=$(jq -r '.phase_dir' < "$INIT_FILE")
-```
 </step>
 
 <step name="check_active_session">
@@ -116,6 +109,19 @@ Examples:
   → Expected: "Clicking Reply opens inline composer below comment. Submitting shows reply nested under parent with visual indentation."
 
 Skip internal/non-observable items (refactors, type changes, etc.).
+
+**Cold-start smoke test injection:**
+
+After extracting tests from SUMMARYs, scan the SUMMARY files for modified/created file paths. If ANY path matches these patterns:
+
+`server.ts`, `server.js`, `app.ts`, `app.js`, `index.ts`, `index.js`, `main.ts`, `main.js`, `database/*`, `db/*`, `seed/*`, `seeds/*`, `migrations/*`, `startup*`, `docker-compose*`, `Dockerfile*`
+
+Then **prepend** this test to the test list:
+
+- name: "Cold Start Smoke Test"
+- expected: "Kill any running server/service. Clear ephemeral state (temp DBs, caches, lock files). Start the application from scratch. Server boots without errors, any seed/migration completes, and a primary query (health check, homepage load, or basic API call) returns live data."
+
+This catches bugs that only manifest on fresh start — race conditions in startup sequences, silent seed failures, missing environment setup — which pass against warm state but break in production.
 </step>
 
 <step name="create_uat_file">
@@ -172,7 +178,7 @@ skipped: 0
 [none yet]
 ```
 
-Write to `.planning/phases/XX-name/{phase}-UAT.md`
+Write to `.planning/phases/XX-name/{phase_num}-UAT.md`
 
 Proceed to `present_test`.
 </step>
@@ -300,7 +306,7 @@ Clear Current Test section:
 
 Commit the UAT file:
 ```bash
-node ~/.claude/get-shit-done/bin/gsd-tools.js commit "test({phase}): complete UAT - {passed} passed, {issues} issues" --files ".planning/phases/XX-name/{phase}-UAT.md"
+node "$HOME/.claude/get-shit-done/bin/gsd-tools.cjs" commit "test({phase_num}): complete UAT - {passed} passed, {issues} issues" --files ".planning/phases/XX-name/{phase_num}-UAT.md"
 ```
 
 Present summary:
@@ -342,7 +348,7 @@ Spawning parallel debug agents to investigate each issue.
 ```
 
 - Load diagnose-issues workflow
-- Follow @/Users/ollorin/.claude/get-shit-done/workflows/diagnose-issues.md
+- Follow @~/.claude/get-shit-done/workflows/diagnose-issues.md
 - Spawn parallel debug agents for each issue
 - Collect root causes
 - Update UAT.md with root causes
@@ -373,14 +379,11 @@ Task(
 **Phase:** {phase_number}
 **Mode:** gap_closure
 
-**UAT with diagnoses:**
-@.planning/phases/{phase_dir}/{phase}-UAT.md
-
-**Project State:**
-@.planning/STATE.md
-
-**Roadmap:**
-@.planning/ROADMAP.md
+<files_to_read>
+- {phase_dir}/{phase_num}-UAT.md (UAT with diagnoses)
+- .planning/STATE.md (Project State)
+- .planning/ROADMAP.md (Roadmap)
+</files_to_read>
 
 </planning_context>
 
@@ -424,8 +427,9 @@ Task(
 **Phase:** {phase_number}
 **Phase Goal:** Close diagnosed gaps from UAT
 
-**Plans to verify:**
-@.planning/phases/{phase_dir}/*-PLAN.md
+<files_to_read>
+- {phase_dir}/*-PLAN.md (Plans to verify)
+</files_to_read>
 
 </verification_context>
 
@@ -463,8 +467,9 @@ Task(
 **Phase:** {phase_number}
 **Mode:** revision
 
-**Existing plans:**
-@.planning/phases/{phase_dir}/*-PLAN.md
+<files_to_read>
+- {phase_dir}/*-PLAN.md (Existing plans)
+</files_to_read>
 
 **Checker issues:**
 {structured_issues_from_checker}

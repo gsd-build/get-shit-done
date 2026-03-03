@@ -6,27 +6,20 @@ Execute a phase prompt (PLAN.md) and create the outcome summary (SUMMARY.md).
 Read STATE.md before any operation to load project context.
 Read config.json for planning behavior settings.
 
-@/Users/ollorin/.claude/get-shit-done/references/git-integration.md
+@~/.claude/get-shit-done/references/git-integration.md
 </required_reading>
 
 <process>
 
 <step name="init_context" priority="first">
-Load execution context (uses `init execute-phase` for full context, including file contents):
+Load execution context (paths only to minimize orchestrator context):
 
 ```bash
-# Use temp file to avoid bash command substitution buffer limits
-INIT_FILE="/tmp/gsd-init-$$.json"
-node ~/.claude/get-shit-done/bin/gsd-tools.js init execute-phase "${PHASE}" --include state,config > "$INIT_FILE"
+INIT=$(node "$HOME/.claude/get-shit-done/bin/gsd-tools.cjs" init execute-phase "${PHASE}")
+if [[ "$INIT" == @file:* ]]; then INIT=$(cat "${INIT#@file:}"); fi
 ```
 
-Extract from init JSON: `executor_model`, `commit_docs`, `phase_dir`, `phase_number`, `plans`, `summaries`, `incomplete_plans`.
-
-**File contents (from --include):** `state_content`, `config_content`. Access with:
-```bash
-STATE_CONTENT=$(jq -r '.state_content // empty' < "$INIT_FILE")
-CONFIG_CONTENT=$(jq -r '.config_content // empty' < "$INIT_FILE")
-```
+Extract from init JSON: `executor_model`, `commit_docs`, `phase_dir`, `phase_number`, `plans`, `summaries`, `incomplete_plans`, `state_path`, `config_path`.
 
 If `.planning/` missing: error.
 </step>
@@ -42,7 +35,7 @@ Find first PLAN without matching SUMMARY. Decimal phases supported (`01.1-hotfix
 
 ```bash
 PHASE=$(echo "$PLAN_PATH" | grep -oE '[0-9]+(\.[0-9]+)?-[0-9]+')
-# config_content already loaded via --include config in init_context
+# config settings can be fetched via gsd-tools config-get if needed
 ```
 
 <if mode="yolo">
@@ -126,11 +119,14 @@ Pattern B only (verify-only checkpoints). Skip for A/C.
 cat .planning/phases/XX-name/{phase}-{plan}-PLAN.md
 ```
 This IS the execution instructions. Follow exactly. If plan references CONTEXT.md: honor user's vision throughout.
+
+**If plan contains `<interfaces>` block:** These are pre-extracted type definitions and contracts. Use them directly — do NOT re-read the source files to discover types. The planner already extracted what you need.
 </step>
 
 <step name="previous_phase_check">
 ```bash
-ls .planning/phases/*/SUMMARY.md 2>/dev/null | sort -r | head -2 | tail -1
+node "$HOME/.claude/get-shit-done/bin/gsd-tools.cjs" phases list --type summaries --raw
+# Extract the second-to-last summary from the JSON result
 ```
 If previous SUMMARY has unresolved "Issues Encountered" or "Next Phase Readiness" blockers: AskUserQuestion(header="Previous Issues", options: "Proceed anyway" | "Address first" | "Review previous").
 </step>
@@ -170,56 +166,6 @@ Auth errors during execution are NOT failures — they're expected interaction p
 
 </authentication_gates>
 
-<telegram_mcp_integration>
-
-## Telegram MCP Integration
-
-When Telegram MCP is available (check via `gsd-tools telegram-mcp status`), use MCP tools for blocking questions instead of CLI prompts.
-
-### Sending a Blocking Question
-
-```javascript
-// Check availability first
-const { available } = await checkTelegramMCP();
-
-if (available) {
-  // Use MCP tool (Claude Code handles this automatically)
-  const result = await mcp_telegram_ask_blocking_question({
-    question: "Should I proceed with Phase 3?",
-    context: "Planning decision for knowledge system"
-  });
-
-  // Poll for answer
-  const { answers } = await mcp_telegram_check_question_answers({
-    question_ids: [result.question_id],
-    wait_seconds: 60
-  });
-
-  if (answers.length > 0) {
-    const userAnswer = answers[0].answer;
-    // Continue with answer
-    await mcp_telegram_mark_question_answered({
-      question_id: result.question_id
-    });
-  }
-} else {
-  // Fallback to CLI prompt
-  const answer = await askUserInCLI("Should I proceed with Phase 3?");
-}
-```
-
-### Graceful Degradation
-
-Orchestrators should ALWAYS check availability and fall back gracefully. The system must work without Telegram MCP (current behavior).
-
-### Configuration
-
-Set environment variables:
-- `TELEGRAM_BOT_TOKEN`: Bot token from @BotFather
-- `TELEGRAM_OWNER_ID`: Your Telegram user ID (get via /start command)
-
-</telegram_mcp_integration>
-
 <deviation_rules>
 
 ## Deviation Rules
@@ -249,7 +195,6 @@ Proceed with proposed change? (yes / different approach / defer)
 
 **Priority:** Rule 4 (STOP) > Rules 1-3 (auto) > unsure → Rule 4
 **Edge cases:** missing validation → R2 | null crash → R1 | new table → R4 | new column → R1/2
-**Silent correctness bugs (R1):** wrong column name in INSERT, wrong operation ordering, TOCTOU race (SELECT-then-UPDATE without lock), skipped HMAC/auth check on null config
 **Heuristic:** Affects correctness/security/completion? → R1-3. Maybe? → R4.
 
 </deviation_rules>
@@ -278,7 +223,7 @@ For `type: tdd` plans — RED-GREEN-REFACTOR:
 
 Errors: RED doesn't fail → investigate test/existing feature. GREEN doesn't pass → debug, iterate. REFACTOR breaks → undo.
 
-See `/Users/ollorin/.claude/get-shit-done/references/tdd.md` for structure.
+See `~/.claude/get-shit-done/references/tdd.md` for structure.
 </tdd_plan_execution>
 
 <task_commit>
@@ -287,14 +232,6 @@ See `/Users/ollorin/.claude/get-shit-done/references/tdd.md` for structure.
 After each task (verification passed, done criteria met), commit immediately.
 
 **1. Check:** `git status --short`
-
-**1b. Pre-commit correctness scan** (silent bugs often pass tests):
-- [ ] **Column/field names:** Do INSERT/UPDATE column names match the actual DB schema or migration? (e.g. `payload` vs `payload_redacted`)
-- [ ] **Operation ordering:** For multi-step flows (reserve-then-dispatch, validate-then-write), is the sequence correct? Check that preconditions execute before dependent operations.
-- [ ] **Security gates:** Does new handler/endpoint code include required auth checks, input validation, rate limiting, and idempotency where applicable?
-- [ ] **Migration privileges:** Does any new GRANT or ALTER DEFAULT PRIVILEGES follow least-privilege? No blanket grants to `authenticated` without RLS.
-- [ ] **Concurrency safety:** Any SELECT-then-UPDATE pattern without `FOR UPDATE`? Any read-validate-write that needs atomicity?
-- [ ] **Set-based SQL:** Any PL/pgSQL loop that could be a single CTE or bulk UPDATE?
 
 **2. Stage individually** (NEVER `git add .` or `git add -A`):
 ```bash
@@ -338,7 +275,7 @@ Display: `CHECKPOINT: [Type]` box → Progress {X}/{Y} → Task name → type-sp
 
 After response: verify if specified. Pass → continue. Fail → inform, wait. WAIT for user — do NOT hallucinate completion.
 
-See /Users/ollorin/.claude/get-shit-done/references/checkpoints.md for details.
+See ~/.claude/get-shit-done/references/checkpoints.md for details.
 </step>
 
 <step name="checkpoint_return_for_orchestrator">
@@ -376,15 +313,13 @@ fi
 grep -A 50 "^user_setup:" .planning/phases/XX-name/{phase}-{plan}-PLAN.md | head -50
 ```
 
-If user_setup exists: create `{phase}-USER-SETUP.md` using template `/Users/ollorin/.claude/get-shit-done/templates/user-setup.md`. Per service: env vars table, account setup checklist, dashboard config, local dev notes, verification commands. Status "Incomplete". Set `USER_SETUP_CREATED=true`. If empty/missing: skip.
+If user_setup exists: create `{phase}-USER-SETUP.md` using template `~/.claude/get-shit-done/templates/user-setup.md`. Per service: env vars table, account setup checklist, dashboard config, local dev notes, verification commands. Status "Incomplete". Set `USER_SETUP_CREATED=true`. If empty/missing: skip.
 </step>
 
 <step name="create_summary">
-Create `{phase}-{plan}-SUMMARY.md` at `.planning/phases/XX-name/`. Use `/Users/ollorin/.claude/get-shit-done/templates/summary.md`.
+Create `{phase}-{plan}-SUMMARY.md` at `.planning/phases/XX-name/`. Use `~/.claude/get-shit-done/templates/summary.md`.
 
-**Frontmatter:** phase, plan, subsystem, tags | requires/provides/affects | tech-stack.added/patterns | key-files.created/modified | key-decisions | duration ($DURATION), completed ($PLAN_END_TIME date).
-
-**requirements-completed:** REQUIRED — Copy ALL requirement IDs verbatim from this plan's `requirements` frontmatter field. Do NOT leave empty if plan has requirements.
+**Frontmatter:** phase, plan, subsystem, tags | requires/provides/affects | tech-stack.added/patterns | key-files.created/modified | key-decisions | requirements-completed (**MUST** copy `requirements` array from PLAN.md frontmatter verbatim) | duration ($DURATION), completed ($PLAN_END_TIME date).
 
 Title: `# Phase [X] Plan [Y]: [Name] Summary`
 
@@ -400,13 +335,13 @@ Update STATE.md using gsd-tools:
 
 ```bash
 # Advance plan counter (handles last-plan edge case)
-node ~/.claude/get-shit-done/bin/gsd-tools.js state advance-plan
+node "$HOME/.claude/get-shit-done/bin/gsd-tools.cjs" state advance-plan
 
 # Recalculate progress bar from disk state
-node ~/.claude/get-shit-done/bin/gsd-tools.js state update-progress
+node "$HOME/.claude/get-shit-done/bin/gsd-tools.cjs" state update-progress
 
 # Record execution metrics
-node ~/.claude/get-shit-done/bin/gsd-tools.js state record-metric \
+node "$HOME/.claude/get-shit-done/bin/gsd-tools.cjs" state record-metric \
   --phase "${PHASE}" --plan "${PLAN}" --duration "${DURATION}" \
   --tasks "${TASK_COUNT}" --files "${FILE_COUNT}"
 ```
@@ -417,11 +352,12 @@ From SUMMARY: Extract decisions and add to STATE.md:
 
 ```bash
 # Add each decision from SUMMARY key-decisions
-node ~/.claude/get-shit-done/bin/gsd-tools.js state add-decision \
-  --phase "${PHASE}" --summary "${DECISION_TEXT}" --rationale "${RATIONALE}"
+# Prefer file inputs for shell-safe text (preserves `$`, `*`, etc. exactly)
+node "$HOME/.claude/get-shit-done/bin/gsd-tools.cjs" state add-decision \
+  --phase "${PHASE}" --summary-file "${DECISION_TEXT_FILE}" --rationale-file "${RATIONALE_FILE}"
 
 # Add blockers if any found
-node ~/.claude/get-shit-done/bin/gsd-tools.js state add-blocker "Blocker description"
+node "$HOME/.claude/get-shit-done/bin/gsd-tools.cjs" state add-blocker --text-file "${BLOCKER_TEXT_FILE}"
 ```
 </step>
 
@@ -429,7 +365,7 @@ node ~/.claude/get-shit-done/bin/gsd-tools.js state add-blocker "Blocker descrip
 Update session info using gsd-tools:
 
 ```bash
-node ~/.claude/get-shit-done/bin/gsd-tools.js state record-session \
+node "$HOME/.claude/get-shit-done/bin/gsd-tools.cjs" state record-session \
   --stopped-at "Completed ${PHASE}-${PLAN}-PLAN.md" \
   --resume-file "None"
 ```
@@ -437,39 +373,32 @@ node ~/.claude/get-shit-done/bin/gsd-tools.js state record-session \
 Keep STATE.md under 150 lines.
 </step>
 
-<step name="update_requirements">
-Mark plan requirements complete in REQUIREMENTS.md and update ROADMAP.md progress:
-
-```bash
-# Extract requirements from plan frontmatter
-PLAN_PATH=".planning/phases/XX-name/{phase}-{plan}-PLAN.md"
-PLAN_REQS=$(node ~/.claude/get-shit-done/bin/gsd-tools.js frontmatter get "${PLAN_PATH}" --field requirements 2>/dev/null)
-
-# Mark them complete if present and non-empty
-if [ -n "${PLAN_REQS}" ] && [ "${PLAN_REQS}" != "[]" ] && [ "${PLAN_REQS}" != "null" ]; then
-  node ~/.claude/get-shit-done/bin/gsd-tools.js requirements mark-complete "${PLAN_REQS}"
-fi
-
-# Update ROADMAP.md progress row for this phase
-node ~/.claude/get-shit-done/bin/gsd-tools.js roadmap update-plan-progress "${PHASE_NUMBER}"
-```
-
-If REQUIREMENTS.md does not exist or requirements not found, log and continue — do not fail.
-</step>
-
 <step name="issues_review_gate">
 If SUMMARY "Issues Encountered" ≠ "None": yolo → log and continue. Interactive → present issues, wait for acknowledgment.
 </step>
 
 <step name="update_roadmap">
-More plans → update plan count, keep "In progress". Last plan → mark phase "Complete", add date.
+```bash
+node "$HOME/.claude/get-shit-done/bin/gsd-tools.cjs" roadmap update-plan-progress "${PHASE}"
+```
+Counts PLAN vs SUMMARY files on disk. Updates progress table row with correct count and status (`In Progress` or `Complete` with date).
+</step>
+
+<step name="update_requirements">
+Mark completed requirements from the PLAN.md frontmatter `requirements:` field:
+
+```bash
+node "$HOME/.claude/get-shit-done/bin/gsd-tools.cjs" requirements mark-complete ${REQ_IDS}
+```
+
+Extract requirement IDs from the plan's frontmatter (e.g., `requirements: [AUTH-01, AUTH-02]`). If no requirements field, skip.
 </step>
 
 <step name="git_commit_metadata">
-Task code already committed per-task. Commit plan metadata including ROADMAP.md and REQUIREMENTS.md (updated by update_requirements step):
+Task code already committed per-task. Commit plan metadata:
 
 ```bash
-node ~/.claude/get-shit-done/bin/gsd-tools.js commit "docs({phase}-{plan}): complete [plan-name] plan" --files .planning/phases/XX-name/{phase}-{plan}-SUMMARY.md .planning/STATE.md .planning/ROADMAP.md .planning/REQUIREMENTS.md
+node "$HOME/.claude/get-shit-done/bin/gsd-tools.cjs" commit "docs({phase}-{plan}): complete [plan-name] plan" --files .planning/phases/XX-name/{phase}-{plan}-SUMMARY.md .planning/STATE.md .planning/ROADMAP.md .planning/REQUIREMENTS.md
 ```
 </step>
 
@@ -484,7 +413,7 @@ git diff --name-only ${FIRST_TASK}^..HEAD 2>/dev/null
 Update only structural changes: new src/ dir → STRUCTURE.md | deps → STACK.md | file pattern → CONVENTIONS.md | API client → INTEGRATIONS.md | config → STACK.md | renamed → update paths. Skip code-only/bugfix/content changes.
 
 ```bash
-node ~/.claude/get-shit-done/bin/gsd-tools.js commit "" --files .planning/codebase/*.md --amend
+node "$HOME/.claude/get-shit-done/bin/gsd-tools.cjs" commit "" --files .planning/codebase/*.md --amend
 ```
 </step>
 
@@ -514,8 +443,7 @@ All routes: `/clear` first for fresh context.
 - USER-SETUP.md generated if user_setup in frontmatter
 - SUMMARY.md created with substantive content
 - STATE.md updated (position, decisions, issues, session)
-- Requirements marked complete in REQUIREMENTS.md (if plan has requirements)
-- ROADMAP.md updated (progress row updated by update_requirements step)
+- ROADMAP.md updated
 - If codebase map exists: map updated with execution changes (or skipped if no significant changes)
 - If USER-SETUP.md created: prominently surfaced in completion output
 </success_criteria>

@@ -27,8 +27,9 @@ Read all files referenced by the invoking prompt's execution_context before star
 
 **If no context file:**
 - Present what shipped in last milestone
-- Ask: "What do you want to build next?"
-- Use AskUserQuestion to explore features, priorities, constraints, scope
+- Ask inline (freeform, NOT AskUserQuestion): "What do you want to build next?"
+- Wait for their response, then use AskUserQuestion to probe specifics
+- If user selects "Other" at any point to provide freeform input, ask follow-up as plain text — not another AskUserQuestion
 
 ## 3. Determine Milestone Version
 
@@ -71,14 +72,14 @@ Keep Accumulated Context section from previous milestone.
 Delete MILESTONE-CONTEXT.md if exists (consumed).
 
 ```bash
-node ~/.claude/get-shit-done/bin/gsd-tools.js commit "docs: start milestone v[X.Y] [Name]" --files .planning/PROJECT.md .planning/STATE.md
+node "$HOME/.claude/get-shit-done/bin/gsd-tools.cjs" commit "docs: start milestone v[X.Y] [Name]" --files .planning/PROJECT.md .planning/STATE.md
 ```
 
 ## 7. Load Context and Resolve Models
 
 ```bash
-INIT_FILE="/tmp/gsd-init-$$.json"
-node ~/.claude/get-shit-done/bin/gsd-tools.js init new-milestone > "$INIT_FILE"
+INIT=$(node "$HOME/.claude/get-shit-done/bin/gsd-tools.cjs" init new-milestone)
+if [[ "$INIT" == @file:* ]]; then INIT=$(cat "${INIT#@file:}"); fi
 ```
 
 Extract from init JSON: `researcher_model`, `synthesizer_model`, `roadmapper_model`, `commit_docs`, `research_enabled`, `current_milestone`, `project_exists`, `roadmap_exists`.
@@ -93,10 +94,10 @@ AskUserQuestion: "Research the domain ecosystem for new features before defining
 
 ```bash
 # If "Research first": persist true
-node ~/.claude/get-shit-done/bin/gsd-tools.js config-set workflow.research true
+node "$HOME/.claude/get-shit-done/bin/gsd-tools.cjs" config-set workflow.research true
 
 # If "Skip research": persist false
-node ~/.claude/get-shit-done/bin/gsd-tools.js config-set workflow.research false
+node "$HOME/.claude/get-shit-done/bin/gsd-tools.cjs" config-set workflow.research false
 ```
 
 **If "Research first":**
@@ -129,7 +130,9 @@ Focus ONLY on what's needed for the NEW features.
 
 <question>{QUESTION}</question>
 
-<project_context>[PROJECT.md summary]</project_context>
+<files_to_read>
+- .planning/PROJECT.md (Project context)
+</files_to_read>
 
 <downstream_consumer>{CONSUMER}</downstream_consumer>
 
@@ -137,7 +140,7 @@ Focus ONLY on what's needed for the NEW features.
 
 <output>
 Write to: .planning/research/{FILE}
-Use template: /Users/ollorin/.claude/get-shit-done/templates/research-project/{FILE}
+Use template: ~/.claude/get-shit-done/templates/research-project/{FILE}
 </output>
 ", subagent_type="gsd-project-researcher", model="{researcher_model}", description="{DIMENSION} research")
 ```
@@ -158,10 +161,15 @@ After all 4 complete, spawn synthesizer:
 Task(prompt="
 Synthesize research outputs into SUMMARY.md.
 
-Read: .planning/research/STACK.md, FEATURES.md, ARCHITECTURE.md, PITFALLS.md
+<files_to_read>
+- .planning/research/STACK.md
+- .planning/research/FEATURES.md
+- .planning/research/ARCHITECTURE.md
+- .planning/research/PITFALLS.md
+</files_to_read>
 
 Write to: .planning/research/SUMMARY.md
-Use template: /Users/ollorin/.claude/get-shit-done/templates/research-project/SUMMARY.md
+Use template: ~/.claude/get-shit-done/templates/research-project/SUMMARY.md
 Commit after writing.
 ", subagent_type="gsd-research-synthesizer", model="{synthesizer_model}", description="Synthesize research")
 ```
@@ -201,7 +209,7 @@ Present features by category:
 
 **If no research:** Gather requirements through conversation. Ask: "What are the main things users need to do with [new features]?" Clarify, probe for related capabilities, group into categories.
 
-**Scope each category** via AskUserQuestion (multiSelect: true):
+**Scope each category** via AskUserQuestion (multiSelect: true, header max 12 chars):
 - "[Feature 1]" — [brief description]
 - "[Feature 2]" — [brief description]
 - "None for this milestone" — Defer entire category
@@ -247,7 +255,7 @@ If "adjust": Return to scoping.
 
 **Commit requirements:**
 ```bash
-node ~/.claude/get-shit-done/bin/gsd-tools.js commit "docs: define milestone v[X.Y] requirements" --files .planning/REQUIREMENTS.md
+node "$HOME/.claude/get-shit-done/bin/gsd-tools.cjs" commit "docs: define milestone v[X.Y] requirements" --files .planning/REQUIREMENTS.md
 ```
 
 ## 10. Create Roadmap
@@ -265,11 +273,13 @@ node ~/.claude/get-shit-done/bin/gsd-tools.js commit "docs: define milestone v[X
 ```
 Task(prompt="
 <planning_context>
-@.planning/PROJECT.md
-@.planning/REQUIREMENTS.md
-@.planning/research/SUMMARY.md (if exists)
-@.planning/config.json
-@.planning/MILESTONES.md
+<files_to_read>
+- .planning/PROJECT.md
+- .planning/REQUIREMENTS.md
+- .planning/research/SUMMARY.md (if exists)
+- .planning/config.json
+- .planning/MILESTONES.md
+</files_to_read>
 </planning_context>
 
 <instructions>
@@ -322,28 +332,10 @@ Success criteria:
 
 **Commit roadmap** (after approval):
 ```bash
-node ~/.claude/get-shit-done/bin/gsd-tools.js commit "docs: create milestone v[X.Y] roadmap ([N] phases)" --files .planning/ROADMAP.md .planning/STATE.md .planning/REQUIREMENTS.md
+node "$HOME/.claude/get-shit-done/bin/gsd-tools.cjs" commit "docs: create milestone v[X.Y] roadmap ([N] phases)" --files .planning/ROADMAP.md .planning/STATE.md .planning/REQUIREMENTS.md
 ```
 
-## 11. Create Milestone Branch
-
-```bash
-BRANCH_INIT=$(node ~/.claude/get-shit-done/bin/gsd-tools.js init milestone-branch)
-BRANCH_NAME=$(echo "$BRANCH_INIT" | jq -r '.branch_name')
-STRATEGY=$(echo "$BRANCH_INIT" | jq -r '.branching_strategy')
-
-if [ "$STRATEGY" != "none" ] && [ "$BRANCH_NAME" != "null" ] && [ -n "$BRANCH_NAME" ]; then
-  git checkout -b "$BRANCH_NAME" 2>/dev/null || git checkout "$BRANCH_NAME"
-  echo "On branch: $BRANCH_NAME"
-fi
-```
-
-If branch was created (or switched to), tell the user:
-> "Created branch `[branch_name]` — all phases in this milestone will commit here."
-
-If strategy is `"none"`, skip silently.
-
-## 12. Done
+## 11. Done
 
 ```
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
@@ -386,7 +378,6 @@ Also: `/gsd:plan-phase [N]` — skip discussion, plan directly
 - [ ] User feedback incorporated (if any)
 - [ ] ROADMAP.md phases continue from previous milestone
 - [ ] All commits made (if planning docs committed)
-- [ ] Milestone branch created (if branching_strategy != "none")
 - [ ] User knows next step: `/gsd:discuss-phase [N]`
 
 **Atomic commits:** Each phase commits its artifacts immediately.

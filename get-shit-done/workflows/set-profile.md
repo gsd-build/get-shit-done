@@ -12,9 +12,9 @@ Read all files referenced by the invoking prompt's execution_context before star
 Validate argument:
 
 ```
-if $ARGUMENTS.profile not in ["quality", "balanced", "budget", "auto"]:
+if $ARGUMENTS.profile not in ["quality", "balanced", "budget"]:
   Error: Invalid profile "$ARGUMENTS.profile"
-  Valid profiles: quality, balanced, budget, auto
+  Valid profiles: quality, balanced, budget
   EXIT
 ```
 </step>
@@ -23,9 +23,9 @@ if $ARGUMENTS.profile not in ["quality", "balanced", "budget", "auto"]:
 Ensure config exists and load current state:
 
 ```bash
-node ~/.claude/get-shit-done/bin/gsd-tools.js config-ensure-section
-INIT_FILE="/tmp/gsd-init-$$.json"
-node ~/.claude/get-shit-done/bin/gsd-tools.js state load > "$INIT_FILE"
+node "$HOME/.claude/get-shit-done/bin/gsd-tools.cjs" config-ensure-section
+INIT=$(node "$HOME/.claude/get-shit-done/bin/gsd-tools.cjs" state load)
+if [[ "$INIT" == @file:* ]]; then INIT=$(cat "${INIT#@file:}"); fi
 ```
 
 This creates `.planning/config.json` with defaults if missing and loads current config.
@@ -52,7 +52,7 @@ Display confirmation with model table for selected profile:
 
 Agents will now use:
 
-[Show table from MODEL_PROFILES in gsd-tools.js for selected profile]
+[Show table from MODEL_PROFILES in gsd-tools.cjs for selected profile]
 
 Example:
 | Agent | Model |
@@ -69,32 +69,6 @@ Map profile names:
 - quality: use "quality" column from MODEL_PROFILES
 - balanced: use "balanced" column from MODEL_PROFILES
 - budget: use "budget" column from MODEL_PROFILES
-- auto: display auto mode documentation (see below)
-
-For auto profile, instead of model table, show:
-
-```
-✓ Model profile set to: auto
-
-## Auto Mode Enabled
-
-Auto mode routes each task to the most appropriate model based on:
-- Task description keyword matching against routing rules
-- Project-specific overrides in `.planning/routing/project-rules.md`
-- Global rules in `/Users/ollorin/.claude/routing-rules.md`
-
-When auto is active:
-- Tasks are analyzed before spawning via gsd-task-router
-- Model selection happens per-task, not per-workflow
-- Token savings tracked in `.planning/quota/session-usage.json`
-- Status bar shows: `Tokens: 32K → Haiku | +15 min | H:60% S:35% O:5%`
-
-**Fallback behavior:** Sonnet when no patterns match (safety over savings)
-
-To view stats:
-- Quick status: `node ~/.claude/get-shit-done/bin/gsd-tools.js quota status-bar`
-- Full breakdown: `node ~/.claude/get-shit-done/bin/gsd-tools.js quota stats --table`
-```
 </step>
 
 </process>
