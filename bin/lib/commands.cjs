@@ -216,13 +216,18 @@ function cmdResolveModel(cwd, agentType, raw, paths) {
   output(result, raw, model);
 }
 
-function cmdCommit(cwd, message, files, raw, amend, paths) {
+function cmdCommit(cwd, message, files, raw, amend, paths, ws) {
   if (!message && !amend) {
     error('commit message required');
   }
 
   const p = paths || buildPaths(cwd);
   const config = loadConfig(cwd, p);
+
+  // Prefix commit message with workstream name if active
+  if (ws && message && !message.startsWith(`[${ws}]`)) {
+    message = `[${ws}] ${message}`;
+  }
 
   // Check commit_docs config
   if (!config.commit_docs) {

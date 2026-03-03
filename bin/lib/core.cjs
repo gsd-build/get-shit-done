@@ -70,6 +70,39 @@ function buildPaths(cwd, workstream) {
   };
 }
 
+// ─── Active Workstream Detection ─────────────────────────────────────────────
+
+/**
+ * Get the active workstream name from .planning/active-workstream file.
+ * Returns null if no active workstream is set or file doesn't exist.
+ */
+function getActiveWorkstream(cwd) {
+  const filePath = path.join(cwd, '.planning', 'active-workstream');
+  try {
+    const name = fs.readFileSync(filePath, 'utf-8').trim();
+    if (!name) return null;
+    // Verify the workstream directory actually exists
+    const wsDir = path.join(cwd, '.planning', 'workstreams', name);
+    if (!fs.existsSync(wsDir)) return null;
+    return name;
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * Set the active workstream. Writes name to .planning/active-workstream.
+ * Pass null or empty string to clear the active workstream.
+ */
+function setActiveWorkstream(cwd, name) {
+  const filePath = path.join(cwd, '.planning', 'active-workstream');
+  if (!name) {
+    try { fs.unlinkSync(filePath); } catch {}
+    return;
+  }
+  fs.writeFileSync(filePath, name + '\n', 'utf-8');
+}
+
 // ─── Model Profile Table ─────────────────────────────────────────────────────
 
 const MODEL_PROFILES = {
@@ -489,4 +522,6 @@ module.exports = {
   toPosixPath,
   resolvePlanningDir,
   buildPaths,
+  getActiveWorkstream,
+  setActiveWorkstream,
 };
