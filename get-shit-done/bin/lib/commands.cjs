@@ -532,6 +532,185 @@ function cmdScaffold(cwd, type, options, raw) {
   output({ created: true, path: relPath }, raw, relPath);
 }
 
+// ─── Review commands ──────────────────────────────────────────────────────────
+
+function cmdReviewCheckCli(cwd, raw) {
+  const { execFileSync } = require('child_process');
+  const result = {};
+  for (const cli of ['gemini', 'claude', 'codex']) {
+    try {
+      execFileSync('which', [cli], { stdio: 'pipe' });
+      result[cli] = true;
+    } catch {
+      result[cli] = false;
+    }
+  }
+  output(result, raw);
+}
+
+function cmdReviewBuildPrompt(cwd, phase, raw) {
+  if (!phase) {
+    error('phase required for review build-prompt');
+  }
+
+  const phaseInfo = findPhaseInternal(cwd, phase);
+  if (!phaseInfo) {
+    error(`Phase ${phase} not found`);
+  }
+
+  const padded = normalizePhaseName(phase);
+  const phaseDirFull = path.join(cwd, phaseInfo.directory);
+
+  // Gather PROJECT.md (first 50 lines)
+  const projectContent = safeReadFile(path.join(cwd, '.planning', 'PROJECT.md'));
+  const projectSnippet = projectContent ? projectContent.split('\n').slice(0, 50).join('\n') : '';
+
+  // Gather ROADMAP phase section
+  const { getRoadmapPhaseInternal } = require('./core.cjs');
+  const roadmapPhase = getRoadmapPhaseInternal(cwd, phase);
+  const roadmapSection = roadmapPhase?.section || '';
+
+  // Gather REQUIREMENTS.md
+  const requirementsContent = safeReadFile(path.join(cwd, '.planning', 'REQUIREMENTS.md')) || '';
+
+  // Gather all PLANs
+  const planFiles = phaseInfo.plans || [];
+  const planContents = planFiles.map(f => {
+    const content = safeReadFile(path.join(phaseDirFull, f));
+    return content ? `## ${f}\n\n${content}` : '';
+  }).filter(Boolean);
+
+  // Optional: CONTEXT.md
+  let contextContent = '';
+  try {
+    const files = fs.readdirSync(phaseDirFull);
+    const contextFile = files.find(f => f.endsWith('-CONTEXT.md') || f === 'CONTEXT.md');
+    if (contextFile) {
+      contextContent = safeReadFile(path.join(phaseDirFull, contextFile)) || '';
+    }
+  } catch {}
+
+  // Optional: RESEARCH.md
+  let researchContent = '';
+  try {
+    const files = fs.readdirSync(phaseDirFull);
+    const researchFile = files.find(f => f.endsWith('-RESEARCH.md') || f === 'RESEARCH.md');
+    if (researchFile) {
+      researchContent = safeReadFile(path.join(phaseDirFull, researchFile)) || '';
+    }
+  } catch {}
+
+  // Build prompt
+  const prompt = `# Cross-AI Review Request
+
+## Project Overview (first 50 lines of PROJECT.md)
+
+${projectSnippet}
+
+## Phase ${phaseInfo.phase_number}: ${phaseInfo.phase_name || 'Unnamed'}
+
+### Roadmap Section
+
+${roadmapSection}
+
+### Requirements
+
+${requirementsContent}
+
+${contextContent ? `### Context\n\n${contextContent}\n` : ''}
+${researchContent ? `### Research\n\n${researchContent}\n` : ''}
+### Plans (${planContents.length} total)
+
+${planContents.join('\n\n---\n\n')}
+
+## Review Instructions
+
+Please review the above phase plans and provide:
+
+1. **Summary** — Brief overview of what the plans cover
+2. **Strengths** — What's well-designed or thorough
+3. **Concerns** — Potential issues, gaps, or risks
+4. **Suggestions** — Concrete improvements or alternatives
+5. **Risk Assessment** — Overall risk level (low/medium/high) with justification
+
+Focus on:
+- Completeness: Do the plans cover all requirements?
+- Feasibility: Are the tasks achievable as described?
+- Dependencies: Are inter-plan dependencies correctly identified?
+- Testing: Is the verification strategy adequate?
+- Architecture: Are there design concerns or anti-patterns?
+`;
+
+  // Write to temp file
+  const os = require('os');
+  const promptPath = path.join(os.tmpdir(), `gsd-review-prompt-${padded}-${Date.now()}.md`);
+  fs.writeFileSync(promptPath, prompt, 'utf-8');
+
+  output({
+    prompt_path: promptPath,
+    plan_count: planContents.length,
+    phase_number: phaseInfo.phase_number,
+    phase_name: phaseInfo.phase_name,
+  }, raw);
+}
+
+function cmdReviewWriteReviews(cwd, options, raw) {
+  const { phase, reviews } = options;
+  if (!phase) {
+    error('phase required for review write-reviews');
+  }
+
+  const phaseInfo = findPhaseInternal(cwd, phase);
+  if (!phaseInfo) {
+    error(`Phase ${phase} not found`);
+  }
+
+  const padded = normalizePhaseName(phase);
+  const phaseDirFull = path.join(cwd, phaseInfo.directory);
+  const today = new Date().toISOString().split('T')[0];
+
+  // reviews is an object like { gemini: '/tmp/gemini-review.md', claude: '/tmp/claude-review.md' }
+  const reviewerNames = Object.keys(reviews || {});
+  if (reviewerNames.length === 0) {
+    error('No review files provided');
+  }
+
+  // Build REVIEWS.md content
+  let content = `---
+phase: "${padded}"
+name: "${phaseInfo.phase_name || 'Unnamed'}"
+created: ${today}
+reviewers: [${reviewerNames.join(', ')}]
+status: complete
+---
+
+# Phase ${phaseInfo.phase_number}: ${phaseInfo.phase_name || 'Unnamed'} -- Cross-AI Reviews
+
+`;
+
+  for (const reviewer of reviewerNames) {
+    const reviewFile = reviews[reviewer];
+    const reviewContent = safeReadFile(reviewFile);
+    if (!reviewContent) {
+      content += `## ${reviewer.charAt(0).toUpperCase() + reviewer.slice(1)} Review\n\n_Review not available (file not found: ${reviewFile})_\n\n`;
+      continue;
+    }
+    content += `## ${reviewer.charAt(0).toUpperCase() + reviewer.slice(1)} Review\n\n${reviewContent.trim()}\n\n`;
+  }
+
+  // Write REVIEWS.md
+  const reviewsPath = path.join(phaseDirFull, `${padded}-REVIEWS.md`);
+  fs.writeFileSync(reviewsPath, content, 'utf-8');
+
+  const relPath = toPosixPath(path.relative(cwd, reviewsPath));
+  output({
+    created: true,
+    path: relPath,
+    reviewers: reviewerNames,
+    phase_number: phaseInfo.phase_number,
+  }, raw);
+}
+
 module.exports = {
   cmdGenerateSlug,
   cmdCurrentTimestamp,
@@ -545,4 +724,7 @@ module.exports = {
   cmdProgressRender,
   cmdTodoComplete,
   cmdScaffold,
+  cmdReviewCheckCli,
+  cmdReviewBuildPrompt,
+  cmdReviewWriteReviews,
 };
