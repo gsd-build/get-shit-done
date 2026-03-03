@@ -16,6 +16,14 @@ Archive accumulated phase directories from completed milestones into `.planning/
 
 <step name="identify_completed_milestones">
 
+**Load milestone-aware paths:**
+
+```bash
+INIT=$(node "$HOME/.claude/get-shit-done/bin/gsd-tools.cjs" init milestone-op)
+```
+
+Extract from init JSON: `planning_base`.
+
 Read `.planning/MILESTONES.md` to identify completed milestones and their versions.
 
 ```bash
@@ -55,7 +63,7 @@ Extract phase numbers and names from the archived roadmap (e.g., Phase 1: Founda
 Check which of those phase directories still exist in `.planning/phases/`:
 
 ```bash
-ls -d .planning/phases/*/ 2>/dev/null
+ls -d {planning_base}/phases/*/ 2>/dev/null
 ```
 
 Match phase directories to milestone membership. Only include directories that still exist in `.planning/phases/`.
@@ -110,7 +118,7 @@ mkdir -p .planning/milestones/v{X.Y}-phases
 For each phase directory belonging to this milestone:
 
 ```bash
-mv .planning/phases/{dir} .planning/milestones/v{X.Y}-phases/
+mv {planning_base}/phases/{dir} .planning/milestones/v{X.Y}-phases/
 ```
 
 Repeat for all milestones in the cleanup set.
@@ -121,8 +129,9 @@ Repeat for all milestones in the cleanup set.
 
 Commit the changes:
 
+If `commit_docs` is true:
 ```bash
-node "$HOME/.claude/get-shit-done/bin/gsd-tools.cjs" commit "chore: archive phase directories from completed milestones" --files .planning/milestones/ .planning/phases/
+node "$HOME/.claude/get-shit-done/bin/gsd-tools.cjs" commit "chore: archive phase directories from completed milestones" --files .planning/milestones/ {planning_base}/phases/
 ```
 
 </step>

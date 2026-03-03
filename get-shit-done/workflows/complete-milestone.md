@@ -37,6 +37,14 @@ When a milestone completes:
 
 <step name="verify_readiness">
 
+**Load milestone-aware paths:**
+
+```bash
+INIT=$(node "$HOME/.claude/get-shit-done/bin/gsd-tools.cjs" init milestone-op)
+```
+
+Extract from init JSON: `state_path`, `roadmap_path`, `requirements_path`, `config_path`, `planning_base`.
+
 **Use `roadmap analyze` for comprehensive readiness check:**
 
 ```bash
@@ -88,7 +96,7 @@ If user selects "Proceed anyway": note incomplete requirements in MILESTONES.md 
 <config-check>
 
 ```bash
-cat .planning/config.json 2>/dev/null
+cat {config_path} 2>/dev/null
 ```
 
 </config-check>
@@ -153,7 +161,7 @@ Extract one-liners from SUMMARY.md files using summary-extract:
 
 ```bash
 # For each phase in milestone, extract one-liner
-for summary in .planning/phases/*-*/*-SUMMARY.md; do
+for summary in {planning_base}/phases/*-*/*-SUMMARY.md; do
   node "$HOME/.claude/get-shit-done/bin/gsd-tools.cjs" summary-extract "$summary" --fields one_liner | jq -r '.one_liner'
 done
 ```
@@ -186,7 +194,7 @@ Full PROJECT.md evolution review at milestone completion.
 Read all phase summaries:
 
 ```bash
-cat .planning/phases/*-*/*-SUMMARY.md
+cat {planning_base}/phases/*-*/*-SUMMARY.md
 ```
 
 **Full review checklist:**
@@ -389,8 +397,8 @@ AskUserQuestion(header="Archive Phases", question="Archive phase directories to 
 If "Yes": move phase directories to the milestone archive:
 ```bash
 mkdir -p .planning/milestones/v[X.Y]-phases
-# For each phase directory in .planning/phases/:
-mv .planning/phases/{phase-dir} .planning/milestones/v[X.Y]-phases/
+# For each phase directory in {planning_base}/phases/:
+mv {planning_base}/phases/{phase-dir} .planning/milestones/v[X.Y]-phases/
 ```
 Verify: `✅ Phase directories archived to .planning/milestones/v[X.Y]-phases/`
 
@@ -432,8 +440,8 @@ After `milestone complete` has archived, reorganize ROADMAP.md with milestone gr
 **Then delete originals:**
 
 ```bash
-rm .planning/ROADMAP.md
-rm .planning/REQUIREMENTS.md
+rm {roadmap_path}
+rm {requirements_path}
 ```
 
 </step>
@@ -493,6 +501,8 @@ ls .planning/RETROSPECTIVE.md 2>/dev/null
 If the "## Cross-Milestone Trends" section exists, update the tables with new data from this milestone.
 
 **Commit:**
+
+If `commit_docs` is true:
 ```bash
 node "$HOME/.claude/get-shit-done/bin/gsd-tools.cjs" commit "docs: update retrospective for v${VERSION}" --files .planning/RETROSPECTIVE.md
 ```
@@ -675,8 +685,9 @@ git push origin v[X.Y]
 
 Commit milestone completion.
 
+If `commit_docs` is true:
 ```bash
-node "$HOME/.claude/get-shit-done/bin/gsd-tools.cjs" commit "chore: complete v[X.Y] milestone" --files .planning/milestones/v[X.Y]-ROADMAP.md .planning/milestones/v[X.Y]-REQUIREMENTS.md .planning/milestones/v[X.Y]-MILESTONE-AUDIT.md .planning/MILESTONES.md .planning/PROJECT.md .planning/STATE.md
+node "$HOME/.claude/get-shit-done/bin/gsd-tools.cjs" commit "chore: complete v[X.Y] milestone" --files .planning/milestones/v[X.Y]-ROADMAP.md .planning/milestones/v[X.Y]-REQUIREMENTS.md .planning/milestones/v[X.Y]-MILESTONE-AUDIT.md .planning/MILESTONES.md .planning/PROJECT.md {state_path}
 ```
 ```
 

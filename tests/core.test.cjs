@@ -11,10 +11,14 @@ const fs = require('fs');
 const path = require('path');
 const os = require('os');
 
+const { execSync } = require('child_process');
+
 const {
   loadConfig,
   resolveModelInternal,
+  evaluateComplexity,
   MODEL_PROFILES,
+  ADAPTIVE_TIERS,
   escapeRegex,
   generateSlugInternal,
   normalizePhaseName,
@@ -26,6 +30,7 @@ const {
   getRoadmapPhaseInternal,
   searchPhaseInDir,
   findPhaseInternal,
+  isGitIgnored,
 } = require('../get-shit-done/bin/lib/core.cjs');
 
 // ─── loadConfig ────────────────────────────────────────────────────────────────
@@ -93,14 +98,14 @@ describe('loadConfig', () => {
     assert.strictEqual(config.model_overrides, null);
   });
 
-  test('returns defaults when config.json contains invalid JSON', () => {
+  test('returns defaults with commit_docs false when config.json contains invalid JSON', () => {
     fs.writeFileSync(
       path.join(tmpDir, '.planning', 'config.json'),
       'not valid json {{{{'
     );
     const config = loadConfig(tmpDir);
     assert.strictEqual(config.model_profile, 'balanced');
-    assert.strictEqual(config.commit_docs, true);
+    assert.strictEqual(config.commit_docs, false);
   });
 
   test('handles parallelization as boolean', () => {
@@ -119,6 +124,18 @@ describe('loadConfig', () => {
     writeConfig({ commit_docs: false, planning: { commit_docs: true } });
     const config = loadConfig(tmpDir);
     assert.strictEqual(config.commit_docs, false);
+  });
+
+  test('reads adaptive_settings from config', () => {
+    writeConfig({ model_profile: 'adaptive', adaptive_settings: { min_model: 'sonnet', max_model: 'opus' } });
+    const config = loadConfig(tmpDir);
+    assert.deepStrictEqual(config.adaptive_settings, { min_model: 'sonnet', max_model: 'opus' });
+  });
+
+  test('returns null adaptive_settings when not present', () => {
+    writeConfig({ model_profile: 'balanced' });
+    const config = loadConfig(tmpDir);
+    assert.strictEqual(config.adaptive_settings, null);
   });
 });
 
@@ -147,7 +164,7 @@ describe('resolveModelInternal', () => {
     test('all known agents resolve to a valid string for each profile', () => {
       const knownAgents = ['gsd-planner', 'gsd-executor', 'gsd-phase-researcher', 'gsd-codebase-mapper'];
       const profiles = ['quality', 'balanced', 'budget'];
-      const validValues = ['inherit', 'sonnet', 'haiku', 'opus'];
+      const validValues = ['opus', 'sonnet', 'haiku'];
 
       for (const profile of profiles) {
         writeConfig({ model_profile: profile });
@@ -171,11 +188,11 @@ describe('resolveModelInternal', () => {
       assert.strictEqual(resolveModelInternal(tmpDir, 'gsd-executor'), 'haiku');
     });
 
-    test('opus override resolves to inherit', () => {
+    test('opus override resolves to opus', () => {
       writeConfig({
         model_overrides: { 'gsd-executor': 'opus' },
       });
-      assert.strictEqual(resolveModelInternal(tmpDir, 'gsd-executor'), 'inherit');
+      assert.strictEqual(resolveModelInternal(tmpDir, 'gsd-executor'), 'opus');
     });
 
     test('agents not in override fall back to profile', () => {
@@ -183,8 +200,8 @@ describe('resolveModelInternal', () => {
         model_profile: 'quality',
         model_overrides: { 'gsd-executor': 'haiku' },
       });
-      // gsd-planner not overridden, should use quality profile -> opus -> inherit
-      assert.strictEqual(resolveModelInternal(tmpDir, 'gsd-planner'), 'inherit');
+      // gsd-planner not overridden, should use quality profile -> opus
+      assert.strictEqual(resolveModelInternal(tmpDir, 'gsd-planner'), 'opus');
     });
   });
 
@@ -196,8 +213,8 @@ describe('resolveModelInternal', () => {
 
     test('defaults to balanced profile when model_profile missing', () => {
       writeConfig({});
-      // balanced profile, gsd-planner -> opus -> inherit
-      assert.strictEqual(resolveModelInternal(tmpDir, 'gsd-planner'), 'inherit');
+      // balanced profile, gsd-planner -> opus
+      assert.strictEqual(resolveModelInternal(tmpDir, 'gsd-planner'), 'opus');
     });
   });
 });
@@ -654,7 +671,7 @@ describe('getRoadmapPhaseInternal', () => {
     assert.strictEqual(result, null);
   });
 
-  test('extracts full section text', () => {
+  test('extracts full section text (with next phase delimiter)', () => {
     fs.writeFileSync(
       path.join(tmpDir, '.planning', 'ROADMAP.md'),
       '### Phase 1: Foundation\n**Goal**: Build the base\n**Requirements**: TEST-01\nSome details here\n\n### Phase 2: API\n**Goal**: REST\n'
@@ -799,5 +816,334 @@ describe('getMilestonePhaseFilter', () => {
 
     const filter = getMilestonePhaseFilter(tmpDir);
     assert.strictEqual(filter.phaseCount, 0);
+  });
+});
+
+// ─── evaluateComplexity ────────────────────────────────────────────────────────
+
+describe('evaluateComplexity', () => {
+  test('null context returns medium tier with score 5', () => {
+    const result = evaluateComplexity(null);
+    assert.strictEqual(result.score, 5);
+    assert.strictEqual(result.tier, 'medium');
+    assert.ok(result.factors.length > 0);
+  });
+
+  test('undefined context returns medium tier with score 5', () => {
+    const result = evaluateComplexity(undefined);
+    assert.strictEqual(result.score, 5);
+    assert.strictEqual(result.tier, 'medium');
+  });
+
+  test('low complexity returns simple tier', () => {
+    const result = evaluateComplexity({
+      files_modified: ['a.js'],
+      task_count: 1,
+      objective: 'fix typo',
+    });
+    assert.ok(result.score <= 3, `Expected score <= 3, got ${result.score}`);
+    assert.strictEqual(result.tier, 'simple');
+  });
+
+  test('moderate complexity returns medium tier', () => {
+    const result = evaluateComplexity({
+      files_modified: ['a.js', 'b.js', 'c.js'],
+      task_count: 4,
+      objective: 'add user profile page',
+    });
+    assert.ok(result.score >= 4 && result.score <= 7, `Expected score 4-7, got ${result.score}`);
+    assert.strictEqual(result.tier, 'medium');
+  });
+
+  test('high complexity returns complex tier', () => {
+    const result = evaluateComplexity({
+      files_modified: ['a.js', 'b.js', 'c.js', 'd.js', 'e.js'],
+      task_count: 8,
+      objective: 'architect new integration with external API',
+    });
+    assert.ok(result.score >= 8, `Expected score >= 8, got ${result.score}`);
+    assert.strictEqual(result.tier, 'complex');
+  });
+
+  test('detects architecture keywords', () => {
+    const result = evaluateComplexity({
+      files_modified: [],
+      task_count: 1,
+      objective: 'architect new data model',
+    });
+    assert.ok(result.factors.some(f => f.includes('architecture')));
+  });
+
+  test('bare design does not trigger architecture keywords', () => {
+    const result = evaluateComplexity({
+      files_modified: [],
+      task_count: 1,
+      objective: 'design the button',
+    });
+    assert.ok(!result.factors.some(f => f.includes('architecture')));
+  });
+
+  test('system-design and system_design still match architecture keywords', () => {
+    const r1 = evaluateComplexity({ files_modified: [], task_count: 1, objective: 'system-design the auth flow' });
+    assert.ok(r1.factors.some(f => f.includes('architecture')), 'system-design should match');
+    const r2 = evaluateComplexity({ files_modified: [], task_count: 1, objective: 'system_design the auth flow' });
+    assert.ok(r2.factors.some(f => f.includes('architecture')), 'system_design should match');
+  });
+
+  test('detects integration keywords', () => {
+    const result = evaluateComplexity({
+      files_modified: [],
+      task_count: 1,
+      objective: 'integrate with external API',
+    });
+    assert.ok(result.factors.some(f => f.includes('integration')));
+  });
+
+  test('detects novel pattern keywords', () => {
+    const result = evaluateComplexity({
+      files_modified: [],
+      task_count: 1,
+      objective: 'prototype new library',
+    });
+    assert.ok(result.factors.some(f => f.includes('novel')));
+  });
+
+  test('detects refactoring keywords', () => {
+    const result = evaluateComplexity({
+      files_modified: [],
+      task_count: 1,
+      objective: 'refactor authentication module',
+    });
+    assert.ok(result.factors.some(f => f.includes('refactoring')));
+  });
+
+  test('files_modified capped at 5 points', () => {
+    const result = evaluateComplexity({
+      files_modified: ['a', 'b', 'c', 'd', 'e', 'f', 'g', 'h'],
+      task_count: 0,
+      objective: '',
+    });
+    assert.strictEqual(result.score, 5);
+    assert.ok(result.factors.some(f => f.includes('files_modified: 8 (+5)')));
+  });
+
+  test('plan_type tdd adds 2 to score', () => {
+    const result = evaluateComplexity({
+      files_modified: [],
+      task_count: 1,
+      objective: 'add tests',
+      plan_type: 'tdd',
+    });
+    assert.ok(result.factors.some(f => f.includes('tdd plan type (+2)')));
+    assert.ok(result.score >= 2);
+  });
+
+  test('depends_on adds 1 to score', () => {
+    const result = evaluateComplexity({
+      files_modified: [],
+      task_count: 1,
+      objective: 'build integration',
+      depends_on: ['03-01', '03-02'],
+    });
+    assert.ok(result.factors.some(f => f.includes('depends_on: 2 deps (+1)')));
+  });
+
+  test('test files in files_modified adds 1 to score', () => {
+    const result = evaluateComplexity({
+      files_modified: ['src/api.ts', 'src/api.test.ts', 'src/__tests__/helper.js'],
+      task_count: 1,
+      objective: 'add api',
+    });
+    assert.ok(result.factors.some(f => f.includes('test_files:')));
+  });
+
+  test('all new signals combined produce expected aggregate', () => {
+    const result = evaluateComplexity({
+      files_modified: ['src/a.ts', 'src/a.test.ts'],
+      task_count: 1,
+      objective: 'build module',
+      plan_type: 'tdd',
+      depends_on: ['03-01'],
+    });
+    assert.strictEqual(result.score, 6, `Expected score 6, got ${result.score}: ${result.factors.join(', ')}`);
+    assert.strictEqual(result.tier, 'medium');
+  });
+
+  test('factor labels included in output', () => {
+    const result = evaluateComplexity({
+      files_modified: ['a.js', 'b.js'],
+      task_count: 6,
+      objective: 'refactor across modules',
+    });
+    assert.ok(Array.isArray(result.factors));
+    assert.ok(result.factors.length > 0);
+    result.factors.forEach(f => assert.strictEqual(typeof f, 'string'));
+  });
+});
+
+// ─── resolveModelInternal (adaptive profile) ───────────────────────────────────
+
+describe('resolveModelInternal (adaptive profile)', () => {
+  let tmpDir;
+
+  beforeEach(() => {
+    tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), 'gsd-core-test-'));
+    fs.mkdirSync(path.join(tmpDir, '.planning'), { recursive: true });
+  });
+
+  afterEach(() => {
+    fs.rmSync(tmpDir, { recursive: true, force: true });
+  });
+
+  function writeConfig(obj) {
+    fs.writeFileSync(
+      path.join(tmpDir, '.planning', 'config.json'),
+      JSON.stringify(obj, null, 2)
+    );
+  }
+
+  test('no context defaults to medium tier', () => {
+    writeConfig({ model_profile: 'adaptive' });
+    // gsd-executor in medium tier = sonnet
+    const result = resolveModelInternal(tmpDir, 'gsd-executor');
+    assert.strictEqual(result, 'sonnet');
+    // gsd-planner in medium tier = opus
+    const plannerResult = resolveModelInternal(tmpDir, 'gsd-planner');
+    assert.strictEqual(plannerResult, 'opus');
+  });
+
+  test('medium tier codebase-mapper resolves to haiku', () => {
+    writeConfig({ model_profile: 'adaptive' });
+    // No context -> medium tier; codebase-mapper in medium = haiku
+    const result = resolveModelInternal(tmpDir, 'gsd-codebase-mapper');
+    assert.strictEqual(result, 'haiku');
+  });
+
+  test('simple context returns haiku for executor', () => {
+    writeConfig({ model_profile: 'adaptive' });
+    const ctx = { files_modified: ['a.js'], task_count: 1, objective: 'fix typo' };
+    const result = resolveModelInternal(tmpDir, 'gsd-executor', ctx);
+    assert.strictEqual(result, 'haiku');
+  });
+
+  test('complex context returns opus for planner', () => {
+    writeConfig({ model_profile: 'adaptive' });
+    const ctx = {
+      files_modified: ['a.js', 'b.js', 'c.js', 'd.js', 'e.js'],
+      task_count: 8,
+      objective: 'architect new integration with external API',
+    };
+    const result = resolveModelInternal(tmpDir, 'gsd-planner', ctx);
+    assert.strictEqual(result, 'opus');
+  });
+
+  test('min_model clamping upgrades haiku to sonnet', () => {
+    writeConfig({
+      model_profile: 'adaptive',
+      adaptive_settings: { min_model: 'sonnet' },
+    });
+    // Simple context would normally give haiku for executor
+    const ctx = { files_modified: ['a.js'], task_count: 1, objective: 'fix typo' };
+    const result = resolveModelInternal(tmpDir, 'gsd-executor', ctx);
+    assert.strictEqual(result, 'sonnet');
+  });
+
+  test('max_model clamping caps opus to sonnet', () => {
+    writeConfig({
+      model_profile: 'adaptive',
+      adaptive_settings: { max_model: 'sonnet' },
+    });
+    // Complex context would normally give opus for planner
+    const ctx = {
+      files_modified: ['a.js', 'b.js', 'c.js', 'd.js', 'e.js'],
+      task_count: 8,
+      objective: 'architect new integration with external API',
+    };
+    const result = resolveModelInternal(tmpDir, 'gsd-planner', ctx);
+    assert.strictEqual(result, 'sonnet');
+  });
+
+  test('overrides take precedence over adaptive', () => {
+    writeConfig({
+      model_profile: 'adaptive',
+      model_overrides: { 'gsd-executor': 'opus' },
+    });
+    const ctx = { files_modified: ['a.js'], task_count: 1, objective: 'fix typo' };
+    // Override should win over adaptive
+    const result = resolveModelInternal(tmpDir, 'gsd-executor', ctx);
+    assert.strictEqual(result, 'opus');
+  });
+
+  test('context ignored for non-adaptive profiles', () => {
+    writeConfig({ model_profile: 'balanced' });
+    const ctx = { files_modified: ['a.js'], task_count: 1, objective: 'fix typo' };
+    // balanced profile, gsd-executor -> sonnet regardless of context
+    const result = resolveModelInternal(tmpDir, 'gsd-executor', ctx);
+    assert.strictEqual(result, 'sonnet');
+  });
+});
+
+// ─── ADAPTIVE_TIERS constant ───────────────────────────────────────────────────
+
+describe('ADAPTIVE_TIERS', () => {
+  test('has all three tiers', () => {
+    assert.ok(ADAPTIVE_TIERS.simple);
+    assert.ok(ADAPTIVE_TIERS.medium);
+    assert.ok(ADAPTIVE_TIERS.complex);
+  });
+
+  test('all known agents have entries in each tier', () => {
+    const knownAgents = Object.keys(MODEL_PROFILES);
+    const validModels = ['opus', 'sonnet', 'haiku'];
+    for (const tier of ['simple', 'medium', 'complex']) {
+      for (const agent of knownAgents) {
+        const model = ADAPTIVE_TIERS[tier][agent];
+        assert.ok(
+          validModels.includes(model),
+          `ADAPTIVE_TIERS.${tier}.${agent} = ${model}, expected one of ${validModels.join(', ')}`
+        );
+      }
+    }
+  });
+});
+
+// ─── isGitIgnored ─────────────────────────────────────────────────────────────
+
+describe('isGitIgnored', () => {
+  let tmpDir;
+
+  beforeEach(() => {
+    tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), 'gsd-gitignore-test-'));
+    execSync('git init', { cwd: tmpDir, stdio: 'pipe' });
+    execSync('git config user.email "test@test.com"', { cwd: tmpDir, stdio: 'pipe' });
+    execSync('git config user.name "Test"', { cwd: tmpDir, stdio: 'pipe' });
+  });
+
+  afterEach(() => {
+    fs.rmSync(tmpDir, { recursive: true, force: true });
+  });
+
+  test('returns true when path is in .gitignore', () => {
+    fs.writeFileSync(path.join(tmpDir, '.gitignore'), '.planning/\n');
+    fs.mkdirSync(path.join(tmpDir, '.planning'), { recursive: true });
+    fs.writeFileSync(path.join(tmpDir, '.planning', 'test.md'), 'test');
+    assert.strictEqual(isGitIgnored(tmpDir, '.planning/test.md'), true);
+  });
+
+  test('returns false when path is not in .gitignore', () => {
+    fs.writeFileSync(path.join(tmpDir, '.gitignore'), '');
+    fs.mkdirSync(path.join(tmpDir, 'src'), { recursive: true });
+    fs.writeFileSync(path.join(tmpDir, 'src', 'index.js'), '');
+    assert.strictEqual(isGitIgnored(tmpDir, 'src/index.js'), false);
+  });
+
+  test('returns true even when path is already tracked (--no-index)', () => {
+    fs.mkdirSync(path.join(tmpDir, '.planning'), { recursive: true });
+    fs.writeFileSync(path.join(tmpDir, '.planning', 'test.md'), 'test');
+    execSync('git add .planning/test.md', { cwd: tmpDir, stdio: 'pipe' });
+    execSync('git commit -m "add planning"', { cwd: tmpDir, stdio: 'pipe' });
+    // Now add to .gitignore — without --no-index git check-ignore would say "not ignored"
+    fs.writeFileSync(path.join(tmpDir, '.gitignore'), '.planning/\n');
+    assert.strictEqual(isGitIgnored(tmpDir, '.planning/test.md'), true);
   });
 });

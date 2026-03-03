@@ -46,7 +46,7 @@ If `$FULL_MODE`:
 INIT=$(node "$HOME/.claude/get-shit-done/bin/gsd-tools.cjs" init quick "$DESCRIPTION")
 ```
 
-Parse JSON for: `planner_model`, `executor_model`, `checker_model`, `verifier_model`, `commit_docs`, `next_num`, `slug`, `date`, `timestamp`, `quick_dir`, `task_dir`, `roadmap_exists`, `planning_exists`.
+Parse JSON for: `planner_model`, `executor_model`, `checker_model`, `verifier_model`, `commit_docs`, `next_num`, `slug`, `date`, `timestamp`, `quick_dir`, `task_dir`, `planning_base`, `roadmap_exists`, `planning_exists`.
 
 **If `roadmap_exists` is false:** Error — Quick mode requires an active project with ROADMAP.md. Run `/gsd:new-project` first.
 
@@ -67,7 +67,7 @@ mkdir -p "${task_dir}"
 Create the directory for this quick task:
 
 ```bash
-QUICK_DIR=".planning/quick/${next_num}-${slug}"
+QUICK_DIR="${quick_dir}/${next_num}-${slug}"
 mkdir -p "$QUICK_DIR"
 ```
 
@@ -97,7 +97,7 @@ Task(
 **Description:** ${DESCRIPTION}
 
 <files_to_read>
-- .planning/STATE.md (Project State)
+- {planning_base}/STATE.md (Project State)
 - ./CLAUDE.md (if exists — follow project-specific guidelines)
 </files_to_read>
 
@@ -250,7 +250,7 @@ Execute quick task ${next_num}.
 
 <files_to_read>
 - ${QUICK_DIR}/${next_num}-PLAN.md (Plan)
-- .planning/STATE.md (Project state)
+- {planning_base}/STATE.md (Project state)
 - ./CLAUDE.md (Project instructions, if exists)
 - .claude/skills/ or .agents/skills/ (Project skills, if either exists — list skills, read SKILL.md for each, follow relevant rules during implementation)
 </files_to_read>
@@ -388,9 +388,10 @@ Stage and commit quick task artifacts:
 Build file list:
 - `${QUICK_DIR}/${next_num}-PLAN.md`
 - `${QUICK_DIR}/${next_num}-SUMMARY.md`
-- `.planning/STATE.md`
+- `{planning_base}/STATE.md`
 - If `$FULL_MODE` and verification file exists: `${QUICK_DIR}/${next_num}-VERIFICATION.md`
 
+If `commit_docs` is true:
 ```bash
 node "$HOME/.claude/get-shit-done/bin/gsd-tools.cjs" commit "docs(quick-${next_num}): ${DESCRIPTION}" --files ${file_list}
 ```
@@ -443,7 +444,7 @@ Ready for next task: /gsd:quick
 - [ ] `--full` flag parsed from arguments when present
 - [ ] Slug generated (lowercase, hyphens, max 40 chars)
 - [ ] Next number calculated (001, 002, 003...)
-- [ ] Directory created at `.planning/quick/NNN-slug/`
+- [ ] Directory created at `${quick_dir}/NNN-slug/`
 - [ ] `${next_num}-PLAN.md` created by planner
 - [ ] (--full) Plan checker validates plan, revision loop capped at 2
 - [ ] `${next_num}-SUMMARY.md` created by executor

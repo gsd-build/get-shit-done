@@ -19,7 +19,7 @@ Load all context in one call:
 INIT=$(node "$HOME/.claude/get-shit-done/bin/gsd-tools.cjs" init execute-phase "${PHASE_ARG}")
 ```
 
-Parse JSON for: `executor_model`, `verifier_model`, `commit_docs`, `parallelization`, `branching_strategy`, `branch_name`, `phase_found`, `phase_dir`, `phase_number`, `phase_name`, `phase_slug`, `plans`, `incomplete_plans`, `plan_count`, `incomplete_count`, `state_exists`, `roadmap_exists`, `phase_req_ids`.
+Parse JSON for: `executor_model`, `verifier_model`, `commit_docs`, `parallelization`, `branching_strategy`, `branch_name`, `phase_found`, `phase_dir`, `phase_number`, `phase_name`, `phase_slug`, `plans`, `incomplete_plans`, `plan_count`, `incomplete_count`, `state_exists`, `roadmap_exists`, `phase_req_ids`, `state_path`, `roadmap_path`, `config_path`, `planning_base`, `milestone`, `is_multi_milestone`, `model_profile`, `adaptive_settings`.
 
 **If `phase_found` is false:** Error — phase directory not found.
 **If `plan_count` is 0:** Error — no plans found in phase.
@@ -99,10 +99,23 @@ Execute each wave in sequence. Within a wave: parallel if `PARALLELIZATION=true`
    Pass paths only — executors read files themselves with their fresh 200k context.
    This keeps orchestrator context lean (~10-15%).
 
+   **Adaptive model resolution:** When `model_profile === 'adaptive'`, resolve the executor model per-plan using plan metadata from `phase-plan-index`:
+
+   ```bash
+   ADAPTIVE_MODEL=$(node "$HOME/.claude/get-shit-done/bin/gsd-tools.cjs" resolve-adaptive-model gsd-executor --context '{"files_modified": [from plan index], "task_count": [from plan index], "objective": "[from plan objective]", "plan_type": "[from plan index type field]", "depends_on": [from plan index depends_on field]}' --raw)
+   ```
+
+   Display the complexity tier in the wave description:
+   ```
+   Model: {model} ({tier} complexity, score {score})
+   ```
+
+   For non-adaptive profiles, use `executor_model` from init directly.
+
    ```
    Task(
      subagent_type="gsd-executor",
-     model="{executor_model}",
+     model="{executor_model or adaptive_model}",
      prompt="
        <objective>
        Execute plan {plan_number} of phase {phase_number}-{phase_name}.
@@ -119,8 +132,8 @@ Execute each wave in sequence. Within a wave: parallel if `PARALLELIZATION=true`
        <files_to_read>
        Read these files at execution start using the Read tool:
        - {phase_dir}/{plan_file} (Plan)
-       - .planning/STATE.md (State)
-       - .planning/config.json (Config, if exists)
+       - {state_path} (State)
+       - {config_path} (Config, if exists)
        - ./CLAUDE.md (Project instructions, if exists — follow project-specific guidelines and coding conventions)
        - .claude/skills/ or .agents/skills/ (Project skills, if either exists — list skills, read SKILL.md for each, follow relevant rules during implementation)
        </files_to_read>
@@ -286,6 +299,8 @@ mv .planning/debug/{slug}.md .planning/debug/resolved/
 ```
 
 **6. Commit updated artifacts:**
+
+If `commit_docs` is true:
 ```bash
 node "$HOME/.claude/get-shit-done/bin/gsd-tools.cjs" commit "docs(phase-${PARENT_PHASE}): resolve UAT gaps and debug sessions after ${PHASE_NUMBER} gap closure" --files .planning/phases/*${PARENT_PHASE}*/*-UAT.md .planning/debug/resolved/*.md
 ```
@@ -293,6 +308,15 @@ node "$HOME/.claude/get-shit-done/bin/gsd-tools.cjs" commit "docs(phase-${PARENT
 
 <step name="verify_phase_goal">
 Verify phase achieved its GOAL, not just completed tasks.
+
+**Adaptive verifier resolution:** When `model_profile === 'adaptive'`, aggregate all plan metadata from `phase-plan-index` (total files across all plans, total tasks, phase goal as objective) and resolve the verifier model per-phase:
+
+```bash
+# Aggregate: collect all files_modified, sum task_count, use phase goal as objective
+VERIFIER_MODEL=$(node "$HOME/.claude/get-shit-done/bin/gsd-tools.cjs" resolve-adaptive-model gsd-verifier --context '{"files_modified": [all files from all plans], "task_count": [sum of all plan task_counts], "objective": "[phase goal from ROADMAP.md]"}' --raw)
+```
+
+For non-adaptive profiles, use `verifier_model` from init directly (unchanged).
 
 ```
 Task(
@@ -304,7 +328,7 @@ Check must_haves against actual codebase.
 Cross-reference requirement IDs from PLAN frontmatter against REQUIREMENTS.md — every ID MUST be accounted for.
 Create VERIFICATION.md.",
   subagent_type="gsd-verifier",
-  model="{verifier_model}"
+  model="{verifier_model or adaptive_verifier_model}"
 )
 ```
 
@@ -370,8 +394,9 @@ The CLI handles:
 
 Extract from result: `next_phase`, `next_phase_name`, `is_last_phase`.
 
+If `commit_docs` is true:
 ```bash
-node "$HOME/.claude/get-shit-done/bin/gsd-tools.cjs" commit "docs(phase-{X}): complete phase execution" --files .planning/ROADMAP.md .planning/STATE.md .planning/REQUIREMENTS.md {phase_dir}/*-VERIFICATION.md
+node "$HOME/.claude/get-shit-done/bin/gsd-tools.cjs" commit "docs(phase-{X}): complete phase execution" --files {roadmap_path} {state_path} {planning_base}/REQUIREMENTS.md {phase_dir}/*-VERIFICATION.md
 ```
 </step>
 

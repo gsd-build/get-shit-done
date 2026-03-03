@@ -12,9 +12,9 @@ Read all files referenced by the invoking prompt's execution_context before star
 Validate argument:
 
 ```
-if $ARGUMENTS.profile not in ["quality", "balanced", "budget"]:
+if $ARGUMENTS.profile not in ["quality", "balanced", "budget", "adaptive"]:
   Error: Invalid profile "$ARGUMENTS.profile"
-  Valid profiles: quality, balanced, budget
+  Valid profiles: quality, balanced, budget, adaptive
   EXIT
 ```
 </step>
@@ -27,7 +27,9 @@ node "$HOME/.claude/get-shit-done/bin/gsd-tools.cjs" config-ensure-section
 INIT=$(node "$HOME/.claude/get-shit-done/bin/gsd-tools.cjs" state load)
 ```
 
-This creates `.planning/config.json` with defaults if missing and loads current config.
+This creates `{planning_base}/config.json` with defaults if missing and loads current config.
+
+Extract `planning_base` from init JSON (or derive from `state load` response).
 </step>
 
 <step name="update_config">
@@ -40,7 +42,7 @@ Update `model_profile` field:
 }
 ```
 
-Write updated config back to `.planning/config.json`.
+Write updated config back to `{planning_base}/config.json`.
 </step>
 
 <step name="confirm">
@@ -68,6 +70,7 @@ Map profile names:
 - quality: use "quality" column from MODEL_PROFILES
 - balanced: use "balanced" column from MODEL_PROFILES
 - budget: use "budget" column from MODEL_PROFILES
+- adaptive: show "Adaptive — model selected per-plan based on complexity (Simple→haiku/sonnet, Medium→sonnet, Complex→opus/sonnet)"
 </step>
 
 </process>

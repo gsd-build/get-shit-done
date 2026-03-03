@@ -15,11 +15,11 @@ Load todo context:
 INIT=$(node "$HOME/.claude/get-shit-done/bin/gsd-tools.cjs" init todos)
 ```
 
-Extract from init JSON: `commit_docs`, `date`, `timestamp`, `todo_count`, `todos`, `pending_dir`, `todos_dir_exists`.
+Extract from init JSON: `commit_docs`, `date`, `timestamp`, `todo_count`, `todos`, `pending_dir`, `completed_dir`, `planning_base`, `todos_dir_exists`.
 
 Ensure directories exist:
 ```bash
-mkdir -p .planning/todos/pending .planning/todos/done
+mkdir -p "${pending_dir}" "${completed_dir}"
 ```
 
 Note existing areas from the todos array for consistency in infer_area step.
@@ -62,7 +62,7 @@ Use existing area from step 2 if similar match exists.
 <step name="check_duplicates">
 ```bash
 # Search for key words from title in existing todos
-grep -l -i "[key words from title]" .planning/todos/pending/*.md 2>/dev/null
+grep -l -i "[key words from title]" ${pending_dir}/*.md 2>/dev/null
 ```
 
 If potential duplicate found:
@@ -86,7 +86,7 @@ Generate slug for the title:
 slug=$(node "$HOME/.claude/get-shit-done/bin/gsd-tools.cjs" generate-slug "$title" --raw)
 ```
 
-Write to `.planning/todos/pending/${date}-${slug}.md`:
+Write to `${pending_dir}/${date}-${slug}.md`:
 
 ```markdown
 ---
@@ -108,27 +108,27 @@ files:
 </step>
 
 <step name="update_state">
-If `.planning/STATE.md` exists:
+If `{planning_base}/STATE.md` exists:
 
 1. Use `todo_count` from init context (or re-run `init todos` if count changed)
 2. Update "### Pending Todos" under "## Accumulated Context"
 </step>
 
 <step name="git_commit">
+If `commit_docs` is true:
+
 Commit the todo and any updated state:
 
 ```bash
-node "$HOME/.claude/get-shit-done/bin/gsd-tools.cjs" commit "docs: capture todo - [title]" --files .planning/todos/pending/[filename] .planning/STATE.md
+node "$HOME/.claude/get-shit-done/bin/gsd-tools.cjs" commit "docs: capture todo - [title]" --files ${pending_dir}/[filename] {planning_base}/STATE.md
 ```
-
-Tool respects `commit_docs` config and gitignore automatically.
 
 Confirm: "Committed: docs: capture todo - [title]"
 </step>
 
 <step name="confirm">
 ```
-Todo saved: .planning/todos/pending/[filename]
+Todo saved: ${pending_dir}/[filename]
 
   [title]
   Area: [area]

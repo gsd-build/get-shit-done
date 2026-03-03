@@ -16,12 +16,14 @@ node "$HOME/.claude/get-shit-done/bin/gsd-tools.cjs" config-ensure-section
 INIT=$(node "$HOME/.claude/get-shit-done/bin/gsd-tools.cjs" state load)
 ```
 
-Creates `.planning/config.json` with defaults if missing and loads current config values.
+Creates `{planning_base}/config.json` with defaults if missing and loads current config values.
+
+Extract `planning_base` from init JSON (or derive from `state load` response).
 </step>
 
 <step name="read_current">
 ```bash
-cat .planning/config.json
+cat {planning_base}/config.json
 ```
 
 Parse current values (default to `true` if not present):
@@ -45,7 +47,8 @@ AskUserQuestion([
     options: [
       { label: "Quality", description: "Opus everywhere except verification (highest cost)" },
       { label: "Balanced (Recommended)", description: "Opus for planning, Sonnet for execution/verification" },
-      { label: "Budget", description: "Sonnet for writing, Haiku for research/verification (lowest cost)" }
+      { label: "Budget", description: "Sonnet for writing, Haiku for research/verification (lowest cost)" },
+      { label: "Adaptive", description: "Auto-selects model per-plan based on complexity (35-65% savings)" }
     ]
   },
   {
@@ -113,7 +116,7 @@ Merge new settings into existing config.json:
 ```json
 {
   ...existing_config,
-  "model_profile": "quality" | "balanced" | "budget",
+  "model_profile": "quality" | "balanced" | "budget" | "adaptive",
   "workflow": {
     "research": true/false,
     "plan_check": true/false,
@@ -127,7 +130,7 @@ Merge new settings into existing config.json:
 }
 ```
 
-Write updated config to `.planning/config.json`.
+Write updated config to `{planning_base}/config.json`.
 </step>
 
 <step name="save_as_defaults">
@@ -183,7 +186,7 @@ Display:
 
 | Setting              | Value |
 |----------------------|-------|
-| Model Profile        | {quality/balanced/budget} |
+| Model Profile        | {quality/balanced/budget/adaptive} |
 | Plan Researcher      | {On/Off} |
 | Plan Checker         | {On/Off} |
 | Execution Verifier   | {On/Off} |

@@ -36,12 +36,12 @@ Load phase operation context:
 INIT=$(node "$HOME/.claude/get-shit-done/bin/gsd-tools.cjs" init phase-op "${PHASE_ARG}")
 ```
 
-Extract from init JSON: `phase_dir`, `phase_number`, `phase_name`.
+Extract from init JSON: `phase_dir`, `phase_number`, `phase_name`, `planning_base`.
 
 Verify the phase directory exists. If not:
 ```
 ERROR: Phase directory not found for phase ${PHASE_ARG}
-Ensure the phase exists in .planning/phases/
+Ensure the phase exists in {planning_base}/phases/
 ```
 Exit.
 
@@ -299,11 +299,10 @@ Record test generation in project state:
 node "$HOME/.claude/get-shit-done/bin/gsd-tools.cjs" state-snapshot
 ```
 
-If there are passing tests to commit:
+If there are passing tests to commit and `commit_docs` is true:
 
 ```bash
-git add {test files}
-git commit -m "test(phase-${phase_number}): add unit and E2E tests from add-tests command"
+node "$HOME/.claude/get-shit-done/bin/gsd-tools.cjs" commit "test(phase-${phase_number}): add unit and E2E tests from add-tests command" --files {test files}
 ```
 
 Present next steps:

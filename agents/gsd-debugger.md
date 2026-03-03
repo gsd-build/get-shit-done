@@ -1042,7 +1042,7 @@ git commit -m "fix: {brief description}
 Root cause: {root_cause}"
 ```
 
-Then commit planning docs via CLI (respects `commit_docs` config automatically):
+If `commit_docs` is true:
 ```bash
 node "$HOME/.claude/get-shit-done/bin/gsd-tools.cjs" commit "docs: resolve debug {slug}" --files .planning/debug/resolved/{slug}.md
 ```
