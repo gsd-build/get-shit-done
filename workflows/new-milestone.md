@@ -12,6 +12,72 @@ Read all files referenced by the invoking prompt's execution_context before star
 
 <process>
 
+## 0. Workstream Detection
+
+**Before anything else, check if an existing milestone is in-flight.**
+
+```bash
+# Check for existing roadmap with incomplete phases
+ROADMAP_EXISTS=$(test -f .planning/ROADMAP.md && echo "true" || echo "false")
+WS_MODE=$(test -d .planning/workstreams && echo "true" || echo "false")
+```
+
+**If flat mode (`WS_MODE=false`) AND `ROADMAP_EXISTS=true`:**
+
+Check if current milestone has incomplete phases:
+```bash
+ANALYZE=$(node "$HOME/.claude/get-shit-done/bin/gsd-tools.cjs" roadmap analyze --cwd . 2>/dev/null)
+```
+
+Parse `progress_percent` from result. **If < 100%** (milestone in-flight):
+
+Use AskUserQuestion:
+- header: "Parallel?"
+- question: "An existing milestone is in-flight (${progress_percent}% complete). Run the new milestone in parallel as a workstream?"
+- options:
+  - "Yes — parallel workstreams (Recommended)" — Create workstream for existing + new milestone. Both run side-by-side.
+  - "No — replace current" — Overwrite existing ROADMAP.md/STATE.md/REQUIREMENTS.md (destructive, current as-is behavior)
+
+**If "Yes — parallel workstreams":**
+
+```bash
+# Create workstream for the NEW milestone (this auto-migrates existing flat files)
+NEW_WS_RESULT=$(node "$HOME/.claude/get-shit-done/bin/gsd-tools.cjs" workstream create "${NEW_WS_SLUG}" --cwd .)
+
+# Set the new workstream as active for this session
+node "$HOME/.claude/get-shit-done/bin/gsd-tools.cjs" workstream set "${NEW_WS_SLUG}" --cwd .
+
+# Update GSD_WS for all subsequent commands
+GSD_WS="--ws ${NEW_WS_SLUG}"
+```
+
+The migration result tells you what name was assigned to the existing milestone's workstream. Display:
+```
+Workstreams created:
+  → ${migrated_ws_name} (existing milestone — migrated)
+  → ${NEW_WS_SLUG} (new milestone — active)
+
+All commands now scoped to: ${NEW_WS_SLUG}
+To switch back: workstream set ${migrated_ws_name}
+```
+
+Note: `${NEW_WS_SLUG}` can be derived from the milestone name entered in Step 3, so you may need to ask for the milestone name first OR use a temporary name and rename later. A practical approach: ask "What's the name for this new milestone?" before creating the workstream, then use `generate-slug` on it.
+
+**If "No — replace current":** Continue without workstreams (existing behavior).
+
+**If already in workstream mode (`WS_MODE=true`):**
+
+Create a new workstream directly:
+```bash
+NEW_WS_RESULT=$(node "$HOME/.claude/get-shit-done/bin/gsd-tools.cjs" workstream create "${NEW_WS_SLUG}" --cwd .)
+node "$HOME/.claude/get-shit-done/bin/gsd-tools.cjs" workstream set "${NEW_WS_SLUG}" --cwd .
+GSD_WS="--ws ${NEW_WS_SLUG}"
+```
+
+Display: `New workstream: ${NEW_WS_SLUG} (active)`
+
+**If flat mode AND no roadmap (greenfield):** Skip — no conflict, proceed in flat mode.
+
 ## 1. Load Context
 
 - Read PROJECT.md (existing project, validated requirements, decisions)
@@ -367,6 +433,8 @@ Also: `/gsd:plan-phase [N]` — skip discussion, plan directly
 </process>
 
 <success_criteria>
+- [ ] Workstream detection: if existing milestone in-flight, user offered parallel workstreams
+- [ ] If parallel chosen: existing files migrated, new workstream created and set active
 - [ ] PROJECT.md updated with Current Milestone section
 - [ ] STATE.md reset for new milestone
 - [ ] MILESTONE-CONTEXT.md consumed and deleted (if existed)
@@ -379,6 +447,7 @@ Also: `/gsd:plan-phase [N]` — skip discussion, plan directly
 - [ ] ROADMAP.md phases continue from previous milestone
 - [ ] All commits made (if planning docs committed)
 - [ ] User knows next step: `/gsd:discuss-phase [N]`
+- [ ] If workstreams active: display shows workstream paths, switch command
 
 **Atomic commits:** Each phase commits its artifacts immediately.
 </success_criteria>
