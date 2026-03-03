@@ -4,7 +4,7 @@
 
 const fs = require('fs');
 const path = require('path');
-const { escapeRegex, normalizePhaseName, comparePhaseNum, findPhaseInternal, getArchivedPhaseDirs, generateSlugInternal, output, error } = require('./core.cjs');
+const { escapeRegex, normalizePhaseName, comparePhaseNum, findPhaseInternal, getArchivedPhaseDirs, generateSlugInternal, getMilestonePhaseFilter, output, error } = require('./core.cjs');
 const { extractFrontmatter } = require('./frontmatter.cjs');
 const { writeStateMd } = require('./state.cjs');
 
@@ -791,8 +791,11 @@ function cmdPhaseComplete(cwd, phaseNum, raw) {
   let isLastPhase = true;
 
   try {
+    const isDirInMilestone = getMilestonePhaseFilter(cwd);
     const entries = fs.readdirSync(phasesDir, { withFileTypes: true });
-    const dirs = entries.filter(e => e.isDirectory()).map(e => e.name).sort((a, b) => comparePhaseNum(a, b));
+    const dirs = entries.filter(e => e.isDirectory()).map(e => e.name)
+      .filter(isDirInMilestone)
+      .sort((a, b) => comparePhaseNum(a, b));
 
     // Find the next phase directory after current
     for (const dir of dirs) {

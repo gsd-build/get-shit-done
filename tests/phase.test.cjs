@@ -1458,6 +1458,109 @@ describe('letter-suffix phase sorting', () => {
 });
 
 // ─────────────────────────────────────────────────────────────────────────────
+// milestone-scoped next-phase in phase complete
+// ─────────────────────────────────────────────────────────────────────────────
+
+describe('phase complete milestone-scoped next-phase', () => {
+  let tmpDir;
+
+  beforeEach(() => {
+    tmpDir = createTempProject();
+  });
+
+  afterEach(() => {
+    cleanup(tmpDir);
+  });
+
+  test('finds next phase within milestone, ignoring prior milestone dirs', () => {
+    // ROADMAP lists phases 5-6 (current milestone v2.0)
+    fs.writeFileSync(
+      path.join(tmpDir, '.planning', 'ROADMAP.md'),
+      [
+        '## Roadmap v2.0: Release',
+        '',
+        '- [ ] Phase 5: Auth',
+        '- [ ] Phase 6: Dashboard',
+        '',
+        '### Phase 5: Auth',
+        '**Goal:** Add authentication',
+        '**Plans:** 1 plans',
+        '',
+        '### Phase 6: Dashboard',
+        '**Goal:** Build dashboard',
+      ].join('\n')
+    );
+
+    fs.writeFileSync(
+      path.join(tmpDir, '.planning', 'STATE.md'),
+      '# State\n\n**Current Phase:** 05\n**Current Phase Name:** Auth\n**Status:** In progress\n**Current Plan:** 05-01\n**Last Activity:** 2025-01-01\n**Last Activity Description:** Working\n'
+    );
+
+    // Disk has dirs 01-06 (01-04 completed from prior milestone)
+    for (let i = 1; i <= 4; i++) {
+      const padded = String(i).padStart(2, '0');
+      const phaseDir = path.join(tmpDir, '.planning', 'phases', `${padded}-old-phase`);
+      fs.mkdirSync(phaseDir, { recursive: true });
+      fs.writeFileSync(path.join(phaseDir, `${padded}-01-PLAN.md`), '# Plan');
+      fs.writeFileSync(path.join(phaseDir, `${padded}-01-SUMMARY.md`), '# Summary');
+    }
+
+    // Phase 5 — completing this one
+    const p5 = path.join(tmpDir, '.planning', 'phases', '05-auth');
+    fs.mkdirSync(p5, { recursive: true });
+    fs.writeFileSync(path.join(p5, '05-01-PLAN.md'), '# Plan');
+    fs.writeFileSync(path.join(p5, '05-01-SUMMARY.md'), '# Summary');
+
+    // Phase 6 — next phase in milestone
+    fs.mkdirSync(path.join(tmpDir, '.planning', 'phases', '06-dashboard'), { recursive: true });
+
+    const result = runGsdTools('phase complete 5', tmpDir);
+    assert.ok(result.success, `Command failed: ${result.error}`);
+
+    const output = JSON.parse(result.output);
+    assert.strictEqual(output.is_last_phase, false, 'should NOT be last phase — phase 6 is in milestone');
+    assert.strictEqual(output.next_phase, '06', 'next phase should be 06');
+  });
+
+  test('detects last phase when only milestone phases are considered', () => {
+    // ROADMAP lists only phase 5 (current milestone)
+    fs.writeFileSync(
+      path.join(tmpDir, '.planning', 'ROADMAP.md'),
+      [
+        '## Roadmap v2.0: Release',
+        '',
+        '### Phase 5: Auth',
+        '**Goal:** Add authentication',
+        '**Plans:** 1 plans',
+      ].join('\n')
+    );
+
+    fs.writeFileSync(
+      path.join(tmpDir, '.planning', 'STATE.md'),
+      '# State\n\n**Current Phase:** 05\n**Current Phase Name:** Auth\n**Status:** In progress\n**Current Plan:** 05-01\n**Last Activity:** 2025-01-01\n**Last Activity Description:** Working\n'
+    );
+
+    // Disk has dirs 01-06 but only 5 is in ROADMAP
+    for (let i = 1; i <= 6; i++) {
+      const padded = String(i).padStart(2, '0');
+      const phaseDir = path.join(tmpDir, '.planning', 'phases', `${padded}-phase-${i}`);
+      fs.mkdirSync(phaseDir, { recursive: true });
+      fs.writeFileSync(path.join(phaseDir, `${padded}-01-PLAN.md`), '# Plan');
+      fs.writeFileSync(path.join(phaseDir, `${padded}-01-SUMMARY.md`), '# Summary');
+    }
+
+    const result = runGsdTools('phase complete 5', tmpDir);
+    assert.ok(result.success, `Command failed: ${result.error}`);
+
+    const output = JSON.parse(result.output);
+    // Without the fix, dirs 06 on disk would make is_last_phase=false
+    // With the fix, only phase 5 is in milestone, so it IS the last phase
+    assert.strictEqual(output.is_last_phase, true, 'should be last phase — only phase 5 is in milestone');
+    assert.strictEqual(output.next_phase, null, 'no next phase in milestone');
+  });
+});
+
+// ─────────────────────────────────────────────────────────────────────────────
 // milestone complete command
 // ─────────────────────────────────────────────────────────────────────────────
 

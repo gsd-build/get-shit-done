@@ -4,7 +4,7 @@
 
 const fs = require('fs');
 const path = require('path');
-const { loadConfig, getMilestoneInfo, output, error } = require('./core.cjs');
+const { loadConfig, getMilestoneInfo, getMilestonePhaseFilter, output, error } = require('./core.cjs');
 const { extractFrontmatter, reconstructFrontmatter } = require('./frontmatter.cjs');
 
 function cmdStateLoad(cwd, raw) {
@@ -597,8 +597,10 @@ function buildStateFrontmatter(bodyContent, cwd) {
     try {
       const phasesDir = path.join(cwd, '.planning', 'phases');
       if (fs.existsSync(phasesDir)) {
+        const isDirInMilestone = getMilestonePhaseFilter(cwd);
         const phaseDirs = fs.readdirSync(phasesDir, { withFileTypes: true })
-          .filter(e => e.isDirectory()).map(e => e.name);
+          .filter(e => e.isDirectory()).map(e => e.name)
+          .filter(isDirInMilestone);
         let diskTotalPlans = 0;
         let diskTotalSummaries = 0;
         let diskCompletedPhases = 0;
@@ -611,7 +613,9 @@ function buildStateFrontmatter(bodyContent, cwd) {
           diskTotalSummaries += summaries;
           if (plans > 0 && summaries >= plans) diskCompletedPhases++;
         }
-        if (totalPhases === null) totalPhases = phaseDirs.length;
+        totalPhases = isDirInMilestone.phaseCount > 0
+          ? Math.max(phaseDirs.length, isDirInMilestone.phaseCount)
+          : phaseDirs.length;
         completedPhases = diskCompletedPhases;
         totalPlans = diskTotalPlans;
         completedPlans = diskTotalSummaries;
