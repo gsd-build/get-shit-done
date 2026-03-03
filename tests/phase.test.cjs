@@ -1255,6 +1255,151 @@ describe('phase complete command', () => {
     assert.ok(result.success, `Command should succeed even without REQUIREMENTS.md: ${result.error}`);
   });
 
+  test('returns requirements_updated field in result', () => {
+    fs.writeFileSync(
+      path.join(tmpDir, '.planning', 'ROADMAP.md'),
+      `# Roadmap
+
+- [ ] Phase 1: Auth
+
+### Phase 1: Auth
+**Goal:** User authentication
+**Requirements:** AUTH-01
+**Plans:** 1 plans
+`
+    );
+    fs.writeFileSync(
+      path.join(tmpDir, '.planning', 'REQUIREMENTS.md'),
+      `# Requirements
+
+## v1 Requirements
+
+- [ ] **AUTH-01**: User can sign up
+
+## Traceability
+
+| Requirement | Phase | Status |
+|-------------|-------|--------|
+| AUTH-01 | Phase 1 | Pending |
+`
+    );
+    fs.writeFileSync(
+      path.join(tmpDir, '.planning', 'STATE.md'),
+      `# State\n\n**Current Phase:** 01\n**Current Phase Name:** Auth\n**Status:** In progress\n**Current Plan:** 01-01\n**Last Activity:** 2025-01-01\n**Last Activity Description:** Working\n`
+    );
+
+    const p1 = path.join(tmpDir, '.planning', 'phases', '01-auth');
+    fs.mkdirSync(p1, { recursive: true });
+    fs.writeFileSync(path.join(p1, '01-01-PLAN.md'), '# Plan');
+    fs.writeFileSync(path.join(p1, '01-01-SUMMARY.md'), '# Summary');
+
+    const result = runGsdTools('phase complete 1', tmpDir);
+    assert.ok(result.success, `Command failed: ${result.error}`);
+    const parsed = JSON.parse(result.output);
+    assert.strictEqual(parsed.requirements_updated, true, 'requirements_updated should be true');
+  });
+
+  test('handles In Progress status in traceability table', () => {
+    fs.writeFileSync(
+      path.join(tmpDir, '.planning', 'ROADMAP.md'),
+      `# Roadmap
+
+- [ ] Phase 1: Auth
+
+### Phase 1: Auth
+**Goal:** User authentication
+**Requirements:** AUTH-01, AUTH-02
+**Plans:** 1 plans
+`
+    );
+    fs.writeFileSync(
+      path.join(tmpDir, '.planning', 'REQUIREMENTS.md'),
+      `# Requirements
+
+## v1 Requirements
+
+- [ ] **AUTH-01**: User can sign up
+- [ ] **AUTH-02**: User can log in
+
+## Traceability
+
+| Requirement | Phase | Status |
+|-------------|-------|--------|
+| AUTH-01 | Phase 1 | In Progress |
+| AUTH-02 | Phase 1 | Pending |
+`
+    );
+    fs.writeFileSync(
+      path.join(tmpDir, '.planning', 'STATE.md'),
+      `# State\n\n**Current Phase:** 01\n**Current Phase Name:** Auth\n**Status:** In progress\n**Current Plan:** 01-01\n**Last Activity:** 2025-01-01\n**Last Activity Description:** Working\n`
+    );
+
+    const p1 = path.join(tmpDir, '.planning', 'phases', '01-auth');
+    fs.mkdirSync(p1, { recursive: true });
+    fs.writeFileSync(path.join(p1, '01-01-PLAN.md'), '# Plan');
+    fs.writeFileSync(path.join(p1, '01-01-SUMMARY.md'), '# Summary');
+
+    const result = runGsdTools('phase complete 1', tmpDir);
+    assert.ok(result.success, `Command failed: ${result.error}`);
+
+    const req = fs.readFileSync(path.join(tmpDir, '.planning', 'REQUIREMENTS.md'), 'utf-8');
+    assert.ok(req.includes('| AUTH-01 | Phase 1 | Complete |'), 'In Progress should become Complete');
+    assert.ok(req.includes('| AUTH-02 | Phase 1 | Complete |'), 'Pending should become Complete');
+  });
+
+  test('scoped regex does not cross phase boundaries', () => {
+    fs.writeFileSync(
+      path.join(tmpDir, '.planning', 'ROADMAP.md'),
+      `# Roadmap
+
+- [ ] Phase 1: Setup
+- [ ] Phase 2: Auth
+
+### Phase 1: Setup
+**Goal:** Project setup
+**Plans:** 1 plans
+
+### Phase 2: Auth
+**Goal:** User authentication
+**Requirements:** AUTH-01
+**Plans:** 0 plans
+`
+    );
+    fs.writeFileSync(
+      path.join(tmpDir, '.planning', 'REQUIREMENTS.md'),
+      `# Requirements
+
+## v1 Requirements
+
+- [ ] **AUTH-01**: User can sign up
+
+## Traceability
+
+| Requirement | Phase | Status |
+|-------------|-------|--------|
+| AUTH-01 | Phase 2 | Pending |
+`
+    );
+    fs.writeFileSync(
+      path.join(tmpDir, '.planning', 'STATE.md'),
+      `# State\n\n**Current Phase:** 01\n**Current Phase Name:** Setup\n**Status:** In progress\n**Current Plan:** 01-01\n**Last Activity:** 2025-01-01\n**Last Activity Description:** Working\n`
+    );
+
+    const p1 = path.join(tmpDir, '.planning', 'phases', '01-setup');
+    fs.mkdirSync(p1, { recursive: true });
+    fs.writeFileSync(path.join(p1, '01-01-PLAN.md'), '# Plan');
+    fs.writeFileSync(path.join(p1, '01-01-SUMMARY.md'), '# Summary');
+    fs.mkdirSync(path.join(tmpDir, '.planning', 'phases', '02-auth'), { recursive: true });
+
+    const result = runGsdTools('phase complete 1', tmpDir);
+    assert.ok(result.success, `Command failed: ${result.error}`);
+
+    // Phase 1 has no Requirements field, so Phase 2's AUTH-01 should NOT be updated
+    const req = fs.readFileSync(path.join(tmpDir, '.planning', 'REQUIREMENTS.md'), 'utf-8');
+    assert.ok(req.includes('- [ ] **AUTH-01**'), 'AUTH-01 should remain unchecked (belongs to Phase 2)');
+    assert.ok(req.includes('| AUTH-01 | Phase 2 | Pending |'), 'AUTH-01 should remain Pending (belongs to Phase 2)');
+  });
+
   test('handles multi-level decimal phase without regex crash', () => {
     fs.writeFileSync(
       path.join(tmpDir, '.planning', 'ROADMAP.md'),
