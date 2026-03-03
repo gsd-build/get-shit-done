@@ -852,15 +852,20 @@ grep -l "status: diagnosed" "$phase_dir"/*-UAT.md 2>/dev/null
 </task>
 ```
 
-**7. Write PLAN.md files:**
+**7. Assign waves using standard dependency analysis** (same as `assign_waves` step):
+- Plans with no dependencies → wave 1
+- Plans that depend on other gap closure plans → max(dependency waves) + 1
+- Also consider dependencies on existing (non-gap) plans in the phase
+
+**8. Write PLAN.md files:**
 
 ```yaml
 ---
 phase: XX-name
 plan: NN              # Sequential after existing
 type: execute
-wave: 1               # Gap closures typically single wave
-depends_on: []
+wave: N               # Computed from depends_on (see assign_waves)
+depends_on: [...]     # Other plans this depends on (gap or existing)
 files_modified: [...]
 autonomous: true
 gap_closure: true     # Flag for tracking
