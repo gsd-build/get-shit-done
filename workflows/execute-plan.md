@@ -12,13 +12,17 @@ Read config.json for planning behavior settings.
 <process>
 
 <step name="init_context" priority="first">
+Parse `--ws <name>` from $ARGUMENTS. If present, set `GSD_WS="--ws ${WS_NAME}"`, otherwise set `GSD_WS=""`. Append `${GSD_WS}` to all `gsd-tools.cjs` invocations in this workflow.
+
 Load execution context (paths only to minimize orchestrator context):
 
 ```bash
-INIT=$(node "$HOME/.claude/get-shit-done/bin/gsd-tools.cjs" init execute-phase "${PHASE}")
+INIT=$(node "$HOME/.claude/get-shit-done/bin/gsd-tools.cjs" init execute-phase "${PHASE}" ${GSD_WS})
 ```
 
 Extract from init JSON: `executor_model`, `commit_docs`, `phase_dir`, `phase_number`, `plans`, `summaries`, `incomplete_plans`, `state_path`, `config_path`.
+
+Extract paths from init JSON: `state_path`, `config_path`, `roadmap_path`, `requirements_path`, `phase_dir`. Use these instead of hardcoded `.planning/` paths.
 
 If `.planning/` missing: error.
 </step>
@@ -26,8 +30,8 @@ If `.planning/` missing: error.
 <step name="identify_plan">
 ```bash
 # Use plans/summaries from INIT JSON, or list files
-ls .planning/phases/XX-name/*-PLAN.md 2>/dev/null | sort
-ls .planning/phases/XX-name/*-SUMMARY.md 2>/dev/null | sort
+ls ${phase_dir}/*-PLAN.md 2>/dev/null | sort
+ls ${phase_dir}/*-SUMMARY.md 2>/dev/null | sort
 ```
 
 Find first PLAN without matching SUMMARY. Decimal phases supported (`01.1-hotfix/`):
@@ -55,7 +59,7 @@ PLAN_START_EPOCH=$(date +%s)
 
 <step name="parse_segments">
 ```bash
-grep -n "type=\"checkpoint" .planning/phases/XX-name/{phase}-{plan}-PLAN.md
+grep -n "type=\"checkpoint" ${phase_dir}/{phase}-{plan}-PLAN.md
 ```
 
 **Routing by checkpoint type:**
@@ -77,19 +81,21 @@ Fresh context per subagent preserves peak quality. Main context stays lean.
 
 <step name="init_agent_tracking">
 ```bash
-if [ ! -f .planning/agent-history.json ]; then
-  echo '{"version":"1.0","max_entries":50,"entries":[]}' > .planning/agent-history.json
+AGENT_HISTORY="${state_path%/*}/agent-history.json"
+AGENT_ID_FILE="${state_path%/*}/current-agent-id.txt"
+if [ ! -f "$AGENT_HISTORY" ]; then
+  echo '{"version":"1.0","max_entries":50,"entries":[]}' > "$AGENT_HISTORY"
 fi
-rm -f .planning/current-agent-id.txt
-if [ -f .planning/current-agent-id.txt ]; then
-  INTERRUPTED_ID=$(cat .planning/current-agent-id.txt)
+rm -f "$AGENT_ID_FILE"
+if [ -f "$AGENT_ID_FILE" ]; then
+  INTERRUPTED_ID=$(cat "$AGENT_ID_FILE")
   echo "Found interrupted agent: $INTERRUPTED_ID"
 fi
 ```
 
 If interrupted: ask user to resume (Task `resume` parameter) or start fresh.
 
-**Tracking protocol:** On spawn: write agent_id to `current-agent-id.txt`, append to agent-history.json: `{"agent_id":"[id]","task_description":"[desc]","phase":"[phase]","plan":"[plan]","segment":[num|null],"timestamp":"[ISO]","status":"spawned","completion_timestamp":null}`. On completion: status → "completed", set completion_timestamp, delete current-agent-id.txt. Prune: if entries > max_entries, remove oldest "completed" (never "spawned").
+**Tracking protocol:** On spawn: write agent_id to `$AGENT_ID_FILE`, append to `$AGENT_HISTORY`: `{"agent_id":"[id]","task_description":"[desc]","phase":"[phase]","plan":"[plan]","segment":[num|null],"timestamp":"[ISO]","status":"spawned","completion_timestamp":null}`. On completion: status → "completed", set completion_timestamp, delete current-agent-id.txt. Prune: if entries > max_entries, remove oldest "completed" (never "spawned").
 
 Run for Pattern A/B before spawning. Pattern C: skip.
 </step>
@@ -115,7 +121,7 @@ Pattern B only (verify-only checkpoints). Skip for A/C.
 
 <step name="load_prompt">
 ```bash
-cat .planning/phases/XX-name/{phase}-{plan}-PLAN.md
+cat ${phase_dir}/{phase}-{plan}-PLAN.md
 ```
 This IS the execution instructions. Follow exactly. If plan references CONTEXT.md: honor user's vision throughout.
 
@@ -124,7 +130,7 @@ This IS the execution instructions. Follow exactly. If plan references CONTEXT.m
 
 <step name="previous_phase_check">
 ```bash
-node "$HOME/.claude/get-shit-done/bin/gsd-tools.cjs" phases list --type summaries --raw
+node "$HOME/.claude/get-shit-done/bin/gsd-tools.cjs" phases list --type summaries --raw ${GSD_WS}
 # Extract the second-to-last summary from the JSON result
 ```
 If previous SUMMARY has unresolved "Issues Encountered" or "Next Phase Readiness" blockers: AskUserQuestion(header="Previous Issues", options: "Proceed anyway" | "Address first" | "Review previous").
@@ -334,13 +340,13 @@ Update STATE.md using gsd-tools:
 
 ```bash
 # Advance plan counter (handles last-plan edge case)
-node "$HOME/.claude/get-shit-done/bin/gsd-tools.cjs" state advance-plan
+node "$HOME/.claude/get-shit-done/bin/gsd-tools.cjs" state advance-plan ${GSD_WS}
 
 # Recalculate progress bar from disk state
-node "$HOME/.claude/get-shit-done/bin/gsd-tools.cjs" state update-progress
+node "$HOME/.claude/get-shit-done/bin/gsd-tools.cjs" state update-progress ${GSD_WS}
 
 # Record execution metrics
-node "$HOME/.claude/get-shit-done/bin/gsd-tools.cjs" state record-metric \
+node "$HOME/.claude/get-shit-done/bin/gsd-tools.cjs" state record-metric ${GSD_WS} \
   --phase "${PHASE}" --plan "${PLAN}" --duration "${DURATION}" \
   --tasks "${TASK_COUNT}" --files "${FILE_COUNT}"
 ```
@@ -352,7 +358,7 @@ From SUMMARY: Extract decisions and add to STATE.md:
 ```bash
 # Add each decision from SUMMARY key-decisions
 # Prefer file inputs for shell-safe text (preserves `$`, `*`, etc. exactly)
-node "$HOME/.claude/get-shit-done/bin/gsd-tools.cjs" state add-decision \
+node "$HOME/.claude/get-shit-done/bin/gsd-tools.cjs" state add-decision ${GSD_WS} \
   --phase "${PHASE}" --summary-file "${DECISION_TEXT_FILE}" --rationale-file "${RATIONALE_FILE}"
 
 # Add blockers if any found
