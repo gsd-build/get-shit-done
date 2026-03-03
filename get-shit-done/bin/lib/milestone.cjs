@@ -4,7 +4,7 @@
 
 const fs = require('fs');
 const path = require('path');
-const { output, error } = require('./core.cjs');
+const { escapeRegex, output, error } = require('./core.cjs');
 const { extractFrontmatter } = require('./frontmatter.cjs');
 const { writeStateMd } = require('./state.cjs');
 
@@ -37,20 +37,21 @@ function cmdRequirementsMarkComplete(cwd, reqIdsRaw, raw) {
 
   for (const reqId of reqIds) {
     let found = false;
+    const reqEscaped = escapeRegex(reqId);
 
     // Update checkbox: - [ ] **REQ-ID** → - [x] **REQ-ID**
-    const checkboxPattern = new RegExp(`(-\\s*\\[)[ ](\\]\\s*\\*\\*${reqId}\\*\\*)`, 'gi');
+    const checkboxPattern = new RegExp(`(-\\s*\\[)[ ](\\]\\s*\\*\\*${reqEscaped}\\*\\*)`, 'gi');
     if (checkboxPattern.test(reqContent)) {
       reqContent = reqContent.replace(checkboxPattern, '$1x$2');
       found = true;
     }
 
     // Update traceability table: | REQ-ID | Phase N | Pending | → | REQ-ID | Phase N | Complete |
-    const tablePattern = new RegExp(`(\\|\\s*${reqId}\\s*\\|[^|]+\\|)\\s*Pending\\s*(\\|)`, 'gi');
+    const tablePattern = new RegExp(`(\\|\\s*${reqEscaped}\\s*\\|[^|]+\\|)\\s*Pending\\s*(\\|)`, 'gi');
     if (tablePattern.test(reqContent)) {
       // Re-read since test() advances lastIndex for global regex
       reqContent = reqContent.replace(
-        new RegExp(`(\\|\\s*${reqId}\\s*\\|[^|]+\\|)\\s*Pending\\s*(\\|)`, 'gi'),
+        new RegExp(`(\\|\\s*${reqEscaped}\\s*\\|[^|]+\\|)\\s*Pending\\s*(\\|)`, 'gi'),
         '$1 Complete $2'
       );
       found = true;
