@@ -6,6 +6,9 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ## [Unreleased]
 
+### Fixed
+- `milestone complete` task count now reads `**Tasks:** N` from summary Performance section instead of only counting `## Task N` markdown headers
+
 ## [1.22.4] - 2026-03-03
 
 ### Added
