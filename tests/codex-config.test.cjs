@@ -443,6 +443,34 @@ describe('mergeCodexConfig', () => {
     assert.strictEqual(first, second, 'idempotent after 2nd merge');
     assert.strictEqual(second, third, 'idempotent after 3rd merge');
   });
+
+  test('case 3 with existing [agents]: does not duplicate [agents] header', () => {
+    const configPath = path.join(tmpDir, 'config.toml');
+    fs.writeFileSync(
+      configPath,
+      [
+        '[model]',
+        'name = "o3"',
+        '',
+        '[agents]',
+        'max_threads = 2',
+        '',
+        '[agents.custom-helper]',
+        'description = "custom helper"',
+        'config_file = "agents/custom-helper.toml"',
+        '',
+      ].join('\n'),
+    );
+
+    mergeCodexConfig(configPath, sampleBlock);
+
+    const content = fs.readFileSync(configPath, 'utf8');
+    const agentsCount = (content.match(/^\[agents\]\s*$/gm) || []).length;
+    assert.strictEqual(agentsCount, 1, 'exactly one [agents] section');
+    assert.ok(content.includes('[agents.custom-helper]'), 'preserves existing custom agent');
+    assert.ok(content.includes('[agents.gsd-executor]'), 'adds GSD agents');
+    assert.ok(content.includes(GSD_CODEX_MARKER), 'adds managed marker');
+  });
 });
 
 // ─── Integration: installCodexConfig ────────────────────────────────────────────
