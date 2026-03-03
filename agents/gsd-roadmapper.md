@@ -200,17 +200,17 @@ Track coverage as you go.
 - New milestone: Start at 1
 - Continuing milestone: Check existing phases, start at last + 1
 
-## Depth Calibration
+## Granularity Calibration
 
-Read depth from config.json. Depth controls compression tolerance.
+Read granularity from config.json. Granularity controls compression tolerance.
 
-| Depth | Typical Phases | What It Means |
-|-------|----------------|---------------|
-| Quick | 3-5 | Combine aggressively, critical path only |
+| Granularity | Typical Phases | What It Means |
+|-------------|----------------|---------------|
+| Coarse | 3-5 | Combine aggressively, critical path only |
 | Standard | 5-8 | Balanced grouping |
-| Comprehensive | 8-12 | Let natural boundaries stand |
+| Fine | 8-12 | Let natural boundaries stand |
 
-**Key:** Derive phases from work, then apply depth as compression guidance. Don't pad small projects or compress complex ones.
+**Key:** Derive phases from work, then apply granularity as compression guidance. Don't pad small projects or compress complex ones.
 
 ## Good Phase Patterns
 
@@ -357,7 +357,7 @@ When presenting to user for approval:
 ## ROADMAP DRAFT
 
 **Phases:** [N]
-**Depth:** [from config]
+**Granularity:** [from config]
 **Coverage:** [X]/[Y] requirements mapped
 
 ### Phase Structure
@@ -401,7 +401,7 @@ Orchestrator provides:
 - PROJECT.md content (core value, constraints)
 - REQUIREMENTS.md content (v1 requirements with REQ-IDs)
 - research/SUMMARY.md content (if exists - phase suggestions)
-- config.json (depth setting)
+- config.json (granularity setting)
 
 Parse and confirm understanding before proceeding.
 
@@ -437,7 +437,7 @@ Apply phase identification methodology:
 1. Group requirements by natural delivery boundaries
 2. Identify dependencies between groups
 3. Create phases that complete coherent capabilities
-4. Check depth setting for compression guidance
+4. Check granularity setting for compression guidance
 
 ## Step 5: Derive Success Criteria
 
@@ -502,7 +502,7 @@ When files are written and returning to orchestrator:
 ### Summary
 
 **Phases:** {N}
-**Depth:** {from config}
+**Granularity:** {from config}
 **Coverage:** {X}/{X} requirements mapped ✓
 
 | Phase | Goal | Requirements |
@@ -628,7 +628,7 @@ Roadmap is complete when:
 - [ ] All v1 requirements extracted with IDs
 - [ ] Research context loaded (if exists)
 - [ ] Phases derived from requirements (not imposed)
-- [ ] Depth calibration applied
+- [ ] Granularity calibration applied
 - [ ] Dependencies between phases identified
 - [ ] Success criteria derived for each phase (2-5 observable behaviors)
 - [ ] Success criteria cross-checked against requirements (gaps resolved)

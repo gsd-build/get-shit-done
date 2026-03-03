@@ -316,7 +316,20 @@ issue:
 
 ## Dimension 8: Nyquist Compliance
 
-Skip if: `workflow.nyquist_validation` is false, phase has no RESEARCH.md, or RESEARCH.md has no "Validation Architecture" section. Output: "Dimension 8: SKIPPED (nyquist_validation disabled or not applicable)"
+Skip if: `workflow.nyquist_validation` is explicitly set to `false` in config.json (absent key = enabled), phase has no RESEARCH.md, or RESEARCH.md has no "Validation Architecture" section. Output: "Dimension 8: SKIPPED (nyquist_validation disabled or not applicable)"
+
+### Check 8e — VALIDATION.md Existence (Gate)
+
+Before running checks 8a-8d, verify VALIDATION.md exists:
+
+```bash
+ls "${PHASE_DIR}"/*-VALIDATION.md 2>/dev/null
+```
+
+**If missing:** **BLOCKING FAIL** — "VALIDATION.md not found for phase {N}. Re-run `/gsd:plan-phase {N} --research` to regenerate."
+Skip checks 8a-8d entirely. Report Dimension 8 as FAIL with this single issue.
+
+**If exists:** Proceed to checks 8a-8d.
 
 ### Check 8a — Automated Verify Presence
 
@@ -368,6 +381,7 @@ If FAIL: return to planner with specific fixes. Same revision loop as other dime
 Load phase operation context:
 ```bash
 INIT=$(node "$HOME/.claude/get-shit-done/bin/gsd-tools.cjs" init phase-op "${PHASE_ARG}")
+if [[ "$INIT" == @file:* ]]; then INIT=$(cat "${INIT#@file:}"); fi
 ```
 
 Extract from init JSON: `phase_dir`, `phase_number`, `has_plans`, `plan_count`.
