@@ -1128,6 +1128,9 @@ function cleanupOrphanedFiles(configDir) {
   const orphanedFiles = [
     'hooks/gsd-notify.sh',  // Removed in v1.6.x
     'hooks/statusline.js',  // Renamed to gsd-statusline.js in v1.9.0
+    'hooks/gsd-statusline.js',  // Renamed to .cjs for ESM compatibility
+    'hooks/gsd-check-update.js',  // Renamed to .cjs for ESM compatibility
+    'hooks/gsd-context-monitor.js',  // Renamed to .cjs for ESM compatibility
   ];
 
   for (const relPath of orphanedFiles) {
@@ -1149,6 +1152,9 @@ function cleanupOrphanedHooks(settings) {
     'gsd-intel-index.js',  // Removed in v1.9.2
     'gsd-intel-session.js',  // Removed in v1.9.2
     'gsd-intel-prune.js',  // Removed in v1.9.2
+    'gsd-statusline.js',  // Renamed to .cjs for ESM compatibility
+    'gsd-check-update.js',  // Renamed to .cjs for ESM compatibility
+    'gsd-context-monitor.js',  // Renamed to .cjs for ESM compatibility
   ];
 
   let cleanedHooks = false;
@@ -1188,9 +1194,20 @@ function cleanupOrphanedHooks(settings) {
       /hooks[\/\\]statusline\.js/.test(settings.statusLine.command)) {
     settings.statusLine.command = settings.statusLine.command.replace(
       /hooks([\/\\])statusline\.js/,
-      'hooks$1gsd-statusline.js'
+      'hooks$1gsd-statusline.cjs'
     );
-    console.log(`  ${green}✓${reset} Updated statusline path (hooks/statusline.js → hooks/gsd-statusline.js)`);
+    console.log(`  ${green}✓${reset} Updated statusline path (hooks/statusline.js → hooks/gsd-statusline.cjs)`);
+  }
+
+  // Fix #125: Update statusLine if it points to gsd-statusline.js (ESM compat)
+  if (settings.statusLine && settings.statusLine.command &&
+      /gsd-statusline\.js/.test(settings.statusLine.command) &&
+      !/gsd-statusline\.cjs/.test(settings.statusLine.command)) {
+    settings.statusLine.command = settings.statusLine.command.replace(
+      /gsd-statusline\.js/,
+      'gsd-statusline.cjs'
+    );
+    console.log(`  ${green}✓${reset} Updated statusline path (gsd-statusline.js → gsd-statusline.cjs)`);
   }
 
   return settings;
@@ -1335,7 +1352,7 @@ function uninstall(isGlobal, runtime = 'claude') {
   // 4. Remove GSD hooks
   const hooksDir = path.join(targetDir, 'hooks');
   if (fs.existsSync(hooksDir)) {
-    const gsdHooks = ['gsd-statusline.js', 'gsd-check-update.js', 'gsd-check-update.sh', 'gsd-context-monitor.js'];
+    const gsdHooks = ['gsd-statusline.cjs', 'gsd-check-update.cjs', 'gsd-check-update.sh', 'gsd-context-monitor.cjs', 'gsd-statusline.js', 'gsd-check-update.js', 'gsd-context-monitor.js'];
     let hookCount = 0;
     for (const hook of gsdHooks) {
       const hookPath = path.join(hooksDir, hook);
@@ -2038,14 +2055,14 @@ function install(isGlobal, runtime = 'claude') {
   const settingsPath = path.join(targetDir, 'settings.json');
   const settings = cleanupOrphanedHooks(readSettings(settingsPath));
   const statuslineCommand = isGlobal
-    ? buildHookCommand(targetDir, 'gsd-statusline.js')
-    : 'node ' + dirName + '/hooks/gsd-statusline.js';
+    ? buildHookCommand(targetDir, 'gsd-statusline.cjs')
+    : 'node ' + dirName + '/hooks/gsd-statusline.cjs';
   const updateCheckCommand = isGlobal
-    ? buildHookCommand(targetDir, 'gsd-check-update.js')
-    : 'node ' + dirName + '/hooks/gsd-check-update.js';
+    ? buildHookCommand(targetDir, 'gsd-check-update.cjs')
+    : 'node ' + dirName + '/hooks/gsd-check-update.cjs';
   const contextMonitorCommand = isGlobal
-    ? buildHookCommand(targetDir, 'gsd-context-monitor.js')
-    : 'node ' + dirName + '/hooks/gsd-context-monitor.js';
+    ? buildHookCommand(targetDir, 'gsd-context-monitor.cjs')
+    : 'node ' + dirName + '/hooks/gsd-context-monitor.cjs';
 
   // Enable experimental agents for Gemini CLI (required for custom sub-agents)
   if (isGemini) {
