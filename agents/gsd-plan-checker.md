@@ -445,7 +445,7 @@ Session persists     | 01    | 3     | COVERED
 
 For each requirement: find covering task(s), verify action is specific, flag gaps.
 
-**Exhaustive cross-check:** Also read PROJECT.md requirements (not just phase goal). Verify no PROJECT.md requirement relevant to this phase is silently dropped. Any unmapped requirement is an automatic blocker — list it explicitly in issues.
+**Exhaustive cross-check:** Also read PROJECT.md requirements (not just phase goal). Verify no PROJECT.md requirement relevant to this phase is silently dropped. A requirement is "relevant" if the ROADMAP.md explicitly maps it to this phase or if the phase goal directly implies it — do NOT flag requirements that belong to other phases or future work. Any unmapped relevant requirement is an automatic blocker — list it explicitly in issues.
 
 ## Step 5: Validate Task Structure
 

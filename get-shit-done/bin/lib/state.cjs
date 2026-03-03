@@ -4,8 +4,20 @@
 
 const fs = require('fs');
 const path = require('path');
-const { loadConfig, getMilestoneInfo, getMilestonePhaseFilter, output, error } = require('./core.cjs');
+const { escapeRegex, loadConfig, getMilestoneInfo, getMilestonePhaseFilter, output, error } = require('./core.cjs');
 const { extractFrontmatter, reconstructFrontmatter } = require('./frontmatter.cjs');
+
+// Shared helper: extract a field value from STATE.md content.
+// Supports both **Field:** bold and plain Field: format.
+function stateExtractField(content, fieldName) {
+  const escaped = escapeRegex(fieldName);
+  const boldPattern = new RegExp(`\\*\\*${escaped}:\\*\\*\\s*(.+)`, 'i');
+  const boldMatch = content.match(boldPattern);
+  if (boldMatch) return boldMatch[1].trim();
+  const plainPattern = new RegExp(`^${escaped}:\\s*(.+)`, 'im');
+  const plainMatch = content.match(plainPattern);
+  return plainMatch ? plainMatch[1].trim() : null;
+}
 
 function cmdStateLoad(cwd, raw) {
   const config = loadConfig(cwd);
@@ -449,30 +461,17 @@ function cmdStateSnapshot(cwd, raw) {
 
   const content = fs.readFileSync(statePath, 'utf-8');
 
-  // Helper to extract field values — supports both **Field:** bold format
-  // and plain Field: format (STATE.md may use either depending on version)
-  const extractField = (fieldName) => {
-    // Try **Field:** format first (bold markdown)
-    const boldPattern = new RegExp(`\\*\\*${fieldName}:\\*\\*\\s*(.+)`, 'i');
-    const boldMatch = content.match(boldPattern);
-    if (boldMatch) return boldMatch[1].trim();
-    // Fall back to plain Field: format
-    const plainPattern = new RegExp(`^${fieldName}:\\s*(.+)`, 'im');
-    const plainMatch = content.match(plainPattern);
-    return plainMatch ? plainMatch[1].trim() : null;
-  };
-
   // Extract basic fields
-  const currentPhase = extractField('Current Phase');
-  const currentPhaseName = extractField('Current Phase Name');
-  const totalPhasesRaw = extractField('Total Phases');
-  const currentPlan = extractField('Current Plan');
-  const totalPlansRaw = extractField('Total Plans in Phase');
-  const status = extractField('Status');
-  const progressRaw = extractField('Progress');
-  const lastActivity = extractField('Last Activity');
-  const lastActivityDesc = extractField('Last Activity Description');
-  const pausedAt = extractField('Paused At');
+  const currentPhase = stateExtractField(content, 'Current Phase');
+  const currentPhaseName = stateExtractField(content, 'Current Phase Name');
+  const totalPhasesRaw = stateExtractField(content, 'Total Phases');
+  const currentPlan = stateExtractField(content, 'Current Plan');
+  const totalPlansRaw = stateExtractField(content, 'Total Plans in Phase');
+  const status = stateExtractField(content, 'Status');
+  const progressRaw = stateExtractField(content, 'Progress');
+  const lastActivity = stateExtractField(content, 'Last Activity');
+  const lastActivityDesc = stateExtractField(content, 'Last Activity Description');
+  const pausedAt = stateExtractField(content, 'Paused At');
 
   // Parse numeric fields
   const totalPhases = totalPhasesRaw ? parseInt(totalPhasesRaw, 10) : null;
@@ -557,26 +556,16 @@ function cmdStateSnapshot(cwd, raw) {
  * reliably via `state json` instead of fragile regex parsing.
  */
 function buildStateFrontmatter(bodyContent, cwd) {
-  // Supports both **Field:** bold and plain Field: format (see state-snapshot)
-  const extractField = (fieldName) => {
-    const boldPattern = new RegExp(`\\*\\*${fieldName}:\\*\\*\\s*(.+)`, 'i');
-    const boldMatch = bodyContent.match(boldPattern);
-    if (boldMatch) return boldMatch[1].trim();
-    const plainPattern = new RegExp(`^${fieldName}:\\s*(.+)`, 'im');
-    const plainMatch = bodyContent.match(plainPattern);
-    return plainMatch ? plainMatch[1].trim() : null;
-  };
-
-  const currentPhase = extractField('Current Phase');
-  const currentPhaseName = extractField('Current Phase Name');
-  const currentPlan = extractField('Current Plan');
-  const totalPhasesRaw = extractField('Total Phases');
-  const totalPlansRaw = extractField('Total Plans in Phase');
-  const status = extractField('Status');
-  const progressRaw = extractField('Progress');
-  const lastActivity = extractField('Last Activity');
-  const stoppedAt = extractField('Stopped At') || extractField('Stopped at');
-  const pausedAt = extractField('Paused At');
+  const currentPhase = stateExtractField(bodyContent, 'Current Phase');
+  const currentPhaseName = stateExtractField(bodyContent, 'Current Phase Name');
+  const currentPlan = stateExtractField(bodyContent, 'Current Plan');
+  const totalPhasesRaw = stateExtractField(bodyContent, 'Total Phases');
+  const totalPlansRaw = stateExtractField(bodyContent, 'Total Plans in Phase');
+  const status = stateExtractField(bodyContent, 'Status');
+  const progressRaw = stateExtractField(bodyContent, 'Progress');
+  const lastActivity = stateExtractField(bodyContent, 'Last Activity');
+  const stoppedAt = stateExtractField(bodyContent, 'Stopped At') || stateExtractField(bodyContent, 'Stopped at');
+  const pausedAt = stateExtractField(bodyContent, 'Paused At');
 
   let milestone = null;
   let milestoneName = null;
