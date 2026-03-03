@@ -1606,8 +1606,40 @@ function uninstall(isGlobal, runtime = 'claude') {
         console.log(`  ${green}✓${reset} Cleaned GSD sections from config.toml`);
       }
     }
+  } else if (isCopilot) {
+    // Copilot: remove skills/gsd-*/ directories (same layout as Codex skills)
+    const skillsDir = path.join(targetDir, 'skills');
+    if (fs.existsSync(skillsDir)) {
+      let skillCount = 0;
+      const entries = fs.readdirSync(skillsDir, { withFileTypes: true });
+      for (const entry of entries) {
+        if (entry.isDirectory() && entry.name.startsWith('gsd-')) {
+          fs.rmSync(path.join(skillsDir, entry.name), { recursive: true });
+          skillCount++;
+        }
+      }
+      if (skillCount > 0) {
+        removedCount++;
+        console.log(`  ${green}✓${reset} Removed ${skillCount} Copilot skills`);
+      }
+    }
+
+    // Copilot: clean GSD section from copilot-instructions.md
+    const instructionsPath = path.join(targetDir, 'copilot-instructions.md');
+    if (fs.existsSync(instructionsPath)) {
+      const content = fs.readFileSync(instructionsPath, 'utf8');
+      const cleaned = stripGsdFromCopilotInstructions(content);
+      if (cleaned === null) {
+        fs.unlinkSync(instructionsPath);
+        removedCount++;
+        console.log(`  ${green}✓${reset} Removed copilot-instructions.md (was GSD-only)`);
+      } else if (cleaned !== content) {
+        fs.writeFileSync(instructionsPath, cleaned);
+        removedCount++;
+        console.log(`  ${green}✓${reset} Cleaned GSD section from copilot-instructions.md`);
+      }
+    }
   } else {
-    // Claude Code & Gemini: remove commands/gsd/ directory
     const gsdCommandsDir = path.join(targetDir, 'commands', 'gsd');
     if (fs.existsSync(gsdCommandsDir)) {
       fs.rmSync(gsdCommandsDir, { recursive: true });
@@ -2014,6 +2046,7 @@ function generateManifest(dir, baseDir) {
 function writeManifest(configDir, runtime = 'claude') {
   const isOpencode = runtime === 'opencode';
   const isCodex = runtime === 'codex';
+  const isCopilot = runtime === 'copilot';
   const gsdDir = path.join(configDir, 'get-shit-done');
   const commandsDir = path.join(configDir, 'commands', 'gsd');
   const opencodeCommandDir = path.join(configDir, 'command');
@@ -2025,7 +2058,7 @@ function writeManifest(configDir, runtime = 'claude') {
   for (const [rel, hash] of Object.entries(gsdHashes)) {
     manifest.files['get-shit-done/' + rel] = hash;
   }
-  if (!isOpencode && !isCodex && fs.existsSync(commandsDir)) {
+  if (!isOpencode && !isCodex && !isCopilot && fs.existsSync(commandsDir)) {
     const cmdHashes = generateManifest(commandsDir);
     for (const [rel, hash] of Object.entries(cmdHashes)) {
       manifest.files['commands/gsd/' + rel] = hash;
@@ -2038,7 +2071,7 @@ function writeManifest(configDir, runtime = 'claude') {
       }
     }
   }
-  if (isCodex && fs.existsSync(codexSkillsDir)) {
+  if ((isCodex || isCopilot) && fs.existsSync(codexSkillsDir)) {
     for (const skillName of listCodexSkillNames(codexSkillsDir)) {
       const skillRoot = path.join(codexSkillsDir, skillName);
       const skillHashes = generateManifest(skillRoot);
@@ -2112,7 +2145,7 @@ function reportLocalPatches(configDir, runtime = 'claude') {
   try { meta = JSON.parse(fs.readFileSync(metaPath, 'utf8')); } catch { return []; }
 
   if (meta.files && meta.files.length > 0) {
-    const reapplyCommand = runtime === 'opencode'
+    const reapplyCommand = (runtime === 'opencode' || runtime === 'copilot')
       ? '/gsd-reapply-patches'
       : runtime === 'codex'
         ? '$gsd-reapply-patches'
@@ -2399,8 +2432,15 @@ function install(isGlobal, runtime = 'claude') {
   }
 
   if (isCopilot) {
+    // Generate copilot-instructions.md
+    const templatePath = path.join(targetDir, 'get-shit-done', 'templates', 'copilot-instructions.md');
+    const instructionsPath = path.join(targetDir, 'copilot-instructions.md');
+    if (fs.existsSync(templatePath)) {
+      const template = fs.readFileSync(templatePath, 'utf8');
+      mergeCopilotInstructions(instructionsPath, template);
+      console.log(`  ${green}✓${reset} Generated copilot-instructions.md`);
+    }
     // Copilot: no settings.json, no hooks, no statusline (like Codex)
-    // Content conversion handled in Phase 2
     return { settingsPath: null, settings: null, statuslineCommand: null, runtime };
   }
 
@@ -2723,6 +2763,10 @@ if (process.env.GSD_TEST_MODE) {
     convertClaudeCommandToCopilotSkill,
     convertClaudeAgentToCopilotAgent,
     copyCommandsAsCopilotSkills,
+    GSD_COPILOT_INSTRUCTIONS_MARKER,
+    GSD_COPILOT_INSTRUCTIONS_CLOSE_MARKER,
+    mergeCopilotInstructions,
+    stripGsdFromCopilotInstructions,
   };
 } else {
 
