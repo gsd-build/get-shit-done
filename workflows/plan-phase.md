@@ -484,7 +484,7 @@ Task(
 
     <arguments>
     PHASE=${PHASE}
-    ARGUMENTS='${PHASE} --auto --no-transition'
+    ARGUMENTS='${PHASE} --auto --no-transition ${GSD_WS}'
     </arguments>
 
     <instructions>

@@ -260,6 +260,9 @@ function cmdWorkstreamStatus(cwd, name, raw) {
   if (!name) {
     error('workstream name required. Usage: workstream status <name>');
   }
+  if (/[/\\]/.test(name) || name === '.' || name === '..') {
+    error('Invalid workstream name');
+  }
 
   const wsDir = path.join(cwd, '.planning', 'workstreams', name);
   if (!fs.existsSync(wsDir)) {
@@ -333,6 +336,11 @@ function cmdWorkstreamComplete(cwd, name, options, raw) {
     error('workstream name required. Usage: workstream complete <name>');
   }
 
+  // Validate name for path traversal
+  if (/[/\\]/.test(name) || name === '.' || name === '..') {
+    error('Invalid workstream name');
+  }
+
   const wsRoot = path.join(cwd, '.planning', 'workstreams');
   const wsDir = path.join(wsRoot, name);
 
@@ -351,26 +359,38 @@ function cmdWorkstreamComplete(cwd, name, options, raw) {
   const today = new Date().toISOString().split('T')[0];
 
   // Avoid same-day archive collision
-  let archiveName = `ws-${name}-${today}`;
-  let archivePath = path.join(archiveDir, archiveName);
+  const baseArchiveName = `ws-${name}-${today}`;
+  let archivePath = path.join(archiveDir, baseArchiveName);
   let suffix = 1;
   while (fs.existsSync(archivePath)) {
-    archivePath = path.join(archiveDir, `${archiveName}-${suffix++}`);
+    archivePath = path.join(archiveDir, `${baseArchiveName}-${suffix++}`);
   }
 
-  // Archive: move the entire workstream dir to milestones/
+  // Archive: move the entire workstream dir to milestones/ (with rollback)
   fs.mkdirSync(archivePath, { recursive: true });
 
-  // Move all contents
-  const entries = fs.readdirSync(wsDir, { withFileTypes: true });
-  for (const entry of entries) {
-    const src = path.join(wsDir, entry.name);
-    const dest = path.join(archivePath, entry.name);
-    fs.renameSync(src, dest);
+  const filesMoved = [];
+  try {
+    const entries = fs.readdirSync(wsDir, { withFileTypes: true });
+    for (const entry of entries) {
+      const src = path.join(wsDir, entry.name);
+      const dest = path.join(archivePath, entry.name);
+      fs.renameSync(src, dest);
+      filesMoved.push(entry.name);
+    }
+  } catch (err) {
+    // Rollback: move files back, restore active-workstream
+    for (const fname of filesMoved) {
+      try { fs.renameSync(path.join(archivePath, fname), path.join(wsDir, fname)); } catch {}
+    }
+    try { fs.rmSync(archivePath, { recursive: true }); } catch {}
+    if (active === name) { setActiveWorkstream(cwd, name); }
+    output({ completed: false, error: 'archive_failed', message: err.message, workstream: name }, raw);
+    return;
   }
 
   // Remove the now-empty workstream directory
-  fs.rmdirSync(wsDir);
+  try { fs.rmdirSync(wsDir); } catch {}
 
   // If no workstreams remain, remove the workstreams/ dir to revert to flat mode
   let remainingWs = 0;

@@ -711,12 +711,7 @@ Confirm: "Committed: chore: complete v[X.Y] milestone"
 
 **If in workstream mode** (`GSD_WS` is set or `.planning/workstreams/` exists):
 
-Extract the workstream name from `GSD_WS`:
-```bash
-WS_NAME=$(echo "${GSD_WS}" | sed 's/--ws //')
-```
-
-If `WS_NAME` is empty, check active-workstream:
+`WS_NAME` was already parsed from arguments at the top of this workflow. If `WS_NAME` is empty, check active-workstream:
 ```bash
 WS_INFO=$(node "$HOME/.claude/get-shit-done/bin/gsd-tools.cjs" workstream get --cwd .)
 ```
