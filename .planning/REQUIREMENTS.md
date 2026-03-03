@@ -252,61 +252,61 @@ Which phases cover which requirements. Updated during roadmap creation.
 
 | Requirement | Phase | Status |
 |-------------|-------|--------|
-| CI-01 | — | Pending |
-| CI-02 | — | Pending |
-| CI-03 | — | Pending |
-| CI-04 | — | Pending |
-| CI-05 | — | Pending |
-| CI-06 | — | Pending |
-| AUTO-01 | — | Pending |
-| AUTO-02 | — | Pending |
-| AUTO-03 | — | Pending |
-| AUTO-04 | — | Pending |
-| AUTO-05 | — | Pending |
-| AUTO-06 | — | Pending |
-| AUTO-07 | — | Pending |
-| SIG-01 | — | Pending |
-| SIG-02 | — | Pending |
-| SIG-03 | — | Pending |
-| SIG-04 | — | Pending |
-| SIG-05 | — | Pending |
-| REFL-01 | — | Pending |
-| REFL-02 | — | Pending |
-| REFL-03 | — | Pending |
-| REFL-04 | — | Pending |
-| HEALTH-01 | — | Pending |
-| HEALTH-02 | — | Pending |
-| HEALTH-03 | — | Pending |
-| HEALTH-04 | — | Pending |
-| HEALTH-05 | — | Pending |
-| HEALTH-06 | — | Pending |
-| HEALTH-07 | — | Pending |
-| EXT-01 | — | Pending |
-| EXT-02 | — | Pending |
-| EXT-03 | — | Pending |
-| EXT-04 | — | Pending |
-| EXT-05 | — | Pending |
-| EXT-06 | — | Pending |
-| PLAN-01 | — | Pending |
-| PLAN-02 | — | Pending |
-| PLAN-03 | — | Pending |
-| PLAN-04 | — | Pending |
-| PLAN-05 | — | Pending |
-| TMPL-01 | — | Pending |
-| TMPL-02 | — | Pending |
-| TMPL-03 | — | Pending |
-| TMPL-04 | — | Pending |
-| TMPL-05 | — | Pending |
-| SIG-06 | — | Pending |
-| REFL-05 | — | Pending |
-| HEALTH-08 | — | Pending |
-| HEALTH-09 | — | Pending |
-| EXT-07 | — | Pending |
+| CI-01 | Phase 36 | Pending |
+| CI-02 | Phase 39 | Pending |
+| CI-03 | Phase 39 | Pending |
+| CI-04 | Phase 39 | Pending |
+| CI-05 | Phase 39 | Pending |
+| CI-06 | Phase 39 | Pending |
+| AUTO-01 | Phase 37 | Pending |
+| AUTO-02 | Phase 37 | Pending |
+| AUTO-03 | Phase 37 | Pending |
+| AUTO-04 | Phase 37 | Pending |
+| AUTO-05 | Phase 37 | Pending |
+| AUTO-06 | Phase 37 | Pending |
+| AUTO-07 | Phase 37 | Pending |
+| SIG-01 | Phase 40 | Pending |
+| SIG-02 | Phase 40 | Pending |
+| SIG-03 | Phase 40 | Pending |
+| SIG-04 | Phase 40 | Pending |
+| SIG-05 | Phase 40 | Pending |
+| SIG-06 | Phase 40 | Pending |
+| REFL-01 | Phase 42 | Pending |
+| REFL-02 | Phase 42 | Pending |
+| REFL-03 | Phase 42 | Pending |
+| REFL-04 | Phase 42 | Pending |
+| REFL-05 | Phase 42 | Pending |
+| HEALTH-01 | Phase 41 | Pending |
+| HEALTH-02 | Phase 41 | Pending |
+| HEALTH-03 | Phase 41 | Pending |
+| HEALTH-04 | Phase 41 | Pending |
+| HEALTH-05 | Phase 41 | Pending |
+| HEALTH-06 | Phase 41 | Pending |
+| HEALTH-07 | Phase 41 | Pending |
+| HEALTH-08 | Phase 41 | Pending |
+| HEALTH-09 | Phase 41 | Pending |
+| EXT-01 | Phase 38 | Pending |
+| EXT-02 | Phase 38 | Pending |
+| EXT-03 | Phase 38 | Pending |
+| EXT-04 | Phase 38 | Pending |
+| EXT-05 | Phase 38 | Pending |
+| EXT-06 | Phase 39 | Pending |
+| EXT-07 | Phase 38 | Pending |
+| PLAN-01 | Phase 43 | Pending |
+| PLAN-02 | Phase 43 | Pending |
+| PLAN-03 | Phase 43 | Pending |
+| PLAN-04 | Phase 43 | Pending |
+| PLAN-05 | Phase 43 | Pending |
+| TMPL-01 | Phase 43 | Pending |
+| TMPL-02 | Phase 43 | Pending |
+| TMPL-03 | Phase 43 | Pending |
+| TMPL-04 | Phase 43 | Pending |
+| TMPL-05 | Phase 43 | Pending |
 
 **Coverage:**
 - v1.17 requirements: 49 total (43 original + 6 philosophically-motivated)
-- Mapped to phases: 0
-- Unmapped: 49
+- Mapped to phases: 49
+- Unmapped: 0
 - Requirements with philosophical annotations: 26 of 49
 
 ## Philosophical Interventions
@@ -335,4 +335,4 @@ These contradictions were identified during philosophical analysis and deliberat
 
 ---
 *Requirements defined: 2026-03-02*
-*Last updated: 2026-03-03 after philosophical deliberation session and contradictions analysis (6 new requirements, 5 philosophical interventions, 22 philosophical annotations, 3 structural tensions documented, `philosophy:` motivation type added)*
+*Last updated: 2026-03-03 after roadmap creation (49/49 requirements mapped to Phases 36-43)*

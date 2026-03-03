@@ -5,14 +5,16 @@
 See: .planning/PROJECT.md (updated 2026-03-02)
 
 **Core value:** The system never makes the same mistake twice -- signals capture what went wrong, spikes resolve uncertainty empirically, and the knowledge base surfaces relevant lessons before they're needed.
-**Current focus:** v1.17 Automation Loop — auto-triggering signals, reflection, CI sensor, health checks
+**Current focus:** v1.17 Automation Loop -- Phase 36: Foundation Fix
 
 ## Current Position
 
-Phase: Not started (defining requirements)
-Plan: —
-Status: Defining requirements
-Last activity: 2026-03-02 — Milestone v1.17 started
+Phase: 36 of 43 (Foundation Fix)
+Plan: 0 of 1 in current phase
+Status: Ready to plan
+Last activity: 2026-03-03 -- Roadmap created (8 phases, 49 requirements mapped, 18 plans estimated)
+
+Progress: [░░░░░░░░░░] 0%
 
 ## Performance Metrics
 
@@ -68,13 +70,14 @@ v1.13-v1.16 decisions archived in milestones/ directories.
 Recent decisions affecting current work:
 v1.17: Automation Loop selected as first of 5 post-v1.16 milestones. See .planning/deliberations/v1.17-plus-roadmap-deliberation.md for full multi-milestone roadmap.
 v1.17: Philosophical foundations established (6 frameworks, 8 documents, ~65 citable principles). `philosophy:` added as motivation type. 6 new requirements from cross-framework convergence. 5 tagged interventions with falsifiable predictions for empirical evaluation.
+v1.17: Roadmap created with 8 phases (36-43), 49 requirements mapped, diverging from research's 6-phase recommendation to separate automation framework (Phase 37) and extensible sensor architecture (Phase 38) as distinct foundational phases.
 
 ### Pending Todos
 
 1 pending:
 - [HIGH] Dual-install Phase 2: update flow, hook awareness, and version-pinned suppression (tooling)
 
-Note: "Feature manifest system" TODO removed — fully built in v1.15/v1.16.
+Note: "Feature manifest system" TODO removed -- fully built in v1.15/v1.16.
 
 ### Blockers/Concerns
 
@@ -82,6 +85,7 @@ Note: "Feature manifest system" TODO removed — fully built in v1.15/v1.16.
 - Gitignore friction (pre-existing from v1.12, not blocking)
 - 12 tech debt items from v1.16 audit (0 blockers) -- see milestones/v1.16-MILESTONE-AUDIT.md
 - Config key inconsistency: spike_sensitivity (flat) vs spike.sensitivity (nested) -- advisory only
+- Research flags: Phase 40 (reentrancy lockfile) and Phase 42 (Stop hook counter) need deeper design during planning
 
 ### Quick Tasks Completed
 
@@ -102,7 +106,7 @@ Note: "Feature manifest system" TODO removed — fully built in v1.15/v1.16.
 
 ### Roadmap Evolution
 
-v1.12 complete (Phases 0-6). v1.13 complete (Phases 7-12). v1.14 complete (Phases 13-21). v1.15 complete (Phases 22-30). v1.16 complete (Phases 31-35). All 5 milestones shipped, 105 plans completed.
+v1.12 complete (Phases 0-6). v1.13 complete (Phases 7-12). v1.14 complete (Phases 13-21). v1.15 complete (Phases 22-30). v1.16 complete (Phases 31-35). All 5 milestones shipped, 105 plans completed. v1.17 roadmap created (Phases 36-43, 18 plans estimated).
 
 ### Key Artifacts
 
@@ -119,5 +123,5 @@ v1.12 complete (Phases 0-6). v1.13 complete (Phases 7-12). v1.14 complete (Phase
 ## Session Continuity
 
 Last session: 2026-03-03
-Stopped at: v1.17 pre-roadmap. Requirements complete (49), philosophical foundations established (8 docs, 65 principles). Pausing to clear context before roadmapper spawn.
-Resume file: .planning/.continue-here.md
+Stopped at: v1.17 roadmap created. 8 phases (36-43), 49/49 requirements mapped, 18 plans estimated. Ready to plan Phase 36.
+Resume file: None
