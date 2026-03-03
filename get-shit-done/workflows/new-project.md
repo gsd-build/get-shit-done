@@ -49,7 +49,7 @@ The document should describe what you want to build.
 INIT=$(node "$HOME/.claude/get-shit-done/bin/gsd-tools.cjs" init new-project)
 ```
 
-Parse JSON for: `researcher_model`, `synthesizer_model`, `roadmapper_model`, `commit_docs`, `project_exists`, `has_codebase_map`, `planning_exists`, `has_existing_code`, `has_package_file`, `is_brownfield`, `needs_codebase_map`, `has_git`, `project_path`.
+Parse JSON for: `researcher_model`, `synthesizer_model`, `roadmapper_model`, `commit_docs`, `project_exists`, `has_codebase_map`, `planning_exists`, `has_existing_code`, `has_package_file`, `is_brownfield`, `needs_codebase_map`, `has_git`, `project_path`, `planning_base`.
 
 **If `project_exists` is true:** Error — project already initialized. Use `/gsd:progress`.
 
@@ -158,7 +158,8 @@ AskUserQuestion([
     options: [
       { label: "Balanced (Recommended)", description: "Sonnet for most agents — good quality/cost ratio" },
       { label: "Quality", description: "Opus for research/roadmap — higher cost, deeper analysis" },
-      { label: "Budget", description: "Haiku where possible — fastest, lowest cost" }
+      { label: "Budget", description: "Haiku where possible — fastest, lowest cost" },
+      { label: "Adaptive", description: "Auto-selects model per-plan based on complexity (35-65% savings)" }
     ]
   }
 ])
@@ -172,7 +173,7 @@ Create `.planning/config.json` with mode set to "yolo":
   "depth": "[selected]",
   "parallelization": true|false,
   "commit_docs": true|false,
-  "model_profile": "quality|balanced|budget",
+  "model_profile": "quality|balanced|budget|adaptive",
   "workflow": {
     "research": true|false,
     "plan_check": true|false,
@@ -457,7 +458,8 @@ questions: [
     options: [
       { label: "Balanced (Recommended)", description: "Sonnet for most agents — good quality/cost ratio" },
       { label: "Quality", description: "Opus for research/roadmap — higher cost, deeper analysis" },
-      { label: "Budget", description: "Haiku where possible — fastest, lowest cost" }
+      { label: "Budget", description: "Haiku where possible — fastest, lowest cost" },
+      { label: "Adaptive", description: "Auto-selects model per-plan based on complexity (35-65% savings)" }
     ]
   }
 ]
@@ -471,7 +473,7 @@ Create `.planning/config.json` with all settings:
   "depth": "quick|standard|comprehensive",
   "parallelization": true|false,
   "commit_docs": true|false,
-  "model_profile": "quality|balanced|budget",
+  "model_profile": "quality|balanced|budget|adaptive",
   "workflow": {
     "research": true|false,
     "plan_check": true|false,
@@ -523,7 +525,7 @@ Researching [domain] ecosystem...
 
 Create research directory:
 ```bash
-mkdir -p .planning/research
+mkdir -p {planning_base}/research
 ```
 
 **Determine milestone context:**
@@ -579,7 +581,7 @@ Your STACK.md feeds into roadmap creation. Be prescriptive:
 </quality_gate>
 
 <output>
-Write to: .planning/research/STACK.md
+Write to: {planning_base}/research/STACK.md
 Use template: ~/.claude/get-shit-done/templates/research-project/STACK.md
 </output>
 ", subagent_type="general-purpose", model="{researcher_model}", description="Stack research")
@@ -619,7 +621,7 @@ Your FEATURES.md feeds into requirements definition. Categorize clearly:
 </quality_gate>
 
 <output>
-Write to: .planning/research/FEATURES.md
+Write to: {planning_base}/research/FEATURES.md
 Use template: ~/.claude/get-shit-done/templates/research-project/FEATURES.md
 </output>
 ", subagent_type="general-purpose", model="{researcher_model}", description="Features research")
@@ -659,7 +661,7 @@ Your ARCHITECTURE.md informs phase structure in roadmap. Include:
 </quality_gate>
 
 <output>
-Write to: .planning/research/ARCHITECTURE.md
+Write to: {planning_base}/research/ARCHITECTURE.md
 Use template: ~/.claude/get-shit-done/templates/research-project/ARCHITECTURE.md
 </output>
 ", subagent_type="general-purpose", model="{researcher_model}", description="Architecture research")
@@ -699,7 +701,7 @@ Your PITFALLS.md prevents mistakes in roadmap/planning. For each pitfall:
 </quality_gate>
 
 <output>
-Write to: .planning/research/PITFALLS.md
+Write to: {planning_base}/research/PITFALLS.md
 Use template: ~/.claude/get-shit-done/templates/research-project/PITFALLS.md
 </output>
 ", subagent_type="general-purpose", model="{researcher_model}", description="Pitfalls research")
@@ -714,14 +716,14 @@ Synthesize research outputs into SUMMARY.md.
 </task>
 
 <files_to_read>
-- .planning/research/STACK.md
-- .planning/research/FEATURES.md
-- .planning/research/ARCHITECTURE.md
-- .planning/research/PITFALLS.md
+- {planning_base}/research/STACK.md
+- {planning_base}/research/FEATURES.md
+- {planning_base}/research/ARCHITECTURE.md
+- {planning_base}/research/PITFALLS.md
 </files_to_read>
 
 <output>
-Write to: .planning/research/SUMMARY.md
+Write to: {planning_base}/research/SUMMARY.md
 Use template: ~/.claude/get-shit-done/templates/research-project/SUMMARY.md
 Commit after writing.
 </output>
@@ -839,7 +841,7 @@ Cross-check requirements against Core Value from PROJECT.md. If gaps detected, s
 
 **Generate REQUIREMENTS.md:**
 
-Create `.planning/REQUIREMENTS.md` with:
+Create `{planning_base}/REQUIREMENTS.md` with:
 - v1 Requirements grouped by category (checkboxes, REQ-IDs)
 - v2 Requirements (deferred)
 - Out of Scope (explicit exclusions with reasoning)
@@ -887,7 +889,7 @@ If "adjust": Return to scoping.
 **Commit requirements:**
 
 ```bash
-node "$HOME/.claude/get-shit-done/bin/gsd-tools.cjs" commit "docs: define v1 requirements" --files .planning/REQUIREMENTS.md
+node "$HOME/.claude/get-shit-done/bin/gsd-tools.cjs" commit "docs: define v1 requirements" --files {planning_base}/REQUIREMENTS.md
 ```
 
 ## 8. Create Roadmap
@@ -909,9 +911,9 @@ Task(prompt="
 
 <files_to_read>
 - .planning/PROJECT.md (Project context)
-- .planning/REQUIREMENTS.md (v1 Requirements)
-- .planning/research/SUMMARY.md (Research findings - if exists)
-- .planning/config.json (Depth and mode settings)
+- {planning_base}/REQUIREMENTS.md (v1 Requirements)
+- {planning_base}/research/SUMMARY.md (Research findings - if exists)
+- {planning_base}/config.json (Depth and mode settings)
 </files_to_read>
 
 </planning_context>
@@ -1001,7 +1003,7 @@ Use AskUserQuestion:
   [user's notes]
 
   <files_to_read>
-  - .planning/ROADMAP.md (Current roadmap to revise)
+  - {planning_base}/ROADMAP.md (Current roadmap to revise)
   </files_to_read>
 
   Update the roadmap based on feedback. Edit files in place.
@@ -1012,12 +1014,12 @@ Use AskUserQuestion:
 - Present revised roadmap
 - Loop until user approves
 
-**If "Review full file":** Display raw `cat .planning/ROADMAP.md`, then re-ask.
+**If "Review full file":** Display raw `cat {planning_base}/ROADMAP.md`, then re-ask.
 
 **Commit roadmap (after approval or auto mode):**
 
 ```bash
-node "$HOME/.claude/get-shit-done/bin/gsd-tools.cjs" commit "docs: create roadmap ([N] phases)" --files .planning/ROADMAP.md .planning/STATE.md .planning/REQUIREMENTS.md
+node "$HOME/.claude/get-shit-done/bin/gsd-tools.cjs" commit "docs: create roadmap ([N] phases)" --files {planning_base}/ROADMAP.md {planning_base}/STATE.md {planning_base}/REQUIREMENTS.md
 ```
 
 ## 9. Done

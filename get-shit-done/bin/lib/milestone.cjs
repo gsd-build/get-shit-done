@@ -7,6 +7,7 @@ const path = require('path');
 const { output, error } = require('./core.cjs');
 const { extractFrontmatter } = require('./frontmatter.cjs');
 const { writeStateMd } = require('./state.cjs');
+const { resolvePlanningPaths } = require('./paths.cjs');
 
 function cmdRequirementsMarkComplete(cwd, reqIdsRaw, raw) {
   if (!reqIdsRaw || reqIdsRaw.length === 0) {
@@ -25,7 +26,7 @@ function cmdRequirementsMarkComplete(cwd, reqIdsRaw, raw) {
     error('no valid requirement IDs found');
   }
 
-  const reqPath = path.join(cwd, '.planning', 'REQUIREMENTS.md');
+  const reqPath = resolvePlanningPaths(cwd).abs.requirements;
   if (!fs.existsSync(reqPath)) {
     output({ updated: false, reason: 'REQUIREMENTS.md not found', ids: reqIds }, raw, 'no requirements file');
     return;
@@ -80,12 +81,13 @@ function cmdMilestoneComplete(cwd, version, options, raw) {
     error('version required for milestone complete (e.g., v1.0)');
   }
 
-  const roadmapPath = path.join(cwd, '.planning', 'ROADMAP.md');
-  const reqPath = path.join(cwd, '.planning', 'REQUIREMENTS.md');
-  const statePath = path.join(cwd, '.planning', 'STATE.md');
-  const milestonesPath = path.join(cwd, '.planning', 'MILESTONES.md');
-  const archiveDir = path.join(cwd, '.planning', 'milestones');
-  const phasesDir = path.join(cwd, '.planning', 'phases');
+  const paths = resolvePlanningPaths(cwd);
+  const roadmapPath = paths.abs.roadmap;
+  const reqPath = paths.abs.requirements;
+  const statePath = paths.abs.state;
+  const milestonesPath = path.join(paths.abs.planningRoot, 'MILESTONES.md');
+  const archiveDir = path.join(paths.abs.planningRoot, 'milestones');
+  const phasesDir = paths.abs.phases;
   const today = new Date().toISOString().split('T')[0];
   const milestoneName = options.name || version;
 
@@ -178,7 +180,7 @@ function cmdMilestoneComplete(cwd, version, options, raw) {
   }
 
   // Archive audit file if exists
-  const auditFile = path.join(cwd, '.planning', `${version}-MILESTONE-AUDIT.md`);
+  const auditFile = path.join(paths.abs.planningRoot, `${version}-MILESTONE-AUDIT.md`);
   if (fs.existsSync(auditFile)) {
     fs.renameSync(auditFile, path.join(archiveDir, `${version}-MILESTONE-AUDIT.md`));
   }
@@ -261,7 +263,258 @@ function cmdMilestoneComplete(cwd, version, options, raw) {
   output(result, raw);
 }
 
+function cmdMilestoneCreate(cwd, name, raw) {
+  if (!name) {
+    error('milestone name required. Usage: milestone create <name>');
+  }
+
+  const today = new Date().toISOString().split('T')[0];
+  const planningRoot = path.join(cwd, '.planning');
+  const milestonesDir = path.join(planningRoot, 'milestones');
+  const activeMilestonePath = path.join(planningRoot, 'ACTIVE_MILESTONE');
+  const targetDir = path.join(milestonesDir, name);
+  let migratedFrom = null;
+
+  // Check if this is the first milestone AND legacy mode exists
+  const legacyStateExists = fs.existsSync(path.join(planningRoot, 'STATE.md'));
+  let existingMilestones = [];
+  try {
+    existingMilestones = fs.readdirSync(milestonesDir, { withFileTypes: true })
+      .filter(e => e.isDirectory() && fs.existsSync(path.join(milestonesDir, e.name, 'STATE.md')))
+      .map(e => e.name);
+  } catch {}
+
+  if (existingMilestones.length === 0 && legacyStateExists) {
+    // Auto-migrate existing global files to a milestone directory
+    // Determine a name for the current milestone from STATE.md
+    let currentMilestoneName = 'initial';
+    try {
+      const stateContent = fs.readFileSync(path.join(planningRoot, 'STATE.md'), 'utf-8');
+      const milestoneMatch = stateContent.match(/\*\*Milestone:\*\*\s*(.+)/);
+      if (milestoneMatch) {
+        currentMilestoneName = milestoneMatch[1].trim().toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, '') || 'initial';
+      }
+    } catch {}
+
+    const migrationDir = path.join(milestonesDir, currentMilestoneName);
+    fs.mkdirSync(migrationDir, { recursive: true });
+    fs.mkdirSync(path.join(migrationDir, 'phases'), { recursive: true });
+
+    // Copy legacy files
+    const filesToMigrate = [
+      { src: 'STATE.md', dest: 'STATE.md' },
+      { src: 'ROADMAP.md', dest: 'ROADMAP.md' },
+      { src: 'REQUIREMENTS.md', dest: 'REQUIREMENTS.md' },
+      { src: 'config.json', dest: 'config.json' },
+    ];
+    for (const { src, dest } of filesToMigrate) {
+      const srcPath = path.join(planningRoot, src);
+      if (fs.existsSync(srcPath)) {
+        fs.copyFileSync(srcPath, path.join(migrationDir, dest));
+      }
+    }
+
+    // Set ACTIVE_MILESTONE to the migrated milestone first
+    fs.writeFileSync(activeMilestonePath, currentMilestoneName, 'utf-8');
+    migratedFrom = currentMilestoneName;
+  }
+
+  // Create the new milestone directory
+  fs.mkdirSync(targetDir, { recursive: true });
+  fs.mkdirSync(path.join(targetDir, 'phases'), { recursive: true });
+
+  // STATE.md template
+  const stateTemplate = `# Session State
+
+## Position
+
+**Milestone:** ${name}
+**Current Phase:** Not started
+**Current Phase Name:** TBD
+**Total Phases:** 0
+**Current Plan:** Not started
+**Total Plans in Phase:** 0
+**Status:** Ready to plan
+**Progress:** [░░░░░░░░░░] 0%
+**Last Activity:** ${today}
+**Last Activity Description:** Milestone created
+
+## Decisions Made
+None yet.
+
+## Blockers
+None
+
+## Performance Metrics
+| Plan | Duration | Tasks | Files |
+|------|----------|-------|-------|
+None yet
+
+## Session
+**Last Date:** ${today}
+**Stopped At:** N/A
+**Resume File:** None
+`;
+  fs.writeFileSync(path.join(targetDir, 'STATE.md'), stateTemplate, 'utf-8');
+
+  // ROADMAP.md template
+  const roadmapTemplate = `# ${name} Roadmap
+
+> Milestone roadmap — run /gsd:new-milestone to populate
+
+## Progress Overview
+
+| Phase | Plans | Status | Completed |
+|-------|-------|--------|-----------|
+
+## Phase Summary
+
+(No phases yet — run /gsd:new-milestone to create roadmap)
+`;
+  fs.writeFileSync(path.join(targetDir, 'ROADMAP.md'), roadmapTemplate, 'utf-8');
+
+  // config.json — copy from current milestone or use defaults
+  let configContent = JSON.stringify({ commit_docs: true, research: true, verifier: true, plan_checker: true, nyquist_validation: true, parallelization: false, branching_strategy: 'none' }, null, 2);
+  try {
+    const currentPaths = resolvePlanningPaths(cwd);
+    if (fs.existsSync(currentPaths.abs.config)) {
+      configContent = fs.readFileSync(currentPaths.abs.config, 'utf-8');
+    }
+  } catch {}
+  fs.writeFileSync(path.join(targetDir, 'config.json'), configContent, 'utf-8');
+
+  // Set ACTIVE_MILESTONE to the new milestone
+  fs.writeFileSync(activeMilestonePath, name, 'utf-8');
+
+  const directory = '.planning/milestones/' + name;
+  output({ created: true, name, directory, migrated_from: migratedFrom }, raw, `milestone "${name}" created at ${directory}`);
+}
+
+function cmdMilestoneSwitch(cwd, name, raw) {
+  if (!name) {
+    error('milestone name required. Usage: milestone switch <name>');
+  }
+
+  const planningRoot = path.join(cwd, '.planning');
+  const milestoneDir = path.join(planningRoot, 'milestones', name);
+  const activeMilestonePath = path.join(planningRoot, 'ACTIVE_MILESTONE');
+
+  if (!fs.existsSync(milestoneDir)) {
+    error(`milestone "${name}" not found in .planning/milestones/`);
+  }
+
+  // Check current active milestone for in-progress work
+  let previousMilestone = null;
+  let previousStatus = null;
+  let hasInProgress = false;
+  try {
+    previousMilestone = fs.readFileSync(activeMilestonePath, 'utf-8').trim();
+    if (previousMilestone && previousMilestone !== name) {
+      const prevStatePath = path.join(planningRoot, 'milestones', previousMilestone, 'STATE.md');
+      if (fs.existsSync(prevStatePath)) {
+        const content = fs.readFileSync(prevStatePath, 'utf-8');
+        const statusMatch = content.match(/\*\*Status:\*\*\s*(.+)/);
+        if (statusMatch) {
+          previousStatus = statusMatch[1].trim();
+          hasInProgress = /executing|planning/i.test(previousStatus);
+        }
+      }
+    }
+  } catch {}
+
+  // Write ACTIVE_MILESTONE
+  fs.writeFileSync(activeMilestonePath, name, 'utf-8');
+
+  // Read status from target milestone's STATE.md
+  let status = 'unknown';
+  const statePath = path.join(milestoneDir, 'STATE.md');
+  if (fs.existsSync(statePath)) {
+    try {
+      const content = fs.readFileSync(statePath, 'utf-8');
+      const statusMatch = content.match(/\*\*Status:\*\*\s*(.+)/);
+      if (statusMatch) status = statusMatch[1].trim();
+    } catch {}
+  }
+
+  const state_path = '.planning/milestones/' + name + '/STATE.md';
+  output({
+    switched: true,
+    name,
+    status,
+    state_path,
+    previous_milestone: previousMilestone,
+    previous_status: previousStatus,
+    has_in_progress: hasInProgress,
+  }, raw, `switched to milestone "${name}" (${status})`);
+}
+
+function cmdMilestoneList(cwd, raw) {
+  const planningRoot = path.join(cwd, '.planning');
+  const milestonesDir = path.join(planningRoot, 'milestones');
+  const activeMilestonePath = path.join(planningRoot, 'ACTIVE_MILESTONE');
+
+  // Read active milestone
+  let active = null;
+  try {
+    const content = fs.readFileSync(activeMilestonePath, 'utf-8').trim();
+    if (content) active = content;
+  } catch {}
+
+  // List milestone directories that contain STATE.md (skip archived v*-phases dirs)
+  const milestones = [];
+  try {
+    const entries = fs.readdirSync(milestonesDir, { withFileTypes: true });
+    for (const entry of entries) {
+      if (!entry.isDirectory()) continue;
+      // Skip archived phase directories (e.g. v1.0-phases)
+      if (/^v[\d.]+-phases$/.test(entry.name)) continue;
+      const stateFile = path.join(milestonesDir, entry.name, 'STATE.md');
+      if (!fs.existsSync(stateFile)) continue;
+
+      let status = 'unknown';
+      try {
+        const content = fs.readFileSync(stateFile, 'utf-8');
+        const statusMatch = content.match(/\*\*Status:\*\*\s*(.+)/);
+        if (statusMatch) status = statusMatch[1].trim();
+      } catch {}
+
+      milestones.push({
+        name: entry.name,
+        status,
+        active: entry.name === active,
+      });
+    }
+  } catch {}
+
+  output({ milestones, active, count: milestones.length }, raw, `${milestones.length} milestone(s) found`);
+}
+
+function cmdMilestoneStatus(cwd, raw) {
+  const planningRoot = path.join(cwd, '.planning');
+  const activeMilestonePath = path.join(planningRoot, 'ACTIVE_MILESTONE');
+
+  let active = null;
+  try {
+    const content = fs.readFileSync(activeMilestonePath, 'utf-8').trim();
+    if (content) active = content;
+  } catch {}
+
+  const isMultiMilestone = !!active;
+  const paths = resolvePlanningPaths(cwd);
+
+  output({
+    active,
+    is_multi_milestone: isMultiMilestone,
+    state_path: paths.rel.state,
+    roadmap_path: paths.rel.roadmap,
+  }, raw, active ? `active milestone: ${active}` : 'legacy mode (no active milestone)');
+}
+
 module.exports = {
   cmdRequirementsMarkComplete,
   cmdMilestoneComplete,
+  cmdMilestoneCreate,
+  cmdMilestoneSwitch,
+  cmdMilestoneList,
+  cmdMilestoneStatus,
 };

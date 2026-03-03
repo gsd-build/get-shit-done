@@ -7,6 +7,37 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 ## [Unreleased]
 
 ### Fixed
+- **Quality/balanced profiles now deliver Opus subagents** — `resolveModelInternal` previously
+  converted `opus` to `inherit`, causing agents to silently run on Sonnet when the parent
+  session used the default Sonnet 4.6 model. Opus is now passed directly to Task calls (#695)
+
+### Added
+- **Kimi CLI support** — install GSD skills and agents to [Kimi](https://github.com/MoonshotAI/kimi-cli) via `--kimi --global`
+  - Skills install to XDG path `~/.config/agents/skills/gsd-<name>/SKILL.md` and are invoked with `/skill:gsd-<name>`
+  - Agents install as dual-file format: `~/.kimi/agents/gsd-<name>.yaml` + `gsd-<name>.md` system prompt
+  - Tool names translated to full module paths (`kimi_cli.tools.file:ReadFile`, `kimi_cli.tools.shell:Shell`, etc.)
+  - MCP tools excluded from agent tool lists (configured separately via Kimi's config)
+  - `${VAR}` patterns in agent bodies escaped for Kimi CLI compatibility
+  - Local install guard — Kimi's XDG skills path is always global; `--kimi --local` exits with a clear error
+  - `KIMI_CONFIG_DIR` and `KIMI_SKILLS_DIR` env overrides for custom paths
+- **Adaptive model profile** — fourth model profile (`adaptive`) that auto-selects models per-plan based on complexity evaluation (#210)
+  - `evaluateComplexity()` scores plan metadata (files modified, task count, objective keywords, plan type, dependencies) on 0-10+ scale
+  - Three tiers: Simple (haiku/sonnet), Medium (sonnet/opus), Complex (opus/sonnet)
+  - `adaptive_settings` config: `min_model`/`max_model` clamping, `log_selections` usage logging
+  - `resolve-adaptive-model` CLI command with `--context` for per-plan resolution
+  - `init plan-phase` and `init quick` now return `model_profile` and `adaptive_settings` for workflow use
+  - Plan index includes `type` and `depends_on` for enriched complexity evaluation
+  - Verifier uses per-plan adaptive resolution when in adaptive mode
+  - Full backward compatibility — non-adaptive profiles unaffected
+- `/gsd:report-bug` command for structured bug reporting with severity tracking, diagnostic log capture, and GitHub issue creation
+  - `gsd-tools bug list/update/resolve` CLI commands for bug management
+  - `gsd-tools init bugs` and `scaffold bugs` for workflow bootstrapping
+  - Severity inference from keywords (critical/high/medium/low)
+  - Automatic diagnostic capture (git state, log files, error output)
+  - Optional GitHub issue creation via `gh` CLI
+  - Bug lifecycle: reported → investigating → fixing → resolved
+
+### Fixed
 - Scope phase counting in `buildStateFrontmatter` and `cmdPhaseComplete` to current milestone — multi-milestone projects no longer report inflated total/completed phases
 - Use ROADMAP phase count for `total_phases` when phases lack directories — prevents premature milestone completion detection
 
@@ -25,6 +56,14 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 - Analysis paralysis guard in agents to prevent over-deliberation during planning
 - Exhaustive cross-check and task-level TDD patterns in agent workflows
 - Code-aware discuss phase with codebase scouting — `/gsd:discuss-phase` now analyzes relevant source files before asking questions
+- Concurrent milestone execution: work on multiple milestones in parallel with isolated state (#291)
+  - Milestone-scoped directories under `.planning/milestones/<name>/`
+  - `ACTIVE_MILESTONE` pointer file for switching context
+  - `/gsd:switch-milestone` command with in-progress work warnings
+  - `--milestone` CLI flag for explicit milestone targeting
+  - Statusline shows active milestone in multi-milestone mode
+  - All 28 workflow files updated for milestone-aware paths
+  - Zero behavioral change for single-milestone projects (legacy mode)
 
 ### Fixed
 - Update checker clears both cache paths to prevent stale version notifications

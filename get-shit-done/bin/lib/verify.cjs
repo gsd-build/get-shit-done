@@ -7,6 +7,7 @@ const path = require('path');
 const { safeReadFile, normalizePhaseName, execGit, findPhaseInternal, getMilestoneInfo, output, error } = require('./core.cjs');
 const { extractFrontmatter, parseMustHavesBlock } = require('./frontmatter.cjs');
 const { writeStateMd } = require('./state.cjs');
+const { resolvePlanningPaths } = require('./paths.cjs');
 
 function cmdVerifySummary(cwd, summaryPath, checkFileCount, raw) {
   if (!summaryPath) {
@@ -395,8 +396,9 @@ function cmdVerifyKeyLinks(cwd, planFilePath, raw) {
 }
 
 function cmdValidateConsistency(cwd, raw) {
-  const roadmapPath = path.join(cwd, '.planning', 'ROADMAP.md');
-  const phasesDir = path.join(cwd, '.planning', 'phases');
+  const paths = resolvePlanningPaths(cwd);
+  const roadmapPath = paths.abs.roadmap;
+  const phasesDir = paths.abs.phases;
   const errors = [];
   const warnings = [];
 
@@ -515,12 +517,13 @@ function cmdValidateConsistency(cwd, raw) {
 }
 
 function cmdValidateHealth(cwd, options, raw) {
-  const planningDir = path.join(cwd, '.planning');
+  const paths = resolvePlanningPaths(cwd);
+  const planningDir = paths.abs.planningRoot;
   const projectPath = path.join(planningDir, 'PROJECT.md');
-  const roadmapPath = path.join(planningDir, 'ROADMAP.md');
-  const statePath = path.join(planningDir, 'STATE.md');
-  const configPath = path.join(planningDir, 'config.json');
-  const phasesDir = path.join(planningDir, 'phases');
+  const roadmapPath = paths.abs.roadmap;
+  const statePath = paths.abs.state;
+  const configPath = paths.abs.config;
+  const phasesDir = paths.abs.phases;
 
   const errors = [];
   const warnings = [];
@@ -607,7 +610,7 @@ function cmdValidateHealth(cwd, options, raw) {
       const raw = fs.readFileSync(configPath, 'utf-8');
       const parsed = JSON.parse(raw);
       // Validate known fields
-      const validProfiles = ['quality', 'balanced', 'budget'];
+      const validProfiles = ['quality', 'balanced', 'budget', 'adaptive'];
       if (parsed.model_profile && !validProfiles.includes(parsed.model_profile)) {
         addIssue('warning', 'W004', `config.json: invalid model_profile "${parsed.model_profile}"`, `Valid values: ${validProfiles.join(', ')}`);
       }

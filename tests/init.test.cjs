@@ -33,6 +33,36 @@ describe('init commands', () => {
     assert.strictEqual(output.config_path, '.planning/config.json');
   });
 
+  test('init execute-phase includes model_profile and adaptive_settings', () => {
+    const phaseDir = path.join(tmpDir, '.planning', 'phases', '03-api');
+    fs.mkdirSync(phaseDir, { recursive: true });
+    fs.writeFileSync(path.join(phaseDir, '03-01-PLAN.md'), '# Plan');
+    fs.writeFileSync(
+      path.join(tmpDir, '.planning', 'config.json'),
+      JSON.stringify({ model_profile: 'adaptive', adaptive_settings: { min_model: 'sonnet' } })
+    );
+
+    const result = runGsdTools('init execute-phase 03', tmpDir);
+    assert.ok(result.success, `Command failed: ${result.error}`);
+
+    const output = JSON.parse(result.output);
+    assert.strictEqual(output.model_profile, 'adaptive');
+    assert.deepStrictEqual(output.adaptive_settings, { min_model: 'sonnet' });
+  });
+
+  test('init execute-phase returns null adaptive_settings for non-adaptive profile', () => {
+    const phaseDir = path.join(tmpDir, '.planning', 'phases', '03-api');
+    fs.mkdirSync(phaseDir, { recursive: true });
+    fs.writeFileSync(path.join(phaseDir, '03-01-PLAN.md'), '# Plan');
+
+    const result = runGsdTools('init execute-phase 03', tmpDir);
+    assert.ok(result.success, `Command failed: ${result.error}`);
+
+    const output = JSON.parse(result.output);
+    assert.strictEqual(output.model_profile, 'balanced');
+    assert.strictEqual(output.adaptive_settings, null);
+  });
+
   test('init plan-phase returns file paths', () => {
     const phaseDir = path.join(tmpDir, '.planning', 'phases', '03-api');
     fs.mkdirSync(phaseDir, { recursive: true });
@@ -669,6 +699,62 @@ describe('cmdInitQuick', () => {
 
     const output = JSON.parse(result.output);
     assert.ok(output.slug.length <= 40, `Slug should be <= 40 chars, got ${output.slug.length}: "${output.slug}"`);
+  });
+
+  test('init quick with adaptive config returns model_profile and adaptive_settings', () => {
+    fs.writeFileSync(
+      path.join(tmpDir, '.planning', 'config.json'),
+      JSON.stringify({ model_profile: 'adaptive', adaptive_settings: { min_model: 'sonnet' } })
+    );
+
+    const result = runGsdTools('init quick "Test task"', tmpDir);
+    assert.ok(result.success, `Command failed: ${result.error}`);
+
+    const output = JSON.parse(result.output);
+    assert.strictEqual(output.model_profile, 'adaptive');
+    assert.deepStrictEqual(output.adaptive_settings, { min_model: 'sonnet' });
+  });
+});
+
+// ─────────────────────────────────────────────────────────────────────────────
+// cmdInitPlanPhase adaptive fields (INIT-07)
+// ─────────────────────────────────────────────────────────────────────────────
+
+describe('cmdInitPlanPhase adaptive fields', () => {
+  let tmpDir;
+
+  beforeEach(() => {
+    tmpDir = createTempProject();
+  });
+
+  afterEach(() => {
+    cleanup(tmpDir);
+  });
+
+  test('init plan-phase with adaptive config returns model_profile and adaptive_settings', () => {
+    fs.mkdirSync(path.join(tmpDir, '.planning', 'phases', '03-api'), { recursive: true });
+    fs.writeFileSync(
+      path.join(tmpDir, '.planning', 'config.json'),
+      JSON.stringify({ model_profile: 'adaptive', adaptive_settings: { max_model: 'sonnet' } })
+    );
+
+    const result = runGsdTools('init plan-phase 3', tmpDir);
+    assert.ok(result.success, `Command failed: ${result.error}`);
+
+    const output = JSON.parse(result.output);
+    assert.strictEqual(output.model_profile, 'adaptive');
+    assert.deepStrictEqual(output.adaptive_settings, { max_model: 'sonnet' });
+  });
+
+  test('init plan-phase with non-adaptive config returns null adaptive_settings', () => {
+    fs.mkdirSync(path.join(tmpDir, '.planning', 'phases', '03-api'), { recursive: true });
+
+    const result = runGsdTools('init plan-phase 3', tmpDir);
+    assert.ok(result.success, `Command failed: ${result.error}`);
+
+    const output = JSON.parse(result.output);
+    assert.strictEqual(output.model_profile, 'balanced');
+    assert.strictEqual(output.adaptive_settings, null);
   });
 });
 
