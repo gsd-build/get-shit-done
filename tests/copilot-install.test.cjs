@@ -526,3 +526,139 @@ Check ~/.claude/settings and run gsd:health.`;
     assert.ok(!result.includes('---'), 'no frontmatter added');
   });
 });
+
+// ─── copyCommandsAsCopilotSkills (integration) ─────────────────────────────────
+
+describe('copyCommandsAsCopilotSkills', () => {
+  const srcDir = path.join(__dirname, '..', 'commands', 'gsd');
+
+  test('creates skill folders from source commands', () => {
+    const tempDir = fs.mkdtempSync(path.join(os.tmpdir(), 'gsd-copilot-skills-'));
+    try {
+      copyCommandsAsCopilotSkills(srcDir, tempDir, 'gsd');
+
+      // Check specific folders exist
+      assert.ok(fs.existsSync(path.join(tempDir, 'gsd-health')), 'gsd-health folder exists');
+      assert.ok(fs.existsSync(path.join(tempDir, 'gsd-health', 'SKILL.md')), 'gsd-health/SKILL.md exists');
+      assert.ok(fs.existsSync(path.join(tempDir, 'gsd-help')), 'gsd-help folder exists');
+      assert.ok(fs.existsSync(path.join(tempDir, 'gsd-progress')), 'gsd-progress folder exists');
+
+      // Count gsd-* directories — should be 31
+      const dirs = fs.readdirSync(tempDir, { withFileTypes: true })
+        .filter(e => e.isDirectory() && e.name.startsWith('gsd-'));
+      assert.strictEqual(dirs.length, 31, `expected 31 skill folders, got ${dirs.length}`);
+    } finally {
+      fs.rmSync(tempDir, { recursive: true });
+    }
+  });
+
+  test('skill content has Copilot frontmatter format', () => {
+    const tempDir = fs.mkdtempSync(path.join(os.tmpdir(), 'gsd-copilot-skills-'));
+    try {
+      copyCommandsAsCopilotSkills(srcDir, tempDir, 'gsd');
+
+      const skillContent = fs.readFileSync(path.join(tempDir, 'gsd-health', 'SKILL.md'), 'utf8');
+      // Frontmatter format checks
+      assert.ok(skillContent.startsWith('---\nname: gsd-health\n'), 'starts with name: gsd-health');
+      assert.ok(skillContent.includes('allowed-tools: Read, Bash, Write, AskUserQuestion'),
+        'allowed-tools is comma-separated');
+      assert.ok(!skillContent.includes('allowed-tools:\n  -'), 'NOT YAML multiline format');
+      // CONV-06/07 applied
+      assert.ok(!skillContent.includes('~/.claude/'), 'no ~/.claude/ references');
+      assert.ok(!skillContent.match(/gsd:[a-z]/), 'no gsd: command references');
+    } finally {
+      fs.rmSync(tempDir, { recursive: true });
+    }
+  });
+
+  test('cleans up old skill directories on re-run', () => {
+    const tempDir = fs.mkdtempSync(path.join(os.tmpdir(), 'gsd-copilot-skills-'));
+    try {
+      // Create a fake old directory
+      fs.mkdirSync(path.join(tempDir, 'gsd-fake-old'), { recursive: true });
+      fs.writeFileSync(path.join(tempDir, 'gsd-fake-old', 'SKILL.md'), 'old');
+      assert.ok(fs.existsSync(path.join(tempDir, 'gsd-fake-old')), 'fake old dir exists before');
+
+      // Run copy — should clean up old dirs
+      copyCommandsAsCopilotSkills(srcDir, tempDir, 'gsd');
+
+      assert.ok(!fs.existsSync(path.join(tempDir, 'gsd-fake-old')), 'fake old dir removed');
+      assert.ok(fs.existsSync(path.join(tempDir, 'gsd-health')), 'real dirs still exist');
+    } finally {
+      fs.rmSync(tempDir, { recursive: true });
+    }
+  });
+});
+
+// ─── Copilot agent conversion - real files ──────────────────────────────────────
+
+describe('Copilot agent conversion - real files', () => {
+  const agentsSrc = path.join(__dirname, '..', 'agents');
+
+  test('converts gsd-executor agent correctly', () => {
+    const content = fs.readFileSync(path.join(agentsSrc, 'gsd-executor.md'), 'utf8');
+    const result = convertClaudeAgentToCopilotAgent(content);
+
+    assert.ok(result.startsWith('---\nname: gsd-executor\n'), 'starts with correct name');
+    // 6 Claude tools (Read, Write, Edit, Bash, Grep, Glob) → 4 after dedup
+    assert.ok(result.includes("tools: ['read', 'edit', 'execute', 'search']"),
+      'tools mapped and deduplicated (6→4)');
+    assert.ok(result.includes('color: yellow'), 'color preserved');
+    assert.ok(!result.includes('~/.claude/'), 'no ~/.claude/ in body');
+  });
+
+  test('converts agent with mcp wildcard tools correctly', () => {
+    const content = fs.readFileSync(path.join(agentsSrc, 'gsd-phase-researcher.md'), 'utf8');
+    const result = convertClaudeAgentToCopilotAgent(content);
+
+    const toolsLine = result.split('\n').find(l => l.startsWith('tools:'));
+    assert.ok(toolsLine.includes('io.github.upstash/context7/*'), 'mcp wildcard mapped in tools');
+    assert.ok(!toolsLine.includes('mcp__context7__'), 'no mcp__ prefix in tools line');
+    assert.ok(toolsLine.includes("'web'"), 'WebSearch/WebFetch deduplicated to web');
+    assert.ok(toolsLine.includes("'read'"), 'Read mapped');
+  });
+
+  test('all 11 agents convert without error', () => {
+    const agents = fs.readdirSync(agentsSrc)
+      .filter(f => f.startsWith('gsd-') && f.endsWith('.md'));
+    assert.strictEqual(agents.length, 11, `expected 11 agents, got ${agents.length}`);
+
+    for (const agentFile of agents) {
+      const content = fs.readFileSync(path.join(agentsSrc, agentFile), 'utf8');
+      const result = convertClaudeAgentToCopilotAgent(content);
+      assert.ok(result.startsWith('---\n'), `${agentFile} should have frontmatter`);
+      assert.ok(result.includes('tools:'), `${agentFile} should have tools field`);
+      assert.ok(!result.includes('~/.claude/'), `${agentFile} should not contain ~/.claude/`);
+    }
+  });
+});
+
+// ─── Copilot content conversion - engine files ─────────────────────────────────
+
+describe('Copilot content conversion - engine files', () => {
+  test('converts engine .md files correctly', () => {
+    const healthMd = fs.readFileSync(
+      path.join(__dirname, '..', 'get-shit-done', 'workflows', 'health.md'), 'utf8'
+    );
+    const result = convertClaudeToCopilotContent(healthMd);
+
+    assert.ok(!result.includes('~/.claude/'), 'no ~/.claude/ references remain');
+    assert.ok(!result.includes('$HOME/.claude/'), 'no $HOME/.claude/ references remain');
+    assert.ok(!result.match(/\/gsd:[a-z]/), 'no /gsd: command references remain');
+    assert.ok(!result.match(/(?<!\/)gsd:[a-z]/), 'no bare gsd: command references remain');
+    // Verify positive conversions
+    assert.ok(result.includes('$HOME/.copilot/'), '$HOME path converted to .copilot');
+    assert.ok(result.includes('gsd-health'), 'command name converted');
+  });
+
+  test('converts engine .cjs files correctly', () => {
+    const verifyCjs = fs.readFileSync(
+      path.join(__dirname, '..', 'get-shit-done', 'bin', 'lib', 'verify.cjs'), 'utf8'
+    );
+    const result = convertClaudeToCopilotContent(verifyCjs);
+
+    assert.ok(!result.match(/gsd:[a-z]/), 'no gsd: references remain');
+    assert.ok(result.includes('gsd-new-project'), 'gsd:new-project converted');
+    assert.ok(result.includes('gsd-health'), 'gsd:health converted');
+  });
+});
