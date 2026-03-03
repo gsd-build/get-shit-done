@@ -478,14 +478,23 @@ function convertCopilotToolName(claudeTool) {
 
 /**
  * Apply Copilot-specific content conversion — CONV-06 (paths) + CONV-07 (command names).
- * Uses fixed mappings: global refs → ~/.copilot/, local refs → .github/.
+ * Path mappings depend on install mode:
+ *   Global: ~/.claude/ → ~/.copilot/, ./.claude/ → ./.github/
+ *   Local:  ~/.claude/ → ./.github/, ./.claude/ → ./.github/
  * Applied to ALL Copilot content (skills, agents, engine files).
+ * @param {string} content - Source content to convert
+ * @param {boolean} [isGlobal=false] - Whether this is a global install
  */
-function convertClaudeToCopilotContent(content) {
+function convertClaudeToCopilotContent(content, isGlobal = false) {
   let c = content;
   // CONV-06: Path replacement — most specific first to avoid substring matches
-  c = c.replace(/\$HOME\/\.claude\//g, '$HOME/.copilot/');
-  c = c.replace(/~\/\.claude\//g, '~/.copilot/');
+  if (isGlobal) {
+    c = c.replace(/\$HOME\/\.claude\//g, '$HOME/.copilot/');
+    c = c.replace(/~\/\.claude\//g, '~/.copilot/');
+  } else {
+    c = c.replace(/\$HOME\/\.claude\//g, '.github/');
+    c = c.replace(/~\/\.claude\//g, '.github/');
+  }
   c = c.replace(/\.\/\.claude\//g, './.github/');
   c = c.replace(/\.claude\//g, '.github/');
   // CONV-07: Command name conversion (all gsd: references → gsd-)
@@ -498,8 +507,8 @@ function convertClaudeToCopilotContent(content) {
  * Transforms frontmatter only — body passes through with CONV-06/07 applied.
  * Skills keep original tool names (no mapping) per CONTEXT.md decision.
  */
-function convertClaudeCommandToCopilotSkill(content, skillName) {
-  const converted = convertClaudeToCopilotContent(content);
+function convertClaudeCommandToCopilotSkill(content, skillName, isGlobal = false) {
+  const converted = convertClaudeToCopilotContent(content, isGlobal);
   const { frontmatter, body } = extractFrontmatterAndBody(converted);
   if (!frontmatter) return converted;
 
@@ -532,8 +541,8 @@ function convertClaudeCommandToCopilotSkill(content, skillName) {
  * Applies tool mapping + deduplication, formats tools as JSON array.
  * CONV-04: JSON array format. CONV-05: Tool name mapping.
  */
-function convertClaudeAgentToCopilotAgent(content) {
-  const converted = convertClaudeToCopilotContent(content);
+function convertClaudeAgentToCopilotAgent(content, isGlobal = false) {
+  const converted = convertClaudeToCopilotContent(content, isGlobal);
   const { frontmatter, body } = extractFrontmatterAndBody(converted);
   if (!frontmatter) return converted;
 
@@ -1308,7 +1317,7 @@ function copyCommandsAsCodexSkills(srcDir, skillsDir, prefix, pathPrefix, runtim
  * Copy Claude commands as Copilot skills — one folder per skill with SKILL.md.
  * Applies CONV-01 (structure), CONV-02 (allowed-tools), CONV-06 (paths), CONV-07 (command names).
  */
-function copyCommandsAsCopilotSkills(srcDir, skillsDir, prefix) {
+function copyCommandsAsCopilotSkills(srcDir, skillsDir, prefix, isGlobal = false) {
   if (!fs.existsSync(srcDir)) {
     return;
   }
@@ -1343,7 +1352,7 @@ function copyCommandsAsCopilotSkills(srcDir, skillsDir, prefix) {
       fs.mkdirSync(skillDir, { recursive: true });
 
       let content = fs.readFileSync(srcPath, 'utf8');
-      content = convertClaudeCommandToCopilotSkill(content, skillName);
+      content = convertClaudeCommandToCopilotSkill(content, skillName, isGlobal);
       content = processAttribution(content, getCommitAttribution('copilot'));
 
       fs.writeFileSync(path.join(skillDir, 'SKILL.md'), content);
@@ -1361,7 +1370,7 @@ function copyCommandsAsCopilotSkills(srcDir, skillsDir, prefix) {
  * @param {string} pathPrefix - Path prefix for file references
  * @param {string} runtime - Target runtime ('claude', 'opencode', 'gemini', 'codex')
  */
-function copyWithPathReplacement(srcDir, destDir, pathPrefix, runtime, isCommand = false) {
+function copyWithPathReplacement(srcDir, destDir, pathPrefix, runtime, isCommand = false, isGlobal = false) {
   const isOpencode = runtime === 'opencode';
   const isCodex = runtime === 'codex';
   const isCopilot = runtime === 'copilot';
@@ -1380,16 +1389,19 @@ function copyWithPathReplacement(srcDir, destDir, pathPrefix, runtime, isCommand
     const destPath = path.join(destDir, entry.name);
 
     if (entry.isDirectory()) {
-      copyWithPathReplacement(srcPath, destPath, pathPrefix, runtime, isCommand);
+      copyWithPathReplacement(srcPath, destPath, pathPrefix, runtime, isCommand, isGlobal);
     } else if (entry.name.endsWith('.md')) {
       // Replace ~/.claude/ and $HOME/.claude/ and ./.claude/ with runtime-appropriate paths
+      // Skip generic replacement for Copilot — convertClaudeToCopilotContent handles all paths
       let content = fs.readFileSync(srcPath, 'utf8');
-      const globalClaudeRegex = /~\/\.claude\//g;
-      const globalClaudeHomeRegex = /\$HOME\/\.claude\//g;
-      const localClaudeRegex = /\.\/\.claude\//g;
-      content = content.replace(globalClaudeRegex, pathPrefix);
-      content = content.replace(globalClaudeHomeRegex, toHomePrefix(pathPrefix));
-      content = content.replace(localClaudeRegex, `./${dirName}/`);
+      if (!isCopilot) {
+        const globalClaudeRegex = /~\/\.claude\//g;
+        const globalClaudeHomeRegex = /\$HOME\/\.claude\//g;
+        const localClaudeRegex = /\.\/\.claude\//g;
+        content = content.replace(globalClaudeRegex, pathPrefix);
+        content = content.replace(globalClaudeHomeRegex, toHomePrefix(pathPrefix));
+        content = content.replace(localClaudeRegex, `./${dirName}/`);
+      }
       content = processAttribution(content, getCommitAttribution(runtime));
 
       // Convert frontmatter for opencode compatibility
@@ -1411,7 +1423,7 @@ function copyWithPathReplacement(srcDir, destDir, pathPrefix, runtime, isCommand
         content = convertClaudeToCodexMarkdown(content);
         fs.writeFileSync(destPath, content);
       } else if (isCopilot) {
-        content = convertClaudeToCopilotContent(content);
+        content = convertClaudeToCopilotContent(content, isGlobal);
         content = processAttribution(content, getCommitAttribution(runtime));
         fs.writeFileSync(destPath, content);
       } else {
@@ -1420,7 +1432,7 @@ function copyWithPathReplacement(srcDir, destDir, pathPrefix, runtime, isCommand
     } else if (isCopilot && (entry.name.endsWith('.cjs') || entry.name.endsWith('.js'))) {
       // Copilot: also transform .cjs/.js files for CONV-06 and CONV-07
       let content = fs.readFileSync(srcPath, 'utf8');
-      content = convertClaudeToCopilotContent(content);
+      content = convertClaudeToCopilotContent(content, isGlobal);
       fs.writeFileSync(destPath, content);
     } else {
       fs.copyFileSync(srcPath, destPath);
@@ -2233,7 +2245,7 @@ function install(isGlobal, runtime = 'claude') {
   } else if (isCopilot) {
     const skillsDir = path.join(targetDir, 'skills');
     const gsdSrc = path.join(src, 'commands', 'gsd');
-    copyCommandsAsCopilotSkills(gsdSrc, skillsDir, 'gsd');
+    copyCommandsAsCopilotSkills(gsdSrc, skillsDir, 'gsd', isGlobal);
     if (fs.existsSync(skillsDir)) {
       const count = fs.readdirSync(skillsDir, { withFileTypes: true })
         .filter(e => e.isDirectory() && e.name.startsWith('gsd-')).length;
@@ -2252,7 +2264,7 @@ function install(isGlobal, runtime = 'claude') {
     
     const gsdSrc = path.join(src, 'commands', 'gsd');
     const gsdDest = path.join(commandsDir, 'gsd');
-    copyWithPathReplacement(gsdSrc, gsdDest, pathPrefix, runtime, true);
+    copyWithPathReplacement(gsdSrc, gsdDest, pathPrefix, runtime, true, isGlobal);
     if (verifyInstalled(gsdDest, 'commands/gsd')) {
       console.log(`  ${green}✓${reset} Installed commands/gsd`);
     } else {
@@ -2263,7 +2275,7 @@ function install(isGlobal, runtime = 'claude') {
   // Copy get-shit-done skill with path replacement
   const skillSrc = path.join(src, 'get-shit-done');
   const skillDest = path.join(targetDir, 'get-shit-done');
-  copyWithPathReplacement(skillSrc, skillDest, pathPrefix, runtime);
+  copyWithPathReplacement(skillSrc, skillDest, pathPrefix, runtime, false, isGlobal);
   if (verifyInstalled(skillDest, 'get-shit-done')) {
     console.log(`  ${green}✓${reset} Installed get-shit-done`);
   } else {
@@ -2306,7 +2318,7 @@ function install(isGlobal, runtime = 'claude') {
         } else if (isCodex) {
           content = convertClaudeAgentToCodexAgent(content);
         } else if (isCopilot) {
-          content = convertClaudeAgentToCopilotAgent(content);
+          content = convertClaudeAgentToCopilotAgent(content, isGlobal);
         }
         const destName = isCopilot ? entry.name.replace('.md', '.agent.md') : entry.name;
         fs.writeFileSync(path.join(agentsDest, destName), content);

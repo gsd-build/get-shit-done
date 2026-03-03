@@ -260,9 +260,16 @@ describe('convertCopilotToolName', () => {
 // ─── convertClaudeToCopilotContent ──────────────────────────────────────────────
 
 describe('convertClaudeToCopilotContent', () => {
-  test('replaces ~/.claude/ with ~/.copilot/', () => {
+  test('replaces ~/.claude/ with .github/ in local mode (default)', () => {
     assert.strictEqual(
       convertClaudeToCopilotContent('see ~/.claude/foo'),
+      'see .github/foo'
+    );
+  });
+
+  test('replaces ~/.claude/ with ~/.copilot/ in global mode', () => {
+    assert.strictEqual(
+      convertClaudeToCopilotContent('see ~/.claude/foo', true),
       'see ~/.copilot/foo'
     );
   });
@@ -281,9 +288,16 @@ describe('convertClaudeToCopilotContent', () => {
     );
   });
 
-  test('replaces $HOME/.claude/ with $HOME/.copilot/', () => {
+  test('replaces $HOME/.claude/ with .github/ in local mode (default)', () => {
     assert.strictEqual(
       convertClaudeToCopilotContent('"$HOME/.claude/config"'),
+      '".github/config"'
+    );
+  });
+
+  test('replaces $HOME/.claude/ with $HOME/.copilot/ in global mode', () => {
+    assert.strictEqual(
+      convertClaudeToCopilotContent('"$HOME/.claude/config"', true),
       '"$HOME/.copilot/config"'
     );
   });
@@ -295,24 +309,41 @@ describe('convertClaudeToCopilotContent', () => {
     );
   });
 
-  test('handles mixed content with all patterns', () => {
+  test('handles mixed content in local mode', () => {
     const input = 'Config at ~/.claude/settings and $HOME/.claude/config.\n' +
       'Local at ./.claude/data and .claude/commands.\n' +
       'Run gsd:health and /gsd:progress.';
     const result = convertClaudeToCopilotContent(input);
-    assert.ok(result.includes('~/.copilot/settings'), 'tilde path converted');
-    assert.ok(result.includes('$HOME/.copilot/config'), '$HOME path converted');
+    assert.ok(result.includes('.github/settings'), 'tilde path converted to local');
+    assert.ok(!result.includes('$HOME/.claude/'), '$HOME path converted');
     assert.ok(result.includes('./.github/data'), 'dot-slash path converted');
     assert.ok(result.includes('.github/commands'), 'bare path converted');
     assert.ok(result.includes('gsd-health'), 'command name converted');
     assert.ok(result.includes('/gsd-progress'), 'slash command converted');
   });
 
-  test('does not double-replace (no .copilot/.github/ artifacts)', () => {
+  test('handles mixed content in global mode', () => {
+    const input = 'Config at ~/.claude/settings and $HOME/.claude/config.\n' +
+      'Local at ./.claude/data and .claude/commands.\n' +
+      'Run gsd:health and /gsd:progress.';
+    const result = convertClaudeToCopilotContent(input, true);
+    assert.ok(result.includes('~/.copilot/settings'), 'tilde path converted to global');
+    assert.ok(result.includes('$HOME/.copilot/config'), '$HOME path converted to global');
+    assert.ok(result.includes('./.github/data'), 'dot-slash path converted');
+    assert.ok(result.includes('.github/commands'), 'bare path converted');
+  });
+
+  test('does not double-replace in local mode', () => {
     const input = '~/.claude/foo and ./.claude/bar and .claude/baz';
     const result = convertClaudeToCopilotContent(input);
-    assert.ok(!result.includes('.copilot/.github/'), 'no .copilot/.github/ artifact');
     assert.ok(!result.includes('.github/.github/'), 'no .github/.github/ artifact');
+    assert.strictEqual(result, '.github/foo and ./.github/bar and .github/baz');
+  });
+
+  test('does not double-replace in global mode', () => {
+    const input = '~/.claude/foo and ./.claude/bar and .claude/baz';
+    const result = convertClaudeToCopilotContent(input, true);
+    assert.ok(!result.includes('.copilot/.github/'), 'no .copilot/.github/ artifact');
     assert.strictEqual(result, '~/.copilot/foo and ./.github/bar and .github/baz');
   });
 
@@ -346,7 +377,7 @@ Body content here referencing ~/.claude/foo and gsd:health.`;
     assert.ok(result.includes('description: Diagnose planning directory health'), 'description preserved');
     assert.ok(result.includes("argument-hint: '[--repair]'"), 'argument-hint single-quoted');
     assert.ok(result.includes('allowed-tools: Read, Bash, Write, AskUserQuestion'), 'tools comma-separated');
-    assert.ok(result.includes('~/.copilot/foo'), 'CONV-06 applied to body');
+    assert.ok(result.includes('.github/foo'), 'CONV-06 applied to body (local mode default)');
     assert.ok(result.includes('gsd-health'), 'CONV-07 applied to body');
     assert.ok(!result.includes('gsd:health'), 'no gsd: references remain');
   });
@@ -381,7 +412,7 @@ Progress body.`;
     assert.ok(result.includes('allowed-tools: Read, Bash'), 'tools present');
   });
 
-  test('applies CONV-06 path conversion to body', () => {
+  test('applies CONV-06 path conversion to body (local mode)', () => {
     const input = `---
 name: gsd:test
 description: Test skill
@@ -390,9 +421,23 @@ description: Test skill
 Check ~/.claude/settings and ./.claude/local and $HOME/.claude/global.`;
 
     const result = convertClaudeCommandToCopilotSkill(input, 'gsd-test');
-    assert.ok(result.includes('~/.copilot/settings'), 'tilde path converted');
+    assert.ok(result.includes('.github/settings'), 'tilde path converted to local');
     assert.ok(result.includes('./.github/local'), 'dot-slash path converted');
-    assert.ok(result.includes('$HOME/.copilot/global'), '$HOME path converted');
+    assert.ok(result.includes('.github/global'), '$HOME path converted to local');
+  });
+
+  test('applies CONV-06 path conversion to body (global mode)', () => {
+    const input = `---
+name: gsd:test
+description: Test skill
+---
+
+Check ~/.claude/settings and ./.claude/local and $HOME/.claude/global.`;
+
+    const result = convertClaudeCommandToCopilotSkill(input, 'gsd-test', true);
+    assert.ok(result.includes('~/.copilot/settings'), 'tilde path converted to global');
+    assert.ok(result.includes('./.github/local'), 'dot-slash path converted');
+    assert.ok(result.includes('$HOME/.copilot/global'), '$HOME path converted to global');
   });
 
   test('applies CONV-07 command name conversion to body', () => {
@@ -409,10 +454,10 @@ Run gsd:health and /gsd:progress for diagnostics.`;
     assert.ok(!result.match(/gsd:[a-z]/), 'no gsd: command refs remain');
   });
 
-  test('handles content without frontmatter', () => {
+  test('handles content without frontmatter (local mode)', () => {
     const input = 'Just some markdown with ~/.claude/path and gsd:health.';
     const result = convertClaudeCommandToCopilotSkill(input, 'gsd-test');
-    assert.ok(result.includes('~/.copilot/path'), 'CONV-06 applied');
+    assert.ok(result.includes('.github/path'), 'CONV-06 applied (local)');
     assert.ok(result.includes('gsd-health'), 'CONV-07 applied');
     assert.ok(!result.includes('---'), 'no frontmatter added');
   });
@@ -508,7 +553,7 @@ Body.`;
     assert.ok(result.includes('tools: []'), 'missing tools produces []');
   });
 
-  test('applies CONV-06 and CONV-07 to body', () => {
+  test('applies CONV-06 and CONV-07 to body (local mode)', () => {
     const input = `---
 name: gsd-test
 description: Test
@@ -518,16 +563,30 @@ tools: Read
 Check ~/.claude/settings and run gsd:health.`;
 
     const result = convertClaudeAgentToCopilotAgent(input);
-    assert.ok(result.includes('~/.copilot/settings'), 'CONV-06 applied');
+    assert.ok(result.includes('.github/settings'), 'CONV-06 applied (local)');
     assert.ok(result.includes('gsd-health'), 'CONV-07 applied');
     assert.ok(!result.includes('~/.claude/'), 'no ~/.claude/ remains');
     assert.ok(!result.match(/gsd:[a-z]/), 'no gsd: command refs remain');
   });
 
-  test('handles content without frontmatter', () => {
+  test('applies CONV-06 and CONV-07 to body (global mode)', () => {
+    const input = `---
+name: gsd-test
+description: Test
+tools: Read
+---
+
+Check ~/.claude/settings and run gsd:health.`;
+
+    const result = convertClaudeAgentToCopilotAgent(input, true);
+    assert.ok(result.includes('~/.copilot/settings'), 'CONV-06 applied (global)');
+    assert.ok(result.includes('gsd-health'), 'CONV-07 applied');
+  });
+
+  test('handles content without frontmatter (local mode)', () => {
     const input = 'Just markdown with ~/.claude/path and gsd:test.';
     const result = convertClaudeAgentToCopilotAgent(input);
-    assert.ok(result.includes('~/.copilot/path'), 'CONV-06 applied');
+    assert.ok(result.includes('.github/path'), 'CONV-06 applied (local)');
     assert.ok(result.includes('gsd-test'), 'CONV-07 applied');
     assert.ok(!result.includes('---'), 'no frontmatter added');
   });
@@ -642,7 +701,7 @@ describe('Copilot agent conversion - real files', () => {
 // ─── Copilot content conversion - engine files ─────────────────────────────────
 
 describe('Copilot content conversion - engine files', () => {
-  test('converts engine .md files correctly', () => {
+  test('converts engine .md files correctly (local mode default)', () => {
     const healthMd = fs.readFileSync(
       path.join(__dirname, '..', 'get-shit-done', 'workflows', 'health.md'), 'utf8'
     );
@@ -652,8 +711,23 @@ describe('Copilot content conversion - engine files', () => {
     assert.ok(!result.includes('$HOME/.claude/'), 'no $HOME/.claude/ references remain');
     assert.ok(!result.match(/\/gsd:[a-z]/), 'no /gsd: command references remain');
     assert.ok(!result.match(/(?<!\/)gsd:[a-z]/), 'no bare gsd: command references remain');
-    // Verify positive conversions
-    assert.ok(result.includes('$HOME/.copilot/'), '$HOME path converted to .copilot');
+    // Local mode: ~ and $HOME resolve to .github (repo-relative, no ./ prefix)
+    assert.ok(result.includes('.github/'), 'paths converted to .github for local');
+    assert.ok(result.includes('gsd-health'), 'command name converted');
+  });
+
+  test('converts engine .md files correctly (global mode)', () => {
+    const healthMd = fs.readFileSync(
+      path.join(__dirname, '..', 'get-shit-done', 'workflows', 'health.md'), 'utf8'
+    );
+    const result = convertClaudeToCopilotContent(healthMd, true);
+
+    assert.ok(!result.includes('~/.claude/'), 'no ~/.claude/ references remain');
+    assert.ok(!result.includes('$HOME/.claude/'), 'no $HOME/.claude/ references remain');
+    // Global mode: ~ and $HOME resolve to .copilot
+    if (healthMd.includes('$HOME/.claude/')) {
+      assert.ok(result.includes('$HOME/.copilot/'), '$HOME path converted to .copilot');
+    }
     assert.ok(result.includes('gsd-health'), 'command name converted');
   });
 
