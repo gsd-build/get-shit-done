@@ -6,6 +6,9 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ## [Unreleased]
 
+### Fixed
+- `roadmap update-plan-progress` now marks individual plan checkboxes (e.g. `- [ ] 50-01-PLAN.md`) as complete when their summary exists
+
 ## [1.22.4] - 2026-03-03
 
 ### Added
