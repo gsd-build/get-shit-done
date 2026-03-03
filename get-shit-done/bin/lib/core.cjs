@@ -229,6 +229,7 @@ function searchPhaseInDir(baseDir, relBase, normalized) {
     const hasResearch = phaseFiles.some(f => f.endsWith('-RESEARCH.md') || f === 'RESEARCH.md');
     const hasContext = phaseFiles.some(f => f.endsWith('-CONTEXT.md') || f === 'CONTEXT.md');
     const hasVerification = phaseFiles.some(f => f.endsWith('-VERIFICATION.md') || f === 'VERIFICATION.md');
+    const hasReviews = phaseFiles.some(f => f.endsWith('-REVIEWS.md') || f === 'REVIEWS.md');
 
     const completedPlanIds = new Set(
       summaries.map(s => s.replace('-SUMMARY.md', '').replace('SUMMARY.md', ''))
@@ -250,6 +251,7 @@ function searchPhaseInDir(baseDir, relBase, normalized) {
       has_research: hasResearch,
       has_context: hasContext,
       has_verification: hasVerification,
+      has_reviews: hasReviews,
     };
   } catch {
     return null;

@@ -119,6 +119,7 @@ function cmdInitPlanPhase(cwd, phase, raw) {
     // Existing artifacts
     has_research: phaseInfo?.has_research || false,
     has_context: phaseInfo?.has_context || false,
+    has_reviews: phaseInfo?.has_reviews || false,
     has_plans: (phaseInfo?.plans?.length || 0) > 0,
     plan_count: phaseInfo?.plans?.length || 0,
 
@@ -152,6 +153,10 @@ function cmdInitPlanPhase(cwd, phase, raw) {
       const uatFile = files.find(f => f.endsWith('-UAT.md') || f === 'UAT.md');
       if (uatFile) {
         result.uat_path = toPosixPath(path.join(phaseInfo.directory, uatFile));
+      }
+      const reviewsFile = files.find(f => f.endsWith('-REVIEWS.md') || f === 'REVIEWS.md');
+      if (reviewsFile) {
+        result.reviews_path = toPosixPath(path.join(phaseInfo.directory, reviewsFile));
       }
     } catch {}
   }
@@ -694,6 +699,78 @@ function cmdInitProgress(cwd, raw) {
   output(result, raw);
 }
 
+function cmdInitReview(cwd, phase, raw) {
+  if (!phase) {
+    error('phase required for init review');
+  }
+
+  const phaseInfo = findPhaseInternal(cwd, phase);
+
+  // Check CLI availability using execFileSync (safe, no shell)
+  const { execFileSync } = require('child_process');
+  const cliAvailable = {};
+  for (const cli of ['gemini', 'claude', 'codex']) {
+    try {
+      execFileSync('which', [cli], { stdio: 'pipe' });
+      cliAvailable[cli] = true;
+    } catch {
+      cliAvailable[cli] = false;
+    }
+  }
+
+  const result = {
+    // Phase info
+    phase_found: !!phaseInfo,
+    phase_dir: phaseInfo?.directory || null,
+    phase_number: phaseInfo?.phase_number || null,
+    phase_name: phaseInfo?.phase_name || null,
+    padded_phase: phaseInfo?.phase_number?.padStart(2, '0') || null,
+
+    // Plan inventory
+    plans: phaseInfo?.plans || [],
+    plan_count: phaseInfo?.plans?.length || 0,
+
+    // Existing artifacts
+    has_research: phaseInfo?.has_research || false,
+    has_context: phaseInfo?.has_context || false,
+    has_reviews: phaseInfo?.has_reviews || false,
+
+    // CLI availability
+    cli_available: cliAvailable,
+
+    // File existence
+    roadmap_exists: pathExistsInternal(cwd, '.planning/ROADMAP.md'),
+    requirements_exists: pathExistsInternal(cwd, '.planning/REQUIREMENTS.md'),
+    project_exists: pathExistsInternal(cwd, '.planning/PROJECT.md'),
+
+    // File paths
+    roadmap_path: '.planning/ROADMAP.md',
+    requirements_path: '.planning/REQUIREMENTS.md',
+    project_path: '.planning/PROJECT.md',
+  };
+
+  if (phaseInfo?.directory) {
+    const phaseDirFull = path.join(cwd, phaseInfo.directory);
+    try {
+      const files = fs.readdirSync(phaseDirFull);
+      const contextFile = files.find(f => f.endsWith('-CONTEXT.md') || f === 'CONTEXT.md');
+      if (contextFile) {
+        result.context_path = toPosixPath(path.join(phaseInfo.directory, contextFile));
+      }
+      const researchFile = files.find(f => f.endsWith('-RESEARCH.md') || f === 'RESEARCH.md');
+      if (researchFile) {
+        result.research_path = toPosixPath(path.join(phaseInfo.directory, researchFile));
+      }
+      const reviewsFile = files.find(f => f.endsWith('-REVIEWS.md') || f === 'REVIEWS.md');
+      if (reviewsFile) {
+        result.reviews_path = toPosixPath(path.join(phaseInfo.directory, reviewsFile));
+      }
+    } catch {}
+  }
+
+  output(result, raw);
+}
+
 module.exports = {
   cmdInitExecutePhase,
   cmdInitPlanPhase,
@@ -707,4 +784,5 @@ module.exports = {
   cmdInitMilestoneOp,
   cmdInitMapCodebase,
   cmdInitProgress,
+  cmdInitReview,
 };
