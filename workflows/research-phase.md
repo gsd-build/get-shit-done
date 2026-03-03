@@ -18,7 +18,15 @@ Resolve model for:
 @C:/Users/rickw/.claude/get-shit-done/references/phase-argument-parsing.md
 
 ```bash
-PHASE_INFO=$(node "$HOME/.claude/get-shit-done/bin/gsd-tools.cjs" roadmap get-phase "${PHASE}")
+# Extract --ws flag from arguments
+WS_NAME=""
+GSD_WS=""
+if echo "$ARGUMENTS" | grep -qE '\-\-ws[= ]'; then
+  WS_NAME=$(echo "$ARGUMENTS" | grep -oE '\-\-ws[= ][^ ]+' | sed 's/--ws[= ]//')
+  GSD_WS="--ws $WS_NAME"
+fi
+
+PHASE_INFO=$(node "$HOME/.claude/get-shit-done/bin/gsd-tools.cjs" roadmap get-phase "${PHASE}" ${GSD_WS})
 ```
 
 If `found` is false: Error and exit.
@@ -26,7 +34,7 @@ If `found` is false: Error and exit.
 ## Step 2: Check Existing Research
 
 ```bash
-ls .planning/phases/${PHASE}-*/RESEARCH.md 2>/dev/null
+ls ${phase_dir}/*RESEARCH.md 2>/dev/null
 ```
 
 If exists: Offer update/view/skip options.
@@ -34,7 +42,7 @@ If exists: Offer update/view/skip options.
 ## Step 3: Gather Phase Context
 
 ```bash
-INIT=$(node "$HOME/.claude/get-shit-done/bin/gsd-tools.cjs" init phase-op "${PHASE}")
+INIT=$(node "$HOME/.claude/get-shit-done/bin/gsd-tools.cjs" init phase-op "${PHASE}" ${GSD_WS})
 # Extract: phase_dir, padded_phase, phase_number, state_path, requirements_path, context_path
 ```
 
@@ -57,7 +65,7 @@ Phase description: {description}
 </additional_context>
 
 <output>
-Write to: .planning/phases/${PHASE}-{slug}/${PHASE}-RESEARCH.md
+Write to: ${phase_dir}/${PHASE}-RESEARCH.md
 </output>",
   subagent_type="gsd-phase-researcher",
   model="{researcher_model}"

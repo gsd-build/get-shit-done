@@ -11,6 +11,20 @@ Read all files referenced by the invoking prompt's execution_context before star
 ## 1. Load Audit Results
 
 ```bash
+# Extract --ws flag from arguments
+WS_NAME=""
+GSD_WS=""
+if echo "$ARGUMENTS" | grep -qE '\-\-ws[= ]'; then
+  WS_NAME=$(echo "$ARGUMENTS" | grep -oE '\-\-ws[= ][^ ]+' | sed 's/--ws[= ]//')
+  GSD_WS="--ws $WS_NAME"
+fi
+
+INIT=$(node "$HOME/.claude/get-shit-done/bin/gsd-tools.cjs" init phase-op "0" $GSD_WS)
+```
+
+Extract from init JSON: `roadmap_path`, `state_path`, `requirements_path`, `phase_dir`.
+
+```bash
 # Find the most recent audit file
 ls -t .planning/v*-MILESTONE-AUDIT.md 2>/dev/null | head -1
 ```
@@ -65,7 +79,7 @@ Gap: Flow "View dashboard" broken at data fetch
 Find highest existing phase:
 ```bash
 # Get sorted phase list, extract last one
-PHASES=$(node "$HOME/.claude/get-shit-done/bin/gsd-tools.cjs" phases list)
+PHASES=$(node "$HOME/.claude/get-shit-done/bin/gsd-tools.cjs" phases list $GSD_WS)
 HIGHEST=$(printf '%s\n' "$PHASES" | jq -r '.directories[-1]')
 ```
 
@@ -135,19 +149,19 @@ Reset checked-off requirements the audit found unsatisfied:
 
 ```bash
 # Verify traceability table reflects gap closure assignments
-grep -c "Pending" .planning/REQUIREMENTS.md
+grep -c "Pending" ${requirements_path}
 ```
 
 ## 8. Create Phase Directories
 
 ```bash
-mkdir -p ".planning/phases/{NN}-{name}"
+mkdir -p "${phase_dir}/{NN}-{name}"
 ```
 
 ## 9. Commit Roadmap and Requirements Update
 
 ```bash
-node "$HOME/.claude/get-shit-done/bin/gsd-tools.cjs" commit "docs(roadmap): add gap closure phases {N}-{M}" --files .planning/ROADMAP.md .planning/REQUIREMENTS.md
+node "$HOME/.claude/get-shit-done/bin/gsd-tools.cjs" commit "docs(roadmap): add gap closure phases {N}-{M}" --files ${roadmap_path} ${requirements_path} $GSD_WS
 ```
 
 ## 10. Offer Next Steps

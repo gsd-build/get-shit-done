@@ -37,10 +37,25 @@ When a milestone completes:
 
 <step name="verify_readiness">
 
+Parse `--ws <name>` from $ARGUMENTS. If present, set `GSD_WS="--ws ${WS_NAME}"`, otherwise set `GSD_WS=""`. Append `${GSD_WS}` to all `gsd-tools.cjs` invocations in this workflow.
+
+Load context and extract paths:
+
+```bash
+INIT=$(node "$HOME/.claude/get-shit-done/bin/gsd-tools.cjs" init execute-phase "1" ${GSD_WS})
+```
+
+Extract paths from init JSON:
+```bash
+state_path=$(echo "$INIT" | jq -r '.state_path')
+roadmap_path=$(echo "$INIT" | jq -r '.roadmap_path')
+requirements_path=$(echo "$INIT" | jq -r '.requirements_path')
+```
+
 **Use `roadmap analyze` for comprehensive readiness check:**
 
 ```bash
-ROADMAP=$(node "$HOME/.claude/get-shit-done/bin/gsd-tools.cjs" roadmap analyze)
+ROADMAP=$(node "$HOME/.claude/get-shit-done/bin/gsd-tools.cjs" roadmap analyze ${GSD_WS})
 ```
 
 This returns all phases with plan/summary counts and disk status. Use this to verify:
@@ -50,7 +65,7 @@ This returns all phases with plan/summary counts and disk status. Use this to ve
 
 **Requirements completion check (REQUIRED before presenting):**
 
-Parse REQUIREMENTS.md traceability table:
+Parse ${requirements_path} traceability table:
 - Count total v1 requirements vs checked-off (`[x]`) requirements
 - Identify any non-Complete rows in the traceability table
 
@@ -154,7 +169,7 @@ Extract one-liners from SUMMARY.md files using summary-extract:
 ```bash
 # For each phase in milestone, extract one-liner
 for summary in .planning/phases/*-*/*-SUMMARY.md; do
-  node "$HOME/.claude/get-shit-done/bin/gsd-tools.cjs" summary-extract "$summary" --fields one_liner | jq -r '.one_liner'
+  node "$HOME/.claude/get-shit-done/bin/gsd-tools.cjs" summary-extract "$summary" --fields one_liner ${GSD_WS} | jq -r '.one_liner'
 done
 ```
 
@@ -367,7 +382,7 @@ Update `.planning/ROADMAP.md` — group completed milestone phases:
 **Delegate archival to gsd-tools:**
 
 ```bash
-ARCHIVE=$(node "$HOME/.claude/get-shit-done/bin/gsd-tools.cjs" milestone complete "v[X.Y]" --name "[Milestone Name]")
+ARCHIVE=$(node "$HOME/.claude/get-shit-done/bin/gsd-tools.cjs" milestone complete "v[X.Y]" --name "[Milestone Name]" ${GSD_WS})
 ```
 
 The CLI handles:
@@ -432,8 +447,8 @@ After `milestone complete` has archived, reorganize ROADMAP.md with milestone gr
 **Then delete originals:**
 
 ```bash
-rm .planning/ROADMAP.md
-rm .planning/REQUIREMENTS.md
+rm ${roadmap_path}
+rm ${requirements_path}
 ```
 
 </step>
@@ -494,7 +509,7 @@ If the "## Cross-Milestone Trends" section exists, update the tables with new da
 
 **Commit:**
 ```bash
-node "$HOME/.claude/get-shit-done/bin/gsd-tools.cjs" commit "docs: update retrospective for v${VERSION}" --files .planning/RETROSPECTIVE.md
+node "$HOME/.claude/get-shit-done/bin/gsd-tools.cjs" commit "docs: update retrospective for v${VERSION}" ${GSD_WS} --files .planning/RETROSPECTIVE.md
 ```
 
 </step>
@@ -528,7 +543,7 @@ Check branching strategy and offer merge options.
 Use `init milestone-op` for context, or load config directly:
 
 ```bash
-INIT=$(node "$HOME/.claude/get-shit-done/bin/gsd-tools.cjs" init execute-phase "1")
+INIT=$(node "$HOME/.claude/get-shit-done/bin/gsd-tools.cjs" init execute-phase "1" ${GSD_WS})
 ```
 
 Extract `branching_strategy`, `phase_branch_template`, `milestone_branch_template`, and `commit_docs` from init JSON.
@@ -676,7 +691,7 @@ git push origin v[X.Y]
 Commit milestone completion.
 
 ```bash
-node "$HOME/.claude/get-shit-done/bin/gsd-tools.cjs" commit "chore: complete v[X.Y] milestone" --files .planning/milestones/v[X.Y]-ROADMAP.md .planning/milestones/v[X.Y]-REQUIREMENTS.md .planning/milestones/v[X.Y]-MILESTONE-AUDIT.md .planning/MILESTONES.md .planning/PROJECT.md .planning/STATE.md
+node "$HOME/.claude/get-shit-done/bin/gsd-tools.cjs" commit "chore: complete v[X.Y] milestone" ${GSD_WS} --files .planning/milestones/v[X.Y]-ROADMAP.md .planning/milestones/v[X.Y]-REQUIREMENTS.md .planning/milestones/v[X.Y]-MILESTONE-AUDIT.md .planning/MILESTONES.md .planning/PROJECT.md ${state_path}
 ```
 ```
 

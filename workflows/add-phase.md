@@ -29,12 +29,22 @@ Exit.
 Load phase operation context:
 
 ```bash
-INIT=$(node "$HOME/.claude/get-shit-done/bin/gsd-tools.cjs" init phase-op "0")
+# Extract --ws flag from arguments
+WS_NAME=""
+GSD_WS=""
+if echo "$ARGUMENTS" | grep -qE '\-\-ws[= ]'; then
+  WS_NAME=$(echo "$ARGUMENTS" | grep -oE '\-\-ws[= ][^ ]+' | sed 's/--ws[= ]//')
+  GSD_WS="--ws $WS_NAME"
+fi
+
+INIT=$(node "$HOME/.claude/get-shit-done/bin/gsd-tools.cjs" init phase-op "0" $GSD_WS)
 ```
+
+Extract from init JSON: `roadmap_path`, `state_path`, `phase_dir`.
 
 Check `roadmap_exists` from init JSON. If false:
 ```
-ERROR: No roadmap found (.planning/ROADMAP.md)
+ERROR: No roadmap found
 Run /gsd:new-project to initialize.
 ```
 Exit.
@@ -44,7 +54,7 @@ Exit.
 **Delegate the phase addition to gsd-tools:**
 
 ```bash
-RESULT=$(node "$HOME/.claude/get-shit-done/bin/gsd-tools.cjs" phase add "${description}")
+RESULT=$(node "$HOME/.claude/get-shit-done/bin/gsd-tools.cjs" phase add "${description}" $GSD_WS)
 ```
 
 The CLI handles:
@@ -60,7 +70,7 @@ Extract from result: `phase_number`, `padded`, `name`, `slug`, `directory`.
 <step name="update_project_state">
 Update STATE.md to reflect the new phase:
 
-1. Read `.planning/STATE.md`
+1. Read `${state_path}`
 2. Under "## Accumulated Context" → "### Roadmap Evolution" add entry:
    ```
    - Phase {N} added: {description}

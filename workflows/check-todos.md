@@ -12,10 +12,18 @@ Read all files referenced by the invoking prompt's execution_context before star
 Load todo context:
 
 ```bash
-INIT=$(node "$HOME/.claude/get-shit-done/bin/gsd-tools.cjs" init todos)
+# Extract --ws flag from arguments
+WS_NAME=""
+GSD_WS=""
+if echo "$ARGUMENTS" | grep -qE '\-\-ws[= ]'; then
+  WS_NAME=$(echo "$ARGUMENTS" | grep -oE '\-\-ws[= ][^ ]+' | sed 's/--ws[= ]//')
+  GSD_WS="--ws $WS_NAME"
+fi
+
+INIT=$(node "$HOME/.claude/get-shit-done/bin/gsd-tools.cjs" init todos $GSD_WS)
 ```
 
-Extract from init JSON: `todo_count`, `todos`, `pending_dir`.
+Extract from init JSON: `todo_count`, `todos`, `pending_dir`, `state_path`, `roadmap_path`.
 
 If `todo_count` is 0:
 ```
@@ -92,7 +100,7 @@ If `files` field has entries, read and briefly summarize each.
 <step name="check_roadmap">
 Check for roadmap (can use init progress or directly check file existence):
 
-If `.planning/ROADMAP.md` exists:
+If `${roadmap_path}` exists (extract `roadmap_path` from init JSON):
 1. Check if todo's area matches an upcoming phase
 2. Check if todo's files overlap with a phase's scope
 3. Note any match for action options
@@ -127,7 +135,7 @@ Use AskUserQuestion:
 ```bash
 mv ".planning/todos/pending/[filename]" ".planning/todos/done/"
 ```
-Update STATE.md todo count. Present problem/solution context. Begin work or ask how to proceed.
+Update `${state_path}` todo count. Present problem/solution context. Begin work or ask how to proceed.
 
 **Add to phase plan:**
 Note todo reference in phase planning notes. Keep in pending. Return to list or exit.
@@ -146,7 +154,7 @@ Return to list_todos step.
 <step name="update_state">
 After any action that changes todo count:
 
-Re-run `init todos` to get updated count, then update STATE.md "### Pending Todos" section if exists.
+Re-run `init todos $GSD_WS` to get updated count, then update `${state_path}` "### Pending Todos" section if exists.
 </step>
 
 <step name="git_commit">
@@ -154,7 +162,7 @@ If todo was moved to done/, commit the change:
 
 ```bash
 git rm --cached .planning/todos/pending/[filename] 2>/dev/null || true
-node "$HOME/.claude/get-shit-done/bin/gsd-tools.cjs" commit "docs: start work on todo - [title]" --files .planning/todos/done/[filename] .planning/STATE.md
+node "$HOME/.claude/get-shit-done/bin/gsd-tools.cjs" commit "docs: start work on todo - [title]" --files .planning/todos/done/[filename] ${state_path} $GSD_WS
 ```
 
 Tool respects `commit_docs` config and gitignore automatically.

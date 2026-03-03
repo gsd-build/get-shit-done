@@ -11,27 +11,35 @@ Read all files referenced by the invoking prompt's execution_context before star
 ## 0. Initialize Milestone Context
 
 ```bash
-INIT=$(node "$HOME/.claude/get-shit-done/bin/gsd-tools.cjs" init milestone-op)
+# Extract --ws flag from arguments
+WS_NAME=""
+GSD_WS=""
+if echo "$ARGUMENTS" | grep -qE '\-\-ws[= ]'; then
+  WS_NAME=$(echo "$ARGUMENTS" | grep -oE '\-\-ws[= ][^ ]+' | sed 's/--ws[= ]//')
+  GSD_WS="--ws $WS_NAME"
+fi
+
+INIT=$(node "$HOME/.claude/get-shit-done/bin/gsd-tools.cjs" init milestone-op $GSD_WS)
 ```
 
-Extract from init JSON: `milestone_version`, `milestone_name`, `phase_count`, `completed_phases`, `commit_docs`.
+Extract from init JSON: `milestone_version`, `milestone_name`, `phase_count`, `completed_phases`, `commit_docs`, `roadmap_path`, `state_path`, `requirements_path`, `phase_dir`.
 
 Resolve integration checker model:
 ```bash
-integration_checker_model=$(node "$HOME/.claude/get-shit-done/bin/gsd-tools.cjs" resolve-model gsd-integration-checker --raw)
+integration_checker_model=$(node "$HOME/.claude/get-shit-done/bin/gsd-tools.cjs" resolve-model gsd-integration-checker --raw $GSD_WS)
 ```
 
 ## 1. Determine Milestone Scope
 
 ```bash
 # Get phases in milestone (sorted numerically, handles decimals)
-node "$HOME/.claude/get-shit-done/bin/gsd-tools.cjs" phases list
+node "$HOME/.claude/get-shit-done/bin/gsd-tools.cjs" phases list $GSD_WS
 ```
 
-- Parse version from arguments or detect current from ROADMAP.md
+- Parse version from arguments or detect current from `${roadmap_path}`
 - Identify all phase directories in scope
-- Extract milestone definition of done from ROADMAP.md
-- Extract requirements mapped to this milestone from REQUIREMENTS.md
+- Extract milestone definition of done from `${roadmap_path}`
+- Extract requirements mapped to this milestone from `${requirements_path}`
 
 ## 2. Read All Phase Verifications
 
@@ -39,9 +47,9 @@ For each phase directory, read the VERIFICATION.md:
 
 ```bash
 # For each phase, use find-phase to resolve the directory (handles archived phases)
-PHASE_INFO=$(node "$HOME/.claude/get-shit-done/bin/gsd-tools.cjs" find-phase 01 --raw)
+PHASE_INFO=$(node "$HOME/.claude/get-shit-done/bin/gsd-tools.cjs" find-phase 01 --raw $GSD_WS)
 # Extract directory from JSON, then read VERIFICATION.md from that directory
-# Repeat for each phase number from ROADMAP.md
+# Repeat for each phase number from ${roadmap_path}
 ```
 
 From each VERIFICATION.md, extract:
@@ -57,7 +65,7 @@ If a phase is missing VERIFICATION.md, flag it as "unverified phase" — this is
 
 With phase context collected:
 
-Extract `MILESTONE_REQ_IDS` from REQUIREMENTS.md traceability table — all REQ-IDs assigned to phases in this milestone.
+Extract `MILESTONE_REQ_IDS` from `${requirements_path}` traceability table — all REQ-IDs assigned to phases in this milestone.
 
 ```
 Task(
@@ -88,7 +96,7 @@ Combine:
 
 MUST cross-reference three independent sources for each requirement:
 
-### 5a. Parse REQUIREMENTS.md Traceability Table
+### 5a. Parse `${requirements_path}` Traceability Table
 
 Extract all REQ-IDs mapped to milestone phases from the traceability table:
 - Requirement ID, description, assigned phase, current status, checked-off state (`[x]` vs `[ ]`)
@@ -103,8 +111,8 @@ For each phase's VERIFICATION.md, extract the expanded requirements table:
 
 For each phase's SUMMARY.md, extract `requirements-completed` from YAML frontmatter:
 ```bash
-for summary in .planning/phases/*-*/*-SUMMARY.md; do
-  node "$HOME/.claude/get-shit-done/bin/gsd-tools.cjs" summary-extract "$summary" --fields requirements_completed | jq -r '.requirements_completed'
+for summary in ${phase_dir}/*-*/*-SUMMARY.md; do
+  node "$HOME/.claude/get-shit-done/bin/gsd-tools.cjs" summary-extract "$summary" --fields requirements_completed $GSD_WS | jq -r '.requirements_completed'
 done
 ```
 

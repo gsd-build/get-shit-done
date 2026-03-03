@@ -16,6 +16,22 @@ Archive accumulated phase directories from completed milestones into `.planning/
 
 <step name="identify_completed_milestones">
 
+Extract workstream context:
+
+```bash
+# Extract --ws flag from arguments
+WS_NAME=""
+GSD_WS=""
+if echo "$ARGUMENTS" | grep -qE '\-\-ws[= ]'; then
+  WS_NAME=$(echo "$ARGUMENTS" | grep -oE '\-\-ws[= ][^ ]+' | sed 's/--ws[= ]//')
+  GSD_WS="--ws $WS_NAME"
+fi
+
+INIT=$(node "$HOME/.claude/get-shit-done/bin/gsd-tools.cjs" init phase-op "0" $GSD_WS)
+```
+
+Extract from init JSON: `phase_dir`, `roadmap_path`, `state_path`.
+
 Read `.planning/MILESTONES.md` to identify completed milestones and their versions.
 
 ```bash
@@ -52,13 +68,13 @@ cat .planning/milestones/v{X.Y}-ROADMAP.md
 
 Extract phase numbers and names from the archived roadmap (e.g., Phase 1: Foundation, Phase 2: Auth).
 
-Check which of those phase directories still exist in `.planning/phases/`:
+Check which of those phase directories still exist in `${phase_dir}`:
 
 ```bash
-ls -d .planning/phases/*/ 2>/dev/null
+ls -d ${phase_dir}/*/ 2>/dev/null
 ```
 
-Match phase directories to milestone membership. Only include directories that still exist in `.planning/phases/`.
+Match phase directories to milestone membership. Only include directories that still exist in `${phase_dir}`.
 
 </step>
 
@@ -110,7 +126,7 @@ mkdir -p .planning/milestones/v{X.Y}-phases
 For each phase directory belonging to this milestone:
 
 ```bash
-mv .planning/phases/{dir} .planning/milestones/v{X.Y}-phases/
+mv ${phase_dir}/{dir} .planning/milestones/v{X.Y}-phases/
 ```
 
 Repeat for all milestones in the cleanup set.
@@ -122,7 +138,7 @@ Repeat for all milestones in the cleanup set.
 Commit the changes:
 
 ```bash
-node "$HOME/.claude/get-shit-done/bin/gsd-tools.cjs" commit "chore: archive phase directories from completed milestones" --files .planning/milestones/ .planning/phases/
+node "$HOME/.claude/get-shit-done/bin/gsd-tools.cjs" commit "chore: archive phase directories from completed milestones" --files .planning/milestones/ ${phase_dir} $GSD_WS
 ```
 
 </step>

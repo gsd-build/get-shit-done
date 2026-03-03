@@ -23,8 +23,16 @@ if $ARGUMENTS.profile not in ["quality", "balanced", "budget"]:
 Ensure config exists and load current state:
 
 ```bash
-node "$HOME/.claude/get-shit-done/bin/gsd-tools.cjs" config-ensure-section
-INIT=$(node "$HOME/.claude/get-shit-done/bin/gsd-tools.cjs" state load)
+# Extract --ws flag from arguments
+WS_NAME=""
+GSD_WS=""
+if echo "$ARGUMENTS" | grep -qE '\-\-ws[= ]'; then
+  WS_NAME=$(echo "$ARGUMENTS" | grep -oE '\-\-ws[= ][^ ]+' | sed 's/--ws[= ]//')
+  GSD_WS="--ws $WS_NAME"
+fi
+
+node "$HOME/.claude/get-shit-done/bin/gsd-tools.cjs" config-ensure-section ${GSD_WS}
+INIT=$(node "$HOME/.claude/get-shit-done/bin/gsd-tools.cjs" state load ${GSD_WS})
 ```
 
 This creates `.planning/config.json` with defaults if missing and loads current config.

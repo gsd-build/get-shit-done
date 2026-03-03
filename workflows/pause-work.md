@@ -9,11 +9,27 @@ Read all files referenced by the invoking prompt's execution_context before star
 <process>
 
 <step name="detect">
+Extract workstream context and find current phase directory:
+
+```bash
+# Extract --ws flag from arguments
+WS_NAME=""
+GSD_WS=""
+if echo "$ARGUMENTS" | grep -qE '\-\-ws[= ]'; then
+  WS_NAME=$(echo "$ARGUMENTS" | grep -oE '\-\-ws[= ][^ ]+' | sed 's/--ws[= ]//')
+  GSD_WS="--ws $WS_NAME"
+fi
+
+INIT=$(node "$HOME/.claude/get-shit-done/bin/gsd-tools.cjs" init phase-op "0" $GSD_WS)
+```
+
+Extract from init JSON: `phase_dir`, `state_path`.
+
 Find current phase directory from most recently modified files:
 
 ```bash
 # Find most recent phase directory with work
-ls -lt .planning/phases/*/PLAN.md 2>/dev/null | head -1 | grep -oP 'phases/\K[^/]+'
+ls -lt ${phase_dir}/*/PLAN.md 2>/dev/null | head -1 | grep -oP 'phases/\K[^/]+'
 ```
 
 If no active phase detected, ask user which phase they're pausing work on.
@@ -34,7 +50,7 @@ Ask user for clarifications if needed via conversational questions.
 </step>
 
 <step name="write">
-**Write handoff to `.planning/phases/XX-name/.continue-here.md`:**
+**Write handoff to `${phase_dir}/XX-name/.continue-here.md`:**
 
 ```markdown
 ---
@@ -86,13 +102,13 @@ Be specific enough for a fresh Claude to understand immediately.
 
 Use `current-timestamp` for last_updated field. You can use init todos (which provides timestamps) or call directly:
 ```bash
-timestamp=$(node "$HOME/.claude/get-shit-done/bin/gsd-tools.cjs" current-timestamp full --raw)
+timestamp=$(node "$HOME/.claude/get-shit-done/bin/gsd-tools.cjs" current-timestamp full --raw $GSD_WS)
 ```
 </step>
 
 <step name="commit">
 ```bash
-node "$HOME/.claude/get-shit-done/bin/gsd-tools.cjs" commit "wip: [phase-name] paused at task [X]/[Y]" --files .planning/phases/*/.continue-here.md
+node "$HOME/.claude/get-shit-done/bin/gsd-tools.cjs" commit "wip: [phase-name] paused at task [X]/[Y]" --files ${phase_dir}/*/.continue-here.md $GSD_WS
 ```
 </step>
 

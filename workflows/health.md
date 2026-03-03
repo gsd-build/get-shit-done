@@ -19,13 +19,23 @@ if arguments contain "--repair"; then
   REPAIR_FLAG="--repair"
 fi
 ```
+
+```bash
+# Extract --ws flag from arguments
+WS_NAME=""
+GSD_WS=""
+if echo "$ARGUMENTS" | grep -qE '\-\-ws[= ]'; then
+  WS_NAME=$(echo "$ARGUMENTS" | grep -oE '\-\-ws[= ][^ ]+' | sed 's/--ws[= ]//')
+  GSD_WS="--ws $WS_NAME"
+fi
+```
 </step>
 
 <step name="run_health_check">
 **Run health validation:**
 
 ```bash
-node "$HOME/.claude/get-shit-done/bin/gsd-tools.cjs" validate health $REPAIR_FLAG
+node "$HOME/.claude/get-shit-done/bin/gsd-tools.cjs" validate health $REPAIR_FLAG $GSD_WS
 ```
 
 Parse JSON output:
@@ -112,7 +122,7 @@ If yes, re-run with --repair flag and display results.
 Re-run health check without --repair to confirm issues are resolved:
 
 ```bash
-node "$HOME/.claude/get-shit-done/bin/gsd-tools.cjs" validate health
+node "$HOME/.claude/get-shit-done/bin/gsd-tools.cjs" validate health $GSD_WS
 ```
 
 Report final status.
