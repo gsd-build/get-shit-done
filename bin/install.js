@@ -639,7 +639,13 @@ function mergeCodexConfig(configPath, gsdBlock) {
   // Case 2: Has GSD marker — truncate and re-append
   if (markerIndex !== -1) {
     const before = existing.substring(0, markerIndex).trimEnd();
-    const newContent = before ? before + '\n\n' + gsdBlock + '\n' : gsdBlock + '\n';
+    // If user's config already has [features], only append from [agents] onward
+    // to avoid duplicating the [features] section (same logic as Case 3)
+    const hasFeatures = /^\[features\]\s*$/m.test(before);
+    const block = hasFeatures
+      ? GSD_CODEX_MARKER + '\n' + gsdBlock.substring(gsdBlock.indexOf('[agents]'))
+      : gsdBlock;
+    const newContent = before ? before + '\n\n' + block + '\n' : gsdBlock + '\n';
     fs.writeFileSync(configPath, newContent);
     return;
   }
