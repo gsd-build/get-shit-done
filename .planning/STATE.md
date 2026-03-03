@@ -3,7 +3,7 @@ gsd_state_version: 1.0
 milestone: v1.23
 milestone_name: milestone
 status: unknown
-last_updated: "2026-03-03T11:01:19.405Z"
+last_updated: "2026-03-03T11:17:57.008Z"
 progress:
   total_phases: 2
   completed_phases: 2
@@ -22,12 +22,12 @@ See: .planning/PROJECT.md (updated 2026-03-02)
 
 ## Current Position
 
-Phase: 2 of 4 (Content Conversion Engine)
-Plan: 2 of 2 in current phase
-Status: Phase 02 complete — all plans executed
-Last activity: 2026-03-03 — Phase 2 Plan 2 executed (Copilot conversion test suite)
+Phase: 3 of 4 (Instructions & Lifecycle)
+Plan: 1 of 2 in current phase
+Status: Plan 03-01 complete — instructions lifecycle implemented
+Last activity: 2026-03-03 — Phase 3 Plan 1 executed (instructions merge/strip + lifecycle fixes)
 
-Progress: [██████████] 100% (3/3 plans complete)
+Progress: [████████░░] 80% (4/5 plans complete)
 
 ## Performance Metrics
 
@@ -46,6 +46,7 @@ Progress: [██████████] 100% (3/3 plans complete)
 | Phase 01 P01 | 6min | 2 tasks | 2 files |
 | Phase 02 P01 | 5min | 2 tasks | 1 files |
 | Phase 02 P02 | 5min | 2 tasks | 1 files |
+| Phase 03 P01 | 5min | 2 tasks | 2 files |
 
 ## Accumulated Context
 
@@ -68,6 +69,8 @@ Recent decisions affecting current work:
 - [Phase 02]: .cjs/.js engine files also get CONV-06+CONV-07 transformation for Copilot
 - [Phase 02]: mcp__context7__* wildcard in agents maps to io.github.upstash/context7/* (no individual tool IDs used)
 - [Phase 02]: extractFrontmatterField \s* regex crosses line boundaries on empty values — known edge case, not blocking
+- [Phase 03]: Copilot instructions use paired HTML comment markers (open + close) unlike Codex single-marker-to-EOF
+- [Phase 03]: Added !isCopilot to commands/gsd/ hashing exclusion in writeManifest for correctness
 
 ### Pending Todos
 
@@ -81,5 +84,5 @@ None yet.
 ## Session Continuity
 
 Last session: 2026-03-03
-Stopped at: Completed 02-02-PLAN.md — conversion test suite added, Phase 02 complete
-Resume file: .planning/phases/02-content-conversion-engine/02-02-SUMMARY.md
+Stopped at: Completed 03-01-PLAN.md
+Resume file: .planning/phases/03-instructions-lifecycle/03-01-SUMMARY.md

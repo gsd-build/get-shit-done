@@ -31,14 +31,14 @@ Requirements for Copilot CLI installation support. Each maps to roadmap phases.
 
 ### Instructions
 
-- [ ] **INST-01**: `copilot-instructions.md` generated/updated at `.github/copilot-instructions.md` with GSD instructions
-- [ ] **INST-02**: Smart marker-based merging preserves existing user content in `copilot-instructions.md` (uses `<!-- GSD Configuration -->` markers)
+- [x] **INST-01**: `copilot-instructions.md` generated/updated at `.github/copilot-instructions.md` with GSD instructions
+- [x] **INST-02**: Smart marker-based merging preserves existing user content in `copilot-instructions.md` (uses `<!-- GSD Configuration -->` markers)
 
 ### Lifecycle
 
-- [ ] **LIFE-01**: Uninstall support removes GSD skills, agents, get-shit-done dir from `.github/` without removing non-GSD content
-- [ ] **LIFE-02**: File manifest (`gsd-file-manifest.json`) written after installation for change detection
-- [ ] **LIFE-03**: Local patch persistence detects user modifications before reinstall, backs up to `gsd-local-patches/`
+- [x] **LIFE-01**: Uninstall support removes GSD skills, agents, get-shit-done dir from `.github/` without removing non-GSD content
+- [x] **LIFE-02**: File manifest (`gsd-file-manifest.json`) written after installation for change detection
+- [x] **LIFE-03**: Local patch persistence detects user modifications before reinstall, backs up to `gsd-local-patches/`
 
 ### Quality
 
@@ -83,11 +83,11 @@ Deferred to later milestones.
 | CONV-08 | Phase 2 | Complete |
 | CONV-09 | Phase 2 | Complete |
 | CONV-10 | Phase 2 | Complete |
-| INST-01 | Phase 3 | Pending |
-| INST-02 | Phase 3 | Pending |
-| LIFE-01 | Phase 3 | Pending |
-| LIFE-02 | Phase 3 | Pending |
-| LIFE-03 | Phase 3 | Pending |
+| INST-01 | Phase 3 | Complete |
+| INST-02 | Phase 3 | Complete |
+| LIFE-01 | Phase 3 | Complete |
+| LIFE-02 | Phase 3 | Complete |
+| LIFE-03 | Phase 3 | Complete |
 | QUAL-01 | Phase 4 | Pending |
 | QUAL-02 | Phase 4 | Pending |
 
