@@ -363,6 +363,37 @@ requirements-completed:
     assert.strictEqual(output.decisions, undefined, 'decisions excluded');
   });
 
+  test('extracts one-liner from body when not in frontmatter', () => {
+    const phaseDir = path.join(tmpDir, '.planning', 'phases', '01-foundation');
+    fs.mkdirSync(phaseDir, { recursive: true });
+
+    fs.writeFileSync(
+      path.join(phaseDir, '01-01-SUMMARY.md'),
+      `---
+phase: "01"
+key-files:
+  - src/lib/db.ts
+---
+
+# Phase 1: Foundation Summary
+
+**JWT auth with refresh rotation using jose library**
+
+## Performance
+
+- **Duration:** 28 min
+- **Tasks:** 5
+`
+    );
+
+    const result = runGsdTools('summary-extract .planning/phases/01-foundation/01-01-SUMMARY.md', tmpDir);
+    assert.ok(result.success, `Command failed: ${result.error}`);
+
+    const output = JSON.parse(result.output);
+    assert.strictEqual(output.one_liner, 'JWT auth with refresh rotation using jose library',
+      'one-liner should be extracted from body **bold** line');
+  });
+
   test('handles missing frontmatter fields gracefully', () => {
     const phaseDir = path.join(tmpDir, '.planning', 'phases', '01-foundation');
     fs.mkdirSync(phaseDir, { recursive: true });
