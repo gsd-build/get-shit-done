@@ -406,7 +406,7 @@ I'll verify: vercel whoami returns your account
 
 | Platform | CLI Command | Example |
 |----------|-------------|---------|
-| Convex | `npx convex env set` | `npx convex env set OPENAI_API_KEY sk-...` |
+| Convex | `npx convex env set` | `npx convex env set OPENAI_API_KEY sk-...` or `npx convex env set NOVITA_API_KEY nv-...` |
 | Vercel | `vercel env add` | `vercel env add STRIPE_KEY production` |
 | Railway | `railway variables set` | `railway variables set API_KEY=value` |
 | Fly | `fly secrets set` | `fly secrets set DATABASE_URL=...` |
@@ -422,21 +422,47 @@ I'll verify: vercel whoami returns your account
 
 <!-- RIGHT: Claude asks for value, then adds via CLI -->
 <task type="checkpoint:human-action">
-  <action>Provide your OpenAI API key</action>
+  <action>Provide your API key (OpenAI or Novita)</action>
   <instructions>
-    I need your OpenAI API key for Convex backend.
-    Get it from: https://platform.openai.com/api-keys
-    Paste the key (starts with sk-)
+    I need an API key for Convex backend.
+    OpenAI: https://platform.openai.com/api-keys (starts with sk-)
+    Novita: https://novita.ai (starts with nv-)
+    Paste either key.
   </instructions>
   <verification>I'll add it via `npx convex env set` and verify</verification>
   <resume-signal>Paste your API key</resume-signal>
 </task>
 
 <task type="auto">
-  <name>Configure OpenAI key in Convex</name>
-  <action>Run `npx convex env set OPENAI_API_KEY {user-provided-key}`</action>
-  <verify>`npx convex env get OPENAI_API_KEY` returns the key (masked)</verify>
+  <name>Configure LLM key in Convex</name>
+  <action>Run `npx convex env set OPENAI_API_KEY {key}` for OpenAI, or `npx convex env set NOVITA_API_KEY {key}` for Novita</action>
+  <verify>`npx convex env get OPENAI_API_KEY` or `npx convex env get NOVITA_API_KEY` returns masked value</verify>
 </task>
+```
+
+**OpenAI SDK + Novita endpoint pattern (drop-in):**
+```ts
+import OpenAI from "openai";
+
+const useNovita = Boolean(process.env.NOVITA_API_KEY);
+
+const client = new OpenAI({
+  apiKey: useNovita ? process.env.NOVITA_API_KEY : process.env.OPENAI_API_KEY,
+  baseURL: useNovita ? "https://api.novita.ai/openai" : undefined,
+});
+
+const model = process.env.LLM_MODEL || (
+  useNovita ? "deepseek/deepseek-v3.2" : "gpt-4o-mini"
+);
+
+// Novita examples:
+// - deepseek/deepseek-v3.2
+// - minimax-minimax-m2.5
+// - zai-org-glm-5
+const response = await client.chat.completions.create({
+  model,
+  messages: [{ role: "user", content: "Hello from GSD" }],
+});
 ```
 
 ## Dev Server Automation
