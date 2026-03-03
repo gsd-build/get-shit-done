@@ -30,9 +30,9 @@ gaps.md
 improve.md
 philosophy.md
 
-
 # Installed skills
 .github/agents/gsd-*
 .github/skills/gsd-*
 .github/get-shit-done/*
 .github/skills/get-shit-done
+.github/copilot-instructions.md
