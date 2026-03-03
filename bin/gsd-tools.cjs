@@ -124,6 +124,14 @@
  *   init milestone-op                  All context for milestone operations
  *   init map-codebase                  All context for map-codebase workflow
  *   init progress                      All context for progress workflow
+ *
+ * Workstream Operations:
+ *   workstream create <name>           Create a new workstream (migrates flat→ws if needed)
+ *     [--migrate-name <name>]          Name for existing work during migration
+ *     [--no-migrate]                   Skip migration, just create empty ws
+ *   workstream list                    List all workstreams with status
+ *   workstream status <name>           Detailed status for one workstream
+ *   workstream complete <name>         Archive a workstream to milestones/
  */
 
 const fs = require('fs');
@@ -140,6 +148,7 @@ const milestone = require('./lib/milestone.cjs');
 const commands = require('./lib/commands.cjs');
 const init = require('./lib/init.cjs');
 const frontmatter = require('./lib/frontmatter.cjs');
+const workstream = require('./lib/workstream.cjs');
 
 // ─── CLI Router ───────────────────────────────────────────────────────────────
 
@@ -189,7 +198,7 @@ async function main() {
   const command = args[0];
 
   if (!command) {
-    error('Usage: gsd-tools <command> [args] [--raw] [--cwd <path>]\nCommands: state, resolve-model, find-phase, commit, verify-summary, verify, frontmatter, template, generate-slug, current-timestamp, list-todos, verify-path-exists, config-ensure-section, init');
+    error('Usage: gsd-tools <command> [args] [--raw] [--cwd <path>] [--ws <name>]\nCommands: state, resolve-model, find-phase, commit, verify-summary, verify, frontmatter, template, generate-slug, current-timestamp, list-todos, verify-path-exists, config-ensure-section, init, workstream');
   }
 
   switch (command) {
@@ -594,6 +603,27 @@ async function main() {
         limit: limitIdx !== -1 ? parseInt(args[limitIdx + 1], 10) : 10,
         freshness: freshnessIdx !== -1 ? args[freshnessIdx + 1] : null,
       }, raw);
+      break;
+    }
+
+    case 'workstream': {
+      const subcommand = args[1];
+      if (subcommand === 'create') {
+        const migrateNameIdx = args.indexOf('--migrate-name');
+        const noMigrate = args.includes('--no-migrate');
+        workstream.cmdWorkstreamCreate(cwd, args[2], {
+          migrate: !noMigrate,
+          migrateName: migrateNameIdx !== -1 ? args[migrateNameIdx + 1] : null,
+        }, raw, paths);
+      } else if (subcommand === 'list') {
+        workstream.cmdWorkstreamList(cwd, raw);
+      } else if (subcommand === 'status') {
+        workstream.cmdWorkstreamStatus(cwd, args[2], raw);
+      } else if (subcommand === 'complete') {
+        workstream.cmdWorkstreamComplete(cwd, args[2], {}, raw);
+      } else {
+        error('Unknown workstream subcommand. Available: create, list, status, complete');
+      }
       break;
     }
 
