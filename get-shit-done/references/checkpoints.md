@@ -457,8 +457,8 @@ const model = process.env.LLM_MODEL || (
 
 // Novita examples:
 // - deepseek/deepseek-v3.2
-// - minimax-minimax-m2.5
-// - zai-org-glm-5
+// - minimax/minimax-m2.5
+// - zai-org/glm-5
 const response = await client.chat.completions.create({
   model,
   messages: [{ role: "user", content: "Hello from GSD" }],
