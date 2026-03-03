@@ -1403,24 +1403,26 @@ function uninstall(isGlobal, runtime = 'claude') {
       }
     }
 
-    // Remove GSD hooks from PostToolUse
-    if (settings.hooks && settings.hooks.PostToolUse) {
-      const before = settings.hooks.PostToolUse.length;
-      settings.hooks.PostToolUse = settings.hooks.PostToolUse.filter(entry => {
-        if (entry.hooks && Array.isArray(entry.hooks)) {
-          const hasGsdHook = entry.hooks.some(h =>
-            h.command && h.command.includes('gsd-context-monitor')
-          );
-          return !hasGsdHook;
+    // Remove GSD hooks from PostToolUse and AfterTool (Gemini uses AfterTool)
+    for (const eventName of ['PostToolUse', 'AfterTool']) {
+      if (settings.hooks && settings.hooks[eventName]) {
+        const before = settings.hooks[eventName].length;
+        settings.hooks[eventName] = settings.hooks[eventName].filter(entry => {
+          if (entry.hooks && Array.isArray(entry.hooks)) {
+            const hasGsdHook = entry.hooks.some(h =>
+              h.command && h.command.includes('gsd-context-monitor')
+            );
+            return !hasGsdHook;
+          }
+          return true;
+        });
+        if (settings.hooks[eventName].length < before) {
+          settingsModified = true;
+          console.log(`  ${green}✓${reset} Removed context monitor hook from settings`);
         }
-        return true;
-      });
-      if (settings.hooks.PostToolUse.length < before) {
-        settingsModified = true;
-        console.log(`  ${green}✓${reset} Removed context monitor hook from settings`);
-      }
-      if (settings.hooks.PostToolUse.length === 0) {
-        delete settings.hooks.PostToolUse;
+        if (settings.hooks[eventName].length === 0) {
+          delete settings.hooks[eventName];
+        }
       }
     }
 
@@ -2031,7 +2033,8 @@ function install(isGlobal, runtime = 'claude') {
   }
 
   // Configure statusline and hooks in settings.json
-  // Gemini shares same hook system as Claude Code for now
+  // Gemini uses AfterTool instead of PostToolUse for post-tool hooks
+  const postToolEvent = runtime === 'gemini' ? 'AfterTool' : 'PostToolUse';
   const settingsPath = path.join(targetDir, 'settings.json');
   const settings = cleanupOrphanedHooks(readSettings(settingsPath));
   const statuslineCommand = isGlobal
@@ -2080,17 +2083,17 @@ function install(isGlobal, runtime = 'claude') {
       console.log(`  ${green}✓${reset} Configured update check hook`);
     }
 
-    // Configure PostToolUse hook for context window monitoring
-    if (!settings.hooks.PostToolUse) {
-      settings.hooks.PostToolUse = [];
+    // Configure post-tool hook for context window monitoring
+    if (!settings.hooks[postToolEvent]) {
+      settings.hooks[postToolEvent] = [];
     }
 
-    const hasContextMonitorHook = settings.hooks.PostToolUse.some(entry =>
+    const hasContextMonitorHook = settings.hooks[postToolEvent].some(entry =>
       entry.hooks && entry.hooks.some(h => h.command && h.command.includes('gsd-context-monitor'))
     );
 
     if (!hasContextMonitorHook) {
-      settings.hooks.PostToolUse.push({
+      settings.hooks[postToolEvent].push({
         hooks: [
           {
             type: 'command',

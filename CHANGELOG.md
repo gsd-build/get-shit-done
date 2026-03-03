@@ -6,6 +6,10 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ## [Unreleased]
 
+### Fixed
+- Scope phase counting in `buildStateFrontmatter` and `cmdPhaseComplete` to current milestone — multi-milestone projects no longer report inflated total/completed phases
+- Use ROADMAP phase count for `total_phases` when phases lack directories — prevents premature milestone completion detection
+
 ## [1.22.1] - 2026-03-02
 
 ### Added

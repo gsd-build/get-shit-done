@@ -1,5 +1,5 @@
 #!/usr/bin/env node
-// Context Monitor - PostToolUse hook
+// Context Monitor - PostToolUse/AfterTool hook (Gemini uses AfterTool)
 // Reads context metrics from the statusline bridge file and injects
 // warnings when context usage is high. This makes the AGENT aware of
 // context limits (the statusline only shows the user).
@@ -109,7 +109,7 @@ process.stdin.on('end', () => {
 
     const output = {
       hookSpecificOutput: {
-        hookEventName: "PostToolUse",
+        hookEventName: process.env.GEMINI_API_KEY ? "AfterTool" : "PostToolUse",
         additionalContext: message
       }
     };

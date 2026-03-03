@@ -4,7 +4,7 @@
 
 const fs = require('fs');
 const path = require('path');
-const { escapeRegex, normalizePhaseName, comparePhaseNum, findPhaseInternal, getArchivedPhaseDirs, generateSlugInternal, output, error } = require('./core.cjs');
+const { escapeRegex, normalizePhaseName, comparePhaseNum, findPhaseInternal, getArchivedPhaseDirs, generateSlugInternal, getMilestonePhaseFilter, output, error } = require('./core.cjs');
 const { extractFrontmatter } = require('./frontmatter.cjs');
 const { writeStateMd } = require('./state.cjs');
 
@@ -783,14 +783,19 @@ function cmdPhaseComplete(cwd, phaseNum, raw) {
     }
   }
 
-  // Find next phase
+  // Find next phase — check both filesystem AND roadmap
+  // Phases may be defined in ROADMAP.md but not yet scaffolded to disk,
+  // so a filesystem-only scan would incorrectly report is_last_phase:true
   let nextPhaseNum = null;
   let nextPhaseName = null;
   let isLastPhase = true;
 
   try {
+    const isDirInMilestone = getMilestonePhaseFilter(cwd);
     const entries = fs.readdirSync(phasesDir, { withFileTypes: true });
-    const dirs = entries.filter(e => e.isDirectory()).map(e => e.name).sort((a, b) => comparePhaseNum(a, b));
+    const dirs = entries.filter(e => e.isDirectory()).map(e => e.name)
+      .filter(isDirInMilestone)
+      .sort((a, b) => comparePhaseNum(a, b));
 
     // Find the next phase directory after current
     for (const dir of dirs) {
@@ -805,6 +810,24 @@ function cmdPhaseComplete(cwd, phaseNum, raw) {
       }
     }
   } catch {}
+
+  // Fallback: if filesystem found no next phase, check ROADMAP.md
+  // for phases that are defined but not yet planned (no directory on disk)
+  if (isLastPhase && fs.existsSync(roadmapPath)) {
+    try {
+      const roadmapForPhases = fs.readFileSync(roadmapPath, 'utf-8');
+      const phasePattern = /#{2,4}\s*Phase\s+(\d+[A-Z]?(?:\.\d+)*)\s*:\s*([^\n]+)/gi;
+      let pm;
+      while ((pm = phasePattern.exec(roadmapForPhases)) !== null) {
+        if (comparePhaseNum(pm[1], phaseNum) > 0) {
+          nextPhaseNum = pm[1];
+          nextPhaseName = pm[2].replace(/\(INSERTED\)/i, '').trim().toLowerCase().replace(/\s+/g, '-');
+          isLastPhase = false;
+          break;
+        }
+      }
+    } catch {}
+  }
 
   // Update STATE.md
   if (fs.existsSync(statePath)) {

@@ -607,41 +607,15 @@ Display banner:
  GSD ► AUTO-ADVANCING TO PLAN
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
-Context captured. Spawning plan-phase...
+Context captured. Launching plan-phase...
 ```
 
-Spawn plan-phase as Task with direct workflow file reference (do NOT use Skill tool — Skills don't resolve inside Task subagents):
+Launch plan-phase using the Skill tool to avoid nested Task sessions (which cause runtime freezes due to deep agent nesting — see #686):
 ```
-Task(
-  prompt="
-    <objective>
-    You are the plan-phase orchestrator. Create executable plans for Phase ${PHASE}: ${PHASE_NAME}, then auto-advance to execution.
-    </objective>
-
-    <execution_context>
-    @~/.claude/get-shit-done/workflows/plan-phase.md
-    @~/.claude/get-shit-done/references/ui-brand.md
-    @~/.claude/get-shit-done/references/model-profile-resolution.md
-    </execution_context>
-
-    <arguments>
-    PHASE=${PHASE}
-    ARGUMENTS='${PHASE} --auto'
-    </arguments>
-
-    <instructions>
-    1. Read plan-phase.md from execution_context for your complete workflow
-    2. Follow ALL steps: initialize, validate, load context, research, plan, verify, auto-advance
-    3. When spawning agents (gsd-phase-researcher, gsd-planner, gsd-plan-checker), use Task with specified subagent_type and model
-    4. For step 14 (auto-advance to execute): spawn execute-phase as a Task with DIRECT file reference — tell it to read execute-phase.md. Include @file refs to execute-phase.md, checkpoints.md, tdd.md, model-profile-resolution.md. Pass --no-transition flag so execute-phase returns results instead of chaining further.
-    5. Do NOT use the Skill tool or /gsd: commands. Read workflow .md files directly.
-    6. Return: PHASE COMPLETE (full pipeline success), PLANNING COMPLETE (planning done but execute failed/skipped), PLANNING INCONCLUSIVE, or GAPS FOUND
-    </instructions>
-  ",
-  subagent_type="general-purpose",
-  description="Plan Phase ${PHASE}"
-)
+Skill(skill="gsd:plan-phase", args="${PHASE} --auto")
 ```
+
+This keeps the auto-advance chain flat — discuss, plan, and execute all run at the same nesting level rather than spawning increasingly deep Task agents.
 
 **Handle plan-phase return:**
 - **PHASE COMPLETE** → Full chain succeeded. Display:

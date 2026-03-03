@@ -13,16 +13,28 @@ Detect whether GSD is installed locally or globally by checking both locations a
 
 ```bash
 # Check local first (takes priority only if valid)
-# Paths templated at install time for runtime compatibility
-LOCAL_VERSION_FILE="./.claude/get-shit-done/VERSION"
-LOCAL_MARKER_FILE="./.claude/get-shit-done/workflows/update.md"
-GLOBAL_VERSION_FILE="$HOME/.claude/get-shit-done/VERSION"
-GLOBAL_MARKER_FILE="$HOME/.claude/get-shit-done/workflows/update.md"
+# Detect runtime config directory (supports Claude, OpenCode, Gemini)
+LOCAL_VERSION_FILE="" LOCAL_MARKER_FILE=""
+for dir in .claude .config/opencode .opencode .gemini; do
+  if [ -f "./$dir/get-shit-done/VERSION" ]; then
+    LOCAL_VERSION_FILE="./$dir/get-shit-done/VERSION"
+    LOCAL_MARKER_FILE="./$dir/get-shit-done/workflows/update.md"
+    break
+  fi
+done
+GLOBAL_VERSION_FILE="" GLOBAL_MARKER_FILE=""
+for dir in .claude .config/opencode .opencode .gemini; do
+  if [ -f "$HOME/$dir/get-shit-done/VERSION" ]; then
+    GLOBAL_VERSION_FILE="$HOME/$dir/get-shit-done/VERSION"
+    GLOBAL_MARKER_FILE="$HOME/$dir/get-shit-done/workflows/update.md"
+    break
+  fi
+done
 
-if [ -f "$LOCAL_VERSION_FILE" ] && [ -f "$LOCAL_MARKER_FILE" ] && grep -Eq '^[0-9]+\.[0-9]+\.[0-9]+' "$LOCAL_VERSION_FILE"; then
+if [ -n "$LOCAL_VERSION_FILE" ] && [ -f "$LOCAL_VERSION_FILE" ] && [ -f "$LOCAL_MARKER_FILE" ] && grep -Eq '^[0-9]+\.[0-9]+\.[0-9]+' "$LOCAL_VERSION_FILE"; then
   cat "$LOCAL_VERSION_FILE"
   echo "LOCAL"
-elif [ -f "$GLOBAL_VERSION_FILE" ] && [ -f "$GLOBAL_MARKER_FILE" ] && grep -Eq '^[0-9]+\.[0-9]+\.[0-9]+' "$GLOBAL_VERSION_FILE"; then
+elif [ -n "$GLOBAL_VERSION_FILE" ] && [ -f "$GLOBAL_VERSION_FILE" ] && [ -f "$GLOBAL_MARKER_FILE" ] && grep -Eq '^[0-9]+\.[0-9]+\.[0-9]+' "$GLOBAL_VERSION_FILE"; then
   cat "$GLOBAL_VERSION_FILE"
   echo "GLOBAL"
 else
@@ -165,11 +177,14 @@ Capture output. If install fails, show error and exit.
 Clear the update cache so statusline indicator disappears:
 
 ```bash
-rm -f ./.claude/cache/gsd-update-check.json
-rm -f ~/.claude/cache/gsd-update-check.json
+# Clear update cache across all runtime directories
+for dir in .claude .config/opencode .opencode .gemini; do
+  rm -f "./$dir/cache/gsd-update-check.json"
+  rm -f "$HOME/$dir/cache/gsd-update-check.json"
+done
 ```
 
-The SessionStart hook (`gsd-check-update.js`) always writes to `~/.claude/cache/` via `os.homedir()` regardless of install type, so both paths must be cleared to prevent stale update indicators.
+The SessionStart hook (`gsd-check-update.js`) writes to the detected runtime's cache directory, so all paths must be cleared to prevent stale update indicators.
 </step>
 
 <step name="display_result">
