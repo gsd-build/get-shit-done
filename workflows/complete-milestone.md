@@ -699,6 +699,42 @@ Confirm: "Committed: chore: complete v[X.Y] milestone"
 
 </step>
 
+<step name="complete_workstream">
+
+**If in workstream mode** (`GSD_WS` is set or `.planning/workstreams/` exists):
+
+Determine the active workstream:
+```bash
+WS_INFO=$(node "$HOME/.claude/get-shit-done/bin/gsd-tools.cjs" workstream get --cwd .)
+```
+
+Parse `active` and `mode` from result. **If mode is "workstream" and active is set:**
+
+AskUserQuestion:
+- header: "Archive WS?"
+- question: "Complete and archive workstream '${active}'? This moves it to milestones/ and clears the active workstream."
+- options:
+  - "Yes — archive workstream (Recommended)" — Archive the workstream directory to milestones/, clear active
+  - "No — keep workstream" — Leave workstream in place for continued use
+
+**If "Yes":**
+
+```bash
+node "$HOME/.claude/get-shit-done/bin/gsd-tools.cjs" workstream complete "${active}" --cwd .
+```
+
+Parse result for `completed`, `archived_to`, `remaining_workstreams`, `reverted_to_flat`.
+
+Display:
+```
+Workstream '${active}' archived to ${archived_to}
+${reverted_to_flat ? "No workstreams remain — reverted to flat mode" : remaining_workstreams + " workstream(s) still active"}
+```
+
+**If "No":** Continue without archiving workstream.
+
+</step>
+
 <step name="offer_next">
 
 ```
@@ -774,5 +810,7 @@ Milestone completion is successful when:
 - [ ] RETROSPECTIVE.md updated with milestone section
 - [ ] Cross-milestone trends updated
 - [ ] User knows next step (/gsd:new-milestone)
+- [ ] If workstream mode: user offered workstream archival
+- [ ] If workstream archived: active workstream cleared, flat revert if last ws
 
 </success_criteria>

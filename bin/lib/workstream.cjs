@@ -10,7 +10,7 @@
 
 const fs = require('fs');
 const path = require('path');
-const { output, error, buildPaths, toPosixPath, getMilestoneInfo, generateSlugInternal } = require('./core.cjs');
+const { output, error, buildPaths, toPosixPath, getMilestoneInfo, generateSlugInternal, setActiveWorkstream } = require('./core.cjs');
 
 // ─── Migration ──────────────────────────────────────────────────────────────
 
@@ -153,6 +153,9 @@ function cmdWorkstreamCreate(cwd, name, options, raw, paths) {
     fs.writeFileSync(statePath, stateContent, 'utf-8');
   }
 
+  // Auto-set this workstream as active
+  setActiveWorkstream(cwd, slug);
+
   const relPath = toPosixPath(path.relative(cwd, wsDir));
   const result = {
     created: true,
@@ -161,6 +164,7 @@ function cmdWorkstreamCreate(cwd, name, options, raw, paths) {
     state_path: relPath + '/STATE.md',
     phases_path: relPath + '/phases',
     migration: migration || null,
+    active: true,
   };
 
   output(result, raw, relPath);

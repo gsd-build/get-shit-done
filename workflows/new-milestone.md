@@ -40,12 +40,18 @@ Use AskUserQuestion:
 
 **If "Yes — parallel workstreams":**
 
-```bash
-# Create workstream for the NEW milestone (this auto-migrates existing flat files)
-NEW_WS_RESULT=$(node "$HOME/.claude/get-shit-done/bin/gsd-tools.cjs" workstream create "${NEW_WS_SLUG}" --cwd .)
+First, gather the milestone name so we can derive the workstream slug:
 
-# Set the new workstream as active for this session
-node "$HOME/.claude/get-shit-done/bin/gsd-tools.cjs" workstream set "${NEW_WS_SLUG}" --cwd .
+Ask the user: **"What's the name for this new milestone?"** (plain text response, no AskUserQuestion — just ask and wait).
+
+Then generate the slug:
+```bash
+NEW_WS_SLUG=$(node "$HOME/.claude/get-shit-done/bin/gsd-tools.cjs" generate-slug "${MILESTONE_NAME}")
+```
+
+Now create the workstream (this auto-migrates existing flat files AND auto-sets it as active):
+```bash
+NEW_WS_RESULT=$(node "$HOME/.claude/get-shit-done/bin/gsd-tools.cjs" workstream create "${NEW_WS_SLUG}" --cwd .)
 
 # Update GSD_WS for all subsequent commands
 GSD_WS="--ws ${NEW_WS_SLUG}"
@@ -61,20 +67,23 @@ All commands now scoped to: ${NEW_WS_SLUG}
 To switch back: workstream set ${migrated_ws_name}
 ```
 
-Note: `${NEW_WS_SLUG}` can be derived from the milestone name entered in Step 3, so you may need to ask for the milestone name first OR use a temporary name and rename later. A practical approach: ask "What's the name for this new milestone?" before creating the workstream, then use `generate-slug` on it.
+Save `${MILESTONE_NAME}` — reuse it in Step 3 (Determine Milestone Version) instead of re-asking.
 
 **If "No — replace current":** Continue without workstreams (existing behavior).
 
 **If already in workstream mode (`WS_MODE=true`):**
 
-Create a new workstream directly:
+Ask: **"What's the name for this new milestone?"** (plain text, wait for response).
+
 ```bash
+NEW_WS_SLUG=$(node "$HOME/.claude/get-shit-done/bin/gsd-tools.cjs" generate-slug "${MILESTONE_NAME}")
 NEW_WS_RESULT=$(node "$HOME/.claude/get-shit-done/bin/gsd-tools.cjs" workstream create "${NEW_WS_SLUG}" --cwd .)
-node "$HOME/.claude/get-shit-done/bin/gsd-tools.cjs" workstream set "${NEW_WS_SLUG}" --cwd .
 GSD_WS="--ws ${NEW_WS_SLUG}"
 ```
 
 Display: `New workstream: ${NEW_WS_SLUG} (active)`
+
+Save `${MILESTONE_NAME}` — reuse in Step 3.
 
 **If flat mode AND no roadmap (greenfield):** Skip — no conflict, proceed in flat mode.
 
