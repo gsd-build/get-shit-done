@@ -53,6 +53,11 @@ const {
   convertClaudeToGeminiToml,
 } = require('./lib/gemini.js');
 
+const {
+  registerHooks,
+  configureStatusline,
+} = require('./lib/claude.js');
+
 // Get version from package.json
 const pkg = require('../package.json');
 
@@ -858,8 +863,6 @@ function install(isGlobal, runtime = 'claude') {
   }
 
   // Configure statusline and hooks in settings.json
-  // Gemini uses AfterTool instead of PostToolUse for post-tool hooks
-  const postToolEvent = runtime === 'gemini' ? 'AfterTool' : 'PostToolUse';
   const settingsPath = path.join(targetDir, 'settings.json');
   const settings = cleanupOrphanedHooks(readSettings(settingsPath));
   const statuslineCommand = isGlobal
@@ -883,52 +886,8 @@ function install(isGlobal, runtime = 'claude') {
     }
   }
 
-  // Configure SessionStart hook for update checking (skip for opencode)
-  if (!isOpencode) {
-    if (!settings.hooks) {
-      settings.hooks = {};
-    }
-    if (!settings.hooks.SessionStart) {
-      settings.hooks.SessionStart = [];
-    }
-
-    const hasGsdUpdateHook = settings.hooks.SessionStart.some(entry =>
-      entry.hooks && entry.hooks.some(h => h.command && h.command.includes('gsd-check-update'))
-    );
-
-    if (!hasGsdUpdateHook) {
-      settings.hooks.SessionStart.push({
-        hooks: [
-          {
-            type: 'command',
-            command: updateCheckCommand
-          }
-        ]
-      });
-      console.log(`  ${green}✓${reset} Configured update check hook`);
-    }
-
-    // Configure post-tool hook for context window monitoring
-    if (!settings.hooks[postToolEvent]) {
-      settings.hooks[postToolEvent] = [];
-    }
-
-    const hasContextMonitorHook = settings.hooks[postToolEvent].some(entry =>
-      entry.hooks && entry.hooks.some(h => h.command && h.command.includes('gsd-context-monitor'))
-    );
-
-    if (!hasContextMonitorHook) {
-      settings.hooks[postToolEvent].push({
-        hooks: [
-          {
-            type: 'command',
-            command: contextMonitorCommand
-          }
-        ]
-      });
-      console.log(`  ${green}✓${reset} Configured context window monitor hook`);
-    }
-  }
+  // Configure SessionStart and PostToolUse/AfterTool hooks (skip for opencode/codex)
+  registerHooks(settings, runtime, updateCheckCommand, contextMonitorCommand);
 
   return { settingsPath, settings, statuslineCommand, runtime };
 }
@@ -941,10 +900,7 @@ function finishInstall(settingsPath, settings, statuslineCommand, shouldInstallS
   const isCodex = runtime === 'codex';
 
   if (shouldInstallStatusline && !isOpencode && !isCodex) {
-    settings.statusLine = {
-      type: 'command',
-      command: statuslineCommand
-    };
+    configureStatusline(settings, statuslineCommand);
     console.log(`  ${green}✓${reset} Configured statusline`);
   }
 

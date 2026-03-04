@@ -13,7 +13,7 @@ The refactor follows a test-first safety pattern: establish a meaningful test ba
 Decimal phases appear between their surrounding integers in numeric order.
 
 - [x] **Phase 1: Test Baseline** - Write tests for all critical paths before any refactoring begins
-- [x] **Phase 2: Module Extraction** - Extract 5 runtime modules + core, reduce install.js to thin orchestrator (completed 2026-03-04)
+- [ ] **Phase 2: Module Extraction** - Extract 5 runtime modules + core, reduce install.js to thin orchestrator
 - [ ] **Phase 3: Verification** - Confirm all tests pass, coverage holds, backward compat intact
 
 ## Phase Details
@@ -23,7 +23,7 @@ Decimal phases appear between their surrounding integers in numeric order.
 **Depends on**: Nothing (first phase)
 **Requirements**: TEST-01, TEST-02, TEST-03, TEST-04
 **Success Criteria** (what must be TRUE):
-  1. All 4 runtime converter functions (Claude→OpenCode, Claude→Gemini, Claude→Codex) have passing tests
+  1. All 4 runtime converter functions (Claude->OpenCode, Claude->Gemini, Claude->Codex) have passing tests
   2. Shared utilities (path helpers, attribution, frontmatter extraction, settings I/O) have passing tests
   3. Install flow (file copying with path replacement, uninstall cleanup) has passing tests
   4. Mutation testing confirms tests fail when critical logic is altered — no false green coverage
@@ -43,12 +43,13 @@ Plans:
   2. `bin/lib/claude.js`, `bin/lib/opencode.js`, `bin/lib/gemini.js`, `bin/lib/codex.js` each exist and own their runtime's install/uninstall logic
   3. `bin/install.js` contains only arg parsing, interactive prompts, and runtime dispatch — no runtime-specific logic
   4. All modules use `require`/`module.exports` (CJS), zero new dependencies, Node >=16.7 compatible
-**Plans:** 4/4 plans complete
+**Plans:** 5 plans
 Plans:
-- [ ] 02-01-PLAN.md — Extract shared utilities into bin/lib/core.js (MOD-01)
-- [ ] 02-02-PLAN.md — Extract Codex functions into bin/lib/codex.js (MOD-05)
-- [ ] 02-03-PLAN.md — Extract OpenCode + Gemini into bin/lib/opencode.js and bin/lib/gemini.js (MOD-03, MOD-04)
-- [ ] 02-04-PLAN.md — Extract Claude module + reduce install.js to orchestrator (MOD-02, MOD-06)
+- [x] 02-01-PLAN.md — Extract shared utilities into bin/lib/core.js (MOD-01)
+- [x] 02-02-PLAN.md — Extract Codex functions into bin/lib/codex.js (MOD-05)
+- [x] 02-03-PLAN.md — Extract OpenCode + Gemini into bin/lib/opencode.js and bin/lib/gemini.js (MOD-03, MOD-04)
+- [x] 02-04-PLAN.md — Extract Claude module + reduce install.js to orchestrator (MOD-02, MOD-06)
+- [ ] 02-05-PLAN.md — Gap closure: extract hook/settings registration into claude.js (MOD-02)
 
 ### Phase 3: Verification
 **Goal**: The refactored codebase is behaviorally identical to the original — no regressions, no coverage regression
@@ -63,10 +64,10 @@ Plans:
 ## Progress
 
 **Execution Order:**
-Phases execute in numeric order: 1 → 2 → 3
+Phases execute in numeric order: 1 -> 2 -> 3
 
 | Phase | Plans Complete | Status | Completed |
 |-------|----------------|--------|-----------|
 | 1. Test Baseline | 4/4 | Complete | 2026-03-04 |
-| 2. Module Extraction | 4/4 | Complete   | 2026-03-04 |
+| 2. Module Extraction | 4/5 | Gap closure | - |
 | 3. Verification | 0/? | Not started | - |
