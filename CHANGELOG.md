@@ -7,7 +7,7 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 ## [Unreleased]
 
 ### Fixed
-- Brownfield projects: `/gsd:new-project` now reads CONVENTIONS.md and STRUCTURE.md during questioning and PROJECT.md creation — prevents re-asking questions already answered by existing codebase conventions
+- Brownfield projects: `/gsd:new-project` now reads CONVENTIONS.md during questioning and PROJECT.md creation — prevents re-asking questions already answered by existing codebase conventions
 
 ## [1.22.4] - 2026-03-03
 

@@ -215,10 +215,7 @@ Proceed to Step 4 (skip Steps 3 and 5).
 
 **If `has_codebase_map` is true:** Load existing codebase context before questioning.
 
-Read from `.planning/codebase/` (if they exist):
-- `CONVENTIONS.md` — coding standards, file organization, naming patterns
-- `STRUCTURE.md` — directory layout, where things live
-- `STACK.md` — technology choices already in use
+Read `.planning/codebase/CONVENTIONS.md` (if it exists) — coding standards, file organization, naming patterns.
 
 Use this context to avoid re-asking questions already answered by existing conventions and to ground follow-up questions in established patterns.
 
@@ -301,7 +298,7 @@ All Active requirements are hypotheses until shipped and validated.
 
 Infer Validated requirements from existing code:
 
-1. Read `.planning/codebase/ARCHITECTURE.md`, `STACK.md`, `CONVENTIONS.md`, and `STRUCTURE.md`
+1. Read `.planning/codebase/ARCHITECTURE.md`, `STACK.md`, and `CONVENTIONS.md`
 2. Identify what the codebase already does
 3. These become the initial Validated set
 
