@@ -13,7 +13,7 @@ The refactor follows a test-first safety pattern: establish a meaningful test ba
 Decimal phases appear between their surrounding integers in numeric order.
 
 - [x] **Phase 1: Test Baseline** - Write tests for all critical paths before any refactoring begins
-- [ ] **Phase 2: Module Extraction** - Extract 5 runtime modules + core, reduce install.js to thin orchestrator
+- [x] **Phase 2: Module Extraction** - Extract 5 runtime modules + core, reduce install.js to thin orchestrator (completed 2026-03-04)
 - [ ] **Phase 3: Verification** - Confirm all tests pass, coverage holds, backward compat intact
 
 ## Phase Details
@@ -43,7 +43,7 @@ Plans:
   2. `bin/lib/claude.js`, `bin/lib/opencode.js`, `bin/lib/gemini.js`, `bin/lib/codex.js` each exist and own their runtime's install/uninstall logic
   3. `bin/install.js` contains only arg parsing, interactive prompts, and runtime dispatch — no runtime-specific logic
   4. All modules use `require`/`module.exports` (CJS), zero new dependencies, Node >=16.7 compatible
-**Plans:** 3/4 plans executed
+**Plans:** 4/4 plans complete
 Plans:
 - [ ] 02-01-PLAN.md — Extract shared utilities into bin/lib/core.js (MOD-01)
 - [ ] 02-02-PLAN.md — Extract Codex functions into bin/lib/codex.js (MOD-05)
@@ -68,5 +68,5 @@ Phases execute in numeric order: 1 → 2 → 3
 | Phase | Plans Complete | Status | Completed |
 |-------|----------------|--------|-----------|
 | 1. Test Baseline | 4/4 | Complete | 2026-03-04 |
-| 2. Module Extraction | 3/4 | In Progress|  |
+| 2. Module Extraction | 4/4 | Complete   | 2026-03-04 |
 | 3. Verification | 0/? | Not started | - |
