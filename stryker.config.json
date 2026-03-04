@@ -1,0 +1,26 @@
+{
+  "$schema": "https://raw.githubusercontent.com/stryker-mutator/stryker/master/packages/core/schema/stryker-core.schema.json",
+  "mutate": [
+    "bin/install.js:228-237",
+    "bin/install.js:455-533",
+    "bin/install.js:839-997",
+    "bin/install.js:951-997",
+    "bin/install.js:998-1045",
+    "bin/install.js:1117-1176",
+    "bin/install.js:1177-1253",
+    "bin/install.js:1551-1610",
+    "bin/install.js:66-109"
+  ],
+  "testRunner": "command",
+  "commandRunner": {
+    "command": "node --test tests/codex-config.test.cjs tests/install-converters.test.cjs tests/install-utils.test.cjs tests/install-flow.test.cjs"
+  },
+  "reporters": ["clear-text", "progress"],
+  "concurrency": 2,
+  "timeoutMS": 30000,
+  "mutator": {
+    "excludedMutations": [
+      "StringLiteral"
+    ]
+  }
+}
