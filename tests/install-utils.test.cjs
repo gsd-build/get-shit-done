@@ -6,9 +6,6 @@
  * manifest generation, and orphaned hook cleanup.
  */
 
-// Enable test exports from install.js (skips main CLI logic)
-process.env.GSD_TEST_MODE = '1';
-
 const { test, describe, beforeEach, afterEach } = require('node:test');
 const assert = require('node:assert');
 const fs = require('fs');
@@ -28,7 +25,7 @@ const {
   cleanupOrphanedHooks,
   fileHash,
   generateManifest,
-} = require('../bin/install.js');
+} = require('../bin/lib/core.js');
 
 // ─── expandTilde ─────────────────────────────────────────────────────────────
 

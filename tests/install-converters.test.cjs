@@ -14,28 +14,34 @@
  * - toSingleLine / yamlQuote (string helpers)
  */
 
-// Enable test exports from install.js (skips main CLI logic)
-process.env.GSD_TEST_MODE = '1';
-
 const { test, describe } = require('node:test');
 const assert = require('node:assert');
 
 const {
   convertToolName,
-  convertGeminiToolName,
   convertClaudeToOpencodeFrontmatter,
+} = require('../bin/lib/opencode.js');
+
+const {
+  convertGeminiToolName,
+  stripSubTags,
   convertClaudeToGeminiAgent,
   convertClaudeToGeminiToml,
+} = require('../bin/lib/gemini.js');
+
+const {
   convertClaudeToCodexMarkdown,
   convertClaudeCommandToCodexSkill,
-  stripSubTags,
-  extractFrontmatterAndBody,
   toSingleLine,
   yamlQuote,
+} = require('../bin/lib/codex.js');
+
+const {
+  extractFrontmatterAndBody,
   colorNameToHex,
   claudeToOpencodeTools,
   claudeToGeminiTools,
-} = require('../bin/install.js');
+} = require('../bin/lib/core.js');
 
 // ─── convertToolName ─────────────────────────────────────────────────────────
 

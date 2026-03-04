@@ -6,9 +6,6 @@
  * Uses temp directories for all file-system operations.
  */
 
-// Enable test exports from install.js (skips main CLI logic)
-process.env.GSD_TEST_MODE = '1';
-
 const { test, describe, beforeEach, afterEach } = require('node:test');
 const assert = require('node:assert');
 const fs = require('fs');
@@ -17,9 +14,15 @@ const os = require('os');
 
 const {
   getDirName,
+  cleanupOrphanedFiles,
+} = require('../bin/lib/core.js');
+
+// copyWithPathReplacement and copyFlattenedCommands are orchestration-level functions
+// that dispatch to runtime converters — they remain in install.js
+process.env.GSD_TEST_MODE = '1';
+const {
   copyWithPathReplacement,
   copyFlattenedCommands,
-  cleanupOrphanedFiles,
 } = require('../bin/install.js');
 
 // ─── getDirName ──────────────────────────────────────────────────────────────
