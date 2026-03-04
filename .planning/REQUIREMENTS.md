@@ -25,7 +25,7 @@
 
 - [x] **VER-01**: All existing tests pass after refactor (including `tests/codex-config.test.cjs`)
 - [x] **VER-02**: Post-refactor line coverage meets or exceeds 27% baseline on `bin/install.js` + `bin/lib/*.js`
-- [ ] **VER-03**: `GSD_TEST_MODE` exports continue to work or are migrated to per-module exports with backward-compatible re-exports
+- [x] **VER-03**: `GSD_TEST_MODE` exports continue to work or are migrated to per-module exports with backward-compatible re-exports
 
 ## v2 Requirements
 
@@ -60,7 +60,7 @@
 | MOD-06 | Phase 2 | Complete |
 | VER-01 | Phase 3 | Complete |
 | VER-02 | Phase 3 | Complete |
-| VER-03 | Phase 3 | Pending |
+| VER-03 | Phase 3 | Complete |
 
 **Coverage:**
 - v1 requirements: 13 total
