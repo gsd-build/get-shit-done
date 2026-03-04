@@ -10,22 +10,29 @@ Autonomous GSD workflow orchestrator — turns a PRD into a built project. Runs 
 
 ## Installation
 
-This package is published to GitHub Packages under the `@nexeradigital` scope.
+### One-liner
 
-### 1. Create a GitHub Personal Access Token
+**macOS / Linux:**
+```bash
+curl -fsSL https://raw.githubusercontent.com/NexeraDigital/get-shit-done/main/autopilot/install.sh | bash
+```
 
-Go to [github.com/settings/tokens](https://github.com/settings/tokens) and create a token (classic) with the `read:packages` scope.
+**Windows (PowerShell):**
+```powershell
+irm https://raw.githubusercontent.com/NexeraDigital/get-shit-done/main/autopilot/install.ps1 | iex
+```
 
-### 2. Configure npm
+### Manual install
+
+This package is published to GitHub Packages under the `@nexeradigital` scope (public).
 
 Add to your `~/.npmrc`:
 
 ```ini
-//npm.pkg.github.com/:_authToken=ghp_YOUR_TOKEN_HERE
 @nexeradigital:registry=https://npm.pkg.github.com
 ```
 
-### 3. Install
+Then install:
 
 ```bash
 npm install -g @nexeradigital/gsd-autopilot
