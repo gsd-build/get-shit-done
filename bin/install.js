@@ -2411,6 +2411,7 @@ function installAllRuntimes(runtimes, isGlobal, isInteractive) {
 // Test-only exports — skip main logic when loaded as a module for testing
 if (process.env.GSD_TEST_MODE) {
   module.exports = {
+    // Existing Codex exports
     getCodexSkillAdapterHeader,
     convertClaudeAgentToCodexAgent,
     generateCodexAgentToml,
@@ -2421,6 +2422,42 @@ if (process.env.GSD_TEST_MODE) {
     convertClaudeCommandToCodexSkill,
     GSD_CODEX_MARKER,
     CODEX_AGENT_SANDBOX,
+    // Converter functions (Plans 01-03)
+    convertClaudeToOpencodeFrontmatter,
+    convertClaudeToGeminiAgent,
+    convertClaudeToGeminiToml,
+    convertClaudeToCodexMarkdown,
+    convertToolName,
+    convertGeminiToolName,
+    extractFrontmatterAndBody,
+    extractFrontmatterField,
+    stripSubTags,
+    toSingleLine,
+    yamlQuote,
+    // Core / shared helpers
+    processAttribution,
+    expandTilde,
+    buildHookCommand,
+    readSettings,
+    writeSettings,
+    toHomePrefix,
+    getCommitAttribution,
+    copyWithPathReplacement,
+    copyFlattenedCommands,
+    cleanupOrphanedFiles,
+    cleanupOrphanedHooks,
+    generateManifest,
+    fileHash,
+    parseJsonc,
+    configureOpencodePermissions,
+    copyCommandsAsCodexSkills,
+    listCodexSkillNames,
+    getDirName,
+    getConfigDirFromHome,
+    // Constants
+    colorNameToHex,
+    claudeToOpencodeTools,
+    claudeToGeminiTools,
   };
 } else {
 
