@@ -15,6 +15,7 @@ Decimal phases appear between their surrounding integers in numeric order.
 - [x] **Phase 1: Test Baseline** - Write tests for all critical paths before any refactoring begins
 - [ ] **Phase 2: Module Extraction** - Extract 5 runtime modules + core, reduce install.js to thin orchestrator
 - [x] **Phase 3: Verification** - Confirm all tests pass, coverage holds, backward compat intact (completed 2026-03-04)
+- [ ] **Phase 4: Post-Refactor Cleanup** - Realign Stryker config, remove dead imports, close audit tech debt
 
 ## Phase Details
 
@@ -49,7 +50,7 @@ Plans:
 - [x] 02-02-PLAN.md — Extract Codex functions into bin/lib/codex.js (MOD-05)
 - [x] 02-03-PLAN.md — Extract OpenCode + Gemini into bin/lib/opencode.js and bin/lib/gemini.js (MOD-03, MOD-04)
 - [x] 02-04-PLAN.md — Extract Claude module + reduce install.js to orchestrator (MOD-02, MOD-06)
-- [ ] 02-05-PLAN.md — Gap closure: extract hook/settings registration into claude.js (MOD-02)
+- [x] 02-05-PLAN.md — Gap closure: extract hook/settings registration into claude.js (MOD-02)
 
 ### Phase 3: Verification
 **Goal**: The refactored codebase is behaviorally identical to the original — no regressions, no coverage regression
@@ -61,8 +62,21 @@ Plans:
   3. `GSD_TEST_MODE` exports work as before, or per-module exports are in place with backward-compatible re-exports from `bin/install.js`
 **Plans:** 2/2 plans complete
 Plans:
-- [ ] 03-01-PLAN.md — Run full test suite and coverage verification (VER-01, VER-02)
-- [ ] 03-02-PLAN.md — Audit GSD_TEST_MODE backward compatibility (VER-03)
+- [x] 03-01-PLAN.md — Run full test suite and coverage verification (VER-01, VER-02)
+- [x] 03-02-PLAN.md — Audit GSD_TEST_MODE backward compatibility (VER-03)
+
+### Phase 4: Post-Refactor Cleanup
+**Goal**: Stryker mutation testing targets the correct code regions in the refactored codebase, and accumulated tech debt is resolved
+**Depends on**: Phase 3
+**Requirements**: TEST-04 (integration hardening)
+**Gap Closure**: Closes `stryker-config-drift` integration gap from v1.0 audit
+**Success Criteria** (what must be TRUE):
+  1. `stryker.config.json` mutate ranges align with actual code in refactored `bin/install.js`
+  2. `bin/lib/*.js` modules are included in Stryker mutate targets
+  3. No dead imports in `bin/install.js`
+  4. All ROADMAP.md plan checkboxes reflect actual completion state
+Plans:
+- [ ] 04-01-PLAN.md — Realign Stryker config and clean up tech debt
 
 ## Progress
 
@@ -72,5 +86,6 @@ Phases execute in numeric order: 1 -> 2 -> 3
 | Phase | Plans Complete | Status | Completed |
 |-------|----------------|--------|-----------|
 | 1. Test Baseline | 4/4 | Complete | 2026-03-04 |
-| 2. Module Extraction | 4/5 | Gap closure | - |
-| 3. Verification | 2/2 | Complete   | 2026-03-04 |
+| 2. Module Extraction | 5/5 | Complete | 2026-03-04 |
+| 3. Verification | 2/2 | Complete | 2026-03-04 |
+| 4. Post-Refactor Cleanup | 0/1 | Pending | - |
