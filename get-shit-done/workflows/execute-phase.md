@@ -329,15 +329,23 @@ grep "^status:" "$PHASE_DIR"/*-VERIFICATION.md | cut -d: -f2 | tr -d ' '
 | `gaps_found` | Present gap summary, offer `/gsd:plan-phase {phase} --gaps` |
 
 **If human_needed:**
-```
-## ✓ Phase {X}: {Name} — Human Verification Required
 
-All automated checks passed. {N} items need human testing:
+Display the human verification items from VERIFICATION.md, then offer clear next-step routing:
 
-{From VERIFICATION.md human_verification section}
+Use AskUserQuestion:
+- header: "Verification"
+- question: "All automated checks passed for Phase {X}: {Name}. {N} items need human testing. How would you like to proceed?"
+- options:
+  - label: "Start /gsd:verify-work {X}"
+    description: "Run the interactive UAT workflow to test each item (/clear recommended for fresh context)"
+  - label: "Mark all approved"
+    description: "Skip manual testing — mark verification as passed and continue to roadmap update"
+  - label: "Review verification report"
+    description: "Show the full VERIFICATION.md before deciding"
 
-"approved" → continue | Report issues → gap closure
-```
+**If "Start /gsd:verify-work"** → Display: `/clear` then `/gsd:verify-work {X}` for fresh context, or run inline if context allows.
+**If "Mark all approved"** → Proceed to update_roadmap.
+**If "Review verification report"** → Display `cat {phase_dir}/{phase_num}-VERIFICATION.md`, then re-present the question.
 
 **If gaps_found:**
 ```

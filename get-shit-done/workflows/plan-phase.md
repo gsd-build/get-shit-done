@@ -526,19 +526,22 @@ Verification: {Passed | Passed with override | Skipped}
 
 ───────────────────────────────────────────────────────────────
 
-## ▶ Next Up
+Then offer the user a choice for next steps:
 
-**Execute Phase {X}** — run all {N} plans
+Use AskUserQuestion:
+- header: "Next Step"
+- question: "Phase {X} planning is complete with {N} plan(s). Ready to execute?"
+- options:
+  - label: "Execute Phase {X} (Recommended)"
+    description: "Run all {N} plans now — /clear first for fresh context is suggested"
+  - label: "Review plans first"
+    description: "Display plan file paths so you can inspect before executing"
+  - label: "Clear context first"
+    description: "Suggest /clear then /gsd:execute-phase {X} for a fresh context window"
 
-/gsd:execute-phase {X}
-
-<sub>/clear first → fresh context window</sub>
-
-───────────────────────────────────────────────────────────────
-
-**Also available:**
-- cat .planning/phases/{phase-dir}/*-PLAN.md — review plans
-- /gsd:plan-phase {X} --research — re-research first
+**If "Execute Phase {X}"** → Display: `/clear` then `/gsd:execute-phase {X}` for best results, or invoke directly if context allows.
+**If "Review plans first"** → Display: `cat .planning/phases/{phase-dir}/*-PLAN.md`, then re-present the question.
+**If "Clear context first"** → Display: `/clear` then `/gsd:execute-phase {X}`.
 
 ───────────────────────────────────────────────────────────────
 </offer_next>

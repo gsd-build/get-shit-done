@@ -648,6 +648,38 @@ function cmdInitProgress(cwd, raw) {
     }
   } catch {}
 
+  // Check ROADMAP.md for phases that may not be scaffolded to disk yet.
+  // Without this, progress routing sees completed_count === phase_count and
+  // routes to "Milestone Complete" even when unscaffolded phases remain.
+  let roadmapPhaseCount = phases.length;
+  const roadmapPath = path.join(cwd, '.planning', 'ROADMAP.md');
+  try {
+    const roadmapContent = fs.readFileSync(roadmapPath, 'utf-8');
+    const roadmapPhases = [];
+    const phasePattern = /#{2,4}\s*Phase\s+(\d+(?:\.\d+)*)\s*:\s*([^\n]+)/gi;
+    let pm;
+    while ((pm = phasePattern.exec(roadmapContent)) !== null) {
+      roadmapPhases.push({ number: pm[1], name: pm[2].trim() });
+    }
+    if (roadmapPhases.length > 0) {
+      roadmapPhaseCount = roadmapPhases.length;
+      // If all disk phases are complete and no next phase found on disk,
+      // find the first roadmap phase without a directory
+      if (!nextPhase && phases.every(p => p.status === 'complete') && phases.length > 0) {
+        const diskNumbers = new Set(phases.map(p => p.number));
+        const unscaffolded = roadmapPhases.find(rp => !diskNumbers.has(rp.number));
+        if (unscaffolded) {
+          nextPhase = {
+            number: unscaffolded.number,
+            name: unscaffolded.name.toLowerCase().replace(/\s+/g, '-'),
+            status: 'not_scaffolded',
+            roadmap_only: true,
+          };
+        }
+      }
+    }
+  } catch {}
+
   // Check for paused work
   let pausedAt = null;
   try {
@@ -671,6 +703,7 @@ function cmdInitProgress(cwd, raw) {
     // Phase overview
     phases,
     phase_count: phases.length,
+    roadmap_phase_count: roadmapPhaseCount,
     completed_count: phases.filter(p => p.status === 'complete').length,
     in_progress_count: phases.filter(p => p.status === 'in_progress').length,
 
