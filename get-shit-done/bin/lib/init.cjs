@@ -125,6 +125,7 @@ function cmdInitPlanPhase(cwd, phase, raw) {
     // Environment
     planning_exists: pathExistsInternal(cwd, '.planning'),
     roadmap_exists: pathExistsInternal(cwd, '.planning/ROADMAP.md'),
+    has_codebase_map: pathExistsInternal(cwd, '.planning/codebase'),
 
     // File paths
     state_path: '.planning/STATE.md',

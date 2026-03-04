@@ -31,6 +31,9 @@ Template for spawning gsd-planner agent. The agent contains all planning experti
 @.planning/phases/{phase_dir}/{phase_num}-VERIFICATION.md
 @.planning/phases/{phase_dir}/{phase_num}-UAT.md
 
+**Codebase Conventions (if .planning/codebase/ exists):**
+@.planning/codebase/CONVENTIONS.md
+
 </planning_context>
 
 <downstream_consumer>
