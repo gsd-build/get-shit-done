@@ -892,6 +892,45 @@ describe('cmdStateAdvancePlan (state advance-plan)', () => {
     assert.ok(output.error !== undefined, 'output should have error field');
     assert.ok(output.error.toLowerCase().includes('cannot parse'), 'error should mention Cannot parse');
   });
+
+  test('advances plan in compound "Plan: X of Y" format', () => {
+    fs.writeFileSync(
+      path.join(tmpDir, '.planning', 'STATE.md'),
+      `# Project State\n\nPlan: 2 of 5 in current phase\nStatus: In progress\nLast activity: 2025-01-01\n`
+    );
+
+    const result = runGsdTools('state advance-plan', tmpDir);
+    assert.ok(result.success, `Command failed: ${result.error}`);
+
+    const output = JSON.parse(result.output);
+    assert.strictEqual(output.advanced, true, 'advanced should be true');
+    assert.strictEqual(output.previous_plan, 2);
+    assert.strictEqual(output.current_plan, 3);
+    assert.strictEqual(output.total_plans, 5);
+
+    const updated = fs.readFileSync(path.join(tmpDir, '.planning', 'STATE.md'), 'utf-8');
+    assert.ok(updated.includes('Plan: 3 of 5 in current phase'),
+      'should preserve compound format with updated plan number');
+    assert.ok(updated.includes('Status: Ready to execute'),
+      'Status should be updated');
+  });
+
+  test('marks phase complete on last plan in compound format', () => {
+    fs.writeFileSync(
+      path.join(tmpDir, '.planning', 'STATE.md'),
+      `# Project State\n\nPlan: 3 of 3 in current phase\nStatus: In progress\nLast activity: 2025-01-01\n`
+    );
+
+    const result = runGsdTools('state advance-plan', tmpDir);
+    assert.ok(result.success, `Command failed: ${result.error}`);
+
+    const output = JSON.parse(result.output);
+    assert.strictEqual(output.advanced, false);
+    assert.strictEqual(output.reason, 'last_plan');
+
+    const updated = fs.readFileSync(path.join(tmpDir, '.planning', 'STATE.md'), 'utf-8');
+    assert.ok(updated.includes('Phase complete'), 'Status should contain Phase complete');
+  });
 });
 
 describe('cmdStateRecordMetric (state record-metric)', () => {

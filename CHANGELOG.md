@@ -6,6 +6,9 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ## [Unreleased]
 
+### Fixed
+- `state advance-plan` now parses compound `Plan: X of Y in current phase` format from current STATE.md template, preserving it on write-back
+
 ## [1.22.4] - 2026-03-03
 
 ### Added
