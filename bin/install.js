@@ -1104,7 +1104,10 @@ function installAllRuntimes(runtimes, isGlobal, isInteractive) {
   }
 }
 
-// Test-only exports — skip main logic when loaded as a module for testing
+// Test-only exports — backward-compatible re-exports of per-module functions.
+// Most tests now import from bin/lib/ directly. This block retained for
+// orchestration functions (copyWithPathReplacement, copyFlattenedCommands)
+// and for any external consumers relying on the GSD_TEST_MODE interface.
 if (process.env.GSD_TEST_MODE) {
   module.exports = {
     // Existing Codex exports
