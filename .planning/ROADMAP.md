@@ -59,7 +59,7 @@ Plans:
   1. All existing tests pass, including `tests/codex-config.test.cjs` which imports from `bin/install.js`
   2. Line coverage across `bin/install.js` + `bin/lib/*.js` combined meets or exceeds 27% pre-refactor baseline
   3. `GSD_TEST_MODE` exports work as before, or per-module exports are in place with backward-compatible re-exports from `bin/install.js`
-**Plans:** 2 plans
+**Plans:** 1/2 plans executed
 Plans:
 - [ ] 03-01-PLAN.md — Run full test suite and coverage verification (VER-01, VER-02)
 - [ ] 03-02-PLAN.md — Audit GSD_TEST_MODE backward compatibility (VER-03)
@@ -73,4 +73,4 @@ Phases execute in numeric order: 1 -> 2 -> 3
 |-------|----------------|--------|-----------|
 | 1. Test Baseline | 4/4 | Complete | 2026-03-04 |
 | 2. Module Extraction | 4/5 | Gap closure | - |
-| 3. Verification | 0/2 | Not started | - |
+| 3. Verification | 1/2 | In Progress|  |
