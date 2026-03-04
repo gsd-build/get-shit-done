@@ -75,13 +75,14 @@ Plans:
   2. `bin/lib/*.js` modules are included in Stryker mutate targets
   3. No dead imports in `bin/install.js`
   4. All ROADMAP.md plan checkboxes reflect actual completion state
+**Plans:** 1 plan
 Plans:
-- [ ] 04-01-PLAN.md — Realign Stryker config and clean up tech debt
+- [ ] 04-01-PLAN.md — Realign Stryker config, remove dead imports, fix ROADMAP checkboxes (TEST-04)
 
 ## Progress
 
 **Execution Order:**
-Phases execute in numeric order: 1 -> 2 -> 3
+Phases execute in numeric order: 1 -> 2 -> 3 -> 4
 
 | Phase | Plans Complete | Status | Completed |
 |-------|----------------|--------|-----------|
