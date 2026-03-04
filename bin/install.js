@@ -41,7 +41,6 @@ const hasOpencode = args.includes('--opencode');
 const hasClaude = args.includes('--claude');
 const hasGemini = args.includes('--gemini');
 const hasCodex = args.includes('--codex');
-const hasBoth = args.includes('--both'); // Legacy flag, keeps working
 const hasAll = args.includes('--all');
 const hasUninstall = args.includes('--uninstall') || args.includes('-u');
 
@@ -49,8 +48,6 @@ const hasUninstall = args.includes('--uninstall') || args.includes('-u');
 let selectedRuntimes = [];
 if (hasAll) {
   selectedRuntimes = ['claude', 'opencode', 'gemini', 'codex'];
-} else if (hasBoth) {
-  selectedRuntimes = ['claude', 'opencode'];
 } else {
   if (hasOpencode) selectedRuntimes.push('opencode');
   if (hasClaude) selectedRuntimes.push('claude');
