@@ -6,6 +6,9 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ## [Unreleased]
 
+### Fixed
+- AskUserQuestion auto-answering in discuss-phase, new-project, and new-milestone workflows — Claude now verifies tool results contain actual user selections and falls back to plain-text numbered lists when the tool returns empty/generic responses (#912)
+
 ## [1.22.4] - 2026-03-03
 
 ### Added

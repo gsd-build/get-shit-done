@@ -6,6 +6,11 @@ Initialize a new project through unified flow: questioning, research (optional),
 Read all files referenced by the invoking prompt's execution_context before starting.
 </required_reading>
 
+<answer_verification>
+**CRITICAL: After every AskUserQuestion call, verify the tool result contains the user's actual selection.**
+The result should name the option label or free-text the user picked. If the result is empty, generic (e.g., "User has answered your questions: ." with no selections listed), or doesn't contain explicit choices — the tool FAILED to collect input. Do NOT assume, guess, or fabricate an answer. Instead, present the same options as a numbered plain-text list and ask the user to type their choice. Only proceed once you have a confirmed, explicit user response.
+</answer_verification>
+
 <auto_mode>
 ## Auto Mode Detection
 
