@@ -1,15 +1,13 @@
 {
   "$schema": "https://raw.githubusercontent.com/stryker-mutator/stryker/master/packages/core/schema/stryker-core.schema.json",
   "mutate": [
-    "bin/install.js:228-237",
-    "bin/install.js:455-533",
-    "bin/install.js:839-997",
-    "bin/install.js:951-997",
-    "bin/install.js:998-1045",
-    "bin/install.js:1117-1176",
-    "bin/install.js:1177-1253",
-    "bin/install.js:1551-1610",
-    "bin/install.js:66-109"
+    "bin/lib/core.js",
+    "bin/lib/codex.js",
+    "bin/lib/opencode.js",
+    "bin/lib/gemini.js",
+    "bin/lib/claude.js",
+    "bin/install.js:152-198",
+    "bin/install.js:208-263"
   ],
   "testRunner": "command",
   "commandRunner": {

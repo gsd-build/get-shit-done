@@ -13,7 +13,7 @@ The refactor follows a test-first safety pattern: establish a meaningful test ba
 Decimal phases appear between their surrounding integers in numeric order.
 
 - [x] **Phase 1: Test Baseline** - Write tests for all critical paths before any refactoring begins
-- [ ] **Phase 2: Module Extraction** - Extract 5 runtime modules + core, reduce install.js to thin orchestrator
+- [x] **Phase 2: Module Extraction** - Extract 5 runtime modules + core, reduce install.js to thin orchestrator
 - [x] **Phase 3: Verification** - Confirm all tests pass, coverage holds, backward compat intact (completed 2026-03-04)
 - [ ] **Phase 4: Post-Refactor Cleanup** - Realign Stryker config, remove dead imports, close audit tech debt
 
