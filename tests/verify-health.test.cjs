@@ -255,6 +255,34 @@ describe('validate health command', () => {
     );
   });
 
+  test('accepts inherit model_profile as valid', () => {
+    writeMinimalProjectMd(tmpDir);
+    writeMinimalRoadmap(tmpDir, ['1']);
+    writeMinimalStateMd(tmpDir);
+    fs.writeFileSync(
+      path.join(tmpDir, '.planning', 'config.json'),
+      JSON.stringify({
+        model_profile: 'inherit',
+        workflow: {
+          research: true,
+          plan_check: true,
+          verifier: true,
+          nyquist_validation: true,
+        },
+      })
+    );
+    fs.mkdirSync(path.join(tmpDir, '.planning', 'phases', '01-a'), { recursive: true });
+
+    const result = runGsdTools('validate health', tmpDir);
+    assert.ok(result.success, `Command failed: ${result.error}`);
+
+    const output = JSON.parse(result.output);
+    assert.ok(
+      !output.warnings.some(w => w.code === 'W004'),
+      `Should not warn for inherit model_profile: ${JSON.stringify(output.warnings)}`
+    );
+  });
+
   // ─── Check 6: Phase directory naming (NN-name format) ─────────────────────
 
   test('warns about incorrectly named phase directories', () => {

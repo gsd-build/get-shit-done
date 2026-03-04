@@ -26,6 +26,8 @@ Task(
 
 **Note:** Opus-tier agents resolve to `"inherit"` (not `"opus"`). This causes the agent to use the parent session's model, avoiding conflicts with organization policies that may block specific opus versions.
 
+If `model_profile` is `"inherit"`, all agents resolve to `"inherit"` (useful for OpenCode `/model`).
+
 ## Usage
 
 1. Resolve once at orchestration start
