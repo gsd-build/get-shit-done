@@ -18,7 +18,7 @@
 - [ ] **MOD-02**: Extract `bin/lib/claude.js` with Claude Code install/uninstall logic, hook and settings registration
 - [ ] **MOD-03**: Extract `bin/lib/opencode.js` with OpenCode install/uninstall, JSONC parsing, permissions, frontmatter conversion
 - [ ] **MOD-04**: Extract `bin/lib/gemini.js` with Gemini install/uninstall, TOML conversion, agent frontmatter conversion
-- [ ] **MOD-05**: Extract `bin/lib/codex.js` with Codex install/uninstall, config.toml management, skill/agent adapters
+- [x] **MOD-05**: Extract `bin/lib/codex.js` with Codex install/uninstall, config.toml management, skill/agent adapters
 - [ ] **MOD-06**: Reduce `bin/install.js` to thin orchestrator (arg parsing, interactive prompts, runtime dispatch)
 
 ### Verification
@@ -56,7 +56,7 @@
 | MOD-02 | Phase 2 | Pending |
 | MOD-03 | Phase 2 | Pending |
 | MOD-04 | Phase 2 | Pending |
-| MOD-05 | Phase 2 | Pending |
+| MOD-05 | Phase 2 | Complete |
 | MOD-06 | Phase 2 | Pending |
 | VER-01 | Phase 3 | Pending |
 | VER-02 | Phase 3 | Pending |
