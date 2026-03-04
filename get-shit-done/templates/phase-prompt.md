@@ -49,6 +49,9 @@ Output: [What artifacts will be created]
 @.planning/ROADMAP.md
 @.planning/STATE.md
 
+# If .planning/codebase/ exists — follow existing conventions:
+# @.planning/codebase/CONVENTIONS.md
+
 # Only reference prior plan SUMMARYs if genuinely needed:
 # - This plan uses types/exports from prior plan
 # - Prior plan made decision that affects this plan
@@ -211,6 +214,9 @@ Wave 3 runs after Waves 1 and 2. Pauses at checkpoint, orchestrator presents to 
 @.planning/PROJECT.md
 @.planning/ROADMAP.md
 @.planning/STATE.md
+
+# If .planning/codebase/ exists — follow existing conventions:
+# @.planning/codebase/CONVENTIONS.md
 
 # Only include SUMMARY refs if genuinely needed:
 # - This plan imports types from prior plan
