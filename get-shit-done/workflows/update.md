@@ -9,23 +9,71 @@ Read all files referenced by the invoking prompt's execution_context before star
 <process>
 
 <step name="get_installed_version">
-Detect whether GSD is installed locally or globally by checking both locations and validating install integrity:
+Detect whether GSD is installed locally or globally by checking both locations and validating install integrity.
+
+First, derive `PREFERRED_RUNTIME` from the invoking prompt's `execution_context` path:
+- Path contains `/.codex/` -> `codex`
+- Path contains `/.gemini/` -> `gemini`
+- Path contains `/.config/opencode/` or `/.opencode/` -> `opencode`
+- Otherwise -> `claude`
+
+Use `PREFERRED_RUNTIME` as the first runtime checked so `/gsd:update` targets the runtime that invoked it.
 
 ```bash
-# Check local first (takes priority only if valid)
-# Detect runtime config directory (supports Claude, OpenCode, Gemini)
-LOCAL_VERSION_FILE="" LOCAL_MARKER_FILE="" LOCAL_DIR=""
-for dir in .claude .config/opencode .opencode .gemini; do
-  if [ -f "./$dir/get-shit-done/VERSION" ]; then
+# Runtime candidates: "<runtime>:<config-dir>"
+RUNTIME_DIRS="claude:.claude opencode:.config/opencode opencode:.opencode gemini:.gemini codex:.codex"
+
+# PREFERRED_RUNTIME should be set from execution_context before running this block.
+# If not set, infer from runtime env vars; fallback to claude.
+if [ -z "$PREFERRED_RUNTIME" ]; then
+  if [ -n "$CODEX_HOME" ]; then
+    PREFERRED_RUNTIME="codex"
+  elif [ -n "$GEMINI_CONFIG_DIR" ]; then
+    PREFERRED_RUNTIME="gemini"
+  elif [ -n "$OPENCODE_CONFIG_DIR" ] || [ -n "$OPENCODE_CONFIG" ]; then
+    PREFERRED_RUNTIME="opencode"
+  elif [ -n "$CLAUDE_CONFIG_DIR" ]; then
+    PREFERRED_RUNTIME="claude"
+  else
+    PREFERRED_RUNTIME="claude"
+  fi
+fi
+
+# Reorder entries so preferred runtime is checked first.
+ORDERED_RUNTIME_DIRS=""
+for entry in $RUNTIME_DIRS; do
+  runtime="${entry%%:*}"
+  if [ "$runtime" = "$PREFERRED_RUNTIME" ]; then
+    ORDERED_RUNTIME_DIRS="$ORDERED_RUNTIME_DIRS $entry"
+  fi
+done
+for entry in $RUNTIME_DIRS; do
+  runtime="${entry%%:*}"
+  if [ "$runtime" != "$PREFERRED_RUNTIME" ]; then
+    ORDERED_RUNTIME_DIRS="$ORDERED_RUNTIME_DIRS $entry"
+  fi
+done
+
+# Check local first (takes priority only if valid and distinct from global)
+LOCAL_VERSION_FILE="" LOCAL_MARKER_FILE="" LOCAL_DIR="" LOCAL_RUNTIME=""
+for entry in $ORDERED_RUNTIME_DIRS; do
+  runtime="${entry%%:*}"
+  dir="${entry#*:}"
+  if [ -f "./$dir/get-shit-done/VERSION" ] || [ -f "./$dir/get-shit-done/workflows/update.md" ]; then
+    LOCAL_RUNTIME="$runtime"
     LOCAL_VERSION_FILE="./$dir/get-shit-done/VERSION"
     LOCAL_MARKER_FILE="./$dir/get-shit-done/workflows/update.md"
     LOCAL_DIR="$(cd "./$dir" 2>/dev/null && pwd)"
     break
   fi
 done
-GLOBAL_VERSION_FILE="" GLOBAL_MARKER_FILE="" GLOBAL_DIR=""
-for dir in .claude .config/opencode .opencode .gemini; do
-  if [ -f "$HOME/$dir/get-shit-done/VERSION" ]; then
+
+GLOBAL_VERSION_FILE="" GLOBAL_MARKER_FILE="" GLOBAL_DIR="" GLOBAL_RUNTIME=""
+for entry in $ORDERED_RUNTIME_DIRS; do
+  runtime="${entry%%:*}"
+  dir="${entry#*:}"
+  if [ -f "$HOME/$dir/get-shit-done/VERSION" ] || [ -f "$HOME/$dir/get-shit-done/workflows/update.md" ]; then
+    GLOBAL_RUNTIME="$runtime"
     GLOBAL_VERSION_FILE="$HOME/$dir/get-shit-done/VERSION"
     GLOBAL_MARKER_FILE="$HOME/$dir/get-shit-done/workflows/update.md"
     GLOBAL_DIR="$(cd "$HOME/$dir" 2>/dev/null && pwd)"
@@ -42,20 +90,40 @@ if [ -n "$LOCAL_VERSION_FILE" ] && [ -f "$LOCAL_VERSION_FILE" ] && [ -f "$LOCAL_
 fi
 
 if [ "$IS_LOCAL" = true ]; then
-  cat "$LOCAL_VERSION_FILE"
-  echo "LOCAL"
+  INSTALLED_VERSION="$(cat "$LOCAL_VERSION_FILE")"
+  INSTALL_SCOPE="LOCAL"
+  TARGET_RUNTIME="$LOCAL_RUNTIME"
 elif [ -n "$GLOBAL_VERSION_FILE" ] && [ -f "$GLOBAL_VERSION_FILE" ] && [ -f "$GLOBAL_MARKER_FILE" ] && grep -Eq '^[0-9]+\.[0-9]+\.[0-9]+' "$GLOBAL_VERSION_FILE"; then
-  cat "$GLOBAL_VERSION_FILE"
-  echo "GLOBAL"
+  INSTALLED_VERSION="$(cat "$GLOBAL_VERSION_FILE")"
+  INSTALL_SCOPE="GLOBAL"
+  TARGET_RUNTIME="$GLOBAL_RUNTIME"
+elif [ -n "$LOCAL_RUNTIME" ] && [ -f "$LOCAL_MARKER_FILE" ]; then
+  # Runtime detected but VERSION missing/corrupt: treat as unknown version, keep runtime target
+  INSTALLED_VERSION="0.0.0"
+  INSTALL_SCOPE="LOCAL"
+  TARGET_RUNTIME="$LOCAL_RUNTIME"
+elif [ -n "$GLOBAL_RUNTIME" ] && [ -f "$GLOBAL_MARKER_FILE" ]; then
+  INSTALLED_VERSION="0.0.0"
+  INSTALL_SCOPE="GLOBAL"
+  TARGET_RUNTIME="$GLOBAL_RUNTIME"
 else
-  echo "UNKNOWN"
+  INSTALLED_VERSION="0.0.0"
+  INSTALL_SCOPE="UNKNOWN"
+  TARGET_RUNTIME="claude"
 fi
+
+echo "$INSTALLED_VERSION"
+echo "$INSTALL_SCOPE"
+echo "$TARGET_RUNTIME"
 ```
 
 Parse output:
-- If last line is "LOCAL": local install is valid; installed version is first line; use `--local`
-- If last line is "GLOBAL": local missing/invalid, global install is valid; installed version is first line; use `--global`
-- If "UNKNOWN": proceed to install step (treat as version 0.0.0)
+- Line 1 = installed version (`0.0.0` means unknown version)
+- Line 2 = install scope (`LOCAL`, `GLOBAL`, or `UNKNOWN`)
+- Line 3 = target runtime (`claude`, `opencode`, `gemini`, or `codex`)
+- If scope is `UNKNOWN`, proceed to install step using `--claude --global` fallback.
+
+If multiple runtime installs are detected and the invoking runtime cannot be determined from execution_context, ask the user which runtime to update before running install.
 
 **If VERSION file missing:**
 ```
@@ -149,7 +217,9 @@ Exit.
 - `get-shit-done/` will be wiped and replaced
 - `agents/gsd-*` files will be replaced
 
-(Paths are relative to your install location: `~/.claude/` for global, `./.claude/` for local)
+(Paths are relative to detected runtime install location:
+global: `~/.claude/`, `~/.config/opencode/`, `~/.opencode/`, `~/.gemini/`, or `~/.codex/`
+local: `./.claude/`, `./.config/opencode/`, `./.opencode/`, `./.gemini/`, or `./.codex/`)
 
 Your custom files in other locations are preserved:
 - Custom commands not in `commands/gsd/` ✓
@@ -172,14 +242,24 @@ Use AskUserQuestion:
 <step name="run_update">
 Run the update using the install type detected in step 1:
 
-**If LOCAL install:**
+Build runtime flag from step 1:
 ```bash
-npx -y get-shit-done-cc@latest --local
+RUNTIME_FLAG="--$TARGET_RUNTIME"
 ```
 
-**If GLOBAL install (or unknown):**
+**If LOCAL install:**
 ```bash
-npx -y get-shit-done-cc@latest --global
+npx -y get-shit-done-cc@latest "$RUNTIME_FLAG" --local
+```
+
+**If GLOBAL install:**
+```bash
+npx -y get-shit-done-cc@latest "$RUNTIME_FLAG" --global
+```
+
+**If UNKNOWN install:**
+```bash
+npx -y get-shit-done-cc@latest --claude --global
 ```
 
 Capture output. If install fails, show error and exit.
@@ -188,7 +268,7 @@ Clear the update cache so statusline indicator disappears:
 
 ```bash
 # Clear update cache across all runtime directories
-for dir in .claude .config/opencode .opencode .gemini; do
+for dir in .claude .config/opencode .opencode .gemini .codex; do
   rm -f "./$dir/cache/gsd-update-check.json"
   rm -f "$HOME/$dir/cache/gsd-update-check.json"
 done
@@ -205,7 +285,7 @@ Format completion message (changelog was already shown in confirmation step):
 ║  GSD Updated: v1.5.10 → v1.5.15                           ║
 ╚═══════════════════════════════════════════════════════════╝
 
-⚠️  Restart Claude Code to pick up the new commands.
+⚠️  Restart your runtime to pick up the new commands.
 
 [View full changelog](https://github.com/glittercowboy/get-shit-done/blob/main/CHANGELOG.md)
 ```
