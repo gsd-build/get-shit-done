@@ -39,6 +39,7 @@
     "node": ">=16.7.0"
   },
   "devDependencies": {
+    "@stryker-mutator/core": "^9.6.0",
     "c8": "^11.0.0",
     "esbuild": "^0.24.0"
   },
@@ -46,6 +47,8 @@
     "build:hooks": "node scripts/build-hooks.js",
     "prepublishOnly": "npm run build:hooks",
     "test": "node scripts/run-tests.cjs",
-    "test:coverage": "c8 --check-coverage --lines 70 --reporter text --include 'get-shit-done/bin/lib/*.cjs' --exclude 'tests/**' --all node scripts/run-tests.cjs"
+    "test:coverage": "c8 --check-coverage --lines 70 --reporter text --include 'get-shit-done/bin/lib/*.cjs' --exclude 'tests/**' --all node scripts/run-tests.cjs",
+    "test:coverage:install": "npx c8 --reporter text --include 'bin/install.js' --include 'bin/lib/*.js' --exclude 'tests/**' node scripts/run-tests.cjs",
+    "test:mutation": "npx stryker run"
   }
 }
