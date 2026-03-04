@@ -6,6 +6,9 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ## [Unreleased]
 
+### Removed
+- `--both` installer flag — use `--claude --opencode` or `--all` instead
+
 ## [1.22.4] - 2026-03-03
 
 ### Added
