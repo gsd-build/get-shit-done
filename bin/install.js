@@ -2190,7 +2190,83 @@ function install(isGlobal, runtime = 'claude') {
     }
   }
 
+  // Create gsd-overrides skeleton directory for user customizations
+  if (isGlobal && !isOpencode) {
+    createOverridesDirectory(targetDir);
+  }
+
   return { settingsPath, settings, statuslineCommand, runtime };
+}
+
+/**
+ * Create gsd-overrides skeleton directory for user customizations
+ * This allows users to override GSD files without forking the repository
+ * @param {string} targetDir - The config directory (e.g., ~/.claude)
+ */
+function createOverridesDirectory(targetDir) {
+  const overridesDir = path.join(targetDir, 'gsd-overrides');
+
+  // Only create if it doesn't exist (preserve user customizations)
+  if (fs.existsSync(overridesDir)) {
+    return;
+  }
+
+  fs.mkdirSync(overridesDir, { recursive: true });
+
+  // Create subdirectories
+  const subdirs = ['agents', 'templates', 'workflows'];
+  for (const subdir of subdirs) {
+    fs.mkdirSync(path.join(overridesDir, subdir), { recursive: true });
+  }
+
+  // Create README.md explaining the override system
+  const readme = `# GSD Overrides Directory
+
+This directory allows you to customize GSD behavior without forking the repository.
+
+## How It Works
+
+GSD checks for override files in this directory before using defaults.
+
+**Priority order:**
+1. \`~/.claude/gsd-overrides/{type}/{filename}\` (your customizations)
+2. \`~/.claude/{type}/{filename}\` (GSD defaults)
+
+## Directory Structure
+
+\`\`\`
+gsd-overrides/
+├── agents/          # Custom agent definitions
+│   └── gsd-executor.md    # Override the executor agent
+├── templates/       # Custom templates
+│   └── plan.md            # Override plan template
+└── workflows/       # Custom workflow pieces
+    └── _commits.md        # Override commit logic
+\`\`\`
+
+## Example: Custom Executor Agent
+
+To customize the executor agent:
+
+1. Copy the default: \`cp ~/.claude/agents/gsd-executor.md ~/.claude/gsd-overrides/agents/\`
+2. Edit your copy
+3. GSD will use your version instead
+
+## Updates
+
+When GSD updates, your overrides are preserved.
+Check the CHANGELOG to see if default files changed that affect your overrides.
+
+## Debugging
+
+If GSD behavior seems wrong, check for override files first:
+\`ls -la ~/.claude/gsd-overrides/\`
+
+To disable an override, rename or remove the file.
+`;
+
+  fs.writeFileSync(path.join(overridesDir, 'README.md'), readme);
+  console.log(`  ${green}✓${reset} Created gsd-overrides/ for customizations`);
 }
 
 /**
