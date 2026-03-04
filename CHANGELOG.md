@@ -6,6 +6,9 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ## [Unreleased]
 
+### Fixed
+- Brownfield projects: phase prompt template now includes codebase CONVENTIONS.md in context — executors follow existing coding patterns
+
 ## [1.22.4] - 2026-03-03
 
 ### Added
