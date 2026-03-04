@@ -374,9 +374,10 @@ function resolveModelInternal(cwd, agentType) {
   }
 
   // Fall back to profile lookup
-  const profile = config.model_profile || 'balanced';
+  const profile = String(config.model_profile || 'balanced').toLowerCase();
   const agentModels = MODEL_PROFILES[agentType];
   if (!agentModels) return 'sonnet';
+  if (profile === 'inherit') return 'inherit';
   const resolved = agentModels[profile] || agentModels['balanced'] || 'sonnet';
   return resolved === 'opus' ? 'inherit' : resolved;
 }

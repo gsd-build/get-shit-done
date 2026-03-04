@@ -147,7 +147,7 @@ describe('resolveModelInternal', () => {
   describe('model profile structural validation', () => {
     test('all known agents resolve to a valid string for each profile', () => {
       const knownAgents = ['gsd-planner', 'gsd-executor', 'gsd-phase-researcher', 'gsd-codebase-mapper'];
-      const profiles = ['quality', 'balanced', 'budget'];
+      const profiles = ['quality', 'balanced', 'budget', 'inherit'];
       const validValues = ['inherit', 'sonnet', 'haiku', 'opus'];
 
       for (const profile of profiles) {
@@ -159,6 +159,14 @@ describe('resolveModelInternal', () => {
             `profile=${profile} agent=${agent} returned unexpected value: ${result}`
           );
         }
+      }
+    });
+
+    test('inherit profile forces all known agents to inherit model', () => {
+      const knownAgents = ['gsd-planner', 'gsd-executor', 'gsd-phase-researcher', 'gsd-codebase-mapper'];
+      writeConfig({ model_profile: 'inherit' });
+      for (const agent of knownAgents) {
+        assert.strictEqual(resolveModelInternal(tmpDir, agent), 'inherit');
       }
     });
   });
@@ -192,6 +200,11 @@ describe('resolveModelInternal', () => {
   describe('edge cases', () => {
     test('returns sonnet for unknown agent type', () => {
       writeConfig({ model_profile: 'balanced' });
+      assert.strictEqual(resolveModelInternal(tmpDir, 'gsd-nonexistent'), 'sonnet');
+    });
+
+    test('returns sonnet for unknown agent type even with inherit profile', () => {
+      writeConfig({ model_profile: 'inherit' });
       assert.strictEqual(resolveModelInternal(tmpDir, 'gsd-nonexistent'), 'sonnet');
     });
 

@@ -272,7 +272,7 @@ GSD stores project settings in `.planning/config.json`. Configure during `/gsd:n
 |---------|---------|---------|------------------|
 | `mode` | `interactive`, `yolo` | `interactive` | `yolo` auto-approves decisions; `interactive` confirms at each step |
 | `granularity` | `coarse`, `standard`, `fine` | `standard` | Phase granularity: how finely scope is sliced (3-5, 5-8, or 8-12 phases) |
-| `model_profile` | `quality`, `balanced`, `budget` | `balanced` | Model tier for each agent (see table below) |
+| `model_profile` | `quality`, `balanced`, `budget`, `inherit` | `balanced` | Model tier for each agent (see table below) |
 
 ### Planning Settings
 
@@ -314,24 +314,25 @@ Disable these to speed up phases in familiar domains or when conserving tokens.
 
 ### Model Profiles (Per-Agent Breakdown)
 
-| Agent | `quality` | `balanced` | `budget` |
-|-------|-----------|------------|----------|
-| gsd-planner | Opus | Opus | Sonnet |
-| gsd-roadmapper | Opus | Sonnet | Sonnet |
-| gsd-executor | Opus | Sonnet | Sonnet |
-| gsd-phase-researcher | Opus | Sonnet | Haiku |
-| gsd-project-researcher | Opus | Sonnet | Haiku |
-| gsd-research-synthesizer | Sonnet | Sonnet | Haiku |
-| gsd-debugger | Opus | Sonnet | Sonnet |
-| gsd-codebase-mapper | Sonnet | Haiku | Haiku |
-| gsd-verifier | Sonnet | Sonnet | Haiku |
-| gsd-plan-checker | Sonnet | Sonnet | Haiku |
-| gsd-integration-checker | Sonnet | Sonnet | Haiku |
+| Agent | `quality` | `balanced` | `budget` | `inherit` |
+|-------|-----------|------------|----------|-----------|
+| gsd-planner | Opus | Opus | Sonnet | Inherit |
+| gsd-roadmapper | Opus | Sonnet | Sonnet | Inherit |
+| gsd-executor | Opus | Sonnet | Sonnet | Inherit |
+| gsd-phase-researcher | Opus | Sonnet | Haiku | Inherit |
+| gsd-project-researcher | Opus | Sonnet | Haiku | Inherit |
+| gsd-research-synthesizer | Sonnet | Sonnet | Haiku | Inherit |
+| gsd-debugger | Opus | Sonnet | Sonnet | Inherit |
+| gsd-codebase-mapper | Sonnet | Haiku | Haiku | Inherit |
+| gsd-verifier | Sonnet | Sonnet | Haiku | Inherit |
+| gsd-plan-checker | Sonnet | Sonnet | Haiku | Inherit |
+| gsd-integration-checker | Sonnet | Sonnet | Haiku | Inherit |
 
 **Profile philosophy:**
 - **quality** -- Opus for all decision-making agents, Sonnet for read-only verification. Use when quota is available and the work is critical.
 - **balanced** -- Opus only for planning (where architecture decisions happen), Sonnet for everything else. The default for good reason.
 - **budget** -- Sonnet for anything that writes code, Haiku for research and verification. Use for high-volume work or less critical phases.
+- **inherit** -- All agents use the current session model. Best when switching models dynamically (for example OpenCode `/model`).
 
 ---
 

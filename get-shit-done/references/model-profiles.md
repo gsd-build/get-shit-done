@@ -1,23 +1,23 @@
 # Model Profiles
 
-Model profiles control which Claude model each GSD agent uses. This allows balancing quality vs token spend.
+Model profiles control which Claude model each GSD agent uses. This allows balancing quality vs token spend, or inheriting the currently selected session model.
 
 ## Profile Definitions
 
-| Agent | `quality` | `balanced` | `budget` |
-|-------|-----------|------------|----------|
-| gsd-planner | opus | opus | sonnet |
-| gsd-roadmapper | opus | sonnet | sonnet |
-| gsd-executor | opus | sonnet | sonnet |
-| gsd-phase-researcher | opus | sonnet | haiku |
-| gsd-project-researcher | opus | sonnet | haiku |
-| gsd-research-synthesizer | sonnet | sonnet | haiku |
-| gsd-debugger | opus | sonnet | sonnet |
-| gsd-codebase-mapper | sonnet | haiku | haiku |
-| gsd-verifier | sonnet | sonnet | haiku |
-| gsd-plan-checker | sonnet | sonnet | haiku |
-| gsd-integration-checker | sonnet | sonnet | haiku |
-| gsd-nyquist-auditor | sonnet | sonnet | haiku |
+| Agent | `quality` | `balanced` | `budget` | `inherit` |
+|-------|-----------|------------|----------|-----------|
+| gsd-planner | opus | opus | sonnet | inherit |
+| gsd-roadmapper | opus | sonnet | sonnet | inherit |
+| gsd-executor | opus | sonnet | sonnet | inherit |
+| gsd-phase-researcher | opus | sonnet | haiku | inherit |
+| gsd-project-researcher | opus | sonnet | haiku | inherit |
+| gsd-research-synthesizer | sonnet | sonnet | haiku | inherit |
+| gsd-debugger | opus | sonnet | sonnet | inherit |
+| gsd-codebase-mapper | sonnet | haiku | haiku | inherit |
+| gsd-verifier | sonnet | sonnet | haiku | inherit |
+| gsd-plan-checker | sonnet | sonnet | haiku | inherit |
+| gsd-integration-checker | sonnet | sonnet | haiku | inherit |
+| gsd-nyquist-auditor | sonnet | sonnet | haiku | inherit |
 
 ## Profile Philosophy
 
@@ -36,6 +36,11 @@ Model profiles control which Claude model each GSD agent uses. This allows balan
 - Sonnet for anything that writes code
 - Haiku for research and verification
 - Use when: conserving quota, high-volume work, less critical phases
+
+**inherit** - Follow the current session model
+- All agents resolve to `inherit`
+- Best when you switch models interactively (for example OpenCode `/model`)
+- Use when: you want GSD to follow your currently selected runtime model
 
 ## Resolution Logic
 
@@ -62,7 +67,7 @@ Override specific agents without changing the entire profile:
 }
 ```
 
-Overrides take precedence over the profile. Valid values: `opus`, `sonnet`, `haiku`.
+Overrides take precedence over the profile. Valid values: `opus`, `sonnet`, `haiku`, `inherit`.
 
 ## Switching Profiles
 
@@ -91,3 +96,6 @@ Read-only exploration and pattern extraction. No reasoning required, just struct
 
 **Why `inherit` instead of passing `opus` directly?**
 Claude Code's `"opus"` alias maps to a specific model version. Organizations may block older opus versions while allowing newer ones. GSD returns `"inherit"` for opus-tier agents, causing them to use whatever opus version the user has configured in their session. This avoids version conflicts and silent fallbacks to Sonnet.
+
+**Why `inherit` profile?**
+Some runtimes (including OpenCode) let users switch models at runtime (`/model`). The `inherit` profile keeps all GSD subagents aligned to that live selection.
