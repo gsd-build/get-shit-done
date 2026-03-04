@@ -52,6 +52,10 @@ When you run `/gsd:autopilot`, this command:
 
 The launcher handles all routing, port assignment, and process management. Multiple branches can run autopilot simultaneously without conflicts.
 
+## Important
+
+The launcher script handles opening the dashboard in the user's browser automatically. Do NOT attempt to open dashboard URLs yourself (e.g. via Chrome extension or any other tool). Just run the launcher and report its output.
+
 ## Execution
 
 ```bash

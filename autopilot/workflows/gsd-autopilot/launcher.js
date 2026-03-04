@@ -206,6 +206,13 @@ async function handleStatus(branch, projectDir) {
  * Does NOT launch the autopilot orchestrator — view-only.
  */
 async function handleShow(branch, projectDir) {
+  // Don't start dashboard if there's no planning data
+  const planningDir = join(projectDir, '.planning');
+  if (!existsSync(planningDir)) {
+    console.log('No planning data found. Run /gsd:autopilot to start a project first.');
+    return;
+  }
+
   const port = await assignPort(branch, projectDir);
 
   // Check if dashboard is already responding

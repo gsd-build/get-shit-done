@@ -5,7 +5,7 @@
 import { Command } from 'commander';
 import { resolve, join, dirname } from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { existsSync, readFileSync, writeFileSync, mkdirSync } from 'node:fs';
+import { existsSync, readFileSync, writeFileSync } from 'node:fs';
 import { FileStateReader } from '../ipc/file-state-reader.js';
 import { EventTailer } from '../ipc/event-tailer.js';
 import { AnswerWriter } from '../ipc/answer-writer.js';
@@ -90,12 +90,10 @@ program
     const statePath = join(projectDir, '.planning', 'autopilot', 'state.json');
     function patchStateFile(patch: Record<string, unknown>) {
       try {
-        let state: Record<string, unknown> = {};
-        try {
-          state = JSON.parse(readFileSync(statePath, 'utf-8'));
-        } catch { /* file may not exist yet */ }
+        // Only patch if state file already exists — don't create directories
+        if (!existsSync(statePath)) return;
+        const state = JSON.parse(readFileSync(statePath, 'utf-8'));
         Object.assign(state, patch);
-        mkdirSync(join(projectDir, '.planning', 'autopilot'), { recursive: true });
         writeFileSync(statePath, JSON.stringify(state, null, 2), 'utf-8');
       } catch { /* best-effort */ }
     }
