@@ -7,8 +7,6 @@ const readline = require('readline');
 
 const {
   cyan, green, yellow, dim, reset,
-  GSD_CODEX_MARKER, CODEX_AGENT_SANDBOX,
-  colorNameToHex, claudeToOpencodeTools, claudeToGeminiTools,
   MANIFEST_NAME, PATCHES_DIR_NAME,
   expandTilde, toHomePrefix, getDirName, getConfigDirFromHome,
   getOpencodeGlobalDir, getGlobalDir,
@@ -24,20 +22,12 @@ const {
 } = require('./lib/core.js');
 
 const {
-  convertSlashCommandsToCodexSkillMentions,
   convertClaudeToCodexMarkdown,
-  getCodexSkillAdapterHeader,
-  convertClaudeCommandToCodexSkill,
   convertClaudeAgentToCodexAgent,
-  generateCodexAgentToml,
-  generateCodexConfigBlock,
   stripGsdFromCodexConfig,
-  mergeCodexConfig,
   installCodexConfig,
   listCodexSkillNames,
   copyCommandsAsCodexSkills,
-  toSingleLine,
-  yamlQuote,
 } = require('./lib/codex.js');
 
 const {
@@ -1109,8 +1099,29 @@ function installAllRuntimes(runtimes, isGlobal, isInteractive) {
 // orchestration functions (copyWithPathReplacement, copyFlattenedCommands)
 // and for any external consumers relying on the GSD_TEST_MODE interface.
 if (process.env.GSD_TEST_MODE) {
+  // Inline require for identifiers not used in install.js function body
+  // but re-exported for backward compatibility with external consumers.
+  const {
+    convertSlashCommandsToCodexSkillMentions,
+    getCodexSkillAdapterHeader,
+    convertClaudeCommandToCodexSkill,
+    generateCodexAgentToml,
+    generateCodexConfigBlock,
+    mergeCodexConfig,
+    toSingleLine,
+    yamlQuote,
+  } = require('./lib/codex.js');
+  const {
+    GSD_CODEX_MARKER,
+    CODEX_AGENT_SANDBOX,
+    colorNameToHex,
+    claudeToOpencodeTools,
+    claudeToGeminiTools,
+  } = require('./lib/core.js');
+
   module.exports = {
-    // Existing Codex exports
+    // Codex exports
+    convertSlashCommandsToCodexSkillMentions,
     getCodexSkillAdapterHeader,
     convertClaudeAgentToCodexAgent,
     generateCodexAgentToml,
