@@ -583,14 +583,43 @@ describe('requirements mark-complete command', () => {
     assert.ok(result.success, `Command failed: ${result.error}`);
 
     const output = JSON.parse(result.output);
-    // Regex only matches [ ] (space), not [x], so TEST-03 goes to not_found
-    assert.ok(output.not_found.includes('TEST-03'), 'already-complete ID should be in not_found');
+    assert.ok(output.already_complete.includes('TEST-03'), 'already-complete ID should be in already_complete');
+    assert.deepStrictEqual(output.not_found, [], 'should not appear in not_found');
 
     const content = readRequirements(tmpDir);
     // File should not be corrupted — no [xx] or doubled markers
     assert.ok(content.includes('- [x] **TEST-03**'), 'existing [x] should remain intact');
     assert.ok(!content.includes('[xx]'), 'should not have doubled x markers');
     assert.ok(!content.includes('- [x] [x]'), 'should not have duplicate checkbox');
+  });
+
+  test('returns already_complete for idempotent calls on completed requirements', () => {
+    writeRequirements(tmpDir, STANDARD_REQUIREMENTS);
+
+    // TEST-03 is already [x] in the fixture
+    const result = runGsdTools('requirements mark-complete TEST-03', tmpDir);
+    assert.ok(result.success, `Command failed: ${result.error}`);
+
+    const output = JSON.parse(result.output);
+    assert.deepStrictEqual(output.already_complete, ['TEST-03'],
+      'should report TEST-03 as already_complete');
+    assert.deepStrictEqual(output.not_found, [],
+      'should not report already-complete IDs as not_found');
+  });
+
+  test('mixed: updates pending, reports already-complete, and flags missing', () => {
+    writeRequirements(tmpDir, STANDARD_REQUIREMENTS);
+
+    const result = runGsdTools('requirements mark-complete TEST-01,TEST-03,FAKE-99', tmpDir);
+    assert.ok(result.success, `Command failed: ${result.error}`);
+
+    const output = JSON.parse(result.output);
+    assert.deepStrictEqual(output.marked_complete, ['TEST-01'],
+      'should mark TEST-01 complete');
+    assert.deepStrictEqual(output.already_complete, ['TEST-03'],
+      'should report TEST-03 as already_complete');
+    assert.deepStrictEqual(output.not_found, ['FAKE-99'],
+      'should report FAKE-99 as not_found');
   });
 
   test('missing REQUIREMENTS.md returns expected error structure', () => {

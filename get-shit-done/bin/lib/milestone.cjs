@@ -33,6 +33,7 @@ function cmdRequirementsMarkComplete(cwd, reqIdsRaw, raw) {
 
   let reqContent = fs.readFileSync(reqPath, 'utf-8');
   const updated = [];
+  const alreadyComplete = [];
   const notFound = [];
 
   for (const reqId of reqIds) {
@@ -60,7 +61,14 @@ function cmdRequirementsMarkComplete(cwd, reqIdsRaw, raw) {
     if (found) {
       updated.push(reqId);
     } else {
-      notFound.push(reqId);
+      // Check if already complete before declaring not_found
+      const doneCheckbox = new RegExp(`-\\s*\\[x\\]\\s*\\*\\*${reqEscaped}\\*\\*`, 'gi');
+      const doneTable = new RegExp(`\\|\\s*${reqEscaped}\\s*\\|[^|]+\\|\\s*Complete\\s*\\|`, 'gi');
+      if (doneCheckbox.test(reqContent) || doneTable.test(reqContent)) {
+        alreadyComplete.push(reqId);
+      } else {
+        notFound.push(reqId);
+      }
     }
   }
 
@@ -71,6 +79,7 @@ function cmdRequirementsMarkComplete(cwd, reqIdsRaw, raw) {
   output({
     updated: updated.length > 0,
     marked_complete: updated,
+    already_complete: alreadyComplete,
     not_found: notFound,
     total: reqIds.length,
   }, raw, `${updated.length}/${reqIds.length} requirements marked complete`);
