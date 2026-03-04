@@ -38,8 +38,15 @@ async function installWorkflow() {
     const launcherDest = join(workflowSubdir, 'launcher.js');
     let launcherContent = await readFile(launcherDest, 'utf-8');
     launcherContent = launcherContent.replace(/__CLI_PATH__/g, cliPath);
-    await writeFile(launcherDest, launcherContent, 'utf-8');
     console.log(`  Injected CLI_PATH into launcher.js: ${cliPath}`);
+
+    // 4c. Resolve and inject DEVTUNNEL_PATH into launcher.js
+    const ext = process.platform === 'win32' ? '.exe' : '';
+    const devtunnelPath = join(__dirname, '..', `devtunnel${ext}`).replace(/\\/g, '/');
+    launcherContent = launcherContent.replace(/__DEVTUNNEL_PATH__/g, devtunnelPath);
+    console.log(`  Injected DEVTUNNEL_PATH into launcher.js: ${devtunnelPath}`);
+
+    await writeFile(launcherDest, launcherContent, 'utf-8');
 
     // 5. Read SKILL.md template
     const skillTemplatePath = join(sourceDir, 'SKILL.md');

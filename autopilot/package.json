@@ -1,6 +1,6 @@
 {
   "name": "@nexeradigital/gsd-autopilot",
-  "version": "0.2.2",
+  "version": "0.2.5",
   "description": "Autonomous GSD workflow orchestrator -- turns a PRD into a built project",
   "type": "module",
   "publishConfig": {

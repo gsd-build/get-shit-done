@@ -3,6 +3,7 @@
 // Pure JavaScript (not TypeScript) - runs directly from ~/.claude/skills/
 
 const CLI_PATH = '__CLI_PATH__';
+const DEVTUNNEL_PATH = '__DEVTUNNEL_PATH__';
 
 import { spawn, execSync, execFile } from 'node:child_process';
 import { readFile, writeFile } from 'node:fs/promises';
@@ -278,6 +279,11 @@ async function handleStop(branch, projectDir) {
  * @returns {string} Path to devtunnel.exe (or devtunnel on non-Windows)
  */
 function resolveDevTunnelExe() {
+  // 1. Use injected path from postinstall (production)
+  if (DEVTUNNEL_PATH !== '__DEVTUNNEL_' + 'PATH__' && existsSync(DEVTUNNEL_PATH)) {
+    return DEVTUNNEL_PATH;
+  }
+  // 2. Fallback: resolve relative to launcher location
   const __filename = fileURLToPath(import.meta.url);
   const packageRoot = pathResolve(dirname(__filename), '..', '..');
   const ext = process.platform === 'win32' ? '.exe' : '';
