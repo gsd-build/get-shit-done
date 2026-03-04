@@ -320,7 +320,7 @@ We'll clarify HOW to implement this.
 - options: Generate 3-4 phase-specific gray areas, each with:
   - "[Specific area]" (label) — concrete, not generic
   - [1-2 questions this covers + code context annotation] (description)
-  - **Highlight the recommended choice with brief explanation why**
+  - If you have a recommendation, append "(Recommended)" to that option's label — but NEVER auto-select it. Always wait for user response.
 
 **Prior decision annotations:** When a gray area was already decided in a prior phase, annotate it:
 ```
@@ -341,6 +341,8 @@ We'll clarify HOW to implement this.
 ```
 
 **Do NOT include a "skip" or "you decide" option.** User ran this command to discuss — give them real choices.
+
+**CRITICAL: Answer verification.** After the AskUserQuestion call returns, verify the result contains the user's actual selections (option labels). If the result is empty or generic (e.g., "User has answered your questions: ." with no selections listed), the tool failed. Do NOT assume the user selected all options or any specific options. Instead, present the gray areas as a numbered plain-text list and ask the user to type which numbers they want to discuss.
 
 **Examples by domain (with code context):**
 
@@ -378,6 +380,14 @@ For each selected area, conduct a focused discussion loop.
 
 Ask 4 questions per area before offering to continue or move on. Each answer often reveals the next question.
 
+**CRITICAL: Answer verification after every AskUserQuestion call.**
+After each AskUserQuestion call, verify the tool result contains the user's actual selection (the option label or free-text response). The result should name what the user picked.
+- If the result is empty, generic (e.g., just "User has answered your questions: ."), or doesn't contain explicit choices — the tool FAILED to collect input.
+- Do NOT assume, guess, or fabricate an answer. Do NOT pick the "(Recommended)" option on their behalf.
+- Instead, present the same options as a numbered plain-text list and ask the user to type their choice number or describe their preference.
+- Example fallback: "I couldn't capture your selection. Which do you prefer?\n1. Cards\n2. List\n3. Timeline\nType a number or describe what you'd like."
+- Only proceed once you have a confirmed, explicit user response.
+
 **For each area:**
 
 1. **Announce the area:**
@@ -388,7 +398,7 @@ Ask 4 questions per area before offering to continue or move on. Each answer oft
 2. **Ask 4 questions using AskUserQuestion:**
    - header: "[Area]" (max 12 chars — abbreviate if needed)
    - question: Specific decision for this area
-   - options: 2-3 concrete choices (AskUserQuestion adds "Other" automatically), with the recommended choice highlighted and brief explanation why
+   - options: 2-3 concrete choices (AskUserQuestion adds "Other" automatically). If you have a recommendation, append "(Recommended)" to that option's label — but NEVER auto-select or answer on behalf of the user. Always wait for their response.
    - **Annotate options with code context** when relevant:
      ```
      "How should posts be displayed?"
