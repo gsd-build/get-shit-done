@@ -39,6 +39,8 @@ async function main() {
     await handleStatus(branch, projectDir);
   } else if (subcommandOrArg === 'stop') {
     await handleStop(branch, projectDir);
+  } else if (subcommandOrArg === 'show') {
+    await handleShow(branch, projectDir);
   } else if (subcommandOrArg === 'login') {
     const provider = process.argv[4]; // 'github' or undefined (for Microsoft default)
     await handleLogin(provider);
@@ -196,6 +198,44 @@ async function handleStatus(branch, projectDir) {
   console.log(`Progress: ${progress}%`);
   console.log(`Dashboard: http://localhost:${port}`);
   console.log(`PID: ${pid}`);
+}
+
+/**
+ * Handle show subcommand
+ * Starts standalone dashboard (if not already running) and opens it in the browser.
+ * Does NOT launch the autopilot orchestrator — view-only.
+ */
+async function handleShow(branch, projectDir) {
+  const port = await assignPort(branch, projectDir);
+
+  // Check if dashboard is already responding
+  const alreadyUp = await checkHealth(port);
+  if (!alreadyUp) {
+    // Start standalone dashboard server (no orchestrator)
+    console.log(`Starting dashboard server on port ${port}...`);
+    killProcessOnPort(port);
+
+    const standaloneScript = join(dirname(CLI_PATH), '..', 'server', 'standalone.js');
+    const child = spawn(process.execPath, [standaloneScript, '--project-dir', projectDir, '--port', String(port)], {
+      stdio: 'ignore',
+      detached: true,
+      cwd: projectDir,
+      env: { ...process.env, NO_TUNNEL: 'true' },
+    });
+    child.unref();
+
+    // Wait for health check
+    const healthy = await performHealthCheck(port);
+    if (!healthy) {
+      console.log('Dashboard server may take a moment to start.');
+    }
+  } else {
+    console.log('Dashboard already running.');
+  }
+
+  console.log(`Dashboard: http://localhost:${port}`);
+  // Open in browser
+  spawn('start', ['', `http://localhost:${port}`], { shell: true, stdio: 'ignore' }).unref();
 }
 
 /**
