@@ -4,7 +4,7 @@
 
 const fs = require('fs');
 const path = require('path');
-const { normalizePhaseName, findPhaseInternal, generateSlugInternal, output, error } = require('./core.cjs');
+const { normalizePhaseName, findPhaseInternal, generateSlugInternal, toPosixPath, output, error } = require('./core.cjs');
 const { reconstructFrontmatter } = require('./frontmatter.cjs');
 
 function cmdTemplateSelect(cwd, planPath, raw) {
@@ -210,12 +210,12 @@ function cmdTemplateFill(cwd, templateType, options, raw) {
   const outPath = path.join(cwd, phaseInfo.directory, fileName);
 
   if (fs.existsSync(outPath)) {
-    output({ error: 'File already exists', path: path.relative(cwd, outPath) }, raw);
+    output({ error: 'File already exists', path: toPosixPath(path.relative(cwd, outPath)) }, raw);
     return;
   }
 
   fs.writeFileSync(outPath, fullContent, 'utf-8');
-  const relPath = path.relative(cwd, outPath);
+  const relPath = toPosixPath(path.relative(cwd, outPath));
   output({ created: true, path: relPath, template: templateType }, raw, relPath);
 }
 

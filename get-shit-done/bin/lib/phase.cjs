@@ -4,8 +4,9 @@
 
 const fs = require('fs');
 const path = require('path');
-const { escapeRegex, normalizePhaseName, comparePhaseNum, findPhaseInternal, getArchivedPhaseDirs, generateSlugInternal, output, error } = require('./core.cjs');
+const { escapeRegex, normalizePhaseName, comparePhaseNum, findPhaseInternal, getArchivedPhaseDirs, generateSlugInternal, getMilestonePhaseFilter, toPosixPath, output, error } = require('./core.cjs');
 const { extractFrontmatter } = require('./frontmatter.cjs');
+const { writeStateMd } = require('./state.cjs');
 
 function cmdPhasesList(cwd, options, raw) {
   const phasesDir = path.join(cwd, '.planning', 'phases');
@@ -179,7 +180,7 @@ function cmdFindPhase(cwd, phase, raw) {
 
     const result = {
       found: true,
-      directory: path.join('.planning', 'phases', match),
+      directory: toPosixPath(path.join('.planning', 'phases', match)),
       phase_number: phaseNumber,
       phase_name: phaseName,
       plans,
@@ -190,6 +191,11 @@ function cmdFindPhase(cwd, phase, raw) {
   } catch {
     output(notFound, raw, '');
   }
+}
+
+function extractObjective(content) {
+  const m = content.match(/<objective>\s*\n?\s*(.+)/);
+  return m ? m[1].trim() : null;
 }
 
 function cmdPhasePlanIndex(cwd, phase, raw) {
@@ -241,9 +247,10 @@ function cmdPhasePlanIndex(cwd, phase, raw) {
     const content = fs.readFileSync(planPath, 'utf-8');
     const fm = extractFrontmatter(content);
 
-    // Count tasks (## Task N patterns)
-    const taskMatches = content.match(/##\s*Task\s*\d+/gi) || [];
-    const taskCount = taskMatches.length;
+    // Count tasks: XML <task> tags (canonical) or ## Task N markdown (legacy)
+    const xmlTasks = content.match(/<task[\s>]/gi) || [];
+    const mdTasks = content.match(/##\s*Task\s*\d+/gi) || [];
+    const taskCount = xmlTasks.length || mdTasks.length;
 
     // Parse wave as integer
     const wave = parseInt(fm.wave, 10) || 1;
@@ -258,10 +265,11 @@ function cmdPhasePlanIndex(cwd, phase, raw) {
       hasCheckpoints = true;
     }
 
-    // Parse files-modified
+    // Parse files_modified (underscore is canonical; also accept hyphenated for compat)
     let filesModified = [];
-    if (fm['files-modified']) {
-      filesModified = Array.isArray(fm['files-modified']) ? fm['files-modified'] : [fm['files-modified']];
+    const fmFiles = fm['files_modified'] || fm['files-modified'];
+    if (fmFiles) {
+      filesModified = Array.isArray(fmFiles) ? fmFiles : [fmFiles];
     }
 
     const hasSummary = completedPlanIds.has(planId);
@@ -273,7 +281,7 @@ function cmdPhasePlanIndex(cwd, phase, raw) {
       id: planId,
       wave,
       autonomous,
-      objective: fm.objective || null,
+      objective: extractObjective(content) || fm.objective || null,
       files_modified: filesModified,
       task_count: taskCount,
       has_summary: hasSummary,
@@ -675,7 +683,7 @@ function cmdPhaseRemove(cwd, targetPhase, options, raw) {
       const oldTotal = parseInt(ofMatch[2], 10);
       stateContent = stateContent.replace(ofPattern, `$1${oldTotal - 1}$3`);
     }
-    fs.writeFileSync(statePath, stateContent, 'utf-8');
+    writeStateMd(statePath, stateContent, cwd);
   }
 
   const result = {
@@ -775,14 +783,19 @@ function cmdPhaseComplete(cwd, phaseNum, raw) {
     }
   }
 
-  // Find next phase
+  // Find next phase — check both filesystem AND roadmap
+  // Phases may be defined in ROADMAP.md but not yet scaffolded to disk,
+  // so a filesystem-only scan would incorrectly report is_last_phase:true
   let nextPhaseNum = null;
   let nextPhaseName = null;
   let isLastPhase = true;
 
   try {
+    const isDirInMilestone = getMilestonePhaseFilter(cwd);
     const entries = fs.readdirSync(phasesDir, { withFileTypes: true });
-    const dirs = entries.filter(e => e.isDirectory()).map(e => e.name).sort((a, b) => comparePhaseNum(a, b));
+    const dirs = entries.filter(e => e.isDirectory()).map(e => e.name)
+      .filter(isDirInMilestone)
+      .sort((a, b) => comparePhaseNum(a, b));
 
     // Find the next phase directory after current
     for (const dir of dirs) {
@@ -797,6 +810,24 @@ function cmdPhaseComplete(cwd, phaseNum, raw) {
       }
     }
   } catch {}
+
+  // Fallback: if filesystem found no next phase, check ROADMAP.md
+  // for phases that are defined but not yet planned (no directory on disk)
+  if (isLastPhase && fs.existsSync(roadmapPath)) {
+    try {
+      const roadmapForPhases = fs.readFileSync(roadmapPath, 'utf-8');
+      const phasePattern = /#{2,4}\s*Phase\s+(\d+[A-Z]?(?:\.\d+)*)\s*:\s*([^\n]+)/gi;
+      let pm;
+      while ((pm = phasePattern.exec(roadmapForPhases)) !== null) {
+        if (comparePhaseNum(pm[1], phaseNum) > 0) {
+          nextPhaseNum = pm[1];
+          nextPhaseName = pm[2].replace(/\(INSERTED\)/i, '').trim().toLowerCase().replace(/\s+/g, '-');
+          isLastPhase = false;
+          break;
+        }
+      }
+    } catch {}
+  }
 
   // Update STATE.md
   if (fs.existsSync(statePath)) {
@@ -840,7 +871,7 @@ function cmdPhaseComplete(cwd, phaseNum, raw) {
       `$1Phase ${phaseNum} complete${nextPhaseNum ? `, transitioned to Phase ${nextPhaseNum}` : ''}`
     );
 
-    fs.writeFileSync(statePath, stateContent, 'utf-8');
+    writeStateMd(statePath, stateContent, cwd);
   }
 
   const result = {

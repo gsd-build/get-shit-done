@@ -115,6 +115,37 @@ lack automated verify commands will not be approved.
 **Disable:** Set `workflow.nyquist_validation: false` in `/gsd:settings` for
 rapid prototyping phases where test infrastructure isn't the focus.
 
+### Retroactive Validation (`/gsd:validate-phase`)
+
+For phases executed before Nyquist validation existed, or for existing codebases
+with only traditional test suites, retroactively audit and fill coverage gaps:
+
+```
+  /gsd:validate-phase N
+         |
+         +-- Detect state (VALIDATION.md exists? SUMMARY.md exists?)
+         |
+         +-- Discover: scan implementation, map requirements to tests
+         |
+         +-- Analyze gaps: which requirements lack automated verification?
+         |
+         +-- Present gap plan for approval
+         |
+         +-- Spawn auditor: generate tests, run, debug (max 3 attempts)
+         |
+         +-- Update VALIDATION.md
+               |
+               +-- COMPLIANT -> all requirements have automated checks
+               +-- PARTIAL -> some gaps escalated to manual-only
+```
+
+The auditor never modifies implementation code — only test files and
+VALIDATION.md. If a test reveals an implementation bug, it's flagged as an
+escalation for you to address.
+
+**When to use:** After executing phases that were planned before Nyquist was
+enabled, or after `/gsd:audit-milestone` surfaces Nyquist compliance gaps.
+
 ### Execution Wave Coordination
 
 ```
@@ -215,7 +246,7 @@ GSD stores project settings in `.planning/config.json`. Configure during `/gsd:n
 ```json
 {
   "mode": "interactive",
-  "depth": "standard",
+  "granularity": "standard",
   "model_profile": "balanced",
   "planning": {
     "commit_docs": true,
@@ -240,7 +271,7 @@ GSD stores project settings in `.planning/config.json`. Configure during `/gsd:n
 | Setting | Options | Default | What it Controls |
 |---------|---------|---------|------------------|
 | `mode` | `interactive`, `yolo` | `interactive` | `yolo` auto-approves decisions; `interactive` confirms at each step |
-| `depth` | `quick`, `standard`, `comprehensive` | `standard` | Planning thoroughness: 3-5, 5-8, or 8-12 phases |
+| `granularity` | `coarse`, `standard`, `fine` | `standard` | Phase granularity: how finely scope is sliced (3-5, 5-8, or 8-12 phases) |
 | `model_profile` | `quality`, `balanced`, `budget` | `balanced` | Model tier for each agent (see table below) |
 
 ### Planning Settings
@@ -364,11 +395,11 @@ claude --dangerously-skip-permissions
 
 ### Speed vs Quality Presets
 
-| Scenario | Mode | Depth | Profile | Research | Plan Check | Verifier |
+| Scenario | Mode | Granularity | Profile | Research | Plan Check | Verifier |
 |----------|------|-------|---------|----------|------------|----------|
-| Prototyping | `yolo` | `quick` | `budget` | off | off | off |
+| Prototyping | `yolo` | `coarse` | `budget` | off | off | off |
 | Normal dev | `interactive` | `standard` | `balanced` | on | on | on |
-| Production | `interactive` | `comprehensive` | `quality` | on | on | on |
+| Production | `interactive` | `fine` | `quality` | on | on | on |
 
 ### Mid-Milestone Scope Changes
 

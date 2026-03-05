@@ -80,7 +80,7 @@ For each gap, fill the debug-subagent-prompt template and spawn:
 ```
 Task(
   prompt=filled_debug_subagent_prompt + "\n\n<files_to_read>\n- {phase_dir}/{phase_num}-UAT.md\n- .planning/STATE.md\n</files_to_read>",
-  subagent_type="general-purpose",
+  subagent_type="gsd-debugger",
   description="Debug: {truth_short}"
 )
 ```
@@ -158,7 +158,7 @@ Update status in frontmatter to "diagnosed".
 
 Commit the updated UAT.md:
 ```bash
-node ~/.claude/get-shit-done/bin/gsd-tools.cjs commit "docs({phase_num}): add root causes from diagnosis" --files ".planning/phases/XX-name/{phase_num}-UAT.md"
+node "$HOME/.claude/get-shit-done/bin/gsd-tools.cjs" commit "docs({phase_num}): add root causes from diagnosis" --files ".planning/phases/XX-name/{phase_num}-UAT.md"
 ```
 </step>
 

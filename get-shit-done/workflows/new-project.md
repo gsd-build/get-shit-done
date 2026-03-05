@@ -14,7 +14,7 @@ Check if `--auto` flag is present in $ARGUMENTS.
 **If auto mode:**
 - Skip brownfield mapping offer (assume greenfield)
 - Skip deep questioning (extract context from provided document)
-- Config: YOLO mode is implicit (skip that question), but ask depth/git/agents FIRST (Step 2a)
+- Config: YOLO mode is implicit (skip that question), but ask granularity/git/agents FIRST (Step 2a)
 - After config: run Steps 6-9 automatically with smart defaults:
   - Research: Always yes
   - Requirements: Include all table stakes + features from provided document
@@ -46,7 +46,8 @@ The document should describe what you want to build.
 **MANDATORY FIRST STEP — Execute these checks before ANY user interaction:**
 
 ```bash
-INIT=$(node ~/.claude/get-shit-done/bin/gsd-tools.cjs init new-project)
+INIT=$(node "$HOME/.claude/get-shit-done/bin/gsd-tools.cjs" init new-project)
+if [[ "$INIT" == @file:* ]]; then INIT=$(cat "${INIT#@file:}"); fi
 ```
 
 Parse JSON for: `researcher_model`, `synthesizer_model`, `roadmapper_model`, `commit_docs`, `project_exists`, `has_codebase_map`, `planning_exists`, `has_existing_code`, `has_package_file`, `is_brownfield`, `needs_codebase_map`, `has_git`, `project_path`.
@@ -90,13 +91,13 @@ YOLO mode is implicit (auto = YOLO). Ask remaining config questions:
 ```
 AskUserQuestion([
   {
-    header: "Depth",
-    question: "How thorough should planning be?",
+    header: "Granularity",
+    question: "How finely should scope be sliced into phases?",
     multiSelect: false,
     options: [
-      { label: "Quick (Recommended)", description: "Ship fast (3-5 phases, 1-3 plans each)" },
-      { label: "Standard", description: "Balanced scope and speed (5-8 phases, 3-5 plans each)" },
-      { label: "Comprehensive", description: "Thorough coverage (8-12 phases, 5-10 plans each)" }
+      { label: "Coarse (Recommended)", description: "Fewer, broader phases (3-5 phases, 1-3 plans each)" },
+      { label: "Standard", description: "Balanced phase size (5-8 phases, 3-5 plans each)" },
+      { label: "Fine", description: "Many focused phases (8-12 phases, 5-10 plans each)" }
     ]
   },
   {
@@ -169,7 +170,7 @@ Create `.planning/config.json` with mode set to "yolo":
 ```json
 {
   "mode": "yolo",
-  "depth": "[selected]",
+  "granularity": "[selected]",
   "parallelization": true|false,
   "commit_docs": true|false,
   "model_profile": "quality|balanced|budget",
@@ -177,6 +178,7 @@ Create `.planning/config.json` with mode set to "yolo":
     "research": true|false,
     "plan_check": true|false,
     "verifier": true|false,
+    "nyquist_validation": depth !== "quick",
     "auto_advance": true
   }
 }
@@ -188,13 +190,13 @@ Create `.planning/config.json` with mode set to "yolo":
 
 ```bash
 mkdir -p .planning
-node ~/.claude/get-shit-done/bin/gsd-tools.cjs commit "chore: add project config" --files .planning/config.json
+node "$HOME/.claude/get-shit-done/bin/gsd-tools.cjs" commit "chore: add project config" --files .planning/config.json
 ```
 
-**Persist auto-advance to config (survives context compaction):**
+**Persist auto-advance chain flag to config (survives context compaction):**
 
 ```bash
-node ~/.claude/get-shit-done/bin/gsd-tools.cjs config-set workflow.auto_advance true
+node "$HOME/.claude/get-shit-done/bin/gsd-tools.cjs" config-set workflow._auto_chain_active true
 ```
 
 Proceed to Step 4 (skip Steps 3 and 5).
@@ -338,7 +340,7 @@ Do not compress. Capture everything gathered.
 
 ```bash
 mkdir -p .planning
-node ~/.claude/get-shit-done/bin/gsd-tools.cjs commit "docs: initialize project" --files .planning/PROJECT.md
+node "$HOME/.claude/get-shit-done/bin/gsd-tools.cjs" commit "docs: initialize project" --files .planning/PROJECT.md
 ```
 
 ## 5. Workflow Preferences
@@ -379,13 +381,13 @@ questions: [
     ]
   },
   {
-    header: "Depth",
-    question: "How thorough should planning be?",
+    header: "Granularity",
+    question: "How finely should scope be sliced into phases?",
     multiSelect: false,
     options: [
-      { label: "Quick", description: "Ship fast (3-5 phases, 1-3 plans each)" },
-      { label: "Standard", description: "Balanced scope and speed (5-8 phases, 3-5 plans each)" },
-      { label: "Comprehensive", description: "Thorough coverage (8-12 phases, 5-10 plans each)" }
+      { label: "Coarse", description: "Fewer, broader phases (3-5 phases, 1-3 plans each)" },
+      { label: "Standard", description: "Balanced phase size (5-8 phases, 3-5 plans each)" },
+      { label: "Fine", description: "Many focused phases (8-12 phases, 5-10 plans each)" }
     ]
   },
   {
@@ -468,14 +470,15 @@ Create `.planning/config.json` with all settings:
 ```json
 {
   "mode": "yolo|interactive",
-  "depth": "quick|standard|comprehensive",
+  "granularity": "coarse|standard|fine",
   "parallelization": true|false,
   "commit_docs": true|false,
   "model_profile": "quality|balanced|budget",
   "workflow": {
     "research": true|false,
     "plan_check": true|false,
-    "verifier": true|false
+    "verifier": true|false,
+    "nyquist_validation": depth !== "quick"
   }
 }
 ```
@@ -490,7 +493,7 @@ Create `.planning/config.json` with all settings:
 **Commit config.json:**
 
 ```bash
-node ~/.claude/get-shit-done/bin/gsd-tools.cjs commit "chore: add project config" --files .planning/config.json
+node "$HOME/.claude/get-shit-done/bin/gsd-tools.cjs" commit "chore: add project config" --files .planning/config.json
 ```
 
 **Note:** Run `/gsd:settings` anytime to update these preferences.
@@ -544,9 +547,7 @@ Display spawning indicator:
 Spawn 4 parallel gsd-project-researcher agents with path references:
 
 ```
-Task(prompt="First, read ~/.claude/agents/gsd-project-researcher.md for your role and instructions.
-
-<research_type>
+Task(prompt="<research_type>
 Project Research — Stack dimension for [domain].
 </research_type>
 
@@ -582,11 +583,9 @@ Your STACK.md feeds into roadmap creation. Be prescriptive:
 Write to: .planning/research/STACK.md
 Use template: ~/.claude/get-shit-done/templates/research-project/STACK.md
 </output>
-", subagent_type="general-purpose", model="{researcher_model}", description="Stack research")
+", subagent_type="gsd-project-researcher", model="{researcher_model}", description="Stack research")
 
-Task(prompt="First, read ~/.claude/agents/gsd-project-researcher.md for your role and instructions.
-
-<research_type>
+Task(prompt="<research_type>
 Project Research — Features dimension for [domain].
 </research_type>
 
@@ -622,11 +621,9 @@ Your FEATURES.md feeds into requirements definition. Categorize clearly:
 Write to: .planning/research/FEATURES.md
 Use template: ~/.claude/get-shit-done/templates/research-project/FEATURES.md
 </output>
-", subagent_type="general-purpose", model="{researcher_model}", description="Features research")
+", subagent_type="gsd-project-researcher", model="{researcher_model}", description="Features research")
 
-Task(prompt="First, read ~/.claude/agents/gsd-project-researcher.md for your role and instructions.
-
-<research_type>
+Task(prompt="<research_type>
 Project Research — Architecture dimension for [domain].
 </research_type>
 
@@ -662,11 +659,9 @@ Your ARCHITECTURE.md informs phase structure in roadmap. Include:
 Write to: .planning/research/ARCHITECTURE.md
 Use template: ~/.claude/get-shit-done/templates/research-project/ARCHITECTURE.md
 </output>
-", subagent_type="general-purpose", model="{researcher_model}", description="Architecture research")
+", subagent_type="gsd-project-researcher", model="{researcher_model}", description="Architecture research")
 
-Task(prompt="First, read ~/.claude/agents/gsd-project-researcher.md for your role and instructions.
-
-<research_type>
+Task(prompt="<research_type>
 Project Research — Pitfalls dimension for [domain].
 </research_type>
 
@@ -702,7 +697,7 @@ Your PITFALLS.md prevents mistakes in roadmap/planning. For each pitfall:
 Write to: .planning/research/PITFALLS.md
 Use template: ~/.claude/get-shit-done/templates/research-project/PITFALLS.md
 </output>
-", subagent_type="general-purpose", model="{researcher_model}", description="Pitfalls research")
+", subagent_type="gsd-project-researcher", model="{researcher_model}", description="Pitfalls research")
 ```
 
 After all 4 agents complete, spawn synthesizer to create SUMMARY.md:
@@ -887,7 +882,7 @@ If "adjust": Return to scoping.
 **Commit requirements:**
 
 ```bash
-node ~/.claude/get-shit-done/bin/gsd-tools.cjs commit "docs: define v1 requirements" --files .planning/REQUIREMENTS.md
+node "$HOME/.claude/get-shit-done/bin/gsd-tools.cjs" commit "docs: define v1 requirements" --files .planning/REQUIREMENTS.md
 ```
 
 ## 8. Create Roadmap
@@ -911,7 +906,7 @@ Task(prompt="
 - .planning/PROJECT.md (Project context)
 - .planning/REQUIREMENTS.md (v1 Requirements)
 - .planning/research/SUMMARY.md (Research findings - if exists)
-- .planning/config.json (Depth and mode settings)
+- .planning/config.json (Granularity and mode settings)
 </files_to_read>
 
 </planning_context>
@@ -1017,7 +1012,7 @@ Use AskUserQuestion:
 **Commit roadmap (after approval or auto mode):**
 
 ```bash
-node ~/.claude/get-shit-done/bin/gsd-tools.cjs commit "docs: create roadmap ([N] phases)" --files .planning/ROADMAP.md .planning/STATE.md .planning/REQUIREMENTS.md
+node "$HOME/.claude/get-shit-done/bin/gsd-tools.cjs" commit "docs: create roadmap ([N] phases)" --files .planning/ROADMAP.md .planning/STATE.md .planning/REQUIREMENTS.md
 ```
 
 ## 9. Done
@@ -1098,7 +1093,7 @@ Exit skill and invoke SlashCommand("/gsd:discuss-phase 1 --auto")
 - [ ] Brownfield detection completed
 - [ ] Deep questioning completed (threads followed, not rushed)
 - [ ] PROJECT.md captures full context → **committed**
-- [ ] config.json has workflow mode, depth, parallelization → **committed**
+- [ ] config.json has workflow mode, granularity, parallelization → **committed**
 - [ ] Research completed (if selected) — 4 parallel agents spawned → **committed**
 - [ ] Requirements gathered (from research or conversation)
 - [ ] User scoped each category (v1/v2/out of scope)

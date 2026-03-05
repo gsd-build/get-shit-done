@@ -10,6 +10,7 @@
  *
  * Atomic Commands:
  *   state load                         Load project config + state
+ *   state json                         Output STATE.md frontmatter as JSON
  *   state update <field> <value>       Update a STATE.md field
  *   state get [section]                Get STATE.md content or section
  *   state patch --field val ...        Batch update STATE.md fields
@@ -177,7 +178,9 @@ async function main() {
   switch (command) {
     case 'state': {
       const subcommand = args[1];
-      if (subcommand === 'update') {
+      if (subcommand === 'json') {
+        state.cmdStateJson(cwd, raw);
+      } else if (subcommand === 'update') {
         state.cmdStateUpdate(cwd, args[2], args[3]);
       } else if (subcommand === 'get') {
         state.cmdStateGet(cwd, args[2], raw);
@@ -256,9 +259,13 @@ async function main() {
 
     case 'commit': {
       const amend = args.includes('--amend');
-      const message = args[1];
-      // Parse --files flag (collect args after --files, stopping at other flags)
       const filesIndex = args.indexOf('--files');
+      // Collect all positional args between command name and first flag,
+      // then join them — handles both quoted ("multi word msg") and
+      // unquoted (multi word msg) invocations from different shells
+      const endIndex = filesIndex !== -1 ? filesIndex : args.length;
+      const messageArgs = args.slice(1, endIndex).filter(a => !a.startsWith('--'));
+      const message = messageArgs.join(' ') || undefined;
       const files = filesIndex !== -1 ? args.slice(filesIndex + 1).filter(a => !a.startsWith('--')) : [];
       commands.cmdCommit(cwd, message, files, raw, amend);
       break;

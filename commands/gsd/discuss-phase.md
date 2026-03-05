@@ -10,16 +10,20 @@ allowed-tools:
   - Grep
   - AskUserQuestion
   - Task
+  - mcp__context7__resolve-library-id
+  - mcp__context7__query-docs
 ---
 
 <objective>
 Extract implementation decisions that downstream agents need — researcher and planner will use CONTEXT.md to know what to investigate and what choices are locked.
 
 **How it works:**
-1. Analyze the phase to identify gray areas (UI, UX, behavior, etc.)
-2. Present gray areas — user selects which to discuss
-3. Deep-dive each selected area until satisfied
-4. Create CONTEXT.md with decisions that guide research and planning
+1. Load prior context (PROJECT.md, REQUIREMENTS.md, STATE.md, prior CONTEXT.md files)
+2. Scout codebase for reusable assets and patterns
+3. Analyze phase — skip gray areas already decided in prior phases
+4. Present remaining gray areas — user selects which to discuss
+5. Deep-dive each selected area until satisfied
+6. Create CONTEXT.md with decisions that guide research and planning
 
 **Output:** `{phase_num}-CONTEXT.md` — decisions clear enough that downstream agents can act without asking the user again
 </objective>
@@ -38,11 +42,13 @@ Context files are resolved in-workflow using `init phase-op` and roadmap/state t
 <process>
 1. Validate phase number (error if missing or not in roadmap)
 2. Check if CONTEXT.md exists (offer update/view/skip if yes)
-3. **Analyze phase** — Identify domain and generate phase-specific gray areas
-4. **Present gray areas** — Multi-select: which to discuss? (NO skip option)
-5. **Deep-dive each area** — 4 questions per area, then offer more/next
-6. **Write CONTEXT.md** — Sections match areas discussed
-7. Offer next steps (research or plan)
+3. **Load prior context** — Read PROJECT.md, REQUIREMENTS.md, STATE.md, and all prior CONTEXT.md files
+4. **Scout codebase** — Find reusable assets, patterns, and integration points
+5. **Analyze phase** — Check prior decisions, skip already-decided areas, generate remaining gray areas
+6. **Present gray areas** — Multi-select: which to discuss? Annotate with prior decisions + code context
+7. **Deep-dive each area** — 4 questions per area, code-informed options, Context7 for library choices
+8. **Write CONTEXT.md** — Sections match areas discussed + code_context section
+9. Offer next steps (research or plan)
 
 **CRITICAL: Scope guardrail**
 - Phase boundary from ROADMAP.md is FIXED
@@ -74,6 +80,7 @@ Generate 3-4 **phase-specific** gray areas, not generic categories.
 </process>
 
 <success_criteria>
+- Prior context loaded and applied (no re-asking decided questions)
 - Gray areas identified through intelligent analysis
 - User chose which areas to discuss
 - Each selected area explored until satisfied

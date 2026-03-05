@@ -25,7 +25,7 @@ fi
 **Run health validation:**
 
 ```bash
-node ~/.claude/get-shit-done/bin/gsd-tools.cjs validate health $REPAIR_FLAG
+node "$HOME/.claude/get-shit-done/bin/gsd-tools.cjs" validate health $REPAIR_FLAG
 ```
 
 Parse JSON output:
@@ -112,7 +112,7 @@ If yes, re-run with --repair flag and display results.
 Re-run health check without --repair to confirm issues are resolved:
 
 ```bash
-node ~/.claude/get-shit-done/bin/gsd-tools.cjs validate health
+node "$HOME/.claude/get-shit-done/bin/gsd-tools.cjs" validate health
 ```
 
 Report final status.
@@ -136,6 +136,8 @@ Report final status.
 | W005 | warning | Phase directory naming mismatch | No |
 | W006 | warning | Phase in ROADMAP but no directory | No |
 | W007 | warning | Phase on disk but not in ROADMAP | No |
+| W008 | warning | config.json: workflow.nyquist_validation absent (defaults to enabled but agents may skip) | Yes |
+| W009 | warning | Phase has Validation Architecture in RESEARCH.md but no VALIDATION.md | No |
 | I001 | info | Plan without SUMMARY (may be in progress) | No |
 
 </error_codes>
@@ -147,6 +149,7 @@ Report final status.
 | createConfig | Create config.json with defaults | None |
 | resetConfig | Delete + recreate config.json | Loses custom settings |
 | regenerateState | Create STATE.md from ROADMAP structure | Loses session history |
+| addNyquistKey | Add workflow.nyquist_validation: true to config.json | None — matches existing default |
 
 **Not repairable (too risky):**
 - PROJECT.md, ROADMAP.md content
