@@ -24,16 +24,6 @@ irm https://raw.githubusercontent.com/NexeraDigital/get-shit-done/main/autopilot
 
 ### Manual install
 
-This package is published to GitHub Packages under the `@nexeradigital` scope (public).
-
-Add to your `~/.npmrc`:
-
-```ini
-@nexeradigital:registry=https://npm.pkg.github.com
-```
-
-Then install:
-
 ```bash
 npm install -g @nexeradigital/gsd-autopilot
 ```
