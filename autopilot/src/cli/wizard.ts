@@ -23,7 +23,10 @@ export interface WizardResult {
 export async function runSetupWizard(): Promise<WizardResult> {
   try {
     // Step 1: Welcome banner
-    console.log('\nWelcome to GSD Autopilot!');
+    console.log('');
+    console.log('  GSD Autopilot by NexeraDigital');
+    console.log('  Autonomous workflow orchestrator');
+    console.log('');
     console.log("Let's set up your autonomous build.\n");
 
     // Step 2: PRD path with file existence validation

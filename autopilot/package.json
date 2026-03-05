@@ -8,6 +8,22 @@
     "registry": "https://registry.npmjs.org",
     "access": "public"
   },
+  "author": "NexeraDigital (https://github.com/NexeraDigital)",
+  "homepage": "https://github.com/NexeraDigital/get-shit-done/tree/main/autopilot#readme",
+  "bugs": {
+    "url": "https://github.com/NexeraDigital/get-shit-done/issues"
+  },
+  "keywords": [
+    "gsd",
+    "autopilot",
+    "ai",
+    "claude",
+    "automation",
+    "workflow",
+    "orchestrator",
+    "prd",
+    "cli"
+  ],
   "repository": {
     "type": "git",
     "url": "https://github.com/NexeraDigital/get-shit-done.git",

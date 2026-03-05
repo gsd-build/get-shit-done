@@ -6,6 +6,7 @@ import { join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { dirname } from 'node:path';
 import { spawn } from 'node:child_process';
+import { createRequire } from 'node:module';
 import { loadConfig } from '../config/index.js';
 import { derivePort } from '../config/derive-port.js';
 import { StateStore } from '../state/index.js';
@@ -38,12 +39,16 @@ import type { QuestionEvent } from '../claude/types.js';
 import { TunnelManager } from '../server/tunnel/index.js';
 import { RemoteSessionManager } from '../server/remote-session/index.js';
 
+// Read version from package.json at runtime
+const require = createRequire(import.meta.url);
+const pkg = require('../../package.json') as { version: string };
+
 const program = new Command();
 
 program
   .name('gsd-autopilot')
   .description('Autonomous GSD workflow orchestrator')
-  .version('0.2.0')
+  .version(pkg.version)
   .showHelpAfterError('(run gsd-autopilot --help for usage information)')
   .addHelpText('after', `
 Examples:
@@ -54,6 +59,8 @@ Examples:
 
 Dashboard:
   Port auto-derived from git repo (override with --port)
+
+Created by NexeraDigital — https://github.com/NexeraDigital
 `)
   .option('--prd <path>', 'Path to PRD/idea document')
   .option('--resume', 'Resume from last checkpoint')
