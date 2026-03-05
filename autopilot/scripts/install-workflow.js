@@ -23,7 +23,10 @@ async function installWorkflow() {
     await mkdir(commandsDir, { recursive: true });
     await mkdir(workflowSubdir, { recursive: true });
 
-    // 4. Copy JS files (launcher, port-manager, pid-manager) to subdirectory
+    // 4. Write package.json so Node treats .js files as ESM
+    await writeFile(join(workflowSubdir, 'package.json'), '{"type":"module"}\n', 'utf-8');
+
+    // 4a. Copy JS files (launcher, port-manager, pid-manager) to subdirectory
     const jsFiles = ['launcher.js', 'port-manager.js', 'pid-manager.js'];
     for (const file of jsFiles) {
       const sourcePath = join(sourceDir, file);
