@@ -174,6 +174,18 @@ rm -f ./.claude/cache/gsd-update-check.json
 rm -f ~/.claude/cache/gsd-update-check.json
 ```
 (Paths are templated at install time for runtime compatibility)
+
+**For fork mode:** If `~/.claude/cache/gsd-update-check.json` contains `"mode": "fork"`, also update the per-project fork SHA:
+```bash
+# Read fork_head_sha from cache and write to project
+CACHE_FILE="$HOME/.claude/cache/gsd-update-check.json"
+if [ -f "$CACHE_FILE" ] && grep -q '"mode":"fork"' "$CACHE_FILE" 2>/dev/null; then
+  FORK_SHA=$(grep -o '"fork_head_sha":"[^"]*"' "$CACHE_FILE" | cut -d'"' -f4)
+  if [ -n "$FORK_SHA" ] && [ -d ".claude" ]; then
+    echo "$FORK_SHA" > .claude/.gsd-fork-sha
+  fi
+fi
+```
 </step>
 
 <step name="display_result">

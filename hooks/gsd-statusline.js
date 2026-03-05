@@ -84,13 +84,50 @@ process.stdin.on('end', () => {
     }
 
     // GSD update available?
+    // Two modes:
+    // - Fork mode: green in fork repo (upstream sync), orange in other projects (fork updated)
+    // - NPM mode: orange when newer version available
     let gsdUpdate = '';
     const cacheFile = path.join(homeDir, '.claude', 'cache', 'gsd-update-check.json');
     if (fs.existsSync(cacheFile)) {
       try {
         const cache = JSON.parse(fs.readFileSync(cacheFile, 'utf8'));
-        if (cache.update_available) {
-          gsdUpdate = '\x1b[33m⬆ /gsd:update\x1b[0m │ ';
+
+        if (cache.mode === 'fork') {
+          // Fork mode - check if we're inside the fork repo
+          const resolvedDir = fs.realpathSync(dir);
+          const isInFork = cache.fork_path && resolvedDir.startsWith(cache.fork_path);
+
+          if (isInFork) {
+            // In fork repo: show green if upstream has updates
+            if (cache.fork_upstream_behind > 0) {
+              gsdUpdate = '\x1b[32m⬆ /gsd:sync-analyze\x1b[0m │ ';
+            }
+          } else {
+            // In other project: show orange if fork has new commits
+            // Compare fork HEAD with last-seen SHA stored per-project
+            const projectClaudeDir = path.join(dir, '.claude');
+            const projectCacheFile = path.join(projectClaudeDir, '.gsd-fork-sha');
+            let lastSeenSha = null;
+            try {
+              if (fs.existsSync(projectCacheFile)) {
+                lastSeenSha = fs.readFileSync(projectCacheFile, 'utf8').trim();
+              } else if (fs.existsSync(projectClaudeDir) && cache.fork_head_sha) {
+                // First run: initialize with current SHA (no notification until next update)
+                fs.writeFileSync(projectCacheFile, cache.fork_head_sha);
+                lastSeenSha = cache.fork_head_sha;
+              }
+            } catch (e) {}
+
+            if (cache.fork_head_sha && lastSeenSha && cache.fork_head_sha !== lastSeenSha) {
+              gsdUpdate = '\x1b[33m⬆ /gsd:update\x1b[0m │ ';
+            }
+          }
+        } else {
+          // NPM mode - original behavior
+          if (cache.update_available) {
+            gsdUpdate = '\x1b[33m⬆ /gsd:update\x1b[0m │ ';
+          }
         }
       } catch (e) {}
     }
