@@ -108,6 +108,7 @@ function PhaseRow({ phase, isCurrent }: {
 
 export function PhaseCard({ phases, currentPhase }: PhaseCardProps) {
   const currentMilestone = useDashboardStore((s) => s.currentMilestone);
+  const autopilotAlive = useDashboardStore((s) => s.autopilotAlive);
   const containerRef = useRef<HTMLDivElement>(null);
   const hasScrolledRef = useRef(false);
 
@@ -127,13 +128,27 @@ export function PhaseCard({ phases, currentPhase }: PhaseCardProps) {
     return (
       <div className="rounded-lg border border-gray-200 shadow-sm p-6 bg-white">
         <div className="flex items-center gap-3">
-          <div className="w-3 h-3 rounded-full bg-blue-500 animate-pulse" />
-          <div>
-            <p className="text-sm font-medium text-gray-700">Initializing project...</p>
-            <p className="text-xs text-gray-400 mt-0.5">
-              Setting up research, requirements, and roadmap
-            </p>
-          </div>
+          {autopilotAlive ? (
+            <>
+              <div className="w-3 h-3 rounded-full bg-blue-500 animate-pulse" />
+              <div>
+                <p className="text-sm font-medium text-gray-700">Initializing project...</p>
+                <p className="text-xs text-gray-400 mt-0.5">
+                  Setting up research, requirements, and roadmap
+                </p>
+              </div>
+            </>
+          ) : (
+            <>
+              <div className="w-3 h-3 rounded-full bg-gray-300" />
+              <div>
+                <p className="text-sm font-medium text-gray-700">No phases yet</p>
+                <p className="text-xs text-gray-400 mt-0.5">
+                  Run <code className="text-xs bg-gray-100 px-1 rounded">/gsd:autopilot</code> to start
+                </p>
+              </div>
+            </>
+          )}
         </div>
       </div>
     );
