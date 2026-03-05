@@ -63,15 +63,15 @@ export function Layout() {
           <div className="flex items-center justify-between h-14">
             {/* App title + connection indicator */}
             <div className="flex items-center gap-3">
-              <h1 className="text-lg font-semibold tracking-tight">
-                GSD Autopilot
+              <h1 className="text-xl font-semibold tracking-tight flex items-center gap-2">
+                GSD Autopilot <span className="font-normal text-gray-400">by</span> <img src="/nexera.png" alt="Nexera" className="h-4 -mb-0.5" />
+                <span
+                  className={`w-2 h-2 rounded-full ${
+                    !connected ? 'bg-red-400' : !autopilotAlive ? 'bg-amber-400' : 'bg-green-400'
+                  }`}
+                  title={!connected ? 'Disconnected' : !autopilotAlive ? 'Autopilot stopped' : 'Connected'}
+                />
               </h1>
-              <span
-                className={`w-2 h-2 rounded-full ${
-                  !connected ? 'bg-red-400' : !autopilotAlive ? 'bg-amber-400' : 'bg-green-400'
-                }`}
-                title={!connected ? 'Disconnected' : !autopilotAlive ? 'Autopilot stopped' : 'Connected'}
-              />
             </div>
 
             {/* Navigation */}
