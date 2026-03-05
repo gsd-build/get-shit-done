@@ -1,6 +1,6 @@
 {
   "name": "@nexeradigital/gsd-autopilot",
-  "version": "0.2.7",
+  "version": "1.0.1",
   "description": "Autonomous GSD workflow orchestrator -- turns a PRD into a built project",
   "license": "MIT",
   "type": "module",
@@ -27,6 +27,7 @@
     "gsd-dashboard": "./dist/server/standalone.js"
   },
   "files": [
+    "README.md",
     "dist/**/*.js",
     "dist/**/*.d.ts",
     "dashboard/dist/",
