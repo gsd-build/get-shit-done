@@ -1,0 +1,82 @@
+[
+  {
+    "query": "let's test the features we just built to make sure they work",
+    "should_trigger": true
+  },
+  {
+    "query": "I want to do UAT on phase 4 before moving on",
+    "should_trigger": true
+  },
+  {
+    "query": "walk me through testing the checkout flow we implemented",
+    "should_trigger": true
+  },
+  {
+    "query": "can we verify that phase 3 actually works from a user perspective?",
+    "should_trigger": true
+  },
+  {
+    "query": "time to do acceptance testing on the auth module",
+    "should_trigger": true
+  },
+  {
+    "query": "test the dashboard we built, one scenario at a time",
+    "should_trigger": true
+  },
+  {
+    "query": "I want to manually verify the features before we continue",
+    "should_trigger": true
+  },
+  {
+    "query": "let's go through the acceptance criteria and test each one",
+    "should_trigger": true
+  },
+  {
+    "query": "check if what we built matches the requirements interactively",
+    "should_trigger": true
+  },
+  {
+    "query": "run user acceptance testing for the notification system",
+    "should_trigger": true
+  },
+  {
+    "query": "check if the .planning directory has any problems or missing files",
+    "should_trigger": false
+  },
+  {
+    "query": "audit the milestone to see if all requirements were delivered",
+    "should_trigger": false
+  },
+  {
+    "query": "generate unit tests for phase 5 based on what was built",
+    "should_trigger": false
+  },
+  {
+    "query": "check if phase 4 has Nyquist validation coverage gaps",
+    "should_trigger": false
+  },
+  {
+    "query": "the payment form is throwing an error, can you investigate?",
+    "should_trigger": false
+  },
+  {
+    "query": "show me the project status and what's next",
+    "should_trigger": false
+  },
+  {
+    "query": "validate the planning file integrity and state consistency",
+    "should_trigger": false
+  },
+  {
+    "query": "did we cover all requirements across all phases of this milestone?",
+    "should_trigger": false
+  },
+  {
+    "query": "retroactively fill test gaps for validation coverage on phase 2",
+    "should_trigger": false
+  },
+  {
+    "query": "write automated tests for the API endpoints we created",
+    "should_trigger": false
+  }
+]

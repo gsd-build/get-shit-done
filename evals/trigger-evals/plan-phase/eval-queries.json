@@ -1,0 +1,82 @@
+[
+  {
+    "query": "plan the next phase for me",
+    "should_trigger": true
+  },
+  {
+    "query": "I need a detailed plan for phase 3",
+    "should_trigger": true
+  },
+  {
+    "query": "create PLAN.md for the authentication phase",
+    "should_trigger": true
+  },
+  {
+    "query": "let's plan out how we'll build the API layer",
+    "should_trigger": true
+  },
+  {
+    "query": "write up the implementation plan with verification steps",
+    "should_trigger": true
+  },
+  {
+    "query": "generate a plan for the current phase including subtasks and acceptance criteria",
+    "should_trigger": true
+  },
+  {
+    "query": "plan phase 2.1 with the verification loop",
+    "should_trigger": true
+  },
+  {
+    "query": "ok let's plan this thing out",
+    "should_trigger": true
+  },
+  {
+    "query": "make me a plan",
+    "should_trigger": true
+  },
+  {
+    "query": "plan the database migration phase -- include rollback steps",
+    "should_trigger": true
+  },
+  {
+    "query": "what questions should we discuss before we start this phase?",
+    "should_trigger": false
+  },
+  {
+    "query": "let's talk through the approach for phase 2 before committing",
+    "should_trigger": false
+  },
+  {
+    "query": "research how to implement SSO integration",
+    "should_trigger": false
+  },
+  {
+    "query": "what assumptions are we making about the caching phase?",
+    "should_trigger": false
+  },
+  {
+    "query": "go ahead and execute the plan we already wrote",
+    "should_trigger": false
+  },
+  {
+    "query": "run the current phase",
+    "should_trigger": false
+  },
+  {
+    "query": "add a new phase for error handling to the roadmap",
+    "should_trigger": false
+  },
+  {
+    "query": "show me the current project progress",
+    "should_trigger": false
+  },
+  {
+    "query": "start a new project from scratch",
+    "should_trigger": false
+  },
+  {
+    "query": "list what we're assuming about this phase's approach",
+    "should_trigger": false
+  }
+]

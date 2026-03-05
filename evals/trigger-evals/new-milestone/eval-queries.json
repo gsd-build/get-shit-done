@@ -1,0 +1,82 @@
+[
+  {
+    "query": "I want to start working on the next version of the app",
+    "should_trigger": true
+  },
+  {
+    "query": "let's kick off v2.0 with notifications and real-time sync",
+    "should_trigger": true
+  },
+  {
+    "query": "we shipped v1, time to define what's next",
+    "should_trigger": true
+  },
+  {
+    "query": "begin a new milestone for the payments integration",
+    "should_trigger": true
+  },
+  {
+    "query": "start the next development cycle, I'm thinking v1.2 dashboard redesign",
+    "should_trigger": true
+  },
+  {
+    "query": "I need to set up goals and requirements for our next release",
+    "should_trigger": true
+  },
+  {
+    "query": "create a new milestone called API v3 migration",
+    "should_trigger": true
+  },
+  {
+    "query": "let's plan the next version - we need auth, billing, and webhooks",
+    "should_trigger": true
+  },
+  {
+    "query": "ready to start a fresh milestone cycle after completing v1.0",
+    "should_trigger": true
+  },
+  {
+    "query": "kick off milestone v2.1 with mobile support as the main theme",
+    "should_trigger": true
+  },
+  {
+    "query": "archive the current milestone and tag it as v1.0",
+    "should_trigger": false
+  },
+  {
+    "query": "check if all the requirements for this milestone are met",
+    "should_trigger": false
+  },
+  {
+    "query": "show me how the project is going, what's left to do",
+    "should_trigger": false
+  },
+  {
+    "query": "I need to initialize this project from scratch with PROJECT.md",
+    "should_trigger": false
+  },
+  {
+    "query": "add a new phase to the current roadmap for error handling",
+    "should_trigger": false
+  },
+  {
+    "query": "the milestone has gaps, create phases to fix them",
+    "should_trigger": false
+  },
+  {
+    "query": "update requirements for the current milestone",
+    "should_trigger": false
+  },
+  {
+    "query": "what's the status of this milestone? are we done?",
+    "should_trigger": false
+  },
+  {
+    "query": "clean up the old phase directories from past milestones",
+    "should_trigger": false
+  },
+  {
+    "query": "I want to scope out what phase 5 should include",
+    "should_trigger": false
+  }
+]

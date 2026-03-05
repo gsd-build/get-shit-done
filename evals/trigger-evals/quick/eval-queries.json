@@ -1,0 +1,82 @@
+[
+  {
+    "query": "quick task: fix the broken import in utils.ts",
+    "should_trigger": true
+  },
+  {
+    "query": "just quickly add a loading spinner to the button",
+    "should_trigger": true
+  },
+  {
+    "query": "do a quick fix for the off-by-one error in pagination",
+    "should_trigger": true
+  },
+  {
+    "query": "quick -- rename the variable from 'data' to 'userData' across the file",
+    "should_trigger": true
+  },
+  {
+    "query": "this is a small one, just update the copyright year in the footer",
+    "should_trigger": true
+  },
+  {
+    "query": "quick change: swap the primary color from blue to indigo",
+    "should_trigger": true
+  },
+  {
+    "query": "just do this real quick without all the ceremony",
+    "should_trigger": true
+  },
+  {
+    "query": "small task, skip the optional agents. bump the package version to 2.1.0",
+    "should_trigger": true
+  },
+  {
+    "query": "quick fix the eslint warning on line 42",
+    "should_trigger": true
+  },
+  {
+    "query": "do a quick one-liner change to the config",
+    "should_trigger": true
+  },
+  {
+    "query": "execute the full phase with all the wave parallelization",
+    "should_trigger": false
+  },
+  {
+    "query": "run all plans in the current phase",
+    "should_trigger": false
+  },
+  {
+    "query": "build out the entire authentication system",
+    "should_trigger": false
+  },
+  {
+    "query": "plan out the next phase in detail",
+    "should_trigger": false
+  },
+  {
+    "query": "how quickly can we finish this milestone?",
+    "should_trigger": false
+  },
+  {
+    "query": "show me a quick summary of progress",
+    "should_trigger": false
+  },
+  {
+    "query": "debug the flaky test in the auth module",
+    "should_trigger": false
+  },
+  {
+    "query": "add a new phase for quick-start documentation",
+    "should_trigger": false
+  },
+  {
+    "query": "research a quick way to implement caching",
+    "should_trigger": false
+  },
+  {
+    "query": "start a new project for the quickbooks integration",
+    "should_trigger": false
+  }
+]

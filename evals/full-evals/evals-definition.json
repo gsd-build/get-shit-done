@@ -1,0 +1,179 @@
+{
+  "test_fixture": "evals/full-evals/test-fixture",
+  "skills": {
+    "quick": {
+      "test_prompts": [
+        {
+          "id": "quick-1",
+          "prompt": "Add a health check endpoint at GET /api/health that returns { status: 'ok', timestamp: Date.now() }",
+          "expected_behaviors": [
+            "Creates a plan in .planning/quick/",
+            "Implements the endpoint in a single file",
+            "Creates an atomic commit",
+            "Updates STATE.md quick tasks table",
+            "Does NOT create a phase in the roadmap"
+          ]
+        },
+        {
+          "id": "quick-2",
+          "prompt": "Fix the typo in README.md where it says 'Taks' instead of 'Tasks'",
+          "expected_behaviors": [
+            "Handles minimal task without over-engineering",
+            "Makes the fix directly",
+            "Commits with descriptive message"
+          ]
+        }
+      ]
+    },
+    "plan-phase": {
+      "test_prompts": [
+        {
+          "id": "plan-1",
+          "prompt": "Plan phase 72",
+          "expected_behaviors": [
+            "Identifies phase 72 as Frontend UI from ROADMAP.md",
+            "Spawns gsd-planner agent",
+            "Creates PLAN.md in phases/72-frontend-ui/",
+            "Includes task breakdown with waves",
+            "Runs verification loop"
+          ]
+        },
+        {
+          "id": "plan-2",
+          "prompt": "Plan the next unplanned phase with --skip-research",
+          "expected_behaviors": [
+            "Auto-detects phase 72 as next unplanned",
+            "Skips research step",
+            "Still creates PLAN.md with verification"
+          ]
+        }
+      ]
+    },
+    "execute-phase": {
+      "test_prompts": [
+        {
+          "id": "exec-1",
+          "prompt": "Execute phase 71",
+          "expected_behaviors": [
+            "Reads PLAN.md from phases/71-api-endpoints/",
+            "Identifies waves and dependencies",
+            "Spawns executor subagents per wave",
+            "Creates atomic commits per task",
+            "Updates STATE.md on completion"
+          ]
+        }
+      ]
+    },
+    "new-project": {
+      "test_prompts": [
+        {
+          "id": "newproj-1",
+          "prompt": "Start a new project for a recipe sharing app",
+          "expected_behaviors": [
+            "Asks context-gathering questions",
+            "Creates PROJECT.md",
+            "Creates .planning/ structure",
+            "Generates REQUIREMENTS.md",
+            "Generates initial ROADMAP.md"
+          ]
+        }
+      ]
+    },
+    "discuss-phase": {
+      "test_prompts": [
+        {
+          "id": "discuss-1",
+          "prompt": "Discuss phase 72 before planning",
+          "expected_behaviors": [
+            "Reads phase 72 context from ROADMAP.md",
+            "Asks targeted questions about frontend decisions",
+            "Covers technology choices, component structure, state management",
+            "Saves decisions to CONTEXT.md"
+          ]
+        }
+      ]
+    },
+    "debug": {
+      "test_prompts": [
+        {
+          "id": "debug-1",
+          "prompt": "The auth middleware is returning 401 for valid tokens after the server restarts",
+          "expected_behaviors": [
+            "Gathers symptoms from the description",
+            "Spawns gsd-debugger subagent",
+            "Forms hypotheses about token invalidation",
+            "Creates debug session file in .planning/debug/",
+            "Presents findings and suggested fix"
+          ]
+        }
+      ]
+    },
+    "verify-work": {
+      "test_prompts": [
+        {
+          "id": "verify-1",
+          "prompt": "Verify that phase 70 works correctly",
+          "expected_behaviors": [
+            "Reads phase 70 SUMMARY.md and success criteria",
+            "Walks through features conversationally",
+            "Checks registration, login, middleware",
+            "Reports pass/fail per criterion",
+            "Creates VERIFICATION.md if needed"
+          ]
+        }
+      ]
+    },
+    "progress": {
+      "test_prompts": [
+        {
+          "id": "progress-1",
+          "prompt": "Where are we?",
+          "expected_behaviors": [
+            "Reads STATE.md, ROADMAP.md",
+            "Shows phase 70 complete, 71 planned, 72 unplanned",
+            "Suggests next action (execute phase 71)",
+            "Displays recent activity"
+          ]
+        },
+        {
+          "id": "progress-2",
+          "prompt": "What should I work on next?",
+          "expected_behaviors": [
+            "Routes to appropriate next action",
+            "Identifies phase 71 as ready to execute",
+            "Offers to run execute-phase"
+          ]
+        }
+      ]
+    },
+    "resume-work": {
+      "test_prompts": [
+        {
+          "id": "resume-1",
+          "prompt": "I'm back, let's continue",
+          "expected_behaviors": [
+            "Detects this is a session resumption",
+            "Loads STATE.md context",
+            "Checks for .continue-here.md handoff",
+            "Restores position (phase 71, planned)",
+            "Suggests continuing with execution"
+          ]
+        }
+      ]
+    },
+    "map-codebase": {
+      "test_prompts": [
+        {
+          "id": "map-1",
+          "prompt": "Map the codebase so we understand the architecture",
+          "expected_behaviors": [
+            "Spawns parallel mapper agents",
+            "Covers tech stack, architecture, quality, concerns",
+            "Produces documents in .planning/codebase/",
+            "Generates structured analysis files"
+          ]
+        }
+      ]
+    }
+  }
+}

@@ -1,0 +1,82 @@
+[
+  {
+    "query": "how do I join the Discord?",
+    "should_trigger": true
+  },
+  {
+    "query": "I want to join the community",
+    "should_trigger": true
+  },
+  {
+    "query": "give me the Discord invite link",
+    "should_trigger": true
+  },
+  {
+    "query": "where's the Discord server?",
+    "should_trigger": true
+  },
+  {
+    "query": "join discord",
+    "should_trigger": true
+  },
+  {
+    "query": "I'd like to chat with other GSD users, is there a community?",
+    "should_trigger": true
+  },
+  {
+    "query": "link me to the discord channel",
+    "should_trigger": true
+  },
+  {
+    "query": "is there a community chat I can join?",
+    "should_trigger": true
+  },
+  {
+    "query": "where can I talk to other people using this tool?",
+    "should_trigger": true
+  },
+  {
+    "query": "discord link pls",
+    "should_trigger": true
+  },
+  {
+    "query": "what commands are available?",
+    "should_trigger": false
+  },
+  {
+    "query": "show me how to use GSD",
+    "should_trigger": false
+  },
+  {
+    "query": "report a bug I found",
+    "should_trigger": false
+  },
+  {
+    "query": "where can I find the documentation?",
+    "should_trigger": false
+  },
+  {
+    "query": "update GSD to the latest version",
+    "should_trigger": false
+  },
+  {
+    "query": "how do I get started with a new project?",
+    "should_trigger": false
+  },
+  {
+    "query": "show project progress",
+    "should_trigger": false
+  },
+  {
+    "query": "I want to connect my Slack workspace",
+    "should_trigger": false
+  },
+  {
+    "query": "configure the settings",
+    "should_trigger": false
+  },
+  {
+    "query": "add a webhook integration for notifications",
+    "should_trigger": false
+  }
+]

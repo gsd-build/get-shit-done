@@ -1,0 +1,193 @@
+Evaluating: Show available GSD commands and usage guide
+Results: 10/20 passed
+  [FAIL] rate=0/3 expected=True: show me how to use GSD
+  [FAIL] rate=0/3 expected=True: help
+  [FAIL] rate=0/3 expected=True: what commands are available?
+  [FAIL] rate=0/3 expected=True: I'm new here, what can this tool do?
+  [FAIL] rate=0/3 expected=True: how does this work? give me the usage guide
+  [FAIL] rate=0/3 expected=True: list all available commands and what they do
+  [FAIL] rate=0/3 expected=True: what are my options? show me the command reference
+  [FAIL] rate=0/3 expected=True: what can I do with GSD? show commands
+  [FAIL] rate=0/3 expected=True: I don't know what to do, show me the available actions
+  [FAIL] rate=0/3 expected=True: give me a quick overview of all the features
+  [PASS] rate=0/3 expected=False: what's the current project progress?
+  [PASS] rate=0/3 expected=False: show me where we are in the milestone
+  [PASS] rate=0/3 expected=False: check on how the phase is going
+  [PASS] rate=0/3 expected=False: how do I join the community?
+  [PASS] rate=0/3 expected=False: configure my workflow settings
+  [PASS] rate=0/3 expected=False: diagnose the planning directory health
+  [PASS] rate=0/3 expected=False: what phase are we on and what's next?
+  [PASS] rate=0/3 expected=False: update GSD to the latest version
+  [PASS] rate=0/3 expected=False: show me my pending todos
+  [PASS] rate=0/3 expected=False: explain what the current phase is about
+{
+  "skill_name": "gsd:help",
+  "description": "Show available GSD commands and usage guide",
+  "results": [
+    {
+      "query": "show me how to use GSD",
+      "should_trigger": true,
+      "trigger_rate": 0.0,
+      "triggers": 0,
+      "runs": 3,
+      "pass": false
+    },
+    {
+      "query": "help",
+      "should_trigger": true,
+      "trigger_rate": 0.0,
+      "triggers": 0,
+      "runs": 3,
+      "pass": false
+    },
+    {
+      "query": "what commands are available?",
+      "should_trigger": true,
+      "trigger_rate": 0.0,
+      "triggers": 0,
+      "runs": 3,
+      "pass": false
+    },
+    {
+      "query": "I'm new here, what can this tool do?",
+      "should_trigger": true,
+      "trigger_rate": 0.0,
+      "triggers": 0,
+      "runs": 3,
+      "pass": false
+    },
+    {
+      "query": "how does this work? give me the usage guide",
+      "should_trigger": true,
+      "trigger_rate": 0.0,
+      "triggers": 0,
+      "runs": 3,
+      "pass": false
+    },
+    {
+      "query": "list all available commands and what they do",
+      "should_trigger": true,
+      "trigger_rate": 0.0,
+      "triggers": 0,
+      "runs": 3,
+      "pass": false
+    },
+    {
+      "query": "what are my options? show me the command reference",
+      "should_trigger": true,
+      "trigger_rate": 0.0,
+      "triggers": 0,
+      "runs": 3,
+      "pass": false
+    },
+    {
+      "query": "what can I do with GSD? show commands",
+      "should_trigger": true,
+      "trigger_rate": 0.0,
+      "triggers": 0,
+      "runs": 3,
+      "pass": false
+    },
+    {
+      "query": "I don't know what to do, show me the available actions",
+      "should_trigger": true,
+      "trigger_rate": 0.0,
+      "triggers": 0,
+      "runs": 3,
+      "pass": false
+    },
+    {
+      "query": "give me a quick overview of all the features",
+      "should_trigger": true,
+      "trigger_rate": 0.0,
+      "triggers": 0,
+      "runs": 3,
+      "pass": false
+    },
+    {
+      "query": "what's the current project progress?",
+      "should_trigger": false,
+      "trigger_rate": 0.0,
+      "triggers": 0,
+      "runs": 3,
+      "pass": true
+    },
+    {
+      "query": "show me where we are in the milestone",
+      "should_trigger": false,
+      "trigger_rate": 0.0,
+      "triggers": 0,
+      "runs": 3,
+      "pass": true
+    },
+    {
+      "query": "check on how the phase is going",
+      "should_trigger": false,
+      "trigger_rate": 0.0,
+      "triggers": 0,
+      "runs": 3,
+      "pass": true
+    },
+    {
+      "query": "how do I join the community?",
+      "should_trigger": false,
+      "trigger_rate": 0.0,
+      "triggers": 0,
+      "runs": 3,
+      "pass": true
+    },
+    {
+      "query": "configure my workflow settings",
+      "should_trigger": false,
+      "trigger_rate": 0.0,
+      "triggers": 0,
+      "runs": 3,
+      "pass": true
+    },
+    {
+      "query": "diagnose the planning directory health",
+      "should_trigger": false,
+      "trigger_rate": 0.0,
+      "triggers": 0,
+      "runs": 3,
+      "pass": true
+    },
+    {
+      "query": "what phase are we on and what's next?",
+      "should_trigger": false,
+      "trigger_rate": 0.0,
+      "triggers": 0,
+      "runs": 3,
+      "pass": true
+    },
+    {
+      "query": "update GSD to the latest version",
+      "should_trigger": false,
+      "trigger_rate": 0.0,
+      "triggers": 0,
+      "runs": 3,
+      "pass": true
+    },
+    {
+      "query": "show me my pending todos",
+      "should_trigger": false,
+      "trigger_rate": 0.0,
+      "triggers": 0,
+      "runs": 3,
+      "pass": true
+    },
+    {
+      "query": "explain what the current phase is about",
+      "should_trigger": false,
+      "trigger_rate": 0.0,
+      "triggers": 0,
+      "runs": 3,
+      "pass": true
+    }
+  ],
+  "summary": {
+    "total": 20,
+    "passed": 10,
+    "failed": 10
+  }
+}

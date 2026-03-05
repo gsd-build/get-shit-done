@@ -1,0 +1,1 @@
+../../../commands/gsd/set-profile.md

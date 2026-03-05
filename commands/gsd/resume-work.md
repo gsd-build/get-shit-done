@@ -1,6 +1,6 @@
 ---
 name: gsd:resume-work
-description: Resume work from previous session with full context restoration
+description: "Restore full context from a previous session's handoff notes and continue where you left off"
 allowed-tools:
   - Read
   - Bash
@@ -19,7 +19,7 @@ Routes to the resume-project workflow which handles:
 - Incomplete work detection (PLAN without SUMMARY)
 - Status presentation
 - Context-aware next action routing
-  </objective>
+</objective>
 
 <execution_context>
 @~/.claude/get-shit-done/workflows/resume-project.md
@@ -37,4 +37,4 @@ The workflow handles all resumption logic including:
 5. Context-aware option offering (checks CONTEXT.md before suggesting plan vs discuss)
 6. Routing to appropriate next command
 7. Session continuity updates
-   </process>
+</process>

@@ -1,0 +1,82 @@
+[
+  {
+    "query": "what commands are available?",
+    "should_trigger": true
+  },
+  {
+    "query": "show me how to use GSD",
+    "should_trigger": true
+  },
+  {
+    "query": "help",
+    "should_trigger": true
+  },
+  {
+    "query": "I'm new here, what can this tool do?",
+    "should_trigger": true
+  },
+  {
+    "query": "list all available commands and what they do",
+    "should_trigger": true
+  },
+  {
+    "query": "how does this work? give me the usage guide",
+    "should_trigger": true
+  },
+  {
+    "query": "what are my options? show me the command reference",
+    "should_trigger": true
+  },
+  {
+    "query": "I don't know what to do, show me the available actions",
+    "should_trigger": true
+  },
+  {
+    "query": "what can I do with GSD? show commands",
+    "should_trigger": true
+  },
+  {
+    "query": "give me a quick overview of all the features",
+    "should_trigger": true
+  },
+  {
+    "query": "what's the current project progress?",
+    "should_trigger": false
+  },
+  {
+    "query": "show me where we are in the milestone",
+    "should_trigger": false
+  },
+  {
+    "query": "check on how the phase is going",
+    "should_trigger": false
+  },
+  {
+    "query": "how do I join the community?",
+    "should_trigger": false
+  },
+  {
+    "query": "configure my workflow settings",
+    "should_trigger": false
+  },
+  {
+    "query": "what phase are we on and what's next?",
+    "should_trigger": false
+  },
+  {
+    "query": "diagnose the planning directory health",
+    "should_trigger": false
+  },
+  {
+    "query": "update GSD to the latest version",
+    "should_trigger": false
+  },
+  {
+    "query": "show me my pending todos",
+    "should_trigger": false
+  },
+  {
+    "query": "explain what the current phase is about",
+    "should_trigger": false
+  }
+]

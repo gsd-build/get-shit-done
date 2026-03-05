@@ -1,0 +1,82 @@
+[
+  {
+    "query": "execute the current phase",
+    "should_trigger": true
+  },
+  {
+    "query": "run all the plans in phase 3",
+    "should_trigger": true
+  },
+  {
+    "query": "start executing -- use wave-based parallelization",
+    "should_trigger": true
+  },
+  {
+    "query": "let's build this phase out, execute everything",
+    "should_trigger": true
+  },
+  {
+    "query": "execute phase 2 plans now",
+    "should_trigger": true
+  },
+  {
+    "query": "go ahead and implement all the plans we wrote",
+    "should_trigger": true
+  },
+  {
+    "query": "time to execute. run all plan files in parallel waves",
+    "should_trigger": true
+  },
+  {
+    "query": "implement the phase",
+    "should_trigger": true
+  },
+  {
+    "query": "ok execute it",
+    "should_trigger": true
+  },
+  {
+    "query": "run the phase plans with the parallel agents",
+    "should_trigger": true
+  },
+  {
+    "query": "just do this one quick task for me real fast",
+    "should_trigger": false
+  },
+  {
+    "query": "can you quickly fix the typo in the header component",
+    "should_trigger": false
+  },
+  {
+    "query": "plan how we'll execute the migration",
+    "should_trigger": false
+  },
+  {
+    "query": "write a plan for the execution layer refactor",
+    "should_trigger": false
+  },
+  {
+    "query": "validate that the built features actually work",
+    "should_trigger": false
+  },
+  {
+    "query": "generate tests for the phase we just completed",
+    "should_trigger": false
+  },
+  {
+    "query": "check where we are in the project",
+    "should_trigger": false
+  },
+  {
+    "query": "resume work from where I left off yesterday",
+    "should_trigger": false
+  },
+  {
+    "query": "research the best approach for implementing websockets",
+    "should_trigger": false
+  },
+  {
+    "query": "let's discuss the phase before we do anything",
+    "should_trigger": false
+  }
+]

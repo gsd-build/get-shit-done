@@ -1,0 +1,82 @@
+[
+  {
+    "query": "the login page is broken, users get a white screen after submitting",
+    "should_trigger": true
+  },
+  {
+    "query": "I'm getting a TypeError: Cannot read properties of undefined in the checkout flow",
+    "should_trigger": true
+  },
+  {
+    "query": "something is wrong with the API, it returns 500 on every POST request",
+    "should_trigger": true
+  },
+  {
+    "query": "the payment webhook stopped working after yesterday's deploy",
+    "should_trigger": true
+  },
+  {
+    "query": "help me figure out why the database queries are timing out",
+    "should_trigger": true
+  },
+  {
+    "query": "there's a race condition in the notification system, messages arrive out of order",
+    "should_trigger": true
+  },
+  {
+    "query": "the tests pass locally but CI fails with a segfault, need to investigate",
+    "should_trigger": true
+  },
+  {
+    "query": "users report the search feature returns wrong results intermittently",
+    "should_trigger": true
+  },
+  {
+    "query": "I have a bug where the session expires after 2 minutes instead of 30",
+    "should_trigger": true
+  },
+  {
+    "query": "the docker container crashes on startup with exit code 137, plz help",
+    "should_trigger": true
+  },
+  {
+    "query": "check the .planning directory for missing files or corrupt state",
+    "should_trigger": false
+  },
+  {
+    "query": "verify that the features we built actually work via UAT",
+    "should_trigger": false
+  },
+  {
+    "query": "analyze the codebase architecture and produce documentation",
+    "should_trigger": false
+  },
+  {
+    "query": "audit the milestone to see if requirements were covered",
+    "should_trigger": false
+  },
+  {
+    "query": "generate unit tests for the auth module we implemented",
+    "should_trigger": false
+  },
+  {
+    "query": "show me what's next, what phase should I work on",
+    "should_trigger": false
+  },
+  {
+    "query": "validate that phase 5 has proper Nyquist test coverage",
+    "should_trigger": false
+  },
+  {
+    "query": "check if phase 3 meets the acceptance criteria we defined",
+    "should_trigger": false
+  },
+  {
+    "query": "research how websockets work before we plan the real-time feature",
+    "should_trigger": false
+  },
+  {
+    "query": "the planning directory is inconsistent, diagnose and repair it",
+    "should_trigger": false
+  }
+]

@@ -1,6 +1,6 @@
 ---
 name: gsd:map-codebase
-description: Analyze codebase with parallel mapper agents to produce .planning/codebase/ documents
+description: "Scan the entire repo with parallel agents to produce structured codebase analysis documents"
 argument-hint: "[optional: specific area to map, e.g., 'api' or 'auth']"
 allowed-tools:
   - Read
@@ -9,6 +9,7 @@ allowed-tools:
   - Grep
   - Write
   - Task
+  - AskUserQuestion
 ---
 
 <objective>

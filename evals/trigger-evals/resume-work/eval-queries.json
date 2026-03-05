@@ -1,0 +1,82 @@
+[
+  {
+    "query": "I'm back, let's pick up where we left off",
+    "should_trigger": true
+  },
+  {
+    "query": "restore context from my last session",
+    "should_trigger": true
+  },
+  {
+    "query": "resume from where I stopped yesterday",
+    "should_trigger": true
+  },
+  {
+    "query": "load the handoff notes and continue working",
+    "should_trigger": true
+  },
+  {
+    "query": "what was I working on? let's continue from the saved state",
+    "should_trigger": true
+  },
+  {
+    "query": "pick up the phase I paused earlier",
+    "should_trigger": true
+  },
+  {
+    "query": "continue from last session's checkpoint",
+    "should_trigger": true
+  },
+  {
+    "query": "I saved my work state last night, reload it",
+    "should_trigger": true
+  },
+  {
+    "query": "rehydrate the context from my previous session and let's go",
+    "should_trigger": true
+  },
+  {
+    "query": "hey I'm back -- restore everything so we can keep going",
+    "should_trigger": true
+  },
+  {
+    "query": "save my context so I can come back tomorrow",
+    "should_trigger": false
+  },
+  {
+    "query": "pause this work and create a handoff",
+    "should_trigger": false
+  },
+  {
+    "query": "what's the project progress?",
+    "should_trigger": false
+  },
+  {
+    "query": "show me my pending todos",
+    "should_trigger": false
+  },
+  {
+    "query": "start a brand new project",
+    "should_trigger": false
+  },
+  {
+    "query": "begin a new milestone for v2",
+    "should_trigger": false
+  },
+  {
+    "query": "reapply my local patches after the update",
+    "should_trigger": false
+  },
+  {
+    "query": "show me the current phase plan",
+    "should_trigger": false
+  },
+  {
+    "query": "debug the failing test from last session",
+    "should_trigger": false
+  },
+  {
+    "query": "I want to start fresh, not continue old work",
+    "should_trigger": false
+  }
+]

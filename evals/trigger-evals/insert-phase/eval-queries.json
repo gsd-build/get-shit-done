@@ -1,0 +1,82 @@
+[
+  {
+    "query": "insert an urgent phase between phase 2 and 3",
+    "should_trigger": true
+  },
+  {
+    "query": "squeeze a hotfix phase in between the existing phases",
+    "should_trigger": true
+  },
+  {
+    "query": "I need to insert a security audit phase between 1 and 2",
+    "should_trigger": true
+  },
+  {
+    "query": "add a phase 2.5 for the database migration we forgot",
+    "should_trigger": true
+  },
+  {
+    "query": "insert urgent work as a decimal phase before phase 4",
+    "should_trigger": true
+  },
+  {
+    "query": "we need to slip a phase in between 3 and 4 for the compliance review",
+    "should_trigger": true
+  },
+  {
+    "query": "insert a blocking phase right after phase 1",
+    "should_trigger": true
+  },
+  {
+    "query": "there's urgent work that needs to go between existing phases",
+    "should_trigger": true
+  },
+  {
+    "query": "wedge in a phase for the critical bug fix between 2 and 3",
+    "should_trigger": true
+  },
+  {
+    "query": "insert a phase 1.5 for setting up the test infrastructure",
+    "should_trigger": true
+  },
+  {
+    "query": "add a new phase for logging at the end of the milestone",
+    "should_trigger": false
+  },
+  {
+    "query": "append a monitoring phase to the roadmap",
+    "should_trigger": false
+  },
+  {
+    "query": "remove phase 3 from the plan",
+    "should_trigger": false
+  },
+  {
+    "query": "delete the phase we don't need anymore",
+    "should_trigger": false
+  },
+  {
+    "query": "plan the inserted phase in detail",
+    "should_trigger": false
+  },
+  {
+    "query": "reorder the phases so testing comes first",
+    "should_trigger": false
+  },
+  {
+    "query": "start a new milestone with different phases",
+    "should_trigger": false
+  },
+  {
+    "query": "discuss the phase before we plan it",
+    "should_trigger": false
+  },
+  {
+    "query": "research the best approach for the phase we're inserting",
+    "should_trigger": false
+  },
+  {
+    "query": "add a todo for inserting the new config values",
+    "should_trigger": false
+  }
+]

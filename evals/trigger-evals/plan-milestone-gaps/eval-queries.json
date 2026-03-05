@@ -1,0 +1,82 @@
+[
+  {
+    "query": "the audit found gaps, create phases to close them all",
+    "should_trigger": true
+  },
+  {
+    "query": "there are unmet requirements from the milestone audit, plan fixes",
+    "should_trigger": true
+  },
+  {
+    "query": "generate fix phases for everything flagged in the audit report",
+    "should_trigger": true
+  },
+  {
+    "query": "the milestone audit has gaps_found status, let's address them",
+    "should_trigger": true
+  },
+  {
+    "query": "create phases to cover the missing requirements from the audit",
+    "should_trigger": true
+  },
+  {
+    "query": "plan the remediation phases for audit gaps before we complete",
+    "should_trigger": true
+  },
+  {
+    "query": "the MILESTONE-AUDIT.md shows gaps, auto-create fix phases for all of them",
+    "should_trigger": true
+  },
+  {
+    "query": "turn the audit gaps into actionable phases on the roadmap",
+    "should_trigger": true
+  },
+  {
+    "query": "we have 4 gaps from the audit, group them into phases and add to roadmap",
+    "should_trigger": true
+  },
+  {
+    "query": "close all the gaps identified by the audit with new phases",
+    "should_trigger": true
+  },
+  {
+    "query": "run the audit to check for gaps in the first place",
+    "should_trigger": false
+  },
+  {
+    "query": "add a single new phase for error handling to the end of the roadmap",
+    "should_trigger": false
+  },
+  {
+    "query": "insert an urgent phase between phase 3 and 4",
+    "should_trigger": false
+  },
+  {
+    "query": "archive the milestone now that we fixed the gaps",
+    "should_trigger": false
+  },
+  {
+    "query": "check if the project is healthy and the planning files are intact",
+    "should_trigger": false
+  },
+  {
+    "query": "plan phase 5 with detailed tasks and acceptance criteria",
+    "should_trigger": false
+  },
+  {
+    "query": "verify that the gap fixes actually work through UAT",
+    "should_trigger": false
+  },
+  {
+    "query": "start the next milestone since we addressed everything",
+    "should_trigger": false
+  },
+  {
+    "query": "validate that phase 6 has proper test coverage for the fix",
+    "should_trigger": false
+  },
+  {
+    "query": "show me progress on the current milestone",
+    "should_trigger": false
+  }
+]

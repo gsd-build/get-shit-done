@@ -1,0 +1,82 @@
+[
+  {
+    "query": "archive the old phase directories from completed milestones",
+    "should_trigger": true
+  },
+  {
+    "query": "clean up the accumulated phase folders",
+    "should_trigger": true
+  },
+  {
+    "query": "there's a lot of old phase directories cluttering things up, archive them",
+    "should_trigger": true
+  },
+  {
+    "query": "tidy up the completed phase dirs",
+    "should_trigger": true
+  },
+  {
+    "query": "cleanup the planning directory -- too many old phase folders",
+    "should_trigger": true
+  },
+  {
+    "query": "archive phase directories from milestones we already finished",
+    "should_trigger": true
+  },
+  {
+    "query": "remove the clutter from old phases",
+    "should_trigger": true
+  },
+  {
+    "query": "the phase folders are piling up, can you clean those out?",
+    "should_trigger": true
+  },
+  {
+    "query": "housekeeping -- archive old phase dirs",
+    "should_trigger": true
+  },
+  {
+    "query": "sweep up the finished phase directories",
+    "should_trigger": true
+  },
+  {
+    "query": "complete the current milestone and archive it",
+    "should_trigger": false
+  },
+  {
+    "query": "mark the milestone as done and move to the next version",
+    "should_trigger": false
+  },
+  {
+    "query": "audit whether the milestone is actually complete",
+    "should_trigger": false
+  },
+  {
+    "query": "check the health of my planning directory",
+    "should_trigger": false
+  },
+  {
+    "query": "repair any issues in the planning structure",
+    "should_trigger": false
+  },
+  {
+    "query": "remove phase 4 from the roadmap",
+    "should_trigger": false
+  },
+  {
+    "query": "show me the project progress",
+    "should_trigger": false
+  },
+  {
+    "query": "start a new milestone cycle",
+    "should_trigger": false
+  },
+  {
+    "query": "delete the test files we don't need anymore",
+    "should_trigger": false
+  },
+  {
+    "query": "finalize milestone v1 and prepare v2",
+    "should_trigger": false
+  }
+]

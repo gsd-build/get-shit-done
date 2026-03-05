@@ -1,0 +1,82 @@
+[
+  {
+    "query": "show me my pending todos",
+    "should_trigger": true
+  },
+  {
+    "query": "what todos do I have?",
+    "should_trigger": true
+  },
+  {
+    "query": "list all open todo items so I can pick one",
+    "should_trigger": true
+  },
+  {
+    "query": "any outstanding tasks I should work on?",
+    "should_trigger": true
+  },
+  {
+    "query": "let me see the todo list and choose something",
+    "should_trigger": true
+  },
+  {
+    "query": "what's on my backlog?",
+    "should_trigger": true
+  },
+  {
+    "query": "pull up the todos -- I need to pick the next thing",
+    "should_trigger": true
+  },
+  {
+    "query": "do I have any pending items captured?",
+    "should_trigger": true
+  },
+  {
+    "query": "show todos",
+    "should_trigger": true
+  },
+  {
+    "query": "I want to review my captured ideas and pick one to work on",
+    "should_trigger": true
+  },
+  {
+    "query": "add a todo to fix the login bug later",
+    "should_trigger": false
+  },
+  {
+    "query": "capture this idea: we should add dark mode",
+    "should_trigger": false
+  },
+  {
+    "query": "what's the current project progress?",
+    "should_trigger": false
+  },
+  {
+    "query": "show me the phase plan",
+    "should_trigger": false
+  },
+  {
+    "query": "what phase are we on and what's next?",
+    "should_trigger": false
+  },
+  {
+    "query": "run the current phase",
+    "should_trigger": false
+  },
+  {
+    "query": "how's the milestone going overall?",
+    "should_trigger": false
+  },
+  {
+    "query": "note this down for later: refactor the auth module",
+    "should_trigger": false
+  },
+  {
+    "query": "remind me to update the docs",
+    "should_trigger": false
+  },
+  {
+    "query": "show me what commands are available",
+    "should_trigger": false
+  }
+]

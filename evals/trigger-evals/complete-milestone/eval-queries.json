@@ -1,0 +1,82 @@
+[
+  {
+    "query": "we're done with v1.0, let's wrap it up and archive everything",
+    "should_trigger": true
+  },
+  {
+    "query": "archive milestone v2.1 and tag the release",
+    "should_trigger": true
+  },
+  {
+    "query": "all phases are finished, time to close out this milestone",
+    "should_trigger": true
+  },
+  {
+    "query": "finalize v1.0 - archive roadmap and requirements, create git tag",
+    "should_trigger": true
+  },
+  {
+    "query": "mark this milestone as complete and prepare for the next one",
+    "should_trigger": true
+  },
+  {
+    "query": "let's ship v1.2 and archive the milestone artifacts",
+    "should_trigger": true
+  },
+  {
+    "query": "close out the current milestone, everything passed audit",
+    "should_trigger": true
+  },
+  {
+    "query": "I want to complete milestone 1.0 and get the git tag created",
+    "should_trigger": true
+  },
+  {
+    "query": "wrap up this version, collapse the roadmap entries and archive",
+    "should_trigger": true
+  },
+  {
+    "query": "time to finish this milestone - archive requirements and tag v3.0",
+    "should_trigger": true
+  },
+  {
+    "query": "clean up the old phase directories from completed milestones",
+    "should_trigger": false
+  },
+  {
+    "query": "check if we actually met all the requirements before we close",
+    "should_trigger": false
+  },
+  {
+    "query": "start working on the next version after this one",
+    "should_trigger": false
+  },
+  {
+    "query": "are there any gaps in the milestone we need to address?",
+    "should_trigger": false
+  },
+  {
+    "query": "verify that the features we built actually work correctly",
+    "should_trigger": false
+  },
+  {
+    "query": "show me the project progress and what's remaining",
+    "should_trigger": false
+  },
+  {
+    "query": "the milestone has issues, create fix phases for the gaps",
+    "should_trigger": false
+  },
+  {
+    "query": "remove phase 7 from the roadmap, it's not needed anymore",
+    "should_trigger": false
+  },
+  {
+    "query": "I need to archive the phase folders that are cluttering things up",
+    "should_trigger": false
+  },
+  {
+    "query": "let's audit everything before we call this milestone done",
+    "should_trigger": false
+  }
+]

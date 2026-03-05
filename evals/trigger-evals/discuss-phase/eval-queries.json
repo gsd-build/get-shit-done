@@ -1,0 +1,82 @@
+[
+  {
+    "query": "let's discuss the next phase before we start planning",
+    "should_trigger": true
+  },
+  {
+    "query": "I want to talk through the approach for this phase first",
+    "should_trigger": true
+  },
+  {
+    "query": "can we have a discussion about phase 4 before diving in?",
+    "should_trigger": true
+  },
+  {
+    "query": "gather some context from me about the auth phase before planning",
+    "should_trigger": true
+  },
+  {
+    "query": "ask me questions about this phase so we get the plan right",
+    "should_trigger": true
+  },
+  {
+    "query": "let's do adaptive questioning for the API integration phase",
+    "should_trigger": true
+  },
+  {
+    "query": "discuss the phase -- I have specific requirements to share",
+    "should_trigger": true
+  },
+  {
+    "query": "before planning, let's talk through what this phase involves",
+    "should_trigger": true
+  },
+  {
+    "query": "interview me about this phase so we capture all the context",
+    "should_trigger": true
+  },
+  {
+    "query": "let's have a back-and-forth about what phase 2 should cover",
+    "should_trigger": true
+  },
+  {
+    "query": "plan the next phase with detailed subtasks",
+    "should_trigger": false
+  },
+  {
+    "query": "create PLAN.md for phase 3",
+    "should_trigger": false
+  },
+  {
+    "query": "what assumptions are we making about this phase?",
+    "should_trigger": false
+  },
+  {
+    "query": "research how to implement websockets for this phase",
+    "should_trigger": false
+  },
+  {
+    "query": "execute the current phase now",
+    "should_trigger": false
+  },
+  {
+    "query": "show me the project progress and context",
+    "should_trigger": false
+  },
+  {
+    "query": "add a discussion forum feature as a new phase",
+    "should_trigger": false
+  },
+  {
+    "query": "join the discord to discuss GSD",
+    "should_trigger": false
+  },
+  {
+    "query": "insert an urgent phase between 2 and 3",
+    "should_trigger": false
+  },
+  {
+    "query": "list the assumptions Claude is making about the approach",
+    "should_trigger": false
+  }
+]

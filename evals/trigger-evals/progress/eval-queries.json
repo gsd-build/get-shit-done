@@ -1,0 +1,82 @@
+[
+  {
+    "query": "show me the project progress",
+    "should_trigger": true
+  },
+  {
+    "query": "where are we at?",
+    "should_trigger": true
+  },
+  {
+    "query": "what's the current status of the project",
+    "should_trigger": true
+  },
+  {
+    "query": "progress check -- which phases are done and what's next",
+    "should_trigger": true
+  },
+  {
+    "query": "how far along are we in this milestone?",
+    "should_trigger": true
+  },
+  {
+    "query": "give me an overview of what's been completed so far",
+    "should_trigger": true
+  },
+  {
+    "query": "check progress and tell me what to do next",
+    "should_trigger": true
+  },
+  {
+    "query": "what's our current context and next action?",
+    "should_trigger": true
+  },
+  {
+    "query": "status update please",
+    "should_trigger": true
+  },
+  {
+    "query": "show progress for milestone v2",
+    "should_trigger": true
+  },
+  {
+    "query": "resume from where we left off last session",
+    "should_trigger": false
+  },
+  {
+    "query": "restore the context from my previous work session",
+    "should_trigger": false
+  },
+  {
+    "query": "diagnose what's wrong with the planning directory",
+    "should_trigger": false
+  },
+  {
+    "query": "is the .planning folder healthy? check for issues",
+    "should_trigger": false
+  },
+  {
+    "query": "audit the milestone to see if we met all the goals",
+    "should_trigger": false
+  },
+  {
+    "query": "plan the next phase",
+    "should_trigger": false
+  },
+  {
+    "query": "start a new milestone for v3",
+    "should_trigger": false
+  },
+  {
+    "query": "archive the completed milestone",
+    "should_trigger": false
+  },
+  {
+    "query": "check my pending todo items",
+    "should_trigger": false
+  },
+  {
+    "query": "validate the features we built match the requirements",
+    "should_trigger": false
+  }
+]

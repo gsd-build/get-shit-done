@@ -1,0 +1,82 @@
+[
+  {
+    "query": "add a todo: refactor the database connection pooling",
+    "should_trigger": true
+  },
+  {
+    "query": "capture this idea -- we should add rate limiting to the API",
+    "should_trigger": true
+  },
+  {
+    "query": "note this down for later: the error messages need better i18n",
+    "should_trigger": true
+  },
+  {
+    "query": "remind me to update the CI pipeline config",
+    "should_trigger": true
+  },
+  {
+    "query": "save this as a task: write migration scripts for the schema change",
+    "should_trigger": true
+  },
+  {
+    "query": "I just realized we need to handle edge case X -- jot it down",
+    "should_trigger": true
+  },
+  {
+    "query": "put 'add retry logic to the webhook handler' on the todo list",
+    "should_trigger": true
+  },
+  {
+    "query": "we should eventually add caching here, capture that as a todo",
+    "should_trigger": true
+  },
+  {
+    "query": "make a note: revisit the auth token expiration logic",
+    "should_trigger": true
+  },
+  {
+    "query": "log this idea before I forget: dark mode support",
+    "should_trigger": true
+  },
+  {
+    "query": "show me my pending todos",
+    "should_trigger": false
+  },
+  {
+    "query": "what todos do I have? let me pick one",
+    "should_trigger": false
+  },
+  {
+    "query": "what's on my backlog?",
+    "should_trigger": false
+  },
+  {
+    "query": "add a new phase for error handling",
+    "should_trigger": false
+  },
+  {
+    "query": "what's the project progress?",
+    "should_trigger": false
+  },
+  {
+    "query": "insert an urgent phase between 2 and 3",
+    "should_trigger": false
+  },
+  {
+    "query": "start a new milestone for v2.0",
+    "should_trigger": false
+  },
+  {
+    "query": "plan out how we'll implement this feature",
+    "should_trigger": false
+  },
+  {
+    "query": "create a context handoff before I leave",
+    "should_trigger": false
+  },
+  {
+    "query": "execute the current phase plan",
+    "should_trigger": false
+  }
+]

@@ -1,0 +1,82 @@
+[
+  {
+    "query": "check if we actually covered all requirements before we archive this milestone",
+    "should_trigger": true
+  },
+  {
+    "query": "audit the milestone to see if there are any gaps we missed",
+    "should_trigger": true
+  },
+  {
+    "query": "I want to verify requirements coverage and cross-phase integration",
+    "should_trigger": true
+  },
+  {
+    "query": "before we close v1.0, let's make sure everything was actually delivered",
+    "should_trigger": true
+  },
+  {
+    "query": "run a completeness check on this milestone against original intent",
+    "should_trigger": true
+  },
+  {
+    "query": "did we hit all the requirements? check milestone completion status",
+    "should_trigger": true
+  },
+  {
+    "query": "audit v2.0 - are there unmet requirements or integration gaps?",
+    "should_trigger": true
+  },
+  {
+    "query": "verify that all phases in the milestone achieved their definition of done",
+    "should_trigger": true
+  },
+  {
+    "query": "I want to check if there's tech debt or deferred gaps before completing",
+    "should_trigger": true
+  },
+  {
+    "query": "let's do a final review of the milestone against the original requirements",
+    "should_trigger": true
+  },
+  {
+    "query": "test the login feature to make sure it works from a user perspective",
+    "should_trigger": false
+  },
+  {
+    "query": "check if phase 4's validation coverage has any Nyquist gaps",
+    "should_trigger": false
+  },
+  {
+    "query": "archive the milestone and create a git tag for v1.0",
+    "should_trigger": false
+  },
+  {
+    "query": "is the .planning directory healthy? any missing or corrupt files?",
+    "should_trigger": false
+  },
+  {
+    "query": "show me where we are in the project, what's left",
+    "should_trigger": false
+  },
+  {
+    "query": "there are gaps in the audit, create phases to fix them",
+    "should_trigger": false
+  },
+  {
+    "query": "generate unit tests for the auth module we just built",
+    "should_trigger": false
+  },
+  {
+    "query": "validate that phase 3 has proper test coverage",
+    "should_trigger": false
+  },
+  {
+    "query": "start a new milestone for the next release cycle",
+    "should_trigger": false
+  },
+  {
+    "query": "walk me through UAT for the payment flow we shipped",
+    "should_trigger": false
+  }
+]

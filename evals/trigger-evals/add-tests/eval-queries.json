@@ -1,0 +1,82 @@
+[
+  {
+    "query": "generate tests for phase 4, focus on edge cases in the pricing module",
+    "should_trigger": true
+  },
+  {
+    "query": "write unit and E2E tests for the auth flow we just finished",
+    "should_trigger": true
+  },
+  {
+    "query": "create automated tests for phase 3 based on what was built",
+    "should_trigger": true
+  },
+  {
+    "query": "I need tests for the completed dashboard phase",
+    "should_trigger": true
+  },
+  {
+    "query": "generate test coverage for phase 12 using the UAT criteria",
+    "should_trigger": true
+  },
+  {
+    "query": "write tests for the notification system we shipped in phase 7",
+    "should_trigger": true
+  },
+  {
+    "query": "add unit tests and browser tests for the payment integration",
+    "should_trigger": true
+  },
+  {
+    "query": "auto-generate tests from the SUMMARY and VERIFICATION of phase 5",
+    "should_trigger": true
+  },
+  {
+    "query": "we need test files for the API endpoints created in phase 2",
+    "should_trigger": true
+  },
+  {
+    "query": "generate RED-GREEN tests for the search feature from phase 8",
+    "should_trigger": true
+  },
+  {
+    "query": "retroactively audit Nyquist validation gaps for phase 4",
+    "should_trigger": false
+  },
+  {
+    "query": "test the checkout feature interactively to see if it works",
+    "should_trigger": false
+  },
+  {
+    "query": "check if all milestone requirements have been met",
+    "should_trigger": false
+  },
+  {
+    "query": "the API is returning 500 errors, can you investigate?",
+    "should_trigger": false
+  },
+  {
+    "query": "verify the features from phase 3 through conversational UAT",
+    "should_trigger": false
+  },
+  {
+    "query": "fill in the VALIDATION.md gaps for the completed phase",
+    "should_trigger": false
+  },
+  {
+    "query": "analyze the codebase testing patterns and conventions",
+    "should_trigger": false
+  },
+  {
+    "query": "check the planning directory integrity and repair issues",
+    "should_trigger": false
+  },
+  {
+    "query": "does phase 6 have adequate validation coverage?",
+    "should_trigger": false
+  },
+  {
+    "query": "manually walk me through the acceptance criteria one by one",
+    "should_trigger": false
+  }
+]

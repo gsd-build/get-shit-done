@@ -1,0 +1,82 @@
+[
+  {
+    "query": "start a new project",
+    "should_trigger": true
+  },
+  {
+    "query": "I want to initialize a fresh project from scratch",
+    "should_trigger": true
+  },
+  {
+    "query": "set up a new project for my SaaS app",
+    "should_trigger": true
+  },
+  {
+    "query": "let's create PROJECT.md and get this project started",
+    "should_trigger": true
+  },
+  {
+    "query": "new project -- it's a CLI tool for managing docker containers",
+    "should_trigger": true
+  },
+  {
+    "query": "initialize the project with deep context gathering",
+    "should_trigger": true
+  },
+  {
+    "query": "I'm starting something brand new, help me set it up",
+    "should_trigger": true
+  },
+  {
+    "query": "create a new project for an e-commerce platform",
+    "should_trigger": true
+  },
+  {
+    "query": "bootstrap this repo as a GSD project",
+    "should_trigger": true
+  },
+  {
+    "query": "begin a new project, I'll describe what I'm building",
+    "should_trigger": true
+  },
+  {
+    "query": "start the next milestone for v2.0",
+    "should_trigger": false
+  },
+  {
+    "query": "create a new milestone with updated requirements",
+    "should_trigger": false
+  },
+  {
+    "query": "update PROJECT.md with the new milestone scope",
+    "should_trigger": false
+  },
+  {
+    "query": "add a new phase to the existing roadmap",
+    "should_trigger": false
+  },
+  {
+    "query": "plan the first phase of the project",
+    "should_trigger": false
+  },
+  {
+    "query": "map the existing codebase so we understand the architecture",
+    "should_trigger": false
+  },
+  {
+    "query": "new feature: add dark mode support",
+    "should_trigger": false
+  },
+  {
+    "query": "create a new file called project-config.ts",
+    "should_trigger": false
+  },
+  {
+    "query": "what's the progress on the current project?",
+    "should_trigger": false
+  },
+  {
+    "query": "new milestone for the refactoring effort",
+    "should_trigger": false
+  }
+]

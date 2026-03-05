@@ -1,0 +1,82 @@
+[
+  {
+    "query": "open the settings panel, I want to toggle some options",
+    "should_trigger": true
+  },
+  {
+    "query": "configure the workflow toggles",
+    "should_trigger": true
+  },
+  {
+    "query": "I want to change my GSD configuration",
+    "should_trigger": true
+  },
+  {
+    "query": "show me the current settings so I can adjust them",
+    "should_trigger": true
+  },
+  {
+    "query": "turn off the auto-verification toggle",
+    "should_trigger": true
+  },
+  {
+    "query": "change the workflow preferences",
+    "should_trigger": true
+  },
+  {
+    "query": "let me tweak some configuration options",
+    "should_trigger": true
+  },
+  {
+    "query": "enable the parallel execution setting",
+    "should_trigger": true
+  },
+  {
+    "query": "disable the Nyquist validation toggle",
+    "should_trigger": true
+  },
+  {
+    "query": "I want to adjust how GSD behaves -- open config",
+    "should_trigger": true
+  },
+  {
+    "query": "switch to the budget model profile",
+    "should_trigger": false
+  },
+  {
+    "query": "set my agent profile to quality mode",
+    "should_trigger": false
+  },
+  {
+    "query": "use balanced profile for the agents",
+    "should_trigger": false
+  },
+  {
+    "query": "update GSD to the latest version",
+    "should_trigger": false
+  },
+  {
+    "query": "what commands are available?",
+    "should_trigger": false
+  },
+  {
+    "query": "show me the project progress",
+    "should_trigger": false
+  },
+  {
+    "query": "check if my planning directory is healthy",
+    "should_trigger": false
+  },
+  {
+    "query": "how do I use GSD?",
+    "should_trigger": false
+  },
+  {
+    "query": "reapply my local patches",
+    "should_trigger": false
+  },
+  {
+    "query": "start a new project with default configuration",
+    "should_trigger": false
+  }
+]

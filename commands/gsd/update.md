@@ -1,6 +1,6 @@
 ---
 name: gsd:update
-description: Update GSD to latest version with changelog display
+description: "Update GSD to the latest version and display the changelog"
 allowed-tools:
   - Bash
   - AskUserQuestion

@@ -1,6 +1,6 @@
 ---
 name: gsd:execute-phase
-description: Execute all plans in a phase with wave-based parallelization
+description: "Run all PLAN.md files for a numbered phase using wave-based parallel subagents and atomic commits"
 argument-hint: "<phase-number> [--gaps-only]"
 allowed-tools:
   - Read

@@ -1,0 +1,82 @@
+[
+  {
+    "query": "research how to implement the authentication phase",
+    "should_trigger": true
+  },
+  {
+    "query": "I need research on the best approach for the caching layer",
+    "should_trigger": true
+  },
+  {
+    "query": "do research for this phase -- what libraries and patterns should we use?",
+    "should_trigger": true
+  },
+  {
+    "query": "research the implementation options for phase 5",
+    "should_trigger": true
+  },
+  {
+    "query": "investigate the technical approach before we plan this phase",
+    "should_trigger": true
+  },
+  {
+    "query": "research how to build real-time notifications for this phase",
+    "should_trigger": true
+  },
+  {
+    "query": "do a standalone research spike on the payment integration",
+    "should_trigger": true
+  },
+  {
+    "query": "research what's involved in implementing SSO",
+    "should_trigger": true
+  },
+  {
+    "query": "look into the best way to implement this phase technically",
+    "should_trigger": true
+  },
+  {
+    "query": "research phase 3 -- compare different ORM options",
+    "should_trigger": true
+  },
+  {
+    "query": "plan the phase with concrete implementation steps",
+    "should_trigger": false
+  },
+  {
+    "query": "discuss the phase with me so we capture context",
+    "should_trigger": false
+  },
+  {
+    "query": "what assumptions are we making about this approach?",
+    "should_trigger": false
+  },
+  {
+    "query": "execute the research phase",
+    "should_trigger": false
+  },
+  {
+    "query": "map the codebase to understand the architecture",
+    "should_trigger": false
+  },
+  {
+    "query": "generate tests for the completed research module",
+    "should_trigger": false
+  },
+  {
+    "query": "add a research documentation page as a new phase",
+    "should_trigger": false
+  },
+  {
+    "query": "quickly fix the research component's CSS",
+    "should_trigger": false
+  },
+  {
+    "query": "let's talk through the phase before committing to an approach",
+    "should_trigger": false
+  },
+  {
+    "query": "list the assumptions we're making about the research API",
+    "should_trigger": false
+  }
+]

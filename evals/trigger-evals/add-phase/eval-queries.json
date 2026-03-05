@@ -1,0 +1,82 @@
+[
+  {
+    "query": "add a new phase to the roadmap for error handling",
+    "should_trigger": true
+  },
+  {
+    "query": "append a phase for the notification system at the end of the milestone",
+    "should_trigger": true
+  },
+  {
+    "query": "add phase for CI/CD pipeline setup",
+    "should_trigger": true
+  },
+  {
+    "query": "I need another phase added for documentation",
+    "should_trigger": true
+  },
+  {
+    "query": "add a new phase at the end -- dark mode support",
+    "should_trigger": true
+  },
+  {
+    "query": "put a new phase on the roadmap for API rate limiting",
+    "should_trigger": true
+  },
+  {
+    "query": "add one more phase for performance optimization",
+    "should_trigger": true
+  },
+  {
+    "query": "we need a phase for internationalization, add it to the milestone",
+    "should_trigger": true
+  },
+  {
+    "query": "add monitoring and logging as a phase",
+    "should_trigger": true
+  },
+  {
+    "query": "tack on a phase for accessibility improvements",
+    "should_trigger": true
+  },
+  {
+    "query": "insert an urgent phase between phase 2 and phase 3",
+    "should_trigger": false
+  },
+  {
+    "query": "squeeze a hotfix phase between 1 and 2",
+    "should_trigger": false
+  },
+  {
+    "query": "remove phase 4 from the roadmap",
+    "should_trigger": false
+  },
+  {
+    "query": "delete the testing phase, we don't need it",
+    "should_trigger": false
+  },
+  {
+    "query": "plan the next phase in detail",
+    "should_trigger": false
+  },
+  {
+    "query": "add a todo item for reviewing the PR",
+    "should_trigger": false
+  },
+  {
+    "query": "add tests for the authentication module",
+    "should_trigger": false
+  },
+  {
+    "query": "start a new milestone with fresh phases",
+    "should_trigger": false
+  },
+  {
+    "query": "show me all the phases in the current milestone",
+    "should_trigger": false
+  },
+  {
+    "query": "create a plan for the new phase we added",
+    "should_trigger": false
+  }
+]

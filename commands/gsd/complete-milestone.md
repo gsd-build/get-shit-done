@@ -1,7 +1,7 @@
 ---
 type: prompt
 name: gsd:complete-milestone
-description: Archive completed milestone and prepare for next version
+description: "Finalize and archive a finished milestone with git tag and prepare for the next version"
 argument-hint: <version>
 allowed-tools:
   - Read

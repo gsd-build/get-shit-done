@@ -1,0 +1,82 @@
+[
+  {
+    "query": "switch to the budget model profile",
+    "should_trigger": true
+  },
+  {
+    "query": "use quality mode for the agents",
+    "should_trigger": true
+  },
+  {
+    "query": "change my profile to balanced",
+    "should_trigger": true
+  },
+  {
+    "query": "set the model profile to quality -- I want Opus subagents",
+    "should_trigger": true
+  },
+  {
+    "query": "switch agents to budget mode to save tokens",
+    "should_trigger": true
+  },
+  {
+    "query": "I want to use the balanced profile instead of quality",
+    "should_trigger": true
+  },
+  {
+    "query": "change to quality profile",
+    "should_trigger": true
+  },
+  {
+    "query": "put agents in budget mode",
+    "should_trigger": true
+  },
+  {
+    "query": "use cheaper models -- switch profile",
+    "should_trigger": true
+  },
+  {
+    "query": "I want the best quality agents, switch profile accordingly",
+    "should_trigger": true
+  },
+  {
+    "query": "open the settings and configure workflow toggles",
+    "should_trigger": false
+  },
+  {
+    "query": "toggle the auto-verification setting",
+    "should_trigger": false
+  },
+  {
+    "query": "change the workflow configuration options",
+    "should_trigger": false
+  },
+  {
+    "query": "update GSD to latest version",
+    "should_trigger": false
+  },
+  {
+    "query": "what commands are available?",
+    "should_trigger": false
+  },
+  {
+    "query": "show me project progress",
+    "should_trigger": false
+  },
+  {
+    "query": "which model is being used right now?",
+    "should_trigger": false
+  },
+  {
+    "query": "configure how the workflow behaves",
+    "should_trigger": false
+  },
+  {
+    "query": "I want to adjust some preferences",
+    "should_trigger": false
+  },
+  {
+    "query": "reapply local modifications after update",
+    "should_trigger": false
+  }
+]

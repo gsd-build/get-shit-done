@@ -1,0 +1,82 @@
+[
+  {
+    "query": "update GSD to the latest version",
+    "should_trigger": true
+  },
+  {
+    "query": "is there a newer version available? let's upgrade",
+    "should_trigger": true
+  },
+  {
+    "query": "pull the latest GSD release",
+    "should_trigger": true
+  },
+  {
+    "query": "upgrade to the newest version and show me the changelog",
+    "should_trigger": true
+  },
+  {
+    "query": "get the latest update",
+    "should_trigger": true
+  },
+  {
+    "query": "I want to update -- show me what's changed",
+    "should_trigger": true
+  },
+  {
+    "query": "check for updates and install if available",
+    "should_trigger": true
+  },
+  {
+    "query": "upgrade GSD",
+    "should_trigger": true
+  },
+  {
+    "query": "install the latest version with changelog",
+    "should_trigger": true
+  },
+  {
+    "query": "update to newest release pls",
+    "should_trigger": true
+  },
+  {
+    "query": "reapply my local patches after the update",
+    "should_trigger": false
+  },
+  {
+    "query": "my custom modifications got wiped, reapply them",
+    "should_trigger": false
+  },
+  {
+    "query": "change my model profile to quality",
+    "should_trigger": false
+  },
+  {
+    "query": "configure the workflow settings",
+    "should_trigger": false
+  },
+  {
+    "query": "what's the current project progress?",
+    "should_trigger": false
+  },
+  {
+    "query": "show me the changelog for the latest milestone",
+    "should_trigger": false
+  },
+  {
+    "query": "refresh the codebase map",
+    "should_trigger": false
+  },
+  {
+    "query": "update the PROJECT.md with new requirements",
+    "should_trigger": false
+  },
+  {
+    "query": "start a new milestone",
+    "should_trigger": false
+  },
+  {
+    "query": "help me understand how to use GSD",
+    "should_trigger": false
+  }
+]

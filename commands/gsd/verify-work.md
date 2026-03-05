@@ -1,6 +1,6 @@
 ---
 name: gsd:verify-work
-description: Validate built features through conversational UAT
+description: "Walk through built features with the user in a conversational UAT testing session"
 argument-hint: "[phase number, e.g., '4']"
 allowed-tools:
   - Read
@@ -10,6 +10,7 @@ allowed-tools:
   - Edit
   - Write
   - Task
+  - AskUserQuestion
 ---
 <objective>
 Validate built features through conversational testing with persistent state.

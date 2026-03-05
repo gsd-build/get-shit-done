@@ -1,0 +1,82 @@
+[
+  {
+    "query": "I need to stop working on this for today, save my context",
+    "should_trigger": true
+  },
+  {
+    "query": "pause this -- I'll pick it up tomorrow",
+    "should_trigger": true
+  },
+  {
+    "query": "create a handoff document so I can come back to this later",
+    "should_trigger": true
+  },
+  {
+    "query": "I'm stepping away from this phase mid-way, save state",
+    "should_trigger": true
+  },
+  {
+    "query": "gotta stop here, can you save where we are?",
+    "should_trigger": true
+  },
+  {
+    "query": "let's pause and create a context snapshot before I close this session",
+    "should_trigger": true
+  },
+  {
+    "query": "freeze current progress so I can hand off to another session",
+    "should_trigger": true
+  },
+  {
+    "query": "save work state -- I need to switch to another project",
+    "should_trigger": true
+  },
+  {
+    "query": "I'm done for the day, preserve the context for next time",
+    "should_trigger": true
+  },
+  {
+    "query": "bookmark where we are in this phase so I can resume later",
+    "should_trigger": true
+  },
+  {
+    "query": "I'm back, let's pick up where we left off",
+    "should_trigger": false
+  },
+  {
+    "query": "restore my previous session context",
+    "should_trigger": false
+  },
+  {
+    "query": "what's the current project status?",
+    "should_trigger": false
+  },
+  {
+    "query": "show me what we were working on last time",
+    "should_trigger": false
+  },
+  {
+    "query": "add a todo to revisit this later",
+    "should_trigger": false
+  },
+  {
+    "query": "let's complete this milestone and archive it",
+    "should_trigger": false
+  },
+  {
+    "query": "stop the execution of this phase -- there's a bug",
+    "should_trigger": false
+  },
+  {
+    "query": "I want to remove this phase from the roadmap",
+    "should_trigger": false
+  },
+  {
+    "query": "archive the old phase directories",
+    "should_trigger": false
+  },
+  {
+    "query": "show me my pending todos",
+    "should_trigger": false
+  }
+]

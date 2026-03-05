@@ -1,0 +1,1 @@
+../../../commands/gsd/health.md

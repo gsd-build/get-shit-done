@@ -1,6 +1,6 @@
 ---
 name: gsd:health
-description: Diagnose planning directory health and optionally repair issues
+description: "Diagnose .planning/ directory integrity — detect missing files, broken refs, and optionally repair them"
 argument-hint: [--repair]
 allowed-tools:
   - Read

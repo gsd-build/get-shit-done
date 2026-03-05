@@ -1,0 +1,82 @@
+[
+  {
+    "query": "remove phase 4 from the roadmap",
+    "should_trigger": true
+  },
+  {
+    "query": "delete the documentation phase, we'll handle it later",
+    "should_trigger": true
+  },
+  {
+    "query": "drop phase 5 and renumber the ones after it",
+    "should_trigger": true
+  },
+  {
+    "query": "remove the testing phase from the milestone",
+    "should_trigger": true
+  },
+  {
+    "query": "take phase 3 off the roadmap, it's out of scope now",
+    "should_trigger": true
+  },
+  {
+    "query": "get rid of the performance optimization phase",
+    "should_trigger": true
+  },
+  {
+    "query": "remove the last phase, we decided not to do it",
+    "should_trigger": true
+  },
+  {
+    "query": "cut phase 6 from the plan and renumber subsequent phases",
+    "should_trigger": true
+  },
+  {
+    "query": "we're descoping phase 4, remove it",
+    "should_trigger": true
+  },
+  {
+    "query": "delete phase 2 from the current milestone roadmap",
+    "should_trigger": true
+  },
+  {
+    "query": "add a new phase for error handling at the end",
+    "should_trigger": false
+  },
+  {
+    "query": "insert an urgent phase between 2 and 3",
+    "should_trigger": false
+  },
+  {
+    "query": "clean up and archive the completed milestone directories",
+    "should_trigger": false
+  },
+  {
+    "query": "archive the completed milestone",
+    "should_trigger": false
+  },
+  {
+    "query": "plan the phase that replaces the one we removed",
+    "should_trigger": false
+  },
+  {
+    "query": "remove the old log files from the project",
+    "should_trigger": false
+  },
+  {
+    "query": "delete the temp files from the build directory",
+    "should_trigger": false
+  },
+  {
+    "query": "remove the unused import on line 15",
+    "should_trigger": false
+  },
+  {
+    "query": "complete the current milestone and move on",
+    "should_trigger": false
+  },
+  {
+    "query": "show me all phases so I can decide which to cut",
+    "should_trigger": false
+  }
+]

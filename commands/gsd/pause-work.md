@@ -1,6 +1,6 @@
 ---
 name: gsd:pause-work
-description: Create context handoff when pausing work mid-phase
+description: "Save a context snapshot and handoff notes so work can resume in a future session"
 allowed-tools:
   - Read
   - Write

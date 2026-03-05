@@ -1,6 +1,6 @@
 ---
 name: gsd:cleanup
-description: Archive accumulated phase directories from completed milestones
+description: "Archive old phase directories from already-completed milestones to reduce .planning/ clutter"
 ---
 <objective>
 Archive phase directories from completed milestones into `.planning/milestones/v{X.Y}-phases/`.

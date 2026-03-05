@@ -1,6 +1,6 @@
 ---
 name: gsd:join-discord
-description: Join the GSD Discord community
+description: "Get the invite link to join the GSD Discord community"
 ---
 
 <objective>

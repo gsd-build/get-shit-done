@@ -1,0 +1,82 @@
+[
+  {
+    "query": "what assumptions are you making about this phase?",
+    "should_trigger": true
+  },
+  {
+    "query": "list the assumptions for phase 3's approach",
+    "should_trigger": true
+  },
+  {
+    "query": "surface any assumptions before we plan this phase",
+    "should_trigger": true
+  },
+  {
+    "query": "what are you assuming about how we'll build the auth layer?",
+    "should_trigger": true
+  },
+  {
+    "query": "show me your assumptions about the implementation approach",
+    "should_trigger": true
+  },
+  {
+    "query": "before we plan, tell me what you're assuming about this phase",
+    "should_trigger": true
+  },
+  {
+    "query": "list assumptions about the caching phase so I can correct them",
+    "should_trigger": true
+  },
+  {
+    "query": "what implicit assumptions does Claude have about this phase?",
+    "should_trigger": true
+  },
+  {
+    "query": "surface your assumptions about the API design approach",
+    "should_trigger": true
+  },
+  {
+    "query": "are there assumptions we should check before planning phase 2?",
+    "should_trigger": true
+  },
+  {
+    "query": "let's discuss the phase approach in detail",
+    "should_trigger": false
+  },
+  {
+    "query": "ask me questions about this phase to gather context",
+    "should_trigger": false
+  },
+  {
+    "query": "plan the phase with verification steps",
+    "should_trigger": false
+  },
+  {
+    "query": "research how to implement this phase",
+    "should_trigger": false
+  },
+  {
+    "query": "execute the current phase",
+    "should_trigger": false
+  },
+  {
+    "query": "validate that our implementation matches requirements",
+    "should_trigger": false
+  },
+  {
+    "query": "audit the milestone against the original intent",
+    "should_trigger": false
+  },
+  {
+    "query": "check the health of the planning directory",
+    "should_trigger": false
+  },
+  {
+    "query": "what are the prerequisites for this project?",
+    "should_trigger": false
+  },
+  {
+    "query": "show me the progress and what's next",
+    "should_trigger": false
+  }
+]

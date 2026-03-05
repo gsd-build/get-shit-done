@@ -1,5 +1,5 @@
 ---
-description: Reapply local modifications after a GSD update
+description: "Restore local customizations that were overwritten by a GSD update"
 allowed-tools: Read, Write, Edit, Bash, Glob, Grep, AskUserQuestion
 ---
 

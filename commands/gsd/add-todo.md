@@ -1,6 +1,6 @@
 ---
 name: gsd:add-todo
-description: Capture idea or task as todo from current conversation context
+description: "Capture a quick idea or task as a structured todo item for later — not a roadmap phase"
 argument-hint: [optional description]
 allowed-tools:
   - Read

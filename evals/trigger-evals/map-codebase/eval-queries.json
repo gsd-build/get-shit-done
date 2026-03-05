@@ -1,0 +1,82 @@
+[
+  {
+    "query": "analyze this codebase so we understand the architecture before planning",
+    "should_trigger": true
+  },
+  {
+    "query": "I just joined this project, map out the codebase for me",
+    "should_trigger": true
+  },
+  {
+    "query": "create codebase documentation - stack, architecture, conventions",
+    "should_trigger": true
+  },
+  {
+    "query": "scan the entire repo and produce codebase analysis documents",
+    "should_trigger": true
+  },
+  {
+    "query": "I need to understand this brownfield codebase before we start planning",
+    "should_trigger": true
+  },
+  {
+    "query": "generate the codebase map with parallel agents, focus on the api layer",
+    "should_trigger": true
+  },
+  {
+    "query": "refresh the codebase analysis, it's gotten stale after recent changes",
+    "should_trigger": true
+  },
+  {
+    "query": "map out the code structure, integrations, testing patterns, and concerns",
+    "should_trigger": true
+  },
+  {
+    "query": "we're about to do a major refactor, analyze the current codebase state first",
+    "should_trigger": true
+  },
+  {
+    "query": "produce .planning/codebase/ documents for this existing repository",
+    "should_trigger": true
+  },
+  {
+    "query": "check if the .planning directory is healthy and consistent",
+    "should_trigger": false
+  },
+  {
+    "query": "show me the project progress and what phase we're on",
+    "should_trigger": false
+  },
+  {
+    "query": "initialize this project from scratch with PROJECT.md",
+    "should_trigger": false
+  },
+  {
+    "query": "research how to implement the auth module before planning it",
+    "should_trigger": false
+  },
+  {
+    "query": "generate tests for the code in phase 3",
+    "should_trigger": false
+  },
+  {
+    "query": "audit the milestone to check requirements coverage",
+    "should_trigger": false
+  },
+  {
+    "query": "list the assumptions Claude has about phase 2's approach",
+    "should_trigger": false
+  },
+  {
+    "query": "diagnose why the planning state seems broken",
+    "should_trigger": false
+  },
+  {
+    "query": "what tech stack are we using? check the package.json",
+    "should_trigger": false
+  },
+  {
+    "query": "figure out why the API is returning 500 errors",
+    "should_trigger": false
+  }
+]

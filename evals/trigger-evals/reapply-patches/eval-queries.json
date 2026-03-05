@@ -1,0 +1,82 @@
+[
+  {
+    "query": "reapply my local patches after the update",
+    "should_trigger": true
+  },
+  {
+    "query": "my custom modifications got overwritten, restore them",
+    "should_trigger": true
+  },
+  {
+    "query": "reapply local mods",
+    "should_trigger": true
+  },
+  {
+    "query": "I updated GSD and lost my customizations, put them back",
+    "should_trigger": true
+  },
+  {
+    "query": "restore the local modifications I had before the upgrade",
+    "should_trigger": true
+  },
+  {
+    "query": "apply my saved patches to the new version",
+    "should_trigger": true
+  },
+  {
+    "query": "the update wiped my local changes -- reapply them",
+    "should_trigger": true
+  },
+  {
+    "query": "put back my custom tweaks after upgrading",
+    "should_trigger": true
+  },
+  {
+    "query": "re-apply local modifications",
+    "should_trigger": true
+  },
+  {
+    "query": "my patches need to be applied again after that update",
+    "should_trigger": true
+  },
+  {
+    "query": "update GSD to the latest version",
+    "should_trigger": false
+  },
+  {
+    "query": "upgrade to newest release",
+    "should_trigger": false
+  },
+  {
+    "query": "change my workflow configuration",
+    "should_trigger": false
+  },
+  {
+    "query": "switch to quality model profile",
+    "should_trigger": false
+  },
+  {
+    "query": "resume from where I left off yesterday",
+    "should_trigger": false
+  },
+  {
+    "query": "fix the broken test in phase 3",
+    "should_trigger": false
+  },
+  {
+    "query": "debug the failing deployment",
+    "should_trigger": false
+  },
+  {
+    "query": "repair the planning directory",
+    "should_trigger": false
+  },
+  {
+    "query": "roll back to a previous version",
+    "should_trigger": false
+  },
+  {
+    "query": "apply the phase plan and start executing",
+    "should_trigger": false
+  }
+]

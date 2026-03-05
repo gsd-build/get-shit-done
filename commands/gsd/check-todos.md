@@ -1,6 +1,6 @@
 ---
 name: gsd:check-todos
-description: List pending todos and select one to work on
+description: "List pending todo items and let the user pick one to work on next"
 argument-hint: [area filter]
 allowed-tools:
   - Read

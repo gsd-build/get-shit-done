@@ -1,7 +1,7 @@
 ---
 name: gsd:quick
-description: Execute a quick task with GSD guarantees (atomic commits, state tracking) but skip optional agents
-argument-hint: "[--full] [--discuss]"
+description: "Run a small ad-hoc task outside the roadmap with atomic commits but no planning ceremony"
+argument-hint: "<task description> [--full] [--discuss]"
 allowed-tools:
   - Read
   - Write

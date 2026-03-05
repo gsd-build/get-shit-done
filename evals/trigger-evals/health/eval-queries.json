@@ -1,0 +1,82 @@
+[
+  {
+    "query": "is my .planning directory in good shape? check for problems",
+    "should_trigger": true
+  },
+  {
+    "query": "something feels off with the planning files, can you diagnose it",
+    "should_trigger": true
+  },
+  {
+    "query": "check the planning directory for missing files or inconsistencies",
+    "should_trigger": true
+  },
+  {
+    "query": "run a health check on the project structure --repair",
+    "should_trigger": true
+  },
+  {
+    "query": "validate the integrity of STATE.md, ROADMAP.md, and the phase directories",
+    "should_trigger": true
+  },
+  {
+    "query": "are there orphaned plans or broken references in .planning?",
+    "should_trigger": true
+  },
+  {
+    "query": "diagnose why the planning state seems inconsistent",
+    "should_trigger": true
+  },
+  {
+    "query": "the project configuration seems wrong, check and repair it",
+    "should_trigger": true
+  },
+  {
+    "query": "scan for invalid configs and orphaned files in the planning directory",
+    "should_trigger": true
+  },
+  {
+    "query": "my planning files might be corrupted, can you check everything?",
+    "should_trigger": true
+  },
+  {
+    "query": "what's the current project progress, what phase are we on?",
+    "should_trigger": false
+  },
+  {
+    "query": "test the login feature to make sure it works properly",
+    "should_trigger": false
+  },
+  {
+    "query": "the login button is broken, I need to figure out why",
+    "should_trigger": false
+  },
+  {
+    "query": "analyze the codebase structure and create documentation",
+    "should_trigger": false
+  },
+  {
+    "query": "audit whether we hit all the milestone requirements",
+    "should_trigger": false
+  },
+  {
+    "query": "check if phase 3 has validation gaps that need filling",
+    "should_trigger": false
+  },
+  {
+    "query": "verify the features we built actually work from user perspective",
+    "should_trigger": false
+  },
+  {
+    "query": "I think there's a bug in the API response handler",
+    "should_trigger": false
+  },
+  {
+    "query": "show me what commands are available and how to use them",
+    "should_trigger": false
+  },
+  {
+    "query": "something is broken in production, users are getting 500 errors",
+    "should_trigger": false
+  }
+]

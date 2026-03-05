@@ -1,0 +1,82 @@
+[
+  {
+    "query": "retroactively validate the Nyquist criteria for phase 2",
+    "should_trigger": true
+  },
+  {
+    "query": "we skipped validation on phase 3, can you audit and fill the gaps?",
+    "should_trigger": true
+  },
+  {
+    "query": "run a retroactive audit on the completed phase for validation gaps",
+    "should_trigger": true
+  },
+  {
+    "query": "check if phase 1 has any Nyquist validation holes and fill them",
+    "should_trigger": true
+  },
+  {
+    "query": "validate the last phase -- we shipped it without proper checks",
+    "should_trigger": true
+  },
+  {
+    "query": "go back and fill in the validation gaps for the phase we just finished",
+    "should_trigger": true
+  },
+  {
+    "query": "the phase is done but we never validated it properly, fix that",
+    "should_trigger": true
+  },
+  {
+    "query": "audit the Nyquist validation coverage on the completed auth phase",
+    "should_trigger": true
+  },
+  {
+    "query": "retroactively add validation for the phase that already shipped",
+    "should_trigger": true
+  },
+  {
+    "query": "fill the validation gaps on phase 2 -- it went out without full checks",
+    "should_trigger": true
+  },
+  {
+    "query": "let's do UAT -- verify the features we built actually work",
+    "should_trigger": false
+  },
+  {
+    "query": "test the login flow interactively with me",
+    "should_trigger": false
+  },
+  {
+    "query": "generate test files for the completed authentication phase",
+    "should_trigger": false
+  },
+  {
+    "query": "write unit tests based on the acceptance criteria",
+    "should_trigger": false
+  },
+  {
+    "query": "audit whether the milestone is complete",
+    "should_trigger": false
+  },
+  {
+    "query": "check the project progress",
+    "should_trigger": false
+  },
+  {
+    "query": "verify that our API endpoints return the right responses",
+    "should_trigger": false
+  },
+  {
+    "query": "walk me through testing the new features we built",
+    "should_trigger": false
+  },
+  {
+    "query": "run the existing test suite",
+    "should_trigger": false
+  },
+  {
+    "query": "create automated tests for phase 3's deliverables",
+    "should_trigger": false
+  }
+]
