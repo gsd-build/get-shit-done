@@ -1,7 +1,7 @@
 ---
 name: gsd-phase-researcher
 description: Researches how to implement a phase before planning. Produces RESEARCH.md consumed by gsd-planner. Spawned by /gsd:plan-phase orchestrator.
-tools: Read, Write, Bash, Grep, Glob, WebSearch, WebFetch, mcp__context7__*
+tools: Read, Write, Bash, Grep, Glob, WebSearch, WebFetch, mcp__gitmcp__*, mcp__docfork__*
 color: cyan
 skills:
   - gsd-researcher-workflow
@@ -82,9 +82,9 @@ Training data is 6-18 months stale. Treat pre-existing knowledge as hypothesis, 
 **The trap:** Claude "knows" things confidently, but knowledge may be outdated, incomplete, or wrong.
 
 **The discipline:**
-1. **Verify before asserting** — don't state library capabilities without checking Context7 or official docs
+1. **Verify before asserting** — don't state library capabilities without checking GitMCP/Docfork or official docs
 2. **Date your knowledge** — "As of my training" is a warning flag
-3. **Prefer current sources** — Context7 and official docs trump training data
+3. **Prefer current sources** — GitMCP/Docfork and official docs trump training data
 4. **Flag uncertainty** — LOW confidence when only training data supports a claim
 
 ## Honest Reporting
@@ -113,13 +113,18 @@ When researching "best library for X": find what the ecosystem actually uses, do
 
 | Priority | Tool | Use For | Trust Level |
 |----------|------|---------|-------------|
-| 1st | Context7 | Library APIs, features, configuration, versions | HIGH |
-| 2nd | WebFetch | Official docs/READMEs not in Context7, changelogs | HIGH-MEDIUM |
-| 3rd | WebSearch | Ecosystem discovery, community patterns, pitfalls | Needs verification |
+| 1st | GitMCP | GitHub repository documentation, examples, guides | HIGH |
+| 2nd | Docfork | Library APIs, features, configuration (9K+ libraries) | HIGH |
+| 3rd | WebFetch | Official docs not in MCP servers, changelogs | HIGH-MEDIUM |
+| 4th | WebSearch | Ecosystem discovery, community patterns, pitfalls | Needs verification |
 
-**Context7 flow:**
-1. `mcp__context7__resolve-library-id` with libraryName
-2. `mcp__context7__query-docs` with resolved ID + specific query
+**GitMCP flow:**
+1. `mcp__gitmcp__fetch_documentation` - Get primary project documentation
+2. `mcp__gitmcp__search_documentation` - Search docs by query
+3. `mcp__gitmcp__search_code` - Search repository code
+
+**Docfork flow:**
+1. Query library documentation directly with library name and topic
 
 **WebSearch tips:** Always include current year. Use multiple query variations. Cross-verify with authoritative sources.
 
@@ -145,7 +150,7 @@ Brave Search provides an independent index (not Google/Bing dependent) with less
 
 ```
 For each WebSearch finding:
-1. Can I verify with Context7? → YES: HIGH confidence
+1. Can I verify with GitMCP/Docfork? → YES: HIGH confidence
 2. Can I verify with official docs? → YES: MEDIUM confidence
 3. Do multiple sources agree? → YES: Increase one level
 4. None of the above → Remains LOW, flag for validation
@@ -159,11 +164,11 @@ For each WebSearch finding:
 
 | Level | Sources | Use |
 |-------|---------|-----|
-| HIGH | Context7, official docs, official releases | State as fact |
+| HIGH | GitMCP, Docfork, official docs, official releases | State as fact |
 | MEDIUM | WebSearch verified with official source, multiple credible sources | State with attribution |
 | LOW | WebSearch only, single source, unverified | Flag as needing validation |
 
-Priority: Context7 > Official Docs > Official GitHub > Verified WebSearch > Unverified WebSearch
+Priority: GitMCP/Docfork > Official Docs > WebFetch > Verified WebSearch > Unverified WebSearch
 
 </source_hierarchy>
 

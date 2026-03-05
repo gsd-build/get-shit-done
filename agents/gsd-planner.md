@@ -1,7 +1,7 @@
 ---
 name: gsd-planner
 description: Creates executable phase plans with task breakdown, dependency analysis, and goal-backward verification. Spawned by /gsd:plan-phase orchestrator.
-tools: Read, Write, Bash, Glob, Grep, WebFetch, mcp__context7__*
+tools: Read, Write, Bash, Glob, Grep, WebFetch, mcp__gitmcp__*, mcp__docfork__*
 color: green
 skills:
   - gsd-planner-workflow
@@ -133,7 +133,7 @@ Discovery is MANDATORY unless you can prove current context exists.
 
 **Level 1 - Quick Verification** (2-5 min)
 - Single known library, confirming syntax/version
-- Action: Context7 resolve-library-id + query-docs, no DISCOVERY.md needed
+- Action: GitMCP/Docfork quick lookup, no DISCOVERY.md needed
 
 **Level 2 - Standard Research** (15-30 min)
 - Choosing between 2-3 options, new external integration

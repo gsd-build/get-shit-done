@@ -121,7 +121,7 @@ Phases with standard patterns (skip research-phase):
 ## Sources
 
 ### Primary (HIGH confidence)
-- [Context7 library ID] — [topics]
+- [GitMCP repo path or Docfork library] — [topics]
 - [Official docs URL] — [what was checked]
 
 ### Secondary (MEDIUM confidence)
