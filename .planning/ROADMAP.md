@@ -17,6 +17,7 @@ This roadmap delivers upstream sync tooling for GSD fork maintainers. The journe
 - [x] **Phase 7: Merge Operations** - Atomic merge with rollback and state logging (completed 2026-02-24)
 - [x] **Phase 8: Interactive & Integration** - Deep dive mode, worktree awareness, and health integration (completed 2026-02-24)
 - [ ] **Phase 9: Documentation** - User guide, architecture docs, and troubleshooting
+- [ ] **Phase 10: Parallel Milestones** - Enable parallel milestone execution with scoped phases
 
 ## Phase Details
 
@@ -112,6 +113,25 @@ Plans:
   4. Troubleshooting guide covers common sync issues with recovery steps
 **Plans:** TBD
 
+### Phase 10: Parallel Milestones
+**Goal**: Enable parallel milestone execution with milestone-scoped phases and progress tracking
+**Depends on**: Phase 8 (uses worktree and state patterns)
+**Requirements**: PM-01, PM-02, PM-03, PM-04, PM-05, PM-06, PM-07, PM-08, PM-09, PM-10
+**Success Criteria** (what must be TRUE):
+  1. Multiple milestones can run in parallel with independent phase numbering
+  2. Commands support `M7/01` syntax for milestone-scoped operations
+  3. Progress display shows per-milestone progress bars
+  4. State tracking maintains separate progress per milestone
+  5. Migration tool converts legacy projects to parallel structure
+  6. Existing single-milestone projects work unchanged (backward compatible)
+**Plans:** 0/4 plans
+
+Plans:
+- [ ] 10-01-PLAN.md — Milestone directory structure and core commands
+- [ ] 10-02-PLAN.md — Milestone-scoped workflow commands
+- [ ] 10-03-PLAN.md — Multi-milestone state tracking
+- [ ] 10-04-PLAN.md — Migration tool and backward compatibility
+
 ## Progress
 
 **Execution Order:**
@@ -125,6 +145,7 @@ Phases execute in numeric order: 5 -> 6 -> 6.1 -> 7 -> 8 -> 9
 | 7. Merge Operations | 3/3 | Complete    | 2026-02-24 |
 | 8. Interactive & Integration | 4/4 | Complete | 2026-02-24 |
 | 9. Documentation | 0/? | Not started | - |
+| 10. Parallel Milestones | 0/4 | Not started | - |
 
 ---
 *Roadmap created: 2026-02-23*

@@ -1543,6 +1543,11 @@ async function cmdUpstreamMerge(cwd, options, output, error, raw) {
 
   const commitCount = parseInt(countResult.stdout.trim(), 10);
   if (commitCount === 0) {
+    // Reset cache to reflect up-to-date state
+    config.commits_behind = 0;
+    config.last_fetch = new Date().toISOString();
+    saveUpstreamConfig(cwd, config);
+
     output({
       merged: false,
       reason: 'up_to_date',
@@ -1604,6 +1609,12 @@ async function cmdUpstreamMerge(cwd, options, output, error, raw) {
 
     appendSyncHistoryEntry(cwd, SYNC_EVENTS.MERGE_COMPLETE,
       `${preMergeHead.slice(0, 7)}..${newHead.slice(0, 7)} (${commitCount} commits)`);
+
+    // Reset commits_behind cache since we're now up to date
+    config.commits_behind = 0;
+    config.last_fetch = new Date().toISOString();
+    config.last_upstream_sha = newHead;
+    saveUpstreamConfig(cwd, config);
 
     // Step 10: Run post-merge verification (unless skipped)
     let verification = null;
@@ -1884,6 +1895,10 @@ function cmdUpstreamAnalyze(cwd, options, output, error, raw) {
     const lastFetchDate = upstreamConfig.last_fetch
       ? formatDate(new Date(upstreamConfig.last_fetch))
       : 'never';
+
+    // Reset cache to reflect up-to-date state
+    upstreamConfig.commits_behind = 0;
+    saveUpstreamConfig(cwd, upstreamConfig);
 
     const result = {
       grouped_by: options?.by_feature ? 'feature' : 'directory',
