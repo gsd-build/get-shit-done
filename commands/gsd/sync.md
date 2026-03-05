@@ -89,15 +89,20 @@ If there are no conflicting phases, no conflicting quicks, and no target-only ph
 ## Step 5: Compute new indexes
 
 For conflicting branch-local phases:
-- Sort by current phase number ascending
-- Assign new integers starting at target_max_phase + 1, incrementing by 1
+- Compute `local_max_non_conflicting` = highest integer phase number among non-conflicting branch-local phases (0 if none)
+- Compute `next_available = max(target_max_phase, local_max_non_conflicting) + 1`
+- Sort conflicting phases by current phase number ascending (numerically, not lexicographically)
+- Assign new integers starting at `next_available`, incrementing by 1
 - Non-conflicting branch-local phases are left at their current number
-- Example: target_max = 18, conflicting local phases are 18 and 19
-  → 18-feature-b becomes 19-feature-b
-  → 19-feature-c becomes 20-feature-c
+- Example: target_max = 18, local non-conflicting max = 19, conflicting local phases are 18 and 20
+  → next_available = max(18, 19) + 1 = 20  ← would collide with existing 20, so bump again
+  → actually: next_available = max(18, 19) + 1 = 20, but 20 is also a conflicting phase being renamed,
+     so assign in order: 18 → 20, 20 → 21
+- In short: compute the full rename map first, then verify no assigned number collides with any
+  remaining local phase not in the rename map. If it does, increment further.
 
 For conflicting branch-local quicks:
-- Same logic using target_max_quick
+- Same logic: `next_available = max(target_max_quick, local_max_non_conflicting_quick) + 1`
 
 Build a rename map: `{ old_name: new_name }` for both phases and quicks.
 
@@ -159,8 +164,11 @@ Git will see them as already present → no conflict on those lines.
 For each phase in the rename map (old → new):
 
 1. Rename files inside the directory first. List all files in `.planning/phases/<old_name>/`.
-   For each file whose name starts with the old numeric prefix (e.g. `18-`):
-   - Compute new filename by replacing old prefix with new prefix (e.g. `18-` → `19-`)
+   The old file prefix is the full numeric part of the directory name followed by a hyphen
+   (e.g. directory `18-slug` → prefix `18-`, directory `18.1-slug` → prefix `18.1-`).
+   The new file prefix is the new integer phase number followed by a hyphen (e.g. `19-`).
+   For each file whose name starts with the old file prefix:
+   - Compute new filename by replacing the old prefix with the new prefix
    - Run: `git mv ".planning/phases/<old_name>/<old_file>" ".planning/phases/<old_name>/<new_file>"`
 
 2. Rename the directory:
