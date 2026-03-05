@@ -1,6 +1,6 @@
 ---
 name: gsd:plan-milestone-gaps
-description: Create phases to close all gaps identified by milestone audit
+description: "Generate fix phases for every gap found by the milestone audit report"
 allowed-tools:
   - Read
   - Write

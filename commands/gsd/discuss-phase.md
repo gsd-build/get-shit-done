@@ -1,6 +1,6 @@
 ---
 name: gsd:discuss-phase
-description: Gather phase context through adaptive questioning before planning
+description: "Ask the user targeted questions to gather decisions and context before planning a phase"
 argument-hint: "<phase> [--auto]"
 allowed-tools:
   - Read
@@ -35,6 +35,9 @@ Extract implementation decisions that downstream agents need — researcher and 
 
 <context>
 Phase number: $ARGUMENTS (required)
+
+**Flags:**
+- `--auto` — Auto-advance to next workflow step (plan-phase) without prompting
 
 Context files are resolved in-workflow using `init phase-op` and roadmap/state tool calls.
 </context>

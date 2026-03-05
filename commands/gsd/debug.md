@@ -1,7 +1,7 @@
 ---
 name: gsd:debug
-description: Systematic debugging with persistent state across context resets
-argument-hint: [issue description]
+description: "Investigate a bug using systematic debugging with persistent state across context resets"
+argument-hint: "[issue description]"
 allowed-tools:
   - Read
   - Bash

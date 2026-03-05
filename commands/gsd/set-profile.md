@@ -1,6 +1,6 @@
 ---
 name: gsd:set-profile
-description: Switch model profile for GSD agents (quality/balanced/budget)
+description: "Switch the model profile for GSD subagents between quality, balanced, or budget tiers"
 argument-hint: <profile>
 allowed-tools:
   - Read

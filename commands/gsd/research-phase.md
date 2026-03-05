@@ -1,6 +1,6 @@
 ---
 name: gsd:research-phase
-description: Research how to implement a phase (standalone - usually use /gsd:plan-phase instead)
+description: "Investigate APIs, libraries, and technical patterns for a phase and produce RESEARCH.md"
 argument-hint: "[phase]"
 allowed-tools:
   - Read
