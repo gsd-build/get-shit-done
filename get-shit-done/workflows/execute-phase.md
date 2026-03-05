@@ -422,6 +422,8 @@ STOP. Do not proceed to auto-advance or transition.
 
 **If `--auto` flag present OR `AUTO_CHAIN` is true OR `AUTO_CFG` is true (AND verification passed with no gaps):**
 
+**Auto-chain verify-work:** If `config.workflow.verifier` is true and verification hasn't already run (no VERIFICATION.md), run the automated verification before transitioning. Skip the manual UAT portion — the automated `verify_phase_goal` step already checks that the codebase delivers what the phase promised.
+
 ```
 ╔══════════════════════════════════════════╗
 ║  AUTO-ADVANCING → TRANSITION             ║

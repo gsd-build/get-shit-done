@@ -470,6 +470,7 @@ You're never locked in. The system adapts.
 | `/gsd:discuss-phase [N] [--auto]` | Capture implementation decisions before planning |
 | `/gsd:plan-phase [N] [--auto]` | Research + plan + verify for a phase |
 | `/gsd:execute-phase <N>` | Execute all plans in parallel waves, verify when complete |
+| `/gsd:autopilot [N] [N-N]` | Full pipeline (discuss → plan → execute) for remaining phases |
 | `/gsd:verify-work [N]` | Manual user acceptance testing ¹ |
 | `/gsd:audit-milestone` | Verify milestone achieved its definition of done |
 | `/gsd:complete-milestone` | Archive milestone, tag release |
