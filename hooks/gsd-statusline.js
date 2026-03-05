@@ -120,13 +120,13 @@ process.stdin.on('end', () => {
             } catch (e) {}
 
             if (cache.fork_head_sha && lastSeenSha && cache.fork_head_sha !== lastSeenSha) {
-              gsdUpdate = '\x1b[33m⬆ /gsd:update\x1b[0m │ ';
+              gsdUpdate = '\x1b[38;5;208m⬆ /gsd:update\x1b[0m │ ';
             }
           }
         } else {
           // NPM mode - original behavior
           if (cache.update_available) {
-            gsdUpdate = '\x1b[33m⬆ /gsd:update\x1b[0m │ ';
+            gsdUpdate = '\x1b[38;5;208m⬆ /gsd:update\x1b[0m │ ';
           }
         }
       } catch (e) {}
