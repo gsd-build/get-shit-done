@@ -6,6 +6,10 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ## [Unreleased]
 
+### Fixed
+- `/gsd:new-milestone` no longer overwrites `workflow.research` config — milestone research decision is now per-invocation, persistent preference only changes via `/gsd:settings`
+- `/gsd:health --repair` now creates config.json with correct nested `workflow` structure matching `config-ensure-section` canonical format
+
 ## [1.22.4] - 2026-03-03
 
 ### Added
