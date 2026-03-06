@@ -735,6 +735,48 @@ Can I observe the behavior directly?
 
 </research_vs_reasoning>
 
+<knowledge_base_protocol>
+
+## Purpose
+
+The knowledge base is a persistent, append-only record of resolved debug sessions. It lets future debugging sessions skip straight to high-probability hypotheses when symptoms match a known pattern.
+
+## File Location
+
+```
+.planning/debug/knowledge-base.md
+```
+
+## Entry Format
+
+Each resolved session appends one entry:
+
+```markdown
+## {slug} — {one-line description}
+- **Date:** {ISO date}
+- **Error patterns:** {comma-separated keywords extracted from symptoms.errors and symptoms.actual}
+- **Root cause:** {from Resolution.root_cause}
+- **Fix:** {from Resolution.fix}
+- **Files changed:** {from Resolution.files_changed}
+---
+```
+
+## When to Read
+
+At the **start of `investigation_loop` Phase 0**, before any file reading or hypothesis formation.
+
+## When to Write
+
+At the **end of `archive_session`**, after the session file is moved to `resolved/` and the fix is confirmed by the user.
+
+## Matching Logic
+
+Matching is keyword overlap, not semantic similarity. Extract nouns and error substrings from `Symptoms.errors` and `Symptoms.actual`. Scan each knowledge base entry's `Error patterns` field for overlapping tokens (case-insensitive, 2+ word overlap = candidate match).
+
+**Important:** A match is a **hypothesis candidate**, not a confirmed diagnosis. Surface it in Current Focus and test it first — but do not skip other hypotheses or assume correctness.
+
+</knowledge_base_protocol>
+
 <debug_file_protocol>
 
 ## File Location
@@ -884,6 +926,16 @@ Gather symptoms through questioning. Update file after EACH answer.
 
 <step name="investigation_loop">
 **Autonomous investigation. Update file continuously.**
+
+**Phase 0: Check knowledge base**
+- If `.planning/debug/knowledge-base.md` exists, read it
+- Extract keywords from `Symptoms.errors` and `Symptoms.actual` (nouns, error substrings, identifiers)
+- Scan knowledge base entries for 2+ keyword overlap (case-insensitive)
+- If match found:
+  - Note in Current Focus: `known_pattern_candidate: "{matched slug} — {description}"`
+  - Add to Evidence: `found: Knowledge base match on [{keywords}] → Root cause was: {root_cause}. Fix was: {fix}.`
+  - Test this hypothesis FIRST in Phase 2 — but treat it as one hypothesis, not a certainty
+- If no match: proceed normally
 
 **Phase 1: Initial evidence gathering**
 - Update Current Focus with "gathering initial evidence"
@@ -1056,6 +1108,37 @@ Root cause: {root_cause}"
 Then commit planning docs via CLI (respects `commit_docs` config automatically):
 ```bash
 node "$HOME/.claude/get-shit-done/bin/gsd-tools.cjs" commit "docs: resolve debug {slug}" --files .planning/debug/resolved/{slug}.md
+```
+
+**Append to knowledge base:**
+
+Read `.planning/debug/resolved/{slug}.md` to extract final `Resolution` values. Then append to `.planning/debug/knowledge-base.md` (create file with header if it doesn't exist):
+
+If creating for the first time, write this header first:
+```markdown
+# GSD Debug Knowledge Base
+
+Resolved debug sessions. Used by `gsd-debugger` to surface known-pattern hypotheses at the start of new investigations.
+
+---
+
+```
+
+Then append the entry:
+```markdown
+## {slug} — {one-line description of the bug}
+- **Date:** {ISO date}
+- **Error patterns:** {comma-separated keywords from Symptoms.errors + Symptoms.actual}
+- **Root cause:** {Resolution.root_cause}
+- **Fix:** {Resolution.fix}
+- **Files changed:** {Resolution.files_changed joined as comma list}
+---
+
+```
+
+Commit the knowledge base update alongside the resolved session:
+```bash
+node "$HOME/.claude/get-shit-done/bin/gsd-tools.cjs" commit "docs: update debug knowledge base with {slug}" --files .planning/debug/knowledge-base.md
 ```
 
 Report completion and offer next steps.
