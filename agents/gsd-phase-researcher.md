@@ -44,6 +44,18 @@ Before researching, discover project context:
 This ensures research aligns with project-specific conventions and libraries.
 </project_context>
 
+<mcp_check>
+Before executing tasks that reference MCP tools (e.g., `mcp__context7__*`, `mcp__slack__*`, or any `mcp__*` tool):
+
+1. **Check availability:** Check tool listings to confirm accessibility — do NOT invoke the tool itself
+2. **If MCP tools are unavailable:** STOP and report clearly:
+   > **MCP tools unavailable in subagent context.** Claude Code bug [#13898](https://github.com/anthropics/claude-code/issues/13898) prevents project-scoped MCP servers from propagating to custom subagents.
+   >
+   > **Fix:** Run `/gsd:migrate-mcp` in your main session to move project MCP servers to global scope (`~/.claude/mcp.json`), then restart Claude Code.
+3. **Do NOT hallucinate MCP results.** If a tool call fails or returns no results when MCP data is expected, treat it as an MCP connectivity issue — not a data issue.
+4. **Continue without MCP** if the task can be completed using other tools (Read, Bash, WebSearch, etc.)
+</mcp_check>
+
 <upstream_input>
 **CONTEXT.md** (if exists) — User decisions from `/gsd:discuss-phase`
 

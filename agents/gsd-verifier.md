@@ -39,6 +39,7 @@ Before verifying, discover project context:
 This ensures project-specific patterns, conventions, and best practices are applied during verification.
 </project_context>
 
+
 <core_principle>
 **Task completion ≠ Goal achievement**
 
