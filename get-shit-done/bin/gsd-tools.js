@@ -4172,21 +4172,26 @@ async function cmdHealth(args) {
     } catch {}
   }
 
-  // W009: detect phases with RESEARCH.md but no VALIDATION.md
+  // W009: detect phases with RESEARCH.md containing Validation Architecture but no VALIDATION.md
   const phasesDir = path.join(process.cwd(), '.planning', 'phases');
   try {
     const phaseEntries = fs.readdirSync(phasesDir, { withFileTypes: true });
     for (const e of phaseEntries) {
       if (!e.isDirectory()) continue;
       const phaseFiles = fs.readdirSync(path.join(phasesDir, e.name));
-      const hasResearch = phaseFiles.some(f => f.endsWith('-RESEARCH.md'));
+      const researchFile = phaseFiles.find(f => f.endsWith('-RESEARCH.md'));
       const hasValidation = phaseFiles.some(f => f.endsWith('-VALIDATION.md'));
-      if (hasResearch && !hasValidation) {
-        checks.push({
-          name: `W009: ${e.name} missing VALIDATION`,
-          status: 'WARN',
-          message: `${e.name}: has RESEARCH.md but no VALIDATION.md — run /gsd:validate-phase to retroactively validate`,
-        });
+      if (researchFile && !hasValidation) {
+        try {
+          const researchContent = fs.readFileSync(path.join(phasesDir, e.name, researchFile), 'utf-8');
+          if (researchContent.includes('## Validation Architecture')) {
+            checks.push({
+              name: `W009: ${e.name}`,
+              status: 'WARN',
+              message: `W009: ${e.name} has Validation Architecture in RESEARCH.md but no VALIDATION.md — run /gsd:validate-phase to retroactively validate`,
+            });
+          }
+        } catch {}
       }
     }
   } catch {}
