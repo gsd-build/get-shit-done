@@ -728,10 +728,16 @@ function cmdValidateHealth(cwd, options, raw) {
               commit_docs: true,
               search_gitignored: false,
               branching_strategy: 'none',
-              research: true,
-              plan_checker: true,
-              verifier: true,
+              phase_branch_template: 'gsd/phase-{phase}-{slug}',
+              milestone_branch_template: 'gsd/{milestone}-{slug}',
+              workflow: {
+                research: true,
+                plan_check: true,
+                verifier: true,
+                nyquist_validation: true,
+              },
               parallelization: true,
+              brave_search: false,
             };
             fs.writeFileSync(configPath, JSON.stringify(defaults, null, 2), 'utf-8');
             repairActions.push({ action: repair, success: true, path: 'config.json' });
