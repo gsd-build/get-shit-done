@@ -203,6 +203,7 @@ const MODEL_PROFILES = {
   'gsd-codebase-mapper':      { quality: 'sonnet', balanced: 'haiku', budget: 'haiku', auto: 'haiku'  },
   'gsd-verifier':             { quality: 'sonnet', balanced: 'sonnet', budget: 'haiku', auto: 'sonnet' },
   'gsd-plan-checker':         { quality: 'sonnet', balanced: 'sonnet', budget: 'haiku', auto: 'sonnet' },
+  'gsd-nyquist-auditor':      { quality: 'sonnet', balanced: 'sonnet', budget: 'haiku' },
   'gsd-integration-checker':  { quality: 'sonnet', balanced: 'sonnet', budget: 'haiku', auto: 'sonnet' },
 };
 
@@ -237,6 +238,7 @@ function loadConfig(cwd) {
     plan_checker: true,
     verifier: true,
     parallelization: true,
+    nyquist_validation: true,
     brave_search: false,
   };
 
@@ -270,6 +272,7 @@ function loadConfig(cwd) {
       plan_checker: get('plan_checker', { section: 'workflow', field: 'plan_check' }) ?? defaults.plan_checker,
       verifier: get('verifier', { section: 'workflow', field: 'verifier' }) ?? defaults.verifier,
       parallelization,
+      nyquist_validation: get('nyquist_validation', { section: 'workflow', field: 'nyquist_validation' }) ?? defaults.nyquist_validation,
       brave_search: get('brave_search') ?? defaults.brave_search,
       coordinator_model: get('coordinator_model') ?? null,
     };
@@ -4151,6 +4154,43 @@ async function cmdHealth(args) {
       'Port in use (use --http flag for custom port)'
   });
 
+  // W008: detect absent nyquist_validation key in config.json
+  const repairs = [];
+  const configPath = path.join(process.cwd(), '.planning', 'config.json');
+  if (fs.existsSync(configPath)) {
+    try {
+      const configRaw = fs.readFileSync(configPath, 'utf-8');
+      const configParsed = JSON.parse(configRaw);
+      if (configParsed.workflow && configParsed.workflow.nyquist_validation === undefined) {
+        checks.push({
+          name: 'W008: nyquist_validation config',
+          status: 'WARN',
+          message: 'config.json: workflow.nyquist_validation absent (defaults to enabled but agents may skip). Run with --repair to add key.',
+        });
+        repairs.push('addNyquistKey');
+      }
+    } catch {}
+  }
+
+  // W009: detect phases with RESEARCH.md but no VALIDATION.md
+  const phasesDir = path.join(process.cwd(), '.planning', 'phases');
+  try {
+    const phaseEntries = fs.readdirSync(phasesDir, { withFileTypes: true });
+    for (const e of phaseEntries) {
+      if (!e.isDirectory()) continue;
+      const phaseFiles = fs.readdirSync(path.join(phasesDir, e.name));
+      const hasResearch = phaseFiles.some(f => f.endsWith('-RESEARCH.md'));
+      const hasValidation = phaseFiles.some(f => f.endsWith('-VALIDATION.md'));
+      if (hasResearch && !hasValidation) {
+        checks.push({
+          name: `W009: ${e.name} missing VALIDATION`,
+          status: 'WARN',
+          message: `${e.name}: has RESEARCH.md but no VALIDATION.md — run /gsd:validate-phase to retroactively validate`,
+        });
+      }
+    }
+  } catch {}
+
   // Print results
   let allPass = true;
   checks.forEach(check => {
@@ -4173,6 +4213,30 @@ async function cmdHealth(args) {
   } else {
     console.log('\x1b[31m✗ Some checks failed\x1b[0m\n');
     console.log('See SETUP.md for configuration instructions');
+  }
+
+  // Handle --repair flag
+  if (args.includes('--repair') && repairs.length > 0) {
+    console.log('\nRunning repairs...');
+    for (const repair of repairs) {
+      switch (repair) {
+        case 'addNyquistKey': {
+          if (fs.existsSync(configPath)) {
+            try {
+              const configRaw = fs.readFileSync(configPath, 'utf-8');
+              const configParsed = JSON.parse(configRaw);
+              if (!configParsed.workflow) configParsed.workflow = {};
+              if (configParsed.workflow.nyquist_validation === undefined) {
+                configParsed.workflow.nyquist_validation = true;
+                fs.writeFileSync(configPath, JSON.stringify(configParsed, null, 2), 'utf-8');
+                console.log('  ✓ Added workflow.nyquist_validation = true to config.json');
+              }
+            } catch {}
+          }
+          break;
+        }
+      }
+    }
   }
 }
 
