@@ -402,7 +402,7 @@ Next: Phase [X+1] — [Name]
 ⚡ Auto-continuing: Plan Phase [X+1] in detail
 ```
 
-Exit skill and invoke SlashCommand("/gsd:plan-phase [X+1] --auto")
+Exit skill and invoke SlashCommand("/gsd:plan-phase [X+1] --auto ${GSD_WS}")
 
 **If CONTEXT.md does NOT exist:**
 
@@ -414,7 +414,7 @@ Next: Phase [X+1] — [Name]
 ⚡ Auto-continuing: Discuss Phase [X+1] first
 ```
 
-Exit skill and invoke SlashCommand("/gsd:discuss-phase [X+1] --auto")
+Exit skill and invoke SlashCommand("/gsd:discuss-phase [X+1] --auto ${GSD_WS}")
 
 </if>
 
@@ -431,15 +431,15 @@ Exit skill and invoke SlashCommand("/gsd:discuss-phase [X+1] --auto")
 
 **Phase [X+1]: [Name]** — [Goal from ROADMAP.md]
 
-`/gsd:discuss-phase [X+1]` — gather context and clarify approach
+`/gsd:discuss-phase [X+1] ${GSD_WS}` — gather context and clarify approach
 
 <sub>`/clear` first → fresh context window</sub>
 
 ---
 
 **Also available:**
-- `/gsd:plan-phase [X+1]` — skip discussion, plan directly
-- `/gsd:research-phase [X+1]` — investigate unknowns
+- `/gsd:plan-phase [X+1] ${GSD_WS}` — skip discussion, plan directly
+- `/gsd:research-phase [X+1] ${GSD_WS}` — investigate unknowns
 
 ---
 ```
@@ -456,15 +456,15 @@ Exit skill and invoke SlashCommand("/gsd:discuss-phase [X+1] --auto")
 **Phase [X+1]: [Name]** — [Goal from ROADMAP.md]
 <sub>✓ Context gathered, ready to plan</sub>
 
-`/gsd:plan-phase [X+1]`
+`/gsd:plan-phase [X+1] ${GSD_WS}`
 
 <sub>`/clear` first → fresh context window</sub>
 
 ---
 
 **Also available:**
-- `/gsd:discuss-phase [X+1]` — revisit context
-- `/gsd:research-phase [X+1]` — investigate unknowns
+- `/gsd:discuss-phase [X+1] ${GSD_WS}` — revisit context
+- `/gsd:research-phase [X+1] ${GSD_WS}` — investigate unknowns
 
 ---
 ```

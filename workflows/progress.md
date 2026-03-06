@@ -189,7 +189,7 @@ Read its `<objective>` section.
 
 **{phase}-{plan}: [Plan Name]** — [objective summary from PLAN.md]
 
-`/gsd:execute-phase {phase}`
+`/gsd:execute-phase {phase} ${GSD_WS}`
 
 <sub>`/clear` first → fresh context window</sub>
 
@@ -212,7 +212,7 @@ Check if `{phase_num}-CONTEXT.md` exists in phase directory.
 **Phase {N}: {Name}** — {Goal from ROADMAP.md}
 <sub>✓ Context gathered, ready to plan</sub>
 
-`/gsd:plan-phase {phase-number}`
+`/gsd:plan-phase {phase-number} ${GSD_WS}`
 
 <sub>`/clear` first → fresh context window</sub>
 
@@ -228,15 +228,15 @@ Check if `{phase_num}-CONTEXT.md` exists in phase directory.
 
 **Phase {N}: {Name}** — {Goal from ROADMAP.md}
 
-`/gsd:discuss-phase {phase}` — gather context and clarify approach
+`/gsd:discuss-phase {phase} ${GSD_WS}` — gather context and clarify approach
 
 <sub>`/clear` first → fresh context window</sub>
 
 ---
 
 **Also available:**
-- `/gsd:plan-phase {phase}` — skip discussion, plan directly
-- `/gsd:list-phase-assumptions {phase}` — see Claude's assumptions
+- `/gsd:plan-phase {phase} ${GSD_WS}` — skip discussion, plan directly
+- `/gsd:list-phase-assumptions {phase} ${GSD_WS}` — see Claude's assumptions
 
 ---
 ```
@@ -254,15 +254,15 @@ UAT.md exists with gaps (diagnosed issues). User needs to plan fixes.
 
 **{phase_num}-UAT.md** has {N} gaps requiring fixes.
 
-`/gsd:plan-phase {phase} --gaps`
+`/gsd:plan-phase {phase} --gaps ${GSD_WS}`
 
 <sub>`/clear` first → fresh context window</sub>
 
 ---
 
 **Also available:**
-- `/gsd:execute-phase {phase}` — execute phase plans
-- `/gsd:verify-work {phase}` — run more UAT testing
+- `/gsd:execute-phase {phase} ${GSD_WS}` — execute phase plans
+- `/gsd:verify-work {phase} ${GSD_WS}` — run more UAT testing
 
 ---
 ```
@@ -301,15 +301,15 @@ Read ROADMAP.md to get the next phase's name and goal.
 
 **Phase {Z+1}: {Name}** — {Goal from ROADMAP.md}
 
-`/gsd:discuss-phase {Z+1}` — gather context and clarify approach
+`/gsd:discuss-phase {Z+1} ${GSD_WS}` — gather context and clarify approach
 
 <sub>`/clear` first → fresh context window</sub>
 
 ---
 
 **Also available:**
-- `/gsd:plan-phase {Z+1}` — skip discussion, plan directly
-- `/gsd:verify-work {Z}` — user acceptance test before continuing
+- `/gsd:plan-phase {Z+1} ${GSD_WS}` — skip discussion, plan directly
+- `/gsd:verify-work {Z} ${GSD_WS}` — user acceptance test before continuing
 
 ---
 ```
@@ -336,7 +336,7 @@ All {N} phases finished!
 ---
 
 **Also available:**
-- `/gsd:verify-work` — user acceptance test before completing milestone
+- `/gsd:verify-work ${GSD_WS}` — user acceptance test before completing milestone
 
 ---
 ```

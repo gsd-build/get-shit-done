@@ -37,10 +37,37 @@ When a milestone completes:
 
 <step name="verify_readiness">
 
+```bash
+# Extract --ws flag from arguments
+WS_NAME=""
+GSD_WS=""
+if echo "$ARGUMENTS" | grep -qE '\-\-ws[= ]'; then
+  WS_NAME=$(echo "$ARGUMENTS" | grep -oE '\-\-ws[= ][^ ]+' | sed 's/--ws[= ]//')
+  GSD_WS="--ws $WS_NAME"
+fi
+```
+
+Load context and extract paths:
+
+```bash
+INIT=$(node "$HOME/.claude/get-shit-done/bin/gsd-tools.cjs" init execute-phase "1" ${GSD_WS})
+```
+
+Extract paths from init JSON:
+```bash
+state_path=$(echo "$INIT" | jq -r '.state_path')
+roadmap_path=$(echo "$INIT" | jq -r '.roadmap_path')
+requirements_path=$(echo "$INIT" | jq -r '.requirements_path')
+config_path=$(echo "$INIT" | jq -r '.config_path')
+phases_path=$(echo "$INIT" | jq -r '.phases_path')
+milestones_path=$(echo "$INIT" | jq -r '.milestones_path // empty')
+planning_dir=$(dirname "$state_path")
+```
+
 **Use `roadmap analyze` for comprehensive readiness check:**
 
 ```bash
-ROADMAP=$(node "$HOME/.claude/get-shit-done/bin/gsd-tools.cjs" roadmap analyze)
+ROADMAP=$(node "$HOME/.claude/get-shit-done/bin/gsd-tools.cjs" roadmap analyze ${GSD_WS})
 ```
 
 This returns all phases with plan/summary counts and disk status. Use this to verify:
@@ -50,7 +77,7 @@ This returns all phases with plan/summary counts and disk status. Use this to ve
 
 **Requirements completion check (REQUIRED before presenting):**
 
-Parse REQUIREMENTS.md traceability table:
+Parse ${requirements_path} traceability table:
 - Count total v1 requirements vs checked-off (`[x]`) requirements
 - Identify any non-Complete rows in the traceability table
 
@@ -88,7 +115,7 @@ If user selects "Proceed anyway": note incomplete requirements in MILESTONES.md 
 <config-check>
 
 ```bash
-cat .planning/config.json 2>/dev/null
+cat "${config_path}" 2>/dev/null
 ```
 
 </config-check>
@@ -153,8 +180,8 @@ Extract one-liners from SUMMARY.md files using summary-extract:
 
 ```bash
 # For each phase in milestone, extract one-liner
-for summary in .planning/phases/*-*/*-SUMMARY.md; do
-  node "$HOME/.claude/get-shit-done/bin/gsd-tools.cjs" summary-extract "$summary" --fields one_liner | jq -r '.one_liner'
+for summary in ${phases_path}/*-*/*-SUMMARY.md; do
+  node "$HOME/.claude/get-shit-done/bin/gsd-tools.cjs" summary-extract "$summary" --fields one_liner ${GSD_WS} | jq -r '.one_liner'
 done
 ```
 
@@ -186,7 +213,7 @@ Full PROJECT.md evolution review at milestone completion.
 Read all phase summaries:
 
 ```bash
-cat .planning/phases/*-*/*-SUMMARY.md
+cat ${phases_path}/*-*/*-SUMMARY.md
 ```
 
 **Full review checklist:**
@@ -367,7 +394,7 @@ Update `.planning/ROADMAP.md` — group completed milestone phases:
 **Delegate archival to gsd-tools:**
 
 ```bash
-ARCHIVE=$(node "$HOME/.claude/get-shit-done/bin/gsd-tools.cjs" milestone complete "v[X.Y]" --name "[Milestone Name]")
+ARCHIVE=$(node "$HOME/.claude/get-shit-done/bin/gsd-tools.cjs" milestone complete "v[X.Y]" --name "[Milestone Name]" ${GSD_WS})
 ```
 
 The CLI handles:
@@ -388,9 +415,9 @@ AskUserQuestion(header="Archive Phases", question="Archive phase directories to 
 
 If "Yes": move phase directories to the milestone archive:
 ```bash
-mkdir -p .planning/milestones/v[X.Y]-phases
-# For each phase directory in .planning/phases/:
-mv .planning/phases/{phase-dir} .planning/milestones/v[X.Y]-phases/
+mkdir -p ${planning_dir}/milestones/v[X.Y]-phases
+# For each phase directory in ${phases_path}/:
+mv ${phases_path}/{phase-dir} ${planning_dir}/milestones/v[X.Y]-phases/
 ```
 Verify: `✅ Phase directories archived to .planning/milestones/v[X.Y]-phases/`
 
@@ -432,8 +459,8 @@ After `milestone complete` has archived, reorganize ROADMAP.md with milestone gr
 **Then delete originals:**
 
 ```bash
-rm .planning/ROADMAP.md
-rm .planning/REQUIREMENTS.md
+rm ${roadmap_path}
+rm ${requirements_path}
 ```
 
 </step>
@@ -444,12 +471,12 @@ rm .planning/REQUIREMENTS.md
 
 Check for existing retrospective:
 ```bash
-ls .planning/RETROSPECTIVE.md 2>/dev/null
+ls ${planning_dir}/RETROSPECTIVE.md 2>/dev/null
 ```
 
 **If exists:** Read the file, append new milestone section before the "## Cross-Milestone Trends" section.
 
-**If doesn't exist:** Create from template at `~/.claude/get-shit-done/templates/retrospective.md`.
+**If doesn't exist:** Create from template at `C:/Users/rickw/.claude/get-shit-done/templates/retrospective.md`.
 
 **Gather retrospective data:**
 
@@ -494,7 +521,7 @@ If the "## Cross-Milestone Trends" section exists, update the tables with new da
 
 **Commit:**
 ```bash
-node "$HOME/.claude/get-shit-done/bin/gsd-tools.cjs" commit "docs: update retrospective for v${VERSION}" --files .planning/RETROSPECTIVE.md
+node "$HOME/.claude/get-shit-done/bin/gsd-tools.cjs" commit "docs: update retrospective for v${VERSION}" ${GSD_WS} --files ${planning_dir}/RETROSPECTIVE.md
 ```
 
 </step>
@@ -528,8 +555,7 @@ Check branching strategy and offer merge options.
 Use `init milestone-op` for context, or load config directly:
 
 ```bash
-INIT=$(node "$HOME/.claude/get-shit-done/bin/gsd-tools.cjs" init execute-phase "1")
-if [[ "$INIT" == @file:* ]]; then INIT=$(cat "${INIT#@file:}"); fi
+INIT=$(node "$HOME/.claude/get-shit-done/bin/gsd-tools.cjs" init execute-phase "1" ${GSD_WS})
 ```
 
 Extract `branching_strategy`, `phase_branch_template`, `milestone_branch_template`, and `commit_docs` from init JSON.
@@ -577,9 +603,9 @@ git checkout main
 if [ "$BRANCHING_STRATEGY" = "phase" ]; then
   for branch in $PHASE_BRANCHES; do
     git merge --squash "$branch"
-    # Strip .planning/ from staging if commit_docs is false
+    # Strip planning dir from staging if commit_docs is false
     if [ "$COMMIT_DOCS" = "false" ]; then
-      git reset HEAD .planning/ 2>/dev/null || true
+      git reset HEAD ${planning_dir}/ 2>/dev/null || true
     fi
     git commit -m "feat: $branch for v[X.Y]"
   done
@@ -587,9 +613,9 @@ fi
 
 if [ "$BRANCHING_STRATEGY" = "milestone" ]; then
   git merge --squash "$MILESTONE_BRANCH"
-  # Strip .planning/ from staging if commit_docs is false
+  # Strip planning dir from staging if commit_docs is false
   if [ "$COMMIT_DOCS" = "false" ]; then
-    git reset HEAD .planning/ 2>/dev/null || true
+    git reset HEAD ${planning_dir}/ 2>/dev/null || true
   fi
   git commit -m "feat: $MILESTONE_BRANCH for v[X.Y]"
 fi
@@ -606,9 +632,9 @@ git checkout main
 if [ "$BRANCHING_STRATEGY" = "phase" ]; then
   for branch in $PHASE_BRANCHES; do
     git merge --no-ff --no-commit "$branch"
-    # Strip .planning/ from staging if commit_docs is false
+    # Strip planning dir from staging if commit_docs is false
     if [ "$COMMIT_DOCS" = "false" ]; then
-      git reset HEAD .planning/ 2>/dev/null || true
+      git reset HEAD ${planning_dir}/ 2>/dev/null || true
     fi
     git commit -m "Merge branch '$branch' for v[X.Y]"
   done
@@ -616,9 +642,9 @@ fi
 
 if [ "$BRANCHING_STRATEGY" = "milestone" ]; then
   git merge --no-ff --no-commit "$MILESTONE_BRANCH"
-  # Strip .planning/ from staging if commit_docs is false
+  # Strip planning dir from staging if commit_docs is false
   if [ "$COMMIT_DOCS" = "false" ]; then
-    git reset HEAD .planning/ 2>/dev/null || true
+    git reset HEAD ${planning_dir}/ 2>/dev/null || true
   fi
   git commit -m "Merge branch '$MILESTONE_BRANCH' for v[X.Y]"
 fi
@@ -658,7 +684,7 @@ Key accomplishments:
 - [Item 2]
 - [Item 3]
 
-See .planning/MILESTONES.md for full details."
+See ${planning_dir}/MILESTONES.md for full details."
 ```
 
 Confirm: "Tagged: v[X.Y]"
@@ -677,11 +703,50 @@ git push origin v[X.Y]
 Commit milestone completion.
 
 ```bash
-node "$HOME/.claude/get-shit-done/bin/gsd-tools.cjs" commit "chore: complete v[X.Y] milestone" --files .planning/milestones/v[X.Y]-ROADMAP.md .planning/milestones/v[X.Y]-REQUIREMENTS.md .planning/milestones/v[X.Y]-MILESTONE-AUDIT.md .planning/MILESTONES.md .planning/PROJECT.md .planning/STATE.md
+node "$HOME/.claude/get-shit-done/bin/gsd-tools.cjs" commit "chore: complete v[X.Y] milestone" ${GSD_WS} --files ${planning_dir}/milestones/v[X.Y]-ROADMAP.md ${planning_dir}/milestones/v[X.Y]-REQUIREMENTS.md ${planning_dir}/milestones/v[X.Y]-MILESTONE-AUDIT.md ${planning_dir}/MILESTONES.md ${planning_dir}/PROJECT.md ${state_path}
 ```
 ```
 
 Confirm: "Committed: chore: complete v[X.Y] milestone"
+
+</step>
+
+<step name="complete_workstream">
+
+**If in workstream mode** (`GSD_WS` is set or `.planning/workstreams/` exists):
+
+`WS_NAME` was already parsed from arguments at the top of this workflow. If `WS_NAME` is empty, check active-workstream:
+```bash
+WS_INFO=$(node "$HOME/.claude/get-shit-done/bin/gsd-tools.cjs" workstream get --cwd .)
+```
+Parse `active` from result. Use that as `WS_NAME`.
+
+**If `WS_NAME` is set:**
+
+Note: By this point, `archive_milestone` and `reorganize_roadmap_and_delete_originals` have already archived ROADMAP.md and REQUIREMENTS.md from the workstream directory and deleted the originals. The workstream dir now contains only STATE.md, phases/, and possibly empty dirs.
+
+AskUserQuestion:
+- header: "Clean up WS?"
+- question: "Archive remaining workstream '${WS_NAME}' files and clear active workstream?"
+- options:
+  - "Yes — archive and clean up (Recommended)" — Archive remaining ws files to milestones/, clear active
+  - "No — keep workstream directory" — Leave as-is for manual handling
+
+**If "Yes":**
+
+```bash
+node "$HOME/.claude/get-shit-done/bin/gsd-tools.cjs" workstream complete "${WS_NAME}" --cwd .
+```
+
+Parse result for `completed`, `archived_to`, `remaining_workstreams`, `reverted_to_flat`.
+
+Display:
+```
+Workstream '${WS_NAME}' cleaned up → ${archived_to}
+${reverted_to_flat ? "No workstreams remain — reverted to flat mode" : remaining_workstreams + " workstream(s) still active"}
+```
+
+**If "No":** Continue without cleanup. User can run `workstream complete ${WS_NAME}` later.
 
 </step>
 
@@ -760,5 +825,7 @@ Milestone completion is successful when:
 - [ ] RETROSPECTIVE.md updated with milestone section
 - [ ] Cross-milestone trends updated
 - [ ] User knows next step (/gsd:new-milestone)
+- [ ] If workstream mode: user offered workstream archival
+- [ ] If workstream archived: active workstream cleared, flat revert if last ws
 
 </success_criteria>

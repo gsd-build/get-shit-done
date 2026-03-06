@@ -33,8 +33,15 @@ Exit.
 Load phase operation context:
 
 ```bash
-INIT=$(node "$HOME/.claude/get-shit-done/bin/gsd-tools.cjs" init phase-op "${PHASE_ARG}")
-if [[ "$INIT" == @file:* ]]; then INIT=$(cat "${INIT#@file:}"); fi
+# Extract --ws flag from arguments
+WS_NAME=""
+GSD_WS=""
+if echo "$ARGUMENTS" | grep -qE '\-\-ws[= ]'; then
+  WS_NAME=$(echo "$ARGUMENTS" | grep -oE '\-\-ws[= ][^ ]+' | sed 's/--ws[= ]//')
+  GSD_WS="--ws $WS_NAME"
+fi
+
+INIT=$(node "$HOME/.claude/get-shit-done/bin/gsd-tools.cjs" init phase-op "${PHASE_ARG}" ${GSD_WS})
 ```
 
 Extract from init JSON: `phase_dir`, `phase_number`, `phase_name`.
@@ -297,7 +304,7 @@ Create a test coverage report and present to user:
 
 Record test generation in project state:
 ```bash
-node "$HOME/.claude/get-shit-done/bin/gsd-tools.cjs" state-snapshot
+node "$HOME/.claude/get-shit-done/bin/gsd-tools.cjs" state-snapshot ${GSD_WS}
 ```
 
 If there are passing tests to commit:

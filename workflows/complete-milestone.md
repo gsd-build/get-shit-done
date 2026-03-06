@@ -58,6 +58,10 @@ Extract paths from init JSON:
 state_path=$(echo "$INIT" | jq -r '.state_path')
 roadmap_path=$(echo "$INIT" | jq -r '.roadmap_path')
 requirements_path=$(echo "$INIT" | jq -r '.requirements_path')
+config_path=$(echo "$INIT" | jq -r '.config_path')
+phases_path=$(echo "$INIT" | jq -r '.phases_path')
+milestones_path=$(echo "$INIT" | jq -r '.milestones_path // empty')
+planning_dir=$(dirname "$state_path")
 ```
 
 **Use `roadmap analyze` for comprehensive readiness check:**
@@ -111,7 +115,7 @@ If user selects "Proceed anyway": note incomplete requirements in MILESTONES.md 
 <config-check>
 
 ```bash
-cat .planning/config.json 2>/dev/null
+cat "${config_path}" 2>/dev/null
 ```
 
 </config-check>
@@ -176,7 +180,7 @@ Extract one-liners from SUMMARY.md files using summary-extract:
 
 ```bash
 # For each phase in milestone, extract one-liner
-for summary in .planning/phases/*-*/*-SUMMARY.md; do
+for summary in ${phases_path}/*-*/*-SUMMARY.md; do
   node "$HOME/.claude/get-shit-done/bin/gsd-tools.cjs" summary-extract "$summary" --fields one_liner ${GSD_WS} | jq -r '.one_liner'
 done
 ```
@@ -209,7 +213,7 @@ Full PROJECT.md evolution review at milestone completion.
 Read all phase summaries:
 
 ```bash
-cat .planning/phases/*-*/*-SUMMARY.md
+cat ${phases_path}/*-*/*-SUMMARY.md
 ```
 
 **Full review checklist:**
@@ -411,9 +415,9 @@ AskUserQuestion(header="Archive Phases", question="Archive phase directories to 
 
 If "Yes": move phase directories to the milestone archive:
 ```bash
-mkdir -p .planning/milestones/v[X.Y]-phases
-# For each phase directory in .planning/phases/:
-mv .planning/phases/{phase-dir} .planning/milestones/v[X.Y]-phases/
+mkdir -p ${planning_dir}/milestones/v[X.Y]-phases
+# For each phase directory in ${phases_path}/:
+mv ${phases_path}/{phase-dir} ${planning_dir}/milestones/v[X.Y]-phases/
 ```
 Verify: `✅ Phase directories archived to .planning/milestones/v[X.Y]-phases/`
 
@@ -467,7 +471,7 @@ rm ${requirements_path}
 
 Check for existing retrospective:
 ```bash
-ls .planning/RETROSPECTIVE.md 2>/dev/null
+ls ${planning_dir}/RETROSPECTIVE.md 2>/dev/null
 ```
 
 **If exists:** Read the file, append new milestone section before the "## Cross-Milestone Trends" section.
@@ -517,7 +521,7 @@ If the "## Cross-Milestone Trends" section exists, update the tables with new da
 
 **Commit:**
 ```bash
-node "$HOME/.claude/get-shit-done/bin/gsd-tools.cjs" commit "docs: update retrospective for v${VERSION}" ${GSD_WS} --files .planning/RETROSPECTIVE.md
+node "$HOME/.claude/get-shit-done/bin/gsd-tools.cjs" commit "docs: update retrospective for v${VERSION}" ${GSD_WS} --files ${planning_dir}/RETROSPECTIVE.md
 ```
 
 </step>
@@ -599,9 +603,9 @@ git checkout main
 if [ "$BRANCHING_STRATEGY" = "phase" ]; then
   for branch in $PHASE_BRANCHES; do
     git merge --squash "$branch"
-    # Strip .planning/ from staging if commit_docs is false
+    # Strip planning dir from staging if commit_docs is false
     if [ "$COMMIT_DOCS" = "false" ]; then
-      git reset HEAD .planning/ 2>/dev/null || true
+      git reset HEAD ${planning_dir}/ 2>/dev/null || true
     fi
     git commit -m "feat: $branch for v[X.Y]"
   done
@@ -609,9 +613,9 @@ fi
 
 if [ "$BRANCHING_STRATEGY" = "milestone" ]; then
   git merge --squash "$MILESTONE_BRANCH"
-  # Strip .planning/ from staging if commit_docs is false
+  # Strip planning dir from staging if commit_docs is false
   if [ "$COMMIT_DOCS" = "false" ]; then
-    git reset HEAD .planning/ 2>/dev/null || true
+    git reset HEAD ${planning_dir}/ 2>/dev/null || true
   fi
   git commit -m "feat: $MILESTONE_BRANCH for v[X.Y]"
 fi
@@ -628,9 +632,9 @@ git checkout main
 if [ "$BRANCHING_STRATEGY" = "phase" ]; then
   for branch in $PHASE_BRANCHES; do
     git merge --no-ff --no-commit "$branch"
-    # Strip .planning/ from staging if commit_docs is false
+    # Strip planning dir from staging if commit_docs is false
     if [ "$COMMIT_DOCS" = "false" ]; then
-      git reset HEAD .planning/ 2>/dev/null || true
+      git reset HEAD ${planning_dir}/ 2>/dev/null || true
     fi
     git commit -m "Merge branch '$branch' for v[X.Y]"
   done
@@ -638,9 +642,9 @@ fi
 
 if [ "$BRANCHING_STRATEGY" = "milestone" ]; then
   git merge --no-ff --no-commit "$MILESTONE_BRANCH"
-  # Strip .planning/ from staging if commit_docs is false
+  # Strip planning dir from staging if commit_docs is false
   if [ "$COMMIT_DOCS" = "false" ]; then
-    git reset HEAD .planning/ 2>/dev/null || true
+    git reset HEAD ${planning_dir}/ 2>/dev/null || true
   fi
   git commit -m "Merge branch '$MILESTONE_BRANCH' for v[X.Y]"
 fi
@@ -680,7 +684,7 @@ Key accomplishments:
 - [Item 2]
 - [Item 3]
 
-See .planning/MILESTONES.md for full details."
+See ${planning_dir}/MILESTONES.md for full details."
 ```
 
 Confirm: "Tagged: v[X.Y]"
@@ -699,7 +703,7 @@ git push origin v[X.Y]
 Commit milestone completion.
 
 ```bash
-node "$HOME/.claude/get-shit-done/bin/gsd-tools.cjs" commit "chore: complete v[X.Y] milestone" ${GSD_WS} --files .planning/milestones/v[X.Y]-ROADMAP.md .planning/milestones/v[X.Y]-REQUIREMENTS.md .planning/milestones/v[X.Y]-MILESTONE-AUDIT.md .planning/MILESTONES.md .planning/PROJECT.md ${state_path}
+node "$HOME/.claude/get-shit-done/bin/gsd-tools.cjs" commit "chore: complete v[X.Y] milestone" ${GSD_WS} --files ${planning_dir}/milestones/v[X.Y]-ROADMAP.md ${planning_dir}/milestones/v[X.Y]-REQUIREMENTS.md ${planning_dir}/milestones/v[X.Y]-MILESTONE-AUDIT.md ${planning_dir}/MILESTONES.md ${planning_dir}/PROJECT.md ${state_path}
 ```
 ```
 

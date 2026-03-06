@@ -23,6 +23,20 @@ With diagnosis: "Comment doesn't refresh" → "useEffect missing dependency" →
 
 <process>
 
+<step name="extract_ws">
+Extract workstream flag if present:
+
+```bash
+# Extract --ws flag from arguments
+WS_NAME=""
+GSD_WS=""
+if echo "$ARGUMENTS" | grep -qE '\-\-ws[= ]'; then
+  WS_NAME=$(echo "$ARGUMENTS" | grep -oE '\-\-ws[= ][^ ]+' | sed 's/--ws[= ]//')
+  GSD_WS="--ws $WS_NAME"
+fi
+```
+</step>
+
 <step name="parse_gaps">
 **Extract gaps from UAT.md:**
 
@@ -79,7 +93,7 @@ For each gap, fill the debug-subagent-prompt template and spawn:
 
 ```
 Task(
-  prompt=filled_debug_subagent_prompt + "\n\n<files_to_read>\n- {phase_dir}/{phase_num}-UAT.md\n- .planning/STATE.md\n</files_to_read>",
+  prompt=filled_debug_subagent_prompt + "\n\n<files_to_read>\n- {phase_dir}/{phase_num}-UAT.md\n- {state_path}\n</files_to_read>",
   subagent_type="gsd-debugger",
   description="Debug: {truth_short}"
 )
@@ -158,7 +172,7 @@ Update status in frontmatter to "diagnosed".
 
 Commit the updated UAT.md:
 ```bash
-node "$HOME/.claude/get-shit-done/bin/gsd-tools.cjs" commit "docs({phase_num}): add root causes from diagnosis" --files ".planning/phases/XX-name/{phase_num}-UAT.md"
+node "$HOME/.claude/get-shit-done/bin/gsd-tools.cjs" commit "docs({phase_num}): add root causes from diagnosis" --files "{phase_dir}/{phase_num}-UAT.md" ${GSD_WS}
 ```
 </step>
 

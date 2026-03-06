@@ -26,8 +26,15 @@ Documents are reference material for Claude when planning/executing. Always incl
 Load codebase mapping context:
 
 ```bash
-INIT=$(node "$HOME/.claude/get-shit-done/bin/gsd-tools.cjs" init map-codebase)
-if [[ "$INIT" == @file:* ]]; then INIT=$(cat "${INIT#@file:}"); fi
+# Extract --ws flag from arguments
+WS_NAME=""
+GSD_WS=""
+if echo "$ARGUMENTS" | grep -qE '\-\-ws[= ]'; then
+  WS_NAME=$(echo "$ARGUMENTS" | grep -oE '\-\-ws[= ][^ ]+' | sed 's/--ws[= ]//')
+  GSD_WS="--ws $WS_NAME"
+fi
+
+INIT=$(node "$HOME/.claude/get-shit-done/bin/gsd-tools.cjs" init map-codebase ${GSD_WS})
 ```
 
 Extract from init JSON: `mapper_model`, `commit_docs`, `codebase_dir`, `existing_maps`, `has_maps`, `codebase_dir_exists`.
@@ -251,7 +258,7 @@ Continue to commit_codebase_map.
 Commit the codebase map:
 
 ```bash
-node "$HOME/.claude/get-shit-done/bin/gsd-tools.cjs" commit "docs: map existing codebase" --files .planning/codebase/*.md
+node "$HOME/.claude/get-shit-done/bin/gsd-tools.cjs" commit "docs: map existing codebase" --files .planning/codebase/*.md ${GSD_WS}
 ```
 
 Continue to offer_next.

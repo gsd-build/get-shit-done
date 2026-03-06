@@ -54,7 +54,7 @@ fi
 INIT=$(node "$HOME/.claude/get-shit-done/bin/gsd-tools.cjs" init quick "$DESCRIPTION" ${GSD_WS})
 ```
 
-Parse JSON for: `planner_model`, `executor_model`, `checker_model`, `verifier_model`, `commit_docs`, `next_num`, `slug`, `date`, `timestamp`, `quick_dir`, `task_dir`, `roadmap_exists`, `planning_exists`.
+Parse JSON for: `planner_model`, `executor_model`, `checker_model`, `verifier_model`, `commit_docs`, `next_num`, `slug`, `date`, `timestamp`, `quick_dir`, `task_dir`, `state_path`, `roadmap_exists`, `planning_exists`.
 
 **If `roadmap_exists` is false:** Error — Quick mode requires an active project with ROADMAP.md. Run `/gsd:new-project` first.
 
@@ -105,7 +105,7 @@ Task(
 **Description:** ${DESCRIPTION}
 
 <files_to_read>
-- .planning/STATE.md (Project State)
+- ${state_path} (Project State)
 - ./CLAUDE.md (if exists — follow project-specific guidelines)
 </files_to_read>
 
@@ -258,7 +258,7 @@ Execute quick task ${next_num}.
 
 <files_to_read>
 - ${QUICK_DIR}/${next_num}-PLAN.md (Plan)
-- .planning/STATE.md (Project state)
+- ${state_path} (Project state)
 - ./CLAUDE.md (Project instructions, if exists)
 - .claude/skills/ or .agents/skills/ (Project skills, if either exists — list skills, read SKILL.md for each, follow relevant rules during implementation)
 </files_to_read>
@@ -396,7 +396,7 @@ Stage and commit quick task artifacts:
 Build file list:
 - `${QUICK_DIR}/${next_num}-PLAN.md`
 - `${QUICK_DIR}/${next_num}-SUMMARY.md`
-- `.planning/STATE.md`
+- `${state_path}`
 - If `$FULL_MODE` and verification file exists: `${QUICK_DIR}/${next_num}-VERIFICATION.md`
 
 ```bash
@@ -424,7 +424,7 @@ Commit: ${commit_hash}
 
 ---
 
-Ready for next task: /gsd:quick
+Ready for next task: /gsd:quick ${GSD_WS}
 ```
 
 **If NOT `$FULL_MODE`:**
@@ -440,7 +440,7 @@ Commit: ${commit_hash}
 
 ---
 
-Ready for next task: /gsd:quick
+Ready for next task: /gsd:quick ${GSD_WS}
 ```
 
 </process>

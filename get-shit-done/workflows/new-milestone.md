@@ -12,6 +12,83 @@ Read all files referenced by the invoking prompt's execution_context before star
 
 <process>
 
+## 0. Workstream Detection
+
+**Before anything else, check if an existing milestone is in-flight.**
+
+```bash
+# Check for existing roadmap with incomplete phases
+DETECT_INIT=$(node "$HOME/.claude/get-shit-done/bin/gsd-tools.cjs" init new-milestone 2>/dev/null)
+detect_roadmap_path=$(echo "$DETECT_INIT" | jq -r '.roadmap_path // ".planning/ROADMAP.md"')
+ROADMAP_EXISTS=$(test -f "$detect_roadmap_path" && echo "true" || echo "false")
+WS_MODE=$(test -d .planning/workstreams && echo "true" || echo "false")
+```
+
+**If flat mode (`WS_MODE=false`) AND `ROADMAP_EXISTS=true`:**
+
+Check if current milestone has incomplete phases:
+```bash
+ANALYZE=$(node "$HOME/.claude/get-shit-done/bin/gsd-tools.cjs" roadmap analyze --cwd . 2>/dev/null)
+```
+
+Parse `progress_percent` from result. **If < 100%** (milestone in-flight):
+
+Use AskUserQuestion:
+- header: "Parallel?"
+- question: "An existing milestone is in-flight (${progress_percent}% complete). Run the new milestone in parallel as a workstream?"
+- options:
+  - "Yes — parallel workstreams (Recommended)" — Create workstream for existing + new milestone. Both run side-by-side.
+  - "No — replace current" — Overwrite existing ROADMAP.md/STATE.md/REQUIREMENTS.md (destructive, current as-is behavior)
+
+**If "Yes — parallel workstreams":**
+
+First, gather the milestone name so we can derive the workstream slug:
+
+Ask the user: **"What's the name for this new milestone?"** (plain text response, no AskUserQuestion — just ask and wait).
+
+Then generate the slug:
+```bash
+NEW_WS_SLUG=$(node "$HOME/.claude/get-shit-done/bin/gsd-tools.cjs" generate-slug "${MILESTONE_NAME}")
+```
+
+Now create the workstream (this auto-migrates existing flat files AND auto-sets it as active):
+```bash
+NEW_WS_RESULT=$(node "$HOME/.claude/get-shit-done/bin/gsd-tools.cjs" workstream create "${NEW_WS_SLUG}" --cwd .)
+
+# Update GSD_WS for all subsequent commands
+GSD_WS="--ws ${NEW_WS_SLUG}"
+```
+
+The migration result tells you what name was assigned to the existing milestone's workstream. Display:
+```
+Workstreams created:
+  → ${migrated_ws_name} (existing milestone — migrated)
+  → ${NEW_WS_SLUG} (new milestone — active)
+
+All commands now scoped to: ${NEW_WS_SLUG}
+To switch back: workstream set ${migrated_ws_name}
+```
+
+Save `${MILESTONE_NAME}` — reuse it in Step 3 (Determine Milestone Version) instead of re-asking.
+
+**If "No — replace current":** Continue without workstreams (existing behavior).
+
+**If already in workstream mode (`WS_MODE=true`):**
+
+Ask: **"What's the name for this new milestone?"** (plain text, wait for response).
+
+```bash
+NEW_WS_SLUG=$(node "$HOME/.claude/get-shit-done/bin/gsd-tools.cjs" generate-slug "${MILESTONE_NAME}")
+NEW_WS_RESULT=$(node "$HOME/.claude/get-shit-done/bin/gsd-tools.cjs" workstream create "${NEW_WS_SLUG}" --cwd .)
+GSD_WS="--ws ${NEW_WS_SLUG}"
+```
+
+Display: `New workstream: ${NEW_WS_SLUG} (active)`
+
+Save `${MILESTONE_NAME}` — reuse in Step 3.
+
+**If flat mode AND no roadmap (greenfield):** Skip — no conflict, proceed in flat mode.
+
 ## 1. Load Context
 
 - Read PROJECT.md (existing project, validated requirements, decisions)
@@ -27,9 +104,8 @@ Read all files referenced by the invoking prompt's execution_context before star
 
 **If no context file:**
 - Present what shipped in last milestone
-- Ask inline (freeform, NOT AskUserQuestion): "What do you want to build next?"
-- Wait for their response, then use AskUserQuestion to probe specifics
-- If user selects "Other" at any point to provide freeform input, ask follow-up as plain text — not another AskUserQuestion
+- Ask: "What do you want to build next?"
+- Use AskUserQuestion to explore features, priorities, constraints, scope
 
 ## 3. Determine Milestone Version
 
@@ -72,17 +148,18 @@ Keep Accumulated Context section from previous milestone.
 Delete MILESTONE-CONTEXT.md if exists (consumed).
 
 ```bash
-node "$HOME/.claude/get-shit-done/bin/gsd-tools.cjs" commit "docs: start milestone v[X.Y] [Name]" --files .planning/PROJECT.md .planning/STATE.md
+node "$HOME/.claude/get-shit-done/bin/gsd-tools.cjs" commit "docs: start milestone v[X.Y] [Name]" --files ${project_path} ${state_path} ${GSD_WS}
 ```
 
 ## 7. Load Context and Resolve Models
 
+**Only if `GSD_WS` was not already set by Step 0:** Parse `--ws <name>` from $ARGUMENTS. If present, set `GSD_WS="--ws ${WS_NAME}"`. If not present, set `GSD_WS=""`. Skip this parsing entirely if Step 0 already assigned `GSD_WS`.
+
 ```bash
-INIT=$(node "$HOME/.claude/get-shit-done/bin/gsd-tools.cjs" init new-milestone)
-if [[ "$INIT" == @file:* ]]; then INIT=$(cat "${INIT#@file:}"); fi
+INIT=$(node "$HOME/.claude/get-shit-done/bin/gsd-tools.cjs" init new-milestone ${GSD_WS})
 ```
 
-Extract from init JSON: `researcher_model`, `synthesizer_model`, `roadmapper_model`, `commit_docs`, `research_enabled`, `current_milestone`, `project_exists`, `roadmap_exists`.
+Extract from init JSON: `researcher_model`, `synthesizer_model`, `roadmapper_model`, `commit_docs`, `research_enabled`, `current_milestone`, `project_exists`, `roadmap_exists`, `project_path`, `state_path`, `config_path`, `requirements_path`, `roadmap_path`. Derive `planning_dir` from `$(dirname "$state_path")`. Use these paths instead of hardcoded `.planning/` paths in all subsequent steps.
 
 ## 8. Research Decision
 
@@ -94,10 +171,10 @@ AskUserQuestion: "Research the domain ecosystem for new features before defining
 
 ```bash
 # If "Research first": persist true
-node "$HOME/.claude/get-shit-done/bin/gsd-tools.cjs" config-set workflow.research true
+node "$HOME/.claude/get-shit-done/bin/gsd-tools.cjs" config-set workflow.research true ${GSD_WS}
 
 # If "Skip research": persist false
-node "$HOME/.claude/get-shit-done/bin/gsd-tools.cjs" config-set workflow.research false
+node "$HOME/.claude/get-shit-done/bin/gsd-tools.cjs" config-set workflow.research false ${GSD_WS}
 ```
 
 **If "Research first":**
@@ -112,7 +189,7 @@ node "$HOME/.claude/get-shit-done/bin/gsd-tools.cjs" config-set workflow.researc
 ```
 
 ```bash
-mkdir -p .planning/research
+mkdir -p ${planning_dir}/research
 ```
 
 Spawn 4 parallel gsd-project-researcher agents. Each uses this template with dimension-specific fields:
@@ -131,7 +208,7 @@ Focus ONLY on what's needed for the NEW features.
 <question>{QUESTION}</question>
 
 <files_to_read>
-- .planning/PROJECT.md (Project context)
+- ${project_path} (Project context)
 </files_to_read>
 
 <downstream_consumer>{CONSUMER}</downstream_consumer>
@@ -139,8 +216,8 @@ Focus ONLY on what's needed for the NEW features.
 <quality_gate>{GATES}</quality_gate>
 
 <output>
-Write to: .planning/research/{FILE}
-Use template: ~/.claude/get-shit-done/templates/research-project/{FILE}
+Write to: ${planning_dir}/research/{FILE}
+Use template: C:/Users/rickw/.claude/get-shit-done/templates/research-project/{FILE}
 </output>
 ", subagent_type="gsd-project-researcher", model="{researcher_model}", description="{DIMENSION} research")
 ```
@@ -162,14 +239,14 @@ Task(prompt="
 Synthesize research outputs into SUMMARY.md.
 
 <files_to_read>
-- .planning/research/STACK.md
-- .planning/research/FEATURES.md
-- .planning/research/ARCHITECTURE.md
-- .planning/research/PITFALLS.md
+- ${planning_dir}/research/STACK.md
+- ${planning_dir}/research/FEATURES.md
+- ${planning_dir}/research/ARCHITECTURE.md
+- ${planning_dir}/research/PITFALLS.md
 </files_to_read>
 
-Write to: .planning/research/SUMMARY.md
-Use template: ~/.claude/get-shit-done/templates/research-project/SUMMARY.md
+Write to: ${planning_dir}/research/SUMMARY.md
+Use template: C:/Users/rickw/.claude/get-shit-done/templates/research-project/SUMMARY.md
 Commit after writing.
 ", subagent_type="gsd-research-synthesizer", model="{synthesizer_model}", description="Synthesize research")
 ```
@@ -255,7 +332,7 @@ If "adjust": Return to scoping.
 
 **Commit requirements:**
 ```bash
-node "$HOME/.claude/get-shit-done/bin/gsd-tools.cjs" commit "docs: define milestone v[X.Y] requirements" --files .planning/REQUIREMENTS.md
+node "$HOME/.claude/get-shit-done/bin/gsd-tools.cjs" commit "docs: define milestone v[X.Y] requirements" --files ${requirements_path} ${GSD_WS}
 ```
 
 ## 10. Create Roadmap
@@ -274,11 +351,11 @@ node "$HOME/.claude/get-shit-done/bin/gsd-tools.cjs" commit "docs: define milest
 Task(prompt="
 <planning_context>
 <files_to_read>
-- .planning/PROJECT.md
-- .planning/REQUIREMENTS.md
-- .planning/research/SUMMARY.md (if exists)
-- .planning/config.json
-- .planning/MILESTONES.md
+- ${project_path}
+- ${requirements_path}
+- ${planning_dir}/research/SUMMARY.md (if exists)
+- ${config_path}
+- ${planning_dir}/MILESTONES.md
 </files_to_read>
 </planning_context>
 
@@ -332,7 +409,7 @@ Success criteria:
 
 **Commit roadmap** (after approval):
 ```bash
-node "$HOME/.claude/get-shit-done/bin/gsd-tools.cjs" commit "docs: create milestone v[X.Y] roadmap ([N] phases)" --files .planning/ROADMAP.md .planning/STATE.md .planning/REQUIREMENTS.md
+node "$HOME/.claude/get-shit-done/bin/gsd-tools.cjs" commit "docs: create milestone v[X.Y] roadmap ([N] phases)" --files ${roadmap_path} ${state_path} ${requirements_path} ${GSD_WS}
 ```
 
 ## 11. Done
@@ -346,10 +423,10 @@ node "$HOME/.claude/get-shit-done/bin/gsd-tools.cjs" commit "docs: create milest
 
 | Artifact       | Location                    |
 |----------------|-----------------------------|
-| Project        | `.planning/PROJECT.md`      |
+| Project        | `${project_path}`           |
 | Research       | `.planning/research/`       |
-| Requirements   | `.planning/REQUIREMENTS.md` |
-| Roadmap        | `.planning/ROADMAP.md`      |
+| Requirements   | `${requirements_path}`      |
+| Roadmap        | `${roadmap_path}`           |
 
 **[N] phases** | **[X] requirements** | Ready to build ✓
 
@@ -357,16 +434,18 @@ node "$HOME/.claude/get-shit-done/bin/gsd-tools.cjs" commit "docs: create milest
 
 **Phase [N]: [Phase Name]** — [Goal]
 
-`/gsd:discuss-phase [N]` — gather context and clarify approach
+`/gsd:discuss-phase [N] ${GSD_WS}` — gather context and clarify approach
 
 <sub>`/clear` first → fresh context window</sub>
 
-Also: `/gsd:plan-phase [N]` — skip discussion, plan directly
+Also: `/gsd:plan-phase [N] ${GSD_WS}` — skip discussion, plan directly
 ```
 
 </process>
 
 <success_criteria>
+- [ ] Workstream detection: if existing milestone in-flight, user offered parallel workstreams
+- [ ] If parallel chosen: existing files migrated, new workstream created and set active
 - [ ] PROJECT.md updated with Current Milestone section
 - [ ] STATE.md reset for new milestone
 - [ ] MILESTONE-CONTEXT.md consumed and deleted (if existed)
@@ -379,6 +458,7 @@ Also: `/gsd:plan-phase [N]` — skip discussion, plan directly
 - [ ] ROADMAP.md phases continue from previous milestone
 - [ ] All commits made (if planning docs committed)
 - [ ] User knows next step: `/gsd:discuss-phase [N]`
+- [ ] If workstreams active: display shows workstream paths, switch command
 
 **Atomic commits:** Each phase commits its artifacts immediately.
 </success_criteria>

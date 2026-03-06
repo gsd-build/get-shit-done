@@ -134,7 +134,7 @@ requirements_path=$(echo "$INIT" | jq -r '.requirements_path')
 phase_dir=$(echo "$INIT" | jq -r '.phase_dir')
 ```
 
-Parse JSON for: `commit_docs`, `phase_found`, `phase_dir`, `phase_number`, `phase_name`, `phase_slug`, `padded_phase`, `has_research`, `has_context`, `has_plans`, `has_verification`, `plan_count`, `roadmap_exists`, `planning_exists`.
+Parse JSON for: `commit_docs`, `phase_found`, `phase_dir`, `phase_number`, `phase_name`, `phase_slug`, `padded_phase`, `has_research`, `has_context`, `has_plans`, `has_verification`, `plan_count`, `roadmap_exists`, `planning_exists`, `phases_path`, `state_path`, `roadmap_path`.
 
 **If `phase_found` is false:**
 ```
@@ -463,7 +463,7 @@ Use values from init: `phase_dir`, `phase_slug`, `padded_phase`.
 
 If `phase_dir` is null (phase exists in roadmap but no directory):
 ```bash
-mkdir -p "${phase_dir:-".planning/phases/${padded_phase}-${phase_slug}"}"
+mkdir -p "${phase_dir:-"${phases_path}/${padded_phase}-${phase_slug}"}"
 ```
 
 **File location:** `${phase_dir}/${padded_phase}-CONTEXT.md`
@@ -563,14 +563,14 @@ Created: .planning/phases/${PADDED_PHASE}-${SLUG}/${PADDED_PHASE}-CONTEXT.md
 
 **Phase ${PHASE}: [Name]** — [Goal from ROADMAP.md]
 
-`/gsd:plan-phase ${PHASE}`
+`/gsd:plan-phase ${PHASE} ${GSD_WS}`
 
 <sub>`/clear` first → fresh context window</sub>
 
 ---
 
 **Also available:**
-- `/gsd:plan-phase ${PHASE} --skip-research` — plan without research
+- `/gsd:plan-phase ${PHASE} --skip-research ${GSD_WS}` — plan without research
 - Review/edit CONTEXT.md before continuing
 
 ---
@@ -644,7 +644,7 @@ Task(
 
     <arguments>
     PHASE=${PHASE}
-    ARGUMENTS='${PHASE} --auto'
+    ARGUMENTS='${PHASE} --auto ${GSD_WS}'
     </arguments>
 
     <instructions>
@@ -670,23 +670,23 @@ Task(
 
   Auto-advance pipeline finished: discuss → plan → execute
 
-  Next: /gsd:discuss-phase ${NEXT_PHASE} --auto
+  Next: /gsd:discuss-phase ${NEXT_PHASE} --auto ${GSD_WS}
   <sub>/clear first → fresh context window</sub>
   ```
 - **PLANNING COMPLETE** → Planning done, execution didn't complete:
   ```
   Auto-advance partial: Planning complete, execution did not finish.
-  Continue: /gsd:execute-phase ${PHASE}
+  Continue: /gsd:execute-phase ${PHASE} ${GSD_WS}
   ```
 - **PLANNING INCONCLUSIVE / CHECKPOINT** → Stop chain:
   ```
   Auto-advance stopped: Planning needs input.
-  Continue: /gsd:plan-phase ${PHASE}
+  Continue: /gsd:plan-phase ${PHASE} ${GSD_WS}
   ```
 - **GAPS FOUND** → Stop chain:
   ```
   Auto-advance stopped: Gaps found during execution.
-  Continue: /gsd:plan-phase ${PHASE} --gaps
+  Continue: /gsd:plan-phase ${PHASE} --gaps ${GSD_WS}
   ```
 
 **If neither `--auto` nor config enabled:**

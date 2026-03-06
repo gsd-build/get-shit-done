@@ -57,7 +57,7 @@ fi
 INIT=$(node "$HOME/.claude/get-shit-done/bin/gsd-tools.cjs" init new-project ${GSD_WS})
 ```
 
-Parse JSON for: `researcher_model`, `synthesizer_model`, `roadmapper_model`, `commit_docs`, `project_exists`, `has_codebase_map`, `planning_exists`, `has_existing_code`, `has_package_file`, `is_brownfield`, `needs_codebase_map`, `has_git`, `project_path`.
+Parse JSON for: `researcher_model`, `synthesizer_model`, `roadmapper_model`, `commit_docs`, `project_exists`, `has_codebase_map`, `planning_exists`, `has_existing_code`, `has_package_file`, `is_brownfield`, `needs_codebase_map`, `has_git`, `project_path`, `config_path`, `state_path`, `roadmap_path`, `requirements_path`, `phases_path`.
 
 **If `project_exists` is true:** Error — project already initialized. Use `/gsd:progress`.
 
@@ -196,7 +196,7 @@ Create `.planning/config.json` with mode set to "yolo":
 
 ```bash
 mkdir -p .planning
-node "$HOME/.claude/get-shit-done/bin/gsd-tools.cjs" commit "chore: add project config" --files .planning/config.json ${GSD_WS}
+node "$HOME/.claude/get-shit-done/bin/gsd-tools.cjs" commit "chore: add project config" --files ${config_path} ${GSD_WS}
 ```
 
 **Persist auto-advance to config (survives context compaction):**
@@ -498,7 +498,7 @@ Create `.planning/config.json` with all settings:
 **Commit config.json:**
 
 ```bash
-node "$HOME/.claude/get-shit-done/bin/gsd-tools.cjs" commit "chore: add project config" --files .planning/config.json ${GSD_WS}
+node "$HOME/.claude/get-shit-done/bin/gsd-tools.cjs" commit "chore: add project config" --files ${config_path} ${GSD_WS}
 ```
 
 **Note:** Run `/gsd:settings` anytime to update these preferences.
@@ -895,7 +895,7 @@ If "adjust": Return to scoping.
 **Commit requirements:**
 
 ```bash
-node "$HOME/.claude/get-shit-done/bin/gsd-tools.cjs" commit "docs: define v1 requirements" --files .planning/REQUIREMENTS.md ${GSD_WS}
+node "$HOME/.claude/get-shit-done/bin/gsd-tools.cjs" commit "docs: define v1 requirements" --files ${requirements_path} ${GSD_WS}
 ```
 
 ## 8. Create Roadmap
@@ -916,10 +916,10 @@ Task(prompt="
 <planning_context>
 
 <files_to_read>
-- .planning/PROJECT.md (Project context)
-- .planning/REQUIREMENTS.md (v1 Requirements)
+- {project_path} (Project context)
+- {requirements_path} (v1 Requirements)
 - .planning/research/SUMMARY.md (Research findings - if exists)
-- .planning/config.json (Depth and mode settings)
+- {config_path} (Depth and mode settings)
 </files_to_read>
 
 </planning_context>
@@ -1009,7 +1009,7 @@ Use AskUserQuestion:
   [user's notes]
 
   <files_to_read>
-  - .planning/ROADMAP.md (Current roadmap to revise)
+  - {roadmap_path} (Current roadmap to revise)
   </files_to_read>
 
   Update the roadmap based on feedback. Edit files in place.
@@ -1020,12 +1020,12 @@ Use AskUserQuestion:
 - Present revised roadmap
 - Loop until user approves
 
-**If "Review full file":** Display raw `cat .planning/ROADMAP.md`, then re-ask.
+**If "Review full file":** Display raw `cat ${roadmap_path}`, then re-ask.
 
 **Commit roadmap (after approval or auto mode):**
 
 ```bash
-node "$HOME/.claude/get-shit-done/bin/gsd-tools.cjs" commit "docs: create roadmap ([N] phases)" --files .planning/ROADMAP.md .planning/STATE.md .planning/REQUIREMENTS.md ${GSD_WS}
+node "$HOME/.claude/get-shit-done/bin/gsd-tools.cjs" commit "docs: create roadmap ([N] phases)" --files ${roadmap_path} ${state_path} ${requirements_path} ${GSD_WS}
 ```
 
 ## 9. Done

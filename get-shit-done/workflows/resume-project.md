@@ -11,7 +11,7 @@ Instantly restore full project context so "Where were we?" has an immediate, com
 </purpose>
 
 <required_reading>
-@~/.claude/get-shit-done/references/continuation-format.md
+@C:/Users/rickw/.claude/get-shit-done/references/continuation-format.md
 </required_reading>
 
 <process>
@@ -20,11 +20,18 @@ Instantly restore full project context so "Where were we?" has an immediate, com
 Load all context in one call:
 
 ```bash
-INIT=$(node "$HOME/.claude/get-shit-done/bin/gsd-tools.cjs" init resume)
-if [[ "$INIT" == @file:* ]]; then INIT=$(cat "${INIT#@file:}"); fi
+# Extract --ws flag from arguments
+WS_NAME=""
+GSD_WS=""
+if echo "$ARGUMENTS" | grep -qE '\-\-ws[= ]'; then
+  WS_NAME=$(echo "$ARGUMENTS" | grep -oE '\-\-ws[= ][^ ]+' | sed 's/--ws[= ]//')
+  GSD_WS="--ws $WS_NAME"
+fi
+
+INIT=$(node "$HOME/.claude/get-shit-done/bin/gsd-tools.cjs" init resume ${GSD_WS})
 ```
 
-Parse JSON for: `state_exists`, `roadmap_exists`, `project_exists`, `planning_exists`, `has_interrupted_agent`, `interrupted_agent_id`, `commit_docs`.
+Parse JSON for: `state_exists`, `roadmap_exists`, `project_exists`, `planning_exists`, `has_interrupted_agent`, `interrupted_agent_id`, `commit_docs`, `state_path`, `project_path`, `roadmap_path`, `phases_path`. Derive `planning_dir` from `$(dirname "$state_path")`.
 
 **If `state_exists` is true:** Proceed to load_state
 **If `state_exists` is false but `roadmap_exists` or `project_exists` is true:** Offer to reconstruct STATE.md
@@ -36,8 +43,8 @@ Parse JSON for: `state_exists`, `roadmap_exists`, `project_exists`, `planning_ex
 Read and parse STATE.md, then PROJECT.md:
 
 ```bash
-cat .planning/STATE.md
-cat .planning/PROJECT.md
+cat ${state_path}
+cat ${project_path}
 ```
 
 **From STATE.md extract:**
@@ -64,10 +71,10 @@ Look for incomplete work that needs attention:
 
 ```bash
 # Check for continue-here files (mid-plan resumption)
-ls .planning/phases/*/.continue-here*.md 2>/dev/null
+ls ${phases_path}/*/.continue-here*.md 2>/dev/null
 
 # Check for plans without summaries (incomplete execution)
-for plan in .planning/phases/*/*-PLAN.md; do
+for plan in ${phases_path}/*/*-PLAN.md; do
   summary="${plan/PLAN/SUMMARY}"
   [ ! -f "$summary" ] && echo "Incomplete: $plan"
 done 2>/dev/null
@@ -197,7 +204,7 @@ What would you like to do?
 **Note:** When offering phase planning, check for CONTEXT.md existence first:
 
 ```bash
-ls .planning/phases/XX-name/*-CONTEXT.md 2>/dev/null
+ls ${phases_path}/XX-name/*-CONTEXT.md 2>/dev/null
 ```
 
 If missing, suggest discuss-phase before plan. If exists, offer plan directly.
@@ -216,7 +223,7 @@ Based on user selection, route to appropriate workflow:
 
   **{phase}-{plan}: [Plan Name]** — [objective from PLAN.md]
 
-  `/gsd:execute-phase {phase}`
+  `/gsd:execute-phase {phase} ${GSD_WS}`
 
   <sub>`/clear` first → fresh context window</sub>
 
@@ -230,15 +237,15 @@ Based on user selection, route to appropriate workflow:
 
   **Phase [N]: [Name]** — [Goal from ROADMAP.md]
 
-  `/gsd:plan-phase [phase-number]`
+  `/gsd:plan-phase [phase-number] ${GSD_WS}`
 
   <sub>`/clear` first → fresh context window</sub>
 
   ---
 
   **Also available:**
-  - `/gsd:discuss-phase [N]` — gather context first
-  - `/gsd:research-phase [N]` — investigate unknowns
+  - `/gsd:discuss-phase [N] ${GSD_WS}` — gather context first
+  - `/gsd:research-phase [N] ${GSD_WS}` — investigate unknowns
 
   ---
   ```

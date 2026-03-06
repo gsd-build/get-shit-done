@@ -18,7 +18,9 @@ Read all files referenced by the invoking prompt's execution_context before star
 
 ```bash
 # Check for existing roadmap with incomplete phases
-ROADMAP_EXISTS=$(test -f .planning/ROADMAP.md && echo "true" || echo "false")
+DETECT_INIT=$(node "$HOME/.claude/get-shit-done/bin/gsd-tools.cjs" init new-milestone 2>/dev/null)
+detect_roadmap_path=$(echo "$DETECT_INIT" | jq -r '.roadmap_path // ".planning/ROADMAP.md"')
+ROADMAP_EXISTS=$(test -f "$detect_roadmap_path" && echo "true" || echo "false")
 WS_MODE=$(test -d .planning/workstreams && echo "true" || echo "false")
 ```
 
@@ -157,7 +159,7 @@ node "$HOME/.claude/get-shit-done/bin/gsd-tools.cjs" commit "docs: start milesto
 INIT=$(node "$HOME/.claude/get-shit-done/bin/gsd-tools.cjs" init new-milestone ${GSD_WS})
 ```
 
-Extract from init JSON: `researcher_model`, `synthesizer_model`, `roadmapper_model`, `commit_docs`, `research_enabled`, `current_milestone`, `project_exists`, `roadmap_exists`, `project_path`, `state_path`, `config_path`, `requirements_path`, `roadmap_path`. Use these paths instead of hardcoded `.planning/` paths in all subsequent steps.
+Extract from init JSON: `researcher_model`, `synthesizer_model`, `roadmapper_model`, `commit_docs`, `research_enabled`, `current_milestone`, `project_exists`, `roadmap_exists`, `project_path`, `state_path`, `config_path`, `requirements_path`, `roadmap_path`. Derive `planning_dir` from `$(dirname "$state_path")`. Use these paths instead of hardcoded `.planning/` paths in all subsequent steps.
 
 ## 8. Research Decision
 
@@ -187,7 +189,7 @@ node "$HOME/.claude/get-shit-done/bin/gsd-tools.cjs" config-set workflow.researc
 ```
 
 ```bash
-mkdir -p .planning/research
+mkdir -p ${planning_dir}/research
 ```
 
 Spawn 4 parallel gsd-project-researcher agents. Each uses this template with dimension-specific fields:
@@ -214,7 +216,7 @@ Focus ONLY on what's needed for the NEW features.
 <quality_gate>{GATES}</quality_gate>
 
 <output>
-Write to: .planning/research/{FILE}
+Write to: ${planning_dir}/research/{FILE}
 Use template: C:/Users/rickw/.claude/get-shit-done/templates/research-project/{FILE}
 </output>
 ", subagent_type="gsd-project-researcher", model="{researcher_model}", description="{DIMENSION} research")
@@ -237,13 +239,13 @@ Task(prompt="
 Synthesize research outputs into SUMMARY.md.
 
 <files_to_read>
-- .planning/research/STACK.md
-- .planning/research/FEATURES.md
-- .planning/research/ARCHITECTURE.md
-- .planning/research/PITFALLS.md
+- ${planning_dir}/research/STACK.md
+- ${planning_dir}/research/FEATURES.md
+- ${planning_dir}/research/ARCHITECTURE.md
+- ${planning_dir}/research/PITFALLS.md
 </files_to_read>
 
-Write to: .planning/research/SUMMARY.md
+Write to: ${planning_dir}/research/SUMMARY.md
 Use template: C:/Users/rickw/.claude/get-shit-done/templates/research-project/SUMMARY.md
 Commit after writing.
 ", subagent_type="gsd-research-synthesizer", model="{synthesizer_model}", description="Synthesize research")
@@ -351,9 +353,9 @@ Task(prompt="
 <files_to_read>
 - ${project_path}
 - ${requirements_path}
-- .planning/research/SUMMARY.md (if exists)
+- ${planning_dir}/research/SUMMARY.md (if exists)
 - ${config_path}
-- .planning/MILESTONES.md
+- ${planning_dir}/MILESTONES.md
 </files_to_read>
 </planning_context>
 
@@ -432,11 +434,11 @@ node "$HOME/.claude/get-shit-done/bin/gsd-tools.cjs" commit "docs: create milest
 
 **Phase [N]: [Phase Name]** — [Goal]
 
-`/gsd:discuss-phase [N]` — gather context and clarify approach
+`/gsd:discuss-phase [N] ${GSD_WS}` — gather context and clarify approach
 
 <sub>`/clear` first → fresh context window</sub>
 
-Also: `/gsd:plan-phase [N]` — skip discussion, plan directly
+Also: `/gsd:plan-phase [N] ${GSD_WS}` — skip discussion, plan directly
 ```
 
 </process>

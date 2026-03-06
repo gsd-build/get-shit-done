@@ -29,19 +29,26 @@ Exit.
 Load phase operation context:
 
 ```bash
-INIT=$(node "$HOME/.claude/get-shit-done/bin/gsd-tools.cjs" init phase-op "${target}")
-if [[ "$INIT" == @file:* ]]; then INIT=$(cat "${INIT#@file:}"); fi
+# Extract --ws flag from arguments
+WS_NAME=""
+GSD_WS=""
+if echo "$ARGUMENTS" | grep -qE '\-\-ws[= ]'; then
+  WS_NAME=$(echo "$ARGUMENTS" | grep -oE '\-\-ws[= ][^ ]+' | sed 's/--ws[= ]//')
+  GSD_WS="--ws $WS_NAME"
+fi
+
+INIT=$(node "$HOME/.claude/get-shit-done/bin/gsd-tools.cjs" init phase-op "${target}" $GSD_WS)
 ```
 
-Extract: `phase_found`, `phase_dir`, `phase_number`, `commit_docs`, `roadmap_exists`.
+Extract: `phase_found`, `phase_dir`, `phase_number`, `commit_docs`, `roadmap_exists`, `roadmap_path`, `state_path`.
 
-Also read STATE.md and ROADMAP.md content for parsing current position.
+Also read `${state_path}` and `${roadmap_path}` content for parsing current position.
 </step>
 
 <step name="validate_future_phase">
 Verify the phase is a future phase (not started):
 
-1. Compare target phase to current phase from STATE.md
+1. Compare target phase to current phase from `${state_path}`
 2. Target must be > current phase number
 
 If target <= current phase:
@@ -80,13 +87,13 @@ Wait for confirmation.
 **Delegate the entire removal operation to gsd-tools:**
 
 ```bash
-RESULT=$(node "$HOME/.claude/get-shit-done/bin/gsd-tools.cjs" phase remove "${target}")
+RESULT=$(node "$HOME/.claude/get-shit-done/bin/gsd-tools.cjs" phase remove "${target}" $GSD_WS)
 ```
 
 If the phase has executed plans (SUMMARY.md files), gsd-tools will error. Use `--force` only if the user confirms:
 
 ```bash
-RESULT=$(node "$HOME/.claude/get-shit-done/bin/gsd-tools.cjs" phase remove "${target}" --force)
+RESULT=$(node "$HOME/.claude/get-shit-done/bin/gsd-tools.cjs" phase remove "${target}" --force $GSD_WS)
 ```
 
 The CLI handles:
@@ -103,7 +110,7 @@ Extract from result: `removed`, `directory_deleted`, `renamed_directories`, `ren
 Stage and commit the removal:
 
 ```bash
-node "$HOME/.claude/get-shit-done/bin/gsd-tools.cjs" commit "chore: remove phase {target} ({original-phase-name})" --files .planning/
+node "$HOME/.claude/get-shit-done/bin/gsd-tools.cjs" commit "chore: remove phase {target} ({original-phase-name})" --files .planning/ $GSD_WS
 ```
 
 The commit message preserves the historical record of what was removed.

@@ -6,20 +6,31 @@ Execute a phase prompt (PLAN.md) and create the outcome summary (SUMMARY.md).
 Read STATE.md before any operation to load project context.
 Read config.json for planning behavior settings.
 
-@~/.claude/get-shit-done/references/git-integration.md
+@C:/Users/rickw/.claude/get-shit-done/references/git-integration.md
 </required_reading>
 
 <process>
 
 <step name="init_context" priority="first">
+```bash
+# Extract --ws flag from arguments
+WS_NAME=""
+GSD_WS=""
+if echo "$ARGUMENTS" | grep -qE '\-\-ws[= ]'; then
+  WS_NAME=$(echo "$ARGUMENTS" | grep -oE '\-\-ws[= ][^ ]+' | sed 's/--ws[= ]//')
+  GSD_WS="--ws $WS_NAME"
+fi
+```
+
 Load execution context (paths only to minimize orchestrator context):
 
 ```bash
-INIT=$(node "$HOME/.claude/get-shit-done/bin/gsd-tools.cjs" init execute-phase "${PHASE}")
-if [[ "$INIT" == @file:* ]]; then INIT=$(cat "${INIT#@file:}"); fi
+INIT=$(node "$HOME/.claude/get-shit-done/bin/gsd-tools.cjs" init execute-phase "${PHASE}" ${GSD_WS})
 ```
 
 Extract from init JSON: `executor_model`, `commit_docs`, `phase_dir`, `phase_number`, `plans`, `summaries`, `incomplete_plans`, `state_path`, `config_path`.
+
+Extract paths from init JSON: `state_path`, `config_path`, `roadmap_path`, `requirements_path`, `phase_dir`. Use these instead of hardcoded `.planning/` paths.
 
 If `.planning/` missing: error.
 </step>
@@ -27,8 +38,8 @@ If `.planning/` missing: error.
 <step name="identify_plan">
 ```bash
 # Use plans/summaries from INIT JSON, or list files
-ls .planning/phases/XX-name/*-PLAN.md 2>/dev/null | sort
-ls .planning/phases/XX-name/*-SUMMARY.md 2>/dev/null | sort
+ls ${phase_dir}/*-PLAN.md 2>/dev/null | sort
+ls ${phase_dir}/*-SUMMARY.md 2>/dev/null | sort
 ```
 
 Find first PLAN without matching SUMMARY. Decimal phases supported (`01.1-hotfix/`):
@@ -56,7 +67,7 @@ PLAN_START_EPOCH=$(date +%s)
 
 <step name="parse_segments">
 ```bash
-grep -n "type=\"checkpoint" .planning/phases/XX-name/{phase}-{plan}-PLAN.md
+grep -n "type=\"checkpoint" ${phase_dir}/{phase}-{plan}-PLAN.md
 ```
 
 **Routing by checkpoint type:**
@@ -78,19 +89,21 @@ Fresh context per subagent preserves peak quality. Main context stays lean.
 
 <step name="init_agent_tracking">
 ```bash
-if [ ! -f .planning/agent-history.json ]; then
-  echo '{"version":"1.0","max_entries":50,"entries":[]}' > .planning/agent-history.json
+AGENT_HISTORY="${state_path%/*}/agent-history.json"
+AGENT_ID_FILE="${state_path%/*}/current-agent-id.txt"
+if [ ! -f "$AGENT_HISTORY" ]; then
+  echo '{"version":"1.0","max_entries":50,"entries":[]}' > "$AGENT_HISTORY"
 fi
-rm -f .planning/current-agent-id.txt
-if [ -f .planning/current-agent-id.txt ]; then
-  INTERRUPTED_ID=$(cat .planning/current-agent-id.txt)
+rm -f "$AGENT_ID_FILE"
+if [ -f "$AGENT_ID_FILE" ]; then
+  INTERRUPTED_ID=$(cat "$AGENT_ID_FILE")
   echo "Found interrupted agent: $INTERRUPTED_ID"
 fi
 ```
 
 If interrupted: ask user to resume (Task `resume` parameter) or start fresh.
 
-**Tracking protocol:** On spawn: write agent_id to `current-agent-id.txt`, append to agent-history.json: `{"agent_id":"[id]","task_description":"[desc]","phase":"[phase]","plan":"[plan]","segment":[num|null],"timestamp":"[ISO]","status":"spawned","completion_timestamp":null}`. On completion: status → "completed", set completion_timestamp, delete current-agent-id.txt. Prune: if entries > max_entries, remove oldest "completed" (never "spawned").
+**Tracking protocol:** On spawn: write agent_id to `$AGENT_ID_FILE`, append to `$AGENT_HISTORY`: `{"agent_id":"[id]","task_description":"[desc]","phase":"[phase]","plan":"[plan]","segment":[num|null],"timestamp":"[ISO]","status":"spawned","completion_timestamp":null}`. On completion: status → "completed", set completion_timestamp, delete current-agent-id.txt. Prune: if entries > max_entries, remove oldest "completed" (never "spawned").
 
 Run for Pattern A/B before spawning. Pattern C: skip.
 </step>
@@ -116,7 +129,7 @@ Pattern B only (verify-only checkpoints). Skip for A/C.
 
 <step name="load_prompt">
 ```bash
-cat .planning/phases/XX-name/{phase}-{plan}-PLAN.md
+cat ${phase_dir}/{phase}-{plan}-PLAN.md
 ```
 This IS the execution instructions. Follow exactly. If plan references CONTEXT.md: honor user's vision throughout.
 
@@ -125,7 +138,7 @@ This IS the execution instructions. Follow exactly. If plan references CONTEXT.m
 
 <step name="previous_phase_check">
 ```bash
-node "$HOME/.claude/get-shit-done/bin/gsd-tools.cjs" phases list --type summaries --raw
+node "$HOME/.claude/get-shit-done/bin/gsd-tools.cjs" phases list --type summaries --raw ${GSD_WS}
 # Extract the second-to-last summary from the JSON result
 ```
 If previous SUMMARY has unresolved "Issues Encountered" or "Next Phase Readiness" blockers: AskUserQuestion(header="Previous Issues", options: "Proceed anyway" | "Address first" | "Review previous").
@@ -223,7 +236,7 @@ For `type: tdd` plans — RED-GREEN-REFACTOR:
 
 Errors: RED doesn't fail → investigate test/existing feature. GREEN doesn't pass → debug, iterate. REFACTOR breaks → undo.
 
-See `~/.claude/get-shit-done/references/tdd.md` for structure.
+See `C:/Users/rickw/.claude/get-shit-done/references/tdd.md` for structure.
 </tdd_plan_execution>
 
 <task_commit>
@@ -275,7 +288,7 @@ Display: `CHECKPOINT: [Type]` box → Progress {X}/{Y} → Task name → type-sp
 
 After response: verify if specified. Pass → continue. Fail → inform, wait. WAIT for user — do NOT hallucinate completion.
 
-See ~/.claude/get-shit-done/references/checkpoints.md for details.
+See C:/Users/rickw/.claude/get-shit-done/references/checkpoints.md for details.
 </step>
 
 <step name="checkpoint_return_for_orchestrator">
@@ -310,14 +323,14 @@ fi
 
 <step name="generate_user_setup">
 ```bash
-grep -A 50 "^user_setup:" .planning/phases/XX-name/{phase}-{plan}-PLAN.md | head -50
+grep -A 50 "^user_setup:" ${phase_dir}/{phase}-{plan}-PLAN.md | head -50
 ```
 
-If user_setup exists: create `{phase}-USER-SETUP.md` using template `~/.claude/get-shit-done/templates/user-setup.md`. Per service: env vars table, account setup checklist, dashboard config, local dev notes, verification commands. Status "Incomplete". Set `USER_SETUP_CREATED=true`. If empty/missing: skip.
+If user_setup exists: create `{phase}-USER-SETUP.md` using template `C:/Users/rickw/.claude/get-shit-done/templates/user-setup.md`. Per service: env vars table, account setup checklist, dashboard config, local dev notes, verification commands. Status "Incomplete". Set `USER_SETUP_CREATED=true`. If empty/missing: skip.
 </step>
 
 <step name="create_summary">
-Create `{phase}-{plan}-SUMMARY.md` at `.planning/phases/XX-name/`. Use `~/.claude/get-shit-done/templates/summary.md`.
+Create `{phase}-{plan}-SUMMARY.md` at `${phase_dir}/`. Use `C:/Users/rickw/.claude/get-shit-done/templates/summary.md`.
 
 **Frontmatter:** phase, plan, subsystem, tags | requires/provides/affects | tech-stack.added/patterns | key-files.created/modified | key-decisions | requirements-completed (**MUST** copy `requirements` array from PLAN.md frontmatter verbatim) | duration ($DURATION), completed ($PLAN_END_TIME date).
 
@@ -335,13 +348,13 @@ Update STATE.md using gsd-tools:
 
 ```bash
 # Advance plan counter (handles last-plan edge case)
-node "$HOME/.claude/get-shit-done/bin/gsd-tools.cjs" state advance-plan
+node "$HOME/.claude/get-shit-done/bin/gsd-tools.cjs" state advance-plan ${GSD_WS}
 
 # Recalculate progress bar from disk state
-node "$HOME/.claude/get-shit-done/bin/gsd-tools.cjs" state update-progress
+node "$HOME/.claude/get-shit-done/bin/gsd-tools.cjs" state update-progress ${GSD_WS}
 
 # Record execution metrics
-node "$HOME/.claude/get-shit-done/bin/gsd-tools.cjs" state record-metric \
+node "$HOME/.claude/get-shit-done/bin/gsd-tools.cjs" state record-metric ${GSD_WS} \
   --phase "${PHASE}" --plan "${PLAN}" --duration "${DURATION}" \
   --tasks "${TASK_COUNT}" --files "${FILE_COUNT}"
 ```
@@ -353,11 +366,11 @@ From SUMMARY: Extract decisions and add to STATE.md:
 ```bash
 # Add each decision from SUMMARY key-decisions
 # Prefer file inputs for shell-safe text (preserves `$`, `*`, etc. exactly)
-node "$HOME/.claude/get-shit-done/bin/gsd-tools.cjs" state add-decision \
+node "$HOME/.claude/get-shit-done/bin/gsd-tools.cjs" state add-decision ${GSD_WS} \
   --phase "${PHASE}" --summary-file "${DECISION_TEXT_FILE}" --rationale-file "${RATIONALE_FILE}"
 
 # Add blockers if any found
-node "$HOME/.claude/get-shit-done/bin/gsd-tools.cjs" state add-blocker --text-file "${BLOCKER_TEXT_FILE}"
+node "$HOME/.claude/get-shit-done/bin/gsd-tools.cjs" state add-blocker ${GSD_WS} --text-file "${BLOCKER_TEXT_FILE}"
 ```
 </step>
 
@@ -365,7 +378,7 @@ node "$HOME/.claude/get-shit-done/bin/gsd-tools.cjs" state add-blocker --text-fi
 Update session info using gsd-tools:
 
 ```bash
-node "$HOME/.claude/get-shit-done/bin/gsd-tools.cjs" state record-session \
+node "$HOME/.claude/get-shit-done/bin/gsd-tools.cjs" state record-session ${GSD_WS} \
   --stopped-at "Completed ${PHASE}-${PLAN}-PLAN.md" \
   --resume-file "None"
 ```
@@ -379,7 +392,7 @@ If SUMMARY "Issues Encountered" ≠ "None": yolo → log and continue. Interacti
 
 <step name="update_roadmap">
 ```bash
-node "$HOME/.claude/get-shit-done/bin/gsd-tools.cjs" roadmap update-plan-progress "${PHASE}"
+node "$HOME/.claude/get-shit-done/bin/gsd-tools.cjs" roadmap update-plan-progress "${PHASE}" ${GSD_WS}
 ```
 Counts PLAN vs SUMMARY files on disk. Updates progress table row with correct count and status (`In Progress` or `Complete` with date).
 </step>
@@ -388,7 +401,7 @@ Counts PLAN vs SUMMARY files on disk. Updates progress table row with correct co
 Mark completed requirements from the PLAN.md frontmatter `requirements:` field:
 
 ```bash
-node "$HOME/.claude/get-shit-done/bin/gsd-tools.cjs" requirements mark-complete ${REQ_IDS}
+node "$HOME/.claude/get-shit-done/bin/gsd-tools.cjs" requirements mark-complete ${REQ_IDS} ${GSD_WS}
 ```
 
 Extract requirement IDs from the plan's frontmatter (e.g., `requirements: [AUTH-01, AUTH-02]`). If no requirements field, skip.
@@ -398,7 +411,7 @@ Extract requirement IDs from the plan's frontmatter (e.g., `requirements: [AUTH-
 Task code already committed per-task. Commit plan metadata:
 
 ```bash
-node "$HOME/.claude/get-shit-done/bin/gsd-tools.cjs" commit "docs({phase}-{plan}): complete [plan-name] plan" --files .planning/phases/XX-name/{phase}-{plan}-SUMMARY.md .planning/STATE.md .planning/ROADMAP.md .planning/REQUIREMENTS.md
+node "$HOME/.claude/get-shit-done/bin/gsd-tools.cjs" commit "docs({phase}-{plan}): complete [plan-name] plan" ${GSD_WS} --files ${phase_dir}/{phase}-{plan}-SUMMARY.md ${state_path} ${roadmap_path} ${requirements_path}
 ```
 </step>
 
@@ -413,7 +426,7 @@ git diff --name-only ${FIRST_TASK}^..HEAD 2>/dev/null
 Update only structural changes: new src/ dir → STRUCTURE.md | deps → STACK.md | file pattern → CONVENTIONS.md | API client → INTEGRATIONS.md | config → STACK.md | renamed → update paths. Skip code-only/bugfix/content changes.
 
 ```bash
-node "$HOME/.claude/get-shit-done/bin/gsd-tools.cjs" commit "" --files .planning/codebase/*.md --amend
+node "$HOME/.claude/get-shit-done/bin/gsd-tools.cjs" commit "" ${GSD_WS} --files .planning/codebase/*.md --amend
 ```
 </step>
 
@@ -421,8 +434,8 @@ node "$HOME/.claude/get-shit-done/bin/gsd-tools.cjs" commit "" --files .planning
 If `USER_SETUP_CREATED=true`: display `⚠️ USER SETUP REQUIRED` with path + env/config tasks at TOP.
 
 ```bash
-ls -1 .planning/phases/[current-phase-dir]/*-PLAN.md 2>/dev/null | wc -l
-ls -1 .planning/phases/[current-phase-dir]/*-SUMMARY.md 2>/dev/null | wc -l
+ls -1 ${phase_dir}/*-PLAN.md 2>/dev/null | wc -l
+ls -1 ${phase_dir}/*-SUMMARY.md 2>/dev/null | wc -l
 ```
 
 | Condition | Route | Action |

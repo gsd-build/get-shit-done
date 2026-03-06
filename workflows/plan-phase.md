@@ -30,7 +30,7 @@ INIT=$(node "$HOME/.claude/get-shit-done/bin/gsd-tools.cjs" init plan-phase "$PH
 
 Parse JSON for: `researcher_model`, `planner_model`, `checker_model`, `research_enabled`, `plan_checker_enabled`, `nyquist_validation_enabled`, `commit_docs`, `phase_found`, `phase_dir`, `phase_number`, `phase_name`, `phase_slug`, `padded_phase`, `has_research`, `has_context`, `has_plans`, `plan_count`, `planning_exists`, `roadmap_exists`, `phase_req_ids`.
 
-**File paths (for <files_to_read> blocks):** `state_path`, `roadmap_path`, `requirements_path`, `context_path`, `research_path`, `verification_path`, `uat_path`. These are null if files don't exist. Use these instead of hardcoded `.planning/` paths.
+**File paths (for <files_to_read> blocks):** `state_path`, `roadmap_path`, `requirements_path`, `phases_path`, `context_path`, `research_path`, `verification_path`, `uat_path`. These are null if files don't exist. Use these instead of hardcoded `.planning/` paths.
 
 **If `planning_exists` is false:** Error — run `/gsd:new-project` first.
 
@@ -44,7 +44,7 @@ Extract `--prd <filepath>` from $ARGUMENTS. If present, set PRD_FILE to the file
 
 **If `phase_found` is false:** Validate phase exists in ROADMAP.md. If valid, create the directory using `phase_slug` and `padded_phase` from init:
 ```bash
-mkdir -p "${phase_dir:-".planning/phases/${padded_phase}-${phase_slug}"}"
+mkdir -p "${phase_dir:-"${phases_path}/${padded_phase}-${phase_slug}"}"
 ```
 
 **Existing artifacts from init:** `has_research`, `has_plans`, `plan_count`.
@@ -163,7 +163,7 @@ Use AskUserQuestion:
   - "Run discuss-phase first" — Capture design decisions before planning
 
 If "Continue without context": Proceed to step 5.
-If "Run discuss-phase first": Display `/gsd:discuss-phase {X}` and exit workflow.
+If "Run discuss-phase first": Display `/gsd:discuss-phase {X} ${GSD_WS}` and exit workflow.
 
 ## 5. Handle Research
 
@@ -511,14 +511,14 @@ Task(
 
   Auto-advance pipeline finished.
 
-  Next: /gsd:discuss-phase ${NEXT_PHASE} --auto
+  Next: /gsd:discuss-phase ${NEXT_PHASE} --auto ${GSD_WS}
   ```
 - **GAPS FOUND / VERIFICATION FAILED** → Display result, stop chain:
   ```
   Auto-advance stopped: Execution needs review.
 
   Review the output above and continue manually:
-  /gsd:execute-phase ${PHASE}
+  /gsd:execute-phase ${PHASE} ${GSD_WS}
   ```
 
 **If neither `--auto` nor config enabled:**
@@ -549,7 +549,7 @@ Verification: {Passed | Passed with override | Skipped}
 
 **Execute Phase {X}** — run all {N} plans
 
-/gsd:execute-phase {X}
+/gsd:execute-phase {X} ${GSD_WS}
 
 <sub>/clear first → fresh context window</sub>
 
@@ -557,7 +557,7 @@ Verification: {Passed | Passed with override | Skipped}
 
 **Also available:**
 - cat ${phase_dir}/*-PLAN.md — review plans
-- /gsd:plan-phase {X} --research — re-research first
+- /gsd:plan-phase {X} --research ${GSD_WS} — re-research first
 
 ───────────────────────────────────────────────────────────────
 </offer_next>

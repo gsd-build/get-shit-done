@@ -9,14 +9,23 @@ Read all files referenced by the invoking prompt's execution_context before star
 <process>
 
 <step name="init_context">
+```bash
+# Extract --ws flag from arguments
+WS_NAME=""
+GSD_WS=""
+if echo "$ARGUMENTS" | grep -qE '\-\-ws[= ]'; then
+  WS_NAME=$(echo "$ARGUMENTS" | grep -oE '\-\-ws[= ][^ ]+' | sed 's/--ws[= ]//')
+  GSD_WS="--ws $WS_NAME"
+fi
+```
+
 **Load progress context (paths only):**
 
 ```bash
-INIT=$(node "$HOME/.claude/get-shit-done/bin/gsd-tools.cjs" init progress)
-if [[ "$INIT" == @file:* ]]; then INIT=$(cat "${INIT#@file:}"); fi
+INIT=$(node "$HOME/.claude/get-shit-done/bin/gsd-tools.cjs" init progress ${GSD_WS})
 ```
 
-Extract from init JSON: `project_exists`, `roadmap_exists`, `state_exists`, `phases`, `current_phase`, `next_phase`, `milestone_version`, `completed_count`, `phase_count`, `paused_at`, `state_path`, `roadmap_path`, `project_path`, `config_path`.
+Extract from init JSON: `project_exists`, `roadmap_exists`, `state_exists`, `phases`, `current_phase`, `next_phase`, `milestone_version`, `completed_count`, `phase_count`, `paused_at`, `state_path`, `roadmap_path`, `project_path`, `config_path`. Use these paths instead of hardcoded `.planning/` references.
 
 If `project_exists` is false (no `.planning/` directory):
 
@@ -41,8 +50,8 @@ If missing both ROADMAP.md and PROJECT.md: suggest `/gsd:new-project`.
 **Use structured extraction from gsd-tools:**
 
 Instead of reading full files, use targeted tools to get only the data needed for the report:
-- `ROADMAP=$(node "$HOME/.claude/get-shit-done/bin/gsd-tools.cjs" roadmap analyze)`
-- `STATE=$(node "$HOME/.claude/get-shit-done/bin/gsd-tools.cjs" state-snapshot)`
+- `ROADMAP=$(node "$HOME/.claude/get-shit-done/bin/gsd-tools.cjs" roadmap analyze ${GSD_WS})`
+- `STATE=$(node "$HOME/.claude/get-shit-done/bin/gsd-tools.cjs" state-snapshot ${GSD_WS})`
 
 This minimizes orchestrator context usage.
 </step>
@@ -51,7 +60,7 @@ This minimizes orchestrator context usage.
 **Get comprehensive roadmap analysis (replaces manual parsing):**
 
 ```bash
-ROADMAP=$(node "$HOME/.claude/get-shit-done/bin/gsd-tools.cjs" roadmap analyze)
+ROADMAP=$(node "$HOME/.claude/get-shit-done/bin/gsd-tools.cjs" roadmap analyze ${GSD_WS})
 ```
 
 This returns structured JSON with:
@@ -70,7 +79,7 @@ Use this instead of manually reading/parsing ROADMAP.md.
 - Find the 2-3 most recent SUMMARY.md files
 - Use `summary-extract` for efficient parsing:
   ```bash
-  node "$HOME/.claude/get-shit-done/bin/gsd-tools.cjs" summary-extract <path> --fields one_liner
+  node "$HOME/.claude/get-shit-done/bin/gsd-tools.cjs" summary-extract <path> --fields one_liner ${GSD_WS}
   ```
 - This shows "what we've been working on"
   </step>
@@ -89,7 +98,7 @@ Use this instead of manually reading/parsing ROADMAP.md.
 
 ```bash
 # Get formatted progress bar
-PROGRESS_BAR=$(node "$HOME/.claude/get-shit-done/bin/gsd-tools.cjs" progress bar --raw)
+PROGRESS_BAR=$(node "$HOME/.claude/get-shit-done/bin/gsd-tools.cjs" progress bar --raw ${GSD_WS})
 ```
 
 Present:
@@ -138,9 +147,9 @@ CONTEXT: [✓ if has_context | - if not]
 List files in the current phase directory:
 
 ```bash
-ls -1 .planning/phases/[current-phase-dir]/*-PLAN.md 2>/dev/null | wc -l
-ls -1 .planning/phases/[current-phase-dir]/*-SUMMARY.md 2>/dev/null | wc -l
-ls -1 .planning/phases/[current-phase-dir]/*-UAT.md 2>/dev/null | wc -l
+ls -1 ${phase_dir}/*-PLAN.md 2>/dev/null | wc -l
+ls -1 ${phase_dir}/*-SUMMARY.md 2>/dev/null | wc -l
+ls -1 ${phase_dir}/*-UAT.md 2>/dev/null | wc -l
 ```
 
 State: "This phase has {X} plans, {Y} summaries."
@@ -151,7 +160,7 @@ Check for UAT.md files with status "diagnosed" (has gaps needing fixes).
 
 ```bash
 # Check for diagnosed UAT with gaps
-grep -l "status: diagnosed" .planning/phases/[current-phase-dir]/*-UAT.md 2>/dev/null
+grep -l "status: diagnosed" ${phase_dir}/*-UAT.md 2>/dev/null
 ```
 
 Track:
@@ -180,7 +189,7 @@ Read its `<objective>` section.
 
 **{phase}-{plan}: [Plan Name]** — [objective summary from PLAN.md]
 
-`/gsd:execute-phase {phase}`
+`/gsd:execute-phase {phase} ${GSD_WS}`
 
 <sub>`/clear` first → fresh context window</sub>
 
@@ -203,7 +212,7 @@ Check if `{phase_num}-CONTEXT.md` exists in phase directory.
 **Phase {N}: {Name}** — {Goal from ROADMAP.md}
 <sub>✓ Context gathered, ready to plan</sub>
 
-`/gsd:plan-phase {phase-number}`
+`/gsd:plan-phase {phase-number} ${GSD_WS}`
 
 <sub>`/clear` first → fresh context window</sub>
 
@@ -219,15 +228,15 @@ Check if `{phase_num}-CONTEXT.md` exists in phase directory.
 
 **Phase {N}: {Name}** — {Goal from ROADMAP.md}
 
-`/gsd:discuss-phase {phase}` — gather context and clarify approach
+`/gsd:discuss-phase {phase} ${GSD_WS}` — gather context and clarify approach
 
 <sub>`/clear` first → fresh context window</sub>
 
 ---
 
 **Also available:**
-- `/gsd:plan-phase {phase}` — skip discussion, plan directly
-- `/gsd:list-phase-assumptions {phase}` — see Claude's assumptions
+- `/gsd:plan-phase {phase} ${GSD_WS}` — skip discussion, plan directly
+- `/gsd:list-phase-assumptions {phase} ${GSD_WS}` — see Claude's assumptions
 
 ---
 ```
@@ -245,15 +254,15 @@ UAT.md exists with gaps (diagnosed issues). User needs to plan fixes.
 
 **{phase_num}-UAT.md** has {N} gaps requiring fixes.
 
-`/gsd:plan-phase {phase} --gaps`
+`/gsd:plan-phase {phase} --gaps ${GSD_WS}`
 
 <sub>`/clear` first → fresh context window</sub>
 
 ---
 
 **Also available:**
-- `/gsd:execute-phase {phase}` — execute phase plans
-- `/gsd:verify-work {phase}` — run more UAT testing
+- `/gsd:execute-phase {phase} ${GSD_WS}` — execute phase plans
+- `/gsd:verify-work {phase} ${GSD_WS}` — run more UAT testing
 
 ---
 ```
@@ -292,15 +301,15 @@ Read ROADMAP.md to get the next phase's name and goal.
 
 **Phase {Z+1}: {Name}** — {Goal from ROADMAP.md}
 
-`/gsd:discuss-phase {Z+1}` — gather context and clarify approach
+`/gsd:discuss-phase {Z+1} ${GSD_WS}` — gather context and clarify approach
 
 <sub>`/clear` first → fresh context window</sub>
 
 ---
 
 **Also available:**
-- `/gsd:plan-phase {Z+1}` — skip discussion, plan directly
-- `/gsd:verify-work {Z}` — user acceptance test before continuing
+- `/gsd:plan-phase {Z+1} ${GSD_WS}` — skip discussion, plan directly
+- `/gsd:verify-work {Z} ${GSD_WS}` — user acceptance test before continuing
 
 ---
 ```
@@ -327,7 +336,7 @@ All {N} phases finished!
 ---
 
 **Also available:**
-- `/gsd:verify-work` — user acceptance test before completing milestone
+- `/gsd:verify-work ${GSD_WS}` — user acceptance test before completing milestone
 
 ---
 ```

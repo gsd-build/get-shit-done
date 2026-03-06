@@ -113,11 +113,28 @@ Phase: "API documentation"
 Phase number from argument (required).
 
 ```bash
-INIT=$(node "$HOME/.claude/get-shit-done/bin/gsd-tools.cjs" init phase-op "${PHASE}")
-if [[ "$INIT" == @file:* ]]; then INIT=$(cat "${INIT#@file:}"); fi
+# Extract --ws flag from arguments
+WS_NAME=""
+GSD_WS=""
+if echo "$ARGUMENTS" | grep -qE '\-\-ws[= ]'; then
+  WS_NAME=$(echo "$ARGUMENTS" | grep -oE '\-\-ws[= ][^ ]+' | sed 's/--ws[= ]//')
+  GSD_WS="--ws $WS_NAME"
+fi
 ```
 
-Parse JSON for: `commit_docs`, `phase_found`, `phase_dir`, `phase_number`, `phase_name`, `phase_slug`, `padded_phase`, `has_research`, `has_context`, `has_plans`, `has_verification`, `plan_count`, `roadmap_exists`, `planning_exists`.
+```bash
+INIT=$(node "$HOME/.claude/get-shit-done/bin/gsd-tools.cjs" init phase-op "${PHASE}" ${GSD_WS})
+```
+
+Extract paths from init JSON:
+```bash
+state_path=$(echo "$INIT" | jq -r '.state_path')
+roadmap_path=$(echo "$INIT" | jq -r '.roadmap_path')
+requirements_path=$(echo "$INIT" | jq -r '.requirements_path')
+phase_dir=$(echo "$INIT" | jq -r '.phase_dir')
+```
+
+Parse JSON for: `commit_docs`, `phase_found`, `phase_dir`, `phase_number`, `phase_name`, `phase_slug`, `padded_phase`, `has_research`, `has_context`, `has_plans`, `has_verification`, `plan_count`, `roadmap_exists`, `planning_exists`, `phases_path`, `state_path`, `roadmap_path`.
 
 **If `phase_found` is false:**
 ```
@@ -176,8 +193,8 @@ Read project-level and prior phase context to avoid re-asking decided questions 
 ```bash
 # Core project files
 cat .planning/PROJECT.md 2>/dev/null
-cat .planning/REQUIREMENTS.md 2>/dev/null
-cat .planning/STATE.md 2>/dev/null
+cat ${requirements_path} 2>/dev/null
+cat ${state_path} 2>/dev/null
 ```
 
 Extract from these:
@@ -423,7 +440,7 @@ Ask 4 questions per area before offering to continue or move on. Each answer oft
 **Question design:**
 - Options should be concrete, not abstract ("Cards" not "Option A")
 - Each answer should inform the next question
-- If user picks "Other" to provide freeform input (e.g., "let me describe it", "something else", or an open-ended reply), ask your follow-up as plain text — NOT another AskUserQuestion. Wait for them to type at the normal prompt, then reflect their input back and confirm before resuming AskUserQuestion for the next question.
+- If user picks "Other", receive their input, reflect it back, confirm
 
 **Scope creep handling:**
 If user mentions something outside the phase domain:
@@ -446,7 +463,7 @@ Use values from init: `phase_dir`, `phase_slug`, `padded_phase`.
 
 If `phase_dir` is null (phase exists in roadmap but no directory):
 ```bash
-mkdir -p ".planning/phases/${padded_phase}-${phase_slug}"
+mkdir -p "${phase_dir:-"${phases_path}/${padded_phase}-${phase_slug}"}"
 ```
 
 **File location:** `${phase_dir}/${padded_phase}-CONTEXT.md`
@@ -546,14 +563,14 @@ Created: .planning/phases/${PADDED_PHASE}-${SLUG}/${PADDED_PHASE}-CONTEXT.md
 
 **Phase ${PHASE}: [Name]** — [Goal from ROADMAP.md]
 
-`/gsd:plan-phase ${PHASE}`
+`/gsd:plan-phase ${PHASE} ${GSD_WS}`
 
 <sub>`/clear` first → fresh context window</sub>
 
 ---
 
 **Also available:**
-- `/gsd:plan-phase ${PHASE} --skip-research` — plan without research
+- `/gsd:plan-phase ${PHASE} --skip-research ${GSD_WS}` — plan without research
 - Review/edit CONTEXT.md before continuing
 
 ---
@@ -564,7 +581,7 @@ Created: .planning/phases/${PADDED_PHASE}-${SLUG}/${PADDED_PHASE}-CONTEXT.md
 Commit phase context (uses `commit_docs` from init internally):
 
 ```bash
-node "$HOME/.claude/get-shit-done/bin/gsd-tools.cjs" commit "docs(${padded_phase}): capture phase context" --files "${phase_dir}/${padded_phase}-CONTEXT.md"
+node "$HOME/.claude/get-shit-done/bin/gsd-tools.cjs" commit "docs(${padded_phase}): capture phase context" ${GSD_WS} --files "${phase_dir}/${padded_phase}-CONTEXT.md"
 ```
 
 Confirm: "Committed: docs(${padded_phase}): capture phase context"
@@ -574,7 +591,7 @@ Confirm: "Committed: docs(${padded_phase}): capture phase context"
 Update STATE.md with session info:
 
 ```bash
-node "$HOME/.claude/get-shit-done/bin/gsd-tools.cjs" state record-session \
+node "$HOME/.claude/get-shit-done/bin/gsd-tools.cjs" state record-session ${GSD_WS} \
   --stopped-at "Phase ${PHASE} context gathered" \
   --resume-file "${phase_dir}/${padded_phase}-CONTEXT.md"
 ```
@@ -582,7 +599,7 @@ node "$HOME/.claude/get-shit-done/bin/gsd-tools.cjs" state record-session \
 Commit STATE.md:
 
 ```bash
-node "$HOME/.claude/get-shit-done/bin/gsd-tools.cjs" commit "docs(state): record phase ${PHASE} context session" --files .planning/STATE.md
+node "$HOME/.claude/get-shit-done/bin/gsd-tools.cjs" commit "docs(state): record phase ${PHASE} context session" ${GSD_WS} --files ${state_path}
 ```
 </step>
 
@@ -590,24 +607,17 @@ node "$HOME/.claude/get-shit-done/bin/gsd-tools.cjs" commit "docs(state): record
 Check for auto-advance trigger:
 
 1. Parse `--auto` flag from $ARGUMENTS
-2. **Sync chain flag with intent** — if user invoked manually (no `--auto`), clear the ephemeral chain flag from any previous interrupted `--auto` chain. This does NOT touch `workflow.auto_advance` (the user's persistent settings preference):
+2. Read `workflow.auto_advance` from config:
    ```bash
-   if [[ ! "$ARGUMENTS" =~ --auto ]]; then
-     node "$HOME/.claude/get-shit-done/bin/gsd-tools.cjs" config-set workflow._auto_chain_active false 2>/dev/null
-   fi
-   ```
-3. Read both the chain flag and user preference:
-   ```bash
-   AUTO_CHAIN=$(node "$HOME/.claude/get-shit-done/bin/gsd-tools.cjs" config-get workflow._auto_chain_active 2>/dev/null || echo "false")
-   AUTO_CFG=$(node "$HOME/.claude/get-shit-done/bin/gsd-tools.cjs" config-get workflow.auto_advance 2>/dev/null || echo "false")
+   AUTO_CFG=$(node "$HOME/.claude/get-shit-done/bin/gsd-tools.cjs" config-get workflow.auto_advance ${GSD_WS} 2>/dev/null || echo "false")
    ```
 
-**If `--auto` flag present AND `AUTO_CHAIN` is not true:** Persist chain flag to config (handles direct `--auto` usage without new-project):
+**If `--auto` flag present AND `AUTO_CFG` is not true:** Persist auto-advance to config (handles direct `--auto` usage without new-project):
 ```bash
-node "$HOME/.claude/get-shit-done/bin/gsd-tools.cjs" config-set workflow._auto_chain_active true
+node "$HOME/.claude/get-shit-done/bin/gsd-tools.cjs" config-set workflow.auto_advance true ${GSD_WS}
 ```
 
-**If `--auto` flag present OR `AUTO_CHAIN` is true OR `AUTO_CFG` is true:**
+**If `--auto` flag present OR `AUTO_CFG` is true:**
 
 Display banner:
 ```
@@ -615,15 +625,41 @@ Display banner:
  GSD ► AUTO-ADVANCING TO PLAN
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
-Context captured. Launching plan-phase...
+Context captured. Spawning plan-phase...
 ```
 
-Launch plan-phase using the Skill tool to avoid nested Task sessions (which cause runtime freezes due to deep agent nesting — see #686):
+Spawn plan-phase as Task with direct workflow file reference (do NOT use Skill tool — Skills don't resolve inside Task subagents):
 ```
-Skill(skill="gsd:plan-phase", args="${PHASE} --auto")
-```
+Task(
+  prompt="
+    <objective>
+    You are the plan-phase orchestrator. Create executable plans for Phase ${PHASE}: ${PHASE_NAME}, then auto-advance to execution.
+    </objective>
 
-This keeps the auto-advance chain flat — discuss, plan, and execute all run at the same nesting level rather than spawning increasingly deep Task agents.
+    <execution_context>
+    @C:/Users/rickw/.claude/get-shit-done/workflows/plan-phase.md
+    @C:/Users/rickw/.claude/get-shit-done/references/ui-brand.md
+    @C:/Users/rickw/.claude/get-shit-done/references/model-profile-resolution.md
+    </execution_context>
+
+    <arguments>
+    PHASE=${PHASE}
+    ARGUMENTS='${PHASE} --auto ${GSD_WS}'
+    </arguments>
+
+    <instructions>
+    1. Read plan-phase.md from execution_context for your complete workflow
+    2. Follow ALL steps: initialize, validate, load context, research, plan, verify, auto-advance
+    3. When spawning agents (gsd-phase-researcher, gsd-planner, gsd-plan-checker), use Task with specified subagent_type and model
+    4. For step 14 (auto-advance to execute): spawn execute-phase as a Task with DIRECT file reference — tell it to read execute-phase.md. Include @file refs to execute-phase.md, checkpoints.md, tdd.md, model-profile-resolution.md. Pass --no-transition flag so execute-phase returns results instead of chaining further.
+    5. Do NOT use the Skill tool or /gsd: commands. Read workflow .md files directly.
+    6. Return: PHASE COMPLETE (full pipeline success), PLANNING COMPLETE (planning done but execute failed/skipped), PLANNING INCONCLUSIVE, or GAPS FOUND
+    </instructions>
+  ",
+  subagent_type="general-purpose",
+  description="Plan Phase ${PHASE}"
+)
+```
 
 **Handle plan-phase return:**
 - **PHASE COMPLETE** → Full chain succeeded. Display:
@@ -634,23 +670,23 @@ This keeps the auto-advance chain flat — discuss, plan, and execute all run at
 
   Auto-advance pipeline finished: discuss → plan → execute
 
-  Next: /gsd:discuss-phase ${NEXT_PHASE} --auto
+  Next: /gsd:discuss-phase ${NEXT_PHASE} --auto ${GSD_WS}
   <sub>/clear first → fresh context window</sub>
   ```
 - **PLANNING COMPLETE** → Planning done, execution didn't complete:
   ```
   Auto-advance partial: Planning complete, execution did not finish.
-  Continue: /gsd:execute-phase ${PHASE}
+  Continue: /gsd:execute-phase ${PHASE} ${GSD_WS}
   ```
 - **PLANNING INCONCLUSIVE / CHECKPOINT** → Stop chain:
   ```
   Auto-advance stopped: Planning needs input.
-  Continue: /gsd:plan-phase ${PHASE}
+  Continue: /gsd:plan-phase ${PHASE} ${GSD_WS}
   ```
 - **GAPS FOUND** → Stop chain:
   ```
   Auto-advance stopped: Gaps found during execution.
-  Continue: /gsd:plan-phase ${PHASE} --gaps
+  Continue: /gsd:plan-phase ${PHASE} --gaps ${GSD_WS}
   ```
 
 **If neither `--auto` nor config enabled:**
