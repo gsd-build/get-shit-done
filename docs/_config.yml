@@ -1,0 +1,37 @@
+title: GSD - Get Shit Done
+description: A meta-prompting system for Claude Code that actually ships software
+url: "https://getshitdone.dev"
+baseurl: ""
+
+# Build
+plugins: []
+
+# Navigation
+nav:
+  - title: Home
+    url: /
+  - title: How It Works
+    url: /how-it-works
+  - title: Getting Started
+    url: /getting-started
+  - title: Commands
+    url: /commands
+  - title: Philosophy
+    url: /philosophy
+
+# Defaults
+defaults:
+  - scope:
+      path: ""
+    values:
+      layout: default
+
+# Build settings
+markdown: kramdown
+highlighter: rouge
+
+# Exclude from build
+exclude:
+  - Gemfile
+  - Gemfile.lock
+  - README.md

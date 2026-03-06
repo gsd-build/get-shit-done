@@ -8,6 +8,9 @@ commands.html
 # Local test installs
 .claude/
 
+# Documentation site build output
+docs/_site/
+
 # Build artifacts (committed to npm, not git)
 hooks/dist/
 
