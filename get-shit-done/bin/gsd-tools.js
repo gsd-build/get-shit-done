@@ -6014,7 +6014,7 @@ async function cmdPhaseArchive(phaseNum, raw) {
   }
 }
 
-async function cmdPhaseInjectContext(cwd, targetPhaseNum, raw) {
+async function cmdPhaseInjectContext(_cwd, targetPhaseNum, raw) {
   if (!targetPhaseNum) {
     error('target phase number required for inject-context');
   }
@@ -6030,7 +6030,7 @@ async function cmdPhaseInjectContext(cwd, targetPhaseNum, raw) {
   }
 }
 
-async function cmdPhaseCleanupCheckpoints(cwd, phaseNum, raw) {
+async function cmdPhaseCleanupCheckpoints(_cwd, phaseNum, raw) {
   if (!phaseNum) {
     error('phase number required for cleanup-checkpoints');
   }
@@ -6526,7 +6526,6 @@ function cmdValidateConsistency(cwd, raw) {
 
 function cmdProgressRender(cwd, format, raw) {
   const phasesDir = path.join(cwd, '.planning', 'phases');
-  const roadmapPath = path.join(cwd, '.planning', 'ROADMAP.md');
   const milestone = getMilestoneInfo(cwd);
 
   const phases = [];
@@ -7771,7 +7770,7 @@ async function cmdHistoricalExtract(cwd, args, raw) {
  *
  * Reports statistics on analyzed sessions.
  */
-function cmdAnalysisStatus(cwd, args, raw) {
+function cmdAnalysisStatus(cwd, _args, raw) {
   let getAnalysisStats;
   try {
     const gates = require(path.join(__dirname, 'session-quality-gates.js'));
@@ -7803,7 +7802,7 @@ function cmdAnalysisStatus(cwd, args, raw) {
  * Scans .planning/telegram-sessions/ for session JSONL files with
  * session_analysis_pending entries that have not yet been processed.
  */
-async function cmdListPendingSessions(cwd, args, raw) {
+async function cmdListPendingSessions(cwd, _args, raw) {
   const sessionsDir = path.join(cwd, '.planning', 'telegram-sessions');
 
   if (!fs.existsSync(sessionsDir)) {
@@ -8825,7 +8824,7 @@ async function cmdStoreConversationResult(cwd, args, raw) {
  * .planning/knowledge/<user>.db files, copies all entries to the global DB,
  * and reports results. Does NOT delete old DBs.
  */
-async function cmdMigrateKnowledge(cwd, args, raw) {
+async function cmdMigrateKnowledge(_cwd, _args, raw) {
   const os = require('os');
   const homedir = os.homedir();
   const username = os.userInfo().username;
@@ -9575,7 +9574,6 @@ async function main() {
         if (args.includes('--table')) {
           // Print as formatted table
           const totalTokens = stats.session_total.tokens;
-          const tasks = state.tasks || [];
           const models = stats.per_model;
 
           console.log('\n=== GSD Auto Mode Session Stats ===\n');
