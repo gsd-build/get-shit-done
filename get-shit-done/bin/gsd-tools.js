@@ -2768,7 +2768,7 @@ function cmdBudget(args, raw) {
 
 // ─── Principle Feedback ──────────────────────────────────────────────────────
 
-function cmdMarkWrong(cwd, args, raw) {
+function cmdMarkWrong(args, raw) {
   const id = parseInt(args[0]);
   if (isNaN(id)) {
     error('mark-wrong: principle-id required (integer)');
@@ -2795,7 +2795,7 @@ function cmdMarkWrong(cwd, args, raw) {
   output(result, raw);
 }
 
-function cmdMarkOutdated(cwd, args, raw) {
+function cmdMarkOutdated(args, raw) {
   const id = parseInt(args[0]);
   if (isNaN(id)) {
     error('mark-outdated: principle-id required (integer)');
@@ -2822,7 +2822,7 @@ function cmdMarkOutdated(cwd, args, raw) {
   output(result, raw);
 }
 
-function cmdPrincipleHistory(cwd, args, raw) {
+function cmdPrincipleHistory(args, raw) {
   const id = parseInt(args[0]);
   if (isNaN(id)) {
     error('principle-history: principle-id required (integer)');
@@ -2858,7 +2858,7 @@ function cmdPrincipleHistory(cwd, args, raw) {
   }
 }
 
-function cmdPendingReplacements(cwd, args, raw) {
+function cmdPendingReplacements(args, raw) {
   const scope = args.includes('--scope') ? args[args.indexOf('--scope') + 1] : 'project';
 
   const { knowledge } = require('./knowledge.js');
@@ -2890,7 +2890,7 @@ function cmdPendingReplacements(cwd, args, raw) {
 
 // ─── Checkpoint Operations ───────────────────────────────────────────────────
 
-function cmdCheckpoint(cwd, args, raw) {
+function cmdCheckpoint(args, raw) {
   const subcommand = args[0];
 
   if (!subcommand) {
@@ -4150,7 +4150,6 @@ async function cmdHealth(args) {
   });
 
   // Check 6: Dashboard ports
-  const net = require('net');
   const isDashboardPortFree = await checkPort(8765);
   checks.push({
     name: 'Dashboard Port 8765',
@@ -5023,7 +5022,7 @@ async function cmdRoadmapDAG(cwd, raw) {
     return;
   }
 
-  const { graph, inDegree } = buildDAG(parsed.phases);
+  const { graph } = buildDAG(parsed.phases);
   const executionResult = getExecutionOrder(parsed.phases);
   const parallelOpportunities = detectParallelOpportunities(graph, executionResult.execution_order);
 
@@ -5713,7 +5712,6 @@ function cmdPhaseComplete(cwd, phaseNum, raw) {
   const roadmapPath = path.join(cwd, '.planning', 'ROADMAP.md');
   const statePath = path.join(cwd, '.planning', 'STATE.md');
   const phasesDir = path.join(cwd, '.planning', 'phases');
-  const normalized = normalizePhaseName(phaseNum);
   const today = new Date().toISOString().split('T')[0];
 
   // Verify phase info
@@ -6000,7 +5998,7 @@ async function cmdPhaseSize(cwd, args, raw) {
 
 // ─── Phase Archive ────────────────────────────────────────────────────────────
 
-async function cmdPhaseArchive(cwd, phaseNum, raw) {
+async function cmdPhaseArchive(phaseNum, raw) {
   if (!phaseNum) {
     error('phase number required for phase archive');
   }
