@@ -6,6 +6,9 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ## [Unreleased]
 
+### Fixed
+- Local install: workflow and reference files now get absolute path to `gsd-tools.cjs` instead of `$HOME/.claude/get-shit-done/`, so local installs work when GSD is outside `$HOME` and spawned subagents with empty `$HOME` still resolve the path (#820)
+
 ## [1.22.4] - 2026-03-03
 
 ### Added
