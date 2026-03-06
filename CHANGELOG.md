@@ -6,6 +6,9 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ## [Unreleased]
 
+### Added
+- **`/gsd:quick --research` flag** — Spawns focused research agent before planning, composable with `--discuss` and `--full`. Addresses the middle-ground gap between quick and full milestone workflows (#317)
+
 ## [1.22.4] - 2026-03-03
 
 ### Added
