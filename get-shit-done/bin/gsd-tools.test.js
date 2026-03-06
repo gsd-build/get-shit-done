@@ -2031,3 +2031,252 @@ describe('scaffold command', () => {
     assert.strictEqual(output.reason, 'already_exists');
   });
 });
+
+// ─── loadConfig / config get ─────────────────────────────────────────────────
+
+describe('config get — nyquist_validation default', () => {
+  let tmpDir;
+
+  beforeEach(() => {
+    tmpDir = createTempProject();
+  });
+
+  afterEach(() => {
+    cleanup(tmpDir);
+  });
+
+  test('returns true when no config.json exists', () => {
+    const result = runGsdTools('config get nyquist_validation --raw', tmpDir);
+    assert.ok(result.success, `Command failed: ${result.error}`);
+    assert.strictEqual(result.output.trim(), 'true');
+  });
+
+  test('returns false when workflow.nyquist_validation is false in config.json', () => {
+    fs.writeFileSync(
+      path.join(tmpDir, '.planning', 'config.json'),
+      JSON.stringify({ workflow: { nyquist_validation: false } })
+    );
+    const result = runGsdTools('config get nyquist_validation --raw', tmpDir);
+    assert.ok(result.success, `Command failed: ${result.error}`);
+    assert.strictEqual(result.output.trim(), 'false');
+  });
+});
+
+describe('config get — granularity default', () => {
+  let tmpDir;
+
+  beforeEach(() => {
+    tmpDir = createTempProject();
+  });
+
+  afterEach(() => {
+    cleanup(tmpDir);
+  });
+
+  test('returns standard when no config.json exists', () => {
+    const result = runGsdTools('config get granularity --raw', tmpDir);
+    assert.ok(result.success, `Command failed: ${result.error}`);
+    assert.strictEqual(result.output.trim(), 'standard');
+  });
+
+  test('returns fine when config.json has granularity: "fine"', () => {
+    fs.writeFileSync(
+      path.join(tmpDir, '.planning', 'config.json'),
+      JSON.stringify({ granularity: 'fine' })
+    );
+    const result = runGsdTools('config get granularity --raw', tmpDir);
+    assert.ok(result.success, `Command failed: ${result.error}`);
+    assert.strictEqual(result.output.trim(), 'fine');
+  });
+});
+
+describe('config get — depth→granularity migration', () => {
+  let tmpDir;
+
+  beforeEach(() => {
+    tmpDir = createTempProject();
+  });
+
+  afterEach(() => {
+    cleanup(tmpDir);
+  });
+
+  test('depth:quick maps to granularity:coarse', () => {
+    const configPath = path.join(tmpDir, '.planning', 'config.json');
+    fs.writeFileSync(configPath, JSON.stringify({ depth: 'quick' }));
+
+    const result = runGsdTools('config get granularity --raw', tmpDir);
+    assert.ok(result.success, `Command failed: ${result.error}`);
+    assert.strictEqual(result.output.trim(), 'coarse');
+  });
+
+  test('depth:quick rewrites config.json to use granularity key', () => {
+    const configPath = path.join(tmpDir, '.planning', 'config.json');
+    fs.writeFileSync(configPath, JSON.stringify({ depth: 'quick' }));
+
+    runGsdTools('config get granularity --raw', tmpDir);
+
+    const written = JSON.parse(fs.readFileSync(configPath, 'utf-8'));
+    assert.ok('granularity' in written, 'config.json should have granularity key after migration');
+    assert.ok(!('depth' in written), 'config.json should not have depth key after migration');
+    assert.strictEqual(written.granularity, 'coarse');
+  });
+
+  test('depth:comprehensive maps to granularity:fine', () => {
+    const configPath = path.join(tmpDir, '.planning', 'config.json');
+    fs.writeFileSync(configPath, JSON.stringify({ depth: 'comprehensive' }));
+
+    const result = runGsdTools('config get granularity --raw', tmpDir);
+    assert.ok(result.success, `Command failed: ${result.error}`);
+    assert.strictEqual(result.output.trim(), 'fine');
+  });
+
+  test('depth:standard maps to granularity:standard', () => {
+    const configPath = path.join(tmpDir, '.planning', 'config.json');
+    fs.writeFileSync(configPath, JSON.stringify({ depth: 'standard' }));
+
+    const result = runGsdTools('config get granularity --raw', tmpDir);
+    assert.ok(result.success, `Command failed: ${result.error}`);
+    assert.strictEqual(result.output.trim(), 'standard');
+  });
+});
+
+// ─── health — W008 ───────────────────────────────────────────────────────────
+
+describe('health — W008 nyquist_validation warning', () => {
+  let tmpDir;
+
+  beforeEach(() => {
+    tmpDir = createTempProject();
+  });
+
+  afterEach(() => {
+    cleanup(tmpDir);
+  });
+
+  test('W008 emitted when config.json has workflow section but no nyquist_validation key', () => {
+    fs.writeFileSync(
+      path.join(tmpDir, '.planning', 'config.json'),
+      JSON.stringify({ workflow: { research: true } })
+    );
+    const result = runGsdTools('health', tmpDir);
+    // health exits 0 even with warnings; capture both success and non-success output
+    const combined = result.output + (result.error || '');
+    assert.ok(combined.includes('W008'), `Expected W008 in output, got: ${combined}`);
+  });
+
+  test('W008 not emitted when workflow.nyquist_validation is explicitly set', () => {
+    fs.writeFileSync(
+      path.join(tmpDir, '.planning', 'config.json'),
+      JSON.stringify({ workflow: { nyquist_validation: true } })
+    );
+    const result = runGsdTools('health', tmpDir);
+    const combined = result.output + (result.error || '');
+    assert.ok(!combined.includes('W008'), `Expected no W008 in output, got: ${combined}`);
+  });
+});
+
+// ─── health — W009 ───────────────────────────────────────────────────────────
+
+describe('health — W009 validation architecture warning', () => {
+  let tmpDir;
+
+  beforeEach(() => {
+    tmpDir = createTempProject();
+  });
+
+  afterEach(() => {
+    cleanup(tmpDir);
+  });
+
+  test('W009 emitted for phase with Validation Architecture in RESEARCH.md but no VALIDATION.md', () => {
+    const phaseDir = path.join(tmpDir, '.planning', 'phases', '01-test');
+    fs.mkdirSync(phaseDir, { recursive: true });
+    fs.writeFileSync(
+      path.join(phaseDir, '01-RESEARCH.md'),
+      '# Research\n\n## Validation Architecture\nsome validation content\n'
+    );
+
+    const result = runGsdTools('health', tmpDir);
+    const combined = result.output + (result.error || '');
+    assert.ok(combined.includes('W009'), `Expected W009 in output, got: ${combined}`);
+  });
+
+  test('W009 not emitted when RESEARCH.md has no Validation Architecture section (no false positive)', () => {
+    const phaseDir = path.join(tmpDir, '.planning', 'phases', '01-test');
+    fs.mkdirSync(phaseDir, { recursive: true });
+    fs.writeFileSync(
+      path.join(phaseDir, '01-RESEARCH.md'),
+      '# Research\n\n## Implementation Notes\nno validation arch here\n'
+    );
+
+    const result = runGsdTools('health', tmpDir);
+    const combined = result.output + (result.error || '');
+    assert.ok(!combined.includes('W009'), `Expected no W009 in output, got: ${combined}`);
+  });
+
+  test('W009 not emitted when phase has both RESEARCH.md with Validation Architecture AND VALIDATION.md', () => {
+    const phaseDir = path.join(tmpDir, '.planning', 'phases', '01-test');
+    fs.mkdirSync(phaseDir, { recursive: true });
+    fs.writeFileSync(
+      path.join(phaseDir, '01-RESEARCH.md'),
+      '# Research\n\n## Validation Architecture\nsome validation content\n'
+    );
+    fs.writeFileSync(
+      path.join(phaseDir, '01-VALIDATION.md'),
+      '# Validation\n\nValidation results here.\n'
+    );
+
+    const result = runGsdTools('health', tmpDir);
+    const combined = result.output + (result.error || '');
+    assert.ok(!combined.includes('W009'), `Expected no W009 in output, got: ${combined}`);
+  });
+});
+
+// ─── resolve-model — gsd-nyquist-auditor profiles ────────────────────────────
+
+describe('resolve-model — gsd-nyquist-auditor model profiles', () => {
+  let tmpDir;
+
+  beforeEach(() => {
+    tmpDir = createTempProject();
+  });
+
+  afterEach(() => {
+    cleanup(tmpDir);
+  });
+
+  test('balanced profile returns sonnet', () => {
+    fs.writeFileSync(
+      path.join(tmpDir, '.planning', 'config.json'),
+      JSON.stringify({ model_profile: 'balanced' })
+    );
+    // Without --raw, output is JSON. With --raw, rawValue is the plain model string.
+    const result = runGsdTools('resolve-model gsd-nyquist-auditor', tmpDir);
+    assert.ok(result.success, `Command failed: ${result.error}`);
+    const parsed = JSON.parse(result.output);
+    assert.strictEqual(parsed.model, 'sonnet');
+  });
+
+  test('budget profile returns haiku', () => {
+    fs.writeFileSync(
+      path.join(tmpDir, '.planning', 'config.json'),
+      JSON.stringify({ model_profile: 'budget' })
+    );
+    const result = runGsdTools('resolve-model gsd-nyquist-auditor', tmpDir);
+    assert.ok(result.success, `Command failed: ${result.error}`);
+    const parsed = JSON.parse(result.output);
+    assert.strictEqual(parsed.model, 'haiku');
+  });
+
+  test('quality profile returns sonnet', () => {
+    fs.writeFileSync(
+      path.join(tmpDir, '.planning', 'config.json'),
+      JSON.stringify({ model_profile: 'quality' })
+    );
+    const result = runGsdTools('resolve-model gsd-nyquist-auditor', tmpDir);
+    assert.ok(result.success, `Command failed: ${result.error}`);
+    const parsed = JSON.parse(result.output);
+    assert.strictEqual(parsed.model, 'sonnet');
+  });
+});

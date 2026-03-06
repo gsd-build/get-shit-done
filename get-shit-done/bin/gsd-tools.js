@@ -1075,6 +1075,19 @@ function cmdConfigSet(cwd, keyPath, value, raw) {
   }
 }
 
+function cmdConfigGet(cwd, key, raw) {
+  if (!key) {
+    error('Usage: config get <key>');
+  }
+  const config = loadConfig(cwd);
+  const value = config[key];
+  if (value === undefined) {
+    error(`Unknown config key: ${key}`);
+  }
+  const strValue = String(value);
+  output({ key, value }, raw, strValue);
+}
+
 function cmdHistoryDigest(cwd, raw) {
   const phasesDir = path.join(cwd, '.planning', 'phases');
   const digest = { phases: {}, decisions: [], tech_stack: new Set() };
@@ -9299,6 +9312,16 @@ async function main() {
 
     case 'config-set': {
       cmdConfigSet(cwd, args[1], args[2], raw);
+      break;
+    }
+
+    case 'config': {
+      const subcommand = args[1];
+      if (subcommand === 'get') {
+        cmdConfigGet(cwd, args[2], raw);
+      } else {
+        error('Unknown config subcommand. Available: get');
+      }
       break;
     }
 
