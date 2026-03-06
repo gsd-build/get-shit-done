@@ -170,7 +170,7 @@
 const fs = require('fs');
 const path = require('path');
 const { execSync } = require('child_process');
-const { EVENT_TYPES, initLog, appendEvent, getHistory, getCurrentPhase, getLastCheckpoint, getExecutionStats, needsResume, getResumeContext, markResumed, getPhaseTimeline } = require('./execution-log.js');
+const { EVENT_TYPES, appendEvent, getHistory, getCurrentPhase, getExecutionStats } = require('./execution-log.js');
 const { parseRoadmap, buildDAG, getExecutionOrder, detectParallelOpportunities } = require('./roadmap-parser.js');
 const { TokenBudgetMonitor } = require('./token-monitor.js');
 const { FailureHandler, executeWithRetry } = require('./failure-handler.js');
@@ -2144,14 +2144,12 @@ function cmdPhasePlanIndex(cwd, phase, raw) {
 
   // Find phase directory
   let phaseDir = null;
-  let phaseDirName = null;
   try {
     const entries = fs.readdirSync(phasesDir, { withFileTypes: true });
     const dirs = entries.filter(e => e.isDirectory()).map(e => e.name).sort();
     const match = dirs.find(d => d.startsWith(normalized));
     if (match) {
       phaseDir = path.join(phasesDir, match);
-      phaseDirName = match;
     }
   } catch {
     // phases dir doesn't exist
@@ -2400,7 +2398,7 @@ function cmdSummaryExtract(cwd, summaryPath, fields, raw) {
 
 // ─── Knowledge Commands ──────────────────────────────────────────────────────
 
-function cmdKnowledgeStatus(cwd, args, raw) {
+function cmdKnowledgeStatus(args, raw) {
   const scope = args.includes('--scope') ? args[args.indexOf('--scope') + 1] : 'project';
   const { knowledge } = require('./knowledge.js');
 
@@ -2440,7 +2438,7 @@ function cmdKnowledgeAdd(cwd, args, raw) {
   output(result, raw);
 }
 
-function cmdKnowledgeSearch(cwd, args, raw) {
+function cmdKnowledgeSearch(args, raw) {
   const query = args[0];
   if (!query) {
     error('knowledge search: query required');
@@ -2456,7 +2454,7 @@ function cmdKnowledgeSearch(cwd, args, raw) {
   output(results, raw);
 }
 
-function cmdKnowledgeGet(cwd, args, raw) {
+function cmdKnowledgeGet(args, raw) {
   const id = parseInt(args[0]);
   if (isNaN(id)) {
     error('knowledge get: id required (integer)');
@@ -2470,7 +2468,7 @@ function cmdKnowledgeGet(cwd, args, raw) {
   output(result, raw);
 }
 
-function cmdKnowledgeDelete(cwd, args, raw) {
+function cmdKnowledgeDelete(args, raw) {
   const id = parseInt(args[0]);
   if (isNaN(id)) {
     error('knowledge delete: id required (integer)');
@@ -2484,7 +2482,7 @@ function cmdKnowledgeDelete(cwd, args, raw) {
   output(result, raw);
 }
 
-function cmdKnowledgeCleanup(cwd, args, raw) {
+function cmdKnowledgeCleanup(args, raw) {
   const scope = args.includes('--scope') ? args[args.indexOf('--scope') + 1] : 'project';
 
   const { knowledge } = require('./knowledge.js');
@@ -2493,7 +2491,7 @@ function cmdKnowledgeCleanup(cwd, args, raw) {
   output(result, raw);
 }
 
-function cmdKnowledgePrune(cwd, args, raw) {
+function cmdKnowledgePrune(args, raw) {
   const scope = args.includes('--scope') ? args[args.indexOf('--scope') + 1] : 'global';
   const dryRun = args.includes('--dry-run');
   const threshold = args.includes('--threshold')
@@ -2591,7 +2589,7 @@ function parseDuration(str) {
   return ms[unit];
 }
 
-function cmdPermissionGrant(cwd, args, raw) {
+function cmdPermissionGrant(args, raw) {
   const action = args[0];
   if (!action) {
     error('grant: action required (e.g., "delete_file:/test/*")');
@@ -2622,7 +2620,7 @@ function cmdPermissionGrant(cwd, args, raw) {
   output(result, raw);
 }
 
-function cmdPermissionRevoke(cwd, args, raw) {
+function cmdPermissionRevoke(args, raw) {
   const token = args[0];
   if (!token) {
     error('revoke: token required');
@@ -2643,7 +2641,7 @@ function cmdPermissionRevoke(cwd, args, raw) {
   output(result, raw);
 }
 
-function cmdPermissionList(cwd, args, raw) {
+function cmdPermissionList(args, raw) {
   const scope = args.includes('--scope') ? args[args.indexOf('--scope') + 1] : 'project';
   const jsonOutput = args.includes('--json');
 
@@ -2680,7 +2678,7 @@ function cmdPermissionList(cwd, args, raw) {
 
 // ─── Emergency Stop & Budget ─────────────────────────────────────────────────
 
-function cmdPause(cwd, args, raw) {
+function cmdPause(args, raw) {
   const reason = args.includes('--reason') ? args[args.indexOf('--reason') + 1] : 'user_requested';
   const scope = args.includes('--scope') ? args[args.indexOf('--scope') + 1] : 'project';
 
@@ -2697,7 +2695,7 @@ function cmdPause(cwd, args, raw) {
   output({ paused: true, reason }, raw, 'Emergency stop enabled. Costly and external actions will be blocked.');
 }
 
-function cmdResume(cwd, args, raw) {
+function cmdResume(args, raw) {
   const scope = args.includes('--scope') ? args[args.indexOf('--scope') + 1] : 'project';
 
   const { knowledge } = require('./knowledge.js');
@@ -2713,7 +2711,7 @@ function cmdResume(cwd, args, raw) {
   output({ resumed: true }, raw, 'Emergency stop disabled. Normal operation resumed.');
 }
 
-function cmdBudget(cwd, args, raw) {
+function cmdBudget(args, raw) {
   const period = args.includes('--period') ? args[args.indexOf('--period') + 1] : 'daily';
   const scope = args.includes('--scope') ? args[args.indexOf('--scope') + 1] : 'project';
 
@@ -9650,25 +9648,25 @@ async function main() {
       const knowledgeArgs = args.slice(2);
       switch (knowledgeSubcmd) {
         case 'status':
-          cmdKnowledgeStatus(cwd, knowledgeArgs, raw);
+          cmdKnowledgeStatus(knowledgeArgs, raw);
           break;
         case 'add':
           cmdKnowledgeAdd(cwd, knowledgeArgs, raw);
           break;
         case 'search':
-          cmdKnowledgeSearch(cwd, knowledgeArgs, raw);
+          cmdKnowledgeSearch(knowledgeArgs, raw);
           break;
         case 'get':
-          cmdKnowledgeGet(cwd, knowledgeArgs, raw);
+          cmdKnowledgeGet(knowledgeArgs, raw);
           break;
         case 'delete':
-          cmdKnowledgeDelete(cwd, knowledgeArgs, raw);
+          cmdKnowledgeDelete(knowledgeArgs, raw);
           break;
         case 'cleanup':
-          cmdKnowledgeCleanup(cwd, knowledgeArgs, raw);
+          cmdKnowledgeCleanup(knowledgeArgs, raw);
           break;
         case 'prune':
-          cmdKnowledgePrune(cwd, knowledgeArgs, raw);
+          cmdKnowledgePrune(knowledgeArgs, raw);
           break;
         case 'stats':
           cmdKnowledgeStats(cwd, knowledgeArgs, raw);
@@ -9680,32 +9678,32 @@ async function main() {
     }
 
     case 'grant': {
-      cmdPermissionGrant(cwd, args.slice(1), raw);
+      cmdPermissionGrant(args.slice(1), raw);
       break;
     }
 
     case 'revoke': {
-      cmdPermissionRevoke(cwd, args.slice(1), raw);
+      cmdPermissionRevoke(args.slice(1), raw);
       break;
     }
 
     case 'list-permissions': {
-      cmdPermissionList(cwd, args.slice(1), raw);
+      cmdPermissionList(args.slice(1), raw);
       break;
     }
 
     case 'pause': {
-      cmdPause(cwd, args.slice(1), raw);
+      cmdPause(args.slice(1), raw);
       break;
     }
 
     case 'resume': {
-      cmdResume(cwd, args.slice(1), raw);
+      cmdResume(args.slice(1), raw);
       break;
     }
 
     case 'budget': {
-      cmdBudget(cwd, args.slice(1), raw);
+      cmdBudget(args.slice(1), raw);
       break;
     }
 
