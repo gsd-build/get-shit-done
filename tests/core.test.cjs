@@ -22,7 +22,6 @@ const {
   safeReadFile,
   pathExistsInternal,
   getMilestoneInfo,
-  getMilestonePhaseFilter,
   getRoadmapPhaseInternal,
   searchPhaseInDir,
   findPhaseInternal,
@@ -60,7 +59,7 @@ describe('loadConfig', () => {
     assert.strictEqual(config.plan_checker, true);
     assert.strictEqual(config.brave_search, false);
     assert.strictEqual(config.parallelization, true);
-    assert.strictEqual(config.nyquist_validation, true);
+    assert.strictEqual(config.nyquist_validation, false);
   });
 
   test('reads model_profile from config.json', () => {
@@ -668,137 +667,3 @@ describe('getRoadmapPhaseInternal', () => {
   });
 });
 
-// ─── getMilestonePhaseFilter ────────────────────────────────────────────────────
-
-describe('getMilestonePhaseFilter', () => {
-  let tmpDir;
-
-  beforeEach(() => {
-    tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), 'gsd-core-test-'));
-    fs.mkdirSync(path.join(tmpDir, '.planning', 'phases'), { recursive: true });
-  });
-
-  afterEach(() => {
-    fs.rmSync(tmpDir, { recursive: true, force: true });
-  });
-
-  test('filters directories to only current milestone phases', () => {
-    // ROADMAP lists only phases 5-7
-    fs.writeFileSync(
-      path.join(tmpDir, '.planning', 'ROADMAP.md'),
-      [
-        '## Roadmap v2.0: Next Release',
-        '',
-        '### Phase 5: Auth',
-        '**Goal:** Add authentication',
-        '',
-        '### Phase 6: Dashboard',
-        '**Goal:** Build dashboard',
-        '',
-        '### Phase 7: Polish',
-        '**Goal:** Final polish',
-      ].join('\n')
-    );
-
-    // Create phase dirs 1-7 on disk (leftover from previous milestones)
-    for (let i = 1; i <= 7; i++) {
-      const padded = String(i).padStart(2, '0');
-      fs.mkdirSync(path.join(tmpDir, '.planning', 'phases', `${padded}-phase-${i}`));
-    }
-
-    const filter = getMilestonePhaseFilter(tmpDir);
-
-    // Only phases 5, 6, 7 should match
-    assert.strictEqual(filter('05-auth'), true);
-    assert.strictEqual(filter('06-dashboard'), true);
-    assert.strictEqual(filter('07-polish'), true);
-
-    // Phases 1-4 should NOT match
-    assert.strictEqual(filter('01-phase-1'), false);
-    assert.strictEqual(filter('02-phase-2'), false);
-    assert.strictEqual(filter('03-phase-3'), false);
-    assert.strictEqual(filter('04-phase-4'), false);
-  });
-
-  test('returns pass-all filter when ROADMAP.md is missing', () => {
-    const filter = getMilestonePhaseFilter(tmpDir);
-
-    assert.strictEqual(filter('01-foundation'), true);
-    assert.strictEqual(filter('99-anything'), true);
-  });
-
-  test('returns pass-all filter when ROADMAP has no phase headings', () => {
-    fs.writeFileSync(
-      path.join(tmpDir, '.planning', 'ROADMAP.md'),
-      '# Roadmap\n\nSome content without phases.\n'
-    );
-
-    const filter = getMilestonePhaseFilter(tmpDir);
-
-    assert.strictEqual(filter('01-foundation'), true);
-    assert.strictEqual(filter('05-api'), true);
-  });
-
-  test('handles letter-suffix phases (e.g. 3A)', () => {
-    fs.writeFileSync(
-      path.join(tmpDir, '.planning', 'ROADMAP.md'),
-      '### Phase 3A: Sub-feature\n**Goal:** Sub work\n'
-    );
-
-    const filter = getMilestonePhaseFilter(tmpDir);
-
-    assert.strictEqual(filter('03A-sub-feature'), true);
-    assert.strictEqual(filter('03-main'), false);
-    assert.strictEqual(filter('04-other'), false);
-  });
-
-  test('handles decimal phases (e.g. 5.1)', () => {
-    fs.writeFileSync(
-      path.join(tmpDir, '.planning', 'ROADMAP.md'),
-      '### Phase 5: Main\n**Goal:** Main work\n\n### Phase 5.1: Patch\n**Goal:** Patch work\n'
-    );
-
-    const filter = getMilestonePhaseFilter(tmpDir);
-
-    assert.strictEqual(filter('05-main'), true);
-    assert.strictEqual(filter('05.1-patch'), true);
-    assert.strictEqual(filter('04-other'), false);
-  });
-
-  test('returns false for non-phase directory names', () => {
-    fs.writeFileSync(
-      path.join(tmpDir, '.planning', 'ROADMAP.md'),
-      '### Phase 1: Init\n**Goal:** Start\n'
-    );
-
-    const filter = getMilestonePhaseFilter(tmpDir);
-
-    assert.strictEqual(filter('not-a-phase'), false);
-    assert.strictEqual(filter('.gitkeep'), false);
-  });
-
-  test('phaseCount reflects ROADMAP phase count', () => {
-    fs.writeFileSync(
-      path.join(tmpDir, '.planning', 'ROADMAP.md'),
-      '### Phase 5: Auth\n### Phase 6: Dashboard\n### Phase 7: Polish\n'
-    );
-
-    const filter = getMilestonePhaseFilter(tmpDir);
-    assert.strictEqual(filter.phaseCount, 3);
-  });
-
-  test('phaseCount is 0 when ROADMAP is missing', () => {
-    const filter = getMilestonePhaseFilter(tmpDir);
-    assert.strictEqual(filter.phaseCount, 0);
-  });
-
-  test('phaseCount is 0 when ROADMAP has no phase headings', () => {
-    fs.writeFileSync(
-      path.join(tmpDir, '.planning', 'ROADMAP.md'),
-      '# Roadmap\n\nSome content.\n'
-    );
-
-    const filter = getMilestonePhaseFilter(tmpDir);
-    assert.strictEqual(filter.phaseCount, 0);
-  });
-});

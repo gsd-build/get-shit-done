@@ -352,6 +352,53 @@ Then `/gsd:new-milestone` starts the next version — same flow as `new-project`
 
 ---
 
+### 7. Parallel Workstreams
+
+```
+/gsd:new-milestone
+```
+
+**Work on multiple features simultaneously across parallel Claude Code instances.**
+
+When you start a new milestone while one is already in progress, GSD offers to run them in parallel using **workstreams**. Each workstream gets its own isolated planning state (roadmap, requirements, phases) while sharing project-level context.
+
+**How it works:**
+
+1. **Terminal 1** — `/gsd:new-milestone` creates your first feature normally
+2. **Terminal 2** — `/gsd:new-milestone` detects work in progress and asks: *"Work in parallel?"*
+   - Choose **Yes** → GSD migrates existing work into a workstream and creates a new one
+3. **Terminal 3+** — Each additional `/gsd:new-milestone` creates another workstream
+
+Each instance works independently with the full GSD workflow. All normal commands (`/gsd:plan-phase`, `/gsd:execute-phase`, etc.) automatically scope to the active workstream.
+
+```
+.planning/
+├── PROJECT.md                  ← shared
+├── config.json                 ← shared
+├── workstreams/
+│   ├── feature-auth/           ← Terminal 1
+│   │   ├── ROADMAP.md
+│   │   ├── STATE.md
+│   │   ├── REQUIREMENTS.md
+│   │   └── phases/
+│   ├── feature-notifications/  ← Terminal 2
+│   │   └── ...
+│   └── feature-dashboard/      ← Terminal 3
+│       └── ...
+├── milestones/                 ← shared archive
+└── research/                   ← shared
+```
+
+Commits are auto-prefixed with the workstream name for clear git history:
+```
+[feature-auth] feat(01-01): add login endpoint
+[feature-notifications] feat(02-01): implement push service
+```
+
+When a feature is done, `/gsd:complete-milestone` archives just that workstream. When all workstreams complete, GSD reverts to flat mode automatically.
+
+---
+
 ### Quick Mode
 
 ```
