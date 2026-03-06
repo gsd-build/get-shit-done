@@ -14,6 +14,23 @@ Claude presents what SHOULD happen. User confirms or describes what's different.
 No Pass/Fail buttons. No severity questions. Just: "Here's what should happen. Does it?"
 </philosophy>
 
+<critical_rules>
+**NEVER substitute existence checks for success criteria.**
+
+The ROADMAP Success Criteria are the ONLY source of truth for Phase Goal tests.
+
+| ROADMAP says | WRONG interpretation | CORRECT interpretation |
+|--------------|---------------------|------------------------|
+| "deployed and healthy" | "files exist" | "az containerapp show returns Running + health endpoint 200" |
+| "configured and validated" | "config in file" | "deploy and verify behavior occurs" |
+| "test passes with X data" | "test file exists" | "run test with X data, assertions pass" |
+| "throughput >N docs/sec" | "batch size configured" | "run pipeline, measure actual throughput" |
+| "scaled to N replicas" | "maxReplicas=N in config" | "trigger scaling, verify N replicas running" |
+
+**If a success criterion requires deployment to verify, the test MUST require deployment.**
+Do NOT downgrade deployment criteria to local file checks.
+</critical_rules>
+
 <template>
 @~/.claude/get-shit-done/templates/UAT.md
 </template>
@@ -106,6 +123,20 @@ Read each SUMMARY.md to extract implementation details.
 Parse the **Success Criteria** section found in find_summaries step.
 Each numbered criterion becomes a "Phase Goal" test.
 
+**VERBATIM RULE:** The test name and expected behavior MUST directly reflect the criterion.
+
+WRONG:
+- Criterion: "All 4 worker types deployed and healthy"
+- Test: "Worker Files Exist" ← NOT the same thing
+
+CORRECT:
+- Criterion: "All 4 worker types deployed and healthy"
+- Test: "All 4 Workers Deployed and Healthy"
+- Expected: "Run `az containerapp list` - all 4 workers show 'Running'. Hit /healthz endpoint for each - returns 200."
+
+**If you cannot verify a criterion without deployment, state that in the expected field:**
+- Expected: "REQUIRES DEPLOYMENT: Run `az containerapp show --name parser-worker` and verify status is 'Running'"
+
 For each criterion, create a test with:
 - name: Brief test name from criterion
 - expected: Observable verification that proves the criterion is met
@@ -114,13 +145,14 @@ For each criterion, create a test with:
 
 **Generate intelligent verification methods based on phase type:**
 
-| Phase Type | Indicators | Verification Approach |
-|------------|------------|----------------------|
-| Infrastructure | "provision", "deploy", "create resource" | Azure CLI commands, Terraform state checks |
-| API/Backend | "endpoint", "API", "service" | curl/httpie commands, API response validation |
-| Frontend/UI | "dashboard", "UI", "display" | Browser verification, visual inspection |
-| Data Pipeline | "download", "ingest", "index" | Blob counts, database queries, metrics |
-| Worker/Job | "worker", "job", "process" | Log verification, state tracker checks |
+| Phase Type | Indicators | Verification Approach | DO NOT |
+|------------|------------|----------------------|--------|
+| Infrastructure | "provision", "deploy" | Azure CLI status checks, Terraform state | grep config files |
+| Worker/Job | "deployed", "healthy", "running" | Container status, health endpoints, logs | check if files exist |
+| Data Pipeline | "throughput", "passes", "verified" | Run pipeline, measure metrics | check batch_size in code |
+| Scaling | "scaled to N", "replicas" | Trigger load, count actual replicas | check maxReplicas config |
+| API/Backend | "endpoint", "API", "service" | curl/httpie commands, API response validation | check route definitions |
+| Frontend/UI | "dashboard", "UI", "display" | Browser verification, visual inspection | check component imports |
 
 **Examples:**
 - Criterion: "FTP download worker can connect to ftp.ncbi.nlm.nih.gov"
@@ -259,6 +291,25 @@ skipped: 0
 ```
 
 Write to `.planning/phases/XX-name/{phase_num}-UAT.md`
+
+Proceed to `validate_tests_match_criteria`.
+</step>
+
+<step name="validate_tests_match_criteria">
+**Before presenting tests, validate alignment:**
+
+For each Phase Goal test, verify:
+1. Test name reflects the ROADMAP criterion (not a downgraded version)
+2. Expected behavior would actually prove the criterion is met
+3. Tests requiring deployment are marked as such
+
+**Red flags that indicate wrong tests:**
+- Test name contains "exists" or "file" when criterion says "deployed" or "running"
+- Expected uses `grep` or `ls` when criterion requires runtime verification
+- Test checks config values when criterion says "validated" or "verified"
+- Missing criterion (fewer Phase Goal tests than ROADMAP success criteria)
+
+If any red flag detected, regenerate the Phase Goal tests using the VERBATIM RULE.
 
 Proceed to `present_test`.
 </step>
