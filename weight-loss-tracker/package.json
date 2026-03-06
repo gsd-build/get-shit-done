@@ -1,0 +1,19 @@
+{
+  "name": "weight-loss-tracker",
+  "version": "1.0.0",
+  "description": "A weight loss and workout tracker with WhatsApp notifications",
+  "main": "server.js",
+  "scripts": {
+    "start": "node server.js",
+    "dev": "node server.js"
+  },
+  "keywords": [
+    "weight-loss",
+    "fitness",
+    "tracker",
+    "whatsapp",
+    "notifications"
+  ],
+  "author": "",
+  "license": "MIT"
+}
