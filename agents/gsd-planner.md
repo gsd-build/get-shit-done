@@ -152,11 +152,64 @@ Every task has four required fields:
 | Type | Use For | Autonomy |
 |------|---------|----------|
 | `auto` | Everything Claude can do independently | Fully autonomous |
-| `checkpoint:human-verify` | Visual/functional verification | Pauses for user |
+| `checkpoint:ui-qa` | Web UI verification (automated via Charlotte browser agent) | Automated — coordinator runs 3-round QA loop |
+| `checkpoint:human-verify` | Non-web verification: macOS apps, audio, Xcode builds | Pauses for user |
 | `checkpoint:decision` | Implementation choices | Pauses for user |
 | `checkpoint:human-action` | Truly unavoidable manual steps (rare) | Pauses for user |
 
-**Automation-first rule:** If Claude CAN do it via CLI/API, Claude MUST do it. Checkpoints verify AFTER automation, not replace it.
+**Automation-first rule:** If Claude CAN do it via CLI/API, Claude MUST do it. Checkpoints verify AFTER automation, not replace it. For web UI: use `checkpoint:ui-qa` (automated Charlotte testing). For non-web (macOS, audio, Xcode): use `checkpoint:human-verify`.
+
+## checkpoint:ui-qa — When and How to Use
+
+**Auto-add rule:** After any task that creates or substantially modifies a web UI page, form, or interactive component, add a `checkpoint:ui-qa` task. This is the default for web projects — do not add `checkpoint:human-verify` for web UI.
+
+**Triggers (always add checkpoint:ui-qa after):**
+- Creating a new page or route (`/dashboard`, `/players/[id]`, etc.)
+- Building a form (login, create, edit, filter forms)
+- Adding modals or dialogs
+- Implementing navigation (sidebar, breadcrumbs, links between pages)
+- Creating data tables with interactions (sort, filter, pagination)
+- Adding any interactive component (buttons with actions, tabs, accordions)
+
+**Do NOT add checkpoint:ui-qa for:**
+- Pure backend work (API routes only, database migrations, no UI impact)
+- Type definitions, utilities, or config files
+- CSS-only changes with no structural HTML/JSX changes (use judgment — if visual regression likely, add it)
+- Non-web projects (use checkpoint:human-verify)
+
+**Reading CLAUDE.md for QA config:**
+When planning a web UI phase, read the project's `## QA / Dev Server` section of CLAUDE.md to understand:
+- The app URL (for populating test-flows with real URLs)
+- Available credentials (for flows requiring login)
+- Whether additional services (Supabase, etc.) need to be running
+
+If the `## QA / Dev Server` section is absent, note this in the plan but still emit checkpoint:ui-qa — the QA agent will use defaults.
+
+**Writing effective test-flows:**
+The `<test-flows>` content is the QA agent's script. Be specific:
+- List each page/route to visit by exact URL
+- Describe each interaction: what to click, what to type, what to verify
+- Include both happy path and basic error cases (submit empty form, try invalid input)
+- Include cross-module navigation if applicable (click an ID to go to detail page)
+- Include authentication flow if the page requires login
+
+**Example checkpoint:ui-qa task structure:**
+```xml
+<task type="checkpoint:ui-qa" gate="blocking">
+  <what-built>User registration form at /auth/register with email/password/name fields</what-built>
+  <test-flows>
+    - Navigate to /auth/register — verify form renders with Email, Password, Name fields
+    - Submit empty form — verify inline validation errors appear on required fields
+    - Enter email without @ — verify email format error appears
+    - Fill valid data (test@example.com / Password123! / Test User) — verify success redirect to /dashboard
+    - After register: verify user name appears in header/nav
+    - Navigate to /auth/login — verify login form renders
+    - Login with the registered credentials — verify successful login and redirect
+  </test-flows>
+</task>
+```
+
+**Grouping rule:** One `checkpoint:ui-qa` per logical feature group, not per individual task. If tasks 1-3 all build parts of the same page, place a single `checkpoint:ui-qa` after task 3. Do not add a checkpoint after each individual task.
 
 ## Task Sizing
 
