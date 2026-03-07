@@ -127,7 +127,46 @@ Use /gsd:progress to see available phases.
 ```
 Exit workflow.
 
-**If `phase_found` is true:** Continue to check_existing.
+**If `phase_found` is true:** Continue to session_resume.
+</step>
+
+<step name="session_resume">
+### Multi-Session Resume (before check_existing)
+
+Before checking for existing CONTEXT.md, check if a DISCUSS-STATE.md exists in the phase directory:
+
+```bash
+ls ${phase_dir}/DISCUSS-STATE.md 2>/dev/null
+```
+
+**If DISCUSS-STATE.md exists** (indicates a previous session was interrupted):
+
+1. Read the file and parse the area checklist:
+   - `[x]` = COMPLETED areas (decisions already captured)
+   - `[~]` = PARTIAL areas (some questions done)
+   - `[ ]` = NOT STARTED areas
+
+2. Use AskUserQuestion:
+   - header: "Previous session"
+   - question: "Found saved discussion state (N of M areas completed). Resume where you left off?"
+   - options:
+     - "Resume" — Continue with remaining areas, skip completed ones
+     - "Start fresh" — Delete saved state and start over
+     - "View state" — Show the saved state before deciding
+
+3. If "Resume":
+   - Load decisions from completed `[x]` areas into memory
+   - Load partial `[~]` area state
+   - Set `areas_to_discuss` = only `[ ]` and `[~]` areas
+   - Skip `check_existing`, `analyze_phase`, `present_gray_areas`
+   - Jump directly to `discuss_areas` with remaining areas
+   - Announce: "Resuming discussion. Areas completed: [list]. Continuing with: [list]."
+
+4. If "View state": Display DISCUSS-STATE.md content, then re-offer Resume/Start fresh
+
+5. If "Start fresh": Delete DISCUSS-STATE.md, continue normally
+
+**If DISCUSS-STATE.md does not exist:** Continue normally to `check_existing`.
 </step>
 
 <step name="check_existing">
@@ -435,6 +474,54 @@ Back to [current area]: [return to current question]"
 ```
 
 Track deferred ideas internally.
+
+### Progress Save Points (during discuss_areas)
+
+After completing all questions for an area and before moving to the next, offer a save point:
+
+Use AskUserQuestion:
+- header: "Progress"
+- question: "Area '[name]' complete. What next?"
+- options:
+  - "Continue" — Proceed to next area without saving
+  - "Save and continue" — Save progress to disk, then continue
+  - "Save and stop" — Save progress, commit, and end session
+
+If "Save and continue" or "Save and stop":
+1. Write `${phase_dir}/DISCUSS-STATE.md` with area completion status and captured decisions
+2. Commit the state file:
+   ```bash
+   node ~/.claude/get-shit-done/bin/gsd-tools.cjs commit "docs(${padded_phase}): save discussion state" --files "${phase_dir}/DISCUSS-STATE.md"
+   ```
+3. If "Save and stop": Inform user "Saved. Resume with `/gsd:discuss-phase ${PHASE}` in a new session." and exit
+
+**Auto-save on context warning:** If a context window warning is received (WARNING or CRITICAL severity), immediately save state, commit, and exit — do NOT attempt further discussion.
+
+**Cleanup:** When all areas are discussed and CONTEXT.md is created successfully, delete DISCUSS-STATE.md (it is transitional).
+
+**DISCUSS-STATE.md format:**
+
+```markdown
+# Phase ${phase}: Discussion State (Multi-Session)
+
+**Started:** [date of first session]
+**Last Updated:** [current date/time]
+**Status:** In Progress — N of M areas completed
+
+## Areas
+1. [x] **Area Name** — COMPLETED
+2. [~] **Area Name** — PARTIAL (N of M questions answered)
+3. [ ] **Area Name** — NOT STARTED
+
+## Completed Areas
+### Area 1: [Name]
+- [Decisions captured]
+
+## Partial Areas
+### Area 2: [Name]
+- [Decisions so far]
+- Topics remaining: [list]
+```
 </step>
 
 <step name="write_context">
@@ -520,6 +607,38 @@ mkdir -p ".planning/phases/${padded_phase}-${phase_slug}"
 ```
 
 Write file.
+</step>
+
+<step name="assumption_verification">
+### Assumption Verification (after write_context, before confirm_creation)
+
+After writing CONTEXT.md and before confirming creation, offer automated verification:
+
+Use AskUserQuestion:
+- header: "Verify"
+- question: "CONTEXT.md created. Run automated assumption verification? (A fresh agent reads CONTEXT.md 'cold' to find gaps and ambiguities.)"
+- options:
+  - "Yes, verify" — Spawn verification agent
+  - "Skip verification" — Proceed directly
+
+**If "Skip verification":** Continue to `confirm_creation`.
+
+**If "Yes, verify":** Spawn an Explore subagent via Task tool to read CONTEXT.md cold (without discussion context) and analyze for:
+- **GAP**: A decision that should exist but doesn't
+- **AMBIGUITY**: A decision that could be interpreted multiple ways
+- **CONTRADICTION**: Two decisions that conflict
+- **IMPLICIT_ASSUMPTION**: Something assumed but never stated
+
+The agent returns a severity rating:
+- **CLEAN** (0-1 minor): Proceed to `confirm_creation`
+- **MINOR** (2-3 findings): Show findings, offer "Auto-refine" or "Accept as-is"
+- **NEEDS_REFINEMENT** (4+ or critical): Show findings, offer "Refine all", "Cherry-pick", or "Accept as-is"
+
+If refinement chosen, address each finding interactively with the user, update CONTEXT.md, and re-commit.
+
+**Maximum 2 verification rounds** (hard cap to prevent infinite loops and context exhaustion).
+
+**Why this matters:** The discuss-phase agent has full discussion context, which masks gaps that downstream planners (who only read CONTEXT.md) would struggle with. A fresh agent reading "cold" simulates the downstream experience.
 </step>
 
 <step name="confirm_creation">
@@ -673,4 +792,7 @@ Route to `confirm_creation` step (existing behavior — show manual next steps).
 - Deferred ideas preserved for future phases
 - STATE.md updated with session info
 - User knows next steps
+- (Multi-session) Interrupted sessions can be resumed from DISCUSS-STATE.md
+- (Multi-session) Progress save points prevent context-window data loss
+- (Verification) CONTEXT.md gaps caught before downstream consumption
 </success_criteria>
