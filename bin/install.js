@@ -1597,7 +1597,7 @@ function install(isGlobal, runtime = 'claude') {
       console.log(`  ${green}✓${reset} Configured session extraction Stop hook`);
     }
 
-    // Register PreToolUse:Write|Edit hook to protect managed files from direct edits
+    // Register PreToolUse:Write + PreToolUse:Edit hooks to protect managed files from direct edits
     const protectHookPath = isGlobal
       ? path.join(targetDir, 'get-shit-done', 'bin', 'hooks', 'gsd-protect-managed-files.js').replace(/\\/g, '/')
       : path.join(dirName, 'get-shit-done', 'bin', 'hooks', 'gsd-protect-managed-files.js').replace(/\\/g, '/');
@@ -1608,11 +1608,16 @@ function install(isGlobal, runtime = 'claude') {
     );
 
     if (!hasProtectHook) {
+      // Two separate entries — one per tool — to avoid relying on regex matcher support
       settings.hooks.PreToolUse.push({
-        matcher: 'Write|Edit',
+        matcher: 'Write',
         hooks: [{ type: 'command', command: protectHookCommand }]
       });
-      console.log(`  ${green}✓${reset} Configured managed file protection hook`);
+      settings.hooks.PreToolUse.push({
+        matcher: 'Edit',
+        hooks: [{ type: 'command', command: protectHookCommand }]
+      });
+      console.log(`  ${green}✓${reset} Configured managed file protection hook (Write + Edit)`);
     }
   }
 
