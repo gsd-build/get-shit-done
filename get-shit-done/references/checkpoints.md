@@ -266,6 +266,68 @@ Plans execute autonomously. Checkpoints formalize interaction points where human
 
 **Key distinction:** Auth gates are created dynamically when Claude encounters auth errors. NOT pre-planned — Claude automates first, asks for credentials only when blocked.
 </type>
+
+<type name="ui-qa">
+## checkpoint:ui-qa (Web UI/UX — Automated)
+
+**When:** Claude built or modified web UI components, pages, or forms and the project has a running dev server.
+
+**Do NOT use for:**
+- macOS apps, iOS apps, Xcode builds (use checkpoint:human-verify)
+- Audio/video quality (use checkpoint:human-verify)
+- Non-web interactive flows (use checkpoint:human-verify)
+- Anything that requires physical hardware or OS-level interaction
+
+**Use instead of `checkpoint:human-verify` when:**
+- A web page, form, or UI component was just built or modified
+- The project has a `## QA / Dev Server` section in CLAUDE.md (or defaults are sufficient)
+- Visual layout, interactive flows, and API wiring can be verified via browser automation
+
+**Structure:**
+```xml
+<task type="checkpoint:ui-qa" gate="blocking">
+  <what-built>Description of what was built</what-built>
+  <test-flows>
+    Specific user flows to test, URLs, what to verify.
+    Be concrete: list each page/flow/interaction to exercise.
+    Example:
+    - Visit /dashboard — verify sidebar, header, content area render
+    - Click "New Project" — verify modal opens with correct form fields
+    - Submit form with empty name — verify inline validation error appears
+    - Submit valid form — verify success toast and redirect to /projects/{id}
+  </test-flows>
+</task>
+```
+
+**How the coordinator handles it:**
+The phase coordinator runs an automated 3-round QA loop:
+- Round 1: spawn gsd-charlotte-qa → if issues found → spawn fix subagent → commit → restart if needed
+- Round 2: re-run gsd-charlotte-qa → if issues → spawn fix subagent
+- Round 3: re-run gsd-charlotte-qa → if still issues → escalate to human with report
+- If clean at any round → continue to next task
+
+**Example:**
+```xml
+<task type="auto">
+  <name>Build player detail page</name>
+  <files>src/app/players/[id]/page.tsx, src/components/PlayerCard.tsx</files>
+  <action>Create player detail page with profile section, KYC status badge, session history table</action>
+  <verify>npm run build succeeds, no TypeScript errors</verify>
+  <done>Player detail page builds without errors</done>
+</task>
+
+<task type="checkpoint:ui-qa" gate="blocking">
+  <what-built>Player detail page at /players/[id] — dev server already running</what-built>
+  <test-flows>
+    - Navigate to /players — click first player row — verify detail page loads with player name and email
+    - Verify KYC status badge shows correct color (green=verified, yellow=pending, red=rejected)
+    - Verify session history table loads with data, pagination works
+    - Verify breadcrumb shows: Home > Players > {player name}
+    - Click "Back to Players" — verify navigates to /players list
+  </test-flows>
+</task>
+```
+</type>
 </checkpoint_types>
 
 <execution_protocol>
@@ -763,9 +825,10 @@ Checkpoints formalize human-in-the-loop points for verification and decisions, n
 **The golden rule:** If Claude CAN automate it, Claude MUST automate it.
 
 **Checkpoint priority:**
-1. **checkpoint:human-verify** (90%) - Claude automated everything, human confirms visual/functional correctness
-2. **checkpoint:decision** (9%) - Human makes architectural/technology choices
-3. **checkpoint:human-action** (1%) - Truly unavoidable manual steps with no API/CLI
+1. **checkpoint:ui-qa** (automated web QA) - Charlotte browser agent tests web UI; human only if 3 rounds fail
+2. **checkpoint:human-verify** (non-web verification) - macOS apps, audio, Xcode builds, anything Charlotte can't test
+3. **checkpoint:decision** (9%) - Human makes architectural/technology choices
+4. **checkpoint:human-action** (1%) - Truly unavoidable manual steps with no API/CLI
 
 **When NOT to use checkpoints:**
 - Things Claude can verify programmatically (tests, builds)
