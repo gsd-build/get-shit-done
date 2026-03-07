@@ -594,6 +594,37 @@ Some things can't be verified programmatically. Flag these for human testing:
 
 </human_verification_triggers>
 
+<database_migrations>
+
+## Database Migrations
+
+### Migration Checklist
+- [ ] Column names in application INSERT/UPDATE match actual migration column names exactly
+- [ ] No `ALTER DEFAULT PRIVILEGES ... GRANT` without explicit RLS on every affected table
+- [ ] New tables have RLS enabled and at least one policy
+- [ ] RPC parameters validated (type constraints, allowlists) — never accept unconstrained TEXT for enums
+- [ ] `SELECT ... FOR UPDATE` used when a read-then-write must be atomic (reversals, chargebacks, one-time codes)
+- [ ] Prefer set-based CTEs over PL/pgSQL loops for batch operations
+- [ ] Indexes exist for WHERE clauses in background jobs and frequent queries — avoid function wrappers (e.g., `DATE(col)`) that prevent index use
+
+</database_migrations>
+
+<security_sensitive_handlers>
+
+## Security-Sensitive Handler Checklist
+
+For payment, webhook, auth, and wallet handlers:
+- [ ] HMAC/signature verification is constant-time (no early return on length mismatch)
+- [ ] Missing credentials = reject (not skip verification)
+- [ ] Idempotency check at handler entry — same pattern as sibling handlers
+- [ ] Input fields validated against allowlist/schema before DB use (sessionId format, status enum)
+- [ ] Rate limiting present on public endpoints
+- [ ] Audit log INSERT uses correct column names (verify against schema)
+- [ ] Operation ordering: reserve/lock resources BEFORE calling external services
+- [ ] Timestamp/replay protection enforced on secured endpoints
+
+</security_sensitive_handlers>
+
 <checkpoint_automation_reference>
 
 ## Pre-Checkpoint Automation
