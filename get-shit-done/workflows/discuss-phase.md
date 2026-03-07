@@ -109,6 +109,8 @@ Phase: "API documentation"
 
 **Express path available:** If you already have a PRD or acceptance criteria document, use `/gsd:plan-phase {phase} --prd path/to/prd.md` to skip this discussion and go straight to planning.
 
+**Document-assisted path:** If you have reference documents, use `/gsd:discuss-phase {phase} --docs path/to/prd.md,path/to/spec.md` to auto-extract decisions from them.
+
 <step name="initialize" priority="first">
 Phase number from argument (required).
 
@@ -145,7 +147,7 @@ Use AskUserQuestion:
   - "View it" — Show me what's there
   - "Skip" — Use existing context as-is
 
-If "Update": Load existing, continue to analyze_phase
+If "Update": Load existing, continue to parse_docs_flag
 If "View": Display CONTEXT.md, then offer update/skip
 If "Skip": Exit workflow
 
@@ -161,11 +163,50 @@ Use AskUserQuestion:
   - "View existing plans" — Show plans before deciding
   - "Cancel" — Skip discuss-phase
 
-If "Continue and replan after": Continue to analyze_phase.
+If "Continue and replan after": Continue to parse_docs_flag.
 If "View existing plans": Display plan files, then offer "Continue" / "Cancel".
 If "Cancel": Exit workflow.
 
-**If `has_plans` is false:** Continue to analyze_phase.
+**If `has_plans` is false:** Continue to parse_docs_flag.
+</step>
+
+<step name="parse_docs_flag">
+Check $ARGUMENTS for --docs flag.
+
+**If --docs present:**
+Extract paths after --docs flag. Split by comma, trim whitespace.
+
+Validate each path:
+```bash
+for doc in "${DOC_PATHS[@]}"; do
+  doc=$(echo "$doc" | xargs)  # trim whitespace
+  if [ -f "$doc" ]; then
+    # Add to valid_docs
+  else
+    # Add to invalid_docs
+  fi
+done
+```
+
+**If any paths invalid:**
+```
+Note: Could not find: {invalid_docs}
+Continuing with: {valid_docs}
+```
+
+**If all paths invalid:**
+```
+None of the specified documents could be found.
+Falling back to standard discuss-phase flow.
+```
+Set `has_docs=false`, proceed to analyze_phase.
+
+**If has valid docs:**
+Set `has_docs=true`, `valid_docs` list stored for extract_from_docs step.
+Proceed to extract_from_docs (added in plan 02).
+
+**If --docs flag not present:**
+Set `has_docs=false`, proceed to analyze_phase.
 </step>
 
 <step name="analyze_phase">
