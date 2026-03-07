@@ -1,0 +1,41 @@
+# Supabase local dev config
+# Docs: https://supabase.com/docs/guides/cli/config
+
+[api]
+port = 54321
+schemas = ["public"]
+extra_search_path = ["public", "extensions"]
+max_rows = 1000
+
+[db]
+port = 54322
+shadow_port = 54320
+major_version = 15
+
+[studio]
+port = 54323
+
+[inbucket]
+port = 54324
+
+[storage]
+file_size_limit = "50MiB"
+
+[auth]
+site_url = "concertpassport://"
+additional_redirect_urls = ["https://localhost:3000"]
+jwt_expiry = 3600
+enable_refresh_token_rotation = true
+refresh_token_reuse_interval = 10
+enable_signup = true
+
+[auth.email]
+enable_signup = true
+double_confirm_changes = true
+enable_confirmations = false
+
+[auth.external.spotify]
+enabled = true
+client_id = "env(SPOTIFY_CLIENT_ID)"
+secret = "env(SPOTIFY_CLIENT_SECRET)"
+redirect_uri = "concertpassport://auth/callback"

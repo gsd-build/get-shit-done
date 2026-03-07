@@ -1,0 +1,48 @@
+{
+  "expo": {
+    "name": "Concert Passport",
+    "slug": "concert-passport",
+    "version": "1.0.0",
+    "orientation": "portrait",
+    "icon": "./src/assets/icon.png",
+    "userInterfaceStyle": "dark",
+    "splash": {
+      "image": "./src/assets/splash.png",
+      "resizeMode": "contain",
+      "backgroundColor": "#0d0d1a"
+    },
+    "ios": {
+      "supportsTablet": false,
+      "bundleIdentifier": "com.concertpassport.app",
+      "infoPlist": {
+        "NSCameraUsageDescription": "Used to capture photos at concerts for your log."
+      }
+    },
+    "android": {
+      "adaptiveIcon": {
+        "foregroundImage": "./src/assets/adaptive-icon.png",
+        "backgroundColor": "#0d0d1a"
+      },
+      "package": "com.concertpassport.app",
+      "permissions": ["CAMERA"]
+    },
+    "plugins": [
+      "expo-router",
+      "expo-font",
+      [
+        "expo-camera",
+        { "cameraPermission": "Used to capture photos at concerts." }
+      ]
+    ],
+    "scheme": "concertpassport",
+    "extra": {
+      "supabaseUrl": "",
+      "supabaseAnonKey": "",
+      "spotifyClientId": "",
+      "setlistfmApiKey": "",
+      "eas": {
+        "projectId": ""
+      }
+    }
+  }
+}

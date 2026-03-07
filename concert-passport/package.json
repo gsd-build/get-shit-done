@@ -1,0 +1,30 @@
+{
+  "name": "concert-passport",
+  "version": "0.1.0",
+  "private": true,
+  "workspaces": [
+    "apps/*",
+    "packages/*"
+  ],
+  "scripts": {
+    "dev:mobile": "yarn workspace @concert-passport/mobile start",
+    "dev:web": "yarn workspace @concert-passport/web dev",
+    "dev:api": "yarn workspace @concert-passport/api dev",
+    "db:push": "supabase db push",
+    "db:seed": "supabase db reset --db-url $DATABASE_URL",
+    "db:types": "supabase gen types typescript --local > packages/db/src/database.types.ts",
+    "lint": "eslint . --ext .ts,.tsx",
+    "typecheck": "tsc --noEmit -p tsconfig.json"
+  },
+  "devDependencies": {
+    "@typescript-eslint/eslint-plugin": "^7.0.0",
+    "@typescript-eslint/parser": "^7.0.0",
+    "eslint": "^8.57.0",
+    "supabase": "^1.142.0",
+    "typescript": "^5.4.0"
+  },
+  "engines": {
+    "node": ">=20.0.0",
+    "yarn": ">=1.22.0"
+  }
+}

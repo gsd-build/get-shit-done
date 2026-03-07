@@ -1,0 +1,15 @@
+node_modules/
+.expo/
+dist/
+build/
+.env
+.env.local
+*.tsbuildinfo
+
+# Supabase
+supabase/.branches
+supabase/.temp
+
+# OS
+.DS_Store
+Thumbs.db
