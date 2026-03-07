@@ -203,10 +203,114 @@ Set `has_docs=false`, proceed to analyze_phase.
 
 **If has valid docs:**
 Set `has_docs=true`, `valid_docs` list stored for extract_from_docs step.
-Proceed to extract_from_docs (added in plan 02).
+Proceed to extract_from_docs.
 
 **If --docs flag not present:**
 Set `has_docs=false`, proceed to analyze_phase.
+</step>
+
+<step name="extract_from_docs">
+**Requires:** has_docs=true, valid_docs list from parse_docs_flag
+
+For each document in valid_docs:
+
+1. Read the document:
+   - If large (> 1000 lines), use focused search based on phase gray areas
+   - Otherwise, read entire document
+
+2. Identify phase gray areas (same analysis as analyze_phase step)
+
+3. For each gray area, search for relevant content and classify:
+
+**Classification tiers:**
+- **Explicit** — Direct statement with quotable text
+  - Notation: `[from: filename.md, "Section Name"]`
+- **Inferred** — Reasonable conclusion from context
+  - Only when evidence is strong
+  - Notation: `[inferred from: filename.md, "Section Name"]`
+- **Ambiguous** — Conflicting information found
+  - Present both signals with sources
+  - Notation: `[ambiguous: file1.md says X, file2.md says Y]`
+- **Gap** — No coverage found for this area
+  - Route to standard questioning
+  - Notation: `[gap - needs user input]`
+
+4. Compile findings into extraction_results structure:
+
+```markdown
+### Extracted Decisions
+
+**From prd.md:**
+| Gray Area | Finding | Classification | Location |
+|-----------|---------|----------------|----------|
+| Layout | "Use card-based layout" | Explicit | UI Requirements |
+| Loading | "smooth experience" | Inferred | Performance section |
+
+**From spec.md:**
+| Gray Area | Finding | Classification | Location |
+|-----------|---------|----------------|----------|
+| Loading | "Paginate 20 items" | Explicit | Data Loading |
+```
+
+5. Detect conflicts (same area, different answers) - mark as Ambiguous
+
+Store extraction_results for present_extractions step.
+Proceed to present_extractions.
+</step>
+
+<step name="present_extractions">
+**Requires:** extraction_results from extract_from_docs
+
+Group by resolution status:
+
+**Resolved (Explicit + Inferred):**
+```
+## Decisions Extracted from Documents
+
+### [Area] (from source.md)
+- Decision [Classification]
+```
+
+**Needs Resolution (Ambiguous):**
+```
+### Conflicts Found
+
+**[Area]:**
+- file1.md: "option A"
+- file2.md: "option B"
+
+Which approach?
+```
+
+**Gaps:**
+```
+### Areas Not Covered by Documents
+
+- [gap area 1]
+- [gap area 2]
+```
+
+Use AskUserQuestion:
+- header: "Review"
+- question: "Review the extracted decisions above. Correct anything, then we'll discuss the gaps."
+- options:
+  - "Looks good, discuss gaps" - route gaps to discuss_areas
+  - "I want to change something" - allow inline overrides
+
+**If user overrides:**
+For each override: "Doc said X, user chose Y [override]"
+Update extraction_results with user_overrides.
+
+**If all areas resolved (no gaps, no ambiguous):**
+- question: "Documents resolved all gray areas. Create CONTEXT.md?"
+- options: "Yes, create it" / "I want to discuss something first"
+
+**Routing:**
+- resolved_areas = Explicit + Inferred + user-resolved Ambiguous (skip in discuss_areas)
+- pending_areas = gaps + remaining ambiguous (route to discuss_areas)
+
+If pending_areas empty and user confirms: proceed to write_context.
+Otherwise: proceed to discuss_areas with pending_areas only.
 </step>
 
 <step name="analyze_phase">
