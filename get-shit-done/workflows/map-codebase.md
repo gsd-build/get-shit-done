@@ -22,29 +22,23 @@ Documents are reference material for Claude when planning/executing. Always incl
 
 <process>
 
-<step name="resolve_model_profile" priority="first">
-Read model profile for agent spawning:
+<step name="init_context" priority="first">
+Load codebase mapping context:
 
 ```bash
-MODEL_PROFILE=$(cat .planning/config.json 2>/dev/null | grep -o '"model_profile"[[:space:]]*:[[:space:]]*"[^"]*"' | grep -o '"[^"]*"$' | tr -d '"' || echo "balanced")
+INIT=$(node "$HOME/.claude/get-shit-done/bin/gsd-tools.cjs" init map-codebase)
+if [[ "$INIT" == @file:* ]]; then INIT=$(cat "${INIT#@file:}"); fi
 ```
 
-Default to "balanced" if not set.
-
-**Model lookup table:**
-
-| Agent | quality | balanced | budget |
-|-------|---------|----------|--------|
-| gsd-codebase-mapper | sonnet | haiku | haiku |
-
-Store resolved model for use in Task calls below.
+Extract from init JSON: `mapper_model`, `commit_docs`, `codebase_dir`, `existing_maps`, `has_maps`, `codebase_dir_exists`.
 </step>
 
 <step name="check_existing">
-Check if .planning/codebase/ already exists:
+Check if .planning/codebase/ already exists using `has_maps` from init context.
 
+If `codebase_dir_exists` is true:
 ```bash
-ls -la .planning/codebase/ 2>/dev/null
+ls -la .planning/codebase/
 ```
 
 **If exists:**
@@ -97,17 +91,13 @@ Use Task tool with `subagent_type="gsd-codebase-mapper"`, `model="{mapper_model}
 
 **Agent 1: Tech Focus**
 
-Task tool parameters:
 ```
-subagent_type: "gsd-codebase-mapper"
-model: "{mapper_model}"
-run_in_background: true
-description: "Map codebase tech stack"
-```
-
-Prompt:
-```
-Focus: tech
+Task(
+  subagent_type="gsd-codebase-mapper",
+  model="{mapper_model}",
+  run_in_background=true,
+  description="Map codebase tech stack",
+  prompt="Focus: tech
 
 Analyze this codebase for technology stack and external integrations.
 
@@ -115,22 +105,19 @@ Write these documents to .planning/codebase/:
 - STACK.md - Languages, runtime, frameworks, dependencies, configuration
 - INTEGRATIONS.md - External APIs, databases, auth providers, webhooks
 
-Explore thoroughly. Write documents directly using templates. Return confirmation only.
+Explore thoroughly. Write documents directly using templates. Return confirmation only."
+)
 ```
 
 **Agent 2: Architecture Focus**
 
-Task tool parameters:
 ```
-subagent_type: "gsd-codebase-mapper"
-model: "{mapper_model}"
-run_in_background: true
-description: "Map codebase architecture"
-```
-
-Prompt:
-```
-Focus: arch
+Task(
+  subagent_type="gsd-codebase-mapper",
+  model="{mapper_model}",
+  run_in_background=true,
+  description="Map codebase architecture",
+  prompt="Focus: arch
 
 Analyze this codebase architecture and directory structure.
 
@@ -138,22 +125,19 @@ Write these documents to .planning/codebase/:
 - ARCHITECTURE.md - Pattern, layers, data flow, abstractions, entry points
 - STRUCTURE.md - Directory layout, key locations, naming conventions
 
-Explore thoroughly. Write documents directly using templates. Return confirmation only.
+Explore thoroughly. Write documents directly using templates. Return confirmation only."
+)
 ```
 
 **Agent 3: Quality Focus**
 
-Task tool parameters:
 ```
-subagent_type: "gsd-codebase-mapper"
-model: "{mapper_model}"
-run_in_background: true
-description: "Map codebase conventions"
-```
-
-Prompt:
-```
-Focus: quality
+Task(
+  subagent_type="gsd-codebase-mapper",
+  model="{mapper_model}",
+  run_in_background=true,
+  description="Map codebase conventions",
+  prompt="Focus: quality
 
 Analyze this codebase for coding conventions and testing patterns.
 
@@ -161,29 +145,27 @@ Write these documents to .planning/codebase/:
 - CONVENTIONS.md - Code style, naming, patterns, error handling
 - TESTING.md - Framework, structure, mocking, coverage
 
-Explore thoroughly. Write documents directly using templates. Return confirmation only.
+Explore thoroughly. Write documents directly using templates. Return confirmation only."
+)
 ```
 
 **Agent 4: Concerns Focus**
 
-Task tool parameters:
 ```
-subagent_type: "gsd-codebase-mapper"
-model: "{mapper_model}"
-run_in_background: true
-description: "Map codebase concerns"
-```
-
-Prompt:
-```
-Focus: concerns
+Task(
+  subagent_type="gsd-codebase-mapper",
+  model="{mapper_model}",
+  run_in_background=true,
+  description="Map codebase concerns",
+  prompt="Focus: concerns
 
 Analyze this codebase for technical debt, known issues, and areas of concern.
 
 Write this document to .planning/codebase/:
 - CONCERNS.md - Tech debt, bugs, security, performance, fragile areas
 
-Explore thoroughly. Write document directly using template. Return confirmation only.
+Explore thoroughly. Write document directly using template. Return confirmation only."
+)
 ```
 
 Continue to collect_confirmations.
@@ -268,31 +250,8 @@ Continue to commit_codebase_map.
 <step name="commit_codebase_map">
 Commit the codebase map:
 
-**Check planning config:**
-
 ```bash
-COMMIT_PLANNING_DOCS=$(cat .planning/config.json 2>/dev/null | grep -o '"commit_docs"[[:space:]]*:[[:space:]]*[^,}]*' | grep -o 'true\|false' || echo "true")
-git check-ignore -q .planning 2>/dev/null && COMMIT_PLANNING_DOCS=false
-```
-
-**If `COMMIT_PLANNING_DOCS=false`:** Skip git operations
-
-**If `COMMIT_PLANNING_DOCS=true` (default):**
-
-```bash
-git add .planning/codebase/*.md
-git commit -m "$(cat <<'EOF'
-docs: map existing codebase
-
-- STACK.md - Technologies and dependencies
-- ARCHITECTURE.md - System design and patterns
-- STRUCTURE.md - Directory layout
-- CONVENTIONS.md - Code style and patterns
-- TESTING.md - Test structure
-- INTEGRATIONS.md - External services
-- CONCERNS.md - Technical debt and issues
-EOF
-)"
+node "$HOME/.claude/get-shit-done/bin/gsd-tools.cjs" commit "docs: map existing codebase" --files .planning/codebase/*.md
 ```
 
 Continue to offer_next.

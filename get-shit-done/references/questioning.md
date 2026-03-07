@@ -79,6 +79,7 @@ Use AskUserQuestion to help users think by presenting concrete options to react 
 - Generic categories ("Technical", "Business", "Other")
 - Leading options that presume an answer
 - Too many options (2-4 is ideal)
+- Headers longer than 12 characters (hard limit — validation will reject them)
 
 **Example — vague answer:**
 User says "it should be fast"
@@ -94,7 +95,27 @@ User mentions "frustrated with current tools"
 - question: "What specifically frustrates you?"
 - options: ["Too many clicks", "Missing features", "Unreliable", "Let me explain"]
 
+**Tip for users — modifying an option:**
+Users who want a slightly modified version of an option can select "Other" and reference the option by number: `#1 but for finger joints only` or `#2 with pagination disabled`. This avoids retyping the full option text.
+
 </using_askuserquestion>
+
+<freeform_rule>
+
+**When the user wants to explain freely, STOP using AskUserQuestion.**
+
+If a user selects "Other" and their response signals they want to describe something in their own words (e.g., "let me describe it", "I'll explain", "something else", or any open-ended reply that isn't choosing/modifying an existing option), you MUST:
+
+1. **Ask your follow-up as plain text** — NOT via AskUserQuestion
+2. **Wait for them to type at the normal prompt**
+3. **Resume AskUserQuestion** only after processing their freeform response
+
+The same applies if YOU include a freeform-indicating option (like "Let me explain" or "Describe in detail") and the user selects it.
+
+**Wrong:** User says "let me describe it" → AskUserQuestion("What feature?", ["Feature A", "Feature B", "Describe in detail"])
+**Right:** User says "let me describe it" → "Go ahead — what are you thinking?"
+
+</freeform_rule>
 
 <context_checklist>
 

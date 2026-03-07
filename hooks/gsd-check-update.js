@@ -9,12 +9,31 @@ const { spawn } = require('child_process');
 
 const homeDir = os.homedir();
 const cwd = process.cwd();
-const cacheDir = path.join(homeDir, '.claude', 'cache');
+
+// Detect runtime config directory (supports Claude, OpenCode, Gemini)
+// Respects CLAUDE_CONFIG_DIR for custom config directory setups
+function detectConfigDir(baseDir) {
+  // Check env override first (supports multi-account setups)
+  const envDir = process.env.CLAUDE_CONFIG_DIR;
+  if (envDir && fs.existsSync(path.join(envDir, 'get-shit-done', 'VERSION'))) {
+    return envDir;
+  }
+  for (const dir of ['.config/opencode', '.opencode', '.gemini', '.claude']) {
+    if (fs.existsSync(path.join(baseDir, dir, 'get-shit-done', 'VERSION'))) {
+      return path.join(baseDir, dir);
+    }
+  }
+  return envDir || path.join(baseDir, '.claude');
+}
+
+const globalConfigDir = detectConfigDir(homeDir);
+const projectConfigDir = detectConfigDir(cwd);
+const cacheDir = path.join(globalConfigDir, 'cache');
 const cacheFile = path.join(cacheDir, 'gsd-update-check.json');
 
 // VERSION file locations (check project first, then global)
-const projectVersionFile = path.join(cwd, '.claude', 'get-shit-done', 'VERSION');
-const globalVersionFile = path.join(homeDir, '.claude', 'get-shit-done', 'VERSION');
+const projectVersionFile = path.join(projectConfigDir, 'get-shit-done', 'VERSION');
+const globalVersionFile = path.join(globalConfigDir, 'get-shit-done', 'VERSION');
 
 // Ensure cache directory exists
 if (!fs.existsSync(cacheDir)) {
@@ -55,7 +74,8 @@ const child = spawn(process.execPath, ['-e', `
   fs.writeFileSync(cacheFile, JSON.stringify(result));
 `], {
   stdio: 'ignore',
-  windowsHide: true
+  windowsHide: true,
+  detached: true  // Required on Windows for proper process detachment
 });
 
 child.unref();

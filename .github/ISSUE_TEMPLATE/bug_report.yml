@@ -1,0 +1,59 @@
+---
+name: Bug Report
+description: Report something that is not working correctly
+labels: ["bug"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thanks for taking the time to report a bug. Please fill out the sections below.
+  - type: input
+    id: version
+    attributes:
+      label: GSD Version
+      description: "Run: npm list -g get-shit-done-cc"
+      placeholder: "e.g., 1.18.0"
+    validations:
+      required: true
+  - type: dropdown
+    id: runtime
+    attributes:
+      label: Runtime
+      options:
+        - Claude Code
+        - Gemini CLI
+        - OpenCode
+    validations:
+      required: true
+  - type: textarea
+    id: description
+    attributes:
+      label: What happened?
+      description: Describe what went wrong
+    validations:
+      required: true
+  - type: textarea
+    id: expected
+    attributes:
+      label: What did you expect?
+      description: Describe what you expected to happen
+    validations:
+      required: true
+  - type: textarea
+    id: reproduce
+    attributes:
+      label: Steps to reproduce
+      description: How can we reproduce this?
+      placeholder: |
+        1. Run /gsd:...
+        2. ...
+    validations:
+      required: true
+  - type: textarea
+    id: logs
+    attributes:
+      label: Relevant logs or error messages
+      description: Paste any error output (will be formatted as code)
+      render: shell
+    validations:
+      required: false

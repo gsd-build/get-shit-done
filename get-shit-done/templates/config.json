@@ -1,10 +1,12 @@
 {
   "mode": "interactive",
-  "depth": "standard",
+  "granularity": "standard",
   "workflow": {
     "research": true,
     "plan_check": true,
-    "verifier": true
+    "verifier": true,
+    "auto_advance": false,
+    "nyquist_validation": true
   },
   "planning": {
     "commit_docs": true,

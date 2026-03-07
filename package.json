@@ -1,7 +1,7 @@
 {
   "name": "get-shit-done-cc",
-  "version": "1.11.3",
-  "description": "A meta-prompting, context engineering and spec-driven development system for Claude Code, OpenCode, Gemini, and Qwen Code.",
+  "version": "1.22.4",
+  "description": "A meta-prompting, context engineering and spec-driven development system for Claude Code, OpenCode, Gemini, Codex, and Qwen Code by TÂCHES.",
   "bin": {
     "get-shit-done-cc": "bin/install.js"
   },
@@ -22,6 +22,8 @@
     "spec-driven-development",
     "gemini",
     "gemini-cli",
+    "codex",
+    "codex-cli",
     "qwen",
     "qwen-code",
     "qwen3-coder"
@@ -39,12 +41,14 @@
   "engines": {
     "node": ">=16.7.0"
   },
-  "dependencies": {},
   "devDependencies": {
+    "c8": "^11.0.0",
     "esbuild": "^0.24.0"
   },
   "scripts": {
     "build:hooks": "node scripts/build-hooks.js",
-    "prepublishOnly": "npm run build:hooks"
+    "prepublishOnly": "npm run build:hooks",
+    "test": "node scripts/run-tests.cjs",
+    "test:coverage": "c8 --check-coverage --lines 70 --reporter text --include 'get-shit-done/bin/lib/*.cjs' --exclude 'tests/**' --all node scripts/run-tests.cjs"
   }
 }

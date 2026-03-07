@@ -79,8 +79,8 @@ For each gap, fill the debug-subagent-prompt template and spawn:
 
 ```
 Task(
-  prompt=filled_debug_subagent_prompt,
-  subagent_type="general-purpose",
+  prompt=filled_debug_subagent_prompt + "\n\n<files_to_read>\n- {phase_dir}/{phase_num}-UAT.md\n- .planning/STATE.md\n</files_to_read>",
+  subagent_type="gsd-debugger",
   description="Debug: {truth_short}"
 )
 ```
@@ -156,21 +156,9 @@ For each gap in the Gaps section, add artifacts and missing fields:
 
 Update status in frontmatter to "diagnosed".
 
-**Check planning config:**
-
-```bash
-COMMIT_PLANNING_DOCS=$(cat .planning/config.json 2>/dev/null | grep -o '"commit_docs"[[:space:]]*:[[:space:]]*[^,}]*' | grep -o 'true\|false' || echo "true")
-git check-ignore -q .planning 2>/dev/null && COMMIT_PLANNING_DOCS=false
-```
-
-**If `COMMIT_PLANNING_DOCS=false`:** Skip git operations
-
-**If `COMMIT_PLANNING_DOCS=true` (default):**
-
 Commit the updated UAT.md:
 ```bash
-git add ".planning/phases/XX-name/{phase}-UAT.md"
-git commit -m "docs({phase}): add root causes from diagnosis"
+node "$HOME/.claude/get-shit-done/bin/gsd-tools.cjs" commit "docs({phase_num}): add root causes from diagnosis" --files ".planning/phases/XX-name/{phase_num}-UAT.md"
 ```
 </step>
 

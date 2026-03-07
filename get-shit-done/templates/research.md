@@ -1,6 +1,6 @@
 # Research Template
 
-Template for `.planning/phases/XX-name/{phase}-RESEARCH.md` - comprehensive ecosystem research before planning.
+Template for `.planning/phases/XX-name/{phase_num}-RESEARCH.md` - comprehensive ecosystem research before planning.
 
 **Purpose:** Document what Claude needs to know to implement a phase well - not just "which library" but "how do experts build this."
 
@@ -547,6 +547,6 @@ function useVehicleControls(rigidBodyRef) {
 - Code examples can be referenced in task actions
 
 **After creation:**
-- File lives in phase directory: `.planning/phases/XX-name/{phase}-RESEARCH.md`
+- File lives in phase directory: `.planning/phases/XX-name/{phase_num}-RESEARCH.md`
 - Referenced during planning workflow
 - plan-phase loads it automatically when present
