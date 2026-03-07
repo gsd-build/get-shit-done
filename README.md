@@ -214,6 +214,7 @@ You approve the roadmap. Now you're ready to build.
 
 ```
 /gsd:discuss-phase 1
+/gsd:discuss-phase 1 --docs docs/PRD.md,docs/SPEC.md
 ```
 
 **This is where you shape the implementation.**
@@ -231,6 +232,11 @@ For each area you select, it asks until you're satisfied. The output — `CONTEX
 
 1. **Researcher reads it** — Knows what patterns to investigate ("user wants card layout" → research card component libraries)
 2. **Planner reads it** — Knows what decisions are locked ("infinite scroll decided" → plan includes scroll handling)
+
+**Document-assisted mode:** Already have a PRD or spec? Use `--docs` to auto-extract decisions:
+- Reads your documents and classifies findings: **Explicit** (direct quotes), **Inferred** (reasonable conclusions), **Ambiguous** (conflicts), **Gap** (not covered)
+- Shows what was found before asking questions — only gaps need your input
+- CONTEXT.md includes provenance: `[from: prd.md]`, `[inferred: spec.md]`, `[user input]`
 
 The deeper you go here, the more the system builds what you actually want. Skip it and you get reasonable defaults. Use it and you get *your* vision.
 
@@ -467,7 +473,7 @@ You're never locked in. The system adapts.
 | Command | What it does |
 |---------|--------------|
 | `/gsd:new-project [--auto]` | Full initialization: questions → research → requirements → roadmap |
-| `/gsd:discuss-phase [N] [--auto]` | Capture implementation decisions before planning |
+| `/gsd:discuss-phase [N] [--auto] [--docs paths]` | Capture implementation decisions before planning (auto-extract from docs) |
 | `/gsd:plan-phase [N] [--auto]` | Research + plan + verify for a phase |
 | `/gsd:execute-phase <N>` | Execute all plans in parallel waves, verify when complete |
 | `/gsd:verify-work [N]` | Manual user acceptance testing ¹ |
