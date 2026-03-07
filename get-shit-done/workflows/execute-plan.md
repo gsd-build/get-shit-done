@@ -233,6 +233,14 @@ After each task (verification passed, done criteria met), commit immediately.
 
 **1. Check:** `git status --short`
 
+**1b. Pre-commit correctness scan** (silent bugs often pass tests):
+- [ ] **Column/field names:** Do INSERT/UPDATE column names match the actual DB schema or migration? (e.g. `payload` vs `payload_redacted`)
+- [ ] **Operation ordering:** For multi-step flows (reserve-then-dispatch, validate-then-write), is the sequence correct? Check that preconditions execute before dependent operations.
+- [ ] **Security gates:** Does new handler/endpoint code include required auth checks, input validation, rate limiting, and idempotency where applicable?
+- [ ] **Migration privileges:** Does any new GRANT or ALTER DEFAULT PRIVILEGES follow least-privilege? No blanket grants to `authenticated` without RLS.
+- [ ] **Concurrency safety:** Any SELECT-then-UPDATE pattern without `FOR UPDATE`? Any read-validate-write that needs atomicity?
+- [ ] **Set-based SQL:** Any PL/pgSQL loop that could be a single CTE or bulk UPDATE?
+
 **2. Stage individually** (NEVER `git add .` or `git add -A`):
 ```bash
 git add src/api/auth.ts
