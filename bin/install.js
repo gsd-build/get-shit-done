@@ -769,6 +769,7 @@ function convertClaudeToGeminiAgent(content) {
   const lines = frontmatter.split('\n');
   const newLines = [];
   let inAllowedTools = false;
+  let inSkills = false;
   const tools = [];
 
   for (const line of lines) {
@@ -777,6 +778,7 @@ function convertClaudeToGeminiAgent(content) {
     // Convert allowed-tools YAML array to tools list
     if (trimmed.startsWith('allowed-tools:')) {
       inAllowedTools = true;
+      inSkills = false;
       continue;
     }
 
@@ -792,12 +794,20 @@ function convertClaudeToGeminiAgent(content) {
       } else {
         // tools: with no value means YAML array follows
         inAllowedTools = true;
+        inSkills = false;
       }
       continue;
     }
 
     // Strip color field (not supported by Gemini CLI, causes validation error)
     if (trimmed.startsWith('color:')) continue;
+
+    // Strip skills field (not supported by Gemini CLI, causes validation error)
+    if (trimmed.startsWith('skills:')) {
+      inSkills = true;
+      inAllowedTools = false;
+      continue;
+    }
 
     // Collect allowed-tools/tools array items
     if (inAllowedTools) {
@@ -810,7 +820,16 @@ function convertClaudeToGeminiAgent(content) {
       }
     }
 
-    if (!inAllowedTools) {
+    // Skip skills array items
+    if (inSkills) {
+      if (trimmed.startsWith('- ')) {
+        continue;
+      } else if (trimmed && !trimmed.startsWith('-')) {
+        inSkills = false;
+      }
+    }
+
+    if (!inAllowedTools && !inSkills) {
       newLines.push(line);
     }
   }
@@ -868,6 +887,7 @@ function convertClaudeToOpencodeFrontmatter(content) {
   const lines = frontmatter.split('\n');
   const newLines = [];
   let inAllowedTools = false;
+  let inSkills = false;
   const allowedTools = [];
 
   for (const line of lines) {
@@ -876,6 +896,7 @@ function convertClaudeToOpencodeFrontmatter(content) {
     // Detect start of allowed-tools array
     if (trimmed.startsWith('allowed-tools:')) {
       inAllowedTools = true;
+      inSkills = false;
       continue;
     }
 
@@ -913,6 +934,13 @@ function convertClaudeToOpencodeFrontmatter(content) {
       continue;
     }
 
+    // Strip skills field (not supported by OpenCode, avoid validation errors)
+    if (trimmed.startsWith('skills:')) {
+      inSkills = true;
+      inAllowedTools = false;
+      continue;
+    }
+
     // Collect allowed-tools items
     if (inAllowedTools) {
       if (trimmed.startsWith('- ')) {
@@ -924,8 +952,17 @@ function convertClaudeToOpencodeFrontmatter(content) {
       }
     }
 
+    // Skip skills array items
+    if (inSkills) {
+      if (trimmed.startsWith('- ')) {
+        continue;
+      } else if (trimmed && !trimmed.startsWith('-')) {
+        inSkills = false;
+      }
+    }
+
     // Keep other fields (including name: which opencode ignores)
-    if (!inAllowedTools) {
+    if (!inAllowedTools && !inSkills) {
       newLines.push(line);
     }
   }
