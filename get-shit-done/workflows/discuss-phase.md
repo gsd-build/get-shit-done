@@ -461,7 +461,75 @@ mkdir -p ".planning/phases/${padded_phase}-${phase_slug}"
 
 **File location:** `${phase_dir}/${padded_phase}-CONTEXT.md`
 
-**Structure the content by what was discussed:**
+**If has_docs is true:**
+
+Use enhanced template with provenance:
+
+```markdown
+# Phase [X]: [Name] - Context
+
+**Gathered:** [date]
+**Status:** Ready for planning
+**Source:** Document extraction + user input
+
+<documents_used>
+## Documents Used
+
+| Document | Coverage | Quality |
+|----------|----------|---------|
+| [doc] | [areas covered] | [HIGH/MEDIUM/LOW] |
+
+</documents_used>
+
+<domain>
+## Phase Boundary
+
+[Clear statement of what this phase delivers — the scope anchor]
+
+</domain>
+
+<decisions>
+## Implementation Decisions
+
+### [Area that was discussed]
+- Decision [from: source.md]
+- Decision [inferred: source.md]
+- Decision [override: doc said X, user chose Y]
+- Decision [user input]
+
+### Claude's Discretion
+- Item [gap - no doc coverage]
+
+</decisions>
+
+<specifics>
+## Specific Ideas
+
+[Any particular references, examples, or "I want it like X" moments from discussion]
+
+[If none: "No specific requirements — open to standard approaches"]
+
+</specifics>
+
+<deferred>
+## Deferred Ideas
+
+[Ideas that came up but belong in other phases. Don't lose them.]
+
+[If none: "None — discussion stayed within phase scope"]
+
+</deferred>
+
+---
+
+*Phase: XX-name*
+*Context gathered: [date]*
+*Source documents: [list of docs used]*
+```
+
+**If has_docs is false:**
+
+Use standard template (unchanged):
 
 ```markdown
 # Phase [X]: [Name] - Context
