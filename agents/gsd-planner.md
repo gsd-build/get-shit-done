@@ -494,7 +494,7 @@ After determining `files_modified`, extract the key interfaces/types/exports fro
 
 ```bash
 # Extract type definitions, interfaces, and exports from relevant files
-grep -n "export\|interface\|type\|class\|function" {relevant_source_files} 2>/dev/null | head -50
+grep -n "export\\|interface\\|type\\|class\\|function" {relevant_source_files} 2>/dev/null | head -50
 ```
 
 Embed these in the plan's `<context>` section as an `<interfaces>` block:
