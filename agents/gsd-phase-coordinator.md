@@ -752,6 +752,197 @@ For each incomplete plan (no SUMMARY.md):
 **On classifyHandoffIfNeeded error:** Claude Code runtime bug — not a plan failure. Spot-check (SUMMARY.md + commits) to confirm success before treating as failed.
 </step>
 
+<checkpoint_ui_qa_loop>
+
+## UI QA Checkpoint Loop
+
+When the executor agent returns a checkpoint message with `Type: ui-qa`, the coordinator runs an automated QA loop before continuing plan execution.
+
+**Trigger:** Executor returns `## CHECKPOINT REACHED` with `Type: ui-qa`.
+
+**Extract from checkpoint message:**
+- `what_built`: from the `<what-built>` tag in the checkpoint task
+- `test_flows`: from the `<test-flows>` tag in the checkpoint task
+
+**Loop (max 3 rounds):**
+
+```
+MAX_ROUNDS = 3
+round = 1
+qa_passed = false
+previous_issues = null
+previous_report = null
+
+while round <= MAX_ROUNDS AND qa_passed == false:
+
+  // --- STEP A: Run QA Agent ---
+  qa_result = Task(
+    subagent_type="gsd-charlotte-qa",
+    model="haiku",
+    prompt="
+      <what_built>{what_built}</what_built>
+      <test_flows>{test_flows}</test_flows>
+      <round>{round}</round>
+      {IF round > 1: <previous_issues>{previous_report}</previous_issues>}
+    "
+  )
+
+  Parse qa_result JSON:
+    qa_passed = qa_result.passed
+    issue_count = qa_result.issue_count
+    severity_counts = qa_result.severity_counts
+    issues = qa_result.issues
+    report_markdown = qa_result.report_markdown
+    screenshots = qa_result.screenshots
+
+  Log: "QA Round {round}: {issue_count} issues (Critical: {critical}, High: {high}, Medium: {medium}, Low: {low})"
+
+  // --- STEP B: If clean, exit loop ---
+  if qa_passed:
+    Log: "QA passed on round {round} — continuing plan execution"
+    break
+
+  // --- STEP C: If round == MAX_ROUNDS and still failing, escalate to human ---
+  if round == MAX_ROUNDS AND NOT qa_passed:
+    // Build human escalation message
+    Send Telegram notification (if telegram_topic_id is not null):
+      mcp__telegram__send_message({
+        text: "UI QA: {issue_count} issues remain after {MAX_ROUNDS} rounds. Human review needed.\n\nCritical: {critical} | High: {high} | Medium: {medium} | Low: {low}\n\nResume to continue or 'stop' to halt.",
+        thread_id: telegram_topic_id (if set)
+      })
+
+    // Return human checkpoint
+    Return checkpoint message to parent:
+    ```
+    ╔═══════════════════════════════════════════════════════╗
+    ║  UI QA: Human Review Required                         ║
+    ╚═══════════════════════════════════════════════════════╝
+
+    Charlotte ran {MAX_ROUNDS} QA rounds. {issue_count} issues remain unfixed.
+
+    Severity: Critical: {critical} | High: {high} | Medium: {medium} | Low: {low}
+
+    Issues summary:
+    {list top 5 issues by severity}
+
+    Full QA report:
+    {report_markdown}
+
+    ────────────────────────────────────────────────────────
+    → Type "continue" to proceed despite issues, or describe what to fix
+    ────────────────────────────────────────────────────────
+    ```
+    Wait for user response. If "continue": proceed to next task. Else: implement requested fix and re-run QA.
+    break
+
+  // --- STEP D: Spawn fix subagent ---
+  // Determine fix subagent tier based on worst severity
+  if severity_counts.critical > 0 OR severity_counts.high > 0:
+    FIX_TIER = "sonnet"
+  else:
+    FIX_TIER = "haiku"
+
+  // Build fix prompt from issues report
+  fix_result = Task(
+    subagent_type="general-purpose",
+    model="{FIX_TIER}",
+    prompt="
+      You are a senior engineer fixing UI/UX issues found during automated QA testing.
+
+      ## Your task
+      Fix the issues listed below. Do not refactor surrounding code. Only fix what is listed.
+      Commit each logical fix atomically: `fix([scope]): [what was fixed]`
+
+      ## Codebase context
+      Read the project's CLAUDE.md to understand:
+      - Project structure and file layout
+      - Framework and stack (Next.js, Vite, etc.)
+      - Component library (shadcn/ui, MUI, etc.)
+      - Code style and patterns
+
+      ## Issues to fix
+      {report_markdown}
+
+      ## Investigation approach
+      1. Read the full issue report
+      2. Group issues by root cause (multiple issues may share one fix)
+      3. Prioritize: Critical → High → Medium → Low
+      4. Use LSP workspaceSymbol/goToDefinition to locate components before editing
+      5. Read files before editing — never edit blind
+
+      ## Common fix patterns
+      - Free-text → dropdown: replace `<Input>` with `<Select>` for predefined-value fields
+      - Missing loading state: add `isPending` to disable button + show spinner
+      - Missing success toast: add `toast.success()` in mutation onSuccess
+      - Page crash on undefined: add optional chaining (`?.`) and null guards
+      - Breadcrumbs missing: add `<Breadcrumb>` component at top of page
+      - Unclickable ID: wrap in `<Link href={...}>` with underline styling
+      - Table overflow: wrap in `<div className='overflow-x-auto'>`
+      - Navigation broken: check if inside `<form>` element; add `type='button'` to links
+
+      ## After each fix
+      - Run type-check: `npx tsc --noEmit` (or project equivalent)
+      - Run lint: `npm run lint` (or project equivalent)
+      - Commit with format: `fix([scope]): [what was fixed]`
+
+      ## Output when done
+      Return a JSON summary:
+      {
+        'issues_fixed': ['ISSUE-001', 'ISSUE-002'],
+        'issues_deferred': [{'id': 'ISSUE-003', 'reason': 'requires design decision'}],
+        'commits': ['abc1234: fix(dashboard): add breadcrumb navigation'],
+        'needs_restart': true | false
+      }
+
+      Set `needs_restart: true` if any fix modified server-side files (API routes, server components, config files) that require a dev server restart to take effect. Set `false` for client-side only changes.
+    "
+  )
+
+  Parse fix_result JSON:
+    issues_fixed = fix_result.issues_fixed
+    needs_restart = fix_result.needs_restart
+
+  Log: "Fix round {round}: {issues_fixed.length} issues fixed, needs_restart: {needs_restart}"
+
+  // --- STEP E: Restart if needed ---
+  if needs_restart:
+    Log: "Restart signal received — checking service health"
+
+    // Wait briefly for process to die
+    Bash: sleep 3
+
+    // Re-read health check command from CLAUDE.md (or use default)
+    QA_HEALTH_CMD = parse from CLAUDE.md `## QA / Dev Server` or default: `curl -s -o /dev/null -w "%{http_code}" http://localhost:3000`
+    QA_LAUNCH_CMD = parse from CLAUDE.md or default: `npm run dev`
+
+    HTTP_CODE = Bash: eval "{QA_HEALTH_CMD}"
+
+    if HTTP_CODE != "200":
+      // Server stopped — relaunch
+      Log: "Server stopped — relaunching"
+      Bash: eval "{QA_LAUNCH_CMD}" &
+      Bash: timeout 60 bash -c "until eval '{QA_HEALTH_CMD}' | grep -q '200'; do sleep 2; done"
+      HTTP_CODE = Bash: eval "{QA_HEALTH_CMD}"
+      if HTTP_CODE != "200":
+        Log: "ERROR: Service failed to restart — escalating to human"
+        // Fall through to human escalation
+        round = MAX_ROUNDS  // Force human escalation on next iteration
+    else:
+      Log: "Server still healthy — hot-reload took effect"
+
+  // --- STEP F: Prepare for next round ---
+  previous_report = report_markdown
+  round = round + 1
+
+// End of loop
+```
+
+**After loop completes successfully (qa_passed == true):** Continue plan execution from the next task after the checkpoint:ui-qa task.
+
+**Note on commit handling:** The fix subagent commits its own changes atomically per fix. The coordinator does not make additional commits for the QA loop — only the executor's per-task commits and the final summary commit exist.
+
+</checkpoint_ui_qa_loop>
+
 <step name="verify">
 Verify phase goal achieved using VERIFICATION.md:
 
