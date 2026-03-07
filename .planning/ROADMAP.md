@@ -132,6 +132,24 @@ Plans:
 - [ ] 10-03-PLAN.md — Multi-milestone state tracking
 - [ ] 10-04-PLAN.md — Migration tool and backward compatibility
 
+### Phase 11: Add --docs flag to discuss-phase for document-assisted context extraction
+
+**Goal:** Enable document-assisted context extraction by adding --docs flag to discuss-phase that auto-extracts implementation decisions from reference documents (PRD, spec, etc.) with four-tier confidence classification, only prompting users for gaps and ambiguities
+**Depends on:** Phase 10
+**Requirements**: TBD
+**Success Criteria** (what must be TRUE):
+  1. User can pass --docs flag with comma-separated document paths
+  2. Decisions are extracted from documents with four-tier classification (Explicit, Inferred, Ambiguous, Gap)
+  3. User sees grouped summary of extractions and can override any decision
+  4. Only gaps and ambiguities route to standard discuss-phase questioning
+  5. CONTEXT.md includes provenance notation showing decision sources
+  6. Standard discuss-phase flow (no --docs) remains unchanged
+**Plans:** 2 plans
+
+Plans:
+- [ ] 11-01-PLAN.md — Add --docs flag parsing and document path validation
+- [ ] 11-02-PLAN.md — Add extraction, presentation, and provenance-enhanced CONTEXT.md output
+
 ## Progress
 
 **Execution Order:**
@@ -146,7 +164,8 @@ Phases execute in numeric order: 5 -> 6 -> 6.1 -> 7 -> 8 -> 9
 | 8. Interactive & Integration | 4/4 | Complete | 2026-02-24 |
 | 9. Documentation | 0/? | Not started | - |
 | 10. Parallel Milestones | 0/4 | Not started | - |
+| 11. Document-assisted discuss-phase | 0/2 | Not started | - |
 
 ---
 *Roadmap created: 2026-02-23*
-*Last updated: 2026-02-24*
+*Last updated: 2026-03-07*
