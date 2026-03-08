@@ -361,12 +361,12 @@ const styles = StyleSheet.create({
     borderWidth:       2,
     borderColor:       '#000000',
     paddingVertical:   spacing.sm,
-    backgroundColor:   '#F0F0F0',
+    backgroundColor:   colors.surfaceRaised,
   },
   statDivider: {
     width:           2,
     height:          32,
-    backgroundColor: '#000000',
+    backgroundColor: colors.border,
   },
   statItem:  { alignItems: 'center', flex: 1 },
   statValue: {
@@ -555,9 +555,9 @@ const styles = StyleSheet.create({
   pageDot: {
     width:           8,
     height:          8,
-    backgroundColor: '#CCCCCC',
+    backgroundColor: colors.border,
     borderWidth:     1,
-    borderColor:     '#000000',
+    borderColor:     colors.border,
   },
   pageDotActive: {
     backgroundColor: colors.accent,
@@ -571,7 +571,7 @@ const styles = StyleSheet.create({
   },
   pageBinding: {
     width:            14,
-    backgroundColor:  '#000000',
+    backgroundColor:  colors.border,
   },
   pageContent: {
     flex:    1,
@@ -596,14 +596,14 @@ const styles = StyleSheet.create({
     height:       200,
     margin:       8,
     borderWidth:  2,
-    borderColor:  '#000000',
+    borderColor:  colors.border,
     borderStyle:  'dashed',
     alignItems:   'center',
     justifyContent: 'center',
   },
   emptyStampIcon: {
     fontSize:   24,
-    color:      '#CCCCCC',
+    color:      colors.textMuted,
     fontFamily: typography.mono,
   },
 });

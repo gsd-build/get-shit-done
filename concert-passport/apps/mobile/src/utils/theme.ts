@@ -4,15 +4,15 @@
 
 export const colors = {
   // Backgrounds
-  background:    '#FFFFFF',   // clean white
-  surface:       '#F7F5F0',   // warm off-white — cards, bottom bar
-  surfaceRaised: '#EDE9E0',   // modals, elevated cards
-  border:        '#E2DDD4',
+  background:    '#0D0D0D',   // near-black
+  surface:       '#1A1A1A',   // dark card surface
+  surfaceRaised: '#242424',   // elevated elements
+  border:        '#2E2E2E',
 
   // Text
-  text:          '#0A0908',   // warm near-black
-  textSecondary: '#5C5751',
-  textMuted:     '#A09890',
+  text:          '#F5F5F5',   // near-white
+  textSecondary: '#AAAAAA',
+  textMuted:     '#666666',
 
   // Brand — lime green
   accent:        '#ADFF2F',
