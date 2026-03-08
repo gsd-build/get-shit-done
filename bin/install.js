@@ -41,6 +41,7 @@ const hasOpencode = args.includes('--opencode');
 const hasClaude = args.includes('--claude');
 const hasGemini = args.includes('--gemini');
 const hasCodex = args.includes('--codex');
+const hasOpenHands = args.includes('--openhands');
 const hasBoth = args.includes('--both'); // Legacy flag, keeps working
 const hasAll = args.includes('--all');
 const hasUninstall = args.includes('--uninstall') || args.includes('-u');
@@ -48,7 +49,7 @@ const hasUninstall = args.includes('--uninstall') || args.includes('-u');
 // Runtime selection - can be set by flags or interactive prompt
 let selectedRuntimes = [];
 if (hasAll) {
-  selectedRuntimes = ['claude', 'opencode', 'gemini', 'codex'];
+  selectedRuntimes = ['claude', 'opencode', 'gemini', 'codex', 'openhands'];
 } else if (hasBoth) {
   selectedRuntimes = ['claude', 'opencode'];
 } else {
@@ -56,6 +57,7 @@ if (hasAll) {
   if (hasClaude) selectedRuntimes.push('claude');
   if (hasGemini) selectedRuntimes.push('gemini');
   if (hasCodex) selectedRuntimes.push('codex');
+  if (hasOpenHands) selectedRuntimes.push('openhands');
 }
 
 /**
@@ -78,6 +80,7 @@ function getDirName(runtime) {
   if (runtime === 'opencode') return '.opencode';
   if (runtime === 'gemini') return '.gemini';
   if (runtime === 'codex') return '.codex';
+  if (runtime === 'openhands') return '.agents';
   return '.claude';
 }
 
@@ -163,6 +166,17 @@ function getGlobalDir(runtime, explicitDir = null) {
     }
     return path.join(os.homedir(), '.codex');
   }
+
+  if (runtime === 'openhands') {
+    // OpenHands: --config-dir > OPENHANDS_CONFIG_DIR > ~/.agents
+    if (explicitDir) {
+      return expandTilde(explicitDir);
+    }
+    if (process.env.OPENHANDS_CONFIG_DIR) {
+      return expandTilde(process.env.OPENHANDS_CONFIG_DIR);
+    }
+    return path.join(os.homedir(), '.agents');
+  }
   
   // Claude Code: --config-dir > CLAUDE_CONFIG_DIR > ~/.claude
   if (explicitDir) {
@@ -218,7 +232,7 @@ console.log(banner);
 
 // Show help if requested
 if (hasHelp) {
-  console.log(`  ${yellow}Usage:${reset} npx get-shit-done-cc [options]\n\n  ${yellow}Options:${reset}\n    ${cyan}-g, --global${reset}              Install globally (to config directory)\n    ${cyan}-l, --local${reset}               Install locally (to current directory)\n    ${cyan}--claude${reset}                  Install for Claude Code only\n    ${cyan}--opencode${reset}                Install for OpenCode only\n    ${cyan}--gemini${reset}                  Install for Gemini only\n    ${cyan}--codex${reset}                   Install for Codex only\n    ${cyan}--all${reset}                     Install for all runtimes\n    ${cyan}-u, --uninstall${reset}           Uninstall GSD (remove all GSD files)\n    ${cyan}-c, --config-dir <path>${reset}   Specify custom config directory\n    ${cyan}-h, --help${reset}                Show this help message\n    ${cyan}--force-statusline${reset}        Replace existing statusline config\n\n  ${yellow}Examples:${reset}\n    ${dim}# Interactive install (prompts for runtime and location)${reset}\n    npx get-shit-done-cc\n\n    ${dim}# Install for Claude Code globally${reset}\n    npx get-shit-done-cc --claude --global\n\n    ${dim}# Install for Gemini globally${reset}\n    npx get-shit-done-cc --gemini --global\n\n    ${dim}# Install for Codex globally${reset}\n    npx get-shit-done-cc --codex --global\n\n    ${dim}# Install for all runtimes globally${reset}\n    npx get-shit-done-cc --all --global\n\n    ${dim}# Install to custom config directory${reset}\n    npx get-shit-done-cc --codex --global --config-dir ~/.codex-work\n\n    ${dim}# Install to current project only${reset}\n    npx get-shit-done-cc --claude --local\n\n    ${dim}# Uninstall GSD from Codex globally${reset}\n    npx get-shit-done-cc --codex --global --uninstall\n\n  ${yellow}Notes:${reset}\n    The --config-dir option is useful when you have multiple configurations.\n    It takes priority over CLAUDE_CONFIG_DIR / GEMINI_CONFIG_DIR / CODEX_HOME environment variables.\n`);
+  console.log(`  ${yellow}Usage:${reset} npx get-shit-done-cc [options]\n\n  ${yellow}Options:${reset}\n    ${cyan}-g, --global${reset}              Install globally (to config directory)\n    ${cyan}-l, --local${reset}               Install locally (to current directory)\n    ${cyan}--claude${reset}                  Install for Claude Code only\n    ${cyan}--opencode${reset}                Install for OpenCode only\n    ${cyan}--gemini${reset}                  Install for Gemini only\n    ${cyan}--codex${reset}                   Install for Codex only\n    ${cyan}--openhands${reset}               Install for OpenHands CLI only\n    ${cyan}--all${reset}                     Install for all runtimes\n    ${cyan}-u, --uninstall${reset}           Uninstall GSD (remove all GSD files)\n    ${cyan}-c, --config-dir <path>${reset}   Specify custom config directory\n    ${cyan}-h, --help${reset}                Show this help message\n    ${cyan}--force-statusline${reset}        Replace existing statusline config\n\n  ${yellow}Examples:${reset}\n    ${dim}# Interactive install (prompts for runtime and location)${reset}\n    npx get-shit-done-cc\n\n    ${dim}# Install for Claude Code globally${reset}\n    npx get-shit-done-cc --claude --global\n\n    ${dim}# Install for Gemini globally${reset}\n    npx get-shit-done-cc --gemini --global\n\n    ${dim}# Install for Codex globally${reset}\n    npx get-shit-done-cc --codex --global\n\n    ${dim}# Install for OpenHands CLI globally${reset}\n    npx get-shit-done-cc --openhands --global\n\n    ${dim}# Install for all runtimes globally${reset}\n    npx get-shit-done-cc --all --global\n\n    ${dim}# Install to custom config directory${reset}\n    npx get-shit-done-cc --codex --global --config-dir ~/.codex-work\n\n    ${dim}# Install to current project only${reset}\n    npx get-shit-done-cc --claude --local\n\n    ${dim}# Uninstall GSD from Codex globally${reset}\n    npx get-shit-done-cc --codex --global --uninstall\n\n  ${yellow}Notes:${reset}\n    The --config-dir option is useful when you have multiple configurations.\n    It takes priority over CLAUDE_CONFIG_DIR / GEMINI_CONFIG_DIR / CODEX_HOME environment variables.\n`);
   process.exit(0);
 }
 
@@ -737,6 +751,59 @@ function installCodexConfig(targetDir, agentsSrc) {
   mergeCodexConfig(configPath, gsdBlock);
 
   return agents.length;
+}
+
+/**
+ * Generate OpenHands skills from GSD agent definitions.
+ * OpenHands skills are directories with SKILL.md files containing YAML frontmatter.
+ * Structure: targetDir/gsd-<agent-name>/SKILL.md
+ */
+function installOpenHandsSkills(targetDir, agentsSrc) {
+  const skillsDir = targetDir;
+  fs.mkdirSync(skillsDir, { recursive: true });
+
+  const agentEntries = fs.readdirSync(agentsSrc).filter(f => f.startsWith('gsd-') && f.endsWith('.md'));
+  const openHandsPathPrefix = `${targetDir.replace(/\\/g, '/')}/`;
+  let count = 0;
+
+  for (const file of agentEntries) {
+    const content = fs.readFileSync(path.join(agentsSrc, file), 'utf8');
+    const { frontmatter, body } = extractFrontmatterAndBody(content);
+    const name = extractFrontmatterField(frontmatter, 'name') || file.replace('.md', '');
+    const description = extractFrontmatterField(frontmatter, 'description') || '';
+    
+    // Create skill directory
+    const skillDir = path.join(skillsDir, `gsd-${name}`);
+    fs.mkdirSync(skillDir, { recursive: true });
+
+    // Generate SKILL.md content for OpenHands
+    const skillContent = generateOpenHandsSkillMd(name, description, body, openHandsPathPrefix);
+    fs.writeFileSync(path.join(skillDir, 'SKILL.md'), skillContent);
+    
+    count++;
+  }
+
+  return count;
+}
+
+/**
+ * Generate SKILL.md content for OpenHands
+ */
+function generateOpenHandsSkillMd(name, description, body, pathPrefix) {
+  // Replace .claude paths with OpenHands config path
+  const adjustedBody = body
+    .replace(/~\/\.claude\//g, pathPrefix)
+    .replace(/\$HOME\/\.claude\//g, pathPrefix.replace('$HOME', os.homedir()));
+
+  return `---
+name: gsd-${name}
+description: ${description || 'GSD agent for ' + name}
+---
+
+# ${name}
+
+${adjustedBody}
+`;
 }
 
 /**
@@ -1876,6 +1943,7 @@ function install(isGlobal, runtime = 'claude') {
   const isOpencode = runtime === 'opencode';
   const isGemini = runtime === 'gemini';
   const isCodex = runtime === 'codex';
+  const isOpenHands = runtime === 'openhands';
   const dirName = getDirName(runtime);
   const src = path.join(__dirname, '..');
 
@@ -1899,6 +1967,7 @@ function install(isGlobal, runtime = 'claude') {
   if (isOpencode) runtimeLabel = 'OpenCode';
   if (isGemini) runtimeLabel = 'Gemini';
   if (isCodex) runtimeLabel = 'Codex';
+  if (isOpenHands) runtimeLabel = 'OpenHands';
 
   console.log(`  Installing for ${cyan}${runtimeLabel}${reset} to ${cyan}${locationLabel}${reset}\n`);
 
@@ -2114,6 +2183,13 @@ function install(isGlobal, runtime = 'claude') {
     const agentCount = installCodexConfig(targetDir, agentsSrc);
     console.log(`  ${green}✓${reset} Generated config.toml with ${agentCount} agent roles`);
     console.log(`  ${green}✓${reset} Generated ${agentCount} agent .toml config files`);
+    return { settingsPath: null, settings: null, statuslineCommand: null, runtime };
+  }
+
+  if (isOpenHands) {
+    // Generate OpenHands skills
+    const skillCount = installOpenHandsSkills(targetDir, agentsSrc);
+    console.log(`  ${green}✓${reset} Installed ${skillCount} GSD skills for OpenHands`);
     return { settingsPath: null, settings: null, statuslineCommand: null, runtime };
   }
 
