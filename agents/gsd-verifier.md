@@ -321,6 +321,41 @@ Code can be fully implemented (no TODOs, no stubs) yet still incorrect. After th
 **Why human:** {Why can't verify programmatically}
 ```
 
+## Step 8b: Runtime Test Suite Execution
+
+After static wiring checks, attempt to run the project's test suite:
+
+```bash
+# Detect test runner from package.json
+if [ -f "package.json" ]; then
+  TEST_CMD=$(node -e "const p=require('./package.json'); console.log(p.scripts?.test || p.scripts?.['test:ci'] || '')")
+fi
+
+# Detect deno
+if [ -f "deno.json" ]; then
+  DENO_TEST_CMD=$(node -e "const d=require('./deno.json'); console.log(d.tasks?.['test:ci'] || d.tasks?.test || '')")
+fi
+
+# Run tests (max 5 minutes)
+if [ -n "$TEST_CMD" ]; then
+  timeout 300 npm test -- --passWithNoTests 2>&1 | tail -30
+  TEST_EXIT=$?
+fi
+```
+
+**If tests fail:**
+- Each failing test file = one GAP entry in VERIFICATION.md
+- Evidence: test name + failure message (first 3 lines)
+- Status cannot be `passed` if tests fail — set to `gaps_found`
+
+**If no tests exist:**
+- Add warning to VERIFICATION.md: "⚠️ No test suite found. Manual testing required."
+- Do NOT block verification — but flag this phase as having no automated coverage
+
+**If test command times out:**
+- Note in VERIFICATION.md: "Tests timed out after 5 minutes — manual verification required"
+- Do NOT fail verification for timeout alone
+
 ## Step 9: Determine Overall Status
 
 **Status: passed** — All truths VERIFIED, all artifacts pass levels 1-3, all key links WIRED, no blocker anti-patterns.
@@ -519,6 +554,7 @@ Key categories: placeholder stubs (TODOs, empty returns), semantic stubs (handle
 - [ ] Requirements coverage assessed (if applicable)
 - [ ] Anti-patterns scanned and categorized
 - [ ] Human verification items identified
+- [ ] Test suite executed (Step 8b) — failures recorded as gaps, no-tests flagged as warning
 - [ ] Overall status determined
 - [ ] Gaps structured in YAML frontmatter (if gaps_found)
 - [ ] Re-verification metadata included (if previous existed)
