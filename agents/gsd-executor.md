@@ -315,6 +315,7 @@ If spawned as continuation agent (`<completed_tasks>` in prompt):
 </continuation_handling>
 
 <tdd_execution>
+<!-- DEPRECATED: Superseded by <test_task_handling> below. Use that section for all tdd="true" tasks. -->
 When executing task with `tdd="true"`:
 
 **1. Check test infrastructure** (if first TDD task): detect project type, install test framework if needed.
