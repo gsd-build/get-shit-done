@@ -10,7 +10,7 @@ export default function TabLayout() {
         headerShown: false,
         tabBarStyle: styles.tabBar,
         tabBarActiveTintColor: colors.accent,
-        tabBarInactiveTintColor: colors.textMuted,
+        tabBarInactiveTintColor: '#666666',
         tabBarShowLabel: true,
         tabBarLabelStyle: styles.tabLabel,
       }}
@@ -18,7 +18,7 @@ export default function TabLayout() {
       <Tabs.Screen
         name="index"
         options={{
-          title: 'Feed',
+          title: 'FEED',
           tabBarIcon: ({ color, size }) => (
             <Ionicons name="home-outline" size={size} color={color} />
           ),
@@ -27,7 +27,7 @@ export default function TabLayout() {
       <Tabs.Screen
         name="discover"
         options={{
-          title: 'Discover',
+          title: 'DISCOVER',
           tabBarIcon: ({ color, size }) => (
             <Ionicons name="search-outline" size={size} color={color} />
           ),
@@ -36,7 +36,7 @@ export default function TabLayout() {
       <Tabs.Screen
         name="log"
         options={{
-          title: 'Log Show',
+          title: 'LOG',
           tabBarIcon: ({ color, size }) => (
             <Ionicons name="add-circle" size={size} color={color} />
           ),
@@ -45,7 +45,7 @@ export default function TabLayout() {
       <Tabs.Screen
         name="passport"
         options={{
-          title: 'Passport',
+          title: 'PASSPORT',
           tabBarIcon: ({ color, size }) => (
             <Ionicons name="book-outline" size={size} color={color} />
           ),
@@ -54,7 +54,7 @@ export default function TabLayout() {
       <Tabs.Screen
         name="profile"
         options={{
-          title: 'Profile',
+          title: 'PROFILE',
           tabBarIcon: ({ color, size }) => (
             <Ionicons name="person-outline" size={size} color={color} />
           ),
@@ -66,15 +66,16 @@ export default function TabLayout() {
 
 const styles = StyleSheet.create({
   tabBar: {
-    backgroundColor: colors.surface,
-    borderTopColor: colors.border,
-    borderTopWidth: 1,
-    paddingBottom: 8,
-    paddingTop: 8,
-    height: 70,
+    backgroundColor: '#000000',
+    borderTopColor:  colors.accent,
+    borderTopWidth:  2,
+    paddingBottom:   8,
+    paddingTop:      8,
+    height:          70,
   },
   tabLabel: {
-    fontSize: 10,
-    fontFamily: 'Inter-Medium',
+    fontSize:      9,
+    fontFamily:    'JetBrainsMono',
+    letterSpacing: 1,
   },
 });
