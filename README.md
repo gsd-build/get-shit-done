@@ -2,7 +2,7 @@
 
 # GET SHIT DONE
 
-**A light-weight and powerful meta-prompting, context engineering and spec-driven development system for Claude Code, OpenCode, Gemini CLI, and Codex.**
+**A light-weight and powerful meta-prompting, context engineering and spec-driven development system for Claude Code, OpenCode, Gemini CLI, Codex, Qwen Code, and Mistral Vibe.**
 
 **Solves context rot — the quality degradation that happens as Claude fills its context window.**
 
@@ -80,16 +80,16 @@ npx get-shit-done-cc@latest
 ```
 
 The installer prompts you to choose:
-1. **Runtime** — Claude Code, OpenCode, Gemini, Codex, or all
+1. **Runtime** — Claude Code, OpenCode, Gemini, Codex, Qwen Code, Mistral Vibe, or all
 2. **Location** — Global (all projects) or local (current project only)
 
 Verify with:
-- Claude Code / Gemini: `/gsd:help`
-- OpenCode: `/gsd-help`
+- Claude Code / Gemini / Qwen Code: `/gsd:help`
+- OpenCode / Mistral Vibe: `/gsd-help`
 - Codex: `$gsd-help`
 
 > [!NOTE]
-> Codex installation uses skills (`skills/gsd-*/SKILL.md`) rather than custom prompts.
+> Codex and Mistral Vibe installations use skills (`skills/gsd-*/`) rather than custom prompts.
 
 ### Staying Updated
 
@@ -117,12 +117,20 @@ npx get-shit-done-cc --gemini --global   # Install to ~/.gemini/
 npx get-shit-done-cc --codex --global    # Install to ~/.codex/
 npx get-shit-done-cc --codex --local     # Install to ./.codex/
 
+# Qwen Code (optimized for Qwen3-Coder)
+npx get-shit-done-cc --qwen --global     # Install to ~/.qwen/
+npx get-shit-done-cc --qwen --local      # Install to ./.qwen/
+
+# Mistral Vibe (Mistral AI coding assistant)
+npx get-shit-done-cc --mistral --global  # Install to ~/.vibe/
+npx get-shit-done-cc --mistral --local   # Install to ./.vibe/
+
 # All runtimes
 npx get-shit-done-cc --all --global      # Install to all directories
 ```
 
 Use `--global` (`-g`) or `--local` (`-l`) to skip the location prompt.
-Use `--claude`, `--opencode`, `--gemini`, `--codex`, or `--all` to skip the runtime prompt.
+Use `--claude`, `--opencode`, `--gemini`, `--codex`, `--qwen`, `--mistral`, or `--all` to skip the runtime prompt.
 
 </details>
 
