@@ -583,16 +583,20 @@ For each incomplete plan (no SUMMARY.md):
    TASK_TIERS = {}
    ROUTING_STATS = { haiku: 0, sonnet: 0, opus: 0 }
    For each <task> element in the plan (by task_index, 1-based):
+     // Prefer <model> element (new format), fall back to [tier] name prefix (legacy)
+     model_el = extract <model> element text if present (haiku|sonnet|opus)
      task_name = extract <name> element text
-     If task_name matches /^\[(haiku|sonnet|opus)\]/i:
-       TASK_TIERS[task_index] = matched tier (lowercase)
+     If model_el matches /^(haiku|sonnet|opus)$/i:
+       TASK_TIERS[task_index] = model_el (lowercase)
+     Else If task_name matches /^\[(haiku|sonnet|opus)\]/i:
+       TASK_TIERS[task_index] = matched tier (lowercase)  // legacy compat
      Else:
-       TASK_TIERS[task_index] = "sonnet"  // default — no tag present
+       TASK_TIERS[task_index] = "sonnet"  // default — no tier specified
 
-   If at least one task has an explicit tier tag:
+   If at least one task has an explicit tier (via <model> or legacy prefix):
      PER_TASK_MODE = true
    Else:
-     // Fall back to plan-level routing (plan has no tier tags — older plan format)
+     // Fall back to plan-level routing (plan has no tier info — older plan format)
      PER_TASK_MODE = false
      Read the plan objective (first line of <objective> tag in PLAN.md) as task description:
        PLAN_OBJECTIVE=$(grep -A1 '<objective>' {plan_file} | tail -1 | tr -d '\n')
@@ -706,7 +710,7 @@ For each incomplete plan (no SUMMARY.md):
         ```bash
         node /Users/ollorin/.claude/get-shit-done/bin/gsd-tools.js execution-log event \
           --type task_dispatch \
-          --data '{"phase":{phase_number},"plan":"{plan_file}","task_index":{task_index},"task_name":"{task_name_without_tier_prefix}","tier":"{TASK_TIER}","quota_pct":{session_percent},"quota_adjusted":{true_if_tier_was_downgraded}}'
+          --data '{"phase":{phase_number},"plan":"{plan_file}","task_index":{task_index},"task_name":"{task_name}","tier":"{TASK_TIER}","quota_pct":{session_percent},"quota_adjusted":{true_if_tier_was_downgraded}}'
         ```
 
      6. Wait for task executor to complete before spawning next task
@@ -943,6 +947,72 @@ while round <= MAX_ROUNDS AND qa_passed == false:
 
 </checkpoint_ui_qa_loop>
 
+<step name="post_phase_ux_sweep">
+
+After ALL plans in this phase have completed execution:
+
+1. Scan all SUMMARY.md files from this phase for `.tsx`, `.jsx`, `.vue`, `.svelte` files in key-files
+2. If any found: this phase produced web UI
+
+3. If web UI was produced:
+   a. Start dev server if not running (see checkpoints.md dev server automation)
+   b. Derive test scope from phase success criteria and SUMMARY.md key-files
+   c. Run the Charlotte 3-round loop — mode="ux-audit":
+      ```
+      Task(
+        subagent_type="gsd-charlotte-qa",
+        model="sonnet",
+        prompt="
+          mode=ux-audit
+          what_built={phase goal + key UI files from SUMMARYs}
+          test_flows={derive from phase success criteria}
+          round=1
+        "
+      )
+      ```
+   d. If issues found: spawn fix subagent (same as existing ui-qa loop)
+   e. Re-run ux-audit after fixes (max 2 fix rounds for UX issues; critical/high blocking)
+
+Note: This runs IN ADDITION to any checkpoint:ui-qa tasks within individual plans.
+Those test individual plan scope. This tests the full phase's UI output together.
+
+</step>
+
+<step name="post_phase_e2e">
+
+After post_phase_ux_sweep and before verify_phase_goal:
+
+1. Collect e2e_flows from ALL plan frontmatters in this phase:
+   ```bash
+   E2E_FLOWS=$(for plan in {phase_dir}/*-PLAN.md; do
+     node ~/.claude/get-shit-done/bin/gsd-tools.js frontmatter get "$plan" --field e2e_flows 2>/dev/null
+   done | jq -s 'flatten | unique')
+   ```
+
+2. If E2E_FLOWS is empty or null: skip this step.
+
+3. If E2E_FLOWS has entries:
+   a. Start dev server if not running
+   b. Spawn gsd-charlotte-qa (mode=e2e):
+      ```
+      Task(
+        subagent_type="gsd-charlotte-qa",
+        model="sonnet",
+        prompt="
+          mode=e2e
+          e2e_flows={E2E_FLOWS}
+          project_dir={project_dir}
+          round=1
+        "
+      )
+      ```
+   c. Parse results:
+      - All flows PASS → log "E2E: {N} flows passing" → continue to verify_phase_goal
+      - Any flow FAILS → create gap entry → spawns gap closure plan (BLOCKING for Critical flows)
+      - Non-critical flow fails → log as warning, continue
+
+</step>
+
 <step name="verify">
 Verify phase goal achieved using VERIFICATION.md:
 
@@ -1004,6 +1074,32 @@ if telegram_topic_id is not null:
   "verification_path": "..."
 }
 ```
+</step>
+
+<step name="cross_phase_integration">
+
+After verify_phase_goal, if current phase `depends_on` has entries:
+
+1. Read SUMMARY.md of each depended-on phase — collect exported artifacts
+2. Read SUMMARY.md of current phase — collect consumed artifacts
+3. If overlap found (same API routes, same tables, same component names):
+
+   Spawn gsd-integration-tester:
+   ```
+   Task(
+     subagent_type="gsd-integration-tester",
+     model="sonnet",
+     prompt="
+       current_phase={phase_slug}
+       depends_on_phases={depends_on list}
+       integration_points={derived overlap}
+       project_dir={project_dir}
+     "
+   )
+   ```
+
+4. If blocking mismatches found: create gap closure plans (same pattern as verification gaps)
+
 </step>
 
 </execution_cycle>
