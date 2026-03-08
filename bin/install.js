@@ -769,11 +769,11 @@ function installOpenHandsSkills(targetDir, agentsSrc) {
   for (const file of agentEntries) {
     const content = fs.readFileSync(path.join(agentsSrc, file), 'utf8');
     const { frontmatter, body } = extractFrontmatterAndBody(content);
-    const name = extractFrontmatterField(frontmatter, 'name') || file.replace('.md', '');
+    const name = extractFrontmatterField(frontmatter, 'name') || file.replace('.md', '').replace(/^gsd-/, '');
     const description = extractFrontmatterField(frontmatter, 'description') || '';
     
-    // Create skill directory
-    const skillDir = path.join(skillsDir, `gsd-${name}`);
+    // Create skill directory (use name directly, already has gsd- prefix)
+    const skillDir = path.join(skillsDir, name);
     fs.mkdirSync(skillDir, { recursive: true });
 
     // Generate SKILL.md content for OpenHands
@@ -796,7 +796,7 @@ function generateOpenHandsSkillMd(name, description, body, pathPrefix) {
     .replace(/\$HOME\/\.claude\//g, pathPrefix.replace('$HOME', os.homedir()));
 
   return `---
-name: gsd-${name}
+name: ${name}
 description: ${description || 'GSD agent for ' + name}
 ---
 
@@ -2275,8 +2275,9 @@ function install(isGlobal, runtime = 'claude') {
 function finishInstall(settingsPath, settings, statuslineCommand, shouldInstallStatusline, runtime = 'claude', isGlobal = true) {
   const isOpencode = runtime === 'opencode';
   const isCodex = runtime === 'codex';
+  const isOpenHands = runtime === 'openhands';
 
-  if (shouldInstallStatusline && !isOpencode && !isCodex) {
+  if (shouldInstallStatusline && !isOpencode && !isCodex && !isOpenHands) {
     settings.statusLine = {
       type: 'command',
       command: statuslineCommand
@@ -2285,7 +2286,7 @@ function finishInstall(settingsPath, settings, statuslineCommand, shouldInstallS
   }
 
   // Write settings when runtime supports settings.json
-  if (!isCodex) {
+  if (!isCodex && !isOpenHands) {
     writeSettings(settingsPath, settings);
   }
 
@@ -2298,6 +2299,7 @@ function finishInstall(settingsPath, settings, statuslineCommand, shouldInstallS
   if (runtime === 'opencode') program = 'OpenCode';
   if (runtime === 'gemini') program = 'Gemini';
   if (runtime === 'codex') program = 'Codex';
+  if (runtime === 'openhands') program = 'OpenHands';
 
   let command = '/gsd:new-project';
   if (runtime === 'opencode') command = '/gsd-new-project';
@@ -2465,6 +2467,9 @@ function installAllRuntimes(runtimes, isGlobal, isInteractive) {
 
   const finalize = (shouldInstallStatusline) => {
     for (const result of results) {
+      // Skip finalize for OpenHands (no settings.json needed)
+      if (result.runtime === 'openhands') continue;
+      
       const useStatusline = statuslineRuntimes.includes(result.runtime) && shouldInstallStatusline;
       finishInstall(
         result.settingsPath,
@@ -2479,8 +2484,16 @@ function installAllRuntimes(runtimes, isGlobal, isInteractive) {
 
   if (primaryStatuslineResult) {
     handleStatusline(primaryStatuslineResult.settings, isInteractive, finalize);
-  } else {
+  } else if (results.length > 0 && results.some(r => r.runtime !== 'openhands')) {
+    // Has other runtimes besides OpenHands
     finalize(false);
+  } else {
+    // Only OpenHands - no statusline needed, just print done message
+    console.log(`
+  ${green}Done!${reset} GSD skills installed for OpenHands.
+
+  ${cyan}Join the community:${reset} https://discord.gg/gsd
+`);
   }
 }
 
