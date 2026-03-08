@@ -1078,7 +1078,7 @@ function convertClaudeToGeminiAgent(content) {
   return `---\n${newFrontmatter}\n---${stripSubTags(escapedBody)}`;
 }
 
-function convertClaudeToOpencodeFrontmatter(content) {
+function convertClaudeToOpencodeFrontmatter(content, { isAgent = false } = {}) {
   // Replace tool name references in content (applies to all files)
   let convertedContent = content;
   convertedContent = convertedContent.replace(/\bAskUserQuestion\b/g, 'question');
@@ -1110,10 +1110,16 @@ function convertClaudeToOpencodeFrontmatter(content) {
   const lines = frontmatter.split('\n');
   const newLines = [];
   let inAllowedTools = false;
+  let inSkippedArray = false;
   const allowedTools = [];
 
   for (const line of lines) {
     const trimmed = line.trim();
+
+    // For agents: skip commented-out lines (e.g. hooks blocks)
+    if (isAgent && trimmed.startsWith('#')) {
+      continue;
+    }
 
     // Detect start of allowed-tools array
     if (trimmed.startsWith('allowed-tools:')) {
@@ -1123,6 +1129,11 @@ function convertClaudeToOpencodeFrontmatter(content) {
 
     // Detect inline tools: field (comma-separated string)
     if (trimmed.startsWith('tools:')) {
+      if (isAgent) {
+        // Agents: strip tools entirely (not supported in OpenCode agent frontmatter)
+        inSkippedArray = true;
+        continue;
+      }
       const toolsValue = trimmed.substring(6).trim();
       if (toolsValue) {
         // Parse comma-separated tools
@@ -1132,12 +1143,27 @@ function convertClaudeToOpencodeFrontmatter(content) {
       continue;
     }
 
-    // Remove name: field - opencode uses filename for command name
-    if (trimmed.startsWith('name:')) {
+    // For agents: strip skills:, color:, memory:, maxTurns:, permissionMode:, disallowedTools:
+    if (isAgent && /^(skills|color|memory|maxTurns|permissionMode|disallowedTools):/.test(trimmed)) {
+      inSkippedArray = true;
       continue;
     }
 
-    // Convert color names to hex for opencode
+    // Skip continuation lines of a stripped array/object field
+    if (inSkippedArray) {
+      if (trimmed.startsWith('- ') || trimmed.startsWith('#') || /^\s/.test(line)) {
+        continue;
+      }
+      inSkippedArray = false;
+    }
+
+    // For commands: remove name: field (opencode uses filename for command name)
+    // For agents: keep name: (required by OpenCode agents)
+    if (!isAgent && trimmed.startsWith('name:')) {
+      continue;
+    }
+
+    // Convert color names to hex for opencode (commands only; agents strip color above)
     if (trimmed.startsWith('color:')) {
       const colorValue = trimmed.substring(6).trim().toLowerCase();
       const hexColor = colorNameToHex[colorValue];
@@ -1166,14 +1192,20 @@ function convertClaudeToOpencodeFrontmatter(content) {
       }
     }
 
-    // Keep other fields (including name: which opencode ignores)
+    // Keep other fields
     if (!inAllowedTools) {
       newLines.push(line);
     }
   }
 
-  // Add tools object if we had allowed-tools or tools
-  if (allowedTools.length > 0) {
+  // For agents: add required OpenCode agent fields
+  if (isAgent) {
+    newLines.push('model: inherit');
+    newLines.push('mode: subagent');
+  }
+
+  // For commands: add tools object if we had allowed-tools or tools
+  if (!isAgent && allowedTools.length > 0) {
     newLines.push('tools:');
     for (const tool of allowedTools) {
       newLines.push(`  ${convertToolName(tool)}: true`);
@@ -2345,9 +2377,9 @@ function install(isGlobal, runtime = 'claude') {
           content = content.replace(homeDirRegex, toHomePrefix(pathPrefix));
         }
         content = processAttribution(content, getCommitAttribution(runtime));
-        // Convert frontmatter for runtime compatibility
+        // Convert frontmatter for runtime compatibility (agents need different handling)
         if (isOpencode) {
-          content = convertClaudeToOpencodeFrontmatter(content);
+          content = convertClaudeToOpencodeFrontmatter(content, { isAgent: true });
         } else if (isGemini) {
           content = convertClaudeToGeminiAgent(content);
         } else if (isCodex) {
@@ -2816,6 +2848,7 @@ if (process.env.GSD_TEST_MODE) {
     mergeCodexConfig,
     installCodexConfig,
     convertClaudeCommandToCodexSkill,
+    convertClaudeToOpencodeFrontmatter,
     GSD_CODEX_MARKER,
     CODEX_AGENT_SANDBOX,
     getDirName,

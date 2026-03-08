@@ -6,6 +6,9 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ## [Unreleased]
 
+### Fixed
+- OpenCode agent frontmatter conversion — agents now get correct `name:`, `model: inherit`, `mode: subagent` instead of broken command-style conversion that stripped name and kept `color:`/`skills:`/`tools:`
+
 ## [1.23.0] - 2026-03-15
 
 ### Added
