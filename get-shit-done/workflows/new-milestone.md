@@ -19,6 +19,26 @@ Read all files referenced by the invoking prompt's execution_context before star
 - Read STATE.md (pending todos, blockers)
 - Check for MILESTONE-CONTEXT.md (from /gsd:discuss-milestone)
 
+## 1.5. Check for Discovery PRD
+
+Before gathering milestone goals, check for an existing discovery PRD:
+
+```bash
+PRD_FLAG=$(echo "${ARGUMENTS}" | grep -o '\-\-prd [^ ]*' | cut -d' ' -f2)
+PRD_AUTO=$(ls .planning/discovery/PRD.md 2>/dev/null)
+PRD_PATH=${PRD_FLAG:-$PRD_AUTO}
+```
+
+**If PRD_PATH exists:**
+- Read the PRD
+- Present summary: "Found discovery PRD for [product_name]. Using it as the milestone foundation."
+- Extract features from PRD "Feature Specification" section → use as milestone goals (skip step 2 "Gather Goals")
+- Skip the Research step entirely (step 5 "Research Decision") — PRD already contains research
+- Use PRD "Open Questions" section as input for requirements gathering
+- Proceed directly to step 6 (Define Requirements), pre-populated from PRD features
+
+**If no PRD:** Continue normal flow.
+
 ## 2. Gather Milestone Goals
 
 **If MILESTONE-CONTEXT.md exists:**
@@ -85,6 +105,8 @@ if [[ "$INIT" == @file:* ]]; then INIT=$(cat "${INIT#@file:}"); fi
 Extract from init JSON: `researcher_model`, `synthesizer_model`, `roadmapper_model`, `commit_docs`, `research_enabled`, `current_milestone`, `project_exists`, `roadmap_exists`.
 
 ## 8. Research Decision
+
+> **Skip this step if PRD_PATH was found in step 1.5.** The PRD already contains research; proceed directly to step 9.
 
 AskUserQuestion: "Research the domain ecosystem for new features before defining requirements?"
 - "Research first (Recommended)" — Discover patterns, features, architecture for NEW capabilities
