@@ -237,7 +237,7 @@ grep -l "## Validation Architecture" "${PHASE_DIR}"/*-RESEARCH.md 2>/dev/null
 test -f "${PHASE_DIR}/${PADDED_PHASE}-VALIDATION.md" && echo "VALIDATION_CREATED=true" || echo "VALIDATION_CREATED=false"
 ```
 5. If `VALIDATION_CREATED=false`: STOP — do not proceed to Step 6
-6. If `commit_docs`: `commit-docs "docs(phase-${PHASE}): add validation strategy"`
+6. If `commit_docs`: `commit "docs(phase-${PHASE}): add validation strategy" --files "${PHASE_DIR}/${PADDED_PHASE}-VALIDATION.md"`
 
 **If not found:** Warn and continue — plans may fail Dimension 8.
 
