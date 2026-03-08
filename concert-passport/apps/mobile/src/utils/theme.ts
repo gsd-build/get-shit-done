@@ -1,47 +1,47 @@
 // =============================================================
 // Concert Passport — Design Tokens
-// Brutalist: black · white · lime-green · monospace · zero-radius
 // =============================================================
 
 export const colors = {
   // Backgrounds
-  background:    '#FFFFFF',
-  surface:       '#FFFFFF',
-  surfaceRaised: '#F0F0F0',
-  border:        '#000000',
+  background:    '#FFFFFF',   // clean white
+  surface:       '#F7F5F0',   // warm off-white — cards, bottom bar
+  surfaceRaised: '#EDE9E0',   // modals, elevated cards
+  border:        '#E2DDD4',
 
   // Text
-  text:          '#000000',
-  textSecondary: '#333333',
-  textMuted:     '#666666',
+  text:          '#0A0908',   // warm near-black
+  textSecondary: '#5C5751',
+  textMuted:     '#A09890',
 
   // Brand — lime green
   accent:        '#ADFF2F',
+  accentLight:   '#C8FF5C',
   accentDark:    '#7BBF00',
-  accentGlow:    'rgba(173, 255, 47, 0.2)',
+  accentGlow:    'rgba(173, 255, 47, 0.12)',
 
   // Stamp rarities
-  common:        '#888888',
-  uncommon:      '#ADFF2F',
-  rare:          '#00D4FF',
-  legendary:     '#FFE500',
+  common:        '#6B7280',
+  uncommon:      '#16A34A',
+  rare:          '#2563EB',
+  legendary:     '#D97706',
 
   // Ratings
-  star:          '#ADFF2F',
+  star:          '#F59E0B',
 
   // Status
-  success:       '#ADFF2F',
-  error:         '#FF3B2F',
-  warning:       '#FFE500',
+  success:       '#16A34A',
+  error:         '#DC2626',
+  warning:       '#D97706',
 } as const;
 
 export const typography = {
-  // Monospace everywhere — digital / pixel feel
-  heading:  'JetBrainsMono',
+  // Font families (loaded via expo-font)
+  heading:  'Playfair-Bold',      // serif — passport/editorial feel
   body:     'Inter-Regular',
   bodyMed:  'Inter-Medium',
   bodySemi: 'Inter-SemiBold',
-  mono:     'JetBrainsMono',
+  mono:     'JetBrainsMono',      // for stats/numbers
 } as const;
 
 export const spacing = {
@@ -53,29 +53,27 @@ export const spacing = {
   xxl: 48,
 } as const;
 
-// Zero border-radius — brutalist sharp corners everywhere
 export const radius = {
-  sm:   0,
-  md:   0,
-  lg:   0,
-  xl:   0,
-  full: 0,
+  sm:   6,
+  md:   12,
+  lg:   20,
+  xl:   32,
+  full: 9999,
 } as const;
 
-// Hard-offset shadows — brutalist feel, no blur
 export const shadows = {
   stamp: {
-    shadowColor:   '#000000',
-    shadowOffset:  { width: 4, height: 4 },
-    shadowOpacity: 1,
-    shadowRadius:  0,
-    elevation:     6,
+    shadowColor:   '#ADFF2F',
+    shadowOffset:  { width: 0, height: 4 },
+    shadowOpacity: 0.22,
+    shadowRadius:  12,
+    elevation:     8,
   },
   card: {
-    shadowColor:   '#000000',
-    shadowOffset:  { width: 2, height: 2 },
-    shadowOpacity: 1,
-    shadowRadius:  0,
+    shadowColor:   '#000',
+    shadowOffset:  { width: 0, height: 2 },
+    shadowOpacity: 0.08,
+    shadowRadius:  8,
     elevation:     3,
   },
 } as const;
