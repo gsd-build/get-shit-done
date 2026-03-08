@@ -1,0 +1,6 @@
+{
+  "name": "@concert-passport/shared",
+  "version": "0.1.0",
+  "main": "src/index.ts",
+  "types": "src/index.ts"
+}
