@@ -47,6 +47,7 @@ Run these commands to read the target branch without switching to it:
 ```bash
 git ls-tree --name-only <target> -- .planning/phases/
 git ls-tree --name-only <target> -- .planning/quick/
+git ls-tree -r --name-only <target> -- .planning/milestones/
 git show <target>:.planning/ROADMAP.md
 git show <target>:.planning/STATE.md
 ```
@@ -54,32 +55,45 @@ git show <target>:.planning/STATE.md
 If .planning/ doesn't exist on target yet, treat all as empty.
 
 Extract:
-- **target_phases**: list of phase directory names (e.g. `["01-foundation", "17-auth", "18-feature-a"]`)
+- **target_phases**: list of phase directory names from `.planning/phases/` (e.g. `["01-foundation", "18-feature-a"]`)
 - **target_quicks**: list of quick directory names (e.g. `["1-fix-sidebar", "3-update-config"]`)
+- **target_archived_phase_nums**: integer phase numbers found in `.planning/milestones/<version>-phases/<NN-slug>/`
+  paths — extract the numeric prefix from the deepest directory name matching `/milestones\/[^/]+-phases\/(\d+[^/]*)\//`
 - **target_roadmap**: full ROADMAP.md text from target
-- **target_max_phase**: highest integer phase number in target_phases (ignore decimal parts — `17.1` counts as `17`)
+- **target_all_phase_nums**: integer parts of numbers from target_phases UNION target_archived_phase_nums
+- **target_max_phase**: highest number in target_all_phase_nums
 - **target_max_quick**: highest integer quick number in target_quicks
 
 ## Step 3: Read local branch state
 
 List `.planning/phases/` and `.planning/quick/` directories.
+List `.planning/milestones/` recursively to find archived phase directories (pattern `<version>-phases/<NN-slug>/`).
 Read `.planning/ROADMAP.md` and `.planning/STATE.md`.
 
 Extract:
-- **local_phases**: list of phase directory names
+- **local_phases**: list of active phase directory names from `.planning/phases/`
 - **local_quicks**: list of quick directory names
+- **local_archived_phases**: list of `{ version, dir_name }` for each phase found under `.planning/milestones/<version>-phases/`
+  e.g. `[{ version: "v1.8", dir_name: "22-data-fields" }, { version: "v1.8", dir_name: "23-compile-pipeline" }]`
+- **local_all_phase_dirs**: local_phases UNION local_archived_phases dir_names
 
 ## Step 4: Identify what needs to change
 
-**Branch-local phases** = local_phases entries whose directory name does NOT appear in target_phases.
+**Branch-local phases** = local_all_phase_dirs entries whose directory name does NOT appear in target_phases
+  AND whose directory name does NOT appear in target_archived_phase directories.
+  This covers both active phases and milestone-archived phases unique to this branch.
+
 **Branch-local quicks** = local_quicks entries whose directory name does NOT appear in target_quicks.
-**Target-only phases** = target_phases entries whose directory name does NOT appear in local_phases.
+
+**Target-only phases** = target_phases entries whose directory name does NOT appear in local_all_phase_dirs.
   These are phases the target has that the current branch doesn't know about yet — their ROADMAP
   entries need to be absorbed locally so git doesn't conflict on them.
 
 For each branch-local phase, extract its numeric prefix using pattern `/^(\d+(?:\.\d+)*)-/`.
+Note whether each branch-local phase is **active** (in `.planning/phases/`) or **archived**
+(in `.planning/milestones/<version>-phases/`) — this determines which directory gets renamed in Step 8.
 
-**Conflicting phases** = branch-local phases whose numeric prefix matches any numeric prefix in target_phases.
+**Conflicting phases** = branch-local phases whose numeric prefix matches any number in target_all_phase_nums.
 **Conflicting quicks** = branch-local quicks whose numeric prefix matches any numeric prefix in target_quicks.
 
 If there are no conflicting phases, no conflicting quicks, and no target-only phases to absorb:
@@ -162,16 +176,31 @@ Git will see them as already present → no conflict on those lines.
 
 For each phase in the rename map (old → new):
 
-1. Rename files inside the directory first. List all files in `.planning/phases/<old_name>/`.
-   The old file prefix is the full numeric part of the directory name followed by a hyphen
-   (e.g. directory `18-slug` → prefix `18-`, directory `18.1-slug` → prefix `18.1-`).
-   The new file prefix is the new integer phase number followed by a hyphen (e.g. `19-`).
-   For each file whose name starts with the old file prefix:
-   - Compute new filename by replacing the old prefix with the new prefix
-   - Run: `git mv ".planning/phases/<old_name>/<old_file>" ".planning/phases/<old_name>/<new_file>"`
+Determine whether the phase is **active** or **archived**:
+- Active: directory is in `.planning/phases/<old_name>/`
+- Archived: directory is in `.planning/milestones/<version>-phases/<old_name>/`
 
+The old file prefix is the full numeric part of the directory name followed by a hyphen
+(e.g. directory `18-slug` → prefix `18-`, directory `18.1-slug` → prefix `18.1-`).
+The new file prefix is the new integer phase number followed by a hyphen (e.g. `19-`).
+
+**For active phases:**
+1. Rename files inside the directory first. For each file in `.planning/phases/<old_name>/`
+   whose name starts with the old file prefix:
+   - Run: `git mv ".planning/phases/<old_name>/<old_file>" ".planning/phases/<old_name>/<new_file>"`
 2. Rename the directory:
    - Run: `git mv ".planning/phases/<old_name>" ".planning/phases/<new_name>"`
+
+**For archived phases** (in `.planning/milestones/<version>-phases/`):
+1. Rename files inside the archive directory. For each file in
+   `.planning/milestones/<version>-phases/<old_name>/` whose name starts with the old file prefix:
+   - Run: `git mv ".planning/milestones/<version>-phases/<old_name>/<old_file>" ".../<new_file>"`
+2. Rename the archive directory:
+   - Run: `git mv ".planning/milestones/<version>-phases/<old_name>" ".planning/milestones/<version>-phases/<new_name>"`
+3. Also update the milestone ROADMAP archive if it exists:
+   - Read `.planning/milestones/<version>-ROADMAP.md`
+   - Replace phase number references (headings, checkboxes, table rows) old → new
+   - Write the updated file
 
 Use `git mv` for all renames so git tracks them as renames rather than delete+add.
 
@@ -228,9 +257,10 @@ Do NOT commit. Do NOT push. Leave that to the user.
 </process>
 
 <success_criteria>
-- No branch-local phase or quick index overlaps with target branch after sync
+- No branch-local phase or quick index overlaps with target branch after sync — including archived phases in `.planning/milestones/`
 - Target branch's ROADMAP.md phase entries are absorbed into local ROADMAP.md
-- All renamed directories have their internal files renamed to match (PLAN, SUMMARY, VERIFICATION, UAT, RESEARCH, CONTEXT)
+- All renamed directories (active and archived) have their internal files renamed to match
+- Milestone archive ROADMAP files updated to reflect new phase numbers
 - ROADMAP.md and STATE.md reflect the new numbers
 - --dry-run shows the full plan with zero filesystem changes
 - User confirmed before any changes were made (unless --dry-run)
