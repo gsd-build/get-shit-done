@@ -57,8 +57,11 @@ If .planning/ doesn't exist on target yet, treat all as empty.
 Extract:
 - **target_phases**: list of phase directory names from `.planning/phases/` (e.g. `["01-foundation", "18-feature-a"]`)
 - **target_quicks**: list of quick directory names (e.g. `["1-fix-sidebar", "3-update-config"]`)
-- **target_archived_phase_nums**: integer phase numbers found in `.planning/milestones/<version>-phases/<NN-slug>/`
-  paths — extract the numeric prefix from the deepest directory name matching `/milestones\/[^/]+-phases\/(\d+[^/]*)\//`
+- **target_archived_phase_dirs**: full phase directory names found in milestone archives — from each file path
+  like `.planning/milestones/v1.8-phases/22-data-fields/22-01-PLAN.md`, extract the third segment after
+  `milestones/`: the part matching `[^/]+-phases/` is the version folder, the next path segment before the
+  next `/` is the phase directory name (e.g. `22-data-fields`). Deduplicate. Keep full names, not just numbers.
+- **target_archived_phase_nums**: integer parts only from target_archived_phase_dirs (e.g. 22 from `22-data-fields`)
 - **target_roadmap**: full ROADMAP.md text from target
 - **target_all_phase_nums**: integer parts of numbers from target_phases UNION target_archived_phase_nums
 - **target_max_phase**: highest number in target_all_phase_nums
@@ -73,7 +76,10 @@ Read `.planning/ROADMAP.md` and `.planning/STATE.md`.
 Extract:
 - **local_phases**: list of active phase directory names from `.planning/phases/`
 - **local_quicks**: list of quick directory names
-- **local_archived_phases**: list of `{ version, dir_name }` for each phase found under `.planning/milestones/<version>-phases/`
+- **local_archived_phases**: list of `{ version, dir_name }` for each phase found under `.planning/milestones/`.
+  Use `git ls-tree -r --name-only HEAD -- .planning/milestones/` to get file paths, then parse each path:
+  `.planning/milestones/<version>-phases/<dir_name>/<file>` — extract `<version>` and `<dir_name>` (the
+  path segment immediately after `<version>-phases/` and before the next `/`). Deduplicate by dir_name.
   e.g. `[{ version: "v1.8", dir_name: "22-data-fields" }, { version: "v1.8", dir_name: "23-compile-pipeline" }]`
 - **local_all_phase_dirs**: local_phases UNION local_archived_phases dir_names
 
