@@ -16,6 +16,19 @@ const VALID_CONFIG_KEYS = new Set([
   'planning.commit_docs', 'planning.search_gitignored',
 ]);
 
+const CONFIG_KEY_SUGGESTIONS = {
+  'workflow.nyquist_validation_enabled': 'workflow.nyquist_validation',
+  'agents.nyquist_validation_enabled': 'workflow.nyquist_validation',
+  'nyquist.validation_enabled': 'workflow.nyquist_validation',
+};
+
+function validateKnownConfigKeyPath(keyPath) {
+  const suggested = CONFIG_KEY_SUGGESTIONS[keyPath];
+  if (suggested) {
+    error(`Unknown config key: ${keyPath}. Did you mean ${suggested}?`);
+  }
+}
+
 function cmdConfigEnsureSection(cwd, raw) {
   const configPath = path.join(cwd, '.planning', 'config.json');
   const planningDir = path.join(cwd, '.planning');
@@ -97,6 +110,8 @@ function cmdConfigSet(cwd, keyPath, value, raw) {
   if (!keyPath) {
     error('Usage: config-set <key.path> <value>');
   }
+
+  validateKnownConfigKeyPath(keyPath);
 
   if (!VALID_CONFIG_KEYS.has(keyPath)) {
     error(`Unknown config key: "${keyPath}". Valid keys: ${[...VALID_CONFIG_KEYS].sort().join(', ')}`);

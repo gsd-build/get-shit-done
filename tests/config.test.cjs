@@ -291,6 +291,17 @@ describe('config-set command', () => {
     const result = runGsdTools('config-set', tmpDir);
     assert.strictEqual(result.success, false);
   });
+
+  test('rejects known invalid nyquist alias keys with a suggestion', () => {
+    const result = runGsdTools('config-set workflow.nyquist_validation_enabled false', tmpDir);
+    assert.strictEqual(result.success, false);
+    assert.match(result.error, /Unknown config key: workflow\.nyquist_validation_enabled/);
+    assert.match(result.error, /workflow\.nyquist_validation/);
+
+    const config = readConfig(tmpDir);
+    assert.strictEqual(config.workflow.nyquist_validation_enabled, undefined);
+    assert.strictEqual(config.workflow.nyquist_validation, true);
+  });
 });
 
 // ─── config-get ──────────────────────────────────────────────────────────────

@@ -242,6 +242,13 @@ Skip if `nyquist_validation_enabled` is false OR `research_enabled` is false.
 
 If `research_enabled` is false and `nyquist_validation_enabled` is true: warn "Nyquist validation enabled but research disabled — VALIDATION.md cannot be created without RESEARCH.md. Plans will lack validation requirements (Dimension 8)." Continue to step 6.
 
+**But Nyquist is not applicable for this run** when all of the following are true:
+- `research_enabled` is false
+- `has_research` is false
+- no `--research` flag was provided
+
+In that case: **skip validation-strategy creation entirely**. Do **not** expect `RESEARCH.md` or `VALIDATION.md` for this run, and continue to Step 6.
+
 ```bash
 grep -l "## Validation Architecture" "${PHASE_DIR}"/*-RESEARCH.md 2>/dev/null
 ```
@@ -325,13 +332,21 @@ CONTEXT_PATH=$(printf '%s\n' "$INIT" | jq -r '.context_path // empty')
 
 Skip if `nyquist_validation_enabled` is false OR `research_enabled` is false.
 
+Also skip if all of the following are true:
+- `research_enabled` is false
+- `has_research` is false
+- no `--research` flag was provided
+
+In that no-research path, Nyquist artifacts are **not required** for this run.
+
 ```bash
 VALIDATION_EXISTS=$(ls "${PHASE_DIR}"/*-VALIDATION.md 2>/dev/null | head -1)
 ```
 
-If missing and Nyquist enabled — ask user:
-1. Re-run with research: `/gsd:plan-phase {PHASE} --research`
-2. Disable Nyquist: `node "$HOME/.claude/get-shit-done/bin/gsd-tools.cjs" config-set workflow.nyquist_validation false`
+If missing and Nyquist is still enabled/applicable — ask user:
+1. Re-run: `/gsd:plan-phase {PHASE} --research`
+2. Disable Nyquist with the exact command:
+   `node "$HOME/.claude/get-shit-done/bin/gsd-tools.cjs" config-set workflow.nyquist_validation false`
 3. Continue anyway (plans fail Dimension 8)
 
 Proceed to Step 8 only if user selects 2 or 3.
