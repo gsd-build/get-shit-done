@@ -4,34 +4,34 @@
 
 export const colors = {
   // Backgrounds
-  background:    '#0d0d1a',   // near-black, deep navy
-  surface:       '#141428',   // card / bottom bar
-  surfaceRaised: '#1c1c38',   // modals, elevated cards
-  border:        '#2a2a50',
+  background:    '#FFFFFF',   // clean white
+  surface:       '#F7F5F0',   // warm off-white — cards, bottom bar
+  surfaceRaised: '#EDE9E0',   // modals, elevated cards
+  border:        '#E2DDD4',
 
   // Text
-  text:          '#f0f0ff',
-  textSecondary: '#9999cc',
-  textMuted:     '#555580',
+  text:          '#0A0908',   // warm near-black
+  textSecondary: '#5C5751',
+  textMuted:     '#A09890',
 
   // Brand
-  accent:        '#7c5cfc',   // electric violet — primary CTA
-  accentLight:   '#a78bfa',
-  accentGlow:    'rgba(124, 92, 252, 0.25)',
+  accent:        '#FF3B2F',   // bold coral-red — primary CTA
+  accentLight:   '#FF6B61',
+  accentGlow:    'rgba(255, 59, 47, 0.12)',
 
   // Stamp rarities
-  common:        '#6b7280',
-  uncommon:      '#22c55e',
-  rare:          '#3b82f6',
-  legendary:     '#f59e0b',
+  common:        '#6B7280',
+  uncommon:      '#16A34A',
+  rare:          '#2563EB',
+  legendary:     '#D97706',
 
   // Ratings
-  star:          '#fbbf24',
+  star:          '#F59E0B',
 
   // Status
-  success:       '#22c55e',
-  error:         '#ef4444',
-  warning:       '#f59e0b',
+  success:       '#16A34A',
+  error:         '#DC2626',
+  warning:       '#D97706',
 } as const;
 
 export const typography = {
@@ -62,17 +62,17 @@ export const radius = {
 
 export const shadows = {
   stamp: {
-    shadowColor: '#7c5cfc',
+    shadowColor: '#FF3B2F',
     shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.3,
+    shadowOpacity: 0.18,
     shadowRadius: 12,
     elevation: 8,
   },
   card: {
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.4,
+    shadowOpacity: 0.08,
     shadowRadius: 8,
-    elevation: 4,
+    elevation: 3,
   },
 } as const;

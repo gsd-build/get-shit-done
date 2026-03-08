@@ -53,7 +53,7 @@ const MOCK_STAMPS: Stamp[] = [
 ];
 
 const MOCK_PASSPORT: Passport = {
-  id: 'p1', user_id: 'u1', theme: 'classic', cover_color: '#1a1a2e',
+  id: 'p1', user_id: 'u1', theme: 'classic', cover_color: '#FF3B2F',
   total_stamps: 5, total_shows: 5, total_artists: 5, total_countries: 2,
 };
 
@@ -90,7 +90,7 @@ function PassportCover({
     <Animated.View style={[styles.passportContainer, coverStyle]}>
       <Pressable onPress={onOpen}>
         <LinearGradient
-          colors={['#1e1e3f', '#0d0d1a', '#1a0a2e']}
+          colors={['#FF4D40', '#FF3B2F', '#CC2219']}
           style={styles.passportCover}
           start={{ x: 0, y: 0 }}
           end={{ x: 1, y: 1 }}
@@ -293,7 +293,7 @@ export default function PassportScreen() {
   return (
     <SafeAreaView style={styles.safeArea} edges={['top']}>
       <LinearGradient
-        colors={['#0d0d1a', '#12102a', '#0d0d1a']}
+        colors={['#FFFFFF', '#F7F5F0', '#FFFFFF']}
         style={styles.background}
       >
         {/* Header */}
@@ -411,32 +411,32 @@ const styles = StyleSheet.create({
     right:     10,
     bottom:    10,
     borderWidth:  1,
-    borderColor:  'rgba(255,215,100,0.2)',
+    borderColor:  'rgba(255,255,255,0.3)',
     borderRadius: radius.lg,
   },
   crest: {
     width:           80,
     height:          80,
     borderRadius:    40,
-    backgroundColor: 'rgba(255,215,100,0.08)',
+    backgroundColor: 'rgba(255,255,255,0.15)',
     borderWidth:     1,
-    borderColor:     'rgba(255,215,100,0.25)',
+    borderColor:     'rgba(255,255,255,0.35)',
     alignItems:      'center',
     justifyContent:  'center',
   },
   crestIcon: {
     fontSize: 36,
-    color:    'rgba(255,215,100,0.8)',
+    color:    'rgba(255,255,255,0.9)',
   },
   coverTitleBlock: { alignItems: 'center' },
   coverCountry: {
-    color:         'rgba(255,215,100,0.5)',
+    color:         'rgba(255,255,255,0.65)',
     fontSize:      11,
     fontFamily:    typography.bodySemi,
     letterSpacing: 4,
   },
   coverTitle: {
-    color:         'rgba(255,215,100,0.9)',
+    color:         '#FFFFFF',
     fontSize:      28,
     fontFamily:    typography.heading,
     letterSpacing: 6,
@@ -444,13 +444,13 @@ const styles = StyleSheet.create({
   },
   coverFooter: { alignItems: 'center', gap: 4 },
   coverUsername: {
-    color:         colors.textSecondary,
+    color:         'rgba(255,255,255,0.75)',
     fontSize:      13,
     fontFamily:    typography.bodySemi,
     letterSpacing: 1,
   },
   coverYear: {
-    color:         'rgba(255,215,100,0.5)',
+    color:         'rgba(255,255,255,0.55)',
     fontSize:      14,
     fontFamily:    typography.mono,
     letterSpacing: 6,
@@ -461,7 +461,7 @@ const styles = StyleSheet.create({
     left:      -20,
     right:     -20,
     height:    1,
-    backgroundColor: 'rgba(255,215,100,0.08)',
+    backgroundColor: 'rgba(255,255,255,0.12)',
     transform: [{ rotate: '-15deg' }],
     top:       PASSPORT_H * 0.3,
   },
@@ -470,7 +470,7 @@ const styles = StyleSheet.create({
     left:      -20,
     right:     -20,
     height:    1,
-    backgroundColor: 'rgba(255,215,100,0.05)',
+    backgroundColor: 'rgba(255,255,255,0.07)',
     transform: [{ rotate: '-15deg' }],
     top:       PASSPORT_H * 0.6,
   },

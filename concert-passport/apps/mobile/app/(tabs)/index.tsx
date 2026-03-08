@@ -217,7 +217,7 @@ function EmptyFeed() {
         onPress={() => router.push('/(tabs)/log')}
       >
         <LinearGradient
-          colors={['#7c5cfc', '#5a3de8']}
+          colors={['#FF3B2F', '#CC2219']}
           style={styles.emptyButtonGradient}
           start={{ x: 0, y: 0 }}
           end={{ x: 1, y: 0 }}
@@ -254,7 +254,7 @@ export default function FeedScreen() {
             onPress={() => router.push('/(tabs)/log')}
           >
             <LinearGradient
-              colors={['#7c5cfc', '#5a3de8']}
+              colors={['#FF3B2F', '#CC2219']}
               style={styles.logButtonGradient}
               start={{ x: 0, y: 0 }}
               end={{ x: 1, y: 0 }}

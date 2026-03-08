@@ -13,10 +13,10 @@ import type { Stamp, StampRarity } from '@concert-passport/shared';
 
 // Rarity config
 const RARITY_CONFIG: Record<StampRarity, { gradient: [string, string]; label: string; glow: string }> = {
-  common:    { gradient: ['#3a3a5c', '#2a2a48'],     label: '',           glow: 'transparent' },
-  uncommon:  { gradient: ['#1a4a2a', '#0f3320'],     label: 'UNCOMMON',   glow: 'rgba(34,197,94,0.3)' },
-  rare:      { gradient: ['#1a3a6a', '#0f2a55'],     label: 'RARE',       glow: 'rgba(59,130,246,0.4)' },
-  legendary: { gradient: ['#5a3a10', '#3d2508'],     label: '✦ LEGENDARY', glow: 'rgba(245,158,11,0.5)' },
+  common:    { gradient: ['#6B7280', '#4B5563'],     label: '',            glow: 'transparent' },
+  uncommon:  { gradient: ['#16A34A', '#15803D'],     label: 'UNCOMMON',    glow: 'rgba(22,163,74,0.3)' },
+  rare:      { gradient: ['#2563EB', '#1D4ED8'],     label: 'RARE',        glow: 'rgba(37,99,235,0.35)' },
+  legendary: { gradient: ['#D97706', '#B45309'],     label: '✦ LEGENDARY', glow: 'rgba(217,119,6,0.4)' },
 };
 
 interface Props {
