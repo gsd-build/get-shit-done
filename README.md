@@ -344,6 +344,8 @@ If everything passes, you move on. If something's broken, you don't manually deb
 
 Loop **discuss → plan → execute → verify** until milestone complete.
 
+If you want faster intake during discussion, use `/gsd:discuss-phase <n> --batch` to answer a small grouped set of questions at once instead of one-by-one.
+
 Each phase gets your input (discuss), proper research (plan), clean execution (execute), and human verification (verify). Context stays fresh. Quality stays high.
 
 When all phases are done, `/gsd:complete-milestone` archives the milestone and tags the release.
