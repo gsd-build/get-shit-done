@@ -79,22 +79,27 @@ Extract:
 
 ## Step 4: Identify what needs to change
 
-**Branch-local phases** = local_all_phase_dirs entries whose directory name does NOT appear in target_phases
-  AND whose directory name does NOT appear in target_archived_phase directories.
-  This covers both active phases and milestone-archived phases unique to this branch.
+Two separate checks — keep them distinct:
 
-**Branch-local quicks** = local_quicks entries whose directory name does NOT appear in target_quicks.
+**Check 1: Is it branch-local? (compare by EXACT DIRECTORY NAME)**
+- Collect every full directory name from local_phases and local_archived_phases (e.g. `22-data-fields`)
+- Collect every full directory name from target_phases and target_archived_phases (e.g. `22-progressindicator-component`)
+- **Branch-local phases** = local directory names that do NOT appear verbatim in target's directory names
+  Example: local has `22-data-fields`, target has `22-progressindicator-component` — different names,
+  so `22-data-fields` IS branch-local even though both have "22"
+- **Branch-local quicks** = same logic for quick directories
 
-**Target-only phases** = target_phases entries whose directory name does NOT appear in local_all_phase_dirs.
-  These are phases the target has that the current branch doesn't know about yet — their ROADMAP
-  entries need to be absorbed locally so git doesn't conflict on them.
+**Check 2: Does it conflict? (compare by NUMERIC PREFIX only)**
+- For each branch-local phase, extract its numeric prefix: `/^(\d+(?:\.\d+)*)-/`
+- **Conflicting phases** = branch-local phases whose numeric prefix matches ANY number in target_all_phase_nums
+  Example: `22-data-fields` is branch-local, its prefix is 22, target_all_phase_nums contains 22 → CONFLICT
+- **Conflicting quicks** = same logic against target quick numbers
 
-For each branch-local phase, extract its numeric prefix using pattern `/^(\d+(?:\.\d+)*)-/`.
+**Target-only phases** = target_phases directory names that do NOT appear verbatim in local_all_phase_dirs.
+  These need their ROADMAP entries absorbed locally.
+
 Note whether each branch-local phase is **active** (in `.planning/phases/`) or **archived**
 (in `.planning/milestones/<version>-phases/`) — this determines which directory gets renamed in Step 8.
-
-**Conflicting phases** = branch-local phases whose numeric prefix matches any number in target_all_phase_nums.
-**Conflicting quicks** = branch-local quicks whose numeric prefix matches any numeric prefix in target_quicks.
 
 If there are no conflicting phases, no conflicting quicks, and no target-only phases to absorb:
   Output: "Nothing to sync — no index conflicts with [target]."
