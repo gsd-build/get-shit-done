@@ -328,11 +328,29 @@ DO NOT execute the task inline. Instead:
    - `behavior_description`: the previous task's `<done>` criteria text
    - `project_dir`: current working directory
 
-2. Spawn gsd-test-writer:
+2. Route then spawn gsd-test-writer:
    ```
+   // Route first — test complexity varies by what's being tested
+   route_result = Task(
+     subagent_type="gsd-task-router",
+     prompt="Route this task: Test {task_name}
+
+Task action:
+Write and run comprehensive tests covering: {behavior_description}
+
+Done criteria:
+All tests pass. gsd-test-writer reports 0 failing tests across all categories (auth, validation, error handling, edge cases, wiring).
+
+Verification:
+Run test suite and confirm 0 failing tests.
+
+Plan context: complexity=medium, depends_on=0 prior plans, must_haves=1 criteria"
+   )
+   test_writer_model = parse "Model:" line from route_result // default "sonnet" if parse fails
+
    Task(
      subagent_type="gsd-test-writer",
-     model="sonnet",
+     model={test_writer_model},
      prompt="
        task_name={task_name}
        files_modified={files_modified}

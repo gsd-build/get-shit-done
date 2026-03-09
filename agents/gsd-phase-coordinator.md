@@ -216,7 +216,7 @@ Store the full `questions` array in a variable for the meta-answerer invocation 
 ```
 Task(
   subagent_type="gsd-meta-answerer",
-  model="sonnet",
+  model="haiku",
   prompt="
     <phase_context>
     Phase: {phase_number}
@@ -784,6 +784,7 @@ while round <= MAX_ROUNDS AND qa_passed == false:
     subagent_type="gsd-charlotte-qa",
     model="haiku",
     prompt="
+      mode=ui-qa
       <what_built>{what_built}</what_built>
       <test_flows>{test_flows}</test_flows>
       <round>{round}</round>
@@ -1022,9 +1023,13 @@ node /Users/ollorin/.claude/get-shit-done/bin/gsd-tools.js init verify-work {pha
 
 Spawn verifier agent to create VERIFICATION.md:
 ```
+// Pick verifier tier based on phase complexity
+MUST_HAVES_COUNT = sum of (must_haves.truths.length + must_haves.artifacts.length) across all PLAN.md files in {phase_dir}
+VERIFIER_MODEL = MUST_HAVES_COUNT >= 8 ? "opus" : "sonnet"
+
 Task(
   subagent_type="gsd-verifier",
-  model="sonnet",
+  model={VERIFIER_MODEL},
   prompt="Verify phase {phase_number} goal achievement.
 Phase directory: {phase_dir}
 Phase goal: {goal from ROADMAP.md}
