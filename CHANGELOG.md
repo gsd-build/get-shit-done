@@ -6,6 +6,9 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ## [Unreleased]
 
+### Fixed
+- `--auto` new-project setup no longer writes `workflow.auto_advance: true` into `.planning/config.json`; the temporary auto-chain now stays ephemeral so later manual `/gsd:execute-phase` runs do not unexpectedly jump into the next phase (#932)
+
 ## [1.22.4] - 2026-03-03
 
 ### Added

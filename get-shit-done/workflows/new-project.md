@@ -179,10 +179,12 @@ Create `.planning/config.json` with mode set to "yolo":
     "plan_check": true|false,
     "verifier": true|false,
     "nyquist_validation": depth !== "quick",
-    "auto_advance": true
+    "auto_advance": false
   }
 }
 ```
+
+`--auto` should only drive the current setup chain. Do **not** persist `workflow.auto_advance: true` into project config, or later manual `/gsd:execute-phase` runs can unexpectedly auto-transition into the next phase.
 
 **If commit_docs = No:** Add `.planning/` to `.gitignore`.
 
