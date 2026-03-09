@@ -36,6 +36,42 @@ Parse JSON for:
 **If `resume_state` is set:** Present resume prompt before continuing (see `<step name="resume_capability">`).
 </step>
 
+<step name="branch_guard">
+**Check branch before any execution — never commit directly to main/master.**
+
+```bash
+CURRENT_BRANCH=$(git rev-parse --abbrev-ref HEAD)
+BRANCHING_STRATEGY=$(node ~/.claude/get-shit-done/bin/gsd-tools.js config-get git.branching_strategy 2>/dev/null || echo "none")
+MILESTONE_VERSION=$(grep -m1 "^## Milestone" .planning/ROADMAP.md | sed 's/.*v\([0-9.]*\).*/\1/' || echo "")
+MILESTONE_SLUG=$(grep -m1 "^## Milestone" .planning/ROADMAP.md | sed 's/## Milestone [^ ]* — //' | tr '[:upper:] ' '[:lower:]-' | tr -cd '[:alnum:]-' | cut -c1-40 || echo "work")
+```
+
+**If `CURRENT_BRANCH` is `main` or `master`:**
+
+Present blocking message:
+```
+⛔ Branch Guard: You are on {CURRENT_BRANCH}
+
+Roadmap execution commits many changes. Running on main risks polluting the main
+branch with partial or broken work.
+
+Options:
+  A) Create milestone branch now: gsd/{MILESTONE_VERSION}-{MILESTONE_SLUG}
+  B) Create custom branch — type: "branch my-branch-name"
+  C) Override — I know what I'm doing (type "override")
+```
+
+Wait for user response:
+- **"A"** or "yes": `git checkout -b "gsd/{MILESTONE_VERSION}-{MILESTONE_SLUG}"` → log branch → proceed
+- **"branch {name}"**: `git checkout -b "{name}"` → log branch → proceed
+- **"override"**: log warning, proceed on main (user explicitly accepted risk)
+- **"stop"** / anything else: exit cleanly
+
+**If `CURRENT_BRANCH` is NOT main/master:** Proceed silently — already on a feature branch.
+
+**If `BRANCHING_STRATEGY` is "milestone" AND not on main:** Inform user which branch will be used (current branch — already correctly set up).
+</step>
+
 <step name="confirm_execution">
 Present execution plan to user before any autonomous action:
 

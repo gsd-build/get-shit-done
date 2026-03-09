@@ -37,9 +37,29 @@ fi
 </step>
 
 <step name="handle_branching">
-Check `branching_strategy` from init:
+Check `branching_strategy` from init and guard against main/master:
 
-**"none":** Skip, continue on current branch.
+```bash
+CURRENT_BRANCH=$(git rev-parse --abbrev-ref HEAD)
+```
+
+**If `CURRENT_BRANCH` is `main` or `master` AND `branching_strategy` is "none":**
+
+Block with:
+```
+⛔ Branch Guard: You are on {CURRENT_BRANCH}
+
+Running on main is not allowed. Options:
+  A) Create phase branch: gsd/phase-{phase_number}-{phase_slug}
+  B) Create custom branch — type: "branch my-branch-name"
+  C) Override — I know what I'm doing (type "override")
+```
+- **"A"**: `git checkout -b "gsd/phase-{phase_number}-{phase_slug}"`
+- **"branch {name}"**: `git checkout -b "{name}"`
+- **"override"**: proceed on main (user accepted risk)
+- **"stop"**: exit
+
+**If `CURRENT_BRANCH` is NOT main/master:** Proceed silently.
 
 **"phase" or "milestone":** Use pre-computed `branch_name` from init:
 ```bash
