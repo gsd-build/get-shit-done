@@ -222,7 +222,9 @@ Task(
 
 ## 5.5. Create Validation Strategy
 
-MANDATORY unless `nyquist_validation_enabled` is false.
+Skip if `nyquist_validation_enabled` is false OR `research_enabled` is false.
+
+If `research_enabled` is false and `nyquist_validation_enabled` is true: warn "Nyquist validation enabled but research disabled — VALIDATION.md cannot be created without RESEARCH.md. Plans will lack validation requirements (Dimension 8)." Continue to step 6.
 
 ```bash
 grep -l "## Validation Architecture" "${PHASE_DIR}"/*-RESEARCH.md 2>/dev/null
@@ -265,15 +267,15 @@ CONTEXT_PATH=$(printf '%s\n' "$INIT" | jq -r '.context_path // empty')
 
 ## 7.5. Verify Nyquist Artifacts
 
-Skip if `nyquist_validation_enabled` is false.
+Skip if `nyquist_validation_enabled` is false OR `research_enabled` is false.
 
 ```bash
 VALIDATION_EXISTS=$(ls "${PHASE_DIR}"/*-VALIDATION.md 2>/dev/null | head -1)
 ```
 
 If missing and Nyquist enabled — ask user:
-1. Re-run: `/gsd:plan-phase {PHASE} --research`
-2. Disable Nyquist in config
+1. Re-run with research: `/gsd:plan-phase {PHASE} --research`
+2. Disable Nyquist: `node "$HOME/.claude/get-shit-done/bin/gsd-tools.cjs" config-set workflow.nyquist_validation false`
 3. Continue anyway (plans fail Dimension 8)
 
 Proceed to Step 8 only if user selects 2 or 3.
