@@ -63,14 +63,14 @@ Parse HARVEST JSON. Extract `status`, `sessionsReady`, `sessions`.
 1. For each item in `session.extractionRequests` (up to 3 — decision, reasoning_pattern, meta_knowledge):
 
    ```
-   Task(
+   Agent(
      subagent_type="general-purpose",
      model="haiku",
      prompt="{item.prompt}"
    )
    ```
 
-   Collect Haiku output text. If Task() throws or returns empty, skip this extraction type and continue.
+   Collect Haiku output text. If Agent() throws or returns empty, skip this extraction type and continue.
 
 2. Assemble results array from successful outputs:
    ```json
@@ -214,7 +214,7 @@ Store the full `questions` array in a variable for the meta-answerer invocation 
 **Spawn meta-answerer to answer questions:**
 
 ```
-Task(
+Agent(
   subagent_type="gsd-meta-answerer",
   model="haiku",
   prompt="
@@ -231,7 +231,7 @@ Task(
 )
 ```
 
-Parse the returned JSON response from the Task() call — the `answers` array and `stats` object per the gsd-meta-answerer output format.
+Parse the returned JSON response from the Agent() call — the `answers` array and `stats` object per the gsd-meta-answerer output format.
 
 **Answer evaluation logic:**
 
@@ -601,7 +601,7 @@ For each incomplete plan (no SUMMARY.md):
      Read the plan objective (first line of <objective> tag in PLAN.md) as task description:
        PLAN_OBJECTIVE=$(grep -A1 '<objective>' {plan_file} | tail -1 | tr -d '\n')
      Spawn routing agent to get model recommendation:
-       Task(
+       Agent(
          subagent_type="gsd-task-router",
          prompt="Route this task: {PLAN_OBJECTIVE}"
        )
@@ -623,7 +623,7 @@ For each incomplete plan (no SUMMARY.md):
 
    **When PER_TASK_MODE is false** (non-auto profile or no tier tags — existing behavior):
    ```
-   Task(
+   Agent(
      subagent_type="gsd-executor",
      model="{EXECUTOR_MODEL}",
      prompt="
@@ -678,7 +678,7 @@ For each incomplete plan (no SUMMARY.md):
      3. Track tier assignment: ROUTING_STATS[TASK_TIER] += 1
 
      4. Spawn per-task executor:
-        Task(
+        Agent(
           subagent_type="gsd-executor",
           model="{TASK_TIER}",
           prompt="
@@ -780,7 +780,7 @@ previous_report = null
 while round <= MAX_ROUNDS AND qa_passed == false:
 
   // --- STEP A: Run QA Agent ---
-  qa_result = Task(
+  qa_result = Agent(
     subagent_type="gsd-charlotte-qa",
     model="haiku",
     prompt="
@@ -848,7 +848,7 @@ while round <= MAX_ROUNDS AND qa_passed == false:
     FIX_TIER = "haiku"
 
   // Build fix prompt from issues report
-  fix_result = Task(
+  fix_result = Agent(
     subagent_type="general-purpose",
     model="{FIX_TIER}",
     prompt="
@@ -960,7 +960,7 @@ After ALL plans in this phase have completed execution:
    b. Derive test scope from phase success criteria and SUMMARY.md key-files
    c. Run the Charlotte 3-round loop — mode="ux-audit":
       ```
-      Task(
+      Agent(
         subagent_type="gsd-charlotte-qa",
         model="sonnet",
         prompt="
@@ -996,7 +996,7 @@ After post_phase_ux_sweep and before verify_phase_goal:
    a. Start dev server if not running
    b. Spawn gsd-charlotte-qa (mode=e2e):
       ```
-      Task(
+      Agent(
         subagent_type="gsd-charlotte-qa",
         model="sonnet",
         prompt="
@@ -1027,7 +1027,7 @@ Spawn verifier agent to create VERIFICATION.md:
 MUST_HAVES_COUNT = sum of (must_haves.truths.length + must_haves.artifacts.length) across all PLAN.md files in {phase_dir}
 VERIFIER_MODEL = MUST_HAVES_COUNT >= 8 ? "opus" : "sonnet"
 
-Task(
+Agent(
   subagent_type="gsd-verifier",
   model={VERIFIER_MODEL},
   prompt="Verify phase {phase_number} goal achievement.
@@ -1091,7 +1091,7 @@ After verify_phase_goal, if current phase `depends_on` has entries:
 
    Spawn gsd-integration-tester:
    ```
-   Task(
+   Agent(
      subagent_type="gsd-integration-tester",
      model="sonnet",
      prompt="

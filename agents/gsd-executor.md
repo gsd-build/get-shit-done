@@ -331,7 +331,7 @@ DO NOT execute the task inline. Instead:
 2. Route then spawn gsd-test-writer:
    ```
    // Route first — test complexity varies by what's being tested
-   route_result = Task(
+   route_result = Agent(
      subagent_type="gsd-task-router",
      prompt="Route this task: Test {task_name}
 
@@ -348,7 +348,7 @@ Plan context: complexity=medium, depends_on=0 prior plans, must_haves=1 criteria
    )
    test_writer_model = parse "Model:" line from route_result // default "sonnet" if parse fails
 
-   Task(
+   Agent(
      subagent_type="gsd-test-writer",
      model={test_writer_model},
      prompt="
