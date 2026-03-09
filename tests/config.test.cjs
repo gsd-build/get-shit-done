@@ -241,21 +241,21 @@ describe('config-set command', () => {
   });
 
   test('coerces numeric strings to numbers', () => {
-    const result = runGsdTools('config-set some_number 42', tmpDir);
+    const result = runGsdTools('config-set granularity 42', tmpDir);
     assert.ok(result.success, `Command failed: ${result.error}`);
 
     const config = readConfig(tmpDir);
-    assert.strictEqual(config.some_number, 42);
-    assert.strictEqual(typeof config.some_number, 'number');
+    assert.strictEqual(config.granularity, 42);
+    assert.strictEqual(typeof config.granularity, 'number');
   });
 
   test('preserves plain strings', () => {
-    const result = runGsdTools('config-set some_string hello', tmpDir);
+    const result = runGsdTools('config-set model_profile hello', tmpDir);
     assert.ok(result.success, `Command failed: ${result.error}`);
 
     const config = readConfig(tmpDir);
-    assert.strictEqual(config.some_string, 'hello');
-    assert.strictEqual(typeof config.some_string, 'string');
+    assert.strictEqual(config.model_profile, 'hello');
+    assert.strictEqual(typeof config.model_profile, 'string');
   });
 
   test('sets nested values via dot-notation', () => {
@@ -266,17 +266,25 @@ describe('config-set command', () => {
     assert.strictEqual(config.workflow.research, false);
   });
 
-  test('auto-creates nested objects for deep dot-notation', () => {
+  test('auto-creates nested objects for dot-notation', () => {
     // Start with empty config
     writeConfig(tmpDir, {});
 
-    const result = runGsdTools('config-set a.b.c deep_value', tmpDir);
+    const result = runGsdTools('config-set workflow.research false', tmpDir);
     assert.ok(result.success, `Command failed: ${result.error}`);
 
     const config = readConfig(tmpDir);
-    assert.strictEqual(config.a.b.c, 'deep_value');
-    assert.strictEqual(typeof config.a, 'object');
-    assert.strictEqual(typeof config.a.b, 'object');
+    assert.strictEqual(config.workflow.research, false);
+    assert.strictEqual(typeof config.workflow, 'object');
+  });
+
+  test('rejects unknown config keys', () => {
+    const result = runGsdTools('config-set workflow.nyquist_validation_enabled false', tmpDir);
+    assert.strictEqual(result.success, false);
+    assert.ok(
+      result.error.includes('Unknown config key'),
+      `Expected "Unknown config key" in error: ${result.error}`
+    );
   });
 
   test('errors when no key path provided', () => {
