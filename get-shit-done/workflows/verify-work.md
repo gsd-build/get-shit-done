@@ -333,6 +333,7 @@ All tests passed. Ready to continue.
 
 - `/gsd:plan-phase {next}` — Plan next phase
 - `/gsd:execute-phase {next}` — Execute next phase
+- `/gsd:ui-review {phase}` — visual quality audit (if frontend files were modified)
 ```
 </step>
 

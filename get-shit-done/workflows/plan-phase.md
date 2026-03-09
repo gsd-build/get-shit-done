@@ -241,6 +241,46 @@ test -f "${PHASE_DIR}/${PADDED_PHASE}-VALIDATION.md" && echo "VALIDATION_CREATED
 
 **If not found:** Warn and continue — plans may fail Dimension 8.
 
+## 5.6. UI Design Contract Gate
+
+> Skip if `workflow.ui_phase` is explicitly `false` AND `workflow.ui_safety_gate` is explicitly `false` in `.planning/config.json`. If keys are absent, treat as enabled.
+
+```bash
+UI_PHASE_CFG=$(node "$HOME/.claude/get-shit-done/bin/gsd-tools.cjs" config-get workflow.ui_phase 2>/dev/null || echo "true")
+UI_GATE_CFG=$(node "$HOME/.claude/get-shit-done/bin/gsd-tools.cjs" config-get workflow.ui_safety_gate 2>/dev/null || echo "true")
+```
+
+**If both are `false`:** Skip to step 6.
+
+Check if phase has frontend indicators:
+
+```bash
+PHASE_SECTION=$(node "$HOME/.claude/get-shit-done/bin/gsd-tools.cjs" roadmap get-phase "${PHASE}" 2>/dev/null)
+echo "$PHASE_SECTION" | grep -iE "UI|interface|frontend|component|layout|page|screen|view|form|dashboard|widget" > /dev/null 2>&1
+HAS_UI=$?
+```
+
+**If `HAS_UI` is 0 (frontend indicators found):**
+
+Check for existing UI-SPEC:
+```bash
+UI_SPEC_FILE=$(ls "${PHASE_DIR}"/*-UI-SPEC.md 2>/dev/null | head -1)
+```
+
+**If UI-SPEC.md found:** Set `UI_SPEC_PATH=$UI_SPEC_FILE`. Display: `Using UI design contract: ${UI_SPEC_PATH}`
+
+**If UI-SPEC.md missing AND `UI_GATE_CFG` is `true`:**
+
+Use AskUserQuestion:
+- header: "UI Design Contract"
+- question: "Phase {N} has frontend indicators but no UI-SPEC.md. Generate a design contract before planning?"
+- options:
+  - "Generate UI-SPEC first" → Display: "Run `/gsd:ui-phase {N}` then re-run `/gsd:plan-phase {N}`". Exit workflow.
+  - "Continue without UI-SPEC" → Continue to step 6.
+  - "Not a frontend phase" → Continue to step 6.
+
+**If `HAS_UI` is 1 (no frontend indicators):** Skip silently to step 6.
+
 ## 6. Check Existing Plans
 
 ```bash
@@ -304,6 +344,7 @@ Planner prompt:
 - {research_path} (Technical Research)
 - {verification_path} (Verification Gaps - if --gaps)
 - {uat_path} (UAT Gaps - if --gaps)
+- {UI_SPEC_PATH} (UI Design Contract — visual/interaction specs, if exists)
 </files_to_read>
 
 **Phase requirement IDs (every ID MUST appear in a plan's `requirements` field):** {phase_req_ids}

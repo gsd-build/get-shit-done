@@ -7,6 +7,7 @@ A detailed reference for workflows, troubleshooting, and configuration. For quic
 ## Table of Contents
 
 - [Workflow Diagrams](#workflow-diagrams)
+- [UI Design Contract](#ui-design-contract)
 - [Command Reference](#command-reference)
 - [Configuration Reference](#configuration-reference)
 - [Usage Examples](#usage-examples)
@@ -31,6 +32,10 @@ A detailed reference for workflows, troubleshooting, and configuration. For quic
              │                            │
              │  ┌────────────────────┐    │
              │  │ /gsd:discuss-phase │    │  <- Lock in preferences
+             │  └──────────┬─────────┘    │
+             │             │              │
+             │  ┌──────────▼─────────┐    │
+             │  │ /gsd:ui-phase      │    │  <- Design contract (frontend)
              │  └──────────┬─────────┘    │
              │             │              │
              │  ┌──────────▼─────────┐    │
@@ -146,6 +151,88 @@ escalation for you to address.
 **When to use:** After executing phases that were planned before Nyquist was
 enabled, or after `/gsd:audit-milestone` surfaces Nyquist compliance gaps.
 
+---
+
+## UI Design Contract
+
+### Why
+
+AI-generated frontends are visually inconsistent not because Claude Code is bad at UI but because no design contract existed before execution. Five components built without a shared spacing scale, color contract, or copywriting standard produce five slightly different visual decisions.
+
+`/gsd:ui-phase` locks the design contract before planning. `/gsd:ui-review` audits the result after execution.
+
+### Commands
+
+| Command | Description |
+|---------|-------------|
+| `/gsd:ui-phase [N]` | Generate UI-SPEC.md design contract for a frontend phase |
+| `/gsd:ui-review [N]` | Retroactive 6-pillar visual audit of implemented UI |
+
+### Workflow: `/gsd:ui-phase`
+
+**When to run:** After `/gsd:discuss-phase`, before `/gsd:plan-phase` — for phases with frontend/UI work.
+
+**Flow:**
+1. Reads CONTEXT.md, RESEARCH.md, REQUIREMENTS.md for existing decisions
+2. Detects design system state (shadcn components.json, Tailwind config, existing tokens)
+3. shadcn initialization gate — offers to initialize if React/Next.js/Vite project has none
+4. Asks only unanswered design contract questions (spacing, typography, color, copywriting, registry safety)
+5. Writes `{phase}-UI-SPEC.md` to phase directory
+6. Validates against 6 dimensions (Copywriting, Visuals, Color, Typography, Spacing, Registry Safety)
+7. Revision loop if BLOCKED (max 2 iterations)
+
+**Output:** `{padded_phase}-UI-SPEC.md` in `.planning/phases/{phase-dir}/`
+
+### Workflow: `/gsd:ui-review`
+
+**When to run:** After `/gsd:execute-phase` or `/gsd:verify-work` — for any project with frontend code.
+
+**Standalone:** Works on any project, not just GSD-managed ones. If no UI-SPEC.md exists, audits against abstract 6-pillar standards.
+
+**6 Pillars (scored 1-4 each):**
+1. Copywriting — CTA labels, empty states, error states
+2. Visuals — focal points, visual hierarchy, icon accessibility
+3. Color — accent usage discipline, 60/30/10 compliance
+4. Typography — font size/weight constraint adherence
+5. Spacing — grid alignment, token consistency
+6. Experience Design — loading/error/empty state coverage
+
+**Output:** `{padded_phase}-UI-REVIEW.md` in phase directory with scores and top 3 priority fixes.
+
+### Configuration
+
+| Setting | Default | Description |
+|---------|---------|-------------|
+| `workflow.ui_phase` | `true` | Generate UI design contracts for frontend phases |
+| `workflow.ui_safety_gate` | `true` | plan-phase prompts to run /gsd:ui-phase for frontend phases |
+
+Both follow the absent=enabled pattern. Disable via `/gsd:settings`.
+
+### shadcn Initialization
+
+For React/Next.js/Vite projects, the UI researcher offers to initialize shadcn if no `components.json` is found. The flow:
+
+1. Visit `ui.shadcn.com/create` and configure your preset
+2. Copy the preset string
+3. Run `npx shadcn init --preset {paste}`
+4. Preset encodes the entire design system — colors, border radius, fonts
+
+The preset string becomes a first-class GSD planning artifact, reproducible across phases and milestones.
+
+### Registry Safety Gate
+
+Third-party shadcn registries can inject arbitrary code. The safety gate requires:
+- `npx shadcn view {component}` — inspect before installing
+- `npx shadcn diff {component}` — compare against official
+
+Controlled by `workflow.ui_safety_gate` config toggle.
+
+### Screenshot Storage
+
+`/gsd:ui-review` captures screenshots via Playwright CLI to `.planning/ui-reviews/`. A `.gitignore` is created automatically to prevent binary files from reaching git. Screenshots are cleaned up during `/gsd:complete-milestone`.
+
+---
+
 ### Execution Wave Coordination
 
 ```
@@ -193,9 +280,11 @@ enabled, or after `/gsd:audit-milestone` surfaces Nyquist compliance gaps.
 | `/gsd:new-project` | Full project init: questions, research, requirements, roadmap | Start of a new project |
 | `/gsd:new-project --auto @idea.md` | Automated init from document | Have a PRD or idea doc ready |
 | `/gsd:discuss-phase [N]` | Capture implementation decisions | Before planning, to shape how it gets built |
+| `/gsd:ui-phase [N]` | Generate UI design contract | After discuss-phase, before plan-phase (frontend phases) |
 | `/gsd:plan-phase [N]` | Research + plan + verify | Before executing a phase |
 | `/gsd:execute-phase <N>` | Execute all plans in parallel waves | After planning is complete |
 | `/gsd:verify-work [N]` | Manual UAT with auto-diagnosis | After execution completes |
+| `/gsd:ui-review [N]` | Retroactive 6-pillar visual audit | After execution or verify-work (frontend projects) |
 | `/gsd:audit-milestone` | Verify milestone met its definition of done | Before completing milestone |
 | `/gsd:complete-milestone` | Archive milestone, tag release | All phases verified |
 | `/gsd:new-milestone [name]` | Start next version cycle | After completing a milestone |
@@ -256,7 +345,9 @@ GSD stores project settings in `.planning/config.json`. Configure during `/gsd:n
     "research": true,
     "plan_check": true,
     "verifier": true,
-    "nyquist_validation": true
+    "nyquist_validation": true,
+    "ui_phase": true,
+    "ui_safety_gate": true
   },
   "git": {
     "branching_strategy": "none",
@@ -291,6 +382,8 @@ GSD stores project settings in `.planning/config.json`. Configure during `/gsd:n
 | `workflow.plan_check` | `true`, `false` | `true` | Plan verification loop (up to 3 iterations) |
 | `workflow.verifier` | `true`, `false` | `true` | Post-execution verification against phase goals |
 | `workflow.nyquist_validation` | `true`, `false` | `true` | Validation architecture research during plan-phase; 8th plan-check dimension |
+| `workflow.ui_phase` | `true`, `false` | `true` | Generate UI design contracts for frontend phases |
+| `workflow.ui_safety_gate` | `true`, `false` | `true` | plan-phase prompts to run /gsd:ui-phase for frontend phases |
 
 Disable these to speed up phases in familiar domains or when conserving tokens.
 
@@ -344,9 +437,11 @@ claude --dangerously-skip-permissions
 /gsd:new-project            # Answer questions, configure, approve roadmap
 /clear
 /gsd:discuss-phase 1        # Lock in your preferences
+/gsd:ui-phase 1             # Design contract (frontend phases)
 /gsd:plan-phase 1           # Research + plan + verify
 /gsd:execute-phase 1        # Parallel execution
 /gsd:verify-work 1          # Manual UAT
+/gsd:ui-review 1            # Visual audit (frontend phases)
 /clear
 /gsd:discuss-phase 2        # Repeat for each phase
 ...
@@ -499,4 +594,7 @@ For reference, here is what GSD creates in your project:
       CONTEXT.md          # Your implementation preferences
       RESEARCH.md         # Ecosystem research findings
       VERIFICATION.md     # Post-execution verification results
+      XX-UI-SPEC.md       # UI design contract (from /gsd:ui-phase)
+      XX-UI-REVIEW.md     # Visual audit scores (from /gsd:ui-review)
+  ui-reviews/             # Screenshots from /gsd:ui-review (gitignored)
 ```
