@@ -1195,6 +1195,9 @@ For each PLAN.md written in the write_phase_prompt step:
    routing_results = await Promise.all(tasks.map(task =>
      Agent(
        subagent_type="gsd-task-router",
+       description="Route task {task.index}",
+       max_turns=5,
+       run_in_background=true,
        prompt="Route this task: {task.name}\n\nTask action:\n{task.action}\n\nDone criteria:\n{task.done}\n\nVerification:\n{task.verify}\n\nPlan context: complexity={plan_context.complexity}, depends_on={plan_context.depends_on.length} prior plans, must_haves={plan_context.must_haves_count} criteria"
      )
    ))

@@ -333,6 +333,8 @@ DO NOT execute the task inline. Instead:
    // Route first — test complexity varies by what's being tested
    route_result = Agent(
      subagent_type="gsd-task-router",
+     description="Route test task",
+     max_turns=5,
      prompt="Route this task: Test {task_name}
 
 Task action:
@@ -350,6 +352,7 @@ Plan context: complexity=medium, depends_on=0 prior plans, must_haves=1 criteria
 
    Agent(
      subagent_type="gsd-test-writer",
+     description="Write tests for {task_name}",
      model={test_writer_model},
      prompt="
        task_name={task_name}

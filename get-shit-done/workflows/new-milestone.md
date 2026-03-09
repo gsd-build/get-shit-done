@@ -164,7 +164,7 @@ Focus ONLY on what's needed for the NEW features.
 Write to: .planning/research/{FILE}
 Use template: ~/.claude/get-shit-done/templates/research-project/{FILE}
 </output>
-", subagent_type="gsd-project-researcher", model="{researcher_model}", description="{DIMENSION} research")
+", subagent_type="gsd-project-researcher", model="{researcher_model}", description="{DIMENSION} research", run_in_background=true)
 ```
 
 **Dimension-specific fields:**

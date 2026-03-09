@@ -72,7 +72,9 @@ Process each session sequentially to extract knowledge.
    Agent(
      subagent_type="general-purpose",
      model="haiku",
-     prompt="{request.prompt}"
+     prompt="{request.prompt}",
+     description="Extract {item.type}",
+     max_turns=15
    )
    ```
 

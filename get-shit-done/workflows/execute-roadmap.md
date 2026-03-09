@@ -170,6 +170,7 @@ COORDINATOR_MODEL=$(jq -r '.coordinator_model // "sonnet"' .planning/config.json
 Agent(
   subagent_type="gsd-phase-coordinator",
   model="{COORDINATOR_MODEL}",
+  description="Execute phase {N}",
   prompt="Execute Phase {N}: {name}
 
   Phase directory: .planning/phases/{phase_dir}/

@@ -583,7 +583,7 @@ Your STACK.md feeds into roadmap creation. Be prescriptive:
 Write to: .planning/research/STACK.md
 Use template: ~/.claude/get-shit-done/templates/research-project/STACK.md
 </output>
-", subagent_type="gsd-project-researcher", model="{researcher_model}", description="Stack research")
+", subagent_type="gsd-project-researcher", model="{researcher_model}", description="Stack research", run_in_background=true)
 
 Agent(prompt="<research_type>
 Project Research — Features dimension for [domain].
@@ -621,7 +621,7 @@ Your FEATURES.md feeds into requirements definition. Categorize clearly:
 Write to: .planning/research/FEATURES.md
 Use template: ~/.claude/get-shit-done/templates/research-project/FEATURES.md
 </output>
-", subagent_type="gsd-project-researcher", model="{researcher_model}", description="Features research")
+", subagent_type="gsd-project-researcher", model="{researcher_model}", description="Features research", run_in_background=true)
 
 Agent(prompt="<research_type>
 Project Research — Architecture dimension for [domain].
@@ -659,7 +659,7 @@ Your ARCHITECTURE.md informs phase structure in roadmap. Include:
 Write to: .planning/research/ARCHITECTURE.md
 Use template: ~/.claude/get-shit-done/templates/research-project/ARCHITECTURE.md
 </output>
-", subagent_type="gsd-project-researcher", model="{researcher_model}", description="Architecture research")
+", subagent_type="gsd-project-researcher", model="{researcher_model}", description="Architecture research", run_in_background=true)
 
 Agent(prompt="<research_type>
 Project Research — Pitfalls dimension for [domain].
@@ -697,7 +697,7 @@ Your PITFALLS.md prevents mistakes in roadmap/planning. For each pitfall:
 Write to: .planning/research/PITFALLS.md
 Use template: ~/.claude/get-shit-done/templates/research-project/PITFALLS.md
 </output>
-", subagent_type="gsd-project-researcher", model="{researcher_model}", description="Pitfalls research")
+", subagent_type="gsd-project-researcher", model="{researcher_model}", description="Pitfalls research", run_in_background=true)
 ```
 
 After all 4 agents complete, spawn synthesizer to create SUMMARY.md:

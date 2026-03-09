@@ -66,6 +66,8 @@ Parse HARVEST JSON. Extract `status`, `sessionsReady`, `sessions`.
    Agent(
      subagent_type="general-purpose",
      model="haiku",
+     description="Extract {item.type}",
+     max_turns=15,
      prompt="{item.prompt}"
    )
    ```
@@ -217,6 +219,8 @@ Store the full `questions` array in a variable for the meta-answerer invocation 
 Agent(
   subagent_type="gsd-meta-answerer",
   model="haiku",
+  description="Answer phase {phase_number} questions",
+  max_turns=15,
   prompt="
     <phase_context>
     Phase: {phase_number}
@@ -603,6 +607,8 @@ For each incomplete plan (no SUMMARY.md):
      Spawn routing agent to get model recommendation:
        Agent(
          subagent_type="gsd-task-router",
+         description="Route plan",
+         max_turns=5,
          prompt="Route this task: {PLAN_OBJECTIVE}"
        )
      Parse the ROUTING DECISION response to extract the Model: line.
@@ -626,6 +632,7 @@ For each incomplete plan (no SUMMARY.md):
    Agent(
      subagent_type="gsd-executor",
      model="{EXECUTOR_MODEL}",
+     description="Execute plan {plan_number}",
      prompt="
        <objective>
        Execute plan {plan_number} of phase {phase_number}-{phase_name}.
@@ -681,6 +688,7 @@ For each incomplete plan (no SUMMARY.md):
         Agent(
           subagent_type="gsd-executor",
           model="{TASK_TIER}",
+          description="Execute task {task_index}",
           prompt="
             <objective>
             Execute task {task_index} of plan {plan_number} in phase {phase_number}-{phase_name}.
@@ -783,6 +791,7 @@ while round <= MAX_ROUNDS AND qa_passed == false:
   qa_result = Agent(
     subagent_type="gsd-charlotte-qa",
     model="haiku",
+    description="UI QA round {round}",
     prompt="
       mode=ui-qa
       <what_built>{what_built}</what_built>
@@ -851,6 +860,7 @@ while round <= MAX_ROUNDS AND qa_passed == false:
   fix_result = Agent(
     subagent_type="general-purpose",
     model="{FIX_TIER}",
+    description="Fix UI issues round {round}",
     prompt="
       You are a senior engineer fixing UI/UX issues found during automated QA testing.
 
@@ -963,6 +973,7 @@ After ALL plans in this phase have completed execution:
       Agent(
         subagent_type="gsd-charlotte-qa",
         model="sonnet",
+        description="UX audit phase {phase_number}",
         prompt="
           mode=ux-audit
           what_built={phase goal + key UI files from SUMMARYs}
@@ -999,6 +1010,7 @@ After post_phase_ux_sweep and before verify_phase_goal:
       Agent(
         subagent_type="gsd-charlotte-qa",
         model="sonnet",
+        description="E2E test phase {phase_number}",
         prompt="
           mode=e2e
           e2e_flows={E2E_FLOWS}
@@ -1030,6 +1042,7 @@ VERIFIER_MODEL = MUST_HAVES_COUNT >= 8 ? "opus" : "sonnet"
 Agent(
   subagent_type="gsd-verifier",
   model={VERIFIER_MODEL},
+  description="Verify phase {phase_number}",
   prompt="Verify phase {phase_number} goal achievement.
 Phase directory: {phase_dir}
 Phase goal: {goal from ROADMAP.md}
@@ -1094,6 +1107,7 @@ After verify_phase_goal, if current phase `depends_on` has entries:
    Agent(
      subagent_type="gsd-integration-tester",
      model="sonnet",
+     description="Integration test phase {phase_number}",
      prompt="
        current_phase={phase_slug}
        depends_on_phases={depends_on list}

@@ -113,6 +113,7 @@ Execute each wave in sequence. Within a wave: parallel if `PARALLELIZATION=true`
    Agent(
      subagent_type="gsd-executor",
      model="{executor_model}",
+     description="Execute plan {plan_number}",
      prompt="
        <objective>
        Execute plan {plan_number} of phase {phase_number}-{phase_name}.
@@ -315,7 +316,8 @@ Check must_haves against actual codebase.
 Cross-reference requirement IDs from PLAN frontmatter against REQUIREMENTS.md — every ID MUST be accounted for.
 Create VERIFICATION.md.",
   subagent_type="gsd-verifier",
-  model="{verifier_model}"
+  model="{verifier_model}",
+  description="Verify phase {phase_number}"
 )
 ```
 

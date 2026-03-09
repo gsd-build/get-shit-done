@@ -61,7 +61,8 @@ Phase description: {description}
 Write to: .planning/phases/${PHASE}-{slug}/${PHASE}-RESEARCH.md
 </output>",
   subagent_type="gsd-phase-researcher",
-  model="{researcher_model}"
+  model="{researcher_model}",
+  description="Research phase {phase}"
 )
 ```
 
