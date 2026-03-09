@@ -26,7 +26,7 @@ Execute GSD workflows autonomously with minimal human intervention. Spawns speci
 Parse options and user guidance using helper script:
 
 ```bash
-eval $(bash ~/.config/opencode/get-shit-done/scripts/gsd-autonomous-parse.sh $ARGUMENTS)
+eval $(node ~/.config/opencode/get-shit-done/scripts/gsd-autonomous-parse.cjs $ARGUMENTS)
 ```
 
 The script outputs parsed values. Read them to determine:
