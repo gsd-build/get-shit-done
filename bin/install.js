@@ -59,13 +59,29 @@ if (hasAll) {
 }
 
 /**
- * Convert a pathPrefix (which uses absolute paths for global installs) to a
- * $HOME-relative form for replacing $HOME/.claude/ references in bash code blocks.
- * Preserves $HOME as a shell variable so paths remain portable across machines.
+ * Convert an absolute in-home pathPrefix to a ~/ path when possible so Claude
+ * prompts stay portable and don't bake usernames into generated planning files.
+ */
+function toTildePrefix(pathPrefix) {
+  const home = os.homedir().replace(/\\/g, '/');
+  const normalized = pathPrefix.replace(/\\/g, '/');
+  if (normalized.startsWith(home)) {
+    return '~' + normalized.slice(home.length);
+  }
+  return normalized;
+}
+
+/**
+ * Convert a pathPrefix to a $HOME-relative form for replacing $HOME/.claude/
+ * references in bash code blocks. Preserves $HOME as a shell variable so
+ * paths remain portable across machines.
  */
 function toHomePrefix(pathPrefix) {
   const home = os.homedir().replace(/\\/g, '/');
   const normalized = pathPrefix.replace(/\\/g, '/');
+  if (normalized.startsWith('~/')) {
+    return '$HOME/' + normalized.slice(2);
+  }
   if (normalized.startsWith(home)) {
     return '$HOME' + normalized.slice(home.length);
   }
@@ -79,6 +95,24 @@ function getDirName(runtime) {
   if (runtime === 'gemini') return '.gemini';
   if (runtime === 'codex') return '.codex';
   return '.claude';
+}
+
+/**
+ * Resolve the markdown path prefix that installed prompts should use for a
+ * runtime. Claude keeps global installs home-relative to avoid leaking local
+ * usernames into generated .planning artifacts.
+ */
+function getPathPrefix(runtime, isGlobal, targetDir) {
+  if (!isGlobal) {
+    return `./${getDirName(runtime)}/`;
+  }
+
+  const absolutePrefix = `${targetDir.replace(/\\/g, '/')}/`;
+  if (runtime === 'claude') {
+    return toTildePrefix(absolutePrefix);
+  }
+
+  return absolutePrefix;
 }
 
 /**
@@ -1888,12 +1922,10 @@ function install(isGlobal, runtime = 'claude') {
     ? targetDir.replace(os.homedir(), '~')
     : targetDir.replace(process.cwd(), '.');
 
-  // Path prefix for file references in markdown content
-  // For global installs: use full path
-  // For local installs: use relative
-  const pathPrefix = isGlobal
-    ? `${targetDir.replace(/\\/g, '/')}/`
-    : `./${dirName}/`;
+  // Path prefix for file references in markdown content.
+  // Claude keeps global installs home-relative to avoid leaking usernames
+  // into generated planning artifacts; other runtimes still use concrete paths.
+  const pathPrefix = getPathPrefix(runtime, isGlobal, targetDir);
 
   let runtimeLabel = 'Claude Code';
   if (isOpencode) runtimeLabel = 'OpenCode';
@@ -2411,6 +2443,9 @@ function installAllRuntimes(runtimes, isGlobal, isInteractive) {
 // Test-only exports — skip main logic when loaded as a module for testing
 if (process.env.GSD_TEST_MODE) {
   module.exports = {
+    toTildePrefix,
+    toHomePrefix,
+    getPathPrefix,
     getCodexSkillAdapterHeader,
     convertClaudeAgentToCodexAgent,
     generateCodexAgentToml,

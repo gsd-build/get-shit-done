@@ -6,6 +6,9 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ## [Unreleased]
 
+### Fixed
+- Claude global installs keep prompt file references home-relative instead of expanding to `C:/Users/<name>` / `/Users/<name>` paths, so generated `.planning` files no longer leak local usernames into committed execution_context blocks (#987)
+
 ## [1.22.4] - 2026-03-03
 
 ### Added
