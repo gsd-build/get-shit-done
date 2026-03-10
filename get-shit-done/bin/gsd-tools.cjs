@@ -83,6 +83,14 @@
  *     [--name <name>]
  *     [--archive-phases]               Move phase dirs to milestones/vX.Y-phases/
  *
+ * Migration Operations:
+ *   migrate-to-parallel                Interactive migration wizard
+ *   migrate-to-parallel --dry-run      Preview migration actions
+ *   migrate-to-parallel --auto         Auto-detect and migrate all phases to M1
+ *   migrate-to-parallel --config <f>   Use mapping file for migration
+ *   migrate-to-parallel --restore <b>  Restore from backup directory
+ *   migrate-to-parallel --list-backups List available migration backups
+ *
  * Validation:
  *   validate consistency               Check phase numbering, disk/roadmap sync
  *   validate health [--repair]         Check .planning/ integrity, optionally repair
@@ -183,6 +191,7 @@ const upstreamModule = require('./lib/upstream.cjs');
 const interactiveModule = require('./lib/interactive.cjs');
 const testDiscoveryModule = require('./lib/test-discovery.cjs');
 const milestoneParallel = require('./lib/milestone-parallel.cjs');
+const migrate = require('./lib/migrate.cjs');
 
 // ─── Upstream Domain Modules ──────────────────────────────────────────────────
 
@@ -5573,6 +5582,97 @@ async function main() {
         error('Unknown milestone subcommand. Available: complete, create, list, switch, info');
       }
       break;
+    }
+
+    case 'migrate-to-parallel': {
+      const dryRun = args.includes('--dry-run');
+      const auto = args.includes('--auto');
+      const configIndex = args.indexOf('--config');
+      const restoreIndex = args.indexOf('--restore');
+      const listBackups = args.includes('--list-backups');
+      const force = args.includes('--force');
+
+      // List backups
+      if (listBackups) {
+        const backups = migrate.listBackups(cwd);
+        output(backups, raw, backups.map(b =>
+          `${b.name} (${b.type}) - ${b.created}`
+        ).join('\n') || 'No backups found');
+        break;
+      }
+
+      // Restore from backup
+      if (restoreIndex !== -1) {
+        const backupPath = args[restoreIndex + 1];
+        if (!backupPath) {
+          error('Backup path required with --restore');
+        }
+        const result = migrate.restoreMigrationBackup(cwd, backupPath);
+        output(result, raw, result.success
+          ? `Restored: ${result.restored.join(', ')}`
+          : `Failed: ${result.errors.join('; ')}`);
+        break;
+      }
+
+      // Dry run (preview)
+      if (dryRun) {
+        const analysis = migrate.analyzeMigration(cwd);
+        if (!analysis.can_migrate) {
+          output({ can_migrate: false, warnings: analysis.warnings }, raw,
+            'Cannot migrate: ' + analysis.warnings.join('; '));
+          break;
+        }
+
+        // Create default mapping for preview
+        const mapping = {
+          'M1': {
+            name: 'Migration',
+            phases: analysis.phases.map(p => p.directory),
+          },
+        };
+        const preview = migrate.previewMigration(cwd, mapping);
+        output({
+          analysis,
+          preview,
+        }, raw, migrate.formatAnalysis(analysis) + '\n\n' + migrate.formatPreview(preview));
+        break;
+      }
+
+      // Config file migration
+      if (configIndex !== -1) {
+        const configFile = args[configIndex + 1];
+        if (!configFile) {
+          error('Config file path required with --config');
+        }
+        const result = migrate.runNonInteractiveWizard(cwd, { configFile, force });
+        output(result, raw, result.success
+          ? 'Migration complete'
+          : `Failed: ${result.error}`);
+        break;
+      }
+
+      // Auto migration
+      if (auto) {
+        const result = migrate.runNonInteractiveWizard(cwd, { auto: true, force });
+        output(result, raw, result.success
+          ? 'Migration complete'
+          : `Failed: ${result.error}`);
+        break;
+      }
+
+      // Interactive wizard (async)
+      migrate.runMigrationWizard(cwd, { force }).then(result => {
+        if (!raw) {
+          // Output already shown by wizard
+          process.exit(result.success ? 0 : (result.cancelled ? 0 : 1));
+        } else {
+          output(result, true);
+        }
+      }).catch(err => {
+        error(err.message);
+      });
+      // Don't break - async handler will exit
+      return;
     }
 
     case 'validate': {
