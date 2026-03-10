@@ -282,11 +282,21 @@ function getCmdConfigSetModelProfileResultMessage(
   previousProfile,
   agentToModelMap
 ) {
-  const didChange = previousProfile !== normalizedProfile;
-  const maybePreviousProfileMsg = didChange ? ` (was: ${previousProfile})` : '';
-  const newProfileLine = `✓ Model profile set to: ${normalizedProfile}${maybePreviousProfileMsg}`;
   const agentToModelTable = formatAgentToModelMapAsTable(agentToModelMap);
-  return `${newProfileLine}\n\nAgents will now use:\n\n${agentToModelTable}\n\nNext spawned agents will use the new profile.`;
+  const didChange = previousProfile !== normalizedProfile;
+  const paragraphs = didChange
+    ? [
+        `✓ Model profile set to: ${normalizedProfile} (was: ${previousProfile})`,
+        'Agents will now use:',
+        agentToModelTable,
+        'Next spawned agents will use the new profile.',
+      ]
+    : [
+        `✓ Model profile is already set to: ${normalizedProfile}`,
+        'Agents are using:',
+        agentToModelTable,
+      ];
+  return paragraphs.join('\n\n');
 }
 
 module.exports = {
