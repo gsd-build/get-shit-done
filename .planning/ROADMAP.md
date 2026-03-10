@@ -7,6 +7,10 @@
 - ✅ **v1.10.0 Autonomous Phase Discussion** — Phases 21-25, 33 (shipped 2026-02-21)
 - ✅ **v1.11.0 System Hardening** — Phases 26-30 (completed 2026-02-20)
   - 26: Telegram MCP Reliability · 27: Knowledge Quality · 28: Compression Observability · 29: Session Fix · 30: Milestone Archival
+- 🚧 **v1.12.0 Autonomous Quality & Flow** — Phases 34-40 (in progress)
+  - 34: Checkpoint & Plan-Structure Gates · 35: Test & Coverage Enforcement · 36: Migration Safety & Error Taxonomy
+  - 37: PRD Traceability & Flow Context · 38: Dev Server Lifecycle & Knowledge Feedback
+  - 39: Execution Intelligence · 40: Observability & Analytics
 
 ## Phases
 
@@ -84,6 +88,9 @@ Full details: `.planning/milestones/v1.10.0-ROADMAP.md`
 
 </details>
 
+<details>
+<summary>✅ v1.11.0 System Hardening (Phases 26-32) — COMPLETE 2026-02-21</summary>
+
 #### Phase 26: Telegram MCP Reliability
 **Goal**: Fix three silent failure modes in the Telegram MCP daemon that cause polling callers to always wait full timeouts, questions to be lost on daemon restart, and timed-out questions to disappear without user notification
 **Depends on**: Phase 25 (validation complete)
@@ -155,6 +162,171 @@ Plans:
 Plans:
 - [x] 30-01: Milestone summarize & archive-phases commands — completed 2026-02-20
 
+#### Phase 31: Per-Task Model Routing
+
+**Goal:** When model_profile is "auto", each task in a PLAN.md gets assigned an optimal model tier (haiku/sonnet/opus) by the planner's post-draft routing pass, and the coordinator spawns per-task executors at those tiers with lightweight runtime quota downgrade — making the executor a mini-orchestrator rather than a single-tier runner
+**Depends on:** Phase 30
+**Plans:** 3/3 plans complete
+
+Plans:
+- [x] 31-01-PLAN.md — Add routing pass to gsd-planner: post-draft tier tagging of task names when model_profile="auto"
+- [ ] 31-02-PLAN.md — Update gsd-phase-coordinator: parse per-task tier tags, apply quota downgrade, spawn per-task executors, add routing stats to Telegram notification
+- [ ] 31-03-PLAN.md — Update gsd-executor: haiku→sonnet escalation on retry, routing tier tracking in SUMMARY.md
+
+#### Phase 32: Reliability & Quality Gap Fixes
+
+**Goal:** Close nine specific gaps identified by post-v1.11.0 audit: Telegram replies written to CONTEXT.md but never injected into the knowledge DB; silent Telegram topic creation failure swallowing all notifications for an entire roadmap run; session-end hook .done race condition allowing duplicate extraction; answered questions accumulating in question-state.jsonl forever; IPC server buffering unbounded partial JSON; embedding dedup timeout hardcoded at 2s; knowledge evolution running without a transaction; compression cache never invalidating on file modification; and knowledge search claiming RRF but performing sequential FTS-then-vector
+**Depends on:** Phase 31
+**Requirements**: GAP-01 through GAP-09
+**Success Criteria** (what must be TRUE):
+  1. After a Telegram escalation, a new knowledge DB entry appears with confidence 1.0 for the question+answer pair — confirmed by querying the DB immediately after escalation completes
+  2. When `create_topic` fails at roadmap start, a visible warning is emitted to the execution log and Telegram notifications are explicitly disabled (not silently no-op) for that run
+  3. Two concurrent Stop hook invocations for the same session produce exactly one knowledge extraction — confirmed by running two simultaneous invocations and checking DB entry count
+  4. Restarting the Telegram daemon after answering two questions leaves question-state.jsonl with zero answered entries (pruned on startup)
+  5. Sending 2MB of partial JSON to the IPC server closes the socket before the process exceeds 50MB RSS increase
+  6. Setting `knowledge.embedding_timeout_ms: 500` in config.json causes `GSD_DEBUG=1` logs to show the configured timeout being used
+  7. Writing two entries where the second write fails mid-operation (vector table update) leaves the DB with either both tables updated or neither — no orphaned main-table entries
+  8. After modifying a compressed doc, the next hook invocation produces a fresh compression result (cache miss) rather than serving the stale cached version
+  9. A search query that matches 3 documents in FTS at ranks [1,2,5] and the same documents in vector at ranks [3,1,2] produces a merged result ranked by RRF score rather than FTS rank alone
+**Plans:** 4/4 complete
+
+Plans:
+- [x] 32-01-PLAN.md — GAP-03 atomic .done guard + GAP-05 IPC buffer cap + GAP-07 evolution mutex — completed 2026-02-21
+- [x] 32-02-PLAN.md — GAP-04 question-state prune on startup + GAP-02 create_topic failure warning — completed 2026-02-21
+- [x] 32-03-PLAN.md — GAP-06 embedding timeout configurable + GAP-01 Telegram escalation answers to KB — completed 2026-02-21
+- [x] 32-04-PLAN.md — GAP-08 compression cache mtime verification + GAP-09 searchKnowledgeAsync + RRF — completed 2026-02-21
+
+#### Phase 33: v1.10.0 Tech Debt Closure
+
+**Goal:** Fix the confidence type contract bug in query-knowledge output (string "medium" returned instead of numeric float, breaking meta-answerer scoring when KB has entries) and update REQUIREMENTS.md traceability + SUMMARY.md frontmatter to accurately reflect v1.10.0 completion
+**Depends on:** Phase 32
+**Success Criteria** (what must be TRUE):
+  1. `query-knowledge` returns `confidence: 0.7` (float) as the fallback when a KB entry lacks `metadata.confidence` — confirmed by inserting a test entry without confidence metadata and querying it
+  2. REQUIREMENTS.md traceability table shows all 25 v1.10.0 requirements as "Complete" and all 25 checkboxes checked `[x]`
+  3. Plans 22-02, 22-03, 22-04, 23-01, 24-02, 24-03, 24-04 each have correct `requirements-completed` arrays in their SUMMARY.md frontmatter matching the requirements they implemented
+**Plans:** 2/2 plans complete
+
+Plans:
+- [x] 33-01-PLAN.md — Fix `confidence` string/float bug in `gsd-tools.js` line 8947 + update REQUIREMENTS.md traceability (20 Pending → Complete, 20 checkboxes) — completed 2026-02-21
+- [x] 33-02-PLAN.md — Backfill `requirements-completed` in 7 SUMMARY.md files (22-02, 22-03, 22-04, 23-01, 24-02, 24-03, 24-04) — completed 2026-02-21
+
+</details>
+
+### v1.12.0 Autonomous Quality & Flow (Phases 34-40)
+
+**Milestone Goal:** Transform GSD's quality controls from advisory prompt text into hard programmatic gates, and add 10 flow improvements that make the PRD-to-production loop faster, more coherent, and self-improving.
+
+#### Phase 34: Checkpoint & Plan-Structure Gates
+
+**Goal:** The coordinator refuses to advance through its lifecycle when plans are structurally incomplete — plan execution is blocked when test tasks are absent, phase completion is blocked when VERIFICATION.md is missing or not passed, and CHECKPOINT.json semantics are standardized so the coordinator's step tracking is unambiguous
+**Depends on:** Phase 33
+**Requirements:** QGATE-01, QGATE-02, QGATE-06, QGATE-09
+**Success Criteria** (what must be TRUE):
+  1. Submitting a plan that lacks `tdd="true"` test tasks to the coordinator's plan step causes `gsd-tools.js verify plan-structure` to emit a non-zero exit and the coordinator halts before spawning an executor
+  2. Calling `gsd-tools.js phase complete` when the phase directory has no VERIFICATION.md (or VERIFICATION.md `status` is not `passed`) returns an error and refuses to mark the phase done
+  3. `gsd-tools.js phase complete` also fails when any PLAN.md in the phase directory lacks a matching SUMMARY.md or when CHECKPOINT.json `last_step` is not `verify`
+  4. CHECKPOINT.json `step_status: "complete"` is documented to mean the step ran — outcome is always read from VERIFICATION.md `status`, not inferred from checkpoint alone; coordinator prompt updated to reflect this contract
+**Plans:** 2/2 plans complete
+
+Plans:
+- [ ] 34-01: Add `verify plan-structure` subcommand to gsd-tools.js — checks tdd and ui-qa task presence; wire into coordinator plan step as hard gate
+- [ ] 34-02: Add phase completeness validation to `phase complete` subcommand — VERIFICATION.md existence + status, SUMMARY.md coverage, CHECKPOINT.json last_step; document CHECKPOINT semantics in coordinator checkpoint_protocol
+
+#### Phase 35: Test & Coverage Enforcement
+
+**Goal:** Executors and verifiers enforce hard quality standards — the test suite runs after every plan, Charlotte sweeps web projects unconditionally, coverage thresholds are configurable and enforced, and the verifier hard-fails when implementation files have no corresponding test files
+**Depends on:** Phase 34
+**Requirements:** QGATE-03, QGATE-04, QGATE-07, QGATE-08, QGATE-10
+**Success Criteria** (what must be TRUE):
+  1. After all tasks in a plan complete, the executor runs the full project test suite; if any test fails, SUMMARY.md is not created and the plan is marked failed
+  2. For a project with React/Next.js/Vue/Svelte detected in package.json, Charlotte UX sweep runs after every plan's executor phase regardless of whether the coordinator happened to notice .tsx in SUMMARY.md
+  3. When `testing.coverage_threshold` is set in config.json, the executor reads it and blocks SUMMARY.md creation if the measured coverage falls below the threshold
+  4. The verifier marks a phase `gaps_found` (not warning) when SUMMARY.md key-files includes .tsx/.jsx but no Charlotte QA session entry appears in the phase record
+  5. The verifier hard-fails (`gaps_found`) when a .ts/.tsx/.js implementation file listed in SUMMARY.md key-files has no corresponding test file — a warning is never emitted for this condition
+**Plans:** TBD
+
+Plans:
+- [ ] 35-01: Executor post-plan test suite gate — run test command after task completion, block SUMMARY.md on failure; add coverage threshold check when config.testing.coverage_threshold is set
+- [ ] 35-02: Charlotte mandatory sweep — detect web framework in package.json; unconditional Charlotte step in executor for web projects; add coverage threshold enforcement
+- [ ] 35-03: Verifier hard-fail rules — gaps_found on missing Charlotte QA for UI files; gaps_found on implementation files with no test counterpart
+
+#### Phase 36: Migration Safety & Error Taxonomy
+
+**Goal:** Migration timestamp conflicts are caught before they reach the commit and VERIFICATION.md gaps carry structured type information so the gap-closure planner can route fixes intelligently rather than treating all gaps as equivalent
+**Depends on:** Phase 34
+**Requirements:** QGATE-05, FLOW-03
+**Success Criteria** (what must be TRUE):
+  1. Running `gsd-tools.js verify migration-timestamps` before commit scans all migration files, detects duplicate timestamps, and auto-resolves conflicts by incrementing the conflicting timestamp — the scan runs as part of the verifier step for projects with a migrations directory
+  2. VERIFICATION.md gap entries include a `failure_type` field set to one of the documented enum values (`stub | unwired | missing_artifact | semantic_stub | broken_chain | regression | missing_test`) — the verifier populates this field; gaps without a type are rejected as malformed
+  3. The gap-closure planner reads `failure_type` from each gap and selects a fix strategy accordingly — stub gaps get a different plan template than regression gaps
+**Plans:** TBD
+
+Plans:
+- [ ] 36-01: Migration timestamp conflict detection — add `verify migration-timestamps` subcommand to gsd-tools.js; auto-resolve by incrementing duplicate timestamps; wire into verifier for projects with migrations directory
+- [ ] 36-02: VERIFICATION.md failure_type enum — update verifier agent prompt to populate failure_type on each gap; update gap-closure planner to route by type
+
+#### Phase 37: PRD Traceability & Flow Context
+
+**Goal:** Plans built on PRD input are traceable to their source requirements, and Wave 2+ executors within a phase receive accurate context about what was actually built in prior waves rather than relying on what earlier plans assumed they would build
+**Depends on:** Phase 34
+**Requirements:** FLOW-02, FLOW-04
+**Success Criteria** (what must be TRUE):
+  1. Running the PRD Express Path in plan-phase produces a PRD-TRACE.md file mapping each PRD requirement to its REQ-ID; the verifier reads PRD-TRACE.md and flags intent mismatches between the PRD requirement and the implementation SUMMARY.md
+  2. When a phase contains multiple waves, the coordinator injects a `<completed_plans_context>` block into each Wave 2+ executor spawn — the block contains the key-files and decisions from each completed plan's SUMMARY.md, not the original plan assumptions
+  3. PRD-TRACE.md is included in the audit-milestone cross-reference output alongside REQUIREMENTS.md
+**Plans:** TBD
+
+Plans:
+- [ ] 37-01: PRD-TRACE.md generation — add PRD-TRACE.md write step to plan-phase PRD Express Path; update verifier to check intent alignment against PRD-TRACE.md when present
+- [ ] 37-02: Wave context carry-forward — add completed_plans_context assembly in coordinator between waves; inject into Wave 2+ executor spawns; update audit-milestone to include PRD-TRACE.md
+
+#### Phase 38: Dev Server Lifecycle & Knowledge Feedback
+
+**Goal:** Dev server management is unified so every part of GSD that needs a running server uses the same config-driven module, and the knowledge DB is continuously fed from phase execution so decisions and anti-patterns discovered during a run are persisted immediately rather than only at session end
+**Depends on:** Phase 35
+**Requirements:** FLOW-05, FLOW-06
+**Success Criteria** (what must be TRUE):
+  1. A `dev_servers` registry in config.json defines named servers with start command, health endpoint, and port; `gsd-tools.js service-health start <name>` starts the server and waits for the health endpoint, and `service-health stop <name>` cleanly terminates it after phase completion
+  2. Charlotte QA, the coordinator UI loop, and the post-phase UX sweep all reference `service-health` rather than spawning their own server processes — no duplicate server starts for the same phase
+  3. After each phase completes, the transition workflow writes decisions from SUMMARY.md key decisions into the knowledge DB as `source_type: decision` entries; the verifier writes identified anti-patterns as `source_type: anti_pattern` entries with `confidence: 0.9`
+**Plans:** TBD
+
+Plans:
+- [ ] 38-01: service-health module in gsd-tools.js — config.json dev_servers registry; start/stop/status subcommands with health polling; update coordinator, Charlotte, and UX sweep references
+- [ ] 38-02: Knowledge DB feedback from execution — transition workflow writes SUMMARY.md decisions to KB; verifier writes anti-patterns; wire into both agent prompts
+
+#### Phase 39: Execution Intelligence
+
+**Goal:** The executor and coordinator detect problems before they cause failures — dependency drift is caught before a phase starts, file conflicts between parallel phases are surfaced in the execution plan, and inter-task type errors are caught and auto-fixed within a plan before they accumulate
+**Depends on:** Phase 35
+**Requirements:** FLOW-01, FLOW-07, FLOW-08
+**Success Criteria** (what must be TRUE):
+  1. Before executing a phase, `gsd-tools.js verify dependency-stability <phase>` checks that key files from depended-on phases have not been modified by intervening phases; a drift report is produced and the coordinator surfaces it before proceeding
+  2. When `roadmap analyze` identifies parallel-eligible phases, the output includes a `file_conflicts` section listing files claimed by more than one parallel phase — shown in the execution plan confirmation prompt before the run starts
+  3. The executor runs `tsc --noEmit` (or equivalent) between tasks; a type error triggers one auto-fix attempt before the error is logged as a gap and execution continues to the next task — type errors never abort the entire plan
+**Plans:** TBD
+
+Plans:
+- [ ] 39-01: Dependency drift detection — add `verify dependency-stability <phase>` subcommand to gsd-tools.js; wire into coordinator pre-execution check; emit drift report
+- [ ] 39-02: Parallel file conflict detection — update `roadmap analyze` to compute file_conflicts across parallel-eligible phases; add to execution plan confirmation output
+- [ ] 39-03: Inter-task type checking — add tsc step between tasks in executor; one auto-fix retry; log as gap on second failure; never abort plan
+
+#### Phase 40: Observability & Analytics
+
+**Goal:** Execution is observable in real time through context budget monitoring with automatic mode switching, and historically through an analytics command that generates reports from accumulated execution data and self-tunes config thresholds from actual history
+**Depends on:** Phase 39
+**Requirements:** FLOW-09, FLOW-10
+**Success Criteria** (what must be TRUE):
+  1. When the coordinator's context window reaches 60% usage, it switches to compressed response mode and sends a Telegram notification; at 80% it considers spawning the verifier as a fresh subagent with a context handoff summary
+  2. Running `gsd-tools.js analytics report` produces a summary from EXECUTION_LOG.md and SUMMARY metrics including phase durations, plan counts, failure rates, and model tier distribution
+  3. Running `gsd-tools.js analytics calibrate` reads actual execution history and updates config.json thresholds (e.g. complexity tier boundaries, coverage thresholds) based on observed outcomes — a dry-run flag shows proposed changes without writing
+  4. `execute-roadmap` automatically runs `analytics report` at completion and appends the summary to the execution log
+**Plans:** TBD
+
+Plans:
+- [ ] 40-01: Context budget monitoring — add context usage tracking to coordinator; compressed mode at 60%; fresh-subagent consideration at 80%; Telegram notification on mode switch
+- [ ] 40-02: Analytics command group — `analytics report` from EXECUTION_LOG.md + SUMMARY metrics; `analytics calibrate` updates config thresholds from history; auto-run report at execute-roadmap completion
+
 ## Progress
 
 | Phase | Milestone | Plans Complete | Status | Completed |
@@ -188,56 +360,16 @@ Plans:
 | 28. Compression & Observability | v1.11.0 | 3/3 | Complete | 2026-02-20 |
 | 29. Session Extraction Fix | v1.11.0 | 1/1 | Complete | 2026-02-20 |
 | 30. Milestone Summary & Archival | v1.11.0 | 1/1 | Complete | 2026-02-20 |
-| 32. Reliability & Quality Gap Fixes | TBD | 4/4 | Complete | 2026-02-21 |
+| 31. Per-Task Model Routing | v1.11.0 | 3/3 | Complete | 2026-02-21 |
+| 32. Reliability & Quality Gap Fixes | v1.11.0 | 4/4 | Complete | 2026-02-21 |
 | 33. v1.10.0 Tech Debt Closure | v1.10.0 | 2/2 | Complete | 2026-02-21 |
-
-### Phase 31: Per-task model routing — executor becomes mini-orchestrator (Option A)
-
-**Goal:** When model_profile is "auto", each task in a PLAN.md gets assigned an optimal model tier (haiku/sonnet/opus) by the planner's post-draft routing pass, and the coordinator spawns per-task executors at those tiers with lightweight runtime quota downgrade — making the executor a mini-orchestrator rather than a single-tier runner
-**Depends on:** Phase 30
-**Plans:** 3/3 plans complete
-
-Plans:
-- [x] 31-01-PLAN.md — Add routing pass to gsd-planner: post-draft tier tagging of task names when model_profile="auto"
-- [ ] 31-02-PLAN.md — Update gsd-phase-coordinator: parse per-task tier tags, apply quota downgrade, spawn per-task executors, add routing stats to Telegram notification
-- [ ] 31-03-PLAN.md — Update gsd-executor: haiku→sonnet escalation on retry, routing tier tracking in SUMMARY.md
-
-### Phase 32: Reliability & Quality Gap Fixes
-
-**Goal:** Close nine specific gaps identified by post-v1.11.0 audit: Telegram replies written to CONTEXT.md but never injected into the knowledge DB; silent Telegram topic creation failure swallowing all notifications for an entire roadmap run; session-end hook .done race condition allowing duplicate extraction; answered questions accumulating in question-state.jsonl forever; IPC server buffering unbounded partial JSON; embedding dedup timeout hardcoded at 2s; knowledge evolution running without a transaction; compression cache never invalidating on file modification; and knowledge search claiming RRF but performing sequential FTS-then-vector
-**Depends on:** Phase 31
-**Requirements**: GAP-01 through GAP-09
-**Success Criteria** (what must be TRUE):
-  1. After a Telegram escalation, a new knowledge DB entry appears with confidence 1.0 for the question+answer pair — confirmed by querying the DB immediately after escalation completes
-  2. When `create_topic` fails at roadmap start, a visible warning is emitted to the execution log and Telegram notifications are explicitly disabled (not silently no-op) for that run
-  3. Two concurrent Stop hook invocations for the same session produce exactly one knowledge extraction — confirmed by running two simultaneous invocations and checking DB entry count
-  4. Restarting the Telegram daemon after answering two questions leaves question-state.jsonl with zero answered entries (pruned on startup)
-  5. Sending 2MB of partial JSON to the IPC server closes the socket before the process exceeds 50MB RSS increase
-  6. Setting `knowledge.embedding_timeout_ms: 500` in config.json causes `GSD_DEBUG=1` logs to show the configured timeout being used
-  7. Writing two entries where the second write fails mid-operation (vector table update) leaves the DB with either both tables updated or neither — no orphaned main-table entries
-  8. After modifying a compressed doc, the next hook invocation produces a fresh compression result (cache miss) rather than serving the stale cached version
-  9. A search query that matches 3 documents in FTS at ranks [1,2,5] and the same documents in vector at ranks [3,1,2] produces a merged result ranked by RRF score rather than FTS rank alone
-**Plans:** 4/4 complete
-
-Plans:
-- [x] 32-01-PLAN.md — GAP-03 atomic .done guard + GAP-05 IPC buffer cap + GAP-07 evolution mutex — completed 2026-02-21
-- [x] 32-02-PLAN.md — GAP-04 question-state prune on startup + GAP-02 create_topic failure warning — completed 2026-02-21
-- [x] 32-03-PLAN.md — GAP-06 embedding timeout configurable + GAP-01 Telegram escalation answers to KB — completed 2026-02-21
-- [x] 32-04-PLAN.md — GAP-08 compression cache mtime verification + GAP-09 searchKnowledgeAsync + RRF — completed 2026-02-21
-
-### Phase 33: v1.10.0 Tech Debt Closure
-
-**Goal:** Fix the confidence type contract bug in query-knowledge output (string "medium" returned instead of numeric float, breaking meta-answerer scoring when KB has entries) and update REQUIREMENTS.md traceability + SUMMARY.md frontmatter to accurately reflect v1.10.0 completion
-**Depends on:** Phase 32
-**Success Criteria** (what must be TRUE):
-  1. `query-knowledge` returns `confidence: 0.7` (float) as the fallback when a KB entry lacks `metadata.confidence` — confirmed by inserting a test entry without confidence metadata and querying it
-  2. REQUIREMENTS.md traceability table shows all 25 v1.10.0 requirements as "Complete" and all 25 checkboxes checked `[x]`
-  3. Plans 22-02, 22-03, 22-04, 23-01, 24-02, 24-03, 24-04 each have correct `requirements-completed` arrays in their SUMMARY.md frontmatter matching the requirements they implemented
-**Plans:** 2/2 plans complete
-
-Plans:
-- [x] 33-01-PLAN.md — Fix `confidence` string/float bug in `gsd-tools.js` line 8947 + update REQUIREMENTS.md traceability (20 Pending → Complete, 20 checkboxes) — completed 2026-02-21
-- [x] 33-02-PLAN.md — Backfill `requirements-completed` in 7 SUMMARY.md files (22-02, 22-03, 22-04, 23-01, 24-02, 24-03, 24-04) — completed 2026-02-21
+| 34. Checkpoint & Plan-Structure Gates | v1.12.0 | Complete    | 2026-03-10 | - |
+| 35. Test & Coverage Enforcement | v1.12.0 | 0/3 | Not started | - |
+| 36. Migration Safety & Error Taxonomy | v1.12.0 | 0/2 | Not started | - |
+| 37. PRD Traceability & Flow Context | v1.12.0 | 0/2 | Not started | - |
+| 38. Dev Server Lifecycle & Knowledge Feedback | v1.12.0 | 0/2 | Not started | - |
+| 39. Execution Intelligence | v1.12.0 | 0/3 | Not started | - |
+| 40. Observability & Analytics | v1.12.0 | 0/2 | Not started | - |
 
 ---
-*Roadmap created: 2026-02-15 | Last updated: 2026-02-21 — v1.10.0 Autonomous Phase Discussion milestone archived*
+*Roadmap created: 2026-02-15 | Last updated: 2026-03-11 — v1.12.0 Autonomous Quality & Flow phases 34-40 added*

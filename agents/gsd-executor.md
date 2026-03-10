@@ -423,6 +423,103 @@ RETRY_ESCALATED=false  # set to true if task was escalated to sonnet from haiku
 **ALWAYS use Write tool** for file creation — never use `Bash(cat << 'EOF')` heredoc patterns for file creation.
 </task_commit_protocol>
 
+<post_plan_test_gate>
+
+## Post-Plan Test Suite Gate
+
+After ALL tasks in the plan complete (including all `tdd="true"` test tasks), run the full project test suite as a final quality gate before creating SUMMARY.md.
+
+**SUMMARY.md creation is BLOCKED if:**
+- Test suite fails (non-zero exit code)
+- Test suite times out (5-minute limit, exit code 124)
+- Measured coverage falls below `testing.coverage_threshold` (when set in config.json)
+
+**Step 1: Detect test command**
+
+```bash
+# Try config.json first
+TEST_CMD=$(node ~/.claude/get-shit-done/bin/gsd-tools.js config get testing.test_command 2>/dev/null || echo "")
+
+if [ -z "$TEST_CMD" ]; then
+  # Auto-detect from package.json
+  if [ -f "package.json" ]; then
+    TEST_CMD=$(node -e "try{const p=require('./package.json');console.log(p.scripts&&p.scripts['test:ci']||p.scripts&&p.scripts.test||'')}catch(e){console.log('')}" 2>/dev/null || echo "")
+  fi
+fi
+
+if [ -z "$TEST_CMD" ]; then
+  # Try deno.json
+  if [ -f "deno.json" ]; then
+    TEST_CMD=$(node -e "try{const d=require('./deno.json');console.log(d.tasks&&d.tasks['test:ci']||d.tasks&&d.tasks.test||'')}catch(e){console.log('')}" 2>/dev/null || echo "")
+  fi
+fi
+```
+
+If TEST_CMD is empty after all detection attempts: log "No test command found — skipping post-plan test gate" and proceed to `<summary_creation>`. Do NOT block or fail when no test command is available.
+
+**Step 2: Run test suite (5-minute timeout)**
+
+```bash
+TEST_OUTPUT_FILE="/tmp/gsd-test-output-$$.txt"
+timeout 300 bash -c "${TEST_CMD}" > "${TEST_OUTPUT_FILE}" 2>&1
+TEST_EXIT_CODE=$?
+TEST_OUTPUT=$(tail -50 "${TEST_OUTPUT_FILE}" 2>/dev/null || echo "")
+rm -f "${TEST_OUTPUT_FILE}"
+```
+
+**Step 3: Read coverage threshold from config.json**
+
+```bash
+COVERAGE_THRESHOLD=$(node ~/.claude/get-shit-done/bin/gsd-tools.js config get testing.coverage_threshold 2>/dev/null || echo "")
+COVERAGE_BLOCKED=false
+COVERAGE_FOUND=""
+```
+
+If COVERAGE_THRESHOLD is set (non-empty) AND TEST_EXIT_CODE == 0, attempt to parse coverage from TEST_OUTPUT:
+- Look for Istanbul/nyc format: `All files | N.N |` — extract the first numeric value in that row
+- Look for `Statements   : N.N%` or `Lines        : N.N%` patterns
+- Look for `Coverage: N.N%` in Jest output
+- Parse the found value as a float
+
+If a coverage value is found:
+```
+COVERAGE_FOUND = parsed float
+if COVERAGE_FOUND < COVERAGE_THRESHOLD:
+  COVERAGE_BLOCKED = true
+  Log: "Coverage ${COVERAGE_FOUND}% < threshold ${COVERAGE_THRESHOLD}% — SUMMARY.md will be blocked"
+```
+
+If coverage cannot be parsed from output: log "Coverage threshold set but unable to parse coverage from output — proceeding without enforcement" and continue (fail open on parse failure).
+
+**Step 4: Decision logic**
+
+| Condition | Action |
+|-----------|--------|
+| TEST_EXIT_CODE == 124 (timeout) | Set TEST_GATE_BLOCKED=true, TEST_GATE_REASON="timeout" |
+| TEST_EXIT_CODE != 0 (not timeout) | Set TEST_GATE_BLOCKED=true, TEST_GATE_REASON="test_failure" |
+| TEST_EXIT_CODE == 0 AND COVERAGE_BLOCKED=true | Set TEST_GATE_BLOCKED=true, TEST_GATE_REASON="coverage_below_threshold" |
+| TEST_EXIT_CODE == 0 AND NOT COVERAGE_BLOCKED | Set TEST_GATE_BLOCKED=false, log "Test suite passed — proceeding to SUMMARY.md" |
+
+**Step 5: If TEST_GATE_BLOCKED=true — return failure, do NOT create SUMMARY.md**
+
+```
+Return:
+## PLAN FAILED: Test gate blocked SUMMARY.md creation
+
+**Reason:** {TEST_GATE_REASON}
+{If TEST_GATE_REASON == "coverage_below_threshold":}
+**Coverage:** {COVERAGE_FOUND}% (threshold: {COVERAGE_THRESHOLD}%)
+{If TEST_GATE_REASON == "test_failure" or "timeout":}
+**Test output (last 30 lines):**
+{TEST_OUTPUT last 30 lines}
+
+**Action required:** Fix failing tests before this plan can be marked complete. Do NOT create SUMMARY.md.
+```
+
+Do NOT proceed to `<summary_creation>`. Do NOT create SUMMARY.md when TEST_GATE_BLOCKED=true.
+
+</post_plan_test_gate>
+
 <summary_creation>
 After all tasks complete, create `{phase}-{plan}-SUMMARY.md` at `.planning/phases/XX-name/`.
 
@@ -596,6 +693,7 @@ Plan execution complete when:
 - [ ] Each task committed individually with proper format
 - [ ] All deviations documented
 - [ ] Authentication gates handled and documented
+- [ ] Post-plan test suite gate passed (test suite ran, no failures, coverage threshold met if configured)
 - [ ] SUMMARY.md created with substantive content
 - [ ] STATE.md updated (position, decisions, issues, session)
 - [ ] Requirements marked complete in REQUIREMENTS.md (if plan has requirements)
