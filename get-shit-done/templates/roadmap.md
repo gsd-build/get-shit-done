@@ -200,3 +200,65 @@ Plans:
 - Current/future milestones expanded
 - Continuous phase numbering (01-99)
 - Progress table includes milestone column
+
+## Parallel Milestone ROADMAP.md
+
+For projects using parallel milestones, each milestone has its own ROADMAP.md in `.planning/milestones/{id}-{slug}/ROADMAP.md`:
+
+```markdown
+# Roadmap: [Milestone Name]
+
+## Overview
+
+[Description of this milestone's goals and scope]
+
+**Milestone ID:** M7
+**Dependencies:** [M1, M3] (or "None")
+
+## Phases
+
+- [ ] **Phase 1: [Name]** - [One-line description]
+- [ ] **Phase 2: [Name]** - [One-line description]
+- [ ] **Phase 3: [Name]** - [One-line description]
+
+## Phase Details
+
+### Phase 1: [Name]
+**Goal**: [What this phase delivers]
+**Depends on**: Nothing (first phase)
+**Requirements**: [REQ-01, REQ-02]
+**Success Criteria** (what must be TRUE):
+  1. [Observable behavior]
+  2. [Observable behavior]
+**Plans**: TBD
+
+Plans:
+- [ ] 01-01: [Brief description]
+- [ ] 01-02: [Brief description]
+
+### Phase 2: [Name]
+**Goal**: [What this phase delivers]
+**Depends on**: Phase 1
+**Requirements**: [REQ-03, REQ-04]
+**Success Criteria** (what must be TRUE):
+  1. [Observable behavior]
+**Plans**: TBD
+
+## Progress
+
+| Phase | Plans Complete | Status | Completed |
+|-------|----------------|--------|-----------|
+| 1. [Name] | 0/2 | Not started | - |
+| 2. [Name] | 0/1 | Not started | - |
+| 3. [Name] | 0/2 | Not started | - |
+```
+
+**Key differences from project-level ROADMAP:**
+- Lives in milestone directory, not `.planning/`
+- Phase numbers are milestone-scoped (Phase 1 of M7 != Phase 1 of M1)
+- References milestone-specific REQUIREMENTS.md
+- Created by `gsd-tools milestone create` or during parallel milestone setup
+
+**Cross-milestone references:**
+- Use `M1/03` syntax to reference phases in other milestones
+- Dependencies can span milestones: "Depends on: M1/Phase 3"

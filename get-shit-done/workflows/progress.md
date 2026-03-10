@@ -44,6 +44,13 @@ Instead of reading full files, use targeted tools to get only the data needed fo
 - `STATE=$(node ~/.claude/get-shit-done/bin/gsd-tools.cjs state-snapshot)`
 
 This minimizes orchestrator context usage.
+
+**For parallel milestone projects:**
+
+If `state-snapshot` returns `parallel_milestones: true`:
+- Use `milestones[]` array from state-snapshot for per-milestone progress
+- Check for `--milestone M7` argument to filter to single milestone
+- Display multi-milestone progress dashboard (see report step)
 </step>
 
 <step name="analyze_roadmap">
@@ -91,7 +98,7 @@ Use this instead of manually reading/parsing ROADMAP.md.
 PROGRESS_BAR=$(node ~/.claude/get-shit-done/bin/gsd-tools.cjs progress bar --raw)
 ```
 
-Present:
+**Standard (single milestone) format:**
 
 ```
 # [Project Name]
@@ -126,6 +133,39 @@ CONTEXT: [✓ if has_context | - if not]
 ## What's Next
 [Next phase/plan objective from roadmap analyze]
 ```
+
+**Multi-milestone format (when `parallel_milestones: true`):**
+
+```
+# [Project Name]
+
+## Milestone Progress
+
+M1 Ingestion      [########--] 80%  Phase 3/5  <- active
+M2 RAG Quality    [##--------] 20%  Phase 1/5
+M4 Admin          [##########] 100% COMPLETE
+M7 Patient Eng    [####------] 40%  Phase 2/4  <- active
+
+## Overall
+[######----] 60%  4 milestones, 2 active
+
+**Profile:** [quality/balanced/budget]
+
+## Recent Activity
+- M7: Completed phase 1-fhir-foundation
+- M1: Started phase 3-bulk-ingestion
+- M1: Completed plan 2-03
+
+## Current Position
+Milestone: M1 (Full PubMed Ingestion)
+Phase [N] of [total]: [phase-name]
+Plan [M] of [phase-total]: [status]
+
+## What's Next
+[Per-milestone next actions or overall next step]
+```
+
+When `--milestone M7` argument provided, filter to show only M7's progress in standard format.
 
 </step>
 

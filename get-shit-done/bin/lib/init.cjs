@@ -6,6 +6,7 @@ const fs = require('fs');
 const path = require('path');
 const { execSync } = require('child_process');
 const { loadConfig, resolveModelInternal, findPhaseInternal, getRoadmapPhaseInternal, pathExistsInternal, generateSlugInternal, getMilestoneInfo, normalizePhaseName, toPosixPath, output, error } = require('./core.cjs');
+const { parseMilestonePhaseRef, getMilestonePath, getMilestoneAbsolutePath, getMilestoneInfo: getMilestoneDetailedInfo, isParallelMilestoneProject, getDefaultMilestone } = require('./milestone-parallel.cjs');
 
 function cmdInitExecutePhase(cwd, phase, raw) {
   if (!phase) {
@@ -13,10 +14,42 @@ function cmdInitExecutePhase(cwd, phase, raw) {
   }
 
   const config = loadConfig(cwd);
-  const phaseInfo = findPhaseInternal(cwd, phase);
+
+  // Parse milestone/phase reference (e.g., "M7/01" or just "01")
+  const { milestone: parsedMilestone, phase: parsedPhase } = parseMilestonePhaseRef(phase);
+
+  // Determine milestone context
+  let milestoneId = parsedMilestone;
+  let milestoneDir = null;
+  let milestoneName = null;
+  const isParallel = isParallelMilestoneProject(cwd);
+
+  if (milestoneId) {
+    milestoneDir = getMilestonePath(cwd, milestoneId);
+    if (!milestoneDir) {
+      error(`Milestone ${milestoneId} not found`);
+    }
+    const milestoneInfo = getMilestoneDetailedInfo(cwd, milestoneId);
+    milestoneName = milestoneInfo?.name || null;
+  } else if (!milestoneId && isParallel) {
+    // Check for default milestone in parallel projects
+    const defaultMilestone = getDefaultMilestone(cwd);
+    if (defaultMilestone) {
+      milestoneId = defaultMilestone;
+      milestoneDir = getMilestonePath(cwd, milestoneId);
+      const milestoneInfo = getMilestoneDetailedInfo(cwd, milestoneId);
+      milestoneName = milestoneInfo?.name || null;
+    }
+  }
+
+  // Find phase with milestone context (cmdFindPhase in phase.cjs handles this)
+  const phaseInfo = findPhaseInternal(cwd, parsedPhase, milestoneId);
   const milestone = getMilestoneInfo(cwd);
 
-  const roadmapPhase = getRoadmapPhaseInternal(cwd, phase);
+  // Get roadmap from appropriate location (milestone or root)
+  const roadmapPhase = milestoneId
+    ? getRoadmapPhaseInternal(cwd, parsedPhase, milestoneId)
+    : getRoadmapPhaseInternal(cwd, parsedPhase);
   const reqMatch = roadmapPhase?.section?.match(/^\*\*Requirements\*\*:[^\S\n]*([^\n]*)$/m);
   const reqExtracted = reqMatch
     ? reqMatch[1].replace(/[\[\]]/g, '').split(',').map(s => s.trim()).filter(Boolean).join(', ')
@@ -62,10 +95,16 @@ function cmdInitExecutePhase(cwd, phase, raw) {
             .replace('{slug}', generateSlugInternal(milestone.name) || 'milestone')
         : null,
 
-    // Milestone info
+    // Milestone info (legacy sequential milestone from ROADMAP.md)
     milestone_version: milestone.version,
     milestone_name: milestone.name,
     milestone_slug: generateSlugInternal(milestone.name),
+
+    // Parallel milestone info (if applicable)
+    is_parallel_project: isParallel,
+    milestone_id: milestoneId || null,
+    parallel_milestone_name: milestoneName,
+    milestone_dir: milestoneDir,
 
     // File existence
     state_exists: pathExistsInternal(cwd, '.planning/STATE.md'),
@@ -86,9 +125,38 @@ function cmdInitPlanPhase(cwd, phase, raw) {
   }
 
   const config = loadConfig(cwd);
-  const phaseInfo = findPhaseInternal(cwd, phase);
 
-  const roadmapPhase = getRoadmapPhaseInternal(cwd, phase);
+  // Parse milestone/phase reference (e.g., "M7/01" or just "01")
+  const { milestone: parsedMilestone, phase: parsedPhase } = parseMilestonePhaseRef(phase);
+
+  // Determine milestone context
+  let milestoneId = parsedMilestone;
+  let milestoneDir = null;
+  let milestoneName = null;
+  const isParallel = isParallelMilestoneProject(cwd);
+
+  if (milestoneId) {
+    milestoneDir = getMilestonePath(cwd, milestoneId);
+    if (!milestoneDir) {
+      error(`Milestone ${milestoneId} not found`);
+    }
+    const milestoneInfo = getMilestoneDetailedInfo(cwd, milestoneId);
+    milestoneName = milestoneInfo?.name || null;
+  } else if (!milestoneId && isParallel) {
+    const defaultMilestone = getDefaultMilestone(cwd);
+    if (defaultMilestone) {
+      milestoneId = defaultMilestone;
+      milestoneDir = getMilestonePath(cwd, milestoneId);
+      const milestoneInfo = getMilestoneDetailedInfo(cwd, milestoneId);
+      milestoneName = milestoneInfo?.name || null;
+    }
+  }
+
+  const phaseInfo = findPhaseInternal(cwd, parsedPhase, milestoneId);
+
+  const roadmapPhase = milestoneId
+    ? getRoadmapPhaseInternal(cwd, parsedPhase, milestoneId)
+    : getRoadmapPhaseInternal(cwd, parsedPhase);
   const reqMatch = roadmapPhase?.section?.match(/^\*\*Requirements\*\*:[^\S\n]*([^\n]*)$/m);
   const reqExtracted = reqMatch
     ? reqMatch[1].replace(/[\[\]]/g, '').split(',').map(s => s.trim()).filter(Boolean).join(', ')
@@ -126,10 +194,16 @@ function cmdInitPlanPhase(cwd, phase, raw) {
     planning_exists: pathExistsInternal(cwd, '.planning'),
     roadmap_exists: pathExistsInternal(cwd, '.planning/ROADMAP.md'),
 
+    // Parallel milestone info
+    is_parallel_project: isParallel,
+    milestone_id: milestoneId || null,
+    parallel_milestone_name: milestoneName,
+    milestone_dir: milestoneDir,
+
     // File paths
     state_path: '.planning/STATE.md',
-    roadmap_path: '.planning/ROADMAP.md',
-    requirements_path: '.planning/REQUIREMENTS.md',
+    roadmap_path: milestoneId && milestoneDir ? path.join(milestoneDir, 'ROADMAP.md') : '.planning/ROADMAP.md',
+    requirements_path: milestoneId && milestoneDir ? path.join(milestoneDir, 'REQUIREMENTS.md') : '.planning/REQUIREMENTS.md',
   };
 
   if (phaseInfo?.directory) {
@@ -338,7 +412,34 @@ function cmdInitVerifyWork(cwd, phase, raw) {
   }
 
   const config = loadConfig(cwd);
-  const phaseInfo = findPhaseInternal(cwd, phase);
+
+  // Parse milestone/phase reference (e.g., "M7/01" or just "01")
+  const { milestone: parsedMilestone, phase: parsedPhase } = parseMilestonePhaseRef(phase);
+
+  // Determine milestone context
+  let milestoneId = parsedMilestone;
+  let milestoneDir = null;
+  let milestoneName = null;
+  const isParallel = isParallelMilestoneProject(cwd);
+
+  if (milestoneId) {
+    milestoneDir = getMilestonePath(cwd, milestoneId);
+    if (!milestoneDir) {
+      error(`Milestone ${milestoneId} not found`);
+    }
+    const milestoneInfo = getMilestoneDetailedInfo(cwd, milestoneId);
+    milestoneName = milestoneInfo?.name || null;
+  } else if (!milestoneId && isParallel) {
+    const defaultMilestone = getDefaultMilestone(cwd);
+    if (defaultMilestone) {
+      milestoneId = defaultMilestone;
+      milestoneDir = getMilestonePath(cwd, milestoneId);
+      const milestoneInfo = getMilestoneDetailedInfo(cwd, milestoneId);
+      milestoneName = milestoneInfo?.name || null;
+    }
+  }
+
+  const phaseInfo = findPhaseInternal(cwd, parsedPhase, milestoneId);
 
   const result = {
     // Models
@@ -356,6 +457,12 @@ function cmdInitVerifyWork(cwd, phase, raw) {
 
     // Existing artifacts
     has_verification: phaseInfo?.has_verification || false,
+
+    // Parallel milestone info
+    is_parallel_project: isParallel,
+    milestone_id: milestoneId || null,
+    parallel_milestone_name: milestoneName,
+    milestone_dir: milestoneDir,
   };
 
   output(result, raw);

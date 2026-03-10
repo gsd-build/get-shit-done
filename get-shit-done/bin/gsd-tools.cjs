@@ -83,6 +83,14 @@
  *     [--name <name>]
  *     [--archive-phases]               Move phase dirs to milestones/vX.Y-phases/
  *
+ * Migration Operations:
+ *   migrate-to-parallel                Interactive migration wizard
+ *   migrate-to-parallel --dry-run      Preview migration actions
+ *   migrate-to-parallel --auto         Auto-detect and migrate all phases to M1
+ *   migrate-to-parallel --config <f>   Use mapping file for migration
+ *   migrate-to-parallel --restore <b>  Restore from backup directory
+ *   migrate-to-parallel --list-backups List available migration backups
+ *
  * Validation:
  *   validate consistency               Check phase numbering, disk/roadmap sync
  *   validate health [--repair]         Check .planning/ integrity, optionally repair
@@ -143,6 +151,18 @@
  *     --stopped-at "..."
  *     [--resume-file path]
  *
+ * Multi-Milestone State:
+ *   state set-milestone <id>           Set current milestone context
+ *   state update-milestone <id>        Refresh milestone row from ROADMAP.md
+ *   state add-milestone <id> [name]    Add milestone to STATE.md tracking
+ *   state remove-milestone <id>        Remove milestone from STATE.md tracking
+ *   state get-milestones               List milestones from STATE.md
+ *   state log-activity --activity "..."  Log cross-milestone activity
+ *     [--milestone M7] [--type "..."]
+ *     [--max-entries N]
+ *   state get-activity                 Get recent activity log
+ *     [--milestone M7] [--limit N]
+ *
  * Compound Commands (workflow-specific initialization):
  *   init execute-phase <phase>         All context for execute-phase workflow
  *   init plan-phase <phase>            All context for plan-phase workflow
@@ -170,6 +190,8 @@ const healthModule = require('./lib/health.cjs');
 const upstreamModule = require('./lib/upstream.cjs');
 const interactiveModule = require('./lib/interactive.cjs');
 const testDiscoveryModule = require('./lib/test-discovery.cjs');
+const milestoneParallel = require('./lib/milestone-parallel.cjs');
+const migrate = require('./lib/migrate.cjs');
 
 // ─── Upstream Domain Modules ──────────────────────────────────────────────────
 
@@ -5076,6 +5098,41 @@ async function main() {
           stopped_at: stoppedIdx !== -1 ? args[stoppedIdx + 1] : null,
           resume_file: resumeIdx !== -1 ? args[resumeIdx + 1] : 'None',
         }, raw);
+      } else if (subcommand === 'set-milestone') {
+        // state set-milestone <id> — Set current milestone context
+        state.cmdStateSetMilestone(cwd, args[2], raw);
+      } else if (subcommand === 'update-milestone') {
+        // state update-milestone <id> — Refresh milestone row from ROADMAP.md
+        state.cmdStateUpdateMilestone(cwd, args[2], raw);
+      } else if (subcommand === 'add-milestone') {
+        // state add-milestone <id> [name] — Add milestone to STATE.md tracking
+        state.cmdStateAddMilestone(cwd, args[2], args[3], raw);
+      } else if (subcommand === 'remove-milestone') {
+        // state remove-milestone <id> — Remove milestone from STATE.md tracking
+        state.cmdStateRemoveMilestone(cwd, args[2], raw);
+      } else if (subcommand === 'get-milestones') {
+        // state get-milestones — List milestones from STATE.md
+        state.cmdStateGetMilestones(cwd, raw);
+      } else if (subcommand === 'log-activity') {
+        // state log-activity --activity "..." [--milestone M7] [--type "..."] [--max-entries N]
+        const activityIdx = args.indexOf('--activity');
+        const milestoneIdx = args.indexOf('--milestone');
+        const typeIdx = args.indexOf('--type');
+        const maxIdx = args.indexOf('--max-entries');
+        state.cmdStateLogActivity(cwd, {
+          activity: activityIdx !== -1 ? args[activityIdx + 1] : null,
+          milestone: milestoneIdx !== -1 ? args[milestoneIdx + 1] : null,
+          type: typeIdx !== -1 ? args[typeIdx + 1] : null,
+          max_entries: maxIdx !== -1 ? parseInt(args[maxIdx + 1], 10) : undefined,
+        }, raw);
+      } else if (subcommand === 'get-activity') {
+        // state get-activity [--milestone M7] [--limit N]
+        const milestoneIdx = args.indexOf('--milestone');
+        const limitIdx = args.indexOf('--limit');
+        state.cmdStateGetActivity(cwd, {
+          milestone: milestoneIdx !== -1 ? args[milestoneIdx + 1] : null,
+          limit: limitIdx !== -1 ? parseInt(args[limitIdx + 1], 10) : null,
+        }, raw);
       } else {
         state.cmdStateLoad(cwd, raw);
       }
@@ -5510,10 +5567,112 @@ async function main() {
           milestoneName = nameArgs.join(' ') || null;
         }
         milestone.cmdMilestoneComplete(cwd, args[2], { name: milestoneName, archivePhases }, raw);
+      } else if (subcommand === 'create') {
+        // milestone create <id> <name...>
+        const id = args[2];
+        const name = args.slice(3).join(' ');
+        milestoneParallel.cmdMilestoneCreate(cwd, id, name, raw);
+      } else if (subcommand === 'list') {
+        milestoneParallel.cmdMilestoneList(cwd, raw);
+      } else if (subcommand === 'switch') {
+        milestoneParallel.cmdMilestoneSwitch(cwd, args[2], raw);
+      } else if (subcommand === 'info') {
+        milestoneParallel.cmdMilestoneInfo(cwd, args[2], raw);
       } else {
-        error('Unknown milestone subcommand. Available: complete');
+        error('Unknown milestone subcommand. Available: complete, create, list, switch, info');
       }
       break;
+    }
+
+    case 'migrate-to-parallel': {
+      const dryRun = args.includes('--dry-run');
+      const auto = args.includes('--auto');
+      const configIndex = args.indexOf('--config');
+      const restoreIndex = args.indexOf('--restore');
+      const listBackups = args.includes('--list-backups');
+      const force = args.includes('--force');
+
+      // List backups
+      if (listBackups) {
+        const backups = migrate.listBackups(cwd);
+        output(backups, raw, backups.map(b =>
+          `${b.name} (${b.type}) - ${b.created}`
+        ).join('\n') || 'No backups found');
+        break;
+      }
+
+      // Restore from backup
+      if (restoreIndex !== -1) {
+        const backupPath = args[restoreIndex + 1];
+        if (!backupPath) {
+          error('Backup path required with --restore');
+        }
+        const result = migrate.restoreMigrationBackup(cwd, backupPath);
+        output(result, raw, result.success
+          ? `Restored: ${result.restored.join(', ')}`
+          : `Failed: ${result.errors.join('; ')}`);
+        break;
+      }
+
+      // Dry run (preview)
+      if (dryRun) {
+        const analysis = migrate.analyzeMigration(cwd);
+        if (!analysis.can_migrate) {
+          output({ can_migrate: false, warnings: analysis.warnings }, raw,
+            'Cannot migrate: ' + analysis.warnings.join('; '));
+          break;
+        }
+
+        // Create default mapping for preview
+        const mapping = {
+          'M1': {
+            name: 'Migration',
+            phases: analysis.phases.map(p => p.directory),
+          },
+        };
+        const preview = migrate.previewMigration(cwd, mapping);
+        output({
+          analysis,
+          preview,
+        }, raw, migrate.formatAnalysis(analysis) + '\n\n' + migrate.formatPreview(preview));
+        break;
+      }
+
+      // Config file migration
+      if (configIndex !== -1) {
+        const configFile = args[configIndex + 1];
+        if (!configFile) {
+          error('Config file path required with --config');
+        }
+        const result = migrate.runNonInteractiveWizard(cwd, { configFile, force });
+        output(result, raw, result.success
+          ? 'Migration complete'
+          : `Failed: ${result.error}`);
+        break;
+      }
+
+      // Auto migration
+      if (auto) {
+        const result = migrate.runNonInteractiveWizard(cwd, { auto: true, force });
+        output(result, raw, result.success
+          ? 'Migration complete'
+          : `Failed: ${result.error}`);
+        break;
+      }
+
+      // Interactive wizard (async)
+      migrate.runMigrationWizard(cwd, { force }).then(result => {
+        if (!raw) {
+          // Output already shown by wizard
+          process.exit(result.success ? 0 : (result.cancelled ? 0 : 1));
+        } else {
+          output(result, true);
+        }
+      }).catch(err => {
+        error(err.message);
+      });
+      // Don't break - async handler will exit
+      return;
     }
 
     case 'validate': {
@@ -5530,8 +5689,24 @@ async function main() {
     }
 
     case 'progress': {
-      const subcommand = args[1] || 'json';
-      commands.cmdProgressRender(cwd, subcommand, raw);
+      // Check for --milestone flag
+      const milestoneIndex = args.indexOf('--milestone');
+      const filterMilestone = milestoneIndex !== -1 ? args[milestoneIndex + 1] : null;
+
+      // Determine format (skip --milestone and its value)
+      let format = 'json';
+      for (let i = 1; i < args.length; i++) {
+        if (args[i] === '--milestone') {
+          i++; // Skip the milestone value
+          continue;
+        }
+        if (['json', 'table', 'bar'].includes(args[i])) {
+          format = args[i];
+        }
+      }
+
+      // Use multi-milestone progress for parallel projects or when filtering
+      commands.cmdProgressMultiMilestone(cwd, format, raw, filterMilestone);
       break;
     }
 

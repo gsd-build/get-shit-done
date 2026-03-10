@@ -5,12 +5,49 @@
 const fs = require('fs');
 const path = require('path');
 const { escapeRegex, normalizePhaseName, output, error, findPhaseInternal } = require('./core.cjs');
+const { parseMilestonePhaseRef, getMilestoneAbsolutePath, getMilestonePath, isParallelMilestoneProject, getDefaultMilestone } = require('./milestone-parallel.cjs');
 
-function cmdRoadmapGetPhase(cwd, phaseNum, raw) {
-  const roadmapPath = path.join(cwd, '.planning', 'ROADMAP.md');
+// ─── Helper Functions ─────────────────────────────────────────────────────────
+
+/**
+ * Get ROADMAP.md path for a milestone (or root)
+ * @param {string} cwd - Current working directory
+ * @param {string|null} milestoneId - Milestone ID or null for legacy
+ * @returns {string} Path to ROADMAP.md
+ */
+function getRoadmapPath(cwd, milestoneId = null) {
+  if (milestoneId) {
+    const milestonePath = getMilestoneAbsolutePath(cwd, milestoneId);
+    if (milestonePath) {
+      return path.join(milestonePath, 'ROADMAP.md');
+    }
+  }
+  return path.join(cwd, '.planning', 'ROADMAP.md');
+}
+
+/**
+ * Get phases directory for a milestone (or legacy)
+ * @param {string} cwd - Current working directory
+ * @param {string|null} milestoneId - Milestone ID or null for legacy
+ * @returns {string} Path to phases directory
+ */
+function getPhasesDir(cwd, milestoneId = null) {
+  if (milestoneId) {
+    const milestonePath = getMilestoneAbsolutePath(cwd, milestoneId);
+    if (milestonePath) {
+      return path.join(milestonePath, 'phases');
+    }
+  }
+  return path.join(cwd, '.planning', 'phases');
+}
+
+// ─── Commands ─────────────────────────────────────────────────────────────────
+
+function cmdRoadmapGetPhase(cwd, phaseNum, raw, milestoneId = null) {
+  const roadmapPath = getRoadmapPath(cwd, milestoneId);
 
   if (!fs.existsSync(roadmapPath)) {
-    output({ found: false, error: 'ROADMAP.md not found' }, raw, '');
+    output({ found: false, error: 'ROADMAP.md not found' + (milestoneId ? ` for milestone ${milestoneId}` : ''), milestone: milestoneId || null }, raw, '');
     return;
   }
 
@@ -81,6 +118,7 @@ function cmdRoadmapGetPhase(cwd, phaseNum, raw) {
         goal,
         success_criteria,
         section,
+        milestone: milestoneId || null,
       },
       raw,
       section
@@ -90,16 +128,16 @@ function cmdRoadmapGetPhase(cwd, phaseNum, raw) {
   }
 }
 
-function cmdRoadmapAnalyze(cwd, raw) {
-  const roadmapPath = path.join(cwd, '.planning', 'ROADMAP.md');
+function cmdRoadmapAnalyze(cwd, raw, milestoneId = null) {
+  const roadmapPath = getRoadmapPath(cwd, milestoneId);
+  const phasesDir = getPhasesDir(cwd, milestoneId);
 
   if (!fs.existsSync(roadmapPath)) {
-    output({ error: 'ROADMAP.md not found', milestones: [], phases: [], current_phase: null }, raw);
+    output({ error: 'ROADMAP.md not found' + (milestoneId ? ` for milestone ${milestoneId}` : ''), milestones: [], phases: [], current_phase: null, milestone: milestoneId || null }, raw);
     return;
   }
 
   const content = fs.readFileSync(roadmapPath, 'utf-8');
-  const phasesDir = path.join(cwd, '.planning', 'phases');
 
   // Extract all phase headings: ## Phase N: Name or ### Phase N: Name
   const phasePattern = /#{2,4}\s*Phase\s+(\d+[A-Z]?(?:\.\d+)*)\s*:\s*([^\n]+)/gi;
@@ -212,21 +250,22 @@ function cmdRoadmapAnalyze(cwd, raw) {
     current_phase: currentPhase ? currentPhase.number : null,
     next_phase: nextPhase ? nextPhase.number : null,
     missing_phase_details: missingDetails.length > 0 ? missingDetails : null,
+    milestone: milestoneId || null,
   };
 
   output(result, raw);
 }
 
-function cmdRoadmapUpdatePlanProgress(cwd, phaseNum, raw) {
+function cmdRoadmapUpdatePlanProgress(cwd, phaseNum, raw, milestoneId = null) {
   if (!phaseNum) {
     error('phase number required for roadmap update-plan-progress');
   }
 
-  const roadmapPath = path.join(cwd, '.planning', 'ROADMAP.md');
+  const roadmapPath = getRoadmapPath(cwd, milestoneId);
 
-  const phaseInfo = findPhaseInternal(cwd, phaseNum);
+  const phaseInfo = findPhaseInternal(cwd, phaseNum, milestoneId);
   if (!phaseInfo) {
-    error(`Phase ${phaseNum} not found`);
+    error(`Phase ${phaseNum} not found` + (milestoneId ? ` in milestone ${milestoneId}` : ''));
   }
 
   const planCount = phaseInfo.plans.length;
@@ -288,6 +327,7 @@ function cmdRoadmapUpdatePlanProgress(cwd, phaseNum, raw) {
     summary_count: summaryCount,
     status,
     complete: isComplete,
+    milestone: milestoneId || null,
   }, raw, `${summaryCount}/${planCount} ${status}`);
 }
 

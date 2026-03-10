@@ -1,11 +1,308 @@
 /**
  * State — STATE.md operations and progression engine
+ *
+ * ## Multi-Milestone STATE.md Schema
+ *
+ * When `parallel_milestones: true` in config.json, STATE.md supports tracking
+ * multiple milestones with independent progress. The schema adds:
+ *
+ * ### YAML Frontmatter Additions
+ * ```yaml
+ * ---
+ * parallel_milestones: true
+ * active_milestones: [M1, M7]    # Quick reference
+ * current_milestone: M1          # Current context
+ * ---
+ * ```
+ *
+ * ### New Markdown Sections
+ *
+ * #### ## Milestones
+ * Tracks all active milestones with per-milestone progress:
+ * ```markdown
+ * ## Milestones
+ *
+ * | ID | Name | Status | Progress | Current Phase | Blockers |
+ * |----|------|--------|----------|---------------|----------|
+ * | M1 | Full PubMed Ingestion | active | 80% | 3-bulk-ingestion | |
+ * | M2 | RAG Quality | blocked | 20% | 1-query-transform | Waiting M1 |
+ * | M7 | Patient Engagement | active | 40% | 2-compliance | |
+ * ```
+ *
+ * Status values: active, blocked, complete, paused
+ *
+ * #### ## Position (Extended)
+ * Adds milestone context to existing position:
+ * ```markdown
+ * ## Position
+ *
+ * **Milestone:** M1
+ * **Phase:** 3-bulk-ingestion
+ * **Plan:** 2
+ * **Status:** Executing plan 3-02
+ * ```
+ *
+ * #### ## Progress (Extended)
+ * Shows overall multi-milestone progress:
+ * ```markdown
+ * ## Progress
+ *
+ * Overall: [██████░░░░] 60%  (3/5 milestones progressing)
+ * ```
+ *
+ * #### ## Recent Activity
+ * Cross-milestone activity log:
+ * ```markdown
+ * ## Recent Activity
+ *
+ * - 2026-02-27 14:30 — M7: Completed phase 1-fhir-foundation
+ * - 2026-02-27 12:15 — M1: Started phase 3-bulk-ingestion
+ * - 2026-02-27 10:00 — M1: Completed plan 2-03
+ * ```
+ *
+ * ### Backward Compatibility
+ * Legacy STATE.md files without milestones section continue to work.
+ * `parallel_milestones: false` (or absent) uses single-project mode.
  */
 
 const fs = require('fs');
 const path = require('path');
 const { loadConfig, getMilestoneInfo, output, error } = require('./core.cjs');
 const { extractFrontmatter, reconstructFrontmatter } = require('./frontmatter.cjs');
+
+// ─── Multi-Milestone State Helpers ────────────────────────────────────────────
+
+/**
+ * Check if STATE.md uses parallel milestones
+ * @param {string} content - STATE.md content
+ * @param {string} cwd - Current working directory
+ * @returns {boolean}
+ */
+function isParallelMilestoneState(content, cwd) {
+  // Check YAML frontmatter first
+  const fm = extractFrontmatter(content);
+  if (fm && fm.parallel_milestones === true) return true;
+
+  // Check config.json
+  const config = loadConfig(cwd);
+  if (config.parallel_milestones === true) return true;
+
+  // Check for ## Milestones section
+  return /^##\s*Milestones\s*$/m.test(content);
+}
+
+/**
+ * Parse the ## Milestones table from STATE.md
+ * @param {string} content - STATE.md content
+ * @returns {Array<{id: string, name: string, status: string, progress_percent: number, current_phase: string, blockers: string[]}>}
+ */
+function parseMilestonesTable(content) {
+  const milestones = [];
+
+  // Match ## Milestones section with markdown table
+  const sectionMatch = content.match(/##\s*Milestones\s*\n([\s\S]*?)(?=\n##|$)/i);
+  if (!sectionMatch) return milestones;
+
+  const sectionContent = sectionMatch[1];
+
+  // Find table rows (skip header and separator)
+  const lines = sectionContent.split('\n');
+  let inTable = false;
+  let headerPassed = false;
+
+  for (const line of lines) {
+    const trimmed = line.trim();
+    if (!trimmed) continue;
+
+    // Detect table start
+    if (trimmed.startsWith('|') && trimmed.includes('ID')) {
+      inTable = true;
+      continue;
+    }
+
+    // Skip separator row
+    if (inTable && /^\|[-|\s]+\|$/.test(trimmed)) {
+      headerPassed = true;
+      continue;
+    }
+
+    // Parse data rows
+    if (inTable && headerPassed && trimmed.startsWith('|')) {
+      const cells = trimmed.split('|').map(c => c.trim()).filter(Boolean);
+      if (cells.length >= 5) {
+        const progressMatch = cells[3].match(/(\d+)/);
+        const blockerText = cells[5] || '';
+        const blockers = blockerText
+          ? blockerText.split(/[,;]/).map(b => b.trim()).filter(Boolean)
+          : [];
+
+        milestones.push({
+          id: cells[0],
+          name: cells[1],
+          status: cells[2].toLowerCase(),
+          progress_percent: progressMatch ? parseInt(progressMatch[1], 10) : 0,
+          current_phase: cells[4],
+          blockers,
+        });
+      }
+    }
+  }
+
+  return milestones;
+}
+
+/**
+ * Get current milestone context from STATE.md
+ * @param {string} content - STATE.md content
+ * @returns {string|null} Current milestone ID or null
+ */
+function getCurrentMilestoneFromState(content) {
+  // Check frontmatter
+  const fm = extractFrontmatter(content);
+  if (fm && fm.current_milestone) return fm.current_milestone;
+
+  // Check ## Position section for **Milestone:** field
+  const milestoneMatch = content.match(/\*\*Milestone:\*\*\s*(\S+)/i);
+  return milestoneMatch ? milestoneMatch[1] : null;
+}
+
+/**
+ * Ensure STATE.md has the ## Milestones section
+ * @param {string} content - STATE.md content
+ * @returns {string} Updated content with milestones section
+ */
+function ensureMilestonesSection(content) {
+  if (/^##\s*Milestones\s*$/m.test(content)) {
+    return content; // Already exists
+  }
+
+  // Insert after frontmatter or at top
+  const milestonesSection = `## Milestones
+
+| ID | Name | Status | Progress | Current Phase | Blockers |
+|----|------|--------|----------|---------------|----------|
+
+`;
+
+  // Find good insertion point (after frontmatter, before ## Position or first ##)
+  const fmMatch = content.match(/^---\n[\s\S]*?\n---\n*/);
+  if (fmMatch) {
+    const insertIdx = fmMatch[0].length;
+    return content.slice(0, insertIdx) + milestonesSection + content.slice(insertIdx);
+  }
+
+  // Insert at top if no frontmatter
+  const firstSection = content.search(/^##/m);
+  if (firstSection > 0) {
+    return content.slice(0, firstSection) + milestonesSection + content.slice(firstSection);
+  }
+
+  return milestonesSection + content;
+}
+
+/**
+ * Ensure STATE.md has the ## Recent Activity section
+ * @param {string} content - STATE.md content
+ * @returns {string} Updated content with activity section
+ */
+function ensureRecentActivitySection(content) {
+  if (/^##\s*Recent Activity\s*$/m.test(content)) {
+    return content; // Already exists
+  }
+
+  const activitySection = `## Recent Activity
+
+`;
+
+  // Insert before last section or at end
+  const lastSectionMatch = content.match(/\n---\n\*[^*]+\*\s*$/);
+  if (lastSectionMatch) {
+    const insertIdx = content.lastIndexOf(lastSectionMatch[0]);
+    return content.slice(0, insertIdx) + '\n' + activitySection + content.slice(insertIdx);
+  }
+
+  return content + '\n' + activitySection;
+}
+
+/**
+ * Update a milestone row in the ## Milestones table
+ * @param {string} content - STATE.md content
+ * @param {string} milestoneId - Milestone ID (e.g., "M7")
+ * @param {object} updates - Fields to update { status?, progress_percent?, current_phase?, blockers? }
+ * @returns {string} Updated content
+ */
+function updateMilestoneRow(content, milestoneId, updates) {
+  const normalizedId = milestoneId.toUpperCase();
+
+  // Find and update the row
+  const rowPattern = new RegExp(
+    `^(\\|\\s*${normalizedId}\\s*\\|)([^|]+\\|)([^|]+\\|)([^|]+\\|)([^|]+\\|)([^|]*)\\|`,
+    'im'
+  );
+
+  const match = content.match(rowPattern);
+  if (!match) return content;
+
+  // Current values
+  const currentName = match[2].trim().replace(/\|$/, '');
+  const currentStatus = match[3].trim().replace(/\|$/, '');
+  const currentProgress = match[4].trim().replace(/\|$/, '');
+  const currentPhase = match[5].trim().replace(/\|$/, '');
+  const currentBlockers = match[6].trim().replace(/\|$/, '');
+
+  // Build new row
+  const newStatus = updates.status || currentStatus;
+  const newProgress = updates.progress_percent !== undefined
+    ? `${updates.progress_percent}%`
+    : currentProgress;
+  const newPhase = updates.current_phase || currentPhase;
+  const newBlockers = updates.blockers !== undefined
+    ? updates.blockers.join(', ')
+    : currentBlockers;
+
+  const newRow = `| ${normalizedId} | ${currentName} | ${newStatus} | ${newProgress} | ${newPhase} | ${newBlockers} |`;
+
+  return content.replace(rowPattern, newRow);
+}
+
+/**
+ * Add a new milestone row to the ## Milestones table
+ * @param {string} content - STATE.md content
+ * @param {object} milestone - { id, name, status, progress_percent, current_phase, blockers }
+ * @returns {string} Updated content
+ */
+function addMilestoneRow(content, milestone) {
+  const { id, name, status = 'active', progress_percent = 0, current_phase = '-', blockers = [] } = milestone;
+
+  // Ensure milestones section exists
+  content = ensureMilestonesSection(content);
+
+  // Find the table and add row
+  const tablePattern = /(##\s*Milestones\s*\n\|[^\n]+\n\|[-|\s]+\n)([\s\S]*?)(?=\n##|$)/i;
+  const match = content.match(tablePattern);
+
+  if (match) {
+    const tableBody = match[2].trimEnd();
+    const newRow = `| ${id.toUpperCase()} | ${name} | ${status} | ${progress_percent}% | ${current_phase} | ${blockers.join(', ')} |`;
+
+    const newTableBody = tableBody ? tableBody + '\n' + newRow : newRow;
+    return content.replace(tablePattern, `${match[1]}${newTableBody}\n`);
+  }
+
+  return content;
+}
+
+/**
+ * Remove a milestone row from the ## Milestones table
+ * @param {string} content - STATE.md content
+ * @param {string} milestoneId - Milestone ID to remove
+ * @returns {string} Updated content
+ */
+function removeMilestoneRow(content, milestoneId) {
+  const normalizedId = milestoneId.toUpperCase();
+  const rowPattern = new RegExp(`^\\|\\s*${normalizedId}\\s*\\|[^\\n]*\\n`, 'im');
+  return content.replace(rowPattern, '');
+}
 
 function cmdStateLoad(cwd, raw) {
   const config = loadConfig(cwd);
@@ -420,6 +717,9 @@ function cmdStateSnapshot(cwd, raw) {
     return match ? match[1].trim() : null;
   };
 
+  // Check if this is a parallel milestones project
+  const parallelMilestones = isParallelMilestoneState(content, cwd);
+
   // Extract basic fields
   const currentPhase = extractField('Current Phase');
   const currentPhaseName = extractField('Current Phase Name');
@@ -499,7 +799,57 @@ function cmdStateSnapshot(cwd, raw) {
     blockers,
     paused_at: pausedAt,
     session,
+    parallel_milestones: parallelMilestones,
   };
+
+  // Add milestone data if parallel milestones enabled
+  if (parallelMilestones) {
+    // Parse milestones from STATE.md table
+    const stateMilestones = parseMilestonesTable(content);
+
+    // Merge with listMilestones() for accuracy if milestone-parallel module available
+    let milestones = stateMilestones;
+    try {
+      const milestoneParallel = require('./milestone-parallel.cjs');
+      const diskMilestones = milestoneParallel.listMilestones(cwd);
+
+      // Create map for quick lookup
+      const stateMap = new Map(stateMilestones.map(m => [m.id, m]));
+
+      // Merge - prefer STATE.md for status/blockers, ROADMAP.md for progress
+      milestones = diskMilestones.map(disk => {
+        const state = stateMap.get(disk.id) || {};
+        return {
+          id: disk.id,
+          name: disk.name,
+          status: state.status || disk.status,
+          progress_percent: disk.progress_percent, // Trust ROADMAP.md calculations
+          current_phase: disk.phase_count > 0
+            ? `Phase ${disk.completed_count + 1}/${disk.phase_count}`
+            : state.current_phase || '-',
+          phase_count: disk.phase_count,
+          completed_phases: disk.completed_count,
+          blockers: state.blockers || [],
+        };
+      });
+    } catch {
+      // milestone-parallel module not available, use STATE.md data only
+    }
+
+    result.milestones = milestones;
+    result.current_milestone = getCurrentMilestoneFromState(content);
+
+    // Calculate overall progress across all milestones
+    if (milestones.length > 0) {
+      const totalProgress = milestones.reduce((sum, m) => sum + (m.progress_percent || 0), 0);
+      result.overall_progress = Math.round(totalProgress / milestones.length);
+
+      // Count active milestones
+      result.active_milestone_count = milestones.filter(m =>
+        m.status === 'active' || m.status === 'blocked'
+      ).length;
+    }
+  }
 
   output(result, raw);
 }
@@ -659,10 +1009,460 @@ function cmdStateJson(cwd, raw) {
   output(fm, raw, JSON.stringify(fm, null, 2));
 }
 
+// ─── Multi-Milestone State Commands ──────────────────────────────────────────
+
+/**
+ * Set current milestone context in STATE.md
+ * Updates ## Position section with milestone: <id>
+ * @param {string} cwd - Current working directory
+ * @param {string} milestoneId - Milestone ID (e.g., "M7")
+ * @param {boolean} raw - Raw output mode
+ */
+function cmdStateSetMilestone(cwd, milestoneId, raw) {
+  if (!milestoneId) {
+    error('Milestone ID required');
+    return;
+  }
+
+  const normalizedId = milestoneId.toUpperCase();
+  const statePath = path.join(cwd, '.planning', 'STATE.md');
+
+  if (!fs.existsSync(statePath)) {
+    output({ error: 'STATE.md not found' }, raw);
+    return;
+  }
+
+  // Validate milestone exists
+  let milestoneExists = false;
+  try {
+    const milestoneParallel = require('./milestone-parallel.cjs');
+    const milestones = milestoneParallel.listMilestones(cwd);
+    milestoneExists = milestones.some(m => m.id === normalizedId);
+  } catch {
+    // Check in STATE.md milestones table
+    const content = fs.readFileSync(statePath, 'utf-8');
+    const stateMilestones = parseMilestonesTable(content);
+    milestoneExists = stateMilestones.some(m => m.id === normalizedId);
+  }
+
+  if (!milestoneExists) {
+    output({ error: `Milestone ${normalizedId} not found` }, raw);
+    return;
+  }
+
+  let content = fs.readFileSync(statePath, 'utf-8');
+
+  // Update **Milestone:** field in ## Position section
+  const milestoneFieldPattern = /(\*\*Milestone:\*\*\s*)(\S+)/i;
+  if (milestoneFieldPattern.test(content)) {
+    content = content.replace(milestoneFieldPattern, `$1${normalizedId}`);
+  } else {
+    // Add Milestone field after ## Position heading
+    const positionPattern = /(##\s*Position\s*\n)/i;
+    if (positionPattern.test(content)) {
+      content = content.replace(positionPattern, `$1\n**Milestone:** ${normalizedId}\n`);
+    }
+  }
+
+  writeStateMd(statePath, content, cwd);
+  output({ set: true, milestone: normalizedId }, raw, `Switched to milestone ${normalizedId}`);
+}
+
+/**
+ * Update milestone row in STATE.md with fresh progress from ROADMAP.md
+ * @param {string} cwd - Current working directory
+ * @param {string} milestoneId - Milestone ID (e.g., "M7")
+ * @param {boolean} raw - Raw output mode
+ */
+function cmdStateUpdateMilestone(cwd, milestoneId, raw) {
+  if (!milestoneId) {
+    error('Milestone ID required');
+    return;
+  }
+
+  const normalizedId = milestoneId.toUpperCase();
+  const statePath = path.join(cwd, '.planning', 'STATE.md');
+
+  if (!fs.existsSync(statePath)) {
+    output({ error: 'STATE.md not found' }, raw);
+    return;
+  }
+
+  // Get fresh data from milestone-parallel module
+  let milestoneInfo = null;
+  try {
+    const milestoneParallel = require('./milestone-parallel.cjs');
+    milestoneInfo = milestoneParallel.getMilestoneInfo(cwd, normalizedId);
+  } catch {
+    output({ error: 'milestone-parallel module not available' }, raw);
+    return;
+  }
+
+  if (!milestoneInfo) {
+    output({ error: `Milestone ${normalizedId} not found` }, raw);
+    return;
+  }
+
+  let content = fs.readFileSync(statePath, 'utf-8');
+
+  // Ensure milestones section exists
+  content = ensureMilestonesSection(content);
+
+  // Check if milestone row exists
+  const rowPattern = new RegExp(`^\\|\\s*${normalizedId}\\s*\\|`, 'im');
+  if (rowPattern.test(content)) {
+    // Update existing row
+    content = updateMilestoneRow(content, normalizedId, {
+      status: milestoneInfo.status,
+      progress_percent: milestoneInfo.progress_percent,
+      current_phase: milestoneInfo.phase_count > 0
+        ? `Phase ${milestoneInfo.completed_count + 1}/${milestoneInfo.phase_count}`
+        : '-',
+    });
+  } else {
+    // Add new row
+    content = addMilestoneRow(content, {
+      id: normalizedId,
+      name: milestoneInfo.name,
+      status: milestoneInfo.status,
+      progress_percent: milestoneInfo.progress_percent,
+      current_phase: milestoneInfo.phase_count > 0
+        ? `Phase ${milestoneInfo.completed_count + 1}/${milestoneInfo.phase_count}`
+        : '-',
+      blockers: [],
+    });
+  }
+
+  writeStateMd(statePath, content, cwd);
+  output({
+    updated: true,
+    milestone: normalizedId,
+    progress_percent: milestoneInfo.progress_percent,
+    status: milestoneInfo.status,
+  }, raw, `Updated ${normalizedId}: ${milestoneInfo.progress_percent}%`);
+}
+
+/**
+ * Add new milestone to STATE.md tracking
+ * @param {string} cwd - Current working directory
+ * @param {string} milestoneId - Milestone ID (e.g., "M7")
+ * @param {string} name - Milestone name
+ * @param {boolean} raw - Raw output mode
+ */
+function cmdStateAddMilestone(cwd, milestoneId, name, raw) {
+  if (!milestoneId) {
+    error('Milestone ID required');
+    return;
+  }
+
+  const normalizedId = milestoneId.toUpperCase();
+  const statePath = path.join(cwd, '.planning', 'STATE.md');
+
+  if (!fs.existsSync(statePath)) {
+    output({ error: 'STATE.md not found' }, raw);
+    return;
+  }
+
+  let content = fs.readFileSync(statePath, 'utf-8');
+
+  // Check if milestone already exists in table
+  const existingMilestones = parseMilestonesTable(content);
+  if (existingMilestones.some(m => m.id === normalizedId)) {
+    output({ error: `Milestone ${normalizedId} already exists in STATE.md` }, raw);
+    return;
+  }
+
+  // Get name from milestone-parallel if not provided
+  let milestoneName = name;
+  if (!milestoneName) {
+    try {
+      const milestoneParallel = require('./milestone-parallel.cjs');
+      const info = milestoneParallel.getMilestoneInfo(cwd, normalizedId);
+      if (info) milestoneName = info.name;
+    } catch {
+      // Use ID as name fallback
+    }
+  }
+  if (!milestoneName) milestoneName = normalizedId;
+
+  // Ensure milestones section exists and add row
+  content = ensureMilestonesSection(content);
+  content = addMilestoneRow(content, {
+    id: normalizedId,
+    name: milestoneName,
+    status: 'active',
+    progress_percent: 0,
+    current_phase: '-',
+    blockers: [],
+  });
+
+  // Update frontmatter active_milestones
+  const fm = extractFrontmatter(content);
+  if (fm) {
+    const activeMilestones = fm.active_milestones || [];
+    if (!activeMilestones.includes(normalizedId)) {
+      activeMilestones.push(normalizedId);
+      fm.active_milestones = activeMilestones;
+      fm.parallel_milestones = true;
+    }
+  }
+
+  writeStateMd(statePath, content, cwd);
+  output({ added: true, milestone: normalizedId, name: milestoneName }, raw, `Added ${normalizedId}: ${milestoneName}`);
+}
+
+/**
+ * Remove milestone from STATE.md tracking
+ * @param {string} cwd - Current working directory
+ * @param {string} milestoneId - Milestone ID (e.g., "M7")
+ * @param {boolean} raw - Raw output mode
+ */
+function cmdStateRemoveMilestone(cwd, milestoneId, raw) {
+  if (!milestoneId) {
+    error('Milestone ID required');
+    return;
+  }
+
+  const normalizedId = milestoneId.toUpperCase();
+  const statePath = path.join(cwd, '.planning', 'STATE.md');
+
+  if (!fs.existsSync(statePath)) {
+    output({ error: 'STATE.md not found' }, raw);
+    return;
+  }
+
+  let content = fs.readFileSync(statePath, 'utf-8');
+
+  // Check if milestone exists in table
+  const existingMilestones = parseMilestonesTable(content);
+  if (!existingMilestones.some(m => m.id === normalizedId)) {
+    output({ error: `Milestone ${normalizedId} not found in STATE.md` }, raw);
+    return;
+  }
+
+  // Remove row from table
+  content = removeMilestoneRow(content, normalizedId);
+
+  // Update frontmatter active_milestones
+  const fm = extractFrontmatter(content);
+  if (fm && Array.isArray(fm.active_milestones)) {
+    fm.active_milestones = fm.active_milestones.filter(id => id !== normalizedId);
+    if (fm.active_milestones.length === 0) {
+      delete fm.active_milestones;
+    }
+  }
+
+  // Clear current_milestone if it matches
+  if (fm && fm.current_milestone === normalizedId) {
+    delete fm.current_milestone;
+  }
+
+  writeStateMd(statePath, content, cwd);
+  output({ removed: true, milestone: normalizedId }, raw, `Removed ${normalizedId}`);
+}
+
+/**
+ * Get milestones list from STATE.md
+ * @param {string} cwd - Current working directory
+ * @param {boolean} raw - Raw output mode
+ */
+function cmdStateGetMilestones(cwd, raw) {
+  const statePath = path.join(cwd, '.planning', 'STATE.md');
+
+  if (!fs.existsSync(statePath)) {
+    output({ error: 'STATE.md not found' }, raw);
+    return;
+  }
+
+  const content = fs.readFileSync(statePath, 'utf-8');
+  const milestones = parseMilestonesTable(content);
+  const currentMilestone = getCurrentMilestoneFromState(content);
+
+  const result = {
+    milestones,
+    current_milestone: currentMilestone,
+    count: milestones.length,
+  };
+
+  // Format human-readable output
+  const lines = milestones.map(m =>
+    `${m.id === currentMilestone ? '* ' : '  '}${m.id}: ${m.name} (${m.status}) - ${m.progress_percent}%`
+  );
+
+  output(result, raw, lines.join('\n') || 'No milestones tracked');
+}
+
+// ─── Cross-Milestone Activity Logging ────────────────────────────────────────
+
+/** Default max activity entries to keep */
+const DEFAULT_MAX_ACTIVITY_ENTRIES = 20;
+
+/**
+ * Activity types for cross-milestone logging
+ */
+const ACTIVITY_TYPES = {
+  PHASE_STARTED: 'Started phase',
+  PHASE_COMPLETED: 'Completed phase',
+  PLAN_STARTED: 'Started plan',
+  PLAN_COMPLETED: 'Completed plan',
+  BLOCKER_ADDED: 'Blocker added',
+  BLOCKER_RESOLVED: 'Blocker resolved',
+  STATUS_CHANGED: 'Status changed to',
+};
+
+/**
+ * Log activity to STATE.md ## Recent Activity section
+ * Format: - YYYY-MM-DD HH:MM — <milestone>: <activity>
+ *
+ * @param {string} cwd - Current working directory
+ * @param {object} options - Activity details
+ * @param {string} options.milestone - Milestone ID (e.g., "M7") or null for global
+ * @param {string} options.activity - Activity description
+ * @param {string} [options.type] - Activity type from ACTIVITY_TYPES
+ * @param {number} [options.max_entries] - Max entries to keep (default 20)
+ * @param {boolean} raw - Raw output mode
+ */
+function cmdStateLogActivity(cwd, options, raw) {
+  const { milestone, activity, type, max_entries = DEFAULT_MAX_ACTIVITY_ENTRIES } = options || {};
+
+  if (!activity) {
+    error('Activity description required');
+    return;
+  }
+
+  const statePath = path.join(cwd, '.planning', 'STATE.md');
+
+  if (!fs.existsSync(statePath)) {
+    output({ error: 'STATE.md not found' }, raw);
+    return;
+  }
+
+  let content = fs.readFileSync(statePath, 'utf-8');
+
+  // Ensure ## Recent Activity section exists
+  content = ensureRecentActivitySection(content);
+
+  // Build activity entry
+  const now = new Date();
+  const timestamp = now.toISOString().replace('T', ' ').slice(0, 16); // YYYY-MM-DD HH:MM
+  const milestonePrefix = milestone ? `${milestone.toUpperCase()}: ` : '';
+  const activityText = type ? `${type} ${activity}` : activity;
+  const entry = `- ${timestamp} \u2014 ${milestonePrefix}${activityText}`;
+
+  // Find ## Recent Activity section and add entry
+  const sectionPattern = /(##\s*Recent Activity\s*\n)([\s\S]*?)(?=\n##|$)/i;
+  const match = content.match(sectionPattern);
+
+  if (match) {
+    let sectionBody = match[2].trim();
+
+    // Parse existing entries
+    const lines = sectionBody.split('\n').filter(l => l.startsWith('- '));
+
+    // Add new entry at top (newest first)
+    lines.unshift(entry);
+
+    // Truncate to max entries
+    const truncatedLines = lines.slice(0, max_entries);
+
+    const newBody = truncatedLines.length > 0 ? truncatedLines.join('\n') + '\n' : '';
+    content = content.replace(sectionPattern, `$1\n${newBody}`);
+
+    writeStateMd(statePath, content, cwd);
+    output({
+      logged: true,
+      entry,
+      entries_count: truncatedLines.length,
+      truncated: lines.length > max_entries,
+    }, raw, `Logged: ${entry}`);
+  } else {
+    output({ logged: false, reason: 'Recent Activity section not found' }, raw, 'false');
+  }
+}
+
+/**
+ * Get recent activity log from STATE.md
+ * @param {string} cwd - Current working directory
+ * @param {object} options - Filter options
+ * @param {string} [options.milestone] - Filter by milestone ID
+ * @param {number} [options.limit] - Limit number of entries
+ * @param {boolean} raw - Raw output mode
+ */
+function cmdStateGetActivity(cwd, options, raw) {
+  const { milestone, limit } = options || {};
+
+  const statePath = path.join(cwd, '.planning', 'STATE.md');
+
+  if (!fs.existsSync(statePath)) {
+    output({ error: 'STATE.md not found' }, raw);
+    return;
+  }
+
+  const content = fs.readFileSync(statePath, 'utf-8');
+
+  // Parse ## Recent Activity section
+  const sectionMatch = content.match(/##\s*Recent Activity\s*\n([\s\S]*?)(?=\n##|$)/i);
+
+  const entries = [];
+  if (sectionMatch) {
+    const lines = sectionMatch[1].trim().split('\n').filter(l => l.startsWith('- '));
+
+    for (const line of lines) {
+      // Parse: - YYYY-MM-DD HH:MM — [M7: ]activity
+      const parseMatch = line.match(/^-\s+(\d{4}-\d{2}-\d{2}\s+\d{2}:\d{2})\s+\u2014\s+(?:(M\d+):\s+)?(.+)$/);
+      if (parseMatch) {
+        entries.push({
+          timestamp: parseMatch[1],
+          milestone: parseMatch[2] || null,
+          activity: parseMatch[3],
+        });
+      }
+    }
+  }
+
+  // Filter by milestone if specified
+  let filtered = entries;
+  if (milestone) {
+    const normalizedMilestone = milestone.toUpperCase();
+    filtered = entries.filter(e => e.milestone === normalizedMilestone);
+  }
+
+  // Apply limit
+  if (limit && limit > 0) {
+    filtered = filtered.slice(0, limit);
+  }
+
+  const result = {
+    entries: filtered,
+    count: filtered.length,
+    total: entries.length,
+  };
+
+  // Format human-readable output
+  const lines = filtered.map(e =>
+    `${e.timestamp} ${e.milestone ? `[${e.milestone}] ` : ''}${e.activity}`
+  );
+
+  output(result, raw, lines.join('\n') || 'No activity logged');
+}
+
 module.exports = {
+  // Core helpers
   stateExtractField,
   stateReplaceField,
   writeStateMd,
+  // Multi-milestone helpers
+  isParallelMilestoneState,
+  parseMilestonesTable,
+  getCurrentMilestoneFromState,
+  ensureMilestonesSection,
+  ensureRecentActivitySection,
+  updateMilestoneRow,
+  addMilestoneRow,
+  removeMilestoneRow,
+  // Activity types
+  ACTIVITY_TYPES,
+  // Standard state commands
   cmdStateLoad,
   cmdStateGet,
   cmdStatePatch,
@@ -676,4 +1476,13 @@ module.exports = {
   cmdStateRecordSession,
   cmdStateSnapshot,
   cmdStateJson,
+  // Multi-milestone commands
+  cmdStateSetMilestone,
+  cmdStateUpdateMilestone,
+  cmdStateAddMilestone,
+  cmdStateRemoveMilestone,
+  cmdStateGetMilestones,
+  // Activity logging
+  cmdStateLogActivity,
+  cmdStateGetActivity,
 };

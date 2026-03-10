@@ -174,3 +174,86 @@ It's a DIGEST, not an archive. If accumulated context grows too large:
 The goal is "read once, know where we are" — if it's too long, that fails.
 
 </size_constraint>
+
+<parallel_milestones>
+
+## Multi-Milestone STATE.md Template
+
+For projects using parallel milestones (`parallel_milestones: true` in config):
+
+```markdown
+---
+project: [Project Name]
+version: 2.0
+parallel_milestones: true
+active_milestones: [M1, M7]
+---
+
+# Project State
+
+## Project Reference
+
+See: .planning/PROJECT.md (updated [date])
+
+**Core value:** [One-liner from PROJECT.md Core Value section]
+
+## Milestones
+
+| ID | Name | Status | Progress | Current Phase | Blockers |
+|----|------|--------|----------|---------------|----------|
+| M1 | Full PubMed Ingestion | active | 80% | 3-bulk-ingestion | |
+| M2 | RAG Quality | blocked | 20% | 1-query-transform | Waiting M1 |
+| M7 | Patient Engagement | active | 40% | 2-compliance | |
+
+## Position
+
+milestone: M1
+phase: 3
+plan: 2
+status: Executing plan 3-02
+Last activity: [YYYY-MM-DD] — [What happened]
+
+## Progress
+
+Overall: [######----] 60%  (3/5 milestones progressing)
+
+## Recent Activity
+
+- 2026-02-27 14:30 - M7: Completed phase 1-fhir-foundation
+- 2026-02-27 12:15 - M1: Started phase 3-bulk-ingestion
+- 2026-02-27 10:00 - M1: Completed plan 2-03
+
+## Accumulated Context
+
+### Decisions
+[Recent decisions affecting current work]
+
+### Pending Todos
+[Count] pending — /gsd:check-todos to review
+
+### Blockers/Concerns
+[Issues that affect future work, prefixed with milestone]
+
+## Session Continuity
+
+Last session: [YYYY-MM-DD HH:MM]
+Stopped at: [Description of last completed action]
+Resume file: [Path or "None"]
+```
+
+**Additional sections for parallel milestones:**
+
+- **Milestones table:** Shows all milestones with status and progress
+- **Position:** Includes `milestone:` field for current context
+- **Recent Activity:** Prefixed with milestone ID (e.g., "M7: Completed...")
+- **YAML frontmatter:** Includes `parallel_milestones: true` and `active_milestones`
+
+**Activity log entries:**
+- Phase started/completed
+- Plan started/completed
+- Blocker added/resolved
+- Milestone status changed
+
+Keep last 20 entries, prune older ones.
+
+</parallel_milestones>

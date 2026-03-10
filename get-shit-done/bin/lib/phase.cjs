@@ -7,17 +7,60 @@ const path = require('path');
 const { escapeRegex, normalizePhaseName, comparePhaseNum, findPhaseInternal, getArchivedPhaseDirs, generateSlugInternal, output, error } = require('./core.cjs');
 const { extractFrontmatter } = require('./frontmatter.cjs');
 const { writeStateMd } = require('./state.cjs');
+const { parseMilestonePhaseRef, getMilestoneAbsolutePath, getDefaultMilestone, isParallelMilestoneProject, getMilestonePath } = require('./milestone-parallel.cjs');
+
+// ─── Helper Functions ─────────────────────────────────────────────────────────
+
+/**
+ * Get phases directory for a milestone (or legacy)
+ * @param {string} cwd - Current working directory
+ * @param {string|null} milestoneId - Milestone ID or null for legacy
+ * @returns {{ path: string, relPath: string } | null} Paths or null if not found
+ */
+function getPhasesDir(cwd, milestoneId = null) {
+  if (milestoneId) {
+    const milestonePath = getMilestoneAbsolutePath(cwd, milestoneId);
+    if (!milestonePath) return null;
+    const absPath = path.join(milestonePath, 'phases');
+    const relPath = path.join(getMilestonePath(cwd, milestoneId), 'phases');
+    return { path: absPath, relPath };
+  }
+  // Legacy path
+  const absPath = path.join(cwd, '.planning', 'phases');
+  return { path: absPath, relPath: '.planning/phases' };
+}
+
+/**
+ * Get ROADMAP.md path for a milestone (or root)
+ * @param {string} cwd - Current working directory
+ * @param {string|null} milestoneId - Milestone ID or null for legacy
+ * @returns {string} Path to ROADMAP.md
+ */
+function getRoadmapPath(cwd, milestoneId = null) {
+  if (milestoneId) {
+    const milestonePath = getMilestoneAbsolutePath(cwd, milestoneId);
+    if (milestonePath) {
+      return path.join(milestonePath, 'ROADMAP.md');
+    }
+  }
+  return path.join(cwd, '.planning', 'ROADMAP.md');
+}
+
+// ─── Commands ─────────────────────────────────────────────────────────────────
 
 function cmdPhasesList(cwd, options, raw) {
-  const phasesDir = path.join(cwd, '.planning', 'phases');
-  const { type, phase, includeArchived } = options;
+  const { type, phase, includeArchived, milestone } = options;
+
+  // Determine phases directory based on milestone context
+  const phasesDirInfo = getPhasesDir(cwd, milestone);
+  const phasesDir = phasesDirInfo?.path || path.join(cwd, '.planning', 'phases');
 
   // If no phases directory, return empty
   if (!fs.existsSync(phasesDir)) {
     if (type) {
-      output({ files: [], count: 0 }, raw, '');
+      output({ files: [], count: 0, milestone: milestone || null }, raw, '');
     } else {
-      output({ directories: [], count: 0 }, raw, '');
+      output({ directories: [], count: 0, milestone: milestone || null }, raw, '');
     }
     return;
   }
@@ -149,46 +192,126 @@ function cmdPhaseNextDecimal(cwd, basePhase, raw) {
   }
 }
 
-function cmdFindPhase(cwd, phase, raw) {
+function cmdFindPhase(cwd, phase, raw, options = {}) {
   if (!phase) {
     error('phase identifier required');
   }
 
-  const phasesDir = path.join(cwd, '.planning', 'phases');
-  const normalized = normalizePhaseName(phase);
+  const notFound = { found: false, directory: null, phase_number: null, phase_name: null, plans: [], summaries: [], milestone: null };
 
-  const notFound = { found: false, directory: null, phase_number: null, phase_name: null, plans: [], summaries: [] };
+  // Parse milestone/phase reference (e.g., "M7/01" or just "01")
+  const { milestone: parsedMilestone, phase: parsedPhase } = parseMilestonePhaseRef(phase);
 
-  try {
-    const entries = fs.readdirSync(phasesDir, { withFileTypes: true });
-    const dirs = entries.filter(e => e.isDirectory()).map(e => e.name).sort((a, b) => comparePhaseNum(a, b));
+  // Determine which milestone to use (explicit > option > default > legacy)
+  let milestoneId = parsedMilestone || options.milestone || null;
 
-    const match = dirs.find(d => d.startsWith(normalized));
-    if (!match) {
-      output(notFound, raw, '');
+  // If no explicit milestone, check for default in parallel milestone projects
+  if (!milestoneId) {
+    const defaultMilestone = getDefaultMilestone(cwd);
+    if (defaultMilestone) {
+      milestoneId = defaultMilestone;
+    }
+  }
+
+  const normalized = normalizePhaseName(parsedPhase);
+
+  // Helper to search in a phases directory
+  function searchInPhasesDir(phasesDir, relBase, milestoneRef) {
+    try {
+      if (!fs.existsSync(phasesDir)) return null;
+
+      const entries = fs.readdirSync(phasesDir, { withFileTypes: true });
+      const dirs = entries.filter(e => e.isDirectory()).map(e => e.name).sort((a, b) => comparePhaseNum(a, b));
+
+      const match = dirs.find(d => d.startsWith(normalized));
+      if (!match) return null;
+
+      const dirMatch = match.match(/^(\d+[A-Z]?(?:\.\d+)*)-?(.*)/i);
+      const phaseNumber = dirMatch ? dirMatch[1] : normalized;
+      const phaseName = dirMatch && dirMatch[2] ? dirMatch[2] : null;
+
+      const phaseDir = path.join(phasesDir, match);
+      const phaseFiles = fs.readdirSync(phaseDir);
+      const plans = phaseFiles.filter(f => f.endsWith('-PLAN.md') || f === 'PLAN.md').sort();
+      const summaries = phaseFiles.filter(f => f.endsWith('-SUMMARY.md') || f === 'SUMMARY.md').sort();
+
+      return {
+        found: true,
+        directory: path.join(relBase, match),
+        phase_number: phaseNumber,
+        phase_name: phaseName,
+        plans,
+        summaries,
+        milestone: milestoneRef,
+      };
+    } catch {
+      return null;
+    }
+  }
+
+  // If explicit milestone in reference (M7/01), search only there
+  if (parsedMilestone) {
+    const milestonePath = getMilestoneAbsolutePath(cwd, parsedMilestone);
+    if (!milestonePath) {
+      output({ ...notFound, error: `Milestone ${parsedMilestone} not found` }, raw, '');
       return;
     }
 
-    const dirMatch = match.match(/^(\d+[A-Z]?(?:\.\d+)*)-?(.*)/i);
-    const phaseNumber = dirMatch ? dirMatch[1] : normalized;
-    const phaseName = dirMatch && dirMatch[2] ? dirMatch[2] : null;
+    const phasesDir = path.join(milestonePath, 'phases');
+    const relBase = path.join(path.relative(cwd, milestonePath), 'phases');
+    const result = searchInPhasesDir(phasesDir, relBase, parsedMilestone);
 
-    const phaseDir = path.join(phasesDir, match);
-    const phaseFiles = fs.readdirSync(phaseDir);
-    const plans = phaseFiles.filter(f => f.endsWith('-PLAN.md') || f === 'PLAN.md').sort();
-    const summaries = phaseFiles.filter(f => f.endsWith('-SUMMARY.md') || f === 'SUMMARY.md').sort();
+    if (result) {
+      output(result, raw, result.directory);
+    } else {
+      output(notFound, raw, '');
+    }
+    return;
+  }
 
-    const result = {
-      found: true,
-      directory: path.join('.planning', 'phases', match),
-      phase_number: phaseNumber,
-      phase_name: phaseName,
-      plans,
-      summaries,
-    };
+  // If milestone provided via options flag, search only there
+  if (options.milestone) {
+    const milestonePath = getMilestoneAbsolutePath(cwd, options.milestone);
+    if (!milestonePath) {
+      output({ ...notFound, error: `Milestone ${options.milestone} not found` }, raw, '');
+      return;
+    }
 
+    const phasesDir = path.join(milestonePath, 'phases');
+    const relBase = path.join(path.relative(cwd, milestonePath), 'phases');
+    const result = searchInPhasesDir(phasesDir, relBase, options.milestone);
+
+    if (result) {
+      output(result, raw, result.directory);
+    } else {
+      output(notFound, raw, '');
+    }
+    return;
+  }
+
+  // If default milestone is set, try there first, then fall back to legacy
+  if (milestoneId) {
+    const milestonePath = getMilestoneAbsolutePath(cwd, milestoneId);
+    if (milestonePath) {
+      const phasesDir = path.join(milestonePath, 'phases');
+      const relBase = path.join(path.relative(cwd, milestonePath), 'phases');
+      const result = searchInPhasesDir(phasesDir, relBase, milestoneId);
+
+      if (result) {
+        output(result, raw, result.directory);
+        return;
+      }
+    }
+    // Fall through to legacy path
+  }
+
+  // Legacy .planning/phases/
+  const phasesDir = path.join(cwd, '.planning', 'phases');
+  const result = searchInPhasesDir(phasesDir, path.join('.planning', 'phases'), null);
+
+  if (result) {
     output(result, raw, result.directory);
-  } catch {
+  } else {
     output(notFound, raw, '');
   }
 }
@@ -301,14 +424,17 @@ function cmdPhasePlanIndex(cwd, phase, raw) {
   output(result, raw);
 }
 
-function cmdPhaseAdd(cwd, description, raw) {
+function cmdPhaseAdd(cwd, description, raw, milestoneId = null) {
   if (!description) {
     error('description required for phase add');
   }
 
-  const roadmapPath = path.join(cwd, '.planning', 'ROADMAP.md');
+  // Determine paths based on milestone context
+  const roadmapPath = getRoadmapPath(cwd, milestoneId);
+  const phasesDirInfo = getPhasesDir(cwd, milestoneId);
+
   if (!fs.existsSync(roadmapPath)) {
-    error('ROADMAP.md not found');
+    error('ROADMAP.md not found' + (milestoneId ? ` for milestone ${milestoneId}` : ''));
   }
 
   const content = fs.readFileSync(roadmapPath, 'utf-8');
@@ -326,7 +452,7 @@ function cmdPhaseAdd(cwd, description, raw) {
   const newPhaseNum = maxPhase + 1;
   const paddedNum = String(newPhaseNum).padStart(2, '0');
   const dirName = `${paddedNum}-${slug}`;
-  const dirPath = path.join(cwd, '.planning', 'phases', dirName);
+  const dirPath = path.join(phasesDirInfo.path, dirName);
 
   // Create directory with .gitkeep so git tracks empty folders
   fs.mkdirSync(dirPath, { recursive: true });
@@ -351,20 +477,24 @@ function cmdPhaseAdd(cwd, description, raw) {
     padded: paddedNum,
     name: description,
     slug,
-    directory: `.planning/phases/${dirName}`,
+    directory: path.join(phasesDirInfo.relPath, dirName),
+    milestone: milestoneId || null,
   };
 
   output(result, raw, paddedNum);
 }
 
-function cmdPhaseInsert(cwd, afterPhase, description, raw) {
+function cmdPhaseInsert(cwd, afterPhase, description, raw, milestoneId = null) {
   if (!afterPhase || !description) {
     error('after-phase and description required for phase insert');
   }
 
-  const roadmapPath = path.join(cwd, '.planning', 'ROADMAP.md');
+  // Determine paths based on milestone context
+  const roadmapPath = getRoadmapPath(cwd, milestoneId);
+  const phasesDirInfo = getPhasesDir(cwd, milestoneId);
+
   if (!fs.existsSync(roadmapPath)) {
-    error('ROADMAP.md not found');
+    error('ROADMAP.md not found' + (milestoneId ? ` for milestone ${milestoneId}` : ''));
   }
 
   const content = fs.readFileSync(roadmapPath, 'utf-8');
@@ -380,7 +510,7 @@ function cmdPhaseInsert(cwd, afterPhase, description, raw) {
   }
 
   // Calculate next decimal using existing logic
-  const phasesDir = path.join(cwd, '.planning', 'phases');
+  const phasesDir = phasesDirInfo.path;
   const normalizedBase = normalizePhaseName(afterPhase);
   let existingDecimals = [];
 
@@ -397,7 +527,7 @@ function cmdPhaseInsert(cwd, afterPhase, description, raw) {
   const nextDecimal = existingDecimals.length === 0 ? 1 : Math.max(...existingDecimals) + 1;
   const decimalPhase = `${normalizedBase}.${nextDecimal}`;
   const dirName = `${decimalPhase}-${slug}`;
-  const dirPath = path.join(cwd, '.planning', 'phases', dirName);
+  const dirPath = path.join(phasesDir, dirName);
 
   // Create directory with .gitkeep so git tracks empty folders
   fs.mkdirSync(dirPath, { recursive: true });
@@ -432,13 +562,14 @@ function cmdPhaseInsert(cwd, afterPhase, description, raw) {
     after_phase: afterPhase,
     name: description,
     slug,
-    directory: `.planning/phases/${dirName}`,
+    directory: path.join(phasesDirInfo.relPath, dirName),
+    milestone: milestoneId || null,
   };
 
   output(result, raw, decimalPhase);
 }
 
-function cmdPhaseRemove(cwd, targetPhase, options, raw) {
+function cmdPhaseRemove(cwd, targetPhase, options, raw, milestoneId = null) {
   if (!targetPhase) {
     error('phase number required for phase remove');
   }
@@ -691,21 +822,23 @@ function cmdPhaseRemove(cwd, targetPhase, options, raw) {
   output(result, raw);
 }
 
-function cmdPhaseComplete(cwd, phaseNum, raw) {
+function cmdPhaseComplete(cwd, phaseNum, raw, milestoneId = null) {
   if (!phaseNum) {
     error('phase number required for phase complete');
   }
 
-  const roadmapPath = path.join(cwd, '.planning', 'ROADMAP.md');
+  // Determine paths based on milestone context
+  const roadmapPath = getRoadmapPath(cwd, milestoneId);
   const statePath = path.join(cwd, '.planning', 'STATE.md');
-  const phasesDir = path.join(cwd, '.planning', 'phases');
+  const phasesDirInfo = getPhasesDir(cwd, milestoneId);
+  const phasesDir = phasesDirInfo?.path || path.join(cwd, '.planning', 'phases');
   const normalized = normalizePhaseName(phaseNum);
   const today = new Date().toISOString().split('T')[0];
 
   // Verify phase info
-  const phaseInfo = findPhaseInternal(cwd, phaseNum);
+  const phaseInfo = findPhaseInternal(cwd, phaseNum, milestoneId);
   if (!phaseInfo) {
-    error(`Phase ${phaseNum} not found`);
+    error(`Phase ${phaseNum} not found` + (milestoneId ? ` in milestone ${milestoneId}` : ''));
   }
 
   const planCount = phaseInfo.plans.length;

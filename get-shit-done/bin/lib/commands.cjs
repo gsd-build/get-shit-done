@@ -6,6 +6,7 @@ const path = require('path');
 const { execSync } = require('child_process');
 const { safeReadFile, loadConfig, isGitIgnored, execGit, normalizePhaseName, comparePhaseNum, getArchivedPhaseDirs, generateSlugInternal, getMilestoneInfo, resolveModelInternal, MODEL_PROFILES, output, error, findPhaseInternal } = require('./core.cjs');
 const { extractFrontmatter } = require('./frontmatter.cjs');
+const { listMilestones, getMilestoneAbsolutePath, isParallelMilestoneProject, getMilestoneInfo: getMilestoneDetailedInfo } = require('./milestone-parallel.cjs');
 
 function cmdGenerateSlug(text, raw) {
   if (!text) {
@@ -532,6 +533,185 @@ function cmdScaffold(cwd, type, options, raw) {
   output({ created: true, path: relPath }, raw, relPath);
 }
 
+/**
+ * Multi-milestone progress display
+ * Shows progress for all milestones when project uses parallel milestones
+ */
+function cmdProgressMultiMilestone(cwd, format, raw, filterMilestone = null) {
+  const isParallel = isParallelMilestoneProject(cwd);
+
+  // If not a parallel project, fall back to single progress
+  if (!isParallel) {
+    return cmdProgressRender(cwd, format, raw);
+  }
+
+  const milestones = listMilestones(cwd);
+
+  // If filtering to specific milestone
+  if (filterMilestone) {
+    const normalizedFilter = filterMilestone.toUpperCase();
+    const filtered = milestones.filter(m => m.id === normalizedFilter);
+    if (filtered.length === 0) {
+      error(`Milestone ${filterMilestone} not found`);
+    }
+    // Return single milestone progress
+    const m = filtered[0];
+    const milestonePath = getMilestoneAbsolutePath(cwd, m.id);
+    const phasesDir = path.join(milestonePath, 'phases');
+
+    let totalPlans = 0;
+    let totalSummaries = 0;
+    const phases = [];
+
+    try {
+      if (fs.existsSync(phasesDir)) {
+        const entries = fs.readdirSync(phasesDir, { withFileTypes: true });
+        const dirs = entries.filter(e => e.isDirectory()).map(e => e.name).sort((a, b) => comparePhaseNum(a, b));
+
+        for (const dir of dirs) {
+          const dm = dir.match(/^(\d+(?:\.\d+)*)-?(.*)/);
+          const phaseNum = dm ? dm[1] : dir;
+          const phaseName = dm && dm[2] ? dm[2].replace(/-/g, ' ') : '';
+          const phaseFiles = fs.readdirSync(path.join(phasesDir, dir));
+          const plans = phaseFiles.filter(f => f.endsWith('-PLAN.md') || f === 'PLAN.md').length;
+          const summaries = phaseFiles.filter(f => f.endsWith('-SUMMARY.md') || f === 'SUMMARY.md').length;
+
+          totalPlans += plans;
+          totalSummaries += summaries;
+
+          let status;
+          if (plans === 0) status = 'Pending';
+          else if (summaries >= plans) status = 'Complete';
+          else if (summaries > 0) status = 'In Progress';
+          else status = 'Planned';
+
+          phases.push({ number: phaseNum, name: phaseName, plans, summaries, status });
+        }
+      }
+    } catch {}
+
+    const percent = totalPlans > 0 ? Math.min(100, Math.round((totalSummaries / totalPlans) * 100)) : 0;
+
+    if (format === 'table') {
+      const barWidth = 10;
+      const filled = Math.round((percent / 100) * barWidth);
+      const bar = '\u2588'.repeat(filled) + '\u2591'.repeat(barWidth - filled);
+      let out = `# ${m.id}: ${m.name}\n\n`;
+      out += `**Progress:** [${bar}] ${totalSummaries}/${totalPlans} plans (${percent}%)\n\n`;
+      out += `| Phase | Name | Plans | Status |\n`;
+      out += `|-------|------|-------|--------|\n`;
+      for (const p of phases) {
+        out += `| ${p.number} | ${p.name} | ${p.summaries}/${p.plans} | ${p.status} |\n`;
+      }
+      output({ rendered: out, milestone: m.id }, raw, out);
+    } else {
+      output({
+        milestone_id: m.id,
+        milestone_name: m.name,
+        phases,
+        total_plans: totalPlans,
+        total_summaries: totalSummaries,
+        percent,
+      }, raw);
+    }
+    return;
+  }
+
+  // Multi-milestone view
+  const milestoneProgress = [];
+  let overallPlans = 0;
+  let overallSummaries = 0;
+  let activeCount = 0;
+
+  for (const m of milestones) {
+    const milestonePath = getMilestoneAbsolutePath(cwd, m.id);
+    const phasesDir = path.join(milestonePath, 'phases');
+
+    let planCount = 0;
+    let summaryCount = 0;
+    let phaseCount = 0;
+    let completedPhaseCount = 0;
+    let isActive = false;
+
+    try {
+      if (fs.existsSync(phasesDir)) {
+        const entries = fs.readdirSync(phasesDir, { withFileTypes: true });
+        const dirs = entries.filter(e => e.isDirectory()).map(e => e.name);
+
+        phaseCount = dirs.length;
+
+        for (const dir of dirs) {
+          const phaseFiles = fs.readdirSync(path.join(phasesDir, dir));
+          const plans = phaseFiles.filter(f => f.endsWith('-PLAN.md') || f === 'PLAN.md').length;
+          const summaries = phaseFiles.filter(f => f.endsWith('-SUMMARY.md') || f === 'SUMMARY.md').length;
+
+          planCount += plans;
+          summaryCount += summaries;
+
+          if (plans > 0 && summaries >= plans) {
+            completedPhaseCount++;
+          } else if (plans > 0 || summaries > 0) {
+            isActive = true;
+          }
+        }
+      }
+    } catch {}
+
+    const percent = planCount > 0 ? Math.min(100, Math.round((summaryCount / planCount) * 100)) : 0;
+    const status = phaseCount > 0 && completedPhaseCount >= phaseCount ? 'COMPLETE' : (isActive ? 'active' : 'pending');
+
+    if (status === 'active') activeCount++;
+
+    overallPlans += planCount;
+    overallSummaries += summaryCount;
+
+    milestoneProgress.push({
+      id: m.id,
+      name: m.name,
+      percent,
+      phase_count: phaseCount,
+      completed_phases: completedPhaseCount,
+      plan_count: planCount,
+      summary_count: summaryCount,
+      status,
+      is_active: isActive,
+    });
+  }
+
+  const overallPercent = overallPlans > 0 ? Math.min(100, Math.round((overallSummaries / overallPlans) * 100)) : 0;
+
+  if (format === 'table') {
+    const barWidth = 10;
+    let out = `# Project Progress\n\n`;
+    out += `## Milestone Progress\n\n`;
+
+    for (const m of milestoneProgress) {
+      const filled = Math.round((m.percent / 100) * barWidth);
+      const bar = '\u2588'.repeat(filled) + '\u2591'.repeat(barWidth - filled);
+      const activeMarker = m.is_active ? ' <- active' : '';
+      const statusDisplay = m.status === 'COMPLETE' ? 'COMPLETE' : `Phase ${m.completed_phases}/${m.phase_count}`;
+      out += `${m.id.padEnd(3)} ${m.name.substring(0, 16).padEnd(17)} [${bar}] ${String(m.percent).padStart(3)}%  ${statusDisplay}${activeMarker}\n`;
+    }
+
+    out += `\n## Overall\n`;
+    const overallFilled = Math.round((overallPercent / 100) * barWidth);
+    const overallBar = '\u2588'.repeat(overallFilled) + '\u2591'.repeat(barWidth - overallFilled);
+    out += `[${overallBar}] ${overallPercent}%  ${milestones.length} milestones, ${activeCount} active\n`;
+
+    output({ rendered: out, milestones: milestoneProgress, overall_percent: overallPercent }, raw, out);
+  } else {
+    output({
+      is_parallel_project: true,
+      milestones: milestoneProgress,
+      milestone_count: milestones.length,
+      active_count: activeCount,
+      overall_plans: overallPlans,
+      overall_summaries: overallSummaries,
+      overall_percent: overallPercent,
+    }, raw);
+  }
+}
+
 module.exports = {
   cmdGenerateSlug,
   cmdCurrentTimestamp,
@@ -543,6 +723,7 @@ module.exports = {
   cmdSummaryExtract,
   cmdWebsearch,
   cmdProgressRender,
+  cmdProgressMultiMilestone,
   cmdTodoComplete,
   cmdScaffold,
 };

@@ -241,13 +241,30 @@ function searchPhaseInDir(baseDir, relBase, normalized) {
   }
 }
 
-function findPhaseInternal(cwd, phase) {
+function findPhaseInternal(cwd, phase, milestoneId = null) {
   if (!phase) return null;
 
-  const phasesDir = path.join(cwd, '.planning', 'phases');
   const normalized = normalizePhaseName(phase);
 
-  // Search current phases first
+  // If milestoneId provided, search only in that milestone's phases
+  if (milestoneId) {
+    // Import getMilestoneAbsolutePath dynamically to avoid circular dependency
+    const { getMilestoneAbsolutePath } = require('./milestone-parallel.cjs');
+    const milestonePath = getMilestoneAbsolutePath(cwd, milestoneId);
+    if (milestonePath) {
+      const phasesDir = path.join(milestonePath, 'phases');
+      const relBase = path.join(path.relative(cwd, milestonePath), 'phases');
+      const result = searchPhaseInDir(phasesDir, relBase, normalized);
+      if (result) {
+        result.milestone = milestoneId;
+        return result;
+      }
+    }
+    return null;
+  }
+
+  // Legacy: search current phases first
+  const phasesDir = path.join(cwd, '.planning', 'phases');
   const current = searchPhaseInDir(phasesDir, '.planning/phases', normalized);
   if (current) return current;
 
@@ -315,9 +332,23 @@ function getArchivedPhaseDirs(cwd) {
 
 // ─── Roadmap & model utilities ────────────────────────────────────────────────
 
-function getRoadmapPhaseInternal(cwd, phaseNum) {
+function getRoadmapPhaseInternal(cwd, phaseNum, milestoneId = null) {
   if (!phaseNum) return null;
-  const roadmapPath = path.join(cwd, '.planning', 'ROADMAP.md');
+
+  // Determine roadmap path based on milestone context
+  let roadmapPath;
+  if (milestoneId) {
+    const { getMilestoneAbsolutePath } = require('./milestone-parallel.cjs');
+    const milestonePath = getMilestoneAbsolutePath(cwd, milestoneId);
+    if (milestonePath) {
+      roadmapPath = path.join(milestonePath, 'ROADMAP.md');
+    } else {
+      return null;
+    }
+  } else {
+    roadmapPath = path.join(cwd, '.planning', 'ROADMAP.md');
+  }
+
   if (!fs.existsSync(roadmapPath)) return null;
 
   try {
