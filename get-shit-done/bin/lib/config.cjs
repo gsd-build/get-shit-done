@@ -255,14 +255,14 @@ function cmdConfigSetModelProfile(cwd, profile, raw) {
 
   // Set the model profile in the config
   const { previousValue } = setConfigValue(cwd, 'model_profile', normalizedProfile, raw);
-  const previousProfile = previousValue || 'balanced (default)';
+  const previousProfile = previousValue || 'balanced';
 
   // Build result value / message and return
   const agentToModelMap = getAgentToModelMapForProfile(normalizedProfile);
   const result = {
     updated: true,
     profile: normalizedProfile,
-    previous: previousProfile,
+    previousProfile,
     agentToModelMap,
   };
   const rawValue = getCmdConfigSetModelProfileResultMessage(
