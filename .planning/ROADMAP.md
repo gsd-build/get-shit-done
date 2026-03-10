@@ -37,7 +37,11 @@
   2. `get-shit-done/workflows/autonomous.md` exists with bootstrap sequence (`gsd-tools.cjs init`) and standard workflow structure
   3. The command uses `name: gsd:autonomous` so the installer auto-generates `.github/skills/gsd-autonomous/SKILL.md` without any installer changes
   4. The workflow can parse ROADMAP.md and produce an ordered list of incomplete phases with their names, numbers, and dependency info
-**Plans**: TBD
+**Plans:** 2 plans
+
+Plans:
+- [ ] 05-01-PLAN.md — Roadmap regex fix + autonomous command file
+- [ ] 05-02-PLAN.md — Autonomous workflow + installer integration test
 
 ### Phase 6: Smart Discuss
 **Goal**: Users get proposed answers for grey areas instead of open-ended questions, and can accept or override them per area
