@@ -116,7 +116,7 @@ For the current phase, display the progress banner:
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 ```
 
-Where N = current phase position (1-based among incomplete), T = total phases, P = percentage complete. Use █ for filled and ░ for empty segments in the progress bar (8 characters wide).
+Where N = current phase number (from the ROADMAP, e.g., 6), T = total milestone phases (from `phase_count` parsed in initialize step, e.g., 8), P = percentage of all milestone phases completed so far. Calculate P as: (number of phases with `disk_status` "complete" from the latest `roadmap analyze` / T × 100). Use █ for filled and ░ for empty segments in the progress bar (8 characters wide).
 
 **3a. Smart Discuss**
 
@@ -259,6 +259,8 @@ On **"Stop autonomous mode"**: Go to handle_blocker with "User stopped — gaps 
 ## Smart Discuss
 
 Run smart discuss for the current phase. Proposes grey area answers in batch tables — the user accepts or overrides per area. Produces identical CONTEXT.md output to regular discuss-phase.
+
+> **Note:** Smart discuss is an autonomous-optimized variant of the `gsd:discuss-phase` skill. It produces identical CONTEXT.md output but uses batch table proposals instead of sequential questioning. The original `discuss-phase` skill remains unchanged (per CTRL-03). Future milestones may extract this to a separate skill file.
 
 **Inputs:** `PHASE_NUM` from execute_phase. Run init to get phase paths:
 
@@ -561,25 +563,126 @@ Check for blockers in the Blockers/Concerns section. If blockers are found, go t
 
 If incomplete phases remain: proceed to next phase, loop back to execute_phase.
 
-If all phases complete, display completion banner:
+If all phases complete, proceed to lifecycle step.
+
+</step>
+
+<step name="lifecycle">
+
+## 5. Lifecycle
+
+After all phases complete, run the milestone lifecycle sequence: audit → complete → cleanup.
+
+Display lifecycle transition banner:
 
 ```
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
- GSD ► AUTONOMOUS ▸ COMPLETE ✅
+ GSD ► AUTONOMOUS ▸ LIFECYCLE
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
- Milestone {milestone_version}: {milestone_name}
- Phases completed: {total}
- Status: All phases executed successfully
+ All phases complete → Starting lifecycle: audit → complete → cleanup
+ Milestone: {milestone_version} — {milestone_name}
+```
 
- Next: /gsd:complete-milestone to finalize
+**5a. Audit**
+
+```
+Skill(skill="gsd:audit-milestone")
+```
+
+After audit completes, detect the result:
+
+```bash
+AUDIT_FILE=".planning/v${milestone_version}-MILESTONE-AUDIT.md"
+AUDIT_STATUS=$(grep "^status:" "${AUDIT_FILE}" 2>/dev/null | head -1 | cut -d: -f2 | tr -d ' ')
+```
+
+**If AUDIT_STATUS is empty** (no audit file or no status field):
+
+Go to handle_blocker: "Audit did not produce results — audit file missing or malformed."
+
+**If `passed`:**
+
+Display:
+```
+Audit ✅ passed — proceeding to complete milestone
+```
+
+Proceed to 5b (no user pause — per CTRL-01).
+
+**If `gaps_found`:**
+
+Read the gaps summary from the audit file. Display:
+```
+⚠ Audit: Gaps Found
+```
+
+Ask user via AskUserQuestion:
+- **question:** "Milestone audit found gaps. How to proceed?"
+- **options:** "Continue anyway — accept gaps" / "Stop — fix gaps manually"
+
+On **"Continue anyway"**: Display `Audit ⏭ Gaps accepted — proceeding to complete milestone` and proceed to 5b.
+
+On **"Stop"**: Go to handle_blocker with "User stopped — audit gaps remain. Run /gsd:audit-milestone to review, then /gsd:complete-milestone when ready."
+
+**If `tech_debt`:**
+
+Read the tech debt summary from the audit file. Display:
+```
+⚠ Audit: Tech Debt Identified
+```
+
+Show the summary, then ask user via AskUserQuestion:
+- **question:** "Milestone audit found tech debt. How to proceed?"
+- **options:** "Continue with tech debt" / "Stop — address debt first"
+
+On **"Continue with tech debt"**: Display `Audit ⏭ Tech debt acknowledged — proceeding to complete milestone` and proceed to 5b.
+
+On **"Stop"**: Go to handle_blocker with "User stopped — tech debt to address. Run /gsd:audit-milestone to review details."
+
+**5b. Complete Milestone**
+
+```
+Skill(skill="gsd:complete-milestone", args="${milestone_version}")
+```
+
+After complete-milestone returns, verify it produced output:
+
+```bash
+ls .planning/milestones/v${milestone_version}-ROADMAP.md 2>/dev/null
+```
+
+If the archive file does not exist, go to handle_blocker: "Complete milestone did not produce expected archive files."
+
+**5c. Cleanup**
+
+```
+Skill(skill="gsd:cleanup")
+```
+
+Cleanup shows its own dry-run and asks user for approval internally — this is an acceptable pause per CTRL-01 since it's an explicit decision about file deletion.
+
+**5d. Final Completion**
+
+Display final completion banner:
+
+```
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+ GSD ► AUTONOMOUS ▸ COMPLETE 🎉
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+ Milestone: {milestone_version} — {milestone_name}
+ Status: Complete ✅
+ Lifecycle: audit ✅ → complete ✅ → cleanup ✅
+
+ Ship it! 🚀
 ```
 
 </step>
 
 <step name="handle_blocker">
 
-## 5. Handle Blocker
+## 6. Handle Blocker
 
 When any phase operation fails or a blocker is detected, present 3 options via AskUserQuestion:
 
@@ -627,4 +730,14 @@ When any phase operation fails or a blocker is detected, present 3 options via A
 - [ ] STATE.md checked for blockers before each phase
 - [ ] Blockers handled via user choice (retry / skip / stop)
 - [ ] Final completion or stop summary displayed
+- [ ] After all phases complete, lifecycle step is invoked (not manual suggestion)
+- [ ] Lifecycle transition banner displayed before audit
+- [ ] Audit invoked via Skill(skill="gsd:audit-milestone")
+- [ ] Audit result routing: passed → auto-continue, gaps_found → user decides, tech_debt → user decides
+- [ ] Audit technical failure (no file/no status) routes to handle_blocker
+- [ ] Complete-milestone invoked via Skill() with ${milestone_version} arg
+- [ ] Cleanup invoked via Skill() — internal confirmation is acceptable (CTRL-01)
+- [ ] Final completion banner displayed after lifecycle
+- [ ] Progress bar uses phase number / total milestone phases (not position among incomplete)
+- [ ] Smart discuss documents relationship to discuss-phase with CTRL-03 note
 </success_criteria>
