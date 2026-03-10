@@ -12,7 +12,11 @@ Configuration options for `.planning/` directory behavior.
   "branching_strategy": "phase",
   "phase_branch_template": "gsd/phase-{phase}-{slug}",
   "milestone_branch_template": "gsd/{milestone}-{slug}"
-}
+},
+"parallel_milestones": false,
+"default_milestone": null,
+"milestones": {},
+"dependency_mode": "advisory"
 ```
 
 | Option | Default | Description |
@@ -22,6 +26,10 @@ Configuration options for `.planning/` directory behavior.
 | `git.branching_strategy` | `"phase"` | Git branching approach: `"none"`, `"phase"`, or `"milestone"`. Enables worktree isolation for parallel execution. |
 | `git.phase_branch_template` | `"gsd/phase-{phase}-{slug}"` | Branch template for phase strategy |
 | `git.milestone_branch_template` | `"gsd/{milestone}-{slug}"` | Branch template for milestone strategy |
+| `parallel_milestones` | `false` | Enable parallel milestone development (multiple concurrent milestones) |
+| `default_milestone` | `null` | Default milestone ID for commands without explicit `M7/` prefix |
+| `milestones` | `{}` | Milestone definitions with names and dependencies |
+| `dependency_mode` | `"advisory"` | How to handle milestone dependencies: `"advisory"` (warn) or `"strict"` (block) |
 </config_schema>
 
 <commit_docs_behavior>
@@ -192,5 +200,83 @@ Squash merge is recommended — keeps main branch history clean while preserving
 | `milestone` | Release branches, staging environments, PR per version |
 
 </branching_strategy_behavior>
+
+<parallel_milestones_behavior>
+
+**Parallel Milestones:**
+
+Enable concurrent milestone development with independent phase numbering.
+
+**When `parallel_milestones: false` (default):**
+- Standard single-milestone workflow
+- Phases in `.planning/phases/`
+- Phase numbers are global (01, 02, 03...)
+
+**When `parallel_milestones: true`:**
+- Milestones stored in `.planning/milestones/{id}-{slug}/`
+- Each milestone has own ROADMAP.md, REQUIREMENTS.md, phases/
+- Phase numbers scoped per-milestone (M1/01, M7/01 can coexist)
+- Commands accept `M7/01` syntax
+
+**Directory structure:**
+```
+.planning/milestones/
+├── M1-ingestion/
+│   ├── ROADMAP.md
+│   ├── REQUIREMENTS.md
+│   └── phases/
+│       ├── 01-setup/
+│       └── 02-pipeline/
+└── M7-patient-engagement/
+    ├── ROADMAP.md
+    └── phases/
+```
+
+**Milestone configuration example:**
+```json
+{
+  "parallel_milestones": true,
+  "default_milestone": "M1",
+  "milestones": {
+    "M1": {
+      "name": "Full PubMed Ingestion",
+      "dependencies": []
+    },
+    "M7": {
+      "name": "Patient Engagement",
+      "dependencies": ["M1"]
+    }
+  },
+  "dependency_mode": "advisory"
+}
+```
+
+**Dependency modes:**
+- `"advisory"`: Warn when starting work on milestone with incomplete dependencies
+- `"strict"`: Block execution until dependencies complete
+
+**Migration:**
+```bash
+# Preview migration
+gsd-tools migrate-to-parallel --dry-run
+
+# Interactive wizard
+gsd-tools migrate-to-parallel
+
+# Auto-detect boundaries
+gsd-tools migrate-to-parallel --auto
+
+# Restore if needed
+gsd-tools migrate-to-parallel --restore <backup-path>
+```
+
+**Backward compatibility:**
+- Legacy projects (no `.planning/milestones/`) work unchanged
+- Commands without `M7/` prefix use default milestone or legacy path
+- Mixed mode supported during gradual migration
+
+See `references/parallel-milestones.md` for complete documentation.
+
+</parallel_milestones_behavior>
 
 </planning_config>

@@ -184,6 +184,44 @@ Archive completed milestone and prepare for next version.
 
 Usage: `/gsd:complete-milestone 1.0.0`
 
+### Parallel Milestones (Advanced)
+
+**Milestone-Scoped Commands**
+All workflow commands support `M7/01` syntax for parallel milestones:
+
+```bash
+/gsd:execute-phase M7/01    # Execute phase 1 of milestone M7
+/gsd:plan-phase M1/03       # Plan phase 3 of milestone M1
+/gsd:progress M7            # Show M7's progress only
+/gsd:verify-work M7/02      # Verify phase 2 of M7
+```
+
+**CLI Commands:**
+```bash
+# Create a new parallel milestone
+gsd-tools milestone create M7 "Patient Engagement"
+
+# List all milestones with status
+gsd-tools milestone list
+
+# Switch default milestone context
+gsd-tools milestone switch M7
+
+# Migrate legacy project to parallel structure
+gsd-tools migrate-to-parallel --dry-run
+gsd-tools migrate-to-parallel
+```
+
+Enable parallel milestones in `.planning/config.json`:
+```json
+{
+  "parallel_milestones": true,
+  "default_milestone": "M1"
+}
+```
+
+See `references/parallel-milestones.md` for complete documentation.
+
 ### Progress Tracking
 
 **`/gsd:progress`**
