@@ -5589,8 +5589,24 @@ async function main() {
     }
 
     case 'progress': {
-      const subcommand = args[1] || 'json';
-      commands.cmdProgressRender(cwd, subcommand, raw);
+      // Check for --milestone flag
+      const milestoneIndex = args.indexOf('--milestone');
+      const filterMilestone = milestoneIndex !== -1 ? args[milestoneIndex + 1] : null;
+
+      // Determine format (skip --milestone and its value)
+      let format = 'json';
+      for (let i = 1; i < args.length; i++) {
+        if (args[i] === '--milestone') {
+          i++; // Skip the milestone value
+          continue;
+        }
+        if (['json', 'table', 'bar'].includes(args[i])) {
+          format = args[i];
+        }
+      }
+
+      // Use multi-milestone progress for parallel projects or when filtering
+      commands.cmdProgressMultiMilestone(cwd, format, raw, filterMilestone);
       break;
     }
 
