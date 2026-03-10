@@ -52,7 +52,10 @@ Plans:
   2. Grey areas are presented one at a time, letting the user focus on a single area before moving on
   3. User can accept all proposed answers for a grey area with a single confirmation, or change specific answers individually
   4. After all grey areas are resolved, CONTEXT.md is written with locked decisions in the same format as regular discuss-phase output
-**Plans**: TBD
+**Plans:** 1 plan
+
+Plans:
+- [ ] 06-01-PLAN.md — Smart discuss logic: table proposals, accept/change UX, CONTEXT.md writing
 
 ### Phase 7: Phase Execution Chain
 **Goal**: For a single phase, the full discuss→plan→execute sequence runs automatically with human input only at decision points
