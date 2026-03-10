@@ -848,3 +848,45 @@ Checkpoints formalize human-in-the-loop points for verification and decisions, n
 - Code correctness (tests and static analysis)
 - Anything automatable via CLI/API
 </summary>
+
+<coordinator_checkpoint_semantics>
+
+## Coordinator Lifecycle Checkpoints (CHECKPOINT.json)
+
+These are DISTINCT from execution checkpoints (checkpoint:human-verify, checkpoint:decision, etc.) described above. Coordinator lifecycle checkpoints track which lifecycle steps have run — they are written to CHECKPOINT.json in the phase directory.
+
+### CHECKPOINT.json Fields
+
+| Field | Values | Meaning |
+|-------|--------|---------|
+| `step_status` | `"complete"` | Step ran to completion. Does NOT mean success or goal achievement. |
+| `step_status` | `"skipped"` | Step not needed (e.g., artifact already exists from prior run). |
+| `step_status` | `"failed"` | Step errored before completing. |
+| `last_step` | step name | Most recent step that ran (discuss/research/plan/execute/verify). |
+| `resume_from` | step name | Where a restarted coordinator picks up. |
+
+### Outcome vs Lifecycle
+
+**CHECKPOINT.json is lifecycle-only.** It answers "what steps ran?" not "did the phase succeed?"
+
+**VERIFICATION.md is the outcome authority.** It answers "did the phase achieve its goal?"
+
+The verify step completing means the verifier agent ran — the actual outcome is in VERIFICATION.md:
+
+- `status: "passed"` — phase goal achieved, phase can be marked complete in ROADMAP.md
+- `status: "gaps_found"` — gaps remain, run gap closure before marking complete
+- `status: "human_needed"` — automated checks passed, human testing still required
+
+Never infer phase success from CHECKPOINT.json alone. A coordinator MUST read VERIFICATION.md `status: "passed"` before marking a phase roadmap-complete.
+
+### Hard Gate Contract
+
+`gsd-tools.js phase complete` enforces this contract — it REFUSES to mark a phase done unless:
+
+1. VERIFICATION.md exists with `status: "passed"`
+2. Every PLAN.md in the phase directory has a matching SUMMARY.md
+3. CHECKPOINT.json has `last_step: "verify"`
+
+The command exits 1 with a `validation_errors` JSON response if any check fails.
+
+</coordinator_checkpoint_semantics>

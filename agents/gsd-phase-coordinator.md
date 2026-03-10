@@ -569,6 +569,28 @@ echo "PLAN_COUNT=$PLAN_COUNT"
 { "status": "failed", "step": "plan", "reason": "gsd-planner returned success but no PLAN.md files found on disk" }
 ```
 
+**Plan structure gate:** After PLAN_COUNT check passes, run structural validation on each plan before proceeding:
+
+```bash
+GATE_FAILURES=0
+for plan_file in .planning/phases/{phase_dir}/*-PLAN.md; do
+  VALIDATION_OUTPUT=$(node /Users/ollorin/.claude/get-shit-done/bin/gsd-tools.js verify plan-structure "$plan_file" 2>/dev/null)
+  VALID=$(echo "$VALIDATION_OUTPUT" | python3 -c "import sys,json; d=json.load(sys.stdin); print(d.get('valid', True))" 2>/dev/null || echo "True")
+  if [ "$VALID" = "False" ] || [ "$VALID" = "false" ]; then
+    ERRORS=$(echo "$VALIDATION_OUTPUT" | python3 -c "import sys,json; d=json.load(sys.stdin); print(', '.join(d.get('errors',[])))" 2>/dev/null || echo "unknown errors")
+    echo "PLAN STRUCTURE GATE FAILED: $plan_file — $ERRORS"
+    GATE_FAILURES=$((GATE_FAILURES + 1))
+  fi
+done
+```
+
+**If GATE_FAILURES > 0:** CRITICAL — do NOT proceed to execute. Return failure state:
+```json
+{ "status": "failed", "step": "plan", "reason": "Plan structure gate: {N} plan(s) failed validation — missing tdd tasks or ui-qa checkpoints. See gate output above for details." }
+```
+
+Note: The gate runs for BOTH the run path (planner just returned) AND the skip path (plans already existed). If the validation tool itself fails to parse a plan (e.g., tool error), treat as non-blocking and continue — only hard-fail on explicit valid:false responses.
+
 Create checkpoint: `{ step: "plan", status: "complete", plan_count: N }`
 
 **Skip rationale:** Plans may already exist from a previous partial execution. Always prefer existing plans over re-planning to preserve prior decisions.
@@ -1199,6 +1221,18 @@ After each step (discuss, research, plan, execute, verify):
 3. Overwrite previous checkpoint (only latest matters for resume)
 
 **Purpose:** Enable resume from any step on failure. Parent coordinator reads checkpoint to understand where to restart.
+
+**CHECKPOINT.json field semantics (authoritative contract):**
+
+- `step_status: "complete"` — the step RAN to completion. This does NOT mean the phase goal was achieved. For the `verify` step, "complete" only means the verifier agent ran and wrote VERIFICATION.md — the actual outcome is in VERIFICATION.md's `status` field.
+- `step_status: "skipped"` — the step was not needed (e.g., CONTEXT.md already existed, so discuss was skipped).
+- `step_status: "failed"` — the step encountered an error before completing.
+- `last_step` — the most recent step that ran. `last_step: "verify"` means the verify step ran (not that it passed).
+- `resume_from` — which step a restarted coordinator should begin from.
+
+**Outcome authority:** VERIFICATION.md `status` is the authoritative judgment on whether the phase achieved its goal. CHECKPOINT.json only tracks execution lifecycle (what ran), not quality outcome (did it succeed). A coordinator MUST NOT mark a phase as roadmap-complete based on CHECKPOINT.json alone — it must read VERIFICATION.md `status: "passed"`.
+
+**Invariant enforced by tooling:** `gsd-tools.js phase complete` refuses to mark a phase done unless VERIFICATION.md has `status: "passed"`, all PLAN.md files have matching SUMMARY.md files, and CHECKPOINT.json has `last_step: "verify"`. This contract is not advisory — it is a hard gate.
 </checkpoint_protocol>
 
 <return_state>
