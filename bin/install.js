@@ -563,9 +563,11 @@ function generateCodexAgentToml(agentName, agentContent) {
 
   const lines = [
     `sandbox_mode = "${sandboxMode}"`,
-    `developer_instructions = """`,
+    // Agent prompts contain raw backslashes in regexes and shell snippets.
+    // TOML literal multiline strings preserve them without escape parsing.
+    `developer_instructions = '''`,
     instructions,
-    `"""`,
+    `'''`,
   ];
   return lines.join('\n') + '\n';
 }
