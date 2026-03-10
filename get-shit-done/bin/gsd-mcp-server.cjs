@@ -14,25 +14,28 @@
 
 const { createServer, connectTransport } = require('./lib/mcp/server.cjs');
 const { registerCoreTools, registerExtendedTools, CORE_TOOLS, EXTENDED_TOOLS } = require('./lib/mcp/tools.cjs');
+const { registerResources } = require('./lib/mcp/resources.cjs');
 
 async function main() {
   const server = createServer();
 
-  // Register core tier (always available)
+  // Register core tier tools (always available)
   registerCoreTools(server);
 
-  // Register extended tier
-  // Per CONTEXT.md: "extended tier via capability negotiation"
-  // For MVP, always register extended tools (same trust model as CLI)
+  // Register extended tier tools
+  // Per CONTEXT.md: Same trust model as CLI (no auth)
   registerExtendedTools(server);
 
-  // Resources will be registered in plan 12-03
+  // Register resource providers
+  // Per CONTEXT.md: Four resources with fixed URIs
+  registerResources(server);
 
   await connectTransport(server);
 
-  // Log to stderr (stdout is for JSON-RPC)
-  const toolCount = CORE_TOOLS.length + EXTENDED_TOOLS.length;
-  console.error(`[gsd-mcp] Server started with ${toolCount} tools`);
+  // Log to stderr (stdout is JSON-RPC)
+  console.error('[gsd-mcp] Server started');
+  console.error('[gsd-mcp] Tools:', CORE_TOOLS.length + EXTENDED_TOOLS.length);
+  console.error('[gsd-mcp] Resources: 4 (state, roadmap, phase/current, health)');
 }
 
 main().catch((err) => {
