@@ -165,7 +165,7 @@ Plans:
   3. Tools accept same parameters as CLI commands with JSON responses
   4. Resources expose project state (STATE.md, ROADMAP.md, current phase)
   5. Error handling returns structured errors with recovery suggestions
-**Plans:** 1/3 plans complete
+**Plans:** 2/3 plans executed
 
 Plans:
 - [x] 12-01-PLAN.md — Create MCP server scaffold with stdio transport and error envelope pattern
@@ -187,7 +187,7 @@ Phases execute in numeric order: 5 -> 6 -> 6.1 -> 7 -> 8 -> 9
 | 9. Documentation | 2/2 | Complete | 2026-03-10 |
 | 10. Parallel Milestones | 4/4 | Complete    | 2026-03-10 |
 | 11. Document-assisted discuss-phase | 0/2 | Not started | - |
-| 12. MCP Server API | 1/3 | In progress | - |
+| 12. MCP Server API | 2/3 | In Progress|  |
 
 ---
 *Roadmap created: 2026-02-23*
