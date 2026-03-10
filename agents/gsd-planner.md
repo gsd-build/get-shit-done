@@ -817,7 +817,7 @@ ls "$phase_dir"/*-VERIFICATION.md 2>/dev/null
 grep -l "status: diagnosed" "$phase_dir"/*-UAT.md 2>/dev/null
 ```
 
-**2. Parse gaps:** Each gap has: truth (failed behavior), reason, artifacts (files with issues), missing (things to add/fix).
+**2. Parse gaps:** Each gap has: `truth` (failed behavior), `failure_type` (classification), `reason`, `artifacts` (files with issues), `missing` (things to add/fix). If `failure_type` is absent, treat the gap as `missing_artifact` and note it in the plan.
 
 **3. Load existing SUMMARYs** to understand what's already built.
 
@@ -825,17 +825,32 @@ grep -l "status: diagnosed" "$phase_dir"/*-UAT.md 2>/dev/null
 
 **5. Group gaps into plans** by: same artifact, same concern, dependency order (can't wire if artifact is stub → fix stub first).
 
-**6. Create gap closure tasks:**
+**6. Route fix strategy by failure_type, then create gap closure tasks:**
+
+| failure_type | Fix strategy | Task focus |
+|---|---|---|
+| `stub` | Implement the stub fully | Replace placeholder body with real implementation; keep signature and file unchanged |
+| `unwired` | Wire the artifact | Find the call site, add import and invocation; minimal changes outside the artifact itself |
+| `missing_artifact` | Create the artifact | Create the file from scratch; derive spec from gap truth and missing list |
+| `semantic_stub` | Fix the semantic effect | Identify the missing I/O (API call, DB write, state mutation); add the real operation while keeping the handler signature |
+| `broken_chain` | Repair the chain | Find the broken link (missing route, missing step, discarded result); add only the missing link, not a rewrite |
+| `regression` | Revert or re-fix | Find what changed since last passing state (from git log/diff); revert the regression or patch the breaking change |
+| `missing_test` | Add test file | Create test file alongside implementation; assert the observable truth from the gap |
+
+Apply the strategy above when constructing the task action. The task name must start with the failure_type prefix: `[stub] Implement X`, `[unwired] Wire X into Y`, `[missing_artifact] Create X`, etc.
 
 ```xml
-<task name="{fix_description}" type="auto">
+<task name="[{failure_type}] {fix_description}" type="auto">
   <files>{artifact.path}</files>
   <action>
+    Strategy: {fix strategy for this failure_type from routing table above}
+
     {For each item in gap.missing:}
     - {missing item}
 
     Reference existing code: {from SUMMARYs}
     Gap reason: {gap.reason}
+    failure_type: {gap.failure_type}
   </action>
   <verify>{How to confirm gap is closed}</verify>
   <done>{Observable truth now achievable}</done>
@@ -1397,6 +1412,8 @@ Planning complete when:
 - [ ] Gaps clustered into focused plans
 - [ ] Plan numbers sequential after existing
 - [ ] PLAN file(s) exist with gap_closure: true
+- [ ] Each gap closure task name prefixed with failure_type (e.g. [stub], [unwired])
+- [ ] Fix strategy in each task matches the gap's failure_type routing table
 - [ ] Each plan: tasks derived from gap.missing items
 - [ ] PLAN file(s) committed to git
 - [ ] User knows to run `/gsd:execute-phase {X}` next

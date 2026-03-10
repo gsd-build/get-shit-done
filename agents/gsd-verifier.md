@@ -374,6 +374,7 @@ Structure gaps in YAML frontmatter for `/gsd:plan-phase --gaps`:
 gaps:
   - truth: "Observable truth that failed"
     status: failed
+    failure_type: stub          # REQUIRED — one of: stub | unwired | missing_artifact | semantic_stub | broken_chain | regression | missing_test
     reason: "Brief explanation"
     artifacts:
       - path: "src/path/to/file.tsx"
@@ -386,7 +387,32 @@ gaps:
 - `status`: failed | partial
 - `reason`: Brief explanation
 - `artifacts`: Files with issues
+- `failure_type`: Required classification — one of: `stub` | `unwired` | `missing_artifact` | `semantic_stub` | `broken_chain` | `regression` | `missing_test`
 - `missing`: Specific things to add/fix
+
+**failure_type classification (REQUIRED — gaps without this field are malformed):**
+
+| Value | When to use |
+|-------|-------------|
+| `stub` | Artifact exists but is a placeholder — empty return, TODO comment, minimal implementation that does nothing |
+| `unwired` | Artifact exists and is substantive but is not imported or called by anything that needs it |
+| `missing_artifact` | Artifact does not exist at all — file is absent, function not defined |
+| `semantic_stub` | Artifact appears wired but produces no real effect — handler updates only UI state, API call result is discarded, action is no-op |
+| `broken_chain` | A multi-step causal chain has a gap — frontend calls route that doesn't exist, mutation has no persistence, step 1 runs but step 2 is absent |
+| `regression` | A truth that previously passed now fails — confirmed by re-verification mode or test that was previously green |
+| `missing_test` | Implementation exists and functions correctly but has no automated test coverage |
+
+**Assign failure_type inline:** When writing each gap entry, determine which type best describes the root cause. A gap may have only one failure_type. When in doubt, choose the most specific type (e.g. prefer `semantic_stub` over `stub` when the artifact exists but behaves inertly).
+
+**Malformed gap rejection:** Before writing VERIFICATION.md, verify every gap entry has a `failure_type` field set to one of the seven values above. If any gap is missing `failure_type`, set the status to `gaps_found` and add a meta-gap:
+```yaml
+- truth: "All gap entries include a failure_type classification"
+  status: failed
+  failure_type: missing_artifact
+  reason: "One or more gaps were written without a failure_type field"
+  missing:
+    - "Add failure_type to every gap entry before finalizing VERIFICATION.md"
+```
 
 **Group related gaps by concern** — if multiple truths fail from the same root cause, note this to help the planner create focused plans.
 
@@ -621,6 +647,7 @@ re_verification: # Only if previous VERIFICATION.md existed
 gaps: # Only if status: gaps_found
   - truth: "Observable truth that failed"
     status: failed
+    failure_type: stub   # Required: stub | unwired | missing_artifact | semantic_stub | broken_chain | regression | missing_test
     reason: "Why it failed"
     artifacts:
       - path: "src/path/to/file.tsx"
@@ -766,7 +793,7 @@ Key categories: placeholder stubs (TODOs, empty returns), semantic stubs (handle
 - [ ] Test file coverage checked (Step 8d) — implementation files without test counterparts → gaps_found (never warning)
 - [ ] Migration timestamp conflicts checked (Step 8e) — unresolved conflicts → gaps_found (never warning)
 - [ ] Overall status determined
-- [ ] Gaps structured in YAML frontmatter (if gaps_found)
+- [ ] Gaps structured in YAML frontmatter (if gaps_found) — each gap includes failure_type field
 - [ ] Re-verification metadata included (if previous existed)
 - [ ] VERIFICATION.md created with complete report
 - [ ] Results returned to orchestrator (NOT committed)
