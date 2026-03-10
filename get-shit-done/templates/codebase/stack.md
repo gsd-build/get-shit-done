@@ -38,7 +38,7 @@ Template for `.planning/codebase/STACK.md` - captures the technology foundation.
 
 **Testing:**
 - [Framework] [Version] - [e.g., "Jest for unit tests"]
-- [Framework] [Version] - [e.g., "Playwright for E2E"]
+- [Tool] - [e.g., "Charlotte (gsd-charlotte-qa) for UI/UX and E2E testing"]
 
 **Build/Dev:**
 - [Tool] [Version] - [e.g., "Vite for bundling"]

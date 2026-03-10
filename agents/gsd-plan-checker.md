@@ -341,7 +341,7 @@ For each `<task>` in each plan:
 ### Check 8b — Feedback Latency Assessment
 
 For each `<automated>` command:
-- Full E2E suite (playwright, cypress, selenium) → **WARNING** — suggest faster unit/smoke test
+- Full Charlotte E2E suite → **WARNING** — suggest faster unit/smoke test; Charlotte runs locally via gsd-charlotte-qa, not as automated CI
 - Watch mode flags (`--watchAll`) → **BLOCKING FAIL**
 - Delays > 30 seconds → **WARNING**
 
