@@ -21,7 +21,7 @@ animation/
 # Internal planning documents
 reports/
 RAILROAD_ARCHITECTURE.md
-.planning/
+# .planning/
 analysis/
 docs/GSD-MASTER-ARCHITECTURE.md
 docs/GSD-RUST-IMPLEMENTATION-GUIDE.md
@@ -31,8 +31,8 @@ improve.md
 philosophy.md
 
 # Installed skills
-.github/agents/gsd-*
-.github/skills/gsd-*
-.github/get-shit-done/*
-.github/skills/get-shit-done
-.github/copilot-instructions.md
+# .github/agents/gsd-*
+# .github/skills/gsd-*
+# .github/get-shit-done/*
+# .github/skills/get-shit-done
+# .github/copilot-instructions.md
