@@ -617,6 +617,16 @@ PLAN_COUNT=$(ls .planning/phases/{phase_dir}/*-PLAN.md 2>/dev/null | wc -l | tr 
 ```
 If PLAN_COUNT == 0: HARD STOP — return failure state. Never execute a phase without plans on disk.
 
+**Pre-execution dependency drift check (advisory — never blocks execution):**
+```bash
+DRIFT_RESULT=$(node /Users/ollorin/.claude/get-shit-done/bin/gsd-tools.js verify dependency-stability {phase_number} 2>/dev/null || echo '{"drift_detected":false,"error":"drift check unavailable"}')
+```
+
+Parse DRIFT_RESULT JSON:
+- If `drift_detected == true`: Log WARNING: "WARNING: Dependency drift detected for phase {phase_number} — files modified by intervening phases: {list drifted_files[].file and modified_by_phase}. Review if critical before proceeding. Continuing with execution."
+- If `drift_detected == false` (and no error): Log: "Dependency stability check passed — no drift detected"
+- If `error` field present or JSON parse fails: Log: "Dependency stability check skipped: {error}" — continue execution
+
 ```bash
 # Check what plans exist and which have summaries
 node /Users/ollorin/.claude/get-shit-done/bin/gsd-tools.js phase-plan-index {phase_number}
@@ -837,16 +847,25 @@ When the executor agent returns a checkpoint message with `Type: ui-qa`, the coo
 - `what_built`: from the `<what-built>` tag in the checkpoint task
 - `test_flows`: from the `<test-flows>` tag in the checkpoint task
 
-**Before the loop: auto-start dev servers — do NOT ask the user:**
+**Before the loop: auto-start dev servers via service-health — do NOT ask the user:**
 
-Check if servers are up. Try http://localhost:3000 and any other URL mentioned in `what_built`:
+Try the service-health registry first:
 ```bash
-curl -s --max-time 3 http://localhost:3000 > /dev/null 2>&1 && echo UP || echo DOWN
+SH_RESULT=$(node "$HOME/.claude/get-shit-done/bin/gsd-tools.js" service-health start default --raw 2>/dev/null)
+SH_STATUS=$(echo "$SH_RESULT" | node -e "try{const r=JSON.parse(require('fs').readFileSync('/dev/stdin','utf8'));process.stdout.write(r.status||'')}catch{}")
 ```
-If DOWN:
-- NX monorepo (nx.json present): `npx nx dev {app-name}` — app name from `<apps>` tag in checkpoint or infer from CLAUDE.md. Start each app in background.
-- Other: detect from package.json scripts.dev → run in background
-- Wait up to 30s for ready signal. If still DOWN: log warning and proceed (Charlotte will report server errors as test failures, not block the loop).
+
+- If SH_STATUS is `already_running` or `started`: log "Dev server ready via service-health" and proceed to the QA loop.
+- If SH_STATUS is `no_config` or empty (no registry): fall back to inline startup:
+  - Check http://localhost:3000 and any other URL mentioned in `what_built`:
+    ```bash
+    curl -s --max-time 3 http://localhost:3000 > /dev/null 2>&1 && echo UP || echo DOWN
+    ```
+    If DOWN:
+    - NX monorepo (nx.json present): `npx nx dev {app-name}` — app name from `<apps>` tag in checkpoint or infer from CLAUDE.md. Start each app in background.
+    - Other: detect from package.json scripts.dev → run in background
+    - Wait up to 30s for ready signal. If still DOWN: log warning and proceed.
+- If SH_STATUS is `start_timeout`: log warning and proceed (Charlotte will report server errors as test failures).
 
 **Loop (max 3 rounds):**
 
@@ -1075,11 +1094,14 @@ After ALL plans in this phase have completed execution:
 2. If EITHER condition is true: proceed with Charlotte UX sweep (steps 3-5 below)
 
 3. If web UI was produced:
-   a. **Auto-start dev server** — do NOT ask user. Check http://localhost:3000 (or other port from CLAUDE.md):
+   a. **Auto-start dev server via service-health** — do NOT ask user:
       ```bash
-      curl -s --max-time 3 http://localhost:3000 > /dev/null 2>&1 && echo UP || echo DOWN
+      SH_RESULT=$(node "$HOME/.claude/get-shit-done/bin/gsd-tools.js" service-health start default --raw 2>/dev/null)
+      SH_STATUS=$(echo "$SH_RESULT" | node -e "try{const r=JSON.parse(require('fs').readFileSync('/dev/stdin','utf8'));process.stdout.write(r.status||'')}catch{}")
       ```
-      If DOWN: NX monorepo → `npx nx dev {app}` in background; other → `npm run dev` in background. Wait up to 30s.
+      If SH_STATUS is `already_running` or `started`: proceed to step b.
+      If SH_STATUS is `no_config` or empty: fallback — check http://localhost:3000; if DOWN → NX monorepo → `npx nx dev {app}` in background; other → `npm run dev` in background. Wait up to 30s.
+      If SH_STATUS is `start_timeout`: log warning and proceed (Charlotte will surface server errors).
    b. Derive test scope from phase success criteria and SUMMARY.md key-files
    c. Run the Charlotte 3-round loop — mode="ux-audit":
       ```
@@ -1117,7 +1139,7 @@ After post_phase_ux_sweep and before verify_phase_goal:
 2. If E2E_FLOWS is empty or null: skip this step.
 
 3. If E2E_FLOWS has entries:
-   a. **Auto-start dev server** — do NOT ask user. Same pattern as post_phase_ux_sweep step 3a.
+   a. **Auto-start dev server via service-health** — do NOT ask user. Same pattern as post_phase_ux_sweep step 3a — call `service-health start default` first, fall back to inline NX/npm startup if SH_STATUS is `no_config`.
    b. Spawn gsd-charlotte-qa (mode=e2e):
       ```
       Agent(

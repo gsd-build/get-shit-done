@@ -5038,6 +5038,192 @@ function cmdVerifyMigrationTimestamps(cwd, raw) {
   }, raw, conflictsFound === 0 || resolved === conflictsFound ? 'valid' : 'invalid');
 }
 
+// ─── Verify Dependency Stability ──────────────────────────────────────────────
+
+function cmdVerifyDependencyStability(cwd, phaseArg, raw) {
+  if (!phaseArg) {
+    error('phase number required: verify dependency-stability <phase>');
+    return;
+  }
+
+  const phaseNum = parseInt(phaseArg, 10);
+  if (isNaN(phaseNum)) {
+    error('phase must be a number');
+    return;
+  }
+
+  const phasesDir = path.join(cwd, '.planning', 'phases');
+  const roadmapPath = path.join(cwd, '.planning', 'ROADMAP.md');
+
+  // 1. Find the target phase directory
+  const normalized = normalizePhaseName(phaseNum.toString());
+  const allDirs = fs.existsSync(phasesDir) ? fs.readdirSync(phasesDir) : [];
+  const phaseDir = allDirs.find(function(d) { return d.startsWith(normalized + '-') || d === normalized; });
+
+  if (!phaseDir) {
+    output({ error: 'Phase ' + phaseNum + ' directory not found', drift_detected: false }, raw);
+    return;
+  }
+
+  // 2. Read ROADMAP.md to find what phases this phase depends on
+  let dependsOn = [];
+  if (fs.existsSync(roadmapPath)) {
+    const roadmapContent = fs.readFileSync(roadmapPath, 'utf-8');
+    // Find the phase section header
+    const phaseHeaderRe = new RegExp('###\\s+Phase\\s+' + phaseNum + '[^\\d]', 'i');
+    const phaseStart = roadmapContent.search(phaseHeaderRe);
+    if (phaseStart !== -1) {
+      const sectionRest = roadmapContent.slice(phaseStart, phaseStart + 2000);
+      const depsMatch = sectionRest.match(/\*\*Depends on:\*\*\s*([^\n]+)/i);
+      if (depsMatch) {
+        const depsText = depsMatch[1].trim();
+        if (!depsText.toLowerCase().includes('nothing')) {
+          dependsOn = depsText
+            .split(',')
+            .map(function(dep) {
+              const m = dep.match(/Phase\s+(\d+)/);
+              return m ? parseInt(m[1]) : null;
+            })
+            .filter(function(n) { return n !== null; });
+        }
+      }
+    }
+  }
+
+  if (dependsOn.length === 0) {
+    output({
+      phase: phaseNum,
+      depends_on_phases: [],
+      files_checked: [],
+      drifted_files: [],
+      drift_detected: false,
+      message: 'No dependencies to check'
+    }, raw, 'stable');
+    return;
+  }
+
+  // 3. For each depended-on phase, collect files_modified from their PLAN.md frontmatters
+  const allTrackedFiles = new Map(); // file -> depPhaseNum
+  const depsWithNoFiles = [];
+
+  for (const depPhaseNum of dependsOn) {
+    const depNorm = normalizePhaseName(depPhaseNum.toString());
+    const depDir = allDirs.find(function(d) { return d.startsWith(depNorm + '-') || d === depNorm; });
+    if (!depDir) continue;
+
+    const depDirPath = path.join(phasesDir, depDir);
+    let planFiles = [];
+    try { planFiles = fs.readdirSync(depDirPath).filter(function(f) { return f.endsWith('-PLAN.md'); }); } catch (e) {}
+    let foundFiles = false;
+
+    for (const planFile of planFiles) {
+      const planContent = safeReadFile(path.join(depDirPath, planFile));
+      if (!planContent) continue;
+      // Parse YAML frontmatter
+      const fmMatch = planContent.match(/^---\n([\s\S]*?)\n---/);
+      if (!fmMatch) continue;
+      const fm = fmMatch[1];
+      // Extract files_modified list
+      const filesModifiedMatch = fm.match(/files_modified:\s*\n((?:\s+-\s+[^\n]+\n?)*)/);
+      if (filesModifiedMatch) {
+        const lines = filesModifiedMatch[1].split('\n');
+        for (const line of lines) {
+          const fileMatch = line.match(/^\s+-\s+(.+)/);
+          if (fileMatch) {
+            const trackedFile = fileMatch[1].trim().replace(/^["']|["']$/g, '');
+            if (trackedFile) {
+              allTrackedFiles.set(trackedFile, depPhaseNum);
+              foundFiles = true;
+            }
+          }
+        }
+      }
+    }
+
+    if (!foundFiles) depsWithNoFiles.push(depPhaseNum);
+  }
+
+  if (allTrackedFiles.size === 0) {
+    output({
+      phase: phaseNum,
+      depends_on_phases: dependsOn,
+      files_checked: [],
+      drifted_files: [],
+      drift_detected: false,
+      message: 'No tracked files found in depended-on phases (files_modified frontmatter may be absent)',
+      deps_with_no_files: depsWithNoFiles
+    }, raw, 'stable');
+    return;
+  }
+
+  // 4. For each tracked file, check git log for commits not from the origin phase
+  const driftedFiles = [];
+  const filesChecked = Array.from(allTrackedFiles.keys());
+
+  for (const [trackedFile, originPhase] of allTrackedFiles) {
+    const fullFilePath = path.join(cwd, trackedFile);
+    if (!fs.existsSync(fullFilePath)) continue;
+
+    try {
+      const { execSync } = require('child_process');
+      const logOutput = execSync(
+        'git log --oneline --follow -- "' + trackedFile + '"',
+        { cwd: cwd, encoding: 'utf-8', stdio: ['pipe', 'pipe', 'pipe'], timeout: 5000 }
+      ).trim();
+
+      if (!logOutput) continue;
+
+      const originNormStr = normalizePhaseName(originPhase.toString());
+      const targetNormStr = normalizePhaseName(phaseNum.toString());
+
+      const commits = logOutput.split('\n').map(function(line) {
+        const spaceIdx = line.indexOf(' ');
+        return {
+          hash: line.slice(0, spaceIdx).trim(),
+          message: line.slice(spaceIdx + 1).trim()
+        };
+      });
+
+      for (const commit of commits) {
+        const msg = commit.message;
+        const isFromOriginPhase = msg.includes(originNormStr) ||
+          msg.toLowerCase().includes('phase ' + originPhase);
+        const isFromTargetPhase = msg.includes(targetNormStr) ||
+          msg.toLowerCase().includes('phase ' + phaseNum);
+
+        if (!isFromOriginPhase && !isFromTargetPhase) {
+          // Extract phase number from conventional commit message if possible
+          const phaseInMsg = msg.match(/(?:feat|fix|refactor|docs|chore|test)[^(]*\((\d+)/);
+          const modifiedByPhase = phaseInMsg ? phaseInMsg[1] : 'unknown';
+          driftedFiles.push({
+            file: trackedFile,
+            origin_phase: originPhase,
+            modified_by_phase: modifiedByPhase,
+            commit_hash: commit.hash,
+            commit_msg: commit.message
+          });
+          break; // Only report first drift per file
+        }
+      }
+    } catch (gitErr) {
+      // git unavailable or file not tracked — skip silently
+    }
+  }
+
+  const result = {
+    phase: phaseNum,
+    depends_on_phases: dependsOn,
+    files_checked: filesChecked,
+    drifted_files: driftedFiles,
+    drift_detected: driftedFiles.length > 0
+  };
+
+  if (depsWithNoFiles.length > 0) result.deps_with_no_files = depsWithNoFiles;
+
+  output(result, raw, driftedFiles.length > 0 ? 'drift_detected' : 'stable');
+}
+
+
 // ─── Roadmap Analysis ─────────────────────────────────────────────────────────
 
 function cmdRoadmapAnalyze(cwd, raw) {
@@ -9492,8 +9678,10 @@ async function main() {
         cmdVerifyKeyLinks(cwd, args[2], raw);
       } else if (subcommand === 'migration-timestamps') {
         cmdVerifyMigrationTimestamps(cwd, raw);
+      } else if (subcommand === 'dependency-stability') {
+        cmdVerifyDependencyStability(cwd, args[2], raw);
       } else {
-        error('Unknown verify subcommand. Available: plan-structure, phase-completeness, references, commits, artifacts, key-links, migration-timestamps');
+        error('Unknown verify subcommand. Available: plan-structure, phase-completeness, references, commits, artifacts, key-links, migration-timestamps, dependency-stability');
       }
       break;
     }
