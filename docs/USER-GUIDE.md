@@ -211,6 +211,9 @@ rapid prototyping phases where test infrastructure isn't the focus.
 |---------|---------|-------------|
 | `/gsd:health` | Diagnose and fix worktree health issues | Orphaned worktrees, stale locks, incomplete finalization |
 | `/gsd:finalize-phase <N>` | Merge phase branch to main, cleanup worktree | After phase verification with worktree isolation enabled |
+| `/gsd:sync-analyze` | Show upstream commits grouped by directory or feature | Before syncing to understand what changed |
+| `/gsd:sync-preview` | Preview merge conflicts and risk assessment | Before attempting merge |
+| `/gsd:sync-resolve` | Address structural conflicts (renames/deletes) | When preview shows structural issues |
 
 **Worktree Isolation Features:**
 
@@ -229,6 +232,59 @@ rapid prototyping phases where test infrastructure isn't the focus.
 - `2` — Incomplete finalization found
 - `3` — Both types found
 - `4+` — Runtime errors
+
+**Upstream Sync Features (v1.1):**
+
+| Feature | Description |
+|---------|-------------|
+| **Remote Configuration** | Auto-detects existing `upstream` remote or lets you configure one |
+| **Cached Fetch** | 24-hour cache prevents redundant network calls; configurable via `upstream.fetch_interval` |
+| **Commit Grouping** | Group by directory (default) or by conventional commit type (--by-feature) |
+| **Conflict Preview** | Uses git merge-tree to predict conflicts with risk scoring (EASY/MODERATE/HARD) |
+| **Binary Detection** | Categorizes binary changes as safe (images), review (archives), or dangerous (executables) |
+| **Structural Conflicts** | Detects rename/delete conflicts requiring explicit acknowledgment |
+| **Backup Branches** | Auto-creates `backup/pre-sync-YYYY-MM-DD-HHMMSS` before merge |
+| **Atomic Rollback** | Merge failures automatically restore pre-merge state |
+| **Post-Merge Verification** | Runs tests on fork-modified files to catch regressions |
+| **Sync History** | All sync events logged to STATE.md with timestamps |
+
+**Upstream Sync Workflow:**
+
+```mermaid
+flowchart LR
+    subgraph Configure
+        A[upstream configure] --> B[Set remote URL]
+    end
+    subgraph Analyze
+        C[upstream fetch] --> D[upstream status]
+        D --> E[/gsd:sync-analyze]
+        E --> F[/gsd:sync-preview]
+    end
+    subgraph Resolve
+        F --> G{Conflicts?}
+        G -->|Yes| H[/gsd:sync-resolve]
+        H --> I{All acknowledged?}
+        I -->|No| H
+        I -->|Yes| J[Ready to merge]
+        G -->|No| J
+    end
+    subgraph Merge
+        J --> K[upstream merge]
+        K --> L[Post-merge verification]
+        L --> M[Complete]
+    end
+
+    Configure --> Analyze
+```
+
+**Typical workflow:**
+
+1. Check status: `gsd-tools upstream status`
+2. Analyze changes: `/gsd:sync-analyze`
+3. Preview conflicts: `/gsd:sync-preview`
+4. Resolve structural issues: `/gsd:sync-resolve --ack-all` (if any)
+5. Merge: `gsd-tools upstream merge`
+6. Verify tests pass, or rollback if prompted
 
 ---
 
@@ -449,6 +505,76 @@ Since v1.17, the installer backs up locally modified files to `gsd-local-patches
 ### Subagent Appears to Fail but Work Was Done
 
 A known workaround exists for a Claude Code classification bug. GSD's orchestrators (execute-phase, quick) spot-check actual output before reporting failure. If you see a failure message but commits were made, check `git log` -- the work may have succeeded.
+
+### "Upstream not configured"
+
+Run `/gsd:sync-analyze` and see "No upstream configured"? You need to set the upstream remote first:
+
+```bash
+gsd-tools upstream configure https://github.com/original/repo.git
+```
+
+If you already have an `upstream` remote in git, it will be auto-detected on next command.
+
+### Sync preview shows conflicts
+
+The `/gsd:sync-preview` command shows what would conflict if you merged now. Options:
+
+1. **EASY conflicts:** Usually auto-resolvable, proceed with merge
+2. **MODERATE conflicts:** Review the conflict regions shown, decide if you can handle
+3. **HARD conflicts:** Consider cherry-picking specific commits instead, or prepare for manual resolution
+
+After merge, if conflicts occur, resolve them normally with git tools, then `git commit`.
+
+### Structural conflicts blocking merge
+
+Structural conflicts (renames/deletes) require explicit acknowledgment because they can cause silent data loss.
+
+1. Run `/gsd:sync-resolve` to see all structural conflicts
+2. For each conflict, decide if you need to extract changes first
+3. Acknowledge: `/gsd:sync-resolve --ack 1` (or `--ack-all` if you've reviewed all)
+4. Check status: `/gsd:sync-resolve --status` confirms ready to merge
+
+### Sync aborted or merge failed
+
+If a sync was interrupted or merge failed, GSD automatically rolls back. To verify state:
+
+```bash
+gsd-tools upstream abort --status    # Check for in-progress merge
+```
+
+If a merge is stuck:
+
+```bash
+gsd-tools upstream abort             # Abort and restore clean state
+```
+
+To restore from a specific backup branch:
+
+```bash
+gsd-tools upstream abort --restore backup/pre-sync-2026-02-24-143052
+```
+
+### Post-merge tests failing
+
+After merge, GSD runs verification tests on files your fork modified. If tests fail:
+
+1. You're prompted to rollback or keep changes
+2. If you rollback, state returns to pre-merge backup
+3. If you keep, fix the test failures manually before committing
+
+To see which tests would run:
+
+```bash
+gsd-tools test-discovery
+```
+
+### "Cannot sync with active worktrees"
+
+GSD blocks sync when phase worktrees are active to protect in-progress work. Options:
+
+1. **Complete the worktrees:** `/gsd:finalize-phase N` for each active phase
+2. **Force sync (dangerous):** Use `--force` flag if you're sure worktree work won't conflict
 
 ---
 
