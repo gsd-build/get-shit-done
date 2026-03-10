@@ -16,10 +16,10 @@ Requirements for the Autonomous Skill. Each maps to roadmap phases.
 
 ### Smart Discuss (Grey Area Resolution)
 
-- [ ] **DISC-01**: System proposes answers for each grey area instead of open-ended questions, presenting one grey area at a time
-- [ ] **DISC-02**: For each grey area, system presents the questions with recommended answers and alternatives
-- [ ] **DISC-03**: User can accept all proposed answers for a grey area, or change specific ones
-- [ ] **DISC-04**: System writes CONTEXT.md with locked decisions (same format as regular discuss-phase)
+- [x] **DISC-01**: System proposes answers for each grey area instead of open-ended questions, presenting one grey area at a time
+- [x] **DISC-02**: For each grey area, system presents the questions with recommended answers and alternatives
+- [x] **DISC-03**: User can accept all proposed answers for a grey area, or change specific ones
+- [x] **DISC-04**: System writes CONTEXT.md with locked decisions (same format as regular discuss-phase)
 
 ### Phase Execution Chain
 
@@ -64,10 +64,10 @@ _(None — all requirements are in scope for v1.24)_
 | ORCH-02 | Phase 8 | Pending |
 | ORCH-03 | Phase 5 | Complete |
 | ORCH-04 | Phase 8 | Pending |
-| DISC-01 | Phase 6 | Pending |
-| DISC-02 | Phase 6 | Pending |
-| DISC-03 | Phase 6 | Pending |
-| DISC-04 | Phase 6 | Pending |
+| DISC-01 | Phase 6 | Complete |
+| DISC-02 | Phase 6 | Complete |
+| DISC-03 | Phase 6 | Complete |
+| DISC-04 | Phase 6 | Complete |
 | EXEC-01 | Phase 7 | Pending |
 | EXEC-02 | Phase 7 | Pending |
 | EXEC-03 | Phase 7 | Pending |

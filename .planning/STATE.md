@@ -3,14 +3,14 @@ gsd_state_version: 1.0
 milestone: v1.24
 milestone_name: Autonomous Skill
 status: completed
-stopped_at: Completed 05-02-PLAN.md
-last_updated: "2026-03-10T02:18:24.845Z"
-last_activity: 2026-03-10 — Completed 05-02-PLAN.md (autonomous workflow + installer test)
+stopped_at: Completed 06-01-PLAN.md
+last_updated: "2026-03-10T02:46:33.754Z"
+last_activity: 2026-03-10 — Completed 06-01-PLAN.md (smart discuss inline logic)
 progress:
   total_phases: 4
-  completed_phases: 1
-  total_plans: 2
-  completed_plans: 2
+  completed_phases: 2
+  total_plans: 3
+  completed_plans: 3
   percent: 50
 ---
 
@@ -25,10 +25,10 @@ See: .planning/PROJECT.md (updated 2026-03-10)
 
 ## Current Position
 
-Phase: 5 of 8 (Skill Scaffolding & Phase Discovery) — first of 4 phases in v1.24
-Plan: 2 of 2 complete
+Phase: 6 of 8 (Smart Discuss) — second of 4 phases in v1.24
+Plan: 1 of 1 complete
 Status: Phase Complete
-Last activity: 2026-03-10 — Completed 05-02-PLAN.md (autonomous workflow + installer test)
+Last activity: 2026-03-10 — Completed 06-01-PLAN.md (smart discuss inline logic)
 
 Progress: [█████░░░░░] 50%
 
@@ -48,6 +48,7 @@ Progress: [█████░░░░░] 50%
 *Updated after each plan completion*
 | Phase 05 P01 | 5min | 2 tasks | 4 files |
 | Phase 05 P02 | 4min | 2 tasks | 2 files |
+| Phase 06 P01 | 6min | 2 tasks | 1 files |
 
 ## Accumulated Context
 
@@ -63,6 +64,9 @@ Recent decisions affecting current work:
 - [Phase 05]: Both source and runtime copies of roadmap.cjs must be kept in sync
 - [Phase 05]: Workflow uses Skill() flat calls (not Task()) per Issue #686
 - [Phase 05]: Phase discovery re-reads ROADMAP.md after each phase for dynamic phase detection
+- [Phase 06]: Smart discuss replaces Skill(discuss-phase) with inline 5-sub-step logic in autonomous.md
+- [Phase 06]: Infrastructure phases auto-detected by 3-criteria heuristic and skip to minimal CONTEXT.md
+- [Phase 06]: Grey areas presented one at a time in tables with Accept all / Change QN / Discuss deeper UX
 
 ### Pending Todos
 
@@ -74,6 +78,6 @@ None yet.
 
 ## Session Continuity
 
-Last session: 2026-03-10T02:18:24.843Z
-Stopped at: Completed 05-02-PLAN.md
+Last session: 2026-03-10T02:46:33.752Z
+Stopped at: Completed 06-01-PLAN.md
 Resume with: `/gsd-execute-phase 5` (plan 05-02 remaining)
