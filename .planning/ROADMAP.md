@@ -81,7 +81,10 @@ Plans:
   3. After all phases complete, the system automatically runs audit → complete → cleanup for the milestone
   4. The system only pauses for explicit user decisions (grey area acceptance, validation requests, blockers) — no unnecessary confirmation prompts
   5. User can interrupt autonomous execution at any point and resume later from the last completed phase
-**Plans**: TBD
+**Plans:** 1 plan
+
+Plans:
+- [ ] 08-01-PLAN.md — Lifecycle automation + progress bar fix + smart_discuss documentation
 
 ## Progress
 
