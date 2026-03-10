@@ -111,7 +111,11 @@ Plans:
   2. Architecture docs include mermaid diagrams showing sync flow
   3. README documents upstream sync features under GSD Enhancements section
   4. Troubleshooting guide covers common sync issues with recovery steps
-**Plans:** TBD
+**Plans:** 2 plans
+
+Plans:
+- [ ] 09-01-PLAN.md — Extend USER-GUIDE.md with Upstream Sync section, Mermaid diagrams, and troubleshooting
+- [ ] 09-02-PLAN.md — Add Upstream Sync section to README GSD Enhancements
 
 ### Phase 10: Parallel Milestones
 **Goal**: Enable parallel milestone execution with milestone-scoped phases and progress tracking
@@ -162,10 +166,10 @@ Phases execute in numeric order: 5 -> 6 -> 6.1 -> 7 -> 8 -> 9
 | 6.1 Local Modifications Integration | 1/1 | Complete | 2026-02-24 |
 | 7. Merge Operations | 3/3 | Complete    | 2026-02-24 |
 | 8. Interactive & Integration | 4/4 | Complete | 2026-02-24 |
-| 9. Documentation | 0/? | Not started | - |
+| 9. Documentation | 0/2 | Not started | - |
 | 10. Parallel Milestones | 0/4 | Not started | - |
 | 11. Document-assisted discuss-phase | 0/2 | Not started | - |
 
 ---
 *Roadmap created: 2026-02-23*
-*Last updated: 2026-03-07*
+*Last updated: 2026-03-10*
