@@ -717,6 +717,9 @@ function cmdStateSnapshot(cwd, raw) {
     return match ? match[1].trim() : null;
   };
 
+  // Check if this is a parallel milestones project
+  const parallelMilestones = isParallelMilestoneState(content, cwd);
+
   // Extract basic fields
   const currentPhase = extractField('Current Phase');
   const currentPhaseName = extractField('Current Phase Name');
@@ -796,7 +799,57 @@ function cmdStateSnapshot(cwd, raw) {
     blockers,
     paused_at: pausedAt,
     session,
+    parallel_milestones: parallelMilestones,
   };
+
+  // Add milestone data if parallel milestones enabled
+  if (parallelMilestones) {
+    // Parse milestones from STATE.md table
+    const stateMilestones = parseMilestonesTable(content);
+
+    // Merge with listMilestones() for accuracy if milestone-parallel module available
+    let milestones = stateMilestones;
+    try {
+      const milestoneParallel = require('./milestone-parallel.cjs');
+      const diskMilestones = milestoneParallel.listMilestones(cwd);
+
+      // Create map for quick lookup
+      const stateMap = new Map(stateMilestones.map(m => [m.id, m]));
+
+      // Merge - prefer STATE.md for status/blockers, ROADMAP.md for progress
+      milestones = diskMilestones.map(disk => {
+        const state = stateMap.get(disk.id) || {};
+        return {
+          id: disk.id,
+          name: disk.name,
+          status: state.status || disk.status,
+          progress_percent: disk.progress_percent, // Trust ROADMAP.md calculations
+          current_phase: disk.phase_count > 0
+            ? `Phase ${disk.completed_count + 1}/${disk.phase_count}`
+            : state.current_phase || '-',
+          phase_count: disk.phase_count,
+          completed_phases: disk.completed_count,
+          blockers: state.blockers || [],
+        };
+      });
+    } catch {
+      // milestone-parallel module not available, use STATE.md data only
+    }
+
+    result.milestones = milestones;
+    result.current_milestone = getCurrentMilestoneFromState(content);
+
+    // Calculate overall progress across all milestones
+    if (milestones.length > 0) {
+      const totalProgress = milestones.reduce((sum, m) => sum + (m.progress_percent || 0), 0);
+      result.overall_progress = Math.round(totalProgress / milestones.length);
+
+      // Count active milestones
+      result.active_milestone_count = milestones.filter(m =>
+        m.status === 'active' || m.status === 'blocked'
+      ).length;
+    }
+  }
 
   output(result, raw);
 }
