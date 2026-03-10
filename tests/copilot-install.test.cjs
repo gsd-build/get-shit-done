@@ -626,7 +626,7 @@ describe('copyCommandsAsCopilotSkills', () => {
       // Count gsd-* directories — should be 31
       const dirs = fs.readdirSync(tempDir, { withFileTypes: true })
         .filter(e => e.isDirectory() && e.name.startsWith('gsd-'));
-      assert.strictEqual(dirs.length, 32, `expected 32 skill folders, got ${dirs.length}`);
+      assert.strictEqual(dirs.length, 33, `expected 33 skill folders, got ${dirs.length}`);
     } finally {
       fs.rmSync(tempDir, { recursive: true });
     }
@@ -649,6 +649,55 @@ describe('copyCommandsAsCopilotSkills', () => {
     } finally {
       fs.rmSync(tempDir, { recursive: true });
     }
+  });
+
+  test('generates gsd-autonomous skill from autonomous.md command', () => {
+    // Fail-fast: source command must exist
+    const srcFile = path.join(srcDir, 'autonomous.md');
+    assert.ok(fs.existsSync(srcFile), 'commands/gsd/autonomous.md must exist as source');
+
+    const tempDir = fs.mkdtempSync(path.join(os.tmpdir(), 'gsd-copilot-skills-'));
+    try {
+      copyCommandsAsCopilotSkills(srcDir, tempDir, 'gsd');
+
+      // Skill folder and file created
+      assert.ok(fs.existsSync(path.join(tempDir, 'gsd-autonomous')), 'gsd-autonomous folder exists');
+      assert.ok(fs.existsSync(path.join(tempDir, 'gsd-autonomous', 'SKILL.md')), 'gsd-autonomous/SKILL.md exists');
+
+      const skillContent = fs.readFileSync(path.join(tempDir, 'gsd-autonomous', 'SKILL.md'), 'utf8');
+
+      // Frontmatter: name converted from gsd:autonomous to gsd-autonomous
+      assert.ok(skillContent.startsWith('---\nname: gsd-autonomous\n'), 'name is gsd-autonomous');
+      assert.ok(skillContent.includes('description: Run all remaining phases autonomously'),
+        'description preserved');
+      // argument-hint present and double-quoted
+      assert.ok(skillContent.includes('argument-hint: "[--from N]"'), 'argument-hint present and quoted');
+      // allowed-tools comma-separated
+      assert.ok(skillContent.includes('allowed-tools: Read, Write, Bash, Glob, Grep, AskUserQuestion, Task'),
+        'allowed-tools is comma-separated');
+      // No Claude-format remnants
+      assert.ok(!skillContent.includes('allowed-tools:\n  -'), 'NOT YAML multiline format');
+      assert.ok(!skillContent.includes('~/.claude/'), 'no ~/.claude/ references in body');
+    } finally {
+      fs.rmSync(tempDir, { recursive: true });
+    }
+  });
+
+  test('autonomous skill body converts gsd: to gsd- (CONV-07)', () => {
+    // Use convertClaudeToCopilotContent directly on the command body content
+    const srcContent = fs.readFileSync(path.join(srcDir, 'autonomous.md'), 'utf8');
+    const result = convertClaudeToCopilotContent(srcContent);
+
+    // gsd:autonomous references should be converted to gsd-autonomous
+    assert.ok(!result.match(/gsd:[a-z]/), 'no gsd: command references remain after conversion');
+    // Specific: gsd:discuss-phase, gsd:plan-phase, gsd:execute-phase mentioned in body
+    // The body references gsd-tools.cjs (not a gsd: command) — those should be unaffected
+    // But /gsd:autonomous → /gsd-autonomous, gsd:discuss-phase → gsd-discuss-phase etc.
+    if (srcContent.includes('gsd:autonomous')) {
+      assert.ok(result.includes('gsd-autonomous'), 'gsd:autonomous converted to gsd-autonomous');
+    }
+    // Path conversion: ~/.claude/ → .github/
+    assert.ok(!result.includes('~/.claude/'), 'no ~/.claude/ paths remain');
   });
 
   test('cleans up old skill directories on re-run', () => {
@@ -1071,7 +1120,7 @@ const { execFileSync } = require('child_process');
 const crypto = require('crypto');
 
 const INSTALL_PATH = path.join(__dirname, '..', 'bin', 'install.js');
-const EXPECTED_SKILLS = 32;
+const EXPECTED_SKILLS = 33;
 const EXPECTED_AGENTS = 12;
 
 function runCopilotInstall(cwd) {
