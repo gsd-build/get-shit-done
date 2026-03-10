@@ -445,6 +445,125 @@ function getMilestoneInfo(cwd, milestoneId) {
   return result;
 }
 
+// ─── Backward Compatibility Wrappers ──────────────────────────────────────────
+
+/**
+ * Get phases directory, respecting project mode (legacy vs parallel milestones)
+ * @param {string} cwd - Current working directory
+ * @param {string|null} milestoneId - Milestone ID (optional, uses default if parallel project)
+ * @returns {string} Absolute path to phases directory
+ */
+function getProjectPhasesDir(cwd, milestoneId = null) {
+  // If explicit milestone provided, use it
+  if (milestoneId) {
+    const milestonePath = getMilestoneAbsolutePath(cwd, milestoneId);
+    if (milestonePath) {
+      return path.join(milestonePath, 'phases');
+    }
+  }
+
+  // Check if this is a parallel milestone project
+  if (isParallelMilestoneProject(cwd)) {
+    // Try default milestone first
+    const defaultMilestone = getDefaultMilestone(cwd);
+    if (defaultMilestone) {
+      const milestonePath = getMilestoneAbsolutePath(cwd, defaultMilestone);
+      if (milestonePath) {
+        return path.join(milestonePath, 'phases');
+      }
+    }
+  }
+
+  // Legacy mode: use .planning/phases directly
+  return path.join(cwd, '.planning', 'phases');
+}
+
+/**
+ * Get ROADMAP.md path, respecting project mode
+ * @param {string} cwd - Current working directory
+ * @param {string|null} milestoneId - Milestone ID (optional, uses default if parallel project)
+ * @returns {string} Path to ROADMAP.md
+ */
+function getProjectRoadmapPath(cwd, milestoneId = null) {
+  // If explicit milestone provided, use it
+  if (milestoneId) {
+    const milestonePath = getMilestoneAbsolutePath(cwd, milestoneId);
+    if (milestonePath) {
+      return path.join(milestonePath, 'ROADMAP.md');
+    }
+  }
+
+  // Check if this is a parallel milestone project
+  if (isParallelMilestoneProject(cwd)) {
+    const defaultMilestone = getDefaultMilestone(cwd);
+    if (defaultMilestone) {
+      const milestonePath = getMilestoneAbsolutePath(cwd, defaultMilestone);
+      if (milestonePath) {
+        return path.join(milestonePath, 'ROADMAP.md');
+      }
+    }
+  }
+
+  // Legacy mode: use .planning/ROADMAP.md
+  return path.join(cwd, '.planning', 'ROADMAP.md');
+}
+
+/**
+ * Get REQUIREMENTS.md path, respecting project mode
+ * @param {string} cwd - Current working directory
+ * @param {string|null} milestoneId - Milestone ID (optional, uses default if parallel project)
+ * @returns {string} Path to REQUIREMENTS.md
+ */
+function getProjectRequirementsPath(cwd, milestoneId = null) {
+  // If explicit milestone provided, use it
+  if (milestoneId) {
+    const milestonePath = getMilestoneAbsolutePath(cwd, milestoneId);
+    if (milestonePath) {
+      return path.join(milestonePath, 'REQUIREMENTS.md');
+    }
+  }
+
+  // Check if this is a parallel milestone project
+  if (isParallelMilestoneProject(cwd)) {
+    const defaultMilestone = getDefaultMilestone(cwd);
+    if (defaultMilestone) {
+      const milestonePath = getMilestoneAbsolutePath(cwd, defaultMilestone);
+      if (milestonePath) {
+        return path.join(milestonePath, 'REQUIREMENTS.md');
+      }
+    }
+  }
+
+  // Legacy mode: use .planning/REQUIREMENTS.md
+  return path.join(cwd, '.planning', 'REQUIREMENTS.md');
+}
+
+/**
+ * Get STATE.md path (always at root level, not milestone-scoped)
+ * @param {string} cwd - Current working directory
+ * @returns {string} Path to STATE.md
+ */
+function getProjectStatePath(cwd) {
+  return path.join(cwd, '.planning', 'STATE.md');
+}
+
+/**
+ * Determine project mode
+ * @param {string} cwd - Current working directory
+ * @returns {{ mode: 'legacy' | 'parallel', default_milestone: string|null, milestones: Array }}
+ */
+function getProjectMode(cwd) {
+  const isParallel = isParallelMilestoneProject(cwd);
+  const defaultMilestone = isParallel ? getDefaultMilestone(cwd) : null;
+  const milestones = isParallel ? listMilestones(cwd) : [];
+
+  return {
+    mode: isParallel ? 'parallel' : 'legacy',
+    default_milestone: defaultMilestone,
+    milestones,
+  };
+}
+
 // ─── Milestone Config ─────────────────────────────────────────────────────────
 
 /**
@@ -536,6 +655,13 @@ module.exports = {
   setDefaultMilestone,
   getMilestoneInfo,
   loadMilestoneConfig,
+
+  // Backward compatibility wrappers
+  getProjectPhasesDir,
+  getProjectRoadmapPath,
+  getProjectRequirementsPath,
+  getProjectStatePath,
+  getProjectMode,
 
   // CLI handlers
   cmdMilestoneCreate,
