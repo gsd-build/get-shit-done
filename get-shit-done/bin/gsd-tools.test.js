@@ -2580,3 +2580,161 @@ Plans:
     assert.ok(parsed.validation_errors.some(e => e.includes('last_step')), 'Should report wrong last_step');
   });
 });
+
+
+// ─── Phase 35-01: gsd-executor post-plan test gate ───────────────────────────
+
+describe('gsd-executor — post-plan test gate section (Phase 35-01)', () => {
+  const EXECUTOR_PATH = path.join('/Users/ollorin/get-shit-done', 'agents', 'gsd-executor.md');
+
+  test('post_plan_test_gate section exists in executor prompt', () => {
+    const content = fs.readFileSync(EXECUTOR_PATH, 'utf8');
+    assert.ok(content.includes('<post_plan_test_gate>'), 'Missing <post_plan_test_gate> opening tag');
+    assert.ok(content.includes('</post_plan_test_gate>'), 'Missing </post_plan_test_gate> closing tag');
+  });
+
+  test('post_plan_test_gate references test command auto-detection', () => {
+    const content = fs.readFileSync(EXECUTOR_PATH, 'utf8');
+    assert.ok(
+      content.includes('testing.test_command') || content.includes('TEST_CMD'),
+      'Missing test command reference'
+    );
+    assert.ok(content.includes('package.json'), 'Missing package.json reference for test detection');
+  });
+
+  test('post_plan_test_gate references coverage threshold', () => {
+    const content = fs.readFileSync(EXECUTOR_PATH, 'utf8');
+    assert.ok(
+      content.includes('testing.coverage_threshold') || content.includes('COVERAGE_THRESHOLD'),
+      'Missing coverage threshold reference'
+    );
+  });
+
+  test('post_plan_test_gate blocks SUMMARY.md on failure', () => {
+    const content = fs.readFileSync(EXECUTOR_PATH, 'utf8');
+    const start = content.indexOf('<post_plan_test_gate>');
+    const end = content.indexOf('</post_plan_test_gate>');
+    assert.ok(start >= 0 && end > start, 'post_plan_test_gate section not found');
+    const section = content.slice(start, end);
+    assert.ok(
+      section.includes('SUMMARY.md') && (section.includes('BLOCKED') || section.includes('blocked')),
+      'Missing SUMMARY.md blocked language in post_plan_test_gate section'
+    );
+  });
+
+  test('post_plan_test_gate appears before summary_creation', () => {
+    const content = fs.readFileSync(EXECUTOR_PATH, 'utf8');
+    const ptgIdx = content.indexOf('<post_plan_test_gate>');
+    const scIdx = content.indexOf('<summary_creation>');
+    assert.ok(ptgIdx >= 0, 'post_plan_test_gate not found');
+    assert.ok(scIdx >= 0, 'summary_creation not found');
+    assert.ok(ptgIdx < scIdx, 'post_plan_test_gate must appear before summary_creation');
+  });
+});
+
+// ─── Phase 35-02: gsd-phase-coordinator web framework detection ───────────────
+
+describe('gsd-phase-coordinator — web framework detection (Phase 35-02)', () => {
+  const COORDINATOR_PATH = path.join('/Users/ollorin/get-shit-done', 'agents', 'gsd-phase-coordinator.md');
+
+  test('detect_web_framework section exists in coordinator', () => {
+    const content = fs.readFileSync(COORDINATOR_PATH, 'utf8');
+    assert.ok(
+      content.includes('detect_web_framework') || content.includes('WEB_FRAMEWORK_DETECTED'),
+      'Missing detect_web_framework or WEB_FRAMEWORK_DETECTED in coordinator'
+    );
+  });
+
+  test('web framework detection checks for React/Next.js/Vue/Svelte', () => {
+    const content = fs.readFileSync(COORDINATOR_PATH, 'utf8');
+    assert.ok(content.includes('react'), 'Missing react framework check');
+    assert.ok(
+      content.includes('next') || content.includes('vue') || content.includes('svelte'),
+      'Missing next/vue/svelte framework check'
+    );
+  });
+
+  test('post_phase_ux_sweep references WEB_FRAMEWORK_DETECTED', () => {
+    const content = fs.readFileSync(COORDINATOR_PATH, 'utf8');
+    const start = content.indexOf('post_phase_ux_sweep');
+    assert.ok(start >= 0, 'post_phase_ux_sweep not found in coordinator');
+    assert.ok(content.includes('WEB_FRAMEWORK_DETECTED'), 'WEB_FRAMEWORK_DETECTED not referenced in coordinator');
+  });
+
+  test('detect_web_framework appears before post_phase_ux_sweep', () => {
+    const content = fs.readFileSync(COORDINATOR_PATH, 'utf8');
+    const detectIdx = content.indexOf('detect_web_framework');
+    const sweepIdx = content.indexOf('post_phase_ux_sweep');
+    assert.ok(detectIdx >= 0, 'detect_web_framework not found');
+    assert.ok(sweepIdx >= 0, 'post_phase_ux_sweep not found');
+    assert.ok(detectIdx < sweepIdx, 'detect_web_framework must appear before post_phase_ux_sweep');
+  });
+
+  test('sweep trigger uses EITHER condition language', () => {
+    const content = fs.readFileSync(COORDINATOR_PATH, 'utf8');
+    assert.ok(
+      content.includes('EITHER') || content.includes('either'),
+      'Missing EITHER/either language for the OR trigger condition in post_phase_ux_sweep'
+    );
+  });
+});
+
+// ─── Phase 35-03: gsd-verifier hard-fail rules ───────────────────────────────
+
+describe('gsd-verifier — hard-fail rules for QA and test coverage (Phase 35-03)', () => {
+  const VERIFIER_PATH = path.join('/Users/ollorin/get-shit-done', 'agents', 'gsd-verifier.md');
+
+  test('check_charlotte_qa_coverage section exists in verifier', () => {
+    const content = fs.readFileSync(VERIFIER_PATH, 'utf8');
+    assert.ok(content.includes('check_charlotte_qa_coverage'), 'Missing check_charlotte_qa_coverage in verifier');
+  });
+
+  test('Charlotte QA check is documented as gaps_found not warning', () => {
+    const content = fs.readFileSync(VERIFIER_PATH, 'utf8');
+    const start = content.indexOf('check_charlotte_qa_coverage');
+    const end = content.indexOf('check_test_file_coverage');
+    assert.ok(start >= 0, 'check_charlotte_qa_coverage not found');
+    const section = end > start ? content.slice(start, end) : content.slice(start);
+    assert.ok(section.includes('gaps_found'), 'Charlotte QA check must emit gaps_found');
+    assert.ok(
+      section.toLowerCase().includes('never') || section.toLowerCase().includes('not a warning') || section.toLowerCase().includes('hard-fail'),
+      'Charlotte QA check must document that it is never a warning'
+    );
+  });
+
+  test('check_test_file_coverage section exists in verifier', () => {
+    const content = fs.readFileSync(VERIFIER_PATH, 'utf8');
+    assert.ok(content.includes('check_test_file_coverage'), 'Missing check_test_file_coverage in verifier');
+  });
+
+  test('test file check is documented as gaps_found not warning', () => {
+    const content = fs.readFileSync(VERIFIER_PATH, 'utf8');
+    const start = content.indexOf('check_test_file_coverage');
+    assert.ok(start >= 0, 'check_test_file_coverage not found');
+    const section = content.slice(start, start + 3000);
+    assert.ok(section.includes('gaps_found'), 'Test file check must emit gaps_found');
+    assert.ok(
+      section.toUpperCase().includes('NEVER') || section.toLowerCase().includes('not a warning') || section.toLowerCase().includes('hard-fail'),
+      'Test file check must document it is NEVER a warning'
+    );
+  });
+
+  test('check_charlotte_qa_coverage appears before check_test_file_coverage', () => {
+    const content = fs.readFileSync(VERIFIER_PATH, 'utf8');
+    const charlotteIdx = content.indexOf('check_charlotte_qa_coverage');
+    const testIdx = content.indexOf('check_test_file_coverage');
+    assert.ok(charlotteIdx >= 0, 'check_charlotte_qa_coverage not found');
+    assert.ok(testIdx >= 0, 'check_test_file_coverage not found');
+    assert.ok(charlotteIdx < testIdx, 'Charlotte QA check must appear before test file check');
+  });
+
+  test('both checks appear before output section', () => {
+    const content = fs.readFileSync(VERIFIER_PATH, 'utf8');
+    const testIdx = content.indexOf('check_test_file_coverage');
+    const outputIdx = content.indexOf('<output>');
+    assert.ok(testIdx >= 0, 'check_test_file_coverage not found');
+    assert.ok(outputIdx >= 0, '<output> section not found');
+    assert.ok(testIdx < outputIdx, 'check_test_file_coverage must appear before <output>');
+  });
+});
+
