@@ -9,10 +9,10 @@ Requirements for the Autonomous Skill. Each maps to roadmap phases.
 
 ### Autonomous Orchestration
 
-- [ ] **ORCH-01**: User can run `gsd-autonomous` to execute all remaining phases in a milestone sequentially without manual phase-by-phase invocation
-- [ ] **ORCH-02**: User can see progress banners between phases showing what's running and what's next
+- [x] **ORCH-01**: User can run `gsd-autonomous` to execute all remaining phases in a milestone sequentially without manual phase-by-phase invocation
+- [x] **ORCH-02**: User can see progress banners between phases showing what's running and what's next
 - [x] **ORCH-03**: System reads ROADMAP.md to discover all phases and their order, starting from the first incomplete phase
-- [ ] **ORCH-04**: System runs audit → complete → cleanup automatically after all phases finish
+- [x] **ORCH-04**: System runs audit → complete → cleanup automatically after all phases finish
 
 ### Smart Discuss (Grey Area Resolution)
 
@@ -30,9 +30,9 @@ Requirements for the Autonomous Skill. Each maps to roadmap phases.
 
 ### Autonomy Control
 
-- [ ] **CTRL-01**: System only pauses for explicit user decisions (grey area acceptance, validation, blockers)
-- [ ] **CTRL-02**: System provides an emergency stop mechanism (user can interrupt at any point)
-- [ ] **CTRL-03**: System preserves all existing skill logic — delegates to real workflows, doesn't reimplement them
+- [x] **CTRL-01**: System only pauses for explicit user decisions (grey area acceptance, validation, blockers)
+- [x] **CTRL-02**: System provides an emergency stop mechanism (user can interrupt at any point)
+- [x] **CTRL-03**: System preserves all existing skill logic — delegates to real workflows, doesn't reimplement them
 
 ### Artifacts
 
@@ -60,10 +60,10 @@ _(None — all requirements are in scope for v1.24)_
 
 | Requirement | Phase | Status |
 |-------------|-------|--------|
-| ORCH-01 | Phase 8 | Pending |
-| ORCH-02 | Phase 8 | Pending |
+| ORCH-01 | Phase 8 | Complete |
+| ORCH-02 | Phase 8 | Complete |
 | ORCH-03 | Phase 5 | Complete |
-| ORCH-04 | Phase 8 | Pending |
+| ORCH-04 | Phase 8 | Complete |
 | DISC-01 | Phase 6 | Complete |
 | DISC-02 | Phase 6 | Complete |
 | DISC-03 | Phase 6 | Complete |
@@ -72,9 +72,9 @@ _(None — all requirements are in scope for v1.24)_
 | EXEC-02 | Phase 7 | Complete |
 | EXEC-03 | Phase 7 | Complete |
 | EXEC-04 | Phase 7 | Complete |
-| CTRL-01 | Phase 8 | Pending |
-| CTRL-02 | Phase 8 | Pending |
-| CTRL-03 | Phase 8 | Pending |
+| CTRL-01 | Phase 8 | Complete |
+| CTRL-02 | Phase 8 | Complete |
+| CTRL-03 | Phase 8 | Complete |
 | ART-01 | Phase 5 | Complete |
 | ART-02 | Phase 5 | Complete |
 | ART-03 | Phase 5 | Complete |

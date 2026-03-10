@@ -3,14 +3,14 @@ gsd_state_version: 1.0
 milestone: v1.24
 milestone_name: Autonomous Skill
 status: completed
-stopped_at: Completed 07-01-PLAN.md
-last_updated: "2026-03-10T07:54:14.681Z"
-last_activity: 2026-03-10 — Completed 06-01-PLAN.md (smart discuss inline logic)
+stopped_at: Completed 08-01-PLAN.md
+last_updated: "2026-03-10T08:20:41.838Z"
+last_activity: 2026-03-10 — Completed 08-01-PLAN.md (lifecycle step, progress bar fix, smart_discuss doc)
 progress:
   total_phases: 4
-  completed_phases: 3
-  total_plans: 4
-  completed_plans: 4
+  completed_phases: 4
+  total_plans: 5
+  completed_plans: 5
   percent: 50
 ---
 
@@ -25,10 +25,10 @@ See: .planning/PROJECT.md (updated 2026-03-10)
 
 ## Current Position
 
-Phase: 6 of 8 (Smart Discuss) — second of 4 phases in v1.24
+Phase: 8 of 8 (Multi-Phase Orchestration & Lifecycle) — fourth of 4 phases in v1.24
 Plan: 1 of 1 complete
 Status: Phase Complete
-Last activity: 2026-03-10 — Completed 06-01-PLAN.md (smart discuss inline logic)
+Last activity: 2026-03-10 — Completed 08-01-PLAN.md (lifecycle step, progress bar fix, smart_discuss doc)
 
 Progress: [█████░░░░░] 50%
 
@@ -50,6 +50,7 @@ Progress: [█████░░░░░] 50%
 | Phase 05 P02 | 4min | 2 tasks | 2 files |
 | Phase 06 P01 | 6min | 2 tasks | 1 files |
 | Phase 07 P01 | 2min | 2 tasks | 1 files |
+| Phase 08 P01 | 2min | 2 tasks | 1 files |
 
 ## Accumulated Context
 
@@ -70,6 +71,9 @@ Recent decisions affecting current work:
 - [Phase 06]: Grey areas presented one at a time in tables with Accept all / Change QN / Discuss deeper UX
 - [Phase 07]: Used --no-transition flag to let autonomous manage transitions externally
 - [Phase 07]: Gap closure limited to 1 retry to prevent infinite loops
+- [Phase 08]: Lifecycle step uses Skill() flat calls for audit, complete, cleanup with 3-outcome audit routing
+- [Phase 08]: Progress bar uses phase number from ROADMAP / total milestone phases from phase_count
+- [Phase 08]: Smart discuss documented as autonomous-optimized variant with CTRL-03 compliance note
 
 ### Pending Todos
 
@@ -81,6 +85,6 @@ None yet.
 
 ## Session Continuity
 
-Last session: 2026-03-10T07:54:14.679Z
-Stopped at: Completed 07-01-PLAN.md
+Last session: 2026-03-10T08:20:41.836Z
+Stopped at: Completed 08-01-PLAN.md
 Resume with: `/gsd-execute-phase 5` (plan 05-02 remaining)
