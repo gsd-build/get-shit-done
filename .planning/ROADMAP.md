@@ -66,7 +66,10 @@ Plans:
   2. After plan completes for a phase, execute-phase is automatically invoked without the user triggering it
   3. Plan-phase interactions (research questions, plan approval) are surfaced to the user directly within the autonomous flow
   4. After execution, the system asks the user whether validation is needed; if declined, it proceeds to the next phase immediately
-**Plans**: TBD
+**Plans:** 1 plan
+
+Plans:
+- [ ] 07-01-PLAN.md — Phase execution chain: --no-transition flag, verification routing, gap closure cycle
 
 ### Phase 8: Multi-Phase Orchestration & Lifecycle
 **Goal**: The entire milestone runs autonomously from first incomplete phase through cleanup, with progress visibility and user safety controls
