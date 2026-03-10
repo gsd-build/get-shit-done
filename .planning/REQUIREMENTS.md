@@ -49,7 +49,7 @@ Requirements for this milestone. Each maps to roadmap phases.
 
 - [ ] **DOC-01**: User guide documents /gsd:sync-upstream command usage
 - [ ] **DOC-02**: Architecture documentation includes mermaid diagrams for sync flow
-- [ ] **DOC-03**: README documents upstream sync features under GSD Enhancements
+- [x] **DOC-03**: README documents upstream sync features under GSD Enhancements
 - [ ] **DOC-04**: Troubleshooting guide covers common sync issues and recovery
 
 ## Future Requirements
