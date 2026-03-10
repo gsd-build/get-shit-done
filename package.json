@@ -39,6 +39,7 @@
     "node": ">=16.7.0"
   },
   "dependencies": {
+    "@modelcontextprotocol/sdk": "^1.0.0",
     "external-editor": "^3.1.0",
     "mdast-util-heading-range": "^4.0.0",
     "mdast-util-to-string": "^4.0.0",
@@ -47,7 +48,8 @@
     "remark-parse": "^11.0.0",
     "remark-stringify": "^11.0.0",
     "unified": "^11.0.5",
-    "unist-util-visit": "^5.1.0"
+    "unist-util-visit": "^5.1.0",
+    "zod": "^3.25.0"
   },
   "devDependencies": {
     "c8": "^11.0.0",
