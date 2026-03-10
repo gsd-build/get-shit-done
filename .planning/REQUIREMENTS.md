@@ -23,10 +23,10 @@ Requirements for the Autonomous Skill. Each maps to roadmap phases.
 
 ### Phase Execution Chain
 
-- [ ] **EXEC-01**: After discuss completes, system automatically invokes plan-phase for the current phase
-- [ ] **EXEC-02**: After plan completes, system automatically invokes execute-phase for the current phase
-- [ ] **EXEC-03**: If validation is needed after execution, system asks user; otherwise continues to next phase
-- [ ] **EXEC-04**: System handles plan-phase interactions (research questions, plan approval) by asking user directly
+- [x] **EXEC-01**: After discuss completes, system automatically invokes plan-phase for the current phase
+- [x] **EXEC-02**: After plan completes, system automatically invokes execute-phase for the current phase
+- [x] **EXEC-03**: If validation is needed after execution, system asks user; otherwise continues to next phase
+- [x] **EXEC-04**: System handles plan-phase interactions (research questions, plan approval) by asking user directly
 
 ### Autonomy Control
 
@@ -68,10 +68,10 @@ _(None — all requirements are in scope for v1.24)_
 | DISC-02 | Phase 6 | Complete |
 | DISC-03 | Phase 6 | Complete |
 | DISC-04 | Phase 6 | Complete |
-| EXEC-01 | Phase 7 | Pending |
-| EXEC-02 | Phase 7 | Pending |
-| EXEC-03 | Phase 7 | Pending |
-| EXEC-04 | Phase 7 | Pending |
+| EXEC-01 | Phase 7 | Complete |
+| EXEC-02 | Phase 7 | Complete |
+| EXEC-03 | Phase 7 | Complete |
+| EXEC-04 | Phase 7 | Complete |
 | CTRL-01 | Phase 8 | Pending |
 | CTRL-02 | Phase 8 | Pending |
 | CTRL-03 | Phase 8 | Pending |
