@@ -274,7 +274,7 @@ Plans:
   1. Running the PRD Express Path in plan-phase produces a PRD-TRACE.md file mapping each PRD requirement to its REQ-ID; the verifier reads PRD-TRACE.md and flags intent mismatches between the PRD requirement and the implementation SUMMARY.md
   2. When a phase contains multiple waves, the coordinator injects a `<completed_plans_context>` block into each Wave 2+ executor spawn — the block contains the key-files and decisions from each completed plan's SUMMARY.md, not the original plan assumptions
   3. PRD-TRACE.md is included in the audit-milestone cross-reference output alongside REQUIREMENTS.md
-**Plans:** TBD
+**Plans:** 2/2 plans complete
 
 Plans:
 - [ ] 37-01: PRD-TRACE.md generation — add PRD-TRACE.md write step to plan-phase PRD Express Path; update verifier to check intent alignment against PRD-TRACE.md when present
@@ -307,9 +307,9 @@ Plans:
 **Plans:** TBD
 
 Plans:
-- [ ] 39-01: Dependency drift detection — add `verify dependency-stability <phase>` subcommand to gsd-tools.js; wire into coordinator pre-execution check; emit drift report
-- [ ] 39-02: Parallel file conflict detection — update `roadmap analyze` to compute file_conflicts across parallel-eligible phases; add to execution plan confirmation output
-- [ ] 39-03: Inter-task type checking — add tsc step between tasks in executor; one auto-fix retry; log as gap on second failure; never abort plan
+- [x] 39-01: Dependency drift detection — add `verify dependency-stability <phase>` subcommand to gsd-tools.js; wire into coordinator pre-execution check; emit drift report
+- [x] 39-02: Parallel file conflict detection — update `roadmap analyze` to compute file_conflicts across parallel-eligible phases; add to execution plan confirmation output
+- [x] 39-03: Inter-task type checking — add tsc step between tasks in executor; one auto-fix retry; log as gap on second failure; never abort plan
 
 #### Phase 40: Observability & Analytics
 
@@ -366,9 +366,9 @@ Plans:
 | 34. Checkpoint & Plan-Structure Gates | v1.12.0 | Complete    | 2026-03-10 | - |
 | 35. Test & Coverage Enforcement | v1.12.0 | 3/3 | Complete | 2026-03-11 |
 | 36. Migration Safety & Error Taxonomy | 2/2 | Complete    | 2026-03-10 | - |
-| 37. PRD Traceability & Flow Context | v1.12.0 | 0/2 | Not started | - |
+| 37. PRD Traceability & Flow Context | 2/2 | Complete   | 2026-03-10 | - |
 | 38. Dev Server Lifecycle & Knowledge Feedback | v1.12.0 | 0/2 | Not started | - |
-| 39. Execution Intelligence | v1.12.0 | 0/3 | Not started | - |
+| 39. Execution Intelligence | v1.12.0 | 3/3 | Complete | 2026-03-11 |
 | 40. Observability & Analytics | v1.12.0 | 0/2 | Not started | - |
 
 ---

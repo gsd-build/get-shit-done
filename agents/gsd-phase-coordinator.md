@@ -46,6 +46,80 @@ if telegram_topic_id is not null:
   // Append above line to .planning/telegram-sessions/{YYYY-MM-DD}.jsonl
 ```
 
+
+<context_budget_monitoring>
+
+## Context Budget Monitoring
+
+Monitor context window usage at the start of each major step. Initialize these state variables once:
+
+```
+COMPRESSED_MODE_THRESHOLD = 0.60   // 60% -- switch to compressed output mode
+FRESH_SUBAGENT_THRESHOLD = 0.80    // 80% -- consider fresh subagent for verifier
+compressed_mode_notified = false   // track whether 60% notification was sent
+fresh_subagent_notified = false    // track whether 80% notification was sent
+context_budget_pct = 0.0           // current estimated usage percentage
+```
+
+**How to estimate context usage:**
+
+Claude Code reports context window usage in the environment. Check it at the start of each major step (harvest_knowledge, discuss, research, plan, execute each plan, verify). If the runtime does not expose this directly, use a conservative heuristic: estimate 5-10% per major step completed.
+
+**Compressed mode (at >= 60% context usage):**
+
+When context_budget_pct >= COMPRESSED_MODE_THRESHOLD:
+- Switch to terse output: use bullet points only, skip verbose reasoning narration
+- Omit intermediate planning commentary -- act and report results concisely
+- Skip optional diagnostic log messages
+- Send ONE Telegram notification (on first threshold crossing only):
+
+```
+if context_budget_pct >= COMPRESSED_MODE_THRESHOLD AND NOT compressed_mode_notified:
+  if telegram_topic_id is not null:
+    mcp__telegram__send_message({
+      text: "Phase {phase_number}: context at {usage_pct}% -- switching to compressed mode",
+      ...(telegram_topic_id ? { thread_id: telegram_topic_id } : {})
+    })
+  compressed_mode_notified = true
+  // Log to JSONL: {"type":"context_budget","event":"compressed_mode","timestamp":"{ISO}","phase":{N},"usage_pct":{usage_pct}}
+```
+
+**Fresh-subagent consideration (at >= 80% context usage):**
+
+When context_budget_pct >= FRESH_SUBAGENT_THRESHOLD:
+- Before spawning the verifier: create a compact handoff summary containing: phase goal, key decisions made, tasks completed, files modified
+- Pass this handoff summary in the verifier subagent prompt so the verifier has full context without relying on the coordinator context window
+- Send ONE Telegram notification (on first threshold crossing only):
+
+```
+if context_budget_pct >= FRESH_SUBAGENT_THRESHOLD AND NOT fresh_subagent_notified:
+  if telegram_topic_id is not null:
+    mcp__telegram__send_message({
+      text: "Phase {phase_number}: context at {usage_pct}% -- passing handoff summary to verifier",
+      ...(telegram_topic_id ? { thread_id: telegram_topic_id } : {})
+    })
+  fresh_subagent_notified = true
+  // Log to JSONL: {"type":"context_budget","event":"fresh_subagent","timestamp":"{ISO}","phase":{N},"usage_pct":{usage_pct}}
+  // Build handoff_summary:
+  handoff_summary = """
+  Phase {phase_number}: {phase_name}
+  Goal: {phase_goal}
+  Steps completed: {steps_completed}
+  Key decisions: {key_decisions_from_CONTEXT.md}
+  Files modified: {files_modified_so_far}
+  """
+```
+
+**Handoff summary injection in verifier spawn:**
+
+When spawning the verifier subagent (verify step), if fresh_subagent_notified is true:
+- Append the handoff_summary to the verifier prompt under a <context_handoff> tag
+- This ensures the verifier has all required context even when spawned from a nearly-full coordinator context window
+
+**Non-fatal:** Context budget monitoring never blocks execution. If usage cannot be determined, default to 0% and proceed normally.
+
+</context_budget_monitoring>
+
 <step name="harvest_knowledge">
 Mine recent Claude Code sessions for decisions and reasoning before planning begins.
 
