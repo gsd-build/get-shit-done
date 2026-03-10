@@ -1,15 +1,15 @@
 ---
 gsd_state_version: 1.0
-milestone: v1.1
-milestone_name: milestone
-status: completed
-last_updated: "2026-03-10T06:18:38.997Z"
-last_activity: 2026-03-10 — Completed plan 10-04 (Migration Tool & Backward Compatibility)
+milestone: v2.0
+milestone_name: GSD Web Dashboard
+status: in_progress
+last_updated: "2026-03-10T12:00:00.000Z"
+last_activity: 2026-03-10 — Milestone v2.0 started
 progress:
-  total_phases: 12
-  completed_phases: 10
-  total_plans: 31
-  completed_plans: 33
+  total_phases: 0
+  completed_phases: 0
+  total_plans: 0
+  completed_plans: 0
 ---
 
 ## Milestones
@@ -17,33 +17,27 @@ progress:
 | ID | Name | Status | Progress | Current Phase | Blockers |
 |----|------|--------|----------|---------------|----------|
 
-# Project State: GSD v1.1 Upstream Sync
+# Project State: GSD v2.0 Web Dashboard
 
 ## Project Reference
 
-**Core Value:** Enable GSD fork maintainers to stay current with upstream while preserving custom enhancements through intelligent sync tooling.
+**Core Value:** Provide a feature-rich web application that replicates the Claude Code CLI experience with visual progress tracking, real-time AI agent streaming, and interactive checkpoint handling.
 
-**Current Focus:** Phase 10 - Parallel Milestones
+**Current Focus:** Defining requirements
 
 ## Current Position
 
-**Phase:** 10 - Parallel Milestones
-**Plan:** 10-04 complete
-**Status:** Milestone complete
-**Last activity:** 2026-03-10 — Completed plan 10-04 (Migration Tool & Backward Compatibility)
+**Phase:** Not started (defining requirements)
+**Plan:** —
+**Status:** Defining requirements
+**Last activity:** 2026-03-10 — Milestone v2.0 started
 
 ```
-[####################] 100% - Phase 10 plan 04 of 04 complete
+[--------------------] 0% - Defining requirements
 ```
 
 **Phases:**
-- [x] Phase 5: Core Infrastructure (7 requirements) - complete
-- [x] Phase 6: Analysis (4 requirements) - complete
-- [x] Phase 6.1: Local Modifications Integration (INSERTED) - complete
-- [x] Phase 7: Merge Operations (4 requirements) - complete
-- [x] Phase 8: Interactive & Integration (5 requirements) - complete
-- [x] Phase 9: Documentation (4 requirements) - complete
-- [x] Phase 10: Parallel Milestones (10 requirements) - complete
+- [ ] Phases to be defined from PRD
 
 ## Performance Metrics
 
@@ -129,30 +123,9 @@ progress:
 
 ### TODOs
 
-- [x] Define v1.1 requirements
-- [x] Create roadmap
-- [x] Plan Phase 5
-- [x] Execute plan 5-01 (upstream.cjs with configure/fetch)
-- [x] Execute plan 5-02 (status and log commands)
-- [x] Execute plan 5-03 (gsd-tools CLI routing)
-- [x] Execute plan 5-04 (notification check functions)
-- [ ] Execute plan 5-05 (session workflow integration)
-- [x] Execute plan 6-01 (commit grouping by directory)
-- [x] Execute plan 6-02 (conflict preview with risk scoring)
-- [x] Execute plan 6-03 (structural conflict detection)
-- [x] Execute plan 6-04 (CLI routing for analysis commands)
-- [x] Execute plan 06.1-01 (finalize-phase command file)
-- [x] Execute plan 7-01 (sync history and backup branch helpers)
-- [x] Execute plan 7-02 (merge command with safety and rollback)
-- [x] Execute plan 7-03 (abort command for sync cancellation)
-- [x] Execute plan 8-01 (interactive exploration module)
-- [x] Execute plan 8-02 (refactoring suggestions)
-- [x] Execute plan 8-03 (post-merge verification)
-- [x] Execute plan 8-04 (worktree sync guards and health checks)
-- [x] Execute plan 10-01 (milestone directory structure and core commands)
-- [x] Execute plan 10-02 (milestone-scoped workflow commands)
-- [x] Execute plan 10-03 (multi-milestone state tracking)
-- [x] Execute plan 10-04 (migration tool and backward compatibility)
+- [ ] Define v2.0 requirements
+- [ ] Create v2.0 roadmap
+- [ ] Complete Phase 12 (MCP Server API) - prerequisite for Dashboard
 
 ### Blockers
 
@@ -160,12 +133,12 @@ None currently.
 
 ## Session Continuity
 
-**Last Session:** 2026-03-10
-**Context:** Completed plan 10-04 - migration tool with backup/restore, backward compatibility wrappers, and interactive wizard for restructuring legacy projects to parallel milestones.
+**Last Session:** 2026-03-10T12:00:00.000Z
+**Context:** Started milestone v2.0 (GSD Web Dashboard). PRD provided at docs/gsd-dashboard-prd.md with 8 features (F1-F8) covering project dashboard, discuss/plan/execute phase UIs, verification, roadmap viz, settings, and debug support.
 
 **To Resume:**
-1. Phase 10 (Parallel Milestones) complete
-2. All plans executed successfully
+1. Define requirements from PRD
+2. Create v2.0 roadmap (phases start at 13, after MCP Server API)
 
 
 ### Sync History

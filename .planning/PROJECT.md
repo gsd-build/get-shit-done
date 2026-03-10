@@ -8,16 +8,18 @@ A meta-prompting framework that extends AI coding assistants (Claude Code, OpenC
 
 Enable developers to ship faster by providing AI assistants with structured context and clear execution paths — turning "build me an app" into atomic, verifiable tasks with persistent state across sessions.
 
-## Current Milestone: v1.1 Upstream Sync
+## Current Milestone: v2.0 GSD Web Dashboard
 
-**Goal:** Enable GSD fork maintainers to stay current with upstream while preserving custom enhancements.
+**Goal:** Provide a feature-rich web application that replicates and enhances the Claude Code CLI experience with visual progress tracking, real-time AI agent orchestration, and interactive checkpoint handling.
 
 **Target features:**
-- Fetch and analyze upstream commits grouped by feature
-- Deep dive mode for interactive exploration of changes
-- Conflict detection before merge attempt
-- Smart refactoring with diff review before commit
-- Post-merge verification tests
+- Project dashboard with health status and progress visualization
+- Discuss phase UI with chat interface and CONTEXT.md preview
+- Plan phase UI with research streaming, wave visualization, and dependency graphs
+- Execute phase UI with real-time log streaming, tool visualization, and checkpoint dialogs
+- Verify work UI with gap highlighting and approval workflow
+- Roadmap visualizer with Gantt-style timeline and dependency graph
+- Settings and configuration management
 
 ## Requirements
 
@@ -37,11 +39,11 @@ Enable developers to ship faster by providing AI assistants with structured cont
 
 ### Active
 
-- [ ] Upstream sync tooling for GSD forks
+- [x] Upstream sync tooling for GSD forks — v1.1 complete
+- [~] API layer (MCP Server) for programmatic GSD access — Phase 12 in progress
+- [~] GUI/web interface — v2.0 milestone started
 
 ### Out of Scope
-
-- GUI/web interface — CLI-first design, complexity not justified
 - Custom AI model hosting — relies on runtime providers
 - Real-time collaboration — single-developer workflow
 
@@ -75,4 +77,4 @@ This is a brownfield project — GSD is being used to improve itself. The codeba
 | Modular code structure | Match upstream's lib/ pattern for easier merges | Shipped v1.0 |
 
 ---
-*Last updated: 2026-02-23 — Milestone v1.1 started*
+*Last updated: 2026-03-10 — Milestone v2.0 GSD Web Dashboard started*
