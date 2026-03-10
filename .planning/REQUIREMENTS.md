@@ -37,7 +37,7 @@ Requirements for the Autonomous Skill. Each maps to roadmap phases.
 ### Artifacts
 
 - [x] **ART-01**: New command file at `commands/gsd/autonomous.md` following existing frontmatter and section patterns
-- [ ] **ART-02**: New workflow file at `get-shit-done/workflows/autonomous.md` with full orchestration logic
+- [x] **ART-02**: New workflow file at `get-shit-done/workflows/autonomous.md` with full orchestration logic
 - [x] **ART-03**: Command follows existing `name: gsd:autonomous` naming convention so the installer generates the Copilot skill automatically
 
 ## Future Requirements
@@ -76,7 +76,7 @@ _(None — all requirements are in scope for v1.24)_
 | CTRL-02 | Phase 8 | Pending |
 | CTRL-03 | Phase 8 | Pending |
 | ART-01 | Phase 5 | Complete |
-| ART-02 | Phase 5 | Pending |
+| ART-02 | Phase 5 | Complete |
 | ART-03 | Phase 5 | Complete |
 
 **Coverage:**
