@@ -28,12 +28,12 @@ progress:
 ## Current Position
 
 **Phase:** 10 - Parallel Milestones
-**Plan:** 10-01 complete
+**Plan:** 10-02 complete
 **Status:** In progress
-**Last activity:** 2026-03-10 — Completed plan 10-01 (Milestone Directory Structure & Core Commands)
+**Last activity:** 2026-03-10 — Completed plan 10-02 (Milestone-Scoped Workflow Commands)
 
 ```
-[######..............] 25% - Phase 10 plan 01 of 04 complete
+[############........] 50% - Phase 10 plan 02 of 04 complete
 ```
 
 **Phases:**
@@ -150,6 +150,7 @@ progress:
 - [x] Execute plan 8-03 (post-merge verification)
 - [x] Execute plan 8-04 (worktree sync guards and health checks)
 - [x] Execute plan 10-01 (milestone directory structure and core commands)
+- [x] Execute plan 10-02 (milestone-scoped workflow commands)
 - [x] Execute plan 10-03 (multi-milestone state tracking)
 
 ### Blockers
