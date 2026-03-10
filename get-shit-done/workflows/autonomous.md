@@ -157,19 +157,100 @@ Verify plan produced output — re-run `init phase-op` and check `has_plans`. If
 **3c. Execute**
 
 ```
-Skill(skill="gsd:execute-phase", args="${PHASE_NUM}")
+Skill(skill="gsd:execute-phase", args="${PHASE_NUM} --no-transition")
 ```
 
-**3d. Transition**
+**3d. Post-Execution Routing**
 
-Display transition message:
+After execute-phase returns, read the verification result:
 
+```bash
+VERIFY_STATUS=$(grep "^status:" "${PHASE_DIR}"/*-VERIFICATION.md 2>/dev/null | head -1 | cut -d: -f2 | tr -d ' ')
 ```
-Phase {N} ✅ {Name}
-→ Phase {N+1}: {Next Name} — {1-line goal}
+
+Where `PHASE_DIR` comes from the `init phase-op` call already made in step 3a. If the variable is not in scope, re-fetch:
+
+```bash
+PHASE_STATE=$(node "$HOME/.claude/get-shit-done/bin/gsd-tools.cjs" init phase-op ${PHASE_NUM})
+```
+
+Parse `phase_dir` from the JSON.
+
+**If VERIFY_STATUS is empty** (no VERIFICATION.md or no status field):
+
+Go to handle_blocker: "Execute phase ${PHASE_NUM} did not produce verification results."
+
+**If `passed`:**
+
+Display:
+```
+Phase ${PHASE_NUM} ✅ ${PHASE_NAME} — Verification passed
 ```
 
 Proceed to iterate step.
+
+**If `human_needed`:**
+
+Read the human_verification section from VERIFICATION.md to get the count and items requiring manual testing.
+
+Display the items, then ask user via AskUserQuestion:
+- **question:** "Phase ${PHASE_NUM} has items needing manual verification. Validate now or continue to next phase?"
+- **options:** "Validate now" / "Continue without validation"
+
+On **"Validate now"**: Present the specific items from VERIFICATION.md's human_verification section. After user reviews, ask:
+- **question:** "Validation result?"
+- **options:** "All good — continue" / "Found issues"
+
+On "All good — continue": Display `Phase ${PHASE_NUM} ✅ Human validation passed` and proceed to iterate step.
+
+On "Found issues": Go to handle_blocker with the user's reported issues as the description.
+
+On **"Continue without validation"**: Display `Phase ${PHASE_NUM} ⏭ Human validation deferred` and proceed to iterate step.
+
+**If `gaps_found`:**
+
+Read gap summary from VERIFICATION.md (score and missing items). Display:
+```
+⚠ Phase ${PHASE_NUM}: ${PHASE_NAME} — Gaps Found
+Score: {N}/{M} must-haves verified
+```
+
+Ask user via AskUserQuestion:
+- **question:** "Gaps found in phase ${PHASE_NUM}. How to proceed?"
+- **options:** "Run gap closure" / "Continue without fixing" / "Stop autonomous mode"
+
+On **"Run gap closure"**: Execute gap closure cycle (limit: 1 attempt):
+
+```
+Skill(skill="gsd:plan-phase", args="${PHASE_NUM} --gaps")
+```
+
+Verify gap plans were created — re-run `init phase-op ${PHASE_NUM}` and check `has_plans`. If no new gap plans → go to handle_blocker: "Gap closure planning for phase ${PHASE_NUM} did not produce plans."
+
+Re-execute:
+```
+Skill(skill="gsd:execute-phase", args="${PHASE_NUM} --no-transition")
+```
+
+Re-read verification status:
+```bash
+VERIFY_STATUS=$(grep "^status:" "${PHASE_DIR}"/*-VERIFICATION.md 2>/dev/null | head -1 | cut -d: -f2 | tr -d ' ')
+```
+
+If `passed` or `human_needed`: Route normally (continue or ask user as above).
+
+If still `gaps_found` after this retry: Display "Gaps persist after closure attempt." and ask via AskUserQuestion:
+- **question:** "Gap closure did not fully resolve issues. How to proceed?"
+- **options:** "Continue anyway" / "Stop autonomous mode"
+
+On "Continue anyway": Proceed to iterate step.
+On "Stop autonomous mode": Go to handle_blocker.
+
+This limits gap closure to 1 automatic retry to prevent infinite loops.
+
+On **"Continue without fixing"**: Display `Phase ${PHASE_NUM} ⏭ Gaps deferred` and proceed to iterate step.
+
+On **"Stop autonomous mode"**: Go to handle_blocker with "User stopped — gaps remain in phase ${PHASE_NUM}".
 
 </step>
 
@@ -535,6 +616,13 @@ When any phase operation fails or a blocker is detected, present 3 options via A
 - [ ] All incomplete phases executed in order (smart discuss → plan → execute each)
 - [ ] Smart discuss proposes grey area answers in tables, user accepts or overrides per area
 - [ ] Progress banners displayed between phases
+- [ ] Execute-phase invoked with --no-transition (autonomous manages transitions)
+- [ ] Post-execution verification reads VERIFICATION.md and routes on status
+- [ ] Passed verification → automatic continue to next phase
+- [ ] Human-needed verification → user prompted to validate or skip
+- [ ] Gaps-found → user offered gap closure, continue, or stop
+- [ ] Gap closure limited to 1 retry (prevents infinite loops)
+- [ ] Plan-phase and execute-phase failures route to handle_blocker
 - [ ] ROADMAP.md re-read after each phase (catches inserted phases)
 - [ ] STATE.md checked for blockers before each phase
 - [ ] Blockers handled via user choice (retry / skip / stop)
