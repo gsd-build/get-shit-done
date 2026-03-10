@@ -506,6 +506,76 @@ Since v1.17, the installer backs up locally modified files to `gsd-local-patches
 
 A known workaround exists for a Claude Code classification bug. GSD's orchestrators (execute-phase, quick) spot-check actual output before reporting failure. If you see a failure message but commits were made, check `git log` -- the work may have succeeded.
 
+### "Upstream not configured"
+
+Run `/gsd:sync-analyze` and see "No upstream configured"? You need to set the upstream remote first:
+
+```bash
+gsd-tools upstream configure https://github.com/original/repo.git
+```
+
+If you already have an `upstream` remote in git, it will be auto-detected on next command.
+
+### Sync preview shows conflicts
+
+The `/gsd:sync-preview` command shows what would conflict if you merged now. Options:
+
+1. **EASY conflicts:** Usually auto-resolvable, proceed with merge
+2. **MODERATE conflicts:** Review the conflict regions shown, decide if you can handle
+3. **HARD conflicts:** Consider cherry-picking specific commits instead, or prepare for manual resolution
+
+After merge, if conflicts occur, resolve them normally with git tools, then `git commit`.
+
+### Structural conflicts blocking merge
+
+Structural conflicts (renames/deletes) require explicit acknowledgment because they can cause silent data loss.
+
+1. Run `/gsd:sync-resolve` to see all structural conflicts
+2. For each conflict, decide if you need to extract changes first
+3. Acknowledge: `/gsd:sync-resolve --ack 1` (or `--ack-all` if you've reviewed all)
+4. Check status: `/gsd:sync-resolve --status` confirms ready to merge
+
+### Sync aborted or merge failed
+
+If a sync was interrupted or merge failed, GSD automatically rolls back. To verify state:
+
+```bash
+gsd-tools upstream abort --status    # Check for in-progress merge
+```
+
+If a merge is stuck:
+
+```bash
+gsd-tools upstream abort             # Abort and restore clean state
+```
+
+To restore from a specific backup branch:
+
+```bash
+gsd-tools upstream abort --restore backup/pre-sync-2026-02-24-143052
+```
+
+### Post-merge tests failing
+
+After merge, GSD runs verification tests on files your fork modified. If tests fail:
+
+1. You're prompted to rollback or keep changes
+2. If you rollback, state returns to pre-merge backup
+3. If you keep, fix the test failures manually before committing
+
+To see which tests would run:
+
+```bash
+gsd-tools test-discovery
+```
+
+### "Cannot sync with active worktrees"
+
+GSD blocks sync when phase worktrees are active to protect in-progress work. Options:
+
+1. **Complete the worktrees:** `/gsd:finalize-phase N` for each active phase
+2. **Force sync (dangerous):** Use `--force` flag if you're sure worktree work won't conflict
+
 ---
 
 ## Recovery Quick Reference
