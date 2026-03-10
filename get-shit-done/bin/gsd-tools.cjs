@@ -143,6 +143,13 @@
  *     --stopped-at "..."
  *     [--resume-file path]
  *
+ * Multi-Milestone State:
+ *   state set-milestone <id>           Set current milestone context
+ *   state update-milestone <id>        Refresh milestone row from ROADMAP.md
+ *   state add-milestone <id> [name]    Add milestone to STATE.md tracking
+ *   state remove-milestone <id>        Remove milestone from STATE.md tracking
+ *   state get-milestones               List milestones from STATE.md
+ *
  * Compound Commands (workflow-specific initialization):
  *   init execute-phase <phase>         All context for execute-phase workflow
  *   init plan-phase <phase>            All context for plan-phase workflow
@@ -5077,6 +5084,21 @@ async function main() {
           stopped_at: stoppedIdx !== -1 ? args[stoppedIdx + 1] : null,
           resume_file: resumeIdx !== -1 ? args[resumeIdx + 1] : 'None',
         }, raw);
+      } else if (subcommand === 'set-milestone') {
+        // state set-milestone <id> — Set current milestone context
+        state.cmdStateSetMilestone(cwd, args[2], raw);
+      } else if (subcommand === 'update-milestone') {
+        // state update-milestone <id> — Refresh milestone row from ROADMAP.md
+        state.cmdStateUpdateMilestone(cwd, args[2], raw);
+      } else if (subcommand === 'add-milestone') {
+        // state add-milestone <id> [name] — Add milestone to STATE.md tracking
+        state.cmdStateAddMilestone(cwd, args[2], args[3], raw);
+      } else if (subcommand === 'remove-milestone') {
+        // state remove-milestone <id> — Remove milestone from STATE.md tracking
+        state.cmdStateRemoveMilestone(cwd, args[2], raw);
+      } else if (subcommand === 'get-milestones') {
+        // state get-milestones — List milestones from STATE.md
+        state.cmdStateGetMilestones(cwd, raw);
       } else {
         state.cmdStateLoad(cwd, raw);
       }
