@@ -318,6 +318,27 @@ node ~/.claude/get-shit-done/bin/gsd-tools.js execution-log event \
   --data '{"completed_phases": [...], "skipped_phases": [...], "timestamp": "..."}'
 ```
 
+1a. **Auto-run analytics report:**
+
+Run the analytics report immediately after logging roadmap_complete, and print it to coordinator output for the user to review:
+
+```bash
+ANALYTICS_REPORT=$(node ~/.claude/get-shit-done/bin/gsd-tools.js analytics report 2>/dev/null || echo "Analytics report unavailable")
+
+# Append a summary event to the execution log (best-effort)
+REPORT_LINES=$(echo "$ANALYTICS_REPORT" | wc -l | tr -d ' ')
+node ~/.claude/get-shit-done/bin/gsd-tools.js execution-log event \
+  --type analytics_report \
+  --data '{"report_lines": '"$REPORT_LINES"', "auto_generated": true}' 2>/dev/null || true
+
+# Print report to coordinator output
+echo ""
+echo "=== Analytics Report ==="
+echo "$ANALYTICS_REPORT"
+echo "========================"
+echo ""
+```
+
 2. **Send execution complete notification:**
 ```
 if telegram_topic_id is not null:
