@@ -5787,7 +5787,11 @@ function cmdPhaseComplete(cwd, phaseNum, raw) {
     let phaseDirPath = null;
     try {
       const entries = fs.readdirSync(phasesDir, { withFileTypes: true });
-      const re = new RegExp('^' + phaseNum.replace(/./g, '\.') + '-');
+      // Normalize phase number for directory matching (e.g., "1" -> "01")
+      const normalizedPhaseNum = phaseNum.includes('.') ? phaseNum : String(parseInt(phaseNum, 10)).padStart(2, '0');
+      const safePhase = normalizedPhaseNum.replace(/[.]/g, String.fromCharCode(92) + String.fromCharCode(92) + '.');
+      const safePhaseOrig = phaseNum.replace(/[.]/g, String.fromCharCode(92) + String.fromCharCode(92) + '.');
+      const re = new RegExp('^(' + safePhase + '|' + safePhaseOrig + ')-');
       const match = entries.find(e => e.isDirectory() && re.test(e.name));
       if (match) phaseDirPath = path.join(phasesDir, match.name);
     } catch {}
@@ -5804,7 +5808,7 @@ function cmdPhaseComplete(cwd, phaseNum, raw) {
       } else {
         try {
           const verContent = fs.readFileSync(path.join(phaseDirPath, verFile), 'utf-8');
-          const statusMatch = verContent.match(/^status:s*(S+)/m);
+          const statusMatch = verContent.match(/^status:\s*(\S+)/m);
           const verStatus = statusMatch ? statusMatch[1].trim() : 'unknown';
           if (verStatus !== 'passed') {
             completenessErrors.push(`VERIFICATION.md status is ${verStatus} — must be passed before phase complete`);
