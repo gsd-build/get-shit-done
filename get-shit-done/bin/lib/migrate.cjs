@@ -680,6 +680,346 @@ function listBackups(cwd) {
   return results;
 }
 
+// ─── Interactive Wizard ───────────────────────────────────────────────────────
+
+/**
+ * Run interactive migration wizard
+ * @param {string} cwd - Current working directory
+ * @param {Object} options - Wizard options
+ * @returns {Promise<{success: boolean, mapping: Object|null, cancelled: boolean, error?: string}>}
+ */
+async function runMigrationWizard(cwd, options = {}) {
+  const readline = require('readline');
+
+  // Non-interactive mode
+  if (options.nonInteractive) {
+    return runNonInteractiveWizard(cwd, options);
+  }
+
+  const rl = readline.createInterface({
+    input: process.stdin,
+    output: process.stdout,
+  });
+
+  const ask = (question) => new Promise((resolve) => {
+    rl.question(question, (answer) => resolve(answer.trim()));
+  });
+
+  const result = {
+    success: false,
+    mapping: null,
+    cancelled: false,
+  };
+
+  try {
+    console.log('\n\u{1F4CA} Analyzing project structure...\n');
+
+    const analysis = analyzeMigration(cwd);
+
+    if (!analysis.can_migrate) {
+      console.log('Cannot migrate: ' + (analysis.warnings.join(', ') || 'No phases found'));
+      rl.close();
+      return result;
+    }
+
+    if (analysis.has_parallel) {
+      console.log('\u26A0\uFE0F  Warning: Project already has parallel milestones.');
+      const proceed = await ask('Continue anyway? [y/N] ');
+      if (proceed.toLowerCase() !== 'y') {
+        result.cancelled = true;
+        rl.close();
+        return result;
+      }
+    }
+
+    // Display found phases
+    console.log(`Found ${analysis.phases.length} phases in .planning/phases/:`);
+    for (const phase of analysis.phases) {
+      const status = phase.completed ? '\u2713' : ' ';
+      console.log(`  [${status}] ${phase.directory} (${phase.summaries}/${phase.plans} plans)`);
+    }
+    console.log('');
+
+    // Ask how to organize
+    console.log('How would you like to organize these into milestones?\n');
+    console.log('  1. Single milestone (move all to M1)');
+    console.log('  2. Manual grouping (assign each phase)');
+    console.log('  3. Keep as-is (add milestone layer without moving)');
+    console.log('  4. Cancel\n');
+
+    const choice = await ask('> ');
+
+    if (choice === '4' || choice.toLowerCase() === 'cancel' || choice === '') {
+      console.log('\nCancelled.');
+      result.cancelled = true;
+      rl.close();
+      return result;
+    }
+
+    let mapping = {};
+
+    if (choice === '1') {
+      // Single milestone
+      const name = await ask('Milestone name [Migration]: ') || 'Migration';
+      mapping = {
+        'M1': {
+          name,
+          phases: analysis.phases.map(p => p.directory),
+        },
+      };
+
+    } else if (choice === '2') {
+      // Manual grouping
+      console.log('\nAssign phases to milestones.');
+      console.log('Enter milestone ID (e.g., M1) or "new" to create, "skip" to leave in legacy:\n');
+
+      const milestoneNames = {};
+      let nextMilestoneNum = 1;
+
+      for (const phase of analysis.phases) {
+        const answer = await ask(`  ${phase.directory} -> `);
+
+        if (answer.toLowerCase() === 'skip' || answer === '') {
+          if (!mapping.default) mapping.default = [];
+          mapping.default.push(phase.directory);
+          continue;
+        }
+
+        let milestoneId = answer.toUpperCase();
+
+        if (answer.toLowerCase() === 'new') {
+          milestoneId = `M${nextMilestoneNum}`;
+          const mileName = await ask(`    New milestone name: `);
+          milestoneNames[milestoneId] = mileName || `Milestone ${nextMilestoneNum}`;
+          nextMilestoneNum++;
+        }
+
+        if (!/^M\d+$/.test(milestoneId)) {
+          console.log(`    Invalid ID "${answer}", using M${nextMilestoneNum}`);
+          milestoneId = `M${nextMilestoneNum}`;
+          nextMilestoneNum++;
+        }
+
+        if (!mapping[milestoneId]) {
+          mapping[milestoneId] = {
+            name: milestoneNames[milestoneId] || milestoneId,
+            phases: [],
+          };
+        }
+        mapping[milestoneId].phases.push(phase.directory);
+      }
+
+    } else if (choice === '3') {
+      // Keep as-is but add milestone layer
+      console.log('\nAdding milestone structure without moving phases.');
+      const name = await ask('Milestone name [Default]: ') || 'Default';
+      mapping = {
+        'M1': {
+          name,
+          phases: [], // Empty - phases stay in legacy location
+        },
+        default: analysis.phases.map(p => p.directory),
+      };
+
+    } else {
+      console.log('\nInvalid choice. Cancelled.');
+      result.cancelled = true;
+      rl.close();
+      return result;
+    }
+
+    // Show preview
+    console.log('\n--- Preview ---\n');
+    const preview = previewMigration(cwd, mapping);
+
+    for (const action of preview.actions) {
+      if (action.type === 'create_milestone') {
+        console.log(`  CREATE: ${action.path}/`);
+      } else if (action.type === 'move_phase') {
+        console.log(`  MOVE: ${action.from} -> ${action.to}`);
+      } else if (action.type === 'keep_legacy') {
+        console.log(`  KEEP: ${action.path}`);
+      }
+    }
+
+    if (preview.warnings.length > 0) {
+      console.log('\nWarnings:');
+      for (const warning of preview.warnings) {
+        console.log(`  ! ${warning}`);
+      }
+    }
+
+    console.log('');
+    const confirm = await ask('Proceed with migration? [y/N] ');
+
+    if (confirm.toLowerCase() !== 'y') {
+      console.log('\nCancelled.');
+      result.cancelled = true;
+      rl.close();
+      return result;
+    }
+
+    // Execute migration
+    console.log('\nExecuting migration...');
+    const execResult = executeMigration(cwd, mapping, options);
+
+    if (execResult.success) {
+      console.log('\n\u2713 Migration complete!');
+      console.log(`  Backup: ${execResult.backup_path}`);
+      console.log(`  Actions: ${execResult.actions_taken.length}`);
+      result.success = true;
+      result.mapping = mapping;
+    } else {
+      console.log('\n\u2717 Migration failed:');
+      for (const err of execResult.errors) {
+        console.log(`  - ${err}`);
+      }
+      result.error = execResult.errors.join('; ');
+    }
+
+  } catch (err) {
+    result.error = err.message;
+    console.error('\nError:', err.message);
+  } finally {
+    rl.close();
+  }
+
+  return result;
+}
+
+/**
+ * Run non-interactive migration (for scripted use)
+ * @param {string} cwd - Current working directory
+ * @param {Object} options - Options including mapping config
+ * @returns {{success: boolean, mapping: Object|null, cancelled: boolean, error?: string}}
+ */
+function runNonInteractiveWizard(cwd, options = {}) {
+  const result = {
+    success: false,
+    mapping: null,
+    cancelled: false,
+  };
+
+  // If config file provided, load mapping from it
+  if (options.configFile) {
+    try {
+      const configPath = path.isAbsolute(options.configFile)
+        ? options.configFile
+        : path.join(cwd, options.configFile);
+      const config = JSON.parse(fs.readFileSync(configPath, 'utf-8'));
+      result.mapping = config.milestones || config;
+    } catch (err) {
+      result.error = `Failed to load config file: ${err.message}`;
+      return result;
+    }
+  }
+
+  // If auto mode, create default mapping
+  if (options.auto) {
+    const analysis = analyzeMigration(cwd);
+    if (!analysis.can_migrate) {
+      result.error = 'Cannot migrate: ' + (analysis.warnings.join(', ') || 'No phases found');
+      return result;
+    }
+
+    // Auto-detect: all phases in M1
+    result.mapping = {
+      'M1': {
+        name: 'Migration',
+        phases: analysis.phases.map(p => p.directory),
+      },
+    };
+  }
+
+  if (!result.mapping) {
+    result.error = 'No mapping provided. Use --config <file> or --auto';
+    return result;
+  }
+
+  // Execute migration
+  const execResult = executeMigration(cwd, result.mapping, options);
+
+  if (execResult.success) {
+    result.success = true;
+  } else {
+    result.error = execResult.errors.join('; ');
+  }
+
+  return result;
+}
+
+/**
+ * Format migration analysis for display
+ * @param {Object} analysis - Result from analyzeMigration
+ * @returns {string} Formatted output
+ */
+function formatAnalysis(analysis) {
+  const lines = [];
+
+  lines.push(`Can migrate: ${analysis.can_migrate ? 'Yes' : 'No'}`);
+  lines.push(`Has parallel milestones: ${analysis.has_parallel ? 'Yes' : 'No'}`);
+
+  if (analysis.phases.length > 0) {
+    lines.push('');
+    lines.push(`Phases found: ${analysis.phases.length}`);
+    for (const phase of analysis.phases) {
+      const status = phase.completed ? '[complete]' : `[${phase.summaries}/${phase.plans}]`;
+      lines.push(`  ${phase.directory} ${status}`);
+    }
+  }
+
+  if (analysis.warnings.length > 0) {
+    lines.push('');
+    lines.push('Warnings:');
+    for (const warning of analysis.warnings) {
+      lines.push(`  - ${warning}`);
+    }
+  }
+
+  return lines.join('\n');
+}
+
+/**
+ * Format migration preview for display
+ * @param {Object} preview - Result from previewMigration
+ * @returns {string} Formatted output
+ */
+function formatPreview(preview) {
+  const lines = [];
+
+  lines.push(`Actions: ${preview.actions.length}`);
+  lines.push('');
+
+  for (const action of preview.actions) {
+    switch (action.type) {
+      case 'create_milestone':
+        lines.push(`  [CREATE] ${action.path}/`);
+        break;
+      case 'move_phase':
+        lines.push(`  [MOVE]   ${action.from}`);
+        lines.push(`        -> ${action.to}`);
+        break;
+      case 'keep_legacy':
+        lines.push(`  [KEEP]   ${action.path}`);
+        break;
+      case 'create_roadmap':
+      case 'create_requirements':
+        lines.push(`  [FILE]   ${action.path}`);
+        break;
+    }
+  }
+
+  if (preview.warnings.length > 0) {
+    lines.push('');
+    lines.push('Warnings:');
+    for (const warning of preview.warnings) {
+      lines.push(`  ! ${warning}`);
+    }
+  }
+
+  return lines.join('\n');
+}
+
 // ─── Exports ──────────────────────────────────────────────────────────────────
 
 module.exports = {
@@ -689,4 +1029,8 @@ module.exports = {
   restoreMigrationBackup,
   listBackups,
   copyDirectoryRecursive,
+  runMigrationWizard,
+  runNonInteractiveWizard,
+  formatAnalysis,
+  formatPreview,
 };
