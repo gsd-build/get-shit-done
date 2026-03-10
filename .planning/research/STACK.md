@@ -1,319 +1,281 @@
-# Technology Stack: Upstream Sync Tooling
+# Stack Research: GSD Web Dashboard
 
-**Project:** GSD v1.1 - Upstream Sync
-**Researched:** 2026-02-23
-**Focus:** Stack additions/changes for upstream sync features
+**Domain:** Real-time AI agent orchestration dashboard
+**Researched:** 2026-03-10
+**Confidence:** HIGH
+**Supersedes:** Previous STACK.md (Upstream Sync Tooling, 2026-02-23)
 
 ## Executive Summary
 
-Upstream sync tooling requires NO new runtime dependencies. All capabilities can be implemented using:
-1. Native git CLI commands (plumbing + porcelain)
-2. Existing Node.js built-ins (`child_process`, `fs`)
-3. Existing GSD patterns from `gsd-tools.cjs`
+The GSD Web Dashboard requires a stack that enables real-time streaming of AI agent output, WebSocket communication, and rich UI visualization. The stack choices below prioritize:
 
-The key insight: Git already provides all the primitives needed for upstream sync. The work is in orchestrating git commands and parsing their output into actionable UX.
+1. **Integration with existing MCP server** (Phase 12) - direct module imports, not HTTP
+2. **Streaming-first architecture** - SSE/WebSocket for agent output
+3. **Minimal runtime overhead** - aligns with GSD's zero-dep philosophy for CLI
+4. **Developer experience** - TypeScript throughout, modern tooling
 
-**Recommendation:** Add new commands to `gsd-tools.cjs` using the existing `execGit()` helper. Create a new `lib/upstream.cjs` module following the `worktree.cjs` / `health.cjs` pattern.
-
----
+**Key corrections to the PRD/Spec:**
+- Socket.io v5 does not exist - use v4.8.x
+- React 18 is outdated - Next.js 15 requires React 19
+- Tailwind CSS v3 is outdated - v4 is 5x faster
+- Start without BullMQ/Redis - add later if needed
 
 ## Recommended Stack
 
-### Core Git Commands (No Changes Needed)
+### Core Frontend
 
-These git commands form the foundation. All are available in Git 2.17+ (already required by GSD).
+| Technology | Version | Purpose | Why Recommended |
+|------------|---------|---------|-----------------|
+| Next.js | 15.5.x | React framework | Turbopack stable, App Router mature, excellent streaming support, shadcn/ui default |
+| React | 19.2.x | UI library | Activity component for hidden states, improved DevTools, concurrent features stable |
+| TypeScript | 5.5+ | Type safety | Required by all dependencies, improves DX significantly |
+| Tailwind CSS | 4.2.x | Styling | CSS-first config, 5x faster builds, native container queries, OKLCH colors |
 
-| Command | Purpose | Output Format | Confidence |
-|---------|---------|---------------|------------|
-| `git remote add upstream <url>` | Configure upstream | Exit code | HIGH |
-| `git fetch upstream` | Fetch upstream commits | Summary text | HIGH |
-| `git rev-list main..upstream/main` | List commits to sync | Hash per line | HIGH |
-| `git log --format=<fmt>` | Commit details | Custom format | HIGH |
-| `git merge-tree $(git merge-base HEAD upstream/main) HEAD upstream/main` | Conflict preview | Conflict markers | HIGH |
-| `git diff --stat main..upstream/main` | Changed files summary | Stat output | HIGH |
-| `git merge upstream/main --no-ff` | Perform merge | Merge result | HIGH |
-| `git shortlog -s --group=author main..upstream/main` | Group by author | Count + author | HIGH |
+**Note:** The spec suggests React 18, but React 19 is stable since Dec 2024 and required by Next.js 15+.
 
-**Source:** [Git Documentation](https://git-scm.com/docs) - verified current as of 2026-02
+### UI Components
 
-### New GSD Module: `lib/upstream.cjs`
+| Library | Version | Purpose | Why Recommended |
+|---------|---------|---------|-----------------|
+| shadcn/ui | CLI v4 | Component library | React 19 + Tailwind 4 support, AI agent skills built-in, preset system |
+| @xyflow/react | 12.10.x | Dependency graphs | Active development (v12), better than reactflow legacy, node-based UI |
+| @monaco-editor/react | 4.7.0 | Code editor | VS Code parity, React 19 support in rc, file diff viewing |
 
-Following the established pattern from `worktree.cjs` and `health.cjs`:
+**Note:** Use `@xyflow/react` (not `reactflow`) - it's the current actively developed package.
 
-| Component | Purpose | Pattern Reference |
-|-----------|---------|-------------------|
-| `cmdUpstreamConfigure` | Set up upstream remote | Similar to `cmdWorktreeInit` |
-| `cmdUpstreamStatus` | Show behind/ahead count | Uses `git rev-list --count` |
-| `cmdUpstreamFetch` | Fetch and report new commits | Uses `execGit` wrapper |
-| `cmdUpstreamAnalyze` | Parse commits into groups | New logic, outputs JSON |
-| `cmdUpstreamConflicts` | Preview conflicts pre-merge | Uses `git merge-tree` |
-| `cmdUpstreamMerge` | Execute merge with validation | Uses `git merge` |
+### State Management
 
-**Integration:** Module exports functions consumed by main `gsd-tools.cjs` command router.
+| Library | Version | Purpose | Why Recommended |
+|---------|---------|---------|-----------------|
+| Zustand | 5.0.11 | Client state | React 18-19 concurrency support, minimal API, persist middleware |
 
-### Git Plumbing for Conflict Detection
+**Why Zustand over alternatives:**
+- Redux Toolkit: Overkill for single-user dashboard
+- Jotai/Recoil: Atomic state not needed here
+- React Context: Insufficient for WebSocket + streaming state
 
-The `git merge-tree` command (modern `--write-tree` mode, Git 2.38+) enables conflict preview without touching the working tree.
+### Real-Time Communication
+
+| Library | Version | Purpose | Why Recommended |
+|---------|---------|---------|-----------------|
+| Socket.io | 4.8.3 | WebSocket abstraction | Auto-reconnect, room support, fallback to long-polling |
+| socket.io-client | 4.8.3 | Client-side | Typed events, React hooks compatible |
+
+**Important:** Socket.io v5 does not exist yet. The spec's reference to v5 is incorrect - use v4.8.x.
+
+### Backend Core
+
+| Technology | Version | Purpose | Why Recommended |
+|------------|---------|---------|-----------------|
+| Node.js | 22+ LTS | Runtime | Required for ES modules, native fetch, modern APIs |
+| Hono | 4.x | HTTP framework | 3x faster than Express, TypeScript-first, edge-ready |
+
+**Why Hono over Express/Fastify:**
+- Express: Too slow for streaming, no native TypeScript
+- Fastify: Good but Node-only, Hono is edge-ready for future
+- Hono: Fastest cold starts, tiny bundle, modern async handlers
+
+### AI Integration
+
+| Library | Version | Purpose | Why Recommended |
+|---------|---------|---------|-----------------|
+| @anthropic-ai/sdk | 0.78.x | Claude API | Official SDK, streaming via SSE, tool use support |
+| ai (Vercel AI SDK) | 6.x | Streaming helpers | useChat hooks, structured outputs, agent abstraction |
+
+**Critical decision:** Use Vercel AI SDK 6 for streaming UI helpers, but call Anthropic SDK directly for tool execution. AI SDK 6's Agent abstraction simplifies the orchestration loop.
+
+### Job Queue (Optional - Start Without)
+
+| Library | Version | Purpose | When to Add |
+|---------|---------|---------|-------------|
+| BullMQ | 5.70.x | Background jobs | Phase 2+ if execution timeouts become an issue |
+| Redis | 7.x | BullMQ backing | Only if BullMQ adopted |
+
+**Recommendation:** Start without BullMQ. Use direct async execution with AbortController for cancellation. Add queue later if needed for:
+- Execution timeout handling
+- Multiple concurrent project execution
+- Rate limiting Claude API calls
+
+### Database
+
+| Technology | Version | Purpose | Why Recommended |
+|------------|---------|---------|-----------------|
+| better-sqlite3 | 12.6.x | Dev/single-user | Zero-config, fastest SQLite for Node, synchronous API |
+| Drizzle ORM | 0.41.x | Type-safe queries | Best TypeScript DX, works with SQLite and PostgreSQL |
+
+**Why SQLite over PostgreSQL:**
+- Single-user dashboard (per PRD)
+- No Docker/external service needed for dev
+- Can migrate to PostgreSQL later via Drizzle's dialect support
+
+### Monorepo & Build
+
+| Tool | Version | Purpose | Why Recommended |
+|------|---------|---------|-----------------|
+| pnpm | 10.32.x | Package manager | 87% disk savings, fastest installs, workspace support |
+| Turborepo | 2.8.x | Build orchestration | Rust-based, parallel tasks, remote caching |
+
+### Testing
+
+| Tool | Version | Purpose | Coverage |
+|------|---------|---------|----------|
+| Vitest | 4.0.x | Unit/integration | 80% target, Vite-native, Jest compatible |
+| @testing-library/react | 16.x | Component testing | RTL standard |
+| Playwright | 1.59.x | E2E testing | Cross-browser, auto-waiting |
+
+### Validation
+
+| Library | Version | Purpose | Why Recommended |
+|---------|---------|---------|-----------------|
+| Zod | 4.3.x | Schema validation | 6.5x faster than v3, TypeScript inference |
+
+**Note:** Zod v4 is significantly faster. Use `zod/v4` imports.
+
+## Installation
 
 ```bash
-# Modern syntax (Git 2.38+)
-git merge-tree --write-tree HEAD upstream/main
+# Create monorepo
+pnpm create turbo@latest gsd-dashboard --example with-shadcn-ui
 
-# Legacy fallback (Git 2.17+)
-git merge-tree $(git merge-base HEAD upstream/main) HEAD upstream/main
+# Core dependencies (packages/web)
+pnpm add react@19 react-dom@19 next@15 zustand@5
+pnpm add @xyflow/react @monaco-editor/react socket.io-client
+pnpm add tailwindcss@4 -D
+
+# UI components
+pnpm dlx shadcn@latest init --preset minimal
+
+# Backend dependencies (packages/server)
+pnpm add hono @hono/node-server socket.io
+pnpm add @anthropic-ai/sdk ai
+pnpm add better-sqlite3 drizzle-orm
+pnpm add zod
+
+# Dev dependencies
+pnpm add -D typescript @types/node @types/better-sqlite3
+pnpm add -D vitest @testing-library/react @playwright/test
+pnpm add -D drizzle-kit
 ```
 
-**Output parsing:**
-- Exit code 0 = clean merge possible
-- Exit code 1 = conflicts exist
-- Stdout contains tree OID and conflict file list
+## What NOT to Use
 
-**Confidence:** HIGH - Verified via [git-merge-tree documentation](https://git-scm.com/docs/git-merge-tree)
+| Avoid | Why | Use Instead |
+|-------|-----|-------------|
+| Socket.io v5 | Does not exist | Socket.io 4.8.x |
+| reactflow | Legacy, maintenance mode | @xyflow/react (v12) |
+| Express | Slow, no native TypeScript | Hono |
+| React 18 | Next.js 15 requires React 19 | React 19.2.x |
+| Tailwind CSS v3 | v4 is 5x faster, better DX | Tailwind CSS 4.2.x |
+| Zod v3 | 6.5x slower than v4 | Zod 4.3.x |
+| BullMQ (initially) | Premature complexity | Direct async + AbortController |
+| PostgreSQL (initially) | Requires Docker setup | better-sqlite3, migrate later |
 
-### Commit Analysis Strategy
+## Integration with Existing GSD
 
-#### Grouping Commits by Directory
+### MCP Server Integration (Phase 12)
 
-Git doesn't have built-in commit grouping by file/directory. Implement via `git log` with custom format:
+The dashboard server should import GSD lib modules directly, NOT via HTTP:
 
-```bash
-# Get commits with primary directory touched
-git log --format="%H" main..upstream/main | while read hash; do
-  primary_dir=$(git diff-tree --no-commit-id --name-only -r "$hash" | cut -d/ -f1 | sort | uniq -c | sort -rn | head -1 | awk '{print $2}')
-  echo "$hash:$primary_dir"
-done
+```typescript
+// packages/server/src/gsd/wrapper.ts
+import { cmdStateSnapshot } from '../../get-shit-done/bin/lib/state.cjs';
+import { cmdHealth } from '../../get-shit-done/bin/lib/health.cjs';
+import { cmdPhasePlanIndex } from '../../get-shit-done/bin/lib/phase.cjs';
 ```
 
-**Alternative:** Use `--name-only` and parse in JavaScript for better control.
+**Why direct imports:**
+- MCP Server uses stdio transport (not HTTP)
+- Dashboard runs on same machine as GSD
+- Avoids serialization overhead
+- Type safety via JSDoc or .d.ts files
 
-**Confidence:** MEDIUM - Custom implementation, but uses stable git primitives
+### gsd-tools.cjs Commands Available
 
-#### Conventional Commit Parsing
+The dashboard can call any gsd-tools.cjs command via child_process, but prefer direct lib imports for:
+- `state load/json/get/update` - via state.cjs
+- `health validate` - via health.cjs
+- `roadmap analyze` - via roadmap.cjs
+- `phase-plan-index` - via phase.cjs
 
-For commit messages following conventional commits format, use regex parsing:
+### Shared Types
 
-```javascript
-// Pattern for conventional commits
-const conventionalPattern = /^(?<type>\w+)(?:\((?<scope>[^()]+)\))?(?<breaking>!)?:\s*(?<description>.+)/;
-```
+Create a shared types package:
 
-**Source:** [Conventional Commits Regex (GitHub Gist)](https://gist.github.com/marcojahn/482410b728c31b221b70ea6d2c433f0c)
+```typescript
+// packages/shared/src/types.ts
+export interface GsdProject {
+  path: string;
+  name: string;
+  milestone: string;
+  currentPhase: number;
+  progress: number;
+  health: 'healthy' | 'degraded' | 'error';
+}
 
-**Confidence:** HIGH - Well-established pattern, works with existing GSD commit conventions
-
----
-
-## Integration Points with Existing GSD Code
-
-### Existing Patterns to Reuse
-
-| Pattern | Location | How to Reuse |
-|---------|----------|--------------|
-| `execGit(cwd, args)` | gsd-tools.cjs:243 | Use for all git command execution |
-| `loadConfig(cwd)` | gsd-tools.cjs:178 | Check for upstream sync settings |
-| `output(data, raw, plaintext)` | Throughout | Consistent JSON/human output |
-| `error(message)` | Throughout | Consistent error handling |
-| Module structure | lib/worktree.cjs | Follow export pattern |
-| State persistence | STATE.md patterns | Log sync events |
-
-### New Config Fields
-
-Add to `.planning/config.json`:
-
-```json
-{
-  "upstream": {
-    "remote_name": "upstream",
-    "remote_url": null,
-    "default_branch": "main",
-    "merge_strategy": "merge",
-    "auto_verify": true
-  }
+export interface PhaseState {
+  phase: number;
+  name: string;
+  status: 'pending' | 'in-progress' | 'complete';
+  plans: PlanState[];
 }
 ```
 
-**Confidence:** HIGH - Follows existing config.json structure
+## Alternatives Considered
 
-### STATE.md Integration
+| Recommended | Alternative | When to Use Alternative |
+|-------------|-------------|-------------------------|
+| Hono | Fastify | If you need maximum Node.js optimization (no edge) |
+| Next.js | Vite + React Router | If you want SPA without SSR |
+| Zustand | Jotai | If you need atomic state for complex forms |
+| better-sqlite3 | PostgreSQL | Multi-user deployment, need concurrent writes |
+| Socket.io | native WebSocket | If you don't need auto-reconnect/rooms |
+| Turborepo | Nx | If you need more build analysis tools |
 
-Track upstream sync state in Implementation Notes section:
+## Version Compatibility Matrix
 
-```markdown
-## Implementation Notes
-- [2026-02-23] Upstream sync: Merged 15 commits from upstream/main (abc123..def456)
-```
+| Package A | Compatible With | Notes |
+|-----------|-----------------|-------|
+| Next.js 15.5.x | React 19.2.x | Required pairing |
+| shadcn/ui CLI v4 | Tailwind CSS 4.x | Uses unified radix-ui package |
+| @xyflow/react 12.x | React 18-19 | Both supported |
+| Vitest 4.x | Vite 6.x | Auto-detected |
+| better-sqlite3 12.x | Node 22+ | Prebuilt binaries available |
 
----
+## Stack Variants
 
-## Git Commands by Feature
+**Minimal MVP (recommended start):**
+- Next.js + shadcn/ui + Zustand
+- Hono + Socket.io
+- better-sqlite3 + Drizzle
+- Direct GSD lib imports
+- No BullMQ, no Redis
 
-### Feature: `upstream configure <url>`
-
-```bash
-git remote add upstream "$URL" 2>/dev/null || git remote set-url upstream "$URL"
-git fetch upstream --tags
-```
-
-### Feature: `upstream status`
-
-```bash
-# Behind count (commits upstream has that we don't)
-git rev-list --count HEAD..upstream/main
-
-# Ahead count (commits we have that upstream doesn't)
-git rev-list --count upstream/main..HEAD
-
-# Last sync (when upstream/main was last fetched)
-git log -1 --format="%ci" upstream/main
-```
-
-### Feature: `upstream log` (grouped)
-
-```bash
-# Raw commit data in parseable format
-git log --format="COMMIT:%H%nAUTHOR:%an%nDATE:%ci%nSUBJECT:%s%nFILES:" main..upstream/main
-git diff-tree --no-commit-id --name-only -r <hash>
-```
-
-Parse output in JavaScript to group by:
-1. Primary directory (most files touched)
-2. Conventional commit type (feat, fix, docs, etc.)
-3. Author
-
-### Feature: `upstream conflicts`
-
-```bash
-# Modern (Git 2.38+) - preferred
-git merge-tree --write-tree HEAD upstream/main
-
-# Exit code: 0 = clean, 1 = conflicts
-# Output: <tree-oid>\n<conflicted-file-info>
-```
-
-Parse output:
-```javascript
-const result = execGit(cwd, ['merge-tree', '--write-tree', 'HEAD', 'upstream/main']);
-const lines = result.stdout.split('\n');
-const treeOid = lines[0];
-const hasConflicts = result.exitCode !== 0;
-const conflictedFiles = lines.slice(1).filter(l => l.includes('CONFLICT'));
-```
-
-### Feature: `upstream merge`
-
-```bash
-# Pre-checks
-git diff --quiet || error "Working tree not clean"
-git diff --cached --quiet || error "Index not clean"
-
-# Fetch latest
-git fetch upstream
-
-# Merge with descriptive message
-git merge upstream/main --no-ff -m "sync: Merge upstream changes
-
-Commits merged: $(git rev-list --count HEAD..upstream/main)
-Range: $(git rev-parse --short HEAD)..$(git rev-parse --short upstream/main)"
-```
-
----
-
-## What NOT to Add
-
-### No External Dependencies
-
-GSD constraint: zero runtime dependencies. These are explicitly rejected:
-
-| Library | Why Tempting | Why Rejected |
-|---------|--------------|--------------|
-| `simple-git` | Nice Promise API | Runtime dependency |
-| `parse-diff` | Easy diff parsing | Runtime dependency |
-| `conventional-commits-parser` | Commit message parsing | Runtime dependency |
-| `isomorphic-git` | Pure JS git | Runtime dependency, massive |
-| `nodegit` | Native bindings | Native dependency, complex |
-
-**Instead:** Parse git output directly. Git's `--porcelain` and format options provide stable, machine-readable output.
-
-### No New Binary Tools
-
-| Tool | Why Tempting | Why Rejected |
-|------|--------------|--------------|
-| `gh` (GitHub CLI) | PR creation | Adds GitHub dependency to git tool |
-| `delta` | Pretty diffs | Not available everywhere |
-| `tig` | Interactive git | TUI complexity |
-
-**Instead:** Use standard git commands. Let users invoke `gh` separately if needed.
-
-### No Database/Persistence
-
-| Approach | Why Tempting | Why Rejected |
-|----------|--------------|--------------|
-| SQLite for commit cache | Fast repeat queries | Runtime dependency |
-| Redis for state | Shared state across sessions | Overkill, external service |
-
-**Instead:** Use existing STATE.md and ephemeral JSON output. Git is the source of truth.
-
----
-
-## Version Requirements
-
-| Component | Minimum Version | Required For | Check Command |
-|-----------|-----------------|--------------|---------------|
-| Git | 2.17 | `worktree --lock` | `git --version` |
-| Git | 2.38 | `merge-tree --write-tree` | (falls back gracefully) |
-| Node.js | 18.0 | Built-in fetch, modern APIs | `node --version` |
-
-**Fallback strategy:** If `git merge-tree --write-tree` fails (Git < 2.38), use legacy three-tree syntax:
-```bash
-git merge-tree $(git merge-base HEAD upstream/main) HEAD upstream/main
-```
-
----
-
-## Implementation Roadmap
-
-### Phase 1: Core Module Structure
-
-1. Create `lib/upstream.cjs` following `worktree.cjs` pattern
-2. Add upstream command routing to `gsd-tools.cjs`
-3. Implement `cmdUpstreamConfigure`, `cmdUpstreamStatus`
-
-### Phase 2: Analysis Commands
-
-4. Implement `cmdUpstreamFetch` with commit counting
-5. Implement `cmdUpstreamAnalyze` with grouping logic
-6. Implement `cmdUpstreamConflicts` using merge-tree
-
-### Phase 3: Merge Operations
-
-7. Implement `cmdUpstreamMerge` with pre-checks
-8. Add STATE.md logging for sync events
-9. Integration with `/gsd:verify-work` for post-merge validation
-
----
+**Full Production:**
+- Add BullMQ + Redis for job queue
+- Add PostgreSQL via Drizzle migration
+- Add auth layer (NextAuth or Clerk)
+- Add monitoring (Sentry)
 
 ## Sources
 
-### Authoritative (HIGH Confidence)
-
-- [Git Documentation - git-merge-tree](https://git-scm.com/docs/git-merge-tree) - Conflict detection
-- [Git Documentation - git-rev-list](https://git-scm.com/docs/git-rev-list) - Commit range filtering
-- [Git Documentation - git-shortlog](https://git-scm.com/docs/git-shortlog) - Commit grouping
-- [Git Documentation - git-diff-tree](https://git-scm.com/docs/git-diff-tree) - File changes per commit
-- [GitHub Docs - Syncing a fork](https://docs.github.com/articles/syncing-a-fork) - Standard workflow
-
-### Community Patterns (MEDIUM Confidence)
-
-- [Atlassian - Git Upstreams and Forks](https://www.atlassian.com/git/tutorials/git-forks-and-upstreams) - Workflow guide
-- [Conventional Commits Regex](https://gist.github.com/marcojahn/482410b728c31b221b70ea6d2c433f0c) - Commit parsing
-- [GitHub Community - Fork Sync Best Practices](https://github.com/orgs/community/discussions/153608) - Community discussion
-
-### Existing GSD Code (HIGH Confidence)
-
-- `gsd-tools.cjs` - Command structure, `execGit()` pattern
-- `lib/worktree.cjs` - Module structure pattern
-- `lib/health.cjs` - Complex logic module pattern
+- [Next.js 15 Release](https://nextjs.org/blog/next-15) - HIGH confidence
+- [React 19 Blog](https://react.dev/blog/2024/12/05/react-19) - HIGH confidence
+- [shadcn/ui Changelog](https://ui.shadcn.com/docs/changelog) - HIGH confidence
+- [Tailwind CSS v4](https://tailwindcss.com/blog/tailwindcss-v4) - HIGH confidence
+- [Socket.io npm](https://www.npmjs.com/package/socket.io) - HIGH confidence (v4.8.3, not v5)
+- [@anthropic-ai/sdk npm](https://www.npmjs.com/package/@anthropic-ai/sdk) - HIGH confidence
+- [Vercel AI SDK 6](https://vercel.com/blog/ai-sdk-6) - HIGH confidence
+- [@xyflow/react npm](https://www.npmjs.com/package/@xyflow/react) - HIGH confidence
+- [Zustand npm](https://www.npmjs.com/package/zustand) - HIGH confidence
+- [BullMQ npm](https://www.npmjs.com/package/bullmq) - HIGH confidence
+- [better-sqlite3 npm](https://www.npmjs.com/package/better-sqlite3) - HIGH confidence
+- [Hono vs Fastify vs Express](https://betterstack.com/community/guides/scaling-nodejs/fastify-vs-express-vs-hono/) - MEDIUM confidence
+- [pnpm npm](https://www.npmjs.com/package/pnpm) - HIGH confidence
+- [Turborepo npm](https://www.npmjs.com/package/turbo) - HIGH confidence
+- [Vitest npm](https://www.npmjs.com/package/vitest) - HIGH confidence
+- [Playwright npm](https://www.npmjs.com/package/@playwright/test) - HIGH confidence
+- [Zod npm](https://www.npmjs.com/package/zod) - HIGH confidence
 
 ---
-
-*Stack research for upstream sync: 2026-02-23*
+*Stack research for: GSD Web Dashboard*
+*Researched: 2026-03-10*
