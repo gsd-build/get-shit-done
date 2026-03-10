@@ -1030,12 +1030,49 @@ while round <= MAX_ROUNDS AND qa_passed == false:
 
 </checkpoint_ui_qa_loop>
 
+<detect_web_framework>
+
+## Detect Web Framework
+
+Before running the post-phase UX sweep, detect if this is a web project by checking package.json. This runs unconditionally — regardless of what file extensions appear in SUMMARY.md.
+
+```bash
+WEB_FRAMEWORK_DETECTED=false
+WEB_FRAMEWORK_NAME=""
+
+if [ -f "package.json" ]; then
+  FRAMEWORK=$(node -e "
+    try {
+      const p = require('./package.json');
+      const deps = Object.assign({}, p.dependencies || {}, p.devDependencies || {});
+      const frameworks = ['react', 'next', 'vue', 'svelte', '@angular/core', 'nuxt', 'gatsby', 'remix', '@remix-run/react', 'solid-js', 'preact'];
+      const found = frameworks.find(function(f) { return deps[f]; });
+      console.log(found || '');
+    } catch(e) { console.log(''); }
+  " 2>/dev/null || echo "")
+
+  if [ -n "$FRAMEWORK" ]; then
+    WEB_FRAMEWORK_DETECTED=true
+    WEB_FRAMEWORK_NAME="$FRAMEWORK"
+    Log: "Web framework detected: ${WEB_FRAMEWORK_NAME} — Charlotte UX sweep will run unconditionally"
+  fi
+fi
+```
+
+If WEB_FRAMEWORK_DETECTED=true: Charlotte UX sweep runs unconditionally for this phase, regardless of whether any .tsx/.jsx files appear in SUMMARY.md. This ensures web projects always get QA coverage.
+
+</detect_web_framework>
+
+
 <step name="post_phase_ux_sweep">
 
 After ALL plans in this phase have completed execution:
 
-1. Scan all SUMMARY.md files from this phase for `.tsx`, `.jsx`, `.vue`, `.svelte` files in key-files
-2. If any found: this phase produced web UI
+1. Detect if this phase produced web UI. Either condition triggers the sweep:
+   a. **Framework detection** (preferred): `WEB_FRAMEWORK_DETECTED=true` from the `detect_web_framework` step above — the project uses a web framework, so ALL phases get a Charlotte sweep regardless of what changed
+   b. **SUMMARY.md scan** (fallback): Scan all SUMMARY.md files from this phase for `.tsx`, `.jsx`, `.vue`, `.svelte` files in key-files
+
+2. If EITHER condition is true: proceed with Charlotte UX sweep (steps 3-5 below)
 
 3. If web UI was produced:
    a. **Auto-start dev server** — do NOT ask user. Check http://localhost:3000 (or other port from CLAUDE.md):
