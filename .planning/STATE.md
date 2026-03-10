@@ -3,8 +3,8 @@ gsd_state_version: 1.0
 milestone: v1.1
 milestone_name: milestone
 status: completed
-last_updated: "2026-03-10T06:18:38.997Z"
-last_activity: 2026-03-10 — Completed plan 10-04 (Migration Tool & Backward Compatibility)
+last_updated: "2026-03-10T07:49:05Z"
+last_activity: 2026-03-10 — Completed plan 12-01 (MCP Server Scaffold)
 progress:
   total_phases: 12
   completed_phases: 10
@@ -23,17 +23,17 @@ progress:
 
 **Core Value:** Enable GSD fork maintainers to stay current with upstream while preserving custom enhancements through intelligent sync tooling.
 
-**Current Focus:** Phase 10 - Parallel Milestones
+**Current Focus:** Phase 12 - MCP Server API
 
 ## Current Position
 
-**Phase:** 10 - Parallel Milestones
-**Plan:** 10-04 complete
-**Status:** Milestone complete
-**Last activity:** 2026-03-10 — Completed plan 10-04 (Migration Tool & Backward Compatibility)
+**Phase:** 12 - MCP Server API
+**Plan:** 12-01 complete
+**Status:** In progress
+**Last activity:** 2026-03-10 — Completed plan 12-01 (MCP Server Scaffold)
 
 ```
-[####################] 100% - Phase 10 plan 04 of 04 complete
+[######--------------] 33% - Phase 12 plan 01 of 03 complete
 ```
 
 **Phases:**
@@ -44,6 +44,7 @@ progress:
 - [x] Phase 8: Interactive & Integration (5 requirements) - complete
 - [x] Phase 9: Documentation (4 requirements) - complete
 - [x] Phase 10: Parallel Milestones (10 requirements) - complete
+- [ ] Phase 12: MCP Server API (5 requirements) - in progress
 
 ## Performance Metrics
 
@@ -105,6 +106,9 @@ progress:
 | M<number>-<slug> milestone naming | Easy parsing and human readability for milestone directories | 2026-03-10 |
 | Fallback from default milestone to legacy | Backward compatibility when default milestone doesn't have phase | 2026-03-10 |
 | Explicit milestone reference precedence | M7/01 syntax explicitly requests milestone scope | 2026-03-10 |
+| Use @modelcontextprotocol/sdk v1.x (stable) | Official SDK, recommended until Q1 2026 v2 release | 2026-03-10 |
+| All MCP logs to stderr | stdout reserved for JSON-RPC messages per MCP protocol | 2026-03-10 |
+| Error envelopes with recovery suggestions | Every error includes actionable recovery referencing /gsd: commands | 2026-03-10 |
 
 ### Roadmap Evolution
 
@@ -153,6 +157,7 @@ progress:
 - [x] Execute plan 10-02 (milestone-scoped workflow commands)
 - [x] Execute plan 10-03 (multi-milestone state tracking)
 - [x] Execute plan 10-04 (migration tool and backward compatibility)
+- [x] Execute plan 12-01 (MCP server scaffold)
 
 ### Blockers
 
@@ -161,11 +166,12 @@ None currently.
 ## Session Continuity
 
 **Last Session:** 2026-03-10
-**Context:** Completed plan 10-04 - migration tool with backup/restore, backward compatibility wrappers, and interactive wizard for restructuring legacy projects to parallel milestones.
+**Context:** Completed plan 12-01 - MCP server scaffold with stdio transport, error envelope module, and entry point for Claude Code integration.
 
 **To Resume:**
-1. Phase 10 (Parallel Milestones) complete
-2. All plans executed successfully
+1. Phase 12 (MCP Server API) in progress
+2. Plan 12-01 complete - server scaffold ready
+3. Next: Plan 12-02 (tool registrations)
 
 
 ### Sync History
@@ -175,7 +181,7 @@ None currently.
 
 ---
 *State initialized: 2026-02-23*
-*Last updated: 2026-03-10 (Phase 10 plan 03 complete)*
+*Last updated: 2026-03-10 (Phase 12 plan 01 complete)*
 
 ## Recent Activity
 

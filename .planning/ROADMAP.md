@@ -18,6 +18,7 @@ This roadmap delivers upstream sync tooling for GSD fork maintainers. The journe
 - [x] **Phase 8: Interactive & Integration** - Deep dive mode, worktree awareness, and health integration (completed 2026-02-24)
 - [x] **Phase 9: Documentation** - User guide, architecture docs, and troubleshooting (completed 2026-03-10)
 - [x] **Phase 10: Parallel Milestones** - Enable parallel milestone execution with scoped phases (completed 2026-03-10)
+- [ ] **Phase 12: MCP Server API** - Expose GSD operations as MCP server for programmatic access (in progress)
 
 ## Phase Details
 
@@ -154,6 +155,23 @@ Plans:
 - [ ] 11-01-PLAN.md — Add --docs flag parsing and document path validation
 - [ ] 11-02-PLAN.md — Add extraction, presentation, and provenance-enhanced CONTEXT.md output
 
+### Phase 12: MCP Server API
+**Goal**: Expose GSD operations as MCP server for programmatic access from AI agents and tools
+**Depends on**: Phase 10
+**Requirements**: MCP-01, MCP-02, MCP-03, MCP-04, MCP-05
+**Success Criteria** (what must be TRUE):
+  1. MCP server starts and connects via stdio transport
+  2. Server exposes core GSD tools (progress, health, state reads)
+  3. Tools accept same parameters as CLI commands with JSON responses
+  4. Resources expose project state (STATE.md, ROADMAP.md, current phase)
+  5. Error handling returns structured errors with recovery suggestions
+**Plans:** 1/3 plans complete
+
+Plans:
+- [x] 12-01-PLAN.md — Create MCP server scaffold with stdio transport and error envelope pattern
+- [ ] 12-02-PLAN.md — Register core and extended tier tools
+- [ ] 12-03-PLAN.md — Register resource providers for state/roadmap
+
 ## Progress
 
 **Execution Order:**
@@ -169,6 +187,7 @@ Phases execute in numeric order: 5 -> 6 -> 6.1 -> 7 -> 8 -> 9
 | 9. Documentation | 2/2 | Complete | 2026-03-10 |
 | 10. Parallel Milestones | 4/4 | Complete    | 2026-03-10 |
 | 11. Document-assisted discuss-phase | 0/2 | Not started | - |
+| 12. MCP Server API | 1/3 | In progress | - |
 
 ---
 *Roadmap created: 2026-02-23*
