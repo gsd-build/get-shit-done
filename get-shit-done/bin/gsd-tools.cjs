@@ -149,6 +149,11 @@
  *   state add-milestone <id> [name]    Add milestone to STATE.md tracking
  *   state remove-milestone <id>        Remove milestone from STATE.md tracking
  *   state get-milestones               List milestones from STATE.md
+ *   state log-activity --activity "..."  Log cross-milestone activity
+ *     [--milestone M7] [--type "..."]
+ *     [--max-entries N]
+ *   state get-activity                 Get recent activity log
+ *     [--milestone M7] [--limit N]
  *
  * Compound Commands (workflow-specific initialization):
  *   init execute-phase <phase>         All context for execute-phase workflow
@@ -5099,6 +5104,26 @@ async function main() {
       } else if (subcommand === 'get-milestones') {
         // state get-milestones — List milestones from STATE.md
         state.cmdStateGetMilestones(cwd, raw);
+      } else if (subcommand === 'log-activity') {
+        // state log-activity --activity "..." [--milestone M7] [--type "..."] [--max-entries N]
+        const activityIdx = args.indexOf('--activity');
+        const milestoneIdx = args.indexOf('--milestone');
+        const typeIdx = args.indexOf('--type');
+        const maxIdx = args.indexOf('--max-entries');
+        state.cmdStateLogActivity(cwd, {
+          activity: activityIdx !== -1 ? args[activityIdx + 1] : null,
+          milestone: milestoneIdx !== -1 ? args[milestoneIdx + 1] : null,
+          type: typeIdx !== -1 ? args[typeIdx + 1] : null,
+          max_entries: maxIdx !== -1 ? parseInt(args[maxIdx + 1], 10) : undefined,
+        }, raw);
+      } else if (subcommand === 'get-activity') {
+        // state get-activity [--milestone M7] [--limit N]
+        const milestoneIdx = args.indexOf('--milestone');
+        const limitIdx = args.indexOf('--limit');
+        state.cmdStateGetActivity(cwd, {
+          milestone: milestoneIdx !== -1 ? args[milestoneIdx + 1] : null,
+          limit: limitIdx !== -1 ? parseInt(args[limitIdx + 1], 10) : null,
+        }, raw);
       } else {
         state.cmdStateLoad(cwd, raw);
       }

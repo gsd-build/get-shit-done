@@ -1292,6 +1292,160 @@ function cmdStateGetMilestones(cwd, raw) {
   output(result, raw, lines.join('\n') || 'No milestones tracked');
 }
 
+// ─── Cross-Milestone Activity Logging ────────────────────────────────────────
+
+/** Default max activity entries to keep */
+const DEFAULT_MAX_ACTIVITY_ENTRIES = 20;
+
+/**
+ * Activity types for cross-milestone logging
+ */
+const ACTIVITY_TYPES = {
+  PHASE_STARTED: 'Started phase',
+  PHASE_COMPLETED: 'Completed phase',
+  PLAN_STARTED: 'Started plan',
+  PLAN_COMPLETED: 'Completed plan',
+  BLOCKER_ADDED: 'Blocker added',
+  BLOCKER_RESOLVED: 'Blocker resolved',
+  STATUS_CHANGED: 'Status changed to',
+};
+
+/**
+ * Log activity to STATE.md ## Recent Activity section
+ * Format: - YYYY-MM-DD HH:MM — <milestone>: <activity>
+ *
+ * @param {string} cwd - Current working directory
+ * @param {object} options - Activity details
+ * @param {string} options.milestone - Milestone ID (e.g., "M7") or null for global
+ * @param {string} options.activity - Activity description
+ * @param {string} [options.type] - Activity type from ACTIVITY_TYPES
+ * @param {number} [options.max_entries] - Max entries to keep (default 20)
+ * @param {boolean} raw - Raw output mode
+ */
+function cmdStateLogActivity(cwd, options, raw) {
+  const { milestone, activity, type, max_entries = DEFAULT_MAX_ACTIVITY_ENTRIES } = options || {};
+
+  if (!activity) {
+    error('Activity description required');
+    return;
+  }
+
+  const statePath = path.join(cwd, '.planning', 'STATE.md');
+
+  if (!fs.existsSync(statePath)) {
+    output({ error: 'STATE.md not found' }, raw);
+    return;
+  }
+
+  let content = fs.readFileSync(statePath, 'utf-8');
+
+  // Ensure ## Recent Activity section exists
+  content = ensureRecentActivitySection(content);
+
+  // Build activity entry
+  const now = new Date();
+  const timestamp = now.toISOString().replace('T', ' ').slice(0, 16); // YYYY-MM-DD HH:MM
+  const milestonePrefix = milestone ? `${milestone.toUpperCase()}: ` : '';
+  const activityText = type ? `${type} ${activity}` : activity;
+  const entry = `- ${timestamp} \u2014 ${milestonePrefix}${activityText}`;
+
+  // Find ## Recent Activity section and add entry
+  const sectionPattern = /(##\s*Recent Activity\s*\n)([\s\S]*?)(?=\n##|$)/i;
+  const match = content.match(sectionPattern);
+
+  if (match) {
+    let sectionBody = match[2].trim();
+
+    // Parse existing entries
+    const lines = sectionBody.split('\n').filter(l => l.startsWith('- '));
+
+    // Add new entry at top (newest first)
+    lines.unshift(entry);
+
+    // Truncate to max entries
+    const truncatedLines = lines.slice(0, max_entries);
+
+    const newBody = truncatedLines.length > 0 ? truncatedLines.join('\n') + '\n' : '';
+    content = content.replace(sectionPattern, `$1\n${newBody}`);
+
+    writeStateMd(statePath, content, cwd);
+    output({
+      logged: true,
+      entry,
+      entries_count: truncatedLines.length,
+      truncated: lines.length > max_entries,
+    }, raw, `Logged: ${entry}`);
+  } else {
+    output({ logged: false, reason: 'Recent Activity section not found' }, raw, 'false');
+  }
+}
+
+/**
+ * Get recent activity log from STATE.md
+ * @param {string} cwd - Current working directory
+ * @param {object} options - Filter options
+ * @param {string} [options.milestone] - Filter by milestone ID
+ * @param {number} [options.limit] - Limit number of entries
+ * @param {boolean} raw - Raw output mode
+ */
+function cmdStateGetActivity(cwd, options, raw) {
+  const { milestone, limit } = options || {};
+
+  const statePath = path.join(cwd, '.planning', 'STATE.md');
+
+  if (!fs.existsSync(statePath)) {
+    output({ error: 'STATE.md not found' }, raw);
+    return;
+  }
+
+  const content = fs.readFileSync(statePath, 'utf-8');
+
+  // Parse ## Recent Activity section
+  const sectionMatch = content.match(/##\s*Recent Activity\s*\n([\s\S]*?)(?=\n##|$)/i);
+
+  const entries = [];
+  if (sectionMatch) {
+    const lines = sectionMatch[1].trim().split('\n').filter(l => l.startsWith('- '));
+
+    for (const line of lines) {
+      // Parse: - YYYY-MM-DD HH:MM — [M7: ]activity
+      const parseMatch = line.match(/^-\s+(\d{4}-\d{2}-\d{2}\s+\d{2}:\d{2})\s+\u2014\s+(?:(M\d+):\s+)?(.+)$/);
+      if (parseMatch) {
+        entries.push({
+          timestamp: parseMatch[1],
+          milestone: parseMatch[2] || null,
+          activity: parseMatch[3],
+        });
+      }
+    }
+  }
+
+  // Filter by milestone if specified
+  let filtered = entries;
+  if (milestone) {
+    const normalizedMilestone = milestone.toUpperCase();
+    filtered = entries.filter(e => e.milestone === normalizedMilestone);
+  }
+
+  // Apply limit
+  if (limit && limit > 0) {
+    filtered = filtered.slice(0, limit);
+  }
+
+  const result = {
+    entries: filtered,
+    count: filtered.length,
+    total: entries.length,
+  };
+
+  // Format human-readable output
+  const lines = filtered.map(e =>
+    `${e.timestamp} ${e.milestone ? `[${e.milestone}] ` : ''}${e.activity}`
+  );
+
+  output(result, raw, lines.join('\n') || 'No activity logged');
+}
+
 module.exports = {
   // Core helpers
   stateExtractField,
@@ -1306,6 +1460,8 @@ module.exports = {
   updateMilestoneRow,
   addMilestoneRow,
   removeMilestoneRow,
+  // Activity types
+  ACTIVITY_TYPES,
   // Standard state commands
   cmdStateLoad,
   cmdStateGet,
@@ -1326,4 +1482,7 @@ module.exports = {
   cmdStateAddMilestone,
   cmdStateRemoveMilestone,
   cmdStateGetMilestones,
+  // Activity logging
+  cmdStateLogActivity,
+  cmdStateGetActivity,
 };
