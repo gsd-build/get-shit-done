@@ -377,6 +377,11 @@ async function main() {
       break;
     }
 
+    case "config-set-model-profile": {
+      config.cmdConfigSetModelProfile(cwd, args[1], raw);
+      break;
+    }
+
     case 'config-get': {
       config.cmdConfigGet(cwd, args[1], raw);
       break;

@@ -5,6 +5,11 @@
 const fs = require('fs');
 const path = require('path');
 const { output, error } = require('./core.cjs');
+const {
+  VALID_PROFILES,
+  getAgentToModelMapForProfile,
+  formatAgentToModelMapAsTable,
+} = require('./model-profiles.cjs');
 
 const VALID_CONFIG_KEYS = new Set([
   'mode', 'granularity', 'parallelization', 'commit_docs', 'model_profile',
@@ -29,7 +34,13 @@ function validateKnownConfigKeyPath(keyPath) {
   }
 }
 
-function cmdConfigEnsureSection(cwd, raw) {
+/**
+ * Ensures the config file exists (creates it if needed).
+ *
+ * Does not call `output()`, so can be used as one step in a command without triggering `exit(0)` in
+ * the happy path. But note that `error()` will still `exit(1)` out of the process.
+ */
+function ensureConfigFile(cwd) {
   const configPath = path.join(cwd, '.planning', 'config.json');
   const planningDir = path.join(cwd, '.planning');
 
@@ -44,9 +55,7 @@ function cmdConfigEnsureSection(cwd, raw) {
 
   // Check if config already exists
   if (fs.existsSync(configPath)) {
-    const result = { created: false, reason: 'already_exists' };
-    output(result, raw, 'exists');
-    return;
+    return { created: false, reason: 'already_exists' };
   }
 
   // Detect Brave Search API key availability
@@ -65,7 +74,9 @@ function cmdConfigEnsureSection(cwd, raw) {
         const depthToGranularity = { quick: 'coarse', standard: 'standard', comprehensive: 'fine' };
         userDefaults.granularity = depthToGranularity[userDefaults.depth] || userDefaults.depth;
         delete userDefaults.depth;
-        try { fs.writeFileSync(globalDefaultsPath, JSON.stringify(userDefaults, null, 2), 'utf-8'); } catch {}
+        try {
+          fs.writeFileSync(globalDefaultsPath, JSON.stringify(userDefaults, null, 2), 'utf-8');
+        } catch {}
       }
     }
   } catch (err) {
@@ -97,31 +108,36 @@ function cmdConfigEnsureSection(cwd, raw) {
 
   try {
     fs.writeFileSync(configPath, JSON.stringify(defaults, null, 2), 'utf-8');
-    const result = { created: true, path: '.planning/config.json' };
-    output(result, raw, 'created');
+    return { created: true, path: '.planning/config.json' };
   } catch (err) {
     error('Failed to create config.json: ' + err.message);
   }
 }
 
-function cmdConfigSet(cwd, keyPath, value, raw) {
+/**
+ * Command to ensure the config file exists (creates it if needed).
+ *
+ * Note that this exits the process (via `output()`) even in the happy path; use
+ * `ensureConfigFile()` directly if you need to avoid this.
+ */
+function cmdConfigEnsureSection(cwd, raw) {
+  const ensureConfigFileResult = ensureConfigFile(cwd);
+  if (ensureConfigFileResult.created) {
+    output(ensureConfigFileResult, raw, 'created');
+  } else {
+    output(ensureConfigFileResult, raw, 'exists');
+  }
+}
+
+/**
+ * Sets a value in the config file, allowing nested values via dot notation (e.g.,
+ * "workflow.research").
+ *
+ * Does not call `output()`, so can be used as one step in a command without triggering `exit(0)` in
+ * the happy path. But note that `error()` will still `exit(1)` out of the process.
+ */
+function setConfigValue(cwd, keyPath, parsedValue) {
   const configPath = path.join(cwd, '.planning', 'config.json');
-
-  if (!keyPath) {
-    error('Usage: config-set <key.path> <value>');
-  }
-
-  validateKnownConfigKeyPath(keyPath);
-
-  if (!VALID_CONFIG_KEYS.has(keyPath)) {
-    error(`Unknown config key: "${keyPath}". Valid keys: ${[...VALID_CONFIG_KEYS].sort().join(', ')}`);
-  }
-
-  // Parse value (handle booleans and numbers)
-  let parsedValue = value;
-  if (value === 'true') parsedValue = true;
-  else if (value === 'false') parsedValue = false;
-  else if (!isNaN(value) && value !== '') parsedValue = Number(value);
 
   // Load existing config or start with empty object
   let config = {};
@@ -143,16 +159,44 @@ function cmdConfigSet(cwd, keyPath, value, raw) {
     }
     current = current[key];
   }
+  const previousValue = current[keys[keys.length - 1]]; // Capture previous value before overwriting
   current[keys[keys.length - 1]] = parsedValue;
 
   // Write back
   try {
     fs.writeFileSync(configPath, JSON.stringify(config, null, 2), 'utf-8');
-    const result = { updated: true, key: keyPath, value: parsedValue };
-    output(result, raw, `${keyPath}=${parsedValue}`);
+    return { updated: true, key: keyPath, value: parsedValue, previousValue };
   } catch (err) {
     error('Failed to write config.json: ' + err.message);
   }
+}
+
+/**
+ * Command to set a value in the config file, allowing nested values via dot notation (e.g.,
+ * "workflow.research").
+ *
+ * Note that this exits the process (via `output()`) even in the happy path; use `setConfigValue()`
+ * directly if you need to avoid this.
+ */
+function cmdConfigSet(cwd, keyPath, value, raw) {
+  if (!keyPath) {
+    error('Usage: config-set <key.path> <value>');
+  }
+
+  validateKnownConfigKeyPath(keyPath);
+
+  if (!VALID_CONFIG_KEYS.has(keyPath)) {
+    error(`Unknown config key: "${keyPath}". Valid keys: ${[...VALID_CONFIG_KEYS].sort().join(', ')}`);
+  }
+
+  // Parse value (handle booleans and numbers)
+  let parsedValue = value;
+  if (value === 'true') parsedValue = true;
+  else if (value === 'false') parsedValue = false;
+  else if (!isNaN(value) && value !== '') parsedValue = Number(value);
+
+  const setConfigValueResult = setConfigValue(cwd, keyPath, parsedValue);
+  output(setConfigValueResult, raw, `${keyPath}=${parsedValue}`);
 }
 
 function cmdConfigGet(cwd, keyPath, raw) {
@@ -191,8 +235,63 @@ function cmdConfigGet(cwd, keyPath, raw) {
   output(current, raw, String(current));
 }
 
+/**
+ * Command to set the model profile in the config file.
+ *
+ * Note that this exits the process (via `output()`) even in the happy path.
+ */
+function cmdConfigSetModelProfile(cwd, profile, raw) {
+  if (!profile) {
+    error(`Usage: config-set-model-profile <${VALID_PROFILES.join('|')}>`);
+  }
+
+  const normalizedProfile = profile.toLowerCase().trim();
+  if (!VALID_PROFILES.includes(normalizedProfile)) {
+    error(`Invalid profile '${profile}'. Valid profiles: ${VALID_PROFILES.join(', ')}`);
+  }
+
+  // Ensure config exists (create if needed)
+  ensureConfigFile(cwd);
+
+  // Set the model profile in the config
+  const { previousValue } = setConfigValue(cwd, 'model_profile', normalizedProfile, raw);
+  const previousProfile = previousValue || 'balanced (default)';
+
+  // Build result value / message and return
+  const agentToModelMap = getAgentToModelMapForProfile(normalizedProfile);
+  const result = {
+    updated: true,
+    profile: normalizedProfile,
+    previous: previousProfile,
+    agentToModelMap,
+  };
+  const rawValue = getCmdConfigSetModelProfileResultMessage(
+    normalizedProfile,
+    previousProfile,
+    agentToModelMap
+  );
+  output(result, raw, rawValue);
+}
+
+/**
+ * Returns the message to display for the result of the `config-set-model-profile` command when
+ * displaying raw output.
+ */
+function getCmdConfigSetModelProfileResultMessage(
+  normalizedProfile,
+  previousProfile,
+  agentToModelMap
+) {
+  const didChange = previousProfile !== normalizedProfile;
+  const maybePreviousProfileMsg = didChange ? ` (was: ${previousProfile})` : '';
+  const newProfileLine = `✓ Model profile set to: ${normalizedProfile}${maybePreviousProfileMsg}`;
+  const agentToModelTable = formatAgentToModelMapAsTable(agentToModelMap);
+  return `${newProfileLine}\n\nAgents will now use:\n\n${agentToModelTable}\n\nNext spawned agents will use the new profile.`;
+}
+
 module.exports = {
   cmdConfigEnsureSection,
   cmdConfigSet,
   cmdConfigGet,
+  cmdConfigSetModelProfile,
 };

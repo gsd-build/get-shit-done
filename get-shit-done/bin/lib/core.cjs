@@ -5,6 +5,7 @@
 const fs = require('fs');
 const path = require('path');
 const { execSync } = require('child_process');
+const { MODEL_PROFILES } = require('./model-profiles.cjs');
 
 // ─── Path helpers ────────────────────────────────────────────────────────────
 
@@ -12,26 +13,6 @@ const { execSync } = require('child_process');
 function toPosixPath(p) {
   return p.split(path.sep).join('/');
 }
-
-// ─── Model Profile Table ─────────────────────────────────────────────────────
-
-const MODEL_PROFILES = {
-  'gsd-planner':              { quality: 'opus', balanced: 'opus',   budget: 'sonnet' },
-  'gsd-roadmapper':           { quality: 'opus', balanced: 'sonnet', budget: 'sonnet' },
-  'gsd-executor':             { quality: 'opus', balanced: 'sonnet', budget: 'sonnet' },
-  'gsd-phase-researcher':     { quality: 'opus', balanced: 'sonnet', budget: 'haiku' },
-  'gsd-project-researcher':   { quality: 'opus', balanced: 'sonnet', budget: 'haiku' },
-  'gsd-research-synthesizer': { quality: 'sonnet', balanced: 'sonnet', budget: 'haiku' },
-  'gsd-debugger':             { quality: 'opus', balanced: 'sonnet', budget: 'sonnet' },
-  'gsd-codebase-mapper':      { quality: 'sonnet', balanced: 'haiku', budget: 'haiku' },
-  'gsd-verifier':             { quality: 'sonnet', balanced: 'sonnet', budget: 'haiku' },
-  'gsd-plan-checker':         { quality: 'sonnet', balanced: 'sonnet', budget: 'haiku' },
-  'gsd-integration-checker':  { quality: 'sonnet', balanced: 'sonnet', budget: 'haiku' },
-  'gsd-nyquist-auditor':      { quality: 'sonnet', balanced: 'sonnet', budget: 'haiku' },
-  'gsd-ui-researcher':        { quality: 'opus', balanced: 'sonnet', budget: 'haiku' },
-  'gsd-ui-checker':           { quality: 'sonnet', balanced: 'sonnet', budget: 'haiku' },
-  'gsd-ui-auditor':           { quality: 'sonnet', balanced: 'sonnet', budget: 'haiku' },
-};
 
 // ─── Output helpers ───────────────────────────────────────────────────────────
 
@@ -501,7 +482,6 @@ function getMilestonePhaseFilter(cwd) {
 }
 
 module.exports = {
-  MODEL_PROFILES,
   output,
   error,
   safeReadFile,
