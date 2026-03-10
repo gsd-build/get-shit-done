@@ -81,7 +81,7 @@
  *     --schema plan|summary|verification
  *
  * Verification Suite:
- *   verify plan-structure <file>       Check PLAN.md structure + tasks
+ *   verify plan-structure <file>       Check PLAN.md structure + tasks (tdd/ui-qa gates; exits 1 on error)
  *   verify phase-completeness <phase>  Check all plans have summaries
  *   verify references <file>           Check @-refs + paths resolve
  *   verify commits <h1> [h2] ...      Batch verify commit hashes
@@ -4628,24 +4628,38 @@ function cmdVerifyPlanStructure(cwd, filePath, raw) {
 
   // Parse and check task elements
   const taskPattern = /<task[^>]*>([\s\S]*?)<\/task>/g;
+  const taskTagPattern = /<task([^>]*)>/g;
   const tasks = [];
   let taskMatch;
+  let taskTagMatch;
+  const taskOpenTags = [];
+  while ((taskTagMatch = taskTagPattern.exec(content)) !== null) {
+    taskOpenTags.push(taskTagMatch[1] || '');
+  }
+  let taskIdx = 0;
+  taskPattern.lastIndex = 0;
   while ((taskMatch = taskPattern.exec(content)) !== null) {
+    const taskAttrs = taskOpenTags[taskIdx] || '';
+    taskIdx++;
+    // Checkpoint tasks have different structure — skip <name>/<action> checks for them
+    const isCheckpointTask = /type=["']?checkpoint:/.test(taskAttrs);
     const taskContent = taskMatch[1];
     const nameMatch = taskContent.match(/<name>([\s\S]*?)<\/name>/);
-    const taskName = nameMatch ? nameMatch[1].trim() : 'unnamed';
+    const taskName = nameMatch ? nameMatch[1].trim() : (isCheckpointTask ? '(checkpoint)' : 'unnamed');
     const hasFiles = /<files>/.test(taskContent);
-    const hasAction = /<action>/.test(taskContent);
+    const hasAction = /<action>/.test(taskContent) || isCheckpointTask;
     const hasVerify = /<verify>/.test(taskContent);
     const hasDone = /<done>/.test(taskContent);
 
-    if (!nameMatch) errors.push('Task missing <name> element');
-    if (!hasAction) errors.push(`Task '${taskName}' missing <action>`);
-    if (!hasVerify) warnings.push(`Task '${taskName}' missing <verify>`);
-    if (!hasDone) warnings.push(`Task '${taskName}' missing <done>`);
-    if (!hasFiles) warnings.push(`Task '${taskName}' missing <files>`);
+    if (!isCheckpointTask) {
+      if (!nameMatch) errors.push('Task missing <name> element');
+      if (!hasAction) errors.push(`Task '${taskName}' missing <action>`);
+      if (!hasVerify) warnings.push(`Task '${taskName}' missing <verify>`);
+      if (!hasDone) warnings.push(`Task '${taskName}' missing <done>`);
+      if (!hasFiles) warnings.push(`Task '${taskName}' missing <files>`);
+    }
 
-    tasks.push({ name: taskName, hasFiles, hasAction, hasVerify, hasDone });
+    tasks.push({ name: taskName, isCheckpoint: isCheckpointTask, hasFiles, hasAction, hasVerify, hasDone });
   }
 
   if (tasks.length === 0) warnings.push('No <task> elements found');
@@ -4661,14 +4675,41 @@ function cmdVerifyPlanStructure(cwd, filePath, raw) {
     errors.push('Has checkpoint tasks but autonomous is not false');
   }
 
-  output({
+  // UI-QA check: plans that modify UI files must have a checkpoint:ui-qa task
+  const UI_FILE_PATTERNS = ['.tsx', '.jsx', '.vue', '.svelte'];
+  const filesModified = Array.isArray(fm.files_modified)
+    ? fm.files_modified
+    : (fm.files_modified ? [String(fm.files_modified)] : []);
+  const hasUiFiles = filesModified.some(f =>
+    UI_FILE_PATTERNS.some(ext => f.endsWith(ext))
+  );
+  const hasUiQaTask = /<task[^>]+type=["']?checkpoint:ui-qa/.test(content);
+  if (hasUiFiles && !hasUiQaTask) {
+    errors.push('Plan modifies UI files (.tsx/.jsx/.vue/.svelte) but has no checkpoint:ui-qa task');
+  }
+
+  // TDD check: plans that modify API/route files must have a tdd="true" task
+  const API_FILE_PATTERNS = ['route.ts', 'route.js', '/api/', '/routes/', '/functions/', 'controller.ts', 'controller.js', 'handler.ts', 'handler.js'];
+  const hasApiFiles = filesModified.some(f =>
+    API_FILE_PATTERNS.some(pat => f.includes(pat))
+  );
+  const hasTddTask = /tdd=["']?true/.test(content);
+  if (hasApiFiles && !hasTddTask) {
+    errors.push('Plan modifies API/route files but has no tdd="true" task');
+  }
+
+  // Output result and exit with code reflecting validation status
+  // Exit 1 when errors exist so bash callers can gate on this
+  const resultData = {
     valid: errors.length === 0,
     errors,
     warnings,
     task_count: tasks.length,
     tasks,
     frontmatter_fields: Object.keys(fm),
-  }, raw, errors.length === 0 ? 'valid' : 'invalid');
+  };
+  process.stdout.write(JSON.stringify(resultData, null, 2));
+  process.exit(errors.length > 0 ? 1 : 0);
 }
 
 function cmdVerifyPhaseCompleteness(cwd, phase, raw) {
@@ -5737,6 +5778,75 @@ function cmdPhaseComplete(cwd, phaseNum, raw) {
 
   const planCount = phaseInfo.plans.length;
   const summaryCount = phaseInfo.summaries.length;
+
+  // ── Phase completeness pre-conditions ──────────────────────────────────────────
+  // Refuse to mark phase complete unless all required artifacts are present and valid.
+  // This prevents phases being marked done without a passing VERIFICATION.md.
+  {
+    // Find phase directory on disk
+    let phaseDirPath = null;
+    try {
+      const entries = fs.readdirSync(phasesDir, { withFileTypes: true });
+      const re = new RegExp('^' + phaseNum.replace(/./g, '\.') + '-');
+      const match = entries.find(e => e.isDirectory() && re.test(e.name));
+      if (match) phaseDirPath = path.join(phasesDir, match.name);
+    } catch {}
+
+    if (phaseDirPath) {
+      let dirFiles;
+      try { dirFiles = fs.readdirSync(phaseDirPath); } catch { dirFiles = []; }
+      const completenessErrors = [];
+
+      // 1. VERIFICATION.md must exist with status: passed
+      const verFile = dirFiles.find(f => f.match(/-VERIFICATION.md$/i));
+      if (!verFile) {
+        completenessErrors.push('VERIFICATION.md not found — verifier must run before phase can be marked complete');
+      } else {
+        try {
+          const verContent = fs.readFileSync(path.join(phaseDirPath, verFile), 'utf-8');
+          const statusMatch = verContent.match(/^status:s*(S+)/m);
+          const verStatus = statusMatch ? statusMatch[1].trim() : 'unknown';
+          if (verStatus !== 'passed') {
+            completenessErrors.push(`VERIFICATION.md status is ${verStatus} — must be passed before phase complete`);
+          }
+        } catch { completenessErrors.push('Cannot read VERIFICATION.md'); }
+      }
+
+      // 2. Every PLAN.md must have a matching SUMMARY.md
+      const planFiles = dirFiles.filter(f => f.match(/-PLAN.md$/i));
+      const summarySet = new Set(dirFiles.filter(f => f.match(/-SUMMARY.md$/i)).map(f => f.replace(/-SUMMARY.md$/i, '')));
+      for (const planFile of planFiles) {
+        const planId = planFile.replace(/-PLAN.md$/i, '');
+        if (!summarySet.has(planId)) {
+          completenessErrors.push(`Plan ${planFile} has no matching SUMMARY.md`);
+        }
+      }
+
+      // 3. CHECKPOINT.json must exist with last_step: verify
+      const checkpointPath = path.join(phaseDirPath, 'CHECKPOINT.json');
+      if (!fs.existsSync(checkpointPath)) {
+        completenessErrors.push('CHECKPOINT.json not found — phase lifecycle must complete before marking done');
+      } else {
+        try {
+          const checkpoint = JSON.parse(fs.readFileSync(checkpointPath, 'utf-8'));
+          if (checkpoint.last_step !== 'verify') {
+            completenessErrors.push(`CHECKPOINT.json last_step is ${checkpoint.last_step} — must be verify before phase complete`);
+          }
+        } catch { completenessErrors.push('CHECKPOINT.json is malformed — cannot verify phase lifecycle completion'); }
+      }
+
+      if (completenessErrors.length > 0) {
+        const result = {
+          error: 'Phase completeness validation failed',
+          phase: phaseNum,
+          validation_errors: completenessErrors,
+          hint: 'Run the verifier first to create VERIFICATION.md with status: passed',
+        };
+        process.stdout.write(JSON.stringify(result, null, 2));
+        process.exit(1);
+      }
+    }
+  }
 
   // Update ROADMAP.md: mark phase complete
   if (fs.existsSync(roadmapPath)) {
