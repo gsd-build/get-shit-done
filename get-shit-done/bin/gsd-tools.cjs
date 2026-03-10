@@ -170,6 +170,7 @@ const healthModule = require('./lib/health.cjs');
 const upstreamModule = require('./lib/upstream.cjs');
 const interactiveModule = require('./lib/interactive.cjs');
 const testDiscoveryModule = require('./lib/test-discovery.cjs');
+const milestoneParallel = require('./lib/milestone-parallel.cjs');
 
 // ─── Upstream Domain Modules ──────────────────────────────────────────────────
 
@@ -5510,8 +5511,19 @@ async function main() {
           milestoneName = nameArgs.join(' ') || null;
         }
         milestone.cmdMilestoneComplete(cwd, args[2], { name: milestoneName, archivePhases }, raw);
+      } else if (subcommand === 'create') {
+        // milestone create <id> <name...>
+        const id = args[2];
+        const name = args.slice(3).join(' ');
+        milestoneParallel.cmdMilestoneCreate(cwd, id, name, raw);
+      } else if (subcommand === 'list') {
+        milestoneParallel.cmdMilestoneList(cwd, raw);
+      } else if (subcommand === 'switch') {
+        milestoneParallel.cmdMilestoneSwitch(cwd, args[2], raw);
+      } else if (subcommand === 'info') {
+        milestoneParallel.cmdMilestoneInfo(cwd, args[2], raw);
       } else {
-        error('Unknown milestone subcommand. Available: complete');
+        error('Unknown milestone subcommand. Available: complete, create, list, switch, info');
       }
       break;
     }
