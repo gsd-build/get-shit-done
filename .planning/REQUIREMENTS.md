@@ -11,7 +11,7 @@ Requirements for the Autonomous Skill. Each maps to roadmap phases.
 
 - [ ] **ORCH-01**: User can run `gsd-autonomous` to execute all remaining phases in a milestone sequentially without manual phase-by-phase invocation
 - [ ] **ORCH-02**: User can see progress banners between phases showing what's running and what's next
-- [ ] **ORCH-03**: System reads ROADMAP.md to discover all phases and their order, starting from the first incomplete phase
+- [x] **ORCH-03**: System reads ROADMAP.md to discover all phases and their order, starting from the first incomplete phase
 - [ ] **ORCH-04**: System runs audit → complete → cleanup automatically after all phases finish
 
 ### Smart Discuss (Grey Area Resolution)
@@ -36,9 +36,9 @@ Requirements for the Autonomous Skill. Each maps to roadmap phases.
 
 ### Artifacts
 
-- [ ] **ART-01**: New command file at `commands/gsd/autonomous.md` following existing frontmatter and section patterns
+- [x] **ART-01**: New command file at `commands/gsd/autonomous.md` following existing frontmatter and section patterns
 - [ ] **ART-02**: New workflow file at `get-shit-done/workflows/autonomous.md` with full orchestration logic
-- [ ] **ART-03**: Command follows existing `name: gsd:autonomous` naming convention so the installer generates the Copilot skill automatically
+- [x] **ART-03**: Command follows existing `name: gsd:autonomous` naming convention so the installer generates the Copilot skill automatically
 
 ## Future Requirements
 
@@ -62,7 +62,7 @@ _(None — all requirements are in scope for v1.24)_
 |-------------|-------|--------|
 | ORCH-01 | Phase 8 | Pending |
 | ORCH-02 | Phase 8 | Pending |
-| ORCH-03 | Phase 5 | Pending |
+| ORCH-03 | Phase 5 | Complete |
 | ORCH-04 | Phase 8 | Pending |
 | DISC-01 | Phase 6 | Pending |
 | DISC-02 | Phase 6 | Pending |
@@ -75,9 +75,9 @@ _(None — all requirements are in scope for v1.24)_
 | CTRL-01 | Phase 8 | Pending |
 | CTRL-02 | Phase 8 | Pending |
 | CTRL-03 | Phase 8 | Pending |
-| ART-01 | Phase 5 | Pending |
+| ART-01 | Phase 5 | Complete |
 | ART-02 | Phase 5 | Pending |
-| ART-03 | Phase 5 | Pending |
+| ART-03 | Phase 5 | Complete |
 
 **Coverage:**
 - v1.24 requirements: 18 total
