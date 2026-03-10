@@ -1,34 +1,34 @@
 ---
 gsd_state_version: 1.0
-milestone: v1.23
-milestone_name: Copilot CLI Support
-status: completed
-last_updated: "2026-03-03T18:02:00.000Z"
+milestone: v1.24
+milestone_name: Autonomous Skill
+status: active
+last_updated: "2026-03-10T01:13:00.000Z"
 progress:
-  total_phases: 4
-  completed_phases: 4
-  total_plans: 6
-  completed_plans: 6
+  total_phases: 0
+  completed_phases: 0
+  total_plans: 0
+  completed_plans: 0
 ---
 
 # Project State
 
 ## Project Reference
 
-See: .planning/PROJECT.md (updated 2026-03-03)
+See: .planning/PROJECT.md (updated 2026-03-10)
 
 **Core value:** Structured, spec-driven AI development from idea to shipped code
-**Current focus:** Planning next milestone
+**Current focus:** v1.24 Autonomous Skill — defining requirements
 
 ## Current Position
 
-Milestone: v1.23 Copilot CLI Support — ✅ SHIPPED 2026-03-03
-All 4 phases complete, 6 plans executed, 22/22 requirements satisfied.
-
-Progress: [██████████] 100% (6/6 plans complete)
+Phase: Not started (defining requirements)
+Plan: —
+Status: Defining requirements
+Last activity: 2026-03-10 — Milestone v1.24 started
 
 ## Session Continuity
 
-Last session: 2026-03-03
-Stopped at: Milestone v1.23 completed and archived
-Resume with: `/gsd-new-milestone` for next milestone
+Last session: 2026-03-10
+Stopped at: Milestone v1.24 initialized — defining requirements
+Resume with: Continue requirements definition

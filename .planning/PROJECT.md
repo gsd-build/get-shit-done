@@ -26,7 +26,10 @@ Structured, spec-driven AI development that takes projects from idea to shipped 
 
 ### Active
 
-(None — planning next milestone)
+- **AUTO-01**: Autonomous skill (`gsd-autonomous`) that chains discuss → plan → execute → verify per phase, then audit → complete → cleanup
+- **AUTO-02**: Grey area resolution with proposed answers grouped by area, user accepts/changes per area
+- **AUTO-03**: Seamless phase transitions — only stops for explicit user decisions
+- **AUTO-04**: Full milestone lifecycle automation from first phase to cleanup
 
 ### Out of Scope
 
@@ -34,6 +37,16 @@ Structured, spec-driven AI development that takes projects from idea to shipped 
 - Web UI or dashboard — not in scope
 - Copilot hook system — Copilot CLI has no lifecycle events
 - Conflict detection for non-GSD files in `.github/` — deferred (QUAL-02)
+
+## Current Milestone: v1.24 Autonomous Skill
+
+**Goal:** Create a `gsd-autonomous` skill that runs the full milestone lifecycle autonomously, chaining existing GSD phases with minimal user interaction.
+
+**Target features:**
+- Autonomous phase chaining (discuss → plan → execute → verify) for all phases in a milestone
+- Smart grey area resolution: proposes answers grouped by area, user accepts or changes
+- Seamless phase transitions — only pauses for explicit user decisions
+- Full milestone lifecycle: all phases → audit → complete → cleanup
 
 ## Context
 
@@ -66,4 +79,4 @@ Structured, spec-driven AI development that takes projects from idea to shipped 
 | QUAL-02 deferred | Conflict detection doesn't exist for any runtime | — Deferred to future milestone |
 
 ---
-*Last updated: 2026-03-03 after v1.23 milestone*
+*Last updated: 2026-03-10 after v1.24 milestone start*
