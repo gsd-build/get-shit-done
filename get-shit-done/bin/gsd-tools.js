@@ -10491,6 +10491,26 @@ async function main() {
       break;
     }
 
+    case 'analytics': {
+      const analyticsSubcmd = args[1];
+      if (!analyticsSubcmd) {
+        error('analytics: subcommand required (report|calibrate)');
+      }
+      if (analyticsSubcmd === 'report') {
+        const { generateReport } = require('./analytics.js');
+        const report = generateReport(cwd);
+        process.stdout.write(report + '\n');
+      } else if (analyticsSubcmd === 'calibrate') {
+        const { calibrate } = require('./analytics.js');
+        const dryRun = args.includes('--dry-run');
+        const result = calibrate(cwd, { dryRun });
+        output(result, raw, dryRun ? 'Calibration (dry run)' : 'Calibration applied');
+      } else {
+        error(`analytics: unknown subcommand "${analyticsSubcmd}"`);
+      }
+      break;
+    }
+
     case 'failure': {
       cmdFailure(cwd, args.slice(1), raw);
       break;
