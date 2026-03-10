@@ -211,6 +211,9 @@ rapid prototyping phases where test infrastructure isn't the focus.
 |---------|---------|-------------|
 | `/gsd:health` | Diagnose and fix worktree health issues | Orphaned worktrees, stale locks, incomplete finalization |
 | `/gsd:finalize-phase <N>` | Merge phase branch to main, cleanup worktree | After phase verification with worktree isolation enabled |
+| `/gsd:sync-analyze` | Show upstream commits grouped by directory or feature | Before syncing to understand what changed |
+| `/gsd:sync-preview` | Preview merge conflicts and risk assessment | Before attempting merge |
+| `/gsd:sync-resolve` | Address structural conflicts (renames/deletes) | When preview shows structural issues |
 
 **Worktree Isolation Features:**
 
@@ -229,6 +232,59 @@ rapid prototyping phases where test infrastructure isn't the focus.
 - `2` — Incomplete finalization found
 - `3` — Both types found
 - `4+` — Runtime errors
+
+**Upstream Sync Features (v1.1):**
+
+| Feature | Description |
+|---------|-------------|
+| **Remote Configuration** | Auto-detects existing `upstream` remote or lets you configure one |
+| **Cached Fetch** | 24-hour cache prevents redundant network calls; configurable via `upstream.fetch_interval` |
+| **Commit Grouping** | Group by directory (default) or by conventional commit type (--by-feature) |
+| **Conflict Preview** | Uses git merge-tree to predict conflicts with risk scoring (EASY/MODERATE/HARD) |
+| **Binary Detection** | Categorizes binary changes as safe (images), review (archives), or dangerous (executables) |
+| **Structural Conflicts** | Detects rename/delete conflicts requiring explicit acknowledgment |
+| **Backup Branches** | Auto-creates `backup/pre-sync-YYYY-MM-DD-HHMMSS` before merge |
+| **Atomic Rollback** | Merge failures automatically restore pre-merge state |
+| **Post-Merge Verification** | Runs tests on fork-modified files to catch regressions |
+| **Sync History** | All sync events logged to STATE.md with timestamps |
+
+**Upstream Sync Workflow:**
+
+```mermaid
+flowchart LR
+    subgraph Configure
+        A[upstream configure] --> B[Set remote URL]
+    end
+    subgraph Analyze
+        C[upstream fetch] --> D[upstream status]
+        D --> E[/gsd:sync-analyze]
+        E --> F[/gsd:sync-preview]
+    end
+    subgraph Resolve
+        F --> G{Conflicts?}
+        G -->|Yes| H[/gsd:sync-resolve]
+        H --> I{All acknowledged?}
+        I -->|No| H
+        I -->|Yes| J[Ready to merge]
+        G -->|No| J
+    end
+    subgraph Merge
+        J --> K[upstream merge]
+        K --> L[Post-merge verification]
+        L --> M[Complete]
+    end
+
+    Configure --> Analyze
+```
+
+**Typical workflow:**
+
+1. Check status: `gsd-tools upstream status`
+2. Analyze changes: `/gsd:sync-analyze`
+3. Preview conflicts: `/gsd:sync-preview`
+4. Resolve structural issues: `/gsd:sync-resolve --ack-all` (if any)
+5. Merge: `gsd-tools upstream merge`
+6. Verify tests pass, or rollback if prompted
 
 ---
 
