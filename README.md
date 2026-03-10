@@ -709,6 +709,39 @@ Enable worktree isolation in `.planning/config.json`:
 - `3` — Both orphans and incomplete
 - `4+` — Runtime errors
 
+### Upstream Sync (v1.1)
+
+**Stay current with upstream while preserving fork customizations** — intelligent sync tooling that makes fork maintenance painless.
+
+| Feature | Description |
+|---------|-------------|
+| **Fetch & Status** | Check commits behind upstream without modifying local branches |
+| **Commit Analysis** | View changes grouped by directory or conventional commit type |
+| **Conflict Preview** | Predict merge conflicts with risk scoring (EASY/MODERATE/HARD) |
+| **Structural Detection** | Detect rename/delete conflicts requiring acknowledgment |
+| **Safe Merge** | Automatic backup branch, atomic rollback on failure |
+| **Post-Merge Verification** | Run tests on fork-modified files to catch regressions |
+
+**New Commands:**
+
+| Command | What it does |
+|---------|--------------|
+| `/gsd:sync-analyze` | Show upstream commits grouped by directory or feature |
+| `/gsd:sync-preview` | Preview conflicts with risk assessment before merge |
+| `/gsd:sync-resolve` | Address structural conflicts (renames/deletes) |
+
+**CLI Commands:**
+
+| Command | What it does |
+|---------|--------------|
+| `gsd-tools upstream configure <url>` | Set upstream remote (auto-detects existing `upstream`) |
+| `gsd-tools upstream fetch` | Fetch upstream changes (24-hour cache) |
+| `gsd-tools upstream status` | Show commits behind and last fetch time |
+| `gsd-tools upstream merge` | Merge upstream with backup and verification |
+| `gsd-tools upstream abort` | Abort incomplete sync and restore state |
+
+See the [User Guide](docs/USER-GUIDE.md#gsd-enhancements) for full workflow documentation and Mermaid diagrams.
+
 ---
 
 ## Community Ports
