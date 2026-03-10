@@ -1,175 +1,211 @@
-# Roadmap: GSD v1.1 Upstream Sync
+# Roadmap: GSD v2.0 Web Dashboard
 
 ## Overview
 
-This roadmap delivers upstream sync tooling for GSD fork maintainers. The journey progresses from core infrastructure (configure, fetch, status, notifications), through analysis capabilities (commit grouping, conflict detection), to merge operations (atomic merge, rollback, state logging), then interactive features and integration (deep dive mode, worktree awareness), and finally documentation. Each phase builds on the previous, enabling fork maintainers to stay current with upstream while preserving custom enhancements through intelligent tooling.
+This roadmap delivers a feature-rich web dashboard that replicates and enhances the Claude Code CLI experience. The journey progresses from infrastructure (WebSocket, file locking, security), through backend core (REST API, agent orchestrator), to frontend foundation (Next.js, dashboard), then feature-specific UIs (Discuss, Execute, Plan, Verify), and finally visualization and debugging tools. Each phase builds on the previous, delivering complete, usable functionality at each boundary.
+
+## Milestones
+
+- <details><summary>v1.0 Worktree Isolation (Phases 1-4) - SHIPPED 2026-02-23</summary>(See legacy roadmap)</details>
+- <details><summary>v1.1 Upstream Sync (Phases 5-10) - SHIPPED 2026-03-10</summary>(See legacy roadmap)</details>
+- [ ] **v2.0 GSD Web Dashboard** - Phases 13-20 (in progress)
 
 ## Phases
 
 **Phase Numbering:**
 - v1.0 completed Phases 1-4 (Worktree Isolation)
-- v1.1 continues from Phase 5 (Upstream Sync)
-- Decimal phases (e.g., 5.1): Urgent insertions (marked with INSERTED)
+- v1.1 completed Phases 5-10 (Upstream Sync)
+- Phases 11-12 pending (Document-assisted discuss, MCP Server API)
+- v2.0 starts at Phase 13 (Web Dashboard)
+- Decimal phases (e.g., 13.1): Urgent insertions (marked with INSERTED)
 
-- [x] **Phase 5: Core Infrastructure** - Upstream configuration, fetch, status, and update notifications (completed 2026-02-24)
-- [x] **Phase 6: Analysis** - Commit grouping, conflict preview, and change detection (completed 2026-02-24)
-- [x] **Phase 6.1: Local Modifications Integration** - Path migration and finalize-phase command (INSERTED, completed 2026-02-24)
-- [x] **Phase 7: Merge Operations** - Atomic merge with rollback and state logging (completed 2026-02-24)
-- [x] **Phase 8: Interactive & Integration** - Deep dive mode, worktree awareness, and health integration (completed 2026-02-24)
-- [x] **Phase 9: Documentation** - User guide, architecture docs, and troubleshooting (completed 2026-03-10)
-- [x] **Phase 10: Parallel Milestones** - Enable parallel milestone execution with scoped phases (completed 2026-03-10)
+- [ ] **Phase 13: Foundation Infrastructure** - WebSocket server, token buffering, file locking, and security layer
+- [ ] **Phase 14: Backend Core** - REST API, agent orchestrator, and WebSocket connection management
+- [ ] **Phase 15: Frontend Foundation & Dashboard** - Next.js app with project listing, health indicators, and navigation
+- [ ] **Phase 16: Discuss Phase UI** - Chat interface with streaming and CONTEXT.md preview
+- [ ] **Phase 17: Execute Phase UI** - Execution streaming, tool visualization, checkpoints, and TDD workflow
+- [ ] **Phase 18: Plan & Verify Phase UIs** - Research streaming, plan preview, verification report, and gap workflow
+- [ ] **Phase 19: Roadmap Visualization** - Dependency graph, Gantt timeline, and progress tracking
+- [ ] **Phase 20: Debug Session UI** - Debug session creation, hypothesis tracking, and evidence collection
 
 ## Phase Details
 
-### Phase 5: Core Infrastructure
-**Goal**: Establish upstream remote management with fetch, status, and proactive notifications
-**Depends on**: v1.0 complete (uses existing gsd-tools patterns)
-**Requirements**: SYNC-01, SYNC-02, SYNC-03, SYNC-04, NOTIF-01, NOTIF-02, NOTIF-03
+### Phase 13: Foundation Infrastructure
+**Goal**: Establish the infrastructure layer required for all real-time streaming and concurrent file access
+**Depends on**: Phase 12 (MCP Server API provides GSD library patterns to wrap)
+**Requirements**: INFRA-01, INFRA-02, INFRA-03, INFRA-04
 **Success Criteria** (what must be TRUE):
-  1. User can configure upstream remote URL and it persists in config.json
-  2. User can fetch upstream changes without modifying their local branches
-  3. User can see how many commits behind upstream they are with summary info
-  4. User can view upstream commit log with author, date, and message summaries
-  5. Starting a GSD session shows notification when upstream has new commits
-**Plans:** 4/4 plans complete
+  1. WebSocket server accepts connections and auto-reconnects with state sync on reconnection
+  2. Token streaming uses requestAnimationFrame buffering without overwhelming the UI
+  3. CLI and dashboard can read/write .planning/ files concurrently without corruption
+  4. File access is restricted to project directories with symlink escape protection
+**Plans**: TBD
 
 Plans:
-- [x] 5-01-PLAN.md — Create upstream.cjs module with configure and fetch operations
-- [x] 5-02-PLAN.md — Add status and log commands to upstream.cjs
-- [x] 5-03-PLAN.md — Integrate upstream commands into gsd-tools.cjs CLI
-- [x] 5-04-PLAN.md — Add notification check for session start integration
+- [ ] 13-01-PLAN.md — Turborepo monorepo with pnpm workspaces and shared typed events
+- [ ] 13-02-PLAN.md — Socket.IO server with auto-reconnect and state sync protocol
+- [ ] 13-03-PLAN.md — File locking and security layer (symlink protection, path validation)
 
-### Phase 6: Analysis
-**Goal**: Provide visibility into upstream changes with grouping and conflict prediction
-**Depends on**: Phase 5
-**Requirements**: ANAL-01, ANAL-02, ANAL-03, ANAL-04
+### Phase 14: Backend Core
+**Goal**: Provide REST API for project data and agent orchestrator for Claude API streaming
+**Depends on**: Phase 13
+**Requirements**: (Backend enables DASH, EXEC, and all streaming requirements - no direct requirement mapping)
 **Success Criteria** (what must be TRUE):
-  1. User can see upstream commits grouped by feature/directory affected
-  2. User can preview which files would conflict before attempting merge
-  3. User receives warning about rename/delete conflicts that need manual attention
-  4. User is notified when upstream contains binary file changes
-**Plans:** 4/4 plans complete
+  1. REST API returns project list with health status from existing GSD modules
+  2. WebSocket emits typed events for agent progress, tool calls, and checkpoints
+  3. Agent orchestrator streams Claude API responses with tool execution loop
+  4. Checkpoint requests are relayed to frontend with idempotent response handling
+  5. Rate limit errors (429) are handled with exponential backoff
+**Plans**: TBD
 
 Plans:
-- [x] 6-01-PLAN.md — Commit grouping functions in upstream.cjs (cmdUpstreamAnalyze)
-- [x] 6-02-PLAN.md — Conflict preview with risk scoring (cmdUpstreamPreview)
-- [x] 6-03-PLAN.md — Structural conflict resolution workflow (cmdUpstreamResolve)
-- [x] 6-04-PLAN.md — gsd-tools CLI routing + workflow command integration
+- [ ] 14-01-PLAN.md — REST API for project listing, health checks, and phase data (Hono)
+- [ ] 14-02-PLAN.md — GSD wrapper adapting sync CJS modules to async TypeScript
+- [ ] 14-03-PLAN.md — Agent orchestrator with Claude API streaming and tool execution
+- [ ] 14-04-PLAN.md — Checkpoint handling with idempotency and timeout warnings
 
-### Phase 06.1: Local Modifications Integration (INSERTED)
-
-**Goal:** Add missing finalize-phase command to enable /gsd:finalize-phase
-**Depends on:** Phase 6
-**Source:** Local modifications made to ~/Projects/OpenClaw/gsd (installed GSD v1.20.3)
-**Changes to integrate:**
-  1. New finalize-phase command file (merge to main, cleanup worktree)
-**Plans:** 1/1 plans complete
-
-Plans:
-- [x] 06.1-01-PLAN.md — Create finalize-phase command file
-
-### Phase 7: Merge Operations
-**Goal**: Enable safe upstream merges with automatic backup, atomic execution, and recovery
-**Depends on**: Phase 6.1
-**Requirements**: MERGE-01, MERGE-02, MERGE-03, MERGE-04
+### Phase 15: Frontend Foundation & Dashboard
+**Goal**: Deliver project dashboard with health status, progress tracking, and navigation
+**Depends on**: Phase 14
+**Requirements**: DASH-01, DASH-02, DASH-03, DASH-04, DASH-05
 **Success Criteria** (what must be TRUE):
-  1. User can merge upstream with automatic backup branch created before merge
-  2. Failed merge automatically rolls back to pre-merge state with clear message
-  3. User can abort an incomplete sync and restore to clean state
-  4. Sync events (fetch, merge, abort) are logged in STATE.md with timestamps
-**Plans:** 3/3 plans complete
+  1. User can view list of all GSD projects with health status indicators (healthy/degraded/error)
+  2. User can see current phase and progress percentage for each project
+  3. User can view recent activity feed (last 5 actions) for each project
+  4. User can search and filter projects by name or status
+  5. User can navigate to project detail view by clicking a project card
+**Plans**: TBD
 
 Plans:
-- [ ] 7-01-PLAN.md — Add STATE.md sync history logging and backup branch helpers
-- [ ] 7-02-PLAN.md — Add merge command with pre-merge safety and atomic rollback
-- [ ] 7-03-PLAN.md — Add abort command for incomplete sync restoration
+- [ ] 15-01-PLAN.md — Next.js 15 app with App Router, Tailwind v4, and dark mode
+- [ ] 15-02-PLAN.md — Socket.IO client hook with reconnection and Zustand stores
+- [ ] 15-03-PLAN.md — Dashboard UI with project cards, health indicators, and activity feed
+- [ ] 15-04-PLAN.md — Project search, filtering, and navigation to detail view
 
-### Phase 8: Interactive & Integration
-**Goal**: Provide interactive exploration and integrate with existing GSD features
-**Depends on**: Phase 7
-**Requirements**: INTER-01, INTER-02, INTER-03, INTEG-01, INTEG-02
+### Phase 16: Discuss Phase UI
+**Goal**: Enable conversational context gathering with real-time streaming and CONTEXT.md preview
+**Depends on**: Phase 15
+**Requirements**: DISC-01, DISC-02, DISC-03, DISC-04, DISC-05
 **Success Criteria** (what must be TRUE):
-  1. User can explore specific upstream commits interactively (view diffs, ask questions)
-  2. User receives refactoring suggestions before merge to minimize conflicts
-  3. Post-merge verification tests run automatically to confirm custom features work
-  4. User receives warning when attempting sync with active worktrees
-  5. Health check reports incomplete/stalled sync operations
-**Plans:** 4/4 plans complete
+  1. User can have a chat-style conversation with Claude with real-time token streaming
+  2. User can see live preview of CONTEXT.md being generated as conversation progresses
+  3. User can mark individual decisions as locked (must keep) vs discretionary (agent can adjust)
+  4. User can refresh browser and resume discussion session where they left off
+  5. User can manually edit CONTEXT.md with sync back to conversation state
+**Plans**: TBD
 
 Plans:
-- [x] 8-01-PLAN.md — Interactive exploration mode (sync explore command with readline REPL)
-- [x] 8-02-PLAN.md — Refactoring suggestions (semantic similarity detection + apply-suggestion)
-- [x] 8-03-PLAN.md — Post-merge verification (test discovery + rollback prompt)
-- [x] 8-04-PLAN.md — Worktree integration (sync guard + health check extension)
+- [ ] 16-01-PLAN.md — Chat conversation interface with streaming token display
+- [ ] 16-02-PLAN.md — CONTEXT.md live preview panel with decision locking
+- [ ] 16-03-PLAN.md — Session persistence across reconnects and browser refresh
+- [ ] 16-04-PLAN.md — Manual CONTEXT.md editing with bidirectional sync
 
-### Phase 9: Documentation
-**Goal**: Document upstream sync features for users and developers
-**Depends on**: Phase 8
-**Requirements**: DOC-01, DOC-02, DOC-03, DOC-04
+### Phase 17: Execute Phase UI
+**Goal**: Deliver real-time execution interface with streaming, tool visualization, checkpoints, and TDD workflow
+**Depends on**: Phase 16
+**Requirements**: EXEC-01, EXEC-02, EXEC-03, EXEC-04, EXEC-05, EXEC-06, EXEC-07, EXEC-08, QUAL-01, QUAL-02, QUAL-03, QUAL-04
 **Success Criteria** (what must be TRUE):
-  1. User guide explains /gsd:sync-upstream command with examples
-  2. Architecture docs include mermaid diagrams showing sync flow
-  3. README documents upstream sync features under GSD Enhancements section
-  4. Troubleshooting guide covers common sync issues with recovery steps
-**Plans:** 2/2 plans complete
+  1. User can see wave-based execution progress with real-time log streaming per plan
+  2. User can see tool calls visualized as collapsible cards (Read, Write, Bash, etc.)
+  3. User can respond to checkpoint dialogs with timeout warning display
+  4. User can view file changes in Monaco DiffEditor with syntax highlighting
+  5. User can see git commit timeline showing commits created during execution
+  6. User can pause execution and resume from the paused state
+  7. User can abort execution gracefully with rollback option
+  8. User can recover from errors with retry options and context preservation
+  9. Execution follows Red-Green-Refactor TDD workflow for code development tasks
+**Plans**: TBD
 
 Plans:
-- [x] 09-01-PLAN.md — Extend USER-GUIDE.md with Upstream Sync section, Mermaid diagrams, and troubleshooting
-- [x] 09-02-PLAN.md — Add Upstream Sync section to README GSD Enhancements
+- [ ] 17-01-PLAN.md — Wave-based execution progress with log streaming
+- [ ] 17-02-PLAN.md — Tool call visualization with collapsible cards
+- [ ] 17-03-PLAN.md — Checkpoint dialog modal with timeout warning
+- [ ] 17-04-PLAN.md — Monaco DiffEditor integration for file changes
+- [ ] 17-05-PLAN.md — Git commit timeline visualization
+- [ ] 17-06-PLAN.md — Pause/resume and abort/rollback controls
+- [ ] 17-07-PLAN.md — Error recovery with retry options
+- [ ] 17-08-PLAN.md — TDD workflow enforcement (Red-Green-Refactor)
 
-### Phase 10: Parallel Milestones
-**Goal**: Enable parallel milestone execution with milestone-scoped phases and progress tracking
-**Depends on**: Phase 8 (uses worktree and state patterns)
-**Requirements**: PM-01, PM-02, PM-03, PM-04, PM-05, PM-06, PM-07, PM-08, PM-09, PM-10
+### Phase 18: Plan & Verify Phase UIs
+**Goal**: Provide research streaming, plan preview, verification report, and gap closure workflow
+**Depends on**: Phase 17
+**Requirements**: PLAN-01, PLAN-02, PLAN-03, PLAN-04, PLAN-05, VERIF-01, VERIF-02, VERIF-03, VERIF-04, VERIF-05, VERIF-06, VERIF-07
 **Success Criteria** (what must be TRUE):
-  1. Multiple milestones can run in parallel with independent phase numbering
-  2. Commands support `M7/01` syntax for milestone-scoped operations
-  3. Progress display shows per-milestone progress bars
-  4. State tracking maintains separate progress per milestone
-  5. Migration tool converts legacy projects to parallel structure
-  6. Existing single-milestone projects work unchanged (backward compatible)
-**Plans:** 4/4 plans complete
+  1. User can see real-time progress as researcher agents spawn, run, and complete
+  2. User can preview generated plans with task breakdown and wave grouping
+  3. User can see verification feedback with specific issues highlighted per plan
+  4. User can view requirement coverage matrix showing requirement-to-phase mapping
+  5. User can edit plan tasks inline before execution
+  6. User can view verification report with pass/fail status per requirement
+  7. User can see gaps highlighted with severity levels (blocking, major, minor)
+  8. Verification executes all tests automatically before displaying results
+  9. Verification validates that all success criteria are genuinely met
+  10. User can mark manual test items as pass/fail in checklist
+  11. User can approve completed work or reject with gap selection
+  12. Rejection routes to plan-phase --gaps to create fix plans automatically
+**Plans**: TBD
 
 Plans:
-- [x] 10-01-PLAN.md — Milestone directory structure and core commands
-- [ ] 10-02-PLAN.md — Milestone-scoped workflow commands
-- [ ] 10-03-PLAN.md — Multi-milestone state tracking
-- [ ] 10-04-PLAN.md — Migration tool and backward compatibility
+- [ ] 18-01-PLAN.md — Research streaming with agent spawn progress
+- [ ] 18-02-PLAN.md — Plan preview with task breakdown and wave visualization
+- [ ] 18-03-PLAN.md — Inline plan editing before execution
+- [ ] 18-04-PLAN.md — Requirement coverage matrix display
+- [ ] 18-05-PLAN.md — Verification report with pass/fail status
+- [ ] 18-06-PLAN.md — Gap highlighting with severity levels
+- [ ] 18-07-PLAN.md — Manual test checklist and approval workflow
+- [ ] 18-08-PLAN.md — Rejection-to-gap-planning flow
 
-### Phase 11: Add --docs flag to discuss-phase for document-assisted context extraction
-
-**Goal:** Enable document-assisted context extraction by adding --docs flag to discuss-phase that auto-extracts implementation decisions from reference documents (PRD, spec, etc.) with four-tier confidence classification, only prompting users for gaps and ambiguities
-**Depends on:** Phase 10
-**Requirements**: TBD
+### Phase 19: Roadmap Visualization
+**Goal**: Visualize project progress with dependency graph, Gantt timeline, and milestone grouping
+**Depends on**: Phase 18
+**Requirements**: ROAD-01, ROAD-02, ROAD-03, ROAD-04, ROAD-05
 **Success Criteria** (what must be TRUE):
-  1. User can pass --docs flag with comma-separated document paths
-  2. Decisions are extracted from documents with four-tier classification (Explicit, Inferred, Ambiguous, Gap)
-  3. User sees grouped summary of extractions and can override any decision
-  4. Only gaps and ambiguities route to standard discuss-phase questioning
-  5. CONTEXT.md includes provenance notation showing decision sources
-  6. Standard discuss-phase flow (no --docs) remains unchanged
-**Plans:** 2 plans
+  1. User can view dependency graph showing phase-to-phase relationships
+  2. User can view Gantt-style timeline showing phase schedule
+  3. User can see progress tracking per phase with visual indicators
+  4. User can see phases grouped by milestone
+  5. User can click phase in visualization to navigate to phase detail
+**Plans**: TBD
 
 Plans:
-- [ ] 11-01-PLAN.md — Add --docs flag parsing and document path validation
-- [ ] 11-02-PLAN.md — Add extraction, presentation, and provenance-enhanced CONTEXT.md output
+- [ ] 19-01-PLAN.md — Dependency graph with React Flow (@xyflow/react)
+- [ ] 19-02-PLAN.md — Gantt-style timeline visualization
+- [ ] 19-03-PLAN.md — Progress tracking and milestone grouping
+- [ ] 19-04-PLAN.md — Phase navigation from visualization
+
+### Phase 20: Debug Session UI
+**Goal**: Enable visual debugging workflow with hypothesis tracking and evidence collection
+**Depends on**: Phase 19
+**Requirements**: DEBUG-01, DEBUG-02, DEBUG-03, DEBUG-04
+**Success Criteria** (what must be TRUE):
+  1. User can create a new debug session from dashboard
+  2. User can track hypotheses with evidence for/against
+  3. User can collect evidence via UI (logs, screenshots, reproduction steps)
+  4. User can view session history with timeline of investigations
+**Plans**: TBD
+
+Plans:
+- [ ] 20-01-PLAN.md — Debug session creation and management
+- [ ] 20-02-PLAN.md — Hypothesis tracking with evidence linking
+- [ ] 20-03-PLAN.md — Evidence collection UI (logs, screenshots, repro steps)
+- [ ] 20-04-PLAN.md — Session history timeline
 
 ## Progress
 
 **Execution Order:**
-Phases execute in numeric order: 5 -> 6 -> 6.1 -> 7 -> 8 -> 9
+Phases execute in numeric order: 13 -> 14 -> 15 -> 16 -> 17 -> 18 -> 19 -> 20
 
 | Phase | Plans Complete | Status | Completed |
 |-------|----------------|--------|-----------|
-| 5. Core Infrastructure | 4/4 | Complete | 2026-02-24 |
-| 6. Analysis | 4/4 | Complete | 2026-02-24 |
-| 6.1 Local Modifications Integration | 1/1 | Complete | 2026-02-24 |
-| 7. Merge Operations | 3/3 | Complete    | 2026-02-24 |
-| 8. Interactive & Integration | 4/4 | Complete | 2026-02-24 |
-| 9. Documentation | 2/2 | Complete | 2026-03-10 |
-| 10. Parallel Milestones | 4/4 | Complete    | 2026-03-10 |
-| 11. Document-assisted discuss-phase | 0/2 | Not started | - |
+| 13. Foundation Infrastructure | 0/3 | Not started | - |
+| 14. Backend Core | 0/4 | Not started | - |
+| 15. Frontend Foundation & Dashboard | 0/4 | Not started | - |
+| 16. Discuss Phase UI | 0/4 | Not started | - |
+| 17. Execute Phase UI | 0/8 | Not started | - |
+| 18. Plan & Verify Phase UIs | 0/8 | Not started | - |
+| 19. Roadmap Visualization | 0/4 | Not started | - |
+| 20. Debug Session UI | 0/4 | Not started | - |
 
 ---
-*Roadmap created: 2026-02-23*
+*Roadmap created: 2026-03-10*
 *Last updated: 2026-03-10*
