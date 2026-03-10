@@ -7,6 +7,7 @@ const path = require('path');
 const { escapeRegex, normalizePhaseName, comparePhaseNum, findPhaseInternal, getArchivedPhaseDirs, generateSlugInternal, output, error } = require('./core.cjs');
 const { extractFrontmatter } = require('./frontmatter.cjs');
 const { writeStateMd } = require('./state.cjs');
+const { parseMilestonePhaseRef, getMilestoneAbsolutePath, getDefaultMilestone } = require('./milestone-parallel.cjs');
 
 function cmdPhasesList(cwd, options, raw) {
   const phasesDir = path.join(cwd, '.planning', 'phases');
@@ -149,46 +150,126 @@ function cmdPhaseNextDecimal(cwd, basePhase, raw) {
   }
 }
 
-function cmdFindPhase(cwd, phase, raw) {
+function cmdFindPhase(cwd, phase, raw, options = {}) {
   if (!phase) {
     error('phase identifier required');
   }
 
-  const phasesDir = path.join(cwd, '.planning', 'phases');
-  const normalized = normalizePhaseName(phase);
+  const notFound = { found: false, directory: null, phase_number: null, phase_name: null, plans: [], summaries: [], milestone: null };
 
-  const notFound = { found: false, directory: null, phase_number: null, phase_name: null, plans: [], summaries: [] };
+  // Parse milestone/phase reference (e.g., "M7/01" or just "01")
+  const { milestone: parsedMilestone, phase: parsedPhase } = parseMilestonePhaseRef(phase);
 
-  try {
-    const entries = fs.readdirSync(phasesDir, { withFileTypes: true });
-    const dirs = entries.filter(e => e.isDirectory()).map(e => e.name).sort((a, b) => comparePhaseNum(a, b));
+  // Determine which milestone to use (explicit > option > default > legacy)
+  let milestoneId = parsedMilestone || options.milestone || null;
 
-    const match = dirs.find(d => d.startsWith(normalized));
-    if (!match) {
-      output(notFound, raw, '');
+  // If no explicit milestone, check for default in parallel milestone projects
+  if (!milestoneId) {
+    const defaultMilestone = getDefaultMilestone(cwd);
+    if (defaultMilestone) {
+      milestoneId = defaultMilestone;
+    }
+  }
+
+  const normalized = normalizePhaseName(parsedPhase);
+
+  // Helper to search in a phases directory
+  function searchInPhasesDir(phasesDir, relBase, milestoneRef) {
+    try {
+      if (!fs.existsSync(phasesDir)) return null;
+
+      const entries = fs.readdirSync(phasesDir, { withFileTypes: true });
+      const dirs = entries.filter(e => e.isDirectory()).map(e => e.name).sort((a, b) => comparePhaseNum(a, b));
+
+      const match = dirs.find(d => d.startsWith(normalized));
+      if (!match) return null;
+
+      const dirMatch = match.match(/^(\d+[A-Z]?(?:\.\d+)*)-?(.*)/i);
+      const phaseNumber = dirMatch ? dirMatch[1] : normalized;
+      const phaseName = dirMatch && dirMatch[2] ? dirMatch[2] : null;
+
+      const phaseDir = path.join(phasesDir, match);
+      const phaseFiles = fs.readdirSync(phaseDir);
+      const plans = phaseFiles.filter(f => f.endsWith('-PLAN.md') || f === 'PLAN.md').sort();
+      const summaries = phaseFiles.filter(f => f.endsWith('-SUMMARY.md') || f === 'SUMMARY.md').sort();
+
+      return {
+        found: true,
+        directory: path.join(relBase, match),
+        phase_number: phaseNumber,
+        phase_name: phaseName,
+        plans,
+        summaries,
+        milestone: milestoneRef,
+      };
+    } catch {
+      return null;
+    }
+  }
+
+  // If explicit milestone in reference (M7/01), search only there
+  if (parsedMilestone) {
+    const milestonePath = getMilestoneAbsolutePath(cwd, parsedMilestone);
+    if (!milestonePath) {
+      output({ ...notFound, error: `Milestone ${parsedMilestone} not found` }, raw, '');
       return;
     }
 
-    const dirMatch = match.match(/^(\d+[A-Z]?(?:\.\d+)*)-?(.*)/i);
-    const phaseNumber = dirMatch ? dirMatch[1] : normalized;
-    const phaseName = dirMatch && dirMatch[2] ? dirMatch[2] : null;
+    const phasesDir = path.join(milestonePath, 'phases');
+    const relBase = path.join(path.relative(cwd, milestonePath), 'phases');
+    const result = searchInPhasesDir(phasesDir, relBase, parsedMilestone);
 
-    const phaseDir = path.join(phasesDir, match);
-    const phaseFiles = fs.readdirSync(phaseDir);
-    const plans = phaseFiles.filter(f => f.endsWith('-PLAN.md') || f === 'PLAN.md').sort();
-    const summaries = phaseFiles.filter(f => f.endsWith('-SUMMARY.md') || f === 'SUMMARY.md').sort();
+    if (result) {
+      output(result, raw, result.directory);
+    } else {
+      output(notFound, raw, '');
+    }
+    return;
+  }
 
-    const result = {
-      found: true,
-      directory: path.join('.planning', 'phases', match),
-      phase_number: phaseNumber,
-      phase_name: phaseName,
-      plans,
-      summaries,
-    };
+  // If milestone provided via options flag, search only there
+  if (options.milestone) {
+    const milestonePath = getMilestoneAbsolutePath(cwd, options.milestone);
+    if (!milestonePath) {
+      output({ ...notFound, error: `Milestone ${options.milestone} not found` }, raw, '');
+      return;
+    }
 
+    const phasesDir = path.join(milestonePath, 'phases');
+    const relBase = path.join(path.relative(cwd, milestonePath), 'phases');
+    const result = searchInPhasesDir(phasesDir, relBase, options.milestone);
+
+    if (result) {
+      output(result, raw, result.directory);
+    } else {
+      output(notFound, raw, '');
+    }
+    return;
+  }
+
+  // If default milestone is set, try there first, then fall back to legacy
+  if (milestoneId) {
+    const milestonePath = getMilestoneAbsolutePath(cwd, milestoneId);
+    if (milestonePath) {
+      const phasesDir = path.join(milestonePath, 'phases');
+      const relBase = path.join(path.relative(cwd, milestonePath), 'phases');
+      const result = searchInPhasesDir(phasesDir, relBase, milestoneId);
+
+      if (result) {
+        output(result, raw, result.directory);
+        return;
+      }
+    }
+    // Fall through to legacy path
+  }
+
+  // Legacy .planning/phases/
+  const phasesDir = path.join(cwd, '.planning', 'phases');
+  const result = searchInPhasesDir(phasesDir, path.join('.planning', 'phases'), null);
+
+  if (result) {
     output(result, raw, result.directory);
-  } catch {
+  } else {
     output(notFound, raw, '');
   }
 }
