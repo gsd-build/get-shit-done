@@ -41,10 +41,17 @@ Do NOT downgrade deployment criteria to local file checks.
 If $ARGUMENTS contains a phase number, load context:
 
 ```bash
+# PHASE_ARG supports milestone-scoped references:
+# - "04" - Legacy single-milestone phase
+# - "M7/04" - Phase 04 in milestone M7 (parallel milestones)
 INIT=$(node ~/.claude/get-shit-done/bin/gsd-tools.cjs init verify-work "${PHASE_ARG}")
 ```
 
-Parse JSON for: `planner_model`, `checker_model`, `commit_docs`, `phase_found`, `phase_dir`, `phase_number`, `phase_name`, `has_verification`.
+Parse JSON for:
+- **Models:** `planner_model`, `checker_model`
+- **Config:** `commit_docs`
+- **Phase:** `phase_found`, `phase_dir`, `phase_number`, `phase_name`, `has_verification`
+- **Milestone (parallel projects):** `is_parallel_project`, `milestone_id`, `parallel_milestone_name`, `milestone_dir`
 </step>
 
 <step name="check_active_session">

@@ -16,16 +16,27 @@ Read STATE.md before any operation to load project context.
 Load all context in one call:
 
 ```bash
+# PHASE_ARG supports milestone-scoped references:
+# - "01" - Legacy single-milestone phase
+# - "M7/01" - Phase 01 in milestone M7 (parallel milestones)
 INIT=$(node ~/.claude/get-shit-done/bin/gsd-tools.cjs init execute-phase "${PHASE_ARG}")
 ```
 
-Parse JSON for: `executor_model`, `verifier_model`, `commit_docs`, `parallelization`, `branching_strategy`, `branch_name`, `phase_found`, `phase_dir`, `phase_number`, `phase_name`, `phase_slug`, `plans`, `incomplete_plans`, `plan_count`, `incomplete_count`, `state_exists`, `roadmap_exists`, `phase_req_ids`.
+Parse JSON for:
+- **Core:** `executor_model`, `verifier_model`, `commit_docs`, `parallelization`
+- **Branching:** `branching_strategy`, `branch_name`
+- **Phase:** `phase_found`, `phase_dir`, `phase_number`, `phase_name`, `phase_slug`, `phase_req_ids`
+- **Plans:** `plans`, `incomplete_plans`, `plan_count`, `incomplete_count`
+- **Files:** `state_exists`, `roadmap_exists`
+- **Milestone (parallel projects):** `is_parallel_project`, `milestone_id`, `parallel_milestone_name`, `milestone_dir`
 
 **If `phase_found` is false:** Error — phase directory not found.
 **If `plan_count` is 0:** Error — no plans found in phase.
 **If `state_exists` is false but `.planning/` exists:** Offer reconstruct or continue.
 
 When `parallelization` is false, plans within a wave execute sequentially.
+
+**Milestone Context:** When `is_parallel_project` is true and `milestone_id` is set, the phase directory will be under `.planning/milestones/{milestone_id}-{slug}/phases/`. All roadmap and requirements paths adjust automatically.
 </step>
 
 <step name="handle_branching">

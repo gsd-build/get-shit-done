@@ -15,14 +15,25 @@ Read all files referenced by the invoking prompt's execution_context before star
 Load all context in one call (paths only to minimize orchestrator context):
 
 ```bash
+# PHASE supports milestone-scoped references:
+# - "02" - Legacy single-milestone phase
+# - "M7/02" - Phase 02 in milestone M7 (parallel milestones)
 INIT=$(node ~/.claude/get-shit-done/bin/gsd-tools.cjs init plan-phase "$PHASE")
 ```
 
-Parse JSON for: `researcher_model`, `planner_model`, `checker_model`, `research_enabled`, `plan_checker_enabled`, `nyquist_validation_enabled`, `commit_docs`, `phase_found`, `phase_dir`, `phase_number`, `phase_name`, `phase_slug`, `padded_phase`, `has_research`, `has_context`, `has_plans`, `plan_count`, `planning_exists`, `roadmap_exists`, `phase_req_ids`.
+Parse JSON for:
+- **Models:** `researcher_model`, `planner_model`, `checker_model`
+- **Workflow:** `research_enabled`, `plan_checker_enabled`, `nyquist_validation_enabled`, `commit_docs`
+- **Phase:** `phase_found`, `phase_dir`, `phase_number`, `phase_name`, `phase_slug`, `padded_phase`, `phase_req_ids`
+- **Artifacts:** `has_research`, `has_context`, `has_plans`, `plan_count`
+- **Environment:** `planning_exists`, `roadmap_exists`
+- **Milestone (parallel projects):** `is_parallel_project`, `milestone_id`, `parallel_milestone_name`, `milestone_dir`
 
 **File paths (for <files_to_read> blocks):** `state_path`, `roadmap_path`, `requirements_path`, `context_path`, `research_path`, `verification_path`, `uat_path`. These are null if files don't exist.
 
 **If `planning_exists` is false:** Error — run `/gsd:new-project` first.
+
+**Milestone Context:** When `milestone_id` is set, `roadmap_path` and `requirements_path` point to the milestone-specific files.
 
 ## 2. Parse and Normalize Arguments
 
