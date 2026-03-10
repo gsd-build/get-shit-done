@@ -60,29 +60,29 @@ _(None — all requirements are in scope for v1.24)_
 
 | Requirement | Phase | Status |
 |-------------|-------|--------|
-| ORCH-01 | — | Pending |
-| ORCH-02 | — | Pending |
-| ORCH-03 | — | Pending |
-| ORCH-04 | — | Pending |
-| DISC-01 | — | Pending |
-| DISC-02 | — | Pending |
-| DISC-03 | — | Pending |
-| DISC-04 | — | Pending |
-| EXEC-01 | — | Pending |
-| EXEC-02 | — | Pending |
-| EXEC-03 | — | Pending |
-| EXEC-04 | — | Pending |
-| CTRL-01 | — | Pending |
-| CTRL-02 | — | Pending |
-| CTRL-03 | — | Pending |
-| ART-01 | — | Pending |
-| ART-02 | — | Pending |
-| ART-03 | — | Pending |
+| ORCH-01 | Phase 8 | Pending |
+| ORCH-02 | Phase 8 | Pending |
+| ORCH-03 | Phase 5 | Pending |
+| ORCH-04 | Phase 8 | Pending |
+| DISC-01 | Phase 6 | Pending |
+| DISC-02 | Phase 6 | Pending |
+| DISC-03 | Phase 6 | Pending |
+| DISC-04 | Phase 6 | Pending |
+| EXEC-01 | Phase 7 | Pending |
+| EXEC-02 | Phase 7 | Pending |
+| EXEC-03 | Phase 7 | Pending |
+| EXEC-04 | Phase 7 | Pending |
+| CTRL-01 | Phase 8 | Pending |
+| CTRL-02 | Phase 8 | Pending |
+| CTRL-03 | Phase 8 | Pending |
+| ART-01 | Phase 5 | Pending |
+| ART-02 | Phase 5 | Pending |
+| ART-03 | Phase 5 | Pending |
 
 **Coverage:**
 - v1.24 requirements: 18 total
-- Mapped to phases: 0 (awaiting roadmap)
-- Unmapped: 18
+- Mapped to phases: 18 ✓
+- Unmapped: 0
 
 ---
 *Requirements defined: 2026-03-10*
