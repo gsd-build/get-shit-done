@@ -39,13 +39,52 @@
 
 ---
 
+## Milestone: v1.24 — Autonomous Skill
+
+**Shipped:** 2026-03-10
+**Phases:** 4 | **Plans:** 5
+
+### What Was Built
+- `gsd-autonomous` skill: 743-line workflow for fully autonomous milestone execution
+- Smart discuss: proposes grey area answers in tables instead of open-ended questions
+- Phase execution chain: discuss→plan→execute with VERIFICATION.md-based routing
+- Lifecycle automation: audit→complete→cleanup runs after all phases finish
+- Roadmap regex fix for colon-outside-bold format
+
+### What Worked
+- Skill() flat calls avoided deep nesting freezes (Issue #686) — critical architectural decision
+- Building incrementally (skeleton → discuss → chain → lifecycle) kept each phase focused
+- Reusing existing skills via Skill() instead of reimplementing gave reliable behavior
+- Inline smart discuss produces identical CONTEXT.md output to regular discuss-phase
+- `--no-transition` flag on execute-phase cleanly separated autonomous flow from existing chaining
+
+### What Was Inefficient
+- Progress table in ROADMAP.md went stale again (same issue as v1.23) — needs automation
+- Phase 5 discovered a regex bug that should have been caught by existing tests
+- STATE.md progress percent was stuck at 50% — tool calculates incorrectly for continuation milestones
+
+### Patterns Established
+- Skill() flat calls pattern for multi-skill orchestration workflows
+- VERIFICATION.md status parsing for autonomous routing (passed/human_needed/gaps_found)
+- Infrastructure phase detection heuristic (3-criteria: no code, setup/config keywords, dependency-only)
+- Gap closure with 1-retry limit to prevent infinite loops
+- `--no-transition` flag for skills that manage their own flow
+
+### Key Lessons
+1. Deep nesting of Task() calls causes runtime freezes — always use flat Skill() calls for orchestration
+2. Regex patterns must be tested for ALL formatting variants found in actual data files
+3. Progress tracking in STATE.md needs fresh calculation per milestone, not continuation from previous
+4. Autonomous skills should produce identical artifacts as manual flows — easier to validate and debug
+
+---
+
 ## Cross-Milestone Trends
 
-| Metric | v1.23 |
-|--------|-------|
-| Phases | 4 |
-| Plans | 6 |
-| Tests added | 104 |
-| Bug fixes post-verification | 3 |
-| Requirements satisfied | 22/22 |
-| Requirements deferred | 1 (QUAL-02) |
+| Metric | v1.23 | v1.24 |
+|--------|-------|-------|
+| Phases | 4 | 4 |
+| Plans | 6 | 5 |
+| Tests added | 104 | 2 |
+| Bug fixes post-verification | 3 | 1 |
+| Requirements satisfied | 22/22 | 18/18 |
+| Requirements deferred | 1 (QUAL-02) | 0 |

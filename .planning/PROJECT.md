@@ -23,40 +23,36 @@ Structured, spec-driven AI development that takes projects from idea to shipped 
 - ✓ GitHub Copilot CLI runtime support in installer — v1.23
 - ✓ Copilot file structure generation (`.github/skills/`, `.github/agents/`, `copilot-instructions.md`) — v1.23
 - ✓ Copilot installation testing and validation (104 tests, 15 E2E) — v1.23
+- ✓ Autonomous skill (`gsd-autonomous`) chaining discuss → plan → execute → verify per phase — v1.24
+- ✓ Grey area resolution with proposed answers grouped by area, user accepts/changes per area — v1.24
+- ✓ Seamless phase transitions — only stops for explicit user decisions — v1.24
+- ✓ Full milestone lifecycle automation from first phase to cleanup — v1.24
 
 ### Active
 
-- **AUTO-01**: Autonomous skill (`gsd-autonomous`) that chains discuss → plan → execute → verify per phase, then audit → complete → cleanup
-- **AUTO-02**: Grey area resolution with proposed answers grouped by area, user accepts/changes per area
-- **AUTO-03**: Seamless phase transitions — only stops for explicit user decisions
-- **AUTO-04**: Full milestone lifecycle automation from first phase to cleanup
+(None — milestone v1.24 complete, next milestone not yet started)
 
 ### Out of Scope
 
-- Adding new GSD workflows or commands — separate milestone
 - Web UI or dashboard — not in scope
 - Copilot hook system — Copilot CLI has no lifecycle events
 - Conflict detection for non-GSD files in `.github/` — deferred (QUAL-02)
 
-## Current Milestone: v1.24 Autonomous Skill
+## Latest Shipped: v1.24 Autonomous Skill
 
-**Goal:** Create a `gsd-autonomous` skill that runs the full milestone lifecycle autonomously, chaining existing GSD phases with minimal user interaction.
-
-**Target features:**
-- Autonomous phase chaining (discuss → plan → execute → verify) for all phases in a milestone
-- Smart grey area resolution: proposes answers grouped by area, user accepts or changes
-- Seamless phase transitions — only pauses for explicit user decisions
-- Full milestone lifecycle: all phases → audit → complete → cleanup
+**Shipped:** 2026-03-10 — Created `gsd-autonomous` skill that runs the full milestone lifecycle autonomously. 4 phases, 5 plans, 743-line workflow. Smart discuss proposes grey area answers, verification routing auto-continues or surfaces decisions, lifecycle automation handles audit→complete→cleanup.
 
 ## Context
 
+- Shipped v1.24 with autonomous milestone execution: 41 commits, +6,139 lines across 33 files
 - Shipped v1.23 with Copilot as 5th runtime: 30 commits, +10,425 lines across 42 files
 - Tech stack: Pure Node.js CommonJS, zero production dependencies
 - `bin/install.js` is ~2,700 lines — single-file monolithic installer
-- 566 total tests passing (104 Copilot-specific)
+- 645 total tests passing (104 Copilot-specific, 2 autonomous-specific)
 - Copilot uses `.github/` for local installs, `~/.copilot/` for global
 - Skills use folder-per-skill structure (`.github/skills/gsd-*/SKILL.md`)
 - Agents use `.agent.md` extension with JSON array tools format
+- `gsd-autonomous` uses Skill() flat calls to avoid deep nesting (Issue #686)
 
 ## Constraints
 
@@ -77,6 +73,10 @@ Structured, spec-driven AI development that takes projects from idea to shipped 
 | `isGlobal` parameter on converters | Local vs global installs need different path mappings | ✓ Good — fixed critical path bug |
 | `yamlQuote()` for argument-hint | Single quotes broke YAML when values contained inner `'` | ✓ Good — uses JSON.stringify |
 | QUAL-02 deferred | Conflict detection doesn't exist for any runtime | — Deferred to future milestone |
+| Skill() flat calls for autonomous | Task() deep nesting caused runtime freezes (Issue #686) | ✓ Good — 5 flat Skill() calls work reliably |
+| Inline smart discuss | Replace open-ended Q&A with batch table proposals per area | ✓ Good — faster UX, identical CONTEXT.md output |
+| --no-transition on execute-phase | Prevent execute-phase from auto-chaining via transition.md | ✓ Good — autonomous controls its own flow |
+| VERIFICATION.md routing | Parse status frontmatter for auto-continue vs human decision | ✓ Good — 3 states cover all cases |
 
 ---
-*Last updated: 2026-03-10 after v1.24 milestone start*
+*Last updated: 2026-03-10 after v1.24 milestone completion*
