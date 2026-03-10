@@ -21,7 +21,7 @@
 
 **Milestone Goal:** Create a `gsd-autonomous` skill that runs the full milestone lifecycle autonomously, chaining existing GSD phases with minimal user interaction.
 
-- [ ] **Phase 5: Skill Scaffolding & Phase Discovery** - Create command/workflow files and implement ROADMAP.md phase parsing
+- [x] **Phase 5: Skill Scaffolding & Phase Discovery** - Create command/workflow files and implement ROADMAP.md phase parsing (completed 2026-03-10)
 - [ ] **Phase 6: Smart Discuss** - Grey area resolution with proposed answers instead of open-ended questions
 - [ ] **Phase 7: Phase Execution Chain** - Wire discuss→plan→execute into an automatic single-phase pipeline
 - [ ] **Phase 8: Multi-Phase Orchestration & Lifecycle** - Drive all phases sequentially with progress visibility, lifecycle completion, and user controls
@@ -37,7 +37,7 @@
   2. `get-shit-done/workflows/autonomous.md` exists with bootstrap sequence (`gsd-tools.cjs init`) and standard workflow structure
   3. The command uses `name: gsd:autonomous` so the installer auto-generates `.github/skills/gsd-autonomous/SKILL.md` without any installer changes
   4. The workflow can parse ROADMAP.md and produce an ordered list of incomplete phases with their names, numbers, and dependency info
-**Plans:** 2 plans
+**Plans:** 2/2 plans complete
 
 Plans:
 - [ ] 05-01-PLAN.md — Roadmap regex fix + autonomous command file
@@ -88,7 +88,7 @@ Phases execute in numeric order: 5 → 6 → 7 → 8
 | 2. Content Conversion Engine | v1.23 | 2/2 | ✅ Complete | 2026-03-03 |
 | 3. Instructions & Lifecycle | v1.23 | 2/2 | ✅ Complete | 2026-03-03 |
 | 4. Integration Testing & Validation | v1.23 | 1/1 | ✅ Complete | 2026-03-03 |
-| 5. Skill Scaffolding & Phase Discovery | v1.24 | 0/? | Not started | - |
+| 5. Skill Scaffolding & Phase Discovery | 2/2 | Complete   | 2026-03-10 | - |
 | 6. Smart Discuss | v1.24 | 0/? | Not started | - |
 | 7. Phase Execution Chain | v1.24 | 0/? | Not started | - |
 | 8. Multi-Phase Orchestration & Lifecycle | v1.24 | 0/? | Not started | - |
