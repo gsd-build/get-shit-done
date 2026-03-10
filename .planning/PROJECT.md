@@ -43,6 +43,13 @@ Enable developers to ship faster by providing AI assistants with structured cont
 - [~] API layer (MCP Server) for programmatic GSD access — Phase 12 in progress
 - [~] GUI/web interface — v2.0 milestone started
 
+### Future (v3.0)
+
+- [ ] Hybrid runtime modernization — TypeScript + agent framework
+- [ ] Database-backed state — Replace markdown with SQLite/PostgreSQL
+- [ ] API-first architecture — CLI becomes thin wrapper
+- [ ] Observable agents — Tracing, debugging, metrics
+
 ### Out of Scope
 - Custom AI model hosting — relies on runtime providers
 - Real-time collaboration — single-developer workflow
@@ -75,6 +82,19 @@ This is a brownfield project — GSD is being used to improve itself. The codeba
 | Worktree isolation for parallel execution | Enables working on multiple phases without branch conflicts | Shipped v1.0 |
 | finalize-phase as separate workflow | Clear separation between execution and merge/cleanup | Shipped v1.0 |
 | Modular code structure | Match upstream's lib/ pattern for easier merges | Shipped v1.0 |
+| v3.0 hybrid modernization | Keep GSD principles/prompts, modernize runtime with TypeScript + agent framework | Planned v3.0 |
+| Ship dashboard before runtime rewrite | Production feedback from v2.0 informs v3.0 design | Decision 2026-03-11 |
+
+## Strategic Roadmap
+
+| Milestone | Focus | Status |
+|-----------|-------|--------|
+| v1.0 | Worktree Isolation | Complete |
+| v1.1 | Upstream Sync | Complete |
+| v2.0 | Web Dashboard | In Progress |
+| v3.0 | Hybrid Runtime Modernization | Planned |
+
+**v3.0 Vision:** Replace gsd-tools.cjs with TypeScript agent runtime while preserving all markdown prompts (agents/, workflows/). API-first design with database-backed state and observable agents.
 
 ---
-*Last updated: 2026-03-10 — Milestone v2.0 GSD Web Dashboard started*
+*Last updated: 2026-03-11 — Added v3.0 strategic direction*
