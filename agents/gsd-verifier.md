@@ -390,6 +390,164 @@ gaps:
 
 **Group related gaps by concern** — if multiple truths fail from the same root cause, note this to help the planner create focused plans.
 
+
+<check_charlotte_qa_coverage>
+
+## Step 8c: Charlotte QA Coverage Check (QGATE-07)
+
+**Trigger:** One or more `.tsx` or `.jsx` files appear in SUMMARY.md key-files for this phase.
+
+**Hard rule:** If UI files were produced but no Charlotte QA session is recorded, mark the phase `gaps_found`. This is NEVER a warning — never emit a warning for missing Charlotte QA on UI-producing phases.
+
+**Step A — Detect UI files in SUMMARY.md:**
+
+```bash
+SUMMARY_UI_FILES="no"
+for summary in "$PHASE_DIR"/*-SUMMARY.md; do
+  if [ -f "$summary" ]; then
+    UI_IN_SUMMARY=$(node -e "
+      try {
+        const fs = require('fs');
+        const content = fs.readFileSync('$summary', 'utf8');
+        const hasTsx = /\.(tsx|jsx)/.test(content);
+        console.log(hasTsx ? 'yes' : 'no');
+      } catch(e) { console.log('no'); }
+    " 2>/dev/null || echo "no")
+    if [ "$UI_IN_SUMMARY" = "yes" ]; then
+      SUMMARY_UI_FILES="yes"
+      break
+    fi
+  fi
+done
+```
+
+**Step B — Check for Charlotte QA session record:**
+
+A Charlotte QA session is recorded when any of these exist in the phase directory:
+- A file matching `*-QA-*.md` or `*-CHARLOTTE-*.md` or `*-UX-*.md`
+- A SUMMARY.md that contains "charlotte", "ui-qa", "ux-audit", or "qa round" in its content
+
+```bash
+CHARLOTTE_QA_FOUND=false
+# Check for Charlotte QA session files
+for qa_file in "$PHASE_DIR"/*-QA-*.md "$PHASE_DIR"/*-CHARLOTTE-*.md "$PHASE_DIR"/*-UX-*.md; do
+  if [ -f "$qa_file" ]; then
+    CHARLOTTE_QA_FOUND=true
+    break
+  fi
+done
+# Also check SUMMARY.md files for Charlotte references
+if [ "$CHARLOTTE_QA_FOUND" = "false" ]; then
+  for summary in "$PHASE_DIR"/*-SUMMARY.md; do
+    if [ -f "$summary" ]; then
+      HAS_CHARLOTTE=$(node -e "
+        try {
+          const fs = require('fs');
+          const content = fs.readFileSync('$summary', 'utf8').toLowerCase();
+          const found = content.includes('charlotte') || content.includes('ui-qa') || content.includes('ux-audit') || content.includes('qa round');
+          console.log(found ? 'yes' : 'no');
+        } catch(e) { console.log('no'); }
+      " 2>/dev/null || echo "no")
+      if [ "$HAS_CHARLOTTE" = "yes" ]; then
+        CHARLOTTE_QA_FOUND=true
+        break
+      fi
+    fi
+  done
+fi
+```
+
+**Step C — Hard-fail if UI files present but no Charlotte QA:**
+
+If SUMMARY_UI_FILES == "yes" AND CHARLOTTE_QA_FOUND == false:
+- Add gap to gaps list:
+  ```yaml
+  - truth: "Charlotte QA was run for phases producing UI files (.tsx/.jsx)"
+    status: failed
+    reason: "Phase produced .tsx/.jsx files but no Charlotte QA session was recorded"
+    artifacts:
+      - path: "{PHASE_DIR}"
+        issue: "No Charlotte QA session files found in phase directory"
+    missing:
+      - "Run Charlotte QA for all .tsx/.jsx files produced in this phase"
+      - "Charlotte QA session must be recorded before phase can pass verification"
+  ```
+- Set STATUS = gaps_found (hard-fail — NOT a warning)
+
+If SUMMARY_UI_FILES == "no" OR CHARLOTTE_QA_FOUND == true: this check passes silently.
+
+</check_charlotte_qa_coverage>
+
+<check_test_file_coverage>
+
+## Step 8d: Implementation File Test Coverage Check (QGATE-10)
+
+**Trigger:** One or more `.ts`, `.tsx`, or `.js` implementation files appear in SUMMARY.md key-files.
+
+**Hard rule:** Every implementation file must have a corresponding test file. Missing test files → `gaps_found`. This is NEVER a warning — never emit a warning for missing test files.
+
+**Implementation files** are `.ts`, `.tsx`, `.js` files that are NOT:
+- Test files themselves: `*.test.ts`, `*.spec.ts`, `*.test.js`, `*.spec.js`, `*.test.tsx`, `*.spec.tsx`
+- Configuration files: `*.config.ts`, `*.config.js`, `vite.config.*`, `next.config.*`, `tailwind.config.*`, `jest.config.*`, `vitest.config.*`
+- Type declaration files: `*.d.ts`
+- Build output files (in `dist/`, `build/`, `.next/`, `.nuxt/`, `out/` directories)
+
+**Step A — Collect implementation files from SUMMARY.md:**
+
+```bash
+IMPL_FILES_RAW=$(for summary in "$PHASE_DIR"/*-SUMMARY.md; do
+  if [ -f "$summary" ]; then
+    node -e "
+      try {
+        const fs = require('fs');
+        const content = fs.readFileSync('$summary', 'utf8');
+        const matches = content.match(/[\w\-\/\.]+\.(ts|tsx|js)(?=[\s\x60'\"]|\$)/g) || [];
+        const impl = matches.filter(function(f) {
+          const isTest = /\.(test|spec)\.(ts|tsx|js)\$/.test(f);
+          const isConfig = /\.(config|d)\.(ts|js)\$/.test(f) || /^(vite|next|tailwind|jest|vitest|webpack|babel|eslint|prettier)\./.test(f.split('/').pop());
+          const isBuildOutput = /^(dist|build|\.next|\.nuxt|out)\//.test(f);
+          return isTest === false && isConfig === false && isBuildOutput === false;
+        });
+        console.log(impl.join('\n'));
+      } catch(e) {}
+    " 2>/dev/null
+  fi
+done)
+```
+
+**Step B — For each implementation file, check for test counterpart:**
+
+For each file in IMPL_FILES_RAW:
+1. Determine test file candidates:
+   - `{dir}/{name}.test.{ext}` — same directory, e.g. `src/api/users.ts` → `src/api/users.test.ts`
+   - `{dir}/{name}.spec.{ext}`
+   - `{dir}/__tests__/{name}.test.{ext}`
+   - `{dir}/__tests__/{name}.spec.{ext}`
+   - `tests/{name}.test.{ext}`
+   - `__tests__/{basename}.test.{ext}`
+2. Check if any candidate exists on disk
+
+**Step C — Hard-fail if any implementation file lacks test:**
+
+For each implementation file that has no test counterpart:
+- Add gap:
+  ```yaml
+  - truth: "Every implementation file (.ts/.tsx/.js) has a corresponding test file"
+    status: failed
+    reason: "Implementation file has no test counterpart"
+    artifacts:
+      - path: "{impl_file}"
+        issue: "No test file found (checked: .test.ts, .spec.ts, __tests__/)"
+    missing:
+      - "Add test file for {impl_file}"
+      - "Acceptable locations: {dir}/{name}.test.ts, {dir}/__tests__/{name}.test.ts"
+  ```
+- Set STATUS = gaps_found (hard-fail — NOT a warning — NEVER emit a warning for missing tests)
+
+If IMPL_FILES_RAW is empty or all implementation files have test counterparts: this check passes silently.
+
+</check_test_file_coverage>
+
 </verification_process>
 
 <output>
@@ -555,6 +713,8 @@ Key categories: placeholder stubs (TODOs, empty returns), semantic stubs (handle
 - [ ] Anti-patterns scanned and categorized
 - [ ] Human verification items identified
 - [ ] Test suite executed (Step 8b) — failures recorded as gaps, no-tests flagged as warning
+- [ ] Charlotte QA coverage checked (Step 8c) — UI files without Charlotte QA → gaps_found (never warning)
+- [ ] Test file coverage checked (Step 8d) — implementation files without test counterparts → gaps_found (never warning)
 - [ ] Overall status determined
 - [ ] Gaps structured in YAML frontmatter (if gaps_found)
 - [ ] Re-verification metadata included (if previous existed)
