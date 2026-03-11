@@ -3,8 +3,8 @@ gsd_state_version: 1.0
 milestone: v1.1
 milestone_name: Completed Phases
 status: completed
-last_updated: "2026-03-11T11:23:20.000Z"
-last_activity: 2026-03-11 — Completed plan 14-02 (GSD Wrapper)
+last_updated: "2026-03-11T11:30:34.000Z"
+last_activity: 2026-03-11 — Completed plan 14-03 (Agent Orchestrator)
 progress:
   total_phases: 15
   completed_phases: 10
@@ -23,12 +23,12 @@ progress:
 ## Current Position
 
 **Phase:** 14 - Backend Core
-**Plan:** 14-02 complete
+**Plan:** 14-03 complete
 **Status:** In progress
-**Last activity:** 2026-03-11 — Completed plan 14-02 (GSD Wrapper)
+**Last activity:** 2026-03-11 — Completed plan 14-03 (Agent Orchestrator)
 
 ```
-[##########----------] 50% - Phase 14 plan 02 of 04 complete
+[###############-----] 75% - Phase 14 plan 03 of 04 complete
 ```
 
 **Phases:**
@@ -42,7 +42,7 @@ progress:
 - [x] Phase 11: Add --docs Flag to discuss-phase (2 requirements) - complete
 - [x] Phase 12: MCP Server API (5 requirements) - complete
 - [x] Phase 13: Foundation Infrastructure (4 requirements) - complete
-- [ ] Phase 14: Backend Core - in progress (2/4 plans)
+- [ ] Phase 14: Backend Core - in progress (3/4 plans)
 
 ## Performance Metrics
 
@@ -60,6 +60,7 @@ progress:
 | Phase 13 P03 | 6m 37s | 3 tasks | 8 files |
 | Phase 14 P01 | 7m 7s | 2 tasks | 12 files |
 | Phase 14 P02 | 8m 35s | 2 tasks | 9 files |
+| Phase 14 P03 | 4m 8s | 3 tasks | 8 files |
 
 ## Accumulated Context
 
@@ -131,6 +132,9 @@ progress:
 | createXxxRoutes factory pattern | Route modules accept dependencies for testability | 2026-03-11 |
 | Shell redirect for gsd-tools stdout | Node.js process.exit() causes stdout truncation; shell redirect to temp file avoids | 2026-03-11 |
 | GsdResult<T> discriminated union | Type-safe error handling with success/error branches | 2026-03-11 |
+| Agent loop pattern | Stream tokens -> check tools -> execute parallel -> feed results -> repeat | 2026-03-11 |
+| 429 retry with exponential backoff | 1s, 2s, 4s delays with jitter, max 3 attempts | 2026-03-11 |
+| Tool errors to Claude | Return is_error tool results for LLM reasoning about failures | 2026-03-11 |
 
 ### Roadmap Evolution
 
@@ -189,6 +193,7 @@ progress:
 - [x] Execute plan 13-03 (file locking and path security)
 - [x] Execute plan 14-01 (REST API for project listing and health)
 - [x] Execute plan 14-02 (GSD wrapper for async TypeScript)
+- [x] Execute plan 14-03 (Agent Orchestrator with Claude streaming)
 
 ### Blockers
 
@@ -196,13 +201,13 @@ None currently.
 
 ## Session Continuity
 
-**Last Session:** 2026-03-11T11:23:20.000Z
-**Context:** Completed Phase 14 Plan 02 - @gsd/gsd-wrapper with typed async wrappers for GSD CLI.
+**Last Session:** 2026-03-11T11:30:34.000Z
+**Context:** Completed Phase 14 Plan 03 - Agent orchestrator with Claude API streaming.
 
 **To Resume:**
-1. Phase 14 plan 02 complete: @gsd/gsd-wrapper exports getHealth, getState, listPhases, discoverProjects
-2. Continue with Phase 14 plan 03 (REST API refinements)
-3. Wrapper uses shell-redirect pattern to avoid Node.js stdout buffering issues
+1. Phase 14 plan 03 complete: createOrchestrator factory, runAgentLoop, withRetry, tool registry
+2. Continue with Phase 14 plan 04 (REST API integration with orchestrator)
+3. Orchestrator streams tokens to WebSocket clients, executes tools in parallel
 
 
 ### Sync History
@@ -212,10 +217,11 @@ None currently.
 
 ---
 *State initialized: 2026-02-23*
-*Last updated: 2026-03-11 (Phase 14 plan 02 complete)*
+*Last updated: 2026-03-11 (Phase 14 plan 03 complete)*
 
 ## Recent Activity
 
+- 2026-03-11 — Completed plan 14-03 (Agent Orchestrator)
 - 2026-03-11 — Completed plan 14-02 (GSD Wrapper)
 - 2026-03-11 — Completed plan 14-01 (REST API for Project Listing and Health)
 - 2026-03-11 — Finalized phase 13 (Foundation Infrastructure) - merged to main
