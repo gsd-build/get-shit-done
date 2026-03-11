@@ -989,6 +989,40 @@ function cleanupOrphanedHooks(settings) {
     console.log(`  ${green}✓${reset} Updated statusline path (statusline.js → gsd-statusline.js)`);
   }
 
+  // Clean up hooks referencing files that don't exist (prevents MODULE_NOT_FOUND errors)
+  if (settings.hooks) {
+    for (const eventType of Object.keys(settings.hooks)) {
+      const hookEntries = settings.hooks[eventType];
+      if (Array.isArray(hookEntries)) {
+        const filtered = hookEntries.filter(entry => {
+          if (entry.hooks && Array.isArray(entry.hooks)) {
+            // Check if any hook references a missing file
+            const hasMissingFile = entry.hooks.some(h => {
+              if (h.command && h.command.includes('node ')) {
+                // Extract path from command like: node "/path/to/hook.js"
+                const match = h.command.match(/node\s+"?([^"]+\.js)"?/);
+                if (match) {
+                  const hookPath = match[1];
+                  if (!fs.existsSync(hookPath)) {
+                    console.log(`  ${yellow}!${reset} Removing missing hook: ${path.basename(hookPath)}`);
+                    return true;
+                  }
+                }
+              }
+              return false;
+            });
+            if (hasMissingFile) {
+              cleanedHooks = true;
+              return false;  // Remove this entry
+            }
+          }
+          return true;  // Keep this entry
+        });
+        settings.hooks[eventType] = filtered;
+      }
+    }
+  }
+
   return settings;
 }
 
@@ -2032,49 +2066,59 @@ function install(isGlobal, runtime = 'claude') {
   }
 
   // Configure SessionStart hook for update checking (skip for opencode)
+  // Only add hooks if the hook files exist (prevents MODULE_NOT_FOUND errors)
   if (!isOpencode) {
     if (!settings.hooks) {
       settings.hooks = {};
     }
-    if (!settings.hooks.SessionStart) {
-      settings.hooks.SessionStart = [];
-    }
 
-    const hasGsdUpdateHook = settings.hooks.SessionStart.some(entry =>
-      entry.hooks && entry.hooks.some(h => h.command && h.command.includes('gsd-check-update'))
-    );
+    // Update check hook
+    const updateCheckPath = path.join(targetDir, 'hooks', 'gsd-check-update.js');
+    if (fs.existsSync(updateCheckPath)) {
+      if (!settings.hooks.SessionStart) {
+        settings.hooks.SessionStart = [];
+      }
 
-    if (!hasGsdUpdateHook) {
-      settings.hooks.SessionStart.push({
-        hooks: [
-          {
-            type: 'command',
-            command: updateCheckCommand
-          }
-        ]
-      });
-      console.log(`  ${green}✓${reset} Configured update check hook`);
+      const hasGsdUpdateHook = settings.hooks.SessionStart.some(entry =>
+        entry.hooks && entry.hooks.some(h => h.command && h.command.includes('gsd-check-update'))
+      );
+
+      if (!hasGsdUpdateHook) {
+        settings.hooks.SessionStart.push({
+          hooks: [
+            {
+              type: 'command',
+              command: updateCheckCommand
+            }
+          ]
+        });
+        console.log(`  ${green}✓${reset} Configured update check hook`);
+      }
     }
 
     // Configure PostToolUse hook for context window monitoring
-    if (!settings.hooks.PostToolUse) {
-      settings.hooks.PostToolUse = [];
-    }
+    // Only add if the hook file exists (prevents MODULE_NOT_FOUND errors)
+    const contextMonitorPath = path.join(targetDir, 'hooks', 'gsd-context-monitor.js');
+    if (fs.existsSync(contextMonitorPath)) {
+      if (!settings.hooks.PostToolUse) {
+        settings.hooks.PostToolUse = [];
+      }
 
-    const hasContextMonitorHook = settings.hooks.PostToolUse.some(entry =>
-      entry.hooks && entry.hooks.some(h => h.command && h.command.includes('gsd-context-monitor'))
-    );
+      const hasContextMonitorHook = settings.hooks.PostToolUse.some(entry =>
+        entry.hooks && entry.hooks.some(h => h.command && h.command.includes('gsd-context-monitor'))
+      );
 
-    if (!hasContextMonitorHook) {
-      settings.hooks.PostToolUse.push({
-        hooks: [
-          {
-            type: 'command',
-            command: contextMonitorCommand
-          }
-        ]
-      });
-      console.log(`  ${green}✓${reset} Configured context window monitor hook`);
+      if (!hasContextMonitorHook) {
+        settings.hooks.PostToolUse.push({
+          hooks: [
+            {
+              type: 'command',
+              command: contextMonitorCommand
+            }
+          ]
+        });
+        console.log(`  ${green}✓${reset} Configured context window monitor hook`);
+      }
     }
   }
 
