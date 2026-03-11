@@ -38,10 +38,10 @@ Output: [What artifacts will be created]
 </objective>
 
 <execution_context>
-@~/.claude/get-shit-done/workflows/execute-plan.md
-@~/.claude/get-shit-done/templates/summary.md
+@/home/dryade/.claude/get-shit-done/workflows/execute-plan.md
+@/home/dryade/.claude/get-shit-done/templates/summary.md
 [If plan contains checkpoint tasks (type="checkpoint:*"), add:]
-@~/.claude/get-shit-done/references/checkpoints.md
+@/home/dryade/.claude/get-shit-done/references/checkpoints.md
 </execution_context>
 
 <context>
@@ -63,20 +63,30 @@ Output: [What artifacts will be created]
 <task type="auto">
   <name>Task 1: [Action-oriented name]</name>
   <files>path/to/file.ext, another/file.ext</files>
-  <action>[Specific implementation - what to do, how to do it, what to avoid and WHY]</action>
+  <read_first>path/to/reference.ext, path/to/source-of-truth.ext</read_first>
+  <action>[Specific implementation - what to do, how to do it, what to avoid and WHY. Include CONCRETE values: exact CSS classes, exact function signatures, exact config values. Never say "align X with Y" without specifying what the aligned result looks like.]</action>
   <verify>[Command or check to prove it worked]</verify>
+  <acceptance_criteria>
+    - [Grep-verifiable condition: "file.ext contains 'exact string'"]
+    - [Measurable condition: "button.tsx base class uses rounded-lg, NOT rounded-full"]
+    - [Structural condition: "PublicTopNav has 6 nav links matching Nav.svelte"]
+  </acceptance_criteria>
   <done>[Measurable acceptance criteria]</done>
 </task>
 
 <task type="auto">
   <name>Task 2: [Action-oriented name]</name>
   <files>path/to/file.ext</files>
-  <action>[Specific implementation]</action>
+  <read_first>path/to/reference.ext</read_first>
+  <action>[Specific implementation with concrete values]</action>
   <verify>[Command or check]</verify>
+  <acceptance_criteria>
+    - [Grep-verifiable condition]
+  </acceptance_criteria>
   <done>[Acceptance criteria]</done>
 </task>
 
-<!-- For checkpoint task examples and patterns, see @~/.claude/get-shit-done/references/checkpoints.md -->
+<!-- For checkpoint task examples and patterns, see @/home/dryade/.claude/get-shit-done/references/checkpoints.md -->
 <!-- Key rule: Claude starts dev server BEFORE human-verify checkpoints. User only visits URLs. -->
 
 <task type="checkpoint:decision" gate="blocking">
@@ -270,7 +280,7 @@ TDD features get dedicated plans with `type: tdd`.
 → Yes: Create a TDD plan
 → No: Standard task in standard plan
 
-See `~/.claude/get-shit-done/references/tdd.md` for TDD plan structure.
+See `/home/dryade/.claude/get-shit-done/references/tdd.md` for TDD plan structure.
 
 ---
 
@@ -374,9 +384,9 @@ Output: Working dashboard component.
 </objective>
 
 <execution_context>
-@~/.claude/get-shit-done/workflows/execute-plan.md
-@~/.claude/get-shit-done/templates/summary.md
-@~/.claude/get-shit-done/references/checkpoints.md
+@/home/dryade/.claude/get-shit-done/workflows/execute-plan.md
+@/home/dryade/.claude/get-shit-done/templates/summary.md
+@/home/dryade/.claude/get-shit-done/references/checkpoints.md
 </execution_context>
 
 <context>
@@ -456,6 +466,39 @@ files_modified: [...]
 </task>
 ```
 
+**Bad: Missing read_first (executor modifies files it hasn't read)**
+```xml
+<task type="auto">
+  <name>Update database config</name>
+  <files>src/config/database.ts</files>
+  <!-- No read_first! Executor doesn't know current state or conventions -->
+  <action>Update the database config to match production settings</action>
+</task>
+```
+
+**Bad: Vague acceptance criteria (not verifiable)**
+```xml
+<acceptance_criteria>
+  - Config is properly set up
+  - Database connection works correctly
+</acceptance_criteria>
+```
+
+**Good: Concrete with read_first + verifiable criteria**
+```xml
+<task type="auto">
+  <name>Update database config for connection pooling</name>
+  <files>src/config/database.ts</files>
+  <read_first>src/config/database.ts, .env.example, docker-compose.yml</read_first>
+  <action>Add pool configuration: min=2, max=20, idleTimeoutMs=30000. Add SSL config: rejectUnauthorized=true when NODE_ENV=production. Add .env.example entry: DATABASE_POOL_MAX=20.</action>
+  <acceptance_criteria>
+    - database.ts contains "max: 20" and "idleTimeoutMillis: 30000"
+    - database.ts contains SSL conditional on NODE_ENV
+    - .env.example contains DATABASE_POOL_MAX
+  </acceptance_criteria>
+</task>
+```
+
 ---
 
 ## Guidelines
@@ -499,7 +542,7 @@ user_setup:
 
 **Result:** Execute-plan generates `{phase}-USER-SETUP.md` with checklist for the user.
 
-See `~/.claude/get-shit-done/templates/user-setup.md` for full schema and examples
+See `/home/dryade/.claude/get-shit-done/templates/user-setup.md` for full schema and examples
 
 ---
 
@@ -566,4 +609,4 @@ Task completion ≠ Goal achievement. A task "create chat component" can complet
 5. Gaps found → fix plans created → execute → re-verify
 6. All must_haves pass → phase complete
 
-See `~/.claude/get-shit-done/workflows/verify-phase.md` for verification logic.
+See `/home/dryade/.claude/get-shit-done/workflows/verify-phase.md` for verification logic.
