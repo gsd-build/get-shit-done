@@ -87,6 +87,7 @@ export function CheckpointModal({ checkpoint, onRespond }: CheckpointModalProps)
           className="fixed inset-0 bg-black/50 z-50"
         />
         <Dialog.Content
+          data-testid="checkpoint-modal"
           aria-modal="true"
           className={clsx(
             'fixed left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 z-50',

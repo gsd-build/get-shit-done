@@ -118,13 +118,13 @@ export function ExecutionPanel({
       {/* Resizable main area */}
       <PanelGroup orientation="horizontal" className="flex-1">
         <Panel defaultSize={70} minSize={50}>
-          <div className="h-full overflow-auto">
+          <div data-testid="pipeline-panel" className="h-full overflow-auto">
             <PipelineView waves={waves} />
           </div>
         </Panel>
         <PanelResizeHandle className="w-1 bg-border hover:bg-primary/50 transition-colors" />
         <Panel defaultSize={30} minSize={20}>
-          <div className="h-full overflow-auto">
+          <div data-testid="diff-panel-container" className="h-full overflow-auto">
             <DiffPanel />
           </div>
         </Panel>

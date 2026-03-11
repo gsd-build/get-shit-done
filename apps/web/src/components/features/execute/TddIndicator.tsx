@@ -68,6 +68,7 @@ export function TddIndicator({ phase }: TddIndicatorProps) {
 
   return (
     <div
+      data-testid="tdd-indicator"
       role="group"
       aria-label={`TDD progress: ${phaseLabel} phase`}
       className="flex items-center gap-1"

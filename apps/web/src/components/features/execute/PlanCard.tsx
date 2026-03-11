@@ -84,9 +84,14 @@ export function PlanCard({ plan }: Props) {
   };
 
   return (
-    <div className="border rounded-lg overflow-hidden bg-card">
+    <div
+      data-testid={`plan-card-${id}`}
+      data-expanded={isExpanded}
+      className="border rounded-lg overflow-hidden bg-card"
+    >
       <div className="p-3 flex items-center gap-3">
         <button
+          data-testid="expand-toggle"
           onClick={toggleExpand}
           className="flex items-center gap-2 flex-1 text-left"
           aria-label={isExpanded ? 'Collapse' : 'Expand'}

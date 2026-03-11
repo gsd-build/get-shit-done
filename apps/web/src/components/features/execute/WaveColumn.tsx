@@ -25,6 +25,7 @@ export function WaveColumn({ wave, waveNumber }: Props) {
 
   return (
     <li
+      data-testid={`wave-column-${waveNumber}`}
       className={`flex flex-col gap-3 p-3 border-t-4 rounded-lg bg-card/50 ${STATUS_COLORS[status]}`}
       role="listitem"
     >

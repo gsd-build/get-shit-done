@@ -231,7 +231,7 @@ export function ToolCard({ tool, defaultExpanded = false, className }: ToolCardP
         )}
       >
         <Icon className="w-5 h-5 text-zinc-500 flex-shrink-0" data-testid={iconTestId} />
-        <span className="flex-1 font-medium text-sm">
+        <span data-testid="tool-name" className="flex-1 font-medium text-sm">
           {tool.toolName}
           {filePath && (
             <span className="ml-2 text-zinc-500 font-normal font-mono text-xs truncate">

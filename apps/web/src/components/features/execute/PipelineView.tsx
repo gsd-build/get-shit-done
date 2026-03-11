@@ -17,6 +17,7 @@ export function PipelineView({ waves }: Props) {
 
   return (
     <ul
+      data-testid="pipeline-view"
       className="grid auto-cols-[280px] grid-flow-col gap-4 overflow-x-auto p-4"
       role="list"
       aria-label="Execution waves"

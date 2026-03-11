@@ -48,8 +48,15 @@ function buildWavesFromPlans(
 
 // Demo page to visualize execute phase UI components
 export default function ExecuteDemoPage() {
-  const store = useExecutionStore();
   const plans = useExecutionStore(selectPlans);
+  // Get stable action references from the store
+  const startExecution = useExecutionStore((state) => state.startExecution);
+  const appendLog = useExecutionStore((state) => state.appendLog);
+  const startTool = useExecutionStore((state) => state.startTool);
+  const endTool = useExecutionStore((state) => state.endTool);
+  const setTddPhase = useExecutionStore((state) => state.setTddPhase);
+  const addCommit = useExecutionStore((state) => state.addCommit);
+  const reset = useExecutionStore((state) => state.reset);
 
   // Build waves from plans
   const waves = useMemo(() => buildWavesFromPlans(plans), [plans]);
@@ -57,21 +64,21 @@ export default function ExecuteDemoPage() {
   // Populate demo data on mount
   useEffect(() => {
     // Start a demo execution
-    store.startExecution('demo-agent-1', 'plan-01', 'Task 1: Setup infrastructure');
+    startExecution('demo-agent-1', 'plan-01', 'Task 1: Setup infrastructure');
 
     // Add some log content
-    setTimeout(() => {
-      store.appendLog('plan-01', '$ pnpm install\n');
-      store.appendLog('plan-01', 'Packages: +342\n');
-      store.appendLog('plan-01', '++++++++++++++++++++++++++++++++\n');
-      store.appendLog('plan-01', 'Done in 4.2s\n\n');
-      store.appendLog('plan-01', '$ pnpm test\n');
-      store.appendLog('plan-01', 'Running 42 tests...\n');
+    const logTimer = setTimeout(() => {
+      appendLog('plan-01', '$ pnpm install\n');
+      appendLog('plan-01', 'Packages: +342\n');
+      appendLog('plan-01', '++++++++++++++++++++++++++++++++\n');
+      appendLog('plan-01', 'Done in 4.2s\n\n');
+      appendLog('plan-01', '$ pnpm test\n');
+      appendLog('plan-01', 'Running 42 tests...\n');
     }, 500);
 
     // Add a tool call
-    setTimeout(() => {
-      store.startTool('plan-01', {
+    const tool1StartTimer = setTimeout(() => {
+      startTool('plan-01', {
         agentId: 'demo-agent-1',
         toolId: 'tool-1',
         toolName: 'Read',
@@ -80,8 +87,8 @@ export default function ExecuteDemoPage() {
       });
     }, 1000);
 
-    setTimeout(() => {
-      store.endTool('plan-01', {
+    const tool1EndTimer = setTimeout(() => {
+      endTool('plan-01', {
         agentId: 'demo-agent-1',
         toolId: 'tool-1',
         success: true,
@@ -94,8 +101,8 @@ export default function ExecuteDemoPage() {
     }, 1500);
 
     // Add another tool call (Write)
-    setTimeout(() => {
-      store.startTool('plan-01', {
+    const tool2StartTimer = setTimeout(() => {
+      startTool('plan-01', {
         agentId: 'demo-agent-1',
         toolId: 'tool-2',
         toolName: 'Write',
@@ -104,8 +111,8 @@ export default function ExecuteDemoPage() {
       });
     }, 2000);
 
-    setTimeout(() => {
-      store.endTool('plan-01', {
+    const tool2EndTimer = setTimeout(() => {
+      endTool('plan-01', {
         agentId: 'demo-agent-1',
         toolId: 'tool-2',
         success: true,
@@ -123,13 +130,13 @@ export default function ExecuteDemoPage() {
     }, 2500);
 
     // Set TDD phase
-    setTimeout(() => {
-      store.setTddPhase('green');
+    const tddTimer = setTimeout(() => {
+      setTddPhase('green');
     }, 1000);
 
     // Add a commit
-    setTimeout(() => {
-      store.addCommit({
+    const commitTimer = setTimeout(() => {
+      addCommit({
         sha: 'a1b2c3d',
         message: 'feat(17-08): implement TddIndicator component',
         timestamp: new Date().toISOString(),
@@ -138,9 +145,16 @@ export default function ExecuteDemoPage() {
 
     // Cleanup on unmount
     return () => {
-      store.reset();
+      clearTimeout(logTimer);
+      clearTimeout(tool1StartTimer);
+      clearTimeout(tool1EndTimer);
+      clearTimeout(tool2StartTimer);
+      clearTimeout(tool2EndTimer);
+      clearTimeout(tddTimer);
+      clearTimeout(commitTimer);
+      reset();
     };
-  }, [store]);
+  }, [startExecution, appendLog, startTool, endTool, setTddPhase, addCommit, reset]);
 
   return (
     <div className="h-screen bg-background">

@@ -144,6 +144,8 @@ export default function ExecutePage() {
         <div className="flex items-center gap-4">
           {/* Connection status indicator */}
           <div
+            data-testid="connection-status"
+            data-connected={isConnected}
             className={`flex items-center gap-1.5 text-xs ${
               isConnected ? 'text-green-500' : 'text-red-500'
             }`}

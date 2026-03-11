@@ -50,6 +50,7 @@ export function AbortConfirmDialog({
       <Dialog.Portal>
         <Dialog.Overlay className="fixed inset-0 bg-black/50 z-50" />
         <Dialog.Content
+          data-testid="abort-confirm-dialog"
           className="fixed top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 bg-zinc-900 border border-zinc-700 rounded-lg shadow-xl max-w-md w-full p-6 z-50"
           role="alertdialog"
           aria-modal="true"
