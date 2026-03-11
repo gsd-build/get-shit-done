@@ -1,32 +1,10 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
-import { render, screen, fireEvent, waitFor } from '@testing-library/react';
+import { render, screen, fireEvent, waitFor, act } from '@testing-library/react';
 import { LogStream } from './LogStream';
 
 describe('LogStream', () => {
-  // Mock scrollHeight, scrollTop, clientHeight for scroll tests
-  const mockScrollProps = (
-    scrollHeight: number,
-    scrollTop: number,
-    clientHeight: number
-  ) => {
-    Object.defineProperty(HTMLElement.prototype, 'scrollHeight', {
-      configurable: true,
-      value: scrollHeight,
-    });
-    Object.defineProperty(HTMLElement.prototype, 'scrollTop', {
-      configurable: true,
-      writable: true,
-      value: scrollTop,
-    });
-    Object.defineProperty(HTMLElement.prototype, 'clientHeight', {
-      configurable: true,
-      value: clientHeight,
-    });
-  };
-
   beforeEach(() => {
-    // Default: at bottom of scroll
-    mockScrollProps(500, 400, 100);
+    vi.restoreAllMocks();
   });
 
   afterEach(() => {
@@ -43,33 +21,46 @@ describe('LogStream', () => {
   });
 
   it('auto-scrolls to bottom when logs update (if autoScroll true)', async () => {
-    const scrollToSpy = vi.fn();
-
     const { rerender } = render(
       <LogStream logs="Initial log" isStreaming={true} />
     );
 
     const container = screen.getByTestId('log-container');
-    container.scrollTo = scrollToSpy;
+
+    // Mock scroll properties on the container element
+    Object.defineProperty(container, 'scrollHeight', { value: 500, configurable: true });
+    Object.defineProperty(container, 'scrollTop', { value: 400, writable: true, configurable: true });
+    Object.defineProperty(container, 'clientHeight', { value: 100, configurable: true });
 
     // Update logs
     rerender(<LogStream logs="Initial log\nNew line" isStreaming={true} />);
 
+    // Component should attempt to set scrollTop = scrollHeight
     await waitFor(() => {
-      // Should have attempted to scroll
       expect(container.scrollTop).toBeDefined();
     });
   });
 
   it('pauses auto-scroll when user scrolls up', async () => {
-    const { rerender } = render(
-      <LogStream logs="Initial log" isStreaming={true} />
-    );
+    render(<LogStream logs="Initial log" isStreaming={true} />);
 
     const container = screen.getByTestId('log-container');
 
-    // Simulate user scrolling up
-    mockScrollProps(500, 100, 100); // scrollTop less than before
+    // Setup: mock that we're scrolled up from before (scrollTop decreased)
+    let currentScrollTop = 400;
+    Object.defineProperty(container, 'scrollHeight', { value: 500, configurable: true });
+    Object.defineProperty(container, 'scrollTop', {
+      get: () => currentScrollTop,
+      set: (v) => { currentScrollTop = v; },
+      configurable: true
+    });
+    Object.defineProperty(container, 'clientHeight', { value: 100, configurable: true });
+
+    // First scroll to establish lastScrollTop
+    fireEvent.scroll(container);
+
+    // Now simulate scrolling up
+    currentScrollTop = 100;
     fireEvent.scroll(container);
 
     // Verify resume button appears (indicating auto-scroll paused)
@@ -83,8 +74,21 @@ describe('LogStream', () => {
 
     const container = screen.getByTestId('log-container');
 
-    // Simulate scrolling up (not at bottom)
-    mockScrollProps(500, 100, 100);
+    // Setup scroll properties
+    let currentScrollTop = 400;
+    Object.defineProperty(container, 'scrollHeight', { value: 500, configurable: true });
+    Object.defineProperty(container, 'scrollTop', {
+      get: () => currentScrollTop,
+      set: (v) => { currentScrollTop = v; },
+      configurable: true
+    });
+    Object.defineProperty(container, 'clientHeight', { value: 100, configurable: true });
+
+    // Establish initial scroll position
+    fireEvent.scroll(container);
+
+    // Scroll up
+    currentScrollTop = 100;
     fireEvent.scroll(container);
 
     await waitFor(() => {
@@ -98,8 +102,19 @@ describe('LogStream', () => {
 
     const container = screen.getByTestId('log-container');
 
-    // Simulate scrolling up
-    mockScrollProps(500, 100, 100);
+    // Setup scroll
+    let currentScrollTop = 400;
+    Object.defineProperty(container, 'scrollHeight', { value: 500, configurable: true });
+    Object.defineProperty(container, 'scrollTop', {
+      get: () => currentScrollTop,
+      set: (v) => { currentScrollTop = v; },
+      configurable: true
+    });
+    Object.defineProperty(container, 'clientHeight', { value: 100, configurable: true });
+
+    // Scroll up
+    fireEvent.scroll(container);
+    currentScrollTop = 100;
     fireEvent.scroll(container);
 
     // Resume button should not appear when not streaming
@@ -111,8 +126,19 @@ describe('LogStream', () => {
 
     const container = screen.getByTestId('log-container');
 
-    // Pause auto-scroll by scrolling up
-    mockScrollProps(500, 100, 100);
+    // Setup scroll
+    let currentScrollTop = 400;
+    Object.defineProperty(container, 'scrollHeight', { value: 500, configurable: true });
+    Object.defineProperty(container, 'scrollTop', {
+      get: () => currentScrollTop,
+      set: (v) => { currentScrollTop = v; },
+      configurable: true
+    });
+    Object.defineProperty(container, 'clientHeight', { value: 100, configurable: true });
+
+    // Establish initial position, then scroll up
+    fireEvent.scroll(container);
+    currentScrollTop = 100;
     fireEvent.scroll(container);
 
     await waitFor(() => {

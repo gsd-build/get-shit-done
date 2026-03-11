@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
-import { render, screen, fireEvent, act, waitFor } from '@testing-library/react';
+import { render, screen, fireEvent, act } from '@testing-library/react';
 import { PlanCard } from './PlanCard';
 
 interface Plan {
@@ -12,10 +12,6 @@ interface Plan {
 }
 
 describe('PlanCard', () => {
-  beforeEach(() => {
-    vi.useFakeTimers();
-  });
-
   afterEach(() => {
     vi.useRealTimers();
   });
@@ -96,7 +92,7 @@ describe('PlanCard', () => {
     expect(screen.queryByTestId('log-stream')).not.toBeInTheDocument();
   });
 
-  it('manual expand/collapse toggle works', async () => {
+  it('manual expand/collapse toggle works', () => {
     const plan: Plan = {
       id: 'plan-1',
       name: 'Task',
@@ -114,16 +110,12 @@ describe('PlanCard', () => {
     fireEvent.click(expandButton);
 
     // Should now show logs
-    await waitFor(() => {
-      expect(screen.getByTestId('log-stream')).toBeInTheDocument();
-    });
+    expect(screen.getByTestId('log-stream')).toBeInTheDocument();
 
     // Click to collapse
     fireEvent.click(expandButton);
 
-    await waitFor(() => {
-      expect(screen.queryByTestId('log-stream')).not.toBeInTheDocument();
-    });
+    expect(screen.queryByTestId('log-stream')).not.toBeInTheDocument();
   });
 
   it('expanded state shows LogStream component', () => {
@@ -165,7 +157,8 @@ describe('PlanCard', () => {
     expect(screen.getByTestId('status-indicator').className).toContain('gray');
   });
 
-  it('live timer updates while running', async () => {
+  it('live timer updates while running', () => {
+    vi.useFakeTimers();
     const startTime = Date.now();
     const runningPlan: Plan = {
       id: 'plan-1',
@@ -185,8 +178,7 @@ describe('PlanCard', () => {
       vi.advanceTimersByTime(1000);
     });
 
-    await waitFor(() => {
-      expect(elapsedTime.textContent).not.toBe(initialText);
-    });
+    // The timer should have updated
+    expect(elapsedTime.textContent).not.toBe(initialText);
   });
 });
