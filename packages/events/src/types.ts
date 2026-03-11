@@ -85,7 +85,20 @@ export interface CheckpointResponseEvent {
 }
 
 /**
+ * Health metrics event - sent periodically with server state
+ *
+ * Includes connected client count, room membership, uptime, and memory usage.
+ */
+export interface HealthMetricsEvent {
+  connectedClients: number;
+  roomCounts: Record<string, number>;
+  uptime: number;
+  memoryUsage: number;
+}
+
+/**
  * Connection health event - sent periodically for app-level health monitoring
+ * (client-side latency tracking)
  */
 export interface ConnectionHealthEvent {
   timestamp: string;
@@ -103,7 +116,7 @@ export interface ServerToClientEvents {
   [EVENTS.AGENT_END]: (event: AgentEndEvent) => void;
   [EVENTS.AGENT_ERROR]: (event: AgentErrorEvent) => void;
   [EVENTS.CHECKPOINT_REQUEST]: (event: CheckpointRequestEvent) => void;
-  [EVENTS.CONNECTION_HEALTH]: (event: ConnectionHealthEvent) => void;
+  [EVENTS.CONNECTION_HEALTH]: (event: HealthMetricsEvent) => void;
 }
 
 /**

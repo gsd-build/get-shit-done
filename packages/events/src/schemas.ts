@@ -85,7 +85,19 @@ export const CheckpointResponseEventSchema = z.object({
 export type CheckpointResponseEventInput = z.input<typeof CheckpointResponseEventSchema>;
 
 /**
- * Connection health event schema
+ * Health metrics event schema - server-side metrics
+ */
+export const HealthMetricsEventSchema = z.object({
+  connectedClients: z.number().int().nonnegative(),
+  roomCounts: z.record(z.string(), z.number().int().nonnegative()),
+  uptime: z.number().nonnegative(),
+  memoryUsage: z.number().nonnegative(),
+});
+
+export type HealthMetricsEventInput = z.input<typeof HealthMetricsEventSchema>;
+
+/**
+ * Connection health event schema - client-side latency
  */
 export const ConnectionHealthEventSchema = z.object({
   timestamp: z.string().datetime(),

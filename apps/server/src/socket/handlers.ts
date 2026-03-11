@@ -1,12 +1,13 @@
 /**
  * Socket.IO event handlers
  *
- * Handles connection lifecycle, room subscriptions, and checkpoint responses.
- * Agent event emission will be added in Phase 14 when agent integration is built.
+ * Handles connection lifecycle, room subscriptions, checkpoint responses,
+ * and health metrics broadcast.
  */
 
 import { EVENTS } from '@gsd/events';
 import { joinProjectRoom, joinAgentRoom, leaveAgentRoom } from './rooms.js';
+import { startHealthBroadcast } from './health.js';
 import type { TypedServer } from './server.js';
 
 /**
@@ -16,6 +17,9 @@ import type { TypedServer } from './server.js';
  * @returns Cleanup function for graceful shutdown
  */
 export function registerHandlers(io: TypedServer): () => void {
+  // Start health metrics broadcast (30 second interval)
+  const stopHealthBroadcast = startHealthBroadcast(io);
+
   io.on('connection', (socket) => {
     // Log recovery status per RESEARCH.md pattern
     if (socket.recovered) {
@@ -52,7 +56,6 @@ export function registerHandlers(io: TypedServer): () => void {
     socket.on(EVENTS.CHECKPOINT_RESPONSE, (event) => {
       console.log(`[socket] Checkpoint response: ${event.checkpointId} = ${event.response}`);
       // TODO (Phase 14): Forward to agent orchestrator
-      // io.to(agentRoom(event.agentId)).emit('checkpoint:received', event);
     });
 
     socket.on('disconnect', (reason) => {
@@ -71,9 +74,8 @@ export function registerHandlers(io: TypedServer): () => void {
     });
   });
 
-  // Return empty cleanup function for now
-  // Health broadcast cleanup will be added in Task 3
+  // Return cleanup function for graceful shutdown
   return () => {
-    // No cleanup needed yet
+    stopHealthBroadcast();
   };
 }
