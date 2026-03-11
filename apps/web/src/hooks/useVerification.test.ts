@@ -1,5 +1,5 @@
 import { describe, it, expect, beforeEach, vi, afterEach } from 'vitest';
-import { renderHook, act, waitFor } from '@testing-library/react';
+import { renderHook, act } from '@testing-library/react';
 import { useVerification } from './useVerification';
 import { useVerificationStore } from '@/stores/verificationStore';
 import type { TypedSocket } from '@gsd/events';
@@ -35,21 +35,19 @@ const createMockSocket = (): TypedSocket => {
   } as unknown as TypedSocket & { __emit: (event: string, ...args: unknown[]) => void };
 };
 
-// Mock fetch
-const mockFetch = vi.fn();
-global.fetch = mockFetch;
-
 describe('useVerification', () => {
   let mockSocket: ReturnType<typeof createMockSocket>;
+  let fetchSpy: ReturnType<typeof vi.spyOn>;
 
   beforeEach(() => {
     useVerificationStore.getState().reset();
     mockSocket = createMockSocket();
-    mockFetch.mockReset();
+    fetchSpy = vi.spyOn(globalThis, 'fetch');
   });
 
   afterEach(() => {
     vi.clearAllMocks();
+    fetchSpy.mockRestore();
   });
 
   describe('subscription', () => {
@@ -78,11 +76,6 @@ describe('useVerification', () => {
 
   describe('startVerification', () => {
     it('calls POST /api/phases/:id/verify', async () => {
-      mockFetch.mockResolvedValueOnce({
-        ok: true,
-        json: () => Promise.resolve({ success: true }),
-      });
-
       const { result } = renderHook(() =>
         useVerification(mockSocket, 'phase-1')
       );
@@ -91,18 +84,13 @@ describe('useVerification', () => {
         await result.current.startVerification();
       });
 
-      expect(mockFetch).toHaveBeenCalledWith(
+      expect(fetchSpy).toHaveBeenCalledWith(
         expect.stringContaining('/api/phases/phase-1/verify'),
         expect.objectContaining({ method: 'POST' })
       );
     });
 
     it('calls setRunning on start', async () => {
-      mockFetch.mockResolvedValueOnce({
-        ok: true,
-        json: () => Promise.resolve({ success: true }),
-      });
-
       const { result } = renderHook(() =>
         useVerification(mockSocket, 'phase-1')
       );
