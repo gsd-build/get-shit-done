@@ -52,7 +52,7 @@ Real-time execution with streaming and checkpoints.
 
 - [x] **EXEC-01**: User can see wave-based execution progress with real-time log streaming per plan
 - [x] **EXEC-02**: User can see tool calls visualized as collapsible cards (Read, Write, Bash, etc.)
-- [ ] **EXEC-03**: User can respond to checkpoint dialogs with timeout warning display
+- [x] **EXEC-03**: User can respond to checkpoint dialogs with timeout warning display
 - [ ] **EXEC-04**: User can view file changes in Monaco DiffEditor with syntax highlighting
 - [ ] **EXEC-05**: User can see git commit timeline showing commits created during execution
 - [ ] **EXEC-06**: User can pause execution and resume from the paused state
@@ -151,7 +151,7 @@ Visual debugging workflow.
 | PLAN-05 | Phase 18 | Pending |
 | EXEC-01 | Phase 17 | Complete |
 | EXEC-02 | Phase 17 | Complete |
-| EXEC-03 | Phase 17 | Pending |
+| EXEC-03 | Phase 17 | Complete |
 | EXEC-04 | Phase 17 | Pending |
 | EXEC-05 | Phase 17 | Pending |
 | EXEC-06 | Phase 17 | Pending |
