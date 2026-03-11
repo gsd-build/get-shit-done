@@ -7,10 +7,12 @@
 - ✅ **v1.10.0 Autonomous Phase Discussion** — Phases 21-25, 33 (shipped 2026-02-21)
 - ✅ **v1.11.0 System Hardening** — Phases 26-30 (completed 2026-02-20)
   - 26: Telegram MCP Reliability · 27: Knowledge Quality · 28: Compression Observability · 29: Session Fix · 30: Milestone Archival
-- 🚧 **v1.12.0 Autonomous Quality & Flow** — Phases 34-40 (in progress)
+- ✅ **v1.12.0 Autonomous Quality & Flow** — Phases 34-40 (completed 2026-03-11)
   - 34: Checkpoint & Plan-Structure Gates · 35: Test & Coverage Enforcement · 36: Migration Safety & Error Taxonomy
   - 37: PRD Traceability & Flow Context · 38: Dev Server Lifecycle & Knowledge Feedback
   - 39: Execution Intelligence · 40: Observability & Analytics
+- 🚧 **v1.13.0 Product Discovery & Docs Automation** — Phases 41-43 (in progress)
+  - 41: gsd:prd Workflow · 42: Milestone PRD Integration · 43: Docs Automation
 
 ## Phases
 
@@ -212,9 +214,8 @@ Plans:
 
 </details>
 
-### v1.12.0 Autonomous Quality & Flow (Phases 34-40)
-
-**Milestone Goal:** Transform GSD's quality controls from advisory prompt text into hard programmatic gates, and add 10 flow improvements that make the PRD-to-production loop faster, more coherent, and self-improving.
+<details>
+<summary>✅ v1.12.0 Autonomous Quality & Flow (Phases 34-40) — COMPLETE 2026-03-11</summary>
 
 #### Phase 34: Checkpoint & Plan-Structure Gates
 
@@ -243,7 +244,7 @@ Plans:
   3. When `testing.coverage_threshold` is set in config.json, the executor reads it and blocks SUMMARY.md creation if the measured coverage falls below the threshold
   4. The verifier marks a phase `gaps_found` (not warning) when SUMMARY.md key-files includes .tsx/.jsx but no Charlotte QA session entry appears in the phase record
   5. The verifier hard-fails (`gaps_found`) when a .ts/.tsx/.js implementation file listed in SUMMARY.md key-files has no corresponding test file — a warning is never emitted for this condition
-**Plans:** TBD
+**Plans:** 3/3 complete
 
 Plans:
 - [x] 35-01: Executor post-plan test suite gate — run test command after task completion, block SUMMARY.md on failure; add coverage threshold check when config.testing.coverage_threshold is set
@@ -304,7 +305,7 @@ Plans:
   1. Before executing a phase, `gsd-tools.js verify dependency-stability <phase>` checks that key files from depended-on phases have not been modified by intervening phases; a drift report is produced and the coordinator surfaces it before proceeding
   2. When `roadmap analyze` identifies parallel-eligible phases, the output includes a `file_conflicts` section listing files claimed by more than one parallel phase — shown in the execution plan confirmation prompt before the run starts
   3. The executor runs `tsc --noEmit` (or equivalent) between tasks; a type error triggers one auto-fix attempt before the error is logged as a gap and execution continues to the next task — type errors never abort the entire plan
-**Plans:** TBD
+**Plans:** 3/3 complete
 
 Plans:
 - [x] 39-01: Dependency drift detection — add `verify dependency-stability <phase>` subcommand to gsd-tools.js; wire into coordinator pre-execution check; emit drift report
@@ -326,6 +327,68 @@ Plans:
 Plans:
 - [ ] 40-01: Context budget monitoring — add context usage tracking to coordinator; compressed mode at 60%; fresh-subagent consideration at 80%; Telegram notification on mode switch
 - [ ] 40-02: Analytics command group — `analytics report` from EXECUTION_LOG.md + SUMMARY metrics; `analytics calibrate` updates config thresholds from history; auto-run report at execute-roadmap completion
+
+</details>
+
+### v1.13.0 Product Discovery & Docs Automation (Phases 41-43)
+
+**Milestone Goal:** Add a structured PRD maturation workflow (`gsd:prd`) that takes raw product ideas through PM/PO/tech stages to produce product-oriented PRDs, update `gsd:new-milestone` to consume PRDs autonomously, and embed mandatory docs updates into the phase execution and verification cycle.
+
+**Dependency note:** Phase 42 depends on Phase 41 (needs `.planning/prds/` structure defined first). Phase 43 is independent and can execute in parallel with Phase 41.
+
+#### Phase 41: gsd:prd Workflow
+
+**Goal:** User can mature a raw product concept into a structured PRD through three sequential PM/PO/tech stages with confidence-driven Q&A, producing a stored product-oriented PRD at `.planning/prds/pending/` that is ready for milestone planning
+**Depends on:** Phase 40 (v1.12.0 complete)
+**Requirements:** PRD-01, PRD-02, PRD-03, PRD-04, PRD-05, PRD-06
+**Success Criteria** (what must be TRUE):
+  1. User runs `gsd:prd` with a concept description (text input, file path, or URL) and the workflow starts without error, entering the PM Discovery stage
+  2. PM Discovery stage performs competitive web research, then conducts multi-round Q&A (max 4 questions per round) stating current confidence and blocking gaps explicitly each round — Q&A stops only when confidence is sufficient to advance, not after a fixed number of rounds
+  3. PO/BA Scoping stage reads the existing codebase and `.planning/prds/done/` for context before defining user stories and acceptance criteria through Q&A, and draws an explicit MVP vs Phase 2 boundary
+  4. HL Tech Discovery stage identifies technology candidates and architectural constraints — the output contains no schemas, API routes, or implementation code
+  5. A completed PRD file appears at `.planning/prds/pending/{name}.md` containing problem statement, goals, user stories, acceptance criteria, tech candidates, open questions, and an explicit assumptions list
+**Plans:** TBD
+
+Plans:
+- [ ] 41-01: Scaffold `gsd:prd` workflow + `.planning/prds/` directory structure + PRD output template
+- [ ] 41-02: PM Discovery stage — web research step + confidence-driven multi-round Q&A loop
+- [ ] 41-03: PO/BA Scoping stage — codebase + done-PRD context read + user story / acceptance criteria Q&A + MVP boundary
+- [ ] 41-04: HL Tech Discovery stage — research step + tech candidate output with no-HOW guard
+
+#### Phase 42: Milestone PRD Integration
+
+**Goal:** When starting a new milestone, the user is offered existing pending PRDs as selectable options, and selecting one drives fully autonomous phase decomposition with a single approval checkpoint before any branch or planning files are created
+**Depends on:** Phase 41 (`.planning/prds/` structure must exist)
+**Requirements:** MILE-01, MILE-02, MILE-03, MILE-04
+**Success Criteria** (what must be TRUE):
+  1. Running `gsd:new-milestone` when `.planning/prds/pending/` contains one or more PRD files presents those PRDs as numbered options before asking "what to build next"
+  2. Selecting a PRD produces a complete phase decomposition (phase names, goals, requirement coverage, dependency ordering) without the user defining any phases manually
+  3. User sees a single approval screen showing the proposed roadmap before any branch or planning files are created — nothing is written until the user approves
+  4. After roadmap approval, the selected PRD file moves from `.planning/prds/pending/` to `.planning/prds/done/` — the pending folder no longer contains that PRD
+**Plans:** TBD
+
+Plans:
+- [ ] 42-01: Detect and present pending PRDs in `gsd:new-milestone` — scan `.planning/prds/pending/`, present as options, fall through to manual input when none found
+- [ ] 42-02: Autonomous phase decomposition from PRD — read selected PRD, derive phases with dependency ordering, present single approval checkpoint
+- [ ] 42-03: PRD lifecycle on approval — move PRD from pending to done on roadmap approval; update REQUIREMENTS.md traceability
+
+#### Phase 43: Docs Automation
+
+**Goal:** Every phase execution automatically produces appropriately-scoped documentation as a mandatory final step, and the verifier gates phase completion on docs being present and proportionate to what was built
+**Depends on:** Phase 40 (v1.12.0 complete — independent of Phases 41 and 42)
+**Requirements:** DOCS-01, DOCS-02, DOCS-03, DOCS-04, DOCS-05
+**Success Criteria** (what must be TRUE):
+  1. After all feature tasks complete in the final execution wave, a Haiku docs agent runs as the last mandatory task — it is not skippable and fires regardless of what was built
+  2. Docs output scales to build scope: a new API endpoint produces a file in `api/`; a new UI surface produces a file in `frontend-operator/` or `frontend-player/`; an architectural decision appends to `architecture/`; an internal refactoring produces only a minimal changelog entry
+  3. The docs agent reads existing `/docs` templates and frontmatter conventions from the target project before writing any content, and its output matches the established project style
+  4. The phase verifier marks the phase `gaps_found` when the docs agent was skipped or when docs scope does not match build scope (e.g., new endpoint built but no `api/` doc entry produced)
+  5. When `/docs` does not exist in the project, the agent creates the folder and seeds it with content covering what was built; when `/docs` exists, the agent updates existing files where relevant and creates new files only for new surfaces — no padding or invented content in either case
+**Plans:** TBD
+
+Plans:
+- [ ] 43-01: `gsd-docs-updater` Haiku agent — reads `/docs` conventions, scales output to build scope, guards against padding and invented content
+- [ ] 43-02: Executor final-wave integration — wire docs agent as last mandatory task after feature work is committed; pass SUMMARY.md build scope as context
+- [ ] 43-03: Verifier docs validation gate — check docs appropriateness relative to build scope; `gaps_found` on skip or scope mismatch
 
 ## Progress
 
@@ -363,13 +426,16 @@ Plans:
 | 31. Per-Task Model Routing | v1.11.0 | 3/3 | Complete | 2026-02-21 |
 | 32. Reliability & Quality Gap Fixes | v1.11.0 | 4/4 | Complete | 2026-02-21 |
 | 33. v1.10.0 Tech Debt Closure | v1.10.0 | 2/2 | Complete | 2026-02-21 |
-| 34. Checkpoint & Plan-Structure Gates | v1.12.0 | Complete    | 2026-03-10 | - |
+| 34. Checkpoint & Plan-Structure Gates | v1.12.0 | 2/2 | Complete | 2026-03-10 |
 | 35. Test & Coverage Enforcement | v1.12.0 | 3/3 | Complete | 2026-03-11 |
-| 36. Migration Safety & Error Taxonomy | 2/2 | Complete    | 2026-03-10 | - |
-| 37. PRD Traceability & Flow Context | 2/2 | Complete   | 2026-03-10 | - |
-| 38. Dev Server Lifecycle & Knowledge Feedback | v1.12.0 | 0/2 | Not started | - |
+| 36. Migration Safety & Error Taxonomy | v1.12.0 | 2/2 | Complete | 2026-03-10 |
+| 37. PRD Traceability & Flow Context | v1.12.0 | 2/2 | Complete | 2026-03-10 |
+| 38. Dev Server Lifecycle & Knowledge Feedback | v1.12.0 | 2/2 | Complete | 2026-03-11 |
 | 39. Execution Intelligence | v1.12.0 | 3/3 | Complete | 2026-03-11 |
-| 40. Observability & Analytics | v1.12.0 | 0/2 | Not started | - |
+| 40. Observability & Analytics | v1.12.0 | 2/2 | Complete | 2026-03-11 |
+| 41. gsd:prd Workflow | v1.13.0 | 0/TBD | Not started | - |
+| 42. Milestone PRD Integration | v1.13.0 | 0/TBD | Not started | - |
+| 43. Docs Automation | v1.13.0 | 0/TBD | Not started | - |
 
 ---
-*Roadmap created: 2026-02-15 | Last updated: 2026-03-11 — v1.12.0 Autonomous Quality & Flow phases 34-40 added*
+*Roadmap created: 2026-02-15 | Last updated: 2026-03-11 — v1.13.0 Product Discovery & Docs Automation phases 41-43 added*
