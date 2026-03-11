@@ -17,15 +17,30 @@ import { success, error } from '../middleware/envelope.js';
 import type { Orchestrator } from '../../orchestrator/index.js';
 
 /**
- * Schema for starting a new agent
+ * Schema for starting an execute-plan agent
  */
-const StartAgentSchema = z.object({
+const ExecutePlanAgentSchema = z.object({
+  agentType: z.literal('execute-plan').optional(),
   projectPath: z.string().min(1),
   planId: z.string().min(1),
   taskName: z.string().min(1),
   systemPrompt: z.string().min(1),
   userPrompt: z.string().min(1),
 });
+
+/**
+ * Schema for starting a discuss-phase agent
+ */
+const DiscussPhaseAgentSchema = z.object({
+  agentType: z.literal('discuss-phase'),
+  projectId: z.string().min(1),
+  prompt: z.string().min(1),
+});
+
+/**
+ * Combined schema for starting agents (discriminated union)
+ */
+const StartAgentSchema = z.union([ExecutePlanAgentSchema, DiscussPhaseAgentSchema]);
 
 /**
  * Create agent routes with orchestrator dependency
@@ -39,12 +54,19 @@ export function createAgentRoutes(orchestrator: Orchestrator) {
   /**
    * POST /api/agents - Start a new agent
    *
-   * Request body:
-   * - projectPath: string - Path to the GSD project
-   * - planId: string - Plan identifier for this execution
-   * - taskName: string - Human-readable task name
-   * - systemPrompt: string - System prompt for Claude
-   * - userPrompt: string - Initial user prompt
+   * Supports two agent types:
+   *
+   * 1. Execute-plan agent (default):
+   *    - projectPath: string - Path to the GSD project
+   *    - planId: string - Plan identifier for this execution
+   *    - taskName: string - Human-readable task name
+   *    - systemPrompt: string - System prompt for Claude
+   *    - userPrompt: string - Initial user prompt
+   *
+   * 2. Discuss-phase agent:
+   *    - agentType: 'discuss-phase'
+   *    - projectId: string - Project identifier
+   *    - prompt: string - User's message
    *
    * Response: { data: { agentId: string }, meta: {...} }
    */
@@ -52,6 +74,16 @@ export function createAgentRoutes(orchestrator: Orchestrator) {
     const body = c.req.valid('json');
 
     try {
+      // Handle discuss-phase agent (conversational)
+      if ('agentType' in body && body.agentType === 'discuss-phase') {
+        const agentId = await orchestrator.startDiscussAgent({
+          projectId: body.projectId,
+          prompt: body.prompt,
+        });
+        return success(c, { agentId }, 201);
+      }
+
+      // Handle execute-plan agent (default)
       const agentId = await orchestrator.startAgent(body);
       return success(c, { agentId }, 201);
     } catch (err) {

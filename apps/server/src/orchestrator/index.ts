@@ -19,12 +19,82 @@ import {
 // Active sessions by agentId
 const sessions = new Map<string, AgentSession>();
 
+/**
+ * Generate a contextual response for discuss-phase conversations.
+ * For Phase 16 UI testing, this provides realistic mock responses.
+ */
+function generateDiscussResponse(prompt: string): string {
+  const lowerPrompt = prompt.toLowerCase();
+
+  // Context-aware responses for common discussion topics
+  if (lowerPrompt.includes('hello') || lowerPrompt.includes('hi') || lowerPrompt.includes('start')) {
+    return `Hello! I'm here to help gather context for your project. Let's discuss the requirements and design decisions.
+
+What would you like to focus on first? You can tell me about:
+- **Goals**: What are you trying to achieve?
+- **Constraints**: Any technical or business limitations?
+- **Users**: Who will be using this feature?`;
+  }
+
+  if (lowerPrompt.includes('goal') || lowerPrompt.includes('objective')) {
+    return `Great, let's clarify your goals. Understanding the "why" helps me provide better guidance.
+
+A few questions:
+1. What problem are you solving?
+2. How will you measure success?
+3. What's the timeline for this work?`;
+  }
+
+  if (lowerPrompt.includes('user') || lowerPrompt.includes('audience')) {
+    return `Understanding your users is crucial. Let me ask a few questions:
+
+1. Who are the primary users of this feature?
+2. What's their technical expertise level?
+3. Are there any accessibility requirements to consider?`;
+  }
+
+  // Default response that encourages discussion
+  return `Thanks for sharing that context. That helps me understand the situation better.
+
+Based on what you've told me, I have a few follow-up questions:
+1. Can you elaborate on the key requirements?
+2. Are there any existing patterns in the codebase we should follow?
+3. What would be the ideal outcome?`;
+}
+
+/**
+ * Stream a response token by token with realistic timing.
+ * Simulates ~30ms per token for typewriter effect per CONTEXT.md.
+ */
+async function streamDiscussResponse(
+  io: TypedServer,
+  agentId: string,
+  response: string
+): Promise<void> {
+  const tokens = response.split(/(\s+)/);
+  const DELAY_MS = 30; // Per CONTEXT.md typewriter effect
+
+  for (const token of tokens) {
+    io.to(`agent:${agentId}`).emit(EVENTS.AGENT_TOKEN, {
+      agentId,
+      token,
+      sequence: 0,
+    });
+    await new Promise((resolve) => setTimeout(resolve, DELAY_MS));
+  }
+}
+
 export interface StartAgentOptions {
   projectPath: string;
   planId: string;
   taskName: string;
   systemPrompt: string;
   userPrompt: string;
+}
+
+export interface StartDiscussAgentOptions {
+  projectId: string;
+  prompt: string;
 }
 
 /**
@@ -74,6 +144,54 @@ export function createOrchestrator(io: TypedServer) {
           }, 60000); // 1 minute grace period
         }
       );
+
+      return agentId;
+    },
+
+    /**
+     * Start a discuss-phase agent session
+     *
+     * Creates a conversational agent for gathering context through discussion.
+     * Streams a response to the user's prompt.
+     *
+     * @param options - Discuss agent options
+     * @returns Agent ID for tracking
+     */
+    async startDiscussAgent(options: StartDiscussAgentOptions): Promise<string> {
+      const agentId = randomUUID();
+
+      const session: AgentSession = {
+        agentId,
+        projectPath: options.projectId,
+        planId: 'discuss',
+        taskName: 'Discuss Phase',
+        status: 'streaming',
+        sequence: 0,
+        messages: [],
+      };
+
+      sessions.set(agentId, session);
+
+      // Emit agent:start event
+      io.to(`agent:${agentId}`).emit(EVENTS.AGENT_START, {
+        agentId,
+        planId: session.planId,
+        taskName: session.taskName,
+      });
+
+      // Simulate streaming response with typewriter effect
+      const response = generateDiscussResponse(options.prompt);
+      streamDiscussResponse(io, agentId, response).then(() => {
+        session.status = 'complete';
+        io.to(`agent:${agentId}`).emit(EVENTS.AGENT_END, {
+          agentId,
+          status: 'success',
+          summary: 'Discussion response completed',
+        });
+
+        // Clean up after grace period
+        setTimeout(() => sessions.delete(agentId), 60000);
+      });
 
       return agentId;
     },
