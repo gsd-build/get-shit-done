@@ -16,9 +16,124 @@ import type { TypedServer } from '../socket/server.js';
 import type { AgentSession, ToolContext } from './types.js';
 import { executeTool, GSD_TOOLS } from './tools.js';
 import { withRetry } from './retry.js';
+import {
+  createCheckpoint,
+  markCheckpointWarned,
+  markCheckpointPaused,
+  getCheckpoint,
+  type PendingCheckpoint,
+} from './checkpoint.js';
 
 // Anthropic client - uses ANTHROPIC_API_KEY environment variable
 const client = new Anthropic();
+
+/**
+ * Wait for a checkpoint response from the user
+ *
+ * Per CONTEXT.md:
+ * - 30s warning before timeout
+ * - 60s pause (agent waits indefinitely after this)
+ * - Checkpoint persists for reconnect recovery
+ *
+ * @param io - Socket.IO server instance
+ * @param session - Agent session state
+ * @param checkpoint - The pending checkpoint
+ * @returns The user's response string
+ */
+export async function waitForCheckpointResponse(
+  io: TypedServer,
+  session: AgentSession,
+  checkpoint: PendingCheckpoint
+): Promise<string> {
+  const room = `agent:${session.agentId}`;
+
+  // Emit phase change
+  session.status = 'awaiting_checkpoint';
+  session.pendingCheckpoint = checkpoint.checkpointId;
+  io.to(room).emit(EVENTS.AGENT_PHASE, {
+    agentId: session.agentId,
+    phase: 'awaiting_checkpoint',
+    sequence: session.sequence++,
+  });
+
+  // Emit checkpoint request
+  // Note: Only include options if defined (exactOptionalPropertyTypes)
+  io.to(room).emit(EVENTS.CHECKPOINT_REQUEST, {
+    checkpointId: checkpoint.checkpointId,
+    type: checkpoint.type,
+    prompt: checkpoint.prompt,
+    ...(checkpoint.options && { options: checkpoint.options }),
+    timeoutMs: checkpoint.timeoutMs,
+  });
+
+  // Wait with timeout handling per CONTEXT.md
+  return new Promise((resolve) => {
+    let warnTimer: NodeJS.Timeout | undefined;
+    let pauseTimer: NodeJS.Timeout | undefined;
+    let checkInterval: NodeJS.Timeout | undefined;
+
+    const cleanup = (): void => {
+      if (warnTimer) clearTimeout(warnTimer);
+      if (pauseTimer) clearTimeout(pauseTimer);
+      if (checkInterval) clearInterval(checkInterval);
+    };
+
+    // 30s warning per CONTEXT.md
+    warnTimer = setTimeout(() => {
+      markCheckpointWarned(checkpoint.checkpointId);
+      // Note: Only include options if defined (exactOptionalPropertyTypes)
+      io.to(room).emit(EVENTS.CHECKPOINT_REQUEST, {
+        checkpointId: checkpoint.checkpointId,
+        type: checkpoint.type,
+        prompt: `[WARNING: Response needed] ${checkpoint.prompt}`,
+        ...(checkpoint.options && { options: checkpoint.options }),
+        timeoutMs: 30000, // 30s remaining
+      });
+    }, 30000);
+
+    // 60s pause per CONTEXT.md
+    pauseTimer = setTimeout(() => {
+      markCheckpointPaused(checkpoint.checkpointId);
+      // Don't reject - just pause and wait indefinitely
+      // User can still respond after pause
+    }, 60000);
+
+    // Poll for response (orchestrator.respondToCheckpoint will update the checkpoint)
+    checkInterval = setInterval(() => {
+      const cp = getCheckpoint(checkpoint.checkpointId);
+      if (cp?.response) {
+        cleanup();
+        // Clear pending checkpoint from session
+        session.pendingCheckpoint = undefined;
+        resolve(cp.response);
+      }
+    }, 100);
+  });
+}
+
+/**
+ * Create a checkpoint and wait for response
+ *
+ * Convenience function that combines createCheckpoint and waitForCheckpointResponse.
+ * Use this when the agent needs user input during execution.
+ *
+ * @param io - Socket.IO server instance
+ * @param session - Agent session state
+ * @param type - Checkpoint type (human-verify, decision, human-action)
+ * @param prompt - User-facing prompt text
+ * @param options - Optional decision options
+ * @returns The user's response string
+ */
+export async function awaitCheckpoint(
+  io: TypedServer,
+  session: AgentSession,
+  type: PendingCheckpoint['type'],
+  prompt: string,
+  options?: PendingCheckpoint['options']
+): Promise<string> {
+  const checkpoint = createCheckpoint(session.agentId, type, prompt, options);
+  return waitForCheckpointResponse(io, session, checkpoint);
+}
 
 /**
  * Run the agent loop: stream Claude responses, execute tools, repeat until done

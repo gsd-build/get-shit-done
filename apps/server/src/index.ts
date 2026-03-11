@@ -13,6 +13,7 @@ import { createSocketServer } from './socket/server.js';
 import { registerHandlers } from './socket/handlers.js';
 import { createSecurityConfig, getSecurityMetrics } from './middleware/security.js';
 import { createApi } from './api/index.js';
+import { createOrchestrator } from './orchestrator/index.js';
 
 const PORT = parseInt(process.env['PORT'] ?? '4000', 10);
 
@@ -38,8 +39,11 @@ export { securityConfig, getSecurityMetrics };
 // Create server with connection state recovery
 const { httpServer, io } = createSocketServer({ port: PORT });
 
-// Register Socket.IO event handlers
-const cleanupSocketHandlers = registerHandlers(io);
+// Create orchestrator for agent management
+const orchestrator = createOrchestrator(io);
+
+// Register Socket.IO event handlers (pass orchestrator for checkpoint handling)
+const cleanupSocketHandlers = registerHandlers(io, orchestrator);
 
 // Attach REST API to the HTTP server (before listen)
 const cleanupApi = createApi(httpServer, io, {

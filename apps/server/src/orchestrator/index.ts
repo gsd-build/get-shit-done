@@ -11,6 +11,10 @@ import type { TypedServer } from '../socket/server.js';
 import type { AgentSession } from './types.js';
 import { runAgentLoop } from './claude.js';
 import { EVENTS } from '@gsd/events';
+import {
+  processCheckpointResponse,
+  getPendingCheckpointsForAgent,
+} from './checkpoint.js';
 
 // Active sessions by agentId
 const sessions = new Map<string, AgentSession>();
@@ -120,6 +124,39 @@ export function createOrchestrator(io: TypedServer) {
 
       return true;
     },
+
+    /**
+     * Submit a checkpoint response (called from socket handler)
+     *
+     * Per CONTEXT.md: idempotency via checkpoint ID + response hash
+     * - First response accepted
+     * - Duplicate of same response: acknowledged without error
+     * - Different response after first: rejected
+     *
+     * @param checkpointId - Checkpoint ID to respond to
+     * @param response - User's response string
+     * @returns Result with accepted flag and optional reason
+     */
+    respondToCheckpoint(
+      checkpointId: string,
+      response: string
+    ): { accepted: boolean; reason?: string } {
+      const result = processCheckpointResponse(checkpointId, response);
+      // Only include reason if defined (exactOptionalPropertyTypes)
+      return result.reason
+        ? { accepted: result.accepted, reason: result.reason }
+        : { accepted: result.accepted };
+    },
+
+    /**
+     * Get pending checkpoints for an agent (for reconnect recovery)
+     *
+     * Per CONTEXT.md: "Auto-push checkpoint:pending immediately after socket reconnects"
+     *
+     * @param agentId - Agent ID to get checkpoints for
+     * @returns Array of pending checkpoints
+     */
+    getPendingCheckpointsForAgent,
   };
 }
 
