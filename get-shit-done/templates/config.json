@@ -38,5 +38,11 @@
   "safety": {
     "always_confirm_destructive": true,
     "always_confirm_external_services": true
+  },
+  "testing": {
+    "tdd_enforcement": true,
+    "require_passing_tests": true,
+    "test_command": null,
+    "coverage_threshold": null
   }
 }

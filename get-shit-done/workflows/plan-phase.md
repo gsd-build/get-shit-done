@@ -277,6 +277,68 @@ UAT_PATH=$(echo "$INIT" | jq -r '.uat_path // empty')
 CONTEXT_PATH=$(echo "$INIT" | jq -r '.context_path // empty')
 ```
 
+## 7.5. Determine TDD Requirements
+
+**Check if TDD enforcement is enabled:**
+```bash
+TDD_ENFORCEMENT=$(node ~/.claude/get-shit-done/bin/gsd-tools.cjs config-get testing.tdd_enforcement 2>/dev/null || echo "true")
+```
+
+**If TDD enforcement is enabled:**
+
+Classify the phase type by reading the RESEARCH.md or CONTEXT.md:
+- **Code phase**: Creates/modifies TypeScript, JavaScript, Python, Go, Rust, or other implementation files
+- **Docs phase**: Only creates/modifies markdown, documentation, or config files
+- **Mixed phase**: Both code and docs
+
+```bash
+# Heuristic: check phase goal and research for code indicators
+PHASE_GOAL=$(node ~/.claude/get-shit-done/bin/gsd-tools.cjs roadmap get-phase "${PHASE}" | jq -r '.goal // .name')
+IS_CODE_PHASE=$(echo "$PHASE_GOAL" | grep -iE "implement|create|build|add|refactor|fix|api|endpoint|service|module|component|function|class" | wc -l)
+```
+
+**If IS_CODE_PHASE > 0 (code phase detected):**
+
+Set `TDD_INSTRUCTIONS` to include in planner prompt:
+
+```markdown
+<tdd_requirement>
+**TDD ENFORCEMENT ACTIVE** — This is a code-related phase. Plans MUST follow RED-GREEN-REFACTOR methodology.
+
+**For each feature/module being created:**
+1. First task writes failing tests (RED) — commit: `test({phase}-{plan}): add failing tests for {feature}`
+2. Second task implements to pass tests (GREEN) — commit: `feat({phase}-{plan}): implement {feature}`
+3. Optional third task refactors (REFACTOR) — commit: `refactor({phase}-{plan}): clean up {feature}`
+
+**Plan structure for TDD:**
+- Group related functionality into TDD-friendly plans (one feature = one plan)
+- Each plan's first task MUST be writing tests that define expected behavior
+- Tests MUST be runnable and initially fail (proving they test something real)
+- Implementation tasks come AFTER test tasks
+
+**Test file conventions:**
+- TypeScript/JavaScript: `*.test.ts`, `*.spec.ts` next to source or in `__tests__/`
+- Python: `test_*.py` in `tests/` directory
+- Go: `*_test.go` next to source
+- Rust: `#[cfg(test)]` module or `tests/` directory
+
+**What to test:**
+- Business logic with defined inputs/outputs
+- API endpoints (request/response contracts)
+- Data transformations and parsing
+- Validation rules and constraints
+- State machines and workflows
+
+**Skip tests for:**
+- UI layout/styling only
+- Pure configuration changes
+- Type definitions with no logic
+</tdd_requirement>
+```
+
+**If IS_CODE_PHASE = 0 (docs/config phase):**
+Set `TDD_INSTRUCTIONS` to empty string — no TDD requirements.
+
 ## 8. Spawn gsd-planner Agent
 
 Display banner:
@@ -286,6 +348,7 @@ Display banner:
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
 ◆ Spawning planner...
+{If TDD_ENFORCEMENT and IS_CODE_PHASE: "📋 TDD mode: Tests will be written first"}
 ```
 
 Planner prompt:
@@ -309,6 +372,8 @@ Planner prompt:
 
 **Project instructions:** Read ./CLAUDE.md if exists — follow project-specific guidelines
 **Project skills:** Check .agents/skills/ directory (if exists) — read SKILL.md files, plans should account for project skill rules
+
+{TDD_INSTRUCTIONS if set, otherwise omit this block}
 </planning_context>
 
 <downstream_consumer>

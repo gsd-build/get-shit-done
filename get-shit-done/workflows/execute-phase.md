@@ -416,6 +416,93 @@ Also: `/gsd:verify-work {X}` — manual testing first
 Gap closure cycle: `/gsd:plan-phase {X} --gaps` reads VERIFICATION.md → creates gap plans with `gap_closure: true` → user runs `/gsd:execute-phase {X} --gaps-only` → verifier re-runs.
 </step>
 
+<step name="run_test_suite">
+**Run test suite and block completion if tests fail.**
+
+Skip this step if:
+- `testing.require_passing_tests` is false in config
+- Phase has no code changes (docs-only, planning-only)
+
+**1. Check config:**
+```bash
+REQUIRE_TESTS=$(node ~/.claude/get-shit-done/bin/gsd-tools.cjs config-get testing.require_passing_tests 2>/dev/null || echo "true")
+TEST_CMD=$(node ~/.claude/get-shit-done/bin/gsd-tools.cjs config-get testing.test_command 2>/dev/null || echo "")
+```
+
+**2. Detect if phase is code-related:**
+```bash
+# Check if any SUMMARY.md lists code files (not just .md files)
+CODE_FILES=$(grep -h "\.ts\|\.js\|\.tsx\|\.jsx\|\.py\|\.go\|\.rs\|\.java\|\.cs\|\.fs" ${PHASE_DIR}/*-SUMMARY.md 2>/dev/null | wc -l)
+```
+
+If `CODE_FILES` is 0: Skip test suite — phase is docs/config only.
+
+**3. Auto-detect test command if not configured:**
+```bash
+if [ -z "$TEST_CMD" ]; then
+  if [ -f "package.json" ]; then
+    TEST_CMD="pnpm test 2>&1 || npm test 2>&1"
+  elif [ -f "Cargo.toml" ]; then
+    TEST_CMD="cargo test"
+  elif [ -f "go.mod" ]; then
+    TEST_CMD="go test ./..."
+  elif [ -f "pyproject.toml" ] || [ -f "requirements.txt" ]; then
+    TEST_CMD="pytest"
+  fi
+fi
+```
+
+**4. Run test suite:**
+```bash
+echo "Running test suite: $TEST_CMD"
+TEST_OUTPUT=$(eval "$TEST_CMD" 2>&1)
+TEST_EXIT=$?
+```
+
+**5. Evaluate results:**
+
+| Exit Code | Action |
+|-----------|--------|
+| 0 | Tests pass → continue to update_roadmap |
+| Non-zero | Tests fail → block completion |
+
+**If tests fail:**
+```
+╔══════════════════════════════════════════════════════════════╗
+║  TEST SUITE FAILED                                           ║
+╚══════════════════════════════════════════════════════════════╝
+
+**{N} tests failing** — phase cannot complete until tests pass.
+
+{Truncated test output - last 50 lines}
+
+## Options
+
+1. **Fix failing tests** — Debug and fix, then re-run `/gsd:execute-phase {X}`
+2. **Skip tests** — Add `--skip-tests` flag (not recommended)
+3. **Investigate** — The tests may have caught a real bug
+
+---
+→ Fix the tests and re-run execute-phase
+---
+```
+
+STOP execution. Do not proceed to update_roadmap.
+
+**If tests pass:**
+```
+✓ Test suite passed ({N} tests)
+```
+
+Continue to update_roadmap.
+
+**6. Handle --skip-tests flag:**
+If `--skip-tests` in $ARGUMENTS: bypass test suite with warning:
+```
+⚠️ Skipping test suite (--skip-tests flag). This is not recommended for code phases.
+```
+</step>
+
 <step name="update_roadmap">
 **Mark phase complete and update all tracking files:**
 

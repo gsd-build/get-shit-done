@@ -211,18 +211,72 @@ End with: **Total deviations:** N auto-fixed (breakdown). **Impact:** assessment
 </deviation_documentation>
 
 <tdd_plan_execution>
-## TDD Execution
+## TDD Execution (RED-GREEN-REFACTOR)
 
-For `type: tdd` plans — RED-GREEN-REFACTOR:
+**For ALL code plans when TDD enforcement is enabled** — not just `type: tdd` plans.
 
-1. **Infrastructure** (first TDD plan only): detect project, install framework, config, verify empty suite
-2. **RED:** Read `<behavior>` → failing test(s) → run (MUST fail) → commit: `test({phase}-{plan}): add failing test for [feature]`
-3. **GREEN:** Read `<implementation>` → minimal code → run (MUST pass) → commit: `feat({phase}-{plan}): implement [feature]`
-4. **REFACTOR:** Clean up → tests MUST pass → commit: `refactor({phase}-{plan}): clean up [feature]`
+Check config:
+```bash
+TDD_ENFORCEMENT=$(node ~/.claude/get-shit-done/bin/gsd-tools.cjs config-get testing.tdd_enforcement 2>/dev/null || echo "true")
+```
 
-Errors: RED doesn't fail → investigate test/existing feature. GREEN doesn't pass → debug, iterate. REFACTOR breaks → undo.
+**If TDD_ENFORCEMENT is true AND plan creates/modifies code files:**
 
-See `~/.claude/get-shit-done/references/tdd.md` for structure.
+### Step 1: Infrastructure (first plan in phase only)
+
+If no test framework detected:
+```bash
+# Detect and install
+if [ -f "package.json" ]; then
+  grep -q '"vitest"' package.json || pnpm add -D vitest @vitest/coverage-v8
+fi
+```
+
+### Step 2: RED — Write Failing Tests FIRST
+
+1. **Before writing ANY implementation code**, create test file
+2. Write tests that define expected behavior from `<objective>` and `must_haves.truths`
+3. Run tests — they MUST fail (if they pass, feature already exists or test is wrong)
+4. Commit: `test({phase}-{plan}): add failing tests for {feature}`
+
+**Validation:** Tests must fail with assertion errors, not import/syntax errors.
+
+### Step 3: GREEN — Implement to Pass
+
+1. Write minimal implementation to make tests pass
+2. No optimization, no cleverness — just make tests green
+3. Run tests — they MUST pass
+4. Commit: `feat({phase}-{plan}): implement {feature}`
+
+**Validation:** All tests must pass. If tests fail, iterate until green.
+
+### Step 4: REFACTOR (optional)
+
+1. Clean up implementation if obvious improvements exist
+2. Run tests — they MUST still pass
+3. If tests fail, undo refactor
+4. Commit only if changes made: `refactor({phase}-{plan}): clean up {feature}`
+
+### Error Handling
+
+| Error | Cause | Action |
+|-------|-------|--------|
+| RED phase tests pass | Feature exists or test is wrong | Investigate before proceeding |
+| GREEN phase tests fail | Implementation bug | Debug and iterate, don't skip |
+| REFACTOR breaks tests | Refactor changed behavior | Undo refactor, try smaller steps |
+
+### TDD Commit Sequence
+
+A properly executed TDD plan produces 2-3 commits in this order:
+```
+test(14-01): add failing tests for REST API endpoints
+feat(14-01): implement REST API endpoints
+refactor(14-01): extract response helpers (optional)
+```
+
+**IMPORTANT:** If you find yourself writing implementation before tests, STOP. Write the test first.
+
+See `~/.claude/get-shit-done/references/tdd.md` for test quality guidelines.
 </tdd_plan_execution>
 
 <task_commit>

@@ -6,6 +6,42 @@ TDD is about design quality, not coverage metrics. The red-green-refactor cycle 
 **Key insight:** TDD work is fundamentally heavier than standard tasks—it requires 2-3 execution cycles (RED → GREEN → REFACTOR), each with file reads, test runs, and potential debugging. TDD features get dedicated plans to ensure full context is available throughout the cycle.
 </overview>
 
+<enforcement>
+## TDD Enforcement Mode
+
+When `testing.tdd_enforcement: true` in config.json (default), GSD enforces TDD for all code-related phases:
+
+**Planning phase:**
+- Planner receives TDD instructions for code phases
+- Plans structure tasks as: write tests → implement → refactor
+- Each plan's first task for a feature MUST be writing tests
+
+**Execution phase:**
+- Executor writes failing tests BEFORE implementation
+- Tests must fail initially (proves they test something real)
+- Implementation commits only after tests pass
+- Commits follow: `test(...)` → `feat(...)` → `refactor(...)`
+
+**Phase completion:**
+- Test suite runs after all plans complete
+- Phase CANNOT complete if tests fail
+- Use `--skip-tests` flag to bypass (not recommended)
+
+**Disable enforcement:**
+```json
+{
+  "testing": {
+    "tdd_enforcement": false
+  }
+}
+```
+
+**When enforcement is disabled:**
+- Plans may implement without tests
+- Phase completion doesn't require passing tests
+- Use `/gsd:add-tests` to add tests after the fact
+</enforcement>
+
 <when_to_use_tdd>
 ## When TDD Improves Quality
 
