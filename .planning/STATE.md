@@ -67,6 +67,7 @@ progress:
 | Phase 15 P02 | 8m 52s | 3 tasks | 11 files |
 | Phase 15 P03 | 10m 38s | 3 tasks | 12 files |
 | Phase 15 P04 | 20m 25s | 3 tasks | 10 files |
+| Phase 17 P09 | 16m 36s | 3 tasks | 11 files |
 
 ## Accumulated Context
 
@@ -156,6 +157,8 @@ progress:
 | expect.extend for jest-dom | Direct matcher extension more reliable than import path | 2026-03-11 |
 | Triple-slash reference for jest-dom types | Use /// reference instead of import to avoid "expect not defined" | 2026-03-11 |
 | E2E tests resilient to missing backend | Check for project grid or empty/loading state for CI compatibility | 2026-03-11 |
+| Stable Zustand action references | Extract individual actions for useEffect dependencies to prevent loops | 2026-03-11 |
+| data-testid for E2E selectors | Use data-testid attributes for reliable Playwright selectors | 2026-03-11 |
 
 ### Roadmap Evolution
 
@@ -247,6 +250,7 @@ None currently.
 
 ## Recent Activity
 
+- 2026-03-11 — Completed plan 17-09 (UAT E2E Test Suite) - 30 E2E tests covering all 13 UAT criteria
 - 2026-03-11 — Completed plan 15-04 (Dashboard Assembly & E2E Tests) - SearchBar, FilterBar, ProjectGrid, E2E tests for DASH-01-05
 - 2026-03-11 — Completed plan 15-03 (UI Primitives & Dashboard Components) - ProgressBar, Badge, FilterChip, HealthBadge, ActivityFeed, ProjectCard
 - 2026-03-11 — Completed plan 15-02 (Data Layer & Hooks) - Zustand, useSocket, useProjects, API client
