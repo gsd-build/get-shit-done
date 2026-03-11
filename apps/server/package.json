@@ -11,9 +11,11 @@
     "typecheck": "tsc --noEmit"
   },
   "dependencies": {
-    "@gsd/events": "workspace:*"
+    "@gsd/events": "workspace:*",
+    "socket.io": "^4.8.0"
   },
   "devDependencies": {
+    "@types/node": "^20.0.0",
     "tsx": "^4.19.0"
   }
 }

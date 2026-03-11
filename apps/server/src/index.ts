@@ -1,30 +1,52 @@
 /**
  * @gsd/server - GSD Dashboard Server Entry Point
  *
- * This module will serve as the entry point for the Express + Socket.IO server.
- * Socket.IO setup will be added in Plan 02.
+ * Socket.IO server with:
+ * - Connection state recovery (2-minute window)
+ * - Room-based event routing (project:*, agent:*)
+ * - Graceful shutdown handling
  */
 
-import {
-  EVENTS,
-  type ServerToClientEvents,
-  type ClientToServerEvents,
-  type TokenEvent,
-} from '@gsd/events';
+import { createSocketServer } from './socket/server.js';
+import { registerHandlers } from './socket/handlers.js';
 
-// Log available events to verify import works
-console.log('GSD Server starting with events:', Object.keys(EVENTS));
+const PORT = parseInt(process.env['PORT'] ?? '4000', 10);
 
-// Type verification - ensure types are importable
-type ServerEvents = ServerToClientEvents;
-type ClientEvents = ClientToServerEvents;
+// Create server with connection state recovery
+const { httpServer, io } = createSocketServer({ port: PORT });
 
-// Example event payload (for type verification)
-const exampleToken: TokenEvent = {
-  agentId: 'agent-123',
-  token: 'Hello',
-  sequence: 0,
-};
+// Register event handlers
+const cleanup = registerHandlers(io);
 
-console.log('Example token event:', exampleToken);
-console.log('Server ready for Socket.IO setup (Plan 02)');
+// Start listening
+httpServer.listen(PORT, () => {
+  console.log(`[server] Socket.IO server listening on port ${PORT}`);
+  console.log(`[server] Connection state recovery: 2 minutes`);
+  console.log(`[server] Heartbeat: pingInterval=25000, pingTimeout=20000`);
+});
+
+// Graceful shutdown
+function handleShutdown(signal: string): void {
+  console.log(`[server] Received ${signal}, shutting down gracefully...`);
+
+  // Run registered cleanup functions
+  cleanup();
+
+  // Close Socket.IO connections
+  io.close(() => {
+    console.log('[server] Socket.IO connections closed');
+    httpServer.close(() => {
+      console.log('[server] HTTP server closed');
+      process.exit(0);
+    });
+  });
+
+  // Force exit after timeout
+  setTimeout(() => {
+    console.error('[server] Forced shutdown after timeout');
+    process.exit(1);
+  }, 10000);
+}
+
+process.on('SIGTERM', () => handleShutdown('SIGTERM'));
+process.on('SIGINT', () => handleShutdown('SIGINT'));
