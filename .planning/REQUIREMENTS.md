@@ -139,7 +139,7 @@ Visual debugging workflow.
 | DASH-03 | Phase 15 | Complete |
 | DASH-04 | Phase 15 | Complete |
 | DASH-05 | Phase 15 | Complete |
-| DISC-01 | Phase 16 | Pending |
+| DISC-01 | Phase 16 | In Progress |
 | DISC-02 | Phase 16 | Pending |
 | DISC-03 | Phase 16 | Pending |
 | DISC-04 | Phase 16 | Pending |

@@ -156,7 +156,7 @@ Plans:
 **Plans**: 4 plans
 
 Plans:
-- [ ] 16-01-PLAN.md — Chat conversation interface with streaming token display
+- [x] 16-01-PLAN.md — Chat conversation interface with streaming token display
 - [ ] 16-02-PLAN.md — CONTEXT.md live preview panel with decision locking
 - [ ] 16-03-PLAN.md — Session persistence across reconnects and browser refresh
 - [ ] 16-04-PLAN.md — Manual CONTEXT.md editing with bidirectional sync
@@ -393,7 +393,7 @@ Phases execute in numeric order: 13 -> 14 -> 15 -> 16 -> 17 -> 18 -> 19 -> 20
 | 13. Foundation Infrastructure | 3/3 | Complete    | 2026-03-11 |
 | 14. Backend Core | 4/4 | Complete    | 2026-03-11 |
 | 15. Frontend Foundation & Dashboard | 4/4 | Complete    | 2026-03-11 |
-| 16. Discuss Phase UI | 0/4 | Planned | - |
+| 16. Discuss Phase UI | 1/4 | In progress | - |
 | 17. Execute Phase UI | 0/8 | Planned | - |
 | 18. Plan & Verify Phase UIs | 0/8 | Not started | - |
 | 19. Roadmap Visualization | 0/4 | Not started | - |
@@ -417,4 +417,4 @@ Phases execute in numeric order: 21 -> 22 -> 23 -> 24 -> 25 -> 26 -> 27 -> 28
 
 ---
 *Roadmap created: 2026-03-10*
-*Last updated: 2026-03-11 (Phase 17 planned)*
+*Last updated: 2026-03-11 (Phase 16 plan 01 complete)*
