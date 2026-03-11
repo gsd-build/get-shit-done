@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { render, screen, within } from '@testing-library/react';
+import { render, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { CheckpointModal } from './CheckpointModal';
 import type { CheckpointRequestEvent } from '@gsd/events';
@@ -138,16 +138,20 @@ describe('CheckpointModal', () => {
       expect(screen.getByRole('dialog')).toHaveAttribute('aria-modal', 'true');
     });
 
-    it('first interactive element receives focus', () => {
+    it('first interactive element receives focus', async () => {
       render(<CheckpointModal checkpoint={mockCheckpoint} onRespond={onRespond} />);
-      // For text input checkpoint, the input should have focus
-      expect(screen.getByRole('textbox')).toHaveFocus();
+      // For text input checkpoint, the input should have focus (async due to RAF)
+      await waitFor(() => {
+        expect(screen.getByRole('textbox')).toHaveFocus();
+      });
     });
 
-    it('first option button receives focus when options are provided', () => {
+    it('first option button receives focus when options are provided', async () => {
       render(<CheckpointModal checkpoint={mockCheckpointWithOptions} onRespond={onRespond} />);
-      // For options checkpoint, the first option should have focus
-      expect(screen.getByRole('button', { name: 'PostgreSQL' })).toHaveFocus();
+      // For options checkpoint, the first option should have focus (async due to RAF)
+      await waitFor(() => {
+        expect(screen.getByRole('button', { name: 'PostgreSQL' })).toHaveFocus();
+      });
     });
   });
 });
