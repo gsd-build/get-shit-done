@@ -1,5 +1,13 @@
 import { describe, it, expect, beforeEach } from 'vitest';
-import { useVerificationStore } from './verificationStore';
+import {
+  useVerificationStore,
+  selectPassedCount,
+  selectFailedCount,
+  selectBlockingGaps,
+  selectHasBlockingGaps,
+  selectManualTestsComplete,
+  selectAllRequirementsPassed,
+} from './verificationStore';
 
 describe('verificationStore', () => {
   beforeEach(() => {
@@ -206,6 +214,260 @@ describe('verificationStore', () => {
       expect(state.manualTests).toEqual([]);
       expect(state.overallPassed).toBeNull();
       expect(state.summary).toBeNull();
+    });
+  });
+
+  describe('derived selectors', () => {
+    describe('selectPassedCount', () => {
+      it('returns correct count of passed tests', () => {
+        useVerificationStore.getState().addTestResult({
+          requirementId: 'REQ-1',
+          testName: 'test1',
+          passed: true,
+          duration: 100,
+        });
+        useVerificationStore.getState().addTestResult({
+          requirementId: 'REQ-2',
+          testName: 'test2',
+          passed: false,
+          duration: 100,
+        });
+        useVerificationStore.getState().addTestResult({
+          requirementId: 'REQ-3',
+          testName: 'test3',
+          passed: true,
+          duration: 100,
+        });
+
+        const state = useVerificationStore.getState();
+        expect(selectPassedCount(state)).toBe(2);
+      });
+
+      it('returns 0 when no results', () => {
+        const state = useVerificationStore.getState();
+        expect(selectPassedCount(state)).toBe(0);
+      });
+    });
+
+    describe('selectFailedCount', () => {
+      it('returns correct count of failed tests', () => {
+        useVerificationStore.getState().addTestResult({
+          requirementId: 'REQ-1',
+          testName: 'test1',
+          passed: true,
+          duration: 100,
+        });
+        useVerificationStore.getState().addTestResult({
+          requirementId: 'REQ-2',
+          testName: 'test2',
+          passed: false,
+          duration: 100,
+        });
+        useVerificationStore.getState().addTestResult({
+          requirementId: 'REQ-3',
+          testName: 'test3',
+          passed: false,
+          duration: 100,
+        });
+
+        const state = useVerificationStore.getState();
+        expect(selectFailedCount(state)).toBe(2);
+      });
+
+      it('returns 0 when all pass', () => {
+        useVerificationStore.getState().addTestResult({
+          requirementId: 'REQ-1',
+          testName: 'test1',
+          passed: true,
+          duration: 100,
+        });
+
+        const state = useVerificationStore.getState();
+        expect(selectFailedCount(state)).toBe(0);
+      });
+    });
+
+    describe('selectBlockingGaps', () => {
+      it('filters to only blocking gaps', () => {
+        useVerificationStore.getState().setGaps([
+          {
+            id: 'gap-1',
+            requirementId: 'REQ-1',
+            description: 'Critical issue',
+            severity: 'blocking',
+          },
+          {
+            id: 'gap-2',
+            requirementId: 'REQ-2',
+            description: 'Major issue',
+            severity: 'major',
+          },
+          {
+            id: 'gap-3',
+            requirementId: 'REQ-3',
+            description: 'Another critical',
+            severity: 'blocking',
+          },
+        ]);
+
+        const state = useVerificationStore.getState();
+        const blocking = selectBlockingGaps(state);
+        expect(blocking).toHaveLength(2);
+        expect(blocking[0]?.id).toBe('gap-1');
+        expect(blocking[1]?.id).toBe('gap-3');
+      });
+
+      it('returns empty array when no blocking gaps', () => {
+        useVerificationStore.getState().setGaps([
+          {
+            id: 'gap-1',
+            requirementId: 'REQ-1',
+            description: 'Minor issue',
+            severity: 'minor',
+          },
+        ]);
+
+        const state = useVerificationStore.getState();
+        expect(selectBlockingGaps(state)).toEqual([]);
+      });
+    });
+
+    describe('selectHasBlockingGaps', () => {
+      it('returns true when blocking gaps exist', () => {
+        useVerificationStore.getState().setGaps([
+          {
+            id: 'gap-1',
+            requirementId: 'REQ-1',
+            description: 'Critical issue',
+            severity: 'blocking',
+          },
+        ]);
+
+        const state = useVerificationStore.getState();
+        expect(selectHasBlockingGaps(state)).toBe(true);
+      });
+
+      it('returns false when no blocking gaps', () => {
+        useVerificationStore.getState().setGaps([
+          {
+            id: 'gap-1',
+            requirementId: 'REQ-1',
+            description: 'Minor issue',
+            severity: 'minor',
+          },
+        ]);
+
+        const state = useVerificationStore.getState();
+        expect(selectHasBlockingGaps(state)).toBe(false);
+      });
+
+      it('returns false when no gaps', () => {
+        const state = useVerificationStore.getState();
+        expect(selectHasBlockingGaps(state)).toBe(false);
+      });
+    });
+
+    describe('selectManualTestsComplete', () => {
+      it('returns true when all manual tests have been evaluated', () => {
+        useVerificationStore.getState().setManualTests([
+          { id: 'mt-1', description: 'Test 1', passed: true },
+          { id: 'mt-2', description: 'Test 2', passed: false },
+        ]);
+
+        const state = useVerificationStore.getState();
+        expect(selectManualTestsComplete(state)).toBe(true);
+      });
+
+      it('returns false when any test has passed === null', () => {
+        useVerificationStore.getState().setManualTests([
+          { id: 'mt-1', description: 'Test 1', passed: true },
+          { id: 'mt-2', description: 'Test 2', passed: null },
+        ]);
+
+        const state = useVerificationStore.getState();
+        expect(selectManualTestsComplete(state)).toBe(false);
+      });
+
+      it('returns false when no manual tests exist', () => {
+        const state = useVerificationStore.getState();
+        expect(selectManualTestsComplete(state)).toBe(false);
+      });
+    });
+
+    describe('selectAllRequirementsPassed', () => {
+      it('returns true when all automated and manual tests pass', () => {
+        useVerificationStore.getState().addTestResult({
+          requirementId: 'REQ-1',
+          testName: 'test1',
+          passed: true,
+          duration: 100,
+        });
+        useVerificationStore.getState().addTestResult({
+          requirementId: 'REQ-2',
+          testName: 'test2',
+          passed: true,
+          duration: 100,
+        });
+        useVerificationStore.getState().setManualTests([
+          { id: 'mt-1', description: 'Test 1', passed: true },
+        ]);
+
+        const state = useVerificationStore.getState();
+        expect(selectAllRequirementsPassed(state)).toBe(true);
+      });
+
+      it('returns false when any automated test fails', () => {
+        useVerificationStore.getState().addTestResult({
+          requirementId: 'REQ-1',
+          testName: 'test1',
+          passed: true,
+          duration: 100,
+        });
+        useVerificationStore.getState().addTestResult({
+          requirementId: 'REQ-2',
+          testName: 'test2',
+          passed: false,
+          duration: 100,
+        });
+        useVerificationStore.getState().setManualTests([
+          { id: 'mt-1', description: 'Test 1', passed: true },
+        ]);
+
+        const state = useVerificationStore.getState();
+        expect(selectAllRequirementsPassed(state)).toBe(false);
+      });
+
+      it('returns false when any manual test fails', () => {
+        useVerificationStore.getState().addTestResult({
+          requirementId: 'REQ-1',
+          testName: 'test1',
+          passed: true,
+          duration: 100,
+        });
+        useVerificationStore.getState().setManualTests([
+          { id: 'mt-1', description: 'Test 1', passed: false },
+        ]);
+
+        const state = useVerificationStore.getState();
+        expect(selectAllRequirementsPassed(state)).toBe(false);
+      });
+
+      it('returns true when all automated pass and no manual tests exist', () => {
+        useVerificationStore.getState().addTestResult({
+          requirementId: 'REQ-1',
+          testName: 'test1',
+          passed: true,
+          duration: 100,
+        });
+
+        const state = useVerificationStore.getState();
+        expect(selectAllRequirementsPassed(state)).toBe(true);
+      });
+
+      it('returns false when no automated tests exist', () => {
+        const state = useVerificationStore.getState();
+        expect(selectAllRequirementsPassed(state)).toBe(false);
+      });
     });
   });
 });
