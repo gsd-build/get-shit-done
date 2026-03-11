@@ -40,7 +40,7 @@ Context gathering through conversational interface.
 
 Research, planning, and verification workflow.
 
-- [ ] **PLAN-01**: User can see real-time progress as researcher agents spawn, run, and complete
+- [x] **PLAN-01**: User can see real-time progress as researcher agents spawn, run, and complete
 - [ ] **PLAN-02**: User can preview generated plans with task breakdown and wave grouping
 - [ ] **PLAN-03**: User can see verification feedback with specific issues highlighted per plan
 - [ ] **PLAN-04**: User can view requirement coverage matrix showing requirement-to-phase mapping
@@ -144,7 +144,7 @@ Visual debugging workflow.
 | DISC-03 | Phase 16 | Pending |
 | DISC-04 | Phase 16 | Pending |
 | DISC-05 | Phase 16 | Pending |
-| PLAN-01 | Phase 18 | Pending |
+| PLAN-01 | Phase 18 | Complete |
 | PLAN-02 | Phase 18 | Pending |
 | PLAN-03 | Phase 18 | Pending |
 | PLAN-04 | Phase 18 | Pending |
