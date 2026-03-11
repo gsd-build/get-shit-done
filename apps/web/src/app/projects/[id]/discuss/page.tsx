@@ -1,18 +1,22 @@
 'use client';
 
 import { useParams } from 'next/navigation';
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useState, useRef, useMemo } from 'react';
 import { useSocket } from '@/hooks/useSocket';
 import { useTokenStream } from '@/hooks/useTokenStream';
+import { useDiscussSession } from '@/hooks/useDiscussSession';
+import { useUnsavedChanges } from '@/hooks/useUnsavedChanges';
 import {
   useDiscussStore,
   selectMessages,
   selectIsStreaming,
   selectCurrentStreamingContent,
   selectTopicIndex,
+  selectHasHydrated,
   type Message,
 } from '@/stores/discussStore';
-import { ChatInterface, DEFAULT_TOPICS } from '@/components/features/discuss';
+import { useContextStore, selectLastUpdated as selectContextLastUpdated } from '@/stores/contextStore';
+import { ChatInterface, SavedIndicator, DEFAULT_TOPICS } from '@/components/features/discuss';
 
 const API_BASE =
   process.env['NEXT_PUBLIC_API_URL'] || 'http://localhost:4000';
@@ -36,6 +40,10 @@ export default function DiscussPage() {
   const isStreaming = useDiscussStore(selectIsStreaming);
   const currentStreamingContent = useDiscussStore(selectCurrentStreamingContent);
   const topicIndex = useDiscussStore(selectTopicIndex);
+  const hasHydrated = useDiscussStore(selectHasHydrated);
+
+  // Context store for tracking unsaved changes
+  const contextLastUpdated = useContextStore(selectContextLastUpdated);
 
   // Store actions
   const addMessage = useDiscussStore((s) => s.addMessage);
@@ -46,9 +54,68 @@ export default function DiscussPage() {
   const setTopicIndex = useDiscussStore((s) => s.setTopicIndex);
   const reset = useDiscussStore((s) => s.reset);
 
+  // Session management with reconnection handling
+  const { isReconnecting } = useDiscussSession({
+    phaseId: projectId,
+    socket,
+    onReconnected: () => {
+      // Connection restored - streaming will resume via agent:subscribe
+    },
+  });
+
   // Current agent ID for streaming
   const [currentAgentId, setCurrentAgentId] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
+
+  // Track saved state for indicator
+  const [showSaved, setShowSaved] = useState(false);
+  const lastSaveTimeRef = useRef<number>(0);
+
+  // Track message count for detecting changes
+  const prevMessageCountRef = useRef<number>(messages.length);
+
+  // Show saved indicator when state persists
+  useEffect(() => {
+    // Skip on initial mount
+    if (prevMessageCountRef.current === 0 && messages.length === 0) return;
+
+    // Check if messages changed (added)
+    if (messages.length > prevMessageCountRef.current) {
+      const now = Date.now();
+      // Debounce: only show if 500ms since last save
+      if (now - lastSaveTimeRef.current > 500) {
+        setShowSaved(true);
+        lastSaveTimeRef.current = now;
+        // Reset showSaved after SavedIndicator auto-hides
+        setTimeout(() => setShowSaved(false), 2500);
+      }
+    }
+    prevMessageCountRef.current = messages.length;
+  }, [messages.length]);
+
+  // Show saved indicator when context updates
+  useEffect(() => {
+    if (!contextLastUpdated) return;
+
+    const now = Date.now();
+    // Debounce: only show if 500ms since last save
+    if (now - lastSaveTimeRef.current > 500) {
+      setShowSaved(true);
+      lastSaveTimeRef.current = now;
+      setTimeout(() => setShowSaved(false), 2500);
+    }
+  }, [contextLastUpdated]);
+
+  // Compute unsaved changes for beforeunload warning
+  const hasUnsavedChanges = useMemo(() => {
+    // Consider unsaved if streaming is in progress
+    if (isStreaming) return true;
+    // Consider unsaved if there are messages and we're in an active session
+    return messages.length > 0 && currentAgentId !== null;
+  }, [isStreaming, messages.length, currentAgentId]);
+
+  // Warn before leaving with unsaved changes
+  useUnsavedChanges(hasUnsavedChanges);
 
   // Token streaming with typewriter effect
   const { displayedText, clear: clearStream } = useTokenStream({
@@ -185,8 +252,23 @@ export default function DiscussPage() {
     [setTopicIndex]
   );
 
+  // Don't render until hydrated to avoid hydration mismatch
+  if (!hasHydrated) {
+    return (
+      <main className="h-screen flex items-center justify-center">
+        <div className="text-muted-foreground">Loading session...</div>
+      </main>
+    );
+  }
+
   return (
     <main className="h-screen flex flex-col">
+      {/* Header with saved indicator */}
+      <div className="flex items-center justify-between px-4 py-2 border-b border-border">
+        <h1 className="text-sm font-medium">Discuss Phase</h1>
+        <SavedIndicator show={showSaved} />
+      </div>
+
       {/* Inline error banner */}
       {error && (
         <div className="bg-red-100 dark:bg-red-900/30 text-red-700 dark:text-red-300 px-4 py-2 text-sm flex items-center justify-between">
@@ -203,7 +285,7 @@ export default function DiscussPage() {
 
       <ChatInterface
         messages={messages}
-        isConnected={isConnected}
+        isConnected={isConnected && !isReconnecting}
         isStreaming={isStreaming}
         streamingText={currentStreamingContent}
         topicIndex={topicIndex}

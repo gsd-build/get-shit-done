@@ -33,6 +33,9 @@ interface ContextStoreState extends ContextPersistedState {
   /** Whether store has been hydrated from storage */
   hasHydrated: boolean;
 
+  /** ID of the decision currently being edited (for conflict detection) */
+  editingDecisionId: string | null;
+
   /** Set context from raw markdown */
   setContext: (phaseId: string, markdown: string) => void;
 
@@ -50,6 +53,9 @@ interface ContextStoreState extends ContextPersistedState {
 
   /** Clear isNew flags after animation completes */
   clearNewFlags: () => void;
+
+  /** Mark a decision as being edited (for conflict detection) */
+  markEditing: (decisionId: string | null) => void;
 
   /** Set hydration status */
   setHasHydrated: (hasHydrated: boolean) => void;
@@ -77,6 +83,7 @@ export const useContextStore = create<ContextStoreState>()(
       previousState: null,
       lastUpdated: null,
       hasHydrated: false,
+      editingDecisionId: null,
 
   setContext: (phaseId: string, markdown: string) => {
     const { contextState: previous } = get();
@@ -177,6 +184,8 @@ export const useContextStore = create<ContextStoreState>()(
     });
   },
 
+  markEditing: (decisionId) => set({ editingDecisionId: decisionId }),
+
   setHasHydrated: (hasHydrated) => set({ hasHydrated }),
 
   reset: () => {
@@ -186,6 +195,7 @@ export const useContextStore = create<ContextStoreState>()(
       previousState: null,
       lastUpdated: null,
       hasHydrated: false,
+      editingDecisionId: null,
     });
   },
     }),
@@ -211,3 +221,4 @@ export const selectDecisions = (state: ContextStoreState) => state.contextState?
 export const selectSpecifics = (state: ContextStoreState) => state.contextState?.specifics ?? [];
 export const selectDeferred = (state: ContextStoreState) => state.contextState?.deferred ?? [];
 export const selectHasHydrated = (state: ContextStoreState) => state.hasHydrated;
+export const selectEditingDecisionId = (state: ContextStoreState) => state.editingDecisionId;

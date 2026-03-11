@@ -15,6 +15,7 @@ export {
   type CheckpointResponseEvent,
   type HealthMetricsEvent,
   type ConnectionHealthEvent,
+  type ContextUpdateEvent,
   type ServerToClientEvents,
   type ClientToServerEvents,
   type InterServerEvents,

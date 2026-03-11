@@ -5,6 +5,7 @@ export { ConnectionBanner } from './ConnectionBanner';
 export { MessageBubble } from './MessageBubble';
 export { ProgressStepper, DEFAULT_TOPICS, type TopicStep } from './ProgressStepper';
 export { QuestionCard } from './QuestionCard';
+export { SavedIndicator } from './SavedIndicator';
 export { StreamingMessage } from './StreamingMessage';
 export { TypingIndicator } from './TypingIndicator';
 export { WelcomeScreen } from './WelcomeScreen';
