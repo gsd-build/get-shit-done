@@ -124,8 +124,8 @@ export function ContextPreview({ onEditStart, onEditComplete }: ContextPreviewPr
                   decision={decision}
                   onToggleLock={handleToggleLock}
                   isEditing={editingDecisionId === decision.id}
-                  onEditStart={onEditStart}
-                  onEditComplete={onEditComplete}
+                  {...(onEditStart && { onEditStart })}
+                  {...(onEditComplete && { onEditComplete })}
                 />
               ))
             )}
@@ -155,8 +155,8 @@ export function ContextPreview({ onEditStart, onEditComplete }: ContextPreviewPr
                   decision={decision}
                   onToggleLock={handleToggleLock}
                   isEditing={editingDecisionId === decision.id}
-                  onEditStart={onEditStart}
-                  onEditComplete={onEditComplete}
+                  {...(onEditStart && { onEditStart })}
+                  {...(onEditComplete && { onEditComplete })}
                 />
               ))
             )}
@@ -186,8 +186,8 @@ export function ContextPreview({ onEditStart, onEditComplete }: ContextPreviewPr
                   decision={decision}
                   onToggleLock={handleToggleLock}
                   isEditing={editingDecisionId === decision.id}
-                  onEditStart={onEditStart}
-                  onEditComplete={onEditComplete}
+                  {...(onEditStart && { onEditStart })}
+                  {...(onEditComplete && { onEditComplete })}
                 />
               ))
             )}

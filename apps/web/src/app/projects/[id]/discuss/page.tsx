@@ -6,6 +6,7 @@ import { useSocket } from '@/hooks/useSocket';
 import { useTokenStream } from '@/hooks/useTokenStream';
 import { useDiscussSession } from '@/hooks/useDiscussSession';
 import { useUnsavedChanges } from '@/hooks/useUnsavedChanges';
+import { useContextSync } from '@/hooks/useContextSync';
 import {
   useDiscussStore,
   selectMessages,
@@ -16,7 +17,7 @@ import {
   type Message,
 } from '@/stores/discussStore';
 import { useContextStore, selectLastUpdated as selectContextLastUpdated } from '@/stores/contextStore';
-import { ChatInterface, SavedIndicator, DEFAULT_TOPICS } from '@/components/features/discuss';
+import { ChatInterface, ConflictDialog, DiscussLayout, SavedIndicator, DEFAULT_TOPICS } from '@/components/features/discuss';
 
 const API_BASE =
   process.env['NEXT_PUBLIC_API_URL'] || 'http://localhost:4000';
@@ -66,6 +67,14 @@ export default function DiscussPage() {
   // Current agent ID for streaming
   const [currentAgentId, setCurrentAgentId] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
+
+  // Context sync for inline editing and conflict detection
+  const {
+    pendingConflict,
+    onEditStart,
+    onEditComplete,
+    onConflictResolve,
+  } = useContextSync(socket, currentAgentId);
 
   // Track saved state for indicator
   const [showSaved, setShowSaved] = useState(false);
@@ -283,18 +292,32 @@ export default function DiscussPage() {
         </div>
       )}
 
-      <ChatInterface
-        messages={messages}
-        isConnected={isConnected && !isReconnecting}
-        isStreaming={isStreaming}
-        streamingText={currentStreamingContent}
-        topicIndex={topicIndex}
-        topics={DEFAULT_TOPICS}
-        phaseNumber="16"
-        phaseName="Discuss Phase UI"
-        onSendMessage={handleSendMessage}
-        onSelectOption={handleSelectOption}
-        onTopicClick={handleTopicClick}
+      <DiscussLayout
+        onEditStart={onEditStart}
+        onEditComplete={onEditComplete}
+      >
+        <ChatInterface
+          messages={messages}
+          isConnected={isConnected && !isReconnecting}
+          isStreaming={isStreaming}
+          streamingText={currentStreamingContent}
+          topicIndex={topicIndex}
+          topics={DEFAULT_TOPICS}
+          phaseNumber="16"
+          phaseName="Discuss Phase UI"
+          onSendMessage={handleSendMessage}
+          onSelectOption={handleSelectOption}
+          onTopicClick={handleTopicClick}
+        />
+      </DiscussLayout>
+
+      {/* Conflict resolution dialog */}
+      <ConflictDialog
+        isOpen={pendingConflict !== null}
+        onClose={() => onConflictResolve('user')}
+        userVersion={pendingConflict?.userVersion ?? ''}
+        claudeVersion={pendingConflict?.claudeVersion ?? ''}
+        onResolve={onConflictResolve}
       />
     </main>
   );

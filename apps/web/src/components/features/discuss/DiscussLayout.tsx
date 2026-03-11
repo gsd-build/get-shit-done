@@ -51,7 +51,7 @@ export function DiscussLayout({ children, onEditStart, onEditComplete }: Discuss
 
           {/* Right Panel: Context Preview */}
           <Panel id="preview" defaultSize={40} minSize={25} className="flex flex-col border-l border-border">
-            <ContextPreview onEditStart={onEditStart} onEditComplete={onEditComplete} />
+            <ContextPreview {...(onEditStart && { onEditStart })} {...(onEditComplete && { onEditComplete })} />
           </Panel>
         </Group>
       </div>
@@ -120,7 +120,7 @@ export function DiscussLayout({ children, onEditStart, onEditComplete }: Discuss
 
           {/* Drawer content */}
           <div className="h-[calc(100%-57px)] overflow-y-auto">
-            <ContextPreview onEditStart={onEditStart} onEditComplete={onEditComplete} />
+            <ContextPreview {...(onEditStart && { onEditStart })} {...(onEditComplete && { onEditComplete })} />
           </div>
         </div>
       </div>
