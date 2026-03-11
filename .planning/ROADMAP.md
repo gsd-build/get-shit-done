@@ -35,7 +35,7 @@ This roadmap delivers the GSD (Get Shit Done) meta-prompting framework across mu
 
 - [x] **Phase 13: Foundation Infrastructure** - WebSocket server, token buffering, file locking, and security layer (completed 2026-03-11)
 - [x] **Phase 14: Backend Core** - REST API, agent orchestrator, and WebSocket connection management (completed 2026-03-11)
-- [ ] **Phase 15: Frontend Foundation & Dashboard** - Next.js app with project listing, health indicators, and navigation
+- [x] **Phase 15: Frontend Foundation & Dashboard** - Next.js app with project listing, health indicators, and navigation (completed 2026-03-11)
 - [ ] **Phase 16: Discuss Phase UI** - Chat interface with streaming and CONTEXT.md preview
 - [ ] **Phase 17: Execute Phase UI** - Execution streaming, tool visualization, checkpoints, and TDD workflow
 - [ ] **Phase 18: Plan & Verify Phase UIs** - Research streaming, plan preview, verification report, and gap workflow
@@ -121,11 +121,11 @@ Plans:
 
 Plans:
 - [x] 14-01-PLAN.md — REST API for project listing, health checks, and phase data (Hono)
-- [ ] 14-02-PLAN.md — GSD wrapper adapting sync CJS modules to async TypeScript
-- [ ] 14-03-PLAN.md — Agent orchestrator with Claude API streaming and tool execution
-- [ ] 14-04-PLAN.md — Checkpoint handling with idempotency and timeout warnings
+- [x] 14-02-PLAN.md — GSD wrapper adapting sync CJS modules to async TypeScript
+- [x] 14-03-PLAN.md — Agent orchestrator with Claude API streaming and tool execution
+- [x] 14-04-PLAN.md — Checkpoint handling with idempotency and timeout warnings
 
-### Phase 15: Frontend Foundation & Dashboard
+### Phase 15: Frontend Foundation & Dashboard (COMPLETE)
 **Goal**: Deliver project dashboard with health status, progress tracking, and navigation
 **Depends on**: Phase 14
 **Requirements**: DASH-01, DASH-02, DASH-03, DASH-04, DASH-05
@@ -135,13 +135,13 @@ Plans:
   3. User can view recent activity feed (last 5 actions) for each project
   4. User can search and filter projects by name or status
   5. User can navigate to project detail view by clicking a project card
-**Plans**: 4 plans
+**Plans:** 4/4 plans complete
 
 Plans:
-- [ ] 15-01-PLAN.md — Next.js 15 app with App Router, Tailwind v4, and dark mode
-- [ ] 15-02-PLAN.md — Socket.IO client hook with reconnection and Zustand stores
-- [ ] 15-03-PLAN.md — Dashboard UI with project cards, health indicators, and activity feed
-- [ ] 15-04-PLAN.md — Project search, filtering, and navigation to detail view
+- [x] 15-01-PLAN.md — Next.js 15 app with App Router, Tailwind v4, and dark mode
+- [x] 15-02-PLAN.md — Socket.IO client hook with reconnection and Zustand stores
+- [x] 15-03-PLAN.md — Dashboard UI with project cards, health indicators, and activity feed
+- [x] 15-04-PLAN.md — Project search, filtering, and navigation to detail view
 
 ### Phase 16: Discuss Phase UI
 **Goal**: Enable conversational context gathering with real-time streaming and CONTEXT.md preview
@@ -392,7 +392,7 @@ Phases execute in numeric order: 13 -> 14 -> 15 -> 16 -> 17 -> 18 -> 19 -> 20
 |-------|----------------|--------|-----------|
 | 13. Foundation Infrastructure | 3/3 | Complete    | 2026-03-11 |
 | 14. Backend Core | 4/4 | Complete    | 2026-03-11 |
-| 15. Frontend Foundation & Dashboard | 0/4 | Not started | - |
+| 15. Frontend Foundation & Dashboard | 3/4 | Complete    | 2026-03-11 |
 | 16. Discuss Phase UI | 0/4 | Not started | - |
 | 17. Execute Phase UI | 0/8 | Not started | - |
 | 18. Plan & Verify Phase UIs | 0/8 | Not started | - |
@@ -417,4 +417,4 @@ Phases execute in numeric order: 21 -> 22 -> 23 -> 24 -> 25 -> 26 -> 27 -> 28
 
 ---
 *Roadmap created: 2026-03-10*
-*Last updated: 2026-03-11 (Phase 14 plan 01 complete)*
+*Last updated: 2026-03-11 (Phase 15 complete)*

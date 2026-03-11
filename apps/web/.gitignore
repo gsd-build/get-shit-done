@@ -1,0 +1,17 @@
+# Next.js
+.next/
+out/
+
+# Dependencies
+node_modules/
+
+# Testing
+test-results/
+playwright-report/
+coverage/
+
+# Build
+*.tsbuildinfo
+
+# Misc
+.DS_Store

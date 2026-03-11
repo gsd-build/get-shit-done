@@ -2,14 +2,14 @@
 gsd_state_version: 1.0
 milestone: v1.1
 milestone_name: Completed Phases
-status: Phase finalized and merged to main
-last_updated: "2026-03-11T13:53:06.320Z"
-last_activity: 2026-03-11 — Finalized phase 14 (Backend Core) - merged to main
+status: completed
+last_updated: "2026-03-11T14:30:08.309Z"
+last_activity: 2026-03-11 — Completed plan 15-04 (Dashboard Assembly & E2E Tests)
 progress:
-  total_phases: 18
-  completed_phases: 14
-  total_plans: 49
-  completed_plans: 43
+  total_phases: 17
+  completed_phases: 12
+  total_plans: 41
+  completed_plans: 46
 ---
 
 # Project State: GSD v1.1 Upstream Sync
@@ -18,17 +18,17 @@ progress:
 
 **Core Value:** Enable GSD fork maintainers to stay current with upstream while preserving custom enhancements through intelligent sync tooling.
 
-**Current Focus:** Phase 14 Complete - Backend Core Finalized
+**Current Focus:** Phase 15 - Frontend Foundation & Dashboard (COMPLETE)
 
 ## Current Position
 
-**Phase:** 14 - Backend Core (FINALIZED)
-**Plan:** 14-04 complete
-**Status:** Phase finalized and merged to main
-**Last activity:** 2026-03-11 — Finalized phase 14 (Backend Core) - merged to main
+**Phase:** 15 - Frontend Foundation & Dashboard
+**Plan:** 15-04 complete (4/4)
+**Status:** Milestone complete
+**Last activity:** 2026-03-11 — Completed plan 15-04 (Dashboard Assembly & E2E Tests)
 
 ```
-[####################] 100% - Phase 14 finalized
+[####################] 100% - Phase 15 plan 04/04 complete
 ```
 
 **Phases:**
@@ -43,6 +43,7 @@ progress:
 - [x] Phase 12: MCP Server API (5 requirements) - complete
 - [x] Phase 13: Foundation Infrastructure (4 requirements) - complete
 - [x] Phase 14: Backend Core (4 plans) - FINALIZED
+- [x] Phase 15: Frontend Foundation & Dashboard (4 plans) - COMPLETE
 
 ## Performance Metrics
 
@@ -62,6 +63,10 @@ progress:
 | Phase 14 P02 | 8m 35s | 2 tasks | 9 files |
 | Phase 14 P03 | 4m 8s | 3 tasks | 8 files |
 | Phase 14 P04 | 5m | 3 tasks | 7 files |
+| Phase 15 P01 | 8m 30s | 3 tasks | 12 files |
+| Phase 15 P02 | 8m 52s | 3 tasks | 11 files |
+| Phase 15 P03 | 10m 38s | 3 tasks | 12 files |
+| Phase 15 P04 | 20m 25s | 3 tasks | 10 files |
 
 ## Accumulated Context
 
@@ -139,6 +144,18 @@ progress:
 | Idempotency via checkpoint ID + hash | Accept first response, acknowledge duplicate same response, reject different responses | 2026-03-11 |
 | exactOptionalPropertyTypes spread pattern | Use ...(value && { key: value }) to avoid undefined in optional properties | 2026-03-11 |
 | Request body event-based buffering | Collect chunks with 'data' event, process on 'end' for POST/PUT/PATCH/DELETE | 2026-03-11 |
+| Tailwind v4 CSS-first pattern | @import "tailwindcss" with @theme block, not tailwind.config.js | 2026-03-11 |
+| next-themes attribute=class | CSS variable theming via class switching for dark mode | 2026-03-11 |
+| Vitest 2.x stable over 4.x alpha | Chose production-ready version for reliability | 2026-03-11 |
+| Zustand selectors pattern | Export selectX functions for minimal re-renders | 2026-03-11 |
+| MSW full URL matching | Use full API_BASE URL in handlers for test isolation | 2026-03-11 |
+| Coverage scoped to implementation | Include only hooks/stores/lib/components, exclude config files | 2026-03-11 |
+| clsx for className merging | Lightweight, tree-shakeable, same API as classnames | 2026-03-11 |
+| date-fns for relative time | ESM-first v4, tree-shakeable, formatDistanceToNow | 2026-03-11 |
+| ResizeObserver mock for Radix | Required for Radix Popover in jsdom test environment | 2026-03-11 |
+| expect.extend for jest-dom | Direct matcher extension more reliable than import path | 2026-03-11 |
+| Triple-slash reference for jest-dom types | Use /// reference instead of import to avoid "expect not defined" | 2026-03-11 |
+| E2E tests resilient to missing backend | Check for project grid or empty/loading state for CI compatibility | 2026-03-11 |
 
 ### Roadmap Evolution
 
@@ -199,6 +216,10 @@ progress:
 - [x] Execute plan 14-02 (GSD wrapper for async TypeScript)
 - [x] Execute plan 14-03 (Agent Orchestrator with Claude streaming)
 - [x] Execute plan 14-04 (Checkpoint handling and Agent REST API)
+- [x] Execute plan 15-01 (Next.js scaffold with Tailwind v4 and testing)
+- [x] Execute plan 15-02 (Data layer and hooks with TDD)
+- [x] Execute plan 15-03 (UI primitives and dashboard components)
+- [x] Execute plan 15-04 (Dashboard assembly and E2E tests)
 
 ### Blockers
 
@@ -206,13 +227,14 @@ None currently.
 
 ## Session Continuity
 
-**Last Session:** 2026-03-11T13:53:06.315Z
-**Context:** Finalized Phase 14 - Backend Core. Merged to main with 117 tests passing.
+**Last Session:** 2026-03-11T14:11:46.000Z
+**Context:** Completed Phase 15 Plan 04 - Dashboard assembly and E2E tests.
 
 **To Resume:**
-1. Phase 14 finalized and merged to main
-2. Full backend stack complete: Socket.IO + Hono REST API + Agent orchestrator with checkpoints
-3. Next: Plan phase 15 or continue with remaining roadmap
+1. Phase 15 complete - all 4 plans executed
+2. Dashboard with search, filter, and project grid functional
+3. 72 unit tests + 8 E2E tests passing
+4. Next: Finalize phase 15 and merge to main
 
 ### Sync History
 
@@ -221,10 +243,14 @@ None currently.
 
 ---
 *State initialized: 2026-02-23*
-*Last updated: 2026-03-11 (Phase 14 finalized - merged to main)*
+*Last updated: 2026-03-11 (Phase 15 Plan 04 complete)*
 
 ## Recent Activity
 
+- 2026-03-11 — Completed plan 15-04 (Dashboard Assembly & E2E Tests) - SearchBar, FilterBar, ProjectGrid, E2E tests for DASH-01-05
+- 2026-03-11 — Completed plan 15-03 (UI Primitives & Dashboard Components) - ProgressBar, Badge, FilterChip, HealthBadge, ActivityFeed, ProjectCard
+- 2026-03-11 — Completed plan 15-02 (Data Layer & Hooks) - Zustand, useSocket, useProjects, API client
+- 2026-03-11 — Completed plan 15-01 (Next.js Scaffold) - Next.js 15, Tailwind v4, Vitest, Playwright, MSW
 - 2026-03-11 — Finalized phase 14 (Backend Core) - merged to main with 117 tests
 - 2026-03-11 — Completed plan 14-04 (Checkpoint Handling and Agent REST API) - Phase 14 complete
 - 2026-03-11 — Completed plan 14-03 (Agent Orchestrator)
