@@ -5,20 +5,37 @@
  */
 
 /**
- * Health check result from gsd-tools health
+ * Health issue from gsd-tools health check
  */
-export interface HealthCheck {
-  passed: boolean;
-  message?: string | undefined;
+export interface HealthIssue {
+  type: string;
+  phase: string | null;
+  path: string | null;
+  branch: string | null;
+  age_days: number | null;
+  suggested_action: string;
+  repairable: boolean;
+  metadata?: Record<string, unknown>;
 }
 
 /**
- * Full health report from gsd-tools health --json
+ * Health report summary
+ */
+export interface HealthSummary {
+  orphan_count: number;
+  stale_lock_count: number;
+  incomplete_count: number;
+  sync_issue_count: number;
+}
+
+/**
+ * Full health report from gsd-tools health check --json
  */
 export interface HealthReport {
   status: 'healthy' | 'degraded' | 'error';
-  issues: string[];
-  checks: Record<string, HealthCheck>;
+  issues: HealthIssue[];
+  exit_code: number;
+  summary: HealthSummary;
 }
 
 /**

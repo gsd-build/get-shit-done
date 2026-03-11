@@ -8,7 +8,8 @@
 // Re-export all types
 export type {
   HealthReport,
-  HealthCheck,
+  HealthIssue,
+  HealthSummary,
   ProjectState,
   Phase,
   Project,
@@ -16,8 +17,14 @@ export type {
   GsdResult,
 } from './types.js';
 
-// Placeholder exports - will be implemented in Task 2
-// export { getHealth } from './health.js';
-// export { getState } from './state.js';
-// export { listPhases } from './phase.js';
-// export { discoverProjects } from './project.js';
+// Health check
+export { getHealth } from './health.js';
+
+// State management
+export { getState, getProgress } from './state.js';
+
+// Phase listing
+export { listPhases } from './phase.js';
+
+// Project discovery
+export { discoverProjects } from './project.js';
