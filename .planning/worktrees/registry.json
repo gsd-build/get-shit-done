@@ -79,7 +79,8 @@
       "branch": "phase-10-parallel-milestones",
       "path": "/Users/mauricevandermerwe/Projects/get-shit-done/.worktrees/get-shit-done-phase-10",
       "created": "2026-03-10T05:45:14.663Z",
-      "status": "active"
+      "status": "removed",
+      "removed": "2026-03-11T12:30:00.000Z"
     },
     "phase-12": {
       "phase_number": "12",
@@ -96,21 +97,9 @@
       "branch": "phase-14-backend-core",
       "path": "/Users/mauricevandermerwe/Projects/get-shit-done/.worktrees/get-shit-done-phase-14",
       "created": "2026-03-11T11:13:55.075Z",
-      "status": "active"
+      "status": "removed",
+      "removed": "2026-03-11T12:18:56.593Z"
     }
   },
-  "locks": {
-    "phase-10": {
-      "acquired": "2026-03-10T05:45:14.500Z",
-      "owner": "mauricevandermerwe",
-      "pid": 2660,
-      "hostname": "Maurices-MacBook-Pro.local"
-    },
-    "phase-14": {
-      "acquired": "2026-03-11T11:13:54.896Z",
-      "owner": "mauricevandermerwe",
-      "pid": 82220,
-      "hostname": "Maurices-MacBook-Pro.local"
-    }
-  }
+  "locks": {}
 }
