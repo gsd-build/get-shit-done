@@ -3,13 +3,13 @@ gsd_state_version: 1.0
 milestone: v1.1
 milestone_name: Completed Phases
 status: in_progress
-last_updated: "2026-03-11T13:35:00.000Z"
-last_activity: 2026-03-11 — Completed plan 15-02 (Data Layer & Hooks)
+last_updated: "2026-03-11T13:48:17.000Z"
+last_activity: 2026-03-11 — Completed plan 15-03 (UI Primitives & Dashboard Components)
 progress:
   total_phases: 17
   completed_phases: 13
   total_plans: 49
-  completed_plans: 44
+  completed_plans: 45
 ---
 
 # Project State: GSD v1.1 Upstream Sync
@@ -18,17 +18,17 @@ progress:
 
 **Core Value:** Enable GSD fork maintainers to stay current with upstream while preserving custom enhancements through intelligent sync tooling.
 
-**Current Focus:** Phase 15 - Frontend Foundation & Dashboard (Plan 02 complete)
+**Current Focus:** Phase 15 - Frontend Foundation & Dashboard (Plan 03 complete)
 
 ## Current Position
 
 **Phase:** 15 - Frontend Foundation & Dashboard
-**Plan:** 15-02 complete, 15-03 next
+**Plan:** 15-03 complete, 15-04 next
 **Status:** In progress
-**Last activity:** 2026-03-11 — Completed plan 15-02 (Data Layer & Hooks)
+**Last activity:** 2026-03-11 — Completed plan 15-03 (UI Primitives & Dashboard Components)
 
 ```
-[##########----------] 50% - Phase 15 plan 02/04 complete
+[###############-----] 75% - Phase 15 plan 03/04 complete
 ```
 
 **Phases:**
@@ -43,7 +43,7 @@ progress:
 - [x] Phase 12: MCP Server API (5 requirements) - complete
 - [x] Phase 13: Foundation Infrastructure (4 requirements) - complete
 - [x] Phase 14: Backend Core (4 plans) - FINALIZED
-- [ ] Phase 15: Frontend Foundation & Dashboard (4 plans) - IN PROGRESS (2/4)
+- [ ] Phase 15: Frontend Foundation & Dashboard (4 plans) - IN PROGRESS (3/4)
 
 ## Performance Metrics
 
@@ -65,6 +65,7 @@ progress:
 | Phase 14 P04 | 5m | 3 tasks | 7 files |
 | Phase 15 P01 | 8m 30s | 3 tasks | 12 files |
 | Phase 15 P02 | 8m 52s | 3 tasks | 11 files |
+| Phase 15 P03 | 10m 38s | 3 tasks | 12 files |
 
 ## Accumulated Context
 
@@ -148,6 +149,10 @@ progress:
 | Zustand selectors pattern | Export selectX functions for minimal re-renders | 2026-03-11 |
 | MSW full URL matching | Use full API_BASE URL in handlers for test isolation | 2026-03-11 |
 | Coverage scoped to implementation | Include only hooks/stores/lib/components, exclude config files | 2026-03-11 |
+| clsx for className merging | Lightweight, tree-shakeable, same API as classnames | 2026-03-11 |
+| date-fns for relative time | ESM-first v4, tree-shakeable, formatDistanceToNow | 2026-03-11 |
+| ResizeObserver mock for Radix | Required for Radix Popover in jsdom test environment | 2026-03-11 |
+| expect.extend for jest-dom | Direct matcher extension more reliable than import path | 2026-03-11 |
 
 ### Roadmap Evolution
 
@@ -210,6 +215,7 @@ progress:
 - [x] Execute plan 14-04 (Checkpoint handling and Agent REST API)
 - [x] Execute plan 15-01 (Next.js scaffold with Tailwind v4 and testing)
 - [x] Execute plan 15-02 (Data layer and hooks with TDD)
+- [x] Execute plan 15-03 (UI primitives and dashboard components)
 
 ### Blockers
 
@@ -217,13 +223,13 @@ None currently.
 
 ## Session Continuity
 
-**Last Session:** 2026-03-11T13:35:00.000Z
-**Context:** Completed Phase 15 Plan 02 - Data layer with Zustand stores and React hooks.
+**Last Session:** 2026-03-11T13:48:17.000Z
+**Context:** Completed Phase 15 Plan 03 - UI primitives and dashboard components with TDD.
 
 **To Resume:**
-1. Phase 15 Plan 02 complete - Zustand stores, useSocket, useProjects hooks, API client
-2. Next: Execute plan 15-03 (Dashboard components)
-3. Data layer ready for component integration
+1. Phase 15 Plan 03 complete - ProgressBar, Badge, FilterChip, HealthBadge, ActivityFeed, ProjectCard
+2. Next: Execute plan 15-04 (Layout components)
+3. Component library complete and tested (98% coverage)
 
 ### Sync History
 
@@ -232,10 +238,11 @@ None currently.
 
 ---
 *State initialized: 2026-02-23*
-*Last updated: 2026-03-11 (Phase 15 Plan 02 complete)*
+*Last updated: 2026-03-11 (Phase 15 Plan 03 complete)*
 
 ## Recent Activity
 
+- 2026-03-11 — Completed plan 15-03 (UI Primitives & Dashboard Components) - ProgressBar, Badge, FilterChip, HealthBadge, ActivityFeed, ProjectCard
 - 2026-03-11 — Completed plan 15-02 (Data Layer & Hooks) - Zustand, useSocket, useProjects, API client
 - 2026-03-11 — Completed plan 15-01 (Next.js Scaffold) - Next.js 15, Tailwind v4, Vitest, Playwright, MSW
 - 2026-03-11 — Finalized phase 14 (Backend Core) - merged to main with 117 tests
