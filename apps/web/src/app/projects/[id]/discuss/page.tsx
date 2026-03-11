@@ -1,0 +1,219 @@
+'use client';
+
+import { useParams } from 'next/navigation';
+import { useCallback, useEffect, useState } from 'react';
+import { useSocket } from '@/hooks/useSocket';
+import { useTokenStream } from '@/hooks/useTokenStream';
+import {
+  useDiscussStore,
+  selectMessages,
+  selectIsStreaming,
+  selectCurrentStreamingContent,
+  selectTopicIndex,
+  type Message,
+} from '@/stores/discussStore';
+import { ChatInterface, DEFAULT_TOPICS } from '@/components/features/discuss';
+
+const API_BASE =
+  process.env['NEXT_PUBLIC_API_URL'] || 'http://localhost:4000';
+const SOCKET_URL =
+  process.env['NEXT_PUBLIC_SOCKET_URL'] || 'http://localhost:4000';
+
+/**
+ * Discuss phase page for conversational context gathering.
+ *
+ * Integrates chat UI with Socket.IO streaming and agent orchestration.
+ */
+export default function DiscussPage() {
+  const params = useParams();
+  const projectId = params['id'] as string;
+
+  // Socket connection
+  const { socket, isConnected } = useSocket(SOCKET_URL);
+
+  // Store state with selectors
+  const messages = useDiscussStore(selectMessages);
+  const isStreaming = useDiscussStore(selectIsStreaming);
+  const currentStreamingContent = useDiscussStore(selectCurrentStreamingContent);
+  const topicIndex = useDiscussStore(selectTopicIndex);
+
+  // Store actions
+  const addMessage = useDiscussStore((s) => s.addMessage);
+  const setStreaming = useDiscussStore((s) => s.setStreaming);
+  const setAgentId = useDiscussStore((s) => s.setAgentId);
+  const updateStreamingContent = useDiscussStore((s) => s.updateStreamingContent);
+  const selectQuestionOption = useDiscussStore((s) => s.selectQuestionOption);
+  const setTopicIndex = useDiscussStore((s) => s.setTopicIndex);
+  const reset = useDiscussStore((s) => s.reset);
+
+  // Current agent ID for streaming
+  const [currentAgentId, setCurrentAgentId] = useState<string | null>(null);
+  const [error, setError] = useState<string | null>(null);
+
+  // Token streaming with typewriter effect
+  const { displayedText, clear: clearStream } = useTokenStream({
+    socket,
+    agentId: currentAgentId,
+    onStart: () => {
+      setStreaming(true);
+      updateStreamingContent('');
+    },
+    onEnd: (content) => {
+      // Add completed message to store
+      const assistantMessage: Message = {
+        id: `assistant-${Date.now()}`,
+        role: 'assistant',
+        content,
+        timestamp: new Date().toISOString(),
+      };
+      addMessage(assistantMessage);
+      setStreaming(false);
+      setCurrentAgentId(null);
+      updateStreamingContent('');
+    },
+  });
+
+  // Sync displayed text to store for ChatInterface
+  useEffect(() => {
+    updateStreamingContent(displayedText);
+  }, [displayedText, updateStreamingContent]);
+
+  // Reset store on unmount
+  useEffect(() => {
+    return () => {
+      reset();
+    };
+  }, [reset]);
+
+  // Send message handler
+  const handleSendMessage = useCallback(
+    async (content: string) => {
+      setError(null);
+
+      // Add user message
+      const userMessage: Message = {
+        id: `user-${Date.now()}`,
+        role: 'user',
+        content,
+        timestamp: new Date().toISOString(),
+      };
+      addMessage(userMessage);
+
+      // Clear any previous streaming state
+      clearStream();
+      setStreaming(true);
+
+      try {
+        // Call agent API to start discuss-phase agent
+        const response = await fetch(`${API_BASE}/api/agents`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            projectId,
+            agentType: 'discuss-phase',
+            prompt: content,
+          }),
+        });
+
+        if (!response.ok) {
+          throw new Error(`Failed to start agent: ${response.status}`);
+        }
+
+        const data = await response.json();
+        const agentId = data.data?.agentId;
+
+        if (!agentId) {
+          throw new Error('No agent ID in response');
+        }
+
+        // Store agent ID and start subscription
+        setAgentId(agentId);
+        setCurrentAgentId(agentId);
+      } catch (err) {
+        setStreaming(false);
+        setError(
+          err instanceof Error ? err.message : 'Failed to generate. Retry?'
+        );
+
+        // Add error message to chat
+        const errorMessage: Message = {
+          id: `error-${Date.now()}`,
+          role: 'system',
+          content: `Error: ${err instanceof Error ? err.message : 'Failed to generate response.'}`,
+          timestamp: new Date().toISOString(),
+        };
+        addMessage(errorMessage);
+      }
+    },
+    [projectId, addMessage, clearStream, setStreaming, setAgentId]
+  );
+
+  // Question option selection handler
+  const handleSelectOption = useCallback(
+    async (messageId: string, optionId: string) => {
+      // Update local state
+      selectQuestionOption(messageId, optionId);
+
+      // Find the message and selected option
+      const message = messages.find((m) => m.id === messageId);
+      if (!message?.questionCard) return;
+
+      const option = message.questionCard.options.find((o) => o.id === optionId);
+      if (!option) return;
+
+      // Create system message for context
+      const systemMessage: Message = {
+        id: `system-${Date.now()}`,
+        role: 'system',
+        content: `[User selected: ${option.label}]`,
+        timestamp: new Date().toISOString(),
+      };
+      addMessage(systemMessage);
+
+      // Continue conversation with selection as follow-up
+      await handleSendMessage(`I selected: ${option.label}`);
+    },
+    [messages, selectQuestionOption, addMessage, handleSendMessage]
+  );
+
+  // Topic click handler
+  const handleTopicClick = useCallback(
+    (index: number) => {
+      setTopicIndex(index);
+      // Actual navigation behavior will be implemented in Plan 03
+    },
+    [setTopicIndex]
+  );
+
+  return (
+    <main className="h-screen flex flex-col">
+      {/* Inline error banner */}
+      {error && (
+        <div className="bg-red-100 dark:bg-red-900/30 text-red-700 dark:text-red-300 px-4 py-2 text-sm flex items-center justify-between">
+          <span>{error}</span>
+          <button
+            type="button"
+            onClick={() => setError(null)}
+            className="text-red-500 hover:text-red-700 dark:hover:text-red-200"
+          >
+            Dismiss
+          </button>
+        </div>
+      )}
+
+      <ChatInterface
+        messages={messages}
+        isConnected={isConnected}
+        isStreaming={isStreaming}
+        streamingText={currentStreamingContent}
+        topicIndex={topicIndex}
+        topics={DEFAULT_TOPICS}
+        phaseNumber="16"
+        phaseName="Discuss Phase UI"
+        onSendMessage={handleSendMessage}
+        onSelectOption={handleSelectOption}
+        onTopicClick={handleTopicClick}
+      />
+    </main>
+  );
+}
