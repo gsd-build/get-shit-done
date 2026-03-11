@@ -81,6 +81,25 @@ Plans:
   2. Token streaming uses requestAnimationFrame buffering without overwhelming the UI
   3. CLI and dashboard can read/write .planning/ files concurrently without corruption
   4. File access is restricted to project directories with symlink escape protection
+**Design Decisions**:
+  - Monorepo: Feature-based (apps/web, apps/server, packages/events, packages/gsd-core)
+  - Shared package: Full SDK with typed client/server wrappers, connection helpers, retry logic
+  - GSD integration: Wrapper package defining v3.0 API, implemented with current CJS modules
+  - Build tooling: Turborepo + pnpm workspaces
+  - TypeScript: Strict everywhere (strict, noUncheckedIndexedAccess, exactOptionalPropertyTypes)
+  - WebSocket: Rooms within single namespace + prefixed event names (agent:token, checkpoint:request)
+  - Reconnection: Full replay from checkpoint (v2.0), evolves to Snapshot + Bounded Replay in v3.0
+  - Token buffering: requestAnimationFrame batching with render-time telemetry; evolve to adaptive throttling in v3.0 if metrics warrant
+  - Heartbeat: Both Socket.IO built-in (pingInterval/pingTimeout) + app-level health metrics
+  - Error verbosity: Environment-aware (full stack traces in dev, structured codes + messages in prod)
+  - File locking: Advisory locks on main worktree only (agents work in isolated worktrees)
+  - Stale locks: TTL-based expiry (30s), auto-cleanup on next access
+  - Lock API: Internal auto-locking for standard ops + exposed acquireLock()/releaseLock() for advanced cases
+  - Lock failures: Structured errors with context { code, file, holder, age }
+  - Path security: Project root only + hardcoded denylist (.env*, *.pem, *.key, secrets/**); evolve to configurable boundaries in v3.0
+  - Symlinks: Resolve and validate target is within boundaries + configurable policy (allow/deny/project-only, default: allow)
+  - Audit logging: Structured logs { path, reason, timestamp } + metrics counter for blocked access
+  - Security implementation: Shared in packages/gsd-core for consistent CLI/dashboard behavior
 **Plans**: TBD
 
 Plans:
@@ -312,6 +331,11 @@ Plans:
   4. Authentication supports optional multi-user deployments
   5. Rate limiting and request validation enforced
   6. CLI uses API (no separate business logic)
+**Design Decisions** (evolving from Phase 13):
+  - Reconnection: Upgrade to Snapshot + Bounded Replay (current state + last N events or since checkpoint)
+  - Event persistence: Event store with sequence numbers enables audit log and efficient delta sync
+  - Token buffering: Evaluate telemetry from v2.0; upgrade to adaptive throttling if slow-frame metrics indicate need
+  - Path security: Upgrade to configurable boundaries (allowedPaths/deniedPaths in config) for hosted/multi-user scenarios
 **Plans**: TBD (planning generates 3-4 plans)
 
 ### Phase 27: CLI Wrapper
