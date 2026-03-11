@@ -100,7 +100,7 @@ Plans:
   - Symlinks: Resolve and validate target is within boundaries + configurable policy (allow/deny/project-only, default: allow)
   - Audit logging: Structured logs { path, reason, timestamp } + metrics counter for blocked access
   - Security implementation: Shared in packages/gsd-core for consistent CLI/dashboard behavior
-**Plans**: TBD
+**Plans**: 3 plans
 
 Plans:
 - [ ] 13-01-PLAN.md — Turborepo monorepo with pnpm workspaces and shared typed events
