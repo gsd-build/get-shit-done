@@ -114,7 +114,7 @@ export const useVerificationStore = create<VerificationStore>((set) => ({
   reset: () => set(initialState),
 }));
 
-// Selectors for optimized re-renders
+// Basic selectors for optimized re-renders
 export const selectStatus = (state: VerificationStore) => state.status;
 export const selectResults = (state: VerificationStore) => state.results;
 export const selectGaps = (state: VerificationStore) => state.gaps;
@@ -125,3 +125,51 @@ export const selectOverallPassed = (state: VerificationStore) =>
 export const selectRunningTest = (state: VerificationStore) =>
   state.runningTest;
 export const selectSummary = (state: VerificationStore) => state.summary;
+
+// Derived selectors for computed values
+/**
+ * Count of test results that passed.
+ */
+export const selectPassedCount = (state: VerificationStore) =>
+  state.results.filter((r) => r.passed).length;
+
+/**
+ * Count of test results that failed.
+ */
+export const selectFailedCount = (state: VerificationStore) =>
+  state.results.filter((r) => !r.passed).length;
+
+/**
+ * Filter gaps to only blocking severity.
+ */
+export const selectBlockingGaps = (state: VerificationStore) =>
+  state.gaps.filter((g) => g.severity === 'blocking');
+
+/**
+ * Returns true if any blocking gaps exist.
+ */
+export const selectHasBlockingGaps = (state: VerificationStore) =>
+  state.gaps.some((g) => g.severity === 'blocking');
+
+/**
+ * Returns true if all manual tests have been completed (passed !== null).
+ */
+export const selectManualTestsComplete = (state: VerificationStore) =>
+  state.manualTests.length > 0 &&
+  state.manualTests.every((t) => t.passed !== null);
+
+/**
+ * Returns true if all automated tests passed AND all manual tests passed.
+ */
+export const selectAllRequirementsPassed = (state: VerificationStore) => {
+  // All automated tests must pass
+  const allAutomatedPassed =
+    state.results.length > 0 && state.results.every((r) => r.passed);
+
+  // All manual tests must pass (if any exist)
+  const allManualPassed =
+    state.manualTests.length === 0 ||
+    state.manualTests.every((t) => t.passed === true);
+
+  return allAutomatedPassed && allManualPassed;
+};
