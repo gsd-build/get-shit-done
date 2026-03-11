@@ -19,27 +19,50 @@ Read all files referenced by the invoking prompt's execution_context before star
 - Read STATE.md (pending todos, blockers)
 - Check for MILESTONE-CONTEXT.md (from /gsd:discuss-milestone)
 
-## 1.5. Check for Discovery PRD
+## 1.5. Check for Pending PRDs
 
-Before gathering milestone goals, check for an existing discovery PRD:
+Before gathering milestone goals, check for existing pending PRDs in `.planning/prds/pending/`:
 
 ```bash
-PRD_FLAG=$(echo "${ARGUMENTS}" | grep -o '\-\-prd [^ ]*' | cut -d' ' -f2)
-PRD_AUTO=$(ls .planning/discovery/PRD.md 2>/dev/null)
-PRD_PATH=${PRD_FLAG:-$PRD_AUTO}
+PENDING_PRDS=$(ls .planning/prds/pending/*.md 2>/dev/null)
 ```
 
-**If PRD_PATH exists:**
-- Read the PRD
-- Present summary: "Found discovery PRD for [product_name]. Using it as the milestone foundation."
-- Extract features from PRD "Feature Specification" section → use as milestone goals (skip step 2 "Gather Goals")
-- Skip the Research step entirely (step 5 "Research Decision") — PRD already contains research
-- Use PRD "Open Questions" section as input for requirements gathering
-- Proceed directly to step 6 (Define Requirements), pre-populated from PRD features
+**If PENDING_PRDS is non-empty (PRDs found):**
 
-**If no PRD:** Continue normal flow.
+For each file in PENDING_PRDS, extract:
+- `SLUG` — filename without `.md` extension (e.g., `auth-system` from `auth-system.md`)
+- `CONCEPT_SUMMARY` — the line starting with `**Concept:**` in the file (e.g., `Auth system for multi-tenant SaaS`)
+- `STAGE` — the stage marker at the top of the file (`<!-- stage: complete -->`, `<!-- stage: pm -->`, etc.)
+- `STATUS_LABEL` — if STAGE is `<!-- stage: complete -->`: empty string; otherwise: ` (in progress)`
+
+Display a selection prompt using AskUserQuestion:
+```
+header: "Pending PRDs"
+question: "Found {N} pending PRD(s). Select one as the milestone foundation, or enter a goal manually:"
+options:
+  - "[1] {slug1} — {concept_summary1}{status_label1}"
+  - "[2] {slug2} — {concept_summary2}{status_label2}"
+  - ... (one per PRD, numbered sequentially)
+  - "Enter milestone goal manually"
+```
+
+**If user selects a PRD option (selects option 1 through N):**
+- Set `SELECTED_PRD_PATH = .planning/prds/pending/{selected_slug}.md`
+- Set `SELECTED_PRD_SLUG = {selected_slug}`
+- Set `PRD_DRIVEN = true`
+- Display: "Using PRD: {SELECTED_PRD_SLUG} as milestone foundation."
+
+**If user selects "Enter milestone goal manually":**
+- Set `PRD_DRIVEN = false`
+- Continue to step 2.
+
+**If PENDING_PRDS is empty (no PRDs found):**
+- Set `PRD_DRIVEN = false`
+- Skip step 1.5 entirely. Continue to step 2 without showing any PRD UI.
 
 ## 2. Gather Milestone Goals
+
+**Skip this step if PRD_DRIVEN=true** — the selected PRD provides goals and scope. Proceed directly to step 3.
 
 **If MILESTONE-CONTEXT.md exists:**
 - Use features and scope from discuss-milestone
@@ -106,7 +129,7 @@ Extract from init JSON: `researcher_model`, `synthesizer_model`, `roadmapper_mod
 
 ## 8. Research Decision
 
-> **Skip this step if PRD_PATH was found in step 1.5.** The PRD already contains research; proceed directly to step 9.
+> **Skip this step if PRD_DRIVEN=true.** The selected PRD already contains research (Tech Candidates from Stage 3 of the PRD workflow); proceed directly to step 9.
 
 AskUserQuestion: "Research the domain ecosystem for new features before defining requirements?"
 - "Research first (Recommended)" — Discover patterns, features, architecture for NEW capabilities
@@ -292,6 +315,10 @@ node "$HOME/.claude/get-shit-done/bin/gsd-tools.js" commit "docs: define milesto
 
 **Starting phase number:** Read MILESTONES.md for last phase number. Continue from there (v1.0 ended at phase 5 → v1.1 starts at phase 6).
 
+**If PRD_DRIVEN=true:** Read the full content of SELECTED_PRD_PATH into variable `PRD_CONTENT`.
+
+**Spawn roadmapper:**
+
 ```
 Agent(prompt="
 <planning_context>
@@ -304,7 +331,29 @@ Agent(prompt="
 </files_to_read>
 </planning_context>
 
+{IF PRD_DRIVEN=true: INSERT THIS BLOCK}
+<prd_source>
+<prd_slug>{SELECTED_PRD_SLUG}</prd_slug>
+<prd_content>
+{PRD_CONTENT}
+</prd_content>
+<decomposition_mode>prd-driven</decomposition_mode>
+</prd_source>
+{END IF}
+
 <instructions>
+{IF PRD_DRIVEN=true:}
+Create roadmap for milestone v[X.Y] from the PRD provided in <prd_source>:
+1. Start phase numbering from [N]
+2. Generate REQUIREMENTS.md entries from the PRD User Stories (use MILE-XX IDs — MILE-01, MILE-02, etc., starting from 01 or continuing from existing numbering)
+3. Derive phases from the generated requirements only — one phase per logical capability cluster
+4. Map every MVP User Story to exactly one phase (use PRD MVP Boundary section to exclude Phase 2 items from this milestone)
+5. Derive 2-5 success criteria per phase from the PRD Acceptance Criteria
+6. Order phases by technical dependency (data/infrastructure before API before UI is typical — adjust for the domain)
+7. DO NOT write any files yet — return ROADMAP PREVIEW with the proposed phase structure and generated requirements
+8. Format the return as: ## ROADMAP PREVIEW followed by the summary table and phase details
+
+{IF PRD_DRIVEN=false (non-PRD-driven — existing behavior):}
 Create roadmap for milestone v[X.Y]:
 1. Start phase numbering from [N]
 2. Derive phases from THIS MILESTONE's requirements only
@@ -323,7 +372,11 @@ Write files first, then return.
 
 **If `## ROADMAP BLOCKED`:** Present blocker, work with user, re-spawn.
 
-**If `## ROADMAP CREATED`:** Read ROADMAP.md, present inline:
+**If `## ROADMAP CREATED`** (non-PRD-driven): Read ROADMAP.md, present inline per format below, then ask for approval.
+
+**If `## ROADMAP PREVIEW`** (PRD-driven): Display the preview inline, then ask for approval. Files have NOT been written yet.
+
+**Display format (for both ROADMAP CREATED and ROADMAP PREVIEW):**
 
 ```
 ## Proposed Roadmap
@@ -347,12 +400,53 @@ Success criteria:
 **Ask for approval** via AskUserQuestion:
 - "Approve" — Commit and continue
 - "Adjust phases" — Tell me what to change
-- "Review full file" — Show raw ROADMAP.md
+- "Review full file" — Show raw roadmap text
 
 **If "Adjust":** Get notes, re-spawn roadmapper with revision context, loop until approved.
-**If "Review":** Display raw ROADMAP.md, re-ask.
+**If "Review":** Display full roadmap text, re-ask.
 
-**Commit roadmap** (after approval):
+**After approval:**
+
+**If PRD_DRIVEN=true (files not yet written — ROADMAP PREVIEW was shown):**
+Re-spawn roadmapper to write files:
+```
+Agent(prompt="
+{same prompt as above, including prd_source block}
+
+<instructions>
+The roadmap below has been approved by the user. Write files now:
+1. Write ROADMAP.md with the approved phase structure
+2. Write REQUIREMENTS.md with the generated MILE-XX requirements and traceability
+3. Update STATE.md for new milestone
+4. Return ROADMAP CREATED
+
+Approved roadmap:
+{ROADMAP PREVIEW text that was displayed to user}
+</instructions>
+", subagent_type="gsd-roadmapper", model="{roadmapper_model}", description="Write approved roadmap")
+```
+
+Wait for ROADMAP CREATED signal before continuing.
+
+**If PRD_DRIVEN=false (files already written by roadmapper):**
+Proceed directly to commit step below.
+
+**Commit roadmap and PRD lifecycle (after approval and files written):**
+
+**If PRD_DRIVEN=true:**
+```bash
+mkdir -p .planning/prds/done
+mv .planning/prds/pending/{SELECTED_PRD_SLUG}.md .planning/prds/done/{SELECTED_PRD_SLUG}.md || echo "Warning: Could not move PRD to done/ — move manually: mv .planning/prds/pending/{SELECTED_PRD_SLUG}.md .planning/prds/done/{SELECTED_PRD_SLUG}.md"
+node "$HOME/.claude/get-shit-done/bin/gsd-tools.js" commit "docs: create milestone v[X.Y] roadmap — {SELECTED_PRD_SLUG} PRD promoted" --files .planning/ROADMAP.md .planning/STATE.md .planning/REQUIREMENTS.md .planning/prds/done/{SELECTED_PRD_SLUG}.md
+```
+
+Print after commit:
+```
+Requirements traceability: REQUIREMENTS.md updated with MILE-XX → Phase mapping.
+PRD promoted: .planning/prds/done/{SELECTED_PRD_SLUG}.md
+```
+
+**If PRD_DRIVEN=false:**
 ```bash
 node "$HOME/.claude/get-shit-done/bin/gsd-tools.js" commit "docs: create milestone v[X.Y] roadmap ([N] phases)" --files .planning/ROADMAP.md .planning/STATE.md .planning/REQUIREMENTS.md
 ```
