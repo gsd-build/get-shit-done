@@ -23,12 +23,12 @@ progress:
 ## Current Position
 
 **Phase:** 14 - Backend Core
-**Plan:** 14-01 complete
+**Plan:** 14-02 complete
 **Status:** In progress
-**Last activity:** 2026-03-11 — Completed plan 14-01 (REST API for Project Listing and Health)
+**Last activity:** 2026-03-11 — Completed plan 14-02 (GSD Wrapper)
 
 ```
-[#####---------------] 25% - Phase 14 plan 01 of 04 complete
+[##########----------] 50% - Phase 14 plan 02 of 04 complete
 ```
 
 **Phases:**
@@ -42,7 +42,7 @@ progress:
 - [x] Phase 11: Add --docs Flag to discuss-phase (2 requirements) - complete
 - [x] Phase 12: MCP Server API (5 requirements) - complete
 - [x] Phase 13: Foundation Infrastructure (4 requirements) - complete
-- [ ] Phase 14: Backend Core - in progress (1/4 plans)
+- [ ] Phase 14: Backend Core - in progress (2/4 plans)
 
 ## Performance Metrics
 
@@ -59,6 +59,7 @@ progress:
 | Phase 13 P02 | 8m 34s | 3 tasks | 15 files |
 | Phase 13 P03 | 6m 37s | 3 tasks | 8 files |
 | Phase 14 P01 | 7m 7s | 2 tasks | 12 files |
+| Phase 14 P02 | 8m 35s | 2 tasks | 9 files |
 
 ## Accumulated Context
 
@@ -128,6 +129,8 @@ progress:
 | Envelope middleware with requestId | crypto.randomUUID() for X-Request-Id header | 2026-03-11 |
 | Base64url cursor pagination | Stateless { id, ts } encoded cursors for consistent pagination | 2026-03-11 |
 | createXxxRoutes factory pattern | Route modules accept dependencies for testability | 2026-03-11 |
+| Shell redirect for gsd-tools stdout | Node.js process.exit() causes stdout truncation; shell redirect to temp file avoids | 2026-03-11 |
+| GsdResult<T> discriminated union | Type-safe error handling with success/error branches | 2026-03-11 |
 
 ### Roadmap Evolution
 
@@ -185,6 +188,7 @@ progress:
 - [x] Execute plan 13-02 (Socket.IO server with connection state recovery)
 - [x] Execute plan 13-03 (file locking and path security)
 - [x] Execute plan 14-01 (REST API for project listing and health)
+- [x] Execute plan 14-02 (GSD wrapper for async TypeScript)
 
 ### Blockers
 
@@ -192,13 +196,13 @@ None currently.
 
 ## Session Continuity
 
-**Last Session:** 2026-03-11T11:22:00.000Z
-**Context:** Completed Phase 14 Plan 01 - REST API with Hono for project listing, phases, and health metrics.
+**Last Session:** 2026-03-11T11:23:20.000Z
+**Context:** Completed Phase 14 Plan 02 - @gsd/gsd-wrapper with typed async wrappers for GSD CLI.
 
 **To Resume:**
-1. Phase 14 plan 01 complete: REST API available at /api
-2. Continue with Phase 14 plan 02 (GSD wrapper for async TypeScript)
-3. Health endpoint at /api/health/summary, projects at /api/projects
+1. Phase 14 plan 02 complete: @gsd/gsd-wrapper exports getHealth, getState, listPhases, discoverProjects
+2. Continue with Phase 14 plan 03 (REST API refinements)
+3. Wrapper uses shell-redirect pattern to avoid Node.js stdout buffering issues
 
 
 ### Sync History
@@ -208,10 +212,11 @@ None currently.
 
 ---
 *State initialized: 2026-02-23*
-*Last updated: 2026-03-11 (Phase 14 plan 01 complete)*
+*Last updated: 2026-03-11 (Phase 14 plan 02 complete)*
 
 ## Recent Activity
 
+- 2026-03-11 — Completed plan 14-02 (GSD Wrapper)
 - 2026-03-11 — Completed plan 14-01 (REST API for Project Listing and Health)
 - 2026-03-11 — Finalized phase 13 (Foundation Infrastructure) - merged to main
 - 2026-03-11 — Completed plan 13-03 (File Locking and Path Security)
