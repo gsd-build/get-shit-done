@@ -51,14 +51,15 @@ export const handlers = [
 
   // GET /api/projects/:id - Get single project
   http.get('/api/projects/:id', ({ params }) => {
-    const project = mockProjects.find((p) => p.id === params.id);
+    const id = params['id'];
+    const project = mockProjects.find((p) => p.id === id);
     if (!project) {
       return HttpResponse.json(
         {
           success: false,
           error: {
             code: 'NOT_FOUND',
-            message: `Project ${params.id} not found`,
+            message: `Project ${id} not found`,
           },
         },
         { status: 404 }
