@@ -35,7 +35,7 @@ describe('ExecutionControls', () => {
         agentId: 'agent-123',
         status: 'running',
         plans: new Map([
-          ['plan-1', { planId: 'plan-1', taskName: 'Test Task', status: 'running' }],
+          ['plan-1', { planId: 'plan-1', taskName: 'Test Task', status: 'running', toolCalls: [] }],
         ]),
         commits: [],
       };
@@ -68,7 +68,7 @@ describe('ExecutionControls', () => {
         agentId: 'agent-123',
         status: 'paused',
         plans: new Map([
-          ['plan-1', { planId: 'plan-1', taskName: 'Test Task', status: 'running' }],
+          ['plan-1', { planId: 'plan-1', taskName: 'Test Task', status: 'running', toolCalls: [] }],
         ]),
         commits: [],
       };
@@ -120,7 +120,7 @@ describe('ExecutionControls', () => {
         agentId: 'agent-123',
         status: 'paused',
         plans: new Map([
-          ['plan-1', { planId: 'plan-1', taskName: 'Test Task', status: 'running' }],
+          ['plan-1', { planId: 'plan-1', taskName: 'Test Task', status: 'running', toolCalls: [] }],
         ]),
         commits: [],
       };
@@ -160,7 +160,7 @@ describe('ExecutionControls', () => {
         agentId: 'agent-123',
         status: 'paused',
         plans: new Map([
-          ['plan-1', { planId: 'plan-1', taskName: 'Test Task', status: 'running' }],
+          ['plan-1', { planId: 'plan-1', taskName: 'Test Task', status: 'running', toolCalls: [] }],
         ]),
         commits: [],
       };
