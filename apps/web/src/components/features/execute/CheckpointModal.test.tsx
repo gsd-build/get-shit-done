@@ -4,12 +4,12 @@ import userEvent from '@testing-library/user-event';
 import { CheckpointModal } from './CheckpointModal';
 import type { CheckpointRequestEvent } from '@gsd/events';
 
-// Mock checkpoint data
+// Mock checkpoint data - omit optional properties rather than setting to undefined
+// (required for exactOptionalPropertyTypes)
 const mockCheckpoint: CheckpointRequestEvent = {
   checkpointId: 'cp-123',
   type: 'human-verify',
   prompt: 'Please verify the deployment looks correct',
-  options: undefined,
   timeoutMs: 60000,
 };
 
@@ -29,8 +29,6 @@ const mockCheckpointNoTimeout: CheckpointRequestEvent = {
   checkpointId: 'cp-789',
   type: 'human-action',
   prompt: 'Please click the verification link in your email',
-  options: undefined,
-  timeoutMs: undefined,
 };
 
 describe('CheckpointModal', () => {
