@@ -208,7 +208,7 @@ function TreeNodeComponent({
                 key={child.fullPath}
                 node={child}
                 onSelect={onSelect}
-                selectedPath={selectedPath}
+                {...(selectedPath && { selectedPath })}
                 level={level + 1}
               />
             ))}
@@ -294,7 +294,7 @@ export function FileTree({
           key={node.fullPath}
           node={node}
           onSelect={onSelect}
-          selectedPath={selectedPath}
+          {...(selectedPath && { selectedPath })}
         />
       ))}
     </div>

@@ -1,3 +1,8 @@
 export { ToolCard } from './ToolCard';
 export { ToolCardList } from './ToolCardList';
+export { DiffPanel } from './DiffPanel';
+export { DiffEditor } from './DiffEditor';
+export { FileTree } from './FileTree';
+export { CommitTimeline } from './CommitTimeline';
 export type { ToolCall, ToolCallStatus, ToolName } from './types';
+export type { FileItem } from './FileTree';

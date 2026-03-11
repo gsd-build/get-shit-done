@@ -65,8 +65,9 @@ describe('CommitTimeline', () => {
     // Message should be present
     expect(screen.getByText(/implement DiffPanel component/i)).toBeInTheDocument();
 
-    // Relative timestamp should be present (e.g., "5 minutes ago")
-    expect(screen.getByText(/minutes ago/i)).toBeInTheDocument();
+    // Relative timestamps should be present (e.g., "5 minutes ago")
+    const timestamps = screen.getAllByText(/minutes ago/i);
+    expect(timestamps.length).toBeGreaterThan(0);
   });
 
   it('empty commits array shows "No commits yet"', () => {
@@ -83,14 +84,14 @@ describe('CommitTimeline', () => {
     const commitItems = screen.getAllByTestId('commit-item');
 
     // First commit should be the newest (abc1234)
-    expect(within(commitItems[0]).getByText('abc1234')).toBeInTheDocument();
+    expect(within(commitItems[0]!).getByText('abc1234')).toBeInTheDocument();
 
     // Last commit should be oldest (xyz7890)
-    expect(within(commitItems[2]).getByText('xyz7890')).toBeInTheDocument();
+    expect(within(commitItems[2]!).getByText('xyz7890')).toBeInTheDocument();
   });
 
   it('displays singular "commit" for single commit', () => {
-    render(<CommitTimeline commits={[mockCommits[0]]} />);
+    render(<CommitTimeline commits={[mockCommits[0]!]} />);
     expect(screen.getByText(/1 commit made/i)).toBeInTheDocument();
   });
 
