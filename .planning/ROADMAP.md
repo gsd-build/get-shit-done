@@ -120,7 +120,7 @@ Plans:
 **Plans**: 4 plans
 
 Plans:
-- [ ] 14-01-PLAN.md — REST API for project listing, health checks, and phase data (Hono)
+- [x] 14-01-PLAN.md — REST API for project listing, health checks, and phase data (Hono)
 - [ ] 14-02-PLAN.md — GSD wrapper adapting sync CJS modules to async TypeScript
 - [ ] 14-03-PLAN.md — Agent orchestrator with Claude API streaming and tool execution
 - [ ] 14-04-PLAN.md — Checkpoint handling with idempotency and timeout warnings
@@ -391,7 +391,7 @@ Phases execute in numeric order: 13 -> 14 -> 15 -> 16 -> 17 -> 18 -> 19 -> 20
 | Phase | Plans Complete | Status | Completed |
 |-------|----------------|--------|-----------|
 | 13. Foundation Infrastructure | 3/3 | Complete    | 2026-03-11 |
-| 14. Backend Core | 0/4 | Not started | - |
+| 14. Backend Core | 1/4 | In progress | - |
 | 15. Frontend Foundation & Dashboard | 0/4 | Not started | - |
 | 16. Discuss Phase UI | 0/4 | Not started | - |
 | 17. Execute Phase UI | 0/8 | Not started | - |
@@ -417,4 +417,4 @@ Phases execute in numeric order: 21 -> 22 -> 23 -> 24 -> 25 -> 26 -> 27 -> 28
 
 ---
 *Roadmap created: 2026-03-10*
-*Last updated: 2026-03-11 (Phase 13 complete)*
+*Last updated: 2026-03-11 (Phase 14 plan 01 complete)*
