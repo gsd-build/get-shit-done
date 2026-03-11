@@ -46,8 +46,10 @@ const orchestrator = createOrchestrator(io);
 const cleanupSocketHandlers = registerHandlers(io, orchestrator);
 
 // Attach REST API to the HTTP server (before listen)
+// Pass orchestrator for agent lifecycle endpoints
 const cleanupApi = createApi(httpServer, io, {
   searchPaths: SEARCH_PATHS,
+  orchestrator,
 });
 
 // Start listening

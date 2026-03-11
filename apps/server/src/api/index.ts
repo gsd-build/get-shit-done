@@ -19,6 +19,8 @@ import { errorHandler } from './middleware/errors.js';
 import { createHealthRoutes } from './routes/health.js';
 import { createProjectRoutes } from './routes/projects.js';
 import { createPhasesRoutes } from './routes/phases.js';
+import { createAgentRoutes } from './routes/agents.js';
+import type { Orchestrator } from '../orchestrator/index.js';
 
 /**
  * API configuration options
@@ -26,6 +28,8 @@ import { createPhasesRoutes } from './routes/phases.js';
 export interface ApiConfig {
   /** Directories to scan for GSD projects */
   searchPaths?: string[];
+  /** Agent orchestrator for agent lifecycle endpoints */
+  orchestrator?: Orchestrator;
 }
 
 /**
@@ -61,6 +65,11 @@ export function createApi(
   app.route('/projects', createProjectRoutes(searchPaths));
   // Phases are mounted under /projects for RESTful URLs
   app.route('/projects', createPhasesRoutes(searchPaths));
+
+  // Mount agent routes if orchestrator is provided
+  if (config.orchestrator) {
+    app.route('/agents', createAgentRoutes(config.orchestrator));
+  }
 
   // 404 handler for unmatched API routes
   app.notFound((c) => {
@@ -99,54 +108,70 @@ export function createApi(
       const host = req.headers.host ?? 'localhost';
       const fullUrl = `${protocol}://${host}${url}`;
 
-      // Create Request object for Hono
-      const request = new Request(fullUrl, {
-        method: req.method ?? 'GET',
-        headers: Object.entries(req.headers).reduce(
-          (acc, [key, value]) => {
-            if (value !== undefined) {
-              acc[key] = Array.isArray(value) ? value.join(', ') : value;
-            }
-            return acc;
-          },
-          {} as Record<string, string>
-        ),
-        // Note: Body handling would be needed for POST/PUT/PATCH
-        // For now, the API is read-only (GET requests)
+      // Collect body for POST/PUT/PATCH/DELETE requests
+      const chunks: Buffer[] = [];
+
+      req.on('data', (chunk: Buffer) => {
+        chunks.push(chunk);
       });
 
-      // Let Hono handle the request (async IIFE for proper await)
-      (async () => {
-        try {
-          const response = await honoFetch(request);
-          // Write status and headers
-          res.statusCode = response.status;
-          response.headers.forEach((value, key) => {
-            res.setHeader(key, value);
-          });
+      req.on('end', () => {
+        const bodyBuffer = Buffer.concat(chunks);
 
-          // Write body
-          const body = await response.text();
-          res.end(body);
-        } catch (err) {
-          console.error('[api] Error handling request:', err);
-          res.statusCode = 500;
-          res.setHeader('Content-Type', 'application/json');
-          res.end(
-            JSON.stringify({
-              data: null,
-              meta: {
-                timestamp: new Date().toISOString(),
-                requestId: 'error',
-              },
-              error: {
-                code: 'INTERNAL_ERROR',
-                message: 'Internal server error',
-              },
-            })
-          );
+        // Create Request object for Hono with body if present
+        const requestInit: RequestInit = {
+          method: req.method ?? 'GET',
+          headers: Object.entries(req.headers).reduce(
+            (acc, [key, value]) => {
+              if (value !== undefined) {
+                acc[key] = Array.isArray(value) ? value.join(', ') : value;
+              }
+              return acc;
+            },
+            {} as Record<string, string>
+          ),
+        };
+
+        // Add body for methods that may have one
+        if (['POST', 'PUT', 'PATCH', 'DELETE'].includes(req.method ?? '')) {
+          requestInit.body = bodyBuffer;
         }
-      })();
+
+        const request = new Request(fullUrl, requestInit);
+
+        // Let Hono handle the request (async IIFE for proper await)
+        (async () => {
+          try {
+            const response = await honoFetch(request);
+            // Write status and headers
+            res.statusCode = response.status;
+            response.headers.forEach((value, key) => {
+              res.setHeader(key, value);
+            });
+
+            // Write body
+            const body = await response.text();
+            res.end(body);
+          } catch (err) {
+            console.error('[api] Error handling request:', err);
+            res.statusCode = 500;
+            res.setHeader('Content-Type', 'application/json');
+            res.end(
+              JSON.stringify({
+                data: null,
+                meta: {
+                  timestamp: new Date().toISOString(),
+                  requestId: 'error',
+                },
+                error: {
+                  code: 'INTERNAL_ERROR',
+                  message: 'Internal server error',
+                },
+              })
+            );
+          }
+        })();
+      });
     } else {
       // Pass through to original listeners (Socket.IO upgrade handling, etc.)
       for (const listener of originalListeners) {
@@ -160,7 +185,7 @@ export function createApi(
   httpServer.on('request', requestHandler);
 
   console.log('[api] REST API mounted at /api');
-  console.log('[api] Routes: /api/health/summary, /api/projects, /api/projects/:id, /api/projects/:id/phases');
+  console.log('[api] Routes: /api/health/summary, /api/projects, /api/projects/:id, /api/projects/:id/phases, /api/agents');
 
   // Return cleanup function
   return () => {
