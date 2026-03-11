@@ -1,0 +1,14 @@
+{
+  "name": "@gsd/web",
+  "version": "0.0.1",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "build": "echo 'Web app placeholder - will be implemented in Phase 15'",
+    "dev": "echo 'Web app placeholder - will be implemented in Phase 15'",
+    "typecheck": "tsc --noEmit"
+  },
+  "dependencies": {
+    "@gsd/events": "workspace:*"
+  }
+}
