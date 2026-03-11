@@ -36,7 +36,7 @@ This roadmap delivers the GSD (Get Shit Done) meta-prompting framework across mu
 - [x] **Phase 13: Foundation Infrastructure** - WebSocket server, token buffering, file locking, and security layer (completed 2026-03-11)
 - [x] **Phase 14: Backend Core** - REST API, agent orchestrator, and WebSocket connection management (completed 2026-03-11)
 - [x] **Phase 15: Frontend Foundation & Dashboard** - Next.js app with project listing, health indicators, and navigation (completed 2026-03-11)
-- [ ] **Phase 16: Discuss Phase UI** - Chat interface with streaming and CONTEXT.md preview
+- [x] **Phase 16: Discuss Phase UI** - Chat interface with streaming and CONTEXT.md preview (completed 2026-03-11)
 - [ ] **Phase 17: Execute Phase UI** - Execution streaming, tool visualization, checkpoints, and TDD workflow
 - [ ] **Phase 18: Plan & Verify Phase UIs** - Research streaming, plan preview, verification report, and gap workflow
 - [ ] **Phase 19: Roadmap Visualization** - Dependency graph, Gantt timeline, and progress tracking
@@ -143,7 +143,7 @@ Plans:
 - [x] 15-03-PLAN.md — Dashboard UI with project cards, health indicators, and activity feed
 - [x] 15-04-PLAN.md — Project search, filtering, and navigation to detail view
 
-### Phase 16: Discuss Phase UI
+### Phase 16: Discuss Phase UI (COMPLETE)
 **Goal**: Enable conversational context gathering with real-time streaming and CONTEXT.md preview
 **Depends on**: Phase 15
 **Requirements**: DISC-01, DISC-02, DISC-03, DISC-04, DISC-05
@@ -153,13 +153,13 @@ Plans:
   3. User can mark individual decisions as locked (must keep) vs discretionary (agent can adjust)
   4. User can refresh browser and resume discussion session where they left off
   5. User can manually edit CONTEXT.md with sync back to conversation state
-**Plans**: 4 plans
+**Plans**: 4/4 plans complete
 
 Plans:
 - [x] 16-01-PLAN.md — Chat conversation interface with streaming token display
 - [x] 16-02-PLAN.md — CONTEXT.md live preview panel with decision locking
-- [ ] 16-03-PLAN.md — Session persistence across reconnects and browser refresh
-- [ ] 16-04-PLAN.md — Manual CONTEXT.md editing with bidirectional sync
+- [x] 16-03-PLAN.md — Session persistence across reconnects and browser refresh
+- [x] 16-04-PLAN.md — Manual CONTEXT.md editing with bidirectional sync
 
 ### Phase 17: Execute Phase UI
 **Goal**: Deliver real-time execution interface with streaming, tool visualization, checkpoints, and TDD workflow
