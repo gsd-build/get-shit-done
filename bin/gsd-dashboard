@@ -1,0 +1,239 @@
+#!/usr/bin/env node
+
+/**
+ * GSD Dashboard Global Launcher
+ *
+ * Reads config from ~/.config/gsd-dashboard/config.json and starts the server.
+ *
+ * Usage:
+ *   gsd-dashboard              # Start server (foreground)
+ *   gsd-dashboard --install    # Install as launchd service
+ *   gsd-dashboard --uninstall  # Remove launchd service
+ *   gsd-dashboard --status     # Check service status
+ */
+
+import { readFileSync, existsSync, mkdirSync, writeFileSync, unlinkSync } from 'fs';
+import { homedir } from 'os';
+import { join, resolve, dirname } from 'path';
+import { execSync, spawn } from 'child_process';
+import { fileURLToPath } from 'url';
+
+const __dirname = dirname(fileURLToPath(import.meta.url));
+const CONFIG_DIR = join(homedir(), '.config', 'gsd-dashboard');
+const CONFIG_FILE = join(CONFIG_DIR, 'config.json');
+const PLIST_NAME = 'com.gsd.dashboard';
+const PLIST_PATH = join(homedir(), 'Library', 'LaunchAgents', `${PLIST_NAME}.plist`);
+const LOG_DIR = join(CONFIG_DIR, 'logs');
+
+// Default configuration
+const DEFAULT_CONFIG = {
+  projectRoots: ['~/Projects'],
+  port: 4000,
+  logLevel: 'info',
+};
+
+function expandPath(p) {
+  if (p.startsWith('~/')) {
+    return join(homedir(), p.slice(2));
+  }
+  return resolve(p);
+}
+
+function loadConfig() {
+  if (!existsSync(CONFIG_FILE)) {
+    console.log(`[gsd-dashboard] No config found, creating default at ${CONFIG_FILE}`);
+    mkdirSync(CONFIG_DIR, { recursive: true });
+    writeFileSync(CONFIG_FILE, JSON.stringify(DEFAULT_CONFIG, null, 2));
+    return DEFAULT_CONFIG;
+  }
+
+  try {
+    const raw = readFileSync(CONFIG_FILE, 'utf-8');
+    return { ...DEFAULT_CONFIG, ...JSON.parse(raw) };
+  } catch (err) {
+    console.error(`[gsd-dashboard] Failed to parse config: ${err.message}`);
+    process.exit(1);
+  }
+}
+
+function generatePlist(config) {
+  const serverPath = resolve(__dirname, '..', 'apps', 'server');
+  const searchPaths = config.projectRoots.map(expandPath).join(':');
+  // Capture current node path for launchd (nvm/fnm don't set PATH in launchd)
+  const nodeBinDir = dirname(process.execPath);
+
+  return `<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+    <key>Label</key>
+    <string>${PLIST_NAME}</string>
+
+    <key>ProgramArguments</key>
+    <array>
+        <string>/bin/sh</string>
+        <string>-c</string>
+        <string>${join(serverPath, 'node_modules', '.bin', 'tsx')} ${join(serverPath, 'src', 'index.ts')}</string>
+    </array>
+
+    <key>WorkingDirectory</key>
+    <string>${serverPath}</string>
+
+    <key>EnvironmentVariables</key>
+    <dict>
+        <key>PATH</key>
+        <string>${nodeBinDir}:/usr/local/bin:/usr/bin:/bin</string>
+        <key>PORT</key>
+        <string>${config.port || 4000}</string>
+        <key>GSD_SEARCH_PATHS</key>
+        <string>${searchPaths}</string>
+        <key>NODE_ENV</key>
+        <string>production</string>
+    </dict>
+
+    <key>RunAtLoad</key>
+    <true/>
+
+    <key>KeepAlive</key>
+    <dict>
+        <key>SuccessfulExit</key>
+        <false/>
+    </dict>
+
+    <key>StandardOutPath</key>
+    <string>${join(LOG_DIR, 'stdout.log')}</string>
+
+    <key>StandardErrorPath</key>
+    <string>${join(LOG_DIR, 'stderr.log')}</string>
+
+    <key>ThrottleInterval</key>
+    <integer>10</integer>
+</dict>
+</plist>`;
+}
+
+function install() {
+  const config = loadConfig();
+
+  // Ensure log directory exists
+  mkdirSync(LOG_DIR, { recursive: true });
+
+  // Generate and write plist
+  const plist = generatePlist(config);
+  mkdirSync(dirname(PLIST_PATH), { recursive: true });
+  writeFileSync(PLIST_PATH, plist);
+  console.log(`[gsd-dashboard] Wrote launchd plist to ${PLIST_PATH}`);
+
+  // Load the service
+  try {
+    execSync(`launchctl unload ${PLIST_PATH} 2>/dev/null || true`);
+    execSync(`launchctl load ${PLIST_PATH}`);
+    console.log(`[gsd-dashboard] Service installed and started`);
+    console.log(`[gsd-dashboard] Dashboard will be available at http://localhost:${config.port}`);
+    console.log(`[gsd-dashboard] Logs: ${LOG_DIR}`);
+  } catch (err) {
+    console.error(`[gsd-dashboard] Failed to load service: ${err.message}`);
+    process.exit(1);
+  }
+}
+
+function uninstall() {
+  if (existsSync(PLIST_PATH)) {
+    try {
+      execSync(`launchctl unload ${PLIST_PATH}`);
+      unlinkSync(PLIST_PATH);
+      console.log(`[gsd-dashboard] Service uninstalled`);
+    } catch (err) {
+      console.error(`[gsd-dashboard] Failed to uninstall: ${err.message}`);
+    }
+  } else {
+    console.log(`[gsd-dashboard] Service not installed`);
+  }
+}
+
+function status() {
+  try {
+    const output = execSync(`launchctl list | grep ${PLIST_NAME}`, { encoding: 'utf-8' });
+    const parts = output.trim().split(/\s+/);
+    const pid = parts[0];
+    const exitCode = parts[1];
+
+    if (pid !== '-') {
+      console.log(`[gsd-dashboard] Running (PID: ${pid})`);
+
+      // Try to check if the server is responding
+      const config = loadConfig();
+      try {
+        execSync(`curl -s http://localhost:${config.port}/api/health`, { timeout: 2000 });
+        console.log(`[gsd-dashboard] API responding at http://localhost:${config.port}`);
+      } catch {
+        console.log(`[gsd-dashboard] API not yet responding`);
+      }
+    } else {
+      console.log(`[gsd-dashboard] Not running (last exit code: ${exitCode})`);
+    }
+  } catch {
+    console.log(`[gsd-dashboard] Service not installed`);
+  }
+}
+
+function startForeground() {
+  const config = loadConfig();
+  const serverPath = resolve(__dirname, '..', 'apps', 'server');
+  const searchPaths = config.projectRoots.map(expandPath).join(':');
+
+  console.log(`[gsd-dashboard] Starting server...`);
+  console.log(`[gsd-dashboard] Port: ${config.port}`);
+  console.log(`[gsd-dashboard] Project roots: ${config.projectRoots.join(', ')}`);
+
+  const child = spawn(
+    join(serverPath, 'node_modules', '.bin', 'tsx'),
+    [join(serverPath, 'src', 'index.ts')],
+    {
+      cwd: serverPath,
+      env: {
+        ...process.env,
+        PORT: String(config.port || 4000),
+        GSD_SEARCH_PATHS: searchPaths,
+      },
+      stdio: 'inherit',
+    }
+  );
+
+  child.on('error', (err) => {
+    console.error(`[gsd-dashboard] Failed to start: ${err.message}`);
+    process.exit(1);
+  });
+
+  process.on('SIGINT', () => child.kill('SIGINT'));
+  process.on('SIGTERM', () => child.kill('SIGTERM'));
+}
+
+// Parse CLI args
+const args = process.argv.slice(2);
+
+if (args.includes('--install')) {
+  install();
+} else if (args.includes('--uninstall')) {
+  uninstall();
+} else if (args.includes('--status')) {
+  status();
+} else if (args.includes('--help') || args.includes('-h')) {
+  console.log(`
+GSD Dashboard - Global Service Manager
+
+Usage:
+  gsd-dashboard              Start server in foreground
+  gsd-dashboard --install    Install as launchd service (auto-start)
+  gsd-dashboard --uninstall  Remove launchd service
+  gsd-dashboard --status     Check service status
+
+Config file: ~/.config/gsd-dashboard/config.json
+  {
+    "projectRoots": ["~/Projects", "~/work"],
+    "port": 4000
+  }
+`);
+} else {
+  startForeground();
+}
