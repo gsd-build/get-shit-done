@@ -6,6 +6,13 @@ import { server } from './mocks/server.js';
 // Extend Vitest's expect with jest-dom matchers
 expect.extend(matchers);
 
+// Mock ResizeObserver for Radix UI components (not available in jsdom)
+global.ResizeObserver = class ResizeObserver {
+  observe() {}
+  unobserve() {}
+  disconnect() {}
+};
+
 // Establish API mocking before all tests
 beforeAll(() => {
   server.listen({ onUnhandledRequest: 'error' });
