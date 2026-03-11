@@ -6,6 +6,9 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ## [Unreleased]
 
+### Added
+- **Phase 43-01:** New `gsd-docs-updater` Haiku agent — reads /docs conventions, classifies build scope from SUMMARY.md into 4 categories (api_change, ui_surface, architecture, refactoring), writes proportionally-scoped documentation with padding guard (internal tooling addition)
+
 ### Fixed
 - **Bash command substitution buffer limit**: Replaced `INIT=$(node gsd-tools.js ...)` pattern with temp file pattern (`INIT_FILE="/tmp/gsd-init-$$.json"`) across all 20+ workflow files to eliminate 2-3MB JSON buffer limit that caused jq parse errors on phases with large VERIFICATION.md files
 - **Control character JSON serialization**: Updated `safeReadFile()` in gsd-tools.js to escape control characters (U+0000 through U+001F except \n, \r, \t) preventing `jq: parse error: Invalid string` errors when file content contains control characters
