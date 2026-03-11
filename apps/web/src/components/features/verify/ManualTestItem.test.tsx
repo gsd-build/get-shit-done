@@ -8,7 +8,6 @@ const mockTest: ManualTest = {
   id: 'test-1',
   description: 'Verify the button is accessible',
   passed: null,
-  note: undefined,
 };
 
 describe('ManualTestItem', () => {
