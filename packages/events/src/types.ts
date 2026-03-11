@@ -13,6 +13,9 @@ export const EVENTS = {
   AGENT_START: 'agent:start',
   AGENT_END: 'agent:end',
   AGENT_ERROR: 'agent:error',
+  AGENT_PHASE: 'agent:phase',
+  TOOL_START: 'agent:tool_start',
+  TOOL_END: 'agent:tool_end',
   CHECKPOINT_REQUEST: 'checkpoint:request',
   CHECKPOINT_RESPONSE: 'checkpoint:response',
   CONNECTION_HEALTH: 'connection:health',
@@ -105,6 +108,39 @@ export interface ConnectionHealthEvent {
   latencyMs: number;
 }
 
+/**
+ * Tool start event - sent when a tool begins executing
+ */
+export interface ToolStartEvent {
+  agentId: string;
+  toolId: string;
+  toolName: string;
+  input: unknown;
+  sequence: number;
+}
+
+/**
+ * Tool end event - sent when a tool completes
+ */
+export interface ToolEndEvent {
+  agentId: string;
+  toolId: string;
+  success: boolean;
+  output: string;
+  duration: number;
+  sequence: number;
+}
+
+/**
+ * Agent phase event - sent when agent phase changes
+ * Per CONTEXT.md: streaming/tool_executing/awaiting_checkpoint
+ */
+export interface AgentPhaseEvent {
+  agentId: string;
+  phase: 'streaming' | 'tool_executing' | 'awaiting_checkpoint';
+  sequence: number;
+}
+
 // Socket.IO typed events
 
 /**
@@ -115,6 +151,9 @@ export interface ServerToClientEvents {
   [EVENTS.AGENT_START]: (event: AgentStartEvent) => void;
   [EVENTS.AGENT_END]: (event: AgentEndEvent) => void;
   [EVENTS.AGENT_ERROR]: (event: AgentErrorEvent) => void;
+  [EVENTS.AGENT_PHASE]: (event: AgentPhaseEvent) => void;
+  [EVENTS.TOOL_START]: (event: ToolStartEvent) => void;
+  [EVENTS.TOOL_END]: (event: ToolEndEvent) => void;
   [EVENTS.CHECKPOINT_REQUEST]: (event: CheckpointRequestEvent) => void;
   [EVENTS.CONNECTION_HEALTH]: (event: HealthMetricsEvent) => void;
 }

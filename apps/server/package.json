@@ -11,6 +11,7 @@
     "typecheck": "tsc --noEmit"
   },
   "dependencies": {
+    "@anthropic-ai/sdk": "^0.61.0",
     "@gsd/events": "workspace:*",
     "@gsd/gsd-core": "workspace:*",
     "@gsd/gsd-wrapper": "workspace:*",

@@ -107,6 +107,44 @@ export const ConnectionHealthEventSchema = z.object({
 export type ConnectionHealthEventInput = z.input<typeof ConnectionHealthEventSchema>;
 
 /**
+ * Tool start event schema
+ */
+export const ToolStartEventSchema = z.object({
+  agentId: z.string().min(1),
+  toolId: z.string().min(1),
+  toolName: z.string().min(1),
+  input: z.unknown(),
+  sequence: z.number().int().nonnegative(),
+});
+
+export type ToolStartEventInput = z.input<typeof ToolStartEventSchema>;
+
+/**
+ * Tool end event schema
+ */
+export const ToolEndEventSchema = z.object({
+  agentId: z.string().min(1),
+  toolId: z.string().min(1),
+  success: z.boolean(),
+  output: z.string(),
+  duration: z.number().nonnegative(),
+  sequence: z.number().int().nonnegative(),
+});
+
+export type ToolEndEventInput = z.input<typeof ToolEndEventSchema>;
+
+/**
+ * Agent phase event schema
+ */
+export const AgentPhaseEventSchema = z.object({
+  agentId: z.string().min(1),
+  phase: z.enum(['streaming', 'tool_executing', 'awaiting_checkpoint']),
+  sequence: z.number().int().nonnegative(),
+});
+
+export type AgentPhaseEventInput = z.input<typeof AgentPhaseEventSchema>;
+
+/**
  * Validate and parse an event payload, returning a typed result
  *
  * @example
