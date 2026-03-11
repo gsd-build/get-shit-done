@@ -7,6 +7,7 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 ## [Unreleased]
 
 ### Added
+- **Phase 43-02/03:** Wired docs automation into executor (mandatory final step) and verifier (Step 8f docs gate — gaps_found when docs scope does not match build scope)
 - **Phase 43-01:** New `gsd-docs-updater` Haiku agent — reads /docs conventions, classifies build scope from SUMMARY.md into 4 categories (api_change, ui_surface, architecture, refactoring), writes proportionally-scoped documentation with padding guard (internal tooling addition)
 
 ### Fixed
