@@ -1,6 +1,7 @@
 'use client';
 
 import { useState, useEffect, useCallback } from 'react';
+import { clsx } from 'clsx';
 import { LogStream } from './LogStream';
 import { ChevronDown, ChevronRight } from 'lucide-react';
 
@@ -97,7 +98,11 @@ export function PlanCard({ plan }: Props) {
           )}
           <span
             data-testid="status-indicator"
-            className={`w-3 h-3 rounded-full ${STATUS_COLORS[status]}`}
+            className={clsx(
+              'w-3 h-3 rounded-full',
+              STATUS_COLORS[status],
+              status === 'running' && 'animate-pulse'
+            )}
           />
           <span className="font-medium flex-1">{name}</span>
         </button>

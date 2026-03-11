@@ -181,4 +181,66 @@ describe('PlanCard', () => {
     // The timer should have updated
     expect(elapsedTime.textContent).not.toBe(initialText);
   });
+
+  it('timer stops when status changes to complete', () => {
+    vi.useFakeTimers();
+    const startTime = Date.now();
+
+    const { rerender } = render(
+      <PlanCard
+        plan={{
+          id: 'plan-1',
+          name: 'Task',
+          status: 'running',
+          startTime,
+          logs: '',
+        }}
+      />
+    );
+
+    // Timer is running
+    expect(screen.getByTestId('elapsed-time')).toBeInTheDocument();
+
+    // Complete the task
+    rerender(
+      <PlanCard
+        plan={{
+          id: 'plan-1',
+          name: 'Task',
+          status: 'complete',
+          startTime,
+          endTime: Date.now() + 2500,
+          logs: '',
+        }}
+      />
+    );
+
+    // Should show completed time format
+    expect(screen.getByText(/completed in/i)).toBeInTheDocument();
+  });
+
+  it('status indicator pulses when running', () => {
+    render(
+      <PlanCard plan={{ id: '1', name: 'Test', status: 'running', logs: '' }} />
+    );
+    const indicator = screen.getByTestId('status-indicator');
+    expect(indicator.className).toContain('animate-pulse');
+  });
+
+  it('status indicator does not pulse when not running', () => {
+    const { rerender } = render(
+      <PlanCard plan={{ id: '1', name: 'Test', status: 'pending', logs: '' }} />
+    );
+    expect(screen.getByTestId('status-indicator').className).not.toContain('animate-pulse');
+
+    rerender(
+      <PlanCard plan={{ id: '1', name: 'Test', status: 'complete', logs: '' }} />
+    );
+    expect(screen.getByTestId('status-indicator').className).not.toContain('animate-pulse');
+
+    rerender(
+      <PlanCard plan={{ id: '1', name: 'Test', status: 'error', logs: '' }} />
+    );
+    expect(screen.getByTestId('status-indicator').className).not.toContain('animate-pulse');
+  });
 });
