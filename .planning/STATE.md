@@ -2,14 +2,14 @@
 gsd_state_version: 1.0
 milestone: v1.1
 milestone_name: Completed Phases
-status: completed
-last_updated: "2026-03-11T09:12:24.696Z"
-last_activity: 2026-03-10 — Completed plan 12-03 (MCP Resources and Auto-Registration)
+status: in-progress
+last_updated: "2026-03-11T10:03:00.000Z"
+last_activity: 2026-03-11 — Completed plan 13-01 (Monorepo Scaffold)
 progress:
   total_phases: 15
   completed_phases: 11
   total_plans: 38
-  completed_plans: 35
+  completed_plans: 36
 ---
 
 # Project State: GSD v1.1 Upstream Sync
@@ -18,17 +18,17 @@ progress:
 
 **Core Value:** Enable GSD fork maintainers to stay current with upstream while preserving custom enhancements through intelligent sync tooling.
 
-**Current Focus:** Phase 12 - MCP Server API
+**Current Focus:** Phase 13 - Foundation Infrastructure
 
 ## Current Position
 
-**Phase:** 12 - MCP Server API
-**Plan:** 12-03 complete
-**Status:** Milestone complete
-**Last activity:** 2026-03-10 — Completed plan 12-03 (MCP Resources and Auto-Registration)
+**Phase:** 13 - Foundation Infrastructure
+**Plan:** 13-01 complete
+**Status:** In progress
+**Last activity:** 2026-03-11 — Completed plan 13-01 (Monorepo Scaffold)
 
 ```
-[####################] 100% - Phase 12 plan 03 of 03 complete
+[######--------------] 33% - Phase 13 plan 01 of 03 complete
 ```
 
 **Phases:**
@@ -41,6 +41,7 @@ progress:
 - [x] Phase 10: Parallel Milestones (10 requirements) - complete
 - [x] Phase 11: Add --docs Flag to discuss-phase (2 requirements) - complete
 - [x] Phase 12: MCP Server API (5 requirements) - complete
+- [ ] Phase 13: Foundation Infrastructure (4 requirements) - in progress (1/3 plans)
 
 ## Performance Metrics
 
@@ -53,6 +54,7 @@ progress:
 | Phase 11 P01 | 74s | 2 tasks | 2 files |
 | Phase 11 P02 | 98s | 3 tasks | 1 file |
 | Phase 12 P02 | 2m 14s | 3 tasks | 2 files |
+| Phase 13 P01 | 4m 17s | 2 tasks | 17 files |
 
 ## Accumulated Context
 
@@ -108,6 +110,10 @@ progress:
 | Use @modelcontextprotocol/sdk v1.x (stable) | Official SDK, recommended until Q1 2026 v2 release | 2026-03-10 |
 | All MCP logs to stderr | stdout reserved for JSON-RPC messages per MCP protocol | 2026-03-10 |
 | Error envelopes with recovery suggestions | Every error includes actionable recovery referencing /gsd: commands | 2026-03-10 |
+| pnpm@9.15.0 as packageManager | Locked version in package.json for workspace protocol support | 2026-03-11 |
+| NodeNext module resolution | Required for proper ESM support with .js extensions | 2026-03-11 |
+| Event naming pattern agent:token | Prefixed names (prefix:action) per CONTEXT.md locked decisions | 2026-03-11 |
+| workspace:* protocol | Ensures packages always use local versions during development | 2026-03-11 |
 
 ### Roadmap Evolution
 
@@ -161,6 +167,7 @@ progress:
 - [x] Execute plan 12-01 (MCP server scaffold)
 - [x] Execute plan 12-02 (MCP tool registrations)
 - [x] Execute plan 12-03 (MCP resources and auto-registration)
+- [x] Execute plan 13-01 (monorepo scaffold with pnpm and Turborepo)
 
 ### Blockers
 
@@ -168,13 +175,13 @@ None currently.
 
 ## Session Continuity
 
-**Last Session:** 2026-03-11T09:12:24.688Z
-**Context:** Finalized Phase 12 - MCP Server API with 9 tools, 4 resources, and auto-registration in ~/.claude.json.
+**Last Session:** 2026-03-11T10:03:00.000Z
+**Context:** Completed Phase 13 Plan 01 - Turborepo monorepo with pnpm workspaces and typed @gsd/events package.
 
 **To Resume:**
-1. Phase 12 (MCP Server API) finalized and merged to main
-2. All 3 plans executed successfully
-3. MCP server ready for production use
+1. Phase 13-01 complete: monorepo scaffold created
+2. Continue with 13-02 (Socket.IO server with connection state recovery)
+3. @gsd/events provides typed event contracts for server and client
 
 
 ### Sync History
@@ -188,6 +195,7 @@ None currently.
 
 ## Recent Activity
 
+- 2026-03-11 — Completed plan 13-01 (Monorepo Scaffold) - Turborepo + pnpm + @gsd/events
 - 2026-03-11 — Finalized phase 12 (MCP Server API) - merged to main
 - 2026-03-10 06:00 — M7: Completed phase 1-fhir-foundation
 - 2026-03-10 05:59 — M1: Test activity
