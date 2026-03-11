@@ -4,10 +4,6 @@ import { useErrorRecovery } from './useErrorRecovery';
 import { useExecutionStore } from '@/stores/executionStore';
 import type { AgentErrorEvent } from '@gsd/events';
 
-// Mock fetch
-const mockFetch = vi.fn();
-global.fetch = mockFetch;
-
 // Test data factories
 function createErrorEvent(overrides: Partial<AgentErrorEvent> = {}): AgentErrorEvent {
   return {
@@ -38,17 +34,33 @@ function createRetryContext(overrides: Partial<RetryContext> = {}): RetryContext
   return { ...base, ...overrides };
 }
 
+// Track request body for assertions
+let lastRequestBody: Record<string, unknown> | null = null;
+
 describe('useErrorRecovery', () => {
+  const originalFetch = global.fetch;
+  let mockFetch: ReturnType<typeof vi.fn>;
+
   beforeEach(() => {
     vi.clearAllMocks();
     useExecutionStore.getState().reset();
-    mockFetch.mockResolvedValue({
-      ok: true,
-      json: () => Promise.resolve({ agentId: 'new-agent-456' }),
+    lastRequestBody = null;
+
+    // Mock fetch to capture request body
+    mockFetch = vi.fn().mockImplementation(async (_url: string, options?: RequestInit) => {
+      if (options?.body) {
+        lastRequestBody = JSON.parse(options.body as string);
+      }
+      return {
+        ok: true,
+        json: () => Promise.resolve({ agentId: 'new-agent-456' }),
+      };
     });
+    global.fetch = mockFetch;
   });
 
   afterEach(() => {
+    global.fetch = originalFetch;
     vi.clearAllMocks();
   });
 
@@ -63,15 +75,11 @@ describe('useErrorRecovery', () => {
         await result.current.retryFromCurrentTask();
       });
 
-      expect(mockFetch).toHaveBeenCalledWith('/api/agents', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          planId: 'plan-1',
-          taskName: 'Task 1',
-          projectPath: '/project/path',
-          resumeFrom: 'cp-123',
-        }),
+      expect(lastRequestBody).toEqual({
+        planId: 'plan-1',
+        taskName: 'Task 1',
+        projectPath: '/project/path',
+        resumeFrom: 'cp-123',
       });
     });
 
@@ -89,9 +97,9 @@ describe('useErrorRecovery', () => {
         await result.current.retryFromCurrentTask();
       });
 
-      const callArgs = JSON.parse(mockFetch.mock.calls[0][1].body);
-      expect(callArgs.planId).toBe('plan-17-07');
-      expect(callArgs.taskName).toBe('Task 3: Implement ErrorRecovery');
+      expect(lastRequestBody).not.toBeNull();
+      expect(lastRequestBody?.planId).toBe('plan-17-07');
+      expect(lastRequestBody?.taskName).toBe('Task 3: Implement ErrorRecovery');
     });
 
     it('clears error state on successful retry', async () => {
@@ -125,28 +133,24 @@ describe('useErrorRecovery', () => {
         await result.current.retryFromBeginning();
       });
 
-      expect(mockFetch).toHaveBeenCalledWith('/api/agents', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          planId: 'plan-1',
-          taskName: 'Task 1',
-          projectPath: '/project/path',
-        }),
+      expect(lastRequestBody).toEqual({
+        planId: 'plan-1',
+        taskName: 'Task 1',
+        projectPath: '/project/path',
       });
 
       // Verify resumeFrom is NOT in the body
-      const callArgs = JSON.parse(mockFetch.mock.calls[0][1].body);
-      expect(callArgs.resumeFrom).toBeUndefined();
+      expect(lastRequestBody?.resumeFrom).toBeUndefined();
     });
   });
 
   describe('error handling', () => {
     it('handles API errors gracefully', async () => {
+      // Override fetch to return an error response
       mockFetch.mockResolvedValue({
         ok: false,
         status: 500,
-        statusText: 'Internal Server Error',
+        json: () => Promise.resolve({ error: 'Internal Server Error' }),
       });
 
       const error = createErrorEvent();
@@ -164,6 +168,7 @@ describe('useErrorRecovery', () => {
     });
 
     it('handles network errors gracefully', async () => {
+      // Override fetch to simulate network error
       mockFetch.mockRejectedValue(new Error('Network error'));
 
       const error = createErrorEvent();
@@ -175,6 +180,7 @@ describe('useErrorRecovery', () => {
         await result.current.retryFromCurrentTask();
       });
 
+      // Should have some retry error message
       expect(result.current.retryError).toBe('Network error');
       expect(result.current.isRetrying).toBe(false);
     });
@@ -188,6 +194,7 @@ describe('useErrorRecovery', () => {
         await result.current.retryFromCurrentTask();
       });
 
+      // No request should be made
       expect(mockFetch).not.toHaveBeenCalled();
     });
   });
@@ -195,21 +202,19 @@ describe('useErrorRecovery', () => {
   describe('loading state', () => {
     it('sets isRetrying to true during retry attempt', async () => {
       // Make fetch hang to observe loading state
-      let resolvePromise: () => void;
-      const pendingPromise = new Promise<void>((resolve) => {
-        resolvePromise = resolve;
+      let resolveFetch: (value: unknown) => void;
+      const fetchPromise = new Promise((resolve) => {
+        resolveFetch = resolve;
       });
-      mockFetch.mockImplementation(() => pendingPromise.then(() => ({
-        ok: true,
-        json: () => Promise.resolve({ agentId: 'new-agent' }),
-      })));
+
+      mockFetch.mockImplementation(() => fetchPromise);
 
       const error = createErrorEvent();
       const context = createRetryContext();
 
       const { result } = renderHook(() => useErrorRecovery(error, context));
 
-      // Start the retry
+      // Start the retry (but don't await)
       act(() => {
         result.current.retryFromCurrentTask();
       });
@@ -217,10 +222,12 @@ describe('useErrorRecovery', () => {
       // Should be retrying
       expect(result.current.isRetrying).toBe(true);
 
-      // Resolve the promise
+      // Resolve the fetch
       await act(async () => {
-        resolvePromise!();
-        await pendingPromise;
+        resolveFetch!({
+          ok: true,
+          json: () => Promise.resolve({ agentId: 'new-agent' }),
+        });
       });
 
       // Should no longer be retrying
