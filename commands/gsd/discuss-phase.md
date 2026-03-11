@@ -1,7 +1,7 @@
 ---
 name: gsd:discuss-phase
 description: Gather phase context through adaptive questioning before planning
-argument-hint: "<phase> [--auto]"
+argument-hint: "<phase> [--auto] [--docs path/to/doc1.md,path/to/doc2.md]"
 allowed-tools:
   - Read
   - Write

@@ -60,14 +60,21 @@ Usage: `/gsd:map-codebase`
 
 ### Phase Planning
 
-**`/gsd:discuss-phase <number>`**
+**`/gsd:discuss-phase <number> [--docs path1,path2,...]`**
 Help articulate your vision for a phase before planning.
 
 - Captures how you imagine this phase working
 - Creates CONTEXT.md with your vision, essentials, and boundaries
 - Use when you have ideas about how something should look/feel
 
+**Document-assisted mode:** Pass `--docs` with comma-separated paths to reference documents (PRD, spec, etc.):
+- Auto-extracts decisions using four-tier classification (Explicit, Inferred, Ambiguous, Gap)
+- Shows grouped summary of what was found before asking questions
+- Only asks about gaps and ambiguities not covered by documents
+- CONTEXT.md includes provenance notation showing where each decision came from
+
 Usage: `/gsd:discuss-phase 2`
+Usage: `/gsd:discuss-phase 3 --docs docs/PRD.md,docs/SPEC.md`
 
 **`/gsd:research-phase <number>`**
 Comprehensive ecosystem research for niche/complex domains.

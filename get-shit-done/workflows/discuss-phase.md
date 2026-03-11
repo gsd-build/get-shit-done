@@ -109,6 +109,8 @@ Phase: "API documentation"
 
 **Express path available:** If you already have a PRD or acceptance criteria document, use `/gsd:plan-phase {phase} --prd path/to/prd.md` to skip this discussion and go straight to planning.
 
+**Document-assisted path:** If you have reference documents, use `/gsd:discuss-phase {phase} --docs path/to/prd.md,path/to/spec.md` to auto-extract decisions from them.
+
 <step name="initialize" priority="first">
 Phase number from argument (required).
 
@@ -145,7 +147,7 @@ Use AskUserQuestion:
   - "View it" — Show me what's there
   - "Skip" — Use existing context as-is
 
-If "Update": Load existing, continue to analyze_phase
+If "Update": Load existing, continue to parse_docs_flag
 If "View": Display CONTEXT.md, then offer update/skip
 If "Skip": Exit workflow
 
@@ -161,11 +163,154 @@ Use AskUserQuestion:
   - "View existing plans" — Show plans before deciding
   - "Cancel" — Skip discuss-phase
 
-If "Continue and replan after": Continue to analyze_phase.
+If "Continue and replan after": Continue to parse_docs_flag.
 If "View existing plans": Display plan files, then offer "Continue" / "Cancel".
 If "Cancel": Exit workflow.
 
-**If `has_plans` is false:** Continue to analyze_phase.
+**If `has_plans` is false:** Continue to parse_docs_flag.
+</step>
+
+<step name="parse_docs_flag">
+Check $ARGUMENTS for --docs flag.
+
+**If --docs present:**
+Extract paths after --docs flag. Split by comma, trim whitespace.
+
+Validate each path:
+```bash
+for doc in "${DOC_PATHS[@]}"; do
+  doc=$(echo "$doc" | xargs)  # trim whitespace
+  if [ -f "$doc" ]; then
+    # Add to valid_docs
+  else
+    # Add to invalid_docs
+  fi
+done
+```
+
+**If any paths invalid:**
+```
+Note: Could not find: {invalid_docs}
+Continuing with: {valid_docs}
+```
+
+**If all paths invalid:**
+```
+None of the specified documents could be found.
+Falling back to standard discuss-phase flow.
+```
+Set `has_docs=false`, proceed to analyze_phase.
+
+**If has valid docs:**
+Set `has_docs=true`, `valid_docs` list stored for extract_from_docs step.
+Proceed to extract_from_docs.
+
+**If --docs flag not present:**
+Set `has_docs=false`, proceed to analyze_phase.
+</step>
+
+<step name="extract_from_docs">
+**Requires:** has_docs=true, valid_docs list from parse_docs_flag
+
+For each document in valid_docs:
+
+1. Read the document:
+   - If large (> 1000 lines), use focused search based on phase gray areas
+   - Otherwise, read entire document
+
+2. Identify phase gray areas (same analysis as analyze_phase step)
+
+3. For each gray area, search for relevant content and classify:
+
+**Classification tiers:**
+- **Explicit** — Direct statement with quotable text
+  - Notation: `[from: filename.md, "Section Name"]`
+- **Inferred** — Reasonable conclusion from context
+  - Only when evidence is strong
+  - Notation: `[inferred from: filename.md, "Section Name"]`
+- **Ambiguous** — Conflicting information found
+  - Present both signals with sources
+  - Notation: `[ambiguous: file1.md says X, file2.md says Y]`
+- **Gap** — No coverage found for this area
+  - Route to standard questioning
+  - Notation: `[gap - needs user input]`
+
+4. Compile findings into extraction_results structure:
+
+```markdown
+### Extracted Decisions
+
+**From prd.md:**
+| Gray Area | Finding | Classification | Location |
+|-----------|---------|----------------|----------|
+| Layout | "Use card-based layout" | Explicit | UI Requirements |
+| Loading | "smooth experience" | Inferred | Performance section |
+
+**From spec.md:**
+| Gray Area | Finding | Classification | Location |
+|-----------|---------|----------------|----------|
+| Loading | "Paginate 20 items" | Explicit | Data Loading |
+```
+
+5. Detect conflicts (same area, different answers) - mark as Ambiguous
+
+Store extraction_results for present_extractions step.
+Proceed to present_extractions.
+</step>
+
+<step name="present_extractions">
+**Requires:** extraction_results from extract_from_docs
+
+Group by resolution status:
+
+**Resolved (Explicit + Inferred):**
+```
+## Decisions Extracted from Documents
+
+### [Area] (from source.md)
+- Decision [Classification]
+```
+
+**Needs Resolution (Ambiguous):**
+```
+### Conflicts Found
+
+**[Area]:**
+- file1.md: "option A"
+- file2.md: "option B"
+
+Which approach?
+```
+
+**Gaps:**
+```
+### Areas Not Covered by Documents
+
+- [gap area 1]
+- [gap area 2]
+```
+
+Use AskUserQuestion:
+- header: "Review"
+- question: "Review the extracted decisions above. Correct anything, then we'll discuss the gaps."
+- options:
+  - "Looks good, discuss gaps" - route gaps to discuss_areas
+  - "I want to change something" - allow inline overrides
+
+**If user overrides:**
+For each override: "Doc said X, user chose Y [override]"
+Update extraction_results with user_overrides.
+
+**If all areas resolved (no gaps, no ambiguous):**
+- question: "Documents resolved all gray areas. Create CONTEXT.md?"
+- options: "Yes, create it" / "I want to discuss something first"
+
+**Routing:**
+- resolved_areas = Explicit + Inferred + user-resolved Ambiguous (skip in discuss_areas)
+- pending_areas = gaps + remaining ambiguous (route to discuss_areas)
+
+If pending_areas empty and user confirms: proceed to write_context.
+Otherwise: proceed to discuss_areas with pending_areas only.
 </step>
 
 <step name="analyze_phase">
@@ -316,7 +461,75 @@ mkdir -p ".planning/phases/${padded_phase}-${phase_slug}"
 
 **File location:** `${phase_dir}/${padded_phase}-CONTEXT.md`
 
-**Structure the content by what was discussed:**
+**If has_docs is true:**
+
+Use enhanced template with provenance:
+
+```markdown
+# Phase [X]: [Name] - Context
+
+**Gathered:** [date]
+**Status:** Ready for planning
+**Source:** Document extraction + user input
+
+<documents_used>
+## Documents Used
+
+| Document | Coverage | Quality |
+|----------|----------|---------|
+| [doc] | [areas covered] | [HIGH/MEDIUM/LOW] |
+
+</documents_used>
+
+<domain>
+## Phase Boundary
+
+[Clear statement of what this phase delivers — the scope anchor]
+
+</domain>
+
+<decisions>
+## Implementation Decisions
+
+### [Area that was discussed]
+- Decision [from: source.md]
+- Decision [inferred: source.md]
+- Decision [override: doc said X, user chose Y]
+- Decision [user input]
+
+### Claude's Discretion
+- Item [gap - no doc coverage]
+
+</decisions>
+
+<specifics>
+## Specific Ideas
+
+[Any particular references, examples, or "I want it like X" moments from discussion]
+
+[If none: "No specific requirements — open to standard approaches"]
+
+</specifics>
+
+<deferred>
+## Deferred Ideas
+
+[Ideas that came up but belong in other phases. Don't lose them.]
+
+[If none: "None — discussion stayed within phase scope"]
+
+</deferred>
+
+---
+
+*Phase: XX-name*
+*Context gathered: [date]*
+*Source documents: [list of docs used]*
+```
+
+**If has_docs is false:**
+
+Use standard template (unchanged):
 
 ```markdown
 # Phase [X]: [Name] - Context
