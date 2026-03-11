@@ -217,9 +217,18 @@ ${any_specific_references_or_examples_from_discussion}
 [If none: "No specific requirements — open to standard approaches"]
 
 </specifics>
+
+<canonical_refs>
+## Canonical References
+
+${any_specs_adrs_or_docs_referenced_during_discussion}
+
+[If none: "No external specs — requirements fully captured in decisions above"]
+
+</canonical_refs>
 ```
 
-Note: Quick task CONTEXT.md omits `<code_context>` and `<deferred>` sections (no codebase scouting, no phase scope to defer to). Keep it lean.
+Note: Quick task CONTEXT.md omits `<code_context>` and `<deferred>` sections (no codebase scouting, no phase scope to defer to). Keep it lean. The `<canonical_refs>` section is included when external docs were referenced — omit it only if no external docs apply.
 
 Report: `Context captured: ${QUICK_DIR}/${next_num}-CONTEXT.md`
 

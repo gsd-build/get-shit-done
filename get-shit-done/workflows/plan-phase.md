@@ -77,6 +77,7 @@ Generating CONTEXT.md from requirements...
    - Extract all requirements, user stories, acceptance criteria, and constraints from the PRD
    - Map each to a locked decision (everything in the PRD is treated as a locked decision)
    - Identify any areas the PRD doesn't cover and mark as "Claude's Discretion"
+   - **Extract canonical refs** from ROADMAP.md for this phase, plus any specs/ADRs referenced in the PRD — expand to full file paths (MANDATORY)
    - Create CONTEXT.md in the phase directory
 
 4. Write CONTEXT.md:
@@ -105,6 +106,21 @@ Generating CONTEXT.md from requirements...
 [Areas not covered by PRD — implementation details, technical choices]
 
 </decisions>
+
+<canonical_refs>
+## Canonical References
+
+**Downstream agents MUST read these before planning or implementing.**
+
+[MANDATORY. Extract from ROADMAP.md and any docs referenced in the PRD.
+Use full relative paths. Group by topic area.]
+
+### [Topic area]
+- `path/to/spec-or-adr.md` — [What it decides/defines]
+
+[If no external specs: "No external specs — requirements fully captured in decisions above"]
+
+</canonical_refs>
 
 <specifics>
 ## Specific Ideas

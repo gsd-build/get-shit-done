@@ -272,6 +272,8 @@ Analyze the phase to identify gray areas worth discussing. **Use both `prior_dec
 
 1. **Domain boundary** — What capability is this phase delivering? State it clearly.
 
+1b. **Extract canonical refs** — Copy any `Canonical refs:` from ROADMAP.md for this phase. Also check REQUIREMENTS.md and PROJECT.md for referenced specs/ADRs. Expand each to a full relative path. These go into the `<canonical_refs>` section of CONTEXT.md — downstream agents need them to know WHAT docs to read. **This is MANDATORY.** If no external docs exist, note that explicitly.
+
 2. **Check prior decisions** — Before generating gray areas, check if any were already decided:
    - Scan `<prior_decisions>` for relevant choices (e.g., "Ctrl+C only, no single-key shortcuts")
    - These are **pre-answered** — don't re-ask unless this phase has conflicting needs
@@ -481,6 +483,23 @@ mkdir -p ".planning/phases/${padded_phase}-${phase_slug}"
 
 </decisions>
 
+<canonical_refs>
+## Canonical References
+
+**Downstream agents MUST read these before planning or implementing.**
+
+[MANDATORY section. Extract from ROADMAP.md, REQUIREMENTS.md, and PROJECT.md.
+List every spec, ADR, feature doc, or design doc that defines requirements or
+constraints for this phase. Use full relative paths. Group by topic area.]
+
+### [Topic area]
+- `path/to/spec-or-adr.md` — [What it decides/defines that's relevant]
+- `path/to/doc.md` §N — [Specific section reference]
+
+[If no external specs: "No external specs — requirements fully captured in decisions above"]
+
+</canonical_refs>
+
 <code_context>
 ## Existing Code Insights
 
@@ -669,6 +688,7 @@ Route to `confirm_creation` step (existing behavior — show manual next steps).
 - Each selected area explored until user satisfied (with code-informed and prior-decision-informed options)
 - Scope creep redirected to deferred ideas
 - CONTEXT.md captures actual decisions, not vague vision
+- CONTEXT.md includes canonical_refs section with full file paths to every spec/ADR/doc downstream agents need (MANDATORY — never omit)
 - CONTEXT.md includes code_context section with reusable assets and patterns
 - Deferred ideas preserved for future phases
 - STATE.md updated with session info
