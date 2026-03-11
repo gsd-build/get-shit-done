@@ -1,6 +1,5 @@
-import { describe, it, expect, beforeEach } from 'vitest';
+import { describe, it, expect, beforeEach, vi, afterEach } from 'vitest';
 import { usePlanStore, selectAgents, selectPlan, selectIsLoading } from './planStore';
-import type { ResearchAgent } from '@/types/plan';
 
 describe('planStore', () => {
   beforeEach(() => {
@@ -151,6 +150,121 @@ describe('planStore', () => {
     it('selectIsLoading returns loading state', () => {
       const isLoading = selectIsLoading(usePlanStore.getState());
       expect(typeof isLoading).toBe('boolean');
+    });
+  });
+
+  describe('timer functionality', () => {
+    beforeEach(() => {
+      vi.useFakeTimers();
+    });
+
+    afterEach(() => {
+      vi.useRealTimers();
+    });
+
+    it('startAgentTimer begins incrementing elapsedMs', async () => {
+      const { addAgent, startAgentTimer } = usePlanStore.getState();
+
+      addAgent({ id: 'agent-1', name: 'Test Agent' });
+      startAgentTimer('agent-1');
+
+      // Initially should still be 0
+      const agentsBefore = selectAgents(usePlanStore.getState());
+      expect(agentsBefore.get('agent-1')?.elapsedMs).toBe(0);
+
+      // Advance time by 200ms (should trigger 2 interval ticks at 100ms each)
+      vi.advanceTimersByTime(200);
+
+      const agentsAfter = selectAgents(usePlanStore.getState());
+      // Should have updated elapsedMs
+      expect(agentsAfter.get('agent-1')?.elapsedMs).toBeGreaterThanOrEqual(200);
+    });
+
+    it('stopAgentTimer freezes elapsedMs', () => {
+      const { addAgent, startAgentTimer, stopAgentTimer } = usePlanStore.getState();
+
+      addAgent({ id: 'agent-1', name: 'Test Agent' });
+      startAgentTimer('agent-1');
+
+      // Advance time by 150ms
+      vi.advanceTimersByTime(150);
+
+      stopAgentTimer('agent-1');
+
+      // Get elapsed time after stop
+      const agentsAtStop = selectAgents(usePlanStore.getState());
+      const elapsedAtStop = agentsAtStop.get('agent-1')?.elapsedMs ?? 0;
+
+      // Advance time more
+      vi.advanceTimersByTime(300);
+
+      // Elapsed time should not have changed
+      const agentsAfter = selectAgents(usePlanStore.getState());
+      expect(agentsAfter.get('agent-1')?.elapsedMs).toBe(elapsedAtStop);
+    });
+
+    it('setAgentComplete stops timer automatically', () => {
+      const { addAgent, startAgentTimer, setAgentComplete } = usePlanStore.getState();
+
+      addAgent({ id: 'agent-1', name: 'Test Agent' });
+      startAgentTimer('agent-1');
+
+      vi.advanceTimersByTime(100);
+
+      setAgentComplete('agent-1', 'Done!');
+
+      const agentsAtComplete = selectAgents(usePlanStore.getState());
+      const elapsedAtComplete = agentsAtComplete.get('agent-1')?.elapsedMs ?? 0;
+
+      // Advance more time
+      vi.advanceTimersByTime(500);
+
+      // Elapsed should be frozen
+      const agentsAfter = selectAgents(usePlanStore.getState());
+      expect(agentsAfter.get('agent-1')?.elapsedMs).toBe(elapsedAtComplete);
+      expect(agentsAfter.get('agent-1')?.status).toBe('complete');
+    });
+
+    it('setAgentError stops timer automatically', () => {
+      const { addAgent, startAgentTimer, setAgentError } = usePlanStore.getState();
+
+      addAgent({ id: 'agent-1', name: 'Test Agent' });
+      startAgentTimer('agent-1');
+
+      vi.advanceTimersByTime(100);
+
+      setAgentError('agent-1', 'Failed!');
+
+      const agentsAtError = selectAgents(usePlanStore.getState());
+      const elapsedAtError = agentsAtError.get('agent-1')?.elapsedMs ?? 0;
+
+      // Advance more time
+      vi.advanceTimersByTime(500);
+
+      // Elapsed should be frozen
+      const agentsAfter = selectAgents(usePlanStore.getState());
+      expect(agentsAfter.get('agent-1')?.elapsedMs).toBe(elapsedAtError);
+      expect(agentsAfter.get('agent-1')?.status).toBe('error');
+    });
+
+    it('resetPlanState stops all timers', () => {
+      const { addAgent, startAgentTimer, resetPlanState } = usePlanStore.getState();
+
+      addAgent({ id: 'agent-1', name: 'Agent 1' });
+      addAgent({ id: 'agent-2', name: 'Agent 2' });
+      startAgentTimer('agent-1');
+      startAgentTimer('agent-2');
+
+      vi.advanceTimersByTime(100);
+
+      resetPlanState();
+
+      // Agents should be cleared
+      const agents = selectAgents(usePlanStore.getState());
+      expect(agents.size).toBe(0);
+
+      // Further time advancement shouldn't throw (timers are cleared)
+      vi.advanceTimersByTime(500);
     });
   });
 });

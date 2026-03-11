@@ -1,7 +1,12 @@
 'use client';
 
 import { useEffect, useCallback } from 'react';
-import type { TypedSocket } from '@gsd/events';
+import type {
+  TypedSocket,
+  VerificationTestStartEvent,
+  VerificationTestResultEvent,
+  VerificationCompleteEvent,
+} from '@gsd/events';
 import {
   useVerificationStore,
   selectStatus,
@@ -11,26 +16,9 @@ import {
   selectOverallPassed,
   selectSummary,
 } from '@/stores/verificationStore';
-import type { TestResult, Gap } from '@/types/verification';
 
 const API_BASE =
   process.env['NEXT_PUBLIC_API_URL'] || 'http://localhost:4000';
-
-/**
- * Verification event payloads from Socket.IO server.
- */
-interface TestStartEvent {
-  testName: string;
-  requirementId: string;
-}
-
-interface TestResultEvent extends TestResult {}
-
-interface CompleteEvent {
-  passed: boolean;
-  summary: string;
-  gaps: Gap[];
-}
 
 /**
  * React hook for verification process management.
@@ -61,33 +49,33 @@ export function useVerification(socket: TypedSocket | null, phaseId: string) {
     if (!socket) return;
 
     // Subscribe to verification channel
-    socket.emit('verification:subscribe' as never, phaseId as never);
+    socket.emit('verification:subscribe', phaseId);
 
     // Event handlers
-    const handleTestStart = (data: TestStartEvent) => {
+    const handleTestStart = (data: VerificationTestStartEvent) => {
       setRunningTest(data.testName);
     };
 
-    const handleTestResult = (data: TestResultEvent) => {
+    const handleTestResult = (data: VerificationTestResultEvent) => {
       addTestResult(data);
     };
 
-    const handleComplete = (data: CompleteEvent) => {
+    const handleComplete = (data: VerificationCompleteEvent) => {
       setComplete(data.passed, data.summary);
       setGaps(data.gaps);
     };
 
     // Register listeners
-    socket.on('verification:test_start' as never, handleTestStart as never);
-    socket.on('verification:test_result' as never, handleTestResult as never);
-    socket.on('verification:complete' as never, handleComplete as never);
+    socket.on('verification:test_start', handleTestStart);
+    socket.on('verification:test_result', handleTestResult);
+    socket.on('verification:complete', handleComplete);
 
     // Cleanup on unmount
     return () => {
-      socket.emit('verification:unsubscribe' as never, phaseId as never);
-      socket.off('verification:test_start' as never, handleTestStart as never);
-      socket.off('verification:test_result' as never, handleTestResult as never);
-      socket.off('verification:complete' as never, handleComplete as never);
+      socket.emit('verification:unsubscribe', phaseId);
+      socket.off('verification:test_start', handleTestStart);
+      socket.off('verification:test_result', handleTestResult);
+      socket.off('verification:complete', handleComplete);
     };
   }, [
     socket,
