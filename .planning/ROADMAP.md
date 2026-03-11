@@ -157,7 +157,7 @@ Plans:
 
 Plans:
 - [x] 16-01-PLAN.md — Chat conversation interface with streaming token display
-- [ ] 16-02-PLAN.md — CONTEXT.md live preview panel with decision locking
+- [x] 16-02-PLAN.md — CONTEXT.md live preview panel with decision locking
 - [ ] 16-03-PLAN.md — Session persistence across reconnects and browser refresh
 - [ ] 16-04-PLAN.md — Manual CONTEXT.md editing with bidirectional sync
 

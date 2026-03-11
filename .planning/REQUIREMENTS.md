@@ -31,8 +31,8 @@ Project overview and navigation.
 Context gathering through conversational interface.
 
 - [ ] **DISC-01**: User can have a chat-style conversation with Claude with real-time token streaming
-- [ ] **DISC-02**: User can see live preview of CONTEXT.md being generated as conversation progresses
-- [ ] **DISC-03**: User can mark individual decisions as locked (must keep) vs discretionary (agent can adjust)
+- [x] **DISC-02**: User can see live preview of CONTEXT.md being generated as conversation progresses
+- [x] **DISC-03**: User can mark individual decisions as locked (must keep) vs discretionary (agent can adjust)
 - [ ] **DISC-04**: User can refresh browser and resume discussion session where they left off
 - [ ] **DISC-05**: User can manually edit CONTEXT.md with sync back to conversation state
 
@@ -140,8 +140,8 @@ Visual debugging workflow.
 | DASH-04 | Phase 15 | Complete |
 | DASH-05 | Phase 15 | Complete |
 | DISC-01 | Phase 16 | In Progress |
-| DISC-02 | Phase 16 | Pending |
-| DISC-03 | Phase 16 | Pending |
+| DISC-02 | Phase 16 | Complete |
+| DISC-03 | Phase 16 | Complete |
 | DISC-04 | Phase 16 | Pending |
 | DISC-05 | Phase 16 | Pending |
 | PLAN-01 | Phase 18 | Pending |
