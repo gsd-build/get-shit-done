@@ -41,10 +41,10 @@ Context gathering through conversational interface.
 Research, planning, and verification workflow.
 
 - [x] **PLAN-01**: User can see real-time progress as researcher agents spawn, run, and complete
-- [ ] **PLAN-02**: User can preview generated plans with task breakdown and wave grouping
-- [ ] **PLAN-03**: User can see verification feedback with specific issues highlighted per plan
-- [ ] **PLAN-04**: User can view requirement coverage matrix showing requirement-to-phase mapping
-- [ ] **PLAN-05**: User can edit plan tasks inline before execution
+- [x] **PLAN-02**: User can preview generated plans with task breakdown and wave grouping
+- [x] **PLAN-03**: User can see verification feedback with specific issues highlighted per plan
+- [x] **PLAN-04**: User can view requirement coverage matrix showing requirement-to-phase mapping
+- [x] **PLAN-05**: User can edit plan tasks inline before execution
 
 ### Execute Phase UI (EXEC)
 
@@ -75,7 +75,7 @@ User acceptance testing and gap closure.
 - [x] **VERIF-01**: User can view verification report with pass/fail status per requirement
 - [x] **VERIF-02**: User can see gaps highlighted with severity levels (blocking, major, minor)
 - [x] **VERIF-03**: Verification executes all tests automatically before displaying results
-- [ ] **VERIF-04**: Verification validates that all success criteria are genuinely met (not superficially passed)
+- [x] **VERIF-04**: Verification validates that all success criteria are genuinely met (not superficially passed)
 - [x] **VERIF-05**: User can mark manual test items as pass/fail in checklist
 - [x] **VERIF-06**: User can approve completed work or reject with gap selection
 - [ ] **VERIF-07**: Rejection routes to plan-phase --gaps to create fix plans automatically
@@ -145,10 +145,10 @@ Visual debugging workflow.
 | DISC-04 | Phase 16 | Pending |
 | DISC-05 | Phase 16 | Pending |
 | PLAN-01 | Phase 18 | Complete |
-| PLAN-02 | Phase 18 | Pending |
-| PLAN-03 | Phase 18 | Pending |
-| PLAN-04 | Phase 18 | Pending |
-| PLAN-05 | Phase 18 | Pending |
+| PLAN-02 | Phase 18 | Complete |
+| PLAN-03 | Phase 18 | Complete |
+| PLAN-04 | Phase 18 | Complete |
+| PLAN-05 | Phase 18 | Complete |
 | EXEC-01 | Phase 17 | Pending |
 | EXEC-02 | Phase 17 | Pending |
 | EXEC-03 | Phase 17 | Pending |
@@ -164,7 +164,7 @@ Visual debugging workflow.
 | VERIF-01 | Phase 18 | Complete |
 | VERIF-02 | Phase 18 | Complete |
 | VERIF-03 | Phase 18 | Complete |
-| VERIF-04 | Phase 18 | Pending |
+| VERIF-04 | Phase 18 | Complete |
 | VERIF-05 | Phase 18 | Complete |
 | VERIF-06 | Phase 18 | Complete |
 | VERIF-07 | Phase 18 | Pending |
