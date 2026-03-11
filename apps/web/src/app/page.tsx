@@ -1,43 +1,62 @@
 'use client';
 
-import { useTheme } from 'next-themes';
-import { Moon, Sun } from 'lucide-react';
-import { useEffect, useState } from 'react';
+import { useRouter } from 'next/navigation';
+import { useProjects } from '@/hooks/useProjects';
+import { SearchBar, FilterBar, ProjectGrid } from '@/components/features/dashboard';
 
-export default function Home() {
-  const { theme, setTheme } = useTheme();
-  const [mounted, setMounted] = useState(false);
+export default function DashboardPage() {
+  const router = useRouter();
+  const { projects, isLoading, error, refetch } = useProjects();
 
-  // Avoid hydration mismatch by waiting for mount
-  useEffect(() => {
-    setMounted(true);
-  }, []);
+  const handleNavigate = (projectId: string) => {
+    router.push(`/projects/${projectId}`);
+  };
 
-  const toggleTheme = () => {
-    setTheme(theme === 'dark' ? 'light' : 'dark');
+  const handleActivityClick = (activityId: string) => {
+    // TODO: Navigate to execution detail when implemented in Phase 17
+    console.log('Activity clicked:', activityId);
   };
 
   return (
-    <main className="min-h-screen p-8">
-      <div className="flex items-center justify-between mb-8">
-        <h1 className="text-3xl font-bold">GSD Dashboard</h1>
-        {mounted && (
-          <button
-            onClick={toggleTheme}
-            className="p-2 rounded-lg bg-(--color-muted) hover:bg-(--color-border) transition-colors"
-            aria-label="Toggle theme"
-          >
-            {theme === 'dark' ? (
-              <Sun className="w-5 h-5" />
-            ) : (
-              <Moon className="w-5 h-5" />
-            )}
-          </button>
+    <main className="min-h-screen bg-background">
+      <div className="max-w-7xl mx-auto px-4 py-8">
+        <header className="mb-8">
+          <h1 className="text-3xl font-bold text-foreground mb-2">GSD Dashboard</h1>
+          <p className="text-muted-foreground">Manage your projects</p>
+        </header>
+
+        <div className="flex flex-col md:flex-row gap-4 mb-6">
+          <div className="flex-1">
+            <SearchBar />
+          </div>
+          <FilterBar />
+        </div>
+
+        {error && (
+          <div className="bg-error/10 border border-error text-error px-4 py-3 rounded-lg mb-6">
+            <p>Error: {error}</p>
+            <button
+              type="button"
+              onClick={() => refetch()}
+              className="text-sm underline mt-1"
+            >
+              Retry
+            </button>
+          </div>
+        )}
+
+        {isLoading ? (
+          <div className="text-center py-12">
+            <p className="text-muted-foreground">Loading projects...</p>
+          </div>
+        ) : (
+          <ProjectGrid
+            projects={projects}
+            onNavigate={handleNavigate}
+            onActivityClick={handleActivityClick}
+          />
         )}
       </div>
-      <p className="text-(--color-muted-foreground)">
-        Project management dashboard coming soon.
-      </p>
     </main>
   );
 }

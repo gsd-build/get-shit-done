@@ -50,7 +50,7 @@ export function ProjectCard({ project, activities = [], onNavigate, onActivityCl
         <ActivityFeed
           activities={displayActivities}
           compact
-          onActivityClick={onActivityClick}
+          {...(onActivityClick && { onActivityClick })}
         />
       )}
 

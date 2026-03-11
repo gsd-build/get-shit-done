@@ -28,7 +28,7 @@ export function ProjectGrid({ projects, onNavigate, onActivityClick }: ProjectGr
           key={project.id}
           project={project}
           onNavigate={onNavigate}
-          onActivityClick={onActivityClick}
+          {...(onActivityClick && { onActivityClick })}
         />
       ))}
     </div>
