@@ -33,8 +33,9 @@ describe('projectStore', () => {
       path: '/test',
     };
     useProjectStore.getState().setProjects([mockProject]);
-    expect(useProjectStore.getState().projects).toHaveLength(1);
-    expect(useProjectStore.getState().projects[0].name).toBe('Test');
+    const { projects } = useProjectStore.getState();
+    expect(projects).toHaveLength(1);
+    expect(projects[0]?.name).toBe('Test');
   });
 
   it('setLoading updates isLoading state', () => {
