@@ -14,6 +14,7 @@ import {
   useContextStore,
   selectContextState,
   selectLastUpdated,
+  selectEditingDecisionId,
 } from '@/stores/contextStore';
 import type { Decision } from '@/lib/contextParser';
 
@@ -23,9 +24,17 @@ interface ExpandedSections {
   deferred: boolean;
 }
 
-export function ContextPreview() {
+interface ContextPreviewProps {
+  /** Called when user starts editing a decision */
+  onEditStart?: (decisionId: string) => void;
+  /** Called when user completes an edit */
+  onEditComplete?: (decisionId: string, newValue: string, oldValue: string) => void;
+}
+
+export function ContextPreview({ onEditStart, onEditComplete }: ContextPreviewProps) {
   const contextState = useContextStore(selectContextState);
   const lastUpdated = useContextStore(selectLastUpdated);
+  const editingDecisionId = useContextStore(selectEditingDecisionId);
   const toggleLock = useContextStore(state => state.toggleLock);
   const bulkLock = useContextStore(state => state.bulkLock);
 
@@ -114,6 +123,9 @@ export function ContextPreview() {
                   key={decision.id}
                   decision={decision}
                   onToggleLock={handleToggleLock}
+                  isEditing={editingDecisionId === decision.id}
+                  onEditStart={onEditStart}
+                  onEditComplete={onEditComplete}
                 />
               ))
             )}
@@ -142,6 +154,9 @@ export function ContextPreview() {
                   key={decision.id}
                   decision={decision}
                   onToggleLock={handleToggleLock}
+                  isEditing={editingDecisionId === decision.id}
+                  onEditStart={onEditStart}
+                  onEditComplete={onEditComplete}
                 />
               ))
             )}
@@ -170,6 +185,9 @@ export function ContextPreview() {
                   key={decision.id}
                   decision={decision}
                   onToggleLock={handleToggleLock}
+                  isEditing={editingDecisionId === decision.id}
+                  onEditStart={onEditStart}
+                  onEditComplete={onEditComplete}
                 />
               ))
             )}

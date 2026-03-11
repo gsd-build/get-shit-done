@@ -12,9 +12,13 @@ import { ContextPreview } from './ContextPreview';
 
 interface DiscussLayoutProps {
   children: ReactNode;
+  /** Called when user starts editing a decision */
+  onEditStart?: (decisionId: string) => void;
+  /** Called when user completes an edit */
+  onEditComplete?: (decisionId: string, newValue: string, oldValue: string) => void;
 }
 
-export function DiscussLayout({ children }: DiscussLayoutProps) {
+export function DiscussLayout({ children, onEditStart, onEditComplete }: DiscussLayoutProps) {
   // Mobile drawer state
   const [isMobileDrawerOpen, setIsMobileDrawerOpen] = useState(false);
 
@@ -47,7 +51,7 @@ export function DiscussLayout({ children }: DiscussLayoutProps) {
 
           {/* Right Panel: Context Preview */}
           <Panel id="preview" defaultSize={40} minSize={25} className="flex flex-col border-l border-border">
-            <ContextPreview />
+            <ContextPreview onEditStart={onEditStart} onEditComplete={onEditComplete} />
           </Panel>
         </Group>
       </div>
@@ -116,7 +120,7 @@ export function DiscussLayout({ children }: DiscussLayoutProps) {
 
           {/* Drawer content */}
           <div className="h-[calc(100%-57px)] overflow-y-auto">
-            <ContextPreview />
+            <ContextPreview onEditStart={onEditStart} onEditComplete={onEditComplete} />
           </div>
         </div>
       </div>

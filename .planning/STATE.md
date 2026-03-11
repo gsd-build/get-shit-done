@@ -4,7 +4,7 @@ milestone: v1.1
 milestone_name: Completed Phases
 status: completed
 last_updated: "2026-03-11T14:30:08.309Z"
-last_activity: 2026-03-11 — Completed plan 15-04 (Dashboard Assembly & E2E Tests)
+last_activity: 2026-03-11 — Completed plan 16-03 (Session Persistence)
 progress:
   total_phases: 17
   completed_phases: 12
@@ -23,12 +23,12 @@ progress:
 ## Current Position
 
 **Phase:** 16 - Discuss Phase UI
-**Plan:** 16-02 complete (2/4)
+**Plan:** 16-03 complete (3/4)
 **Status:** In progress
-**Last activity:** 2026-03-11 — Completed plan 16-02 (Context Preview Panel)
+**Last activity:** 2026-03-11 — Completed plan 16-03 (Session Persistence)
 
 ```
-[##########----------] 50% - Phase 16 plan 02/04 complete
+[###############-----] 75% - Phase 16 plan 03/04 complete
 ```
 
 **Phases:**
@@ -70,6 +70,7 @@ progress:
 | Phase 15 P04 | 20m 25s | 3 tasks | 10 files |
 | Phase 16 P01 | 6m 14s | 3 tasks | 14 files |
 | Phase 16 P02 | 8m 24s | 3 tasks | 2 files |
+| Phase 16 P03 | 4m 37s | 3 tasks | 11 files |
 
 ## Accumulated Context
 
@@ -227,6 +228,7 @@ progress:
 - [x] Execute plan 15-04 (Dashboard assembly and E2E tests)
 - [x] Execute plan 16-01 (Chat Interface & Streaming)
 - [x] Execute plan 16-02 (Context Preview Panel)
+- [x] Execute plan 16-03 (Session Persistence)
 
 ### Blockers
 
@@ -234,14 +236,14 @@ None currently.
 
 ## Session Continuity
 
-**Last Session:** 2026-03-11T14:53:18.000Z
-**Context:** Completed Phase 16 Plan 02 - Context Preview Panel.
+**Last Session:** 2026-03-11T15:03:00.000Z
+**Context:** Completed Phase 16 Plan 03 - Session Persistence.
 
 **To Resume:**
-1. Phase 16 in progress - plan 02/04 complete
-2. DiscussLayout with resizable panels (60/40 split)
-3. useContextPreview hook for real-time updates
-4. Next: Execute plan 16-03 (Session Persistence)
+1. Phase 16 in progress - plan 03/04 complete
+2. Zustand stores persist to sessionStorage
+3. Reconnection re-subscribes to agent room
+4. Next: Execute plan 16-04 (Final Integration)
 
 ### Sync History
 
@@ -254,6 +256,7 @@ None currently.
 
 ## Recent Activity
 
+- 2026-03-11 — Completed plan 16-03 (Session Persistence) - persist middleware, useDiscussSession, useUnsavedChanges, SavedIndicator
 - 2026-03-11 — Completed plan 16-02 (Context Preview Panel) - DiscussLayout, useContextPreview, resizable panels
 - 2026-03-11 — Completed plan 16-01 (Chat Interface & Streaming) - discussStore, useTokenStream, ChatInterface, MessageBubble, QuestionCard
 - 2026-03-11 — Completed plan 15-04 (Dashboard Assembly & E2E Tests) - SearchBar, FilterBar, ProjectGrid, E2E tests for DASH-01-05
