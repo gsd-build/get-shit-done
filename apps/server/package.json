@@ -11,8 +11,13 @@
     "typecheck": "tsc --noEmit"
   },
   "dependencies": {
+    "@anthropic-ai/sdk": "^0.61.0",
     "@gsd/events": "workspace:*",
     "@gsd/gsd-core": "workspace:*",
+    "@gsd/gsd-wrapper": "workspace:*",
+    "@hono/node-server": "^1.13.0",
+    "@hono/zod-validator": "^0.4.0",
+    "hono": "^4.6.0",
     "socket.io": "^4.8.0"
   },
   "devDependencies": {

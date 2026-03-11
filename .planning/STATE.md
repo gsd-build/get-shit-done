@@ -3,13 +3,13 @@ gsd_state_version: 1.0
 milestone: v1.1
 milestone_name: Completed Phases
 status: completed
-last_updated: "2026-03-11T12:10:44.884Z"
-last_activity: 2026-03-11 — Completed plan 13-03 (File Locking and Path Security)
+last_updated: "2026-03-11T12:16:00.000Z"
+last_activity: 2026-03-11 — Finalized phase 14 (Backend Core) - merged to main
 progress:
   total_phases: 17
-  completed_phases: 12
-  total_plans: 45
-  completed_plans: 38
+  completed_phases: 13
+  total_plans: 49
+  completed_plans: 42
 ---
 
 # Project State: GSD v1.1 Upstream Sync
@@ -18,17 +18,17 @@ progress:
 
 **Core Value:** Enable GSD fork maintainers to stay current with upstream while preserving custom enhancements through intelligent sync tooling.
 
-**Current Focus:** Phase 13 - Foundation Infrastructure
+**Current Focus:** Phase 14 Complete - Backend Core Finalized
 
 ## Current Position
 
-**Phase:** 13 - Foundation Infrastructure
-**Plan:** 13-03 complete
-**Status:** Milestone complete
-**Last activity:** 2026-03-11 — Completed plan 13-03 (File Locking and Path Security)
+**Phase:** 14 - Backend Core (FINALIZED)
+**Plan:** 14-04 complete
+**Status:** Phase finalized and merged to main
+**Last activity:** 2026-03-11 — Finalized phase 14 (Backend Core) - merged to main
 
 ```
-[####################] 100% - Phase 13 plan 03 of 03 complete
+[####################] 100% - Phase 14 finalized
 ```
 
 **Phases:**
@@ -42,6 +42,7 @@ progress:
 - [x] Phase 11: Add --docs Flag to discuss-phase (2 requirements) - complete
 - [x] Phase 12: MCP Server API (5 requirements) - complete
 - [x] Phase 13: Foundation Infrastructure (4 requirements) - complete
+- [x] Phase 14: Backend Core (4 plans) - FINALIZED
 
 ## Performance Metrics
 
@@ -57,6 +58,10 @@ progress:
 | Phase 13 P01 | 4m 17s | 2 tasks | 17 files |
 | Phase 13 P02 | 8m 34s | 3 tasks | 15 files |
 | Phase 13 P03 | 6m 37s | 3 tasks | 8 files |
+| Phase 14 P01 | 7m 7s | 2 tasks | 12 files |
+| Phase 14 P02 | 8m 35s | 2 tasks | 9 files |
+| Phase 14 P03 | 4m 8s | 3 tasks | 8 files |
+| Phase 14 P04 | 5m | 3 tasks | 7 files |
 
 ## Accumulated Context
 
@@ -122,6 +127,18 @@ progress:
 | Connection state recovery 2-minute window | Allows checkpoint dialogs to survive network interruptions | 2026-03-11 |
 | RAF token buffering with 1000 cap | requestAnimationFrame prevents UI thrashing; cap prevents memory leaks | 2026-03-11 |
 | HealthMetricsEvent for server metrics | Server-side metrics (clients, rooms, memory) broadcast every 30s | 2026-03-11 |
+| Hono co-located with Socket.IO | Route /api/* to Hono, pass other requests to Socket.IO | 2026-03-11 |
+| Envelope middleware with requestId | crypto.randomUUID() for X-Request-Id header | 2026-03-11 |
+| Base64url cursor pagination | Stateless { id, ts } encoded cursors for consistent pagination | 2026-03-11 |
+| createXxxRoutes factory pattern | Route modules accept dependencies for testability | 2026-03-11 |
+| Shell redirect for gsd-tools stdout | Node.js process.exit() causes stdout truncation; shell redirect to temp file avoids | 2026-03-11 |
+| GsdResult<T> discriminated union | Type-safe error handling with success/error branches | 2026-03-11 |
+| Agent loop pattern | Stream tokens -> check tools -> execute parallel -> feed results -> repeat | 2026-03-11 |
+| 429 retry with exponential backoff | 1s, 2s, 4s delays with jitter, max 3 attempts | 2026-03-11 |
+| Tool errors to Claude | Return is_error tool results for LLM reasoning about failures | 2026-03-11 |
+| Idempotency via checkpoint ID + hash | Accept first response, acknowledge duplicate same response, reject different responses | 2026-03-11 |
+| exactOptionalPropertyTypes spread pattern | Use ...(value && { key: value }) to avoid undefined in optional properties | 2026-03-11 |
+| Request body event-based buffering | Collect chunks with 'data' event, process on 'end' for POST/PUT/PATCH/DELETE | 2026-03-11 |
 
 ### Roadmap Evolution
 
@@ -178,6 +195,10 @@ progress:
 - [x] Execute plan 13-01 (monorepo scaffold with pnpm and Turborepo)
 - [x] Execute plan 13-02 (Socket.IO server with connection state recovery)
 - [x] Execute plan 13-03 (file locking and path security)
+- [x] Execute plan 14-01 (REST API for project listing and health)
+- [x] Execute plan 14-02 (GSD wrapper for async TypeScript)
+- [x] Execute plan 14-03 (Agent Orchestrator with Claude streaming)
+- [x] Execute plan 14-04 (Checkpoint handling and Agent REST API)
 
 ### Blockers
 
@@ -185,14 +206,13 @@ None currently.
 
 ## Session Continuity
 
-**Last Session:** 2026-03-11T12:10:44.878Z
-**Context:** Completed Phase 13 - Foundation Infrastructure with monorepo, Socket.IO server, file locking, and path security.
+**Last Session:** 2026-03-11T12:16:00.000Z
+**Context:** Finalized Phase 14 - Backend Core. Merged to main with 117 tests passing.
 
 **To Resume:**
-1. Phase 13 complete: all infrastructure ready
-2. Continue with Phase 14 (REST API with file operations)
-3. @gsd/gsd-core provides locks, security, audit modules for CLI/dashboard
-
+1. Phase 14 finalized and merged to main
+2. Full backend stack complete: Socket.IO + Hono REST API + Agent orchestrator with checkpoints
+3. Next: Plan phase 15 or continue with remaining roadmap
 
 ### Sync History
 
@@ -201,10 +221,15 @@ None currently.
 
 ---
 *State initialized: 2026-02-23*
-*Last updated: 2026-03-11 (Phase 13 complete)*
+*Last updated: 2026-03-11 (Phase 14 finalized - merged to main)*
 
 ## Recent Activity
 
+- 2026-03-11 — Finalized phase 14 (Backend Core) - merged to main with 117 tests
+- 2026-03-11 — Completed plan 14-04 (Checkpoint Handling and Agent REST API) - Phase 14 complete
+- 2026-03-11 — Completed plan 14-03 (Agent Orchestrator)
+- 2026-03-11 — Completed plan 14-02 (GSD Wrapper)
+- 2026-03-11 — Completed plan 14-01 (REST API for Project Listing and Health)
 - 2026-03-11 — Finalized phase 13 (Foundation Infrastructure) - merged to main
 - 2026-03-11 — Completed plan 13-03 (File Locking and Path Security)
 - 2026-03-11 — Completed plan 13-02 (Socket.IO Server)
