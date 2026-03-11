@@ -38,10 +38,10 @@ Output: [What artifacts will be created]
 </objective>
 
 <execution_context>
-@/home/dryade/.claude/get-shit-done/workflows/execute-plan.md
-@/home/dryade/.claude/get-shit-done/templates/summary.md
+@~/.claude/get-shit-done/workflows/execute-plan.md
+@~/.claude/get-shit-done/templates/summary.md
 [If plan contains checkpoint tasks (type="checkpoint:*"), add:]
-@/home/dryade/.claude/get-shit-done/references/checkpoints.md
+@~/.claude/get-shit-done/references/checkpoints.md
 </execution_context>
 
 <context>
@@ -86,7 +86,7 @@ Output: [What artifacts will be created]
   <done>[Acceptance criteria]</done>
 </task>
 
-<!-- For checkpoint task examples and patterns, see @/home/dryade/.claude/get-shit-done/references/checkpoints.md -->
+<!-- For checkpoint task examples and patterns, see @~/.claude/get-shit-done/references/checkpoints.md -->
 <!-- Key rule: Claude starts dev server BEFORE human-verify checkpoints. User only visits URLs. -->
 
 <task type="checkpoint:decision" gate="blocking">
@@ -280,7 +280,7 @@ TDD features get dedicated plans with `type: tdd`.
 → Yes: Create a TDD plan
 → No: Standard task in standard plan
 
-See `/home/dryade/.claude/get-shit-done/references/tdd.md` for TDD plan structure.
+See `~/.claude/get-shit-done/references/tdd.md` for TDD plan structure.
 
 ---
 
@@ -384,9 +384,9 @@ Output: Working dashboard component.
 </objective>
 
 <execution_context>
-@/home/dryade/.claude/get-shit-done/workflows/execute-plan.md
-@/home/dryade/.claude/get-shit-done/templates/summary.md
-@/home/dryade/.claude/get-shit-done/references/checkpoints.md
+@~/.claude/get-shit-done/workflows/execute-plan.md
+@~/.claude/get-shit-done/templates/summary.md
+@~/.claude/get-shit-done/references/checkpoints.md
 </execution_context>
 
 <context>
@@ -542,7 +542,7 @@ user_setup:
 
 **Result:** Execute-plan generates `{phase}-USER-SETUP.md` with checklist for the user.
 
-See `/home/dryade/.claude/get-shit-done/templates/user-setup.md` for full schema and examples
+See `~/.claude/get-shit-done/templates/user-setup.md` for full schema and examples
 
 ---
 
@@ -609,4 +609,4 @@ Task completion ≠ Goal achievement. A task "create chat component" can complet
 5. Gaps found → fix plans created → execute → re-verify
 6. All must_haves pass → phase complete
 
-See `/home/dryade/.claude/get-shit-done/workflows/verify-phase.md` for verification logic.
+See `~/.claude/get-shit-done/workflows/verify-phase.md` for verification logic.

@@ -5,7 +5,7 @@ Create executable phase prompts (PLAN.md files) for a roadmap phase with integra
 <required_reading>
 Read all files referenced by the invoking prompt's execution_context before starting.
 
-@/home/dryade/.claude/get-shit-done/references/ui-brand.md
+@~/.claude/get-shit-done/references/ui-brand.md
 </required_reading>
 
 <process>
@@ -230,7 +230,7 @@ grep -l "## Validation Architecture" "${PHASE_DIR}"/*-RESEARCH.md 2>/dev/null
 ```
 
 **If found:**
-1. Read validation template from `/home/dryade/.claude/get-shit-done/templates/VALIDATION.md`
+1. Read validation template from `~/.claude/get-shit-done/templates/VALIDATION.md`
 2. Write to `${PHASE_DIR}/${PADDED_PHASE}-VALIDATION.md`
 3. Fill frontmatter: replace `{N}` with phase number, `{phase-slug}` with phase slug, `{date}` with current date
 4. If `commit_docs` is true:
