@@ -78,7 +78,7 @@ User acceptance testing and gap closure.
 - [x] **VERIF-04**: Verification validates that all success criteria are genuinely met (not superficially passed)
 - [x] **VERIF-05**: User can mark manual test items as pass/fail in checklist
 - [x] **VERIF-06**: User can approve completed work or reject with gap selection
-- [ ] **VERIF-07**: Rejection routes to plan-phase --gaps to create fix plans automatically
+- [x] **VERIF-07**: Rejection routes to plan-phase --gaps to create fix plans automatically
 
 ### Roadmap Visualization (ROAD)
 
@@ -167,7 +167,7 @@ Visual debugging workflow.
 | VERIF-04 | Phase 18 | Complete |
 | VERIF-05 | Phase 18 | Complete |
 | VERIF-06 | Phase 18 | Complete |
-| VERIF-07 | Phase 18 | Pending |
+| VERIF-07 | Phase 18 | Complete |
 | ROAD-01 | Phase 19 | Pending |
 | ROAD-02 | Phase 19 | Pending |
 | ROAD-03 | Phase 19 | Pending |
