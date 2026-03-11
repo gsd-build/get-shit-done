@@ -12,6 +12,7 @@
   },
   "dependencies": {
     "@gsd/events": "workspace:*",
+    "@gsd/gsd-core": "workspace:*",
     "socket.io": "^4.8.0"
   },
   "devDependencies": {
