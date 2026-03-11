@@ -207,14 +207,14 @@ Plans:
 **Plans**: 8 plans
 
 Plans:
-- [ ] 18-01-PLAN.md — Research streaming with agent spawn progress
-- [ ] 18-02-PLAN.md — Plan preview with task breakdown and wave visualization
-- [ ] 18-03-PLAN.md — Inline plan editing before execution
-- [ ] 18-04-PLAN.md — Requirement coverage matrix display
-- [ ] 18-05-PLAN.md — Verification report with pass/fail status
-- [ ] 18-06-PLAN.md — Gap highlighting with severity levels
-- [ ] 18-07-PLAN.md — Manual test checklist and approval workflow
-- [ ] 18-08-PLAN.md — Rejection-to-gap-planning flow
+- [ ] 18-01-PLAN.md — Planning state store and research agent streaming hook
+- [ ] 18-02-PLAN.md — Verification state store and test result streaming hook
+- [ ] 18-03-PLAN.md — Research agent swimlane visualization components
+- [ ] 18-04-PLAN.md — Kanban plan preview with wave columns and inline editing
+- [ ] 18-05-PLAN.md — Verification report with header summary and requirement drill-down
+- [ ] 18-06-PLAN.md — Gap severity badges and coverage heatmap matrix
+- [ ] 18-07-PLAN.md — Manual test checklist and approval workflow with confirmation
+- [ ] 18-08-PLAN.md — Plan and verify pages with E2E tests and gap-to-planning flow
 
 ### Phase 19: Roadmap Visualization
 **Goal**: Visualize project progress with dependency graph, Gantt timeline, and milestone grouping
@@ -395,7 +395,7 @@ Phases execute in numeric order: 13 -> 14 -> 15 -> 16 -> 17 -> 18 -> 19 -> 20
 | 15. Frontend Foundation & Dashboard | 4/4 | Complete    | 2026-03-11 |
 | 16. Discuss Phase UI | 0/4 | Planned | - |
 | 17. Execute Phase UI | 0/8 | Planned | - |
-| 18. Plan & Verify Phase UIs | 0/8 | Not started | - |
+| 18. Plan & Verify Phase UIs | 0/8 | Planned | - |
 | 19. Roadmap Visualization | 0/4 | Not started | - |
 | 20. Debug Session UI | 0/4 | Not started | - |
 
