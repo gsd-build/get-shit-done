@@ -11,6 +11,7 @@
  */
 
 import { Hono } from 'hono';
+import { cors } from 'hono/cors';
 import { serve } from '@hono/node-server';
 import type { Server as HttpServer, IncomingMessage, ServerResponse } from 'http';
 import type { Server as SocketServer } from 'socket.io';
@@ -53,6 +54,15 @@ export function createApi(
 
   // Create Hono app
   const app = new Hono().basePath('/api');
+
+  // Apply CORS middleware (must be before other middleware)
+  app.use(
+    '*',
+    cors({
+      origin: process.env['CORS_ORIGIN'] ?? 'http://localhost:3000',
+      credentials: true,
+    })
+  );
 
   // Apply global middleware
   app.use('*', envelopeMiddleware);

@@ -19,12 +19,175 @@ import {
 // Active sessions by agentId
 const sessions = new Map<string, AgentSession>();
 
+// Track conversation context for mock CONTEXT.md generation
+const conversationContext = new Map<string, { messageCount: number; topics: string[] }>();
+
+/**
+ * Generate mock CONTEXT.md markdown based on conversation progress.
+ * For Phase 16 UI testing, this simulates context being gathered.
+ *
+ * IMPORTANT: Uses XML-tagged format to match CLI /gsd:discuss-phase output.
+ * The frontend parser (contextParser.ts) expects <section>...</section> tags.
+ */
+function generateMockContextMd(agentId: string, prompt: string): string {
+  const ctx = conversationContext.get(agentId) || { messageCount: 0, topics: [] };
+  ctx.messageCount++;
+
+  // Extract topics from prompt
+  const lowerPrompt = prompt.toLowerCase();
+  if (lowerPrompt.includes('goal') || lowerPrompt.includes('objective')) {
+    ctx.topics.push('goals');
+  }
+  if (lowerPrompt.includes('user') || lowerPrompt.includes('audience')) {
+    ctx.topics.push('users');
+  }
+  if (lowerPrompt.includes('tech') || lowerPrompt.includes('stack') || lowerPrompt.includes('react') || lowerPrompt.includes('typescript')) {
+    ctx.topics.push('technology');
+  }
+  if (lowerPrompt.includes('decision') || lowerPrompt.includes('decided')) {
+    ctx.topics.push('decisions');
+  }
+
+  conversationContext.set(agentId, ctx);
+
+  // Build CONTEXT.md content with decisions
+  const decisions: string[] = [];
+  const specifics: string[] = [];
+  const deferred: string[] = [];
+
+  if (ctx.topics.includes('goals')) {
+    decisions.push('- Focus on user experience as primary metric');
+    decisions.push('- Prioritize performance over feature count <!-- locked -->');
+  }
+  if (ctx.topics.includes('users')) {
+    decisions.push('- Target developers with moderate experience');
+    specifics.push('- Include onboarding flow for first-time users');
+  }
+  if (ctx.topics.includes('technology')) {
+    decisions.push('- Use React with TypeScript for frontend');
+    specifics.push('- Deploy to Vercel for initial launch');
+  }
+  if (ctx.topics.includes('decisions')) {
+    decisions.push('- User-specified decision captured from conversation');
+  }
+
+  // Always include at least one decision after first message
+  if (decisions.length === 0 && ctx.messageCount > 0) {
+    decisions.push('- Initial context gathering in progress');
+  }
+
+  // Always have a deferred item
+  deferred.push('- Future enhancement: Add AI suggestions');
+
+  // Use XML-tagged format for parser compatibility
+  return `# Phase Context
+
+<domain>
+## Phase Boundary
+
+Discussion phase for gathering project requirements and design decisions.
+
+</domain>
+
+<decisions>
+## Implementation Decisions
+
+${decisions.join('\n')}
+
+</decisions>
+
+<specifics>
+## Specific Ideas
+
+${specifics.length > 0 ? specifics.join('\n') : '(none yet)'}
+
+</specifics>
+
+<deferred>
+## Deferred Ideas
+
+${deferred.join('\n')}
+
+</deferred>
+`;
+}
+
+/**
+ * Generate a contextual response for discuss-phase conversations.
+ * For Phase 16 UI testing, this provides realistic mock responses.
+ */
+function generateDiscussResponse(prompt: string): string {
+  const lowerPrompt = prompt.toLowerCase();
+
+  // Context-aware responses for common discussion topics
+  if (lowerPrompt.includes('hello') || lowerPrompt.includes('hi') || lowerPrompt.includes('start')) {
+    return `Hello! I'm here to help gather context for your project. Let's discuss the requirements and design decisions.
+
+What would you like to focus on first? You can tell me about:
+- **Goals**: What are you trying to achieve?
+- **Constraints**: Any technical or business limitations?
+- **Users**: Who will be using this feature?`;
+  }
+
+  if (lowerPrompt.includes('goal') || lowerPrompt.includes('objective')) {
+    return `Great, let's clarify your goals. Understanding the "why" helps me provide better guidance.
+
+A few questions:
+1. What problem are you solving?
+2. How will you measure success?
+3. What's the timeline for this work?`;
+  }
+
+  if (lowerPrompt.includes('user') || lowerPrompt.includes('audience')) {
+    return `Understanding your users is crucial. Let me ask a few questions:
+
+1. Who are the primary users of this feature?
+2. What's their technical expertise level?
+3. Are there any accessibility requirements to consider?`;
+  }
+
+  // Default response that encourages discussion
+  return `Thanks for sharing that context. That helps me understand the situation better.
+
+Based on what you've told me, I have a few follow-up questions:
+1. Can you elaborate on the key requirements?
+2. Are there any existing patterns in the codebase we should follow?
+3. What would be the ideal outcome?`;
+}
+
+/**
+ * Stream a response token by token with realistic timing.
+ * Simulates ~30ms per token for typewriter effect per CONTEXT.md.
+ */
+async function streamDiscussResponse(
+  io: TypedServer,
+  agentId: string,
+  response: string
+): Promise<void> {
+  const tokens = response.split(/(\s+)/);
+  const DELAY_MS = 30; // Per CONTEXT.md typewriter effect
+
+  for (const token of tokens) {
+    io.to(`agent:${agentId}`).emit(EVENTS.AGENT_TOKEN, {
+      agentId,
+      token,
+      sequence: 0,
+    });
+    await new Promise((resolve) => setTimeout(resolve, DELAY_MS));
+  }
+}
+
 export interface StartAgentOptions {
   projectPath: string;
   planId: string;
   taskName: string;
   systemPrompt: string;
   userPrompt: string;
+}
+
+export interface StartDiscussAgentOptions {
+  projectId: string;
+  prompt: string;
 }
 
 /**
@@ -74,6 +237,71 @@ export function createOrchestrator(io: TypedServer) {
           }, 60000); // 1 minute grace period
         }
       );
+
+      return agentId;
+    },
+
+    /**
+     * Start a discuss-phase agent session
+     *
+     * Creates a conversational agent for gathering context through discussion.
+     * Streams a response to the user's prompt.
+     *
+     * @param options - Discuss agent options
+     * @returns Agent ID for tracking
+     */
+    async startDiscussAgent(options: StartDiscussAgentOptions): Promise<string> {
+      const agentId = randomUUID();
+
+      const session: AgentSession = {
+        agentId,
+        projectPath: options.projectId,
+        planId: 'discuss',
+        taskName: 'Discuss Phase',
+        status: 'streaming',
+        sequence: 0,
+        messages: [],
+      };
+
+      sessions.set(agentId, session);
+
+      // Delay to allow client to join socket room after API returns
+      // This prevents race condition where tokens are emitted before subscription
+      // 1000ms gives React time to: receive response -> update state -> trigger effect -> subscribe
+      setTimeout(async () => {
+        console.log(`[orchestrator] Starting stream for agent ${agentId} after 1s delay`);
+
+        // Emit agent:start event
+        io.to(`agent:${agentId}`).emit(EVENTS.AGENT_START, {
+          agentId,
+          planId: session.planId,
+          taskName: session.taskName,
+        });
+
+        // Simulate streaming response with typewriter effect
+        const response = generateDiscussResponse(options.prompt);
+        await streamDiscussResponse(io, agentId, response);
+
+        // Generate and emit context update after response completes
+        const contextMd = generateMockContextMd(agentId, options.prompt);
+        io.to(`agent:${agentId}`).emit('context:update' as any, {
+          agentId,
+          markdown: contextMd,
+        });
+
+        session.status = 'complete';
+        io.to(`agent:${agentId}`).emit(EVENTS.AGENT_END, {
+          agentId,
+          status: 'success',
+          summary: 'Discussion response completed',
+        });
+
+        // Clean up after grace period
+        setTimeout(() => {
+          sessions.delete(agentId);
+          conversationContext.delete(agentId);
+        }, 60000);
+      }, 1000); // 1000ms delay for client subscription (React needs time to update state and run effects)
 
       return agentId;
     },

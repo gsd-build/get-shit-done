@@ -36,7 +36,16 @@ export function ActivityFeed({ activities, compact = false, onActivityClick }: A
     <div className="space-y-1">
       {visibleActivities.map((activity) => {
         const Icon = iconMap[activity.type || 'execute'] || Play;
-        const relativeTime = formatDistanceToNow(new Date(activity.timestamp), { addSuffix: true });
+        // Safely parse timestamp, fallback to "recently" if invalid
+        let relativeTime = 'recently';
+        try {
+          const date = new Date(activity.timestamp);
+          if (!isNaN(date.getTime())) {
+            relativeTime = formatDistanceToNow(date, { addSuffix: true });
+          }
+        } catch {
+          // Keep default "recently"
+        }
 
         return (
           <button

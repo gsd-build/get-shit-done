@@ -3,8 +3,8 @@ gsd_state_version: 1.0
 milestone: v1.1
 milestone_name: Completed Phases
 status: completed
-last_updated: "2026-03-11T16:02:30.617Z"
-last_activity: 2026-03-11 — Completed plan 15-04 (Dashboard Assembly & E2E Tests)
+last_updated: "2026-03-11T14:30:08.309Z"
+last_activity: 2026-03-11 — Completed plan 16-04 (Manual CONTEXT.md Editing)
 progress:
   total_phases: 21
   completed_phases: 15
@@ -18,17 +18,17 @@ progress:
 
 **Core Value:** Enable GSD fork maintainers to stay current with upstream while preserving custom enhancements through intelligent sync tooling.
 
-**Current Focus:** Phase 15 - Frontend Foundation & Dashboard (COMPLETE)
+**Current Focus:** Phase 16 - Discuss Phase UI
 
 ## Current Position
 
-**Phase:** 15 - Frontend Foundation & Dashboard
-**Plan:** 15-04 complete (4/4)
-**Status:** Milestone complete
-**Last activity:** 2026-03-11 — Completed plan 15-04 (Dashboard Assembly & E2E Tests)
+**Phase:** 16 - Discuss Phase UI
+**Plan:** 16-04 complete (4/4)
+**Status:** Phase complete
+**Last activity:** 2026-03-11 — Completed plan 16-04 (Manual CONTEXT.md Editing)
 
 ```
-[####################] 100% - Phase 15 plan 04/04 complete
+[####################] 100% - Phase 16 plan 04/04 complete
 ```
 
 **Phases:**
@@ -44,6 +44,7 @@ progress:
 - [x] Phase 13: Foundation Infrastructure (4 requirements) - complete
 - [x] Phase 14: Backend Core (4 plans) - FINALIZED
 - [x] Phase 15: Frontend Foundation & Dashboard (4 plans) - COMPLETE
+- [ ] Phase 16: Discuss Phase UI (4 plans) - IN PROGRESS
 
 ## Performance Metrics
 
@@ -67,6 +68,10 @@ progress:
 | Phase 15 P02 | 8m 52s | 3 tasks | 11 files |
 | Phase 15 P03 | 10m 38s | 3 tasks | 12 files |
 | Phase 15 P04 | 20m 25s | 3 tasks | 10 files |
+| Phase 16 P01 | 6m 14s | 3 tasks | 14 files |
+| Phase 16 P02 | 8m 24s | 3 tasks | 2 files |
+| Phase 16 P03 | 4m 37s | 3 tasks | 11 files |
+| Phase 16 P04 | 7m 54s | 3 tasks | 9 files |
 
 ## Accumulated Context
 
@@ -156,6 +161,11 @@ progress:
 | expect.extend for jest-dom | Direct matcher extension more reliable than import path | 2026-03-11 |
 | Triple-slash reference for jest-dom types | Use /// reference instead of import to avoid "expect not defined" | 2026-03-11 |
 | E2E tests resilient to missing backend | Check for project grid or empty/loading state for CI compatibility | 2026-03-11 |
+| ~30ms typewriter delay for streaming | Character-by-character animation per CONTEXT.md decision | 2026-03-11 |
+| react-resizable-panels v4.x API | Group/Panel/Separator (not PanelGroup/PanelResizeHandle) | 2026-03-11 |
+| react-contenteditable for inline editing | Managed contentEditable preserves cursor position across React renders | 2026-03-11 |
+| Edit tracking via system messages | "[User edited: Changed X to Y]" creates audit trail in conversation | 2026-03-11 |
+| Word-level diff for conflict dialog | Green additions, red removals for visual comparison | 2026-03-11 |
 
 ### Roadmap Evolution
 
@@ -220,6 +230,10 @@ progress:
 - [x] Execute plan 15-02 (Data layer and hooks with TDD)
 - [x] Execute plan 15-03 (UI primitives and dashboard components)
 - [x] Execute plan 15-04 (Dashboard assembly and E2E tests)
+- [x] Execute plan 16-01 (Chat Interface & Streaming)
+- [x] Execute plan 16-02 (Context Preview Panel)
+- [x] Execute plan 16-03 (Session Persistence)
+- [x] Execute plan 16-04 (Manual CONTEXT.md Editing)
 
 ### Blockers
 
@@ -227,14 +241,14 @@ None currently.
 
 ## Session Continuity
 
-**Last Session:** 2026-03-11T16:02:30.613Z
-**Context:** Completed Phase 15 Plan 04 - Dashboard assembly and E2E tests.
+**Last Session:** 2026-03-11T15:06:17.000Z
+**Context:** Completed Phase 16 Plan 04 - Manual CONTEXT.md Editing. Phase 16 complete!
 
 **To Resume:**
-1. Phase 15 complete - all 4 plans executed
-2. Dashboard with search, filter, and project grid functional
-3. 72 unit tests + 8 E2E tests passing
-4. Next: Finalize phase 15 and merge to main
+1. Phase 16 complete - all 4 plans done
+2. Inline editing with react-contenteditable
+3. Conflict detection and resolution dialog
+4. Next: Finalize phase 16 and merge to main
 
 ### Sync History
 
@@ -247,6 +261,10 @@ None currently.
 
 ## Recent Activity
 
+- 2026-03-11 — Completed plan 16-04 (Manual CONTEXT.md Editing) - InlineEditor, ConflictDialog, useContextSync, edit tracking
+- 2026-03-11 — Completed plan 16-03 (Session Persistence) - persist middleware, useDiscussSession, useUnsavedChanges, SavedIndicator
+- 2026-03-11 — Completed plan 16-02 (Context Preview Panel) - DiscussLayout, useContextPreview, resizable panels
+- 2026-03-11 — Completed plan 16-01 (Chat Interface & Streaming) - discussStore, useTokenStream, ChatInterface, MessageBubble, QuestionCard
 - 2026-03-11 — Completed plan 15-04 (Dashboard Assembly & E2E Tests) - SearchBar, FilterBar, ProjectGrid, E2E tests for DASH-01-05
 - 2026-03-11 — Completed plan 15-03 (UI Primitives & Dashboard Components) - ProgressBar, Badge, FilterChip, HealthBadge, ActivityFeed, ProjectCard
 - 2026-03-11 — Completed plan 15-02 (Data Layer & Hooks) - Zustand, useSocket, useProjects, API client

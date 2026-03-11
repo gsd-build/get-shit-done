@@ -10,6 +10,26 @@ export interface ProjectsResponse extends ApiEnvelope<Project[]> {
   };
 }
 
+/** Raw API response structure from backend */
+interface RawProjectsResponse {
+  data: {
+    items: Project[];
+    pagination: {
+      nextCursor: string | null;
+      hasNextPage: boolean;
+      total: number;
+    };
+  };
+  meta: {
+    timestamp: string;
+    requestId: string;
+  };
+  error?: {
+    code: string;
+    message: string;
+  };
+}
+
 /**
  * Fetch all projects from the API.
  *
@@ -39,8 +59,33 @@ export async function fetchProjects(cursor?: string): Promise<ProjectsResponse> 
       };
     }
 
-    const json = await response.json();
-    return json as ProjectsResponse;
+    const json: RawProjectsResponse = await response.json();
+
+    // Transform backend response to frontend expected structure
+    if (json.error) {
+      return {
+        success: false,
+        data: [],
+        meta: {
+          timestamp: json.meta.timestamp,
+          requestId: json.meta.requestId,
+          total: 0,
+          hasNextPage: false,
+        },
+        error: json.error,
+      };
+    }
+
+    return {
+      success: true,
+      data: json.data.items,
+      meta: {
+        timestamp: json.meta.timestamp,
+        requestId: json.meta.requestId,
+        total: json.data.pagination.total,
+        hasNextPage: json.data.pagination.hasNextPage,
+      },
+    };
   } catch (err) {
     return {
       success: false,

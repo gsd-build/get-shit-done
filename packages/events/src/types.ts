@@ -19,6 +19,7 @@ export const EVENTS = {
   CHECKPOINT_REQUEST: 'checkpoint:request',
   CHECKPOINT_RESPONSE: 'checkpoint:response',
   CONNECTION_HEALTH: 'connection:health',
+  CONTEXT_UPDATE: 'context:update',
 } as const;
 
 export type EventName = (typeof EVENTS)[keyof typeof EVENTS];
@@ -141,6 +142,19 @@ export interface AgentPhaseEvent {
   sequence: number;
 }
 
+/**
+ * Context update event - sent when CONTEXT.md changes during discuss phase
+ */
+export interface ContextUpdateEvent {
+  agentId: string;
+  /** Decision ID that was added/modified (if applicable) */
+  decisionId?: string;
+  /** The updated content for the decision */
+  content: string;
+  /** Section that was updated */
+  section?: 'decisions' | 'specifics' | 'deferred';
+}
+
 // Socket.IO typed events
 
 /**
@@ -156,6 +170,7 @@ export interface ServerToClientEvents {
   [EVENTS.TOOL_END]: (event: ToolEndEvent) => void;
   [EVENTS.CHECKPOINT_REQUEST]: (event: CheckpointRequestEvent) => void;
   [EVENTS.CONNECTION_HEALTH]: (event: HealthMetricsEvent) => void;
+  [EVENTS.CONTEXT_UPDATE]: (event: ContextUpdateEvent) => void;
 }
 
 /**
