@@ -371,7 +371,7 @@ remove_worktree() {
     fi
 
     # Get branch name from registry or construct it
-    local branch
+    local branch=""
     if [ -n "$existing" ]; then
         branch=$(echo "$existing" | grep -o '"branch": *"[^"]*"' | cut -d'"' -f4)
     fi
