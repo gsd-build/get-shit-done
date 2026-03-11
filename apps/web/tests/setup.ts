@@ -1,6 +1,10 @@
-import '@testing-library/jest-dom/vitest';
-import { beforeAll, afterEach, afterAll } from 'vitest';
+import * as matchers from '@testing-library/jest-dom/matchers';
+import { expect, beforeAll, afterEach, afterAll } from 'vitest';
+import { cleanup } from '@testing-library/react';
 import { server } from './mocks/server.js';
+
+// Extend Vitest's expect with jest-dom matchers
+expect.extend(matchers);
 
 // Establish API mocking before all tests
 beforeAll(() => {
@@ -8,7 +12,9 @@ beforeAll(() => {
 });
 
 // Reset any request handlers that we may add during the tests
+// Also cleanup React Testing Library renders
 afterEach(() => {
+  cleanup();
   server.resetHandlers();
 });
 
