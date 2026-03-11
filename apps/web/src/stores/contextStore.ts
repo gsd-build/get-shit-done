@@ -2,7 +2,10 @@
  * Context Store - Zustand store for parsed CONTEXT.md state
  */
 
+'use client';
+
 import { create } from 'zustand';
+import { persist, createJSONStorage } from 'zustand/middleware';
 import {
   parseContextMd,
   markNewDecisions,
@@ -10,18 +13,25 @@ import {
   type Decision,
 } from '@/lib/contextParser';
 
-interface ContextStoreState {
+/** Persisted state fields */
+interface ContextPersistedState {
   /** Current phase ID */
   phaseId: string | null;
 
   /** Parsed CONTEXT.md state */
   contextState: ContextMdState | null;
+}
 
+/** Full context store state */
+interface ContextStoreState extends ContextPersistedState {
   /** Previous state for diff comparison */
   previousState: ContextMdState | null;
 
   /** Last update timestamp */
   lastUpdated: number | null;
+
+  /** Whether store has been hydrated from storage */
+  hasHydrated: boolean;
 
   /** Set context from raw markdown */
   setContext: (phaseId: string, markdown: string) => void;
@@ -41,6 +51,9 @@ interface ContextStoreState {
   /** Clear isNew flags after animation completes */
   clearNewFlags: () => void;
 
+  /** Set hydration status */
+  setHasHydrated: (hasHydrated: boolean) => void;
+
   /** Reset the store */
   reset: () => void;
 }
@@ -56,11 +69,14 @@ function mapDecisions(
   return decisions.map(d => (predicate(d) ? update(d) : d));
 }
 
-export const useContextStore = create<ContextStoreState>((set, get) => ({
-  phaseId: null,
-  contextState: null,
-  previousState: null,
-  lastUpdated: null,
+export const useContextStore = create<ContextStoreState>()(
+  persist(
+    (set, get) => ({
+      phaseId: null,
+      contextState: null,
+      previousState: null,
+      lastUpdated: null,
+      hasHydrated: false,
 
   setContext: (phaseId: string, markdown: string) => {
     const { contextState: previous } = get();
@@ -161,15 +177,31 @@ export const useContextStore = create<ContextStoreState>((set, get) => ({
     });
   },
 
+  setHasHydrated: (hasHydrated) => set({ hasHydrated }),
+
   reset: () => {
     set({
       phaseId: null,
       contextState: null,
       previousState: null,
       lastUpdated: null,
+      hasHydrated: false,
     });
   },
-}));
+    }),
+    {
+      name: 'gsd-context-state',
+      storage: createJSONStorage(() => sessionStorage),
+      partialize: (state): ContextPersistedState => ({
+        phaseId: state.phaseId,
+        contextState: state.contextState,
+      }),
+      onRehydrateStorage: () => (state) => {
+        state?.setHasHydrated(true);
+      },
+    }
+  )
+);
 
 // Selectors for optimized re-renders
 export const selectContextState = (state: ContextStoreState) => state.contextState;
@@ -178,3 +210,4 @@ export const selectLastUpdated = (state: ContextStoreState) => state.lastUpdated
 export const selectDecisions = (state: ContextStoreState) => state.contextState?.decisions ?? [];
 export const selectSpecifics = (state: ContextStoreState) => state.contextState?.specifics ?? [];
 export const selectDeferred = (state: ContextStoreState) => state.contextState?.deferred ?? [];
+export const selectHasHydrated = (state: ContextStoreState) => state.hasHydrated;

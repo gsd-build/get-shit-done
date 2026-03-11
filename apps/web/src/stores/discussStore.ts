@@ -1,4 +1,7 @@
+'use client';
+
 import { create } from 'zustand';
+import { persist, createJSONStorage } from 'zustand/middleware';
 
 /** Question card option */
 export interface QuestionOption {
@@ -25,15 +28,23 @@ export interface Message {
   questionCard?: QuestionCardData;
 }
 
-/** Discuss store state */
-interface DiscussState {
+/** Discuss store state (persisted fields) */
+interface DiscussPersistedState {
   phaseId: string | null;
   messages: Message[];
-  isStreaming: boolean;
-  currentStreamingContent: string;
   agentId: string | null;
   topicIndex: number;
 }
+
+/** Discuss store state (transient fields - not persisted) */
+interface DiscussTransientState {
+  isStreaming: boolean;
+  currentStreamingContent: string;
+  hasHydrated: boolean;
+}
+
+/** Full Discuss store state */
+interface DiscussState extends DiscussPersistedState, DiscussTransientState {}
 
 /** Discuss store actions */
 interface DiscussActions {
@@ -44,6 +55,7 @@ interface DiscussActions {
   setAgentId: (agentId: string | null) => void;
   selectQuestionOption: (messageId: string, optionId: string) => void;
   setTopicIndex: (index: number) => void;
+  setHasHydrated: (hasHydrated: boolean) => void;
   reset: () => void;
 }
 
@@ -56,10 +68,13 @@ const initialState: DiscussState = {
   currentStreamingContent: '',
   agentId: null,
   topicIndex: 0,
+  hasHydrated: false,
 };
 
-export const useDiscussStore = create<DiscussStore>((set) => ({
-  ...initialState,
+export const useDiscussStore = create<DiscussStore>()(
+  persist(
+    (set) => ({
+      ...initialState,
 
   setPhaseId: (phaseId) => set({ phaseId }),
 
@@ -109,8 +124,25 @@ export const useDiscussStore = create<DiscussStore>((set) => ({
 
   setTopicIndex: (topicIndex) => set({ topicIndex }),
 
+  setHasHydrated: (hasHydrated) => set({ hasHydrated }),
+
   reset: () => set(initialState),
-}));
+    }),
+    {
+      name: 'gsd-discuss-session',
+      storage: createJSONStorage(() => sessionStorage),
+      partialize: (state): DiscussPersistedState => ({
+        phaseId: state.phaseId,
+        messages: state.messages,
+        agentId: state.agentId,
+        topicIndex: state.topicIndex,
+      }),
+      onRehydrateStorage: () => (state) => {
+        state?.setHasHydrated(true);
+      },
+    }
+  )
+);
 
 // Selectors for optimized re-renders
 export const selectMessages = (state: DiscussStore) => state.messages;
@@ -120,3 +152,4 @@ export const selectCurrentStreamingContent = (state: DiscussStore) =>
 export const selectAgentId = (state: DiscussStore) => state.agentId;
 export const selectTopicIndex = (state: DiscussStore) => state.topicIndex;
 export const selectPhaseId = (state: DiscussStore) => state.phaseId;
+export const selectHasHydrated = (state: DiscussStore) => state.hasHydrated;
