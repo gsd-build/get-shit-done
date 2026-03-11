@@ -22,9 +22,9 @@ Project overview and navigation.
 
 - [x] **DASH-01**: User can view list of all GSD projects with health status indicators (healthy/degraded/error)
 - [x] **DASH-02**: User can see current phase and progress percentage for each project
-- [ ] **DASH-03**: User can view recent activity feed (last 5 actions) for each project
+- [x] **DASH-03**: User can view recent activity feed (last 5 actions) for each project
 - [x] **DASH-04**: User can search and filter projects by name or status
-- [ ] **DASH-05**: User can navigate to project detail view by clicking a project card
+- [x] **DASH-05**: User can navigate to project detail view by clicking a project card
 
 ### Discuss Phase UI (DISC)
 
@@ -136,9 +136,9 @@ Visual debugging workflow.
 | INFRA-04 | Phase 13 | Complete |
 | DASH-01 | Phase 15 | Complete |
 | DASH-02 | Phase 15 | Complete |
-| DASH-03 | Phase 15 | Pending |
+| DASH-03 | Phase 15 | Complete |
 | DASH-04 | Phase 15 | Complete |
-| DASH-05 | Phase 15 | Pending |
+| DASH-05 | Phase 15 | Complete |
 | DISC-01 | Phase 16 | Pending |
 | DISC-02 | Phase 16 | Pending |
 | DISC-03 | Phase 16 | Pending |
