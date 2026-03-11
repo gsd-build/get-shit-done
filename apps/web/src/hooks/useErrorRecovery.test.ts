@@ -98,8 +98,8 @@ describe('useErrorRecovery', () => {
       });
 
       expect(lastRequestBody).not.toBeNull();
-      expect(lastRequestBody?.planId).toBe('plan-17-07');
-      expect(lastRequestBody?.taskName).toBe('Task 3: Implement ErrorRecovery');
+      expect(lastRequestBody?.['planId']).toBe('plan-17-07');
+      expect(lastRequestBody?.['taskName']).toBe('Task 3: Implement ErrorRecovery');
     });
 
     it('clears error state on successful retry', async () => {
@@ -140,7 +140,7 @@ describe('useErrorRecovery', () => {
       });
 
       // Verify resumeFrom is NOT in the body
-      expect(lastRequestBody?.resumeFrom).toBeUndefined();
+      expect(lastRequestBody?.['resumeFrom']).toBeUndefined();
     });
   });
 

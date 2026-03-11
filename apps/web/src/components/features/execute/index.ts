@@ -1,3 +1,4 @@
+export { ErrorRecovery } from './ErrorRecovery';
 export { ToolCard } from './ToolCard';
 export { ToolCardList } from './ToolCardList';
 export { DiffPanel } from './DiffPanel';

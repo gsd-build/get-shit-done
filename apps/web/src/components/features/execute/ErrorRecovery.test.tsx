@@ -207,7 +207,8 @@ describe('ErrorRecovery', () => {
 
       render(<ErrorRecovery error={error} context={context} />);
 
-      const retryButton = screen.getByRole('button', { name: /retry/i });
+      // Get specifically the "Retry" button (not "Retry from Beginning")
+      const retryButton = screen.getByRole('button', { name: /^retry$/i });
       expect(retryButton).toBeDisabled();
     });
   });
