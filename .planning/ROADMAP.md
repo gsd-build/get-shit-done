@@ -121,9 +121,9 @@ Plans:
 
 Plans:
 - [x] 14-01-PLAN.md — REST API for project listing, health checks, and phase data (Hono)
-- [ ] 14-02-PLAN.md — GSD wrapper adapting sync CJS modules to async TypeScript
-- [ ] 14-03-PLAN.md — Agent orchestrator with Claude API streaming and tool execution
-- [ ] 14-04-PLAN.md — Checkpoint handling with idempotency and timeout warnings
+- [x] 14-02-PLAN.md — GSD wrapper adapting sync CJS modules to async TypeScript
+- [x] 14-03-PLAN.md — Agent orchestrator with Claude API streaming and tool execution
+- [x] 14-04-PLAN.md — Checkpoint handling with idempotency and timeout warnings
 
 ### Phase 15: Frontend Foundation & Dashboard
 **Goal**: Deliver project dashboard with health status, progress tracking, and navigation
@@ -138,7 +138,7 @@ Plans:
 **Plans**: 4 plans
 
 Plans:
-- [ ] 15-01-PLAN.md — Next.js 15 app with App Router, Tailwind v4, and dark mode
+- [x] 15-01-PLAN.md — Next.js 15 app with App Router, Tailwind v4, and dark mode
 - [ ] 15-02-PLAN.md — Socket.IO client hook with reconnection and Zustand stores
 - [ ] 15-03-PLAN.md — Dashboard UI with project cards, health indicators, and activity feed
 - [ ] 15-04-PLAN.md — Project search, filtering, and navigation to detail view
@@ -392,7 +392,7 @@ Phases execute in numeric order: 13 -> 14 -> 15 -> 16 -> 17 -> 18 -> 19 -> 20
 |-------|----------------|--------|-----------|
 | 13. Foundation Infrastructure | 3/3 | Complete    | 2026-03-11 |
 | 14. Backend Core | 4/4 | Complete    | 2026-03-11 |
-| 15. Frontend Foundation & Dashboard | 0/4 | Not started | - |
+| 15. Frontend Foundation & Dashboard | 1/4 | In Progress | - |
 | 16. Discuss Phase UI | 0/4 | Not started | - |
 | 17. Execute Phase UI | 0/8 | Not started | - |
 | 18. Plan & Verify Phase UIs | 0/8 | Not started | - |
@@ -417,4 +417,4 @@ Phases execute in numeric order: 21 -> 22 -> 23 -> 24 -> 25 -> 26 -> 27 -> 28
 
 ---
 *Roadmap created: 2026-03-10*
-*Last updated: 2026-03-11 (Phase 14 plan 01 complete)*
+*Last updated: 2026-03-11 (Phase 15 plan 01 complete)*

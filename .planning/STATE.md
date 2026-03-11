@@ -2,9 +2,9 @@
 gsd_state_version: 1.0
 milestone: v1.1
 milestone_name: Completed Phases
-status: Phase finalized and merged to main
-last_updated: "2026-03-11T13:53:06.320Z"
-last_activity: 2026-03-11 — Finalized phase 14 (Backend Core) - merged to main
+status: in_progress
+last_updated: "2026-03-11T13:22:00.000Z"
+last_activity: 2026-03-11 — Completed plan 15-01 (Next.js Scaffold)
 progress:
   total_phases: 18
   completed_phases: 14
@@ -18,17 +18,17 @@ progress:
 
 **Core Value:** Enable GSD fork maintainers to stay current with upstream while preserving custom enhancements through intelligent sync tooling.
 
-**Current Focus:** Phase 14 Complete - Backend Core Finalized
+**Current Focus:** Phase 15 - Frontend Foundation & Dashboard (Plan 01 complete)
 
 ## Current Position
 
-**Phase:** 14 - Backend Core (FINALIZED)
-**Plan:** 14-04 complete
-**Status:** Phase finalized and merged to main
-**Last activity:** 2026-03-11 — Finalized phase 14 (Backend Core) - merged to main
+**Phase:** 15 - Frontend Foundation & Dashboard
+**Plan:** 15-01 complete, 15-02 next
+**Status:** In progress
+**Last activity:** 2026-03-11 — Completed plan 15-01 (Next.js Scaffold)
 
 ```
-[####################] 100% - Phase 14 finalized
+[#####---------------] 25% - Phase 15 plan 01/04 complete
 ```
 
 **Phases:**
@@ -43,6 +43,7 @@ progress:
 - [x] Phase 12: MCP Server API (5 requirements) - complete
 - [x] Phase 13: Foundation Infrastructure (4 requirements) - complete
 - [x] Phase 14: Backend Core (4 plans) - FINALIZED
+- [ ] Phase 15: Frontend Foundation & Dashboard (4 plans) - IN PROGRESS (1/4)
 
 ## Performance Metrics
 
@@ -62,6 +63,7 @@ progress:
 | Phase 14 P02 | 8m 35s | 2 tasks | 9 files |
 | Phase 14 P03 | 4m 8s | 3 tasks | 8 files |
 | Phase 14 P04 | 5m | 3 tasks | 7 files |
+| Phase 15 P01 | 8m 30s | 3 tasks | 12 files |
 
 ## Accumulated Context
 
@@ -139,6 +141,9 @@ progress:
 | Idempotency via checkpoint ID + hash | Accept first response, acknowledge duplicate same response, reject different responses | 2026-03-11 |
 | exactOptionalPropertyTypes spread pattern | Use ...(value && { key: value }) to avoid undefined in optional properties | 2026-03-11 |
 | Request body event-based buffering | Collect chunks with 'data' event, process on 'end' for POST/PUT/PATCH/DELETE | 2026-03-11 |
+| Tailwind v4 CSS-first pattern | @import "tailwindcss" with @theme block, not tailwind.config.js | 2026-03-11 |
+| next-themes attribute=class | CSS variable theming via class switching for dark mode | 2026-03-11 |
+| Vitest 2.x stable over 4.x alpha | Chose production-ready version for reliability | 2026-03-11 |
 
 ### Roadmap Evolution
 
@@ -199,6 +204,7 @@ progress:
 - [x] Execute plan 14-02 (GSD wrapper for async TypeScript)
 - [x] Execute plan 14-03 (Agent Orchestrator with Claude streaming)
 - [x] Execute plan 14-04 (Checkpoint handling and Agent REST API)
+- [x] Execute plan 15-01 (Next.js scaffold with Tailwind v4 and testing)
 
 ### Blockers
 
@@ -206,13 +212,13 @@ None currently.
 
 ## Session Continuity
 
-**Last Session:** 2026-03-11T13:53:06.315Z
-**Context:** Finalized Phase 14 - Backend Core. Merged to main with 117 tests passing.
+**Last Session:** 2026-03-11T13:22:00.000Z
+**Context:** Completed Phase 15 Plan 01 - Next.js scaffold with Tailwind v4 and testing infrastructure.
 
 **To Resume:**
-1. Phase 14 finalized and merged to main
-2. Full backend stack complete: Socket.IO + Hono REST API + Agent orchestrator with checkpoints
-3. Next: Plan phase 15 or continue with remaining roadmap
+1. Phase 15 Plan 01 complete - Next.js 15, Tailwind v4, Vitest, Playwright, MSW configured
+2. Next: Execute plan 15-02 (Layout components)
+3. Dashboard foundation ready for component development
 
 ### Sync History
 
@@ -221,10 +227,11 @@ None currently.
 
 ---
 *State initialized: 2026-02-23*
-*Last updated: 2026-03-11 (Phase 14 finalized - merged to main)*
+*Last updated: 2026-03-11 (Phase 15 Plan 01 complete)*
 
 ## Recent Activity
 
+- 2026-03-11 — Completed plan 15-01 (Next.js Scaffold) - Next.js 15, Tailwind v4, Vitest, Playwright, MSW
 - 2026-03-11 — Finalized phase 14 (Backend Core) - merged to main with 117 tests
 - 2026-03-11 — Completed plan 14-04 (Checkpoint Handling and Agent REST API) - Phase 14 complete
 - 2026-03-11 — Completed plan 14-03 (Agent Orchestrator)
