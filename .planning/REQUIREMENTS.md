@@ -20,10 +20,10 @@ Foundation layer required for all streaming and real-time features.
 
 Project overview and navigation.
 
-- [ ] **DASH-01**: User can view list of all GSD projects with health status indicators (healthy/degraded/error)
-- [ ] **DASH-02**: User can see current phase and progress percentage for each project
+- [x] **DASH-01**: User can view list of all GSD projects with health status indicators (healthy/degraded/error)
+- [x] **DASH-02**: User can see current phase and progress percentage for each project
 - [ ] **DASH-03**: User can view recent activity feed (last 5 actions) for each project
-- [ ] **DASH-04**: User can search and filter projects by name or status
+- [x] **DASH-04**: User can search and filter projects by name or status
 - [ ] **DASH-05**: User can navigate to project detail view by clicking a project card
 
 ### Discuss Phase UI (DISC)
@@ -134,10 +134,10 @@ Visual debugging workflow.
 | INFRA-02 | Phase 13 | Complete |
 | INFRA-03 | Phase 13 | Complete |
 | INFRA-04 | Phase 13 | Complete |
-| DASH-01 | Phase 15 | Pending |
-| DASH-02 | Phase 15 | Pending |
+| DASH-01 | Phase 15 | Complete |
+| DASH-02 | Phase 15 | Complete |
 | DASH-03 | Phase 15 | Pending |
-| DASH-04 | Phase 15 | Pending |
+| DASH-04 | Phase 15 | Complete |
 | DASH-05 | Phase 15 | Pending |
 | DISC-01 | Phase 16 | Pending |
 | DISC-02 | Phase 16 | Pending |
