@@ -1,14 +1,15 @@
-# Roadmap: GSD v2.0 Web Dashboard
+# Roadmap: GSD
 
 ## Overview
 
-This roadmap delivers a feature-rich web dashboard that replicates and enhances the Claude Code CLI experience. The journey progresses from infrastructure (WebSocket, file locking, security), through backend core (REST API, agent orchestrator), to frontend foundation (Next.js, dashboard), then feature-specific UIs (Discuss, Execute, Plan, Verify), and finally visualization and debugging tools. Each phase builds on the previous, delivering complete, usable functionality at each boundary.
+This roadmap delivers the GSD (Get Shit Done) meta-prompting framework across multiple milestones. v2.0 delivers a feature-rich web dashboard. v3.0 modernizes the runtime with TypeScript, database-backed state, and observable agents while preserving all markdown prompts.
 
 ## Milestones
 
 - <details><summary>v1.0 Worktree Isolation (Phases 1-4) - SHIPPED 2026-02-23</summary>(See legacy roadmap)</details>
 - <details><summary>v1.1 Upstream Sync (Phases 5-10) - SHIPPED 2026-03-10</summary>(See legacy roadmap)</details>
 - [ ] **v2.0 GSD Web Dashboard** - Phases 13-20 (in progress)
+- [ ] **v3.0 Hybrid Runtime Modernization** - Phases 21-28 (planned)
 
 ## Phases
 
@@ -27,6 +28,17 @@ This roadmap delivers a feature-rich web dashboard that replicates and enhances 
 - [ ] **Phase 18: Plan & Verify Phase UIs** - Research streaming, plan preview, verification report, and gap workflow
 - [ ] **Phase 19: Roadmap Visualization** - Dependency graph, Gantt timeline, and progress tracking
 - [ ] **Phase 20: Debug Session UI** - Debug session creation, hypothesis tracking, and evidence collection
+
+### v3.0 Hybrid Runtime Modernization (Phases 21-28)
+
+- [ ] **Phase 21: Agent Runtime Engine** - Core TypeScript runtime that loads and executes markdown prompts
+- [ ] **Phase 22: Prompt Loader** - Parse markdown prompts into executable agent configurations
+- [ ] **Phase 23: State Management** - Database-backed state with Drizzle ORM and markdown sync
+- [ ] **Phase 24: Observability** - OpenTelemetry tracing for debugging and performance analysis
+- [ ] **Phase 25: Agent Framework Integration** - Vercel AI SDK integration for streaming and orchestration
+- [ ] **Phase 26: API Layer** - REST and WebSocket API as primary interface
+- [ ] **Phase 27: CLI Wrapper** - Thin Commander-based CLI that wraps the API
+- [ ] **Phase 28: Testing Infrastructure** - Unit and integration tests for agent logic
 
 ## Phase Details
 
@@ -190,7 +202,117 @@ Plans:
 - [ ] 20-03-PLAN.md — Evidence collection UI (logs, screenshots, repro steps)
 - [ ] 20-04-PLAN.md — Session history timeline
 
+---
+
+## v3.0 Phase Details
+
+### Phase 21: Agent Runtime Engine
+**Goal**: Build the core TypeScript runtime that loads markdown prompts and executes agents
+**Depends on**: v2.0 complete (production feedback informs design)
+**Requirements**: RUNTIME-01, RUNTIME-02, RUNTIME-03, RUNTIME-04, RUNTIME-05, RUNTIME-06
+**Success Criteria** (what must be TRUE):
+  1. Agent definitions load from `agents/*.md` with frontmatter parsing
+  2. Agent graph executes with typed state transitions
+  3. Tool calls have typed inputs/outputs with validation
+  4. Checkpoints persist to database and resume across sessions
+  5. Agent output streams to consumers (WebSocket, CLI)
+  6. Claude API integrated via Anthropic SDK
+**Plans**: TBD (planning generates 3-4 plans)
+
+### Phase 22: Prompt Loader
+**Goal**: Parse markdown prompts into executable agent configurations
+**Depends on**: Phase 21
+**Requirements**: PROMPT-01, PROMPT-02, PROMPT-03, PROMPT-04, PROMPT-05, PROMPT-06
+**Success Criteria** (what must be TRUE):
+  1. YAML frontmatter extracts agent metadata (name, description, tools)
+  2. Markdown body becomes system prompt with section parsing
+  3. `@file` references resolve to include external content
+  4. Template variables resolve at runtime
+  5. Invalid prompts produce clear error messages with line numbers
+  6. Hot-reload works in development mode
+**Plans**: TBD (planning generates 2-3 plans)
+
+### Phase 23: State Management
+**Goal**: Implement database-backed state replacing markdown file parsing
+**Depends on**: Phase 22
+**Requirements**: STATE-01, STATE-02, STATE-03, STATE-04, STATE-05, STATE-06
+**Success Criteria** (what must be TRUE):
+  1. SQLite works for local, PostgreSQL for production
+  2. Drizzle ORM provides type-safe queries and migrations
+  3. Schema covers project, phase, plan, execution, checkpoint state
+  4. Backward compatibility with `.planning/` markdown files
+  5. Bidirectional sync keeps database and markdown in sync
+  6. Common queries complete in <10ms
+**Plans**: TBD (planning generates 3-4 plans)
+
+### Phase 24: Observability
+**Goal**: Add OpenTelemetry tracing for debugging and performance analysis
+**Depends on**: Phase 23
+**Requirements**: TRACE-01, TRACE-02, TRACE-03, TRACE-04, TRACE-05, TRACE-06
+**Success Criteria** (what must be TRUE):
+  1. OpenTelemetry traces generated for all agent operations
+  2. Tool calls traced with input, output, duration, status
+  3. Checkpoint events traced with user response time
+  4. LLM calls traced with token counts and latency
+  5. Local trace viewer works without external dependencies
+  6. Traces exportable to Jaeger, Honeycomb
+**Plans**: TBD (planning generates 2-3 plans)
+
+### Phase 25: Agent Framework Integration
+**Goal**: Integrate Vercel AI SDK for streaming, tool calling, and orchestration
+**Depends on**: Phase 24
+**Requirements**: AGENT-01, AGENT-02, AGENT-03, AGENT-04, AGENT-05, AGENT-06
+**Success Criteria** (what must be TRUE):
+  1. Vercel AI SDK integrated with custom orchestration layer
+  2. GSD workflow patterns mapped to framework primitives
+  3. Parallel agent execution (wave-based) works
+  4. Agent-to-agent communication (orchestrator → subagent) works
+  5. GSD checkpoint semantics maintained within framework
+  6. Framework is TypeScript native throughout
+**Plans**: TBD (planning generates 3-4 plans)
+
+### Phase 26: API Layer
+**Goal**: Build REST and WebSocket API as primary interface
+**Depends on**: Phase 25
+**Requirements**: API-01, API-02, API-03, API-04, API-05, API-06
+**Success Criteria** (what must be TRUE):
+  1. REST API provides CRUD for projects, phases, plans, executions
+  2. WebSocket API handles streaming and checkpoint responses
+  3. OpenAPI spec auto-generated with TypeScript types
+  4. Authentication supports optional multi-user deployments
+  5. Rate limiting and request validation enforced
+  6. CLI uses API (no separate business logic)
+**Plans**: TBD (planning generates 3-4 plans)
+
+### Phase 27: CLI Wrapper
+**Goal**: Build thin Commander-based CLI that wraps the API
+**Depends on**: Phase 26
+**Requirements**: CLI-01, CLI-02, CLI-03, CLI-04, CLI-05, CLI-06
+**Success Criteria** (what must be TRUE):
+  1. Commander CLI with subcommands mirrors `/gsd:*` interface
+  2. All commands call API endpoints
+  3. Long-running operations stream to terminal
+  4. Checkpoints prompt interactively
+  5. Configuration via env vars and config file
+  6. Output matches existing `/gsd:*` command formats
+**Plans**: TBD (planning generates 2-3 plans)
+
+### Phase 28: Testing Infrastructure
+**Goal**: Establish unit and integration tests for agent logic
+**Depends on**: Phase 27
+**Requirements**: TEST-01, TEST-02, TEST-03, TEST-04, TEST-05, TEST-06
+**Success Criteria** (what must be TRUE):
+  1. Mock LLM responses enable deterministic tests
+  2. Agent state transitions testable without API calls
+  3. Snapshot testing validates prompt rendering
+  4. Integration tests work with real API
+  5. CI enforces 80%+ coverage, blocks on failure
+  6. Playwright tests cover Dashboard-API integration
+**Plans**: TBD (planning generates 3-4 plans)
+
 ## Progress
+
+### v2.0 Progress
 
 **Execution Order:**
 Phases execute in numeric order: 13 -> 14 -> 15 -> 16 -> 17 -> 18 -> 19 -> 20
@@ -206,6 +328,22 @@ Phases execute in numeric order: 13 -> 14 -> 15 -> 16 -> 17 -> 18 -> 19 -> 20
 | 19. Roadmap Visualization | 0/4 | Not started | - |
 | 20. Debug Session UI | 0/4 | Not started | - |
 
+### v3.0 Progress
+
+**Execution Order:**
+Phases execute in numeric order: 21 -> 22 -> 23 -> 24 -> 25 -> 26 -> 27 -> 28
+
+| Phase | Plans Complete | Status | Completed |
+|-------|----------------|--------|-----------|
+| 21. Agent Runtime Engine | 0/TBD | Not started | - |
+| 22. Prompt Loader | 0/TBD | Not started | - |
+| 23. State Management | 0/TBD | Not started | - |
+| 24. Observability | 0/TBD | Not started | - |
+| 25. Agent Framework Integration | 0/TBD | Not started | - |
+| 26. API Layer | 0/TBD | Not started | - |
+| 27. CLI Wrapper | 0/TBD | Not started | - |
+| 28. Testing Infrastructure | 0/TBD | Not started | - |
+
 ---
 *Roadmap created: 2026-03-10*
-*Last updated: 2026-03-10*
+*Last updated: 2026-03-11 (v3.0 phases added)*

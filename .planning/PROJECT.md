@@ -8,18 +8,24 @@ A meta-prompting framework that extends AI coding assistants (Claude Code, OpenC
 
 Enable developers to ship faster by providing AI assistants with structured context and clear execution paths — turning "build me an app" into atomic, verifiable tasks with persistent state across sessions.
 
-## Current Milestone: v2.0 GSD Web Dashboard
+## Current Milestone: v3.0 Hybrid Runtime Modernization
+
+**Goal:** Replace gsd-tools.cjs with a TypeScript agent runtime while preserving all markdown prompts. API-first design with database-backed state and observable agents.
+
+**Target features:**
+- Agent Runtime Engine — TypeScript runtime that loads and executes markdown prompts
+- Prompt Loader — Parse agents/*.md with frontmatter, @file includes, template variables
+- State Management — Drizzle ORM + SQLite/PostgreSQL replacing markdown state files
+- Observability — OpenTelemetry tracing for every tool call, checkpoint, and LLM request
+- Agent Framework — Vercel AI SDK integration for streaming and tool calling
+- API-First Design — REST + WebSocket API, CLI becomes thin wrapper
+- Testing Infrastructure — 80%+ unit test coverage for agent logic
+
+## Previous Milestone: v2.0 GSD Web Dashboard
 
 **Goal:** Provide a feature-rich web application that replicates and enhances the Claude Code CLI experience with visual progress tracking, real-time AI agent orchestration, and interactive checkpoint handling.
 
-**Target features:**
-- Project dashboard with health status and progress visualization
-- Discuss phase UI with chat interface and CONTEXT.md preview
-- Plan phase UI with research streaming, wave visualization, and dependency graphs
-- Execute phase UI with real-time log streaming, tool visualization, and checkpoint dialogs
-- Verify work UI with gap highlighting and approval workflow
-- Roadmap visualizer with Gantt-style timeline and dependency graph
-- Settings and configuration management
+**Status:** In Progress (Phases 13-20)
 
 ## Requirements
 

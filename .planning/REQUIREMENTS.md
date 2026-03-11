@@ -185,6 +185,158 @@ Visual debugging workflow.
 
 ---
 
+---
+
+## v3.0 Requirements
+
+### Agent Runtime Engine (RUNTIME)
+
+Core TypeScript runtime that loads and executes markdown prompts.
+
+- [ ] **RUNTIME-01**: Agent definitions load from `agents/*.md` with frontmatter parsing
+- [ ] **RUNTIME-02**: Agent graph executes with typed state transitions using Vercel AI SDK
+- [ ] **RUNTIME-03**: Tool calls have typed inputs/outputs with Zod validation
+- [ ] **RUNTIME-04**: Checkpoints persist to database and resume across sessions
+- [ ] **RUNTIME-05**: Agent output streams to consumers (WebSocket, CLI)
+- [ ] **RUNTIME-06**: Claude API integration via Anthropic SDK with provider abstraction
+
+### Prompt Loader (PROMPT)
+
+Parse markdown prompts into executable agent configurations.
+
+- [ ] **PROMPT-01**: YAML frontmatter extracts agent metadata (name, description, tools)
+- [ ] **PROMPT-02**: Markdown body becomes system prompt with section parsing
+- [ ] **PROMPT-03**: `@file` references resolve to include external content inline
+- [ ] **PROMPT-04**: Template variables (`{phase_number}`, `{project_path}`) resolve at runtime
+- [ ] **PROMPT-05**: Invalid prompts produce clear error messages with line numbers
+- [ ] **PROMPT-06**: Hot-reload prompts in development mode without restart
+
+### State Management (STATE)
+
+Database-backed state replacing markdown file parsing.
+
+- [ ] **STATE-01**: SQLite works for local development, PostgreSQL for production
+- [ ] **STATE-02**: Drizzle ORM provides type-safe queries and migrations
+- [ ] **STATE-03**: Schema covers project, phase, plan, execution, checkpoint state
+- [ ] **STATE-04**: Backward compatibility maintained with `.planning/` markdown files
+- [ ] **STATE-05**: Bidirectional sync keeps database and markdown in sync
+- [ ] **STATE-06**: Common queries complete in <10ms (vs 100ms+ markdown parsing)
+
+### Observability (TRACE)
+
+Trace agent execution for debugging and performance analysis.
+
+- [ ] **TRACE-01**: OpenTelemetry traces generated for all agent operations
+- [ ] **TRACE-02**: Tool calls traced with input, output, duration, and status
+- [ ] **TRACE-03**: Checkpoint events traced with user response time
+- [ ] **TRACE-04**: LLM calls traced with token counts and latency
+- [ ] **TRACE-05**: Local trace viewer (web UI) for development debugging
+- [ ] **TRACE-06**: Traces exportable to external systems (Jaeger, Honeycomb)
+
+### Agent Framework Integration (AGENT)
+
+Build on Vercel AI SDK for streaming and tool calling.
+
+- [ ] **AGENT-01**: Framework selected and integrated (Vercel AI SDK + custom orchestration)
+- [ ] **AGENT-02**: GSD workflow patterns mapped to framework primitives
+- [ ] **AGENT-03**: Parallel agent execution (wave-based) supported
+- [ ] **AGENT-04**: Agent-to-agent communication (orchestrator → subagent) works
+- [ ] **AGENT-05**: GSD checkpoint semantics maintained within framework
+- [ ] **AGENT-06**: Framework is TypeScript native throughout
+
+### API-First Design (API)
+
+REST and WebSocket API as primary interface.
+
+- [ ] **API-01**: REST API provides CRUD for projects, phases, plans, executions
+- [ ] **API-02**: WebSocket API handles streaming output and checkpoint responses
+- [ ] **API-03**: OpenAPI specification auto-generated with TypeScript types
+- [ ] **API-04**: Authentication layer supports optional multi-user deployments
+- [ ] **API-05**: Rate limiting and request validation enforced
+- [ ] **API-06**: CLI implemented as API client (no separate business logic)
+
+### CLI Wrapper (CLI)
+
+Thin CLI that wraps the API.
+
+- [ ] **CLI-01**: Commander-based CLI with subcommands mirrors current `/gsd:*` interface
+- [ ] **CLI-02**: All commands call API endpoints (no direct database access)
+- [ ] **CLI-03**: Long-running operations stream output to terminal
+- [ ] **CLI-04**: Checkpoints prompt interactively, responses sent via API
+- [ ] **CLI-05**: Configuration via environment variables and config file
+- [ ] **CLI-06**: Backward-compatible with existing `/gsd:*` command outputs
+
+### Testing Infrastructure (TEST)
+
+Unit and integration tests for agent logic.
+
+- [ ] **TEST-01**: Mock LLM responses enable deterministic agent tests
+- [ ] **TEST-02**: Agent state transitions testable without API calls
+- [ ] **TEST-03**: Snapshot testing validates prompt rendering
+- [ ] **TEST-04**: Integration tests with real API using test account
+- [ ] **TEST-05**: CI pipeline enforces 80%+ coverage, blocks on failure
+- [ ] **TEST-06**: Playwright tests cover Dashboard-API integration
+
+### v3.0 Traceability
+
+| Requirement | Phase | Status |
+|-------------|-------|--------|
+| RUNTIME-01 | Phase 21 | Pending |
+| RUNTIME-02 | Phase 21 | Pending |
+| RUNTIME-03 | Phase 21 | Pending |
+| RUNTIME-04 | Phase 21 | Pending |
+| RUNTIME-05 | Phase 21 | Pending |
+| RUNTIME-06 | Phase 21 | Pending |
+| PROMPT-01 | Phase 22 | Pending |
+| PROMPT-02 | Phase 22 | Pending |
+| PROMPT-03 | Phase 22 | Pending |
+| PROMPT-04 | Phase 22 | Pending |
+| PROMPT-05 | Phase 22 | Pending |
+| PROMPT-06 | Phase 22 | Pending |
+| STATE-01 | Phase 23 | Pending |
+| STATE-02 | Phase 23 | Pending |
+| STATE-03 | Phase 23 | Pending |
+| STATE-04 | Phase 23 | Pending |
+| STATE-05 | Phase 23 | Pending |
+| STATE-06 | Phase 23 | Pending |
+| TRACE-01 | Phase 24 | Pending |
+| TRACE-02 | Phase 24 | Pending |
+| TRACE-03 | Phase 24 | Pending |
+| TRACE-04 | Phase 24 | Pending |
+| TRACE-05 | Phase 24 | Pending |
+| TRACE-06 | Phase 24 | Pending |
+| AGENT-01 | Phase 25 | Pending |
+| AGENT-02 | Phase 25 | Pending |
+| AGENT-03 | Phase 25 | Pending |
+| AGENT-04 | Phase 25 | Pending |
+| AGENT-05 | Phase 25 | Pending |
+| AGENT-06 | Phase 25 | Pending |
+| API-01 | Phase 26 | Pending |
+| API-02 | Phase 26 | Pending |
+| API-03 | Phase 26 | Pending |
+| API-04 | Phase 26 | Pending |
+| API-05 | Phase 26 | Pending |
+| API-06 | Phase 26 | Pending |
+| CLI-01 | Phase 27 | Pending |
+| CLI-02 | Phase 27 | Pending |
+| CLI-03 | Phase 27 | Pending |
+| CLI-04 | Phase 27 | Pending |
+| CLI-05 | Phase 27 | Pending |
+| CLI-06 | Phase 27 | Pending |
+| TEST-01 | Phase 28 | Pending |
+| TEST-02 | Phase 28 | Pending |
+| TEST-03 | Phase 28 | Pending |
+| TEST-04 | Phase 28 | Pending |
+| TEST-05 | Phase 28 | Pending |
+| TEST-06 | Phase 28 | Pending |
+
+**v3.0 Coverage:**
+- v3.0 requirements: 48 total
+- Mapped to phases: 48 (100%)
+- Unmapped: 0
+
+---
+
 ## Previous Milestones
 
 ### v1.1 Upstream Sync (Complete)
