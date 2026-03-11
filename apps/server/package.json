@@ -13,6 +13,9 @@
   "dependencies": {
     "@gsd/events": "workspace:*",
     "@gsd/gsd-core": "workspace:*",
+    "@hono/node-server": "^1.13.0",
+    "@hono/zod-validator": "^0.4.0",
+    "hono": "^4.6.0",
     "socket.io": "^4.8.0"
   },
   "devDependencies": {
