@@ -1,0 +1,50 @@
+@import "tailwindcss";
+
+@theme {
+  /* Base colors */
+  --color-background: #ffffff;
+  --color-foreground: #0a0a0a;
+
+  /* Card colors */
+  --color-card: #ffffff;
+  --color-card-foreground: #0a0a0a;
+
+  /* Border and muted */
+  --color-border: #e5e7eb;
+  --color-muted: #f3f4f6;
+  --color-muted-foreground: #6b7280;
+
+  /* Health status colors */
+  --color-healthy: #22c55e;
+  --color-degraded: #eab308;
+  --color-error: #ef4444;
+
+  /* Progress bar */
+  --color-progress-bg: #e5e7eb;
+  --color-progress-fill: #3b82f6;
+
+  /* Primary accent */
+  --color-primary: #3b82f6;
+  --color-primary-foreground: #ffffff;
+}
+
+/* Dark mode overrides */
+.dark {
+  --color-background: #0a0a0a;
+  --color-foreground: #fafafa;
+  --color-card: #171717;
+  --color-card-foreground: #fafafa;
+  --color-border: #27272a;
+  --color-muted: #262626;
+  --color-muted-foreground: #a1a1aa;
+  --color-progress-bg: #3f3f46;
+  --color-progress-fill: #60a5fa;
+  --color-primary: #60a5fa;
+  --color-primary-foreground: #0a0a0a;
+}
+
+body {
+  background-color: var(--color-background);
+  color: var(--color-foreground);
+  font-family: system-ui, -apple-system, sans-serif;
+}
