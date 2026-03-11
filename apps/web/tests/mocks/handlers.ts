@@ -74,4 +74,16 @@ export const handlers = [
       data: project,
     });
   }),
+
+  // POST /api/phases/:id/verify - Start verification
+  http.post(`${API_BASE}/api/phases/:id/verify`, () => {
+    return HttpResponse.json({
+      success: true,
+      data: { started: true },
+      meta: {
+        timestamp: new Date().toISOString(),
+        requestId: 'mock-verify-request-id',
+      },
+    });
+  }),
 ];
