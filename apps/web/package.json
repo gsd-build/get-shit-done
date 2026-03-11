@@ -15,6 +15,7 @@
   },
   "dependencies": {
     "@gsd/events": "workspace:*",
+    "@radix-ui/react-accordion": "^1.2.12",
     "@radix-ui/react-dialog": "^1.1.15",
     "@radix-ui/react-popover": "^1.1.2",
     "clsx": "^2.1.1",

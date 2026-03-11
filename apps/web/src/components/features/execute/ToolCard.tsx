@@ -71,8 +71,8 @@ function formatDuration(ms: number): string {
 function getFilePath(input: unknown): string | null {
   if (typeof input === 'object' && input !== null) {
     const obj = input as Record<string, unknown>;
-    if (typeof obj.file_path === 'string') return obj.file_path;
-    if (typeof obj.path === 'string') return obj.path;
+    if (typeof obj['file_path'] === 'string') return obj['file_path'];
+    if (typeof obj['path'] === 'string') return obj['path'];
   }
   return null;
 }
@@ -83,7 +83,7 @@ function getFilePath(input: unknown): string | null {
 function getWriteContent(input: unknown): string | null {
   if (typeof input === 'object' && input !== null) {
     const obj = input as Record<string, unknown>;
-    if (typeof obj.content === 'string') return obj.content;
+    if (typeof obj['content'] === 'string') return obj['content'];
   }
   return null;
 }

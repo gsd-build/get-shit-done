@@ -7,17 +7,15 @@ import type { ToolCall } from './types';
 
 // Mock tool data factory
 function createToolCall(overrides: Partial<ToolCall> = {}): ToolCall {
-  return {
+  const base: ToolCall = {
     toolId: 'tool-1',
     toolName: 'Read',
     input: { file_path: '/src/index.ts' },
-    output: undefined,
-    success: undefined,
-    duration: undefined,
     startTime: Date.now(),
     status: 'running',
-    ...overrides,
   };
+  // Use spread to merge, avoiding explicit undefined
+  return { ...base, ...overrides };
 }
 
 describe('ToolCard', () => {
