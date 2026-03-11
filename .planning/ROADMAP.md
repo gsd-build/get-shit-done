@@ -178,14 +178,14 @@ Plans:
 **Plans**: 8 plans
 
 Plans:
-- [ ] 17-01-PLAN.md — Wave-based execution progress with log streaming
-- [ ] 17-02-PLAN.md — Tool call visualization with collapsible cards
-- [ ] 17-03-PLAN.md — Checkpoint dialog modal with timeout warning
-- [ ] 17-04-PLAN.md — Monaco DiffEditor integration for file changes
-- [ ] 17-05-PLAN.md — Git commit timeline visualization
-- [ ] 17-06-PLAN.md — Pause/resume and abort/rollback controls
-- [ ] 17-07-PLAN.md — Error recovery with retry options
-- [ ] 17-08-PLAN.md — TDD workflow enforcement (Red-Green-Refactor)
+- [ ] 17-01-PLAN.md — Execution state store and Socket.IO subscription hooks
+- [ ] 17-02-PLAN.md — Wave pipeline visualization with plan cards and log streaming
+- [ ] 17-03-PLAN.md — Tool call cards with icons, code preview, and live timers
+- [ ] 17-04-PLAN.md — Checkpoint modal with countdown timer and response handling
+- [ ] 17-05-PLAN.md — Monaco DiffEditor panel with file tree and commit timeline
+- [ ] 17-06-PLAN.md — Pause/resume and abort controls with confirmation dialog
+- [ ] 17-07-PLAN.md — Error recovery UI with retry options
+- [ ] 17-08-PLAN.md — TDD indicator and ExecutionPanel integration with E2E tests
 
 ### Phase 18: Plan & Verify Phase UIs
 **Goal**: Provide research streaming, plan preview, verification report, and gap closure workflow
@@ -394,7 +394,7 @@ Phases execute in numeric order: 13 -> 14 -> 15 -> 16 -> 17 -> 18 -> 19 -> 20
 | 14. Backend Core | 4/4 | Complete    | 2026-03-11 |
 | 15. Frontend Foundation & Dashboard | 4/4 | Complete    | 2026-03-11 |
 | 16. Discuss Phase UI | 0/4 | Planned | - |
-| 17. Execute Phase UI | 0/8 | Not started | - |
+| 17. Execute Phase UI | 0/8 | Planned | - |
 | 18. Plan & Verify Phase UIs | 0/8 | Not started | - |
 | 19. Roadmap Visualization | 0/4 | Not started | - |
 | 20. Debug Session UI | 0/4 | Not started | - |
@@ -417,4 +417,4 @@ Phases execute in numeric order: 21 -> 22 -> 23 -> 24 -> 25 -> 26 -> 27 -> 28
 
 ---
 *Roadmap created: 2026-03-10*
-*Last updated: 2026-03-11 (Phase 16 planned)*
+*Last updated: 2026-03-11 (Phase 17 planned)*
