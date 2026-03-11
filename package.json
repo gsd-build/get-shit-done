@@ -2,6 +2,7 @@
   "name": "get-shit-done-cc",
   "version": "1.21.1",
   "description": "A meta-prompting, context engineering and spec-driven development system for Claude Code, OpenCode, Gemini and Codex by TÂCHES.",
+  "packageManager": "pnpm@9.15.0",
   "bin": {
     "get-shit-done-cc": "bin/install.js"
   },
@@ -53,10 +54,15 @@
   },
   "devDependencies": {
     "c8": "^11.0.0",
-    "esbuild": "^0.24.0"
+    "esbuild": "^0.24.0",
+    "turbo": "^2.3.0",
+    "typescript": "^5.4.0"
   },
   "scripts": {
+    "build": "turbo build",
     "build:hooks": "node scripts/build-hooks.js",
+    "dev": "turbo dev",
+    "typecheck": "turbo typecheck",
     "prepublishOnly": "npm run build:hooks",
     "test": "node scripts/run-tests.cjs",
     "test:coverage": "c8 --check-coverage --lines 70 --reporter text --include 'get-shit-done/bin/lib/*.cjs' --exclude 'tests/**' --all node scripts/run-tests.cjs"

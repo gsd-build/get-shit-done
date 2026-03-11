@@ -1,0 +1,22 @@
+{
+  "name": "@gsd/server",
+  "version": "0.0.1",
+  "private": true,
+  "type": "module",
+  "main": "dist/index.js",
+  "types": "dist/index.d.ts",
+  "scripts": {
+    "build": "tsc",
+    "dev": "tsx watch src/index.ts",
+    "typecheck": "tsc --noEmit"
+  },
+  "dependencies": {
+    "@gsd/events": "workspace:*",
+    "@gsd/gsd-core": "workspace:*",
+    "socket.io": "^4.8.0"
+  },
+  "devDependencies": {
+    "@types/node": "^20.0.0",
+    "tsx": "^4.19.0"
+  }
+}

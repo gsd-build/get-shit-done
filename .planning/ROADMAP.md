@@ -33,7 +33,7 @@ This roadmap delivers the GSD (Get Shit Done) meta-prompting framework across mu
 
 ### v2.0 Phases
 
-- [ ] **Phase 13: Foundation Infrastructure** - WebSocket server, token buffering, file locking, and security layer
+- [x] **Phase 13: Foundation Infrastructure** - WebSocket server, token buffering, file locking, and security layer (completed 2026-03-11)
 - [ ] **Phase 14: Backend Core** - REST API, agent orchestrator, and WebSocket connection management
 - [ ] **Phase 15: Frontend Foundation & Dashboard** - Next.js app with project listing, health indicators, and navigation
 - [ ] **Phase 16: Discuss Phase UI** - Chat interface with streaming and CONTEXT.md preview
@@ -103,9 +103,9 @@ Plans:
 **Plans**: 3 plans
 
 Plans:
-- [ ] 13-01-PLAN.md — Turborepo monorepo with pnpm workspaces and shared typed events
-- [ ] 13-02-PLAN.md — Socket.IO server with auto-reconnect and state sync protocol
-- [ ] 13-03-PLAN.md — File locking and security layer (symlink protection, path validation)
+- [x] 13-01-PLAN.md — Turborepo monorepo with pnpm workspaces and shared typed events
+- [x] 13-02-PLAN.md — Socket.IO server with auto-reconnect and state sync protocol
+- [x] 13-03-PLAN.md — File locking and security layer (symlink protection, path validation)
 
 ### Phase 14: Backend Core
 **Goal**: Provide REST API for project data and agent orchestrator for Claude API streaming
@@ -390,7 +390,7 @@ Phases execute in numeric order: 13 -> 14 -> 15 -> 16 -> 17 -> 18 -> 19 -> 20
 
 | Phase | Plans Complete | Status | Completed |
 |-------|----------------|--------|-----------|
-| 13. Foundation Infrastructure | 0/3 | Not started | - |
+| 13. Foundation Infrastructure | 3/3 | Complete    | 2026-03-11 |
 | 14. Backend Core | 0/4 | Not started | - |
 | 15. Frontend Foundation & Dashboard | 0/4 | Not started | - |
 | 16. Discuss Phase UI | 0/4 | Not started | - |
@@ -417,4 +417,4 @@ Phases execute in numeric order: 21 -> 22 -> 23 -> 24 -> 25 -> 26 -> 27 -> 28
 
 ---
 *Roadmap created: 2026-03-10*
-*Last updated: 2026-03-11 (Phase 12 finalized, v1.1 milestone shipped)*
+*Last updated: 2026-03-11 (Phase 13 complete)*
