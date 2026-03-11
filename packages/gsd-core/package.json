@@ -15,6 +15,13 @@
     "build": "tsc",
     "typecheck": "tsc --noEmit"
   },
+  "dependencies": {
+    "proper-lockfile": "^4.1.2"
+  },
+  "devDependencies": {
+    "@types/node": "^20.11.0",
+    "@types/proper-lockfile": "^4.1.4"
+  },
   "peerDependencies": {
     "get-shit-done-cc": ">=1.21.0"
   },
