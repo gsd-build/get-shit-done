@@ -53,10 +53,12 @@
     "zod": "^3.25.0"
   },
   "devDependencies": {
+    "@vitest/coverage-v8": "^4.0.18",
     "c8": "^11.0.0",
     "esbuild": "^0.24.0",
     "turbo": "^2.3.0",
-    "typescript": "^5.4.0"
+    "typescript": "^5.4.0",
+    "vitest": "^4.0.18"
   },
   "scripts": {
     "build": "turbo build",
