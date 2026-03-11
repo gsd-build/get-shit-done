@@ -186,6 +186,40 @@ export function useContextSync(
     };
   }, [socket, agentId, editingDecisionId, findDecision]);
 
+  /**
+   * Test hook: Listen for custom events to inject context updates
+   * Only active in development/test environments
+   */
+  useEffect(() => {
+    if (process.env.NODE_ENV === 'production') return;
+
+    const handleTestContextUpdate = (event: Event) => {
+      const customEvent = event as CustomEvent<{ decisionId: string; content: string }>;
+      const { decisionId, content } = customEvent.detail;
+
+      // If we're editing and this affects our edited decision, show conflict
+      if (editingDecisionId) {
+        const currentDecision = findDecision(editingDecisionId);
+        const currentContent = currentDecision?.content || '';
+
+        // Trigger conflict if editing any decision (for testing)
+        if (content && content !== currentContent) {
+          setPendingConflict({
+            decisionId: editingDecisionId,
+            userVersion: currentContent,
+            claudeVersion: content,
+          });
+        }
+      }
+    };
+
+    window.addEventListener('test:context-update', handleTestContextUpdate);
+
+    return () => {
+      window.removeEventListener('test:context-update', handleTestContextUpdate);
+    };
+  }, [editingDecisionId, findDecision]);
+
   return {
     isEditing,
     editingDecisionId,

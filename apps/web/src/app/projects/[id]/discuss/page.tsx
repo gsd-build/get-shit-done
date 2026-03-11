@@ -7,6 +7,7 @@ import { useTokenStream } from '@/hooks/useTokenStream';
 import { useDiscussSession } from '@/hooks/useDiscussSession';
 import { useUnsavedChanges } from '@/hooks/useUnsavedChanges';
 import { useContextSync } from '@/hooks/useContextSync';
+import { useContextPreview } from '@/hooks/useContextPreview';
 import {
   useDiscussStore,
   selectMessages,
@@ -53,7 +54,21 @@ export default function DiscussPage() {
   const updateStreamingContent = useDiscussStore((s) => s.updateStreamingContent);
   const selectQuestionOption = useDiscussStore((s) => s.selectQuestionOption);
   const setTopicIndex = useDiscussStore((s) => s.setTopicIndex);
+  const setHasHydrated = useDiscussStore((s) => s.setHasHydrated);
   const reset = useDiscussStore((s) => s.reset);
+
+  // Fix for hydration timing issue on client-side navigation
+  // The onRehydrateStorage callback may have fired before this component mounted,
+  // or may not fire again on client-side navigation. This ensures hydration completes.
+  useEffect(() => {
+    // Small delay to allow Zustand persist to complete rehydration
+    const timer = setTimeout(() => {
+      if (!hasHydrated) {
+        setHasHydrated(true);
+      }
+    }, 100);
+    return () => clearTimeout(timer);
+  }, [hasHydrated, setHasHydrated]);
 
   // Session management with reconnection handling
   const { isReconnecting } = useDiscussSession({
@@ -75,6 +90,13 @@ export default function DiscussPage() {
     onEditComplete,
     onConflictResolve,
   } = useContextSync(socket, currentAgentId);
+
+  // Listen for context:update events to populate preview panel
+  useContextPreview({
+    socket,
+    agentId: currentAgentId,
+    phaseId: projectId,
+  });
 
   // Track saved state for indicator
   const [showSaved, setShowSaved] = useState(false);
@@ -126,27 +148,32 @@ export default function DiscussPage() {
   // Warn before leaving with unsaved changes
   useUnsavedChanges(hasUnsavedChanges);
 
+  // Stable callbacks for useTokenStream (must not change between renders)
+  const handleStreamStart = useCallback(() => {
+    setStreaming(true);
+    updateStreamingContent('');
+  }, [setStreaming, updateStreamingContent]);
+
+  const handleStreamEnd = useCallback((content: string) => {
+    // Add completed message to store
+    const assistantMessage: Message = {
+      id: `assistant-${Date.now()}`,
+      role: 'assistant',
+      content,
+      timestamp: new Date().toISOString(),
+    };
+    addMessage(assistantMessage);
+    setStreaming(false);
+    setCurrentAgentId(null);
+    updateStreamingContent('');
+  }, [addMessage, setStreaming, updateStreamingContent]);
+
   // Token streaming with typewriter effect
   const { displayedText, clear: clearStream } = useTokenStream({
     socket,
     agentId: currentAgentId,
-    onStart: () => {
-      setStreaming(true);
-      updateStreamingContent('');
-    },
-    onEnd: (content) => {
-      // Add completed message to store
-      const assistantMessage: Message = {
-        id: `assistant-${Date.now()}`,
-        role: 'assistant',
-        content,
-        timestamp: new Date().toISOString(),
-      };
-      addMessage(assistantMessage);
-      setStreaming(false);
-      setCurrentAgentId(null);
-      updateStreamingContent('');
-    },
+    onStart: handleStreamStart,
+    onEnd: handleStreamEnd,
   });
 
   // Sync displayed text to store for ChatInterface
@@ -202,7 +229,12 @@ export default function DiscussPage() {
           throw new Error('No agent ID in response');
         }
 
-        // Store agent ID and start subscription
+        // Subscribe to agent socket room FIRST (before setting ID triggers streaming hooks)
+        if (socket?.connected) {
+          socket.emit('agent:subscribe', agentId);
+        }
+
+        // Store agent ID (this triggers useTokenStream)
         setAgentId(agentId);
         setCurrentAgentId(agentId);
       } catch (err) {

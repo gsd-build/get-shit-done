@@ -73,7 +73,7 @@ const initialState: DiscussState = {
 
 export const useDiscussStore = create<DiscussStore>()(
   persist(
-    (set) => ({
+    (set, get) => ({
       ...initialState,
 
   setPhaseId: (phaseId) => set({ phaseId }),

@@ -94,12 +94,20 @@ export function useTokenStream({
       const newFullText = tokens.join('');
       const prevFullText = fullTextRef.current;
 
+      // Debug: log first and periodic updates
+      if (tokens.length === 1 || tokens.length % 50 === 0) {
+        console.log(`[useTokenStream] tokens: ${tokens.length}, fullText: ${newFullText.length}, prevText: ${prevFullText.length}`);
+      }
+
       // Find characters to add to queue
       if (newFullText.length > prevFullText.length) {
         const newChars = newFullText.slice(prevFullText.length);
         charQueueRef.current.push(...newChars.split(''));
         fullTextRef.current = newFullText;
         startDraining();
+      } else if (newFullText.length < prevFullText.length) {
+        // This shouldn't happen - tokens should only grow
+        console.warn(`[useTokenStream] TOKENS SHRUNK: ${prevFullText.length} -> ${newFullText.length}`);
       }
     },
     [startDraining]
@@ -123,15 +131,17 @@ export function useTokenStream({
   useEffect(() => {
     if (!socket || !agentId) return;
 
+    console.log(`[useTokenStream] Effect running for agentId: ${agentId}`);
+
     // Create token buffer
     tokenBufferRef.current = createTokenBuffer(socket, handleTokens);
 
     // Handle agent:start
     const handleStart = (event: AgentStartEvent) => {
       if (event.agentId !== agentId) return;
-      clear();
+      // Don't call clear() or subscribe() here - we already subscribed when agentId changed
+      // Calling subscribe() again would unsubscribe first, losing tokens during re-subscription
       setIsStreaming(true);
-      tokenBufferRef.current?.subscribe(agentId);
       onStart?.();
     };
 
@@ -159,6 +169,7 @@ export function useTokenStream({
     setIsStreaming(true);
 
     return () => {
+      console.log(`[useTokenStream] Effect cleanup for agentId: ${agentId}`);
       socket.off('agent:start', handleStart);
       socket.off('agent:end', handleEnd);
       tokenBufferRef.current?.unsubscribe(agentId);
