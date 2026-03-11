@@ -3,13 +3,13 @@ gsd_state_version: 1.0
 milestone: v1.1
 milestone_name: milestone
 status: completed
-last_updated: "2026-03-07T05:32:07.698Z"
-last_activity: 2026-03-07 — Completed plan 11-02 (document extraction and provenance)
+last_updated: "2026-03-11T07:41:41.934Z"
+last_activity: 2026-03-10 — Completed plan 12-03 (MCP Resources and Auto-Registration)
 progress:
-  total_phases: 11
+  total_phases: 13
   completed_phases: 10
-  total_plans: 29
-  completed_plans: 29
+  total_plans: 30
+  completed_plans: 35
 ---
 
 # Project State: GSD v1.1 Upstream Sync
@@ -18,37 +18,41 @@ progress:
 
 **Core Value:** Enable GSD fork maintainers to stay current with upstream while preserving custom enhancements through intelligent sync tooling.
 
-**Current Focus:** Phase 11 - Add --docs Flag to discuss-phase
+**Current Focus:** Phase 12 - MCP Server API
 
 ## Current Position
 
-**Phase:** 11 - Add --docs Flag to discuss-phase
-**Plan:** 11-02 complete (2/2)
+**Phase:** 12 - MCP Server API
+**Plan:** 12-03 complete
 **Status:** Milestone complete
-**Last activity:** 2026-03-07 — Completed plan 11-02 (document extraction and provenance)
+**Last activity:** 2026-03-10 — Completed plan 12-03 (MCP Resources and Auto-Registration)
 
 ```
-[####################] 100% - Phase 11 complete
+[####################] 100% - Phase 12 plan 03 of 03 complete
 ```
 
 **Phases:**
 - [x] Phase 5: Core Infrastructure (7 requirements) - complete
 - [x] Phase 6: Analysis (4 requirements) - complete
 - [x] Phase 6.1: Local Modifications Integration (INSERTED) - complete
-- [ ] Phase 7: Merge Operations (4 requirements)
-- [ ] Phase 8: Interactive & Integration (5 requirements)
-- [ ] Phase 9: Documentation (4 requirements)
+- [x] Phase 7: Merge Operations (4 requirements) - complete
+- [x] Phase 8: Interactive & Integration (5 requirements) - complete
+- [x] Phase 9: Documentation (4 requirements) - complete
+- [x] Phase 10: Parallel Milestones (10 requirements) - complete
+- [x] Phase 11: Add --docs Flag to discuss-phase (2 requirements) - complete
+- [x] Phase 12: MCP Server API (5 requirements) - complete
 
 ## Performance Metrics
 
 | Metric | Value |
 |--------|-------|
-| Plans completed (v1.1) | 16 |
+| Plans completed (v1.1) | 21 |
 | Plans failed (v1.1) | 0 |
-| Current streak | 16 |
+| Current streak | 21 |
 | v1.0 plans completed | 11 |
 | Phase 11 P01 | 74s | 2 tasks | 2 files |
 | Phase 11 P02 | 98s | 3 tasks | 1 file |
+| Phase 12 P02 | 2m 14s | 3 tasks | 2 files |
 
 ## Accumulated Context
 
@@ -98,6 +102,12 @@ progress:
 | Config-backed suggestion storage | Store suggestions in config.json for persistence | 2026-02-24 |
 | Three-tier test discovery | Naming conventions first, then import analysis; coverage data optional | 2026-02-24 |
 | Non-TTY defaults to keep changes | Allows batch/CI use without hanging on prompt | 2026-02-24 |
+| M<number>-<slug> milestone naming | Easy parsing and human readability for milestone directories | 2026-03-10 |
+| Fallback from default milestone to legacy | Backward compatibility when default milestone doesn't have phase | 2026-03-10 |
+| Explicit milestone reference precedence | M7/01 syntax explicitly requests milestone scope | 2026-03-10 |
+| Use @modelcontextprotocol/sdk v1.x (stable) | Official SDK, recommended until Q1 2026 v2 release | 2026-03-10 |
+| All MCP logs to stderr | stdout reserved for JSON-RPC messages per MCP protocol | 2026-03-10 |
+| Error envelopes with recovery suggestions | Every error includes actionable recovery referencing /gsd: commands | 2026-03-10 |
 
 ### Roadmap Evolution
 
@@ -142,6 +152,15 @@ progress:
 - [x] Execute plan 8-02 (refactoring suggestions)
 - [x] Execute plan 8-03 (post-merge verification)
 - [x] Execute plan 8-04 (worktree sync guards and health checks)
+- [x] Execute plan 10-01 (milestone directory structure and core commands)
+- [x] Execute plan 10-02 (milestone-scoped workflow commands)
+- [x] Execute plan 10-03 (multi-milestone state tracking)
+- [x] Execute plan 10-04 (migration tool and backward compatibility)
+- [x] Execute plan 11-01 (--docs flag for discuss-phase)
+- [x] Execute plan 11-02 (document extraction and provenance)
+- [x] Execute plan 12-01 (MCP server scaffold)
+- [x] Execute plan 12-02 (MCP tool registrations)
+- [x] Execute plan 12-03 (MCP resources and auto-registration)
 
 ### Blockers
 
@@ -149,11 +168,13 @@ None currently.
 
 ## Session Continuity
 
-**Last Session:** 2026-03-07
-**Context:** Completed plan 11-02 - added extract_from_docs, present_extractions steps and provenance-enhanced write_context.
+**Last Session:** 2026-03-11
+**Context:** Finalized Phase 12 - MCP Server API with 9 tools, 4 resources, and auto-registration in ~/.claude.json.
 
 **To Resume:**
-Phase 11 complete. --docs flag feature fully functional.
+1. Phase 12 (MCP Server API) finalized and merged to main
+2. All 3 plans executed successfully
+3. MCP server ready for production use
 
 
 ### Sync History
@@ -163,4 +184,10 @@ Phase 11 complete. --docs flag feature fully functional.
 
 ---
 *State initialized: 2026-02-23*
-*Last updated: 2026-03-07 (Phase 11 complete)*
+*Last updated: 2026-03-11 (Phase 12 finalized)*
+
+## Recent Activity
+
+- 2026-03-11 — Finalized phase 12 (MCP Server API) - merged to main
+- 2026-03-10 06:00 — M7: Completed phase 1-fhir-foundation
+- 2026-03-10 05:59 — M1: Test activity

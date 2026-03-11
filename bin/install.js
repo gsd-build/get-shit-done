@@ -2082,11 +2082,54 @@ function install(isGlobal, runtime = 'claude') {
 }
 
 /**
+ * Register MCP server in Claude Code's config file.
+ * Adds gsd entry to mcpServers in ~/.claude.json.
+ *
+ * @param {string} gsdInstallPath - Path where GSD is installed
+ * @returns {boolean} True if registration succeeded
+ */
+function registerMcpServer(gsdInstallPath) {
+  const home = os.homedir();
+  const claudeConfigPath = path.join(home, '.claude.json');
+
+  // MCP server config per CONTEXT.md/RESEARCH.md
+  const mcpConfig = {
+    type: 'stdio',
+    command: 'node',
+    args: [path.join(gsdInstallPath, 'get-shit-done', 'bin', 'gsd-mcp-server.cjs')],
+    env: {}
+  };
+
+  // Read existing config or create new
+  let config = {};
+  try {
+    const existing = fs.readFileSync(claudeConfigPath, 'utf-8');
+    config = JSON.parse(existing);
+  } catch {
+    // No existing config, start fresh
+  }
+
+  // Ensure mcpServers section exists
+  if (!config.mcpServers) {
+    config.mcpServers = {};
+  }
+
+  // Add or update gsd entry
+  config.mcpServers.gsd = mcpConfig;
+
+  // Write back
+  fs.writeFileSync(claudeConfigPath, JSON.stringify(config, null, 2) + '\n');
+
+  return true;
+}
+
+/**
  * Apply statusline config, then print completion message
  */
 function finishInstall(settingsPath, settings, statuslineCommand, shouldInstallStatusline, runtime = 'claude', isGlobal = true) {
   const isOpencode = runtime === 'opencode';
   const isCodex = runtime === 'codex';
+  const isClaude = runtime === 'claude';
 
   if (shouldInstallStatusline && !isOpencode && !isCodex) {
     settings.statusLine = {
@@ -2104,6 +2147,18 @@ function finishInstall(settingsPath, settings, statuslineCommand, shouldInstallS
   // Configure OpenCode permissions
   if (isOpencode) {
     configureOpencodePermissions(isGlobal);
+  }
+
+  // Register MCP server for Claude Code
+  if (isClaude && isGlobal) {
+    try {
+      const gsdInstallPath = getGlobalDir('claude', explicitConfigDir);
+      registerMcpServer(gsdInstallPath);
+      console.log(`  ${green}✓${reset} Registered MCP server in ~/.claude.json`);
+    } catch (err) {
+      console.log(`  ${yellow}⚠${reset} Could not register MCP server: ${err.message}`);
+      console.log(`    You can manually add it to ~/.claude.json later`);
+    }
   }
 
   let program = 'Claude Code';
