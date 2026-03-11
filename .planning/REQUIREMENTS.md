@@ -13,8 +13,8 @@ Foundation layer required for all streaming and real-time features.
 
 - [x] **INFRA-01**: WebSocket server supports bidirectional communication with auto-reconnect and state sync on reconnection
 - [x] **INFRA-02**: Token buffering system batches streaming output using requestAnimationFrame to prevent UI backpressure
-- [ ] **INFRA-03**: File locking prevents race conditions when CLI and dashboard access the same .planning/ files concurrently
-- [ ] **INFRA-04**: Security layer validates file paths, resolves symlinks, and restricts access to project directories only
+- [x] **INFRA-03**: File locking prevents race conditions when CLI and dashboard access the same .planning/ files concurrently
+- [x] **INFRA-04**: Security layer validates file paths, resolves symlinks, and restricts access to project directories only
 
 ### Dashboard (DASH)
 
@@ -132,8 +132,8 @@ Visual debugging workflow.
 |-------------|-------|--------|
 | INFRA-01 | Phase 13 | Complete |
 | INFRA-02 | Phase 13 | Complete |
-| INFRA-03 | Phase 13 | Pending |
-| INFRA-04 | Phase 13 | Pending |
+| INFRA-03 | Phase 13 | Complete |
+| INFRA-04 | Phase 13 | Complete |
 | DASH-01 | Phase 15 | Pending |
 | DASH-02 | Phase 15 | Pending |
 | DASH-03 | Phase 15 | Pending |
