@@ -17,6 +17,9 @@ coverage/
 # Monorepo build artifacts
 apps/*/dist/
 packages/*/dist/
+.turbo/
+apps/*/.turbo/
+packages/*/.turbo/
 
 # pnpm
 pnpm-lock.yaml
