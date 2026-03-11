@@ -54,7 +54,49 @@
       "created": "2026-02-24T16:14:23.047Z",
       "status": "removed",
       "removed": "2026-02-24T16:57:03.232Z"
+    },
+    "phase-11": {
+      "phase_number": "11",
+      "phase_name": "add-docs-flag-to-discuss-phase-for-document-assisted-context-extraction",
+      "branch": "phase-11-add-docs-flag-to-discuss-phase-for-document-assisted-context-extraction",
+      "path": "/Users/mauricevandermerwe/Projects/get-shit-done/.worktrees/get-shit-done-phase-11",
+      "created": "2026-03-07T05:22:15.046Z",
+      "status": "removed",
+      "removed": "2026-03-11T07:23:08.819Z"
+    },
+    "phase-09": {
+      "phase_number": "09",
+      "phase_name": "documentation",
+      "branch": "phase-09-documentation",
+      "path": "/Users/mauricevandermerwe/Projects/get-shit-done/.worktrees/get-shit-done-phase-09",
+      "created": "2026-03-10T05:08:15.127Z",
+      "status": "removed",
+      "removed": "2026-03-10T05:20:59.387Z"
+    },
+    "phase-10": {
+      "phase_number": "10",
+      "phase_name": "parallel-milestones",
+      "branch": "phase-10-parallel-milestones",
+      "path": "/Users/mauricevandermerwe/Projects/get-shit-done/.worktrees/get-shit-done-phase-10",
+      "created": "2026-03-10T05:45:14.663Z",
+      "status": "active"
+    },
+    "phase-12": {
+      "phase_number": "12",
+      "phase_name": "mcp-server-api",
+      "branch": "phase-12-mcp-server-api",
+      "path": "/Users/mauricevandermerwe/Projects/get-shit-done/.worktrees/get-shit-done-phase-12",
+      "created": "2026-03-10T07:45:40.551Z",
+      "status": "removed",
+      "removed": "2026-03-11T07:49:10.895Z"
     }
   },
-  "locks": {}
+  "locks": {
+    "phase-10": {
+      "acquired": "2026-03-10T05:45:14.500Z",
+      "owner": "mauricevandermerwe",
+      "pid": 2660,
+      "hostname": "Maurices-MacBook-Pro.local"
+    }
+  }
 }
