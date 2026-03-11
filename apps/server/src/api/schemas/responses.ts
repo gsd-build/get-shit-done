@@ -90,19 +90,13 @@ export const SocketMetricsSchema = z.object({
 export type SocketMetrics = z.infer<typeof SocketMetricsSchema>;
 
 /**
- * Security metrics from audit log
+ * Security metrics from audit log (matches @gsd/gsd-core SecurityMetrics)
  */
 export const SecurityMetricsSchema = z.object({
-  pathValidations: z.number().int().min(0),
-  blockedAccess: z.number().int().min(0),
-  symlinkResolutions: z.number().int().min(0),
-  recentBlocked: z.array(
-    z.object({
-      path: z.string(),
-      reason: z.string(),
-      timestamp: z.string().datetime(),
-    })
-  ),
+  blockedCount: z.number().int().min(0),
+  allowedCount: z.number().int().min(0),
+  symlinkCount: z.number().int().min(0),
+  deniedPatterns: z.record(z.string(), z.number().int()),
 });
 
 export type SecurityMetrics = z.infer<typeof SecurityMetricsSchema>;
