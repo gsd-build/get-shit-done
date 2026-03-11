@@ -19,6 +19,99 @@ import {
 // Active sessions by agentId
 const sessions = new Map<string, AgentSession>();
 
+// Track conversation context for mock CONTEXT.md generation
+const conversationContext = new Map<string, { messageCount: number; topics: string[] }>();
+
+/**
+ * Generate mock CONTEXT.md markdown based on conversation progress.
+ * For Phase 16 UI testing, this simulates context being gathered.
+ *
+ * IMPORTANT: Uses XML-tagged format to match CLI /gsd:discuss-phase output.
+ * The frontend parser (contextParser.ts) expects <section>...</section> tags.
+ */
+function generateMockContextMd(agentId: string, prompt: string): string {
+  const ctx = conversationContext.get(agentId) || { messageCount: 0, topics: [] };
+  ctx.messageCount++;
+
+  // Extract topics from prompt
+  const lowerPrompt = prompt.toLowerCase();
+  if (lowerPrompt.includes('goal') || lowerPrompt.includes('objective')) {
+    ctx.topics.push('goals');
+  }
+  if (lowerPrompt.includes('user') || lowerPrompt.includes('audience')) {
+    ctx.topics.push('users');
+  }
+  if (lowerPrompt.includes('tech') || lowerPrompt.includes('stack') || lowerPrompt.includes('react') || lowerPrompt.includes('typescript')) {
+    ctx.topics.push('technology');
+  }
+  if (lowerPrompt.includes('decision') || lowerPrompt.includes('decided')) {
+    ctx.topics.push('decisions');
+  }
+
+  conversationContext.set(agentId, ctx);
+
+  // Build CONTEXT.md content with decisions
+  const decisions: string[] = [];
+  const specifics: string[] = [];
+  const deferred: string[] = [];
+
+  if (ctx.topics.includes('goals')) {
+    decisions.push('- Focus on user experience as primary metric');
+    decisions.push('- Prioritize performance over feature count <!-- locked -->');
+  }
+  if (ctx.topics.includes('users')) {
+    decisions.push('- Target developers with moderate experience');
+    specifics.push('- Include onboarding flow for first-time users');
+  }
+  if (ctx.topics.includes('technology')) {
+    decisions.push('- Use React with TypeScript for frontend');
+    specifics.push('- Deploy to Vercel for initial launch');
+  }
+  if (ctx.topics.includes('decisions')) {
+    decisions.push('- User-specified decision captured from conversation');
+  }
+
+  // Always include at least one decision after first message
+  if (decisions.length === 0 && ctx.messageCount > 0) {
+    decisions.push('- Initial context gathering in progress');
+  }
+
+  // Always have a deferred item
+  deferred.push('- Future enhancement: Add AI suggestions');
+
+  // Use XML-tagged format for parser compatibility
+  return `# Phase Context
+
+<domain>
+## Phase Boundary
+
+Discussion phase for gathering project requirements and design decisions.
+
+</domain>
+
+<decisions>
+## Implementation Decisions
+
+${decisions.join('\n')}
+
+</decisions>
+
+<specifics>
+## Specific Ideas
+
+${specifics.length > 0 ? specifics.join('\n') : '(none yet)'}
+
+</specifics>
+
+<deferred>
+## Deferred Ideas
+
+${deferred.join('\n')}
+
+</deferred>
+`;
+}
+
 /**
  * Generate a contextual response for discuss-phase conversations.
  * For Phase 16 UI testing, this provides realistic mock responses.
@@ -172,16 +265,30 @@ export function createOrchestrator(io: TypedServer) {
 
       sessions.set(agentId, session);
 
-      // Emit agent:start event
-      io.to(`agent:${agentId}`).emit(EVENTS.AGENT_START, {
-        agentId,
-        planId: session.planId,
-        taskName: session.taskName,
-      });
+      // Delay to allow client to join socket room after API returns
+      // This prevents race condition where tokens are emitted before subscription
+      // 1000ms gives React time to: receive response -> update state -> trigger effect -> subscribe
+      setTimeout(async () => {
+        console.log(`[orchestrator] Starting stream for agent ${agentId} after 1s delay`);
 
-      // Simulate streaming response with typewriter effect
-      const response = generateDiscussResponse(options.prompt);
-      streamDiscussResponse(io, agentId, response).then(() => {
+        // Emit agent:start event
+        io.to(`agent:${agentId}`).emit(EVENTS.AGENT_START, {
+          agentId,
+          planId: session.planId,
+          taskName: session.taskName,
+        });
+
+        // Simulate streaming response with typewriter effect
+        const response = generateDiscussResponse(options.prompt);
+        await streamDiscussResponse(io, agentId, response);
+
+        // Generate and emit context update after response completes
+        const contextMd = generateMockContextMd(agentId, options.prompt);
+        io.to(`agent:${agentId}`).emit('context:update' as any, {
+          agentId,
+          markdown: contextMd,
+        });
+
         session.status = 'complete';
         io.to(`agent:${agentId}`).emit(EVENTS.AGENT_END, {
           agentId,
@@ -190,8 +297,11 @@ export function createOrchestrator(io: TypedServer) {
         });
 
         // Clean up after grace period
-        setTimeout(() => sessions.delete(agentId), 60000);
-      });
+        setTimeout(() => {
+          sessions.delete(agentId);
+          conversationContext.delete(agentId);
+        }, 60000);
+      }, 1000); // 1000ms delay for client subscription (React needs time to update state and run effects)
 
       return agentId;
     },
