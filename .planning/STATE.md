@@ -55,6 +55,7 @@ progress:
 | Phase 11 P02 | 98s | 3 tasks | 1 file |
 | Phase 12 P02 | 2m 14s | 3 tasks | 2 files |
 | Phase 13 P01 | 4m 17s | 2 tasks | 17 files |
+| Phase 13 P02 | 8m 34s | 3 tasks | 15 files |
 | Phase 13 P03 | 6m 37s | 3 tasks | 8 files |
 
 ## Accumulated Context
@@ -118,6 +119,9 @@ progress:
 | proper-lockfile for mkdir-based locks | POSIX-atomic, survives crashes better than flock | 2026-03-11 |
 | 30s TTL with 15s mtime refresh | Automatic stale lock detection per CONTEXT.md | 2026-03-11 |
 | Denylist check before symlink resolution | Security research: symlink attacks bypass post-resolution checks | 2026-03-11 |
+| Connection state recovery 2-minute window | Allows checkpoint dialogs to survive network interruptions | 2026-03-11 |
+| RAF token buffering with 1000 cap | requestAnimationFrame prevents UI thrashing; cap prevents memory leaks | 2026-03-11 |
+| HealthMetricsEvent for server metrics | Server-side metrics (clients, rooms, memory) broadcast every 30s | 2026-03-11 |
 
 ### Roadmap Evolution
 
