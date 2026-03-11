@@ -31,6 +31,8 @@ export function useResearchStream(socket: TypedSocket | null, phaseId: string) {
       name: event.taskName,
       status: 'running',
     });
+    // Start the elapsed time timer
+    store.startAgentTimer(event.agentId);
   }, []);
 
   const handleAgentEnd = useCallback((event: AgentEndEvent) => {

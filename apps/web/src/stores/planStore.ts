@@ -2,6 +2,7 @@
  * Plan store - Zustand store for planning state.
  *
  * Manages research agent state for swimlane visualization.
+ * Includes elapsed time tracking with intervals for running agents.
  */
 
 import { create } from 'zustand';
@@ -16,8 +17,14 @@ interface PlanStore {
   updateAgentAction: (agentId: string, action: string) => void;
   setAgentComplete: (agentId: string, summary: string) => void;
   setAgentError: (agentId: string, error: string) => void;
+  startAgentTimer: (agentId: string) => void;
+  stopAgentTimer: (agentId: string) => void;
   resetPlanState: () => void;
 }
+
+// Store interval IDs outside of Zustand state to avoid serialization issues
+const timerIntervals = new Map<string, ReturnType<typeof setInterval>>();
+const timerStartTimes = new Map<string, number>();
 
 const initialState = {
   agents: new Map<string, ResearchAgent>(),
@@ -69,6 +76,9 @@ export const usePlanStore = create<PlanStore>((set, get) => ({
   },
 
   setAgentComplete: (agentId, summary) => {
+    // Stop the timer first
+    get().stopAgentTimer(agentId);
+
     set((state) => {
       const agent = state.agents.get(agentId);
       if (!agent) return state;
@@ -80,6 +90,9 @@ export const usePlanStore = create<PlanStore>((set, get) => ({
   },
 
   setAgentError: (agentId, error) => {
+    // Stop the timer first
+    get().stopAgentTimer(agentId);
+
     set((state) => {
       const agent = state.agents.get(agentId);
       if (!agent) return state;
@@ -90,7 +103,63 @@ export const usePlanStore = create<PlanStore>((set, get) => ({
     });
   },
 
+  startAgentTimer: (agentId) => {
+    // Clear any existing timer for this agent
+    const existingInterval = timerIntervals.get(agentId);
+    if (existingInterval) {
+      clearInterval(existingInterval);
+    }
+
+    // Record start time
+    const startTime = Date.now();
+    timerStartTimes.set(agentId, startTime);
+
+    // Start interval to update elapsedMs every 100ms
+    const intervalId = setInterval(() => {
+      const elapsed = Date.now() - startTime;
+      set((state) => {
+        const agent = state.agents.get(agentId);
+        if (!agent) return state;
+
+        const newAgents = new Map(state.agents);
+        newAgents.set(agentId, { ...agent, elapsedMs: elapsed });
+        return { agents: newAgents };
+      });
+    }, 100);
+
+    timerIntervals.set(agentId, intervalId);
+  },
+
+  stopAgentTimer: (agentId) => {
+    const intervalId = timerIntervals.get(agentId);
+    if (intervalId) {
+      clearInterval(intervalId);
+      timerIntervals.delete(agentId);
+    }
+
+    // Finalize elapsed time
+    const startTime = timerStartTimes.get(agentId);
+    if (startTime) {
+      const finalElapsed = Date.now() - startTime;
+      timerStartTimes.delete(agentId);
+
+      set((state) => {
+        const agent = state.agents.get(agentId);
+        if (!agent) return state;
+
+        const newAgents = new Map(state.agents);
+        newAgents.set(agentId, { ...agent, elapsedMs: finalElapsed });
+        return { agents: newAgents };
+      });
+    }
+  },
+
   resetPlanState: () => {
+    // Stop all active timers
+    timerIntervals.forEach((intervalId) => clearInterval(intervalId));
+    timerIntervals.clear();
+    timerStartTimes.clear();
+
     set({
       agents: new Map(),
       plan: null,
