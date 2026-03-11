@@ -36,13 +36,17 @@ const mockProjects = [
   },
 ];
 
+const API_BASE = 'http://localhost:4000';
+
 export const handlers = [
   // GET /api/projects - List all projects
-  http.get('/api/projects', () => {
+  http.get(`${API_BASE}/api/projects`, () => {
     return HttpResponse.json({
       success: true,
       data: mockProjects,
       meta: {
+        timestamp: new Date().toISOString(),
+        requestId: 'mock-request-id',
         total: mockProjects.length,
         hasNextPage: false,
       },
@@ -50,7 +54,7 @@ export const handlers = [
   }),
 
   // GET /api/projects/:id - Get single project
-  http.get('/api/projects/:id', ({ params }) => {
+  http.get(`${API_BASE}/api/projects/:id`, ({ params }) => {
     const id = params['id'];
     const project = mockProjects.find((p) => p.id === id);
     if (!project) {
