@@ -5405,7 +5405,6 @@ function cmdRoadmapAnalyze(cwd, raw) {
     }
 
     // Find parallel-eligible pairs: phases with no mutual dependency
-    const incompleteNums = incompletePhases.map(function(p) { return p.number; });
     const conflictMap = {}; // file -> Set of phase numbers
 
     for (let i = 0; i < incompletePhases.length; i++) {
