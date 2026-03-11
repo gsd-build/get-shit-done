@@ -207,13 +207,13 @@ Plans:
 **Plans**: 8 plans
 
 Plans:
-- [ ] 18-01-PLAN.md — Planning state store and research agent streaming hook
-- [ ] 18-02-PLAN.md — Verification state store and test result streaming hook
-- [ ] 18-03-PLAN.md — Research agent swimlane visualization components
+- [x] 18-01-PLAN.md — Planning state store and research agent streaming hook
+- [x] 18-02-PLAN.md — Verification state store and test result streaming hook
+- [x] 18-03-PLAN.md — Research agent swimlane visualization components
 - [ ] 18-04-PLAN.md — Kanban plan preview with wave columns and inline editing
 - [ ] 18-05-PLAN.md — Verification report with header summary and requirement drill-down
 - [ ] 18-06-PLAN.md — Gap severity badges and coverage heatmap matrix
-- [ ] 18-07-PLAN.md — Manual test checklist and approval workflow with confirmation
+- [x] 18-07-PLAN.md — Manual test checklist and approval workflow with confirmation
 - [ ] 18-08-PLAN.md — Plan and verify pages with E2E tests and gap-to-planning flow
 
 ### Phase 19: Roadmap Visualization
