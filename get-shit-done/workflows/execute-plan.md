@@ -136,8 +136,10 @@ Deviations are normal — handle via rules below.
 
 1. Read @context files from prompt
 2. Per task:
+   - **MANDATORY read_first gate:** If the task has a `<read_first>` field, you MUST read every listed file BEFORE making any edits. This is not optional. Do not skip files because you "already know" what's in them — read them. The read_first files establish ground truth for the task.
    - `type="auto"`: if `tdd="true"` → TDD execution. Implement with deviation rules + auth gates. Verify done criteria. Commit (see task_commit). Track hash for Summary.
    - `type="checkpoint:*"`: STOP → checkpoint_protocol → wait for user → continue only after confirmation.
+   - **MANDATORY acceptance_criteria check:** After completing each task, if it has `<acceptance_criteria>`, verify EVERY criterion before moving to the next task. Use grep, file reads, or CLI commands to confirm each criterion. If any criterion fails, fix the implementation before proceeding. Do not skip criteria or mark them as "will verify later".
 3. Run `<verification>` checks
 4. Confirm `<success_criteria>` met
 5. Document deviations in Summary
@@ -225,6 +227,23 @@ Errors: RED doesn't fail → investigate test/existing feature. GREEN doesn't pa
 
 See `~/.claude/get-shit-done/references/tdd.md` for structure.
 </tdd_plan_execution>
+
+<precommit_failure_handling>
+## Pre-commit Hook Failure Handling
+
+Your commits may trigger pre-commit hooks. Auto-fix hooks handle themselves transparently — files get fixed and re-staged automatically.
+
+If a commit is BLOCKED by a hook:
+
+1. The `git commit` command fails with hook error output
+2. Read the error — it tells you exactly which hook and what failed
+3. Fix the issue (type error, lint violation, secret leak, etc.)
+4. `git add` the fixed files
+5. Retry the commit
+6. Do NOT use `--no-verify`
+
+This is normal and expected. Budget 1-2 retry cycles per commit.
+</precommit_failure_handling>
 
 <task_commit>
 ## Task Commit Protocol
