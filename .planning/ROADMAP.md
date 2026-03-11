@@ -117,7 +117,7 @@ Plans:
   3. Agent orchestrator streams Claude API responses with tool execution loop
   4. Checkpoint requests are relayed to frontend with idempotent response handling
   5. Rate limit errors (429) are handled with exponential backoff
-**Plans**: TBD
+**Plans**: 4 plans
 
 Plans:
 - [ ] 14-01-PLAN.md — REST API for project listing, health checks, and phase data (Hono)
@@ -135,7 +135,7 @@ Plans:
   3. User can view recent activity feed (last 5 actions) for each project
   4. User can search and filter projects by name or status
   5. User can navigate to project detail view by clicking a project card
-**Plans**: TBD
+**Plans**: 4 plans
 
 Plans:
 - [ ] 15-01-PLAN.md — Next.js 15 app with App Router, Tailwind v4, and dark mode
@@ -153,7 +153,7 @@ Plans:
   3. User can mark individual decisions as locked (must keep) vs discretionary (agent can adjust)
   4. User can refresh browser and resume discussion session where they left off
   5. User can manually edit CONTEXT.md with sync back to conversation state
-**Plans**: TBD
+**Plans**: 4 plans
 
 Plans:
 - [ ] 16-01-PLAN.md — Chat conversation interface with streaming token display
@@ -175,7 +175,7 @@ Plans:
   7. User can abort execution gracefully with rollback option
   8. User can recover from errors with retry options and context preservation
   9. Execution follows Red-Green-Refactor TDD workflow for code development tasks
-**Plans**: TBD
+**Plans**: 8 plans
 
 Plans:
 - [ ] 17-01-PLAN.md — Wave-based execution progress with log streaming
@@ -204,7 +204,7 @@ Plans:
   10. User can mark manual test items as pass/fail in checklist
   11. User can approve completed work or reject with gap selection
   12. Rejection routes to plan-phase --gaps to create fix plans automatically
-**Plans**: TBD
+**Plans**: 8 plans
 
 Plans:
 - [ ] 18-01-PLAN.md — Research streaming with agent spawn progress
@@ -226,7 +226,7 @@ Plans:
   3. User can see progress tracking per phase with visual indicators
   4. User can see phases grouped by milestone
   5. User can click phase in visualization to navigate to phase detail
-**Plans**: TBD
+**Plans**: 4 plans
 
 Plans:
 - [ ] 19-01-PLAN.md — Dependency graph with React Flow (@xyflow/react)
@@ -243,7 +243,7 @@ Plans:
   2. User can track hypotheses with evidence for/against
   3. User can collect evidence via UI (logs, screenshots, reproduction steps)
   4. User can view session history with timeline of investigations
-**Plans**: TBD
+**Plans**: 4 plans
 
 Plans:
 - [ ] 20-01-PLAN.md — Debug session creation and management
