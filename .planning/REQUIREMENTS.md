@@ -55,8 +55,8 @@ Real-time execution with streaming and checkpoints.
 - [x] **EXEC-03**: User can respond to checkpoint dialogs with timeout warning display
 - [x] **EXEC-04**: User can view file changes in Monaco DiffEditor with syntax highlighting
 - [x] **EXEC-05**: User can see git commit timeline showing commits created during execution
-- [ ] **EXEC-06**: User can pause execution and resume from the paused state
-- [ ] **EXEC-07**: User can abort execution gracefully with rollback option
+- [x] **EXEC-06**: User can pause execution and resume from the paused state
+- [x] **EXEC-07**: User can abort execution gracefully with rollback option
 - [x] **EXEC-08**: User can recover from errors with retry options and context preservation
 
 ### Execute Quality (QUAL)
@@ -154,8 +154,8 @@ Visual debugging workflow.
 | EXEC-03 | Phase 17 | Complete |
 | EXEC-04 | Phase 17 | Complete |
 | EXEC-05 | Phase 17 | Complete |
-| EXEC-06 | Phase 17 | Pending |
-| EXEC-07 | Phase 17 | Pending |
+| EXEC-06 | Phase 17 | Complete |
+| EXEC-07 | Phase 17 | Complete |
 | EXEC-08 | Phase 17 | Complete |
 | QUAL-01 | Phase 17 | Pending |
 | QUAL-02 | Phase 17 | Pending |
