@@ -34,7 +34,7 @@ This roadmap delivers the GSD (Get Shit Done) meta-prompting framework across mu
 ### v2.0 Phases
 
 - [x] **Phase 13: Foundation Infrastructure** - WebSocket server, token buffering, file locking, and security layer (completed 2026-03-11)
-- [ ] **Phase 14: Backend Core** - REST API, agent orchestrator, and WebSocket connection management
+- [x] **Phase 14: Backend Core** - REST API, agent orchestrator, and WebSocket connection management (completed 2026-03-11)
 - [ ] **Phase 15: Frontend Foundation & Dashboard** - Next.js app with project listing, health indicators, and navigation
 - [ ] **Phase 16: Discuss Phase UI** - Chat interface with streaming and CONTEXT.md preview
 - [ ] **Phase 17: Execute Phase UI** - Execution streaming, tool visualization, checkpoints, and TDD workflow
@@ -391,7 +391,7 @@ Phases execute in numeric order: 13 -> 14 -> 15 -> 16 -> 17 -> 18 -> 19 -> 20
 | Phase | Plans Complete | Status | Completed |
 |-------|----------------|--------|-----------|
 | 13. Foundation Infrastructure | 3/3 | Complete    | 2026-03-11 |
-| 14. Backend Core | 3/4 | In Progress|  |
+| 14. Backend Core | 4/4 | Complete   | 2026-03-11 |
 | 15. Frontend Foundation & Dashboard | 0/4 | Not started | - |
 | 16. Discuss Phase UI | 0/4 | Not started | - |
 | 17. Execute Phase UI | 0/8 | Not started | - |

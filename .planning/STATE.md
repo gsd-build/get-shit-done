@@ -3,8 +3,8 @@ gsd_state_version: 1.0
 milestone: v1.1
 milestone_name: Completed Phases
 status: completed
-last_updated: "2026-03-11T11:30:34.000Z"
-last_activity: 2026-03-11 — Completed plan 14-03 (Agent Orchestrator)
+last_updated: "2026-03-11T11:38:32.000Z"
+last_activity: 2026-03-11 — Completed plan 14-04 (Checkpoint Handling and Agent REST API)
 progress:
   total_phases: 15
   completed_phases: 10
@@ -23,12 +23,12 @@ progress:
 ## Current Position
 
 **Phase:** 14 - Backend Core
-**Plan:** 14-03 complete
-**Status:** In progress
-**Last activity:** 2026-03-11 — Completed plan 14-03 (Agent Orchestrator)
+**Plan:** 14-04 complete
+**Status:** Complete
+**Last activity:** 2026-03-11 — Completed plan 14-04 (Checkpoint Handling and Agent REST API)
 
 ```
-[###############-----] 75% - Phase 14 plan 03 of 04 complete
+[####################] 100% - Phase 14 plan 04 of 04 complete
 ```
 
 **Phases:**
@@ -42,7 +42,7 @@ progress:
 - [x] Phase 11: Add --docs Flag to discuss-phase (2 requirements) - complete
 - [x] Phase 12: MCP Server API (5 requirements) - complete
 - [x] Phase 13: Foundation Infrastructure (4 requirements) - complete
-- [ ] Phase 14: Backend Core - in progress (3/4 plans)
+- [x] Phase 14: Backend Core (4 plans) - complete
 
 ## Performance Metrics
 
@@ -61,6 +61,7 @@ progress:
 | Phase 14 P01 | 7m 7s | 2 tasks | 12 files |
 | Phase 14 P02 | 8m 35s | 2 tasks | 9 files |
 | Phase 14 P03 | 4m 8s | 3 tasks | 8 files |
+| Phase 14 P04 | 5m | 3 tasks | 7 files |
 
 ## Accumulated Context
 
@@ -135,6 +136,9 @@ progress:
 | Agent loop pattern | Stream tokens -> check tools -> execute parallel -> feed results -> repeat | 2026-03-11 |
 | 429 retry with exponential backoff | 1s, 2s, 4s delays with jitter, max 3 attempts | 2026-03-11 |
 | Tool errors to Claude | Return is_error tool results for LLM reasoning about failures | 2026-03-11 |
+| Idempotency via checkpoint ID + hash | Accept first response, acknowledge duplicate same response, reject different responses | 2026-03-11 |
+| exactOptionalPropertyTypes spread pattern | Use ...(value && { key: value }) to avoid undefined in optional properties | 2026-03-11 |
+| Request body event-based buffering | Collect chunks with 'data' event, process on 'end' for POST/PUT/PATCH/DELETE | 2026-03-11 |
 
 ### Roadmap Evolution
 
@@ -194,6 +198,7 @@ progress:
 - [x] Execute plan 14-01 (REST API for project listing and health)
 - [x] Execute plan 14-02 (GSD wrapper for async TypeScript)
 - [x] Execute plan 14-03 (Agent Orchestrator with Claude streaming)
+- [x] Execute plan 14-04 (Checkpoint handling and Agent REST API)
 
 ### Blockers
 
@@ -201,13 +206,13 @@ None currently.
 
 ## Session Continuity
 
-**Last Session:** 2026-03-11T11:30:34.000Z
-**Context:** Completed Phase 14 Plan 03 - Agent orchestrator with Claude API streaming.
+**Last Session:** 2026-03-11T11:38:32.000Z
+**Context:** Completed Phase 14 Plan 04 - Checkpoint handling and Agent REST API. Phase 14 complete.
 
 **To Resume:**
-1. Phase 14 plan 03 complete: createOrchestrator factory, runAgentLoop, withRetry, tool registry
-2. Continue with Phase 14 plan 04 (REST API integration with orchestrator)
-3. Orchestrator streams tokens to WebSocket clients, executes tools in parallel
+1. Phase 14 complete: All 4 plans executed (REST API, GSD Wrapper, Orchestrator, Checkpoint + Agent API)
+2. Ready to finalize phase 14 and merge to main
+3. Full backend stack: Socket.IO + Hono REST API + Agent orchestrator with checkpoints
 
 
 ### Sync History
@@ -217,10 +222,11 @@ None currently.
 
 ---
 *State initialized: 2026-02-23*
-*Last updated: 2026-03-11 (Phase 14 plan 03 complete)*
+*Last updated: 2026-03-11 (Phase 14 plan 04 complete - phase complete)*
 
 ## Recent Activity
 
+- 2026-03-11 — Completed plan 14-04 (Checkpoint Handling and Agent REST API) - Phase 14 complete
 - 2026-03-11 — Completed plan 14-03 (Agent Orchestrator)
 - 2026-03-11 — Completed plan 14-02 (GSD Wrapper)
 - 2026-03-11 — Completed plan 14-01 (REST API for Project Listing and Health)
