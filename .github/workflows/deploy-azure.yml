@@ -1,0 +1,132 @@
+name: Deploy to Azure Container Apps
+
+on:
+  push:
+    branches:
+      - main
+    paths:
+      - 'apps/server/**'
+      - 'apps/web/**'
+      - 'packages/**'
+      - '.github/workflows/deploy-azure.yml'
+  workflow_dispatch:
+    inputs:
+      environment:
+        description: 'Environment to deploy to'
+        required: true
+        default: 'prod'
+        type: choice
+        options:
+          - prod
+
+concurrency:
+  group: deploy-${{ github.event.inputs.environment || 'prod' }}
+  cancel-in-progress: false
+
+env:
+  ACR_NAME: gsdlabsacr
+  ACR_LOGIN_SERVER: gsdlabsacr.azurecr.io
+  RESOURCE_GROUP: rg-gsd-labs
+  SERVER_APP_NAME: ca-gsd-server
+  WEB_APP_NAME: ca-gsd-web
+  API_URL: https://api.labs.aversoft.net
+  WEB_URL: https://labs.aversoft.net
+
+jobs:
+  build-and-push:
+    name: Build and Push Images
+    runs-on: ubuntu-latest
+    outputs:
+      image_tag: ${{ steps.meta.outputs.image_tag }}
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set image tag
+        id: meta
+        run: |
+          IMAGE_TAG="${GITHUB_SHA::8}"
+          echo "image_tag=${IMAGE_TAG}" >> $GITHUB_OUTPUT
+          echo "Image tag: ${IMAGE_TAG}"
+
+      - name: Login to Azure
+        uses: azure/login@v2
+        with:
+          creds: ${{ secrets.AZURE_CREDENTIALS }}
+
+      - name: Login to ACR
+        uses: azure/docker-login@v2
+        with:
+          login-server: ${{ env.ACR_LOGIN_SERVER }}
+          username: ${{ secrets.ACR_USERNAME }}
+          password: ${{ secrets.ACR_PASSWORD }}
+
+      - name: Build and push server image
+        run: |
+          docker build \
+            -f apps/server/Dockerfile \
+            -t ${{ env.ACR_LOGIN_SERVER }}/gsd-server:${{ steps.meta.outputs.image_tag }} \
+            -t ${{ env.ACR_LOGIN_SERVER }}/gsd-server:latest \
+            .
+          docker push ${{ env.ACR_LOGIN_SERVER }}/gsd-server:${{ steps.meta.outputs.image_tag }}
+          docker push ${{ env.ACR_LOGIN_SERVER }}/gsd-server:latest
+
+      - name: Build and push web image
+        run: |
+          docker build \
+            -f apps/web/Dockerfile \
+            --build-arg NEXT_PUBLIC_API_URL=${{ env.API_URL }} \
+            --build-arg NEXT_PUBLIC_SOCKET_URL=${{ env.API_URL }} \
+            -t ${{ env.ACR_LOGIN_SERVER }}/gsd-web:${{ steps.meta.outputs.image_tag }} \
+            -t ${{ env.ACR_LOGIN_SERVER }}/gsd-web:latest \
+            .
+          docker push ${{ env.ACR_LOGIN_SERVER }}/gsd-web:${{ steps.meta.outputs.image_tag }}
+          docker push ${{ env.ACR_LOGIN_SERVER }}/gsd-web:latest
+
+  deploy:
+    name: Deploy to Azure
+    needs: build-and-push
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Login to Azure
+        uses: azure/login@v2
+        with:
+          creds: ${{ secrets.AZURE_CREDENTIALS }}
+
+      - name: Deploy Server Container App
+        uses: azure/container-apps-deploy-action@v2
+        with:
+          resourceGroup: ${{ env.RESOURCE_GROUP }}
+          containerAppName: ${{ env.SERVER_APP_NAME }}
+          imageToDeploy: ${{ env.ACR_LOGIN_SERVER }}/gsd-server:${{ needs.build-and-push.outputs.image_tag }}
+
+      - name: Deploy Web Container App
+        uses: azure/container-apps-deploy-action@v2
+        with:
+          resourceGroup: ${{ env.RESOURCE_GROUP }}
+          containerAppName: ${{ env.WEB_APP_NAME }}
+          imageToDeploy: ${{ env.ACR_LOGIN_SERVER }}/gsd-web:${{ needs.build-and-push.outputs.image_tag }}
+
+      - name: Get deployment URLs
+        run: |
+          SERVER_FQDN=$(az containerapp show \
+            --name ${{ env.SERVER_APP_NAME }} \
+            --resource-group ${{ env.RESOURCE_GROUP }} \
+            --query properties.configuration.ingress.fqdn \
+            --output tsv)
+
+          WEB_FQDN=$(az containerapp show \
+            --name ${{ env.WEB_APP_NAME }} \
+            --resource-group ${{ env.RESOURCE_GROUP }} \
+            --query properties.configuration.ingress.fqdn \
+            --output tsv)
+
+          echo "## Deployment Complete" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "- **Server**: https://${SERVER_FQDN}" >> $GITHUB_STEP_SUMMARY
+          echo "- **Web**: https://${WEB_FQDN}" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "Custom domain: https://labs.aversoft.net" >> $GITHUB_STEP_SUMMARY
