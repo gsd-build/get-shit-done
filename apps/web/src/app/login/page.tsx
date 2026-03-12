@@ -57,7 +57,9 @@ export default function LoginPage() {
             </label>
             <input
               id="username"
+              name="username"
               type="text"
+              autoComplete="username"
               value={username}
               onChange={(e) => setUsername(e.target.value)}
               className="w-full px-3 py-2 rounded-md border border-border bg-background text-foreground focus:outline-none focus:ring-2 focus:ring-primary"
@@ -72,7 +74,9 @@ export default function LoginPage() {
             </label>
             <input
               id="password"
+              name="password"
               type="password"
+              autoComplete="current-password"
               value={password}
               onChange={(e) => setPassword(e.target.value)}
               className="w-full px-3 py-2 rounded-md border border-border bg-background text-foreground focus:outline-none focus:ring-2 focus:ring-primary"

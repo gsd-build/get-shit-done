@@ -14,6 +14,7 @@ import { registerHandlers } from './socket/handlers.js';
 import { createSecurityConfig, getSecurityMetrics } from './middleware/security.js';
 import { createApi } from './api/index.js';
 import { createOrchestrator } from './orchestrator/index.js';
+import { getAllowedOrigins } from './config/cors.js';
 
 const PORT = parseInt(process.env['PORT'] ?? '4000', 10);
 
@@ -54,9 +55,11 @@ const cleanupApi = createApi(httpServer, io, {
 
 // Start listening
 httpServer.listen(PORT, () => {
+  const allowedOrigins = getAllowedOrigins();
   console.log(`[server] GSD Dashboard Server listening on port ${PORT}`);
   console.log(`[server] REST API: http://localhost:${PORT}/api`);
   console.log(`[server] Socket.IO: ws://localhost:${PORT}`);
+  console.log(`[server] CORS allowed origins: ${allowedOrigins.join(', ')}`);
   console.log(`[server] Security configured for: ${PROJECT_ROOT}`);
   console.log(`[server] Project search paths: ${SEARCH_PATHS.join(', ')}`);
   console.log(`[server] Connection state recovery: 2 minutes`);

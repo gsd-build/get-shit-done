@@ -11,10 +11,18 @@ import type { NextRequest } from 'next/server';
 export function middleware(request: NextRequest) {
   const pathname = request.nextUrl.pathname;
 
+  // Explicitly satisfy browser favicon requests in environments
+  // where no branded icon asset is configured yet.
+  if (pathname === '/favicon.ico') {
+    return new NextResponse(null, {
+      status: 204,
+      headers: { 'Cache-Control': 'public, max-age=86400' },
+    });
+  }
+
   // Skip auth for static files, Next.js internals, and API routes
   if (
     pathname.startsWith('/_next') ||
-    pathname.startsWith('/favicon') ||
     pathname.startsWith('/api/') ||
     pathname === '/login' ||
     pathname.includes('.')
@@ -38,12 +46,6 @@ export function middleware(request: NextRequest) {
 
 export const config = {
   matcher: [
-    /*
-     * Match all request paths except:
-     * - _next/static (static files)
-     * - _next/image (image optimization files)
-     * - favicon.ico (favicon file)
-     */
-    '/((?!_next/static|_next/image|favicon.ico).*)',
+    '/((?!_next/static|_next/image).*)',
   ],
 };
