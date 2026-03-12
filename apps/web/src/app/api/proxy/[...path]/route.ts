@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { cookies } from 'next/headers';
 
-const API_BASE = process.env['NEXT_PUBLIC_API_URL'] || 'http://localhost:4000';
+const API_BASE = process.env['API_URL'] || process.env['NEXT_PUBLIC_API_URL'] || 'http://localhost:4000';
 const AUTH_USERNAME = process.env['AUTH_USERNAME'];
 const AUTH_PASSWORD = process.env['AUTH_PASSWORD'];
 
@@ -50,9 +50,13 @@ async function handler(
     const data = await response.json();
     return NextResponse.json(data, { status: response.status });
   } catch (error) {
-    console.error('Proxy error:', error);
+    console.error('Proxy error:', error, 'URL:', url.toString());
     return NextResponse.json(
-      { error: 'Failed to fetch from API' },
+      {
+        error: 'Failed to fetch from API',
+        url: url.toString(),
+        message: error instanceof Error ? error.message : 'Unknown error'
+      },
       { status: 500 }
     );
   }
