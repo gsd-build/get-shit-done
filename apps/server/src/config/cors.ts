@@ -19,13 +19,27 @@ function splitOrigins(value: string | undefined): string[] {
 }
 
 export function getAllowedOrigins(): string[] {
+  const envDerivedOrigins = [
+    process.env['WEB_URL'],
+    process.env['NEXT_PUBLIC_WEB_URL'],
+    process.env['APP_URL'],
+    process.env['FRONTEND_URL'],
+  ]
+    .map((origin) => origin?.trim())
+    .filter((origin): origin is string => Boolean(origin));
+
   const envOrigins = [
     ...splitOrigins(process.env['CORS_ORIGINS']),
     ...splitOrigins(process.env['CORS_ORIGIN']),
+    ...envDerivedOrigins,
   ];
 
   if (envOrigins.length > 0) {
     return Array.from(new Set(envOrigins));
+  }
+
+  if (process.env['NODE_ENV'] === 'production') {
+    return [];
   }
 
   return DEFAULT_ORIGINS;

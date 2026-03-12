@@ -103,6 +103,15 @@ jobs:
           containerAppName: ${{ env.SERVER_APP_NAME }}
           imageToDeploy: ${{ env.ACR_LOGIN_SERVER }}/gsd-server:${{ needs.build-and-push.outputs.image_tag }}
 
+      - name: Enforce server runtime CORS origins
+        run: |
+          az containerapp update \
+            --name ${{ env.SERVER_APP_NAME }} \
+            --resource-group ${{ env.RESOURCE_GROUP }} \
+            --set-env-vars \
+              CORS_ORIGINS=${{ env.WEB_URL }} \
+              WEB_URL=${{ env.WEB_URL }}
+
       - name: Deploy Web Container App
         uses: azure/container-apps-deploy-action@v2
         with:
