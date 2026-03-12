@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useState, useRef } from 'react';
+import { useEffect, useState, useRef, useCallback } from 'react';
 import { createSocketClient, type TypedSocket } from '@gsd/events';
 
 /**
@@ -10,7 +10,7 @@ import { createSocketClient, type TypedSocket } from '@gsd/events';
  * connection state automatically. Cleans up on unmount.
  *
  * @param url - Socket.IO server URL
- * @returns Object with socket instance and connection status
+ * @returns Object with socket instance, connection status, and reconnect function
  */
 export function useSocket(url: string) {
   const [isConnected, setIsConnected] = useState(false);
@@ -38,5 +38,13 @@ export function useSocket(url: string) {
     };
   }, [url]);
 
-  return { socket: socketRef.current, isConnected };
+  // Manual reconnect function
+  const reconnect = useCallback(() => {
+    if (socketRef.current) {
+      socketRef.current.disconnect();
+      socketRef.current.connect();
+    }
+  }, []);
+
+  return { socket: socketRef.current, isConnected, reconnect };
 }

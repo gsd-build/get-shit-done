@@ -11,9 +11,11 @@
 
 import { useParams, useRouter, useSearchParams } from 'next/navigation';
 import { useCallback, useEffect, useMemo, useState } from 'react';
-import { ArrowLeft, Wifi, WifiOff } from 'lucide-react';
+import { ArrowLeft } from 'lucide-react';
 import { EVENTS } from '@gsd/events';
 import { ExecutionPanel } from '@/components/features/execute';
+import { ConnectionStatus } from '@/components/features/execute/ConnectionStatus';
+import { EmptyState } from '@/components/features/execute/EmptyState';
 import type { Wave } from '@/components/features/execute/WaveColumn';
 import { useSocket } from '@/hooks/useSocket';
 import { useAgentSubscription } from '@/hooks/useAgentSubscription';
@@ -21,7 +23,18 @@ import { useCheckpointResponse } from '@/hooks/useCheckpointResponse';
 import { useExecutionStore, selectPlans, selectStatus } from '@/stores/executionStore';
 
 // Socket.IO server URL - configurable via env
-const SOCKET_URL = process.env['NEXT_PUBLIC_SOCKET_URL'] || 'http://localhost:3001';
+const SOCKET_URL = process.env['NEXT_PUBLIC_SOCKET_URL'] || 'http://localhost:4000';
+
+// API base URL
+const API_URL = process.env['NEXT_PUBLIC_API_URL'] || 'http://localhost:4000';
+
+interface Phase {
+  number: number;
+  name: string;
+  status: string;
+  plans: number;
+  completedPlans: number;
+}
 
 /**
  * Build waves from the execution store plans.
@@ -78,8 +91,14 @@ export default function ExecutePage() {
   // Track the active agent ID
   const [activeAgentId, setActiveAgentId] = useState<string | null>(agentIdFromUrl);
 
+  // Track phases and execution state
+  const [phases, setPhases] = useState<Phase[]>([]);
+  const [selectedPhase, setSelectedPhase] = useState<number | null>(null);
+  const [isStarting, setIsStarting] = useState(false);
+  const [startError, setStartError] = useState<string | null>(null);
+
   // Connect to Socket.IO server
-  const { socket, isConnected } = useSocket(SOCKET_URL);
+  const { socket, isConnected, reconnect } = useSocket(SOCKET_URL);
 
   // Subscribe to agent events
   useAgentSubscription(socket, activeAgentId);
@@ -90,7 +109,7 @@ export default function ExecutePage() {
   // Get execution state from store
   const plans = useExecutionStore(selectPlans);
   const status = useExecutionStore(selectStatus);
-  const store = useExecutionStore();
+  const reset = useExecutionStore((s) => s.reset);
 
   // Build waves from plans
   const waves = useMemo(() => buildWavesFromPlans(plans), [plans]);
@@ -124,9 +143,62 @@ export default function ExecutePage() {
   // Reset store when leaving the page
   useEffect(() => {
     return () => {
-      store.reset();
+      reset();
     };
-  }, [store]);
+  }, [reset]);
+
+  // Fetch phases for the project
+  useEffect(() => {
+    const fetchPhases = async () => {
+      try {
+        const response = await fetch(`${API_URL}/api/projects/${projectId}/phases`);
+        if (!response.ok) return;
+        const json = await response.json();
+        const phaseList = json.data?.phases ?? [];
+        setPhases(phaseList);
+        // Auto-select first phase that's not completed
+        const readyPhase = phaseList.find((p: Phase) => p.status !== 'completed');
+        if (readyPhase) {
+          setSelectedPhase(readyPhase.number);
+        }
+      } catch {
+        // Ignore errors - phases are optional
+      }
+    };
+    fetchPhases();
+  }, [projectId]);
+
+  // Start execution for selected phase
+  const handleStartExecution = async () => {
+    if (!selectedPhase || isStarting) return;
+
+    setIsStarting(true);
+    setStartError(null);
+
+    try {
+      const response = await fetch(`${API_URL}/api/projects/${projectId}/execute`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ phaseNumber: selectedPhase }),
+      });
+
+      const json = await response.json();
+
+      if (!response.ok) {
+        throw new Error(json.error?.message || 'Failed to start execution');
+      }
+
+      // Subscribe to first agent's events
+      const agents = json.data?.agents ?? [];
+      if (agents.length > 0 && agents[0].agentId) {
+        setActiveAgentId(agents[0].agentId);
+      }
+    } catch (err) {
+      setStartError((err as Error).message);
+    } finally {
+      setIsStarting(false);
+    }
+  };
 
   return (
     <div className="h-screen flex flex-col bg-background">
@@ -142,26 +214,13 @@ export default function ExecutePage() {
         </button>
 
         <div className="flex items-center gap-4">
-          {/* Connection status indicator */}
-          <div
-            data-testid="connection-status"
-            data-connected={isConnected}
-            className={`flex items-center gap-1.5 text-xs ${
-              isConnected ? 'text-green-500' : 'text-red-500'
-            }`}
-          >
-            {isConnected ? (
-              <>
-                <Wifi className="w-3.5 h-3.5" />
-                <span>Connected</span>
-              </>
-            ) : (
-              <>
-                <WifiOff className="w-3.5 h-3.5" />
-                <span>Disconnected</span>
-              </>
-            )}
-          </div>
+          {/* Connection status with recovery CTAs */}
+          <ConnectionStatus
+            isConnected={isConnected}
+            socketUrl={SOCKET_URL}
+            apiUrl={API_URL}
+            onRetryConnection={reconnect}
+          />
 
           {/* Execution status badge */}
           {status !== 'idle' && (
@@ -197,18 +256,16 @@ export default function ExecutePage() {
       {/* Empty state when no execution is running */}
       {status === 'idle' && waves.length === 0 && (
         <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
-          <div className="text-center pointer-events-auto">
-            <h2 className="text-xl font-semibold text-foreground mb-2">
-              No Execution Running
-            </h2>
-            <p className="text-muted-foreground mb-4">
-              Start a plan execution to see real-time progress here.
-            </p>
-            {!isConnected && (
-              <p className="text-sm text-yellow-600 dark:text-yellow-400">
-                Socket.IO server is not connected. Make sure the backend is running.
-              </p>
-            )}
+          <div className="pointer-events-auto">
+            <EmptyState
+              isConnected={isConnected}
+              phases={phases}
+              selectedPhase={selectedPhase}
+              isStarting={isStarting}
+              startError={startError}
+              onPhaseSelect={setSelectedPhase}
+              onStartExecution={handleStartExecution}
+            />
           </div>
         </div>
       )}

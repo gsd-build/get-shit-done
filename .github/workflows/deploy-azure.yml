@@ -1,6 +1,14 @@
 name: Deploy to Azure Container Apps
 
 on:
+  push:
+    branches:
+      - main
+    paths:
+      - 'apps/server/**'
+      - 'apps/web/**'
+      - 'packages/**'
+      - '.github/workflows/deploy-azure.yml'
   workflow_dispatch:
     inputs:
       environment:
@@ -21,6 +29,8 @@ env:
   RESOURCE_GROUP: rg-gsd-labs
   SERVER_APP_NAME: ca-gsd-server
   WEB_APP_NAME: ca-gsd-web
+  API_URL: https://api.labs.aversoft.net
+  WEB_URL: https://labs.aversoft.net
 
 jobs:
   build-and-push:
@@ -65,8 +75,8 @@ jobs:
         run: |
           docker build \
             -f apps/web/Dockerfile \
-            --build-arg NEXT_PUBLIC_API_URL=https://ca-gsd-server.internal.${{ env.RESOURCE_GROUP }}.azurecontainerapps.io \
-            --build-arg NEXT_PUBLIC_SOCKET_URL=https://ca-gsd-server.internal.${{ env.RESOURCE_GROUP }}.azurecontainerapps.io \
+            --build-arg NEXT_PUBLIC_API_URL=${{ env.API_URL }} \
+            --build-arg NEXT_PUBLIC_SOCKET_URL=${{ env.API_URL }} \
             -t ${{ env.ACR_LOGIN_SERVER }}/gsd-web:${{ steps.meta.outputs.image_tag }} \
             -t ${{ env.ACR_LOGIN_SERVER }}/gsd-web:latest \
             .
