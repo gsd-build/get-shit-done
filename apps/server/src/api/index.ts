@@ -24,6 +24,7 @@ import { createPhasesRoutes } from './routes/phases.js';
 import { createAgentRoutes } from './routes/agents.js';
 import { createExecuteRoutes } from './routes/execute.js';
 import type { Orchestrator } from '../orchestrator/index.js';
+import { getAllowedOrigins, resolveCorsOrigin } from '../config/cors.js';
 
 // Auth credentials from environment
 const AUTH_USERNAME = process.env['AUTH_USERNAME'];
@@ -53,6 +54,8 @@ export function createApi(
   io: SocketServer,
   config: ApiConfig = {}
 ): () => void {
+  const allowedOrigins = getAllowedOrigins();
+
   // Default search paths: parent directory and home projects
   const searchPaths = config.searchPaths ?? [
     process.cwd(),
@@ -62,20 +65,16 @@ export function createApi(
   // Create Hono app
   const app = new Hono().basePath('/api');
 
-  // Apply CORS middleware (allow frontend origins)
-  app.use('*', cors({
-    origin: (origin) => {
-      // Allow localhost for development
-      if (origin?.startsWith('http://localhost:')) return origin;
-      // Allow Azure Container Apps and custom domain
-      if (origin?.endsWith('.azurecontainerapps.io')) return origin;
-      if (origin?.endsWith('labs.aversoft.net')) return origin;
-      return null;
-    },
-    allowMethods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
-    allowHeaders: ['Content-Type', 'Authorization'],
-    credentials: true,
-  }));
+  // Apply CORS middleware (must be before other middleware)
+  app.use(
+    '*',
+    cors({
+      origin: (origin) => resolveCorsOrigin(origin, allowedOrigins),
+      allowMethods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
+      allowHeaders: ['Content-Type', 'Authorization'],
+      credentials: true,
+    })
+  );
 
   // Apply Basic Auth if credentials are configured (skip health endpoint)
   if (AUTH_ENABLED) {
@@ -85,7 +84,6 @@ export function createApi(
         return next();
       }
 
-      // Apply basic auth
       const auth = basicAuth({
         username: AUTH_USERNAME!,
         password: AUTH_PASSWORD!,
