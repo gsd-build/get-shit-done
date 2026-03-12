@@ -11,11 +11,14 @@
     "test": "vitest",
     "test:coverage": "vitest run --coverage",
     "e2e": "playwright test",
-    "e2e:ui": "playwright test --ui"
+    "e2e:ui": "playwright test --ui",
+    "test:reset-fixture": "./tests/fixtures/reset-todo-app.sh"
   },
   "dependencies": {
     "@gsd/events": "workspace:*",
-    "@radix-ui/react-collapsible": "^1.1.12",
+    "@monaco-editor/react": "^4.7.0",
+    "@radix-ui/react-accordion": "^1.2.12",
+    "@radix-ui/react-dialog": "^1.1.15",
     "@radix-ui/react-popover": "^1.1.2",
     "clsx": "^2.1.1",
     "date-fns": "^4.1.0",
@@ -23,11 +26,8 @@
     "next": "^15.1.0",
     "next-themes": "^0.4.4",
     "react": "^19.0.0",
-    "react-contenteditable": "^3.3.7",
     "react-dom": "^19.0.0",
-    "react-markdown": "^10.1.0",
     "react-resizable-panels": "^4.7.2",
-    "remark-gfm": "^4.0.1",
     "zustand": "^5.0.11"
   },
   "devDependencies": {
