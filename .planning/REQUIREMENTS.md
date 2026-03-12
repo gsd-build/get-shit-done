@@ -19,9 +19,9 @@ Requirements for initial release. Each maps to roadmap phases.
 ### Execution
 
 - [ ] **EXEC-01**: Multiple ClaudeService instances run simultaneously, one per parallel phase
-- [ ] **EXEC-02**: Each parallel phase runs the full lifecycle (discuss → plan → execute → verify) independently
+- [ ] **EXEC-02**: Each parallel phase runs the full lifecycle (discuss -> plan -> execute -> verify) independently
 - [ ] **EXEC-03**: Phase completion updates are atomic and conflict-free across concurrent workers
-- [ ] **EXEC-04**: State consistency is maintained — STATE.md and state.json reflect accurate parallel status
+- [ ] **EXEC-04**: State consistency is maintained -- STATE.md and state.json reflect accurate parallel status
 
 ### Git Isolation
 
@@ -69,7 +69,7 @@ Deferred to future release. Tracked but not in current roadmap.
 
 | Feature | Reason |
 |---------|--------|
-| Distributed execution across machines | Requires network coordination, shared state, auth — completely different architecture |
+| Distributed execution across machines | Requires network coordination, shared state, auth -- completely different architecture |
 | Dynamic worker scaling mid-run | Massive complexity for marginal gain; static concurrency is sufficient |
 | Cross-phase file locking | Hides dependency design problems; worktrees provide proper isolation |
 | Automatic retry on failure | AI agent phases are not idempotent; gap-iteration handles recovery |
@@ -80,38 +80,38 @@ Deferred to future release. Tracked but not in current roadmap.
 
 | Requirement | Phase | Status |
 |-------------|-------|--------|
-| SCHED-01 | — | Pending |
-| SCHED-02 | — | Pending |
-| SCHED-03 | — | Pending |
-| SCHED-04 | — | Pending |
-| SCHED-05 | — | Pending |
-| SCHED-06 | — | Pending |
-| EXEC-01 | — | Pending |
-| EXEC-02 | — | Pending |
-| EXEC-03 | — | Pending |
-| EXEC-04 | — | Pending |
-| GIT-01 | — | Pending |
-| GIT-02 | — | Pending |
-| GIT-03 | — | Pending |
-| GIT-04 | — | Pending |
-| GIT-05 | — | Pending |
-| GIT-06 | — | Pending |
-| FAIL-01 | — | Pending |
-| FAIL-02 | — | Pending |
-| FAIL-03 | — | Pending |
-| FAIL-04 | — | Pending |
-| EVNT-01 | — | Pending |
-| EVNT-02 | — | Pending |
-| EVNT-03 | — | Pending |
-| DASH-01 | — | Pending |
-| DASH-02 | — | Pending |
-| DASH-03 | — | Pending |
+| SCHED-01 | Phase 2 | Pending |
+| SCHED-02 | Phase 1 | Pending |
+| SCHED-03 | Phase 2 | Pending |
+| SCHED-04 | Phase 2 | Pending |
+| SCHED-05 | Phase 1 | Pending |
+| SCHED-06 | Phase 1 | Pending |
+| EXEC-01 | Phase 2 | Pending |
+| EXEC-02 | Phase 2 | Pending |
+| EXEC-03 | Phase 1 | Pending |
+| EXEC-04 | Phase 1 | Pending |
+| GIT-01 | Phase 2 | Pending |
+| GIT-02 | Phase 2 | Pending |
+| GIT-03 | Phase 3 | Pending |
+| GIT-04 | Phase 3 | Pending |
+| GIT-05 | Phase 3 | Pending |
+| GIT-06 | Phase 2 | Pending |
+| FAIL-01 | Phase 3 | Pending |
+| FAIL-02 | Phase 3 | Pending |
+| FAIL-03 | Phase 3 | Pending |
+| FAIL-04 | Phase 3 | Pending |
+| EVNT-01 | Phase 1 | Pending |
+| EVNT-02 | Phase 1 | Pending |
+| EVNT-03 | Phase 4 | Pending |
+| DASH-01 | Phase 4 | Pending |
+| DASH-02 | Phase 4 | Pending |
+| DASH-03 | Phase 4 | Pending |
 
 **Coverage:**
 - v1 requirements: 26 total
-- Mapped to phases: 0
-- Unmapped: 26 ⚠️
+- Mapped to phases: 26
+- Unmapped: 0
 
 ---
 *Requirements defined: 2026-03-11*
-*Last updated: 2026-03-11 after initial definition*
+*Last updated: 2026-03-11 after roadmap creation*
