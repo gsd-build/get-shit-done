@@ -1,7 +1,7 @@
 import type { Project, ApiEnvelope, ApiMeta } from '@/types';
 
-const API_BASE =
-  process.env['NEXT_PUBLIC_API_URL'] || 'http://localhost:4000';
+// Use local proxy to add authentication to API calls
+const API_BASE = '/api/proxy';
 
 export interface ProjectsResponse extends ApiEnvelope<Project[]> {
   meta: ApiMeta & {
@@ -17,13 +17,13 @@ export interface ProjectsResponse extends ApiEnvelope<Project[]> {
  * @returns Projects response with envelope structure
  */
 export async function fetchProjects(cursor?: string): Promise<ProjectsResponse> {
-  const url = new URL('/api/projects', API_BASE);
+  let url = `${API_BASE}/projects`;
   if (cursor) {
-    url.searchParams.set('cursor', cursor);
+    url += `?cursor=${encodeURIComponent(cursor)}`;
   }
 
   try {
-    const response = await fetch(url.toString());
+    const response = await fetch(url, { credentials: 'include' });
 
     if (!response.ok) {
       return {
@@ -40,7 +40,22 @@ export async function fetchProjects(cursor?: string): Promise<ProjectsResponse> 
     }
 
     const json = await response.json();
-    return json as ProjectsResponse;
+
+    // API returns { data: { items: [...], pagination: {...} }, meta: {...} }
+    // Transform to expected shape: { success: true, data: [...], meta: {...} }
+    const items = json.data?.items ?? json.data ?? [];
+    const pagination = json.data?.pagination ?? {};
+
+    return {
+      success: true,
+      data: items,
+      meta: {
+        timestamp: json.meta?.timestamp ?? new Date().toISOString(),
+        requestId: json.meta?.requestId ?? '',
+        total: pagination.total ?? items.length,
+        hasNextPage: pagination.hasNextPage ?? false,
+      },
+    };
   } catch (err) {
     return {
       success: false,
