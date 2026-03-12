@@ -1,0 +1,10 @@
+# Copy this file to terraform.tfvars and fill in values
+
+location         = "South Africa North"
+environment      = "prod"
+auth_username    = "admin"
+auth_password    = "your-secure-password-here"
+acr_login_server = "aversoftacr.azurecr.io"
+acr_username     = "aversoftacr"
+acr_password     = "your-acr-password-here"
+image_tag        = "latest"
