@@ -48,17 +48,3 @@ body {
   color: var(--color-foreground);
   font-family: system-ui, -apple-system, sans-serif;
 }
-
-/* Highlight animation for new decisions */
-@keyframes highlight {
-  0% {
-    background-color: rgb(134 239 172 / 0.5); /* green-300/50 */
-  }
-  100% {
-    background-color: transparent;
-  }
-}
-
-.animate-highlight {
-  animation: highlight 1.5s ease-out;
-}

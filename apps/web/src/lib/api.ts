@@ -1,32 +1,12 @@
 import type { Project, ApiEnvelope, ApiMeta } from '@/types';
 
-const API_BASE =
-  process.env['NEXT_PUBLIC_API_URL'] || 'http://localhost:4000';
+// Use local proxy to add authentication to API calls
+const API_BASE = '/api/proxy';
 
 export interface ProjectsResponse extends ApiEnvelope<Project[]> {
   meta: ApiMeta & {
     total: number;
     hasNextPage: boolean;
-  };
-}
-
-/** Raw API response structure from backend */
-interface RawProjectsResponse {
-  data: {
-    items: Project[];
-    pagination: {
-      nextCursor: string | null;
-      hasNextPage: boolean;
-      total: number;
-    };
-  };
-  meta: {
-    timestamp: string;
-    requestId: string;
-  };
-  error?: {
-    code: string;
-    message: string;
   };
 }
 
@@ -37,13 +17,13 @@ interface RawProjectsResponse {
  * @returns Projects response with envelope structure
  */
 export async function fetchProjects(cursor?: string): Promise<ProjectsResponse> {
-  const url = new URL('/api/projects', API_BASE);
+  let url = `${API_BASE}/projects`;
   if (cursor) {
-    url.searchParams.set('cursor', cursor);
+    url += `?cursor=${encodeURIComponent(cursor)}`;
   }
 
   try {
-    const response = await fetch(url.toString());
+    const response = await fetch(url, { credentials: 'include' });
 
     if (!response.ok) {
       return {
@@ -59,31 +39,21 @@ export async function fetchProjects(cursor?: string): Promise<ProjectsResponse> 
       };
     }
 
-    const json: RawProjectsResponse = await response.json();
+    const json = await response.json();
 
-    // Transform backend response to frontend expected structure
-    if (json.error) {
-      return {
-        success: false,
-        data: [],
-        meta: {
-          timestamp: json.meta.timestamp,
-          requestId: json.meta.requestId,
-          total: 0,
-          hasNextPage: false,
-        },
-        error: json.error,
-      };
-    }
+    // API returns { data: { items: [...], pagination: {...} }, meta: {...} }
+    // Transform to expected shape: { success: true, data: [...], meta: {...} }
+    const items = json.data?.items ?? json.data ?? [];
+    const pagination = json.data?.pagination ?? {};
 
     return {
       success: true,
-      data: json.data.items,
+      data: items,
       meta: {
-        timestamp: json.meta.timestamp,
-        requestId: json.meta.requestId,
-        total: json.data.pagination.total,
-        hasNextPage: json.data.pagination.hasNextPage,
+        timestamp: json.meta?.timestamp ?? new Date().toISOString(),
+        requestId: json.meta?.requestId ?? '',
+        total: pagination.total ?? items.length,
+        hasNextPage: pagination.hasNextPage ?? false,
       },
     };
   } catch (err) {
