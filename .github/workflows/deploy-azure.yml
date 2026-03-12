@@ -16,8 +16,8 @@ concurrency:
   cancel-in-progress: false
 
 env:
-  ACR_NAME: aversoftacr
-  ACR_LOGIN_SERVER: aversoftacr.azurecr.io
+  ACR_NAME: gsdlabsacr
+  ACR_LOGIN_SERVER: gsdlabsacr.azurecr.io
   RESOURCE_GROUP: rg-gsd-labs
   SERVER_APP_NAME: ca-gsd-server
   WEB_APP_NAME: ca-gsd-web

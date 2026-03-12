@@ -55,7 +55,7 @@ variable "auth_password" {
 variable "acr_login_server" {
   description = "Azure Container Registry login server"
   type        = string
-  default     = "aversoftacr.azurecr.io"
+  default     = "gsdlabsacr.azurecr.io"
 }
 
 variable "acr_username" {
