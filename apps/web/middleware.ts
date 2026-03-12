@@ -1,69 +1,39 @@
 /**
- * Next.js Middleware for HTTP Basic Authentication
+ * Next.js Middleware for Cookie-Based Authentication
  *
  * Enabled when AUTH_USERNAME and AUTH_PASSWORD environment variables are set.
- * Protects all routes except static assets and API routes.
+ * Redirects unauthenticated users to /login.
  */
 
 import { NextResponse } from 'next/server';
 import type { NextRequest } from 'next/server';
 
 export function middleware(request: NextRequest) {
-  // Read env vars at runtime (not build time)
-  const AUTH_USERNAME = process.env['AUTH_USERNAME'];
-  const AUTH_PASSWORD = process.env['AUTH_PASSWORD'];
-  const AUTH_ENABLED = Boolean(AUTH_USERNAME && AUTH_PASSWORD);
-
-  // Skip auth if not enabled
-  if (!AUTH_ENABLED) {
-    return NextResponse.next();
-  }
-
-  // Skip auth for static files and Next.js internals
   const pathname = request.nextUrl.pathname;
+
+  // Skip auth for static files, Next.js internals, and API routes
   if (
     pathname.startsWith('/_next') ||
     pathname.startsWith('/favicon') ||
+    pathname.startsWith('/api/') ||
+    pathname === '/login' ||
     pathname.includes('.')
   ) {
     return NextResponse.next();
   }
 
-  // Check for Basic Auth header
-  const authHeader = request.headers.get('authorization');
+  // Check for auth cookie
+  const authCookie = request.cookies.get('gsd-auth');
 
-  if (!authHeader || !authHeader.startsWith('Basic ')) {
-    return new NextResponse('Authentication required', {
-      status: 401,
-      headers: {
-        'WWW-Authenticate': 'Basic realm="GSD Labs"',
-      },
-    });
+  if (!authCookie?.value) {
+    // Redirect to login page
+    const loginUrl = new URL('/login', request.url);
+    loginUrl.searchParams.set('from', pathname);
+    return NextResponse.redirect(loginUrl);
   }
 
-  try {
-    const base64Credentials = authHeader.split(' ')[1];
-    const credentials = Buffer.from(base64Credentials ?? '', 'base64').toString('utf-8');
-    const [username, password] = credentials.split(':');
-
-    if (username === AUTH_USERNAME && password === AUTH_PASSWORD) {
-      return NextResponse.next();
-    }
-
-    return new NextResponse('Invalid credentials', {
-      status: 401,
-      headers: {
-        'WWW-Authenticate': 'Basic realm="GSD Labs"',
-      },
-    });
-  } catch {
-    return new NextResponse('Invalid authentication header', {
-      status: 401,
-      headers: {
-        'WWW-Authenticate': 'Basic realm="GSD Labs"',
-      },
-    });
-  }
+  // Cookie exists, allow request
+  return NextResponse.next();
 }
 
 export const config = {
