@@ -3,9 +3,9 @@
 import { useState, useCallback } from 'react';
 import type { AgentErrorEvent } from '@gsd/events';
 import { useExecutionStore } from '@/stores/executionStore';
+import { API_PROXY_BASE } from '@/lib/endpoints';
 
-const API_BASE =
-  process.env['NEXT_PUBLIC_API_URL'] || 'http://localhost:4000';
+const API_BASE = API_PROXY_BASE;
 
 /**
  * Context for retry operations

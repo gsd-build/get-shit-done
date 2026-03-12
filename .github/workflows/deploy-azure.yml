@@ -119,6 +119,29 @@ jobs:
           containerAppName: ${{ env.WEB_APP_NAME }}
           imageToDeploy: ${{ env.ACR_LOGIN_SERVER }}/gsd-web:${{ needs.build-and-push.outputs.image_tag }}
 
+      - name: Validate realtime socket room health
+        run: |
+          set -euo pipefail
+          HEALTH_URL="${{ env.API_URL }}/api/health/socket-room"
+          echo "Probing ${HEALTH_URL}"
+
+          for attempt in $(seq 1 12); do
+            response="$(curl -fsS "${HEALTH_URL}" || true)"
+
+            if [ -n "${response}" ] && echo "${response}" | jq -e '.data.ok == true' >/dev/null 2>&1; then
+              echo "Realtime channel healthy on attempt ${attempt}"
+              echo "${response}" | jq '.data'
+              exit 0
+            fi
+
+            echo "Attempt ${attempt}/12 failed; waiting 10s..."
+            [ -n "${response}" ] && echo "${response}" | jq '.' || true
+            sleep 10
+          done
+
+          echo "Realtime channel health probe failed after retries"
+          exit 1
+
       - name: Get deployment URLs
         run: |
           SERVER_FQDN=$(az containerapp show \

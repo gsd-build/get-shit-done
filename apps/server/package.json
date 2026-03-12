@@ -18,7 +18,8 @@
     "@hono/node-server": "^1.13.0",
     "@hono/zod-validator": "^0.4.0",
     "hono": "^4.6.0",
-    "socket.io": "^4.8.0"
+    "socket.io": "^4.8.0",
+    "socket.io-client": "^4.8.0"
   },
   "devDependencies": {
     "@types/node": "^20.0.0",

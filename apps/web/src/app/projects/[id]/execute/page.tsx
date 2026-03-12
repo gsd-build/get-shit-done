@@ -20,13 +20,11 @@ import type { Wave } from '@/components/features/execute/WaveColumn';
 import { useSocket } from '@/hooks/useSocket';
 import { useAgentSubscription } from '@/hooks/useAgentSubscription';
 import { useCheckpointResponse } from '@/hooks/useCheckpointResponse';
+import { API_PROXY_BASE, HEALTH_SUMMARY_URL, SOCKET_BASE } from '@/lib/endpoints';
 import { useExecutionStore, selectPlans, selectStatus } from '@/stores/executionStore';
 
-// Socket.IO server URL - configurable via env
-const SOCKET_URL = process.env['NEXT_PUBLIC_SOCKET_URL'] || 'http://localhost:4000';
-
-// API base URL
-const API_URL = process.env['NEXT_PUBLIC_API_URL'] || 'http://localhost:4000';
+const SOCKET_URL = SOCKET_BASE;
+const API_URL = API_PROXY_BASE;
 
 interface Phase {
   number: number;
@@ -151,7 +149,7 @@ export default function ExecutePage() {
   useEffect(() => {
     const fetchPhases = async () => {
       try {
-        const response = await fetch(`${API_URL}/api/projects/${projectId}/phases`);
+        const response = await fetch(`${API_URL}/projects/${projectId}/phases`);
         if (!response.ok) return;
         const json = await response.json();
         const phaseList = json.data?.phases ?? [];
@@ -176,7 +174,7 @@ export default function ExecutePage() {
     setStartError(null);
 
     try {
-      const response = await fetch(`${API_URL}/api/projects/${projectId}/execute`, {
+      const response = await fetch(`${API_URL}/projects/${projectId}/execute`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ phaseNumber: selectedPhase }),
@@ -218,7 +216,7 @@ export default function ExecutePage() {
           <ConnectionStatus
             isConnected={isConnected}
             socketUrl={SOCKET_URL}
-            apiUrl={API_URL}
+            healthSummaryUrl={HEALTH_SUMMARY_URL}
             onRetryConnection={reconnect}
           />
 
