@@ -36,7 +36,9 @@ async function probeSocketRoom(c: { req: { url: string } }, io: Server): Promise
   return await new Promise<SocketProbeResult>((resolve) => {
     const client = socketClient(origin, {
       path: '/socket.io',
-      transports: ['websocket', 'polling'],
+      // Use long-polling for probe stability across ingress/LB setups.
+      // This still validates Socket.IO handshake + room join behavior.
+      transports: ['polling'],
       query: { projectId: probeProjectId },
       reconnection: false,
       timeout: SOCKET_PROBE_TIMEOUT_MS,
