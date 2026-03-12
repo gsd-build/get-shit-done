@@ -16,6 +16,9 @@ export const IPC_PATHS = {
   /** Individual answer file */
   answer: (projectDir: string, questionId: string) =>
     join(projectDir, '.planning', 'autopilot', 'answers', `${questionId}.json`),
+  /** Per-worker event log file for parallel execution */
+  workerEvents: (projectDir: string, phaseNumber: number) =>
+    join(projectDir, '.planning', 'autopilot', 'log', `events-phase-${phaseNumber}.ndjson`),
 } as const;
 
 /** Event written to the NDJSON event log */
@@ -24,6 +27,12 @@ export interface IPCEvent {
   timestamp: string;
   event: string;
   data: unknown;
+  /** Phase number of the worker that emitted this event (parallel execution) */
+  phaseNumber?: number;
+  /** Identifier of the worker that emitted this event (parallel execution) */
+  workerId?: string;
+  /** Name of the step within the phase (e.g., 'plan', 'execute') */
+  stepName?: string;
 }
 
 /** Answer file written by the dashboard, read by the autopilot */
