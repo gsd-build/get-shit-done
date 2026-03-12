@@ -29,15 +29,17 @@ interface SocketProbeResult {
 
 async function probeSocketRoom(c: { req: { url: string } }, io: Server): Promise<SocketProbeResult> {
   const requestUrl = new URL(c.req.url);
-  const origin = `${requestUrl.protocol}//${requestUrl.host}`;
+  const requestOrigin = `${requestUrl.protocol}//${requestUrl.host}`;
+  const localPort = (process.env['PORT'] ?? requestUrl.port) || '4000';
+  const probeSocketUrl = process.env['SOCKET_PROBE_URL']?.trim() || `http://127.0.0.1:${localPort}`;
   const allowedOrigins = getAllowedOrigins();
   const probeOrigin =
-    allowedOrigins.find((allowedOrigin) => allowedOrigin !== '*') ?? origin;
+    allowedOrigins.find((allowedOrigin) => allowedOrigin !== '*') ?? requestOrigin;
   const probeProjectId = `health-probe-${Date.now()}`;
   const roomName = `project:${probeProjectId}`;
 
   return await new Promise<SocketProbeResult>((resolve) => {
-    const client = socketClient(origin, {
+    const client = socketClient(probeSocketUrl, {
       path: '/socket.io',
       // Use long-polling for probe stability across ingress/LB setups.
       // This still validates Socket.IO handshake + room join behavior.
