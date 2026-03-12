@@ -222,6 +222,16 @@ function normalizeRuntimePathsForLocalInstall(text) {
     .replace(/(?<!\.)\/\.(claude|opencode|gemini)\//g, "./.$1/");
 }
 
+function homeRemappingBlock() {
+  return `## Path Resolution 
+
+  The GSD workflow files contain bash commands that reference \`$HOME/.claude/get-shit-done/bin/gsd-tools.cjs\`. 
+  **In this workspace, the module lives at \`.claude/get-shit-done/bin/gsd-tools.cjs\` relative to the workspace root — \`$HOME\` does not apply.
+  ** When executing or interpreting any bash snippet from a workflow file, mentally substitute \`$HOME/.claude/\` → \`.claude/\` (workspace-relative).
+  ---
+  `;
+}
+
 function adapterBlock() {
   // Universal shim: map upstream AskUserQuestion to VS Code's askQuestions tool.
   return `## Copilot Runtime Adapter (important)
@@ -450,6 +460,7 @@ function stepAssemble(ctx) {
   ctx.output = joinBlocks(
     frontmatter,
     annotations,
+    homeRemappingBlock().trimEnd(),
     needsAskTool ? adapterBlock().trimEnd() : '',
     ctx.body.trimEnd()
   ) + '\n';
