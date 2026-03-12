@@ -94,6 +94,8 @@ AskUserQuestion([
       { label: "No", description: "Skip validation research. Good for rapid prototyping or no-test phases." }
     ]
   },
+  // Note: Nyquist validation depends on research output. If research is disabled,
+  // plan-phase automatically skips Nyquist steps (no RESEARCH.md to extract from).
   {
     question: "Git branching strategy?",
     header: "Branching",

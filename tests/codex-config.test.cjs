@@ -155,9 +155,9 @@ tools: Read, Grep, Glob
 
   test('includes developer_instructions from body', () => {
     const result = generateCodexAgentToml('gsd-executor', sampleAgent);
-    assert.ok(result.includes('developer_instructions = """'), 'has triple-quoted instructions');
+    assert.ok(result.includes("developer_instructions = '''"), 'has literal triple-quoted instructions');
     assert.ok(result.includes('<role>You are an executor.</role>'), 'body content in instructions');
-    assert.ok(result.includes('"""'), 'has closing triple quotes');
+    assert.ok(result.includes("'''"), 'has closing literal triple quotes');
   });
 
   test('defaults unknown agents to read-only', () => {

@@ -6,6 +6,16 @@ const fs = require('fs');
 const path = require('path');
 const { output, error } = require('./core.cjs');
 
+const VALID_CONFIG_KEYS = new Set([
+  'mode', 'granularity', 'parallelization', 'commit_docs', 'model_profile',
+  'search_gitignored', 'brave_search',
+  'workflow.research', 'workflow.plan_check', 'workflow.verifier',
+  'workflow.nyquist_validation', 'workflow.ui_phase', 'workflow.ui_safety_gate',
+  'workflow._auto_chain_active',
+  'git.branching_strategy', 'git.phase_branch_template', 'git.milestone_branch_template',
+  'planning.commit_docs', 'planning.search_gitignored',
+]);
+
 function cmdConfigEnsureSection(cwd, raw) {
   const configPath = path.join(cwd, '.planning', 'config.json');
   const planningDir = path.join(cwd, '.planning');
@@ -86,6 +96,10 @@ function cmdConfigSet(cwd, keyPath, value, raw) {
 
   if (!keyPath) {
     error('Usage: config-set <key.path> <value>');
+  }
+
+  if (!VALID_CONFIG_KEYS.has(keyPath)) {
+    error(`Unknown config key: "${keyPath}". Valid keys: ${[...VALID_CONFIG_KEYS].sort().join(', ')}`);
   }
 
   // Parse value (handle booleans and numbers)

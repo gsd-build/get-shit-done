@@ -136,8 +136,10 @@ Deviations are normal — handle via rules below.
 
 1. Read @context files from prompt
 2. Per task:
+   - **MANDATORY read_first gate:** If the task has a `<read_first>` field, you MUST read every listed file BEFORE making any edits. This is not optional. Do not skip files because you "already know" what's in them — read them. The read_first files establish ground truth for the task.
    - `type="auto"`: if `tdd="true"` → TDD execution. Implement with deviation rules + auth gates. Verify done criteria. Commit (see task_commit). Track hash for Summary.
    - `type="checkpoint:*"`: STOP → checkpoint_protocol → wait for user → continue only after confirmation.
+   - **MANDATORY acceptance_criteria check:** After completing each task, if it has `<acceptance_criteria>`, verify EVERY criterion before moving to the next task. Use grep, file reads, or CLI commands to confirm each criterion. If any criterion fails, fix the implementation before proceeding. Do not skip criteria or mark them as "will verify later".
 3. Run `<verification>` checks
 4. Confirm `<success_criteria>` met
 5. Document deviations in Summary
@@ -226,6 +228,23 @@ Errors: RED doesn't fail → investigate test/existing feature. GREEN doesn't pa
 See `~/.claude/get-shit-done/references/tdd.md` for structure.
 </tdd_plan_execution>
 
+<precommit_failure_handling>
+## Pre-commit Hook Failure Handling
+
+Your commits may trigger pre-commit hooks. Auto-fix hooks handle themselves transparently — files get fixed and re-staged automatically.
+
+If a commit is BLOCKED by a hook:
+
+1. The `git commit` command fails with hook error output
+2. Read the error — it tells you exactly which hook and what failed
+3. Fix the issue (type error, lint violation, secret leak, etc.)
+4. `git add` the fixed files
+5. Retry the commit
+6. Do NOT use `--no-verify`
+
+This is normal and expected. Budget 1-2 retry cycles per commit.
+</precommit_failure_handling>
+
 <task_commit>
 ## Task Commit Protocol
 
@@ -287,7 +306,22 @@ Orchestrator parses → presents to user → spawns fresh continuation with your
 </step>
 
 <step name="verification_failure_gate">
-If verification fails: STOP. Present: "Verification failed for Task [X]: [name]. Expected: [criteria]. Actual: [result]." Options: Retry | Skip (mark incomplete) | Stop (investigate). If skipped → SUMMARY "Issues Encountered".
+If verification fails:
+
+**Check if node repair is enabled** (default: on):
+```bash
+NODE_REPAIR=$(node "./.claude/get-shit-done/bin/gsd-tools.cjs" config-get workflow.node_repair 2>/dev/null || echo "true")
+```
+
+If `NODE_REPAIR` is `true`: invoke `@./.claude/get-shit-done/workflows/node-repair.md` with:
+- FAILED_TASK: task number, name, done-criteria
+- ERROR: expected vs actual result
+- PLAN_CONTEXT: adjacent task names + phase goal
+- REPAIR_BUDGET: `workflow.node_repair_budget` from config (default: 2)
+
+Node repair will attempt RETRY, DECOMPOSE, or PRUNE autonomously. Only reaches this gate again if repair budget is exhausted (ESCALATE).
+
+If `NODE_REPAIR` is `false` OR repair returns ESCALATE: STOP. Present: "Verification failed for Task [X]: [name]. Expected: [criteria]. Actual: [result]. Repair attempted: [summary of what was tried]." Options: Retry | Skip (mark incomplete) | Stop (investigate). If skipped → SUMMARY "Issues Encountered".
 </step>
 
 <step name="record_completion_time">

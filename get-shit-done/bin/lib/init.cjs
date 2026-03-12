@@ -255,18 +255,18 @@ function cmdInitQuick(cwd, description, raw) {
   const now = new Date();
   const slug = description ? generateSlugInternal(description)?.substring(0, 40) : null;
 
-  // Find next quick task number
-  const quickDir = path.join(cwd, '.planning', 'quick');
-  let nextNum = 1;
-  try {
-    const existing = fs.readdirSync(quickDir)
-      .filter(f => /^\d+-/.test(f))
-      .map(f => parseInt(f.split('-')[0], 10))
-      .filter(n => !isNaN(n));
-    if (existing.length > 0) {
-      nextNum = Math.max(...existing) + 1;
-    }
-  } catch {}
+  // Generate collision-resistant quick task ID: YYMMDD-xxx
+  // xxx = 2-second precision blocks since midnight, encoded as 3-char Base36 (lowercase)
+  // Range: 000 (00:00:00) to xbz (23:59:58), guaranteed 3 chars for any time of day.
+  // Provides ~2s uniqueness window per user — practically collision-free across a team.
+  const yy = String(now.getFullYear()).slice(-2);
+  const mm = String(now.getMonth() + 1).padStart(2, '0');
+  const dd = String(now.getDate()).padStart(2, '0');
+  const dateStr = yy + mm + dd;
+  const secondsSinceMidnight = now.getHours() * 3600 + now.getMinutes() * 60 + now.getSeconds();
+  const timeBlocks = Math.floor(secondsSinceMidnight / 2);
+  const timeEncoded = timeBlocks.toString(36).padStart(3, '0');
+  const quickId = dateStr + '-' + timeEncoded;
 
   const result = {
     // Models
@@ -279,7 +279,7 @@ function cmdInitQuick(cwd, description, raw) {
     commit_docs: config.commit_docs,
 
     // Quick task info
-    next_num: nextNum,
+    quick_id: quickId,
     slug: slug,
     description: description || null,
 
@@ -289,7 +289,7 @@ function cmdInitQuick(cwd, description, raw) {
 
     // Paths
     quick_dir: '.planning/quick',
-    task_dir: slug ? `.planning/quick/${nextNum}-${slug}` : null,
+    task_dir: slug ? `.planning/quick/${quickId}-${slug}` : null,
 
     // File existence
     roadmap_exists: pathExistsInternal(cwd, '.planning/ROADMAP.md'),

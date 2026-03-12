@@ -157,6 +157,13 @@ function cmdRoadmapAnalyze(cwd, raw) {
     const checkboxMatch = content.match(checkboxPattern);
     const roadmapComplete = checkboxMatch ? checkboxMatch[1] === 'x' : false;
 
+    // If roadmap marks phase complete, trust that over disk file structure.
+    // Phases completed before GSD tracking (or via external tools) may lack
+    // the standard PLAN/SUMMARY pairs but are still done.
+    if (roadmapComplete && diskStatus !== 'complete') {
+      diskStatus = 'complete';
+    }
+
     phases.push({
       number: phaseNum,
       name: phaseName,
