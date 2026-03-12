@@ -30,6 +30,9 @@ interface SocketProbeResult {
 async function probeSocketRoom(c: { req: { url: string } }, io: Server): Promise<SocketProbeResult> {
   const requestUrl = new URL(c.req.url);
   const origin = `${requestUrl.protocol}//${requestUrl.host}`;
+  const allowedOrigins = getAllowedOrigins();
+  const probeOrigin =
+    allowedOrigins.find((allowedOrigin) => allowedOrigin !== '*') ?? origin;
   const probeProjectId = `health-probe-${Date.now()}`;
   const roomName = `project:${probeProjectId}`;
 
@@ -40,6 +43,9 @@ async function probeSocketRoom(c: { req: { url: string } }, io: Server): Promise
       // This still validates Socket.IO handshake + room join behavior.
       transports: ['polling'],
       query: { projectId: probeProjectId },
+      extraHeaders: {
+        Origin: probeOrigin,
+      },
       reconnection: false,
       timeout: SOCKET_PROBE_TIMEOUT_MS,
     });
