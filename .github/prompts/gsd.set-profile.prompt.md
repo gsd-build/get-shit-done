@@ -8,6 +8,13 @@ agent: agent
 
 <!-- upstream-tools: ["Read","Write","Bash"] -->
 
+## Path Resolution 
+
+  The GSD workflow files contain bash commands that reference `$HOME/.claude/get-shit-done/bin/gsd-tools.cjs`. 
+  **In this workspace, the module lives at `.claude/get-shit-done/bin/gsd-tools.cjs` relative to the workspace root — `$HOME` does not apply.
+  ** When executing or interpreting any bash snippet from a workflow file, mentally substitute `$HOME/.claude/` → `.claude/` (workspace-relative).
+  ---
+
 <objective>
 Switch the model profile used by GSD agents. Controls which Claude model each agent uses, balancing quality vs token spend.
 

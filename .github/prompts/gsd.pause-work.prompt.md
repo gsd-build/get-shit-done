@@ -7,6 +7,13 @@ agent: agent
 
 <!-- upstream-tools: ["Read","Write","Bash"] -->
 
+## Path Resolution 
+
+  The GSD workflow files contain bash commands that reference `$HOME/.claude/get-shit-done/bin/gsd-tools.cjs`. 
+  **In this workspace, the module lives at `.claude/get-shit-done/bin/gsd-tools.cjs` relative to the workspace root — `$HOME` does not apply.
+  ** When executing or interpreting any bash snippet from a workflow file, mentally substitute `$HOME/.claude/` → `.claude/` (workspace-relative).
+  ---
+
 <objective>
 Create `.continue-here.md` handoff file to preserve complete work state across sessions.
 
