@@ -50,23 +50,23 @@ Research, planning, and verification workflow.
 
 Real-time execution with streaming and checkpoints.
 
-- [ ] **EXEC-01**: User can see wave-based execution progress with real-time log streaming per plan
-- [ ] **EXEC-02**: User can see tool calls visualized as collapsible cards (Read, Write, Bash, etc.)
-- [ ] **EXEC-03**: User can respond to checkpoint dialogs with timeout warning display
-- [ ] **EXEC-04**: User can view file changes in Monaco DiffEditor with syntax highlighting
-- [ ] **EXEC-05**: User can see git commit timeline showing commits created during execution
-- [ ] **EXEC-06**: User can pause execution and resume from the paused state
-- [ ] **EXEC-07**: User can abort execution gracefully with rollback option
-- [ ] **EXEC-08**: User can recover from errors with retry options and context preservation
+- [x] **EXEC-01**: User can see wave-based execution progress with real-time log streaming per plan
+- [x] **EXEC-02**: User can see tool calls visualized as collapsible cards (Read, Write, Bash, etc.)
+- [x] **EXEC-03**: User can respond to checkpoint dialogs with timeout warning display
+- [x] **EXEC-04**: User can view file changes in Monaco DiffEditor with syntax highlighting
+- [x] **EXEC-05**: User can see git commit timeline showing commits created during execution
+- [x] **EXEC-06**: User can pause execution and resume from the paused state
+- [x] **EXEC-07**: User can abort execution gracefully with rollback option
+- [x] **EXEC-08**: User can recover from errors with retry options and context preservation
 
 ### Execute Quality (QUAL)
 
 Quality enforcement during code execution.
 
-- [ ] **QUAL-01**: Execution follows Red-Green-Refactor TDD workflow for code development tasks
-- [ ] **QUAL-02**: Tests are written before implementation and must fail initially (Red)
-- [ ] **QUAL-03**: Implementation makes tests pass without shortcuts (Green)
-- [ ] **QUAL-04**: Code is refactored for clarity after tests pass (Refactor)
+- [x] **QUAL-01**: Execution follows Red-Green-Refactor TDD workflow for code development tasks
+- [x] **QUAL-02**: Tests are written before implementation and must fail initially (Red)
+- [x] **QUAL-03**: Implementation makes tests pass without shortcuts (Green)
+- [x] **QUAL-04**: Code is refactored for clarity after tests pass (Refactor)
 
 ### Verify Work UI (VERIF)
 
@@ -139,7 +139,7 @@ Visual debugging workflow.
 | DASH-03 | Phase 15 | Complete |
 | DASH-04 | Phase 15 | Complete |
 | DASH-05 | Phase 15 | Complete |
-| DISC-01 | Phase 16 | In Progress |
+| DISC-01 | Phase 16 | Complete |
 | DISC-02 | Phase 16 | Complete |
 | DISC-03 | Phase 16 | Complete |
 | DISC-04 | Phase 16 | Complete |
@@ -149,18 +149,18 @@ Visual debugging workflow.
 | PLAN-03 | Phase 18 | Pending |
 | PLAN-04 | Phase 18 | Pending |
 | PLAN-05 | Phase 18 | Pending |
-| EXEC-01 | Phase 17 | Pending |
-| EXEC-02 | Phase 17 | Pending |
-| EXEC-03 | Phase 17 | Pending |
-| EXEC-04 | Phase 17 | Pending |
-| EXEC-05 | Phase 17 | Pending |
-| EXEC-06 | Phase 17 | Pending |
-| EXEC-07 | Phase 17 | Pending |
-| EXEC-08 | Phase 17 | Pending |
-| QUAL-01 | Phase 17 | Pending |
-| QUAL-02 | Phase 17 | Pending |
-| QUAL-03 | Phase 17 | Pending |
-| QUAL-04 | Phase 17 | Pending |
+| EXEC-01 | Phase 17 | Complete |
+| EXEC-02 | Phase 17 | Complete |
+| EXEC-03 | Phase 17 | Complete |
+| EXEC-04 | Phase 17 | Complete |
+| EXEC-05 | Phase 17 | Complete |
+| EXEC-06 | Phase 17 | Complete |
+| EXEC-07 | Phase 17 | Complete |
+| EXEC-08 | Phase 17 | Complete |
+| QUAL-01 | Phase 17 | Complete |
+| QUAL-02 | Phase 17 | Complete |
+| QUAL-03 | Phase 17 | Complete |
+| QUAL-04 | Phase 17 | Complete |
 | VERIF-01 | Phase 18 | Pending |
 | VERIF-02 | Phase 18 | Pending |
 | VERIF-03 | Phase 18 | Pending |

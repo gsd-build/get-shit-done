@@ -37,7 +37,7 @@ This roadmap delivers the GSD (Get Shit Done) meta-prompting framework across mu
 - [x] **Phase 14: Backend Core** - REST API, agent orchestrator, and WebSocket connection management (completed 2026-03-11)
 - [x] **Phase 15: Frontend Foundation & Dashboard** - Next.js app with project listing, health indicators, and navigation (completed 2026-03-11)
 - [x] **Phase 16: Discuss Phase UI** - Chat interface with streaming and CONTEXT.md preview (completed 2026-03-11)
-- [ ] **Phase 17: Execute Phase UI** - Execution streaming, tool visualization, checkpoints, and TDD workflow
+- [x] **Phase 17: Execute Phase UI** - Execution streaming, tool visualization, checkpoints, and TDD workflow (completed 2026-03-12)
 - [ ] **Phase 18: Plan & Verify Phase UIs** - Research streaming, plan preview, verification report, and gap workflow
 - [ ] **Phase 19: Roadmap Visualization** - Dependency graph, Gantt timeline, and progress tracking
 - [ ] **Phase 20: Debug Session UI** - Debug session creation, hypothesis tracking, and evidence collection
@@ -392,10 +392,10 @@ Phases execute in numeric order: 13 -> 14 -> 15 -> 16 -> 17 -> 18 -> 19 -> 20
 | 13. Foundation Infrastructure | 3/3 | Complete    | 2026-03-11 |
 | 14. Backend Core | 4/4 | Complete    | 2026-03-11 |
 | 15. Frontend Foundation & Dashboard | 4/4 | Complete    | 2026-03-11 |
-| 16. Discuss Phase UI | 3/4 | In Progress|  |
-| 17. Execute Phase UI | 0/8 | Planned | - |
-| 18. Plan & Verify Phase UIs | 0/8 | Planned | - |
-| 19. Roadmap Visualization | 0/3 | Planned | - |
+| 16. Discuss Phase UI | 4/4 | Complete | 2026-03-11 |
+| 17. Execute Phase UI | 9/9 | Complete    | 2026-03-12 |
+| 18. Plan & Verify Phase UIs | 0/8 | Not started | - |
+| 19. Roadmap Visualization | 0/4 | Not started | - |
 | 20. Debug Session UI | 0/4 | Not started | - |
 
 ### v3.0 Progress
@@ -416,4 +416,4 @@ Phases execute in numeric order: 21 -> 22 -> 23 -> 24 -> 25 -> 26 -> 27 -> 28
 
 ---
 *Roadmap created: 2026-03-10*
-*Last updated: 2026-03-11 (Phase 16 plan 01 complete)*
+*Last updated: 2026-03-12 (Phase 17 complete)*
