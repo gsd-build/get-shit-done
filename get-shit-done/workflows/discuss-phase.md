@@ -272,6 +272,15 @@ Analyze the phase to identify gray areas worth discussing. **Use both `prior_dec
 
 1. **Domain boundary** — What capability is this phase delivering? State it clearly.
 
+1b. **Initialize canonical refs accumulator** — Start building the `<canonical_refs>` list for CONTEXT.md. This accumulates throughout the entire discussion, not just this step.
+
+   **Source 1 (now):** Copy `Canonical refs:` from ROADMAP.md for this phase. Expand each to a full relative path.
+   **Source 2 (now):** Check REQUIREMENTS.md and PROJECT.md for any specs/ADRs referenced for this phase.
+   **Source 3 (scout_codebase):** If existing code references docs (e.g., comments citing ADRs), add those.
+   **Source 4 (discuss_areas):** When the user says "read X", "check Y", or references any doc/spec/ADR during discussion — add it immediately. These are often the MOST important refs because they represent docs the user specifically wants followed.
+
+   This list is MANDATORY in CONTEXT.md. Every ref must have a full relative path so downstream agents can read it directly. If no external docs exist, note that explicitly.
+
 2. **Check prior decisions** — Before generating gray areas, check if any were already decided:
    - Scan `<prior_decisions>` for relevant choices (e.g., "Ctrl+C only, no single-key shortcuts")
    - These are **pre-answered** — don't re-ask unless this phase has conflicting needs
@@ -374,9 +383,17 @@ Continue to discuss_areas with selected areas.
 <step name="discuss_areas">
 For each selected area, conduct a focused discussion loop.
 
-**Philosophy: 4 questions, then check.**
+**Batch mode support:** Parse optional `--batch` from `$ARGUMENTS`.
+- Accept `--batch`, `--batch=N`, or `--batch N`
+- Default to 4 questions per batch when no number is provided
+- Clamp explicit sizes to 2-5 so a batch stays answerable
+- If `--batch` is absent, keep the existing one-question-at-a-time flow
 
-Ask 4 questions per area before offering to continue or move on. Each answer often reveals the next question.
+**Philosophy:** stay adaptive, but let the user choose the pacing.
+- Default mode: 4 single-question turns, then check whether to continue
+- `--batch` mode: 1 grouped turn with 2-5 numbered questions, then check whether to continue
+
+Each answer (or answer set, in batch mode) should reveal the next question or next batch.
 
 **For each area:**
 
@@ -385,7 +402,9 @@ Ask 4 questions per area before offering to continue or move on. Each answer oft
    Let's talk about [Area].
    ```
 
-2. **Ask 4 questions using AskUserQuestion:**
+2. **Ask questions using the selected pacing:**
+
+   **Default (no `--batch`): Ask 4 questions using AskUserQuestion**
    - header: "[Area]" (max 12 chars — abbreviate if needed)
    - question: Specific decision for this area
    - options: 2-3 concrete choices (AskUserQuestion adds "Other" automatically), with the recommended choice highlighted and brief explanation why
@@ -399,12 +418,19 @@ Ask 4 questions per area before offering to continue or move on. Each answer oft
    - Include "You decide" as an option when reasonable — captures Claude discretion
    - **Context7 for library choices:** When a gray area involves library selection (e.g., "magic links" → query next-auth docs) or API approach decisions, use `mcp__context7__*` tools to fetch current documentation and inform the options. Don't use Context7 for every question — only when library-specific knowledge improves the options.
 
-3. **After 4 questions, check:**
+   **Batch mode (`--batch`): Ask 2-5 numbered questions in one plain-text turn**
+   - Group closely related questions for the current area into a single message
+   - Keep each question concrete and answerable in one reply
+   - When options are helpful, include short inline choices per question rather than a separate AskUserQuestion for every item
+   - After the user replies, reflect back the captured decisions, note any unanswered items, and ask only the minimum follow-up needed before moving on
+   - Preserve adaptiveness between batches: use the full set of answers to decide the next batch or whether the area is sufficiently clear
+
+3. **After the current set of questions, check:**
    - header: "[Area]" (max 12 chars)
    - question: "More questions about [area], or move to next?"
    - options: "More questions" / "Next area"
 
-   If "More questions" → ask 4 more, then check again
+   If "More questions" → ask another 4 single questions, or another 2-5 question batch when `--batch` is active, then check again
    If "Next area" → proceed to next selected area
    If "Other" (free text) → interpret intent: continuation phrases ("chat more", "keep going", "yes", "more") map to "More questions"; advancement phrases ("done", "move on", "next", "skip") map to "Next area". If ambiguous, ask: "Continue with more questions about [area], or move to the next area?"
 
@@ -420,10 +446,18 @@ Ask 4 questions per area before offering to continue or move on. Each answer oft
      - Loop: discuss new areas, then prompt again
    - If "I'm ready for context": Proceed to write_context
 
+**Canonical ref accumulation during discussion:**
+When the user references a doc, spec, or ADR during any answer — e.g., "read adr-014", "check the MCP spec", "per browse-spec.md" — immediately:
+1. Read the referenced doc (or confirm it exists)
+2. Add it to the canonical refs accumulator with full relative path
+3. Use what you learned from the doc to inform subsequent questions
+
+These user-referenced docs are often MORE important than ROADMAP.md refs because they represent docs the user specifically wants downstream agents to follow. Never drop them.
+
 **Question design:**
 - Options should be concrete, not abstract ("Cards" not "Option A")
-- Each answer should inform the next question
-- If user picks "Other" to provide freeform input (e.g., "let me describe it", "something else", or an open-ended reply), ask your follow-up as plain text — NOT another AskUserQuestion. Wait for them to type at the normal prompt, then reflect their input back and confirm before resuming AskUserQuestion for the next question.
+- Each answer should inform the next question or next batch
+- If user picks "Other" to provide freeform input (e.g., "let me describe it", "something else", or an open-ended reply), ask your follow-up as plain text — NOT another AskUserQuestion. Wait for them to type at the normal prompt, then reflect their input back and confirm before resuming AskUserQuestion or the next numbered batch.
 
 **Scope creep handling:**
 If user mentions something outside the phase domain:
@@ -480,6 +514,27 @@ mkdir -p ".planning/phases/${padded_phase}-${phase_slug}"
 [Areas where user said "you decide" — note that Claude has flexibility here]
 
 </decisions>
+
+<canonical_refs>
+## Canonical References
+
+**Downstream agents MUST read these before planning or implementing.**
+
+[MANDATORY section. Write the FULL accumulated canonical refs list here.
+Sources: ROADMAP.md refs + REQUIREMENTS.md refs + user-referenced docs during
+discussion + any docs discovered during codebase scout. Group by topic area.
+Every entry needs a full relative path — not just a name.]
+
+### [Topic area 1]
+- `path/to/adr-or-spec.md` — [What it decides/defines that's relevant]
+- `path/to/doc.md` §N — [Specific section reference]
+
+### [Topic area 2]
+- `path/to/feature-doc.md` — [What this doc defines]
+
+[If no external specs: "No external specs — requirements fully captured in decisions above"]
+
+</canonical_refs>
 
 <code_context>
 ## Existing Code Insights
@@ -669,6 +724,7 @@ Route to `confirm_creation` step (existing behavior — show manual next steps).
 - Each selected area explored until user satisfied (with code-informed and prior-decision-informed options)
 - Scope creep redirected to deferred ideas
 - CONTEXT.md captures actual decisions, not vague vision
+- CONTEXT.md includes canonical_refs section with full file paths to every spec/ADR/doc downstream agents need (MANDATORY — never omit)
 - CONTEXT.md includes code_context section with reusable assets and patterns
 - Deferred ideas preserved for future phases
 - STATE.md updated with session info

@@ -72,7 +72,7 @@ INIT=$(node "$HOME/.claude/get-shit-done/bin/gsd-tools.cjs" init quick "$DESCRIP
 if [[ "$INIT" == @file:* ]]; then INIT=$(cat "${INIT#@file:}"); fi
 ```
 
-Parse JSON for: `planner_model`, `executor_model`, `checker_model`, `verifier_model`, `commit_docs`, `next_num`, `slug`, `date`, `timestamp`, `quick_dir`, `task_dir`, `roadmap_exists`, `planning_exists`.
+Parse JSON for: `planner_model`, `executor_model`, `checker_model`, `verifier_model`, `commit_docs`, `quick_id`, `slug`, `date`, `timestamp`, `quick_dir`, `task_dir`, `roadmap_exists`, `planning_exists`.
 
 **If `roadmap_exists` is false:** Error — Quick mode requires an active project with ROADMAP.md. Run `/gsd:new-project` first.
 
@@ -93,13 +93,13 @@ mkdir -p "${task_dir}"
 Create the directory for this quick task:
 
 ```bash
-QUICK_DIR=".planning/quick/${next_num}-${slug}"
+QUICK_DIR=".planning/quick/${quick_id}-${slug}"
 mkdir -p "$QUICK_DIR"
 ```
 
 Report to user:
 ```
-Creating quick task ${next_num}: ${DESCRIPTION}
+Creating quick task ${quick_id}: ${DESCRIPTION}
 Directory: ${QUICK_DIR}
 ```
 
@@ -180,10 +180,10 @@ Collect all decisions into `$DECISIONS`.
 
 **4.5d. Write CONTEXT.md**
 
-Write `${QUICK_DIR}/${next_num}-CONTEXT.md` using the standard context template structure:
+Write `${QUICK_DIR}/${quick_id}-CONTEXT.md` using the standard context template structure:
 
 ```markdown
-# Quick Task ${next_num}: ${DESCRIPTION} - Context
+# Quick Task ${quick_id}: ${DESCRIPTION} - Context
 
 **Gathered:** ${date}
 **Status:** Ready for planning
@@ -217,11 +217,20 @@ ${any_specific_references_or_examples_from_discussion}
 [If none: "No specific requirements — open to standard approaches"]
 
 </specifics>
+
+<canonical_refs>
+## Canonical References
+
+${any_specs_adrs_or_docs_referenced_during_discussion}
+
+[If none: "No external specs — requirements fully captured in decisions above"]
+
+</canonical_refs>
 ```
 
-Note: Quick task CONTEXT.md omits `<code_context>` and `<deferred>` sections (no codebase scouting, no phase scope to defer to). Keep it lean.
+Note: Quick task CONTEXT.md omits `<code_context>` and `<deferred>` sections (no codebase scouting, no phase scope to defer to). Keep it lean. The `<canonical_refs>` section is included when external docs were referenced — omit it only if no external docs apply.
 
-Report: `Context captured: ${QUICK_DIR}/${next_num}-CONTEXT.md`
+Report: `Context captured: ${QUICK_DIR}/${quick_id}-CONTEXT.md`
 
 ---
 
@@ -243,7 +252,7 @@ Task(
 <files_to_read>
 - .planning/STATE.md (Project State)
 - ./CLAUDE.md (if exists — follow project-specific guidelines)
-${DISCUSS_MODE ? '- ' + QUICK_DIR + '/' + next_num + '-CONTEXT.md (User decisions — locked, do not revisit)' : ''}
+${DISCUSS_MODE ? '- ' + QUICK_DIR + '/' + quick_id + '-CONTEXT.md (User decisions — locked, do not revisit)' : ''}
 </files_to_read>
 
 **Project skills:** Check .claude/skills/ or .agents/skills/ directory (if either exists) — read SKILL.md files, plans should account for project skill rules
@@ -260,7 +269,7 @@ ${FULL_MODE ? '- Each task MUST have `files`, `action`, `verify`, `done` fields'
 </constraints>
 
 <output>
-Write plan to: ${QUICK_DIR}/${next_num}-PLAN.md
+Write plan to: ${QUICK_DIR}/${quick_id}-PLAN.md
 Return: ## PLANNING COMPLETE with plan path
 </output>
 ",
@@ -271,11 +280,11 @@ Return: ## PLANNING COMPLETE with plan path
 ```
 
 After planner returns:
-1. Verify plan exists at `${QUICK_DIR}/${next_num}-PLAN.md`
+1. Verify plan exists at `${QUICK_DIR}/${quick_id}-PLAN.md`
 2. Extract plan count (typically 1 for quick tasks)
-3. Report: "Plan created: ${QUICK_DIR}/${next_num}-PLAN.md"
+3. Report: "Plan created: ${QUICK_DIR}/${quick_id}-PLAN.md"
 
-If plan not found, error: "Planner failed to create ${next_num}-PLAN.md"
+If plan not found, error: "Planner failed to create ${quick_id}-PLAN.md"
 
 ---
 
@@ -300,7 +309,7 @@ Checker prompt:
 **Task Description:** ${DESCRIPTION}
 
 <files_to_read>
-- ${QUICK_DIR}/${next_num}-PLAN.md (Plan to verify)
+- ${QUICK_DIR}/${quick_id}-PLAN.md (Plan to verify)
 </files_to_read>
 
 **Scope:** This is a quick task, not a full phase. Skip checks that require a ROADMAP phase goal.
@@ -352,7 +361,7 @@ Revision prompt:
 **Mode:** quick-full (revision)
 
 <files_to_read>
-- ${QUICK_DIR}/${next_num}-PLAN.md (Existing plan)
+- ${QUICK_DIR}/${quick_id}-PLAN.md (Existing plan)
 </files_to_read>
 
 **Checker issues:** ${structured_issues_from_checker}
@@ -392,10 +401,10 @@ Spawn gsd-executor with plan reference:
 ```
 Task(
   prompt="
-Execute quick task ${next_num}.
+Execute quick task ${quick_id}.
 
 <files_to_read>
-- ${QUICK_DIR}/${next_num}-PLAN.md (Plan)
+- ${QUICK_DIR}/${quick_id}-PLAN.md (Plan)
 - .planning/STATE.md (Project state)
 - ./CLAUDE.md (Project instructions, if exists)
 - .claude/skills/ or .agents/skills/ (Project skills, if either exists — list skills, read SKILL.md for each, follow relevant rules during implementation)
@@ -404,7 +413,7 @@ Execute quick task ${next_num}.
 <constraints>
 - Execute all tasks in the plan
 - Commit each task atomically
-- Create summary at: ${QUICK_DIR}/${next_num}-SUMMARY.md
+- Create summary at: ${QUICK_DIR}/${quick_id}-SUMMARY.md
 - Do NOT update ROADMAP.md (quick tasks are separate from planned phases)
 </constraints>
 ",
@@ -415,13 +424,13 @@ Execute quick task ${next_num}.
 ```
 
 After executor returns:
-1. Verify summary exists at `${QUICK_DIR}/${next_num}-SUMMARY.md`
+1. Verify summary exists at `${QUICK_DIR}/${quick_id}-SUMMARY.md`
 2. Extract commit hash from executor output
 3. Report completion status
 
 **Known Claude Code bug (classifyHandoffIfNeeded):** If executor reports "failed" with error `classifyHandoffIfNeeded is not defined`, this is a Claude Code runtime bug — not a real failure. Check if summary file exists and git log shows commits. If so, treat as successful.
 
-If summary not found, error: "Executor failed to create ${next_num}-SUMMARY.md"
+If summary not found, error: "Executor failed to create ${quick_id}-SUMMARY.md"
 
 Note: For quick tasks producing multiple plans (rare), spawn executors in parallel waves per execute-phase patterns.
 
@@ -447,10 +456,10 @@ Task directory: ${QUICK_DIR}
 Task goal: ${DESCRIPTION}
 
 <files_to_read>
-- ${QUICK_DIR}/${next_num}-PLAN.md (Plan)
+- ${QUICK_DIR}/${quick_id}-PLAN.md (Plan)
 </files_to_read>
 
-Check must_haves against actual codebase. Create VERIFICATION.md at ${QUICK_DIR}/${next_num}-VERIFICATION.md.",
+Check must_haves against actual codebase. Create VERIFICATION.md at ${QUICK_DIR}/${quick_id}-VERIFICATION.md.",
   subagent_type="gsd-verifier",
   model="{verifier_model}",
   description="Verify: ${DESCRIPTION}"
@@ -459,7 +468,7 @@ Check must_haves against actual codebase. Create VERIFICATION.md at ${QUICK_DIR}
 
 Read verification status:
 ```bash
-grep "^status:" "${QUICK_DIR}/${next_num}-VERIFICATION.md" | cut -d: -f2 | tr -d ' '
+grep "^status:" "${QUICK_DIR}/${quick_id}-VERIFICATION.md" | cut -d: -f2 | tr -d ' '
 ```
 
 Store as `$VERIFICATION_STATUS`.
@@ -508,19 +517,19 @@ Use `date` from init:
 
 **If `$FULL_MODE` (or table has Status column):**
 ```markdown
-| ${next_num} | ${DESCRIPTION} | ${date} | ${commit_hash} | ${VERIFICATION_STATUS} | [${next_num}-${slug}](./quick/${next_num}-${slug}/) |
+| ${quick_id} | ${DESCRIPTION} | ${date} | ${commit_hash} | ${VERIFICATION_STATUS} | [${quick_id}-${slug}](./quick/${quick_id}-${slug}/) |
 ```
 
 **If NOT `$FULL_MODE` (and table has no Status column):**
 ```markdown
-| ${next_num} | ${DESCRIPTION} | ${date} | ${commit_hash} | [${next_num}-${slug}](./quick/${next_num}-${slug}/) |
+| ${quick_id} | ${DESCRIPTION} | ${date} | ${commit_hash} | [${quick_id}-${slug}](./quick/${quick_id}-${slug}/) |
 ```
 
 **7d. Update "Last activity" line:**
 
 Use `date` from init:
 ```
-Last activity: ${date} - Completed quick task ${next_num}: ${DESCRIPTION}
+Last activity: ${date} - Completed quick task ${quick_id}: ${DESCRIPTION}
 ```
 
 Use Edit tool to make these changes atomically
@@ -532,14 +541,14 @@ Use Edit tool to make these changes atomically
 Stage and commit quick task artifacts:
 
 Build file list:
-- `${QUICK_DIR}/${next_num}-PLAN.md`
-- `${QUICK_DIR}/${next_num}-SUMMARY.md`
+- `${QUICK_DIR}/${quick_id}-PLAN.md`
+- `${QUICK_DIR}/${quick_id}-SUMMARY.md`
 - `.planning/STATE.md`
-- If `$DISCUSS_MODE` and context file exists: `${QUICK_DIR}/${next_num}-CONTEXT.md`
-- If `$FULL_MODE` and verification file exists: `${QUICK_DIR}/${next_num}-VERIFICATION.md`
+- If `$DISCUSS_MODE` and context file exists: `${QUICK_DIR}/${quick_id}-CONTEXT.md`
+- If `$FULL_MODE` and verification file exists: `${QUICK_DIR}/${quick_id}-VERIFICATION.md`
 
 ```bash
-node "$HOME/.claude/get-shit-done/bin/gsd-tools.cjs" commit "docs(quick-${next_num}): ${DESCRIPTION}" --files ${file_list}
+node "$HOME/.claude/get-shit-done/bin/gsd-tools.cjs" commit "docs(quick-${quick_id}): ${DESCRIPTION}" --files ${file_list}
 ```
 
 Get final commit hash:
@@ -555,10 +564,10 @@ Display completion output:
 
 GSD > QUICK TASK COMPLETE (FULL MODE)
 
-Quick Task ${next_num}: ${DESCRIPTION}
+Quick Task ${quick_id}: ${DESCRIPTION}
 
-Summary: ${QUICK_DIR}/${next_num}-SUMMARY.md
-Verification: ${QUICK_DIR}/${next_num}-VERIFICATION.md (${VERIFICATION_STATUS})
+Summary: ${QUICK_DIR}/${quick_id}-SUMMARY.md
+Verification: ${QUICK_DIR}/${quick_id}-VERIFICATION.md (${VERIFICATION_STATUS})
 Commit: ${commit_hash}
 
 ---
@@ -572,9 +581,9 @@ Ready for next task: /gsd:quick
 
 GSD > QUICK TASK COMPLETE
 
-Quick Task ${next_num}: ${DESCRIPTION}
+Quick Task ${quick_id}: ${DESCRIPTION}
 
-Summary: ${QUICK_DIR}/${next_num}-SUMMARY.md
+Summary: ${QUICK_DIR}/${quick_id}-SUMMARY.md
 Commit: ${commit_hash}
 
 ---
@@ -589,13 +598,13 @@ Ready for next task: /gsd:quick
 - [ ] User provides task description
 - [ ] `--full` and `--discuss` flags parsed from arguments when present
 - [ ] Slug generated (lowercase, hyphens, max 40 chars)
-- [ ] Next number calculated (001, 002, 003...)
-- [ ] Directory created at `.planning/quick/NNN-slug/`
-- [ ] (--discuss) Gray areas identified and presented, decisions captured in `${next_num}-CONTEXT.md`
-- [ ] `${next_num}-PLAN.md` created by planner (honors CONTEXT.md decisions when --discuss)
+- [ ] Quick ID generated (YYMMDD-xxx format, 2s Base36 precision)
+- [ ] Directory created at `.planning/quick/YYMMDD-xxx-slug/`
+- [ ] (--discuss) Gray areas identified and presented, decisions captured in `${quick_id}-CONTEXT.md`
+- [ ] `${quick_id}-PLAN.md` created by planner (honors CONTEXT.md decisions when --discuss)
 - [ ] (--full) Plan checker validates plan, revision loop capped at 2
-- [ ] `${next_num}-SUMMARY.md` created by executor
-- [ ] (--full) `${next_num}-VERIFICATION.md` created by verifier
+- [ ] `${quick_id}-SUMMARY.md` created by executor
+- [ ] (--full) `${quick_id}-VERIFICATION.md` created by verifier
 - [ ] STATE.md updated with quick task row (Status column when --full)
 - [ ] Artifacts committed
 </success_criteria>

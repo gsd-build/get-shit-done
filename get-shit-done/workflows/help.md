@@ -66,8 +66,11 @@ Help articulate your vision for a phase before planning.
 - Captures how you imagine this phase working
 - Creates CONTEXT.md with your vision, essentials, and boundaries
 - Use when you have ideas about how something should look/feel
+- Optional `--batch` asks 2-5 related questions at a time instead of one-by-one
 
 Usage: `/gsd:discuss-phase 2`
+Usage: `/gsd:discuss-phase 2 --batch`
+Usage: `/gsd:discuss-phase 2 --batch=3`
 
 **`/gsd:research-phase <number>`**
 Comprehensive ecosystem research for niche/complex domains.
