@@ -184,21 +184,6 @@ resource "azurerm_container_app" "server" {
         secret_name = "auth-password"
       }
 
-      liveness_probe {
-        path             = "/api/health/summary"
-        port             = 4000
-        transport        = "HTTP"
-        initial_delay    = 10
-        interval_seconds = 30
-      }
-
-      readiness_probe {
-        path             = "/api/health/summary"
-        port             = 4000
-        transport        = "HTTP"
-        initial_delay    = 5
-        interval_seconds = 10
-      }
     }
   }
 
@@ -280,14 +265,6 @@ resource "azurerm_container_app" "web" {
       env {
         name        = "AUTH_PASSWORD"
         secret_name = "auth-password"
-      }
-
-      liveness_probe {
-        path             = "/"
-        port             = 3000
-        transport        = "HTTP"
-        initial_delay    = 10
-        interval_seconds = 30
       }
     }
   }

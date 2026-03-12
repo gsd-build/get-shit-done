@@ -64,7 +64,14 @@ export function createApi(
 
   // Apply CORS middleware (allow frontend origins)
   app.use('*', cors({
-    origin: ['http://localhost:3000', 'http://localhost:3001', /\.azurecontainerapps\.io$/, /labs\.aversoft\.net$/],
+    origin: (origin) => {
+      // Allow localhost for development
+      if (origin?.startsWith('http://localhost:')) return origin;
+      // Allow Azure Container Apps and custom domain
+      if (origin?.endsWith('.azurecontainerapps.io')) return origin;
+      if (origin?.endsWith('labs.aversoft.net')) return origin;
+      return null;
+    },
     allowMethods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
     allowHeaders: ['Content-Type', 'Authorization'],
     credentials: true,
