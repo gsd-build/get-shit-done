@@ -10,7 +10,17 @@ import { randomUUID } from 'crypto';
 import type { TypedServer } from '../socket/server.js';
 import type { AgentSession } from './types.js';
 import { runAgentLoop } from './claude.js';
+import { runMockAgentLoop } from './mock.js';
 import { EVENTS } from '@gsd/events';
+
+// Use mock mode when explicitly enabled or no valid API key
+const MOCK_MODE =
+  process.env['MOCK_EXECUTION'] === 'true' ||
+  !process.env['ANTHROPIC_API_KEY']?.startsWith('sk-ant-');
+
+if (MOCK_MODE) {
+  console.log('[orchestrator] Running in MOCK MODE (no real Claude API calls)');
+}
 import {
   processCheckpointResponse,
   getPendingCheckpointsForAgent,
@@ -64,16 +74,24 @@ export function createOrchestrator(io: TypedServer) {
 
       sessions.set(agentId, session);
 
-      // Run agent loop (fire and forget - streams to WebSocket)
-      runAgentLoop(io, session, options.systemPrompt, options.userPrompt).finally(
-        () => {
-          // Clean up session after completion
-          // Keep for a grace period to handle late checkpoint responses
-          setTimeout(() => {
-            sessions.delete(agentId);
-          }, 60000); // 1 minute grace period
-        }
-      );
+      // Delay agent start to give frontend time to subscribe to the room
+      // This prevents the race condition where events are emitted before
+      // the client has subscribed after receiving the API response
+      console.log(`[orchestrator] Scheduling agent ${agentId} to start in 500ms (mock=${MOCK_MODE})`);
+      setTimeout(() => {
+        console.log(`[orchestrator] Starting agent ${agentId}`);
+        // Run agent loop (fire and forget - streams to WebSocket)
+        const loopFn = MOCK_MODE ? runMockAgentLoop : runAgentLoop;
+        loopFn(io, session, options.systemPrompt, options.userPrompt).finally(
+          () => {
+            // Clean up session after completion
+            // Keep for a grace period to handle late checkpoint responses
+            setTimeout(() => {
+              sessions.delete(agentId);
+            }, 60000); // 1 minute grace period
+          }
+        );
+      }, 500); // 500ms delay for client subscription
 
       return agentId;
     },

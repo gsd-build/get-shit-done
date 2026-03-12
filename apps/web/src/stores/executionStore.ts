@@ -188,7 +188,7 @@ export const useExecutionStore = create<ExecutionState>((set, get) => ({
   setPaused: (paused) =>
     set({ status: paused ? 'paused' : 'running' }),
 
-  completePlan: (planId, status) =>
+  completePlan: (planId, planStatus) =>
     set((state) => {
       const plan = state.plans.get(planId);
       if (!plan) return state;
@@ -196,10 +196,25 @@ export const useExecutionStore = create<ExecutionState>((set, get) => ({
       const newPlans = new Map(state.plans);
       newPlans.set(planId, {
         ...plan,
-        status,
+        status: planStatus,
         endTime: Date.now(),
       });
-      return { plans: newPlans };
+
+      // Check if all plans are complete to update global status
+      const allPlans = Array.from(newPlans.values());
+      const hasError = allPlans.some((p) => p.status === 'error');
+      const allComplete = allPlans.every(
+        (p) => p.status === 'complete' || p.status === 'error'
+      );
+
+      let globalStatus: ExecutionState['status'] = state.status;
+      if (hasError) {
+        globalStatus = 'error';
+      } else if (allComplete) {
+        globalStatus = 'complete';
+      }
+
+      return { plans: newPlans, status: globalStatus };
     }),
 
   reset: () =>

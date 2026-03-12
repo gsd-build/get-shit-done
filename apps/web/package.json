@@ -11,7 +11,8 @@
     "test": "vitest",
     "test:coverage": "vitest run --coverage",
     "e2e": "playwright test",
-    "e2e:ui": "playwright test --ui"
+    "e2e:ui": "playwright test --ui",
+    "test:reset-fixture": "./tests/fixtures/reset-todo-app.sh"
   },
   "dependencies": {
     "@gsd/events": "workspace:*",
