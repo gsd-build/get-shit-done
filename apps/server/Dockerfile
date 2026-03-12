@@ -32,6 +32,12 @@ COPY --from=base /app/apps/server/dist ./apps/server/dist
 COPY --from=base /app/apps/server/package.json ./apps/server/package.json
 COPY --from=base /app/apps/server/node_modules ./apps/server/node_modules
 
+# Copy demo projects for the dashboard
+COPY --from=base /app/apps/server/demo-projects /demo-projects
+
+# Set search path to include demo projects
+ENV GSD_SEARCH_PATHS=/demo-projects
+
 WORKDIR /app/apps/server
 
 # Expose port
