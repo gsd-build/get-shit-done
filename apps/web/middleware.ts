@@ -8,11 +8,12 @@
 import { NextResponse } from 'next/server';
 import type { NextRequest } from 'next/server';
 
-const AUTH_USERNAME = process.env['AUTH_USERNAME'];
-const AUTH_PASSWORD = process.env['AUTH_PASSWORD'];
-const AUTH_ENABLED = Boolean(AUTH_USERNAME && AUTH_PASSWORD);
-
 export function middleware(request: NextRequest) {
+  // Read env vars at runtime (not build time)
+  const AUTH_USERNAME = process.env['AUTH_USERNAME'];
+  const AUTH_PASSWORD = process.env['AUTH_PASSWORD'];
+  const AUTH_ENABLED = Boolean(AUTH_USERNAME && AUTH_PASSWORD);
+
   // Skip auth if not enabled
   if (!AUTH_ENABLED) {
     return NextResponse.next();
