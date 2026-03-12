@@ -9,8 +9,8 @@
 
 import { useState, useCallback } from 'react';
 import { useExecutionStore } from '@/stores/executionStore';
-
-const API_BASE = process.env['NEXT_PUBLIC_API_URL'] || 'http://localhost:3001';
+import { API_PROXY_BASE } from '@/lib/endpoints';
+const API_BASE = API_PROXY_BASE;
 
 export interface UseAgentControlResult {
   pause: () => Promise<void>;

@@ -8,8 +8,8 @@ import { http, HttpResponse, delay } from 'msw';
 import { server } from '../../tests/mocks/server.js';
 import { useAgentControl } from './useAgentControl';
 
-// API base matches the hook's default
-const API_BASE = 'http://localhost:3001';
+// API base matches the hook's same-origin proxy contract
+const API_BASE = '/api/proxy';
 
 // Track requests for verification
 let lastRequest: { method: string; url: string; body?: unknown } | null = null;

@@ -80,8 +80,8 @@ export function createApi(
   // Apply Basic Auth if credentials are configured (skip health endpoint)
   if (AUTH_ENABLED) {
     app.use('*', async (c, next) => {
-      // Skip auth for health check endpoint
-      if (c.req.path === '/api/health' || c.req.path === '/api/health/summary') {
+      // Skip auth for health check endpoints
+      if (c.req.path.startsWith('/api/health')) {
         return next();
       }
 
@@ -247,7 +247,7 @@ export function createApi(
   httpServer.on('request', requestHandler);
 
   console.log('[api] REST API mounted at /api');
-  console.log('[api] Routes: /api/health/summary, /api/projects, /api/projects/:id, /api/projects/:id/phases, /api/projects/:id/execute, /api/agents');
+  console.log('[api] Routes: /api/health/summary, /api/health/socket-room, /api/projects, /api/projects/:id, /api/projects/:id/phases, /api/projects/:id/execute, /api/agents');
 
   // Return cleanup function
   return () => {

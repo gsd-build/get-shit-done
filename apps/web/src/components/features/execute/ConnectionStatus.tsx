@@ -26,8 +26,8 @@ export interface ConnectionStatusProps {
   isConnected: boolean;
   /** Socket URL for diagnostics */
   socketUrl: string;
-  /** API URL for health checks */
-  apiUrl: string;
+  /** Health endpoint URL */
+  healthSummaryUrl: string;
   /** Callback to retry connection */
   onRetryConnection: () => void;
 }
@@ -54,7 +54,7 @@ interface HealthStatus {
 export function ConnectionStatus({
   isConnected,
   socketUrl,
-  apiUrl,
+  healthSummaryUrl,
   onRetryConnection,
 }: ConnectionStatusProps) {
   const [isRetrying, setIsRetrying] = useState(false);
@@ -77,7 +77,7 @@ export function ConnectionStatus({
   const handleCheckBackend = useCallback(async () => {
     setHealthStatus({ status: 'checking' });
     try {
-      const response = await fetch(`${apiUrl}/api/health/summary`);
+      const response = await fetch(healthSummaryUrl);
       if (response.ok) {
         const json = await response.json();
         setHealthStatus({
@@ -101,7 +101,7 @@ export function ConnectionStatus({
         message: error instanceof Error ? error.message : 'Failed to reach backend',
       });
     }
-  }, [apiUrl]);
+  }, [healthSummaryUrl]);
 
   // Connected state - compact indicator
   if (isConnected) {
@@ -208,7 +208,7 @@ export function ConnectionStatus({
               <span className="text-zinc-500">Socket URL:</span> {socketUrl}
             </div>
             <div>
-              <span className="text-zinc-500">API URL:</span> {apiUrl}
+              <span className="text-zinc-500">Health URL:</span> {healthSummaryUrl}
             </div>
             <div>
               <span className="text-zinc-500">Status:</span>{' '}
