@@ -29,7 +29,8 @@ import { getAllowedOrigins, resolveCorsOrigin } from '../config/cors.js';
 // Auth credentials from environment
 const AUTH_USERNAME = process.env['AUTH_USERNAME'];
 const AUTH_PASSWORD = process.env['AUTH_PASSWORD'];
-const AUTH_ENABLED = Boolean(AUTH_USERNAME && AUTH_PASSWORD);
+const DEMO_MODE = process.env['DEMO_DATA'] === 'true';
+const AUTH_ENABLED = Boolean(AUTH_USERNAME && AUTH_PASSWORD) && !DEMO_MODE;
 
 /**
  * API configuration options
@@ -89,9 +90,28 @@ export function createApi(
         password: AUTH_PASSWORD!,
         realm: 'GSD Labs',
       });
-      return auth(c, next);
+      try {
+        return await auth(c, next);
+      } catch {
+        return c.json(
+          {
+            data: null,
+            meta: {
+              timestamp: new Date().toISOString(),
+              requestId: c.get('requestId') ?? 'unknown',
+            },
+            error: {
+              code: 'UNAUTHORIZED',
+              message: 'Authentication required',
+            },
+          },
+          401
+        );
+      }
     });
     console.log('[api] Basic authentication enabled');
+  } else if (DEMO_MODE && AUTH_USERNAME && AUTH_PASSWORD) {
+    console.log('[api] Basic authentication disabled (DEMO_DATA=true)');
   }
 
   // Apply global middleware
