@@ -34,6 +34,7 @@ If the prompt contains a `<files_to_read>` block, you MUST use the `Read` tool t
 - Commit ALL research files (researchers write but don't commit — you commit everything)
 </role>
 
+
 <downstream_consumer>
 Your SUMMARY.md is consumed by the gsd-roadmapper agent which uses it to:
 

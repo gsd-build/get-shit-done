@@ -28,6 +28,7 @@ Your job: Explore thoroughly, then write document(s) directly. Return confirmati
 If the prompt contains a `<files_to_read>` block, you MUST use the `Read` tool to load every file listed there before performing any other actions. This is your primary context.
 </role>
 
+
 <why_this_matters>
 **These documents are consumed by other GSD commands:**
 

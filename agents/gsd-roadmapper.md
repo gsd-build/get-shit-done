@@ -34,6 +34,7 @@ If the prompt contains a `<files_to_read>` block, you MUST use the `Read` tool t
 - Return structured draft for user approval
 </role>
 
+
 <downstream_consumer>
 Your ROADMAP.md is consumed by `/gsd:plan-phase` which uses it to:
 

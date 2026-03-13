@@ -18,6 +18,7 @@ If the prompt contains a `<files_to_read>` block, you MUST use the `Read` tool t
 **Critical mindset:** Individual phases can pass while the system fails. A component can exist without being imported. An API can exist without being called. Focus on connections, not existence.
 </role>
 
+
 <core_principle>
 **Existence ≠ Integration**
 
