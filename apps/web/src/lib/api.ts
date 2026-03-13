@@ -9,55 +9,6 @@ function proxyUrl(path: string): string {
   return `${API_BASE}${path}`;
 }
 
-interface ProjectPhase {
-  number: number;
-  name: string;
-  slug: string;
-  status: 'not_started' | 'in_progress' | 'completed' | 'blocked';
-  plans: number;
-  completedPlans: number;
-}
-
-interface ProjectPhasesResponse {
-  success: boolean;
-  data?: {
-    phases?: ProjectPhase[];
-    total?: number;
-  };
-  meta?: ApiMeta;
-  error?: {
-    code: string;
-    message: string;
-  };
-}
-
-async function fetchProjectPhases(projectId: string): Promise<ApiEnvelope<ProjectPhase[]>> {
-  const response = await fetch(proxyUrl(`/projects/${projectId}/phases`));
-
-  if (!response.ok) {
-    return {
-      success: false,
-      data: [],
-      meta: {
-        timestamp: new Date().toISOString(),
-        requestId: '',
-      },
-      error: { code: 'FETCH_ERROR', message: `HTTP ${response.status}` },
-    };
-  }
-
-  const json = (await response.json()) as ProjectPhasesResponse;
-  return {
-    success: Boolean(json.success),
-    data: json.data?.phases ?? [],
-    meta: {
-      timestamp: json.meta?.timestamp ?? new Date().toISOString(),
-      requestId: json.meta?.requestId ?? '',
-    },
-    ...(json.error ? { error: json.error } : {}),
-  };
-}
-
 export interface ProjectsResponse extends ApiEnvelope<Project[]> {
   meta: ApiMeta & {
     total: number;
@@ -140,9 +91,12 @@ export async function fetchProjects(cursor?: string): Promise<ProjectsResponse> 
  * @returns Plan data with tasks
  */
 export async function fetchPlan(phaseId: string): Promise<ApiEnvelope<Plan | null>> {
+  const url = proxyUrl(`/projects/${phaseId}/plan`);
+
   try {
-    const phasesResponse = await fetchProjectPhases(phaseId);
-    if (!phasesResponse.success) {
+    const response = await fetch(url);
+
+    if (!response.ok) {
       return {
         success: false,
         data: null,
@@ -150,38 +104,12 @@ export async function fetchPlan(phaseId: string): Promise<ApiEnvelope<Plan | nul
           timestamp: new Date().toISOString(),
           requestId: '',
         },
-        error: phasesResponse.error ?? { code: 'FETCH_ERROR', message: 'Failed to fetch phases' },
+        error: { code: 'FETCH_ERROR', message: `HTTP ${response.status}` },
       };
     }
 
-    const tasks: PlanTask[] = (phasesResponse.data ?? []).flatMap((phase) =>
-      Array.from({ length: phase.plans }, (_, index) => ({
-        id: `${phase.slug}-plan-${index + 1}`,
-        name: `${phase.name} Plan ${index + 1}`,
-        description:
-          phase.status === 'completed'
-            ? 'Completed plan from this phase.'
-            : 'Plan discovered for this phase.',
-        wave: phase.number,
-        dependsOn: [],
-        files: [],
-        type: 'auto',
-      }))
-    );
-
-    return {
-      success: true,
-      data: {
-        id: `project-${phaseId}-plan`,
-        phaseId,
-        tasks,
-        createdAt: new Date().toISOString(),
-      },
-      meta: phasesResponse.meta ?? {
-        timestamp: new Date().toISOString(),
-        requestId: '',
-      },
-    };
+    const json = await response.json();
+    return json as ApiEnvelope<Plan>;
   } catch (err) {
     return {
       success: false,
@@ -211,22 +139,43 @@ export async function updatePlanTask(
   taskId: string,
   updates: Partial<PlanTask>
 ): Promise<ApiEnvelope<PlanTask | null>> {
-  return {
-    success: true,
-    data: {
-      id: taskId,
-      name: updates.name ?? 'Updated Task',
-      description: updates.description ?? '',
-      wave: updates.wave ?? 1,
-      dependsOn: updates.dependsOn ?? [],
-      files: updates.files ?? [],
-      type: updates.type ?? 'auto',
-    },
-    meta: {
-      timestamp: new Date().toISOString(),
-      requestId: '',
-    },
-  };
+  const url = proxyUrl(`/projects/${phaseId}/plan/tasks/${taskId}`);
+
+  try {
+    const response = await fetch(url, {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(updates),
+    });
+
+    if (!response.ok) {
+      return {
+        success: false,
+        data: null,
+        meta: {
+          timestamp: new Date().toISOString(),
+          requestId: '',
+        },
+        error: { code: 'UPDATE_ERROR', message: `HTTP ${response.status}` },
+      };
+    }
+
+    const json = await response.json();
+    return json as ApiEnvelope<PlanTask>;
+  } catch (err) {
+    return {
+      success: false,
+      data: null,
+      meta: {
+        timestamp: new Date().toISOString(),
+        requestId: '',
+      },
+      error: {
+        code: 'NETWORK_ERROR',
+        message: err instanceof Error ? err.message : 'Unknown error',
+      },
+    };
+  }
 }
 
 /**
@@ -235,7 +184,8 @@ export async function updatePlanTask(
  * @param phaseId - The phase ID to start research for
  */
 export async function startResearch(phaseId: string): Promise<void> {
-  void phaseId;
+  const url = proxyUrl(`/projects/${phaseId}/research`);
+  await fetch(url, { method: 'POST' });
 }
 
 // ------------------------------------------------------------------
@@ -248,7 +198,8 @@ export async function startResearch(phaseId: string): Promise<void> {
  * @param phaseId - The phase ID to verify
  */
 export async function startVerification(phaseId: string): Promise<void> {
-  void phaseId;
+  const url = proxyUrl(`/projects/${phaseId}/verify`);
+  await fetch(url, { method: 'POST' });
 }
 
 /**
@@ -257,7 +208,8 @@ export async function startVerification(phaseId: string): Promise<void> {
  * @param phaseId - The phase ID to approve
  */
 export async function submitApproval(phaseId: string): Promise<void> {
-  void phaseId;
+  const url = proxyUrl(`/projects/${phaseId}/approve`);
+  await fetch(url, { method: 'POST' });
 }
 
 /**
@@ -272,8 +224,20 @@ export async function submitRejection(
   phaseId: string,
   gapIds: string[]
 ): Promise<{ planUrl: string }> {
-  void gapIds;
-  return { planUrl: `/projects/${phaseId}/plan` };
+  const url = proxyUrl(`/projects/${phaseId}/reject`);
+
+  const response = await fetch(url, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ gapIds }),
+  });
+
+  if (!response.ok) {
+    throw new Error(`Rejection failed: HTTP ${response.status}`);
+  }
+
+  const json = await response.json();
+  return json.data as { planUrl: string };
 }
 
 /**
@@ -285,9 +249,12 @@ export async function submitRejection(
 export async function fetchCoverage(
   phaseId: string
 ): Promise<ApiEnvelope<Coverage[]>> {
+  const url = proxyUrl(`/projects/${phaseId}/coverage`);
+
   try {
-    const phasesResponse = await fetchProjectPhases(phaseId);
-    if (!phasesResponse.success) {
+    const response = await fetch(url);
+
+    if (!response.ok) {
       return {
         success: false,
         data: [],
@@ -295,25 +262,12 @@ export async function fetchCoverage(
           timestamp: new Date().toISOString(),
           requestId: '',
         },
-        error: phasesResponse.error ?? { code: 'FETCH_ERROR', message: 'Failed to fetch phases' },
+        error: { code: 'FETCH_ERROR', message: `HTTP ${response.status}` },
       };
     }
 
-    const phases = phasesResponse.data ?? [];
-    const coverage: Coverage[] = phases.map((phase) => ({
-      requirementId: `phase-${phase.number}`,
-      phaseId: phase.slug,
-      coverage: phase.plans === 0 ? 0 : phase.completedPlans >= phase.plans ? 2 : 1,
-    }));
-
-    return {
-      success: true,
-      data: coverage,
-      meta: phasesResponse.meta ?? {
-        timestamp: new Date().toISOString(),
-        requestId: '',
-      },
-    };
+    const json = await response.json();
+    return json as ApiEnvelope<Coverage[]>;
   } catch (err) {
     return {
       success: false,

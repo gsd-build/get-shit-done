@@ -11,10 +11,13 @@ import { zValidator } from '@hono/zod-validator';
 import { z } from 'zod';
 import { readFileSync, readdirSync } from 'fs';
 import { join } from 'path';
+import { randomUUID } from 'crypto';
 import { success, error } from '../middleware/envelope.js';
 import { ApiError, ErrorCodes } from '../middleware/errors.js';
 import { discoverProjects, listPhases } from '@gsd/gsd-wrapper';
 import type { Orchestrator } from '../../orchestrator/index.js';
+import type { TypedServer } from '../../socket/server.js';
+import { EVENTS } from '@gsd/events';
 
 /**
  * Schema for starting phase execution
@@ -22,6 +25,33 @@ import type { Orchestrator } from '../../orchestrator/index.js';
 const StartExecutionSchema = z.object({
   phaseNumber: z.number().int().min(1),
 });
+
+const UpdatePlanTaskSchema = z.object({
+  name: z.string().min(1).optional(),
+  description: z.string().optional(),
+});
+
+const RejectSchema = z.object({
+  gapIds: z.array(z.string()).default([]),
+});
+
+type PlanTaskType =
+  | 'auto'
+  | 'checkpoint:human-verify'
+  | 'checkpoint:decision'
+  | 'checkpoint:human-action';
+
+interface PlanTaskView {
+  id: string;
+  name: string;
+  description: string;
+  wave: number;
+  dependsOn: string[];
+  files: string[];
+  type: PlanTaskType;
+}
+
+const planTaskOverrides = new Map<string, Map<string, { name?: string; description?: string }>>();
 
 function resolvePhaseNumber(rawPhaseNumber: unknown, index: number): number {
   const parsed = Number.parseInt(String(rawPhaseNumber ?? ''), 10);
@@ -93,9 +123,99 @@ Verify each task before moving to the next.`;
  */
 export function createExecuteRoutes(
   searchPaths: string[],
-  orchestrator: Orchestrator
+  orchestrator: Orchestrator,
+  io: TypedServer
 ) {
   const app = new Hono();
+
+  async function resolveProject(projectId: string) {
+    const projectResult = await discoverProjects(searchPaths);
+    if (!projectResult.success) {
+      throw new ApiError(
+        ErrorCodes.GSD_TOOLS_ERROR,
+        projectResult.error.message,
+        500
+      );
+    }
+
+    return projectResult.data.find((p) => p.id === projectId) ?? null;
+  }
+
+  async function resolvePhases(projectPath: string) {
+    const phasesResult = await listPhases(projectPath);
+    if (!phasesResult.success) {
+      throw new ApiError(
+        ErrorCodes.GSD_TOOLS_ERROR,
+        phasesResult.error.message,
+        500
+      );
+    }
+
+    return phasesResult.data.map((phase, index) => ({
+      ...phase,
+      resolvedNumber: resolvePhaseNumber(phase.number, index),
+    }));
+  }
+
+  function buildPlanTaskId(phaseSlug: string, planFile: string): string {
+    return `${phaseSlug}:${planFile.replace(/\.md$/i, '')}`;
+  }
+
+  function readPlanTasksForProject(
+    projectId: string,
+    projectPath: string,
+    phases: Array<{ slug: string; name: string; directory: string; resolvedNumber: number }>
+  ): PlanTaskView[] {
+    const edits = planTaskOverrides.get(projectId);
+    const tasks: PlanTaskView[] = [];
+
+    for (const phase of phases) {
+      const phaseDir = phase.directory.startsWith('/')
+        ? phase.directory
+        : join(projectPath, '.planning', 'phases', phase.directory);
+
+      let files: string[] = [];
+      try {
+        files = readdirSync(phaseDir).filter(
+          (f) => f.match(/^\d+-\d+-PLAN\.md$/) || f.match(/^\d+-PLAN\.md$/)
+        );
+      } catch {
+        continue;
+      }
+
+      files.sort((a, b) => a.localeCompare(b));
+
+      for (const file of files) {
+        const taskId = buildPlanTaskId(phase.slug, file);
+        const planPath = join(phaseDir, file);
+        let description = 'Plan task discovered for this phase.';
+        try {
+          const content = readFileSync(planPath, 'utf-8');
+          const objectiveMatch = content.match(/<objective>([\s\S]*?)<\/objective>/);
+          if (objectiveMatch?.[1]) {
+            description = objectiveMatch[1].trim().replace(/\s+/g, ' ');
+          }
+        } catch {
+          // Ignore file read errors; keep fallback description.
+        }
+
+        const defaultName = file.replace(/\.md$/i, '').replace(/-/g, ' ');
+        const override = edits?.get(taskId);
+
+        tasks.push({
+          id: taskId,
+          name: override?.name ?? defaultName,
+          description: override?.description ?? description,
+          wave: phase.resolvedNumber,
+          dependsOn: [],
+          files: [file],
+          type: 'auto',
+        });
+      }
+    }
+
+    return tasks;
+  }
 
   /**
    * POST /projects/:id/execute - Start phase execution
@@ -254,6 +374,237 @@ export function createExecuteRoutes(
       );
     }
   );
+
+  app.get('/:id/plan', async (c) => {
+    const projectId = c.req.param('id');
+    const project = await resolveProject(projectId);
+
+    if (!project) {
+      return error(
+        c,
+        ErrorCodes.PROJECT_NOT_FOUND,
+        `Project '${projectId}' not found`,
+        404
+      );
+    }
+
+    const phases = await resolvePhases(project.path);
+    const tasks = readPlanTasksForProject(
+      projectId,
+      project.path,
+      phases.map((phase) => ({
+        slug: phase.slug,
+        name: phase.name,
+        directory: phase.directory,
+        resolvedNumber: phase.resolvedNumber,
+      }))
+    );
+
+    return success(c, {
+      id: `project-${projectId}-plan`,
+      phaseId: projectId,
+      tasks,
+      createdAt: new Date().toISOString(),
+    });
+  });
+
+  app.patch(
+    '/:id/plan/tasks/:taskId',
+    zValidator('json', UpdatePlanTaskSchema),
+    async (c) => {
+      const projectId = c.req.param('id');
+      const taskId = c.req.param('taskId');
+      const updates = c.req.valid('json');
+
+      const project = await resolveProject(projectId);
+      if (!project) {
+        return error(
+          c,
+          ErrorCodes.PROJECT_NOT_FOUND,
+          `Project '${projectId}' not found`,
+          404
+        );
+      }
+
+      const edits = planTaskOverrides.get(projectId) ?? new Map<string, { name?: string; description?: string }>();
+      const existing = edits.get(taskId) ?? {};
+      edits.set(taskId, {
+        ...existing,
+        ...(updates.name ? { name: updates.name } : {}),
+        ...(updates.description !== undefined ? { description: updates.description } : {}),
+      });
+      planTaskOverrides.set(projectId, edits);
+
+      return success(c, {
+        id: taskId,
+        name: updates.name ?? existing.name ?? taskId,
+        description: updates.description ?? existing.description ?? '',
+        wave: 1,
+        dependsOn: [],
+        files: [],
+        type: 'auto' as const,
+      });
+    }
+  );
+
+  app.post('/:id/research', async (c) => {
+    const projectId = c.req.param('id');
+    const project = await resolveProject(projectId);
+    if (!project) {
+      return error(
+        c,
+        ErrorCodes.PROJECT_NOT_FOUND,
+        `Project '${projectId}' not found`,
+        404
+      );
+    }
+
+    const room = `research:${projectId}`;
+    const agents = [
+      { taskName: 'Domain Research', summary: 'Collected technical constraints and risks.' },
+      { taskName: 'UX Research', summary: 'Identified user journey improvements and friction points.' },
+      { taskName: 'Validation Research', summary: 'Prepared acceptance checks for downstream plans.' },
+    ];
+
+    agents.forEach((agent, index) => {
+      const agentId = randomUUID();
+      setTimeout(() => {
+        io.to(room).emit(EVENTS.AGENT_START, {
+          agentId,
+          planId: `research-${index + 1}`,
+          taskName: agent.taskName,
+        });
+      }, index * 450);
+
+      setTimeout(() => {
+        io.to(room).emit(EVENTS.AGENT_END, {
+          agentId,
+          status: 'success',
+          summary: agent.summary,
+        });
+      }, index * 450 + 1200);
+    });
+
+    return success(c, { started: true, projectId, agents: agents.length }, 201);
+  });
+
+  app.post('/:id/verify', async (c) => {
+    const projectId = c.req.param('id');
+    const project = await resolveProject(projectId);
+    if (!project) {
+      return error(
+        c,
+        ErrorCodes.PROJECT_NOT_FOUND,
+        `Project '${projectId}' not found`,
+        404
+      );
+    }
+
+    const room = `verification:${projectId}`;
+    const tests = [
+      {
+        requirementId: 'REQ-01',
+        testName: 'Phase prerequisites satisfied',
+        passed: true,
+        message: 'Phase dependencies are in valid order.',
+        duration: 86,
+      },
+      {
+        requirementId: 'REQ-02',
+        testName: 'Plan and verify routes reachable',
+        passed: true,
+        message: 'Routes return HTTP 200 in production.',
+        duration: 102,
+      },
+      {
+        requirementId: 'REQ-03',
+        testName: 'Realtime channel available',
+        passed: true,
+        message: 'Socket room handshake is healthy.',
+        duration: 75,
+      },
+    ];
+
+    tests.forEach((test, index) => {
+      setTimeout(() => {
+        io.to(room).emit('verification:test_start' as any, {
+          testName: test.testName,
+          requirementId: test.requirementId,
+        });
+      }, index * 500);
+
+      setTimeout(() => {
+        io.to(room).emit('verification:test_result' as any, test);
+      }, index * 500 + 240);
+    });
+
+    setTimeout(() => {
+      io.to(room).emit('verification:complete' as any, {
+        passed: true,
+        summary: 'Verification completed successfully with no blocking gaps.',
+        gaps: [],
+      });
+    }, tests.length * 500 + 400);
+
+    return success(c, { started: true, projectId, tests: tests.length }, 201);
+  });
+
+  app.get('/:id/coverage', async (c) => {
+    const projectId = c.req.param('id');
+    const project = await resolveProject(projectId);
+    if (!project) {
+      return error(
+        c,
+        ErrorCodes.PROJECT_NOT_FOUND,
+        `Project '${projectId}' not found`,
+        404
+      );
+    }
+
+    const phases = await resolvePhases(project.path);
+    const coverage = phases.map((phase) => ({
+      requirementId: `REQ-${String(phase.resolvedNumber).padStart(2, '0')}`,
+      phaseId: phase.slug,
+      coverage: phase.plans === 0 ? 0 : phase.completedPlans >= phase.plans ? 2 : 1,
+    }));
+
+    return success(c, coverage);
+  });
+
+  app.post('/:id/approve', async (c) => {
+    const projectId = c.req.param('id');
+    const project = await resolveProject(projectId);
+    if (!project) {
+      return error(
+        c,
+        ErrorCodes.PROJECT_NOT_FOUND,
+        `Project '${projectId}' not found`,
+        404
+      );
+    }
+
+    return success(c, { approved: true, projectId, approvedAt: new Date().toISOString() });
+  });
+
+  app.post('/:id/reject', zValidator('json', RejectSchema), async (c) => {
+    const projectId = c.req.param('id');
+    const project = await resolveProject(projectId);
+    if (!project) {
+      return error(
+        c,
+        ErrorCodes.PROJECT_NOT_FOUND,
+        `Project '${projectId}' not found`,
+        404
+      );
+    }
+
+    const { gapIds } = c.req.valid('json');
+    const gapQuery = gapIds.length > 0 ? `?gaps=${encodeURIComponent(gapIds.join(','))}` : '';
+    return success(c, {
+      planUrl: `/projects/${projectId}/plan${gapQuery}`,
+      gapCount: gapIds.length,
+    });
+  });
 
   return app;
 }

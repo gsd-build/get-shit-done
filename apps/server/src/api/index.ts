@@ -130,7 +130,7 @@ export function createApi(
   if (config.orchestrator) {
     app.route('/agents', createAgentRoutes(config.orchestrator));
     // Execute routes also need orchestrator to start agents
-    app.route('/projects', createExecuteRoutes(searchPaths, config.orchestrator));
+    app.route('/projects', createExecuteRoutes(searchPaths, config.orchestrator, io));
   }
 
   // 404 handler for unmatched API routes

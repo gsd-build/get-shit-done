@@ -83,6 +83,30 @@ export function registerHandlers(
       console.log(`[socket] ${socket.id} unsubscribed from agent:${agentId}`);
     });
 
+    socket.on('research:subscribe' as any, (phaseId: string) => {
+      socket.join(`research:${phaseId}`);
+      console.log(`[socket] ${socket.id} subscribed to research:${phaseId}`);
+    });
+
+    socket.on('research:unsubscribe' as any, () => {
+      for (const room of socket.rooms) {
+        if (room.startsWith('research:')) {
+          socket.leave(room);
+        }
+      }
+      console.log(`[socket] ${socket.id} unsubscribed from all research rooms`);
+    });
+
+    socket.on('verification:subscribe' as any, (phaseId: string) => {
+      socket.join(`verification:${phaseId}`);
+      console.log(`[socket] ${socket.id} subscribed to verification:${phaseId}`);
+    });
+
+    socket.on('verification:unsubscribe' as any, (phaseId: string) => {
+      socket.leave(`verification:${phaseId}`);
+      console.log(`[socket] ${socket.id} unsubscribed from verification:${phaseId}`);
+    });
+
     // Checkpoint response handling - forward to orchestrator
     // Per CONTEXT.md: idempotency via checkpoint ID + response hash
     socket.on(EVENTS.CHECKPOINT_RESPONSE, (event) => {
