@@ -10,6 +10,15 @@
 
 const DEFAULT_ORIGINS = ['http://localhost:3000'];
 
+function isLocalhostOrigin(origin: string): boolean {
+  return (
+    origin.startsWith('http://localhost') ||
+    origin.startsWith('https://localhost') ||
+    origin.startsWith('http://127.0.0.1') ||
+    origin.startsWith('https://127.0.0.1')
+  );
+}
+
 function splitOrigins(value: string | undefined): string[] {
   if (!value) return [];
   return value
@@ -19,6 +28,9 @@ function splitOrigins(value: string | undefined): string[] {
 }
 
 export function getAllowedOrigins(): string[] {
+  const isProduction = process.env['NODE_ENV'] === 'production';
+  const allowLocalhostInProd = process.env['ALLOW_LOCALHOST_CORS'] === 'true';
+
   const envDerivedOrigins = [
     process.env['WEB_URL'],
     process.env['NEXT_PUBLIC_WEB_URL'],
@@ -34,11 +46,17 @@ export function getAllowedOrigins(): string[] {
     ...envDerivedOrigins,
   ];
 
-  if (envOrigins.length > 0) {
-    return Array.from(new Set(envOrigins));
+  const uniqueOrigins = Array.from(new Set(envOrigins));
+  const filteredOrigins =
+    isProduction && !allowLocalhostInProd
+      ? uniqueOrigins.filter((origin) => !isLocalhostOrigin(origin))
+      : uniqueOrigins;
+
+  if (filteredOrigins.length > 0) {
+    return filteredOrigins;
   }
 
-  if (process.env['NODE_ENV'] === 'production') {
+  if (isProduction) {
     return [];
   }
 

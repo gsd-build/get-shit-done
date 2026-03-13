@@ -11,7 +11,7 @@ export default function ProjectDetailPage() {
 
   const navItems = [
     { href: `/projects/${projectId}/execute`, label: 'Execute', icon: Play, ready: true },
-    { href: `/projects/${projectId}/discuss`, label: 'Discuss', icon: MessageSquare, ready: false },
+    { href: `/projects/${projectId}/discuss`, label: 'Discuss', icon: MessageSquare, ready: true },
     { href: `/projects/${projectId}/plan`, label: 'Plan', icon: FileText, ready: false },
     { href: `/projects/${projectId}/verify`, label: 'Verify', icon: CheckCircle, ready: false },
   ];
@@ -22,7 +22,7 @@ export default function ProjectDetailPage() {
         <button
           type="button"
           onClick={() => router.back()}
-          className="flex items-center gap-2 text-muted-foreground hover:text-foreground mb-6"
+          className="inline-flex items-center gap-2 min-h-11 px-3 rounded-md text-muted-foreground hover:text-foreground hover:bg-muted/50 mb-6"
         >
           <ArrowLeft className="w-4 h-4" />
           Back to Dashboard

@@ -20,10 +20,9 @@ import type { Wave } from '@/components/features/execute/WaveColumn';
 import { useSocket } from '@/hooks/useSocket';
 import { useAgentSubscription } from '@/hooks/useAgentSubscription';
 import { useCheckpointResponse } from '@/hooks/useCheckpointResponse';
-import { API_PROXY_BASE, HEALTH_SUMMARY_URL, SOCKET_BASE } from '@/lib/endpoints';
+import { API_PROXY_BASE, HEALTH_SUMMARY_URL, resolveSocketBase } from '@/lib/endpoints';
 import { useExecutionStore, selectPlans, selectStatus } from '@/stores/executionStore';
 
-const SOCKET_URL = SOCKET_BASE;
 const API_URL = API_PROXY_BASE;
 
 interface Phase {
@@ -84,6 +83,7 @@ export default function ExecutePage() {
   const searchParams = useSearchParams();
 
   const projectId = params['id'] as string;
+  const socketUrl = useMemo(() => resolveSocketBase(), []);
   const agentIdFromUrl = searchParams.get('agentId');
 
   // Track the active agent ID
@@ -96,7 +96,7 @@ export default function ExecutePage() {
   const [startError, setStartError] = useState<string | null>(null);
 
   // Connect to Socket.IO server
-  const { socket, isConnected, reconnect } = useSocket(SOCKET_URL);
+  const { socket, isConnected, reconnect } = useSocket(socketUrl);
 
   // Subscribe to agent events
   useAgentSubscription(socket, activeAgentId);
@@ -205,7 +205,7 @@ export default function ExecutePage() {
         <button
           type="button"
           onClick={() => router.push(`/projects/${projectId}`)}
-          className="flex items-center gap-2 text-sm text-muted-foreground hover:text-foreground transition-colors"
+          className="inline-flex items-center gap-2 min-h-11 px-3 rounded-md text-sm text-muted-foreground hover:text-foreground hover:bg-muted/50 transition-colors"
         >
           <ArrowLeft className="w-4 h-4" />
           <span>Back to Project</span>
@@ -215,7 +215,7 @@ export default function ExecutePage() {
           {/* Connection status with recovery CTAs */}
           <ConnectionStatus
             isConnected={isConnected}
-            socketUrl={SOCKET_URL}
+            socketUrl={socketUrl}
             healthSummaryUrl={HEALTH_SUMMARY_URL}
             onRetryConnection={reconnect}
           />

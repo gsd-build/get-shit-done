@@ -15,7 +15,7 @@ export function SearchBar() {
         value={searchText}
         onChange={(e) => setSearchText(e.target.value)}
         placeholder="Search projects..."
-        className="w-full pl-10 pr-4 py-2 rounded-lg border border-border bg-background text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-primary"
+        className="w-full min-h-11 pl-10 pr-4 rounded-lg border border-border bg-background text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-primary"
       />
     </div>
   );
