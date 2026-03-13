@@ -64,6 +64,7 @@ const hasGemini = args.includes('--gemini');
 const hasCodex = args.includes('--codex');
 const hasCopilot = args.includes('--copilot');
 const hasAntigravity = args.includes('--antigravity');
+const hasCursor = args.includes('--cursor');
 const hasBoth = args.includes('--both'); // Legacy flag, keeps working
 const hasAll = args.includes('--all');
 const hasUninstall = args.includes('--uninstall') || args.includes('-u');
@@ -71,7 +72,7 @@ const hasUninstall = args.includes('--uninstall') || args.includes('-u');
 // Runtime selection - can be set by flags or interactive prompt
 let selectedRuntimes = [];
 if (hasAll) {
-  selectedRuntimes = ['claude', 'opencode', 'gemini', 'codex', 'copilot', 'antigravity'];
+  selectedRuntimes = ['claude', 'opencode', 'gemini', 'codex', 'copilot', 'antigravity', 'cursor'];
 } else if (hasBoth) {
   selectedRuntimes = ['claude', 'opencode'];
 } else {
@@ -81,6 +82,7 @@ if (hasAll) {
   if (hasCodex) selectedRuntimes.push('codex');
   if (hasCopilot) selectedRuntimes.push('copilot');
   if (hasAntigravity) selectedRuntimes.push('antigravity');
+  if (hasCursor) selectedRuntimes.push('cursor');
 }
 
 // WSL + Windows Node.js detection
@@ -124,6 +126,7 @@ function getDirName(runtime) {
   if (runtime === 'gemini') return '.gemini';
   if (runtime === 'codex') return '.codex';
   if (runtime === 'antigravity') return '.agent';
+  if (runtime === 'cursor') return '.cursor';
   return '.claude';
 }
 
@@ -151,6 +154,7 @@ function getConfigDirFromHome(runtime, isGlobal) {
     if (!isGlobal) return "'.agent'";
     return "'.gemini', 'antigravity'";
   }
+  if (runtime === 'cursor') return "'.cursor'";
   return "'.claude'";
 }
 
@@ -237,6 +241,18 @@ function getGlobalDir(runtime, explicitDir = null) {
     return path.join(os.homedir(), '.gemini', 'antigravity');
   }
 
+  if (runtime === 'cursor') {
+    // Cursor: --config-dir > CURSOR_CONFIG_DIR > ~/.cursor
+    if (explicitDir) {
+      return expandTilde(explicitDir);
+    }
+    if (process.env.CURSOR_CONFIG_DIR) {
+      return expandTilde(process.env.CURSOR_CONFIG_DIR);
+    }
+    return path.join(os.homedir(), '.cursor');
+  }
+
+
   // Claude Code: --config-dir > CLAUDE_CONFIG_DIR > ~/.claude
   if (explicitDir) {
     return expandTilde(explicitDir);
@@ -257,7 +273,7 @@ const banner = '\n' +
   '\n' +
   '  Get Shit Done ' + dim + 'v' + pkg.version + reset + '\n' +
   '  A meta-prompting, context engineering and spec-driven\n' +
-  '  development system for Claude Code, OpenCode, Gemini, Codex, Copilot, and Antigravity by TÂCHES.\n';
+  '  development system for Claude Code, OpenCode, Gemini, Codex, Copilot, Antigravity, and Cursor by TÂCHES.\n';
 
 // Parse --config-dir argument
 function parseConfigDirArg() {
@@ -295,7 +311,7 @@ if (hasUninstall) {
 
 // Show help if requested
 if (hasHelp) {
-  console.log(`  ${yellow}Usage:${reset} npx get-shit-done-cc [options]\n\n  ${yellow}Options:${reset}\n    ${cyan}-g, --global${reset}              Install globally (to config directory)\n    ${cyan}-l, --local${reset}               Install locally (to current directory)\n    ${cyan}--claude${reset}                  Install for Claude Code only\n    ${cyan}--opencode${reset}                Install for OpenCode only\n    ${cyan}--gemini${reset}                  Install for Gemini only\n    ${cyan}--codex${reset}                   Install for Codex only\n    ${cyan}--copilot${reset}                 Install for Copilot only\n    ${cyan}--antigravity${reset}             Install for Antigravity only\n    ${cyan}--all${reset}                     Install for all runtimes\n    ${cyan}-u, --uninstall${reset}           Uninstall GSD (remove all GSD files)\n    ${cyan}-c, --config-dir <path>${reset}   Specify custom config directory\n    ${cyan}-h, --help${reset}                Show this help message\n    ${cyan}--force-statusline${reset}        Replace existing statusline config\n\n  ${yellow}Examples:${reset}\n    ${dim}# Interactive install (prompts for runtime and location)${reset}\n    npx get-shit-done-cc\n\n    ${dim}# Install for Claude Code globally${reset}\n    npx get-shit-done-cc --claude --global\n\n    ${dim}# Install for Gemini globally${reset}\n    npx get-shit-done-cc --gemini --global\n\n    ${dim}# Install for Codex globally${reset}\n    npx get-shit-done-cc --codex --global\n\n    ${dim}# Install for Copilot globally${reset}\n    npx get-shit-done-cc --copilot --global\n\n    ${dim}# Install for Copilot locally${reset}\n    npx get-shit-done-cc --copilot --local\n\n    ${dim}# Install for Antigravity globally${reset}\n    npx get-shit-done-cc --antigravity --global\n\n    ${dim}# Install for Antigravity locally${reset}\n    npx get-shit-done-cc --antigravity --local\n\n    ${dim}# Install for all runtimes globally${reset}\n    npx get-shit-done-cc --all --global\n\n    ${dim}# Install to custom config directory${reset}\n    npx get-shit-done-cc --codex --global --config-dir ~/.codex-work\n\n    ${dim}# Install to current project only${reset}\n    npx get-shit-done-cc --claude --local\n\n    ${dim}# Uninstall GSD from Codex globally${reset}\n    npx get-shit-done-cc --codex --global --uninstall\n\n  ${yellow}Notes:${reset}\n    The --config-dir option is useful when you have multiple configurations.\n    It takes priority over CLAUDE_CONFIG_DIR / GEMINI_CONFIG_DIR / CODEX_HOME / COPILOT_CONFIG_DIR / ANTIGRAVITY_CONFIG_DIR environment variables.\n`);
+  console.log(`  ${yellow}Usage:${reset} npx get-shit-done-cc [options]\n\n  ${yellow}Options:${reset}\n    ${cyan}-g, --global${reset}              Install globally (to config directory)\n    ${cyan}-l, --local${reset}               Install locally (to current directory)\n    ${cyan}--claude${reset}                  Install for Claude Code only\n    ${cyan}--opencode${reset}                Install for OpenCode only\n    ${cyan}--gemini${reset}                  Install for Gemini only\n    ${cyan}--codex${reset}                   Install for Codex only\n    ${cyan}--copilot${reset}                 Install for Copilot only\n    ${cyan}--antigravity${reset}             Install for Antigravity only\n    ${cyan}--cursor${reset}                  Install for Cursor only\n    ${cyan}--all${reset}                     Install for all runtimes\n    ${cyan}-u, --uninstall${reset}           Uninstall GSD (remove all GSD files)\n    ${cyan}-c, --config-dir <path>${reset}   Specify custom config directory\n    ${cyan}-h, --help${reset}                Show this help message\n    ${cyan}--force-statusline${reset}        Replace existing statusline config\n\n  ${yellow}Examples:${reset}\n    ${dim}# Interactive install (prompts for runtime and location)${reset}\n    npx get-shit-done-cc\n\n    ${dim}# Install for Claude Code globally${reset}\n    npx get-shit-done-cc --claude --global\n\n    ${dim}# Install for Gemini globally${reset}\n    npx get-shit-done-cc --gemini --global\n\n    ${dim}# Install for Codex globally${reset}\n    npx get-shit-done-cc --codex --global\n\n    ${dim}# Install for Copilot globally${reset}\n    npx get-shit-done-cc --copilot --global\n\n    ${dim}# Install for Copilot locally${reset}\n    npx get-shit-done-cc --copilot --local\n\n    ${dim}# Install for Antigravity globally${reset}\n    npx get-shit-done-cc --antigravity --global\n\n    ${dim}# Install for Antigravity locally${reset}\n    npx get-shit-done-cc --antigravity --local\n\n    ${dim}# Install for Cursor globally${reset}\n    npx get-shit-done-cc --cursor --global\n\n    ${dim}# Install for Cursor locally${reset}\n    npx get-shit-done-cc --cursor --local\n\n    ${dim}# Install for all runtimes globally${reset}\n    npx get-shit-done-cc --all --global\n\n    ${dim}# Install to custom config directory${reset}\n    npx get-shit-done-cc --codex --global --config-dir ~/.codex-work\n\n    ${dim}# Install to current project only${reset}\n    npx get-shit-done-cc --claude --local\n\n    ${dim}# Uninstall GSD from Cursor globally${reset}\n    npx get-shit-done-cc --cursor --global --uninstall\n\n  ${yellow}Notes:${reset}\n    The --config-dir option is useful when you have multiple configurations.\n    It takes priority over CLAUDE_CONFIG_DIR / GEMINI_CONFIG_DIR / CODEX_HOME / COPILOT_CONFIG_DIR / ANTIGRAVITY_CONFIG_DIR / CURSOR_CONFIG_DIR environment variables.\n`);
   process.exit(0);
 }
 
@@ -715,6 +731,123 @@ function extractFrontmatterField(frontmatter, fieldName) {
   const match = frontmatter.match(regex);
   if (!match) return null;
   return match[1].trim().replace(/^['"]|['"]$/g, '');
+}
+
+// Tool name mapping from Claude Code to Cursor CLI
+const claudeToCursorTools = {
+  Bash: 'Shell',
+  Edit: 'StrReplace',
+  AskUserQuestion: null, // No direct equivalent — use conversational prompting
+  SlashCommand: null,    // No equivalent — skills are auto-discovered
+};
+
+/**
+ * Convert a Claude Code tool name to Cursor CLI format
+ * @returns {string|null} Cursor tool name, or null if tool should be excluded
+ */
+function convertCursorToolName(claudeTool) {
+  if (claudeTool in claudeToCursorTools) {
+    return claudeToCursorTools[claudeTool];
+  }
+  // MCP tools keep their format (Cursor supports MCP)
+  if (claudeTool.startsWith('mcp__')) {
+    return claudeTool;
+  }
+  // Most tools share the same name (Read, Write, Glob, Grep, Task, WebSearch, WebFetch, TodoWrite)
+  return claudeTool;
+}
+
+function convertSlashCommandsToCursorSkillMentions(content) {
+  let converted = content.replace(/\/gsd:([a-z0-9-]+)/gi, (_, commandName) => {
+    return `gsd-${String(commandName).toLowerCase()}`;
+  });
+  converted = converted.replace(/\/gsd-help\b/g, 'gsd-help');
+  return converted;
+}
+
+function convertClaudeToCursorMarkdown(content) {
+  let converted = convertSlashCommandsToCursorSkillMentions(content);
+  // Replace tool name references in body text
+  converted = converted.replace(/\bBash\(/g, 'Shell(');
+  converted = converted.replace(/\bEdit\(/g, 'StrReplace(');
+  converted = converted.replace(/\bAskUserQuestion\b/g, 'conversational prompting');
+  // Replace subagent_type from Claude to Cursor format
+  converted = converted.replace(/subagent_type="general-purpose"/g, 'subagent_type="generalPurpose"');
+  converted = converted.replace(/\$ARGUMENTS\b/g, '{{GSD_ARGS}}');
+  // Replace project-level Claude conventions with Cursor equivalents
+  converted = converted.replace(/`\.\/CLAUDE\.md`/g, '`.cursor/rules/`');
+  converted = converted.replace(/\.\/CLAUDE\.md/g, '.cursor/rules/');
+  converted = converted.replace(/`CLAUDE\.md`/g, '`.cursor/rules/`');
+  converted = converted.replace(/\bCLAUDE\.md\b/g, '.cursor/rules/');
+  converted = converted.replace(/\.claude\/skills\//g, '.cursor/skills/');
+  // Remove Claude Code-specific bug workarounds before brand replacement
+  converted = converted.replace(/\*\*Known Claude Code bug \(classifyHandoffIfNeeded\):\*\*[^\n]*\n/g, '');
+  converted = converted.replace(/- \*\*classifyHandoffIfNeeded false failure:\*\*[^\n]*\n/g, '');
+  // Replace "Claude Code" brand references with "Cursor"
+  converted = converted.replace(/\bClaude Code\b/g, 'Cursor');
+  return converted;
+}
+
+function getCursorSkillAdapterHeader(skillName) {
+  return `<cursor_skill_adapter>
+## A. Skill Invocation
+- This skill is invoked when the user mentions \`${skillName}\` or describes a task matching this skill.
+- Treat all user text after the skill mention as \`{{GSD_ARGS}}\`.
+- If no arguments are present, treat \`{{GSD_ARGS}}\` as empty.
+
+## B. User Prompting
+When the workflow needs user input, prompt the user conversationally:
+- Present options as a numbered list in your response text
+- Ask the user to reply with their choice
+- For multi-select, ask for comma-separated numbers
+
+## C. Tool Usage
+Use these Cursor tools when executing GSD workflows:
+- \`Shell\` for running commands (terminal operations)
+- \`StrReplace\` for editing existing files
+- \`Read\`, \`Write\`, \`Glob\`, \`Grep\`, \`Task\`, \`WebSearch\`, \`WebFetch\`, \`TodoWrite\` as needed
+
+## D. Subagent Spawning
+When the workflow needs to spawn a subagent:
+- Use \`Task(subagent_type="generalPurpose", ...)\`
+- The \`model\` parameter maps to Cursor's model options (e.g., "fast")
+</cursor_skill_adapter>`;
+}
+
+function convertClaudeCommandToCursorSkill(content, skillName) {
+  const converted = convertClaudeToCursorMarkdown(content);
+  const { frontmatter, body } = extractFrontmatterAndBody(converted);
+  let description = `Run GSD workflow ${skillName}.`;
+  if (frontmatter) {
+    const maybeDescription = extractFrontmatterField(frontmatter, 'description');
+    if (maybeDescription) {
+      description = maybeDescription;
+    }
+  }
+  description = toSingleLine(description);
+  const shortDescription = description.length > 180 ? `${description.slice(0, 177)}...` : description;
+  const adapter = getCursorSkillAdapterHeader(skillName);
+
+  return `---\nname: ${yamlQuote(skillName)}\ndescription: ${yamlQuote(shortDescription)}\n---\n\n${adapter}\n\n${body.trimStart()}`;
+}
+
+/**
+ * Convert Claude Code agent markdown to Cursor agent format.
+ * Strips frontmatter fields Cursor doesn't support (color, skills),
+ * converts tool references, and adds a role context header.
+ */
+function convertClaudeAgentToCursorAgent(content) {
+  let converted = convertClaudeToCursorMarkdown(content);
+
+  const { frontmatter, body } = extractFrontmatterAndBody(converted);
+  if (!frontmatter) return converted;
+
+  const name = extractFrontmatterField(frontmatter, 'name') || 'unknown';
+  const description = extractFrontmatterField(frontmatter, 'description') || '';
+
+  const cleanFrontmatter = `---\nname: ${yamlQuote(name)}\ndescription: ${yamlQuote(toSingleLine(description))}\n---`;
+
+  return `${cleanFrontmatter}\n${body}`;
 }
 
 function convertSlashCommandsToCodexSkillMentions(content) {
@@ -1445,6 +1578,59 @@ function copyCommandsAsCodexSkills(srcDir, skillsDir, prefix, pathPrefix, runtim
   recurse(srcDir, prefix);
 }
 
+function copyCommandsAsCursorSkills(srcDir, skillsDir, prefix, pathPrefix, runtime) {
+  if (!fs.existsSync(srcDir)) {
+    return;
+  }
+
+  fs.mkdirSync(skillsDir, { recursive: true });
+
+  // Remove previous GSD Cursor skills to avoid stale command skills
+  const existing = fs.readdirSync(skillsDir, { withFileTypes: true });
+  for (const entry of existing) {
+    if (entry.isDirectory() && entry.name.startsWith(`${prefix}-`)) {
+      fs.rmSync(path.join(skillsDir, entry.name), { recursive: true });
+    }
+  }
+
+  function recurse(currentSrcDir, currentPrefix) {
+    const entries = fs.readdirSync(currentSrcDir, { withFileTypes: true });
+
+    for (const entry of entries) {
+      const srcPath = path.join(currentSrcDir, entry.name);
+      if (entry.isDirectory()) {
+        recurse(srcPath, `${currentPrefix}-${entry.name}`);
+        continue;
+      }
+
+      if (!entry.name.endsWith('.md')) {
+        continue;
+      }
+
+      const baseName = entry.name.replace('.md', '');
+      const skillName = `${currentPrefix}-${baseName}`;
+      const skillDir = path.join(skillsDir, skillName);
+      fs.mkdirSync(skillDir, { recursive: true });
+
+      let content = fs.readFileSync(srcPath, 'utf8');
+      const globalClaudeRegex = /~\/\.claude\//g;
+      const globalClaudeHomeRegex = /\$HOME\/\.claude\//g;
+      const localClaudeRegex = /\.\/\.claude\//g;
+      const cursorDirRegex = /~\/\.cursor\//g;
+      content = content.replace(globalClaudeRegex, pathPrefix);
+      content = content.replace(globalClaudeHomeRegex, toHomePrefix(pathPrefix));
+      content = content.replace(localClaudeRegex, `./${getDirName(runtime)}/`);
+      content = content.replace(cursorDirRegex, pathPrefix);
+      content = processAttribution(content, getCommitAttribution(runtime));
+      content = convertClaudeCommandToCursorSkill(content, skillName);
+
+      fs.writeFileSync(path.join(skillDir, 'SKILL.md'), content);
+    }
+  }
+
+  recurse(srcDir, prefix);
+}
+
 /**
  * Copy Claude commands as Copilot skills — one folder per skill with SKILL.md.
  * Applies CONV-01 (structure), CONV-02 (allowed-tools), CONV-06 (paths), CONV-07 (command names).
@@ -1561,6 +1747,7 @@ function copyWithPathReplacement(srcDir, destDir, pathPrefix, runtime, isCommand
   const isCodex = runtime === 'codex';
   const isCopilot = runtime === 'copilot';
   const isAntigravity = runtime === 'antigravity';
+  const isCursor = runtime === 'cursor';
   const dirName = getDirName(runtime);
 
   // Clean install: remove existing destination to prevent orphaned files
@@ -1617,6 +1804,9 @@ function copyWithPathReplacement(srcDir, destDir, pathPrefix, runtime, isCommand
         content = convertClaudeToAntigravityContent(content, isGlobal);
         content = processAttribution(content, getCommitAttribution(runtime));
         fs.writeFileSync(destPath, content);
+      } else if (isCursor) {
+        content = convertClaudeToCursorMarkdown(content);
+        fs.writeFileSync(destPath, content);
       } else {
         fs.writeFileSync(destPath, content);
       }
@@ -1630,6 +1820,14 @@ function copyWithPathReplacement(srcDir, destDir, pathPrefix, runtime, isCommand
       let content = fs.readFileSync(srcPath, 'utf8');
       content = convertClaudeToAntigravityContent(content, isGlobal);
       fs.writeFileSync(destPath, content);
+    } else if (isCursor && (entry.name.endsWith('.cjs') || entry.name.endsWith('.js'))) {
+      // For Cursor, also convert Claude references in JS/CJS utility scripts
+      let jsContent = fs.readFileSync(srcPath, 'utf8');
+      jsContent = jsContent.replace(/\/gsd:([a-z0-9-]+)/gi, (_, cmd) => `gsd-${cmd.toLowerCase()}`);
+      jsContent = jsContent.replace(/\.claude\/skills\//g, '.cursor/skills/');
+      jsContent = jsContent.replace(/CLAUDE\.md/g, '.cursor/rules/');
+      jsContent = jsContent.replace(/\bClaude Code\b/g, 'Cursor');
+      fs.writeFileSync(destPath, jsContent);
     } else {
       fs.copyFileSync(srcPath, destPath);
     }
@@ -1722,6 +1920,7 @@ function uninstall(isGlobal, runtime = 'claude') {
   const isCodex = runtime === 'codex';
   const isCopilot = runtime === 'copilot';
   const isAntigravity = runtime === 'antigravity';
+  const isCursor = runtime === 'cursor';
   const dirName = getDirName(runtime);
 
   // Get the target directory based on runtime and install type
@@ -1739,6 +1938,7 @@ function uninstall(isGlobal, runtime = 'claude') {
   if (runtime === 'codex') runtimeLabel = 'Codex';
   if (runtime === 'copilot') runtimeLabel = 'Copilot';
   if (runtime === 'antigravity') runtimeLabel = 'Antigravity';
+  if (runtime === 'cursor') runtimeLabel = 'Cursor';
 
   console.log(`  Uninstalling GSD from ${cyan}${runtimeLabel}${reset} at ${cyan}${locationLabel}${reset}\n`);
 
@@ -1765,8 +1965,8 @@ function uninstall(isGlobal, runtime = 'claude') {
       }
       console.log(`  ${green}✓${reset} Removed GSD commands from command/`);
     }
-  } else if (isCodex) {
-    // Codex: remove skills/gsd-*/SKILL.md skill directories
+  } else if (isCodex || isCursor) {
+    // Codex/Cursor: remove skills/gsd-*/SKILL.md skill directories
     const skillsDir = path.join(targetDir, 'skills');
     if (fs.existsSync(skillsDir)) {
       let skillCount = 0;
@@ -1779,11 +1979,12 @@ function uninstall(isGlobal, runtime = 'claude') {
       }
       if (skillCount > 0) {
         removedCount++;
-        console.log(`  ${green}✓${reset} Removed ${skillCount} Codex skills`);
+        console.log(`  ${green}✓${reset} Removed ${skillCount} ${runtimeLabel} skills`);
       }
     }
 
-    // Codex: remove GSD agent .toml config files
+    // Codex-only: remove GSD agent .toml config files and config.toml sections
+    if (isCodex) {
     const codexAgentsDir = path.join(targetDir, 'agents');
     if (fs.existsSync(codexAgentsDir)) {
       const tomlFiles = fs.readdirSync(codexAgentsDir);
@@ -1816,6 +2017,7 @@ function uninstall(isGlobal, runtime = 'claude') {
         console.log(`  ${green}✓${reset} Cleaned GSD sections from config.toml`);
       }
     }
+    } // end isCodex-only toml cleanup
   } else if (isCopilot) {
     // Copilot: remove skills/gsd-*/ directories (same layout as Codex skills)
     const skillsDir = path.join(targetDir, 'skills');
@@ -1864,6 +2066,23 @@ function uninstall(isGlobal, runtime = 'claude') {
       if (skillCount > 0) {
         removedCount++;
         console.log(`  ${green}✓${reset} Removed ${skillCount} Antigravity skills`);
+      }
+    }
+  } else if (isCursor) {
+    // Cursor: remove skills/gsd-*/ directories
+    const skillsDir = path.join(targetDir, 'skills');
+    if (fs.existsSync(skillsDir)) {
+      let skillCount = 0;
+      const entries = fs.readdirSync(skillsDir, { withFileTypes: true });
+      for (const entry of entries) {
+        if (entry.isDirectory() && entry.name.startsWith('gsd-')) {
+          fs.rmSync(path.join(skillsDir, entry.name), { recursive: true });
+          skillCount++;
+        }
+      }
+      if (skillCount > 0) {
+        removedCount++;
+        console.log(`  ${green}✓${reset} Removed ${skillCount} Cursor skills`);
       }
     }
   } else {
@@ -2274,10 +2493,12 @@ function writeManifest(configDir, runtime = 'claude') {
   const isCodex = runtime === 'codex';
   const isCopilot = runtime === 'copilot';
   const isAntigravity = runtime === 'antigravity';
+  const isCursor = runtime === 'cursor';
   const gsdDir = path.join(configDir, 'get-shit-done');
   const commandsDir = path.join(configDir, 'commands', 'gsd');
   const opencodeCommandDir = path.join(configDir, 'command');
   const codexSkillsDir = path.join(configDir, 'skills');
+  const cursorSkillsDir = path.join(configDir, 'skills');
   const agentsDir = path.join(configDir, 'agents');
   const manifest = { version: pkg.version, timestamp: new Date().toISOString(), files: {} };
 
@@ -2298,7 +2519,7 @@ function writeManifest(configDir, runtime = 'claude') {
       }
     }
   }
-  if ((isCodex || isCopilot || isAntigravity) && fs.existsSync(codexSkillsDir)) {
+  if ((isCodex || isCopilot || isAntigravity || isCursor) && fs.existsSync(codexSkillsDir)) {
     for (const skillName of listCodexSkillNames(codexSkillsDir)) {
       const skillRoot = path.join(codexSkillsDir, skillName);
       const skillHashes = generateManifest(skillRoot);
@@ -2376,7 +2597,9 @@ function reportLocalPatches(configDir, runtime = 'claude') {
       ? '/gsd-reapply-patches'
       : runtime === 'codex'
         ? '$gsd-reapply-patches'
-        : '/gsd:reapply-patches';
+        : runtime === 'cursor'
+          ? 'gsd-reapply-patches (mention the skill name)'
+          : '/gsd:reapply-patches';
     console.log('');
     console.log('  ' + yellow + 'Local patches detected' + reset + ' (from v' + meta.from_version + '):');
     for (const f of meta.files) {
@@ -2397,6 +2620,7 @@ function install(isGlobal, runtime = 'claude') {
   const isCodex = runtime === 'codex';
   const isCopilot = runtime === 'copilot';
   const isAntigravity = runtime === 'antigravity';
+  const isCursor = runtime === 'cursor';
   const dirName = getDirName(runtime);
   const src = path.join(__dirname, '..');
 
@@ -2421,6 +2645,7 @@ function install(isGlobal, runtime = 'claude') {
   if (isCodex) runtimeLabel = 'Codex';
   if (isCopilot) runtimeLabel = 'Copilot';
   if (isAntigravity) runtimeLabel = 'Antigravity';
+  if (isCursor) runtimeLabel = 'Cursor';
 
   console.log(`  Installing for ${cyan}${runtimeLabel}${reset} to ${cyan}${locationLabel}${reset}\n`);
 
@@ -2488,6 +2713,16 @@ function install(isGlobal, runtime = 'claude') {
     } else {
       failures.push('skills/gsd-*');
     }
+  } else if (isCursor) {
+    const skillsDir = path.join(targetDir, 'skills');
+    const gsdSrc = path.join(src, 'commands', 'gsd');
+    copyCommandsAsCursorSkills(gsdSrc, skillsDir, 'gsd', pathPrefix, runtime);
+    const installedSkillNames = listCodexSkillNames(skillsDir);
+    if (installedSkillNames.length > 0) {
+      console.log(`  ${green}✓${reset} Installed ${installedSkillNames.length} skills to skills/`);
+    } else {
+      failures.push('skills/gsd-*');
+    }
   } else {
     // Claude Code & Gemini: nested structure in commands/ directory
     const commandsDir = path.join(targetDir, 'commands');
@@ -2552,6 +2787,8 @@ function install(isGlobal, runtime = 'claude') {
           content = convertClaudeAgentToCopilotAgent(content, isGlobal);
         } else if (isAntigravity) {
           content = convertClaudeAgentToAntigravityAgent(content, isGlobal);
+        } else if (isCursor) {
+          content = convertClaudeAgentToCursorAgent(content);
         }
         const destName = isCopilot ? entry.name.replace('.md', '.agent.md') : entry.name;
         fs.writeFileSync(path.join(agentsDest, destName), content);
@@ -2585,7 +2822,7 @@ function install(isGlobal, runtime = 'claude') {
     failures.push('VERSION');
   }
 
-  if (!isCodex && !isCopilot) {
+  if (!isCodex && !isCopilot && !isCursor) {
     // Write package.json to force CommonJS mode for GSD scripts
     // Prevents "require is not defined" errors when project has "type": "module"
     // Node.js walks up looking for package.json - this stops inheritance from project
@@ -2739,6 +2976,11 @@ function install(isGlobal, runtime = 'claude') {
     return { settingsPath: null, settings: null, statuslineCommand: null, runtime };
   }
 
+  if (isCursor) {
+    // Cursor uses skills — no config.toml, no settings.json hooks needed
+    return { settingsPath: null, settings: null, statuslineCommand: null, runtime };
+  }
+
   // Configure statusline and hooks in settings.json
   // Gemini and Antigravity use AfterTool instead of PostToolUse for post-tool hooks
   const postToolEvent = (runtime === 'gemini' || runtime === 'antigravity') ? 'AfterTool' : 'PostToolUse';
@@ -2822,8 +3064,9 @@ function finishInstall(settingsPath, settings, statuslineCommand, shouldInstallS
   const isOpencode = runtime === 'opencode';
   const isCodex = runtime === 'codex';
   const isCopilot = runtime === 'copilot';
+  const isCursor = runtime === 'cursor';
 
-  if (shouldInstallStatusline && !isOpencode && !isCodex && !isCopilot) {
+  if (shouldInstallStatusline && !isOpencode && !isCodex && !isCopilot && !isCursor) {
     settings.statusLine = {
       type: 'command',
       command: statuslineCommand
@@ -2832,7 +3075,7 @@ function finishInstall(settingsPath, settings, statuslineCommand, shouldInstallS
   }
 
   // Write settings when runtime supports settings.json
-  if (!isCodex && !isCopilot) {
+  if (!isCodex && !isCopilot && !isCursor) {
     writeSettings(settingsPath, settings);
   }
 
@@ -2847,12 +3090,14 @@ function finishInstall(settingsPath, settings, statuslineCommand, shouldInstallS
   if (runtime === 'codex') program = 'Codex';
   if (runtime === 'copilot') program = 'Copilot';
   if (runtime === 'antigravity') program = 'Antigravity';
+  if (runtime === 'cursor') program = 'Cursor';
 
   let command = '/gsd:new-project';
   if (runtime === 'opencode') command = '/gsd-new-project';
   if (runtime === 'codex') command = '$gsd-new-project';
   if (runtime === 'copilot') command = '/gsd-new-project';
   if (runtime === 'antigravity') command = '/gsd-new-project';
+  if (runtime === 'cursor') command = 'gsd-new-project (mention the skill name)';
   console.log(`
   ${green}Done!${reset} Open a blank directory in ${program} and run ${cyan}${command}${reset}.
 
@@ -2936,15 +3181,18 @@ function promptRuntime(callback) {
   ${cyan}4${reset}) Codex        ${dim}(~/.codex)${reset}
   ${cyan}5${reset}) Copilot      ${dim}(~/.copilot)${reset}
   ${cyan}6${reset}) Antigravity  ${dim}(~/.gemini/antigravity)${reset}
-  ${cyan}7${reset}) All
+  ${cyan}7${reset}) Cursor       ${dim}(~/.cursor)${reset}
+  ${cyan}8${reset}) All
 `);
 
   rl.question(`  Choice ${dim}[1]${reset}: `, (answer) => {
     answered = true;
     rl.close();
     const choice = answer.trim() || '1';
-    if (choice === '7') {
-      callback(['claude', 'opencode', 'gemini', 'codex', 'copilot', 'antigravity']);
+    if (choice === '8') {
+      callback(['claude', 'opencode', 'gemini', 'codex', 'copilot', 'antigravity', 'cursor']);
+    } else if (choice === '7') {
+      callback(['cursor']);
     } else if (choice === '6') {
       callback(['antigravity']);
     } else if (choice === '5') {
