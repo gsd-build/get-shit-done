@@ -687,6 +687,13 @@ function mergeCodexConfig(configPath, gsdBlock) {
   let content = existing;
   const featuresRegex = /^\[features\]\s*$/m;
   const hasFeatures = featuresRegex.test(content);
+  const hasAgentsHeader = /^\[agents\]\s*$/m.test(content);
+  const agentsBlock = gsdBlock.substring(gsdBlock.indexOf('[agents]'));
+  const agentSubsections = agentsBlock
+    .split('\n')
+    .slice(4)
+    .join('\n')
+    .trim();
 
   if (hasFeatures) {
     if (!content.includes('multi_agent')) {
@@ -695,11 +702,23 @@ function mergeCodexConfig(configPath, gsdBlock) {
     if (!content.includes('default_mode_request_user_input')) {
       content = content.replace(/^\[features\].*$/m, '$&\ndefault_mode_request_user_input = true');
     }
-    // Append agents block (skip the [features] section from gsdBlock)
-    const agentsBlock = gsdBlock.substring(gsdBlock.indexOf('[agents]'));
-    content = content.trimEnd() + '\n\n' + GSD_CODEX_MARKER + '\n' + agentsBlock + '\n';
+    if (hasAgentsHeader && agentSubsections) {
+      content = content.trimEnd() + '\n\n' + GSD_CODEX_MARKER + '\n' + agentSubsections + '\n';
+    } else {
+      // Append agents block (skip the [features] section from gsdBlock)
+      content = content.trimEnd() + '\n\n' + GSD_CODEX_MARKER + '\n' + agentsBlock + '\n';
+    }
   } else {
-    content = content.trimEnd() + '\n\n' + gsdBlock + '\n';
+    if (hasAgentsHeader && agentSubsections) {
+      content = content.trimEnd() + '\n\n' +
+        GSD_CODEX_MARKER + '\n' +
+        '[features]\n' +
+        'multi_agent = true\n' +
+        'default_mode_request_user_input = true\n\n' +
+        agentSubsections + '\n';
+    } else {
+      content = content.trimEnd() + '\n\n' + gsdBlock + '\n';
+    }
   }
 
   fs.writeFileSync(configPath, content);
