@@ -8,17 +8,17 @@ This fork automatically syncs with `gsd-build/get-shit-done` using GitHub Action
 1. **GitHub Action triggers** (`upstream-sync.yml`): daily at 6 AM UTC (or on manual dispatch)
 2. **Detects upstream changes** by comparing with `upstream/main`
 3. **Merges upstream** using `git merge upstream/main`
-4. **Regenerates wrappers** using `scripts/generate-prompts.mjs` and `scripts/verify-prompts.mjs`
+4. **Regenerates wrappers** using `node bin/install.js --copilot --local`
 5. **Creates PR** for human review if everything passes
 
 ### If Validation Fails
-1. GitHub Action detects that generator or verifier fails
-2. **gsd-upstream-sync agent is invoked** (via Claude Code or manual invocation)
+1. GitHub Action detects that `node bin/install.js --copilot --local` fails
+2. **gsd-upstream-sync agent is invoked** (via manual invocation)
 3. Agent:
    - Analyzes upstream changes
-   - Diagnoses what broke in the generator/verifier
-   - **Fixes the scripts** (not upstream content)
-   - Re-runs validation
+   - Diagnoses what broke in `bin/install-copilot.js`
+   - **Fixes `bin/install-copilot.js`** (not upstream content)
+   - Re-runs `node bin/install.js --copilot --local`
    - Commits changes
 4. Human reviews and merges PR
 
@@ -35,7 +35,7 @@ Upstream directories remain source-of-truth:
 Only maintain the Copilot wrapper layer:
 - .github/prompts/**  (generated from commands/gsd/)
 - .github/agents/**   (custom Copilot profiles)
-- scripts/            (generator/verifier that maintains wrapper layer)
+- bin/install-copilot.js  (conversion logic that maintains wrapper layer)
 ```
 
 ## Manual Sync (If Needed)
@@ -57,25 +57,22 @@ git fetch upstream main
 # Merge
 git merge upstream/main
 
-# Regenerate prompts
-node scripts/generate-prompts.mjs
+# Regenerate Copilot layer (prompts + agents)
+node bin/install.js --copilot --local
 
-# Verify
-node scripts/verify-prompts.mjs
-
-# If either fails, invoke the sync agent via Claude Code:
-# > @gsd-upstream-sync analyze why the generator broke and fix it
+# If it fails, invoke the sync agent:
+# > @gsd-upstream-sync analyze why the install script broke and fix bin/install-copilot.js
 ```
 
 ### Option 3: Invoke Sync Agent Directly
 
-If you're in Claude Code (GitHub Copilot):
+If invoking the agent manually:
 
 ```
 @gsd-upstream-sync 
 
-The upstream merge succeeded but verification failed. 
-Diagnose and fix the generator/verifier scripts.
+The upstream merge succeeded but node bin/install.js --copilot --local failed. 
+Diagnose and fix bin/install-copilot.js.
 ```
 
 Agent will:
@@ -89,21 +86,21 @@ Agent will:
 ## Common Scenarios
 
 ### Scenario: New Commands Added Upstream
-- ✅ Generator automatically discovers new files in `commands/gsd/`
+- ✅ `node bin/install.js --copilot --local` automatically discovers new files in `commands/gsd/`
 - ✅ New prompts generated in `.github/prompts/`
-- ✅ Verifier confirms all commands have prompts
+- ✅ Prompt count is verified after generation
 - → PR created automatically
 
 ### Scenario: Command Metadata Format Changed
-- ❌ Generator fails because YAML parser expects old format
+- ❌ `node bin/install.js --copilot --local` fails because parser expects old format
 - → Sync agent invoked
-- → Agent fixes `parseFrontmatter()` in generator
-- → Scripts re-run and pass
+- → Agent fixes parsing logic in `bin/install-copilot.js`
+- → Script re-runs and passes
 - → PR created
 
 ### Scenario: Upstream Agent Removed/Renamed
-- ✅ Generator only processes `commands/gsd/` (not affected by upstream agents)
-- ✅ Verifier only checks prompt generation (not affected)
+- ✅ `node bin/install.js --copilot --local` only processes `commands/gsd/` for prompts (not affected by upstream agents)
+- ✅ Prompt count check confirms no regression
 - → No validation failure
 - → PR created normally
 
@@ -117,7 +114,7 @@ Agent will:
 ```bash
 git fetch upstream main
 git merge upstream/main
-# Resolve conflicts (usually in .github/prompts/ from parallel edits)
+# Resolve conflicts in tracked files (.github/prompts/ is generated, not checked in)
 git add .
 git commit -m "merge(upstream): resolve conflicts"
 git push

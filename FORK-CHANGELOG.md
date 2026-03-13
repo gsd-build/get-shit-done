@@ -8,6 +8,29 @@ This fork tracks the upstream [gsd-build/get-shit-done](https://github.com/gsd-b
 
 ---
 
+## [v1.6] - 2026-03-12 — Install Architecture Refactor
+
+### Added
+- `bin/install-copilot.js` — new fork-owned module containing all Copilot conversion logic; extracted from `bin/install.js` to minimize upstream merge conflict surface
+- `scripts/tools.json` — Claude-to-VS Code tool map (added to `guard-exemptions.txt`)
+- `scripts/guard-exemptions.txt`: added `bin/install-copilot.js`, `scripts/tools.json`, and `agents/gsd-upstream-sync.md`
+- PS1 installer: version-gated migration step that removes legacy `.claude/gsd-*` files on upgrade; `-SkipLegacyCleanup` flag allows side-by-side Claude+Copilot installs
+- README: model profiles callout clarifying Opus/Sonnet/Haiku are GSD tier labels (not Copilot model names); contributor clone note for generating prompts locally
+
+### Changed
+- `bin/install.js`: slimmed to entry-point + `require('./install-copilot')` + branch logic only; upstream changes will no longer conflict with Copilot code
+- `release.yml`: replaced static `cp -r` staging with `node bin/install.js --copilot --local`; release zip now contains only `.github/` + `gsd-copilot-installer/` (no `.claude/`)
+- `upstream-sync-worker.yml`: replaced `generate-prompts.mjs` and `verify-prompts.mjs` steps with single `node bin/install.js --copilot --local` step
+- PS1 installer: removed `.claude/` install section entirely; installer now only delivers `.github/prompts/`, `.github/agents/`, `.github/get-shit-done/`
+- `patchContentForCopilot`: `/gsd.update` command now uses PS1 one-liner (`irm ... | iex`) instead of `npx -y get-shit-done-cc@latest --copilot --local`
+- All docs updated: `AGENTS.md`, `.github/copilot-instructions.md`, `.github/instructions/upstream-sync-guide.md`, `agents/gsd-upstream-sync.md` now reference `bin/install-copilot.js` and `node bin/install.js --copilot --local`
+
+### Removed
+- `.github/prompts/*.prompt.md` — generated prompt files are no longer checked into the repo; produced on-demand by the installer and `node bin/install.js --copilot --local`
+- `.github/instructions/gsd-port.instructions.md` — rules folded into `bin/install-copilot.js` file header and `AGENTS.md`
+
+---
+
 ## [v1.5] - 2026-02-22 — Repo Metadata Alignment
 
 ### Added

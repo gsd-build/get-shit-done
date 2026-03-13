@@ -5,10 +5,8 @@
 
 .DESCRIPTION
     Downloads the GSD Copilot release zip from GitHub Releases and installs
-    .github/prompts/, .github/instructions/,
-    .claude/commands/gsd/, .claude/get-shit-done/, .claude/agents/,
-    .claude/hooks/, and .claude/package.json
-    into the target workspace without touching non-GSD files.
+    .github/prompts/, .github/agents/, .github/get-shit-done/, and
+    .github/instructions/ into the target workspace without touching non-GSD files.
 
 .PARAMETER WorkspaceDir
     Path to the target workspace. Defaults to the current directory.
@@ -27,7 +25,8 @@ param(
     [string]$WorkspaceDir = (Get-Location).Path,
     [string]$Tag = "latest",
     [switch]$DryRun,
-    [switch]$Force
+    [switch]$Force,
+    [switch]$SkipLegacyCleanup
 )
 
 Set-StrictMode -Version Latest
@@ -140,11 +139,7 @@ if (-not $DryRun) {
         exit 1
     }
 
-    $claudeSrcRoot = Join-Path $tmpDir ".claude"
-    if (-not (Test-Path $claudeSrcRoot)) {
-        Write-Error "Extracted zip does not contain a .claude/ directory. Unexpected asset structure."
-        exit 1
-    }
+    $claudeSrcRoot = $null  # no longer used; .claude/ not in zip since v0.0.9
 
     # ── 5. Install files ──────────────────────────────────────────────────────
     try {
@@ -235,20 +230,6 @@ if (-not $DryRun) {
                 Write-Host "[DRY-RUN] would write: .github/$rel"
             }
         }
-        $claudeSrcRootDry = Join-Path $tmpDir ".claude"
-        if (Test-Path $claudeSrcRootDry) {
-            $claudeFilesDry = Get-ChildItem -Recurse -File -Path $claudeSrcRootDry
-            foreach ($src in $claudeFilesDry) {
-                $rel  = $src.FullName.Substring($claudeSrcRootDry.Length).TrimStart('\', '/')
-                $dest = Join-Path (Join-Path $WorkspaceDir ".claude") $rel
-                $exists = Test-Path $dest
-                if ($exists) {
-                    Write-Host "[DRY-RUN] would overwrite: .claude/$rel"
-                } else {
-                    Write-Host "[DRY-RUN] would write: .claude/$rel"
-                }
-            }
-        }
         Remove-Item -Force $tmpZip -ErrorAction SilentlyContinue
         Remove-Item -Recurse -Force $tmpDir -ErrorAction SilentlyContinue
     } catch {
@@ -257,7 +238,62 @@ if (-not $DryRun) {
     }
 }
 
-# ── 7. Print summary ──────────────────────────────────────────────────────────
+# ── 7. Legacy .claude/ migration cleanup ─────────────────────────────────────
+# Old installs (pre-0.0.9) placed GSD files in both .github/ AND .claude/.
+# Since 0.0.9, Copilot installs live entirely in .github/ — .claude/ is unused.
+#
+# Only runs when upgrading from a genuinely older fork version so that users who
+# intentionally run Claude + Copilot side-by-side can pass -SkipLegacyCleanup
+# to preserve their .claude/ GSD files.
+$legacyClaudeDir = Join-Path $WorkspaceDir ".claude"
+$shouldMigrate = $false
+if (-not $SkipLegacyCleanup -and $installedVersion) {
+    try {
+        # Strip the -upstream-vX.Y.Z suffix before parsing so [System.Version] works
+        $forkInstalled = [System.Version]($installedVersion -replace '-.*$', '')
+        $forkTarget    = [System.Version]($releaseVersion   -replace '-.*$', '')
+        if ($forkInstalled -lt $forkTarget -and (Test-Path $legacyClaudeDir)) {
+            $shouldMigrate = $true
+        }
+    } catch {
+        # Non-parseable version string — skip migration
+    }
+}
+
+if ($shouldMigrate) {
+    Write-Host ""
+    Write-Host "  Migrating from legacy install: removing old .claude/gsd-* files"
+    Write-Host "  (Your non-GSD .claude/ files are untouched.)"
+    Write-Host "  To keep Claude + Copilot side by side, re-run with -SkipLegacyCleanup"
+    Write-Host ""
+    $legacyTargets = @(
+        (Join-Path $legacyClaudeDir "commands\gsd"),
+        (Join-Path $legacyClaudeDir "get-shit-done")
+    )
+    foreach ($p in $legacyTargets) {
+        if (Test-Path $p) {
+            if ($DryRun) {
+                Write-Host "[DRY-RUN] would remove: $p"
+            } else {
+                Remove-Item $p -Recurse -Force -ErrorAction SilentlyContinue
+            }
+        }
+    }
+    # agents: only remove gsd-* prefixed files, leave any user agents alone
+    $legacyAgentsDir = Join-Path $legacyClaudeDir "agents"
+    if (Test-Path $legacyAgentsDir) {
+        $gsdAgents = Get-ChildItem $legacyAgentsDir -Filter "gsd-*.md" -ErrorAction SilentlyContinue
+        foreach ($f in $gsdAgents) {
+            if ($DryRun) {
+                Write-Host "[DRY-RUN] would remove: $($f.FullName)"
+            } else {
+                Remove-Item $f.FullName -Force -ErrorAction SilentlyContinue
+            }
+        }
+    }
+}
+
+# ── 8. Print summary ──────────────────────────────────────────────────────────
 Write-Host "------------------------------------------"
 if ($DryRun) {
     Write-Host "No files written (dry run)"
@@ -268,7 +304,7 @@ if ($DryRun) {
 Write-Host "------------------------------------------"
 Write-Host ""
 
-# ── 8. Cleanup temp files ──────────────────────────────────────────────────────
+# ── 9. Cleanup temp files ──────────────────────────────────────────────────────
 if (-not $DryRun) {
     Remove-Item -Force $tmpZip -ErrorAction SilentlyContinue
     Remove-Item -Recurse -Force $tmpDir -ErrorAction SilentlyContinue

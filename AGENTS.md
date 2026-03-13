@@ -9,17 +9,17 @@ Do NOT rewrite upstream content. Upstream directories remain source-of-truth:
 - get-shit-done/workflows/**
 - agents/**
 Only maintain the Copilot wrapper layer:
-- .github/prompts/**  (VS Code slash commands)
+- .github/prompts/**  (VS Code slash commands, generated — not checked in)
 - .github/agents/**   (custom Copilot agents)
 - .github/copilot-instructions.md
-- .github/instructions/**
+- .github/instructions/upstream-sync-guide.md
+- bin/install-copilot.js  (Copilot conversion module)
 
 ## Sync PR workflow (what to do when @copilot is pinged)
 1) Identify upstream changes.
-2) Run: `node scripts/generate-prompts.mjs`
-3) Run: `node scripts/verify-prompts.mjs`
-4) Commit regenerated wrapper files.
-5) If generator/verification fails due to upstream changes, fix the generator/verification scripts (do not rewrite upstream docs).
+2) Run: `node bin/install.js --copilot --local`
+3) Commit regenerated wrapper files.
+4) If the install script fails due to upstream changes, fix `bin/install-copilot.js` (do not rewrite upstream docs).
 
 ## Naming conventions
 - Prompt command names use dot-namespace: /gsd.new-project
@@ -37,23 +37,22 @@ The upstream sync is now **automated via GitHub Actions** (`upstream-sync.yml`):
 ### Daily Schedule
 1. **Detection:** Compares fork HEAD with `upstream/main`
 2. **Merge:** `git merge upstream/main` (if changes exist)
-3. **Generation:** `node scripts/generate-prompts.mjs`
-4. **Verification:** `node scripts/verify-prompts.mjs`
-5. **PR Creation:** Submits PR on **this fork** if validation passes
+3. **Generation + Verification:** `node bin/install.js --copilot --local`
+4. **PR Creation:** Submits PR on **this fork** if validation passes
 
 ### If Validation Fails
-When generator or verifier fails:
+When the install script fails:
 1. **Sync Agent Invoked:** `@gsd-upstream-sync` agent analyzes the problem
-2. **Diagnosis:** Agent reads failing scripts and upstream changes
-3. **Fix:** Agent updates generator/verifier scripts (never upstream content)
-4. **Verification:** Agent re-runs scripts to confirm fix works
+2. **Diagnosis:** Agent reads `bin/install-copilot.js` and upstream changes
+3. **Fix:** Agent updates `bin/install-copilot.js` (never upstream content)
+4. **Verification:** Agent re-runs `node bin/install.js --copilot --local` to confirm fix
 5. **Commit:** Changes committed and PR created on this fork
 
 See `.github/instructions/upstream-sync-guide.md` for full details and manual sync options.
 
 ## Definition of Done
 - [ ] PR contains upstream merge + updated Copilot wrapper layer
-- [ ] Generator + verification scripts pass
+- [ ] `node bin/install.js --copilot --local` succeeds
 - [ ] No manual edits to upstream files unless absolutely unavoidable and explained
-- [ ] If upstream changes broke generator/verifier, sync agent fixed them
+- [ ] If upstream changes broke the install script, sync agent fixed `bin/install-copilot.js`
 - [ ] All generated prompts validated

@@ -51,34 +51,14 @@ jobs:
 
       - name: Build zip artifact
         run: |
-          # --- Create staging directory structure ---
-          mkdir -p staging/.github/prompts
-          mkdir -p staging/.github/instructions
-          mkdir -p staging/.claude/commands/gsd
-          mkdir -p staging/.claude/get-shit-done
-          mkdir -p staging/.claude/agents
-          mkdir -p staging/.claude/hooks
+          # --- Generate Copilot layer into staging dir via install.js ---
           mkdir -p staging/gsd-copilot-installer
-
-          # --- Copilot layer: .github/ files ---
-          cp -r .github/prompts/. staging/.github/prompts/
-
-          find .github/instructions -maxdepth 1 \( -name "gsd-*.instructions.md" -o -name "gsd.*.md" \) \
-            -exec cp {} staging/.github/instructions/ \; 2>/dev/null || true
-
-          # --- Upstream runtime: .claude/ ---
-          cp -r commands/gsd/. staging/.claude/commands/gsd/
-          cp -r get-shit-done/. staging/.claude/get-shit-done/
-          cp -r agents/. staging/.claude/agents/
-
-          find hooks -maxdepth 1 -name "*.js" -exec cp {} staging/.claude/hooks/ \; 2>/dev/null || true
-
-          echo '{"type":"commonjs"}' > staging/.claude/package.json
+          cd staging
+          node ../bin/install.js --copilot --local
+          cd ..
 
           cp gsd-copilot-installer/gsd-copilot-install.ps1 staging/gsd-copilot-installer/gsd-copilot-install.ps1
           cp gsd-copilot-installer/README.md staging/gsd-copilot-installer/README.md
-
-          find staging/.claude -name "*.md" -exec sed -i 's#~/.claude/#./.claude/#g' {} \;
 
           TAG="${{ steps.tag.outputs.tag }}"
           cd staging && zip -r "../gsd-copilot-${TAG}.zip" .
@@ -100,13 +80,11 @@ jobs:
             fi
           }
           check_path ".github/prompts/" ".github/prompts/"
-          check_path ".claude/commands/gsd/" ".claude/commands/gsd/"
-          check_path ".claude/get-shit-done/workflows/" ".claude/get-shit-done/workflows/"
-          check_path ".claude/agents/" ".claude/agents/"
-          check_path ".claude/hooks/" ".claude/hooks/"
-          check_path ".claude/get-shit-done/bin/gsd-tools.cjs" ".claude/get-shit-done/bin/gsd-tools.cjs"
-          check_path ".claude/package.json" ".claude/package.json"
+          check_path ".github/get-shit-done/workflows/" ".github/get-shit-done/workflows/"
+          check_path ".github/agents/" ".github/agents/"
+          check_path ".github/get-shit-done/bin/gsd-tools.cjs" ".github/get-shit-done/bin/gsd-tools.cjs"
           check_path "at least one .prompt.md" "\.prompt\.md"
+          check_path "gsd-copilot-installer" "gsd-copilot-installer/gsd-copilot-install.ps1"
           if [ "$fail" -eq 1 ]; then
             echo ""
             echo "Release blocked: zip is missing required paths. See errors above."

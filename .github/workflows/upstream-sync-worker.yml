@@ -145,33 +145,28 @@ jobs:
         if: steps.detect.outputs.behind != '0'
         run: npm ci
 
-      - name: Regenerate prompts + verify (non-agent)
+      - name: Regenerate Copilot layer + verify
         if: steps.detect.outputs.behind != '0'
         id: verify
         run: |
           set -euo pipefail
-          rm -rf "${PROMPTS_DIR:?}/"* || true
-          node scripts/generate-prompts.mjs 2>&1 | tee /tmp/generate.log
-          set +e
-          node scripts/verify-prompts.mjs 2>&1 | tee /tmp/verify.log
-          VERIFY_EXIT=${PIPESTATUS[0]}
-          set -e
-          if [ "$VERIFY_EXIT" -eq 0 ]; then
+          node bin/install.js --copilot --local 2>&1 | tee /tmp/install.log
+          INSTALL_EXIT=${PIPESTATUS[0]}
+          PROMPT_COUNT=$(find .github/prompts -name "gsd.*.prompt.md" 2>/dev/null | wc -l | tr -d ' ')
+          if [ "$INSTALL_EXIT" -eq 0 ] && [ "$PROMPT_COUNT" -gt 0 ]; then
             echo "verify_ok=true" >> "$GITHUB_OUTPUT"
-            echo "Prompt verification passed."
+            echo "Copilot layer generated: $PROMPT_COUNT prompts."
           else
             echo "verify_ok=false" >> "$GITHUB_OUTPUT"
-            echo "Prompt verification failed (exit $VERIFY_EXIT)."
+            echo "Copilot layer generation failed (exit $INSTALL_EXIT, prompts=$PROMPT_COUNT)."
           fi
 
-      - name: Upload prompt logs on verify failure
+      - name: Upload install log on verify failure
         if: steps.detect.outputs.behind != '0' && steps.verify.outputs.verify_ok == 'false'
         uses: actions/upload-artifact@v4
         with:
-          name: upstream-sync-verify-logs
-          path: |
-            /tmp/generate.log
-            /tmp/verify.log
+          name: upstream-sync-install-log
+          path: /tmp/install.log
 
       - name: Dispatch repair agent for verify failures
         if: steps.detect.outputs.behind != '0' && steps.verify.outputs.verify_ok == 'false'
@@ -190,15 +185,15 @@ jobs:
           echo "Repair agent dispatched. Worker exiting."
           exit 0
 
-      - name: Commit regenerated prompts (adds/deletes)
+      - name: Commit regenerated Copilot layer (adds/deletes)
         if: steps.detect.outputs.behind != '0'
         run: |
           set -euo pipefail
-          git add -A "${PROMPTS_DIR}" || true
+          git add -A .github/prompts .github/agents .github/get-shit-done .github/CHANGELOG.md .github/gsd-file-manifest.json .github/VERSION 2>/dev/null || true
           if git diff --cached --quiet; then
-            echo "No prompt changes to commit."
+            echo "No Copilot layer changes to commit."
           else
-            git commit -m "chore: regenerate prompts" || true
+            git commit -m "chore: regenerate Copilot layer" || true
           fi
       
       - name: Notice if workflows changed (fork-owned enforcement)

@@ -16,6 +16,13 @@ README.md
 .github/CODEOWNERS
 AGENTS.md
 
+# Fork-owned Copilot conversion module and tool map
+bin/install-copilot.js
+scripts/tools.json
+
+# Fork-specific sync agent (does not exist in upstream repo)
+agents/gsd-upstream-sync.md
+
 # Fork-owned workflows (recursive)
 .github/workflows/**
 

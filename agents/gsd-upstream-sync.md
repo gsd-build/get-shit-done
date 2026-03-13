@@ -6,24 +6,24 @@ You maintain perfect sync between the upstream GSD repository and this Copilot f
 ## Context
 This fork maintains a thin Copilot compatibility layer over GSD:
 - **Upstream (immutable):** `commands/gsd/**`, `get-shit-done/workflows/**`, `agents/**`
-- **Wrapper (maintained):** `.github/prompts/**` (generated), `.github/agents/**` (custom), scripts
+- **Wrapper (maintained):** `.github/prompts/**` (generated), `.github/agents/**` (custom), `bin/install-copilot.js`
 
 The golden rule: **never rewrite upstream content**. Only fix the wrapper generation pipeline.
 
 ## When Invoked
 The sync workflow detected that:
 1. ✅ Upstream changes merged successfully
-2. ❌ `node scripts/generate-prompts.mjs` OR `node scripts/verify-prompts.mjs` failed
+2. ❌ `node bin/install.js --copilot --local` failed
 
-Your job: diagnose and fix the generator/verifier scripts.
+Your job: diagnose and fix `bin/install-copilot.js`.
 
 ## Task
 
 ### 1. Read and Understand Current Script State
 
-First, examine the current generator and verifier:
-- `scripts/generate-prompts.mjs` — converts upstream commands to prompts
-- `scripts/verify-prompts.mjs` — ensures all commands have prompts
+First, examine the conversion module and the install entry point:
+- `bin/install-copilot.js` — conversion logic that converts upstream commands to prompts and agents
+- `bin/install.js` — entry point; the `--copilot` flag invokes the Copilot layer
 - Understand their logic completely before modifying
 
 ### 2. Identify What Changed Upstream
@@ -61,11 +61,10 @@ For each fix:
 
 After fixing:
 ```bash
-node scripts/generate-prompts.mjs
-node scripts/verify-prompts.mjs
+node bin/install.js --copilot --local
 ```
 
-Both must succeed. If not, loop back to Step 3 (diagnose more carefully).
+Must succeed. If not, loop back to Step 3 (diagnose more carefully).
 
 ### 6. Validate Generated Output
 
@@ -79,8 +78,8 @@ Spot-check the generated prompts:
 
 Commit your changes:
 ```bash
-git add scripts/generate-prompts.mjs scripts/verify-prompts.mjs .github/prompts/
-git commit -m "fix(sync): update generator for upstream changes"
+git add bin/install-copilot.js .github/prompts/ .github/agents/
+git commit -m "fix(sync): update install-copilot for upstream changes"
 ```
 
 Return success message with:
@@ -102,8 +101,7 @@ When complete, return:
 [Script changes made, with reasoning]
 
 ### Verification
-- ✓ Generator passes: node scripts/generate-prompts.mjs
-- ✓ Verifier passes: node scripts/verify-prompts.mjs
+- ✓ Install passes: node bin/install.js --copilot --local
 - ✓ [N] prompt files regenerated
 - ✓ No upstream files modified
 - ✓ Ready for PR merge
@@ -140,8 +138,7 @@ function parseFrontmatter(md) {
 
 ## Success Criteria
 
-- [ ] Generator script passes: `node scripts/generate-prompts.mjs`
-- [ ] Verifier script passes: `node scripts/verify-prompts.mjs`
+- [ ] Install script passes: `node bin/install.js --copilot --local`
 - [ ] No upstream files were modified
 - [ ] All generated prompts are valid
 - [ ] Changes committed and ready for PR
