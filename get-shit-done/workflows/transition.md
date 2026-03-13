@@ -358,46 +358,34 @@ This returns all phases with goals, disk status, and completion info.
 
 Read ROADMAP.md to get the next phase's name and goal.
 
-**Check if next phase has CONTEXT.md:**
+**If next phase exists:**
 
+Probe next phase state to determine routing:
 ```bash
-ls .planning/phases/*[X+1]*/*-CONTEXT.md 2>/dev/null
+NEXT_INFO=$(node ~/.claude/get-shit-done/bin/gsd-tools.cjs init phase-op "${next_phase}")
 ```
 
-**If next phase exists:**
+Parse `has_context`, `has_plans` from result. Select primary command:
+- `has_plans: true` → primary = `/gsd:execute-phase [X+1]`
+- `has_context: true` AND `has_plans: false` → primary = `/gsd:plan-phase [X+1]`
+- `has_context: false` → primary = `/gsd:discuss-phase [X+1]`
 
 <if mode="yolo">
 
-**If CONTEXT.md exists:**
-
 ```
 Phase [X] marked complete.
 
 Next: Phase [X+1] — [Name]
 
-⚡ Auto-continuing: Plan Phase [X+1] in detail
+⚡ Auto-continuing: {primary command description}
 ```
 
-Exit skill and invoke SlashCommand("/gsd:plan-phase [X+1] --auto")
-
-**If CONTEXT.md does NOT exist:**
-
-```
-Phase [X] marked complete.
-
-Next: Phase [X+1] — [Name]
-
-⚡ Auto-continuing: Discuss Phase [X+1] first
-```
-
-Exit skill and invoke SlashCommand("/gsd:discuss-phase [X+1] --auto")
+Exit skill and invoke the primary command with `--auto` flag (e.g., SlashCommand("/gsd:discuss-phase [X+1]") if `has_context: false`).
 
 </if>
 
 <if mode="interactive" OR="custom with gates.confirm_transition true">
 
-**If CONTEXT.md does NOT exist:**
-
 ```
 ## ✓ Phase [X] Complete
 
@@ -407,43 +395,23 @@ Exit skill and invoke SlashCommand("/gsd:discuss-phase [X+1] --auto")
 
 **Phase [X+1]: [Name]** — [Goal from ROADMAP.md]
 
-`/gsd:discuss-phase [X+1]` — gather context and clarify approach
+`{primary command}`
 
 <sub>`/clear` first → fresh context window</sub>
 
 ---
 
 **Also available:**
-- `/gsd:plan-phase [X+1]` — skip discussion, plan directly
-- `/gsd:research-phase [X+1]` — investigate unknowns
+- `{alt command 1}` — {description}
+- `{alt command 2}` — {description}
 
 ---
 ```
 
-**If CONTEXT.md exists:**
-
-```
-## ✓ Phase [X] Complete
-
----
-
-## ▶ Next Up
-
-**Phase [X+1]: [Name]** — [Goal from ROADMAP.md]
-<sub>✓ Context gathered, ready to plan</sub>
-
-`/gsd:plan-phase [X+1]`
-
-<sub>`/clear` first → fresh context window</sub>
-
----
-
-**Also available:**
-- `/gsd:discuss-phase [X+1]` — revisit context
-- `/gsd:research-phase [X+1]` — investigate unknowns
-
----
-```
+Where `{alt command 1}` and `{alt command 2}` are the two commands NOT selected as primary:
+- `/gsd:discuss-phase [X+1]` — gather context first
+- `/gsd:plan-phase [X+1]` — create execution plans
+- `/gsd:execute-phase [X+1]` — run existing plans
 
 </if>
 
