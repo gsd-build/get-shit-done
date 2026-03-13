@@ -154,10 +154,14 @@ export default function ExecutePage() {
         const json = await response.json();
         const phaseList = json.data?.phases ?? [];
         setPhases(phaseList);
-        // Auto-select first phase that's not completed
-        const readyPhase = phaseList.find((p: Phase) => p.status !== 'completed');
+        // Auto-select first executable phase that's not completed
+        const readyPhase = phaseList.find(
+          (p: Phase) => p.status !== 'completed' && p.plans > 0
+        );
         if (readyPhase) {
           setSelectedPhase(readyPhase.number);
+        } else {
+          setSelectedPhase(null);
         }
       } catch {
         // Ignore errors - phases are optional
@@ -169,6 +173,12 @@ export default function ExecutePage() {
   // Start execution for selected phase
   const handleStartExecution = async () => {
     if (!selectedPhase || isStarting) return;
+
+    const selected = phases.find((phase) => phase.number === selectedPhase);
+    if (!selected || selected.plans <= 0) {
+      setStartError('Selected phase has no executable plan files.');
+      return;
+    }
 
     setIsStarting(true);
     setStartError(null);
