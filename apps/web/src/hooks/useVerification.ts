@@ -16,9 +16,7 @@ import {
   selectOverallPassed,
   selectSummary,
 } from '@/stores/verificationStore';
-
-const API_BASE =
-  process.env['NEXT_PUBLIC_API_URL'] || 'http://localhost:4000';
+import { startVerification as startVerificationRequest } from '@/lib/api';
 
 /**
  * React hook for verification process management.
@@ -93,9 +91,7 @@ export function useVerification(socket: TypedSocket | null, phaseId: string) {
     setRunning();
 
     try {
-      await fetch(`${API_BASE}/api/phases/${phaseId}/verify`, {
-        method: 'POST',
-      });
+      await startVerificationRequest(phaseId);
     } catch (err) {
       // Error handling could be expanded here
       console.error('Failed to start verification:', err);
