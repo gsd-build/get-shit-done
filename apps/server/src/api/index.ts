@@ -11,6 +11,8 @@
  */
 
 import { Hono } from 'hono';
+import { cors } from 'hono/cors';
+import { basicAuth } from 'hono/basic-auth';
 import { serve } from '@hono/node-server';
 import type { Server as HttpServer, IncomingMessage, ServerResponse } from 'http';
 import type { Server as SocketServer } from 'socket.io';
@@ -20,7 +22,15 @@ import { createHealthRoutes } from './routes/health.js';
 import { createProjectRoutes } from './routes/projects.js';
 import { createPhasesRoutes } from './routes/phases.js';
 import { createAgentRoutes } from './routes/agents.js';
+import { createExecuteRoutes } from './routes/execute.js';
 import type { Orchestrator } from '../orchestrator/index.js';
+import { getAllowedOrigins, resolveCorsOrigin } from '../config/cors.js';
+
+// Auth credentials from environment
+const AUTH_USERNAME = process.env['AUTH_USERNAME'];
+const AUTH_PASSWORD = process.env['AUTH_PASSWORD'];
+const DEMO_MODE = process.env['DEMO_DATA'] === 'true';
+const AUTH_ENABLED = Boolean(AUTH_USERNAME && AUTH_PASSWORD) && !DEMO_MODE;
 
 /**
  * API configuration options
@@ -45,6 +55,8 @@ export function createApi(
   io: SocketServer,
   config: ApiConfig = {}
 ): () => void {
+  const allowedOrigins = getAllowedOrigins();
+
   // Default search paths: parent directory and home projects
   const searchPaths = config.searchPaths ?? [
     process.cwd(),
@@ -53,6 +65,54 @@ export function createApi(
 
   // Create Hono app
   const app = new Hono().basePath('/api');
+
+  // Apply CORS middleware (must be before other middleware)
+  app.use(
+    '*',
+    cors({
+      origin: (origin) => resolveCorsOrigin(origin, allowedOrigins),
+      allowMethods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
+      allowHeaders: ['Content-Type', 'Authorization'],
+      credentials: true,
+    })
+  );
+
+  // Apply Basic Auth if credentials are configured (skip health endpoint)
+  if (AUTH_ENABLED) {
+    app.use('*', async (c, next) => {
+      // Skip auth for health check endpoints
+      if (c.req.path.startsWith('/api/health')) {
+        return next();
+      }
+
+      const auth = basicAuth({
+        username: AUTH_USERNAME!,
+        password: AUTH_PASSWORD!,
+        realm: 'GSD Labs',
+      });
+      try {
+        return await auth(c, next);
+      } catch {
+        return c.json(
+          {
+            data: null,
+            meta: {
+              timestamp: new Date().toISOString(),
+              requestId: c.get('requestId') ?? 'unknown',
+            },
+            error: {
+              code: 'UNAUTHORIZED',
+              message: 'Authentication required',
+            },
+          },
+          401
+        );
+      }
+    });
+    console.log('[api] Basic authentication enabled');
+  } else if (DEMO_MODE && AUTH_USERNAME && AUTH_PASSWORD) {
+    console.log('[api] Basic authentication disabled (DEMO_DATA=true)');
+  }
 
   // Apply global middleware
   app.use('*', envelopeMiddleware);
@@ -69,6 +129,8 @@ export function createApi(
   // Mount agent routes if orchestrator is provided
   if (config.orchestrator) {
     app.route('/agents', createAgentRoutes(config.orchestrator));
+    // Execute routes also need orchestrator to start agents
+    app.route('/projects', createExecuteRoutes(searchPaths, config.orchestrator, io));
   }
 
   // 404 handler for unmatched API routes
@@ -185,7 +247,7 @@ export function createApi(
   httpServer.on('request', requestHandler);
 
   console.log('[api] REST API mounted at /api');
-  console.log('[api] Routes: /api/health/summary, /api/projects, /api/projects/:id, /api/projects/:id/phases, /api/agents');
+  console.log('[api] Routes: /api/health/summary, /api/health/socket-room, /api/projects, /api/projects/:id, /api/projects/:id/phases, /api/projects/:id/execute, /api/agents');
 
   // Return cleanup function
   return () => {

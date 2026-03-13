@@ -17,10 +17,18 @@ export function ProjectCard({ project, activities = [], onNavigate, onActivityCl
   const [isHovered, setIsHovered] = useState(false);
 
   // Create a default activity from lastActivity if no activities provided
+  // lastActivity format: "2026-03-12 — Phase 16 finalized and merged to main"
   const displayActivities = activities.length > 0
     ? activities
     : project.lastActivity
-    ? [{ id: 'last', description: 'Recent activity', agent: 'system', timestamp: project.lastActivity }]
+    ? [{
+        id: 'last',
+        description: project.lastActivity.includes(' — ')
+          ? project.lastActivity.split(' — ')[1] ?? 'Recent activity'
+          : project.lastActivity,
+        agent: 'system',
+        timestamp: project.lastActivity.split(' — ')[0] ?? new Date().toISOString(),
+      }]
     : [];
 
   return (

@@ -14,7 +14,7 @@ export function FilterChip({ label, active, onClick, className }: FilterChipProp
       aria-pressed={active}
       onClick={onClick}
       className={clsx(
-        'px-3 py-1 rounded-full text-sm font-medium transition-colors',
+        'px-4 min-h-11 rounded-full text-sm font-medium transition-colors',
         active
           ? 'bg-primary text-primary-foreground'
           : 'bg-gray-100 text-gray-700 hover:bg-gray-200 dark:bg-gray-700 dark:text-gray-200 dark:hover:bg-gray-600',

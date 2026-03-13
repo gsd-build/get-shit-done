@@ -3,13 +3,13 @@ gsd_state_version: 1.0
 milestone: v1.1
 milestone_name: Completed Phases
 status: completed
-last_updated: "2026-03-11T16:11:19.515Z"
-last_activity: 2026-03-11 — Completed plan 18-08 (Plan & Verify Phase Pages)
+last_updated: "2026-03-12T00:00:00.000Z"
+last_activity: 2026-03-12 — Phase 17 finalized and merged to main
 progress:
-  total_phases: 20
-  completed_phases: 13
-  total_plans: 61
-  completed_plans: 54
+  total_phases: 21
+  completed_phases: 17
+  total_plans: 69
+  completed_plans: 56
 ---
 
 # Project State: GSD v1.1 Upstream Sync
@@ -23,12 +23,12 @@ progress:
 ## Current Position
 
 **Phase:** 18 - Plan & Verify Phase UIs
-**Plan:** 18-08 complete (8/8)
-**Status:** Milestone complete
-**Last activity:** 2026-03-11 — Completed plan 18-08 (Plan & Verify Phase Pages)
+**Plan:** Ready to plan
+**Status:** Ready to start
+**Last activity:** 2026-03-12 — Phase 17 finalized and merged to main
 
 ```
-[################] 100% - Phase 18 plan 08/08 complete
+[####################] 100% - Phase 17 plan 09/09 complete
 ```
 
 **Phases:**
@@ -44,15 +44,16 @@ progress:
 - [x] Phase 13: Foundation Infrastructure (4 requirements) - complete
 - [x] Phase 14: Backend Core (4 plans) - FINALIZED
 - [x] Phase 15: Frontend Foundation & Dashboard (4 plans) - COMPLETE
-- [x] Phase 18: Plan & Verify Phase UIs (8 plans) - COMPLETE
+- [x] Phase 16: Discuss Phase UI (4 plans) - FINALIZED
+- [x] Phase 17: Execute Phase UI (9 plans) - FINALIZED
 
 ## Performance Metrics
 
 | Metric | Value |
 |--------|-------|
-| Plans completed (v1.1) | 22 |
+| Plans completed (v1.1) | 21 |
 | Plans failed (v1.1) | 0 |
-| Current streak | 22 |
+| Current streak | 21 |
 | v1.0 plans completed | 11 |
 | Phase 11 P01 | 74s | 2 tasks | 2 files |
 | Phase 11 P02 | 98s | 3 tasks | 1 file |
@@ -68,14 +69,11 @@ progress:
 | Phase 15 P02 | 8m 52s | 3 tasks | 11 files |
 | Phase 15 P03 | 10m 38s | 3 tasks | 12 files |
 | Phase 15 P04 | 20m 25s | 3 tasks | 10 files |
-| Phase 18 P01 | 6m 57s | 3 tasks | 9 files |
-| Phase 18 P02 | 7m | 3 tasks | 6 files |
-| Phase 18 P03 | 4m 59s | 3 tasks | 6 files |
-| Phase 18 P04 | 6m 3s | 3 tasks | 6 files |
-| Phase 18 P07 | 5m 28s | 3 tasks | 8 files |
-| Phase 18 P06 | 376s | 3 tasks | 5 files |
-| Phase 18 P05 | 6 min | 3 tasks | 9 files |
-| Phase 18 P08 | 11m | 3 tasks | 6 files |
+| Phase 16 P01 | 6m 14s | 3 tasks | 14 files |
+| Phase 16 P02 | 8m 24s | 3 tasks | 2 files |
+| Phase 16 P03 | 4m 37s | 3 tasks | 11 files |
+| Phase 16 P04 | 7m 54s | 3 tasks | 9 files |
+| Phase 17 P09 | 16m 36s | 3 tasks | 11 files |
 
 ## Accumulated Context
 
@@ -165,10 +163,13 @@ progress:
 | expect.extend for jest-dom | Direct matcher extension more reliable than import path | 2026-03-11 |
 | Triple-slash reference for jest-dom types | Use /// reference instead of import to avoid "expect not defined" | 2026-03-11 |
 | E2E tests resilient to missing backend | Check for project grid or empty/loading state for CI compatibility | 2026-03-11 |
-| Timer intervals outside Zustand state | Interval IDs stored in external Map to avoid serialization issues | 2026-03-11 |
-| Radix Tabs for section navigation | Consistent with existing Radix usage in verify page | 2026-03-11 |
-| Skip-based E2E tests for CI | test.skip() when page returns 404 for backend-less environments | 2026-03-11 |
-| Rejection auto-routes to gap planning | Per CONTEXT.md, submitRejection returns planUrl for redirect | 2026-03-11 |
+| ~30ms typewriter delay for streaming | Character-by-character animation per CONTEXT.md decision | 2026-03-11 |
+| react-resizable-panels v4.x API | Group/Panel/Separator (not PanelGroup/PanelResizeHandle) | 2026-03-11 |
+| react-contenteditable for inline editing | Managed contentEditable preserves cursor position across React renders | 2026-03-11 |
+| Edit tracking via system messages | "[User edited: Changed X to Y]" creates audit trail in conversation | 2026-03-11 |
+| Word-level diff for conflict dialog | Green additions, red removals for visual comparison | 2026-03-11 |
+| Stable Zustand action references | Extract individual actions for useEffect dependencies to prevent loops | 2026-03-11 |
+| data-testid for E2E selectors | Use data-testid attributes for reliable Playwright selectors | 2026-03-11 |
 
 ### Roadmap Evolution
 
@@ -233,6 +234,11 @@ progress:
 - [x] Execute plan 15-02 (Data layer and hooks with TDD)
 - [x] Execute plan 15-03 (UI primitives and dashboard components)
 - [x] Execute plan 15-04 (Dashboard assembly and E2E tests)
+- [x] Execute plan 16-01 (Chat Interface & Streaming)
+- [x] Execute plan 16-02 (Context Preview Panel)
+- [x] Execute plan 16-03 (Session Persistence)
+- [x] Execute plan 16-04 (Manual CONTEXT.md Editing)
+- [x] Execute plan 17-09 (UAT E2E Test Suite)
 
 ### Blockers
 
@@ -240,14 +246,14 @@ None currently.
 
 ## Session Continuity
 
-**Last Session:** 2026-03-11T15:52:47Z
-**Context:** Completed Phase 18 Plan 08 - Plan & Verify Phase Pages.
+**Last Session:** 2026-03-12T00:00:00.000Z
+**Context:** Finalized Phase 17 - Execute Phase UI merged to main.
 
 **To Resume:**
-1. Phase 18 complete - all 8 plans executed
-2. Plan and verify phase pages fully integrated
-3. 265 unit tests + 48 E2E tests (24 pass, 24 skip for CI)
-4. Next: Finalize phase 18 and merge to main
+1. Phase 17 complete - all 9 plans done
+2. Execute phase UI with real-time streaming
+3. Connection recovery UI and empty state guidance
+4. Next: Plan phase 18 (Plan & Verify Phase UIs)
 
 ### Sync History
 
@@ -256,16 +262,16 @@ None currently.
 
 ---
 *State initialized: 2026-02-23*
-*Last updated: 2026-03-11 (Phase 18 Plan 08 complete)*
+*Last updated: 2026-03-11 (Phase 15 Plan 04 complete)*
 
 ## Recent Activity
 
-- 2026-03-11 — Completed plan 18-08 (Plan & Verify Phase Pages) - plan page, verify page, E2E tests
-- 2026-03-11 — Completed plan 18-05 (Verification Report Display) - ReportHeader, RequirementItem, RequirementList, VerificationPanel, EvidenceTrail
-- 2026-03-11 — Completed plan 18-04 (Plan Kanban Board) - TaskCard, WaveColumn, DependencyLines, PlanKanban
-- 2026-03-11 — Completed plan 18-07 (Manual Checklist & Approval) - ManualTestItem, ManualChecklist, ApprovalBar, GapSelectionModal
-- 2026-03-11 — Completed plan 18-03 (Research Agent Swimlane Visualization) - AgentLane, AgentSummary, ResearchSwimlanes
-- 2026-03-11 — Completed plan 18-01 (Planning State & Research Streaming) - planStore, useResearchStream, timer tracking
+- 2026-03-12 — Finalized phase 17 (Execute Phase UI) - merged to main
+- 2026-03-11 — Completed plan 17-09 (UAT E2E Test Suite) - 30 E2E tests covering all 13 UAT criteria
+- 2026-03-11 — Completed plan 16-04 (Manual CONTEXT.md Editing) - InlineEditor, ConflictDialog, useContextSync, edit tracking
+- 2026-03-11 — Completed plan 16-03 (Session Persistence) - persist middleware, useDiscussSession, useUnsavedChanges, SavedIndicator
+- 2026-03-11 — Completed plan 16-02 (Context Preview Panel) - DiscussLayout, useContextPreview, resizable panels
+- 2026-03-11 — Completed plan 16-01 (Chat Interface & Streaming) - discussStore, useTokenStream, ChatInterface, MessageBubble, QuestionCard
 - 2026-03-11 — Completed plan 15-04 (Dashboard Assembly & E2E Tests) - SearchBar, FilterBar, ProjectGrid, E2E tests for DASH-01-05
 - 2026-03-11 — Completed plan 15-03 (UI Primitives & Dashboard Components) - ProgressBar, Badge, FilterChip, HealthBadge, ActivityFeed, ProjectCard
 - 2026-03-11 — Completed plan 15-02 (Data Layer & Hooks) - Zustand, useSocket, useProjects, API client

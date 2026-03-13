@@ -1,298 +1,85 @@
 import { test, expect } from '@playwright/test';
 
+const PROJECT_ID = process.env['E2E_PROJECT_ID'] ?? 'todo-app';
+
 test.describe('Verify Phase Page', () => {
-  /**
-   * Helper to check if page loaded successfully (not 404).
-   * E2E tests are resilient to backend unavailability.
-   */
-  async function isPageLoaded(page: import('@playwright/test').Page): Promise<boolean> {
-    const notFound = await page.getByRole('heading', { name: '404' }).isVisible().catch(() => false);
-    return !notFound;
+  async function skipIfUnavailable(page: import('@playwright/test').Page) {
+    const is404 = await page.getByRole('heading', { name: '404' }).isVisible().catch(() => false);
+    test.skip(is404, 'Verify route is unavailable in this environment');
   }
 
   test.beforeEach(async ({ page }) => {
-    // Navigate to verify page for a test project
-    await page.goto('/projects/test-project-1/verify');
+    await page.goto(`/projects/${PROJECT_ID}/verify`);
     await page.waitForLoadState('networkidle');
   });
 
-  test('navigates to verify page from project detail', async ({ page }) => {
-    // First go to project detail
-    await page.goto('/projects/test-project-1');
-    await page.waitForLoadState('networkidle');
-
-    const loaded = await isPageLoaded(page);
-    if (!loaded) {
-      test.skip();
-      return;
-    }
-
-    // Check we're on project detail
-    const projectDetail = await page.getByText('Project Detail').isVisible().catch(() => false);
-    const projectId = await page.getByText(/Project.*:.*test-project-1/i).isVisible().catch(() => false);
-    expect(projectDetail || projectId).toBeTruthy();
-  });
-
-  test('shows Verification header', async ({ page }) => {
-    const loaded = await isPageLoaded(page);
-    if (!loaded) {
-      test.skip();
-      return;
-    }
-
-    // Check for header
+  test('renders verify page shell with tabs and action bar', async ({ page }) => {
+    await skipIfUnavailable(page);
     await expect(page.getByRole('heading', { name: /Verification/i })).toBeVisible();
+    await expect(page.getByRole('tab', { name: /Gaps/i })).toBeVisible();
+    await expect(page.getByRole('tab', { name: /Coverage/i })).toBeVisible();
+    await expect(page.getByRole('tab', { name: /Manual Tests/i })).toBeVisible();
+    await expect(page.getByRole('button', { name: /Reject with Gaps/i })).toBeVisible();
+    await expect(page.getByRole('button', { name: /^Approve$/i })).toBeVisible();
   });
 
-  test('shows ReportHeader with status', async ({ page }) => {
-    const loaded = await isPageLoaded(page);
-    if (!loaded) {
-      test.skip();
-      return;
+  test('run verification renders report + gaps context', async ({ page }) => {
+    await skipIfUnavailable(page);
+    const runButton = page.getByRole('button', { name: /Run Verification/i });
+    if (await runButton.isVisible()) {
+      await runButton.click();
     }
 
-    // Report header should show verification status
-    // Either loading skeleton or actual status
-    const loadingSkeleton = await page.getByTestId('verification-loading').isVisible().catch(() => false);
-    const reportHeader = await page.locator('.max-w-4xl').first().isVisible().catch(() => false);
-
-    expect(loadingSkeleton || reportHeader).toBeTruthy();
+    await expect(
+      page
+        .getByRole('heading', { name: /Verification Passed|Verification Failed/i })
+        .or(page.getByTestId('verification-loading'))
+        .first()
+    ).toBeVisible();
   });
 
-  test('shows RequirementList with expandable items', async ({ page }) => {
-    const loaded = await isPageLoaded(page);
-    if (!loaded) {
-      test.skip();
-      return;
+  test('reject flow opens gap selection modal', async ({ page }) => {
+    await skipIfUnavailable(page);
+    const runButton = page.getByRole('button', { name: /Run Verification/i });
+    if (await runButton.isVisible()) {
+      await runButton.click();
     }
 
-    // Look for requirement items or loading state
-    const hasContent = await page.locator('.max-w-4xl').first().isVisible().catch(() => false);
-    expect(hasContent).toBeTruthy();
+    await page.getByRole('button', { name: /Reject with Gaps/i }).click();
+    await expect(page.getByRole('dialog', { name: /Select Gaps to Address/i })).toBeVisible();
+    await expect(page.getByRole('button', { name: /Create Fix Plans/i })).toBeVisible();
   });
 
-  test('clicking requirement expands to show tests', async ({ page }) => {
-    const loaded = await isPageLoaded(page);
-    if (!loaded) {
-      test.skip();
-      return;
+  test('approve is blocked when major/blocking gaps exist', async ({ page }) => {
+    await skipIfUnavailable(page);
+    const runButton = page.getByRole('button', { name: /Run Verification/i });
+    if (await runButton.isVisible()) {
+      await runButton.click();
     }
 
-    // Find an expandable requirement item if present
-    const requirementItem = page.locator('[data-testid="requirement-item"]').first();
-    const isVisible = await requirementItem.isVisible().catch(() => false);
-
-    if (isVisible) {
-      // Click to expand
-      await requirementItem.click();
-
-      // Should show expanded content
-      await page.waitForTimeout(100);
-    }
-
-    // Pass test - expansion behavior is conditional on having data
-    expect(true).toBeTruthy();
-  });
-
-  test('shows GapList with severity badges when gaps exist', async ({ page }) => {
-    const loaded = await isPageLoaded(page);
-    if (!loaded) {
-      test.skip();
-      return;
-    }
-
-    // Click on Gaps tab
-    const gapsTab = page.getByRole('tab', { name: /Gaps/i });
-    await expect(gapsTab).toBeVisible();
-    await gapsTab.click();
-
-    // Check for gap list content
-    // Either "No gaps found" or actual gaps with severity badges
-    const noGaps = await page.getByText(/No gaps found/i).isVisible().catch(() => false);
-    const hasSeverityBadge = await page.getByText(/blocking|major|minor/i).first().isVisible().catch(() => false);
-
-    expect(noGaps || hasSeverityBadge || true).toBeTruthy();
-  });
-
-  test('shows ManualChecklist section', async ({ page }) => {
-    const loaded = await isPageLoaded(page);
-    if (!loaded) {
-      test.skip();
-      return;
-    }
-
-    // Click on Manual Tests tab
-    const manualTab = page.getByRole('tab', { name: /Manual Tests/i });
-    await expect(manualTab).toBeVisible();
-    await manualTab.click();
-
-    // Should show checklist header
-    await expect(page.getByRole('heading', { name: /Manual Test Checklist/i })).toBeVisible();
-  });
-
-  test('ApprovalBar visible at bottom', async ({ page }) => {
-    const loaded = await isPageLoaded(page);
-    if (!loaded) {
-      test.skip();
-      return;
-    }
-
-    // Approval bar is fixed at bottom
-    const approveButton = page.getByRole('button', { name: /Approve/i });
-    const rejectButton = page.getByRole('button', { name: /Reject with Gaps/i });
-
-    await expect(approveButton).toBeVisible();
-    await expect(rejectButton).toBeVisible();
-  });
-
-  test('Approve button shows confirmation modal', async ({ page }) => {
-    const loaded = await isPageLoaded(page);
-    if (!loaded) {
-      test.skip();
-      return;
-    }
-
-    // Click Approve button
+    const hasMajorOrBlocking = await page
+      .getByText(/Major|Blocking/i)
+      .first()
+      .isVisible()
+      .catch(() => false);
     const approveButton = page.getByRole('button', { name: /^Approve$/i });
 
-    // Check if approve is enabled (no blocking gaps)
-    const isEnabled = await approveButton.isEnabled();
-
-    if (isEnabled) {
-      await approveButton.click();
-
-      // Should show confirmation dialog
-      await expect(page.getByRole('dialog')).toBeVisible();
-      await expect(page.getByText(/Confirm Approval/i)).toBeVisible();
-
-      // Close dialog
-      await page.keyboard.press('Escape');
-    }
-  });
-
-  test('Reject button opens gap selection modal', async ({ page }) => {
-    const loaded = await isPageLoaded(page);
-    if (!loaded) {
-      test.skip();
+    if (hasMajorOrBlocking) {
+      await expect(approveButton).toBeDisabled();
+      await expect(
+        page.getByText(/Resolve major or blocking gaps before approval/i)
+      ).toBeVisible();
       return;
     }
 
-    // Click Reject button
-    const rejectButton = page.getByRole('button', { name: /Reject with Gaps/i });
-    await rejectButton.click();
-
-    // Should show gap selection modal
-    await expect(page.getByRole('dialog')).toBeVisible();
-
-    // Look for modal title or gap selection UI
-    const modalContent = await page.getByText(/Select Gaps|Gaps to Address/i).isVisible().catch(() => false);
-    const hasDialog = await page.getByRole('dialog').isVisible();
-
-    expect(modalContent || hasDialog).toBeTruthy();
-
-    // Close dialog
-    await page.keyboard.press('Escape');
+    await expect(approveButton).toBeVisible();
   });
 
-  test('selecting gaps and confirming triggers redirect', async ({ page }) => {
-    const loaded = await isPageLoaded(page);
-    if (!loaded) {
-      test.skip();
-      return;
-    }
-
-    // This test validates the rejection flow mock behavior
-    // In real scenarios, API mock would provide gap data
-
-    const rejectButton = page.getByRole('button', { name: /Reject with Gaps/i });
-    await rejectButton.click();
-
-    // Should open modal
-    const dialog = page.getByRole('dialog');
-    await expect(dialog).toBeVisible();
-
-    // Look for confirm button in modal
-    const confirmButton = page.getByRole('button', { name: /Confirm|Submit|Create Plan/i });
-    const hasConfirm = await confirmButton.isVisible().catch(() => false);
-
-    // Close modal for cleanup
-    await page.keyboard.press('Escape');
-
-    // Test passes - flow is verified
-    expect(true).toBeTruthy();
-  });
-
-  test('Run Verification button visible when not running', async ({ page }) => {
-    const loaded = await isPageLoaded(page);
-    if (!loaded) {
-      test.skip();
-      return;
-    }
-
-    // Check for Run Verification button
-    const runButton = page.getByRole('button', { name: /Run Verification/i });
-    const isVisible = await runButton.isVisible().catch(() => false);
-
-    // Button should be visible unless verification is complete
-    // (visibility depends on verification status)
-    expect(true).toBeTruthy();
-  });
-
-  test('Coverage tab shows heatmap or empty state', async ({ page }) => {
-    const loaded = await isPageLoaded(page);
-    if (!loaded) {
-      test.skip();
-      return;
-    }
-
-    // Click on Coverage tab
-    const coverageTab = page.getByRole('tab', { name: /Coverage/i });
-    await expect(coverageTab).toBeVisible();
-    await coverageTab.click();
-
-    // Should show coverage content
-    // Either loading, heatmap, or "No coverage data available"
-    const hasContent = await page.locator('[value="coverage"]').isVisible().catch(() => false);
-    expect(hasContent || true).toBeTruthy();
-  });
-
-  test('shows tabs for Gaps, Coverage, and Manual Tests', async ({ page }) => {
-    const loaded = await isPageLoaded(page);
-    if (!loaded) {
-      test.skip();
-      return;
-    }
-
-    // Check all three tabs exist
-    const gapsTab = page.getByRole('tab', { name: /Gaps/i });
-    const coverageTab = page.getByRole('tab', { name: /Coverage/i });
-    const manualTab = page.getByRole('tab', { name: /Manual Tests/i });
-
-    await expect(gapsTab).toBeVisible();
-    await expect(coverageTab).toBeVisible();
-    await expect(manualTab).toBeVisible();
-  });
-
-  test('tabs switch content correctly', async ({ page }) => {
-    const loaded = await isPageLoaded(page);
-    if (!loaded) {
-      test.skip();
-      return;
-    }
-
-    // Click Coverage tab
-    const coverageTab = page.getByRole('tab', { name: /Coverage/i });
-    await coverageTab.click();
-    await expect(coverageTab).toHaveAttribute('data-state', 'active');
-
-    // Click Manual Tests tab
-    const manualTab = page.getByRole('tab', { name: /Manual Tests/i });
-    await manualTab.click();
-    await expect(manualTab).toHaveAttribute('data-state', 'active');
-
-    // Click back to Gaps tab
-    const gapsTab = page.getByRole('tab', { name: /Gaps/i });
-    await gapsTab.click();
-    await expect(gapsTab).toHaveAttribute('data-state', 'active');
+  test('coverage tab renders matrix or explicit empty state', async ({ page }) => {
+    await skipIfUnavailable(page);
+    await page.getByRole('tab', { name: /Coverage/i }).click();
+    await expect(
+      page.getByText(/Legend:/i).or(page.getByText(/No coverage data available/i)).first()
+    ).toBeVisible();
   });
 });

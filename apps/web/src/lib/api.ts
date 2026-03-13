@@ -2,8 +2,12 @@ import type { Project, ApiEnvelope, ApiMeta } from '@/types';
 import type { Plan, PlanTask } from '@/types/plan';
 import type { Coverage } from '@/components/features/verify/CoverageHeatmap';
 
-const API_BASE =
-  process.env['NEXT_PUBLIC_API_URL'] || 'http://localhost:4000';
+// Use local proxy to add authentication to API calls
+const API_BASE = '/api/proxy';
+
+function proxyUrl(path: string): string {
+  return `${API_BASE}${path}`;
+}
 
 export interface ProjectsResponse extends ApiEnvelope<Project[]> {
   meta: ApiMeta & {
@@ -19,13 +23,13 @@ export interface ProjectsResponse extends ApiEnvelope<Project[]> {
  * @returns Projects response with envelope structure
  */
 export async function fetchProjects(cursor?: string): Promise<ProjectsResponse> {
-  const url = new URL('/api/projects', API_BASE);
+  let url = `${API_BASE}/projects`;
   if (cursor) {
-    url.searchParams.set('cursor', cursor);
+    url += `?cursor=${encodeURIComponent(cursor)}`;
   }
 
   try {
-    const response = await fetch(url.toString());
+    const response = await fetch(url, { credentials: 'include' });
 
     if (!response.ok) {
       return {
@@ -42,7 +46,22 @@ export async function fetchProjects(cursor?: string): Promise<ProjectsResponse> 
     }
 
     const json = await response.json();
-    return json as ProjectsResponse;
+
+    // API returns { data: { items: [...], pagination: {...} }, meta: {...} }
+    // Transform to expected shape: { success: true, data: [...], meta: {...} }
+    const items = json.data?.items ?? json.data ?? [];
+    const pagination = json.data?.pagination ?? {};
+
+    return {
+      success: true,
+      data: items,
+      meta: {
+        timestamp: json.meta?.timestamp ?? new Date().toISOString(),
+        requestId: json.meta?.requestId ?? '',
+        total: pagination.total ?? items.length,
+        hasNextPage: pagination.hasNextPage ?? false,
+      },
+    };
   } catch (err) {
     return {
       success: false,
@@ -72,10 +91,10 @@ export async function fetchProjects(cursor?: string): Promise<ProjectsResponse> 
  * @returns Plan data with tasks
  */
 export async function fetchPlan(phaseId: string): Promise<ApiEnvelope<Plan | null>> {
-  const url = new URL(`/api/phases/${phaseId}/plan`, API_BASE);
+  const url = proxyUrl(`/projects/${phaseId}/plan`);
 
   try {
-    const response = await fetch(url.toString());
+    const response = await fetch(url);
 
     if (!response.ok) {
       return {
@@ -120,10 +139,10 @@ export async function updatePlanTask(
   taskId: string,
   updates: Partial<PlanTask>
 ): Promise<ApiEnvelope<PlanTask | null>> {
-  const url = new URL(`/api/phases/${phaseId}/plan/tasks/${taskId}`, API_BASE);
+  const url = proxyUrl(`/projects/${phaseId}/plan/tasks/${taskId}`);
 
   try {
-    const response = await fetch(url.toString(), {
+    const response = await fetch(url, {
       method: 'PATCH',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(updates),
@@ -165,9 +184,8 @@ export async function updatePlanTask(
  * @param phaseId - The phase ID to start research for
  */
 export async function startResearch(phaseId: string): Promise<void> {
-  const url = new URL(`/api/phases/${phaseId}/research`, API_BASE);
-
-  await fetch(url.toString(), { method: 'POST' });
+  const url = proxyUrl(`/projects/${phaseId}/research`);
+  await fetch(url, { method: 'POST' });
 }
 
 // ------------------------------------------------------------------
@@ -180,9 +198,8 @@ export async function startResearch(phaseId: string): Promise<void> {
  * @param phaseId - The phase ID to verify
  */
 export async function startVerification(phaseId: string): Promise<void> {
-  const url = new URL(`/api/phases/${phaseId}/verify`, API_BASE);
-
-  await fetch(url.toString(), { method: 'POST' });
+  const url = proxyUrl(`/projects/${phaseId}/verify`);
+  await fetch(url, { method: 'POST' });
 }
 
 /**
@@ -191,9 +208,11 @@ export async function startVerification(phaseId: string): Promise<void> {
  * @param phaseId - The phase ID to approve
  */
 export async function submitApproval(phaseId: string): Promise<void> {
-  const url = new URL(`/api/phases/${phaseId}/approve`, API_BASE);
-
-  await fetch(url.toString(), { method: 'POST' });
+  const url = proxyUrl(`/projects/${phaseId}/approve`);
+  const response = await fetch(url, { method: 'POST' });
+  if (!response.ok) {
+    throw new Error(`Approval failed: HTTP ${response.status}`);
+  }
 }
 
 /**
@@ -208,9 +227,9 @@ export async function submitRejection(
   phaseId: string,
   gapIds: string[]
 ): Promise<{ planUrl: string }> {
-  const url = new URL(`/api/phases/${phaseId}/reject`, API_BASE);
+  const url = proxyUrl(`/projects/${phaseId}/reject`);
 
-  const response = await fetch(url.toString(), {
+  const response = await fetch(url, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ gapIds }),
@@ -233,10 +252,10 @@ export async function submitRejection(
 export async function fetchCoverage(
   phaseId: string
 ): Promise<ApiEnvelope<Coverage[]>> {
-  const url = new URL(`/api/phases/${phaseId}/coverage`, API_BASE);
+  const url = proxyUrl(`/projects/${phaseId}/coverage`);
 
   try {
-    const response = await fetch(url.toString());
+    const response = await fetch(url);
 
     if (!response.ok) {
       return {

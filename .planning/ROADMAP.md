@@ -36,9 +36,9 @@ This roadmap delivers the GSD (Get Shit Done) meta-prompting framework across mu
 - [x] **Phase 13: Foundation Infrastructure** - WebSocket server, token buffering, file locking, and security layer (completed 2026-03-11)
 - [x] **Phase 14: Backend Core** - REST API, agent orchestrator, and WebSocket connection management (completed 2026-03-11)
 - [x] **Phase 15: Frontend Foundation & Dashboard** - Next.js app with project listing, health indicators, and navigation (completed 2026-03-11)
-- [ ] **Phase 16: Discuss Phase UI** - Chat interface with streaming and CONTEXT.md preview
-- [ ] **Phase 17: Execute Phase UI** - Execution streaming, tool visualization, checkpoints, and TDD workflow
-- [x] **Phase 18: Plan & Verify Phase UIs** - Research streaming, plan preview, verification report, and gap workflow (completed 2026-03-11)
+- [x] **Phase 16: Discuss Phase UI** - Chat interface with streaming and CONTEXT.md preview (completed 2026-03-11)
+- [x] **Phase 17: Execute Phase UI** - Execution streaming, tool visualization, checkpoints, and TDD workflow (completed 2026-03-12)
+- [ ] **Phase 18: Plan & Verify Phase UIs** - Research streaming, plan preview, verification report, and gap workflow
 - [ ] **Phase 19: Roadmap Visualization** - Dependency graph, Gantt timeline, and progress tracking
 - [ ] **Phase 20: Debug Session UI** - Debug session creation, hypothesis tracking, and evidence collection
 
@@ -143,7 +143,7 @@ Plans:
 - [x] 15-03-PLAN.md — Dashboard UI with project cards, health indicators, and activity feed
 - [x] 15-04-PLAN.md — Project search, filtering, and navigation to detail view
 
-### Phase 16: Discuss Phase UI
+### Phase 16: Discuss Phase UI (COMPLETE)
 **Goal**: Enable conversational context gathering with real-time streaming and CONTEXT.md preview
 **Depends on**: Phase 15
 **Requirements**: DISC-01, DISC-02, DISC-03, DISC-04, DISC-05
@@ -153,13 +153,13 @@ Plans:
   3. User can mark individual decisions as locked (must keep) vs discretionary (agent can adjust)
   4. User can refresh browser and resume discussion session where they left off
   5. User can manually edit CONTEXT.md with sync back to conversation state
-**Plans**: 4 plans
+**Plans**: 4/4 plans complete
 
 Plans:
-- [ ] 16-01-PLAN.md — Chat conversation interface with streaming token display
-- [ ] 16-02-PLAN.md — CONTEXT.md live preview panel with decision locking
-- [ ] 16-03-PLAN.md — Session persistence across reconnects and browser refresh
-- [ ] 16-04-PLAN.md — Manual CONTEXT.md editing with bidirectional sync
+- [x] 16-01-PLAN.md — Chat conversation interface with streaming token display
+- [x] 16-02-PLAN.md — CONTEXT.md live preview panel with decision locking
+- [x] 16-03-PLAN.md — Session persistence across reconnects and browser refresh
+- [x] 16-04-PLAN.md — Manual CONTEXT.md editing with bidirectional sync
 
 ### Phase 17: Execute Phase UI
 **Goal**: Deliver real-time execution interface with streaming, tool visualization, checkpoints, and TDD workflow
@@ -207,14 +207,14 @@ Plans:
 **Plans**: 8 plans
 
 Plans:
-- [x] 18-01-PLAN.md — Planning state store and research agent streaming hook
-- [x] 18-02-PLAN.md — Verification state store and test result streaming hook
-- [x] 18-03-PLAN.md — Research agent swimlane visualization components
-- [x] 18-04-PLAN.md — Kanban plan preview with wave columns and inline editing
-- [x] 18-05-PLAN.md — Verification report with header summary and requirement drill-down
-- [x] 18-06-PLAN.md — Gap severity badges and coverage heatmap matrix
-- [x] 18-07-PLAN.md — Manual test checklist and approval workflow with confirmation
-- [x] 18-08-PLAN.md — Plan and verify pages with E2E tests and gap-to-planning flow
+- [ ] 18-01-PLAN.md — Planning state store and research agent streaming hook
+- [ ] 18-02-PLAN.md — Verification state store and test result streaming hook
+- [ ] 18-03-PLAN.md — Research agent swimlane visualization components
+- [ ] 18-04-PLAN.md — Kanban plan preview with wave columns and inline editing
+- [ ] 18-05-PLAN.md — Verification report with header summary and requirement drill-down
+- [ ] 18-06-PLAN.md — Gap severity badges and coverage heatmap matrix
+- [ ] 18-07-PLAN.md — Manual test checklist and approval workflow with confirmation
+- [ ] 18-08-PLAN.md — Plan and verify pages with E2E tests and gap-to-planning flow
 
 ### Phase 19: Roadmap Visualization
 **Goal**: Visualize project progress with dependency graph, Gantt timeline, and milestone grouping
@@ -226,13 +226,12 @@ Plans:
   3. User can see progress tracking per phase with visual indicators
   4. User can see phases grouped by milestone
   5. User can click phase in visualization to navigate to phase detail
-**Plans**: 4 plans
+**Plans**: 3 plans
 
 Plans:
-- [ ] 19-01-PLAN.md — Dependency graph with React Flow (@xyflow/react)
-- [ ] 19-02-PLAN.md — Gantt-style timeline visualization
-- [ ] 19-03-PLAN.md — Progress tracking and milestone grouping
-- [ ] 19-04-PLAN.md — Phase navigation from visualization
+- [ ] 19-01-PLAN.md — Roadmap store, types, PhaseNode, and DependencyGraph with React Flow
+- [ ] 19-02-PLAN.md — Timeline view with TimelineBar, MilestoneGroup, and ViewToggle
+- [ ] 19-03-PLAN.md — RoadmapPage integration, navigation, and E2E tests
 
 ### Phase 20: Debug Session UI
 **Goal**: Enable visual debugging workflow with hypothesis tracking and evidence collection
@@ -315,7 +314,7 @@ Plans:
   1. Vercel AI SDK integrated with custom orchestration layer
   2. GSD workflow patterns mapped to framework primitives
   3. Parallel agent execution (wave-based) works
-  4. Agent-to-agent communication (orchestrator → subagent) works
+  4. Agent-to-agent communication (orchestrator -> subagent) works
   5. GSD checkpoint semantics maintained within framework
   6. Framework is TypeScript native throughout
 **Plans**: TBD (planning generates 3-4 plans)
@@ -393,9 +392,9 @@ Phases execute in numeric order: 13 -> 14 -> 15 -> 16 -> 17 -> 18 -> 19 -> 20
 | 13. Foundation Infrastructure | 3/3 | Complete    | 2026-03-11 |
 | 14. Backend Core | 4/4 | Complete    | 2026-03-11 |
 | 15. Frontend Foundation & Dashboard | 4/4 | Complete    | 2026-03-11 |
-| 16. Discuss Phase UI | 0/4 | Planned | - |
-| 17. Execute Phase UI | 0/8 | Planned | - |
-| 18. Plan & Verify Phase UIs | 8/8 | Complete    | 2026-03-11 |
+| 16. Discuss Phase UI | 4/4 | Complete | 2026-03-11 |
+| 17. Execute Phase UI | 9/9 | Complete    | 2026-03-12 |
+| 18. Plan & Verify Phase UIs | 0/8 | Not started | - |
 | 19. Roadmap Visualization | 0/4 | Not started | - |
 | 20. Debug Session UI | 0/4 | Not started | - |
 
@@ -417,4 +416,4 @@ Phases execute in numeric order: 21 -> 22 -> 23 -> 24 -> 25 -> 26 -> 27 -> 28
 
 ---
 *Roadmap created: 2026-03-10*
-*Last updated: 2026-03-11 (Phase 18 complete)*
+*Last updated: 2026-03-12 (Phase 17 complete)*

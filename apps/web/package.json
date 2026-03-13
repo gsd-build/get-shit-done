@@ -11,14 +11,17 @@
     "test": "vitest",
     "test:coverage": "vitest run --coverage",
     "e2e": "playwright test",
-    "e2e:ui": "playwright test --ui"
+    "e2e:ui": "playwright test --ui",
+    "test:reset-fixture": "./tests/fixtures/reset-todo-app.sh"
   },
   "dependencies": {
     "@dnd-kit/core": "^6.3.1",
     "@dnd-kit/sortable": "^10.0.0",
     "@gsd/events": "workspace:*",
+    "@monaco-editor/react": "^4.7.0",
+    "@radix-ui/react-accordion": "^1.2.12",
+    "@radix-ui/react-dialog": "^1.1.15",
     "@radix-ui/react-checkbox": "^1.3.3",
-    "@radix-ui/react-dialog": "^1.1.6",
     "@radix-ui/react-popover": "^1.1.2",
     "@radix-ui/react-tabs": "^1.1.13",
     "clsx": "^2.1.1",
@@ -29,6 +32,7 @@
     "react": "^19.0.0",
     "react-contenteditable": "^3.3.7",
     "react-dom": "^19.0.0",
+    "react-resizable-panels": "^4.7.2",
     "react-grid-heatmap": "^1.3.0",
     "zustand": "^5.0.11"
   },

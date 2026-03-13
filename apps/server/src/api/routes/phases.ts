@@ -10,6 +10,11 @@ import { ApiError, ErrorCodes } from '../middleware/errors.js';
 import type { Phase as ApiPhase } from '../schemas/responses.js';
 import { discoverProjects, listPhases } from '@gsd/gsd-wrapper';
 
+function resolvePhaseNumber(rawPhaseNumber: unknown, index: number): number {
+  const parsed = Number.parseInt(String(rawPhaseNumber ?? ''), 10);
+  return Number.isFinite(parsed) && parsed > 0 ? parsed : index + 1;
+}
+
 /**
  * Create phases routes
  *
@@ -60,7 +65,7 @@ export function createPhasesRoutes(searchPaths: string[]): Hono {
 
     // Convert to API Phase format
     const phases: ApiPhase[] = phasesResult.data.map((phase, index) => ({
-      number: parseInt(phase.number, 10) || index + 1,
+      number: resolvePhaseNumber(phase.number, index),
       name: phase.name,
       slug: phase.slug,
       status: mapPhaseStatus(phase.status),

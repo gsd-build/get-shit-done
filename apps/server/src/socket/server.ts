@@ -19,13 +19,14 @@ import type {
   InterServerEvents,
   SocketData,
 } from '@gsd/events';
+import { getAllowedOrigins, isOriginAllowed } from '../config/cors.js';
 
 export interface ServerConfig {
   port: number;
   maxDisconnectionDuration?: number; // Default 2 minutes per CONTEXT.md
   pingInterval?: number; // Default 25000
   pingTimeout?: number; // Default 20000
-  corsOrigin?: string; // Default http://localhost:3000
+  corsOrigin?: string; // Backward-compatible single origin override
 }
 
 export type TypedServer = Server<
@@ -46,6 +47,7 @@ export function createSocketServer(config: ServerConfig): {
   io: TypedServer;
 } {
   const httpServer = createServer();
+  const allowedOrigins = config.corsOrigin ? [config.corsOrigin] : getAllowedOrigins();
 
   const io: TypedServer = new Server<
     ClientToServerEvents,
@@ -60,7 +62,14 @@ export function createSocketServer(config: ServerConfig): {
     pingInterval: config.pingInterval ?? 25000,
     pingTimeout: config.pingTimeout ?? 20000,
     cors: {
-      origin: config.corsOrigin ?? process.env['CORS_ORIGIN'] ?? 'http://localhost:3000',
+      origin: (origin, callback) => {
+        if (isOriginAllowed(origin, allowedOrigins)) {
+          callback(null, true);
+          return;
+        }
+
+        callback(new Error(`CORS origin denied: ${origin}`), false);
+      },
       credentials: true,
     },
   });

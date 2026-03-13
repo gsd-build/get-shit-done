@@ -158,6 +158,7 @@ export async function runAgentLoop(
   systemPrompt: string,
   userPrompt: string
 ): Promise<void> {
+  console.log(`[claude] runAgentLoop started for ${session.agentId}`);
   const room = `agent:${session.agentId}`;
   const ctx: ToolContext = {
     agentId: session.agentId,
@@ -167,6 +168,7 @@ export async function runAgentLoop(
   // Initialize messages
   session.messages = [{ role: 'user', content: userPrompt }];
 
+  console.log(`[claude] Emitting AGENT_START to room ${room}`);
   // Emit start event
   io.to(room).emit(EVENTS.AGENT_START, {
     agentId: session.agentId,
@@ -185,7 +187,9 @@ export async function runAgentLoop(
       });
 
       // Stream Claude response with retry for 429
+      console.log(`[claude] Calling Claude API for ${session.agentId}`);
       const response = await withRetry(async () => {
+        console.log(`[claude] Creating message stream...`);
         const stream = client.messages.stream({
           model: 'claude-sonnet-4-20250514',
           max_tokens: 4096,
@@ -206,6 +210,7 @@ export async function runAgentLoop(
 
         return stream.finalMessage();
       });
+      console.log(`[claude] Claude API response received for ${session.agentId}`);
 
       // Check for tool use blocks
       const toolUseBlocks = response.content.filter(
@@ -284,6 +289,7 @@ export async function runAgentLoop(
       session.messages.push({ role: 'user', content: toolResults });
     }
   } catch (err) {
+    console.error(`[claude] Agent ${session.agentId} error:`, (err as Error).message);
     session.status = 'error';
     const errorEvent = {
       agentId: session.agentId,

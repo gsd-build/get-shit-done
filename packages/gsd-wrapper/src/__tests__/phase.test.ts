@@ -1,14 +1,19 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
+import { readdir } from 'fs/promises';
 
 // Mock execGsdTools before importing phase module
 vi.mock('../exec.js', () => ({
   execGsdTools: vi.fn(),
+}));
+vi.mock('fs/promises', () => ({
+  readdir: vi.fn(),
 }));
 
 import { listPhases } from '../phase.js';
 import { execGsdTools } from '../exec.js';
 
 const mockExecGsdTools = vi.mocked(execGsdTools);
+const mockReaddir = vi.mocked(readdir);
 
 describe('phase', () => {
   beforeEach(() => {
@@ -166,7 +171,7 @@ describe('phase', () => {
       }
     });
 
-    it('propagates error from execGsdTools', async () => {
+    it('returns empty phases when gsd-tools fails and fallback directory is missing', async () => {
       // Arrange
       mockExecGsdTools.mockResolvedValue({
         success: false,
@@ -176,14 +181,40 @@ describe('phase', () => {
           command: 'gsd-tools phases list --json',
         },
       });
+      mockReaddir.mockRejectedValue(new Error('ENOENT'));
 
       // Act
       const result = await listPhases('/project');
 
       // Assert
-      expect(result.success).toBe(false);
-      if (!result.success) {
-        expect(result.error.code).toBe('GSD_COMMAND_FAILED');
+      expect(result.success).toBe(true);
+      if (result.success) {
+        expect(result.data).toEqual([]);
+      }
+    });
+
+    it('falls back to filesystem phase discovery when gsd-tools fails', async () => {
+      mockExecGsdTools.mockResolvedValue({
+        success: false,
+        error: {
+          code: 'GSD_COMMAND_FAILED',
+          message: 'gsd-tools phases failed',
+          command: 'gsd-tools phases list --json',
+        },
+      });
+      mockReaddir.mockResolvedValue([
+        { name: '13-foundation-infrastructure', isDirectory: () => true },
+        { name: '14-backend-core', isDirectory: () => true },
+        { name: 'README.md', isDirectory: () => false },
+      ] as never);
+
+      const result = await listPhases('/project');
+
+      expect(result.success).toBe(true);
+      if (result.success) {
+        expect(result.data).toHaveLength(2);
+        expect(result.data[0]?.number).toBe('13');
+        expect(result.data[1]?.number).toBe('14');
       }
     });
 

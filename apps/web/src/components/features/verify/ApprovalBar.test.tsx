@@ -26,7 +26,7 @@ describe('ApprovalBar', () => {
     expect(screen.getByRole('button', { name: /reject/i })).toBeInTheDocument();
   });
 
-  it('Approve disabled when blocking gaps exist', () => {
+  it('Approve disabled when blocking or major gaps exist', () => {
     render(
       <ApprovalBar
         gaps={mockGaps}
@@ -38,7 +38,7 @@ describe('ApprovalBar', () => {
     expect(approveButton).toBeDisabled();
   });
 
-  it('Approve enabled when no blocking gaps', () => {
+  it('Approve enabled when only minor gaps exist', () => {
     render(
       <ApprovalBar
         gaps={nonBlockingGaps}
@@ -48,6 +48,19 @@ describe('ApprovalBar', () => {
     );
     const approveButton = screen.getByRole('button', { name: /approve/i });
     expect(approveButton).not.toBeDisabled();
+  });
+
+  it('shows guidance when major or blocking gaps are present', () => {
+    render(
+      <ApprovalBar
+        gaps={mockGaps}
+        onApprove={vi.fn()}
+        onReject={vi.fn()}
+      />
+    );
+    expect(
+      screen.getByText(/resolve major or blocking gaps before approval/i)
+    ).toBeInTheDocument();
   });
 
   it('clicking Reject opens gap selection modal', async () => {

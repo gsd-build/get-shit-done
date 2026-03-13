@@ -99,7 +99,54 @@
       "created": "2026-03-11T11:13:55.075Z",
       "status": "removed",
       "removed": "2026-03-11T12:18:56.593Z"
+    },
+    "phase-16": {
+      "phase_number": "16",
+      "phase_name": "discuss-phase-ui",
+      "branch": "phase-16-discuss-phase-ui",
+      "path": "/Users/mauricevandermerwe/Projects/get-shit-done/.worktrees/get-shit-done-phase-16",
+      "created": "2026-03-11T14:43:03.294Z",
+      "status": "removed",
+      "removed": "2026-03-11T22:15:47.849Z"
+    },
+    "phase-17": {
+      "phase_number": "17",
+      "phase_name": "execute-phase-ui",
+      "branch": "phase-17-execute-phase-ui",
+      "path": "/Users/mauricevandermerwe/Projects/get-shit-done/.worktrees/get-shit-done-phase-17",
+      "created": "2026-03-11T14:43:30.534Z",
+      "status": "removed",
+      "removed": "2026-03-12T00:00:00.000Z"
+    },
+    "phase-18": {
+      "phase_number": "18",
+      "phase_name": "plan-verify-phase-uis",
+      "branch": "phase-18-plan-verify-phase-uis",
+      "path": "/Users/mauricevandermerwe/Projects/get-shit-done/.worktrees/get-shit-done-phase-18",
+      "created": "2026-03-11T15:19:39.567Z",
+      "status": "active"
+    },
+    "phase-19": {
+      "phase_number": "19",
+      "phase_name": "roadmap-visualization",
+      "branch": "phase-19-roadmap-visualization",
+      "path": "/Users/mauricevandermerwe/Projects/get-shit-done/.worktrees/get-shit-done-phase-19",
+      "created": "2026-03-11T17:20:02.443Z",
+      "status": "active"
     }
   },
-  "locks": {}
+  "locks": {
+    "phase-18": {
+      "acquired": "2026-03-11T15:19:39.326Z",
+      "owner": "mauricevandermerwe",
+      "pid": 3454,
+      "hostname": "Maurices-MacBook-Pro.local"
+    },
+    "phase-19": {
+      "acquired": "2026-03-11T17:20:02.185Z",
+      "owner": "mauricevandermerwe",
+      "pid": 8229,
+      "hostname": "Maurices-MacBook-Pro.local"
+    }
+  }
 }

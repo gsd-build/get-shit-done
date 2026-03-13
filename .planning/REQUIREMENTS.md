@@ -31,54 +31,54 @@ Project overview and navigation.
 Context gathering through conversational interface.
 
 - [ ] **DISC-01**: User can have a chat-style conversation with Claude with real-time token streaming
-- [ ] **DISC-02**: User can see live preview of CONTEXT.md being generated as conversation progresses
-- [ ] **DISC-03**: User can mark individual decisions as locked (must keep) vs discretionary (agent can adjust)
-- [ ] **DISC-04**: User can refresh browser and resume discussion session where they left off
+- [x] **DISC-02**: User can see live preview of CONTEXT.md being generated as conversation progresses
+- [x] **DISC-03**: User can mark individual decisions as locked (must keep) vs discretionary (agent can adjust)
+- [x] **DISC-04**: User can refresh browser and resume discussion session where they left off
 - [ ] **DISC-05**: User can manually edit CONTEXT.md with sync back to conversation state
 
 ### Plan Phase UI (PLAN)
 
 Research, planning, and verification workflow.
 
-- [x] **PLAN-01**: User can see real-time progress as researcher agents spawn, run, and complete
-- [x] **PLAN-02**: User can preview generated plans with task breakdown and wave grouping
-- [x] **PLAN-03**: User can see verification feedback with specific issues highlighted per plan
-- [x] **PLAN-04**: User can view requirement coverage matrix showing requirement-to-phase mapping
-- [x] **PLAN-05**: User can edit plan tasks inline before execution
+- [ ] **PLAN-01**: User can see real-time progress as researcher agents spawn, run, and complete
+- [ ] **PLAN-02**: User can preview generated plans with task breakdown and wave grouping
+- [ ] **PLAN-03**: User can see verification feedback with specific issues highlighted per plan
+- [ ] **PLAN-04**: User can view requirement coverage matrix showing requirement-to-phase mapping
+- [ ] **PLAN-05**: User can edit plan tasks inline before execution
 
 ### Execute Phase UI (EXEC)
 
 Real-time execution with streaming and checkpoints.
 
-- [ ] **EXEC-01**: User can see wave-based execution progress with real-time log streaming per plan
-- [ ] **EXEC-02**: User can see tool calls visualized as collapsible cards (Read, Write, Bash, etc.)
-- [ ] **EXEC-03**: User can respond to checkpoint dialogs with timeout warning display
-- [ ] **EXEC-04**: User can view file changes in Monaco DiffEditor with syntax highlighting
-- [ ] **EXEC-05**: User can see git commit timeline showing commits created during execution
-- [ ] **EXEC-06**: User can pause execution and resume from the paused state
-- [ ] **EXEC-07**: User can abort execution gracefully with rollback option
-- [ ] **EXEC-08**: User can recover from errors with retry options and context preservation
+- [x] **EXEC-01**: User can see wave-based execution progress with real-time log streaming per plan
+- [x] **EXEC-02**: User can see tool calls visualized as collapsible cards (Read, Write, Bash, etc.)
+- [x] **EXEC-03**: User can respond to checkpoint dialogs with timeout warning display
+- [x] **EXEC-04**: User can view file changes in Monaco DiffEditor with syntax highlighting
+- [x] **EXEC-05**: User can see git commit timeline showing commits created during execution
+- [x] **EXEC-06**: User can pause execution and resume from the paused state
+- [x] **EXEC-07**: User can abort execution gracefully with rollback option
+- [x] **EXEC-08**: User can recover from errors with retry options and context preservation
 
 ### Execute Quality (QUAL)
 
 Quality enforcement during code execution.
 
-- [ ] **QUAL-01**: Execution follows Red-Green-Refactor TDD workflow for code development tasks
-- [ ] **QUAL-02**: Tests are written before implementation and must fail initially (Red)
-- [ ] **QUAL-03**: Implementation makes tests pass without shortcuts (Green)
-- [ ] **QUAL-04**: Code is refactored for clarity after tests pass (Refactor)
+- [x] **QUAL-01**: Execution follows Red-Green-Refactor TDD workflow for code development tasks
+- [x] **QUAL-02**: Tests are written before implementation and must fail initially (Red)
+- [x] **QUAL-03**: Implementation makes tests pass without shortcuts (Green)
+- [x] **QUAL-04**: Code is refactored for clarity after tests pass (Refactor)
 
 ### Verify Work UI (VERIF)
 
 User acceptance testing and gap closure.
 
-- [x] **VERIF-01**: User can view verification report with pass/fail status per requirement
-- [x] **VERIF-02**: User can see gaps highlighted with severity levels (blocking, major, minor)
-- [x] **VERIF-03**: Verification executes all tests automatically before displaying results
-- [x] **VERIF-04**: Verification validates that all success criteria are genuinely met (not superficially passed)
-- [x] **VERIF-05**: User can mark manual test items as pass/fail in checklist
-- [x] **VERIF-06**: User can approve completed work or reject with gap selection
-- [x] **VERIF-07**: Rejection routes to plan-phase --gaps to create fix plans automatically
+- [ ] **VERIF-01**: User can view verification report with pass/fail status per requirement
+- [ ] **VERIF-02**: User can see gaps highlighted with severity levels (blocking, major, minor)
+- [ ] **VERIF-03**: Verification executes all tests automatically before displaying results
+- [ ] **VERIF-04**: Verification validates that all success criteria are genuinely met (not superficially passed)
+- [ ] **VERIF-05**: User can mark manual test items as pass/fail in checklist
+- [ ] **VERIF-06**: User can approve completed work or reject with gap selection
+- [ ] **VERIF-07**: Rejection routes to plan-phase --gaps to create fix plans automatically
 
 ### Roadmap Visualization (ROAD)
 
@@ -139,35 +139,35 @@ Visual debugging workflow.
 | DASH-03 | Phase 15 | Complete |
 | DASH-04 | Phase 15 | Complete |
 | DASH-05 | Phase 15 | Complete |
-| DISC-01 | Phase 16 | Pending |
-| DISC-02 | Phase 16 | Pending |
-| DISC-03 | Phase 16 | Pending |
-| DISC-04 | Phase 16 | Pending |
+| DISC-01 | Phase 16 | Complete |
+| DISC-02 | Phase 16 | Complete |
+| DISC-03 | Phase 16 | Complete |
+| DISC-04 | Phase 16 | Complete |
 | DISC-05 | Phase 16 | Pending |
-| PLAN-01 | Phase 18 | Complete |
-| PLAN-02 | Phase 18 | Complete |
-| PLAN-03 | Phase 18 | Complete |
-| PLAN-04 | Phase 18 | Complete |
-| PLAN-05 | Phase 18 | Complete |
-| EXEC-01 | Phase 17 | Pending |
-| EXEC-02 | Phase 17 | Pending |
-| EXEC-03 | Phase 17 | Pending |
-| EXEC-04 | Phase 17 | Pending |
-| EXEC-05 | Phase 17 | Pending |
-| EXEC-06 | Phase 17 | Pending |
-| EXEC-07 | Phase 17 | Pending |
-| EXEC-08 | Phase 17 | Pending |
-| QUAL-01 | Phase 17 | Pending |
-| QUAL-02 | Phase 17 | Pending |
-| QUAL-03 | Phase 17 | Pending |
-| QUAL-04 | Phase 17 | Pending |
-| VERIF-01 | Phase 18 | Complete |
-| VERIF-02 | Phase 18 | Complete |
-| VERIF-03 | Phase 18 | Complete |
-| VERIF-04 | Phase 18 | Complete |
-| VERIF-05 | Phase 18 | Complete |
-| VERIF-06 | Phase 18 | Complete |
-| VERIF-07 | Phase 18 | Complete |
+| PLAN-01 | Phase 18 | Pending |
+| PLAN-02 | Phase 18 | Pending |
+| PLAN-03 | Phase 18 | Pending |
+| PLAN-04 | Phase 18 | Pending |
+| PLAN-05 | Phase 18 | Pending |
+| EXEC-01 | Phase 17 | Complete |
+| EXEC-02 | Phase 17 | Complete |
+| EXEC-03 | Phase 17 | Complete |
+| EXEC-04 | Phase 17 | Complete |
+| EXEC-05 | Phase 17 | Complete |
+| EXEC-06 | Phase 17 | Complete |
+| EXEC-07 | Phase 17 | Complete |
+| EXEC-08 | Phase 17 | Complete |
+| QUAL-01 | Phase 17 | Complete |
+| QUAL-02 | Phase 17 | Complete |
+| QUAL-03 | Phase 17 | Complete |
+| QUAL-04 | Phase 17 | Complete |
+| VERIF-01 | Phase 18 | Pending |
+| VERIF-02 | Phase 18 | Pending |
+| VERIF-03 | Phase 18 | Pending |
+| VERIF-04 | Phase 18 | Pending |
+| VERIF-05 | Phase 18 | Pending |
+| VERIF-06 | Phase 18 | Pending |
+| VERIF-07 | Phase 18 | Pending |
 | ROAD-01 | Phase 19 | Pending |
 | ROAD-02 | Phase 19 | Pending |
 | ROAD-03 | Phase 19 | Pending |

@@ -51,7 +51,7 @@ export function useResearchStream(socket: TypedSocket | null, phaseId: string) {
   }, []);
 
   useEffect(() => {
-    if (!socket || !socket.connected) return;
+    if (!socket) return;
 
     // Subscribe to the phase's research events
     socket.emit('research:subscribe', phaseId);

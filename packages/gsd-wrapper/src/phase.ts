@@ -2,6 +2,8 @@
  * Async wrapper for gsd-tools phases command
  */
 
+import { readdir } from 'fs/promises';
+import { join } from 'path';
 import { execGsdTools } from './exec.js';
 import type { Phase, GsdResult } from './types.js';
 
@@ -23,11 +25,38 @@ interface RawPhasesOutput {
 export async function listPhases(cwd: string): Promise<GsdResult<Phase[]>> {
   const result = await execGsdTools<RawPhasesOutput>(['phases', 'list', '--json'], cwd);
 
-  if (!result.success) return result;
+  if (!result.success) {
+    const fallback = await listPhasesFromFilesystem(cwd);
+    if (fallback.success) {
+      return fallback;
+    }
+    return result;
+  }
 
-  // Parse directory names into Phase objects
-  const phases: Phase[] = result.data.directories.map((dir) => {
-    // Directory format: NN-name or NN-name-slug
+  return {
+    success: true,
+    data: parsePhaseDirectories(result.data.directories),
+  };
+}
+
+async function listPhasesFromFilesystem(cwd: string): Promise<GsdResult<Phase[]>> {
+  try {
+    const phasesDir = join(cwd, '.planning', 'phases');
+    const entries = await readdir(phasesDir, { withFileTypes: true });
+    const directories = entries
+      .filter((entry) => entry.isDirectory())
+      .map((entry) => entry.name)
+      .sort();
+
+    return { success: true, data: parsePhaseDirectories(directories) };
+  } catch {
+    // Missing .planning/phases or unreadable directory: treat as no phases.
+    return { success: true, data: [] };
+  }
+}
+
+function parsePhaseDirectories(directories: string[]): Phase[] {
+  return directories.map((dir) => {
     const basename = dir.split('/').pop() || dir;
     const match = basename.match(/^(\d+(?:\.\d+)?)-(.+)$/);
 
@@ -48,12 +77,10 @@ export async function listPhases(cwd: string): Promise<GsdResult<Phase[]>> {
       number: number || '0',
       name: rest?.replace(/-/g, ' ') || '',
       slug: rest || '',
-      status: 'pending' as const, // Would need to read PLAN.md files for actual status
+      status: 'pending' as const,
       plans: 0,
       completedPlans: 0,
       directory: dir,
     };
   });
-
-  return { success: true, data: phases };
 }
