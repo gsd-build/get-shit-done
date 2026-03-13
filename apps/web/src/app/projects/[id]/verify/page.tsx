@@ -20,9 +20,9 @@ import {
 } from '@/components/features/verify';
 import type { Coverage } from '@/components/features/verify/CoverageHeatmap';
 import { fetchCoverage, submitApproval, submitRejection } from '@/lib/api';
+import { resolveSocketBase } from '@/lib/endpoints';
 
-const SOCKET_URL =
-  process.env['NEXT_PUBLIC_SOCKET_URL'] || 'http://localhost:4000';
+const SOCKET_URL = resolveSocketBase();
 
 /**
  * Verify Phase Page - Report display, gaps, coverage, manual tests, and approval.

@@ -9,10 +9,10 @@ import { useResearchStream } from '@/hooks/useResearchStream';
 import { usePlanStore, selectAgents, selectPlan } from '@/stores/planStore';
 import { ResearchSwimlanes, PlanKanban } from '@/components/features/plan';
 import { fetchPlan, updatePlanTask, startResearch } from '@/lib/api';
+import { resolveSocketBase } from '@/lib/endpoints';
 import type { ResearchAgent, Plan, PlanTask } from '@/types/plan';
 
-const SOCKET_URL =
-  process.env['NEXT_PUBLIC_SOCKET_URL'] || 'http://localhost:4000';
+const SOCKET_URL = resolveSocketBase();
 
 /**
  * Plan Phase Page - Research swimlanes and Kanban preview.

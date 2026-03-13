@@ -12,8 +12,8 @@ export default function ProjectDetailPage() {
   const navItems = [
     { href: `/projects/${projectId}/execute`, label: 'Execute', icon: Play, ready: true },
     { href: `/projects/${projectId}/discuss`, label: 'Discuss', icon: MessageSquare, ready: true },
-    { href: `/projects/${projectId}/plan`, label: 'Plan', icon: FileText, ready: false },
-    { href: `/projects/${projectId}/verify`, label: 'Verify', icon: CheckCircle, ready: false },
+    { href: `/projects/${projectId}/plan`, label: 'Plan', icon: FileText, ready: true },
+    { href: `/projects/${projectId}/verify`, label: 'Verify', icon: CheckCircle, ready: true },
   ];
 
   return (
