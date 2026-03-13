@@ -131,7 +131,7 @@ export function ExecutionControls() {
               type="button"
               onClick={handlePause}
               disabled={isLoading}
-              className="flex items-center gap-1.5 px-3 py-1.5 text-sm font-medium text-zinc-200 bg-zinc-800 hover:bg-zinc-700 disabled:opacity-50 disabled:cursor-not-allowed rounded-md transition-colors"
+              className="flex items-center gap-1.5 min-h-11 px-3 py-1.5 text-sm font-medium text-zinc-200 bg-zinc-800 hover:bg-zinc-700 disabled:opacity-50 disabled:cursor-not-allowed rounded-md transition-colors"
               aria-label="Pause execution"
             >
               <Pause className="w-4 h-4" />
@@ -144,7 +144,7 @@ export function ExecutionControls() {
               type="button"
               onClick={handleResume}
               disabled={isLoading}
-              className="flex items-center gap-1.5 px-3 py-1.5 text-sm font-medium text-zinc-200 bg-zinc-800 hover:bg-zinc-700 disabled:opacity-50 disabled:cursor-not-allowed rounded-md transition-colors"
+              className="flex items-center gap-1.5 min-h-11 px-3 py-1.5 text-sm font-medium text-zinc-200 bg-zinc-800 hover:bg-zinc-700 disabled:opacity-50 disabled:cursor-not-allowed rounded-md transition-colors"
               aria-label="Resume execution"
             >
               <Play className="w-4 h-4" />
@@ -157,7 +157,7 @@ export function ExecutionControls() {
             type="button"
             onClick={() => setIsAbortDialogOpen(true)}
             disabled={!isActive || isLoading}
-            className="flex items-center gap-1.5 px-3 py-1.5 text-sm font-medium text-red-400 bg-zinc-800 hover:bg-zinc-700 disabled:opacity-50 disabled:cursor-not-allowed rounded-md transition-colors"
+            className="flex items-center gap-1.5 min-h-11 px-3 py-1.5 text-sm font-medium text-red-400 bg-zinc-800 hover:bg-zinc-700 disabled:opacity-50 disabled:cursor-not-allowed rounded-md transition-colors"
             aria-label="Abort execution"
           >
             <X className="w-4 h-4" />

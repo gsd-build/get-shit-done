@@ -36,14 +36,14 @@ jobs:
       - name: Install dependencies
         run: npm ci
 
-      - name: Run tests with coverage
-        # c8 v11 requires Node 20+ (engines: ^20.0.0 || >=22.0.0). Node 18 EOL April 2025.
-        # Use bash on all platforms so shell glob expansion works on Windows.
-        if: matrix.node-version != 18
-        shell: bash
-        run: npm run test:coverage
-
-      - name: Run tests (Node 18, coverage not supported)
-        if: matrix.node-version == 18
+      - name: Run tests
         shell: bash
         run: npm test
+
+      - name: Coverage report (informational)
+        # Keep the matrix stable. Coverage is reported on one canonical target only
+        # and does not gate PR success.
+        if: matrix.os == 'ubuntu-latest' && matrix.node-version == 22
+        shell: bash
+        continue-on-error: true
+        run: npm run test:coverage

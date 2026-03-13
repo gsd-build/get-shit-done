@@ -32,7 +32,7 @@ export function FilterBar() {
         <button
           type="button"
           onClick={clearFilters}
-          className="text-sm text-muted-foreground hover:text-foreground underline"
+          className="text-sm min-h-11 px-2 rounded-md text-muted-foreground hover:text-foreground underline"
         >
           Clear all
         </button>

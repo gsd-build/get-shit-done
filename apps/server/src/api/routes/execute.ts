@@ -23,6 +23,11 @@ const StartExecutionSchema = z.object({
   phaseNumber: z.number().int().min(1),
 });
 
+function resolvePhaseNumber(rawPhaseNumber: unknown, index: number): number {
+  const parsed = Number.parseInt(String(rawPhaseNumber ?? ''), 10);
+  return Number.isFinite(parsed) && parsed > 0 ? parsed : index + 1;
+}
+
 /**
  * Extract objective from plan content
  */
@@ -139,9 +144,12 @@ export function createExecuteRoutes(
       }
 
       // Find the requested phase
-      const phase = phasesResult.data.find(
-        (p) => parseInt(p.number, 10) === phaseNumber
-      );
+      const phasesWithResolvedNumber = phasesResult.data.map((phase, index) => ({
+        ...phase,
+        resolvedNumber: resolvePhaseNumber(phase.number, index),
+      }));
+
+      const phase = phasesWithResolvedNumber.find((p) => p.resolvedNumber === phaseNumber);
       if (!phase) {
         return error(
           c,
