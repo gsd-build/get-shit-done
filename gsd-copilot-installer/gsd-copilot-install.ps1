@@ -173,38 +173,6 @@ if (-not $DryRun) {
         exit 1
     }
 
-    # ── 5b. Install .claude/ files ───────────────────────────────────────────
-    try {
-        $claudeFiles = Get-ChildItem -Recurse -File -Path $claudeSrcRoot
-        foreach ($src in $claudeFiles) {
-            $rel  = $src.FullName.Substring($claudeSrcRoot.Length).TrimStart('\', '/')
-            $dest = Join-Path (Join-Path $WorkspaceDir ".claude") $rel
-            $exists = Test-Path $dest
-
-            if ($exists) {
-                if ($Force) {
-                    New-Item -ItemType Directory -Force -Path (Split-Path $dest) | Out-Null
-                    Copy-Item -Path $src.FullName -Destination $dest -Force
-                    Write-Verbose "  Overwritten (--force): .claude/$rel"
-                } else {
-                    Write-Host "  `u{26A0} Overwriting: .claude/$rel"
-                    New-Item -ItemType Directory -Force -Path (Split-Path $dest) | Out-Null
-                    Copy-Item -Path $src.FullName -Destination $dest -Force
-                }
-                $writtenCount++
-                $overwroteCount++
-            } else {
-                New-Item -ItemType Directory -Force -Path (Split-Path $dest) | Out-Null
-                Copy-Item -Path $src.FullName -Destination $dest -Force
-                Write-Verbose "  Written: .claude/$rel"
-                $writtenCount++
-            }
-        }
-    } catch {
-        Write-Error "Install failed writing .claude/$rel`: $_"
-        exit 1
-    }
-
     # ── 6. Write version marker ───────────────────────────────────────────────
     New-Item -ItemType Directory -Force -Path (Split-Path $versionFilePath) | Out-Null
     Set-Content -Path $versionFilePath -Value $releaseVersion -Encoding UTF8
