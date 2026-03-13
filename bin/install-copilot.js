@@ -148,8 +148,7 @@ function convertClaudeCommandToCopilotPrompt(source, cmdFile, toolMap, pathPrefi
 
   // Generated banner
   const sourceRel = path.relative(path.join(__dirname, '..'), cmdFile).replace(/\\/g, '/');
-  const banner = `<!-- GENERATED — DO NOT EDIT.\nSource: ${sourceRel}\nRegenerate: node bin/install.js --copilot --local\n-->`;
-
+  
   const upstreamToolsComment = upstreamTools.length
     ? `<!-- upstream-tools: ${JSON.stringify(upstreamTools)} -->`
     : '';
@@ -189,7 +188,7 @@ function convertClaudeCommandToCopilotPrompt(source, cmdFile, toolMap, pathPrefi
   // Rewrite command references: /gsd:cmd → /gsd.cmd (Copilot uses dot namespace)
   processedBody = processedBody.replace(/\/gsd:/g, '/gsd.');
 
-  const blocks = [banner, upstreamToolsComment, adapterBlock, processedBody.trimEnd()]
+  const blocks = [upstreamToolsComment, adapterBlock, processedBody.trimEnd()]
     .filter(b => b && b.trim().length > 0)
     .join('\n\n');
 
