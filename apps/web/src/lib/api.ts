@@ -5,6 +5,10 @@ import type { Coverage } from '@/components/features/verify/CoverageHeatmap';
 // Use local proxy to add authentication to API calls
 const API_BASE = '/api/proxy';
 
+function proxyUrl(path: string): string {
+  return `${API_BASE}${path}`;
+}
+
 export interface ProjectsResponse extends ApiEnvelope<Project[]> {
   meta: ApiMeta & {
     total: number;
@@ -87,10 +91,10 @@ export async function fetchProjects(cursor?: string): Promise<ProjectsResponse> 
  * @returns Plan data with tasks
  */
 export async function fetchPlan(phaseId: string): Promise<ApiEnvelope<Plan | null>> {
-  const url = new URL(`/api/phases/${phaseId}/plan`, API_BASE);
+  const url = proxyUrl(`/api/phases/${phaseId}/plan`);
 
   try {
-    const response = await fetch(url.toString());
+    const response = await fetch(url);
 
     if (!response.ok) {
       return {
@@ -135,10 +139,10 @@ export async function updatePlanTask(
   taskId: string,
   updates: Partial<PlanTask>
 ): Promise<ApiEnvelope<PlanTask | null>> {
-  const url = new URL(`/api/phases/${phaseId}/plan/tasks/${taskId}`, API_BASE);
+  const url = proxyUrl(`/api/phases/${phaseId}/plan/tasks/${taskId}`);
 
   try {
-    const response = await fetch(url.toString(), {
+    const response = await fetch(url, {
       method: 'PATCH',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(updates),
@@ -180,9 +184,9 @@ export async function updatePlanTask(
  * @param phaseId - The phase ID to start research for
  */
 export async function startResearch(phaseId: string): Promise<void> {
-  const url = new URL(`/api/phases/${phaseId}/research`, API_BASE);
+  const url = proxyUrl(`/api/phases/${phaseId}/research`);
 
-  await fetch(url.toString(), { method: 'POST' });
+  await fetch(url, { method: 'POST' });
 }
 
 // ------------------------------------------------------------------
@@ -195,9 +199,9 @@ export async function startResearch(phaseId: string): Promise<void> {
  * @param phaseId - The phase ID to verify
  */
 export async function startVerification(phaseId: string): Promise<void> {
-  const url = new URL(`/api/phases/${phaseId}/verify`, API_BASE);
+  const url = proxyUrl(`/api/phases/${phaseId}/verify`);
 
-  await fetch(url.toString(), { method: 'POST' });
+  await fetch(url, { method: 'POST' });
 }
 
 /**
@@ -206,9 +210,9 @@ export async function startVerification(phaseId: string): Promise<void> {
  * @param phaseId - The phase ID to approve
  */
 export async function submitApproval(phaseId: string): Promise<void> {
-  const url = new URL(`/api/phases/${phaseId}/approve`, API_BASE);
+  const url = proxyUrl(`/api/phases/${phaseId}/approve`);
 
-  await fetch(url.toString(), { method: 'POST' });
+  await fetch(url, { method: 'POST' });
 }
 
 /**
@@ -223,9 +227,9 @@ export async function submitRejection(
   phaseId: string,
   gapIds: string[]
 ): Promise<{ planUrl: string }> {
-  const url = new URL(`/api/phases/${phaseId}/reject`, API_BASE);
+  const url = proxyUrl(`/api/phases/${phaseId}/reject`);
 
-  const response = await fetch(url.toString(), {
+  const response = await fetch(url, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ gapIds }),
@@ -248,10 +252,10 @@ export async function submitRejection(
 export async function fetchCoverage(
   phaseId: string
 ): Promise<ApiEnvelope<Coverage[]>> {
-  const url = new URL(`/api/phases/${phaseId}/coverage`, API_BASE);
+  const url = proxyUrl(`/api/phases/${phaseId}/coverage`);
 
   try {
-    const response = await fetch(url.toString());
+    const response = await fetch(url);
 
     if (!response.ok) {
       return {
