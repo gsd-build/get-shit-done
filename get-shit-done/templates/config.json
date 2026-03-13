@@ -30,6 +30,10 @@
     "issues_review": true,
     "confirm_transition": true
   },
+  "autopilot": {
+    "discuss_agents": 5,
+    "discuss_model": "sonnet"
+  },
   "safety": {
     "always_confirm_destructive": true,
     "always_confirm_external_services": true
