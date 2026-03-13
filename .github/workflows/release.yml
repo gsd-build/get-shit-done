@@ -19,6 +19,7 @@ permissions:
 
 env:
   EXPECTED_REPO: darrylwisner/get-shit-done-github-copilot
+  FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
 
 jobs:
   publish-release:

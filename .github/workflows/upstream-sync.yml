@@ -32,6 +32,7 @@ env:
   EXPECTED_REPO: darrylwisner/get-shit-done-github-copilot
   UPSTREAM_BRANCH: main
   UPSTREAM_REPO: gsd-build/get-shit-done
+  FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
 
 jobs:
   sync:

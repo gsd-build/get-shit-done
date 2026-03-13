@@ -21,6 +21,7 @@ env:
   EXEMPTIONS_FILE: scripts/guard-exemptions.txt
   PROMPTS_DIR: .github/prompts
   REPAIR_WORKFLOW: upstream-sync-repair-agent.yml
+  FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
 
 jobs:
   sync:

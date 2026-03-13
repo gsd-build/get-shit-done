@@ -49,7 +49,7 @@ if ($WorkspaceDir -eq $PSScriptRoot) {
     Write-Host ""
     Write-Host "  .\gsd-copilot-installer\gsd-copilot-install.ps1 -WorkspaceDir '<your-project-root>'"
     Write-Host ""
-    exit 1
+    throw "WorkspaceDir does not exist: $WorkspaceDir"
 }
 
 # ── Configuration ─────────────────────────────────────────────────────────────
@@ -69,14 +69,14 @@ try {
     $release = Invoke-RestMethod -Uri $apiUrl -Headers $headers
 } catch {
     Write-Error "Failed to fetch release metadata from GitHub: $($_.Exception.Message)"
-    exit 1
+    throw "Release fetch failed"
 }
 
 $releaseVersion = $release.tag_name.TrimStart('v')
 $asset = $release.assets | Where-Object { $_.name -like $ASSET_NAME } | Select-Object -First 1
 if (-not $asset) {
     Write-Error "No zip asset found in release $($release.tag_name). Expected asset matching: $ASSET_NAME"
-    exit 1
+    throw "Asset not found"
 }
 
 # ── 2. Downgrade check ────────────────────────────────────────────────────────
@@ -93,7 +93,7 @@ if ($installedVersion) {
         if ($installedVer -gt $targetVer) {
             if (-not $Force) {
                 Write-Error "Downgrade blocked: installed v$installedVersion → target v$releaseVersion. Use -Force to override."
-                exit 1
+                throw "Downgrade blocked"
             } else {
                 Write-Host "⚠ Warning: downgrading from v$installedVersion to v$releaseVersion (-Force specified)."
             }
@@ -130,13 +130,13 @@ if (-not $DryRun) {
         Expand-Archive -Path $tmpZip -DestinationPath $tmpDir -Force
     } catch {
         Write-Error "Download/extract failed: $($_.Exception.Message)"
-        exit 1
+        throw "Download/extract failed"
     }
 
     $srcRoot = Join-Path $tmpDir ".github"
     if (-not (Test-Path $srcRoot)) {
         Write-Error "Extracted zip does not contain a .github/ directory. Unexpected asset structure."
-        exit 1
+        throw "Unexpected zip structure"
     }
 
     $claudeSrcRoot = $null  # no longer used; .claude/ not in zip since v0.0.9
@@ -170,7 +170,7 @@ if (-not $DryRun) {
         }
     } catch {
         Write-Error "Install failed writing .github/$rel`: $_"
-        exit 1
+        throw "Install failed"
     }
 
     # ── 6. Write version marker ───────────────────────────────────────────────
@@ -202,7 +202,7 @@ if (-not $DryRun) {
         Remove-Item -Recurse -Force $tmpDir -ErrorAction SilentlyContinue
     } catch {
         Write-Error "Dry-run failed fetching release manifest: $($_.Exception.Message)"
-        exit 1
+        throw "Dry-run failed"
     }
 }
 
@@ -277,5 +277,3 @@ if (-not $DryRun) {
     Remove-Item -Force $tmpZip -ErrorAction SilentlyContinue
     Remove-Item -Recurse -Force $tmpDir -ErrorAction SilentlyContinue
 }
-
-exit 0

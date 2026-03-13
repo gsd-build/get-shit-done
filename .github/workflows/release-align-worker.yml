@@ -30,6 +30,7 @@ env:
   PROMPTS_DIR: .github/prompts
   REPAIR_WORKFLOW: upstream-sync-repair-agent.yml
   MIRROR_WORKFLOW: release-mirror-worker.yml
+  FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
 
 jobs:
   align:

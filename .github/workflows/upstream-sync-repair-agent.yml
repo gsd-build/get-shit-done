@@ -52,6 +52,7 @@ concurrency:
 env:
   EXEMPTIONS_FILE: scripts/guard-exemptions.txt
   PROMPTS_DIR: .github/prompts
+  FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
 
 jobs:
   repair:
