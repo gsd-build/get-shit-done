@@ -112,8 +112,37 @@ export function EmptyState({
   }
 
   // Has phases - show selector and start
-  const readyPhases = phases.filter((p) => p.status !== 'completed');
-  const completedPhases = phases.filter((p) => p.status === 'completed');
+  const executablePhases = phases.filter((p) => p.plans > 0);
+  const readyPhases = executablePhases.filter((p) => p.status !== 'completed');
+  const completedPhases = executablePhases.filter((p) => p.status === 'completed');
+
+  if (executablePhases.length === 0) {
+    return (
+      <div className="text-center max-w-md">
+        <div className="w-16 h-16 mx-auto mb-4 rounded-full bg-zinc-500/10 flex items-center justify-center">
+          <FileCode className="w-8 h-8 text-zinc-400" />
+        </div>
+        <h2 className="text-xl font-semibold text-foreground mb-2">
+          No Executable Plans Yet
+        </h2>
+        <p className="text-muted-foreground mb-4">
+          Phases exist, but none contain runnable plan files. Add plan files to a phase
+          before starting execution.
+        </p>
+        <div className="text-sm text-zinc-500 bg-zinc-800/50 rounded-lg p-4 text-left">
+          <p className="font-medium mb-2">Next steps:</p>
+          <ol className="list-decimal ml-4 space-y-1">
+            <li>
+              Add plan files such as{' '}
+              <code className="text-xs bg-zinc-700 px-1 rounded">17-01-PLAN.md</code>
+            </li>
+            <li>Refresh the execute page</li>
+            <li>Start execution once at least one phase shows plans</li>
+          </ol>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="text-center max-w-lg">
