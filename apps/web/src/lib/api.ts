@@ -209,7 +209,10 @@ export async function startVerification(phaseId: string): Promise<void> {
  */
 export async function submitApproval(phaseId: string): Promise<void> {
   const url = proxyUrl(`/projects/${phaseId}/approve`);
-  await fetch(url, { method: 'POST' });
+  const response = await fetch(url, { method: 'POST' });
+  if (!response.ok) {
+    throw new Error(`Approval failed: HTTP ${response.status}`);
+  }
 }
 
 /**

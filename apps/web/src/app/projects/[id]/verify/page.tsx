@@ -60,6 +60,7 @@ export default function VerifyPhasePage() {
   const [requirements, setRequirements] = useState<string[]>([]);
   const [phases, setPhases] = useState<string[]>([]);
   const [isLoadingCoverage, setIsLoadingCoverage] = useState(true);
+  const [actionError, setActionError] = useState<string | null>(null);
 
   // Fetch coverage data on mount
   useEffect(() => {
@@ -90,24 +91,30 @@ export default function VerifyPhasePage() {
 
   // Handle approval - per CONTEXT.md
   const handleApprove = useCallback(async () => {
+    setActionError(null);
     try {
       await submitApproval(projectId);
       // Show success and navigate back to project
       router.push(`/projects/${projectId}`);
     } catch (err) {
-      console.error('Approval failed:', err);
+      setActionError(
+        err instanceof Error ? err.message : 'Approval failed. Please try again.'
+      );
     }
   }, [projectId, router]);
 
   // Handle rejection - per CONTEXT.md auto-route to gap planning
   const handleReject = useCallback(
     async (selectedGapIds: string[]) => {
+      setActionError(null);
       try {
         const { planUrl } = await submitRejection(projectId, selectedGapIds);
         // Redirect to plan phase with gaps
         router.push(planUrl);
       } catch (err) {
-        console.error('Rejection failed:', err);
+        setActionError(
+          err instanceof Error ? err.message : 'Rejection failed. Please try again.'
+        );
       }
     },
     [projectId, router]
@@ -157,6 +164,12 @@ export default function VerifyPhasePage() {
         <section className="mb-8">
           <VerificationPanel />
         </section>
+
+        {actionError && (
+          <div className="mb-6 rounded-md border border-red-300 bg-red-50 text-red-800 px-4 py-3 text-sm">
+            {actionError}
+          </div>
+        )}
 
         {/* Tabbed sections for Gaps, Coverage, Manual Tests */}
         <Tabs.Root defaultValue="gaps" className="bg-card border border-border rounded-lg">

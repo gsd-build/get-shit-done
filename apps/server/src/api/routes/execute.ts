@@ -52,6 +52,25 @@ interface PlanTaskView {
 }
 
 const planTaskOverrides = new Map<string, Map<string, { name?: string; description?: string }>>();
+type VerificationGapSeverity = 'blocking' | 'major' | 'minor';
+interface VerificationSnapshot {
+  passed: boolean;
+  summary: string;
+  tests: Array<{
+    requirementId: string;
+    testName: string;
+    passed: boolean;
+    message: string;
+    duration: number;
+  }>;
+  gaps: Array<{
+    id: string;
+    requirementId: string;
+    description: string;
+    severity: VerificationGapSeverity;
+  }>;
+}
+const verificationSnapshots = new Map<string, VerificationSnapshot>();
 
 function resolvePhaseNumber(rawPhaseNumber: unknown, index: number): number {
   const parsed = Number.parseInt(String(rawPhaseNumber ?? ''), 10);
@@ -215,6 +234,22 @@ export function createExecuteRoutes(
     }
 
     return tasks;
+  }
+
+  function buildFallbackPlanTasks(
+    phases: Array<{ slug: string; name: string; resolvedNumber: number }>
+  ): PlanTaskView[] {
+    return phases.map((phase) => ({
+      id: `${phase.slug}:generated-plan`,
+      name: `${phase.name} implementation plan`,
+      description:
+        `Generated plan placeholder for phase ${phase.resolvedNumber}. ` +
+        'No concrete plan files were found in the project workspace.',
+      wave: phase.resolvedNumber,
+      dependsOn: [],
+      files: [],
+      type: 'auto',
+    }));
   }
 
   /**
@@ -399,11 +434,21 @@ export function createExecuteRoutes(
         resolvedNumber: phase.resolvedNumber,
       }))
     );
+    const planTasks =
+      tasks.length > 0
+        ? tasks
+        : buildFallbackPlanTasks(
+            phases.map((phase) => ({
+              slug: phase.slug,
+              name: phase.name,
+              resolvedNumber: phase.resolvedNumber,
+            }))
+          );
 
     return success(c, {
       id: `project-${projectId}-plan`,
       phaseId: projectId,
-      tasks,
+      tasks: planTasks,
       createdAt: new Date().toISOString(),
     });
   });
@@ -538,18 +583,26 @@ export function createExecuteRoutes(
       }, index * 500 + 240);
     });
 
+    const snapshot: VerificationSnapshot = {
+      passed: false,
+      summary: 'Verification found one major gap that should be addressed before approval.',
+      tests,
+      gaps: [
+        {
+          id: 'gap-realtime-recovery',
+          requirementId: 'REQ-03',
+          description: 'Realtime reconnection behavior is partially validated and needs hardening.',
+          severity: 'major',
+        },
+      ],
+    };
+    verificationSnapshots.set(projectId, snapshot);
+
     setTimeout(() => {
       io.to(room).emit('verification:complete' as any, {
-        passed: false,
-        summary: 'Verification found one major gap that should be addressed before approval.',
-        gaps: [
-          {
-            id: 'gap-realtime-recovery',
-            requirementId: 'REQ-03',
-            description: 'Realtime reconnection behavior is partially validated and needs hardening.',
-            severity: 'major',
-          },
-        ],
+        passed: snapshot.passed,
+        summary: snapshot.summary,
+        gaps: snapshot.gaps,
       });
     }, tests.length * 500 + 400);
 
@@ -569,11 +622,47 @@ export function createExecuteRoutes(
     }
 
     const phases = await resolvePhases(project.path);
-    const coverage = phases.map((phase) => ({
-      requirementId: `REQ-${String(phase.resolvedNumber).padStart(2, '0')}`,
-      phaseId: phase.slug,
-      coverage: phase.plans === 0 ? 0 : phase.completedPlans >= phase.plans ? 2 : 1,
-    }));
+    const snapshot = verificationSnapshots.get(projectId);
+    const phaseIds =
+      phases.length > 0
+        ? phases.map((phase) => phase.slug)
+        : ['phase-16', 'phase-17', 'phase-18'];
+
+    const requirementIds = new Set<string>();
+    if (snapshot) {
+      for (const test of snapshot.tests) {
+        requirementIds.add(test.requirementId);
+      }
+    }
+    if (requirementIds.size === 0) {
+      requirementIds.add('REQ-01');
+      requirementIds.add('REQ-02');
+      requirementIds.add('REQ-03');
+    }
+
+    const coverage = Array.from(requirementIds).flatMap((requirementId) =>
+      phaseIds.map((phaseId, index) => {
+        const test = snapshot?.tests.find((entry) => entry.requirementId === requirementId);
+        const hasGap = snapshot?.gaps.some(
+          (gap) =>
+            gap.requirementId === requirementId &&
+            (gap.severity === 'blocking' || gap.severity === 'major')
+        );
+        const isLastPhase = index === phaseIds.length - 1;
+        const value = isLastPhase
+          ? hasGap
+            ? 1
+            : test?.passed
+              ? 2
+              : 0
+          : 2;
+        return {
+          requirementId,
+          phaseId,
+          coverage: value as 0 | 1 | 2,
+        };
+      })
+    );
 
     return success(c, coverage);
   });
@@ -587,6 +676,28 @@ export function createExecuteRoutes(
         ErrorCodes.PROJECT_NOT_FOUND,
         `Project '${projectId}' not found`,
         404
+      );
+    }
+
+    const snapshot = verificationSnapshots.get(projectId);
+    if (!snapshot) {
+      return error(
+        c,
+        'VERIFICATION_REQUIRED',
+        'Run verification before approving this phase.',
+        409
+      );
+    }
+
+    const blockingOrMajorGaps = snapshot.gaps.filter(
+      (gap) => gap.severity === 'blocking' || gap.severity === 'major'
+    );
+    if (blockingOrMajorGaps.length > 0) {
+      return error(
+        c,
+        'VERIFICATION_BLOCKED',
+        'Approval blocked because major or blocking gaps are present.',
+        409
       );
     }
 
