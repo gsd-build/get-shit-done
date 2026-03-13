@@ -519,9 +519,9 @@ export function createExecuteRoutes(
       {
         requirementId: 'REQ-03',
         testName: 'Realtime channel available',
-        passed: true,
-        message: 'Socket room handshake is healthy.',
-        duration: 75,
+        passed: false,
+        message: 'Socket recovery requires retry after transient disconnect.',
+        duration: 112,
       },
     ];
 
@@ -540,9 +540,16 @@ export function createExecuteRoutes(
 
     setTimeout(() => {
       io.to(room).emit('verification:complete' as any, {
-        passed: true,
-        summary: 'Verification completed successfully with no blocking gaps.',
-        gaps: [],
+        passed: false,
+        summary: 'Verification found one major gap that should be addressed before approval.',
+        gaps: [
+          {
+            id: 'gap-realtime-recovery',
+            requirementId: 'REQ-03',
+            description: 'Realtime reconnection behavior is partially validated and needs hardening.',
+            severity: 'major',
+          },
+        ],
       });
     }, tests.length * 500 + 400);
 
