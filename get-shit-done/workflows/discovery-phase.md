@@ -20,13 +20,14 @@ NOTE: For comprehensive ecosystem research ("how do experts build this"), use /g
 </depth_levels>
 
 <source_hierarchy>
-**MANDATORY: Context7 BEFORE WebSearch**
+**MANDATORY: MCP Tools BEFORE WebSearch**
 
 Claude's training data is 6-18 months stale. Always verify.
 
-1. **Context7 MCP FIRST** - Current docs, no hallucination
-2. **Official docs** - When Context7 lacks coverage
-3. **WebSearch LAST** - For comparisons and trends only
+1. **GitMCP** - GitHub repository documentation (unlimited, free)
+2. **Docfork** - Library APIs and documentation (9K+ libraries, 1K/month free)
+3. **WebFetch** - Official docs not in MCP servers
+4. **WebSearch LAST** - For comparisons and trends only
 
 See ~/.claude/get-shit-done/templates/discovery.md `<discovery_protocol>` for full protocol.
 </source_hierarchy>
@@ -49,18 +50,21 @@ For: Single known library, confirming syntax/version still correct.
 
 **Process:**
 
-1. Resolve library in Context7:
-
-   ```
-   mcp__context7__resolve-library-id with libraryName: "[library]"
-   ```
+1. Choose appropriate MCP tool:
+   - GitHub repo? Use GitMCP
+   - Library API? Use Docfork
 
 2. Fetch relevant docs:
 
+   **GitMCP:**
    ```
-   mcp__context7__get-library-docs with:
-   - context7CompatibleLibraryID: [from step 1]
-   - topic: [specific concern]
+   mcp__gitmcp__fetch_documentation (primary docs)
+   mcp__gitmcp__search_documentation with query: "[specific concern]"
+   ```
+
+   **Docfork:**
+   ```
+   Query with library name and specific topic
    ```
 
 3. Verify:
@@ -89,15 +93,21 @@ For: Choosing between options, new external integration.
    - What are the key comparison criteria?
    - What's our specific use case?
 
-2. **Context7 for each option:**
+2. **MCP tools for each option:**
 
+   **For GitHub projects:**
    ```
-   For each library/framework:
-   - mcp__context7__resolve-library-id
-   - mcp__context7__get-library-docs (mode: "code" for API, "info" for concepts)
+   - mcp__gitmcp__fetch_documentation
+   - mcp__gitmcp__search_documentation with relevant queries
+   - mcp__gitmcp__search_code (for implementation patterns)
    ```
 
-3. **Official docs** for anything Context7 lacks.
+   **For library APIs:**
+   ```
+   - Docfork: Query with library name and topic
+   ```
+
+3. **WebFetch** for official docs not covered by MCPs.
 
 4. **WebSearch** for comparisons:
 
@@ -105,13 +115,13 @@ For: Choosing between options, new external integration.
    - "[option] known issues"
    - "[option] with [our stack]"
 
-5. **Cross-verify:** Any WebSearch finding → confirm with Context7/official docs.
+5. **Cross-verify:** Any WebSearch finding → confirm with GitMCP/Docfork/official docs.
 
 6. **Create DISCOVERY.md** using ~/.claude/get-shit-done/templates/discovery.md structure:
 
    - Summary with recommendation
    - Key findings per option
-   - Code examples from Context7
+   - Code examples from GitMCP/Docfork
    - Confidence level (should be MEDIUM-HIGH for Level 2)
 
 7. Return to plan-phase.md.
@@ -132,13 +142,19 @@ For: Architectural decisions, novel problems, high-risk choices.
    - Define include/exclude boundaries
    - List specific questions to answer
 
-2. **Exhaustive Context7 research:**
+2. **Exhaustive MCP research:**
 
+   **GitMCP for GitHub projects:**
+   - Fetch complete documentation
+   - Search for specific patterns and concepts
+   - Review code examples and implementations
+
+   **Docfork for libraries:**
    - All relevant libraries
    - Related patterns and concepts
    - Multiple topics per library if needed
 
-3. **Official documentation deep read:**
+3. **Official documentation deep read via WebFetch:**
 
    - Architecture guides
    - Best practices sections
@@ -154,7 +170,7 @@ For: Architectural decisions, novel problems, high-risk choices.
 
 5. **Cross-verify ALL findings:**
 
-   - Every WebSearch claim → verify with authoritative source
+   - Every WebSearch claim → verify with GitMCP/Docfork/official docs
    - Mark what's verified vs assumed
    - Flag contradictions
 
@@ -190,14 +206,16 @@ Include:
 
 - Clear discovery objective
 - Scoped include/exclude lists
-- Source preferences (official docs, Context7, current year)
+- Source preferences (GitMCP, Docfork, official docs, current year)
 - Output structure for DISCOVERY.md
   </step>
 
 <step name="execute_discovery">
 Run the discovery:
-- Use web search for current info
-- Use Context7 MCP for library docs
+- Use GitMCP for GitHub repository docs
+- Use Docfork for library API docs
+- Use WebFetch for official documentation
+- Use WebSearch for current info and comparisons
 - Prefer current year sources
 - Structure findings per template
 </step>
@@ -266,12 +284,12 @@ NOTE: DISCOVERY.md is NOT committed separately. It will be committed with phase 
 
 <success_criteria>
 **Level 1 (Quick Verify):**
-- Context7 consulted for library/topic
+- GitMCP/Docfork consulted for library/topic
 - Current state verified or concerns escalated
 - Verbal confirmation to proceed (no files)
 
 **Level 2 (Standard):**
-- Context7 consulted for all options
+- GitMCP/Docfork consulted for all options
 - WebSearch findings cross-verified
 - DISCOVERY.md created with recommendation
 - Confidence level MEDIUM or higher
@@ -279,7 +297,7 @@ NOTE: DISCOVERY.md is NOT committed separately. It will be committed with phase 
 
 **Level 3 (Deep Dive):**
 - Discovery scope defined
-- Context7 exhaustively consulted
+- GitMCP/Docfork exhaustively consulted
 - All WebSearch findings verified against authoritative sources
 - DISCOVERY.md created with comprehensive analysis
 - Quality report with source attribution

@@ -95,7 +95,7 @@ src/
 **When to use:** [conditions]
 **Example:**
 ```typescript
-// [code example from Context7/official docs]
+// [code example from GitMCP/Docfork/official docs]
 ```
 
 ### Pattern 2: [Pattern Name]
@@ -154,19 +154,19 @@ Verified patterns from official sources:
 
 ### [Common Operation 1]
 ```typescript
-// Source: [Context7/official docs URL]
+// Source: [GitMCP/Docfork/official docs URL]
 [code]
 ```
 
 ### [Common Operation 2]
 ```typescript
-// Source: [Context7/official docs URL]
+// Source: [GitMCP/Docfork/official docs URL]
 [code]
 ```
 
 ### [Common Operation 3]
 ```typescript
-// Source: [Context7/official docs URL]
+// Source: [GitMCP/Docfork/official docs URL]
 [code]
 ```
 </code_examples>
@@ -208,7 +208,7 @@ Things that couldn't be fully resolved:
 ## Sources
 
 ### Primary (HIGH confidence)
-- [Context7 library ID] - [topics fetched]
+- [GitMCP repo path or Docfork library] - [topics fetched]
 - [Official docs URL] - [what was checked]
 
 ### Secondary (MEDIUM confidence)
@@ -502,10 +502,10 @@ function useVehicleControls(rigidBodyRef) {
 - Pitfalls: Performance, physics, feel
 
 **Confidence breakdown:**
-- Standard stack: HIGH - verified with Context7, widely used
+- Standard stack: HIGH - verified with GitMCP/Docfork, widely used
 - Architecture: HIGH - from official examples
 - Pitfalls: HIGH - documented in discourse, verified in docs
-- Code examples: HIGH - from Context7/official sources
+- Code examples: HIGH - from GitMCP/Docfork/official sources
 
 **Research date:** 2025-01-20
 **Valid until:** 2025-02-20 (30 days - R3F ecosystem stable)
