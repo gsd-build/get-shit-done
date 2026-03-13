@@ -79,6 +79,111 @@ Report:
 ```
 </step>
 
+<step name="check_overrides">
+Check for user override files before using GSD defaults.
+
+```bash
+# Helper function to resolve file with override support
+# Returns override path if exists, otherwise default path
+resolve_gsd_file() {
+  local type="$1"      # e.g., "workflows", "agents", "templates"
+  local filename="$2"  # e.g., "_base.md", "gsd-executor.md"
+
+  local override_path="$HOME/.claude/gsd-overrides/$type/$filename"
+  local default_path="$HOME/.claude/get-shit-done/$type/$filename"
+
+  # For agents, default is in agents/ not get-shit-done/agents/
+  if [ "$type" = "agents" ]; then
+    default_path="$HOME/.claude/agents/$filename"
+  fi
+
+  if [ -f "$override_path" ]; then
+    echo "[GSD] Using override: $override_path" >&2
+    echo "$override_path"
+  else
+    echo "$default_path"
+  fi
+}
+```
+
+**Override detection logging:**
+
+When spawning agents, check for overrides and log if detected:
+
+```bash
+EXECUTOR_PATH=$(resolve_gsd_file "agents" "gsd-executor.md")
+```
+
+If override is detected, a message is logged to stderr so the user knows their customization is being used.
+</step>
+
+<step name="build_execution_context">
+Build minimal execution context for each plan by loading only required workflow modules.
+
+**Always load (core modules) with override support:**
+```bash
+BASE_PATH=$(resolve_gsd_file "workflows/execute-plan" "_base.md")
+COMMITS_PATH=$(resolve_gsd_file "workflows/execute-plan" "_commits.md")
+DEVIATION_PATH=$(resolve_gsd_file "workflows/execute-plan" "_deviation.md")
+
+BASE_CONTENT=$(cat "$BASE_PATH")
+COMMITS_CONTENT=$(cat "$COMMITS_PATH")
+DEVIATION_CONTENT=$(cat "$DEVIATION_PATH")
+```
+
+**Conditionally load based on plan frontmatter:**
+
+```bash
+# For each plan in the wave, check frontmatter
+for plan in $WAVE_PLANS; do
+  # Check for TDD flag
+  HAS_TDD=$(grep -q 'tdd:\s*true\|tdd="true"' "$plan" && echo "true" || echo "false")
+
+  # Check for checkpoints (autonomous: false means has checkpoints)
+  HAS_CHECKPOINTS=$(grep -q 'autonomous:\s*false\|type="checkpoint' "$plan" && echo "true" || echo "false")
+
+  # Check verifier config
+  VERIFIER_ENABLED=$(cat .planning/config.json 2>/dev/null | grep -o '"verifier"[[:space:]]*:[[:space:]]*[^,}]*' | grep -q 'true' && echo "true" || echo "false")
+
+  # Build execution context for this plan
+  EXECUTION_CONTEXT="$BASE_CONTENT\n\n$COMMITS_CONTENT\n\n$DEVIATION_CONTENT"
+
+  if [ "$HAS_TDD" = "true" ]; then
+    TDD_PATH=$(resolve_gsd_file "workflows/execute-plan" "_tdd.md")
+    TDD_CONTENT=$(cat "$TDD_PATH")
+    EXECUTION_CONTEXT="$EXECUTION_CONTEXT\n\n$TDD_CONTENT"
+  fi
+
+  if [ "$HAS_CHECKPOINTS" = "true" ]; then
+    CHECKPOINTS_PATH=$(resolve_gsd_file "workflows/execute-plan" "_checkpoints.md")
+    CHECKPOINTS_CONTENT=$(cat "$CHECKPOINTS_PATH")
+    EXECUTION_CONTEXT="$EXECUTION_CONTEXT\n\n$CHECKPOINTS_CONTENT"
+  fi
+
+  if [ "$VERIFIER_ENABLED" = "true" ]; then
+    VERIFICATION_PATH=$(resolve_gsd_file "workflows/execute-plan" "_verification.md")
+    VERIFICATION_CONTENT=$(cat "$VERIFICATION_PATH")
+    EXECUTION_CONTEXT="$EXECUTION_CONTEXT\n\n$VERIFICATION_CONTENT"
+  fi
+
+  # Store for spawn step
+  PLAN_EXECUTION_CONTEXTS["$plan"]="$EXECUTION_CONTEXT"
+done
+```
+
+**Expected context savings:**
+
+| Plan Type | Modules Loaded | Approximate Lines | Savings vs Full |
+|-----------|----------------|-------------------|-----------------|
+| Standard | base + commits + deviation | ~750 | 60% |
+| TDD | + tdd | ~900 | 52% |
+| With Checkpoints | + checkpoints | ~950 | 49% |
+| With Verification | + verification | ~1050 | 44% |
+| Full (all modules) | All 6 modules | ~1400 | 25% |
+
+**Note:** Original monolithic execute-plan.md was ~1,856 lines.
+</step>
+
 <step name="execute_waves">
 Execute each wave in sequence. Within a wave: parallel if `PARALLELIZATION=true`, sequential if `false`.
 
