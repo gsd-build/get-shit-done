@@ -135,9 +135,6 @@ function convertClaudeCommandToCopilotPrompt(source, cmdFile, toolMap, pathPrefi
   const rawName = fm['name'] || path.basename(cmdFile, '.md');
   const name = rawName.replace(/^gsd:/, 'gsd.').replace(/:/g, '.');
 
-  const toolsYaml = mappedTools.length
-    ? `[${mappedTools.map(t => `'${t}'`).join(', ')}]`
-    : '[]';
   const hasAgent = mappedTools.includes('agent');
 
   const desc = (fm['description'] || '').replace(/\/gsd:/g, '/gsd.').replace(/"/g, '\\"');
@@ -146,7 +143,7 @@ function convertClaudeCommandToCopilotPrompt(source, cmdFile, toolMap, pathPrefi
     `description: "${desc}"`,
   ];
   if (fm['argument-hint']) fmLines.push(`argument-hint: "${fm['argument-hint']}"`);
-  fmLines.push(`tools: ${toolsYaml}`);
+  if (mappedTools.length) fmLines.push(`tools: [${mappedTools.map(t => `'${t}'`).join(', ')}]`);
   if (hasAgent) fmLines.push('agent: agent');
 
   // Generated banner
