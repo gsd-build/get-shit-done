@@ -124,6 +124,40 @@ export interface AgentPhaseEvent {
     sequence: number;
 }
 /**
+ * Verification test start event
+ */
+export interface VerificationTestStartEvent {
+    testName: string;
+    requirementId: string;
+}
+/**
+ * Verification test result event
+ */
+export interface VerificationTestResultEvent {
+    requirementId: string;
+    testName: string;
+    passed: boolean;
+    message?: string;
+    duration: number;
+}
+/**
+ * Verification gap structure
+ */
+export interface VerificationGap {
+    id: string;
+    requirementId: string;
+    description: string;
+    severity: 'blocking' | 'major' | 'minor';
+}
+/**
+ * Verification complete event
+ */
+export interface VerificationCompleteEvent {
+    passed: boolean;
+    summary: string;
+    gaps: VerificationGap[];
+}
+/**
  * Events emitted from server to client
  */
 export interface ServerToClientEvents {
@@ -136,6 +170,9 @@ export interface ServerToClientEvents {
     [EVENTS.TOOL_END]: (event: ToolEndEvent) => void;
     [EVENTS.CHECKPOINT_REQUEST]: (event: CheckpointRequestEvent) => void;
     [EVENTS.CONNECTION_HEALTH]: (event: HealthMetricsEvent) => void;
+    'verification:test_start': (event: VerificationTestStartEvent) => void;
+    'verification:test_result': (event: VerificationTestResultEvent) => void;
+    'verification:complete': (event: VerificationCompleteEvent) => void;
 }
 /**
  * Events emitted from client to server
@@ -144,6 +181,10 @@ export interface ClientToServerEvents {
     [EVENTS.CHECKPOINT_RESPONSE]: (event: CheckpointResponseEvent) => void;
     'agent:subscribe': (agentId: string) => void;
     'agent:unsubscribe': (agentId: string) => void;
+    'research:subscribe': (phaseId: string) => void;
+    'research:unsubscribe': () => void;
+    'verification:subscribe': (phaseId: string) => void;
+    'verification:unsubscribe': (phaseId: string) => void;
 }
 /**
  * Inter-server events (for future scaling)
