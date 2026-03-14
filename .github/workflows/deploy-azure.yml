@@ -111,7 +111,9 @@ jobs:
             --set-env-vars \
               CORS_ORIGINS=${{ env.WEB_URL }} \
               WEB_URL=${{ env.WEB_URL }} \
-              MOCK_EXECUTION=false
+              MOCK_EXECUTION=false \
+              ANTHROPIC_MODEL=claude-sonnet-4-5 \
+              ANTHROPIC_DEPLOYMENT=azure-claude-sonnet-4-5
 
       - name: Deploy Web Container App
         uses: azure/container-apps-deploy-action@v2

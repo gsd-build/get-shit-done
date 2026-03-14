@@ -24,8 +24,17 @@ import {
   type PendingCheckpoint,
 } from './checkpoint.js';
 
-// Anthropic client - uses ANTHROPIC_API_KEY environment variable
-const client = new Anthropic();
+const ANTHROPIC_BASE_URL = process.env['ANTHROPIC_BASE_URL']?.trim();
+const ANTHROPIC_MODEL = process.env['ANTHROPIC_MODEL']?.trim() || 'claude-sonnet-4-5';
+const ANTHROPIC_DEPLOYMENT =
+  process.env['ANTHROPIC_DEPLOYMENT']?.trim() || 'azure-claude-sonnet-4-5';
+const REQUEST_MODEL = ANTHROPIC_DEPLOYMENT || ANTHROPIC_MODEL;
+
+// Anthropic client (supports custom base URL for Azure deployment endpoints)
+const client = new Anthropic({
+  apiKey: process.env['ANTHROPIC_API_KEY'],
+  ...(ANTHROPIC_BASE_URL ? { baseURL: ANTHROPIC_BASE_URL } : {}),
+});
 
 /**
  * Wait for a checkpoint response from the user
@@ -191,7 +200,7 @@ export async function runAgentLoop(
       const response = await withRetry(async () => {
         console.log(`[claude] Creating message stream...`);
         const stream = client.messages.stream({
-          model: 'claude-sonnet-4-20250514',
+          model: REQUEST_MODEL,
           max_tokens: 4096,
           system: systemPrompt,
           messages: session.messages,
