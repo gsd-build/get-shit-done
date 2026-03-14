@@ -124,7 +124,8 @@
       "branch": "phase-18-plan-verify-phase-uis",
       "path": "/Users/mauricevandermerwe/Projects/get-shit-done/.worktrees/get-shit-done-phase-18",
       "created": "2026-03-11T15:19:39.567Z",
-      "status": "active"
+      "status": "removed",
+      "removed": "2026-03-14T00:12:43.531Z"
     },
     "phase-19": {
       "phase_number": "19",
@@ -133,19 +134,21 @@
       "path": "/Users/mauricevandermerwe/Projects/get-shit-done/.worktrees/get-shit-done-phase-19",
       "created": "2026-03-11T17:20:02.443Z",
       "status": "active"
+    },
+    "phase-18.1": {
+      "phase_number": "18.1",
+      "phase_name": "ui-controls-gsd-end-to-end-orchestration",
+      "branch": "phase-18.1-ui-controls-gsd-end-to-end-orchestration",
+      "path": "/Users/mauricevandermerwe/Projects/get-shit-done/.worktrees/get-shit-done-phase-18.1",
+      "created": "2026-03-14T12:22:24.192Z",
+      "status": "active"
     }
   },
   "locks": {
-    "phase-18": {
-      "acquired": "2026-03-11T15:19:39.326Z",
+    "phase-18.1": {
+      "acquired": "2026-03-14T12:22:23.798Z",
       "owner": "mauricevandermerwe",
-      "pid": 3454,
-      "hostname": "Maurices-MacBook-Pro.local"
-    },
-    "phase-19": {
-      "acquired": "2026-03-11T17:20:02.185Z",
-      "owner": "mauricevandermerwe",
-      "pid": 8229,
+      "pid": 87405,
       "hostname": "Maurices-MacBook-Pro.local"
     }
   }

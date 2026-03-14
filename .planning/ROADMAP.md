@@ -216,6 +216,33 @@ Plans:
 - [ ] 18-07-PLAN.md — Manual test checklist and approval workflow with confirmation
 - [ ] 18-08-PLAN.md — Plan and verify pages with E2E tests and gap-to-planning flow
 
+### Phase 18.2: Resolve add-new-feature end-to-end workflow blockers from labs QA (INSERTED)
+
+**Goal:** Restore complete add-new-feature workflow across Discuss -> Plan -> Verify for initialized projects
+**Requirements**: TBD
+**Depends on:** Phase 18
+**Plans:** 5 plans
+
+Plans:
+- [ ] 18.2-01-PLAN.md — Initialized-project API contract and explicit workflow error handling
+- [ ] 18.2-02-PLAN.md — Global New Plan modal and category confirmation model
+- [ ] 18.2-03-PLAN.md — Discuss ranked options and Accept all defaults progression
+- [ ] 18.2-04-PLAN.md — Plan payload authority and reject-with-gaps fix-plan preselection
+- [ ] 18.2-05-PLAN.md — Verify approval gating and stale rerun visibility
+
+### Phase 18.1: UI controls GSD end-to-end orchestration (INSERTED)
+
+**Goal:** [Urgent work - to be planned]
+**Requirements**: TBD
+**Depends on:** Phase 18
+**Plans:** 4 plans
+
+Plans:
+- [ ] 18.1-01-PLAN.md — Shared orchestration control plane and server parallelism gating contracts
+- [ ] 18.1-02-PLAN.md — Workflow parallelism/sequencing diagram with assessed-status visibility
+- [ ] 18.1-03-PLAN.md — Lifecycle safety UX (confirmations, edit locks, resume revalidation)
+- [ ] 18.1-04-PLAN.md — Dashboard paused-job visibility and end-to-end orchestration validation
+
 ### Phase 19: Roadmap Visualization
 **Goal**: Visualize project progress with dependency graph, Gantt timeline, and milestone grouping
 **Depends on**: Phase 18
@@ -413,7 +440,3 @@ Phases execute in numeric order: 21 -> 22 -> 23 -> 24 -> 25 -> 26 -> 27 -> 28
 | 26. API Layer | 0/TBD | Not started | - |
 | 27. CLI Wrapper | 0/TBD | Not started | - |
 | 28. Testing Infrastructure | 0/TBD | Not started | - |
-
----
-*Roadmap created: 2026-03-10*
-*Last updated: 2026-03-12 (Phase 17 complete)*
