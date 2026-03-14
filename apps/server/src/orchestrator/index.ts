@@ -13,13 +13,19 @@ import { runAgentLoop } from './claude.js';
 import { runMockAgentLoop } from './mock.js';
 import { EVENTS } from '@gsd/events';
 
-// Use mock mode when explicitly enabled or no valid API key
-const MOCK_MODE =
-  process.env['MOCK_EXECUTION'] === 'true' ||
-  !process.env['ANTHROPIC_API_KEY']?.startsWith('sk-ant-');
+// Mock mode is opt-in only.
+const MOCK_MODE = process.env['MOCK_EXECUTION'] === 'true';
+const ANTHROPIC_API_KEY = process.env['ANTHROPIC_API_KEY'];
+const HAS_VALID_ANTHROPIC_KEY = ANTHROPIC_API_KEY?.startsWith('sk-ant-') ?? false;
+
+if (!MOCK_MODE && !HAS_VALID_ANTHROPIC_KEY) {
+  throw new Error(
+    '[orchestrator] ANTHROPIC_API_KEY is required when MOCK_EXECUTION is not true'
+  );
+}
 
 if (MOCK_MODE) {
-  console.log('[orchestrator] Running in MOCK MODE (no real Claude API calls)');
+  console.log('[orchestrator] Running in MOCK MODE (MOCK_EXECUTION=true)');
 }
 import {
   processCheckpointResponse,
@@ -283,43 +289,56 @@ export function createOrchestrator(io: TypedServer) {
 
       sessions.set(agentId, session);
 
-      // Delay to allow client to join socket room after API returns
-      // This prevents race condition where tokens are emitted before subscription
-      // 1000ms gives React time to: receive response -> update state -> trigger effect -> subscribe
+      // Delay to allow client to join socket room after API returns.
+      // 1000ms gives React time to: receive response -> update state -> trigger effect -> subscribe.
       setTimeout(async () => {
-        console.log(`[orchestrator] Starting stream for agent ${agentId} after 1s delay`);
+        console.log(`[orchestrator] Starting discuss stream for agent ${agentId} after 1s delay`);
 
-        // Emit agent:start event
-        io.to(`agent:${agentId}`).emit(EVENTS.AGENT_START, {
-          agentId,
-          planId: session.planId,
-          taskName: session.taskName,
+        if (MOCK_MODE) {
+          // Simulate streaming response with typewriter effect
+          io.to(`agent:${agentId}`).emit(EVENTS.AGENT_START, {
+            agentId,
+            planId: session.planId,
+            taskName: session.taskName,
+          });
+
+          const response = generateDiscussResponse(options.prompt);
+          await streamDiscussResponse(io, agentId, response);
+
+          // Generate and emit context update after response completes
+          const contextMd = generateMockContextMd(agentId, options.prompt);
+          io.to(`agent:${agentId}`).emit('context:update' as any, {
+            agentId,
+            markdown: contextMd,
+          });
+
+          session.status = 'complete';
+          io.to(`agent:${agentId}`).emit(EVENTS.AGENT_END, {
+            agentId,
+            status: 'success',
+            summary: 'Discussion response completed',
+          });
+          setTimeout(() => {
+            sessions.delete(agentId);
+            conversationContext.delete(agentId);
+          }, 60000);
+          return;
+        }
+
+        const discussSystemPrompt = [
+          'You are facilitating the GSD discuss phase.',
+          'Ask concise follow-up questions to clarify goals, constraints, users, and key decisions.',
+          'Do not fabricate project context or fake outputs.',
+          'If you do not have required project context, ask for it explicitly.',
+        ].join(' ');
+
+        runAgentLoop(io, session, discussSystemPrompt, options.prompt).finally(() => {
+          setTimeout(() => {
+            sessions.delete(agentId);
+            conversationContext.delete(agentId);
+          }, 60000);
         });
-
-        // Simulate streaming response with typewriter effect
-        const response = generateDiscussResponse(options.prompt);
-        await streamDiscussResponse(io, agentId, response);
-
-        // Generate and emit context update after response completes
-        const contextMd = generateMockContextMd(agentId, options.prompt);
-        io.to(`agent:${agentId}`).emit('context:update' as any, {
-          agentId,
-          markdown: contextMd,
-        });
-
-        session.status = 'complete';
-        io.to(`agent:${agentId}`).emit(EVENTS.AGENT_END, {
-          agentId,
-          status: 'success',
-          summary: 'Discussion response completed',
-        });
-
-        // Clean up after grace period
-        setTimeout(() => {
-          sessions.delete(agentId);
-          conversationContext.delete(agentId);
-        }, 60000);
-      }, 1000); // 1000ms delay for client subscription (React needs time to update state and run effects)
+      }, 1000);
 
       return agentId;
     },

@@ -2,7 +2,7 @@
  * Mock agent loop for demo/testing purposes
  *
  * Simulates agent execution without actually calling Claude API.
- * Use when MOCK_EXECUTION=true or no ANTHROPIC_API_KEY is set.
+ * Use only when MOCK_EXECUTION=true.
  */
 
 import { EVENTS } from '@gsd/events';
