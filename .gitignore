@@ -35,7 +35,6 @@ RAILROAD_ARCHITECTURE.md
 .worktrees/
 
 # Internal working documents
-.planning/
 analysis/
 docs/GSD-MASTER-ARCHITECTURE.md
 docs/GSD-RUST-IMPLEMENTATION-GUIDE.md
