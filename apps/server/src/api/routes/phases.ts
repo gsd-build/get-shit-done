@@ -104,8 +104,13 @@ export function createPhasesRoutes(searchPaths: string[]): Hono {
 
     const workflow = phasesResult.data.map((phase, index) => {
       const phaseId = String(phase.number ?? index + 1);
+      const dependsOn = index > 0 ? [String(phasesResult.data[index - 1]?.number ?? index)] : [];
+      const previous = index > 0 ? phasesResult.data[index - 1] : null;
+      const previousComplete = previous?.status === 'complete';
       const isCompleted = phase.status === 'complete';
       const isInProgress = phase.status === 'active';
+      const isBlockedByDependency = dependsOn.length > 0 && !previousComplete;
+
       return {
         id: phaseId,
         label: phase.name,
@@ -114,8 +119,20 @@ export function createPhasesRoutes(searchPaths: string[]): Hono {
           ? 'complete'
           : isInProgress
             ? 'active'
-            : 'assessed',
-        dependsOn: index > 0 ? [String(phasesResult.data[index - 1]?.number ?? index)] : [],
+            : isBlockedByDependency
+              ? 'blocked'
+              : 'runnable',
+        dependsOn,
+        blockerDetails: isBlockedByDependency
+          ? [
+              {
+                id: `phase-${phaseId}-dependency`,
+                reason: `Phase ${dependsOn[0]} must complete before this phase can run.`,
+                dependsOn,
+                resolutionHint: 'Complete upstream phase or explicitly re-plan dependencies.',
+              },
+            ]
+          : undefined,
       };
     });
 

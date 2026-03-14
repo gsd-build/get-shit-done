@@ -132,7 +132,13 @@ export async function fetchParallelismAssessment(
         error: { code: 'FETCH_ERROR', message: `HTTP ${response.status}` },
       };
     }
-    return (await response.json()) as ApiEnvelope<ParallelismAssessment>;
+    const json = (await response.json()) as Partial<ApiEnvelope<ParallelismAssessment>>;
+    return {
+      success: !json.error,
+      data: (json.data ?? null) as ParallelismAssessment | null,
+      meta: json.meta ?? { timestamp: new Date().toISOString(), requestId: '' },
+      ...(json.error ? { error: json.error } : {}),
+    };
   } catch (err) {
     return {
       success: false,
@@ -160,7 +166,13 @@ export async function fetchParallelismWorkflow(
         error: { code: 'FETCH_ERROR', message: `HTTP ${response.status}` },
       };
     }
-    return (await response.json()) as ApiEnvelope<ParallelismWorkflowNode[]>;
+    const json = (await response.json()) as Partial<ApiEnvelope<ParallelismWorkflowNode[]>>;
+    return {
+      success: !json.error,
+      data: (json.data ?? []) as ParallelismWorkflowNode[],
+      meta: json.meta ?? { timestamp: new Date().toISOString(), requestId: '' },
+      ...(json.error ? { error: json.error } : {}),
+    };
   } catch (err) {
     return {
       success: false,
