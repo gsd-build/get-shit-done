@@ -1,6 +1,8 @@
 import { defineConfig, devices } from '@playwright/test';
 
 const isCI = !!process.env['CI'];
+const baseURL = process.env['PLAYWRIGHT_BASE_URL'] ?? 'http://localhost:3000';
+const authToken = process.env['E2E_AUTH_TOKEN'] ?? 'manual-test-token';
 
 export default defineConfig({
   testDir: './tests/e2e',
@@ -12,8 +14,23 @@ export default defineConfig({
   timeout: 30000,
 
   use: {
-    baseURL: 'http://localhost:3000',
+    baseURL,
     trace: 'on-first-retry',
+    storageState: {
+      cookies: [
+        {
+          name: 'gsd-auth',
+          value: authToken,
+          domain: 'localhost',
+          path: '/',
+          expires: Math.floor(Date.now() / 1000) + 60 * 60 * 24 * 30,
+          httpOnly: false,
+          secure: false,
+          sameSite: 'Lax',
+        },
+      ],
+      origins: [],
+    },
   },
 
   projects: [
@@ -29,7 +46,7 @@ export default defineConfig({
 
   webServer: {
     command: 'pnpm run dev',
-    url: 'http://localhost:3000',
+    url: baseURL,
     reuseExistingServer: !isCI,
   },
 });

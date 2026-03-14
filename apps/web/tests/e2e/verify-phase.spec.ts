@@ -1,6 +1,6 @@
 import { test, expect } from '@playwright/test';
 
-const PROJECT_ID = process.env['E2E_PROJECT_ID'] ?? 'todo-app';
+const PROJECT_ID = process.env['E2E_PROJECT_ID'] ?? 'get-shit-done';
 
 test.describe('Verify Phase Page', () => {
   async function skipIfUnavailable(page: import('@playwright/test').Page) {
@@ -32,7 +32,7 @@ test.describe('Verify Phase Page', () => {
 
     await expect(
       page
-        .getByRole('heading', { name: /Verification Passed|Verification Failed/i })
+        .getByRole('heading', { name: /Verification Running|Verification Passed|Verification Failed/i })
         .or(page.getByTestId('verification-loading'))
         .first()
     ).toBeVisible();

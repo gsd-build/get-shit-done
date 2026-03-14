@@ -5,6 +5,17 @@ import { test, expect } from '@playwright/test';
  * These tests require both frontend (localhost:3000) and backend (localhost:4000) running.
  */
 test.describe('Dashboard - Live Backend', () => {
+  async function openDashboard(page: import('@playwright/test').Page) {
+    await page.goto('/', { waitUntil: 'domcontentloaded' });
+    await expect(page.getByRole('heading', { name: /GSD Dashboard/i })).toBeVisible({ timeout: 20000 });
+    await expect(
+      page
+        .getByTestId('project-grid')
+        .or(page.getByText(/No projects found|Error:/i))
+        .first()
+    ).toBeVisible({ timeout: 20000 });
+  }
+
   test.beforeEach(async ({ page }) => {
     // Enable console logging for debugging
     page.on('console', msg => {
@@ -27,10 +38,7 @@ test.describe('Dashboard - Live Backend', () => {
   });
 
   test('Dashboard loads and displays header', async ({ page }) => {
-    await page.goto('/');
-
-    // Wait for page to load
-    await page.waitForLoadState('networkidle');
+    await openDashboard(page);
 
     // Check for dashboard header
     const header = page.getByRole('heading', { name: /GSD Dashboard/i });
@@ -41,34 +49,16 @@ test.describe('Dashboard - Live Backend', () => {
   });
 
   test('Dashboard fetches projects from API', async ({ page }) => {
-    // Intercept API call to verify it happens
-    let apiCalled = false;
-    let apiResponse: unknown = null;
-
-    await page.route('**/api/projects**', async (route) => {
-      apiCalled = true;
-      const response = await route.fetch();
-      apiResponse = await response.json();
-      console.log('Intercepted API response:', JSON.stringify(apiResponse, null, 2));
-      await route.fulfill({ response });
+    await openDashboard(page);
+    const status = await page.evaluate(async () => {
+      const res = await fetch('/api/proxy/projects');
+      return res.status;
     });
-
-    await page.goto('/');
-    await page.waitForLoadState('networkidle');
-
-    // Verify API was called
-    expect(apiCalled).toBeTruthy();
-
-    // Take screenshot
-    await page.screenshot({ path: 'test-results/dashboard-after-api.png' });
+    expect(status).toBe(200);
   });
 
   test('Projects are displayed in grid when API returns data', async ({ page }) => {
-    await page.goto('/');
-    await page.waitForLoadState('networkidle');
-
-    // Wait a bit for React to render
-    await page.waitForTimeout(2000);
+    await openDashboard(page);
 
     // Check what's on the page
     const bodyText = await page.locator('body').textContent();
@@ -95,8 +85,7 @@ test.describe('Dashboard - Live Backend', () => {
   });
 
   test('Search input is functional', async ({ page }) => {
-    await page.goto('/');
-    await page.waitForLoadState('networkidle');
+    await openDashboard(page);
 
     const searchInput = page.getByPlaceholder(/search/i);
     await expect(searchInput).toBeVisible();
@@ -111,13 +100,12 @@ test.describe('Dashboard - Live Backend', () => {
   });
 
   test('Filter chips are rendered and clickable', async ({ page }) => {
-    await page.goto('/');
-    await page.waitForLoadState('networkidle');
+    await openDashboard(page);
 
     // Look for filter chips
-    const healthyChip = page.getByRole('button', { name: /healthy/i });
-    const degradedChip = page.getByRole('button', { name: /degraded/i });
-    const errorChip = page.getByRole('button', { name: /error/i });
+    const healthyChip = page.getByRole('button', { name: 'Healthy', exact: true }).first();
+    const degradedChip = page.getByRole('button', { name: 'Degraded', exact: true }).first();
+    const errorChip = page.getByRole('button', { name: 'Error', exact: true }).first();
 
     await expect(healthyChip).toBeVisible();
     await expect(degradedChip).toBeVisible();
@@ -133,9 +121,8 @@ test.describe('Dashboard - Live Backend', () => {
   });
 
   test('Debug: Capture full page state', async ({ page }) => {
-    await page.goto('/');
-    await page.waitForLoadState('networkidle');
-    await page.waitForTimeout(3000);
+    await openDashboard(page);
+    await page.waitForTimeout(1000);
 
     // Get all text content
     const allText = await page.locator('body').allTextContents();
