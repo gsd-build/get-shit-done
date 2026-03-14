@@ -141,15 +141,9 @@
       "branch": "phase-18.1-ui-controls-gsd-end-to-end-orchestration",
       "path": "/Users/mauricevandermerwe/Projects/get-shit-done/.worktrees/get-shit-done-phase-18.1",
       "created": "2026-03-14T12:22:24.192Z",
-      "status": "active"
+      "status": "removed",
+      "removed": "2026-03-14T17:35:11.113Z"
     }
   },
-  "locks": {
-    "phase-18.1": {
-      "acquired": "2026-03-14T12:22:23.798Z",
-      "owner": "mauricevandermerwe",
-      "pid": 87405,
-      "hostname": "Maurices-MacBook-Pro.local"
-    }
-  }
+  "locks": {}
 }
