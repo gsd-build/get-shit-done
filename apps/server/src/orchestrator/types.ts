@@ -47,3 +47,24 @@ export type OrchestratorEvent =
 
 // Re-export SDK types for convenience
 export type { MessageParam, Tool, ToolUseBlock, ToolResultBlockParam };
+
+export interface ParallelismBlockerDetail {
+  id: string;
+  reason: string;
+  dependsOn: string[];
+  resolutionHint?: string;
+}
+
+export interface ParallelismAssessmentPayload {
+  phaseId: string;
+  allowed: boolean;
+  blockers: ParallelismBlockerDetail[];
+  assessedAt: string;
+}
+
+export interface ResumeRevalidationPayload {
+  runId: string;
+  passed: boolean;
+  failures: string[];
+  changedTasks: string[];
+}

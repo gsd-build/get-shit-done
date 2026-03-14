@@ -76,6 +76,135 @@ export function createPhasesRoutes(searchPaths: string[]): Hono {
     return success(c, { phases, total: phases.length });
   });
 
+  app.get('/:id/phases/workflow', async (c) => {
+    const id = c.req.param('id');
+    const projectResult = await discoverProjects(searchPaths);
+
+    if (!projectResult.success) {
+      throw new ApiError(
+        ErrorCodes.GSD_TOOLS_ERROR,
+        projectResult.error.message,
+        500
+      );
+    }
+
+    const project = projectResult.data.find((p) => p.id === id);
+    if (!project) {
+      return error(c, ErrorCodes.PROJECT_NOT_FOUND, `Project '${id}' not found`, 404);
+    }
+
+    const phasesResult = await listPhases(project.path);
+    if (!phasesResult.success) {
+      throw new ApiError(
+        ErrorCodes.GSD_TOOLS_ERROR,
+        phasesResult.error.message,
+        500
+      );
+    }
+
+    const workflow = phasesResult.data.map((phase, index) => {
+      const phaseId = String(phase.number ?? index + 1);
+      const dependsOn = index > 0 ? [String(phasesResult.data[index - 1]?.number ?? index)] : [];
+      const previous = index > 0 ? phasesResult.data[index - 1] : null;
+      const previousComplete = previous?.status === 'complete';
+      const isCompleted = phase.status === 'complete';
+      const isInProgress = phase.status === 'active';
+      const isBlockedByDependency = dependsOn.length > 0 && !previousComplete;
+
+      return {
+        id: phaseId,
+        label: phase.name,
+        wave: Math.max(1, index + 1),
+        status: isCompleted
+          ? 'complete'
+          : isInProgress
+            ? 'active'
+            : isBlockedByDependency
+              ? 'blocked'
+              : 'runnable',
+        dependsOn,
+        blockerDetails: isBlockedByDependency
+          ? [
+              {
+                id: `phase-${phaseId}-dependency`,
+                reason: `Phase ${dependsOn[0]} must complete before this phase can run.`,
+                dependsOn,
+                resolutionHint: 'Complete upstream phase or explicitly re-plan dependencies.',
+              },
+            ]
+          : undefined,
+      };
+    });
+
+    return success(c, workflow);
+  });
+
+  app.get('/:id/phases/:phaseId/parallelism', async (c) => {
+    const id = c.req.param('id');
+    const phaseId = c.req.param('phaseId');
+    const projectResult = await discoverProjects(searchPaths);
+
+    if (!projectResult.success) {
+      throw new ApiError(
+        ErrorCodes.GSD_TOOLS_ERROR,
+        projectResult.error.message,
+        500
+      );
+    }
+
+    const project = projectResult.data.find((p) => p.id === id);
+    if (!project) {
+      return error(c, ErrorCodes.PROJECT_NOT_FOUND, `Project '${id}' not found`, 404);
+    }
+
+    const phasesResult = await listPhases(project.path);
+    if (!phasesResult.success) {
+      throw new ApiError(
+        ErrorCodes.GSD_TOOLS_ERROR,
+        phasesResult.error.message,
+        500
+      );
+    }
+
+    const targetIndex = phasesResult.data.findIndex(
+      (phase, index) => String(phase.number ?? index + 1) === phaseId
+    );
+    if (targetIndex < 0) {
+      return error(c, 'PHASE_NOT_FOUND', `Phase '${phaseId}' not found`, 404);
+    }
+
+    const blockers: Array<{
+      id: string;
+      reason: string;
+      dependsOn: string[];
+      resolutionHint?: string;
+    }> = [];
+
+    if (targetIndex > 0) {
+      const previous = phasesResult.data[targetIndex - 1];
+      if (!previous) {
+        return error(c, 'PHASE_NOT_FOUND', `Phase '${phaseId}' not found`, 404);
+      }
+
+      const isPreviousDone = previous.status === 'complete';
+      if (!isPreviousDone) {
+        blockers.push({
+          id: `phase-${phaseId}-dependency`,
+          reason: `Phase ${previous.number ?? targetIndex} must complete before parallel start`,
+          dependsOn: [String(previous.number ?? targetIndex)],
+          resolutionHint: 'Finish upstream dependencies or pause and re-plan safely.',
+        });
+      }
+    }
+
+    return success(c, {
+      phaseId,
+      allowed: blockers.length === 0,
+      blockers,
+      assessedAt: new Date().toISOString(),
+    });
+  });
+
   return app;
 }
 

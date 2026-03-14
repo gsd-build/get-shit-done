@@ -6,11 +6,33 @@ import Link from 'next/link';
 import { ArrowLeft, Play } from 'lucide-react';
 import { useSocket } from '@/hooks/useSocket';
 import { useResearchStream } from '@/hooks/useResearchStream';
-import { usePlanStore, selectAgents, selectPlan } from '@/stores/planStore';
-import { ResearchSwimlanes, PlanKanban } from '@/components/features/plan';
-import { fetchPlan, updatePlanTask, startResearch } from '@/lib/api';
+import {
+  usePlanStore,
+  selectAgents,
+  selectPlan,
+  selectIsEditLocked,
+} from '@/stores/planStore';
+import {
+  ResearchSwimlanes,
+  PlanKanban,
+  ParallelismWorkflowGraph,
+} from '@/components/features/plan';
+import {
+  fetchPlan,
+  updatePlanTask,
+  startResearch,
+  fetchParallelismWorkflow,
+} from '@/lib/api';
 import { resolveSocketBase } from '@/lib/endpoints';
-import type { ResearchAgent, Plan, PlanTask } from '@/types/plan';
+import type { ResearchAgent, Plan, PlanTask, ParallelismWorkflowNode } from '@/types/plan';
+import {
+  OrchestrationControlBar,
+  RunStatusStrip,
+} from '@/components/features/orchestration';
+import {
+  useOrchestrationStore,
+  selectSelectedOrchestrationRun,
+} from '@/stores/orchestrationStore';
 
 const SOCKET_URL = resolveSocketBase();
 
@@ -37,11 +59,19 @@ export default function PlanPhasePage() {
   // Plan state from Zustand store
   const plan = usePlanStore(selectPlan);
   const storeAgents = usePlanStore(selectAgents);
+  const isEditLocked = usePlanStore(selectIsEditLocked);
 
   // Local state for plan data (fetched from API)
   const [planData, setPlanData] = useState<Plan | null>(null);
   const [isLoadingPlan, setIsLoadingPlan] = useState(true);
   const [isStartingResearch, setIsStartingResearch] = useState(false);
+  const [workflow, setWorkflow] = useState<ParallelismWorkflowNode[]>([]);
+  const setRuns = useOrchestrationStore((state) => state.setRuns);
+  const setSelectedRun = useOrchestrationStore((state) => state.setSelectedRun);
+  const setWorkflowStore = useOrchestrationStore((state) => state.setWorkflow);
+  const selectedRun = useOrchestrationStore(selectSelectedOrchestrationRun);
+  const agentsArray: ResearchAgent[] = Array.from(storeAgents.values());
+  const hasRunningAgents = agentsArray.some((a) => a.status === 'running');
 
   // Fetch plan data on mount
   useEffect(() => {
@@ -56,11 +86,31 @@ export default function PlanPhasePage() {
     loadPlan();
   }, [projectId]);
 
-  // Convert agents Map to array for component
-  const agentsArray: ResearchAgent[] = Array.from(storeAgents.values());
+  useEffect(() => {
+    async function loadWorkflow() {
+      const response = await fetchParallelismWorkflow(projectId);
+      if (response.success) {
+        setWorkflow(response.data);
+        setWorkflowStore(response.data);
+      }
+    }
+    loadWorkflow();
+  }, [projectId, setWorkflowStore]);
 
-  // Check if any agents are running
-  const hasRunningAgents = agentsArray.some((a) => a.status === 'running');
+  useEffect(() => {
+    const runId = `${projectId}:plan`;
+    setRuns([
+      {
+        id: runId,
+        phaseId: 'plan',
+        name: 'Plan Orchestration',
+        status: hasRunningAgents ? 'active' : 'paused',
+        updatedAt: new Date().toISOString(),
+        isEditingLocked: hasRunningAgents,
+      },
+    ]);
+    setSelectedRun(runId);
+  }, [projectId, hasRunningAgents, setRuns, setSelectedRun]);
 
   // Handle starting research
   const handleStartResearch = async () => {
@@ -77,6 +127,10 @@ export default function PlanPhasePage() {
     taskId: string,
     updates: { title: string; description: string }
   ) => {
+    if (isEditLocked) {
+      return;
+    }
+
     const response = await updatePlanTask(projectId, taskId, {
       name: updates.title,
       description: updates.description,
@@ -132,6 +186,18 @@ export default function PlanPhasePage() {
             </button>
           )}
         </div>
+
+        <div className="mb-6 space-y-3">
+          <OrchestrationControlBar projectId={projectId} phaseId="plan" />
+          <RunStatusStrip run={selectedRun} />
+        </div>
+
+        <section className="mb-8">
+          <h2 className="text-xl font-semibold text-foreground mb-4">
+            Workflow Parallelism
+          </h2>
+          <ParallelismWorkflowGraph nodes={workflow} />
+        </section>
 
         {/* Research Progress Section */}
         <section className="mb-8">

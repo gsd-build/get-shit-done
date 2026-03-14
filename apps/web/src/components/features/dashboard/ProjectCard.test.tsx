@@ -13,6 +13,11 @@ const mockProject: Project = {
   progress: { completedPhases: 8, totalPhases: 12, completedPlans: 24, totalPlans: 36, percentage: 67 },
   currentPhase: 'Phase 15',
   lastActivity: '2026-03-11T10:00:00Z',
+  orchestration: {
+    pausedRuns: 2,
+    pausedRunNames: ['phase-18', 'phase-18.1'],
+    hasPausedRuns: true,
+  },
 };
 
 describe('ProjectCard', () => {
@@ -35,6 +40,11 @@ describe('ProjectCard', () => {
   it('displays current phase', () => {
     render(<ProjectCard project={mockProject} onNavigate={() => {}} />);
     expect(screen.getByText('Phase 15')).toBeInTheDocument();
+  });
+
+  it('shows paused run indicator when orchestration has paused runs', () => {
+    render(<ProjectCard project={mockProject} onNavigate={() => {}} />);
+    expect(screen.getByText('2 paused')).toBeInTheDocument();
   });
 
   it('shows action buttons on hover', async () => {

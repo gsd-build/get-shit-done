@@ -18,9 +18,17 @@ import {
   ManualChecklist,
   ApprovalBar,
 } from '@/components/features/verify';
+import {
+  OrchestrationControlBar,
+  RunStatusStrip,
+} from '@/components/features/orchestration';
 import type { Coverage } from '@/components/features/verify/CoverageHeatmap';
 import { fetchCoverage, submitApproval, submitRejection } from '@/lib/api';
 import { resolveSocketBase } from '@/lib/endpoints';
+import {
+  useOrchestrationStore,
+  selectSelectedOrchestrationRun,
+} from '@/stores/orchestrationStore';
 
 const SOCKET_URL = resolveSocketBase();
 
@@ -61,6 +69,10 @@ export default function VerifyPhasePage() {
   const [phases, setPhases] = useState<string[]>([]);
   const [isLoadingCoverage, setIsLoadingCoverage] = useState(true);
   const [actionError, setActionError] = useState<string | null>(null);
+  const setRuns = useOrchestrationStore((state) => state.setRuns);
+  const setSelectedRun = useOrchestrationStore((state) => state.setSelectedRun);
+  const selectedRun = useOrchestrationStore(selectSelectedOrchestrationRun);
+  const isRunning = status === 'running';
 
   // Fetch coverage data on mount
   useEffect(() => {
@@ -80,6 +92,21 @@ export default function VerifyPhasePage() {
     }
     loadCoverage();
   }, [projectId]);
+
+  useEffect(() => {
+    const runId = `${projectId}:verify`;
+    setRuns([
+      {
+        id: runId,
+        phaseId: 'verify',
+        name: 'Verify Orchestration',
+        status: isRunning ? 'active' : overallPassed ? 'complete' : 'paused',
+        updatedAt: new Date().toISOString(),
+        isEditingLocked: isRunning,
+      },
+    ]);
+    setSelectedRun(runId);
+  }, [projectId, isRunning, overallPassed, setRuns, setSelectedRun]);
 
   // Handle manual test update
   const handleManualTestUpdate = useCallback(
@@ -120,9 +147,6 @@ export default function VerifyPhasePage() {
     [projectId, router]
   );
 
-  // Check if verification is running
-  const isRunning = status === 'running';
-
   return (
     <main className="min-h-screen bg-background pb-24">
       <div className="max-w-7xl mx-auto px-4 py-8">
@@ -158,6 +182,11 @@ export default function VerifyPhasePage() {
               Run Verification
             </button>
           )}
+        </div>
+
+        <div className="mb-6 space-y-3">
+          <OrchestrationControlBar projectId={projectId} phaseId="verify" />
+          <RunStatusStrip run={selectedRun} />
         </div>
 
         {/* Verification Panel (Report Header + Requirement List) */}

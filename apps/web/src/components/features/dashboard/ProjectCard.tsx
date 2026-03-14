@@ -52,6 +52,11 @@ export function ProjectCard({ project, activities = [], onNavigate, onActivityCl
         {project.currentPhase && (
           <span className="text-sm text-muted-foreground">{project.currentPhase}</span>
         )}
+        {project.orchestration?.hasPausedRuns && (
+          <span className="text-[10px] uppercase tracking-wide px-2 py-0.5 rounded-full bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-300">
+            {project.orchestration.pausedRuns} paused
+          </span>
+        )}
       </div>
 
       {displayActivities.length > 0 && (

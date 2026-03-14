@@ -1,13 +1,40 @@
 'use client';
 
+import { useEffect } from 'react';
 import { useParams, useRouter } from 'next/navigation';
 import Link from 'next/link';
 import { ArrowLeft, Play, MessageSquare, FileText, CheckCircle } from 'lucide-react';
+import {
+  OrchestrationControlBar,
+  RunStatusStrip,
+} from '@/components/features/orchestration';
+import {
+  useOrchestrationStore,
+  selectSelectedOrchestrationRun,
+} from '@/stores/orchestrationStore';
 
 export default function ProjectDetailPage() {
   const params = useParams();
   const router = useRouter();
   const projectId = params['id'] as string;
+  const setRuns = useOrchestrationStore((state) => state.setRuns);
+  const setSelectedRun = useOrchestrationStore((state) => state.setSelectedRun);
+  const selectedRun = useOrchestrationStore(selectSelectedOrchestrationRun);
+
+  useEffect(() => {
+    const runId = `${projectId}:overview`;
+    setRuns([
+      {
+        id: runId,
+        phaseId: 'overview',
+        name: 'Project Orchestration Overview',
+        status: 'paused',
+        updatedAt: new Date().toISOString(),
+        isEditingLocked: false,
+      },
+    ]);
+    setSelectedRun(runId);
+  }, [projectId, setRuns, setSelectedRun]);
 
   const navItems = [
     { href: `/projects/${projectId}/execute`, label: 'Execute', icon: Play, ready: true },
@@ -29,6 +56,11 @@ export default function ProjectDetailPage() {
         </button>
 
         <h1 className="text-3xl font-bold text-foreground mb-4">{projectId}</h1>
+
+        <div className="mb-6 space-y-3">
+          <OrchestrationControlBar projectId={projectId} phaseId="overview" />
+          <RunStatusStrip run={selectedRun} />
+        </div>
 
         <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-8">
           {navItems.map(({ href, label, icon: Icon, ready }) => (

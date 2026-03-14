@@ -36,6 +36,11 @@ export interface Project {
   currentPhase: string | null;
   progress: ProjectProgress;
   lastActivity?: string;
+  orchestration?: {
+    pausedRuns: number;
+    pausedRunNames: string[];
+    hasPausedRuns: boolean;
+  };
 }
 
 /** API envelope meta information */

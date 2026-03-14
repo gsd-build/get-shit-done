@@ -6,6 +6,14 @@ import { ArrowLeft, Send } from 'lucide-react';
 import { EVENTS } from '@gsd/events';
 import { useSocket } from '@/hooks/useSocket';
 import { API_PROXY_BASE, resolveSocketBase } from '@/lib/endpoints';
+import {
+  OrchestrationControlBar,
+  RunStatusStrip,
+} from '@/components/features/orchestration';
+import {
+  useOrchestrationStore,
+  selectSelectedOrchestrationRun,
+} from '@/stores/orchestrationStore';
 
 interface DiscussMessage {
   id: string;
@@ -26,26 +34,48 @@ export default function DiscussPage() {
   const [agentId, setAgentId] = useState<string | null>(null);
   const [messages, setMessages] = useState<DiscussMessage[]>([]);
   const [contextPreview, setContextPreview] = useState('');
+  const [hasHydratedStorage, setHasHydratedStorage] = useState(false);
   const [prompt, setPrompt] = useState('');
   const [isStreaming, setIsStreaming] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const setRuns = useOrchestrationStore((state) => state.setRuns);
+  const setSelectedRun = useOrchestrationStore((state) => state.setSelectedRun);
+  const selectedRun = useOrchestrationStore(selectSelectedOrchestrationRun);
+
+  useEffect(() => {
+    const runId = `${projectId}:discuss`;
+    setRuns([
+      {
+        id: runId,
+        phaseId: 'discuss',
+        name: 'Discuss Context Session',
+        status: isStreaming ? 'active' : 'paused',
+        updatedAt: new Date().toISOString(),
+        isEditingLocked: isStreaming,
+      },
+    ]);
+    setSelectedRun(runId);
+  }, [projectId, isStreaming, setRuns, setSelectedRun]);
 
   useEffect(() => {
     const raw = localStorage.getItem(storageKey);
-    if (!raw) return;
-    try {
-      const parsed = JSON.parse(raw) as {
-        messages?: DiscussMessage[];
-        contextPreview?: string;
-      };
-      setMessages(parsed.messages ?? []);
-      setContextPreview(parsed.contextPreview ?? '');
-    } catch {
-      // Ignore invalid persisted state
+    if (raw) {
+      try {
+        const parsed = JSON.parse(raw) as {
+          messages?: DiscussMessage[];
+          contextPreview?: string;
+        };
+        setMessages(parsed.messages ?? []);
+        setContextPreview(parsed.contextPreview ?? '');
+      } catch {
+        // Ignore invalid persisted state
+      }
     }
+    setHasHydratedStorage(true);
   }, [storageKey]);
 
   useEffect(() => {
+    if (!hasHydratedStorage) return;
     localStorage.setItem(
       storageKey,
       JSON.stringify({
@@ -53,7 +83,7 @@ export default function DiscussPage() {
         contextPreview,
       })
     );
-  }, [messages, contextPreview, storageKey]);
+  }, [messages, contextPreview, storageKey, hasHydratedStorage]);
 
   useEffect(() => {
     if (!socket || !agentId) return;
@@ -154,6 +184,9 @@ export default function DiscussPage() {
             {isStreaming ? 'Streaming' : isConnected ? 'Connected' : 'Disconnected'}
           </span>
         </div>
+
+        <OrchestrationControlBar projectId={projectId} phaseId="discuss" />
+        <RunStatusStrip run={selectedRun} />
 
         {error && (
           <div className="rounded-md border border-red-300 bg-red-50 text-red-700 px-3 py-2 text-sm">

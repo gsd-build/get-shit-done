@@ -75,7 +75,7 @@ describe('useVerification', () => {
   });
 
   describe('startVerification', () => {
-    it('calls POST /api/phases/:id/verify', async () => {
+    it('calls POST /api/proxy/projects/:id/verify', async () => {
       const { result } = renderHook(() =>
         useVerification(mockSocket, 'phase-1')
       );
@@ -85,7 +85,7 @@ describe('useVerification', () => {
       });
 
       expect(fetchSpy).toHaveBeenCalledWith(
-        expect.stringContaining('/api/phases/phase-1/verify'),
+        expect.stringContaining('/api/proxy/projects/phase-1/verify'),
         expect.objectContaining({ method: 'POST' })
       );
     });

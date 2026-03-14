@@ -22,6 +22,17 @@ import { useAgentSubscription } from '@/hooks/useAgentSubscription';
 import { useCheckpointResponse } from '@/hooks/useCheckpointResponse';
 import { API_PROXY_BASE, HEALTH_SUMMARY_URL, resolveSocketBase } from '@/lib/endpoints';
 import { useExecutionStore, selectPlans, selectStatus } from '@/stores/executionStore';
+import {
+  OrchestrationControlBar,
+  RunStatusStrip,
+} from '@/components/features/orchestration';
+import { ParallelismWorkflowGraph } from '@/components/features/plan';
+import { fetchParallelismWorkflow } from '@/lib/api';
+import type { ParallelismWorkflowNode } from '@/types/plan';
+import {
+  useOrchestrationStore,
+  selectSelectedOrchestrationRun,
+} from '@/stores/orchestrationStore';
 
 const API_URL = API_PROXY_BASE;
 
@@ -94,6 +105,7 @@ export default function ExecutePage() {
   const [selectedPhase, setSelectedPhase] = useState<number | null>(null);
   const [isStarting, setIsStarting] = useState(false);
   const [startError, setStartError] = useState<string | null>(null);
+  const [workflow, setWorkflow] = useState<ParallelismWorkflowNode[]>([]);
 
   // Connect to Socket.IO server
   const { socket, isConnected, reconnect } = useSocket(socketUrl);
@@ -108,9 +120,48 @@ export default function ExecutePage() {
   const plans = useExecutionStore(selectPlans);
   const status = useExecutionStore(selectStatus);
   const reset = useExecutionStore((s) => s.reset);
+  const setRuns = useOrchestrationStore((state) => state.setRuns);
+  const setSelectedRun = useOrchestrationStore((state) => state.setSelectedRun);
+  const setWorkflowStore = useOrchestrationStore((state) => state.setWorkflow);
+  const selectedRun = useOrchestrationStore(selectSelectedOrchestrationRun);
 
   // Build waves from plans
   const waves = useMemo(() => buildWavesFromPlans(plans), [plans]);
+
+  useEffect(() => {
+    const runId = `${projectId}:execute`;
+    setRuns([
+      {
+        id: runId,
+        phaseId: 'execute',
+        name: 'Execute Orchestration',
+        status:
+          status === 'running'
+            ? 'active'
+            : status === 'paused'
+              ? 'paused'
+              : status === 'error'
+                ? 'blocked'
+                : status === 'complete'
+                  ? 'complete'
+                  : 'paused',
+        updatedAt: new Date().toISOString(),
+        isEditingLocked: status === 'running',
+      },
+    ]);
+    setSelectedRun(runId);
+  }, [projectId, status, setRuns, setSelectedRun]);
+
+  useEffect(() => {
+    async function loadWorkflow() {
+      const response = await fetchParallelismWorkflow(projectId);
+      if (response.success) {
+        setWorkflow(response.data);
+        setWorkflowStore(response.data);
+      }
+    }
+    loadWorkflow();
+  }, [projectId, setWorkflowStore]);
 
   // Handle checkpoint responses by emitting to socket
   const handleCheckpointResponse = useCallback(
@@ -253,12 +304,17 @@ export default function ExecutePage() {
 
       {/* Main execution panel */}
       <main className="flex-1 overflow-hidden">
-        <ExecutionPanel
-          waves={waves}
-          projectPath={`/projects/${projectId}`}
-          onCheckpointResponse={handleCheckpointResponse}
-          className="h-full"
-        />
+        <div className="h-full overflow-auto px-4 py-3 space-y-3">
+          <OrchestrationControlBar projectId={projectId} phaseId="execute" />
+          <RunStatusStrip run={selectedRun} />
+          <ParallelismWorkflowGraph nodes={workflow} />
+          <ExecutionPanel
+            waves={waves}
+            projectPath={`/projects/${projectId}`}
+            onCheckpointResponse={handleCheckpointResponse}
+            className="h-[calc(100%-12rem)]"
+          />
+        </div>
       </main>
 
       {/* Empty state when no execution is running */}
