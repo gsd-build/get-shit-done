@@ -12,6 +12,7 @@ interface PlanStore {
   agents: Map<string, ResearchAgent>;
   plan: Plan | null;
   isLoading: boolean;
+  isEditLocked: boolean;
   addAgent: (agent: Partial<ResearchAgent>) => void;
   updateAgentStatus: (agentId: string, status: AgentStatus) => void;
   updateAgentAction: (agentId: string, action: string) => void;
@@ -19,6 +20,7 @@ interface PlanStore {
   setAgentError: (agentId: string, error: string) => void;
   startAgentTimer: (agentId: string) => void;
   stopAgentTimer: (agentId: string) => void;
+  setEditLocked: (locked: boolean) => void;
   resetPlanState: () => void;
 }
 
@@ -30,6 +32,7 @@ const initialState = {
   agents: new Map<string, ResearchAgent>(),
   plan: null as Plan | null,
   isLoading: false,
+  isEditLocked: false,
 };
 
 export const usePlanStore = create<PlanStore>((set, get) => ({
@@ -154,6 +157,8 @@ export const usePlanStore = create<PlanStore>((set, get) => ({
     }
   },
 
+  setEditLocked: (locked) => set({ isEditLocked: locked }),
+
   resetPlanState: () => {
     // Stop all active timers
     timerIntervals.forEach((intervalId) => clearInterval(intervalId));
@@ -164,6 +169,7 @@ export const usePlanStore = create<PlanStore>((set, get) => ({
       agents: new Map(),
       plan: null,
       isLoading: false,
+      isEditLocked: false,
     });
   },
 }));
@@ -172,3 +178,4 @@ export const usePlanStore = create<PlanStore>((set, get) => ({
 export const selectAgents = (state: PlanStore) => state.agents;
 export const selectPlan = (state: PlanStore) => state.plan;
 export const selectIsLoading = (state: PlanStore) => state.isLoading;
+export const selectIsEditLocked = (state: PlanStore) => state.isEditLocked;

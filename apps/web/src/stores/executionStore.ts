@@ -60,6 +60,7 @@ export interface ExecutionState {
   pendingCheckpoint: CheckpointRequestEvent | null;
   selectedFile: SelectedFile | null;
   commits: Commit[];
+  planEditingLocked: boolean;
 
   // Actions
   startExecution: (agentId: string, planId: string, taskName: string) => void;
@@ -71,6 +72,7 @@ export interface ExecutionState {
   selectFile: (file: SelectedFile | null) => void;
   addCommit: (commit: Commit) => void;
   setPaused: (paused: boolean) => void;
+  setPlanEditingLocked: (locked: boolean) => void;
   completePlan: (planId: string, status: 'complete' | 'error') => void;
   reset: () => void;
 }
@@ -83,6 +85,7 @@ const initialState = {
   pendingCheckpoint: null as CheckpointRequestEvent | null,
   selectedFile: null as SelectedFile | null,
   commits: [] as Commit[],
+  planEditingLocked: false,
 };
 
 /**
@@ -186,7 +189,12 @@ export const useExecutionStore = create<ExecutionState>((set, get) => ({
     })),
 
   setPaused: (paused) =>
-    set({ status: paused ? 'paused' : 'running' }),
+    set({
+      status: paused ? 'paused' : 'running',
+      planEditingLocked: !paused,
+    }),
+
+  setPlanEditingLocked: (locked) => set({ planEditingLocked: locked }),
 
   completePlan: (planId, planStatus) =>
     set((state) => {
@@ -226,6 +234,7 @@ export const useExecutionStore = create<ExecutionState>((set, get) => ({
       pendingCheckpoint: null,
       selectedFile: null,
       commits: [],
+      planEditingLocked: false,
     }),
 }));
 
@@ -237,3 +246,5 @@ export const selectPlans = (state: ExecutionState) => state.plans;
 export const selectPendingCheckpoint = (state: ExecutionState) => state.pendingCheckpoint;
 export const selectSelectedFile = (state: ExecutionState) => state.selectedFile;
 export const selectCommits = (state: ExecutionState) => state.commits;
+export const selectPlanEditingLocked = (state: ExecutionState) =>
+  state.planEditingLocked;

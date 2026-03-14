@@ -73,3 +73,27 @@ export async function withRetry<T>(
 
   throw lastError;
 }
+
+export interface RecoveryPaths {
+  retry: {
+    action: 'retryFailedStep';
+    label: 'Retry';
+  };
+  fixPlan: {
+    action: 'openFixPlan';
+    label: 'Open fix plan';
+  };
+}
+
+export function getRecoveryPaths(): RecoveryPaths {
+  return {
+    retry: {
+      action: 'retryFailedStep',
+      label: 'Retry',
+    },
+    fixPlan: {
+      action: 'openFixPlan',
+      label: 'Open fix plan',
+    },
+  };
+}

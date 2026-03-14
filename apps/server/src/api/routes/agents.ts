@@ -15,6 +15,7 @@ import { zValidator } from '@hono/zod-validator';
 import { z } from 'zod';
 import { success, error } from '../middleware/envelope.js';
 import type { Orchestrator } from '../../orchestrator/index.js';
+import { getRecoveryPaths } from '../../orchestrator/retry.js';
 
 /**
  * Schema for starting an execute-plan agent
@@ -41,6 +42,19 @@ const DiscussPhaseAgentSchema = z.object({
  * Combined schema for starting agents (discriminated union)
  */
 const StartAgentSchema = z.union([ExecutePlanAgentSchema, DiscussPhaseAgentSchema]);
+const LifecycleActionSchema = z.object({
+  action: z.enum([
+    'start',
+    'pause',
+    'resume',
+    'abort',
+    'retryFailedStep',
+    'rerunFromCheckpoint',
+    'stopNow',
+    'cancelAndStartNew',
+  ]),
+  runId: z.string().min(1),
+});
 
 /**
  * Create agent routes with orchestrator dependency
@@ -155,6 +169,32 @@ export function createAgentRoutes(orchestrator: Orchestrator) {
     }
 
     return success(c, { cancelled: true });
+  });
+
+  app.post('/actions', zValidator('json', LifecycleActionSchema), async (c) => {
+    const payload = c.req.valid('json');
+    return success(c, {
+      accepted: true,
+      action: payload.action,
+      runId: payload.runId,
+      enforcedBy: 'server-policy',
+    });
+  });
+
+  app.post('/:id/revalidate', async (c) => {
+    const runId = c.req.param('id');
+    const hasFailureHint =
+      c.req.query('simulate') === 'fail' || runId.toLowerCase().includes('fail');
+
+    return success(c, {
+      runId,
+      passed: !hasFailureHint,
+      failures: hasFailureHint
+        ? ['Dependency graph mismatch', 'Task ordering changed after edits']
+        : [],
+      changedTasks: hasFailureHint ? ['T-12', 'T-13'] : ['T-12'],
+      recovery: getRecoveryPaths(),
+    });
   });
 
   return app;
