@@ -1,7 +1,7 @@
 import { test, expect, type Page } from '@playwright/test';
 
 test.describe('Discuss Phase Full Workflow', () => {
-  const projectId = process.env.E2E_PROJECT_ID || 'get-shit-done';
+  const projectId = process.env['E2E_PROJECT_ID'] || 'get-shit-done';
 
   async function chatInput(page: Page) {
     return page.getByPlaceholder('Ask about goals, constraints, users, or decisions...').first();

@@ -111,6 +111,15 @@ async function enrichProject(project: GsdProject): Promise<ProjectResponse> {
   };
 }
 
+function matchesProjectId(project: GsdProject, requestedId: string): boolean {
+  if (project.id === requestedId) return true;
+  const normalizedRequested = requestedId.trim().toLowerCase();
+  const pathParts = project.path.split(/[\\/]/).filter(Boolean);
+  const basename = (pathParts[pathParts.length - 1] ?? '').toLowerCase();
+  if (basename === normalizedRequested) return true;
+  return project.name.trim().toLowerCase() === normalizedRequested;
+}
+
 /**
  * Create project routes
  *
@@ -183,7 +192,7 @@ export function createProjectRoutes(searchPaths: string[]): Hono {
       );
     }
 
-    const project = result.data.find((p) => p.id === id);
+    const project = result.data.find((p) => matchesProjectId(p, id));
 
     if (!project) {
       return error(

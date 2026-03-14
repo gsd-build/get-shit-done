@@ -118,11 +118,11 @@ describe('GapList', () => {
       const items = within(list).getAllByRole('listitem');
 
       // First item should be blocking
-      expect(within(items[0]).getByText('Blocking issue')).toBeInTheDocument();
+      expect(within(items[0]!).getByText('Blocking issue')).toBeInTheDocument();
       // Second item should be major
-      expect(within(items[1]).getByText('Major issue')).toBeInTheDocument();
+      expect(within(items[1]!).getByText('Major issue')).toBeInTheDocument();
       // Third item should be minor
-      expect(within(items[2]).getByText('Minor issue')).toBeInTheDocument();
+      expect(within(items[2]!).getByText('Minor issue')).toBeInTheDocument();
     });
   });
 });

@@ -46,7 +46,7 @@ describe('TaskCard', () => {
   });
 
   it('does not render file count if no files', () => {
-    const taskWithoutFiles = { ...mockTask, files: undefined };
+    const { files: _files, ...taskWithoutFiles } = mockTask;
     render(<TaskCard task={taskWithoutFiles} />);
     expect(screen.queryByText(/files/)).not.toBeInTheDocument();
   });

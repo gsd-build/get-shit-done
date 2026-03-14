@@ -18,6 +18,7 @@ import { discoverProjects, listPhases } from '@gsd/gsd-wrapper';
 import type { Orchestrator } from '../../orchestrator/index.js';
 import type { TypedServer } from '../../socket/server.js';
 import { EVENTS } from '@gsd/events';
+import type { Project as GsdProject } from '@gsd/gsd-wrapper';
 
 /**
  * Schema for starting phase execution
@@ -29,6 +30,11 @@ const StartExecutionSchema = z.object({
 const UpdatePlanTaskSchema = z.object({
   name: z.string().min(1).optional(),
   description: z.string().optional(),
+});
+const CreatePlanSchema = z.object({
+  title: z.string().min(1),
+  category: z.string().min(1),
+  intent: z.string().optional(),
 });
 
 const RejectSchema = z.object({
@@ -52,6 +58,7 @@ interface PlanTaskView {
 }
 
 const planTaskOverrides = new Map<string, Map<string, { name?: string; description?: string }>>();
+const createdPlanTasks = new Map<string, PlanTaskView[]>();
 type VerificationGapSeverity = 'blocking' | 'major' | 'minor';
 interface VerificationSnapshot {
   passed: boolean;
@@ -146,6 +153,16 @@ export function createExecuteRoutes(
   io: TypedServer
 ) {
   const app = new Hono();
+  const PLAN_FILE_PATTERN = /^\d+(?:\.\d+)?-\d+-PLAN\.md$/i;
+
+  function matchesProjectId(project: GsdProject, requestedId: string): boolean {
+    if (project.id === requestedId) return true;
+    const normalizedRequested = requestedId.trim().toLowerCase();
+    const pathParts = project.path.split(/[\\/]/).filter(Boolean);
+    const basename = (pathParts[pathParts.length - 1] ?? '').toLowerCase();
+    if (basename === normalizedRequested) return true;
+    return project.name.trim().toLowerCase() === normalizedRequested;
+  }
 
   async function resolveProject(projectId: string) {
     const projectResult = await discoverProjects(searchPaths);
@@ -157,7 +174,7 @@ export function createExecuteRoutes(
       );
     }
 
-    return projectResult.data.find((p) => p.id === projectId) ?? null;
+    return projectResult.data.find((p) => matchesProjectId(p, projectId)) ?? null;
   }
 
   async function resolvePhases(projectPath: string) {
@@ -195,9 +212,7 @@ export function createExecuteRoutes(
 
       let files: string[] = [];
       try {
-        files = readdirSync(phaseDir).filter(
-          (f) => f.match(/^\d+-\d+-PLAN\.md$/) || f.match(/^\d+-PLAN\.md$/)
-        );
+        files = readdirSync(phaseDir).filter((f) => PLAN_FILE_PATTERN.test(f));
       } catch {
         continue;
       }
@@ -269,16 +284,7 @@ export function createExecuteRoutes(
       console.log(`[execute] Starting execution for project ${projectId}, phase ${phaseNumber}`);
 
       // Find project
-      const projectResult = await discoverProjects(searchPaths);
-      if (!projectResult.success) {
-        throw new ApiError(
-          ErrorCodes.GSD_TOOLS_ERROR,
-          projectResult.error.message,
-          500
-        );
-      }
-
-      const project = projectResult.data.find((p) => p.id === projectId);
+      const project = await resolveProject(projectId);
       if (!project) {
         return error(
           c,
@@ -323,9 +329,7 @@ export function createExecuteRoutes(
 
       try {
         const files = readdirSync(phaseDir);
-        planFiles = files.filter(
-          (f) => f.match(/^\d+-\d+-PLAN\.md$/) || f.match(/^\d+-PLAN\.md$/)
-        );
+        planFiles = files.filter((f) => PLAN_FILE_PATTERN.test(f));
       } catch (err) {
         return error(
           c,
@@ -434,7 +438,7 @@ export function createExecuteRoutes(
         resolvedNumber: phase.resolvedNumber,
       }))
     );
-    const planTasks =
+    const generatedTasks =
       tasks.length > 0
         ? tasks
         : buildFallbackPlanTasks(
@@ -444,6 +448,8 @@ export function createExecuteRoutes(
               resolvedNumber: phase.resolvedNumber,
             }))
           );
+    const customTasks = createdPlanTasks.get(projectId) ?? [];
+    const planTasks = [...customTasks, ...generatedTasks];
 
     return success(c, {
       id: `project-${projectId}-plan`,
@@ -491,6 +497,45 @@ export function createExecuteRoutes(
       });
     }
   );
+
+  app.post('/:id/plan', zValidator('json', CreatePlanSchema), async (c) => {
+    const projectId = c.req.param('id');
+    const payload = c.req.valid('json');
+
+    const project = await resolveProject(projectId);
+    if (!project) {
+      return error(
+        c,
+        ErrorCodes.PROJECT_NOT_FOUND,
+        `Project '${projectId}' not found`,
+        404
+      );
+    }
+
+    const task: PlanTaskView = {
+      id: `custom:${randomUUID()}`,
+      name: payload.title,
+      description: payload.intent?.trim()
+        ? `${payload.intent.trim()} (${payload.category})`
+        : `Created from New Plan modal (${payload.category})`,
+      wave: 1,
+      dependsOn: [],
+      files: [],
+      type: 'auto',
+    };
+
+    const existing = createdPlanTasks.get(projectId) ?? [];
+    createdPlanTasks.set(projectId, [task, ...existing]);
+
+    return success(
+      c,
+      {
+        created: true,
+        task,
+      },
+      201
+    );
+  });
 
   app.post('/:id/research', async (c) => {
     const projectId = c.req.param('id');

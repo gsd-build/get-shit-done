@@ -347,6 +347,52 @@ export async function updatePlanTask(
 }
 
 /**
+ * Create a new plan task from UI input.
+ */
+export async function createPlan(
+  projectId: string,
+  payload: { title: string; category: string; intent?: string }
+): Promise<ApiEnvelope<{ created: boolean; task: PlanTask } | null>> {
+  const url = proxyUrl(`/projects/${projectId}/plan`);
+
+  try {
+    const response = await fetch(url, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(payload),
+    });
+
+    if (!response.ok) {
+      return {
+        success: false,
+        data: null,
+        meta: {
+          timestamp: new Date().toISOString(),
+          requestId: '',
+        },
+        error: { code: 'CREATE_ERROR', message: `HTTP ${response.status}` },
+      };
+    }
+
+    const json = await response.json();
+    return json as ApiEnvelope<{ created: boolean; task: PlanTask }>;
+  } catch (err) {
+    return {
+      success: false,
+      data: null,
+      meta: {
+        timestamp: new Date().toISOString(),
+        requestId: '',
+      },
+      error: {
+        code: 'NETWORK_ERROR',
+        message: err instanceof Error ? err.message : 'Unknown error',
+      },
+    };
+  }
+}
+
+/**
  * Start research for a phase.
  *
  * @param phaseId - The phase ID to start research for

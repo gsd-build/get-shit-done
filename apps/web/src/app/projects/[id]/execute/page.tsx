@@ -11,7 +11,7 @@
 
 import { useParams, useRouter, useSearchParams } from 'next/navigation';
 import { useCallback, useEffect, useMemo, useState } from 'react';
-import { ArrowLeft } from 'lucide-react';
+import { ArrowLeft, Plus } from 'lucide-react';
 import { EVENTS } from '@gsd/events';
 import { ExecutionPanel } from '@/components/features/execute';
 import { ConnectionStatus } from '@/components/features/execute/ConnectionStatus';
@@ -33,6 +33,7 @@ import {
   useOrchestrationStore,
   selectSelectedOrchestrationRun,
 } from '@/stores/orchestrationStore';
+import { NewPlanModal } from '@/components/features/projects/NewPlanModal';
 
 const API_URL = API_PROXY_BASE;
 
@@ -106,6 +107,7 @@ export default function ExecutePage() {
   const [isStarting, setIsStarting] = useState(false);
   const [startError, setStartError] = useState<string | null>(null);
   const [workflow, setWorkflow] = useState<ParallelismWorkflowNode[]>([]);
+  const [showNewPlan, setShowNewPlan] = useState(false);
 
   // Connect to Socket.IO server
   const { socket, isConnected, reconnect } = useSocket(socketUrl);
@@ -273,6 +275,14 @@ export default function ExecutePage() {
         </button>
 
         <div className="flex items-center gap-4">
+          <button
+            type="button"
+            onClick={() => setShowNewPlan(true)}
+            className="inline-flex items-center gap-2 px-3 py-2 text-sm font-medium text-white bg-primary rounded-md"
+          >
+            <Plus className="w-4 h-4" />
+            New Plan
+          </button>
           {/* Connection status with recovery CTAs */}
           <ConnectionStatus
             isConnected={isConnected}
@@ -333,6 +343,11 @@ export default function ExecutePage() {
           </div>
         </div>
       )}
+      <NewPlanModal
+        projectId={projectId}
+        open={showNewPlan}
+        onOpenChange={setShowNewPlan}
+      />
     </div>
   );
 }

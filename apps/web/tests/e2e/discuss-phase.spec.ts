@@ -1,7 +1,7 @@
 import { test, expect, type Page } from '@playwright/test';
 
 test.describe('Discuss Phase UI', () => {
-  const testProjectId = process.env.E2E_PROJECT_ID || 'get-shit-done';
+  const testProjectId = process.env['E2E_PROJECT_ID'] || 'get-shit-done';
   const discussUrl = `/projects/${testProjectId}/discuss`;
 
   async function getPromptInput(page: Page) {

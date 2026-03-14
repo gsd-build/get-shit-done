@@ -7,6 +7,7 @@ import {
   selectFailedCount,
   selectRunningTest,
   selectSummary,
+  selectHasStaleResults,
 } from '@/stores/verificationStore';
 import { ReportHeader } from './ReportHeader';
 import { RequirementList } from './RequirementList';
@@ -25,6 +26,7 @@ export function VerificationPanel() {
   const failedCount = useVerificationStore(selectFailedCount);
   const runningTest = useVerificationStore(selectRunningTest);
   const summary = useVerificationStore(selectSummary);
+  const hasStaleResults = useVerificationStore(selectHasStaleResults);
 
   // Show loading skeleton when idle with no results
   if (status === 'idle' && results.length === 0) {
@@ -51,6 +53,7 @@ export function VerificationPanel() {
         failedCount={failedCount}
         {...(runningTest && { runningTest })}
         {...(summary && { summary })}
+        hasStaleResults={hasStaleResults}
       />
 
       <RequirementList results={results} />

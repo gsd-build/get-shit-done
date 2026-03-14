@@ -9,6 +9,7 @@ interface ReportHeaderProps {
   failedCount: number;
   runningTest?: string;
   summary?: string;
+  hasStaleResults?: boolean;
 }
 
 /**
@@ -24,6 +25,7 @@ export function ReportHeader({
   failedCount,
   runningTest,
   summary,
+  hasStaleResults = false,
 }: ReportHeaderProps) {
   return (
     <div className="mb-6 p-6 bg-card rounded-lg border border-border">
@@ -42,6 +44,11 @@ export function ReportHeader({
               {runningTest && (
                 <p className="text-muted-foreground text-sm mt-1">
                   Running: {runningTest}
+                </p>
+              )}
+              {hasStaleResults && (
+                <p className="text-amber-600 text-sm mt-1">
+                  Showing stale results while new verification run is in progress.
                 </p>
               )}
             </div>

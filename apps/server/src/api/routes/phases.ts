@@ -9,10 +9,20 @@ import { success, error } from '../middleware/envelope.js';
 import { ApiError, ErrorCodes } from '../middleware/errors.js';
 import type { Phase as ApiPhase } from '../schemas/responses.js';
 import { discoverProjects, listPhases } from '@gsd/gsd-wrapper';
+import type { Project as GsdProject } from '@gsd/gsd-wrapper';
 
 function resolvePhaseNumber(rawPhaseNumber: unknown, index: number): number {
   const parsed = Number.parseInt(String(rawPhaseNumber ?? ''), 10);
   return Number.isFinite(parsed) && parsed > 0 ? parsed : index + 1;
+}
+
+function matchesProjectId(project: GsdProject, requestedId: string): boolean {
+  if (project.id === requestedId) return true;
+  const normalizedRequested = requestedId.trim().toLowerCase();
+  const pathParts = project.path.split(/[\\/]/).filter(Boolean);
+  const basename = (pathParts[pathParts.length - 1] ?? '').toLowerCase();
+  if (basename === normalizedRequested) return true;
+  return project.name.trim().toLowerCase() === normalizedRequested;
 }
 
 /**
@@ -41,7 +51,7 @@ export function createPhasesRoutes(searchPaths: string[]): Hono {
       );
     }
 
-    const project = projectResult.data.find((p) => p.id === id);
+    const project = projectResult.data.find((p) => matchesProjectId(p, id));
 
     if (!project) {
       return error(
@@ -88,7 +98,7 @@ export function createPhasesRoutes(searchPaths: string[]): Hono {
       );
     }
 
-    const project = projectResult.data.find((p) => p.id === id);
+    const project = projectResult.data.find((p) => matchesProjectId(p, id));
     if (!project) {
       return error(c, ErrorCodes.PROJECT_NOT_FOUND, `Project '${id}' not found`, 404);
     }
@@ -152,7 +162,7 @@ export function createPhasesRoutes(searchPaths: string[]): Hono {
       );
     }
 
-    const project = projectResult.data.find((p) => p.id === id);
+    const project = projectResult.data.find((p) => matchesProjectId(p, id));
     if (!project) {
       return error(c, ErrorCodes.PROJECT_NOT_FOUND, `Project '${id}' not found`, 404);
     }

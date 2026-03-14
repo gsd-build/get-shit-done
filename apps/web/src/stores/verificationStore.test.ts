@@ -42,7 +42,7 @@ describe('verificationStore', () => {
       expect(useVerificationStore.getState().status).toBe('running');
     });
 
-    it('clears results when called', () => {
+    it('preserves results and marks them stale when rerun starts', () => {
       // Add some results first
       useVerificationStore.getState().addTestResult({
         requirementId: 'REQ-1',
@@ -52,9 +52,10 @@ describe('verificationStore', () => {
       });
       expect(useVerificationStore.getState().results.length).toBe(1);
 
-      // Now setRunning should clear
+      // Now setRunning should keep results visible and mark as stale
       useVerificationStore.getState().setRunning();
-      expect(useVerificationStore.getState().results).toEqual([]);
+      expect(useVerificationStore.getState().results).toHaveLength(1);
+      expect(useVerificationStore.getState().hasStaleResults).toBe(true);
     });
 
     it('sets runningTest to null', () => {

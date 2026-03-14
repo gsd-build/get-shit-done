@@ -5,7 +5,7 @@
 import { test, expect, type Page } from '@playwright/test';
 
 const PROJECT_ID = process.env['E2E_PROJECT_ID'] ?? 'get-shit-done';
-const E2E_AUTH_TOKEN = process.env.E2E_AUTH_TOKEN ?? 'manual-test-token';
+const E2E_AUTH_TOKEN = process.env['E2E_AUTH_TOKEN'] ?? 'manual-test-token';
 const discussUrl = `/projects/${PROJECT_ID}/discuss`;
 
 async function freshDiscussPage(page: Page) {

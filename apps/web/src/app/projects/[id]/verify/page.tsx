@@ -2,8 +2,7 @@
 
 import { useEffect, useState, useCallback } from 'react';
 import { useParams, useRouter } from 'next/navigation';
-import Link from 'next/link';
-import { ArrowLeft, Play } from 'lucide-react';
+import { Play } from 'lucide-react';
 import * as Tabs from '@radix-ui/react-tabs';
 import { useSocket } from '@/hooks/useSocket';
 import { useVerification } from '@/hooks/useVerification';
@@ -29,6 +28,8 @@ import {
   useOrchestrationStore,
   selectSelectedOrchestrationRun,
 } from '@/stores/orchestrationStore';
+import { WorkflowHeader } from '@/components/features/projects/WorkflowHeader';
+import { NewPlanModal } from '@/components/features/projects/NewPlanModal';
 
 const SOCKET_URL = resolveSocketBase();
 
@@ -53,6 +54,7 @@ export default function VerifyPhasePage() {
   // Verification streaming via useVerification hook
   const {
     status,
+    results,
     gaps,
     overallPassed,
     summary,
@@ -69,10 +71,12 @@ export default function VerifyPhasePage() {
   const [phases, setPhases] = useState<string[]>([]);
   const [isLoadingCoverage, setIsLoadingCoverage] = useState(true);
   const [actionError, setActionError] = useState<string | null>(null);
+  const [showNewPlan, setShowNewPlan] = useState(false);
   const setRuns = useOrchestrationStore((state) => state.setRuns);
   const setSelectedRun = useOrchestrationStore((state) => state.setSelectedRun);
   const selectedRun = useOrchestrationStore(selectSelectedOrchestrationRun);
   const isRunning = status === 'running';
+  const canApprove = !isRunning && status === 'complete' && results.length > 0;
 
   // Fetch coverage data on mount
   useEffect(() => {
@@ -150,29 +154,15 @@ export default function VerifyPhasePage() {
   return (
     <main className="min-h-screen bg-background pb-24">
       <div className="max-w-7xl mx-auto px-4 py-8">
-        {/* Back navigation */}
-        <Link
-          href={`/projects/${projectId}`}
-          className="flex items-center gap-2 text-muted-foreground hover:text-foreground mb-6"
-        >
-          <ArrowLeft className="w-4 h-4" />
-          Back to Project
-        </Link>
+        <WorkflowHeader
+          projectId={projectId}
+          title="Verification"
+          subtitle={`Project: ${projectId}${isConnected ? ' · Connected' : ''}`}
+          onNewPlan={() => setShowNewPlan(true)}
+        />
 
-        {/* Header */}
-        <div className="flex items-center justify-between mb-8">
-          <div>
-            <h1 className="text-3xl font-bold text-foreground">Verification</h1>
-            <p className="text-muted-foreground mt-1">
-              Project: {projectId}
-              {isConnected && (
-                <span className="ml-2 text-green-500 text-sm">Connected</span>
-              )}
-            </p>
-          </div>
-
-          {/* Run Verification button */}
-          {!isRunning && status !== 'complete' && (
+        {!isRunning && status !== 'complete' && (
+          <div className="mb-8">
             <button
               type="button"
               onClick={startVerification}
@@ -181,8 +171,8 @@ export default function VerifyPhasePage() {
               <Play className="w-4 h-4" />
               Run Verification
             </button>
-          )}
-        </div>
+          </div>
+        )}
 
         <div className="mb-6 space-y-3">
           <OrchestrationControlBar projectId={projectId} phaseId="verify" />
@@ -255,7 +245,17 @@ export default function VerifyPhasePage() {
       </div>
 
       {/* Approval Bar - fixed at bottom */}
-      <ApprovalBar gaps={gaps} onApprove={handleApprove} onReject={handleReject} />
+      <ApprovalBar
+        gaps={gaps}
+        onApprove={handleApprove}
+        onReject={handleReject}
+        disabled={!canApprove}
+      />
+      <NewPlanModal
+        projectId={projectId}
+        open={showNewPlan}
+        onOpenChange={setShowNewPlan}
+      />
     </main>
   );
 }

@@ -28,10 +28,10 @@ const __dirname = dirname(__filename);
 // ============================================================================
 
 const BASE_URL = 'http://localhost:3000';
-const EXEC_PROJECT_ID = process.env.E2E_PROJECT_ID ?? 'todo-app';
+const EXEC_PROJECT_ID = process.env['E2E_PROJECT_ID'] ?? 'todo-app';
 const EXEC_PROJECT_NAME =
-  process.env.E2E_PROJECT_NAME ?? (EXEC_PROJECT_ID === 'todo-app' ? 'Todo App' : 'Get Shit Done');
-const E2E_AUTH_TOKEN = process.env.E2E_AUTH_TOKEN ?? 'manual-test-token';
+  process.env['E2E_PROJECT_NAME'] ?? (EXEC_PROJECT_ID === 'todo-app' ? 'Todo App' : 'Get Shit Done');
+const E2E_AUTH_TOKEN = process.env['E2E_AUTH_TOKEN'] ?? 'manual-test-token';
 const API_BASE = 'http://localhost:4000/api';
 
 /** Viewport sizes for responsive testing */
@@ -1339,8 +1339,8 @@ test.describe('UAT-12: Resizable Panel Layout', () => {
       const pipelinePanel = page.getByTestId('pipeline-panel');
       const diffPanelContainer = page.getByTestId('diff-panel-container');
 
-      const pipelineWidth = await pipelinePanel.evaluate((el) => el.offsetWidth);
-      const diffWidth = await diffPanelContainer.evaluate((el) => el.offsetWidth);
+      const pipelineWidth = await pipelinePanel.evaluate((el) => (el as HTMLElement).offsetWidth);
+      const diffWidth = await diffPanelContainer.evaluate((el) => (el as HTMLElement).offsetWidth);
 
       expect(pipelineWidth).toBeGreaterThan(0);
       expect(diffWidth).toBeGreaterThan(0);

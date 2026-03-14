@@ -37,17 +37,17 @@ const createMockSocket = (): TypedSocket => {
 
 describe('useVerification', () => {
   let mockSocket: ReturnType<typeof createMockSocket>;
-  let fetchSpy: ReturnType<typeof vi.spyOn>;
+  let fetchSpy: ReturnType<typeof vi.fn>;
 
   beforeEach(() => {
     useVerificationStore.getState().reset();
     mockSocket = createMockSocket();
-    fetchSpy = vi.spyOn(globalThis, 'fetch');
+    fetchSpy = vi.spyOn(globalThis, 'fetch') as unknown as ReturnType<typeof vi.fn>;
   });
 
   afterEach(() => {
     vi.clearAllMocks();
-    fetchSpy.mockRestore();
+    (fetchSpy as unknown as { mockRestore: () => void }).mockRestore();
   });
 
   describe('subscription', () => {

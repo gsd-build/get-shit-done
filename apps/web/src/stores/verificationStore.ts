@@ -21,6 +21,7 @@ interface VerificationStore {
   manualTests: ManualTest[];
   overallPassed: boolean | null;
   summary: string | null;
+  hasStaleResults: boolean;
 
   // Actions
   setRunning: () => void;
@@ -41,6 +42,7 @@ const initialState = {
   manualTests: [] as ManualTest[],
   overallPassed: null as boolean | null,
   summary: null as string | null,
+  hasStaleResults: false,
 };
 
 /**
@@ -56,11 +58,11 @@ export const useVerificationStore = create<VerificationStore>((set) => ({
    * Start verification - sets status to running and clears previous results.
    */
   setRunning: () =>
-    set({
+    set((state) => ({
       status: 'running',
-      results: [],
       runningTest: null,
-    }),
+      hasStaleResults: state.results.length > 0,
+    })),
 
   /**
    * Update the currently running test name.
@@ -84,6 +86,7 @@ export const useVerificationStore = create<VerificationStore>((set) => ({
       overallPassed: passed,
       summary,
       runningTest: null,
+      hasStaleResults: false,
     }),
 
   /**
@@ -125,6 +128,7 @@ export const selectOverallPassed = (state: VerificationStore) =>
 export const selectRunningTest = (state: VerificationStore) =>
   state.runningTest;
 export const selectSummary = (state: VerificationStore) => state.summary;
+export const selectHasStaleResults = (state: VerificationStore) => state.hasStaleResults;
 
 // Derived selectors for computed values
 /**

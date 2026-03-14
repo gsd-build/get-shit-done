@@ -1,11 +1,14 @@
 'use client';
 
 import { FormEvent, useEffect, useMemo, useState } from 'react';
-import { useParams, useRouter } from 'next/navigation';
-import { ArrowLeft, Send } from 'lucide-react';
+import { useParams } from 'next/navigation';
+import { Send } from 'lucide-react';
 import { EVENTS } from '@gsd/events';
 import { useSocket } from '@/hooks/useSocket';
 import { API_PROXY_BASE, resolveSocketBase } from '@/lib/endpoints';
+import { WorkflowHeader } from '@/components/features/projects/WorkflowHeader';
+import { NewPlanModal } from '@/components/features/projects/NewPlanModal';
+import { DecisionOptionsPanel } from '@/components/features/discuss/DecisionOptionsPanel';
 import {
   OrchestrationControlBar,
   RunStatusStrip,
@@ -14,6 +17,13 @@ import {
   useOrchestrationStore,
   selectSelectedOrchestrationRun,
 } from '@/stores/orchestrationStore';
+import {
+  useDiscussStore,
+  selectDecisions,
+  selectAuditEvents,
+  selectUnresolvedDecisions,
+  type DiscussDecision,
+} from '@/stores/discussStore';
 
 interface DiscussMessage {
   id: string;
@@ -23,9 +33,41 @@ interface DiscussMessage {
 
 const STORAGE_PREFIX = 'gsd-discuss';
 
+function buildDefaultDecisionOptions(question: string) {
+  return [
+    {
+      id: `${question}-recommended`,
+      label: 'Use suggested default',
+      recommended: true,
+    },
+    {
+      id: `${question}-alternative`,
+      label: 'Choose alternative approach',
+    },
+    {
+      id: `${question}-defer`,
+      label: 'Defer this decision',
+    },
+  ];
+}
+
+function parseDecisionQuestions(text: string): DiscussDecision[] {
+  const questionLines = text
+    .split('\n')
+    .map((line) => line.trim())
+    .filter((line) => /^\d+\.\s+/.test(line))
+    .map((line) => line.replace(/^\d+\.\s+/, '').trim())
+    .filter(Boolean);
+
+  return questionLines.map((question, index) => ({
+    id: `decision-${index + 1}-${question.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/(^-|-$)/g, '')}`,
+    question,
+    options: buildDefaultDecisionOptions(question),
+  }));
+}
+
 export default function DiscussPage() {
   const params = useParams();
-  const router = useRouter();
   const projectId = params['id'] as string;
   const socketUrl = useMemo(() => resolveSocketBase(), []);
   const storageKey = `${STORAGE_PREFIX}:${projectId}`;
@@ -38,6 +80,14 @@ export default function DiscussPage() {
   const [prompt, setPrompt] = useState('');
   const [isStreaming, setIsStreaming] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [showNewPlan, setShowNewPlan] = useState(false);
+  const decisions = useDiscussStore(selectDecisions);
+  const unresolvedDecisions = useDiscussStore(selectUnresolvedDecisions);
+  const auditEvents = useDiscussStore(selectAuditEvents);
+  const setDecisions = useDiscussStore((state) => state.setDecisions);
+  const applyDecision = useDiscussStore((state) => state.applyDecision);
+  const acceptAllDefaults = useDiscussStore((state) => state.acceptAllDefaults);
+  const clearDiscussState = useDiscussStore((state) => state.clear);
   const setRuns = useOrchestrationStore((state) => state.setRuns);
   const setSelectedRun = useOrchestrationStore((state) => state.setSelectedRun);
   const selectedRun = useOrchestrationStore(selectSelectedOrchestrationRun);
@@ -58,6 +108,7 @@ export default function DiscussPage() {
   }, [projectId, isStreaming, setRuns, setSelectedRun]);
 
   useEffect(() => {
+    clearDiscussState();
     const raw = localStorage.getItem(storageKey);
     if (raw) {
       try {
@@ -72,7 +123,7 @@ export default function DiscussPage() {
       }
     }
     setHasHydratedStorage(true);
-  }, [storageKey]);
+  }, [storageKey, clearDiscussState]);
 
   useEffect(() => {
     if (!hasHydratedStorage) return;
@@ -133,16 +184,11 @@ export default function DiscussPage() {
     };
   }, [socket, agentId]);
 
-  const handleSubmit = async (e: FormEvent) => {
-    e.preventDefault();
-    if (!prompt.trim() || isStreaming) return;
-
-    const nextPrompt = prompt.trim();
-    setPrompt('');
+  const sendPrompt = async (nextPrompt: string) => {
+    if (!nextPrompt.trim() || isStreaming) return;
     setError(null);
     setIsStreaming(true);
     setMessages((prev) => [...prev, { id: `user-${Date.now()}`, role: 'user', text: nextPrompt }]);
-
     try {
       const response = await fetch(`${API_PROXY_BASE}/agents`, {
         method: 'POST',
@@ -166,24 +212,59 @@ export default function DiscussPage() {
     }
   };
 
+  const handleSubmit = async (e: FormEvent) => {
+    e.preventDefault();
+    if (!prompt.trim() || isStreaming) return;
+
+    const nextPrompt = prompt.trim();
+    setPrompt('');
+    await sendPrompt(nextPrompt);
+  };
+
+  const handleChooseOption = async (decisionId: string, optionId: string) => {
+    const decision = decisions.find((item) => item.id === decisionId);
+    const option = decision?.options.find((item) => item.id === optionId);
+    if (!decision || !option) return;
+
+    applyDecision(decisionId, optionId);
+    await sendPrompt(
+      `Decision selected:\n- Question: ${decision.question}\n- Option: ${option.label}\nPlease continue with the next unresolved decision.`
+    );
+  };
+
+  const handleAcceptAllDefaults = async () => {
+    if (unresolvedDecisions.length === 0) return;
+    const summaryLines = unresolvedDecisions.map((decision) => {
+      const recommended = decision.options.find((option) => option.recommended) ?? decision.options[0];
+      return `- ${decision.question}: ${recommended?.label ?? 'Use suggested default'}`;
+    });
+
+    acceptAllDefaults();
+    await sendPrompt(
+      `Accept all defaults for unresolved decisions:\n${summaryLines.join('\n')}\nProceed to finalize discuss outcomes.`
+    );
+  };
+
+  useEffect(() => {
+    if (isStreaming) return;
+    const latestAssistant = [...messages].reverse().find((message) => message.role === 'assistant');
+    if (!latestAssistant) return;
+
+    const parsedDecisions = parseDecisionQuestions(latestAssistant.text);
+    if (parsedDecisions.length > 0) {
+      setDecisions(parsedDecisions);
+    }
+  }, [messages, isStreaming, setDecisions]);
+
   return (
     <main className="min-h-screen bg-background">
       <div className="max-w-7xl mx-auto px-4 py-6 space-y-4">
-        <button
-          type="button"
-          onClick={() => router.push(`/projects/${projectId}`)}
-          className="inline-flex items-center gap-2 min-h-11 px-3 rounded-md text-sm text-muted-foreground hover:text-foreground hover:bg-muted/50"
-        >
-          <ArrowLeft className="w-4 h-4" />
-          Back to Project
-        </button>
-
-        <div className="flex items-center justify-between gap-3">
-          <h1 className="text-2xl font-semibold">Discuss</h1>
-          <span className="text-xs px-2 py-1 rounded-full border border-border text-muted-foreground">
-            {isStreaming ? 'Streaming' : isConnected ? 'Connected' : 'Disconnected'}
-          </span>
-        </div>
+        <WorkflowHeader
+          projectId={projectId}
+          title="Discuss"
+          subtitle={isConnected ? 'Connected' : 'Disconnected'}
+          onNewPlan={() => setShowNewPlan(true)}
+        />
 
         <OrchestrationControlBar projectId={projectId} phaseId="discuss" />
         <RunStatusStrip run={selectedRun} />
@@ -239,13 +320,44 @@ export default function DiscussPage() {
             </form>
           </section>
 
-          <section className="border border-border rounded-lg bg-card overflow-hidden">
-            <div className="px-4 py-3 border-b border-border font-medium">CONTEXT.md Preview</div>
-            <pre className="h-[474px] overflow-y-auto p-4 text-xs leading-5 whitespace-pre-wrap">
-              {contextPreview || 'Context preview will appear after agent responses.'}
-            </pre>
-          </section>
+          <div className="space-y-4">
+            <section className="border border-border rounded-lg bg-card overflow-hidden">
+              <div className="px-4 py-3 border-b border-border font-medium">CONTEXT.md Preview</div>
+              <pre className="h-[300px] overflow-y-auto p-4 text-xs leading-5 whitespace-pre-wrap">
+                {contextPreview || 'Context preview will appear after agent responses.'}
+              </pre>
+            </section>
+
+            <DecisionOptionsPanel
+              decisions={decisions}
+              disabled={isStreaming}
+              onChooseOption={handleChooseOption}
+              onAcceptAllDefaults={handleAcceptAllDefaults}
+            />
+
+            <section className="border border-border rounded-lg bg-card overflow-hidden">
+              <div className="px-4 py-3 border-b border-border font-medium">Decision Audit</div>
+              <div className="p-4 space-y-2 max-h-[180px] overflow-y-auto">
+                {auditEvents.length === 0 ? (
+                  <p className="text-xs text-muted-foreground">No decision audit entries yet.</p>
+                ) : (
+                  auditEvents.map((event) => (
+                    <div key={event.id} className="text-xs text-foreground">
+                      <span className="font-medium uppercase mr-1">{event.type}</span>
+                      <span>{event.message}</span>
+                    </div>
+                  ))
+                )}
+              </div>
+            </section>
+          </div>
         </div>
+
+        <NewPlanModal
+          projectId={projectId}
+          open={showNewPlan}
+          onOpenChange={setShowNewPlan}
+        />
       </div>
     </main>
   );

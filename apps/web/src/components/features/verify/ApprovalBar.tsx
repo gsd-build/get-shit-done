@@ -10,6 +10,7 @@ interface ApprovalBarProps {
   gaps: Gap[];
   onApprove: () => void;
   onReject: (selectedGapIds: string[]) => void;
+  disabled?: boolean;
 }
 
 /**
@@ -19,7 +20,7 @@ interface ApprovalBarProps {
  * - Approve: Disabled when blocking gaps exist, shows confirmation dialog
  * - Reject: Opens GapSelectionModal to select gaps for fix plans
  */
-export function ApprovalBar({ gaps, onApprove, onReject }: ApprovalBarProps) {
+export function ApprovalBar({ gaps, onApprove, onReject, disabled = false }: ApprovalBarProps) {
   const [showApproveConfirm, setShowApproveConfirm] = useState(false);
   const [showRejectModal, setShowRejectModal] = useState(false);
   const [selectedGaps, setSelectedGaps] = useState<string[]>([]);
@@ -27,6 +28,7 @@ export function ApprovalBar({ gaps, onApprove, onReject }: ApprovalBarProps) {
   const hasBlockingOrMajorGaps = gaps.some(
     (g) => g.severity === 'blocking' || g.severity === 'major'
   );
+  const isApproveDisabled = disabled || hasBlockingOrMajorGaps;
 
   const handleApproveClick = () => {
     setShowApproveConfirm(true);
@@ -66,15 +68,17 @@ export function ApprovalBar({ gaps, onApprove, onReject }: ApprovalBarProps) {
           <button
             type="button"
             onClick={handleApproveClick}
-            disabled={hasBlockingOrMajorGaps}
+            disabled={isApproveDisabled}
             className="px-4 py-2 text-sm font-medium text-white bg-green-600 hover:bg-green-700 rounded-md transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
           >
             Approve
           </button>
         </div>
-        {hasBlockingOrMajorGaps && (
+        {isApproveDisabled && (
           <p className="max-w-4xl mx-auto mt-2 text-xs text-orange-600 text-right">
-            Resolve major or blocking gaps before approval.
+            {disabled
+              ? 'Approval available only after verification completes with results.'
+              : 'Resolve major or blocking gaps before approval.'}
           </p>
         )}
       </div>
