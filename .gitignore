@@ -35,6 +35,8 @@ RAILROAD_ARCHITECTURE.md
 .worktrees/
 
 # Internal working documents
+.planning/config.json
+.planning/worktrees/locks/
 analysis/
 docs/GSD-MASTER-ARCHITECTURE.md
 docs/GSD-RUST-IMPLEMENTATION-GUIDE.md
