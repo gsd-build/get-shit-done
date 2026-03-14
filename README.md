@@ -2,6 +2,8 @@
 
 # GET SHIT DONE
 
+**English** · [简体中文](README.zh-CN.md)
+
 **A light-weight and powerful meta-prompting, context engineering and spec-driven development system for Claude Code, OpenCode, Gemini CLI, and Codex.**
 
 **Solves context rot — the quality degradation that happens as Claude fills its context window.**
