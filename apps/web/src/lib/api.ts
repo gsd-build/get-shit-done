@@ -1,5 +1,10 @@
 import type { Project, ApiEnvelope, ApiMeta } from '@/types';
-import type { Plan, PlanTask } from '@/types/plan';
+import type {
+  Plan,
+  PlanTask,
+  ParallelismAssessment,
+  ParallelismWorkflowNode,
+} from '@/types/plan';
 import type { Coverage } from '@/components/features/verify/CoverageHeatmap';
 
 // Use local proxy to add authentication to API calls
@@ -14,6 +19,38 @@ export interface ProjectsResponse extends ApiEnvelope<Project[]> {
     total: number;
     hasNextPage: boolean;
   };
+}
+
+export type OrchestrationAction =
+  | 'start'
+  | 'pause'
+  | 'resume'
+  | 'abort'
+  | 'retryFailedStep'
+  | 'rerunFromCheckpoint'
+  | 'stopNow'
+  | 'cancelAndStartNew';
+
+export interface LifecycleActionRequest {
+  action: OrchestrationAction;
+  runId: string;
+}
+
+export interface RevalidationSummary {
+  runId: string;
+  passed: boolean;
+  failures: string[];
+  changedTasks: string[];
+  recovery?: {
+    retry: { action: 'retryFailedStep'; label: string };
+    fixPlan: { action: 'openFixPlan'; label: string };
+  };
+}
+
+export interface ProjectsOrchestrationSummary {
+  pausedRuns: number;
+  pausedRunNames: string[];
+  hasPausedRuns: boolean;
 }
 
 /**
@@ -72,6 +109,125 @@ export async function fetchProjects(cursor?: string): Promise<ProjectsResponse> 
         total: 0,
         hasNextPage: false,
       },
+      error: {
+        code: 'NETWORK_ERROR',
+        message: err instanceof Error ? err.message : 'Unknown error',
+      },
+    };
+  }
+}
+
+export async function fetchParallelismAssessment(
+  projectId: string,
+  phaseId: string
+): Promise<ApiEnvelope<ParallelismAssessment | null>> {
+  const url = proxyUrl(`/projects/${projectId}/phases/${phaseId}/parallelism`);
+  try {
+    const response = await fetch(url);
+    if (!response.ok) {
+      return {
+        success: false,
+        data: null,
+        meta: { timestamp: new Date().toISOString(), requestId: '' },
+        error: { code: 'FETCH_ERROR', message: `HTTP ${response.status}` },
+      };
+    }
+    return (await response.json()) as ApiEnvelope<ParallelismAssessment>;
+  } catch (err) {
+    return {
+      success: false,
+      data: null,
+      meta: { timestamp: new Date().toISOString(), requestId: '' },
+      error: {
+        code: 'NETWORK_ERROR',
+        message: err instanceof Error ? err.message : 'Unknown error',
+      },
+    };
+  }
+}
+
+export async function fetchParallelismWorkflow(
+  projectId: string
+): Promise<ApiEnvelope<ParallelismWorkflowNode[]>> {
+  const url = proxyUrl(`/projects/${projectId}/phases/workflow`);
+  try {
+    const response = await fetch(url);
+    if (!response.ok) {
+      return {
+        success: false,
+        data: [],
+        meta: { timestamp: new Date().toISOString(), requestId: '' },
+        error: { code: 'FETCH_ERROR', message: `HTTP ${response.status}` },
+      };
+    }
+    return (await response.json()) as ApiEnvelope<ParallelismWorkflowNode[]>;
+  } catch (err) {
+    return {
+      success: false,
+      data: [],
+      meta: { timestamp: new Date().toISOString(), requestId: '' },
+      error: {
+        code: 'NETWORK_ERROR',
+        message: err instanceof Error ? err.message : 'Unknown error',
+      },
+    };
+  }
+}
+
+export async function postAgentLifecycleAction(
+  _projectId: string,
+  payload: LifecycleActionRequest
+): Promise<ApiEnvelope<{ accepted: boolean } | null>> {
+  const url = proxyUrl('/agents/actions');
+  try {
+    const response = await fetch(url, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(payload),
+    });
+    if (!response.ok) {
+      return {
+        success: false,
+        data: null,
+        meta: { timestamp: new Date().toISOString(), requestId: '' },
+        error: { code: 'ACTION_ERROR', message: `HTTP ${response.status}` },
+      };
+    }
+    return (await response.json()) as ApiEnvelope<{ accepted: boolean }>;
+  } catch (err) {
+    return {
+      success: false,
+      data: null,
+      meta: { timestamp: new Date().toISOString(), requestId: '' },
+      error: {
+        code: 'NETWORK_ERROR',
+        message: err instanceof Error ? err.message : 'Unknown error',
+      },
+    };
+  }
+}
+
+export async function postRunRevalidation(
+  _projectId: string,
+  runId: string
+): Promise<ApiEnvelope<RevalidationSummary | null>> {
+  const url = proxyUrl(`/agents/${runId}/revalidate`);
+  try {
+    const response = await fetch(url, { method: 'POST' });
+    if (!response.ok) {
+      return {
+        success: false,
+        data: null,
+        meta: { timestamp: new Date().toISOString(), requestId: '' },
+        error: { code: 'REVALIDATION_ERROR', message: `HTTP ${response.status}` },
+      };
+    }
+    return (await response.json()) as ApiEnvelope<RevalidationSummary>;
+  } catch (err) {
+    return {
+      success: false,
+      data: null,
+      meta: { timestamp: new Date().toISOString(), requestId: '' },
       error: {
         code: 'NETWORK_ERROR',
         message: err instanceof Error ? err.message : 'Unknown error',

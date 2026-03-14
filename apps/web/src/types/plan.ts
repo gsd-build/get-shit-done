@@ -36,3 +36,33 @@ export interface Plan {
   tasks: PlanTask[];
   createdAt: string;
 }
+
+export type OrchestrationRunStatus =
+  | 'active'
+  | 'paused'
+  | 'blocked'
+  | 'complete'
+  | 'error';
+
+export interface ParallelismBlockerDetail {
+  id: string;
+  reason: string;
+  dependsOn: string[];
+  resolutionHint?: string;
+}
+
+export interface ParallelismAssessment {
+  phaseId: string;
+  allowed: boolean;
+  blockers: ParallelismBlockerDetail[];
+  assessedAt: string;
+}
+
+export interface ParallelismWorkflowNode {
+  id: string;
+  label: string;
+  wave: number;
+  status: 'assessed' | 'runnable' | 'blocked' | 'active' | 'paused' | 'complete';
+  dependsOn: string[];
+  blockerDetails?: ParallelismBlockerDetail[];
+}

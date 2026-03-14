@@ -50,6 +50,11 @@ export const ProjectSchema = z.object({
   currentPhase: z.string().nullable(),
   progress: ProjectProgressSchema,
   lastActivity: z.string().datetime().optional(),
+  orchestration: z.object({
+    pausedRuns: z.number().int().min(0),
+    pausedRunNames: z.array(z.string()),
+    hasPausedRuns: z.boolean(),
+  }).optional(),
 });
 
 export type Project = z.infer<typeof ProjectSchema>;

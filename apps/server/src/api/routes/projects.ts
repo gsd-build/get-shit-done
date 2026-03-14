@@ -62,6 +62,8 @@ async function enrichProject(project: GsdProject): Promise<ProjectResponse> {
 
   let currentPhase: string | null = null;
   let status: 'active' | 'paused' | 'completed' | 'unknown' = 'unknown';
+  let pausedRuns = 0;
+  let pausedRunNames: string[] = [];
 
   if (stateResult.success) {
     currentPhase = stateResult.data.phase;
@@ -70,15 +72,24 @@ async function enrichProject(project: GsdProject): Promise<ProjectResponse> {
     progress.totalPlans = stateResult.data.progress.total;
 
     // Map GSD status to project status
-    switch (stateResult.data.status) {
+    const stateStatus = String(stateResult.data.status);
+    switch (stateStatus) {
       case 'active':
         status = 'active';
+        break;
+      case 'paused':
+        status = 'paused';
         break;
       case 'complete':
         status = 'completed';
         break;
       default:
         status = 'active';
+    }
+
+    if (status === 'paused') {
+      pausedRuns = 1;
+      pausedRunNames = [stateResult.data.phase || project.name];
     }
   }
 
@@ -91,6 +102,11 @@ async function enrichProject(project: GsdProject): Promise<ProjectResponse> {
     currentPhase,
     progress,
     lastActivity: stateResult.success ? stateResult.data.lastActivity : undefined,
+    orchestration: {
+      pausedRuns,
+      pausedRunNames,
+      hasPausedRuns: pausedRuns > 0,
+    },
     discoveredAt,
   };
 }
