@@ -112,6 +112,7 @@ jobs:
               CORS_ORIGINS=${{ env.WEB_URL }} \
               WEB_URL=${{ env.WEB_URL }} \
               MOCK_EXECUTION=false \
+              ANTHROPIC_BASE_URL=https://maurice-9781-resource.services.ai.azure.com/anthropic/v1/messages \
               ANTHROPIC_MODEL=claude-sonnet-4-5 \
               ANTHROPIC_DEPLOYMENT=azure-claude-sonnet-4-5
 

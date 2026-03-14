@@ -24,7 +24,8 @@ import {
   type PendingCheckpoint,
 } from './checkpoint.js';
 
-const ANTHROPIC_BASE_URL = process.env['ANTHROPIC_BASE_URL']?.trim();
+const rawAnthropicBaseUrl = process.env['ANTHROPIC_BASE_URL']?.trim();
+const ANTHROPIC_BASE_URL = rawAnthropicBaseUrl?.replace(/\/v1\/messages\/?$/, '');
 const ANTHROPIC_MODEL = process.env['ANTHROPIC_MODEL']?.trim() || 'claude-sonnet-4-5';
 const ANTHROPIC_DEPLOYMENT =
   process.env['ANTHROPIC_DEPLOYMENT']?.trim() || 'azure-claude-sonnet-4-5';
