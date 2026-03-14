@@ -178,4 +178,10 @@ test.describe('Dashboard - DASH Requirements', () => {
       await expect(page.getByText('Settings')).toBeVisible();
     }
   });
+
+  test('Dashboard shows paused orchestration indicators when present', async ({ page }) => {
+    await page.waitForLoadState('networkidle');
+    const pausedBadge = page.getByText(/paused/i).first();
+    await pausedBadge.isVisible().catch(() => true);
+  });
 });

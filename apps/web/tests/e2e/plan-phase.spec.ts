@@ -35,6 +35,13 @@ test.describe('Plan Phase Page', () => {
     await expect(kanban.or(emptyState).first()).toBeVisible();
   });
 
+  test('shows orchestration controls and workflow graph container', async ({ page }) => {
+    await skipIfUnavailable(page);
+    await expect(page.getByText(/Orchestration Controls/i)).toBeVisible();
+    await expect(page.getByText(/Workflow Parallelism/i)).toBeVisible();
+    await expect(page.getByTestId('parallelism-workflow-graph')).toBeVisible();
+  });
+
   test('supports task inline editing when plan tasks are present', async ({ page }) => {
     await skipIfUnavailable(page);
     const taskCards = page.locator('[data-testid^="task-card-"]');

@@ -190,6 +190,14 @@ test.describe('Execute Page Navigation', () => {
     await expect(emptyState).toBeVisible();
   });
 
+  test('Execute page shows orchestration controls and workflow graph', async ({ page }) => {
+    await page.goto('/projects/test-project/execute');
+    await page.waitForLoadState('domcontentloaded');
+
+    await expect(page.getByText(/Orchestration Controls/i)).toBeVisible();
+    await expect(page.getByTestId('parallelism-workflow-graph')).toBeVisible();
+  });
+
   test('Back button navigates to project detail', async ({ page }) => {
     await page.goto('/projects/test-project/execute');
     await page.waitForLoadState('domcontentloaded');
