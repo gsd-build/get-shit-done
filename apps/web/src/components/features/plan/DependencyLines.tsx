@@ -15,6 +15,7 @@ interface Line {
   toX: number;
   toY: number;
   id: string;
+  blocked?: boolean;
 }
 
 /**
@@ -53,6 +54,7 @@ export function DependencyLines({ tasks, cardPositions, containerRef }: Dependen
             toX,
             toY,
             id: `${depId}-${task.id}`,
+            blocked: task.type === 'checkpoint:human-action',
           });
         }
       });
@@ -93,9 +95,9 @@ export function DependencyLines({ tasks, cardPositions, containerRef }: Dependen
           y1={line.fromY}
           x2={line.toX}
           y2={line.toY}
-          stroke="#888"
+          stroke={line.blocked ? '#dc2626' : '#888'}
           strokeWidth="1.5"
-          strokeDasharray="4"
+          strokeDasharray={line.blocked ? '2 3' : '4'}
           markerEnd="url(#arrowhead)"
         />
       ))}

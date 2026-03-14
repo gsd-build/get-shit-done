@@ -9,3 +9,4 @@ export { DependencyLines } from './DependencyLines';
 export { ResearchSwimlanes } from './ResearchSwimlanes';
 export { AgentLane } from './AgentLane';
 export { AgentSummary } from './AgentSummary';
+export { ParallelismWorkflowGraph } from './ParallelismWorkflowGraph';
