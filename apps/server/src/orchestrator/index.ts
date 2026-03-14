@@ -16,9 +16,9 @@ import { EVENTS } from '@gsd/events';
 // Mock mode is opt-in only.
 const MOCK_MODE = process.env['MOCK_EXECUTION'] === 'true';
 const ANTHROPIC_API_KEY = process.env['ANTHROPIC_API_KEY'];
-const HAS_VALID_ANTHROPIC_KEY = ANTHROPIC_API_KEY?.startsWith('sk-ant-') ?? false;
+const HAS_ANTHROPIC_API_KEY = (ANTHROPIC_API_KEY?.trim().length ?? 0) > 0;
 
-if (!MOCK_MODE && !HAS_VALID_ANTHROPIC_KEY) {
+if (!MOCK_MODE && !HAS_ANTHROPIC_API_KEY) {
   throw new Error(
     '[orchestrator] ANTHROPIC_API_KEY is required when MOCK_EXECUTION is not true'
   );

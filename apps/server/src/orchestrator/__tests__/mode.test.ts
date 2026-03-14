@@ -30,4 +30,10 @@ describe('orchestrator mode configuration', () => {
 
     await expect(import('../index.js')).resolves.toHaveProperty('createOrchestrator');
   });
+
+  it('allows startup when a non-empty non-sk key is present (e.g., Azure key)', async () => {
+    process.env['ANTHROPIC_API_KEY'] = 'azure-foundry-token-value';
+
+    await expect(import('../index.js')).resolves.toHaveProperty('createOrchestrator');
+  });
 });
