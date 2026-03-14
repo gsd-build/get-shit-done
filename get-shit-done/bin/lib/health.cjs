@@ -507,8 +507,14 @@ function checkSyncHealth(cwd) {
       }
     }
 
-    // Check for binary files pending acknowledgment
-    if (analysis.binary_files && analysis.binary_files.length > 0 && !analysis.binary_acknowledged) {
+    // Check for binary files pending acknowledgment.
+    // Safe binary files (e.g. favicon/logo assets) should not block health.
+    const hasBinaryFiles = Array.isArray(analysis.binary_files) && analysis.binary_files.length > 0;
+    const hasReviewOrDangerousBinaries = Boolean(analysis.binary_requires_acknowledgment)
+      || (Array.isArray(analysis.binary_review_files) && analysis.binary_review_files.length > 0)
+      || (Array.isArray(analysis.binary_dangerous_files) && analysis.binary_dangerous_files.length > 0);
+
+    if (hasBinaryFiles && hasReviewOrDangerousBinaries && !analysis.binary_acknowledged) {
       issues.push({
         type: 'binary_files_pending',
         message: `${analysis.binary_files.length} binary file(s) pending acknowledgment`,

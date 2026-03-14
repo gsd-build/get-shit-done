@@ -2626,6 +2626,9 @@ function cmdUpstreamPreview(cwd, options, output, error, raw) {
     analyzed_sha: currentUpstreamSha,
     conflict_count: detailedConflicts.length,
     binary_acknowledged: false,
+    binary_requires_acknowledgment: requiresAcknowledgment,
+    binary_review_files: binaries.review,
+    binary_dangerous_files: binaries.dangerous,
     binary_files: [...binaries.safe, ...binaries.review, ...binaries.dangerous],
   };
   saveUpstreamConfig(cwd, upstreamConfig);
