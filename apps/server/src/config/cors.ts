@@ -68,6 +68,11 @@ export function isOriginAllowed(origin: string | undefined, allowedOrigins: stri
     return true;
   }
 
+  // Safe local fallback when no explicit origins are configured.
+  if (allowedOrigins.length === 0) {
+    return isLocalhostOrigin(origin);
+  }
+
   if (allowedOrigins.includes('*')) {
     return true;
   }
@@ -80,7 +85,12 @@ export function resolveCorsOrigin(
   allowedOrigins: string[]
 ): string | null {
   if (!origin) {
-    return allowedOrigins.includes('*') ? '*' : allowedOrigins[0] ?? null;
+    if (allowedOrigins.includes('*')) return '*';
+    return allowedOrigins[0] ?? null;
+  }
+
+  if (allowedOrigins.length === 0) {
+    return isLocalhostOrigin(origin) ? origin : null;
   }
 
   if (allowedOrigins.includes('*')) {

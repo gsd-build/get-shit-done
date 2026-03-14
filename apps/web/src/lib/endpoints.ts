@@ -25,6 +25,15 @@ export function resolveSocketBase(): string {
     return process.env['NEXT_PUBLIC_API_URL'];
   }
   if (typeof window !== 'undefined') {
+    const { hostname, port } = window.location;
+    const isLocalHost =
+      hostname === 'localhost' || hostname === '127.0.0.1' || hostname === '0.0.0.0';
+
+    // In local dev, Next.js runs on 3000 while API/socket runs on 4000.
+    if (isLocalHost && (port === '3000' || port === '3001' || port === '3002')) {
+      return `http://${hostname}:4000`;
+    }
+
     return window.location.origin;
   }
   return LOCAL_API_FALLBACK;

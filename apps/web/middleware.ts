@@ -10,6 +10,7 @@ import type { NextRequest } from 'next/server';
 
 export function middleware(request: NextRequest) {
   const pathname = request.nextUrl.pathname;
+  const authEnabled = Boolean(process.env['AUTH_USERNAME'] && process.env['AUTH_PASSWORD']);
 
   // Explicitly satisfy browser favicon requests in environments
   // where no branded icon asset is configured yet.
@@ -27,6 +28,11 @@ export function middleware(request: NextRequest) {
     pathname === '/login' ||
     pathname.includes('.')
   ) {
+    return NextResponse.next();
+  }
+
+  // Keep local/dev environments usable when auth is not configured.
+  if (!authEnabled) {
     return NextResponse.next();
   }
 

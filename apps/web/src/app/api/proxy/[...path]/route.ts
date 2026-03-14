@@ -13,12 +13,15 @@ async function handler(
   request: NextRequest,
   { params }: { params: Promise<{ path: string[] }> }
 ) {
-  // Check if user is authenticated
-  const cookieStore = await cookies();
-  const authCookie = cookieStore.get('gsd-auth');
+  const authConfigured = Boolean(AUTH_USERNAME && AUTH_PASSWORD);
+  if (authConfigured) {
+    // Check if user is authenticated
+    const cookieStore = await cookies();
+    const authCookie = cookieStore.get('gsd-auth');
 
-  if (!authCookie?.value) {
-    return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+    if (!authCookie?.value) {
+      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+    }
   }
 
   const { path } = await params;

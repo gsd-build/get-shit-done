@@ -15,7 +15,7 @@ test.describe('Verify Phase Page', () => {
 
   test('renders verify page shell with tabs and action bar', async ({ page }) => {
     await skipIfUnavailable(page);
-    await expect(page.getByRole('heading', { name: /Verification/i })).toBeVisible();
+    await expect(page.getByRole('heading', { name: 'Verification', exact: true })).toBeVisible();
     await expect(page.getByRole('tab', { name: /Gaps/i })).toBeVisible();
     await expect(page.getByRole('tab', { name: /Coverage/i })).toBeVisible();
     await expect(page.getByRole('tab', { name: /Manual Tests/i })).toBeVisible();
