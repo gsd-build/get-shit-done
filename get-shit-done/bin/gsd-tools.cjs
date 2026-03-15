@@ -488,6 +488,32 @@ async function main() {
       break;
     }
 
+    case 'review': {
+      const subcommand = args[1];
+      if (subcommand === 'check-cli') {
+        commands.cmdReviewCheckCli(cwd, raw);
+      } else if (subcommand === 'build-prompt') {
+        const phaseIdx = args.indexOf('--phase');
+        commands.cmdReviewBuildPrompt(cwd, phaseIdx !== -1 ? args[phaseIdx + 1] : null, raw);
+      } else if (subcommand === 'write-reviews') {
+        const phaseIdx = args.indexOf('--phase');
+        const reviews = {};
+        const geminiIdx = args.indexOf('--gemini-file');
+        const claudeIdx = args.indexOf('--claude-file');
+        const codexIdx = args.indexOf('--codex-file');
+        if (geminiIdx !== -1) reviews.gemini = args[geminiIdx + 1];
+        if (claudeIdx !== -1) reviews.claude = args[claudeIdx + 1];
+        if (codexIdx !== -1) reviews.codex = args[codexIdx + 1];
+        commands.cmdReviewWriteReviews(cwd, {
+          phase: phaseIdx !== -1 ? args[phaseIdx + 1] : null,
+          reviews,
+        }, raw);
+      } else {
+        error('Unknown review subcommand. Available: check-cli, build-prompt, write-reviews');
+      }
+      break;
+    }
+
     case 'todo': {
       const subcommand = args[1];
       if (subcommand === 'complete') {
@@ -549,8 +575,11 @@ async function main() {
         case 'progress':
           init.cmdInitProgress(cwd, raw);
           break;
+        case 'review':
+          init.cmdInitReview(cwd, args[2], raw);
+          break;
         default:
-          error(`Unknown init workflow: ${workflow}\nAvailable: execute-phase, plan-phase, new-project, new-milestone, quick, resume, verify-work, phase-op, todos, milestone-op, map-codebase, progress`);
+          error(`Unknown init workflow: ${workflow}\nAvailable: execute-phase, plan-phase, new-project, new-milestone, quick, resume, verify-work, phase-op, todos, milestone-op, map-codebase, progress, review`);
       }
       break;
     }
