@@ -365,6 +365,29 @@ function cmdInitPhaseOp(cwd, phase, raw) {
   const config = loadConfig(cwd);
   let phaseInfo = findPhaseInternal(cwd, phase);
 
+  // If the only disk match comes from an archived milestone, prefer the
+  // current milestone's ROADMAP entry so discuss-phase and similar flows
+  // don't attach to shipped work that reused the same phase number.
+  if (phaseInfo?.archived) {
+    const roadmapPhase = getRoadmapPhaseInternal(cwd, phase);
+    if (roadmapPhase?.found) {
+      const phaseName = roadmapPhase.phase_name;
+      phaseInfo = {
+        found: true,
+        directory: null,
+        phase_number: roadmapPhase.phase_number,
+        phase_name: phaseName,
+        phase_slug: phaseName ? phaseName.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, '') : null,
+        plans: [],
+        summaries: [],
+        incomplete_plans: [],
+        has_research: false,
+        has_context: false,
+        has_verification: false,
+      };
+    }
+  }
+
   // Fallback to ROADMAP.md if no directory exists (e.g., Plans: TBD)
   if (!phaseInfo) {
     const roadmapPhase = getRoadmapPhaseInternal(cwd, phase);

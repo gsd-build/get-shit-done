@@ -475,6 +475,51 @@ describe('cmdInitPhaseOp fallback', () => {
     assert.strictEqual(output.has_plans, false);
   });
 
+  test('prefers current milestone roadmap entry over archived phase with same number', () => {
+    const archiveDir = path.join(
+      tmpDir,
+      '.planning',
+      'milestones',
+      'v1.2-phases',
+      '02-event-parser-and-queue-schema'
+    );
+    fs.mkdirSync(archiveDir, { recursive: true });
+    fs.writeFileSync(path.join(archiveDir, '02-CONTEXT.md'), '# Archived context');
+    fs.writeFileSync(path.join(archiveDir, '02-01-PLAN.md'), '# Archived plan');
+    fs.writeFileSync(path.join(archiveDir, '02-VERIFICATION.md'), '# Archived verification');
+
+    fs.writeFileSync(
+      path.join(tmpDir, '.planning', 'ROADMAP.md'),
+      `# Roadmap
+
+<details>
+<summary>Shipped milestone v1.2</summary>
+
+### Phase 2: Event Parser and Queue Schema
+**Goal:** Archived milestone work
+</details>
+
+## Milestone v1.3 Current
+
+### Phase 2: Retry Orchestration
+**Goal:** Current milestone work
+**Plans:** TBD
+`
+    );
+
+    const result = runGsdTools('init phase-op 2', tmpDir);
+    assert.ok(result.success, `Command failed: ${result.error}`);
+
+    const output = JSON.parse(result.output);
+    assert.strictEqual(output.phase_found, true);
+    assert.strictEqual(output.phase_dir, null);
+    assert.strictEqual(output.phase_name, 'Retry Orchestration');
+    assert.strictEqual(output.phase_slug, 'retry-orchestration');
+    assert.strictEqual(output.has_context, false);
+    assert.strictEqual(output.has_plans, false);
+    assert.strictEqual(output.has_verification, false);
+  });
+
   test('neither directory nor roadmap entry returns not found', () => {
     fs.writeFileSync(
       path.join(tmpDir, '.planning', 'ROADMAP.md'),
@@ -867,4 +912,3 @@ describe('cmdInitNewMilestone', () => {
 // ─────────────────────────────────────────────────────────────────────────────
 // roadmap analyze command
 // ─────────────────────────────────────────────────────────────────────────────
-
