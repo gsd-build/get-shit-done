@@ -8,7 +8,6 @@ import { useResearchStream } from '@/hooks/useResearchStream';
 import {
   usePlanStore,
   selectAgents,
-  selectPlan,
   selectIsEditLocked,
 } from '@/stores/planStore';
 import {
@@ -17,13 +16,12 @@ import {
   ParallelismWorkflowGraph,
 } from '@/components/features/plan';
 import {
-  fetchPlan,
   updatePlanTask,
   startResearch,
   fetchParallelismWorkflow,
 } from '@/lib/api';
 import { resolveSocketBase } from '@/lib/endpoints';
-import type { ResearchAgent, Plan, PlanTask, ParallelismWorkflowNode } from '@/types/plan';
+import type { ResearchAgent, PlanTask, ParallelismWorkflowNode } from '@/types/plan';
 import {
   OrchestrationControlBar,
   RunStatusStrip,
@@ -34,6 +32,7 @@ import {
 } from '@/stores/orchestrationStore';
 import { WorkflowHeader } from '@/components/features/projects/WorkflowHeader';
 import { NewPlanModal } from '@/components/features/projects/NewPlanModal';
+import { usePlanData } from '@/hooks/usePlanData';
 
 const SOCKET_URL = resolveSocketBase();
 
@@ -58,15 +57,18 @@ export default function PlanPhasePage() {
   );
 
   // Plan state from Zustand store
-  const plan = usePlanStore(selectPlan);
   const storeAgents = usePlanStore(selectAgents);
   const isEditLocked = usePlanStore(selectIsEditLocked);
 
-  // Local state for plan data (fetched from API)
-  const [planData, setPlanData] = useState<Plan | null>(null);
-  const [isLoadingPlan, setIsLoadingPlan] = useState(true);
+  const {
+    planData,
+    isLoading: isLoadingPlan,
+    planError,
+    loadPlan,
+    patchTask,
+  } = usePlanData(projectId);
+
   const [isStartingResearch, setIsStartingResearch] = useState(false);
-  const [planError, setPlanError] = useState<string | null>(null);
   const [showNewPlan, setShowNewPlan] = useState(false);
   const [workflow, setWorkflow] = useState<ParallelismWorkflowNode[]>([]);
   const setRuns = useOrchestrationStore((state) => state.setRuns);
@@ -79,24 +81,6 @@ export default function PlanPhasePage() {
     .split(',')
     .map((gap) => gap.trim())
     .filter(Boolean);
-
-  async function loadPlan() {
-    setIsLoadingPlan(true);
-    setPlanError(null);
-    const response = await fetchPlan(projectId);
-    if (response.success && response.data) {
-      // Authoritative server payload overrides local stale/empty state.
-      setPlanData(response.data);
-    } else {
-      setPlanError(response.error?.message || 'Failed to load plan tasks');
-    }
-    setIsLoadingPlan(false);
-  }
-
-  // Fetch plan data on mount
-  useEffect(() => {
-    loadPlan();
-  }, [projectId]);
 
   useEffect(() => {
     async function loadWorkflow() {
@@ -149,15 +133,12 @@ export default function PlanPhasePage() {
     });
 
     // Update local state if successful
-    if (response.success && response.data && planData) {
-      setPlanData({
-        ...planData,
-        tasks: planData.tasks.map((task) =>
-          task.id === taskId
-            ? { ...task, name: updates.title, description: updates.description }
-            : task
-        ),
-      });
+    if (response.success && response.data) {
+      patchTask(taskId, (task) => ({
+        ...task,
+        name: updates.title,
+        description: updates.description,
+      }));
     }
   };
 

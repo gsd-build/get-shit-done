@@ -17,12 +17,32 @@ function resolvePhaseNumber(rawPhaseNumber: unknown, index: number): number {
 }
 
 function matchesProjectId(project: GsdProject, requestedId: string): boolean {
-  if (project.id === requestedId) return true;
   const normalizedRequested = requestedId.trim().toLowerCase();
+  const aliases = new Set([
+    normalizedRequested,
+    normalizedRequested.replace(/-(app|project)$/i, ''),
+  ]);
+
   const pathParts = project.path.split(/[\\/]/).filter(Boolean);
   const basename = (pathParts[pathParts.length - 1] ?? '').toLowerCase();
-  if (basename === normalizedRequested) return true;
-  return project.name.trim().toLowerCase() === normalizedRequested;
+  const candidates = [
+    project.id.trim().toLowerCase(),
+    project.name.trim().toLowerCase(),
+    basename,
+  ];
+
+  for (const candidate of candidates) {
+    const normalizedCandidate = candidate.replace(/-(app|project)$/i, '');
+    if (
+      aliases.has(candidate) ||
+      aliases.has(normalizedCandidate) ||
+      candidate.startsWith(`${normalizedRequested}-`)
+    ) {
+      return true;
+    }
+  }
+
+  return false;
 }
 
 /**

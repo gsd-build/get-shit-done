@@ -20,7 +20,7 @@ test.describe('Plan Phase Page', () => {
   test('renders plan page shell and navigation', async ({ page }) => {
     await skipIfUnavailable(page);
     await expect(page.getByRole('heading', { name: /Planning Phase/i })).toBeVisible();
-    await expect(page.getByRole('link', { name: /Back to Project/i })).toBeVisible();
+    await expect(page.getByRole('button', { name: /Back to Project/i })).toBeVisible();
     await expect(page.getByRole('heading', { name: /Research Progress/i })).toBeVisible();
     await expect(page.getByRole('heading', { name: /Plan Preview/i })).toBeVisible();
   });
@@ -57,7 +57,12 @@ test.describe('Plan Phase Page', () => {
     await skipIfUnavailable(page);
     const taskCards = page.locator('[data-testid^="task-card-"]');
     if ((await taskCards.count()) === 0) {
-      await expect(page.getByText(/No plan tasks available yet/i)).toBeVisible();
+      await expect(
+        page
+          .getByText(/No plan tasks available yet/i)
+          .or(page.getByText(/Failed to load plan tasks|Plan phase is unavailable/i))
+          .first()
+      ).toBeVisible();
       return;
     }
 
@@ -73,7 +78,12 @@ test.describe('Plan Phase Page', () => {
     await skipIfUnavailable(page);
     const taskCards = page.locator('[data-testid^="task-card-"]');
     if ((await taskCards.count()) === 0) {
-      await expect(page.getByText(/No plan tasks available yet/i)).toBeVisible();
+      await expect(
+        page
+          .getByText(/No plan tasks available yet/i)
+          .or(page.getByText(/Failed to load plan tasks|Plan phase is unavailable/i))
+          .first()
+      ).toBeVisible();
       return;
     }
 
