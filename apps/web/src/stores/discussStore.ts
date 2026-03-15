@@ -39,6 +39,55 @@ function getRecommendedOption(decision: DiscussDecision): DecisionOption | undef
   return decision.options.find((option) => option.recommended) ?? decision.options[0];
 }
 
+function areDecisionsEquivalent(
+  previous: DiscussDecision[],
+  next: DiscussDecision[]
+): boolean {
+  if (previous.length !== next.length) {
+    return false;
+  }
+
+  for (let i = 0; i < previous.length; i += 1) {
+    const prevDecision = previous[i];
+    const nextDecision = next[i];
+
+    if (!prevDecision || !nextDecision) {
+      return false;
+    }
+
+    if (
+      prevDecision.id !== nextDecision.id ||
+      prevDecision.question !== nextDecision.question ||
+      prevDecision.selectedOptionId !== nextDecision.selectedOptionId
+    ) {
+      return false;
+    }
+
+    if (prevDecision.options.length !== nextDecision.options.length) {
+      return false;
+    }
+
+    for (let optionIndex = 0; optionIndex < prevDecision.options.length; optionIndex += 1) {
+      const prevOption = prevDecision.options[optionIndex];
+      const nextOption = nextDecision.options[optionIndex];
+
+      if (!prevOption || !nextOption) {
+        return false;
+      }
+
+      if (
+        prevOption.id !== nextOption.id ||
+        prevOption.label !== nextOption.label ||
+        !!prevOption.recommended !== !!nextOption.recommended
+      ) {
+        return false;
+      }
+    }
+  }
+
+  return true;
+}
+
 export const useDiscussStore = create<DiscussStore>((set) => ({
   decisions: [],
   auditEvents: [],
@@ -59,6 +108,10 @@ export const useDiscussStore = create<DiscussStore>((set) => ({
           ? { ...decision, selectedOptionId }
           : decision;
       });
+
+      if (areDecisionsEquivalent(state.decisions, merged)) {
+        return state;
+      }
 
       return { decisions: merged };
     }),
@@ -141,5 +194,15 @@ export const useDiscussStore = create<DiscussStore>((set) => ({
 
 export const selectDecisions = (state: DiscussStore) => state.decisions;
 export const selectAuditEvents = (state: DiscussStore) => state.auditEvents;
-export const selectUnresolvedDecisions = (state: DiscussStore) =>
-  state.decisions.filter((decision) => !decision.selectedOptionId);
+const unresolvedDecisionCache = new WeakMap<DiscussDecision[], DiscussDecision[]>();
+
+export const selectUnresolvedDecisions = (state: DiscussStore) => {
+  const cached = unresolvedDecisionCache.get(state.decisions);
+  if (cached) {
+    return cached;
+  }
+
+  const unresolved = state.decisions.filter((decision) => !decision.selectedOptionId);
+  unresolvedDecisionCache.set(state.decisions, unresolved);
+  return unresolved;
+};

@@ -21,7 +21,6 @@ import {
   useDiscussStore,
   selectDecisions,
   selectAuditEvents,
-  selectUnresolvedDecisions,
   type DiscussDecision,
 } from '@/stores/discussStore';
 
@@ -82,7 +81,10 @@ export default function DiscussPage() {
   const [error, setError] = useState<string | null>(null);
   const [showNewPlan, setShowNewPlan] = useState(false);
   const decisions = useDiscussStore(selectDecisions);
-  const unresolvedDecisions = useDiscussStore(selectUnresolvedDecisions);
+  const unresolvedDecisions = useMemo(
+    () => decisions.filter((decision) => !decision.selectedOptionId),
+    [decisions]
+  );
   const auditEvents = useDiscussStore(selectAuditEvents);
   const setDecisions = useDiscussStore((state) => state.setDecisions);
   const applyDecision = useDiscussStore((state) => state.applyDecision);
