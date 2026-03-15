@@ -221,7 +221,7 @@ Plans:
 **Goal:** Restore complete add-new-feature workflow across Discuss -> Plan -> Verify for initialized projects
 **Requirements**: TBD
 **Depends on:** Phase 18
-**Plans:** 5 plans
+**Plans:** 8/8 plans complete
 
 Plans:
 - [ ] 18.2-01-PLAN.md — Initialized-project API contract and explicit workflow error handling
@@ -229,6 +229,9 @@ Plans:
 - [ ] 18.2-03-PLAN.md — Discuss ranked options and Accept all defaults progression
 - [ ] 18.2-04-PLAN.md — Plan payload authority and reject-with-gaps fix-plan preselection
 - [ ] 18.2-05-PLAN.md — Verify approval gating and stale rerun visibility
+- [ ] 18.2-06-PLAN.md — Discuss render-loop crash stabilization and defaults-flow recovery
+- [ ] 18.2-07-PLAN.md — Route contract consistency and authoritative plan payload rendering closure
+- [ ] 18.2-08-PLAN.md — Verify rerun control and stale-state lifecycle completion
 
 ### Phase 18.1: UI controls GSD end-to-end orchestration (INSERTED)
 
