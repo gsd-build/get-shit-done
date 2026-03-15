@@ -6,6 +6,13 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ## [Unreleased]
 
+### Added
+- **Antigravity runtime support** — Full installation support for the Antigravity AI agent runtime (`--antigravity`), alongside Claude Code, OpenCode, Gemini, Codex, and Copilot.
+
+### Fixed
+- **Antigravity skills** — `processAttribution` was missing from `copyCommandsAsAntigravitySkills`, causing SKILL.md files to be written without commit attribution metadata.
+- **Copilot install tests** — updated agent count (12→15) and CLI assertions to account for the three UI agents added in v1.23.0.
+
 ## [1.24.0] - 2026-03-15
 
 ### Added
