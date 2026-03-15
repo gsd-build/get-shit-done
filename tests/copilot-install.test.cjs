@@ -746,7 +746,7 @@ describe('Copilot agent conversion - real files', () => {
     assert.ok(toolsLine.includes("'read'"), 'Read mapped');
   });
 
-  test('all 12 agents convert without error', () => {
+  test('all 15 agents convert without error', () => {
     const agents = fs.readdirSync(agentsSrc)
       .filter(f => f.startsWith('gsd-') && f.endsWith('.md'));
     assert.strictEqual(agents.length, 15, `expected 15 agents, got ${agents.length}`);
