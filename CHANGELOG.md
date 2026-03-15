@@ -13,6 +13,8 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 - **`inherit` model profile** for OpenCode — agents inherit the user's selected runtime model via `/model`
 - **Persistent debug knowledge base** — resolved debug sessions append to `.planning/debug/knowledge-base.md`, eliminating cold-start investigation on recurring issues
 - **Programmatic `/gsd:set-profile`** — runs as a script instead of LLM-driven workflow, executes in seconds instead of 30-40s
+- **Antigravity AI agent support** — Full installation support for the Antigravity runtime, bringing get-shit-done capabilities natively alongside Claude Code, OpenCode, Gemini, Codex, and Copilot.
+- **Node repair operator** (`workflows/node-repair.md`) — autonomous recovery when task verification fails. Instead of immediately asking the user, the executor attempts structured repair: RETRY (different approach), DECOMPOSE (break into sub-tasks), or PRUNE (skip with justification). Only escalates to the user when the repair budget is exhausted or an architectural decision is needed. Repair budget defaults to 2 attempts per task; configurable via `workflow.node_repair_budget`. Disable entirely with `workflow.node_repair: false` to restore original behavior.
 
 ### Fixed
 - ROADMAP.md searches scoped to current milestone — multi-milestone projects no longer match phases from archived milestones
