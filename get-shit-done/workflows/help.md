@@ -116,6 +116,20 @@ Execute all plans in a phase.
 
 Usage: `/gsd:execute-phase 5`
 
+### Smart Router
+
+**`/gsd:do <description>`**
+Route freeform text to the right GSD command automatically.
+
+- Analyzes natural language input to find the best matching GSD command
+- Acts as a dispatcher — never does the work itself
+- Resolves ambiguity by asking you to pick between top matches
+- Use when you know what you want but don't know which `/gsd:*` command to run
+
+Usage: `/gsd:do fix the login button`
+Usage: `/gsd:do refactor the auth system`
+Usage: `/gsd:do I want to start a new milestone`
+
 ### Quick Mode
 
 **`/gsd:quick [--full] [--discuss] [--research]`**
