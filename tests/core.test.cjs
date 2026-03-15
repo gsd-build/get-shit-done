@@ -624,8 +624,8 @@ describe('getRoadmapPhaseInternal', () => {
     assert.strictEqual(result.goal, 'Create REST endpoints');
   });
 
-  test('returns null goal when Goal uses colon-outside-bold format', () => {
-    // Actual ROADMAP.md uses **Goal**: (colon outside bold) which the regex does not match
+  test('returns goal when Goal uses colon-outside-bold format', () => {
+    // **Goal**: (colon outside bold) is now supported alongside **Goal:**
     fs.writeFileSync(
       path.join(tmpDir, '.planning', 'ROADMAP.md'),
       '### Phase 1: Foundation\n**Goal**: Build the base\n'
@@ -633,7 +633,7 @@ describe('getRoadmapPhaseInternal', () => {
     const result = getRoadmapPhaseInternal(tmpDir, '1');
     assert.strictEqual(result.found, true);
     assert.strictEqual(result.phase_name, 'Foundation');
-    assert.strictEqual(result.goal, null);
+    assert.strictEqual(result.goal, 'Build the base');
   });
 
   test('returns null when roadmap missing', () => {

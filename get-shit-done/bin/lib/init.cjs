@@ -5,7 +5,7 @@
 const fs = require('fs');
 const path = require('path');
 const { execSync } = require('child_process');
-const { loadConfig, resolveModelInternal, findPhaseInternal, getRoadmapPhaseInternal, pathExistsInternal, generateSlugInternal, getMilestoneInfo, normalizePhaseName, toPosixPath, output, error } = require('./core.cjs');
+const { loadConfig, resolveModelInternal, findPhaseInternal, getRoadmapPhaseInternal, pathExistsInternal, generateSlugInternal, getMilestoneInfo, getMilestonePhaseFilter, stripShippedMilestones, normalizePhaseName, toPosixPath, output, error } = require('./core.cjs');
 
 function cmdInitExecutePhase(cwd, phase, raw) {
   if (!phase) {
@@ -600,20 +600,46 @@ function cmdInitProgress(cwd, raw) {
   const config = loadConfig(cwd);
   const milestone = getMilestoneInfo(cwd);
 
-  // Analyze phases
+  // Analyze phases — filter to current milestone and include ROADMAP-only phases
   const phasesDir = path.join(cwd, '.planning', 'phases');
   const phases = [];
   let currentPhase = null;
   let nextPhase = null;
 
+  // Build set of phases defined in ROADMAP for the current milestone
+  const roadmapPhaseNums = new Set();
+  const roadmapPhaseNames = new Map();
+  try {
+    const roadmapContent = stripShippedMilestones(
+      fs.readFileSync(path.join(cwd, '.planning', 'ROADMAP.md'), 'utf-8')
+    );
+    const headingPattern = /#{2,4}\s*Phase\s+(\d+[A-Z]?(?:\.\d+)*)\s*:\s*([^\n]+)/gi;
+    let hm;
+    while ((hm = headingPattern.exec(roadmapContent)) !== null) {
+      roadmapPhaseNums.add(hm[1]);
+      roadmapPhaseNames.set(hm[1], hm[2].replace(/\(INSERTED\)/i, '').trim());
+    }
+  } catch {}
+
+  const isDirInMilestone = getMilestonePhaseFilter(cwd);
+  const seenPhaseNums = new Set();
+
   try {
     const entries = fs.readdirSync(phasesDir, { withFileTypes: true });
-    const dirs = entries.filter(e => e.isDirectory()).map(e => e.name).sort();
+    const dirs = entries.filter(e => e.isDirectory()).map(e => e.name)
+      .filter(isDirInMilestone)
+      .sort((a, b) => {
+        const pa = a.match(/^(\d+[A-Z]?(?:\.\d+)*)/i);
+        const pb = b.match(/^(\d+[A-Z]?(?:\.\d+)*)/i);
+        if (!pa || !pb) return a.localeCompare(b);
+        return parseInt(pa[1], 10) - parseInt(pb[1], 10);
+      });
 
     for (const dir of dirs) {
-      const match = dir.match(/^(\d+(?:\.\d+)*)-?(.*)/);
+      const match = dir.match(/^(\d+[A-Z]?(?:\.\d+)*)-?(.*)/i);
       const phaseNumber = match ? match[1] : dir;
       const phaseName = match && match[2] ? match[2] : null;
+      seenPhaseNums.add(phaseNumber.replace(/^0+/, '') || '0');
 
       const phasePath = path.join(phasesDir, dir);
       const phaseFiles = fs.readdirSync(phasePath);
@@ -647,6 +673,29 @@ function cmdInitProgress(cwd, raw) {
       }
     }
   } catch {}
+
+  // Add phases defined in ROADMAP but not yet scaffolded to disk
+  for (const [num, name] of roadmapPhaseNames) {
+    const stripped = num.replace(/^0+/, '') || '0';
+    if (!seenPhaseNums.has(stripped)) {
+      const phaseInfo = {
+        number: num,
+        name: name.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, ''),
+        directory: null,
+        status: 'not_started',
+        plan_count: 0,
+        summary_count: 0,
+        has_research: false,
+      };
+      phases.push(phaseInfo);
+      if (!nextPhase && !currentPhase) {
+        nextPhase = phaseInfo;
+      }
+    }
+  }
+
+  // Re-sort phases by number after adding ROADMAP-only phases
+  phases.sort((a, b) => parseInt(a.number, 10) - parseInt(b.number, 10));
 
   // Check for paused work
   let pausedAt = null;

@@ -331,6 +331,34 @@ function getArchivedPhaseDirs(cwd) {
   return results;
 }
 
+// ─── Roadmap milestone scoping ───────────────────────────────────────────────
+
+/**
+ * Strip shipped milestone content wrapped in <details> blocks.
+ * Used to isolate current milestone phases when searching ROADMAP.md
+ * for phase headings or checkboxes — prevents matching archived milestone
+ * phases that share the same numbers as current milestone phases.
+ */
+function stripShippedMilestones(content) {
+  return content.replace(/<details>[\s\S]*?<\/details>/gi, '');
+}
+
+/**
+ * Replace a pattern only in the current milestone section of ROADMAP.md
+ * (everything after the last </details> close tag). Used for write operations
+ * that must not accidentally modify archived milestone checkboxes/tables.
+ */
+function replaceInCurrentMilestone(content, pattern, replacement) {
+  const lastDetailsClose = content.lastIndexOf('</details>');
+  if (lastDetailsClose === -1) {
+    return content.replace(pattern, replacement);
+  }
+  const offset = lastDetailsClose + '</details>'.length;
+  const before = content.slice(0, offset);
+  const after = content.slice(offset);
+  return before + after.replace(pattern, replacement);
+}
+
 // ─── Roadmap & model utilities ────────────────────────────────────────────────
 
 function getRoadmapPhaseInternal(cwd, phaseNum) {
@@ -339,7 +367,7 @@ function getRoadmapPhaseInternal(cwd, phaseNum) {
   if (!fs.existsSync(roadmapPath)) return null;
 
   try {
-    const content = fs.readFileSync(roadmapPath, 'utf-8');
+    const content = stripShippedMilestones(fs.readFileSync(roadmapPath, 'utf-8'));
     const escapedPhase = escapeRegex(phaseNum.toString());
     const phasePattern = new RegExp(`#{2,4}\\s*Phase\\s+${escapedPhase}:\\s*([^\\n]+)`, 'i');
     const headerMatch = content.match(phasePattern);
@@ -352,7 +380,7 @@ function getRoadmapPhaseInternal(cwd, phaseNum) {
     const sectionEnd = nextHeaderMatch ? headerIndex + nextHeaderMatch.index : content.length;
     const section = content.slice(headerIndex, sectionEnd).trim();
 
-    const goalMatch = section.match(/\*\*Goal:\*\*\s*([^\n]+)/i);
+    const goalMatch = section.match(/\*\*Goal(?:\*\*:|\*?\*?:\*\*)\s*([^\n]+)/i);
     const goal = goalMatch ? goalMatch[1].trim() : null;
 
     return {
@@ -416,7 +444,7 @@ function getMilestoneInfo(cwd) {
     }
 
     // Second: heading-format roadmaps — strip shipped milestones in <details> blocks
-    const cleaned = roadmap.replace(/<details>[\s\S]*?<\/details>/gi, '');
+    const cleaned = stripShippedMilestones(roadmap);
     // Extract version and name from the same ## heading for consistency
     const headingMatch = cleaned.match(/## .*v(\d+\.\d+)[:\s]+([^\n(]+)/);
     if (headingMatch) {
@@ -444,7 +472,7 @@ function getMilestoneInfo(cwd) {
 function getMilestonePhaseFilter(cwd) {
   const milestonePhaseNums = new Set();
   try {
-    const roadmap = fs.readFileSync(path.join(cwd, '.planning', 'ROADMAP.md'), 'utf-8');
+    const roadmap = stripShippedMilestones(fs.readFileSync(path.join(cwd, '.planning', 'ROADMAP.md'), 'utf-8'));
     const phasePattern = /#{2,4}\s*Phase\s+(\d+[A-Z]?(?:\.\d+)*)\s*:/gi;
     let m;
     while ((m = phasePattern.exec(roadmap)) !== null) {
@@ -491,5 +519,7 @@ module.exports = {
   generateSlugInternal,
   getMilestoneInfo,
   getMilestonePhaseFilter,
+  stripShippedMilestones,
+  replaceInCurrentMilestone,
   toPosixPath,
 };

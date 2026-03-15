@@ -276,14 +276,16 @@ function cmdStateUpdateProgress(cwd, raw) {
 
   let content = fs.readFileSync(statePath, 'utf-8');
 
-  // Count summaries across all phases
+  // Count summaries across current milestone phases only
   const phasesDir = path.join(cwd, '.planning', 'phases');
   let totalPlans = 0;
   let totalSummaries = 0;
 
   if (fs.existsSync(phasesDir)) {
+    const isDirInMilestone = getMilestonePhaseFilter(cwd);
     const phaseDirs = fs.readdirSync(phasesDir, { withFileTypes: true })
-      .filter(e => e.isDirectory()).map(e => e.name);
+      .filter(e => e.isDirectory()).map(e => e.name)
+      .filter(isDirInMilestone);
     for (const dir of phaseDirs) {
       const files = fs.readdirSync(path.join(phasesDir, dir));
       totalPlans += files.filter(f => f.match(/-PLAN\.md$/i)).length;

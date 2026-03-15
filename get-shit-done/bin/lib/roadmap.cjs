@@ -4,7 +4,7 @@
 
 const fs = require('fs');
 const path = require('path');
-const { escapeRegex, normalizePhaseName, output, error, findPhaseInternal } = require('./core.cjs');
+const { escapeRegex, normalizePhaseName, output, error, findPhaseInternal, stripShippedMilestones, replaceInCurrentMilestone } = require('./core.cjs');
 
 function cmdRoadmapGetPhase(cwd, phaseNum, raw) {
   const roadmapPath = path.join(cwd, '.planning', 'ROADMAP.md');
@@ -15,7 +15,7 @@ function cmdRoadmapGetPhase(cwd, phaseNum, raw) {
   }
 
   try {
-    const content = fs.readFileSync(roadmapPath, 'utf-8');
+    const content = stripShippedMilestones(fs.readFileSync(roadmapPath, 'utf-8'));
 
     // Escape special regex chars in phase number, handle decimal
     const escapedPhase = escapeRegex(phaseNum);
@@ -98,7 +98,8 @@ function cmdRoadmapAnalyze(cwd, raw) {
     return;
   }
 
-  const content = fs.readFileSync(roadmapPath, 'utf-8');
+  const rawContent = fs.readFileSync(roadmapPath, 'utf-8');
+  const content = stripShippedMilestones(rawContent);
   const phasesDir = path.join(cwd, '.planning', 'phases');
 
   // Extract all phase headings: ## Phase N: Name or ### Phase N: Name
@@ -153,7 +154,7 @@ function cmdRoadmapAnalyze(cwd, raw) {
     } catch {}
 
     // Check ROADMAP checkbox status
-    const checkboxPattern = new RegExp(`-\\s*\\[(x| )\\]\\s*.*Phase\\s+${escapeRegex(phaseNum)}`, 'i');
+    const checkboxPattern = new RegExp(`-\\s*\\[(x| )\\]\\s*.*Phase\\s+${escapeRegex(phaseNum)}[:\\s]`, 'i');
     const checkboxMatch = content.match(checkboxPattern);
     const roadmapComplete = checkboxMatch ? checkboxMatch[1] === 'x' : false;
 
@@ -262,8 +263,8 @@ function cmdRoadmapUpdatePlanProgress(cwd, phaseNum, raw) {
     'i'
   );
   const dateField = isComplete ? ` ${today} ` : '  ';
-  roadmapContent = roadmapContent.replace(
-    tablePattern,
+  roadmapContent = replaceInCurrentMilestone(
+    roadmapContent, tablePattern,
     `$1 ${summaryCount}/${planCount} $2 ${status.padEnd(11)}$3${dateField}$4`
   );
 
@@ -275,7 +276,7 @@ function cmdRoadmapUpdatePlanProgress(cwd, phaseNum, raw) {
   const planCountText = isComplete
     ? `${summaryCount}/${planCount} plans complete`
     : `${summaryCount}/${planCount} plans executed`;
-  roadmapContent = roadmapContent.replace(planCountPattern, `$1${planCountText}`);
+  roadmapContent = replaceInCurrentMilestone(roadmapContent, planCountPattern, `$1${planCountText}`);
 
   // If complete: check checkbox
   if (isComplete) {
@@ -283,7 +284,7 @@ function cmdRoadmapUpdatePlanProgress(cwd, phaseNum, raw) {
       `(-\\s*\\[)[ ](\\]\\s*.*Phase\\s+${phaseEscaped}[:\\s][^\\n]*)`,
       'i'
     );
-    roadmapContent = roadmapContent.replace(checkboxPattern, `$1x$2 (completed ${today})`);
+    roadmapContent = replaceInCurrentMilestone(roadmapContent, checkboxPattern, `$1x$2 (completed ${today})`);
   }
 
   fs.writeFileSync(roadmapPath, roadmapContent, 'utf-8');
