@@ -4,7 +4,7 @@
 
 const fs = require('fs');
 const path = require('path');
-const { output, error } = require('./core.cjs');
+const { output, error, buildPaths } = require('./core.cjs');
 
 const VALID_CONFIG_KEYS = new Set([
   'mode', 'granularity', 'parallelization', 'commit_docs', 'model_profile',
@@ -16,9 +16,10 @@ const VALID_CONFIG_KEYS = new Set([
   'planning.commit_docs', 'planning.search_gitignored',
 ]);
 
-function cmdConfigEnsureSection(cwd, raw) {
-  const configPath = path.join(cwd, '.planning', 'config.json');
-  const planningDir = path.join(cwd, '.planning');
+function cmdConfigEnsureSection(cwd, raw, paths) {
+  const p = paths || buildPaths(cwd);
+  const configPath = p.config;
+  const planningDir = p.baseDir;
 
   // Ensure .planning directory exists
   try {
@@ -47,13 +48,6 @@ function cmdConfigEnsureSection(cwd, raw) {
   try {
     if (fs.existsSync(globalDefaultsPath)) {
       userDefaults = JSON.parse(fs.readFileSync(globalDefaultsPath, 'utf-8'));
-      // Migrate deprecated "depth" key to "granularity"
-      if ('depth' in userDefaults && !('granularity' in userDefaults)) {
-        const depthToGranularity = { quick: 'coarse', standard: 'standard', comprehensive: 'fine' };
-        userDefaults.granularity = depthToGranularity[userDefaults.depth] || userDefaults.depth;
-        delete userDefaults.depth;
-        try { fs.writeFileSync(globalDefaultsPath, JSON.stringify(userDefaults, null, 2), 'utf-8'); } catch {}
-      }
     }
   } catch (err) {
     // Ignore malformed global defaults, fall back to hardcoded
@@ -71,7 +65,7 @@ function cmdConfigEnsureSection(cwd, raw) {
       research: true,
       plan_check: true,
       verifier: true,
-      nyquist_validation: true,
+      nyquist_validation: false,
     },
     parallelization: true,
     brave_search: hasBraveSearch,
@@ -84,15 +78,16 @@ function cmdConfigEnsureSection(cwd, raw) {
 
   try {
     fs.writeFileSync(configPath, JSON.stringify(defaults, null, 2), 'utf-8');
-    const result = { created: true, path: '.planning/config.json' };
+    const result = { created: true, path: p.configRel };
     output(result, raw, 'created');
   } catch (err) {
     error('Failed to create config.json: ' + err.message);
   }
 }
 
-function cmdConfigSet(cwd, keyPath, value, raw) {
-  const configPath = path.join(cwd, '.planning', 'config.json');
+function cmdConfigSet(cwd, keyPath, value, raw, paths) {
+  const p = paths || buildPaths(cwd);
+  const configPath = p.config;
 
   if (!keyPath) {
     error('Usage: config-set <key.path> <value>');
@@ -140,8 +135,9 @@ function cmdConfigSet(cwd, keyPath, value, raw) {
   }
 }
 
-function cmdConfigGet(cwd, keyPath, raw) {
-  const configPath = path.join(cwd, '.planning', 'config.json');
+function cmdConfigGet(cwd, keyPath, raw, paths) {
+  const p = paths || buildPaths(cwd);
+  const configPath = p.config;
 
   if (!keyPath) {
     error('Usage: config-get <key.path>');

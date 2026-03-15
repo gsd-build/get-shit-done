@@ -1264,32 +1264,16 @@ describe('milestone-scoped phase counting in frontmatter', () => {
     cleanup(tmpDir);
   });
 
-  test('total_phases counts only current milestone phases', () => {
-    // ROADMAP lists only phases 5-6 (current milestone)
-    fs.writeFileSync(
-      path.join(tmpDir, '.planning', 'ROADMAP.md'),
-      [
-        '## Roadmap v2.0: Next Release',
-        '',
-        '### Phase 5: Auth',
-        '**Goal:** Add authentication',
-        '',
-        '### Phase 6: Dashboard',
-        '**Goal:** Build dashboard',
-      ].join('\n')
-    );
-
-    // Disk has dirs 01-06 (01-04 are leftover from previous milestone)
+  test('total_phases counts all disk phases in flat mode', () => {
+    // In flat mode (no workstreams), all disk phases are counted
     for (let i = 1; i <= 6; i++) {
       const padded = String(i).padStart(2, '0');
       const phaseDir = path.join(tmpDir, '.planning', 'phases', `${padded}-phase-${i}`);
       fs.mkdirSync(phaseDir, { recursive: true });
-      // Add a plan to each
       fs.writeFileSync(path.join(phaseDir, `${padded}-01-PLAN.md`), '# Plan');
       fs.writeFileSync(path.join(phaseDir, `${padded}-01-SUMMARY.md`), '# Summary');
     }
 
-    // Write a STATE.md and trigger a write that will sync frontmatter
     fs.writeFileSync(
       path.join(tmpDir, '.planning', 'STATE.md'),
       '# Project State\n\n**Current Phase:** 05\n**Status:** In progress\n'
@@ -1298,32 +1282,16 @@ describe('milestone-scoped phase counting in frontmatter', () => {
     const result = runGsdTools('state update Status "Executing"', tmpDir);
     assert.ok(result.success, `Command failed: ${result.error}`);
 
-    // Read the state json to check frontmatter
     const jsonResult = runGsdTools('state json', tmpDir);
     assert.ok(jsonResult.success, `state json failed: ${jsonResult.error}`);
 
     const output = JSON.parse(jsonResult.output);
-    assert.strictEqual(Number(output.progress.total_phases), 2, 'should count only milestone phases (5 and 6), not all 6');
-    assert.strictEqual(Number(output.progress.completed_phases), 2, 'both milestone phases have summaries');
+    assert.strictEqual(Number(output.progress.total_phases), 6, 'should count all 6 disk phases');
+    assert.strictEqual(Number(output.progress.completed_phases), 6, 'all phases have summaries');
   });
 
-  test('total_phases includes ROADMAP phases without directories', () => {
-    // ROADMAP lists 6 phases (5-10), but only 4 have directories on disk
-    fs.writeFileSync(
-      path.join(tmpDir, '.planning', 'ROADMAP.md'),
-      [
-        '## Roadmap v3.0',
-        '',
-        '### Phase 5: Auth',
-        '### Phase 6: Dashboard',
-        '### Phase 7: API',
-        '### Phase 8: Notifications',
-        '### Phase 9: Analytics',
-        '### Phase 10: Polish',
-      ].join('\n')
-    );
-
-    // Only phases 5-8 have directories (9 and 10 not yet planned)
+  test('total_phases counts disk phases only (ROADMAP does not inflate)', () => {
+    // Only phases 5-8 have directories
     for (let i = 5; i <= 8; i++) {
       const padded = String(i).padStart(2, '0');
       const phaseDir = path.join(tmpDir, '.planning', 'phases', `${padded}-phase-${i}`);
@@ -1344,8 +1312,8 @@ describe('milestone-scoped phase counting in frontmatter', () => {
     assert.ok(jsonResult.success, `state json failed: ${jsonResult.error}`);
 
     const output = JSON.parse(jsonResult.output);
-    assert.strictEqual(Number(output.progress.total_phases), 6, 'should count all 6 ROADMAP phases, not just 4 with directories');
-    assert.strictEqual(Number(output.progress.completed_phases), 4, 'only 4 phases have summaries');
+    assert.strictEqual(Number(output.progress.total_phases), 4, 'should count 4 disk phases');
+    assert.strictEqual(Number(output.progress.completed_phases), 4, 'all 4 phases have summaries');
   });
 
   test('without ROADMAP counts all phases (pass-all filter)', () => {

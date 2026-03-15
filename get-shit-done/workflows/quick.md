@@ -1,11 +1,7 @@
 <purpose>
 Execute small, ad-hoc tasks with GSD guarantees (atomic commits, STATE.md tracking). Quick mode spawns gsd-planner (quick mode) + gsd-executor(s), tracks tasks in `.planning/quick/`, and updates STATE.md's "Quick Tasks Completed" table.
 
-With `--discuss` flag: lightweight discussion phase before planning. Surfaces assumptions, clarifies gray areas, captures decisions in CONTEXT.md so the planner treats them as locked.
-
 With `--full` flag: enables plan-checking (max 2 iterations) and post-execution verification for quality guarantees without full milestone ceremony.
-
-Flags are composable: `--discuss --full` gives discussion + plan-checking + verification.
 </purpose>
 
 <required_reading>
@@ -17,7 +13,6 @@ Read all files referenced by the invoking prompt's execution_context before star
 
 Parse `$ARGUMENTS` for:
 - `--full` flag → store as `$FULL_MODE` (true/false)
-- `--discuss` flag → store as `$DISCUSS_MODE` (true/false)
 - Remaining text → use as `$DESCRIPTION` if non-empty
 
 If `$DESCRIPTION` is empty after parsing, prompt user interactively:
@@ -34,27 +29,7 @@ Store response as `$DESCRIPTION`.
 
 If still empty, re-prompt: "Please provide a task description."
 
-Display banner based on active flags:
-
-If `$DISCUSS_MODE` and `$FULL_MODE`:
-```
-━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
- GSD ► QUICK TASK (DISCUSS + FULL)
-━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-
-◆ Discussion + plan checking + verification enabled
-```
-
-If `$DISCUSS_MODE` only:
-```
-━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
- GSD ► QUICK TASK (DISCUSS)
-━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-
-◆ Discussion phase enabled — surfacing gray areas before planning
-```
-
-If `$FULL_MODE` only:
+If `$FULL_MODE`:
 ```
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
  GSD ► QUICK TASK (FULL MODE)
@@ -68,11 +43,18 @@ If `$FULL_MODE` only:
 **Step 2: Initialize**
 
 ```bash
-INIT=$(node "$HOME/.claude/get-shit-done/bin/gsd-tools.cjs" init quick "$DESCRIPTION")
-if [[ "$INIT" == @file:* ]]; then INIT=$(cat "${INIT#@file:}"); fi
+# Extract --ws flag from arguments
+WS_NAME=""
+GSD_WS=""
+if echo "$ARGUMENTS" | grep -qE '\-\-ws[= ]'; then
+  WS_NAME=$(echo "$ARGUMENTS" | grep -oE '\-\-ws[= ][^ ]+' | sed 's/--ws[= ]//')
+  GSD_WS="--ws $WS_NAME"
+fi
+
+INIT=$(node "$HOME/.claude/get-shit-done/bin/gsd-tools.cjs" init quick "$DESCRIPTION" ${GSD_WS})
 ```
 
-Parse JSON for: `planner_model`, `executor_model`, `checker_model`, `verifier_model`, `commit_docs`, `quick_id`, `slug`, `date`, `timestamp`, `quick_dir`, `task_dir`, `roadmap_exists`, `planning_exists`.
+Parse JSON for: `planner_model`, `executor_model`, `checker_model`, `verifier_model`, `commit_docs`, `quick_id`, `slug`, `date`, `timestamp`, `quick_dir`, `task_dir`, `state_path`, `roadmap_exists`, `planning_exists`.
 
 **If `roadmap_exists` is false:** Error — Quick mode requires an active project with ROADMAP.md. Run `/gsd:new-project` first.
 
@@ -234,6 +216,7 @@ Report: `Context captured: ${QUICK_DIR}/${quick_id}-CONTEXT.md`
 
 ---
 
+
 **Step 5: Spawn planner (quick mode)**
 
 **If `$FULL_MODE`:** Use `quick-full` mode with stricter constraints.
@@ -250,7 +233,7 @@ Task(
 **Description:** ${DESCRIPTION}
 
 <files_to_read>
-- .planning/STATE.md (Project State)
+- ${state_path} (Project State)
 - ./CLAUDE.md (if exists — follow project-specific guidelines)
 ${DISCUSS_MODE ? '- ' + QUICK_DIR + '/' + quick_id + '-CONTEXT.md (User decisions — locked, do not revisit)' : ''}
 </files_to_read>
@@ -322,8 +305,7 @@ Checker prompt:
 - Scope sanity: Is this appropriately sized for a quick task (1-3 tasks)?
 - must_haves derivation: Are must_haves traceable to the task description?
 
-Skip: cross-plan deps (single plan), ROADMAP alignment
-${DISCUSS_MODE ? '- Context compliance: Does the plan honor locked decisions from CONTEXT.md?' : '- Skip: context compliance (no CONTEXT.md)'}
+Skip: context compliance (no CONTEXT.md), cross-plan deps (single plan), ROADMAP alignment
 </check_dimensions>
 
 <expected_output>
@@ -377,8 +359,8 @@ Return what changed.
 
 ```
 Task(
-  prompt=revision_prompt,
-  subagent_type="gsd-planner",
+  prompt="First, read C:/Users/rickw/.claude/agents/gsd-planner.md for your role and instructions.\n\n" + revision_prompt,
+  subagent_type="general-purpose",
   model="{planner_model}",
   description="Revise quick plan: ${DESCRIPTION}"
 )
@@ -405,7 +387,7 @@ Execute quick task ${quick_id}.
 
 <files_to_read>
 - ${QUICK_DIR}/${quick_id}-PLAN.md (Plan)
-- .planning/STATE.md (Project state)
+- ${state_path} (Project state)
 - ./CLAUDE.md (Project instructions, if exists)
 - .claude/skills/ or .agents/skills/ (Project skills, if either exists — list skills, read SKILL.md for each, follow relevant rules during implementation)
 </files_to_read>
@@ -543,12 +525,12 @@ Stage and commit quick task artifacts:
 Build file list:
 - `${QUICK_DIR}/${quick_id}-PLAN.md`
 - `${QUICK_DIR}/${quick_id}-SUMMARY.md`
-- `.planning/STATE.md`
+- `${state_path}`
 - If `$DISCUSS_MODE` and context file exists: `${QUICK_DIR}/${quick_id}-CONTEXT.md`
 - If `$FULL_MODE` and verification file exists: `${QUICK_DIR}/${quick_id}-VERIFICATION.md`
 
 ```bash
-node "$HOME/.claude/get-shit-done/bin/gsd-tools.cjs" commit "docs(quick-${quick_id}): ${DESCRIPTION}" --files ${file_list}
+node "$HOME/.claude/get-shit-done/bin/gsd-tools.cjs" commit "docs(quick-${quick_id}): ${DESCRIPTION}" --files ${file_list} ${GSD_WS}
 ```
 
 Get final commit hash:
@@ -572,7 +554,7 @@ Commit: ${commit_hash}
 
 ---
 
-Ready for next task: /gsd:quick
+Ready for next task: /gsd:quick ${GSD_WS}
 ```
 
 **If NOT `$FULL_MODE`:**
@@ -588,7 +570,7 @@ Commit: ${commit_hash}
 
 ---
 
-Ready for next task: /gsd:quick
+Ready for next task: /gsd:quick ${GSD_WS}
 ```
 
 </process>
@@ -596,7 +578,7 @@ Ready for next task: /gsd:quick
 <success_criteria>
 - [ ] ROADMAP.md validation passes
 - [ ] User provides task description
-- [ ] `--full` and `--discuss` flags parsed from arguments when present
+- [ ] `--full` flag parsed from arguments when present
 - [ ] Slug generated (lowercase, hyphens, max 40 chars)
 - [ ] Quick ID generated (YYMMDD-xxx format, 2s Base36 precision)
 - [ ] Directory created at `.planning/quick/YYMMDD-xxx-slug/`

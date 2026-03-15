@@ -72,4 +72,28 @@ function cleanup(tmpDir) {
   fs.rmSync(tmpDir, { recursive: true, force: true });
 }
 
-module.exports = { runGsdTools, createTempProject, createTempGitProject, cleanup, TOOLS_PATH };
+/**
+ * Run gsd-tools command with custom environment variables.
+ * Uses execFileSync to avoid shell injection.
+ */
+function runGsdToolsWithEnv(args, cwd, env) {
+  const mergedEnv = { ...process.env, ...env };
+  try {
+    const argList = Array.isArray(args) ? args : args.split(/\s+/);
+    const result = execFileSync(process.execPath, [TOOLS_PATH, ...argList], {
+      cwd,
+      encoding: 'utf-8',
+      stdio: ['pipe', 'pipe', 'pipe'],
+      env: mergedEnv,
+    });
+    return { success: true, output: result.trim() };
+  } catch (err) {
+    return {
+      success: false,
+      output: err.stdout?.toString().trim() || '',
+      error: err.stderr?.toString().trim() || err.message,
+    };
+  }
+}
+
+module.exports = { runGsdTools, runGsdToolsWithEnv, createTempProject, createTempGitProject, cleanup, TOOLS_PATH };

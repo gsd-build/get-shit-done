@@ -7,6 +7,7 @@ A detailed reference for workflows, troubleshooting, and configuration. For quic
 ## Table of Contents
 
 - [Workflow Diagrams](#workflow-diagrams)
+- [Workstreams (Parallel Features)](#workstreams-parallel-features)
 - [Command Reference](#command-reference)
 - [Configuration Reference](#configuration-reference)
 - [Usage Examples](#usage-examples)
@@ -181,6 +182,116 @@ enabled, or after `/gsd:audit-milestone` surfaces Nyquist compliance gaps.
         │ /gsd:new-project │  <- Questions focus on what you're ADDING
         └──────────────────┘
 ```
+
+---
+
+## Workstreams (Parallel Features)
+
+Workstreams let you develop multiple features simultaneously, each in its own Claude Code instance with fully isolated planning state. Every workstream gets its own ROADMAP, STATE, REQUIREMENTS, and phases directory, while sharing project-level files (PROJECT.md, config.json, research, todos).
+
+### When to Use Workstreams
+
+- Building multiple independent features in parallel
+- Running several Claude Code terminals on different parts of a project
+- Starting a new milestone before the current one is finished
+
+### Setting Up Parallel Workstreams
+
+**Terminal 1** — Start your first feature normally:
+
+```bash
+/gsd:new-milestone
+# Answer questions, approve roadmap — creates normal flat .planning/ structure
+```
+
+**Terminal 2** — Start a second feature:
+
+```bash
+/gsd:new-milestone
+```
+
+GSD detects the in-flight milestone and asks:
+
+> An existing milestone is in progress. Work in parallel?
+> - **Yes — parallel workstreams (Recommended)**
+> - No — replace current
+
+Choose **Yes**. GSD will:
+1. Migrate existing flat files into `.planning/workstreams/{existing-milestone-name}/`
+2. Create a new workstream for the second feature
+3. Set the new workstream as active for this session
+
+**Terminal 3+** — Each additional `/gsd:new-milestone` creates another workstream directly (no migration needed since you're already in workstream mode).
+
+### Directory Structure
+
+```
+.planning/
+├── PROJECT.md                  ← shared across all workstreams
+├── config.json                 ← shared
+├── active-workstream           ← tracks which workstream is current
+├── workstreams/
+│   ├── ai-chat-history/
+│   │   ├── ROADMAP.md          ← scoped to this workstream
+│   │   ├── STATE.md
+│   │   ├── REQUIREMENTS.md
+│   │   └── phases/
+│   │       └── 01-setup/
+│   │           └── ...
+│   ├── voice-commands/
+│   │   ├── ROADMAP.md
+│   │   ├── STATE.md
+│   │   ├── REQUIREMENTS.md
+│   │   └── phases/
+│   └── smart-notifications/
+│       └── ...
+├── milestones/                 ← shared archive
+├── research/                   ← shared
+├── codebase/                   ← shared
+└── todos/                      ← shared
+```
+
+### Day-to-Day Workflow
+
+All standard GSD commands work exactly the same — they automatically scope to the active workstream:
+
+```bash
+# Each terminal works independently on its own feature
+/gsd:plan-phase 1        # Plans phase 1 of the active workstream
+/gsd:execute-phase 1     # Executes within the active workstream
+/gsd:progress             # Shows progress for the active workstream
+/gsd:pause-work           # Saves context for the active workstream
+```
+
+### Git History
+
+Commits are automatically prefixed with the workstream name:
+
+```
+[ai-chat-history] feat(01-01): add conversation storage
+[ai-chat-history] feat(01-02): implement message threading
+[voice-commands] feat(01-01): integrate speech recognition API
+[smart-notifications] feat(02-01): add push notification service
+```
+
+This makes `git log` and `git bisect` easy to navigate across parallel workstreams.
+
+### Completing a Workstream
+
+When a feature is finished:
+
+```bash
+/gsd:complete-milestone
+```
+
+GSD archives just that workstream to `milestones/`. Other workstreams continue unaffected. When the last workstream is completed, GSD automatically reverts to flat mode.
+
+### Backward Compatibility
+
+Workstreams are fully opt-in:
+- Projects without workstreams continue to work unchanged (flat `.planning/` structure)
+- Workstreams are only created when you choose "parallel" during `/gsd:new-milestone`
+- All GSD commands work identically in both flat and workstream modes
 
 ---
 
@@ -477,6 +588,8 @@ A known workaround exists for a Claude Code classification bug. GSD's orchestrat
 
 For reference, here is what GSD creates in your project:
 
+### Flat Mode (Default)
+
 ```
 .planning/
   PROJECT.md              # Project vision and context (always loaded)
@@ -499,4 +612,28 @@ For reference, here is what GSD creates in your project:
       CONTEXT.md          # Your implementation preferences
       RESEARCH.md         # Ecosystem research findings
       VERIFICATION.md     # Post-execution verification results
+```
+
+### Workstream Mode (Parallel Features)
+
+```
+.planning/
+  PROJECT.md              # Shared — project vision and context
+  config.json             # Shared — workflow configuration
+  active-workstream       # Tracks current workstream name
+  research/               # Shared — domain research
+  codebase/               # Shared — brownfield codebase mapping
+  todos/                  # Shared — captured ideas
+  milestones/             # Shared — completed milestone archive
+  workstreams/
+    feature-a/
+      ROADMAP.md          # Scoped — this workstream's phases
+      STATE.md            # Scoped — this workstream's progress
+      REQUIREMENTS.md     # Scoped — this workstream's requirements
+      phases/             # Scoped — this workstream's phase plans
+    feature-b/
+      ROADMAP.md
+      STATE.md
+      REQUIREMENTS.md
+      phases/
 ```
