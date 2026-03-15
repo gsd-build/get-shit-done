@@ -4,6 +4,7 @@
 
 const { test, describe, beforeEach, afterEach } = require('node:test');
 const assert = require('node:assert');
+const { execSync } = require('node:child_process');
 const fs = require('fs');
 const path = require('path');
 const { runGsdTools, createTempProject, cleanup } = require('./helpers.cjs');
@@ -1236,7 +1237,8 @@ describe('stats command', () => {
     assert.strictEqual(stats.phases_completed, 1);
     assert.strictEqual(stats.total_plans, 3);
     assert.strictEqual(stats.total_summaries, 2);
-    assert.strictEqual(stats.percent, 67);
+    assert.strictEqual(stats.percent, 50);
+    assert.strictEqual(stats.plan_percent, 67);
   });
 
   test('counts requirements from REQUIREMENTS.md', () => {
@@ -1274,6 +1276,105 @@ describe('stats command', () => {
     assert.strictEqual(stats.last_activity, '2025-06-15');
   });
 
+  test('reads last activity from plain STATE.md template format', () => {
+    fs.writeFileSync(
+      path.join(tmpDir, '.planning', 'STATE.md'),
+      `# Project State\n\n## Current Position\n\nPhase: 1 of 2 (Foundation)\nPlan: 1 of 1 in current phase\nStatus: In progress\nLast activity: 2025-06-16 — Finished plan 01-01\n`
+    );
+
+    const result = runGsdTools('stats', tmpDir);
+    assert.ok(result.success, `Command failed: ${result.error}`);
+
+    const stats = JSON.parse(result.output);
+    assert.strictEqual(stats.last_activity, '2025-06-16 — Finished plan 01-01');
+  });
+
+  test('includes roadmap-only phases in totals and preserves hyphenated names', () => {
+    const p1 = path.join(tmpDir, '.planning', 'phases', '14-auth-hardening');
+    const p2 = path.join(tmpDir, '.planning', 'phases', '15-proof-generation');
+    fs.mkdirSync(p1, { recursive: true });
+    fs.mkdirSync(p2, { recursive: true });
+    fs.writeFileSync(path.join(p1, '14-01-PLAN.md'), '# Plan');
+    fs.writeFileSync(path.join(p1, '14-01-SUMMARY.md'), '# Summary');
+    fs.writeFileSync(path.join(p2, '15-01-PLAN.md'), '# Plan');
+    fs.writeFileSync(path.join(p2, '15-01-SUMMARY.md'), '# Summary');
+
+    fs.writeFileSync(
+      path.join(tmpDir, '.planning', 'ROADMAP.md'),
+      `# Roadmap
+
+- [x] **Phase 14: Auth Hardening**
+- [x] **Phase 15: Proof Generation**
+- [ ] **Phase 16: Multi-Claim Verification & UX**
+
+## Milestone v1.0 Growth
+
+### Phase 14: Auth Hardening
+**Goal:** Improve auth checks
+
+### Phase 15: Proof Generation
+**Goal:** Improve proof generation
+
+### Phase 16: Multi-Claim Verification & UX
+**Goal:** Support multi-claim verification
+`
+    );
+
+    const result = runGsdTools('stats', tmpDir);
+    assert.ok(result.success, `Command failed: ${result.error}`);
+
+    const stats = JSON.parse(result.output);
+    assert.strictEqual(stats.phases_total, 3);
+    assert.strictEqual(stats.phases_completed, 2);
+    assert.strictEqual(stats.percent, 67);
+    assert.strictEqual(stats.plan_percent, 100);
+    assert.strictEqual(
+      stats.phases.find(p => p.number === '16')?.name,
+      'Multi-Claim Verification & UX'
+    );
+    assert.strictEqual(
+      stats.phases.find(p => p.number === '16')?.status,
+      'Not Started'
+    );
+  });
+
+  test('reports git commit count and first commit date from repository history', () => {
+    execSync('git init', { cwd: tmpDir, stdio: 'pipe' });
+    execSync('git config user.email "test@example.com"', { cwd: tmpDir, stdio: 'pipe' });
+    execSync('git config user.name "Test User"', { cwd: tmpDir, stdio: 'pipe' });
+
+    fs.writeFileSync(path.join(tmpDir, '.planning', 'PROJECT.md'), '# Project\n');
+    execSync('git add -A', { cwd: tmpDir, stdio: 'pipe' });
+    execSync('git commit -m "initial commit"', {
+      cwd: tmpDir,
+      stdio: 'pipe',
+      env: {
+        ...process.env,
+        GIT_AUTHOR_DATE: '2026-01-01T00:00:00Z',
+        GIT_COMMITTER_DATE: '2026-01-01T00:00:00Z',
+      },
+    });
+
+    fs.writeFileSync(path.join(tmpDir, 'README.md'), '# Updated\n');
+    execSync('git add README.md', { cwd: tmpDir, stdio: 'pipe' });
+    execSync('git commit -m "second commit"', {
+      cwd: tmpDir,
+      stdio: 'pipe',
+      env: {
+        ...process.env,
+        GIT_AUTHOR_DATE: '2026-02-01T00:00:00Z',
+        GIT_COMMITTER_DATE: '2026-02-01T00:00:00Z',
+      },
+    });
+
+    const result = runGsdTools('stats', tmpDir);
+    assert.ok(result.success, `Command failed: ${result.error}`);
+
+    const stats = JSON.parse(result.output);
+    assert.strictEqual(stats.git_commits, 2);
+    assert.strictEqual(stats.git_first_commit_date, '2026-01-01');
+  });
+
   test('table format renders readable output', () => {
     const p1 = path.join(tmpDir, '.planning', 'phases', '01-auth');
     fs.mkdirSync(p1, { recursive: true });
@@ -1288,5 +1389,6 @@ describe('stats command', () => {
     assert.ok(parsed.rendered.includes('Statistics'), 'should include Statistics header');
     assert.ok(parsed.rendered.includes('| Phase |'), 'should include table header');
     assert.ok(parsed.rendered.includes('| 1 |'), 'should include phase row');
+    assert.ok(parsed.rendered.includes('1/1 phases'), 'should report phase progress');
   });
 });
