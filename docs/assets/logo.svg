@@ -1,0 +1,11 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 200 48" fill="currentColor">
+  <style>
+    .logo-text { font-family: 'SF Mono', 'Fira Code', 'JetBrains Mono', Consolas, monospace; font-size: 7px; }
+  </style>
+  <text class="logo-text" y="8" xml:space="preserve"> ██████╗ ███████╗██████╗</text>
+  <text class="logo-text" y="16" xml:space="preserve">██╔════╝ ██╔════╝██╔══██╗</text>
+  <text class="logo-text" y="24" xml:space="preserve">██║  ███╗███████╗██║  ██║</text>
+  <text class="logo-text" y="32" xml:space="preserve">██║   ██║╚════██║██║  ██║</text>
+  <text class="logo-text" y="40" xml:space="preserve">╚██████╔╝███████║██████╔╝</text>
+  <text class="logo-text" y="48" xml:space="preserve"> ╚═════╝ ╚══════╝╚═════╝</text>
+</svg>
