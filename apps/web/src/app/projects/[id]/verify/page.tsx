@@ -76,6 +76,7 @@ export default function VerifyPhasePage() {
   const setSelectedRun = useOrchestrationStore((state) => state.setSelectedRun);
   const selectedRun = useOrchestrationStore(selectSelectedOrchestrationRun);
   const isRunning = status === 'running';
+  const canRunVerification = !isRunning;
   const canApprove = !isRunning && status === 'complete' && results.length > 0;
 
   // Fetch coverage data on mount
@@ -161,7 +162,7 @@ export default function VerifyPhasePage() {
           onNewPlan={() => setShowNewPlan(true)}
         />
 
-        {!isRunning && status !== 'complete' && (
+        {canRunVerification && (
           <div className="mb-8">
             <button
               type="button"
@@ -169,7 +170,7 @@ export default function VerifyPhasePage() {
               className="flex items-center gap-2 px-4 py-2 text-sm font-medium text-white bg-blue-600 hover:bg-blue-700 rounded-md transition-colors"
             >
               <Play className="w-4 h-4" />
-              Run Verification
+              {status === 'complete' ? 'Run Verification Again' : 'Run Verification'}
             </button>
           </div>
         )}

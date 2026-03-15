@@ -22,6 +22,8 @@ interface VerificationStore {
   overallPassed: boolean | null;
   summary: string | null;
   hasStaleResults: boolean;
+  incomingResults: TestResult[];
+  activeRunId: string | null;
 
   // Actions
   setRunning: () => void;
@@ -43,6 +45,8 @@ const initialState = {
   overallPassed: null as boolean | null,
   summary: null as string | null,
   hasStaleResults: false,
+  incomingResults: [] as TestResult[],
+  activeRunId: null as string | null,
 };
 
 /**
@@ -62,6 +66,8 @@ export const useVerificationStore = create<VerificationStore>((set) => ({
       status: 'running',
       runningTest: null,
       hasStaleResults: state.results.length > 0,
+      incomingResults: [],
+      activeRunId: `run-${Date.now()}`,
     })),
 
   /**
@@ -73,21 +79,34 @@ export const useVerificationStore = create<VerificationStore>((set) => ({
    * Add a test result to the results array.
    */
   addTestResult: (result) =>
-    set((state) => ({
-      results: [...state.results, result],
-    })),
+    set((state) => {
+      if (state.hasStaleResults) {
+        return {
+          incomingResults: [...state.incomingResults, result],
+        };
+      }
+
+      return {
+        results: [...state.results, result],
+      };
+    }),
 
   /**
    * Mark verification as complete with overall status and summary.
    */
   setComplete: (passed, summary) =>
-    set({
+    set((state) => ({
       status: 'complete',
       overallPassed: passed,
       summary,
       runningTest: null,
       hasStaleResults: false,
-    }),
+      results:
+        state.hasStaleResults && state.incomingResults.length > 0
+          ? state.incomingResults
+          : state.results,
+      incomingResults: [],
+    })),
 
   /**
    * Replace the gaps array.

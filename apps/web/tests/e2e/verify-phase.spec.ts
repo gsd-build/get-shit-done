@@ -82,4 +82,26 @@ test.describe('Verify Phase Page', () => {
       page.getByText(/Legend:/i).or(page.getByText(/No coverage data available/i)).first()
     ).toBeVisible();
   });
+
+  test('completed state exposes rerun action and keeps approval gated while rerun is active', async ({ page }) => {
+    await skipIfUnavailable(page);
+
+    const runButton = page.getByRole('button', { name: /Run Verification/i });
+    if (await runButton.isVisible()) {
+      await runButton.click();
+    }
+
+    await expect(
+      page
+        .getByRole('heading', { name: /Verification Passed|Verification Failed/i })
+        .first()
+    ).toBeVisible({ timeout: 20000 });
+
+    const rerunButton = page.getByRole('button', { name: /Run Verification Again/i });
+    await expect(rerunButton).toBeVisible();
+    await rerunButton.click();
+
+    await expect(page.getByRole('heading', { name: /Verification Running/i })).toBeVisible();
+    await expect(page.getByRole('button', { name: /^Approve$/i })).toBeDisabled();
+  });
 });

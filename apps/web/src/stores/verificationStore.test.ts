@@ -96,6 +96,28 @@ describe('verificationStore', () => {
       expect(results[1]?.testName).toBe('test2');
       expect(results[1]?.passed).toBe(false);
     });
+
+    it('buffers rerun results while stale results remain visible', () => {
+      useVerificationStore.getState().addTestResult({
+        requirementId: 'REQ-1',
+        testName: 'baseline',
+        passed: true,
+        duration: 100,
+      });
+      useVerificationStore.getState().setRunning();
+      useVerificationStore.getState().addTestResult({
+        requirementId: 'REQ-2',
+        testName: 'rerun',
+        passed: false,
+        duration: 120,
+      });
+
+      const state = useVerificationStore.getState();
+      expect(state.results).toHaveLength(1);
+      expect(state.results[0]?.testName).toBe('baseline');
+      expect(state.incomingResults).toHaveLength(1);
+      expect(state.incomingResults[0]?.testName).toBe('rerun');
+    });
   });
 
   describe('setComplete', () => {
@@ -118,6 +140,30 @@ describe('verificationStore', () => {
       useVerificationStore.getState().setRunningTest('current-test');
       useVerificationStore.getState().setComplete(true, 'Done');
       expect(useVerificationStore.getState().runningTest).toBeNull();
+    });
+
+    it('replaces stale visible results with rerun results on completion', () => {
+      useVerificationStore.getState().addTestResult({
+        requirementId: 'REQ-1',
+        testName: 'old-result',
+        passed: true,
+        duration: 100,
+      });
+
+      useVerificationStore.getState().setRunning();
+      useVerificationStore.getState().addTestResult({
+        requirementId: 'REQ-1',
+        testName: 'new-result',
+        passed: false,
+        duration: 90,
+      });
+      useVerificationStore.getState().setComplete(false, 'Rerun complete');
+
+      const state = useVerificationStore.getState();
+      expect(state.hasStaleResults).toBe(false);
+      expect(state.incomingResults).toHaveLength(0);
+      expect(state.results).toHaveLength(1);
+      expect(state.results[0]?.testName).toBe('new-result');
     });
   });
 
