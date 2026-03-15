@@ -1,0 +1,6 @@
+node_modules
+.git
+.github
+.work
+ralph_analysis
+*.log
