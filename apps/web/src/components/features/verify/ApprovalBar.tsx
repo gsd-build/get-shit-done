@@ -17,7 +17,7 @@ interface ApprovalBarProps {
  * ApprovalBar - Approve/Reject action bar with two-step confirmation.
  *
  * Per CONTEXT.md: Two-step confirmation for approval/rejection.
- * - Approve: Disabled when blocking gaps exist, shows confirmation dialog
+ * - Approve: Availability is controlled by parent lifecycle gating, shows confirmation dialog
  * - Reject: Opens GapSelectionModal to select gaps for fix plans
  */
 export function ApprovalBar({ gaps, onApprove, onReject, disabled = false }: ApprovalBarProps) {
@@ -25,10 +25,7 @@ export function ApprovalBar({ gaps, onApprove, onReject, disabled = false }: App
   const [showRejectModal, setShowRejectModal] = useState(false);
   const [selectedGaps, setSelectedGaps] = useState<string[]>([]);
 
-  const hasBlockingOrMajorGaps = gaps.some(
-    (g) => g.severity === 'blocking' || g.severity === 'major'
-  );
-  const isApproveDisabled = disabled || hasBlockingOrMajorGaps;
+  const isApproveDisabled = disabled;
 
   const handleApproveClick = () => {
     setShowApproveConfirm(true);
@@ -76,9 +73,7 @@ export function ApprovalBar({ gaps, onApprove, onReject, disabled = false }: App
         </div>
         {isApproveDisabled && (
           <p className="max-w-4xl mx-auto mt-2 text-xs text-orange-600 text-right">
-            {disabled
-              ? 'Approval available only after verification completes with results.'
-              : 'Resolve major or blocking gaps before approval.'}
+            Approval available only after verification completes with results.
           </p>
         )}
       </div>

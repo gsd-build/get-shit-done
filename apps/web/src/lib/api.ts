@@ -277,7 +277,19 @@ export async function fetchPlan(phaseId: string): Promise<ApiEnvelope<Plan | nul
     }
 
     const json = await response.json();
-    return json as ApiEnvelope<Plan>;
+
+    // Proxy responses are shaped as { data, meta, error } without a top-level success field.
+    // Normalize to ApiEnvelope so callers can consistently branch on `success`.
+    const hasError = Boolean(json?.error);
+    return {
+      success: !hasError,
+      data: (json?.data ?? null) as Plan | null,
+      meta: {
+        timestamp: json?.meta?.timestamp ?? new Date().toISOString(),
+        requestId: json?.meta?.requestId ?? '',
+      },
+      ...(hasError ? { error: json.error } : {}),
+    };
   } catch (err) {
     return {
       success: false,

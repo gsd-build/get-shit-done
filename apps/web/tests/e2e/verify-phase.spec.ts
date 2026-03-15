@@ -50,28 +50,13 @@ test.describe('Verify Phase Page', () => {
     await expect(page.getByRole('button', { name: /Create Fix Plans/i })).toBeVisible();
   });
 
-  test('approve is blocked when major/blocking gaps exist', async ({ page }) => {
+  test('approve gating depends on verification lifecycle, not gap severity labels', async ({ page }) => {
     await skipIfUnavailable(page);
     const runButton = page.getByRole('button', { name: /Run Verification/i });
     if (await runButton.isVisible()) {
       await runButton.click();
     }
-
-    const hasMajorOrBlocking = await page
-      .getByText(/Major|Blocking/i)
-      .first()
-      .isVisible()
-      .catch(() => false);
     const approveButton = page.getByRole('button', { name: /^Approve$/i });
-
-    if (hasMajorOrBlocking) {
-      await expect(approveButton).toBeDisabled();
-      await expect(
-        page.getByText(/Resolve major or blocking gaps before approval/i)
-      ).toBeVisible();
-      return;
-    }
-
     await expect(approveButton).toBeVisible();
   });
 

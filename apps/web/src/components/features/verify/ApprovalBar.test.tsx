@@ -26,7 +26,7 @@ describe('ApprovalBar', () => {
     expect(screen.getByRole('button', { name: /reject/i })).toBeInTheDocument();
   });
 
-  it('Approve disabled when blocking or major gaps exist', () => {
+  it('Approve is enabled even when major/blocking gaps exist if lifecycle gate allows it', () => {
     render(
       <ApprovalBar
         gaps={mockGaps}
@@ -35,7 +35,7 @@ describe('ApprovalBar', () => {
       />
     );
     const approveButton = screen.getByRole('button', { name: /approve/i });
-    expect(approveButton).toBeDisabled();
+    expect(approveButton).not.toBeDisabled();
   });
 
   it('Approve enabled when only minor gaps exist', () => {
@@ -50,16 +50,17 @@ describe('ApprovalBar', () => {
     expect(approveButton).not.toBeDisabled();
   });
 
-  it('shows guidance when major or blocking gaps are present', () => {
+  it('shows lifecycle guidance only when disabled by parent gate', () => {
     render(
       <ApprovalBar
-        gaps={mockGaps}
+        gaps={[]}
         onApprove={vi.fn()}
         onReject={vi.fn()}
+        disabled
       />
     );
     expect(
-      screen.getByText(/resolve major or blocking gaps before approval/i)
+      screen.getByText(/approval available only after verification completes with results/i)
     ).toBeInTheDocument();
   });
 
