@@ -16,7 +16,7 @@ STATS=$(node "$GSD_TOOLS" stats json)
 if [[ "$STATS" == @file:* ]]; then STATS=$(cat "${STATS#@file:}"); fi
 ```
 
-Extract fields from JSON: `milestone_version`, `milestone_name`, `phases`, `total_plans`, `total_summaries`, `percent`, `requirements_total`, `requirements_complete`, `git_commits`, `git_first_commit_date`, `last_activity`.
+Extract fields from JSON: `milestone_version`, `milestone_name`, `phases`, `phases_completed`, `phases_total`, `total_plans`, `total_summaries`, `percent`, `plan_percent`, `requirements_total`, `requirements_complete`, `git_commits`, `git_first_commit_date`, `last_activity`.
 </step>
 
 <step name="present_stats">
@@ -26,7 +26,10 @@ Present to the user with this format:
 # 📊 Project Statistics — {milestone_version} {milestone_name}
 
 ## Progress
-[████████░░] X/Y plans (Z%)
+[████████░░] X/Y phases (Z%)
+
+## Plans
+X/Y plans complete (Z%)
 
 ## Phases
 | Phase | Name | Plans | Completed | Status |

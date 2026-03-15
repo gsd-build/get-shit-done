@@ -4,7 +4,7 @@
 
 const fs = require('fs');
 const path = require('path');
-const { execSync } = require('child_process');
+const { execSync, spawnSync } = require('child_process');
 const { MODEL_PROFILES } = require('./model-profiles.cjs');
 
 // ─── Path helpers ────────────────────────────────────────────────────────────
@@ -132,24 +132,16 @@ function isGitIgnored(cwd, targetPath) {
 }
 
 function execGit(cwd, args) {
-  try {
-    const escaped = args.map(a => {
-      if (/^[a-zA-Z0-9._\-/=:@]+$/.test(a)) return a;
-      return "'" + a.replace(/'/g, "'\\''") + "'";
-    });
-    const stdout = execSync('git ' + escaped.join(' '), {
-      cwd,
-      stdio: 'pipe',
-      encoding: 'utf-8',
-    });
-    return { exitCode: 0, stdout: stdout.trim(), stderr: '' };
-  } catch (err) {
-    return {
-      exitCode: err.status ?? 1,
-      stdout: (err.stdout ?? '').toString().trim(),
-      stderr: (err.stderr ?? '').toString().trim(),
-    };
-  }
+  const result = spawnSync('git', args, {
+    cwd,
+    stdio: 'pipe',
+    encoding: 'utf-8',
+  });
+  return {
+    exitCode: result.status ?? 1,
+    stdout: (result.stdout ?? '').toString().trim(),
+    stderr: (result.stderr ?? '').toString().trim(),
+  };
 }
 
 // ─── Phase utilities ──────────────────────────────────────────────────────────
