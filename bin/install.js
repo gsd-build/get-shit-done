@@ -1539,6 +1539,7 @@ function copyCommandsAsAntigravitySkills(srcDir, skillsDir, prefix, isGlobal = f
 
       let content = fs.readFileSync(srcPath, 'utf8');
       content = convertClaudeCommandToAntigravitySkill(content, skillName, isGlobal);
+      content = processAttribution(content, getCommitAttribution('antigravity'));
 
       fs.writeFileSync(path.join(skillDir, 'SKILL.md'), content);
     }
