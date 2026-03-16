@@ -309,6 +309,33 @@ Analyze the phase to identify gray areas worth discussing. **Use both `prior_dec
 
 4. **Skip assessment** — If no meaningful gray areas exist (pure infrastructure, clear-cut implementation, or all already decided in prior phases), the phase may not need discussion.
 
+**Advisor Mode Detection:**
+
+Check if advisor mode should activate:
+
+1. Check for USER-PROFILE.md:
+   ```bash
+   PROFILE_PATH="$HOME/.claude/get-shit-done/USER-PROFILE.md"
+   ```
+   ADVISOR_MODE = file exists at PROFILE_PATH → true, otherwise → false
+
+2. If ADVISOR_MODE is true, resolve vendor_philosophy calibration tier:
+   - Priority 1: Read config.json > preferences.vendor_philosophy (project-level override)
+   - Priority 2: Read USER-PROFILE.md Vendor Choices/Philosophy rating (global)
+   - Priority 3: Default to "standard" if neither has a value or value is UNSCORED
+
+   Map to calibration tier:
+   - conservative OR thorough-evaluator → full_maturity
+   - opinionated → minimal_decisive
+   - pragmatic-fast OR any other value OR empty → standard
+
+3. Resolve model for advisor agents:
+   ```bash
+   ADVISOR_MODEL=$(node "$HOME/.claude/get-shit-done/bin/gsd-tools.cjs" resolve-model gsd-advisor-researcher --raw)
+   ```
+
+If ADVISOR_MODE is false, skip all advisor-specific steps — workflow proceeds with existing conversational flow unchanged.
+
 **Output your analysis internally, then present to user.**
 
 Example analysis for "Post Feed" phase (with code and prior context):
@@ -398,10 +425,96 @@ For "Organize photo library" (organization task):
 ☐ Folder structure — Flat, nested by year, or by category?
 ```
 
-Continue to discuss_areas with selected areas.
+Continue to discuss_areas with selected areas (or advisor_research if ADVISOR_MODE is true).
+</step>
+
+<step name="advisor_research">
+**Advisor Research** (only when ADVISOR_MODE is true)
+
+After user selects gray areas in present_gray_areas, spawn parallel research agents.
+
+1. Display brief status: "Researching {N} areas..."
+
+2. For EACH user-selected gray area, spawn a Task() in parallel:
+
+   Task(
+     prompt="First, read @~/.claude/agents/gsd-advisor-researcher.md for your role and instructions.
+
+     <gray_area>{area_name}: {area_description from gray area identification}</gray_area>
+     <phase_context>{phase_goal and description from ROADMAP.md}</phase_context>
+     <project_context>{project name and brief description from PROJECT.md}</project_context>
+     <calibration_tier>{resolved calibration tier: full_maturity | standard | minimal_decisive}</calibration_tier>
+
+     Research this gray area and return a structured comparison table with rationale.",
+     subagent_type="general-purpose",
+     model="{ADVISOR_MODEL}",
+     description="Research: {area_name}"
+   )
+
+   All Task() calls spawn simultaneously — do NOT wait for one before starting the next.
+
+3. After ALL agents return, SYNTHESIZE results before presenting:
+   For each agent's return:
+   a. Parse the markdown comparison table and rationale paragraph
+   b. Verify all 5 columns present (Option | Pros | Cons | Complexity | Recommendation) — fill any missing columns rather than showing broken table
+   c. Verify option count matches calibration tier:
+      - full_maturity: 3-5 options acceptable
+      - standard: 2-4 options acceptable
+      - minimal_decisive: 1-2 options acceptable
+      If agent returned too many, trim least viable. If too few, accept as-is.
+   d. Rewrite rationale paragraph to weave in project context and ongoing discussion context that the agent did not have access to
+   e. If agent returned only 1 option, convert from table format to direct recommendation: "Standard approach for {area}: {option}. {rationale}"
+
+4. Store synthesized tables for use in discuss_areas.
+
+**If ADVISOR_MODE is false:** Skip this step entirely — proceed directly from present_gray_areas to discuss_areas.
 </step>
 
 <step name="discuss_areas">
+Discuss each selected area with the user. Flow depends on advisor mode.
+
+**If ADVISOR_MODE is true:**
+
+Table-first discussion flow — present research-backed comparison tables, then capture user picks.
+
+**For each selected area:**
+
+1. **Present the synthesized comparison table + rationale paragraph** (from advisor_research step)
+
+2. **Use AskUserQuestion:**
+   - header: "{area_name}"
+   - question: "Which approach for {area_name}?"
+   - options: Extract from the table's Option column (AskUserQuestion adds "Other" automatically)
+
+3. **Record the user's selection:**
+   - If user picks from table options → record as locked decision for that area
+   - If user picks "Other" → receive their input, reflect it back for confirmation, record
+
+4. **After recording pick, Claude decides whether follow-up questions are needed:**
+   - If the pick has ambiguity that would affect downstream planning → ask 1-2 targeted follow-up questions using AskUserQuestion
+   - If the pick is clear and self-contained → move to next area
+   - Do NOT ask the standard 4 questions — the table already provided the context
+
+5. **After all areas processed:**
+   - header: "Done"
+   - question: "That covers [list areas]. Ready to create context?"
+   - options: "Create context" / "Revisit an area"
+
+**Scope creep handling (advisor mode):**
+If user mentions something outside the phase domain:
+```
+"[Feature] sounds like a new capability — that belongs in its own phase.
+I'll note it as a deferred idea.
+
+Back to [current area]: [return to current question]"
+```
+
+Track deferred ideas internally.
+
+---
+
+**If ADVISOR_MODE is false:**
+
 For each selected area, conduct a focused discussion loop.
 
 **Batch mode support:** Parse optional `--batch` from `$ARGUMENTS`.
