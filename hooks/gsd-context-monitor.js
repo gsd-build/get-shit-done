@@ -115,7 +115,6 @@ process.stdin.on('end', () => {
     fs.writeFileSync(warnPath, JSON.stringify(warnData));
 
     // Detect if GSD is active (has .planning/STATE.md in working directory)
-    const cwd = data.cwd || process.cwd();
     const isGsdActive = fs.existsSync(path.join(cwd, '.planning', 'STATE.md'));
 
     // Build advisory warning message (never use imperative commands that
