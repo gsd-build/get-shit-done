@@ -463,7 +463,8 @@ Read and follow `~/.claude/get-shit-done/workflows/transition.md`, passing throu
 ## ✓ Phase {X}: {Name} Complete
 
 /gsd:progress — see updated roadmap
-/gsd:transition — plan next phase transition
+/gsd:discuss-phase {next} — discuss next phase before planning
+/gsd:plan-phase {next} — plan next phase
 /gsd:execute-phase {next} — execute next phase
 ```
 </step>
