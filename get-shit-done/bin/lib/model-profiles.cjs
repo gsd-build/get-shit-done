@@ -25,6 +25,38 @@ const MODEL_PROFILES = {
 };
 const VALID_PROFILES = Object.keys(MODEL_PROFILES['gsd-planner']);
 
+// Maps agent types to roles for custom model configuration.
+// Configure in .planning/config.json under "models" key with fallback arrays:
+//
+// {
+//   "model_profile": "custom",
+//   "models": {
+//     "planning": ["google/antigravity-claude-opus-4-6-thinking", "openai/gpt-5.2"],
+//     "coding": ["openai/gpt-5.3-codex", "openai/gpt-5.2-codex"],
+//     "research": ["google/antigravity-gemini-3-pro", "zai-coding-plan/glm-4.7"],
+//     "verification": ["google/antigravity-claude-opus-4-5-thinking", "openai/gpt-5.2"]
+//   }
+// }
+//
+// Each role can be a single model string or an array (first = primary, rest = fallbacks).
+const AGENT_TO_ROLE = {
+  'gsd-planner': 'planning',
+  'gsd-roadmapper': 'planning',
+  'gsd-executor': 'coding',
+  'gsd-phase-researcher': 'research',
+  'gsd-project-researcher': 'research',
+  'gsd-research-synthesizer': 'research',
+  'gsd-debugger': 'coding',
+  'gsd-codebase-mapper': 'research',
+  'gsd-verifier': 'verification',
+  'gsd-plan-checker': 'verification',
+  'gsd-integration-checker': 'verification',
+  'gsd-nyquist-auditor': 'verification',
+  'gsd-ui-researcher': 'research',
+  'gsd-ui-checker': 'verification',
+  'gsd-ui-auditor': 'verification',
+};
+
 /**
  * Formats the agent-to-model mapping as a human-readable table (in string format).
  *
@@ -63,6 +95,7 @@ function getAgentToModelMapForProfile(normalizedProfile) {
 module.exports = {
   MODEL_PROFILES,
   VALID_PROFILES,
+  AGENT_TO_ROLE,
   formatAgentToModelMapAsTable,
   getAgentToModelMapForProfile,
 };

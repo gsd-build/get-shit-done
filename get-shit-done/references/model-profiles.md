@@ -42,6 +42,11 @@ Model profiles control which Claude model each GSD agent uses. This allows balan
 - Best when you switch models interactively (for example OpenCode `/model`)
 - Use when: you want GSD to follow your currently selected runtime model
 
+**custom** - Manual model assignment with fallback support
+- Map specific models to each role (planning, coding, research, verification)
+- Define fallback arrays for each role - if primary fails, try fallbacks in order
+- Use when: using non-Anthropic models, or need specific model control per task type
+
 ## Resolution Logic
 
 Orchestrators resolve model before spawning:
@@ -49,8 +54,63 @@ Orchestrators resolve model before spawning:
 ```
 1. Read .planning/config.json
 2. Check model_overrides for agent-specific override
-3. If no override, look up agent in profile table
-4. Pass model parameter to Task call
+3. If profile is "custom", look up agent's role in custom models config
+4. If no override/custom, look up agent in profile table
+5. Pass model parameter to Task call
+```
+
+## Role Mapping
+
+When using the `custom` profile, agents are mapped to roles:
+
+| Role | Agents |
+|------|--------|
+| planning | gsd-planner, gsd-roadmapper |
+| coding | gsd-executor, gsd-debugger |
+| research | gsd-phase-researcher, gsd-project-researcher, gsd-research-synthesizer, gsd-codebase-mapper |
+| verification | gsd-verifier, gsd-plan-checker, gsd-integration-checker, gsd-nyquist-auditor |
+
+## Custom Model Configuration
+
+Use the `custom` profile to assign specific models to each role:
+
+```json
+{
+  "model_profile": "custom",
+  "models": {
+    "planning": "google/antigravity-claude-opus-4-6-thinking",
+    "coding": "openai/gpt-5.3-codex",
+    "research": "google/antigravity-gemini-3-pro",
+    "verification": "google/antigravity-claude-opus-4-5-thinking"
+  }
+}
+```
+
+### Fallback Support
+
+Each role can be an array of models. If the primary fails, orchestrators try fallbacks in order:
+
+```json
+{
+  "model_profile": "custom",
+  "models": {
+    "planning": [
+      "google/antigravity-claude-opus-4-6-thinking",
+      "openai/gpt-5.2",
+      "anthropic/claude-opus-4"
+    ],
+    "coding": ["openai/gpt-5.3-codex", "openai/gpt-5.2-codex"],
+    "research": ["google/antigravity-gemini-3-pro", "zai-coding-plan/glm-4.7"],
+    "verification": ["google/antigravity-claude-opus-4-5-thinking", "openai/gpt-5.2"]
+  }
+}
+```
+
+The `resolve-model` command returns fallbacks when configured:
+
+```bash
+gsd-tools resolve-model gsd-planner
+# Output: {"model": "google/antigravity-claude-opus-4-6-thinking", "profile": "custom", "fallbacks": ["openai/gpt-5.2", "anthropic/claude-opus-4"]}
 ```
 
 ## Per-Agent Overrides

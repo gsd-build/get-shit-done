@@ -5,7 +5,7 @@
 const fs = require('fs');
 const path = require('path');
 const { execSync, spawnSync } = require('child_process');
-const { MODEL_PROFILES } = require('./model-profiles.cjs');
+const { MODEL_PROFILES, AGENT_TO_ROLE } = require('./model-profiles.cjs');
 
 // ─── Path helpers ────────────────────────────────────────────────────────────
 
@@ -111,6 +111,18 @@ function loadConfig(cwd) {
   } catch {
     return defaults;
   }
+}
+
+function loadCustomModels(cwd) {
+  const configPath = path.join(cwd, '.planning', 'config.json');
+  try {
+    const raw = fs.readFileSync(configPath, 'utf-8');
+    const parsed = JSON.parse(raw);
+    if (parsed.model_profile === 'custom' && parsed.models) {
+      return parsed.models;
+    }
+  } catch {}
+  return null;
 }
 
 // ─── Git utilities ────────────────────────────────────────────────────────────
@@ -377,8 +389,29 @@ function resolveModelInternal(cwd, agentType) {
     return override;
   }
 
-  // Fall back to profile lookup
+  // Check custom model configuration if profile is "custom"
   const profile = String(config.model_profile || 'balanced').toLowerCase();
+  if (profile === 'custom') {
+    const customModels = loadCustomModels(cwd);
+    if (customModels) {
+      const role = AGENT_TO_ROLE[agentType];
+      if (role && customModels[role]) {
+        const roleModels = customModels[role];
+        // Support both single string and array formats
+        if (Array.isArray(roleModels) && roleModels.length > 0) {
+          return roleModels[0]; // Return primary model (first in fallback array)
+        }
+        if (typeof roleModels === 'string') {
+          return roleModels;
+        }
+      }
+    }
+    // Fallback to balanced profile if custom config is invalid
+    const agentModels = MODEL_PROFILES[agentType];
+    return agentModels?.['balanced'] || 'sonnet';
+  }
+
+  // Fall back to profile lookup
   const agentModels = MODEL_PROFILES[agentType];
   if (!agentModels) return 'sonnet';
   if (profile === 'inherit') return 'inherit';
@@ -477,6 +510,7 @@ module.exports = {
   error,
   safeReadFile,
   loadConfig,
+  loadCustomModels,
   isGitIgnored,
   execGit,
   escapeRegex,

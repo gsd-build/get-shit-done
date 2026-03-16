@@ -4,9 +4,9 @@
 const fs = require('fs');
 const path = require('path');
 const { execSync } = require('child_process');
-const { safeReadFile, loadConfig, isGitIgnored, execGit, normalizePhaseName, comparePhaseNum, getArchivedPhaseDirs, generateSlugInternal, getMilestoneInfo, getMilestonePhaseFilter, resolveModelInternal, stripShippedMilestones, toPosixPath, output, error, findPhaseInternal } = require('./core.cjs');
+const { safeReadFile, loadConfig, loadCustomModels, isGitIgnored, execGit, normalizePhaseName, comparePhaseNum, getArchivedPhaseDirs, generateSlugInternal, getMilestoneInfo, getMilestonePhaseFilter, resolveModelInternal, stripShippedMilestones, toPosixPath, output, error, findPhaseInternal } = require('./core.cjs');
 const { extractFrontmatter } = require('./frontmatter.cjs');
-const { MODEL_PROFILES } = require('./model-profiles.cjs');
+const { MODEL_PROFILES, AGENT_TO_ROLE } = require('./model-profiles.cjs');
 
 function cmdGenerateSlug(text, raw) {
   if (!text) {
@@ -211,6 +211,18 @@ function cmdResolveModel(cwd, agentType, raw) {
   const result = agentModels
     ? { model, profile }
     : { model, profile, unknown_agent: true };
+
+  // Include fallbacks for custom profile with array configuration
+  if (profile === 'custom') {
+    const customModels = loadCustomModels(cwd);
+    if (customModels) {
+      const role = AGENT_TO_ROLE[agentType];
+      if (role && customModels[role] && Array.isArray(customModels[role]) && customModels[role].length > 1) {
+        result.fallbacks = customModels[role].slice(1);
+      }
+    }
+  }
+
   output(result, raw, model);
 }
 
