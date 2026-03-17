@@ -322,6 +322,8 @@ Execute ad-hoc task with GSD guarantees.
 | `--discuss` | Lightweight pre-planning discussion |
 | `--research` | Spawn focused researcher before planning |
 
+Default quick runs use the lighter quick-planner profile; `--full` keeps the standard planner profile for stricter plans.
+
 Flags are composable.
 
 ```bash

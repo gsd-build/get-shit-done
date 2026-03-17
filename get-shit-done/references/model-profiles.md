@@ -7,6 +7,7 @@ Model profiles control which Claude model each GSD agent uses. This allows balan
 | Agent | `quality` | `balanced` | `budget` | `inherit` |
 |-------|-----------|------------|----------|-----------|
 | gsd-planner | opus | opus | sonnet | inherit |
+| gsd-quick-planner | opus | sonnet | sonnet | inherit |
 | gsd-roadmapper | opus | sonnet | sonnet | inherit |
 | gsd-executor | opus | sonnet | sonnet | inherit |
 | gsd-phase-researcher | opus | sonnet | haiku | inherit |
@@ -84,6 +85,9 @@ Per-project default: Set in `.planning/config.json`:
 
 **Why Opus for gsd-planner?**
 Planning involves architecture decisions, goal decomposition, and task design. This is where model quality has the highest impact.
+
+**Why Sonnet for gsd-quick-planner in balanced?**
+Quick tasks still need planning, but they are explicitly constrained to 1-3 atomic tasks. Sonnet is fast enough for that narrower scope and saves Opus for milestone-scale planning or `--full` quick runs.
 
 **Why Sonnet for gsd-executor?**
 Executors follow explicit PLAN.md instructions. The plan already contains the reasoning; execution is implementation.

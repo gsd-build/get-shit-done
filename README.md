@@ -376,7 +376,7 @@ Then `/gsd:new-milestone` starts the next version — same flow as `new-project`
 
 Quick mode gives you GSD guarantees (atomic commits, state tracking) with a faster path:
 
-- **Same agents** — Planner + executor, same quality
+- **Lighter default planner** — Standard `/gsd:quick` uses the quick-planner profile to keep trivial tasks moving
 - **Skips optional steps** — No research, no plan checker, no verifier by default
 - **Separate tracking** — Lives in `.planning/quick/`, not phases
 
@@ -384,7 +384,7 @@ Quick mode gives you GSD guarantees (atomic commits, state tracking) with a fast
 
 **`--research` flag:** Spawns a focused researcher before planning. Investigates implementation approaches, library options, and pitfalls. Use when you're unsure how to approach a task.
 
-**`--full` flag:** Enables plan-checking (max 2 iterations) and post-execution verification.
+**`--full` flag:** Enables plan-checking (max 2 iterations) and post-execution verification, and keeps the standard planner profile for stricter plans.
 
 Flags are composable: `--discuss --research --full` gives discussion + research + plan-checking + verification.
 

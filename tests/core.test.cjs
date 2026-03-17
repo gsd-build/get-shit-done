@@ -146,7 +146,7 @@ describe('resolveModelInternal', () => {
 
   describe('model profile structural validation', () => {
     test('all known agents resolve to a valid string for each profile', () => {
-      const knownAgents = ['gsd-planner', 'gsd-executor', 'gsd-phase-researcher', 'gsd-codebase-mapper'];
+      const knownAgents = ['gsd-planner', 'gsd-quick-planner', 'gsd-executor', 'gsd-phase-researcher', 'gsd-codebase-mapper'];
       const profiles = ['quality', 'balanced', 'budget', 'inherit'];
       const validValues = ['inherit', 'sonnet', 'haiku', 'opus'];
 
@@ -163,7 +163,7 @@ describe('resolveModelInternal', () => {
     });
 
     test('inherit profile forces all known agents to inherit model', () => {
-      const knownAgents = ['gsd-planner', 'gsd-executor', 'gsd-phase-researcher', 'gsd-codebase-mapper'];
+      const knownAgents = ['gsd-planner', 'gsd-quick-planner', 'gsd-executor', 'gsd-phase-researcher', 'gsd-codebase-mapper'];
       writeConfig({ model_profile: 'inherit' });
       for (const agent of knownAgents) {
         assert.strictEqual(resolveModelInternal(tmpDir, agent), 'inherit');
@@ -195,6 +195,15 @@ describe('resolveModelInternal', () => {
       // gsd-planner not overridden, should use quality profile -> opus
       assert.strictEqual(resolveModelInternal(tmpDir, 'gsd-planner'), 'opus');
     });
+
+    test('quick planner override can differ from standard planner', () => {
+      writeConfig({
+        model_profile: 'balanced',
+        model_overrides: { 'gsd-quick-planner': 'haiku' },
+      });
+      assert.strictEqual(resolveModelInternal(tmpDir, 'gsd-quick-planner'), 'haiku');
+      assert.strictEqual(resolveModelInternal(tmpDir, 'gsd-planner'), 'opus');
+    });
   });
 
   describe('edge cases', () => {
@@ -212,6 +221,7 @@ describe('resolveModelInternal', () => {
       writeConfig({});
       // balanced profile, gsd-planner -> opus
       assert.strictEqual(resolveModelInternal(tmpDir, 'gsd-planner'), 'opus');
+      assert.strictEqual(resolveModelInternal(tmpDir, 'gsd-quick-planner'), 'sonnet');
     });
   });
 });

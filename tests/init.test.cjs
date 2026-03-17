@@ -694,6 +694,9 @@ describe('cmdInitQuick', () => {
     assert.ok(/^\.planning\/quick\/\d{6}-[0-9a-z]{3}-fix-login-bug$/.test(output.task_dir),
       `task_dir format wrong: "${output.task_dir}"`);
 
+    assert.strictEqual(output.planner_model, 'sonnet');
+    assert.strictEqual(output.full_planner_model, 'opus');
+
     // next_num must NOT be present
     assert.ok(!('next_num' in output), 'next_num should not be in output');
   });
@@ -735,6 +738,20 @@ describe('cmdInitQuick', () => {
 
     const output = JSON.parse(result.output);
     assert.ok(output.slug.length <= 40, `Slug should be <= 40 chars, got ${output.slug.length}: "${output.slug}"`);
+  });
+
+  test('quality profile keeps quick and full planners on opus', () => {
+    fs.writeFileSync(
+      path.join(tmpDir, '.planning', 'config.json'),
+      JSON.stringify({ model_profile: 'quality', commit_docs: true }, null, 2)
+    );
+
+    const result = runGsdTools('init quick "Fix login bug"', tmpDir);
+    assert.ok(result.success, `Command failed: ${result.error}`);
+
+    const output = JSON.parse(result.output);
+    assert.strictEqual(output.planner_model, 'opus');
+    assert.strictEqual(output.full_planner_model, 'opus');
   });
 });
 

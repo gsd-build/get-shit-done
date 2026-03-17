@@ -410,6 +410,7 @@ Disable these to speed up phases in familiar domains or when conserving tokens.
 | Agent | `quality` | `balanced` | `budget` | `inherit` |
 |-------|-----------|------------|----------|-----------|
 | gsd-planner | Opus | Opus | Sonnet | Inherit |
+| gsd-quick-planner | Opus | Sonnet | Sonnet | Inherit |
 | gsd-roadmapper | Opus | Sonnet | Sonnet | Inherit |
 | gsd-executor | Opus | Sonnet | Sonnet | Inherit |
 | gsd-phase-researcher | Opus | Sonnet | Haiku | Inherit |
