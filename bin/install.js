@@ -33,6 +33,10 @@ const CODEX_AGENT_SANDBOX = {
 // Get version from package.json
 const pkg = require('../package.json');
 
+function getHomeDir() {
+  return process.env.HOME || process.env.USERPROFILE || os.homedir();
+}
+
 // Parse args
 const args = process.argv.slice(2);
 const hasGlobal = args.includes('--global') || args.includes('-g');
@@ -66,7 +70,7 @@ if (hasAll) {
  * Preserves $HOME as a shell variable so paths remain portable across machines.
  */
 function toHomePrefix(pathPrefix) {
-  const home = os.homedir().replace(/\\/g, '/');
+  const home = getHomeDir().replace(/\\/g, '/');
   const normalized = pathPrefix.replace(/\\/g, '/');
   if (normalized.startsWith(home)) {
     return '$HOME' + normalized.slice(home.length);
@@ -129,7 +133,7 @@ function getOpencodeGlobalDir() {
   }
   
   // 4. Default: ~/.config/opencode (XDG default)
-  return path.join(os.homedir(), '.config', 'opencode');
+  return path.join(getHomeDir(), '.config', 'opencode');
 }
 
 /**
@@ -154,7 +158,7 @@ function getGlobalDir(runtime, explicitDir = null) {
     if (process.env.GEMINI_CONFIG_DIR) {
       return expandTilde(process.env.GEMINI_CONFIG_DIR);
     }
-    return path.join(os.homedir(), '.gemini');
+    return path.join(getHomeDir(), '.gemini');
   }
 
   if (runtime === 'codex') {
@@ -165,7 +169,7 @@ function getGlobalDir(runtime, explicitDir = null) {
     if (process.env.CODEX_HOME) {
       return expandTilde(process.env.CODEX_HOME);
     }
-    return path.join(os.homedir(), '.codex');
+    return path.join(getHomeDir(), '.codex');
   }
 
   if (runtime === 'kiro') {
@@ -176,7 +180,7 @@ function getGlobalDir(runtime, explicitDir = null) {
     if (process.env.KIRO_CONFIG_DIR) {
       return expandTilde(process.env.KIRO_CONFIG_DIR);
     }
-    return path.join(os.homedir(), '.kiro');
+    return path.join(getHomeDir(), '.kiro');
   }
   
   // Claude Code: --config-dir > CLAUDE_CONFIG_DIR > ~/.claude
@@ -186,7 +190,7 @@ function getGlobalDir(runtime, explicitDir = null) {
   if (process.env.CLAUDE_CONFIG_DIR) {
     return expandTilde(process.env.CLAUDE_CONFIG_DIR);
   }
-  return path.join(os.homedir(), '.claude');
+  return path.join(getHomeDir(), '.claude');
 }
 
 const banner = '\n' +
@@ -243,7 +247,7 @@ if (hasHelp) {
  */
 function expandTilde(filePath) {
   if (filePath && filePath.startsWith('~/')) {
-    return path.join(os.homedir(), filePath.slice(2));
+    return path.join(getHomeDir(), filePath.slice(2));
   }
   return filePath;
 }
@@ -1291,7 +1295,7 @@ function uninstall(isGlobal, runtime = 'claude') {
     : path.join(process.cwd(), dirName);
 
   const locationLabel = isGlobal
-    ? targetDir.replace(os.homedir(), '~')
+    ? targetDir.replace(getHomeDir(), '~')
     : targetDir.replace(process.cwd(), '.');
 
   let runtimeLabel = 'Claude Code';
@@ -1671,7 +1675,7 @@ function configureOpencodePermissions(isGlobal = true) {
 
   // Build the GSD path using the actual config directory
   // Use ~ shorthand if it's in the default location, otherwise use full path
-  const defaultConfigDir = path.join(os.homedir(), '.config', 'opencode');
+  const defaultConfigDir = path.join(getHomeDir(), '.config', 'opencode');
   const gsdPath = opencodeConfigDir === defaultConfigDir
     ? '~/.config/opencode/get-shit-done/*'
     : `${opencodeConfigDir.replace(/\\/g, '/')}/get-shit-done/*`;
@@ -1916,7 +1920,7 @@ function install(isGlobal, runtime = 'claude') {
     : path.join(process.cwd(), dirName);
 
   const locationLabel = isGlobal
-    ? targetDir.replace(os.homedir(), '~')
+    ? targetDir.replace(getHomeDir(), '~')
     : targetDir.replace(process.cwd(), '.');
 
   // Path prefix for file references in markdown content
@@ -2390,7 +2394,7 @@ function promptLocation(runtimes) {
 
   const pathExamples = runtimes.map(r => {
     const globalPath = getGlobalDir(r, explicitConfigDir);
-    return globalPath.replace(os.homedir(), '~');
+    return globalPath.replace(getHomeDir(), '~');
   }).join(', ');
 
   const localExamples = runtimes.map(r => `./${getDirName(r)}`).join(', ');
