@@ -144,6 +144,7 @@ const init = require('./lib/init.cjs');
 const frontmatter = require('./lib/frontmatter.cjs');
 const profilePipeline = require('./lib/profile-pipeline.cjs');
 const profileOutput = require('./lib/profile-output.cjs');
+const knowledge = require('./lib/knowledge/index.cjs');
 
 // ─── CLI Router ───────────────────────────────────────────────────────────────
 
@@ -177,7 +178,7 @@ async function main() {
   const command = args[0];
 
   if (!command) {
-    error('Usage: gsd-tools <command> [args] [--raw] [--cwd <path>]\nCommands: state, resolve-model, find-phase, commit, verify-summary, verify, frontmatter, template, generate-slug, current-timestamp, list-todos, verify-path-exists, config-ensure-section, init');
+    error('Usage: gsd-tools <command> [args] [--raw] [--cwd <path>]\nCommands: state, resolve-model, find-phase, commit, verify-summary, verify, frontmatter, template, generate-slug, current-timestamp, list-todos, verify-path-exists, config-ensure-section, init, knowledge');
   }
 
   switch (command) {
@@ -711,6 +712,70 @@ async function main() {
       const autoFlag = args.includes('--auto');
       const forceFlag = args.includes('--force');
       profileOutput.cmdGenerateClaudeMd(cwd, { output: outputPath, auto: autoFlag, force: forceFlag }, raw);
+      break;
+    }
+
+    // ─── Knowledge Layer Commands ──────────────────────────────────────────────
+    case 'knowledge': {
+      const { output: coreOutput } = require('./lib/core.cjs');
+      const subcommand = args[1];
+
+      if (subcommand === 'init') {
+        const result = knowledge.initKnowledge(cwd);
+        coreOutput(result, raw);
+
+      } else if (subcommand === 'index') {
+        const incremental = args.includes('--incremental');
+        const result = incremental
+          ? knowledge.updateIndexIncremental(cwd)
+          : knowledge.buildIndex(cwd);
+        coreOutput(result, raw);
+
+      } else if (subcommand === 'deps') {
+        const result = knowledge.buildDependencyGraph(cwd);
+        coreOutput(result, raw);
+
+      } else if (subcommand === 'context') {
+        const taskDesc = args.slice(2).filter(a => !a.startsWith('--')).join(' ');
+        if (!taskDesc) error('Usage: knowledge context <task description>');
+        const agentIdx = args.indexOf('--agent');
+        const agent = agentIdx !== -1 ? args[agentIdx + 1] : undefined;
+        const budgetIdx = args.indexOf('--budget');
+        const budget = budgetIdx !== -1 ? parseInt(args[budgetIdx + 1], 10) : undefined;
+        const diffAware = args.includes('--diff');
+        const result = diffAware
+          ? knowledge.assembleDiffAwareContext(cwd, taskDesc, { agent, budget })
+          : knowledge.assembleContext(cwd, taskDesc, { agent, budget });
+        coreOutput(result, raw);
+
+      } else if (subcommand === 'modules') {
+        const result = knowledge.listModules(cwd);
+        coreOutput(result, raw);
+
+      } else if (subcommand === 'impact') {
+        const filePath = args[2];
+        if (!filePath) error('Usage: knowledge impact <file-path>');
+        const result = knowledge.getImpactedFiles(cwd, filePath);
+        coreOutput(result, raw);
+
+      } else if (subcommand === 'staleness') {
+        const ip = knowledge.indexPath(cwd);
+        const fs = require('fs');
+        if (!fs.existsSync(ip)) {
+          coreOutput({ stale: true, message: 'INDEX.json not found. Run: gsd-tools.cjs knowledge init && gsd-tools.cjs knowledge index' }, raw);
+        } else {
+          const index = knowledge.getIndex(cwd);
+          coreOutput({
+            stale: !index || index.last_mapped_commit === '0000000',
+            last_mapped_commit: index ? index.last_mapped_commit : null,
+            total_files: index ? (index.stats || {}).total_files : 0,
+            total_modules: index ? (index.stats || {}).total_modules : 0,
+          }, raw);
+        }
+
+      } else {
+        error('Unknown knowledge subcommand: ' + subcommand + '\nAvailable: init, index, deps, context, modules, impact, staleness');
+      }
       break;
     }
 
