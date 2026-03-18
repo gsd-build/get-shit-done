@@ -2698,14 +2698,22 @@ function install(isGlobal, runtime = 'claude') {
     const configPath = path.join(targetDir, 'config.toml');
     try {
       let configContent = fs.existsSync(configPath) ? fs.readFileSync(configPath, 'utf-8') : '';
+      const rootConfigBlock = [
+        'model = "gpt-5.4"',
+        'model_reasoning_effort = "high"',
+        'disable_response_storage = true',
+      ].join('\n');
 
       // Enable hooks feature flag if not present
       if (!configContent.includes('codex_hooks')) {
         const featuresSection = '[features]\ncodex_hooks = true\n';
         if (configContent.includes('[features]')) {
+          if (!configContent.startsWith(rootConfigBlock)) {
+            configContent = rootConfigBlock + '\n\n' + configContent.trimStart();
+          }
           configContent = configContent.replace(/\[features\]\n/, featuresSection);
         } else {
-          configContent = featuresSection + '\n' + configContent;
+          configContent = rootConfigBlock + '\n\n' + featuresSection + '\n' + configContent;
         }
       }
 
