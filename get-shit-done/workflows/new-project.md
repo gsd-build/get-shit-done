@@ -507,12 +507,12 @@ node "$HOME/.claude/get-shit-done/bin/gsd-tools.cjs" commit "chore: add project 
 Check for directories with their own `.git` folders (separate repos within the workspace):
 
 ```bash
-find . -maxdepth 2 -type d -name ".git" -not -path "./.git"
+find . -maxdepth 1 -type d -not -name ".*" -not -name "node_modules" -exec test -d "{}/.git" \; -print
 ```
 
 **If sub-repos found:**
 
-Strip the `/.git` suffix and `./` prefix to get directory names (e.g., `./backend/.git` → `backend`).
+Strip the `./` prefix to get directory names (e.g., `./backend` → `backend`).
 
 Use AskUserQuestion:
 - header: "Multi-Repo Workspace"

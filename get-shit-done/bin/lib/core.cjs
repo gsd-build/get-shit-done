@@ -57,7 +57,18 @@ function findProjectRoot(startDir) {
   const resolved = path.resolve(startDir);
   const root = path.parse(resolved).root;
   const homedir = require('os').homedir();
-  const startHasGit = fs.existsSync(path.join(resolved, '.git'));
+
+  // Check if startDir or any of its ancestors (up to but not including a
+  // candidate project root) contains a .git directory. This handles both
+  // `backend/` (direct sub-repo) and `backend/src/modules/` (nested inside).
+  function isInsideGitRepo(candidateParent) {
+    let d = resolved;
+    while (d !== candidateParent && d !== root) {
+      if (fs.existsSync(path.join(d, '.git'))) return true;
+      d = path.dirname(d);
+    }
+    return false;
+  }
 
   let dir = resolved;
   while (dir !== root) {
@@ -82,15 +93,15 @@ function findProjectRoot(startDir) {
         }
 
         // Check legacy multiRepo flag
-        if (config.multiRepo === true && startHasGit) {
+        if (config.multiRepo === true && isInsideGitRepo(parent)) {
           return parent;
         }
       } catch {
         // config.json missing or malformed — fall back to .git heuristic
       }
 
-      // Heuristic: parent has .planning/ and startDir has its own .git
-      if (startHasGit) {
+      // Heuristic: parent has .planning/ and we're inside a git repo
+      if (isInsideGitRepo(parent)) {
         return parent;
       }
     }

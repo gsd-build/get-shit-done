@@ -1059,6 +1059,53 @@ describe('findProjectRoot', () => {
     assert.strictEqual(findProjectRoot(backendDir), projectRoot);
   });
 
+  test('walks up from nested path inside sub-repo via .git heuristic', () => {
+    fs.mkdirSync(path.join(projectRoot, '.planning'), { recursive: true });
+
+    // Sub-repo with .git at its root
+    const backendDir = path.join(projectRoot, 'backend');
+    fs.mkdirSync(path.join(backendDir, '.git'), { recursive: true });
+
+    // Nested path deep inside the sub-repo
+    const nestedDir = path.join(backendDir, 'src', 'modules', 'auth');
+    fs.mkdirSync(nestedDir, { recursive: true });
+
+    // isInsideGitRepo walks up and finds backend/.git
+    assert.strictEqual(findProjectRoot(nestedDir), projectRoot);
+  });
+
+  test('walks up from nested path inside sub-repo via sub_repos config', () => {
+    fs.mkdirSync(path.join(projectRoot, '.planning'), { recursive: true });
+    fs.writeFileSync(
+      path.join(projectRoot, '.planning', 'config.json'),
+      JSON.stringify({ sub_repos: ['backend'] })
+    );
+
+    // Nested path deep inside the sub-repo
+    const nestedDir = path.join(projectRoot, 'backend', 'src', 'modules');
+    fs.mkdirSync(nestedDir, { recursive: true });
+
+    // With sub_repos config, it checks topSegment of relative path
+    assert.strictEqual(findProjectRoot(nestedDir), projectRoot);
+  });
+
+  test('walks up from nested path via legacy multiRepo flag', () => {
+    fs.mkdirSync(path.join(projectRoot, '.planning'), { recursive: true });
+    fs.writeFileSync(
+      path.join(projectRoot, '.planning', 'config.json'),
+      JSON.stringify({ multiRepo: true })
+    );
+
+    const backendDir = path.join(projectRoot, 'backend');
+    fs.mkdirSync(path.join(backendDir, '.git'), { recursive: true });
+
+    // Nested inside sub-repo — isInsideGitRepo walks up and finds backend/.git
+    const nestedDir = path.join(backendDir, 'src');
+    fs.mkdirSync(nestedDir, { recursive: true });
+
+    assert.strictEqual(findProjectRoot(nestedDir), projectRoot);
+  });
+
   test('does not walk up for dirs without .git when no sub_repos config', () => {
     fs.mkdirSync(path.join(projectRoot, '.planning'), { recursive: true });
 
