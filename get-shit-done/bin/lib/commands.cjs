@@ -269,6 +269,11 @@ function cmdSummaryExtract(cwd, summaryPath, fields, raw) {
   }
 
   const fullPath = path.join(cwd, summaryPath);
+  const normalized = path.resolve(fullPath);
+  const projectRoot = path.resolve(cwd);
+  if (!normalized.startsWith(projectRoot + path.sep) && normalized !== projectRoot) {
+    error('Path traversal not allowed: path must be within project directory');
+  }
 
   if (!fs.existsSync(fullPath)) {
     output({ error: 'File not found', path: summaryPath }, raw);
