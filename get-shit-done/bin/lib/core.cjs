@@ -14,6 +14,91 @@ function toPosixPath(p) {
   return p.split(path.sep).join('/');
 }
 
+/**
+ * Scan immediate child directories for separate git repos.
+ * Returns a sorted array of directory names that have their own `.git`.
+ * Excludes hidden directories and node_modules.
+ */
+function detectSubRepos(cwd) {
+  const results = [];
+  try {
+    const entries = fs.readdirSync(cwd, { withFileTypes: true });
+    for (const entry of entries) {
+      if (!entry.isDirectory()) continue;
+      if (entry.name.startsWith('.') || entry.name === 'node_modules') continue;
+      const gitPath = path.join(cwd, entry.name, '.git');
+      try {
+        if (fs.existsSync(gitPath)) {
+          results.push(entry.name);
+        }
+      } catch {}
+    }
+  } catch {}
+  return results.sort();
+}
+
+/**
+ * Walk up from `startDir` to find the project root that owns `.planning/`.
+ *
+ * In multi-repo workspaces, Claude may open inside a sub-repo (e.g. `backend/`)
+ * instead of the project root. This function prevents `.planning/` from being
+ * created inside the sub-repo by locating the nearest ancestor that already has
+ * a `.planning/` directory.
+ *
+ * Detection strategy (checked in order for each ancestor):
+ * 1. Parent has `.planning/config.json` with `sub_repos` listing this directory
+ * 2. Parent has `.planning/config.json` with `multiRepo: true` (legacy format)
+ * 3. Parent has `.planning/` and current dir has its own `.git` (heuristic)
+ *
+ * Returns `startDir` unchanged when no ancestor `.planning/` is found (first-run
+ * or single-repo projects).
+ */
+function findProjectRoot(startDir) {
+  const resolved = path.resolve(startDir);
+  const root = path.parse(resolved).root;
+  const homedir = require('os').homedir();
+  const startHasGit = fs.existsSync(path.join(resolved, '.git'));
+
+  let dir = resolved;
+  while (dir !== root) {
+    const parent = path.dirname(dir);
+    if (parent === dir) break; // filesystem root
+    if (parent === homedir) break; // never go above home
+
+    const parentPlanning = path.join(parent, '.planning');
+    if (fs.existsSync(parentPlanning) && fs.statSync(parentPlanning).isDirectory()) {
+      const configPath = path.join(parentPlanning, 'config.json');
+      try {
+        const config = JSON.parse(fs.readFileSync(configPath, 'utf-8'));
+        const subRepos = config.sub_repos || config.planning?.sub_repos || [];
+
+        // Check explicit sub_repos list
+        if (Array.isArray(subRepos) && subRepos.length > 0) {
+          const relPath = path.relative(parent, resolved);
+          const topSegment = relPath.split(path.sep)[0];
+          if (subRepos.includes(topSegment)) {
+            return parent;
+          }
+        }
+
+        // Check legacy multiRepo flag
+        if (config.multiRepo === true && startHasGit) {
+          return parent;
+        }
+      } catch {
+        // config.json missing or malformed — fall back to .git heuristic
+      }
+
+      // Heuristic: parent has .planning/ and startDir has its own .git
+      if (startHasGit) {
+        return parent;
+      }
+    }
+    dir = parent;
+  }
+  return startDir;
+}
+
 // ─── Output helpers ───────────────────────────────────────────────────────────
 
 function output(result, raw, rawValue) {
@@ -64,6 +149,7 @@ function loadConfig(cwd) {
     nyquist_validation: true,
     parallelization: true,
     brave_search: false,
+    sub_repos: [],
     resolve_model_ids: false, // when true, resolve aliases (opus/sonnet/haiku) to full model IDs
   };
 
@@ -76,6 +162,39 @@ function loadConfig(cwd) {
       const depthToGranularity = { quick: 'coarse', standard: 'standard', comprehensive: 'fine' };
       parsed.granularity = depthToGranularity[parsed.depth] || parsed.depth;
       delete parsed.depth;
+      try { fs.writeFileSync(configPath, JSON.stringify(parsed, null, 2), 'utf-8'); } catch {}
+    }
+
+    // Auto-detect and sync sub_repos: scan for child directories with .git
+    let configDirty = false;
+
+    // Migrate legacy "multiRepo: true" boolean → sub_repos array
+    if (parsed.multiRepo === true && !parsed.sub_repos && !parsed.planning?.sub_repos) {
+      const detected = detectSubRepos(cwd);
+      if (detected.length > 0) {
+        parsed.sub_repos = detected;
+        if (!parsed.planning) parsed.planning = {};
+        parsed.planning.commit_docs = false;
+        delete parsed.multiRepo;
+        configDirty = true;
+      }
+    }
+
+    // Keep sub_repos in sync with actual filesystem
+    const currentSubRepos = parsed.sub_repos || parsed.planning?.sub_repos || [];
+    if (Array.isArray(currentSubRepos) && currentSubRepos.length > 0) {
+      const detected = detectSubRepos(cwd);
+      if (detected.length > 0) {
+        const sorted = [...currentSubRepos].sort();
+        if (JSON.stringify(sorted) !== JSON.stringify(detected)) {
+          parsed.sub_repos = detected;
+          configDirty = true;
+        }
+      }
+    }
+
+    // Persist sub_repos changes (migration or sync)
+    if (configDirty) {
       try { fs.writeFileSync(configPath, JSON.stringify(parsed, null, 2), 'utf-8'); } catch {}
     }
 
@@ -107,6 +226,7 @@ function loadConfig(cwd) {
       nyquist_validation: get('nyquist_validation', { section: 'workflow', field: 'nyquist_validation' }) ?? defaults.nyquist_validation,
       parallelization,
       brave_search: get('brave_search') ?? defaults.brave_search,
+      sub_repos: get('sub_repos', { section: 'planning', field: 'sub_repos' }) ?? defaults.sub_repos,
       resolve_model_ids: get('resolve_model_ids') ?? defaults.resolve_model_ids,
       model_overrides: parsed.model_overrides || null,
     };
@@ -708,5 +828,7 @@ module.exports = {
   extractCurrentMilestone,
   replaceInCurrentMilestone,
   toPosixPath,
+  findProjectRoot,
+  detectSubRepos,
   MODEL_ALIAS_MAP,
 };

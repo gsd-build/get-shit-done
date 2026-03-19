@@ -20,6 +20,7 @@
  *   resolve-model <agent-type>         Get model for agent based on profile
  *   find-phase <phase>                 Find phase directory by number
  *   commit <message> [--files f1 f2]   Commit planning docs
+ *   commit-to-subrepo <msg> --files f1 f2  Route commits to sub-repos
  *   verify-summary <path>              Verify a SUMMARY.md file
  *   generate-slug <text>               Convert text to URL-safe slug
  *   current-timestamp [format]         Get timestamp (full|date|filename)
@@ -131,7 +132,7 @@
 
 const fs = require('fs');
 const path = require('path');
-const { error } = require('./lib/core.cjs');
+const { error, findProjectRoot } = require('./lib/core.cjs');
 const state = require('./lib/state.cjs');
 const phase = require('./lib/phase.cjs');
 const roadmap = require('./lib/roadmap.cjs');
@@ -169,6 +170,10 @@ async function main() {
   if (!fs.existsSync(cwd) || !fs.statSync(cwd).isDirectory()) {
     error(`Invalid --cwd: ${cwd}`);
   }
+
+  // Multi-repo guard: if CWD is inside a sub-repo, walk up to the project root
+  // so .planning/ is read/written at the correct level.
+  cwd = findProjectRoot(cwd);
 
   const rawIndex = args.indexOf('--raw');
   const raw = rawIndex !== -1;
@@ -299,6 +304,14 @@ async function main() {
       const message = messageArgs.join(' ') || undefined;
       const files = filesIndex !== -1 ? args.slice(filesIndex + 1).filter(a => !a.startsWith('--')) : [];
       commands.cmdCommit(cwd, message, files, raw, amend);
+      break;
+    }
+
+    case 'commit-to-subrepo': {
+      const message = args[1];
+      const filesIndex = args.indexOf('--files');
+      const files = filesIndex !== -1 ? args.slice(filesIndex + 1).filter(a => !a.startsWith('--')) : [];
+      commands.cmdCommitToSubrepo(cwd, message, files, raw);
       break;
     }
 

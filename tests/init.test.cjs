@@ -910,5 +910,69 @@ describe('cmdInitNewMilestone', () => {
 });
 
 // ─────────────────────────────────────────────────────────────────────────────
+// findProjectRoot integration — gsd-tools resolves project root from sub-repo
+// ─────────────────────────────────────────────────────────────────────────────
+
+describe('findProjectRoot integration via --cwd', () => {
+  let projectRoot;
+
+  beforeEach(() => {
+    projectRoot = createTempProject();
+    // Add ROADMAP.md so init quick doesn't error
+    fs.writeFileSync(
+      path.join(projectRoot, '.planning', 'ROADMAP.md'),
+      '# Roadmap\n\n## Phase 1: Foundation\n**Goal:** Setup\n'
+    );
+    // Write sub_repos config
+    fs.writeFileSync(
+      path.join(projectRoot, '.planning', 'config.json'),
+      JSON.stringify({ sub_repos: ['backend', 'frontend'] })
+    );
+    // Create sub-repo directory
+    fs.mkdirSync(path.join(projectRoot, 'backend'));
+  });
+
+  afterEach(() => {
+    cleanup(projectRoot);
+  });
+
+  test('init quick from sub-repo CWD returns project_root pointing to parent', () => {
+    const backendDir = path.join(projectRoot, 'backend');
+    const result = runGsdTools(['init', 'quick', 'test task', '--cwd', backendDir]);
+    assert.ok(result.success, `Command failed: ${result.error}`);
+
+    const output = JSON.parse(result.output);
+    assert.ok('project_root' in output, 'Should have project_root');
+    assert.strictEqual(output.project_root, projectRoot, 'project_root should be the parent, not the sub-repo');
+    assert.ok(output.roadmap_exists, 'Should find ROADMAP.md at project root');
+  });
+
+  test('init quick from project root returns project_root as-is', () => {
+    const result = runGsdTools(['init', 'quick', 'test task', '--cwd', projectRoot]);
+    assert.ok(result.success, `Command failed: ${result.error}`);
+
+    const output = JSON.parse(result.output);
+    assert.strictEqual(output.project_root, projectRoot);
+  });
+
+  test('state load from sub-repo CWD reads project root config', () => {
+    // Write STATE.md at project root
+    fs.writeFileSync(
+      path.join(projectRoot, '.planning', 'STATE.md'),
+      '---\ncurrent_phase: 1\nphase_name: Foundation\n---\n# State\n'
+    );
+
+    const backendDir = path.join(projectRoot, 'backend');
+    const result = runGsdTools(['state', '--cwd', backendDir]);
+    assert.ok(result.success, `Command failed: ${result.error}`);
+
+    const output = JSON.parse(result.output);
+    // Should find config from project root, not from backend/
+    assert.deepStrictEqual(output.config.sub_repos, ['backend', 'frontend'],
+      'Should read sub_repos from project root config');
+  });
+});
+
+// ─────────────────────────────────────────────────────────────────────────────
 // roadmap analyze command
 // ─────────────────────────────────────────────────────────────────────────────
