@@ -18,14 +18,19 @@ const {
 
 // ─── Directory Walker ─────────────────────────────────────────────────────────
 
+const MAX_FILES = 50_000; // Guard against enormous repos hanging the CLI
+
 function walkDir(dir) {
   const results = [];
   function walk(currentDir) {
+    if (results.length >= MAX_FILES) return;
     let entries;
     try { entries = fs.readdirSync(currentDir, { withFileTypes: true }); } catch { return; }
     for (const entry of entries) {
+      if (results.length >= MAX_FILES) return;
       if (IGNORE_DIRS.has(entry.name)) continue;
       if (entry.name.startsWith('.') && entry.name !== '.env.example') continue;
+      if (entry.isSymbolicLink()) continue; // Skip symlinks — prevents following circular links
       const full = path.join(currentDir, entry.name);
       if (entry.isDirectory()) {
         walk(full);

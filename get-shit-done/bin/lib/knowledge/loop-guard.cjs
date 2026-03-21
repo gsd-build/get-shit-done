@@ -9,7 +9,7 @@ const crypto = require('crypto');
 
 const WARN_THRESHOLD = 3;
 const BLOCK_THRESHOLD = 5;
-const CIRCUIT_BREAK_TOTAL = 30;
+const CIRCUIT_BREAK_TOTAL = 200;
 const HISTORY_SIZE = 30;
 const POLL_MULTIPLIER = 3;
 
@@ -39,13 +39,16 @@ function detectPingPong(history) {
 
 function createLoopGuard(opts) {
   const pollTools = new Set((opts && opts.pollTools) ? opts.pollTools : []);
+  const circuitBreakTotal = (opts && typeof opts.circuitBreakTotal === 'number')
+    ? opts.circuitBreakTotal
+    : CIRCUIT_BREAK_TOTAL;
   const counters = new Map();
   let history = [];
   let totalCalls = 0;
 
   function check(toolName, params) {
     totalCalls += 1;
-    if (totalCalls >= CIRCUIT_BREAK_TOTAL) {
+    if (totalCalls >= circuitBreakTotal) {
       return { action: 'circuit_break', message: `Circuit breaker tripped: ${totalCalls} total calls.` };
     }
     const hash = hashCall(toolName, params);
