@@ -233,7 +233,7 @@ describe('Knowledge Layer: createLoopGuard', () => {
   });
 
   it('circuit breaks on total calls', () => {
-    const guard = createLoopGuard();
+    const guard = createLoopGuard({ circuitBreakTotal: 30 });
     let result;
     for (let i = 0; i < 30; i++) {
       result = guard.check('tool' + i, { i });

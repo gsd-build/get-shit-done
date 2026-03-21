@@ -956,7 +956,6 @@ async function runCommand(command, args, cwd, raw) {
 
       } else if (subcommand === 'staleness') {
         const ip = knowledge.indexPath(cwd);
-        const fs = require('fs');
         if (!fs.existsSync(ip)) {
           coreOutput({ stale: true, message: 'INDEX.json not found. Run: gsd-tools.cjs knowledge init && gsd-tools.cjs knowledge index' }, raw);
         } else {

@@ -86,7 +86,7 @@ function acquireLock(lockPath, timeout) {
       const wait = Math.min(delay, remaining);
       if (wait > 0) {
         try { Atomics.wait(new Int32Array(new SharedArrayBuffer(4)), 0, 0, wait); }
-        catch { const end = Date.now() + wait; while (Date.now() < end) {} }
+        catch { /* Atomics.wait unavailable — retry immediately without spinning */ }
       }
       delay = Math.min(delay * 2, 1000);
     }
