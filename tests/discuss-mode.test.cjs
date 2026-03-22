@@ -117,6 +117,31 @@ describe('workflow.discuss_mode config', () => {
     assert.ok(workflow.includes('--text'), 'should handle --text flag');
   });
 
+  test('plan-phase workflow references text_mode', () => {
+    const planPhase = fs.readFileSync(
+      path.join(__dirname, '..', 'get-shit-done', 'workflows', 'plan-phase.md'), 'utf8'
+    );
+    assert.ok(planPhase.includes('text_mode'), 'plan-phase workflow should reference text_mode');
+    assert.ok(planPhase.includes('TEXT_MODE'), 'plan-phase workflow should use TEXT_MODE variable');
+    assert.ok(planPhase.includes('--text'), 'plan-phase workflow should handle --text flag');
+  });
+
+  test('plan-phase command argument-hint includes --text', () => {
+    const command = fs.readFileSync(
+      path.join(__dirname, '..', 'commands', 'gsd', 'plan-phase.md'), 'utf8'
+    );
+    assert.ok(command.includes('--text'), 'argument-hint should include --text flag');
+  });
+
+  test('plan-phase init exposes text_mode in workflow flags', () => {
+    const initSrc = fs.readFileSync(
+      path.join(__dirname, '..', 'get-shit-done', 'bin', 'lib', 'init.cjs'), 'utf8'
+    );
+    // The cmdInitPlanPhase result object must include text_mode
+    const planPhaseBlock = initSrc.slice(initSrc.indexOf('function cmdInitPlanPhase'));
+    assert.ok(planPhaseBlock.includes('text_mode: config.text_mode'), 'init plan-phase must expose text_mode');
+  });
+
   test('progress workflow references discuss_mode', () => {
     const progress = fs.readFileSync(
       path.join(__dirname, '..', 'get-shit-done', 'workflows', 'progress.md'), 'utf8'

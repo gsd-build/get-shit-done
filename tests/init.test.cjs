@@ -54,6 +54,25 @@ describe('init commands', () => {
     assert.strictEqual(output.uat_path, '.planning/phases/03-api/03-UAT.md');
   });
 
+  test('init plan-phase exposes text_mode from config (defaults false)', () => {
+    const result = runGsdTools('init plan-phase 03', tmpDir);
+    assert.ok(result.success, `Command failed: ${result.error}`);
+    const output = JSON.parse(result.output);
+    assert.strictEqual(output.text_mode, false, 'text_mode should default to false');
+  });
+
+  test('init plan-phase exposes text_mode true when set in config', () => {
+    const configPath = path.join(tmpDir, '.planning', 'config.json');
+    const config = JSON.parse(fs.readFileSync(configPath, 'utf8'));
+    config.workflow = { ...(config.workflow || {}), text_mode: true };
+    fs.writeFileSync(configPath, JSON.stringify(config, null, 2));
+
+    const result = runGsdTools('init plan-phase 03', tmpDir);
+    assert.ok(result.success, `Command failed: ${result.error}`);
+    const output = JSON.parse(result.output);
+    assert.strictEqual(output.text_mode, true, 'text_mode should reflect config value');
+  });
+
   test('init progress returns file paths', () => {
     const result = runGsdTools('init progress', tmpDir);
     assert.ok(result.success, `Command failed: ${result.error}`);

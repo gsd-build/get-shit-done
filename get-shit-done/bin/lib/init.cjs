@@ -173,6 +173,7 @@ function cmdInitPlanPhase(cwd, phase, raw) {
     plan_checker_enabled: config.plan_checker,
     nyquist_validation_enabled: config.nyquist_validation,
     commit_docs: config.commit_docs,
+    text_mode: config.text_mode,
 
     // Phase info
     phase_found: !!phaseInfo,
