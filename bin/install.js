@@ -2895,6 +2895,50 @@ function cleanupOrphanedHooks(settings) {
     console.log(`  ${green}✓${reset} Removed orphaned hook registrations`);
   }
 
+  // Validate hook schemas to prevent settings.json from failing Zod validation.
+  // Claude Code validates the entire settings file with a strict Zod schema.
+  // If ANY hook has an invalid schema (e.g., type: "agent" missing "prompt"),
+  // the ENTIRE settings.json is silently discarded — disabling all plugins,
+  // env vars, and other configuration. This defensive check removes invalid
+  // hook entries and cleans up empty event arrays to prevent this.
+  if (settings.hooks) {
+    let fixedHooks = false;
+    for (const eventType of Object.keys(settings.hooks)) {
+      const hookEntries = settings.hooks[eventType];
+      if (Array.isArray(hookEntries)) {
+        const validated = hookEntries.filter(entry => {
+          if (!entry.hooks || !Array.isArray(entry.hooks)) return true;
+          const validHooks = entry.hooks.filter(h => {
+            // Agent hooks require a "prompt" field per Claude Code's schema
+            if (h.type === 'agent' && !h.prompt) {
+              fixedHooks = true;
+              return false;
+            }
+            // Command hooks require a "command" field
+            if (h.type === 'command' && !h.command) {
+              fixedHooks = true;
+              return false;
+            }
+            return true;
+          });
+          if (validHooks.length === 0) return false;
+          entry.hooks = validHooks;
+          return true;
+        });
+        settings.hooks[eventType] = validated;
+      }
+
+      // Remove empty hook event arrays
+      if (Array.isArray(settings.hooks[eventType]) && settings.hooks[eventType].length === 0) {
+        delete settings.hooks[eventType];
+        fixedHooks = true;
+      }
+    }
+    if (fixedHooks) {
+      console.log(`  ${green}✓${reset} Fixed invalid hook entries (prevents settings.json schema rejection)`);
+    }
+  }
+
   // Fix #330: Update statusLine if it points to old GSD statusline.js path
   // Only match the specific old GSD path pattern (hooks/statusline.js),
   // not third-party statusline scripts that happen to contain 'statusline.js'
