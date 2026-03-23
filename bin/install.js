@@ -2223,7 +2223,7 @@ function finishInstall(settingsPath, settings, statuslineCommand, shouldInstallS
   if (runtime === 'gemini') program = 'Gemini';
   if (runtime === 'codex') program = 'Codex';
 
-  let command = '/gsd:new-project';
+  let command = runtime === 'gemini' ? 'gemini-cli' : '/gsd:new-project';
   if (runtime === 'opencode') command = '/gsd-new-project';
   if (runtime === 'codex') command = '$gsd-new-project';
   console.log(`
