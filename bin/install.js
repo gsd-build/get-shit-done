@@ -68,6 +68,7 @@ const hasAntigravity = args.includes('--antigravity');
 const hasCursor = args.includes('--cursor');
 const hasWindsurf = args.includes('--windsurf');
 const hasSdk = args.includes('--sdk');
+const hasRovodev = args.includes('--rovodev') || args.includes('--rovo-dev');
 const hasBoth = args.includes('--both'); // Legacy flag, keeps working
 const hasAll = args.includes('--all');
 const hasUninstall = args.includes('--uninstall') || args.includes('-u');
@@ -75,7 +76,7 @@ const hasUninstall = args.includes('--uninstall') || args.includes('-u');
 // Runtime selection - can be set by flags or interactive prompt
 let selectedRuntimes = [];
 if (hasAll) {
-  selectedRuntimes = ['claude', 'opencode', 'gemini', 'codex', 'copilot', 'antigravity', 'cursor', 'windsurf'];
+  selectedRuntimes = ['claude', 'opencode', 'gemini', 'codex', 'copilot', 'antigravity', 'cursor', 'windsurf', 'rovodev'];
 } else if (hasBoth) {
   selectedRuntimes = ['claude', 'opencode'];
 } else {
@@ -87,6 +88,7 @@ if (hasAll) {
   if (hasAntigravity) selectedRuntimes.push('antigravity');
   if (hasCursor) selectedRuntimes.push('cursor');
   if (hasWindsurf) selectedRuntimes.push('windsurf');
+  if (hasRovodev) selectedRuntimes.push('rovodev');
 }
 
 // WSL + Windows Node.js detection
@@ -132,6 +134,7 @@ function getDirName(runtime) {
   if (runtime === 'antigravity') return '.agent';
   if (runtime === 'cursor') return '.cursor';
   if (runtime === 'windsurf') return '.windsurf';
+  if (runtime === 'rovodev') return '.rovodev';
   return '.claude';
 }
 
@@ -161,6 +164,7 @@ function getConfigDirFromHome(runtime, isGlobal) {
   }
   if (runtime === 'cursor') return "'.cursor'";
   if (runtime === 'windsurf') return "'.windsurf'";
+  if (runtime === 'rovodev') return "'.rovodev'";
   return "'.claude'";
 }
 
@@ -269,6 +273,16 @@ function getGlobalDir(runtime, explicitDir = null) {
     return path.join(os.homedir(), '.windsurf');
   }
 
+  if (runtime === 'rovodev') {
+    // Rovo Dev: --config-dir > ROVODEV_CONFIG_DIR > ~/.rovodev
+    if (explicitDir) {
+      return expandTilde(explicitDir);
+    }
+    if (process.env.ROVODEV_CONFIG_DIR) {
+      return expandTilde(process.env.ROVODEV_CONFIG_DIR);
+    }
+    return path.join(os.homedir(), '.rovodev');
+  }
 
   // Claude Code: --config-dir > CLAUDE_CONFIG_DIR > ~/.claude
   if (explicitDir) {
@@ -290,7 +304,7 @@ const banner = '\n' +
   '\n' +
   '  Get Shit Done ' + dim + 'v' + pkg.version + reset + '\n' +
   '  A meta-prompting, context engineering and spec-driven\n' +
-  '  development system for Claude Code, OpenCode, Gemini, Codex, Copilot, Antigravity, Cursor, and Windsurf by TÂCHES.\n';
+  '  development system for Claude Code, OpenCode, Gemini, Codex, Copilot, Antigravity, Cursor, Windsurf, and Rovo Dev by TÂCHES.\n';
 
 // Parse --config-dir argument
 function parseConfigDirArg() {
@@ -994,6 +1008,378 @@ function convertClaudeAgentToWindsurfAgent(content) {
   const cleanFrontmatter = `---\nname: ${yamlIdentifier(name)}\ndescription: ${yamlQuote(toSingleLine(description))}\n---`;
 
   return `${cleanFrontmatter}\n${body}`;
+}
+
+// --- Rovo Dev converters ---
+// Rovo Dev (by Atlassian) is a standalone AI coding agent with its own tool names.
+// Config lives in .rovodev/ (local) and ~/.rovodev/ (global).
+// Skills use SKILL.md format. Subagents live in subagents/ directory.
+
+// Tool name mapping from Claude Code to Rovo Dev
+const claudeToRovodevTools = {
+  Read: 'open_files',
+  Write: 'create_file',
+  Edit: 'find_and_replace_code',
+  Bash: 'bash',
+  Grep: 'grep',
+  Glob: 'expand_folder',
+  Task: 'invoke_subagents',
+  TodoWrite: 'update_todo',
+  AskUserQuestion: 'ask_user_questions',
+  WebSearch: null,   // No direct equivalent — use bash with curl or MCP tools
+  WebFetch: null,    // No direct equivalent — use bash with curl or MCP tools
+  SlashCommand: null, // No equivalent — skills are loaded via get_skill()
+};
+
+/**
+ * Convert a Claude Code tool name to Rovo Dev format
+ * @returns {string|null} Rovo Dev tool name, or null if tool should be excluded
+ */
+function convertRovodevToolName(claudeTool) {
+  if (claudeTool in claudeToRovodevTools) {
+    return claudeToRovodevTools[claudeTool];
+  }
+  // MCP tools keep their format (Rovo Dev supports MCP)
+  if (claudeTool.startsWith('mcp__')) {
+    return claudeTool;
+  }
+  // Default: lowercase
+  return claudeTool.toLowerCase();
+}
+
+function convertSlashCommandsToRovodevSkillMentions(content) {
+  // Normalize gsd: -> gsd- for skill references
+  return content.replace(/gsd:/gi, 'gsd-');
+}
+
+function convertClaudeToRovodevMarkdown(content) {
+  let converted = convertSlashCommandsToRovodevSkillMentions(content);
+  // Convert @$HOME/... file references to bash cat instructions
+  // Rovo Dev's open_files tool can only access workspace files, not global paths
+  // Replace @$HOME/.rovodev/... references with bash cat instructions
+  converted = converted.replace(/@\$HOME\/\.(rovodev|claude)\/([^\s\n]+)/g, (match, dir, filePath) => {
+    return `(read via bash: cat "$HOME/.rovodev/${filePath}")`;
+  });
+  // Replace tool name references in body text
+  converted = converted.replace(/\bBash\(/g, 'bash(');
+  converted = converted.replace(/\bEdit\(/g, 'find_and_replace_code(');
+  converted = converted.replace(/\bRead\(/g, 'open_files(');
+  converted = converted.replace(/\bWrite\(/g, 'create_file(');
+  converted = converted.replace(/\bGrep\(/g, 'grep(');
+  converted = converted.replace(/\bGlob\(/g, 'expand_folder(');
+  converted = converted.replace(/\bAskUserQuestion\b/g, 'ask_user_questions');
+  converted = converted.replace(/\bTodoWrite\b/g, 'update_todo');
+  // Replace subagent_type from Claude to Rovo Dev format
+  converted = converted.replace(/subagent_type="general-purpose"/g, 'subagent_names=["General Purpose"]');
+  converted = converted.replace(/\$ARGUMENTS\b/g, '{{GSD_ARGS}}');
+  // Replace project-level Claude conventions with Rovo Dev equivalents
+  converted = converted.replace(/`\.\/CLAUDE\.md`/g, '`AGENTS.md`');
+  converted = converted.replace(/\.\/CLAUDE\.md/g, 'AGENTS.md');
+  converted = converted.replace(/`CLAUDE\.md`/g, '`AGENTS.md`');
+  converted = converted.replace(/\bCLAUDE\.md\b/g, 'AGENTS.md');
+  converted = converted.replace(/\.claude\/skills\//g, '.rovodev/skills/');
+  // Remove Claude Code-specific bug workarounds before brand replacement
+  converted = converted.replace(/\*\*Known Claude Code bug \(classifyHandoffIfNeeded\):\*\*[^\n]*\n/g, '');
+  converted = converted.replace(/- \*\*classifyHandoffIfNeeded false failure:\*\*[^\n]*\n/g, '');
+  // Replace standalone ~/.claude references (without trailing slash)
+  converted = converted.replace(/~\/\.claude\b/g, '~/.rovodev');
+  // Replace "Claude Code" brand references with "Rovo Dev"
+  converted = converted.replace(/\bClaude Code\b/g, 'Rovo Dev');
+  return converted;
+}
+
+function getRovodevSkillAdapterHeader(skillName) {
+  return `<rovodev_skill_adapter>
+## A. Skill Invocation
+- This skill is loaded via \`get_skill("${skillName}")\` or when the user describes a task matching this skill.
+- Treat all user text after the skill mention as \`{{GSD_ARGS}}\`.
+- If no arguments are present, treat \`{{GSD_ARGS}}\` as empty.
+
+## B. User Prompting
+When the workflow needs user input, use the \`ask_user_questions\` tool:
+- Present options with labels and descriptions
+- For simple choices, use the tool's options format
+- For open-ended input, prompt conversationally
+
+## C. Tool Usage
+Use these Rovo Dev tools when executing GSD workflows:
+- \`bash\` for running commands (terminal operations)
+- \`find_and_replace_code\` for editing existing files
+- \`open_files\` and \`expand_code_chunks\` for reading files
+- \`create_file\` for creating new files
+- \`grep\` for searching file contents
+- \`expand_folder\` for directory listing
+- \`update_todo\` for task tracking
+- \`invoke_subagents\` for delegating to specialized agents
+
+## D. Subagent Spawning
+When the workflow needs to spawn a subagent:
+- Use \`invoke_subagents(subagent_names=["General Purpose"], task_names=["..."], task_descriptions=["..."])\`
+- Up to 4 subagents can be invoked concurrently
+- Each subagent receives only the context you provide in the task description
+</rovodev_skill_adapter>`;
+}
+
+function convertClaudeCommandToRovodevSkill(content, skillName) {
+  const converted = convertClaudeToRovodevMarkdown(content);
+  const { frontmatter, body } = extractFrontmatterAndBody(converted);
+  let description = `Run GSD workflow ${skillName}.`;
+  if (frontmatter) {
+    const maybeDescription = extractFrontmatterField(frontmatter, 'description');
+    if (maybeDescription) {
+      description = maybeDescription;
+    }
+  }
+  description = toSingleLine(description);
+  const shortDescription = description.length > 180 ? `${description.slice(0, 177)}...` : description;
+  const adapter = getRovodevSkillAdapterHeader(skillName);
+
+  return `---\nname: ${yamlIdentifier(skillName)}\ndescription: ${yamlQuote(shortDescription)}\n---\n\n${adapter}\n\n${body.trimStart()}`;
+}
+
+/**
+ * Convert Claude Code agent markdown to Rovo Dev subagent format.
+ * Translates tool names, strips unsupported frontmatter fields,
+ * and converts body references to Rovo Dev conventions.
+ */
+function convertClaudeAgentToRovodevAgent(content) {
+  let converted = convertClaudeToRovodevMarkdown(content);
+
+  const { frontmatter, body } = extractFrontmatterAndBody(converted);
+  if (!frontmatter) return converted;
+
+  const name = extractFrontmatterField(frontmatter, 'name') || 'unknown';
+  const description = extractFrontmatterField(frontmatter, 'description') || '';
+
+  // Extract tools from frontmatter and convert them
+  // Handle both inline format (tools: Read, Write, Bash) and list format (tools:\n  - Read\n  - Write)
+  let rawTools = [];
+  const toolsInlineMatch = frontmatter.match(/^tools:\s*(.+)$/m);
+  if (toolsInlineMatch && toolsInlineMatch[1].trim() && !toolsInlineMatch[1].trim().startsWith('-')) {
+    // Inline comma-separated format: tools: Read, Write, Bash
+    rawTools = toolsInlineMatch[1].split(',').map(t => t.trim());
+  } else {
+    // YAML list format: tools:\n  - Read\n  - Write
+    const toolsListMatch = frontmatter.match(/^tools:\s*\n((?:\s+-\s+.+\n?)+)/m);
+    if (toolsListMatch) {
+      rawTools = toolsListMatch[1].match(/^\s+-\s+(.+)$/gm)
+        .map(line => line.replace(/^\s+-\s+/, '').trim());
+    }
+  }
+  let toolsList = '';
+  if (rawTools.length > 0) {
+    const convertedTools = rawTools
+      .map(t => convertRovodevToolName(t))
+      .filter(t => t !== null);
+    // Add expand_code_chunks alongside open_files
+    if (convertedTools.includes('open_files') && !convertedTools.includes('expand_code_chunks')) {
+      const idx = convertedTools.indexOf('open_files');
+      convertedTools.splice(idx + 1, 0, 'expand_code_chunks');
+    }
+    toolsList = '\ntools:\n' + convertedTools.map(t => `  - ${t}`).join('\n');
+  }
+
+  const cleanFrontmatter = `---\nname: ${yamlIdentifier(name)}\ndescription: ${yamlQuote(toSingleLine(description))}${toolsList}\n---`;
+
+  return `${cleanFrontmatter}\n${body}`;
+}
+
+/**
+ * Copy Claude commands as Rovo Dev skills — one folder per skill with SKILL.md.
+ * Mirrors copyCommandsAsCursorSkills but uses Rovo Dev converters.
+ */
+function copyCommandsAsRovodevSkills(srcDir, skillsDir, prefix, pathPrefix, runtime) {
+  if (!fs.existsSync(srcDir)) {
+    return;
+  }
+
+  fs.mkdirSync(skillsDir, { recursive: true });
+
+  // Remove previous GSD Rovo Dev skills to avoid stale command skills
+  const existing = fs.readdirSync(skillsDir, { withFileTypes: true });
+  for (const entry of existing) {
+    if (entry.isDirectory() && entry.name.startsWith(`${prefix}-`)) {
+      fs.rmSync(path.join(skillsDir, entry.name), { recursive: true });
+    }
+  }
+
+  function recurse(currentSrcDir, currentPrefix) {
+    const entries = fs.readdirSync(currentSrcDir, { withFileTypes: true });
+
+    for (const entry of entries) {
+      const srcPath = path.join(currentSrcDir, entry.name);
+      if (entry.isDirectory()) {
+        recurse(srcPath, `${currentPrefix}-${entry.name}`);
+        continue;
+      }
+
+      if (!entry.name.endsWith('.md')) {
+        continue;
+      }
+
+      const baseName = entry.name.replace('.md', '');
+      const skillName = `${currentPrefix}-${baseName}`;
+      const skillDir = path.join(skillsDir, skillName);
+      fs.mkdirSync(skillDir, { recursive: true });
+
+      let content = fs.readFileSync(srcPath, 'utf8');
+      const globalClaudeRegex = /~\/\.claude\//g;
+      const globalClaudeHomeRegex = /\$HOME\/\.claude\//g;
+      const localClaudeRegex = /\.\/\.claude\//g;
+      const rovodevDirRegex = /~\/\.rovodev\//g;
+      content = content.replace(globalClaudeRegex, pathPrefix);
+      content = content.replace(globalClaudeHomeRegex, pathPrefix);
+      content = content.replace(localClaudeRegex, `./${getDirName(runtime)}/`);
+      content = content.replace(rovodevDirRegex, pathPrefix);
+      content = processAttribution(content, getCommitAttribution(runtime));
+      content = convertClaudeCommandToRovodevSkill(content, skillName);
+
+      fs.writeFileSync(path.join(skillDir, 'SKILL.md'), content);
+    }
+  }
+
+  recurse(srcDir, prefix);
+}
+
+/**
+ * Generate Rovo Dev prompts.yml and prompt content files from GSD commands.
+ * This enables native slash commands in Rovo Dev (e.g. /gsd-new-project).
+ * Merges with existing prompts.yml if present (preserves non-GSD entries).
+ */
+function generateRovodevPrompts(targetDir, src, pathPrefix, runtime) {
+  const gsdSrc = path.join(src, 'commands', 'gsd');
+  if (!fs.existsSync(gsdSrc)) return;
+
+  const promptsDir = path.join(targetDir, 'prompts');
+  fs.mkdirSync(promptsDir, { recursive: true });
+
+  // Remove old GSD prompt content files
+  if (fs.existsSync(promptsDir)) {
+    for (const file of fs.readdirSync(promptsDir)) {
+      if (file.startsWith('gsd-') && file.endsWith('.md')) {
+        fs.unlinkSync(path.join(promptsDir, file));
+      }
+    }
+  }
+
+  const gsdPrompts = [];
+
+  function recurse(currentSrcDir, currentPrefix) {
+    const entries = fs.readdirSync(currentSrcDir, { withFileTypes: true });
+
+    for (const entry of entries) {
+      const srcPath = path.join(currentSrcDir, entry.name);
+      if (entry.isDirectory()) {
+        recurse(srcPath, `${currentPrefix}-${entry.name}`);
+        continue;
+      }
+      if (!entry.name.endsWith('.md')) continue;
+
+      const baseName = entry.name.replace('.md', '');
+      const promptName = `${currentPrefix}-${baseName}`;
+      const contentFileName = `prompts/${promptName}.md`;
+
+      let content = fs.readFileSync(srcPath, 'utf8');
+      // Path replacement
+      content = content.replace(/~\/\.claude\//g, pathPrefix);
+      content = content.replace(/\$HOME\/\.claude\//g, pathPrefix);
+      content = content.replace(/\.\/\.claude\//g, `./${getDirName(runtime)}/`);
+      content = processAttribution(content, getCommitAttribution(runtime));
+      // Convert body content to Rovo Dev conventions
+      content = convertClaudeToRovodevMarkdown(content);
+
+      // Extract description from frontmatter
+      const { frontmatter, body } = extractFrontmatterAndBody(content);
+      let description = `GSD workflow: ${promptName}`;
+      if (frontmatter) {
+        const maybeDescription = extractFrontmatterField(frontmatter, 'description');
+        if (maybeDescription) {
+          description = toSingleLine(maybeDescription);
+        }
+      }
+
+      // Write the prompt content file (body only, no frontmatter)
+      fs.writeFileSync(path.join(targetDir, contentFileName), body.trimStart());
+
+      gsdPrompts.push({
+        name: promptName,
+        description: description,
+        content_file: contentFileName
+      });
+    }
+  }
+
+  recurse(gsdSrc, 'gsd');
+
+  if (gsdPrompts.length === 0) return;
+
+  // Merge with existing prompts.yml — preserve non-GSD entries
+  const promptsYmlPath = path.join(targetDir, 'prompts.yml');
+  let existingNonGsdContent = '';
+  if (fs.existsSync(promptsYmlPath)) {
+    try {
+      const existing = fs.readFileSync(promptsYmlPath, 'utf8');
+      // Extract non-GSD prompt entries by parsing block-by-block
+      // Each entry starts with "- name:" and ends before the next "- name:" or EOF
+      const lines = existing.split('\n');
+      let currentBlock = [];
+      let currentIsGsd = false;
+      let preservedBlocks = [];
+      let inPrompts = false;
+
+      for (const line of lines) {
+        if (line.match(/^prompts:\s*$/)) {
+          inPrompts = true;
+          continue;
+        }
+        if (!inPrompts) continue;
+
+        if (line.match(/^- name:\s*/)) {
+          // Save previous block if non-GSD
+          if (currentBlock.length > 0 && !currentIsGsd) {
+            preservedBlocks.push(currentBlock.join('\n'));
+          }
+          // Start new block
+          currentBlock = [line];
+          const nameValue = line.replace(/^- name:\s*/, '').trim().replace(/^['"]|['"]$/g, '');
+          currentIsGsd = nameValue.startsWith('gsd-');
+        } else if (currentBlock.length > 0) {
+          currentBlock.push(line);
+        }
+      }
+      // Don't forget last block
+      if (currentBlock.length > 0 && !currentIsGsd) {
+        preservedBlocks.push(currentBlock.join('\n'));
+      }
+
+      if (preservedBlocks.length > 0) {
+        existingNonGsdContent = preservedBlocks.join('\n\n') + '\n\n';
+      }
+    } catch (e) { /* ignore parse errors, regenerate */ }
+  }
+
+  // Build prompts.yml content — existing non-GSD entries first, then GSD
+  let yml = '';
+  if (existingNonGsdContent) {
+    yml += '# Rovo Dev prompts\n';
+    yml += 'prompts:\n';
+    yml += '# --- Your prompts ---\n';
+    yml += existingNonGsdContent;
+    yml += '# --- GSD prompts (managed by get-shit-done installer) ---\n';
+  } else {
+    yml += '# GSD prompts — managed by get-shit-done installer\n';
+    yml += '# These enable native /gsd-* slash commands in Rovo Dev\n';
+    yml += 'prompts:\n';
+  }
+  for (const p of gsdPrompts) {
+    yml += `- name: ${p.name}\n`;
+    yml += `  description: ${JSON.stringify(p.description)}\n`;
+    yml += `  content_file: ${p.content_file}\n\n`;
+  }
+
+  fs.writeFileSync(promptsYmlPath, yml);
+  console.log(`  ${green}✓${reset} Generated prompts.yml with ${gsdPrompts.length} GSD prompts`);
+  console.log(`  ${green}✓${reset} Installed ${gsdPrompts.length} prompt content files to prompts/`);
 }
 
 function convertSlashCommandsToCodexSkillMentions(content) {
@@ -3041,6 +3427,7 @@ function copyWithPathReplacement(srcDir, destDir, pathPrefix, runtime, isCommand
   const isAntigravity = runtime === 'antigravity';
   const isCursor = runtime === 'cursor';
   const isWindsurf = runtime === 'windsurf';
+  const isRovodev = runtime === 'rovodev';
   const dirName = getDirName(runtime);
 
   // Clean install: remove existing destination to prevent orphaned files
@@ -3305,6 +3692,7 @@ function uninstall(isGlobal, runtime = 'claude') {
   const isAntigravity = runtime === 'antigravity';
   const isCursor = runtime === 'cursor';
   const isWindsurf = runtime === 'windsurf';
+  const isRovodev = runtime === 'rovodev';
   const dirName = getDirName(runtime);
 
   // Get the target directory based on runtime and install type
@@ -3920,6 +4308,7 @@ function writeManifest(configDir, runtime = 'claude') {
   const isAntigravity = runtime === 'antigravity';
   const isCursor = runtime === 'cursor';
   const isWindsurf = runtime === 'windsurf';
+  const isRovodev = runtime === 'rovodev';
   const gsdDir = path.join(configDir, 'get-shit-done');
   const commandsDir = path.join(configDir, 'commands', 'gsd');
   const opencodeCommandDir = path.join(configDir, 'command');
@@ -3931,7 +4320,7 @@ function writeManifest(configDir, runtime = 'claude') {
   for (const [rel, hash] of Object.entries(gsdHashes)) {
     manifest.files['get-shit-done/' + rel] = hash;
   }
-  if (!isOpencode && !isCodex && !isCopilot && !isAntigravity && !isCursor && !isWindsurf && fs.existsSync(commandsDir)) {
+  if (!isOpencode && !isCodex && !isCopilot && !isAntigravity && !isCursor && !isWindsurf && !isRovodev && fs.existsSync(commandsDir)) {
     const cmdHashes = generateManifest(commandsDir);
     for (const [rel, hash] of Object.entries(cmdHashes)) {
       manifest.files['commands/gsd/' + rel] = hash;
@@ -4059,6 +4448,7 @@ function install(isGlobal, runtime = 'claude') {
   const isAntigravity = runtime === 'antigravity';
   const isCursor = runtime === 'cursor';
   const isWindsurf = runtime === 'windsurf';
+  const isRovodev = runtime === 'rovodev';
   const dirName = getDirName(runtime);
   const src = path.join(__dirname, '..');
 
@@ -4090,6 +4480,7 @@ function install(isGlobal, runtime = 'claude') {
   if (isAntigravity) runtimeLabel = 'Antigravity';
   if (isCursor) runtimeLabel = 'Cursor';
   if (isWindsurf) runtimeLabel = 'Windsurf';
+  if (isRovodev) runtimeLabel = 'Rovo Dev';
 
   console.log(`  Installing for ${cyan}${runtimeLabel}${reset} to ${cyan}${locationLabel}${reset}\n`);
 
@@ -4177,6 +4568,16 @@ function install(isGlobal, runtime = 'claude') {
     } else {
       failures.push('skills/gsd-*');
     }
+  } else if (isRovodev) {
+    const skillsDir = path.join(targetDir, 'skills');
+    const gsdSrc = path.join(src, 'commands', 'gsd');
+    copyCommandsAsRovodevSkills(gsdSrc, skillsDir, 'gsd', pathPrefix, runtime);
+    const installedSkillNames = listCodexSkillNames(skillsDir); // reuse — same dir structure
+    if (installedSkillNames.length > 0) {
+      console.log(`  ${green}✓${reset} Installed ${installedSkillNames.length} skills to skills/`);
+    } else {
+      failures.push('skills/gsd-*');
+    }
   } else {
     // Claude Code & Gemini: nested structure in commands/ directory
     const commandsDir = path.join(targetDir, 'commands');
@@ -4202,10 +4603,11 @@ function install(isGlobal, runtime = 'claude') {
     failures.push('get-shit-done');
   }
 
-  // Copy agents to agents directory
+  // Copy agents to agents directory (Rovo Dev uses "subagents" directory)
   const agentsSrc = path.join(src, 'agents');
   if (fs.existsSync(agentsSrc)) {
-    const agentsDest = path.join(targetDir, 'agents');
+    const agentsDirName = isRovodev ? 'subagents' : 'agents';
+    const agentsDest = path.join(targetDir, agentsDirName);
     fs.mkdirSync(agentsDest, { recursive: true });
 
     // Remove old GSD agents (gsd-*.md) before copying new ones
@@ -4245,6 +4647,8 @@ function install(isGlobal, runtime = 'claude') {
           content = convertClaudeAgentToCursorAgent(content);
         } else if (isWindsurf) {
           content = convertClaudeAgentToWindsurfAgent(content);
+        } else if (isRovodev) {
+          content = convertClaudeAgentToRovodevAgent(content);
         }
         const destName = isCopilot ? entry.name.replace('.md', '.agent.md') : entry.name;
         fs.writeFileSync(path.join(agentsDest, destName), content);
@@ -4278,7 +4682,7 @@ function install(isGlobal, runtime = 'claude') {
     failures.push('VERSION');
   }
 
-  if (!isCodex && !isCopilot && !isCursor && !isWindsurf) {
+  if (!isCodex && !isCopilot && !isCursor && !isWindsurf && !isRovodev) {
     // Write package.json to force CommonJS mode for GSD scripts
     // Prevents "require is not defined" errors when project has "type": "module"
     // Node.js walks up looking for package.json - this stops inheritance from project
@@ -4444,6 +4848,12 @@ function install(isGlobal, runtime = 'claude') {
     return { settingsPath: null, settings: null, statuslineCommand: null, runtime };
   }
 
+  if (isRovodev) {
+    // Rovo Dev uses skills + subagents — skills get the native / prefix, prompts get !
+    // So we only install skills (via copyCommandsAsRovodevSkills), not prompts
+    return { settingsPath: null, settings: null, statuslineCommand: null, runtime };
+  }
+
   // Configure statusline and hooks in settings.json
   // Gemini and Antigravity use AfterTool instead of PostToolUse for post-tool hooks
   const postToolEvent = (runtime === 'gemini' || runtime === 'antigravity') ? 'AfterTool' : 'PostToolUse';
@@ -4579,8 +4989,9 @@ function finishInstall(settingsPath, settings, statuslineCommand, shouldInstallS
   const isCopilot = runtime === 'copilot';
   const isCursor = runtime === 'cursor';
   const isWindsurf = runtime === 'windsurf';
+  const isRovodev = runtime === 'rovodev';
 
-  if (shouldInstallStatusline && !isOpencode && !isCodex && !isCopilot && !isCursor && !isWindsurf) {
+  if (shouldInstallStatusline && !isOpencode && !isCodex && !isCopilot && !isCursor && !isWindsurf && !isRovodev) {
     settings.statusLine = {
       type: 'command',
       command: statuslineCommand
@@ -4589,7 +5000,7 @@ function finishInstall(settingsPath, settings, statuslineCommand, shouldInstallS
   }
 
   // Write settings when runtime supports settings.json
-  if (!isCodex && !isCopilot && !isCursor && !isWindsurf) {
+  if (!isCodex && !isCopilot && !isCursor && !isWindsurf && !isRovodev) {
     writeSettings(settingsPath, settings);
   }
 
@@ -4626,6 +5037,7 @@ function finishInstall(settingsPath, settings, statuslineCommand, shouldInstallS
   if (runtime === 'copilot') program = 'Copilot';
   if (runtime === 'antigravity') program = 'Antigravity';
   if (runtime === 'cursor') program = 'Cursor';
+  if (runtime === 'rovodev') program = 'Rovo Dev';
 
   let command = '/gsd:new-project';
   if (runtime === 'opencode') command = '/gsd-new-project';
@@ -4633,6 +5045,7 @@ function finishInstall(settingsPath, settings, statuslineCommand, shouldInstallS
   if (runtime === 'copilot') command = '/gsd-new-project';
   if (runtime === 'antigravity') command = '/gsd-new-project';
   if (runtime === 'cursor') command = 'gsd-new-project (mention the skill name)';
+  if (runtime === 'rovodev') command = '/prompts gsd-new-project';
   console.log(`
   ${green}Done!${reset} Open a blank directory in ${program} and run ${cyan}${command}${reset}.
 
@@ -4783,9 +5196,10 @@ function promptRuntime(callback) {
     '5': 'copilot',
     '6': 'antigravity',
     '7': 'cursor',
-    '8': 'windsurf'
+    '8': 'windsurf',
+    '9': 'rovodev'
   };
-  const allRuntimes = ['claude', 'opencode', 'gemini', 'codex', 'copilot', 'antigravity', 'cursor', 'windsurf'];
+  const allRuntimes = ['claude', 'opencode', 'gemini', 'codex', 'copilot', 'antigravity', 'cursor', 'windsurf', 'rovodev'];
 
   console.log(`  ${yellow}Which runtime(s) would you like to install for?${reset}\n\n  ${cyan}1${reset}) Claude Code  ${dim}(~/.claude)${reset}
   ${cyan}2${reset}) OpenCode     ${dim}(~/.config/opencode)${reset} - open source, free models
@@ -4795,7 +5209,8 @@ function promptRuntime(callback) {
   ${cyan}6${reset}) Antigravity  ${dim}(~/.gemini/antigravity)${reset}
   ${cyan}7${reset}) Cursor       ${dim}(~/.cursor)${reset}
   ${cyan}8${reset}) Windsurf     ${dim}(~/.windsurf)${reset}
-  ${cyan}9${reset}) All
+  ${cyan}9${reset}) Rovo Dev     ${dim}(~/.rovodev)${reset}
+  ${cyan}0${reset}) All
 
   ${dim}Select multiple: 1,4,6 or 1 4 6${reset}
 `);
@@ -4806,7 +5221,7 @@ function promptRuntime(callback) {
     const input = answer.trim() || '1';
 
     // "All" shortcut
-    if (input === '9') {
+    if (input === '0') {
       callback(allRuntimes);
       return;
     }
@@ -4962,6 +5377,12 @@ if (process.env.GSD_TEST_MODE) {
     convertClaudeCommandToWindsurfSkill,
     convertClaudeAgentToWindsurfAgent,
     copyCommandsAsWindsurfSkills,
+    claudeToRovodevTools,
+    convertRovodevToolName,
+    convertClaudeToRovodevMarkdown,
+    convertClaudeCommandToRovodevSkill,
+    convertClaudeAgentToRovodevAgent,
+    copyCommandsAsRovodevSkills,
     writeManifest,
     reportLocalPatches,
     validateHookFields,
