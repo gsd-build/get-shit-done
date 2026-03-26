@@ -1193,7 +1193,26 @@ Use template structure for each PLAN.md.
 
 **ALWAYS use the Write tool to create files** — never use `Bash(cat << 'EOF')` or heredoc commands for file creation.
 
-Write to `.planning/phases/XX-name/{phase}-{NN}-PLAN.md`
+**CRITICAL — File naming convention (enforced):**
+
+The filename MUST follow the exact pattern: `{padded_phase}-{NN}-PLAN.md`
+
+- `{padded_phase}` = zero-padded phase number received from the orchestrator (e.g. `01`, `02`, `03`, `02.1`)
+- `{NN}` = zero-padded sequential plan number within the phase (e.g. `01`, `02`, `03`)
+- The suffix is always `-PLAN.md` — NEVER `PLAN-NN.md`, `NN-PLAN.md`, or any other variation
+
+**Correct examples:**
+- Phase 1, Plan 1 → `01-01-PLAN.md`
+- Phase 3, Plan 2 → `03-02-PLAN.md`
+- Phase 2.1, Plan 1 → `02.1-01-PLAN.md`
+
+**Incorrect (will break gsd-tools detection):**
+- ❌ `PLAN-01-auth.md`
+- ❌ `01-PLAN-01.md`
+- ❌ `plan-01.md`
+- ❌ `01-01-plan.md` (lowercase)
+
+Full write path: `.planning/phases/{padded_phase}-{slug}/{padded_phase}-{NN}-PLAN.md`
 
 Include all frontmatter fields.
 </step>

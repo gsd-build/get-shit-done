@@ -244,7 +244,7 @@ Options:
 
 Use AskUserQuestion for the choice.
 
-## 10. Present Final Status
+## 10. Present Final Status and Prompt Next Step
 
 Display:
 ```
@@ -256,19 +256,69 @@ Display:
 
 Dimensions: 6/6 passed
 {If any FLAGs: "Recommendations: {N} (non-blocking)"}
+```
 
-───────────────────────────────────────────────────────────────
+Check text mode:
+```bash
+TEXT_MODE_CFG=$(node "$HOME/.claude/get-shit-done/bin/gsd-tools.cjs" config-get text_mode 2>/dev/null || echo "false")
+```
 
+**If `TEXT_MODE` is true OR `TEXT_MODE_CFG` is true:**
+```
+─────────────────────────────────────────────────────
 ## ▶ Next Up
 
-**Plan Phase {N}** — planner will use UI-SPEC.md as design context
+Run in a new context window:
 
-`/gsd:plan-phase {N}`
+  /clear
+  /gsd:plan-phase {N} {GSD_WS}
 
-<sub>/clear first → fresh context window</sub>
-
-───────────────────────────────────────────────────────────────
+💡 /clear reduces context rot — recommended before each phase command.
+─────────────────────────────────────────────────────
 ```
+Exit workflow.
+
+**If `TEXT_MODE` is false AND `TEXT_MODE_CFG` is false:**
+
+Use AskUserQuestion:
+- header: "ui-phase done ✓"
+- question: "UI-SPEC approved for Phase {N}. Ready to plan. What would you like to do next?"
+- options:
+  - label: "→ Run plan-phase next (recommended)"
+    description: "Proceed to planning with UI-SPEC as design context. Use /clear first for a fresh context window."
+  - label: "Review UI-SPEC.md first"
+    description: "Exit and review the design contract before planning."
+
+If "→ Run plan-phase next (recommended)":
+```
+─────────────────────────────────────────────────────
+ GSD ► ui-phase complete ✓ — next: plan-phase
+─────────────────────────────────────────────────────
+
+Run in a new context window:
+
+  /clear
+  /gsd:plan-phase {N} {GSD_WS}
+
+💡 /clear reduces context rot — recommended before each phase command.
+─────────────────────────────────────────────────────
+```
+Exit workflow.
+
+If "Review UI-SPEC.md first":
+```
+─────────────────────────────────────────────────────
+ GSD ► ui-phase complete ✓
+─────────────────────────────────────────────────────
+
+UI-SPEC.md saved at:
+  {phase_dir}/{padded_phase}-UI-SPEC.md
+
+When ready:
+  /gsd:plan-phase {N} {GSD_WS}
+─────────────────────────────────────────────────────
+```
+Exit workflow.
 
 ## 11. Commit (if configured)
 

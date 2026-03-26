@@ -199,36 +199,46 @@ DISCUSS_MODE=$(node "$HOME/.claude/get-shit-done/bin/gsd-tools.cjs" config-get w
 
 If `TEXT_MODE` is true, present as a plain-text numbered list:
 ```
-No CONTEXT.md found for Phase {X}. Plans will use research and requirements only — your design preferences won't be included.
+⚠ No CONTEXT.md found for Phase {X}.
 
-1. Continue without context — Plan using research + requirements only
-[If DISCUSS_MODE is "assumptions":]
-2. Gather context (assumptions mode) — Analyze codebase and surface assumptions before planning
+Without context, plans skip your design preferences and implementation decisions.
+The recommended workflow is: discuss-phase → (ui-phase) → plan-phase
+
 [If DISCUSS_MODE is "discuss" or unset:]
-2. Run discuss-phase first — Capture design decisions before planning
+1. Run discuss-phase first (recommended) — Capture design decisions before planning
+[If DISCUSS_MODE is "assumptions":]
+1. Gather context (assumptions mode) (recommended) — Analyze codebase and surface assumptions before planning
+2. Continue without context — Plan using research + requirements only (not recommended)
 
 Enter number:
 ```
 
 Otherwise use AskUserQuestion:
-- header: "No context"
-- question: "No CONTEXT.md found for Phase {X}. Plans will use research and requirements only — your design preferences won't be included. Continue or capture context first?"
+- header: "No context found"
+- question: "⚠ No CONTEXT.md found for Phase {X}. Without it, your design preferences won't be included in plans. The recommended workflow is: discuss-phase → (ui-phase) → plan-phase. What would you like to do?"
 - options:
-  - "Continue without context" — Plan using research + requirements only
-  If `DISCUSS_MODE` is `"assumptions"`:
-  - "Gather context (assumptions mode)" — Analyze codebase and surface assumptions before planning
   If `DISCUSS_MODE` is `"discuss"` (or unset):
-  - "Run discuss-phase first" — Capture design decisions before planning
+  - "Run discuss-phase first (recommended)" — Capture design decisions before planning (best results)
+  If `DISCUSS_MODE` is `"assumptions"`:
+  - "Gather context — assumptions mode (recommended)" — Analyze codebase and surface assumptions before planning
+  - "Continue without context" — Skip context capture; plans use research + requirements only
 
 If "Continue without context": Proceed to step 5.
-If "Run discuss-phase first":
+If "Run discuss-phase first (recommended)" OR "Gather context — assumptions mode (recommended)":
   **IMPORTANT:** Do NOT invoke discuss-phase as a nested Skill/Task call — AskUserQuestion
   does not work correctly in nested subcontexts (#1009). Instead, display the command
   and exit so the user runs it as a top-level command:
   ```
-  Run this command first, then re-run /gsd:plan-phase {X} ${GSD_WS}:
+  ─────────────────────────────────────────────────────
+  Run this first, then re-run /gsd:plan-phase {X} ${GSD_WS}:
 
   /gsd:discuss-phase {X} ${GSD_WS}
+
+  Recommended full sequence:
+    1. /gsd:discuss-phase {X} ${GSD_WS}
+    2. /gsd:ui-phase {X} ${GSD_WS}     ← if phase has frontend work
+    3. /gsd:plan-phase {X} ${GSD_WS}
+  ─────────────────────────────────────────────────────
   ```
   **Exit the plan-phase workflow. Do not continue.**
 
@@ -392,22 +402,35 @@ UI_SPEC_FILE=$(ls "${PHASE_DIR}"/*-UI-SPEC.md 2>/dev/null | head -1)
 
 If `TEXT_MODE` is true, present as a plain-text numbered list:
 ```
-Phase {N} has frontend indicators but no UI-SPEC.md. Generate a design contract before planning?
+⚠ Phase {N} has frontend indicators but no UI-SPEC.md.
 
-1. Generate UI-SPEC first — Run /gsd:ui-phase {N} then re-run /gsd:plan-phase {N}
-2. Continue without UI-SPEC
-3. Not a frontend phase
+Without a UI design contract, the planner will make ad-hoc styling decisions
+that may cause design debt. Recommended: run ui-phase before plan-phase.
+
+1. Generate UI-SPEC first (recommended) — Run /gsd:ui-phase {N} then re-run /gsd:plan-phase {N}
+2. Continue without UI-SPEC — Planner will make styling decisions ad-hoc (not recommended)
+3. Not a frontend phase — Skip UI-SPEC check
 
 Enter number:
 ```
 
 Otherwise use AskUserQuestion:
-- header: "UI Design Contract"
-- question: "Phase {N} has frontend indicators but no UI-SPEC.md. Generate a design contract before planning?"
+- header: "No UI-SPEC found"
+- question: "⚠ Phase {N} has frontend indicators but no UI-SPEC.md. Without it, the planner makes ad-hoc styling decisions that cause design debt. Generate a design contract first?"
 - options:
-  - "Generate UI-SPEC first" → Display: "Run `/gsd:ui-phase {N} ${GSD_WS}` then re-run `/gsd:plan-phase {N} ${GSD_WS}`". Exit workflow.
+  - "Generate UI-SPEC first (recommended)" → Display exit message and command. Exit workflow.
   - "Continue without UI-SPEC" → Continue to step 6.
   - "Not a frontend phase" → Continue to step 6.
+
+If "Generate UI-SPEC first (recommended)":
+  ```
+  ─────────────────────────────────────────────────────
+  Run this first, then re-run /gsd:plan-phase {N} ${GSD_WS}:
+
+  /gsd:ui-phase {N} ${GSD_WS}
+  ─────────────────────────────────────────────────────
+  ```
+  **Exit the plan-phase workflow. Do not continue.**
 
 **If `HAS_UI` is 1 (no frontend indicators):** Skip silently to step 6.
 

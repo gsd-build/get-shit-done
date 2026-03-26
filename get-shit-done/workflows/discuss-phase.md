@@ -850,7 +850,7 @@ Write file.
 </step>
 
 <step name="confirm_creation">
-Present summary and next steps:
+Present summary of decisions captured:
 
 ```
 Created: .planning/phases/${PADDED_PHASE}-${SLUG}/${PADDED_PHASE}-CONTEXT.md
@@ -866,26 +866,123 @@ Created: .planning/phases/${PADDED_PHASE}-${SLUG}/${PADDED_PHASE}-CONTEXT.md
 [If deferred ideas exist:]
 ## Noted for Later
 - [Deferred idea] — future phase
-
----
-
-## ▶ Next Up
-
-**Phase ${PHASE}: [Name]** — [Goal from ROADMAP.md]
-
-`/gsd:plan-phase ${PHASE} ${GSD_WS}`
-
-<sub>`/clear` first → fresh context window</sub>
-
----
-
-**Also available:**
-- `/gsd:plan-phase ${PHASE} --skip-research ${GSD_WS}` — plan without research
-- `/gsd:ui-phase ${PHASE} ${GSD_WS}` — generate UI design contract before planning (if phase has frontend work)
-- Review/edit CONTEXT.md before continuing
-
----
 ```
+
+Then detect if phase has frontend indicators to determine next step options:
+
+```bash
+PHASE_SECTION=$(node "$HOME/.claude/get-shit-done/bin/gsd-tools.cjs" roadmap get-phase "${PHASE}" 2>/dev/null)
+echo "$PHASE_SECTION" | grep -iE "UI|interface|frontend|component|layout|page|screen|view|form|dashboard|widget" > /dev/null 2>&1
+HAS_UI_INDICATORS=$?
+TEXT_MODE_CFG=$(node "$HOME/.claude/get-shit-done/bin/gsd-tools.cjs" config-get text_mode 2>/dev/null || echo "false")
+```
+
+**If `TEXT_MODE` is true OR `TEXT_MODE_CFG` is true:**
+
+Display the following text-based next steps and exit (no interactive prompt in text mode):
+
+```
+─────────────────────────────────────────────────────
+✓ discuss-phase complete.
+
+## ▶ Recommended next steps (in order):
+
+[If HAS_UI_INDICATORS is 0 (frontend phase):]
+  1. /gsd:ui-phase ${PHASE} ${GSD_WS}   ← run in a new context (/clear first)
+  2. /gsd:plan-phase ${PHASE} ${GSD_WS}  ← run after ui-phase completes
+
+[If HAS_UI_INDICATORS is 1 (no frontend indicators):]
+  1. /gsd:plan-phase ${PHASE} ${GSD_WS}  ← run in a new context (/clear first)
+
+💡 /clear first → fresh context window reduces token usage and context rot.
+─────────────────────────────────────────────────────
+```
+
+**If `TEXT_MODE` is false AND `TEXT_MODE_CFG` is false:**
+
+Use AskUserQuestion with options based on whether phase has frontend indicators:
+
+**If `HAS_UI_INDICATORS` is 0 (frontend phase — ui-phase recommended):**
+
+```
+AskUserQuestion:
+- header: "discuss-phase done ✓"
+- question: "Context captured for Phase ${PHASE}. Phase has frontend work — run ui-phase before plan-phase for best results. What would you like to do next?"
+- options:
+  - label: "→ Run ui-phase next (recommended)"
+    description: "Generate UI design contract — then run plan-phase. Use /clear first for a fresh context window."
+  - label: "→ Skip to plan-phase"
+    description: "Go straight to planning (skips UI design contract)."
+  - label: "Review CONTEXT.md first"
+    description: "Exit and review the captured decisions before continuing."
+```
+
+**If `HAS_UI_INDICATORS` is 1 (no frontend indicators):**
+
+```
+AskUserQuestion:
+- header: "discuss-phase done ✓"
+- question: "Context captured for Phase ${PHASE}. Ready to plan. What would you like to do next?"
+- options:
+  - label: "→ Run plan-phase next (recommended)"
+    description: "Proceed to planning. Use /clear first for a fresh context window."
+  - label: "Review CONTEXT.md first"
+    description: "Exit and review the captured decisions before continuing."
+```
+
+**Handle user choice:**
+
+If "→ Run ui-phase next (recommended)":
+```
+─────────────────────────────────────────────────────
+ GSD ► discuss-phase complete ✓ — next: ui-phase
+─────────────────────────────────────────────────────
+
+Run in a new context window:
+
+  /clear
+  /gsd:ui-phase ${PHASE} ${GSD_WS}
+
+💡 /clear reduces context rot — recommended before each phase command.
+─────────────────────────────────────────────────────
+```
+Exit workflow.
+
+If "→ Skip to plan-phase" OR "→ Run plan-phase next (recommended)":
+```
+─────────────────────────────────────────────────────
+ GSD ► discuss-phase complete ✓ — next: plan-phase
+─────────────────────────────────────────────────────
+
+Run in a new context window:
+
+  /clear
+  /gsd:plan-phase ${PHASE} ${GSD_WS}
+
+💡 /clear reduces context rot — recommended before each phase command.
+─────────────────────────────────────────────────────
+```
+Exit workflow.
+
+If "Review CONTEXT.md first":
+```
+─────────────────────────────────────────────────────
+ GSD ► discuss-phase complete ✓
+─────────────────────────────────────────────────────
+
+CONTEXT.md saved at:
+  .planning/phases/${PADDED_PHASE}-${SLUG}/${PADDED_PHASE}-CONTEXT.md
+
+When ready:
+[If HAS_UI_INDICATORS is 0:]
+  /gsd:ui-phase ${PHASE} ${GSD_WS}   ← recommended (frontend phase)
+  /gsd:plan-phase ${PHASE} ${GSD_WS}
+
+[If HAS_UI_INDICATORS is 1:]
+  /gsd:plan-phase ${PHASE} ${GSD_WS}
+─────────────────────────────────────────────────────
+```
+Exit workflow.
 </step>
 
 <step name="git_commit">
