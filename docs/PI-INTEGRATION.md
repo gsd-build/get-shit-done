@@ -14,6 +14,10 @@ GSD is already integrated into this project. The pi integration files are locate
 .pi/
 ├── commands/gsd/     # Pi command wrappers
 ├── agents/           # Pi agent definitions
+├── extensions/       # Pi extensions (hooks, tools)
+│   ├── gsd-context-monitor.ts  # Context window warnings
+│   ├── gsd-statusline.ts       # Status line integration
+│   └── gsd-tools.ts            # Native GSD tools
 └── taskplane.json    # Taskplane configuration
 ```
 
@@ -75,6 +79,52 @@ This will:
 | `gsd-phase-researcher` | Researches implementation patterns |
 | `gsd-project-researcher` | Researches domain ecosystem |
 
+## Extensions
+
+Pi extensions provide deeper integration with GSD's core features.
+
+### Context Monitor (`gsd-context-monitor.ts`)
+
+GSD's signature feature: warns when context window is running low.
+
+**Thresholds:**
+- ⚠️ Warning at 65% used (35% remaining)
+- 🚨 Critical at 75% used (25% remaining)
+
+The extension monitors tool calls and notifies you to start fresh context or wrap up work before quality degrades.
+
+### Status Line (`gsd-statusline.ts`)
+
+Shows current GSD position in pi's status:
+
+```
+GSD Phase 01 Plan 1 of 3 [In Progress]
+```
+
+Updates automatically when STATE.md changes. Also provides `/gsd-status` command for manual check.
+
+### Custom Tools (`gsd-tools.ts`)
+
+Native pi tools that wrap `gsd-tools.cjs`:
+
+| Tool | Description |
+|------|-------------|
+| `gsd_state` | Get current project state (JSON) |
+| `gsd_advance_plan` | Move to next plan |
+| `gsd_add_decision` | Record a decision in STATE.md |
+| `gsd_progress` | Get progress summary |
+
+**Example usage by LLM:**
+```
+The gsd_state tool returns:
+{
+  "currentPhase": "01",
+  "currentPlan": "2 of 3",
+  "status": "In Progress",
+  "progress": "███████░░░ 33%"
+}
+```
+
 ## How It Works
 
 ### Command Wrappers
@@ -122,10 +172,14 @@ Run the pi integration tests:
 npm test
 ```
 
-Or specifically:
+Or run specific test files:
 
 ```bash
+# Command and agent tests
 node --test tests/pi-integration.test.cjs
+
+# Extension tests
+node --test tests/pi-extensions.test.cjs
 ```
 
 ## Differences from Claude Code
