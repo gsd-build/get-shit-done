@@ -1,6 +1,6 @@
 {
   "name": "get-shit-done-cc",
-  "version": "1.29.0",
+  "version": "1.30.0",
   "description": "A meta-prompting, context engineering and spec-driven development system for Claude Code, OpenCode, Gemini and Codex by TÂCHES.",
   "bin": {
     "get-shit-done-cc": "bin/install.js"
@@ -50,6 +50,7 @@
     "typescript": "^5.0.0",
     "@types/node": "^22.0.0",
     "@sinclair/typebox": "^0.34.0"
+    "vitest": "^4.1.2"
   },
   "scripts": {
     "build:hooks": "node scripts/build-hooks.js",

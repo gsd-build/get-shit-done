@@ -6,6 +6,12 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ## [Unreleased]
 
+## [1.30.0] - 2026-03-26
+
+### Added
+- **GSD SDK** — Headless TypeScript SDK (`@gsd-build/sdk`) with `gsd-sdk init` and `gsd-sdk auto` CLI commands for autonomous project execution
+- **`--sdk` installer flag** — Optionally install the GSD SDK during setup (interactive prompt or `--sdk` flag)
+
 ## [1.29.0] - 2026-03-25
 
 ### Added
@@ -1696,7 +1702,8 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 - YOLO mode for autonomous execution
 - Interactive mode with checkpoints
 
-[Unreleased]: https://github.com/gsd-build/get-shit-done/compare/v1.29.0...HEAD
+[Unreleased]: https://github.com/gsd-build/get-shit-done/compare/v1.30.0...HEAD
+[1.30.0]: https://github.com/gsd-build/get-shit-done/releases/tag/v1.30.0
 [1.29.0]: https://github.com/gsd-build/get-shit-done/releases/tag/v1.29.0
 [1.28.0]: https://github.com/gsd-build/get-shit-done/releases/tag/v1.28.0
 [1.27.0]: https://github.com/glittercowboy/get-shit-done/releases/tag/v1.27.0

@@ -143,6 +143,7 @@ npx get-shit-done-cc --all --global      # Install to all directories
 
 Use `--global` (`-g`) or `--local` (`-l`) to skip the location prompt.
 Use `--claude`, `--opencode`, `--gemini`, `--codex`, `--copilot`, `--cursor`, `--windsurf`, `--antigravity`, or `--all` to skip the runtime prompt.
+Use `--sdk` to also install the GSD SDK CLI (`gsd-sdk`) for headless autonomous execution.
 
 </details>
 
