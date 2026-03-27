@@ -37,6 +37,13 @@ function withProjectRoot(cwd, result) {
   const agentStatus = checkAgentsInstalled();
   result.agents_installed = agentStatus.agents_installed;
   result.missing_agents = agentStatus.missing_agents;
+  // Inject response_language into all init outputs (#1399).
+  // Workflows propagate this to subagent prompts so user-facing questions
+  // stay in the configured language across phase boundaries.
+  const config = loadConfig(cwd);
+  if (config.response_language) {
+    result.response_language = config.response_language;
+  }
   return result;
 }
 

@@ -99,6 +99,18 @@ describe('loadConfig', () => {
     assert.strictEqual(config.model_overrides, null);
   });
 
+  test('reads response_language when set', () => {
+    writeConfig({ response_language: 'Portuguese' });
+    const config = loadConfig(tmpDir);
+    assert.strictEqual(config.response_language, 'Portuguese');
+  });
+
+  test('returns response_language as null when not set', () => {
+    writeConfig({ model_profile: 'balanced' });
+    const config = loadConfig(tmpDir);
+    assert.strictEqual(config.response_language, null);
+  });
+
   test('returns defaults when config.json contains invalid JSON', () => {
     fs.writeFileSync(
       path.join(tmpDir, '.planning', 'config.json'),

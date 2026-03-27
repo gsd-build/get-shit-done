@@ -29,6 +29,7 @@ const VALID_CONFIG_KEYS = new Set([
   'hooks.context_warnings',
   'project_code', 'phase_naming',
   'manager.flags.discuss', 'manager.flags.plan', 'manager.flags.execute',
+  'response_language',
 ]);
 
 /**

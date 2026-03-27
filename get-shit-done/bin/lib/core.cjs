@@ -357,6 +357,7 @@ function loadConfig(cwd) {
       model_overrides: parsed.model_overrides || null,
       agent_skills: parsed.agent_skills || {},
       manager: parsed.manager || {},
+      response_language: get('response_language') || null,
     };
   } catch {
     return defaults;
