@@ -11,7 +11,8 @@
     "get-shit-done",
     "agents",
     "hooks/dist",
-    "scripts"
+    "scripts",
+    ".pi"
   ],
   "keywords": [
     "claude",
@@ -23,8 +24,14 @@
     "gemini",
     "gemini-cli",
     "codex",
-    "codex-cli"
+    "codex-cli",
+    "pi-package"
   ],
+  "pi": {
+    "commands": ["./.pi/commands"],
+    "agents": ["./.pi/agents"],
+    "extensions": ["./.pi/extensions"]
+  },
   "author": "TÂCHES",
   "license": "MIT",
   "repository": {

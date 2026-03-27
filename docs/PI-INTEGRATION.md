@@ -8,6 +8,30 @@ GSD (Get Shit Done) is a meta-prompting, context engineering, and spec-driven de
 
 ## Installation
 
+### As a Pi Package (Recommended)
+
+GSD is a [pi package](https://pi.dev) and can be installed directly:
+
+```bash
+# Install from npm
+pi install npm:get-shit-done-cc
+
+# Install specific version (pinned)
+pi install npm:get-shit-done-cc@1.29.0
+
+# Project-local install (shareable with team)
+pi install -l npm:get-shit-done-cc
+```
+
+This installs:
+- **57 commands** in `.pi/commands/gsd/` (or global `~/.pi/agent/commands/gsd/`)
+- **18 agents** in `.pi/agents/` (or global `~/.pi/agent/agents/`)
+- **11 extensions** for native pi integration
+
+After installation, all `/gsd:*` commands are available in pi.
+
+### Manual Integration
+
 GSD is already integrated into this project. The pi integration files are located in:
 
 ```
@@ -27,6 +51,21 @@ GSD is already integrated into this project. The pi integration files are locate
 │   ├── gsd-mcp-server.ts        # MCP server
 │   └── gsd-metrics.ts           # Usage tracking
 └── taskplane.json        # Taskplane configuration
+```
+
+### Package Manifest
+
+The `package.json` includes a `pi` manifest for auto-discovery:
+
+```json
+{
+  "keywords": ["pi-package"],
+  "pi": {
+    "commands": ["./.pi/commands"],
+    "agents": ["./.pi/agents"],
+    "extensions": ["./.pi/extensions"]
+  }
+}
 ```
 
 ## Available Commands
