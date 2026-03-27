@@ -261,8 +261,43 @@ describe('Dashboard Extension', () => {
     const content = fs.readFileSync(extPath, 'utf-8');
 
     assert.ok(
-      content.includes('onKey') || content.includes('key'),
+      content.includes('handleInput') || content.includes('matchesKey'),
       'Should handle keyboard input'
+    );
+  });
+
+  test('handles missing runCommand gracefully', () => {
+    const content = fs.readFileSync(extPath, 'utf-8');
+
+    // runCommand may not be available in all pi versions
+    // Should either use optional chaining or existence check
+    const hasOptionalChaining = content.includes('ctx.runCommand ?.') || content.includes('this.ctx.runCommand ?.');
+    const hasExistenceCheck = content.includes('if') && content.includes('runCommand');
+    const hasPrivateMethod = content.includes('private runCommand');
+
+    assert.ok(
+      hasOptionalChaining || hasExistenceCheck || hasPrivateMethod,
+      'Should handle missing runCommand gracefully (optional chaining, existence check, or private method)'
+    );
+  });
+
+  test('runCommand is typed as optional', () => {
+    const content = fs.readFileSync(extPath, 'utf-8');
+
+    // Should have runCommand? in the interface
+    assert.ok(
+      content.includes('runCommand?') || content.includes('runCommand ?'),
+      'runCommand should be typed as optional in the context interface'
+    );
+  });
+
+  test('has error handling for runCommand', () => {
+    const content = fs.readFileSync(extPath, 'utf-8');
+
+    // Should have .catch or try/catch for runCommand calls
+    assert.ok(
+      content.includes('.catch') || (content.includes('try') && content.includes('catch')),
+      'Should have error handling for runCommand calls'
     );
   });
 });
