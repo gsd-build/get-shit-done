@@ -241,7 +241,8 @@ export default function (pi: ExtensionAPI) {
         };
       }
 
-      const branchName = params.name.startsWith("gsd/") ? params.name : `gsd/${params.name}`;
+      const name = params.name as string;
+      const branchName = name.startsWith("gsd/") ? name : `gsd/${name}`;
 
       if (params.action === "create") {
         const result = git(["checkout", "-b", branchName]);

@@ -83,20 +83,23 @@ function formatStatus(state: GsdState | null): string {
 }
 
 export default function (pi: ExtensionAPI) {
-  // Register status line on session start
-  pi.on("session_start", async (_event, ctx) => {
+  /**
+   * Update the status line with current GSD state
+   */
+  function updateStatus(ctx: { ui: { setStatus: (id: string, status: string) => void } }) {
     try {
-      // Get project root from working directory
       const projectRoot = process.cwd();
       const state = parseStateMd(projectRoot);
       const status = formatStatus(state);
-
-      // Store in session for later access
-      ctx.session.gsdStatus = status;
+      ctx.ui.setStatus("gsd", status);
     } catch {
-      // Failed to read state, continue without status
-      ctx.session.gsdStatus = "GSD: unavailable";
+      ctx.ui.setStatus("gsd", "GSD: unavailable");
     }
+  }
+
+  // Register status line on session start
+  pi.on("session_start", async (_event, ctx) => {
+    updateStatus(ctx);
   });
 
   // Update status on relevant tool calls
@@ -106,13 +109,7 @@ export default function (pi: ExtensionAPI) {
     if (toolName === "write" || toolName === "edit") {
       const filePath = event.input?.path || event.input?.file || "";
       if (typeof filePath === "string" && filePath.includes(".planning")) {
-        try {
-          const projectRoot = process.cwd();
-          const state = parseStateMd(projectRoot);
-          ctx.session.gsdStatus = formatStatus(state);
-        } catch {
-          // Ignore errors during status update
-        }
+        updateStatus(ctx);
       }
     }
   });

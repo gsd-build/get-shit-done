@@ -163,10 +163,12 @@ export default function (pi: ExtensionAPI) {
       }),
     }),
     async execute(_toolCallId, params, _signal, _onUpdate, _ctx) {
+      const phase = params.phase as string;
+      const summary = params.summary as string;
       const result = runGsdTools([
         "state", "add-decision",
-        "--phase", params.phase,
-        "--summary", params.summary,
+        "--phase", phase,
+        "--summary", summary,
       ]);
 
       if (!result.success) {
@@ -182,9 +184,9 @@ export default function (pi: ExtensionAPI) {
       return {
         content: [{
           type: "text" as const,
-          text: `Decision recorded successfully.\n\nPhase: ${params.phase}\nDecision: ${params.summary}`,
+          text: `Decision recorded successfully.\n\nPhase: ${phase}\nDecision: ${summary}`,
         }],
-        details: { success: true, phase: params.phase, summary: params.summary },
+        details: { success: true, phase, summary },
       };
     },
   });

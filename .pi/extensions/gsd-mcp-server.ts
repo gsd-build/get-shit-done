@@ -288,15 +288,16 @@ export default function (pi: ExtensionAPI) {
       uri: Type.String({ description: "Resource URI (gsd://state, gsd://project, gsd://roadmap, gsd://requirements)" }),
     }),
     async execute(_toolCallId, params, _signal, _onUpdate, _ctx) {
-      const content = readResource(params.uri);
+      const uri = params.uri as string;
+      const content = readResource(uri);
 
       if (!content) {
         return {
           content: [{
             type: "text" as const,
-            text: `Resource not found: ${params.uri}\n\nAvailable: gsd://state, gsd://project, gsd://roadmap, gsd://requirements`,
+            text: `Resource not found: ${uri}\n\nAvailable: gsd://state, gsd://project, gsd://roadmap, gsd://requirements`,
           }],
-          details: { success: false, uri: params.uri },
+          details: { success: false, uri },
         };
       }
 
@@ -320,11 +321,13 @@ export default function (pi: ExtensionAPI) {
       args: Type.Record(Type.String(), Type.Unknown(), { description: "Tool arguments" }),
     }),
     async execute(_toolCallId, params, _signal, _onUpdate, _ctx) {
-      const result = handleToolCall(params.tool, params.args as Record<string, unknown>);
+      const tool = params.tool as string;
+      const args = params.args as Record<string, unknown>;
+      const result = handleToolCall(tool, args);
 
       return {
         content: [{ type: "text" as const, text: result.content }],
-        details: { success: !result.isError, tool: params.tool },
+        details: { success: !result.isError, tool },
       };
     },
   });
