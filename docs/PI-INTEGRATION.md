@@ -12,13 +12,21 @@ GSD is already integrated into this project. The pi integration files are locate
 
 ```
 .pi/
-├── commands/gsd/     # Pi command wrappers
-├── agents/           # Pi agent definitions
-├── extensions/       # Pi extensions (hooks, tools)
-│   ├── gsd-context-monitor.ts  # Context window warnings
-│   ├── gsd-statusline.ts       # Status line integration
-│   └── gsd-tools.ts            # Native GSD tools
-└── taskplane.json    # Taskplane configuration
+├── commands/gsd/         # Pi command wrappers
+├── agents/               # Pi agent definitions
+├── extensions/           # Pi extensions (hooks, tools)
+│   ├── gsd-context-monitor.ts   # Context window warnings
+│   ├── gsd-statusline.ts        # Status line integration
+│   ├── gsd-tools.ts             # Native GSD tools
+│   ├── gsd-prompt-guard.ts      # Injection detection
+│   ├── gsd-workflow-guard.ts    # Workflow tracking
+│   ├── gsd-auto-spawn.ts        # Intent detection
+│   ├── gsd-compaction.ts        # Context preservation
+│   ├── gsd-dashboard.ts         # Interactive TUI
+│   ├── gsd-git.ts               # Git integration
+│   ├── gsd-mcp-server.ts        # MCP server
+│   └── gsd-metrics.ts           # Usage tracking
+└── taskplane.json        # Taskplane configuration
 ```
 
 ## Available Commands
@@ -124,6 +132,135 @@ The gsd_state tool returns:
   "progress": "███████░░░ 33%"
 }
 ```
+
+## Advanced Extensions
+
+Deeper integrations for security, automation, and observability.
+
+### Security Extensions
+
+#### Prompt Guard (`gsd-prompt-guard.ts`)
+
+Scans writes to `.planning/` for prompt injection patterns. Blocks potentially malicious content.
+
+**Detection patterns:**
+- "Ignore previous instructions"
+- "You are now..."
+- "System:" injections
+- Jailbreak attempts
+
+**Commands:**
+- `/gsd-check-injection <text>` - Test content for injection
+
+#### Workflow Guard (`gsd-workflow-guard.ts`)
+
+Warns when editing files outside GSD workflow context. Encourages tracked changes.
+
+**Enable in config.json:**
+```json
+{ "hooks": { "workflow_guard": true } }
+```
+
+### Automation Extensions
+
+#### Auto-Spawn (`gsd-auto-spawn.ts`)
+
+Detects user intent and suggests relevant GSD commands.
+
+**Example triggers:**
+- "I want to add a feature" → `/gsd:quick`
+- "Start a new project" → `/gsd:new-project`
+- "Fix this bug" → `/gsd:debug`
+- "What's next?" → `/gsd:next`
+
+**Commands:**
+- `/gsd-detect-intent <text>` - Test intent detection
+- `/gsd-intents` - List all intent patterns
+
+#### Compaction (`gsd-compaction.ts`)
+
+Custom compaction strategy preserving GSD state files.
+
+**Priority:**
+1. Critical: STATE.md, PROJECT.md (always kept)
+2. High: REQUIREMENTS.md, ROADMAP.md
+3. Medium: Phase files
+4. Summarizable: Research docs
+
+**Commands:**
+- `/gsd-compaction-preview` - Preview what gets preserved
+- `/gsd-state-summary` - Get compact state summary
+
+### UI Extensions
+
+#### Dashboard (`gsd-dashboard.ts`)
+
+Interactive TUI dashboard showing phases, progress, and actions.
+
+**Commands:**
+- `/gsd-dashboard` - Open interactive dashboard
+
+**Keyboard shortcuts:**
+- `[P]` - Plan phase
+- `[E]` - Execute phase
+- `[V]` - Verify work
+- `[S]` - Ship (create PR)
+- `[H]` - Help
+- `[Q]` - Quit
+
+### Git Integration (`gsd-git.ts`)
+
+Git workflow integration for GSD.
+
+**Tools:**
+| Tool | Description |
+|------|-------------|
+| `gsd_ship` | Create PR from current phase work |
+| `gsd_branch` | Create/switch GSD feature branches |
+| `gsd_git_status` | Get git status for GSD context |
+
+**Commands:**
+- `/gsd-workflow-guard` - Toggle workflow guard
+
+### MCP Server (`gsd-mcp-server.ts`)
+
+Exposes GSD via Model Context Protocol for external tools.
+
+**Resources:**
+- `gsd://project` - PROJECT.md
+- `gsd://state` - STATE.md
+- `gsd://roadmap` - ROADMAP.md
+- `gsd://requirements` - REQUIREMENTS.md
+
+**Tools:**
+- `gsd_query` - Query GSD artifacts
+- `gsd_plan` - Get/create plans
+- `gsd_record` - Record decisions/blockers
+
+**Commands:**
+- `/gsd-mcp-resources` - List MCP resources
+- `/gsd-mcp-tools` - List MCP tools
+
+### Metrics (`gsd-metrics.ts`)
+
+Tracks GSD usage metrics.
+
+**Tracked:**
+- Sessions count
+- Total duration
+- Phases completed
+- Plans executed
+- Commands used
+
+**Tools:**
+| Tool | Description |
+|------|-------------|
+| `gsd_metrics` | Get usage metrics |
+
+**Commands:**
+- `/gsd-metrics` - Show metrics summary
+- `/gsd-metrics clear` - Reset metrics
+- `/gsd-session-stats` - Current session statistics
 
 ## How It Works
 
