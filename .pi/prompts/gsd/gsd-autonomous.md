@@ -1,0 +1,24 @@
+---
+description: Run all remaining phases autonomously — discuss→plan→execute per phase
+---
+
+# GSD Autonomous
+
+Execute all remaining milestone phases autonomously. For each phase: discuss → plan → execute.
+
+## Usage
+
+```
+/gsd-autonomous [--from $1]
+```
+
+**Flags:**
+- `--from N` — Start from phase N instead of current phase
+
+## Process
+
+Execute the autonomous workflow from `get-shit-done/workflows/autonomous.md` end-to-end.
+
+## Reference
+
+See `commands/gsd/autonomous.md` in the GSD source for the full command definition.

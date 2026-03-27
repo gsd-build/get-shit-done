@@ -28,8 +28,7 @@
     "pi-package"
   ],
   "pi": {
-    "commands": ["./.pi/commands"],
-    "agents": ["./.pi/agents"],
+    "prompts": ["./.pi/prompts/gsd"],
     "extensions": ["./.pi/extensions"]
   },
   "author": "TÂCHES",

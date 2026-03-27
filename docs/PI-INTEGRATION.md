@@ -4,7 +4,7 @@
 
 ## Overview
 
-GSD (Get Shit Done) is a meta-prompting, context engineering, and spec-driven development system. This integration provides pi-native access to GSD's workflow commands and agents.
+GSD (Get Shit Done) is a meta-prompting, context engineering, and spec-driven development system. This integration provides pi-native access to GSD's workflow commands.
 
 ## Installation
 
@@ -13,7 +13,10 @@ GSD (Get Shit Done) is a meta-prompting, context engineering, and spec-driven de
 GSD is a [pi package](https://pi.dev) and can be installed directly:
 
 ```bash
-# Install from npm
+# Install from local path (development)
+pi install /path/to/get-shit-done
+
+# Install from npm (when published)
 pi install npm:get-shit-done-cc
 
 # Install specific version (pinned)
@@ -24,11 +27,10 @@ pi install -l npm:get-shit-done-cc
 ```
 
 This installs:
-- **57 commands** in `.pi/commands/gsd/` (or global `~/.pi/agent/commands/gsd/`)
-- **18 agents** in `.pi/agents/` (or global `~/.pi/agent/agents/`)
-- **11 extensions** for native pi integration
+- **12 prompt templates** for `/gsd-*` commands
+- **11 TypeScript extensions** for native pi integration
 
-After installation, all `/gsd:*` commands are available in pi.
+After installation, all `/gsd-*` commands are available in pi.
 
 ### Manual Integration
 
@@ -36,9 +38,22 @@ GSD is already integrated into this project. The pi integration files are locate
 
 ```
 .pi/
-├── commands/gsd/         # Pi command wrappers
-├── agents/               # Pi agent definitions
-├── extensions/           # Pi extensions (hooks, tools)
+├── prompts/gsd/          # Pi prompt templates (commands)
+│   ├── gsd-new-project.md
+│   ├── gsd-discuss-phase.md
+│   ├── gsd-plan-phase.md
+│   ├── gsd-execute-phase.md
+│   ├── gsd-verify-work.md
+│   ├── gsd-quick.md
+│   ├── gsd-progress.md
+│   ├── gsd-help.md
+│   ├── gsd-autonomous.md
+│   ├── gsd-next.md
+│   ├── gsd-debug.md
+│   └── gsd-health.md
+├── commands/gsd/         # Source command definitions
+├── agents/               # Source agent definitions
+├── extensions/           # Pi TypeScript extensions
 │   ├── gsd-context-monitor.ts   # Context window warnings
 │   ├── gsd-statusline.ts        # Status line integration
 │   ├── gsd-tools.ts             # Native GSD tools
@@ -74,21 +89,30 @@ The `package.json` includes a `pi` manifest for auto-discovery:
 
 | Command | Description |
 |---------|-------------|
-| `/gsd:new-project` | Initialize project with full context gathering |
-| `/gsd:discuss-phase` | Capture implementation decisions |
-| `/gsd:plan-phase` | Research and create execution plans |
-| `/gsd:execute-phase` | Execute plans with parallelization |
-| `/gsd:verify-work` | User acceptance testing |
-| `/gsd:quick` | Ad-hoc tasks without full planning |
-| `/gsd:progress` | Show current position |
-| `/gsd:help` | Show all commands |
+| `/gsd-new-project` | Initialize project with full context gathering |
+| `/gsd-discuss-phase` | Capture implementation decisions |
+| `/gsd-plan-phase` | Research and create execution plans |
+| `/gsd-execute-phase` | Execute plans with parallelization |
+| `/gsd-verify-work` | User acceptance testing |
+| `/gsd-quick` | Ad-hoc tasks without full planning |
+| `/gsd-progress` | Show current position |
+| `/gsd-help` | Show all commands |
+
+### Utility Commands
+
+| Command | Description |
+|---------|-------------|
+| `/gsd-autonomous` | Run all remaining phases autonomously |
+| `/gsd-next` | Auto-detect and run next workflow step |
+| `/gsd-debug` | Systematic debugging with state persistence |
+| `/gsd-health` | Diagnose and repair planning directory |
 
 ## Quick Start
 
 ### 1. Initialize a New Project
 
 ```
-/gsd:new-project
+/gsd-new-project
 ```
 
 This will:
@@ -100,35 +124,25 @@ This will:
 ### 2. Plan Your First Phase
 
 ```
-/gsd:discuss-phase 1
-/gsd:plan-phase 1
+/gsd-discuss-phase 1
+/gsd-plan-phase 1
 ```
 
 ### 3. Execute
 
 ```
-/gsd:execute-phase 1
+/gsd-execute-phase 1
 ```
 
 ### 4. Verify
 
 ```
-/gsd:verify-work 1
+/gsd-verify-work 1
 ```
-
-## Available Agents
-
-| Agent | Role |
-|-------|------|
-| `gsd-planner` | Creates execution plans |
-| `gsd-executor` | Executes plans with atomic commits |
-| `gsd-verifier` | Verifies phase goals |
-| `gsd-phase-researcher` | Researches implementation patterns |
-| `gsd-project-researcher` | Researches domain ecosystem |
 
 ## Extensions
 
-Pi extensions provide deeper integration with GSD's core features.
+Pi extensions provide deeper integration with GSD's core features. All 11 extensions are auto-enabled when you install the package.
 
 ### Context Monitor (`gsd-context-monitor.ts`)
 
