@@ -220,6 +220,7 @@ describe('neutralizeAgentReferences', () => {
   test('uses different instruction file per runtime', () => {
     const input = 'Read CLAUDE.md for instructions.';
     assert.ok(neutralizeAgentReferences(input, 'GEMINI.md').includes('GEMINI.md'));
+    assert.ok(neutralizeAgentReferences(input, 'QWEN.md').includes('QWEN.md'));
     assert.ok(neutralizeAgentReferences(input, 'copilot-instructions.md').includes('copilot-instructions.md'));
     assert.ok(neutralizeAgentReferences(input, 'AGENTS.md').includes('AGENTS.md'));
   });

@@ -67,6 +67,7 @@ const hasCopilot = args.includes('--copilot');
 const hasAntigravity = args.includes('--antigravity');
 const hasCursor = args.includes('--cursor');
 const hasWindsurf = args.includes('--windsurf');
+const hasQwen = args.includes('--qwen');
 const hasSdk = args.includes('--sdk');
 const hasBoth = args.includes('--both'); // Legacy flag, keeps working
 const hasAll = args.includes('--all');
@@ -75,7 +76,7 @@ const hasUninstall = args.includes('--uninstall') || args.includes('-u');
 // Runtime selection - can be set by flags or interactive prompt
 let selectedRuntimes = [];
 if (hasAll) {
-  selectedRuntimes = ['claude', 'opencode', 'gemini', 'codex', 'copilot', 'antigravity', 'cursor', 'windsurf'];
+  selectedRuntimes = ['claude', 'opencode', 'gemini', 'codex', 'copilot', 'antigravity', 'cursor', 'windsurf', 'qwen'];
 } else if (hasBoth) {
   selectedRuntimes = ['claude', 'opencode'];
 } else {
@@ -87,6 +88,7 @@ if (hasAll) {
   if (hasAntigravity) selectedRuntimes.push('antigravity');
   if (hasCursor) selectedRuntimes.push('cursor');
   if (hasWindsurf) selectedRuntimes.push('windsurf');
+  if (hasQwen) selectedRuntimes.push('qwen');
 }
 
 // WSL + Windows Node.js detection
@@ -132,6 +134,7 @@ function getDirName(runtime) {
   if (runtime === 'antigravity') return '.agent';
   if (runtime === 'cursor') return '.cursor';
   if (runtime === 'windsurf') return '.windsurf';
+  if (runtime === 'qwen') return '.qwen';
   return '.claude';
 }
 
@@ -161,6 +164,7 @@ function getConfigDirFromHome(runtime, isGlobal) {
   }
   if (runtime === 'cursor') return "'.cursor'";
   if (runtime === 'windsurf') return "'.windsurf'";
+  if (runtime === 'qwen') return "'.qwen'";
   return "'.claude'";
 }
 
@@ -267,6 +271,17 @@ function getGlobalDir(runtime, explicitDir = null) {
       return expandTilde(process.env.WINDSURF_CONFIG_DIR);
     }
     return path.join(os.homedir(), '.windsurf');
+  }
+
+  if (runtime === 'qwen') {
+    // Qwen-Code: --config-dir > QWEN_CONFIG_DIR > ~/.qwen
+    if (explicitDir) {
+      return expandTilde(explicitDir);
+    }
+    if (process.env.QWEN_CONFIG_DIR) {
+      return expandTilde(process.env.QWEN_CONFIG_DIR);
+    }
+    return path.join(os.homedir(), '.qwen');
   }
 
 
@@ -3035,6 +3050,8 @@ function copyCommandsAsAntigravitySkills(srcDir, skillsDir, prefix, isGlobal = f
  */
 function copyWithPathReplacement(srcDir, destDir, pathPrefix, runtime, isCommand = false, isGlobal = false) {
   const isOpencode = runtime === 'opencode';
+  const isGemini = runtime === 'gemini';
+  const isQwen = runtime === 'qwen';
   const isCodex = runtime === 'codex';
   const isCopilot = runtime === 'copilot';
   const isAntigravity = runtime === 'antigravity';
@@ -3074,9 +3091,10 @@ function copyWithPathReplacement(srcDir, destDir, pathPrefix, runtime, isCommand
       if (isOpencode) {
         content = convertClaudeToOpencodeFrontmatter(content);
         fs.writeFileSync(destPath, content);
-      } else if (runtime === 'gemini') {
+      } else if (isGemini || isQwen) {
+        // Qwen-Code is a fork of Gemini CLI, uses same TOML format
         if (isCommand) {
-          // Convert to TOML for Gemini (strip <sub> tags — terminals can't render subscript)
+          // Convert to TOML for Gemini/Qwen (strip <sub> tags — terminals can't render subscript)
           content = stripSubTags(content);
           const tomlContent = convertClaudeToGeminiToml(content);
           // Replace extension with .toml
@@ -4053,6 +4071,7 @@ function reportLocalPatches(configDir, runtime = 'claude') {
 function install(isGlobal, runtime = 'claude') {
   const isOpencode = runtime === 'opencode';
   const isGemini = runtime === 'gemini';
+  const isQwen = runtime === 'qwen';
   const isCodex = runtime === 'codex';
   const isCopilot = runtime === 'copilot';
   const isAntigravity = runtime === 'antigravity';
@@ -4084,6 +4103,7 @@ function install(isGlobal, runtime = 'claude') {
   let runtimeLabel = 'Claude Code';
   if (isOpencode) runtimeLabel = 'OpenCode';
   if (isGemini) runtimeLabel = 'Gemini';
+  if (isQwen) runtimeLabel = 'Qwen-Code';
   if (isCodex) runtimeLabel = 'Codex';
   if (isCopilot) runtimeLabel = 'Copilot';
   if (isAntigravity) runtimeLabel = 'Antigravity';
@@ -4177,10 +4197,10 @@ function install(isGlobal, runtime = 'claude') {
       failures.push('skills/gsd-*');
     }
   } else {
-    // Claude Code & Gemini: nested structure in commands/ directory
+    // Claude Code, Gemini & Qwen-Code: nested structure in commands/ directory
     const commandsDir = path.join(targetDir, 'commands');
     fs.mkdirSync(commandsDir, { recursive: true });
-    
+
     const gsdSrc = path.join(src, 'commands', 'gsd');
     const gsdDest = path.join(commandsDir, 'gsd');
     copyWithPathReplacement(gsdSrc, gsdDest, pathPrefix, runtime, true, isGlobal);
@@ -4232,7 +4252,8 @@ function install(isGlobal, runtime = 'claude') {
         // Convert frontmatter for runtime compatibility (agents need different handling)
         if (isOpencode) {
           content = convertClaudeToOpencodeFrontmatter(content, { isAgent: true });
-        } else if (isGemini) {
+        } else if (isGemini || isQwen) {
+          // Qwen-Code is a fork of Gemini CLI, uses same agent format
           content = convertClaudeToGeminiAgent(content);
         } else if (isCodex) {
           content = convertClaudeAgentToCodexAgent(content);
@@ -4782,19 +4803,21 @@ function promptRuntime(callback) {
     '5': 'copilot',
     '6': 'antigravity',
     '7': 'cursor',
-    '8': 'windsurf'
+    '8': 'windsurf',
+    '9': 'qwen'
   };
-  const allRuntimes = ['claude', 'opencode', 'gemini', 'codex', 'copilot', 'antigravity', 'cursor', 'windsurf'];
+  const allRuntimes = ['claude', 'opencode', 'gemini', 'codex', 'copilot', 'antigravity', 'cursor', 'windsurf', 'qwen'];
 
-  console.log(`  ${yellow}Which runtime(s) would you like to install for?${reset}\n\n  ${cyan}1${reset}) Claude Code  ${dim}(~/.claude)${reset}
-  ${cyan}2${reset}) OpenCode     ${dim}(~/.config/opencode)${reset} - open source, free models
-  ${cyan}3${reset}) Gemini       ${dim}(~/.gemini)${reset}
-  ${cyan}4${reset}) Codex        ${dim}(~/.codex)${reset}
-  ${cyan}5${reset}) Copilot      ${dim}(~/.copilot)${reset}
-  ${cyan}6${reset}) Antigravity  ${dim}(~/.gemini/antigravity)${reset}
-  ${cyan}7${reset}) Cursor       ${dim}(~/.cursor)${reset}
-  ${cyan}8${reset}) Windsurf     ${dim}(~/.windsurf)${reset}
-  ${cyan}9${reset}) All
+  console.log(`  ${yellow}Which runtime(s) would you like to install for?${reset}\n\n  ${cyan}1${reset}) Claude Code   ${dim}(~/.claude)${reset}
+  ${cyan}2${reset}) OpenCode      ${dim}(~/.config/opencode)${reset} - open source, free models
+  ${cyan}3${reset}) Gemini        ${dim}(~/.gemini)${reset}
+  ${cyan}4${reset}) Codex         ${dim}(~/.codex)${reset}
+  ${cyan}5${reset}) Copilot       ${dim}(~/.copilot)${reset}
+  ${cyan}6${reset}) Antigravity   ${dim}(~/.gemini/antigravity)${reset}
+  ${cyan}7${reset}) Cursor        ${dim}(~/.cursor)${reset}
+  ${cyan}8${reset}) Windsurf      ${dim}(~/.windsurf)${reset}
+  ${cyan}9${reset}) Qwen-code     ${dim}(~/.qwen)${reset}
+  ${cyan}10${reset}) All
 
   ${dim}Select multiple: 1,4,6 or 1 4 6${reset}
 `);
@@ -4805,7 +4828,7 @@ function promptRuntime(callback) {
     const input = answer.trim() || '1';
 
     // "All" shortcut
-    if (input === '9') {
+    if (input === '10') {
       callback(allRuntimes);
       return;
     }
