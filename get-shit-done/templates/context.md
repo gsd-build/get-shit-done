@@ -31,14 +31,14 @@ Template for `.planning/phases/XX-name/{phase_num}-CONTEXT.md` - captures implem
 ## Implementation Decisions
 
 ### [Area 1 that was discussed]
-- [Specific decision made]
-- [Another decision if applicable]
+- **D-01:** [Specific decision made]
+- **D-02:** [Another decision if applicable]
 
 ### [Area 2 that was discussed]
-- [Specific decision made]
+- **D-03:** [Specific decision made]
 
 ### [Area 3 that was discussed]
-- [Specific decision made]
+- **D-04:** [Specific decision made]
 
 ### Claude's Discretion
 [Areas where user explicitly said "you decide" — Claude has flexibility here during planning/implementation]
@@ -53,6 +53,24 @@ Template for `.planning/phases/XX-name/{phase_num}-CONTEXT.md` - captures implem
 [If none: "No specific requirements — open to standard approaches"]
 
 </specifics>
+
+<canonical_refs>
+## Canonical References
+
+**Downstream agents MUST read these before planning or implementing.**
+
+[List every spec, ADR, feature doc, or design doc that defines requirements or constraints for this phase. Use full relative paths so agents can read them directly. Group by topic area when the phase has multiple concerns.]
+
+### [Topic area 1]
+- `path/to/spec-or-adr.md` — [What this doc decides/defines that's relevant]
+- `path/to/doc.md` §N — [Specific section and what it covers]
+
+### [Topic area 2]
+- `path/to/feature-doc.md` — [What capability this defines]
+
+[If the project has no external specs: "No external specs — requirements are fully captured in decisions above"]
+
+</canonical_refs>
 
 <code_context>
 ## Existing Code Insights
@@ -124,6 +142,18 @@ Display posts from followed users in a scrollable feed. Users can view posts and
 
 </decisions>
 
+<canonical_refs>
+## Canonical References
+
+### Feed display
+- `docs/features/social-feed.md` — Feed requirements, post card fields, engagement display rules
+- `docs/decisions/adr-012-infinite-scroll.md` — Scroll strategy decision, virtualization requirements
+
+### Empty states
+- `docs/design/empty-states.md` — Empty state patterns, illustration guidelines
+
+</canonical_refs>
+
 <specifics>
 ## Specific Ideas
 
@@ -185,6 +215,15 @@ CLI command to backup database to local file or S3. Supports full and incrementa
 - Temp file handling
 
 </decisions>
+
+<canonical_refs>
+## Canonical References
+
+### Backup CLI
+- `docs/features/backup-restore.md` — Backup requirements, supported backends, encryption spec
+- `docs/decisions/adr-007-cli-conventions.md` — Flag naming, exit codes, output format standards
+
+</canonical_refs>
 
 <specifics>
 ## Specific Ideas
@@ -248,6 +287,15 @@ Organize existing photo library into structured folders. Handle duplicates and a
 
 </decisions>
 
+<canonical_refs>
+## Canonical References
+
+### Organization rules
+- `docs/features/photo-organization.md` — Grouping rules, duplicate policy, naming spec
+- `docs/decisions/adr-003-exif-handling.md` — EXIF extraction strategy, fallback for missing metadata
+
+</canonical_refs>
+
 <specifics>
 ## Specific Ideas
 
@@ -291,7 +339,14 @@ The output should answer: "What does the researcher need to investigate? What ch
 
 **After creation:**
 - File lives in phase directory: `.planning/phases/XX-name/{phase_num}-CONTEXT.md`
-- `gsd-phase-researcher` uses decisions to focus investigation
-- `gsd-planner` uses decisions + research to create executable tasks
+- `gsd-phase-researcher` uses decisions to focus investigation AND reads canonical_refs to know WHAT docs to study
+- `gsd-planner` uses decisions + research to create executable tasks AND reads canonical_refs to verify alignment
 - Downstream agents should NOT need to ask the user again about captured decisions
+
+**CRITICAL — Canonical references:**
+- The `<canonical_refs>` section is MANDATORY. Every CONTEXT.md must have one.
+- If your project has external specs, ADRs, or design docs, list them with full relative paths grouped by topic
+- If ROADMAP.md lists `Canonical refs:` per phase, extract and expand those
+- Inline mentions like "see ADR-019" scattered in decisions are useless to downstream agents — they need full paths and section references in a dedicated section they can find
+- If no external specs exist, say so explicitly — don't silently omit the section
 </guidelines>

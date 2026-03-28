@@ -1,0 +1,7 @@
+# .base64scanignore — Base64 blobs to exclude from security scanning
+#
+# Add exact base64 strings (one per line) that are known false positives.
+# Comments (#) and empty lines are ignored.
+#
+# Example:
+# aHR0cHM6Ly9leGFtcGxlLmNvbQ==

@@ -191,10 +191,9 @@ describe('validate health command', () => {
     assert.ok(result.success, `Command failed: ${result.error}`);
 
     const output = JSON.parse(result.output);
-    assert.ok(
-      output.warnings.some(w => w.code === 'W002'),
-      `Expected W002 in warnings: ${JSON.stringify(output.warnings)}`
-    );
+    const w002 = output.warnings.find(w => w.code === 'W002');
+    assert.ok(w002, `Expected W002 in warnings: ${JSON.stringify(output.warnings)}`);
+    assert.strictEqual(w002.repairable, false, 'W002 should not be auto-repairable');
   });
 
   // ─── Check 5: config.json valid JSON + valid schema ───────────────────────
@@ -252,6 +251,34 @@ describe('validate health command', () => {
     assert.ok(
       output.warnings.some(w => w.code === 'W004'),
       `Expected W004 in warnings: ${JSON.stringify(output.warnings)}`
+    );
+  });
+
+  test('accepts inherit model_profile as valid', () => {
+    writeMinimalProjectMd(tmpDir);
+    writeMinimalRoadmap(tmpDir, ['1']);
+    writeMinimalStateMd(tmpDir);
+    fs.writeFileSync(
+      path.join(tmpDir, '.planning', 'config.json'),
+      JSON.stringify({
+        model_profile: 'inherit',
+        workflow: {
+          research: true,
+          plan_check: true,
+          verifier: true,
+          nyquist_validation: true,
+        },
+      })
+    );
+    fs.mkdirSync(path.join(tmpDir, '.planning', 'phases', '01-a'), { recursive: true });
+
+    const result = runGsdTools('validate health', tmpDir);
+    assert.ok(result.success, `Command failed: ${result.error}`);
+
+    const output = JSON.parse(result.output);
+    assert.ok(
+      !output.warnings.some(w => w.code === 'W004'),
+      `Should not warn for inherit model_profile: ${JSON.stringify(output.warnings)}`
     );
   });
 
@@ -347,6 +374,103 @@ describe('validate health command', () => {
     );
   });
 
+  // ─── Check 5b: Nyquist validation key presence (W008) ─────────────────────
+
+  test('detects W008 when workflow.nyquist_validation absent from config', () => {
+    writeMinimalProjectMd(tmpDir);
+    writeMinimalRoadmap(tmpDir, ['1']);
+    writeMinimalStateMd(tmpDir, '# Session State\n\nPhase 1 in progress.\n');
+    // Config with workflow section but WITHOUT nyquist_validation key
+    fs.writeFileSync(
+      path.join(tmpDir, '.planning', 'config.json'),
+      JSON.stringify({ model_profile: 'balanced', workflow: { research: true } }, null, 2)
+    );
+    fs.mkdirSync(path.join(tmpDir, '.planning', 'phases', '01-a'), { recursive: true });
+
+    const result = runGsdTools('validate health', tmpDir);
+    assert.ok(result.success, `Command failed: ${result.error}`);
+
+    const output = JSON.parse(result.output);
+    assert.ok(
+      output.warnings.some(w => w.code === 'W008'),
+      `Expected W008 in warnings: ${JSON.stringify(output.warnings)}`
+    );
+  });
+
+  test('does not emit W008 when nyquist_validation is explicitly set', () => {
+    writeMinimalProjectMd(tmpDir);
+    writeMinimalRoadmap(tmpDir, ['1']);
+    writeMinimalStateMd(tmpDir, '# Session State\n\nPhase 1 in progress.\n');
+    // Config with workflow.nyquist_validation explicitly set
+    fs.writeFileSync(
+      path.join(tmpDir, '.planning', 'config.json'),
+      JSON.stringify({ model_profile: 'balanced', workflow: { research: true, nyquist_validation: true } }, null, 2)
+    );
+    fs.mkdirSync(path.join(tmpDir, '.planning', 'phases', '01-a'), { recursive: true });
+
+    const result = runGsdTools('validate health', tmpDir);
+    assert.ok(result.success, `Command failed: ${result.error}`);
+
+    const output = JSON.parse(result.output);
+    assert.ok(
+      !output.warnings.some(w => w.code === 'W008'),
+      `Should not have W008: ${JSON.stringify(output.warnings)}`
+    );
+  });
+
+  // ─── Check 7b: Nyquist VALIDATION.md consistency (W009) ──────────────────
+
+  test('detects W009 when RESEARCH.md has Validation Architecture but no VALIDATION.md', () => {
+    writeMinimalProjectMd(tmpDir);
+    writeMinimalRoadmap(tmpDir, ['1']);
+    writeMinimalStateMd(tmpDir, '# Session State\n\nPhase 1 in progress.\n');
+    writeValidConfigJson(tmpDir);
+    // Create phase dir with RESEARCH.md containing Validation Architecture
+    const phaseDir = path.join(tmpDir, '.planning', 'phases', '01-setup');
+    fs.mkdirSync(phaseDir, { recursive: true });
+    fs.writeFileSync(
+      path.join(phaseDir, '01-RESEARCH.md'),
+      '# Research\n\n## Validation Architecture\n\nSome validation content.\n'
+    );
+    // No VALIDATION.md
+
+    const result = runGsdTools('validate health', tmpDir);
+    assert.ok(result.success, `Command failed: ${result.error}`);
+
+    const output = JSON.parse(result.output);
+    assert.ok(
+      output.warnings.some(w => w.code === 'W009'),
+      `Expected W009 in warnings: ${JSON.stringify(output.warnings)}`
+    );
+  });
+
+  test('does not emit W009 when VALIDATION.md exists alongside RESEARCH.md', () => {
+    writeMinimalProjectMd(tmpDir);
+    writeMinimalRoadmap(tmpDir, ['1']);
+    writeMinimalStateMd(tmpDir, '# Session State\n\nPhase 1 in progress.\n');
+    writeValidConfigJson(tmpDir);
+    // Create phase dir with both RESEARCH.md and VALIDATION.md
+    const phaseDir = path.join(tmpDir, '.planning', 'phases', '01-setup');
+    fs.mkdirSync(phaseDir, { recursive: true });
+    fs.writeFileSync(
+      path.join(phaseDir, '01-RESEARCH.md'),
+      '# Research\n\n## Validation Architecture\n\nSome validation content.\n'
+    );
+    fs.writeFileSync(
+      path.join(phaseDir, '01-VALIDATION.md'),
+      '# Validation\n\nValidation content.\n'
+    );
+
+    const result = runGsdTools('validate health', tmpDir);
+    assert.ok(result.success, `Command failed: ${result.error}`);
+
+    const output = JSON.parse(result.output);
+    assert.ok(
+      !output.warnings.some(w => w.code === 'W009'),
+      `Should not have W009: ${JSON.stringify(output.warnings)}`
+    );
+  });
+
   // ─── Overall status ────────────────────────────────────────────────────────
 
   test("returns 'healthy' when all checks pass", () => {
@@ -430,6 +554,15 @@ describe('validate health --repair command', () => {
     assert.ok(fs.existsSync(configPath), 'config.json should now exist on disk');
     const diskConfig = JSON.parse(fs.readFileSync(configPath, 'utf-8'));
     assert.strictEqual(diskConfig.model_profile, 'balanced', 'default model_profile should be balanced');
+    // Verify nested workflow structure matches config.cjs canonical format
+    assert.ok(diskConfig.workflow, 'config should have nested workflow object');
+    assert.strictEqual(diskConfig.workflow.research, true, 'workflow.research should default to true');
+    assert.strictEqual(diskConfig.workflow.plan_check, true, 'workflow.plan_check should default to true');
+    assert.strictEqual(diskConfig.workflow.verifier, true, 'workflow.verifier should default to true');
+    assert.strictEqual(diskConfig.workflow.nyquist_validation, true, 'workflow.nyquist_validation should default to true');
+    // Verify branch templates are present
+    assert.strictEqual(diskConfig.phase_branch_template, 'gsd/phase-{phase}-{slug}');
+    assert.strictEqual(diskConfig.milestone_branch_template, 'gsd/{milestone}-{slug}');
   });
 
   test('resets config.json when JSON is invalid', () => {
@@ -448,9 +581,11 @@ describe('validate health --repair command', () => {
     const resetAction = output.repairs_performed.find(r => r.action === 'resetConfig');
     assert.ok(resetAction, `Expected resetConfig action: ${JSON.stringify(output.repairs_performed)}`);
 
-    // Verify config.json is now valid JSON
+    // Verify config.json is now valid JSON with correct nested structure
     const diskConfig = JSON.parse(fs.readFileSync(configPath, 'utf-8'));
     assert.ok(typeof diskConfig === 'object', 'config.json should be valid JSON after repair');
+    assert.ok(diskConfig.workflow, 'reset config should have nested workflow object');
+    assert.strictEqual(diskConfig.workflow.research, true, 'workflow.research should be true after reset');
   });
 
   test('regenerates STATE.md when missing', () => {
@@ -477,16 +612,40 @@ describe('validate health --repair command', () => {
     assert.ok(stateContent.includes('# Session State'), 'regenerated STATE.md should contain "# Session State"');
   });
 
-  test('backs up existing STATE.md before regenerating', () => {
+  test('does not rewrite existing STATE.md for invalid phase references', () => {
     writeValidConfigJson(tmpDir);
     const statePath = path.join(tmpDir, '.planning', 'STATE.md');
-    const originalContent = '# Session State\n\nOriginal content here.\n';
-    fs.writeFileSync(statePath, originalContent);
-
-    // Make STATE.md reference a nonexistent phase so repair is triggered
+    const originalContent = '# Session State\n\nPhase 99 is current.\n';
     fs.writeFileSync(
       statePath,
-      '# Session State\n\nPhase 99 is current.\n'
+      originalContent
+    );
+
+    const result = runGsdTools('validate health --repair', tmpDir);
+    assert.ok(result.success, `Command failed: ${result.error}`);
+
+    const output = JSON.parse(result.output);
+    assert.ok(
+      !Array.isArray(output.repairs_performed) || !output.repairs_performed.some(r => r.action === 'regenerateState'),
+      `Did not expect regenerateState for W002: ${JSON.stringify(output)}`
+    );
+
+    const stateContent = fs.readFileSync(statePath, 'utf-8');
+    assert.strictEqual(stateContent, originalContent, 'existing STATE.md should be preserved');
+
+    const planningDir = path.join(tmpDir, '.planning');
+    const planningFiles = fs.readdirSync(planningDir);
+    const backupFile = planningFiles.find(f => f.startsWith('STATE.md.bak-'));
+    assert.strictEqual(backupFile, undefined, `Did not expect backup file for non-destructive repair. Found: ${planningFiles.join(', ')}`);
+  });
+
+  test('adds nyquist_validation key to config.json via addNyquistKey repair', () => {
+    writeMinimalStateMd(tmpDir, '# Session State\n\nPhase 1 in progress.\n');
+    // Config with workflow section but missing nyquist_validation
+    const configPath = path.join(tmpDir, '.planning', 'config.json');
+    fs.writeFileSync(
+      configPath,
+      JSON.stringify({ model_profile: 'balanced', workflow: { research: true } }, null, 2)
     );
 
     const result = runGsdTools('validate health --repair', tmpDir);
@@ -495,18 +654,15 @@ describe('validate health --repair command', () => {
     const output = JSON.parse(result.output);
     assert.ok(
       Array.isArray(output.repairs_performed),
-      `Expected repairs_performed: ${JSON.stringify(output)}`
+      `Expected repairs_performed array: ${JSON.stringify(output)}`
     );
+    const addKeyAction = output.repairs_performed.find(r => r.action === 'addNyquistKey');
+    assert.ok(addKeyAction, `Expected addNyquistKey action: ${JSON.stringify(output.repairs_performed)}`);
+    assert.strictEqual(addKeyAction.success, true, 'addNyquistKey should succeed');
 
-    // Verify a .bak- file exists alongside STATE.md
-    const planningDir = path.join(tmpDir, '.planning');
-    const planningFiles = fs.readdirSync(planningDir);
-    const backupFile = planningFiles.find(f => f.startsWith('STATE.md.bak-'));
-    assert.ok(backupFile, `Expected a STATE.md.bak- file. Found files: ${planningFiles.join(', ')}`);
-
-    // Verify backup contains the original content
-    const backupContent = fs.readFileSync(path.join(planningDir, backupFile), 'utf-8');
-    assert.ok(backupContent.includes('Phase 99'), 'backup should contain the original STATE.md content');
+    // Read config.json and verify workflow.nyquist_validation is true
+    const diskConfig = JSON.parse(fs.readFileSync(configPath, 'utf-8'));
+    assert.strictEqual(diskConfig.workflow.nyquist_validation, true, 'nyquist_validation should be true');
   });
 
   test('reports repairable_count correctly', () => {
@@ -525,5 +681,19 @@ describe('validate health --repair command', () => {
       output.repairable_count >= 2,
       `Expected repairable_count >= 2, got ${output.repairable_count}. Full output: ${JSON.stringify(output)}`
     );
+  });
+
+  test('phase mismatch warnings do not count as repairable issues', () => {
+    writeValidConfigJson(tmpDir);
+    fs.writeFileSync(
+      path.join(tmpDir, '.planning', 'STATE.md'),
+      '# Session State\n\nPhase 99 is the current phase.\n'
+    );
+
+    const result = runGsdTools('validate health', tmpDir);
+    assert.ok(result.success, `Command failed: ${result.error}`);
+
+    const output = JSON.parse(result.output);
+    assert.strictEqual(output.repairable_count, 0, `Expected no repairable issues for W002: ${JSON.stringify(output)}`);
   });
 });

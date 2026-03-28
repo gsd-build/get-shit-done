@@ -14,11 +14,24 @@ After a GSD update wipes and reinstalls files, this command merges user's previo
 Check for local patches directory:
 
 ```bash
-# Global install (path templated at install time)
-PATCHES_DIR=~/.claude/gsd-local-patches
-# Local install fallback
+# Global install — detect runtime config directory
+if [ -d "$HOME/.config/opencode/gsd-local-patches" ]; then
+  PATCHES_DIR="$HOME/.config/opencode/gsd-local-patches"
+elif [ -d "$HOME/.opencode/gsd-local-patches" ]; then
+  PATCHES_DIR="$HOME/.opencode/gsd-local-patches"
+elif [ -d "$HOME/.gemini/gsd-local-patches" ]; then
+  PATCHES_DIR="$HOME/.gemini/gsd-local-patches"
+else
+  PATCHES_DIR="$HOME/.claude/gsd-local-patches"
+fi
+# Local install fallback — check all runtime directories
 if [ ! -d "$PATCHES_DIR" ]; then
-  PATCHES_DIR=./.claude/gsd-local-patches
+  for dir in .config/opencode .opencode .gemini .claude; do
+    if [ -d "./$dir/gsd-local-patches" ]; then
+      PATCHES_DIR="./$dir/gsd-local-patches"
+      break
+    fi
+  done
 fi
 ```
 

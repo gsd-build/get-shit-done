@@ -27,7 +27,7 @@ Extract each milestone version (e.g., v1.0, v1.1, v2.0).
 Check which milestone archive dirs already exist:
 
 ```bash
-ls -d .planning/milestones/v*-phases 2>/dev/null
+ls -d .planning/milestones/v*-phases 2>/dev/null || true
 ```
 
 Filter to milestones that do NOT already have a `-phases` archive directory.
@@ -55,7 +55,7 @@ Extract phase numbers and names from the archived roadmap (e.g., Phase 1: Founda
 Check which of those phase directories still exist in `.planning/phases/`:
 
 ```bash
-ls -d .planning/phases/*/ 2>/dev/null
+ls -d .planning/phases/*/ 2>/dev/null || true
 ```
 
 Match phase directories to milestone membership. Only include directories that still exist in `.planning/phases/`.

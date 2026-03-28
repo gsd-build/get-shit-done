@@ -330,6 +330,89 @@ must_haves:
     assert.deepStrictEqual(result, []);
   });
 
+  test('parses key_links with 2-space indentation — issue #1356', () => {
+    // Real-world YAML uses 2-space indentation, not 4-space.
+    // The parser was hardcoded to expect 4-space indentation which caused
+    // "No must_haves.key_links found in frontmatter" for valid YAML.
+    const content = `---
+phase: 01-conversion-engine-iva-correctness
+plan: 02
+type: execute
+wave: 2
+depends_on: ["01-01"]
+files_modified:
+  - src/features/currency/exchange-rate-store.ts
+  - src/features/currency/use-currency-config.ts
+autonomous: true
+requirements:
+  - CONV-02
+  - CONV-03
+
+must_haves:
+  truths:
+    - "All tests pass"
+  artifacts:
+    - path: "src/features/currency/use-currency-config.ts"
+  key_links:
+    - from: "src/features/currency/use-currency-config.ts"
+      to: "src/api/generated/company-config/company-config.ts"
+      via: "getCompanyConfigControllerFindAllQueryOptions"
+      pattern: "getCompanyConfigControllerFindAllQueryOptions"
+    - from: "src/features/currency/use-currency-config.ts"
+      to: "src/features/currency/exchange-rate-store.ts"
+      via: "useExchangeRateStore for MMKV persist"
+      pattern: "useExchangeRateStore"
+---
+
+# Plan body
+`;
+    const result = parseMustHavesBlock(content, 'key_links');
+    assert.ok(Array.isArray(result), 'should return an array');
+    assert.strictEqual(result.length, 2, `expected 2 key_links, got ${result.length}: ${JSON.stringify(result)}`);
+    assert.strictEqual(result[0].from, 'src/features/currency/use-currency-config.ts');
+    assert.strictEqual(result[0].to, 'src/api/generated/company-config/company-config.ts');
+    assert.strictEqual(result[0].via, 'getCompanyConfigControllerFindAllQueryOptions');
+    assert.strictEqual(result[0].pattern, 'getCompanyConfigControllerFindAllQueryOptions');
+    assert.strictEqual(result[1].from, 'src/features/currency/use-currency-config.ts');
+    assert.strictEqual(result[1].to, 'src/features/currency/exchange-rate-store.ts');
+    assert.strictEqual(result[1].via, 'useExchangeRateStore for MMKV persist');
+    assert.strictEqual(result[1].pattern, 'useExchangeRateStore');
+  });
+
+  test('parses truths with 2-space indentation — issue #1356', () => {
+    const content = `---
+phase: 01
+must_haves:
+  truths:
+    - "All tests pass on CI"
+    - "Coverage exceeds 80%"
+---
+`;
+    const result = parseMustHavesBlock(content, 'truths');
+    assert.ok(Array.isArray(result), 'should return an array');
+    assert.strictEqual(result.length, 2);
+    assert.strictEqual(result[0], 'All tests pass on CI');
+    assert.strictEqual(result[1], 'Coverage exceeds 80%');
+  });
+
+  test('parses artifacts with 2-space indentation — issue #1356', () => {
+    const content = `---
+phase: 01
+must_haves:
+  artifacts:
+    - path: "src/auth.ts"
+      provides: "JWT authentication"
+      min_lines: 100
+---
+`;
+    const result = parseMustHavesBlock(content, 'artifacts');
+    assert.ok(Array.isArray(result), 'should return an array');
+    assert.strictEqual(result.length, 1);
+    assert.strictEqual(result[0].path, 'src/auth.ts');
+    assert.strictEqual(result[0].provides, 'JWT authentication');
+    assert.strictEqual(result[0].min_lines, 100);
+  });
+
   test('handles nested arrays within artifact objects', () => {
     const content = `---
 phase: 01

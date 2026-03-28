@@ -34,6 +34,7 @@ Load phase operation context:
 
 ```bash
 INIT=$(node "$HOME/.claude/get-shit-done/bin/gsd-tools.cjs" init phase-op "${PHASE_ARG}")
+if [[ "$INIT" == @file:* ]]; then INIT=$(cat "${INIT#@file:}"); fi
 ```
 
 Extract from init JSON: `phase_dir`, `phase_number`, `phase_name`.
@@ -145,7 +146,7 @@ find . -type d -name "*test*" -o -name "*spec*" -o -name "*__tests__*" 2>/dev/nu
 # Find existing test files for convention matching
 find . -type f \( -name "*.test.*" -o -name "*.spec.*" -o -name "*Tests.fs" -o -name "*Test.fs" \) 2>/dev/null | head -20
 # Check for test runners
-ls package.json *.sln 2>/dev/null
+ls package.json *.sln 2>/dev/null || true
 ```
 
 Identify:
@@ -242,7 +243,7 @@ For each approved E2E test:
 
 1. **Check for existing tests** covering the same scenario:
    ```bash
-   grep -r "{scenario keyword}" {e2e test directory} 2>/dev/null
+   grep -r "{scenario keyword}" {e2e test directory} 2>/dev/null || true
    ```
    If found, extend rather than duplicate.
 

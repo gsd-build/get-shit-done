@@ -146,6 +146,50 @@ This phase covers:
     assert.strictEqual(output.goal, 'Set up project infrastructure', 'goal extracted');
   });
 
+  test('extracts goal when colon is outside bold (**Goal**: format)', () => {
+    fs.writeFileSync(
+      path.join(tmpDir, '.planning', 'ROADMAP.md'),
+      `# Roadmap v1.24
+
+### Phase 5: Skill Scaffolding
+**Goal**: The autonomous skill files exist following project conventions
+**Plans:** 2 plans
+
+### Phase 6: Smart Discuss
+**Goal**: Grey area resolution works with proposals
+`
+    );
+
+    const result = runGsdTools('roadmap get-phase 5', tmpDir);
+    assert.ok(result.success, `Command failed: ${result.error}`);
+
+    const output = JSON.parse(result.output);
+    assert.strictEqual(output.found, true, 'phase should be found');
+    assert.strictEqual(output.goal, 'The autonomous skill files exist following project conventions', 'goal extracted with colon outside bold');
+  });
+
+  test('extracts goal for both colon-inside and colon-outside bold formats', () => {
+    fs.writeFileSync(
+      path.join(tmpDir, '.planning', 'ROADMAP.md'),
+      `# Roadmap
+
+### Phase 1: Alpha
+**Goal:** Colon inside bold format
+
+### Phase 2: Beta
+**Goal**: Colon outside bold format
+`
+    );
+
+    const result1 = runGsdTools('roadmap get-phase 1', tmpDir);
+    const output1 = JSON.parse(result1.output);
+    assert.strictEqual(output1.goal, 'Colon inside bold format', 'colon-inside-bold goal extracted');
+
+    const result2 = runGsdTools('roadmap get-phase 2', tmpDir);
+    const output2 = JSON.parse(result2.output);
+    assert.strictEqual(output2.goal, 'Colon outside bold format', 'colon-outside-bold goal extracted');
+  });
+
   test('detects malformed ROADMAP with summary list but no detail sections', () => {
     fs.writeFileSync(
       path.join(tmpDir, '.planning', 'ROADMAP.md'),
@@ -256,6 +300,56 @@ describe('roadmap analyze command', () => {
     assert.strictEqual(output.phases[0].depends_on, 'Nothing');
     assert.strictEqual(output.phases[1].goal, 'Build features');
     assert.strictEqual(output.phases[1].depends_on, 'Phase 1');
+  });
+
+  test('extracts goals and depends_on with colon outside bold (**Goal**: format)', () => {
+    fs.writeFileSync(
+      path.join(tmpDir, '.planning', 'ROADMAP.md'),
+      `# Roadmap v1.24
+
+### Phase 5: Skill Scaffolding
+**Goal**: The autonomous skill files exist following project conventions
+**Depends on**: Phase 4 (v1.23 complete)
+
+### Phase 6: Smart Discuss
+**Goal**: Grey area resolution works with proposals
+**Depends on**: Phase 5
+`
+    );
+
+    const result = runGsdTools('roadmap analyze', tmpDir);
+    assert.ok(result.success, `Command failed: ${result.error}`);
+
+    const output = JSON.parse(result.output);
+    assert.strictEqual(output.phases[0].goal, 'The autonomous skill files exist following project conventions', 'goal extracted with colon outside bold');
+    assert.strictEqual(output.phases[0].depends_on, 'Phase 4 (v1.23 complete)', 'depends_on extracted with colon outside bold');
+    assert.strictEqual(output.phases[1].goal, 'Grey area resolution works with proposals', 'second phase goal extracted');
+    assert.strictEqual(output.phases[1].depends_on, 'Phase 5', 'second phase depends_on extracted');
+  });
+
+  test('handles mixed colon-inside and colon-outside bold formats in analyze', () => {
+    fs.writeFileSync(
+      path.join(tmpDir, '.planning', 'ROADMAP.md'),
+      `# Roadmap
+
+### Phase 1: Alpha
+**Goal:** Colon inside bold
+**Depends on:** Nothing
+
+### Phase 2: Beta
+**Goal**: Colon outside bold
+**Depends on**: Phase 1
+`
+    );
+
+    const result = runGsdTools('roadmap analyze', tmpDir);
+    assert.ok(result.success, `Command failed: ${result.error}`);
+
+    const output = JSON.parse(result.output);
+    assert.strictEqual(output.phases[0].goal, 'Colon inside bold', 'colon-inside goal works');
+    assert.strictEqual(output.phases[0].depends_on, 'Nothing', 'colon-inside depends_on works');
+    assert.strictEqual(output.phases[1].goal, 'Colon outside bold', 'colon-outside goal works');
+    assert.strictEqual(output.phases[1].depends_on, 'Phase 1', 'colon-outside depends_on works');
   });
 });
 
@@ -661,6 +755,74 @@ describe('roadmap update-plan-progress command', () => {
     const output = JSON.parse(result.output);
     assert.strictEqual(output.updated, false, 'should not update');
     assert.ok(output.reason.includes('ROADMAP.md not found'), 'reason should mention missing ROADMAP.md');
+  });
+
+  test('marks completed plan checkboxes', () => {
+    const roadmapContent = `# Roadmap
+
+- [ ] Phase 50: Build
+  - [ ] 50-01-PLAN.md
+  - [ ] 50-02-PLAN.md
+
+### Phase 50: Build
+**Goal:** Build stuff
+**Plans:** 2 plans
+
+## Progress
+
+| Phase | Plans Complete | Status | Completed |
+|-------|---------------|--------|-----------|
+| 50. Build | 0/2 | Planned |  |
+`;
+    fs.writeFileSync(path.join(tmpDir, '.planning', 'ROADMAP.md'), roadmapContent);
+
+    const p50 = path.join(tmpDir, '.planning', 'phases', '50-build');
+    fs.mkdirSync(p50, { recursive: true });
+    fs.writeFileSync(path.join(p50, '50-01-PLAN.md'), '# Plan 1');
+    fs.writeFileSync(path.join(p50, '50-02-PLAN.md'), '# Plan 2');
+    // Only plan 1 has a summary (completed)
+    fs.writeFileSync(path.join(p50, '50-01-SUMMARY.md'), '# Summary 1');
+
+    const result = runGsdTools('roadmap update-plan-progress 50', tmpDir);
+    assert.ok(result.success, `Command failed: ${result.error}`);
+
+    const roadmap = fs.readFileSync(path.join(tmpDir, '.planning', 'ROADMAP.md'), 'utf-8');
+    assert.ok(roadmap.includes('[x] 50-01-PLAN.md') || roadmap.includes('[x] 50-01'),
+      'completed plan checkbox should be marked');
+    assert.ok(roadmap.includes('[ ] 50-02-PLAN.md') || roadmap.includes('[ ] 50-02'),
+      'incomplete plan checkbox should remain unchecked');
+  });
+
+  test('preserves Milestone column in 5-column progress table', () => {
+    const roadmapContent = `# Roadmap
+
+### Phase 50: Build
+**Goal:** Build stuff
+**Plans:** 1 plans
+
+## Progress
+
+| Phase | Milestone | Plans Complete | Status | Completed |
+|-------|-----------|----------------|--------|-----------|
+| 50. Build | v2.0 | 0/1 | Planned |  |
+`;
+    fs.writeFileSync(path.join(tmpDir, '.planning', 'ROADMAP.md'), roadmapContent);
+
+    const p50 = path.join(tmpDir, '.planning', 'phases', '50-build');
+    fs.mkdirSync(p50, { recursive: true });
+    fs.writeFileSync(path.join(p50, '50-01-PLAN.md'), '# Plan');
+    fs.writeFileSync(path.join(p50, '50-01-SUMMARY.md'), '# Summary');
+
+    const result = runGsdTools('roadmap update-plan-progress 50', tmpDir);
+    assert.ok(result.success, `Command failed: ${result.error}`);
+
+    const roadmap = fs.readFileSync(path.join(tmpDir, '.planning', 'ROADMAP.md'), 'utf-8');
+    const rowMatch = roadmap.match(/^\|[^\n]*50\. Build[^\n]*$/m);
+    assert.ok(rowMatch, 'table row should exist');
+    const cells = rowMatch[0].split('|').slice(1, -1).map(c => c.trim());
+    assert.strictEqual(cells.length, 5, 'should have 5 columns');
+    assert.strictEqual(cells[1], 'v2.0', 'Milestone column should be preserved');
+    assert.ok(cells[3].includes('Complete'), 'Status column should show Complete');
   });
 });
 

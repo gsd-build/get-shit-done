@@ -3,6 +3,12 @@ name: gsd-verifier
 description: Verifies phase goal achievement through goal-backward analysis. Checks codebase delivers what phase promised, not just that tasks completed. Creates VERIFICATION.md report.
 tools: Read, Write, Bash, Grep, Glob
 color: green
+# hooks:
+#   PostToolUse:
+#     - matcher: "Write|Edit"
+#       hooks:
+#         - type: command
+#           command: "npx eslint --fix $FILE 2>/dev/null || true"
 ---
 
 <role>
@@ -194,6 +200,63 @@ grep -r "$artifact_name" "${search_path:-src/}" --include="*.ts" --include="*.ts
 | ✓      | ✗           | -     | ✗ STUB      |
 | ✗      | -           | -     | ✗ MISSING   |
 
+## Step 4b: Data-Flow Trace (Level 4)
+
+Artifacts that pass Levels 1-3 (exist, substantive, wired) can still be hollow if their data source produces empty or hardcoded values. Level 4 traces upstream from the artifact to verify real data flows through the wiring.
+
+**When to run:** For each artifact that passes Level 3 (WIRED) and renders dynamic data (components, pages, dashboards — not utilities or configs).
+
+**How:**
+
+1. **Identify the data variable** — what state/prop does the artifact render?
+
+```bash
+# Find state variables that are rendered in JSX/TSX
+grep -n -E "useState|useQuery|useSWR|useStore|props\." "$artifact" 2>/dev/null
+```
+
+2. **Trace the data source** — where does that variable get populated?
+
+```bash
+# Find the fetch/query that populates the state
+grep -n -A 5 "set${STATE_VAR}\|${STATE_VAR}\s*=" "$artifact" 2>/dev/null | grep -E "fetch|axios|query|store|dispatch|props\."
+```
+
+3. **Verify the source produces real data** — does the API/store return actual data or static/empty values?
+
+```bash
+# Check the API route or data source for real DB queries vs static returns
+grep -n -E "prisma\.|db\.|query\(|findMany|findOne|select|FROM" "$source_file" 2>/dev/null
+# Flag: static returns with no query
+grep -n -E "return.*json\(\s*\[\]|return.*json\(\s*\{\}" "$source_file" 2>/dev/null
+```
+
+4. **Check for disconnected props** — props passed to child components that are hardcoded empty at the call site
+
+```bash
+# Find where the component is used and check prop values
+grep -r -A 3 "<${COMPONENT_NAME}" "${search_path:-src/}" --include="*.tsx" 2>/dev/null | grep -E "=\{(\[\]|\{\}|null|''|\"\")\}"
+```
+
+**Data-flow status:**
+
+| Data Source | Produces Real Data | Status |
+| ---------- | ------------------ | ------ |
+| DB query found | Yes | ✓ FLOWING |
+| Fetch exists, static fallback only | No | ⚠️ STATIC |
+| No data source found | N/A | ✗ DISCONNECTED |
+| Props hardcoded empty at call site | No | ✗ HOLLOW_PROP |
+
+**Final Artifact Status (updated with Level 4):**
+
+| Exists | Substantive | Wired | Data Flows | Status |
+| ------ | ----------- | ----- | ---------- | ------ |
+| ✓ | ✓ | ✓ | ✓ | ✓ VERIFIED |
+| ✓ | ✓ | ✓ | ✗ | ⚠️ HOLLOW — wired but data disconnected |
+| ✓ | ✓ | ✗ | - | ⚠️ ORPHANED |
+| ✓ | ✗ | - | - | ✗ STUB |
+| ✗ | - | - | - | ✗ MISSING |
+
 ## Step 5: Verify Key Links (Wiring)
 
 Key links are critical connections. If broken, the goal fails even with all artifacts present.
@@ -300,14 +363,66 @@ Run anti-pattern detection on each file:
 ```bash
 # TODO/FIXME/placeholder comments
 grep -n -E "TODO|FIXME|XXX|HACK|PLACEHOLDER" "$file" 2>/dev/null
-grep -n -E "placeholder|coming soon|will be here" "$file" -i 2>/dev/null
+grep -n -E "placeholder|coming soon|will be here|not yet implemented|not available" "$file" -i 2>/dev/null
 # Empty implementations
 grep -n -E "return null|return \{\}|return \[\]|=> \{\}" "$file" 2>/dev/null
+# Hardcoded empty data (common stub patterns)
+grep -n -E "=\s*\[\]|=\s*\{\}|=\s*null|=\s*undefined" "$file" 2>/dev/null | grep -v -E "(test|spec|mock|fixture|\.test\.|\.spec\.)" 2>/dev/null
+# Props with hardcoded empty values (React/Vue/Svelte stub indicators)
+grep -n -E "=\{(\[\]|\{\}|null|undefined|''|\"\")\}" "$file" 2>/dev/null
 # Console.log only implementations
 grep -n -B 2 -A 2 "console\.log" "$file" 2>/dev/null | grep -E "^\s*(const|function|=>)"
 ```
 
+**Stub classification:** A grep match is a STUB only when the value flows to rendering or user-visible output AND no other code path populates it with real data. A test helper, type default, or initial state that gets overwritten by a fetch/store is NOT a stub. Check for data-fetching (useEffect, fetch, query, useSWR, useQuery, subscribe) that writes to the same variable before flagging.
+
 Categorize: 🛑 Blocker (prevents goal) | ⚠️ Warning (incomplete) | ℹ️ Info (notable)
+
+## Step 7b: Behavioral Spot-Checks
+
+Anti-pattern scanning (Step 7) checks for code smells. Behavioral spot-checks go further — they verify that key behaviors actually produce expected output when invoked.
+
+**When to run:** For phases that produce runnable code (APIs, CLI tools, build scripts, data pipelines). Skip for documentation-only or config-only phases.
+
+**How:**
+
+1. **Identify checkable behaviors** from must-haves truths. Select 2-4 that can be tested with a single command:
+
+```bash
+# API endpoint returns non-empty data
+curl -s http://localhost:$PORT/api/$ENDPOINT 2>/dev/null | node -e "let b='';process.stdin.setEncoding('utf8');process.stdin.on('data',c=>b+=c);process.stdin.on('end',()=>{const d=JSON.parse(b);process.exit(Array.isArray(d)?(d.length>0?0:1):(Object.keys(d).length>0?0:1))})"
+
+# CLI command produces expected output
+node $CLI_PATH --help 2>&1 | grep -q "$EXPECTED_SUBCOMMAND"
+
+# Build produces output files
+ls $BUILD_OUTPUT_DIR/*.{js,css} 2>/dev/null | wc -l
+
+# Module exports expected functions
+node -e "const m = require('$MODULE_PATH'); console.log(typeof m.$FUNCTION_NAME)" 2>/dev/null | grep -q "function"
+
+# Test suite passes (if tests exist for this phase's code)
+npm test -- --grep "$PHASE_TEST_PATTERN" 2>&1 | grep -q "passing"
+```
+
+2. **Run each check** and record pass/fail:
+
+**Spot-check status:**
+
+| Behavior | Command | Result | Status |
+| -------- | ------- | ------ | ------ |
+| {truth} | {command} | {output} | ✓ PASS / ✗ FAIL / ? SKIP |
+
+3. **Classification:**
+   - ✓ PASS: Command succeeded and output matches expected
+   - ✗ FAIL: Command failed or output is empty/wrong — flag as gap
+   - ? SKIP: Can't test without running server/external service — route to human verification (Step 8)
+
+**Spot-check constraints:**
+- Each check must complete in under 10 seconds
+- Do not start servers or services — only test what's already runnable
+- Do not modify state (no writes, no mutations, no side effects)
+- If the project has no runnable entry points yet, skip with: "Step 7b: SKIPPED (no runnable entry points)"
 
 ## Step 8: Identify Human Verification Needs
 
@@ -426,6 +541,16 @@ human_verification: # Only if status: human_needed
 | From | To  | Via | Status | Details |
 | ---- | --- | --- | ------ | ------- |
 
+### Data-Flow Trace (Level 4)
+
+| Artifact | Data Variable | Source | Produces Real Data | Status |
+| -------- | ------------- | ------ | ------------------ | ------ |
+
+### Behavioral Spot-Checks
+
+| Behavior | Command | Result | Status |
+| -------- | ------- | ------ | ------ |
+
 ### Requirements Coverage
 
 | Requirement | Source Plan | Description | Status | Evidence |
@@ -489,7 +614,7 @@ Automated checks passed. Awaiting human verification.
 
 **DO NOT trust SUMMARY claims.** Verify the component actually renders messages, not a placeholder.
 
-**DO NOT assume existence = implementation.** Need level 2 (substantive) and level 3 (wired).
+**DO NOT assume existence = implementation.** Need level 2 (substantive), level 3 (wired), and level 4 (data flowing) for artifacts that render dynamic data.
 
 **DO NOT skip key link verification.** 80% of stubs hide here — pieces exist but aren't connected.
 
@@ -561,9 +686,11 @@ return <div>No messages</div>  // Always shows "no messages"
 - [ ] If initial: must-haves established (from frontmatter or derived)
 - [ ] All truths verified with status and evidence
 - [ ] All artifacts checked at all three levels (exists, substantive, wired)
+- [ ] Data-flow trace (Level 4) run on wired artifacts that render dynamic data
 - [ ] All key links verified
 - [ ] Requirements coverage assessed (if applicable)
 - [ ] Anti-patterns scanned and categorized
+- [ ] Behavioral spot-checks run on runnable code (or skipped with reason)
 - [ ] Human verification items identified
 - [ ] Overall status determined
 - [ ] Gaps structured in YAML frontmatter (if gaps_found)

@@ -1,8 +1,14 @@
 ---
 name: gsd-phase-researcher
 description: Researches how to implement a phase before planning. Produces RESEARCH.md consumed by gsd-planner. Spawned by /gsd:plan-phase orchestrator.
-tools: Read, Write, Bash, Grep, Glob, WebSearch, WebFetch, mcp__context7__*
+tools: Read, Write, Bash, Grep, Glob, WebSearch, WebFetch, mcp__context7__*, mcp__firecrawl__*, mcp__exa__*
 color: cyan
+# hooks:
+#   PostToolUse:
+#     - matcher: "Write|Edit"
+#       hooks:
+#         - type: command
+#           command: "npx eslint --fix $FILE 2>/dev/null || true"
 ---
 
 <role>
@@ -34,6 +40,8 @@ Before researching, discover project context:
 5. Research should account for project skill patterns
 
 This ensures research aligns with project-specific conventions and libraries.
+
+**CLAUDE.md enforcement:** If `./CLAUDE.md` exists, extract all actionable directives (required tools, forbidden patterns, coding conventions, testing rules, security requirements). Include a `## Project Constraints (from CLAUDE.md)` section in RESEARCH.md listing these directives so the planner can verify compliance. Treat CLAUDE.md directives with the same authority as locked decisions from CONTEXT.md — research should not recommend approaches that contradict them.
 </project_context>
 
 <upstream_input>
@@ -131,6 +139,31 @@ If `brave_search: false` (or not set), use built-in WebSearch tool instead.
 
 Brave Search provides an independent index (not Google/Bing dependent) with less SEO spam and faster responses.
 
+### Exa Semantic Search (MCP)
+
+Check `exa_search` from init context. If `true`, use Exa for semantic, research-heavy queries:
+
+```
+mcp__exa__web_search_exa with query: "your semantic query"
+```
+
+**Best for:** Research questions where keyword search fails — "best approaches to X", finding technical/academic content, discovering niche libraries. Returns semantically relevant results.
+
+If `exa_search: false` (or not set), fall back to WebSearch or Brave Search.
+
+### Firecrawl Deep Scraping (MCP)
+
+Check `firecrawl` from init context. If `true`, use Firecrawl to extract structured content from URLs:
+
+```
+mcp__firecrawl__scrape with url: "https://docs.example.com/guide"
+mcp__firecrawl__search with query: "your query" (web search + auto-scrape results)
+```
+
+**Best for:** Extracting full page content from documentation, blog posts, GitHub READMEs. Use after finding a URL from Exa, WebSearch, or known docs. Returns clean markdown.
+
+If `firecrawl: false` (or not set), fall back to WebFetch.
+
 ## Verification Protocol
 
 **WebSearch findings MUST be verified:**
@@ -155,7 +188,7 @@ For each WebSearch finding:
 | MEDIUM | WebSearch verified with official source, multiple credible sources | State with attribution |
 | LOW | WebSearch only, single source, unverified | Flag as needing validation |
 
-Priority: Context7 > Official Docs > Official GitHub > Verified WebSearch > Unverified WebSearch
+Priority: Context7 > Exa (verified) > Firecrawl (official docs) > Official GitHub > Brave/WebSearch (verified) > WebSearch (unverified)
 
 </source_hierarchy>
 
@@ -188,6 +221,7 @@ Priority: Context7 > Official Docs > Official GitHub > Verified WebSearch > Unve
 - [ ] Publication dates checked (prefer recent/current)
 - [ ] Confidence levels assigned honestly
 - [ ] "What might I have missed?" review completed
+- [ ] **If rename/refactor phase:** Runtime State Inventory completed — all 5 categories answered explicitly (not left blank)
 
 </verification_protocol>
 
@@ -232,6 +266,12 @@ Priority: Context7 > Official Docs > Official GitHub > Verified WebSearch > Unve
 npm install [packages]
 \`\`\`
 
+**Version verification:** Before writing the Standard Stack table, verify each recommended package version is current:
+\`\`\`bash
+npm view [package] version
+\`\`\`
+Document the verified version and publish date. Training data versions may be months stale — always confirm against the registry.
+
 ## Architecture Patterns
 
 ### Recommended Project Structure
@@ -261,6 +301,20 @@ src/
 | [problem] | [what you'd build] | [library] | [edge cases, complexity] |
 
 **Key insight:** [why custom solutions are worse in this domain]
+
+## Runtime State Inventory
+
+> Include this section for rename/refactor/migration phases only. Omit entirely for greenfield phases.
+
+| Category | Items Found | Action Required |
+|----------|-------------|------------------|
+| Stored data | [e.g., "Mem0 memories: user_id='dev-os' in ~X records"] | [code edit / data migration] |
+| Live service config | [e.g., "25 n8n workflows in SQLite not exported to git"] | [API patch / manual] |
+| OS-registered state | [e.g., "Windows Task Scheduler: 3 tasks with 'dev-os' in description"] | [re-register tasks] |
+| Secrets/env vars | [e.g., "SOPS key 'webhook_auth_header' — code rename only, key unchanged"] | [none / update key] |
+| Build artifacts | [e.g., "scripts/devos-cli/devos_cli.egg-info/ — stale after pyproject.toml rename"] | [reinstall package] |
+
+**Nothing found in category:** State explicitly ("None — verified by X").
 
 ## Common Pitfalls
 
@@ -296,9 +350,23 @@ Verified patterns from official sources:
    - What's unclear: [the gap]
    - Recommendation: [how to handle]
 
+## Environment Availability
+
+> Skip this section if the phase has no external dependencies (code/config-only changes).
+
+| Dependency | Required By | Available | Version | Fallback |
+|------------|------------|-----------|---------|----------|
+| [tool] | [feature/requirement] | ✓/✗ | [version or —] | [fallback or —] |
+
+**Missing dependencies with no fallback:**
+- [items that block execution]
+
+**Missing dependencies with fallback:**
+- [items with viable alternatives]
+
 ## Validation Architecture
 
-> Skip this section entirely if workflow.nyquist_validation is false in .planning/config.json
+> Skip this section entirely if workflow.nyquist_validation is explicitly set to false in .planning/config.json. If the key is absent, treat as enabled.
 
 ### Test Framework
 | Property | Value |
@@ -360,11 +428,12 @@ Orchestrator provides: phase number/name, description/goal, requirements, constr
 Load phase context using init command:
 ```bash
 INIT=$(node "$HOME/.claude/get-shit-done/bin/gsd-tools.cjs" init phase-op "${PHASE}")
+if [[ "$INIT" == @file:* ]]; then INIT=$(cat "${INIT#@file:}"); fi
 ```
 
 Extract from init JSON: `phase_dir`, `padded_phase`, `phase_number`, `commit_docs`.
 
-Also read `.planning/config.json` — if `workflow.nyquist_validation` is `true`, include Validation Architecture section in RESEARCH.md. If `false`, skip it.
+Also read `.planning/config.json` — include Validation Architecture section in RESEARCH.md unless `workflow.nyquist_validation` is explicitly `false`. If the key is absent or `true`, include the section.
 
 Then read CONTEXT.md if exists:
 ```bash
@@ -394,13 +463,95 @@ Based on phase description, identify what needs investigating:
 - **Pitfalls:** Common beginner mistakes, gotchas, rewrite-causing errors
 - **Don't Hand-Roll:** Existing solutions for deceptively complex problems
 
+## Step 2.5: Runtime State Inventory (rename / refactor / migration phases only)
+
+**Trigger:** Any phase involving rename, rebrand, refactor, string replacement, or migration.
+
+A grep audit finds files. It does NOT find runtime state. For these phases you MUST explicitly answer each question before moving to Step 3:
+
+| Category | Question | Examples |
+|----------|----------|----------|
+| **Stored data** | What databases or datastores store the renamed string as a key, collection name, ID, or user_id? | ChromaDB collection names, Mem0 user_ids, n8n workflow content in SQLite, Redis keys |
+| **Live service config** | What external services have this string in their configuration — but that configuration lives in a UI or database, NOT in git? | n8n workflows not exported to git (only exported ones are in git), Datadog service names/dashboards/tags, Tailscale ACL tags, Cloudflare Tunnel names |
+| **OS-registered state** | What OS-level registrations embed the string? | Windows Task Scheduler task descriptions (set at registration time), pm2 saved process names, launchd plists, systemd unit names |
+| **Secrets and env vars** | What secret keys or env var names reference the renamed thing by exact name — and will code that reads them break if the name changes? | SOPS key names, .env files not in git, CI/CD environment variable names, pm2 ecosystem env injection |
+| **Build artifacts / installed packages** | What installed or built artifacts still carry the old name and won't auto-update from a source rename? | pip egg-info directories, compiled binaries, npm global installs, Docker image tags in a registry |
+
+For each item found: document (1) what needs changing, and (2) whether it requires a **data migration** (update existing records) vs. a **code edit** (change how new records are written). These are different tasks and must both appear in the plan.
+
+**The canonical question:** *After every file in the repo is updated, what runtime systems still have the old string cached, stored, or registered?*
+
+If the answer for a category is "nothing" — say so explicitly. Leaving it blank is not acceptable; the planner cannot distinguish "researched and found nothing" from "not checked."
+
+## Step 2.6: Environment Availability Audit
+
+**Trigger:** Any phase that depends on external tools, services, runtimes, or CLI utilities beyond the project's own code.
+
+Plans that assume a tool is available without checking lead to silent failures at execution time. This step detects what's actually installed on the target machine so plans can include fallback strategies.
+
+**How:**
+
+1. **Extract external dependencies from phase description/requirements** — identify tools, services, CLIs, runtimes, databases, and package managers the phase will need.
+
+2. **Probe availability** for each dependency:
+
+```bash
+# CLI tools — check if command exists and get version
+command -v $TOOL 2>/dev/null && $TOOL --version 2>/dev/null | head -1
+
+# Runtimes — check version meets minimum
+node --version 2>/dev/null
+python3 --version 2>/dev/null
+ruby --version 2>/dev/null
+
+# Package managers
+npm --version 2>/dev/null
+pip3 --version 2>/dev/null
+cargo --version 2>/dev/null
+
+# Databases / services — check if process is running or port is open
+pg_isready 2>/dev/null
+redis-cli ping 2>/dev/null
+curl -s http://localhost:27017 2>/dev/null
+
+# Docker
+docker info 2>/dev/null | head -3
+```
+
+3. **Document in RESEARCH.md** as `## Environment Availability`:
+
+```markdown
+## Environment Availability
+
+| Dependency | Required By | Available | Version | Fallback |
+|------------|------------|-----------|---------|----------|
+| PostgreSQL | Data layer | ✓ | 15.4 | — |
+| Redis | Caching | ✗ | — | Use in-memory cache |
+| Docker | Containerization | ✓ | 24.0.7 | — |
+| ffmpeg | Media processing | ✗ | — | Skip media features, flag for human |
+
+**Missing dependencies with no fallback:**
+- {list items that block execution — planner must address these}
+
+**Missing dependencies with fallback:**
+- {list items with viable alternatives — planner should use fallback}
+```
+
+4. **Classification:**
+   - **Available:** Tool found, version meets minimum → no action needed
+   - **Available, wrong version:** Tool found but version too old → document upgrade path
+   - **Missing with fallback:** Not found, but a viable alternative exists → planner uses fallback
+   - **Missing, blocking:** Not found, no fallback → planner must address (install step, or descope feature)
+
+**Skip condition:** If the phase is purely code/config changes with no external dependencies (e.g., refactoring, documentation), output: "Step 2.6: SKIPPED (no external dependencies identified)" and move on.
+
 ## Step 3: Execute Research Protocol
 
 For each domain: Context7 first → Official docs → WebSearch → Cross-verify. Document findings with confidence levels as you go.
 
 ## Step 4: Validation Architecture Research (if nyquist_validation enabled)
 
-**Skip if** workflow.nyquist_validation is false.
+**Skip if** workflow.nyquist_validation is explicitly set to false. If absent, treat as enabled.
 
 ### Detect Test Infrastructure
 Scan for: test config files (pytest.ini, jest.config.*, vitest.config.*), test directories (test/, tests/, __tests__/), test files (*.test.*, *.spec.*), package.json test scripts.
@@ -421,7 +572,7 @@ List missing test files, framework config, or shared fixtures needed before impl
 
 ## Step 6: Write RESEARCH.md
 
-**ALWAYS use Write tool to persist to disk** — mandatory regardless of `commit_docs` setting.
+**ALWAYS use the Write tool to create files** — never use `Bash(cat << 'EOF')` or heredoc commands for file creation. Mandatory regardless of `commit_docs` setting.
 
 **CRITICAL: If CONTEXT.md exists, FIRST content section MUST be `<user_constraints>`:**
 
@@ -447,7 +598,7 @@ List missing test files, framework config, or shared fixtures needed before impl
 ## Phase Requirements
 
 | ID | Description | Research Support |
-|----|-------------|-----------------|
+|----|-------------|------------------|
 | {REQ-ID} | {from REQUIREMENTS.md} | {which research findings enable implementation} |
 </phase_requirements>
 ```
@@ -528,6 +679,7 @@ Research is complete when:
 - [ ] Architecture patterns documented
 - [ ] Don't-hand-roll items listed
 - [ ] Common pitfalls catalogued
+- [ ] Environment availability audited (or skipped with reason)
 - [ ] Code examples provided
 - [ ] Source hierarchy followed (Context7 → Official → WebSearch)
 - [ ] All findings have confidence levels

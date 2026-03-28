@@ -1,59 +1,234 @@
 ---
 name: Bug Report
 description: Report something that is not working correctly
-labels: ["bug"]
+labels: ["bug", "needs-triage"]
 body:
   - type: markdown
     attributes:
       value: |
-        Thanks for taking the time to report a bug. Please fill out the sections below.
+        Thanks for taking the time to report a bug. The more detail you provide, the faster we can fix it.
+
+        > **⚠️ Privacy Notice:** Some fields below ask for logs or config files that may contain **personally identifiable information (PII)** such as file paths with your username, API keys, project names, or system details. Before pasting any output, please:
+        > 1. Review it for sensitive data
+        > 2. Redact usernames, paths, and API keys (e.g., replace `/Users/yourname/` with `/Users/REDACTED/`)
+        > 3. Or run your logs through an anonymizer — we recommend **[presidio-anonymizer](https://microsoft.github.io/presidio/)** (open-source, local-only) or **[scrub](https://github.com/dssg/scrub)** before pasting
+
   - type: input
     id: version
     attributes:
       label: GSD Version
-      description: "Run: npm list -g get-shit-done-cc"
+      description: "Run: `npm list -g get-shit-done-cc` or check `npx get-shit-done-cc --version`"
       placeholder: "e.g., 1.18.0"
     validations:
       required: true
+
   - type: dropdown
     id: runtime
     attributes:
       label: Runtime
+      description: Which AI coding tool are you using GSD with?
       options:
         - Claude Code
         - Gemini CLI
         - OpenCode
+        - Codex
+        - Copilot
+        - Antigravity
+        - Cursor
+        - Windsurf
+        - Multiple (specify in description)
     validations:
       required: true
+
+  - type: dropdown
+    id: os
+    attributes:
+      label: Operating System
+      options:
+        - macOS
+        - Windows
+        - Linux (Ubuntu/Debian)
+        - Linux (Fedora/RHEL)
+        - Linux (Arch)
+        - Linux (Other)
+        - WSL
+    validations:
+      required: true
+
+  - type: input
+    id: node_version
+    attributes:
+      label: Node.js Version
+      description: "Run: `node --version`"
+      placeholder: "e.g., v20.11.0"
+    validations:
+      required: true
+
+  - type: input
+    id: shell
+    attributes:
+      label: Shell
+      description: "Run: `echo $SHELL` (macOS/Linux) or `echo %COMSPEC%` (Windows)"
+      placeholder: "e.g., /bin/zsh, /bin/bash, PowerShell 7"
+    validations:
+      required: false
+
+  - type: dropdown
+    id: install_method
+    attributes:
+      label: Installation Method
+      options:
+        - npx get-shit-done-cc@latest (fresh run)
+        - npm install -g get-shit-done-cc
+        - Updated from a previous version
+    validations:
+      required: true
+
   - type: textarea
     id: description
     attributes:
       label: What happened?
-      description: Describe what went wrong
+      description: Describe what went wrong. Be specific about which GSD command you were running.
+      placeholder: |
+        When I ran `/gsd:plan`, the system...
     validations:
       required: true
+
   - type: textarea
     id: expected
     attributes:
       label: What did you expect?
-      description: Describe what you expected to happen
+      description: Describe what you expected to happen instead.
     validations:
       required: true
+
   - type: textarea
     id: reproduce
     attributes:
       label: Steps to reproduce
-      description: How can we reproduce this?
+      description: |
+        Exact steps to reproduce the issue. Include the GSD command used.
       placeholder: |
-        1. Run /gsd:...
-        2. ...
+        1. Install GSD with `npx get-shit-done-cc@latest`
+        2. Select runtime: Claude Code
+        3. Run `/gsd:init` with a new project
+        4. Run `/gsd:plan`
+        5. Error appears at step...
     validations:
       required: true
+
   - type: textarea
     id: logs
     attributes:
-      label: Relevant logs or error messages
-      description: Paste any error output (will be formatted as code)
+      label: Error output / logs
+      description: |
+        Paste any error messages from the terminal. This will be rendered as code.
+
+        **⚠️ PII Warning:** Terminal output often contains your system username in file paths (e.g., `/Users/yourname/.claude/...`). Please redact before pasting.
       render: shell
     validations:
       required: false
+
+  - type: textarea
+    id: config
+    attributes:
+      label: GSD Configuration
+      description: |
+        If the bug is related to planning, phases, or workflow behavior, paste your `.planning/config.json`.
+
+        **How to retrieve:** `cat .planning/config.json`
+
+        **⚠️ PII Warning:** This file may contain project-specific names. Redact if sensitive.
+      render: json
+    validations:
+      required: false
+
+  - type: textarea
+    id: state
+    attributes:
+      label: GSD State (if relevant)
+      description: |
+        If the bug involves incorrect state tracking or phase progression, include your `.planning/STATE.md`.
+
+        **How to retrieve:** `cat .planning/STATE.md`
+
+        **⚠️ PII Warning:** This file contains project names, phase descriptions, and timestamps. Redact any project names or details you don't want public.
+      render: markdown
+    validations:
+      required: false
+
+  - type: textarea
+    id: settings_json
+    attributes:
+      label: Runtime settings.json (if relevant)
+      description: |
+        If the bug involves hooks, statusline, or runtime integration, include your runtime's settings.json.
+
+        **How to retrieve:**
+        - Claude Code: `cat ~/.claude/settings.json`
+        - Gemini CLI: `cat ~/.gemini/settings.json`
+        - OpenCode: `cat ~/.config/opencode/opencode.json` or `opencode.jsonc`
+
+        **⚠️ PII Warning:** This file may contain API keys, tokens, or custom paths. **Remove all API keys and tokens before pasting.** We recommend running through [presidio-anonymizer](https://microsoft.github.io/presidio/) or manually redacting any line containing "key", "token", or "secret".
+      render: json
+    validations:
+      required: false
+
+  - type: dropdown
+    id: frequency
+    attributes:
+      label: How often does this happen?
+      options:
+        - Every time (100% reproducible)
+        - Most of the time
+        - Sometimes / intermittent
+        - Only happened once
+    validations:
+      required: true
+
+  - type: dropdown
+    id: severity
+    attributes:
+      label: Impact
+      description: How much does this affect your workflow?
+      options:
+        - Blocker — Cannot use GSD at all
+        - Major — Core feature is broken, no workaround
+        - Moderate — Feature is broken but I have a workaround
+        - Minor — Cosmetic or edge case
+    validations:
+      required: true
+
+  - type: textarea
+    id: workaround
+    attributes:
+      label: Workaround (if any)
+      description: Have you found any way to work around this issue?
+    validations:
+      required: false
+
+  - type: textarea
+    id: additional
+    attributes:
+      label: Additional context
+      description: |
+        Anything else — screenshots, screen recordings, related issues, or links.
+
+        **Useful diagnostics to include (if applicable):**
+        - `npm list -g get-shit-done-cc` — confirms installed version
+        - `ls -la ~/.claude/get-shit-done/` — confirms installation files (Claude Code)
+        - `cat ~/.claude/get-shit-done/gsd-file-manifest.json` — file manifest for debugging install issues
+        - `ls -la .planning/` — confirms planning directory state
+
+        **⚠️ PII Warning:** File listings and manifests contain your home directory path. Replace your username with `REDACTED`.
+    validations:
+      required: false
+
+  - type: checkboxes
+    id: pii_check
+    attributes:
+      label: Privacy Checklist
+      description: Please confirm you've reviewed your submission for sensitive data.
+      options:
+        - label: I have reviewed all pasted output for PII (usernames, paths, API keys) and redacted where necessary
+          required: true

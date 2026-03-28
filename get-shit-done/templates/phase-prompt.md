@@ -63,21 +63,29 @@ Output: [What artifacts will be created]
 <task type="auto">
   <name>Task 1: [Action-oriented name]</name>
   <files>path/to/file.ext, another/file.ext</files>
-  <action>[Specific implementation - what to do, how to do it, what to avoid and WHY]</action>
+  <read_first>path/to/reference.ext, path/to/source-of-truth.ext</read_first>
+  <action>[Specific implementation - what to do, how to do it, what to avoid and WHY. Include CONCRETE values: exact identifiers, parameters, expected outputs, file paths, command arguments. Never say "align X with Y" without specifying the exact target state.]</action>
   <verify>[Command or check to prove it worked]</verify>
+  <acceptance_criteria>
+    - [Grep-verifiable condition: "file.ext contains 'exact string'"]
+    - [Measurable condition: "output.ext uses 'expected-value', NOT 'wrong-value'"]
+  </acceptance_criteria>
   <done>[Measurable acceptance criteria]</done>
 </task>
 
 <task type="auto">
   <name>Task 2: [Action-oriented name]</name>
   <files>path/to/file.ext</files>
-  <action>[Specific implementation]</action>
+  <read_first>path/to/reference.ext</read_first>
+  <action>[Specific implementation with concrete values]</action>
   <verify>[Command or check]</verify>
+  <acceptance_criteria>
+    - [Grep-verifiable condition]
+  </acceptance_criteria>
   <done>[Acceptance criteria]</done>
 </task>
 
 <!-- For checkpoint task examples and patterns, see @~/.claude/get-shit-done/references/checkpoints.md -->
-<!-- Key rule: Claude starts dev server BEFORE human-verify checkpoints. User only visits URLs. -->
 
 <task type="checkpoint:decision" gate="blocking">
   <decision>[What needs deciding]</decision>
@@ -333,7 +341,7 @@ Output: User model, API endpoints, and UI components.
   <name>Task 2: Create User API endpoints</name>
   <files>src/features/user/api.ts</files>
   <action>GET /users (list), GET /users/:id (single), POST /users (create). Use User type from model.</action>
-  <verify>curl tests pass for all endpoints</verify>
+  <verify>fetch tests pass for all endpoints</verify>
   <done>All CRUD operations work</done>
 </task>
 </tasks>
@@ -399,7 +407,7 @@ Output: Working dashboard component.
 <task type="auto">
   <name>Start dev server</name>
   <action>Run `npm run dev` in background, wait for ready</action>
-  <verify>curl localhost:3000 returns 200</verify>
+  <verify>fetch http://localhost:3000 returns 200</verify>
 </task>
 
 <task type="checkpoint:human-verify" gate="blocking">
@@ -453,6 +461,39 @@ files_modified: [...]
 <task type="auto">
   <name>Set up authentication</name>
   <action>Add auth to the app</action>
+</task>
+```
+
+**Bad: Missing read_first (executor modifies files it hasn't read)**
+```xml
+<task type="auto">
+  <name>Update database config</name>
+  <files>src/config/database.ts</files>
+  <!-- No read_first! Executor doesn't know current state or conventions -->
+  <action>Update the database config to match production settings</action>
+</task>
+```
+
+**Bad: Vague acceptance criteria (not verifiable)**
+```xml
+<acceptance_criteria>
+  - Config is properly set up
+  - Database connection works correctly
+</acceptance_criteria>
+```
+
+**Good: Concrete with read_first + verifiable criteria**
+```xml
+<task type="auto">
+  <name>Update database config for connection pooling</name>
+  <files>src/config/database.ts</files>
+  <read_first>src/config/database.ts, .env.example, docker-compose.yml</read_first>
+  <action>Add pool configuration: min=2, max=20, idleTimeoutMs=30000. Add SSL config: rejectUnauthorized=true when NODE_ENV=production. Add .env.example entry: DATABASE_POOL_MAX=20.</action>
+  <acceptance_criteria>
+    - database.ts contains "max: 20" and "idleTimeoutMillis: 30000"
+    - database.ts contains SSL conditional on NODE_ENV
+    - .env.example contains DATABASE_POOL_MAX
+  </acceptance_criteria>
 </task>
 ```
 

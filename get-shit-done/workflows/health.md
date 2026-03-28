@@ -72,8 +72,8 @@ Errors: N | Warnings: N | Info: N
 ```
 ## Warnings
 
-- [W001] STATE.md references phase 5, but only phases 1-3 exist
-  Fix: Run /gsd:health --repair to regenerate
+- [W002] STATE.md references phase 5, but only phases 1-3 exist
+  Fix: Review STATE.md manually before changing it; repair will not overwrite an existing STATE.md
 
 - [W005] Phase directory "1-setup" doesn't follow NN-name format
   Fix: Rename to match pattern (e.g., 01-setup)
@@ -130,12 +130,14 @@ Report final status.
 | E004 | error | STATE.md not found | Yes |
 | E005 | error | config.json parse error | Yes |
 | W001 | warning | PROJECT.md missing required section | No |
-| W002 | warning | STATE.md references invalid phase | Yes |
+| W002 | warning | STATE.md references invalid phase | No |
 | W003 | warning | config.json not found | Yes |
 | W004 | warning | config.json invalid field value | No |
 | W005 | warning | Phase directory naming mismatch | No |
 | W006 | warning | Phase in ROADMAP but no directory | No |
 | W007 | warning | Phase on disk but not in ROADMAP | No |
+| W008 | warning | config.json: workflow.nyquist_validation absent (defaults to enabled but agents may skip) | Yes |
+| W009 | warning | Phase has Validation Architecture in RESEARCH.md but no VALIDATION.md | No |
 | I001 | info | Plan without SUMMARY (may be in progress) | No |
 
 </error_codes>
@@ -146,7 +148,8 @@ Report final status.
 |--------|--------|------|
 | createConfig | Create config.json with defaults | None |
 | resetConfig | Delete + recreate config.json | Loses custom settings |
-| regenerateState | Create STATE.md from ROADMAP structure | Loses session history |
+| regenerateState | Create STATE.md from ROADMAP structure when it is missing | Loses session history |
+| addNyquistKey | Add workflow.nyquist_validation: true to config.json | None — matches existing default |
 
 **Not repairable (too risky):**
 - PROJECT.md, ROADMAP.md content
@@ -154,3 +157,25 @@ Report final status.
 - Orphaned plan cleanup
 
 </repair_actions>
+
+<stale_task_cleanup>
+**Windows-specific:** Check for stale Claude Code task directories that accumulate on crash/freeze.
+These are left behind when subagents are force-killed and consume disk space.
+
+When `--repair` is active, detect and clean up:
+
+```bash
+# Check for stale task directories (older than 24 hours)
+TASKS_DIR="$HOME/.claude/tasks"
+if [ -d "$TASKS_DIR" ]; then
+  STALE_COUNT=$( (find "$TASKS_DIR" -maxdepth 1 -type d -mtime +1 2>/dev/null || true) | wc -l )
+  if [ "$STALE_COUNT" -gt 0 ]; then
+    echo "⚠️  Found $STALE_COUNT stale task directories in ~/.claude/tasks/"
+    echo "   These are leftover from crashed subagent sessions."
+    echo "   Run: rm -rf ~/.claude/tasks/*  (safe — only affects dead sessions)"
+  fi
+fi
+```
+
+Report as info diagnostic: `I002 | info | Stale subagent task directories found | Yes (--repair removes them)`
+</stale_task_cleanup>

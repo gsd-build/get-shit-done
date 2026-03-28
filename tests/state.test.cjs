@@ -149,27 +149,34 @@ describe('state-snapshot command', () => {
     assert.strictEqual(output.paused_at, 'Phase 3, Plan 1, Task 2 - mid-implementation', 'paused_at extracted');
   });
 
-  test('supports --cwd override when command runs outside project root', () => {
-    fs.writeFileSync(
-      path.join(tmpDir, '.planning', 'STATE.md'),
-      `# Session State
+  describe('--cwd override', () => {
+    let outsideDir;
+
+    beforeEach(() => {
+      outsideDir = fs.mkdtempSync(path.join(require('os').tmpdir(), 'gsd-test-outside-'));
+    });
+
+    afterEach(() => {
+      cleanup(outsideDir);
+    });
+
+    test('supports --cwd override when command runs outside project root', () => {
+      fs.writeFileSync(
+        path.join(tmpDir, '.planning', 'STATE.md'),
+        `# Session State
 
 **Current Phase:** 03
 **Status:** Ready to plan
 `
-    );
-    const outsideDir = fs.mkdtempSync(path.join(require('os').tmpdir(), 'gsd-test-outside-'));
+      );
 
-    try {
       const result = runGsdTools(`state-snapshot --cwd "${tmpDir}"`, outsideDir);
       assert.ok(result.success, `Command failed: ${result.error}`);
 
       const output = JSON.parse(result.output);
       assert.strictEqual(output.current_phase, '03', 'should read STATE.md from overridden cwd');
       assert.strictEqual(output.status, 'Ready to plan', 'should parse status from overridden cwd');
-    } finally {
-      cleanup(outsideDir);
-    }
+    });
   });
 
   test('returns error for invalid --cwd path', () => {
@@ -475,6 +482,30 @@ describe('STATE.md frontmatter sync', () => {
     assert.ok(content.includes('status: paused'), 'frontmatter should reflect latest status');
   });
 
+  test('preserves frontmatter status when body Status field is missing', () => {
+    // Simulate: frontmatter has status: executing, but body lost Status: field
+    fs.writeFileSync(
+      path.join(tmpDir, '.planning', 'STATE.md'),
+      `---
+status: executing
+milestone: v1.0
+---
+
+# Project State
+
+**Current Phase:** 03
+**Current Plan:** 03-02
+`
+    );
+
+    // Any writeStateMd triggers syncStateFrontmatter — use state update on a field that exists
+    runGsdTools('state update "Current Plan" "03-03"', tmpDir);
+
+    const content = fs.readFileSync(path.join(tmpDir, '.planning', 'STATE.md'), 'utf-8');
+    assert.ok(content.includes('status: executing'), 'should preserve existing status, not overwrite with unknown');
+    assert.ok(!content.includes('status: unknown'), 'should not contain unknown status');
+  });
+
   test('round-trip: write then read via state json', () => {
     fs.writeFileSync(
       path.join(tmpDir, '.planning', 'STATE.md'),
@@ -506,7 +537,7 @@ describe('STATE.md frontmatter sync', () => {
 // stateExtractField and stateReplaceField helpers
 // ─────────────────────────────────────────────────────────────────────────────
 
-const { stateExtractField, stateReplaceField } = require('../get-shit-done/bin/lib/state.cjs');
+const { stateExtractField, stateReplaceField, stateReplaceFieldWithFallback } = require('../get-shit-done/bin/lib/state.cjs');
 
 describe('stateExtractField and stateReplaceField helpers', () => {
   // stateExtractField tests
@@ -582,6 +613,45 @@ describe('stateExtractField and stateReplaceField helpers', () => {
 
     const reExtracted = stateExtractField(updated, 'Phase');
     assert.strictEqual(reExtracted, '4', 'extract after replace should return "4"');
+  });
+});
+
+// ─────────────────────────────────────────────────────────────────────────────
+// stateReplaceFieldWithFallback — consolidated fallback helper
+// ─────────────────────────────────────────────────────────────────────────────
+
+describe('stateReplaceFieldWithFallback', () => {
+  test('replaces primary field when present', () => {
+    const content = '# State\n\n**Status:** Old\n';
+    const result = stateReplaceFieldWithFallback(content, 'Status', null, 'New');
+    assert.ok(result.includes('**Status:** New'));
+  });
+
+  test('falls back to secondary field when primary not found', () => {
+    const content = '# State\n\nLast activity: 2024-01-01\n';
+    const result = stateReplaceFieldWithFallback(content, 'Last Activity', 'Last activity', '2025-03-19');
+    assert.ok(result.includes('Last activity: 2025-03-19'), 'should update fallback field');
+  });
+
+  test('returns content unchanged when neither field matches', () => {
+    const content = '# State\n\n**Phase:** 3\n';
+    const result = stateReplaceFieldWithFallback(content, 'Status', 'state', 'New');
+    assert.strictEqual(result, content, 'content should be unchanged');
+  });
+
+  test('prefers primary over fallback when both exist', () => {
+    const content = '# State\n\n**Status:** Old\nStatus: Also old\n';
+    const result = stateReplaceFieldWithFallback(content, 'Status', 'Status', 'New');
+    // Bold format is tried first by stateReplaceField
+    assert.ok(result.includes('**Status:** New'), 'should replace bold (primary) format');
+  });
+
+  test('works with plain format fields', () => {
+    const content = '# State\n\nPhase: 1 of 3 (Foundation)\nStatus: In progress\nPlan: 01-01\n';
+    let updated = stateReplaceFieldWithFallback(content, 'Status', null, 'Complete');
+    assert.ok(updated.includes('Status: Complete'), 'should update plain Status');
+    updated = stateReplaceFieldWithFallback(updated, 'Current Plan', 'Plan', 'Not started');
+    assert.ok(updated.includes('Plan: Not started'), 'should fall back to Plan field');
   });
 });
 
@@ -891,6 +961,45 @@ describe('cmdStateAdvancePlan (state advance-plan)', () => {
     const output = JSON.parse(result.output);
     assert.ok(output.error !== undefined, 'output should have error field');
     assert.ok(output.error.toLowerCase().includes('cannot parse'), 'error should mention Cannot parse');
+  });
+
+  test('advances plan in compound "Plan: X of Y" format', () => {
+    fs.writeFileSync(
+      path.join(tmpDir, '.planning', 'STATE.md'),
+      `# Project State\n\nPlan: 2 of 5 in current phase\nStatus: In progress\nLast activity: 2025-01-01\n`
+    );
+
+    const result = runGsdTools('state advance-plan', tmpDir);
+    assert.ok(result.success, `Command failed: ${result.error}`);
+
+    const output = JSON.parse(result.output);
+    assert.strictEqual(output.advanced, true, 'advanced should be true');
+    assert.strictEqual(output.previous_plan, 2);
+    assert.strictEqual(output.current_plan, 3);
+    assert.strictEqual(output.total_plans, 5);
+
+    const updated = fs.readFileSync(path.join(tmpDir, '.planning', 'STATE.md'), 'utf-8');
+    assert.ok(updated.includes('Plan: 3 of 5 in current phase'),
+      'should preserve compound format with updated plan number');
+    assert.ok(updated.includes('Status: Ready to execute'),
+      'Status should be updated');
+  });
+
+  test('marks phase complete on last plan in compound format', () => {
+    fs.writeFileSync(
+      path.join(tmpDir, '.planning', 'STATE.md'),
+      `# Project State\n\nPlan: 3 of 3 in current phase\nStatus: In progress\nLast activity: 2025-01-01\n`
+    );
+
+    const result = runGsdTools('state advance-plan', tmpDir);
+    assert.ok(result.success, `Command failed: ${result.error}`);
+
+    const output = JSON.parse(result.output);
+    assert.strictEqual(output.advanced, false);
+    assert.strictEqual(output.reason, 'last_plan');
+
+    const updated = fs.readFileSync(path.join(tmpDir, '.planning', 'STATE.md'), 'utf-8');
+    assert.ok(updated.includes('Phase complete'), 'Status should contain Phase complete');
   });
 });
 
@@ -1246,6 +1355,254 @@ describe('cmdStateRecordSession (state record-session)', () => {
     const output = JSON.parse(result.output);
     assert.strictEqual(output.recorded, false, 'recorded should be false when no session fields found');
     assert.ok(output.reason !== undefined, 'should have a reason');
+  });
+});
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Milestone-scoped phase counting in frontmatter
+// ─────────────────────────────────────────────────────────────────────────────
+
+describe('milestone-scoped phase counting in frontmatter', () => {
+  let tmpDir;
+
+  beforeEach(() => {
+    tmpDir = createTempProject();
+  });
+
+  afterEach(() => {
+    cleanup(tmpDir);
+  });
+
+  test('total_phases counts only current milestone phases', () => {
+    // ROADMAP lists only phases 5-6 (current milestone)
+    fs.writeFileSync(
+      path.join(tmpDir, '.planning', 'ROADMAP.md'),
+      [
+        '## Roadmap v2.0: Next Release',
+        '',
+        '### Phase 5: Auth',
+        '**Goal:** Add authentication',
+        '',
+        '### Phase 6: Dashboard',
+        '**Goal:** Build dashboard',
+      ].join('\n')
+    );
+
+    // Disk has dirs 01-06 (01-04 are leftover from previous milestone)
+    for (let i = 1; i <= 6; i++) {
+      const padded = String(i).padStart(2, '0');
+      const phaseDir = path.join(tmpDir, '.planning', 'phases', `${padded}-phase-${i}`);
+      fs.mkdirSync(phaseDir, { recursive: true });
+      // Add a plan to each
+      fs.writeFileSync(path.join(phaseDir, `${padded}-01-PLAN.md`), '# Plan');
+      fs.writeFileSync(path.join(phaseDir, `${padded}-01-SUMMARY.md`), '# Summary');
+    }
+
+    // Write a STATE.md and trigger a write that will sync frontmatter
+    fs.writeFileSync(
+      path.join(tmpDir, '.planning', 'STATE.md'),
+      '# Project State\n\n**Current Phase:** 05\n**Status:** In progress\n'
+    );
+
+    const result = runGsdTools('state update Status "Executing"', tmpDir);
+    assert.ok(result.success, `Command failed: ${result.error}`);
+
+    // Read the state json to check frontmatter
+    const jsonResult = runGsdTools('state json', tmpDir);
+    assert.ok(jsonResult.success, `state json failed: ${jsonResult.error}`);
+
+    const output = JSON.parse(jsonResult.output);
+    assert.strictEqual(Number(output.progress.total_phases), 2, 'should count only milestone phases (5 and 6), not all 6');
+    assert.strictEqual(Number(output.progress.completed_phases), 2, 'both milestone phases have summaries');
+  });
+
+  test('total_phases includes ROADMAP phases without directories', () => {
+    // ROADMAP lists 6 phases (5-10), but only 4 have directories on disk
+    fs.writeFileSync(
+      path.join(tmpDir, '.planning', 'ROADMAP.md'),
+      [
+        '## Roadmap v3.0',
+        '',
+        '### Phase 5: Auth',
+        '### Phase 6: Dashboard',
+        '### Phase 7: API',
+        '### Phase 8: Notifications',
+        '### Phase 9: Analytics',
+        '### Phase 10: Polish',
+      ].join('\n')
+    );
+
+    // Only phases 5-8 have directories (9 and 10 not yet planned)
+    for (let i = 5; i <= 8; i++) {
+      const padded = String(i).padStart(2, '0');
+      const phaseDir = path.join(tmpDir, '.planning', 'phases', `${padded}-phase-${i}`);
+      fs.mkdirSync(phaseDir, { recursive: true });
+      fs.writeFileSync(path.join(phaseDir, `${padded}-01-PLAN.md`), '# Plan');
+      fs.writeFileSync(path.join(phaseDir, `${padded}-01-SUMMARY.md`), '# Summary');
+    }
+
+    fs.writeFileSync(
+      path.join(tmpDir, '.planning', 'STATE.md'),
+      '# Project State\n\n**Current Phase:** 08\n**Status:** In progress\n'
+    );
+
+    const result = runGsdTools('state update Status "Executing"', tmpDir);
+    assert.ok(result.success, `Command failed: ${result.error}`);
+
+    const jsonResult = runGsdTools('state json', tmpDir);
+    assert.ok(jsonResult.success, `state json failed: ${jsonResult.error}`);
+
+    const output = JSON.parse(jsonResult.output);
+    assert.strictEqual(Number(output.progress.total_phases), 6, 'should count all 6 ROADMAP phases, not just 4 with directories');
+    assert.strictEqual(Number(output.progress.completed_phases), 4, 'only 4 phases have summaries');
+  });
+
+  test('without ROADMAP counts all phases (pass-all filter)', () => {
+    // No ROADMAP.md — all phases should be counted
+    for (let i = 1; i <= 4; i++) {
+      const padded = String(i).padStart(2, '0');
+      const phaseDir = path.join(tmpDir, '.planning', 'phases', `${padded}-phase-${i}`);
+      fs.mkdirSync(phaseDir, { recursive: true });
+      fs.writeFileSync(path.join(phaseDir, `${padded}-01-PLAN.md`), '# Plan');
+    }
+
+    fs.writeFileSync(
+      path.join(tmpDir, '.planning', 'STATE.md'),
+      '# Project State\n\n**Current Phase:** 01\n**Status:** Planning\n'
+    );
+
+    const result = runGsdTools('state update Status "In progress"', tmpDir);
+    assert.ok(result.success, `Command failed: ${result.error}`);
+
+    const jsonResult = runGsdTools('state json', tmpDir);
+    assert.ok(jsonResult.success, `state json failed: ${jsonResult.error}`);
+
+    const output = JSON.parse(jsonResult.output);
+    assert.strictEqual(Number(output.progress.total_phases), 4, 'without ROADMAP should count all 4 phases');
+  });
+});
+
+// ─────────────────────────────────────────────────────────────────────────────
+// begin-phase — field preservation (#1365)
+// ─────────────────────────────────────────────────────────────────────────────
+
+describe('state begin-phase preserves Current Position fields (#1365)', () => {
+  let tmpDir;
+
+  beforeEach(() => {
+    tmpDir = createTempProject();
+  });
+
+  afterEach(() => {
+    cleanup(tmpDir);
+  });
+
+  test('begin-phase preserves Status, Last activity, and Progress in Current Position', () => {
+    const stateMd = `# Project State
+
+**Current Phase:** 1
+**Current Phase Name:** setup
+**Total Phases:** 5
+**Current Plan:** 0
+**Total Plans in Phase:** 0
+**Status:** Ready to plan
+**Last Activity:** 2026-03-20
+**Last Activity Description:** Roadmap created
+
+## Current Position
+Phase: 1 of 5 (setup)
+Plan: 0 of ? in current phase
+Status: Ready to plan
+Last activity: 2026-03-20 -- Roadmap created
+Progress: [..........] 0%
+
+## Decisions Made
+
+| Phase | Decision | Rationale |
+|-------|----------|-----------|
+`;
+    fs.writeFileSync(path.join(tmpDir, '.planning', 'STATE.md'), stateMd);
+
+    const result = runGsdTools(
+      ['state', 'begin-phase', '--phase', '1', '--name', 'setup', '--plans', '4'],
+      tmpDir
+    );
+    assert.ok(result.success, `Command failed: ${result.error}`);
+
+    const content = fs.readFileSync(
+      path.join(tmpDir, '.planning', 'STATE.md'), 'utf-8'
+    );
+
+    // Extract the Current Position section
+    const posMatch = content.match(/## Current Position\s*\n([\s\S]*?)(?=\n##|$)/i);
+    assert.ok(posMatch, 'Current Position section should exist');
+    const posSection = posMatch[1];
+
+    // Phase and Plan lines should be updated
+    assert.ok(/^Phase:.*EXECUTING/m.test(posSection), 'Phase line should say EXECUTING');
+    assert.ok(/^Plan:.*1 of 4/m.test(posSection), 'Plan line should show 1 of 4');
+
+    // Status, Last activity, and Progress must still be present (the bug destroys these)
+    assert.ok(/^Status:/m.test(posSection),
+      'Status field must be preserved in Current Position');
+    assert.ok(/^Last activity:/m.test(posSection),
+      'Last activity field must be preserved in Current Position');
+    assert.ok(/^Progress:/m.test(posSection),
+      'Progress field must be preserved in Current Position');
+  });
+
+  test('advance-plan can update Status after begin-phase', () => {
+    // Simulates the full workflow: begin-phase then advance through all plans
+    const stateMd = `# Project State
+
+**Current Phase:** 1
+**Current Phase Name:** setup
+**Total Phases:** 5
+**Current Plan:** 0
+**Total Plans in Phase:** 0
+**Status:** Ready to plan
+**Last Activity:** 2026-03-20
+**Last Activity Description:** Roadmap created
+
+## Current Position
+Phase: 1 of 5 (setup)
+Plan: 0 of ? in current phase
+Status: Ready to plan
+Last activity: 2026-03-20 -- Roadmap created
+Progress: [..........] 0%
+
+## Decisions Made
+
+| Phase | Decision | Rationale |
+|-------|----------|-----------|
+`;
+    fs.writeFileSync(path.join(tmpDir, '.planning', 'STATE.md'), stateMd);
+
+    // Step 1: begin-phase
+    const beginResult = runGsdTools(
+      ['state', 'begin-phase', '--phase', '1', '--name', 'setup', '--plans', '2'],
+      tmpDir
+    );
+    assert.ok(beginResult.success, `begin-phase failed: ${beginResult.error}`);
+
+    // Step 2: advance-plan to go from plan 1 to plan 2
+    const adv1 = runGsdTools(['state', 'advance-plan'], tmpDir);
+    assert.ok(adv1.success, `advance-plan 1 failed: ${adv1.error}`);
+
+    // Step 3: advance-plan again — plan 2 of 2 is the last, should set "Phase complete"
+    const adv2 = runGsdTools(['state', 'advance-plan'], tmpDir);
+    assert.ok(adv2.success, `advance-plan 2 failed: ${adv2.error}`);
+
+    const content = fs.readFileSync(
+      path.join(tmpDir, '.planning', 'STATE.md'), 'utf-8'
+    );
+    const posMatch = content.match(/## Current Position\s*\n([\s\S]*?)(?=\n##|$)/i);
+    assert.ok(posMatch, 'Current Position section should exist after advance-plan');
+    const posSection = posMatch[1];
+
+    // After advancing past all plans, Status should say "Phase complete"
+    assert.ok(/Status:.*Phase complete/i.test(posSection),
+      'Status should be updated to "Phase complete" after last advance-plan');
   });
 });
 

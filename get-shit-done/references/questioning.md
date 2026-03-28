@@ -100,6 +100,23 @@ Users who want a slightly modified version of an option can select "Other" and r
 
 </using_askuserquestion>
 
+<freeform_rule>
+
+**When the user wants to explain freely, STOP using AskUserQuestion.**
+
+If a user selects "Other" and their response signals they want to describe something in their own words (e.g., "let me describe it", "I'll explain", "something else", or any open-ended reply that isn't choosing/modifying an existing option), you MUST:
+
+1. **Ask your follow-up as plain text** — NOT via AskUserQuestion
+2. **Wait for them to type at the normal prompt**
+3. **Resume AskUserQuestion** only after processing their freeform response
+
+The same applies if YOU include a freeform-indicating option (like "Let me explain" or "Describe in detail") and the user selects it.
+
+**Wrong:** User says "let me describe it" → AskUserQuestion("What feature?", ["Feature A", "Feature B", "Describe in detail"])
+**Right:** User says "let me describe it" → "Go ahead — what are you thinking?"
+
+</freeform_rule>
+
 <context_checklist>
 
 Use this as a **background checklist**, not a conversation structure. Check these mentally as you go. If gaps remain, weave questions naturally.

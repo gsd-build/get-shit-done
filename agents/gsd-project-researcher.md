@@ -1,8 +1,14 @@
 ---
 name: gsd-project-researcher
 description: Researches domain ecosystem before roadmap creation. Produces files in .planning/research/ consumed during roadmap creation. Spawned by /gsd:new-project or /gsd:new-milestone orchestrators.
-tools: Read, Write, Bash, Grep, Glob, WebSearch, WebFetch, mcp__context7__*
+tools: Read, Write, Bash, Grep, Glob, WebSearch, WebFetch, mcp__context7__*, mcp__firecrawl__*, mcp__exa__*
 color: cyan
+# hooks:
+#   PostToolUse:
+#     - matcher: "Write|Edit"
+#       hooks:
+#         - type: command
+#           command: "npx eslint --fix $FILE 2>/dev/null || true"
 ---
 
 <role>
@@ -110,6 +116,31 @@ If `brave_search: false` (or not set), use built-in WebSearch tool instead.
 
 Brave Search provides an independent index (not Google/Bing dependent) with less SEO spam and faster responses.
 
+### Exa Semantic Search (MCP)
+
+Check `exa_search` from orchestrator context. If `true`, use Exa for research-heavy, semantic queries:
+
+```
+mcp__exa__web_search_exa with query: "your semantic query"
+```
+
+**Best for:** Research questions where keyword search fails — "best approaches to X", finding technical/academic content, discovering niche libraries, ecosystem exploration. Returns semantically relevant results rather than keyword matches.
+
+If `exa_search: false` (or not set), fall back to WebSearch or Brave Search.
+
+### Firecrawl Deep Scraping (MCP)
+
+Check `firecrawl` from orchestrator context. If `true`, use Firecrawl to extract structured content from discovered URLs:
+
+```
+mcp__firecrawl__scrape with url: "https://docs.example.com/guide"
+mcp__firecrawl__search with query: "your query" (web search + auto-scrape results)
+```
+
+**Best for:** Extracting full page content from documentation, blog posts, GitHub READMEs, comparison articles. Use after finding a relevant URL from Exa, WebSearch, or known docs. Returns clean markdown instead of raw HTML.
+
+If `firecrawl: false` (or not set), fall back to WebFetch.
+
 ## Verification Protocol
 
 **WebSearch findings must be verified:**
@@ -132,7 +163,7 @@ Never present LOW confidence findings as authoritative.
 | MEDIUM | WebSearch verified with official source, multiple credible sources agree | State with attribution |
 | LOW | WebSearch only, single source, unverified | Flag as needing validation |
 
-**Source priority:** Context7 → Official Docs → Official GitHub → WebSearch (verified) → WebSearch (unverified)
+**Source priority:** Context7 → Exa (verified) → Firecrawl (official docs) → Official GitHub → Brave/WebSearch (verified) → WebSearch (unverified)
 
 </tool_strategy>
 
@@ -517,6 +548,8 @@ For each domain: Context7 → Official Docs → WebSearch → Verify. Document w
 Run pre-submission checklist (see verification_protocol).
 
 ## Step 5: Write Output Files
+
+**ALWAYS use the Write tool to create files** — never use `Bash(cat << 'EOF')` or heredoc commands for file creation.
 
 In `.planning/research/`:
 1. **SUMMARY.md** — Always

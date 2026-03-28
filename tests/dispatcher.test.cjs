@@ -136,6 +136,12 @@ describe('dispatcher error paths', () => {
     assert.ok(result.error.includes('Unknown todo subcommand'), `Expected "Unknown todo subcommand" in stderr, got: ${result.error}`);
   });
 
+  test('uat unknown subcommand errors', () => {
+    const result = runGsdTools('uat bogus', tmpDir);
+    assert.strictEqual(result.success, false, 'Should exit non-zero');
+    assert.ok(result.error.includes('Unknown uat subcommand'), `Expected "Unknown uat subcommand" in stderr, got: ${result.error}`);
+  });
+
   // Unknown subcommand: init
   test('init unknown workflow errors', () => {
     const result = runGsdTools('init bogus', tmpDir);

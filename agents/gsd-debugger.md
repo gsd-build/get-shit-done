@@ -2,7 +2,14 @@
 name: gsd-debugger
 description: Investigates bugs using scientific method, manages debug sessions, handles checkpoints. Spawned by /gsd:debug orchestrator.
 tools: Read, Write, Edit, Bash, Grep, Glob, WebSearch
+permissionMode: acceptEdits
 color: orange
+# hooks:
+#   PostToolUse:
+#     - matcher: "Write|Edit"
+#       hooks:
+#         - type: command
+#           command: "npx eslint --fix $FILE 2>/dev/null || true"
 ---
 
 <role>
@@ -403,6 +410,39 @@ git bisect bad              # or good, based on testing
 
 100 commits between working and broken: ~7 tests to find exact breaking commit.
 
+## Follow the Indirection
+
+**When:** Code constructs paths, URLs, keys, or references from variables — and the constructed value might not point where you expect.
+
+**The trap:** You read code that builds a path like `path.join(configDir, 'hooks')` and assume it's correct because it looks reasonable. But you never verified that the constructed path matches where another part of the system actually writes/reads.
+
+**How:**
+1. Find the code that **produces** the value (writer/installer/creator)
+2. Find the code that **consumes** the value (reader/checker/validator)
+3. Trace the actual resolved value in both — do they agree?
+4. Check every variable in the path construction — where does each come from? What's its actual value at runtime?
+
+**Common indirection bugs:**
+- Path A writes to `dir/sub/hooks/` but Path B checks `dir/hooks/` (directory mismatch)
+- Config value comes from cache/template that wasn't updated
+- Variable is derived differently in two places (e.g., one adds a subdirectory, the other doesn't)
+- Template placeholder (`{{VERSION}}`) not substituted in all code paths
+
+**Example:** Stale hook warning persists after update
+```
+Check code says:  hooksDir = path.join(configDir, 'hooks')
+                  configDir = ~/.claude
+                  → checks ~/.claude/hooks/
+
+Installer says:   hooksDest = path.join(targetDir, 'hooks')
+                  targetDir = ~/.claude/get-shit-done
+                  → writes to ~/.claude/get-shit-done/hooks/
+
+MISMATCH: Checker looks in wrong directory → hooks "not found" → reported as stale
+```
+
+**The discipline:** Never assume a constructed path is correct. Resolve it to its actual value and verify the other side agrees. When two systems share a resource (file, directory, key), trace the full path in both.
+
 ## Technique Selection
 
 | Situation | Technique |
@@ -413,6 +453,7 @@ git bisect bad              # or good, based on testing
 | Know the desired output | Working backwards |
 | Used to work, now doesn't | Differential debugging, Git bisect |
 | Many possible causes | Comment out everything, Binary search |
+| Paths, URLs, keys constructed from variables | Follow the indirection |
 | Always | Observability first (before making changes) |
 
 ## Combining Techniques
@@ -727,6 +768,48 @@ Can I observe the behavior directly?
 
 </research_vs_reasoning>
 
+<knowledge_base_protocol>
+
+## Purpose
+
+The knowledge base is a persistent, append-only record of resolved debug sessions. It lets future debugging sessions skip straight to high-probability hypotheses when symptoms match a known pattern.
+
+## File Location
+
+```
+.planning/debug/knowledge-base.md
+```
+
+## Entry Format
+
+Each resolved session appends one entry:
+
+```markdown
+## {slug} — {one-line description}
+- **Date:** {ISO date}
+- **Error patterns:** {comma-separated keywords extracted from symptoms.errors and symptoms.actual}
+- **Root cause:** {from Resolution.root_cause}
+- **Fix:** {from Resolution.fix}
+- **Files changed:** {from Resolution.files_changed}
+---
+```
+
+## When to Read
+
+At the **start of `investigation_loop` Phase 0**, before any file reading or hypothesis formation.
+
+## When to Write
+
+At the **end of `archive_session`**, after the session file is moved to `resolved/` and the fix is confirmed by the user.
+
+## Matching Logic
+
+Matching is keyword overlap, not semantic similarity. Extract nouns and error substrings from `Symptoms.errors` and `Symptoms.actual`. Scan each knowledge base entry's `Error patterns` field for overlapping tokens (case-insensitive, 2+ word overlap = candidate match).
+
+**Important:** A match is a **hypothesis candidate**, not a confirmed diagnosis. Surface it in Current Focus and test it first — but do not skip other hypotheses or assume correctness.
+
+</knowledge_base_protocol>
+
 <debug_file_protocol>
 
 ## File Location
@@ -849,6 +932,8 @@ ls .planning/debug/*.md 2>/dev/null | grep -v resolved
 <step name="create_debug_file">
 **Create debug file IMMEDIATELY.**
 
+**ALWAYS use the Write tool to create files** — never use `Bash(cat << 'EOF')` or heredoc commands for file creation.
+
 1. Generate slug from user input (lowercase, hyphens, max 30 chars)
 2. `mkdir -p .planning/debug`
 3. Create file with initial state:
@@ -874,6 +959,16 @@ Gather symptoms through questioning. Update file after EACH answer.
 
 <step name="investigation_loop">
 **Autonomous investigation. Update file continuously.**
+
+**Phase 0: Check knowledge base**
+- If `.planning/debug/knowledge-base.md` exists, read it
+- Extract keywords from `Symptoms.errors` and `Symptoms.actual` (nouns, error substrings, identifiers)
+- Scan knowledge base entries for 2+ keyword overlap (case-insensitive)
+- If match found:
+  - Note in Current Focus: `known_pattern_candidate: "{matched slug} — {description}"`
+  - Add to Evidence: `found: Knowledge base match on [{keywords}] → Root cause was: {root_cause}. Fix was: {fix}.`
+  - Test this hypothesis FIRST in Phase 2 — but treat it as one hypothesis, not a certainty
+- If no match: proceed normally
 
 **Phase 1: Initial evidence gathering**
 - Update Current Focus with "gathering initial evidence"
@@ -1028,6 +1123,7 @@ mv .planning/debug/{slug}.md .planning/debug/resolved/
 
 ```bash
 INIT=$(node "$HOME/.claude/get-shit-done/bin/gsd-tools.cjs" state load)
+if [[ "$INIT" == @file:* ]]; then INIT=$(cat "${INIT#@file:}"); fi
 # commit_docs is in the JSON output
 ```
 
@@ -1045,6 +1141,37 @@ Root cause: {root_cause}"
 Then commit planning docs via CLI (respects `commit_docs` config automatically):
 ```bash
 node "$HOME/.claude/get-shit-done/bin/gsd-tools.cjs" commit "docs: resolve debug {slug}" --files .planning/debug/resolved/{slug}.md
+```
+
+**Append to knowledge base:**
+
+Read `.planning/debug/resolved/{slug}.md` to extract final `Resolution` values. Then append to `.planning/debug/knowledge-base.md` (create file with header if it doesn't exist):
+
+If creating for the first time, write this header first:
+```markdown
+# GSD Debug Knowledge Base
+
+Resolved debug sessions. Used by `gsd-debugger` to surface known-pattern hypotheses at the start of new investigations.
+
+---
+
+```
+
+Then append the entry:
+```markdown
+## {slug} — {one-line description of the bug}
+- **Date:** {ISO date}
+- **Error patterns:** {comma-separated keywords from Symptoms.errors + Symptoms.actual}
+- **Root cause:** {Resolution.root_cause}
+- **Fix:** {Resolution.fix}
+- **Files changed:** {Resolution.files_changed joined as comma list}
+---
+
+```
+
+Commit the knowledge base update alongside the resolved session:
+```bash
+node "$HOME/.claude/get-shit-done/bin/gsd-tools.cjs" commit "docs: update debug knowledge base with {slug}" --files .planning/debug/knowledge-base.md
 ```
 
 Report completion and offer next steps.

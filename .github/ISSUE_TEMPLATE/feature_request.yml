@@ -6,21 +6,58 @@ body:
   - type: markdown
     attributes:
       value: |
-        Thanks for suggesting a feature\! Please describe what you would like to see.
+        Thanks for suggesting a feature! Please describe what you'd like to see.
+
   - type: textarea
     id: problem
     attributes:
       label: Problem or motivation
       description: What problem does this solve? Why do you want this?
+      placeholder: "I'm frustrated when..."
     validations:
       required: true
+
   - type: textarea
     id: solution
     attributes:
       label: Proposed solution
-      description: How do you think this should work?
+      description: How do you think this should work? Include example commands or workflows if possible.
+      placeholder: |
+        A new command `/gsd:example` that...
     validations:
       required: true
+
+  - type: dropdown
+    id: scope
+    attributes:
+      label: Which area does this affect?
+      options:
+        - Core workflow (init, plan, build, verify)
+        - Planning system (phases, roadmap, state)
+        - Context management (context engineering, summaries)
+        - Runtime integration (hooks, statusline, settings)
+        - Installation / setup
+        - Documentation
+        - Other
+    validations:
+      required: true
+
+  - type: checkboxes
+    id: runtimes
+    attributes:
+      label: Applicable runtimes
+      description: Which runtimes should this work with?
+      options:
+        - label: Claude Code
+        - label: Gemini CLI
+        - label: OpenCode
+        - label: Codex
+        - label: Copilot
+        - label: Antigravity
+        - label: Cursor
+        - label: Windsurf
+        - label: All runtimes
+
   - type: textarea
     id: alternatives
     attributes:
@@ -28,10 +65,11 @@ body:
       description: Have you considered other approaches?
     validations:
       required: false
+
   - type: textarea
     id: context
     attributes:
       label: Additional context
-      description: Any other information, screenshots, or examples
+      description: Any other information, screenshots, or examples.
     validations:
       required: false
