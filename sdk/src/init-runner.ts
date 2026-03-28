@@ -72,6 +72,8 @@ export interface InitRunnerDeps {
   config?: Partial<InitConfig>;
   /** Override for SDK prompts directory. Defaults to package-relative sdk/prompts/. */
   sdkPromptsDir?: string;
+  /** Workstream name. When set, artifacts go to .planning/workstreams/<name>/. */
+  workstream?: string;
 }
 
 export class InitRunner {
@@ -81,11 +83,18 @@ export class InitRunner {
   private readonly config: InitConfig;
   private readonly sessionId: string;
   private readonly sdkPromptsDir: string;
+  private readonly workstream?: string;
+  /** Resolved planning directory (workstream-aware). */
+  private readonly planningDir: string;
 
   constructor(deps: InitRunnerDeps) {
     this.projectDir = deps.projectDir;
     this.tools = deps.tools;
     this.eventStream = deps.eventStream;
+    this.workstream = deps.workstream;
+    this.planningDir = deps.workstream
+      ? join(deps.projectDir, '.planning', 'workstreams', deps.workstream)
+      : join(deps.projectDir, '.planning');
     this.config = {
       maxBudgetPerSession: deps.config?.maxBudgetPerSession ?? 3.0,
       maxTurnsPerSession: deps.config?.maxTurnsPerSession ?? 30,
@@ -138,21 +147,21 @@ export class InitRunner {
           await this.execGit(['init']);
         }
 
-        // Ensure .planning/ directory exists
-        const planningDir = join(this.projectDir, '.planning');
-        await mkdir(planningDir, { recursive: true });
+        // Ensure planning directory exists (workstream-aware)
+        await mkdir(this.planningDir, { recursive: true });
 
         // Write config.json
-        const configPath = join(planningDir, 'config.json');
+        const configPath = join(this.planningDir, 'config.json');
         await writeFile(configPath, JSON.stringify(AUTO_MODE_CONFIG, null, 2) + '\n', 'utf-8');
-        artifacts.push('.planning/config.json');
+        const configRelPath = this.relPlanningPath('config.json');
+        artifacts.push(configRelPath);
 
         // Persist auto_advance via gsd-tools (validates & updates state)
         await this.tools.configSet('workflow.auto_advance', 'true');
 
         // Commit config
         if (projectInfo.commit_docs) {
-          await this.tools.commit('chore: add project config', ['.planning/config.json']);
+          await this.tools.commit('chore: add project config', [configRelPath]);
         }
       });
       steps.push(configResult.stepResult);
@@ -167,9 +176,10 @@ export class InitRunner {
         if (!result.success) {
           throw new Error(`PROJECT.md synthesis failed: ${result.error?.messages.join(', ') ?? 'unknown error'}`);
         }
-        artifacts.push('.planning/PROJECT.md');
+        const projectPath = this.relPlanningPath('PROJECT.md');
+        artifacts.push(projectPath);
         if (projectInfo.commit_docs) {
-          await this.tools.commit('docs: add PROJECT.md', ['.planning/PROJECT.md']);
+          await this.tools.commit('docs: add PROJECT.md', [projectPath]);
         }
         return result;
       });
@@ -202,9 +212,10 @@ export class InitRunner {
         if (!result.success) {
           throw new Error(`Research synthesis failed: ${result.error?.messages.join(', ') ?? 'unknown error'}`);
         }
-        artifacts.push('.planning/research/SUMMARY.md');
+        const summaryPath = this.relPlanningPath('research/SUMMARY.md');
+        artifacts.push(summaryPath);
         if (projectInfo.commit_docs) {
-          await this.tools.commit('docs: add research files', ['.planning/research/']);
+          await this.tools.commit('docs: add research files', [this.relPlanningPath('research/')]);
         }
         return result;
       });
@@ -220,9 +231,10 @@ export class InitRunner {
         if (!result.success) {
           throw new Error(`Requirements generation failed: ${result.error?.messages.join(', ') ?? 'unknown error'}`);
         }
-        artifacts.push('.planning/REQUIREMENTS.md');
+        const reqPath = this.relPlanningPath('REQUIREMENTS.md');
+        artifacts.push(reqPath);
         if (projectInfo.commit_docs) {
-          await this.tools.commit('docs: add REQUIREMENTS.md', ['.planning/REQUIREMENTS.md']);
+          await this.tools.commit('docs: add REQUIREMENTS.md', [reqPath]);
         }
         return result;
       });
@@ -238,12 +250,11 @@ export class InitRunner {
         if (!result.success) {
           throw new Error(`Roadmap generation failed: ${result.error?.messages.join(', ') ?? 'unknown error'}`);
         }
-        artifacts.push('.planning/ROADMAP.md', '.planning/STATE.md');
+        const roadmapPath = this.relPlanningPath('ROADMAP.md');
+        const statePath = this.relPlanningPath('STATE.md');
+        artifacts.push(roadmapPath, statePath);
         if (projectInfo.commit_docs) {
-          await this.tools.commit('docs: add ROADMAP.md and STATE.md', [
-            '.planning/ROADMAP.md',
-            '.planning/STATE.md',
-          ]);
+          await this.tools.commit('docs: add ROADMAP.md and STATE.md', [roadmapPath, statePath]);
         }
         return result;
       });
@@ -352,7 +363,7 @@ export class InitRunner {
       });
       // Attach artifact path on success
       if (result.stepResult.success) {
-        result.stepResult.artifacts = [`.planning/research/${researchType}.md`];
+        result.stepResult.artifacts = [this.relPlanningPath(`research/${researchType}.md`)];
       }
       return result.stepResult;
     });
@@ -384,9 +395,10 @@ export class InitRunner {
   private async buildProjectPrompt(input: string): Promise<string> {
     const template = await this.readGSDFile('templates/project.md');
 
+    const targetPath = this.relPlanningPath('PROJECT.md');
     return sanitizePrompt([
       'You are creating the PROJECT.md for a new software project.',
-      'Write .planning/PROJECT.md based on the template structure below and the user\'s project description.',
+      `Write ${targetPath} based on the template structure below and the user\'s project description.`,
       '',
       '<project_template>',
       template,
@@ -396,7 +408,7 @@ export class InitRunner {
       input,
       '</user_input>',
       '',
-      'Write the file to .planning/PROJECT.md. Follow the template structure but fill in with real content derived from the user input.',
+      `Write the file to ${targetPath}. Follow the template structure but fill in with real content derived from the user input.`,
       'Be specific and opinionated — make decisions, don\'t list options.',
     ].join('\n'));
   }
@@ -413,27 +425,27 @@ export class InitRunner {
     const template = await this.readGSDFile(`templates/research-project/${researchType}.md`);
 
     // Read PROJECT.md if it exists (it should by now)
+    const projectMdPath = join(this.planningDir, 'PROJECT.md');
     let projectContent = '';
     try {
-      projectContent = await readFile(
-        join(this.projectDir, '.planning', 'PROJECT.md'),
-        'utf-8',
-      );
+      projectContent = await readFile(projectMdPath, 'utf-8');
     } catch {
       // Fall back to raw input if PROJECT.md not yet written
       projectContent = input;
     }
 
+    const researchTarget = this.relPlanningPath(`research/${researchType}.md`);
+    const projectRef = this.relPlanningPath('PROJECT.md');
     return sanitizePrompt([
       '<agent_definition>',
       agentDef,
       '</agent_definition>',
       '',
       `You are researching the ${researchType} aspect of this project.`,
-      `Write your findings to .planning/research/${researchType}.md`,
+      `Write your findings to ${researchTarget}`,
       '',
       '<files_to_read>',
-      '.planning/PROJECT.md',
+      projectRef,
       '</files_to_read>',
       '',
       '<project_context>',
@@ -444,7 +456,7 @@ export class InitRunner {
       template,
       '</research_template>',
       '',
-      `Write .planning/research/${researchType}.md following the template structure.`,
+      `Write ${researchTarget} following the template structure.`,
       'Be comprehensive but opinionated. "Use X because Y" not "Options are X, Y, Z."',
     ].join('\n'));
   }
@@ -456,7 +468,7 @@ export class InitRunner {
   private async buildSynthesisPrompt(): Promise<string> {
     const agentDef = await this.readAgentFile('gsd-research-synthesizer.md');
     const summaryTemplate = await this.readGSDFile('templates/research-project/SUMMARY.md');
-    const researchDir = join(this.projectDir, '.planning', 'research');
+    const researchDir = join(this.planningDir, 'research');
 
     // Read whatever research files exist
     const researchContent: string[] = [];
@@ -469,19 +481,21 @@ export class InitRunner {
       }
     }
 
+    const summaryTarget = this.relPlanningPath('research/SUMMARY.md');
+    const researchRelDir = this.relPlanningPath('research/');
     return sanitizePrompt([
       '<agent_definition>',
       agentDef,
       '</agent_definition>',
       '',
       '<files_to_read>',
-      '.planning/research/STACK.md',
-      '.planning/research/FEATURES.md',
-      '.planning/research/ARCHITECTURE.md',
-      '.planning/research/PITFALLS.md',
+      this.relPlanningPath('research/STACK.md'),
+      this.relPlanningPath('research/FEATURES.md'),
+      this.relPlanningPath('research/ARCHITECTURE.md'),
+      this.relPlanningPath('research/PITFALLS.md'),
       '</files_to_read>',
       '',
-      'Synthesize the research files below into .planning/research/SUMMARY.md',
+      `Synthesize the research files below into ${summaryTarget}`,
       '',
       ...researchContent,
       '',
@@ -489,8 +503,8 @@ export class InitRunner {
       summaryTemplate,
       '</summary_template>',
       '',
-      'Write .planning/research/SUMMARY.md synthesizing all research findings.',
-      'Also commit all research files: git add .planning/research/ && git commit.',
+      `Write ${summaryTarget} synthesizing all research findings.`,
+      `Also commit all research files: git add ${researchRelDir} && git commit.`,
     ].join('\n'));
   }
 
@@ -504,22 +518,17 @@ export class InitRunner {
     let projectContent = '';
     let featuresContent = '';
     try {
-      projectContent = await readFile(
-        join(this.projectDir, '.planning', 'PROJECT.md'),
-        'utf-8',
-      );
+      projectContent = await readFile(join(this.planningDir, 'PROJECT.md'), 'utf-8');
     } catch {
       // Should not happen at this point
     }
     try {
-      featuresContent = await readFile(
-        join(this.projectDir, '.planning', 'research', 'FEATURES.md'),
-        'utf-8',
-      );
+      featuresContent = await readFile(join(this.planningDir, 'research', 'FEATURES.md'), 'utf-8');
     } catch {
       // Research may have partially failed
     }
 
+    const reqTarget = this.relPlanningPath('REQUIREMENTS.md');
     return sanitizePrompt([
       'You are generating REQUIREMENTS.md for this project.',
       'Derive requirements from the PROJECT.md and research outputs.',
@@ -537,7 +546,7 @@ export class InitRunner {
       reqTemplate,
       '</requirements_template>',
       '',
-      'Write .planning/REQUIREMENTS.md following the template structure.',
+      `Write ${reqTarget} following the template structure.`,
       'Every requirement must be testable and specific. No vague aspirations.',
     ].join('\n'));
   }
@@ -552,10 +561,10 @@ export class InitRunner {
     const stateTemplate = await this.readGSDFile('templates/state.md');
 
     const filesToRead = [
-      '.planning/PROJECT.md',
-      '.planning/REQUIREMENTS.md',
-      '.planning/research/SUMMARY.md',
-      '.planning/config.json',
+      this.relPlanningPath('PROJECT.md'),
+      this.relPlanningPath('REQUIREMENTS.md'),
+      this.relPlanningPath('research/SUMMARY.md'),
+      this.relPlanningPath('config.json'),
     ];
 
     const fileContents: string[] = [];
@@ -568,6 +577,8 @@ export class InitRunner {
       }
     }
 
+    const roadmapTarget = this.relPlanningPath('ROADMAP.md');
+    const stateTarget = this.relPlanningPath('STATE.md');
     return sanitizePrompt([
       '<agent_definition>',
       agentDef,
@@ -587,7 +598,7 @@ export class InitRunner {
       stateTemplate,
       '</state_template>',
       '',
-      'Create .planning/ROADMAP.md and .planning/STATE.md.',
+      `Create ${roadmapTarget} and ${stateTarget}.`,
       'ROADMAP.md: Transform requirements into phases. Every v1 requirement maps to exactly one phase.',
       'STATE.md: Initialize project state tracking.',
     ].join('\n'));
@@ -599,7 +610,7 @@ export class InitRunner {
    * Run a single Agent SDK session via runPhaseStepSession.
    */
   private async runSession(prompt: string, modelOverride?: string): Promise<PlanResult> {
-    const config = await loadConfig(this.projectDir);
+    const config = await loadConfig(this.projectDir, this.workstream);
 
     return runPhaseStepSession(
       prompt,
@@ -614,6 +625,18 @@ export class InitRunner {
       this.eventStream,
       { phase: undefined, planName: undefined },
     );
+  }
+
+  // ─── Path helpers ──────────────────────────────────────────────────────────
+
+  /**
+   * Build a relative path into the planning directory (workstream-aware).
+   * Returns e.g. `.planning/workstreams/my-ws/PROJECT.md` or `.planning/PROJECT.md`.
+   */
+  private relPlanningPath(filename: string): string {
+    return this.workstream
+      ? `.planning/workstreams/${this.workstream}/${filename}`
+      : `.planning/${filename}`;
   }
 
   // ─── File reading helpers ──────────────────────────────────────────────────

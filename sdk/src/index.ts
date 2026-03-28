@@ -44,6 +44,7 @@ export class GSD {
   private readonly defaultMaxBudgetUsd: number;
   private readonly defaultMaxTurns: number;
   private readonly autoMode: boolean;
+  private readonly workstream?: string;
   readonly eventStream: GSDEventStream;
 
   constructor(options: GSDOptions) {
@@ -54,6 +55,7 @@ export class GSD {
     this.defaultMaxBudgetUsd = options.maxBudgetUsd ?? 5.0;
     this.defaultMaxTurns = options.maxTurns ?? 50;
     this.autoMode = options.autoMode ?? false;
+    this.workstream = options.workstream;
     this.eventStream = new GSDEventStream();
   }
 
@@ -75,7 +77,7 @@ export class GSD {
     const plan = await parsePlanFile(absolutePlanPath);
 
     // Load project config
-    const config = await loadConfig(this.projectDir);
+    const config = await loadConfig(this.projectDir, this.workstream);
 
     // Try to load agent definition for tool restrictions
     const agentDef = await this.loadAgentDefinition();
@@ -117,6 +119,7 @@ export class GSD {
     return new GSDTools({
       projectDir: this.projectDir,
       gsdToolsPath: this.gsdToolsPath,
+      workstream: this.workstream,
     });
   }
 
@@ -133,8 +136,10 @@ export class GSD {
   async runPhase(phaseNumber: string, options?: PhaseRunnerOptions): Promise<PhaseRunnerResult> {
     const tools = this.createTools();
     const promptFactory = new PromptFactory();
-    const contextEngine = new ContextEngine(this.projectDir);
-    const config = await loadConfig(this.projectDir);
+    const contextEngine = new ContextEngine(this.projectDir, {
+      workstream: this.workstream,
+    });
+    const config = await loadConfig(this.projectDir, this.workstream);
 
     // Auto mode: force auto_advance on and skip_discuss off so self-discuss kicks in
     if (this.autoMode) {

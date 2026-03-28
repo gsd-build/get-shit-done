@@ -77,10 +77,12 @@ export class ContextEngine {
   private readonly logger?: GSDLogger;
   private readonly truncation: TruncationOptions;
 
-  constructor(projectDir: string, logger?: GSDLogger, truncation?: Partial<TruncationOptions>) {
-    this.planningDir = join(projectDir, '.planning');
-    this.logger = logger;
-    this.truncation = { ...DEFAULT_TRUNCATION_OPTIONS, ...truncation };
+  constructor(projectDir: string, opts?: { workstream?: string; logger?: GSDLogger; truncation?: Partial<TruncationOptions> }) {
+    this.planningDir = opts?.workstream
+      ? join(projectDir, '.planning', 'workstreams', opts.workstream)
+      : join(projectDir, '.planning');
+    this.logger = opts?.logger;
+    this.truncation = { ...DEFAULT_TRUNCATION_OPTIONS, ...opts?.truncation };
   }
 
   /**

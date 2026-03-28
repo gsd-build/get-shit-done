@@ -96,11 +96,15 @@ export const CONFIG_DEFAULTS: GSDConfig = {
 
 /**
  * Load project config from `.planning/config.json`, merging with defaults.
+ * When workstream is provided, reads from `.planning/workstreams/<name>/config.json`.
  * Returns full defaults when file is missing or empty.
  * Throws on malformed JSON with a helpful error message.
  */
-export async function loadConfig(projectDir: string): Promise<GSDConfig> {
-  const configPath = join(projectDir, '.planning', 'config.json');
+export async function loadConfig(projectDir: string, workstream?: string): Promise<GSDConfig> {
+  const planningDir = workstream
+    ? join(projectDir, '.planning', 'workstreams', workstream)
+    : join(projectDir, '.planning');
+  const configPath = join(planningDir, 'config.json');
 
   let raw: string;
   try {

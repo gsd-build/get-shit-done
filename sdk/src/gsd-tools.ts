@@ -39,16 +39,19 @@ export class GSDTools {
   private readonly projectDir: string;
   private readonly gsdToolsPath: string;
   private readonly timeoutMs: number;
+  private readonly workstream?: string;
 
   constructor(opts: {
     projectDir: string;
     gsdToolsPath?: string;
     timeoutMs?: number;
+    workstream?: string;
   }) {
     this.projectDir = opts.projectDir;
     this.gsdToolsPath =
       opts.gsdToolsPath ?? resolveGsdToolsPath(opts.projectDir);
     this.timeoutMs = opts.timeoutMs ?? DEFAULT_TIMEOUT_MS;
+    this.workstream = opts.workstream;
   }
 
   // ─── Core exec ───────────────────────────────────────────────────────────
@@ -58,7 +61,8 @@ export class GSDTools {
    * Handles the `@file:` prefix pattern for large results.
    */
   async exec(command: string, args: string[] = []): Promise<unknown> {
-    const fullArgs = [this.gsdToolsPath, command, ...args];
+    const wsArgs = this.workstream ? ['--ws', this.workstream] : [];
+    const fullArgs = [this.gsdToolsPath, command, ...args, ...wsArgs];
 
     return new Promise<unknown>((resolve, reject) => {
       const child = execFile(
@@ -160,7 +164,8 @@ export class GSDTools {
    * Use for commands like `config-set` that return plain text, not JSON.
    */
   async execRaw(command: string, args: string[] = []): Promise<string> {
-    const fullArgs = [this.gsdToolsPath, command, ...args, '--raw'];
+    const wsArgs = this.workstream ? ['--ws', this.workstream] : [];
+    const fullArgs = [this.gsdToolsPath, command, ...args, ...wsArgs, '--raw'];
 
     return new Promise<string>((resolve, reject) => {
       const child = execFile(

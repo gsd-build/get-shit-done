@@ -139,7 +139,7 @@ describe('ContextEngine', () => {
       });
 
       const logger = makeMockLogger();
-      const engine = new ContextEngine(projectDir, logger);
+      const engine = new ContextEngine(projectDir, { logger });
       const files = await engine.resolveContextFiles(PhaseType.Plan);
 
       // research and requirements are optional for plan — no warning
@@ -153,7 +153,7 @@ describe('ContextEngine', () => {
       await createPlanningDir(projectDir, {});
 
       const logger = makeMockLogger();
-      const engine = new ContextEngine(projectDir, logger);
+      const engine = new ContextEngine(projectDir, { logger });
       await engine.resolveContextFiles(PhaseType.Execute);
 
       expect(logger.warn).toHaveBeenCalledWith(
@@ -196,7 +196,7 @@ describe('ContextEngine', () => {
         'CONTEXT.md': largeContent,
       });
 
-      const engine = new ContextEngine(projectDir, undefined, { maxContentLength: 500 });
+      const engine = new ContextEngine(projectDir, { truncation: { maxContentLength: 500 } });
       const files = await engine.resolveContextFiles(PhaseType.Plan);
 
       // CONTEXT.md should be truncated
@@ -223,7 +223,7 @@ describe('ContextEngine', () => {
         'STATE.md': largeState,
       });
 
-      const engine = new ContextEngine(projectDir, undefined, { maxContentLength: 100 });
+      const engine = new ContextEngine(projectDir, { truncation: { maxContentLength: 100 } });
       const files = await engine.resolveContextFiles(PhaseType.Execute);
 
       expect(files.state).toBe(largeState);
@@ -262,7 +262,7 @@ Build content.`;
       });
 
       // Low threshold forces truncation
-      const engine = new ContextEngine(projectDir, undefined, { maxContentLength: 50 });
+      const engine = new ContextEngine(projectDir, { truncation: { maxContentLength: 50 } });
       const files = await engine.resolveContextFiles(PhaseType.Plan);
       expect(files.context!.length).toBeLessThan(content.length);
     });

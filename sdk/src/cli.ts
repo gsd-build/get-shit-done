@@ -29,6 +29,8 @@ export interface ParsedCliArgs {
   wsPort: number | undefined;
   model: string | undefined;
   maxBudget: number | undefined;
+  /** Workstream name. Routes all .planning/ paths to .planning/workstreams/<name>/. */
+  workstream: string | undefined;
   help: boolean;
   version: boolean;
 }
@@ -43,6 +45,7 @@ export function parseCliArgs(argv: string[]): ParsedCliArgs {
     options: {
       'project-dir': { type: 'string', default: process.cwd() },
       'ws-port': { type: 'string' },
+      ws: { type: 'string' },
       model: { type: 'string' },
       'max-budget': { type: 'string' },
       init: { type: 'string' },
@@ -69,6 +72,7 @@ export function parseCliArgs(argv: string[]): ParsedCliArgs {
     wsPort: values['ws-port'] ? Number(values['ws-port']) : undefined,
     model: values.model as string | undefined,
     maxBudget: values['max-budget'] ? Number(values['max-budget']) : undefined,
+    workstream: values.ws as string | undefined,
     help: values.help as boolean,
     version: values.version as boolean,
   };
@@ -92,6 +96,7 @@ Options:
   --init <input>        Bootstrap from a PRD before running (auto only)
                         Accepts @path/to/prd.md or "description text"
   --project-dir <dir>   Project directory (default: cwd)
+  --ws <name>           Workstream name (routes .planning/ to .planning/workstreams/<name>/)
   --ws-port <port>      Enable WebSocket transport on <port>
   --model <model>       Override LLM model
   --max-budget <n>      Max budget per step in USD
@@ -226,6 +231,7 @@ export async function main(argv: string[] = process.argv.slice(2)): Promise<void
       projectDir: args.projectDir,
       model: args.model,
       maxBudgetUsd: args.maxBudget,
+      workstream: args.workstream,
     });
 
     // Wire CLI transport
@@ -241,12 +247,17 @@ export async function main(argv: string[] = process.argv.slice(2)): Promise<void
       console.log(`WebSocket transport listening on port ${args.wsPort}`);
     }
 
+    if (args.workstream) {
+      console.log(`[init] Workstream: ${args.workstream}`);
+    }
+
     try {
       const tools = gsd.createTools();
       const runner = new InitRunner({
         projectDir: args.projectDir,
         tools,
         eventStream: gsd.eventStream,
+        workstream: args.workstream,
         config: {
           maxBudgetPerSession: args.maxBudget,
           orchestratorModel: args.model,
@@ -296,6 +307,7 @@ export async function main(argv: string[] = process.argv.slice(2)): Promise<void
       model: args.model,
       maxBudgetUsd: args.maxBudget,
       autoMode: true,
+      workstream: args.workstream,
     });
 
     // Wire CLI transport (always active)
@@ -327,6 +339,7 @@ export async function main(argv: string[] = process.argv.slice(2)): Promise<void
           projectDir: args.projectDir,
           tools,
           eventStream: gsd.eventStream,
+          workstream: args.workstream,
           config: {
             maxBudgetPerSession: args.maxBudget,
             orchestratorModel: args.model,
@@ -384,6 +397,7 @@ export async function main(argv: string[] = process.argv.slice(2)): Promise<void
     projectDir: args.projectDir,
     model: args.model,
     maxBudgetUsd: args.maxBudget,
+    workstream: args.workstream,
   });
 
   // Wire CLI transport (always active)
