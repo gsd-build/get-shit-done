@@ -469,23 +469,23 @@ describe('health check new validations', () => {
 
 describe('hook file validation', () => {
   const hooksDir = path.join(__dirname, '..', 'hooks');
+  const isWindows = process.platform === 'win32';
 
-  test('gsd-session-state.sh is executable', () => {
+  test('gsd-session-state.sh is executable', { skip: isWindows ? 'Windows has no POSIX file permissions' : false }, () => {
     const hookPath = path.join(hooksDir, 'gsd-session-state.sh');
     assert.ok(fs.existsSync(hookPath), 'gsd-session-state.sh should exist');
     const stat = fs.statSync(hookPath);
-    // Check that at least owner execute bit is set (mode & 0o100)
     assert.ok((stat.mode & 0o111) !== 0, 'gsd-session-state.sh should be executable');
   });
 
-  test('gsd-validate-commit.sh is executable', () => {
+  test('gsd-validate-commit.sh is executable', { skip: isWindows ? 'Windows has no POSIX file permissions' : false }, () => {
     const hookPath = path.join(hooksDir, 'gsd-validate-commit.sh');
     assert.ok(fs.existsSync(hookPath), 'gsd-validate-commit.sh should exist');
     const stat = fs.statSync(hookPath);
     assert.ok((stat.mode & 0o111) !== 0, 'gsd-validate-commit.sh should be executable');
   });
 
-  test('gsd-phase-boundary.sh is executable', () => {
+  test('gsd-phase-boundary.sh is executable', { skip: isWindows ? 'Windows has no POSIX file permissions' : false }, () => {
     const hookPath = path.join(hooksDir, 'gsd-phase-boundary.sh');
     assert.ok(fs.existsSync(hookPath), 'gsd-phase-boundary.sh should exist');
     const stat = fs.statSync(hookPath);
