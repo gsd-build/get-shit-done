@@ -4493,6 +4493,17 @@ function install(isGlobal, runtime = 'claude') {
     }
   }
 
+  // Enable hooks for Qwen-Code (required for hooks system)
+  if (isQwen) {
+    if (!settings.hooksConfig) {
+      settings.hooksConfig = {};
+    }
+    if (!settings.hooksConfig.enabled) {
+      settings.hooksConfig.enabled = true;
+      console.log(`  ${green}✓${reset} Enabled hooks`);
+    }
+  }
+
   // Configure SessionStart hook for update checking (skip for opencode)
   if (!isOpencode) {
     if (!settings.hooks) {
