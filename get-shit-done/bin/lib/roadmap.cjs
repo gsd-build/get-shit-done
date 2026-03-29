@@ -4,7 +4,7 @@
 
 const fs = require('fs');
 const path = require('path');
-const { escapeRegex, normalizePhaseName, planningPaths, output, error, findPhaseInternal, stripShippedMilestones, extractCurrentMilestone, replaceInCurrentMilestone } = require('./core.cjs');
+const { escapeRegex, normalizePhaseName, planningPaths, withPlanningLock, output, error, findPhaseInternal, stripShippedMilestones, extractCurrentMilestone, replaceInCurrentMilestone } = require('./core.cjs');
 
 function cmdRoadmapGetPhase(cwd, phaseNum, raw) {
   const roadmapPath = planningPaths(cwd).roadmap;
@@ -254,63 +254,66 @@ function cmdRoadmapUpdatePlanProgress(cwd, phaseNum, raw) {
     return;
   }
 
-  let roadmapContent = fs.readFileSync(roadmapPath, 'utf-8');
-  const phaseEscaped = escapeRegex(phaseNum);
+  // Wrap entire read-modify-write in lock to prevent concurrent corruption
+  withPlanningLock(cwd, () => {
+    let roadmapContent = fs.readFileSync(roadmapPath, 'utf-8');
+    const phaseEscaped = escapeRegex(phaseNum);
 
-  // Progress table row: update Plans/Status/Date columns (handles 4 or 5 column tables)
-  const tableRowPattern = new RegExp(
-    `^(\\|\\s*${phaseEscaped}\\.?\\s[^|]*(?:\\|[^\\n]*))$`,
-    'im'
-  );
-  const dateField = isComplete ? ` ${today} ` : '  ';
-  roadmapContent = roadmapContent.replace(tableRowPattern, (fullRow) => {
-    const cells = fullRow.split('|').slice(1, -1); // drop leading/trailing empty from split
-    if (cells.length === 5) {
-      // 5-col: Phase | Milestone | Plans | Status | Completed
-      cells[2] = ` ${summaryCount}/${planCount} `;
-      cells[3] = ` ${status.padEnd(11)}`;
-      cells[4] = dateField;
-    } else if (cells.length === 4) {
-      // 4-col: Phase | Plans | Status | Completed
-      cells[1] = ` ${summaryCount}/${planCount} `;
-      cells[2] = ` ${status.padEnd(11)}`;
-      cells[3] = dateField;
+    // Progress table row: update Plans/Status/Date columns (handles 4 or 5 column tables)
+    const tableRowPattern = new RegExp(
+      `^(\\|\\s*${phaseEscaped}\\.?\\s[^|]*(?:\\|[^\\n]*))$`,
+      'im'
+    );
+    const dateField = isComplete ? ` ${today} ` : '  ';
+    roadmapContent = roadmapContent.replace(tableRowPattern, (fullRow) => {
+      const cells = fullRow.split('|').slice(1, -1); // drop leading/trailing empty from split
+      if (cells.length === 5) {
+        // 5-col: Phase | Milestone | Plans | Status | Completed
+        cells[2] = ` ${summaryCount}/${planCount} `;
+        cells[3] = ` ${status.padEnd(11)}`;
+        cells[4] = dateField;
+      } else if (cells.length === 4) {
+        // 4-col: Phase | Plans | Status | Completed
+        cells[1] = ` ${summaryCount}/${planCount} `;
+        cells[2] = ` ${status.padEnd(11)}`;
+        cells[3] = dateField;
+      }
+      return '|' + cells.join('|') + '|';
+    });
+
+    // Update plan count in phase detail section
+    const planCountPattern = new RegExp(
+      `(#{2,4}\\s*Phase\\s+${phaseEscaped}[\\s\\S]*?\\*\\*Plans:\\*\\*\\s*)[^\\n]+`,
+      'i'
+    );
+    const planCountText = isComplete
+      ? `${summaryCount}/${planCount} plans complete`
+      : `${summaryCount}/${planCount} plans executed`;
+    roadmapContent = replaceInCurrentMilestone(roadmapContent, planCountPattern, `$1${planCountText}`);
+
+    // If complete: check checkbox
+    if (isComplete) {
+      const checkboxPattern = new RegExp(
+        `(-\\s*\\[)[ ](\\]\\s*.*Phase\\s+${phaseEscaped}[:\\s][^\\n]*)`,
+        'i'
+      );
+      roadmapContent = replaceInCurrentMilestone(roadmapContent, checkboxPattern, `$1x$2 (completed ${today})`);
     }
-    return '|' + cells.join('|') + '|';
+
+    // Mark completed plan checkboxes (e.g. "- [ ] 50-01-PLAN.md" or "- [ ] 50-01:")
+    for (const summaryFile of phaseInfo.summaries) {
+      const planId = summaryFile.replace('-SUMMARY.md', '').replace('SUMMARY.md', '');
+      if (!planId) continue;
+      const planEscaped = escapeRegex(planId);
+      const planCheckboxPattern = new RegExp(
+        `(-\\s*\\[) (\\]\\s*${planEscaped})`,
+        'i'
+      );
+      roadmapContent = roadmapContent.replace(planCheckboxPattern, '$1x$2');
+    }
+
+    fs.writeFileSync(roadmapPath, roadmapContent, 'utf-8');
   });
-
-  // Update plan count in phase detail section
-  const planCountPattern = new RegExp(
-    `(#{2,4}\\s*Phase\\s+${phaseEscaped}[\\s\\S]*?\\*\\*Plans:\\*\\*\\s*)[^\\n]+`,
-    'i'
-  );
-  const planCountText = isComplete
-    ? `${summaryCount}/${planCount} plans complete`
-    : `${summaryCount}/${planCount} plans executed`;
-  roadmapContent = replaceInCurrentMilestone(roadmapContent, planCountPattern, `$1${planCountText}`);
-
-  // If complete: check checkbox
-  if (isComplete) {
-    const checkboxPattern = new RegExp(
-      `(-\\s*\\[)[ ](\\]\\s*.*Phase\\s+${phaseEscaped}[:\\s][^\\n]*)`,
-      'i'
-    );
-    roadmapContent = replaceInCurrentMilestone(roadmapContent, checkboxPattern, `$1x$2 (completed ${today})`);
-  }
-
-  // Mark completed plan checkboxes (e.g. "- [ ] 50-01-PLAN.md" or "- [ ] 50-01:")
-  for (const summaryFile of phaseInfo.summaries) {
-    const planId = summaryFile.replace('-SUMMARY.md', '').replace('SUMMARY.md', '');
-    if (!planId) continue;
-    const planEscaped = escapeRegex(planId);
-    const planCheckboxPattern = new RegExp(
-      `(-\\s*\\[) (\\]\\s*${planEscaped})`,
-      'i'
-    );
-    roadmapContent = roadmapContent.replace(planCheckboxPattern, '$1x$2');
-  }
-
-  fs.writeFileSync(roadmapPath, roadmapContent, 'utf-8');
 
   output({
     updated: true,

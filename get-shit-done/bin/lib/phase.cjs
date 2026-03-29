@@ -4,7 +4,7 @@
 
 const fs = require('fs');
 const path = require('path');
-const { escapeRegex, loadConfig, normalizePhaseName, comparePhaseNum, findPhaseInternal, getArchivedPhaseDirs, generateSlugInternal, getMilestonePhaseFilter, stripShippedMilestones, extractCurrentMilestone, replaceInCurrentMilestone, toPosixPath, planningDir, output, error, readSubdirectories } = require('./core.cjs');
+const { escapeRegex, loadConfig, normalizePhaseName, comparePhaseNum, findPhaseInternal, getArchivedPhaseDirs, generateSlugInternal, getMilestonePhaseFilter, stripShippedMilestones, extractCurrentMilestone, replaceInCurrentMilestone, toPosixPath, planningDir, withPlanningLock, output, error, readSubdirectories } = require('./core.cjs');
 const { extractFrontmatter } = require('./frontmatter.cjs');
 const { writeStateMd, stateExtractField, stateReplaceField, stateReplaceFieldWithFallback } = require('./state.cjs');
 
@@ -328,57 +328,62 @@ function cmdPhaseAdd(cwd, description, raw, customId) {
     error('ROADMAP.md not found');
   }
 
-  const rawContent = fs.readFileSync(roadmapPath, 'utf-8');
-  const content = extractCurrentMilestone(rawContent, cwd);
   const slug = generateSlugInternal(description);
 
-  let newPhaseId;
-  let dirName;
+  // Wrap entire read-modify-write in lock to prevent concurrent corruption
+  const { newPhaseId, dirName } = withPlanningLock(cwd, () => {
+    const rawContent = fs.readFileSync(roadmapPath, 'utf-8');
+    const content = extractCurrentMilestone(rawContent, cwd);
 
-  // Optional project code prefix (e.g., 'CK' → 'CK-01-foundation')
-  const projectCode = config.project_code || '';
-  const prefix = projectCode ? `${projectCode}-` : '';
+    // Optional project code prefix (e.g., 'CK' → 'CK-01-foundation')
+    const projectCode = config.project_code || '';
+    const prefix = projectCode ? `${projectCode}-` : '';
 
-  if (customId || config.phase_naming === 'custom') {
-    // Custom phase naming: use provided ID or generate from description
-    newPhaseId = customId || slug.toUpperCase().replace(/-/g, '-');
-    if (!newPhaseId) error('--id required when phase_naming is "custom"');
-    dirName = `${prefix}${newPhaseId}-${slug}`;
-  } else {
-    // Sequential mode: find highest integer phase number (in current milestone only)
-    const phasePattern = /#{2,4}\s*Phase\s+(\d+)[A-Z]?(?:\.\d+)*:/gi;
-    let maxPhase = 0;
-    let m;
-    while ((m = phasePattern.exec(content)) !== null) {
-      const num = parseInt(m[1], 10);
-      if (num > maxPhase) maxPhase = num;
+    let _newPhaseId;
+    let _dirName;
+
+    if (customId || config.phase_naming === 'custom') {
+      // Custom phase naming: use provided ID or generate from description
+      _newPhaseId = customId || slug.toUpperCase().replace(/-/g, '-');
+      if (!_newPhaseId) error('--id required when phase_naming is "custom"');
+      _dirName = `${prefix}${_newPhaseId}-${slug}`;
+    } else {
+      // Sequential mode: find highest integer phase number (in current milestone only)
+      const phasePattern = /#{2,4}\s*Phase\s+(\d+)[A-Z]?(?:\.\d+)*:/gi;
+      let maxPhase = 0;
+      let m;
+      while ((m = phasePattern.exec(content)) !== null) {
+        const num = parseInt(m[1], 10);
+        if (num > maxPhase) maxPhase = num;
+      }
+
+      _newPhaseId = maxPhase + 1;
+      const paddedNum = String(_newPhaseId).padStart(2, '0');
+      _dirName = `${prefix}${paddedNum}-${slug}`;
     }
 
-    newPhaseId = maxPhase + 1;
-    const paddedNum = String(newPhaseId).padStart(2, '0');
-    dirName = `${prefix}${paddedNum}-${slug}`;
-  }
+    const dirPath = path.join(planningDir(cwd), 'phases', _dirName);
 
-  const dirPath = path.join(planningDir(cwd), 'phases', dirName);
+    // Create directory with .gitkeep so git tracks empty folders
+    fs.mkdirSync(dirPath, { recursive: true });
+    fs.writeFileSync(path.join(dirPath, '.gitkeep'), '');
 
-  // Create directory with .gitkeep so git tracks empty folders
-  fs.mkdirSync(dirPath, { recursive: true });
-  fs.writeFileSync(path.join(dirPath, '.gitkeep'), '');
+    // Build phase entry
+    const dependsOn = config.phase_naming === 'custom' ? '' : `\n**Depends on:** Phase ${typeof _newPhaseId === 'number' ? _newPhaseId - 1 : 'TBD'}`;
+    const phaseEntry = `\n### Phase ${_newPhaseId}: ${description}\n\n**Goal:** [To be planned]\n**Requirements**: TBD${dependsOn}\n**Plans:** 0 plans\n\nPlans:\n- [ ] TBD (run /gsd:plan-phase ${_newPhaseId} to break down)\n`;
 
-  // Build phase entry
-  const dependsOn = config.phase_naming === 'custom' ? '' : `\n**Depends on:** Phase ${typeof newPhaseId === 'number' ? newPhaseId - 1 : 'TBD'}`;
-  const phaseEntry = `\n### Phase ${newPhaseId}: ${description}\n\n**Goal:** [To be planned]\n**Requirements**: TBD${dependsOn}\n**Plans:** 0 plans\n\nPlans:\n- [ ] TBD (run /gsd:plan-phase ${newPhaseId} to break down)\n`;
+    // Find insertion point: before last "---" or at end
+    let updatedContent;
+    const lastSeparator = rawContent.lastIndexOf('\n---');
+    if (lastSeparator > 0) {
+      updatedContent = rawContent.slice(0, lastSeparator) + phaseEntry + rawContent.slice(lastSeparator);
+    } else {
+      updatedContent = rawContent + phaseEntry;
+    }
 
-  // Find insertion point: before last "---" or at end
-  let updatedContent;
-  const lastSeparator = rawContent.lastIndexOf('\n---');
-  if (lastSeparator > 0) {
-    updatedContent = rawContent.slice(0, lastSeparator) + phaseEntry + rawContent.slice(lastSeparator);
-  } else {
-    updatedContent = rawContent + phaseEntry;
-  }
-
-  fs.writeFileSync(roadmapPath, updatedContent, 'utf-8');
+    fs.writeFileSync(roadmapPath, updatedContent, 'utf-8');
+    return { newPhaseId: _newPhaseId, dirName: _dirName };
+  });
 
   const result = {
     phase_number: typeof newPhaseId === 'number' ? newPhaseId : String(newPhaseId),
@@ -402,71 +407,74 @@ function cmdPhaseInsert(cwd, afterPhase, description, raw) {
     error('ROADMAP.md not found');
   }
 
-  const rawContent = fs.readFileSync(roadmapPath, 'utf-8');
-  const content = extractCurrentMilestone(rawContent, cwd);
   const slug = generateSlugInternal(description);
 
-  // Normalize input then strip leading zeros for flexible matching
-  const normalizedAfter = normalizePhaseName(afterPhase);
-  const unpadded = normalizedAfter.replace(/^0+/, '');
-  const afterPhaseEscaped = unpadded.replace(/\./g, '\\.');
-  const targetPattern = new RegExp(`#{2,4}\\s*Phase\\s+0*${afterPhaseEscaped}:`, 'i');
-  if (!targetPattern.test(content)) {
-    error(`Phase ${afterPhase} not found in ROADMAP.md`);
-  }
+  // Wrap entire read-modify-write in lock to prevent concurrent corruption
+  const { decimalPhase, dirName } = withPlanningLock(cwd, () => {
+    const rawContent = fs.readFileSync(roadmapPath, 'utf-8');
+    const content = extractCurrentMilestone(rawContent, cwd);
 
-  // Calculate next decimal using existing logic
-  const phasesDir = path.join(planningDir(cwd), 'phases');
-  const normalizedBase = normalizePhaseName(afterPhase);
-  let existingDecimals = [];
-
-  try {
-    const entries = fs.readdirSync(phasesDir, { withFileTypes: true });
-    const dirs = entries.filter(e => e.isDirectory()).map(e => e.name);
-    const decimalPattern = new RegExp(`^(?:[A-Z]{1,6}-)?${normalizedBase}\\.(\\d+)`);
-    for (const dir of dirs) {
-      const dm = dir.match(decimalPattern);
-      if (dm) existingDecimals.push(parseInt(dm[1], 10));
+    // Normalize input then strip leading zeros for flexible matching
+    const normalizedAfter = normalizePhaseName(afterPhase);
+    const unpadded = normalizedAfter.replace(/^0+/, '');
+    const afterPhaseEscaped = unpadded.replace(/\./g, '\\.');
+    const targetPattern = new RegExp(`#{2,4}\\s*Phase\\s+0*${afterPhaseEscaped}:`, 'i');
+    if (!targetPattern.test(content)) {
+      error(`Phase ${afterPhase} not found in ROADMAP.md`);
     }
-  } catch { /* intentionally empty */ }
 
-  const nextDecimal = existingDecimals.length === 0 ? 1 : Math.max(...existingDecimals) + 1;
-  const decimalPhase = `${normalizedBase}.${nextDecimal}`;
+    // Calculate next decimal using existing logic
+    const phasesDir = path.join(planningDir(cwd), 'phases');
+    const normalizedBase = normalizePhaseName(afterPhase);
+    let existingDecimals = [];
 
-  // Optional project code prefix
-  const config = loadConfig(cwd);
-  const projectCode = config.project_code || '';
-  const prefix = projectCode ? `${projectCode}-` : '';
-  const dirName = `${prefix}${decimalPhase}-${slug}`;
-  const dirPath = path.join(planningDir(cwd), 'phases', dirName);
+    try {
+      const entries = fs.readdirSync(phasesDir, { withFileTypes: true });
+      const dirs = entries.filter(e => e.isDirectory()).map(e => e.name);
+      const decimalPattern = new RegExp(`^(?:[A-Z]{1,6}-)?${normalizedBase}\\.(\\d+)`);
+      for (const dir of dirs) {
+        const dm = dir.match(decimalPattern);
+        if (dm) existingDecimals.push(parseInt(dm[1], 10));
+      }
+    } catch { /* intentionally empty */ }
 
-  // Create directory with .gitkeep so git tracks empty folders
-  fs.mkdirSync(dirPath, { recursive: true });
-  fs.writeFileSync(path.join(dirPath, '.gitkeep'), '');
+    const nextDecimal = existingDecimals.length === 0 ? 1 : Math.max(...existingDecimals) + 1;
+    const _decimalPhase = `${normalizedBase}.${nextDecimal}`;
+    // Optional project code prefix
+    const projectCode = config.project_code || '';
+    const pfx = projectCode ? `${projectCode}-` : '';
+    const _dirName = `${pfx}${_decimalPhase}-${slug}`;
+    const dirPath = path.join(planningDir(cwd), 'phases', _dirName);
 
-  // Build phase entry
-  const phaseEntry = `\n### Phase ${decimalPhase}: ${description} (INSERTED)\n\n**Goal:** [Urgent work - to be planned]\n**Requirements**: TBD\n**Depends on:** Phase ${afterPhase}\n**Plans:** 0 plans\n\nPlans:\n- [ ] TBD (run /gsd:plan-phase ${decimalPhase} to break down)\n`;
+    // Create directory with .gitkeep so git tracks empty folders
+    fs.mkdirSync(dirPath, { recursive: true });
+    fs.writeFileSync(path.join(dirPath, '.gitkeep'), '');
 
-  // Insert after the target phase section
-  const headerPattern = new RegExp(`(#{2,4}\\s*Phase\\s+0*${afterPhaseEscaped}:[^\\n]*\\n)`, 'i');
-  const headerMatch = rawContent.match(headerPattern);
-  if (!headerMatch) {
-    error(`Could not find Phase ${afterPhase} header`);
-  }
+    // Build phase entry
+    const phaseEntry = `\n### Phase ${_decimalPhase}: ${description} (INSERTED)\n\n**Goal:** [Urgent work - to be planned]\n**Requirements**: TBD\n**Depends on:** Phase ${afterPhase}\n**Plans:** 0 plans\n\nPlans:\n- [ ] TBD (run /gsd:plan-phase ${_decimalPhase} to break down)\n`;
 
-  const headerIdx = rawContent.indexOf(headerMatch[0]);
-  const afterHeader = rawContent.slice(headerIdx + headerMatch[0].length);
-  const nextPhaseMatch = afterHeader.match(/\n#{2,4}\s+Phase\s+\d/i);
+    // Insert after the target phase section
+    const headerPattern = new RegExp(`(#{2,4}\\s*Phase\\s+0*${afterPhaseEscaped}:[^\\n]*\\n)`, 'i');
+    const headerMatch = rawContent.match(headerPattern);
+    if (!headerMatch) {
+      error(`Could not find Phase ${afterPhase} header`);
+    }
 
-  let insertIdx;
-  if (nextPhaseMatch) {
-    insertIdx = headerIdx + headerMatch[0].length + nextPhaseMatch.index;
-  } else {
-    insertIdx = rawContent.length;
-  }
+    const headerIdx = rawContent.indexOf(headerMatch[0]);
+    const afterHeader = rawContent.slice(headerIdx + headerMatch[0].length);
+    const nextPhaseMatch = afterHeader.match(/\n#{2,4}\s+Phase\s+\d/i);
 
-  const updatedContent = rawContent.slice(0, insertIdx) + phaseEntry + rawContent.slice(insertIdx);
-  fs.writeFileSync(roadmapPath, updatedContent, 'utf-8');
+    let insertIdx;
+    if (nextPhaseMatch) {
+      insertIdx = headerIdx + headerMatch[0].length + nextPhaseMatch.index;
+    } else {
+      insertIdx = rawContent.length;
+    }
+
+    const updatedContent = rawContent.slice(0, insertIdx) + phaseEntry + rawContent.slice(insertIdx);
+    fs.writeFileSync(roadmapPath, updatedContent, 'utf-8');
+    return { decimalPhase: _decimalPhase, dirName: _dirName };
+  });
 
   const result = {
     phase_number: decimalPhase,
@@ -554,29 +562,32 @@ function renameIntegerPhases(phasesDir, removedInt) {
 /**
  * Remove a phase section from ROADMAP.md and renumber all subsequent integer phases.
  */
-function updateRoadmapAfterPhaseRemoval(roadmapPath, targetPhase, isDecimal, removedInt) {
-  let content = fs.readFileSync(roadmapPath, 'utf-8');
-  const escaped = escapeRegex(targetPhase);
+function updateRoadmapAfterPhaseRemoval(roadmapPath, targetPhase, isDecimal, removedInt, cwd) {
+  // Wrap entire read-modify-write in lock to prevent concurrent corruption
+  withPlanningLock(cwd, () => {
+    let content = fs.readFileSync(roadmapPath, 'utf-8');
+    const escaped = escapeRegex(targetPhase);
 
-  content = content.replace(new RegExp(`\\n?#{2,4}\\s*Phase\\s+${escaped}\\s*:[\\s\\S]*?(?=\\n#{2,4}\\s+Phase\\s+\\d|$)`, 'i'), '');
-  content = content.replace(new RegExp(`\\n?-\\s*\\[[ x]\\]\\s*.*Phase\\s+${escaped}[:\\s][^\\n]*`, 'gi'), '');
-  content = content.replace(new RegExp(`\\n?\\|\\s*${escaped}\\.?\\s[^|]*\\|[^\\n]*`, 'gi'), '');
+    content = content.replace(new RegExp(`\\n?#{2,4}\\s*Phase\\s+${escaped}\\s*:[\\s\\S]*?(?=\\n#{2,4}\\s+Phase\\s+\\d|$)`, 'i'), '');
+    content = content.replace(new RegExp(`\\n?-\\s*\\[[ x]\\]\\s*.*Phase\\s+${escaped}[:\\s][^\\n]*`, 'gi'), '');
+    content = content.replace(new RegExp(`\\n?\\|\\s*${escaped}\\.?\\s[^|]*\\|[^\\n]*`, 'gi'), '');
 
-  if (!isDecimal) {
-    const MAX_PHASE = 99;
-    for (let oldNum = MAX_PHASE; oldNum > removedInt; oldNum--) {
-      const newNum = oldNum - 1;
-      const oldStr = String(oldNum), newStr = String(newNum);
-      const oldPad = oldStr.padStart(2, '0'), newPad = newStr.padStart(2, '0');
-      content = content.replace(new RegExp(`(#{2,4}\\s*Phase\\s+)${oldStr}(\\s*:)`, 'gi'), `$1${newStr}$2`);
-      content = content.replace(new RegExp(`(Phase\\s+)${oldStr}([:\\s])`, 'g'), `$1${newStr}$2`);
-      content = content.replace(new RegExp(`${oldPad}-(\\d{2})`, 'g'), `${newPad}-$1`);
-      content = content.replace(new RegExp(`(\\|\\s*)${oldStr}\\.\\s`, 'g'), `$1${newStr}. `);
-      content = content.replace(new RegExp(`(Depends on:\\*\\*\\s*Phase\\s+)${oldStr}\\b`, 'gi'), `$1${newStr}`);
+    if (!isDecimal) {
+      const MAX_PHASE = 99;
+      for (let oldNum = MAX_PHASE; oldNum > removedInt; oldNum--) {
+        const newNum = oldNum - 1;
+        const oldStr = String(oldNum), newStr = String(newNum);
+        const oldPad = oldStr.padStart(2, '0'), newPad = newStr.padStart(2, '0');
+        content = content.replace(new RegExp(`(#{2,4}\\s*Phase\\s+)${oldStr}(\\s*:)`, 'gi'), `$1${newStr}$2`);
+        content = content.replace(new RegExp(`(Phase\\s+)${oldStr}([:\\s])`, 'g'), `$1${newStr}$2`);
+        content = content.replace(new RegExp(`${oldPad}-(\\d{2})`, 'g'), `${newPad}-$1`);
+        content = content.replace(new RegExp(`(\\|\\s*)${oldStr}\\.\\s`, 'g'), `$1${newStr}. `);
+        content = content.replace(new RegExp(`(Depends on:\\*\\*\\s*Phase\\s+)${oldStr}\\b`, 'gi'), `$1${newStr}`);
+      }
     }
-  }
 
-  fs.writeFileSync(roadmapPath, content, 'utf-8');
+    fs.writeFileSync(roadmapPath, content, 'utf-8');
+  });
 }
 
 function cmdPhaseRemove(cwd, targetPhase, options, raw) {
@@ -617,7 +628,7 @@ function cmdPhaseRemove(cwd, targetPhase, options, raw) {
   } catch { /* intentionally empty */ }
 
   // Update ROADMAP.md
-  updateRoadmapAfterPhaseRemoval(roadmapPath, targetPhase, isDecimal, parseInt(normalized, 10));
+  updateRoadmapAfterPhaseRemoval(roadmapPath, targetPhase, isDecimal, parseInt(normalized, 10), cwd);
 
   // Update STATE.md phase count
   const statePath = path.join(planningDir(cwd), 'STATE.md');
@@ -686,98 +697,100 @@ function cmdPhaseComplete(cwd, phaseNum, raw) {
     }
   } catch {}
 
-  // Update ROADMAP.md: mark phase complete
+  // Update ROADMAP.md and REQUIREMENTS.md atomically under lock
   if (fs.existsSync(roadmapPath)) {
-    let roadmapContent = fs.readFileSync(roadmapPath, 'utf-8');
+    withPlanningLock(cwd, () => {
+      let roadmapContent = fs.readFileSync(roadmapPath, 'utf-8');
 
-    // Checkbox: - [ ] Phase N: → - [x] Phase N: (...completed DATE)
-    const checkboxPattern = new RegExp(
-      `(-\\s*\\[)[ ](\\]\\s*.*Phase\\s+${escapeRegex(phaseNum)}[:\\s][^\\n]*)`,
-      'i'
-    );
-    roadmapContent = replaceInCurrentMilestone(roadmapContent, checkboxPattern, `$1x$2 (completed ${today})`);
-
-    // Progress table: update Status to Complete, add date (handles 4 or 5 column tables)
-    const phaseEscaped = escapeRegex(phaseNum);
-    const tableRowPattern = new RegExp(
-      `^(\\|\\s*${phaseEscaped}\\.?\\s[^|]*(?:\\|[^\\n]*))$`,
-      'im'
-    );
-    roadmapContent = roadmapContent.replace(tableRowPattern, (fullRow) => {
-      const cells = fullRow.split('|').slice(1, -1);
-      if (cells.length === 5) {
-        // 5-col: Phase | Milestone | Plans | Status | Completed
-        cells[2] = ` ${summaryCount}/${planCount} `;
-        cells[3] = ' Complete    ';
-        cells[4] = ` ${today} `;
-      } else if (cells.length === 4) {
-        // 4-col: Phase | Plans | Status | Completed
-        cells[1] = ` ${summaryCount}/${planCount} `;
-        cells[2] = ' Complete    ';
-        cells[3] = ` ${today} `;
-      }
-      return '|' + cells.join('|') + '|';
-    });
-
-    // Update plan count in phase section
-    const planCountPattern = new RegExp(
-      `(#{2,4}\\s*Phase\\s+${phaseEscaped}[\\s\\S]*?\\*\\*Plans:\\*\\*\\s*)[^\\n]+`,
-      'i'
-    );
-    roadmapContent = replaceInCurrentMilestone(
-      roadmapContent, planCountPattern,
-      `$1${summaryCount}/${planCount} plans complete`
-    );
-
-    // Mark completed plan checkboxes (safety net for missed per-plan updates)
-    for (const summaryFile of phaseInfo.summaries) {
-      const planId = summaryFile.replace('-SUMMARY.md', '').replace('SUMMARY.md', '');
-      if (!planId) continue;
-      const planEscaped = escapeRegex(planId);
-      const planCheckboxPattern = new RegExp(
-        `(-\\s*\\[) (\\]\\s*${planEscaped})`,
+      // Checkbox: - [ ] Phase N: → - [x] Phase N: (...completed DATE)
+      const checkboxPattern = new RegExp(
+        `(-\\s*\\[)[ ](\\]\\s*.*Phase\\s+${escapeRegex(phaseNum)}[:\\s][^\\n]*)`,
         'i'
       );
-      roadmapContent = roadmapContent.replace(planCheckboxPattern, '$1x$2');
-    }
+      roadmapContent = replaceInCurrentMilestone(roadmapContent, checkboxPattern, `$1x$2 (completed ${today})`);
 
-    fs.writeFileSync(roadmapPath, roadmapContent, 'utf-8');
+      // Progress table: update Status to Complete, add date (handles 4 or 5 column tables)
+      const phaseEscaped = escapeRegex(phaseNum);
+      const tableRowPattern = new RegExp(
+        `^(\\|\\s*${phaseEscaped}\\.?\\s[^|]*(?:\\|[^\\n]*))$`,
+        'im'
+      );
+      roadmapContent = roadmapContent.replace(tableRowPattern, (fullRow) => {
+        const cells = fullRow.split('|').slice(1, -1);
+        if (cells.length === 5) {
+          // 5-col: Phase | Milestone | Plans | Status | Completed
+          cells[2] = ` ${summaryCount}/${planCount} `;
+          cells[3] = ' Complete    ';
+          cells[4] = ` ${today} `;
+        } else if (cells.length === 4) {
+          // 4-col: Phase | Plans | Status | Completed
+          cells[1] = ` ${summaryCount}/${planCount} `;
+          cells[2] = ' Complete    ';
+          cells[3] = ` ${today} `;
+        }
+        return '|' + cells.join('|') + '|';
+      });
 
-    // Update REQUIREMENTS.md traceability for this phase's requirements
-    const reqPath = path.join(planningDir(cwd), 'REQUIREMENTS.md');
-    if (fs.existsSync(reqPath)) {
-      // Extract the current phase section from roadmap (scoped to avoid cross-phase matching)
-      const phaseEsc = escapeRegex(phaseNum);
-      const currentMilestoneRoadmap = extractCurrentMilestone(roadmapContent, cwd);
-      const phaseSectionMatch = currentMilestoneRoadmap.match(
-        new RegExp(`(#{2,4}\\s*Phase\\s+${phaseEsc}[:\\s][\\s\\S]*?)(?=#{2,4}\\s*Phase\\s+|$)`, 'i')
+      // Update plan count in phase section
+      const planCountPattern = new RegExp(
+        `(#{2,4}\\s*Phase\\s+${phaseEscaped}[\\s\\S]*?\\*\\*Plans:\\*\\*\\s*)[^\\n]+`,
+        'i'
+      );
+      roadmapContent = replaceInCurrentMilestone(
+        roadmapContent, planCountPattern,
+        `$1${summaryCount}/${planCount} plans complete`
       );
 
-      const sectionText = phaseSectionMatch ? phaseSectionMatch[1] : '';
-      const reqMatch = sectionText.match(/\*\*Requirements:\*\*\s*([^\n]+)/i);
-
-      if (reqMatch) {
-        const reqIds = reqMatch[1].replace(/[\[\]]/g, '').split(/[,\s]+/).map(r => r.trim()).filter(Boolean);
-        let reqContent = fs.readFileSync(reqPath, 'utf-8');
-
-        for (const reqId of reqIds) {
-          const reqEscaped = escapeRegex(reqId);
-          // Update checkbox: - [ ] **REQ-ID** → - [x] **REQ-ID**
-          reqContent = reqContent.replace(
-            new RegExp(`(-\\s*\\[)[ ](\\]\\s*\\*\\*${reqEscaped}\\*\\*)`, 'gi'),
-            '$1x$2'
-          );
-          // Update traceability table: | REQ-ID | Phase N | Pending/In Progress | → | REQ-ID | Phase N | Complete |
-          reqContent = reqContent.replace(
-            new RegExp(`(\\|\\s*${reqEscaped}\\s*\\|[^|]+\\|)\\s*(?:Pending|In Progress)\\s*(\\|)`, 'gi'),
-            '$1 Complete $2'
-          );
-        }
-
-        fs.writeFileSync(reqPath, reqContent, 'utf-8');
-        requirementsUpdated = true;
+      // Mark completed plan checkboxes (safety net for missed per-plan updates)
+      for (const summaryFile of phaseInfo.summaries) {
+        const planId = summaryFile.replace('-SUMMARY.md', '').replace('SUMMARY.md', '');
+        if (!planId) continue;
+        const planEscaped = escapeRegex(planId);
+        const planCheckboxPattern = new RegExp(
+          `(-\\s*\\[) (\\]\\s*${planEscaped})`,
+          'i'
+        );
+        roadmapContent = roadmapContent.replace(planCheckboxPattern, '$1x$2');
       }
-    }
+
+      fs.writeFileSync(roadmapPath, roadmapContent, 'utf-8');
+
+      // Update REQUIREMENTS.md traceability for this phase's requirements
+      const reqPath = path.join(planningDir(cwd), 'REQUIREMENTS.md');
+      if (fs.existsSync(reqPath)) {
+        // Extract the current phase section from roadmap (scoped to avoid cross-phase matching)
+        const phaseEsc = escapeRegex(phaseNum);
+        const currentMilestoneRoadmap = extractCurrentMilestone(roadmapContent, cwd);
+        const phaseSectionMatch = currentMilestoneRoadmap.match(
+          new RegExp(`(#{2,4}\\s*Phase\\s+${phaseEsc}[:\\s][\\s\\S]*?)(?=#{2,4}\\s*Phase\\s+|$)`, 'i')
+        );
+
+        const sectionText = phaseSectionMatch ? phaseSectionMatch[1] : '';
+        const reqMatch = sectionText.match(/\*\*Requirements:\*\*\s*([^\n]+)/i);
+
+        if (reqMatch) {
+          const reqIds = reqMatch[1].replace(/[\[\]]/g, '').split(/[,\s]+/).map(r => r.trim()).filter(Boolean);
+          let reqContent = fs.readFileSync(reqPath, 'utf-8');
+
+          for (const reqId of reqIds) {
+            const reqEscaped = escapeRegex(reqId);
+            // Update checkbox: - [ ] **REQ-ID** → - [x] **REQ-ID**
+            reqContent = reqContent.replace(
+              new RegExp(`(-\\s*\\[)[ ](\\]\\s*\\*\\*${reqEscaped}\\*\\*)`, 'gi'),
+              '$1x$2'
+            );
+            // Update traceability table: | REQ-ID | Phase N | Pending/In Progress | → | REQ-ID | Phase N | Complete |
+            reqContent = reqContent.replace(
+              new RegExp(`(\\|\\s*${reqEscaped}\\s*\\|[^|]+\\|)\\s*(?:Pending|In Progress)\\s*(\\|)`, 'gi'),
+              '$1 Complete $2'
+            );
+          }
+
+          fs.writeFileSync(reqPath, reqContent, 'utf-8');
+          requirementsUpdated = true;
+        }
+      }
+    });
   }
 
   // Find next phase — check both filesystem AND roadmap

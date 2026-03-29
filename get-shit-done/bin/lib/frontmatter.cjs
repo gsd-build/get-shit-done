@@ -252,6 +252,19 @@ function parseMustHavesBlock(content, blockName) {
   }
   if (current) items.push(current);
 
+  // Warn when must_haves block exists but parsed as empty -- likely YAML formatting issue.
+  // This is a critical diagnostic: empty must_haves causes verification to silently degrade
+  // to Option C (LLM-derived truths) instead of checking documented contracts.
+  if (items.length === 0 && blockLines.length > 0) {
+    const nonEmptyLines = blockLines.filter(l => l.trim() !== '').length;
+    if (nonEmptyLines > 0) {
+      process.stderr.write(
+        `[gsd-tools] WARNING: must_haves.${blockName} block has ${nonEmptyLines} content lines but parsed 0 items. ` +
+        `Possible YAML formatting issue — verification will fall back to LLM-derived truths.\n`
+      );
+    }
+  }
+
   return items;
 }
 

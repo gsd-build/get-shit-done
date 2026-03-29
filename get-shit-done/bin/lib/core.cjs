@@ -360,20 +360,44 @@ function normalizeMd(content) {
   const lines = text.split('\n');
   const result = [];
 
+  // Pre-compute fence state in a single O(n) pass instead of O(n^2) per-line scanning
+  const fenceRegex = /^```/;
+  const insideFence = new Array(lines.length);
+  let fenceOpen = false;
+  for (let i = 0; i < lines.length; i++) {
+    if (fenceRegex.test(lines[i].trimEnd())) {
+      if (fenceOpen) {
+        // This is a closing fence — mark as NOT inside (it's the boundary)
+        insideFence[i] = false;
+        fenceOpen = false;
+      } else {
+        // This is an opening fence
+        insideFence[i] = false;
+        fenceOpen = true;
+      }
+    } else {
+      insideFence[i] = fenceOpen;
+    }
+  }
+
   for (let i = 0; i < lines.length; i++) {
     const line = lines[i];
     const prev = i > 0 ? lines[i - 1] : '';
     const prevTrimmed = prev.trimEnd();
     const trimmed = line.trimEnd();
+    const isFenceLine = fenceRegex.test(trimmed);
 
     // MD022: Blank line before headings (skip first line and frontmatter delimiters)
     if (/^#{1,6}\s/.test(trimmed) && i > 0 && prevTrimmed !== '' && prevTrimmed !== '---') {
       result.push('');
     }
 
-    // MD031: Blank line before fenced code blocks
-    if (/^```/.test(trimmed) && i > 0 && prevTrimmed !== '' && !isInsideFencedBlock(lines, i)) {
-      result.push('');
+    // MD031: Blank line before fenced code blocks (opening fences only)
+    if (isFenceLine && i > 0 && prevTrimmed !== '' && !insideFence[i] && (i === 0 || !insideFence[i - 1] || isFenceLine)) {
+      // Only add blank before opening fences (not closing ones)
+      if (i === 0 || !insideFence[i - 1]) {
+        result.push('');
+      }
     }
 
     // MD032: Blank line before lists (- item, * item, N. item, - [ ] item)
@@ -394,7 +418,7 @@ function normalizeMd(content) {
     }
 
     // MD031: Blank line after closing fenced code blocks
-    if (/^```\s*$/.test(trimmed) && isClosingFence(lines, i) && i < lines.length - 1) {
+    if (/^```\s*$/.test(trimmed) && i > 0 && insideFence[i - 1] && i < lines.length - 1) {
       const next = lines[i + 1];
       if (next !== undefined && next.trimEnd() !== '') {
         result.push('');
@@ -422,24 +446,6 @@ function normalizeMd(content) {
   text = text.replace(/\n*$/, '\n');
 
   return text;
-}
-
-/** Check if line index i is inside an already-open fenced code block */
-function isInsideFencedBlock(lines, i) {
-  let fenceCount = 0;
-  for (let j = 0; j < i; j++) {
-    if (/^```/.test(lines[j].trimEnd())) fenceCount++;
-  }
-  return fenceCount % 2 === 1;
-}
-
-/** Check if a ``` line is a closing fence (odd number of fences up to and including this one) */
-function isClosingFence(lines, i) {
-  let fenceCount = 0;
-  for (let j = 0; j <= i; j++) {
-    if (/^```/.test(lines[j].trimEnd())) fenceCount++;
-  }
-  return fenceCount % 2 === 0;
 }
 
 function execGit(cwd, args) {

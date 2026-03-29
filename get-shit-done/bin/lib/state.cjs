@@ -141,29 +141,28 @@ function cmdStatePatch(cwd, patches, raw) {
 
   const statePath = planningPaths(cwd).state;
   try {
-    let content = fs.readFileSync(statePath, 'utf-8');
     const results = { updated: [], failed: [] };
 
-    for (const [field, value] of Object.entries(patches)) {
-      const fieldEscaped = escapeRegex(field);
-      // Try **Field:** bold format first, then plain Field: format
-      const boldPattern = new RegExp(`(\\*\\*${fieldEscaped}:\\*\\*\\s*)(.*)`, 'i');
-      const plainPattern = new RegExp(`(^${fieldEscaped}:\\s*)(.*)`, 'im');
+    // Use atomic read-modify-write to prevent lost updates from concurrent agents
+    readModifyWriteStateMd(statePath, (content) => {
+      for (const [field, value] of Object.entries(patches)) {
+        const fieldEscaped = escapeRegex(field);
+        // Try **Field:** bold format first, then plain Field: format
+        const boldPattern = new RegExp(`(\\*\\*${fieldEscaped}:\\*\\*\\s*)(.*)`, 'i');
+        const plainPattern = new RegExp(`(^${fieldEscaped}:\\s*)(.*)`, 'im');
 
-      if (boldPattern.test(content)) {
-        content = content.replace(boldPattern, (_match, prefix) => `${prefix}${value}`);
-        results.updated.push(field);
-      } else if (plainPattern.test(content)) {
-        content = content.replace(plainPattern, (_match, prefix) => `${prefix}${value}`);
-        results.updated.push(field);
-      } else {
-        results.failed.push(field);
+        if (boldPattern.test(content)) {
+          content = content.replace(boldPattern, (_match, prefix) => `${prefix}${value}`);
+          results.updated.push(field);
+        } else if (plainPattern.test(content)) {
+          content = content.replace(plainPattern, (_match, prefix) => `${prefix}${value}`);
+          results.updated.push(field);
+        } else {
+          results.failed.push(field);
+        }
       }
-    }
-
-    if (results.updated.length > 0) {
-      writeStateMd(statePath, content, cwd);
-    }
+      return content;
+    }, cwd);
 
     output(results, raw, results.updated.length > 0 ? 'true' : 'false');
   } catch {
@@ -781,6 +780,50 @@ function syncStateFrontmatter(content, cwd) {
 }
 
 /**
+ * Acquire a lockfile for STATE.md operations.
+ * Returns the lock path for later release.
+ */
+function acquireStateLock(statePath) {
+  const lockPath = statePath + '.lock';
+  const maxRetries = 10;
+  const retryDelay = 200; // ms
+
+  for (let i = 0; i < maxRetries; i++) {
+    try {
+      const fd = fs.openSync(lockPath, fs.constants.O_CREAT | fs.constants.O_EXCL | fs.constants.O_WRONLY);
+      fs.writeSync(fd, String(process.pid));
+      fs.closeSync(fd);
+      return lockPath;
+    } catch (err) {
+      if (err.code === 'EEXIST') {
+        try {
+          const stat = fs.statSync(lockPath);
+          if (Date.now() - stat.mtimeMs > 10000) {
+            fs.unlinkSync(lockPath);
+            continue;
+          }
+        } catch { /* lock was released between check — retry */ }
+
+        if (i === maxRetries - 1) {
+          try { fs.unlinkSync(lockPath); } catch {}
+          return lockPath;
+        }
+        const jitter = Math.floor(Math.random() * 50);
+        const start = Date.now();
+        while (Date.now() - start < retryDelay + jitter) { /* busy wait */ }
+        continue;
+      }
+      return lockPath; // non-EEXIST error — proceed without lock
+    }
+  }
+  return statePath + '.lock';
+}
+
+function releaseStateLock(lockPath) {
+  try { fs.unlinkSync(lockPath); } catch { /* lock already gone */ }
+}
+
+/**
  * Write STATE.md with synchronized YAML frontmatter.
  * All STATE.md writes should use this instead of raw writeFileSync.
  * Uses a simple lockfile to prevent parallel agents from overwriting
@@ -788,48 +831,29 @@ function syncStateFrontmatter(content, cwd) {
  */
 function writeStateMd(statePath, content, cwd) {
   const synced = syncStateFrontmatter(content, cwd);
-  const lockPath = statePath + '.lock';
-  const maxRetries = 10;
-  const retryDelay = 200; // ms
-
-  // Acquire lock (spin with backoff)
-  for (let i = 0; i < maxRetries; i++) {
-    try {
-      // O_EXCL fails if file already exists — atomic lock
-      const fd = fs.openSync(lockPath, fs.constants.O_CREAT | fs.constants.O_EXCL | fs.constants.O_WRONLY);
-      fs.writeSync(fd, String(process.pid));
-      fs.closeSync(fd);
-      break;
-    } catch (err) {
-      if (err.code === 'EEXIST') {
-        // Check for stale lock (> 10s old)
-        try {
-          const stat = fs.statSync(lockPath);
-          if (Date.now() - stat.mtimeMs > 10000) {
-            fs.unlinkSync(lockPath);
-            continue; // retry immediately after clearing stale lock
-          }
-        } catch { /* lock was released between check — retry */ }
-
-        if (i === maxRetries - 1) {
-          // Last resort: write anyway rather than losing data
-          try { fs.unlinkSync(lockPath); } catch {}
-          break;
-        }
-        // Spin-wait with small jitter
-        const jitter = Math.floor(Math.random() * 50);
-        const start = Date.now();
-        while (Date.now() - start < retryDelay + jitter) { /* busy wait */ }
-        continue;
-      }
-      break; // non-EEXIST error — proceed without lock
-    }
-  }
-
+  const lockPath = acquireStateLock(statePath);
   try {
     fs.writeFileSync(statePath, normalizeMd(synced), 'utf-8');
   } finally {
-    try { fs.unlinkSync(lockPath); } catch { /* lock already gone */ }
+    releaseStateLock(lockPath);
+  }
+}
+
+/**
+ * Atomic read-modify-write for STATE.md.
+ * Holds the lock across the entire read -> transform -> write cycle,
+ * preventing the lost-update problem where two agents read the same
+ * content and the second write clobbers the first.
+ */
+function readModifyWriteStateMd(statePath, transformFn, cwd) {
+  const lockPath = acquireStateLock(statePath);
+  try {
+    const content = fs.existsSync(statePath) ? fs.readFileSync(statePath, 'utf-8') : '';
+    const modified = transformFn(content);
+    const synced = syncStateFrontmatter(modified, cwd);
+    fs.writeFileSync(statePath, normalizeMd(synced), 'utf-8');
+  } finally {
+    releaseStateLock(lockPath);
   }
 }
 
