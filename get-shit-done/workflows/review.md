@@ -22,7 +22,7 @@ command -v codex >/dev/null 2>&1 && echo "codex:available" || echo "codex:missin
 
 Parse flags from `$ARGUMENTS`:
 - `--gemini` → include Gemini
-- `--claude` → include Claude
+- `--claude` → include the agent
 - `--codex` → include Codex
 - `--all` → include all available
 - No flags → include all available
@@ -34,19 +34,39 @@ No external AI CLIs found. Install at least one:
 - codex: https://github.com/openai/codex
 - claude: https://github.com/anthropics/claude-code
 
-Then run /gsd:review again.
+Then run /gsd-review again.
 ```
 Exit.
 
-If only one CLI is the current runtime (e.g. running inside Claude), skip it for the review
-to ensure independence. At least one DIFFERENT CLI must be available.
+Determine which CLI to skip based on the current runtime environment:
+
+```bash
+# Environment-based runtime detection (priority order)
+if [ "$ANTIGRAVITY_AGENT" = "1" ]; then
+  # Antigravity is a separate client — all CLIs are external, skip none
+  SELF_CLI="none"
+elif [ -n "$CLAUDE_CODE_ENTRYPOINT" ]; then
+  # Running inside Claude Code CLI — skip claude for independence
+  SELF_CLI="claude"
+else
+  # Other environments (Gemini CLI, Codex CLI, etc.)
+  # Fall back to AI self-identification to decide which CLI to skip
+  SELF_CLI="auto"
+fi
+```
+
+Rules:
+- If `SELF_CLI="none"` → invoke ALL available CLIs (no skip)
+- If `SELF_CLI="claude"` → skip claude, use gemini/codex
+- If `SELF_CLI="auto"` → the executing AI identifies itself and skips its own CLI
+- At least one DIFFERENT CLI must be available for the review to proceed.
 </step>
 
 <step name="gather_context">
 Collect phase artifacts for the review prompt:
 
 ```bash
-INIT=$(node "$HOME/.claude/get-shit-done/bin/gsd-tools.cjs" init phase-op "${PHASE_ARG}")
+INIT=$(node "$HOME/.gemini/antigravity/get-shit-done/bin/gsd-tools.cjs" init phase-op "${PHASE_ARG}")
 if [[ "$INIT" == @file:* ]]; then INIT=$(cat "${INIT#@file:}"); fi
 ```
 
@@ -121,7 +141,7 @@ For each selected CLI, invoke in sequence (not parallel — avoid rate limits):
 gemini -p "$(cat /tmp/gsd-review-prompt-{phase}.md)" 2>/dev/null > /tmp/gsd-review-gemini-{phase}.md
 ```
 
-**Claude (separate session):**
+**the agent (separate session):**
 ```bash
 claude -p "$(cat /tmp/gsd-review-prompt-{phase}.md)" --no-input 2>/dev/null > /tmp/gsd-review-claude-{phase}.md
 ```
@@ -163,7 +183,7 @@ plans_reviewed: [{list of PLAN.md files}]
 
 ---
 
-## Claude Review
+## the agent Review
 
 {claude review content}
 
@@ -191,7 +211,7 @@ plans_reviewed: [{list of PLAN.md files}]
 
 Commit:
 ```bash
-node "$HOME/.claude/get-shit-done/bin/gsd-tools.cjs" commit "docs: cross-AI review for phase {N}" --files {phase_dir}/{padded_phase}-REVIEWS.md
+node "$HOME/.gemini/antigravity/get-shit-done/bin/gsd-tools.cjs" commit "docs: cross-AI review for phase {N}" --files {phase_dir}/{padded_phase}-REVIEWS.md
 ```
 </step>
 
@@ -211,7 +231,7 @@ Consensus concerns:
 Full review: {padded_phase}-REVIEWS.md
 
 To incorporate feedback into planning:
-  /gsd:plan-phase {N} --reviews
+  /gsd-plan-phase {N} --reviews
 ```
 
 Clean up temp files.
@@ -224,5 +244,5 @@ Clean up temp files.
 - [ ] REVIEWS.md written with structured feedback
 - [ ] Consensus summary synthesized from multiple reviewers
 - [ ] Temp files cleaned up
-- [ ] User knows how to use feedback (/gsd:plan-phase --reviews)
+- [ ] User knows how to use feedback (/gsd-plan-phase --reviews)
 </success_criteria>
