@@ -235,6 +235,12 @@ function stateReplaceFieldWithFallback(content, primary, fallback, value) {
     result = stateReplaceField(content, fallback, value);
     if (result) return result;
   }
+  // Neither pattern matched — field may have been reformatted or removed.
+  // Log diagnostic so template drift is detected early rather than silently swallowed.
+  process.stderr.write(
+    `[gsd-tools] WARNING: STATE.md field "${primary}"${fallback ? ` (fallback: "${fallback}")` : ''} not found — update skipped. ` +
+    `This may indicate STATE.md was externally modified or uses an unexpected format.\n`
+  );
   return content;
 }
 

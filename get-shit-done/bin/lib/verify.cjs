@@ -757,6 +757,71 @@ function cmdValidateHealth(cwd, options, raw) {
     }
   }
 
+  // ─── Check 9: STATE.md / ROADMAP.md cross-validation ─────────────────────
+  if (fs.existsSync(statePath) && fs.existsSync(roadmapPath)) {
+    try {
+      const stateContent = fs.readFileSync(statePath, 'utf-8');
+      const roadmapContentFull = fs.readFileSync(roadmapPath, 'utf-8');
+
+      // Extract current phase from STATE.md
+      const currentPhaseMatch = stateContent.match(/\*\*Current Phase:\*\*\s*(\S+)/i) ||
+                                 stateContent.match(/Current Phase:\s*(\S+)/i);
+      if (currentPhaseMatch) {
+        const statePhase = currentPhaseMatch[1].replace(/^0+/, '');
+        // Check if ROADMAP shows this phase as already complete
+        const phaseCheckboxRe = new RegExp(`-\\s*\\[x\\].*Phase\\s+0*${escapeRegex(statePhase)}[:\\s]`, 'i');
+        if (phaseCheckboxRe.test(roadmapContentFull)) {
+          // STATE says "current" but ROADMAP says "complete" — divergence
+          const stateStatus = stateContent.match(/\*\*Status:\*\*\s*(.+)/i);
+          const statusVal = stateStatus ? stateStatus[1].trim().toLowerCase() : '';
+          if (statusVal !== 'complete' && statusVal !== 'done') {
+            addIssue('warning', 'W011',
+              `STATE.md says current phase is ${statePhase} (status: ${statusVal || 'unknown'}) but ROADMAP.md shows it as [x] complete — state files may be out of sync`,
+              'Run /gsd:progress to re-derive current position, or manually update STATE.md');
+          }
+        }
+      }
+    } catch { /* intentionally empty — cross-validation is advisory */ }
+  }
+
+  // ─── Check 10: Config field validation ────────────────────────────────────
+  if (fs.existsSync(configPath)) {
+    try {
+      const configRaw = fs.readFileSync(configPath, 'utf-8');
+      const configParsed = JSON.parse(configRaw);
+
+      // Validate branching_strategy
+      const validStrategies = ['none', 'phase', 'milestone'];
+      if (configParsed.branching_strategy && !validStrategies.includes(configParsed.branching_strategy)) {
+        addIssue('warning', 'W012',
+          `config.json: invalid branching_strategy "${configParsed.branching_strategy}"`,
+          `Valid values: ${validStrategies.join(', ')}`);
+      }
+
+      // Validate context_window is a positive integer
+      if (configParsed.context_window !== undefined) {
+        const cw = configParsed.context_window;
+        if (typeof cw !== 'number' || cw <= 0 || !Number.isInteger(cw)) {
+          addIssue('warning', 'W013',
+            `config.json: context_window should be a positive integer, got "${cw}"`,
+            'Set to 200000 (default) or 1000000 (for 1M models)');
+        }
+      }
+
+      // Validate branch templates have required placeholders
+      if (configParsed.phase_branch_template && !configParsed.phase_branch_template.includes('{phase}')) {
+        addIssue('warning', 'W014',
+          'config.json: phase_branch_template missing {phase} placeholder',
+          'Template must include {phase} for phase number substitution');
+      }
+      if (configParsed.milestone_branch_template && !configParsed.milestone_branch_template.includes('{milestone}')) {
+        addIssue('warning', 'W015',
+          'config.json: milestone_branch_template missing {milestone} placeholder',
+          'Template must include {milestone} for version substitution');
+      }
+    } catch { /* parse error already caught in Check 5 */ }
+  }
+
   // ─── Perform repairs if requested ─────────────────────────────────────────
   const repairActions = [];
   if (options.repair && repairs.length > 0) {
