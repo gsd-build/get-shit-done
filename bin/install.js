@@ -3091,10 +3091,9 @@ function copyWithPathReplacement(srcDir, destDir, pathPrefix, runtime, isCommand
       if (isOpencode) {
         content = convertClaudeToOpencodeFrontmatter(content);
         fs.writeFileSync(destPath, content);
-      } else if (isGemini || isQwen) {
-        // Qwen-Code is a fork of Gemini CLI, uses same TOML format
+      } else if (isGemini) {
         if (isCommand) {
-          // Convert to TOML for Gemini/Qwen (strip <sub> tags — terminals can't render subscript)
+          // Convert to TOML for Gemini (strip <sub> tags — terminals can't render subscript)
           content = stripSubTags(content);
           const tomlContent = convertClaudeToGeminiToml(content);
           // Replace extension with .toml
@@ -3103,6 +3102,9 @@ function copyWithPathReplacement(srcDir, destDir, pathPrefix, runtime, isCommand
         } else {
           fs.writeFileSync(destPath, content);
         }
+      } else if (isQwen) {
+        // Qwen-Code uses Markdown format (same as Claude Code)
+        fs.writeFileSync(destPath, content);
       } else if (isCodex) {
         content = convertClaudeToCodexMarkdown(content);
         fs.writeFileSync(destPath, content);
@@ -4197,7 +4199,7 @@ function install(isGlobal, runtime = 'claude') {
       failures.push('skills/gsd-*');
     }
   } else {
-    // Claude Code, Gemini & Qwen-Code: nested structure in commands/ directory
+    // Claude Code & Qwen-Code: nested structure in commands/ directory (Markdown format)
     const commandsDir = path.join(targetDir, 'commands');
     fs.mkdirSync(commandsDir, { recursive: true });
 
@@ -4252,9 +4254,11 @@ function install(isGlobal, runtime = 'claude') {
         // Convert frontmatter for runtime compatibility (agents need different handling)
         if (isOpencode) {
           content = convertClaudeToOpencodeFrontmatter(content, { isAgent: true });
-        } else if (isGemini || isQwen) {
-          // Qwen-Code is a fork of Gemini CLI, uses same agent format
+        } else if (isGemini) {
           content = convertClaudeToGeminiAgent(content);
+        } else if (isQwen) {
+          // Qwen-Code uses Markdown format (same as Claude Code)
+          // No conversion needed
         } else if (isCodex) {
           content = convertClaudeAgentToCodexAgent(content);
         } else if (isCopilot) {
