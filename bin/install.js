@@ -369,7 +369,8 @@ function resolveOpencodeConfigPath(configDir) {
 function readSettings(settingsPath) {
   if (fs.existsSync(settingsPath)) {
     try {
-      return JSON.parse(fs.readFileSync(settingsPath, 'utf8'));
+      const content = fs.readFileSync(settingsPath, 'utf8');
+      return parseJsonc(content);
     } catch (e) {
       return {};
     }
