@@ -22,6 +22,7 @@ const MODEL_PROFILES = {
   'gsd-ui-researcher': { quality: 'opus', balanced: 'sonnet', budget: 'haiku' },
   'gsd-ui-checker': { quality: 'sonnet', balanced: 'sonnet', budget: 'haiku' },
   'gsd-ui-auditor': { quality: 'sonnet', balanced: 'sonnet', budget: 'haiku' },
+  'gsd-doc-writer': { quality: 'opus', balanced: 'sonnet', budget: 'haiku' },
 };
 const VALID_PROFILES = Object.keys(MODEL_PROFILES['gsd-planner']);
 

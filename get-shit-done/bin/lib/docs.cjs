@@ -8,8 +8,7 @@
 
 const fs = require('fs');
 const path = require('path');
-const { output, loadConfig, resolveModelInternal, pathExistsInternal, toPosixPath } = require('./core.cjs');
-const { withProjectRoot } = require('./init.cjs');
+const { output, loadConfig, resolveModelInternal, pathExistsInternal, toPosixPath, checkAgentsInstalled } = require('./core.cjs');
 
 // ─── Constants ────────────────────────────────────────────────────────────────
 
@@ -227,7 +226,12 @@ function cmdDocsInit(cwd, raw) {
     monorepo_workspaces: detectMonorepoWorkspaces(cwd),
     planning_exists: pathExistsInternal(cwd, '.planning'),
   };
-  output(withProjectRoot(cwd, result), raw);
+  // Inject project_root and agent installation status (mirrors withProjectRoot in init.cjs)
+  result.project_root = cwd;
+  const agentStatus = checkAgentsInstalled();
+  result.agents_installed = agentStatus.agents_installed;
+  result.missing_agents = agentStatus.missing_agents;
+  output(result, raw);
 }
 
 module.exports = { cmdDocsInit };

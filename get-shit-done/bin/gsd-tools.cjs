@@ -133,6 +133,9 @@
  *   init milestone-op                  All context for milestone operations
  *   init map-codebase                  All context for map-codebase workflow
  *   init progress                      All context for progress workflow
+ *
+ * Documentation:
+ *   docs-init                            Project context for docs-update workflow
  */
 
 const fs = require('fs');
@@ -152,6 +155,7 @@ const frontmatter = require('./lib/frontmatter.cjs');
 const profilePipeline = require('./lib/profile-pipeline.cjs');
 const profileOutput = require('./lib/profile-output.cjs');
 const workstream = require('./lib/workstream.cjs');
+const docs = require('./lib/docs.cjs');
 
 // ─── Arg parsing helpers ──────────────────────────────────────────────────────
 
@@ -274,7 +278,7 @@ async function main() {
   const command = args[0];
 
   if (!command) {
-    error('Usage: gsd-tools <command> [args] [--raw] [--pick <field>] [--cwd <path>] [--ws <name>]\nCommands: state, resolve-model, find-phase, commit, verify-summary, verify, frontmatter, template, generate-slug, current-timestamp, list-todos, verify-path-exists, config-ensure-section, config-new-project, init, workstream');
+    error('Usage: gsd-tools <command> [args] [--raw] [--pick <field>] [--cwd <path>] [--ws <name>]\nCommands: state, resolve-model, find-phase, commit, verify-summary, verify, frontmatter, template, generate-slug, current-timestamp, list-todos, verify-path-exists, config-ensure-section, config-new-project, init, workstream, docs-init');
   }
 
   // Multi-repo guard: resolve project root for commands that read/write .planning/.
@@ -907,6 +911,13 @@ async function runCommand(command, args, cwd, raw) {
       } else {
         error('Unknown workstream subcommand. Available: create, list, status, complete, set, get, progress');
       }
+      break;
+    }
+
+    // ─── Documentation ────────────────────────────────────────────────────
+
+    case 'docs-init': {
+      docs.cmdDocsInit(cwd, raw);
       break;
     }
 
