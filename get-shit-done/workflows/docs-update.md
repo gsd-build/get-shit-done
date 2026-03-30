@@ -161,6 +161,43 @@ Mode resolution:
 Track the resolved mode and file path (primary or fallback) for each queued doc. For update-mode docs, store the loaded file content — it will be passed to the agent in the next steps.
 </step>
 
+<step name="preservation_check">
+Check for hand-written docs in the queue and gather user decisions before dispatch.
+
+**Skip conditions (check in order):**
+
+1. If `--force` is present in `$ARGUMENTS`: treat all docs as mode: regenerate, skip to detect_runtime_capabilities.
+2. If `--verify-only` is present in `$ARGUMENTS`: skip to verify_only_report (do not continue to detect_runtime_capabilities).
+3. If no docs in the queue have `has_gsd_marker: false` in the `existing_docs` array: skip to detect_runtime_capabilities.
+
+**For each queued doc where `has_gsd_marker` is false (hand-written doc detected):**
+
+Present the following choice using `AskUserQuestion` if available, or inline prompt otherwise:
+
+```
+{filename} appears to be hand-written (no GSD marker found).
+
+How should this file be handled?
+  [1] preserve    -- Skip entirely. Leave unchanged.
+  [2] supplement  -- Append only missing sections. Existing content untouched.
+  [3] regenerate  -- Overwrite with a fresh GSD-generated doc.
+```
+
+Record each decision. Update the doc queue:
+- `preserve` decisions: remove the doc from the queue entirely
+- `supplement` decisions: set mode to `supplement` in the doc_assignment block; include `existing_content` (full file content)
+- `regenerate` decisions: set mode to `create` (treat as a fresh write)
+
+**Fallback when AskUserQuestion is unavailable:** Default all hand-written docs to `preserve` (safest default). Display message:
+
+```
+AskUserQuestion unavailable — hand-written docs preserved by default.
+Use --force to regenerate all docs, or re-run in Claude Code to get per-file prompts.
+```
+
+After all decisions recorded, continue to detect_runtime_capabilities.
+</step>
+
 <step name="detect_runtime_capabilities">
 Before spawning agents, detect whether the current runtime supports the `Task` tool for subagent delegation.
 
@@ -190,9 +227,10 @@ Task(
   description="Generate README.md for target project",
   prompt="<doc_assignment>
 type: readme
-mode: {create|update}
+mode: {create|update|supplement}
+preservation_mode: {preserve|supplement|regenerate|null}
 project_context: {INIT JSON}
-{existing_content: | (include full file content here if mode is update, else omit this line)}
+{existing_content: | (include full file content here if mode is update or supplement, else omit this line)}
 </doc_assignment>
 
 {AGENT_SKILLS}
@@ -211,9 +249,10 @@ Task(
   description="Generate ARCHITECTURE.md for target project",
   prompt="<doc_assignment>
 type: architecture
-mode: {create|update}
+mode: {create|update|supplement}
+preservation_mode: {preserve|supplement|regenerate|null}
 project_context: {INIT JSON}
-{existing_content: | (include full file content here if mode is update, else omit this line)}
+{existing_content: | (include full file content here if mode is update or supplement, else omit this line)}
 </doc_assignment>
 
 {AGENT_SKILLS}
@@ -232,9 +271,10 @@ Task(
   description="Generate CONFIGURATION.md for target project",
   prompt="<doc_assignment>
 type: configuration
-mode: {create|update}
+mode: {create|update|supplement}
+preservation_mode: {preserve|supplement|regenerate|null}
 project_context: {INIT JSON}
-{existing_content: | (include full file content here if mode is update, else omit this line)}
+{existing_content: | (include full file content here if mode is update or supplement, else omit this line)}
 note: Apply VERIFY markers to any infrastructure claim not discoverable from the repository.
 </doc_assignment>
 
@@ -311,9 +351,10 @@ Task(
   description="Generate GETTING-STARTED.md for target project",
   prompt="<doc_assignment>
 type: getting_started
-mode: {create|update}
+mode: {create|update|supplement}
+preservation_mode: {preserve|supplement|regenerate|null}
 project_context: {INIT JSON}
-{existing_content: | (include full file content here if mode is update, else omit this line)}
+{existing_content: | (include full file content here if mode is update or supplement, else omit this line)}
 wave_1_outputs:
   - README.md
   - ARCHITECTURE.md
@@ -336,9 +377,10 @@ Task(
   description="Generate DEVELOPMENT.md for target project",
   prompt="<doc_assignment>
 type: development
-mode: {create|update}
+mode: {create|update|supplement}
+preservation_mode: {preserve|supplement|regenerate|null}
 project_context: {INIT JSON}
-{existing_content: | (include full file content here if mode is update, else omit this line)}
+{existing_content: | (include full file content here if mode is update or supplement, else omit this line)}
 wave_1_outputs:
   - README.md
   - ARCHITECTURE.md
@@ -361,9 +403,10 @@ Task(
   description="Generate TESTING.md for target project",
   prompt="<doc_assignment>
 type: testing
-mode: {create|update}
+mode: {create|update|supplement}
+preservation_mode: {preserve|supplement|regenerate|null}
 project_context: {INIT JSON}
-{existing_content: | (include full file content here if mode is update, else omit this line)}
+{existing_content: | (include full file content here if mode is update or supplement, else omit this line)}
 wave_1_outputs:
   - README.md
   - ARCHITECTURE.md
@@ -386,9 +429,10 @@ Task(
   description="Generate API.md for target project",
   prompt="<doc_assignment>
 type: api
-mode: {create|update}
+mode: {create|update|supplement}
+preservation_mode: {preserve|supplement|regenerate|null}
 project_context: {INIT JSON}
-{existing_content: | (include full file content here if mode is update, else omit this line)}
+{existing_content: | (include full file content here if mode is update or supplement, else omit this line)}
 wave_1_outputs:
   - README.md
   - ARCHITECTURE.md
@@ -411,9 +455,10 @@ Task(
   description="Generate DEPLOYMENT.md for target project",
   prompt="<doc_assignment>
 type: deployment
-mode: {create|update}
+mode: {create|update|supplement}
+preservation_mode: {preserve|supplement|regenerate|null}
 project_context: {INIT JSON}
-{existing_content: | (include full file content here if mode is update, else omit this line)}
+{existing_content: | (include full file content here if mode is update or supplement, else omit this line)}
 note: Apply VERIFY markers to any infrastructure claim not discoverable from the repository.
 wave_1_outputs:
   - README.md
@@ -437,9 +482,10 @@ Task(
   description="Generate CONTRIBUTING.md for target project",
   prompt="<doc_assignment>
 type: contributing
-mode: {create|update}
+mode: {create|update|supplement}
+preservation_mode: {preserve|supplement|regenerate|null}
 project_context: {INIT JSON}
-{existing_content: | (include full file content here if mode is update, else omit this line)}
+{existing_content: | (include full file content here if mode is update or supplement, else omit this line)}
 wave_1_outputs:
   - README.md
   - ARCHITECTURE.md
@@ -490,6 +536,56 @@ ls -la GETTING-STARTED.md DEVELOPMENT.md TESTING.md 2>/dev/null
 
 If any agent failed or its file is missing, note the failure and continue. Missing docs will be reported in the final report.
 
+Continue to dispatch_monorepo_packages (if monorepo_workspaces is non-empty) or commit_docs.
+</step>
+
+<step name="dispatch_monorepo_packages" condition="monorepo_workspaces is non-empty">
+After Wave 2 collection, generate per-package READMEs for each monorepo workspace.
+
+**Condition:** Only run this step if `monorepo_workspaces` from the init JSON is non-empty.
+
+**Resolve workspace packages from glob patterns:**
+
+```bash
+# Expand workspace globs to actual package directories
+for pattern in {monorepo_workspaces}; do
+  ls -d $pattern 2>/dev/null
+done
+```
+
+**For each resolved directory that contains a `package.json`:**
+
+Determine mode:
+- If `{package_dir}/README.md` exists: mode = `update`, read existing content
+- Else: mode = `create`
+
+Spawn a `gsd-doc-writer` agent with `run_in_background=true`:
+
+```
+Task(
+  subagent_type="gsd-doc-writer",
+  model="{doc_writer_model}",
+  run_in_background=true,
+  description="Generate per-package README for {package_dir}",
+  prompt="<doc_assignment>
+type: readme
+mode: {create|update}
+scope: per_package
+package_dir: {absolute path to package directory}
+project_context: {INIT JSON with project_root set to package directory}
+{existing_content: | (include full README.md content here if mode is update, else omit)}
+</doc_assignment>
+
+{AGENT_SKILLS}
+
+Write {package_dir}/README.md directly. Return confirmation only — do not return doc content."
+)
+```
+
+Collect confirmations via TaskOutput for all package agents. Note failures in the final report.
+
+**Fallback when Task tool is unavailable:** Generate per-package READMEs sequentially inline after the `sequential_generation` step. For each package directory with a `package.json`, construct the equivalent `doc_assignment` block and generate the README following gsd-doc-writer instructions.
+
 Continue to commit_docs.
 </step>
 
@@ -504,18 +600,18 @@ Read `agents/gsd-doc-writer.md` instructions once before beginning. Follow the c
 
 For each Wave 1 doc, construct the equivalent doc_assignment block and generate the file inline:
 
-1. **README** — mode from resolve_modes; for update mode, include existing_content
-   - Construct doc_assignment: `type: readme`, `mode: {create|update}`, `project_context: {INIT JSON}`, `existing_content:` (if update)
+1. **README** — mode from resolve_modes; for update/supplement mode, include existing_content
+   - Construct doc_assignment: `type: readme`, `mode: {create|update|supplement}`, `preservation_mode: {value|null}`, `project_context: {INIT JSON}`, `existing_content:` (if update/supplement)
    - Explore the codebase (Read, Grep, Glob, Bash) following gsd-doc-writer create_mode / update_mode instructions
    - Write the file to the resolved path (README.md)
 
-2. **ARCHITECTURE** — mode from resolve_modes; for update mode, include existing_content
-   - Construct doc_assignment: `type: architecture`, `mode: {create|update}`, `project_context: {INIT JSON}`, `existing_content:` (if update)
+2. **ARCHITECTURE** — mode from resolve_modes; for update/supplement mode, include existing_content
+   - Construct doc_assignment: `type: architecture`, `mode: {create|update|supplement}`, `preservation_mode: {value|null}`, `project_context: {INIT JSON}`, `existing_content:` (if update/supplement)
    - Explore the codebase following gsd-doc-writer instructions
    - Write the file to the resolved path (ARCHITECTURE.md or docs/ARCHITECTURE.md)
 
-3. **CONFIGURATION** — mode from resolve_modes; for update mode, include existing_content
-   - Construct doc_assignment: `type: configuration`, `mode: {create|update}`, `project_context: {INIT JSON}`, `existing_content:` (if update)
+3. **CONFIGURATION** — mode from resolve_modes; for update/supplement mode, include existing_content
+   - Construct doc_assignment: `type: configuration`, `mode: {create|update|supplement}`, `preservation_mode: {value|null}`, `project_context: {INIT JSON}`, `existing_content:` (if update/supplement)
    - Apply VERIFY markers to any infrastructure claim not discoverable from the repository
    - Explore the codebase following gsd-doc-writer instructions
    - Write the file to the resolved path (CONFIGURATION.md or docs/CONFIGURATION.md)
@@ -531,7 +627,54 @@ Wave 2 docs can reference Wave 1 outputs since they are already written. Include
 8. **DEPLOYMENT** (only if queued) — Apply VERIFY markers to any infrastructure claim not discoverable from the repository; include wave_1_outputs
 9. **CONTRIBUTING** (only if queued) — mode from resolve_modes; include wave_1_outputs
 
+**Monorepo per-package READMEs (only if `monorepo_workspaces` is non-empty):**
+
+After all 9 root-level docs are written, generate per-package READMEs sequentially:
+
+For each resolved package directory (from workspace glob expansion) that contains a `package.json`:
+- Determine mode: if `{package_dir}/README.md` exists, mode = `update`; else mode = `create`
+- Construct doc_assignment: `type: readme`, `mode: {create|update}`, `scope: per_package`, `package_dir: {absolute path}`, `project_context: {INIT JSON with project_root set to package directory}`, `existing_content:` (if update)
+- Follow gsd-doc-writer instructions for per_package scope
+- Write the file to `{package_dir}/README.md`
+
 Continue to commit_docs.
+</step>
+
+<step name="verify_only_report">
+**Reached when `--verify-only` is present in `$ARGUMENTS`.** This is an early-exit step — do not proceed to dispatch, generation, commit, or report steps after this step.
+
+For each file listed in `existing_docs` from the init JSON:
+
+1. Read the file content
+2. Count VERIFY markers: grep for `<!-- VERIFY:` in the file content
+3. Count total lines in the file
+
+Present a summary table:
+
+```
+--verify-only audit:
+
+| File                | Lines | VERIFY Markers |
+|---------------------|-------|----------------|
+| README.md           | 87    | 0              |
+| ARCHITECTURE.md     | 124   | 2              |
+| CONFIGURATION.md    | 45    | 5              |
+| ...                 | ...   | ...            |
+
+Total VERIFY markers requiring manual review: {N}
+```
+
+Display note:
+
+```
+Full codebase fact-checking requires the gsd-doc-verifier agent (Phase 4).
+Currently showing VERIFY marker audit only.
+
+To generate or update docs: /gsd:docs-update
+To regenerate and skip preservation prompts: /gsd:docs-update --force
+```
+
+End workflow — do not proceed to any dispatch, commit, or report steps.
 </step>
 
 <step name="commit_docs">
@@ -544,6 +687,8 @@ node "$HOME/.claude/get-shit-done/bin/gsd-tools.cjs" commit "docs: generate proj
   --files README.md ARCHITECTURE.md CONFIGURATION.md GETTING-STARTED.md DEVELOPMENT.md TESTING.md
 # Append any conditional docs that were generated:
 # --files ... API.md DEPLOYMENT.md CONTRIBUTING.md
+# Append per-package READMEs if monorepo dispatch ran:
+# --files ... packages/core/README.md packages/cli/README.md
 ```
 
 Only include files that were successfully written to disk. Do not include failed or skipped docs.
@@ -572,9 +717,20 @@ Generated docs:
 | CONFIGURATION.md    | create | 45    |
 [conditional docs if generated]
 
+{If monorepo per-package READMEs were generated:}
+Per-package READMEs:
+| Package             | Mode   | Lines |
+|---------------------|--------|-------|
+| packages/core       | create | 42    |
+| packages/cli        | create | 38    |
+
 {If any docs failed or were skipped:}
 Skipped / failed:
   - API.md: agent did not complete
+
+{If preservation_check ran:}
+Preservation decisions:
+  - {filename}: {preserve|supplement|regenerate}
 
 {If DEPLOYMENT.md or CONFIGURATION.md were generated:}
 VERIFY markers: {N} markers placed in DEPLOYMENT.md and/or CONFIGURATION.md for infrastructure claims that require manual verification.
@@ -604,4 +760,8 @@ End workflow.
 - [ ] Generated docs contain zero GSD methodology content
 - [ ] DEPLOYMENT.md and CONFIGURATION.md use VERIFY markers for undiscoverable claims (if generated)
 - [ ] All generated files committed (if commit_docs is true)
+- [ ] Hand-written docs (no GSD marker) prompted for preserve/supplement/regenerate before dispatch (unless --force)
+- [ ] --force flag skipped preservation prompts and regenerated all docs
+- [ ] --verify-only flag reported doc status without generating files
+- [ ] Per-package READMEs generated for monorepo workspaces (if applicable)
 </success_criteria>
