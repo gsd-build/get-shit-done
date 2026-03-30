@@ -7,7 +7,7 @@ With `--full` flag: enables plan-checking (max 2 iterations) and post-execution 
 
 With `--research` flag: spawns a focused research agent before planning. Investigates implementation approaches, library options, and pitfalls. Use when you're unsure how to approach a task.
 
-Flags are composable: `--discuss --research --full` gives discussion + research + plan-checking + verification.
+Flags are composable: `--full` implies `--discuss` and `--research` (the full quality pipeline). Equivalently, `--discuss --research --full` is the same as just `--full`.
 </purpose>
 
 <required_reading>
@@ -31,6 +31,8 @@ Parse `$ARGUMENTS` for:
 - `--discuss` flag → store as `$DISCUSS_MODE` (true/false)
 - `--research` flag → store as `$RESEARCH_MODE` (true/false)
 - Remaining text → use as `$DESCRIPTION` if non-empty
+
+**`--full` implies `--discuss` and `--research`:** When `$FULL_MODE` is true, also set `$DISCUSS_MODE` and `$RESEARCH_MODE` to true (unless the user wants the full quality pipeline, it makes sense to include discussion and research by default — the whole point of `--full` is maximum quality). Users who explicitly only want plan-checking + verification without discuss/research can use `--full --no-discuss --no-research` if needed in the future.
 
 If `$DESCRIPTION` is empty after parsing, prompt user interactively:
 
@@ -743,6 +745,7 @@ Ready for next task: /gsd:quick ${GSD_WS}
 - [ ] ROADMAP.md validation passes
 - [ ] User provides task description
 - [ ] `--full`, `--discuss`, and `--research` flags parsed from arguments when present
+- [ ] `--full` automatically enables `--discuss` and `--research` (full quality pipeline)
 - [ ] Slug generated (lowercase, hyphens, max 40 chars)
 - [ ] Quick ID generated (YYMMDD-xxx format, 2s Base36 precision)
 - [ ] Directory created at `.planning/quick/YYMMDD-xxx-slug/`
