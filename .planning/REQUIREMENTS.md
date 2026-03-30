@@ -28,9 +28,9 @@ Requirements for this contribution. Each maps to roadmap phases.
 
 ### Verification
 
-- [ ] **VERF-01**: Verification gate checks file paths, commands, endpoints, signatures, config, dependencies against codebase
-- [ ] **VERF-02**: Bounded fix loop — max 2 iterations, re-sends flagged items to doc-writer
-- [ ] **VERF-03**: Secret scanning before commit (same pattern as map-codebase)
+- [x] **VERF-01**: Verification gate checks file paths, commands, endpoints, signatures, config, dependencies against codebase
+- [x] **VERF-02**: Bounded fix loop — max 2 iterations, re-sends flagged items to doc-writer
+- [x] **VERF-03**: Secret scanning before commit (same pattern as map-codebase)
 
 ### Existing Doc Handling
 
@@ -80,9 +80,9 @@ Which phases cover which requirements. Updated during roadmap creation.
 | DOCG-06 | Phase 3 | Complete |
 | DOCG-07 | Phase 3 | Complete |
 | DOCG-08 | Phase 1 | Complete |
-| VERF-01 | Phase 4 | Pending |
-| VERF-02 | Phase 4 | Pending |
-| VERF-03 | Phase 4 | Pending |
+| VERF-01 | Phase 4 | Complete |
+| VERF-02 | Phase 4 | Complete |
+| VERF-03 | Phase 4 | Complete |
 | EXIST-01 | Phase 3 | Complete |
 | EXIST-02 | Phase 3 | Complete |
 | EXIST-03 | Phase 3 | Complete |

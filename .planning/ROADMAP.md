@@ -15,7 +15,7 @@ Decimal phases appear between their surrounding integers in numeric order.
 - [x] **Phase 1: Infrastructure & Agent Skeleton** - Wire init.cjs, gsd-tools.cjs dispatcher, and define the doc-writer agent stub (completed 2026-03-30)
 - [x] **Phase 2: Workflow Orchestration** - Build the docs-update workflow with wave-based parallel dispatch and doc routing logic (completed 2026-03-30)
 - [x] **Phase 3: Full Doc Generation & Existing Doc Handling** - Complete all 9 doc types, command entry point, and preserve/supplement/regenerate per file (completed 2026-03-30)
-- [ ] **Phase 4: Verification Gate & Test Suite** - Add fact-checker agent, bounded fix loop, and node:test coverage for gsd-tools commands
+- [x] **Phase 4: Verification Gate & Test Suite** - Add fact-checker agent, bounded fix loop, and node:test coverage for gsd-tools commands (completed 2026-03-30)
 
 ## Phase Details
 
@@ -74,8 +74,12 @@ Plans:
   1. `agents/gsd-doc-verifier.md` checks file paths, commands, endpoints, and function signatures using filesystem tools (Read, Grep, Glob, Bash) — not self-consistency checks
   2. Flagged inaccuracies are re-sent to the doc-writer for surgical correction; the loop runs at most 2 times and halts if a fact regresses between iterations
   3. Secret scanning runs before any commit and follows the same pattern as map-codebase
-  4. `test/docs-update.test.cjs` covers all new gsd-tools.cjs subcommands using node:test and node:assert/strict exclusively
-**Plans**: TBD
+  4. `tests/docs-update.test.cjs` covers all new gsd-tools.cjs subcommands using node:test and node:assert/strict exclusively
+**Plans**: 3 plans
+Plans:
+- [x] 04-01-PLAN.md — Create gsd-doc-verifier agent and add fix_mode to gsd-doc-writer
+- [x] 04-02-PLAN.md — Extend docs-update workflow with verification gate, fix loop, and secret scanning
+- [x] 04-03-PLAN.md — Create docs-init test suite (node:test + node:assert/strict)
 
 ## Progress
 
@@ -87,4 +91,4 @@ Phases execute in numeric order: 1 → 2 → 3 → 4
 | 1. Infrastructure & Agent Skeleton | 2/2 | Complete   | 2026-03-30 |
 | 2. Workflow Orchestration | 1/1 | Complete   | 2026-03-30 |
 | 3. Full Doc Generation & Existing Doc Handling | 2/2 | Complete   | 2026-03-30 |
-| 4. Verification Gate & Test Suite | 0/TBD | Not started | - |
+| 4. Verification Gate & Test Suite | 3/3 | Complete   | 2026-03-30 |
