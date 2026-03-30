@@ -11,19 +11,19 @@ Requirements for this contribution. Each maps to roadmap phases.
 
 - [x] **INFRA-01**: gsd-tools init returns JSON context with project signals, existing docs, model resolution
 - [x] **INFRA-02**: docs-update case wired into gsd-tools.cjs switch with help text
-- [ ] **INFRA-03**: Command entry point (commands/gsd/docs-update.md) with --force and --verify-only flags
+- [x] **INFRA-03**: Command entry point (commands/gsd/docs-update.md) with --force and --verify-only flags
 - [x] **INFRA-04**: Workflow orchestration (workflows/docs-update.md) with 13-step process
 - [ ] **INFRA-05**: Cross-runtime sequential fallback when Task tool unavailable
 
 ### Documentation Generation
 
 - [x] **DOCG-01**: gsd-doc-writer agent with dynamic assignment list, create and update modes
-- [ ] **DOCG-02**: 9 doc types: README, ARCHITECTURE, GETTING-STARTED, DEVELOPMENT, TESTING, API, CONFIGURATION, DEPLOYMENT, CONTRIBUTING
+- [x] **DOCG-02**: 9 doc types: README, ARCHITECTURE, GETTING-STARTED, DEVELOPMENT, TESTING, API, CONFIGURATION, DEPLOYMENT, CONTRIBUTING
 - [x] **DOCG-03**: Project type detection (open source library, private SaaS, CLI tool, monorepo)
 - [x] **DOCG-04**: Conditional doc routing — API.md only for API projects, CONTRIBUTING.md only for open source, DEPLOYMENT.md only for projects with deploy config
 - [ ] **DOCG-05**: Parallel subagent spawning with confirmation-only returns (same pattern as map-codebase)
-- [ ] **DOCG-06**: VERIFY markers for undiscoverable infrastructure claims
-- [ ] **DOCG-07**: Update mode preserves user-written content, updates only inaccurate/missing sections
+- [x] **DOCG-06**: VERIFY markers for undiscoverable infrastructure claims
+- [x] **DOCG-07**: Update mode preserves user-written content, updates only inaccurate/missing sections
 - [x] **DOCG-08**: Embedded doc templates in agent definition (no external template dependencies)
 
 ### Verification
@@ -34,10 +34,10 @@ Requirements for this contribution. Each maps to roadmap phases.
 
 ### Existing Doc Handling
 
-- [ ] **EXIST-01**: Detect hand-written docs (no GSD marker) vs GSD-generated docs
-- [ ] **EXIST-02**: Preserve/supplement/regenerate choice per hand-written file
-- [ ] **EXIST-03**: Doc tooling detection (Docusaurus, VitePress, MkDocs, Storybook) — respect their structure
-- [ ] **EXIST-04**: Monorepo awareness — detect workspaces, per-package docs when appropriate
+- [x] **EXIST-01**: Detect hand-written docs (no GSD marker) vs GSD-generated docs
+- [x] **EXIST-02**: Preserve/supplement/regenerate choice per hand-written file
+- [x] **EXIST-03**: Doc tooling detection (Docusaurus, VitePress, MkDocs, Storybook) — respect their structure
+- [x] **EXIST-04**: Monorepo awareness — detect workspaces, per-package docs when appropriate
 
 ### Constraints
 
@@ -69,24 +69,24 @@ Which phases cover which requirements. Updated during roadmap creation.
 |-------------|-------|--------|
 | INFRA-01 | Phase 1 | Complete |
 | INFRA-02 | Phase 1 | Complete |
-| INFRA-03 | Phase 3 | Pending |
+| INFRA-03 | Phase 3 | Complete |
 | INFRA-04 | Phase 2 | Complete |
 | INFRA-05 | Phase 2 | Pending |
 | DOCG-01 | Phase 1 | Complete |
-| DOCG-02 | Phase 3 | Pending |
+| DOCG-02 | Phase 3 | Complete |
 | DOCG-03 | Phase 2 | Complete |
 | DOCG-04 | Phase 2 | Complete |
 | DOCG-05 | Phase 2 | Pending |
-| DOCG-06 | Phase 3 | Pending |
-| DOCG-07 | Phase 3 | Pending |
+| DOCG-06 | Phase 3 | Complete |
+| DOCG-07 | Phase 3 | Complete |
 | DOCG-08 | Phase 1 | Complete |
 | VERF-01 | Phase 4 | Pending |
 | VERF-02 | Phase 4 | Pending |
 | VERF-03 | Phase 4 | Pending |
-| EXIST-01 | Phase 3 | Pending |
-| EXIST-02 | Phase 3 | Pending |
-| EXIST-03 | Phase 3 | Pending |
-| EXIST-04 | Phase 3 | Pending |
+| EXIST-01 | Phase 3 | Complete |
+| EXIST-02 | Phase 3 | Complete |
+| EXIST-03 | Phase 3 | Complete |
+| EXIST-04 | Phase 3 | Complete |
 | CONS-01 | Phase 2 | Complete |
 | CONS-02 | Phase 2 | Complete |
 | CONS-03 | Phase 1 | Complete |

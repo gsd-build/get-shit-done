@@ -14,7 +14,7 @@ Decimal phases appear between their surrounding integers in numeric order.
 
 - [x] **Phase 1: Infrastructure & Agent Skeleton** - Wire init.cjs, gsd-tools.cjs dispatcher, and define the doc-writer agent stub (completed 2026-03-30)
 - [x] **Phase 2: Workflow Orchestration** - Build the docs-update workflow with wave-based parallel dispatch and doc routing logic (completed 2026-03-30)
-- [ ] **Phase 3: Full Doc Generation & Existing Doc Handling** - Complete all 9 doc types, command entry point, and preserve/supplement/regenerate per file
+- [x] **Phase 3: Full Doc Generation & Existing Doc Handling** - Complete all 9 doc types, command entry point, and preserve/supplement/regenerate per file (completed 2026-03-30)
 - [ ] **Phase 4: Verification Gate & Test Suite** - Add fact-checker agent, bounded fix loop, and node:test coverage for gsd-tools commands
 
 ## Phase Details
@@ -60,7 +60,10 @@ Plans:
   4. Update mode rewrites only inaccurate or missing sections, leaving user-authored prose intact
   5. Docusaurus, VitePress, MkDocs, and Storybook config signals are detected and their directory/front-matter conventions respected
   6. Monorepo workspaces are detected; per-package doc generation is triggered when appropriate
-**Plans**: TBD
+**Plans**: 2 plans
+Plans:
+- [x] 03-01-PLAN.md — Fill 9 doc type templates with content guidance, add supplement mode and doc tooling guidance
+- [x] 03-02-PLAN.md — Create command entry point, add preservation check, flag handling, and monorepo dispatch to workflow
 **UI hint**: no
 
 ### Phase 4: Verification Gate & Test Suite
@@ -83,5 +86,5 @@ Phases execute in numeric order: 1 → 2 → 3 → 4
 |-------|----------------|--------|-----------|
 | 1. Infrastructure & Agent Skeleton | 2/2 | Complete   | 2026-03-30 |
 | 2. Workflow Orchestration | 1/1 | Complete   | 2026-03-30 |
-| 3. Full Doc Generation & Existing Doc Handling | 0/TBD | Not started | - |
+| 3. Full Doc Generation & Existing Doc Handling | 2/2 | Complete   | 2026-03-30 |
 | 4. Verification Gate & Test Suite | 0/TBD | Not started | - |
