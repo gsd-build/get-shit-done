@@ -12,15 +12,15 @@ Requirements for this contribution. Each maps to roadmap phases.
 - [x] **INFRA-01**: gsd-tools init returns JSON context with project signals, existing docs, model resolution
 - [x] **INFRA-02**: docs-update case wired into gsd-tools.cjs switch with help text
 - [ ] **INFRA-03**: Command entry point (commands/gsd/docs-update.md) with --force and --verify-only flags
-- [ ] **INFRA-04**: Workflow orchestration (workflows/docs-update.md) with 13-step process
+- [x] **INFRA-04**: Workflow orchestration (workflows/docs-update.md) with 13-step process
 - [ ] **INFRA-05**: Cross-runtime sequential fallback when Task tool unavailable
 
 ### Documentation Generation
 
 - [x] **DOCG-01**: gsd-doc-writer agent with dynamic assignment list, create and update modes
 - [ ] **DOCG-02**: 9 doc types: README, ARCHITECTURE, GETTING-STARTED, DEVELOPMENT, TESTING, API, CONFIGURATION, DEPLOYMENT, CONTRIBUTING
-- [ ] **DOCG-03**: Project type detection (open source library, private SaaS, CLI tool, monorepo)
-- [ ] **DOCG-04**: Conditional doc routing — API.md only for API projects, CONTRIBUTING.md only for open source, DEPLOYMENT.md only for projects with deploy config
+- [x] **DOCG-03**: Project type detection (open source library, private SaaS, CLI tool, monorepo)
+- [x] **DOCG-04**: Conditional doc routing — API.md only for API projects, CONTRIBUTING.md only for open source, DEPLOYMENT.md only for projects with deploy config
 - [ ] **DOCG-05**: Parallel subagent spawning with confirmation-only returns (same pattern as map-codebase)
 - [ ] **DOCG-06**: VERIFY markers for undiscoverable infrastructure claims
 - [ ] **DOCG-07**: Update mode preserves user-written content, updates only inaccurate/missing sections
@@ -41,10 +41,10 @@ Requirements for this contribution. Each maps to roadmap phases.
 
 ### Constraints
 
-- [ ] **CONS-01**: CHANGELOG.md is out of scope
-- [ ] **CONS-02**: No GSD methodology content in generated docs
+- [x] **CONS-01**: CHANGELOG.md is out of scope
+- [x] **CONS-02**: No GSD methodology content in generated docs
 - [x] **CONS-03**: CommonJS (.cjs), no external dependencies in core
-- [ ] **CONS-04**: Evidence-based infrastructure docs only — never fabricate claims
+- [x] **CONS-04**: Evidence-based infrastructure docs only — never fabricate claims
 
 ## Out of Scope
 
@@ -70,12 +70,12 @@ Which phases cover which requirements. Updated during roadmap creation.
 | INFRA-01 | Phase 1 | Complete |
 | INFRA-02 | Phase 1 | Complete |
 | INFRA-03 | Phase 3 | Pending |
-| INFRA-04 | Phase 2 | Pending |
+| INFRA-04 | Phase 2 | Complete |
 | INFRA-05 | Phase 2 | Pending |
 | DOCG-01 | Phase 1 | Complete |
 | DOCG-02 | Phase 3 | Pending |
-| DOCG-03 | Phase 2 | Pending |
-| DOCG-04 | Phase 2 | Pending |
+| DOCG-03 | Phase 2 | Complete |
+| DOCG-04 | Phase 2 | Complete |
 | DOCG-05 | Phase 2 | Pending |
 | DOCG-06 | Phase 3 | Pending |
 | DOCG-07 | Phase 3 | Pending |
@@ -87,10 +87,10 @@ Which phases cover which requirements. Updated during roadmap creation.
 | EXIST-02 | Phase 3 | Pending |
 | EXIST-03 | Phase 3 | Pending |
 | EXIST-04 | Phase 3 | Pending |
-| CONS-01 | Phase 2 | Pending |
-| CONS-02 | Phase 2 | Pending |
+| CONS-01 | Phase 2 | Complete |
+| CONS-02 | Phase 2 | Complete |
 | CONS-03 | Phase 1 | Complete |
-| CONS-04 | Phase 2 | Pending |
+| CONS-04 | Phase 2 | Complete |
 
 **Coverage:**
 - v1 requirements: 24 total

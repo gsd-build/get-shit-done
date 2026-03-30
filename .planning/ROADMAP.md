@@ -13,7 +13,7 @@ Four phases deliver a verified documentation generation command for GSD. Phase 1
 Decimal phases appear between their surrounding integers in numeric order.
 
 - [x] **Phase 1: Infrastructure & Agent Skeleton** - Wire init.cjs, gsd-tools.cjs dispatcher, and define the doc-writer agent stub (completed 2026-03-30)
-- [ ] **Phase 2: Workflow Orchestration** - Build the docs-update workflow with wave-based parallel dispatch and doc routing logic
+- [x] **Phase 2: Workflow Orchestration** - Build the docs-update workflow with wave-based parallel dispatch and doc routing logic (completed 2026-03-30)
 - [ ] **Phase 3: Full Doc Generation & Existing Doc Handling** - Complete all 9 doc types, command entry point, and preserve/supplement/regenerate per file
 - [ ] **Phase 4: Verification Gate & Test Suite** - Add fact-checker agent, bounded fix loop, and node:test coverage for gsd-tools commands
 
@@ -46,7 +46,7 @@ Plans:
   6. DEPLOYMENT.md and CONFIGURATION.md use VERIFY markers for any infrastructure claim not discoverable from the repo
 **Plans**: 1 plan
 Plans:
-- [ ] 02-01-PLAN.md — Create docs-update.md workflow with 13-step orchestration (init, classify, route, dispatch, fallback, commit)
+- [x] 02-01-PLAN.md — Create docs-update.md workflow with 13-step orchestration (init, classify, route, dispatch, fallback, commit)
 **UI hint**: no
 
 ### Phase 3: Full Doc Generation & Existing Doc Handling
@@ -82,6 +82,6 @@ Phases execute in numeric order: 1 → 2 → 3 → 4
 | Phase | Plans Complete | Status | Completed |
 |-------|----------------|--------|-----------|
 | 1. Infrastructure & Agent Skeleton | 2/2 | Complete   | 2026-03-30 |
-| 2. Workflow Orchestration | 0/1 | Not started | - |
+| 2. Workflow Orchestration | 1/1 | Complete   | 2026-03-30 |
 | 3. Full Doc Generation & Existing Doc Handling | 0/TBD | Not started | - |
 | 4. Verification Gate & Test Suite | 0/TBD | Not started | - |
