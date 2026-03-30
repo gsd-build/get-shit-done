@@ -183,6 +183,69 @@ grep -E "Phase ${PHASE_NUM}" .planning/REQUIREMENTS.md 2>/dev/null || true
 For each requirement: parse description → identify supporting truths/artifacts → status: ✓ SATISFIED / ✗ BLOCKED / ? NEEDS HUMAN.
 </step>
 
+<step name="behavioral_verification">
+**Run the project's test suite and CLI commands to verify behavior, not just structure.**
+
+Static checks (grep, file existence, wiring) catch structural gaps but miss runtime
+failures. This step runs actual tests and project commands to verify the phase goal
+is behaviorally achieved.
+
+This follows Anthropic's harness engineering principle: separating generation from
+evaluation, with the evaluator interacting with the running system rather than
+inspecting static artifacts.
+
+**Step 1: Run test suite**
+
+```bash
+# Detect test runner and run all tests
+if [ -f "package.json" ]; then
+  npx jest --passWithNoTests --no-coverage -q 2>&1 || npx vitest run 2>&1
+elif [ -f "Cargo.toml" ]; then
+  cargo test 2>&1
+elif [ -f "pyproject.toml" ] || [ -f "requirements.txt" ]; then
+  python -m pytest -q --tb=short 2>&1 || uv run python -m pytest -q --tb=short 2>&1
+elif [ -f "go.mod" ]; then
+  go test ./... 2>&1
+fi
+```
+
+Record: total tests, passed, failed, coverage (if available).
+
+**If any tests fail:** Mark as `behavioral_failures` — these are BLOCKER severity
+regardless of whether static checks passed. A phase cannot be verified if tests fail.
+
+**Step 2: Run project CLI/commands from success criteria**
+
+For each success criterion that describes a user command (e.g., "User can run
+`mixtiq validate`", "User can run `npm start`"):
+
+Extract the command, run it against an example input (from templates, fixtures,
+or test data), and verify it exits successfully with expected output patterns.
+
+```bash
+# Example: if success criterion mentions "mixtiq run example.yaml"
+# Find a suitable example file and run it
+{project_cli} {example_input} 2>&1
+```
+
+Record: command, exit code, output summary, pass/fail.
+
+**Step 3: Report**
+
+```
+## Behavioral Verification
+
+| Check | Result | Detail |
+|-------|--------|--------|
+| Test suite | {N} passed, {M} failed | {first failure if any} |
+| {CLI command 1} | ✓ / ✗ | {output summary} |
+| {CLI command 2} | ✓ / ✗ | {output summary} |
+```
+
+**If all behavioral checks pass:** Continue to scan_antipatterns.
+**If any fail:** Add to verification gaps with BLOCKER severity.
+</step>
+
 <step name="scan_antipatterns">
 Extract files modified in this phase from SUMMARY.md, scan each:
 

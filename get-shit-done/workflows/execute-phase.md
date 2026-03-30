@@ -370,6 +370,10 @@ Execute each selected wave in sequence. Within a wave: parallel if `PARALLELIZAT
        orchestrator validates hooks once after all agents complete.
        For gsd-tools commits: add --no-verify flag.
        For direct git commits: use git commit --no-verify -m "..."
+
+       IMPORTANT: Do NOT modify STATE.md or ROADMAP.md. These shared tracking
+       files cause merge conflicts when multiple worktrees modify them
+       simultaneously. The orchestrator updates them centrally after merge.
        </parallel_execution>
 
        <execution_context>
@@ -407,6 +411,7 @@ Execute each selected wave in sequence. Within a wave: parallel if `PARALLELIZAT
        - [ ] All tasks executed
        - [ ] Each task committed individually
        - [ ] SUMMARY.md created in plan directory
+       - [ ] No modifications to STATE.md or ROADMAP.md (orchestrator handles these)
        </success_criteria>
      "
    )
@@ -547,21 +552,71 @@ Execute each selected wave in sequence. Within a wave: parallel if `PARALLELIZAT
 
    **If no worktrees found:** Skip silently — agents may have been spawned without worktree isolation.
 
-5.6. **Post-wave shared artifact update (worktree mode only):**
+5.6. **Post-merge test gate (parallel mode only):**
+
+   After merging all worktrees in a wave, run the project's test suite to catch
+   cross-plan integration issues that individual worktree self-checks cannot detect
+   (e.g., conflicting type definitions, removed exports, import changes).
+
+   This addresses the Generator self-evaluation blind spot identified in Anthropic's
+   harness engineering research: agents reliably report Self-Check: PASSED even when
+   merging their work creates failures.
+
+   ```bash
+   # Detect test runner and run quick smoke test
+   if [ -f "package.json" ]; then
+     npx jest --passWithNoTests --no-coverage -q 2>&1 || npx vitest run 2>&1
+   elif [ -f "Cargo.toml" ]; then
+     cargo test 2>&1
+   elif [ -f "pyproject.toml" ] || [ -f "requirements.txt" ]; then
+     python -m pytest -x -q --tb=short 2>&1 || uv run python -m pytest -x -q --tb=short 2>&1
+   fi
+   ```
+
+   **If tests pass:** `✓ Post-merge test gate: {N} tests passed — no cross-plan conflicts`
+
+5.7. **Post-wave shared artifact update (worktree mode only):**
 
    When executor agents ran with `isolation="worktree"`, they skipped STATE.md and ROADMAP.md updates to avoid last-merge-wins overwrites. The orchestrator is the single writer for these files. After worktrees are merged back, update shared artifacts once:
 
    ```bash
    # Update ROADMAP.md for each completed plan in this wave
-   for PLAN_ID in ${WAVE_PLAN_IDS}; do
-     node "$HOME/.claude/get-shit-done/bin/gsd-tools.cjs" roadmap update-plan-progress "${PHASE_NUMBER}" "${PLAN_ID}" completed
+   for plan_id in {completed_plan_ids}; do
+     node "$HOME/.claude/get-shit-done/bin/gsd-tools.cjs" roadmap update-plan-progress "${PHASE_NUMBER}" "${plan_id}" "complete"
    done
 
+   # Update STATE.md with current position
+   node "$HOME/.claude/get-shit-done/bin/gsd-tools.cjs" commit "docs(phase-${PHASE_NUMBER}): update tracking after wave ${N}" --files .planning/ROADMAP.md .planning/STATE.md
    ```
 
    Where `WAVE_PLAN_IDS` is the space-separated list of plan IDs that completed in this wave.
 
    **If `workflow.use_worktrees` is `false`:** Sequential agents already updated STATE.md and ROADMAP.md themselves — skip this step.
+
+   **If tests fail (from 5.6):**
+   ```
+   ## ⚠ Post-Merge Test Failure
+
+   Wave {N} worktrees merged successfully, but {M} tests fail after merge.
+   This typically indicates conflicting changes across parallel plans
+   (e.g., type definitions, shared imports, API contracts).
+
+   Failed tests:
+   {first 10 lines of failure output}
+
+   Options:
+   1. Fix now (recommended) — resolve conflicts before next wave
+   2. Continue — failures may compound in subsequent waves
+   ```
+
+   If "Fix now": diagnose failures (typically import conflicts, missing types,
+   or changed function signatures from parallel plans modifying the same module).
+   Fix, commit as `fix: resolve post-merge conflicts from wave {N}`, re-run tests.
+
+   **Why this matters:** Worktree isolation means each agent's Self-Check passes
+   in isolation. But when merged, add/add conflicts in shared files (models, registries,
+   CLI entry points) can silently drop code. The post-merge gate catches this before
+   the next wave builds on a broken foundation.
 
 6. **Report completion — spot-check claims first:**
 
