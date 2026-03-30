@@ -44,7 +44,9 @@ Plans:
   4. When Task tool is unavailable, docs are generated sequentially using the same inline fallback pattern as map-codebase
   5. Generated docs contain zero GSD methodology content — all content describes the target project exclusively
   6. DEPLOYMENT.md and CONFIGURATION.md use VERIFY markers for any infrastructure claim not discoverable from the repo
-**Plans**: TBD
+**Plans**: 1 plan
+Plans:
+- [ ] 02-01-PLAN.md — Create docs-update.md workflow with 13-step orchestration (init, classify, route, dispatch, fallback, commit)
 **UI hint**: no
 
 ### Phase 3: Full Doc Generation & Existing Doc Handling
@@ -80,6 +82,6 @@ Phases execute in numeric order: 1 → 2 → 3 → 4
 | Phase | Plans Complete | Status | Completed |
 |-------|----------------|--------|-----------|
 | 1. Infrastructure & Agent Skeleton | 2/2 | Complete   | 2026-03-30 |
-| 2. Workflow Orchestration | 0/TBD | Not started | - |
+| 2. Workflow Orchestration | 0/1 | Not started | - |
 | 3. Full Doc Generation & Existing Doc Handling | 0/TBD | Not started | - |
 | 4. Verification Gate & Test Suite | 0/TBD | Not started | - |
