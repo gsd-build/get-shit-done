@@ -9,8 +9,8 @@ Requirements for this contribution. Each maps to roadmap phases.
 
 ### Command Infrastructure
 
-- [ ] **INFRA-01**: gsd-tools init returns JSON context with project signals, existing docs, model resolution
-- [ ] **INFRA-02**: docs-update case wired into gsd-tools.cjs switch with help text
+- [x] **INFRA-01**: gsd-tools init returns JSON context with project signals, existing docs, model resolution
+- [x] **INFRA-02**: docs-update case wired into gsd-tools.cjs switch with help text
 - [ ] **INFRA-03**: Command entry point (commands/gsd/docs-update.md) with --force and --verify-only flags
 - [ ] **INFRA-04**: Workflow orchestration (workflows/docs-update.md) with 13-step process
 - [ ] **INFRA-05**: Cross-runtime sequential fallback when Task tool unavailable
@@ -43,7 +43,7 @@ Requirements for this contribution. Each maps to roadmap phases.
 
 - [ ] **CONS-01**: CHANGELOG.md is out of scope
 - [ ] **CONS-02**: No GSD methodology content in generated docs
-- [ ] **CONS-03**: CommonJS (.cjs), no external dependencies in core
+- [x] **CONS-03**: CommonJS (.cjs), no external dependencies in core
 - [ ] **CONS-04**: Evidence-based infrastructure docs only — never fabricate claims
 
 ## Out of Scope
@@ -67,8 +67,8 @@ Which phases cover which requirements. Updated during roadmap creation.
 
 | Requirement | Phase | Status |
 |-------------|-------|--------|
-| INFRA-01 | Phase 1 | Pending |
-| INFRA-02 | Phase 1 | Pending |
+| INFRA-01 | Phase 1 | Complete |
+| INFRA-02 | Phase 1 | Complete |
 | INFRA-03 | Phase 3 | Pending |
 | INFRA-04 | Phase 2 | Pending |
 | INFRA-05 | Phase 2 | Pending |
@@ -89,7 +89,7 @@ Which phases cover which requirements. Updated during roadmap creation.
 | EXIST-04 | Phase 3 | Pending |
 | CONS-01 | Phase 2 | Pending |
 | CONS-02 | Phase 2 | Pending |
-| CONS-03 | Phase 1 | Pending |
+| CONS-03 | Phase 1 | Complete |
 | CONS-04 | Phase 2 | Pending |
 
 **Coverage:**
