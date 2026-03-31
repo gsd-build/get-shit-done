@@ -180,24 +180,18 @@ If no gaps are detected, omit this section entirely.
 
 Present the assembled queue to the user before proceeding:
 
+Present the mode resolution table from resolve_modes (shown above), followed by:
+
 ```
-Doc queue assembled ({N} docs):
-
-{list each doc with its resolved_path from resolve_modes, e.g.:}
-  - README.md (create)
-  - docs/architecture/overview.md (create)
-  - docs/guides/getting-started.md (create)
-  - docs/guides/development.md (create)
-  - docs/testing/overview.md (update — hand-written)
-  - docs/configuration/overview.md (create)
-
-Conditional:
-  [list conditional docs queued with resolved paths, or "none"]
+{If non-canonical docs found:}
+Existing docs queued for accuracy review:
+  - {path} (hand-written)
+  - ...
 
 CHANGELOG.md: excluded (out of scope)
 ```
 
-NOTE: The queue presentation MUST show the actual `resolved_path` for each doc, not the default paths from the table. This is what the user sees before confirming — it must reflect where files will actually be written.
+The mode resolution table IS the queue presentation — it shows every doc with its resolved path, mode, and source. Do not duplicate the list in a separate format.
 
 Then confirm with AskUserQuestion:
 
@@ -287,15 +281,27 @@ mkdir -p docs/
 ```
 
 **Output a mode resolution table:**
+
+Present a table showing the resolved path, mode, and source for every doc in the queue:
+
 ```
 Mode resolution:
-  README.md               — create (not found)
-  docs/ARCHITECTURE.md    — update (found at docs/ARCHITECTURE.md)
-  docs/GETTING-STARTED.md — create (not found)
-  ...
+
+| Doc | Resolved Path | Mode | Source |
+|-----|---------------|------|--------|
+| readme | README.md | update | found at README.md |
+| architecture | docs/architecture/overview.md | create | new directory |
+| getting_started | docs/guides/getting-started.md | update | found, hand-written |
+| development | docs/guides/development.md | create | matched docs/guides/ |
+| testing | docs/guides/testing.md | create | matched docs/guides/ |
+| configuration | docs/guides/configuration.md | create | matched docs/guides/ |
+| api | docs/api/reference.md | create | new directory |
+| deployment | docs/guides/deployment.md | update | found, hand-written |
 ```
 
-Track the resolved mode and file path (primary or fallback) for each queued doc. For update-mode docs, store the loaded file content — it will be passed to the agent in the next steps.
+This table MUST be shown to the user — it is the primary confirmation of where files will be written and whether existing files will be updated. It appears as part of the queue presentation BEFORE the AskUserQuestion confirmation.
+
+Track the resolved mode and file path for each queued doc. For update-mode docs, store the loaded file content — it will be passed to the agent in the next steps.
 </step>
 
 <step name="preservation_check">
