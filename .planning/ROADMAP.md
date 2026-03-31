@@ -94,7 +94,7 @@ Plans:
 **Plans**: 2 plans
 Plans:
 - [x] 05-01-PLAN.md — Fix recursive docs/ scanning in docs.cjs and update doc-writer default path guidance
-- [ ] 05-02-PLAN.md — Invert workflow path table, add CONTRIBUTING confirmation gate, and existing doc review queue
+- [x] 05-02-PLAN.md — Invert workflow path table, add CONTRIBUTING confirmation gate, and existing doc review queue
 
 ## Progress
 
