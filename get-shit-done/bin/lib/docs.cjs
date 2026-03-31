@@ -42,14 +42,37 @@ function hasGsdMarker(filePath) {
 }
 
 /**
- * Scan the project root (immediate .md files) and docs/ directory (one level
- * deep) for Markdown files, excluding dirs in SKIP_DIRS.
+ * Recursively scan the project root (immediate .md files) and docs/ directory
+ * (up to 4 levels deep) for Markdown files, excluding dirs in SKIP_DIRS.
  *
  * @param {string} cwd - Project root
  * @returns {Array<{path: string, has_gsd_marker: boolean}>}
  */
 function scanExistingDocs(cwd) {
+  const MAX_DEPTH = 4;
   const results = [];
+
+  /**
+   * Recursively walk a directory for .md files up to MAX_DEPTH levels.
+   * @param {string} dir - Directory to scan
+   * @param {number} depth - Current depth (1-based)
+   */
+  function walkDir(dir, depth) {
+    if (depth > MAX_DEPTH) return;
+    try {
+      const entries = fs.readdirSync(dir, { withFileTypes: true });
+      for (const entry of entries) {
+        if (SKIP_DIRS.has(entry.name)) continue;
+        const abs = path.join(dir, entry.name);
+        if (entry.isDirectory()) {
+          walkDir(abs, depth + 1);
+        } else if (entry.isFile() && entry.name.toLowerCase().endsWith('.md')) {
+          const rel = toPosixPath(path.relative(cwd, abs));
+          results.push({ path: rel, has_gsd_marker: hasGsdMarker(abs) });
+        }
+      }
+    } catch { /* directory may not exist — best-effort */ }
+  }
 
   // Scan root-level .md files (non-recursive)
   try {
@@ -63,19 +86,26 @@ function scanExistingDocs(cwd) {
     }
   } catch { /* best-effort */ }
 
-  // Scan docs/ directory one level deep
+  // Recursively scan docs/ directory
   const docsDir = path.join(cwd, 'docs');
+  walkDir(docsDir, 1);
+
+  // Fallback: if docs/ does not exist, try documentation/ or doc/
   try {
-    const entries = fs.readdirSync(docsDir, { withFileTypes: true });
-    for (const entry of entries) {
-      if (SKIP_DIRS.has(entry.name)) continue;
-      if (entry.isFile() && entry.name.toLowerCase().endsWith('.md')) {
-        const abs = path.join(docsDir, entry.name);
-        const rel = toPosixPath(path.relative(cwd, abs));
-        results.push({ path: rel, has_gsd_marker: hasGsdMarker(abs) });
-      }
+    fs.statSync(docsDir);
+  } catch {
+    const alternatives = ['documentation', 'doc'];
+    for (const alt of alternatives) {
+      const altDir = path.join(cwd, alt);
+      try {
+        const stat = fs.statSync(altDir);
+        if (stat.isDirectory()) {
+          walkDir(altDir, 1);
+          break;
+        }
+      } catch { /* not present */ }
     }
-  } catch { /* docs/ may not exist — that's fine */ }
+  }
 
   return results.sort((a, b) => a.path.localeCompare(b.path));
 }
