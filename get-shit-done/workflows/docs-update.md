@@ -2,11 +2,6 @@
 Generate, update, and verify all project documentation — both canonical doc types and existing hand-written docs. The orchestrator detects the project's doc structure, assembles a work manifest tracking every item, dispatches parallel doc-writer and doc-verifier agents across waves, reviews existing docs for accuracy, identifies documentation gaps, and fixes inaccuracies via a bounded fix loop. All state is persisted in a work manifest so no work item is lost between steps. Output: Complete, structure-aware documentation verified against the live codebase.
 </purpose>
 
-<available_agent_types>
-Valid GSD subagent types (use exact names — do not fall back to 'general-purpose'):
-- gsd-doc-writer — Writes and updates project documentation files
-</available_agent_types>
-
 <process>
 
 <step name="init_context" priority="first">
@@ -25,29 +20,7 @@ Extract from init JSON:
 - `project_type` — object with boolean signals: `has_package_json`, `has_api_routes`, `has_cli_bin`, `is_open_source`, `has_deploy_config`, `is_monorepo`, `has_tests`
 - `doc_tooling` — object with booleans: `docusaurus`, `vitepress`, `mkdocs`, `storybook`
 - `monorepo_workspaces` — array of workspace glob patterns (empty if not a monorepo)
-- `agents_installed` — boolean; true if gsd-doc-writer agent is installed
-- `missing_agents` — array of agent names not found
 - `project_root` — absolute path to the project root
-</step>
-
-<step name="validate_agents">
-Check the `agents_installed` field from the init JSON.
-
-**If `agents_installed` is false:**
-
-```
-Warning: gsd-doc-writer agent is not installed. Documentation generation may fail.
-
-Missing agents:
-[list items from missing_agents array]
-
-To install agents, run the GSD installer and ensure all agents are set up.
-```
-
-Do NOT halt execution — warn only. The agent may be loaded via other means (e.g., in-context agent definitions, custom agent directories). Continue to classify_project.
-
-**If `agents_installed` is true:**
-Continue to classify_project.
 </step>
 
 <step name="classify_project">
@@ -387,17 +360,7 @@ Use --force to regenerate all docs, or re-run in Claude Code to get per-file pro
 After all decisions recorded, continue to detect_runtime_capabilities.
 </step>
 
-<step name="detect_runtime_capabilities">
-Before spawning agents, detect whether the current runtime supports the `Task` tool for subagent delegation.
-
-**How to detect:** Check if you have access to a `Task` tool (may be capitalized as `Task` or lowercase as `task` depending on runtime). If you do NOT have a `Task`/`task` tool (or only have tools like `browser_subagent` which is for web browsing, NOT code analysis):
-
-→ **Skip `dispatch_wave_1`, `collect_wave_1`, `dispatch_wave_2`, and `collect_wave_2`** — go directly to `sequential_generation` instead.
-
-**CRITICAL:** Never use `browser_subagent` or `Explore` as a substitute for `Task`. The `browser_subagent` tool is exclusively for web page interaction and will produce incorrect results for documentation generation. If `Task` is unavailable, generate docs sequentially in-context.
-
-<!-- Steps 7-13 follow below -->
-</step>
+<!-- If Task tool is unavailable at runtime, skip dispatch/collect waves and use sequential_generation instead. -->
 
 <step name="dispatch_wave_1" condition="Task tool is available">
 **Read the work manifest first:** `Read .planning/tmp/docs-work-manifest.json` — use `canonical_queue` items with `wave: 1` for this step.
@@ -513,9 +476,9 @@ TaskOutput tool:
 Ready for orchestrator summary.
 ```
 
-**After collection, verify the 3 Wave 1 files exist on disk:**
+**After collection, verify the Wave 1 files exist on disk** using the `resolved_path` from each manifest entry:
 ```bash
-ls -la README.md docs/ARCHITECTURE.md docs/CONFIGURATION.md 2>/dev/null
+ls -la {resolved_path_1} {resolved_path_2} {resolved_path_3} 2>/dev/null
 ```
 
 If any agent failed or its file is missing:
@@ -723,11 +686,9 @@ TaskOutput tool:
 # Add one TaskOutput call per conditional agent spawned (API, DEPLOYMENT, CONTRIBUTING)
 ```
 
-**After collection, verify all Wave 2 files exist on disk:**
+**After collection, verify all Wave 2 files exist on disk** using the `resolved_path` from each manifest entry:
 ```bash
-ls -la docs/GETTING-STARTED.md docs/DEVELOPMENT.md docs/TESTING.md 2>/dev/null
-# Also check conditional docs if they were queued:
-# ls -la docs/API.md docs/DEPLOYMENT.md CONTRIBUTING.md 2>/dev/null
+ls -la {resolved_path for each wave 2 item} 2>/dev/null
 ```
 
 If any agent failed or its file is missing, note the failure and continue. Missing docs will be reported in the final report.
