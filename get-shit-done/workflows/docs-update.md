@@ -122,25 +122,61 @@ AskUserQuestion([{
 If the user selects "No, skip it": remove CONTRIBUTING.md from the doc queue.
 If CONTRIBUTING.md already exists in `existing_docs`: skip this prompt entirely, include it for update.
 
-**Existing non-canonical docs (verification queue):**
+**Existing non-canonical docs (review queue):**
 
 After assembling the canonical doc queue above, scan the `existing_docs` array from init JSON for files that do NOT match any canonical path in the queue (neither primary nor fallback path from the resolve_modes table). These are hand-written docs like `docs/api/endpoint-map.md` or `docs/frontend/pages/not-found.md`.
 
 For each non-canonical existing doc found:
-- Add to a separate `review_queue` (NOT the generation queue)
+- Add to a separate `review_queue`
 - These will be passed to gsd-doc-verifier in the verify_docs step for accuracy checking
-- They will NOT be dispatched to gsd-doc-writer -- the writer has no template for arbitrary docs
+- If inaccuracies are found, they will be dispatched to gsd-doc-writer in `fix` mode for surgical corrections
 
 If non-canonical docs are found, display them in the queue presentation:
 
 ```
-Existing non-canonical docs queued for accuracy review:
+Existing docs queued for accuracy review:
   - docs/api/endpoint-map.md (hand-written)
   - docs/api/README.md (hand-written)
   - docs/frontend/pages/not-found.md (hand-written)
 ```
 
 If none found, omit this section from the queue presentation.
+
+**Documentation gap detection (missing non-canonical docs):**
+
+After assembling the canonical and review queues, analyze the codebase to identify areas that should have documentation but don't. This ensures the command creates complete project documentation, not just the 9 canonical types.
+
+1. **Scan the codebase for undocumented areas:**
+   - Use Glob/Grep to discover significant source directories (e.g., `src/components/`, `src/pages/`, `src/services/`, `src/api/`, `lib/`, `routes/`)
+   - Compare against existing docs: for each major source directory, check if corresponding documentation exists in the docs tree
+   - Look at the project's existing doc structure for patterns — if the project has `docs/frontend/components/`, `docs/services/`, etc., these indicate the project's documentation conventions
+
+2. **Identify gaps based on project conventions:**
+   - If the project has a `docs/` directory with grouped subdirectories, each source module area that has a corresponding docs subdirectory but is missing documentation files represents a gap
+   - If the project has frontend components/pages but no component docs, flag this
+   - If the project has service modules but no service docs, flag this
+   - Skip areas that are already covered by canonical docs (e.g., don't flag missing API docs if `docs/API.md` is already in the canonical queue)
+
+3. **Present discovered gaps to the user:**
+
+```
+AskUserQuestion([{
+  question: "Found {N} documentation gaps in the codebase. Which should be created?",
+  header: "Doc gaps",
+  multiSelect: true,
+  options: [
+    { label: "{area}", description: "{why it needs docs — e.g., '5 components in src/components/ with no docs'}" },
+    ...up to 4 options (group related gaps if more than 4)
+  ]
+}])
+```
+
+4. For each gap the user selects:
+   - Add to the generation queue with mode = `"create"`
+   - Set the output path to match the project's existing doc directory structure
+   - The gsd-doc-writer will receive a `doc_assignment` with `type: "custom"` and a description of what to document, using the project's source files as content discovery targets
+
+If no gaps are detected, omit this section entirely.
 
 Present the assembled queue to the user before proceeding:
 
@@ -181,9 +217,9 @@ If the user selects "Abort": exit the workflow. Otherwise continue to resolve_mo
 <step name="resolve_modes">
 For each doc in the assembled queue, determine whether to create (new file) or update (existing file).
 
-**Doc type to canonical path mapping:**
+**Doc type to canonical path mapping (defaults):**
 
-| Type | Primary Path | Fallback Path |
+| Type | Default Path | Fallback Path |
 |------|-------------|---------------|
 | `readme` | `README.md` | — |
 | `architecture` | `docs/ARCHITECTURE.md` | `ARCHITECTURE.md` |
@@ -195,16 +231,40 @@ For each doc in the assembled queue, determine whether to create (new file) or u
 | `deployment` | `docs/DEPLOYMENT.md` | `DEPLOYMENT.md` |
 | `contributing` | `CONTRIBUTING.md` | — |
 
+**Structure-aware path resolution:**
+
+Before applying the default path table, inspect the project's existing docs directory structure to detect grouping conventions. This ensures new docs are placed where the project expects them.
+
+1. List `existing_docs` paths from the init JSON and extract the directory structure pattern:
+   - If existing docs use **grouped subdirectories** (e.g., `docs/architecture/`, `docs/api/`, `docs/guides/`), new docs MUST follow the same grouping convention. Map canonical types to matching subdirectories:
+     - `architecture` → `docs/architecture/` (if that subdirectory exists or similar like `docs/arch/`)
+     - `api` → `docs/api/` (if that subdirectory exists)
+     - `testing` → `docs/testing/` or `docs/guides/` (match closest existing subdirectory)
+     - etc.
+   - If existing docs are **flat** in `docs/` (e.g., `docs/ARCHITECTURE.md`, `docs/API.md`), use the default path table above as-is.
+   - If no `docs/` directory exists, use the default path table and create `docs/`.
+
+2. For each doc type in the queue, resolve the final output path:
+   - Check if a matching subdirectory exists in the project's docs structure
+   - If yes: use `docs/{subdirectory}/{filename}` as the output path
+   - If no matching subdirectory: use the default path from the table above
+   - Store the resolved path as `resolved_path` for use in agent dispatch
+
+3. Create any necessary directories before agent dispatch:
+   ```bash
+   mkdir -p {each unique directory from resolved paths}
+   ```
+
 **Mode resolution logic:**
 
 For each doc type in the queue:
-1. Check if the primary path appears in the `existing_docs` array from the init JSON
-2. If not found at primary path, check the fallback path
-3. If found at either path: mode = `"update"` — use the Read tool to load the current file content (will be passed as `existing_content` in the doc_assignment block)
-4. If not found: mode = `"create"` — no existing content to load
+1. Check if the `resolved_path` appears in the `existing_docs` array from the init JSON
+2. If not found at resolved path, check the default and fallback paths from the table
+3. If found at any path: mode = `"update"` — use the Read tool to load the current file content (will be passed as `existing_content` in the doc_assignment block). Use the found path as the output path (do not move existing docs).
+4. If not found: mode = `"create"` — no existing content to load. Use the `resolved_path`.
 
 **Ensure docs/ directory exists:**
-Before proceeding to the next step, create the `docs/` directory if it does not exist:
+Before proceeding to the next step, create the `docs/` directory and any resolved subdirectories if they do not exist:
 ```bash
 mkdir -p docs/
 ```
@@ -722,10 +782,9 @@ For each doc in the generation queue that was successfully written to disk:
 
 For each doc in the `review_queue` assembled in build_doc_queue:
 - Run the same gsd-doc-verifier verification process (check file paths, commands, endpoints, function signatures)
-- Report findings but do NOT dispatch to gsd-doc-writer for fixes -- these docs have no matching template
-- Include verification results in the report with a note: "Manual correction recommended" for any failures
+- Include verification results in the verification summary table
 
-Non-canonical docs are excluded from the fix_loop -- only canonical docs with templates are eligible for automated fixes.
+Non-canonical docs with failures ARE eligible for the fix_loop. When a non-canonical doc has `claims_failed > 0`, dispatch it to gsd-doc-writer in `fix` mode with the failures array — the writer's fix mode does surgical corrections on specific lines regardless of doc type (no template needed). The writer MUST NOT restructure, rephrase, or reformat any content beyond the failing claims.
 
 Present a verification summary:
 
@@ -975,12 +1034,12 @@ VERIFY markers: {N} markers placed in docs/DEPLOYMENT.md and/or docs/CONFIGURATI
 
 Existing doc accuracy review:
 
-| Doc | Claims Checked | Passed | Failed |
-|-----|----------------|--------|--------|
-| docs/api/endpoint-map.md | 5 | 4 | 1 |
+| Doc | Claims Checked | Passed | Failed | Fixed |
+|-----|----------------|--------|--------|-------|
+| docs/api/endpoint-map.md | 5 | 4 | 1 | 1 |
 
-{For any failures:}
-Manual correction recommended for flagged items above.
+{For any remaining unfixed failures after fix_loop:}
+Remaining inaccuracies could not be auto-corrected — manual review recommended for flagged items above.
 
 {If commit_docs was true:}
 All generated files committed.
