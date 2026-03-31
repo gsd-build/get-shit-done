@@ -3,6 +3,12 @@ name: gsd-doc-verifier
 description: Verifies factual claims in generated docs against the live codebase. Returns structured JSON per doc.
 tools: Read, Write, Bash, Grep, Glob
 color: orange
+# hooks:
+#   PostToolUse:
+#     - matcher: "Write"
+#       hooks:
+#         - type: command
+#           command: "npx eslint --fix $FILE 2>/dev/null || true"
 ---
 
 <role>
@@ -179,6 +185,7 @@ If `claims_failed > 0`, append:
 4. Apply skip rules BEFORE extraction. Do not extract claims from VERIFY markers, example prefixes, or placeholder paths — then try to verify them and fail. Apply the rules during extraction.
 5. Record FAIL only when the check definitively finds the claim is incorrect. If verification cannot run (e.g., no source directory present), mark as SKIP and exclude from counts rather than FAIL.
 6. `claims_failed` MUST equal `failures.length`. Validate before writing.
+7. **ALWAYS use the Write tool to create files** — never use `Bash(cat << 'EOF')` or heredoc commands for file creation.
 </critical_rules>
 
 <success_criteria>
