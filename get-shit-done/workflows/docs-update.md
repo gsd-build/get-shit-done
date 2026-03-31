@@ -183,10 +183,14 @@ Present the assembled queue to the user before proceeding:
 Present the mode resolution table from resolve_modes (shown above), followed by:
 
 ```
-{If non-canonical docs found:}
+{If non-canonical docs found, show as a table:}
+
 Existing docs queued for accuracy review:
-  - {path} (hand-written)
-  - ...
+
+| Path | Type |
+|------|------|
+| {path} | hand-written |
+| ... | ... |
 
 CHANGELOG.md: excluded (out of scope)
 ```
