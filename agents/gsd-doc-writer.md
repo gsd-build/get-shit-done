@@ -525,7 +525,9 @@ change — only location and metadata change.
   placement or frontmatter.
 
 **No tooling detected:**
-- Write to canonical paths from the `resolve_modes` table (project root or docs/).
+- Write to `docs/` directory by default. Exceptions: `README.md` and `CONTRIBUTING.md` stay at project root.
+- The `resolve_modes` table in the workflow determines the exact path for each doc type.
+- Create the `docs/` directory if it does not exist.
 - No frontmatter added.
 </doc_tooling_guidance>
 
