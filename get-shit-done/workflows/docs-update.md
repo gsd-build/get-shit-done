@@ -183,19 +183,21 @@ Present the assembled queue to the user before proceeding:
 ```
 Doc queue assembled ({N} docs):
 
-Always-on:
-  - README.md
-  - docs/ARCHITECTURE.md
-  - docs/GETTING-STARTED.md
-  - docs/DEVELOPMENT.md
-  - docs/TESTING.md
-  - docs/CONFIGURATION.md
+{list each doc with its resolved_path from resolve_modes, e.g.:}
+  - README.md (create)
+  - docs/architecture/overview.md (create)
+  - docs/guides/getting-started.md (create)
+  - docs/guides/development.md (create)
+  - docs/testing/overview.md (update — hand-written)
+  - docs/configuration/overview.md (create)
 
 Conditional:
-  [list conditional docs queued, or "none"]
+  [list conditional docs queued with resolved paths, or "none"]
 
 CHANGELOG.md: excluded (out of scope)
 ```
+
+NOTE: The queue presentation MUST show the actual `resolved_path` for each doc, not the default paths from the table. This is what the user sees before confirming — it must reflect where files will actually be written.
 
 Then confirm with AskUserQuestion:
 
@@ -233,27 +235,42 @@ For each doc in the assembled queue, determine whether to create (new file) or u
 
 **Structure-aware path resolution:**
 
-Before applying the default path table, inspect the project's existing docs directory structure to detect grouping conventions. This ensures new docs are placed where the project expects them.
+Before applying the default path table, inspect the project's existing docs directory structure to detect whether the project uses **grouped subdirectories** or **flat files**. This determines how ALL new docs are placed.
 
-1. List `existing_docs` paths from the init JSON and extract the directory structure pattern:
-   - If existing docs use **grouped subdirectories** (e.g., `docs/architecture/`, `docs/api/`, `docs/guides/`), new docs MUST follow the same grouping convention. Map canonical types to matching subdirectories:
-     - `architecture` → `docs/architecture/` (if that subdirectory exists or similar like `docs/arch/`)
-     - `api` → `docs/api/` (if that subdirectory exists)
-     - `testing` → `docs/testing/` or `docs/guides/` (match closest existing subdirectory)
-     - etc.
-   - If existing docs are **flat** in `docs/` (e.g., `docs/ARCHITECTURE.md`, `docs/API.md`), use the default path table above as-is.
-   - If no `docs/` directory exists, use the default path table and create `docs/`.
+**Step 1: Detect the project's docs organization pattern.**
 
-2. For each doc type in the queue, resolve the final output path:
-   - Check if a matching subdirectory exists in the project's docs structure
-   - If yes: use `docs/{subdirectory}/{filename}` as the output path
-   - If no matching subdirectory: use the default path from the table above
-   - Store the resolved path as `resolved_path` for use in agent dispatch
+List subdirectories under `docs/` from the `existing_docs` paths. If the project has 2+ subdirectories (e.g., `docs/architecture/`, `docs/api/`, `docs/guides/`, `docs/frontend/`), the project uses a **grouped structure**. If docs are only flat files directly in `docs/` (e.g., `docs/ARCHITECTURE.md`), it uses a **flat structure**.
 
-3. Create any necessary directories before agent dispatch:
-   ```bash
-   mkdir -p {each unique directory from resolved paths}
-   ```
+**Step 2: Resolve paths based on the detected pattern.**
+
+**If GROUPED structure detected:**
+
+Every doc type MUST be placed in an appropriate subdirectory — no doc should be left flat in `docs/` when the project organizes into groups. Use the following resolution logic:
+
+| Type | Subdirectory resolution (in priority order) |
+|------|----------------------------------------------|
+| `architecture` | existing `docs/architecture/` → create `docs/architecture/` if not present |
+| `getting_started` | existing `docs/guides/` → existing `docs/getting-started/` → create `docs/guides/` |
+| `development` | existing `docs/guides/` → existing `docs/development/` → create `docs/guides/` |
+| `testing` | existing `docs/testing/` → existing `docs/guides/` → create `docs/testing/` |
+| `api` | existing `docs/api/` → create `docs/api/` if not present |
+| `configuration` | existing `docs/configuration/` → existing `docs/guides/` → create `docs/configuration/` |
+| `deployment` | existing `docs/deployment/` → existing `docs/guides/` → create `docs/deployment/` |
+
+For each type, check the resolution chain left-to-right. Use the first existing subdirectory. If none exist, create the rightmost option.
+
+The filename within the subdirectory should be contextual — e.g., `docs/guides/getting-started.md`, `docs/architecture/overview.md`, `docs/api/reference.md` — rather than `docs/architecture/ARCHITECTURE.md`. Match the naming style of existing files in that subdirectory (lowercase-kebab, UPPERCASE, etc.).
+
+**If FLAT structure detected (or no docs/ directory):**
+
+Use the default path table above as-is (e.g., `docs/ARCHITECTURE.md`, `docs/TESTING.md`).
+
+**Step 3: Store each resolved path and create directories.**
+
+For each doc type, store the resolved path as `resolved_path`. Then create all necessary directories:
+```bash
+mkdir -p {each unique directory from resolved paths}
+```
 
 **Mode resolution logic:**
 
