@@ -306,6 +306,48 @@ Mode resolution:
 This table MUST be shown to the user — it is the primary confirmation of where files will be written and whether existing files will be updated. It appears as part of the queue presentation BEFORE the AskUserQuestion confirmation.
 
 Track the resolved mode and file path for each queued doc. For update-mode docs, store the loaded file content — it will be passed to the agent in the next steps.
+
+**CRITICAL: Persist the work manifest.**
+
+After resolve_modes completes, write ALL work items to `.planning/tmp/docs-work-manifest.json`. This is the single source of truth for every subsequent step — the orchestrator MUST read this file at each step instead of relying on memory.
+
+```bash
+mkdir -p .planning/tmp
+```
+
+Write the manifest using the Write tool:
+
+```json
+{
+  "canonical_queue": [
+    {
+      "type": "readme",
+      "resolved_path": "README.md",
+      "mode": "create|update|supplement",
+      "preservation_mode": null,
+      "wave": 1,
+      "status": "pending"
+    }
+  ],
+  "review_queue": [
+    {
+      "path": "docs/frontend/components/button.md",
+      "type": "hand-written",
+      "status": "pending_review"
+    }
+  ],
+  "gap_queue": [
+    {
+      "description": "Frontend components in src/components/",
+      "output_path": "docs/frontend/components/overview.md",
+      "status": "pending"
+    }
+  ],
+  "created_at": "{ISO timestamp}"
+}
+```
+
+Every subsequent step (dispatch, collect, verify, fix_loop, report) MUST begin by reading `.planning/tmp/docs-work-manifest.json` and update the `status` field for items it processes. This prevents the orchestrator from "forgetting" any work item across the multi-step workflow.
 </step>
 
 <step name="preservation_check">
@@ -358,6 +400,8 @@ Before spawning agents, detect whether the current runtime supports the `Task` t
 </step>
 
 <step name="dispatch_wave_1" condition="Task tool is available">
+**Read the work manifest first:** `Read .planning/tmp/docs-work-manifest.json` — use `canonical_queue` items with `wave: 1` for this step.
+
 Spawn 3 parallel gsd-doc-writer agents for Wave 1 docs: README, ARCHITECTURE, CONFIGURATION.
 
 These are foundational docs with no cross-references needed, making them ideal for parallel generation.
@@ -437,6 +481,8 @@ Continue to collect_wave_1.
 </step>
 
 <step name="collect_wave_1">
+**Read the work manifest first:** `Read .planning/tmp/docs-work-manifest.json` — update `status` to `"completed"` or `"failed"` for each Wave 1 item after collection. Write the updated manifest back to disk.
+
 Wait for all 3 Wave 1 agents to complete using the TaskOutput tool.
 
 Call TaskOutput for all 3 agents in parallel (single message with 3 TaskOutput calls):
@@ -481,6 +527,8 @@ Continue to dispatch_wave_2.
 </step>
 
 <step name="dispatch_wave_2" condition="Task tool is available">
+**Read the work manifest first:** `Read .planning/tmp/docs-work-manifest.json` — use `canonical_queue` items with `wave: 2` for this step.
+
 Spawn agents for all queued Wave 2 docs: GETTING-STARTED, DEVELOPMENT, TESTING, and any conditional docs (API, DEPLOYMENT, CONTRIBUTING) that were queued in build_doc_queue.
 
 Wave 2 agents can reference Wave 1 outputs for cross-referencing — include the `wave_1_outputs` field in each doc_assignment block.
@@ -650,6 +698,8 @@ Continue to collect_wave_2.
 </step>
 
 <step name="collect_wave_2">
+**Read the work manifest first:** `Read .planning/tmp/docs-work-manifest.json` — update `status` to `"completed"` or `"failed"` for each Wave 2 item after collection. Write the updated manifest back to disk.
+
 Wait for all Wave 2 agents to complete using the TaskOutput tool.
 
 Call TaskOutput for all Wave 2 agents in parallel (single message with N TaskOutput calls — one per spawned Wave 2 agent):
@@ -736,6 +786,8 @@ Continue to commit_docs.
 </step>
 
 <step name="sequential_generation" condition="Task tool is NOT available (e.g. Antigravity, Gemini CLI, Codex, Copilot)">
+**Read the work manifest first:** `Read .planning/tmp/docs-work-manifest.json` — use `canonical_queue` items for generation order. Update `status` after each doc is generated. Write the updated manifest back to disk after all docs are complete.
+
 When the `Task` tool is unavailable, generate docs sequentially in the current context. This step replaces dispatch_wave_1, collect_wave_1, dispatch_wave_2, and collect_wave_2.
 
 **IMPORTANT:** Do NOT use `browser_subagent`, `Explore`, or any browser-based tool. Use only file system tools (Read, Bash, Write, Grep, Glob, or equivalent tools available in your runtime).
@@ -787,11 +839,21 @@ Continue to verify_docs.
 </step>
 
 <step name="verify_docs">
-Verify factual claims in all generated docs against the live codebase. Per D-02, verify every doc in the queue -- including supplemented and preserved docs, not just newly created ones.
+Verify factual claims in ALL docs — both canonical (generated) and non-canonical (existing hand-written) — against the live codebase.
+
+**CRITICAL: Read the work manifest first.**
+
+```
+Read .planning/tmp/docs-work-manifest.json
+```
+
+Extract `canonical_queue` (items with `status: "completed"`) and `review_queue` (items with `status: "pending_review"`). Both queues are verified in this step.
 
 **Skip condition:** If `--verify-only` is present in `$ARGUMENTS`, this step was already handled by `verify_only_report` (early exit). Skip.
 
-For each doc in the generation queue that was successfully written to disk:
+**Phase 1: Verify canonical docs (generated/updated docs)**
+
+For each doc in `canonical_queue` that was successfully written to disk:
 
 1. Spawn the `gsd-doc-verifier` agent (or invoke sequentially if Task tool is unavailable) with a `<verify_assignment>` block:
    ```xml
@@ -803,35 +865,53 @@ For each doc in the generation queue that was successfully written to disk:
 
 2. After the verifier completes, read the result JSON from `.planning/tmp/verify-{doc_filename}.json`.
 
-3. Collect all results into a `verification_results` array.
+3. Update the manifest: set `status: "verified"` for each canonical doc processed.
 
-**Additionally, verify non-canonical existing docs from the review_queue:**
+**Phase 2: Verify non-canonical docs (existing hand-written docs)**
 
-For each doc in the `review_queue` assembled in build_doc_queue:
-- Run the same gsd-doc-verifier verification process (check file paths, commands, endpoints, function signatures)
-- Include verification results in the verification summary table
+This is NOT optional. Every doc in `review_queue` MUST be verified.
+
+For each doc in `review_queue` from the manifest:
+
+1. Spawn the `gsd-doc-verifier` agent with the same `<verify_assignment>` block as above.
+2. Read the result JSON from `.planning/tmp/verify-{doc_filename}.json`.
+3. Update the manifest: set `status: "verified"` for each review_queue doc processed.
 
 Non-canonical docs with failures ARE eligible for the fix_loop. When a non-canonical doc has `claims_failed > 0`, dispatch it to gsd-doc-writer in `fix` mode with the failures array — the writer's fix mode does surgical corrections on specific lines regardless of doc type (no template needed). The writer MUST NOT restructure, rephrase, or reformat any content beyond the failing claims.
 
-Present a verification summary:
+**Phase 3: Present combined verification summary**
+
+Collect ALL results (canonical + non-canonical) into a single `verification_results` array:
 
 ```
 Verification results:
 
+Canonical docs (generated):
+
 | Doc                    | Claims | Passed | Failed |
 |------------------------|--------|--------|--------|
 | README.md              | 12     | 10     | 2      |
-| docs/ARCHITECTURE.md   | 8      | 8      | 0      |
-| ...               | ...    | ...    | ...    |
+| docs/architecture/overview.md | 8 | 8   | 0      |
+
+Existing docs (reviewed):
+
+| Doc                    | Claims | Passed | Failed |
+|------------------------|--------|--------|--------|
+| docs/frontend/components/button.md | 5 | 4 | 1   |
+| docs/services/api.md   | 8      | 8      | 0      |
 
 Total: {total_checked} claims checked, {total_failed} failures
 ```
 
+Write the updated manifest back to disk.
+
 If all docs have `claims_failed === 0`: skip fix_loop, continue to scan_for_secrets.
-If any doc has `claims_failed > 0`: continue to fix_loop.
+If any doc (canonical OR non-canonical) has `claims_failed > 0`: continue to fix_loop.
 </step>
 
 <step name="fix_loop">
+**Read the work manifest first:** `Read .planning/tmp/docs-work-manifest.json` — identify ALL docs (canonical AND non-canonical) with `claims_failed > 0` from the verification results in `.planning/tmp/verify-*.json`. Both queues are eligible for fixes.
+
 Correct flagged inaccuracies by re-sending failing docs to the doc-writer in fix mode. Per D-06, max 2 iterations. Per D-05, halt immediately on regression.
 
 **Skip condition:** If all docs passed verification (no failures), skip this step.
@@ -1019,6 +1099,8 @@ Continue to report.
 </step>
 
 <step name="report">
+**Read the work manifest first:** `Read .planning/tmp/docs-work-manifest.json` — use the manifest to compile the complete report covering all canonical docs, review_queue results, and gap_queue results. The manifest is the source of truth for what was processed.
+
 Present a completion summary to the user.
 
 **Summary format:**
