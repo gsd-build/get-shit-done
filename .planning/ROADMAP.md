@@ -93,7 +93,7 @@ Plans:
   4. New CONTRIBUTING.md creation prompts user for confirmation unless `--force` is passed or the file already exists
 **Plans**: 2 plans
 Plans:
-- [ ] 05-01-PLAN.md — Fix recursive docs/ scanning in docs.cjs and update doc-writer default path guidance
+- [x] 05-01-PLAN.md — Fix recursive docs/ scanning in docs.cjs and update doc-writer default path guidance
 - [ ] 05-02-PLAN.md — Invert workflow path table, add CONTRIBUTING confirmation gate, and existing doc review queue
 
 ## Progress

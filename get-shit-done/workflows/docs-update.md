@@ -107,11 +107,11 @@ Doc queue assembled ({N} docs):
 
 Always-on:
   - README.md
-  - ARCHITECTURE.md
-  - GETTING-STARTED.md
-  - DEVELOPMENT.md
-  - TESTING.md
-  - CONFIGURATION.md
+  - docs/ARCHITECTURE.md
+  - docs/GETTING-STARTED.md
+  - docs/DEVELOPMENT.md
+  - docs/TESTING.md
+  - docs/CONFIGURATION.md
 
 Conditional:
   [list conditional docs queued, or "none"]
@@ -132,13 +132,13 @@ For each doc in the assembled queue, determine whether to create (new file) or u
 | Type | Primary Path | Fallback Path |
 |------|-------------|---------------|
 | `readme` | `README.md` | — |
-| `architecture` | `ARCHITECTURE.md` | `docs/ARCHITECTURE.md` |
-| `getting_started` | `GETTING-STARTED.md` | `docs/GETTING-STARTED.md` |
-| `development` | `DEVELOPMENT.md` | `docs/DEVELOPMENT.md` |
-| `testing` | `TESTING.md` | `docs/TESTING.md` |
-| `api` | `API.md` | `docs/API.md` |
-| `configuration` | `CONFIGURATION.md` | `docs/CONFIGURATION.md` |
-| `deployment` | `DEPLOYMENT.md` | `docs/DEPLOYMENT.md` |
+| `architecture` | `docs/ARCHITECTURE.md` | `ARCHITECTURE.md` |
+| `getting_started` | `docs/GETTING-STARTED.md` | `GETTING-STARTED.md` |
+| `development` | `docs/DEVELOPMENT.md` | `DEVELOPMENT.md` |
+| `testing` | `docs/TESTING.md` | `TESTING.md` |
+| `api` | `docs/API.md` | `API.md` |
+| `configuration` | `docs/CONFIGURATION.md` | `CONFIGURATION.md` |
+| `deployment` | `docs/DEPLOYMENT.md` | `DEPLOYMENT.md` |
 | `contributing` | `CONTRIBUTING.md` | — |
 
 **Mode resolution logic:**
@@ -149,12 +149,18 @@ For each doc type in the queue:
 3. If found at either path: mode = `"update"` — use the Read tool to load the current file content (will be passed as `existing_content` in the doc_assignment block)
 4. If not found: mode = `"create"` — no existing content to load
 
+**Ensure docs/ directory exists:**
+Before proceeding to the next step, create the `docs/` directory if it does not exist:
+```bash
+mkdir -p docs/
+```
+
 **Output a mode resolution table:**
 ```
 Mode resolution:
-  README.md          — create (not found)
-  ARCHITECTURE.md    — update (found at ARCHITECTURE.md)
-  GETTING-STARTED.md — create (not found)
+  README.md               — create (not found)
+  docs/ARCHITECTURE.md    — update (found at docs/ARCHITECTURE.md)
+  docs/GETTING-STARTED.md — create (not found)
   ...
 ```
 
@@ -322,8 +328,7 @@ Ready for orchestrator summary.
 
 **After collection, verify the 3 Wave 1 files exist on disk:**
 ```bash
-ls -la README.md ARCHITECTURE.md CONFIGURATION.md 2>/dev/null || \
-  ls -la docs/ARCHITECTURE.md docs/CONFIGURATION.md 2>/dev/null
+ls -la README.md docs/ARCHITECTURE.md docs/CONFIGURATION.md 2>/dev/null
 ```
 
 If any agent failed or its file is missing:
@@ -357,8 +362,8 @@ project_context: {INIT JSON}
 {existing_content: | (include full file content here if mode is update or supplement, else omit this line)}
 wave_1_outputs:
   - README.md
-  - ARCHITECTURE.md
-  - CONFIGURATION.md
+  - docs/ARCHITECTURE.md
+  - docs/CONFIGURATION.md
 </doc_assignment>
 
 {AGENT_SKILLS}
@@ -383,8 +388,8 @@ project_context: {INIT JSON}
 {existing_content: | (include full file content here if mode is update or supplement, else omit this line)}
 wave_1_outputs:
   - README.md
-  - ARCHITECTURE.md
-  - CONFIGURATION.md
+  - docs/ARCHITECTURE.md
+  - docs/CONFIGURATION.md
 </doc_assignment>
 
 {AGENT_SKILLS}
@@ -409,8 +414,8 @@ project_context: {INIT JSON}
 {existing_content: | (include full file content here if mode is update or supplement, else omit this line)}
 wave_1_outputs:
   - README.md
-  - ARCHITECTURE.md
-  - CONFIGURATION.md
+  - docs/ARCHITECTURE.md
+  - docs/CONFIGURATION.md
 </doc_assignment>
 
 {AGENT_SKILLS}
@@ -435,8 +440,8 @@ project_context: {INIT JSON}
 {existing_content: | (include full file content here if mode is update or supplement, else omit this line)}
 wave_1_outputs:
   - README.md
-  - ARCHITECTURE.md
-  - CONFIGURATION.md
+  - docs/ARCHITECTURE.md
+  - docs/CONFIGURATION.md
 </doc_assignment>
 
 {AGENT_SKILLS}
@@ -462,8 +467,8 @@ project_context: {INIT JSON}
 note: Apply VERIFY markers to any infrastructure claim not discoverable from the repository.
 wave_1_outputs:
   - README.md
-  - ARCHITECTURE.md
-  - CONFIGURATION.md
+  - docs/ARCHITECTURE.md
+  - docs/CONFIGURATION.md
 </doc_assignment>
 
 {AGENT_SKILLS}
@@ -488,8 +493,8 @@ project_context: {INIT JSON}
 {existing_content: | (include full file content here if mode is update or supplement, else omit this line)}
 wave_1_outputs:
   - README.md
-  - ARCHITECTURE.md
-  - CONFIGURATION.md
+  - docs/ARCHITECTURE.md
+  - docs/CONFIGURATION.md
 </doc_assignment>
 
 {AGENT_SKILLS}
@@ -529,9 +534,9 @@ TaskOutput tool:
 
 **After collection, verify all Wave 2 files exist on disk:**
 ```bash
-ls -la GETTING-STARTED.md DEVELOPMENT.md TESTING.md 2>/dev/null
+ls -la docs/GETTING-STARTED.md docs/DEVELOPMENT.md docs/TESTING.md 2>/dev/null
 # Also check conditional docs if they were queued:
-# ls -la API.md DEPLOYMENT.md CONTRIBUTING.md 2>/dev/null
+# ls -la docs/API.md docs/DEPLOYMENT.md CONTRIBUTING.md 2>/dev/null
 ```
 
 If any agent failed or its file is missing, note the failure and continue. Missing docs will be reported in the final report.
@@ -608,19 +613,19 @@ For each Wave 1 doc, construct the equivalent doc_assignment block and generate 
 2. **ARCHITECTURE** — mode from resolve_modes; for update/supplement mode, include existing_content
    - Construct doc_assignment: `type: architecture`, `mode: {create|update|supplement}`, `preservation_mode: {value|null}`, `project_context: {INIT JSON}`, `existing_content:` (if update/supplement)
    - Explore the codebase following gsd-doc-writer instructions
-   - Write the file to the resolved path (ARCHITECTURE.md or docs/ARCHITECTURE.md)
+   - Write the file to the resolved path (docs/ARCHITECTURE.md, or ARCHITECTURE.md if found at root as fallback)
 
 3. **CONFIGURATION** — mode from resolve_modes; for update/supplement mode, include existing_content
    - Construct doc_assignment: `type: configuration`, `mode: {create|update|supplement}`, `preservation_mode: {value|null}`, `project_context: {INIT JSON}`, `existing_content:` (if update/supplement)
    - Apply VERIFY markers to any infrastructure claim not discoverable from the repository
    - Explore the codebase following gsd-doc-writer instructions
-   - Write the file to the resolved path (CONFIGURATION.md or docs/CONFIGURATION.md)
+   - Write the file to the resolved path (docs/CONFIGURATION.md, or CONFIGURATION.md if found at root as fallback)
 
 **Wave 2 (sequential — begin only after all Wave 1 docs are written):**
 
 Wave 2 docs can reference Wave 1 outputs since they are already written. Include `wave_1_outputs` in each doc_assignment.
 
-4. **GETTING-STARTED** — mode from resolve_modes; include wave_1_outputs: [README.md, ARCHITECTURE.md, CONFIGURATION.md]
+4. **GETTING-STARTED** — mode from resolve_modes; include wave_1_outputs: [README.md, docs/ARCHITECTURE.md, docs/CONFIGURATION.md]
 5. **DEVELOPMENT** — mode from resolve_modes; include wave_1_outputs
 6. **TESTING** — mode from resolve_modes; include wave_1_outputs
 7. **API** (only if queued) — mode from resolve_modes; include wave_1_outputs
@@ -664,10 +669,10 @@ Present a verification summary:
 ```
 Verification results:
 
-| Doc               | Claims | Passed | Failed |
-|-------------------|--------|--------|--------|
-| README.md         | 12     | 10     | 2      |
-| ARCHITECTURE.md   | 8      | 8      | 0      |
+| Doc                    | Claims | Passed | Failed |
+|------------------------|--------|--------|--------|
+| README.md              | 12     | 10     | 2      |
+| docs/ARCHITECTURE.md   | 8      | 8      | 0      |
 | ...               | ...    | ...    | ...    |
 
 Total: {total_checked} claims checked, {total_failed} failures
@@ -766,11 +771,11 @@ Present a combined summary table:
 ```
 --verify-only audit:
 
-| File                | Claims Checked | Passed | Failed | VERIFY Markers |
-|---------------------|----------------|--------|--------|----------------|
-| README.md           | 12             | 10     | 2      | 0              |
-| ARCHITECTURE.md     | 8              | 8      | 0      | 0              |
-| CONFIGURATION.md    | 5              | 3      | 2      | 5              |
+| File                     | Claims Checked | Passed | Failed | VERIFY Markers |
+|--------------------------|----------------|--------|--------|----------------|
+| README.md                | 12             | 10     | 2      | 0              |
+| docs/ARCHITECTURE.md     | 8              | 8      | 0      | 0              |
+| docs/CONFIGURATION.md    | 5              | 3      | 2      | 5              |
 | ...                 | ...            | ...    | ...    | ...            |
 
 Total: {total_checked} claims checked, {total_failed} failures, {total_markers} VERIFY markers requiring manual review
@@ -780,7 +785,7 @@ If any failures exist, show details:
 ```
 Failed claims:
   README.md:34 - "src/cli/index.ts" (expected: file exists, actual: file not found)
-  CONFIGURATION.md:12 - "npm run deploy" (expected: script in package.json, actual: script not found)
+  docs/CONFIGURATION.md:12 - "npm run deploy" (expected: script in package.json, actual: script not found)
 ```
 
 Display note:
@@ -840,9 +845,9 @@ Assemble the list of files that were actually generated (do not include files th
 
 ```bash
 node "$HOME/.claude/get-shit-done/bin/gsd-tools.cjs" commit "docs: generate project documentation" \
-  --files README.md ARCHITECTURE.md CONFIGURATION.md GETTING-STARTED.md DEVELOPMENT.md TESTING.md
+  --files README.md docs/ARCHITECTURE.md docs/CONFIGURATION.md docs/GETTING-STARTED.md docs/DEVELOPMENT.md docs/TESTING.md
 # Append any conditional docs that were generated:
-# --files ... API.md DEPLOYMENT.md CONTRIBUTING.md
+# --files ... docs/API.md docs/DEPLOYMENT.md CONTRIBUTING.md
 # Append per-package READMEs if monorepo dispatch ran:
 # --files ... packages/core/README.md packages/cli/README.md
 ```
@@ -863,14 +868,14 @@ Documentation generation complete.
 Project type: {primary_type}
 
 Generated docs:
-| File                | Mode   | Lines |
-|---------------------|--------|-------|
-| README.md           | create | 87    |
-| ARCHITECTURE.md     | update | 124   |
-| GETTING-STARTED.md  | create | 63    |
-| DEVELOPMENT.md      | create | 71    |
-| TESTING.md          | create | 58    |
-| CONFIGURATION.md    | create | 45    |
+| File                     | Mode   | Lines |
+|--------------------------|--------|-------|
+| README.md                | create | 87    |
+| docs/ARCHITECTURE.md     | update | 124   |
+| docs/GETTING-STARTED.md  | create | 63    |
+| docs/DEVELOPMENT.md      | create | 71    |
+| docs/TESTING.md          | create | 58    |
+| docs/CONFIGURATION.md    | create | 45    |
 [conditional docs if generated]
 
 {If monorepo per-package READMEs were generated:}
@@ -882,14 +887,14 @@ Per-package READMEs:
 
 {If any docs failed or were skipped:}
 Skipped / failed:
-  - API.md: agent did not complete
+  - docs/API.md: agent did not complete
 
 {If preservation_check ran:}
 Preservation decisions:
   - {filename}: {preserve|supplement|regenerate}
 
-{If DEPLOYMENT.md or CONFIGURATION.md were generated:}
-VERIFY markers: {N} markers placed in DEPLOYMENT.md and/or CONFIGURATION.md for infrastructure claims that require manual verification.
+{If docs/DEPLOYMENT.md or docs/CONFIGURATION.md were generated:}
+VERIFY markers: {N} markers placed in docs/DEPLOYMENT.md and/or docs/CONFIGURATION.md for infrastructure claims that require manual verification.
 
 {If commit_docs was true:}
 All generated files committed.
@@ -914,7 +919,7 @@ End workflow.
 - [ ] Each doc was generated in correct mode (create for new, update for existing)
 - [ ] Wave 1 docs (README, ARCHITECTURE, CONFIGURATION) completed before Wave 2 started
 - [ ] Generated docs contain zero GSD methodology content
-- [ ] DEPLOYMENT.md and CONFIGURATION.md use VERIFY markers for undiscoverable claims (if generated)
+- [ ] docs/DEPLOYMENT.md and docs/CONFIGURATION.md use VERIFY markers for undiscoverable claims (if generated)
 - [ ] All generated files committed (if commit_docs is true)
 - [ ] Hand-written docs (no GSD marker) prompted for preserve/supplement/regenerate before dispatch (unless --force)
 - [ ] --force flag skipped preservation prompts and regenerated all docs
