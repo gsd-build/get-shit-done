@@ -100,6 +100,41 @@ Assemble the complete doc queue from always-on docs plus conditional docs from c
 
 **Doc queue limit:** Maximum 9 docs. Always-on (6) + up to 3 conditional = at most 9.
 
+**CONTRIBUTING.md confirmation (new file only):**
+
+If CONTRIBUTING.md is in the conditional queue AND does NOT appear in the `existing_docs` array from init JSON:
+
+1. If `--force` is present in `$ARGUMENTS`: skip this check, include CONTRIBUTING.md in the queue.
+2. Otherwise, ask the user before including it:
+
+```
+This project appears to be open source (LICENSE file detected).
+CONTRIBUTING.md does not exist yet. Would you like to create one? (y/n)
+```
+
+If the user answers "n" or "no": remove CONTRIBUTING.md from the doc queue.
+If CONTRIBUTING.md already exists in `existing_docs`: skip this prompt entirely, include it for update.
+
+**Existing non-canonical docs (verification queue):**
+
+After assembling the canonical doc queue above, scan the `existing_docs` array from init JSON for files that do NOT match any canonical path in the queue (neither primary nor fallback path from the resolve_modes table). These are hand-written docs like `docs/api/endpoint-map.md` or `docs/frontend/pages/not-found.md`.
+
+For each non-canonical existing doc found:
+- Add to a separate `review_queue` (NOT the generation queue)
+- These will be passed to gsd-doc-verifier in the verify_docs step for accuracy checking
+- They will NOT be dispatched to gsd-doc-writer -- the writer has no template for arbitrary docs
+
+If non-canonical docs are found, display them in the queue presentation:
+
+```
+Existing non-canonical docs queued for accuracy review:
+  - docs/api/endpoint-map.md (hand-written)
+  - docs/api/README.md (hand-written)
+  - docs/frontend/pages/not-found.md (hand-written)
+```
+
+If none found, omit this section from the queue presentation.
+
 Present the assembled queue to the user before proceeding:
 
 ```
@@ -664,6 +699,15 @@ For each doc in the generation queue that was successfully written to disk:
 
 3. Collect all results into a `verification_results` array.
 
+**Additionally, verify non-canonical existing docs from the review_queue:**
+
+For each doc in the `review_queue` assembled in build_doc_queue:
+- Run the same gsd-doc-verifier verification process (check file paths, commands, endpoints, function signatures)
+- Report findings but do NOT dispatch to gsd-doc-writer for fixes -- these docs have no matching template
+- Include verification results in the report with a note: "Manual correction recommended" for any failures
+
+Non-canonical docs are excluded from the fix_loop -- only canonical docs with templates are eligible for automated fixes.
+
 Present a verification summary:
 
 ```
@@ -895,6 +939,17 @@ Preservation decisions:
 
 {If docs/DEPLOYMENT.md or docs/CONFIGURATION.md were generated:}
 VERIFY markers: {N} markers placed in docs/DEPLOYMENT.md and/or docs/CONFIGURATION.md for infrastructure claims that require manual verification.
+
+{If review_queue was non-empty:}
+
+Existing doc accuracy review:
+
+| Doc | Claims Checked | Passed | Failed |
+|-----|----------------|--------|--------|
+| docs/api/endpoint-map.md | 5 | 4 | 1 |
+
+{For any failures:}
+Manual correction recommended for flagged items above.
 
 {If commit_docs was true:}
 All generated files committed.
