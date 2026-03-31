@@ -105,14 +105,21 @@ Assemble the complete doc queue from always-on docs plus conditional docs from c
 If CONTRIBUTING.md is in the conditional queue AND does NOT appear in the `existing_docs` array from init JSON:
 
 1. If `--force` is present in `$ARGUMENTS`: skip this check, include CONTRIBUTING.md in the queue.
-2. Otherwise, ask the user before including it:
+2. Otherwise, use AskUserQuestion to confirm:
 
 ```
-This project appears to be open source (LICENSE file detected).
-CONTRIBUTING.md does not exist yet. Would you like to create one? (y/n)
+AskUserQuestion([{
+  question: "This project appears to be open source (LICENSE file detected). CONTRIBUTING.md does not exist yet. Would you like to create one?",
+  header: "Contributing",
+  multiSelect: false,
+  options: [
+    { label: "Yes, create it", description: "Generate CONTRIBUTING.md with project guidelines" },
+    { label: "No, skip it", description: "This project does not need a CONTRIBUTING.md" }
+  ]
+}])
 ```
 
-If the user answers "n" or "no": remove CONTRIBUTING.md from the doc queue.
+If the user selects "No, skip it": remove CONTRIBUTING.md from the doc queue.
 If CONTRIBUTING.md already exists in `existing_docs`: skip this prompt entirely, include it for update.
 
 **Existing non-canonical docs (verification queue):**
@@ -152,11 +159,23 @@ Conditional:
   [list conditional docs queued, or "none"]
 
 CHANGELOG.md: excluded (out of scope)
-
-Proceed with generation? (y/n)
 ```
 
-Wait for user confirmation before continuing to resolve_modes.
+Then confirm with AskUserQuestion:
+
+```
+AskUserQuestion([{
+  question: "Doc queue assembled ({N} docs). Proceed with generation?",
+  header: "Doc queue",
+  multiSelect: false,
+  options: [
+    { label: "Proceed", description: "Generate all {N} docs in the queue" },
+    { label: "Abort", description: "Cancel doc generation" }
+  ]
+}])
+```
+
+If the user selects "Abort": exit the workflow. Otherwise continue to resolve_modes.
 </step>
 
 <step name="resolve_modes">
@@ -871,11 +890,23 @@ Action required:
 1. Review the flagged lines above
 2. Remove any real secrets from the doc files
 3. Re-run /gsd:docs-update to regenerate clean docs
-
-Type "safe to proceed" to commit anyway, or "abort" to skip commit.
 ```
 
-Wait for user response. If user confirms "safe to proceed", continue to commit_docs. If "abort", skip commit_docs and continue to report.
+Then confirm with AskUserQuestion:
+
+```
+AskUserQuestion([{
+  question: "Potential secrets detected in generated docs. How would you like to proceed?",
+  header: "Security",
+  multiSelect: false,
+  options: [
+    { label: "Safe to proceed", description: "I've reviewed the flagged lines — no real secrets, commit the docs" },
+    { label: "Abort commit", description: "Skip committing — I'll clean up the docs first" }
+  ]
+}])
+```
+
+If the user selects "Abort commit": skip commit_docs and continue to report. If "Safe to proceed": continue to commit_docs.
 
 **If SECRETS_FOUND=false:**
 
