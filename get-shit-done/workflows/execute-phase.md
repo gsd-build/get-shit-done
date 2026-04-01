@@ -53,6 +53,7 @@ Parse `$ARGUMENTS` before loading any context:
 - First positional token → `PHASE_ARG`
 - Optional `--wave N` → `WAVE_FILTER`
 - Optional `--gaps-only` keeps its current meaning
+- Optional `--agent-team` → `AGENT_TEAM=true` (experimental: uses Claude Code agent teams instead of independent subagents)
 
 If `--wave` is absent, preserve the current behavior of executing all incomplete waves in the phase.
 </step>
@@ -194,8 +195,139 @@ Report:
 ```
 </step>
 
+<step name="agent_teams_mode" optional="true">
+### Agent Teams Mode (Experimental)
+
+**Requires:** `CLAUDE_CODE_EXPERIMENTAL_AGENT_TEAMS=1` environment variable enabled in Claude Code.
+
+**If `AGENT_TEAM=true` (from `--agent-team` flag):** Replace the `execute_waves` step with the agent teams protocol below. All other steps (parse_args, initialize, check_interactive_mode, handle_branching, validate_phase, discover_and_group_plans, checkpoint_handling, regression_gate, verify_phase_goal, update_roadmap, offer_next) remain unchanged.
+
+**If `AGENT_TEAM` is not set:** Skip this step entirely — use standard `execute_waves`.
+
+**Agent Teams execute_waves protocol:**
+
+1. **Create team** (once, before first wave):
+   ```
+   TeamCreate(
+     team_name: "gsd-phase-{PHASE_NUMBER}-execution",
+     description: "GSD Phase {PHASE_NUMBER}: {PHASE_NAME} — wave-based parallel execution"
+   )
+   ```
+
+   **Fallback:** If `TeamCreate` fails (feature not enabled, unsupported runtime, etc.), warn the user and fall back to standard `execute_waves`. Do not abort the phase.
+
+2. **For each wave**, instead of independent `Task()` calls:
+
+   a. **Describe what's being built** — same as standard execute_waves step 1 (read plan objectives, present wave summary).
+
+   b. **Spawn gsd-executor teammates** with team context:
+      ```
+      Task(
+        subagent_type="gsd-executor",
+        model="{executor_model}",
+        isolation="worktree",
+        team_name="gsd-phase-{PHASE_NUMBER}-execution",
+        name="executor-{plan_id}",
+        prompt="
+          <objective>
+          Execute plan {plan_number} of phase {PHASE_NUMBER}-{PHASE_NAME}.
+          Commit each task atomically. Create SUMMARY.md. Update STATE.md and ROADMAP.md.
+          </objective>
+
+          <team_context>
+          You are part of an agent team executing phase {PHASE_NUMBER}.
+          Your teammates are executing other plans in the same wave.
+          Use SendMessage to notify the team lead if you encounter:
+          - A blocking issue that affects other plans in this wave
+          - A dependency that a teammate's plan should be aware of
+          - A deviation from the plan that changes shared interfaces
+          Do NOT message for routine progress — only for issues requiring coordination.
+          </team_context>
+
+          <parallel_execution>
+          You are running as a PARALLEL executor agent. Use --no-verify on all git
+          commits to avoid pre-commit hook contention with other agents. The
+          orchestrator validates hooks once after all agents complete.
+          For gsd-tools commits: add --no-verify flag.
+          For direct git commits: use git commit --no-verify -m '...'
+          </parallel_execution>
+
+          <execution_context>
+          @~/.claude/get-shit-done/workflows/execute-plan.md
+          @~/.claude/get-shit-done/templates/summary.md
+          @~/.claude/get-shit-done/references/checkpoints.md
+          @~/.claude/get-shit-done/references/tdd.md
+          </execution_context>
+
+          <files_to_read>
+          Read these files at execution start using the Read tool:
+          - {phase_dir}/{plan_file} (Plan)
+          - .planning/PROJECT.md (Project context)
+          - .planning/STATE.md (State)
+          - .planning/config.json (Config, if exists)
+          - ./CLAUDE.md (Project instructions, if exists)
+          - .claude/skills/ or .agents/skills/ (Project skills, if either exists)
+          </files_to_read>
+
+          ${AGENT_SKILLS}
+
+          <mcp_tools>
+          If CLAUDE.md or project instructions reference MCP tools, prefer those over
+          Grep/Glob for code navigation when available.
+          </mcp_tools>
+
+          <success_criteria>
+          - [ ] All tasks executed
+          - [ ] Each task committed individually
+          - [ ] SUMMARY.md created in plan directory
+          - [ ] STATE.md updated with position and decisions
+          - [ ] ROADMAP.md updated with plan progress (via roadmap update-plan-progress)
+          </success_criteria>
+        "
+      )
+      ```
+
+   c. **Monitor progress via team communication:**
+      - Teammates send `SendMessage` to the lead when encountering blocking issues
+      - The lead can respond with guidance or reassign work without waiting for wave completion
+      - This enables mid-wave course correction that standard subagents cannot do
+
+   d. **Wait for all teammates in wave to complete.** Apply the same spot-check fallback as standard execute_waves (check SUMMARY.md exists, git commits present) if a teammate doesn't return a completion signal.
+
+   e. **Post-wave hook validation:** Same as standard execute_waves — run pre-commit hooks once after the wave when agents committed with `--no-verify`.
+
+   f. **Report completion:** Same spot-check and reporting format as standard execute_waves.
+
+3. **Handle checkpoint plans** (`autonomous: false`): Identically to standard execute_waves — present checkpoint to user, spawn continuation agent. Checkpoint plans are NOT spawned as team members.
+
+4. **Shutdown after all waves complete:**
+   ```
+   SendMessage(
+     to: "all",
+     type: "shutdown_request",
+     message: "Phase {PHASE_NUMBER} execution complete. Shutting down team."
+   )
+   TeamDelete(team_name: "gsd-phase-{PHASE_NUMBER}-execution")
+   ```
+
+5. **Failure handling:** Same as standard execute_waves, with one addition: if a teammate reports a blocking issue via `SendMessage`, the lead can reassign dependent plans or pause the wave before other teammates waste tokens on doomed work.
+
+**Benefits over standard execute_waves:**
+- Teammates can notify the lead and each other about blocking issues mid-wave
+- Shared task list provides real-time progress visibility across all executors
+- The lead can intervene during execution, not just between waves
+- More natural coordination for complex phases where plans touch related subsystems
+
+**When NOT to use agent teams:**
+- Small phases (1-3 plans) — coordination overhead exceeds benefit
+- Fully independent plans with no shared interfaces — standard subagents suffice
+- Token-constrained runs — each teammate is a full Claude Code session
+</step>
+
 <step name="execute_waves">
 Execute each selected wave in sequence. Within a wave: parallel if `PARALLELIZATION=true`, sequential if `false`.
+
+**If `AGENT_TEAM=true`: skip this step — agent_teams_mode handles wave execution.**
 
 **For each wave:**
 
