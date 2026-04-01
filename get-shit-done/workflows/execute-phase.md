@@ -307,6 +307,22 @@ Execute each selected wave in sequence. Within a wave: parallel if `PARALLELIZAT
    EXPECTED_BASE=$(git rev-parse HEAD)
    ```
 
+   **Sequential dispatch for parallel execution (waves with 2+ agents):**
+   When spawning multiple agents in a wave, dispatch each `Task()` call **one at a time
+   with `run_in_background: true`** — do NOT send all Task calls in a single message.
+   `git worktree add` acquires an exclusive lock on `.git/config.lock`, so simultaneous
+   calls race for this lock and fail. Sequential dispatch ensures each worktree finishes
+   creation before the next begins (the round-trip latency of each tool call provides
+   natural spacing), while all agents still **run in parallel** once created.
+
+   ```
+   # CORRECT: dispatch one Task() per message, each with run_in_background: true
+   # → worktrees created sequentially, agents execute in parallel
+   #
+   # WRONG: multiple Task() calls in a single message
+   # → simultaneous git worktree add → .git/config.lock contention → failures
+   ```
+
    ```
    Task(
      subagent_type="gsd-executor",
