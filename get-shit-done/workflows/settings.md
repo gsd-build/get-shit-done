@@ -153,6 +153,15 @@ AskUserQuestion([
       { label: "No (Recommended)", description: "Run smart discuss before each phase — surfaces gray areas and captures decisions." },
       { label: "Yes", description: "Skip discuss in /gsd:autonomous — chain directly to plan. Best for backend/pipeline work where phase descriptions are the spec." }
     ]
+  },
+  {
+    question: "Use Agent Teams for execution? (experimental — requires CLAUDE_CODE_EXPERIMENTAL_AGENT_TEAMS=1)",
+    header: "Agent Teams",
+    multiSelect: false,
+    options: [
+      { label: "No (Recommended)", description: "Standard Task() subagents — fire-and-forget, lower token cost." },
+      { label: "Yes", description: "Agent teams — executors can communicate mid-wave. Higher token cost but better coordination for complex phases." }
+    ]
   }
 ])
 ```
@@ -176,7 +185,8 @@ Merge new settings into existing config.json:
     "text_mode": true/false,
     "research_before_questions": true/false,
     "discuss_mode": "discuss" | "assumptions",
-    "skip_discuss": true/false
+    "skip_discuss": true/false,
+    "agent_teams": true/false
   },
   "git": {
     "branching_strategy": "none" | "phase" | "milestone",
@@ -233,7 +243,8 @@ Write `~/.gsd/defaults.json` with:
     "nyquist_validation": <current>,
     "ui_phase": <current>,
     "ui_safety_gate": <current>,
-    "skip_discuss": <current>
+    "skip_discuss": <current>,
+    "agent_teams": <current>
   }
 }
 ```
@@ -259,6 +270,7 @@ Display:
 | UI Safety Gate       | {On/Off} |
 | Git Branching        | {None/Per Phase/Per Milestone} |
 | Skip Discuss         | {On/Off} |
+| Agent Teams          | {On/Off} |
 | Context Warnings     | {On/Off} |
 | Saved as Defaults    | {Yes/No} |
 
@@ -276,7 +288,7 @@ Quick commands:
 
 <success_criteria>
 - [ ] Current config read
-- [ ] User presented with 10 settings (profile + 8 workflow toggles + git branching)
+- [ ] User presented with 11 settings (profile + 9 workflow toggles + git branching)
 - [ ] Config updated with model_profile, workflow, and git sections
 - [ ] User offered to save as global defaults (~/.gsd/defaults.json)
 - [ ] Changes confirmed to user

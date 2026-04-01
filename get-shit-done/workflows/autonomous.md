@@ -16,12 +16,17 @@ Read all files referenced by the invoking prompt's execution_context before star
 
 ## 1. Initialize
 
-Parse `$ARGUMENTS` for `--from N` flag:
+Parse `$ARGUMENTS` for flags:
 
 ```bash
 FROM_PHASE=""
 if echo "$ARGUMENTS" | grep -qE '\-\-from\s+[0-9]'; then
   FROM_PHASE=$(echo "$ARGUMENTS" | grep -oE '\-\-from\s+[0-9]+\.?[0-9]*' | awk '{print $2}')
+fi
+
+AGENT_TEAM_FLAG=""
+if echo "$ARGUMENTS" | grep -qE '\-\-agent-team'; then
+  AGENT_TEAM_FLAG="--agent-team"
 fi
 ```
 
@@ -49,6 +54,16 @@ Display startup banner:
 ```
 
 If `FROM_PHASE` is set, display: `Starting from phase ${FROM_PHASE}`
+
+**Agent teams detection:** If `AGENT_TEAM_FLAG` was not set via CLI, check config:
+
+```bash
+AGENT_TEAMS_CFG=$(node "$HOME/.claude/get-shit-done/bin/gsd-tools.cjs" config-get workflow.agent_teams 2>/dev/null || echo "false")
+```
+
+If `AGENT_TEAMS_CFG` is `"true"`, set `AGENT_TEAM_FLAG="--agent-team"`.
+
+If agent teams are enabled (via flag or config), display: `Agent teams: enabled`
 
 </step>
 
@@ -269,7 +284,7 @@ Verify plan produced output — re-run `init phase-op` and check `has_plans`. If
 **3c. Execute**
 
 ```
-Skill(skill="gsd:execute-phase", args="${PHASE_NUM} --no-transition")
+Skill(skill="gsd:execute-phase", args="${PHASE_NUM} --no-transition ${AGENT_TEAM_FLAG}")
 ```
 
 **3d. Post-Execution Routing**
@@ -341,7 +356,7 @@ Verify gap plans were created — re-run `init phase-op ${PHASE_NUM}` and check 
 
 Re-execute:
 ```
-Skill(skill="gsd:execute-phase", args="${PHASE_NUM} --no-transition")
+Skill(skill="gsd:execute-phase", args="${PHASE_NUM} --no-transition ${AGENT_TEAM_FLAG}")
 ```
 
 Re-read verification status:

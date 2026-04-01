@@ -27,6 +27,14 @@ Parse JSON for: `milestone_version`, `milestone_name`, `phase_count`, `completed
 
 **If error:** Display the error message and exit.
 
+**Agent teams detection:**
+
+```bash
+AGENT_TEAMS_CFG=$(node "$HOME/.claude/get-shit-done/bin/gsd-tools.cjs" config-get workflow.agent_teams 2>/dev/null || echo "false")
+```
+
+If `AGENT_TEAMS_CFG` is `"true"`, set `AGENT_TEAM_FLAG="--agent-team"`, otherwise `AGENT_TEAM_FLAG=""`.
+
 Display startup banner:
 
 ```
@@ -256,12 +264,16 @@ Task(
 Working directory: {cwd}
 Phase: {N} — {phase_name}
 Goal: {goal}
+Agent teams: {AGENT_TEAM_FLAG or 'disabled'}
 
 Steps:
 1. Read the execute-phase workflow: cat ~/.claude/get-shit-done/workflows/execute-phase.md
 2. Run: node \"$HOME/.claude/get-shit-done/bin/gsd-tools.cjs\" init execute-phase {N}
 3. Follow the workflow steps: discover plans, analyze dependencies, group into waves.
 4. For each wave, spawn gsd-executor subagents via Task() to execute plans in parallel.
+   If agent teams are enabled (AGENT_TEAM_FLAG is '--agent-team'), use the agent_teams_mode
+   step from execute-phase.md instead of standard execute_waves — create a team via
+   TeamCreate, spawn teammates with team_name, and use SendMessage for coordination.
 5. After all waves complete, spawn a gsd-verifier subagent if verifier is enabled.
 6. Update ROADMAP.md and STATE.md with progress.
 7. Commit all changes.
