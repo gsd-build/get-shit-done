@@ -63,7 +63,21 @@ AGENT_TEAMS_CFG=$(node "$HOME/.claude/get-shit-done/bin/gsd-tools.cjs" config-ge
 
 If `AGENT_TEAMS_CFG` is `"true"`, set `AGENT_TEAM_FLAG="--agent-team"`.
 
-If agent teams are enabled (via flag or config), display: `Agent teams: enabled`
+**Runtime guard:** Agent teams are a Claude Code-only feature. If the flag is set (via CLI or config), verify the runtime supports it:
+
+```bash
+if [[ -n "$AGENT_TEAM_FLAG" ]]; then
+  # Check Claude Code is available and agent teams feature is enabled
+  CLAUDE_VERSION=$(claude --version 2>/dev/null | grep -oE '[0-9]+\.[0-9]+\.[0-9]+' | head -1)
+  if [[ -z "$CLAUDE_VERSION" ]] || [[ "${CLAUDE_CODE_EXPERIMENTAL_AGENT_TEAMS:-}" != "1" ]]; then
+    AGENT_TEAM_FLAG=""
+  fi
+fi
+```
+
+If the guard clears `AGENT_TEAM_FLAG`, display: `⚠ Agent teams unavailable (requires Claude Code v2.1.32+ with CLAUDE_CODE_EXPERIMENTAL_AGENT_TEAMS=1) — using standard execution`
+
+If agent teams are enabled (via flag or config) and the runtime guard passes, display: `Agent teams: enabled`
 
 </step>
 

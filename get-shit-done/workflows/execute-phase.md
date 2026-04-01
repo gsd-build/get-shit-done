@@ -204,6 +204,29 @@ Report:
 
 **If `AGENT_TEAM` is not set:** Skip this step entirely — use standard `execute_waves`.
 
+**Pre-flight checks (run before creating the team):**
+
+1. **Runtime check:** Agent teams are a Claude Code-only feature. If `COPILOT_SEQUENTIAL=true` (set during initialize step) or the `Task()` subagent API is unavailable, agent teams cannot work. Warn and fall back to standard `execute_waves`:
+   ```
+   ⚠ Agent teams require Claude Code — falling back to standard execution.
+   ```
+
+2. **Feature flag check:** Verify `CLAUDE_CODE_EXPERIMENTAL_AGENT_TEAMS` is set:
+   ```bash
+   if [[ "${CLAUDE_CODE_EXPERIMENTAL_AGENT_TEAMS:-}" != "1" ]]; then
+     echo "⚠ Agent teams require CLAUDE_CODE_EXPERIMENTAL_AGENT_TEAMS=1 — falling back to standard execution."
+   fi
+   ```
+   If not set, fall back to standard `execute_waves`.
+
+3. **Version check:** Agent teams require Claude Code v2.1.32+. Check the version:
+   ```bash
+   CLAUDE_VERSION=$(claude --version 2>/dev/null | grep -oE '[0-9]+\.[0-9]+\.[0-9]+' | head -1)
+   ```
+   If version is below 2.1.32 or `claude` is not found, warn and fall back to standard `execute_waves`.
+
+If any pre-flight check fails, set `AGENT_TEAM=false` and fall through to the standard `execute_waves` step. Do not abort the phase.
+
 **Agent Teams execute_waves protocol:**
 
 1. **Create team** (once, before first wave):
@@ -214,7 +237,7 @@ Report:
    )
    ```
 
-   **Fallback:** If `TeamCreate` fails (feature not enabled, unsupported runtime, etc.), warn the user and fall back to standard `execute_waves`. Do not abort the phase.
+   **Fallback:** If `TeamCreate` fails (tool unavailable, permissions error, etc.), warn the user and fall back to standard `execute_waves`. Do not abort the phase.
 
 2. **For each wave**, instead of independent `Task()` calls:
 

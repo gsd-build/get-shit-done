@@ -35,6 +35,19 @@ AGENT_TEAMS_CFG=$(node "$HOME/.claude/get-shit-done/bin/gsd-tools.cjs" config-ge
 
 If `AGENT_TEAMS_CFG` is `"true"`, set `AGENT_TEAM_FLAG="--agent-team"`, otherwise `AGENT_TEAM_FLAG=""`.
 
+**Runtime guard:** Agent teams are a Claude Code-only feature. If the config is enabled, verify the runtime supports it:
+
+```bash
+if [[ -n "$AGENT_TEAM_FLAG" ]]; then
+  CLAUDE_VERSION=$(claude --version 2>/dev/null | grep -oE '[0-9]+\.[0-9]+\.[0-9]+' | head -1)
+  if [[ -z "$CLAUDE_VERSION" ]] || [[ "${CLAUDE_CODE_EXPERIMENTAL_AGENT_TEAMS:-}" != "1" ]]; then
+    AGENT_TEAM_FLAG=""
+  fi
+fi
+```
+
+If the guard clears the flag, silently fall back to standard execution (manager init runs on every dashboard refresh — don't spam warnings).
+
 Display startup banner:
 
 ```
