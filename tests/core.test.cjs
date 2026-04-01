@@ -145,6 +145,30 @@ describe('loadConfig', () => {
     }
   });
 
+  test('known config keys are derived from VALID_CONFIG_KEYS (not hardcoded)', () => {
+    // Verify that loadConfig's unknown-key check uses config-set's VALID_CONFIG_KEYS
+    // as its source of truth. If a new key is added to config-set, it should
+    // automatically be recognized by loadConfig without a separate update.
+    const { VALID_CONFIG_KEYS } = require('../get-shit-done/bin/lib/config.cjs');
+    // Every top-level key from VALID_CONFIG_KEYS should be recognized
+    const topLevelKeys = [...VALID_CONFIG_KEYS].map(k => k.split('.')[0]);
+    for (const key of topLevelKeys) {
+      writeConfig({ [key]: 'test-value' });
+      const origWrite = process.stderr.write;
+      let stderrOutput = '';
+      process.stderr.write = (chunk) => { stderrOutput += chunk; };
+      try {
+        loadConfig(tmpDir);
+        assert.ok(
+          !stderrOutput.includes(key),
+          `VALID_CONFIG_KEYS key "${key}" should not trigger unknown-key warning`
+        );
+      } finally {
+        process.stderr.write = origWrite;
+      }
+    }
+  });
+
   test('does not warn when all config keys are known', () => {
     writeConfig({ model_profile: 'balanced', workflow: { research: false }, git: { branching_strategy: 'per-phase' } });
     const origWrite = process.stderr.write;

@@ -440,6 +440,7 @@ function getCmdConfigSetModelProfileResultMessage(
 }
 
 module.exports = {
+  VALID_CONFIG_KEYS,
   cmdConfigEnsureSection,
   cmdConfigSet,
   cmdConfigGet,
