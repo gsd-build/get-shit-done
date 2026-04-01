@@ -1073,6 +1073,23 @@ function convertClaudeCommandToCodexSkill(content, skillName) {
 }
 
 /**
+ * Convert Claude Code command markdown to Claude Code skill format.
+ * Minimal transformation: replace `gsd:xxx` naming with `gsd-xxx` format.
+ * Body content passes through unchanged.
+ */
+function convertClaudeCommandToClaudeSkill(content, skillName) {
+  const { frontmatter, body } = extractFrontmatterAndBody(content);
+  if (!frontmatter) return content;
+
+  const description = extractFrontmatterField(frontmatter, 'description') || '';
+
+  // Reconstruct frontmatter with skill naming format
+  const fm = `---\nname: ${skillName}\ndescription: ${yamlQuote(description)}\n---`;
+
+  return `${fm}\n${body}`;
+}
+
+/**
  * Convert Claude Code agent markdown to Codex agent format.
  * Applies base markdown conversions, then adds a <codex_agent_role> header
  * and cleans up frontmatter (removes tools/color fields).
@@ -2813,6 +2830,62 @@ function copyCommandsAsCodexSkills(srcDir, skillsDir, prefix, pathPrefix, runtim
   recurse(srcDir, prefix);
 }
 
+/**
+ * Copy Claude Code commands as Claude Code skills (SKILL.md format).
+ * Uses the new skills/gsd-* structure for Claude Code v2.1.88+.
+ */
+function copyCommandsAsClaudeSkills(srcDir, skillsDir, prefix, pathPrefix, isGlobal) {
+  if (!fs.existsSync(srcDir)) {
+    return;
+  }
+
+  fs.mkdirSync(skillsDir, { recursive: true });
+
+  // Remove previous GSD Claude skills to avoid stale skills.
+  const existing = fs.readdirSync(skillsDir, { withFileTypes: true });
+  for (const entry of existing) {
+    if (entry.isDirectory() && entry.name.startsWith(`${prefix}-`)) {
+      fs.rmSync(path.join(skillsDir, entry.name), { recursive: true });
+    }
+  }
+
+  function recurse(currentSrcDir, currentPrefix) {
+    const entries = fs.readdirSync(currentSrcDir, { withFileTypes: true });
+
+    for (const entry of entries) {
+      const srcPath = path.join(currentSrcDir, entry.name);
+      if (entry.isDirectory()) {
+        recurse(srcPath, `${currentPrefix}-${entry.name}`);
+        continue;
+      }
+
+      if (!entry.name.endsWith('.md')) {
+        continue;
+      }
+
+      const baseName = entry.name.replace('.md', '');
+      const skillName = `${currentPrefix}-${baseName}`;
+      const skillDir = path.join(skillsDir, skillName);
+      fs.mkdirSync(skillDir, { recursive: true });
+
+      let content = fs.readFileSync(srcPath, 'utf8');
+      // Replace path references
+      const globalClaudeRegex = /~\/\.claude\//g;
+      const globalClaudeHomeRegex = /\$HOME\/\.claude\//g;
+      const localClaudeRegex = /\.\/\.claude\//g;
+      content = content.replace(globalClaudeRegex, pathPrefix);
+      content = content.replace(globalClaudeHomeRegex, pathPrefix);
+      content = content.replace(localClaudeRegex, './.claude/');
+      content = processAttribution(content, getCommitAttribution('claude'));
+      content = convertClaudeCommandToClaudeSkill(content, skillName);
+
+      fs.writeFileSync(path.join(skillDir, 'SKILL.md'), content);
+    }
+  }
+
+  recurse(srcDir, prefix);
+}
+
 function copyCommandsAsCursorSkills(srcDir, skillsDir, prefix, pathPrefix, runtime) {
   if (!fs.existsSync(srcDir)) {
     return;
@@ -3488,11 +3561,29 @@ function uninstall(isGlobal, runtime = 'claude') {
       }
     }
   } else {
+    // Claude Code: remove skills/gsd-*/ directories (new format)
+    const skillsDir = path.join(targetDir, 'skills');
+    if (fs.existsSync(skillsDir)) {
+      let skillCount = 0;
+      const entries = fs.readdirSync(skillsDir, { withFileTypes: true });
+      for (const entry of entries) {
+        if (entry.isDirectory() && entry.name.startsWith('gsd-')) {
+          fs.rmSync(path.join(skillsDir, entry.name), { recursive: true });
+          skillCount++;
+        }
+      }
+      if (skillCount > 0) {
+        removedCount++;
+        console.log(`  ${green}✓${reset} Removed ${skillCount} Claude Code skills`);
+      }
+    }
+
+    // Also remove old commands/gsd directory if it exists (legacy)
     const gsdCommandsDir = path.join(targetDir, 'commands', 'gsd');
     if (fs.existsSync(gsdCommandsDir)) {
       fs.rmSync(gsdCommandsDir, { recursive: true });
       removedCount++;
-      console.log(`  ${green}✓${reset} Removed commands/gsd/`);
+      console.log(`  ${green}✓${reset} Removed legacy commands/gsd/`);
     }
   }
 
@@ -4177,11 +4268,11 @@ function install(isGlobal, runtime = 'claude') {
     } else {
       failures.push('skills/gsd-*');
     }
-  } else {
-    // Claude Code & Gemini: nested structure in commands/ directory
+  } else if (isGemini) {
+    // Gemini: nested structure in commands/ directory (still supported)
     const commandsDir = path.join(targetDir, 'commands');
     fs.mkdirSync(commandsDir, { recursive: true });
-    
+
     const gsdSrc = path.join(src, 'commands', 'gsd');
     const gsdDest = path.join(commandsDir, 'gsd');
     copyWithPathReplacement(gsdSrc, gsdDest, pathPrefix, runtime, true, isGlobal);
@@ -4189,6 +4280,33 @@ function install(isGlobal, runtime = 'claude') {
       console.log(`  ${green}✓${reset} Installed commands/gsd`);
     } else {
       failures.push('commands/gsd');
+    }
+  } else {
+    // Claude Code: skills/ directory format (CC v2.1.88+ requirement)
+    const skillsDir = path.join(targetDir, 'skills');
+    const gsdSrc = path.join(src, 'commands', 'gsd');
+    copyCommandsAsClaudeSkills(gsdSrc, skillsDir, 'gsd', pathPrefix, isGlobal);
+
+    // Clean up old commands/gsd directory if it exists
+    const oldCommandsDir = path.join(targetDir, 'commands', 'gsd');
+    if (fs.existsSync(oldCommandsDir)) {
+      fs.rmSync(oldCommandsDir, { recursive: true });
+      // Also remove empty commands directory
+      const commandsParent = path.join(targetDir, 'commands');
+      if (fs.existsSync(commandsParent)) {
+        const remaining = fs.readdirSync(commandsParent);
+        if (remaining.length === 0) {
+          fs.rmSync(commandsParent, { recursive: true });
+        }
+      }
+      console.log(`  ${yellow}ℹ${reset} Removed deprecated commands/gsd directory`);
+    }
+
+    const installedSkillNames = listCodexSkillNames(skillsDir); // reuse — same dir structure
+    if (installedSkillNames.length > 0) {
+      console.log(`  ${green}✓${reset} Installed ${installedSkillNames.length} skills to skills/`);
+    } else {
+      failures.push('skills/gsd-*');
     }
   }
 
@@ -4937,6 +5055,8 @@ if (process.env.GSD_TEST_MODE) {
     installCodexConfig,
     install,
     convertClaudeCommandToCodexSkill,
+    convertClaudeCommandToClaudeSkill,
+    copyCommandsAsClaudeSkills,
     convertClaudeToOpencodeFrontmatter,
     neutralizeAgentReferences,
     GSD_CODEX_MARKER,
