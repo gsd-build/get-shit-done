@@ -286,6 +286,24 @@ function loadConfig(cwd) {
       try { fs.writeFileSync(configPath, JSON.stringify(parsed, null, 2), 'utf-8'); } catch {}
     }
 
+    // Warn about unrecognized top-level keys so users don't silently lose config
+    const KNOWN_CONFIG_KEYS = new Set([
+      'mode', 'granularity', 'depth', 'model_profile', 'commit_docs', 'search_gitignored',
+      'branching_strategy', 'phase_branch_template', 'milestone_branch_template', 'quick_branch_template',
+      'research', 'plan_checker', 'plan_check', 'verifier', 'nyquist_validation',
+      'parallelization', 'brave_search', 'firecrawl', 'exa_search', 'text_mode',
+      'sub_repos', 'multiRepo', 'resolve_model_ids', 'context_window',
+      'phase_naming', 'project_code', 'model_overrides', 'agent_skills',
+      // Nested section containers (hold sub-keys)
+      'git', 'workflow', 'planning', 'hooks',
+    ]);
+    const unknownKeys = Object.keys(parsed).filter(k => !KNOWN_CONFIG_KEYS.has(k));
+    if (unknownKeys.length > 0) {
+      process.stderr.write(
+        `gsd-tools: warning: unknown config key(s) in .planning/config.json: ${unknownKeys.join(', ')} — these will be ignored\n`
+      );
+    }
+
     const get = (key, nested) => {
       if (parsed[key] !== undefined) return parsed[key];
       if (nested && parsed[nested.section] && parsed[nested.section][nested.field] !== undefined) {

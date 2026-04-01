@@ -126,6 +126,37 @@ describe('loadConfig', () => {
     const config = loadConfig(tmpDir);
     assert.strictEqual(config.commit_docs, false);
   });
+
+  test('warns on unknown config keys to stderr (#1535)', () => {
+    writeConfig({ model_profile: 'quality', active_project: 'my-project', custom_flag: true });
+    const origWrite = process.stderr.write;
+    let stderrOutput = '';
+    process.stderr.write = (chunk) => { stderrOutput += chunk; };
+    try {
+      const config = loadConfig(tmpDir);
+      // Known key still loads correctly
+      assert.strictEqual(config.model_profile, 'quality');
+      // Warning emitted for unknown keys
+      assert.ok(stderrOutput.includes('active_project'), 'should warn about active_project');
+      assert.ok(stderrOutput.includes('custom_flag'), 'should warn about custom_flag');
+      assert.ok(stderrOutput.includes('ignored'), 'should mention keys will be ignored');
+    } finally {
+      process.stderr.write = origWrite;
+    }
+  });
+
+  test('does not warn when all config keys are known', () => {
+    writeConfig({ model_profile: 'balanced', workflow: { research: false }, git: { branching_strategy: 'per-phase' } });
+    const origWrite = process.stderr.write;
+    let stderrOutput = '';
+    process.stderr.write = (chunk) => { stderrOutput += chunk; };
+    try {
+      loadConfig(tmpDir);
+      assert.strictEqual(stderrOutput, '', 'should not emit any warnings for valid config');
+    } finally {
+      process.stderr.write = origWrite;
+    }
+  });
 });
 
 // ─── loadConfig commit_docs gitignore auto-detection (#1250) ──────────────────
