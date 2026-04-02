@@ -67,6 +67,7 @@ const hasCopilot = args.includes('--copilot');
 const hasAntigravity = args.includes('--antigravity');
 const hasCursor = args.includes('--cursor');
 const hasWindsurf = args.includes('--windsurf');
+const hasCodebuddy = args.includes('--codebuddy');
 const hasSdk = args.includes('--sdk');
 const hasBoth = args.includes('--both'); // Legacy flag, keeps working
 const hasAll = args.includes('--all');
@@ -75,7 +76,7 @@ const hasUninstall = args.includes('--uninstall') || args.includes('-u');
 // Runtime selection - can be set by flags or interactive prompt
 let selectedRuntimes = [];
 if (hasAll) {
-  selectedRuntimes = ['claude', 'opencode', 'gemini', 'codex', 'copilot', 'antigravity', 'cursor', 'windsurf'];
+  selectedRuntimes = ['claude', 'opencode', 'gemini', 'codex', 'copilot', 'antigravity', 'cursor', 'windsurf', 'codebuddy'];
 } else if (hasBoth) {
   selectedRuntimes = ['claude', 'opencode'];
 } else {
@@ -87,6 +88,7 @@ if (hasAll) {
   if (hasAntigravity) selectedRuntimes.push('antigravity');
   if (hasCursor) selectedRuntimes.push('cursor');
   if (hasWindsurf) selectedRuntimes.push('windsurf');
+  if (hasCodebuddy) selectedRuntimes.push('codebuddy');
 }
 
 // WSL + Windows Node.js detection
@@ -132,6 +134,7 @@ function getDirName(runtime) {
   if (runtime === 'antigravity') return '.agent';
   if (runtime === 'cursor') return '.cursor';
   if (runtime === 'windsurf') return '.windsurf';
+  if (runtime === 'codebuddy') return '.codebuddy';
   return '.claude';
 }
 
@@ -161,6 +164,7 @@ function getConfigDirFromHome(runtime, isGlobal) {
   }
   if (runtime === 'cursor') return "'.cursor'";
   if (runtime === 'windsurf') return "'.windsurf'";
+  if (runtime === 'codebuddy') return "'.codebuddy'";
   return "'.claude'";
 }
 
@@ -267,6 +271,17 @@ function getGlobalDir(runtime, explicitDir = null) {
       return expandTilde(process.env.WINDSURF_CONFIG_DIR);
     }
     return path.join(os.homedir(), '.windsurf');
+  }
+
+  if (runtime === 'codebuddy') {
+    // Codebuddy: --config-dir > CODEBUDDY_CONFIG_DIR > ~/.codebuddy
+    if (explicitDir) {
+      return expandTilde(explicitDir);
+    }
+    if (process.env.CODEBUDDY_CONFIG_DIR) {
+      return expandTilde(process.env.CODEBUDDY_CONFIG_DIR);
+    }
+    return path.join(os.homedir(), '.codebuddy');
   }
 
 
@@ -3464,6 +3479,7 @@ function uninstall(isGlobal, runtime = 'claude') {
   const isAntigravity = runtime === 'antigravity';
   const isCursor = runtime === 'cursor';
   const isWindsurf = runtime === 'windsurf';
+  const isCodebuddy = runtime === 'codebuddy';
   const dirName = getDirName(runtime);
 
   // Get the target directory based on runtime and install type
@@ -3483,6 +3499,7 @@ function uninstall(isGlobal, runtime = 'claude') {
   if (runtime === 'antigravity') runtimeLabel = 'Antigravity';
   if (runtime === 'cursor') runtimeLabel = 'Cursor';
   if (runtime === 'windsurf') runtimeLabel = 'Windsurf';
+  if (isCodebuddy) runtimeLabel = 'Codebuddy';
 
   console.log(`  Uninstalling GSD from ${cyan}${runtimeLabel}${reset} at ${cyan}${locationLabel}${reset}\n`);
 
@@ -4110,6 +4127,7 @@ function writeManifest(configDir, runtime = 'claude') {
   const isAntigravity = runtime === 'antigravity';
   const isCursor = runtime === 'cursor';
   const isWindsurf = runtime === 'windsurf';
+  const isCodebuddy = runtime === 'codebuddy';
   const gsdDir = path.join(configDir, 'get-shit-done');
   const commandsDir = path.join(configDir, 'commands', 'gsd');
   const opencodeCommandDir = path.join(configDir, 'command');
@@ -4269,6 +4287,7 @@ function install(isGlobal, runtime = 'claude') {
   const isAntigravity = runtime === 'antigravity';
   const isCursor = runtime === 'cursor';
   const isWindsurf = runtime === 'windsurf';
+  const isCodebuddy = runtime === 'codebuddy';
   const dirName = getDirName(runtime);
   const src = path.join(__dirname, '..');
 
@@ -4300,6 +4319,7 @@ function install(isGlobal, runtime = 'claude') {
   if (isAntigravity) runtimeLabel = 'Antigravity';
   if (isCursor) runtimeLabel = 'Cursor';
   if (isWindsurf) runtimeLabel = 'Windsurf';
+  if (isCodebuddy) runtimeLabel = 'Codebuddy';
 
   console.log(`  Installing for ${cyan}${runtimeLabel}${reset} to ${cyan}${locationLabel}${reset}\n`);
 
@@ -4817,6 +4837,7 @@ function finishInstall(settingsPath, settings, statuslineCommand, shouldInstallS
   const isCopilot = runtime === 'copilot';
   const isCursor = runtime === 'cursor';
   const isWindsurf = runtime === 'windsurf';
+  const isCodebuddy = runtime === 'codebuddy';
 
   if (shouldInstallStatusline && !isOpencode && !isCodex && !isCopilot && !isCursor && !isWindsurf) {
     settings.statusLine = {
@@ -4864,6 +4885,7 @@ function finishInstall(settingsPath, settings, statuslineCommand, shouldInstallS
   if (runtime === 'copilot') program = 'Copilot';
   if (runtime === 'antigravity') program = 'Antigravity';
   if (runtime === 'cursor') program = 'Cursor';
+  if (runtime === 'codebuddy') program = 'Codebuddy';
 
   let command = '/gsd:new-project';
   if (runtime === 'opencode') command = '/gsd-new-project';
@@ -5021,9 +5043,10 @@ function promptRuntime(callback) {
     '5': 'copilot',
     '6': 'antigravity',
     '7': 'cursor',
-    '8': 'windsurf'
+    '8': 'windsurf',
+    '9': 'codebuddy'
   };
-  const allRuntimes = ['claude', 'opencode', 'gemini', 'codex', 'copilot', 'antigravity', 'cursor', 'windsurf'];
+  const allRuntimes = ['claude', 'opencode', 'gemini', 'codex', 'copilot', 'antigravity', 'cursor', 'windsurf', 'codebuddy'];
 
   console.log(`  ${yellow}Which runtime(s) would you like to install for?${reset}\n\n  ${cyan}1${reset}) Claude Code  ${dim}(~/.claude)${reset}
   ${cyan}2${reset}) OpenCode     ${dim}(~/.config/opencode)${reset} - open source, free models
@@ -5033,7 +5056,8 @@ function promptRuntime(callback) {
   ${cyan}6${reset}) Antigravity  ${dim}(~/.gemini/antigravity)${reset}
   ${cyan}7${reset}) Cursor       ${dim}(~/.cursor)${reset}
   ${cyan}8${reset}) Windsurf     ${dim}(~/.windsurf)${reset}
-  ${cyan}9${reset}) All
+  ${cyan}9${reset}) Codebuddy    ${dim}(~/.codebuddy)${reset}
+  ${cyan}0${reset}) All
 
   ${dim}Select multiple: 1,4,6 or 1 4 6${reset}
 `);
@@ -5044,7 +5068,7 @@ function promptRuntime(callback) {
     const input = answer.trim() || '1';
 
     // "All" shortcut
-    if (input === '9') {
+    if (input === '0') {
       callback(allRuntimes);
       return;
     }
