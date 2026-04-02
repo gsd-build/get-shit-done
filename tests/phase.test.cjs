@@ -655,6 +655,43 @@ describe('phase add command', () => {
     const roadmap = fs.readFileSync(path.join(tmpDir, '.planning', 'ROADMAP.md'), 'utf-8');
     assert.ok(roadmap.includes('**Requirements**: TBD'), 'new phase entry should include Requirements TBD');
   });
+
+  test('skips 999.x backlog phases when calculating next phase number', () => {
+    fs.writeFileSync(
+      path.join(tmpDir, '.planning', 'ROADMAP.md'),
+      `# Roadmap v1.0
+
+### Phase 1: Foundation
+**Goal:** Setup
+
+### Phase 2: API
+**Goal:** Build API
+
+### Phase 3: UI
+**Goal:** Build UI
+
+### Phase 999.1: Future Idea A
+**Goal:** Backlog item
+
+### Phase 999.2: Future Idea B
+**Goal:** Backlog item
+
+---
+`
+    );
+
+    const result = runGsdTools('phase add Dashboard', tmpDir);
+    assert.ok(result.success, `Command failed: ${result.error}`);
+
+    const output = JSON.parse(result.output);
+    assert.strictEqual(output.phase_number, 4, 'should be phase 4, not 1000');
+    assert.strictEqual(output.slug, 'dashboard');
+
+    assert.ok(
+      fs.existsSync(path.join(tmpDir, '.planning', 'phases', '04-dashboard')),
+      'directory should be 04-dashboard, not 1000-dashboard'
+    );
+  });
 });
 
 // ─────────────────────────────────────────────────────────────────────────────

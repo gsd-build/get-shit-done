@@ -341,11 +341,13 @@ function cmdPhaseAdd(cwd, description, raw, customId) {
       _dirName = `${prefix}${_newPhaseId}-${slug}`;
     } else {
       // Sequential mode: find highest integer phase number (in current milestone only)
+      // Skip 999.x backlog phases — they live outside the active sequence
       const phasePattern = /#{2,4}\s*Phase\s+(\d+)[A-Z]?(?:\.\d+)*:/gi;
       let maxPhase = 0;
       let m;
       while ((m = phasePattern.exec(content)) !== null) {
         const num = parseInt(m[1], 10);
+        if (num >= 999) continue; // backlog phases use 999.x numbering
         if (num > maxPhase) maxPhase = num;
       }
 
