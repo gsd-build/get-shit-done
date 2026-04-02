@@ -563,17 +563,29 @@ Execute each selected wave in sequence. Within a wave: parallel if `PARALLELIZAT
    merging their work creates failures.
 
    ```bash
-   # Detect test runner and run quick smoke test
+   # Detect test runner and run quick smoke test (timeout: 5 minutes)
+   timeout 300 bash -c '
    if [ -f "package.json" ]; then
-     npx jest --passWithNoTests --no-coverage -q 2>&1 || npx vitest run 2>&1
+     npm test 2>&1
    elif [ -f "Cargo.toml" ]; then
      cargo test 2>&1
+   elif [ -f "go.mod" ]; then
+     go test ./... 2>&1
    elif [ -f "pyproject.toml" ] || [ -f "requirements.txt" ]; then
      python -m pytest -x -q --tb=short 2>&1 || uv run python -m pytest -x -q --tb=short 2>&1
+   fi
+   '
+   TEST_EXIT=$?
+   if [ $TEST_EXIT -eq 124 ]; then
+     echo "⚠ Post-merge test gate timed out after 5 minutes"
    fi
    ```
 
    **If tests pass:** `✓ Post-merge test gate: {N} tests passed — no cross-plan conflicts`
+
+   **If tests fail:** Set `WAVE_FAILURE_COUNT=$((WAVE_FAILURE_COUNT + 1))` to track
+   cumulative failures across waves. Subsequent waves should report:
+   `⚠ Note: ${WAVE_FAILURE_COUNT} prior wave(s) had test failures`
 
 5.7. **Post-wave shared artifact update (worktree mode only):**
 
@@ -585,8 +597,10 @@ Execute each selected wave in sequence. Within a wave: parallel if `PARALLELIZAT
      node "$HOME/.claude/get-shit-done/bin/gsd-tools.cjs" roadmap update-plan-progress "${PHASE_NUMBER}" "${plan_id}" "complete"
    done
 
-   # Update STATE.md with current position
-   node "$HOME/.claude/get-shit-done/bin/gsd-tools.cjs" commit "docs(phase-${PHASE_NUMBER}): update tracking after wave ${N}" --files .planning/ROADMAP.md .planning/STATE.md
+   # Only commit tracking files if they actually changed
+   if ! git diff --quiet .planning/ROADMAP.md .planning/STATE.md 2>/dev/null; then
+     node "$HOME/.claude/get-shit-done/bin/gsd-tools.cjs" commit "docs(phase-${PHASE_NUMBER}): update tracking after wave ${N}" --files .planning/ROADMAP.md .planning/STATE.md
+   fi
    ```
 
    Where `WAVE_PLAN_IDS` is the space-separated list of plan IDs that completed in this wave.
@@ -595,7 +609,7 @@ Execute each selected wave in sequence. Within a wave: parallel if `PARALLELIZAT
 
    **If tests fail (from 5.6):**
    ```
-   ## ⚠ Post-Merge Test Failure
+   ## ⚠ Post-Merge Test Failure (cumulative failures: ${WAVE_FAILURE_COUNT})
 
    Wave {N} worktrees merged successfully, but {M} tests fail after merge.
    This typically indicates conflicting changes across parallel plans
@@ -608,6 +622,9 @@ Execute each selected wave in sequence. Within a wave: parallel if `PARALLELIZAT
    1. Fix now (recommended) — resolve conflicts before next wave
    2. Continue — failures may compound in subsequent waves
    ```
+
+   Note: If `WAVE_FAILURE_COUNT > 1`, strongly recommend "Fix now" — compounding
+   failures across multiple waves become exponentially harder to diagnose.
 
    If "Fix now": diagnose failures (typically import conflicts, missing types,
    or changed function signatures from parallel plans modifying the same module).

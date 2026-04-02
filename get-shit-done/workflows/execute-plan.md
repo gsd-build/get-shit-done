@@ -396,6 +396,10 @@ Next: more plans → "Ready for {next-plan}" | last → "Phase complete, ready f
 </step>
 
 <step name="update_current_position">
+**Skip this step if running in parallel mode** (the orchestrator in execute-phase.md
+handles STATE.md/ROADMAP.md updates centrally after merging worktrees to avoid
+merge conflicts).
+
 Update STATE.md using gsd-tools:
 
 ```bash
@@ -443,6 +447,9 @@ If SUMMARY "Issues Encountered" ≠ "None": yolo → log and continue. Interacti
 </step>
 
 <step name="update_roadmap">
+**Skip this step if running in parallel mode** (the orchestrator handles ROADMAP.md
+updates centrally after merging worktrees).
+
 ```bash
 node "$HOME/.claude/get-shit-done/bin/gsd-tools.cjs" roadmap update-plan-progress "${PHASE}"
 ```
@@ -463,7 +470,12 @@ Extract requirement IDs from the plan's frontmatter (e.g., `requirements: [AUTH-
 Task code already committed per-task. Commit plan metadata:
 
 ```bash
-node "$HOME/.claude/get-shit-done/bin/gsd-tools.cjs" commit "docs({phase}-{plan}): complete [plan-name] plan" --files .planning/phases/XX-name/{phase}-{plan}-SUMMARY.md .planning/STATE.md .planning/ROADMAP.md .planning/REQUIREMENTS.md
+# In parallel mode: exclude STATE.md and ROADMAP.md (orchestrator commits these)
+if [ "${PARALLEL_MODE}" = "true" ]; then
+  node "$HOME/.claude/get-shit-done/bin/gsd-tools.cjs" commit "docs({phase}-{plan}): complete [plan-name] plan" --files .planning/phases/XX-name/{phase}-{plan}-SUMMARY.md .planning/REQUIREMENTS.md
+else
+  node "$HOME/.claude/get-shit-done/bin/gsd-tools.cjs" commit "docs({phase}-{plan}): complete [plan-name] plan" --files .planning/phases/XX-name/{phase}-{plan}-SUMMARY.md .planning/STATE.md .planning/ROADMAP.md .planning/REQUIREMENTS.md
+fi
 ```
 </step>
 
@@ -507,8 +519,8 @@ All routes: `/clear` first for fresh context.
 - All verifications pass
 - USER-SETUP.md generated if user_setup in frontmatter
 - SUMMARY.md created with substantive content
-- STATE.md updated (position, decisions, issues, session)
-- ROADMAP.md updated
+- STATE.md updated (position, decisions, issues, session) — unless parallel mode (orchestrator handles)
+- ROADMAP.md updated — unless parallel mode (orchestrator handles)
 - If codebase map exists: map updated with execution changes (or skipped if no significant changes)
 - If USER-SETUP.md created: prominently surfaced in completion output
 </success_criteria>

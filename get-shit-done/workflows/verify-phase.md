@@ -199,13 +199,13 @@ inspecting static artifacts.
 ```bash
 # Detect test runner and run all tests
 if [ -f "package.json" ]; then
-  npx jest --passWithNoTests --no-coverage -q 2>&1 || npx vitest run 2>&1
+  npm test 2>&1
 elif [ -f "Cargo.toml" ]; then
   cargo test 2>&1
-elif [ -f "pyproject.toml" ] || [ -f "requirements.txt" ]; then
-  python -m pytest -q --tb=short 2>&1 || uv run python -m pytest -q --tb=short 2>&1
 elif [ -f "go.mod" ]; then
   go test ./... 2>&1
+elif [ -f "pyproject.toml" ] || [ -f "requirements.txt" ]; then
+  python -m pytest -q --tb=short 2>&1 || uv run python -m pytest -q --tb=short 2>&1
 fi
 ```
 
@@ -214,21 +214,27 @@ Record: total tests, passed, failed, coverage (if available).
 **If any tests fail:** Mark as `behavioral_failures` — these are BLOCKER severity
 regardless of whether static checks passed. A phase cannot be verified if tests fail.
 
-**Step 2: Run project CLI/commands from success criteria**
+**Step 2: Run project CLI/commands from success criteria (if testable)**
 
 For each success criterion that describes a user command (e.g., "User can run
 `mixtiq validate`", "User can run `npm start`"):
 
-Extract the command, run it against an example input (from templates, fixtures,
-or test data), and verify it exits successfully with expected output patterns.
+1. Check if the command exists and required inputs are available:
+   - Look for example files in `templates/`, `fixtures/`, `test/`, `examples/`, or `testdata/`
+   - Check if the CLI binary/script exists on PATH or in the project
+2. **If no suitable inputs or fixtures exist:** Mark as `? NEEDS HUMAN` with reason
+   "No test fixtures available — requires manual verification" and move on.
+   Do NOT invent example inputs.
+3. If inputs are available: run the command and verify it exits successfully.
 
 ```bash
-# Example: if success criterion mentions "mixtiq run example.yaml"
-# Find a suitable example file and run it
-{project_cli} {example_input} 2>&1
+# Only run if both command and input exist
+if command -v {project_cli} &>/dev/null && [ -f "{example_input}" ]; then
+  {project_cli} {example_input} 2>&1
+fi
 ```
 
-Record: command, exit code, output summary, pass/fail.
+Record: command, exit code, output summary, pass/fail (or SKIPPED if no fixtures).
 
 **Step 3: Report**
 
