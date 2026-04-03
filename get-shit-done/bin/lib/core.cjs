@@ -951,9 +951,15 @@ function getRoadmapPhaseInternal(cwd, phaseNum) {
  * gsd-tools.cjs lives at <configDir>/get-shit-done/bin/gsd-tools.cjs,
  * so agents/ is at <configDir>/agents/.
  *
+ * GSD_AGENTS_DIR env var overrides the default path. Used in tests and for
+ * installs where the agents directory is not co-located with gsd-tools.cjs.
+ *
  * @returns {string} Absolute path to the agents directory
  */
 function getAgentsDir() {
+  if (process.env.GSD_AGENTS_DIR) {
+    return process.env.GSD_AGENTS_DIR;
+  }
   // __dirname is get-shit-done/bin/lib/ → go up 3 levels to configDir
   return path.join(__dirname, '..', '..', '..', 'agents');
 }
@@ -961,6 +967,9 @@ function getAgentsDir() {
 /**
  * Check which GSD agents are installed on disk.
  * Returns an object with installation status and details.
+ *
+ * Recognises both standard format (gsd-planner.md) and Copilot format
+ * (gsd-planner.agent.md). Copilot renames agent files during install (#1512).
  *
  * @returns {{ agents_installed: boolean, missing_agents: string[], installed_agents: string[], agents_dir: string }}
  */
@@ -980,8 +989,10 @@ function checkAgentsInstalled() {
   }
 
   for (const agent of expectedAgents) {
+    // Check both .md (standard) and .agent.md (Copilot) file formats.
     const agentFile = path.join(agentsDir, `${agent}.md`);
-    if (fs.existsSync(agentFile)) {
+    const agentFileCopilot = path.join(agentsDir, `${agent}.agent.md`);
+    if (fs.existsSync(agentFile) || fs.existsSync(agentFileCopilot)) {
       installed.push(agent);
     } else {
       missing.push(agent);
