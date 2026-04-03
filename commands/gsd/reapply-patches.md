@@ -1,4 +1,5 @@
 ---
+name: gsd:reapply-patches
 description: Reapply local modifications after a GSD update
 allowed-tools: Read, Write, Edit, Bash, Glob, Grep, AskUserQuestion
 ---
@@ -152,22 +153,13 @@ Each matching commit represents an intentional user modification. Use the commit
 
 **Never report `Skipped — no custom content`.** If a file is in the backup, it has custom content.
 
-## Step 5: Update manifest
-
-After reapplying, regenerate the file manifest so future updates correctly detect these as user modifications:
-
-```bash
-# The manifest will be regenerated on next /gsd:update
-# For now, just note which files were modified
-```
-
-## Step 6: Cleanup option
+## Step 5: Cleanup option
 
 Ask user:
 - "Keep patch backups for reference?" → preserve `gsd-local-patches/`
 - "Clean up patch backups?" → remove `gsd-local-patches/` directory
 
-## Step 7: Report
+## Step 6: Report
 
 ```
 ## Patches Reapplied
