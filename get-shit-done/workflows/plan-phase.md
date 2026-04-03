@@ -419,11 +419,31 @@ UI_SPEC_FILE=$(ls "${PHASE_DIR}"/*-UI-SPEC.md 2>/dev/null | head -1)
 
 **If UI-SPEC.md missing AND `UI_GATE_CFG` is `true`:**
 
+Read auto-chain state:
+```bash
+AUTO_CHAIN=$(node "$HOME/.claude/get-shit-done/bin/gsd-tools.cjs" config-get workflow._auto_chain_active 2>/dev/null || echo "false")
+```
+
+**If `AUTO_CHAIN` is `true` (running inside a `--chain` or `--auto` pipeline):**
+
+Auto-generate UI-SPEC without prompting:
+```
+Skill(skill="gsd-ui-phase", args="${PHASE} --auto ${GSD_WS}")
+```
+After `gsd-ui-phase` returns, re-read:
+```bash
+UI_SPEC_FILE=$(ls "${PHASE_DIR}"/*-UI-SPEC.md 2>/dev/null | head -1)
+UI_SPEC_PATH="${UI_SPEC_FILE}"
+```
+Continue to step 6.
+
+**If `AUTO_CHAIN` is `false` (manual invocation):**
+
 If `TEXT_MODE` is true, present as a plain-text numbered list:
 ```
 Phase {N} has frontend indicators but no UI-SPEC.md. Generate a design contract before planning?
 
-1. Generate UI-SPEC first — Run /gsd:ui-phase {N} then re-run /gsd:plan-phase {N}
+1. Generate UI-SPEC first — Run /gsd-ui-phase {N} then re-run /gsd-plan-phase {N}
 2. Continue without UI-SPEC
 3. Not a frontend phase
 
@@ -434,7 +454,7 @@ Otherwise use AskUserQuestion:
 - header: "UI Design Contract"
 - question: "Phase {N} has frontend indicators but no UI-SPEC.md. Generate a design contract before planning?"
 - options:
-  - "Generate UI-SPEC first" → Display: "Run `/gsd:ui-phase {N} ${GSD_WS}` then re-run `/gsd:plan-phase {N} ${GSD_WS}`". Exit workflow.
+  - "Generate UI-SPEC first" → Display: "Run `/gsd-ui-phase {N} ${GSD_WS}` then re-run `/gsd-plan-phase {N} ${GSD_WS}`". Exit workflow.
   - "Continue without UI-SPEC" → Continue to step 6.
   - "Not a frontend phase" → Continue to step 6.
 
@@ -855,10 +875,10 @@ Route to `<offer_next>` OR `auto_advance` depending on flags/config.
 
 Check for auto-advance trigger:
 
-1. Parse `--auto` flag from $ARGUMENTS
-2. **Sync chain flag with intent** — if user invoked manually (no `--auto`), clear the ephemeral chain flag from any previous interrupted `--auto` chain. This does NOT touch `workflow.auto_advance` (the user's persistent settings preference):
+1. Parse `--auto` and `--chain` flags from $ARGUMENTS
+2. **Sync chain flag with intent** — if user invoked manually (no `--auto` and no `--chain`), clear the ephemeral chain flag from any previous interrupted `--auto` chain. This does NOT touch `workflow.auto_advance` (the user's persistent settings preference):
    ```bash
-   if [[ ! "$ARGUMENTS" =~ --auto ]]; then
+   if [[ ! "$ARGUMENTS" =~ --auto ]] && [[ ! "$ARGUMENTS" =~ --chain ]]; then
      node "$HOME/.claude/get-shit-done/bin/gsd-tools.cjs" config-set workflow._auto_chain_active false 2>/dev/null
    fi
    ```
