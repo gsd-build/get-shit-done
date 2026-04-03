@@ -184,6 +184,90 @@ describe('ContextEngine', () => {
     });
   });
 
+  describe('context truncation', () => {
+    it('truncates files exceeding maxContentLength', async () => {
+      const largeContent = Array.from({ length: 100 }, (_, i) =>
+        `## Section ${i}\n\nFirst paragraph.\n\nLong detail ${'x'.repeat(200)}.`
+      ).join('\n\n');
+
+      await createPlanningDir(projectDir, {
+        'STATE.md': '# State',
+        'ROADMAP.md': '# Roadmap',
+        'CONTEXT.md': largeContent,
+      });
+
+      const engine = new ContextEngine(projectDir, undefined, { maxContentLength: 500 });
+      const files = await engine.resolveContextFiles(PhaseType.Plan);
+
+      // CONTEXT.md should be truncated
+      expect(files.context!.length).toBeLessThan(largeContent.length);
+      expect(files.context).toContain('[...');
+    });
+
+    it('does not truncate files below threshold', async () => {
+      await createPlanningDir(projectDir, {
+        'STATE.md': '# State\nproject: test',
+        'ROADMAP.md': '# Roadmap\nphase 01',
+        'CONTEXT.md': '# Context\nstack: node',
+      });
+
+      const engine = new ContextEngine(projectDir);
+      const files = await engine.resolveContextFiles(PhaseType.Plan);
+
+      expect(files.context).toBe('# Context\nstack: node');
+    });
+
+    it('never truncates STATE.md (not in truncatable list)', async () => {
+      const largeState = `# State\n\n${'x'.repeat(20000)}`;
+      await createPlanningDir(projectDir, {
+        'STATE.md': largeState,
+      });
+
+      const engine = new ContextEngine(projectDir, undefined, { maxContentLength: 100 });
+      const files = await engine.resolveContextFiles(PhaseType.Execute);
+
+      expect(files.state).toBe(largeState);
+    });
+
+    it('extracts current milestone from ROADMAP.md when state is available', async () => {
+      const roadmap = `# Roadmap
+
+## Milestone 1: Setup
+### Phase 01
+Setup content.
+
+## Milestone 2: Build
+### Phase 02
+Build content.`;
+
+      await createPlanningDir(projectDir, {
+        'STATE.md': 'Current Milestone: Build',
+        'ROADMAP.md': roadmap,
+        'CONTEXT.md': '# Context',
+      });
+
+      const engine = new ContextEngine(projectDir);
+      const files = await engine.resolveContextFiles(PhaseType.Plan);
+
+      expect(files.roadmap).toContain('## Milestone 2: Build');
+      expect(files.roadmap).not.toContain('### Phase 01');
+    });
+
+    it('respects custom truncation options', async () => {
+      const content = '## Heading\n\nParagraph.\n\nMore.\n' + 'x'.repeat(500);
+      await createPlanningDir(projectDir, {
+        'STATE.md': '# State',
+        'ROADMAP.md': '# Roadmap',
+        'CONTEXT.md': content,
+      });
+
+      // Low threshold forces truncation
+      const engine = new ContextEngine(projectDir, undefined, { maxContentLength: 50 });
+      const files = await engine.resolveContextFiles(PhaseType.Plan);
+      expect(files.context!.length).toBeLessThan(content.length);
+    });
+  });
+
   describe('PHASE_FILE_MANIFEST', () => {
     it('covers all phase types', () => {
       for (const phase of Object.values(PhaseType)) {

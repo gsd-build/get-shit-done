@@ -154,6 +154,11 @@ describe('PromptFactory', () => {
       expect(prompt).toContain('# State');
       expect(prompt).toContain('# Roadmap');
       expect(prompt).toContain('## Phase Instructions');
+
+      // Cache-friendly ordering (#1614): stable prefix before variable context
+      const phaseInstrIdx = prompt.indexOf('## Phase Instructions');
+      const contextIdx = prompt.indexOf('## Context');
+      expect(phaseInstrIdx).toBeLessThan(contextIdx);
     });
 
     it('assembles plan prompt with all context files', async () => {

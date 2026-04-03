@@ -102,7 +102,12 @@ export class PromptFactory {
       return sanitizePrompt(buildExecutorPrompt(plan, agentDef));
     }
 
+    // Prompt assembly order is cache-optimized (#1614):
+    // Stable prefix (deterministic per phase type) → cached by Anthropic at 0.1x cost
+    // Variable suffix (.planning/ files) → uncached, changes per project/run
     const sections: string[] = [];
+
+    // ── STABLE PREFIX (cacheable across runs for the same phase type) ──
 
     // ── Agent role ──
     const agentDef = await this.loadAgentDef(phaseType);
@@ -131,16 +136,18 @@ export class PromptFactory {
       }
     }
 
+    // ── Phase-specific instructions (hardcoded per phase type — stable) ──
+    const phaseInstructions = this.getPhaseInstructions(phaseType);
+    if (phaseInstructions) {
+      sections.push(`## Phase Instructions\n\n${phaseInstructions}`);
+    }
+
+    // ── VARIABLE SUFFIX (project-specific, changes per run) ──
+
     // ── Context files ──
     const contextSection = this.formatContextFiles(contextFiles);
     if (contextSection) {
       sections.push(contextSection);
-    }
-
-    // ── Phase-specific instructions ──
-    const phaseInstructions = this.getPhaseInstructions(phaseType);
-    if (phaseInstructions) {
-      sections.push(`## Phase Instructions\n\n${phaseInstructions}`);
     }
 
     return sanitizePrompt(sections.join('\n\n'));

@@ -296,6 +296,8 @@ export { GSDEventStream } from './event-stream.js';
 export type { EventStreamContext } from './event-stream.js';
 export { ContextEngine, PHASE_FILE_MANIFEST } from './context-engine.js';
 export type { FileSpec } from './context-engine.js';
+export { truncateMarkdown, extractCurrentMilestone, DEFAULT_TRUNCATION_OPTIONS } from './context-truncation.js';
+export type { TruncationOptions } from './context-truncation.js';
 export { getToolsForPhase, PHASE_AGENT_MAP, PHASE_DEFAULT_TOOLS } from './tool-scoping.js';
 export { PromptFactory, extractBlock, extractSteps, PHASE_WORKFLOW_MAP } from './phase-prompt.js';
 export { GSDLogger } from './logger.js';
