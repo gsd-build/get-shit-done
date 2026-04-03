@@ -403,16 +403,19 @@ merge conflicts).
 Update STATE.md using gsd-tools:
 
 ```bash
-# Advance plan counter (handles last-plan edge case)
-node "$HOME/.claude/get-shit-done/bin/gsd-tools.cjs" state advance-plan
+# Skip in parallel mode — orchestrator handles STATE.md centrally
+if [ "${PARALLEL_MODE}" != "true" ]; then
+  # Advance plan counter (handles last-plan edge case)
+  node "$HOME/.claude/get-shit-done/bin/gsd-tools.cjs" state advance-plan
 
-# Recalculate progress bar from disk state
-node "$HOME/.claude/get-shit-done/bin/gsd-tools.cjs" state update-progress
+  # Recalculate progress bar from disk state
+  node "$HOME/.claude/get-shit-done/bin/gsd-tools.cjs" state update-progress
 
-# Record execution metrics
-node "$HOME/.claude/get-shit-done/bin/gsd-tools.cjs" state record-metric \
-  --phase "${PHASE}" --plan "${PLAN}" --duration "${DURATION}" \
-  --tasks "${TASK_COUNT}" --files "${FILE_COUNT}"
+  # Record execution metrics
+  node "$HOME/.claude/get-shit-done/bin/gsd-tools.cjs" state record-metric \
+    --phase "${PHASE}" --plan "${PLAN}" --duration "${DURATION}" \
+    --tasks "${TASK_COUNT}" --files "${FILE_COUNT}"
+fi
 ```
 </step>
 
@@ -451,7 +454,10 @@ If SUMMARY "Issues Encountered" ≠ "None": yolo → log and continue. Interacti
 updates centrally after merging worktrees).
 
 ```bash
-node "$HOME/.claude/get-shit-done/bin/gsd-tools.cjs" roadmap update-plan-progress "${PHASE}"
+# Skip in parallel mode — orchestrator handles ROADMAP.md centrally
+if [ "${PARALLEL_MODE}" != "true" ]; then
+  node "$HOME/.claude/get-shit-done/bin/gsd-tools.cjs" roadmap update-plan-progress "${PHASE}"
+fi
 ```
 Counts PLAN vs SUMMARY files on disk. Updates progress table row with correct count and status (`In Progress` or `Complete` with date).
 </step>
