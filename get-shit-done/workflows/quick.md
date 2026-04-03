@@ -550,12 +550,26 @@ Offer: 1) Force proceed, 2) Abort
 
 **Step 6: Spawn executor**
 
+Capture current HEAD before spawning (used for worktree branch check):
+```bash
+EXPECTED_BASE=$(git rev-parse HEAD)
+```
+
 Spawn gsd-executor with plan reference:
 
 ```
 Task(
   prompt="
 Execute quick task ${quick_id}.
+
+${USE_WORKTREES !== "false" ? `
+<worktree_branch_check>
+FIRST ACTION before any other work: verify this worktree branch is based on the correct commit.
+Run: git merge-base HEAD ${EXPECTED_BASE}
+If the result differs from ${EXPECTED_BASE}, run: git reset --soft ${EXPECTED_BASE}
+This corrects a known issue on Windows where EnterWorktree creates branches from main instead of the feature branch HEAD.
+</worktree_branch_check>
+` : ''}
 
 <files_to_read>
 - ${QUICK_DIR}/${quick_id}-PLAN.md (Plan)

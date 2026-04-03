@@ -34,6 +34,7 @@ Parse current values (default to `true` if not present):
 - `workflow.ui_safety_gate` — prompt to run /gsd:ui-phase before planning frontend phases (default: true if absent)
 - `model_profile` — which model each agent uses (default: `balanced`)
 - `git.branching_strategy` — branching approach (default: `"none"`)
+- `workflow.use_worktrees` — whether parallel executor agents run in worktree isolation (default: `true`)
 </step>
 
 <step name="present_settings">
@@ -153,6 +154,15 @@ AskUserQuestion([
       { label: "No (Recommended)", description: "Run smart discuss before each phase — surfaces gray areas and captures decisions." },
       { label: "Yes", description: "Skip discuss in /gsd:autonomous — chain directly to plan. Best for backend/pipeline work where phase descriptions are the spec." }
     ]
+  },
+  {
+    question: "Use git worktrees for parallel agent isolation?",
+    header: "Worktrees",
+    multiSelect: false,
+    options: [
+      { label: "Yes (Recommended)", description: "Each parallel executor runs in its own worktree branch — no conflicts between agents." },
+      { label: "No", description: "Disable worktree isolation. Use on platforms where EnterWorktree is broken (e.g. Windows with feature branches). Agents run sequentially on the main working tree." }
+    ]
   }
 ])
 ```
@@ -176,7 +186,8 @@ Merge new settings into existing config.json:
     "text_mode": true/false,
     "research_before_questions": true/false,
     "discuss_mode": "discuss" | "assumptions",
-    "skip_discuss": true/false
+    "skip_discuss": true/false,
+    "use_worktrees": true/false
   },
   "git": {
     "branching_strategy": "none" | "phase" | "milestone",

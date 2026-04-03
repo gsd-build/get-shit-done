@@ -233,6 +233,11 @@ Execute each selected wave in sequence. Within a wave: parallel if `PARALLELIZAT
 
    **Worktree mode** (`USE_WORKTREES` is not `false`):
 
+   Before spawning, capture the current HEAD:
+   ```bash
+   EXPECTED_BASE=$(git rev-parse HEAD)
+   ```
+
    ```
    Task(
      subagent_type="gsd-executor",
@@ -243,6 +248,29 @@ Execute each selected wave in sequence. Within a wave: parallel if `PARALLELIZAT
        Execute plan {plan_number} of phase {phase_number}-{phase_name}.
        Commit each task atomically. Create SUMMARY.md. Update STATE.md and ROADMAP.md.
        </objective>
+
+       <worktree_branch_check>
+       FIRST ACTION before any other work: verify this worktree's branch is based on the correct commit.
+
+       Run:
+       ```bash
+       ACTUAL_BASE=$(git merge-base HEAD {EXPECTED_BASE})
+       CURRENT_HEAD=$(git rev-parse HEAD)
+       ```
+
+       If `ACTUAL_BASE` != `{EXPECTED_BASE}` (i.e. the worktree branch was created from an older
+       base such as `main` instead of the feature branch HEAD), rebase onto the correct base:
+       ```bash
+       git rebase --onto {EXPECTED_BASE} $(git rev-parse --abbrev-ref HEAD~1 2>/dev/null || git rev-parse HEAD^) HEAD 2>/dev/null || true
+       # If rebase fails or is a no-op, reset the branch to start from the correct base:
+       git reset --soft {EXPECTED_BASE}
+       ```
+
+       If `ACTUAL_BASE` == `{EXPECTED_BASE}`: the branch base is correct, proceed immediately.
+
+       This check fixes a known issue on Windows where `EnterWorktree` creates branches from
+       `main` instead of the current feature branch HEAD.
+       </worktree_branch_check>
 
        <parallel_execution>
        You are running as a PARALLEL executor agent. Use --no-verify on all git
