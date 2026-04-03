@@ -10,6 +10,7 @@ allowed-tools:
   - Glob
   - Grep
   - Task
+  - AskUserQuestion
   - WebFetch
   - mcp__context7__*
 ---
@@ -25,6 +26,10 @@ Create executable phase prompts (PLAN.md files) for a roadmap phase with integra
 @~/.claude/get-shit-done/workflows/plan-phase.md
 @~/.claude/get-shit-done/references/ui-brand.md
 </execution_context>
+
+<runtime_note>
+**Copilot (VS Code):** Use `vscode_askquestions` wherever this workflow calls `AskUserQuestion`. They are equivalent — `vscode_askquestions` is the VS Code Copilot implementation of the same interactive question API. Do not skip questioning steps because `AskUserQuestion` appears unavailable; use `vscode_askquestions` instead.
+</runtime_note>
 
 <context>
 Phase number: $ARGUMENTS (optional — auto-detects next unplanned phase if omitted)

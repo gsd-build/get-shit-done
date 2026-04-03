@@ -34,6 +34,10 @@ Extract implementation decisions that downstream agents need — researcher and 
 @~/.claude/get-shit-done/templates/context.md
 </execution_context>
 
+<runtime_note>
+**Copilot (VS Code):** Use `vscode_askquestions` wherever this workflow calls `AskUserQuestion`. They are equivalent — `vscode_askquestions` is the VS Code Copilot implementation of the same interactive question API.
+</runtime_note>
+
 <context>
 Phase number: $ARGUMENTS (required)
 
