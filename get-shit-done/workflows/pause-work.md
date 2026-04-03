@@ -9,14 +9,28 @@ Read all files referenced by the invoking prompt's execution_context before star
 <process>
 
 <step name="detect">
-Find current phase directory from most recently modified files:
+## Context Detection
+
+Determine what kind of work is being paused and set the handoff destination accordingly:
 
 ```bash
-# Find most recent phase directory with work
-(ls -lt .planning/phases/*/PLAN.md 2>/dev/null || true) | head -1 | grep -oP 'phases/\K[^/]+' || true
+# Check for active phase
+phase=$(( ls -lt .planning/phases/*/PLAN.md 2>/dev/null || true ) | head -1 | grep -oP 'phases/\K[^/]+' || true)
+
+# Check for active spike
+spike=$(( ls -lt .planning/spikes/*/SPIKE.md .planning/spikes/*/DESIGN.md 2>/dev/null || true ) | head -1 | grep -oP 'spikes/\K[^/]+' || true)
+
+# Check for active deliberation
+deliberation=$(ls .planning/deliberations/*.md 2>/dev/null | head -1 || true)
 ```
 
-If no active phase detected, ask user which phase they're pausing work on.
+- **Phase work**: active phase directory → handoff to `.planning/phases/XX-name/.continue-here.md`
+- **Spike work**: active spike directory or spike-related files (no active phase) → handoff to `.planning/spikes/SPIKE-NNN/.continue-here.md` (create directory if needed)
+- **Deliberation work**: active deliberation file (no phase/spike) → handoff to `.planning/deliberations/.continue-here.md`
+- **Research work**: research notes exist but no phase/spike/deliberation → handoff to `.planning/.continue-here.md`
+- **Default**: no detectable context → handoff to `.planning/.continue-here.md`, note the ambiguity in `<current_state>`
+
+If phase is detected, proceed with phase handoff path. Otherwise use the first matching non-phase path above.
 </step>
 
 <step name="gather">
@@ -85,10 +99,11 @@ timestamp=$(node "$HOME/.claude/get-shit-done/bin/gsd-tools.cjs" current-timesta
 </step>
 
 <step name="write">
-**Write handoff to `.planning/phases/XX-name/.continue-here.md`:**
+**Write handoff to the path determined in the detect step** (e.g. `.planning/phases/XX-name/.continue-here.md`, `.planning/spikes/SPIKE-NNN/.continue-here.md`, or `.planning/.continue-here.md`):
 
 ```markdown
 ---
+context: [phase|spike|deliberation|research|default]
 phase: XX-name
 task: 3
 total_tasks: 7
@@ -124,6 +139,24 @@ last_updated: [timestamp from current-timestamp]
 - [Blocker 1]: [status/workaround]
 </blockers>
 
+## Required Reading (in order)
+<!-- List documents the resuming agent must read before acting -->
+1. [document] — [why it matters]
+
+## Critical Anti-Patterns (do NOT repeat these)
+<!-- Mistakes discovered this session that must be structurally avoided -->
+- [ANTI-PATTERN]: [what it is] → [structural mitigation]
+
+## Infrastructure State
+<!-- Running services, external state, environment specifics -->
+- [service/env]: [current state]
+
+## Pre-Execution Critique Required
+<!-- Fill in ONLY if pausing between design and execution (e.g. spike design done, not yet run) -->
+- Design artifact: [path]
+- Critique focus: [key questions the critic should probe]
+- Gate: Do NOT begin execution until critique is complete and design is revised
+
 <context>
 [Mental state, what were you thinking, the plan]
 </context>
@@ -143,7 +176,7 @@ timestamp=$(node "$HOME/.claude/get-shit-done/bin/gsd-tools.cjs" current-timesta
 
 <step name="commit">
 ```bash
-node "$HOME/.claude/get-shit-done/bin/gsd-tools.cjs" commit "wip: [phase-name] paused at task [X]/[Y]" --files .planning/phases/*/.continue-here.md .planning/HANDOFF.json
+node "$HOME/.claude/get-shit-done/bin/gsd-tools.cjs" commit "wip: [context-name] paused at [X]/[Y]" --files [handoff-path] .planning/HANDOFF.json
 ```
 </step>
 
@@ -151,11 +184,12 @@ node "$HOME/.claude/get-shit-done/bin/gsd-tools.cjs" commit "wip: [phase-name] p
 ```
 ✓ Handoff created:
   - .planning/HANDOFF.json (structured, machine-readable)
-  - .planning/phases/[XX-name]/.continue-here.md (human-readable)
+  - [handoff-path] (human-readable)
 
 Current state:
 
-- Phase: [XX-name]
+- Context: [phase|spike|deliberation|research]
+- Location: [XX-name or SPIKE-NNN]
 - Task: [X] of [Y]
 - Status: [in_progress/blocked]
 - Blockers: [count] ({human_actions_pending count} need human action)
@@ -169,8 +203,10 @@ To resume: /gsd:resume-work
 </process>
 
 <success_criteria>
-- [ ] .continue-here.md created in correct phase directory
-- [ ] All sections filled with specific content
+- [ ] Context detected (phase/spike/deliberation/research/default)
+- [ ] .continue-here.md created at correct path for detected context
+- [ ] Required Reading, Anti-Patterns, and Infrastructure State sections filled
+- [ ] Pre-Execution Critique section filled if pausing between design and execution
 - [ ] Committed as WIP
 - [ ] User knows location and how to resume
 </success_criteria>
