@@ -695,9 +695,20 @@ function getSessionScopedWorkstreamFile(cwd) {
   const sessionKey = getWorkstreamSessionKey();
   if (!sessionKey) return null;
 
+  // Use realpathSync.native so the hash is derived from the canonical filesystem
+  // path. On Windows, path.resolve returns whatever case the caller supplied,
+  // while realpathSync.native returns the case the OS recorded — they differ on
+  // case-insensitive NTFS, producing different hashes and different tmpdir slots.
+  // Fall back to path.resolve when the directory does not yet exist.
+  let planningAbs;
+  try {
+    planningAbs = fs.realpathSync.native(planningRoot(cwd));
+  } catch {
+    planningAbs = path.resolve(planningRoot(cwd));
+  }
   const projectId = crypto
     .createHash('sha1')
-    .update(path.resolve(planningRoot(cwd)))
+    .update(planningAbs)
     .digest('hex')
     .slice(0, 16);
 
