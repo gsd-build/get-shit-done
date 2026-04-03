@@ -1232,11 +1232,8 @@ for each plan B in plan_order:
       waves[B.id] = B.wave
 ```
 
-**Rule:** Any two plans in the same wave MUST have zero `files_modified` overlap — even if
-no explicit `depends_on` was set. After computing all wave numbers, verify every wave group:
-collect the union of `files_modified` per wave; if any file appears in two or more plans
-within the same wave, bump the later plan to the next wave and repeat until clean.
-Log each bump: `"Plan {B} moved to wave {N+1}: files_modified overlap with Plan {A} on {file}"`
+**Rule:** Same-wave plans must have zero `files_modified` overlap. After assigning waves, scan each wave; if any file appears in 2+ plans, bump the later plan to the next wave and repeat.
+Log: `"Plan {B} → wave {N+1}: overlap with {A} on {file}"`
 </step>
 
 <step name="group_into_plans">
@@ -1257,17 +1254,12 @@ Apply goal-backward methodology (see goal_backward section):
 </step>
 
 <step name="reachability_check">
-Rules:
-1. Every new entity introduced must have a defined creation path within this phase or an existing one.
-2. Every new workflow/feature must be reachable via a concrete user action or API call.
-3. Every config flag must have a default value and at least one consumer.
-4. Every new UI component (if applicable) must have a route or navigation link.
-
-For each must-have artifact from derive_must_haves:
-- Identify the creation/access path
-- If no path exists: mark UNREACHABLE and revise the plan to add the path, or remove the artifact
-
-Log: "Reachability: {artifact} → {creation_path}" or "UNREACHABLE: {artifact} — no creation path; revising plan"
+For each must-have artifact, verify a concrete path exists:
+- Entity → in-phase or existing creation path
+- Workflow → user action or API call triggers it
+- Config flag → default value + consumer
+- UI → route or nav link
+UNREACHABLE (no path) → revise plan.
 </step>
 
 <step name="estimate_scope">
