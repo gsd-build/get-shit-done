@@ -1208,6 +1208,9 @@ Prefer vertical slices over horizontal layers.
 </step>
 
 <step name="assign_waves">
+Wave numbers are computed from two sources of dependency — explicit (`depends_on`) and
+implicit (`files_modified` overlap). Both must be satisfied before assigning a wave.
+
 ```
 waves = {}
 for each plan in plan_order:
@@ -1216,13 +1219,35 @@ for each plan in plan_order:
   else:
     plan.wave = max(waves[dep] for dep in plan.depends_on) + 1
   waves[plan.id] = plan.wave
+
+# files_modified overlap check — implicit dependency detection
+# If Plan B shares any file in files_modified with an earlier Plan A,
+# Plan B has an implicit dependency on Plan A and MUST be in a strictly later wave.
+for each plan B in plan_order:
+  for each earlier plan A where A != B:
+    if any file in B.files_modified is also in A.files_modified:
+      # Implicit dependency: B must run after A
+      B.wave = max(B.wave, A.wave + 1)
+      waves[B.id] = B.wave
 ```
+
+**Rule:** Any two plans in the same wave MUST have zero `files_modified` overlap.
+If Plan B lists any file that Plan A also lists in `files_modified`, Plan B MUST be in a
+strictly later wave than Plan A — regardless of whether `depends_on` was set.
+
+**Validation (mandatory before finalising plan documents):**
+After computing all wave numbers, scan every wave group:
+- For each wave, collect the union of all `files_modified` entries across plans in that wave.
+- If any file appears in two or more plans within the same wave, those plans have a
+  `files_modified overlap` — bump the later plan to the next wave and repeat until no
+  same-wave overlap exists.
+- Log each bump: `"Plan {B} moved from wave {N} to wave {N+1}: files_modified overlap with Plan {A} on {file}"`
 </step>
 
 <step name="group_into_plans">
 Rules:
 1. Same-wave tasks with no file conflicts → parallel plans
-2. Shared files → same plan or sequential plans
+2. Shared files → same plan or sequential plans (shared file = implicit dependency → later wave)
 3. Checkpoint tasks → `autonomous: false`
 4. Each plan: 2-3 tasks, single concern, ~50% context target
 </step>
