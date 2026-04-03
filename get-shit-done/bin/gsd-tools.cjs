@@ -153,6 +153,7 @@ const milestone = require('./lib/milestone.cjs');
 const commands = require('./lib/commands.cjs');
 const init = require('./lib/init.cjs');
 const frontmatter = require('./lib/frontmatter.cjs');
+const preflight = require('./lib/preflight.cjs');
 const profilePipeline = require('./lib/profile-pipeline.cjs');
 const profileOutput = require('./lib/profile-output.cjs');
 const workstream = require('./lib/workstream.cjs');
@@ -667,6 +668,22 @@ async function runCommand(command, args, cwd, raw) {
       } else {
         error('Unknown validate subcommand. Available: consistency, health, agents');
       }
+      break;
+    }
+
+    case 'preflight': {
+      // Support both: preflight <phase> --workflow plan
+      //           and: preflight plan-phase <phase> (step 3.7 compat)
+      const KNOWN_WORKFLOWS = ['discuss-phase','plan-phase','execute-phase','verify-phase','discuss','plan','execute','verify'];
+      let wfArg = null, phaseArg = null;
+      if (KNOWN_WORKFLOWS.includes(args[1])) {
+        wfArg = args[1]; phaseArg = args[2];
+      } else {
+        phaseArg = args[1];
+        const wfIdx = args.indexOf('--workflow');
+        if (wfIdx !== -1) wfArg = args[wfIdx + 1];
+      }
+      preflight.cmdPreflight(cwd, phaseArg, wfArg, raw);
       break;
     }
 
