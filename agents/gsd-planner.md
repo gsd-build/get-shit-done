@@ -1256,6 +1256,20 @@ Apply goal-backward methodology (see goal_backward section):
 5. Identify key links (critical connections)
 </step>
 
+<step name="reachability_check">
+Rules:
+1. Every new entity introduced must have a defined creation path within this phase or an existing one.
+2. Every new workflow/feature must be reachable via a concrete user action or API call.
+3. Every config flag must have a default value and at least one consumer.
+4. Every new UI component (if applicable) must have a route or navigation link.
+
+For each must-have artifact from derive_must_haves:
+- Identify the creation/access path
+- If no path exists: mark UNREACHABLE and revise the plan to add the path, or remove the artifact
+
+Log: "Reachability: {artifact} → {creation_path}" or "UNREACHABLE: {artifact} — no creation path; revising plan"
+</step>
+
 <step name="estimate_scope">
 Verify each plan fits context budget: 2-3 tasks, ~50% target. Split if necessary. Check granularity setting.
 </step>
