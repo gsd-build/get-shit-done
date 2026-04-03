@@ -874,204 +874,18 @@ TDD plans target ~40% context (lower than standard 50%). The RED→GREEN→REFAC
 </tdd_integration>
 
 <gap_closure_mode>
-
-## Planning from Verification Gaps
-
-Triggered by `--gaps` flag. Creates plans to address verification or UAT failures.
-
-**1. Find gap sources:**
-
-Use init context (from load_project_state) which provides `phase_dir`:
-
-```bash
-# Check for VERIFICATION.md (code verification gaps)
-ls "$phase_dir"/*-VERIFICATION.md 2>/dev/null
-
-# Check for UAT.md with diagnosed status (user testing gaps)
-grep -l "status: diagnosed" "$phase_dir"/*-UAT.md 2>/dev/null
-```
-
-**2. Parse gaps:** Each gap has: truth (failed behavior), reason, artifacts (files with issues), missing (things to add/fix).
-
-**3. Load existing SUMMARYs** to understand what's already built.
-
-**4. Find next plan number:** If plans 01-03 exist, next is 04.
-
-**5. Group gaps into plans** by: same artifact, same concern, dependency order (can't wire if artifact is stub → fix stub first).
-
-**6. Create gap closure tasks:**
-
-```xml
-<task name="{fix_description}" type="auto">
-  <files>{artifact.path}</files>
-  <action>
-    {For each item in gap.missing:}
-    - {missing item}
-
-    Reference existing code: {from SUMMARYs}
-    Gap reason: {gap.reason}
-  </action>
-  <verify>{How to confirm gap is closed}</verify>
-  <done>{Observable truth now achievable}</done>
-</task>
-```
-
-**7. Assign waves using standard dependency analysis** (same as `assign_waves` step):
-- Plans with no dependencies → wave 1
-- Plans that depend on other gap closure plans → max(dependency waves) + 1
-- Also consider dependencies on existing (non-gap) plans in the phase
-
-**8. Write PLAN.md files:**
-
-```yaml
----
-phase: XX-name
-plan: NN              # Sequential after existing
-type: execute
-wave: N               # Computed from depends_on (see assign_waves)
-depends_on: [...]     # Other plans this depends on (gap or existing)
-files_modified: [...]
-autonomous: true
-gap_closure: true     # Flag for tracking
----
-```
-
+See `get-shit-done/references/planner-gap-closure.md`. Load this file at the
+start of execution when `--gaps` flag is detected or gap_closure mode is active.
 </gap_closure_mode>
 
 <revision_mode>
-
-## Planning from Checker Feedback
-
-Triggered when orchestrator provides `<revision_context>` with checker issues. NOT starting fresh — making targeted updates to existing plans.
-
-**Mindset:** Surgeon, not architect. Minimal changes for specific issues.
-
-### Step 1: Load Existing Plans
-
-```bash
-cat .planning/phases/$PHASE-*/$PHASE-*-PLAN.md
-```
-
-Build mental model of current plan structure, existing tasks, must_haves.
-
-### Step 2: Parse Checker Issues
-
-Issues come in structured format:
-
-```yaml
-issues:
-  - plan: "16-01"
-    dimension: "task_completeness"
-    severity: "blocker"
-    description: "Task 2 missing <verify> element"
-    fix_hint: "Add verification command for build output"
-```
-
-Group by plan, dimension, severity.
-
-### Step 3: Revision Strategy
-
-| Dimension | Strategy |
-|-----------|----------|
-| requirement_coverage | Add task(s) for missing requirement |
-| task_completeness | Add missing elements to existing task |
-| dependency_correctness | Fix depends_on, recompute waves |
-| key_links_planned | Add wiring task or update action |
-| scope_sanity | Split into multiple plans |
-| must_haves_derivation | Derive and add must_haves to frontmatter |
-
-### Step 4: Make Targeted Updates
-
-**DO:** Edit specific flagged sections, preserve working parts, update waves if dependencies change.
-
-**DO NOT:** Rewrite entire plans for minor issues, add unnecessary tasks, break existing working plans.
-
-### Step 5: Validate Changes
-
-- [ ] All flagged issues addressed
-- [ ] No new issues introduced
-- [ ] Wave numbers still valid
-- [ ] Dependencies still correct
-- [ ] Files on disk updated
-
-### Step 6: Commit
-
-```bash
-node "$HOME/.claude/get-shit-done/bin/gsd-tools.cjs" commit "fix($PHASE): revise plans based on checker feedback" --files .planning/phases/$PHASE-*/$PHASE-*-PLAN.md
-```
-
-### Step 7: Return Revision Summary
-
-```markdown
-## REVISION COMPLETE
-
-**Issues addressed:** {N}/{M}
-
-### Changes Made
-
-| Plan | Change | Issue Addressed |
-|------|--------|-----------------|
-| 16-01 | Added <verify> to Task 2 | task_completeness |
-| 16-02 | Added logout task | requirement_coverage (AUTH-02) |
-
-### Files Updated
-
-- .planning/phases/16-xxx/16-01-PLAN.md
-- .planning/phases/16-xxx/16-02-PLAN.md
-
-{If any issues NOT addressed:}
-
-### Unaddressed Issues
-
-| Issue | Reason |
-|-------|--------|
-| {issue} | {why - needs user input, architectural change, etc.} |
-```
-
+See `get-shit-done/references/planner-revision.md`. Load this file at the
+start of execution when `<revision_context>` is provided by the orchestrator.
 </revision_mode>
 
 <reviews_mode>
-
-## Planning from Cross-AI Review Feedback
-
-Triggered when orchestrator sets Mode to `reviews`. Replanning from scratch with REVIEWS.md feedback as additional context.
-
-**Mindset:** Fresh planner with review insights — not a surgeon making patches, but an architect who has read peer critiques.
-
-### Step 1: Load REVIEWS.md
-Read the reviews file from `<files_to_read>`. Parse:
-- Per-reviewer feedback (strengths, concerns, suggestions)
-- Consensus Summary (agreed concerns = highest priority to address)
-- Divergent Views (investigate, make a judgment call)
-
-### Step 2: Categorize Feedback
-Group review feedback into:
-- **Must address**: HIGH severity consensus concerns
-- **Should address**: MEDIUM severity concerns from 2+ reviewers
-- **Consider**: Individual reviewer suggestions, LOW severity items
-
-### Step 3: Plan Fresh with Review Context
-Create new plans following the standard planning process, but with review feedback as additional constraints:
-- Each HIGH severity consensus concern MUST have a task that addresses it
-- MEDIUM concerns should be addressed where feasible without over-engineering
-- Note in task actions: "Addresses review concern: {concern}" for traceability
-
-### Step 4: Return
-Use standard PLANNING COMPLETE return format, adding a reviews section:
-
-```markdown
-### Review Feedback Addressed
-
-| Concern | Severity | How Addressed |
-|---------|----------|---------------|
-| {concern} | HIGH | Plan {N}, Task {M}: {how} |
-
-### Review Feedback Deferred
-| Concern | Reason |
-|---------|--------|
-| {concern} | {why — out of scope, disagree, etc.} |
-```
-
+See `get-shit-done/references/planner-reviews.md`. Load this file at the
+start of execution when `--reviews` flag is present or reviews mode is active.
 </reviews_mode>
 
 <execution_flow>
@@ -1092,6 +906,18 @@ cat .planning/STATE.md 2>/dev/null
 ```
 
 If STATE.md missing but .planning/ exists, offer to reconstruct or continue without.
+</step>
+
+<step name="load_mode_context">
+Check the invocation mode and load the relevant reference file:
+
+- If `--gaps` flag or gap_closure context present: Read `get-shit-done/references/planner-gap-closure.md`
+- If `<revision_context>` provided by orchestrator: Read `get-shit-done/references/planner-revision.md`
+- If `--reviews` flag present or reviews mode active: Read `get-shit-done/references/planner-reviews.md`
+- Standard planning mode: no additional file to read
+
+Load the file before proceeding to planning steps. The reference file contains the full
+instructions for operating in that mode.
 </step>
 
 <step name="load_codebase_context">
