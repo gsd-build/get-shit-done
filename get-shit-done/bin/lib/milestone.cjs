@@ -246,7 +246,28 @@ function cmdMilestoneComplete(cwd, version, options, raw) {
   output(result, raw);
 }
 
+function cmdPhasesClear(cwd, raw) {
+  const phasesDir = planningPaths(cwd).phases;
+  let cleared = 0;
+
+  if (fs.existsSync(phasesDir)) {
+    try {
+      const entries = fs.readdirSync(phasesDir, { withFileTypes: true });
+      for (const entry of entries) {
+        if (!entry.isDirectory()) continue;
+        fs.rmSync(path.join(phasesDir, entry.name), { recursive: true, force: true });
+        cleared++;
+      }
+    } catch (e) {
+      error('Failed to clear phases directory: ' + e.message);
+    }
+  }
+
+  output({ cleared }, raw, `${cleared} phase director${cleared === 1 ? 'y' : 'ies'} cleared`);
+}
+
 module.exports = {
   cmdRequirementsMarkComplete,
   cmdMilestoneComplete,
+  cmdPhasesClear,
 };

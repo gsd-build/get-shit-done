@@ -137,6 +137,12 @@ Keep Accumulated Context section from previous milestone.
 
 Delete MILESTONE-CONTEXT.md if exists (consumed).
 
+Clear leftover phase directories from the previous milestone:
+
+```bash
+node "$HOME/.claude/get-shit-done/bin/gsd-tools.cjs" phases clear
+```
+
 ```bash
 node "$HOME/.claude/get-shit-done/bin/gsd-tools.cjs" commit "docs: start milestone v[X.Y] [Name]" --files .planning/PROJECT.md .planning/STATE.md
 ```

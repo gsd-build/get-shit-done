@@ -583,8 +583,10 @@ async function runCommand(command, args, cwd, raw) {
           includeArchived: args.includes('--include-archived'),
         };
         phase.cmdPhasesList(cwd, options, raw);
+      } else if (subcommand === 'clear') {
+        milestone.cmdPhasesClear(cwd, raw);
       } else {
-        error('Unknown phases subcommand. Available: list');
+        error('Unknown phases subcommand. Available: list, clear');
       }
       break;
     }
