@@ -218,7 +218,41 @@ Execute each selected wave in sequence. Within a wave: parallel if `PARALLELIZAT
 
 **For each wave:**
 
-1. **Describe what's being built (BEFORE spawning):**
+1. **Intra-wave files_modified overlap check (BEFORE spawning):**
+
+   Before spawning any agents for this wave, inspect the `files_modified` list of all plans
+   in the wave. Check every pair of plans in the wave — if any two plans share even one file
+   in their `files_modified` lists, those plans have an implicit dependency and MUST NOT run
+   in parallel.
+
+   **Detection algorithm (pseudocode):**
+   ```
+   seen_files = {}
+   overlapping_plans = []
+   for each plan in wave_plans:
+     for each file in plan.files_modified:
+       if file in seen_files:
+         overlapping_plans.add(plan, seen_files[file])  # both plans overlap on this file
+       else:
+         seen_files[file] = plan
+   ```
+
+   **If overlap is detected:**
+   - Warn the user:
+     ```
+     ⚠ Intra-wave files_modified overlap detected in Wave {N}:
+       Plan {A} and Plan {B} both modify {file}
+       Running these plans sequentially to avoid parallel worktree conflicts.
+     ```
+   - Override `PARALLELIZATION` to `false` for this wave only — run all plans in the wave
+     sequentially regardless of the global parallelization setting.
+   - This is a safety net for plans that were incorrectly assigned to the same wave.
+     The planner should have caught this; flag it as a planning defect so the user can
+     replan the phase if desired.
+
+   **If no overlap:** proceed normally (parallel if `PARALLELIZATION=true`).
+
+2. **Describe what's being built (BEFORE spawning):**
 
    Read each plan's `<objective>`. Extract what's being built and why.
 
@@ -236,7 +270,7 @@ Execute each selected wave in sequence. Within a wave: parallel if `PARALLELIZAT
    - Bad: "Executing terrain generation plan"
    - Good: "Procedural terrain generator using Perlin noise — creates height maps, biome zones, and collision meshes. Required before vehicle physics can interact with ground."
 
-2. **Spawn executor agents:**
+3. **Spawn executor agents:**
 
    Pass paths only — executors read files themselves with their fresh context window.
    For 200k models, this keeps orchestrator context lean (~10-15%).
@@ -258,7 +292,8 @@ Execute each selected wave in sequence. Within a wave: parallel if `PARALLELIZAT
      prompt="
        <objective>
        Execute plan {plan_number} of phase {phase_number}-{phase_name}.
-       Commit each task atomically. Create SUMMARY.md. Update STATE.md and ROADMAP.md.
+       Commit each task atomically. Create SUMMARY.md.
+       Do NOT update STATE.md or ROADMAP.md — the orchestrator owns those writes after all worktree agents in the wave complete.
        </objective>
 
        <worktree_branch_check>
@@ -327,8 +362,6 @@ Execute each selected wave in sequence. Within a wave: parallel if `PARALLELIZAT
        - [ ] All tasks executed
        - [ ] Each task committed individually
        - [ ] SUMMARY.md created in plan directory
-       - [ ] STATE.md updated with position and decisions
-       - [ ] ROADMAP.md updated with plan progress (via `roadmap update-plan-progress`)
        </success_criteria>
      "
    )
@@ -345,9 +378,21 @@ Execute each selected wave in sequence. Within a wave: parallel if `PARALLELIZAT
        </sequential_execution>
    ```
 
+   The sequential mode Task prompt uses the same structure as worktree mode but with these differences in success_criteria — since there is only one agent writing at a time, there are no shared-file conflicts:
+
+   ```
+       <success_criteria>
+       - [ ] All tasks executed
+       - [ ] Each task committed individually
+       - [ ] SUMMARY.md created in plan directory
+       - [ ] STATE.md updated with position and decisions
+       - [ ] ROADMAP.md updated with plan progress (via `roadmap update-plan-progress`)
+       </success_criteria>
+   ```
+
    When worktrees are disabled, execute plans **one at a time within each wave** (sequential) regardless of the `PARALLELIZATION` setting — multiple agents writing to the same working tree concurrently would cause conflicts.
 
-3. **Wait for all agents in wave to complete.**
+4. **Wait for all agents in wave to complete.**
 
    **Completion signal fallback (Copilot and runtimes where Task() may not return):**
 
@@ -361,17 +406,17 @@ Execute each selected wave in sequence. Within a wave: parallel if `PARALLELIZAT
    ```
 
    **If SUMMARY.md exists AND commits are found:** The agent completed successfully —
-   treat as done and proceed to step 4. Log: `"✓ {Plan ID} completed (verified via spot-check — completion signal not received)"`
+   treat as done and proceed to step 5. Log: `"✓ {Plan ID} completed (verified via spot-check — completion signal not received)"`
 
    **If SUMMARY.md does NOT exist after a reasonable wait:** The agent may still be
    running or may have failed silently. Check `git log --oneline -5` for recent
    activity. If commits are still appearing, wait longer. If no activity, report
-   the plan as failed and route to the failure handler in step 5.
+   the plan as failed and route to the failure handler in step 6.
 
    **This fallback applies automatically to all runtimes.** Claude Code's Task() normally
    returns synchronously, but the fallback ensures resilience if it doesn't.
 
-4. **Post-wave hook validation (parallel mode only):**
+5. **Post-wave hook validation (parallel mode only):**
 
    When agents committed with `--no-verify`, run pre-commit hooks once after the wave:
    ```bash
@@ -381,7 +426,7 @@ Execute each selected wave in sequence. Within a wave: parallel if `PARALLELIZAT
    ```
    If hooks fail: report the failure and ask "Fix hook issues now?" or "Continue to next wave?"
 
-4.5. **Worktree cleanup (when `isolation="worktree"` was used):**
+5.5. **Worktree cleanup (when `isolation="worktree"` was used):**
 
    When executor agents ran in worktree isolation, their commits land on temporary branches in separate working trees. After the wave completes, merge these changes back and clean up:
 
@@ -414,7 +459,25 @@ Execute each selected wave in sequence. Within a wave: parallel if `PARALLELIZAT
 
    **If no worktrees found:** Skip silently — agents may have been spawned without worktree isolation.
 
-5. **Report completion — spot-check claims first:**
+5.6. **Post-wave shared artifact update (worktree mode only):**
+
+   When executor agents ran with `isolation="worktree"`, they skipped STATE.md and ROADMAP.md updates to avoid last-merge-wins overwrites. The orchestrator is the single writer for these files. After worktrees are merged back, update shared artifacts once:
+
+   ```bash
+   # Update ROADMAP.md for each completed plan in this wave
+   for PLAN_ID in ${WAVE_PLAN_IDS}; do
+     node "$HOME/.claude/get-shit-done/bin/gsd-tools.cjs" roadmap update-plan-progress "${PHASE_NUMBER}" "${PLAN_ID}" completed
+   done
+
+   # Update STATE.md position to reflect the last completed plan in this wave
+   node "$HOME/.claude/get-shit-done/bin/gsd-tools.cjs" state update-position --phase "${PHASE_NUMBER}" --plan "${LAST_PLAN_ID}"
+   ```
+
+   Where `WAVE_PLAN_IDS` is the space-separated list of plan IDs that completed in this wave, and `LAST_PLAN_ID` is the last plan ID in the wave (used to set current position).
+
+   **If `workflow.use_worktrees` is `false`:** Sequential agents already updated STATE.md and ROADMAP.md themselves — skip this step.
+
+6. **Report completion — spot-check claims first:**
 
    For each SUMMARY.md:
    - Verify first 2 files from `key-files.created` exist on disk
@@ -439,13 +502,13 @@ Execute each selected wave in sequence. Within a wave: parallel if `PARALLELIZAT
    - Bad: "Wave 2 complete. Proceeding to Wave 3."
    - Good: "Terrain system complete — 3 biome types, height-based texturing, physics collision meshes. Vehicle physics (Wave 3) can now reference ground surfaces."
 
-5. **Handle failures:**
+7. **Handle failures:**
 
-   **Known Claude Code bug (classifyHandoffIfNeeded):** If an agent reports "failed" with error containing `classifyHandoffIfNeeded is not defined`, this is a Claude Code runtime bug — not a GSD or agent issue. The error fires in the completion handler AFTER all tool calls finish. In this case: run the same spot-checks as step 4 (SUMMARY.md exists, git commits present, no Self-Check: FAILED). If spot-checks PASS → treat as **successful**. If spot-checks FAIL → treat as real failure below.
+   **Known Claude Code bug (classifyHandoffIfNeeded):** If an agent reports "failed" with error containing `classifyHandoffIfNeeded is not defined`, this is a Claude Code runtime bug — not a GSD or agent issue. The error fires in the completion handler AFTER all tool calls finish. In this case: run the same spot-checks as step 5 (SUMMARY.md exists, git commits present, no Self-Check: FAILED). If spot-checks PASS → treat as **successful**. If spot-checks FAIL → treat as real failure below.
 
    For real failures: report which plan failed → ask "Continue?" or "Stop?" → if continue, dependent plans may also fail. If stop, partial completion report.
 
-5b. **Pre-wave dependency check (waves 2+ only):**
+7b. **Pre-wave dependency check (waves 2+ only):**
 
     Before spawning wave N+1, for each plan in the upcoming wave:
     ```bash
@@ -466,9 +529,9 @@ Execute each selected wave in sequence. Within a wave: parallel if `PARALLELIZAT
 
     Key-links referencing files in the CURRENT (upcoming) wave are skipped.
 
-6. **Execute checkpoint plans between waves** — see `<checkpoint_handling>`.
+8. **Execute checkpoint plans between waves** — see `<checkpoint_handling>`.
 
-7. **Proceed to next wave.**
+9. **Proceed to next wave.**
 </step>
 
 <step name="checkpoint_handling">
