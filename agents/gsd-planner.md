@@ -1233,7 +1233,6 @@ for each plan B in plan_order:
 ```
 
 **Rule:** Same-wave plans must have zero `files_modified` overlap. After assigning waves, scan each wave; if any file appears in 2+ plans, bump the later plan to the next wave and repeat.
-Log: `"Plan {B} → wave {N+1}: overlap with {A} on {file}"`
 </step>
 
 <step name="group_into_plans">
