@@ -110,6 +110,30 @@ fi
 ```
 </step>
 
+<step name="check_blocking_antipatterns" priority="first">
+**MANDATORY — Check for blocking anti-patterns before any other work.**
+
+Look for a `.continue-here.md` in the current phase directory:
+
+```bash
+ls ${phase_dir}/.continue-here.md 2>/dev/null || true
+```
+
+If `.continue-here.md` exists, parse its "Critical Anti-Patterns" table for rows with `severity` = `blocking`.
+
+**If one or more `blocking` anti-patterns are found:**
+
+This step cannot be skipped. Before proceeding to `check_interactive_mode` or any other step, the agent must demonstrate understanding of each blocking anti-pattern by answering all three questions for each one:
+
+1. **What is this anti-pattern?** — Describe it in your own words, not by quoting the handoff.
+2. **How did it manifest?** — Explain the specific failure that caused it to be recorded.
+3. **What structural mechanism (not acknowledgment) prevents it?** — Name the concrete step, checklist item, or enforcement mechanism that stops recurrence.
+
+Write these answers inline before continuing. If a blocking anti-pattern cannot be answered from the context in `.continue-here.md`, stop and ask the user for clarification.
+
+**If no `.continue-here.md` exists, or no `blocking` rows are found:** Proceed directly to `check_interactive_mode`.
+</step>
+
 <step name="check_interactive_mode">
 **Parse `--interactive` flag from $ARGUMENTS.**
 

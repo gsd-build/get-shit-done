@@ -30,6 +30,9 @@ If no active phase detected, ask user which phase they're pausing work on.
 6. **Human actions pending**: Things that need manual intervention (MCP setup, API keys, approvals, manual testing)
 7. **Background processes**: Any running servers/watchers that were part of the workflow
 8. **Files modified**: What's changed but not committed
+9. **Blocking constraints**: Anti-patterns or methodological failures encountered during this session that a resuming agent MUST be aware of before proceeding. Only include items discovered through actual failure — not warnings or predictions. Assign each constraint a `severity`:
+   - `blocking` — The resuming agent MUST demonstrate understanding before proceeding. The discuss-phase and execute-phase workflows will enforce a mandatory understanding check.
+   - `advisory` — Important context but does not gate resumption.
 
 Ask user for clarifications if needed via conversational questions.
 
@@ -96,12 +99,35 @@ status: in_progress
 last_updated: [timestamp from current-timestamp]
 ---
 
+# BLOCKING CONSTRAINTS — Read Before Anything Else
+
+> These are not suggestions. Each constraint below was discovered through failure.
+> Acknowledge each one explicitly before proceeding.
+
+- [ ] CONSTRAINT: [name] — [what it is] — [structural mitigation required]
+
+**Do not proceed until all boxes are checked.**
+
+_If no constraints have been identified yet, remove this section._
+
+## Critical Anti-Patterns
+
+| Pattern | Description | Severity | Prevention Mechanism |
+|---------|-------------|----------|---------------------|
+| [pattern name] | [what it is and how it manifested] | blocking | [structural step that prevents recurrence — not acknowledgment] |
+| [pattern name] | [what it is and how it manifested] | advisory | [guidance for avoiding it] |
+
+**Severity values:** `blocking` — resuming agent must pass understanding check before proceeding. `advisory` — important context, does not gate resumption.
+
+_Remove rows that do not apply. The discuss-phase and execute-phase workflows parse this table and enforce a mandatory understanding check for any `blocking` rows._
+
 <current_state>
 [Where exactly are we? Immediate context]
 </current_state>
 
 <completed_work>
 
+Completed Tasks:
 - Task 1: [name] - Done
 - Task 2: [name] - Done
 - Task 3: [name] - In progress, [what's done]
