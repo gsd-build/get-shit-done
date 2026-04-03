@@ -1,5 +1,8 @@
 ---
 description: Manage parallel workstreams — list, create, switch, status, progress, complete, and resume
+allowed-tools:
+  - Read
+  - Bash
 ---
 
 # /gsd:workstreams

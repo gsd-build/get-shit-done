@@ -1,6 +1,11 @@
 ---
 name: gsd:cleanup
 description: Archive accumulated phase directories from completed milestones
+allowed-tools:
+  - Read
+  - Write
+  - Bash
+  - Glob
 ---
 <objective>
 Archive phase directories from completed milestones into `.planning/milestones/v{X.Y}-phases/`.
