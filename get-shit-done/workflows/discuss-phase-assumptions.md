@@ -186,6 +186,24 @@ Parse JSON for: `todo_count`, `matches[]`.
 **Auto mode (`--auto`):** Fold all todos with score >= 0.4 automatically. Log the selection.
 </step>
 
+<step name="load_methodology">
+Read the project-level methodology file if it exists. This must happen before assumption analysis
+so that active lenses shape how assumptions are generated and evaluated.
+
+```bash
+cat .planning/METHODOLOGY.md 2>/dev/null || true
+```
+
+**If METHODOLOGY.md exists:**
+- Parse each named lens: its diagnoses, recommendations, and triggering conditions
+- Store as internal `<active_lenses>` for use in deep_codebase_analysis and present_assumptions
+- When spawning the gsd-assumptions-analyzer, pass the lens list so it can flag which lenses apply
+- When presenting assumptions, append a "Methodology" section showing which lenses were applied
+  and what they flagged (if anything)
+
+**If METHODOLOGY.md does not exist:** Skip silently. This artifact is optional.
+</step>
+
 <step name="scout_codebase">
 Lightweight scan of existing code to inform assumption generation.
 

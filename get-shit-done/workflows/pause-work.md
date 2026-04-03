@@ -142,6 +142,7 @@ last_updated: [timestamp from current-timestamp]
 ## Required Reading (in order)
 <!-- List documents the resuming agent must read before acting -->
 1. [document] — [why it matters]
+1. `.planning/METHODOLOGY.md` (if it exists) — project analytical lenses; apply before any assumption analysis
 
 ## Critical Anti-Patterns (do NOT repeat these)
 <!-- Mistakes discovered this session that must be structurally avoided -->
