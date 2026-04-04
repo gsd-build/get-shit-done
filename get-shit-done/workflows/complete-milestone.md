@@ -719,9 +719,9 @@ Tag: v[X.Y]
 
 **Start Next Milestone** — questioning → research → requirements → roadmap
 
-`/gsd:new-milestone`
+`/clear` then:
 
-<sub>`/clear` first → fresh context window</sub>
+`/gsd:new-milestone`
 
 ---
 ```

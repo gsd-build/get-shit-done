@@ -108,9 +108,9 @@ Always at end of major completions.
 
 **{Identifier}: {Name}** — {one-line description}
 
-`{copy-paste command}`
+`/clear` then:
 
-<sub>`/clear` first → fresh context window</sub>
+`{copy-paste command}`
 
 ───────────────────────────────────────────────────────────────
 

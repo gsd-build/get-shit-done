@@ -465,9 +465,9 @@ node "$HOME/.claude/get-shit-done/bin/gsd-tools.cjs" commit "docs: create milest
 
 **Phase [N]: [Phase Name]** — [Goal]
 
-`/gsd:discuss-phase [N] ${GSD_WS}` — gather context and clarify approach
+`/clear` then:
 
-<sub>`/clear` first → fresh context window</sub>
+`/gsd:discuss-phase [N] ${GSD_WS}` — gather context and clarify approach
 
 Also: `/gsd:plan-phase [N] ${GSD_WS}` — skip discussion, plan directly
 ```

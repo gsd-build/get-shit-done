@@ -263,9 +263,9 @@ Dimensions: 6/6 passed
 
 **Plan Phase {N}** — planner will use UI-SPEC.md as design context
 
-`/gsd:plan-phase {N}`
+`/clear` then:
 
-<sub>/clear first → fresh context window</sub>
+`/gsd:plan-phase {N}`
 
 ───────────────────────────────────────────────────────────────
 ```

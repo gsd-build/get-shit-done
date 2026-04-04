@@ -475,9 +475,9 @@ Exit skill and invoke SlashCommand("/gsd:discuss-phase [X+1] --auto ${GSD_WS}")
 
 **Phase [X+1]: [Name]** — [Goal from ROADMAP.md]
 
-`/gsd:discuss-phase [X+1] ${GSD_WS}` — gather context and clarify approach
+`/clear` then:
 
-<sub>`/clear` first → fresh context window</sub>
+`/gsd:discuss-phase [X+1] ${GSD_WS}` — gather context and clarify approach
 
 ---
 
@@ -500,9 +500,9 @@ Exit skill and invoke SlashCommand("/gsd:discuss-phase [X+1] --auto ${GSD_WS}")
 **Phase [X+1]: [Name]** — [Goal from ROADMAP.md]
 <sub>✓ Context gathered, ready to plan</sub>
 
-`/gsd:plan-phase [X+1] ${GSD_WS}`
+`/clear` then:
 
-<sub>`/clear` first → fresh context window</sub>
+`/gsd:plan-phase [X+1] ${GSD_WS}`
 
 ---
 
@@ -610,9 +610,9 @@ Exit skill and invoke SlashCommand("/gsd:complete-milestone {version} ${GSD_WS}"
 
 **Complete Milestone {version}** — archive and prepare for next
 
-`/gsd:complete-milestone {version} ${GSD_WS}`
+`/clear` then:
 
-<sub>`/clear` first → fresh context window</sub>
+`/gsd:complete-milestone {version} ${GSD_WS}`
 
 ---
 

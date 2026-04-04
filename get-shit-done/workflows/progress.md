@@ -215,9 +215,9 @@ Read its `<objective>` section.
 
 **{phase}-{plan}: [Plan Name]** — [objective summary from PLAN.md]
 
-`/gsd:execute-phase {phase} ${GSD_WS}`
+`/clear` then:
 
-<sub>`/clear` first → fresh context window</sub>
+`/gsd:execute-phase {phase} ${GSD_WS}`
 
 ---
 ```
@@ -245,9 +245,9 @@ PHASE_HAS_UI=$(echo "$PHASE_SECTION" | grep -qi "UI hint.*yes" && echo "true" ||
 **Phase {N}: {Name}** — {Goal from ROADMAP.md}
 <sub>✓ Context gathered, ready to plan</sub>
 
-`/gsd:plan-phase {phase-number} ${GSD_WS}`
+`/clear` then:
 
-<sub>`/clear` first → fresh context window</sub>
+`/gsd:plan-phase {phase-number} ${GSD_WS}`
 
 ---
 ```
@@ -261,9 +261,9 @@ PHASE_HAS_UI=$(echo "$PHASE_SECTION" | grep -qi "UI hint.*yes" && echo "true" ||
 
 **Phase {N}: {Name}** — {Goal from ROADMAP.md}
 
-`/gsd:discuss-phase {phase}` — gather context and clarify approach
+`/clear` then:
 
-<sub>`/clear` first → fresh context window</sub>
+`/gsd:discuss-phase {phase}` — gather context and clarify approach
 
 ---
 
@@ -284,9 +284,9 @@ PHASE_HAS_UI=$(echo "$PHASE_SECTION" | grep -qi "UI hint.*yes" && echo "true" ||
 
 **Phase {N}: {Name}** — {Goal from ROADMAP.md}
 
-`/gsd:discuss-phase {phase} ${GSD_WS}` — gather context and clarify approach
+`/clear` then:
 
-<sub>`/clear` first → fresh context window</sub>
+`/gsd:discuss-phase {phase} ${GSD_WS}` — gather context and clarify approach
 
 ---
 
@@ -310,9 +310,9 @@ UAT.md exists with gaps (diagnosed issues). User needs to plan fixes.
 
 **{phase_num}-UAT.md** has {N} gaps requiring fixes.
 
-`/gsd:plan-phase {phase} --gaps ${GSD_WS}`
+`/clear` then:
 
-<sub>`/clear` first → fresh context window</sub>
+`/gsd:plan-phase {phase} --gaps ${GSD_WS}`
 
 ---
 
@@ -336,9 +336,9 @@ UAT.md exists with `status: partial` — testing session ended before all items 
 
 **{phase_num}-UAT.md** has {N} unresolved tests (pending, blocked, or skipped).
 
-`/gsd:verify-work {phase} ${GSD_WS}` — resume testing from where you left off
+`/clear` then:
 
-<sub>`/clear` first → fresh context window</sub>
+`/gsd:verify-work {phase} ${GSD_WS}` — resume testing from where you left off
 
 ---
 
@@ -392,9 +392,9 @@ NEXT_HAS_UI=$(echo "$NEXT_PHASE_SECTION" | grep -qi "UI hint.*yes" && echo "true
 
 **Phase {Z+1}: {Name}** — {Goal from ROADMAP.md}
 
-`/gsd:discuss-phase {Z+1}` — gather context and clarify approach
+`/clear` then:
 
-<sub>`/clear` first → fresh context window</sub>
+`/gsd:discuss-phase {Z+1}` — gather context and clarify approach
 
 ---
 
@@ -417,9 +417,9 @@ NEXT_HAS_UI=$(echo "$NEXT_PHASE_SECTION" | grep -qi "UI hint.*yes" && echo "true
 
 **Phase {Z+1}: {Name}** — {Goal from ROADMAP.md}
 
-`/gsd:discuss-phase {Z+1} ${GSD_WS}` — gather context and clarify approach
+`/clear` then:
 
-<sub>`/clear` first → fresh context window</sub>
+`/gsd:discuss-phase {Z+1} ${GSD_WS}` — gather context and clarify approach
 
 ---
 
@@ -445,9 +445,9 @@ All {N} phases finished!
 
 **Complete Milestone** — archive and prepare for next
 
-`/gsd:complete-milestone ${GSD_WS}`
+`/clear` then:
 
-<sub>`/clear` first → fresh context window</sub>
+`/gsd:complete-milestone ${GSD_WS}`
 
 ---
 
@@ -476,9 +476,9 @@ Ready to plan the next milestone.
 
 **Start Next Milestone** — questioning → research → requirements → roadmap
 
-`/gsd:new-milestone ${GSD_WS}`
+`/clear` then:
 
-<sub>`/clear` first → fresh context window</sub>
+`/gsd:new-milestone ${GSD_WS}`
 
 ---
 ```

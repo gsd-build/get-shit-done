@@ -597,9 +597,9 @@ Created: .planning/phases/${PADDED_PHASE}-${SLUG}/${PADDED_PHASE}-CONTEXT.md
 
 **Phase ${PHASE}: {phase_name}** — {Goal from ROADMAP.md}
 
-`/gsd:plan-phase ${PHASE}`
+`/clear` then:
 
-<sub>`/clear` first → fresh context window</sub>
+`/gsd:plan-phase ${PHASE}`
 
 ---
 

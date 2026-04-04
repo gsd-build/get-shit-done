@@ -11,9 +11,9 @@ Standard format for presenting next steps after completing a command or workflow
 
 **{identifier}: {name}** — {one-line description}
 
-`{command to copy-paste}`
+`/clear` then:
 
-<sub>`/clear` first → fresh context window</sub>
+`{command to copy-paste}`
 
 ---
 
@@ -29,7 +29,7 @@ Standard format for presenting next steps after completing a command or workflow
 1. **Always show what it is** — name + description, never just a command path
 2. **Pull context from source** — ROADMAP.md for phases, PLAN.md `<objective>` for plans
 3. **Command in inline code** — backticks, easy to copy-paste, renders as clickable link
-4. **`/clear` explanation** — always include, keeps it concise but explains why
+4. **`/clear` first** — always show `/clear` before the command so users run it in the correct order
 5. **"Also available" not "Other options"** — sounds more app-like
 6. **Visual separators** — `---` above and below to make it stand out
 
@@ -44,9 +44,9 @@ Standard format for presenting next steps after completing a command or workflow
 
 **02-03: Refresh Token Rotation** — Add /api/auth/refresh with sliding expiry
 
-`/gsd:execute-phase 2`
+`/clear` then:
 
-<sub>`/clear` first → fresh context window</sub>
+`/gsd:execute-phase 2`
 
 ---
 
@@ -69,9 +69,9 @@ Add note that this is the last plan and what comes after:
 **02-03: Refresh Token Rotation** — Add /api/auth/refresh with sliding expiry
 <sub>Final plan in Phase 2</sub>
 
-`/gsd:execute-phase 2`
+`/clear` then:
 
-<sub>`/clear` first → fresh context window</sub>
+`/gsd:execute-phase 2`
 
 ---
 
@@ -91,9 +91,9 @@ Add note that this is the last plan and what comes after:
 
 **Phase 2: Authentication** — JWT login flow with refresh tokens
 
-`/gsd:plan-phase 2`
+`/clear` then:
 
-<sub>`/clear` first → fresh context window</sub>
+`/gsd:plan-phase 2`
 
 ---
 
@@ -120,9 +120,9 @@ Show completion status before next action:
 
 **Phase 3: Core Features** — User dashboard, settings, and data export
 
-`/gsd:plan-phase 3`
+`/clear` then:
 
-<sub>`/clear` first → fresh context window</sub>
+`/gsd:plan-phase 3`
 
 ---
 
@@ -145,13 +145,13 @@ When there's no clear primary action:
 
 **Phase 3: Core Features** — User dashboard, settings, and data export
 
+`/clear` then one of:
+
 **To plan directly:** `/gsd:plan-phase 3`
 
 **To discuss context first:** `/gsd:discuss-phase 3`
 
 **To research unknowns:** `/gsd:research-phase 3`
-
-<sub>`/clear` first → fresh context window</sub>
 
 ---
 ```
@@ -169,9 +169,9 @@ All 4 phases shipped
 
 **Start v1.1** — questioning → research → requirements → roadmap
 
-`/gsd:new-milestone`
+`/clear` then:
 
-<sub>`/clear` first → fresh context window</sub>
+`/gsd:new-milestone`
 
 ---
 ```

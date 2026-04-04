@@ -1194,9 +1194,9 @@ PHASE1_HAS_UI=$(echo "$PHASE1_SECTION" | grep -qi "UI hint.*yes" && echo "true" 
 
 **Phase 1: [Phase Name]** — [Goal from ROADMAP.md]
 
-/gsd:discuss-phase 1 — gather context and clarify approach
+/clear then:
 
-<sub>/clear first → fresh context window</sub>
+/gsd:discuss-phase 1 — gather context and clarify approach
 
 ---
 
@@ -1216,9 +1216,9 @@ PHASE1_HAS_UI=$(echo "$PHASE1_SECTION" | grep -qi "UI hint.*yes" && echo "true" 
 
 **Phase 1: [Phase Name]** — [Goal from ROADMAP.md]
 
-/gsd:discuss-phase 1 — gather context and clarify approach
+/clear then:
 
-<sub>/clear first → fresh context window</sub>
+/gsd:discuss-phase 1 — gather context and clarify approach
 
 ---
 

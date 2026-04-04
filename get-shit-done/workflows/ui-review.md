@@ -138,10 +138,10 @@ Full review: {path to UI-REVIEW.md}
 
 ## ▶ Next
 
+`/clear` then one of:
+
 - `/gsd:verify-work {N}` — UAT testing
 - `/gsd:plan-phase {N+1}` — plan next phase
-
-<sub>/clear first → fresh context window</sub>
 
 ───────────────────────────────────────────────────────────────
 ```

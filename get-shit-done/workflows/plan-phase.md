@@ -933,9 +933,9 @@ Verification: {Passed | Passed with override | Skipped}
 
 **Execute Phase {X}** — run all {N} plans
 
-/gsd:execute-phase {X} ${GSD_WS}
+/clear then:
 
-<sub>/clear first → fresh context window</sub>
+/gsd:execute-phase {X} ${GSD_WS}
 
 ───────────────────────────────────────────────────────────────
 

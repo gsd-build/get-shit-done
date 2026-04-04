@@ -976,9 +976,9 @@ Items saved to `{phase_num}-HUMAN-UAT.md` — they will appear in `/gsd:progress
 ---
 ## ▶ Next Up
 
-`/gsd:plan-phase {X} --gaps ${GSD_WS}`
+`/clear` then:
 
-<sub>`/clear` first → fresh context window</sub>
+`/gsd:plan-phase {X} --gaps ${GSD_WS}`
 
 Also: `cat {phase_dir}/{phase_num}-VERIFICATION.md` — full report
 Also: `/gsd:verify-work {X} ${GSD_WS}` — manual testing first
