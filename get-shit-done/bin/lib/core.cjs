@@ -214,32 +214,37 @@ function safeReadFile(filePath) {
   }
 }
 
+/**
+ * Canonical config defaults. Single source of truth — imported by config.cjs and verify.cjs.
+ */
+const CONFIG_DEFAULTS = {
+  model_profile: 'balanced',
+  commit_docs: true,
+  search_gitignored: false,
+  branching_strategy: 'none',
+  phase_branch_template: 'gsd/phase-{phase}-{slug}',
+  milestone_branch_template: 'gsd/{milestone}-{slug}',
+  quick_branch_template: null,
+  research: true,
+  plan_checker: true,
+  verifier: true,
+  nyquist_validation: true,
+  parallelization: true,
+  brave_search: false,
+  firecrawl: false,
+  exa_search: false,
+  text_mode: false, // when true, use plain-text numbered lists instead of AskUserQuestion menus
+  sub_repos: [],
+  resolve_model_ids: false, // false: return alias as-is | true: map to full Claude model ID | "omit": return '' (runtime uses its default)
+  context_window: 200000, // default 200k; set to 1000000 for Opus/Sonnet 4.6 1M models
+  phase_naming: 'sequential', // 'sequential' (default, auto-increment) or 'custom' (arbitrary string IDs)
+  project_code: null, // optional short prefix for phase dirs (e.g., 'CK' → 'CK-01-foundation')
+  subagent_timeout: 300000, // 5 min default; increase for large codebases or slower models (ms)
+};
+
 function loadConfig(cwd) {
   const configPath = path.join(planningDir(cwd), 'config.json');
-  const defaults = {
-    model_profile: 'balanced',
-    commit_docs: true,
-    search_gitignored: false,
-    branching_strategy: 'none',
-    phase_branch_template: 'gsd/phase-{phase}-{slug}',
-    milestone_branch_template: 'gsd/{milestone}-{slug}',
-    quick_branch_template: null,
-    research: true,
-    plan_checker: true,
-    verifier: true,
-    nyquist_validation: true,
-    parallelization: true,
-    brave_search: false,
-    firecrawl: false,
-    exa_search: false,
-    text_mode: false, // when true, use plain-text numbered lists instead of AskUserQuestion menus
-    sub_repos: [],
-    resolve_model_ids: false, // false: return alias as-is | true: map to full Claude model ID | "omit": return '' (runtime uses its default)
-    context_window: 200000, // default 200k; set to 1000000 for Opus/Sonnet 4.6 1M models
-    phase_naming: 'sequential', // 'sequential' (default, auto-increment) or 'custom' (arbitrary string IDs)
-    project_code: null, // optional short prefix for phase dirs (e.g., 'CK' → 'CK-01-foundation')
-    subagent_timeout: 300000, // 5 min default; increase for large codebases or slower models (ms)
-  };
+  const defaults = CONFIG_DEFAULTS;
 
   try {
     const raw = fs.readFileSync(configPath, 'utf-8');
@@ -1484,6 +1489,7 @@ module.exports = {
   detectSubRepos,
   reapStaleTempFiles,
   MODEL_ALIAS_MAP,
+  CONFIG_DEFAULTS,
   planningDir,
   planningRoot,
   planningPaths,
