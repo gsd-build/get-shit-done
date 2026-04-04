@@ -906,6 +906,52 @@ Cross-phase audit of all outstanding UAT and verification items.
 
 ---
 
+### `/gsd-secure-phase`
+
+Retroactively verify threat mitigations for a completed phase.
+
+| Argument | Required | Description |
+|----------|----------|-------------|
+| `phase number` | No | Phase to audit (default: last completed phase) |
+
+**Prerequisites:** Phase must have been executed. Works with or without existing SECURITY.md.
+**Produces:** `{phase}-SECURITY.md` with threat verification results
+**Spawns:** `gsd-security-auditor` agent
+
+Three operating modes:
+1. SECURITY.md exists — audit and verify existing mitigations
+2. No SECURITY.md but PLAN.md has threat model — generate from artifacts
+3. Phase not executed — exits with guidance
+
+```bash
+/gsd-secure-phase                   # Audit last completed phase
+/gsd-secure-phase 5                 # Audit specific phase
+```
+
+---
+
+### `/gsd-docs-update`
+
+Generate or update project documentation verified against the codebase.
+
+| Argument | Required | Description |
+|----------|----------|-------------|
+| `--force` | No | Skip preservation prompts, regenerate all docs |
+| `--verify-only` | No | Check existing docs for accuracy, no generation |
+
+**Produces:** Up to 9 documentation files (README, architecture, API, getting started, development, testing, configuration, deployment, contributing)
+**Spawns:** `gsd-doc-writer` agents (one per doc type), then `gsd-doc-verifier` agents for factual verification
+
+Each doc writer explores the codebase directly — no hallucinated paths or stale signatures. Doc verifier checks claims against the live filesystem.
+
+```bash
+/gsd-docs-update                    # Generate/update docs interactively
+/gsd-docs-update --force            # Regenerate all docs
+/gsd-docs-update --verify-only      # Verify existing docs only
+```
+
+---
+
 ## Backlog & Thread Commands
 
 ### `/gsd-add-backlog`
