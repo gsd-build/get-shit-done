@@ -106,9 +106,9 @@ Parse REVIEW.md frontmatter to check status and extract context for --auto loop:
 
 ```bash
 # Parse status field
-REVIEW_STATUS=$(node -e "
+REVIEW_STATUS=$(REVIEW_PATH="${REVIEW_PATH}" node -e "
   const fs = require('fs');
-  const content = fs.readFileSync('${REVIEW_PATH}', 'utf-8');
+  const content = fs.readFileSync(process.env.REVIEW_PATH, 'utf-8');
   const match = content.match(/^---\n([\s\S]*?)\n---/);
   if (match && /status:\s*(\S+)/.test(match[1])) {
     console.log(match[1].match(/status:\s*(\S+)/)[1]);
@@ -132,9 +132,9 @@ Warning: Could not parse REVIEW.md status. Proceeding with fix attempt.
 Extract review depth for --auto re-review:
 
 ```bash
-REVIEW_DEPTH=$(node -e "
+REVIEW_DEPTH=$(REVIEW_PATH="${REVIEW_PATH}" node -e "
   const fs = require('fs');
-  const content = fs.readFileSync('${REVIEW_PATH}', 'utf-8');
+  const content = fs.readFileSync(process.env.REVIEW_PATH, 'utf-8');
   const match = content.match(/^---\n([\s\S]*?)\n---/);
   if (match && /depth:\s*(\S+)/.test(match[1])) {
     console.log(match[1].match(/depth:\s*(\S+)/)[1]);
@@ -147,10 +147,13 @@ REVIEW_DEPTH=$(node -e "
 Extract original review file list for --auto re-review scope persistence:
 
 ```bash
-# Extract review file list as newline-separated paths (safe for spaces/special chars)
-mapfile -t REVIEW_FILES_ARRAY < <(node -e "
+# Extract review file list — portable bash 3.2+ (no mapfile, handles spaces in paths)
+REVIEW_FILES_ARRAY=()
+while IFS= read -r line; do
+  [ -n "$line" ] && REVIEW_FILES_ARRAY+=("$line")
+done < <(REVIEW_PATH="${REVIEW_PATH}" node -e "
   const fs = require('fs');
-  const content = fs.readFileSync('${REVIEW_PATH}', 'utf-8');
+  const content = fs.readFileSync(process.env.REVIEW_PATH, 'utf-8');
   const match = content.match(/^---\n([\s\S]*?)\n---/);
   if (match) {
     const fm = match[1];
@@ -229,6 +232,9 @@ Only runs if AUTO_MODE is true. If AUTO_MODE is false, skip this step entirely.
 
 ```bash
 if [ "$AUTO_MODE" = "true" ]; then
+  # Iteration semantics: the initial fix pass (step 5) is iteration 1.
+  # This loop runs iterations 2..MAX_ITERATIONS (re-review + re-fix cycles).
+  # Total fix passes = MAX_ITERATIONS. Loop uses -lt (not -le) intentionally.
   ITERATION=1
   MAX_ITERATIONS=3
   
@@ -277,9 +283,9 @@ Do NOT commit the output — the orchestrator handles that.
 ")
     
     # Check new REVIEW.md status
-    NEW_STATUS=$(node -e "
+    NEW_STATUS=$(REVIEW_PATH="${REVIEW_PATH}" node -e "
       const fs = require('fs');
-      const content = fs.readFileSync('${REVIEW_PATH}', 'utf-8');
+      const content = fs.readFileSync(process.env.REVIEW_PATH, 'utf-8');
       const match = content.match(/^---\n([\s\S]*?)\n---/);
       if (match && /status:\s*(\S+)/.test(match[1])) {
         console.log(match[1].match(/status:\s*(\S+)/)[1]);
@@ -330,7 +336,7 @@ fi
 ```
 
 Key design decisions for --auto (addresses ALL review HIGH concerns):
-1. **Re-review scope**: Uses REVIEW_FILES_ARRAY from original REVIEW.md frontmatter, falling back to full phase scope. Scope is NOT lost between iterations. Uses mapfile for safe array construction (handles spaces/special chars).
+1. **Re-review scope**: Uses REVIEW_FILES_ARRAY from original REVIEW.md frontmatter, falling back to full phase scope. Scope is NOT lost between iterations. Uses portable while-read loop (bash 3.2+ compatible, handles spaces in paths).
 2. **Artifact semantics**: REVIEW.md is overwritten by each re-review (latest review state). REVIEW-FIX.md is overwritten by each fixer iteration (latest fix state with iteration count). There is ONE final version of each artifact, not per-iteration copies.
    Backup files (.iterN.md) preserve history for post-mortem analysis if iterations degrade.
 3. **Commit timing**: Fix commits happen per-finding inside the agent. REVIEW-FIX.md is NOT committed until step 7 (after ALL iterations complete). Only ONE docs commit for REVIEW-FIX.md, not one per iteration.
@@ -342,9 +348,9 @@ After ALL iterations complete (or single pass in non-auto mode), validate and co
 ```bash
 if [ -f "${FIX_REPORT_PATH}" ]; then
   # Validate REVIEW-FIX.md has valid YAML frontmatter with status field
-  HAS_STATUS=$(node -e "
+  HAS_STATUS=$(REVIEW_PATH="${REVIEW_PATH}" node -e "
     const fs = require('fs');
-    const content = fs.readFileSync('${FIX_REPORT_PATH}', 'utf-8');
+    const content = fs.readFileSync(process.env.FIX_REPORT_PATH, 'utf-8');
     const match = content.match(/^---\n([\s\S]*?)\n---/);
     if (match && /status:/.test(match[1])) { console.log('valid'); } else { console.log('invalid'); }
   " 2>/dev/null)
@@ -399,9 +405,9 @@ Extract frontmatter fields:
 
 ```bash
 # Extract only the YAML frontmatter block (between first two --- lines)
-FIX_FRONTMATTER=$(node -e "
+FIX_FRONTMATTER=$(REVIEW_PATH="${REVIEW_PATH}" node -e "
   const fs = require('fs');
-  const content = fs.readFileSync('${FIX_REPORT_PATH}', 'utf-8');
+  const content = fs.readFileSync(process.env.FIX_REPORT_PATH, 'utf-8');
   const match = content.match(/^---\n([\s\S]*?)\n---/);
   if (match) process.stdout.write(match[1]);
 " 2>/dev/null)

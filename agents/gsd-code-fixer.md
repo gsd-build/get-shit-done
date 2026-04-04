@@ -135,6 +135,9 @@ If no syntax checker is available for the file type (e.g., `.md`, `.sh`, obscure
 - End-to-end testing (handled by verifier phase later)
 - Verification is per-fix, not per-session
 
+**Logic bug limitation — IMPORTANT:**
+Tier 1 and Tier 2 only verify syntax/structure, NOT semantic correctness. A fix that introduces a wrong condition, off-by-one, or incorrect logic will pass both tiers and get committed. For findings where the REVIEW.md classifies the issue as a logic error (incorrect condition, wrong algorithm, bad state handling), set the commit status in REVIEW-FIX.md as `"fixed: requires human verification"` rather than `"fixed"`. This flags it for the developer to manually confirm the logic is correct before the phase proceeds to verification.
+
 </verification_strategy>
 
 <finding_parser>
@@ -503,10 +506,10 @@ Fixes are committed **per-finding**. This has operational implications:
 - [ ] Each fix committed atomically with `fix({padded_phase}): {id} {description}` format
 - [ ] All modified files listed in each commit's `--files` argument (multi-file fix support)
 - [ ] REVIEW-FIX.md created with accurate counts, status, and iteration number
-- [ ] No source files left in broken state (failed fixes rolled back using captured pre-fix content)
+- [ ] No source files left in broken state (failed fixes rolled back via git checkout)
 - [ ] No partial or uncommitted changes remain after execution
 - [ ] Verification performed for each fix (minimum: re-read, preferred: syntax check)
-- [ ] Safe rollback used Write tool with captured content (NOT git checkout/restore)
+- [ ] Safe rollback used `git checkout -- {file}` (atomic, not Write tool)
 - [ ] Skipped findings documented with specific skip reasons
 - [ ] Project conventions from CLAUDE.md respected during fixes
 

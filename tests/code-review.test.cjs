@@ -93,6 +93,35 @@ describe('CR-AGENT: code review agent frontmatter', () => {
     assert.ok(!frontmatter.includes('skills:'),
       'gsd-code-fixer has skills: in frontmatter — breaks Gemini CLI');
   });
+
+  test('gsd-code-fixer.md rollback uses git checkout (not Write tool)', () => {
+    const content = fs.readFileSync(path.join(AGENTS_DIR, 'gsd-code-fixer.md'), 'utf-8');
+    assert.ok(content.includes('git checkout --'),
+      'gsd-code-fixer rollback should use git checkout -- {file} for atomic rollback');
+    assert.ok(!content.includes('PRE_FIX_CONTENT'),
+      'gsd-code-fixer should not use PRE_FIX_CONTENT in-memory capture (use git checkout instead)');
+  });
+
+  test('gsd-code-fixer.md success_criteria consistent with rollback strategy (git checkout)', () => {
+    const content = fs.readFileSync(path.join(AGENTS_DIR, 'gsd-code-fixer.md'), 'utf-8');
+    const successCriteria = content.match(/<success_criteria>([\s\S]*?)<\/success_criteria>/)?.[1] || '';
+    assert.ok(successCriteria.includes('git checkout'),
+      'gsd-code-fixer success_criteria must reference git checkout rollback');
+    assert.ok(!successCriteria.includes('Write tool with captured'),
+      'gsd-code-fixer success_criteria must not say Write tool for rollback');
+  });
+
+  test('gsd-code-fixer.md flags logic-bug fixes for human review', () => {
+    const content = fs.readFileSync(path.join(AGENTS_DIR, 'gsd-code-fixer.md'), 'utf-8');
+    assert.ok(content.includes('requires human verification'),
+      'gsd-code-fixer should flag logic-bug fixes as requiring human verification');
+  });
+
+  test('gsd-code-reviewer.md REVIEW.md spec includes files_reviewed_list field', () => {
+    const content = fs.readFileSync(path.join(AGENTS_DIR, 'gsd-code-reviewer.md'), 'utf-8');
+    assert.ok(content.includes('files_reviewed_list'),
+      'gsd-code-reviewer REVIEW.md frontmatter spec must include files_reviewed_list for --auto scope persistence');
+  });
 });
 
 // --- CR-CMD: code review command structure ---
@@ -205,6 +234,37 @@ describe('CR-WORKFLOW: code review workflow structure', () => {
     // Check for iteration logic with cap
     assert.ok(content.includes('MAX_ITERATIONS') || (content.includes('3') && content.includes('iteration')),
       'code-review-fix.md workflow missing iteration cap logic');
+  });
+
+  test('code-review.md --files path traversal guard rejects paths outside repo', () => {
+    const content = fs.readFileSync(path.join(WORKFLOWS_DIR, 'code-review.md'), 'utf-8');
+    // Guard must resolve and compare against REPO_ROOT
+    assert.ok(content.includes('REPO_ROOT') && content.includes('realpath'),
+      'code-review.md missing path traversal guard (realpath + REPO_ROOT check)');
+    assert.ok(content.includes('File path outside repository'),
+      'code-review.md missing rejection message for paths outside repo');
+  });
+
+  test('code-review.md uses portable while-read loop for array dedup (not mapfile)', () => {
+    const content = fs.readFileSync(path.join(WORKFLOWS_DIR, 'code-review.md'), 'utf-8');
+    // mapfile is bash 4+ only; macOS ships bash 3.2. Dedup must use portable while-read.
+    // Note: 'mapfile' may appear in platform_notes documentation — check bash code blocks only
+    const codeBlocks = content.match(/```bash[\s\S]*?```/g) || [];
+    const hasMapfileInCode = codeBlocks.some(block => block.includes('mapfile -t'));
+    assert.ok(!hasMapfileInCode,
+      'code-review.md bash code blocks use mapfile which is bash 4+ only — breaks macOS default bash 3.2');
+    assert.ok(content.includes('while IFS= read -r'),
+      'code-review.md should use portable while-read loop instead of mapfile');
+  });
+
+  test('code-review-fix.md uses portable while-read loop for array construction (not mapfile)', () => {
+    const content = fs.readFileSync(path.join(WORKFLOWS_DIR, 'code-review-fix.md'), 'utf-8');
+    const codeBlocks = content.match(/```bash[\s\S]*?```/g) || [];
+    const hasMapfileInCode = codeBlocks.some(block => block.includes('mapfile -t'));
+    assert.ok(!hasMapfileInCode,
+      'code-review-fix.md bash code blocks use mapfile which is bash 4+ only — breaks macOS default bash 3.2');
+    assert.ok(content.includes('while IFS= read -r'),
+      'code-review-fix.md should use portable while-read loop instead of mapfile');
   });
 });
 

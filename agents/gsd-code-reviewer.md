@@ -94,8 +94,6 @@ Additional checks:
 
 **3. Determine changed files:**
 
-**3. Determine changed files:**
-
 **Primary: Parse `files` from config block.** The workflow passes an explicit file list in YAML format:
 ```yaml
 files:

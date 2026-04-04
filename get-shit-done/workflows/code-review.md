@@ -270,9 +270,13 @@ if [ $DELETED_COUNT -gt 0 ]; then
 fi
 ```
 
-3. **Deduplicate:** Remove duplicate paths (using mapfile to handle spaces in paths)
+3. **Deduplicate:** Remove duplicate paths (portable — bash 3.2+ compatible, handles spaces in paths)
 ```bash
-mapfile -t REVIEW_FILES < <(printf '%s\n' "${REVIEW_FILES[@]}" | sort -u)
+DEDUPED=()
+while IFS= read -r line; do
+  [ -n "$line" ] && DEDUPED+=("$line")
+done < <(printf '%s\n' "${REVIEW_FILES[@]}" | sort -u)
+REVIEW_FILES=("${DEDUPED[@]}")
 ```
 
 4. **Sort:** Alphabetical sort for reproducible agent input (already sorted by sort -u above)
@@ -380,9 +384,9 @@ After agent completes successfully, verify REVIEW.md was created and has valid s
 ```bash
 if [ -f "${REVIEW_PATH}" ]; then
   # Validate REVIEW.md has valid YAML frontmatter with status field
-  HAS_STATUS=$(node -e "
+  HAS_STATUS=$(REVIEW_PATH="${REVIEW_PATH}" node -e "
     const fs = require('fs');
-    const content = fs.readFileSync('${REVIEW_PATH}', 'utf-8');
+    const content = fs.readFileSync(process.env.REVIEW_PATH, 'utf-8');
     const match = content.match(/^---\n([\s\S]*?)\n---/);
     if (match && /status:/.test(match[1])) { console.log('valid'); } else { console.log('invalid'); }
   " 2>/dev/null)
@@ -413,9 +417,9 @@ Extract frontmatter between `---` delimiters first to avoid matching values in t
 
 ```bash
 # Extract only the YAML frontmatter block (between first two --- lines)
-FRONTMATTER=$(node -e "
+FRONTMATTER=$(REVIEW_PATH="${REVIEW_PATH}" node -e "
   const fs = require('fs');
-  const content = fs.readFileSync('${REVIEW_PATH}', 'utf-8');
+  const content = fs.readFileSync(process.env.REVIEW_PATH, 'utf-8');
   const match = content.match(/^---\n([\s\S]*?)\n---/);
   if (match) process.stdout.write(match[1]);
 " 2>/dev/null)
@@ -483,9 +487,16 @@ grep -A 3 "^### CR-\|^### WR-" "${REVIEW_PATH}" | head -n 12
 </process>
 
 <platform_notes>
-**Windows:** This workflow uses bash features (arrays, mapfile, IFS). On Windows, it requires
+**Windows:** This workflow uses bash features (arrays, process substitution). On Windows, it requires
 Git Bash or WSL. Native PowerShell is not supported. The CI matrix (Ubuntu/macOS/Windows)
 runs under Git Bash on Windows runners, which provides bash compatibility.
+
+**macOS:** macOS ships with bash 3.2 (GPL licensing). This workflow does NOT use `mapfile` (bash 4+
+only) — all array construction uses portable `while IFS= read -r` loops compatible with bash 3.2.
+The `--files` path validation uses `realpath -m` which requires GNU coreutils (install via
+`brew install coreutils`). Without coreutils, the path guard falls back to fail-closed behavior
+(rejects paths it cannot verify), so security is maintained but valid relative paths may be rejected.
+If `--files` validation fails unexpectedly on macOS, install coreutils or use absolute paths.
 </platform_notes>
 
 <success_criteria>

@@ -634,7 +634,23 @@ If `"false"`, skip with message "Code review skipped (workflow.code_review=false
 
 **Scope files from executor's commits:**
 ```bash
-CHANGED_FILES=$(git diff --name-only HEAD~$(git log --oneline "${QUICK_DIR}/${quick_id}-SUMMARY.md" 2>/dev/null | wc -l) HEAD -- . ':!.planning' 2>/dev/null | tr '\n' ' ')
+# Find the diff base: last commit before quick task started
+# Use git log to find commits referencing the quick task id, then take the parent of the oldest
+QUICK_COMMITS=$(git log --oneline --format="%H" --grep="${quick_id}" 2>/dev/null)
+if [ -n "$QUICK_COMMITS" ]; then
+  DIFF_BASE=$(echo "$QUICK_COMMITS" | tail -1)^
+  # Verify parent exists (guard against first commit in repo)
+  git rev-parse "${DIFF_BASE}" >/dev/null 2>&1 || DIFF_BASE=$(echo "$QUICK_COMMITS" | tail -1)
+else
+  # No commits found for this quick task — skip review
+  DIFF_BASE=""
+fi
+
+if [ -n "$DIFF_BASE" ]; then
+  CHANGED_FILES=$(git diff --name-only "${DIFF_BASE}..HEAD" -- . ':!.planning' 2>/dev/null | tr '\n' ' ')
+else
+  CHANGED_FILES=""
+fi
 ```
 
 If `CHANGED_FILES` is empty, skip with "No source files changed — skipping code review."
