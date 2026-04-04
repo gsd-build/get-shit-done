@@ -19,8 +19,12 @@ if (files.length === 0) {
   process.exit(1);
 }
 
+const concurrency = process.env.TEST_CONCURRENCY
+  ? `--test-concurrency=${process.env.TEST_CONCURRENCY}`
+  : '--test-concurrency=4';
+
 try {
-  execFileSync(process.execPath, ['--test', ...files], {
+  execFileSync(process.execPath, ['--test', concurrency, ...files], {
     stdio: 'inherit',
     env: { ...process.env },
   });
