@@ -67,30 +67,26 @@ Before editing ANY file for a finding, establish safe rollback capability.
 
 **Rollback Protocol:**
 
-1. **Capture pre-fix state:** For EACH file about to be modified for this finding:
-   - Use Read tool to load FULL file content
-   - Store content in memory (e.g., `PRE_FIX_CONTENT["path/to/file"]`)
-   - Record exactly which files will be touched for this finding
+1. **Record files to touch:** Note each file path in `touched_files` before editing anything.
 
-2. **Apply fix:** Use Edit tool (preferred) for targeted changes
+2. **Apply fix:** Use Edit tool (preferred) for targeted changes.
 
-3. **Verify fix:** Apply 3-tier verification strategy (see verification_strategy)
+3. **Verify fix:** Apply 3-tier verification strategy (see verification_strategy).
 
 4. **On verification failure:**
-   - Restore ONLY the files touched for the current finding to their pre-fix contents
-   - Use Write tool with captured `PRE_FIX_CONTENT` — this is the safe rollback mechanism
-   - **DO NOT use `git checkout` or `git restore`** — these could revert unrelated staged changes or changes from prior findings
-   - Write tool with captured content ensures surgical rollback
+   - Run `git checkout -- {file}` for EACH file in `touched_files`.
+   - This is safe: the fix has NOT been committed yet (commit happens only after verification passes). `git checkout --` reverts only the uncommitted in-progress change for that file and does not affect commits from prior findings.
+   - **DO NOT use Write tool for rollback** — a partial write on tool failure leaves the file corrupted with no recovery path.
 
 5. **After rollback:**
-   - Re-read the file and confirm it matches pre-fix state
-   - Mark finding as "skipped: fix caused errors, rolled back"
-   - Document failure details in skip reason
-   - Continue with next finding
+   - Re-read the file and confirm it matches pre-fix state.
+   - Mark finding as "skipped: fix caused errors, rolled back".
+   - Document failure details in skip reason.
+   - Continue with next finding.
 
-**Rollback scope:** Per-finding only. Files modified by prior (already committed) findings are NOT touched during rollback.
+**Rollback scope:** Per-finding only. Files modified by prior (already committed) findings are NOT touched during rollback — `git checkout --` only reverts uncommitted changes.
 
-**Key constraint:** Each finding is independent. Rollback for finding N does NOT affect commits/changes from findings 1 through N-1.
+**Key constraint:** Each finding is independent. Rollback for finding N does NOT affect commits from findings 1 through N-1.
 
 </rollback_strategy>
 
@@ -270,11 +266,10 @@ For each finding in sorted order:
 - For primary file: read at least +/- 10 lines around cited line for context
 - For additional files: read full file
 
-**b. Capture pre-fix state (CRITICAL for safe rollback):**
+**b. Record files to touch (for rollback):**
 - For EVERY file about to be modified:
-  - Use Read tool to load FULL file content
-  - Store in memory: `PRE_FIX_CONTENT[file_path] = content`
-  - Record file in `touched_files` list for this finding
+  - Record file path in `touched_files` list for this finding
+  - No pre-capture needed — rollback uses `git checkout -- {file}` which is atomic
 
 **c. Determine if fix applies:**
 - Compare current code state to what reviewer described
@@ -442,7 +437,7 @@ _Iteration: {N}_
 
 **DO read the actual source file** before applying any fix — never blindly apply REVIEW.md suggestions without understanding current code state.
 
-**DO capture file state before EVERY fix attempt** — this is your rollback safety net. Use Read tool to load full file content before editing.
+**DO record which files will be touched** before every fix attempt — this is your rollback list. Rollback is `git checkout -- {file}`, not content capture.
 
 **DO commit each fix atomically** — one commit per finding, listing ALL modified files in `--files` argument.
 
@@ -455,7 +450,7 @@ _Iteration: {N}_
 
 **DO skip findings that cannot be applied cleanly** — do not force broken fixes. Mark as skipped with clear reason.
 
-**DO rollback using Write with captured content** — NEVER use `git checkout` or `git restore` for rollback. These can revert unrelated staged changes or prior fix commits.
+**DO rollback using `git checkout -- {file}`** — atomic and safe since the fix has not been committed yet. Do NOT use Write tool for rollback (partial write on tool failure corrupts the file).
 
 **DO NOT modify files unrelated to the finding** — scope each fix narrowly to the issue at hand.
 
