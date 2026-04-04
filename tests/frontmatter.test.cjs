@@ -54,21 +54,22 @@ describe('extractFrontmatter', () => {
     assert.deepStrictEqual(result.key, ['a', 'b', 'c']);
   });
 
-  test('handles quoted commas in inline arrays — REG-04 known limitation', () => {
-    // REG-04: The split(',') on line 53 does NOT respect quotes.
-    // The parser WILL split on commas inside quotes, producing wrong results.
-    // This test documents the CURRENT (buggy) behavior.
+  test('handles quoted commas in inline arrays — REG-04 fixed', () => {
     const content = '---\nkey: ["a, b", c]\n---\n';
     const result = extractFrontmatter(content);
-    // Current behavior: splits on ALL commas, producing 3 items instead of 2
-    // Expected correct behavior would be: ["a, b", "c"]
-    // Actual current behavior: ["a", "b", "c"] (split ignores quotes)
-    assert.ok(Array.isArray(result.key), 'should produce an array');
-    assert.ok(result.key.length >= 2, 'should produce at least 2 items from comma split');
-    // The bug produces ["a", "b\"", "c"] or similar — the exact output depends on
-    // how the regex strips quotes after the split.
-    // We verify the key insight: the result has MORE items than intended (known limitation).
-    assert.ok(result.key.length > 2, 'REG-04: split produces more items than intended due to quoted comma bug');
+    assert.deepStrictEqual(result.key, ['a, b', 'c']);
+  });
+
+  test('handles single-quoted commas in inline arrays', () => {
+    const content = "---\nkey: ['x, y', z]\n---\n";
+    const result = extractFrontmatter(content);
+    assert.deepStrictEqual(result.key, ['x, y', 'z']);
+  });
+
+  test('handles mixed quotes in inline arrays', () => {
+    const content = '---\nkey: ["a, b", \'c, d\', e]\n---\n';
+    const result = extractFrontmatter(content);
+    assert.deepStrictEqual(result.key, ['a, b', 'c, d', 'e']);
   });
 
   test('returns empty object for no frontmatter', () => {
