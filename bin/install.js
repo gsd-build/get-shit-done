@@ -3398,10 +3398,12 @@ function copyFlattenedCommands(srcDir, destDir, prefix, pathPrefix, runtime) {
       const globalClaudeHomeRegex = /\$HOME\/\.claude\//g;
       const localClaudeRegex = /\.\/\.claude\//g;
       const opencodeDirRegex = /~\/\.opencode\//g;
+      const kiloDirRegex = /~\/\.kilo\//g;
       content = content.replace(globalClaudeRegex, pathPrefix);
       content = content.replace(globalClaudeHomeRegex, pathPrefix);
       content = content.replace(localClaudeRegex, `./${getDirName(runtime)}/`);
       content = content.replace(opencodeDirRegex, pathPrefix);
+      content = content.replace(kiloDirRegex, pathPrefix);
       content = processAttribution(content, getCommitAttribution(runtime));
       content = runtime === 'kilo'
         ? convertClaudeToKiloFrontmatter(content)
