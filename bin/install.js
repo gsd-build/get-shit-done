@@ -5988,8 +5988,8 @@ function promptRuntime(callback) {
   const allRuntimes = ['claude', 'kilo', 'opencode', 'gemini', 'codex', 'copilot', 'antigravity', 'cursor', 'windsurf', 'augment', 'trae'];
 
   console.log(`  ${yellow}Which runtime(s) would you like to install for?${reset}\n\n  ${cyan}1${reset}) Claude Code  ${dim}(~/.claude)${reset}
-  ${cyan}2${reset}) Kilo         ${dim}(~/.config/kilo)${reset} - open source, the #1 AI coding platform on OpenRouter
-  ${cyan}3${reset}) OpenCode     ${dim}(~/.config/opencode)${reset} - open source, free models
+  ${cyan}2${reset}) Kilo         ${dim}(~/.config/kilo)${reset}
+  ${cyan}3${reset}) OpenCode     ${dim}(~/.config/opencode)${reset}
   ${cyan}4${reset}) Gemini       ${dim}(~/.gemini)${reset}
   ${cyan}5${reset}) Codex        ${dim}(~/.codex)${reset}
   ${cyan}6${reset}) Copilot      ${dim}(~/.copilot)${reset}
