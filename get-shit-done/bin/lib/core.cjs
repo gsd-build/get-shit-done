@@ -581,8 +581,8 @@ function withPlanningLock(cwd, fn) {
           }
         } catch { continue; }
 
-        // Wait and retry
-        spawnSync('sleep', ['0.1'], { stdio: 'ignore' });
+        // Wait and retry (cross-platform, no shell dependency)
+        Atomics.wait(new Int32Array(new SharedArrayBuffer(4)), 0, 0, 100);
         continue;
       }
       throw err;
