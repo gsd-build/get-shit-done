@@ -110,30 +110,6 @@ fi
 ```
 </step>
 
-<step name="check_blocking_antipatterns" priority="first">
-**MANDATORY — Check for blocking anti-patterns before any other work.**
-
-Look for a `.continue-here.md` in the current phase directory:
-
-```bash
-ls ${phase_dir}/.continue-here.md 2>/dev/null || true
-```
-
-If `.continue-here.md` exists, parse its "Critical Anti-Patterns" table for rows with `severity` = `blocking`.
-
-**If one or more `blocking` anti-patterns are found:**
-
-This step cannot be skipped. Before proceeding to `check_interactive_mode` or any other step, the agent must demonstrate understanding of each blocking anti-pattern by answering all three questions for each one:
-
-1. **What is this anti-pattern?** — Describe it in your own words, not by quoting the handoff.
-2. **How did it manifest?** — Explain the specific failure that caused it to be recorded.
-3. **What structural mechanism (not acknowledgment) prevents it?** — Name the concrete step, checklist item, or enforcement mechanism that stops recurrence.
-
-Write these answers inline before continuing. If a blocking anti-pattern cannot be answered from the context in `.continue-here.md`, stop and ask the user for clarification.
-
-**If no `.continue-here.md` exists, or no `blocking` rows are found:** Proceed directly to `check_interactive_mode`.
-</step>
-
 <step name="check_interactive_mode">
 **Parse `--interactive` flag from $ARGUMENTS.**
 
@@ -163,7 +139,7 @@ checkpoints between tasks. The user can review, modify, or redirect work at any 
 
    b. **If "Review first":** Read and display the full plan file. Ask again: Execute, Modify, Skip.
 
-   c. **If "Execute":** Read and follow `~/.claude/get-shit-done/workflows/execute-plan.md` **inline**
+   c. **If "Execute":** Read and follow `$HOME/.claude/get-shit-done/workflows/execute-plan.md` **inline**
       (do NOT spawn a subagent). Execute tasks one at a time.
 
    d. **After each task:** Pause briefly. If the user intervenes (types anything), stop and address
@@ -242,41 +218,7 @@ Execute each selected wave in sequence. Within a wave: parallel if `PARALLELIZAT
 
 **For each wave:**
 
-1. **Intra-wave files_modified overlap check (BEFORE spawning):**
-
-   Before spawning any agents for this wave, inspect the `files_modified` list of all plans
-   in the wave. Check every pair of plans in the wave — if any two plans share even one file
-   in their `files_modified` lists, those plans have an implicit dependency and MUST NOT run
-   in parallel.
-
-   **Detection algorithm (pseudocode):**
-   ```
-   seen_files = {}
-   overlapping_plans = []
-   for each plan in wave_plans:
-     for each file in plan.files_modified:
-       if file in seen_files:
-         overlapping_plans.add(plan, seen_files[file])  # both plans overlap on this file
-       else:
-         seen_files[file] = plan
-   ```
-
-   **If overlap is detected:**
-   - Warn the user:
-     ```
-     ⚠ Intra-wave files_modified overlap detected in Wave {N}:
-       Plan {A} and Plan {B} both modify {file}
-       Running these plans sequentially to avoid parallel worktree conflicts.
-     ```
-   - Override `PARALLELIZATION` to `false` for this wave only — run all plans in the wave
-     sequentially regardless of the global parallelization setting.
-   - This is a safety net for plans that were incorrectly assigned to the same wave.
-     The planner should have caught this; flag it as a planning defect so the user can
-     replan the phase if desired.
-
-   **If no overlap:** proceed normally (parallel if `PARALLELIZATION=true`).
-
-2. **Describe what's being built (BEFORE spawning):**
+1. **Describe what's being built (BEFORE spawning):**
 
    Read each plan's `<objective>`. Extract what's being built and why.
 
@@ -294,18 +236,13 @@ Execute each selected wave in sequence. Within a wave: parallel if `PARALLELIZAT
    - Bad: "Executing terrain generation plan"
    - Good: "Procedural terrain generator using Perlin noise — creates height maps, biome zones, and collision meshes. Required before vehicle physics can interact with ground."
 
-3. **Spawn executor agents:**
+2. **Spawn executor agents:**
 
    Pass paths only — executors read files themselves with their fresh context window.
    For 200k models, this keeps orchestrator context lean (~10-15%).
    For 1M+ models (Opus 4.6, Sonnet 4.6), richer context can be passed directly.
 
    **Worktree mode** (`USE_WORKTREES` is not `false`):
-
-   Before spawning, capture the current HEAD:
-   ```bash
-   EXPECTED_BASE=$(git rev-parse HEAD)
-   ```
 
    ```
    Task(
@@ -316,32 +253,8 @@ Execute each selected wave in sequence. Within a wave: parallel if `PARALLELIZAT
      prompt="
        <objective>
        Execute plan {plan_number} of phase {phase_number}-{phase_name}.
-       Commit each task atomically. Create SUMMARY.md.
-       Do NOT update STATE.md or ROADMAP.md — the orchestrator owns those writes after all worktree agents in the wave complete.
+       Commit each task atomically. Create SUMMARY.md. Update STATE.md and ROADMAP.md.
        </objective>
-
-       <worktree_branch_check>
-       FIRST ACTION before any other work: verify this worktree's branch is based on the correct commit.
-
-       Run:
-       ```bash
-       ACTUAL_BASE=$(git merge-base HEAD {EXPECTED_BASE})
-       CURRENT_HEAD=$(git rev-parse HEAD)
-       ```
-
-       If `ACTUAL_BASE` != `{EXPECTED_BASE}` (i.e. the worktree branch was created from an older
-       base such as `main` instead of the feature branch HEAD), rebase onto the correct base:
-       ```bash
-       git rebase --onto {EXPECTED_BASE} $(git rev-parse --abbrev-ref HEAD~1 2>/dev/null || git rev-parse HEAD^) HEAD 2>/dev/null || true
-       # If rebase fails or is a no-op, reset the branch to start from the correct base:
-       git reset --soft {EXPECTED_BASE}
-       ```
-
-       If `ACTUAL_BASE` == `{EXPECTED_BASE}`: the branch base is correct, proceed immediately.
-
-       This check fixes a known issue on Windows where `EnterWorktree` creates branches from
-       `main` instead of the current feature branch HEAD.
-       </worktree_branch_check>
 
        <parallel_execution>
        You are running as a PARALLEL executor agent. Use --no-verify on all git
@@ -352,10 +265,10 @@ Execute each selected wave in sequence. Within a wave: parallel if `PARALLELIZAT
        </parallel_execution>
 
        <execution_context>
-       @~/.claude/get-shit-done/workflows/execute-plan.md
-       @~/.claude/get-shit-done/templates/summary.md
-       @~/.claude/get-shit-done/references/checkpoints.md
-       @~/.claude/get-shit-done/references/tdd.md
+       @$HOME/.claude/get-shit-done/workflows/execute-plan.md
+       @$HOME/.claude/get-shit-done/templates/summary.md
+       @$HOME/.claude/get-shit-done/references/checkpoints.md
+       @$HOME/.claude/get-shit-done/references/tdd.md
        </execution_context>
 
        <files_to_read>
@@ -386,6 +299,8 @@ Execute each selected wave in sequence. Within a wave: parallel if `PARALLELIZAT
        - [ ] All tasks executed
        - [ ] Each task committed individually
        - [ ] SUMMARY.md created in plan directory
+       - [ ] STATE.md updated with position and decisions
+       - [ ] ROADMAP.md updated with plan progress (via `roadmap update-plan-progress`)
        </success_criteria>
      "
    )
@@ -402,21 +317,9 @@ Execute each selected wave in sequence. Within a wave: parallel if `PARALLELIZAT
        </sequential_execution>
    ```
 
-   The sequential mode Task prompt uses the same structure as worktree mode but with these differences in success_criteria — since there is only one agent writing at a time, there are no shared-file conflicts:
-
-   ```
-       <success_criteria>
-       - [ ] All tasks executed
-       - [ ] Each task committed individually
-       - [ ] SUMMARY.md created in plan directory
-       - [ ] STATE.md updated with position and decisions
-       - [ ] ROADMAP.md updated with plan progress (via `roadmap update-plan-progress`)
-       </success_criteria>
-   ```
-
    When worktrees are disabled, execute plans **one at a time within each wave** (sequential) regardless of the `PARALLELIZATION` setting — multiple agents writing to the same working tree concurrently would cause conflicts.
 
-4. **Wait for all agents in wave to complete.**
+3. **Wait for all agents in wave to complete.**
 
    **Completion signal fallback (Copilot and runtimes where Task() may not return):**
 
@@ -430,17 +333,17 @@ Execute each selected wave in sequence. Within a wave: parallel if `PARALLELIZAT
    ```
 
    **If SUMMARY.md exists AND commits are found:** The agent completed successfully —
-   treat as done and proceed to step 5. Log: `"✓ {Plan ID} completed (verified via spot-check — completion signal not received)"`
+   treat as done and proceed to step 4. Log: `"✓ {Plan ID} completed (verified via spot-check — completion signal not received)"`
 
    **If SUMMARY.md does NOT exist after a reasonable wait:** The agent may still be
    running or may have failed silently. Check `git log --oneline -5` for recent
    activity. If commits are still appearing, wait longer. If no activity, report
-   the plan as failed and route to the failure handler in step 6.
+   the plan as failed and route to the failure handler in step 5.
 
    **This fallback applies automatically to all runtimes.** Claude Code's Task() normally
    returns synchronously, but the fallback ensures resilience if it doesn't.
 
-5. **Post-wave hook validation (parallel mode only):**
+4. **Post-wave hook validation (parallel mode only):**
 
    When agents committed with `--no-verify`, run pre-commit hooks once after the wave:
    ```bash
@@ -450,7 +353,7 @@ Execute each selected wave in sequence. Within a wave: parallel if `PARALLELIZAT
    ```
    If hooks fail: report the failure and ask "Fix hook issues now?" or "Continue to next wave?"
 
-5.5. **Worktree cleanup (when `isolation="worktree"` was used):**
+4.5. **Worktree cleanup (when `isolation="worktree"` was used):**
 
    When executor agents ran in worktree isolation, their commits land on temporary branches in separate working trees. After the wave completes, merge these changes back and clean up:
 
@@ -483,25 +386,7 @@ Execute each selected wave in sequence. Within a wave: parallel if `PARALLELIZAT
 
    **If no worktrees found:** Skip silently — agents may have been spawned without worktree isolation.
 
-5.6. **Post-wave shared artifact update (worktree mode only):**
-
-   When executor agents ran with `isolation="worktree"`, they skipped STATE.md and ROADMAP.md updates to avoid last-merge-wins overwrites. The orchestrator is the single writer for these files. After worktrees are merged back, update shared artifacts once:
-
-   ```bash
-   # Update ROADMAP.md for each completed plan in this wave
-   for PLAN_ID in ${WAVE_PLAN_IDS}; do
-     node "$HOME/.claude/get-shit-done/bin/gsd-tools.cjs" roadmap update-plan-progress "${PHASE_NUMBER}" "${PLAN_ID}" completed
-   done
-
-   # Update STATE.md position to reflect the last completed plan in this wave
-   node "$HOME/.claude/get-shit-done/bin/gsd-tools.cjs" state update-position --phase "${PHASE_NUMBER}" --plan "${LAST_PLAN_ID}"
-   ```
-
-   Where `WAVE_PLAN_IDS` is the space-separated list of plan IDs that completed in this wave, and `LAST_PLAN_ID` is the last plan ID in the wave (used to set current position).
-
-   **If `workflow.use_worktrees` is `false`:** Sequential agents already updated STATE.md and ROADMAP.md themselves — skip this step.
-
-6. **Report completion — spot-check claims first:**
+5. **Report completion — spot-check claims first:**
 
    For each SUMMARY.md:
    - Verify first 2 files from `key-files.created` exist on disk
@@ -526,13 +411,13 @@ Execute each selected wave in sequence. Within a wave: parallel if `PARALLELIZAT
    - Bad: "Wave 2 complete. Proceeding to Wave 3."
    - Good: "Terrain system complete — 3 biome types, height-based texturing, physics collision meshes. Vehicle physics (Wave 3) can now reference ground surfaces."
 
-7. **Handle failures:**
+5. **Handle failures:**
 
-   **Known Claude Code bug (classifyHandoffIfNeeded):** If an agent reports "failed" with error containing `classifyHandoffIfNeeded is not defined`, this is a Claude Code runtime bug — not a GSD or agent issue. The error fires in the completion handler AFTER all tool calls finish. In this case: run the same spot-checks as step 5 (SUMMARY.md exists, git commits present, no Self-Check: FAILED). If spot-checks PASS → treat as **successful**. If spot-checks FAIL → treat as real failure below.
+   **Known Claude Code bug (classifyHandoffIfNeeded):** If an agent reports "failed" with error containing `classifyHandoffIfNeeded is not defined`, this is a Claude Code runtime bug — not a GSD or agent issue. The error fires in the completion handler AFTER all tool calls finish. In this case: run the same spot-checks as step 4 (SUMMARY.md exists, git commits present, no Self-Check: FAILED). If spot-checks PASS → treat as **successful**. If spot-checks FAIL → treat as real failure below.
 
    For real failures: report which plan failed → ask "Continue?" or "Stop?" → if continue, dependent plans may also fail. If stop, partial completion report.
 
-7b. **Pre-wave dependency check (waves 2+ only):**
+5b. **Pre-wave dependency check (waves 2+ only):**
 
     Before spawning wave N+1, for each plan in the upcoming wave:
     ```bash
@@ -553,9 +438,9 @@ Execute each selected wave in sequence. Within a wave: parallel if `PARALLELIZAT
 
     Key-links referencing files in the CURRENT (upcoming) wave are skipped.
 
-8. **Execute checkpoint plans between waves** — see `<checkpoint_handling>`.
+6. **Execute checkpoint plans between waves** — see `<checkpoint_handling>`.
 
-9. **Proceed to next wave.**
+7. **Proceed to next wave.**
 </step>
 
 <step name="checkpoint_handling">
@@ -645,6 +530,9 @@ If `SECURITY_CFG` is `true` AND SECURITY.md exists: check frontmatter `threats_o
 ⚠ Security gate: {threats_open} threats open
   /gsd:secure-phase {PHASE} — resolve before advancing
 ```
+
+**IMPORTANT — Next step after aggregate_results:**
+Proceed to `handle_partial_wave_execution`, then `code_review_gate`, then `close_parent_artifacts`, then `regression_gate`, then `verify_phase_goal`. Do NOT skip directly to verify_phase_goal.
 </step>
 
 <step name="handle_partial_wave_execution">
@@ -676,6 +564,45 @@ Selected wave finished successfully. This phase still has incomplete plans, so p
 **If no incomplete plans remain after the selected wave finishes:**
 - continue with the normal phase-level verification and completion flow below
 - this means the selected wave happened to be the last remaining work in the phase
+</step>
+
+<step name="code_review_gate" required="true">
+**This step is REQUIRED and must not be skipped.** Auto-invoke code review on the phase's source changes. Advisory only — never blocks execution flow.
+
+**Config gate:**
+```bash
+CODE_REVIEW_ENABLED=$(node "$HOME/.claude/get-shit-done/bin/gsd-tools.cjs" config-get workflow.code_review 2>/dev/null || echo "true")
+```
+
+If `CODE_REVIEW_ENABLED` is `"false"`: display "Code review skipped (workflow.code_review=false)" and proceed to next step.
+
+**Invoke review:**
+```
+Skill(skill="gsd:code-review", args="${PHASE_NUMBER}")
+```
+
+**Check results using deterministic path (not glob):**
+```bash
+PADDED=$(printf "%02d" "${PHASE_NUMBER}")
+REVIEW_FILE="${PHASE_DIR}/${PADDED}-REVIEW.md"
+```
+
+If `REVIEW_FILE` exists, parse status from frontmatter only (between first `---` delimiters):
+```bash
+REVIEW_STATUS=$(sed -n '/^---$/,/^---$/p' "$REVIEW_FILE" | grep "^status:" | head -1 | cut -d: -f2 | tr -d ' ')
+```
+
+If REVIEW_STATUS is not "clean" and not "skipped" and not empty, display:
+```
+Code review found issues. Consider running:
+/gsd:code-review-fix ${PHASE_NUMBER}
+```
+
+Per D-02: Do NOT auto-chain code-review-fix. Only suggest it.
+
+**Error handling:** If the Skill invocation fails or throws, catch the error, display "Code review encountered an error (non-blocking): {error}" and proceed to next step. Review failures must never block execution.
+
+Regardless of review result, ALWAYS proceed to the next step.
 </step>
 
 <step name="close_parent_artifacts">
@@ -1087,7 +1014,7 @@ STOP. Do not proceed to auto-advance or transition.
 
 Execute the transition workflow inline (do NOT use Task — orchestrator context is ~10-15%, transition needs phase completion data already in context):
 
-Read and follow `~/.claude/get-shit-done/workflows/transition.md`, passing through the `--auto` flag so it propagates to the next phase invocation.
+Read and follow `$HOME/.claude/get-shit-done/workflows/transition.md`, passing through the `--auto` flag so it propagates to the next phase invocation.
 
 **If none of `--auto`, `AUTO_CHAIN`, or `AUTO_CFG` is true:**
 
