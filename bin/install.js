@@ -4255,7 +4255,7 @@ function uninstall(isGlobal, runtime = 'claude') {
   // 4. Remove GSD hooks
   const hooksDir = path.join(targetDir, 'hooks');
   if (fs.existsSync(hooksDir)) {
-    const gsdHooks = ['gsd-statusline.js', 'gsd-check-update.js', 'gsd-check-update.sh', 'gsd-context-monitor.js', 'gsd-prompt-guard.js', 'gsd-session-state.sh', 'gsd-validate-commit.sh', 'gsd-phase-boundary.sh'];
+    const gsdHooks = ['gsd-statusline.js', 'gsd-check-update.js', 'gsd-check-update.sh', 'gsd-context-monitor.js', 'gsd-prompt-guard.js', 'gsd-read-guard.js', 'gsd-session-state.sh', 'gsd-validate-commit.sh', 'gsd-phase-boundary.sh'];
     let hookCount = 0;
     for (const hook of gsdHooks) {
       const hookPath = path.join(hooksDir, hook);
@@ -4357,7 +4357,7 @@ function uninstall(isGlobal, runtime = 'claude') {
         settings.hooks[eventName] = settings.hooks[eventName].filter(entry => {
           if (entry.hooks && Array.isArray(entry.hooks)) {
             const hasGsdHook = entry.hooks.some(h =>
-              h.command && h.command.includes('gsd-prompt-guard')
+              h.command && (h.command.includes('gsd-prompt-guard') || h.command.includes('gsd-read-guard'))
             );
             return !hasGsdHook;
           }
@@ -4365,7 +4365,7 @@ function uninstall(isGlobal, runtime = 'claude') {
         });
         if (settings.hooks[eventName].length < before) {
           settingsModified = true;
-          console.log(`  ${green}✓${reset} Removed prompt injection guard hook from settings`);
+          console.log(`  ${green}✓${reset} Removed GSD pre-tool guard hooks from settings`);
         }
         if (settings.hooks[eventName].length === 0) {
           delete settings.hooks[eventName];
@@ -5381,6 +5381,9 @@ function install(isGlobal, runtime = 'claude') {
   const promptGuardCommand = isGlobal
     ? buildHookCommand(targetDir, 'gsd-prompt-guard.js')
     : 'node ' + dirName + '/hooks/gsd-prompt-guard.js';
+  const readGuardCommand = isGlobal
+    ? buildHookCommand(targetDir, 'gsd-read-guard.js')
+    : 'node ' + dirName + '/hooks/gsd-read-guard.js';
 
   // Enable experimental agents for Gemini CLI (required for custom sub-agents)
   if (isGemini) {
@@ -5484,6 +5487,27 @@ function install(isGlobal, runtime = 'claude') {
         ]
       });
       console.log(`  ${green}✓${reset} Configured prompt injection guard hook`);
+    }
+
+    // Configure PreToolUse hook for read-before-edit guidance (#1628)
+    // Prevents infinite retry loops when non-Claude models attempt to edit
+    // files without reading them first. Advisory-only — does not block.
+    const hasReadGuardHook = settings.hooks[preToolEvent].some(entry =>
+      entry.hooks && entry.hooks.some(h => h.command && h.command.includes('gsd-read-guard'))
+    );
+
+    if (!hasReadGuardHook) {
+      settings.hooks[preToolEvent].push({
+        matcher: 'Write|Edit',
+        hooks: [
+          {
+            type: 'command',
+            command: readGuardCommand,
+            timeout: 5
+          }
+        ]
+      });
+      console.log(`  ${green}✓${reset} Configured read-before-edit guard hook`);
     }
 
     // Community hooks — registered on install but opt-in at runtime.
