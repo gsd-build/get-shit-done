@@ -871,6 +871,19 @@ If `TEXT_MODE` is true, present as a plain-text numbered list (options already s
 
 ## 14. Present Final Status
 
+**Update STATE.md for plan completion:**
+```bash
+PLAN_COUNT=$(ls -1 ${PHASE_DIR}/*-PLAN.md 2>/dev/null | wc -l | tr -d ' ')
+node "$HOME/.claude/get-shit-done/bin/gsd-tools.cjs" state update "Status" "Phase ${PHASE} planned — ready to execute"
+node "$HOME/.claude/get-shit-done/bin/gsd-tools.cjs" state update "Last Activity" "$(date +%Y-%m-%d)"
+node "$HOME/.claude/get-shit-done/bin/gsd-tools.cjs" state update "Last Activity Description" "Phase ${PHASE} planning complete (${PLAN_COUNT} plans)"
+```
+
+Commit the state update:
+```bash
+node "$HOME/.claude/get-shit-done/bin/gsd-tools.cjs" commit "docs(state): record phase ${PHASE} planning complete" --files .planning/STATE.md
+```
+
 Route to `<offer_next>` OR `auto_advance` depending on flags/config.
 
 ## 15. Auto-Advance Check
