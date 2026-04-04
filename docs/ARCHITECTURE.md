@@ -113,7 +113,7 @@ User-facing entry points. Each file contains YAML frontmatter (name, description
 - **Copilot:** Slash commands (`/gsd-command-name`)
 - **Antigravity:** Skills
 
-**Total commands:** 44
+**Total commands:** 60
 
 ### Workflows (`get-shit-done/workflows/*.md`)
 
@@ -124,7 +124,7 @@ Orchestration logic that commands reference. Contains the step-by-step process i
 - State update patterns
 - Error handling and recovery
 
-**Total workflows:** 46
+**Total workflows:** 60
 
 ### Agents (`agents/*.md`)
 
@@ -134,29 +134,45 @@ Specialized agent definitions with frontmatter specifying:
 - `tools` — Allowed tool access (Read, Write, Edit, Bash, Grep, Glob, WebSearch, etc.)
 - `color` — Terminal output color for visual distinction
 
-**Total agents:** 16
+**Total agents:** 21
 
 ### References (`get-shit-done/references/*.md`)
 
-Shared knowledge documents that workflows and agents `@-reference`:
+Shared knowledge documents that workflows and agents `@-reference` (25 total):
+
+**Core references:**
 - `checkpoints.md` — Checkpoint type definitions and interaction patterns
 - `model-profiles.md` — Per-agent model tier assignments
+- `model-profile-resolution.md` — Model resolution algorithm documentation
 - `verification-patterns.md` — How to verify different artifact types
 - `planning-config.md` — Full config schema and behavior
 - `git-integration.md` — Git commit, branching, and history patterns
+- `git-planning-commit.md` — Planning directory commit conventions
 - `questioning.md` — Dream extraction philosophy for project initialization
 - `tdd.md` — Test-driven development integration patterns
 - `ui-brand.md` — Visual output formatting patterns
 
-### Modular Planner Decomposition
+**Workflow references:**
+- `agent-contracts.md` — Formal interface between orchestrators and agents
+- `context-budget.md` — Context window budget allocation rules
+- `continuation-format.md` — Session continuation/resume format
+- `domain-probes.md` — Domain-specific probing questions for discuss-phase
+- `gate-prompts.md` — Gate/checkpoint prompt templates
+- `revision-loop.md` — Plan revision iteration patterns
+- `universal-anti-patterns.md` — Common anti-patterns to detect and avoid
+- `artifact-types.md` — Planning artifact type definitions
+- `phase-argument-parsing.md` — Phase argument parsing conventions
+- `decimal-phase-calculation.md` — Decimal sub-phase numbering rules
+- `workstream-flag.md` — Workstream active pointer conventions
+- `user-profiling.md` — User behavioral profiling methodology
 
-The planner agent (`agents/gsd-planner.md`) was decomposed from a single monolithic file into a core agent plus reference modules to stay under the 50K character limit imposed by some runtimes. The planner now `@-references` specialized modules:
+**Modular planner decomposition:**
+
+The planner agent (`agents/gsd-planner.md`) was decomposed from a single monolithic file into a core agent plus reference modules to stay under the 50K character limit imposed by some runtimes:
 
 - `planner-gap-closure.md` — Gap closure mode behavior (reads VERIFICATION.md, targeted replanning)
 - `planner-reviews.md` — Cross-AI review integration (reads REVIEWS.md from `/gsd-review`)
 - `planner-revision.md` — Plan revision patterns for iterative refinement
-
-This keeps the base planner prompt under the character budget while preserving full functionality through on-demand reference loading.
 
 ### Templates (`get-shit-done/templates/`)
 
@@ -181,12 +197,14 @@ Runtime hooks that integrate with the host AI agent:
 | `gsd-check-update.js` | `SessionStart` | Background check for new GSD versions |
 | `gsd-prompt-guard.js` | `PreToolUse` | Scans `.planning/` writes for prompt injection patterns (advisory) |
 | `gsd-workflow-guard.js` | `PreToolUse` | Detects file edits outside GSD workflow context (advisory, opt-in via `hooks.workflow_guard`) |
-| `gsd-read-before-edit.js` | `PreToolUse` | Advisory guard preventing Edit/Write on files not yet read in the session (v1.32) |
-| `gsd-commit-docs.js` | `PreToolUse` | Guard for `commit_docs` enforcement (v1.32) |
+| `gsd-read-guard.js` | `PreToolUse` | Advisory guard preventing Edit/Write on files not yet read in the session |
+| `gsd-session-state.sh` | `PostToolUse` | Session state tracking for shell-based runtimes |
+| `gsd-validate-commit.sh` | `PostToolUse` | Commit validation for conventional commit enforcement |
+| `gsd-phase-boundary.sh` | `PostToolUse` | Phase boundary detection for workflow transitions |
 
 ### CLI Tools (`get-shit-done/bin/`)
 
-Node.js CLI utility (`gsd-tools.cjs`) with 17 domain modules:
+Node.js CLI utility (`gsd-tools.cjs`) with 19 domain modules:
 
 | Module | Responsibility |
 |--------|---------------|
@@ -204,6 +222,11 @@ Node.js CLI utility (`gsd-tools.cjs`) with 17 domain modules:
 | `model-profiles.cjs` | Model profile resolution table |
 | `security.cjs` | Path traversal prevention, prompt injection detection, safe JSON parsing, shell argument validation |
 | `uat.cjs` | UAT file parsing, verification debt tracking, audit-uat support |
+| `docs.cjs` | Docs-update workflow init, Markdown scanning, monorepo detection |
+| `workstream.cjs` | Workstream CRUD, migration, session-scoped active pointer |
+| `schema-detect.cjs` | Schema-drift detection for ORM patterns (Prisma, Drizzle, etc.) |
+| `profile-pipeline.cjs` | User behavioral profiling data pipeline, session file scanning |
+| `profile-output.cjs` | Profile rendering, USER-PROFILE.md and dev-preferences.md generation |
 
 ---
 
@@ -243,7 +266,10 @@ Orchestrator (workflow .md)
 | **Verifiers** | gsd-verifier | Sequential (after all executors complete) |
 | **Mappers** | gsd-codebase-mapper | 4 parallel (tech, arch, quality, concerns) |
 | **Debuggers** | gsd-debugger | Sequential (interactive) |
-| **Auditors** | gsd-ui-auditor | Sequential |
+| **Auditors** | gsd-ui-auditor, gsd-security-auditor | Sequential |
+| **Doc Writers** | gsd-doc-writer, gsd-doc-verifier | Sequential (writer then verifier) |
+| **Profilers** | gsd-user-profiler | Sequential |
+| **Analyzers** | gsd-assumptions-analyzer | Sequential (during discuss-phase) |
 
 ### Wave Execution Model
 
@@ -369,14 +395,14 @@ UI-SPEC.md (per phase) ───────────────────
 
 ```
 ~/.claude/                          # Claude Code (global install)
-├── commands/gsd/*.md               # 37 slash commands
+├── commands/gsd/*.md               # 60 slash commands
 ├── get-shit-done/
 │   ├── bin/gsd-tools.cjs           # CLI utility
-│   ├── bin/lib/*.cjs               # 15 domain modules
-│   ├── workflows/*.md              # 42 workflow definitions
-│   ├── references/*.md             # 13 shared reference docs
+│   ├── bin/lib/*.cjs               # 19 domain modules
+│   ├── workflows/*.md              # 60 workflow definitions
+│   ├── references/*.md             # 25 shared reference docs
 │   └── templates/                  # Planning artifact templates
-├── agents/*.md                     # 15 agent definitions
+├── agents/*.md                     # 21 agent definitions
 ├── hooks/
 │   ├── gsd-statusline.js           # Statusline hook
 │   ├── gsd-context-monitor.js      # Context warning hook
