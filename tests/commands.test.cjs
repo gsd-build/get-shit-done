@@ -3,7 +3,7 @@
  */
 
 const { test, describe, beforeEach, afterEach } = require('node:test');
-const assert = require('node:assert');
+const assert = require('node:assert/strict');
 const { execSync } = require('node:child_process');
 const fs = require('fs');
 const path = require('path');

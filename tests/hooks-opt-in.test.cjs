@@ -9,7 +9,7 @@
  */
 
 const { test, describe, beforeEach, afterEach } = require('node:test');
-const assert = require('node:assert');
+const assert = require('node:assert/strict');
 const fs = require('fs');
 const path = require('path');
 const os = require('os');
@@ -234,25 +234,22 @@ describe('opt-in gating behavior', { skip: isWindows ? 'bash hooks require unix 
     assert.strictEqual(result.status, 0, `Should be no-op when disabled, got ${result.status}`);
   });
 
-  test('validate-commit is a no-op when config.json is absent', () => {
+  test('validate-commit is a no-op when config.json is absent', (t) => {
     // No config.json at all
     const bareDir = fs.mkdtempSync(path.join(os.tmpdir(), 'gsd-hook-bare-'));
+    t.after(() => { fs.rmSync(bareDir, { recursive: true, force: true }); });
     const hookPath = path.join(HOOKS_DIR, 'gsd-validate-commit.sh');
     const input = JSON.stringify({
       tool_input: { command: 'git commit -m "WIP save"' }
     });
 
-    try {
-      const result = spawnHook(hookPath, {
-        input,
-        encoding: 'utf-8',
-        cwd: bareDir,
-      });
+    const result = spawnHook(hookPath, {
+      input,
+      encoding: 'utf-8',
+      cwd: bareDir,
+    });
 
-      assert.strictEqual(result.status, 0, `Should be no-op without config.json, got ${result.status}`);
-    } finally {
-      fs.rmSync(bareDir, { recursive: true, force: true });
-    }
+    assert.strictEqual(result.status, 0, `Should be no-op without config.json, got ${result.status}`);
   });
 
   test('session-state is a no-op when hooks.community is false', () => {
@@ -375,28 +372,25 @@ describe('hook execution when enabled', { skip: isWindows ? 'bash hooks require 
     );
   });
 
-  test('session-state exits 0 without .planning/ (in enabled project)', () => {
+  test('session-state exits 0 without .planning/ (in enabled project)', (t) => {
     // Create a dir with config but no STATE.md
     const noStateDir = fs.mkdtempSync(path.join(os.tmpdir(), 'gsd-hook-nostate-'));
+    t.after(() => { fs.rmSync(noStateDir, { recursive: true, force: true }); });
     fs.mkdirSync(path.join(noStateDir, '.planning'), { recursive: true });
     writeConfigWithHooks(noStateDir, true);
     const hookPath = path.join(HOOKS_DIR, 'gsd-session-state.sh');
 
-    try {
-      const result = spawnHook(hookPath, {
-        input: '',
-        encoding: 'utf-8',
-        cwd: noStateDir,
-      });
+    const result = spawnHook(hookPath, {
+      input: '',
+      encoding: 'utf-8',
+      cwd: noStateDir,
+    });
 
-      assert.strictEqual(result.status, 0, `Should exit 0: ${result.stderr}`);
-      assert.ok(
-        result.stdout.includes('No .planning/ found') || result.stdout.includes('Project State'),
-        `Should handle missing STATE.md gracefully: ${result.stdout}`
-      );
-    } finally {
-      fs.rmSync(noStateDir, { recursive: true, force: true });
-    }
+    assert.strictEqual(result.status, 0, `Should exit 0: ${result.stderr}`);
+    assert.ok(
+      result.stdout.includes('No .planning/ found') || result.stdout.includes('Project State'),
+      `Should handle missing STATE.md gracefully: ${result.stdout}`
+    );
   });
 
   test('phase-boundary detects .planning/ writes when enabled', () => {

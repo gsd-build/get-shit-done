@@ -11,7 +11,7 @@
  */
 
 const { test, describe } = require('node:test');
-const assert = require('node:assert');
+const assert = require('node:assert/strict');
 
 process.env.GSD_TEST_MODE = '1';
 const {

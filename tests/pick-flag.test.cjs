@@ -6,7 +6,7 @@
  */
 
 const { test, describe } = require('node:test');
-const assert = require('node:assert');
+const assert = require('node:assert/strict');
 const { runGsdTools } = require('./helpers.cjs');
 
 // ─── --pick flag ─────────────────────────────────────────────────────────────

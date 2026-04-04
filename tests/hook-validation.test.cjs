@@ -10,7 +10,7 @@
 process.env.GSD_TEST_MODE = '1';
 
 const { test, describe } = require('node:test');
-const assert = require('node:assert');
+const assert = require('node:assert/strict');
 const { validateHookFields } = require('../bin/install.js');
 
 // ─── Helpers ────────────────────────────────────────────────────────────────

@@ -9,7 +9,7 @@
 process.env.GSD_TEST_MODE = '1';
 
 const { test, describe, before } = require('node:test');
-const assert = require('node:assert');
+const assert = require('node:assert/strict');
 const fs = require('fs');
 const path = require('path');
 const { execFileSync } = require('child_process');
