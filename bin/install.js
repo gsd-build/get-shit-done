@@ -3740,6 +3740,9 @@ function copyCommandsAsClaudeSkills(srcDir, skillsDir, prefix, pathPrefix, runti
       fs.mkdirSync(skillDir, { recursive: true });
 
       let content = fs.readFileSync(srcPath, 'utf8');
+      // Rewrite paths for local installs (global: pathPrefix is ~/.claude/ — no-op)
+      content = content.replace(/~\/\.claude\//g, pathPrefix);
+      content = content.replace(/\$HOME\/\.claude\//g, pathPrefix);
       content = processAttribution(content, getCommitAttribution('claude'));
       content = convertClaudeCommandToClaudeSkill(content, skillName);
 
