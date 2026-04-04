@@ -32,9 +32,7 @@ CONTEXT_WINDOW=$(node "$HOME/.claude/get-shit-done/bin/gsd-tools.cjs" config-get
 
 When `CONTEXT_WINDOW >= 500000`, the planner prompt includes prior phase CONTEXT.md files so cross-phase decisions are consistent (e.g., "use library X for all data fetching" from Phase 2 is visible to Phase 5's planner).
 
-Parse JSON for: `researcher_model`, `planner_model`, `checker_model`, `research_enabled`, `plan_checker_enabled`, `nyquist_validation_enabled`, `commit_docs`, `text_mode`, `phase_found`, `phase_dir`, `phase_number`, `phase_name`, `phase_slug`, `padded_phase`, `has_research`, `has_context`, `has_reviews`, `has_plans`, `plan_count`, `planning_exists`, `roadmap_exists`, `phase_req_ids`, `response_language`.
-
-**If `response_language` is set:** Include `response_language: {value}` in all spawned subagent prompts so any user-facing output stays in the configured language.
+Parse JSON for: `researcher_model`, `planner_model`, `checker_model`, `research_enabled`, `plan_checker_enabled`, `nyquist_validation_enabled`, `commit_docs`, `text_mode`, `phase_found`, `phase_dir`, `phase_number`, `phase_name`, `phase_slug`, `padded_phase`, `has_research`, `has_context`, `has_reviews`, `has_plans`, `plan_count`, `planning_exists`, `roadmap_exists`, `phase_req_ids`.
 
 **File paths (for <files_to_read> blocks):** `state_path`, `roadmap_path`, `requirements_path`, `context_path`, `research_path`, `verification_path`, `uat_path`, `reviews_path`. These are null if files don't exist.
 
@@ -89,6 +87,8 @@ PHASE_INFO=$(node "$HOME/.claude/get-shit-done/bin/gsd-tools.cjs" roadmap get-ph
 
 **If `--prd <filepath>` provided:**
 
+> **DEPRECATED:** The `--prd` flag on `/gsd-plan-phase` is deprecated. Use `/gsd-import --prd <filepath>` instead, which provides conflict detection, validation, and full roadmap generation from PRDs. This flag is preserved for backwards compatibility but will be removed in a future version.
+
 1. Read the PRD file:
 ```bash
 PRD_CONTENT=$(cat "$PRD_FILE" 2>/dev/null)
@@ -101,7 +101,7 @@ fi
 2. Display banner:
 ```
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
- GSD ► PRD EXPRESS PATH
+ GSD ► PRD EXPRESS PATH (deprecated — use /gsd-import --prd)
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
 Using PRD: {PRD_FILE}
@@ -421,26 +421,6 @@ UI_SPEC_FILE=$(ls "${PHASE_DIR}"/*-UI-SPEC.md 2>/dev/null | head -1)
 
 **If UI-SPEC.md missing AND `UI_GATE_CFG` is `true`:**
 
-Read auto-chain state:
-```bash
-AUTO_CHAIN=$(node "$HOME/.claude/get-shit-done/bin/gsd-tools.cjs" config-get workflow._auto_chain_active 2>/dev/null || echo "false")
-```
-
-**If `AUTO_CHAIN` is `true` (running inside a `--chain` or `--auto` pipeline):**
-
-Auto-generate UI-SPEC without prompting:
-```
-Skill(skill="gsd-ui-phase", args="${PHASE} --auto ${GSD_WS}")
-```
-After `gsd-ui-phase` returns, re-read:
-```bash
-UI_SPEC_FILE=$(ls "${PHASE_DIR}"/*-UI-SPEC.md 2>/dev/null | head -1)
-UI_SPEC_PATH="${UI_SPEC_FILE}"
-```
-Continue to step 6.
-
-**If `AUTO_CHAIN` is `false` (manual invocation):**
-
 If `TEXT_MODE` is true, present as a plain-text numbered list:
 ```
 Phase {N} has frontend indicators but no UI-SPEC.md. Generate a design contract before planning?
@@ -575,10 +555,40 @@ Proceed to Step 8 only if user selects 2 or 3.
 
 ## 8. Spawn gsd-planner Agent
 
+Resolve status line values before displaying the banner:
+```bash
+MODEL_PROFILE=$(node "$HOME/.claude/get-shit-done/bin/gsd-tools.cjs" config-get model_profile 2>/dev/null || echo "balanced")
+CONTEXT_TIER="PEAK"  # Derive from current context usage: PEAK (<30%), GOOD (30-50%), DEGRADING (50-70%), POOR (70%+)
+```
+
+Resolve learnings paths for planner injection:
+```bash
+LEARNINGS_ENABLED=$(node "$HOME/.claude/get-shit-done/bin/gsd-tools.cjs" config-get features.learnings 2>/dev/null || echo "false")
+if [[ "$LEARNINGS_ENABLED" == "true" ]]; then
+  LEARNINGS_FILES=$(ls .planning/phases/*/[0-9][0-9]-LEARNINGS.md 2>/dev/null | sort)
+  LEARNINGS_PATHS=""
+  for f in $LEARNINGS_FILES; do
+    LEARNINGS_PATHS+="- $f (Prior phase learnings — patterns and pitfalls)\n"
+  done
+fi
+```
+
+Resolve intel paths for planner enrichment:
+```bash
+INTEL_ENABLED=$(node -e "try{const c=JSON.parse(require('fs').readFileSync('.planning/config.json','utf8'));console.log(c.intel&&c.intel.enabled?'true':'false')}catch(e){console.log('false')}")
+INTEL_PATHS=""
+if [[ "$INTEL_ENABLED" == "true" ]] && [[ -d ".planning/intel" ]]; then
+  for f in .planning/intel/*.json .planning/intel/arch.md; do
+    [[ -f "$f" ]] && INTEL_PATHS+="- $f (Codebase intelligence — queryable index)\n"
+  done
+fi
+```
+
 Display banner:
 ```
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
  GSD ► PLANNING PHASE {X}
+ Phase {X}: {phase_name} | {MODEL_PROFILE} | {CONTEXT_TIER}
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
 ◆ Spawning planner...
@@ -601,10 +611,22 @@ Planner prompt:
 - {uat_path} (UAT Gaps - if --gaps)
 - {reviews_path} (Cross-AI Review Feedback - if --reviews)
 - {UI_SPEC_PATH} (UI Design Contract — visual/interaction specs, if exists)
+${INTEL_PATHS ? `
+**Codebase intelligence (auto-injected when intel.enabled):**
+${INTEL_PATHS}
+` : ''}
+${LEARNINGS_PATHS ? `
+**Prior phase learnings (auto-injected when features.learnings enabled):**
+${LEARNINGS_PATHS}
+` : ''}
 ${CONTEXT_WINDOW >= 500000 ? `
 **Cross-phase context (1M model enrichment):**
 - Prior phase CONTEXT.md files (locked decisions from earlier phases — maintain consistency)
 - Prior phase SUMMARY.md files (what was actually built — reuse patterns, avoid duplication)
+` : ''}
+${LEARNINGS_ENABLED === 'true' ? `
+**Prior phase learnings (if available):**
+${LEARNINGS_PATHS}
 ` : ''}
 </files_to_read>
 
@@ -772,10 +794,23 @@ Task(
 ## 12. Revision Loop (Max 3 Iterations)
 
 Track `iteration_count` (starts at 1 after initial plan + check).
+Track `prev_issue_count` (initialized to `Infinity` before the loop begins).
 
 **If iteration_count < 3:**
 
-Display: `Sending back to planner for revision... (iteration {N}/3)`
+Parse issue count from checker return: count BLOCKER + WARNING entries in the YAML issues block (structured output from gsd-plan-checker, per revision-loop.md lines 43-45).
+
+Display: `Revision iteration {N}/3 -- {blocker_count} blockers, {warning_count} warnings`
+
+**Stall detection:** If `issue_count >= prev_issue_count`:
+  Display: `Revision loop stalled — issue count not decreasing ({issue_count} issues remain after {N} iterations)`
+  Escalate using `yes-no` gate from gate-prompts.md:
+    Question: "Issues remain after {N} revision attempts with no progress. Proceed with current output?"
+    Options: "Proceed anyway" | "Adjust approach"
+  If "Proceed anyway": accept current plans and continue to step 13.
+  If "Adjust approach": open freeform discussion, then re-enter step 8 (full replanning).
+
+Set `prev_issue_count = issue_count`.
 
 Revision prompt:
 
@@ -869,16 +904,6 @@ Options:
 
 If `TEXT_MODE` is true, present as a plain-text numbered list (options already shown in the block above). Otherwise use AskUserQuestion to present the options.
 
-## 13b. Record Planning Completion in STATE.md
-
-After plans pass all gates, record that planning is complete so STATE.md reflects the new phase status:
-
-```bash
-node "$HOME/.claude/get-shit-done/bin/gsd-tools.cjs" state planned-phase --phase "${PHASE_NUMBER}" --name "${PHASE_NAME}" --plans "${PLAN_COUNT}"
-```
-
-This updates STATUS to "Ready to execute", sets the correct plan count, and timestamps Last Activity.
-
 ## 14. Present Final Status
 
 Route to `<offer_next>` OR `auto_advance` depending on flags/config.
@@ -887,10 +912,10 @@ Route to `<offer_next>` OR `auto_advance` depending on flags/config.
 
 Check for auto-advance trigger:
 
-1. Parse `--auto` and `--chain` flags from $ARGUMENTS
-2. **Sync chain flag with intent** — if user invoked manually (no `--auto` and no `--chain`), clear the ephemeral chain flag from any previous interrupted `--auto` chain. This does NOT touch `workflow.auto_advance` (the user's persistent settings preference):
+1. Parse `--auto` flag from $ARGUMENTS
+2. **Sync chain flag with intent** — if user invoked manually (no `--auto`), clear the ephemeral chain flag from any previous interrupted `--auto` chain. This does NOT touch `workflow.auto_advance` (the user's persistent settings preference):
    ```bash
-   if [[ ! "$ARGUMENTS" =~ --auto ]] && [[ ! "$ARGUMENTS" =~ --chain ]]; then
+   if [[ ! "$ARGUMENTS" =~ --auto ]]; then
      node "$HOME/.claude/get-shit-done/bin/gsd-tools.cjs" config-set workflow._auto_chain_active false 2>/dev/null
    fi
    ```
@@ -900,14 +925,7 @@ Check for auto-advance trigger:
    AUTO_CFG=$(node "$HOME/.claude/get-shit-done/bin/gsd-tools.cjs" config-get workflow.auto_advance 2>/dev/null || echo "false")
    ```
 
-**If `--auto` or `--chain` flag present AND `AUTO_CHAIN` is not true:** Persist chain flag to config (handles direct invocation without prior discuss-phase):
-```bash
-if ([[ "$ARGUMENTS" =~ --auto ]] || [[ "$ARGUMENTS" =~ --chain ]]) && [[ "$AUTO_CHAIN" != "true" ]]; then
-  node "$HOME/.claude/get-shit-done/bin/gsd-tools.cjs" config-set workflow._auto_chain_active true
-fi
-```
-
-**If `--auto` or `--chain` flag present OR `AUTO_CHAIN` is true OR `AUTO_CFG` is true:**
+**If `--auto` flag present OR `AUTO_CHAIN` is true OR `AUTO_CFG` is true:**
 
 Display banner:
 ```
@@ -920,7 +938,7 @@ Plans ready. Launching execute-phase...
 
 Launch execute-phase using the Skill tool to avoid nested Task sessions (which cause runtime freezes due to deep agent nesting):
 ```
-Skill(skill="gsd-execute-phase", args="${PHASE} --auto --no-transition ${GSD_WS}")
+Skill(skill="gsd:execute-phase", args="${PHASE} --auto --no-transition ${GSD_WS}")
 ```
 
 The `--no-transition` flag tells execute-phase to return status after verification instead of chaining further. This keeps the auto-advance chain flat — each phase runs at the same nesting level rather than spawning deeper Task agents.
@@ -972,9 +990,9 @@ Verification: {Passed | Passed with override | Skipped}
 
 **Execute Phase {X}** — run all {N} plans
 
-/clear then:
-
 /gsd-execute-phase {X} ${GSD_WS}
+
+<sub>/clear first → fresh context window</sub>
 
 ───────────────────────────────────────────────────────────────
 

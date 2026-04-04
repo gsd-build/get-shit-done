@@ -154,6 +154,32 @@ describe('loadConfig', () => {
     expect(config.parallelization).toBe(0);
   });
 
+  it('CONFIG_DEFAULTS.workflow.wave_execution defaults to false', () => {
+    expect(CONFIG_DEFAULTS.workflow.wave_execution).toBe(false);
+  });
+
+  it('wave_execution defaults to false when absent from config.json', async () => {
+    const userConfig = { model_profile: 'fast' };
+    await writeFile(
+      join(tmpDir, '.planning', 'config.json'),
+      JSON.stringify(userConfig),
+    );
+
+    const config = await loadConfig(tmpDir);
+    expect(config.workflow.wave_execution).toBe(false);
+  });
+
+  it('wave_execution can be enabled via config.json', async () => {
+    const userConfig = { workflow: { wave_execution: true } };
+    await writeFile(
+      join(tmpDir, '.planning', 'config.json'),
+      JSON.stringify(userConfig),
+    );
+
+    const config = await loadConfig(tmpDir);
+    expect(config.workflow.wave_execution).toBe(true);
+  });
+
   it('does not mutate CONFIG_DEFAULTS between calls', async () => {
     const before = structuredClone(CONFIG_DEFAULTS);
 

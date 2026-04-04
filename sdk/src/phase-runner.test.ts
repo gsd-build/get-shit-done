@@ -1411,7 +1411,7 @@ Use TypeScript.`, 'utf-8');
       });
 
       const phaseOp = makePhaseOp({ has_context: true, has_plans: true, plan_count: 3 });
-      const config = makeConfig({ workflow: { research: false, verifier: false, skip_discuss: true, plan_check: false } as any });
+      const config = makeConfig({ workflow: { research: false, verifier: false, skip_discuss: true, plan_check: false, wave_execution: true } as any });
       const deps = makeDeps({ config });
       (deps.tools.initPhaseOp as ReturnType<typeof vi.fn>).mockResolvedValue(phaseOp);
       (deps.tools.phasePlanIndex as ReturnType<typeof vi.fn>).mockResolvedValue(planIndex);
@@ -1460,7 +1460,7 @@ Use TypeScript.`, 'utf-8');
       });
 
       const phaseOp = makePhaseOp({ has_context: true, has_plans: true, plan_count: 2 });
-      const config = makeConfig({ workflow: { research: false, verifier: false, skip_discuss: true, plan_check: false } as any });
+      const config = makeConfig({ workflow: { research: false, verifier: false, skip_discuss: true, plan_check: false, wave_execution: true } as any });
       const deps = makeDeps({ config });
       (deps.tools.initPhaseOp as ReturnType<typeof vi.fn>).mockResolvedValue(phaseOp);
       (deps.tools.phasePlanIndex as ReturnType<typeof vi.fn>).mockResolvedValue(planIndex);
@@ -1497,7 +1497,7 @@ Use TypeScript.`, 'utf-8');
       });
 
       const phaseOp = makePhaseOp({ has_context: true, has_plans: true, plan_count: 3 });
-      const config = makeConfig({ workflow: { research: false, verifier: false, skip_discuss: true, plan_check: false } as any });
+      const config = makeConfig({ workflow: { research: false, verifier: false, skip_discuss: true, plan_check: false, wave_execution: true } as any });
       const deps = makeDeps({ config });
       (deps.tools.initPhaseOp as ReturnType<typeof vi.fn>).mockResolvedValue(phaseOp);
       (deps.tools.phasePlanIndex as ReturnType<typeof vi.fn>).mockResolvedValue(planIndex);
@@ -1641,7 +1641,7 @@ Use TypeScript.`, 'utf-8');
       });
 
       const phaseOp = makePhaseOp({ has_context: true, has_plans: true, plan_count: 3 });
-      const config = makeConfig({ workflow: { research: false, verifier: false, skip_discuss: true, plan_check: false } as any });
+      const config = makeConfig({ workflow: { research: false, verifier: false, skip_discuss: true, plan_check: false, wave_execution: true } as any });
       const deps = makeDeps({ config });
       (deps.tools.initPhaseOp as ReturnType<typeof vi.fn>).mockResolvedValue(phaseOp);
       (deps.tools.phasePlanIndex as ReturnType<typeof vi.fn>).mockResolvedValue(planIndex);
@@ -1677,7 +1677,7 @@ Use TypeScript.`, 'utf-8');
       const planIndex = makePlanIndex(1);
 
       const phaseOp = makePhaseOp({ has_context: true, has_plans: true, plan_count: 1 });
-      const config = makeConfig({ workflow: { research: false, verifier: false, skip_discuss: true, plan_check: false } as any });
+      const config = makeConfig({ workflow: { research: false, verifier: false, skip_discuss: true, plan_check: false, wave_execution: true } as any });
       const deps = makeDeps({ config });
       (deps.tools.initPhaseOp as ReturnType<typeof vi.fn>).mockResolvedValue(phaseOp);
       (deps.tools.phasePlanIndex as ReturnType<typeof vi.fn>).mockResolvedValue(planIndex);
@@ -1702,7 +1702,7 @@ Use TypeScript.`, 'utf-8');
       });
 
       const phaseOp = makePhaseOp({ has_context: true, has_plans: true, plan_count: 3 });
-      const config = makeConfig({ workflow: { research: false, verifier: false, skip_discuss: true, plan_check: false } as any });
+      const config = makeConfig({ workflow: { research: false, verifier: false, skip_discuss: true, plan_check: false, wave_execution: true } as any });
       const deps = makeDeps({ config });
       (deps.tools.initPhaseOp as ReturnType<typeof vi.fn>).mockResolvedValue(phaseOp);
       (deps.tools.phasePlanIndex as ReturnType<typeof vi.fn>).mockResolvedValue(planIndex);
@@ -1761,6 +1761,71 @@ Use TypeScript.`, 'utf-8');
         e => e.type === GSDEventType.WaveStart || e.type === GSDEventType.WaveComplete,
       );
       expect(waveEvents).toHaveLength(0);
+    });
+
+    it('wave_execution=false runs plans sequentially even when parallelization is true', async () => {
+      const planIndex = makePlanIndex(0, {
+        plans: [
+          makePlanInfo({ id: 'p1', wave: 1 }),
+          makePlanInfo({ id: 'p2', wave: 1 }),
+          makePlanInfo({ id: 'p3', wave: 2 }),
+        ],
+        waves: { '1': ['p1', 'p2'], '2': ['p3'] },
+        incomplete: ['p1', 'p2', 'p3'],
+      });
+
+      const phaseOp = makePhaseOp({ has_context: true, has_plans: true, plan_count: 3 });
+      // parallelization true but wave_execution false (default) — should run sequentially
+      const config = makeConfig({
+        workflow: { research: false, verifier: false, skip_discuss: true, plan_check: false, wave_execution: false } as any,
+      });
+      const deps = makeDeps({ config });
+      (deps.tools.initPhaseOp as ReturnType<typeof vi.fn>).mockResolvedValue(phaseOp);
+      (deps.tools.phasePlanIndex as ReturnType<typeof vi.fn>).mockResolvedValue(planIndex);
+
+      const runner = new PhaseRunner(deps);
+      await runner.run('1');
+
+      const events = getEmittedEvents(deps);
+      // No wave events — sequential execution
+      const waveEvents = events.filter(
+        e => e.type === GSDEventType.WaveStart || e.type === GSDEventType.WaveComplete,
+      );
+      expect(waveEvents).toHaveLength(0);
+    });
+
+    it('wave_execution=true activates wave grouping', async () => {
+      const planIndex = makePlanIndex(0, {
+        plans: [
+          makePlanInfo({ id: 'p1', wave: 1 }),
+          makePlanInfo({ id: 'p2', wave: 1 }),
+          makePlanInfo({ id: 'p3', wave: 2 }),
+        ],
+        waves: { '1': ['p1', 'p2'], '2': ['p3'] },
+        incomplete: ['p1', 'p2', 'p3'],
+      });
+
+      const phaseOp = makePhaseOp({ has_context: true, has_plans: true, plan_count: 3 });
+      const config = makeConfig({
+        workflow: { research: false, verifier: false, skip_discuss: true, plan_check: false, wave_execution: true } as any,
+      });
+      const deps = makeDeps({ config });
+      (deps.tools.initPhaseOp as ReturnType<typeof vi.fn>).mockResolvedValue(phaseOp);
+      (deps.tools.phasePlanIndex as ReturnType<typeof vi.fn>).mockResolvedValue(planIndex);
+
+      const runner = new PhaseRunner(deps);
+      await runner.run('1');
+
+      const events = getEmittedEvents(deps);
+      const waveStarts = events.filter(e => e.type === GSDEventType.WaveStart) as any[];
+      const waveCompletes = events.filter(e => e.type === GSDEventType.WaveComplete) as any[];
+
+      // Two waves → two start + two complete events
+      expect(waveStarts).toHaveLength(2);
+      expect(waveCompletes).toHaveLength(2);
+      expect(waveStarts[0].waveNumber).toBe(1);
+      expect(waveStarts[0].planCount).toBe(2);
+      expect(waveStarts[1].waveNumber).toBe(2);
     });
 
     it('phasePlanIndex error is captured in step result', async () => {

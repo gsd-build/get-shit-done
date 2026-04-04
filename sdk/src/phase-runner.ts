@@ -19,7 +19,7 @@ import type {
   PlanInfo,
 } from './types.js';
 import { PhaseStepType, PhaseType, GSDEventType } from './types.js';
-import type { GSDConfig } from './config.js';
+import type { GSDConfig, WorkflowConfig } from './config.js';
 import type { GSDTools } from './gsd-tools.js';
 import type { GSDEventStream } from './event-stream.js';
 import type { PromptFactory } from './phase-prompt.js';
@@ -652,73 +652,86 @@ export class PhaseRunner {
         planResults.push(result);
       }
     } else {
-      // Group incomplete plans by wave, sort waves numerically
-      const waveMap = new Map<number, PlanInfo[]>();
-      for (const plan of incompletePlans) {
-        const existing = waveMap.get(plan.wave) ?? [];
-        existing.push(plan);
-        waveMap.set(plan.wave, existing);
-      }
-      const sortedWaves = [...waveMap.keys()].sort((a, b) => a - b);
+      // Wave execution: only activates when workflow.wave_execution is explicitly enabled.
+      // Default (false): execute all plans sequentially, regardless of wave field.
+      const waveEnabled = (this.config.workflow as WorkflowConfig).wave_execution === true;
 
-      for (const waveNum of sortedWaves) {
-        const wavePlans = waveMap.get(waveNum)!;
-        const wavePlanIds = wavePlans.map(p => p.id);
-
-        // Emit wave_start
-        this.eventStream.emitEvent({
-          type: GSDEventType.WaveStart,
-          timestamp: new Date().toISOString(),
-          sessionId: '',
-          phaseNumber,
-          waveNumber: waveNum,
-          planCount: wavePlans.length,
-          planIds: wavePlanIds,
-        });
-
-        const waveStart = Date.now();
-
-        // Execute all plans in this wave concurrently
-        const settled = await Promise.allSettled(
-          wavePlans.map(plan => this.executeSinglePlan(phaseNumber, plan.id, sessionOpts)),
-        );
-
-        // Map settled results to PlanResult[]
-        let successCount = 0;
-        let failureCount = 0;
-        for (const outcome of settled) {
-          if (outcome.status === 'fulfilled') {
-            planResults.push(outcome.value);
-            if (outcome.value.success) successCount++;
-            else failureCount++;
-          } else {
-            failureCount++;
-            planResults.push({
-              success: false,
-              sessionId: '',
-              totalCostUsd: 0,
-              durationMs: 0,
-              usage: { inputTokens: 0, outputTokens: 0, cacheReadInputTokens: 0, cacheCreationInputTokens: 0 },
-              numTurns: 0,
-              error: {
-                subtype: 'error_during_execution',
-                messages: [outcome.reason instanceof Error ? outcome.reason.message : String(outcome.reason)],
-              },
-            });
-          }
+      if (!waveEnabled) {
+        // wave_execution disabled — run all incomplete plans sequentially
+        for (const plan of incompletePlans) {
+          const result = await this.executeSinglePlan(phaseNumber, plan.id, sessionOpts);
+          planResults.push(result);
         }
+      } else {
+        // wave_execution enabled — group by wave and execute wave-by-wave
+        // Group incomplete plans by wave, sort waves numerically
+        const waveMap = new Map<number, PlanInfo[]>();
+        for (const plan of incompletePlans) {
+          const existing = waveMap.get(plan.wave) ?? [];
+          existing.push(plan);
+          waveMap.set(plan.wave, existing);
+        }
+        const sortedWaves = [...waveMap.keys()].sort((a, b) => a - b);
 
-        // Emit wave_complete
-        this.eventStream.emitEvent({
-          type: GSDEventType.WaveComplete,
-          timestamp: new Date().toISOString(),
-          sessionId: '',
-          phaseNumber,
-          waveNumber: waveNum,
-          successCount,
-          failureCount,
-          durationMs: Date.now() - waveStart,
-        });
+        for (const waveNum of sortedWaves) {
+          const wavePlans = waveMap.get(waveNum)!;
+          const wavePlanIds = wavePlans.map(p => p.id);
+
+          // Emit wave_start
+          this.eventStream.emitEvent({
+            type: GSDEventType.WaveStart,
+            timestamp: new Date().toISOString(),
+            sessionId: '',
+            phaseNumber,
+            waveNumber: waveNum,
+            planCount: wavePlans.length,
+            planIds: wavePlanIds,
+          });
+
+          const waveStart = Date.now();
+
+          // Execute all plans in this wave concurrently
+          const settled = await Promise.allSettled(
+            wavePlans.map(plan => this.executeSinglePlan(phaseNumber, plan.id, sessionOpts)),
+          );
+
+          // Map settled results to PlanResult[]
+          let successCount = 0;
+          let failureCount = 0;
+          for (const outcome of settled) {
+            if (outcome.status === 'fulfilled') {
+              planResults.push(outcome.value);
+              if (outcome.value.success) successCount++;
+              else failureCount++;
+            } else {
+              failureCount++;
+              planResults.push({
+                success: false,
+                sessionId: '',
+                totalCostUsd: 0,
+                durationMs: 0,
+                usage: { inputTokens: 0, outputTokens: 0, cacheReadInputTokens: 0, cacheCreationInputTokens: 0 },
+                numTurns: 0,
+                error: {
+                  subtype: 'error_during_execution',
+                  messages: [outcome.reason instanceof Error ? outcome.reason.message : String(outcome.reason)],
+                },
+              });
+            }
+          }
+
+          // Emit wave_complete
+          this.eventStream.emitEvent({
+            type: GSDEventType.WaveComplete,
+            timestamp: new Date().toISOString(),
+            sessionId: '',
+            phaseNumber,
+            waveNumber: waveNum,
+            successCount,
+            failureCount,
+            durationMs: Date.now() - waveStart,
+          });
+        }
       }
     }
 

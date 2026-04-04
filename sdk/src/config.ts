@@ -33,6 +33,8 @@ export interface WorkflowConfig {
   skip_discuss: boolean;
   /** Maximum self-discuss passes in auto/headless mode before forcing proceed. Default: 3. */
   max_discuss_passes: number;
+  /** Enable wave-ordered parallel execution (default: false). */
+  wave_execution: boolean;
 }
 
 export interface HooksConfig {
@@ -85,6 +87,7 @@ export const CONFIG_DEFAULTS: GSDConfig = {
     discuss_mode: 'discuss',
     skip_discuss: false,
     max_discuss_passes: 3,
+    wave_execution: false,
   },
   hooks: {
     context_warnings: true,

@@ -25,6 +25,9 @@ via filesystem and git state.
 
 <required_reading>
 Read STATE.md before any operation to load project context.
+
+@~/.claude/get-shit-done/references/agent-contracts.md
+@~/.claude/get-shit-done/references/wave-execution.md
 </required_reading>
 
 <available_agent_types>
@@ -66,9 +69,7 @@ if [[ "$INIT" == @file:* ]]; then INIT=$(cat "${INIT#@file:}"); fi
 AGENT_SKILLS=$(node "$HOME/.claude/get-shit-done/bin/gsd-tools.cjs" agent-skills gsd-executor 2>/dev/null)
 ```
 
-Parse JSON for: `executor_model`, `verifier_model`, `commit_docs`, `parallelization`, `branching_strategy`, `branch_name`, `phase_found`, `phase_dir`, `phase_number`, `phase_name`, `phase_slug`, `plans`, `incomplete_plans`, `plan_count`, `incomplete_count`, `state_exists`, `roadmap_exists`, `phase_req_ids`, `response_language`.
-
-**If `response_language` is set:** Include `response_language: {value}` in all spawned subagent prompts so any user-facing output stays in the configured language.
+Parse JSON for: `executor_model`, `verifier_model`, `commit_docs`, `parallelization`, `branching_strategy`, `branch_name`, `phase_found`, `phase_dir`, `phase_number`, `phase_name`, `phase_slug`, `plans`, `incomplete_plans`, `plan_count`, `incomplete_count`, `state_exists`, `roadmap_exists`, `phase_req_ids`.
 
 Read worktree config:
 
@@ -282,15 +283,22 @@ Execute each selected wave in sequence. Within a wave: parallel if `PARALLELIZAT
 
    Read each plan's `<objective>`. Extract what's being built and why.
 
+   Resolve status line values:
+   ```bash
+   MODEL_PROFILE=$(node "$HOME/.claude/get-shit-done/bin/gsd-tools.cjs" config-get model_profile 2>/dev/null || echo "balanced")
+   CONTEXT_TIER="PEAK"  # Derive from current context usage: PEAK (<30%), GOOD (30-50%), DEGRADING (50-70%), POOR (70%+)
    ```
-   ---
-   ## Wave {N}
+
+   ```
+   ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+    GSD ► EXECUTING WAVE {N}
+    Phase {PHASE}: {phase_name} | {MODEL_PROFILE} | {CONTEXT_TIER}
+   ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
    **{Plan ID}: {Plan Name}**
    {2-3 sentences: what this builds, technical approach, why it matters}
 
    Spawning {count} agent(s)...
-   ---
    ```
 
    - Bad: "Executing terrain generation plan"
@@ -307,22 +315,6 @@ Execute each selected wave in sequence. Within a wave: parallel if `PARALLELIZAT
    Before spawning, capture the current HEAD:
    ```bash
    EXPECTED_BASE=$(git rev-parse HEAD)
-   ```
-
-   **Sequential dispatch for parallel execution (waves with 2+ agents):**
-   When spawning multiple agents in a wave, dispatch each `Task()` call **one at a time
-   with `run_in_background: true`** — do NOT send all Task calls in a single message.
-   `git worktree add` acquires an exclusive lock on `.git/config.lock`, so simultaneous
-   calls race for this lock and fail. Sequential dispatch ensures each worktree finishes
-   creation before the next begins (the round-trip latency of each tool call provides
-   natural spacing), while all agents still **run in parallel** once created.
-
-   ```
-   # CORRECT: dispatch one Task() per message, each with run_in_background: true
-   # → worktrees created sequentially, agents execute in parallel
-   #
-   # WRONG: multiple Task() calls in a single message
-   # → simultaneous git worktree add → .git/config.lock contention → failures
    ```
 
    ```
@@ -367,6 +359,11 @@ Execute each selected wave in sequence. Within a wave: parallel if `PARALLELIZAT
        orchestrator validates hooks once after all agents complete.
        For gsd-tools commits: add --no-verify flag.
        For direct git commits: use git commit --no-verify -m "..."
+
+       Git lock retry: if a commit fails with "lock file exists" or similar git lock error, retry up to 3 times with 2-second backoff:
+         git commit --no-verify -m "..." || (sleep 2 && git commit --no-verify -m "...") || (sleep 2 && git commit --no-verify -m "...")
+
+       Note: On Windows, NTFS file locking may require longer backoffs. If all 3 attempts fail, wait 5 seconds and retry once more before reporting the error. See wave-execution.md for known open items.
        </parallel_execution>
 
        <execution_context>
@@ -374,6 +371,7 @@ Execute each selected wave in sequence. Within a wave: parallel if `PARALLELIZAT
        @~/.claude/get-shit-done/templates/summary.md
        @~/.claude/get-shit-done/references/checkpoints.md
        @~/.claude/get-shit-done/references/tdd.md
+       @~/.claude/get-shit-done/references/context-budget.md
        </execution_context>
 
        <files_to_read>
@@ -511,9 +509,11 @@ Execute each selected wave in sequence. Within a wave: parallel if `PARALLELIZAT
      node "$HOME/.claude/get-shit-done/bin/gsd-tools.cjs" roadmap update-plan-progress "${PHASE_NUMBER}" "${PLAN_ID}" completed
    done
 
+   # Update STATE.md position to reflect the last completed plan in this wave
+   node "$HOME/.claude/get-shit-done/bin/gsd-tools.cjs" state update-position --phase "${PHASE_NUMBER}" --plan "${LAST_PLAN_ID}"
    ```
 
-   Where `WAVE_PLAN_IDS` is the space-separated list of plan IDs that completed in this wave.
+   Where `WAVE_PLAN_IDS` is the space-separated list of plan IDs that completed in this wave, and `LAST_PLAN_ID` is the last plan ID in the wave (used to set current position).
 
    **If `workflow.use_worktrees` is `false`:** Sequential agents already updated STATE.md and ROADMAP.md themselves — skip this step.
 
@@ -639,6 +639,55 @@ After all waves:
 
 ### Issues Encountered
 [Aggregate from SUMMARYs, or "None"]
+```
+
+**Phase manifest write (for /gsd-undo support):**
+```bash
+# Collect plan IDs for this phase
+PLAN_LIST=$(node "$HOME/.claude/get-shit-done/bin/gsd-tools.cjs" phase-plan-index "${PHASE_NUMBER}" --raw 2>/dev/null | node -e "try{const d=JSON.parse(require('fs').readFileSync('/dev/stdin','utf8'));console.log(d.plans.map(p=>p.id).join(','));}catch(e){console.log('')}")
+node -e "
+const { execSync } = require('child_process');
+const fs = require('fs');
+const phase = process.env.PHASE_NUMBER;
+const commit = execSync('git rev-parse HEAD').toString().trim();
+const log = execSync('git log --oneline -20').toString().trim().split('\n');
+const plans = process.env.PLAN_LIST ? process.env.PLAN_LIST.split(',').filter(Boolean) : [];
+const manifest = {
+  phase,
+  completed_at: new Date().toISOString(),
+  plans,
+  last_good_commit: commit,
+  commit_log: log
+};
+fs.writeFileSync('.planning/.phase-manifest.json', JSON.stringify(manifest, null, 2));
+console.log('Phase manifest written: .planning/.phase-manifest.json');
+" PHASE_NUMBER="${PHASE_NUMBER}" PLAN_LIST="${PLAN_LIST}"
+node "$HOME/.claude/get-shit-done/bin/gsd-tools.cjs" commit "docs(phase-${PHASE_NUMBER}): write phase manifest" --files ".planning/.phase-manifest.json"
+```
+
+**Intel refresh (if enabled):**
+```bash
+INTEL_CFG=$(node -e "try{const c=JSON.parse(require('fs').readFileSync('.planning/config.json','utf8'));console.log(c.intel&&c.intel.enabled?'true':'false')}catch(e){console.log('false')}")
+```
+
+If `INTEL_CFG` is `true`:
+```
+◆ Refreshing codebase intelligence...
+```
+```bash
+node "$HOME/.claude/get-shit-done/bin/gsd-tools.cjs" intel snapshot 2>/dev/null || true
+```
+This keeps intel index fresh after every phase execution without requiring manual `/gsd-intel refresh`.
+
+**Undo offer on catastrophic failure:**
+
+If any plan in the phase failed AND phase manifest was written:
+```
+## Recovery Options
+
+1. Retry failed plan: `/gsd-execute-phase {phase} --gaps-only`
+2. Undo this phase: `/gsd-undo --phase {phase_number}`
+3. Continue anyway: `/gsd-next`
 ```
 
 **Security gate check:**
@@ -992,9 +1041,9 @@ Items saved to `{phase_num}-HUMAN-UAT.md` — they will appear in `/gsd-progress
 ---
 ## ▶ Next Up
 
-`/clear` then:
-
 `/gsd-plan-phase {X} --gaps ${GSD_WS}`
+
+<sub>`/clear` first → fresh context window</sub>
 
 Also: `cat {phase_dir}/{phase_num}-VERIFICATION.md` — full report
 Also: `/gsd-verify-work {X} ${GSD_WS}` — manual testing first
