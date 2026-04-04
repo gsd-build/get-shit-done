@@ -38,14 +38,19 @@ const {
 describe('loadConfig', () => {
   let tmpDir;
   let originalCwd;
+  let originalHome;
 
   beforeEach(() => {
     tmpDir = createTempProject();
     originalCwd = process.cwd();
+    // Sandbox HOME so real ~/.gsd/defaults.json doesn't leak into tests
+    originalHome = process.env.HOME;
+    process.env.HOME = tmpDir;
   });
 
   afterEach(() => {
     process.chdir(originalCwd);
+    process.env.HOME = originalHome;
     cleanup(tmpDir);
   });
 
@@ -119,6 +124,46 @@ describe('loadConfig', () => {
     const config = loadConfig(tmpDir);
     assert.strictEqual(config.model_profile, 'balanced');
     assert.strictEqual(config.commit_docs, true);
+  });
+
+  test('falls back to ~/.gsd/defaults.json when no config.json exists', () => {
+    // Remove .planning/config.json so loadConfig hits the catch path
+    fs.rmSync(path.join(tmpDir, '.planning', 'config.json'), { force: true });
+    // Create ~/.gsd/defaults.json in the sandboxed HOME
+    const gsdDir = path.join(tmpDir, '.gsd');
+    fs.mkdirSync(gsdDir, { recursive: true });
+    fs.writeFileSync(
+      path.join(gsdDir, 'defaults.json'),
+      JSON.stringify({ model_profile: 'quality', resolve_model_ids: true })
+    );
+    const config = loadConfig(tmpDir);
+    assert.strictEqual(config.model_profile, 'quality');
+    assert.strictEqual(config.resolve_model_ids, true);
+    // Keys not in defaults.json should still get hardcoded defaults
+    assert.strictEqual(config.commit_docs, true);
+  });
+
+  test('falls back to hardcoded defaults when no config.json and no defaults.json', () => {
+    fs.rmSync(path.join(tmpDir, '.planning', 'config.json'), { force: true });
+    const config = loadConfig(tmpDir);
+    assert.strictEqual(config.model_profile, 'balanced');
+    assert.strictEqual(config.commit_docs, true);
+  });
+
+  test('defaults.json supports nested keys (git, workflow)', () => {
+    fs.rmSync(path.join(tmpDir, '.planning', 'config.json'), { force: true });
+    const gsdDir = path.join(tmpDir, '.gsd');
+    fs.mkdirSync(gsdDir, { recursive: true });
+    fs.writeFileSync(
+      path.join(gsdDir, 'defaults.json'),
+      JSON.stringify({
+        git: { branching_strategy: 'per-phase' },
+        workflow: { research: false },
+      })
+    );
+    const config = loadConfig(tmpDir);
+    assert.strictEqual(config.branching_strategy, 'per-phase');
+    assert.strictEqual(config.research, false);
   });
 
   test('handles parallelization as boolean', () => {

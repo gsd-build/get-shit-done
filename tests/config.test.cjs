@@ -39,7 +39,8 @@ describe('config-ensure-section command', () => {
   });
 
   test('creates config.json with expected structure and types', () => {
-    const result = runGsdTools('config-ensure-section', tmpDir);
+    // Sandbox HOME to prevent real ~/.gsd/defaults.json from leaking in
+    const result = runGsdTools('config-ensure-section', tmpDir, { HOME: tmpDir });
     assert.ok(result.success, `Command failed: ${result.error}`);
 
     const output = JSON.parse(result.output);

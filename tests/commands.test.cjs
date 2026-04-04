@@ -1048,12 +1048,16 @@ describe('verify-path-exists command', () => {
 
 describe('resolve-model command', () => {
   let tmpDir;
+  let originalHome;
 
   beforeEach(() => {
     tmpDir = createTempProject();
+    originalHome = process.env.HOME;
+    process.env.HOME = tmpDir;
   });
 
   afterEach(() => {
+    process.env.HOME = originalHome;
     cleanup(tmpDir);
   });
 

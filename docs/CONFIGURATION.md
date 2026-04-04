@@ -453,8 +453,15 @@ The intent is the same as the Claude profile tiers -- use a stronger model for p
 
 ## Global Defaults
 
-Save settings as global defaults for future projects:
+Save settings as global defaults for all GSD commands:
 
 **Location:** `~/.gsd/defaults.json`
 
-When `/gsd-new-project` creates a new `config.json`, it reads global defaults and merges them as the starting configuration. Per-project settings always override globals.
+Global defaults are consulted in two scenarios:
+
+1. **Project initialization:** When `/gsd-new-project` creates a new `config.json`, it reads global defaults and merges them as the starting configuration.
+2. **Pre-project commands:** Commands that run before project initialization (e.g., `map-codebase`) use global defaults as a fallback when no `.planning/config.json` exists.
+
+**Merge order:** `hardcoded defaults ← ~/.gsd/defaults.json ← .planning/config.json`
+
+Per-project settings always override globals.
