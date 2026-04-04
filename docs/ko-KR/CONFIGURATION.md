@@ -331,7 +331,7 @@ quick 태스크 브랜칭 예시:
 | 값 | 동작 | 사용 시점 |
 |----|------|----------|
 | `false` (기본값) | Claude 별칭 반환 (`opus`, `sonnet`, `haiku`) | 네이티브 Anthropic API를 사용하는 Claude Code |
-| `true` | 별칭을 전체 Claude 모델 ID로 매핑 (`claude-opus-4-0`) | 전체 ID가 필요한 API를 사용하는 Claude Code |
+| `true` | 별칭을 전체 Claude 모델 ID로 매핑 (`claude-opus-4-6`) | 전체 ID가 필요한 API를 사용하는 Claude Code |
 | `"omit"` | 빈 문자열 반환 (런타임이 기본값 선택) | 비 Claude 런타임 (Codex, OpenCode, Gemini CLI, Kilo) |
 
 ### 프로필 철학

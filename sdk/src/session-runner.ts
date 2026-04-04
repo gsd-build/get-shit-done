@@ -29,7 +29,7 @@ function resolveModel(options?: SessionOptions, config?: GSDConfig): string | un
     const profileMap: Record<string, string> = {
       balanced: 'claude-sonnet-4-6',
       quality: 'claude-opus-4-6',
-      speed: 'claude-haiku-3-5',
+      speed: 'claude-haiku-4-5',
     };
     return profileMap[config.model_profile] ?? config.model_profile;
   }
