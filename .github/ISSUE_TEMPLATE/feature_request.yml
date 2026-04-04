@@ -1,44 +1,165 @@
 ---
 name: Feature Request
-description: Suggest a new feature or improvement
-labels: ["enhancement"]
+description: Propose a new feature. Read the full instructions before opening this issue.
+labels: ["feature-request", "needs-review"]
 body:
   - type: markdown
     attributes:
       value: |
-        Thanks for suggesting a feature! Please describe what you'd like to see.
+        ## ⚠️ Read this before you fill anything out
 
-  - type: textarea
-    id: problem
+        A feature adds something new to GSD — a new command, workflow, concept, or integration. Features have the **highest bar** for acceptance because every feature adds permanent maintenance burden to a project built for solo developers.
+
+        **Before opening this issue:**
+        - Check [Discussions](https://github.com/gsd-build/get-shit-done/discussions) — has this been proposed and declined before?
+        - Read [CONTRIBUTING.md](../../CONTRIBUTING.md#-feature) — understand what "approved-feature" means and why you must wait for it before writing code.
+        - Ask yourself: *does this solve a real problem for a solo developer working with an AI coding tool, or is it a feature I personally want?*
+
+        **What happens after you submit:**
+        A maintainer will review this spec. If it is incomplete, it will be **closed**, not revised. If it conflicts with GSD's design philosophy, it will be declined. If it is approved, it will be labeled `approved-feature` and you may begin coding.
+
+        **Do not open a PR until this issue is labeled `approved-feature`.**
+
+  - type: checkboxes
+    id: preflight
     attributes:
-      label: Problem or motivation
-      description: What problem does this solve? Why do you want this?
-      placeholder: "I'm frustrated when..."
+      label: Pre-submission checklist
+      description: You must check every box. Unchecked boxes are an immediate close.
+      options:
+        - label: I have searched existing issues and discussions — this has not been proposed and declined before
+          required: true
+        - label: I have read CONTRIBUTING.md and understand that I must wait for `approved-feature` before writing any code
+          required: true
+        - label: I have read the existing GSD commands and workflows and confirmed this feature does not duplicate existing behavior
+          required: true
+        - label: This feature solves a problem for solo developers using AI coding tools, not a personal preference or workflow I happen to like
+          required: true
+
+  - type: input
+    id: feature_name
+    attributes:
+      label: Feature name
+      description: A short, concrete name for this feature (not a sales pitch — just what it is).
+      placeholder: "e.g., Phase rollback command, Auto-archive completed phases, Cross-project state sync"
+    validations:
+      required: true
+
+  - type: dropdown
+    id: feature_type
+    attributes:
+      label: Type of addition
+      description: What kind of thing is this feature adding?
+      options:
+        - New command (slash command or CLI flag)
+        - New workflow (multi-step process)
+        - New runtime integration
+        - New planning concept (phase type, state, etc.)
+        - New installation/setup behavior
+        - New output or reporting format
+        - Other (describe in spec)
     validations:
       required: true
 
   - type: textarea
-    id: solution
+    id: problem_statement
     attributes:
-      label: Proposed solution
-      description: How do you think this should work? Include example commands or workflows if possible.
+      label: The solo developer problem
+      description: |
+        Describe the concrete problem this solves for a solo developer using an AI coding tool. Be specific.
+
+        Good: "When a phase fails mid-way, there is no way to roll back state without manually editing STATE.md. This causes the AI agent to continue from a corrupted state, producing wrong plans."
+
+        Bad: "It would be nice to have a rollback feature." / "Other tools have this." / "I need this for my workflow."
       placeholder: |
-        A new command `/gsd:example` that...
+        When [specific situation], the developer cannot [specific thing], which causes [specific negative outcome].
+    validations:
+      required: true
+
+  - type: textarea
+    id: what_is_added
+    attributes:
+      label: What this feature adds
+      description: |
+        Describe exactly what is being added. Be specific about commands, output, behavior, and user interaction.
+        Include example commands or example output where possible.
+      placeholder: |
+        A new command `/gsd:rollback` that:
+        1. Reads the current phase from STATE.md
+        2. Reverts STATE.md to the previous phase's snapshot
+        3. Outputs a confirmation with the rolled-back state
+
+        Example usage:
+        ```
+        /gsd:rollback
+        > Rolled back from Phase 3 (failed) to Phase 2 (completed)
+        ```
+    validations:
+      required: true
+
+  - type: textarea
+    id: full_scope
+    attributes:
+      label: Full scope of changes
+      description: |
+        List every file, system, and area of the codebase this feature would touch. Be exhaustive.
+        If you cannot fill this out, you do not understand the codebase well enough to propose this feature yet.
+      placeholder: |
+        Files that would be created:
+        - `get-shit-done/commands/gsd/rollback.md` — new slash command definition
+
+        Files that would be modified:
+        - `get-shit-done/bin/lib/state.cjs` — add rollback() function
+        - `get-shit-done/bin/lib/phases.cjs` — expose phase snapshot API
+        - `tests/rollback.test.cjs` — new test file
+        - `docs/COMMANDS.md` — document new command
+        - `CHANGELOG.md` — entry for this feature
+
+        Systems affected:
+        - STATE.md schema (must remain backward compatible)
+        - Phase lifecycle state machine
+    validations:
+      required: true
+
+  - type: textarea
+    id: user_stories
+    attributes:
+      label: User stories
+      description: Write at least two user stories in the format "As a [user], I want [thing] so that [outcome]."
+      placeholder: |
+        1. As a solo developer, I want to roll back a failed phase so that I can re-attempt it without corrupting my project state.
+        2. As a solo developer, I want rollback to be undoable so that I don't accidentally lose completed work.
+    validations:
+      required: true
+
+  - type: textarea
+    id: acceptance_criteria
+    attributes:
+      label: Acceptance criteria
+      description: |
+        List the specific, testable conditions that must be true for this feature to be considered complete.
+        These become the basis for reviewer sign-off. Vague criteria ("it works") are not acceptable.
+      placeholder: |
+        - [ ] `/gsd:rollback` reverts STATE.md to the previous phase when current phase status is `failed`
+        - [ ] `/gsd:rollback` exits with an error if there is no previous phase to roll back to
+        - [ ] `/gsd:rollback` outputs the before/after phase names in its confirmation message
+        - [ ] Rollback is logged in the phase history so the AI agent can see it happened
+        - [ ] All existing tests still pass
+        - [ ] New tests cover the happy path, no-previous-phase case, and STATE.md corruption case
     validations:
       required: true
 
   - type: dropdown
     id: scope
     attributes:
-      label: Which area does this affect?
+      label: Which area does this primarily affect?
       options:
         - Core workflow (init, plan, build, verify)
         - Planning system (phases, roadmap, state)
         - Context management (context engineering, summaries)
         - Runtime integration (hooks, statusline, settings)
         - Installation / setup
-        - Documentation
-        - Other
+        - Documentation only
+        - Multiple areas (describe in scope section above)
     validations:
       required: true
 
@@ -46,7 +167,7 @@ body:
     id: runtimes
     attributes:
       label: Applicable runtimes
-      description: Which runtimes should this work with?
+      description: Which runtimes must this work with? Check all that apply.
       options:
         - label: Claude Code
         - label: Gemini CLI
@@ -59,17 +180,71 @@ body:
         - label: All runtimes
 
   - type: textarea
+    id: breaking_changes
+    attributes:
+      label: Breaking changes assessment
+      description: |
+        Does this feature change existing behavior, command output, file formats, or APIs?
+        If yes, describe exactly what breaks and how existing users would migrate.
+        Write "None" only if you are certain.
+      placeholder: |
+        None — this adds a new command and does not modify any existing command behavior or file schemas.
+
+        OR:
+
+        STATE.md will gain a new `phase_history` array field. Existing STATE.md files without this field
+        will be treated as having an empty history (backward compatible). The rollback command will
+        decline gracefully if history is empty.
+    validations:
+      required: true
+
+  - type: textarea
+    id: maintenance_burden
+    attributes:
+      label: Maintenance burden
+      description: |
+        Every feature is code that must be maintained forever. Describe the ongoing cost:
+        - How does this interact with future changes to phases, state, or commands?
+        - Does this add external dependencies?
+        - Does this require documentation updates across multiple files?
+        - Will this create edge cases or interactions with other features?
+      placeholder: |
+        - No new dependencies
+        - The rollback function must be updated if the STATE.md schema ever changes
+        - Will need to be tested on each new Node.js LTS release
+        - The command definition must be kept in sync with any future command format changes
+    validations:
+      required: true
+
+  - type: textarea
     id: alternatives
     attributes:
       label: Alternatives considered
-      description: Have you considered other approaches?
+      description: |
+        What other approaches did you consider? Why did you reject them?
+        If the answer is "I didn't consider any alternatives", this issue will be closed.
+      placeholder: |
+        1. Manual STATE.md editing — rejected because it requires the developer to understand the schema
+           and is error-prone. The AI agent cannot reliably guide this.
+        2. A `/gsd:reset` command that wipes all state — rejected because it is too destructive and
+           loses all completed phase history.
+    validations:
+      required: true
+
+  - type: textarea
+    id: prior_art
+    attributes:
+      label: Prior art and references
+      description: |
+        Does any other tool, project, or GSD discussion address this? Link to anything relevant.
+        If you are aware of a prior declined proposal for this feature, explain why this proposal is different.
     validations:
       required: false
 
   - type: textarea
-    id: context
+    id: additional_context
     attributes:
       label: Additional context
-      description: Any other information, screenshots, or examples.
+      description: Anything else — screenshots, recordings, related issues, or links.
     validations:
       required: false
