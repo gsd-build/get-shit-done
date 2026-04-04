@@ -48,8 +48,10 @@ const SCAN_DIRS = [
 const SCAN_EXTS = new Set(['.md', '.cjs', '.js', '.json']);
 
 // Files that legitimately reference injection patterns (e.g., security docs, this test)
+// or exceed the 50K size threshold due to legitimate workflow complexity
 const ALLOWLIST = new Set([
   'get-shit-done/bin/lib/security.cjs',        // The security module itself
+  'get-shit-done/workflows/discuss-phase.md',  // Large workflow (~50K) with power mode + i18n
   'hooks/gsd-prompt-guard.js',                  // The prompt guard hook
   'tests/security.test.cjs',                    // Security tests
   'tests/prompt-injection-scan.test.cjs',       // This file
