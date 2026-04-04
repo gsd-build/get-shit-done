@@ -862,20 +862,45 @@ function comparePhaseNum(a, b) {
   return 0;
 }
 
+/**
+ * Extract the phase token from a directory name.
+ * Supports: '01-name', '1009A-name', '999.6-name', 'CK-01-name', 'PROJ-42-name'.
+ * Returns the token portion (e.g. '01', '1009A', '999.6', 'PROJ-42') or the full name if no separator.
+ */
+function extractPhaseToken(dirName) {
+  // Try project-code-prefixed numeric: CK-01-name → CK-01, CK-01A.2-name → CK-01A.2
+  const codePrefixed = dirName.match(/^([A-Z]{1,6}-\d+[A-Z]?(?:\.\d+)*)(?:-|$)/i);
+  if (codePrefixed) return codePrefixed[1];
+  // Try plain numeric: 01-name, 1009A-name, 999.6-name
+  const numeric = dirName.match(/^(\d+[A-Z]?(?:\.\d+)*)(?:-|$)/i);
+  if (numeric) return numeric[1];
+  // Custom IDs: PROJ-42-name → everything before the last segment that looks like a name
+  const custom = dirName.match(/^([A-Z][A-Z0-9]*(?:-[A-Z0-9]+)*)(?:-[a-z]|$)/i);
+  if (custom) return custom[1];
+  return dirName;
+}
+
+/**
+ * Check if a directory name's phase token matches the normalized phase exactly.
+ * Case-insensitive comparison for the token portion.
+ */
+function phaseTokenMatches(dirName, normalized) {
+  const token = extractPhaseToken(dirName);
+  if (token.toUpperCase() === normalized.toUpperCase()) return true;
+  // Strip optional project_code prefix from dir and retry
+  const stripped = dirName.replace(/^[A-Z]{1,6}-(?=\d)/, '');
+  if (stripped !== dirName) {
+    const strippedToken = extractPhaseToken(stripped);
+    if (strippedToken.toUpperCase() === normalized.toUpperCase()) return true;
+  }
+  return false;
+}
+
 function searchPhaseInDir(baseDir, relBase, normalized) {
   try {
     const dirs = readSubdirectories(baseDir, true);
-    // Match: starts with normalized (numeric) OR contains normalized as prefix segment (custom ID)
-    const match = dirs.find(d => {
-      if (d.startsWith(normalized)) return true;
-      // For custom IDs like PROJ-42, match case-insensitively
-      if (d.toUpperCase().startsWith(normalized.toUpperCase())) return true;
-      // Strip optional project_code prefix (e.g., 'CK-01-name' → '01-name') and retry
-      const stripped = d.replace(/^[A-Z]{1,6}-/, '');
-      if (stripped.startsWith(normalized)) return true;
-      if (stripped.toUpperCase().startsWith(normalized.toUpperCase())) return true;
-      return false;
-    });
+    // Match: exact phase token comparison (not prefix matching)
+    const match = dirs.find(d => phaseTokenMatches(d, normalized));
     if (!match) return null;
 
     // Extract phase number and name — supports numeric (01-name), project-code-prefixed (CK-01-name), and custom (PROJ-42-name)
@@ -1415,6 +1440,8 @@ module.exports = {
   normalizePhaseName,
   comparePhaseNum,
   searchPhaseInDir,
+  extractPhaseToken,
+  phaseTokenMatches,
   findPhaseInternal,
   getArchivedPhaseDirs,
   getRoadmapPhaseInternal,

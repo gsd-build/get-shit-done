@@ -2019,6 +2019,100 @@ describe('phase complete milestone-scoped next-phase', () => {
 });
 
 // ─────────────────────────────────────────────────────────────────────────────
+// exact token matching (no prefix collisions)
+// ─────────────────────────────────────────────────────────────────────────────
+
+describe('phase resolution uses exact token matching', () => {
+  let tmpDir;
+
+  beforeEach(() => {
+    tmpDir = createTempProject();
+  });
+
+  afterEach(() => {
+    cleanup(tmpDir);
+  });
+
+  test('1009 must NOT match 1009A-feature-consistency when 1009 dir is absent', () => {
+    // With only 1009A on disk, searching for 1009 should return not-found
+    // because 1009 !== 1009A (prefix match bug: '1009A-...' starts with '1009')
+    const phasesDir = path.join(tmpDir, '.planning', 'phases');
+    fs.mkdirSync(path.join(phasesDir, '1009A-feature-consistency'));
+    fs.writeFileSync(path.join(phasesDir, '1009A-feature-consistency', 'PLAN.md'), '# Plan');
+
+    const result = runGsdTools('find-phase 1009', tmpDir);
+    assert.ok(result.success, `Command failed: ${result.error}`);
+    const output = JSON.parse(result.output);
+    assert.strictEqual(output.found, false, 'should NOT find phase 1009 when only 1009A exists');
+  });
+
+  test('1009 matches 1009-pipeline-accuracy-fix when both exist', () => {
+    const phasesDir = path.join(tmpDir, '.planning', 'phases');
+    fs.mkdirSync(path.join(phasesDir, '1009-pipeline-accuracy-fix'));
+    fs.mkdirSync(path.join(phasesDir, '1009A-feature-consistency'));
+    fs.writeFileSync(path.join(phasesDir, '1009-pipeline-accuracy-fix', 'PLAN.md'), '# Plan');
+
+    const result = runGsdTools('find-phase 1009', tmpDir);
+    assert.ok(result.success, `Command failed: ${result.error}`);
+    const output = JSON.parse(result.output);
+    assert.strictEqual(output.found, true, 'should find phase 1009');
+    assert.ok(
+      output.directory.includes('1009-pipeline-accuracy-fix'),
+      `should match 1009-pipeline-accuracy-fix, got: ${output.directory}`
+    );
+  });
+
+  test('999.6 must NOT match 999.60-episode-processing when 999.6 dir is absent', () => {
+    // With only 999.60 on disk, searching for 999.6 should return not-found
+    // because '999.60-...' starts with '999.6' (prefix match bug)
+    const phasesDir = path.join(tmpDir, '.planning', 'phases');
+    fs.mkdirSync(path.join(phasesDir, '999.60-episode-processing'));
+    fs.writeFileSync(path.join(phasesDir, '999.60-episode-processing', 'PLAN.md'), '# Plan');
+
+    const result = runGsdTools('find-phase 999.6', tmpDir);
+    assert.ok(result.success, `Command failed: ${result.error}`);
+    const output = JSON.parse(result.output);
+    assert.strictEqual(output.found, false, 'should NOT find phase 999.6 when only 999.60 exists');
+  });
+
+  test('999.6 matches 999.6-ground-truth-dataset when both exist', () => {
+    const phasesDir = path.join(tmpDir, '.planning', 'phases');
+    fs.mkdirSync(path.join(phasesDir, '999.6-ground-truth-dataset'));
+    fs.mkdirSync(path.join(phasesDir, '999.60-episode-processing'));
+    fs.writeFileSync(path.join(phasesDir, '999.6-ground-truth-dataset', 'PLAN.md'), '# Plan');
+
+    const result = runGsdTools('find-phase 999.6', tmpDir);
+    assert.ok(result.success, `Command failed: ${result.error}`);
+    const output = JSON.parse(result.output);
+    assert.strictEqual(output.found, true, 'should find phase 999.6');
+    assert.ok(
+      output.directory.includes('999.6-ground-truth-dataset'),
+      `should match 999.6-ground-truth-dataset, got: ${output.directory}`
+    );
+  });
+
+  test('normal non-colliding phases still resolve', () => {
+    const phasesDir = path.join(tmpDir, '.planning', 'phases');
+    fs.mkdirSync(path.join(phasesDir, '01-foundation'));
+    fs.mkdirSync(path.join(phasesDir, '02-implementation'));
+    fs.writeFileSync(path.join(phasesDir, '01-foundation', 'PLAN.md'), '# Plan');
+    fs.writeFileSync(path.join(phasesDir, '02-implementation', 'PLAN.md'), '# Plan');
+
+    const r1 = runGsdTools('find-phase 1', tmpDir);
+    assert.ok(r1.success, `Command failed for phase 1: ${r1.error}`);
+    const o1 = JSON.parse(r1.output);
+    assert.strictEqual(o1.found, true, 'should find phase 1');
+    assert.ok(o1.directory.includes('01-foundation'), `should match 01-foundation, got: ${o1.directory}`);
+
+    const r2 = runGsdTools('find-phase 2', tmpDir);
+    assert.ok(r2.success, `Command failed for phase 2: ${r2.error}`);
+    const o2 = JSON.parse(r2.output);
+    assert.strictEqual(o2.found, true, 'should find phase 2');
+    assert.ok(o2.directory.includes('02-implementation'), `should match 02-implementation, got: ${o2.directory}`);
+  });
+});
+
+// ─────────────────────────────────────────────────────────────────────────────
 // milestone complete command
 // ─────────────────────────────────────────────────────────────────────────────
 
