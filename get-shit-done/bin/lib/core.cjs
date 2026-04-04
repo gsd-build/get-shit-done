@@ -384,35 +384,28 @@ function loadConfig(cwd) {
       // Ignore malformed global defaults
     }
 
-    return {
-      ...defaults,
-      model_profile: userDefaults.model_profile ?? defaults.model_profile,
-      commit_docs: userDefaults.commit_docs ?? defaults.commit_docs,
-      search_gitignored: userDefaults.search_gitignored ?? defaults.search_gitignored,
-      branching_strategy: (userDefaults.git?.branching_strategy ?? userDefaults.branching_strategy) ?? defaults.branching_strategy,
-      phase_branch_template: (userDefaults.git?.phase_branch_template ?? userDefaults.phase_branch_template) ?? defaults.phase_branch_template,
-      milestone_branch_template: (userDefaults.git?.milestone_branch_template ?? userDefaults.milestone_branch_template) ?? defaults.milestone_branch_template,
-      quick_branch_template: (userDefaults.git?.quick_branch_template ?? userDefaults.quick_branch_template) ?? defaults.quick_branch_template,
-      research: (userDefaults.workflow?.research ?? userDefaults.research) ?? defaults.research,
-      plan_checker: (userDefaults.workflow?.plan_check ?? userDefaults.plan_checker) ?? defaults.plan_checker,
-      verifier: (userDefaults.workflow?.verifier ?? userDefaults.verifier) ?? defaults.verifier,
-      nyquist_validation: (userDefaults.workflow?.nyquist_validation ?? userDefaults.nyquist_validation) ?? defaults.nyquist_validation,
-      parallelization: userDefaults.parallelization ?? defaults.parallelization,
-      brave_search: userDefaults.brave_search ?? defaults.brave_search,
-      firecrawl: userDefaults.firecrawl ?? defaults.firecrawl,
-      exa_search: userDefaults.exa_search ?? defaults.exa_search,
-      text_mode: (userDefaults.workflow?.text_mode ?? userDefaults.text_mode) ?? defaults.text_mode,
-      sub_repos: userDefaults.sub_repos ?? defaults.sub_repos,
-      resolve_model_ids: userDefaults.resolve_model_ids ?? defaults.resolve_model_ids,
-      context_window: userDefaults.context_window ?? defaults.context_window,
-      phase_naming: userDefaults.phase_naming ?? defaults.phase_naming,
-      project_code: userDefaults.project_code ?? defaults.project_code,
-      subagent_timeout: (userDefaults.workflow?.subagent_timeout ?? userDefaults.subagent_timeout) ?? defaults.subagent_timeout,
-      model_overrides: userDefaults.model_overrides || null,
-      agent_skills: userDefaults.agent_skills || {},
-      manager: userDefaults.manager || {},
-      response_language: userDefaults.response_language || null,
-    };
+    // Flatten nested defaults.json keys (git.*, workflow.*) to top-level,
+    // matching how the try block's get() helper resolves both formats.
+    const flat = { ...defaults };
+    for (const [key, val] of Object.entries(userDefaults)) {
+      if (key === 'git' || key === 'workflow') {
+        // Nested section — merge each sub-key, mapping workflow.plan_check → plan_checker
+        if (val && typeof val === 'object') {
+          for (const [subKey, subVal] of Object.entries(val)) {
+            const mapped = (key === 'workflow' && subKey === 'plan_check') ? 'plan_checker' : subKey;
+            if (mapped in flat) flat[mapped] = subVal;
+          }
+        }
+      } else if (key in flat) {
+        flat[key] = val;
+      }
+    }
+    // Include keys that aren't in the hardcoded defaults but loadConfig() returns
+    flat.model_overrides = userDefaults.model_overrides || null;
+    flat.agent_skills = userDefaults.agent_skills || {};
+    flat.manager = userDefaults.manager || {};
+    flat.response_language = userDefaults.response_language || null;
+    return flat;
   }
 }
 
