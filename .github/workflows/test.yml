@@ -24,12 +24,12 @@ jobs:
         os: [ubuntu-latest]
         node-version: [22, 24]
         include:
-          # Single macOS runner — verifies platform compatibility
+          # Single macOS runner — verifies platform compatibility on the standard version
           - os: macos-latest
-            node-version: 22
-          # Single Windows runner — slowest CI runner, smoke-test only
-          - os: windows-latest
-            node-version: 22
+            node-version: 24
+          # Windows path/separator coverage is handled by hardcoded-paths.test.cjs
+          # and windows-robustness.test.cjs (static analysis, runs on all platforms).
+          # A dedicated windows-compat workflow runs on a weekly schedule.
 
     steps:
       - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd  # v6.0.2
