@@ -550,12 +550,26 @@ Offer: 1) Force proceed, 2) Abort
 
 **Step 6: Spawn executor**
 
+Capture current HEAD before spawning (used for worktree branch check):
+```bash
+EXPECTED_BASE=$(git rev-parse HEAD)
+```
+
 Spawn gsd-executor with plan reference:
 
 ```
 Task(
   prompt="
 Execute quick task ${quick_id}.
+
+${USE_WORKTREES !== "false" ? `
+<worktree_branch_check>
+FIRST ACTION before any other work: verify this worktree branch is based on the correct commit.
+Run: git merge-base HEAD ${EXPECTED_BASE}
+If the result differs from ${EXPECTED_BASE}, run: git reset --soft ${EXPECTED_BASE}
+This corrects a known issue on Windows where EnterWorktree creates branches from main instead of the feature branch HEAD.
+</worktree_branch_check>
+` : ''}
 
 <files_to_read>
 - ${QUICK_DIR}/${quick_id}-PLAN.md (Plan)
@@ -610,7 +624,7 @@ Note: For quick tasks producing multiple plans (rare), spawn executors in parall
 
 **Step 6.25: Code review (auto)**
 
-Skip this step entirely if `$FULL_MODE` is false (code review only meaningful with structured execution).
+Skip this step entirely if `$FULL_MODE` is false.
 
 **Config gate:**
 ```bash
@@ -618,16 +632,14 @@ CODE_REVIEW_ENABLED=$(node "$HOME/.claude/get-shit-done/bin/gsd-tools.cjs" confi
 ```
 If `"false"`, skip with message "Code review skipped (workflow.code_review=false)".
 
-**Scope the review from executor's committed files (addresses review concern: don't re-parse SUMMARY.md):**
-
-Use git to get files changed by the executor's commits. The executor creates atomic commits, so diff against the state before execution:
+**Scope files from executor's commits:**
 ```bash
 CHANGED_FILES=$(git diff --name-only HEAD~$(git log --oneline "${QUICK_DIR}/${quick_id}-SUMMARY.md" 2>/dev/null | wc -l) HEAD -- . ':!.planning' 2>/dev/null | tr '\n' ' ')
 ```
 
-If `CHANGED_FILES` is empty, skip with message "No source files changed -- skipping code review."
+If `CHANGED_FILES` is empty, skip with "No source files changed — skipping code review."
 
-**Invoke review via Task (quick tasks have no phase number):**
+**Invoke review:**
 ```
 Task(
   prompt="Review these files for bugs, security issues, and code quality.
@@ -639,15 +651,7 @@ Task(
 )
 ```
 
-If review produces findings, display:
-```
-Code review found issues in quick task. Consider reviewing:
-${QUICK_DIR}/${quick_id}-REVIEW.md
-```
-
-**Error handling:** If Task invocation fails, display "Code review encountered an error (non-blocking)" and proceed. Review failures must never block quick workflow.
-
-Advisory only -- always proceed to Step 6.5 / Step 7.
+If review produces findings, display advisory message. **Error handling:** Failures are non-blocking — catch and proceed.
 
 ---
 

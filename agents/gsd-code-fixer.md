@@ -67,26 +67,30 @@ Before editing ANY file for a finding, establish safe rollback capability.
 
 **Rollback Protocol:**
 
-1. **Record files:** Note exactly which files will be touched for this finding before editing.
+1. **Capture pre-fix state:** For EACH file about to be modified for this finding:
+   - Use Read tool to load FULL file content
+   - Store content in memory (e.g., `PRE_FIX_CONTENT["path/to/file"]`)
+   - Record exactly which files will be touched for this finding
 
-2. **Apply fix:** Use Edit tool (preferred) for targeted changes.
+2. **Apply fix:** Use Edit tool (preferred) for targeted changes
 
-3. **Verify fix:** Apply 3-tier verification strategy (see verification_strategy).
+3. **Verify fix:** Apply 3-tier verification strategy (see verification_strategy)
 
 4. **On verification failure:**
-   - Run `git checkout -- {file}` for EACH file touched for this finding.
-   - This is safe: the fix edit has NOT been committed yet (commit only happens after verification passes in step 3g). `git checkout --` reverts only the uncommitted in-progress change for that file — it does not affect commits from prior findings.
-   - Do NOT use Write tool for rollback — a partial write on tool failure leaves the file corrupted with no recovery path.
+   - Restore ONLY the files touched for the current finding to their pre-fix contents
+   - Use Write tool with captured `PRE_FIX_CONTENT` — this is the safe rollback mechanism
+   - **DO NOT use `git checkout` or `git restore`** — these could revert unrelated staged changes or changes from prior findings
+   - Write tool with captured content ensures surgical rollback
 
 5. **After rollback:**
-   - Re-read the file and confirm it matches the pre-fix state.
-   - Mark finding as "skipped: fix caused errors, rolled back".
-   - Document failure details in skip reason.
-   - Continue with next finding.
+   - Re-read the file and confirm it matches pre-fix state
+   - Mark finding as "skipped: fix caused errors, rolled back"
+   - Document failure details in skip reason
+   - Continue with next finding
 
-**Rollback scope:** Per-finding only. Files modified by prior (already committed) findings are NOT touched during rollback — `git checkout --` only reverts uncommitted changes.
+**Rollback scope:** Per-finding only. Files modified by prior (already committed) findings are NOT touched during rollback.
 
-**Key constraint:** Each finding is independent. Rollback for finding N does NOT affect commits from findings 1 through N-1.
+**Key constraint:** Each finding is independent. Rollback for finding N does NOT affect commits/changes from findings 1 through N-1.
 
 </rollback_strategy>
 
@@ -134,9 +138,6 @@ If no syntax checker is available for the file type (e.g., `.md`, `.sh`, obscure
 - Running full test suite between fixes (too slow)
 - End-to-end testing (handled by verifier phase later)
 - Verification is per-fix, not per-session
-
-**Logic bug limitation — IMPORTANT:**
-Tier 1 and Tier 2 only verify syntax/structure, NOT semantic correctness. A fix that introduces a wrong condition, off-by-one, or incorrect logic will pass both tiers and get committed. For findings where the REVIEW.md classifies the issue as a logic error (incorrect condition, wrong algorithm, bad state handling), set the commit status in REVIEW-FIX.md as `"fixed: requires human verification"` rather than `"fixed"`. This flags it for the developer to manually confirm the logic is actually correct before the phase is verified.
 
 </verification_strategy>
 
@@ -269,10 +270,11 @@ For each finding in sorted order:
 - For primary file: read at least +/- 10 lines around cited line for context
 - For additional files: read full file
 
-**b. Record files to touch (CRITICAL for safe rollback):**
+**b. Capture pre-fix state (CRITICAL for safe rollback):**
 - For EVERY file about to be modified:
-  - Record file path in `touched_files` list for this finding
-  - No need to capture content — rollback uses `git checkout -- {file}` which is atomic
+  - Use Read tool to load FULL file content
+  - Store in memory: `PRE_FIX_CONTENT[file_path] = content`
+  - Record file in `touched_files` list for this finding
 
 **c. Determine if fix applies:**
 - Compare current code state to what reviewer described
@@ -509,7 +511,7 @@ Fixes are committed **per-finding**. This has operational implications:
 - [ ] No source files left in broken state (failed fixes rolled back using captured pre-fix content)
 - [ ] No partial or uncommitted changes remain after execution
 - [ ] Verification performed for each fix (minimum: re-read, preferred: syntax check)
-- [ ] Safe rollback used `git checkout -- {file}` (atomic, not Write tool)
+- [ ] Safe rollback used Write tool with captured content (NOT git checkout/restore)
 - [ ] Skipped findings documented with specific skip reasons
 - [ ] Project conventions from CLAUDE.md respected during fixes
 

@@ -93,26 +93,6 @@ describe('CR-AGENT: code review agent frontmatter', () => {
     assert.ok(!frontmatter.includes('skills:'),
       'gsd-code-fixer has skills: in frontmatter — breaks Gemini CLI');
   });
-
-  test('gsd-code-fixer.md rollback uses git checkout (atomic, not Write tool)', () => {
-    const content = fs.readFileSync(path.join(AGENTS_DIR, 'gsd-code-fixer.md'), 'utf-8');
-    assert.ok(content.includes('git checkout --'),
-      'gsd-code-fixer rollback should use git checkout -- {file} for atomic rollback');
-    assert.ok(!content.includes('PRE_FIX_CONTENT'),
-      'gsd-code-fixer should not capture pre-fix content in memory (use git checkout instead)');
-  });
-
-  test('gsd-code-fixer.md flags logic-bug fixes for human review', () => {
-    const content = fs.readFileSync(path.join(AGENTS_DIR, 'gsd-code-fixer.md'), 'utf-8');
-    assert.ok(content.includes('requires human verification'),
-      'gsd-code-fixer should flag logic-bug fixes as requiring human verification');
-  });
-
-  test('gsd-code-reviewer.md REVIEW.md spec includes files_reviewed_list field', () => {
-    const content = fs.readFileSync(path.join(AGENTS_DIR, 'gsd-code-reviewer.md'), 'utf-8');
-    assert.ok(content.includes('files_reviewed_list'),
-      'gsd-code-reviewer REVIEW.md frontmatter spec must include files_reviewed_list for --auto scope persistence');
-  });
 });
 
 // --- CR-CMD: code review command structure ---

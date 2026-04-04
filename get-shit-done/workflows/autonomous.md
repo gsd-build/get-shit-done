@@ -342,48 +342,24 @@ Skill(skill="gsd:execute-phase", args="${PHASE_NUM} --no-transition")
 
 **3c.5. Code Review and Fix**
 
-Auto-invoke code review and fix chain. Autonomous mode chains both review and fix automatically (unlike execute-phase/quick which only suggest fix).
+Auto-invoke code review and fix chain. Autonomous mode chains both review and fix (unlike execute-phase/quick which only suggest fix).
 
 **Config gate:**
 ```bash
 CODE_REVIEW_ENABLED=$(node "$HOME/.claude/get-shit-done/bin/gsd-tools.cjs" config-get workflow.code_review 2>/dev/null || echo "true")
 ```
-If `CODE_REVIEW_ENABLED` is `"false"`: display "Code review skipped (workflow.code_review=false)" and proceed to 3d.
+If `"false"`: display "Code review skipped (workflow.code_review=false)" and proceed to 3d.
 
-**Invoke review:**
 ```
 Skill(skill="gsd:code-review", args="${PHASE_NUM}")
 ```
 
-**Check results using deterministic path:**
-```bash
-PADDED=$(printf "%02d" "${PHASE_NUM}")
-REVIEW_FILE="${PHASE_DIR}/${PADDED}-REVIEW.md"
-```
-
-If `REVIEW_FILE` exists, parse status from frontmatter only:
-```bash
-REVIEW_STATUS=$(sed -n '/^---$/,/^---$/p' "$REVIEW_FILE" | grep "^status:" | head -1 | cut -d: -f2 | tr -d ' ')
-```
-
-**Decision logic:**
-
-If REVIEW_STATUS is "clean" or "skipped" or empty:
-- Display: "Code review clean for phase ${PHASE_NUM}"
-- Proceed to 3d.
-
-If REVIEW_STATUS has findings (not "clean", not "skipped", not empty):
-- Display: "Code review found issues -- auto-fixing..."
-- Invoke fix:
+Parse status from REVIEW.md frontmatter. If "clean" or "skipped": proceed to 3d. If findings found: auto-invoke:
 ```
 Skill(skill="gsd:code-review-fix", args="${PHASE_NUM} --auto")
 ```
-- The `--auto` flag triggers the iteration loop (up to 3 iterations) in the fix workflow.
-- Display: "Code review + fix complete for phase ${PHASE_NUM}"
 
-**Error handling:** If either Skill invocation (review or fix) fails or throws, catch the error, display "Code review/fix encountered an error (non-blocking): {error}" and proceed to 3d. Review/fix failures must never block the autonomous pipeline.
-
-Always proceed to 3d regardless of outcome.
+**Error handling:** If either Skill fails, catch the error, display as non-blocking, and proceed to 3d.
 
 **3d. Post-Execution Routing**
 
@@ -1039,6 +1015,4 @@ When any phase operation fails or a blocker is detected, present 3 options via A
 - [ ] `--interactive` main context only accumulates discuss conversations (lean)
 - [ ] `--interactive` waits for background agents before post-execution routing
 - [ ] `--interactive` compatible with `--only` and `--from` flags
-- [ ] Code review auto-invoked after execute for each phase (gated by workflow.code_review)
-- [ ] Code review fix auto-chained with --auto when findings exist
 </success_criteria>
