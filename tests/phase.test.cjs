@@ -2173,6 +2173,12 @@ describe('phase complete updates Performance Metrics', () => {
 
     const stateAfter = fs.readFileSync(path.join(tmpDir, '.planning', 'STATE.md'), 'utf-8');
     assert.ok(stateAfter.match(/\|\s*1\s*\|\s*2\s*\|/), 'By Phase table should have row for phase 1 with 2 plans');
+    // Row must appear BEFORE the next section, not after it (regression: empty table body regex)
+    const rowIdx = stateAfter.indexOf('| 1 |');
+    const accIdx = stateAfter.indexOf('## Accumulated Context');
+    if (accIdx !== -1) {
+      assert.ok(rowIdx < accIdx, 'By Phase row must appear before ## Accumulated Context section');
+    }
   });
 });
 
