@@ -659,7 +659,7 @@ describe('copyCommandsAsCopilotSkills', () => {
     assert.ok(skillContent.includes('description: Run all remaining phases autonomously'),
       'description preserved');
     // argument-hint present and double-quoted
-    assert.ok(skillContent.includes('argument-hint: "[--from N] [--only N] [--interactive]"'), 'argument-hint present and quoted');
+    assert.ok(skillContent.includes('argument-hint: "[--from N] [--to N] [--only N] [--interactive]"'), 'argument-hint present and quoted');
     // allowed-tools comma-separated
     assert.ok(skillContent.includes('allowed-tools: Read, Write, Bash, Glob, Grep, AskUserQuestion, Task'),
       'allowed-tools is comma-separated');

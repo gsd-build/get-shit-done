@@ -1,6 +1,6 @@
 <purpose>
 
-Drive milestone phases autonomously — all remaining phases, or a single phase via `--only N`. For each incomplete phase: discuss → plan → execute using Skill() flat invocations. Pauses only for explicit user decisions (grey area acceptance, blockers, validation requests). Re-reads ROADMAP.md after each phase to catch dynamically inserted phases.
+Drive milestone phases autonomously — all remaining phases, a range via `--from N`/`--to N`, or a single phase via `--only N`. For each incomplete phase: discuss → plan → execute using Skill() flat invocations. Pauses only for explicit user decisions (grey area acceptance, blockers, validation requests). Re-reads ROADMAP.md after each phase to catch dynamically inserted phases.
 
 </purpose>
 
@@ -16,12 +16,17 @@ Read all files referenced by the invoking prompt's execution_context before star
 
 ## 1. Initialize
 
-Parse `$ARGUMENTS` for `--from N`, `--only N`, and `--interactive` flags:
+Parse `$ARGUMENTS` for `--from N`, `--to N`, `--only N`, and `--interactive` flags:
 
 ```bash
 FROM_PHASE=""
 if echo "$ARGUMENTS" | grep -qE '\-\-from\s+[0-9]'; then
   FROM_PHASE=$(echo "$ARGUMENTS" | grep -oE '\-\-from\s+[0-9]+\.?[0-9]*' | awk '{print $2}')
+fi
+
+TO_PHASE=""
+if echo "$ARGUMENTS" | grep -qE '\-\-to\s+[0-9]'; then
+  TO_PHASE=$(echo "$ARGUMENTS" | grep -oE '\-\-to\s+[0-9]+\.?[0-9]*' | awk '{print $2}')
 fi
 
 ONLY_PHASE=""
@@ -65,6 +70,7 @@ Display startup banner:
 
 If `ONLY_PHASE` is set, display: `Single phase mode: Phase ${ONLY_PHASE}`
 Else if `FROM_PHASE` is set, display: `Starting from phase ${FROM_PHASE}`
+If `TO_PHASE` is set, display: `Stopping after phase ${TO_PHASE}`
 If `INTERACTIVE` is set, display: `Mode: Interactive (discuss inline, plan+execute in background)`
 
 </step>
@@ -85,7 +91,17 @@ Parse the JSON `phases` array.
 
 **Apply `--from N` filter:** If `FROM_PHASE` was provided, additionally filter out phases where `number < FROM_PHASE` (use numeric comparison — handles decimal phases like "5.1").
 
+**Apply `--to N` filter:** If `TO_PHASE` was provided, additionally filter out phases where `number > TO_PHASE` (use numeric comparison). This limits execution to phases up through the target phase.
+
 **Apply `--only N` filter:** If `ONLY_PHASE` was provided, additionally filter OUT phases where `number != ONLY_PHASE`. This means the phase list will contain exactly one phase (or zero if already complete).
+
+**If `TO_PHASE` is set and no phases remain** (all phases up to N are already completed):
+
+```
+All phases through ${TO_PHASE} are already completed. Nothing to do.
+```
+
+Exit cleanly.
 
 **If `ONLY_PHASE` is set and no phases remain** (phase already complete):
 
@@ -758,6 +774,21 @@ Decisions captured: {count} across {area_count} areas
 
 **If `ONLY_PHASE` is set:** Do not iterate. Proceed directly to lifecycle step (which exits cleanly per single-phase mode).
 
+**If `TO_PHASE` is set and current phase number >= `TO_PHASE`:** The target phase has been reached. Do not iterate further. Display:
+
+```
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+ GSD ► AUTONOMOUS ▸ --to ${TO_PHASE} REACHED
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+ Completed through phase ${TO_PHASE} as requested.
+ Remaining phases were not executed.
+
+ Resume with: /gsd:autonomous --from ${next_incomplete_phase}
+```
+
+Proceed directly to lifecycle step (which handles partial completion — skips audit/complete/cleanup since not all phases are done). Exit cleanly.
+
 **Otherwise:** After each phase completes, re-read ROADMAP.md to catch phases inserted mid-execution (decimal phases like 5.1):
 
 ```bash
@@ -767,6 +798,7 @@ ROADMAP=$(node "$HOME/.claude/get-shit-done/bin/gsd-tools.cjs" roadmap analyze)
 Re-filter incomplete phases using the same logic as discover_phases:
 - Keep phases where `disk_status !== "complete"` OR `roadmap_complete === false`
 - Apply `--from N` filter if originally provided
+- Apply `--to N` filter if originally provided
 - Sort by number ascending
 
 Read STATE.md fresh:
@@ -947,7 +979,7 @@ When any phase operation fails or a blocker is detected, present 3 options via A
  Skipped: {list of skipped phases}
  Remaining: {list of remaining phases}
 
- Resume with: /gsd-autonomous ${ONLY_PHASE ? "--only " + ONLY_PHASE : "--from " + next_phase}
+ Resume with: /gsd-autonomous ${ONLY_PHASE ? "--only " + ONLY_PHASE : "--from " + next_phase}${TO_PHASE ? " --to " + TO_PHASE : ""}
 ```
 
 </step>
@@ -988,10 +1020,17 @@ When any phase operation fails or a blocker is detected, present 3 options via A
 - [ ] `--only N` exits cleanly after single phase completes
 - [ ] `--only N` on already-complete phase exits with message
 - [ ] `--only N` handle_blocker resume message uses --only flag
+- [ ] `--to N` stops execution after phase N completes (halts at iterate step)
+- [ ] `--to N` filters out phases with number > N during discovery
+- [ ] `--to N` displays "Stopping after phase N" in startup banner
+- [ ] `--to N` on already completed target exits with "already completed" message
+- [ ] `--to N` compatible with `--from N` (run phases from M to N)
+- [ ] `--to N` handle_blocker resume message preserves --to flag
+- [ ] `--to N` skips lifecycle when not all milestone phases complete
 - [ ] `--interactive` runs discuss inline via gsd:discuss-phase (asks questions, waits for user)
 - [ ] `--interactive` dispatches plan and execute as background agents (context isolation)
 - [ ] `--interactive` enables pipeline parallelism: discuss Phase N+1 while Phase N builds
 - [ ] `--interactive` main context only accumulates discuss conversations (lean)
 - [ ] `--interactive` waits for background agents before post-execution routing
-- [ ] `--interactive` compatible with `--only` and `--from` flags
+- [ ] `--interactive` compatible with `--only`, `--from`, and `--to` flags
 </success_criteria>
