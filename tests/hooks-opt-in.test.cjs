@@ -18,6 +18,18 @@ const { spawnSync } = require('child_process');
 const HOOKS_DIR = path.join(__dirname, '..', 'hooks');
 const isWindows = process.platform === 'win32';
 
+// Ensure the running node binary is on PATH so bash hooks can call `node`
+// (Claude Code shell sessions do not have `node` on PATH).
+const hookEnv = {
+  ...process.env,
+  PATH: `${path.dirname(process.execPath)}:${process.env.PATH || '/usr/local/bin:/usr/bin:/bin'}`,
+};
+
+// Wrapper that always injects hookEnv so bash hooks can find `node`.
+function spawnHook(hookPath, options) {
+  return spawnSync('bash', [hookPath], { ...options, env: hookEnv });
+}
+
 // ─── Helpers ────────────────────────────────────────────────────────────────
 
 function createTempProject(prefix = 'gsd-hook-test-') {
@@ -212,7 +224,7 @@ describe('opt-in gating behavior', { skip: isWindows ? 'bash hooks require unix 
       tool_input: { command: 'git commit -m "WIP save"' }
     });
 
-    const result = spawnSync('bash', [hookPath], {
+    const result = spawnHook(hookPath, {
       input,
       encoding: 'utf-8',
       cwd: tmpDir,
@@ -231,7 +243,7 @@ describe('opt-in gating behavior', { skip: isWindows ? 'bash hooks require unix 
     });
 
     try {
-      const result = spawnSync('bash', [hookPath], {
+      const result = spawnHook(hookPath, {
         input,
         encoding: 'utf-8',
         cwd: bareDir,
@@ -248,7 +260,7 @@ describe('opt-in gating behavior', { skip: isWindows ? 'bash hooks require unix 
     writeMinimalStateMd(tmpDir);
     const hookPath = path.join(HOOKS_DIR, 'gsd-session-state.sh');
 
-    const result = spawnSync('bash', [hookPath], {
+    const result = spawnHook(hookPath, {
       input: '',
       encoding: 'utf-8',
       cwd: tmpDir,
@@ -269,7 +281,7 @@ describe('opt-in gating behavior', { skip: isWindows ? 'bash hooks require unix 
       tool_input: { file_path: '.planning/STATE.md' }
     });
 
-    const result = spawnSync('bash', [hookPath], {
+    const result = spawnHook(hookPath, {
       input,
       encoding: 'utf-8',
       cwd: tmpDir,
@@ -305,7 +317,7 @@ describe('hook execution when enabled', { skip: isWindows ? 'bash hooks require 
       tool_input: { command: 'git commit -m "fix(core): add locking mechanism"' }
     });
 
-    const result = spawnSync('bash', [hookPath], {
+    const result = spawnHook(hookPath, {
       input,
       encoding: 'utf-8',
       cwd: tmpDir,
@@ -320,7 +332,7 @@ describe('hook execution when enabled', { skip: isWindows ? 'bash hooks require 
       tool_input: { command: 'git commit -m "WIP save"' }
     });
 
-    const result = spawnSync('bash', [hookPath], {
+    const result = spawnHook(hookPath, {
       input,
       encoding: 'utf-8',
       cwd: tmpDir,
@@ -337,7 +349,7 @@ describe('hook execution when enabled', { skip: isWindows ? 'bash hooks require 
       tool_input: { command: 'git push origin main' }
     });
 
-    const result = spawnSync('bash', [hookPath], {
+    const result = spawnHook(hookPath, {
       input,
       encoding: 'utf-8',
       cwd: tmpDir,
@@ -350,7 +362,7 @@ describe('hook execution when enabled', { skip: isWindows ? 'bash hooks require 
     writeMinimalStateMd(tmpDir);
     const hookPath = path.join(HOOKS_DIR, 'gsd-session-state.sh');
 
-    const result = spawnSync('bash', [hookPath], {
+    const result = spawnHook(hookPath, {
       input: '',
       encoding: 'utf-8',
       cwd: tmpDir,
@@ -371,7 +383,7 @@ describe('hook execution when enabled', { skip: isWindows ? 'bash hooks require 
     const hookPath = path.join(HOOKS_DIR, 'gsd-session-state.sh');
 
     try {
-      const result = spawnSync('bash', [hookPath], {
+      const result = spawnHook(hookPath, {
         input: '',
         encoding: 'utf-8',
         cwd: noStateDir,
@@ -393,7 +405,7 @@ describe('hook execution when enabled', { skip: isWindows ? 'bash hooks require 
       tool_input: { file_path: '.planning/STATE.md' }
     });
 
-    const result = spawnSync('bash', [hookPath], {
+    const result = spawnHook(hookPath, {
       input,
       encoding: 'utf-8',
       cwd: tmpDir,
@@ -429,7 +441,7 @@ describe('hook security tests', { skip: isWindows ? 'bash hooks require unix she
       tool_input: { command: 'git commit -m "$(rm -rf /)"' }
     });
 
-    const result = spawnSync('bash', [hookPath], {
+    const result = spawnHook(hookPath, {
       input,
       encoding: 'utf-8',
       cwd: tmpDir,
@@ -445,7 +457,7 @@ describe('hook security tests', { skip: isWindows ? 'bash hooks require unix she
       tool_input: { command: 'git commit -m "`whoami`"' }
     });
 
-    const result = spawnSync('bash', [hookPath], {
+    const result = spawnHook(hookPath, {
       input,
       encoding: 'utf-8',
       cwd: tmpDir,
@@ -461,7 +473,7 @@ describe('hook security tests', { skip: isWindows ? 'bash hooks require unix she
       tool_input: { command: 'git commit -m "fix(api/v2): handle edge case"' }
     });
 
-    const result = spawnSync('bash', [hookPath], {
+    const result = spawnHook(hookPath, {
       input,
       encoding: 'utf-8',
       cwd: tmpDir,
@@ -474,7 +486,7 @@ describe('hook security tests', { skip: isWindows ? 'bash hooks require unix she
     const hookPath = path.join(HOOKS_DIR, 'gsd-phase-boundary.sh');
     const input = 'not json at all';
 
-    const result = spawnSync('bash', [hookPath], {
+    const result = spawnHook(hookPath, {
       input,
       encoding: 'utf-8',
       cwd: tmpDir,
@@ -495,7 +507,7 @@ describe('hook security tests', { skip: isWindows ? 'bash hooks require unix she
       tool_input: { command: 'git commit -m "WIP save"' }
     });
 
-    const result = spawnSync('bash', [hookPath], {
+    const result = spawnHook(hookPath, {
       input,
       encoding: 'utf-8',
       cwd: tmpDir,

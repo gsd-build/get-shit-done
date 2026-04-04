@@ -46,7 +46,14 @@ function runGsdTools(args, cwd = process.cwd(), env = {}) {
         env: childEnv,
       });
     } else {
-      result = execSync(`node "${TOOLS_PATH}" ${args}`, {
+      // Split shell-style string into argv, stripping surrounding quotes, so we
+      // can invoke execFileSync with process.execPath instead of relying on
+      // `node` being on PATH (it isn't in Claude Code shell sessions).
+      // Apply shell-style quote removal: strip surrounding quotes from quoted
+      // sequences anywhere in a token (handles both "foo bar" and --"foo bar").
+      const argv = (args.match(/(?:[^\s"']+|"[^"]*"|'[^']*')+/g) || [])
+        .map(t => t.replace(/"([^"]*)"/g, '$1').replace(/'([^']*)'/g, '$1'));
+      result = execFileSync(process.execPath, [TOOLS_PATH, ...argv], {
         cwd,
         encoding: 'utf-8',
         stdio: ['pipe', 'pipe', 'pipe'],

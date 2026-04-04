@@ -343,8 +343,9 @@ describe('multi-process concurrent write tests', () => {
     );
 
     const toolsPath = TOOLS_PATH;
-    const cmdA = `node "${toolsPath}" state patch --Status Complete --cwd "${tmpDir}"`;
-    const cmdB = `node "${toolsPath}" state patch --"Current Plan" 01-02 --cwd "${tmpDir}"`;
+    const nodeBin = process.execPath;
+    const cmdA = `"${nodeBin}" "${toolsPath}" state patch --Status Complete --cwd "${tmpDir}"`;
+    const cmdB = `"${nodeBin}" "${toolsPath}" state patch --"Current Plan" 01-02 --cwd "${tmpDir}"`;
 
     const [resultA, resultB] = await Promise.all([
       execAsync(cmdA, { encoding: 'utf-8' }).catch(e => e),
@@ -384,8 +385,9 @@ describe('multi-process concurrent write tests', () => {
     );
 
     const toolsPath = TOOLS_PATH;
-    const cmdA = `node "${toolsPath}" state patch --Status Complete --cwd "${tmpDir}"`;
-    const cmdB = `node "${toolsPath}" state patch --"Current Plan" 01-02 --cwd "${tmpDir}"`;
+    const nodeBin = process.execPath;
+    const cmdA = `"${nodeBin}" "${toolsPath}" state patch --Status Complete --cwd "${tmpDir}"`;
+    const cmdB = `"${nodeBin}" "${toolsPath}" state patch --"Current Plan" 01-02 --cwd "${tmpDir}"`;
 
     await Promise.all([
       execAsync(cmdA, { encoding: 'utf-8' }).catch(() => {}),
