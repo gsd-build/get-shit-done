@@ -365,7 +365,31 @@ function loadConfig(cwd) {
       response_language: get('response_language') || null,
     };
   } catch {
-    return defaults;
+    // Fall back to ~/.gsd/defaults.json for pre-project commands (#1683)
+    try {
+      const globalDefaultsPath = path.join(os.homedir(), '.gsd', 'defaults.json');
+      const raw = fs.readFileSync(globalDefaultsPath, 'utf-8');
+      const globalDefaults = JSON.parse(raw);
+      return {
+        ...defaults,
+        model_profile: globalDefaults.model_profile ?? defaults.model_profile,
+        commit_docs: globalDefaults.commit_docs ?? defaults.commit_docs,
+        research: globalDefaults.research ?? defaults.research,
+        plan_checker: globalDefaults.plan_checker ?? defaults.plan_checker,
+        verifier: globalDefaults.verifier ?? defaults.verifier,
+        nyquist_validation: globalDefaults.nyquist_validation ?? defaults.nyquist_validation,
+        parallelization: globalDefaults.parallelization ?? defaults.parallelization,
+        text_mode: globalDefaults.text_mode ?? defaults.text_mode,
+        resolve_model_ids: globalDefaults.resolve_model_ids ?? defaults.resolve_model_ids,
+        context_window: globalDefaults.context_window ?? defaults.context_window,
+        subagent_timeout: globalDefaults.subagent_timeout ?? defaults.subagent_timeout,
+        model_overrides: globalDefaults.model_overrides || null,
+        agent_skills: globalDefaults.agent_skills || {},
+        response_language: globalDefaults.response_language || null,
+      };
+    } catch {
+      return defaults;
+    }
   }
 }
 
