@@ -95,6 +95,9 @@ grep -n "type=\"checkpoint" [plan-path]
 </step>
 
 <step name="execute_tasks">
+At execution decision points, apply structured reasoning:
+@~/.claude/get-shit-done/references/thinking-models-execution.md
+
 For each task:
 
 1. **If `type="auto"`:**
@@ -415,6 +418,56 @@ If any stubs exist, add a `## Known Stubs` section to the SUMMARY listing each s
 
 Omit section if nothing found.
 </summary_creation>
+
+<learnings_write>
+After SUMMARY.md is written, check if this is the last plan in the phase and if learnings are enabled:
+
+```bash
+LEARNINGS_ENABLED=$(node "$HOME/.claude/get-shit-done/bin/gsd-tools.cjs" config-get features.learnings 2>/dev/null || echo "false")
+REMAINING=$(node "$HOME/.claude/get-shit-done/bin/gsd-tools.cjs" state remaining-plans 2>/dev/null || echo "1")
+```
+
+If `LEARNINGS_ENABLED=true` AND `REMAINING=0` (this is the last plan in the phase):
+
+Write `.planning/phases/{padded_phase}-{phase_slug}/{padded_phase}-LEARNINGS.md` with this structure:
+
+```markdown
+# Phase {N}: {phase_name} - Learnings
+
+**Phase:** {padded_phase}
+**Completed:** {YYYY-MM-DD}
+**Plans executed:** {total_plans_in_phase}
+
+## What Worked Well
+
+- [Pattern or approach that saved time or produced quality output — be specific]
+
+## Pitfalls Encountered
+
+- [What went wrong, root cause, how resolved — include file/line if relevant]
+
+## Decisions Made During Execution
+
+- [Any Rule 4 decisions or architectural choices not in CONTEXT.md]
+
+## Patterns to Reuse
+
+- [Code patterns, file structures, or conventions worth replicating in future phases]
+
+## Recommendations for Future Phases
+
+- [What the next planner should know — dependencies, constraints, gotchas]
+```
+
+Fill each section from execution memory: what happened during this phase's plans, what was found, what was changed. Sections with nothing notable should say "None noted."
+
+Commit the LEARNINGS.md file alongside the phase-closing commit:
+```bash
+node "$HOME/.claude/get-shit-done/bin/gsd-tools.cjs" commit "docs({phase}): write phase learnings" --files .planning/phases/{phase}-{slug}/{phase}-LEARNINGS.md
+```
+
+If `LEARNINGS_ENABLED=false` OR `REMAINING>0`: skip silently.
+</learnings_write>
 
 <self_check>
 After writing SUMMARY.md, verify claims before proceeding.

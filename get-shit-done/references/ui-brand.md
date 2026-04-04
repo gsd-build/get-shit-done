@@ -23,6 +23,33 @@ Use for major workflow transitions.
 - `PHASE {N} COMPLETE ✓`
 - `MILESTONE COMPLETE 🎉`
 
+### Status Line
+
+Append a status line to stage banners at workflow transitions (planning, execution, verification). Shows current phase context at a glance.
+
+```
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+ GSD ► {STAGE NAME}
+ Phase {N}: {phase_name} | {model_profile} | {context_tier}
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+```
+
+**Status line values:**
+- `{N}`: current phase number from STATE.md
+- `{phase_name}`: phase slug (e.g., `knowledge-quality-uplift`)
+- `{model_profile}`: from `gsd-tools config-get model_profile` — one of `quality / balanced / budget / adaptive` (default: `balanced`)
+- `{context_tier}`: from context-budget.md thresholds — one of `PEAK / GOOD / DEGRADING / POOR`
+
+**Context tier resolution:**
+```bash
+MODEL_PROFILE=$(node "$HOME/.claude/get-shit-done/bin/gsd-tools.cjs" config-get model_profile 2>/dev/null || echo "balanced")
+CONTEXT_WINDOW=$(node "$HOME/.claude/get-shit-done/bin/gsd-tools.cjs" config-get context_window_tokens 2>/dev/null || echo "200000")
+# Tier: PEAK (<30% used), GOOD (30-50%), DEGRADING (50-70%), POOR (70%+)
+# Workflows derive tier from current context usage at render time
+```
+
+**Omit the status line** when: phase number is not available (pre-init), or in error boxes and checkpoint boxes (status line is for stage banners only).
+
 ---
 
 ## Checkpoint Boxes
@@ -108,9 +135,9 @@ Always at end of major completions.
 
 **{Identifier}: {Name}** — {one-line description}
 
-`/clear` then:
-
 `{copy-paste command}`
+
+<sub>`/clear` first → fresh context window</sub>
 
 ───────────────────────────────────────────────────────────────
 

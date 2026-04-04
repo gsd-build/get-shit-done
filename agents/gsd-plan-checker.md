@@ -80,6 +80,9 @@ Same methodology (goal-backward), different timing, different subject matter.
 
 <verification_dimensions>
 
+For calibration on scoring and issue identification, reference these examples:
+@~/.claude/get-shit-done/references/few-shot-examples/plan-checker.md
+
 ## Dimension 1: Requirement Coverage
 
 **Question:** Does every phase requirement have task(s) addressing it?

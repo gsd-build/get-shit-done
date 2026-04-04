@@ -1022,6 +1022,9 @@ cat "$phase_dir"/*-DISCOVERY.md 2>/dev/null  # From mandatory discovery
 </step>
 
 <step name="break_into_tasks">
+At decision points during plan creation, apply structured reasoning:
+@~/.claude/get-shit-done/references/thinking-models-planning.md
+
 Decompose phase into tasks. **Think dependencies first, not sequence.**
 
 For each task:
@@ -1059,6 +1062,8 @@ for each plan B in plan_order:
 ```
 
 **Rule:** Same-wave plans must have zero `files_modified` overlap. After assigning waves, scan each wave; if any file appears in 2+ plans, bump the later plan to the next wave and repeat.
+
+See `@~/.claude/get-shit-done/references/wave-execution.md` for the full wave assignment algorithm, feature flag documentation, git lock retry patterns for parallel executors, and the phase manifest schema.
 </step>
 
 <step name="group_into_plans">
