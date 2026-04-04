@@ -12,7 +12,8 @@ const {
 } = require('./model-profiles.cjs');
 
 const VALID_CONFIG_KEYS = new Set([
-  'mode', 'granularity', 'parallelization', 'commit_docs', 'model_profile',
+  'mode', 'granularity', 'parallelization', 'commit_docs', 'model_profile', 'depth',
+  'execution_context', 'context_window_tokens',
   'search_gitignored', 'brave_search', 'firecrawl', 'exa_search',
   'workflow.research', 'workflow.plan_check', 'workflow.verifier',
   'workflow.nyquist_validation', 'workflow.ui_phase', 'workflow.ui_safety_gate',
@@ -23,13 +24,14 @@ const VALID_CONFIG_KEYS = new Set([
   'workflow.skip_discuss',
   'workflow._auto_chain_active',
   'workflow.use_worktrees',
+  'workflow.wave_execution',
   'git.branching_strategy', 'git.base_branch', 'git.phase_branch_template', 'git.milestone_branch_template', 'git.quick_branch_template',
   'planning.commit_docs', 'planning.search_gitignored',
   'workflow.subagent_timeout',
   'hooks.context_warnings',
   'project_code', 'phase_naming',
   'manager.flags.discuss', 'manager.flags.plan', 'manager.flags.execute',
-  'response_language',
+  'intel.enabled',
 ]);
 
 /**
@@ -41,6 +43,10 @@ function isValidConfigKey(keyPath) {
   if (VALID_CONFIG_KEYS.has(keyPath)) return true;
   // Allow agent_skills.<agent-type> with any agent type string
   if (/^agent_skills\.[a-zA-Z0-9_-]+$/.test(keyPath)) return true;
+  // Per-agent model overrides: models.gsd-planner, models.gsd-executor, etc.
+  if (/^models\.[a-zA-Z0-9_-]+$/.test(keyPath)) return true;
+  // Feature toggles: features.inline_verify, features.extended_context, etc.
+  if (/^features\.[a-zA-Z0-9_-]+$/.test(keyPath)) return true;
   return false;
 }
 
@@ -65,7 +71,7 @@ function validateKnownConfigKeyPath(keyPath) {
  * Merges (increasing priority):
  *   1. Hardcoded defaults — every key that loadConfig() resolves, plus mode/granularity
  *   2. User-level defaults from ~/.gsd/defaults.json (if present)
- *   3. userChoices — the settings the user explicitly selected during /gsd-new-project
+ *   3. userChoices — the settings the user explicitly selected during /gsd:new-project
  *
  * Uses the canonical `git` namespace for branching keys (consistent with VALID_CONFIG_KEYS
  * and the settings workflow). loadConfig() handles both flat and nested formats, so this
@@ -91,15 +97,10 @@ function buildNewProjectConfig(userChoices) {
   try {
     if (fs.existsSync(globalDefaultsPath)) {
       userDefaults = JSON.parse(fs.readFileSync(globalDefaultsPath, 'utf-8'));
-      // Migrate deprecated "depth" key to "granularity"
-      if ('depth' in userDefaults && !('granularity' in userDefaults)) {
-        const depthToGranularity = { quick: 'coarse', standard: 'standard', comprehensive: 'fine' };
-        userDefaults.granularity = depthToGranularity[userDefaults.depth] || userDefaults.depth;
-        delete userDefaults.depth;
-        try {
-          fs.writeFileSync(globalDefaultsPath, JSON.stringify(userDefaults, null, 2), 'utf-8');
-        } catch { /* intentionally empty */ }
-      }
+      // Historical migration: "depth" was auto-migrated to "granularity" in earlier GSD versions.
+      // Migration disabled — all existing configs have been migrated, and "depth" is now reused
+      // as an independent field (quick/standard/comprehensive) controlling workflow thoroughness.
+      // The old "granularity" field (coarse/standard/fine) controls plan granularity separately.
     }
   } catch {
     // Ignore malformed global defaults
@@ -174,7 +175,7 @@ function buildNewProjectConfig(userChoices) {
  * Command: create a fully-materialized .planning/config.json for a new project.
  *
  * Accepts user-chosen settings as a JSON string (the keys the user explicitly
- * configured during /gsd-new-project). All remaining keys are filled from
+ * configured during /gsd:new-project). All remaining keys are filled from
  * hardcoded defaults and optional ~/.gsd/defaults.json.
  *
  * Idempotent: if config.json already exists, returns { created: false }.
@@ -324,7 +325,7 @@ function cmdConfigSet(cwd, keyPath, value, raw) {
   validateKnownConfigKeyPath(keyPath);
 
   if (!isValidConfigKey(keyPath)) {
-    error(`Unknown config key: "${keyPath}". Valid keys: ${[...VALID_CONFIG_KEYS].sort().join(', ')}, agent_skills.<agent-type>`);
+    error(`Unknown config key: "${keyPath}". Valid keys: ${[...VALID_CONFIG_KEYS].sort().join(', ')}, agent_skills.<agent-type>, models.<agent-type>, features.<name>`);
   }
 
   // Parse value (handle booleans, numbers, and JSON arrays/objects)
@@ -441,10 +442,10 @@ function getCmdConfigSetModelProfileResultMessage(
 }
 
 module.exports = {
-  VALID_CONFIG_KEYS,
   cmdConfigEnsureSection,
   cmdConfigSet,
   cmdConfigGet,
   cmdConfigSetModelProfile,
   cmdConfigNewProject,
+  isValidConfigKey,
 };

@@ -245,13 +245,10 @@ function loadConfig(cwd) {
     const raw = fs.readFileSync(configPath, 'utf-8');
     const parsed = JSON.parse(raw);
 
-    // Migrate deprecated "depth" key to "granularity" with value mapping
-    if ('depth' in parsed && !('granularity' in parsed)) {
-      const depthToGranularity = { quick: 'coarse', standard: 'standard', comprehensive: 'fine' };
-      parsed.granularity = depthToGranularity[parsed.depth] || parsed.depth;
-      delete parsed.depth;
-      try { fs.writeFileSync(configPath, JSON.stringify(parsed, null, 2), 'utf-8'); } catch { /* intentionally empty */ }
-    }
+    // Historical migration: "depth" was auto-migrated to "granularity" in earlier GSD versions.
+    // Migration disabled — all existing configs have been migrated, and "depth" is now reused
+    // as an independent field (quick/standard/comprehensive) controlling workflow thoroughness.
+    // The old "granularity" field (coarse/standard/fine) controls plan granularity separately.
 
     // Auto-detect and sync sub_repos: scan for child directories with .git
     let configDirty = false;
@@ -284,28 +281,6 @@ function loadConfig(cwd) {
     // Persist sub_repos changes (migration or sync)
     if (configDirty) {
       try { fs.writeFileSync(configPath, JSON.stringify(parsed, null, 2), 'utf-8'); } catch {}
-    }
-
-    // Warn about unrecognized top-level keys so users don't silently lose config.
-    // Derived from config-set's VALID_CONFIG_KEYS (canonical source) plus internal-only
-    // keys that loadConfig handles but config-set doesn't expose. This avoids maintaining
-    // a hardcoded duplicate that drifts when new config keys are added.
-    const { VALID_CONFIG_KEYS } = require('./config.cjs');
-    const KNOWN_TOP_LEVEL = new Set([
-      // Extract top-level key names from dot-notation paths (e.g., 'workflow.research' → 'workflow')
-      ...[...VALID_CONFIG_KEYS].map(k => k.split('.')[0]),
-      // Section containers that hold nested sub-keys
-      'git', 'workflow', 'planning', 'hooks',
-      // Internal keys loadConfig reads but config-set doesn't expose
-      'model_overrides', 'agent_skills', 'context_window', 'resolve_model_ids',
-      // Deprecated keys (still accepted for migration, not in config-set)
-      'depth', 'multiRepo',
-    ]);
-    const unknownKeys = Object.keys(parsed).filter(k => !KNOWN_TOP_LEVEL.has(k));
-    if (unknownKeys.length > 0) {
-      process.stderr.write(
-        `gsd-tools: warning: unknown config key(s) in .planning/config.json: ${unknownKeys.join(', ')} — these will be ignored\n`
-      );
     }
 
     const get = (key, nested) => {
@@ -354,10 +329,12 @@ function loadConfig(cwd) {
       phase_naming: get('phase_naming') ?? defaults.phase_naming,
       project_code: get('project_code') ?? defaults.project_code,
       subagent_timeout: get('subagent_timeout', { section: 'workflow', field: 'subagent_timeout' }) ?? defaults.subagent_timeout,
-      model_overrides: parsed.model_overrides || null,
+      execution_context: get('execution_context') ?? null,
+      context_window_tokens: get('context_window_tokens') ?? get('context_window') ?? defaults.context_window,
+      depth: get('depth') ?? null,
+      model_overrides: parsed.models || parsed.model_overrides || null,
       agent_skills: parsed.agent_skills || {},
       manager: parsed.manager || {},
-      response_language: get('response_language') || null,
     };
   } catch {
     return defaults;
@@ -885,45 +862,20 @@ function comparePhaseNum(a, b) {
   return 0;
 }
 
-/**
- * Extract the phase token from a directory name.
- * Supports: '01-name', '1009A-name', '999.6-name', 'CK-01-name', 'PROJ-42-name'.
- * Returns the token portion (e.g. '01', '1009A', '999.6', 'PROJ-42') or the full name if no separator.
- */
-function extractPhaseToken(dirName) {
-  // Try project-code-prefixed numeric: CK-01-name → CK-01, CK-01A.2-name → CK-01A.2
-  const codePrefixed = dirName.match(/^([A-Z]{1,6}-\d+[A-Z]?(?:\.\d+)*)(?:-|$)/i);
-  if (codePrefixed) return codePrefixed[1];
-  // Try plain numeric: 01-name, 1009A-name, 999.6-name
-  const numeric = dirName.match(/^(\d+[A-Z]?(?:\.\d+)*)(?:-|$)/i);
-  if (numeric) return numeric[1];
-  // Custom IDs: PROJ-42-name → everything before the last segment that looks like a name
-  const custom = dirName.match(/^([A-Z][A-Z0-9]*(?:-[A-Z0-9]+)*)(?:-[a-z]|$)/i);
-  if (custom) return custom[1];
-  return dirName;
-}
-
-/**
- * Check if a directory name's phase token matches the normalized phase exactly.
- * Case-insensitive comparison for the token portion.
- */
-function phaseTokenMatches(dirName, normalized) {
-  const token = extractPhaseToken(dirName);
-  if (token.toUpperCase() === normalized.toUpperCase()) return true;
-  // Strip optional project_code prefix from dir and retry
-  const stripped = dirName.replace(/^[A-Z]{1,6}-(?=\d)/i, '');
-  if (stripped !== dirName) {
-    const strippedToken = extractPhaseToken(stripped);
-    if (strippedToken.toUpperCase() === normalized.toUpperCase()) return true;
-  }
-  return false;
-}
-
 function searchPhaseInDir(baseDir, relBase, normalized) {
   try {
     const dirs = readSubdirectories(baseDir, true);
-    // Match: exact phase token comparison (not prefix matching)
-    const match = dirs.find(d => phaseTokenMatches(d, normalized));
+    // Match: starts with normalized (numeric) OR contains normalized as prefix segment (custom ID)
+    const match = dirs.find(d => {
+      if (d.startsWith(normalized)) return true;
+      // For custom IDs like PROJ-42, match case-insensitively
+      if (d.toUpperCase().startsWith(normalized.toUpperCase())) return true;
+      // Strip optional project_code prefix (e.g., 'CK-01-name' → '01-name') and retry
+      const stripped = d.replace(/^[A-Z]{1,6}-/, '');
+      if (stripped.startsWith(normalized)) return true;
+      if (stripped.toUpperCase().startsWith(normalized.toUpperCase())) return true;
+      return false;
+    });
     if (!match) return null;
 
     // Extract phase number and name — supports numeric (01-name), project-code-prefixed (CK-01-name), and custom (PROJ-42-name)
@@ -1463,8 +1415,6 @@ module.exports = {
   normalizePhaseName,
   comparePhaseNum,
   searchPhaseInDir,
-  extractPhaseToken,
-  phaseTokenMatches,
   findPhaseInternal,
   getArchivedPhaseDirs,
   getRoadmapPhaseInternal,

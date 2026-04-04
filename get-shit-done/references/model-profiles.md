@@ -4,20 +4,25 @@ Model profiles control which Claude model each GSD agent uses. This allows balan
 
 ## Profile Definitions
 
-| Agent | `quality` | `balanced` | `budget` | `inherit` |
-|-------|-----------|------------|----------|-----------|
-| gsd-planner | opus | opus | sonnet | inherit |
-| gsd-roadmapper | opus | sonnet | sonnet | inherit |
-| gsd-executor | opus | sonnet | sonnet | inherit |
-| gsd-phase-researcher | opus | sonnet | haiku | inherit |
-| gsd-project-researcher | opus | sonnet | haiku | inherit |
-| gsd-research-synthesizer | sonnet | sonnet | haiku | inherit |
-| gsd-debugger | opus | sonnet | sonnet | inherit |
-| gsd-codebase-mapper | sonnet | haiku | haiku | inherit |
-| gsd-verifier | sonnet | sonnet | haiku | inherit |
-| gsd-plan-checker | sonnet | sonnet | haiku | inherit |
-| gsd-integration-checker | sonnet | sonnet | haiku | inherit |
-| gsd-nyquist-auditor | sonnet | sonnet | haiku | inherit |
+| Agent | `quality` | `balanced` | `budget` | `adaptive` | `inherit` |
+|-------|-----------|------------|----------|------------|-----------|
+| gsd-planner | opus | opus | sonnet | sonnet | inherit |
+| gsd-roadmapper | opus | sonnet | sonnet | sonnet | inherit |
+| gsd-executor | opus | sonnet | sonnet | sonnet | inherit |
+| gsd-phase-researcher | opus | sonnet | haiku | sonnet | inherit |
+| gsd-project-researcher | opus | sonnet | haiku | sonnet | inherit |
+| gsd-research-synthesizer | sonnet | sonnet | haiku | haiku | inherit |
+| gsd-debugger | opus | sonnet | sonnet | sonnet | inherit |
+| gsd-codebase-mapper | sonnet | haiku | haiku | haiku | inherit |
+| gsd-verifier | sonnet | sonnet | haiku | sonnet | inherit |
+| gsd-plan-checker | sonnet | sonnet | haiku | haiku | inherit |
+| gsd-integration-checker | sonnet | sonnet | haiku | haiku | inherit |
+| gsd-nyquist-auditor | sonnet | sonnet | haiku | haiku | inherit |
+| gsd-ui-researcher | opus | sonnet | haiku | sonnet | inherit |
+| gsd-ui-checker | sonnet | sonnet | haiku | haiku | inherit |
+| gsd-ui-auditor | sonnet | sonnet | haiku | haiku | inherit |
+| gsd-doc-writer | opus | sonnet | haiku | sonnet | inherit |
+| gsd-doc-verifier | sonnet | sonnet | haiku | haiku | inherit |
 
 ## Profile Philosophy
 
@@ -31,6 +36,11 @@ Model profiles control which Claude model each GSD agent uses. This allows balan
 - Sonnet for execution and research (follows explicit instructions)
 - Sonnet for verification (needs reasoning, not just pattern matching)
 - Use when: normal development, good balance of quality and cost
+
+**adaptive** - Smart cost-quality tradeoff
+- Sonnet for agents that reason (research, planning, execution, debugging, verification)
+- Haiku for agents that do mechanical/aggregation work (mapper, synthesizer, checkers, auditors)
+- Use when: want quality planning without opus cost, or want better-than-budget verification
 
 **budget** - Minimal Opus usage
 - Sonnet for anything that writes code
@@ -69,7 +79,7 @@ If you're using Claude Code with OpenRouter, a local model, or any non-Anthropic
 
 ```bash
 # Via settings command
-/gsd-settings
+/gsd:settings
 # → Select "Inherit" for model profile
 
 # Or manually in .planning/config.json
@@ -109,7 +119,7 @@ Overrides take precedence over the profile. Valid values: `opus`, `sonnet`, `hai
 
 ## Switching Profiles
 
-Runtime: `/gsd-set-profile <profile>`
+Runtime: `/gsd:set-profile <profile>`
 
 Per-project default: Set in `.planning/config.json`:
 ```json
