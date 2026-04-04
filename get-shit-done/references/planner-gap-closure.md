@@ -2,6 +2,8 @@
 
 Triggered by `--gaps` flag. Creates plans to address verification or UAT failures.
 
+**Important: Skip deferred items.** When reading VERIFICATION.md, only the `gaps:` section contains actionable items that need closure plans. The `deferred:` section (if present) lists items explicitly addressed in later milestone phases — these are NOT gaps and must be ignored during gap closure planning. Creating plans for deferred items wastes effort on work already scheduled for future phases.
+
 **1. Find gap sources:**
 
 Use init context (from load_project_state) which provides `phase_dir`:

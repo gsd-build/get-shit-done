@@ -42,7 +42,12 @@ grep -E "^| ${phase_number}" .planning/REQUIREMENTS.md 2>/dev/null || true
 ls "$phase_dir"/*-SUMMARY.md "$phase_dir"/*-PLAN.md 2>/dev/null || true
 ```
 
-Extract **phase goal** from ROADMAP.md (the outcome to verify, not tasks) and **requirements** from REQUIREMENTS.md if it exists.
+Load full milestone phases for deferred-item filtering (Step 9b):
+```bash
+node "$HOME/.claude/get-shit-done/bin/gsd-tools.cjs" roadmap analyze
+```
+
+Extract **phase goal** from ROADMAP.md (the outcome to verify, not tasks), **requirements** from REQUIREMENTS.md if it exists, and **all milestone phases** from roadmap analyze (for cross-referencing gaps against later phases).
 </step>
 
 <step name="establish_must_haves">
@@ -303,6 +308,25 @@ Classify status using this decision tree IN ORDER (most restrictive first):
 **Score:** `verified_truths / total_truths`
 </step>
 
+<step name="filter_deferred_items">
+Before reporting gaps, cross-reference each gap against later phases in the milestone using the full roadmap data loaded in load_context (from `roadmap analyze`).
+
+For each potential gap identified in determine_status:
+1. Check if the gap's failed truth or missing item is covered by a later phase's goal or success criteria
+2. **Match criteria:** The gap's concern appears in a later phase's goal text, success criteria text, or the later phase's name clearly suggests it covers this area
+3. If a clear match is found → move the gap to a `deferred` list with the matching phase reference and evidence text
+4. If no match in any later phase → keep as a real `gap`
+
+**Important:** Be conservative. Only defer a gap when there is clear, specific evidence in a later phase. Vague or tangential matches should NOT cause deferral — when in doubt, keep it as a real gap.
+
+**Deferred items do NOT affect the status determination.** Recalculate after filtering:
+- If gaps list is now empty and no human items exist → `passed`
+- If gaps list is now empty but human items exist → `human_needed`
+- If gaps list still has items → `gaps_found`
+
+Include deferred items in VERIFICATION.md frontmatter (`deferred:` section) and body (Deferred Items table) for transparency. If no deferred items exist, omit these sections.
+</step>
+
 <step name="generate_fix_plans">
 If gaps_found:
 
@@ -344,7 +368,8 @@ Orchestrator routes: `passed` → update_roadmap | `gaps_found` → create/execu
 - [ ] Test quality audited (disabled tests, circular patterns, assertion strength, provenance)
 - [ ] Human verification items identified
 - [ ] Overall status determined
-- [ ] Fix plans generated (if gaps_found)
+- [ ] Deferred items filtered against later milestone phases (if gaps found)
+- [ ] Fix plans generated (if gaps_found after filtering)
 - [ ] VERIFICATION.md created with complete report
 - [ ] Results returned to orchestrator
 </success_criteria>

@@ -21,7 +21,9 @@ Then verify each level against the actual codebase.
 <step name="load_context" priority="first">
 Load phase operation context from injected context files. Extract: phase directory, phase number, phase name, plan count.
 
-Load phase details, plans, and summaries. Extract the **phase goal** from the roadmap (the outcome to verify, not tasks) and **requirements** if they exist.
+Load phase details, plans, and summaries. Also load the full milestone roadmap via `roadmap analyze` so the verifier can cross-reference gaps against later phases (for deferred-item filtering).
+
+Extract the **phase goal** from the roadmap (the outcome to verify, not tasks), **requirements** if they exist, and **all milestone phases** for deferred-item filtering.
 </step>
 
 <step name="establish_must_haves">
@@ -92,6 +94,19 @@ Categorize: Blocker (prevents goal) | Warning (incomplete) | Info (notable).
 **gaps_found:** Any truth FAILED, artifact MISSING/STUB, key link NOT_WIRED, or blocker found.
 
 **Score:** verified_truths / total_truths
+</step>
+
+<step name="filter_deferred_items">
+Before reporting gaps, cross-reference each gap against later phases in the milestone (from the `roadmap analyze` data loaded in load_context).
+
+For each potential gap: check if a later phase's goal or success criteria explicitly covers the concern. If there is a clear match, move the gap to a `deferred` list with the matching phase reference and evidence. Only defer when there is specific evidence -- vague matches should remain as real gaps.
+
+Deferred items do not affect status. Recalculate after filtering:
+- Gaps list empty, no human items -> passed
+- Gaps list empty, human items exist -> human_needed (not applicable in SDK headless mode)
+- Gaps list still has items -> gaps_found
+
+Include deferred items in VERIFICATION.md frontmatter and body for transparency.
 </step>
 
 <step name="generate_fix_plans">
