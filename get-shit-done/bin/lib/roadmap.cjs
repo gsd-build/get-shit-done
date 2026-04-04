@@ -87,10 +87,14 @@ function cmdRoadmapGetPhase(cwd, phaseNum, raw) {
     // Escape special regex chars in phase number, handle decimal
     const escapedPhase = escapeRegex(phaseNum);
 
-    // Search the current milestone slice first, then fall back to full roadmap
+    // Search the current milestone slice first, then fall back to full roadmap.
+    // A malformed_roadmap result (checklist-only) from the milestone should not
+    // block finding a full header match in the wider roadmap content.
     const fullContent = stripShippedMilestones(rawContent);
-    const result = searchPhaseInContent(milestoneContent, escapedPhase, phaseNum)
-      || searchPhaseInContent(fullContent, escapedPhase, phaseNum);
+    const milestoneResult = searchPhaseInContent(milestoneContent, escapedPhase, phaseNum);
+    const result = (milestoneResult && !milestoneResult.error)
+      ? milestoneResult
+      : searchPhaseInContent(fullContent, escapedPhase, phaseNum) || milestoneResult;
 
     if (!result) {
       output({ found: false, phase_number: phaseNum }, raw, '');

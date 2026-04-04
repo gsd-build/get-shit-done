@@ -178,6 +178,35 @@ describe('roadmap get-phase fallback to full ROADMAP.md (#1634)', () => {
     assert.ok(output.message.includes('missing'), 'should explain the issue');
   });
 
+  test('checklist in milestone does not block full header match in wider roadmap', () => {
+    writeState(tmpDir, 'v1.0');
+    fs.writeFileSync(
+      path.join(tmpDir, '.planning', 'ROADMAP.md'),
+      `# Roadmap
+
+## v1.0 Current Release
+
+### Phase 1: Foundation
+**Goal:** Set up project infrastructure
+
+- [ ] **Phase 50: Cleanup** - referenced in checklist
+
+## v2.0 Future Release
+
+### Phase 50: Cleanup
+**Goal:** Remove deprecated modules
+`
+    );
+
+    const result = runGsdTools('roadmap get-phase 50', tmpDir);
+    assert.ok(result.success, `Command failed: ${result.error}`);
+
+    const output = JSON.parse(result.output);
+    assert.equal(output.found, true, 'full header in v2.0 should win over checklist in v1.0');
+    assert.equal(output.phase_name, 'Cleanup');
+    assert.equal(output.goal, 'Remove deprecated modules');
+  });
+
   test('section extraction from fallback includes correct content boundaries', () => {
     writeState(tmpDir, 'v1.0');
     fs.writeFileSync(
