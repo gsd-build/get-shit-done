@@ -272,6 +272,81 @@ describe('copyCommandsAsClaudeSkills', () => {
   });
 });
 
+// ─── Path replacement in Claude skills (#1653) ────────────────────────────────
+
+describe('copyCommandsAsClaudeSkills path replacement (#1653)', () => {
+  let tmpDir;
+
+  beforeEach(() => {
+    tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), 'gsd-claude-path-test-'));
+  });
+
+  afterEach(() => {
+    fs.rmSync(tmpDir, { recursive: true, force: true });
+  });
+
+  test('replaces ~/.claude/ paths with pathPrefix on local install', () => {
+    const srcDir = path.join(tmpDir, 'src');
+    fs.mkdirSync(srcDir, { recursive: true });
+    fs.writeFileSync(
+      path.join(srcDir, 'manager.md'),
+      [
+        '---',
+        'name: gsd:manager',
+        'description: Manager command',
+        '---',
+        '',
+        '<execution_context>',
+        '@~/.claude/get-shit-done/workflows/manager.md',
+        '@~/.claude/get-shit-done/references/ui-brand.md',
+        '</execution_context>',
+      ].join('\n')
+    );
+
+    const skillsDir = path.join(tmpDir, 'skills');
+    const localPrefix = '/Users/test/myproject/.claude/';
+    copyCommandsAsClaudeSkills(srcDir, skillsDir, 'gsd', localPrefix, 'claude', false);
+
+    const content = fs.readFileSync(path.join(skillsDir, 'gsd-manager', 'SKILL.md'), 'utf8');
+    assert.ok(!content.includes('~/.claude/'), 'no hardcoded ~/.claude/ paths remain');
+    assert.ok(content.includes(localPrefix + 'get-shit-done/workflows/manager.md'), 'path rewritten to local prefix');
+    assert.ok(content.includes(localPrefix + 'get-shit-done/references/ui-brand.md'), 'reference path rewritten');
+  });
+
+  test('replaces $HOME/.claude/ paths with pathPrefix', () => {
+    const srcDir = path.join(tmpDir, 'src');
+    fs.mkdirSync(srcDir, { recursive: true });
+    fs.writeFileSync(
+      path.join(srcDir, 'debug.md'),
+      '---\nname: gsd:debug\ndescription: Debug\n---\n\n@$HOME/.claude/get-shit-done/workflows/debug.md'
+    );
+
+    const skillsDir = path.join(tmpDir, 'skills');
+    const localPrefix = '/tmp/project/.claude/';
+    copyCommandsAsClaudeSkills(srcDir, skillsDir, 'gsd', localPrefix, 'claude', false);
+
+    const content = fs.readFileSync(path.join(skillsDir, 'gsd-debug', 'SKILL.md'), 'utf8');
+    assert.ok(!content.includes('$HOME/.claude/'), 'no $HOME/.claude/ paths remain');
+    assert.ok(content.includes(localPrefix + 'get-shit-done/workflows/debug.md'), 'path rewritten');
+  });
+
+  test('global install preserves $HOME/.claude/ when pathPrefix matches', () => {
+    const srcDir = path.join(tmpDir, 'src');
+    fs.mkdirSync(srcDir, { recursive: true });
+    fs.writeFileSync(
+      path.join(srcDir, 'next.md'),
+      '---\nname: gsd:next\ndescription: Next\n---\n\n@~/.claude/get-shit-done/workflows/next.md'
+    );
+
+    const skillsDir = path.join(tmpDir, 'skills');
+    copyCommandsAsClaudeSkills(srcDir, skillsDir, 'gsd', '$HOME/.claude/', 'claude', true);
+
+    const content = fs.readFileSync(path.join(skillsDir, 'gsd-next', 'SKILL.md'), 'utf8');
+    assert.ok(content.includes('$HOME/.claude/get-shit-done/workflows/next.md'), 'global paths use $HOME form');
+    assert.ok(!content.includes('~/.claude/'), '~/ form replaced with $HOME/ form');
+  });
+});
+
 // ─── Legacy cleanup during install ──────────────────────────────────────────
 
 describe('Legacy commands/gsd/ cleanup', () => {
