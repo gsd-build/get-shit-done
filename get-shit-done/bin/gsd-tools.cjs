@@ -70,6 +70,15 @@
  *   audit-uat                           Scan all phases for unresolved UAT/verification items
  *   uat render-checkpoint --file <path> Render the current UAT checkpoint block
  *
+ * Intel:
+ *   intel query <term>             Query intel files for a term
+ *   intel status                   Show intel file freshness
+ *   intel diff                     Show changed intel entries since last snapshot
+ *   intel snapshot                 Save current intel state as diff baseline
+ *   intel patch-meta <file>        Update _meta.updated_at in an intel file
+ *   intel validate                 Validate intel file structure
+ *   intel extract-exports <file>   Extract exported symbols from a source file
+ *
  * Scaffolding:
  *   scaffold context --phase <N>       Create CONTEXT.md template
  *   scaffold uat --phase <N>           Create UAT.md template
@@ -399,14 +408,6 @@ async function runCommand(command, args, cwd, raw) {
         state.cmdSignalWaiting(cwd, type, question, options, p, raw);
       } else if (subcommand === 'signal-resume') {
         state.cmdSignalResume(cwd, raw);
-      } else if (subcommand === 'planned-phase') {
-        const { phase: p, name, plans } = parseNamedArgs(args, ['phase', 'name', 'plans']);
-        state.cmdStatePlannedPhase(cwd, p, plans !== null ? parseInt(plans, 10) : null, raw);
-      } else if (subcommand === 'validate') {
-        state.cmdStateValidate(cwd, raw);
-      } else if (subcommand === 'sync') {
-        const { verify } = parseNamedArgs(args, [], ['verify']);
-        state.cmdStateSync(cwd, { verify }, raw);
       } else {
         state.cmdStateLoad(cwd, raw);
       }
@@ -735,16 +736,12 @@ async function runCommand(command, args, cwd, raw) {
     case 'init': {
       const workflow = args[1];
       switch (workflow) {
-        case 'execute-phase': {
-          const { validate: epValidate } = parseNamedArgs(args, [], ['validate']);
-          init.cmdInitExecutePhase(cwd, args[2], raw, { validate: epValidate });
+        case 'execute-phase':
+          init.cmdInitExecutePhase(cwd, args[2], raw);
           break;
-        }
-        case 'plan-phase': {
-          const { validate: ppValidate } = parseNamedArgs(args, [], ['validate']);
-          init.cmdInitPlanPhase(cwd, args[2], raw, { validate: ppValidate });
+        case 'plan-phase':
+          init.cmdInitPlanPhase(cwd, args[2], raw);
           break;
-        }
         case 'new-project':
           init.cmdInitNewProject(cwd, raw);
           break;
@@ -933,6 +930,42 @@ async function runCommand(command, args, cwd, raw) {
         workstream.cmdWorkstreamProgress(cwd, raw);
       } else {
         error('Unknown workstream subcommand. Available: create, list, status, complete, set, get, progress');
+      }
+      break;
+    }
+
+    // ─── Intel ────────────────────────────────────────────────────────────
+
+    case 'intel': {
+      const intel = require('./lib/intel.cjs');
+      const subcommand = args[1];
+      if (subcommand === 'query') {
+        const term = args[2];
+        if (!term) error('Usage: gsd-tools intel query <term>');
+        const planningDir = path.join(cwd, '.planning');
+        core.output(intel.intelQuery(term, planningDir), raw);
+      } else if (subcommand === 'status') {
+        const planningDir = path.join(cwd, '.planning');
+        core.output(intel.intelStatus(planningDir), raw);
+      } else if (subcommand === 'diff') {
+        const planningDir = path.join(cwd, '.planning');
+        core.output(intel.intelDiff(planningDir), raw);
+      } else if (subcommand === 'snapshot') {
+        const planningDir = path.join(cwd, '.planning');
+        core.output(intel.intelSnapshot(planningDir), raw);
+      } else if (subcommand === 'patch-meta') {
+        const filePath = args[2];
+        if (!filePath) error('Usage: gsd-tools intel patch-meta <file-path>');
+        core.output(intel.intelPatchMeta(path.resolve(cwd, filePath)), raw);
+      } else if (subcommand === 'validate') {
+        const planningDir = path.join(cwd, '.planning');
+        core.output(intel.intelValidate(planningDir), raw);
+      } else if (subcommand === 'extract-exports') {
+        const filePath = args[2];
+        if (!filePath) error('Usage: gsd-tools intel extract-exports <file-path>');
+        core.output(intel.intelExtractExports(path.resolve(cwd, filePath)), raw);
+      } else {
+        error('Unknown intel subcommand. Available: query, status, diff, snapshot, patch-meta, validate, extract-exports');
       }
       break;
     }
