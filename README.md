@@ -1,12 +1,3 @@
-> [!WARNING]
-> **NPM PUBLISH FIX FOR v1.32.0**
-> If `npx get-shit-done-cc@latest` does not resolve to v1.32.0, install directly from source:
-> ```bash
-> git clone https://github.com/gsd-build/get-shit-done && cd get-shit-done
-> node scripts/build-hooks.js && node bin/install.js --claude --global
-> ```
-> See **[docs/manual-update.md](docs/manual-update.md)** for all runtime flags and update instructions.
-
 <div align="center">
 
 # GET SHIT DONE
