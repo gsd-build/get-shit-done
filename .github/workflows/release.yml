@@ -305,6 +305,17 @@ jobs:
         env:
           NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
 
+      - name: Clean up next dist-tag
+        if: ${{ !inputs.dry_run }}
+        env:
+          VERSION: ${{ inputs.version }}
+          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
+        run: |
+          # Point next to the stable release so @next never returns something
+          # older than @latest. This prevents stale pre-release installs.
+          npm dist-tag add "get-shit-done-cc@${VERSION}" next 2>/dev/null || true
+          echo "✓ next dist-tag updated to v${VERSION}"
+
       - name: Verify publish
         if: ${{ !inputs.dry_run }}
         env:
