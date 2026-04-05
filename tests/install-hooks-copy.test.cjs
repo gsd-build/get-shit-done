@@ -325,7 +325,7 @@ describe('uninstall settings cleanup preserves user hooks', () => {
   function filterGsdHooks(entries) {
     return entries
       .map(entry => {
-        if (!entry.hooks || !Array.isArray(entry.hooks)) return null;
+        if (!entry.hooks || !Array.isArray(entry.hooks)) return entry;
         entry.hooks = entry.hooks.filter(h => !isGsdHookCommand(h.command));
         return entry.hooks.length > 0 ? entry : null;
       })
@@ -370,6 +370,19 @@ describe('uninstall settings cleanup preserves user hooks', () => {
     const result = filterGsdHooks(entries);
     assert.strictEqual(result.length, 1, 'entry should survive');
     assert.strictEqual(result[0].hooks.length, 1, 'user hook should remain');
+  });
+
+  test('non-array hook entries are preserved during uninstall (#1825)', () => {
+    const entries = [
+      { type: 'custom', command: 'echo hello' },
+      { matcher: 'Bash', hooks: [{ type: 'command', command: 'node /path/to/gsd-prompt-guard.js' }] },
+      { url: 'https://example.com/webhook' },
+    ];
+
+    const result = filterGsdHooks(JSON.parse(JSON.stringify(entries)));
+    assert.strictEqual(result.length, 2, 'both non-array entries should survive');
+    assert.deepStrictEqual(result[0], { type: 'custom', command: 'echo hello' }, 'first non-array entry preserved');
+    assert.deepStrictEqual(result[1], { url: 'https://example.com/webhook' }, 'second non-array entry preserved');
   });
 
   test('all GSD hook names are recognized by isGsdHookCommand', () => {
