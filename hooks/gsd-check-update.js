@@ -81,12 +81,22 @@ const child = spawn(process.execPath, ['-e', `
 
   // Check for stale hooks — compare hook version headers against installed VERSION
   // Hooks are installed at configDir/hooks/ (e.g. ~/.claude/hooks/) (#1421)
+  // Only check hooks that GSD currently ships — orphaned files from removed features
+  // (e.g., gsd-intel-*.js) must be ignored to avoid permanent stale warnings (#1750)
+  const MANAGED_HOOKS = [
+    'gsd-check-update.js',
+    'gsd-context-monitor.js',
+    'gsd-prompt-guard.js',
+    'gsd-read-guard.js',
+    'gsd-statusline.js',
+    'gsd-workflow-guard.js',
+  ];
   let staleHooks = [];
   if (configDir) {
     const hooksDir = path.join(configDir, 'hooks');
     try {
       if (fs.existsSync(hooksDir)) {
-        const hookFiles = fs.readdirSync(hooksDir).filter(f => f.startsWith('gsd-') && f.endsWith('.js'));
+        const hookFiles = fs.readdirSync(hooksDir).filter(f => MANAGED_HOOKS.includes(f));
         for (const hookFile of hookFiles) {
           try {
             const content = fs.readFileSync(path.join(hooksDir, hookFile), 'utf8');
