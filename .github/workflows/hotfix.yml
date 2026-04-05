@@ -96,6 +96,7 @@ jobs:
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
 
       - name: Create hotfix branch
+        if: inputs.dry_run != 'true'
         env:
           BRANCH: ${{ needs.validate-version.outputs.branch }}
           BASE_TAG: ${{ needs.validate-version.outputs.base_tag }}
@@ -144,6 +145,27 @@ jobs:
           npm ci
           npm run test:coverage
 
+      - name: Create PR to merge hotfix back to main
+        if: ${{ !inputs.dry_run }}
+        env:
+          GH_TOKEN: ${{ github.token }}
+          BRANCH: ${{ needs.validate-version.outputs.branch }}
+          VERSION: ${{ inputs.version }}
+        run: |
+          EXISTING_PR=$(gh pr list --base main --head "$BRANCH" --state open --json number --jq '.[0].number')
+          if [ -n "$EXISTING_PR" ]; then
+            echo "PR #$EXISTING_PR already exists; updating"
+            gh pr edit "$EXISTING_PR" \
+              --title "chore: merge hotfix v${VERSION} back to main" \
+              --body "Merge hotfix changes back to main after v${VERSION} release."
+          else
+            gh pr create \
+              --base main \
+              --head "$BRANCH" \
+              --title "chore: merge hotfix v${VERSION} back to main" \
+              --body "Merge hotfix changes back to main after v${VERSION} release."
+          fi
+
       - name: Tag and push
         if: ${{ !inputs.dry_run }}
         env:
@@ -191,27 +213,6 @@ jobs:
             exit 1
           fi
           echo "✓ Verified: get-shit-done-cc@$VERSION is live on npm"
-
-      - name: Create PR to merge hotfix back to main
-        if: ${{ !inputs.dry_run }}
-        env:
-          GH_TOKEN: ${{ github.token }}
-          BRANCH: ${{ needs.validate-version.outputs.branch }}
-          VERSION: ${{ inputs.version }}
-        run: |
-          EXISTING_PR=$(gh pr list --base main --head "$BRANCH" --state open --json number --jq '.[0].number')
-          if [ -n "$EXISTING_PR" ]; then
-            echo "PR #$EXISTING_PR already exists; updating"
-            gh pr edit "$EXISTING_PR" \
-              --title "chore: merge hotfix v${VERSION} back to main" \
-              --body "Merge hotfix changes back to main after v${VERSION} release."
-          else
-            gh pr create \
-              --base main \
-              --head "$BRANCH" \
-              --title "chore: merge hotfix v${VERSION} back to main" \
-              --body "Merge hotfix changes back to main after v${VERSION} release."
-          fi
 
       - name: Summary
         env:

@@ -37,14 +37,18 @@ jobs:
             const prefixMap = {
               'bug': 'fix',
               'enhancement': 'feat',
-              'priority: critical': 'hotfix',
+              'priority: critical': 'fix',
               'type: chore': 'chore',
               'area: docs': 'docs',
             };
             const prefix = prefixMap[label];
             if (!prefix) return;
 
-            const branch = `${prefix}/${number}-${slug}`;
+            // For priority: critical, use fix/critical-NNN-slug to avoid
+            // colliding with the hotfix workflow's hotfix/X.Y.Z naming.
+            const branch = label === 'priority: critical'
+              ? `fix/critical-${number}-${slug}`
+              : `${prefix}/${number}-${slug}`;
 
             // Check if branch already exists
             try {

@@ -165,13 +165,18 @@ jobs:
           PRE_VERSION: ${{ steps.prerelease.outputs.pre_version }}
         run: |
           npm version "$PRE_VERSION" --no-git-tag-version
-          git add package.json package-lock.json
-          git commit -m "chore: bump to ${PRE_VERSION}"
 
       - name: Install and test
         run: |
           npm ci
           npm run test:coverage
+
+      - name: Commit pre-release version bump
+        env:
+          PRE_VERSION: ${{ steps.prerelease.outputs.pre_version }}
+        run: |
+          git add package.json package-lock.json
+          git commit -m "chore: bump to ${PRE_VERSION}"
 
       - name: Dry-run publish validation
         run: npm publish --dry-run --tag next
@@ -280,6 +285,27 @@ jobs:
         env:
           NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
 
+      - name: Create PR to merge release back to main
+        if: ${{ !inputs.dry_run }}
+        env:
+          GH_TOKEN: ${{ github.token }}
+          BRANCH: ${{ needs.validate-version.outputs.branch }}
+          VERSION: ${{ inputs.version }}
+        run: |
+          EXISTING_PR=$(gh pr list --base main --head "$BRANCH" --state open --json number --jq '.[0].number')
+          if [ -n "$EXISTING_PR" ]; then
+            echo "PR #$EXISTING_PR already exists; updating"
+            gh pr edit "$EXISTING_PR" \
+              --title "chore: merge release v${VERSION} to main" \
+              --body "Merge release branch back to main after v${VERSION} stable release."
+          else
+            gh pr create \
+              --base main \
+              --head "$BRANCH" \
+              --title "chore: merge release v${VERSION} to main" \
+              --body "Merge release branch back to main after v${VERSION} stable release."
+          fi
+
       - name: Tag and push
         if: ${{ !inputs.dry_run }}
         env:
@@ -331,27 +357,6 @@ jobs:
           # Verify latest tag
           LATEST_TAG=$(npm dist-tag ls get-shit-done-cc 2>/dev/null | grep "latest:" | awk '{print $2}')
           echo "✓ latest tag points to: $LATEST_TAG"
-
-      - name: Create PR to merge release back to main
-        if: ${{ !inputs.dry_run }}
-        env:
-          GH_TOKEN: ${{ github.token }}
-          BRANCH: ${{ needs.validate-version.outputs.branch }}
-          VERSION: ${{ inputs.version }}
-        run: |
-          EXISTING_PR=$(gh pr list --base main --head "$BRANCH" --state open --json number --jq '.[0].number')
-          if [ -n "$EXISTING_PR" ]; then
-            echo "PR #$EXISTING_PR already exists; updating"
-            gh pr edit "$EXISTING_PR" \
-              --title "chore: merge release v${VERSION} to main" \
-              --body "Merge release branch back to main after v${VERSION} stable release."
-          else
-            gh pr create \
-              --base main \
-              --head "$BRANCH" \
-              --title "chore: merge release v${VERSION} to main" \
-              --body "Merge release branch back to main after v${VERSION} stable release."
-          fi
 
       - name: Summary
         env:
