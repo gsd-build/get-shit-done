@@ -9,6 +9,7 @@ Read all files referenced by the invoking prompt's execution_context before star
 @~/.claude/get-shit-done/references/revision-loop.md
 @~/.claude/get-shit-done/references/gate-prompts.md
 @~/.claude/get-shit-done/references/agent-contracts.md
+@~/.claude/get-shit-done/references/gates.md
 </required_reading>
 
 <available_agent_types>

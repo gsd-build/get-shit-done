@@ -28,6 +28,7 @@ Read STATE.md before any operation to load project context.
 
 @~/.claude/get-shit-done/references/agent-contracts.md
 @~/.claude/get-shit-done/references/context-budget.md
+@~/.claude/get-shit-done/references/gates.md
 </required_reading>
 
 <available_agent_types>
