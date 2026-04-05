@@ -4258,40 +4258,6 @@ function uninstall(isGlobal, runtime = 'claude') {
         console.log(`  ${green}✓${reset} Removed ${skillCount} Antigravity skills`);
       }
     }
-  } else if (isCursor) {
-    // Cursor: remove skills/gsd-*/ directories (same layout as Codex skills)
-    const skillsDir = path.join(targetDir, 'skills');
-    if (fs.existsSync(skillsDir)) {
-      let skillCount = 0;
-      const entries = fs.readdirSync(skillsDir, { withFileTypes: true });
-      for (const entry of entries) {
-        if (entry.isDirectory() && entry.name.startsWith('gsd-')) {
-          fs.rmSync(path.join(skillsDir, entry.name), { recursive: true });
-          skillCount++;
-        }
-      }
-      if (skillCount > 0) {
-        removedCount++;
-        console.log(`  ${green}✓${reset} Removed ${skillCount} Cursor skills`);
-      }
-    }
-  } else if (isWindsurf) {
-    // Windsurf: remove skills/gsd-*/ directories (same layout as Cursor skills)
-    const skillsDir = path.join(targetDir, 'skills');
-    if (fs.existsSync(skillsDir)) {
-      let skillCount = 0;
-      const entries = fs.readdirSync(skillsDir, { withFileTypes: true });
-      for (const entry of entries) {
-        if (entry.isDirectory() && entry.name.startsWith('gsd-')) {
-          fs.rmSync(path.join(skillsDir, entry.name), { recursive: true });
-          skillCount++;
-        }
-      }
-      if (skillCount > 0) {
-        removedCount++;
-        console.log(`  ${green}✓${reset} Removed ${skillCount} Windsurf skills`);
-      }
-    }
   } else if (isGemini) {
     // Gemini: still uses commands/gsd/
     const gsdCommandsDir = path.join(targetDir, 'commands', 'gsd');
@@ -4401,7 +4367,7 @@ function uninstall(isGlobal, runtime = 'claude') {
   // 4. Remove GSD hooks
   const hooksDir = path.join(targetDir, 'hooks');
   if (fs.existsSync(hooksDir)) {
-    const gsdHooks = ['gsd-statusline.js', 'gsd-check-update.js', 'gsd-check-update.sh', 'gsd-context-monitor.js', 'gsd-prompt-guard.js', 'gsd-read-guard.js', 'gsd-session-state.sh', 'gsd-validate-commit.sh', 'gsd-phase-boundary.sh'];
+    const gsdHooks = ['gsd-statusline.js', 'gsd-check-update.js', 'gsd-context-monitor.js', 'gsd-prompt-guard.js', 'gsd-read-guard.js', 'gsd-workflow-guard.js', 'gsd-session-state.sh', 'gsd-validate-commit.sh', 'gsd-phase-boundary.sh'];
     let hookCount = 0;
     for (const hook of gsdHooks) {
       const hookPath = path.join(hooksDir, hook);
@@ -4457,7 +4423,7 @@ function uninstall(isGlobal, runtime = 'claude') {
         if (entry.hooks && Array.isArray(entry.hooks)) {
           // Filter out GSD hooks
           const hasGsdHook = entry.hooks.some(h =>
-            h.command && (h.command.includes('gsd-check-update') || h.command.includes('gsd-statusline'))
+            h.command && (h.command.includes('gsd-check-update') || h.command.includes('gsd-statusline') || h.command.includes('gsd-session-state'))
           );
           return !hasGsdHook;
         }
@@ -4480,7 +4446,7 @@ function uninstall(isGlobal, runtime = 'claude') {
         settings.hooks[eventName] = settings.hooks[eventName].filter(entry => {
           if (entry.hooks && Array.isArray(entry.hooks)) {
             const hasGsdHook = entry.hooks.some(h =>
-              h.command && h.command.includes('gsd-context-monitor')
+              h.command && (h.command.includes('gsd-context-monitor') || h.command.includes('gsd-phase-boundary'))
             );
             return !hasGsdHook;
           }
@@ -4503,7 +4469,7 @@ function uninstall(isGlobal, runtime = 'claude') {
         settings.hooks[eventName] = settings.hooks[eventName].filter(entry => {
           if (entry.hooks && Array.isArray(entry.hooks)) {
             const hasGsdHook = entry.hooks.some(h =>
-              h.command && (h.command.includes('gsd-prompt-guard') || h.command.includes('gsd-read-guard'))
+              h.command && (h.command.includes('gsd-prompt-guard') || h.command.includes('gsd-read-guard') || h.command.includes('gsd-validate-commit'))
             );
             return !hasGsdHook;
           }
@@ -4969,7 +4935,7 @@ function writeManifest(configDir, runtime = 'claude') {
     const hooksDir = path.join(configDir, 'hooks');
     if (fs.existsSync(hooksDir)) {
       for (const file of fs.readdirSync(hooksDir)) {
-        if (file.startsWith('gsd-') && file.endsWith('.js')) {
+        if (file.startsWith('gsd-') && (file.endsWith('.js') || file.endsWith('.sh'))) {
           manifest.files['hooks/' + file] = fileHash(path.join(hooksDir, file));
         }
       }
@@ -5390,11 +5356,22 @@ function install(isGlobal, runtime = 'claude') {
             try { fs.chmodSync(destFile, 0o755); } catch (e) { /* Windows doesn't support chmod */ }
           } else {
             fs.copyFileSync(srcFile, destFile);
+            // Ensure .sh hook files are executable (mirrors chmod in build-hooks.js)
+            if (entry.endsWith('.sh')) {
+              try { fs.chmodSync(destFile, 0o755); } catch (e) { /* Windows doesn't support chmod */ }
+            }
           }
         }
       }
       if (verifyInstalled(hooksDest, 'hooks')) {
         console.log(`  ${green}✓${reset} Installed hooks (bundled)`);
+        // Warn if expected community .sh hooks are missing (non-fatal)
+        const expectedShHooks = ['gsd-session-state.sh', 'gsd-validate-commit.sh', 'gsd-phase-boundary.sh'];
+        for (const sh of expectedShHooks) {
+          if (!fs.existsSync(path.join(hooksDest, sh))) {
+            console.warn(`  ${yellow}⚠${reset}  Missing expected hook: ${sh}`);
+          }
+        }
       } else {
         failures.push('hooks');
       }
@@ -5402,8 +5379,8 @@ function install(isGlobal, runtime = 'claude') {
   }
 
   // Clear stale update cache so next session re-evaluates hook versions
-  // targetDir is e.g. ~/.claude/get-shit-done/, parent is the config dir
-  const updateCacheFile = path.join(path.dirname(targetDir), 'cache', 'gsd-update-check.json');
+  // Cache lives at ~/.cache/gsd/ (see hooks/gsd-check-update.js line 35-36)
+  const updateCacheFile = path.join(os.homedir(), '.cache', 'gsd', 'gsd-update-check.json');
   try { fs.unlinkSync(updateCacheFile); } catch (e) { /* cache may not exist yet */ }
 
   if (failures.length > 0) {
@@ -5482,14 +5459,14 @@ function install(isGlobal, runtime = 'claude') {
       configContent = setManagedCodexHooksOwnership(codexHooksFeature.content, codexHooksFeature.ownership);
 
       // Add SessionStart hook for update checking
-      const updateCheckScript = path.resolve(targetDir, 'get-shit-done', 'hooks', 'gsd-update-check.js').replace(/\\/g, '/');
+      const updateCheckScript = path.resolve(targetDir, 'hooks', 'gsd-check-update.js').replace(/\\/g, '/');
       const hookBlock =
         `${eol}# GSD Hooks${eol}` +
         `[[hooks]]${eol}` +
         `event = "SessionStart"${eol}` +
         `command = "node ${updateCheckScript}"${eol}`;
 
-      if (hasEnabledCodexHooksFeature(configContent) && !configContent.includes('gsd-update-check')) {
+      if (hasEnabledCodexHooksFeature(configContent) && !configContent.includes('gsd-check-update')) {
         configContent += hookBlock;
       }
 
