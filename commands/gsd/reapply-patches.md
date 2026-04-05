@@ -217,6 +217,21 @@ git -C "$CONFIG_DIR" log --oneline --no-merges -- "{file_path}" | grep -v "gsd:u
 Each matching commit represents an intentional user modification. Use the commit messages and diffs to understand what was changed and why.
 
 4. **Write merged result** to the installed location
+
+### Post-merge verification
+
+After writing each merged file, verify that user modifications survived the merge:
+
+1. **Line-count check:** Count lines in the backup and the merged result. If the merged result has fewer lines than the backup minus the expected upstream removals, flag for review.
+2. **Hunk presence check:** For each user-added section identified during diff analysis, search the merged output for at least the first significant line (non-blank, non-comment) of each addition. Missing signature lines indicate a dropped hunk.
+3. **Report warnings inline** (do not block):
+   ```
+   ⚠ Potential dropped content in {file_path}:
+     - Missing hunk near line {N}: "{first_line_preview}..." ({line_count} lines)
+     - Backup available: {patches_dir}/{file_path}
+   ```
+4. **Track verification status** — add to per-file report: `Merged (verified)` vs `Merged (⚠ {N} hunks may be missing)`
+
 5. **Report status per file:**
    - `Merged` — user modifications applied cleanly (show summary of what was preserved)
    - `Conflict` — user reviewed and chose resolution
@@ -253,4 +268,5 @@ Ask user:
 - [ ] User modifications identified and merged into new version
 - [ ] Conflicts surfaced to user with both versions shown
 - [ ] Status reported for each file with summary of what was preserved
+- [ ] Post-merge verification checks each file for dropped hunks and warns if content appears missing
 </success_criteria>
