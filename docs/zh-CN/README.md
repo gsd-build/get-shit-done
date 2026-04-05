@@ -116,7 +116,7 @@ npx get-shit-done-cc --opencode --global # 安装到 ~/.config/opencode/
 # Gemini CLI
 npx get-shit-done-cc --gemini --global   # 安装到 ~/.gemini/
 
-# Kilo（OpenCode 分支）
+# KiloCode（开源，免费模型）
 npx get-shit-done-cc --kilo --global     # 安装到 ~/.config/kilo/
 npx get-shit-done-cc --kilo --local      # 安装到 ./.kilo/
 

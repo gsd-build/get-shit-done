@@ -131,7 +131,7 @@ npx get-shit-done-cc --opencode --global # ~/.config/opencode/에 설치
 # Gemini CLI
 npx get-shit-done-cc --gemini --global   # ~/.gemini/에 설치
 
-# Kilo (OpenCode 포크)
+# KiloCode (오픈소스, 무료 모델)
 npx get-shit-done-cc --kilo --global     # ~/.config/kilo/에 설치
 npx get-shit-done-cc --kilo --local      # ./.kilo/에 설치
 

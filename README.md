@@ -143,7 +143,7 @@ npx get-shit-done-cc --opencode --global # Install to ~/.config/opencode/
 # Gemini CLI
 npx get-shit-done-cc --gemini --global   # Install to ~/.gemini/
 
-# Kilo (OpenCode fork)
+# KiloCode (open source, free models)
 npx get-shit-done-cc --kilo --global     # Install to ~/.config/kilo/
 npx get-shit-done-cc --kilo --local      # Install to ./.kilo/
 
