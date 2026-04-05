@@ -957,6 +957,9 @@ Gather symptoms through questioning. Update file after EACH answer.
 </step>
 
 <step name="investigation_loop">
+At investigation decision points, apply structured reasoning:
+@~/.claude/get-shit-done/references/thinking-models-debug.md
+
 **Autonomous investigation. Update file continuously.**
 
 **Phase 0: Check knowledge base**

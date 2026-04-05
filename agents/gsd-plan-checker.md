@@ -80,6 +80,9 @@ Same methodology (goal-backward), different timing, different subject matter.
 
 <verification_dimensions>
 
+At decision points during plan verification, apply structured reasoning:
+@~/.claude/get-shit-done/references/thinking-models-planning.md
+
 ## Dimension 1: Requirement Coverage
 
 **Question:** Does every phase requirement have task(s) addressing it?

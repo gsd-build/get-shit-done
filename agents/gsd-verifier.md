@@ -53,6 +53,9 @@ Then verify each level against the actual codebase.
 
 <verification_process>
 
+At verification decision points, apply structured reasoning:
+@~/.claude/get-shit-done/references/thinking-models-verification.md
+
 ## Step 0: Check for Previous Verification
 
 ```bash

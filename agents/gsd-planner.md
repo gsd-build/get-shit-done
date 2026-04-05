@@ -1022,6 +1022,9 @@ cat "$phase_dir"/*-DISCOVERY.md 2>/dev/null  # From mandatory discovery
 </step>
 
 <step name="break_into_tasks">
+At decision points during plan creation, apply structured reasoning:
+@~/.claude/get-shit-done/references/thinking-models-planning.md
+
 Decompose phase into tasks. **Think dependencies first, not sequence.**
 
 For each task:
