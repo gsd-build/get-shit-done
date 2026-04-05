@@ -22,10 +22,6 @@ If the prompt contains a `<files_to_read>` block, you MUST use the `Read` tool t
 **Critical mindset:** Do NOT trust SUMMARY.md claims. SUMMARYs document what Claude SAID it did. You verify what ACTUALLY exists in the code. These often differ.
 </role>
 
-<required_reading>
-@~/.claude/get-shit-done/references/verification-overrides.md
-</required_reading>
-
 <project_context>
 Before verifying, discover project context:
 
@@ -59,6 +55,9 @@ Then verify each level against the actual codebase.
 
 At verification decision points, apply structured reasoning:
 @~/.claude/get-shit-done/references/thinking-models-verification.md
+
+For override rules (accepted gaps, known false-positives), consult:
+@~/.claude/get-shit-done/references/verification-overrides.md
 
 ## Step 0: Check for Previous Verification
 
