@@ -1,8 +1,9 @@
 /**
  * GSD Tools Tests — ~/.gsd/defaults.json fallback (#1683)
  *
- * When .planning/config.json is missing, loadConfig() should consult
- * ~/.gsd/defaults.json before returning hardcoded defaults.
+ * When .planning/ does not exist (pre-project context), loadConfig() should
+ * consult ~/.gsd/defaults.json before returning hardcoded defaults.
+ * When .planning/ exists but config.json is missing, hardcoded defaults are used.
  */
 
 const { test, describe } = require('node:test');
@@ -10,21 +11,20 @@ const assert = require('node:assert/strict');
 const fs = require('fs');
 const path = require('path');
 const os = require('os');
-const { createTempProject, cleanup } = require('./helpers.cjs');
+const { cleanup } = require('./helpers.cjs');
 
 const { loadConfig } = require('../get-shit-done/bin/lib/core.cjs');
 
-describe('loadConfig ~/.gsd/defaults.json fallback (#1683)', () => {
-  test('no project config, no defaults.json → hardcoded defaults', (t) => {
-    const tmpDir = createTempProject();
-    // Remove config.json so the primary path fails
-    const configPath = path.join(tmpDir, '.planning', 'config.json');
-    try { fs.unlinkSync(configPath); } catch { /* already absent */ }
+/** Create a bare temp dir (no .planning/) to simulate pre-project context */
+function createBareTmpDir() {
+  return fs.mkdtempSync(path.join(os.tmpdir(), 'gsd-test-'));
+}
 
-    // Point HOME to tmpDir so ~/.gsd/defaults.json doesn't exist
-    const origHome = process.env.HOME;
-    process.env.HOME = tmpDir;
-    t.after(() => { process.env.HOME = origHome; cleanup(tmpDir); });
+describe('loadConfig ~/.gsd/defaults.json fallback (#1683)', () => {
+  test('pre-project, no defaults.json → hardcoded defaults', (t) => {
+    const tmpDir = createBareTmpDir();
+    process.env.GSD_HOME = tmpDir;
+    t.after(() => { delete process.env.GSD_HOME; cleanup(tmpDir); });
 
     const config = loadConfig(tmpDir);
     assert.strictEqual(config.model_profile, 'balanced');
@@ -33,12 +33,10 @@ describe('loadConfig ~/.gsd/defaults.json fallback (#1683)', () => {
     assert.strictEqual(config.subagent_timeout, 300000);
   });
 
-  test('no project config, defaults.json exists → merges with hardcoded defaults', (t) => {
-    const tmpDir = createTempProject();
-    const configPath = path.join(tmpDir, '.planning', 'config.json');
-    try { fs.unlinkSync(configPath); } catch { /* already absent */ }
+  test('pre-project, defaults.json exists → merges with hardcoded defaults', (t) => {
+    const tmpDir = createBareTmpDir();
 
-    // Create ~/.gsd/defaults.json under fake HOME
+    // Create ~/.gsd/defaults.json under fake GSD_HOME
     const gsdDir = path.join(tmpDir, '.gsd');
     fs.mkdirSync(gsdDir, { recursive: true });
     fs.writeFileSync(
@@ -46,9 +44,8 @@ describe('loadConfig ~/.gsd/defaults.json fallback (#1683)', () => {
       JSON.stringify({ model_profile: 'quality', context_window: 1000000 })
     );
 
-    const origHome = process.env.HOME;
-    process.env.HOME = tmpDir;
-    t.after(() => { process.env.HOME = origHome; cleanup(tmpDir); });
+    process.env.GSD_HOME = tmpDir;
+    t.after(() => { delete process.env.GSD_HOME; cleanup(tmpDir); });
 
     const config = loadConfig(tmpDir);
     // Values from defaults.json
@@ -60,10 +57,31 @@ describe('loadConfig ~/.gsd/defaults.json fallback (#1683)', () => {
     assert.strictEqual(config.parallelization, true);
   });
 
-  test('project config exists → project config wins, defaults.json NOT consulted', (t) => {
-    const tmpDir = createTempProject();
+  test('.planning/ exists but no config.json → hardcoded defaults (not defaults.json)', (t) => {
+    const tmpDir = createBareTmpDir();
+    // Create .planning/ without config.json
+    fs.mkdirSync(path.join(tmpDir, '.planning'), { recursive: true });
 
-    // Write project-level config
+    // Create defaults.json — should NOT be consulted
+    const gsdDir = path.join(tmpDir, '.gsd');
+    fs.mkdirSync(gsdDir, { recursive: true });
+    fs.writeFileSync(
+      path.join(gsdDir, 'defaults.json'),
+      JSON.stringify({ model_profile: 'quality', context_window: 1000000 })
+    );
+
+    process.env.GSD_HOME = tmpDir;
+    t.after(() => { delete process.env.GSD_HOME; cleanup(tmpDir); });
+
+    const config = loadConfig(tmpDir);
+    // Hardcoded defaults — NOT defaults.json values
+    assert.strictEqual(config.model_profile, 'balanced');
+    assert.strictEqual(config.context_window, 200000);
+  });
+
+  test('project config exists → project config wins', (t) => {
+    const tmpDir = createBareTmpDir();
+    fs.mkdirSync(path.join(tmpDir, '.planning'), { recursive: true });
     fs.writeFileSync(
       path.join(tmpDir, '.planning', 'config.json'),
       JSON.stringify({ model_profile: 'budget' })
@@ -77,21 +95,16 @@ describe('loadConfig ~/.gsd/defaults.json fallback (#1683)', () => {
       JSON.stringify({ model_profile: 'quality', context_window: 1000000 })
     );
 
-    const origHome = process.env.HOME;
-    process.env.HOME = tmpDir;
-    t.after(() => { process.env.HOME = origHome; cleanup(tmpDir); });
+    process.env.GSD_HOME = tmpDir;
+    t.after(() => { delete process.env.GSD_HOME; cleanup(tmpDir); });
 
     const config = loadConfig(tmpDir);
-    // Project config wins
     assert.strictEqual(config.model_profile, 'budget');
-    // defaults.json context_window NOT applied — project config path succeeded
     assert.strictEqual(config.context_window, 200000);
   });
 
   test('defaults.json with unknown keys → unknown keys NOT passed through', (t) => {
-    const tmpDir = createTempProject();
-    const configPath = path.join(tmpDir, '.planning', 'config.json');
-    try { fs.unlinkSync(configPath); } catch { /* already absent */ }
+    const tmpDir = createBareTmpDir();
 
     const gsdDir = path.join(tmpDir, '.gsd');
     fs.mkdirSync(gsdDir, { recursive: true });
@@ -104,9 +117,8 @@ describe('loadConfig ~/.gsd/defaults.json fallback (#1683)', () => {
       })
     );
 
-    const origHome = process.env.HOME;
-    process.env.HOME = tmpDir;
-    t.after(() => { process.env.HOME = origHome; cleanup(tmpDir); });
+    process.env.GSD_HOME = tmpDir;
+    t.after(() => { delete process.env.GSD_HOME; cleanup(tmpDir); });
 
     const config = loadConfig(tmpDir);
     assert.strictEqual(config.model_profile, 'quality');
@@ -115,17 +127,14 @@ describe('loadConfig ~/.gsd/defaults.json fallback (#1683)', () => {
   });
 
   test('defaults.json with invalid JSON → returns hardcoded defaults', (t) => {
-    const tmpDir = createTempProject();
-    const configPath = path.join(tmpDir, '.planning', 'config.json');
-    try { fs.unlinkSync(configPath); } catch { /* already absent */ }
+    const tmpDir = createBareTmpDir();
 
     const gsdDir = path.join(tmpDir, '.gsd');
     fs.mkdirSync(gsdDir, { recursive: true });
     fs.writeFileSync(path.join(gsdDir, 'defaults.json'), '{ not valid json !!!');
 
-    const origHome = process.env.HOME;
-    process.env.HOME = tmpDir;
-    t.after(() => { process.env.HOME = origHome; cleanup(tmpDir); });
+    process.env.GSD_HOME = tmpDir;
+    t.after(() => { delete process.env.GSD_HOME; cleanup(tmpDir); });
 
     const config = loadConfig(tmpDir);
     assert.strictEqual(config.model_profile, 'balanced');

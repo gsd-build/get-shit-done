@@ -365,9 +365,14 @@ function loadConfig(cwd) {
       response_language: get('response_language') || null,
     };
   } catch {
-    // Fall back to ~/.gsd/defaults.json for pre-project commands (#1683)
+    // Fall back to ~/.gsd/defaults.json only for truly pre-project contexts (#1683)
+    // If .planning/ exists, the project is initialized — just missing config.json
+    if (fs.existsSync(planningDir(cwd))) {
+      return defaults;
+    }
     try {
-      const globalDefaultsPath = path.join(os.homedir(), '.gsd', 'defaults.json');
+      const home = process.env.GSD_HOME || os.homedir();
+      const globalDefaultsPath = path.join(home, '.gsd', 'defaults.json');
       const raw = fs.readFileSync(globalDefaultsPath, 'utf-8');
       const globalDefaults = JSON.parse(raw);
       return {
