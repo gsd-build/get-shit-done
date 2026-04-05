@@ -246,10 +246,29 @@ function cmdMilestoneComplete(cwd, version, options, raw) {
   output(result, raw);
 }
 
-function cmdPhasesClear(cwd, raw) {
-  const phasesDir = planningPaths(cwd).phases;
-  let cleared = 0;
+function cmdPhasesClear(cwd, options, raw) {
+  // Support legacy call signature: cmdPhasesClear(cwd, raw)
+  if (typeof options === 'boolean') {
+    raw = options;
+    options = { confirm: true };
+  }
+  options = options || {};
 
+  const phasesDir = planningPaths(cwd).phases;
+
+  // Count what would be cleared before doing anything destructive
+  let targetCount = 0;
+  if (fs.existsSync(phasesDir)) {
+    const entries = fs.readdirSync(phasesDir, { withFileTypes: true });
+    targetCount = entries.filter(e => e.isDirectory()).length;
+  }
+
+  // Require --confirm when there are directories to delete (#1818)
+  if (targetCount > 0 && !options.confirm) {
+    error(`${targetCount} phase director${targetCount === 1 ? 'y' : 'ies'} would be deleted. Pass --confirm to proceed. Usage: gsd-tools phases clear --confirm`);
+  }
+
+  let cleared = 0;
   if (fs.existsSync(phasesDir)) {
     try {
       const entries = fs.readdirSync(phasesDir, { withFileTypes: true });

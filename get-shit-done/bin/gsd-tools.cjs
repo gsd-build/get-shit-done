@@ -223,6 +223,24 @@ async function main() {
     error(`Invalid --cwd: ${cwd}`);
   }
 
+  // ─── Global --help guard ─────────────────────────────────────────────────
+  // Intercept --help / -h before any command handler runs to prevent
+  // destructive commands from executing when the user only wants usage info.
+  // See: https://github.com/gsd-build/get-shit-done/issues/1818
+  if (args.includes('--help') || args.includes('-h')) {
+    const cmd = args[0] || '';
+    const sub = args[1] || '';
+    const tag = [cmd, sub].filter(Boolean).join(' ') || 'gsd-tools';
+    const isRaw = args.includes('--raw');
+    const msg = `Usage: gsd-tools ${tag} [...options]\n\nRun without --help to execute the command.`;
+    if (isRaw) {
+      fs.writeSync(1, JSON.stringify({ help: true, command: tag }) + '\n');
+    } else {
+      fs.writeSync(1, msg + '\n');
+    }
+    return;
+  }
+
   // Resolve worktree root: in a linked worktree, .planning/ lives in the main worktree.
   // However, in monorepo worktrees where the subdirectory itself owns .planning/,
   // skip worktree resolution — the CWD is already the correct project root.
@@ -592,7 +610,14 @@ async function runCommand(command, args, cwd, raw) {
         };
         phase.cmdPhasesList(cwd, options, raw);
       } else if (subcommand === 'clear') {
-        milestone.cmdPhasesClear(cwd, raw);
+        // Reject unrecognized flags to prevent silent destructive execution (#1818)
+        const clearArgs = args.slice(2).filter(a => a !== '--raw');
+        const validClearFlags = ['--confirm'];
+        const unknownFlags = clearArgs.filter(a => a.startsWith('-') && !validClearFlags.includes(a));
+        if (unknownFlags.length > 0) {
+          error(`Unknown flag${unknownFlags.length > 1 ? 's' : ''}: ${unknownFlags.join(', ')}. Usage: gsd-tools phases clear [--confirm]`);
+        }
+        milestone.cmdPhasesClear(cwd, { confirm: clearArgs.includes('--confirm') }, raw);
       } else {
         error('Unknown phases subcommand. Available: list, clear');
       }
