@@ -23,6 +23,7 @@ Valid GSD subagent types (use exact names — do not fall back to 'general-purpo
 - gsd-plan-checker — Reviews plan quality before execution
 - gsd-executor — Executes plan tasks, commits, creates SUMMARY.md
 - gsd-verifier — Verifies phase completion, checks quality gates
+- gsd-code-reviewer — Reviews source files for bugs, security issues, and code quality
 </available_agent_types>
 
 <process>
