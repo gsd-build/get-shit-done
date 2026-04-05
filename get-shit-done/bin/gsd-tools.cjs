@@ -282,6 +282,16 @@ async function main() {
     error('Usage: gsd-tools <command> [args] [--raw] [--pick <field>] [--cwd <path>] [--ws <name>]\nCommands: state, resolve-model, find-phase, commit, verify-summary, verify, frontmatter, template, generate-slug, current-timestamp, list-todos, verify-path-exists, config-ensure-section, config-new-project, init, workstream, docs-init');
   }
 
+  // Reject flags that are never valid for any gsd-tools command. AI agents
+  // sometimes hallucinate --help or --version on tool invocations; silently
+  // ignoring them can cause destructive operations to proceed unchecked.
+  const NEVER_VALID_FLAGS = new Set(['-h', '--help', '-?', '--h', '--version', '-v', '--usage']);
+  for (const arg of args) {
+    if (NEVER_VALID_FLAGS.has(arg)) {
+      error(`Unknown flag: ${arg}\ngsd-tools does not accept help or version flags. Run "gsd-tools" with no arguments for usage.`);
+    }
+  }
+
   // Multi-repo guard: resolve project root for commands that read/write .planning/.
   // Skip for pure-utility commands that don't touch .planning/ to avoid unnecessary
   // filesystem traversal on every invocation.
