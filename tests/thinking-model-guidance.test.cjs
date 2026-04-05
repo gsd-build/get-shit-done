@@ -219,11 +219,14 @@ describe('agent files use inline @-reference wiring at decision points', () => {
         );
       });
 
-      test('does NOT use <required_reading> block (inline wiring only)', () => {
+      test('does NOT put thinking-models reference inside <required_reading> (inline wiring only)', () => {
+        // Extract content from all <required_reading> blocks
+        const reqReadingMatches = content.match(/<required_reading>([\s\S]*?)<\/required_reading>/g) || [];
+        const reqReadingContent = reqReadingMatches.join('');
         assert.equal(
-          content.includes('<required_reading>'),
+          reqReadingContent.includes(wiring.refFile),
           false,
-          `${agent}.md uses <required_reading> block — should use inline @-reference wiring instead`
+          `${agent}.md puts ${wiring.refFile} inside a <required_reading> block — should use inline @-reference wiring instead`
         );
       });
     });
