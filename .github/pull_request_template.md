@@ -29,6 +29,8 @@ For **features**: the linked issue must have the `approved-feature` label before
 
 PRs that arrive without a labeled, approved issue are closed without review.
 
+> **No draft PRs.** Draft PRs are automatically closed. Only open a PR when your code is complete, tests pass, and the correct template is used. See [CONTRIBUTING.md](../CONTRIBUTING.md).
+
 See [CONTRIBUTING.md](../CONTRIBUTING.md) for the full process.
 
 ---

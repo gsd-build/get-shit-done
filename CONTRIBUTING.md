@@ -83,6 +83,7 @@ PRs that arrive without a properly-labeled linked issue are closed automatically
 
 **Every PR must link to an approved issue.** PRs without a linked issue are closed without review, no exceptions.
 
+- **No draft PRs** — draft PRs are automatically closed. Only open a PR when it is complete, tested, and ready for review. If your work is not finished, keep it on your local branch until it is.
 - **Use the correct PR template** — there are separate templates for [Fix](.github/PULL_REQUEST_TEMPLATE/fix.md), [Enhancement](.github/PULL_REQUEST_TEMPLATE/enhancement.md), and [Feature](.github/PULL_REQUEST_TEMPLATE/feature.md). Using the wrong template or using the default template for a feature is a rejection reason.
 - **Link with a closing keyword** — use `Closes #123`, `Fixes #123`, or `Resolves #123` in the PR body. The CI check will fail and the PR will be auto-closed if no valid issue reference is found.
 - **One concern per PR** — bug fixes, enhancements, and features must be separate PRs
