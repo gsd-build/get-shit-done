@@ -125,21 +125,21 @@ npx get-shit-done-cc@latest
 npx get-shit-done-cc --claude --global   # ~/.claude/ にインストール
 npx get-shit-done-cc --claude --local    # ./.claude/ にインストール
 
-# OpenCode（オープンソース、無料モデル）
+# OpenCode
 npx get-shit-done-cc --opencode --global # ~/.config/opencode/ にインストール
 
 # Gemini CLI
 npx get-shit-done-cc --gemini --global   # ~/.gemini/ にインストール
 
-# Kilo（OpenCodeフォーク）
+# Kilo
 npx get-shit-done-cc --kilo --global     # ~/.config/kilo/ にインストール
 npx get-shit-done-cc --kilo --local      # ./.kilo/ にインストール
 
-# Codex（スキルファースト）
+# Codex
 npx get-shit-done-cc --codex --global    # ~/.codex/ にインストール
 npx get-shit-done-cc --codex --local     # ./.codex/ にインストール
 
-# Copilot（GitHub Copilot CLI）
+# Copilot
 npx get-shit-done-cc --copilot --global  # ~/.github/ にインストール
 npx get-shit-done-cc --copilot --local   # ./.github/ にインストール
 
@@ -147,7 +147,7 @@ npx get-shit-done-cc --copilot --local   # ./.github/ にインストール
 npx get-shit-done-cc --cursor --global      # ~/.cursor/ にインストール
 npx get-shit-done-cc --cursor --local       # ./.cursor/ にインストール
 
-# Antigravity（Google、スキルファースト、Geminiベース）
+# Antigravity
 npx get-shit-done-cc --antigravity --global # ~/.gemini/antigravity/ にインストール
 npx get-shit-done-cc --antigravity --local  # ./.agent/ にインストール
 
@@ -155,11 +155,11 @@ npx get-shit-done-cc --antigravity --local  # ./.agent/ にインストール
 npx get-shit-done-cc --augment --global     # ~/.augment/ にインストール
 npx get-shit-done-cc --augment --local      # ./.augment/ にインストール
 
-# Trae（ByteDance、スキルファースト）
+# Trae
 npx get-shit-done-cc --trae --global        # ~/.trae/ にインストール
 npx get-shit-done-cc --trae --local         # ./.trae/ にインストール
 
-# Cline（.clinerules使用）
+# Cline
 npx get-shit-done-cc --cline --global       # ~/.cline/ にインストール
 npx get-shit-done-cc --cline --local        # ./.clinerules にインストール
 

@@ -110,17 +110,17 @@ npx get-shit-done-cc@latest
 npx get-shit-done-cc --claude --global   # 安装到 ~/.claude/
 npx get-shit-done-cc --claude --local    # 安装到 ./.claude/
 
-# OpenCode（开源，免费模型）
+# OpenCode
 npx get-shit-done-cc --opencode --global # 安装到 ~/.config/opencode/
 
 # Gemini CLI
 npx get-shit-done-cc --gemini --global   # 安装到 ~/.gemini/
 
-# Kilo（OpenCode 分支）
+# Kilo
 npx get-shit-done-cc --kilo --global     # 安装到 ~/.config/kilo/
 npx get-shit-done-cc --kilo --local      # 安装到 ./.kilo/
 
-# Codex（技能优先）
+# Codex
 npx get-shit-done-cc --codex --global    # 安装到 ~/.codex/
 npx get-shit-done-cc --codex --local     # 安装到 ./.codex/
 

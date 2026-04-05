@@ -153,7 +153,7 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 ## [1.29.0] - 2026-03-25
 
 ### Added
-- **Windsurf runtime support** — Full installation and command conversion for Windsurf (Codeium)
+- **Windsurf runtime support** — Full installation and command conversion for Windsurf
 - **Agent skill injection** — Inject project-specific skills into subagents via `agent_skills` config section
 - **UI-phase and UI-review steps** in autonomous workflow
 - **Security scanning CI** — Prompt injection, base64, and secret scanning workflows

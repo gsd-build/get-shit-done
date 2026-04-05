@@ -151,11 +151,11 @@ npx get-shit-done-cc --antigravity --local
 npx get-shit-done-cc --augment --global     # Install to ~/.augment/
 npx get-shit-done-cc --augment --local      # Install to ./.augment/
 
-# Trae (ByteDance, skills-first)
+# Trae
 npx get-shit-done-cc --trae --global        # Install to ~/.trae/
 npx get-shit-done-cc --trae --local         # Install to ./.trae/
 
-# Cline (usa .clinerules)
+# Cline
 npx get-shit-done-cc --cline --global       # Install to ~/.cline/
 npx get-shit-done-cc --cline --local        # Install to ./.clinerules
 

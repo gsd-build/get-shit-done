@@ -137,21 +137,21 @@ npx get-shit-done-cc@latest
 npx get-shit-done-cc --claude --global   # Install to ~/.claude/
 npx get-shit-done-cc --claude --local    # Install to ./.claude/
 
-# OpenCode (open source, free models)
+# OpenCode
 npx get-shit-done-cc --opencode --global # Install to ~/.config/opencode/
 
 # Gemini CLI
 npx get-shit-done-cc --gemini --global   # Install to ~/.gemini/
 
-# Kilo (OpenCode fork)
+# Kilo
 npx get-shit-done-cc --kilo --global     # Install to ~/.config/kilo/
 npx get-shit-done-cc --kilo --local      # Install to ./.kilo/
 
-# Codex (skills-first)
+# Codex
 npx get-shit-done-cc --codex --global    # Install to ~/.codex/
 npx get-shit-done-cc --codex --local     # Install to ./.codex/
 
-# Copilot (GitHub Copilot CLI)
+# Copilot
 npx get-shit-done-cc --copilot --global  # Install to ~/.github/
 npx get-shit-done-cc --copilot --local   # Install to ./.github/
 
@@ -159,11 +159,11 @@ npx get-shit-done-cc --copilot --local   # Install to ./.github/
 npx get-shit-done-cc --cursor --global      # Install to ~/.cursor/
 npx get-shit-done-cc --cursor --local       # Install to ./.cursor/
 
-# Windsurf (Codeium, VS Code-based)
+# Windsurf
 npx get-shit-done-cc --windsurf --global    # Install to ~/.windsurf/
 npx get-shit-done-cc --windsurf --local     # Install to ./.windsurf/
 
-# Antigravity (Google, skills-first, Gemini-based)
+# Antigravity
 npx get-shit-done-cc --antigravity --global # Install to ~/.gemini/antigravity/
 npx get-shit-done-cc --antigravity --local  # Install to ./.agent/
 
@@ -171,11 +171,11 @@ npx get-shit-done-cc --antigravity --local  # Install to ./.agent/
 npx get-shit-done-cc --augment --global     # Install to ~/.augment/
 npx get-shit-done-cc --augment --local      # Install to ./.augment/
 
-# Trae (ByteDance, skills-first)
+# Trae
 npx get-shit-done-cc --trae --global        # Install to ~/.trae/
 npx get-shit-done-cc --trae --local         # Install to ./.trae/
 
-# Cline (uses .clinerules)
+# Cline
 npx get-shit-done-cc --cline --global       # Install to ~/.cline/
 npx get-shit-done-cc --cline --local        # Install to ./.clinerules
 

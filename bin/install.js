@@ -1121,7 +1121,7 @@ function convertClaudeAgentToCursorAgent(content) {
 }
 
 // --- Windsurf converters ---
-// Windsurf (by Codeium) uses a tool set similar to Cursor (both VS Code-based).
+// Windsurf uses a tool set similar to Cursor.
 // Config lives in .windsurf/ (local) and ~/.windsurf/ (global).
 
 // Tool name mapping from Claude Code to Windsurf Cascade
@@ -1239,7 +1239,7 @@ function convertClaudeAgentToWindsurfAgent(content) {
 }
 
 // --- Augment converters ---
-// Augment (auggie CLI) uses a tool set similar to Cursor/Windsurf (VS Code-based).
+// Augment uses a tool set similar to Cursor/Windsurf.
 // Config lives in .augment/ (local) and ~/.augment/ (global).
 
 const claudeToAugmentTools = {
@@ -3134,7 +3134,7 @@ function convertClaudeToOpencodeFrontmatter(content, { isAgent = false } = {}) {
   return `---\n${newFrontmatter}\n---${body}`;
 }
 
-// Kilo CLI — fork of OpenCode, same conversion logic, different config paths.
+// Kilo CLI — same conversion logic as OpenCode, different config paths.
 function convertClaudeToKiloFrontmatter(content, { isAgent = false } = {}) {
   // Replace tool name references in content (applies to all files)
   let convertedContent = content;
