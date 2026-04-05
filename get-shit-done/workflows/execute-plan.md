@@ -403,8 +403,11 @@ merge conflicts).
 Update STATE.md using gsd-tools:
 
 ```bash
+# Auto-detect parallel mode: .git is a file in worktrees, a directory in main repo
+IS_WORKTREE=$([ -f .git ] && echo "true" || echo "false")
+
 # Skip in parallel mode — orchestrator handles STATE.md centrally
-if [ "${PARALLEL_MODE}" != "true" ]; then
+if [ "$IS_WORKTREE" != "true" ]; then
   # Advance plan counter (handles last-plan edge case)
   node "$HOME/.claude/get-shit-done/bin/gsd-tools.cjs" state advance-plan
 
@@ -454,8 +457,11 @@ If SUMMARY "Issues Encountered" ≠ "None": yolo → log and continue. Interacti
 updates centrally after merging worktrees).
 
 ```bash
+# Auto-detect parallel mode: .git is a file in worktrees, a directory in main repo
+IS_WORKTREE=$([ -f .git ] && echo "true" || echo "false")
+
 # Skip in parallel mode — orchestrator handles ROADMAP.md centrally
-if [ "${PARALLEL_MODE}" != "true" ]; then
+if [ "$IS_WORKTREE" != "true" ]; then
   node "$HOME/.claude/get-shit-done/bin/gsd-tools.cjs" roadmap update-plan-progress "${PHASE}"
 fi
 ```
@@ -476,8 +482,11 @@ Extract requirement IDs from the plan's frontmatter (e.g., `requirements: [AUTH-
 Task code already committed per-task. Commit plan metadata:
 
 ```bash
+# Auto-detect parallel mode: .git is a file in worktrees, a directory in main repo
+IS_WORKTREE=$([ -f .git ] && echo "true" || echo "false")
+
 # In parallel mode: exclude STATE.md and ROADMAP.md (orchestrator commits these)
-if [ "${PARALLEL_MODE}" = "true" ]; then
+if [ "$IS_WORKTREE" = "true" ]; then
   node "$HOME/.claude/get-shit-done/bin/gsd-tools.cjs" commit "docs({phase}-{plan}): complete [plan-name] plan" --files .planning/phases/XX-name/{phase}-{plan}-SUMMARY.md .planning/REQUIREMENTS.md
 else
   node "$HOME/.claude/get-shit-done/bin/gsd-tools.cjs" commit "docs({phase}-{plan}): complete [plan-name] plan" --files .planning/phases/XX-name/{phase}-{plan}-SUMMARY.md .planning/STATE.md .planning/ROADMAP.md .planning/REQUIREMENTS.md

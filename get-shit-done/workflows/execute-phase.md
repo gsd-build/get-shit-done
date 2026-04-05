@@ -365,15 +365,16 @@ Execute each selected wave in sequence. Within a wave: parallel if `PARALLELIZAT
        </worktree_branch_check>
 
        <parallel_execution>
-       You are running as a PARALLEL executor agent. Use --no-verify on all git
-       commits to avoid pre-commit hook contention with other agents. The
-       orchestrator validates hooks once after all agents complete.
+       You are running as a PARALLEL executor agent in a git worktree.
+       Use --no-verify on all git commits to avoid pre-commit hook contention
+       with other agents. The orchestrator validates hooks once after all agents complete.
        For gsd-tools commits: add --no-verify flag.
        For direct git commits: use git commit --no-verify -m "..."
 
-       IMPORTANT: Do NOT modify STATE.md or ROADMAP.md. These shared tracking
-       files cause merge conflicts when multiple worktrees modify them
-       simultaneously. The orchestrator updates them centrally after merge.
+       IMPORTANT: Do NOT modify STATE.md or ROADMAP.md. execute-plan.md
+       auto-detects worktree mode (`.git` is a file, not a directory) and skips
+       shared file updates automatically. The orchestrator updates them centrally
+       after merge.
        </parallel_execution>
 
        <execution_context>
@@ -576,14 +577,21 @@ Execute each selected wave in sequence. Within a wave: parallel if `PARALLELIZAT
    fi
    '
    TEST_EXIT=$?
-   if [ $TEST_EXIT -eq 124 ]; then
+   if [ $TEST_EXIT -eq 0 ]; then
+     echo "✓ Post-merge test gate passed — no cross-plan conflicts"
+   elif [ $TEST_EXIT -eq 124 ]; then
      echo "⚠ Post-merge test gate timed out after 5 minutes"
+   else
+     echo "✗ Post-merge test gate failed (exit code $TEST_EXIT)"
+     WAVE_FAILURE_COUNT=$((WAVE_FAILURE_COUNT + 1))
    fi
    ```
 
-   **If tests pass:** `✓ Post-merge test gate: {N} tests passed — no cross-plan conflicts`
+   **If `TEST_EXIT` is 0 (pass):** `✓ Post-merge test gate: {N} tests passed — no cross-plan conflicts` → continue to orchestrator tracking update.
 
-   **If tests fail:** Set `WAVE_FAILURE_COUNT=$((WAVE_FAILURE_COUNT + 1))` to track
+   **If `TEST_EXIT` is 124 (timeout):** Log warning, treat as non-blocking, continue. Tests may need a longer budget or manual run.
+
+   **If `TEST_EXIT` is non-zero (test failure):** Increment `WAVE_FAILURE_COUNT` to track
    cumulative failures across waves. Subsequent waves should report:
    `⚠ Note: ${WAVE_FAILURE_COUNT} prior wave(s) had test failures`
 
@@ -607,7 +615,8 @@ Execute each selected wave in sequence. Within a wave: parallel if `PARALLELIZAT
 
    **If `workflow.use_worktrees` is `false`:** Sequential agents already updated STATE.md and ROADMAP.md themselves — skip this step.
 
-   **If tests fail (from 5.6):**
+5.8. **Handle test gate failures (when `WAVE_FAILURE_COUNT > 0`):**
+
    ```
    ## ⚠ Post-Merge Test Failure (cumulative failures: ${WAVE_FAILURE_COUNT})
 
@@ -920,10 +929,11 @@ Collect all unique test file paths into `REGRESSION_FILES`.
 ```bash
 # Detect test runner and run prior phase tests
 if [ -f "package.json" ]; then
-  # Node.js — use project's test runner
-  npx jest ${REGRESSION_FILES} --passWithNoTests --no-coverage -q 2>&1 || npx vitest run ${REGRESSION_FILES} 2>&1
+  npm test 2>&1
 elif [ -f "Cargo.toml" ]; then
   cargo test 2>&1
+elif [ -f "go.mod" ]; then
+  go test ./... 2>&1
 elif [ -f "requirements.txt" ] || [ -f "pyproject.toml" ]; then
   python -m pytest ${REGRESSION_FILES} -q --tb=short 2>&1
 fi
