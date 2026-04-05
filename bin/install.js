@@ -5666,8 +5666,11 @@ function install(isGlobal, runtime = 'claude') {
     const hasValidateCommitHook = settings.hooks[preToolEvent].some(entry =>
       entry.hooks && entry.hooks.some(h => h.command && h.command.includes('gsd-validate-commit'))
     );
-
-    if (!hasValidateCommitHook) {
+    // Guard: only register if the .sh file was actually installed. If the npm package
+    // omitted the file (as happened in v1.32.0, bug #1817), registering a missing hook
+    // causes a hook error on every Bash tool invocation.
+    const validateCommitFile = path.join(targetDir, 'hooks', 'gsd-validate-commit.sh');
+    if (!hasValidateCommitHook && fs.existsSync(validateCommitFile)) {
       settings.hooks[preToolEvent].push({
         matcher: 'Bash',
         hooks: [
@@ -5679,6 +5682,8 @@ function install(isGlobal, runtime = 'claude') {
         ]
       });
       console.log(`  ${green}✓${reset} Configured commit validation hook (opt-in via config)`);
+    } else if (!hasValidateCommitHook && !fs.existsSync(validateCommitFile)) {
+      console.warn(`  ${yellow}⚠${reset}  Skipped commit validation hook — gsd-validate-commit.sh not found at target`);
     }
 
     // Configure session state orientation hook (opt-in)
@@ -5688,8 +5693,8 @@ function install(isGlobal, runtime = 'claude') {
     const hasSessionStateHook = settings.hooks.SessionStart.some(entry =>
       entry.hooks && entry.hooks.some(h => h.command && h.command.includes('gsd-session-state'))
     );
-
-    if (!hasSessionStateHook) {
+    const sessionStateFile = path.join(targetDir, 'hooks', 'gsd-session-state.sh');
+    if (!hasSessionStateHook && fs.existsSync(sessionStateFile)) {
       settings.hooks.SessionStart.push({
         hooks: [
           {
@@ -5699,6 +5704,8 @@ function install(isGlobal, runtime = 'claude') {
         ]
       });
       console.log(`  ${green}✓${reset} Configured session state orientation hook (opt-in via config)`);
+    } else if (!hasSessionStateHook && !fs.existsSync(sessionStateFile)) {
+      console.warn(`  ${yellow}⚠${reset}  Skipped session state hook — gsd-session-state.sh not found at target`);
     }
 
     // Configure phase boundary detection hook (opt-in)
@@ -5708,8 +5715,8 @@ function install(isGlobal, runtime = 'claude') {
     const hasPhaseBoundaryHook = settings.hooks[postToolEvent].some(entry =>
       entry.hooks && entry.hooks.some(h => h.command && h.command.includes('gsd-phase-boundary'))
     );
-
-    if (!hasPhaseBoundaryHook) {
+    const phaseBoundaryFile = path.join(targetDir, 'hooks', 'gsd-phase-boundary.sh');
+    if (!hasPhaseBoundaryHook && fs.existsSync(phaseBoundaryFile)) {
       settings.hooks[postToolEvent].push({
         matcher: 'Write|Edit',
         hooks: [
@@ -5721,6 +5728,8 @@ function install(isGlobal, runtime = 'claude') {
         ]
       });
       console.log(`  ${green}✓${reset} Configured phase boundary detection hook (opt-in via config)`);
+    } else if (!hasPhaseBoundaryHook && !fs.existsSync(phaseBoundaryFile)) {
+      console.warn(`  ${yellow}⚠${reset}  Skipped phase boundary hook — gsd-phase-boundary.sh not found at target`);
     }
   }
 
