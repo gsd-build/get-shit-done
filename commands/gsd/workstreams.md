@@ -57,7 +57,7 @@ Run: `node "$HOME/.claude/get-shit-done/bin/gsd-tools.cjs" workstream progress -
 Display a progress overview across all workstreams.
 
 ### complete
-Run: `node "$HOME/.claude/get-shit-done/bin/gsd-tools.cjs" workstream complete <name> --raw --cwd "$CWD"`
+Run: `node "$HOME/.claude/get-shit-done/bin/gsd-tools.cjs" workstream complete <name> --confirm --raw --cwd "$CWD"`
 Archive the workstream to milestones/.
 
 ### resume

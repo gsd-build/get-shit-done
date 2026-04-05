@@ -279,6 +279,10 @@ function cmdWorkstreamStatus(cwd, name, raw) {
 function cmdWorkstreamComplete(cwd, name, options, raw) {
   if (!name) error('workstream name required. Usage: workstream complete <name>');
   if (/[/\\]/.test(name) || name === '.' || name === '..') error('Invalid workstream name');
+  // Require --confirm for this destructive operation (#1818)
+  if (!options.confirm) {
+    error(`workstream complete archives and deletes the entire "${name}" workstream. Pass --confirm to proceed.`);
+  }
 
   const root = planningRoot(cwd);
   const wsRoot = path.join(root, 'workstreams');

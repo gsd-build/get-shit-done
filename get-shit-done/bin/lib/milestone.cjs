@@ -89,6 +89,10 @@ function cmdMilestoneComplete(cwd, version, options, raw) {
   if (!version) {
     error('version required for milestone complete (e.g., v1.0)');
   }
+  // Require --confirm for this multi-file destructive operation (#1818)
+  if (!options.confirm) {
+    error(`milestone complete archives ROADMAP.md, REQUIREMENTS.md, STATE.md, and MILESTONES.md for ${version}. Pass --confirm to proceed.`);
+  }
 
   const roadmapPath = planningPaths(cwd).roadmap;
   const reqPath = planningPaths(cwd).requirements;

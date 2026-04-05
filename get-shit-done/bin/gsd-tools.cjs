@@ -183,6 +183,28 @@ function parseNamedArgs(args, valueFlags = [], booleanFlags = []) {
 }
 
 /**
+ * Reject any --flag tokens in args that are not in the known set.
+ * Prevents destructive commands from silently ignoring typos or misused flags.
+ * Positional args (tokens not starting with --) are ignored.
+ * See: https://github.com/gsd-build/get-shit-done/issues/1818
+ *
+ * rejectUnknownFlags(args.slice(2), ['force', 'confirm'], 'phase remove')
+ */
+function rejectUnknownFlags(args, knownFlags = [], commandName = '') {
+  const known = new Set(knownFlags.map(f => f.startsWith('--') ? f : `--${f}`));
+  // Always allow these global flags that are stripped before command dispatch
+  known.add('--raw');
+  known.add('--cwd');
+  known.add('--ws');
+  known.add('--pick');
+  const unknown = args.filter(a => a.startsWith('--') && !known.has(a) && !known.has(a.split('=')[0]));
+  if (unknown.length > 0) {
+    const usage = commandName ? `. Usage: gsd-tools ${commandName}` : '';
+    error(`Unknown flag${unknown.length > 1 ? 's' : ''}: ${unknown.join(', ')}${usage}`);
+  }
+}
+
+/**
  * Collect all tokens after --flag until the next --flag or end of args.
  * Handles multi-word values like --name Foo Bar Version 1.
  * Returns null if the flag is absent.
@@ -506,11 +528,14 @@ async function runCommand(command, args, cwd, raw) {
       const subcommand = args[1];
       const file = args[2];
       if (subcommand === 'get') {
+        rejectUnknownFlags(args.slice(3), ['field'], 'frontmatter get <file> --field <key>');
         frontmatter.cmdFrontmatterGet(cwd, file, parseNamedArgs(args, ['field']).field, raw);
       } else if (subcommand === 'set') {
+        rejectUnknownFlags(args.slice(3), ['field', 'value'], 'frontmatter set <file> --field <key> --value <val>');
         const { field, value } = parseNamedArgs(args, ['field', 'value']);
         frontmatter.cmdFrontmatterSet(cwd, file, field, value !== null ? value : undefined, raw);
       } else if (subcommand === 'merge') {
+        rejectUnknownFlags(args.slice(3), ['data'], 'frontmatter merge <file> --data <json>');
         frontmatter.cmdFrontmatterMerge(cwd, file, parseNamedArgs(args, ['data']).data, raw);
       } else if (subcommand === 'validate') {
         frontmatter.cmdFrontmatterValidate(cwd, file, parseNamedArgs(args, ['schema']).schema, raw);
@@ -610,14 +635,8 @@ async function runCommand(command, args, cwd, raw) {
         };
         phase.cmdPhasesList(cwd, options, raw);
       } else if (subcommand === 'clear') {
-        // Reject unrecognized flags to prevent silent destructive execution (#1818)
-        const clearArgs = args.slice(2).filter(a => a !== '--raw');
-        const validClearFlags = ['--confirm'];
-        const unknownFlags = clearArgs.filter(a => a.startsWith('-') && !validClearFlags.includes(a));
-        if (unknownFlags.length > 0) {
-          error(`Unknown flag${unknownFlags.length > 1 ? 's' : ''}: ${unknownFlags.join(', ')}. Usage: gsd-tools phases clear [--confirm]`);
-        }
-        milestone.cmdPhasesClear(cwd, { confirm: clearArgs.includes('--confirm') }, raw);
+        rejectUnknownFlags(args.slice(2), ['confirm'], 'phases clear [--confirm]');
+        milestone.cmdPhasesClear(cwd, { confirm: args.includes('--confirm') }, raw);
       } else {
         error('Unknown phases subcommand. Available: list, clear');
       }
@@ -668,9 +687,12 @@ async function runCommand(command, args, cwd, raw) {
       } else if (subcommand === 'insert') {
         phase.cmdPhaseInsert(cwd, args[2], args.slice(3).join(' '), raw);
       } else if (subcommand === 'remove') {
+        rejectUnknownFlags(args.slice(3), ['force', 'confirm'], 'phase remove <phase> --confirm [--force]');
         const forceFlag = args.includes('--force');
-        phase.cmdPhaseRemove(cwd, args[2], { force: forceFlag }, raw);
+        const confirm = args.includes('--confirm');
+        phase.cmdPhaseRemove(cwd, args[2], { force: forceFlag, confirm }, raw);
       } else if (subcommand === 'complete') {
+        rejectUnknownFlags(args.slice(3), [], 'phase complete <phase>');
         phase.cmdPhaseComplete(cwd, args[2], raw);
       } else {
         error('Unknown phase subcommand. Available: next-decimal, add, insert, remove, complete');
@@ -681,9 +703,11 @@ async function runCommand(command, args, cwd, raw) {
     case 'milestone': {
       const subcommand = args[1];
       if (subcommand === 'complete') {
+        rejectUnknownFlags(args.slice(2), ['name', 'archive-phases', 'confirm'], 'milestone complete <version> --confirm [--name <name>] [--archive-phases]');
         const milestoneName = parseMultiwordArg(args, 'name');
         const archivePhases = args.includes('--archive-phases');
-        milestone.cmdMilestoneComplete(cwd, args[2], { name: milestoneName, archivePhases }, raw);
+        const confirm = args.includes('--confirm');
+        milestone.cmdMilestoneComplete(cwd, args[2], { name: milestoneName, archivePhases, confirm }, raw);
       } else {
         error('Unknown milestone subcommand. Available: complete');
       }
@@ -695,6 +719,7 @@ async function runCommand(command, args, cwd, raw) {
       if (subcommand === 'consistency') {
         verify.cmdValidateConsistency(cwd, raw);
       } else if (subcommand === 'health') {
+        rejectUnknownFlags(args.slice(2), ['repair'], 'validate health [--repair]');
         const repairFlag = args.includes('--repair');
         verify.cmdValidateHealth(cwd, { repair: repairFlag }, raw);
       } else if (subcommand === 'agents') {
@@ -738,6 +763,7 @@ async function runCommand(command, args, cwd, raw) {
     case 'todo': {
       const subcommand = args[1];
       if (subcommand === 'complete') {
+        rejectUnknownFlags(args.slice(3), [], 'todo complete <filename>');
         commands.cmdTodoComplete(cwd, args[2], raw);
       } else if (subcommand === 'match-phase') {
         commands.cmdTodoMatchPhase(cwd, args[2], raw);
@@ -889,6 +915,7 @@ async function runCommand(command, args, cwd, raw) {
     // ─── Profile Output ──────────────────────────────────────────────────
 
     case 'write-profile': {
+      rejectUnknownFlags(args.slice(1), ['input', 'output'], 'write-profile --input <path> [--output <path>]');
       const inputIdx = args.indexOf('--input');
       const inputPath = inputIdx !== -1 ? args[inputIdx + 1] : null;
       if (!inputPath) error('--input <analysis-json-path> is required');
@@ -917,6 +944,7 @@ async function runCommand(command, args, cwd, raw) {
     }
 
     case 'generate-claude-profile': {
+      rejectUnknownFlags(args.slice(1), ['analysis', 'output', 'global'], 'generate-claude-profile [--analysis <path>] [--output <path>] [--global]');
       const analysisIdx = args.indexOf('--analysis');
       const analysisPath = analysisIdx !== -1 ? args[analysisIdx + 1] : null;
       const outputIdx = args.indexOf('--output');
@@ -927,6 +955,7 @@ async function runCommand(command, args, cwd, raw) {
     }
 
     case 'generate-claude-md': {
+      rejectUnknownFlags(args.slice(1), ['output', 'auto', 'force'], 'generate-claude-md [--output <path>] [--auto] [--force]');
       const outputIdx = args.indexOf('--output');
       const outputPath = outputIdx !== -1 ? args[outputIdx + 1] : null;
       const autoFlag = args.includes('--auto');
@@ -938,6 +967,7 @@ async function runCommand(command, args, cwd, raw) {
     case 'workstream': {
       const subcommand = args[1];
       if (subcommand === 'create') {
+        rejectUnknownFlags(args.slice(3), ['migrate-name', 'no-migrate'], 'workstream create <name> [--no-migrate] [--migrate-name <name>]');
         const migrateNameIdx = args.indexOf('--migrate-name');
         const noMigrate = args.includes('--no-migrate');
         workstream.cmdWorkstreamCreate(cwd, args[2], {
@@ -949,7 +979,8 @@ async function runCommand(command, args, cwd, raw) {
       } else if (subcommand === 'status') {
         workstream.cmdWorkstreamStatus(cwd, args[2], raw);
       } else if (subcommand === 'complete') {
-        workstream.cmdWorkstreamComplete(cwd, args[2], {}, raw);
+        rejectUnknownFlags(args.slice(3), ['confirm'], 'workstream complete <name> --confirm');
+        workstream.cmdWorkstreamComplete(cwd, args[2], { confirm: args.includes('--confirm') }, raw);
       } else if (subcommand === 'set') {
         workstream.cmdWorkstreamSet(cwd, args[2], raw);
       } else if (subcommand === 'get') {

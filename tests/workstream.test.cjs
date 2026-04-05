@@ -480,7 +480,7 @@ describe('workstream complete', () => {
   after(() => cleanup(tmpDir));
 
   test('archives workstream to milestones/', () => {
-    const result = runGsdTools(['workstream', 'complete', 'done-ws', '--raw'], tmpDir);
+    const result = runGsdTools(['workstream', 'complete', 'done-ws', '--confirm', '--raw'], tmpDir);
     assert.ok(result.success, `complete failed: ${result.error}`);
     const data = JSON.parse(result.output);
     assert.strictEqual(data.completed, true);

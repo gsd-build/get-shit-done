@@ -586,6 +586,10 @@ function updateRoadmapAfterPhaseRemoval(roadmapPath, targetPhase, isDecimal, rem
 
 function cmdPhaseRemove(cwd, targetPhase, options, raw) {
   if (!targetPhase) error('phase number required for phase remove');
+  // Require --confirm for this destructive operation (#1818)
+  if (!options.confirm) {
+    error(`phase remove deletes the phase directory and renumbers all subsequent phases. Pass --confirm to proceed. Usage: gsd-tools phase remove <phase> --confirm [--force]`);
+  }
 
   const roadmapPath = path.join(planningDir(cwd), 'ROADMAP.md');
   const phasesDir = path.join(planningDir(cwd), 'phases');

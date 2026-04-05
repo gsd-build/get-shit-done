@@ -40,7 +40,7 @@ describe('milestone complete command', () => {
       `---\none-liner: Set up project infrastructure\n---\n# Summary\n`
     );
 
-    const result = runGsdTools('milestone complete v1.0 --name MVP Foundation', tmpDir);
+    const result = runGsdTools('milestone complete v1.0 --confirm --name MVP Foundation', tmpDir);
     assert.ok(result.success, `Command failed: ${result.error}`);
 
     const output = JSON.parse(result.output);
@@ -83,7 +83,7 @@ describe('milestone complete command', () => {
       `# State\n\n**Status:** In progress\n**Last Activity:** 2025-01-01\n**Last Activity Description:** Working\n`
     );
 
-    const result = runGsdTools('milestone complete v1.0 --name Beta', tmpDir);
+    const result = runGsdTools('milestone complete v1.0 --confirm --name Beta', tmpDir);
     assert.ok(result.success, `Command failed: ${result.error}`);
 
     const milestones = fs.readFileSync(path.join(tmpDir, '.planning', 'MILESTONES.md'), 'utf-8');
@@ -109,7 +109,7 @@ describe('milestone complete command', () => {
       `# State\n\n**Status:** In progress\n**Last Activity:** 2025-01-01\n**Last Activity Description:** Working\n`
     );
 
-    let result = runGsdTools('milestone complete v1.1 --name Second', tmpDir);
+    let result = runGsdTools('milestone complete v1.1 --confirm --name Second', tmpDir);
     assert.ok(result.success, `v1.1 failed: ${result.error}`);
 
     fs.writeFileSync(
@@ -117,7 +117,7 @@ describe('milestone complete command', () => {
       `# Roadmap v1.2\n`
     );
 
-    result = runGsdTools('milestone complete v1.2 --name Third', tmpDir);
+    result = runGsdTools('milestone complete v1.2 --confirm --name Third', tmpDir);
     assert.ok(result.success, `v1.2 failed: ${result.error}`);
 
     const milestones = fs.readFileSync(
@@ -152,7 +152,7 @@ describe('milestone complete command', () => {
       `---\none-liner: Set up project infrastructure\n---\n# Summary\n`
     );
 
-    const result = runGsdTools('milestone complete v1.0 --name MVP --archive-phases', tmpDir);
+    const result = runGsdTools('milestone complete v1.0 --confirm --name MVP --archive-phases', tmpDir);
     assert.ok(result.success, `Command failed: ${result.error}`);
 
     const output = JSON.parse(result.output);
@@ -185,7 +185,7 @@ describe('milestone complete command', () => {
       `# State\n\n**Status:** In progress\n**Last Activity:** 2025-01-01\n**Last Activity Description:** Working\n`
     );
 
-    const result = runGsdTools('milestone complete v1.0 --name MVP', tmpDir);
+    const result = runGsdTools('milestone complete v1.0 --confirm --name MVP', tmpDir);
     assert.ok(result.success, `Command failed: ${result.error}`);
 
     const archivedReq = fs.readFileSync(
@@ -209,7 +209,7 @@ describe('milestone complete command', () => {
       `# State\n\n**Status:** In progress\n**Last Activity:** 2025-01-01\n**Last Activity Description:** Working\n`
     );
 
-    const result = runGsdTools('milestone complete v1.0 --name Test', tmpDir);
+    const result = runGsdTools('milestone complete v1.0 --confirm --name Test', tmpDir);
     assert.ok(result.success, `Command failed: ${result.error}`);
 
     const output = JSON.parse(result.output);
@@ -230,7 +230,7 @@ describe('milestone complete command', () => {
       `# State\n\n**Status:** In progress\n**Last Activity:** 2025-01-01\n**Last Activity Description:** Working\n`
     );
 
-    const result = runGsdTools('milestone complete v1.0 --name NoRoadmap', tmpDir);
+    const result = runGsdTools('milestone complete v1.0 --confirm --name NoRoadmap', tmpDir);
     assert.ok(result.success, `Command failed: ${result.error}`);
 
     const output = JSON.parse(result.output);
@@ -276,7 +276,7 @@ describe('milestone complete command', () => {
     fs.writeFileSync(path.join(p4, '04-02-PLAN.md'), '# Plan 2\n');
     fs.writeFileSync(path.join(p4, '04-01-SUMMARY.md'), '---\none-liner: Polished UI\n---\n# Summary\n');
 
-    const result = runGsdTools('milestone complete v1.1 --name "Second Release"', tmpDir);
+    const result = runGsdTools('milestone complete v1.1 --confirm --name "Second Release"', tmpDir);
     assert.ok(result.success, `Command failed: ${result.error}`);
 
     const output = JSON.parse(result.output);
@@ -310,7 +310,7 @@ describe('milestone complete command', () => {
     fs.mkdirSync(p2, { recursive: true });
     fs.writeFileSync(path.join(p2, '02-01-PLAN.md'), '# Plan\n');
 
-    const result = runGsdTools('milestone complete v1.1 --name Test --archive-phases', tmpDir);
+    const result = runGsdTools('milestone complete v1.1 --confirm --name Test --archive-phases', tmpDir);
     assert.ok(result.success, `Command failed: ${result.error}`);
 
     // Phase 2 should be archived
@@ -351,7 +351,7 @@ describe('milestone complete command', () => {
       '---\none-liner: Scaling work\n---\n'
     );
 
-    const result = runGsdTools('milestone complete v1.0 --name MVP', tmpDir);
+    const result = runGsdTools('milestone complete v1.0 --confirm --name MVP', tmpDir);
     assert.ok(result.success, `Command failed: ${result.error}`);
 
     const output = JSON.parse(result.output);
@@ -386,7 +386,7 @@ describe('milestone complete command', () => {
     fs.mkdirSync(misc, { recursive: true });
     fs.writeFileSync(path.join(misc, 'PLAN.md'), '# Not a phase\n');
 
-    const result = runGsdTools('milestone complete v1.0 --name Test', tmpDir);
+    const result = runGsdTools('milestone complete v1.0 --confirm --name Test', tmpDir);
     assert.ok(result.success, `Command failed: ${result.error}`);
 
     const output = JSON.parse(result.output);
@@ -417,7 +417,7 @@ describe('milestone complete command', () => {
     fs.mkdirSync(p45, { recursive: true });
     fs.writeFileSync(path.join(p45, 'PLAN.md'), '# Plan\n');
 
-    const result = runGsdTools('milestone complete v1.49 --name DACP', tmpDir);
+    const result = runGsdTools('milestone complete v1.49 --confirm --name DACP', tmpDir);
     assert.ok(result.success, `Command failed: ${result.error}`);
 
     const output = JSON.parse(result.output);
@@ -441,7 +441,7 @@ describe('milestone complete command', () => {
       `---\none-liner: Built the foundation\n---\n\n# Phase 1: Foundation Summary\n\n**Built the foundation**\n\n## Performance\n\n- **Duration:** 28 min\n- **Tasks:** 7\n- **Files modified:** 12\n`
     );
 
-    const result = runGsdTools('milestone complete v1.0 --name MVP', tmpDir);
+    const result = runGsdTools('milestone complete v1.0 --confirm --name MVP', tmpDir);
     assert.ok(result.success, `Command failed: ${result.error}`);
 
     const output = JSON.parse(result.output);
@@ -466,7 +466,7 @@ describe('milestone complete command', () => {
       `---\nphase: "01"\n---\n\n# Phase 1: Foundation Summary\n\n**JWT auth with refresh rotation using jose library**\n\n## Performance\n`
     );
 
-    const result = runGsdTools('milestone complete v1.0 --name MVP', tmpDir);
+    const result = runGsdTools('milestone complete v1.0 --confirm --name MVP', tmpDir);
     assert.ok(result.success, `Command failed: ${result.error}`);
 
     const output = JSON.parse(result.output);
@@ -486,7 +486,7 @@ describe('milestone complete command', () => {
       `# State\n\nStatus: In progress\nLast Activity: 2025-01-01\nLast Activity Description: Working\n`
     );
 
-    const result = runGsdTools('milestone complete v1.0 --name Test', tmpDir);
+    const result = runGsdTools('milestone complete v1.0 --confirm --name Test', tmpDir);
     assert.ok(result.success, `Command failed: ${result.error}`);
 
     const state = fs.readFileSync(path.join(tmpDir, '.planning', 'STATE.md'), 'utf-8');
@@ -504,7 +504,7 @@ describe('milestone complete command', () => {
     );
     // phases directory exists but is empty (from createTempProject)
 
-    const result = runGsdTools('milestone complete v1.0 --name EmptyPhases', tmpDir);
+    const result = runGsdTools('milestone complete v1.0 --confirm --name EmptyPhases', tmpDir);
     assert.ok(result.success, `Command failed: ${result.error}`);
 
     const output = JSON.parse(result.output);
