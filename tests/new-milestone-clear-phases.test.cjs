@@ -35,7 +35,7 @@ describe('phases clear command', () => {
     fs.writeFileSync(path.join(phase1, '01-01-PLAN.md'), '# Plan');
     fs.writeFileSync(path.join(phase2, '02-01-SUMMARY.md'), '# Summary');
 
-    const result = runGsdTools('phases clear', tmpDir);
+    const result = runGsdTools('phases clear --confirm', tmpDir);
     assert.ok(result.success, `Command failed: ${result.error}`);
 
     const output = JSON.parse(result.output);
@@ -54,7 +54,7 @@ describe('phases clear command', () => {
     const phasesDir = path.join(tmpDir, '.planning', 'phases');
     // createTempProject creates the directory but leaves it empty
 
-    const result = runGsdTools('phases clear', tmpDir);
+    const result = runGsdTools('phases clear --confirm', tmpDir);
     assert.ok(result.success, `Command failed: ${result.error}`);
 
     const output = JSON.parse(result.output);
@@ -66,7 +66,7 @@ describe('phases clear command', () => {
     // Remove the phases directory entirely
     fs.rmSync(path.join(tmpDir, '.planning', 'phases'), { recursive: true, force: true });
 
-    const result = runGsdTools('phases clear', tmpDir);
+    const result = runGsdTools('phases clear --confirm', tmpDir);
     assert.ok(result.success, `Command failed: ${result.error}`);
 
     const output = JSON.parse(result.output);
@@ -83,7 +83,7 @@ describe('phases clear command', () => {
     fs.mkdirSync(phase1, { recursive: true });
     fs.writeFileSync(path.join(phase1, '01-01-PLAN.md'), '# Plan');
 
-    const result = runGsdTools('phases clear', tmpDir);
+    const result = runGsdTools('phases clear --confirm', tmpDir);
     assert.ok(result.success, `Command failed: ${result.error}`);
 
     const output = JSON.parse(result.output);
@@ -103,7 +103,7 @@ describe('phases clear command', () => {
     fs.mkdirSync(nested, { recursive: true });
     fs.writeFileSync(path.join(nested, 'deep-file.md'), '# Deep');
 
-    const result = runGsdTools('phases clear', tmpDir);
+    const result = runGsdTools('phases clear --confirm', tmpDir);
     assert.ok(result.success, `Command failed: ${result.error}`);
 
     assert.ok(!fs.existsSync(phase1), 'phase directory including nested content should be removed');

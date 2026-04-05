@@ -602,7 +602,7 @@ async function runCommand(command, args, cwd, raw) {
         };
         phase.cmdPhasesList(cwd, options, raw);
       } else if (subcommand === 'clear') {
-        milestone.cmdPhasesClear(cwd, raw);
+        milestone.cmdPhasesClear(cwd, raw, args.slice(2));
       } else {
         error('Unknown phases subcommand. Available: list, clear');
       }

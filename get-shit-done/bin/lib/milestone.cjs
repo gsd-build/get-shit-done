@@ -246,15 +246,24 @@ function cmdMilestoneComplete(cwd, version, options, raw) {
   output(result, raw);
 }
 
-function cmdPhasesClear(cwd, raw) {
+function cmdPhasesClear(cwd, raw, args) {
   const phasesDir = planningPaths(cwd).phases;
+  const confirm = Array.isArray(args) && args.includes('--confirm');
   let cleared = 0;
 
   if (fs.existsSync(phasesDir)) {
+    const entries = fs.readdirSync(phasesDir, { withFileTypes: true });
+    const dirs = entries.filter(e => e.isDirectory());
+
+    if (dirs.length > 0 && !confirm) {
+      error(
+        `phases clear would delete ${dirs.length} phase director${dirs.length === 1 ? 'y' : 'ies'}. ` +
+        `Pass --confirm to proceed.`
+      );
+    }
+
     try {
-      const entries = fs.readdirSync(phasesDir, { withFileTypes: true });
-      for (const entry of entries) {
-        if (!entry.isDirectory()) continue;
+      for (const entry of dirs) {
         fs.rmSync(path.join(phasesDir, entry.name), { recursive: true, force: true });
         cleared++;
       }
