@@ -11,7 +11,14 @@
     "security_asvs_level": 1,
     "security_block_on": "high",
     "discuss_mode": "discuss",
-    "research_before_questions": false
+    "research_before_questions": false,
+    "plan_bounce": false,
+    "plan_bounce_script": null,
+    "plan_bounce_passes": 2,
+    "cross_ai_execution": false,
+    "cross_ai_command": null,
+    "code_review_command": null,
+    "compound": false
   },
   "planning": {
     "commit_docs": true,
