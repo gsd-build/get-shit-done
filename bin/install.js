@@ -5168,8 +5168,8 @@ function install(isGlobal, runtime = 'claude') {
     } else {
       failures.push('commands/gsd');
     }
-  } else {
-    // Claude Code: skills/ format (2.1.88+ compatibility)
+  } else if (isGlobal) {
+    // Claude Code global: skills/ format (2.1.88+ compatibility)
     const skillsDir = path.join(targetDir, 'skills');
     const gsdSrc = path.join(src, 'commands', 'gsd');
     copyCommandsAsClaudeSkills(gsdSrc, skillsDir, 'gsd', pathPrefix, runtime, isGlobal);
@@ -5185,11 +5185,38 @@ function install(isGlobal, runtime = 'claude') {
       failures.push('skills/gsd-*');
     }
 
-    // Clean up legacy commands/gsd/ from previous installs
+    // Clean up legacy commands/gsd/ from previous global installs
     const legacyCommandsDir = path.join(targetDir, 'commands', 'gsd');
     if (fs.existsSync(legacyCommandsDir)) {
       fs.rmSync(legacyCommandsDir, { recursive: true });
       console.log(`  ${green}✓${reset} Removed legacy commands/gsd/ directory`);
+    }
+  } else {
+    // Claude Code local: commands/gsd/ format — Claude Code reads local project
+    // commands from .claude/commands/gsd/, not .claude/skills/
+    const commandsDir = path.join(targetDir, 'commands');
+    fs.mkdirSync(commandsDir, { recursive: true });
+    const gsdSrc = path.join(src, 'commands', 'gsd');
+    const gsdDest = path.join(commandsDir, 'gsd');
+    copyWithPathReplacement(gsdSrc, gsdDest, pathPrefix, runtime, true, isGlobal);
+    if (verifyInstalled(gsdDest, 'commands/gsd')) {
+      const count = fs.readdirSync(gsdDest).filter(f => f.endsWith('.md')).length;
+      console.log(`  ${green}✓${reset} Installed ${count} commands to commands/gsd/`);
+    } else {
+      failures.push('commands/gsd');
+    }
+
+    // Clean up any stale skills/ from a previous local install
+    const staleSkillsDir = path.join(targetDir, 'skills');
+    if (fs.existsSync(staleSkillsDir)) {
+      const staleGsd = fs.readdirSync(staleSkillsDir, { withFileTypes: true })
+        .filter(e => e.isDirectory() && e.name.startsWith('gsd-'));
+      for (const e of staleGsd) {
+        fs.rmSync(path.join(staleSkillsDir, e.name), { recursive: true });
+      }
+      if (staleGsd.length > 0) {
+        console.log(`  ${green}✓${reset} Removed ${staleGsd.length} stale GSD skill(s) from skills/`);
+      }
     }
   }
 
