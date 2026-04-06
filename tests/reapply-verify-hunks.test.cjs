@@ -7,7 +7,7 @@
  * Closes: #1758
  */
 
-const { describe, test } = require('node:test');
+const { describe, test, before } = require('node:test');
 const assert = require('node:assert/strict');
 const fs = require('fs');
 const path = require('path');
@@ -17,8 +17,13 @@ const WORKFLOW_PATH = path.join(
 );
 
 describe('reapply-patches post-merge verification (#1758)', () => {
+  let content;
+
+  before(() => {
+    content = fs.readFileSync(WORKFLOW_PATH, 'utf8');
+  });
+
   test('workflow file contains "Post-merge verification" section', () => {
-    const content = fs.readFileSync(WORKFLOW_PATH, 'utf8');
     assert.ok(
       content.includes('Post-merge verification'),
       'workflow must contain a "Post-merge verification" section'
@@ -26,7 +31,7 @@ describe('reapply-patches post-merge verification (#1758)', () => {
   });
 
   test('workflow mentions "Hunk presence check"', () => {
-    const content = fs.readFileSync(WORKFLOW_PATH, 'utf8');
+
     assert.ok(
       content.includes('Hunk presence check'),
       'workflow must describe hunk presence checking'
@@ -34,7 +39,7 @@ describe('reapply-patches post-merge verification (#1758)', () => {
   });
 
   test('workflow mentions "Line-count check"', () => {
-    const content = fs.readFileSync(WORKFLOW_PATH, 'utf8');
+
     assert.ok(
       content.includes('Line-count check'),
       'workflow must describe line-count sanity checking'
@@ -42,7 +47,7 @@ describe('reapply-patches post-merge verification (#1758)', () => {
   });
 
   test('success criteria includes verification', () => {
-    const content = fs.readFileSync(WORKFLOW_PATH, 'utf8');
+
     const criteria = content.split('<success_criteria>')[1] || '';
     assert.ok(
       criteria.includes('Post-merge verification') ||
@@ -52,7 +57,7 @@ describe('reapply-patches post-merge verification (#1758)', () => {
   });
 
   test('verification warns but never auto-reverts', () => {
-    const content = fs.readFileSync(WORKFLOW_PATH, 'utf8');
+
     assert.ok(
       content.includes('do not block'),
       'verification must be advisory (do not block)'
@@ -60,7 +65,7 @@ describe('reapply-patches post-merge verification (#1758)', () => {
   });
 
   test('verification references backup availability for recovery', () => {
-    const content = fs.readFileSync(WORKFLOW_PATH, 'utf8');
+
     assert.ok(
       content.includes('Backup available'),
       'verification warning must reference backup path for manual recovery'
@@ -68,11 +73,30 @@ describe('reapply-patches post-merge verification (#1758)', () => {
   });
 
   test('verification tracks per-file status', () => {
-    const content = fs.readFileSync(WORKFLOW_PATH, 'utf8');
+
     assert.ok(
       content.includes('Merged (verified)') &&
       content.includes('hunks may be missing'),
       'verification must distinguish "Merged (verified)" from "hunks may be missing" status'
+    );
+  });
+
+  test('verification section appears between merge-write and status-report steps', () => {
+    const mergeWritePos = content.indexOf('Write merged result');
+    const verificationPos = content.indexOf('Post-merge verification');
+    const statusReportPos = content.indexOf('Report status per file');
+
+    assert.ok(mergeWritePos > -1, 'workflow must contain "Write merged result" step');
+    assert.ok(verificationPos > -1, 'workflow must contain "Post-merge verification" section');
+    assert.ok(statusReportPos > -1, 'workflow must contain "Report status per file" step');
+
+    assert.ok(
+      mergeWritePos < verificationPos,
+      'Post-merge verification must appear after "Write merged result"'
+    );
+    assert.ok(
+      verificationPos < statusReportPos,
+      'Post-merge verification must appear before "Report status per file"'
     );
   });
 });
