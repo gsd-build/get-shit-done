@@ -47,6 +47,8 @@ function isValidConfigKey(keyPath) {
   if (VALID_CONFIG_KEYS.has(keyPath)) return true;
   // Allow agent_skills.<agent-type> with any agent type string
   if (/^agent_skills\.[a-zA-Z0-9_-]+$/.test(keyPath)) return true;
+  // Allow review.models.<cli-name> for per-CLI model selection in /gsd-review
+  if (/^review\.models\.[a-zA-Z0-9_-]+$/.test(keyPath)) return true;
   // Allow features.<feature_name> — dynamic namespace for feature flags.
   // Intentionally open-ended so new flags (e.g., features.global_learnings) work
   // without updating VALID_CONFIG_KEYS each time.
@@ -64,6 +66,7 @@ const CONFIG_KEY_SUGGESTIONS = {
   'workflow.review': 'workflow.code_review',
   'workflow.code_review_level': 'workflow.code_review_depth',
   'workflow.review_depth': 'workflow.code_review_depth',
+  'review.model': 'review.models.<cli-name>',
 };
 
 function validateKnownConfigKeyPath(keyPath) {

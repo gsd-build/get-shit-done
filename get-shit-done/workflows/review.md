@@ -139,26 +139,47 @@ Write to a temp file: `/tmp/gsd-review-prompt-{phase}.md`
 </step>
 
 <step name="invoke_reviewers">
+Read model preferences from planning config. Null/missing values fall back to CLI defaults.
+
+```bash
+GEMINI_MODEL=$(node "$HOME/.claude/get-shit-done/bin/gsd-tools.cjs" config-get review.models.gemini --raw 2>/dev/null)
+CLAUDE_MODEL=$(node "$HOME/.claude/get-shit-done/bin/gsd-tools.cjs" config-get review.models.claude --raw 2>/dev/null)
+CODEX_MODEL=$(node "$HOME/.claude/get-shit-done/bin/gsd-tools.cjs" config-get review.models.codex --raw 2>/dev/null)
+OPENCODE_MODEL=$(node "$HOME/.claude/get-shit-done/bin/gsd-tools.cjs" config-get review.models.opencode --raw 2>/dev/null)
+```
+
 For each selected CLI, invoke in sequence (not parallel — avoid rate limits):
 
 **Gemini:**
 ```bash
-gemini -p "$(cat /tmp/gsd-review-prompt-{phase}.md)" 2>/dev/null > /tmp/gsd-review-gemini-{phase}.md
+if [ -n "$GEMINI_MODEL" ]; then
+  gemini -m "$GEMINI_MODEL" -p "$(cat /tmp/gsd-review-prompt-{phase}.md)" 2>/dev/null > /tmp/gsd-review-gemini-{phase}.md
+else
+  gemini -p "$(cat /tmp/gsd-review-prompt-{phase}.md)" 2>/dev/null > /tmp/gsd-review-gemini-{phase}.md
+fi
 ```
 
 **Claude (separate session):**
 ```bash
-claude -p "$(cat /tmp/gsd-review-prompt-{phase}.md)" 2>/dev/null > /tmp/gsd-review-claude-{phase}.md
+if [ -n "$CLAUDE_MODEL" ]; then
+  claude --model "$CLAUDE_MODEL" -p "$(cat /tmp/gsd-review-prompt-{phase}.md)" 2>/dev/null > /tmp/gsd-review-claude-{phase}.md
+else
+  claude -p "$(cat /tmp/gsd-review-prompt-{phase}.md)" 2>/dev/null > /tmp/gsd-review-claude-{phase}.md
+fi
 ```
 
 **Codex:**
 ```bash
-codex exec --skip-git-repo-check "$(cat /tmp/gsd-review-prompt-{phase}.md)" 2>/dev/null > /tmp/gsd-review-codex-{phase}.md
+if [ -n "$CODEX_MODEL" ]; then
+  codex exec --model "$CODEX_MODEL" --skip-git-repo-check "$(cat /tmp/gsd-review-prompt-{phase}.md)" 2>/dev/null > /tmp/gsd-review-codex-{phase}.md
+else
+  codex exec --skip-git-repo-check "$(cat /tmp/gsd-review-prompt-{phase}.md)" 2>/dev/null > /tmp/gsd-review-codex-{phase}.md
+fi
 ```
 
 **CodeRabbit:**
 
-Note: CodeRabbit reviews the current git diff/working tree — it does not accept a prompt. It may take up to 5 minutes. Use `timeout: 360000` on the Bash tool call.
+Note: CodeRabbit reviews the current git diff/working tree — it does not accept a prompt or model flag. It may take up to 5 minutes. Use `timeout: 360000` on the Bash tool call.
 
 ```bash
 coderabbit review --prompt-only 2>/dev/null > /tmp/gsd-review-coderabbit-{phase}.md
@@ -166,7 +187,11 @@ coderabbit review --prompt-only 2>/dev/null > /tmp/gsd-review-coderabbit-{phase}
 
 **OpenCode (via GitHub Copilot):**
 ```bash
-cat /tmp/gsd-review-prompt-{phase}.md | opencode run - 2>/dev/null > /tmp/gsd-review-opencode-{phase}.md
+if [ -n "$OPENCODE_MODEL" ]; then
+  cat /tmp/gsd-review-prompt-{phase}.md | opencode run --model "$OPENCODE_MODEL" - 2>/dev/null > /tmp/gsd-review-opencode-{phase}.md
+else
+  cat /tmp/gsd-review-prompt-{phase}.md | opencode run - 2>/dev/null > /tmp/gsd-review-opencode-{phase}.md
+fi
 if [ ! -s /tmp/gsd-review-opencode-{phase}.md ]; then
   echo "OpenCode review failed or returned empty output." > /tmp/gsd-review-opencode-{phase}.md
 fi
