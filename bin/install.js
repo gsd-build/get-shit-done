@@ -303,14 +303,14 @@ function getGlobalDir(runtime, explicitDir = null) {
   }
 
   if (runtime === 'windsurf') {
-    // Windsurf: --config-dir > WINDSURF_CONFIG_DIR > ~/.windsurf
+    // Windsurf: --config-dir > WINDSURF_CONFIG_DIR > ~/.codeium/windsurf
     if (explicitDir) {
       return expandTilde(explicitDir);
     }
     if (process.env.WINDSURF_CONFIG_DIR) {
       return expandTilde(process.env.WINDSURF_CONFIG_DIR);
     }
-    return path.join(os.homedir(), '.windsurf');
+    return path.join(os.homedir(), '.codeium', 'windsurf');
   }
 
   if (runtime === 'augment') {
@@ -1122,7 +1122,7 @@ function convertClaudeAgentToCursorAgent(content) {
 
 // --- Windsurf converters ---
 // Windsurf uses a tool set similar to Cursor.
-// Config lives in .windsurf/ (local) and ~/.windsurf/ (global).
+// Config lives in .windsurf/ (local) and ~/.codeium/windsurf/ (global).
 
 // Tool name mapping from Claude Code to Windsurf Cascade
 const claudeToWindsurfTools = {
@@ -3572,7 +3572,7 @@ function copyCommandsAsWindsurfSkills(srcDir, skillsDir, prefix, pathPrefix, run
       const globalClaudeRegex = /~\/\.claude\//g;
       const globalClaudeHomeRegex = /\$HOME\/\.claude\//g;
       const localClaudeRegex = /\.\/\.claude\//g;
-      const windsurfDirRegex = /~\/\.windsurf\//g;
+      const windsurfDirRegex = /~\/\.codeium\/windsurf\//g;
       content = content.replace(globalClaudeRegex, pathPrefix);
       content = content.replace(globalClaudeHomeRegex, pathPrefix);
       content = content.replace(localClaudeRegex, `./${getDirName(runtime)}/`);
@@ -5965,7 +5965,7 @@ function promptRuntime(callback) {
   ${cyan}8${reset}) Kilo         ${dim}(~/.config/kilo)${reset}
   ${cyan}9${reset}) OpenCode     ${dim}(~/.config/opencode)${reset}
   ${cyan}10${reset}) Trae         ${dim}(~/.trae)${reset}
-  ${cyan}11${reset}) Windsurf     ${dim}(~/.windsurf)${reset}
+  ${cyan}11${reset}) Windsurf     ${dim}(~/.codeium/windsurf)${reset}
   ${cyan}12${reset}) All
 
   ${dim}Select multiple: 1,2,6 or 1 2 6${reset}

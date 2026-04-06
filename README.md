@@ -160,7 +160,7 @@ npx get-shit-done-cc --cursor --global      # Install to ~/.cursor/
 npx get-shit-done-cc --cursor --local       # Install to ./.cursor/
 
 # Windsurf
-npx get-shit-done-cc --windsurf --global    # Install to ~/.windsurf/
+npx get-shit-done-cc --windsurf --global    # Install to ~/.codeium/windsurf/
 npx get-shit-done-cc --windsurf --local     # Install to ./.windsurf/
 
 # Antigravity
