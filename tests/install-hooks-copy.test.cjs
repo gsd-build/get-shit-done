@@ -325,7 +325,7 @@ describe('uninstall settings cleanup preserves user hooks', () => {
   function filterGsdHooks(entries) {
     return entries
       .map(entry => {
-        if (!entry.hooks || !Array.isArray(entry.hooks)) return null;
+        if (!entry.hooks || !Array.isArray(entry.hooks)) return entry;
         entry.hooks = entry.hooks.filter(h => !isGsdHookCommand(h.command));
         return entry.hooks.length > 0 ? entry : null;
       })
@@ -370,6 +370,32 @@ describe('uninstall settings cleanup preserves user hooks', () => {
     const result = filterGsdHooks(entries);
     assert.strictEqual(result.length, 1, 'entry should survive');
     assert.strictEqual(result[0].hooks.length, 1, 'user hook should remain');
+  });
+
+  test('uninstall preserves non-array hook entries (#1825)', () => {
+    // Entries where entry.hooks is missing or not an array must be preserved as-is.
+    // Previously, `return null` caused .filter(Boolean) to silently drop them.
+    const nonArrayEntry = { matcher: 'Task', command: 'bash /my/custom-hook.sh' };
+    const missingHooksEntry = { type: 'command', command: 'echo hello' };
+    const entries = [
+      nonArrayEntry,
+      missingHooksEntry,
+      {
+        matcher: 'Bash',
+        hooks: [
+          { type: 'command', command: 'node /path/to/gsd-prompt-guard.js' },
+          { type: 'command', command: 'bash /my/custom-lint.sh' },
+        ],
+      },
+    ];
+
+    const result = filterGsdHooks(entries);
+    // The non-array entries must survive; the GSD hook inside the third entry must be stripped
+    assert.strictEqual(result.length, 3, 'non-array hook entries must be preserved (not silently dropped)');
+    assert.deepStrictEqual(result[0], nonArrayEntry, 'first non-array entry must survive unchanged');
+    assert.deepStrictEqual(result[1], missingHooksEntry, 'second non-array entry must survive unchanged');
+    assert.strictEqual(result[2].hooks.length, 1, 'GSD hook stripped from mixed entry');
+    assert.ok(result[2].hooks[0].command.includes('custom-lint'), 'user hook preserved in mixed entry');
   });
 
   test('all GSD hook names are recognized by isGsdHookCommand', () => {
