@@ -1,10 +1,11 @@
 <purpose>
-Generate an AI design contract (AI-SPEC.md) for phases that involve building AI systems. Orchestrates gsd-framework-selector → gsd-ai-researcher → gsd-eval-planner with a validation gate. Inserts between discuss-phase and plan-phase in the GSD lifecycle.
+Generate an AI design contract (AI-SPEC.md) for phases that involve building AI systems. Orchestrates gsd-framework-selector → gsd-ai-researcher → gsd-domain-researcher → gsd-eval-planner with a validation gate. Inserts between discuss-phase and plan-phase in the GSD lifecycle.
 
-AI-SPEC.md locks three things before the planner creates tasks:
+AI-SPEC.md locks four things before the planner creates tasks:
 1. Framework selection (with rationale and alternatives)
 2. Implementation guidance (correct syntax, patterns, pitfalls from official docs)
-3. Evaluation strategy (dimensions, rubrics, tooling, reference dataset, guardrails)
+3. Domain context (practitioner rubric ingredients, failure modes, regulatory constraints)
+4. Evaluation strategy (dimensions, rubrics, tooling, reference dataset, guardrails)
 
 This prevents the two most common AI development failures: choosing the wrong framework for the use case, and treating evaluation as an afterthought.
 </purpose>
@@ -31,12 +32,13 @@ Resolve agent models:
 ```bash
 SELECTOR_MODEL=$(node "$HOME/.claude/get-shit-done/bin/gsd-tools.cjs" resolve-model gsd-framework-selector --raw)
 RESEARCHER_MODEL=$(node "$HOME/.claude/get-shit-done/bin/gsd-tools.cjs" resolve-model gsd-ai-researcher --raw)
+DOMAIN_MODEL=$(node "$HOME/.claude/get-shit-done/bin/gsd-tools.cjs" resolve-model gsd-domain-researcher --raw)
 PLANNER_MODEL=$(node "$HOME/.claude/get-shit-done/bin/gsd-tools.cjs" resolve-model gsd-eval-planner --raw)
 ```
 
 Check config:
 ```bash
-AI_PHASE_ENABLED=$(node "$HOME/.claude/get-shit-done/bin/gsd-tools.cjs" config-get workflow.ai_phase 2>/dev/null || echo "true")
+AI_PHASE_ENABLED=$(node "$HOME/.claude/get-shit-done/bin/gsd-tools.cjs" config-get workflow.ai_integration_phase 2>/dev/null || echo "true")
 ```
 
 **If `AI_PHASE_ENABLED` is `false`:**
@@ -118,7 +120,7 @@ Goal: {phase_goal}
 
 Parse selector output for: `primary_framework`, `system_type`, `model_provider`, `eval_concerns`, `alternative_framework`.
 
-**If selector fails or returns empty:** Exit with error — "Framework selection failed. Re-run /gsd:ai-phase {N} or answer the framework question in /gsd:discuss-phase {N} first."
+**If selector fails or returns empty:** Exit with error — "Framework selection failed. Re-run /gsd:ai-integration-phase {N} or answer the framework question in /gsd:discuss-phase {N} first."
 
 ## 6. Initialize AI-SPEC.md
 
@@ -163,7 +165,7 @@ phase_context: Phase {phase_number}: {phase_name} — {phase_goal}
 </input>
 ```
 
-## 7.5. Spawn gsd-domain-researcher
+## 8. Spawn gsd-domain-researcher
 
 Display:
 ```
@@ -193,7 +195,7 @@ ai_spec_path: {ai_spec_path}
 </input>
 ```
 
-## 8. Spawn gsd-eval-planner
+## 9. Spawn gsd-eval-planner
 
 Display:
 ```
@@ -226,7 +228,7 @@ ai_spec_path: {ai_spec_path}
 </input>
 ```
 
-## 9. Validate AI-SPEC Completeness
+## 10. Validate AI-SPEC Completeness
 
 Read the completed AI-SPEC.md. Check that:
 - Section 2 has a framework name (not placeholder)
@@ -239,7 +241,7 @@ Read the completed AI-SPEC.md. Check that:
 
 **If validation fails:** Display specific missing sections. Ask user if they want to re-run the specific step or continue anyway.
 
-## 10. Commit
+## 11. Commit
 
 **If `commit_docs` is true:**
 ```bash
@@ -247,7 +249,7 @@ git add "${AI_SPEC_FILE}"
 git commit -m "docs({phase_slug}): generate AI-SPEC.md — {primary_framework} + domain context + eval strategy"
 ```
 
-## 11. Display Completion
+## 12. Display Completion
 
 ```
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━

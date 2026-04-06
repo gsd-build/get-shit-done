@@ -143,6 +143,7 @@ function buildNewProjectConfig(userChoices) {
       node_repair_budget: 2,
       ui_phase: true,
       ui_safety_gate: true,
+      ai_integration_phase: true,
       text_mode: false,
       research_before_questions: false,
       discuss_mode: 'discuss',

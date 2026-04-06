@@ -56,7 +56,7 @@ If "Re-audit": continue.
 ```
 No AI-SPEC.md found for Phase {N}.
 Audit will evaluate against general AI eval best practices rather than a phase-specific plan.
-Consider running /gsd:ai-phase {N} before implementation next time.
+Consider running /gsd:ai-integration-phase {N} before implementation next time.
 ```
 Continue (non-blocking).
 
