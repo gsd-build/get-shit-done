@@ -4285,8 +4285,8 @@ function uninstall(isGlobal, runtime = 'claude') {
         }
       }
     }
-  } else {
-    // Claude Code: remove skills/gsd-*/ directories
+  } else if (isGlobal) {
+    // Claude Code global: remove skills/gsd-*/ directories (primary global install location)
     const skillsDir = path.join(targetDir, 'skills');
     if (fs.existsSync(skillsDir)) {
       let skillCount = 0;
@@ -4303,7 +4303,7 @@ function uninstall(isGlobal, runtime = 'claude') {
       }
     }
 
-    // Also clean up legacy commands/gsd/ from older installs
+    // Also clean up legacy commands/gsd/ from older global installs
     const legacyCommandsDir = path.join(targetDir, 'commands', 'gsd');
     if (fs.existsSync(legacyCommandsDir)) {
       // Preserve user-generated files before legacy wipe (#1423)
@@ -4317,6 +4317,28 @@ function uninstall(isGlobal, runtime = 'claude') {
       if (preservedDevPrefs) {
         try {
           fs.mkdirSync(legacyCommandsDir, { recursive: true });
+          fs.writeFileSync(devPrefsPath, preservedDevPrefs);
+          console.log(`  ${green}✓${reset} Preserved commands/gsd/dev-preferences.md`);
+        } catch (err) {
+          console.error(`  ${red}✗${reset} Failed to restore dev-preferences.md: ${err.message}`);
+        }
+      }
+    }
+  } else {
+    // Claude Code local: remove commands/gsd/ (primary local install location since #1736)
+    const gsdCommandsDir = path.join(targetDir, 'commands', 'gsd');
+    if (fs.existsSync(gsdCommandsDir)) {
+      // Preserve user-generated files before wipe (#1423)
+      const devPrefsPath = path.join(gsdCommandsDir, 'dev-preferences.md');
+      const preservedDevPrefs = fs.existsSync(devPrefsPath) ? fs.readFileSync(devPrefsPath, 'utf-8') : null;
+
+      fs.rmSync(gsdCommandsDir, { recursive: true });
+      removedCount++;
+      console.log(`  ${green}✓${reset} Removed commands/gsd/`);
+
+      if (preservedDevPrefs) {
+        try {
+          fs.mkdirSync(gsdCommandsDir, { recursive: true });
           fs.writeFileSync(devPrefsPath, preservedDevPrefs);
           console.log(`  ${green}✓${reset} Preserved commands/gsd/dev-preferences.md`);
         } catch (err) {

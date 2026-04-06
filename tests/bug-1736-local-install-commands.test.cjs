@@ -35,14 +35,11 @@ describe('#1736: local Claude install populates .claude/commands/gsd/', () => {
     fs.rmSync(tmpDir, { recursive: true, force: true });
   });
 
-  test('local install creates .claude/commands/gsd/ directory', () => {
+  test('local install creates .claude/commands/gsd/ directory', (t) => {
     const origCwd = process.cwd();
-    try {
-      process.chdir(tmpDir);
-      install(false, 'claude');
-    } finally {
-      process.chdir(origCwd);
-    }
+    t.after(() => { process.chdir(origCwd); });
+    process.chdir(tmpDir);
+    install(false, 'claude');
 
     const commandsDir = path.join(tmpDir, '.claude', 'commands', 'gsd');
     assert.ok(
@@ -51,14 +48,11 @@ describe('#1736: local Claude install populates .claude/commands/gsd/', () => {
     );
   });
 
-  test('local install deploys at least one .md command file to .claude/commands/gsd/', () => {
+  test('local install deploys at least one .md command file to .claude/commands/gsd/', (t) => {
     const origCwd = process.cwd();
-    try {
-      process.chdir(tmpDir);
-      install(false, 'claude');
-    } finally {
-      process.chdir(origCwd);
-    }
+    t.after(() => { process.chdir(origCwd); });
+    process.chdir(tmpDir);
+    install(false, 'claude');
 
     const commandsDir = path.join(tmpDir, '.claude', 'commands', 'gsd');
     assert.ok(
@@ -73,14 +67,11 @@ describe('#1736: local Claude install populates .claude/commands/gsd/', () => {
     );
   });
 
-  test('local install deploys quick.md to .claude/commands/gsd/', () => {
+  test('local install deploys quick.md to .claude/commands/gsd/', (t) => {
     const origCwd = process.cwd();
-    try {
-      process.chdir(tmpDir);
-      install(false, 'claude');
-    } finally {
-      process.chdir(origCwd);
-    }
+    t.after(() => { process.chdir(origCwd); });
+    process.chdir(tmpDir);
+    install(false, 'claude');
 
     const quickCmd = path.join(tmpDir, '.claude', 'commands', 'gsd', 'quick.md');
     assert.ok(
