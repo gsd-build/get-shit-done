@@ -565,6 +565,7 @@ Execute each selected wave in sequence. Within a wave: parallel if `PARALLELIZAT
 
    ```bash
    # Detect test runner and run quick smoke test (timeout: 5 minutes)
+   TEST_EXIT=0
    timeout 300 bash -c '
    if [ -f "package.json" ]; then
      npm test 2>&1
@@ -574,15 +575,18 @@ Execute each selected wave in sequence. Within a wave: parallel if `PARALLELIZAT
      go test ./... 2>&1
    elif [ -f "pyproject.toml" ] || [ -f "requirements.txt" ]; then
      python -m pytest -x -q --tb=short 2>&1 || uv run python -m pytest -x -q --tb=short 2>&1
+   else
+     echo "⚠ No test runner detected — skipping post-merge test gate"
+     exit 0
    fi
    '
    TEST_EXIT=$?
-   if [ $TEST_EXIT -eq 0 ]; then
+   if [ "${TEST_EXIT}" -eq 0 ]; then
      echo "✓ Post-merge test gate passed — no cross-plan conflicts"
-   elif [ $TEST_EXIT -eq 124 ]; then
+   elif [ "${TEST_EXIT}" -eq 124 ]; then
      echo "⚠ Post-merge test gate timed out after 5 minutes"
    else
-     echo "✗ Post-merge test gate failed (exit code $TEST_EXIT)"
+     echo "✗ Post-merge test gate failed (exit code ${TEST_EXIT})"
      WAVE_FAILURE_COUNT=$((WAVE_FAILURE_COUNT + 1))
    fi
    ```
@@ -595,19 +599,31 @@ Execute each selected wave in sequence. Within a wave: parallel if `PARALLELIZAT
    cumulative failures across waves. Subsequent waves should report:
    `⚠ Note: ${WAVE_FAILURE_COUNT} prior wave(s) had test failures`
 
-5.7. **Post-wave shared artifact update (worktree mode only):**
+5.7. **Post-wave shared artifact update (worktree mode only, skip if tests failed):**
 
-   When executor agents ran with `isolation="worktree"`, they skipped STATE.md and ROADMAP.md updates to avoid last-merge-wins overwrites. The orchestrator is the single writer for these files. After worktrees are merged back, update shared artifacts once:
+   When executor agents ran with `isolation="worktree"`, they skipped STATE.md and ROADMAP.md updates to avoid last-merge-wins overwrites. The orchestrator is the single writer for these files. After worktrees are merged back, update shared artifacts once.
+
+   **Only update tracking when tests passed (TEST_EXIT=0).**
+   If tests failed or timed out, skip the tracking update — plans should
+   not be marked as complete when integration tests are failing or inconclusive.
 
    ```bash
-   # Update ROADMAP.md for each completed plan in this wave
-   for plan_id in {completed_plan_ids}; do
-     node "$HOME/.claude/get-shit-done/bin/gsd-tools.cjs" roadmap update-plan-progress "${PHASE_NUMBER}" "${plan_id}" "complete"
-   done
+   # Guard: only update tracking if post-merge tests passed
+   # Timeout (124) is treated as inconclusive — do NOT mark plans complete
+   if [ "${TEST_EXIT}" -eq 0 ]; then
+     # Update ROADMAP plan progress for each completed plan in this wave
+     for plan_id in {completed_plan_ids}; do
+       node "$HOME/.claude/get-shit-done/bin/gsd-tools.cjs" roadmap update-plan-progress "${PHASE_NUMBER}" "${plan_id}" "complete"
+     done
 
-   # Only commit tracking files if they actually changed
-   if ! git diff --quiet .planning/ROADMAP.md .planning/STATE.md 2>/dev/null; then
-     node "$HOME/.claude/get-shit-done/bin/gsd-tools.cjs" commit "docs(phase-${PHASE_NUMBER}): update tracking after wave ${N}" --files .planning/ROADMAP.md .planning/STATE.md
+     # Only commit tracking files if they actually changed
+     if ! git diff --quiet .planning/ROADMAP.md .planning/STATE.md 2>/dev/null; then
+       node "$HOME/.claude/get-shit-done/bin/gsd-tools.cjs" commit "docs(phase-${PHASE_NUMBER}): update tracking after wave ${N}" --files .planning/ROADMAP.md .planning/STATE.md
+     fi
+   elif [ "${TEST_EXIT}" -eq 124 ]; then
+     echo "⚠ Skipping tracking update — test suite timed out. Plans remain in-progress. Run tests manually to confirm."
+   else
+     echo "⚠ Skipping tracking update — post-merge tests failed (exit ${TEST_EXIT}). Plans remain in-progress until tests pass."
    fi
    ```
 
