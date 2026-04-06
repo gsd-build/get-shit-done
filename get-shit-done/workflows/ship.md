@@ -159,7 +159,39 @@ Report: "PR #{number} created: {url}"
 </step>
 
 <step name="optional_review">
-Ask if user wants to trigger a code review:
+
+**Automated review (if configured):**
+
+Before presenting manual options, check for a configured review command:
+
+```bash
+REVIEW_CMD=$(node "$HOME/.claude/get-shit-done/bin/gsd-tools.cjs" config-get workflow.code_review_command 2>/dev/null || echo "")
+CODE_REVIEW_ENABLED=$(node "$HOME/.claude/get-shit-done/bin/gsd-tools.cjs" config-get workflow.code_review 2>/dev/null || echo "true")
+```
+
+If `CODE_REVIEW_ENABLED` is `"true"` AND `REVIEW_CMD` is not empty:
+
+1. Resolve base branch and generate diff:
+   ```bash
+   BASE_BRANCH=$(gh repo view --json defaultBranchRef -q .defaultBranchRef.name 2>/dev/null || echo "main")
+   DIFF=$(git diff ${BASE_BRANCH}...HEAD)
+   DIFF_STAT=$(git diff --stat ${BASE_BRANCH}...HEAD)
+   ```
+
+2. Build review prompt with diff, diff stats, and phase context. Pipe to configured command:
+   ```bash
+   echo "${REVIEW_PROMPT}" | ${REVIEW_CMD}
+   ```
+   The command should return JSON: `verdict` (APPROVED/REVISE), `confidence` (0-100), `summary`, `issues` array with `{severity, file, line_range, description, suggestion}`.
+
+3. Report result:
+   - **APPROVED:** `✓ Automated review: APPROVED (confidence: {N}%)`
+   - **REVISE:** Show issues by severity, then continue to manual options below
+   - **Command failed or invalid JSON:** `⚠ Automated review failed — continuing to manual review`
+
+If `REVIEW_CMD` is empty, skip automated review silently.
+
+**Manual review options:**
 
 ```
 AskUserQuestion:

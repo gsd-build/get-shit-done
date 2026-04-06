@@ -299,6 +299,53 @@ Execute each selected wave in sequence. Within a wave: parallel if `PARALLELIZAT
    - Bad: "Executing terrain generation plan"
    - Good: "Procedural terrain generator using Perlin noise — creates height maps, biome zones, and collision meshes. Required before vehicle physics can interact with ground."
 
+2.5. **Check for cross-AI execution mode:**
+
+   ```bash
+   CROSS_AI=$(node "$HOME/.claude/get-shit-done/bin/gsd-tools.cjs" config-get workflow.cross_ai_execution 2>/dev/null || echo "false")
+   ```
+
+   A plan uses cross-AI execution if:
+   - `--cross-ai` flag is in $ARGUMENTS (forces ALL plans), OR
+   - Plan frontmatter contains `cross_ai: true` AND (`CROSS_AI` is `"true"` OR `--cross-ai` flag present)
+
+   **Skip cross-AI if:** `--no-cross-ai` flag in $ARGUMENTS.
+
+   **If cross-AI is active for this plan:**
+
+   Resolve the cross-AI command from config:
+   ```bash
+   CROSS_AI_CMD=$(node "$HOME/.claude/get-shit-done/bin/gsd-tools.cjs" config-get workflow.cross_ai_command 2>/dev/null || echo "")
+   ```
+
+   If `CROSS_AI_CMD` is empty or null, error with setup instructions:
+   ```
+   ⚠ Cross-AI execution enabled but no command configured.
+   Set it with: gsd config-set workflow.cross_ai_command "your-command-here"
+   The command receives the task prompt via stdin and should execute the plan.
+   ```
+   Fall back to normal executor spawning for this plan.
+
+   Display: `Delegating to cross-AI execution: {plan_name}`
+
+   - Read the plan's `<objective>` and full task list
+   - Construct a task description combining the objective and tasks
+   - Write the task prompt to a temp file and pipe to the configured command:
+     ```bash
+     echo "${TASK_PROMPT}" | ${CROSS_AI_CMD}
+     ```
+   - **If execution completes successfully:**
+     - Generate SUMMARY.md in GSD format (matching the template at `@$HOME/.claude/get-shit-done/templates/summary.md`) from the output
+     - Update STATE.md and ROADMAP.md as normal
+     - Display: `✓ {plan_name} completed via cross-AI execution`
+   - **If execution fails or returns no result:**
+     - Display: `⚠ Cross-AI execution failed for {plan_name}: {error}`
+     - Leave plan in non-complete state
+     - Offer: 1) Retry with normal executor, 2) Skip plan, 3) Abort phase
+   - **Skip to next plan** — do not also spawn a normal executor for this plan.
+
+   **If cross-AI is NOT active for this plan:** proceed with normal executor spawning below.
+
 3. **Spawn executor agents:**
 
    Pass paths only — executors read files themselves with their fresh context window.

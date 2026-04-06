@@ -864,6 +864,83 @@ Display: `Max iterations reached. {N} issues remain:` + issue list
 
 Offer: 1) Force proceed, 2) Provide guidance and retry, 3) Abandon
 
+## 12.5. Plan Bounce (optional)
+
+After plans pass the checker (or checker is skipped), optionally bounce each plan through an external refinement script for cross-AI review.
+
+**Activation:** `--bounce` flag in $ARGUMENTS OR `workflow.plan_bounce` config is true.
+**Skip if:** `--skip-bounce` flag in $ARGUMENTS, or `--gaps` mode (gap closure plans don't need bouncing).
+
+```bash
+PLAN_BOUNCE=$(node "$HOME/.claude/get-shit-done/bin/gsd-tools.cjs" config-get workflow.plan_bounce 2>/dev/null || echo "false")
+```
+
+If bounce is active:
+
+First, resolve the bounce script and pass count from config:
+```bash
+BOUNCER_SCRIPT=$(node "$HOME/.claude/get-shit-done/bin/gsd-tools.cjs" config-get workflow.plan_bounce_script 2>/dev/null || echo "")
+BOUNCE_PASSES=$(node "$HOME/.claude/get-shit-done/bin/gsd-tools.cjs" config-get workflow.plan_bounce_passes 2>/dev/null || echo "2")
+```
+
+If `BOUNCER_SCRIPT` is empty or null: error with setup instructions:
+```
+⚠ Plan bounce enabled but no bounce script configured.
+Set it with: gsd config-set workflow.plan_bounce_script "/path/to/your/bouncer.sh"
+The script must accept: <plan-file> <max-passes> <agent1> <agent2>
+Skipping bounce.
+```
+Skip to step 13.
+
+If `BOUNCER_SCRIPT` is set but the file doesn't exist:
+```
+⚠ Bounce script not found: ${BOUNCER_SCRIPT} — skipping bounce
+```
+Skip to step 13.
+
+Display: `Bouncing plans through external refinement...`
+
+For each `*-PLAN.md` in `${PHASE_DIR}`:
+
+1. **Backup:** Copy the plan to `*-PLAN.pre-bounce.md`
+2. **Snapshot frontmatter:** Extract all YAML frontmatter keys and their value types from the backup
+3. **Invoke bounce script:**
+   ```bash
+   bash "${BOUNCER_SCRIPT}" "${PHASE_DIR}/${PLAN_FILE}" "${BOUNCE_PASSES}" claude codex
+   ```
+4. **Read output:** The bouncer overwrites the plan file in place. Read the bounced version.
+5. **Validate frontmatter:** Compare the full set of frontmatter keys against the snapshot. If any key is missing or its value type changed:
+   - Restore from `*-PLAN.pre-bounce.md`
+   - Display: `⚠ Bounce broke frontmatter in ${PLAN_FILE} — restored from backup`
+6. **If frontmatter intact and content changed:**
+   - Display: `✓ ${PLAN_FILE} refined by bounce`
+7. **If content unchanged (converged immediately):**
+   - Display: `○ ${PLAN_FILE} — no changes from bounce`
+
+After all plans processed, if any were changed (compare against backups to avoid committing unchanged restored files):
+```bash
+# Only stage plans that actually changed
+for PLAN in "${PHASE_DIR}"/*-PLAN.md; do
+  BACKUP="${PLAN%.md}.pre-bounce.md"
+  if [ -f "$BACKUP" ] && ! diff -q "$PLAN" "$BACKUP" >/dev/null 2>&1; then
+    git add "$PLAN"
+  fi
+done
+# Only commit if something was staged
+if ! git diff --cached --quiet 2>/dev/null; then
+  git commit -m "docs(phase-${PHASE_NUMBER}): bounce plans through external refinement"
+fi
+```
+
+Clean up backup files:
+```bash
+rm -f "${PHASE_DIR}"/*-PLAN.pre-bounce.md
+```
+
+**Re-check after bounce:** If any plans were changed by the bounce, and `plan_checker_enabled` is true, re-run the plan checker (step 10) on the modified plans only. If the checker finds issues introduced by the bounce, route back through the existing revision loop (step 11). This ensures bounced plans meet the same quality bar as the original plans.
+
+If no plans were changed, or plan checker is disabled, skip re-checking.
+
 ## 13. Requirements Coverage Gate
 
 After plans pass the checker (or checker is skipped), verify that all phase requirements are covered by at least one plan.
