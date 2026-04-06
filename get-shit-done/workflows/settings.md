@@ -32,6 +32,7 @@ Parse current values (default to `true` if not present):
 - `workflow.nyquist_validation` — validation architecture research during plan-phase (default: true if absent)
 - `workflow.ui_phase` — generate UI-SPEC.md design contracts for frontend phases (default: true if absent)
 - `workflow.ui_safety_gate` — prompt to run /gsd-ui-phase before planning frontend phases (default: true if absent)
+- `workflow.ai_integration_phase` — framework selection + eval strategy for AI phases (default: true if absent)
 - `model_profile` — which model each agent uses (default: `balanced`)
 - `git.branching_strategy` — branching approach (default: `"none"`)
 - `workflow.use_worktrees` — whether parallel executor agents run in worktree isolation (default: `true`)
@@ -119,6 +120,15 @@ AskUserQuestion([
     ]
   },
   {
+    question: "Enable AI Phase? (framework selection + eval strategy for AI phases)",
+    header: "AI Phase",
+    multiSelect: false,
+    options: [
+      { label: "Yes (Recommended)", description: "Run /gsd:ai-phase before planning AI system phases. Surfaces the right framework, researches its docs, and designs the evaluation strategy." },
+      { label: "No", description: "Skip AI design contract. Good for non-AI phases or when framework is already decided." }
+    ]
+  },
+  {
     question: "Git branching strategy?",
     header: "Branching",
     multiSelect: false,
@@ -183,6 +193,7 @@ Merge new settings into existing config.json:
     "nyquist_validation": true/false,
     "ui_phase": true/false,
     "ui_safety_gate": true/false,
+    "ai_integration_phase": true/false,
     "text_mode": true/false,
     "research_before_questions": true/false,
     "discuss_mode": "discuss" | "assumptions",
@@ -244,6 +255,7 @@ Write `~/.gsd/defaults.json` with:
     "nyquist_validation": <current>,
     "ui_phase": <current>,
     "ui_safety_gate": <current>,
+    "ai_integration_phase": <current>,
     "skip_discuss": <current>
   }
 }
@@ -268,6 +280,7 @@ Display:
 | Nyquist Validation   | {On/Off} |
 | UI Phase             | {On/Off} |
 | UI Safety Gate       | {On/Off} |
+| AI Integration Phase | {On/Off} |
 | Git Branching        | {None/Per Phase/Per Milestone} |
 | Skip Discuss         | {On/Off} |
 | Context Warnings     | {On/Off} |
@@ -287,7 +300,7 @@ Quick commands:
 
 <success_criteria>
 - [ ] Current config read
-- [ ] User presented with 10 settings (profile + 8 workflow toggles + git branching)
+- [ ] User presented with 14 settings (profile + 11 workflow toggles + git branching + ctx warnings)
 - [ ] Config updated with model_profile, workflow, and git sections
 - [ ] User offered to save as global defaults (~/.gsd/defaults.json)
 - [ ] Changes confirmed to user
