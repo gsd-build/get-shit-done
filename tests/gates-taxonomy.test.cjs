@@ -85,4 +85,22 @@ describe('gates taxonomy (#1715)', () => {
       'execute-phase.md must reference gates.md in its required_reading block'
     );
   });
+
+  test('gsd-plan-checker.md references gates.md for revision gate behavior', () => {
+    const planChecker = path.join(ROOT, 'agents', 'gsd-plan-checker.md');
+    const content = fs.readFileSync(planChecker, 'utf-8');
+    assert.ok(
+      content.includes('references/gates.md'),
+      'gsd-plan-checker.md must reference gates.md for revision gate behavior'
+    );
+  });
+
+  test('gsd-verifier.md references gates.md for escalation gate behavior', () => {
+    const verifier = path.join(ROOT, 'agents', 'gsd-verifier.md');
+    const content = fs.readFileSync(verifier, 'utf-8');
+    assert.ok(
+      content.includes('references/gates.md'),
+      'gsd-verifier.md must reference gates.md for escalation gate behavior'
+    );
+  });
 });
