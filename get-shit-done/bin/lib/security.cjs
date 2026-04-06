@@ -153,6 +153,25 @@ const INJECTION_PATTERNS = [
 ];
 
 /**
+ * Layer 2: Encoding-obfuscation patterns with custom finding messages.
+ * Each entry: { pattern: RegExp, message: string }
+ */
+const OBFUSCATION_PATTERN_ENTRIES = [
+  {
+    pattern: /\b(\w\s){4,}\w\b/,
+    message: 'Character-spacing obfuscation pattern detected (e.g. "i g n o r e")',
+  },
+  {
+    pattern: /<\/?(system|human|assistant|user)\s*>/i,
+    message: 'Delimiter injection pattern: <system>/<assistant>/<user> tag detected',
+  },
+  {
+    pattern: /0x[0-9a-fA-F]{16,}/,
+    message: 'Long hex sequence detected — possible encoded payload',
+  },
+];
+
+/**
  * Scan text for potential prompt injection patterns.
  * Returns an array of findings (empty = clean).
  *
@@ -174,11 +193,24 @@ function scanForInjection(text, opts = {}) {
     }
   }
 
+  // Layer 2: encoding-obfuscation patterns with custom messages
+  for (const entry of OBFUSCATION_PATTERN_ENTRIES) {
+    if (entry.pattern.test(text)) {
+      findings.push(entry.message);
+    }
+  }
+
   if (opts.strict) {
     // Check for suspicious Unicode that could hide instructions
     // (zero-width chars, RTL override, homoglyph attacks)
     if (/[\u200B-\u200F\u2028-\u202F\uFEFF\u00AD]/.test(text)) {
       findings.push('Contains suspicious zero-width or invisible Unicode characters');
+    }
+
+    // Layer 1: Unicode tag block U+E0000–U+E007F (2025 supply-chain attack vector)
+    // These characters are invisible and can embed hidden instructions
+    if (/[\uDB40\uDC00-\uDB40\uDC7F]/u.test(text) || /[\u{E0000}-\u{E007F}]/u.test(text)) {
+      findings.push('Contains Unicode tag block characters (U+E0000–E007F) — invisible instruction injection vector');
     }
 
     // Check for extremely long strings that could be prompt stuffing.
@@ -361,6 +393,87 @@ function validateFieldName(field) {
   return { valid: false, error: `Invalid field name: "${field}"` };
 }
 
+// ─── Layer 3: Structural Schema Validation ───────────────────────────────────
+
+const KNOWN_VALID_TAGS = new Set([
+  'objective', 'process', 'step', 'success_criteria', 'critical_rules',
+  'available_agent_types', 'purpose', 'required_reading',
+]);
+
+/**
+ * Validate the XML structure of a prompt file.
+ * For agent/workflow files, flags any XML tag not in the known-valid set.
+ *
+ * @param {string} text - The file content to validate
+ * @param {'agent'|'workflow'|'unknown'} fileType - The type of prompt file
+ * @returns {{ valid: boolean, violations: string[] }}
+ */
+function validatePromptStructure(text, fileType) {
+  if (!text || typeof text !== 'string') {
+    return { valid: true, violations: [] };
+  }
+
+  if (fileType !== 'agent' && fileType !== 'workflow') {
+    return { valid: true, violations: [] };
+  }
+
+  const violations = [];
+  const tagRegex = /<([A-Za-z][A-Za-z0-9_-]*)/g;
+  let match;
+  while ((match = tagRegex.exec(text)) !== null) {
+    const tag = match[1].toLowerCase();
+    if (!KNOWN_VALID_TAGS.has(tag)) {
+      violations.push(`Unknown XML tag in ${fileType} file: <${tag}>`);
+    }
+  }
+
+  return { valid: violations.length === 0, violations };
+}
+
+// ─── Layer 4: Paragraph-Level Entropy Anomaly Detection ─────────────────────
+
+function shannonEntropy(text) {
+  if (!text || text.length === 0) return 0;
+  const freq = {};
+  for (const ch of text) {
+    freq[ch] = (freq[ch] || 0) + 1;
+  }
+  const len = text.length;
+  let entropy = 0;
+  for (const count of Object.values(freq)) {
+    const p = count / len;
+    entropy -= p * Math.log2(p);
+  }
+  return entropy;
+}
+
+/**
+ * Scan text for paragraphs with anomalously high Shannon entropy.
+ *
+ * @param {string} text - The text to scan
+ * @returns {{ clean: boolean, findings: string[] }}
+ */
+function scanEntropyAnomalies(text) {
+  if (!text || typeof text !== 'string') {
+    return { clean: true, findings: [] };
+  }
+
+  const findings = [];
+  const paragraphs = text.split(/\n\n+/);
+
+  for (const para of paragraphs) {
+    if (para.length <= 50) continue;
+    const entropy = shannonEntropy(para);
+    if (entropy > 5.5) {
+      findings.push(
+        `High-entropy paragraph detected (${entropy.toFixed(2)} bits/char) — possible encoded payload`
+      );
+    }
+  }
+
+  return { clean: findings.length === 0, findings };
+}
+
 module.exports = {
   // Path safety
   validatePath,
@@ -381,4 +494,10 @@ module.exports = {
   // Input validation
   validatePhaseNumber,
   validateFieldName,
+
+  // Structural validation (Layer 3)
+  validatePromptStructure,
+
+  // Entropy anomaly detection (Layer 4)
+  scanEntropyAnomalies,
 };
