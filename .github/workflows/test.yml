@@ -22,7 +22,7 @@ jobs:
       fail-fast: true
       matrix:
         os: [ubuntu-latest]
-        node-version: [22, 24]
+        node-version: [24]
         include:
           # Single macOS runner — verifies platform compatibility on the standard version
           - os: macos-latest

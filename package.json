@@ -36,7 +36,7 @@
     "url": "https://github.com/gsd-build/get-shit-done/issues"
   },
   "engines": {
-    "node": ">=22.0.0"
+    "node": ">=24.0.0"
   },
   "devDependencies": {
     "c8": "^11.0.0",

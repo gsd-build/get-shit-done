@@ -88,7 +88,7 @@ PRs that arrive without a properly-labeled linked issue are closed automatically
 - **Link with a closing keyword** — use `Closes #123`, `Fixes #123`, or `Resolves #123` in the PR body. The CI check will fail and the PR will be auto-closed if no valid issue reference is found.
 - **One concern per PR** — bug fixes, enhancements, and features must be separate PRs
 - **No drive-by formatting** — don't reformat code unrelated to your change
-- **CI must pass** — all matrix jobs (Ubuntu, macOS, Windows × Node 22, 24) must be green
+- **CI must pass** — all matrix jobs (Ubuntu, macOS × Node 24) must be green
 - **Scope matches the approved issue** — if your PR does more than what the issue describes, the extra changes will be asked to be removed or moved to a new issue
 
 ## Testing Standards
@@ -231,25 +231,25 @@ const content = `
 
 ### Node.js Version Compatibility
 
-**Node 24 is the primary CI target.** All tests must pass on Node 24. Node 22 (LTS) must remain backward-compatible — do not use APIs that are not available in Node 22.
+**Node 24 is the minimum and primary CI target.** All tests must pass on Node 24.
 
 | Version | Status |
 |---------|--------|
-| **Node 24** | Primary CI target — all tests must pass |
-| **Node 22** | Backward compatibility required |
+| Node 22 | EOL April 2027 — no longer a CI target; may still work but unsupported |
+| **Node 24** | Minimum required — primary CI target, all tests must pass |
 | Node 26 | Forward-compatible target — avoid deprecated APIs |
 
 Do not use:
 - Deprecated APIs
-- Version-specific features not available in Node 22
+- APIs not available in Node 24
 
 Safe to use:
-- `node:test` — stable since Node 18, fully featured in 22+
+- `node:test` — stable since Node 18, fully featured in 24
 - `describe`/`it`/`test` — all supported
 - `beforeEach`/`afterEach`/`before`/`after` — all supported
-- `t.after()` — per-test cleanup, available in Node 22+
-- `t.plan()` — available since Node 22.2
-- Snapshot testing — available since Node 22.3
+- `t.after()` — per-test cleanup
+- `t.plan()` — fully supported
+- Snapshot testing — fully supported
 
 ### Assertions
 
