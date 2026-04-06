@@ -65,7 +65,7 @@ describe('gates taxonomy (#1715)', () => {
     assert.ok(content.includes('plan-phase'), 'Gate Matrix must reference plan-phase');
     assert.ok(content.includes('execute-phase'), 'Gate Matrix must reference execute-phase');
     assert.ok(content.includes('verify-work'), 'Gate Matrix must reference verify-work');
-    assert.ok(content.includes('/gsd-next'), 'Gate Matrix must reference /gsd-next');
+    assert.ok(content.includes('| next |'), 'Gate Matrix must reference next workflow');
   });
 
   test('plan-phase.md references gates.md', () => {
@@ -86,21 +86,39 @@ describe('gates taxonomy (#1715)', () => {
     );
   });
 
-  test('gsd-plan-checker.md references gates.md for revision gate behavior', () => {
+  test('gsd-plan-checker.md references gates.md in required_reading block', () => {
     const planChecker = path.join(ROOT, 'agents', 'gsd-plan-checker.md');
     const content = fs.readFileSync(planChecker, 'utf-8');
     assert.ok(
-      content.includes('references/gates.md'),
-      'gsd-plan-checker.md must reference gates.md for revision gate behavior'
+      content.includes('<required_reading>'),
+      'gsd-plan-checker.md must have a <required_reading> block'
+    );
+    const reqBlock = content.split('<required_reading>')[1].split('</required_reading>')[0];
+    assert.ok(
+      reqBlock.includes('references/gates.md'),
+      'gsd-plan-checker.md must reference gates.md inside <required_reading>'
     );
   });
 
-  test('gsd-verifier.md references gates.md for escalation gate behavior', () => {
+  test('gsd-verifier.md references gates.md in required_reading block', () => {
     const verifier = path.join(ROOT, 'agents', 'gsd-verifier.md');
     const content = fs.readFileSync(verifier, 'utf-8');
     assert.ok(
-      content.includes('references/gates.md'),
-      'gsd-verifier.md must reference gates.md for escalation gate behavior'
+      content.includes('<required_reading>'),
+      'gsd-verifier.md must have a <required_reading> block'
+    );
+    const reqBlock = content.split('<required_reading>')[1].split('</required_reading>')[0];
+    assert.ok(
+      reqBlock.includes('references/gates.md'),
+      'gsd-verifier.md must reference gates.md inside <required_reading>'
+    );
+  });
+
+  test('Revision Gate recovery mentions stall detection', () => {
+    const content = fs.readFileSync(GATES_REF, 'utf-8');
+    assert.ok(
+      content.includes('stall detection'),
+      'Revision Gate recovery must mention stall detection (early escalation when issues stop decreasing)'
     );
   });
 });

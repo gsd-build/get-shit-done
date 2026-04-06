@@ -18,7 +18,7 @@ Canonical gate types used across GSD workflows. Every validation checkpoint maps
 ### Revision Gate
 **Purpose:** Evaluates output quality and routes to revision if insufficient.
 **Behavior:** Loops back to producer with specific feedback. Bounded by iteration cap.
-**Recovery:** Producer addresses feedback; checker re-evaluates. After max iterations, escalates.
+**Recovery:** Producer addresses feedback; checker re-evaluates. The loop also escalates early if issue count does not decrease between consecutive iterations (stall detection). After max iterations, escalates unconditionally.
 **Examples:**
 - Plan-checker reviewing PLAN.md (max 3 iterations)
 - Verifier checking phase deliverables against success criteria
@@ -54,7 +54,7 @@ Canonical gate types used across GSD workflows. Every validation checkpoint maps
 | execute-phase | Completion | Revision | SUMMARY.md completeness | Re-run incomplete tasks |
 | verify-work | Entry | Pre-flight | SUMMARY.md | Block with missing-summary |
 | verify-work | Evaluation | Escalation | Failed criteria | Surface gaps to developer |
-| /gsd-next | Entry | Abort | Error state, checkpoints | Stop with diagnostic |
+| next | Entry | Abort | Error state, checkpoints | Stop with diagnostic |
 
 ---
 
