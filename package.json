@@ -10,7 +10,7 @@
     "commands",
     "get-shit-done",
     "agents",
-    "hooks/dist",
+    "hooks",
     "scripts"
   ],
   "keywords": [
