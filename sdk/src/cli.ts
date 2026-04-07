@@ -63,6 +63,11 @@ export function parseCliArgs(argv: string[]): ParsedCliArgs {
   // For 'run' command, it's the prompt. Both use positionals[1+].
   const initInput = command === 'init' ? prompt : undefined;
 
+  const workstream = values.ws as string | undefined;
+  if (workstream && !/^[a-zA-Z0-9][a-zA-Z0-9._-]*$/.test(workstream)) {
+    throw new Error('--ws name must start with a letter or digit and contain only letters, digits, hyphens, underscores, or dots.');
+  }
+
   return {
     command,
     prompt,
@@ -72,7 +77,7 @@ export function parseCliArgs(argv: string[]): ParsedCliArgs {
     wsPort: values['ws-port'] ? Number(values['ws-port']) : undefined,
     model: values.model as string | undefined,
     maxBudget: values['max-budget'] ? Number(values['max-budget']) : undefined,
-    workstream: values.ws as string | undefined,
+    workstream,
     help: values.help as boolean,
     version: values.version as boolean,
   };
