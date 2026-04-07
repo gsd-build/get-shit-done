@@ -260,19 +260,19 @@ echo "${phase_goal}" | grep -qi "agent\|llm\|rag\|chatbot\|embedding\|langchain\
 **If AI keywords detected AND no AI-SPEC.md:**
 ```
 ◆ Note: This phase appears to involve AI system development.
-  Consider running /gsd:ai-integration-phase {N} before planning to:
+  Consider running /gsd-ai-integration-phase {N} before planning to:
   - Select the right framework for your use case
   - Research its docs and best practices
   - Design an evaluation strategy
 
-  Continue planning without AI-SPEC? (non-blocking — /gsd:ai-integration-phase can be run after)
+  Continue planning without AI-SPEC? (non-blocking — /gsd-ai-integration-phase can be run after)
 ```
 
 Use AskUserQuestion with options:
 - "Continue — plan without AI-SPEC"
-- "Stop — I'll run /gsd:ai-integration-phase {N} first"
+- "Stop — I'll run /gsd-ai-integration-phase {N} first"
 
-If "Stop": Exit with `/gsd:ai-integration-phase {N}` reminder.
+If "Stop": Exit with `/gsd-ai-integration-phase {N}` reminder.
 If "Continue": Proceed. (Non-blocking — planner will note AI-SPEC is absent.)
 
 **If `AI_SPEC_FILE` is non-empty:** Extract framework for planner context:

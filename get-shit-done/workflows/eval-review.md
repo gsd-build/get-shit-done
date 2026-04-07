@@ -1,7 +1,7 @@
 <purpose>
 Retroactive audit of an implemented AI phase's evaluation coverage. Standalone command that works on any GSD-managed AI phase. Produces a scored EVAL-REVIEW.md with gap analysis and remediation plan.
 
-Use after /gsd:execute-phase to verify that the evaluation strategy from AI-SPEC.md was actually implemented. Mirrors the pattern of /gsd:ui-review and /gsd:validate-phase.
+Use after /gsd-execute-phase to verify that the evaluation strategy from AI-SPEC.md was actually implemented. Mirrors the pattern of /gsd-ui-review and /gsd-validate-phase.
 </purpose>
 
 <required_reading>
@@ -40,7 +40,7 @@ EVAL_REVIEW_FILE=$(ls "${PHASE_DIR}"/*-EVAL-REVIEW.md 2>/dev/null | head -1)
 
 **State A** — AI-SPEC.md + SUMMARY.md exist: Full audit against spec
 **State B** — SUMMARY.md exists, no AI-SPEC.md: Audit against general best practices
-**State C** — No SUMMARY.md: Exit — "Phase {N} not executed. Run /gsd:execute-phase {N} first."
+**State C** — No SUMMARY.md: Exit — "Phase {N} not executed. Run /gsd-execute-phase {N} first."
 
 **If `EVAL_REVIEW_FILE` non-empty:** Use AskUserQuestion:
 - header: "Existing Eval Review"
@@ -56,7 +56,7 @@ If "Re-audit": continue.
 ```
 No AI-SPEC.md found for Phase {N}.
 Audit will evaluate against general AI eval best practices rather than a phase-specific plan.
-Consider running /gsd:ai-integration-phase {N} before implementation next time.
+Consider running /gsd-ai-integration-phase {N} before implementation next time.
 ```
 Continue (non-blocking).
 
@@ -122,10 +122,10 @@ Read the written EVAL-REVIEW.md. Extract:
 ◆ Output: {eval_review_path}
 
 {If PRODUCTION READY:}
-  Next step: /gsd:plan-phase (next phase) or deploy
+  Next step: /gsd-plan-phase (next phase) or deploy
 
 {If NEEDS WORK:}
-  Address critical gaps in EVAL-REVIEW.md, then re-run /gsd:eval-review {N}
+  Address critical gaps in EVAL-REVIEW.md, then re-run /gsd-eval-review {N}
 
 {If SIGNIFICANT GAPS or NOT IMPLEMENTED:}
   Review AI-SPEC.md evaluation plan. Critical eval dimensions are not implemented.

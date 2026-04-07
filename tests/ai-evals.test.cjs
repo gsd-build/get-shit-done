@@ -1,9 +1,9 @@
 /**
  * GSD AI Evals Framework Tests
  *
- * Validates the /gsd:ai-integration-phase + /gsd:eval-review contribution:
+ * Validates the /gsd-ai-integration-phase + /gsd-eval-review contribution:
  * - workflow.ai_integration_phase key in config defaults and config-set/get
- * - W010 validate-health warning when ai_integration_phase absent
+ * - W016 validate-health warning when ai_integration_phase absent
  * - addAiIntegrationPhaseKey repair action
  * - AI-SPEC.md template section completeness
  * - New agent frontmatter (picked up by agent-frontmatter.test.cjs — covered there)
@@ -111,15 +111,15 @@ describe('CONFIG: config-set / config-get workflow.ai_integration_phase', () => 
   });
 });
 
-// ─── Validate Health: W010 ────────────────────────────────────────────────────
+// ─── Validate Health: W016 ────────────────────────────────────────────────────
 
-describe('HEALTH: W010 — workflow.ai_integration_phase absent', () => {
+describe('HEALTH: W016 — workflow.ai_integration_phase absent', () => {
   let tmpDir;
 
   beforeEach(() => { tmpDir = createTempProject(); });
   afterEach(() => { cleanup(tmpDir); });
 
-  test('emits W010 when workflow.ai_integration_phase absent from config', () => {
+  test('emits W016 when workflow.ai_integration_phase absent from config', () => {
     writeMinimalHealth(tmpDir);
     writeConfig(tmpDir, { model_profile: 'balanced', workflow: { research: true, nyquist_validation: true } });
 
@@ -128,12 +128,12 @@ describe('HEALTH: W010 — workflow.ai_integration_phase absent', () => {
 
     const output = JSON.parse(result.output);
     assert.ok(
-      output.warnings.some(w => w.code === 'W010'),
-      `Expected W010 in warnings: ${JSON.stringify(output.warnings)}`
+      output.warnings.some(w => w.code === 'W016'),
+      `Expected W016 in warnings: ${JSON.stringify(output.warnings)}`
     );
   });
 
-  test('does not emit W010 when workflow.ai_integration_phase is explicitly set', () => {
+  test('does not emit W016 when workflow.ai_integration_phase is explicitly set', () => {
     writeMinimalHealth(tmpDir);
     writeConfig(tmpDir, {
       model_profile: 'balanced',
@@ -145,12 +145,12 @@ describe('HEALTH: W010 — workflow.ai_integration_phase absent', () => {
 
     const output = JSON.parse(result.output);
     assert.ok(
-      !output.warnings.some(w => w.code === 'W010'),
-      `Should not have W010: ${JSON.stringify(output.warnings)}`
+      !output.warnings.some(w => w.code === 'W016'),
+      `Should not have W016: ${JSON.stringify(output.warnings)}`
     );
   });
 
-  test('does not emit W010 when workflow.ai_integration_phase is false (explicit opt-out)', () => {
+  test('does not emit W016 when workflow.ai_integration_phase is false (explicit opt-out)', () => {
     writeMinimalHealth(tmpDir);
     writeConfig(tmpDir, {
       model_profile: 'balanced',
@@ -162,8 +162,8 @@ describe('HEALTH: W010 — workflow.ai_integration_phase absent', () => {
 
     const output = JSON.parse(result.output);
     assert.ok(
-      !output.warnings.some(w => w.code === 'W010'),
-      `Should not have W010: ${JSON.stringify(output.warnings)}`
+      !output.warnings.some(w => w.code === 'W016'),
+      `Should not have W016: ${JSON.stringify(output.warnings)}`
     );
   });
 });
@@ -348,7 +348,7 @@ describe('WORKFLOW: plan-phase.md AI nudge integration', () => {
     );
   });
 
-  test('plan-phase.md references /gsd:ai-integration-phase nudge', () => {
+  test('plan-phase.md references /gsd-ai-integration-phase nudge', () => {
     const content = fs.readFileSync(planPhasePath, 'utf-8');
     assert.ok(
       content.includes('ai-integration-phase') || content.includes('ai_integration_phase'),

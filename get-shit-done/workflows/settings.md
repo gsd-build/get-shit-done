@@ -124,7 +124,7 @@ AskUserQuestion([
     header: "AI Phase",
     multiSelect: false,
     options: [
-      { label: "Yes (Recommended)", description: "Run /gsd:ai-phase before planning AI system phases. Surfaces the right framework, researches its docs, and designs the evaluation strategy." },
+      { label: "Yes (Recommended)", description: "Run /gsd-ai-phase before planning AI system phases. Surfaces the right framework, researches its docs, and designs the evaluation strategy." },
       { label: "No", description: "Skip AI design contract. Good for non-AI phases or when framework is already decided." }
     ]
   },

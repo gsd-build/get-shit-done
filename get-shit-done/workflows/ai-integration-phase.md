@@ -43,11 +43,11 @@ AI_PHASE_ENABLED=$(node "$HOME/.claude/get-shit-done/bin/gsd-tools.cjs" config-g
 
 **If `AI_PHASE_ENABLED` is `false`:**
 ```
-AI phase is disabled in config. Enable via /gsd:settings.
+AI phase is disabled in config. Enable via /gsd-settings.
 ```
 Exit workflow.
 
-**If `planning_exists` is false:** Error — run `/gsd:new-project` first.
+**If `planning_exists` is false:** Error — run `/gsd-new-project` first.
 
 ## 2. Parse and Validate Phase
 
@@ -64,7 +64,7 @@ PHASE_INFO=$(node "$HOME/.claude/get-shit-done/bin/gsd-tools.cjs" roadmap get-ph
 **If `has_context` is false:**
 ```
 No CONTEXT.md found for Phase {N}.
-Recommended: run /gsd:discuss-phase {N} first to capture framework preferences.
+Recommended: run /gsd-discuss-phase {N} first to capture framework preferences.
 Continuing without user decisions — framework selector will ask all questions.
 ```
 Continue (non-blocking).
@@ -120,7 +120,7 @@ Goal: {phase_goal}
 
 Parse selector output for: `primary_framework`, `system_type`, `model_provider`, `eval_concerns`, `alternative_framework`.
 
-**If selector fails or returns empty:** Exit with error — "Framework selection failed. Re-run /gsd:ai-integration-phase {N} or answer the framework question in /gsd:discuss-phase {N} first."
+**If selector fails or returns empty:** Exit with error — "Framework selection failed. Re-run /gsd-ai-integration-phase {N} or answer the framework question in /gsd-discuss-phase {N} first."
 
 ## 6. Initialize AI-SPEC.md
 
@@ -264,7 +264,7 @@ git commit -m "docs({phase_slug}): generate AI-SPEC.md — {primary_framework} +
 ◆ Output: {ai_spec_path}
 
 Next step:
-  /gsd:plan-phase {N}   — planner will consume AI-SPEC.md
+  /gsd-plan-phase {N}   — planner will consume AI-SPEC.md
 ```
 
 </process>
