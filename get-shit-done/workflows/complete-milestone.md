@@ -715,7 +715,7 @@ Tag: v[X.Y]
 
 ---
 
-## ▶ Next Up
+## ▶ Next Up — [${PROJECT_CODE}] ${PROJECT_TITLE}
 
 **Start Next Milestone** — questioning → research → requirements → roadmap
 

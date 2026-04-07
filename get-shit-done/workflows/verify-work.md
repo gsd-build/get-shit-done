@@ -638,7 +638,7 @@ Plans verified and ready for execution.
 
 ───────────────────────────────────────────────────────────────
 
-## ▶ Next Up
+## ▶ Next Up — [${PROJECT_CODE}] ${PROJECT_TITLE}
 
 **Execute fixes** — run fix plans
 

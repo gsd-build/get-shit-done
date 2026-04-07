@@ -1015,7 +1015,7 @@ Verification: {Passed | Passed with override | Skipped}
 
 ───────────────────────────────────────────────────────────────
 
-## ▶ Next Up
+## ▶ Next Up — [${PROJECT_CODE}] ${PROJECT_TITLE}
 
 **Execute Phase {X}** — run all {N} plans
 
