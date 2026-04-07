@@ -77,7 +77,6 @@ GSD stores project settings in `.planning/config.json`. Created during `/gsd-new
   "security_block_on": "high",
   "agent_skills": {},
   "response_language": null,
-  "context_profile": null,
   "features": {
     "thinking_partner": false,
     "global_learnings": false
@@ -358,14 +357,6 @@ Settings for the security enforcement feature (v1.31). All follow the **absent =
 | `security_enforcement` | boolean | `true` | Enable threat-model-anchored security verification via `/gsd-secure-phase`. When `false`, security checks are skipped entirely |
 | `security_asvs_level` | number (1-3) | `1` | OWASP ASVS verification level. Level 1 = opportunistic, Level 2 = standard, Level 3 = comprehensive |
 | `security_block_on` | string | `"high"` | Minimum severity that blocks phase advancement. Options: `"high"`, `"medium"`, `"low"` |
-
----
-
-## Hook Settings
-
-| Setting | Type | Default | Description |
-|---------|------|---------|-------------|
-| `hooks.context_warnings` | boolean | `true` | Show context window usage warnings during sessions |
 
 ---
 
