@@ -773,6 +773,46 @@ describe('requirements mark-complete command', () => {
     assert.strictEqual(output.updated, false, 'updated should be false');
     assert.strictEqual(output.reason, 'REQUIREMENTS.md not found', 'should report file not found');
   });
+
+  test('regression #1922: checkbox and table both updated when only those two lines exist (no surrounding content)', () => {
+    // Exercises the fix for #1922: the function must use replace()+comparison instead
+    // of test()+replace() on the same /gi regex, and must not create the table regex
+    // twice.  With only a checkbox line and a table row, both transforms must succeed.
+    const content = [
+      '- [ ] **REQ-01**: requirement with no surrounding text',
+      '',
+      '| REQ-01 | Phase 1 | Pending |',
+    ].join('\n');
+    writeRequirements(tmpDir, content);
+
+    const result = runGsdTools('requirements mark-complete REQ-01', tmpDir);
+    assert.ok(result.success, `Command failed: ${result.error}`);
+
+    const output = JSON.parse(result.output);
+    assert.ok(output.marked_complete.includes('REQ-01'), 'REQ-01 must be in marked_complete');
+    assert.deepStrictEqual(output.not_found, [], 'REQ-01 must not be reported as not_found');
+
+    const updated = readRequirements(tmpDir);
+    assert.ok(updated.includes('- [x] **REQ-01**'), 'checkbox must be checked');
+    assert.ok(updated.includes('| REQ-01 | Phase 1 | Complete |'), 'table row must be Complete');
+  });
+
+  test('regression #1922: marks complete when requirement is at position 0 of file (no leading content)', () => {
+    // Only a single line with no preceding characters — exercises the start-of-string
+    // match path to guard against any future regression where lastIndex from test()
+    // could affect replace().
+    writeRequirements(tmpDir, '- [ ] **START-01**: very first line');
+
+    const result = runGsdTools('requirements mark-complete START-01', tmpDir);
+    assert.ok(result.success, `Command failed: ${result.error}`);
+
+    const output = JSON.parse(result.output);
+    assert.ok(output.marked_complete.includes('START-01'), 'START-01 must be in marked_complete');
+    assert.deepStrictEqual(output.not_found, [], 'must not be reported as not_found');
+
+    const updated = readRequirements(tmpDir);
+    assert.ok(updated.includes('- [x] **START-01**'), 'checkbox at position 0 must be checked');
+  });
 });
 
 // ─────────────────────────────────────────────────────────────────────────────

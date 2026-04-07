@@ -42,19 +42,17 @@ function cmdRequirementsMarkComplete(cwd, reqIdsRaw, raw) {
 
     // Update checkbox: - [ ] **REQ-ID** → - [x] **REQ-ID**
     const checkboxPattern = new RegExp(`(-\\s*\\[)[ ](\\]\\s*\\*\\*${reqEscaped}\\*\\*)`, 'gi');
-    if (checkboxPattern.test(reqContent)) {
-      reqContent = reqContent.replace(checkboxPattern, '$1x$2');
+    const afterCheckbox = reqContent.replace(checkboxPattern, '$1x$2');
+    if (afterCheckbox !== reqContent) {
+      reqContent = afterCheckbox;
       found = true;
     }
 
     // Update traceability table: | REQ-ID | Phase N | Pending | → | REQ-ID | Phase N | Complete |
     const tablePattern = new RegExp(`(\\|\\s*${reqEscaped}\\s*\\|[^|]+\\|)\\s*Pending\\s*(\\|)`, 'gi');
-    if (tablePattern.test(reqContent)) {
-      // Re-read since test() advances lastIndex for global regex
-      reqContent = reqContent.replace(
-        new RegExp(`(\\|\\s*${reqEscaped}\\s*\\|[^|]+\\|)\\s*Pending\\s*(\\|)`, 'gi'),
-        '$1 Complete $2'
-      );
+    const afterTable = reqContent.replace(tablePattern, '$1 Complete $2');
+    if (afterTable !== reqContent) {
+      reqContent = afterTable;
       found = true;
     }
 
@@ -62,8 +60,8 @@ function cmdRequirementsMarkComplete(cwd, reqIdsRaw, raw) {
       updated.push(reqId);
     } else {
       // Check if already complete before declaring not_found
-      const doneCheckbox = new RegExp(`-\\s*\\[x\\]\\s*\\*\\*${reqEscaped}\\*\\*`, 'gi');
-      const doneTable = new RegExp(`\\|\\s*${reqEscaped}\\s*\\|[^|]+\\|\\s*Complete\\s*\\|`, 'gi');
+      const doneCheckbox = new RegExp(`-\\s*\\[x\\]\\s*\\*\\*${reqEscaped}\\*\\*`, 'i');
+      const doneTable = new RegExp(`\\|\\s*${reqEscaped}\\s*\\|[^|]+\\|\\s*Complete\\s*\\|`, 'i');
       if (doneCheckbox.test(reqContent) || doneTable.test(reqContent)) {
         alreadyComplete.push(reqId);
       } else {
