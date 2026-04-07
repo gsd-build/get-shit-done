@@ -345,7 +345,7 @@ Created .planning/codebase/:
 
 ---
 
-## ▶ Next Up
+## ▶ Next Up — [${PROJECT_CODE}] ${PROJECT_TITLE}
 
 **Initialize project** — use codebase context for planning
 

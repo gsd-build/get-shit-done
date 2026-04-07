@@ -259,7 +259,7 @@ Dimensions: 6/6 passed
 
 ───────────────────────────────────────────────────────────────
 
-## ▶ Next Up
+## ▶ Next Up — [${PROJECT_CODE}] ${PROJECT_TITLE}
 
 **Plan Phase {N}** — planner will use UI-SPEC.md as design context
 

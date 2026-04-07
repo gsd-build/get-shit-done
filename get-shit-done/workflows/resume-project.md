@@ -231,7 +231,7 @@ Based on user selection, route to appropriate workflow:
   ```
   ---
 
-  ## ▶ Next Up
+  ## ▶ Next Up — [${PROJECT_CODE}] ${PROJECT_TITLE}
 
   **{phase}-{plan}: [Plan Name]** — [objective from PLAN.md]
 
@@ -245,7 +245,7 @@ Based on user selection, route to appropriate workflow:
   ```
   ---
 
-  ## ▶ Next Up
+  ## ▶ Next Up — [${PROJECT_CODE}] ${PROJECT_TITLE}
 
   **Phase [N]: [Name]** — [Goal from ROADMAP.md]
 
