@@ -18,6 +18,7 @@
 | "I don't know my requirements yet" | LangChain |
 | Regulated / audit-trail required | LangGraph |
 | Enterprise Microsoft/.NET shops | AutoGen/AG2 |
+| Google Cloud / Gemini-committed teams | Google ADK |
 | Pure NLP pipelines with explicit control | Haystack |
 
 ---
@@ -101,6 +102,17 @@
 - **Weaknesses:** Ecosystem fragmented (AutoGen maintenance mode, AG2 fork, Microsoft Agent Framework preview) — genuine long-term risk
 - **Eval concerns:** Conversation goal completion, consensus quality, code execution correctness
 
+### Google ADK (Agent Development Kit)
+- **Type:** Multi-agent orchestration framework
+- **Language:** Python + Java
+- **Model support:** Optimized for Gemini; supports other models via LiteLLM
+- **Learning curve:** Intermediate (agent/tool/session model, familiar if you know LangGraph)
+- **Best for:** Google Cloud / Vertex AI shops, multi-agent workflows needing built-in session management and memory, teams already committed to Gemini, agent pipelines that need Google Search / BigQuery tool integration
+- **Avoid if:** Model flexibility is required beyond Gemini, no Google Cloud dependency acceptable, TypeScript-only stack
+- **Strengths:** First-party Google support, built-in session/memory/artifact management, tight Vertex AI and Google Search integration, own eval framework (RAGAS-compatible), multi-agent by design (sequential, parallel, loop patterns), Java SDK for enterprise teams
+- **Weaknesses:** Gemini vendor lock-in in practice, younger community than LangChain/LlamaIndex, less third-party integration depth
+- **Eval concerns:** Multi-agent task decomposition, tool use correctness, session state consistency, goal completion rate
+
 ### Haystack
 - **Type:** NLP pipeline framework
 - **Language:** Python
@@ -121,7 +133,7 @@
 | System Type | Primary Framework(s) | Key Eval Concerns |
 |-------------|---------------------|-------------------|
 | RAG / Knowledge Q&A | LlamaIndex, LangChain | Context faithfulness, hallucination, retrieval precision/recall |
-| Multi-agent orchestration | CrewAI, LangGraph | Task decomposition, handoff quality, goal completion |
+| Multi-agent orchestration | CrewAI, LangGraph, Google ADK | Task decomposition, handoff quality, goal completion |
 | Conversational assistants | OpenAI Agents SDK, Claude Agent SDK | Tone, safety, instruction following, escalation |
 | Structured data extraction | LangChain, LlamaIndex | Schema compliance, extraction accuracy |
 | Autonomous task agents | LangGraph, OpenAI Agents SDK | Safety guardrails, tool correctness, cost adherence |
@@ -145,6 +157,7 @@
 |-----------|-----------|
 | OpenAI-only | OpenAI Agents SDK |
 | Anthropic/Claude-only | Claude Agent SDK |
+| Google/Gemini-committed | Google ADK |
 | Model-agnostic (full flexibility) | LangChain, LlamaIndex, CrewAI, LangGraph, Haystack |
 
 ---

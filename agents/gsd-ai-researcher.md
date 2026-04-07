@@ -45,6 +45,7 @@ Use context7 MCP first (fastest). Fall back to WebFetch.
 | OpenAI Agents SDK | https://openai.github.io/openai-agents-python |
 | Claude Agent SDK | https://docs.anthropic.com/en/docs/claude-code/sdk |
 | AutoGen / AG2 | https://ag2ai.github.io/ag2 |
+| Google ADK | https://google.github.io/adk-docs |
 | Haystack | https://docs.haystack.deepset.ai |
 </documentation_sources>
 

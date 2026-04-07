@@ -51,6 +51,7 @@ AskUserQuestion([
     options: [
       { label: "OpenAI (GPT-4o, o3, etc.)", description: "Comfortable with OpenAI vendor lock-in" },
       { label: "Anthropic (Claude)", description: "Comfortable with Anthropic vendor lock-in" },
+      { label: "Google (Gemini)", description: "Committed to Gemini / Google Cloud / Vertex AI" },
       { label: "Model-agnostic", description: "Need ability to swap models or use local models" },
       { label: "Undecided / Want flexibility" }
     ]
