@@ -3810,6 +3810,42 @@ function copyCommandsAsAntigravitySkills(srcDir, skillsDir, prefix, isGlobal = f
 }
 
 /**
+ * Save user-generated files from destDir to an in-memory map before a wipe.
+ *
+ * @param {string} destDir - Directory that is about to be wiped
+ * @param {string[]} fileNames - Relative file names (e.g. ['USER-PROFILE.md']) to preserve
+ * @returns {Map<string, string>} Map of fileName → file content (only entries that existed)
+ */
+function preserveUserArtifacts(destDir, fileNames) {
+  const saved = new Map();
+  for (const name of fileNames) {
+    const fullPath = path.join(destDir, name);
+    if (fs.existsSync(fullPath)) {
+      try {
+        saved.set(name, fs.readFileSync(fullPath, 'utf8'));
+      } catch { /* skip unreadable files */ }
+    }
+  }
+  return saved;
+}
+
+/**
+ * Restore user-generated files saved by preserveUserArtifacts after a wipe.
+ *
+ * @param {string} destDir - Directory that was wiped and recreated
+ * @param {Map<string, string>} saved - Map returned by preserveUserArtifacts
+ */
+function restoreUserArtifacts(destDir, saved) {
+  for (const [name, content] of saved) {
+    const fullPath = path.join(destDir, name);
+    try {
+      fs.mkdirSync(path.dirname(fullPath), { recursive: true });
+      fs.writeFileSync(fullPath, content, 'utf8');
+    } catch { /* skip unwritable paths */ }
+  }
+}
+
+/**
  * Recursively copy directory, replacing paths in .md files
  * Deletes existing destDir first to remove orphaned files from previous versions
  * @param {string} srcDir - Source directory
@@ -5208,10 +5244,13 @@ function install(isGlobal, runtime = 'claude') {
     }
 
     // Clean up legacy commands/gsd/ from previous global installs
+    // Preserve user-generated files (dev-preferences.md) before wiping the directory
     const legacyCommandsDir = path.join(targetDir, 'commands', 'gsd');
     if (fs.existsSync(legacyCommandsDir)) {
+      const savedLegacyArtifacts = preserveUserArtifacts(legacyCommandsDir, ['dev-preferences.md']);
       fs.rmSync(legacyCommandsDir, { recursive: true });
       console.log(`  ${green}✓${reset} Removed legacy commands/gsd/ directory`);
+      restoreUserArtifacts(legacyCommandsDir, savedLegacyArtifacts);
     }
   } else {
     // Claude Code local: commands/gsd/ format — Claude Code reads local project
@@ -5243,9 +5282,12 @@ function install(isGlobal, runtime = 'claude') {
   }
 
   // Copy get-shit-done skill with path replacement
+  // Preserve user-generated files before the wipe-and-copy so they survive re-install
   const skillSrc = path.join(src, 'get-shit-done');
   const skillDest = path.join(targetDir, 'get-shit-done');
+  const savedGsdArtifacts = preserveUserArtifacts(skillDest, ['USER-PROFILE.md']);
   copyWithPathReplacement(skillSrc, skillDest, pathPrefix, runtime, false, isGlobal);
+  restoreUserArtifacts(skillDest, savedGsdArtifacts);
   if (verifyInstalled(skillDest, 'get-shit-done')) {
     console.log(`  ${green}✓${reset} Installed get-shit-done`);
   } else {
@@ -6141,6 +6183,8 @@ if (process.env.GSD_TEST_MODE) {
     writeManifest,
     reportLocalPatches,
     validateHookFields,
+    preserveUserArtifacts,
+    restoreUserArtifacts,
   };
 } else {
 
