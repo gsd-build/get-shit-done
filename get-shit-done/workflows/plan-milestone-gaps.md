@@ -159,7 +159,7 @@ node "$HOME/.claude/get-shit-done/bin/gsd-tools.cjs" commit "docs(roadmap): add 
 
 ---
 
-## ▶ Next Up
+## ▶ Next Up — [${PROJECT_CODE}] ${PROJECT_TITLE}
 
 **Plan first gap closure phase**
 

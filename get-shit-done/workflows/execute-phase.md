@@ -1335,7 +1335,7 @@ Items saved to `{phase_num}-HUMAN-UAT.md` — they will appear in `/gsd-progress
 {Gap summaries from VERIFICATION.md}
 
 ---
-## ▶ Next Up
+## ▶ Next Up — [${PROJECT_CODE}] ${PROJECT_TITLE}
 
 `/clear` then:
 

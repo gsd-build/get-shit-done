@@ -315,7 +315,7 @@ Present next steps:
 ```
 ---
 
-## ▶ Next Up
+## ▶ Next Up — [${PROJECT_CODE}] ${PROJECT_TITLE}
 
 {if bugs discovered:}
 **Fix discovered bugs:** `/gsd-quick fix the {N} test failures discovered in phase ${phase_number}`

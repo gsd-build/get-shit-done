@@ -44,6 +44,22 @@ function withProjectRoot(cwd, result) {
   if (config.response_language) {
     result.response_language = config.response_language;
   }
+  // Inject project identity into all init outputs so handoff blocks
+  // can include project context for cross-session continuity.
+  if (config.project_code) {
+    result.project_code = config.project_code;
+  }
+  // Extract project title from PROJECT.md first H1 heading.
+  const projectMdPath = path.join(planningDir(cwd), 'PROJECT.md');
+  try {
+    if (fs.existsSync(projectMdPath)) {
+      const content = fs.readFileSync(projectMdPath, 'utf8');
+      const h1Match = content.match(/^#\s+(.+)$/m);
+      if (h1Match) {
+        result.project_title = h1Match[1].trim();
+      }
+    }
+  } catch { /* intentionally empty */ }
   return result;
 }
 

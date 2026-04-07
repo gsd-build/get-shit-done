@@ -225,7 +225,7 @@ All requirements covered. Cross-phase integration verified. E2E flows complete.
 
 ───────────────────────────────────────────────────────────────
 
-## ▶ Next Up
+## ▶ Next Up — [${PROJECT_CODE}] ${PROJECT_TITLE}
 
 **Complete milestone** — archive and tag
 
@@ -270,7 +270,7 @@ Phases needing validation: run `/gsd-validate-phase {N}` for each flagged phase.
 
 ───────────────────────────────────────────────────────────────
 
-## ▶ Next Up
+## ▶ Next Up — [${PROJECT_CODE}] ${PROJECT_TITLE}
 
 **Plan gap closure** — create phases to complete milestone
 

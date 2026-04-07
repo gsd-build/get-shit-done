@@ -514,7 +514,7 @@ node "$HOME/.claude/get-shit-done/bin/gsd-tools.cjs" commit "docs: create milest
 
 **[N] phases** | **[X] requirements** | Ready to build ✓
 
-## ▶ Next Up
+## ▶ Next Up — [${PROJECT_CODE}] ${PROJECT_TITLE}
 
 **Phase [N]: [Phase Name]** — [Goal]
 

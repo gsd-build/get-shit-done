@@ -83,7 +83,7 @@ Roadmap updated: .planning/ROADMAP.md
 
 ---
 
-## ▶ Next Up
+## ▶ Next Up — [${PROJECT_CODE}] ${PROJECT_TITLE}
 
 **Phase {N}: {description}**
 
