@@ -4,7 +4,7 @@
 
 const fs = require('fs');
 const path = require('path');
-const { output, error, planningRoot, CONFIG_DEFAULTS, atomicWriteFileSync } = require('./core.cjs');
+const { output, error, planningRoot, withPlanningLock, CONFIG_DEFAULTS, atomicWriteFileSync } = require('./core.cjs');
 const {
   VALID_PROFILES,
   getAgentToModelMapForProfile,
@@ -293,36 +293,38 @@ function cmdConfigEnsureSection(cwd, raw) {
 function setConfigValue(cwd, keyPath, parsedValue) {
   const configPath = path.join(planningRoot(cwd), 'config.json');
 
-  // Load existing config or start with empty object
-  let config = {};
-  try {
-    if (fs.existsSync(configPath)) {
-      config = JSON.parse(fs.readFileSync(configPath, 'utf-8'));
+  return withPlanningLock(cwd, () => {
+    // Load existing config or start with empty object
+    let config = {};
+    try {
+      if (fs.existsSync(configPath)) {
+        config = JSON.parse(fs.readFileSync(configPath, 'utf-8'));
+      }
+    } catch (err) {
+      error('Failed to read config.json: ' + err.message);
     }
-  } catch (err) {
-    error('Failed to read config.json: ' + err.message);
-  }
 
-  // Set nested value using dot notation (e.g., "workflow.research")
-  const keys = keyPath.split('.');
-  let current = config;
-  for (let i = 0; i < keys.length - 1; i++) {
-    const key = keys[i];
-    if (current[key] === undefined || typeof current[key] !== 'object') {
-      current[key] = {};
+    // Set nested value using dot notation (e.g., "workflow.research")
+    const keys = keyPath.split('.');
+    let current = config;
+    for (let i = 0; i < keys.length - 1; i++) {
+      const key = keys[i];
+      if (current[key] === undefined || typeof current[key] !== 'object') {
+        current[key] = {};
+      }
+      current = current[key];
     }
-    current = current[key];
-  }
-  const previousValue = current[keys[keys.length - 1]]; // Capture previous value before overwriting
-  current[keys[keys.length - 1]] = parsedValue;
+    const previousValue = current[keys[keys.length - 1]]; // Capture previous value before overwriting
+    current[keys[keys.length - 1]] = parsedValue;
 
-  // Write back
-  try {
-    atomicWriteFileSync(configPath, JSON.stringify(config, null, 2), 'utf-8');
-    return { updated: true, key: keyPath, value: parsedValue, previousValue };
-  } catch (err) {
-    error('Failed to write config.json: ' + err.message);
-  }
+    // Write back
+    try {
+      atomicWriteFileSync(configPath, JSON.stringify(config, null, 2), 'utf-8');
+      return { updated: true, key: keyPath, value: parsedValue, previousValue };
+    } catch (err) {
+      error('Failed to write config.json: ' + err.message);
+    }
+  });
 }
 
 /**

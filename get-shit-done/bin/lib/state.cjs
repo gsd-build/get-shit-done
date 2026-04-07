@@ -12,6 +12,16 @@ function getStatePath(cwd) {
   return planningPaths(cwd).state;
 }
 
+// Track all lock files held by this process so they can be removed on exit.
+// process.on('exit') fires even on process.exit(1), unlike try/finally which is
+// skipped when error() calls process.exit(1) inside a locked region (#1916).
+const _heldStateLocks = new Set();
+process.on('exit', () => {
+  for (const lockPath of _heldStateLocks) {
+    try { require('fs').unlinkSync(lockPath); } catch { /* already gone */ }
+  }
+});
+
 // Shared helper: extract a field value from STATE.md content.
 // Supports both **Field:** bold and plain Field: format.
 function stateExtractField(content, fieldName) {
@@ -184,18 +194,22 @@ function cmdStateUpdate(cwd, field, value) {
 
   const statePath = planningPaths(cwd).state;
   try {
-    let content = fs.readFileSync(statePath, 'utf-8');
-    const fieldEscaped = escapeRegex(field);
-    // Try **Field:** bold format first, then plain Field: format
-    const boldPattern = new RegExp(`(\\*\\*${fieldEscaped}:\\*\\*\\s*)(.*)`, 'i');
-    const plainPattern = new RegExp(`(^${fieldEscaped}:\\s*)(.*)`, 'im');
-    if (boldPattern.test(content)) {
-      content = content.replace(boldPattern, (_match, prefix) => `${prefix}${value}`);
-      writeStateMd(statePath, content, cwd);
-      output({ updated: true });
-    } else if (plainPattern.test(content)) {
-      content = content.replace(plainPattern, (_match, prefix) => `${prefix}${value}`);
-      writeStateMd(statePath, content, cwd);
+    let updated = false;
+    readModifyWriteStateMd(statePath, (content) => {
+      const fieldEscaped = escapeRegex(field);
+      // Try **Field:** bold format first, then plain Field: format
+      const boldPattern = new RegExp(`(\\*\\*${fieldEscaped}:\\*\\*\\s*)(.*)`, 'i');
+      const plainPattern = new RegExp(`(^${fieldEscaped}:\\s*)(.*)`, 'im');
+      if (boldPattern.test(content)) {
+        updated = true;
+        return content.replace(boldPattern, (_match, prefix) => `${prefix}${value}`);
+      } else if (plainPattern.test(content)) {
+        updated = true;
+        return content.replace(plainPattern, (_match, prefix) => `${prefix}${value}`);
+      }
+      return content;
+    }, cwd);
+    if (updated) {
       output({ updated: true });
     } else {
       output({ updated: false, reason: `Field "${field}" not found in STATE.md` });
@@ -274,55 +288,67 @@ function cmdStateAdvancePlan(cwd, raw) {
   const statePath = planningPaths(cwd).state;
   if (!fs.existsSync(statePath)) { output({ error: 'STATE.md not found' }, raw); return; }
 
-  let content = fs.readFileSync(statePath, 'utf-8');
   const today = new Date().toISOString().split('T')[0];
+  let result = null;
 
-  // Try legacy separate fields first, then compound "Plan: X of Y" format
-  const legacyPlan = stateExtractField(content, 'Current Plan');
-  const legacyTotal = stateExtractField(content, 'Total Plans in Phase');
-  const planField = stateExtractField(content, 'Plan');
+  readModifyWriteStateMd(statePath, (content) => {
+    // Try legacy separate fields first, then compound "Plan: X of Y" format
+    const legacyPlan = stateExtractField(content, 'Current Plan');
+    const legacyTotal = stateExtractField(content, 'Total Plans in Phase');
+    const planField = stateExtractField(content, 'Plan');
 
-  let currentPlan, totalPlans;
-  let useCompoundFormat = false;
+    let currentPlan, totalPlans;
+    let useCompoundFormat = false;
 
-  if (legacyPlan && legacyTotal) {
-    currentPlan = parseInt(legacyPlan, 10);
-    totalPlans = parseInt(legacyTotal, 10);
-  } else if (planField) {
-    // Compound format: "2 of 6 in current phase" or "2 of 6"
-    currentPlan = parseInt(planField, 10);
-    const ofMatch = planField.match(/of\s+(\d+)/);
-    totalPlans = ofMatch ? parseInt(ofMatch[1], 10) : NaN;
-    useCompoundFormat = true;
-  }
+    if (legacyPlan && legacyTotal) {
+      currentPlan = parseInt(legacyPlan, 10);
+      totalPlans = parseInt(legacyTotal, 10);
+    } else if (planField) {
+      // Compound format: "2 of 6 in current phase" or "2 of 6"
+      currentPlan = parseInt(planField, 10);
+      const ofMatch = planField.match(/of\s+(\d+)/);
+      totalPlans = ofMatch ? parseInt(ofMatch[1], 10) : NaN;
+      useCompoundFormat = true;
+    }
 
-  if (isNaN(currentPlan) || isNaN(totalPlans)) {
+    if (isNaN(currentPlan) || isNaN(totalPlans)) {
+      result = { error: true };
+      return content;
+    }
+
+    if (currentPlan >= totalPlans) {
+      content = stateReplaceFieldWithFallback(content, 'Status', null, 'Phase complete — ready for verification');
+      content = stateReplaceFieldWithFallback(content, 'Last Activity', 'Last activity', today);
+      content = updateCurrentPositionFields(content, { status: 'Phase complete — ready for verification', lastActivity: today });
+      result = { advanced: false, reason: 'last_plan', current_plan: currentPlan, total_plans: totalPlans, status: 'ready_for_verification' };
+    } else {
+      const newPlan = currentPlan + 1;
+      let planDisplayValue;
+      if (useCompoundFormat) {
+        // Preserve compound format: "X of Y in current phase" → replace X only
+        planDisplayValue = planField.replace(/^\d+/, String(newPlan));
+        content = stateReplaceField(content, 'Plan', planDisplayValue) || content;
+      } else {
+        planDisplayValue = `${newPlan} of ${totalPlans}`;
+        content = stateReplaceField(content, 'Current Plan', String(newPlan)) || content;
+      }
+      content = stateReplaceFieldWithFallback(content, 'Status', null, 'Ready to execute');
+      content = stateReplaceFieldWithFallback(content, 'Last Activity', 'Last activity', today);
+      content = updateCurrentPositionFields(content, { status: 'Ready to execute', lastActivity: today, plan: planDisplayValue });
+      result = { advanced: true, previous_plan: currentPlan, current_plan: newPlan, total_plans: totalPlans };
+    }
+    return content;
+  }, cwd);
+
+  if (!result || result.error) {
     output({ error: 'Cannot parse Current Plan or Total Plans in Phase from STATE.md' }, raw);
     return;
   }
 
-  if (currentPlan >= totalPlans) {
-    content = stateReplaceFieldWithFallback(content, 'Status', null, 'Phase complete — ready for verification');
-    content = stateReplaceFieldWithFallback(content, 'Last Activity', 'Last activity', today);
-    content = updateCurrentPositionFields(content, { status: 'Phase complete — ready for verification', lastActivity: today });
-    writeStateMd(statePath, content, cwd);
-    output({ advanced: false, reason: 'last_plan', current_plan: currentPlan, total_plans: totalPlans, status: 'ready_for_verification' }, raw, 'false');
+  if (result.advanced === false) {
+    output(result, raw, 'false');
   } else {
-    const newPlan = currentPlan + 1;
-    let planDisplayValue;
-    if (useCompoundFormat) {
-      // Preserve compound format: "X of Y in current phase" → replace X only
-      planDisplayValue = planField.replace(/^\d+/, String(newPlan));
-      content = stateReplaceField(content, 'Plan', planDisplayValue) || content;
-    } else {
-      planDisplayValue = `${newPlan} of ${totalPlans}`;
-      content = stateReplaceField(content, 'Current Plan', String(newPlan)) || content;
-    }
-    content = stateReplaceFieldWithFallback(content, 'Status', null, 'Ready to execute');
-    content = stateReplaceFieldWithFallback(content, 'Last Activity', 'Last activity', today);
-    content = updateCurrentPositionFields(content, { status: 'Ready to execute', lastActivity: today, plan: planDisplayValue });
-    writeStateMd(statePath, content, cwd);
-    output({ advanced: true, previous_plan: currentPlan, current_plan: newPlan, total_plans: totalPlans }, raw, 'true');
+    output(result, raw, 'true');
   }
 }
 
@@ -330,7 +356,6 @@ function cmdStateRecordMetric(cwd, options, raw) {
   const statePath = planningPaths(cwd).state;
   if (!fs.existsSync(statePath)) { output({ error: 'STATE.md not found' }, raw); return; }
 
-  let content = fs.readFileSync(statePath, 'utf-8');
   const { phase, plan, duration, tasks, files } = options;
 
   if (!phase || !plan || !duration) {
@@ -338,22 +363,29 @@ function cmdStateRecordMetric(cwd, options, raw) {
     return;
   }
 
-  // Find Performance Metrics section and its table
-  const metricsPattern = /(##\s*Performance Metrics[\s\S]*?\n\|[^\n]+\n\|[-|\s]+\n)([\s\S]*?)(?=\n##|\n$|$)/i;
-  const metricsMatch = content.match(metricsPattern);
+  let recorded = false;
+  readModifyWriteStateMd(statePath, (content) => {
+    // Find Performance Metrics section and its table
+    const metricsPattern = /(##\s*Performance Metrics[\s\S]*?\n\|[^\n]+\n\|[-|\s]+\n)([\s\S]*?)(?=\n##|\n$|$)/i;
+    const metricsMatch = content.match(metricsPattern);
 
-  if (metricsMatch) {
-    let tableBody = metricsMatch[2].trimEnd();
-    const newRow = `| Phase ${phase} P${plan} | ${duration} | ${tasks || '-'} tasks | ${files || '-'} files |`;
+    if (metricsMatch) {
+      let tableBody = metricsMatch[2].trimEnd();
+      const newRow = `| Phase ${phase} P${plan} | ${duration} | ${tasks || '-'} tasks | ${files || '-'} files |`;
 
-    if (tableBody.trim() === '' || tableBody.includes('None yet')) {
-      tableBody = newRow;
-    } else {
-      tableBody = tableBody + '\n' + newRow;
+      if (tableBody.trim() === '' || tableBody.includes('None yet')) {
+        tableBody = newRow;
+      } else {
+        tableBody = tableBody + '\n' + newRow;
+      }
+
+      recorded = true;
+      return content.replace(metricsPattern, (_match, header) => `${header}${tableBody}\n`);
     }
+    return content;
+  }, cwd);
 
-    content = content.replace(metricsPattern, (_match, header) => `${header}${tableBody}\n`);
-    writeStateMd(statePath, content, cwd);
+  if (recorded) {
     output({ recorded: true, phase, plan, duration }, raw, 'true');
   } else {
     output({ recorded: false, reason: 'Performance Metrics section not found in STATE.md' }, raw, 'false');
@@ -364,9 +396,7 @@ function cmdStateUpdateProgress(cwd, raw) {
   const statePath = planningPaths(cwd).state;
   if (!fs.existsSync(statePath)) { output({ error: 'STATE.md not found' }, raw); return; }
 
-  let content = fs.readFileSync(statePath, 'utf-8');
-
-  // Count summaries across current milestone phases only
+  // Count summaries across current milestone phases only (outside lock — read-only)
   const phasesDir = planningPaths(cwd).phases;
   let totalPlans = 0;
   let totalSummaries = 0;
@@ -389,17 +419,26 @@ function cmdStateUpdateProgress(cwd, raw) {
   const bar = '\u2588'.repeat(filled) + '\u2591'.repeat(barWidth - filled);
   const progressStr = `[${bar}] ${percent}%`;
 
-  // Try **Progress:** bold format first, then plain Progress: format
-  const boldProgressPattern = /(\*\*Progress:\*\*\s*).*/i;
-  const plainProgressPattern = /^(Progress:\s*).*/im;
-  if (boldProgressPattern.test(content)) {
-    content = content.replace(boldProgressPattern, (_match, prefix) => `${prefix}${progressStr}`);
-    writeStateMd(statePath, content, cwd);
-    output({ updated: true, percent, completed: totalSummaries, total: totalPlans, bar: progressStr }, raw, progressStr);
-  } else if (plainProgressPattern.test(content)) {
-    content = content.replace(plainProgressPattern, (_match, prefix) => `${prefix}${progressStr}`);
-    writeStateMd(statePath, content, cwd);
-    output({ updated: true, percent, completed: totalSummaries, total: totalPlans, bar: progressStr }, raw, progressStr);
+  let updated = false;
+  const _totalPlans = totalPlans;
+  const _totalSummaries = totalSummaries;
+
+  readModifyWriteStateMd(statePath, (content) => {
+    // Try **Progress:** bold format first, then plain Progress: format
+    const boldProgressPattern = /(\*\*Progress:\*\*\s*).*/i;
+    const plainProgressPattern = /^(Progress:\s*).*/im;
+    if (boldProgressPattern.test(content)) {
+      updated = true;
+      return content.replace(boldProgressPattern, (_match, prefix) => `${prefix}${progressStr}`);
+    } else if (plainProgressPattern.test(content)) {
+      updated = true;
+      return content.replace(plainProgressPattern, (_match, prefix) => `${prefix}${progressStr}`);
+    }
+    return content;
+  }, cwd);
+
+  if (updated) {
+    output({ updated: true, percent, completed: _totalSummaries, total: _totalPlans, bar: progressStr }, raw, progressStr);
   } else {
     output({ updated: false, reason: 'Progress field not found in STATE.md' }, raw, 'false');
   }
@@ -423,20 +462,26 @@ function cmdStateAddDecision(cwd, options, raw) {
 
   if (!summaryText) { output({ error: 'summary required' }, raw); return; }
 
-  let content = fs.readFileSync(statePath, 'utf-8');
   const entry = `- [Phase ${phase || '?'}]: ${summaryText}${rationaleText ? ` — ${rationaleText}` : ''}`;
+  let added = false;
 
-  // Find Decisions section (various heading patterns)
-  const sectionPattern = /(###?\s*(?:Decisions|Decisions Made|Accumulated.*Decisions)\s*\n)([\s\S]*?)(?=\n###?|\n##[^#]|$)/i;
-  const match = content.match(sectionPattern);
+  readModifyWriteStateMd(statePath, (content) => {
+    // Find Decisions section (various heading patterns)
+    const sectionPattern = /(###?\s*(?:Decisions|Decisions Made|Accumulated.*Decisions)\s*\n)([\s\S]*?)(?=\n###?|\n##[^#]|$)/i;
+    const match = content.match(sectionPattern);
 
-  if (match) {
-    let sectionBody = match[2];
-    // Remove placeholders
-    sectionBody = sectionBody.replace(/None yet\.?\s*\n?/gi, '').replace(/No decisions yet\.?\s*\n?/gi, '');
-    sectionBody = sectionBody.trimEnd() + '\n' + entry + '\n';
-    content = content.replace(sectionPattern, (_match, header) => `${header}${sectionBody}`);
-    writeStateMd(statePath, content, cwd);
+    if (match) {
+      let sectionBody = match[2];
+      // Remove placeholders
+      sectionBody = sectionBody.replace(/None yet\.?\s*\n?/gi, '').replace(/No decisions yet\.?\s*\n?/gi, '');
+      sectionBody = sectionBody.trimEnd() + '\n' + entry + '\n';
+      added = true;
+      return content.replace(sectionPattern, (_match, header) => `${header}${sectionBody}`);
+    }
+    return content;
+  }, cwd);
+
+  if (added) {
     output({ added: true, decision: entry }, raw, 'true');
   } else {
     output({ added: false, reason: 'Decisions section not found in STATE.md' }, raw, 'false');
@@ -458,18 +503,24 @@ function cmdStateAddBlocker(cwd, text, raw) {
 
   if (!blockerText) { output({ error: 'text required' }, raw); return; }
 
-  let content = fs.readFileSync(statePath, 'utf-8');
   const entry = `- ${blockerText}`;
+  let added = false;
 
-  const sectionPattern = /(###?\s*(?:Blockers|Blockers\/Concerns|Concerns)\s*\n)([\s\S]*?)(?=\n###?|\n##[^#]|$)/i;
-  const match = content.match(sectionPattern);
+  readModifyWriteStateMd(statePath, (content) => {
+    const sectionPattern = /(###?\s*(?:Blockers|Blockers\/Concerns|Concerns)\s*\n)([\s\S]*?)(?=\n###?|\n##[^#]|$)/i;
+    const match = content.match(sectionPattern);
 
-  if (match) {
-    let sectionBody = match[2];
-    sectionBody = sectionBody.replace(/None\.?\s*\n?/gi, '').replace(/None yet\.?\s*\n?/gi, '');
-    sectionBody = sectionBody.trimEnd() + '\n' + entry + '\n';
-    content = content.replace(sectionPattern, (_match, header) => `${header}${sectionBody}`);
-    writeStateMd(statePath, content, cwd);
+    if (match) {
+      let sectionBody = match[2];
+      sectionBody = sectionBody.replace(/None\.?\s*\n?/gi, '').replace(/None yet\.?\s*\n?/gi, '');
+      sectionBody = sectionBody.trimEnd() + '\n' + entry + '\n';
+      added = true;
+      return content.replace(sectionPattern, (_match, header) => `${header}${sectionBody}`);
+    }
+    return content;
+  }, cwd);
+
+  if (added) {
     output({ added: true, blocker: blockerText }, raw, 'true');
   } else {
     output({ added: false, reason: 'Blockers section not found in STATE.md' }, raw, 'false');
@@ -481,27 +532,33 @@ function cmdStateResolveBlocker(cwd, text, raw) {
   if (!fs.existsSync(statePath)) { output({ error: 'STATE.md not found' }, raw); return; }
   if (!text) { output({ error: 'text required' }, raw); return; }
 
-  let content = fs.readFileSync(statePath, 'utf-8');
+  let resolved = false;
 
-  const sectionPattern = /(###?\s*(?:Blockers|Blockers\/Concerns|Concerns)\s*\n)([\s\S]*?)(?=\n###?|\n##[^#]|$)/i;
-  const match = content.match(sectionPattern);
+  readModifyWriteStateMd(statePath, (content) => {
+    const sectionPattern = /(###?\s*(?:Blockers|Blockers\/Concerns|Concerns)\s*\n)([\s\S]*?)(?=\n###?|\n##[^#]|$)/i;
+    const match = content.match(sectionPattern);
 
-  if (match) {
-    const sectionBody = match[2];
-    const lines = sectionBody.split('\n');
-    const filtered = lines.filter(line => {
-      if (!line.startsWith('- ')) return true;
-      return !line.toLowerCase().includes(text.toLowerCase());
-    });
+    if (match) {
+      const sectionBody = match[2];
+      const lines = sectionBody.split('\n');
+      const filtered = lines.filter(line => {
+        if (!line.startsWith('- ')) return true;
+        return !line.toLowerCase().includes(text.toLowerCase());
+      });
 
-    let newBody = filtered.join('\n');
-    // If section is now empty, add placeholder
-    if (!newBody.trim() || !newBody.includes('- ')) {
-      newBody = 'None\n';
+      let newBody = filtered.join('\n');
+      // If section is now empty, add placeholder
+      if (!newBody.trim() || !newBody.includes('- ')) {
+        newBody = 'None\n';
+      }
+
+      resolved = true;
+      return content.replace(sectionPattern, (_match, header) => `${header}${newBody}`);
     }
+    return content;
+  }, cwd);
 
-    content = content.replace(sectionPattern, (_match, header) => `${header}${newBody}`);
-    writeStateMd(statePath, content, cwd);
+  if (resolved) {
     output({ resolved: true, blocker: text }, raw, 'true');
   } else {
     output({ resolved: false, reason: 'Blockers section not found in STATE.md' }, raw, 'false');
@@ -512,31 +569,33 @@ function cmdStateRecordSession(cwd, options, raw) {
   const statePath = planningPaths(cwd).state;
   if (!fs.existsSync(statePath)) { output({ error: 'STATE.md not found' }, raw); return; }
 
-  let content = fs.readFileSync(statePath, 'utf-8');
   const now = new Date().toISOString();
   const updated = [];
 
-  // Update Last session / Last Date
-  let result = stateReplaceField(content, 'Last session', now);
-  if (result) { content = result; updated.push('Last session'); }
-  result = stateReplaceField(content, 'Last Date', now);
-  if (result) { content = result; updated.push('Last Date'); }
+  readModifyWriteStateMd(statePath, (content) => {
+    // Update Last session / Last Date
+    let result = stateReplaceField(content, 'Last session', now);
+    if (result) { content = result; updated.push('Last session'); }
+    result = stateReplaceField(content, 'Last Date', now);
+    if (result) { content = result; updated.push('Last Date'); }
 
-  // Update Stopped at
-  if (options.stopped_at) {
-    result = stateReplaceField(content, 'Stopped At', options.stopped_at);
-    if (!result) result = stateReplaceField(content, 'Stopped at', options.stopped_at);
-    if (result) { content = result; updated.push('Stopped At'); }
-  }
+    // Update Stopped at
+    if (options.stopped_at) {
+      result = stateReplaceField(content, 'Stopped At', options.stopped_at);
+      if (!result) result = stateReplaceField(content, 'Stopped at', options.stopped_at);
+      if (result) { content = result; updated.push('Stopped At'); }
+    }
 
-  // Update Resume file
-  const resumeFile = options.resume_file || 'None';
-  result = stateReplaceField(content, 'Resume File', resumeFile);
-  if (!result) result = stateReplaceField(content, 'Resume file', resumeFile);
-  if (result) { content = result; updated.push('Resume File'); }
+    // Update Resume file
+    const resumeFile = options.resume_file || 'None';
+    result = stateReplaceField(content, 'Resume File', resumeFile);
+    if (!result) result = stateReplaceField(content, 'Resume file', resumeFile);
+    if (result) { content = result; updated.push('Resume File'); }
+
+    return content;
+  }, cwd);
 
   if (updated.length > 0) {
-    writeStateMd(statePath, content, cwd);
     output({ recorded: true, updated }, raw, 'true');
   } else {
     output({ recorded: false, reason: 'No session fields found in STATE.md' }, raw, 'false');
@@ -805,6 +864,9 @@ function acquireStateLock(statePath) {
       const fd = fs.openSync(lockPath, fs.constants.O_CREAT | fs.constants.O_EXCL | fs.constants.O_WRONLY);
       fs.writeSync(fd, String(process.pid));
       fs.closeSync(fd);
+      // Register for exit-time cleanup so process.exit(1) inside a locked region
+      // cannot leave a stale lock file (#1916).
+      _heldStateLocks.add(lockPath);
       return lockPath;
     } catch (err) {
       if (err.code === 'EEXIST') {
@@ -821,8 +883,7 @@ function acquireStateLock(statePath) {
           return lockPath;
         }
         const jitter = Math.floor(Math.random() * 50);
-        const start = Date.now();
-        while (Date.now() - start < retryDelay + jitter) { /* busy wait */ }
+        Atomics.wait(new Int32Array(new SharedArrayBuffer(4)), 0, 0, retryDelay + jitter);
         continue;
       }
       return lockPath; // non-EEXIST error — proceed without lock
@@ -832,6 +893,7 @@ function acquireStateLock(statePath) {
 }
 
 function releaseStateLock(lockPath) {
+  _heldStateLocks.delete(lockPath);
   try { fs.unlinkSync(lockPath); } catch { /* lock already gone */ }
 }
 
@@ -913,96 +975,95 @@ function cmdStateBeginPhase(cwd, phaseNumber, phaseName, planCount, raw) {
     return;
   }
 
-  let content = fs.readFileSync(statePath, 'utf-8');
   const today = new Date().toISOString().split('T')[0];
   const updated = [];
 
-  // Update Status field
-  const statusValue = `Executing Phase ${phaseNumber}`;
-  let result = stateReplaceField(content, 'Status', statusValue);
-  if (result) { content = result; updated.push('Status'); }
+  readModifyWriteStateMd(statePath, (content) => {
+    // Update Status field
+    const statusValue = `Executing Phase ${phaseNumber}`;
+    let result = stateReplaceField(content, 'Status', statusValue);
+    if (result) { content = result; updated.push('Status'); }
 
-  // Update Last Activity
-  result = stateReplaceField(content, 'Last Activity', today);
-  if (result) { content = result; updated.push('Last Activity'); }
+    // Update Last Activity
+    result = stateReplaceField(content, 'Last Activity', today);
+    if (result) { content = result; updated.push('Last Activity'); }
 
-  // Update Last Activity Description if it exists
-  const activityDesc = `Phase ${phaseNumber} execution started`;
-  result = stateReplaceField(content, 'Last Activity Description', activityDesc);
-  if (result) { content = result; updated.push('Last Activity Description'); }
+    // Update Last Activity Description if it exists
+    const activityDesc = `Phase ${phaseNumber} execution started`;
+    result = stateReplaceField(content, 'Last Activity Description', activityDesc);
+    if (result) { content = result; updated.push('Last Activity Description'); }
 
-  // Update Current Phase
-  result = stateReplaceField(content, 'Current Phase', String(phaseNumber));
-  if (result) { content = result; updated.push('Current Phase'); }
+    // Update Current Phase
+    result = stateReplaceField(content, 'Current Phase', String(phaseNumber));
+    if (result) { content = result; updated.push('Current Phase'); }
 
-  // Update Current Phase Name
-  if (phaseName) {
-    result = stateReplaceField(content, 'Current Phase Name', phaseName);
-    if (result) { content = result; updated.push('Current Phase Name'); }
-  }
-
-  // Update Current Plan to 1 (starting from the first plan)
-  result = stateReplaceField(content, 'Current Plan', '1');
-  if (result) { content = result; updated.push('Current Plan'); }
-
-  // Update Total Plans in Phase
-  if (planCount) {
-    result = stateReplaceField(content, 'Total Plans in Phase', String(planCount));
-    if (result) { content = result; updated.push('Total Plans in Phase'); }
-  }
-
-  // Update **Current focus:** body text line (#1104)
-  const focusLabel = phaseName ? `Phase ${phaseNumber} — ${phaseName}` : `Phase ${phaseNumber}`;
-  const focusPattern = /(\*\*Current focus:\*\*\s*).*/i;
-  if (focusPattern.test(content)) {
-    content = content.replace(focusPattern, (_match, prefix) => `${prefix}${focusLabel}`);
-    updated.push('Current focus');
-  }
-
-  // Update ## Current Position section (#1104, #1365)
-  // Update individual fields within Current Position instead of replacing the
-  // entire section, so that Status, Last activity, and Progress are preserved.
-  const positionPattern = /(##\s*Current Position\s*\n)([\s\S]*?)(?=\n##|$)/i;
-  const positionMatch = content.match(positionPattern);
-  if (positionMatch) {
-    const header = positionMatch[1];
-    let posBody = positionMatch[2];
-
-    // Update or insert Phase line
-    const newPhase = `Phase: ${phaseNumber}${phaseName ? ` (${phaseName})` : ''} — EXECUTING`;
-    if (/^Phase:/m.test(posBody)) {
-      posBody = posBody.replace(/^Phase:.*$/m, newPhase);
-    } else {
-      posBody = newPhase + '\n' + posBody;
+    // Update Current Phase Name
+    if (phaseName) {
+      result = stateReplaceField(content, 'Current Phase Name', phaseName);
+      if (result) { content = result; updated.push('Current Phase Name'); }
     }
 
-    // Update or insert Plan line
-    const newPlan = `Plan: 1 of ${planCount || '?'}`;
-    if (/^Plan:/m.test(posBody)) {
-      posBody = posBody.replace(/^Plan:.*$/m, newPlan);
-    } else {
-      posBody = posBody.replace(/^(Phase:.*$)/m, `$1\n${newPlan}`);
+    // Update Current Plan to 1 (starting from the first plan)
+    result = stateReplaceField(content, 'Current Plan', '1');
+    if (result) { content = result; updated.push('Current Plan'); }
+
+    // Update Total Plans in Phase
+    if (planCount) {
+      result = stateReplaceField(content, 'Total Plans in Phase', String(planCount));
+      if (result) { content = result; updated.push('Total Plans in Phase'); }
     }
 
-    // Update Status line if present
-    const newStatus = `Status: Executing Phase ${phaseNumber}`;
-    if (/^Status:/m.test(posBody)) {
-      posBody = posBody.replace(/^Status:.*$/m, newStatus);
+    // Update **Current focus:** body text line (#1104)
+    const focusLabel = phaseName ? `Phase ${phaseNumber} — ${phaseName}` : `Phase ${phaseNumber}`;
+    const focusPattern = /(\*\*Current focus:\*\*\s*).*/i;
+    if (focusPattern.test(content)) {
+      content = content.replace(focusPattern, (_match, prefix) => `${prefix}${focusLabel}`);
+      updated.push('Current focus');
     }
 
-    // Update Last activity line if present
-    const newActivity = `Last activity: ${today} -- Phase ${phaseNumber} execution started`;
-    if (/^Last activity:/im.test(posBody)) {
-      posBody = posBody.replace(/^Last activity:.*$/im, newActivity);
+    // Update ## Current Position section (#1104, #1365)
+    // Update individual fields within Current Position instead of replacing the
+    // entire section, so that Status, Last activity, and Progress are preserved.
+    const positionPattern = /(##\s*Current Position\s*\n)([\s\S]*?)(?=\n##|$)/i;
+    const positionMatch = content.match(positionPattern);
+    if (positionMatch) {
+      const header = positionMatch[1];
+      let posBody = positionMatch[2];
+
+      // Update or insert Phase line
+      const newPhase = `Phase: ${phaseNumber}${phaseName ? ` (${phaseName})` : ''} — EXECUTING`;
+      if (/^Phase:/m.test(posBody)) {
+        posBody = posBody.replace(/^Phase:.*$/m, newPhase);
+      } else {
+        posBody = newPhase + '\n' + posBody;
+      }
+
+      // Update or insert Plan line
+      const newPlan = `Plan: 1 of ${planCount || '?'}`;
+      if (/^Plan:/m.test(posBody)) {
+        posBody = posBody.replace(/^Plan:.*$/m, newPlan);
+      } else {
+        posBody = posBody.replace(/^(Phase:.*$)/m, `$1\n${newPlan}`);
+      }
+
+      // Update Status line if present
+      const newStatus = `Status: Executing Phase ${phaseNumber}`;
+      if (/^Status:/m.test(posBody)) {
+        posBody = posBody.replace(/^Status:.*$/m, newStatus);
+      }
+
+      // Update Last activity line if present
+      const newActivity = `Last activity: ${today} -- Phase ${phaseNumber} execution started`;
+      if (/^Last activity:/im.test(posBody)) {
+        posBody = posBody.replace(/^Last activity:.*$/im, newActivity);
+      }
+
+      content = content.replace(positionPattern, `${header}${posBody}`);
+      updated.push('Current Position');
     }
 
-    content = content.replace(positionPattern, `${header}${posBody}`);
-    updated.push('Current Position');
-  }
-
-  if (updated.length > 0) {
-    writeStateMd(statePath, content, cwd);
-  }
+    return content;
+  }, cwd);
 
   output({ updated, phase: phaseNumber, phase_name: phaseName || null, plan_count: planCount || null }, raw, updated.length > 0 ? 'true' : 'false');
 }

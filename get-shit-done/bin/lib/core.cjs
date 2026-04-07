@@ -27,6 +27,16 @@ const WORKSTREAM_SESSION_ENV_KEYS = [
 let cachedControllingTtyToken = null;
 let didProbeControllingTtyToken = false;
 
+// Track all .planning/.lock files held by this process so they can be removed
+// on exit. process.on('exit') fires even on process.exit(1), unlike try/finally
+// which is skipped when error() calls process.exit(1) inside a locked region (#1916).
+const _heldPlanningLocks = new Set();
+process.on('exit', () => {
+  for (const lockPath of _heldPlanningLocks) {
+    try { fs.unlinkSync(lockPath); } catch { /* already gone */ }
+  }
+});
+
 // ─── Path helpers ────────────────────────────────────────────────────────────
 
 /** Normalize a relative path to always use forward slashes (cross-platform). */
@@ -604,10 +614,15 @@ function withPlanningLock(cwd, fn) {
         acquired: new Date().toISOString(),
       }), { flag: 'wx' });
 
+      // Register for exit-time cleanup so process.exit(1) inside a locked region
+      // cannot leave a stale lock file (#1916).
+      _heldPlanningLocks.add(lockPath);
+
       // Lock acquired — run the function
       try {
         return fn();
       } finally {
+        _heldPlanningLocks.delete(lockPath);
         try { fs.unlinkSync(lockPath); } catch { /* already released */ }
       }
     } catch (err) {
