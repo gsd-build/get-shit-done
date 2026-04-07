@@ -72,7 +72,7 @@ Update AI-SPEC.md at `ai_spec_path`:
 <step name="write_section_4b">
 Add **Section 4b — AI Systems Best Practices** to AI-SPEC.md. Always included, independent of framework choice.
 
-**4b.1 Structured Outputs with Pydantic** — Define output contract as a Pydantic model; LLM must validate or retry. Write for this specific `framework` + `system_type`:
+**4b.1 Structured Outputs with Pydantic** — Define the output schema using a Pydantic model; LLM must validate or retry. Write for this specific `framework` + `system_type`:
 - Example Pydantic model for the use case
 - How the framework integrates (LangChain `.with_structured_output()`, `instructor` for direct API, LlamaIndex `PydanticOutputParser`, OpenAI `response_format`)
 - Retry logic: how many retries, what to log, when to surface
