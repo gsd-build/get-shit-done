@@ -66,6 +66,7 @@ function isTestInput(filePath, line) {
     'tests/copilot-install.test.cjs',
     'tests/codex-config.test.cjs',
     'tests/trae-install.test.cjs',
+    'tests/codebuddy-install.test.cjs',
   ];
 
   if (conversionTestFiles.includes(rel)) {
