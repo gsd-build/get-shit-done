@@ -210,7 +210,8 @@ cat .planning/phases/XX-current/*-SUMMARY.md
 
 4. **Decisions to log?**
    - Extract decisions from SUMMARY.md files
-   - Add to Key Decisions table with outcome if known
+   - Cross-reference this phase's CONTEXT.md and DISCUSSION-LOG.md for rejected alternatives
+   - Add to Key Decisions table with all columns: Decision | Alternatives Considered | Rationale | Outcome
 
 5. **"What This Is" still accurate?**
    - If the product has meaningfully changed, update the description

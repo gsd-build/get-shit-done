@@ -339,9 +339,9 @@ Initialize with any decisions made during questioning:
 ```markdown
 ## Key Decisions
 
-| Decision | Rationale | Outcome |
-|----------|-----------|---------|
-| [Choice from questioning] | [Why] | — Pending |
+| Decision | Alternatives Considered | Rationale | Outcome |
+|----------|------------------------|-----------|---------|
+| [Choice from questioning] | [What else was evaluated] | [Why this one won] | — Pending |
 ```
 
 **Last updated footer:**

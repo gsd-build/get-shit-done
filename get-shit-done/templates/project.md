@@ -59,9 +59,9 @@ Common types: Tech stack, Timeline, Budget, Dependencies, Compatibility, Perform
 
 <!-- Decisions that constrain future work. Add throughout project lifecycle. -->
 
-| Decision | Rationale | Outcome |
-|----------|-----------|---------|
-| [Choice] | [Why] | [✓ Good / ⚠️ Revisit / — Pending] |
+| Decision | Alternatives Considered | Rationale | Outcome |
+|----------|------------------------|-----------|---------|
+| [Choice] | [What else was evaluated] | [Why this one won] | [✓ Good / ⚠️ Revisit / — Pending] |
 
 ---
 *Last updated: [date] after [trigger]*
@@ -112,6 +112,7 @@ Common types: Tech stack, Timeline, Budget, Dependencies, Compatibility, Perform
 **Key Decisions:**
 - Significant choices that affect future work
 - Add decisions as they're made throughout the project
+- **Alternatives Considered** — record what else was evaluated and why it lost. This is critical for cross-milestone recall: future phases need to know not just what was chosen, but what was rejected and why, to avoid re-litigating settled decisions
 - Track outcome when known:
   - ✓ Good — decision proved correct
   - ⚠️ Revisit — decision may need reconsideration

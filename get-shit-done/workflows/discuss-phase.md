@@ -222,7 +222,7 @@ cat .planning/STATE.md 2>/dev/null || true
 ```
 
 Extract from these:
-- **PROJECT.md** — Vision, principles, non-negotiables, user preferences
+- **PROJECT.md** — Vision, principles, non-negotiables, user preferences, **and the Key Decisions table (includes alternatives considered and rationale — this is the primary source for cross-milestone decision recall)**
 - **REQUIREMENTS.md** — Acceptance criteria, constraints, must-haves vs nice-to-haves
 - **STATE.md** — Current progress, any flags or session notes
 
@@ -246,7 +246,11 @@ Structure the extracted information:
 - [Key principle or constraint from PROJECT.md]
 - [Requirement that affects this phase from REQUIREMENTS.md]
 
-## From Prior Phases
+## Cross-Milestone Decisions (from PROJECT.md Key Decisions table)
+- [Decision] — chose [X] over [alternatives] because [rationale] ([outcome])
+- [Decision] — chose [X] over [alternatives] because [rationale] ([outcome])
+
+## From Prior Phases (current milestone)
 ### Phase N: [Name]
 - [Decision that may be relevant to current phase]
 - [Preference that establishes a pattern]
@@ -364,7 +368,8 @@ Analyze the phase to identify gray areas worth discussing. **Use both `prior_dec
    This list is MANDATORY in CONTEXT.md. Every ref must have a full relative path so downstream agents can read it directly. If no external docs exist, note that explicitly.
 
 2. **Check prior decisions** — Before generating gray areas, check if any were already decided:
-   - Scan `<prior_decisions>` for relevant choices (e.g., "Ctrl+C only, no single-key shortcuts")
+   - Scan `<prior_decisions>` for relevant choices — both from prior phases (current milestone) AND cross-milestone decisions from PROJECT.md's Key Decisions table
+   - Cross-milestone decisions include rejected alternatives — use these to avoid re-litigating settled choices (e.g., if Whisper was chosen over Deepgram for transcription, don't surface "which transcription service?" as a gray area)
    - These are **pre-answered** — don't re-ask unless this phase has conflicting needs
    - Note applicable prior decisions for use in presentation
 

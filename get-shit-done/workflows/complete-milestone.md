@@ -225,8 +225,15 @@ cat .planning/phases/*-*/*-SUMMARY.md
 
 5. **Key Decisions audit:**
    - Extract all decisions from milestone phase summaries
-   - Add to Key Decisions table with outcomes
-   - Mark ✓ Good, ⚠️ Revisit, or — Pending
+   - **Cross-reference CONTEXT.md and DISCUSSION-LOG.md files** from each phase to capture rejected alternatives and rationale:
+     ```bash
+     # Find all CONTEXT.md and DISCUSSION-LOG.md files for this milestone's phases
+     find .planning/phases -name "*-CONTEXT.md" -o -name "*-DISCUSSION-LOG.md" 2>/dev/null | sort
+     ```
+   - For each decision, extract: what was chosen, what alternatives were considered, and why they were rejected
+   - Add to Key Decisions table with all four columns: Decision | Alternatives Considered | Rationale | Outcome
+   - Mark outcome: ✓ Good, ⚠️ Revisit, or — Pending
+   - Example row: `| Whisper for transcription | Deepgram, AssemblyAI | Only model with timestamp_granularities support | ✓ Good |`
 
 6. **Constraints check:**
    - Any constraints changed during development? Update as needed
