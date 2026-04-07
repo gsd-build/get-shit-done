@@ -142,17 +142,17 @@ Write to a temp file: `/tmp/gsd-review-prompt-{phase}.md`
 Read model preferences from planning config. Null/missing values fall back to CLI defaults.
 
 ```bash
-GEMINI_MODEL=$(node "$HOME/.claude/get-shit-done/bin/gsd-tools.cjs" config-get review.models.gemini --raw 2>/dev/null)
-CLAUDE_MODEL=$(node "$HOME/.claude/get-shit-done/bin/gsd-tools.cjs" config-get review.models.claude --raw 2>/dev/null)
-CODEX_MODEL=$(node "$HOME/.claude/get-shit-done/bin/gsd-tools.cjs" config-get review.models.codex --raw 2>/dev/null)
-OPENCODE_MODEL=$(node "$HOME/.claude/get-shit-done/bin/gsd-tools.cjs" config-get review.models.opencode --raw 2>/dev/null)
+GEMINI_MODEL=$(node "$HOME/.claude/get-shit-done/bin/gsd-tools.cjs" config-get review.models.gemini --raw 2>/dev/null || true)
+CLAUDE_MODEL=$(node "$HOME/.claude/get-shit-done/bin/gsd-tools.cjs" config-get review.models.claude --raw 2>/dev/null || true)
+CODEX_MODEL=$(node "$HOME/.claude/get-shit-done/bin/gsd-tools.cjs" config-get review.models.codex --raw 2>/dev/null || true)
+OPENCODE_MODEL=$(node "$HOME/.claude/get-shit-done/bin/gsd-tools.cjs" config-get review.models.opencode --raw 2>/dev/null || true)
 ```
 
 For each selected CLI, invoke in sequence (not parallel — avoid rate limits):
 
 **Gemini:**
 ```bash
-if [ -n "$GEMINI_MODEL" ]; then
+if [ -n "$GEMINI_MODEL" ] && [ "$GEMINI_MODEL" != "null" ]; then
   gemini -m "$GEMINI_MODEL" -p "$(cat /tmp/gsd-review-prompt-{phase}.md)" 2>/dev/null > /tmp/gsd-review-gemini-{phase}.md
 else
   gemini -p "$(cat /tmp/gsd-review-prompt-{phase}.md)" 2>/dev/null > /tmp/gsd-review-gemini-{phase}.md
@@ -161,7 +161,7 @@ fi
 
 **Claude (separate session):**
 ```bash
-if [ -n "$CLAUDE_MODEL" ]; then
+if [ -n "$CLAUDE_MODEL" ] && [ "$CLAUDE_MODEL" != "null" ]; then
   claude --model "$CLAUDE_MODEL" -p "$(cat /tmp/gsd-review-prompt-{phase}.md)" 2>/dev/null > /tmp/gsd-review-claude-{phase}.md
 else
   claude -p "$(cat /tmp/gsd-review-prompt-{phase}.md)" 2>/dev/null > /tmp/gsd-review-claude-{phase}.md
@@ -170,7 +170,7 @@ fi
 
 **Codex:**
 ```bash
-if [ -n "$CODEX_MODEL" ]; then
+if [ -n "$CODEX_MODEL" ] && [ "$CODEX_MODEL" != "null" ]; then
   codex exec --model "$CODEX_MODEL" --skip-git-repo-check "$(cat /tmp/gsd-review-prompt-{phase}.md)" 2>/dev/null > /tmp/gsd-review-codex-{phase}.md
 else
   codex exec --skip-git-repo-check "$(cat /tmp/gsd-review-prompt-{phase}.md)" 2>/dev/null > /tmp/gsd-review-codex-{phase}.md
@@ -187,7 +187,7 @@ coderabbit review --prompt-only 2>/dev/null > /tmp/gsd-review-coderabbit-{phase}
 
 **OpenCode (via GitHub Copilot):**
 ```bash
-if [ -n "$OPENCODE_MODEL" ]; then
+if [ -n "$OPENCODE_MODEL" ] && [ "$OPENCODE_MODEL" != "null" ]; then
   cat /tmp/gsd-review-prompt-{phase}.md | opencode run --model "$OPENCODE_MODEL" - 2>/dev/null > /tmp/gsd-review-opencode-{phase}.md
 else
   cat /tmp/gsd-review-prompt-{phase}.md | opencode run - 2>/dev/null > /tmp/gsd-review-opencode-{phase}.md
