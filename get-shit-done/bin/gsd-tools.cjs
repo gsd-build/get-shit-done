@@ -366,7 +366,27 @@ async function main() {
     return;
   }
 
-  await runCommand(command, args, cwd, raw, defaultValue);
+  // Intercept stdout to transparently resolve @file: references (#1891).
+  // core.cjs output() writes @file:<path> when JSON > 50KB. The --pick path
+  // already resolves this, but the normal path wrote @file: to stdout, forcing
+  // every workflow to have a bash-specific `if [[ "$INIT" == @file:* ]]` check
+  // that breaks on PowerShell and other non-bash shells.
+  const origWriteSync2 = fs.writeSync;
+  const outChunks = [];
+  fs.writeSync = function (fd, data, ...rest) {
+    if (fd === 1) { outChunks.push(String(data)); return; }
+    return origWriteSync2.call(fs, fd, data, ...rest);
+  };
+  try {
+    await runCommand(command, args, cwd, raw, defaultValue);
+  } finally {
+    fs.writeSync = origWriteSync2;
+  }
+  let captured = outChunks.join('');
+  if (captured.startsWith('@file:')) {
+    captured = fs.readFileSync(captured.slice(6), 'utf-8');
+  }
+  origWriteSync2.call(fs, 1, captured);
 }
 
 /**
