@@ -1427,5 +1427,86 @@ describe('#2192: init plan-phase includes auto-advance config to prevent separat
 });
 
 // ─────────────────────────────────────────────────────────────────────────────
+// withProjectRoot: project identity injection (#1948)
+// ─────────────────────────────────────────────────────────────────────────────
+
+describe('withProjectRoot project identity', () => {
+  let tmpDir;
+
+  beforeEach(() => {
+    tmpDir = createTempProject();
+  });
+
+  afterEach(() => {
+    cleanup(tmpDir);
+  });
+
+  test('injects project_code when config.project_code is set', () => {
+    fs.writeFileSync(
+      path.join(tmpDir, '.planning', 'config.json'),
+      JSON.stringify({ project_code: 'CK' })
+    );
+
+    const result = runGsdTools(['init', 'quick', 'test task'], tmpDir, { HOME: tmpDir });
+    assert.ok(result.success, `Command failed: ${result.error}`);
+
+    const output = JSON.parse(result.output);
+    assert.strictEqual(output.project_code, 'CK');
+  });
+
+  test('injects project_title extracted from PROJECT.md H1', () => {
+    fs.writeFileSync(
+      path.join(tmpDir, '.planning', 'config.json'),
+      JSON.stringify({ project_code: 'CK' })
+    );
+    fs.writeFileSync(
+      path.join(tmpDir, '.planning', 'PROJECT.md'),
+      '# CareKit\n\nA care management platform.\n'
+    );
+
+    const result = runGsdTools(['init', 'quick', 'test task'], tmpDir, { HOME: tmpDir });
+    assert.ok(result.success, `Command failed: ${result.error}`);
+
+    const output = JSON.parse(result.output);
+    assert.strictEqual(output.project_title, 'CareKit');
+  });
+
+  test('omits project_code and project_title when project_code is not set', () => {
+    fs.writeFileSync(
+      path.join(tmpDir, '.planning', 'config.json'),
+      JSON.stringify({})
+    );
+
+    const result = runGsdTools(['init', 'quick', 'test task'], tmpDir, { HOME: tmpDir });
+    assert.ok(result.success, `Command failed: ${result.error}`);
+
+    const output = JSON.parse(result.output);
+    assert.strictEqual(output.project_code, undefined,
+      'project_code should not be present when not configured');
+    // project_title may or may not be present depending on PROJECT.md existence,
+    // but without project_code the workflow omits the identity suffix entirely
+  });
+
+  test('omits project_title when PROJECT.md does not exist', () => {
+    fs.writeFileSync(
+      path.join(tmpDir, '.planning', 'config.json'),
+      JSON.stringify({ project_code: 'CK' })
+    );
+    // Ensure no PROJECT.md exists (createTempProject doesn't create one)
+    const projectMdPath = path.join(tmpDir, '.planning', 'PROJECT.md');
+    if (fs.existsSync(projectMdPath)) fs.unlinkSync(projectMdPath);
+
+    const result = runGsdTools(['init', 'quick', 'test task'], tmpDir, { HOME: tmpDir });
+    assert.ok(result.success, `Command failed: ${result.error}`);
+
+    const output = JSON.parse(result.output);
+    assert.strictEqual(output.project_code, 'CK',
+      'project_code should still be present');
+    assert.strictEqual(output.project_title, undefined,
+      'project_title should not be present when PROJECT.md is missing');
+  });
+});
+
+// ─────────────────────────────────────────────────────────────────────────────
 // roadmap analyze command
 // ─────────────────────────────────────────────────────────────────────────────
