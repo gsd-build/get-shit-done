@@ -7,7 +7,7 @@ Standard format for presenting next steps after completing a command or workflow
 ```
 ---
 
-## ▶ Next Up — [{PROJECT_CODE}] {PROJECT_TITLE}
+## ▶ Next Up — [${PROJECT_CODE}] ${PROJECT_TITLE}
 
 **{identifier}: {name}** — {one-line description}
 
