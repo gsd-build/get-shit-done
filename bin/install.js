@@ -1477,16 +1477,29 @@ function convertClaudeAgentToTraeAgent(content) {
 }
 
 function convertSlashCommandsToCodexSkillMentions(content) {
+  // Convert colon-style skill invocations to Codex $ prefix
   let converted = content.replace(/\/gsd:([a-z0-9-]+)/gi, (_, commandName) => {
     return `$gsd-${String(commandName).toLowerCase()}`;
   });
-  converted = converted.replace(/\/gsd-help\b/g, '$gsd-help');
+  // Convert hyphen-style command references (workflow output) to Codex $ prefix.
+  // Negative lookbehind excludes file paths like bin/gsd-tools.cjs where
+  // the slash is preceded by a word char, dot, or another slash.
+  converted = converted.replace(/(?<![a-zA-Z0-9./])\/gsd-([a-z0-9-]+)/gi, (_, commandName) => {
+    return `$gsd-${String(commandName).toLowerCase()}`;
+  });
   return converted;
 }
 
 function convertClaudeToCodexMarkdown(content) {
   let converted = convertSlashCommandsToCodexSkillMentions(content);
   converted = converted.replace(/\$ARGUMENTS\b/g, '{{GSD_ARGS}}');
+  // Remove /clear references — Codex has no equivalent command
+  // Handle backtick-wrapped: `\/clear` then: → (removed)
+  converted = converted.replace(/`\/clear`\s*,?\s*then:?\s*\n?/gi, '');
+  // Handle bare: /clear then: → (removed)
+  converted = converted.replace(/\/clear\s*,?\s*then:?\s*\n?/gi, '');
+  // Handle standalone /clear on its own line
+  converted = converted.replace(/^\s*`?\/clear`?\s*$/gm, '');
   // Path replacement: .claude → .codex (#1430)
   converted = converted.replace(/\$HOME\/\.claude\//g, '$HOME/.codex/');
   converted = converted.replace(/~\/\.claude\//g, '~/.codex/');
