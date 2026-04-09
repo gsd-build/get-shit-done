@@ -11,15 +11,15 @@ Read all files referenced by the invoking prompt's execution_context before star
 <step name="parse_arguments">
 Parse the command arguments:
 - All arguments become the phase description
-- Example: `/gsd:add-phase Add authentication` → description = "Add authentication"
-- Example: `/gsd:add-phase Fix critical performance issues` → description = "Fix critical performance issues"
+- Example: `/gsd-add-phase Add authentication` → description = "Add authentication"
+- Example: `/gsd-add-phase Fix critical performance issues` → description = "Fix critical performance issues"
 
 If no arguments provided:
 
 ```
 ERROR: Phase description required
-Usage: /gsd:add-phase <description>
-Example: /gsd:add-phase Add authentication system
+Usage: /gsd-add-phase <description>
+Example: /gsd-add-phase Add authentication system
 ```
 
 Exit.
@@ -29,13 +29,14 @@ Exit.
 Load phase operation context:
 
 ```bash
-INIT=$(node ~/.claude/get-shit-done/bin/gsd-tools.cjs init phase-op "0")
+INIT=$(node "$HOME/.claude/get-shit-done/bin/gsd-tools.cjs" init phase-op "0")
+if [[ "$INIT" == @file:* ]]; then INIT=$(cat "${INIT#@file:}"); fi
 ```
 
 Check `roadmap_exists` from init JSON. If false:
 ```
 ERROR: No roadmap found (.planning/ROADMAP.md)
-Run /gsd:new-project to initialize.
+Run /gsd-new-project to initialize.
 ```
 Exit.
 </step>
@@ -44,7 +45,7 @@ Exit.
 **Delegate the phase addition to gsd-tools:**
 
 ```bash
-RESULT=$(node ~/.claude/get-shit-done/bin/gsd-tools.cjs phase add "${description}")
+RESULT=$(node "$HOME/.claude/get-shit-done/bin/gsd-tools.cjs" phase add "${description}")
 ```
 
 The CLI handles:
@@ -86,14 +87,14 @@ Roadmap updated: .planning/ROADMAP.md
 
 **Phase {N}: {description}**
 
-`/gsd:plan-phase {N}`
+`/clear` then:
 
-<sub>`/clear` first → fresh context window</sub>
+`/gsd-plan-phase {N}`
 
 ---
 
 **Also available:**
-- `/gsd:add-phase <description>` — add another phase
+- `/gsd-add-phase <description>` — add another phase
 - Review roadmap
 
 ---

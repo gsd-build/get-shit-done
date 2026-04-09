@@ -1,0 +1,229 @@
+name: Hotfix Release
+
+on:
+  workflow_dispatch:
+    inputs:
+      action:
+        description: 'Action to perform'
+        required: true
+        type: choice
+        options:
+          - create
+          - finalize
+      version:
+        description: 'Patch version (e.g., 1.27.1)'
+        required: true
+        type: string
+      dry_run:
+        description: 'Dry run (skip npm publish, tagging, and push)'
+        required: false
+        type: boolean
+        default: false
+
+concurrency:
+  group: hotfix-${{ inputs.version }}
+  cancel-in-progress: false
+
+env:
+  NODE_VERSION: 24
+
+jobs:
+  validate-version:
+    runs-on: ubuntu-latest
+    timeout-minutes: 2
+    permissions:
+      contents: read
+    outputs:
+      base_tag: ${{ steps.validate.outputs.base_tag }}
+      branch: ${{ steps.validate.outputs.branch }}
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+        with:
+          fetch-depth: 0
+
+      - name: Validate version format
+        id: validate
+        env:
+          VERSION: ${{ inputs.version }}
+        run: |
+          # Must be X.Y.Z where Z > 0 (patch release)
+          if ! echo "$VERSION" | grep -qE '^[0-9]+\.[0-9]+\.[1-9][0-9]*$'; then
+            echo "::error::Version must be a patch release (e.g., 1.27.1, not 1.28.0)"
+            exit 1
+          fi
+          MAJOR_MINOR=$(echo "$VERSION" | cut -d. -f1-2)
+          TARGET_TAG="v${VERSION}"
+          BRANCH="hotfix/${VERSION}"
+          BASE_TAG=$(git tag -l "v${MAJOR_MINOR}.*" \
+            | grep -E "^v[0-9]+\.[0-9]+\.[0-9]+$" \
+            | sort -V \
+            | awk -v target="$TARGET_TAG" '$1 < target { last=$1 } END { if (last != "") print last }')
+          if [ -z "$BASE_TAG" ]; then
+            echo "::error::No prior stable tag found for ${MAJOR_MINOR}.x before $TARGET_TAG"
+            exit 1
+          fi
+          echo "base_tag=$BASE_TAG" >> "$GITHUB_OUTPUT"
+          echo "branch=$BRANCH" >> "$GITHUB_OUTPUT"
+
+  create:
+    needs: validate-version
+    if: inputs.action == 'create'
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+        with:
+          fetch-depth: 0
+
+      - uses: actions/setup-node@39370e3970a6d050c480ffad4ff0ed4d3fdee5af # v4.1.0
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+
+      - name: Check branch doesn't already exist
+        env:
+          BRANCH: ${{ needs.validate-version.outputs.branch }}
+        run: |
+          if git ls-remote --exit-code origin "refs/heads/$BRANCH" >/dev/null 2>&1; then
+            echo "::error::Branch $BRANCH already exists. Delete it first or use finalize."
+            exit 1
+          fi
+
+      - name: Configure git identity
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+
+      - name: Create hotfix branch
+        if: inputs.dry_run != 'true'
+        env:
+          BRANCH: ${{ needs.validate-version.outputs.branch }}
+          BASE_TAG: ${{ needs.validate-version.outputs.base_tag }}
+          VERSION: ${{ inputs.version }}
+        run: |
+          git checkout -b "$BRANCH" "$BASE_TAG"
+          # Bump version in package.json
+          npm version "$VERSION" --no-git-tag-version
+          git add package.json package-lock.json
+          git commit -m "chore: bump version to $VERSION for hotfix"
+          git push origin "$BRANCH"
+          echo "## Hotfix branch created" >> "$GITHUB_STEP_SUMMARY"
+          echo "- Branch: \`$BRANCH\`" >> "$GITHUB_STEP_SUMMARY"
+          echo "- Based on: \`$BASE_TAG\`" >> "$GITHUB_STEP_SUMMARY"
+          echo "- Apply your fix, push, then run this workflow again with \`finalize\`" >> "$GITHUB_STEP_SUMMARY"
+
+  finalize:
+    needs: validate-version
+    if: inputs.action == 'finalize'
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    permissions:
+      contents: write
+      pull-requests: write
+      id-token: write
+    environment: npm-publish
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+        with:
+          ref: ${{ needs.validate-version.outputs.branch }}
+          fetch-depth: 0
+
+      - uses: actions/setup-node@39370e3970a6d050c480ffad4ff0ed4d3fdee5af # v4.1.0
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          registry-url: 'https://registry.npmjs.org'
+          cache: 'npm'
+
+      - name: Configure git identity
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+
+      - name: Install and test
+        run: |
+          npm ci
+          npm run test:coverage
+
+      - name: Create PR to merge hotfix back to main
+        if: ${{ !inputs.dry_run }}
+        env:
+          GH_TOKEN: ${{ github.token }}
+          BRANCH: ${{ needs.validate-version.outputs.branch }}
+          VERSION: ${{ inputs.version }}
+        run: |
+          EXISTING_PR=$(gh pr list --base main --head "$BRANCH" --state open --json number --jq '.[0].number')
+          if [ -n "$EXISTING_PR" ]; then
+            echo "PR #$EXISTING_PR already exists; updating"
+            gh pr edit "$EXISTING_PR" \
+              --title "chore: merge hotfix v${VERSION} back to main" \
+              --body "Merge hotfix changes back to main after v${VERSION} release."
+          else
+            gh pr create \
+              --base main \
+              --head "$BRANCH" \
+              --title "chore: merge hotfix v${VERSION} back to main" \
+              --body "Merge hotfix changes back to main after v${VERSION} release."
+          fi
+
+      - name: Tag and push
+        if: ${{ !inputs.dry_run }}
+        env:
+          VERSION: ${{ inputs.version }}
+        run: |
+          if git rev-parse -q --verify "refs/tags/v${VERSION}" >/dev/null; then
+            EXISTING_SHA=$(git rev-parse "refs/tags/v${VERSION}")
+            HEAD_SHA=$(git rev-parse HEAD)
+            if [ "$EXISTING_SHA" != "$HEAD_SHA" ]; then
+              echo "::error::Tag v${VERSION} already exists pointing to different commit"
+              exit 1
+            fi
+            echo "Tag v${VERSION} already exists on current commit; skipping"
+          else
+            git tag "v${VERSION}"
+            git push origin "v${VERSION}"
+          fi
+
+      - name: Publish to npm (latest)
+        if: ${{ !inputs.dry_run }}
+        run: npm publish --provenance --access public
+        env:
+          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
+
+      - name: Clean up next dist-tag
+        if: ${{ !inputs.dry_run }}
+        env:
+          VERSION: ${{ inputs.version }}
+          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
+        run: |
+          # Point next to the stable release so @next never returns something
+          # older than @latest. This prevents stale pre-release installs.
+          npm dist-tag add "get-shit-done-cc@${VERSION}" next 2>/dev/null || true
+          echo "✓ next dist-tag updated to v${VERSION}"
+
+      - name: Verify publish
+        if: ${{ !inputs.dry_run }}
+        env:
+          VERSION: ${{ inputs.version }}
+        run: |
+          sleep 10
+          PUBLISHED=$(npm view get-shit-done-cc@"$VERSION" version 2>/dev/null || echo "NOT_FOUND")
+          if [ "$PUBLISHED" != "$VERSION" ]; then
+            echo "::error::Published version verification failed. Expected $VERSION, got $PUBLISHED"
+            exit 1
+          fi
+          echo "✓ Verified: get-shit-done-cc@$VERSION is live on npm"
+
+      - name: Summary
+        env:
+          VERSION: ${{ inputs.version }}
+          DRY_RUN: ${{ inputs.dry_run }}
+        run: |
+          echo "## Hotfix v${VERSION}" >> "$GITHUB_STEP_SUMMARY"
+          if [ "$DRY_RUN" = "true" ]; then
+            echo "**DRY RUN** — npm publish, tagging, and push skipped" >> "$GITHUB_STEP_SUMMARY"
+          else
+            echo "- Published to npm as \`latest\`" >> "$GITHUB_STEP_SUMMARY"
+            echo "- Tagged \`v${VERSION}\`" >> "$GITHUB_STEP_SUMMARY"
+            echo "- PR created to merge back to main" >> "$GITHUB_STEP_SUMMARY"
+          fi

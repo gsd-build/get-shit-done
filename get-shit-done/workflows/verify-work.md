@@ -1,8 +1,14 @@
 <purpose>
-Validate built features through conversational testing with persistent state. Creates UAT.md that tracks test progress, survives /clear, and feeds gaps into /gsd:plan-phase --gaps.
+Validate built features through conversational testing with persistent state. Creates UAT.md that tracks test progress, survives /clear, and feeds gaps into /gsd-plan-phase --gaps.
 
 User tests, Claude records. One test at a time. Plain text responses.
 </purpose>
+
+<available_agent_types>
+Valid GSD subagent types (use exact names — do not fall back to 'general-purpose'):
+- gsd-planner — Creates detailed plans from phase scope
+- gsd-plan-checker — Reviews plan quality before execution
+</available_agent_types>
 
 <philosophy>
 **Show expected, ask if reality matches.**
@@ -24,17 +30,20 @@ No Pass/Fail buttons. No severity questions. Just: "Here's what should happen. D
 If $ARGUMENTS contains a phase number, load context:
 
 ```bash
-INIT=$(node ~/.claude/get-shit-done/bin/gsd-tools.cjs init verify-work "${PHASE_ARG}")
+INIT=$(node "$HOME/.claude/get-shit-done/bin/gsd-tools.cjs" init verify-work "${PHASE_ARG}")
+if [[ "$INIT" == @file:* ]]; then INIT=$(cat "${INIT#@file:}"); fi
+AGENT_SKILLS_PLANNER=$(node "$HOME/.claude/get-shit-done/bin/gsd-tools.cjs" agent-skills gsd-planner 2>/dev/null)
+AGENT_SKILLS_CHECKER=$(node "$HOME/.claude/get-shit-done/bin/gsd-tools.cjs" agent-skills gsd-checker 2>/dev/null)
 ```
 
-Parse JSON for: `planner_model`, `checker_model`, `commit_docs`, `phase_found`, `phase_dir`, `phase_number`, `phase_name`, `has_verification`.
+Parse JSON for: `planner_model`, `checker_model`, `commit_docs`, `phase_found`, `phase_dir`, `phase_number`, `phase_name`, `has_verification`, `uat_path`.
 </step>
 
 <step name="check_active_session">
 **First: Check for active UAT sessions**
 
 ```bash
-find .planning/phases -name "*-UAT.md" -type f 2>/dev/null | head -5
+(find .planning/phases -name "*-UAT.md" -type f 2>/dev/null || true) | head -5
 ```
 
 **If active sessions exist AND no $ARGUMENTS provided:**
@@ -69,12 +78,48 @@ If no, continue to `create_uat_file`.
 ```
 No active UAT sessions.
 
-Provide a phase number to start testing (e.g., /gsd:verify-work 4)
+Provide a phase number to start testing (e.g., /gsd-verify-work 4)
 ```
 
 **If no active sessions AND $ARGUMENTS provided:**
 
 Continue to `create_uat_file`.
+</step>
+
+<step name="automated_ui_verification">
+**Automated UI Verification (when Playwright-MCP is available)**
+
+Before running manual UAT, check whether this phase has a UI component and whether
+`mcp__playwright__*` or `mcp__puppeteer__*` tools are available in the current session.
+
+```
+UI_PHASE_FLAG=$(node "$HOME/.claude/get-shit-done/bin/gsd-tools.cjs" config-get workflow.ui_phase --raw 2>/dev/null || echo "true")
+UI_SPEC_FILE=$(ls "${PHASE_DIR}"/*-UI-SPEC.md 2>/dev/null | head -1)
+```
+
+**If Playwright-MCP tools are available in this session (`mcp__playwright__*` tools
+respond to tool calls) AND (`UI_PHASE_FLAG` is `true` OR `UI_SPEC_FILE` is non-empty):**
+
+For each UI checkpoint listed in the phase's UI-SPEC.md (or inferred from SUMMARY.md):
+
+1. Use `mcp__playwright__navigate` (or equivalent) to open the component's URL.
+2. Use `mcp__playwright__screenshot` to capture a screenshot.
+3. Compare the screenshot visually against the spec's stated requirements
+   (dimensions, color, layout, spacing).
+4. Automatically mark checkpoints as **passed** or **needs review** based on the
+   visual comparison — no manual question required for items that clearly match.
+5. Flag items that require human judgment (subjective aesthetics, content accuracy)
+   and present only those as manual UAT questions.
+
+If automated verification is not available, fall back to the standard manual
+checkpoint questions defined in this workflow unchanged. This step is entirely
+conditional: if Playwright-MCP is not configured, behavior is unchanged from today.
+
+**Display summary line before proceeding:**
+```
+UI checkpoints: {N} auto-verified, {M} queued for manual review
+```
+
 </step>
 
 <step name="find_summaries">
@@ -83,7 +128,7 @@ Continue to `create_uat_file`.
 Use `phase_dir` from init (or run init if not already done).
 
 ```bash
-ls "$phase_dir"/*-SUMMARY.md 2>/dev/null
+ls "$phase_dir"/*-SUMMARY.md 2>/dev/null || true
 ```
 
 Read each SUMMARY.md to extract testable deliverables.
@@ -108,6 +153,19 @@ Examples:
   → Expected: "Clicking Reply opens inline composer below comment. Submitting shows reply nested under parent with visual indentation."
 
 Skip internal/non-observable items (refactors, type changes, etc.).
+
+**Cold-start smoke test injection:**
+
+After extracting tests from SUMMARYs, scan the SUMMARY files for modified/created file paths. If ANY path matches these patterns:
+
+`server.ts`, `server.js`, `app.ts`, `app.js`, `index.ts`, `index.js`, `main.ts`, `main.js`, `database/*`, `db/*`, `seed/*`, `seeds/*`, `migrations/*`, `startup*`, `docker-compose*`, `Dockerfile*`
+
+Then **prepend** this test to the test list:
+
+- name: "Cold Start Smoke Test"
+- expected: "Kill any running server/service. Clear ephemeral state (temp DBs, caches, lock files). Start the application from scratch. Server boots without errors, any seed/migration completes, and a primary query (health check, homepage load, or basic API call) returns live data."
+
+This catches bugs that only manifest on fresh start — race conditions in startup sequences, silent seed failures, missing environment setup — which pass against warm state but break in production.
 </step>
 
 <step name="create_uat_file">
@@ -172,23 +230,23 @@ Proceed to `present_test`.
 <step name="present_test">
 **Present current test to user:**
 
-Read Current Test section from UAT file.
+Render the checkpoint from the structured UAT file instead of composing it freehand:
 
-Display using checkpoint box format:
+```bash
+CHECKPOINT=$(node "$HOME/.claude/get-shit-done/bin/gsd-tools.cjs" uat render-checkpoint --file "$uat_path" --raw)
+if [[ "$CHECKPOINT" == @file:* ]]; then CHECKPOINT=$(cat "${CHECKPOINT#@file:}"); fi
+```
+
+Display the returned checkpoint EXACTLY as-is:
 
 ```
-╔══════════════════════════════════════════════════════════════╗
-║  CHECKPOINT: Verification Required                           ║
-╚══════════════════════════════════════════════════════════════╝
-
-**Test {number}: {name}**
-
-{expected}
-
-──────────────────────────────────────────────────────────────
-→ Type "pass" or describe what's wrong
-──────────────────────────────────────────────────────────────
+{CHECKPOINT}
 ```
+
+**Critical response hygiene:**
+- Your entire response MUST equal `{CHECKPOINT}` byte-for-byte.
+- Do NOT add commentary before or after the block.
+- If you notice protocol/meta markers such as `to=all:`, role-routing text, XML system tags, hidden instruction markers, ad copy, or any unrelated suffix, discard the draft and output `{CHECKPOINT}` only.
 
 Wait for user response (plain text, no AskUserQuestion).
 </step>
@@ -216,6 +274,29 @@ expected: {expected}
 result: skipped
 reason: [user's reason if provided]
 ```
+
+**If response indicates blocked:**
+- "blocked", "can't test - server not running", "need physical device", "need release build"
+- Or any response containing: "server", "blocked", "not running", "physical device", "release build"
+
+Infer blocked_by tag from response:
+- Contains: server, not running, gateway, API → `server`
+- Contains: physical, device, hardware, real phone → `physical-device`
+- Contains: release, preview, build, EAS → `release-build`
+- Contains: stripe, twilio, third-party, configure → `third-party`
+- Contains: depends on, prior phase, prerequisite → `prior-phase`
+- Default: `other`
+
+Update Tests section:
+```
+### {N}. {name}
+expected: {expected}
+result: blocked
+blocked_by: {inferred tag}
+reason: "{verbatim user response}"
+```
+
+Note: Blocked tests do NOT go into the Gaps section (they aren't code issues — they're prerequisite gates).
 
 **If response is anything else:**
 - Treat as issue description
@@ -279,8 +360,24 @@ Proceed to `present_test`.
 <step name="complete_session">
 **Complete testing and commit:**
 
+**Determine final status:**
+
+Count results:
+- `pending_count`: tests with `result: [pending]`
+- `blocked_count`: tests with `result: blocked`
+- `skipped_no_reason`: tests with `result: skipped` and no `reason` field
+
+```
+if pending_count > 0 OR blocked_count > 0 OR skipped_no_reason > 0:
+  status: partial
+  # Session ended but not all tests resolved
+else:
+  status: complete
+  # All tests have a definitive result (pass, issue, or skipped-with-reason)
+```
+
 Update frontmatter:
-- status: complete
+- status: {computed status}
 - updated: [now]
 
 Clear Current Test section:
@@ -292,7 +389,7 @@ Clear Current Test section:
 
 Commit the UAT file:
 ```bash
-node ~/.claude/get-shit-done/bin/gsd-tools.cjs commit "test({phase_num}): complete UAT - {passed} passed, {issues} issues" --files ".planning/phases/XX-name/{phase_num}-UAT.md"
+node "$HOME/.claude/get-shit-done/bin/gsd-tools.cjs" commit "test({phase_num}): complete UAT - {passed} passed, {issues} issues" --files ".planning/phases/XX-name/{phase_num}-UAT.md"
 ```
 
 Present summary:
@@ -314,11 +411,39 @@ Present summary:
 **If issues > 0:** Proceed to `diagnose_issues`
 
 **If issues == 0:**
+
+```bash
+SECURITY_CFG=$(node "$HOME/.claude/get-shit-done/bin/gsd-tools.cjs" config-get workflow.security_enforcement --raw 2>/dev/null || echo "true")
+SECURITY_FILE=$(ls "${PHASE_DIR}"/*-SECURITY.md 2>/dev/null | head -1)
+```
+
+If `SECURITY_CFG` is `true` AND `SECURITY_FILE` is empty:
+```
+⚠ Security enforcement enabled — /gsd-secure-phase {phase} has not run.
+Run before advancing to the next phase.
+
+All tests passed. Ready to continue.
+
+- `/gsd-secure-phase {phase}` — security review (required before advancing)
+- `/gsd-plan-phase {next}` — Plan next phase
+- `/gsd-execute-phase {next}` — Execute next phase
+- `/gsd-ui-review {phase}` — visual quality audit (if frontend files were modified)
+```
+
+If `SECURITY_CFG` is `true` AND `SECURITY_FILE` exists: check frontmatter `threats_open`. If > 0:
+```
+⚠ Security gate: {threats_open} threats open
+  /gsd-secure-phase {phase} — resolve before advancing
+```
+
+If `SECURITY_CFG` is `false` OR (`SECURITY_FILE` exists AND `threats_open` is `0`):
 ```
 All tests passed. Ready to continue.
 
-- `/gsd:plan-phase {next}` — Plan next phase
-- `/gsd:execute-phase {next}` — Execute next phase
+- `/gsd-plan-phase {next}` — Plan next phase
+- `/gsd-execute-phase {next}` — Execute next phase
+- `/gsd-secure-phase {phase}` — security review
+- `/gsd-ui-review {phase}` — visual quality audit (if frontend files were modified)
 ```
 </step>
 
@@ -365,19 +490,18 @@ Task(
 **Phase:** {phase_number}
 **Mode:** gap_closure
 
-**UAT with diagnoses:**
-@.planning/phases/{phase_dir}/{phase_num}-UAT.md
+<files_to_read>
+- {phase_dir}/{phase_num}-UAT.md (UAT with diagnoses)
+- .planning/STATE.md (Project State)
+- .planning/ROADMAP.md (Roadmap)
+</files_to_read>
 
-**Project State:**
-@.planning/STATE.md
-
-**Roadmap:**
-@.planning/ROADMAP.md
+${AGENT_SKILLS_PLANNER}
 
 </planning_context>
 
 <downstream_consumer>
-Output consumed by /gsd:execute-phase
+Output consumed by /gsd-execute-phase
 Plans must be executable prompts.
 </downstream_consumer>
 """,
@@ -416,8 +540,11 @@ Task(
 **Phase:** {phase_number}
 **Phase Goal:** Close diagnosed gaps from UAT
 
-**Plans to verify:**
-@.planning/phases/{phase_dir}/*-PLAN.md
+<files_to_read>
+- {phase_dir}/*-PLAN.md (Plans to verify)
+</files_to_read>
+
+${AGENT_SKILLS_CHECKER}
 
 </verification_context>
 
@@ -455,8 +582,11 @@ Task(
 **Phase:** {phase_number}
 **Mode:** revision
 
-**Existing plans:**
-@.planning/phases/{phase_dir}/*-PLAN.md
+<files_to_read>
+- {phase_dir}/*-PLAN.md (Existing plans)
+</files_to_read>
+
+${AGENT_SKILLS_PLANNER}
 
 **Checker issues:**
 {structured_issues_from_checker}
@@ -484,7 +614,7 @@ Display: `Max iterations reached. {N} issues remain.`
 Offer options:
 1. Force proceed (execute despite issues)
 2. Provide guidance (user gives direction, retry)
-3. Abandon (exit, user runs /gsd:plan-phase manually)
+3. Abandon (exit, user runs /gsd-plan-phase manually)
 
 Wait for user response.
 </step>
@@ -512,7 +642,7 @@ Plans verified and ready for execution.
 
 **Execute fixes** — run fix plans
 
-`/clear` then `/gsd:execute-phase {phase} --gaps-only`
+`/clear` then `/gsd-execute-phase {phase} --gaps-only`
 
 ───────────────────────────────────────────────────────────────
 ```
@@ -566,5 +696,5 @@ Default to **major** if unclear. User can correct if needed.
 - [ ] If issues: gsd-planner creates fix plans (gap_closure mode)
 - [ ] If issues: gsd-plan-checker verifies fix plans
 - [ ] If issues: revision loop until plans pass (max 3 iterations)
-- [ ] Ready for `/gsd:execute-phase --gaps-only` when complete
+- [ ] Ready for `/gsd-execute-phase --gaps-only` when complete
 </success_criteria>

@@ -22,8 +22,7 @@ Output: Phase deleted, all subsequent phases renumbered, git commit as historica
 <context>
 Phase: $ARGUMENTS
 
-@.planning/ROADMAP.md
-@.planning/STATE.md
+Roadmap and state are resolved in-workflow via `init phase-op` and targeted reads.
 </context>
 
 <process>

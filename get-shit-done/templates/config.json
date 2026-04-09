@@ -1,15 +1,22 @@
 {
   "mode": "interactive",
-  "depth": "standard",
+  "granularity": "standard",
   "workflow": {
     "research": true,
     "plan_check": true,
     "verifier": true,
-    "auto_advance": false
+    "auto_advance": false,
+    "nyquist_validation": true,
+    "security_enforcement": true,
+    "security_asvs_level": 1,
+    "security_block_on": "high",
+    "discuss_mode": "discuss",
+    "research_before_questions": false
   },
   "planning": {
     "commit_docs": true,
-    "search_gitignored": false
+    "search_gitignored": false,
+    "sub_repos": []
   },
   "parallelization": {
     "enabled": true,
@@ -32,5 +39,10 @@
   "safety": {
     "always_confirm_destructive": true,
     "always_confirm_external_services": true
-  }
+  },
+  "hooks": {
+    "context_warnings": true
+  },
+  "project_code": null,
+  "agent_skills": {}
 }

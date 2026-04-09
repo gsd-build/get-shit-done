@@ -1,0 +1,85 @@
+name: Auto-Branch from Issue Label
+
+on:
+  issues:
+    types: [labeled]
+
+permissions:
+  contents: write
+  issues: write
+
+jobs:
+  create-branch:
+    runs-on: ubuntu-latest
+    timeout-minutes: 2
+    if: >-
+      contains(fromJSON('["bug", "enhancement", "priority: critical", "type: chore", "area: docs"]'),
+      github.event.label.name)
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+
+      - name: Create branch
+        uses: actions/github-script@60a0d83039c74a4aee543508d2ffcb1c3799cdea # v7.0.1
+        with:
+          script: |
+            const label = context.payload.label.name;
+            const issue = context.payload.issue;
+            const number = issue.number;
+
+            // Generate slug from title
+            const slug = issue.title
+              .toLowerCase()
+              .replace(/[^a-z0-9]+/g, '-')
+              .replace(/^-+|-+$/g, '')
+              .substring(0, 40);
+
+            // Map label to branch prefix
+            const prefixMap = {
+              'bug': 'fix',
+              'enhancement': 'feat',
+              'priority: critical': 'fix',
+              'type: chore': 'chore',
+              'area: docs': 'docs',
+            };
+            const prefix = prefixMap[label];
+            if (!prefix) return;
+
+            // For priority: critical, use fix/critical-NNN-slug to avoid
+            // colliding with the hotfix workflow's hotfix/X.Y.Z naming.
+            const branch = label === 'priority: critical'
+              ? `fix/critical-${number}-${slug}`
+              : `${prefix}/${number}-${slug}`;
+
+            // Check if branch already exists
+            try {
+              await github.rest.git.getRef({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                ref: `heads/${branch}`,
+              });
+              core.info(`Branch ${branch} already exists`);
+              return;
+            } catch (e) {
+              if (e.status !== 404) throw e;
+            }
+
+            // Create branch from main HEAD
+            const mainRef = await github.rest.git.getRef({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              ref: 'heads/main',
+            });
+
+            await github.rest.git.createRef({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              ref: `refs/heads/${branch}`,
+              sha: mainRef.data.object.sha,
+            });
+
+            await github.rest.issues.createComment({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              issue_number: number,
+              body: `Branch \`${branch}\` created.\n\n\`\`\`bash\ngit fetch origin && git checkout ${branch}\n\`\`\``,
+            });

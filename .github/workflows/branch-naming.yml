@@ -1,0 +1,38 @@
+name: Validate Branch Name
+
+on:
+  pull_request:
+    types: [opened, synchronize]
+
+permissions: {}
+
+jobs:
+  check-branch:
+    runs-on: ubuntu-latest
+    timeout-minutes: 1
+    steps:
+      - name: Validate branch naming convention
+        uses: actions/github-script@60a0d83039c74a4aee543508d2ffcb1c3799cdea # v7.0.1
+        with:
+          script: |
+            const branch = context.payload.pull_request.head.ref;
+
+            const validPrefixes = [
+              'feat/', 'fix/', 'hotfix/', 'docs/', 'chore/',
+              'refactor/', 'test/', 'release/', 'ci/', 'perf/', 'revert/',
+            ];
+
+            const alwaysValid = ['main', 'develop'];
+            if (alwaysValid.includes(branch)) return;
+            if (branch.startsWith('dependabot/') || branch.startsWith('renovate/')) return;
+            // GSD auto-created branches
+            if (branch.startsWith('gsd/') || branch.startsWith('claude/')) return;
+
+            const isValid = validPrefixes.some(prefix => branch.startsWith(prefix));
+            if (!isValid) {
+              const prefixList = validPrefixes.map(p => `\`${p}\``).join(', ');
+              core.warning(
+                `Branch "${branch}" doesn't follow naming convention. ` +
+                `Expected prefixes: ${prefixList}`
+              );
+            }

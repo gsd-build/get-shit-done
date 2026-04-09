@@ -4,7 +4,7 @@ Produces DISCOVERY.md (for Level 2-3) that informs PLAN.md creation.
 
 Called from plan-phase.md's mandatory_discovery step with a depth parameter.
 
-NOTE: For comprehensive ecosystem research ("how do experts build this"), use /gsd:research-phase instead, which produces RESEARCH.md.
+NOTE: For comprehensive ecosystem research ("how do experts build this"), use /gsd-research-phase instead, which produces RESEARCH.md.
 </purpose>
 
 <depth_levels>
@@ -252,8 +252,8 @@ Confidence: [level]
 
 What's next?
 
-1. Discuss phase context (/gsd:discuss-phase [current-phase])
-2. Create phase plan (/gsd:plan-phase [current-phase])
+1. Discuss phase context (/gsd-discuss-phase [current-phase])
+2. Create phase plan (/gsd-plan-phase [current-phase])
 3. Refine discovery (dig deeper)
 4. Review discovery
 

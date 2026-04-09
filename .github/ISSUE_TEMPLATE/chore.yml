@@ -1,0 +1,118 @@
+---
+name: Chore / Maintenance
+description: Internal improvements — refactoring, test quality, CI/CD, dependency updates, tech debt.
+labels: ["type: chore", "needs-triage"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        ## Internal maintenance work
+
+        Use this template for work that improves the **project's health** without changing user-facing behavior. Examples:
+        - Test suite refactoring or standardization
+        - CI/CD pipeline improvements
+        - Dependency updates
+        - Code quality or linting changes
+        - Build system or tooling updates
+        - Documentation infrastructure (not content — use Docs Issue for content)
+        - Tech debt paydown
+
+        If this changes how GSD **works** for users, use [Enhancement](./enhancement.yml) or [Feature Request](./feature_request.yml) instead.
+
+  - type: checkboxes
+    id: preflight
+    attributes:
+      label: Pre-submission checklist
+      options:
+        - label: This does not change user-facing behavior (commands, output, file formats, config)
+          required: true
+        - label: I have searched existing issues — this has not already been filed
+          required: true
+
+  - type: input
+    id: chore_title
+    attributes:
+      label: What is the maintenance task?
+      description: A short, concrete description of what needs to happen.
+      placeholder: "e.g., Migrate test suite to node:assert/strict, Update c8 to v12, Add Windows CI matrix entry"
+    validations:
+      required: true
+
+  - type: dropdown
+    id: chore_type
+    attributes:
+      label: Type of maintenance
+      options:
+        - Test quality (coverage, patterns, runner)
+        - CI/CD pipeline
+        - Dependency update
+        - Refactoring / code quality
+        - Build system / tooling
+        - Documentation infrastructure
+        - Tech debt
+        - Other
+    validations:
+      required: true
+
+  - type: textarea
+    id: current_state
+    attributes:
+      label: Current state
+      description: |
+        Describe the current situation. What is the problem or debt? Include numbers where possible (test count, coverage %, build time, dependency age).
+      placeholder: |
+        73 of 89 test files use `require('node:assert')` instead of `require('node:assert/strict')`.
+        CONTRIBUTING.md requires strict mode. Non-strict assert allows type coercion in `deepEqual`,
+        masking potential bugs.
+    validations:
+      required: true
+
+  - type: textarea
+    id: proposed_work
+    attributes:
+      label: Proposed work
+      description: |
+        What changes will be made? List files, patterns, or systems affected.
+      placeholder: |
+        - Replace `require('node:assert')` with `require('node:assert/strict')` across all 73 test files
+        - Replace `try/finally` cleanup with `t.after()` hooks per CONTRIBUTING.md standards
+        - Verify all 2148 tests still pass
+    validations:
+      required: true
+
+  - type: textarea
+    id: acceptance_criteria
+    attributes:
+      label: Done when
+      description: |
+        List the specific conditions that mean this work is complete. These should be verifiable.
+      placeholder: |
+        - [ ] All test files use `node:assert/strict`
+        - [ ] Zero `try/finally` cleanup blocks in test lifecycle code
+        - [ ] CI green on all matrix entries (Node 22/24, Ubuntu/macOS/Windows)
+        - [ ] No change to user-facing behavior
+    validations:
+      required: true
+
+  - type: dropdown
+    id: area
+    attributes:
+      label: Area affected
+      options:
+        - Test suite
+        - CI/CD
+        - Build system
+        - Core library code
+        - Installer
+        - Documentation tooling
+        - Multiple areas
+    validations:
+      required: true
+
+  - type: textarea
+    id: additional_context
+    attributes:
+      label: Additional context
+      description: Related issues, prior art, or anything else that helps scope this work.
+    validations:
+      required: false

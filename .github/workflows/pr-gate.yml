@@ -1,0 +1,67 @@
+name: PR Gate
+
+on:
+  pull_request:
+    types: [opened, synchronize]
+
+permissions:
+  pull-requests: write
+  issues: write
+
+jobs:
+  size-check:
+    runs-on: ubuntu-latest
+    timeout-minutes: 2
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+        with:
+          fetch-depth: 0
+
+      - name: Check PR size
+        uses: actions/github-script@60a0d83039c74a4aee543508d2ffcb1c3799cdea # v7.0.1
+        with:
+          script: |
+            const files = await github.paginate(github.rest.pulls.listFiles, {
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              pull_number: context.issue.number,
+              per_page: 100,
+            });
+
+            const additions = files.reduce((sum, f) => sum + f.additions, 0);
+            const deletions = files.reduce((sum, f) => sum + f.deletions, 0);
+            const total = additions + deletions;
+
+            let label = '';
+            if (total <= 50) label = 'size/S';
+            else if (total <= 200) label = 'size/M';
+            else if (total <= 500) label = 'size/L';
+            else label = 'size/XL';
+
+            // Remove existing size labels
+            const existingLabels = context.payload.pull_request.labels || [];
+            const sizeLabels = existingLabels.filter(l => l.name.startsWith('size/'));
+            for (const staleLabel of sizeLabels) {
+              await github.rest.issues.removeLabel({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                issue_number: context.issue.number,
+                name: staleLabel.name
+              }).catch(() => {}); // ignore if already removed
+            }
+
+            // Add size label
+            try {
+              await github.rest.issues.addLabels({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                issue_number: context.issue.number,
+                labels: [label],
+              });
+            } catch (e) {
+              core.warning(`Could not add label: ${e.message}`);
+            }
+
+            if (total > 500) {
+              core.warning(`Large PR: ${total} lines changed (${additions}+ / ${deletions}-). Consider splitting.`);
+            }

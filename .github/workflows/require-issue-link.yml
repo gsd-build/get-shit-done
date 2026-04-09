@@ -1,0 +1,52 @@
+name: Require Issue Link
+
+on:
+  pull_request:
+    types: [opened, edited, reopened, synchronize]
+
+permissions:
+  pull-requests: write
+
+jobs:
+  check-issue-link:
+    name: Issue link required
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check PR body for issue reference
+        id: check
+        env:
+          # Bound to env var — never interpolated into shell directly
+          PR_BODY: ${{ github.event.pull_request.body }}
+        run: |
+          if echo "$PR_BODY" | grep -qiE '(closes|fixes|resolves)\s+#[0-9]+'; then
+            echo "found=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "found=false" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Comment and fail if no issue link
+        if: steps.check.outputs.found == 'false'
+        uses: actions/github-script@v7
+        with:
+          # Uses GitHub API SDK — no shell string interpolation of untrusted input
+          script: |
+            const repoUrl = `https://github.com/${context.repo.owner}/${context.repo.repo}`;
+            await github.rest.issues.createComment({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              issue_number: context.payload.pull_request.number,
+              body: [
+                '## Missing issue link',
+                '',
+                'This PR does not reference an issue. **All PRs must link to an open issue** using a closing keyword in the PR body:',
+                '',
+                '```',
+                'Closes #123',
+                '```',
+                '',
+                `If no issue exists for this change, [open one first](${repoUrl}/issues/new/choose), then update this PR body with the reference.`,
+                '',
+                'This PR will remain blocked until a valid `Closes #NNN`, `Fixes #NNN`, or `Resolves #NNN` line is present in the description.',
+              ].join('\n')
+            });
+            core.setFailed('PR body must contain a closing issue reference (e.g. "Closes #123")');

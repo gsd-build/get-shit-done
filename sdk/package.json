@@ -1,0 +1,52 @@
+{
+  "name": "@gsd-build/sdk",
+  "version": "0.1.0",
+  "description": "GSD SDK — programmatic interface for running GSD plans via the Agent SDK",
+  "type": "module",
+  "main": "dist/index.js",
+  "types": "dist/index.d.ts",
+  "exports": {
+    ".": {
+      "import": "./dist/index.js",
+      "types": "./dist/index.d.ts"
+    }
+  },
+  "bin": {
+    "gsd-sdk": "./dist/cli.js"
+  },
+  "files": [
+    "dist",
+    "prompts"
+  ],
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/gsd-build/get-shit-done.git",
+    "directory": "sdk"
+  },
+  "homepage": "https://github.com/gsd-build/get-shit-done/tree/main/sdk",
+  "bugs": {
+    "url": "https://github.com/gsd-build/get-shit-done/issues"
+  },
+  "author": "TÂCHES",
+  "license": "MIT",
+  "engines": {
+    "node": ">=20"
+  },
+  "scripts": {
+    "build": "tsc",
+    "prepublishOnly": "npm run build",
+    "test": "vitest run",
+    "test:unit": "vitest run --project unit",
+    "test:integration": "vitest run --project integration"
+  },
+  "dependencies": {
+    "@anthropic-ai/claude-agent-sdk": "^0.2.84",
+    "ws": "^8.20.0"
+  },
+  "devDependencies": {
+    "@types/node": "^22.0.0",
+    "@types/ws": "^8.18.1",
+    "typescript": "^5.7.0",
+    "vitest": "^3.1.1"
+  }
+}

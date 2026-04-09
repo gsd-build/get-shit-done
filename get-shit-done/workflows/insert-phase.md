@@ -13,7 +13,7 @@ Parse the command arguments:
 - First argument: integer phase number to insert after
 - Remaining arguments: phase description
 
-Example: `/gsd:insert-phase 72 Fix critical auth bug`
+Example: `/gsd-insert-phase 72 Fix critical auth bug`
 -> after = 72
 -> description = "Fix critical auth bug"
 
@@ -21,8 +21,8 @@ If arguments missing:
 
 ```
 ERROR: Both phase number and description required
-Usage: /gsd:insert-phase <after> <description>
-Example: /gsd:insert-phase 72 Fix critical auth bug
+Usage: /gsd-insert-phase <after> <description>
+Example: /gsd-insert-phase 72 Fix critical auth bug
 ```
 
 Exit.
@@ -34,7 +34,8 @@ Validate first argument is an integer.
 Load phase operation context:
 
 ```bash
-INIT=$(node ~/.claude/get-shit-done/bin/gsd-tools.cjs init phase-op "${after_phase}")
+INIT=$(node "$HOME/.claude/get-shit-done/bin/gsd-tools.cjs" init phase-op "${after_phase}")
+if [[ "$INIT" == @file:* ]]; then INIT=$(cat "${INIT#@file:}"); fi
 ```
 
 Check `roadmap_exists` from init JSON. If false:
@@ -48,7 +49,7 @@ Exit.
 **Delegate the phase insertion to gsd-tools:**
 
 ```bash
-RESULT=$(node ~/.claude/get-shit-done/bin/gsd-tools.cjs phase insert "${after_phase}" "${description}")
+RESULT=$(node "$HOME/.claude/get-shit-done/bin/gsd-tools.cjs" phase insert "${after_phase}" "${description}")
 ```
 
 The CLI handles:
@@ -92,9 +93,9 @@ Project state updated: .planning/STATE.md
 
 **Phase {decimal_phase}: {description}** -- urgent insertion
 
-`/gsd:plan-phase {decimal_phase}`
+`/clear` then:
 
-<sub>`/clear` first -> fresh context window</sub>
+`/gsd-plan-phase {decimal_phase}`
 
 ---
 
@@ -110,11 +111,11 @@ Project state updated: .planning/STATE.md
 
 <anti_patterns>
 
-- Don't use this for planned work at end of milestone (use /gsd:add-phase)
+- Don't use this for planned work at end of milestone (use /gsd-add-phase)
 - Don't insert before Phase 1 (decimal 0.1 makes no sense)
 - Don't renumber existing phases
 - Don't modify the target phase content
-- Don't create plans yet (that's /gsd:plan-phase)
+- Don't create plans yet (that's /gsd-plan-phase)
 - Don't commit changes (user decides when to commit)
 </anti_patterns>
 

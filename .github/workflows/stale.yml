@@ -1,0 +1,34 @@
+name: Stale Cleanup
+
+on:
+  schedule:
+    - cron: '0 9 * * 1'  # Monday 9am UTC
+  workflow_dispatch:
+
+permissions:
+  issues: write
+  pull-requests: write
+
+jobs:
+  stale:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/stale@28ca1036281a5e5922ead5184a1bbf96e5fc984e # v9.0.0
+        with:
+          days-before-stale: 28
+          days-before-close: 14
+          stale-issue-message: >
+            This issue has been inactive for 28 days. It will be closed in 14 days
+            if there is no further activity. If this is still relevant, please comment
+            or update to the latest GSD version and retest.
+          stale-pr-message: >
+            This PR has been inactive for 28 days. It will be closed in 14 days
+            if there is no further activity.
+          close-issue-message: >
+            Closed due to inactivity. If this is still relevant, please reopen
+            with updated reproduction steps on the latest GSD version.
+          stale-issue-label: 'stale'
+          stale-pr-label: 'stale'
+          exempt-issue-labels: 'fix-pending,priority: critical,pinned,confirmed-bug,confirmed'
+          exempt-pr-labels: 'fix-pending,priority: critical,pinned,DO NOT MERGE'

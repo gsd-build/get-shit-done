@@ -11,15 +11,15 @@ Read all files referenced by the invoking prompt's execution_context before star
 <step name="parse_arguments">
 Parse the command arguments:
 - Argument is the phase number to remove (integer or decimal)
-- Example: `/gsd:remove-phase 17` → phase = 17
-- Example: `/gsd:remove-phase 16.1` → phase = 16.1
+- Example: `/gsd-remove-phase 17` → phase = 17
+- Example: `/gsd-remove-phase 16.1` → phase = 16.1
 
 If no argument provided:
 
 ```
 ERROR: Phase number required
-Usage: /gsd:remove-phase <phase-number>
-Example: /gsd:remove-phase 17
+Usage: /gsd-remove-phase <phase-number>
+Example: /gsd-remove-phase 17
 ```
 
 Exit.
@@ -29,7 +29,8 @@ Exit.
 Load phase operation context:
 
 ```bash
-INIT=$(node ~/.claude/get-shit-done/bin/gsd-tools.cjs init phase-op "${target}")
+INIT=$(node "$HOME/.claude/get-shit-done/bin/gsd-tools.cjs" init phase-op "${target}")
+if [[ "$INIT" == @file:* ]]; then INIT=$(cat "${INIT#@file:}"); fi
 ```
 
 Extract: `phase_found`, `phase_dir`, `phase_number`, `commit_docs`, `roadmap_exists`.
@@ -52,7 +53,7 @@ Only future phases can be removed:
 - Current phase: {current}
 - Phase {target} is current or completed
 
-To abandon current work, use /gsd:pause-work instead.
+To abandon current work, use /gsd-pause-work instead.
 ```
 
 Exit.
@@ -79,13 +80,13 @@ Wait for confirmation.
 **Delegate the entire removal operation to gsd-tools:**
 
 ```bash
-RESULT=$(node ~/.claude/get-shit-done/bin/gsd-tools.cjs phase remove "${target}")
+RESULT=$(node "$HOME/.claude/get-shit-done/bin/gsd-tools.cjs" phase remove "${target}")
 ```
 
 If the phase has executed plans (SUMMARY.md files), gsd-tools will error. Use `--force` only if the user confirms:
 
 ```bash
-RESULT=$(node ~/.claude/get-shit-done/bin/gsd-tools.cjs phase remove "${target}" --force)
+RESULT=$(node "$HOME/.claude/get-shit-done/bin/gsd-tools.cjs" phase remove "${target}" --force)
 ```
 
 The CLI handles:
@@ -102,7 +103,7 @@ Extract from result: `removed`, `directory_deleted`, `renamed_directories`, `ren
 Stage and commit the removal:
 
 ```bash
-node ~/.claude/get-shit-done/bin/gsd-tools.cjs commit "chore: remove phase {target} ({original-phase-name})" --files .planning/
+node "$HOME/.claude/get-shit-done/bin/gsd-tools.cjs" commit "chore: remove phase {target} ({original-phase-name})" --files .planning/
 ```
 
 The commit message preserves the historical record of what was removed.
@@ -125,7 +126,7 @@ Changes:
 ## What's Next
 
 Would you like to:
-- `/gsd:progress` — see updated roadmap status
+- `/gsd-progress` — see updated roadmap status
 - Continue with current phase
 - Review roadmap
 

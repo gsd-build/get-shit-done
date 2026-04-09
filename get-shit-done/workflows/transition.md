@@ -1,3 +1,19 @@
+<internal_workflow>
+
+**This is an INTERNAL workflow — NOT a user-facing command.**
+
+There is no `/gsd-transition` command. This workflow is invoked automatically by
+`execute-phase` during auto-advance, or inline by the orchestrator after phase
+verification. Users should never be told to run `/gsd-transition`.
+
+**Valid user commands for phase progression:**
+- `/gsd-discuss-phase {N}` — discuss a phase before planning
+- `/gsd-plan-phase {N}` — plan a phase
+- `/gsd-execute-phase {N}` — execute a phase
+- `/gsd-progress` — see roadmap progress
+
+</internal_workflow>
+
 <required_reading>
 
 **Read these files NOW:**
@@ -25,8 +41,8 @@ Mark current phase complete and advance to next. This is the natural point where
 Before transition, read project state:
 
 ```bash
-cat .planning/STATE.md 2>/dev/null
-cat .planning/PROJECT.md 2>/dev/null
+cat .planning/STATE.md 2>/dev/null || true
+cat .planning/PROJECT.md 2>/dev/null || true
 ```
 
 Parse current position to verify we're transitioning the right phase.
@@ -39,8 +55,8 @@ Note accumulated context that may need updating after transition.
 Check current phase has all plan summaries:
 
 ```bash
-ls .planning/phases/XX-current/*-PLAN.md 2>/dev/null | sort
-ls .planning/phases/XX-current/*-SUMMARY.md 2>/dev/null | sort
+(ls .planning/phases/XX-current/*-PLAN.md 2>/dev/null || true) | sort
+(ls .planning/phases/XX-current/*-SUMMARY.md 2>/dev/null || true) | sort
 ```
 
 **Verification logic:**
@@ -53,10 +69,34 @@ ls .planning/phases/XX-current/*-SUMMARY.md 2>/dev/null | sort
 <config-check>
 
 ```bash
-cat .planning/config.json 2>/dev/null
+cat .planning/config.json 2>/dev/null || true
 ```
 
 </config-check>
+
+**Check for verification debt in this phase:**
+
+```bash
+# Count outstanding items in current phase
+OUTSTANDING=""
+for f in .planning/phases/XX-current/*-UAT.md .planning/phases/XX-current/*-VERIFICATION.md; do
+  [ -f "$f" ] || continue
+  grep -q "result: pending\|result: blocked\|status: partial\|status: human_needed\|status: diagnosed" "$f" && OUTSTANDING="$OUTSTANDING\n$(basename $f)"
+done
+```
+
+**If OUTSTANDING is not empty:**
+
+Append to the completion confirmation message (regardless of mode):
+
+```
+Outstanding verification items in this phase:
+{list filenames}
+
+These will carry forward as debt. Review: `/gsd-audit-uat`
+```
+
+This does NOT block transition — it ensures the user sees the debt before confirming.
 
 **If all plans complete:**
 
@@ -111,7 +151,7 @@ Wait for user decision.
 Check for lingering handoffs:
 
 ```bash
-ls .planning/phases/XX-current/.continue-here*.md 2>/dev/null
+ls .planning/phases/XX-current/.continue-here*.md 2>/dev/null || true
 ```
 
 If found, delete them — phase is complete, handoffs are stale.
@@ -123,7 +163,7 @@ If found, delete them — phase is complete, handoffs are stale.
 **Delegate ROADMAP.md and STATE.md updates to gsd-tools:**
 
 ```bash
-TRANSITION=$(node ~/.claude/get-shit-done/bin/gsd-tools.cjs phase complete "${current_phase}")
+TRANSITION=$(node "$HOME/.claude/get-shit-done/bin/gsd-tools.cjs" phase complete "${current_phase}")
 ```
 
 The CLI handles:
@@ -238,7 +278,7 @@ After (Phase 2 shipped JWT auth, discovered rate limiting needed):
 Verify the updates are correct by reading STATE.md. If the progress bar needs updating, use:
 
 ```bash
-PROGRESS=$(node ~/.claude/get-shit-done/bin/gsd-tools.cjs progress bar --raw)
+PROGRESS=$(node "$HOME/.claude/get-shit-done/bin/gsd-tools.cjs" progress bar --raw)
 ```
 
 Update the progress bar line in STATE.md with the result.
@@ -341,16 +381,44 @@ Resume file: None
 
 The `is_last_phase` field from the phase complete result tells you directly:
 - `is_last_phase: false` → More phases remain → Go to **Route A**
-- `is_last_phase: true` → Milestone complete → Go to **Route B**
+- `is_last_phase: true` → Last phase done → **Check for workstream collisions first**
 
 The `next_phase` and `next_phase_name` fields give you the next phase details.
 
 If you need additional context, use:
 ```bash
-ROADMAP=$(node ~/.claude/get-shit-done/bin/gsd-tools.cjs roadmap analyze)
+ROADMAP=$(node "$HOME/.claude/get-shit-done/bin/gsd-tools.cjs" roadmap analyze)
 ```
 
 This returns all phases with goals, disk status, and completion info.
+
+---
+
+**Workstream collision check (when `is_last_phase: true`):**
+
+Before routing to Route B, check whether other workstreams are still active.
+This prevents one workstream from advancing or completing the milestone while
+other workstreams are still working on their phases.
+
+**Skip this check if NOT in workstream mode** (i.e., `GSD_WORKSTREAM` is not set / flat mode).
+In flat mode, go directly to **Route B**.
+
+```bash
+# Only check if we're in workstream mode
+if [ -n "$GSD_WORKSTREAM" ]; then
+  WS_LIST=$(node "$HOME/.claude/get-shit-done/bin/gsd-tools.cjs" workstream list --raw)
+fi
+```
+
+Parse the JSON result. The output has `{ mode, workstreams: [...] }`.
+Each workstream entry has: `name`, `status`, `current_phase`, `phase_count`, `completed_phases`.
+
+Filter out the current workstream (`$GSD_WORKSTREAM`) and any workstreams with
+status containing "milestone complete" or "archived" (case-insensitive).
+The remaining entries are **other active workstreams**.
+
+- **If other active workstreams exist** → Go to **Route B1**
+- **If NO other active workstreams** (or flat mode) → Go to **Route B**
 
 ---
 
@@ -361,7 +429,7 @@ Read ROADMAP.md to get the next phase's name and goal.
 **Check if next phase has CONTEXT.md:**
 
 ```bash
-ls .planning/phases/*[X+1]*/*-CONTEXT.md 2>/dev/null
+ls .planning/phases/*[X+1]*/*-CONTEXT.md 2>/dev/null || true
 ```
 
 **If next phase exists:**
@@ -378,7 +446,7 @@ Next: Phase [X+1] — [Name]
 ⚡ Auto-continuing: Plan Phase [X+1] in detail
 ```
 
-Exit skill and invoke SlashCommand("/gsd:plan-phase [X+1] --auto")
+Exit skill and invoke SlashCommand("/gsd-plan-phase [X+1] --auto ${GSD_WS}")
 
 **If CONTEXT.md does NOT exist:**
 
@@ -390,7 +458,7 @@ Next: Phase [X+1] — [Name]
 ⚡ Auto-continuing: Discuss Phase [X+1] first
 ```
 
-Exit skill and invoke SlashCommand("/gsd:discuss-phase [X+1] --auto")
+Exit skill and invoke SlashCommand("/gsd-discuss-phase [X+1] --auto ${GSD_WS}")
 
 </if>
 
@@ -407,15 +475,15 @@ Exit skill and invoke SlashCommand("/gsd:discuss-phase [X+1] --auto")
 
 **Phase [X+1]: [Name]** — [Goal from ROADMAP.md]
 
-`/gsd:discuss-phase [X+1]` — gather context and clarify approach
+`/clear` then:
 
-<sub>`/clear` first → fresh context window</sub>
+`/gsd-discuss-phase [X+1] ${GSD_WS}` — gather context and clarify approach
 
 ---
 
 **Also available:**
-- `/gsd:plan-phase [X+1]` — skip discussion, plan directly
-- `/gsd:research-phase [X+1]` — investigate unknowns
+- `/gsd-plan-phase [X+1] ${GSD_WS}` — skip discussion, plan directly
+- `/gsd-research-phase [X+1] ${GSD_WS}` — investigate unknowns
 
 ---
 ```
@@ -432,15 +500,15 @@ Exit skill and invoke SlashCommand("/gsd:discuss-phase [X+1] --auto")
 **Phase [X+1]: [Name]** — [Goal from ROADMAP.md]
 <sub>✓ Context gathered, ready to plan</sub>
 
-`/gsd:plan-phase [X+1]`
+`/clear` then:
 
-<sub>`/clear` first → fresh context window</sub>
+`/gsd-plan-phase [X+1] ${GSD_WS}`
 
 ---
 
 **Also available:**
-- `/gsd:discuss-phase [X+1]` — revisit context
-- `/gsd:research-phase [X+1]` — investigate unknowns
+- `/gsd-discuss-phase [X+1] ${GSD_WS}` — revisit context
+- `/gsd-research-phase [X+1] ${GSD_WS}` — investigate unknowns
 
 ---
 ```
@@ -449,11 +517,70 @@ Exit skill and invoke SlashCommand("/gsd:discuss-phase [X+1] --auto")
 
 ---
 
+**Route B1: Workstream done, other workstreams still active**
+
+This route is reached when `is_last_phase: true` AND the collision check found
+other active workstreams. Do NOT suggest completing the milestone or advancing
+to the next milestone — other workstreams are still working.
+
+**Clear auto-advance chain flag** — workstream boundary is the natural stopping point:
+
+```bash
+node "$HOME/.claude/get-shit-done/bin/gsd-tools.cjs" config-set workflow._auto_chain_active false
+```
+
+<if mode="yolo">
+
+Override auto-advance: do NOT auto-continue to milestone completion.
+Present the blocking information and stop.
+
+</if>
+
+Present (all modes):
+
+```
+## ✓ Phase {X}: {Phase Name} Complete
+
+This workstream's phases are complete. Other workstreams are still active:
+
+| Workstream | Status | Phase | Progress |
+|------------|--------|-------|----------|
+| {name}     | {status} | {current_phase} | {completed_phases}/{phase_count} |
+| ...        | ...    | ...   | ...      |
+
+---
+
+## Next Steps
+
+Archive this workstream:
+
+`/gsd-workstreams complete {current_ws_name} ${GSD_WS}`
+
+See overall milestone progress:
+
+`/gsd-workstreams progress ${GSD_WS}`
+
+<sub>Milestone completion will be available once all workstreams finish.</sub>
+
+---
+```
+
+Do NOT suggest `/gsd-complete-milestone` or `/gsd-new-milestone`.
+Do NOT auto-invoke any further slash commands.
+
+**Stop here.** The user must explicitly decide what to do next.
+
+---
+
 **Route B: Milestone complete (all phases done)**
 
-**Clear auto-advance** — milestone boundary is the natural stopping point:
+**This route is only reached when:**
+- `is_last_phase: true` AND no other active workstreams exist (or flat mode)
+
+**Clear auto-advance chain flag** — milestone boundary is the natural stopping point:
+
 ```bash
-node ~/.claude/get-shit-done/bin/gsd-tools.cjs config-set workflow.auto_advance false
+node "$HOME/.claude/get-shit-done/bin/gsd-tools.cjs" config-set workflow._auto_chain_active false
 ```
 
 <if mode="yolo">
@@ -466,7 +593,7 @@ Phase {X} marked complete.
 ⚡ Auto-continuing: Complete milestone and archive
 ```
 
-Exit skill and invoke SlashCommand("/gsd:complete-milestone {version}")
+Exit skill and invoke SlashCommand("/gsd-complete-milestone {version} ${GSD_WS}")
 
 </if>
 
@@ -483,9 +610,9 @@ Exit skill and invoke SlashCommand("/gsd:complete-milestone {version}")
 
 **Complete Milestone {version}** — archive and prepare for next
 
-`/gsd:complete-milestone {version}`
+`/clear` then:
 
-<sub>`/clear` first → fresh context window</sub>
+`/gsd-complete-milestone {version} ${GSD_WS}`
 
 ---
 

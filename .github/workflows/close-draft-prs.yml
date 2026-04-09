@@ -1,0 +1,51 @@
+name: Close Draft PRs
+
+on:
+  pull_request:
+    types: [opened, reopened, converted_to_draft]
+
+permissions:
+  pull-requests: write
+
+jobs:
+  close-if-draft:
+    name: Reject draft PRs
+    if: github.event.pull_request.draft == true
+    runs-on: ubuntu-latest
+    steps:
+      - name: Comment and close draft PR
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const pr = context.payload.pull_request;
+            const repoUrl = context.repo.owner + '/' + context.repo.repo;
+
+            await github.rest.issues.createComment({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              issue_number: pr.number,
+              body: [
+                '## Draft PRs are not accepted',
+                '',
+                'This project only accepts completed pull requests. Draft PRs are automatically closed.',
+                '',
+                '**Why?** GSD requires all PRs to be ready for review when opened \u2014 with tests passing, the correct PR template used, and a linked approved issue. Draft PRs bypass these quality gates and create review overhead.',
+                '',
+                '### What to do instead',
+                '',
+                '1. Finish your implementation locally',
+                '2. Run `npm run test:coverage` and confirm all tests pass',
+                '3. Open a **non-draft** PR using the [correct template](https://github.com/' + repoUrl + '/blob/main/CONTRIBUTING.md#pull-request-guidelines)',
+                '',
+                'See [CONTRIBUTING.md](https://github.com/' + repoUrl + '/blob/main/CONTRIBUTING.md) for the full process.',
+              ].join('\n')
+            });
+
+            await github.rest.pulls.update({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              pull_number: pr.number,
+              state: 'closed'
+            });
+
+            core.info('Closed draft PR #' + pr.number + ': ' + pr.title);

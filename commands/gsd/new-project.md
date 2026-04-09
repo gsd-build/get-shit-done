@@ -9,6 +9,10 @@ allowed-tools:
   - Task
   - AskUserQuestion
 ---
+<runtime_note>
+**Copilot (VS Code):** Use `vscode_askquestions` wherever this workflow calls `AskUserQuestion`. They are equivalent — `vscode_askquestions` is the VS Code Copilot implementation of the same interactive question API.
+</runtime_note>
+
 <context>
 **Flags:**
 - `--auto` — Automatic mode. After config questions, runs research → requirements → roadmap without further interaction. Expects idea document via @ reference.
@@ -25,7 +29,7 @@ Initialize a new project through unified flow: questioning → research (optiona
 - `.planning/ROADMAP.md` — phase structure
 - `.planning/STATE.md` — project memory
 
-**After this command:** Run `/gsd:plan-phase 1` to start execution.
+**After this command:** Run `/gsd-plan-phase 1` to start execution.
 </objective>
 
 <execution_context>

@@ -8,7 +8,7 @@ Plans execute autonomously. Checkpoints formalize interaction points where human
 2. **Claude sets up the verification environment** - Start dev servers, seed databases, configure env vars
 3. **User only does what requires human judgment** - Visual checks, UX evaluation, "does this feel right?"
 4. **Secrets come from user, automation comes from Claude** - Ask for API keys, then Claude uses them via CLI
-5. **Auto-mode bypasses verification/decision checkpoints** — When `workflow.auto_advance` is true in config: human-verify auto-approves, decision auto-selects first option, human-action still stops (auth gates cannot be automated)
+5. **Auto-mode bypasses verification/decision checkpoints** — When `workflow._auto_chain_active` or `workflow.auto_advance` is true in config: human-verify auto-approves, decision auto-selects first option, human-action still stops (auth gates cannot be automated)
 </overview>
 
 <checkpoint_types>
@@ -50,7 +50,7 @@ Plans execute autonomously. Checkpoints formalize interaction points where human
 <task type="auto">
   <name>Start dev server for verification</name>
   <action>Run `npm run dev` in background, wait for "ready" message, capture port</action>
-  <verify>curl http://localhost:3000 returns 200</verify>
+  <verify>fetch http://localhost:3000 returns 200</verify>
   <done>Dev server running at http://localhost:3000</done>
 </task>
 
@@ -240,7 +240,7 @@ Plans execute autonomously. Checkpoints formalize interaction points where human
   <name>Deploy to Vercel</name>
   <files>.vercel/, vercel.json</files>
   <action>Run `vercel --yes` to deploy</action>
-  <verify>vercel ls shows deployment, curl returns 200</verify>
+  <verify>vercel ls shows deployment, fetch returns 200</verify>
 </task>
 
 <!-- If vercel returns "Error: Not authenticated", Claude creates checkpoint on the fly -->
@@ -261,7 +261,7 @@ Plans execute autonomously. Checkpoints formalize interaction points where human
 <task type="auto">
   <name>Retry Vercel deployment</name>
   <action>Run `vercel --yes` (now authenticated)</action>
-  <verify>vercel ls shows deployment, curl returns 200</verify>
+  <verify>vercel ls shows deployment, fetch returns 200</verify>
 </task>
 ```
 
@@ -455,8 +455,8 @@ I'll verify: vercel whoami returns your account
 npm run dev &
 DEV_SERVER_PID=$!
 
-# Wait for ready (max 30s)
-timeout 30 bash -c 'until curl -s localhost:3000 > /dev/null 2>&1; do sleep 1; done'
+# Wait for ready (max 30s) — uses fetch() for cross-platform compatibility
+timeout 30 bash -c 'until node -e "fetch(\"http://localhost:3000\").then(r=>{process.exit(r.ok?0:1)}).catch(()=>process.exit(1))" 2>/dev/null; do sleep 1; done'
 ```
 
 **Port conflicts:** Kill stale process (`lsof -ti:3000 | xargs kill`) or use alternate port (`--port 3001`).
@@ -489,7 +489,9 @@ timeout 30 bash -c 'until curl -s localhost:3000 > /dev/null 2>&1; do sleep 1; d
 | Auth error | Create auth gate checkpoint |
 | Network timeout | Retry with backoff, then checkpoint if persistent |
 
-**Never present a checkpoint with broken verification environment.** If `curl localhost:3000` fails, don't ask user to "visit localhost:3000".
+**Never present a checkpoint with broken verification environment.** If the local server isn't responding, don't ask user to "visit localhost:3000".
+
+> **Cross-platform note:** Use `node -e "fetch('http://localhost:3000').then(r=>console.log(r.status))"` instead of `curl` for health checks. `curl` is broken on Windows MSYS/Git Bash due to SSL/path mangling issues.
 
 ```xml
 <!-- WRONG: Checkpoint with broken environment -->
@@ -502,7 +504,7 @@ timeout 30 bash -c 'until curl -s localhost:3000 > /dev/null 2>&1; do sleep 1; d
 <task type="auto">
   <name>Fix server startup issue</name>
   <action>Investigate error, fix root cause, restart server</action>
-  <verify>curl http://localhost:3000 returns 200</verify>
+  <verify>fetch http://localhost:3000 returns 200</verify>
 </task>
 
 <task type="checkpoint:human-verify">
@@ -608,7 +610,7 @@ timeout 30 bash -c 'until curl -s localhost:3000 > /dev/null 2>&1; do sleep 1; d
 <task type="auto">
   <name>Start dev server for auth testing</name>
   <action>Run `npm run dev` in background, wait for ready signal</action>
-  <verify>curl http://localhost:3000 returns 200</verify>
+  <verify>fetch http://localhost:3000 returns 200</verify>
   <done>Dev server running at http://localhost:3000</done>
 </task>
 
@@ -651,7 +653,7 @@ timeout 30 bash -c 'until curl -s localhost:3000 > /dev/null 2>&1; do sleep 1; d
 <task type="auto">
   <name>Start dev server</name>
   <action>Run `npm run dev` in background</action>
-  <verify>curl localhost:3000 returns 200</verify>
+  <verify>fetch http://localhost:3000 returns 200</verify>
 </task>
 
 <task type="checkpoint:human-verify" gate="blocking">
@@ -677,7 +679,7 @@ timeout 30 bash -c 'until curl -s localhost:3000 > /dev/null 2>&1; do sleep 1; d
 <task type="auto">
   <name>Deploy to Vercel</name>
   <action>Run `vercel --yes`. Capture URL.</action>
-  <verify>vercel ls shows deployment, curl returns 200</verify>
+  <verify>vercel ls shows deployment, fetch returns 200</verify>
 </task>
 
 <task type="checkpoint:human-verify">

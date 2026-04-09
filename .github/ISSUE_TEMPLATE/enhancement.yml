@@ -1,0 +1,160 @@
+---
+name: Enhancement Proposal
+description: Propose an improvement to an existing feature. Read the full instructions before opening this issue.
+labels: ["enhancement", "needs-review"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        ## ⚠️ Read this before you fill anything out
+
+        An enhancement improves something that already exists — better output, expanded edge-case handling, improved performance, cleaner UX. It does **not** add new commands, new workflows, or new concepts. If you are proposing something new, use the [Feature Request](./feature_request.yml) template instead.
+
+        **Before opening this issue:**
+        - Confirm the thing you want to improve actually exists and works today.
+        - Read [CONTRIBUTING.md](../../CONTRIBUTING.md#-enhancement) — understand what `approved-enhancement` means and why you must wait for it before writing any code.
+
+        **What happens after you submit:**
+        A maintainer will review this proposal. If it is incomplete or out of scope, it will be **closed**. If approved, it will be labeled `approved-enhancement` and you may begin coding.
+
+        **Do not open a PR until this issue is labeled `approved-enhancement`.**
+
+  - type: checkboxes
+    id: preflight
+    attributes:
+      label: Pre-submission checklist
+      description: You must check every box. Unchecked boxes are an immediate close.
+      options:
+        - label: I have confirmed this improves existing behavior — it does not add a new command, workflow, or concept
+          required: true
+        - label: I have searched existing issues and this enhancement has not already been proposed
+          required: true
+        - label: I have read CONTRIBUTING.md and understand I must wait for `approved-enhancement` before writing any code
+          required: true
+        - label: I can clearly describe the concrete benefit — not just "it would be nicer"
+          required: true
+
+  - type: input
+    id: what_is_being_improved
+    attributes:
+      label: What existing feature or behavior does this improve?
+      description: Name the specific command, workflow, output, or behavior you are enhancing.
+      placeholder: "e.g., `/gsd-plan` output, phase status display in statusline, context summary format"
+    validations:
+      required: true
+
+  - type: textarea
+    id: current_behavior
+    attributes:
+      label: Current behavior
+      description: |
+        Describe exactly how the thing works today. Be specific. Include example output or commands if helpful.
+      placeholder: |
+        Currently, `/gsd-status` shows:
+        ```
+        Phase 2/5 — In Progress
+        ```
+        It does not show the phase name, making it hard to know what phase you are actually in without
+        opening STATE.md.
+    validations:
+      required: true
+
+  - type: textarea
+    id: proposed_behavior
+    attributes:
+      label: Proposed behavior
+      description: |
+        Describe exactly how it should work after the enhancement. Be specific. Include example output or commands.
+      placeholder: |
+        After the enhancement, `/gsd-status` would show:
+        ```
+        Phase 2/5 — In Progress — "Implement core auth module"
+        ```
+        The phase name is pulled from STATE.md and appended to the existing output.
+    validations:
+      required: true
+
+  - type: textarea
+    id: reason_and_benefit
+    attributes:
+      label: Reason and benefit
+      description: |
+        Answer both of these clearly:
+
+        1. **Why is the current behavior a problem?** (Not just inconvenient — what goes wrong, what is harder than it should be, or what is confusing?)
+        2. **What is the concrete benefit of the proposed behavior?** (What becomes easier, faster, less error-prone, or clearer?)
+
+        Vague answers like "it would be better" or "it's more user-friendly" are not sufficient.
+      placeholder: |
+        **Why the current behavior is a problem:**
+        When working in a long session, the AI agent frequently loses track of which phase is active
+        and must re-read STATE.md. The numeric-only status gives no semantic context.
+
+        **Concrete benefit:**
+        Showing the phase name means the agent can confirm the active phase from the status output
+        alone, without an extra file read. This reduces context consumption in long sessions.
+    validations:
+      required: true
+
+  - type: textarea
+    id: scope
+    attributes:
+      label: Scope of changes
+      description: |
+        List the files and systems this enhancement would touch. Be complete.
+        An enhancement should have a narrow, well-defined scope. If your list is long, this might be a feature, not an enhancement.
+      placeholder: |
+        Files modified:
+        - `get-shit-done/commands/gsd/status.md` — update output format description
+        - `get-shit-done/bin/lib/state.cjs` — expose phase name in status() return value
+        - `tests/status.test.cjs` — update snapshot and add test for phase name in output
+        - `CHANGELOG.md` — user-facing change entry
+
+        No new files created. No new dependencies.
+    validations:
+      required: true
+
+  - type: textarea
+    id: breaking_changes
+    attributes:
+      label: Breaking changes
+      description: |
+        Does this change existing command output, file formats, or behavior that users or AI agents might depend on?
+        If yes, describe exactly what changes and how it stays backward compatible (or why it cannot).
+        Write "None" only if you are certain.
+    validations:
+      required: true
+
+  - type: textarea
+    id: alternatives
+    attributes:
+      label: Alternatives considered
+      description: |
+        What other ways could this be improved? Why is your proposed approach the right one?
+        If you haven't considered alternatives, take a moment before submitting.
+    validations:
+      required: true
+
+  - type: dropdown
+    id: area
+    attributes:
+      label: Area affected
+      options:
+        - Core workflow (init, plan, build, verify)
+        - Planning system (phases, roadmap, state)
+        - Context management (context engineering, summaries)
+        - Runtime integration (hooks, statusline, settings)
+        - Installation / setup
+        - Output / formatting
+        - Documentation
+        - Other
+    validations:
+      required: true
+
+  - type: textarea
+    id: additional_context
+    attributes:
+      label: Additional context
+      description: Screenshots, related issues, or anything else that helps explain the proposal.
+    validations:
+      required: false

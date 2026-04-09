@@ -8,7 +8,7 @@ Template for `.planning/phases/XX-name/{phase_num}-UAT.md` — persistent UAT se
 
 ```markdown
 ---
-status: testing | complete | diagnosed
+status: testing | partial | complete | diagnosed
 phase: XX-name
 source: [list of SUMMARY.md files tested]
 started: [ISO timestamp]
@@ -45,6 +45,12 @@ expected: [observable behavior]
 result: skipped
 reason: [why skipped]
 
+### 5. [Test Name]
+expected: [observable behavior]
+result: blocked
+blocked_by: server | physical-device | release-build | third-party | prior-phase
+reason: [why blocked]
+
 ...
 
 ## Summary
@@ -54,6 +60,7 @@ passed: [N]
 issues: [N]
 pending: [N]
 skipped: [N]
+blocked: [N]
 
 ## Gaps
 
@@ -74,7 +81,7 @@ skipped: [N]
 <section_rules>
 
 **Frontmatter:**
-- `status`: OVERWRITE - "testing" or "complete"
+- `status`: OVERWRITE - "testing", "partial", or "complete"
 - `phase`: IMMUTABLE - set on creation
 - `source`: IMMUTABLE - SUMMARY files being tested
 - `started`: IMMUTABLE - set on creation
@@ -87,9 +94,10 @@ skipped: [N]
 
 **Tests:**
 - Each test: OVERWRITE result field when user responds
-- `result` values: [pending], pass, issue, skipped
+- `result` values: [pending], pass, issue, skipped, blocked
 - If issue: add `reported` (verbatim) and `severity` (inferred)
 - If skipped: add `reason` if provided
+- If blocked: add `blocked_by` (tag) and `reason` (if provided)
 
 **Summary:**
 - OVERWRITE counts after each response
@@ -98,7 +106,7 @@ skipped: [N]
 **Gaps:**
 - APPEND only when issue found (YAML format)
 - After diagnosis: fill `root_cause`, `artifacts`, `missing`, `debug_session`
-- This section feeds directly into /gsd:plan-phase --gaps
+- This section feeds directly into /gsd-plan-phase --gaps
 
 </section_rules>
 
@@ -112,7 +120,7 @@ skipped: [N]
 4. UAT.md Gaps section updated with diagnosis:
    - Each gap gets `root_cause`, `artifacts`, `missing`, `debug_session` filled
 5. status → "diagnosed"
-6. Ready for /gsd:plan-phase --gaps with root causes
+6. Ready for /gsd-plan-phase --gaps with root causes
 
 **After diagnosis:**
 ```yaml
@@ -136,7 +144,7 @@ skipped: [N]
 
 <lifecycle>
 
-**Creation:** When /gsd:verify-work starts new session
+**Creation:** When /gsd-verify-work starts new session
 - Extract tests from SUMMARY.md files
 - Set status to "testing"
 - Current Test points to test 1
@@ -155,6 +163,16 @@ skipped: [N]
 - Current Test → "[testing complete]"
 - Commit file
 - Present summary with next steps
+
+**Partial completion:**
+- status → "partial" (if pending, blocked, or unresolved skipped tests remain)
+- Current Test → "[testing paused — {N} items outstanding]"
+- Commit file
+- Present summary with outstanding items highlighted
+
+**Resuming partial session:**
+- `/gsd-verify-work {phase}` picks up from first pending/blocked test
+- When all items resolved, status advances to "complete"
 
 **Resume after /clear:**
 1. Read frontmatter → know phase and status

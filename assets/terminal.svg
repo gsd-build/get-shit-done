@@ -58,7 +58,7 @@
     <text class="text" font-size="15" y="304"><tspan class="green">  ✓</tspan><tspan class="white"> Installed get-shit-done</tspan></text>
 
     <!-- Done message -->
-    <text class="text" font-size="15" y="352"><tspan class="green">  Done!</tspan><tspan class="white"> Run </tspan><tspan class="cyan">/gsd:help</tspan><tspan class="white"> to get started.</tspan></text>
+    <text class="text" font-size="15" y="352"><tspan class="green">  Done!</tspan><tspan class="white"> Run </tspan><tspan class="cyan">/gsd-help</tspan><tspan class="white"> to get started.</tspan></text>
 
     <!-- New prompt -->
     <text class="text prompt" font-size="15" y="400">~</text>

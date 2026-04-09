@@ -11,6 +11,9 @@ commands.html
 # Build artifacts (committed to npm, not git)
 hooks/dist/
 
+# Coverage artifacts
+coverage/
+
 # Animation assets
 animation/
 *.gif
@@ -18,3 +21,45 @@ animation/
 # Internal planning documents
 reports/
 RAILROAD_ARCHITECTURE.md
+.planning/
+analysis/
+docs/GSD-MASTER-ARCHITECTURE.md
+docs/GSD-RUST-IMPLEMENTATION-GUIDE.md
+docs/GSD-SYSTEM-SPECIFICATION.md
+gaps.md
+improve.md
+philosophy.md
+
+# Installed skills
+.github/agents/gsd-*
+.github/skills/gsd-*
+.github/get-shit-done/*
+.github/skills/get-shit-done
+.github/copilot-instructions.md
+.bg-shell/
+
+# ── GSD baseline (auto-generated) ──
+.gsd
+Thumbs.db
+*.swp
+*.swo
+*~
+.idea/
+.vscode/
+*.code-workspace
+.env
+.env.*
+!.env.example
+.next/
+dist/
+build/
+__pycache__/
+*.pyc
+.venv/
+venv/
+target/
+vendor/
+*.log
+.cache/
+tmp/
+.worktrees

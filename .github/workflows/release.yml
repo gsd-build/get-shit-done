@@ -1,0 +1,374 @@
+name: Release
+
+on:
+  workflow_dispatch:
+    inputs:
+      action:
+        description: 'Action to perform'
+        required: true
+        type: choice
+        options:
+          - create
+          - rc
+          - finalize
+      version:
+        description: 'Version (e.g., 1.28.0 or 2.0.0)'
+        required: true
+        type: string
+      dry_run:
+        description: 'Dry run (skip npm publish, tagging, and push)'
+        required: false
+        type: boolean
+        default: false
+
+concurrency:
+  group: release-${{ inputs.version }}
+  cancel-in-progress: false
+
+env:
+  NODE_VERSION: 24
+
+jobs:
+  validate-version:
+    runs-on: ubuntu-latest
+    timeout-minutes: 2
+    permissions:
+      contents: read
+    outputs:
+      branch: ${{ steps.validate.outputs.branch }}
+      is_major: ${{ steps.validate.outputs.is_major }}
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+        with:
+          fetch-depth: 0
+
+      - name: Validate version format
+        id: validate
+        env:
+          VERSION: ${{ inputs.version }}
+        run: |
+          # Must be X.Y.0 (minor or major release, not patch)
+          if ! echo "$VERSION" | grep -qE '^[0-9]+\.[0-9]+\.0$'; then
+            echo "::error::Version must end in .0 (e.g., 1.28.0 or 2.0.0). Use hotfix workflow for patch releases."
+            exit 1
+          fi
+          BRANCH="release/${VERSION}"
+          # Detect major (X.0.0)
+          IS_MAJOR="false"
+          if echo "$VERSION" | grep -qE '^[0-9]+\.0\.0$'; then
+            IS_MAJOR="true"
+          fi
+          echo "branch=$BRANCH" >> "$GITHUB_OUTPUT"
+          echo "is_major=$IS_MAJOR" >> "$GITHUB_OUTPUT"
+
+  create:
+    needs: validate-version
+    if: inputs.action == 'create'
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+        with:
+          fetch-depth: 0
+
+      - uses: actions/setup-node@39370e3970a6d050c480ffad4ff0ed4d3fdee5af # v4.1.0
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+
+      - name: Check branch doesn't already exist
+        env:
+          BRANCH: ${{ needs.validate-version.outputs.branch }}
+        run: |
+          if git ls-remote --exit-code origin "refs/heads/$BRANCH" >/dev/null 2>&1; then
+            echo "::error::Branch $BRANCH already exists. Delete it first or use rc/finalize."
+            exit 1
+          fi
+
+      - name: Configure git identity
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+
+      - name: Create release branch
+        env:
+          BRANCH: ${{ needs.validate-version.outputs.branch }}
+          VERSION: ${{ inputs.version }}
+          IS_MAJOR: ${{ needs.validate-version.outputs.is_major }}
+        run: |
+          git checkout -b "$BRANCH"
+          npm version "$VERSION" --no-git-tag-version
+          git add package.json package-lock.json
+          git commit -m "chore: bump version to ${VERSION} for release"
+          git push origin "$BRANCH"
+          echo "## Release branch created" >> "$GITHUB_STEP_SUMMARY"
+          echo "- Branch: \`$BRANCH\`" >> "$GITHUB_STEP_SUMMARY"
+          echo "- Version: \`$VERSION\`" >> "$GITHUB_STEP_SUMMARY"
+          if [ "$IS_MAJOR" = "true" ]; then
+            echo "- Type: **Major** (will start with beta pre-releases)" >> "$GITHUB_STEP_SUMMARY"
+          else
+            echo "- Type: **Minor** (will start with RC pre-releases)" >> "$GITHUB_STEP_SUMMARY"
+          fi
+          echo "" >> "$GITHUB_STEP_SUMMARY"
+          echo "Next: run this workflow with \`rc\` action to publish a pre-release to \`next\`" >> "$GITHUB_STEP_SUMMARY"
+
+  rc:
+    needs: validate-version
+    if: inputs.action == 'rc'
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    permissions:
+      contents: write
+      id-token: write
+    environment: npm-publish
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+        with:
+          ref: ${{ needs.validate-version.outputs.branch }}
+          fetch-depth: 0
+
+      - uses: actions/setup-node@39370e3970a6d050c480ffad4ff0ed4d3fdee5af # v4.1.0
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          registry-url: 'https://registry.npmjs.org'
+          cache: 'npm'
+
+      - name: Determine pre-release version
+        id: prerelease
+        env:
+          VERSION: ${{ inputs.version }}
+          IS_MAJOR: ${{ needs.validate-version.outputs.is_major }}
+        run: |
+          # Determine pre-release type: major → beta, minor → rc
+          if [ "$IS_MAJOR" = "true" ]; then
+            PREFIX="beta"
+          else
+            PREFIX="rc"
+          fi
+          # Find next pre-release number by checking existing tags
+          N=1
+          while git tag -l "v${VERSION}-${PREFIX}.${N}" | grep -q .; do
+            N=$((N + 1))
+          done
+          PRE_VERSION="${VERSION}-${PREFIX}.${N}"
+          echo "pre_version=$PRE_VERSION" >> "$GITHUB_OUTPUT"
+          echo "prefix=$PREFIX" >> "$GITHUB_OUTPUT"
+
+      - name: Configure git identity
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+
+      - name: Bump to pre-release version
+        env:
+          PRE_VERSION: ${{ steps.prerelease.outputs.pre_version }}
+        run: |
+          npm version "$PRE_VERSION" --no-git-tag-version
+
+      - name: Install and test
+        run: |
+          npm ci
+          npm run test:coverage
+
+      - name: Commit pre-release version bump
+        env:
+          PRE_VERSION: ${{ steps.prerelease.outputs.pre_version }}
+        run: |
+          git add package.json package-lock.json
+          git commit -m "chore: bump to ${PRE_VERSION}"
+
+      - name: Dry-run publish validation
+        run: npm publish --dry-run --tag next
+        env:
+          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
+
+      - name: Tag and push
+        if: ${{ !inputs.dry_run }}
+        env:
+          PRE_VERSION: ${{ steps.prerelease.outputs.pre_version }}
+          BRANCH: ${{ needs.validate-version.outputs.branch }}
+        run: |
+          if git rev-parse -q --verify "refs/tags/v${PRE_VERSION}" >/dev/null; then
+            EXISTING_SHA=$(git rev-parse "refs/tags/v${PRE_VERSION}")
+            HEAD_SHA=$(git rev-parse HEAD)
+            if [ "$EXISTING_SHA" != "$HEAD_SHA" ]; then
+              echo "::error::Tag v${PRE_VERSION} already exists pointing to different commit"
+              exit 1
+            fi
+            echo "Tag v${PRE_VERSION} already exists on current commit; skipping tag"
+          else
+            git tag "v${PRE_VERSION}"
+          fi
+          git push origin "$BRANCH" --tags
+
+      - name: Publish to npm (next)
+        if: ${{ !inputs.dry_run }}
+        run: npm publish --provenance --access public --tag next
+        env:
+          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
+
+      - name: Verify publish
+        if: ${{ !inputs.dry_run }}
+        env:
+          PRE_VERSION: ${{ steps.prerelease.outputs.pre_version }}
+        run: |
+          sleep 10
+          PUBLISHED=$(npm view get-shit-done-cc@"$PRE_VERSION" version 2>/dev/null || echo "NOT_FOUND")
+          if [ "$PUBLISHED" != "$PRE_VERSION" ]; then
+            echo "::error::Published version verification failed. Expected $PRE_VERSION, got $PUBLISHED"
+            exit 1
+          fi
+          echo "✓ Verified: get-shit-done-cc@$PRE_VERSION is live on npm"
+          # Also verify dist-tag
+          NEXT_TAG=$(npm dist-tag ls get-shit-done-cc 2>/dev/null | grep "next:" | awk '{print $2}')
+          echo "✓ next tag points to: $NEXT_TAG"
+
+      - name: Summary
+        env:
+          PRE_VERSION: ${{ steps.prerelease.outputs.pre_version }}
+          DRY_RUN: ${{ inputs.dry_run }}
+        run: |
+          echo "## Pre-release v${PRE_VERSION}" >> "$GITHUB_STEP_SUMMARY"
+          if [ "$DRY_RUN" = "true" ]; then
+            echo "**DRY RUN** — npm publish, tagging, and push skipped" >> "$GITHUB_STEP_SUMMARY"
+          else
+            echo "- Published to npm as \`next\`" >> "$GITHUB_STEP_SUMMARY"
+            echo "- Install: \`npx get-shit-done-cc@next\`" >> "$GITHUB_STEP_SUMMARY"
+          fi
+          echo "" >> "$GITHUB_STEP_SUMMARY"
+          echo "To publish another pre-release: run \`rc\` again" >> "$GITHUB_STEP_SUMMARY"
+          echo "To finalize: run \`finalize\` action" >> "$GITHUB_STEP_SUMMARY"
+
+  finalize:
+    needs: validate-version
+    if: inputs.action == 'finalize'
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    permissions:
+      contents: write
+      pull-requests: write
+      id-token: write
+    environment: npm-publish
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+        with:
+          ref: ${{ needs.validate-version.outputs.branch }}
+          fetch-depth: 0
+
+      - uses: actions/setup-node@39370e3970a6d050c480ffad4ff0ed4d3fdee5af # v4.1.0
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          registry-url: 'https://registry.npmjs.org'
+          cache: 'npm'
+
+      - name: Configure git identity
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+
+      - name: Set final version
+        env:
+          VERSION: ${{ inputs.version }}
+        run: |
+          npm version "$VERSION" --no-git-tag-version --allow-same-version
+          git add package.json package-lock.json
+          git diff --cached --quiet || git commit -m "chore: finalize v${VERSION}"
+
+      - name: Install and test
+        run: |
+          npm ci
+          npm run test:coverage
+
+      - name: Dry-run publish validation
+        run: npm publish --dry-run
+        env:
+          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
+
+      - name: Create PR to merge release back to main
+        if: ${{ !inputs.dry_run }}
+        env:
+          GH_TOKEN: ${{ github.token }}
+          BRANCH: ${{ needs.validate-version.outputs.branch }}
+          VERSION: ${{ inputs.version }}
+        run: |
+          EXISTING_PR=$(gh pr list --base main --head "$BRANCH" --state open --json number --jq '.[0].number')
+          if [ -n "$EXISTING_PR" ]; then
+            echo "PR #$EXISTING_PR already exists; updating"
+            gh pr edit "$EXISTING_PR" \
+              --title "chore: merge release v${VERSION} to main" \
+              --body "Merge release branch back to main after v${VERSION} stable release."
+          else
+            gh pr create \
+              --base main \
+              --head "$BRANCH" \
+              --title "chore: merge release v${VERSION} to main" \
+              --body "Merge release branch back to main after v${VERSION} stable release."
+          fi
+
+      - name: Tag and push
+        if: ${{ !inputs.dry_run }}
+        env:
+          VERSION: ${{ inputs.version }}
+          BRANCH: ${{ needs.validate-version.outputs.branch }}
+        run: |
+          if git rev-parse -q --verify "refs/tags/v${VERSION}" >/dev/null; then
+            EXISTING_SHA=$(git rev-parse "refs/tags/v${VERSION}")
+            HEAD_SHA=$(git rev-parse HEAD)
+            if [ "$EXISTING_SHA" != "$HEAD_SHA" ]; then
+              echo "::error::Tag v${VERSION} already exists pointing to different commit"
+              exit 1
+            fi
+            echo "Tag v${VERSION} already exists on current commit; skipping tag"
+          else
+            git tag "v${VERSION}"
+          fi
+          git push origin "$BRANCH" --tags
+
+      - name: Publish to npm (latest)
+        if: ${{ !inputs.dry_run }}
+        run: npm publish --provenance --access public
+        env:
+          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
+
+      - name: Clean up next dist-tag
+        if: ${{ !inputs.dry_run }}
+        env:
+          VERSION: ${{ inputs.version }}
+          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
+        run: |
+          # Point next to the stable release so @next never returns something
+          # older than @latest. This prevents stale pre-release installs.
+          npm dist-tag add "get-shit-done-cc@${VERSION}" next 2>/dev/null || true
+          echo "✓ next dist-tag updated to v${VERSION}"
+
+      - name: Verify publish
+        if: ${{ !inputs.dry_run }}
+        env:
+          VERSION: ${{ inputs.version }}
+        run: |
+          sleep 10
+          PUBLISHED=$(npm view get-shit-done-cc@"$VERSION" version 2>/dev/null || echo "NOT_FOUND")
+          if [ "$PUBLISHED" != "$VERSION" ]; then
+            echo "::error::Published version verification failed. Expected $VERSION, got $PUBLISHED"
+            exit 1
+          fi
+          echo "✓ Verified: get-shit-done-cc@$VERSION is live on npm"
+          # Verify latest tag
+          LATEST_TAG=$(npm dist-tag ls get-shit-done-cc 2>/dev/null | grep "latest:" | awk '{print $2}')
+          echo "✓ latest tag points to: $LATEST_TAG"
+
+      - name: Summary
+        env:
+          VERSION: ${{ inputs.version }}
+          DRY_RUN: ${{ inputs.dry_run }}
+        run: |
+          echo "## Release v${VERSION}" >> "$GITHUB_STEP_SUMMARY"
+          if [ "$DRY_RUN" = "true" ]; then
+            echo "**DRY RUN** — npm publish, tagging, and push skipped" >> "$GITHUB_STEP_SUMMARY"
+          else
+            echo "- Published to npm as \`latest\`" >> "$GITHUB_STEP_SUMMARY"
+            echo "- Tagged \`v${VERSION}\`" >> "$GITHUB_STEP_SUMMARY"
+            echo "- PR created to merge back to main" >> "$GITHUB_STEP_SUMMARY"
+            echo "- Install: \`npx get-shit-done-cc@latest\`" >> "$GITHUB_STEP_SUMMARY"
+          fi
