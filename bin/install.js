@@ -3945,6 +3945,10 @@ function copyWithPathReplacement(srcDir, destDir, pathPrefix, runtime, isCommand
       } else if (isTrae) {
         content = convertClaudeToTraeMarkdown(content);
         fs.writeFileSync(destPath, content);
+      } else if (isQwen) {
+        content = content.replace(/CLAUDE\.md/g, 'QWEN.md');
+        content = content.replace(/\bClaude Code\b/g, 'Qwen Code');
+        fs.writeFileSync(destPath, content);
       } else {
         fs.writeFileSync(destPath, content);
       }
@@ -3982,6 +3986,13 @@ function copyWithPathReplacement(srcDir, destDir, pathPrefix, runtime, isCommand
       jsContent = jsContent.replace(/\.claude\/skills\//g, '.trae/skills/');
       jsContent = jsContent.replace(/CLAUDE\.md/g, '.trae/rules/');
       jsContent = jsContent.replace(/\bClaude Code\b/g, 'Trae');
+      fs.writeFileSync(destPath, jsContent);
+    } else if (isQwen && (entry.name.endsWith('.cjs') || entry.name.endsWith('.js'))) {
+      let jsContent = fs.readFileSync(srcPath, 'utf8');
+      jsContent = jsContent.replace(/\.claude\/skills\//g, '.qwen/skills/');
+      jsContent = jsContent.replace(/\.claude\//g, '.qwen/');
+      jsContent = jsContent.replace(/CLAUDE\.md/g, 'QWEN.md');
+      jsContent = jsContent.replace(/\bClaude Code\b/g, 'Qwen Code');
       fs.writeFileSync(destPath, jsContent);
     } else {
       fs.copyFileSync(srcPath, destPath);
