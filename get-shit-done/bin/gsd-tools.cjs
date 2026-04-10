@@ -154,6 +154,10 @@
  *   learnings copy                       Copy from current project's LEARNINGS.md
  *   learnings prune --older-than <dur>   Remove entries older than duration (e.g. 90d)
  *   learnings delete <id>                Delete a learning by ID
+ *
+ * GSD-2 Migration:
+ *   from-gsd2 [--path <dir>] [--force] [--dry-run]
+ *             Import a GSD-2 (.gsd/) project back to GSD v1 (.planning/) format
  */
 
 const fs = require('fs');
@@ -1067,6 +1071,14 @@ async function runCommand(command, args, cwd, raw, defaultValue) {
       } else {
         error('Unknown learnings subcommand. Available: list, query, copy, prune, delete');
       }
+      break;
+    }
+
+    // ─── GSD-2 Reverse Migration ───────────────────────────────────────────
+
+    case 'from-gsd2': {
+      const gsd2Import = require('./lib/gsd2-import.cjs');
+      gsd2Import.cmdFromGsd2(args.slice(1), cwd, raw);
       break;
     }
 
