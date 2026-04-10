@@ -1315,13 +1315,32 @@ Read and follow `~/.claude/get-shit-done/workflows/transition.md`, passing throu
 
 **IMPORTANT: There is NO `/gsd-transition` command. Never suggest it. The transition workflow is internal only.**
 
+Check whether CONTEXT.md already exists for the next phase:
+
+```bash
+ls .planning/phases/*{next}*/{next}-CONTEXT.md 2>/dev/null || echo "no-context"
+```
+
+If CONTEXT.md does **not** exist for the next phase, present:
+
 ```
 ## ✓ Phase {X}: {Name} Complete
 
 /gsd-progress ${GSD_WS} — see updated roadmap
-/gsd-discuss-phase {next} ${GSD_WS} — discuss next phase before planning
-/gsd-plan-phase {next} ${GSD_WS} — plan next phase
-/gsd-execute-phase {next} ${GSD_WS} — execute next phase
+/gsd-discuss-phase {next} ${GSD_WS} — start here: discuss next phase before planning  ← recommended
+/gsd-plan-phase {next} ${GSD_WS} — plan next phase (skip discuss)
+/gsd-execute-phase {next} ${GSD_WS} — execute next phase (skip discuss and plan)
+```
+
+If CONTEXT.md **exists** for the next phase, present:
+
+```
+## ✓ Phase {X}: {Name} Complete
+
+/gsd-progress ${GSD_WS} — see updated roadmap
+/gsd-plan-phase {next} ${GSD_WS} — start here: plan next phase (CONTEXT.md already present)  ← recommended
+/gsd-discuss-phase {next} ${GSD_WS} — re-discuss next phase
+/gsd-execute-phase {next} ${GSD_WS} — execute next phase (skip planning)
 ```
 
 Only suggest the commands listed above. Do not invent or hallucinate command names.
