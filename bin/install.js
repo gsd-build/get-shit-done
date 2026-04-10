@@ -443,7 +443,13 @@ function expandTilde(filePath) {
 function buildHookCommand(configDir, hookName) {
   // Use forward slashes for Node.js compatibility on all platforms
   const hooksPath = configDir.replace(/\\/g, '/') + '/hooks/' + hookName;
-  return `node "${hooksPath}"`;
+  // .sh hooks use bash; .js hooks use node. Both wrap the path in double quotes
+  // so that paths with spaces (e.g. Windows "C:/Users/First Last/") work correctly
+  // (fixes #2045). Routing .sh hooks through this function also ensures they always
+  // receive an absolute path rather than the bare relative string that the old manual
+  // concatenation produced (fixes #2046).
+  const runner = hookName.endsWith('.sh') ? 'bash' : 'node';
+  return `${runner} "${hooksPath}"`;
 }
 
 /**
@@ -6038,7 +6044,7 @@ function install(isGlobal, runtime = 'claude') {
 
     // Configure commit validation hook (Conventional Commits enforcement, opt-in)
     const validateCommitCommand = isGlobal
-      ? 'bash ' + targetDir.replace(/\\/g, '/') + '/hooks/gsd-validate-commit.sh'
+      ? buildHookCommand(targetDir, 'gsd-validate-commit.sh')
       : 'bash ' + localPrefix + '/hooks/gsd-validate-commit.sh';
     const hasValidateCommitHook = settings.hooks[preToolEvent].some(entry =>
       entry.hooks && entry.hooks.some(h => h.command && h.command.includes('gsd-validate-commit'))
@@ -6065,7 +6071,7 @@ function install(isGlobal, runtime = 'claude') {
 
     // Configure session state orientation hook (opt-in)
     const sessionStateCommand = isGlobal
-      ? 'bash ' + targetDir.replace(/\\/g, '/') + '/hooks/gsd-session-state.sh'
+      ? buildHookCommand(targetDir, 'gsd-session-state.sh')
       : 'bash ' + localPrefix + '/hooks/gsd-session-state.sh';
     const hasSessionStateHook = settings.hooks.SessionStart.some(entry =>
       entry.hooks && entry.hooks.some(h => h.command && h.command.includes('gsd-session-state'))
@@ -6087,7 +6093,7 @@ function install(isGlobal, runtime = 'claude') {
 
     // Configure phase boundary detection hook (opt-in)
     const phaseBoundaryCommand = isGlobal
-      ? 'bash ' + targetDir.replace(/\\/g, '/') + '/hooks/gsd-phase-boundary.sh'
+      ? buildHookCommand(targetDir, 'gsd-phase-boundary.sh')
       : 'bash ' + localPrefix + '/hooks/gsd-phase-boundary.sh';
     const hasPhaseBoundaryHook = settings.hooks[postToolEvent].some(entry =>
       entry.hooks && entry.hooks.some(h => h.command && h.command.includes('gsd-phase-boundary'))
