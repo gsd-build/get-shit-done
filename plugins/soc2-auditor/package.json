@@ -1,0 +1,29 @@
+{
+  "name": "gsd-plugin-soc2",
+  "version": "0.1.0",
+  "description": "SOC 2 Auditor skill plugin for GSD / Claude Code — end-to-end engagement lifecycle from kickoff to final report",
+  "bin": {
+    "gsd-plugin-soc2": "bin/install.js"
+  },
+  "files": [
+    "bin",
+    "skills",
+    "references",
+    "templates"
+  ],
+  "keywords": [
+    "soc2",
+    "audit",
+    "gsd",
+    "claude-code",
+    "compliance",
+    "aicpa",
+    "trust-service-criteria",
+    "attestation"
+  ],
+  "author": "",
+  "license": "MIT",
+  "engines": {
+    "node": ">=22.0.0"
+  }
+}

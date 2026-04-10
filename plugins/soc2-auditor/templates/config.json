@@ -1,0 +1,41 @@
+{
+  "engagement": {
+    "id": "",
+    "client": "",
+    "type": "type2",
+    "periodStart": "",
+    "periodEnd": ""
+  },
+  "firm": {
+    "name": "",
+    "address": "",
+    "phone": "",
+    "website": ""
+  },
+  "settings": {
+    "defaultConfidenceLevel": 95,
+    "defaultTolerableDeviationRate": 5,
+    "defaultExpectedDeviationRate": 0,
+    "materialityThreshold": "qualitative",
+    "wordTemplate": null
+  },
+  "sampling": {
+    "annual": { "min": 1, "max": 1 },
+    "quarterly": { "min": 2, "max": 4 },
+    "monthly": { "min": 2, "max": 5 },
+    "weekly": { "min": 5, "max": 15 },
+    "daily": { "min": 20, "max": 40 },
+    "perOccurrence": { "min": 25, "max": 60 }
+  },
+  "integrations": {
+    "platform": null,
+    "baseUrl": null,
+    "apiKeyEnvVar": null,
+    "syncEnabled": false
+  },
+  "paths": {
+    "auditDir": ".audit",
+    "evidenceDir": ".audit/workpapers",
+    "deliverablesDir": ".audit/deliverables"
+  }
+}
