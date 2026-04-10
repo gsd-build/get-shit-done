@@ -10,16 +10,16 @@
 
 ## Phase History
 
-| Phase | Started | Completed | Notes |
-|-------|---------|-----------|-------|
-| Kickoff | {{KICKOFF_DATE}} | {{KICKOFF_COMPLETE}} | |
-| Planning | | | |
-| PBC Generation | | | |
-| Sampling | | | |
-| Testing | | | |
-| Work Papers | | | |
-| Review | | | |
-| Report Packaging | | | |
+| # | Phase | Skill | Started | Completed | Notes |
+|---|-------|-------|---------|-----------|-------|
+| 1 | Kickoff | /soc2-kickoff | {{KICKOFF_DATE}} | {{KICKOFF_COMPLETE}} | |
+| 2 | Planning | /soc2-plan | | | |
+| 3 | Evidence Requests | /soc2-pbc | | | |
+| 4 | Sampling | /soc2-sample | | | |
+| 5 | Testing | /soc2-test | | | |
+| 6 | Work Papers | /soc2-workpaper | | | |
+| 7 | Peer Review | /soc2-review | | | |
+| 8 | Report Packaging | /soc2-package | | | |
 
 ## Controls Summary
 

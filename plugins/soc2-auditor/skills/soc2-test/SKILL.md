@@ -119,6 +119,8 @@ Read the engagement type from .audit/config.json:
   - Verify: control was performed, performed timely, performed by authorized personnel, evidence retained
   - Conclusion language: "suitably designed and operated effectively throughout the period"
 
+**Type I early exit:** If Type I, the test is a design walkthrough only. Inspect the control design (policy, procedure, configuration) to verify it IS suitably designed. Do not test operating instances. After the walkthrough, skip to Step 3 to record results.
+
 ## Step 2: Execute Testing by Mode
 
 ### Mode: Inspect
@@ -138,6 +140,13 @@ For each sample item in the sampling memo:
      - Does the content show the control operating as designed?
      - Are approvals/sign-offs present where expected?
      - Are the correct settings/configurations shown?
+   - **Screenshot inspection example** (MFA enforcement policy):
+     - Check: date/timestamp in top corner → must be within audit period
+     - Check: URL bar shows correct system (e.g., admin.okta.com)
+     - Check: policy setting shows "MFA Required" or equivalent
+     - Check: enforcement scope → "All Users" vs limited subset
+     - Check: policy status → "Active" not "Draft" or "Disabled"
+     - Check: last modified date → should be current/within period
    - For **documents/PDFs**: Read and verify:
      - Document date is within the audit period
      - Content matches the control description

@@ -183,16 +183,21 @@ For each identified control, determine:
 
 ### 2c: Determine Testing Approach
 
-For Type I engagements:
-- All controls: design effectiveness only (sample size = 1, walkthrough)
-- No operating effectiveness testing
-- Test methods focus on inspection and inquiry
+**Type I engagements:**
+- All controls: design effectiveness only (sample size = 1, design walkthrough)
+- No operating effectiveness testing — no sampling calculations needed
+- Test methods: inspection and inquiry only
+- Materiality focuses on design defects, not operating failures
+- CONTROL-MATRIX.md should show "Type I — Design Only" in the Test Method column
+- Timeline is typically shorter (2–4 weeks vs. 6–12 weeks for Type II)
+- Report period is "as of [date]" not a date range
 
-For Type II engagements:
+**Type II engagements:**
 - Design AND operating effectiveness
 - Sample sizes driven by frequency and risk level (per sampling tables)
-- Higher-risk controls: combination of test methods
-- IT automated controls: test 1 + validate no changes
+- Higher-risk controls: combination of test methods (inspect + reperform)
+- IT automated controls: test 1 instance + validate no changes via ITGC
+- Report period is "for the period [start] to [end]"
 
 ## Step 3: Build Audit Plan
 

@@ -28,6 +28,13 @@ npx gsd-plugin-soc2 --uninstall
 | `/soc2-review` | Peer review / engagement quality review |
 | `/soc2-package` | Final report assembly + Word (.docx) export |
 
+Additionally, two shared resource directories are installed:
+
+| Directory | Purpose |
+|-----------|---------|
+| `soc2-references/` | AICPA standards, Trust Service Criteria matrix, sampling tables, risk factors, evidence catalog, test procedures, report structure |
+| `soc2-templates/` | Document templates for all `.audit/` files (engagement, state, control matrix, work papers, report sections, etc.) |
+
 ## Workflow
 
 ```

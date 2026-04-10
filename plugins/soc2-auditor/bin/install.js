@@ -32,16 +32,19 @@ ${bold}Usage:${reset}
   npx gsd-plugin-soc2 --uninstall  Remove installed skills
 
 ${bold}What gets installed:${reset}
-  .claude/skills/soc2-kickoff/     Engagement kickoff
-  .claude/skills/soc2-plan/        Audit planning + risk assessment
-  .claude/skills/soc2-pbc/         PBC / evidence request list
-  .claude/skills/soc2-sample/      Statistical/judgmental sampling
-  .claude/skills/soc2-test/        Control testing + evidence review
-  .claude/skills/soc2-workpaper/   Work paper assembly
-  .claude/skills/soc2-review/      Peer review / quality review
-  .claude/skills/soc2-package/     Final report assembly + Word export
-  .claude/skills/soc2-references/  Shared reference knowledge base
-  .claude/skills/soc2-templates/   Shared document templates
+  Skills (8):
+    .claude/skills/soc2-kickoff/     Phase 1: Engagement kickoff
+    .claude/skills/soc2-plan/        Phase 2: Audit planning + risk assessment
+    .claude/skills/soc2-pbc/         Phase 3: PBC / evidence request list
+    .claude/skills/soc2-sample/      Phase 4: Statistical/judgmental sampling
+    .claude/skills/soc2-test/        Phase 5: Control testing + evidence review
+    .claude/skills/soc2-workpaper/   Phase 6: Work paper assembly
+    .claude/skills/soc2-review/      Phase 7: Peer review / quality review
+    .claude/skills/soc2-package/     Phase 8: Final report assembly + Word export
+
+  Shared resources (loaded by skills via @ references):
+    .claude/skills/soc2-references/  AICPA standards, TSC criteria, sampling tables
+    .claude/skills/soc2-templates/   Document templates for .audit/ files
 `);
   process.exit(0);
 }

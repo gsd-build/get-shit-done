@@ -176,6 +176,19 @@ Standard test procedures for SOC 2 control testing by control type and category.
 6. Verify contractual security requirements are in place (DPA, security addendum)
 7. For SOC reports: verify CUEC (complementary user entity controls) are addressed
 
+**Procedure: Test Subservice Organization Controls**
+1. Obtain list of subservice organizations from SCOPE.md
+2. For each subservice org using carve-out method:
+   - Obtain their current SOC 1 or SOC 2 report
+   - Verify the report covers the audit period (or gap ≤ 3 months)
+   - Verify the report opinion is unqualified (flag if qualified/adverse)
+   - Review CUECs — verify the entity has implemented each applicable CUEC
+   - Review exceptions in the subservice org's report — assess impact on the entity's controls
+3. For each subservice org using inclusive method:
+   - The subservice org's controls are included in the entity's description and tested directly
+   - Verify testing covers the subservice org's relevant controls
+4. Document: which CUECs are applicable, which are implemented, which have gaps
+
 ### A1 — Availability
 
 #### A1.2 — Backup and Recovery
@@ -197,23 +210,6 @@ Standard test procedures for SOC 2 control testing by control type and category.
 2. Inspect application configuration for validation rules
 3. Reperform: attempt to submit invalid inputs; verify rejection
 4. Select sample of processing errors/exceptions; verify handling per policy
-
-### CC9 — Risk Mitigation (Subservice Organizations)
-
-#### CC9.2 — Vendor and Subservice Organization Management
-
-**Procedure: Test Subservice Organization Controls**
-1. Obtain list of subservice organizations from SCOPE.md
-2. For each subservice org with carve-out method:
-   a. Obtain their current SOC 1 or SOC 2 report
-   b. Verify the report covers the audit period (or acceptable gap ≤ 3 months)
-   c. Verify the report opinion is unqualified (flag if qualified/adverse)
-   d. Review Complementary User Entity Controls (CUECs) — verify the entity has implemented each applicable CUEC
-   e. Review exceptions in the subservice org's report — assess impact on the entity's system
-3. For each subservice org with inclusive method:
-   a. The subservice org's controls are included in the entity's description and tested directly
-   b. Verify the testing covers the subservice org's relevant controls
-4. Document: which CUECs are applicable, which are implemented, which have gaps
 
 ---
 

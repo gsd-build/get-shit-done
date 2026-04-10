@@ -295,7 +295,12 @@ For each control in the control matrix:
 |----------------------|-----------------|-------------|-----------------|---------|
 | CC6.1 | [Control description] | Inspected | [Procedure summary from work paper] | [Result] |
 
-### Format results:
+### Type I Results Format:
+- **Test Applied:** "Inspected"
+- **Results (effective):** "The control is suitably designed as of [date] to [objective]. No design deficiencies noted."
+- **Results (deficiency):** "The control design does not adequately address [criteria] because [deficiency description]."
+
+### Type II Results Format:
 - **No exceptions:** "No exceptions noted."
 - **Exceptions:** "[N] of [sample size] items tested exhibited [specific deviation]. The exception resulted from [root cause]. [Management response if applicable]."
 

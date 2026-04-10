@@ -65,7 +65,7 @@ Display the following to the auditor before doing anything else:
 
 ## Step 0: Load Engagement Context
 
-Read `.audit/ENGAGEMENT.md`, `.audit/SCOPE.md`, and `.audit/CONTROL-MATRIX.md`.
+Read `.audit/ENGAGEMENT.md`, `.audit/SCOPE.md`, `.audit/CONTROL-MATRIX.md`, and `.audit/STATE.md`.
 
 If CONTROL-MATRIX.md doesn't exist, tell the user to run `/soc2-plan` first and stop.
 

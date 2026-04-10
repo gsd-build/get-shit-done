@@ -95,18 +95,14 @@ Before proceeding, check the control's status in CONTROL-MATRIX.md:
 
 ## Step 1: Determine Sampling Method
 
-### Type I Early Exit
-
-If the engagement type is Type I (read from .audit/ENGAGEMENT.md or .audit/config.json):
-- **Sample size = 1 for every control.** Type I tests design effectiveness only.
-- Skip all sampling method calculations.
-- Select 1 representative instance of the control operating.
-- The sampling memo documents this as "Type I design walkthrough — single instance."
-- Proceed directly to Step 3 (present for confirmation) then Step 4 (write memo).
-
 ### Decision Logic
 
-1. **Type I engagement** → Sample size = 1 for all controls (design walkthrough only). Skip to Step 4.
+1. **Type I engagement** (read from .audit/config.json):
+   - **Sample size = 1 for every control.** Type I tests design effectiveness only.
+   - Skip all method calculations below.
+   - Select 1 representative instance of the control.
+   - The sampling memo documents this as "Type I design walkthrough — single instance."
+   - Proceed directly to Step 3 (confirm) then Step 4 (write memo).
 
 2. **IT automated control** (system-enforced, no human judgment):
    - Sample size = 1
