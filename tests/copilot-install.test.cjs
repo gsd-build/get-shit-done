@@ -139,8 +139,8 @@ describe('Source code integration (Copilot)', () => {
     assert.ok(src.includes('--copilot'), 'help text has --copilot option');
   });
 
-  test('CLI-02: promptRuntime runtimeMap has Copilot as option 6', () => {
-    assert.ok(src.includes("'6': 'copilot'"), 'runtimeMap has 6 -> copilot');
+  test('CLI-02: promptRuntime runtimeMap has Copilot as option 7', () => {
+    assert.ok(src.includes("'7': 'copilot'"), 'runtimeMap has 7 -> copilot');
   });
 
   test('CLI-02: promptRuntime allRuntimes array includes copilot', () => {

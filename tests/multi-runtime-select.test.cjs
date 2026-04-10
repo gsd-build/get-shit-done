@@ -21,17 +21,18 @@ const runtimeMap = {
   '1': 'claude',
   '2': 'antigravity',
   '3': 'augment',
-  '4': 'codebuddy',
-  '5': 'codex',
-  '6': 'copilot',
-  '7': 'cursor',
-  '8': 'gemini',
-  '9': 'kilo',
-  '10': 'opencode',
-  '11': 'trae',
-  '12': 'windsurf'
+  '4': 'cline',
+  '5': 'codebuddy',
+  '6': 'codex',
+  '7': 'copilot',
+  '8': 'cursor',
+  '9': 'gemini',
+  '10': 'kilo',
+  '11': 'opencode',
+  '12': 'trae',
+  '13': 'windsurf'
 };
-const allRuntimes = ['claude', 'antigravity', 'augment', 'codebuddy', 'codex', 'copilot', 'cursor', 'gemini', 'kilo', 'opencode', 'trae', 'windsurf'];
+const allRuntimes = ['claude', 'antigravity', 'augment', 'cline', 'codebuddy', 'codex', 'copilot', 'cursor', 'gemini', 'kilo', 'opencode', 'trae', 'windsurf'];
 
 /**
  * Simulate the parsing logic from promptRuntime without requiring readline.
@@ -40,7 +41,7 @@ const allRuntimes = ['claude', 'antigravity', 'augment', 'codebuddy', 'codex', '
 function parseRuntimeInput(input) {
   input = input.trim() || '1';
 
-  if (input === '13') {
+  if (input === '14') {
     return allRuntimes;
   }
 
@@ -61,42 +62,43 @@ describe('multi-runtime selection parsing', () => {
     assert.deepStrictEqual(parseRuntimeInput('1'), ['claude']);
     assert.deepStrictEqual(parseRuntimeInput('2'), ['antigravity']);
     assert.deepStrictEqual(parseRuntimeInput('3'), ['augment']);
-    assert.deepStrictEqual(parseRuntimeInput('4'), ['codebuddy']);
-    assert.deepStrictEqual(parseRuntimeInput('5'), ['codex']);
-    assert.deepStrictEqual(parseRuntimeInput('6'), ['copilot']);
-    assert.deepStrictEqual(parseRuntimeInput('7'), ['cursor']);
+    assert.deepStrictEqual(parseRuntimeInput('4'), ['cline']);
+    assert.deepStrictEqual(parseRuntimeInput('5'), ['codebuddy']);
+    assert.deepStrictEqual(parseRuntimeInput('6'), ['codex']);
+    assert.deepStrictEqual(parseRuntimeInput('7'), ['copilot']);
+    assert.deepStrictEqual(parseRuntimeInput('8'), ['cursor']);
   });
 
   test('comma-separated choices return multiple runtimes', () => {
-    assert.deepStrictEqual(parseRuntimeInput('1,6,8'), ['claude', 'copilot', 'gemini']);
+    assert.deepStrictEqual(parseRuntimeInput('1,7,9'), ['claude', 'copilot', 'gemini']);
     assert.deepStrictEqual(parseRuntimeInput('2,3'), ['antigravity', 'augment']);
-    assert.deepStrictEqual(parseRuntimeInput('3,5'), ['augment', 'codex']);
+    assert.deepStrictEqual(parseRuntimeInput('3,6'), ['augment', 'codex']);
   });
 
   test('space-separated choices return multiple runtimes', () => {
-    assert.deepStrictEqual(parseRuntimeInput('1 6 8'), ['claude', 'copilot', 'gemini']);
-    assert.deepStrictEqual(parseRuntimeInput('7 9'), ['cursor', 'kilo']);
+    assert.deepStrictEqual(parseRuntimeInput('1 7 9'), ['claude', 'copilot', 'gemini']);
+    assert.deepStrictEqual(parseRuntimeInput('8 10'), ['cursor', 'kilo']);
   });
 
   test('mixed comma and space separators work', () => {
-    assert.deepStrictEqual(parseRuntimeInput('1, 6, 8'), ['claude', 'copilot', 'gemini']);
-    assert.deepStrictEqual(parseRuntimeInput('2 , 7'), ['antigravity', 'cursor']);
+    assert.deepStrictEqual(parseRuntimeInput('1, 7, 9'), ['claude', 'copilot', 'gemini']);
+    assert.deepStrictEqual(parseRuntimeInput('2 , 8'), ['antigravity', 'cursor']);
   });
 
   test('single choice for opencode', () => {
-    assert.deepStrictEqual(parseRuntimeInput('10'), ['opencode']);
+    assert.deepStrictEqual(parseRuntimeInput('11'), ['opencode']);
   });
 
   test('single choice for trae', () => {
-    assert.deepStrictEqual(parseRuntimeInput('11'), ['trae']);
+    assert.deepStrictEqual(parseRuntimeInput('12'), ['trae']);
   });
 
   test('single choice for windsurf', () => {
-    assert.deepStrictEqual(parseRuntimeInput('12'), ['windsurf']);
+    assert.deepStrictEqual(parseRuntimeInput('13'), ['windsurf']);
   });
 
-  test('choice 13 returns all runtimes', () => {
-    assert.deepStrictEqual(parseRuntimeInput('13'), allRuntimes);
+  test('choice 14 returns all runtimes', () => {
+    assert.deepStrictEqual(parseRuntimeInput('14'), allRuntimes);
   });
 
   test('empty input defaults to claude', () => {
@@ -105,29 +107,29 @@ describe('multi-runtime selection parsing', () => {
   });
 
   test('invalid choices are ignored, falls back to claude if all invalid', () => {
-    assert.deepStrictEqual(parseRuntimeInput('14'), ['claude']);
+    assert.deepStrictEqual(parseRuntimeInput('15'), ['claude']);
     assert.deepStrictEqual(parseRuntimeInput('0'), ['claude']);
     assert.deepStrictEqual(parseRuntimeInput('abc'), ['claude']);
   });
 
   test('invalid choices mixed with valid are filtered out', () => {
-    assert.deepStrictEqual(parseRuntimeInput('1,14,6'), ['claude', 'copilot']);
+    assert.deepStrictEqual(parseRuntimeInput('1,15,7'), ['claude', 'copilot']);
     assert.deepStrictEqual(parseRuntimeInput('abc 3 xyz'), ['augment']);
   });
 
   test('duplicate choices are deduplicated', () => {
     assert.deepStrictEqual(parseRuntimeInput('1,1,1'), ['claude']);
-    assert.deepStrictEqual(parseRuntimeInput('6,6,8,8'), ['copilot', 'gemini']);
+    assert.deepStrictEqual(parseRuntimeInput('7,7,9,9'), ['copilot', 'gemini']);
   });
 
   test('preserves selection order', () => {
-    assert.deepStrictEqual(parseRuntimeInput('8,1,6'), ['gemini', 'claude', 'copilot']);
-    assert.deepStrictEqual(parseRuntimeInput('9,2,7'), ['kilo', 'antigravity', 'cursor']);
+    assert.deepStrictEqual(parseRuntimeInput('9,1,7'), ['gemini', 'claude', 'copilot']);
+    assert.deepStrictEqual(parseRuntimeInput('10,2,8'), ['kilo', 'antigravity', 'cursor']);
   });
 });
 
 describe('install.js source contains multi-select support', () => {
-  test('runtimeMap is defined with all 12 runtimes', () => {
+  test('runtimeMap is defined with all 13 runtimes', () => {
     for (const [key, name] of Object.entries(runtimeMap)) {
       assert.ok(
         installSrc.includes(`'${key}': '${name}'`),
@@ -144,21 +146,21 @@ describe('install.js source contains multi-select support', () => {
     }
   });
 
-  test('all shortcut uses option 13', () => {
+  test('all shortcut uses option 14', () => {
     assert.ok(
-      installSrc.includes("if (input === '13')"),
-      'all shortcut uses option 13'
+      installSrc.includes("if (input === '14')"),
+      'all shortcut uses option 14'
     );
   });
 
-  test('prompt lists Trae as option 11 and All as option 13', () => {
+  test('prompt lists Trae as option 12 and All as option 14', () => {
     assert.ok(
-      installSrc.includes('11${reset}) Trae'),
-      'prompt lists Trae as option 11'
+      installSrc.includes('12${reset}) Trae'),
+      'prompt lists Trae as option 12'
     );
     assert.ok(
-      installSrc.includes('13${reset}) All'),
-      'prompt lists All as option 13'
+      installSrc.includes('14${reset}) All'),
+      'prompt lists All as option 14'
     );
   });
 
