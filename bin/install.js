@@ -4313,6 +4313,23 @@ function uninstall(isGlobal, runtime = 'claude') {
         console.log(`  ${green}✓${reset} Removed ${skillCount} Antigravity skills`);
       }
     }
+  } else if (isQwen) {
+    // Qwen Code: remove skills/gsd-*/ directories (same layout as Claude Code global)
+    const skillsDir = path.join(targetDir, 'skills');
+    if (fs.existsSync(skillsDir)) {
+      let skillCount = 0;
+      const entries = fs.readdirSync(skillsDir, { withFileTypes: true });
+      for (const entry of entries) {
+        if (entry.isDirectory() && entry.name.startsWith('gsd-')) {
+          fs.rmSync(path.join(skillsDir, entry.name), { recursive: true });
+          skillCount++;
+        }
+      }
+      if (skillCount > 0) {
+        removedCount++;
+        console.log(`  ${green}✓${reset} Removed ${skillCount} Qwen Code skills`);
+      }
+    }
   } else if (isGemini) {
     // Gemini: still uses commands/gsd/
     const gsdCommandsDir = path.join(targetDir, 'commands', 'gsd');
@@ -5136,6 +5153,7 @@ function install(isGlobal, runtime = 'claude') {
   if (isWindsurf) runtimeLabel = 'Windsurf';
   if (isAugment) runtimeLabel = 'Augment';
   if (isTrae) runtimeLabel = 'Trae';
+  if (isQwen) runtimeLabel = 'Qwen Code';
 
   console.log(`  Installing for ${cyan}${runtimeLabel}${reset} to ${cyan}${locationLabel}${reset}\n`);
 
@@ -5240,6 +5258,22 @@ function install(isGlobal, runtime = 'claude') {
     const installedSkillNames = listCodexSkillNames(skillsDir);
     if (installedSkillNames.length > 0) {
       console.log(`  ${green}✓${reset} Installed ${installedSkillNames.length} skills to skills/`);
+    } else {
+      failures.push('skills/gsd-*');
+    }
+  } else if (isQwen) {
+    // Qwen Code uses skills/ format (same as Claude Code 2.1.88+)
+    const skillsDir = path.join(targetDir, 'skills');
+    const gsdSrc = path.join(src, 'commands', 'gsd');
+    copyCommandsAsClaudeSkills(gsdSrc, skillsDir, 'gsd', pathPrefix, runtime, isGlobal);
+    if (fs.existsSync(skillsDir)) {
+      const count = fs.readdirSync(skillsDir, { withFileTypes: true })
+        .filter(e => e.isDirectory() && e.name.startsWith('gsd-')).length;
+      if (count > 0) {
+        console.log(`  ${green}✓${reset} Installed ${count} skills to skills/`);
+      } else {
+        failures.push('skills/gsd-*');
+      }
     } else {
       failures.push('skills/gsd-*');
     }

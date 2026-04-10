@@ -142,21 +142,21 @@ describe('install.js source contains multi-select support', () => {
     }
   });
 
-  test('all shortcut uses option 12', () => {
+  test('all shortcut uses option 13', () => {
     assert.ok(
-      installSrc.includes("if (input === '12')"),
-      'all shortcut uses option 12'
+      installSrc.includes("if (input === '13')"),
+      'all shortcut uses option 13'
     );
   });
 
-  test('prompt lists Trae as option 10 and All as option 12', () => {
+  test('prompt lists Qwen as option 12 and All as option 13', () => {
     assert.ok(
-      installSrc.includes('10${reset}) Trae'),
-      'prompt lists Trae as option 10'
+      installSrc.includes('12${reset}) Qwen Code'),
+      'prompt lists Qwen as option 12'
     );
     assert.ok(
-      installSrc.includes('12${reset}) All'),
-      'prompt lists All as option 12'
+      installSrc.includes('13${reset}) All'),
+      'prompt lists All as option 13'
     );
   });
 
