@@ -437,8 +437,17 @@ If `SECURITY_CFG` is `true` AND `SECURITY_FILE` exists: check frontmatter `threa
 ```
 
 If `SECURITY_CFG` is `false` OR (`SECURITY_FILE` exists AND `threats_open` is `0`):
+
+**Auto-transition: mark phase complete in ROADMAP.md and STATE.md**
+
+Execute the transition workflow inline (do NOT use Task — the orchestrator context already holds the UAT results and phase data needed for accurate transition):
+
+Read and follow `~/.claude/get-shit-done/workflows/transition.md`.
+
+After transition completes, present next-step options to the user:
+
 ```
-All tests passed. Ready to continue.
+All tests passed. Phase {phase} marked complete.
 
 - `/gsd-plan-phase {next}` — Plan next phase
 - `/gsd-execute-phase {next}` — Execute next phase
