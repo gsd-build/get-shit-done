@@ -567,8 +567,9 @@ ${USE_WORKTREES !== "false" ? `
 <worktree_branch_check>
 FIRST ACTION before any other work: verify this worktree branch is based on the correct commit.
 Run: git merge-base HEAD ${EXPECTED_BASE}
-If the result differs from ${EXPECTED_BASE}, run: git reset --soft ${EXPECTED_BASE}
-This corrects a known issue on Windows where EnterWorktree creates branches from main instead of the feature branch HEAD.
+If the result differs from ${EXPECTED_BASE}, run: git reset --hard ${EXPECTED_BASE}
+This resets both HEAD and working tree to the correct base commit and is safe in a fresh worktree (#2015).
+This corrects a known issue on Windows/macOS where EnterWorktree creates branches from main instead of the feature branch HEAD.
 </worktree_branch_check>
 ` : ''}
 
