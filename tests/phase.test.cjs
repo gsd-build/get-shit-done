@@ -695,6 +695,117 @@ describe('phase add command', () => {
 });
 
 // ─────────────────────────────────────────────────────────────────────────────
+// phase add — orphan directory collision prevention (#2026)
+// ─────────────────────────────────────────────────────────────────────────────
+
+describe('phase add — orphan directory collision prevention (#2026)', () => {
+  let tmpDir;
+
+  beforeEach(() => {
+    tmpDir = createTempProject();
+  });
+
+  afterEach(() => {
+    cleanup(tmpDir);
+  });
+
+  test('orphan directory with higher number than ROADMAP pushes maxPhase up', () => {
+    // Orphan directory 05-orphan exists on disk but is NOT in ROADMAP.md
+    const orphanDir = path.join(tmpDir, '.planning', 'phases', '05-orphan');
+    fs.mkdirSync(orphanDir, { recursive: true });
+    fs.writeFileSync(path.join(orphanDir, 'SUMMARY.md'), 'existing work');
+
+    fs.writeFileSync(
+      path.join(tmpDir, '.planning', 'ROADMAP.md'),
+      [
+        '# Roadmap',
+        '## Milestone v1',
+        '### Phase 1: First phase',
+        '**Plans:** 0 plans',
+        '---',
+      ].join('\n')
+    );
+
+    const result = runGsdTools('phase add dashboard', tmpDir);
+    assert.ok(result.success, `Command failed: ${result.error}`);
+
+    const output = JSON.parse(result.output);
+    // ROADMAP max is 1, but orphan 05-orphan means disk max is 5 → new phase = 6
+    assert.strictEqual(output.phase_number, 6, 'should be phase 6 (orphan 05 pushes max to 5)');
+
+    // The new directory must be 06-dashboard, not 02-dashboard
+    assert.ok(
+      fs.existsSync(path.join(tmpDir, '.planning', 'phases', '06-dashboard')),
+      'new phase directory must be 06-dashboard, not collide with orphan 05-orphan'
+    );
+
+    // The orphan directory must be untouched
+    assert.ok(
+      fs.existsSync(path.join(orphanDir, 'SUMMARY.md')),
+      'orphan directory content must be preserved (not overwritten)'
+    );
+  });
+
+  test('orphan directories with 999.x prefix are skipped when calculating disk max', () => {
+    // 999.x backlog orphans must not inflate the next sequential phase number
+    const backlogOrphan = path.join(tmpDir, '.planning', 'phases', '999-backlog-stuff');
+    fs.mkdirSync(backlogOrphan, { recursive: true });
+
+    fs.writeFileSync(
+      path.join(tmpDir, '.planning', 'ROADMAP.md'),
+      [
+        '# Roadmap',
+        '### Phase 1: Foundation',
+        '**Plans:** 0 plans',
+        '---',
+      ].join('\n')
+    );
+
+    const result = runGsdTools('phase add new-feature', tmpDir);
+    assert.ok(result.success, `Command failed: ${result.error}`);
+
+    const output = JSON.parse(result.output);
+    // ROADMAP max is 1, disk orphan is 999 (backlog) → should be ignored → new phase = 2
+    assert.strictEqual(output.phase_number, 2, 'backlog 999.x orphan must not inflate phase count');
+    assert.ok(
+      fs.existsSync(path.join(tmpDir, '.planning', 'phases', '02-new-feature')),
+      'new phase directory should be 02-new-feature'
+    );
+  });
+
+  test('project_code prefix in orphan directory name is stripped before comparing', () => {
+    // Orphan directory has project_code prefix e.g. CK-05-orphan
+    const orphanDir = path.join(tmpDir, '.planning', 'phases', 'CK-05-old-feature');
+    fs.mkdirSync(orphanDir, { recursive: true });
+
+    fs.writeFileSync(
+      path.join(tmpDir, '.planning', 'config.json'),
+      JSON.stringify({ project_code: 'CK' })
+    );
+    fs.writeFileSync(
+      path.join(tmpDir, '.planning', 'ROADMAP.md'),
+      [
+        '# Roadmap',
+        '### Phase 1: Foundation',
+        '**Plans:** 0 plans',
+        '---',
+      ].join('\n')
+    );
+
+    const result = runGsdTools('phase add new-feature', tmpDir, { HOME: tmpDir });
+    assert.ok(result.success, `Command failed: ${result.error}`);
+
+    const output = JSON.parse(result.output);
+    // ROADMAP max is 1, disk has CK-05-old-feature → strip prefix → disk max is 5 → new phase = 6
+    assert.strictEqual(output.phase_number, 6, 'project_code prefix must be stripped before disk max calculation');
+    assert.ok(
+      fs.existsSync(path.join(tmpDir, '.planning', 'phases', 'CK-06-new-feature')),
+      'new phase directory must be CK-06-new-feature'
+    );
+  });
+});
+
+// ─────────────────────────────────────────────────────────────────────────────
 // phase add with project_code prefix
 // ─────────────────────────────────────────────────────────────────────────────
 

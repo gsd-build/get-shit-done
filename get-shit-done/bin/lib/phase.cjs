@@ -340,7 +340,9 @@ function cmdPhaseAdd(cwd, description, raw, customId) {
       if (!_newPhaseId) error('--id required when phase_naming is "custom"');
       _dirName = `${prefix}${_newPhaseId}-${slug}`;
     } else {
-      // Sequential mode: find highest integer phase number (in current milestone only)
+      // Sequential mode: find highest integer phase number from two sources:
+      // 1. ROADMAP.md (current milestone only)
+      // 2. .planning/phases/ on disk (orphan directories not tracked in roadmap)
       // Skip 999.x backlog phases — they live outside the active sequence
       const phasePattern = /#{2,4}\s*Phase\s+(\d+)[A-Z]?(?:\.\d+)*:/gi;
       let maxPhase = 0;
@@ -349,6 +351,21 @@ function cmdPhaseAdd(cwd, description, raw, customId) {
         const num = parseInt(m[1], 10);
         if (num >= 999) continue; // backlog phases use 999.x numbering
         if (num > maxPhase) maxPhase = num;
+      }
+
+      // Also scan .planning/phases/ for orphan directories not tracked in ROADMAP.
+      // Directory names follow: [PREFIX-]NN-slug (e.g. 03-api or CK-05-old-feature).
+      // Strip the optional project_code prefix before extracting the leading integer.
+      const phasesOnDisk = path.join(planningDir(cwd), 'phases');
+      if (fs.existsSync(phasesOnDisk)) {
+        const dirNumPattern = /^(?:[A-Z][A-Z0-9]*-)?(\d+)-/;
+        for (const entry of fs.readdirSync(phasesOnDisk)) {
+          const match = entry.match(dirNumPattern);
+          if (!match) continue;
+          const num = parseInt(match[1], 10);
+          if (num >= 999) continue; // skip backlog orphans
+          if (num > maxPhase) maxPhase = num;
+        }
       }
 
       _newPhaseId = maxPhase + 1;
