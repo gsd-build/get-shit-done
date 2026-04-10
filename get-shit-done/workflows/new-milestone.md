@@ -40,6 +40,8 @@ If the flag is absent, keep the current behavior of continuing phase numbering f
 
 **If no context file:**
 - Present what shipped in last milestone
+
+**Text mode (`workflow.text_mode: true` in config or `--text` flag):** Set `TEXT_MODE=true` if `--text` is present in `$ARGUMENTS` OR `text_mode` from init JSON is `true`. When TEXT_MODE is active, replace every `AskUserQuestion` call with a plain-text numbered list and ask the user to type their choice number. This is required for non-Claude runtimes (OpenAI Codex, Gemini CLI, etc.) where `AskUserQuestion` is not available.
 - Ask inline (freeform, NOT AskUserQuestion): "What do you want to build next?"
 - Wait for their response, then use AskUserQuestion to probe specifics
 - If user selects "Other" at any point to provide freeform input, ask follow-up as plain text — not another AskUserQuestion

@@ -164,6 +164,8 @@ Exit WITHOUT writing any files. This is the safety gate — no PLAN.md is writte
 
 **If only WARNINGS and/or INFO (no blockers):**
 
+
+**Text mode (`workflow.text_mode: true` in config or `--text` flag):** Set `TEXT_MODE=true` if `--text` is present in `$ARGUMENTS` OR `text_mode` from init JSON is `true`. When TEXT_MODE is active, replace every `AskUserQuestion` call with a plain-text numbered list and ask the user to type their choice number. This is required for non-Claude runtimes (OpenAI Codex, Gemini CLI, etc.) where `AskUserQuestion` is not available.
 Ask via AskUserQuestion using the approve-revise-abort pattern:
 - question: "Review the warnings above. Proceed with import?"
 - header: "Approve?"

@@ -84,6 +84,8 @@ Assemble the complete doc queue from always-on docs plus conditional docs from c
 If CONTRIBUTING.md is in the conditional queue AND does NOT appear in the `existing_docs` array from init JSON:
 
 1. If `--force` is present in `$ARGUMENTS`: skip this check, include CONTRIBUTING.md in the queue.
+
+**Text mode (`workflow.text_mode: true` in config or `--text` flag):** Set `TEXT_MODE=true` if `--text` is present in `$ARGUMENTS` OR `text_mode` from init JSON is `true`. When TEXT_MODE is active, replace every `AskUserQuestion` call with a plain-text numbered list and ask the user to type their choice number. This is required for non-Claude runtimes (OpenAI Codex, Gemini CLI, etc.) where `AskUserQuestion` is not available.
 2. Otherwise, use AskUserQuestion to confirm:
 
 ```

@@ -93,6 +93,8 @@ No phase directories found to archive. Phases may have been removed or archived 
 
 Stop here.
 
+
+**Text mode (`workflow.text_mode: true` in config or `--text` flag):** Set `TEXT_MODE=true` if `--text` is present in `$ARGUMENTS` OR `text_mode` from init JSON is `true`. When TEXT_MODE is active, replace every `AskUserQuestion` call with a plain-text numbered list and ask the user to type their choice number. This is required for non-Claude runtimes (OpenAI Codex, Gemini CLI, etc.) where `AskUserQuestion` is not available.
 AskUserQuestion: "Proceed with archiving?" with options: "Yes — archive listed phases" | "Cancel"
 
 If "Cancel": Stop.
