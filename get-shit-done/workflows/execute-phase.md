@@ -510,6 +510,15 @@ Execute each selected wave in sequence. Within a wave: parallel if `PARALLELIZAT
        # Snapshot list of files on main BEFORE merge to detect resurrections
        PRE_MERGE_FILES=$(git ls-files .planning/)
 
+       # Pre-merge deletion check: warn if the worktree branch deletes tracked files
+       DELETIONS=$(git diff --diff-filter=D --name-only HEAD..."$WT_BRANCH" 2>/dev/null || true)
+       if [ -n "$DELETIONS" ]; then
+         echo "BLOCKED: Worktree branch $WT_BRANCH contains file deletions: $DELETIONS"
+         echo "Review these deletions before merging. If intentional, remove this guard and re-run."
+         rm -f "$STATE_BACKUP" "$ROADMAP_BACKUP"
+         continue
+       fi
+
        # Merge the worktree branch into the current branch
        git merge "$WT_BRANCH" --no-edit -m "chore: merge executor worktree ($WT_BRANCH)" 2>&1 || {
          echo "⚠ Merge conflict from worktree $WT_BRANCH — resolve manually"
