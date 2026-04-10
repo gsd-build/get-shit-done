@@ -252,6 +252,16 @@ describe('config-set command', () => {
     assert.strictEqual(config.git.base_branch, 'master');
   });
 
+  test('sets intel.enabled to opt into the intel subsystem', () => {
+    writeConfig(tmpDir, {});
+
+    const result = runGsdTools('config-set intel.enabled true', tmpDir);
+    assert.ok(result.success, `Command failed: ${result.error}`);
+
+    const config = readConfig(tmpDir);
+    assert.strictEqual(config.intel.enabled, true);
+  });
+
   test('errors when no key path provided', () => {
     const result = runGsdTools('config-set', tmpDir);
     assert.strictEqual(result.success, false);

@@ -308,6 +308,14 @@ Set via `learnings.*` namespace (e.g., `"learnings": { "max_inject": 5 }`). Used
 |-----|------|---------|----------------|-------------|
 | `learnings.max_inject` | number | `10` | Any positive integer | Maximum number of global learning entries to inject into agent prompts per session |
 
+### Intel Fields
+
+Set via `intel.*` namespace (e.g., `"intel": { "enabled": true }`). Controls the queryable codebase intelligence system consumed by `/gsd-intel`.
+
+| Key | Type | Default | Allowed Values | Description |
+|-----|------|---------|----------------|-------------|
+| `intel.enabled` | boolean | `false` | `true`, `false` | Enable queryable codebase intelligence system. When `true`, `/gsd-intel` commands build and query a JSON index in `.planning/intel/`. |
+
 ### Manager Fields
 
 Set via `manager.*` namespace (e.g., `"manager": { "flags": { "discuss": "--auto" } }`).

@@ -36,6 +36,7 @@ const VALID_CONFIG_KEYS = new Set([
   'project_code', 'phase_naming',
   'manager.flags.discuss', 'manager.flags.plan', 'manager.flags.execute',
   'response_language',
+  'intel.enabled',
 ]);
 
 /**
