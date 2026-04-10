@@ -316,17 +316,22 @@ Update `.audit/STATE.md`:
     .audit/CONTROL-MATRIX.md
     .audit/STATE.md
 
-  ─────────────────────────────────────────────────────────
-  WORKFLOW TRACKER (Phase 5 of 8)
-  ─────────────────────────────────────────────────────────
-  Controls tested: {{TESTED}} / {{TOTAL}}
-  Effective: {{EFFECTIVE_COUNT}}  |  Exceptions: {{EXCEPTION_COUNT}}
-  Remaining: {{REMAINING}}
-  ─────────────────────────────────────────────────────────
+  Progress: {{TESTED}}/{{TOTAL}} controls tested
+    Effective: {{EFFECTIVE_COUNT}} | Exceptions: {{EXCEPTION_COUNT}}
 
   Next steps:
     - Test more controls: /soc2-test <next-control-id>
     - When all controls tested: /soc2-workpaper all
+
+  Full workflow:
+    1. /soc2-kickoff   (complete)
+    2. /soc2-plan      (complete)
+    3. /soc2-pbc       (complete)
+    4. /soc2-sample    (complete)
+    5. /soc2-test      ← YOU ARE HERE
+    6. /soc2-workpaper ← NEXT (when all controls tested)
+    7. /soc2-review
+    8. /soc2-package
 ===========================================================
 ```
 
