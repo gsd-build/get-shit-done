@@ -712,7 +712,7 @@ function cmdPhaseComplete(cwd, phaseNum, raw) {
         `(-\\s*\\[)[ ](\\]\\s*.*Phase\\s+${escapeRegex(phaseNum)}[:\\s][^\\n]*)`,
         'i'
       );
-      roadmapContent = replaceInCurrentMilestone(roadmapContent, checkboxPattern, `$1x$2 (completed ${today})`);
+      roadmapContent = roadmapContent.replace(checkboxPattern, `$1x$2 (completed ${today})`);
 
       // Progress table: update Status to Complete, add date (handles 4 or 5 column tables)
       const phaseEscaped = escapeRegex(phaseNum);
@@ -736,13 +736,20 @@ function cmdPhaseComplete(cwd, phaseNum, raw) {
         return '|' + cells.join('|') + '|';
       });
 
-      // Update plan count in phase section
+      // Update plan count in phase section.
+      // Use direct .replace() rather than replaceInCurrentMilestone() so this
+      // works when the current milestone section is itself inside a <details>
+      // block (the standard /gsd-new-project layout). replaceInCurrentMilestone
+      // scopes to content after the last </details>, which misses content inside
+      // the current milestone's own <details> wrapper (#2005).
+      // The phase-scoped heading pattern is specific enough to avoid matching
+      // archived phases (which belong to different milestones).
       const planCountPattern = new RegExp(
         `(#{2,4}\\s*Phase\\s+${phaseEscaped}[\\s\\S]*?\\*\\*Plans:\\*\\*\\s*)[^\\n]+`,
         'i'
       );
-      roadmapContent = replaceInCurrentMilestone(
-        roadmapContent, planCountPattern,
+      roadmapContent = roadmapContent.replace(
+        planCountPattern,
         `$1${summaryCount}/${planCount} plans complete`
       );
 

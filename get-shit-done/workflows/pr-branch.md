@@ -1,7 +1,8 @@
 <purpose>
-Create a clean branch for pull requests by filtering out .planning/ commits.
-The PR branch contains only code changes — reviewers don't see GSD artifacts
-(PLAN.md, SUMMARY.md, STATE.md, CONTEXT.md, etc.).
+Create a clean branch for pull requests by filtering out transient .planning/ commits.
+The PR branch contains only code changes and structural planning state — reviewers
+don't see GSD transient artifacts (PLAN.md, SUMMARY.md, CONTEXT.md, RESEARCH.md, etc.)
+but milestone archives, STATE.md, ROADMAP.md, and PROJECT.md changes are preserved.
 
 Uses git cherry-pick with path filtering to rebuild a clean history.
 </purpose>
@@ -48,24 +49,47 @@ Classify commits:
 git log --oneline "$TARGET".."$CURRENT_BRANCH" --no-merges
 ```
 
-For each commit, check if it ONLY touches .planning/ files:
+**Structural planning files** — always preserved (repository planning state):
+- `.planning/STATE.md`
+- `.planning/ROADMAP.md`
+- `.planning/MILESTONES.md`
+- `.planning/PROJECT.md`
+- `.planning/REQUIREMENTS.md`
+- `.planning/milestones/**`
+
+**Transient planning files** — excluded from PR branch (reviewer noise):
+- `.planning/phases/**` (PLAN.md, SUMMARY.md, CONTEXT.md, RESEARCH.md, etc.)
+- `.planning/quick/**`
+- `.planning/research/**`
+- `.planning/threads/**`
+- `.planning/todos/**`
+- `.planning/debug/**`
+- `.planning/seeds/**`
+- `.planning/codebase/**`
+- `.planning/ui-reviews/**`
+
+For each commit, check what it touches:
 
 ```bash
 # For each commit hash
 FILES=$(git diff-tree --no-commit-id --name-only -r $HASH)
-ALL_PLANNING=$(echo "$FILES" | grep -v "^\.planning/" | wc -l)
+NON_PLANNING=$(echo "$FILES" | grep -v "^\.planning/" | wc -l)
+STRUCTURAL=$(echo "$FILES" | grep -E "^\.planning/(STATE|ROADMAP|MILESTONES|PROJECT|REQUIREMENTS)\.md|^\.planning/milestones/" | wc -l)
+TRANSIENT_ONLY=$(echo "$FILES" | grep "^\.planning/" | grep -vE "^\.planning/(STATE|ROADMAP|MILESTONES|PROJECT|REQUIREMENTS)\.md|^\.planning/milestones/" | wc -l)
 ```
 
 Classify:
 - **Code commits**: Touch at least one non-.planning/ file → INCLUDE
-- **Planning-only commits**: Touch only .planning/ files → EXCLUDE
-- **Mixed commits**: Touch both → INCLUDE (planning changes come along)
+- **Structural planning commits**: Touch only structural .planning/ files (STATE.md, ROADMAP.md, MILESTONES.md, PROJECT.md, REQUIREMENTS.md, milestones/**) → INCLUDE
+- **Transient planning commits**: Touch only transient .planning/ files (phases/, quick/, research/, etc.) → EXCLUDE
+- **Mixed commits**: Touch code + any planning files → INCLUDE (transient planning changes come along; acceptable in mixed context)
 
 Display analysis:
 ```
-Commits to include: {N} (code changes)
-Commits to exclude: {N} (planning-only)
+Commits to include: {N} (code changes + structural planning)
+Commits to exclude: {N} (transient planning-only)
 Mixed commits: {N} (code + planning — included)
+Structural planning commits: {N} (STATE/ROADMAP/milestone updates — included)
 ```
 </step>
 
@@ -77,13 +101,17 @@ PR_BRANCH="${CURRENT_BRANCH}-pr"
 git checkout -b "$PR_BRANCH" "$TARGET"
 ```
 
-Cherry-pick only code commits (in order):
+Cherry-pick code commits and structural planning commits (in order):
 
 ```bash
-for HASH in $CODE_COMMITS; do
+for HASH in $CODE_AND_STRUCTURAL_COMMITS; do
   git cherry-pick "$HASH" --no-commit
-  # Remove any .planning/ files that came along in mixed commits
-  git rm -r --cached .planning/ 2>/dev/null || true
+  # Remove only transient .planning/ subdirectories that came along in mixed commits.
+  # DO NOT remove structural files (STATE.md, ROADMAP.md, MILESTONES.md, PROJECT.md,
+  # REQUIREMENTS.md, milestones/) — these must survive into the PR branch.
+  for dir in phases quick research threads todos debug seeds codebase ui-reviews; do
+    git rm -r --cached ".planning/$dir/" 2>/dev/null || true
+  done
   git commit -C "$HASH"
 done
 ```

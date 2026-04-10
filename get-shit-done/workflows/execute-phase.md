@@ -351,10 +351,15 @@ Execute each selected wave in sequence. Within a wave: parallel if `PARALLELIZAT
        ```
 
        If `ACTUAL_BASE` != `{EXPECTED_BASE}` (i.e. the worktree branch was created from an older
-       base such as `main` instead of the feature branch HEAD), reset the branch to start from
-       the correct base:
+       base such as `main` instead of the feature branch HEAD), hard-reset to the correct base:
        ```bash
+       # Safe: this runs before any agent work, so no uncommitted changes to lose
        git reset --hard {EXPECTED_BASE}
+       # Verify correction succeeded
+       if [ "$(git rev-parse HEAD)" != "{EXPECTED_BASE}" ]; then
+         echo "ERROR: Could not correct worktree base — aborting to prevent data loss"
+         exit 1
+       fi
        ```
 
        `reset --hard` is safe here because this is a fresh worktree with no user changes. It
@@ -362,8 +367,8 @@ Execute each selected wave in sequence. Within a wave: parallel if `PARALLELIZAT
 
        If `ACTUAL_BASE` == `{EXPECTED_BASE}`: the branch base is correct, proceed immediately.
 
-       This check fixes a known issue on Windows/macOS where `EnterWorktree` creates branches
-       from `main` instead of the current feature branch HEAD.
+       This check fixes a known issue where `EnterWorktree` creates branches from
+       `main` instead of the current feature branch HEAD (affects all platforms).
        </worktree_branch_check>
 
        <parallel_execution>
@@ -1313,13 +1318,32 @@ Read and follow `~/.claude/get-shit-done/workflows/transition.md`, passing throu
 
 **IMPORTANT: There is NO `/gsd-transition` command. Never suggest it. The transition workflow is internal only.**
 
+Check whether CONTEXT.md already exists for the next phase:
+
+```bash
+ls .planning/phases/*{next}*/{next}-CONTEXT.md 2>/dev/null || echo "no-context"
+```
+
+If CONTEXT.md does **not** exist for the next phase, present:
+
 ```
 ## ✓ Phase {X}: {Name} Complete
 
 /gsd-progress ${GSD_WS} — see updated roadmap
-/gsd-discuss-phase {next} ${GSD_WS} — discuss next phase before planning
-/gsd-plan-phase {next} ${GSD_WS} — plan next phase
-/gsd-execute-phase {next} ${GSD_WS} — execute next phase
+/gsd-discuss-phase {next} ${GSD_WS} — start here: discuss next phase before planning  ← recommended
+/gsd-plan-phase {next} ${GSD_WS} — plan next phase (skip discuss)
+/gsd-execute-phase {next} ${GSD_WS} — execute next phase (skip discuss and plan)
+```
+
+If CONTEXT.md **exists** for the next phase, present:
+
+```
+## ✓ Phase {X}: {Name} Complete
+
+/gsd-progress ${GSD_WS} — see updated roadmap
+/gsd-plan-phase {next} ${GSD_WS} — start here: plan next phase (CONTEXT.md already present)  ← recommended
+/gsd-discuss-phase {next} ${GSD_WS} — re-discuss next phase
+/gsd-execute-phase {next} ${GSD_WS} — execute next phase (skip planning)
 ```
 
 Only suggest the commands listed above. Do not invent or hallucinate command names.

@@ -313,11 +313,19 @@ function cmdCommit(cwd, message, files, raw, amend, noVerify) {
   }
 
   // Stage files
-  const filesToStage = files && files.length > 0 ? files : ['.planning/'];
+  const explicitFiles = files && files.length > 0;
+  const filesToStage = explicitFiles ? files : ['.planning/'];
   for (const file of filesToStage) {
     const fullPath = path.join(cwd, file);
     if (!fs.existsSync(fullPath)) {
-      // File was deleted/moved — stage the deletion
+      if (explicitFiles) {
+        // Caller passed an explicit --files list: missing files are skipped.
+        // Staging a deletion here would silently remove tracked planning files
+        // (e.g. STATE.md, ROADMAP.md) when they are temporarily absent (#2014).
+        continue;
+      }
+      // Default mode (staging all of .planning/): stage the deletion so
+      // removed planning files are not left dangling in the index.
       execGit(cwd, ['rm', '--cached', '--ignore-unmatch', file]);
     } else {
       execGit(cwd, ['add', file]);

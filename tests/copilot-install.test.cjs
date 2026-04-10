@@ -139,8 +139,8 @@ describe('Source code integration (Copilot)', () => {
     assert.ok(src.includes('--copilot'), 'help text has --copilot option');
   });
 
-  test('CLI-02: promptRuntime runtimeMap has Copilot as option 6', () => {
-    assert.ok(src.includes("'6': 'copilot'"), 'runtimeMap has 6 -> copilot');
+  test('CLI-02: promptRuntime runtimeMap has Copilot as option 7', () => {
+    assert.ok(src.includes("'7': 'copilot'"), 'runtimeMap has 7 -> copilot');
   });
 
   test('CLI-02: promptRuntime allRuntimes array includes copilot', () => {
@@ -1180,6 +1180,7 @@ describe('E2E: Copilot full install verification', () => {
     const gsdAgents = files.filter(f => f.startsWith('gsd-') && f.endsWith('.agent.md')).sort();
     const expected = [
       'gsd-advisor-researcher.agent.md',
+      'gsd-ai-researcher.agent.md',
       'gsd-assumptions-analyzer.agent.md',
       'gsd-code-fixer.agent.md',
       'gsd-code-reviewer.agent.md',
@@ -1187,7 +1188,11 @@ describe('E2E: Copilot full install verification', () => {
       'gsd-debugger.agent.md',
       'gsd-doc-verifier.agent.md',
       'gsd-doc-writer.agent.md',
+      'gsd-domain-researcher.agent.md',
+      'gsd-eval-auditor.agent.md',
+      'gsd-eval-planner.agent.md',
       'gsd-executor.agent.md',
+      'gsd-framework-selector.agent.md',
       'gsd-integration-checker.agent.md',
       'gsd-intel-updater.agent.md',
       'gsd-nyquist-auditor.agent.md',

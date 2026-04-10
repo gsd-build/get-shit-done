@@ -241,6 +241,46 @@ If "Run discuss-phase first":
   ```
   **Exit the plan-phase workflow. Do not continue.**
 
+## 4.5. Check AI-SPEC
+
+**Skip if:** `ai_integration_phase_enabled` from config is false, or `--skip-ai-spec` flag provided.
+
+```bash
+AI_SPEC_FILE=$(ls "${PHASE_DIR}"/*-AI-SPEC.md 2>/dev/null | head -1)
+AI_PHASE_CFG=$(node "$HOME/.claude/get-shit-done/bin/gsd-tools.cjs" config-get workflow.ai_integration_phase 2>/dev/null || echo "true")
+```
+
+**Skip if `AI_PHASE_CFG` is `false`.**
+
+**If `AI_SPEC_FILE` is empty:** Check phase goal for AI keywords:
+```bash
+echo "${phase_goal}" | grep -qi "agent\|llm\|rag\|chatbot\|embedding\|langchain\|llamaindex\|crewai\|langgraph\|openai\|anthropic\|vector\|eval\|ai system"
+```
+
+**If AI keywords detected AND no AI-SPEC.md:**
+```
+◆ Note: This phase appears to involve AI system development.
+  Consider running /gsd-ai-integration-phase {N} before planning to:
+  - Select the right framework for your use case
+  - Research its docs and best practices
+  - Design an evaluation strategy
+
+  Continue planning without AI-SPEC? (non-blocking — /gsd-ai-integration-phase can be run after)
+```
+
+Use AskUserQuestion with options:
+- "Continue — plan without AI-SPEC"
+- "Stop — I'll run /gsd-ai-integration-phase {N} first"
+
+If "Stop": Exit with `/gsd-ai-integration-phase {N}` reminder.
+If "Continue": Proceed. (Non-blocking — planner will note AI-SPEC is absent.)
+
+**If `AI_SPEC_FILE` is non-empty:** Extract framework for planner context:
+```bash
+FRAMEWORK_LINE=$(grep "Selected Framework:" "${AI_SPEC_FILE}" | head -1)
+```
+Pass `ai_spec_path` and `framework_line` to planner in step 7 so it can reference the AI design contract.
+
 ## 5. Handle Research
 
 **Skip if:** `--gaps` flag or `--skip-research` flag or `--reviews` flag.

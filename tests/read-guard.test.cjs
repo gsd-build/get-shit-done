@@ -26,14 +26,17 @@ const HOOK_PATH = path.join(__dirname, '..', 'hooks', 'gsd-read-guard.js');
  * Run the read guard hook with a given tool input payload.
  * Returns { exitCode, stdout, stderr }.
  */
-function runHook(payload) {
+function runHook(payload, envOverrides = {}) {
   const input = JSON.stringify(payload);
+  // Sanitize CLAUDE_SESSION_ID so positive-path tests work inside Claude Code sessions
+  const env = { ...process.env, CLAUDE_SESSION_ID: '', ...envOverrides };
   try {
     const stdout = execFileSync(process.execPath, [HOOK_PATH], {
       input,
       encoding: 'utf-8',
       timeout: 5000,
       stdio: ['pipe', 'pipe', 'pipe'],
+      env,
     });
     return { exitCode: 0, stdout: stdout.trim(), stderr: '' };
   } catch (err) {
@@ -220,5 +223,20 @@ describe('gsd-read-guard hook', () => {
     // file_path is a number — || '' yields '' — hook exits silently
     assert.equal(result.exitCode, 0);
     assert.equal(result.stdout, '');
+  });
+
+  // ─── Claude Code runtime skip (#1984) ─────────────────────────────────
+
+  test('skips advisory on Claude Code runtime (CLAUDE_SESSION_ID set)', () => {
+    const filePath = path.join(tmpDir, 'existing.js');
+    fs.writeFileSync(filePath, 'const x = 1;\n');
+
+    const result = runHook(
+      { tool_name: 'Edit', tool_input: { file_path: filePath, old_string: 'const x = 1;', new_string: 'const x = 2;' } },
+      { CLAUDE_SESSION_ID: 'test-session-123' }
+    );
+
+    assert.equal(result.exitCode, 0);
+    assert.equal(result.stdout, '', 'should produce no output on Claude Code');
   });
 });
