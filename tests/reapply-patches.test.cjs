@@ -7,7 +7,7 @@
  * Closes: #1469
  */
 
-const { test, describe, beforeEach, afterEach } = require('node:test');
+const { test, describe, before, beforeEach, afterEach } = require('node:test');
 const assert = require('node:assert/strict');
 const fs = require('fs');
 const path = require('path');
@@ -272,5 +272,77 @@ describe('reapply-patches workflow contract (#1469)', () => {
 
     assert.ok(content.includes('git log') || content.includes('git -C'),
       'workflow must describe git-based detection of user changes');
+  });
+});
+
+describe('reapply-patches gated hunk verification (#1999)', () => {
+  let workflowContent;
+
+  before(() => {
+    const workflowPath = path.join(__dirname, '..', 'commands', 'gsd', 'reapply-patches.md');
+    workflowContent = fs.readFileSync(workflowPath, 'utf8');
+  });
+
+  test('Step 4 requires a Hunk Verification Table output format', () => {
+    // Step 4 must mandate production of a named table with specific columns
+    assert.ok(
+      workflowContent.includes('Hunk Verification Table'),
+      'Step 4 must require production of a Hunk Verification Table'
+    );
+  });
+
+  test('Hunk Verification Table includes required columns: file, hunk_id, signature_line, line_count, verified', () => {
+    assert.ok(
+      workflowContent.includes('hunk_id'),
+      'Hunk Verification Table must include hunk_id column'
+    );
+    assert.ok(
+      workflowContent.includes('signature_line'),
+      'Hunk Verification Table must include signature_line column'
+    );
+    assert.ok(
+      workflowContent.includes('line_count'),
+      'Hunk Verification Table must include line_count column'
+    );
+    assert.ok(
+      workflowContent.includes('verified'),
+      'Hunk Verification Table must include verified column'
+    );
+  });
+
+  test('Step 5 references the Hunk Verification Table before proceeding', () => {
+    // Step 5 must consume the table produced by Step 4
+    const step5Match = workflowContent.match(/##\s+Step\s+5[^\n]*\n([\s\S]*?)(?=##\s+Step\s+6|<\/process>|$)/);
+    assert.ok(step5Match, 'Step 5 must exist in the workflow');
+
+    const step5Content = step5Match[1];
+    assert.ok(
+      step5Content.includes('Hunk Verification Table'),
+      'Step 5 must reference the Hunk Verification Table'
+    );
+  });
+
+  test('Step 5 includes an explicit gate that stops execution when verification fails', () => {
+    const step5Match = workflowContent.match(/##\s+Step\s+5[^\n]*\n([\s\S]*?)(?=##\s+Step\s+6|<\/process>|$)/);
+    assert.ok(step5Match, 'Step 5 must exist in the workflow');
+
+    const step5Content = step5Match[1];
+
+    // Must refuse to proceed when any hunk is unverified or the table is absent
+    const hasGate = (
+      step5Content.includes('verified: no') ||
+      step5Content.includes('verified: No') ||
+      step5Content.includes('"no"') ||
+      step5Content.includes('STOP')
+    ) && (
+      step5Content.includes('absent') ||
+      step5Content.includes('missing') ||
+      step5Content.includes('not present')
+    );
+
+    assert.ok(
+      hasGate,
+      'Step 5 must include an explicit gate: STOP if any row shows verified: no or the table is absent'
+    );
   });
 });
