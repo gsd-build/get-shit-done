@@ -70,6 +70,7 @@ const hasCursor = args.includes('--cursor');
 const hasWindsurf = args.includes('--windsurf');
 const hasAugment = args.includes('--augment');
 const hasTrae = args.includes('--trae');
+const hasQwen = args.includes('--qwen');
 const hasBoth = args.includes('--both'); // Legacy flag, keeps working
 const hasAll = args.includes('--all');
 const hasUninstall = args.includes('--uninstall') || args.includes('-u');
@@ -77,7 +78,7 @@ const hasUninstall = args.includes('--uninstall') || args.includes('-u');
 // Runtime selection - can be set by flags or interactive prompt
 let selectedRuntimes = [];
 if (hasAll) {
-  selectedRuntimes = ['claude', 'kilo', 'opencode', 'gemini', 'codex', 'copilot', 'antigravity', 'cursor', 'windsurf', 'augment', 'trae'];
+  selectedRuntimes = ['claude', 'kilo', 'opencode', 'gemini', 'codex', 'copilot', 'antigravity', 'cursor', 'windsurf', 'augment', 'trae', 'qwen'];
 } else if (hasBoth) {
   selectedRuntimes = ['claude', 'opencode'];
 } else {
@@ -92,6 +93,7 @@ if (hasAll) {
   if (hasWindsurf) selectedRuntimes.push('windsurf');
   if (hasAugment) selectedRuntimes.push('augment');
   if (hasTrae) selectedRuntimes.push('trae');
+  if (hasQwen) selectedRuntimes.push('qwen');
 }
 
 // WSL + Windows Node.js detection
@@ -140,6 +142,7 @@ function getDirName(runtime) {
   if (runtime === 'windsurf') return '.windsurf';
   if (runtime === 'augment') return '.augment';
   if (runtime === 'trae') return '.trae';
+  if (runtime === 'qwen') return '.qwen';
   return '.claude';
 }
 
@@ -172,6 +175,7 @@ function getConfigDirFromHome(runtime, isGlobal) {
   if (runtime === 'windsurf') return "'.windsurf'";
   if (runtime === 'augment') return "'.augment'";
   if (runtime === 'trae') return "'.trae'";
+  if (runtime === 'qwen') return "'.qwen'";
   return "'.claude'";
 }
 
@@ -334,6 +338,16 @@ function getGlobalDir(runtime, explicitDir = null) {
     return path.join(os.homedir(), '.trae');
   }
 
+  if (runtime === 'qwen') {
+    // Qwen Code: --config-dir > QWEN_CONFIG_DIR > ~/.qwen
+    if (explicitDir) {
+      return expandTilde(explicitDir);
+    }
+    if (process.env.QWEN_CONFIG_DIR) {
+      return expandTilde(process.env.QWEN_CONFIG_DIR);
+    }
+    return path.join(os.homedir(), '.qwen');
+  }
 
   // Claude Code: --config-dir > CLAUDE_CONFIG_DIR > ~/.claude
   if (explicitDir) {
@@ -393,7 +407,7 @@ if (hasUninstall) {
 
 // Show help if requested
 if (hasHelp) {
-  console.log(`  ${yellow}Usage:${reset} npx get-shit-done-cc [options]\n\n  ${yellow}Options:${reset}\n    ${cyan}-g, --global${reset}              Install globally (to config directory)\n    ${cyan}-l, --local${reset}               Install locally (to current directory)\n    ${cyan}--claude${reset}                  Install for Claude Code only\n    ${cyan}--opencode${reset}                Install for OpenCode only\n    ${cyan}--gemini${reset}                  Install for Gemini only\n    ${cyan}--kilo${reset}                    Install for Kilo only\n    ${cyan}--codex${reset}                   Install for Codex only\n    ${cyan}--copilot${reset}                 Install for Copilot only\n    ${cyan}--antigravity${reset}             Install for Antigravity only\n    ${cyan}--cursor${reset}                  Install for Cursor only\n    ${cyan}--windsurf${reset}                Install for Windsurf only\n    ${cyan}--augment${reset}                 Install for Augment only\n    ${cyan}--trae${reset}                    Install for Trae only\n    ${cyan}--all${reset}                     Install for all runtimes\n    ${cyan}-u, --uninstall${reset}           Uninstall GSD (remove all GSD files)\n    ${cyan}-c, --config-dir <path>${reset}   Specify custom config directory\n    ${cyan}-h, --help${reset}                Show this help message\n    ${cyan}--force-statusline${reset}        Replace existing statusline config\n\n  ${yellow}Examples:${reset}\n    ${dim}# Interactive install (prompts for runtime and location)${reset}\n    npx get-shit-done-cc\n\n    ${dim}# Install for Claude Code globally${reset}\n    npx get-shit-done-cc --claude --global\n\n    ${dim}# Install for Gemini globally${reset}\n    npx get-shit-done-cc --gemini --global\n\n    ${dim}# Install for Kilo globally${reset}\n    npx get-shit-done-cc --kilo --global\n\n    ${dim}# Install for Codex globally${reset}\n    npx get-shit-done-cc --codex --global\n\n    ${dim}# Install for Copilot globally${reset}\n    npx get-shit-done-cc --copilot --global\n\n    ${dim}# Install for Copilot locally${reset}\n    npx get-shit-done-cc --copilot --local\n\n    ${dim}# Install for Antigravity globally${reset}\n    npx get-shit-done-cc --antigravity --global\n\n    ${dim}# Install for Antigravity locally${reset}\n    npx get-shit-done-cc --antigravity --local\n\n    ${dim}# Install for Cursor globally${reset}\n    npx get-shit-done-cc --cursor --global\n\n    ${dim}# Install for Cursor locally${reset}\n    npx get-shit-done-cc --cursor --local\n\n    ${dim}# Install for Windsurf globally${reset}\n    npx get-shit-done-cc --windsurf --global\n\n    ${dim}# Install for Windsurf locally${reset}\n    npx get-shit-done-cc --windsurf --local\n\n    ${dim}# Install for Augment globally${reset}\n    npx get-shit-done-cc --augment --global\n\n    ${dim}# Install for Augment locally${reset}\n    npx get-shit-done-cc --augment --local\n\n    ${dim}# Install for Trae globally${reset}\n    npx get-shit-done-cc --trae --global\n\n    ${dim}# Install for Trae locally${reset}\n    npx get-shit-done-cc --trae --local\n\n    ${dim}# Install for all runtimes globally${reset}\n    npx get-shit-done-cc --all --global\n\n    ${dim}# Install to custom config directory${reset}\n    npx get-shit-done-cc --kilo --global --config-dir ~/.kilo-work\n\n    ${dim}# Install to current project only${reset}\n    npx get-shit-done-cc --claude --local\n\n    ${dim}# Uninstall GSD from Cursor globally${reset}\n    npx get-shit-done-cc --cursor --global --uninstall\n\n  ${yellow}Notes:${reset}\n    The --config-dir option is useful when you have multiple configurations.\n    It takes priority over CLAUDE_CONFIG_DIR / OPENCODE_CONFIG_DIR / GEMINI_CONFIG_DIR / KILO_CONFIG_DIR / CODEX_HOME / COPILOT_CONFIG_DIR / ANTIGRAVITY_CONFIG_DIR / CURSOR_CONFIG_DIR / WINDSURF_CONFIG_DIR / AUGMENT_CONFIG_DIR / TRAE_CONFIG_DIR environment variables.\n`);
+  console.log(`  ${yellow}Usage:${reset} npx get-shit-done-cc [options]\n\n  ${yellow}Options:${reset}\n    ${cyan}-g, --global${reset}              Install globally (to config directory)\n    ${cyan}-l, --local${reset}               Install locally (to current directory)\n    ${cyan}--claude${reset}                  Install for Claude Code only\n    ${cyan}--opencode${reset}                Install for OpenCode only\n    ${cyan}--gemini${reset}                  Install for Gemini only\n    ${cyan}--kilo${reset}                    Install for Kilo only\n    ${cyan}--codex${reset}                   Install for Codex only\n    ${cyan}--copilot${reset}                 Install for Copilot only\n    ${cyan}--antigravity${reset}             Install for Antigravity only\n    ${cyan}--cursor${reset}                  Install for Cursor only\n    ${cyan}--windsurf${reset}                Install for Windsurf only\n    ${cyan}--augment${reset}                 Install for Augment only\n    ${cyan}--trae${reset}                    Install for Trae only\n    ${cyan}--qwen${reset}                    Install for Qwen Code only\n    ${cyan}--all${reset}                     Install for all runtimes\n    ${cyan}-u, --uninstall${reset}           Uninstall GSD (remove all GSD files)\n    ${cyan}-c, --config-dir <path>${reset}   Specify custom config directory\n    ${cyan}-h, --help${reset}                Show this help message\n    ${cyan}--force-statusline${reset}        Replace existing statusline config\n\n  ${yellow}Examples:${reset}\n    ${dim}# Interactive install (prompts for runtime and location)${reset}\n    npx get-shit-done-cc\n\n    ${dim}# Install for Claude Code globally${reset}\n    npx get-shit-done-cc --claude --global\n\n    ${dim}# Install for Gemini globally${reset}\n    npx get-shit-done-cc --gemini --global\n\n    ${dim}# Install for Kilo globally${reset}\n    npx get-shit-done-cc --kilo --global\n\n    ${dim}# Install for Codex globally${reset}\n    npx get-shit-done-cc --codex --global\n\n    ${dim}# Install for Copilot globally${reset}\n    npx get-shit-done-cc --copilot --global\n\n    ${dim}# Install for Copilot locally${reset}\n    npx get-shit-done-cc --copilot --local\n\n    ${dim}# Install for Antigravity globally${reset}\n    npx get-shit-done-cc --antigravity --global\n\n    ${dim}# Install for Antigravity locally${reset}\n    npx get-shit-done-cc --antigravity --local\n\n    ${dim}# Install for Cursor globally${reset}\n    npx get-shit-done-cc --cursor --global\n\n    ${dim}# Install for Cursor locally${reset}\n    npx get-shit-done-cc --cursor --local\n\n    ${dim}# Install for Windsurf globally${reset}\n    npx get-shit-done-cc --windsurf --global\n\n    ${dim}# Install for Windsurf locally${reset}\n    npx get-shit-done-cc --windsurf --local\n\n    ${dim}# Install for Augment globally${reset}\n    npx get-shit-done-cc --augment --global\n\n    ${dim}# Install for Augment locally${reset}\n    npx get-shit-done-cc --augment --local\n\n    ${dim}# Install for Trae globally${reset}\n    npx get-shit-done-cc --trae --global\n\n    ${dim}# Install for Trae locally${reset}\n    npx get-shit-done-cc --trae --local\n\n    ${dim}# Install for Qwen Code globally${reset}\n    npx get-shit-done-cc --qwen --global\n\n    ${dim}# Install for Qwen Code locally${reset}\n    npx get-shit-done-cc --qwen --local\n\n    ${dim}# Install for all runtimes globally${reset}\n    npx get-shit-done-cc --all --global\n\n    ${dim}# Install to custom config directory${reset}\n    npx get-shit-done-cc --kilo --global --config-dir ~/.kilo-work\n\n    ${dim}# Install to current project only${reset}\n    npx get-shit-done-cc --claude --local\n\n    ${dim}# Uninstall GSD from Cursor globally${reset}\n    npx get-shit-done-cc --cursor --global --uninstall\n\n  ${yellow}Notes:${reset}\n    The --config-dir option is useful when you have multiple configurations.\n    It takes priority over CLAUDE_CONFIG_DIR / OPENCODE_CONFIG_DIR / GEMINI_CONFIG_DIR / KILO_CONFIG_DIR / CODEX_HOME / COPILOT_CONFIG_DIR / ANTIGRAVITY_CONFIG_DIR / CURSOR_CONFIG_DIR / WINDSURF_CONFIG_DIR / AUGMENT_CONFIG_DIR / TRAE_CONFIG_DIR / QWEN_CONFIG_DIR environment variables.\n`);
   process.exit(0);
 }
 
@@ -3863,6 +3877,7 @@ function copyWithPathReplacement(srcDir, destDir, pathPrefix, runtime, isCommand
   const isWindsurf = runtime === 'windsurf';
   const isAugment = runtime === 'augment';
   const isTrae = runtime === 'trae';
+  const isQwen = runtime === 'qwen';
   const dirName = getDirName(runtime);
 
   // Clean install: remove existing destination to prevent orphaned files
@@ -4145,6 +4160,7 @@ function uninstall(isGlobal, runtime = 'claude') {
   const isWindsurf = runtime === 'windsurf';
   const isAugment = runtime === 'augment';
   const isTrae = runtime === 'trae';
+  const isQwen = runtime === 'qwen';
   const dirName = getDirName(runtime);
 
   // Get the target directory based on runtime and install type
@@ -4167,6 +4183,7 @@ function uninstall(isGlobal, runtime = 'claude') {
   if (runtime === 'windsurf') runtimeLabel = 'Windsurf';
   if (runtime === 'augment') runtimeLabel = 'Augment';
   if (runtime === 'trae') runtimeLabel = 'Trae';
+  if (runtime === 'qwen') runtimeLabel = 'Qwen Code';
 
   console.log(`  Uninstalling GSD from ${cyan}${runtimeLabel}${reset} at ${cyan}${locationLabel}${reset}\n`);
 
@@ -4921,6 +4938,7 @@ function writeManifest(configDir, runtime = 'claude') {
   const isCursor = runtime === 'cursor';
   const isWindsurf = runtime === 'windsurf';
   const isTrae = runtime === 'trae';
+  const isQwen = runtime === 'qwen';
   const gsdDir = path.join(configDir, 'get-shit-done');
   const commandsDir = path.join(configDir, 'commands', 'gsd');
   const opencodeCommandDir = path.join(configDir, 'command');
@@ -5083,6 +5101,7 @@ function install(isGlobal, runtime = 'claude') {
   const isWindsurf = runtime === 'windsurf';
   const isAugment = runtime === 'augment';
   const isTrae = runtime === 'trae';
+  const isQwen = runtime === 'qwen';
   const dirName = getDirName(runtime);
   const src = path.join(__dirname, '..');
 
@@ -5869,6 +5888,7 @@ function finishInstall(settingsPath, settings, statuslineCommand, shouldInstallS
   const isCursor = runtime === 'cursor';
   const isWindsurf = runtime === 'windsurf';
   const isTrae = runtime === 'trae';
+  const isQwen = runtime === 'qwen';
 
   if (shouldInstallStatusline && !isOpencode && !isKilo && !isCodex && !isCopilot && !isCursor && !isWindsurf && !isTrae) {
     settings.statusLine = {
@@ -6024,9 +6044,10 @@ function promptRuntime(callback) {
     '8': 'kilo',
     '9': 'opencode',
     '10': 'trae',
-    '11': 'windsurf'
+    '11': 'windsurf',
+    '12': 'qwen'
   };
-  const allRuntimes = ['claude', 'antigravity', 'augment', 'codex', 'copilot', 'cursor', 'gemini', 'kilo', 'opencode', 'trae', 'windsurf'];
+  const allRuntimes = ['claude', 'antigravity', 'augment', 'codex', 'copilot', 'cursor', 'gemini', 'kilo', 'opencode', 'trae', 'windsurf', 'qwen'];
 
   console.log(`  ${yellow}Which runtime(s) would you like to install for?${reset}\n\n  ${cyan}1${reset}) Claude Code  ${dim}(~/.claude)${reset}
   ${cyan}2${reset}) Antigravity  ${dim}(~/.gemini/antigravity)${reset}
@@ -6039,7 +6060,8 @@ function promptRuntime(callback) {
   ${cyan}9${reset}) OpenCode     ${dim}(~/.config/opencode)${reset}
   ${cyan}10${reset}) Trae         ${dim}(~/.trae)${reset}
   ${cyan}11${reset}) Windsurf     ${dim}(~/.codeium/windsurf)${reset}
-  ${cyan}12${reset}) All
+  ${cyan}12${reset}) Qwen Code    ${dim}(~/.qwen)${reset}
+  ${cyan}13${reset}) All
 
   ${dim}Select multiple: 1,2,6 or 1 2 6${reset}
 `);
@@ -6050,7 +6072,7 @@ function promptRuntime(callback) {
     const input = answer.trim() || '1';
 
     // "All" shortcut
-    if (input === '12') {
+    if (input === '13') {
       callback(allRuntimes);
       return;
     }
