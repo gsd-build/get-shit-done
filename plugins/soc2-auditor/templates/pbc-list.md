@@ -56,6 +56,12 @@
 | G-13 | List of critical vendors / subservice organizations | Spreadsheet | |
 | G-14 | Network diagram | PDF/image | |
 | G-15 | Data flow diagram | PDF/image | |
+| G-16 | Penetration test report (from qualified third party) | PDF | |
+| G-17 | Most recent vulnerability scan report | PDF/system report | |
+| G-18 | Prior SOC report (if one exists from predecessor auditor) | PDF | |
+| G-19 | SOC reports from subservice organizations (e.g., AWS, Azure, GCP) | PDF | |
+| G-20 | Security awareness training completion records | System report/CSV | |
+| G-21 | Board/management meeting minutes related to security oversight | PDF (redacted OK) | |
 
 ## Notes for Client
 

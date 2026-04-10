@@ -16,7 +16,10 @@ Execute control testing for a specific control. Supports four test modes: inspec
 
 This is the core testing skill — it examines evidence and determines whether controls are operating effectively.
 
-Requires: `.audit/workpapers/{control-id}/SAMPLING-MEMO.md` must exist (run /soc2-sample first).
+ENGAGEMENT PHASE: Control Testing (Phase 5 of 8)
+  Precondition: /soc2-sample completed (.audit/workpapers/{control-id}/SAMPLING-MEMO.md must exist)
+  Produces: .audit/workpapers/{control-id}/TEST-RESULTS.md
+  Next: /soc2-workpaper (formal work paper assembly)
 </objective>
 
 <references>
@@ -30,6 +33,41 @@ $ARGUMENTS
 
 <process>
 
+## Welcome
+
+Display the following to the auditor before doing anything else:
+
+```
+===========================================================
+  SOC 2 AUDITOR — Control Testing
+===========================================================
+
+  PHASE 5 of 8: Testing
+  ─────────────────────────────────────────────────────────
+  Previous: /soc2-sample (Sampling)
+  Next:     /soc2-workpaper (Work Paper Assembly)
+
+  This is the core of your audit. You'll examine evidence
+  and determine whether each control operates effectively.
+
+  Four test modes available:
+    inspect     Review documents, screenshots, logs
+    reperform   Re-execute the control independently
+    observe     Witness the control being performed
+    inquiry     Interview management/staff
+
+  Usage examples:
+    /soc2-test CC6.1-01
+    /soc2-test CC6.1-01 --mode inspect --evidence-path ./evidence/
+    /soc2-test CC8.1-01 --mode reperform
+
+  Screenshot/image evidence: Claude can read images directly
+  and verify dates, approvals, and configurations.
+
+  Estimated time: 10–30 min per control (varies by sample size)
+===========================================================
+```
+
 ## Step 0: Parse Arguments and Load Context
 
 Parse $ARGUMENTS for:
@@ -37,13 +75,18 @@ Parse $ARGUMENTS for:
 - **--mode** (optional) — test mode override (inspect | reperform | observe | inquiry)
 - **--evidence-path** (optional) — path to evidence files
 
-Read:
-- `.audit/CONTROL-MATRIX.md` — get control details
-- `.audit/workpapers/{control-id}/SAMPLING-MEMO.md` — get sample items
-- `.audit/ENGAGEMENT.md` — get audit period dates
-- `.audit/AUDIT-PLAN.md` — get testing strategy
+Read the following files:
 
-If SAMPLING-MEMO.md doesn't exist, tell the user to run `/soc2-sample {control-id}` first and stop.
+**REQUIRED** (skill stops if missing):
+- `.audit/workpapers/{control-id}/SAMPLING-MEMO.md` — sample items to test
+- `.audit/CONTROL-MATRIX.md` — control details, criteria, risk level
+
+**CONTEXT** (used for reference, not blocking):
+- `.audit/ENGAGEMENT.md` — audit period dates for evidence date validation
+- `.audit/AUDIT-PLAN.md` — testing strategy context
+- `.audit/config.json` — engagement type (Type I/II)
+
+If SAMPLING-MEMO.md doesn't exist, tell the user: "No sampling memo found for {control-id}. Run /soc2-sample {control-id} first." and stop.
 
 Extract:
 - Control description, criteria, frequency, risk level
@@ -59,6 +102,22 @@ If the control matrix specifies "Combination", determine the primary and seconda
 - High risk: Inspection + Reperformance
 - Moderate risk: Inspection + Inquiry
 - Low risk: Inspection alone
+
+### Type I vs Type II Testing
+
+Read the engagement type from .audit/config.json:
+
+- **Type I (design effectiveness only):**
+  - Test only whether the control IS suitably designed
+  - Verify: policy exists, procedure is documented, control is assigned, frequency is defined
+  - Do NOT test operating effectiveness (no sample testing)
+  - Conclusion language: "suitably designed as of [date]"
+
+- **Type II (design AND operating effectiveness):**
+  - Test design (same as Type I) PLUS
+  - Test whether the control OPERATED as designed for each sample item
+  - Verify: control was performed, performed timely, performed by authorized personnel, evidence retained
+  - Conclusion language: "suitably designed and operated effectively throughout the period"
 
 ## Step 2: Execute Testing by Mode
 
@@ -88,6 +147,11 @@ For each sample item in the sampling memo:
      - Report parameters cover the correct period
      - Data appears complete (no gaps)
      - Results are consistent with control description
+
+**Evidence handling:**
+- If an evidence file is unreadable, corrupted, or in an unsupported format: document as "Unable to examine — file unreadable/corrupted" and ask the auditor whether to request replacement evidence or note a scope limitation
+- If a screenshot is too small or unclear to read: note it and ask the auditor whether the evidence is sufficient
+- If evidence is missing for a sample item: this is NOT an exception — it is a **scope limitation**. Document: "Evidence not provided for item [X]. Unable to conclude on this item."
 
 3. **Record observation:**
    - What was examined
@@ -228,22 +292,33 @@ Update `.audit/STATE.md`:
 ## Step 7: Display Summary
 
 ```
-Testing Complete — {{CONTROL_ID}}
+===========================================================
+  Testing Complete — {{CONTROL_ID}}
+===========================================================
 
-Control: {{CONTROL_DESC}}
-Test Mode: {{MODE}}
-Result: {{EFFECTIVE or EXCEPTION}}
-Items Tested: {{N}}
-Exceptions: {{N}} ({{RATE}}%)
+  Control: {{CONTROL_DESC}}
+  Test Mode: {{MODE}}
+  Result: {{EFFECTIVE or EXCEPTION}}
+  Items Tested: {{N}}
+  Exceptions: {{N}} ({{RATE}}%)
 
-Files Created/Updated:
-  .audit/workpapers/{{CONTROL_ID}}/TEST-RESULTS.md
-  .audit/CONTROL-MATRIX.md
-  .audit/STATE.md
+  Files Created/Updated:
+    .audit/workpapers/{{CONTROL_ID}}/TEST-RESULTS.md
+    .audit/CONTROL-MATRIX.md
+    .audit/STATE.md
 
-Next steps:
-  - Test more controls: /soc2-test <next-control-id>
-  - When all controls tested: /soc2-workpaper all
+  ─────────────────────────────────────────────────────────
+  WORKFLOW TRACKER (Phase 5 of 8)
+  ─────────────────────────────────────────────────────────
+  Controls tested: {{TESTED}} / {{TOTAL}}
+  Effective: {{EFFECTIVE_COUNT}}  |  Exceptions: {{EXCEPTION_COUNT}}
+  Remaining: {{REMAINING}}
+  ─────────────────────────────────────────────────────────
+
+  Next steps:
+    - Test more controls: /soc2-test <next-control-id>
+    - When all controls tested: /soc2-workpaper all
+===========================================================
 ```
 
 </process>

@@ -88,6 +88,13 @@
 
 {{CONCLUSION}}
 
+<!-- Type I Note: For Type I examinations, the Operating Effectiveness Test section
+     above is not applicable. The Conclusion should address design effectiveness only.
+     Use language: "suitably designed as of [date]" — never reference operating effectiveness. -->
+<!-- Type II Note: For Type II examinations, the Conclusion must address BOTH design
+     and operating effectiveness. Use language: "suitably designed and operated
+     effectively throughout the period [start] to [end]." -->
+
 ### Design Effectiveness
 
 {{DESIGN_CONCLUSION}}

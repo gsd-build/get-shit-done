@@ -13,7 +13,10 @@ allowed-tools:
 <objective>
 Perform comprehensive audit planning: risk assessment, control identification, criteria-to-control mapping, and testing strategy. Produces RISK-ASSESSMENT.md, AUDIT-PLAN.md, and CONTROL-MATRIX.md.
 
-Requires: `.audit/ENGAGEMENT.md` and `.audit/SCOPE.md` must exist (run /soc2-kickoff first).
+ENGAGEMENT PHASE: Planning (Phase 2 of 8)
+  Precondition: /soc2-kickoff completed (.audit/ENGAGEMENT.md and .audit/SCOPE.md must exist)
+  Produces: RISK-ASSESSMENT.md, AUDIT-PLAN.md, CONTROL-MATRIX.md
+  Next: /soc2-pbc (PBC evidence request generation)
 </objective>
 
 <references>
@@ -31,9 +34,42 @@ $ARGUMENTS
 
 <process>
 
+## Welcome
+
+Display the following to the auditor before doing anything else:
+
+```
+===========================================================
+  SOC 2 AUDITOR — Audit Planning
+===========================================================
+
+  PHASE 2 of 8: Planning
+  ─────────────────────────────────────────────────────────
+  Previous: /soc2-kickoff (Engagement Kickoff)
+  Next:     /soc2-pbc (PBC Generation)
+
+  This skill performs the foundation of your audit:
+
+    1. Assess entity-level and control-level risks
+    2. Identify controls for each in-scope TSC criteria
+    3. Map controls to testing strategies
+    4. Build the formal audit plan
+
+  We'll present the risk assessment and control matrix
+  for your review before finalizing anything.
+
+  What you'll need:
+    - Understanding of the client's industry and technology
+    - Knowledge of prior audit findings (if any)
+    - Time to review the control matrix (~30-60 controls typical)
+
+  Estimated time: 15–30 minutes
+===========================================================
+```
+
 ## Step 0: Load Engagement Context
 
-Read `.audit/ENGAGEMENT.md` and `.audit/SCOPE.md`. If they don't exist, tell the user to run `/soc2-kickoff` first and stop.
+Read `.audit/ENGAGEMENT.md`, `.audit/SCOPE.md`, and `.audit/STATE.md`. If ENGAGEMENT.md and SCOPE.md don't exist, tell the user to run `/soc2-kickoff` first and stop.
 
 Extract:
 - Client name, industry, system type
@@ -128,6 +164,13 @@ For each additional in-scope category, identify additional controls:
 - **C1**: Data classification, DLP, disposal
 - **P1-P8**: Privacy notice, consent, collection, retention, access, disclosure, quality, monitoring
 
+**Important:** You are identifying controls the client has IMPLEMENTED, not controls they SHOULD have. Base control identification on:
+- Information from the engagement letter and client discussions
+- Industry-standard controls typical for the client's technology stack
+- Prior SOC reports (if predecessor auditor information available)
+
+Flag any criteria that lack a clear control for inquiry during the PBC phase. Do not assume controls exist.
+
 ### 2b: Classify Each Control
 
 For each identified control, determine:
@@ -155,13 +198,22 @@ For Type II engagements:
 
 ### 3a: Materiality Determination
 
-Determine materiality approach:
-- SOC 2 uses primarily qualitative materiality
-- Set tolerable deviation rate per risk level:
-  - High risk: 3-5%
-  - Moderate risk: 5-7%
-  - Low risk: 7-10%
-- Set confidence level: 95% (default) or 90% (lower risk)
+SOC 2 examinations use primarily **qualitative materiality** — there are no numeric thresholds like financial audits.
+
+**Qualitative factors for assessing whether an exception is material:**
+- Nature: Is the exception a systematic design flaw or an isolated procedural miss?
+- Pervasiveness: Does it affect one control or multiple criteria?
+- Duration: Did it persist throughout the period or was it corrected promptly?
+- Compensating controls: Do other controls mitigate the risk?
+- Impact on users: Could the exception affect user entity decisions?
+
+**For sampling purposes (tolerable deviation rates used in sample size calculations only):**
+- High-risk controls: 5% tolerable deviation rate
+- Moderate-risk controls: 7% tolerable deviation rate
+- Low-risk controls: 10% tolerable deviation rate
+- Confidence level: 95% (default) or 90% (if justified by low risk)
+
+Note: These sampling parameters guide sample size calculations in /soc2-sample. The ultimate materiality determination for the opinion is qualitative and made during /soc2-package.
 
 ### 3b: Team Assignments
 
@@ -235,6 +287,16 @@ Files Updated:
   .audit/AUDIT-PLAN.md
   .audit/CONTROL-MATRIX.md
   .audit/STATE.md
+
+  Full workflow:
+    1. /soc2-kickoff  (complete)
+    2. /soc2-plan     ← YOU ARE HERE (complete)
+    3. /soc2-pbc      ← NEXT
+    4. /soc2-sample
+    5. /soc2-test
+    6. /soc2-workpaper
+    7. /soc2-review
+    8. /soc2-package
 
 Next step: Run /soc2-pbc to generate the evidence request list
 ```

@@ -15,7 +15,10 @@ Calculate appropriate sample sizes and select specific sample items for control 
 
 Supports statistical attribute sampling, frequency-based sampling, and judgmental sampling. The method is determined by control frequency, risk level, and population size.
 
-Requires: `.audit/CONTROL-MATRIX.md` must exist. If a specific control-id is provided, that control must be in the matrix.
+ENGAGEMENT PHASE: Sampling (Phase 4 of 8)
+  Precondition: /soc2-plan completed (.audit/CONTROL-MATRIX.md must exist)
+  Produces: .audit/workpapers/{control-id}/SAMPLING-MEMO.md
+  Next: /soc2-test (control testing and evidence review)
 </objective>
 
 <references>
@@ -29,6 +32,40 @@ $ARGUMENTS
 </context>
 
 <process>
+
+## Welcome
+
+Display the following to the auditor before doing anything else:
+
+```
+===========================================================
+  SOC 2 AUDITOR — Sampling
+===========================================================
+
+  PHASE 4 of 8: Sampling
+  ─────────────────────────────────────────────────────────
+  Previous: /soc2-pbc (PBC Generation)
+  Next:     /soc2-test (Control Testing)
+
+  This skill calculates sample sizes and selects specific
+  items for control testing. The approach depends on:
+
+    - Control frequency (daily, weekly, monthly, etc.)
+    - Risk level (high, moderate, low)
+    - Engagement type (Type I = 1 item, Type II = varies)
+
+  Usage examples:
+    /soc2-sample CC6.1-01
+    /soc2-sample CC6.1-01 --method statistical --confidence 95
+    /soc2-sample all
+
+  What you'll need:
+    - Population sizes for per-occurrence controls
+    - Evidence received from client (to verify population)
+
+  Estimated time: 5 min per control, 30–60 min for "all"
+===========================================================
+```
 
 ## Step 0: Parse Arguments and Load Context
 
@@ -49,7 +86,23 @@ If processing a specific control, extract:
 
 If "all" is specified, iterate through all controls with Status = "Not Tested".
 
+### Status Check
+
+Before proceeding, check the control's status in CONTROL-MATRIX.md:
+- If Status = "Effective" or "Exception": This control has already been tested. Warn the auditor: "Control {{CONTROL_ID}} has already been tested (Status: {{STATUS}}). Would you like to re-sample for extended testing?"
+- If Status = "In Progress": A sampling memo may already exist. Warn and ask whether to overwrite.
+- If Status = "Not Tested": Proceed normally.
+
 ## Step 1: Determine Sampling Method
+
+### Type I Early Exit
+
+If the engagement type is Type I (read from .audit/ENGAGEMENT.md or .audit/config.json):
+- **Sample size = 1 for every control.** Type I tests design effectiveness only.
+- Skip all sampling method calculations.
+- Select 1 representative instance of the control operating.
+- The sampling memo documents this as "Type I design walkthrough — single instance."
+- Proceed directly to Step 3 (present for confirmation) then Step 4 (write memo).
 
 ### Decision Logic
 
@@ -106,12 +159,15 @@ Using the determined method, calculate the sample size:
 ### Selection Method
 
 1. **Random selection** (default for statistical and large frequency-based):
-   - Generate random numbers using Bash:
+   - Generate a reproducible seed from the engagement ID + control ID:
    ```bash
-   # Generate N random numbers between 1 and POPULATION_SIZE
-   shuf -i 1-POPULATION_SIZE -n SAMPLE_SIZE | sort -n
+   # Generate reproducible random selection
+   SEED=$(echo "{{ENGAGEMENT_ID}}-{{CONTROL_ID}}" | cksum | cut -d' ' -f1)
+   shuf --random-source=<(openssl enc -aes-256-ctr -pass pass:$SEED -nosalt </dev/zero 2>/dev/null) \
+     -i 1-{{POPULATION_SIZE}} -n {{SAMPLE_SIZE}} | sort -n
    ```
-   - Map random numbers to specific population items
+   - Document the seed in the sampling memo for reproducibility
+   - Map random numbers to specific population items (see mapping guidance below)
 
 2. **Systematic selection** (for time-based populations):
    - Calculate interval: population_size ÷ sample_size
@@ -132,6 +188,20 @@ Verify the selected items provide adequate period coverage:
 - For high-risk controls, ensure every quarter is represented
 
 If coverage is inadequate, re-select to ensure distribution.
+
+### Mapping Numbers to Items
+
+After generating random numbers, map them to actual population items:
+
+| Control Frequency | Population | Mapping Approach |
+|-------------------|-----------|-----------------|
+| Monthly | 12 months | Number 1 = January, 2 = February, ..., 12 = December |
+| Weekly | 52 weeks | Number 1 = Week 1 (first week of audit period), etc. |
+| Daily | ~250 business days | Number 1 = first business day of audit period, etc. |
+| Per occurrence | N transactions | Number maps to transaction sequence (by date/ID) |
+| Quarterly | 4 quarters | Number 1 = Q1, 2 = Q2, 3 = Q3, 4 = Q4 |
+
+For per-occurrence controls where the population is a list of events/transactions, the auditor must obtain the full population list from the client first, then select items by row number.
 
 ## Step 3: Present Sample for Confirmation
 
@@ -180,17 +250,33 @@ Update `.audit/STATE.md` to reflect sampling progress.
 ## Step 6: Display Summary
 
 ```
-Sampling Memo Created
+===========================================================
+  Sampling Memo Created
+===========================================================
 
-Control: {{CONTROL_ID}} — {{CONTROL_DESC}}
-Method: {{METHOD}}
-Sample Size: {{SAMPLE_SIZE}}
-Items Selected: [list of identifiers/dates]
+  Control: {{CONTROL_ID}} — {{CONTROL_DESC}}
+  Method: {{METHOD}}
+  Sample Size: {{SAMPLE_SIZE}}
+  Items Selected: [list of identifiers/dates]
 
-File Created:
-  .audit/workpapers/{{CONTROL_ID}}/SAMPLING-MEMO.md
+  File Created:
+    .audit/workpapers/{{CONTROL_ID}}/SAMPLING-MEMO.md
 
-Next step: Run /soc2-test {{CONTROL_ID}} to begin testing this control
+  ─────────────────────────────────────────────────────────
+  NEXT STEP: Run /soc2-test {{CONTROL_ID}} to begin testing
+             this control
+  ─────────────────────────────────────────────────────────
+
+  Full workflow:
+    1. /soc2-kickoff   (complete)
+    2. /soc2-plan      (complete)
+    3. /soc2-pbc       (complete)
+    4. /soc2-sample    ← YOU ARE HERE
+    5. /soc2-test      ← NEXT
+    6. /soc2-workpaper
+    7. /soc2-review
+    8. /soc2-package
+===========================================================
 ```
 
 </process>
