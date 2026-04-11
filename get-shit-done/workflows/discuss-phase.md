@@ -113,6 +113,15 @@ Phase: "API documentation"
 
 <answer_validation>
 **IMPORTANT: Answer validation** — After every AskUserQuestion call, check if the response is empty or whitespace-only. If so:
+
+**Exception — "Other" with empty text:** If the user selected "Other" (or "Chat more") and the response body is empty or whitespace-only, this is NOT an empty answer — it is a signal that the user wants to type freeform input. In this case:
+1. Output a single plain-text line: "What would you like to discuss?"
+2. STOP generating. Do not call any tools. Do not output any further text.
+3. Wait for the user's next message.
+4. After receiving their message, reflect it back and continue.
+Do NOT retry the AskUserQuestion or generate more questions when "Other" is selected with empty text.
+
+**All other empty responses:** If the response is empty or whitespace-only (and the user did NOT select "Other"):
 1. Retry the question once with the same parameters
 2. If still empty, present the options as a plain-text numbered list and ask the user to type their choice number
 Never proceed with an empty answer.
