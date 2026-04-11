@@ -82,12 +82,56 @@ Use `--force` to bypass this check.
 ```
 Exit.
 
-**Consecutive-call guard:**
-After passing all gates, check a counter file `.planning/.next-call-count`:
-- If file exists and count >= 6: prompt "You've called /gsd-next {N} times consecutively. Continue? [y/N]"
-- If user says no, exit
-- Increment the counter
-- The counter file is deleted by any non-`/gsd-next` command (convention — other workflows don't need to implement this, the note here is sufficient)
+**Prior-phase completeness scan:**
+After passing all three hard-stop gates, scan all phases that precede the current phase in ROADMAP.md order for incomplete work. Use the existing `gsd-tools.cjs phase json <N>` output to inspect each prior phase.
+
+Detect three categories of incomplete work:
+1. **Plans without summaries** — a PLAN.md exists in a prior phase directory but no matching SUMMARY.md exists (execution started but not completed).
+2. **Verification failures not overridden** — a prior phase has a VERIFICATION.md with `FAIL` items that have no override annotation.
+3. **CONTEXT.md without plans** — a prior phase directory has a CONTEXT.md but no PLAN.md files (discussion happened, planning never ran).
+
+If no incomplete prior work is found, continue to `determine_next_action` silently with no interruption.
+
+If incomplete prior work is found, show a structured completeness report:
+```
+⚠ Prior phase has incomplete work
+
+Phase {N} — "{name}" has unresolved items:
+  • Plan {N}-{M} ({slug}): executed but no SUMMARY.md
+  [... additional items ...]
+
+Advancing before resolving these may cause:
+  • Verification gaps — future phase verification won't have visibility into what prior phases shipped
+  • Context loss — plans that ran without summaries leave no record for future agents
+
+Options:
+  [C] Continue and defer these items to backlog
+  [S] Stop and resolve manually (recommended)
+  [F] Force advance without recording deferral
+
+Choice [S]:
+```
+
+**If the user chooses "Stop" (S or Enter/default):** Exit without routing.
+
+**If the user chooses "Continue and defer" (C):**
+1. For each incomplete item, create a backlog entry in `ROADMAP.md` under `## Backlog` using the existing `999.x` numbering scheme:
+```markdown
+### Phase 999.{N}: Follow-up — Phase {src} incomplete plans (BACKLOG)
+
+**Goal:** Resolve plans that ran without producing summaries during Phase {src} execution
+**Source phase:** {src}
+**Deferred at:** {date} during /gsd-next advancement to Phase {dest}
+**Plans:**
+- [ ] {N}-{M}: {slug} (ran, no SUMMARY.md)
+```
+2. Commit the deferral record:
+```bash
+node "$HOME/.claude/get-shit-done/bin/gsd-tools.cjs" commit "docs: defer incomplete Phase {src} items to backlog"
+```
+3. Continue routing to `determine_next_action` immediately — no second prompt.
+
+**If the user chooses "Force" (F):** Continue to `determine_next_action` without recording deferral.
 </step>
 
 <step name="determine_next_action">
