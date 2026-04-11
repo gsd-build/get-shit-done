@@ -360,6 +360,36 @@ Settings for the security enforcement feature (v1.31). All follow the **absent =
 
 ---
 
+## Review Settings
+
+Configure per-CLI model selection for `/gsd-review`. When set, overrides the CLI's default model for that reviewer.
+
+| Setting | Type | Default | Description |
+|---------|------|---------|-------------|
+| `review.models.gemini` | string | (CLI default) | Model used when `--gemini` reviewer is invoked |
+| `review.models.claude` | string | (CLI default) | Model used when `--claude` reviewer is invoked |
+| `review.models.codex` | string | (CLI default) | Model used when `--codex` reviewer is invoked |
+| `review.models.opencode` | string | (CLI default) | Model used when `--opencode` reviewer is invoked |
+| `review.models.qwen` | string | (CLI default) | Model used when `--qwen` reviewer is invoked |
+| `review.models.cursor` | string | (CLI default) | Model used when `--cursor` reviewer is invoked |
+
+### Example
+
+```json
+{
+  "review": {
+    "models": {
+      "gemini": "gemini-2.5-pro",
+      "qwen": "qwen-max"
+    }
+  }
+}
+```
+
+Falls back to each CLI's configured default when a key is absent. Added in v1.35.0 (#1849).
+
+---
+
 ## Manager Passthrough Flags
 
 Configure per-step flags that `/gsd-manager` appends to each dispatched command. This allows customizing how the manager runs discuss, plan, and execute steps without manual flag entry.

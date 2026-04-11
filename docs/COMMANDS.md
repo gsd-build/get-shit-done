@@ -593,6 +593,31 @@ Ingest an external plan file into the GSD planning system with conflict detectio
 
 ---
 
+### `/gsd-from-gsd2`
+
+Reverse migration from GSD-2 format (`.gsd/` with Milestone→Slice→Task hierarchy) back to v1 `.planning/` format.
+
+| Flag | Required | Description |
+|------|----------|-------------|
+| `--dry-run` | No | Preview what would be migrated without writing anything |
+| `--force` | No | Overwrite existing `.planning/` directory |
+| `--path <dir>` | No | Specify GSD-2 root directory (defaults to current directory) |
+
+**Flattening:** Milestone→Slice hierarchy is flattened to sequential phase numbers (M001/S01→phase 01, M001/S02→phase 02, M002/S01→phase 03, etc.).
+
+**Produces:** `PROJECT.md`, `REQUIREMENTS.md`, `ROADMAP.md`, `STATE.md`, and sequential phase directories in `.planning/`.
+
+**Safety:** Guards against overwriting an existing `.planning/` directory without `--force`.
+
+```bash
+/gsd-from-gsd2                          # Migrate .gsd/ in current directory
+/gsd-from-gsd2 --dry-run                # Preview migration without writing
+/gsd-from-gsd2 --force                  # Overwrite existing .planning/
+/gsd-from-gsd2 --path /path/to/gsd2-project  # Specify GSD-2 root
+```
+
+---
+
 ### `/gsd-quick`
 
 Execute ad-hoc task with GSD guarantees.
@@ -896,6 +921,37 @@ Query, inspect, or refresh queryable codebase intelligence files stored in `.pla
 /gsd-intel query authentication     # Search intel for a term
 /gsd-intel diff                     # What changed since last snapshot
 /gsd-intel refresh                  # Rebuild intel index
+```
+
+---
+
+## AI Integration Commands
+
+### `/gsd-ai-integration-phase`
+
+AI framework selection wizard for integrating AI/LLM capabilities into a project phase. Presents an interactive decision matrix, surfaces domain-specific failure modes and eval criteria, and produces `AI-SPEC.md` with a framework recommendation, implementation guidance, and evaluation strategy.
+
+**Produces:** `{phase}-AI-SPEC.md` in the phase directory
+
+**Spawns:** 3 parallel specialist agents: domain-researcher, framework-selector, ai-researcher, and eval-planner
+
+```bash
+/gsd-ai-integration-phase              # Wizard for the current phase
+/gsd-ai-integration-phase 3           # Wizard for a specific phase
+```
+
+---
+
+### `/gsd-eval-review`
+
+Retroactive audit of an implemented AI phase's evaluation coverage. Checks implementation against the `AI-SPEC.md` evaluation plan produced by `/gsd-ai-integration-phase`. Scores each eval dimension as COVERED/PARTIAL/MISSING.
+
+**Prerequisites:** Phase has been executed and has an `AI-SPEC.md`
+**Produces:** `{phase}-EVAL-REVIEW.md` with findings, gaps, and remediation guidance
+
+```bash
+/gsd-eval-review                       # Audit current phase
+/gsd-eval-review 3                     # Audit a specific phase
 ```
 
 ---

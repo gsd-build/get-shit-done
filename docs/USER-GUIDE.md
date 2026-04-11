@@ -868,6 +868,40 @@ The installer auto-configures `resolve_model_ids: "omit"` for Gemini CLI, OpenCo
 
 See the [Configuration Reference](CONFIGURATION.md#non-claude-runtimes-codex-opencode-gemini-cli-kilo) for the full explanation.
 
+### Installing for Cline
+
+Cline uses a rules-based integration — GSD installs as `.clinerules` rather than slash commands.
+
+```bash
+# Global install (applies to all projects)
+npx get-shit-done-cc --cline --global
+
+# Local install (this project only)
+npx get-shit-done-cc --cline --local
+```
+
+Global installs write to `~/.cline/`. Local installs write to `./.cline/`. No custom slash commands are registered — GSD rules are loaded automatically by Cline from the rules file.
+
+### Installing for CodeBuddy
+
+CodeBuddy uses a skills-based integration.
+
+```bash
+npx get-shit-done-cc --codebuddy --global
+```
+
+Skills are installed to `~/.codebuddy/skills/gsd-*/SKILL.md`.
+
+### Installing for Qwen Code
+
+Qwen Code uses the same open skills standard as Claude Code 2.1.88+.
+
+```bash
+npx get-shit-done-cc --qwen --global
+```
+
+Skills are installed to `~/.qwen/skills/gsd-*/SKILL.md`. Use the `QWEN_CONFIG_DIR` environment variable to override the default install path.
+
 ### Using Claude Code with Non-Anthropic Providers (OpenRouter, Local)
 
 If GSD subagents call Anthropic models and you're paying through OpenRouter or a local provider, switch to the `inherit` profile: `/gsd-set-profile inherit`. This makes all agents use your current session model instead of specific Anthropic models. See also `/gsd-settings` → Model Profile → Inherit.

@@ -102,6 +102,11 @@
   - [Hard Stop Safety Gates in /gsd-next](#101-hard-stop-safety-gates-in-gsd-next)
   - [Adaptive Model Preset](#102-adaptive-model-preset)
   - [Post-Merge Hunk Verification](#103-post-merge-hunk-verification)
+- [v1.35.0 Features](#v1350-features)
+  - [New Runtime Support (Cline, CodeBuddy, Qwen Code)](#104-new-runtime-support-cline-codebuddy-qwen-code)
+  - [GSD-2 Reverse Migration](#105-gsd-2-reverse-migration)
+  - [AI Integration Phase Wizard](#106-ai-integration-phase-wizard)
+  - [AI Eval Review](#107-ai-eval-review)
 - [v1.32 Features](#v132-features)
   - [STATE.md Consistency Gates](#69-statemd-consistency-gates)
   - [Autonomous `--to N` Flag](#70-autonomous---to-n-flag)
@@ -917,7 +922,7 @@ fix(03-01): correct auth token expiry
 **Purpose:** Run GSD across multiple AI coding agent runtimes.
 
 **Requirements:**
-- REQ-RUNTIME-01: System MUST support Claude Code, OpenCode, Gemini CLI, Kilo, Codex, Copilot, Antigravity, Trae, Cline, Augment Code
+- REQ-RUNTIME-01: System MUST support Claude Code, OpenCode, Gemini CLI, Kilo, Codex, Copilot, Antigravity, Trae, Cline, Augment Code, CodeBuddy, Qwen Code
 - REQ-RUNTIME-02: Installer MUST transform content per runtime (tool names, paths, frontmatter)
 - REQ-RUNTIME-03: Installer MUST support interactive and non-interactive (`--claude --global`) modes
 - REQ-RUNTIME-04: Installer MUST support both global and local installation
@@ -926,12 +931,12 @@ fix(03-01): correct auth token expiry
 
 **Runtime Transformations:**
 
-| Aspect | Claude Code | OpenCode | Gemini | Kilo | Codex | Copilot | Antigravity | Trae | Cline | Augment |
-|--------|------------|----------|--------|-------|-------|---------|-------------|------|-------|---------|
-| Commands | Slash commands | Slash commands | Slash commands | Slash commands | Skills (TOML) | Slash commands | Skills | Skills | Rules | Skills |
-| Agent format | Claude native | `mode: subagent` | Claude native | `mode: subagent` | Skills | Tool mapping | Skills | Skills | Rules | Skills |
-| Hook events | `PostToolUse` | N/A | `AfterTool` | N/A | N/A | N/A | N/A | N/A | N/A | N/A |
-| Config | `settings.json` | `opencode.json(c)` | `settings.json` | `kilo.json(c)` | TOML | Instructions | Config | Config | Config | Config |
+| Aspect | Claude Code | OpenCode | Gemini | Kilo | Codex | Copilot | Antigravity | Trae | Cline | Augment | CodeBuddy | Qwen Code |
+|--------|------------|----------|--------|-------|-------|---------|-------------|------|-------|---------|-----------|-----------|
+| Commands | Slash commands | Slash commands | Slash commands | Slash commands | Skills (TOML) | Slash commands | Skills | Skills | Rules | Skills | Skills | Skills |
+| Agent format | Claude native | `mode: subagent` | Claude native | `mode: subagent` | Skills | Tool mapping | Skills | Skills | Rules | Skills | Skills | Skills |
+| Hook events | `PostToolUse` | N/A | `AfterTool` | N/A | N/A | N/A | N/A | N/A | N/A | N/A | N/A | N/A |
+| Config | `settings.json` | `opencode.json(c)` | `settings.json` | `kilo.json(c)` | TOML | Instructions | Config | Config | `.clinerules` | Config | Config | Config |
 
 ---
 
@@ -2179,3 +2184,88 @@ Test suite that scans all agent, workflow, and command files for embedded inject
 - REQ-PATCH-VERIFY-01: Reapply-patches MUST verify each hunk was applied after the merge
 - REQ-PATCH-VERIFY-02: Dropped or partial hunks MUST be reported to the user with file and line context
 - REQ-PATCH-VERIFY-03: Verification MUST run after all patches are applied, not per-patch
+
+---
+
+## v1.35.0 Features
+
+- [New Runtime Support (Cline, CodeBuddy, Qwen Code)](#104-new-runtime-support-cline-codebuddy-qwen-code)
+- [GSD-2 Reverse Migration](#105-gsd-2-reverse-migration)
+- [AI Integration Phase Wizard](#106-ai-integration-phase-wizard)
+- [AI Eval Review](#107-ai-eval-review)
+
+---
+
+### 104. New Runtime Support (Cline, CodeBuddy, Qwen Code)
+
+**Part of:** `npx get-shit-done-cc`
+
+**Purpose:** Extend GSD installation to Cline, CodeBuddy, and Qwen Code runtimes.
+
+**Requirements:**
+- REQ-CLINE-02: Cline install MUST write `.clinerules` to `~/.cline/` (global) or `./.cline/` (local). No custom slash commands — rules-based integration only. Flag: `--cline`.
+- REQ-CODEBUDDY-01: CodeBuddy install MUST deploy skills to `~/.codebuddy/skills/gsd-*/SKILL.md`. Flag: `--codebuddy`.
+- REQ-QWEN-01: Qwen Code install MUST deploy skills to `~/.qwen/skills/gsd-*/SKILL.md`, following the open standard used by Claude Code 2.1.88+. `QWEN_CONFIG_DIR` env var overrides the default path. Flag: `--qwen`.
+
+**Runtime summary:**
+
+| Runtime | Install Format | Config Path | Flag |
+|---------|---------------|-------------|------|
+| Cline | `.clinerules` | `~/.cline/` or `./.cline/` | `--cline` |
+| CodeBuddy | Skills (`SKILL.md`) | `~/.codebuddy/skills/` | `--codebuddy` |
+| Qwen Code | Skills (`SKILL.md`) | `~/.qwen/skills/` | `--qwen` |
+
+---
+
+### 105. GSD-2 Reverse Migration
+
+**Command:** `/gsd-from-gsd2 [--dry-run] [--force] [--path <dir>]`
+
+**Purpose:** Migrate a project from GSD-2 format (`.gsd/` directory with Milestone→Slice→Task hierarchy) back to the v1 `.planning/` format, restoring full compatibility with all GSD v1 commands.
+
+**Requirements:**
+- REQ-FROM-GSD2-01: Importer MUST read `.gsd/` from the specified or current directory
+- REQ-FROM-GSD2-02: Milestone→Slice hierarchy MUST be flattened to sequential phase numbers (M001/S01→phase 01, M001/S02→phase 02, M002/S01→phase 03, etc.)
+- REQ-FROM-GSD2-03: System MUST guard against overwriting an existing `.planning/` directory without `--force`
+- REQ-FROM-GSD2-04: `--dry-run` MUST preview all changes without writing any files
+- REQ-FROM-GSD2-05: Migration MUST produce `PROJECT.md`, `REQUIREMENTS.md`, `ROADMAP.md`, `STATE.md`, and sequential phase directories
+
+**Flags:**
+
+| Flag | Description |
+|------|-------------|
+| `--dry-run` | Preview migration output without writing files |
+| `--force` | Overwrite an existing `.planning/` directory |
+| `--path <dir>` | Specify the GSD-2 root directory |
+
+---
+
+### 106. AI Integration Phase Wizard
+
+**Command:** `/gsd-ai-integration-phase [N]`
+
+**Purpose:** Guide developers through selecting, integrating, and planning evaluation for AI/LLM capabilities in a project phase. Produces a structured `AI-SPEC.md` that feeds into planning and verification.
+
+**Requirements:**
+- REQ-AISPEC-01: Wizard MUST present an interactive decision matrix covering framework selection, model choice, and integration approach
+- REQ-AISPEC-02: System MUST surface domain-specific failure modes and eval criteria relevant to the project type
+- REQ-AISPEC-03: System MUST spawn 3 parallel specialist agents: domain-researcher, framework-selector, and eval-planner
+- REQ-AISPEC-04: Output MUST produce `{phase}-AI-SPEC.md` with framework recommendation, implementation guidance, and evaluation strategy
+
+**Produces:** `{phase}-AI-SPEC.md` in the phase directory
+
+---
+
+### 107. AI Eval Review
+
+**Command:** `/gsd-eval-review [N]`
+
+**Purpose:** Retroactively audit an executed AI phase's evaluation coverage against the `AI-SPEC.md` plan. Identifies gaps between planned and implemented evaluation before the phase is closed.
+
+**Requirements:**
+- REQ-EVALREVIEW-01: Review MUST read `AI-SPEC.md` from the specified phase
+- REQ-EVALREVIEW-02: Each eval dimension MUST be scored as COVERED, PARTIAL, or MISSING
+- REQ-EVALREVIEW-03: Output MUST include findings, gap descriptions, and remediation guidance
+- REQ-EVALREVIEW-04: `EVAL-REVIEW.md` MUST be written to the phase directory
+
+**Produces:** `{phase}-EVAL-REVIEW.md` with scored eval dimensions, gap analysis, and remediation steps
