@@ -638,6 +638,11 @@ async function runCommand(command, args, cwd, raw, defaultValue) {
       break;
     }
 
+    case 'skill-manifest': {
+      init.cmdSkillManifest(cwd, args, raw);
+      break;
+    }
+
     case 'history-digest': {
       commands.cmdHistoryDigest(cwd, raw);
       break;

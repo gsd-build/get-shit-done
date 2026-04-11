@@ -1513,6 +1513,105 @@ function cmdAgentSkills(cwd, agentType, raw) {
   process.exit(0);
 }
 
+/**
+ * Generate a skill manifest from a skills directory.
+ *
+ * Scans the given skills directory for subdirectories containing SKILL.md,
+ * extracts frontmatter (name, description) and trigger conditions from the
+ * body text, and returns an array of skill descriptors.
+ *
+ * @param {string} skillsDir - Absolute path to the skills directory
+ * @returns {Array<{name: string, description: string, triggers: string[], path: string}>}
+ */
+function buildSkillManifest(skillsDir) {
+  const { extractFrontmatter } = require('./frontmatter.cjs');
+
+  if (!fs.existsSync(skillsDir)) return [];
+
+  let entries;
+  try {
+    entries = fs.readdirSync(skillsDir, { withFileTypes: true });
+  } catch {
+    return [];
+  }
+
+  const manifest = [];
+  for (const entry of entries) {
+    if (!entry.isDirectory()) continue;
+
+    const skillMdPath = path.join(skillsDir, entry.name, 'SKILL.md');
+    if (!fs.existsSync(skillMdPath)) continue;
+
+    let content;
+    try {
+      content = fs.readFileSync(skillMdPath, 'utf-8');
+    } catch {
+      continue;
+    }
+
+    const frontmatter = extractFrontmatter(content);
+    const name = frontmatter.name || entry.name;
+    const description = frontmatter.description || '';
+
+    // Extract trigger lines from body text (after frontmatter)
+    const triggers = [];
+    const bodyMatch = content.match(/^---[\s\S]*?---\s*\n([\s\S]*)$/);
+    if (bodyMatch) {
+      const body = bodyMatch[1];
+      const triggerLines = body.match(/^TRIGGER\s+when:\s*(.+)$/gmi);
+      if (triggerLines) {
+        for (const line of triggerLines) {
+          const m = line.match(/^TRIGGER\s+when:\s*(.+)$/i);
+          if (m) triggers.push(m[1].trim());
+        }
+      }
+    }
+
+    manifest.push({
+      name,
+      description,
+      triggers,
+      path: entry.name,
+    });
+  }
+
+  // Sort by name for deterministic output
+  manifest.sort((a, b) => a.name.localeCompare(b.name));
+  return manifest;
+}
+
+/**
+ * Command: generate skill manifest JSON.
+ *
+ * Options:
+ *   --skills-dir <path>  Path to skills directory (required)
+ *   --write              Also write to .planning/skill-manifest.json
+ */
+function cmdSkillManifest(cwd, args, raw) {
+  const skillsDirIdx = args.indexOf('--skills-dir');
+  const skillsDir = skillsDirIdx >= 0 && args[skillsDirIdx + 1]
+    ? args[skillsDirIdx + 1]
+    : null;
+
+  if (!skillsDir) {
+    output([], raw);
+    return;
+  }
+
+  const manifest = buildSkillManifest(skillsDir);
+
+  // Optionally write to .planning/skill-manifest.json
+  if (args.includes('--write')) {
+    const planningDir = path.join(cwd, '.planning');
+    if (fs.existsSync(planningDir)) {
+      const manifestPath = path.join(planningDir, 'skill-manifest.json');
+      fs.writeFileSync(manifestPath, JSON.stringify(manifest, null, 2), 'utf-8');
+    }
+  }
+
+  output(manifest, raw);
+}
+
 module.exports = {
   cmdInitExecutePhase,
   cmdInitPlanPhase,
@@ -1533,4 +1632,6 @@ module.exports = {
   detectChildRepos,
   buildAgentSkillsBlock,
   cmdAgentSkills,
+  buildSkillManifest,
+  cmdSkillManifest,
 };
