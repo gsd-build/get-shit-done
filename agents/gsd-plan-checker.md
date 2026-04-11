@@ -338,6 +338,8 @@ issue:
    - `"future enhancement"`, `"placeholder"`, `"basic version"`, `"minimal"`
    - `"will be wired later"`, `"dynamic in future"`, `"skip for now"`
    - `"not wired to"`, `"not connected to"`, `"stub"`
+   - `"too complex"`, `"too difficult"`, `"challenging"`, `"non-trivial"` (when used to justify omission)
+   - Time estimates used as scope justification: `"would take"`, `"hours"`, `"days"`, `"minutes"` (in sizing context)
 2. For each match, cross-reference with the CONTEXT.md decision it claims to implement
 3. Compare: does the task deliver what D-XX actually says, or a reduced version?
 4. If reduced: BLOCKER — the planner must either deliver fully or propose phase split

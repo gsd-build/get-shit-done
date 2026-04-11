@@ -719,41 +719,70 @@ Task(
 ## 9. Handle Planner Return
 
 - **`## PLANNING COMPLETE`:** Display plan count. If `--skip-verify` or `plan_checker_enabled` is false (from init): skip to step 13. Otherwise: step 10.
-- **`## PHASE SPLIT RECOMMENDED`:** The planner determined the phase is too complex to implement all user decisions without simplifying them. Handle in step 9b.
+- **`## PHASE SPLIT RECOMMENDED`:** The planner determined the phase exceeds the context budget for full-fidelity implementation of all source items. Handle in step 9b.
+- **`## ⚠ Source Audit: Unplanned Items Found`:** The planner's multi-source coverage audit found items from REQUIREMENTS.md, RESEARCH.md, ROADMAP goal, or CONTEXT.md decisions that are not covered by any plan. Handle in step 9c.
 - **`## CHECKPOINT REACHED`:** Present to user, get response, spawn continuation (step 12)
 - **`## PLANNING INCONCLUSIVE`:** Show attempts, offer: Add context / Retry / Manual
 
 ## 9b. Handle Phase Split Recommendation
 
-When the planner returns `## PHASE SPLIT RECOMMENDED`, it means the phase has too many decisions to implement at full fidelity within the plan budget. The planner proposes groupings.
+When the planner returns `## PHASE SPLIT RECOMMENDED`, it means the phase's source items exceed the context budget for full-fidelity implementation. The planner proposes groupings.
 
 **Extract from planner return:**
 - Proposed sub-phases (e.g., "17a: processing core (D-01 to D-19)", "17b: billing + config UX (D-20 to D-27)")
-- Which D-XX decisions go in each sub-phase
-- Why the split is necessary (decision count, complexity estimate)
+- Which source items (REQ-IDs, D-XX decisions, RESEARCH items) go in each sub-phase
+- Why the split is necessary (context cost estimate, file count)
 
 **Present to user:**
 ```
-## Phase {X} is too complex for full-fidelity implementation
+## Phase {X} exceeds context budget for full-fidelity implementation
 
-The planner found {N} decisions that cannot all be implemented without
-simplifying some. Instead of reducing your decisions, we recommend splitting:
+The planner found {N} source items that exceed the context budget when
+planned at full fidelity. Instead of reducing scope, we recommend splitting:
 
 **Option 1: Split into sub-phases**
-- Phase {X}a: {name} — {D-XX to D-YY} ({N} decisions)
-- Phase {X}b: {name} — {D-XX to D-YY} ({M} decisions)
+- Phase {X}a: {name} — {items} ({N} source items, ~{P}% context)
+- Phase {X}b: {name} — {items} ({M} source items, ~{Q}% context)
 
-**Option 2: Proceed anyway** (planner will attempt all, quality may degrade)
+**Option 2: Proceed anyway** (planner will attempt all, quality may degrade past 50% context)
 
-**Option 3: Prioritize** — you choose which decisions to implement now,
+**Option 3: Prioritize** — you choose which items to implement now,
 rest become a follow-up phase
 ```
 
 Use AskUserQuestion with these 3 options.
 
 **If "Split":** Use `/gsd-insert-phase` to create the sub-phases, then replan each.
-**If "Proceed":** Return to planner with instruction to attempt all decisions at full fidelity, accepting more plans/tasks.
-**If "Prioritize":** Use AskUserQuestion (multiSelect) to let user pick which D-XX are "now" vs "later". Create CONTEXT.md for each sub-phase with the selected decisions.
+**If "Proceed":** Return to planner with instruction to attempt all items at full fidelity, accepting more plans/tasks.
+**If "Prioritize":** Use AskUserQuestion (multiSelect) to let user pick which items are "now" vs "later". Create CONTEXT.md for each sub-phase with the selected items.
+
+## 9c. Handle Source Audit Gaps
+
+When the planner returns `## ⚠ Source Audit: Unplanned Items Found`, it means items from REQUIREMENTS.md, RESEARCH.md, ROADMAP goal, or CONTEXT.md decisions have no corresponding plan.
+
+**Extract from planner return:**
+- Each unplanned item with its source artifact and section
+- The planner's suggested options (A: add plan, B: split phase, C: defer with confirmation)
+
+**Present each gap to user.** For each unplanned item:
+
+```
+## ⚠ Unplanned: {item description}
+
+Source: {RESEARCH.md / REQUIREMENTS.md / ROADMAP goal / CONTEXT.md}
+Details: {why the planner flagged this}
+
+Options:
+1. Add a plan to cover this item (recommended)
+2. Split phase — move to a sub-phase with related items
+3. Defer — add to backlog (developer confirms this is intentional)
+```
+
+Use AskUserQuestion for each gap (or batch if multiple gaps).
+
+**If "Add plan":** Return to planner (step 8) with instruction to add plans covering the missing items, preserving existing plans.
+**If "Split":** Use `/gsd-insert-phase` for overflow items, then replan.
+**If "Defer":** Record in CONTEXT.md `## Deferred Ideas` with developer's confirmation. Proceed to step 10.
 
 ## 10. Spawn gsd-plan-checker Agent
 

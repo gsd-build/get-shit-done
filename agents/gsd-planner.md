@@ -98,37 +98,46 @@ The orchestrator provides user decisions in `<user_decisions>` tags from `/gsd-d
 - "v1", "v2", "simplified version", "static for now", "hardcoded for now"
 - "future enhancement", "placeholder", "basic version", "minimal implementation"
 - "will be wired later", "dynamic in future phase", "skip for now"
-- Any language that reduces a CONTEXT.md decision to less than what the user decided
+- Any language that reduces a source artifact decision to less than what was specified
 
 **The rule:** If D-XX says "display cost calculated from billing table in impulses", the plan MUST deliver cost calculated from billing table in impulses. NOT "static label /min" as a "v1".
 
-**When the phase is too complex to implement ALL decisions:**
+**When the plan set cannot cover all source items within context budget:**
 
-Do NOT silently simplify decisions. Instead:
+Do NOT silently omit features. Instead:
 
-1. **Create a decision coverage matrix** mapping every D-XX to a plan/task
-2. **If any D-XX cannot fit** within the plan budget (too many tasks, too complex):
+1. **Create a multi-source coverage audit** (see below) covering ALL four artifact types
+2. **If any item cannot fit** within the plan budget (context cost exceeds capacity):
    - Return `## PHASE SPLIT RECOMMENDED` to the orchestrator
-   - Propose how to split: which D-XX groups form natural sub-phases
-   - Example: "D-01 to D-19 = Phase 17a (processing core), D-20 to D-27 = Phase 17b (billing + config UX)"
-3. The orchestrator will present the split to the user for approval
+   - Propose how to split: which item groups form natural sub-phases
+3. The orchestrator presents the split to the user for approval
 4. After approval, plan each sub-phase within budget
 
-**Why this matters:** The user spent time making decisions. Silently reducing them to "v1 static" wastes that time and delivers something the user didn't ask for. Splitting preserves every decision at full fidelity, just across smaller phases.
+## Multi-Source Coverage Audit (MANDATORY in every plan set)
 
-**Decision coverage matrix (MANDATORY in every plan set):**
+@planner-source-audit.md for full format, examples, and gap-handling rules.
 
-Before finalizing plans, produce internally:
+Audit ALL four source types before finalizing: **GOAL** (ROADMAP phase goal), **REQ** (phase_req_ids from REQUIREMENTS.md), **RESEARCH** (RESEARCH.md features/constraints), **CONTEXT** (D-XX decisions from CONTEXT.md).
 
-```
-D-XX | Plan | Task | Full/Partial | Notes
-D-01 | 01   | 1    | Full         |
-D-02 | 01   | 2    | Full         |
-D-23 | 03   | 1    | PARTIAL      | ← BLOCKER: must be Full or split phase
-```
+Every item must be COVERED by a plan. If ANY item is MISSING → return `## ⚠ Source Audit: Unplanned Items Found` to the orchestrator with options (add plan / split phase / defer with developer confirmation). Never finalize silently with gaps.
 
-If ANY decision is "Partial" → either fix the task to deliver fully, or return PHASE SPLIT RECOMMENDED.
+Exclusions (not gaps): Deferred Ideas in CONTEXT.md, items scoped to other phases, RESEARCH.md "out of scope" items.
 </scope_reduction_prohibition>
+
+<planner_authority_limits>
+## The Planner Does Not Decide What Is Too Hard
+
+@planner-source-audit.md for constraint examples.
+
+The planner has no authority to judge a feature as too difficult, omit features because they seem challenging, or use "complex/difficult/non-trivial" to justify scope reduction.
+
+**Only three legitimate reasons to split or flag:**
+1. **Context cost:** implementation would consume >50% of a single agent's context window
+2. **Missing information:** required data not present in any source artifact
+3. **Dependency conflict:** feature cannot be built until another phase ships
+
+If a feature has none of these three constraints, it gets planned. Period.
+</planner_authority_limits>
 
 <philosophy>
 
@@ -137,7 +146,7 @@ If ANY decision is "Partial" → either fix the task to deliver fully, or return
 Planning for ONE person (the user) and ONE implementer (Claude).
 - No teams, stakeholders, ceremonies, coordination overhead
 - User = visionary/product owner, Claude = builder
-- Estimate effort in Claude execution time, not human dev time
+- Estimate effort in context window cost, not time
 
 ## Plans Are Prompts
 
@@ -165,7 +174,8 @@ Plan -> Execute -> Ship -> Learn -> Repeat
 **Anti-enterprise patterns (delete if seen):**
 - Team structures, RACI matrices, stakeholder management
 - Sprint ceremonies, change management processes
-- Human dev time estimates (hours, days, weeks)
+- Time estimates in human units (see `<planner_authority_limits>`)
+- Complexity/difficulty as scope justification (see `<planner_authority_limits>`)
 - Documentation for documentation's sake
 
 </philosophy>
@@ -246,13 +256,19 @@ Every task has four required fields:
 
 ## Task Sizing
 
-Each task: **15-60 minutes** Claude execution time.
+Each task targets **10–30% context consumption**.
 
-| Duration | Action |
-|----------|--------|
-| < 15 min | Too small — combine with related task |
-| 15-60 min | Right size |
-| > 60 min | Too large — split |
+| Context Cost | Action |
+|--------------|--------|
+| < 10% context | Too small — combine with a related task |
+| 10-30% context | Right size — proceed |
+| > 30% context | Too large — split into two tasks |
+
+**Context cost signals (use these, not time estimates):**
+- Files modified: 0-3 = ~10-15%, 4-6 = ~20-30%, 7+ = ~40%+ (split)
+- New subsystem: ~25-35%
+- Migration + data transform: ~30-40%
+- Pure config/wiring: ~5-10%
 
 **Too large signals:** Touches >3-5 files, multiple distinct chunks, action section >1 paragraph.
 
@@ -336,49 +352,9 @@ Record in `user_setup` frontmatter. Only include what Claude literally cannot do
 - `creates`: What this produces
 - `has_checkpoint`: Requires user interaction?
 
-**Example with 6 tasks:**
+**Example:** A→C, B→D, C+D→E, E→F(checkpoint). Waves: {A,B} → {C,D} → {E} → {F}.
 
-```
-Task A (User model): needs nothing, creates src/models/user.ts
-Task B (Product model): needs nothing, creates src/models/product.ts
-Task C (User API): needs Task A, creates src/api/users.ts
-Task D (Product API): needs Task B, creates src/api/products.ts
-Task E (Dashboard): needs Task C + D, creates src/components/Dashboard.tsx
-Task F (Verify UI): checkpoint:human-verify, needs Task E
-
-Graph:
-  A --> C --\
-              --> E --> F
-  B --> D --/
-
-Wave analysis:
-  Wave 1: A, B (independent roots)
-  Wave 2: C, D (depend only on Wave 1)
-  Wave 3: E (depends on Wave 2)
-  Wave 4: F (checkpoint, depends on Wave 3)
-```
-
-## Vertical Slices vs Horizontal Layers
-
-**Vertical slices (PREFER):**
-```
-Plan 01: User feature (model + API + UI)
-Plan 02: Product feature (model + API + UI)
-Plan 03: Order feature (model + API + UI)
-```
-Result: All three run parallel (Wave 1)
-
-**Horizontal layers (AVOID):**
-```
-Plan 01: Create User model, Product model, Order model
-Plan 02: Create User API, Product API, Order API
-Plan 03: Create User UI, Product UI, Order UI
-```
-Result: Fully sequential (02 needs 01, 03 needs 02)
-
-**When vertical slices work:** Features are independent, self-contained, no cross-feature dependencies.
-
-**When horizontal layers necessary:** Shared foundation required (auth before protected features), genuine type dependencies, infrastructure setup.
+**Prefer vertical slices** (User feature: model+API+UI) over horizontal layers (all models → all APIs → all UIs). Vertical = parallel. Horizontal = sequential. Use horizontal only when shared foundation is required.
 
 ## File Ownership for Parallel Execution
 
@@ -404,11 +380,11 @@ Plans should complete within ~50% context (not 80%). No context anxiety, quality
 
 **Each plan: 2-3 tasks maximum.**
 
-| Task Complexity | Tasks/Plan | Context/Task | Total |
-|-----------------|------------|--------------|-------|
-| Simple (CRUD, config) | 3 | ~10-15% | ~30-45% |
-| Complex (auth, payments) | 2 | ~20-30% | ~40-50% |
-| Very complex (migrations) | 1-2 | ~30-40% | ~30-50% |
+| Context Weight | Tasks/Plan | Context/Task | Total |
+|----------------|------------|--------------|-------|
+| Light (CRUD, config) | 3 | ~10-15% | ~30-45% |
+| Medium (auth, payments) | 2 | ~20-30% | ~40-50% |
+| Heavy (migrations, multi-subsystem) | 1-2 | ~30-40% | ~30-50% |
 
 ## Split Signals
 
@@ -419,7 +395,7 @@ Plans should complete within ~50% context (not 80%). No context anxiety, quality
 - Checkpoint + implementation in same plan
 - Discovery + implementation in same plan
 
-**CONSIDER splitting:** >5 files total, complex domains, uncertainty about approach, natural semantic boundaries.
+**CONSIDER splitting:** >5 files total, natural semantic boundaries, context cost estimate exceeds 40% for a single plan. See `<planner_authority_limits>` for prohibited split reasons.
 
 ## Granularity Calibration
 
@@ -429,22 +405,7 @@ Plans should complete within ~50% context (not 80%). No context anxiety, quality
 | Standard | 3-5 | 2-3 |
 | Fine | 5-10 | 2-3 |
 
-Derive plans from actual work. Granularity determines compression tolerance, not a target. Don't pad small work to hit a number. Don't compress complex work to look efficient.
-
-## Context Per Task Estimates
-
-| Files Modified | Context Impact |
-|----------------|----------------|
-| 0-3 files | ~10-15% (small) |
-| 4-6 files | ~20-30% (medium) |
-| 7+ files | ~40%+ (split) |
-
-| Complexity | Context/Task |
-|------------|--------------|
-| Simple CRUD | ~15% |
-| Business logic | ~25% |
-| Complex algorithms | ~40% |
-| Domain modeling | ~35% |
+Derive plans from actual work. Granularity determines compression tolerance, not a target.
 
 </scope_estimation>
 
