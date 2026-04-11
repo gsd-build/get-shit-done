@@ -579,6 +579,49 @@ issue:
 2. **Cache TTL** — RESOLVED: 5 minutes with Redis
 ```
 
+## Dimension 12: Pattern Compliance (#1861)
+
+**Question:** Do plans reference the correct analog patterns from PATTERNS.md for each new/modified file?
+
+**Skip if:** No PATTERNS.md exists for this phase. Output: "Dimension 12: SKIPPED (no PATTERNS.md found)"
+
+**Process:**
+1. Read the phase's PATTERNS.md file
+2. For each file listed in the `## File Classification` table:
+   a. Find the corresponding PLAN.md that creates/modifies this file
+   b. Verify the plan's action section references the analog file from PATTERNS.md
+   c. Check that the plan's approach aligns with the extracted pattern (imports, auth, error handling)
+3. For files in `## No Analog Found`, verify the plan references RESEARCH.md patterns instead
+4. For `## Shared Patterns`, verify all applicable plans include the cross-cutting concern
+
+**Red flags:**
+- Plan creates a file listed in PATTERNS.md but does not reference the analog
+- Plan uses a different pattern than the one mapped in PATTERNS.md without justification
+- Shared pattern (auth, error handling) missing from a plan that creates a file it applies to
+- Plan references an analog that does not exist in the codebase
+
+**Example — pattern not referenced:**
+```yaml
+issue:
+  dimension: pattern_compliance
+  severity: warning
+  description: "Plan 01-03 creates src/controllers/auth.ts but does not reference analog src/controllers/users.ts from PATTERNS.md"
+  file: "01-03-PLAN.md"
+  expected_analog: "src/controllers/users.ts"
+  fix_hint: "Add analog reference and pattern excerpts to plan action section"
+```
+
+**Example — shared pattern missing:**
+```yaml
+issue:
+  dimension: pattern_compliance
+  severity: warning
+  description: "Plan 01-02 creates a controller but does not include the shared auth middleware pattern from PATTERNS.md"
+  file: "01-02-PLAN.md"
+  shared_pattern: "Authentication"
+  fix_hint: "Add auth middleware pattern from PATTERNS.md ## Shared Patterns to plan"
+```
+
 </verification_dimensions>
 
 <verification_process>

@@ -3956,6 +3956,12 @@ function copyCommandsAsClaudeSkills(srcDir, skillsDir, prefix, pathPrefix, runti
       content = content.replace(/~\/\.qwen\//g, pathPrefix);
       content = content.replace(/\$HOME\/\.qwen\//g, pathPrefix);
       content = content.replace(/\.\/\.qwen\//g, `./${getDirName(runtime)}/`);
+      // Qwen reuses Claude skill format but needs runtime-specific content replacement
+      if (runtime === 'qwen') {
+        content = content.replace(/CLAUDE\.md/g, 'QWEN.md');
+        content = content.replace(/\bClaude Code\b/g, 'Qwen Code');
+        content = content.replace(/\.claude\//g, '.qwen/');
+      }
       content = processAttribution(content, getCommitAttribution(runtime));
       content = convertClaudeCommandToClaudeSkill(content, skillName);
 
@@ -4152,6 +4158,7 @@ function copyWithPathReplacement(srcDir, destDir, pathPrefix, runtime, isCommand
       } else if (isQwen) {
         content = content.replace(/CLAUDE\.md/g, 'QWEN.md');
         content = content.replace(/\bClaude Code\b/g, 'Qwen Code');
+        content = content.replace(/\.claude\//g, '.qwen/');
         fs.writeFileSync(destPath, content);
       } else {
         fs.writeFileSync(destPath, content);
@@ -5682,6 +5689,10 @@ function install(isGlobal, runtime = 'claude') {
           content = convertClaudeAgentToCodebuddyAgent(content);
         } else if (isCline) {
           content = convertClaudeAgentToClineAgent(content);
+        } else if (isQwen) {
+          content = content.replace(/CLAUDE\.md/g, 'QWEN.md');
+          content = content.replace(/\bClaude Code\b/g, 'Qwen Code');
+          content = content.replace(/\.claude\//g, '.qwen/');
         }
         const destName = isCopilot ? entry.name.replace('.md', '.agent.md') : entry.name;
         fs.writeFileSync(path.join(agentsDest, destName), content);
@@ -5740,6 +5751,11 @@ function install(isGlobal, runtime = 'claude') {
           if (entry.endsWith('.js')) {
             let content = fs.readFileSync(srcFile, 'utf8');
             content = content.replace(/'\.claude'/g, configDirReplacement);
+            content = content.replace(/\/\.claude\//g, `/${getDirName(runtime)}/`);
+            if (isQwen) {
+              content = content.replace(/CLAUDE\.md/g, 'QWEN.md');
+              content = content.replace(/\bClaude Code\b/g, 'Qwen Code');
+            }
             content = content.replace(/\{\{GSD_VERSION\}\}/g, pkg.version);
             fs.writeFileSync(destFile, content);
             // Ensure hook files are executable (fixes #1162 — missing +x permission)

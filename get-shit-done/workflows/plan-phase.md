@@ -15,6 +15,7 @@ Read all files referenced by the invoking prompt's execution_context before star
 <available_agent_types>
 Valid GSD subagent types (use exact names — do not fall back to 'general-purpose'):
 - gsd-phase-researcher — Researches technical approaches for a phase
+- gsd-pattern-mapper — Analyzes codebase for existing patterns, produces PATTERNS.md
 - gsd-planner — Creates detailed plans from phase scope
 - gsd-plan-checker — Reviews plan quality before execution
 </available_agent_types>
@@ -37,7 +38,7 @@ TDD_MODE=$(node "$HOME/.claude/get-shit-done/bin/gsd-tools.cjs" config-get workf
 
 When `TDD_MODE` is `true`, the planner agent is instructed to apply `type: tdd` to eligible tasks using heuristics from `references/tdd.md`. The planner's `<required_reading>` is extended to include `@~/.claude/get-shit-done/references/tdd.md` so gate enforcement rules are available during planning.
 
-When `CONTEXT_WINDOW >= 500000`, the planner prompt includes prior phase CONTEXT.md files so cross-phase decisions are consistent (e.g., "use library X for all data fetching" from Phase 2 is visible to Phase 5's planner).
+When `CONTEXT_WINDOW >= 500000`, the planner prompt includes the 3 most recent prior phase CONTEXT.md and SUMMARY.md files PLUS any phases explicitly listed in the current phase's `Depends on:` field in ROADMAP.md. Explicit dependencies always load regardless of recency (e.g., Phase 7 declaring `Depends on: Phase 2` always sees Phase 2's context). Bounded recency keeps the planner's context budget focused on recent work.
 
 Parse JSON for: `researcher_model`, `planner_model`, `checker_model`, `research_enabled`, `plan_checker_enabled`, `nyquist_validation_enabled`, `commit_docs`, `text_mode`, `phase_found`, `phase_dir`, `phase_number`, `phase_name`, `phase_slug`, `padded_phase`, `has_research`, `has_context`, `has_reviews`, `has_plans`, `plan_count`, `planning_exists`, `roadmap_exists`, `phase_req_ids`, `response_language`.
 
@@ -591,6 +592,7 @@ VERIFICATION_PATH=$(_gsd_field "$INIT" verification_path)
 UAT_PATH=$(_gsd_field "$INIT" uat_path)
 CONTEXT_PATH=$(_gsd_field "$INIT" context_path)
 REVIEWS_PATH=$(_gsd_field "$INIT" reviews_path)
+PATTERNS_PATH=$(_gsd_field "$INIT" patterns_path)
 ```
 
 ## 7.5. Verify Nyquist Artifacts
@@ -614,7 +616,66 @@ If missing and Nyquist is still enabled/applicable — ask user:
    `node "$HOME/.claude/get-shit-done/bin/gsd-tools.cjs" config-set workflow.nyquist_validation false`
 3. Continue anyway (plans fail Dimension 8)
 
-Proceed to Step 8 only if user selects 2 or 3.
+Proceed to Step 7.8 (or Step 8 if pattern mapper is disabled) only if user selects 2 or 3.
+
+## 7.8. Spawn gsd-pattern-mapper Agent (Optional)
+
+**Skip if** `workflow.pattern_mapper` is explicitly set to `false` in config.json (absent key = enabled). Also skip if no CONTEXT.md and no RESEARCH.md exist for this phase (nothing to extract file lists from).
+
+Check config:
+```bash
+PATTERN_MAPPER_CFG=$(node "$HOME/.claude/get-shit-done/bin/gsd-tools.cjs" config-get workflow.pattern_mapper --default true 2>/dev/null)
+```
+
+**If `PATTERN_MAPPER_CFG` is `false`:** Skip to step 8.
+
+**If PATTERNS.md already exists** (`PATTERNS_PATH` is non-empty from step 7): Skip to step 8 (use existing).
+
+Display banner:
+```
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+ GSD ► PATTERN MAPPING PHASE {X}
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+◆ Spawning pattern mapper...
+```
+
+Pattern mapper prompt:
+
+```markdown
+<pattern_mapping_context>
+**Phase:** {phase_number} - {phase_name}
+**Phase directory:** {phase_dir}
+**Padded phase:** {padded_phase}
+
+<files_to_read>
+- {context_path} (USER DECISIONS from /gsd-discuss-phase)
+- {research_path} (Technical Research)
+</files_to_read>
+
+**Output file:** {phase_dir}/{padded_phase}-PATTERNS.md
+
+Extract the list of files to be created/modified from CONTEXT.md and RESEARCH.md. For each file, classify by role and data flow, find the closest existing analog in the codebase, extract concrete code excerpts, and produce PATTERNS.md.
+</pattern_mapping_context>
+```
+
+Spawn with:
+```
+Task(
+  prompt="{above}",
+  subagent_type="gsd-pattern-mapper",
+  model="{researcher_model}",
+)
+```
+
+**Handle return:**
+- **`## PATTERN MAPPING COMPLETE`:** Update `PATTERNS_PATH` to the created file path, continue to step 8.
+- **Any error or empty return:** Log warning, continue to step 8 without patterns (non-blocking).
+
+After pattern mapper completes, update the path variable:
+```bash
+PATTERNS_PATH="${PHASE_DIR}/${PADDED_PHASE}-PATTERNS.md"
+```
 
 ## 8. Spawn gsd-planner Agent
 
@@ -640,14 +701,17 @@ Planner prompt:
 - {requirements_path} (Requirements)
 - {context_path} (USER DECISIONS from /gsd-discuss-phase)
 - {research_path} (Technical Research)
+- {PATTERNS_PATH} (Pattern Map — analog files and code excerpts, if exists)
 - {verification_path} (Verification Gaps - if --gaps)
 - {uat_path} (UAT Gaps - if --gaps)
 - {reviews_path} (Cross-AI Review Feedback - if --reviews)
 - {UI_SPEC_PATH} (UI Design Contract — visual/interaction specs, if exists)
 ${CONTEXT_WINDOW >= 500000 ? `
 **Cross-phase context (1M model enrichment):**
-- Prior phase CONTEXT.md files (locked decisions from earlier phases — maintain consistency)
-- Prior phase SUMMARY.md files (what was actually built — reuse patterns, avoid duplication)
+- CONTEXT.md files from the 3 most recent completed phases (locked decisions — maintain consistency)
+- SUMMARY.md files from the 3 most recent completed phases (what was built — reuse patterns, avoid duplication)
+- CONTEXT.md and SUMMARY.md from any phases listed in the current phase's "Depends on:" field in ROADMAP.md (regardless of recency — explicit dependencies always load, deduplicated against the 3 most recent)
+- Skip all other prior phases to stay within context budget
 ` : ''}
 </files_to_read>
 

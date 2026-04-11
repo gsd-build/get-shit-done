@@ -205,3 +205,90 @@ describe('config-set agent_skills', () => {
     );
   });
 });
+
+// ─── global: prefix support (#1992) ──────────────────────────────────────────
+
+describe('agent-skills global: prefix', () => {
+  let tmpDir;
+  let fakeHome;
+  let globalSkillsDir;
+
+  beforeEach(() => {
+    tmpDir = createTempProject();
+    // Create a fake HOME with ~/.claude/skills/ structure
+    fakeHome = fs.mkdtempSync(path.join(require('os').tmpdir(), 'gsd-1992-home-'));
+    globalSkillsDir = path.join(fakeHome, '.claude', 'skills');
+    fs.mkdirSync(globalSkillsDir, { recursive: true });
+  });
+
+  afterEach(() => {
+    cleanup(tmpDir);
+    fs.rmSync(fakeHome, { recursive: true, force: true });
+  });
+
+  function createGlobalSkill(name) {
+    const skillDir = path.join(globalSkillsDir, name);
+    fs.mkdirSync(skillDir, { recursive: true });
+    fs.writeFileSync(path.join(skillDir, 'SKILL.md'), `# ${name}\nGlobal skill content.\n`);
+    return skillDir;
+  }
+
+  test('global:valid-skill resolves to $HOME/.claude/skills/valid-skill/SKILL.md', () => {
+    createGlobalSkill('valid-skill');
+    writeConfig(tmpDir, {
+      agent_skills: { 'gsd-executor': ['global:valid-skill'] },
+    });
+
+    const result = runGsdTools(['agent-skills', 'gsd-executor'], tmpDir, { HOME: fakeHome, USERPROFILE: fakeHome });
+    assert.ok(result.output.includes('valid-skill/SKILL.md'), `should reference the global skill: ${result.output}`);
+    assert.ok(result.output.includes('<agent_skills>'), 'should emit agent_skills block');
+  });
+
+  test('global:invalid!name is rejected by regex and skipped', () => {
+    writeConfig(tmpDir, {
+      agent_skills: { 'gsd-executor': ['global:invalid!name'] },
+    });
+
+    const result = runGsdTools(['agent-skills', 'gsd-executor'], tmpDir, { HOME: fakeHome, USERPROFILE: fakeHome });
+    // No valid skills → empty output, command succeeds
+    assert.strictEqual(result.output, '', 'should skip invalid name without crashing');
+  });
+
+  test('global:missing-skill is skipped when directory is absent', () => {
+    // Do NOT create the skill directory
+    writeConfig(tmpDir, {
+      agent_skills: { 'gsd-executor': ['global:missing-skill'] },
+    });
+
+    const result = runGsdTools(['agent-skills', 'gsd-executor'], tmpDir, { HOME: fakeHome, USERPROFILE: fakeHome });
+    assert.strictEqual(result.output, '', 'should skip missing skill gracefully');
+  });
+
+  test('mix of global: and project-relative paths both resolve correctly', () => {
+    createGlobalSkill('shadcn');
+
+    // Create a project-relative skill
+    const projectSkillDir = path.join(tmpDir, 'skills', 'local-skill');
+    fs.mkdirSync(projectSkillDir, { recursive: true });
+    fs.writeFileSync(path.join(projectSkillDir, 'SKILL.md'), '# local\n');
+
+    writeConfig(tmpDir, {
+      agent_skills: { 'gsd-executor': ['global:shadcn', 'skills/local-skill'] },
+    });
+
+    const result = runGsdTools(['agent-skills', 'gsd-executor'], tmpDir, { HOME: fakeHome, USERPROFILE: fakeHome });
+    assert.ok(result.output.includes('shadcn/SKILL.md'), 'should include global shadcn');
+    assert.ok(result.output.includes('skills/local-skill/SKILL.md'), 'should include project-relative skill');
+  });
+
+  test('global: with empty name produces clear warning and skips', () => {
+    writeConfig(tmpDir, {
+      agent_skills: { 'gsd-executor': ['global:'] },
+    });
+
+    const result = runGsdTools(['agent-skills', 'gsd-executor'], tmpDir, { HOME: fakeHome, USERPROFILE: fakeHome });
+    assert.strictEqual(result.output, '', 'should skip empty global: prefix');
+    // The warning goes to stderr — cannot assert on it through runGsdTools's output field,
+    // but the command must not crash and must return empty.
+  });
+});

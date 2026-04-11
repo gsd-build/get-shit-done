@@ -176,3 +176,141 @@ describe('E2E: Qwen Code uninstall skills cleanup', () => {
       'get-shit-done engine should be removed after Qwen uninstall');
   });
 });
+
+// ─── Regression: no Claude references leak into Qwen install (#2112) ──────────
+
+describe('Qwen install contains no leaked Claude references (#2112)', () => {
+  let tmpDir;
+  let previousCwd;
+
+  beforeEach(() => {
+    tmpDir = createTempDir('gsd-qwen-refs-');
+    previousCwd = process.cwd();
+    process.chdir(tmpDir);
+    install(false, 'qwen');
+  });
+
+  afterEach(() => {
+    process.chdir(previousCwd);
+    cleanup(tmpDir);
+  });
+
+  /**
+   * Recursively walk a directory and return all file paths.
+   */
+  function walk(dir) {
+    const results = [];
+    for (const entry of fs.readdirSync(dir, { withFileTypes: true })) {
+      const full = path.join(dir, entry.name);
+      if (entry.isDirectory()) {
+        results.push(...walk(full));
+      } else {
+        results.push(full);
+      }
+    }
+    return results;
+  }
+
+  /**
+   * Return files under .qwen/ that contain Claude references,
+   * excluding CHANGELOG.md (historical accuracy) and VERSION (no prose).
+   */
+  function findClaudeLeaks() {
+    const qwenDir = path.join(tmpDir, '.qwen');
+    const allFiles = walk(qwenDir);
+    const textFiles = allFiles.filter(f =>
+      f.endsWith('.md') || f.endsWith('.cjs') || f.endsWith('.js')
+    );
+    const excluded = ['CHANGELOG.md'];
+    const candidates = textFiles.filter(f =>
+      !excluded.includes(path.basename(f))
+    );
+    const leaks = [];
+    for (const file of candidates) {
+      const content = fs.readFileSync(file, 'utf8');
+      if (/\bCLAUDE\.md\b/.test(content) ||
+          /\bClaude Code\b/.test(content) ||
+          /\.claude\//.test(content)) {
+        leaks.push(path.relative(tmpDir, file));
+      }
+    }
+    return leaks;
+  }
+
+  test('skills contain no CLAUDE.md or Claude Code references', () => {
+    const qwenDir = path.join(tmpDir, '.qwen');
+    const skillsDir = path.join(qwenDir, 'skills');
+    assert.ok(fs.existsSync(skillsDir), 'skills directory exists');
+
+    const skillFiles = walk(skillsDir).filter(f => f.endsWith('.md'));
+    assert.ok(skillFiles.length > 0, 'at least one skill file exists');
+
+    const leaks = [];
+    for (const file of skillFiles) {
+      const content = fs.readFileSync(file, 'utf8');
+      if (/\bCLAUDE\.md\b/.test(content) || /\bClaude Code\b/.test(content)) {
+        leaks.push(path.relative(tmpDir, file));
+      }
+    }
+    assert.strictEqual(leaks.length, 0,
+      [
+        'Skills should not contain Claude references after Qwen install.',
+        'Leaking files:',
+        ...leaks,
+      ].join('\n'));
+  });
+
+  test('agents contain no CLAUDE.md or Claude Code references', () => {
+    const agentsDir = path.join(tmpDir, '.qwen', 'agents');
+    assert.ok(fs.existsSync(agentsDir), 'agents directory exists');
+
+    const agentFiles = walk(agentsDir).filter(f => f.endsWith('.md'));
+    assert.ok(agentFiles.length > 0, 'at least one agent file exists');
+
+    const leaks = [];
+    for (const file of agentFiles) {
+      const content = fs.readFileSync(file, 'utf8');
+      if (/\bCLAUDE\.md\b/.test(content) || /\bClaude Code\b/.test(content)) {
+        leaks.push(path.relative(tmpDir, file));
+      }
+    }
+    assert.strictEqual(leaks.length, 0,
+      [
+        'Agents should not contain Claude references after Qwen install.',
+        'Leaking files:',
+        ...leaks,
+      ].join('\n'));
+  });
+
+  test('hooks contain no .claude/ path references', () => {
+    const hooksDir = path.join(tmpDir, '.qwen', 'hooks');
+    if (!fs.existsSync(hooksDir)) {
+      return; // hooks may not be present in local installs
+    }
+
+    const hookFiles = walk(hooksDir).filter(f => f.endsWith('.js'));
+    const leaks = [];
+    for (const file of hookFiles) {
+      const content = fs.readFileSync(file, 'utf8');
+      if (/\.claude\//.test(content)) {
+        leaks.push(path.relative(tmpDir, file));
+      }
+    }
+    assert.strictEqual(leaks.length, 0,
+      [
+        'Hooks should not contain .claude/ path references after Qwen install.',
+        'Leaking files:',
+        ...leaks,
+      ].join('\n'));
+  });
+
+  test('full tree scan finds zero Claude references outside CHANGELOG.md', () => {
+    const leaks = findClaudeLeaks();
+    assert.strictEqual(leaks.length, 0,
+      [
+        'No files under .qwen/ (except CHANGELOG.md) should contain Claude references.',
+        `Found ${leaks.length} leaking file(s):`,
+        ...leaks,
+      ].join('\n'));
+  });
+});

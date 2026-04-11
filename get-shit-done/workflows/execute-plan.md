@@ -61,10 +61,19 @@ PLAN_START_EPOCH=$(date +%s)
 
 <step name="parse_segments">
 ```bash
+# Count tasks — match <task tag at any indentation level
+TASK_COUNT=$(grep -cE '^\s*<task[[:space:]>]' .planning/phases/XX-name/{phase}-{plan}-PLAN.md 2>/dev/null || echo "0")
+INLINE_THRESHOLD=$(node "$HOME/.claude/get-shit-done/bin/gsd-tools.cjs" config-get workflow.inline_plan_threshold --default 2 2>/dev/null || echo "2")
 grep -n "type=\"checkpoint" .planning/phases/XX-name/{phase}-{plan}-PLAN.md
 ```
 
-**Routing by checkpoint type:**
+**Primary routing: task count threshold (#1979)**
+
+If `INLINE_THRESHOLD > 0` AND `TASK_COUNT <= INLINE_THRESHOLD`: Use Pattern C (inline) regardless of checkpoint type. Small plans execute faster inline — avoids ~14K token subagent spawn overhead and preserves prompt cache. Configure threshold via `workflow.inline_plan_threshold` (default: 2, set to `0` to always spawn subagents).
+
+Otherwise: Apply checkpoint-based routing below.
+
+**Checkpoint-based routing (plans with > threshold tasks):**
 
 | Checkpoints | Pattern | Execution |
 |-------------|---------|-----------|

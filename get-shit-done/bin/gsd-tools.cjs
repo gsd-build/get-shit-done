@@ -470,6 +470,9 @@ async function runCommand(command, args, cwd, raw, defaultValue) {
       } else if (subcommand === 'sync') {
         const { verify } = parseNamedArgs(args, [], ['verify']);
         state.cmdStateSync(cwd, { verify }, raw);
+      } else if (subcommand === 'prune') {
+        const { 'keep-recent': keepRecent, 'dry-run': dryRun } = parseNamedArgs(args, ['keep-recent'], ['dry-run']);
+        state.cmdStatePrune(cwd, { keepRecent: keepRecent || '3', dryRun: !!dryRun }, raw);
       } else {
         state.cmdStateLoad(cwd, raw);
       }

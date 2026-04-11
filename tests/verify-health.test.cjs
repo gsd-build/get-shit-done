@@ -767,3 +767,47 @@ describe('validate health --repair command', () => {
     assert.strictEqual(output.repairable_count, 0, `Expected no repairable issues for W002: ${JSON.stringify(output)}`);
   });
 });
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Graceful degradation when phasesDir is missing (#1973)
+// ─────────────────────────────────────────────────────────────────────────────
+
+describe('validate health — missing phasesDir', () => {
+  let tmpDir;
+
+  beforeEach(() => {
+    tmpDir = createTempProject();
+  });
+
+  afterEach(() => {
+    cleanup(tmpDir);
+  });
+
+  test('completes without throwing and emits zero phase-directory warnings when phasesDir does not exist', () => {
+    // Setup: valid PROJECT, ROADMAP, STATE, config but NO phases directory
+    writeMinimalProjectMd(tmpDir);
+    writeMinimalRoadmap(tmpDir, ['1', '2']);
+    writeMinimalStateMd(tmpDir);
+    writeValidConfigJson(tmpDir);
+
+    // Remove the phases directory if it exists
+    const phasesDir = path.join(tmpDir, '.planning', 'phases');
+    if (fs.existsSync(phasesDir)) {
+      fs.rmSync(phasesDir, { recursive: true, force: true });
+    }
+
+    // Should complete without throwing
+    const result = runGsdTools('validate health', tmpDir);
+    assert.ok(result.success, `Command should succeed when phasesDir is missing: ${result.error}`);
+
+    const output = JSON.parse(result.output);
+
+    // Assert no phase-directory warnings fired
+    const phaseDirCodes = ['W005', 'W006', 'W007', 'W009', 'I001'];
+    const issues = output.issues || [];
+    for (const code of phaseDirCodes) {
+      const matches = issues.filter(i => i.code === code);
+      assert.strictEqual(matches.length, 0, `Expected no ${code} issues when phasesDir is missing, got: ${JSON.stringify(matches)}`);
+    }
+  });
+});

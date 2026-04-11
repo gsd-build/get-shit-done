@@ -4,7 +4,7 @@
 
 const fs = require('fs');
 const path = require('path');
-const { escapeRegex, loadConfig, normalizePhaseName, comparePhaseNum, findPhaseInternal, getArchivedPhaseDirs, generateSlugInternal, getMilestonePhaseFilter, stripShippedMilestones, extractCurrentMilestone, replaceInCurrentMilestone, toPosixPath, planningDir, withPlanningLock, output, error, readSubdirectories, phaseTokenMatches } = require('./core.cjs');
+const { escapeRegex, loadConfig, normalizePhaseName, comparePhaseNum, findPhaseInternal, getArchivedPhaseDirs, generateSlugInternal, getMilestonePhaseFilter, stripShippedMilestones, extractCurrentMilestone, replaceInCurrentMilestone, toPosixPath, planningDir, withPlanningLock, output, error, readSubdirectories, phaseTokenMatches, atomicWriteFileSync } = require('./core.cjs');
 const { extractFrontmatter } = require('./frontmatter.cjs');
 const { writeStateMd, readModifyWriteStateMd, stateExtractField, stateReplaceField, stateReplaceFieldWithFallback, updatePerformanceMetricsSection } = require('./state.cjs');
 
@@ -392,7 +392,7 @@ function cmdPhaseAdd(cwd, description, raw, customId) {
       updatedContent = rawContent + phaseEntry;
     }
 
-    fs.writeFileSync(roadmapPath, updatedContent, 'utf-8');
+    atomicWriteFileSync(roadmapPath, updatedContent);
     return { newPhaseId: _newPhaseId, dirName: _dirName };
   });
 
@@ -493,7 +493,7 @@ function cmdPhaseInsert(cwd, afterPhase, description, raw) {
     }
 
     const updatedContent = rawContent.slice(0, insertIdx) + phaseEntry + rawContent.slice(insertIdx);
-    fs.writeFileSync(roadmapPath, updatedContent, 'utf-8');
+    atomicWriteFileSync(roadmapPath, updatedContent);
     return { decimalPhase: _decimalPhase, dirName: _dirName };
   });
 
@@ -607,7 +607,7 @@ function updateRoadmapAfterPhaseRemoval(roadmapPath, targetPhase, isDecimal, rem
       }
     }
 
-    fs.writeFileSync(roadmapPath, content, 'utf-8');
+    atomicWriteFileSync(roadmapPath, content);
   });
 }
 
@@ -783,7 +783,7 @@ function cmdPhaseComplete(cwd, phaseNum, raw) {
         roadmapContent = roadmapContent.replace(planCheckboxPattern, '$1x$2');
       }
 
-      fs.writeFileSync(roadmapPath, roadmapContent, 'utf-8');
+      atomicWriteFileSync(roadmapPath, roadmapContent);
 
       // Update REQUIREMENTS.md traceability for this phase's requirements
       const reqPath = path.join(planningDir(cwd), 'REQUIREMENTS.md');
@@ -816,7 +816,7 @@ function cmdPhaseComplete(cwd, phaseNum, raw) {
             );
           }
 
-          fs.writeFileSync(reqPath, reqContent, 'utf-8');
+          atomicWriteFileSync(reqPath, reqContent);
           requirementsUpdated = true;
         }
       }
