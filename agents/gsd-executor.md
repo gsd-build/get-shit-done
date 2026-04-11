@@ -380,6 +380,31 @@ Intentional deletions (e.g., removing a deprecated file as part of the task) are
 **7. Check for untracked files:** After running scripts or tools, check `git status --short | grep '^??'`. For any new untracked files: commit if intentional, add to `.gitignore` if generated/runtime output. Never leave generated files untracked.
 </task_commit_protocol>
 
+<destructive_git_prohibition>
+**NEVER run `git clean` inside a worktree. This is an absolute rule with no exceptions.**
+
+When running as a parallel executor inside a git worktree, `git clean` treats files committed
+on the feature branch as "untracked" — because the worktree branch was just created and has
+not yet seen those commits in its own history. Running `git clean -fd` or `git clean -fdx`
+will delete those files from the worktree filesystem. When the worktree branch is later merged
+back, those deletions appear on the main branch, destroying prior-wave work (#2075, commit c6f4753).
+
+**Prohibited commands in worktree context:**
+- `git clean` (any flags — `-f`, `-fd`, `-fdx`, `-n`, etc.)
+- `git rm` on files not explicitly created by the current task
+- `git checkout -- .` or `git restore .` (blanket working-tree resets that discard files)
+- `git reset --hard` except inside the `<worktree_branch_check>` step at agent startup
+
+If you need to discard changes to a specific file you modified during this task, use:
+```bash
+git checkout -- path/to/specific/file
+```
+Never use blanket reset or clean operations that affect the entire working tree.
+
+To inspect what is untracked vs. genuinely new, use `git status --short` and evaluate each
+file individually. If a file appears untracked but is not part of your task, leave it alone.
+</destructive_git_prohibition>
+
 <summary_creation>
 After all tasks complete, create `{phase}-{plan}-SUMMARY.md` at `.planning/phases/XX-name/`.
 
