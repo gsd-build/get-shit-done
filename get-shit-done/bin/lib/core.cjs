@@ -313,7 +313,7 @@ function loadConfig(cwd) {
       // Section containers that hold nested sub-keys
       'git', 'workflow', 'planning', 'hooks', 'features',
       // Internal keys loadConfig reads but config-set doesn't expose
-      'model_overrides', 'agent_skills', 'context_window', 'resolve_model_ids',
+      'model_overrides', 'agent_skills', 'context_window', 'resolve_model_ids', 'claude_md_path',
       // Deprecated keys (still accepted for migration, not in config-set)
       'depth', 'multiRepo',
     ]);
@@ -374,6 +374,7 @@ function loadConfig(cwd) {
       agent_skills: parsed.agent_skills || {},
       manager: parsed.manager || {},
       response_language: get('response_language') || null,
+      claude_md_path: get('claude_md_path') || null,
     };
   } catch {
     // Fall back to ~/.gsd/defaults.json only for truly pre-project contexts (#1683)

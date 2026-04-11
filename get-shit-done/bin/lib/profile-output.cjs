@@ -12,7 +12,7 @@
 const fs = require('fs');
 const path = require('path');
 const os = require('os');
-const { output, error, safeReadFile } = require('./core.cjs');
+const { output, error, safeReadFile, loadConfig } = require('./core.cjs');
 
 // ─── Constants ────────────────────────────────────────────────────────────────
 
@@ -870,7 +870,13 @@ function cmdGenerateClaudeProfile(cwd, options, raw) {
   } else if (options.output) {
     targetPath = path.isAbsolute(options.output) ? options.output : path.join(cwd, options.output);
   } else {
-    targetPath = path.join(cwd, 'CLAUDE.md');
+    // Read claude_md_path from config, default to ./CLAUDE.md
+    let configClaudeMdPath = './CLAUDE.md';
+    try {
+      const config = loadConfig(cwd);
+      if (config.claude_md_path) configClaudeMdPath = config.claude_md_path;
+    } catch { /* use default */ }
+    targetPath = path.isAbsolute(configClaudeMdPath) ? configClaudeMdPath : path.join(cwd, configClaudeMdPath);
   }
 
   let action;
@@ -944,7 +950,13 @@ function cmdGenerateClaudeMd(cwd, options, raw) {
 
   let outputPath = options.output;
   if (!outputPath) {
-    outputPath = path.join(cwd, 'CLAUDE.md');
+    // Read claude_md_path from config, default to ./CLAUDE.md
+    let configClaudeMdPath = './CLAUDE.md';
+    try {
+      const config = loadConfig(cwd);
+      if (config.claude_md_path) configClaudeMdPath = config.claude_md_path;
+    } catch { /* use default */ }
+    outputPath = path.isAbsolute(configClaudeMdPath) ? configClaudeMdPath : path.join(cwd, configClaudeMdPath);
   } else if (!path.isAbsolute(outputPath)) {
     outputPath = path.join(cwd, outputPath);
   }

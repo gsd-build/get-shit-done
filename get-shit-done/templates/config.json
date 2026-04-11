@@ -44,5 +44,6 @@
     "context_warnings": true
   },
   "project_code": null,
-  "agent_skills": {}
+  "agent_skills": {},
+  "claude_md_path": "./CLAUDE.md"
 }

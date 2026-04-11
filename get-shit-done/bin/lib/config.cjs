@@ -37,6 +37,7 @@ const VALID_CONFIG_KEYS = new Set([
   'manager.flags.discuss', 'manager.flags.plan', 'manager.flags.execute',
   'response_language',
   'intel.enabled',
+  'claude_md_path',
 ]);
 
 /**
@@ -161,6 +162,7 @@ function buildNewProjectConfig(userChoices) {
     project_code: null,
     phase_naming: 'sequential',
     agent_skills: {},
+    claude_md_path: './CLAUDE.md',
   };
 
   // Three-level deep merge: hardcoded <- userDefaults <- choices
