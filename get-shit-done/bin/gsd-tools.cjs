@@ -807,13 +807,13 @@ async function runCommand(command, args, cwd, raw, defaultValue) {
       const workflow = args[1];
       switch (workflow) {
         case 'execute-phase': {
-          const { validate: epValidate } = parseNamedArgs(args, [], ['validate']);
-          init.cmdInitExecutePhase(cwd, args[2], raw, { validate: epValidate });
+          const { validate: epValidate, tdd: epTdd } = parseNamedArgs(args, [], ['validate', 'tdd']);
+          init.cmdInitExecutePhase(cwd, args[2], raw, { validate: epValidate, tdd: epTdd });
           break;
         }
         case 'plan-phase': {
-          const { validate: ppValidate } = parseNamedArgs(args, [], ['validate']);
-          init.cmdInitPlanPhase(cwd, args[2], raw, { validate: ppValidate });
+          const { validate: ppValidate, tdd: ppTdd } = parseNamedArgs(args, [], ['validate', 'tdd']);
+          init.cmdInitPlanPhase(cwd, args[2], raw, { validate: ppValidate, tdd: ppTdd });
           break;
         }
         case 'new-project':

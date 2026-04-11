@@ -88,6 +88,7 @@ function cmdInitExecutePhase(cwd, phase, raw, options = {}) {
     verifier_model: resolveModelInternal(cwd, 'gsd-verifier'),
 
     // Config flags
+    tdd_mode: options.tdd || config.tdd_mode || false,
     commit_docs: config.commit_docs,
     sub_repos: config.sub_repos,
     parallelization: config.parallelization,
@@ -211,6 +212,7 @@ function cmdInitPlanPhase(cwd, phase, raw, options = {}) {
     checker_model: resolveModelInternal(cwd, 'gsd-plan-checker'),
 
     // Workflow flags
+    tdd_mode: options.tdd || config.tdd_mode || false,
     research_enabled: config.research,
     plan_checker_enabled: config.plan_checker,
     nyquist_validation_enabled: config.nyquist_validation,
