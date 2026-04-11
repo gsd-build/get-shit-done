@@ -382,6 +382,12 @@ Execute each selected wave in sequence. Within a wave: parallel if `PARALLELIZAT
        auto-detects worktree mode (`.git` is a file, not a directory) and skips
        shared file updates automatically. The orchestrator updates them centrally
        after merge.
+
+       REQUIRED: SUMMARY.md MUST be committed before you return. In worktree mode the
+       git_commit_metadata step in execute-plan.md commits SUMMARY.md and REQUIREMENTS.md
+       only (STATE.md and ROADMAP.md are excluded automatically). Do NOT skip or defer
+       this commit — the orchestrator force-removes the worktree after you return, and
+       any uncommitted SUMMARY.md will be permanently lost (#2070).
        </parallel_execution>
 
        <execution_context>
@@ -554,6 +560,17 @@ Execute each selected wave in sequence. Within a wave: parallel if `PARALLELIZAT
            git add .planning/STATE.md .planning/ROADMAP.md 2>/dev/null || true
            git commit --amend --no-edit 2>/dev/null || true
          fi
+       fi
+
+       # Safety net: commit any uncommitted SUMMARY.md before force-removing the worktree.
+       # This guards against executors that skipped the git_commit_metadata step (#2070).
+       UNCOMMITTED_SUMMARY=$(git -C "$WT" ls-files --modified --others --exclude-standard -- "*SUMMARY.md" 2>/dev/null || true)
+       if [ -n "$UNCOMMITTED_SUMMARY" ]; then
+         echo "⚠ SUMMARY.md was not committed by executor — committing now to prevent data loss"
+         git -C "$WT" add -- "*SUMMARY.md" 2>/dev/null || true
+         git -C "$WT" commit --no-verify -m "docs(recovery): rescue uncommitted SUMMARY.md before worktree removal (#2070)" 2>/dev/null || true
+         # Re-merge the recovery commit
+         git merge "$WT_BRANCH" --no-edit -m "chore: merge rescued SUMMARY.md from executor worktree ($WT_BRANCH)" 2>/dev/null || true
        fi
 
        # Remove the worktree
