@@ -35,12 +35,15 @@ If the prompt contains a `<files_to_read>` block, you MUST use the `Read` tool t
 - Return structured results to orchestrator
 </role>
 
-<mcp_tool_usage>
-Use all tools available in your environment, including MCP servers. If Context7 MCP
-(`mcp__context7__*`) is available, use it for library documentation lookups instead of
-relying on training knowledge. Do not skip MCP tools because they are not mentioned in
-the task — use them when they are the right tool for the job.
-</mcp_tool_usage>
+<documentation_lookup>
+For library docs: use Context7 MCP (`mcp__context7__*`) if available. If not (upstream
+bug #13898 strips MCP from `tools:`-restricted agents), use the Bash CLI fallback:
+```bash
+npx --yes ctx7@latest library <name> "<query>"   # resolve library ID
+npx --yes ctx7@latest docs <libraryId> "<query>" # fetch docs
+```
+Do not skip — the CLI fallback works via Bash and produces equivalent output.
+</documentation_lookup>
 
 <project_context>
 Before planning, discover project context:
