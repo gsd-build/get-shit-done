@@ -103,3 +103,111 @@ describe('workflow.tdd_mode config round-trip', () => {
     assert.strictEqual(typeof config.workflow.tdd_mode, 'boolean');
   });
 });
+
+// ─── init JSON exposure ────────────────────────────────────────────────────
+
+describe('tdd_mode in init plan-phase JSON output', () => {
+  let tmpDir;
+
+  beforeEach(() => {
+    tmpDir = createTempProject();
+    // Create ROADMAP.md with a phase so init plan-phase can find it
+    const roadmap = [
+      '# Roadmap',
+      '',
+      '## Phase 1 — Foundation',
+      '**Status:** Planned',
+      '**Requirements:** [R1]',
+    ].join('\n');
+    fs.writeFileSync(path.join(tmpDir, '.planning', 'ROADMAP.md'), roadmap);
+    // Ensure config exists
+    runGsdTools('config-ensure-section', tmpDir, { HOME: tmpDir });
+  });
+
+  afterEach(() => {
+    cleanup(tmpDir);
+  });
+
+  test('init plan-phase includes tdd_mode: false by default', () => {
+    const result = runGsdTools('init plan-phase 1', tmpDir);
+    assert.ok(result.success, `init plan-phase failed: ${result.error}`);
+    const json = JSON.parse(result.output);
+    assert.strictEqual(json.tdd_mode, false);
+  });
+
+  test('init plan-phase --tdd overrides to tdd_mode: true', () => {
+    const result = runGsdTools('init plan-phase 1 --tdd', tmpDir);
+    assert.ok(result.success, `init plan-phase --tdd failed: ${result.error}`);
+    const json = JSON.parse(result.output);
+    assert.strictEqual(json.tdd_mode, true);
+  });
+
+  test('config workflow.tdd_mode: true surfaces in init plan-phase without flag', () => {
+    runGsdTools('config-set workflow.tdd_mode true', tmpDir);
+    const result = runGsdTools('init plan-phase 1', tmpDir);
+    assert.ok(result.success, `init plan-phase failed: ${result.error}`);
+    const json = JSON.parse(result.output);
+    assert.strictEqual(json.tdd_mode, true);
+  });
+
+  test('--tdd flag overrides config value of false', () => {
+    runGsdTools('config-set workflow.tdd_mode false', tmpDir);
+    const result = runGsdTools('init plan-phase 1 --tdd', tmpDir);
+    assert.ok(result.success, `init plan-phase --tdd failed: ${result.error}`);
+    const json = JSON.parse(result.output);
+    assert.strictEqual(json.tdd_mode, true);
+  });
+});
+
+describe('tdd_mode in init execute-phase JSON output', () => {
+  let tmpDir;
+
+  beforeEach(() => {
+    tmpDir = createTempProject();
+    // Create ROADMAP.md with a phase so init execute-phase can find it
+    const roadmap = [
+      '# Roadmap',
+      '',
+      '## Phase 1 — Foundation',
+      '**Status:** Planned',
+      '**Requirements:** [R1]',
+    ].join('\n');
+    fs.writeFileSync(path.join(tmpDir, '.planning', 'ROADMAP.md'), roadmap);
+    // Ensure config exists
+    runGsdTools('config-ensure-section', tmpDir, { HOME: tmpDir });
+  });
+
+  afterEach(() => {
+    cleanup(tmpDir);
+  });
+
+  test('init execute-phase includes tdd_mode: false by default', () => {
+    const result = runGsdTools('init execute-phase 1', tmpDir);
+    assert.ok(result.success, `init execute-phase failed: ${result.error}`);
+    const json = JSON.parse(result.output);
+    assert.strictEqual(json.tdd_mode, false);
+  });
+
+  test('init execute-phase --tdd overrides to tdd_mode: true', () => {
+    const result = runGsdTools('init execute-phase 1 --tdd', tmpDir);
+    assert.ok(result.success, `init execute-phase --tdd failed: ${result.error}`);
+    const json = JSON.parse(result.output);
+    assert.strictEqual(json.tdd_mode, true);
+  });
+
+  test('config workflow.tdd_mode: true surfaces in init execute-phase without flag', () => {
+    runGsdTools('config-set workflow.tdd_mode true', tmpDir);
+    const result = runGsdTools('init execute-phase 1', tmpDir);
+    assert.ok(result.success, `init execute-phase failed: ${result.error}`);
+    const json = JSON.parse(result.output);
+    assert.strictEqual(json.tdd_mode, true);
+  });
+
+  test('--tdd flag overrides config value of false', () => {
+    runGsdTools('config-set workflow.tdd_mode false', tmpDir);
+    const result = runGsdTools('init execute-phase 1 --tdd', tmpDir);
+    assert.ok(result.success, `init execute-phase --tdd failed: ${result.error}`);
+    const json = JSON.parse(result.output);
+    assert.strictEqual(json.tdd_mode, true);
+  });
+});
