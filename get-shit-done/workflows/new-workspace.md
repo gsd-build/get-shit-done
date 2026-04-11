@@ -202,7 +202,7 @@ Workspace created: $TARGET_PATH
   Branch: $BRANCH_NAME
 
 Next steps:
-  cd $TARGET_PATH
+  cd "$TARGET_PATH"
   /gsd-new-project    # Initialize GSD in the workspace
 ```
 
@@ -215,7 +215,7 @@ Workspace created with $SUCCESS_COUNT of $TOTAL_COUNT repos: $TARGET_PATH
   Failed: repo3 (branch already exists), repo4 (not a git repo)
 
 Next steps:
-  cd $TARGET_PATH
+  cd "$TARGET_PATH"
   /gsd-new-project    # Initialize GSD in the workspace
 ```
 
@@ -225,7 +225,7 @@ Use AskUserQuestion:
 - header: "Initialize GSD"
 - question: "Would you like to initialize a GSD project in the new workspace?"
 - options:
-  - "Yes — run /gsd-new-project" → tell user to `cd $TARGET_PATH` first, then run `/gsd-new-project`
+  - "Yes — run /gsd-new-project" → tell user to `cd "$TARGET_PATH"` first, then run `/gsd-new-project`
   - "No — I'll set it up later" → done
 
 </process>

@@ -43,7 +43,7 @@ Cannot remove workspace "$WORKSPACE_NAME" — the following repos have uncommitt
   - repo2
 
 Commit or stash changes in these repos before removing the workspace:
-  cd $WORKSPACE_PATH/repo1
+  cd "$WORKSPACE_PATH/repo1"
   git stash   # or git commit
 ```
 
