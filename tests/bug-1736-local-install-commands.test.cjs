@@ -12,7 +12,7 @@
 
 process.env.GSD_TEST_MODE = '1';
 
-const { describe, test, beforeEach, afterEach } = require('node:test');
+const { describe, test, before, beforeEach, afterEach } = require('node:test');
 const assert = require('node:assert/strict');
 const fs = require('fs');
 const path = require('path');
@@ -20,7 +20,21 @@ const os = require('os');
 const { execFileSync } = require('child_process');
 
 const INSTALL_SRC = path.join(__dirname, '..', 'bin', 'install.js');
+const BUILD_SCRIPT = path.join(__dirname, '..', 'scripts', 'build-hooks.js');
 const { install, copyCommandsAsClaudeSkills } = require(INSTALL_SRC);
+
+// ─── Ensure hooks/dist/ is populated before install tests ────────────────────
+// With --test-concurrency=4, other install tests (bug-1834, bug-1924) run
+// build-hooks.js concurrently. That script creates hooks/dist/ empty first,
+// then copies files — creating a window where this test sees an empty dir and
+// install() fails with "directory is empty" → process.exit(1).
+
+before(() => {
+  execFileSync(process.execPath, [BUILD_SCRIPT], {
+    encoding: 'utf-8',
+    stdio: 'pipe',
+  });
+});
 
 // ─── #1736: local install deploys commands/gsd/ ─────────────────────────────
 
