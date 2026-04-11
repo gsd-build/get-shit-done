@@ -21,6 +21,7 @@ const VALID_CONFIG_KEYS = new Set([
   'workflow.research_before_questions',
   'workflow.discuss_mode',
   'workflow.skip_discuss',
+  'workflow.auto_prune_state',
   'workflow._auto_chain_active',
   'workflow.use_worktrees',
   'workflow.code_review',
@@ -168,6 +169,7 @@ function buildNewProjectConfig(userChoices) {
       plan_bounce: false,
       plan_bounce_script: null,
       plan_bounce_passes: 2,
+      auto_prune_state: false,
     },
     hooks: {
       context_warnings: true,

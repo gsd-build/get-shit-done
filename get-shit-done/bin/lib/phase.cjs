@@ -937,6 +937,21 @@ function cmdPhaseComplete(cwd, phaseNum, raw) {
     }, cwd);
   }
 
+  // Auto-prune STATE.md on phase boundary when configured (#2087)
+  let autoPruned = false;
+  try {
+    const configPath = path.join(planningDir(cwd), 'config.json');
+    if (fs.existsSync(configPath)) {
+      const rawConfig = JSON.parse(fs.readFileSync(configPath, 'utf-8'));
+      const autoPruneEnabled = rawConfig.workflow && rawConfig.workflow.auto_prune_state === true;
+      if (autoPruneEnabled && fs.existsSync(statePath)) {
+        const { cmdStatePrune } = require('./state.cjs');
+        cmdStatePrune(cwd, { keepRecent: '3', dryRun: false, silent: true }, true);
+        autoPruned = true;
+      }
+    }
+  } catch { /* intentionally empty — auto-prune is best-effort */ }
+
   const result = {
     completed_phase: phaseNum,
     phase_name: phaseInfo.phase_name,
@@ -948,6 +963,7 @@ function cmdPhaseComplete(cwd, phaseNum, raw) {
     roadmap_updated: fs.existsSync(roadmapPath),
     state_updated: fs.existsSync(statePath),
     requirements_updated: requirementsUpdated,
+    auto_pruned: autoPruned,
     warnings,
     has_warnings: warnings.length > 0,
   };

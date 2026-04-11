@@ -248,6 +248,7 @@ Set via `workflow.*` namespace in config.json (e.g., `"workflow": { "research": 
 | `workflow.plan_check` | boolean | `true` | `true`, `false` | Run plan-checker agent to validate plans. _Alias:_ `plan_checker` is the flat-key form used in `CONFIG_DEFAULTS`; `workflow.plan_check` is the canonical namespaced form. |
 | `workflow.verifier` | boolean | `true` | `true`, `false` | Run verifier agent after execution |
 | `workflow.nyquist_validation` | boolean | `true` | `true`, `false` | Enable Nyquist-inspired validation gates |
+| `workflow.auto_prune_state` | boolean | `false` | `true`, `false` | Automatically prune old STATE.md entries on phase completion (keeps 3 most recent phases) |
 | `workflow.auto_advance` | boolean | `false` | `true`, `false` | Auto-advance to next phase after completion |
 | `workflow.node_repair` | boolean | `true` | `true`, `false` | Attempt automatic repair of failed plan nodes |
 | `workflow.node_repair_budget` | number | `2` | Any positive integer | Max repair retries per failed node |

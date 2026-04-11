@@ -1417,8 +1417,10 @@ function cmdStateSync(cwd, options, raw) {
  *   dryRun: if true, return what would be pruned without modifying STATE.md
  */
 function cmdStatePrune(cwd, options, raw) {
+  const silent = !!options.silent;
+  const emit = silent ? () => {} : (result, r, v) => output(result, r, v);
   const statePath = planningPaths(cwd).state;
-  if (!fs.existsSync(statePath)) { output({ error: 'STATE.md not found' }, raw); return; }
+  if (!fs.existsSync(statePath)) { emit({ error: 'STATE.md not found' }, raw); return; }
 
   const keepRecent = parseInt(options.keepRecent, 10) || 3;
   const dryRun = !!options.dryRun;
@@ -1427,7 +1429,7 @@ function cmdStatePrune(cwd, options, raw) {
   const cutoff = currentPhase - keepRecent;
 
   if (cutoff <= 0) {
-    output({ pruned: false, reason: `Only ${currentPhase} phases — nothing to prune with --keep-recent ${keepRecent}` }, raw, 'false');
+    emit({ pruned: false, reason: `Only ${currentPhase} phases — nothing to prune with --keep-recent ${keepRecent}` }, raw, 'false');
     return;
   }
 
@@ -1504,6 +1506,35 @@ function cmdStatePrune(cwd, options, raw) {
       }
     }
 
+    // Prune Performance Metrics table rows: keep only rows for phases > cutoff.
+    // Preserves header rows (| Phase | ... and |---|...) and any prose around the table.
+    const metricsPattern = /(###?\s*Performance Metrics\s*\n)([\s\S]*?)(?=\n###?|\n##[^#]|$)/i;
+    const metricsMatch = content.match(metricsPattern);
+    if (metricsMatch) {
+      const sectionLines = metricsMatch[2].split('\n');
+      const keep = [];
+      const archive = [];
+      for (const line of sectionLines) {
+        // Table data row: starts with | followed by a number (phase)
+        const tableRowMatch = line.match(/^\|\s*(\d+)\s*\|/);
+        if (tableRowMatch) {
+          const rowPhase = parseInt(tableRowMatch[1], 10);
+          if (rowPhase <= cutoff) {
+            archive.push(line);
+          } else {
+            keep.push(line);
+          }
+        } else {
+          // Header row, separator row, or prose — always keep
+          keep.push(line);
+        }
+      }
+      if (archive.length > 0) {
+        sections.push({ section: 'Performance Metrics', count: archive.length, lines: archive });
+        content = content.replace(metricsPattern, (_m, header) => `${header}${keep.join('\n')}`);
+      }
+    }
+
     return { newContent: content, archivedSections: sections };
   }
 
@@ -1512,7 +1543,7 @@ function cmdStatePrune(cwd, options, raw) {
     const content = fs.readFileSync(statePath, 'utf-8');
     const result = prunePass(content);
     const totalPruned = result.archivedSections.reduce((sum, s) => sum + s.count, 0);
-    output({
+    emit({
       pruned: false,
       dry_run: true,
       cutoff_phase: cutoff,
@@ -1547,7 +1578,7 @@ function cmdStatePrune(cwd, options, raw) {
   }
 
   const totalPruned = archived.reduce((sum, s) => sum + s.count, 0);
-  output({
+  emit({
     pruned: totalPruned > 0,
     cutoff_phase: cutoff,
     keep_recent: keepRecent,
