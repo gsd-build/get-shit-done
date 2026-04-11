@@ -159,14 +159,25 @@ function findProjectRoot(startDir) {
  * @param {number} opts.maxAgeMs - max age in ms before removal (default: 5 min)
  * @param {boolean} opts.dirsOnly - if true, only remove directories (default: false)
  */
+/**
+ * Dedicated GSD temp directory: path.join(os.tmpdir(), 'gsd').
+ * Created on first use. Keeps GSD temp files isolated from the system
+ * temp directory so reap scans only GSD files (#1975).
+ */
+const GSD_TEMP_DIR = path.join(require('os').tmpdir(), 'gsd');
+
+function ensureGsdTempDir() {
+  fs.mkdirSync(GSD_TEMP_DIR, { recursive: true });
+}
+
 function reapStaleTempFiles(prefix = 'gsd-', { maxAgeMs = 5 * 60 * 1000, dirsOnly = false } = {}) {
   try {
-    const tmpDir = require('os').tmpdir();
+    ensureGsdTempDir();
     const now = Date.now();
-    const entries = fs.readdirSync(tmpDir);
+    const entries = fs.readdirSync(GSD_TEMP_DIR);
     for (const entry of entries) {
       if (!entry.startsWith(prefix)) continue;
-      const fullPath = path.join(tmpDir, entry);
+      const fullPath = path.join(GSD_TEMP_DIR, entry);
       try {
         const stat = fs.statSync(fullPath);
         if (now - stat.mtimeMs > maxAgeMs) {
@@ -195,7 +206,8 @@ function output(result, raw, rawValue) {
     // Write to tmpfile and output the path prefixed with @file: so callers can detect it.
     if (json.length > 50000) {
       reapStaleTempFiles();
-      const tmpPath = path.join(require('os').tmpdir(), `gsd-${Date.now()}.json`);
+      ensureGsdTempDir();
+      const tmpPath = path.join(GSD_TEMP_DIR, `gsd-${Date.now()}.json`);
       fs.writeFileSync(tmpPath, json, 'utf-8');
       data = '@file:' + tmpPath;
     } else {
@@ -1578,6 +1590,7 @@ module.exports = {
   findProjectRoot,
   detectSubRepos,
   reapStaleTempFiles,
+  GSD_TEMP_DIR,
   MODEL_ALIAS_MAP,
   CONFIG_DEFAULTS,
   planningDir,

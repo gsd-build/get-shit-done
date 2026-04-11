@@ -1629,9 +1629,11 @@ describe('findProjectRoot', () => {
 // ─── reapStaleTempFiles ─────────────────────────────────────────────────────
 
 describe('reapStaleTempFiles', () => {
+  const gsdTmpDir = path.join(os.tmpdir(), 'gsd');
+
   test('removes stale gsd-*.json files older than maxAgeMs', () => {
-    const tmpDir = os.tmpdir();
-    const stalePath = path.join(tmpDir, `gsd-reap-test-${Date.now()}.json`);
+    fs.mkdirSync(gsdTmpDir, { recursive: true });
+    const stalePath = path.join(gsdTmpDir, `gsd-reap-test-${Date.now()}.json`);
     fs.writeFileSync(stalePath, '{}');
     // Set mtime to 10 minutes ago
     const oldTime = new Date(Date.now() - 10 * 60 * 1000);
@@ -1643,8 +1645,8 @@ describe('reapStaleTempFiles', () => {
   });
 
   test('preserves fresh gsd-*.json files', () => {
-    const tmpDir = os.tmpdir();
-    const freshPath = path.join(tmpDir, `gsd-reap-fresh-${Date.now()}.json`);
+    fs.mkdirSync(gsdTmpDir, { recursive: true });
+    const freshPath = path.join(gsdTmpDir, `gsd-reap-fresh-${Date.now()}.json`);
     fs.writeFileSync(freshPath, '{}');
 
     reapStaleTempFiles('gsd-reap-fresh-', { maxAgeMs: 5 * 60 * 1000 });
@@ -1655,8 +1657,8 @@ describe('reapStaleTempFiles', () => {
   });
 
   test('removes stale temp directories when present', () => {
-    const tmpDir = os.tmpdir();
-    const staleDir = fs.mkdtempSync(path.join(tmpDir, 'gsd-reap-dir-'));
+    fs.mkdirSync(gsdTmpDir, { recursive: true });
+    const staleDir = fs.mkdtempSync(path.join(gsdTmpDir, 'gsd-reap-dir-'));
     fs.writeFileSync(path.join(staleDir, 'data.jsonl'), 'test');
     // Set mtime to 10 minutes ago
     const oldTime = new Date(Date.now() - 10 * 60 * 1000);
