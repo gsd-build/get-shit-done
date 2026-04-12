@@ -876,3 +876,105 @@ describe('graphifyBuild', () => {
     assert.ok(result.version_warning.includes('outside tested range'));
   });
 });
+
+// ─── writeSnapshot (BUILD-01, TEST-02) ──────────────────────────────────────
+
+describe('writeSnapshot', () => {
+  let tmpDir;
+  let planningDir;
+
+  beforeEach(() => {
+    tmpDir = createTempProject();
+    planningDir = path.join(tmpDir, '.planning');
+  });
+
+  afterEach(() => {
+    cleanup(tmpDir);
+  });
+
+  test('writes snapshot from existing graph.json', () => {
+    const graphData = {
+      nodes: [{ id: 'A', label: 'Node A' }, { id: 'B', label: 'Node B' }],
+      edges: [{ source: 'A', target: 'B', label: 'relates' }],
+    };
+    writeGraphJson(planningDir, graphData);
+
+    const result = writeSnapshot(tmpDir);
+    assert.strictEqual(result.saved, true);
+    assert.strictEqual(result.node_count, 2);
+    assert.strictEqual(result.edge_count, 1);
+    assert.ok(result.timestamp);
+
+    // Verify file was actually written
+    const snapshotPath = path.join(planningDir, 'graphs', '.last-build-snapshot.json');
+    assert.strictEqual(fs.existsSync(snapshotPath), true);
+
+    const snapshot = JSON.parse(fs.readFileSync(snapshotPath, 'utf8'));
+    assert.strictEqual(snapshot.version, 1);
+    assert.strictEqual(snapshot.nodes.length, 2);
+    assert.strictEqual(snapshot.edges.length, 1);
+    assert.ok(snapshot.timestamp);
+  });
+
+  test('returns error when graph.json does not exist', () => {
+    // graphs directory exists but no graph.json
+    fs.mkdirSync(path.join(planningDir, 'graphs'), { recursive: true });
+
+    const result = writeSnapshot(tmpDir);
+    assert.ok(result.error);
+    assert.ok(result.error.includes('not parseable'));
+  });
+
+  test('returns error when graph.json is invalid JSON', () => {
+    const graphsDir = path.join(planningDir, 'graphs');
+    fs.mkdirSync(graphsDir, { recursive: true });
+    fs.writeFileSync(path.join(graphsDir, 'graph.json'), 'not valid json{{{', 'utf8');
+
+    const result = writeSnapshot(tmpDir);
+    assert.ok(result.error);
+    assert.ok(result.error.includes('not parseable'));
+  });
+
+  test('handles graph.json with empty nodes and edges', () => {
+    writeGraphJson(planningDir, { nodes: [], edges: [] });
+
+    const result = writeSnapshot(tmpDir);
+    assert.strictEqual(result.saved, true);
+    assert.strictEqual(result.node_count, 0);
+    assert.strictEqual(result.edge_count, 0);
+  });
+
+  test('handles graph.json missing nodes/edges keys gracefully', () => {
+    writeGraphJson(planningDir, { metadata: { tool: 'graphify' } });
+
+    const result = writeSnapshot(tmpDir);
+    assert.strictEqual(result.saved, true);
+    assert.strictEqual(result.node_count, 0);
+    assert.strictEqual(result.edge_count, 0);
+  });
+
+  test('overwrites existing snapshot on rebuild', () => {
+    // Write initial graph and snapshot
+    writeGraphJson(planningDir, {
+      nodes: [{ id: 'A' }],
+      edges: [],
+    });
+    writeSnapshot(tmpDir);
+
+    // Write updated graph with more nodes
+    writeGraphJson(planningDir, {
+      nodes: [{ id: 'A' }, { id: 'B' }, { id: 'C' }],
+      edges: [{ source: 'A', target: 'B' }],
+    });
+
+    const result = writeSnapshot(tmpDir);
+    assert.strictEqual(result.saved, true);
+    assert.strictEqual(result.node_count, 3);
+    assert.strictEqual(result.edge_count, 1);
+
+    // Verify file reflects latest data
+    const snapshotPath = path.join(planningDir, 'graphs', '.last-build-snapshot.json');
+    const snapshot = JSON.parse(fs.readFileSync(snapshotPath, 'utf8'));
+    assert.strictEqual(snapshot.nodes.length, 3);
+  });
+});
