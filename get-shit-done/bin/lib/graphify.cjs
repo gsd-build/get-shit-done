@@ -133,12 +133,291 @@ function checkGraphifyVersion() {
   return { version: versionStr, compatible, warning };
 }
 
+// ─── Internal Helpers ────────────────────────────────────────────────────────
+
+/**
+ * Safely read and parse a JSON file. Returns null on missing file or parse error.
+ * Prevents crashes on malformed JSON (T-02-01 mitigation).
+ *
+ * @param {string} filePath - Absolute path to JSON file
+ * @returns {object|null}
+ */
+function safeReadJson(filePath) {
+  try {
+    if (!fs.existsSync(filePath)) return null;
+    return JSON.parse(fs.readFileSync(filePath, 'utf8'));
+  } catch (_e) {
+    return null;
+  }
+}
+
+/**
+ * Build a bidirectional adjacency map from graph nodes and edges.
+ * Each node ID maps to an array of { target, edge } entries.
+ * Bidirectional: both source->target and target->source are added (Pitfall 3).
+ *
+ * @param {{ nodes: object[], edges: object[] }} graph
+ * @returns {Object.<string, Array<{ target: string, edge: object }>>}
+ */
+function buildAdjacencyMap(graph) {
+  const adj = {};
+  for (const node of (graph.nodes || [])) {
+    adj[node.id] = [];
+  }
+  for (const edge of (graph.edges || [])) {
+    if (!adj[edge.source]) adj[edge.source] = [];
+    if (!adj[edge.target]) adj[edge.target] = [];
+    adj[edge.source].push({ target: edge.target, edge });
+    adj[edge.target].push({ target: edge.source, edge });
+  }
+  return adj;
+}
+
+/**
+ * Seed-then-expand query: find nodes matching term, then BFS-expand up to maxHops.
+ * Matches on node label and description (case-insensitive substring, D-01).
+ *
+ * @param {{ nodes: object[], edges: object[] }} graph
+ * @param {string} term - Search term
+ * @param {number} [maxHops=2] - Maximum BFS hops from seed nodes
+ * @returns {{ nodes: object[], edges: object[], seeds: Set<string> }}
+ */
+function seedAndExpand(graph, term, maxHops = 2) {
+  const lowerTerm = term.toLowerCase();
+  const nodeMap = Object.fromEntries((graph.nodes || []).map(n => [n.id, n]));
+  const adj = buildAdjacencyMap(graph);
+
+  // Seed: match on label and description (case-insensitive substring)
+  const seeds = (graph.nodes || []).filter(n =>
+    (n.label || '').toLowerCase().includes(lowerTerm) ||
+    (n.description || '').toLowerCase().includes(lowerTerm)
+  );
+
+  // BFS expand from seeds
+  const visitedNodes = new Set(seeds.map(n => n.id));
+  const collectedEdges = [];
+  const seenEdgeKeys = new Set();
+  let frontier = seeds.map(n => n.id);
+
+  for (let hop = 0; hop < maxHops && frontier.length > 0; hop++) {
+    const nextFrontier = [];
+    for (const nodeId of frontier) {
+      for (const entry of (adj[nodeId] || [])) {
+        // Deduplicate edges by source::target::label key
+        const edgeKey = `${entry.edge.source}::${entry.edge.target}::${entry.edge.label || ''}`;
+        if (!seenEdgeKeys.has(edgeKey)) {
+          seenEdgeKeys.add(edgeKey);
+          collectedEdges.push(entry.edge);
+        }
+        if (!visitedNodes.has(entry.target)) {
+          visitedNodes.add(entry.target);
+          nextFrontier.push(entry.target);
+        }
+      }
+    }
+    frontier = nextFrontier;
+  }
+
+  const resultNodes = [...visitedNodes].map(id => nodeMap[id]).filter(Boolean);
+  return { nodes: resultNodes, edges: collectedEdges, seeds: new Set(seeds.map(n => n.id)) };
+}
+
+/**
+ * Apply token budget by dropping edges by confidence tier (D-04, D-05, D-06).
+ * Token estimation: Math.ceil(JSON.stringify(obj).length / 4).
+ * Drop order: AMBIGUOUS -> INFERRED -> EXTRACTED.
+ *
+ * @param {{ nodes: object[], edges: object[], seeds: Set<string> }} result
+ * @param {number|null} budgetTokens - Max tokens, or null/falsy for unlimited
+ * @returns {{ nodes: object[], edges: object[], trimmed: string|null, total_nodes: number, total_edges: number, term?: string }}
+ */
+function applyBudget(result, budgetTokens) {
+  if (!budgetTokens) return result;
+
+  const CONFIDENCE_ORDER = ['AMBIGUOUS', 'INFERRED', 'EXTRACTED'];
+  let edges = [...result.edges];
+  let omitted = 0;
+
+  const estimateTokens = (obj) => Math.ceil(JSON.stringify(obj).length / 4);
+
+  for (const tier of CONFIDENCE_ORDER) {
+    if (estimateTokens({ nodes: result.nodes, edges }) <= budgetTokens) break;
+    const before = edges.length;
+    // Check both confidence and confidence_score field names (Open Question 1)
+    edges = edges.filter(e => (e.confidence || e.confidence_score) !== tier);
+    omitted += before - edges.length;
+  }
+
+  // Find unreachable nodes after edge removal
+  const reachableNodes = new Set();
+  for (const edge of edges) {
+    reachableNodes.add(edge.source);
+    reachableNodes.add(edge.target);
+  }
+  // Always keep seed nodes
+  const nodes = result.nodes.filter(n => reachableNodes.has(n.id) || (result.seeds && result.seeds.has(n.id)));
+  const unreachable = result.nodes.length - nodes.length;
+
+  return {
+    nodes,
+    edges,
+    trimmed: omitted > 0 ? `[${omitted} edges omitted, ${unreachable} nodes unreachable]` : null,
+    total_nodes: nodes.length,
+    total_edges: edges.length,
+  };
+}
+
+// ─── Public API ──────────────────────────────────────────────────────────────
+
+/**
+ * Query the knowledge graph for nodes matching a term, with optional budget cap.
+ * Uses seed-then-expand BFS traversal (D-01).
+ *
+ * @param {string} cwd - Working directory
+ * @param {string} term - Search term
+ * @param {{ budget?: number|null }} [options={}]
+ * @returns {object}
+ */
+function graphifyQuery(cwd, term, options = {}) {
+  const planningDir = path.join(cwd, '.planning');
+  if (!isGraphifyEnabled(planningDir)) return disabledResponse();
+
+  const graphPath = path.join(planningDir, 'graphs', 'graph.json');
+  if (!fs.existsSync(graphPath)) {
+    return { error: 'No graph built yet. Run graphify build first.' };
+  }
+
+  const graph = safeReadJson(graphPath);
+  if (!graph) {
+    return { error: 'Failed to parse graph.json' };
+  }
+
+  let result = seedAndExpand(graph, term);
+
+  if (options.budget) {
+    result = applyBudget(result, options.budget);
+  }
+
+  return {
+    term,
+    nodes: result.nodes,
+    edges: result.edges,
+    total_nodes: result.nodes.length,
+    total_edges: result.edges.length,
+    trimmed: result.trimmed || null,
+  };
+}
+
+/**
+ * Return status information about the knowledge graph (STAT-01, STAT-02).
+ *
+ * @param {string} cwd - Working directory
+ * @returns {object}
+ */
+function graphifyStatus(cwd) {
+  const planningDir = path.join(cwd, '.planning');
+  if (!isGraphifyEnabled(planningDir)) return disabledResponse();
+
+  const graphPath = path.join(planningDir, 'graphs', 'graph.json');
+  if (!fs.existsSync(graphPath)) {
+    return { exists: false, message: 'No graph built yet. Run graphify build to create one.' };
+  }
+
+  const stat = fs.statSync(graphPath);
+  const graph = safeReadJson(graphPath);
+  if (!graph) {
+    return { error: 'Failed to parse graph.json' };
+  }
+
+  const STALE_MS = 24 * 60 * 60 * 1000; // 24 hours
+  const age = Date.now() - stat.mtimeMs;
+
+  return {
+    exists: true,
+    last_build: stat.mtime.toISOString(),
+    node_count: (graph.nodes || []).length,
+    edge_count: (graph.edges || []).length,
+    hyperedge_count: (graph.hyperedges || []).length,
+    stale: age > STALE_MS,
+    age_hours: Math.round(age / (60 * 60 * 1000)),
+  };
+}
+
+/**
+ * Compute topology-level diff between current graph and last build snapshot (D-07, D-08, D-09).
+ *
+ * @param {string} cwd - Working directory
+ * @returns {object}
+ */
+function graphifyDiff(cwd) {
+  const planningDir = path.join(cwd, '.planning');
+  if (!isGraphifyEnabled(planningDir)) return disabledResponse();
+
+  const snapshotPath = path.join(planningDir, 'graphs', '.last-build-snapshot.json');
+  const graphPath = path.join(planningDir, 'graphs', 'graph.json');
+
+  if (!fs.existsSync(snapshotPath)) {
+    return { no_baseline: true, message: 'No previous snapshot. Run graphify build first, then build again to generate a diff baseline.' };
+  }
+
+  if (!fs.existsSync(graphPath)) {
+    return { error: 'No current graph. Run graphify build first.' };
+  }
+
+  const current = safeReadJson(graphPath);
+  const snapshot = safeReadJson(snapshotPath);
+
+  if (!current || !snapshot) {
+    return { error: 'Failed to parse graph or snapshot file' };
+  }
+
+  // Diff nodes
+  const currentNodeMap = Object.fromEntries((current.nodes || []).map(n => [n.id, n]));
+  const snapshotNodeMap = Object.fromEntries((snapshot.nodes || []).map(n => [n.id, n]));
+
+  const nodesAdded = Object.keys(currentNodeMap).filter(id => !snapshotNodeMap[id]);
+  const nodesRemoved = Object.keys(snapshotNodeMap).filter(id => !currentNodeMap[id]);
+  const nodesChanged = Object.keys(currentNodeMap).filter(id =>
+    snapshotNodeMap[id] && JSON.stringify(currentNodeMap[id]) !== JSON.stringify(snapshotNodeMap[id])
+  );
+
+  // Diff edges (keyed by source+target+relation)
+  const edgeKey = (e) => `${e.source}::${e.target}::${e.relation || e.label || ''}`;
+  const currentEdgeMap = Object.fromEntries((current.edges || []).map(e => [edgeKey(e), e]));
+  const snapshotEdgeMap = Object.fromEntries((snapshot.edges || []).map(e => [edgeKey(e), e]));
+
+  const edgesAdded = Object.keys(currentEdgeMap).filter(k => !snapshotEdgeMap[k]);
+  const edgesRemoved = Object.keys(snapshotEdgeMap).filter(k => !currentEdgeMap[k]);
+  const edgesChanged = Object.keys(currentEdgeMap).filter(k =>
+    snapshotEdgeMap[k] && JSON.stringify(currentEdgeMap[k]) !== JSON.stringify(snapshotEdgeMap[k])
+  );
+
+  return {
+    nodes: { added: nodesAdded.length, removed: nodesRemoved.length, changed: nodesChanged.length },
+    edges: { added: edgesAdded.length, removed: edgesRemoved.length, changed: edgesChanged.length },
+    timestamp: snapshot.timestamp || null,
+  };
+}
+
 // ─── Exports ─────────────────────────────────────────────────────────────────
 
 module.exports = {
+  // Config gate
   isGraphifyEnabled,
   disabledResponse,
+  // Subprocess
   execGraphify,
+  // Presence and version
   checkGraphifyInstalled,
   checkGraphifyVersion,
+  // Query (Phase 2)
+  graphifyQuery,
+  safeReadJson,
+  buildAdjacencyMap,
+  seedAndExpand,
+  applyBudget,
+  // Status (Phase 2)
+  graphifyStatus,
+  // Diff (Phase 2)
+  graphifyDiff,
 };
