@@ -2331,6 +2331,83 @@ describe('phase complete updates Performance Metrics', () => {
 });
 
 // ─────────────────────────────────────────────────────────────────────────────
+// phase complete — backlog phase (999.x) exclusion (#2129)
+// ─────────────────────────────────────────────────────────────────────────────
+
+describe('phase complete excludes 999.x backlog from next-phase (#2129)', () => {
+  let tmpDir;
+
+  beforeEach(() => {
+    tmpDir = createTempProject();
+  });
+
+  afterEach(() => {
+    cleanup(tmpDir);
+  });
+
+  test('next phase skips 999.x backlog dirs and falls back to roadmap', () => {
+    // ROADMAP defines phases 1, 2, 3 and a backlog 999.1
+    fs.writeFileSync(
+      path.join(tmpDir, '.planning', 'ROADMAP.md'),
+      [
+        '# Roadmap',
+        '',
+        '- [ ] Phase 1: Setup',
+        '- [ ] Phase 2: Core',
+        '- [ ] Phase 3: Polish',
+        '- [ ] Phase 999.1: Backlog idea',
+        '',
+        '### Phase 1: Setup',
+        '**Goal:** Initial setup',
+        '',
+        '### Phase 2: Core',
+        '**Goal:** Build core',
+        '',
+        '### Phase 3: Polish',
+        '**Goal:** Polish everything',
+        '',
+        '### Phase 999.1: Backlog idea',
+        '**Goal:** Parked idea',
+      ].join('\n')
+    );
+    fs.writeFileSync(
+      path.join(tmpDir, '.planning', 'STATE.md'),
+      [
+        '# State',
+        '',
+        '**Current Phase:** 02',
+        '**Status:** In progress',
+        '**Current Plan:** 02-01',
+        '**Last Activity:** 2025-01-01',
+        '**Last Activity Description:** Working',
+      ].join('\n')
+    );
+
+    // Phase 1 and 2 exist on disk, phase 3 does NOT exist yet, 999.1 DOES exist
+    const p1 = path.join(tmpDir, '.planning', 'phases', '01-setup');
+    fs.mkdirSync(p1, { recursive: true });
+    fs.writeFileSync(path.join(p1, '01-01-PLAN.md'), '# Plan');
+    fs.writeFileSync(path.join(p1, '01-01-SUMMARY.md'), '# Summary');
+
+    const p2 = path.join(tmpDir, '.planning', 'phases', '02-core');
+    fs.mkdirSync(p2, { recursive: true });
+    fs.writeFileSync(path.join(p2, '02-01-PLAN.md'), '# Plan');
+    fs.writeFileSync(path.join(p2, '02-01-SUMMARY.md'), '# Summary');
+
+    // Backlog stub on disk — this is what triggers the bug
+    fs.mkdirSync(path.join(tmpDir, '.planning', 'phases', '999.1-backlog-idea'), { recursive: true });
+
+    const result = runGsdTools('phase complete 2', tmpDir);
+    assert.ok(result.success, `Command failed: ${result.error}`);
+
+    const output = JSON.parse(result.output);
+    // Should find phase 3 from roadmap, NOT 999.1 from filesystem
+    assert.strictEqual(output.next_phase, '3', 'next_phase should be 3, not 999.1');
+    assert.strictEqual(output.is_last_phase, false, 'should not be last phase');
+  });
+});
+
+// ─────────────────────────────────────────────────────────────────────────────
 // milestone complete command
 // ─────────────────────────────────────────────────────────────────────────────
 

@@ -531,4 +531,46 @@ describe('init manager', () => {
 
     assert.strictEqual(output.response_language, undefined);
   });
+
+  test('all_complete is true when non-backlog phases are complete and 999.x exists (#2129)', () => {
+    writeState(tmpDir);
+    writeRoadmap(tmpDir, [
+      { number: '1', name: 'Setup', complete: true },
+      { number: '2', name: 'Core', complete: true },
+      { number: '3', name: 'Polish', complete: true },
+      { number: '999.1', name: 'Backlog idea' },
+    ]);
+
+    // Scaffold completed phases on disk
+    scaffoldPhase(tmpDir, 1, { slug: 'setup', plans: 2, summaries: 2 });
+    scaffoldPhase(tmpDir, 2, { slug: 'core', plans: 1, summaries: 1 });
+    scaffoldPhase(tmpDir, 3, { slug: 'polish', plans: 1, summaries: 1 });
+
+    const result = runGsdTools('init manager', tmpDir);
+    assert.ok(result.success, `Command failed: ${result.error}`);
+
+    const output = JSON.parse(result.output);
+    assert.strictEqual(output.all_complete, true, 'all_complete should be true when only 999.x phases remain incomplete');
+  });
+
+  test('all_complete false with incomplete non-backlog phase still produces recommended_actions (#2129)', () => {
+    writeState(tmpDir);
+    writeRoadmap(tmpDir, [
+      { number: '1', name: 'Setup', complete: true },
+      { number: '2', name: 'Core', complete: true },
+      { number: '3', name: 'Polish' },
+      { number: '999.1', name: 'Backlog idea' },
+    ]);
+
+    scaffoldPhase(tmpDir, 1, { slug: 'setup', plans: 1, summaries: 1 });
+    scaffoldPhase(tmpDir, 2, { slug: 'core', plans: 1, summaries: 1 });
+    // Phase 3 has no directory — should trigger discuss recommendation
+
+    const result = runGsdTools('init manager', tmpDir);
+    assert.ok(result.success, `Command failed: ${result.error}`);
+
+    const output = JSON.parse(result.output);
+    assert.strictEqual(output.all_complete, false, 'all_complete should be false with phase 3 incomplete');
+    assert.ok(output.recommended_actions.length > 0, 'recommended_actions should not be empty when non-backlog phases remain');
+  });
 });
