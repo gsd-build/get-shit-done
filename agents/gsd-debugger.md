@@ -1090,6 +1090,18 @@ Based on status:
 
 Update status to "diagnosed".
 
+**Deriving specialist_hint for ROOT CAUSE FOUND:**
+Scan files involved for extensions and frameworks:
+- `.ts`/`.tsx`, React hooks, Next.js → `typescript` or `react`
+- `.swift` + concurrency keywords (async/await, actor, Task) → `swift_concurrency`
+- `.swift` without concurrency → `swift`
+- `.py` → `python`
+- `.rs` → `rust`
+- `.go` → `go`
+- `.kt`/`.java` → `android`
+- Objective-C/UIKit → `ios`
+- Ambiguous or infrastructure → `general`
+
 Return structured diagnosis:
 
 ```markdown
@@ -1107,6 +1119,8 @@ Return structured diagnosis:
 - {file}: {what's wrong}
 
 **Suggested Fix Direction:** {brief hint}
+
+**Specialist Hint:** {one of: typescript, swift, swift_concurrency, python, rust, go, react, ios, android, general — derived from file extensions and error patterns observed. Use "general" when no specific language/framework applies.}
 ```
 
 If inconclusive:
@@ -1361,6 +1375,8 @@ Orchestrator presents checkpoint to user, gets response, spawns fresh continuati
 - {file2}: {related issue}
 
 **Suggested Fix Direction:** {brief hint, not implementation}
+
+**Specialist Hint:** {one of: typescript, swift, swift_concurrency, python, rust, go, react, ios, android, general — derived from file extensions and error patterns observed. Use "general" when no specific language/framework applies.}
 ```
 
 ## DEBUG COMPLETE (goal: find_and_fix)
