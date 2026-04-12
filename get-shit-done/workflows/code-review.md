@@ -172,7 +172,7 @@ if [ -z "$FILES_OVERRIDE" ]; then
         for (const line of yaml.split('\n')) {
           if (/^\s+created:/.test(line)) { inSection = 'created'; continue; }
           if (/^\s+modified:/.test(line)) { inSection = 'modified'; continue; }
-          if (/^\s+\w+:/.test(line) && !/^\s+-/.test(line)) { inSection = null; continue; }
+          if (/^\s*\w+:/.test(line) && !/^\s*-/.test(line)) { inSection = null; continue; }
           if (inSection && /^\s+-\s+(.+)/.test(line)) {
             files.push(line.match(/^\s+-\s+(.+)/)[1].trim());
           }
