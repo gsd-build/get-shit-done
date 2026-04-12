@@ -289,7 +289,16 @@ Exit.
 **Installed:** X.Y.Z
 **Latest:** A.B.C
 
-You're ahead of the latest release (development version?).
+You're ahead of the latest release — this looks like a dev install.
+
+If you see a "⚠ dev install — re-run installer to sync hooks" warning in
+your statusline, your hook files are older than your VERSION file. Fix it
+by re-running the local installer from your dev branch:
+
+    node bin/install.js --global --claude
+
+Running /gsd-update would install the npm release (A.B.C) and downgrade
+your dev version — do NOT use it to resolve this warning.
 ```
 
 Exit.
