@@ -1104,7 +1104,9 @@ function cmdInitManager(cwd, raw) {
     return true;
   });
 
-  const completedCount = phases.filter(p => p.disk_status === 'complete').length;
+  // Exclude backlog phases (999.x) from completion accounting (#2129)
+  const nonBacklogPhases = phases.filter(p => !/^999(?:\.|$)/.test(p.number));
+  const completedCount = nonBacklogPhases.filter(p => p.disk_status === 'complete').length;
 
   // Read manager flags from config (passthrough flags for each step)
   // Validate: flags must be CLI-safe (only --flags, alphanumeric, hyphens, spaces)
@@ -1135,7 +1137,7 @@ function cmdInitManager(cwd, raw) {
     in_progress_count: phases.filter(p => ['partial', 'planned', 'discussed', 'researched'].includes(p.disk_status)).length,
     recommended_actions: filteredActions,
     waiting_signal: waitingSignal,
-    all_complete: completedCount === phases.length && phases.length > 0,
+    all_complete: completedCount === nonBacklogPhases.length && nonBacklogPhases.length > 0,
     project_exists: pathExistsInternal(cwd, '.planning/PROJECT.md'),
     roadmap_exists: true,
     state_exists: true,

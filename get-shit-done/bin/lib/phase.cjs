@@ -838,9 +838,11 @@ function cmdPhaseComplete(cwd, phaseNum, raw) {
       .sort((a, b) => comparePhaseNum(a, b));
 
     // Find the next phase directory after current
+    // Skip backlog phases (999.x) — they are parked ideas, not sequential work (#2129)
     for (const dir of dirs) {
       const dm = dir.match(/^(\d+[A-Z]?(?:\.\d+)*)-?(.*)/i);
       if (dm) {
+        if (/^999(?:\.|$)/.test(dm[1])) continue;
         if (comparePhaseNum(dm[1], phaseNum) > 0) {
           nextPhaseNum = dm[1];
           nextPhaseName = dm[2] || null;
