@@ -1062,6 +1062,29 @@ async function runCommand(command, args, cwd, raw, defaultValue) {
       break;
     }
 
+    // ─── Graphify ──────────────────────────────────────────────────────────
+
+    case 'graphify': {
+      const graphify = require('./lib/graphify.cjs');
+      const subcommand = args[1];
+      if (subcommand === 'query') {
+        const term = args[2];
+        if (!term) error('Usage: gsd-tools graphify query <term>');
+        const budgetIdx = args.indexOf('--budget');
+        const budget = budgetIdx !== -1 ? parseInt(args[budgetIdx + 1], 10) : null;
+        core.output(graphify.graphifyQuery(cwd, term, { budget }), raw);
+      } else if (subcommand === 'status') {
+        core.output(graphify.graphifyStatus(cwd), raw);
+      } else if (subcommand === 'diff') {
+        core.output(graphify.graphifyDiff(cwd), raw);
+      } else if (subcommand === 'build') {
+        error('graphify build is not yet implemented. Coming in Phase 3.');
+      } else {
+        error('Unknown graphify subcommand. Available: build, query, status, diff');
+      }
+      break;
+    }
+
     // ─── Documentation ────────────────────────────────────────────────────
 
     case 'docs-init': {
