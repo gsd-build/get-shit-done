@@ -5856,6 +5856,35 @@ function install(isGlobal, runtime = 'claude') {
     console.log(`  ${green}✓${reset} Generated config.toml with ${agentCount} agent roles`);
     console.log(`  ${green}✓${reset} Generated ${agentCount} agent .toml config files`);
 
+    // Copy hook files that are referenced in config.toml (#2153)
+    // The main hook-copy block is gated to non-Codex runtimes, but Codex registers
+    // gsd-check-update.js in config.toml — the file must physically exist.
+    const codexHooksSrc = path.join(src, 'hooks', 'dist');
+    if (fs.existsSync(codexHooksSrc)) {
+      const codexHooksDest = path.join(targetDir, 'hooks');
+      fs.mkdirSync(codexHooksDest, { recursive: true });
+      const configDirReplacement = getConfigDirFromHome(runtime, isGlobal);
+      for (const entry of fs.readdirSync(codexHooksSrc)) {
+        const srcFile = path.join(codexHooksSrc, entry);
+        if (!fs.statSync(srcFile).isFile()) continue;
+        const destFile = path.join(codexHooksDest, entry);
+        if (entry.endsWith('.js')) {
+          let content = fs.readFileSync(srcFile, 'utf8');
+          content = content.replace(/'\.claude'/g, configDirReplacement);
+          content = content.replace(/\/\.claude\//g, `/${getDirName(runtime)}/`);
+          content = content.replace(/\{\{GSD_VERSION\}\}/g, pkg.version);
+          fs.writeFileSync(destFile, content);
+          try { fs.chmodSync(destFile, 0o755); } catch (e) { /* Windows */ }
+        } else {
+          fs.copyFileSync(srcFile, destFile);
+          if (entry.endsWith('.sh')) {
+            try { fs.chmodSync(destFile, 0o755); } catch (e) { /* Windows */ }
+          }
+        }
+      }
+      console.log(`  ${green}✓${reset} Installed hooks`);
+    }
+
     // Add Codex hooks (SessionStart for update checking) — requires codex_hooks feature flag
     const configPath = path.join(targetDir, 'config.toml');
     try {
