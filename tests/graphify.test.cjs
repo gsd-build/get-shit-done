@@ -21,6 +21,14 @@ const {
   execGraphify,
   checkGraphifyInstalled,
   checkGraphifyVersion,
+  // Phase 2
+  graphifyQuery,
+  graphifyStatus,
+  graphifyDiff,
+  safeReadJson,
+  buildAdjacencyMap,
+  seedAndExpand,
+  applyBudget,
 } = require('../get-shit-done/bin/lib/graphify.cjs');
 
 // ─── Helpers ────────────────────────────────────────────────────────────────
@@ -33,6 +41,44 @@ function enableGraphify(planningDir) {
   config.graphify = { enabled: true };
   fs.writeFileSync(configPath, JSON.stringify(config, null, 2), 'utf8');
 }
+
+function writeGraphJson(planningDir, data) {
+  const graphsDir = path.join(planningDir, 'graphs');
+  fs.mkdirSync(graphsDir, { recursive: true });
+  fs.writeFileSync(
+    path.join(graphsDir, 'graph.json'),
+    JSON.stringify(data, null, 2),
+    'utf8'
+  );
+}
+
+function writeSnapshotJson(planningDir, data) {
+  const graphsDir = path.join(planningDir, 'graphs');
+  fs.mkdirSync(graphsDir, { recursive: true });
+  fs.writeFileSync(
+    path.join(graphsDir, '.last-build-snapshot.json'),
+    JSON.stringify(data, null, 2),
+    'utf8'
+  );
+}
+
+const SAMPLE_GRAPH = {
+  nodes: [
+    { id: 'n1', label: 'AuthService', description: 'Handles user authentication and token validation', type: 'service' },
+    { id: 'n2', label: 'UserModel', description: 'User database model for storing credentials', type: 'model' },
+    { id: 'n3', label: 'SessionManager', description: 'Manages active user sessions', type: 'service' },
+    { id: 'n4', label: 'EmailService', description: 'Sends notification emails', type: 'service' },
+    { id: 'n5', label: 'Logger', description: 'Centralized logging utility', type: 'utility' },
+  ],
+  edges: [
+    { source: 'n1', target: 'n2', label: 'reads_from', confidence: 'EXTRACTED' },
+    { source: 'n1', target: 'n3', label: 'creates', confidence: 'INFERRED' },
+    { source: 'n2', target: 'n3', label: 'triggers', confidence: 'AMBIGUOUS' },
+    { source: 'n3', target: 'n4', label: 'notifies', confidence: 'INFERRED' },
+    { source: 'n4', target: 'n5', label: 'logs_via', confidence: 'EXTRACTED' },
+  ],
+  hyperedges: [],
+};
 
 // ─── isGraphifyEnabled (TEST-03, FOUND-01) ──────────────────────────────────
 
@@ -347,5 +393,84 @@ describe('checkGraphifyVersion', () => {
     checkGraphifyVersion();
     assert.strictEqual(capturedCmd, 'python3');
     assert.ok(capturedArgs.some(arg => arg.includes('importlib.metadata')));
+  });
+});
+
+// ─── safeReadJson (TEST-01) ────────────────────────────────────────────────
+
+describe('safeReadJson', () => {
+  let tmpDir;
+  let planningDir;
+
+  beforeEach(() => {
+    tmpDir = createTempProject();
+    planningDir = path.join(tmpDir, '.planning');
+  });
+
+  afterEach(() => {
+    cleanup(tmpDir);
+  });
+});
+
+// ─── buildAdjacencyMap (TEST-01) ───────────────────────────────────────────
+
+describe('buildAdjacencyMap', () => {
+});
+
+// ─── seedAndExpand (TEST-01) ───────────────────────────────────────────────
+
+describe('seedAndExpand', () => {
+});
+
+// ─── applyBudget (TEST-01) ─────────────────────────────────────────────────
+
+describe('applyBudget', () => {
+});
+
+// ─── graphifyQuery (QUERY-01, QUERY-02, QUERY-03) ─────────────────────────
+
+describe('graphifyQuery', () => {
+  let tmpDir;
+  let planningDir;
+
+  beforeEach(() => {
+    tmpDir = createTempProject();
+    planningDir = path.join(tmpDir, '.planning');
+  });
+
+  afterEach(() => {
+    cleanup(tmpDir);
+  });
+});
+
+// ─── graphifyStatus (STAT-01, STAT-02) ────────────────────────────────────
+
+describe('graphifyStatus', () => {
+  let tmpDir;
+  let planningDir;
+
+  beforeEach(() => {
+    tmpDir = createTempProject();
+    planningDir = path.join(tmpDir, '.planning');
+  });
+
+  afterEach(() => {
+    cleanup(tmpDir);
+  });
+});
+
+// ─── graphifyDiff (DIFF-01, DIFF-02) ──────────────────────────────────────
+
+describe('graphifyDiff', () => {
+  let tmpDir;
+  let planningDir;
+
+  beforeEach(() => {
+    tmpDir = createTempProject();
+    planningDir = path.join(tmpDir, '.planning');
+  });
+
+  afterEach(() => {
+    cleanup(tmpDir);
   });
 });
