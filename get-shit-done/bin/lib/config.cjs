@@ -46,6 +46,7 @@ const VALID_CONFIG_KEYS = new Set([
   'manager.flags.discuss', 'manager.flags.plan', 'manager.flags.execute',
   'response_language',
   'intel.enabled',
+  'graphify.enabled',
   'claude_md_path',
 ]);
 
