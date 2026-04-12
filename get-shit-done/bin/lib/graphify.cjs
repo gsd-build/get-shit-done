@@ -3,6 +3,7 @@
 const fs = require('fs');
 const path = require('path');
 const childProcess = require('child_process');
+const { atomicWriteFileSync } = require('./core.cjs');
 
 // ─── Config Gate ─────────────────────────────────────────────────────────────
 
@@ -399,6 +400,73 @@ function graphifyDiff(cwd) {
   };
 }
 
+// ─── Build Pipeline (Phase 3) ───────────────────────────────────────────────
+
+/**
+ * Pre-flight checks for graphify build (BUILD-01, BUILD-02, D-09).
+ * Does NOT invoke graphify -- returns structured JSON for the builder agent.
+ *
+ * @param {string} cwd - Working directory
+ * @returns {object}
+ */
+function graphifyBuild(cwd) {
+  const planningDir = path.join(cwd, '.planning');
+  if (!isGraphifyEnabled(planningDir)) return disabledResponse();
+
+  const installed = checkGraphifyInstalled();
+  if (!installed.installed) return { error: installed.message };
+
+  const version = checkGraphifyVersion();
+
+  // Ensure output directory exists (D-05)
+  const graphsDir = path.join(planningDir, 'graphs');
+  fs.mkdirSync(graphsDir, { recursive: true });
+
+  // Read build timeout from config -- default 300s per D-02
+  const config = safeReadJson(path.join(planningDir, 'config.json')) || {};
+  const timeoutSec = (config.graphify && config.graphify.build_timeout) || 300;
+
+  return {
+    action: 'spawn_agent',
+    graphs_dir: graphsDir,
+    graphify_out: path.join(cwd, 'graphify-out'),
+    timeout_seconds: timeoutSec,
+    version: version.version,
+    version_warning: version.warning,
+    artifacts: ['graph.json', 'graph.html', 'GRAPH_REPORT.md'],
+  };
+}
+
+/**
+ * Write a diff snapshot after successful build (D-06).
+ * Reads graph.json from .planning/graphs/ and writes .last-build-snapshot.json
+ * using atomicWriteFileSync for crash safety.
+ *
+ * @param {string} cwd - Working directory
+ * @returns {object}
+ */
+function writeSnapshot(cwd) {
+  const graphPath = path.join(cwd, '.planning', 'graphs', 'graph.json');
+  const graph = safeReadJson(graphPath);
+  if (!graph) return { error: 'Cannot write snapshot: graph.json not parseable' };
+
+  const snapshot = {
+    version: 1,
+    timestamp: new Date().toISOString(),
+    nodes: graph.nodes || [],
+    edges: graph.edges || [],
+  };
+
+  const snapshotPath = path.join(cwd, '.planning', 'graphs', '.last-build-snapshot.json');
+  atomicWriteFileSync(snapshotPath, JSON.stringify(snapshot, null, 2));
+  return {
+    saved: true,
+    timestamp: snapshot.timestamp,
+    node_count: snapshot.nodes.length,
+    edge_count: snapshot.edges.length,
+  };
+}
+
 // ─── Exports ─────────────────────────────────────────────────────────────────
 
 module.exports = {
@@ -420,4 +488,7 @@ module.exports = {
   graphifyStatus,
   // Diff (Phase 2)
   graphifyDiff,
+  // Build (Phase 3)
+  graphifyBuild,
+  writeSnapshot,
 };

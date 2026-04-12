@@ -47,6 +47,7 @@ const VALID_CONFIG_KEYS = new Set([
   'response_language',
   'intel.enabled',
   'graphify.enabled',
+  'graphify.build_timeout',
   'claude_md_path',
 ]);
 
