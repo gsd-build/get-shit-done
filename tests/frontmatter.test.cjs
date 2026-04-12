@@ -113,6 +113,104 @@ describe('extractFrontmatter', () => {
     assert.strictEqual(result.second, 'two');
     assert.strictEqual(result.third, 'three');
   });
+
+  // ─── Bug #2130: body --- sequence mis-parse ──────────────────────────────
+
+  test('#2130: frontmatter at top with YAML example block in body — returns top frontmatter', () => {
+    const content = [
+      '---',
+      'name: my-agent',
+      'type: execute',
+      '---',
+      '',
+      '# Documentation',
+      '',
+      'Here is a YAML example:',
+      '',
+      '```yaml',
+      '---',
+      'key: value',
+      'other: stuff',
+      '---',
+      '```',
+      '',
+      'End of doc.',
+    ].join('\n');
+    const result = extractFrontmatter(content);
+    assert.strictEqual(result.name, 'my-agent', 'should extract name from TOP frontmatter');
+    assert.strictEqual(result.type, 'execute', 'should extract type from TOP frontmatter');
+    assert.strictEqual(result.key, undefined, 'should NOT extract key from body YAML block');
+    assert.strictEqual(result.other, undefined, 'should NOT extract other from body YAML block');
+  });
+
+  test('#2130: frontmatter at top with horizontal rules in body — returns top frontmatter', () => {
+    const content = [
+      '---',
+      'title: My Doc',
+      'status: active',
+      '---',
+      '',
+      '# Section One',
+      '',
+      'Some text.',
+      '',
+      '---',
+      '',
+      '# Section Two',
+      '',
+      'More text.',
+      '',
+      '---',
+      '',
+      '# Section Three',
+    ].join('\n');
+    const result = extractFrontmatter(content);
+    assert.strictEqual(result.title, 'My Doc', 'should extract title from TOP frontmatter');
+    assert.strictEqual(result.status, 'active', 'should extract status from TOP frontmatter');
+  });
+
+  test('#2130: body-only --- block with no frontmatter at byte 0 — returns empty', () => {
+    const content = [
+      '# My Document',
+      '',
+      'Some intro text.',
+      '',
+      '---',
+      'key: value',
+      'other: stuff',
+      '---',
+      '',
+      'End of doc.',
+    ].join('\n');
+    const result = extractFrontmatter(content);
+    assert.deepStrictEqual(result, {}, 'should return empty object when --- block is not at byte 0');
+  });
+
+  test('#2130: valid frontmatter at byte 0 still works (regression guard)', () => {
+    const content = [
+      '---',
+      'phase: 01',
+      'plan: 03',
+      'type: execute',
+      'wave: 1',
+      'depends_on: ["01-01", "01-02"]',
+      'files_modified:',
+      '  - src/auth.ts',
+      '  - src/middleware.ts',
+      'autonomous: true',
+      '---',
+      '',
+      '# Plan body here',
+    ].join('\n');
+    const result = extractFrontmatter(content);
+    assert.strictEqual(result.phase, '01');
+    assert.strictEqual(result.plan, '03');
+    assert.strictEqual(result.type, 'execute');
+    assert.strictEqual(result.wave, '1');
+    assert.deepStrictEqual(result.depends_on, ['01-01', '01-02']);
+    assert.deepStrictEqual(result.files_modified, ['src/auth.ts', 'src/middleware.ts']);
+    assert.strictEqual(result.autonomous, 'true');
+  });
 });
 
 // ─── reconstructFrontmatter ─────────────────────────────────────────────────
