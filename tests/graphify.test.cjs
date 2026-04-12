@@ -978,3 +978,74 @@ describe('writeSnapshot', () => {
     assert.strictEqual(snapshot.nodes.length, 3);
   });
 });
+
+// --- AGENT-03: Graceful degradation (graph absent) -------------------------
+
+describe('AGENT-03 graceful degradation', () => {
+  let tmpDir;
+  let planningDir;
+
+  beforeEach(() => {
+    tmpDir = createTempProject();
+    planningDir = path.join(tmpDir, '.planning');
+  });
+
+  afterEach(() => {
+    cleanup(tmpDir);
+  });
+
+  // AGENT-03: graphifyQuery returns error object when graph.json absent (not exception)
+  test('graphifyQuery returns clean error object when graph.json does not exist', () => {
+    enableGraphify(planningDir);
+    const result = graphifyQuery(tmpDir, 'anything');
+    assert.ok(result.error, 'should have error property');
+    assert.ok(result.error.includes('No graph'), 'error should mention no graph');
+    assert.strictEqual(typeof result.error, 'string', 'error should be a string, not thrown');
+  });
+
+  // AGENT-03: graphifyStatus returns exists:false when graph.json absent (not exception)
+  test('graphifyStatus returns exists:false when graph.json does not exist', () => {
+    enableGraphify(planningDir);
+    const result = graphifyStatus(tmpDir);
+    assert.strictEqual(result.exists, false, 'should report exists as false');
+    assert.ok(result.message, 'should have a message');
+    assert.ok(result.message.includes('No graph'), 'message should mention no graph');
+  });
+
+  // AGENT-03: graphifyQuery with various terms all return clean errors when no graph
+  test('graphifyQuery gracefully handles any query term when graph absent', () => {
+    enableGraphify(planningDir);
+    const terms = ['auth', 'payment', 'nonexistent', ''];
+    for (const term of terms) {
+      const result = graphifyQuery(tmpDir, term);
+      assert.ok(result.error || result.nodes !== undefined,
+        `term "${term}" should return error or valid result, not throw`);
+    }
+  });
+
+  // D-12: Integration test - query returns expected structure with known graph.json
+  test('graphifyQuery returns non-empty results with expected structure for known graph', () => {
+    enableGraphify(planningDir);
+    writeGraphJson(planningDir, SAMPLE_GRAPH);
+    const result = graphifyQuery(tmpDir, 'auth');
+    assert.ok(!result.error, 'should not have error when graph exists');
+    assert.ok(Array.isArray(result.nodes), 'nodes should be an array');
+    assert.ok(Array.isArray(result.edges), 'edges should be an array');
+    assert.ok(result.nodes.length > 0, 'should have matching nodes for auth term');
+    assert.strictEqual(typeof result.total_nodes, 'number', 'total_nodes should be a number');
+    assert.strictEqual(typeof result.total_edges, 'number', 'total_edges should be a number');
+    assert.strictEqual(result.term, 'auth', 'term should be echoed back');
+  });
+
+  // D-12: graphifyStatus returns valid structure with known graph.json
+  test('graphifyStatus returns valid structure when graph.json exists', () => {
+    enableGraphify(planningDir);
+    writeGraphJson(planningDir, SAMPLE_GRAPH);
+    const result = graphifyStatus(tmpDir);
+    assert.strictEqual(result.exists, true, 'should report exists as true');
+    assert.strictEqual(typeof result.node_count, 'number', 'node_count should be number');
+    assert.strictEqual(typeof result.edge_count, 'number', 'edge_count should be number');
+    assert.strictEqual(typeof result.stale, 'boolean', 'stale should be boolean');
+    assert.strictEqual(typeof result.age_hours, 'number', 'age_hours should be number');
+  });
+});
