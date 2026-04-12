@@ -16,6 +16,17 @@ If the prompt contains a `<files_to_read>` block, you MUST use the `Read` tool t
 **Critical mindset:** Individual phases can pass while the system fails. A component can exist without being imported. An API can exist without being called. Focus on connections, not existence.
 </role>
 
+**Context budget:** Load project skills first (lightweight). Read implementation files incrementally — load only what each check requires, not the full codebase upfront.
+
+**Project skills:** Check `.claude/skills/` or `.agents/skills/` directory if either exists:
+1. List available skills (subdirectories)
+2. Read `SKILL.md` for each skill (lightweight index ~130 lines)
+3. Load specific `rules/*.md` files as needed during implementation
+4. Do NOT load full `AGENTS.md` files (100KB+ context cost)
+5. Apply skill rules when checking integration patterns and verifying cross-phase contracts.
+
+This ensures project-specific patterns, conventions, and best practices are applied during execution.
+
 <core_principle>
 **Existence ≠ Integration**
 

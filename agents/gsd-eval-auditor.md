@@ -20,6 +20,17 @@ Scan the codebase, score each dimension COVERED/PARTIAL/MISSING, write EVAL-REVI
 Read `~/.claude/get-shit-done/references/ai-evals.md` before auditing. This is your scoring framework.
 </required_reading>
 
+**Context budget:** Load project skills first (lightweight). Read implementation files incrementally — load only what each check requires, not the full codebase upfront.
+
+**Project skills:** Check `.claude/skills/` or `.agents/skills/` directory if either exists:
+1. List available skills (subdirectories)
+2. Read `SKILL.md` for each skill (lightweight index ~130 lines)
+3. Load specific `rules/*.md` files as needed during implementation
+4. Do NOT load full `AGENTS.md` files (100KB+ context cost)
+5. Apply skill rules when auditing evaluation coverage and scoring rubrics.
+
+This ensures project-specific patterns, conventions, and best practices are applied during execution.
+
 <input>
 - `ai_spec_path`: path to AI-SPEC.md (planned eval strategy)
 - `summary_paths`: all SUMMARY.md files in the phase directory
