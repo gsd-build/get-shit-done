@@ -122,7 +122,15 @@ If no snapshot exists, suggest running `build` twice (first to create, second to
 
 ## Step 3 -- Build (Agent Spawn)
 
-Display before spawning:
+Run pre-flight check first:
+
+```
+PREFLIGHT=$(node "$HOME/.claude/get-shit-done/bin/gsd-tools.cjs" graphify build)
+```
+
+If pre-flight returns `disabled: true` or `error`, display the message and **STOP**.
+
+If pre-flight returns `action: "spawn_agent"`, display:
 
 ```
 GSD > Spawning graphify-builder agent...
@@ -138,13 +146,44 @@ Task(
 Project root: ${CWD}
 gsd-tools path: $HOME/.claude/get-shit-done/bin/gsd-tools.cjs
 
-Instructions:
-1. Run graphify build to generate graph.json in .planning/graphs/
-2. Verify the output graph is valid JSON with nodes[] and edges[] arrays
-3. Save a snapshot for future diff comparisons
+## Instructions
 
-When complete, output: ## GRAPHIFY BUILD COMPLETE
-If something fails, output: ## GRAPHIFY BUILD FAILED with details."
+1. **Invoke graphify:**
+   Run from the project root:
+   ```
+   graphify . --update
+   ```
+   This builds the knowledge graph with SHA256 incremental caching.
+   Timeout: up to 5 minutes (or as configured via graphify.build_timeout).
+
+2. **Validate output:**
+   Check that graphify-out/graph.json exists and is valid JSON with nodes[] and edges[] arrays.
+   If graphify exited non-zero or graph.json is not parseable, output:
+   ## GRAPHIFY BUILD FAILED
+   Include the stderr output for debugging. Do NOT delete .planning/graphs/ -- prior valid graph remains available.
+
+3. **Copy artifacts to .planning/graphs/:**
+   ```
+   cp graphify-out/graph.json .planning/graphs/graph.json
+   cp graphify-out/graph.html .planning/graphs/graph.html
+   cp graphify-out/GRAPH_REPORT.md .planning/graphs/GRAPH_REPORT.md
+   ```
+   These three files are the build output consumed by query, status, and diff commands.
+
+4. **Write diff snapshot:**
+   ```
+   node \"$HOME/.claude/get-shit-done/bin/gsd-tools.cjs\" graphify build snapshot
+   ```
+   This creates .planning/graphs/.last-build-snapshot.json for future diff comparisons.
+
+5. **Report build summary:**
+   ```
+   node \"$HOME/.claude/get-shit-done/bin/gsd-tools.cjs\" graphify status
+   ```
+   Display the node count, edge count, and hyperedge count from the status output.
+
+When complete, output: ## GRAPHIFY BUILD COMPLETE with the summary counts.
+If something fails at any step, output: ## GRAPHIFY BUILD FAILED with details."
 )
 ```
 

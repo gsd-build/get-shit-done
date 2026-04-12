@@ -1078,7 +1078,11 @@ async function runCommand(command, args, cwd, raw, defaultValue) {
       } else if (subcommand === 'diff') {
         core.output(graphify.graphifyDiff(cwd), raw);
       } else if (subcommand === 'build') {
-        error('graphify build is not yet implemented. Coming in Phase 3.');
+        if (args[2] === 'snapshot') {
+          core.output(graphify.writeSnapshot(cwd), raw);
+        } else {
+          core.output(graphify.graphifyBuild(cwd), raw);
+        }
       } else {
         error('Unknown graphify subcommand. Available: build, query, status, diff');
       }
