@@ -43,7 +43,7 @@ Parse JSON for: `planner_model`, `checker_model`, `commit_docs`, `phase_found`, 
 **First: Check for active UAT sessions**
 
 ```bash
-(find .planning/phases -name "*-UAT.md" -type f 2>/dev/null || true) | head -5
+(find .planning/phases -name "*-UAT.md" -type f 2>/dev/null || true)
 ```
 
 **If active sessions exist AND no $ARGUMENTS provided:**
