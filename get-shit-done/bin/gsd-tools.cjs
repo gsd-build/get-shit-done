@@ -1020,7 +1020,15 @@ async function runCommand(command, args, cwd, raw, defaultValue) {
         core.output(intel.intelQuery(term, planningDir), raw);
       } else if (subcommand === 'status') {
         const planningDir = path.join(cwd, '.planning');
-        core.output(intel.intelStatus(planningDir), raw);
+        const status = intel.intelStatus(planningDir);
+        if (!raw && status.files) {
+          for (const file of Object.values(status.files)) {
+            if (file.updated_at) {
+              file.updated_at = core.timeAgo(new Date(file.updated_at));
+            }
+          }
+        }
+        core.output(status, raw);
       } else if (subcommand === 'diff') {
         const planningDir = path.join(cwd, '.planning');
         core.output(intel.intelDiff(planningDir), raw);
