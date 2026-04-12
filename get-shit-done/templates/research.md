@@ -94,6 +94,20 @@ yarn add [packages]
 <architecture_patterns>
 ## Architecture Patterns
 
+### System Architecture Diagram
+
+Architecture diagrams MUST show data flow through conceptual components, not file listings.
+
+Requirements:
+- Show entry points (how data/requests enter the system)
+- Show processing stages (what transformations happen, in what order)
+- Show decision points and branching paths
+- Show external dependencies and service boundaries
+- Use arrows to indicate data flow direction
+- A reader should be able to trace the primary use case from input to output by following the arrows
+
+File-to-implementation mapping belongs in the Component Responsibilities table, not in the diagram.
+
 ### Recommended Project Structure
 ```
 src/
@@ -311,6 +325,20 @@ npm install three @react-three/fiber @react-three/drei @react-three/rapier zusta
 
 <architecture_patterns>
 ## Architecture Patterns
+
+### System Architecture Diagram
+
+Architecture diagrams MUST show data flow through conceptual components, not file listings.
+
+Requirements:
+- Show entry points (how data/requests enter the system)
+- Show processing stages (what transformations happen, in what order)
+- Show decision points and branching paths
+- Show external dependencies and service boundaries
+- Use arrows to indicate data flow direction
+- A reader should be able to trace the primary use case from input to output by following the arrows
+
+File-to-implementation mapping belongs in the Component Responsibilities table, not in the diagram.
 
 ### Recommended Project Structure
 ```
