@@ -70,6 +70,9 @@
  *   audit-uat                           Scan all phases for unresolved UAT/verification items
  *   uat render-checkpoint --file <path> Render the current UAT checkpoint block
  *
+ * Open Artifact Audit:
+ *   audit-open [--json]                 Scan all .planning/ artifact types for unresolved items
+ *
  * Intel:
  *   intel query <term>             Query intel files for a term
  *   intel status                   Show intel file freshness
@@ -760,6 +763,18 @@ async function runCommand(command, args, cwd, raw, defaultValue) {
     case 'audit-uat': {
       const uat = require('./lib/uat.cjs');
       uat.cmdAuditUat(cwd, raw);
+      break;
+    }
+
+    case 'audit-open': {
+      const { auditOpenArtifacts, formatAuditReport } = require('./lib/audit.cjs');
+      const includeRaw = args.includes('--json');
+      const result = auditOpenArtifacts(cwd);
+      if (includeRaw) {
+        output(JSON.stringify(result, null, 2), raw);
+      } else {
+        output(formatAuditReport(result), raw);
+      }
       break;
     }
 

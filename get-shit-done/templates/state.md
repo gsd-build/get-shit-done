@@ -66,6 +66,14 @@ None yet.
 
 None yet.
 
+## Deferred Items
+
+Items acknowledged and carried forward from previous milestone close:
+
+| Category | Item | Status | Deferred At |
+|----------|------|--------|-------------|
+| *(none)* | | | |
+
 ## Session Continuity
 
 Last session: [YYYY-MM-DD HH:MM]
