@@ -2,7 +2,7 @@
 
 const fs = require('fs');
 const path = require('path');
-const { spawnSync } = require('child_process');
+const childProcess = require('child_process');
 
 // ─── Config Gate ─────────────────────────────────────────────────────────────
 
@@ -46,7 +46,7 @@ function disabledResponse() {
  */
 function execGraphify(cwd, args, options = {}) {
   const timeout = options.timeout ?? 30000;
-  const result = spawnSync('graphify', args, {
+  const result = childProcess.spawnSync('graphify', args, {
     cwd,
     stdio: 'pipe',
     encoding: 'utf-8',
@@ -84,7 +84,7 @@ function execGraphify(cwd, args, options = {}) {
  * @returns {{ installed: boolean, message?: string }}
  */
 function checkGraphifyInstalled() {
-  const result = spawnSync('graphify', ['--help'], {
+  const result = childProcess.spawnSync('graphify', ['--help'], {
     stdio: 'pipe',
     encoding: 'utf-8',
     timeout: 5000,
@@ -107,7 +107,7 @@ function checkGraphifyInstalled() {
  * @returns {{ version: string|null, compatible: boolean|null, warning: string|null }}
  */
 function checkGraphifyVersion() {
-  const result = spawnSync('python3', [
+  const result = childProcess.spawnSync('python3', [
     '-c',
     'from importlib.metadata import version; print(version("graphifyy"))',
   ], {
