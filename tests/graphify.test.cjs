@@ -29,6 +29,9 @@ const {
   buildAdjacencyMap,
   seedAndExpand,
   applyBudget,
+  // Build (Phase 3)
+  graphifyBuild,
+  writeSnapshot,
 } = require('../get-shit-done/bin/lib/graphify.cjs');
 
 // ─── Helpers ────────────────────────────────────────────────────────────────
@@ -766,5 +769,110 @@ describe('graphifyDiff', () => {
     const result = graphifyDiff(tmpDir);
     assert.strictEqual(result.nodes.changed, 1, 'n1 label changed');
     assert.strictEqual(result.edges.changed, 1, 'edge confidence changed');
+  });
+});
+
+// ─── graphifyBuild (BUILD-01, BUILD-02, TEST-02) ────────────────────────────
+
+describe('graphifyBuild', () => {
+  let tmpDir;
+  let planningDir;
+
+  beforeEach(() => {
+    tmpDir = createTempProject();
+    planningDir = path.join(tmpDir, '.planning');
+    enableGraphify(planningDir);
+  });
+
+  afterEach(() => {
+    cleanup(tmpDir);
+    mock.restoreAll();
+  });
+
+  test('returns disabled response when graphify not enabled', () => {
+    const tmpDir2 = createTempProject();
+    const result = graphifyBuild(tmpDir2);
+    assert.strictEqual(result.disabled, true);
+    cleanup(tmpDir2);
+  });
+
+  test('returns error when graphify not installed', () => {
+    mock.method(childProcess, 'spawnSync', () => ({
+      status: null,
+      stdout: '',
+      stderr: '',
+      error: { code: 'ENOENT' },
+      signal: null,
+    }));
+
+    const result = graphifyBuild(tmpDir);
+    assert.ok(result.error);
+    assert.ok(result.error.includes('not installed') || result.error.includes('pip install'));
+  });
+
+  test('returns spawn_agent action on successful pre-flight', () => {
+    mock.method(childProcess, 'spawnSync', (_cmd, args) => {
+      if (args && args[0] === '--help') {
+        return { status: 0, stdout: 'Usage', stderr: '', error: undefined, signal: null };
+      }
+      // version check via python3
+      return { status: 0, stdout: '0.4.3\n', stderr: '', error: undefined, signal: null };
+    });
+
+    const result = graphifyBuild(tmpDir);
+    assert.strictEqual(result.action, 'spawn_agent');
+    assert.ok(result.graphs_dir);
+    assert.ok(result.graphify_out);
+    assert.strictEqual(result.timeout_seconds, 300);
+    assert.strictEqual(result.version, '0.4.3');
+    assert.strictEqual(result.version_warning, null);
+    assert.deepStrictEqual(result.artifacts, ['graph.json', 'graph.html', 'GRAPH_REPORT.md']);
+  });
+
+  test('creates .planning/graphs/ directory if missing', () => {
+    mock.method(childProcess, 'spawnSync', (_cmd, args) => {
+      if (args && args[0] === '--help') {
+        return { status: 0, stdout: 'Usage', stderr: '', error: undefined, signal: null };
+      }
+      return { status: 0, stdout: '0.4.3\n', stderr: '', error: undefined, signal: null };
+    });
+
+    const graphsDir = path.join(planningDir, 'graphs');
+    assert.strictEqual(fs.existsSync(graphsDir), false);
+
+    graphifyBuild(tmpDir);
+    assert.strictEqual(fs.existsSync(graphsDir), true);
+  });
+
+  test('reads graphify.build_timeout from config', () => {
+    // Write config with custom timeout
+    const configPath = path.join(planningDir, 'config.json');
+    const config = JSON.parse(fs.readFileSync(configPath, 'utf8'));
+    config.graphify.build_timeout = 600;
+    fs.writeFileSync(configPath, JSON.stringify(config, null, 2), 'utf8');
+
+    mock.method(childProcess, 'spawnSync', (_cmd, args) => {
+      if (args && args[0] === '--help') {
+        return { status: 0, stdout: 'Usage', stderr: '', error: undefined, signal: null };
+      }
+      return { status: 0, stdout: '0.4.3\n', stderr: '', error: undefined, signal: null };
+    });
+
+    const result = graphifyBuild(tmpDir);
+    assert.strictEqual(result.timeout_seconds, 600);
+  });
+
+  test('includes version warning when outside tested range', () => {
+    mock.method(childProcess, 'spawnSync', (_cmd, args) => {
+      if (args && args[0] === '--help') {
+        return { status: 0, stdout: 'Usage', stderr: '', error: undefined, signal: null };
+      }
+      return { status: 0, stdout: '1.2.0\n', stderr: '', error: undefined, signal: null };
+    });
+
+    const result = graphifyBuild(tmpDir);
+    assert.strictEqual(result.action, 'spawn_agent');
+    assert.ok(result.version_warning);
+    assert.ok(result.version_warning.includes('outside tested range'));
   });
 });
