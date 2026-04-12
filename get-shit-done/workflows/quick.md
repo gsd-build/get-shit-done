@@ -146,6 +146,15 @@ Parse JSON for: `planner_model`, `executor_model`, `checker_model`, `verifier_mo
 USE_WORKTREES=$(node "$HOME/.claude/get-shit-done/bin/gsd-tools.cjs" config-get workflow.use_worktrees 2>/dev/null || echo "true")
 ```
 
+If the project uses git submodules, worktree isolation is skipped:
+
+```bash
+if [ -f .gitmodules ]; then
+  echo "[worktree] Submodule project detected (.gitmodules exists) — falling back to sequential execution"
+  USE_WORKTREES=false
+fi
+```
+
 **If `roadmap_exists` is false:** Error — Quick mode requires an active project with ROADMAP.md. Run `/gsd-new-project` first.
 
 Quick tasks can run mid-phase - validation only checks ROADMAP.md exists, not phase status.

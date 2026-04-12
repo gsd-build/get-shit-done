@@ -82,6 +82,15 @@ Read worktree config:
 USE_WORKTREES=$(node "$HOME/.claude/get-shit-done/bin/gsd-tools.cjs" config-get workflow.use_worktrees 2>/dev/null || echo "true")
 ```
 
+If the project uses git submodules, worktree isolation is skipped regardless of the `workflow.use_worktrees` config — the executor commit protocol cannot correctly handle submodule commits inside isolated worktrees. Sequential execution handles submodules transparently.
+
+```bash
+if [ -f .gitmodules ]; then
+  echo "[worktree] Submodule project detected (.gitmodules exists) — falling back to sequential execution"
+  USE_WORKTREES=false
+fi
+```
+
 When `USE_WORKTREES` is `false`, all executor agents run without `isolation="worktree"` — they execute sequentially on the main working tree instead of in parallel worktrees.
 
 Read context window size for adaptive prompt enrichment:
