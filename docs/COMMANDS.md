@@ -700,9 +700,20 @@ Systematic debugging with persistent state.
 |------|-------------|
 | `--diagnose` | Diagnosis-only mode — investigate without attempting fixes |
 
+**Subcommands:**
+- `/gsd-debug list` — List all active debug sessions with status, hypothesis, and next action
+- `/gsd-debug status <slug>` — Print full summary of a session (Evidence count, Eliminated count, Resolution, TDD checkpoint) without spawning an agent
+- `/gsd-debug continue <slug>` — Resume a specific session by slug (surfaces Current Focus then spawns continuation agent)
+- `/gsd-debug [--diagnose] <description>` — Start new debug session (existing behavior; `--diagnose` stops at root cause without applying fix)
+
+**TDD mode:** When `tdd_mode: true` in `.planning/config.json`, debug sessions require a failing test to be written and verified before any fix is applied (red → green → done).
+
 ```bash
 /gsd-debug "Login button not responding on mobile Safari"
 /gsd-debug --diagnose "Intermittent 500 errors on /api/users"
+/gsd-debug list
+/gsd-debug status auth-token-null
+/gsd-debug continue form-submit-500
 ```
 
 ### `/gsd-add-todo`
