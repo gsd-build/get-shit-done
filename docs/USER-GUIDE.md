@@ -831,6 +831,12 @@ Clear your context window between major commands: `/clear` in Claude Code. GSD i
 
 Run `/gsd-discuss-phase [N]` before planning. Most plan quality issues come from Claude making assumptions that `CONTEXT.md` would have prevented. You can also run `/gsd-list-phase-assumptions [N]` to see what Claude intends to do before committing to a plan.
 
+### Discuss-Phase Uses Technical Jargon I Don't Understand
+
+`/gsd-discuss-phase` adapts its language based on your `USER-PROFILE.md`. If the profile indicates a non-technical owner — `learning_style: guided`, `jargon` listed as a frustration trigger, or `explanation_depth: high-level` — gray area questions are automatically reframed in product-outcome language instead of implementation terminology.
+
+To enable this: run `/gsd-profile-user` to generate your profile. The profile is stored at `~/.claude/get-shit-done/USER-PROFILE.md` and is read automatically on every `/gsd-discuss-phase` invocation. No other configuration is required.
+
 ### Execution Fails or Produces Stubs
 
 Check that the plan was not too ambitious. Plans should have 2-3 tasks maximum. If tasks are too large, they exceed what a single context window can produce reliably. Re-plan with smaller scope.
