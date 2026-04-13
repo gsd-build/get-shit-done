@@ -273,6 +273,49 @@ Create PR from completed phase work with auto-generated body.
 
 ---
 
+### `/gsd-sync-github`
+
+One-way mirror of GSD planning state (`.planning/`) onto GitHub Issues + Milestones. GSD remains the source of truth — GitHub is a read-only reflection.
+
+| Argument | Required | Description |
+|----------|----------|-------------|
+| `--dry-run` | No | Print structured diff, no writes (default) |
+| `--apply` | No | Execute the diff: create missing milestones/issues, transition labels, close shipped phases |
+| `--seed-historical` | No | One-time: create current milestone + closed umbrella issue with shipped phases checklist |
+| `--repair` | No | Rebuild `.planning/.github-sync.json` from live GitHub state |
+| `--help` | No | Show mode reference |
+
+**Prerequisites:** `github_sync.enabled=true` in `.planning/config.json`, `gh` CLI installed + authenticated, repo has issues enabled
+**Produces:** GitHub milestone, phase issues (one per planned phase), single umbrella issue per milestone for historical phases, `.planning/.github-sync.json` registry, `.planning/.github-sync.log` audit log
+
+```bash
+/gsd-sync-github                          # dry-run (default)
+/gsd-sync-github --apply                  # execute the diff
+/gsd-sync-github --seed-historical        # one-time seed of milestone + umbrella
+/gsd-sync-github --repair                 # rebuild registry from GitHub
+```
+
+**Configuration in `.planning/config.json`:**
+
+```json
+{
+  "github_sync": {
+    "enabled": true,
+    "repo": "owner/repo",
+    "label_prefix": "gsd",
+    "close_on_ship": true
+  }
+}
+```
+
+**Environment overrides:** `GSD_SYNC_DRYRUN=1` (convert gh writes to echo), `GSD_SYNC_SANDBOX=1` (read `.planning/config.local.json`), `GSD_SYNC_VERBOSE=1` (debug traces).
+
+**Hook integration:** PostToolUse hook `hooks/gsd-github-sync.sh` reacts to GSD skill invocations (`gsd-add-phase`, `gsd-execute-phase`, `gsd-ship`, `gsd-new-milestone`, `gsd-complete-milestone`, `gsd-remove-phase`, `gsd-insert-phase`) and dispatches incremental sync automatically. The slash command handles drift repair, historical seed, and full reconciliation.
+
+**Safety:** opt-in (default off); preflight failures degrade gracefully and never block the GSD action; idempotent; non-destructive.
+
+---
+
 ### `/gsd-ui-review`
 
 Retroactive 6-pillar visual audit of implemented frontend.
