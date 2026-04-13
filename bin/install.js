@@ -73,6 +73,7 @@ const hasTrae = args.includes('--trae');
 const hasQwen = args.includes('--qwen');
 const hasCodebuddy = args.includes('--codebuddy');
 const hasCline = args.includes('--cline');
+const hasKiro = args.includes('--kiro');
 const hasBoth = args.includes('--both'); // Legacy flag, keeps working
 const hasAll = args.includes('--all');
 const hasUninstall = args.includes('--uninstall') || args.includes('-u');
@@ -80,7 +81,7 @@ const hasUninstall = args.includes('--uninstall') || args.includes('-u');
 // Runtime selection - can be set by flags or interactive prompt
 let selectedRuntimes = [];
 if (hasAll) {
-  selectedRuntimes = ['claude', 'kilo', 'opencode', 'gemini', 'codex', 'copilot', 'antigravity', 'cursor', 'windsurf', 'augment', 'trae', 'qwen', 'codebuddy', 'cline'];
+  selectedRuntimes = ['claude', 'kilo', 'kiro', 'opencode', 'gemini', 'codex', 'copilot', 'antigravity', 'cursor', 'windsurf', 'augment', 'trae', 'qwen', 'codebuddy', 'cline'];
 } else if (hasBoth) {
   selectedRuntimes = ['claude', 'opencode'];
 } else {
@@ -98,6 +99,7 @@ if (hasAll) {
   if (hasQwen) selectedRuntimes.push('qwen');
   if (hasCodebuddy) selectedRuntimes.push('codebuddy');
   if (hasCline) selectedRuntimes.push('cline');
+  if (hasKiro) selectedRuntimes.push('kiro');
 }
 
 // WSL + Windows Node.js detection
@@ -149,6 +151,7 @@ function getDirName(runtime) {
   if (runtime === 'qwen') return '.qwen';
   if (runtime === 'codebuddy') return '.codebuddy';
   if (runtime === 'cline') return '.cline';
+  if (runtime === 'kiro') return '.kiro';
   return '.claude';
 }
 
@@ -184,6 +187,7 @@ function getConfigDirFromHome(runtime, isGlobal) {
   if (runtime === 'qwen') return "'.qwen'";
   if (runtime === 'codebuddy') return "'.codebuddy'";
   if (runtime === 'cline') return "'.cline'";
+  if (runtime === 'kiro') return "'.kiro'";
   return "'.claude'";
 }
 
@@ -378,6 +382,17 @@ function getGlobalDir(runtime, explicitDir = null) {
     return path.join(os.homedir(), '.cline');
   }
 
+  if (runtime === 'kiro') {
+    // Kiro: --config-dir > KIRO_CONFIG_DIR > ~/.kiro
+    if (explicitDir) {
+      return expandTilde(explicitDir);
+    }
+    if (process.env.KIRO_CONFIG_DIR) {
+      return expandTilde(process.env.KIRO_CONFIG_DIR);
+    }
+    return path.join(os.homedir(), '.kiro');
+  }
+
   // Claude Code: --config-dir > CLAUDE_CONFIG_DIR > ~/.claude
   if (explicitDir) {
     return expandTilde(explicitDir);
@@ -398,7 +413,7 @@ const banner = '\n' +
   '\n' +
   '  Get Shit Done ' + dim + 'v' + pkg.version + reset + '\n' +
   '  A meta-prompting, context engineering and spec-driven\n' +
-  '  development system for Claude Code, OpenCode, Gemini, Kilo, Codex, Copilot, Antigravity, Cursor, Windsurf, Augment, Trae, Qwen Code, Cline and CodeBuddy by TÂCHES.\n';
+  '  development system for Claude Code, OpenCode, Gemini, Kilo, Kiro, Codex, Copilot, Antigravity, Cursor, Windsurf, Augment, Trae, Qwen Code, Cline and CodeBuddy by TÂCHES.\n';
 
 // Parse --config-dir argument
 function parseConfigDirArg() {
@@ -436,7 +451,7 @@ if (hasUninstall) {
 
 // Show help if requested
 if (hasHelp) {
-  console.log(`  ${yellow}Usage:${reset} npx get-shit-done-cc [options]\n\n  ${yellow}Options:${reset}\n    ${cyan}-g, --global${reset}              Install globally (to config directory)\n    ${cyan}-l, --local${reset}               Install locally (to current directory)\n    ${cyan}--claude${reset}                  Install for Claude Code only\n    ${cyan}--opencode${reset}                Install for OpenCode only\n    ${cyan}--gemini${reset}                  Install for Gemini only\n    ${cyan}--kilo${reset}                    Install for Kilo only\n    ${cyan}--codex${reset}                   Install for Codex only\n    ${cyan}--copilot${reset}                 Install for Copilot only\n    ${cyan}--antigravity${reset}             Install for Antigravity only\n    ${cyan}--cursor${reset}                  Install for Cursor only\n    ${cyan}--windsurf${reset}                Install for Windsurf only\n    ${cyan}--augment${reset}                 Install for Augment only\n    ${cyan}--trae${reset}                    Install for Trae only\n    ${cyan}--qwen${reset}                    Install for Qwen Code only\n    ${cyan}--cline${reset}                   Install for Cline only\n    ${cyan}--codebuddy${reset}              Install for CodeBuddy only\n    ${cyan}--all${reset}                     Install for all runtimes\n    ${cyan}-u, --uninstall${reset}           Uninstall GSD (remove all GSD files)\n    ${cyan}-c, --config-dir <path>${reset}   Specify custom config directory\n    ${cyan}-h, --help${reset}                Show this help message\n    ${cyan}--force-statusline${reset}        Replace existing statusline config\n\n  ${yellow}Examples:${reset}\n    ${dim}# Interactive install (prompts for runtime and location)${reset}\n    npx get-shit-done-cc\n\n    ${dim}# Install for Claude Code globally${reset}\n    npx get-shit-done-cc --claude --global\n\n    ${dim}# Install for Gemini globally${reset}\n    npx get-shit-done-cc --gemini --global\n\n    ${dim}# Install for Kilo globally${reset}\n    npx get-shit-done-cc --kilo --global\n\n    ${dim}# Install for Codex globally${reset}\n    npx get-shit-done-cc --codex --global\n\n    ${dim}# Install for Copilot globally${reset}\n    npx get-shit-done-cc --copilot --global\n\n    ${dim}# Install for Copilot locally${reset}\n    npx get-shit-done-cc --copilot --local\n\n    ${dim}# Install for Antigravity globally${reset}\n    npx get-shit-done-cc --antigravity --global\n\n    ${dim}# Install for Antigravity locally${reset}\n    npx get-shit-done-cc --antigravity --local\n\n    ${dim}# Install for Cursor globally${reset}\n    npx get-shit-done-cc --cursor --global\n\n    ${dim}# Install for Cursor locally${reset}\n    npx get-shit-done-cc --cursor --local\n\n    ${dim}# Install for Windsurf globally${reset}\n    npx get-shit-done-cc --windsurf --global\n\n    ${dim}# Install for Windsurf locally${reset}\n    npx get-shit-done-cc --windsurf --local\n\n    ${dim}# Install for Augment globally${reset}\n    npx get-shit-done-cc --augment --global\n\n    ${dim}# Install for Augment locally${reset}\n    npx get-shit-done-cc --augment --local\n\n    ${dim}# Install for Trae globally${reset}\n    npx get-shit-done-cc --trae --global\n\n    ${dim}# Install for Trae locally${reset}\n    npx get-shit-done-cc --trae --local\n\n    ${dim}# Install for Cline locally${reset}\n    npx get-shit-done-cc --cline --local\n\n    ${dim}# Install for CodeBuddy globally${reset}\n    npx get-shit-done-cc --codebuddy --global\n\n    ${dim}# Install for CodeBuddy locally${reset}\n    npx get-shit-done-cc --codebuddy --local\n\n    ${dim}# Install for all runtimes globally${reset}\n    npx get-shit-done-cc --all --global\n\n    ${dim}# Install to custom config directory${reset}\n    npx get-shit-done-cc --kilo --global --config-dir ~/.kilo-work\n\n    ${dim}# Install to current project only${reset}\n    npx get-shit-done-cc --claude --local\n\n    ${dim}# Uninstall GSD from Cursor globally${reset}\n    npx get-shit-done-cc --cursor --global --uninstall\n\n  ${yellow}Notes:${reset}\n    The --config-dir option is useful when you have multiple configurations.\n    It takes priority over CLAUDE_CONFIG_DIR / OPENCODE_CONFIG_DIR / GEMINI_CONFIG_DIR / KILO_CONFIG_DIR / CODEX_HOME / COPILOT_CONFIG_DIR / ANTIGRAVITY_CONFIG_DIR / CURSOR_CONFIG_DIR / WINDSURF_CONFIG_DIR / AUGMENT_CONFIG_DIR / TRAE_CONFIG_DIR / QWEN_CONFIG_DIR / CLINE_CONFIG_DIR / CODEBUDDY_CONFIG_DIR environment variables.\n`);
+  console.log(`  ${yellow}Usage:${reset} npx get-shit-done-cc [options]\n\n  ${yellow}Options:${reset}\n    ${cyan}-g, --global${reset}              Install globally (to config directory)\n    ${cyan}-l, --local${reset}               Install locally (to current directory)\n    ${cyan}--claude${reset}                  Install for Claude Code only\n    ${cyan}--opencode${reset}                Install for OpenCode only\n    ${cyan}--gemini${reset}                  Install for Gemini only\n    ${cyan}--kilo${reset}                    Install for Kilo only\n    ${cyan}--codex${reset}                   Install for Codex only\n    ${cyan}--copilot${reset}                 Install for Copilot only\n    ${cyan}--antigravity${reset}             Install for Antigravity only\n    ${cyan}--cursor${reset}                  Install for Cursor only\n    ${cyan}--windsurf${reset}                Install for Windsurf only\n    ${cyan}--augment${reset}                 Install for Augment only\n    ${cyan}--trae${reset}                    Install for Trae only\n    ${cyan}--qwen${reset}                    Install for Qwen Code only\n    ${cyan}--cline${reset}                   Install for Cline only\n    ${cyan}--codebuddy${reset}              Install for CodeBuddy only\n    ${cyan}--kiro${reset}                    Install for Kiro only\n    ${cyan}--all${reset}                     Install for all runtimes\n    ${cyan}-u, --uninstall${reset}           Uninstall GSD (remove all GSD files)\n    ${cyan}-c, --config-dir <path>${reset}   Specify custom config directory\n    ${cyan}-h, --help${reset}                Show this help message\n    ${cyan}--force-statusline${reset}        Replace existing statusline config\n\n  ${yellow}Examples:${reset}\n    ${dim}# Interactive install (prompts for runtime and location)${reset}\n    npx get-shit-done-cc\n\n    ${dim}# Install for Claude Code globally${reset}\n    npx get-shit-done-cc --claude --global\n\n    ${dim}# Install for Gemini globally${reset}\n    npx get-shit-done-cc --gemini --global\n\n    ${dim}# Install for Kilo globally${reset}\n    npx get-shit-done-cc --kilo --global\n\n    ${dim}# Install for Codex globally${reset}\n    npx get-shit-done-cc --codex --global\n\n    ${dim}# Install for Copilot globally${reset}\n    npx get-shit-done-cc --copilot --global\n\n    ${dim}# Install for Copilot locally${reset}\n    npx get-shit-done-cc --copilot --local\n\n    ${dim}# Install for Antigravity globally${reset}\n    npx get-shit-done-cc --antigravity --global\n\n    ${dim}# Install for Antigravity locally${reset}\n    npx get-shit-done-cc --antigravity --local\n\n    ${dim}# Install for Cursor globally${reset}\n    npx get-shit-done-cc --cursor --global\n\n    ${dim}# Install for Cursor locally${reset}\n    npx get-shit-done-cc --cursor --local\n\n    ${dim}# Install for Windsurf globally${reset}\n    npx get-shit-done-cc --windsurf --global\n\n    ${dim}# Install for Windsurf locally${reset}\n    npx get-shit-done-cc --windsurf --local\n\n    ${dim}# Install for Augment globally${reset}\n    npx get-shit-done-cc --augment --global\n\n    ${dim}# Install for Augment locally${reset}\n    npx get-shit-done-cc --augment --local\n\n    ${dim}# Install for Trae globally${reset}\n    npx get-shit-done-cc --trae --global\n\n    ${dim}# Install for Trae locally${reset}\n    npx get-shit-done-cc --trae --local\n\n    ${dim}# Install for Cline locally${reset}\n    npx get-shit-done-cc --cline --local\n\n    ${dim}# Install for CodeBuddy globally${reset}\n    npx get-shit-done-cc --codebuddy --global\n\n    ${dim}# Install for CodeBuddy locally${reset}\n    npx get-shit-done-cc --codebuddy --local\n\n    ${dim}# Install for all runtimes globally${reset}\n    npx get-shit-done-cc --all --global\n\n    ${dim}# Install to custom config directory${reset}\n    npx get-shit-done-cc --kilo --global --config-dir ~/.kilo-work\n\n    ${dim}# Install to current project only${reset}\n    npx get-shit-done-cc --claude --local\n\n    ${dim}# Uninstall GSD from Cursor globally${reset}\n    npx get-shit-done-cc --cursor --global --uninstall\n\n  ${yellow}Notes:${reset}\n    The --config-dir option is useful when you have multiple configurations.\n    It takes priority over CLAUDE_CONFIG_DIR / OPENCODE_CONFIG_DIR / GEMINI_CONFIG_DIR / KILO_CONFIG_DIR / CODEX_HOME / COPILOT_CONFIG_DIR / ANTIGRAVITY_CONFIG_DIR / CURSOR_CONFIG_DIR / WINDSURF_CONFIG_DIR / AUGMENT_CONFIG_DIR / TRAE_CONFIG_DIR / QWEN_CONFIG_DIR / CLINE_CONFIG_DIR / CODEBUDDY_CONFIG_DIR environment variables.\n`);
   process.exit(0);
 }
 
@@ -1607,6 +1622,183 @@ function convertClaudeAgentToClineAgent(content) {
 }
 
 // ── End Cline converters ─────────────────────────────────────────────────────
+
+// ── Kiro converters ──────────────────────────────────────────────────────────
+// Kiro IDE/CLI uses .kiro/ (local) and ~/.kiro/ (global).
+// Kiro uses lowercase tool names: read, write, shell, grep, glob.
+
+const claudeToKiroTools = {
+  Bash: 'shell',
+  Edit: 'write',
+  Read: 'read',
+  Write: 'write',
+  Glob: 'glob',
+  Grep: 'grep',
+  AskUserQuestion: null,
+  SlashCommand: null,
+  Task: null,
+  WebSearch: 'web_search',
+  WebFetch: 'web_fetch',
+  TodoWrite: 'todo_write',
+};
+
+function convertKiroToolName(claudeTool) {
+  if (claudeTool in claudeToKiroTools) {
+    return claudeToKiroTools[claudeTool];
+  }
+  if (claudeTool.startsWith('mcp__')) {
+    return claudeTool;
+  }
+  return claudeTool.toLowerCase();
+}
+
+function convertSlashCommandsToKiroSkillMentions(content) {
+  return content.replace(/gsd:/gi, 'gsd-');
+}
+
+function convertClaudeToKiroMarkdown(content) {
+  let converted = convertSlashCommandsToKiroSkillMentions(content);
+  converted = converted.replace(/\bBash\(/g, 'shell(');
+  converted = converted.replace(/\bEdit\(/g, 'write(');
+  converted = converted.replace(/\bAskUserQuestion\b/g, 'conversational prompting');
+  converted = converted.replace(/subagent_type="general-purpose"/g, 'subagent_type="generalPurpose"');
+  converted = converted.replace(/\$ARGUMENTS\b/g, '{{GSD_ARGS}}');
+  converted = converted.replace(/`\.\/CLAUDE\.md`/g, '`.kiro/steering/`');
+  converted = converted.replace(/\.\/CLAUDE\.md/g, '.kiro/steering/');
+  converted = converted.replace(/`CLAUDE\.md`/g, '`.kiro/steering/`');
+  converted = converted.replace(/\bCLAUDE\.md\b/g, '.kiro/steering/');
+  converted = converted.replace(/\.claude\/skills\//g, '.kiro/skills/');
+  converted = converted.replace(/\.\/\.claude\//g, './.kiro/');
+  converted = converted.replace(/\.claude\//g, '.kiro/');
+  converted = converted.replace(/\*\*Known Claude Code bug \(classifyHandoffIfNeeded\):\*\*[^\n]*\n/g, '');
+  converted = converted.replace(/- \*\*classifyHandoffIfNeeded false failure:\*\*[^\n]*\n/g, '');
+  converted = converted.replace(/\bClaude Code\b/g, 'Kiro');
+  return converted;
+}
+
+function getKiroSkillAdapterHeader(skillName) {
+  return `<kiro_skill_adapter>
+## A. Skill Invocation
+- This skill is invoked when the user mentions \`${skillName}\` or describes a task matching this skill.
+- Treat all user text after the skill mention as \`{{GSD_ARGS}}\`.
+- If no arguments are present, treat \`{{GSD_ARGS}}\` as empty.
+
+## B. User Prompting
+When the workflow needs user input, prompt the user conversationally:
+- Present options as a numbered list in your response text
+- Ask the user to reply with their choice
+- For multi-select, ask for comma-separated numbers
+
+## C. Tool Usage
+Use these Kiro tools when executing GSD workflows:
+- \`shell\` for running commands (terminal operations)
+- \`write\` for editing or creating files
+- \`read\` for reading files
+- \`glob\`, \`grep\` for searching code
+- \`web_search\`, \`web_fetch\` for web queries
+
+## D. Subagent Spawning
+When the workflow needs to spawn a subagent:
+- Use the built-in agent spawning capability
+- Define agent configs in \`.kiro/agents/\` directory
+</kiro_skill_adapter>`;
+}
+
+function convertClaudeCommandToKiroSkill(content, skillName) {
+  const converted = convertClaudeToKiroMarkdown(content);
+  const { frontmatter, body } = extractFrontmatterAndBody(converted);
+  let description = `Run GSD workflow ${skillName}.`;
+  if (frontmatter) {
+    const maybeDescription = extractFrontmatterField(frontmatter, 'description');
+    if (maybeDescription) {
+      description = maybeDescription;
+    }
+  }
+  description = toSingleLine(description);
+  const shortDescription = description.length > 180 ? `${description.slice(0, 177)}...` : description;
+  const adapter = getKiroSkillAdapterHeader(skillName);
+
+  return `---\nname: ${yamlIdentifier(skillName)}\ndescription: ${yamlQuote(shortDescription)}\n---\n\n${adapter}\n\n${body.trimStart()}`;
+}
+
+function convertClaudeAgentToKiroAgent(content) {
+  let converted = convertClaudeToKiroMarkdown(content);
+
+  const { frontmatter, body } = extractFrontmatterAndBody(converted);
+  if (!frontmatter) return converted;
+
+  const name = extractFrontmatterField(frontmatter, 'name') || 'unknown';
+  const description = extractFrontmatterField(frontmatter, 'description') || '';
+
+  const cleanFrontmatter = `---\nname: ${yamlIdentifier(name)}\ndescription: ${yamlQuote(toSingleLine(description))}\n---`;
+
+  return `${cleanFrontmatter}\n${body}`;
+}
+
+/**
+ * Copy Claude commands as Kiro skills — one folder per skill with SKILL.md.
+ * Kiro uses .kiro/skills/ with YAML frontmatter (name + description).
+ */
+function copyCommandsAsKiroSkills(srcDir, skillsDir, prefix, pathPrefix, runtime) {
+  if (!fs.existsSync(srcDir)) {
+    return;
+  }
+
+  fs.mkdirSync(skillsDir, { recursive: true });
+
+  const existing = fs.readdirSync(skillsDir, { withFileTypes: true });
+  for (const entry of existing) {
+    if (entry.isDirectory() && entry.name.startsWith(`${prefix}-`)) {
+      fs.rmSync(path.join(skillsDir, entry.name), { recursive: true });
+    }
+  }
+
+  function recurse(currentSrcDir, currentPrefix) {
+    const entries = fs.readdirSync(currentSrcDir, { withFileTypes: true });
+
+    for (const entry of entries) {
+      const srcPath = path.join(currentSrcDir, entry.name);
+      if (entry.isDirectory()) {
+        recurse(srcPath, `${currentPrefix}-${entry.name}`);
+        continue;
+      }
+
+      if (!entry.name.endsWith('.md')) {
+        continue;
+      }
+
+      const baseName = entry.name.replace('.md', '');
+      const skillName = `${currentPrefix}-${baseName}`;
+      const skillDir = path.join(skillsDir, skillName);
+      fs.mkdirSync(skillDir, { recursive: true });
+
+      let content = fs.readFileSync(srcPath, 'utf8');
+      const globalClaudeRegex = /~\/\.claude\//g;
+      const globalClaudeHomeRegex = /\$HOME\/\.claude\//g;
+      const localClaudeRegex = /\.\/\.claude\//g;
+      const bareGlobalClaudeRegex = /~\/\.claude\b/g;
+      const bareGlobalClaudeHomeRegex = /\$HOME\/\.claude\b/g;
+      const bareLocalClaudeRegex = /\.\/\.claude\b/g;
+      const kiroDirRegex = /~\/\.kiro\//g;
+      const normalizedPathPrefix = pathPrefix.replace(/\/$/, '');
+      content = content.replace(globalClaudeRegex, pathPrefix);
+      content = content.replace(globalClaudeHomeRegex, pathPrefix);
+      content = content.replace(localClaudeRegex, `./${getDirName(runtime)}/`);
+      content = content.replace(bareGlobalClaudeRegex, normalizedPathPrefix);
+      content = content.replace(bareGlobalClaudeHomeRegex, normalizedPathPrefix);
+      content = content.replace(bareLocalClaudeRegex, `./${getDirName(runtime)}`);
+      content = content.replace(kiroDirRegex, pathPrefix);
+      content = processAttribution(content, getCommitAttribution(runtime));
+      content = convertClaudeCommandToKiroSkill(content, skillName);
+
+      fs.writeFileSync(path.join(skillDir, 'SKILL.md'), content);
+    }
+  }
+
+  recurse(srcDir, prefix);
+}
+
+// ── End Kiro converters ──────────────────────────────────────────────────────
 
 function convertSlashCommandsToCodexSkillMentions(content) {
   // Convert colon-style skill invocations to Codex $ prefix
@@ -4390,6 +4582,7 @@ function uninstall(isGlobal, runtime = 'claude') {
   const isTrae = runtime === 'trae';
   const isQwen = runtime === 'qwen';
   const isCodebuddy = runtime === 'codebuddy';
+  const isKiro = runtime === 'kiro';
   const dirName = getDirName(runtime);
 
   // Get the target directory based on runtime and install type
@@ -4414,6 +4607,7 @@ function uninstall(isGlobal, runtime = 'claude') {
   if (runtime === 'trae') runtimeLabel = 'Trae';
   if (runtime === 'qwen') runtimeLabel = 'Qwen Code';
   if (runtime === 'codebuddy') runtimeLabel = 'CodeBuddy';
+  if (runtime === 'kiro') runtimeLabel = 'Kiro';
 
   console.log(`  Uninstalling GSD from ${cyan}${runtimeLabel}${reset} at ${cyan}${locationLabel}${reset}\n`);
 
@@ -4440,8 +4634,8 @@ function uninstall(isGlobal, runtime = 'claude') {
       }
       console.log(`  ${green}✓${reset} Removed GSD commands from command/`);
     }
-  } else if (isCodex || isCursor || isWindsurf || isTrae || isCodebuddy) {
-    // Codex/Cursor/Windsurf/Trae/CodeBuddy: remove skills/gsd-*/SKILL.md skill directories
+  } else if (isCodex || isCursor || isWindsurf || isTrae || isCodebuddy || isKiro) {
+    // Codex/Cursor/Windsurf/Trae/CodeBuddy/Kiro: remove skills/gsd-*/SKILL.md skill directories
     const skillsDir = path.join(targetDir, 'skills');
     if (fs.existsSync(skillsDir)) {
       let skillCount = 0;
@@ -5367,6 +5561,7 @@ function install(isGlobal, runtime = 'claude') {
   const isQwen = runtime === 'qwen';
   const isCodebuddy = runtime === 'codebuddy';
   const isCline = runtime === 'cline';
+  const isKiro = runtime === 'kiro';
   const dirName = getDirName(runtime);
   const src = path.join(__dirname, '..');
 
@@ -5408,6 +5603,7 @@ function install(isGlobal, runtime = 'claude') {
   if (isQwen) runtimeLabel = 'Qwen Code';
   if (isCodebuddy) runtimeLabel = 'CodeBuddy';
   if (isCline) runtimeLabel = 'Cline';
+  if (isKiro) runtimeLabel = 'Kiro';
 
   console.log(`  Installing for ${cyan}${runtimeLabel}${reset} to ${cyan}${locationLabel}${reset}\n`);
 
@@ -5552,6 +5748,16 @@ function install(isGlobal, runtime = 'claude') {
     // Cline is rules-based — commands are embedded in .clinerules (generated below).
     // No skills/commands directory needed. Engine is installed via copyWithPathReplacement.
     console.log(`  ${green}✓${reset} Cline: commands will be available via .clinerules`);
+  } else if (isKiro) {
+    const skillsDir = path.join(targetDir, 'skills');
+    const gsdSrc = path.join(src, 'commands', 'gsd');
+    copyCommandsAsKiroSkills(gsdSrc, skillsDir, 'gsd', pathPrefix, runtime);
+    const installedSkillNames = listCodexSkillNames(skillsDir);
+    if (installedSkillNames.length > 0) {
+      console.log(`  ${green}✓${reset} Installed ${installedSkillNames.length} skills to skills/`);
+    } else {
+      failures.push('skills/gsd-*');
+    }
   } else if (isGemini) {
     const commandsDir = path.join(targetDir, 'commands');
     fs.mkdirSync(commandsDir, { recursive: true });
@@ -5689,6 +5895,8 @@ function install(isGlobal, runtime = 'claude') {
           content = convertClaudeAgentToCodebuddyAgent(content);
         } else if (isCline) {
           content = convertClaudeAgentToClineAgent(content);
+        } else if (isKiro) {
+          content = convertClaudeAgentToKiroAgent(content);
         } else if (isQwen) {
           content = content.replace(/CLAUDE\.md/g, 'QWEN.md');
           content = content.replace(/\bClaude Code\b/g, 'Qwen Code');
@@ -5726,7 +5934,7 @@ function install(isGlobal, runtime = 'claude') {
     failures.push('VERSION');
   }
 
-  if (!isCodex && !isCopilot && !isCursor && !isWindsurf && !isTrae && !isCline) {
+  if (!isCodex && !isCopilot && !isCursor && !isWindsurf && !isTrae && !isCline && !isKiro) {
     // Write package.json to force CommonJS mode for GSD scripts
     // Prevents "require is not defined" errors when project has "type": "module"
     // Node.js walks up looking for package.json - this stops inheritance from project
@@ -5946,6 +6154,11 @@ function install(isGlobal, runtime = 'claude') {
 
   if (isTrae) {
     // Trae uses skills — no settings.json hooks needed
+    return { settingsPath: null, settings: null, statuslineCommand: null, runtime, configDir: targetDir };
+  }
+
+  if (isKiro) {
+    // Kiro uses skills and steering — no settings.json hooks needed
     return { settingsPath: null, settings: null, statuslineCommand: null, runtime, configDir: targetDir };
   }
 
@@ -6260,8 +6473,9 @@ function finishInstall(settingsPath, settings, statuslineCommand, shouldInstallS
   const isWindsurf = runtime === 'windsurf';
   const isTrae = runtime === 'trae';
   const isCline = runtime === 'cline';
+  const isKiro = runtime === 'kiro';
 
-  if (shouldInstallStatusline && !isOpencode && !isKilo && !isCodex && !isCopilot && !isCursor && !isWindsurf && !isTrae) {
+  if (shouldInstallStatusline && !isOpencode && !isKilo && !isCodex && !isCopilot && !isCursor && !isWindsurf && !isTrae && !isKiro) {
     settings.statusLine = {
       type: 'command',
       command: statuslineCommand
@@ -6270,7 +6484,7 @@ function finishInstall(settingsPath, settings, statuslineCommand, shouldInstallS
   }
 
   // Write settings when runtime supports settings.json
-  if (!isCodex && !isCopilot && !isKilo && !isCursor && !isWindsurf && !isTrae && !isCline) {
+  if (!isCodex && !isCopilot && !isKilo && !isCursor && !isWindsurf && !isTrae && !isCline && !isKiro) {
     writeSettings(settingsPath, settings);
   }
 
@@ -6419,12 +6633,13 @@ function promptRuntime(callback) {
     '8': 'cursor',
     '9': 'gemini',
     '10': 'kilo',
-    '11': 'opencode',
-    '12': 'qwen',
-    '13': 'trae',
-    '14': 'windsurf'
+    '11': 'kiro',
+    '12': 'opencode',
+    '13': 'qwen',
+    '14': 'trae',
+    '15': 'windsurf'
   };
-  const allRuntimes = ['claude', 'antigravity', 'augment', 'cline', 'codebuddy', 'codex', 'copilot', 'cursor', 'gemini', 'kilo', 'opencode', 'qwen', 'trae', 'windsurf'];
+  const allRuntimes = ['claude', 'antigravity', 'augment', 'cline', 'codebuddy', 'codex', 'copilot', 'cursor', 'gemini', 'kilo', 'kiro', 'opencode', 'qwen', 'trae', 'windsurf'];
 
   console.log(`  ${yellow}Which runtime(s) would you like to install for?${reset}\n\n  ${cyan}1${reset}) Claude Code  ${dim}(~/.claude)${reset}
   ${cyan}2${reset}) Antigravity  ${dim}(~/.gemini/antigravity)${reset}
@@ -6436,11 +6651,12 @@ function promptRuntime(callback) {
   ${cyan}8${reset}) Cursor       ${dim}(~/.cursor)${reset}
   ${cyan}9${reset}) Gemini       ${dim}(~/.gemini)${reset}
   ${cyan}10${reset}) Kilo         ${dim}(~/.config/kilo)${reset}
-  ${cyan}11${reset}) OpenCode     ${dim}(~/.config/opencode)${reset}
-  ${cyan}12${reset}) Qwen Code    ${dim}(~/.qwen)${reset}
-  ${cyan}13${reset}) Trae         ${dim}(~/.trae)${reset}
-  ${cyan}14${reset}) Windsurf     ${dim}(~/.codeium/windsurf)${reset}
-  ${cyan}15${reset}) All
+  ${cyan}11${reset}) Kiro         ${dim}(~/.kiro)${reset}
+  ${cyan}12${reset}) OpenCode     ${dim}(~/.config/opencode)${reset}
+  ${cyan}13${reset}) Qwen Code    ${dim}(~/.qwen)${reset}
+  ${cyan}14${reset}) Trae         ${dim}(~/.trae)${reset}
+  ${cyan}15${reset}) Windsurf     ${dim}(~/.codeium/windsurf)${reset}
+  ${cyan}16${reset}) All
 
   ${dim}Select multiple: 1,2,6 or 1 2 6${reset}
 `);
@@ -6451,7 +6667,7 @@ function promptRuntime(callback) {
     const input = answer.trim() || '1';
 
     // "All" shortcut
-    if (input === '15') {
+    if (input === '16') {
       callback(allRuntimes);
       return;
     }
@@ -6618,6 +6834,10 @@ if (process.env.GSD_TEST_MODE) {
     copyCommandsAsCodebuddySkills,
     convertClaudeToCliineMarkdown,
     convertClaudeAgentToClineAgent,
+    convertClaudeToKiroMarkdown,
+    convertClaudeCommandToKiroSkill,
+    convertClaudeAgentToKiroAgent,
+    copyCommandsAsKiroSkills,
     writeManifest,
     reportLocalPatches,
     validateHookFields,

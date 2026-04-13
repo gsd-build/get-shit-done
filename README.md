@@ -4,7 +4,7 @@
 
 **English** · [Português](README.pt-BR.md) · [简体中文](README.zh-CN.md) · [日本語](README.ja-JP.md) · [한국어](README.ko-KR.md)
 
-**A light-weight and powerful meta-prompting, context engineering and spec-driven development system for Claude Code, OpenCode, Gemini CLI, Kilo, Codex, Copilot, Cursor, Windsurf, Antigravity, Augment, Trae, Qwen Code, Cline, and CodeBuddy.**
+**A light-weight and powerful meta-prompting, context engineering and spec-driven development system for Claude Code, OpenCode, Gemini CLI, Kilo, Kiro, Codex, Copilot, Cursor, Windsurf, Antigravity, Augment, Trae, Qwen Code, Cline, and CodeBuddy.**
 
 **Solves context rot — the quality degradation that happens as Claude fills its context window.**
 
@@ -106,12 +106,12 @@ npx get-shit-done-cc@latest
 ```
 
 The installer prompts you to choose:
-1. **Runtime** — Claude Code, OpenCode, Gemini, Kilo, Codex, Copilot, Cursor, Windsurf, Antigravity, Augment, Trae, Qwen Code, CodeBuddy, Cline, or all (interactive multi-select — pick multiple runtimes in a single install session)
+1. **Runtime** — Claude Code, OpenCode, Gemini, Kilo, Kiro, Codex, Copilot, Cursor, Windsurf, Antigravity, Augment, Trae, Qwen Code, CodeBuddy, Cline, or all (interactive multi-select — pick multiple runtimes in a single install session)
 2. **Location** — Global (all projects) or local (current project only)
 
 Verify with:
 - Claude Code / Gemini / Copilot / Antigravity / Qwen Code: `/gsd-help`
-- OpenCode / Kilo / Augment / Trae / CodeBuddy: `/gsd-help`
+- OpenCode / Kilo / Kiro / Augment / Trae / CodeBuddy: `/gsd-help`
 - Codex: `$gsd-help`
 - Cline: GSD installs via `.clinerules` — verify by checking `.clinerules` exists
 
@@ -146,6 +146,10 @@ npx get-shit-done-cc --gemini --global   # Install to ~/.gemini/
 # Kilo
 npx get-shit-done-cc --kilo --global     # Install to ~/.config/kilo/
 npx get-shit-done-cc --kilo --local      # Install to ./.kilo/
+
+# Kiro
+npx get-shit-done-cc --kiro --global     # Install to ~/.kiro/
+npx get-shit-done-cc --kiro --local      # Install to ./.kiro/
 
 # Codex
 npx get-shit-done-cc --codex --global    # Install to ~/.codex/
@@ -192,7 +196,7 @@ npx get-shit-done-cc --all --global      # Install to all directories
 ```
 
 Use `--global` (`-g`) or `--local` (`-l`) to skip the location prompt.
-Use `--claude`, `--opencode`, `--gemini`, `--kilo`, `--codex`, `--copilot`, `--cursor`, `--windsurf`, `--antigravity`, `--augment`, `--trae`, `--qwen`, `--codebuddy`, `--cline`, or `--all` to skip the runtime prompt.
+Use `--claude`, `--opencode`, `--gemini`, `--kilo`, `--kiro`, `--codex`, `--copilot`, `--cursor`, `--windsurf`, `--antigravity`, `--augment`, `--trae`, `--qwen`, `--codebuddy`, `--cline`, or `--all` to skip the runtime prompt.
 Use `--sdk` to also install the GSD SDK CLI (`gsd-sdk`) for headless autonomous execution.
 
 </details>
@@ -847,6 +851,7 @@ npx get-shit-done-cc --claude --global --uninstall
 npx get-shit-done-cc --opencode --global --uninstall
 npx get-shit-done-cc --gemini --global --uninstall
 npx get-shit-done-cc --kilo --global --uninstall
+npx get-shit-done-cc --kiro --global --uninstall
 npx get-shit-done-cc --codex --global --uninstall
 npx get-shit-done-cc --copilot --global --uninstall
 npx get-shit-done-cc --cursor --global --uninstall
@@ -863,6 +868,7 @@ npx get-shit-done-cc --claude --local --uninstall
 npx get-shit-done-cc --opencode --local --uninstall
 npx get-shit-done-cc --gemini --local --uninstall
 npx get-shit-done-cc --kilo --local --uninstall
+npx get-shit-done-cc --kiro --local --uninstall
 npx get-shit-done-cc --codex --local --uninstall
 npx get-shit-done-cc --copilot --local --uninstall
 npx get-shit-done-cc --cursor --local --uninstall
@@ -881,7 +887,7 @@ This removes all GSD commands, agents, hooks, and settings while preserving your
 
 ## Community Ports
 
-OpenCode, Gemini CLI, Kilo, and Codex are now natively supported via `npx get-shit-done-cc`.
+OpenCode, Gemini CLI, Kilo, Kiro, and Codex are now natively supported via `npx get-shit-done-cc`.
 
 These community ports pioneered multi-runtime support:
 

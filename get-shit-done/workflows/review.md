@@ -32,6 +32,7 @@ Parse flags from `$ARGUMENTS`:
 - `--opencode` → include OpenCode
 - `--qwen` → include Qwen Code
 - `--cursor` → include Cursor
+- `--kiro` → include Kiro
 - `--all` → include all available
 - No flags → include all available
 
@@ -44,6 +45,7 @@ No external AI CLIs found. Install at least one:
 - opencode: https://opencode.ai (leverages GitHub Copilot subscription models)
 - qwen: https://github.com/nicepkg/qwen-code (Alibaba Qwen models)
 - cursor: https://cursor.com (Cursor IDE agent mode)
+- kiro: https://kiro.dev (Kiro IDE / Kiro CLI)
 
 Then run /gsd-review again.
 ```
@@ -59,6 +61,9 @@ if [ "$ANTIGRAVITY_AGENT" = "1" ]; then
 elif [ -n "$CURSOR_SESSION_ID" ]; then
   # Running inside Cursor agent — skip cursor for independence
   SELF_CLI="cursor"
+elif [ -n "$KIRO_SESSION_ID" ]; then
+  # Running inside Kiro IDE/CLI — skip kiro for independence
+  SELF_CLI="kiro"
 elif [ -n "$CLAUDE_CODE_ENTRYPOINT" ]; then
   # Running inside Claude Code CLI — skip claude for independence
   SELF_CLI="claude"

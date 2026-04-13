@@ -66,6 +66,10 @@ if [ -z "$PREFERRED_RUNTIME" ]; then
     PREFERRED_RUNTIME="kilo"
   elif [ -n "$OPENCODE_CONFIG_DIR" ] || [ -n "$OPENCODE_CONFIG" ]; then
     PREFERRED_RUNTIME="opencode"
+  elif [ -n "$KIRO_CONFIG_DIR" ]; then
+    PREFERRED_RUNTIME="kiro"
+  elif [ -n "$KIRO_SESSION_ID" ]; then
+    PREFERRED_RUNTIME="kiro"
   elif [ -n "$CLAUDE_CONFIG_DIR" ]; then
     PREFERRED_RUNTIME="claude"
   else
@@ -78,7 +82,7 @@ fi
 # runtime directories.
 if [ -n "$PREFERRED_CONFIG_DIR" ] && { [ -f "$PREFERRED_CONFIG_DIR/get-shit-done/VERSION" ] || [ -f "$PREFERRED_CONFIG_DIR/get-shit-done/workflows/update.md" ]; }; then
   INSTALL_SCOPE="GLOBAL"
-  for dir in .claude .config/opencode .opencode .gemini .config/kilo .kilo .codex; do
+  for dir in .claude .config/opencode .opencode .gemini .config/kilo .kilo .kiro .codex; do
     resolved_local="$(cd "./$dir" 2>/dev/null && pwd)"
     if [ -n "$resolved_local" ] && [ "$resolved_local" = "$PREFERRED_CONFIG_DIR" ]; then
       INSTALL_SCOPE="LOCAL"
