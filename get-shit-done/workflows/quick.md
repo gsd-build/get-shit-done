@@ -49,21 +49,48 @@ Store response as `$DESCRIPTION`.
 
 If still empty, re-prompt: "Please provide a task description."
 
-Display banner based on active flags:
+**Step 1.5: Phase confirmation (interactive)**
 
-If `$FULL_MODE` (all phases enabled — `--full` or all granular flags):
+Present the current phase configuration and let the user adjust before proceeding.
+
+Build options dynamically from current phase states:
+- Always include: `{ label: "Proceed", description: "Continue with current phases" }`
+- For each **inactive** phase: an "Add" option
+- For each **active** phase: a "Remove" option
+
+| Phase | Add description | Remove description |
+|-------|----------------|--------------------|
+| Discussion | "Surface gray areas before planning" | "Skip gray area discussion" |
+| Research | "Investigate approaches before planning" | "Skip approach investigation" |
+| Plan checking + verification | "Verify plan quality and results" | "Skip quality verification" |
+
+```
+AskUserQuestion(
+  header: "Quick Task — Phase Confirmation",
+  question: "Active phases:\n${DISCUSS_MODE ? '  ✓ Discussion' : '  ✗ Discussion'}\n${RESEARCH_MODE ? '  ✓ Research' : '  ✗ Research'}\n${VALIDATE_MODE ? '  ✓ Plan checking + verification' : '  ✗ Plan checking + verification'}",
+  options: [
+    { label: "Proceed", description: "Continue with current phases" },
+    ...toggleOptions
+  ],
+  multiSelect: true
+)
+```
+
+Process response:
+- "Proceed" only (or no toggle selected) → continue unchanged
+- Each "Add/Remove" toggle flips the corresponding `$*_MODE` variable
+- Multiple toggles may be selected simultaneously
+
+**Normalize flags after confirmation:** If `$DISCUSS_MODE`, `$RESEARCH_MODE`, and `$VALIDATE_MODE` are all true (regardless of how they were set), set `$FULL_MODE=true`. If any were removed from the full set, set `$FULL_MODE=false`. This ensures `--discuss --research --validate` and `--full` always produce identical banner display and behavior.
+
+---
+
+Display banner based on active flags (first matching condition wins):
+
+If `$FULL_MODE` (all phases enabled):
 ```
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
  GSD ► QUICK TASK (FULL)
-━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-
-◆ Discussion + research + plan checking + verification enabled
-```
-
-If `$DISCUSS_MODE` and `$RESEARCH_MODE` and `$VALIDATE_MODE` (no `$FULL_MODE` — composed granularly):
-```
-━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
- GSD ► QUICK TASK (DISCUSS + RESEARCH + VALIDATE)
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
 ◆ Discussion + research + plan checking + verification enabled
@@ -792,6 +819,8 @@ Ready for next task: /gsd-quick ${GSD_WS}
 - [ ] User provides task description
 - [ ] `--full`, `--validate`, `--discuss`, and `--research` flags parsed from arguments when present
 - [ ] `--full` sets all booleans (`$FULL_MODE`, `$DISCUSS_MODE`, `$RESEARCH_MODE`, `$VALIDATE_MODE`)
+- [ ] Phase confirmation presented — user can add/remove phases before proceeding
+- [ ] Flags normalized after confirmation: all three granular flags → `$FULL_MODE=true`
 - [ ] Slug generated (lowercase, hyphens, max 40 chars)
 - [ ] Quick ID generated (YYMMDD-xxx format, 2s Base36 precision)
 - [ ] Directory created at `.planning/quick/YYMMDD-xxx-slug/`

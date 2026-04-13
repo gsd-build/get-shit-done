@@ -294,4 +294,90 @@ describe('quick workflow: banner variants for flag combinations', () => {
       'should have banner for --full (all phases enabled)'
     );
   });
+
+  test('no redundant DISCUSS + RESEARCH + VALIDATE banner (#2181)', () => {
+    content = fs.readFileSync(path.join(WORKFLOWS_DIR, 'quick.md'), 'utf-8');
+    assert.ok(
+      !content.includes('QUICK TASK (DISCUSS + RESEARCH + VALIDATE)'),
+      'should not have separate DISCUSS + RESEARCH + VALIDATE banner — normalized to FULL'
+    );
+  });
+
+  test('normalizes all-three-flags to FULL_MODE (#2181)', () => {
+    content = fs.readFileSync(path.join(WORKFLOWS_DIR, 'quick.md'), 'utf-8');
+    assert.ok(
+      content.includes('Normalize flags'),
+      'should contain flag normalization instruction'
+    );
+    assert.ok(
+      content.includes('$FULL_MODE=true'),
+      'normalization should set $FULL_MODE=true when all three granular flags are active'
+    );
+  });
+});
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Phase confirmation: interactive step before proceeding (#2180)
+// ─────────────────────────────────────────────────────────────────────────────
+
+describe('quick workflow: phase confirmation step (#2180)', () => {
+  let content;
+
+  test('has phase confirmation step', () => {
+    content = fs.readFileSync(path.join(WORKFLOWS_DIR, 'quick.md'), 'utf-8');
+    assert.ok(
+      content.includes('Phase confirmation'),
+      'should contain phase confirmation step'
+    );
+  });
+
+  test('phase confirmation uses AskUserQuestion', () => {
+    content = fs.readFileSync(path.join(WORKFLOWS_DIR, 'quick.md'), 'utf-8');
+    const confirmSection = content.substring(
+      content.indexOf('Phase confirmation'),
+      content.indexOf('Display banner')
+    );
+    assert.ok(
+      confirmSection.includes('AskUserQuestion'),
+      'phase confirmation should use AskUserQuestion for interaction'
+    );
+  });
+
+  test('phase confirmation shows active/inactive phases', () => {
+    content = fs.readFileSync(path.join(WORKFLOWS_DIR, 'quick.md'), 'utf-8');
+    const confirmSection = content.substring(
+      content.indexOf('Phase confirmation'),
+      content.indexOf('Display banner')
+    );
+    assert.ok(
+      confirmSection.includes('Discussion') &&
+      confirmSection.includes('Research') &&
+      confirmSection.includes('Plan checking + verification'),
+      'phase confirmation should list all three phases'
+    );
+  });
+
+  test('phase confirmation allows adding and removing phases', () => {
+    content = fs.readFileSync(path.join(WORKFLOWS_DIR, 'quick.md'), 'utf-8');
+    const confirmSection = content.substring(
+      content.indexOf('Phase confirmation'),
+      content.indexOf('Display banner')
+    );
+    assert.ok(
+      confirmSection.includes('Add') && confirmSection.includes('Remove'),
+      'phase confirmation should support both adding and removing phases'
+    );
+  });
+
+  test('phase confirmation includes proceed option', () => {
+    content = fs.readFileSync(path.join(WORKFLOWS_DIR, 'quick.md'), 'utf-8');
+    const confirmSection = content.substring(
+      content.indexOf('Phase confirmation'),
+      content.indexOf('Display banner')
+    );
+    assert.ok(
+      confirmSection.includes('Proceed'),
+      'phase confirmation should have a Proceed option'
+    );
+  });
 });
