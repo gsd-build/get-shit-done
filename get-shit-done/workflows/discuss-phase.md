@@ -171,6 +171,13 @@ Exit workflow.
 - Read and execute @~/.claude/get-shit-done/workflows/discuss-phase-power.md end-to-end
 - Do not continue with the steps below
 
+**All mode** — If `--all` is present in ARGUMENTS:
+- In `present_gray_areas`: auto-select ALL gray areas without asking the user (skips the AskUserQuestion selection step)
+- Discussion for each area proceeds fully interactively (user drives the conversation for every area)
+- Does NOT auto-advance to plan-phase afterward — use `--chain` or `--auto` if you want auto-advance
+- Log: `[--all] Auto-selected all gray areas: [list area names].`
+- This is the "discuss everything" shortcut: skip the selection friction, keep full interactive control
+
 **Auto mode** — If `--auto` is present in ARGUMENTS:
 - In `check_existing`: auto-select "Skip" (if context exists) or continue without prompting (if no context/plans)
 - In `present_gray_areas`: auto-select ALL gray areas without asking the user
@@ -522,7 +529,7 @@ We'll clarify HOW to implement this.
 - [Decision from Phase M that applies here]
 ```
 
-**If `--auto`:** Auto-select ALL gray areas. Log: `[auto] Selected all gray areas: [list area names].` Skip the AskUserQuestion below and continue directly to discuss_areas with all areas selected.
+**If `--auto` or `--all`:** Auto-select ALL gray areas. Log: `[--auto/--all] Selected all gray areas: [list area names].` Skip the AskUserQuestion below and continue directly to discuss_areas with all areas selected.
 
 **Otherwise, use AskUserQuestion (multiSelect: true):**
 - header: "Discuss"
@@ -1130,7 +1137,7 @@ node "$HOME/.claude/get-shit-done/bin/gsd-tools.cjs" commit "docs(state): record
 <step name="auto_advance">
 Check for auto-advance trigger:
 
-1. Parse `--auto` and `--chain` flags from $ARGUMENTS
+1. Parse `--auto` and `--chain` flags from $ARGUMENTS. Note: --all is NOT an auto-advance trigger — it only affects area selection. A session with `--all` but without `--auto` or `--chain` returns to manual next-steps after discussion completes.
 2. **Sync chain flag with intent** — if user invoked manually (no `--auto` and no `--chain`), clear the ephemeral chain flag from any previous interrupted `--auto` chain. This does NOT touch `workflow.auto_advance` (the user's persistent settings preference):
    ```bash
    if [[ ! "$ARGUMENTS" =~ --auto ]] && [[ ! "$ARGUMENTS" =~ --chain ]]; then

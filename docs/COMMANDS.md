@@ -98,6 +98,7 @@ Capture implementation decisions before planning.
 
 | Flag | Description |
 |------|-------------|
+| `--all` | Skip area selection — discuss all gray areas interactively (no auto-advance) |
 | `--auto` | Auto-select recommended defaults for all questions |
 | `--batch` | Group questions for batch intake instead of one-by-one |
 | `--analyze` | Add trade-off analysis during discussion |
@@ -108,6 +109,7 @@ Capture implementation decisions before planning.
 
 ```bash
 /gsd-discuss-phase 1                # Interactive discussion for phase 1
+/gsd-discuss-phase 1 --all          # Discuss all gray areas without selection step
 /gsd-discuss-phase 3 --auto         # Auto-select defaults for phase 3
 /gsd-discuss-phase --batch          # Batch mode for current phase
 /gsd-discuss-phase 2 --analyze      # Discussion with trade-off analysis
