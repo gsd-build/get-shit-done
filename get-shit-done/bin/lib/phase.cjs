@@ -712,7 +712,7 @@ function cmdPhaseRemove(cwd, targetPhase, options, raw) {
   let renamedDirs = [], renamedFiles = [];
   try {
     const renamed = isDecimal
-      ? renameDecimalPhases(phasesDir, normalized.split('.')[0], parseInt(normalized.split('.')[1], 10))
+      ? renameDecimalPhases(phasesDir, parseInt(normalized.split('.')[0], 10), parseInt(normalized.split('.')[1], 10))
       : renameIntegerPhases(phasesDir, parseInt(normalized, 10));
     renamedDirs = renamed.renamedDirs;
     renamedFiles = renamed.renamedFiles;
