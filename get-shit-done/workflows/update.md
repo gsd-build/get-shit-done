@@ -361,6 +361,88 @@ Use AskUserQuestion:
 **If user cancels:** Exit.
 </step>
 
+<step name="backup_custom_files">
+Before running the installer, detect and back up any user-added files inside
+GSD-managed directories. These are files that exist on disk but are NOT listed
+in `gsd-file-manifest.json` — i.e., files the user added themselves that the
+installer does not know about and will delete during the wipe.
+
+**Do not use bash path-stripping (`${filepath#$RUNTIME_DIR/}`) or `node -e require()`
+inline** — those patterns fail when `$RUNTIME_DIR` is unset and the stripped
+relative path may not match manifest key format, which causes CUSTOM_COUNT=0
+even when custom files exist (bug #1997). Use `gsd-tools detect-custom-files`
+instead, which resolves paths reliably with Node.js `path.relative()`.
+
+First, resolve the config directory (`RUNTIME_DIR`) from the install scope
+detected in `get_installed_version`:
+
+```bash
+# RUNTIME_DIR is the resolved config directory (e.g. ~/.claude, ~/.config/opencode)
+# It should already be set from get_installed_version as GLOBAL_DIR or LOCAL_DIR.
+# Use the appropriate variable based on INSTALL_SCOPE.
+if [ "$INSTALL_SCOPE" = "LOCAL" ]; then
+  RUNTIME_DIR="$LOCAL_DIR"
+elif [ "$INSTALL_SCOPE" = "GLOBAL" ]; then
+  RUNTIME_DIR="$GLOBAL_DIR"
+else
+  RUNTIME_DIR=""
+fi
+```
+
+If `RUNTIME_DIR` is empty or does not exist, skip this step (no config dir to
+inspect).
+
+Otherwise, resolve the path to `gsd-tools.cjs` and run:
+
+```bash
+GSD_TOOLS="$RUNTIME_DIR/get-shit-done/bin/gsd-tools.cjs"
+if [ -f "$GSD_TOOLS" ] && [ -n "$RUNTIME_DIR" ]; then
+  CUSTOM_JSON=$(node "$GSD_TOOLS" detect-custom-files --config-dir "$RUNTIME_DIR" 2>/dev/null)
+  CUSTOM_COUNT=$(echo "$CUSTOM_JSON" | node -e "process.stdin.resume();let d='';process.stdin.on('data',c=>d+=c);process.stdin.on('end',()=>{try{console.log(JSON.parse(d).custom_count);}catch{console.log(0);}})" 2>/dev/null || echo "0")
+else
+  CUSTOM_COUNT=0
+  CUSTOM_JSON='{"custom_files":[],"custom_count":0}'
+fi
+```
+
+**If `CUSTOM_COUNT` > 0:**
+
+Back up each custom file to `$RUNTIME_DIR/gsd-user-files-backup/` before the
+installer wipes the directories:
+
+```bash
+BACKUP_DIR="$RUNTIME_DIR/gsd-user-files-backup"
+mkdir -p "$BACKUP_DIR"
+
+# Parse custom_files array from CUSTOM_JSON and copy each file
+node - "$RUNTIME_DIR" "$BACKUP_DIR" "$CUSTOM_JSON" <<'JSEOF'
+const [,, runtimeDir, backupDir, customJson] = process.argv;
+const { custom_files } = JSON.parse(customJson);
+const fs = require('fs');
+const path = require('path');
+for (const relPath of custom_files) {
+  const src = path.join(runtimeDir, relPath);
+  const dst = path.join(backupDir, relPath);
+  if (fs.existsSync(src)) {
+    fs.mkdirSync(path.dirname(dst), { recursive: true });
+    fs.copyFileSync(src, dst);
+    console.log('  Backed up: ' + relPath);
+  }
+}
+JSEOF
+```
+
+Then inform the user:
+
+```
+⚠️  Found N custom file(s) inside GSD-managed directories.
+    These have been backed up to gsd-user-files-backup/ before the update.
+    Restore them after the update if needed.
+```
+
+**If `CUSTOM_COUNT` == 0:** No user-added files detected. Continue to install.
+</step>
+
 <step name="run_update">
 Run the update using the install type detected in step 1:
 
