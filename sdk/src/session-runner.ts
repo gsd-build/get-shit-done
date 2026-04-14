@@ -277,7 +277,7 @@ export async function runPhaseStepSession(
   const cwd = options?.cwd ?? process.cwd();
 
   const queryStream = query({
-    prompt: prompt,
+    prompt: `Execute this phase step: ${phaseStep}`,
     options: {
       systemPrompt: {
         type: 'preset',
