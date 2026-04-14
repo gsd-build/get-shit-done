@@ -254,6 +254,30 @@ describe('install.js source correctness', () => {
       'install should warn about missing .sh hooks after verification'
     );
   });
+
+  test('.sh hook sources carry gsd-hook-version template placeholder', () => {
+    // Shell hooks must ship a version header so gsd-check-update.js can
+    // detect staleness after updates (mirrors the .js convention).
+    const hooksSrcDir = path.join(__dirname, '..', 'hooks');
+    for (const sh of EXPECTED_SH_HOOKS) {
+      const content = fs.readFileSync(path.join(hooksSrcDir, sh), 'utf8');
+      assert.ok(
+        content.includes('# gsd-hook-version: {{GSD_VERSION}}'),
+        `${sh} should include the gsd-hook-version template placeholder`
+      );
+    }
+  });
+
+  test('install.js substitutes {{GSD_VERSION}} in .sh hooks', () => {
+    // The .sh install branch must perform template substitution so the
+    // shipped hook files carry a concrete version string, not the literal
+    // placeholder.
+    const shBranchRegex = /entry\.endsWith\(['"]\.sh['"]\)[\s\S]{0,400}?GSD_VERSION/;
+    assert.ok(
+      shBranchRegex.test(src),
+      'install.js .sh branch should substitute {{GSD_VERSION}}'
+    );
+  });
 });
 
 // ─────────────────────────────────────────────────────────────────────────────

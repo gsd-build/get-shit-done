@@ -6,6 +6,9 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ## [Unreleased]
 
+### Fixed
+- **Shell hooks falsely flagged as stale** — `gsd-phase-boundary.sh`, `gsd-session-state.sh`, and `gsd-validate-commit.sh` now ship with a `gsd-hook-version` header, and the installer substitutes `{{GSD_VERSION}}` in `.sh` hooks the same way it does for `.js` hooks. Resolves the "⚠ stale hooks — run /gsd-update" warning on fresh installs (#2136, #2206, #2209, #2210, #2212)
+
 ## [1.36.0] - 2026-04-14
 
 ### Added

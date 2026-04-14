@@ -5761,10 +5761,16 @@ function install(isGlobal, runtime = 'claude') {
             // Ensure hook files are executable (fixes #1162 — missing +x permission)
             try { fs.chmodSync(destFile, 0o755); } catch (e) { /* Windows doesn't support chmod */ }
           } else {
-            fs.copyFileSync(srcFile, destFile);
-            // Ensure .sh hook files are executable (mirrors chmod in build-hooks.js)
+            // Non-.js hooks: .sh hooks also carry a gsd-hook-version header so
+            // gsd-check-update.js can detect staleness after updates — stamp the
+            // version in the same way we do for .js hooks.
             if (entry.endsWith('.sh')) {
+              let content = fs.readFileSync(srcFile, 'utf8');
+              content = content.replace(/\{\{GSD_VERSION\}\}/g, pkg.version);
+              fs.writeFileSync(destFile, content);
               try { fs.chmodSync(destFile, 0o755); } catch (e) { /* Windows doesn't support chmod */ }
+            } else {
+              fs.copyFileSync(srcFile, destFile);
             }
           }
         }
@@ -5876,9 +5882,13 @@ function install(isGlobal, runtime = 'claude') {
           fs.writeFileSync(destFile, content);
           try { fs.chmodSync(destFile, 0o755); } catch (e) { /* Windows */ }
         } else {
-          fs.copyFileSync(srcFile, destFile);
           if (entry.endsWith('.sh')) {
+            let content = fs.readFileSync(srcFile, 'utf8');
+            content = content.replace(/\{\{GSD_VERSION\}\}/g, pkg.version);
+            fs.writeFileSync(destFile, content);
             try { fs.chmodSync(destFile, 0o755); } catch (e) { /* Windows */ }
+          } else {
+            fs.copyFileSync(srcFile, destFile);
           }
         }
       }
