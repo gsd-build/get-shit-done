@@ -103,7 +103,7 @@ const child = spawn(process.execPath, ['-e', `
         for (const hookFile of hookFiles) {
           try {
             const content = fs.readFileSync(path.join(hooksDir, hookFile), 'utf8');
-            const versionMatch = content.match(/\\/\\/ gsd-hook-version:\\s*(.+)/);
+            const versionMatch = content.match(/(?:\/\/|#) gsd-hook-version:\s*(.+)/);
             if (versionMatch) {
               const hookVersion = versionMatch[1].trim();
               if (isNewer(installed, hookVersion) && !hookVersion.includes('{{')) {
