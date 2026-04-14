@@ -238,6 +238,12 @@ function cmdInitPlanPhase(cwd, phase, raw, options = {}) {
     nyquist_validation_enabled: config.nyquist_validation,
     commit_docs: config.commit_docs,
     text_mode: config.text_mode,
+    // Auto-advance config — included so workflows don't need separate config-get
+    // calls for these values, which causes infinite config-read loops on some models
+    // (e.g. Kimi K2.5). See #2192.
+    auto_advance: !!(config.auto_advance),
+    auto_chain_active: !!(config._auto_chain_active),
+    mode: config.mode || 'interactive',
 
     // Phase info
     phase_found: !!phaseInfo,

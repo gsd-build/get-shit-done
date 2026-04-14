@@ -1145,20 +1145,20 @@ Route to `<offer_next>` OR `auto_advance` depending on flags/config.
 
 ## 15. Auto-Advance Check
 
-Check for auto-advance trigger:
+Check for auto-advance trigger using values already loaded in step 1:
 
 1. Parse `--auto` and `--chain` flags from $ARGUMENTS
-2. **Sync chain flag with intent** — if user invoked manually (no `--auto` and no `--chain`), clear the ephemeral chain flag from any previous interrupted `--auto` chain. This does NOT touch `workflow.auto_advance` (the user's persistent settings preference):
+2. Use `auto_chain_active` and `auto_advance` from the INIT JSON parsed in step 1 — **do not issue additional `config-get` calls for these values** (they are already present in the init output). Issuing redundant `config-get` calls for values already in INIT can cause infinite read loops on some runtimes.
+3. **Sync chain flag with intent** — if user invoked manually (no `--auto` and no `--chain`), clear the ephemeral chain flag from any previous interrupted `--auto` chain. This does NOT touch `workflow.auto_advance` (the user's persistent settings preference):
    ```bash
    if [[ ! "$ARGUMENTS" =~ --auto ]] && [[ ! "$ARGUMENTS" =~ --chain ]]; then
      node "$HOME/.claude/get-shit-done/bin/gsd-tools.cjs" config-set workflow._auto_chain_active false 2>/dev/null
    fi
    ```
-3. Read both the chain flag and user preference:
-   ```bash
-   AUTO_CHAIN=$(node "$HOME/.claude/get-shit-done/bin/gsd-tools.cjs" config-get workflow._auto_chain_active 2>/dev/null || echo "false")
-   AUTO_CFG=$(node "$HOME/.claude/get-shit-done/bin/gsd-tools.cjs" config-get workflow.auto_advance 2>/dev/null || echo "false")
-   ```
+
+Set local variables from INIT (parsed once in step 1):
+- `AUTO_CHAIN` = `auto_chain_active` from INIT JSON (boolean, default false)
+- `AUTO_CFG` = `auto_advance` from INIT JSON (boolean, default false)
 
 **If `--auto` or `--chain` flag present AND `AUTO_CHAIN` is not true:** Persist chain flag to config (handles direct invocation without prior discuss-phase):
 ```bash
