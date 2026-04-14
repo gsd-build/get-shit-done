@@ -38,6 +38,7 @@ const { execFileSync } = require('child_process');
 
 const HOOKS_DIR = path.join(__dirname, '..', 'hooks');
 const CHECK_UPDATE_FILE = path.join(HOOKS_DIR, 'gsd-check-update.js');
+const WORKER_FILE = path.join(HOOKS_DIR, 'gsd-check-update-worker.js');
 const INSTALL_SCRIPT = path.join(__dirname, '..', 'bin', 'install.js');
 const BUILD_SCRIPT = path.join(__dirname, '..', 'scripts', 'build-hooks.js');
 
@@ -106,26 +107,27 @@ describe('bug #2136 part 1: bash hook sources carry gsd-hook-version placeholder
 });
 
 // ─────────────────────────────────────────────────────────────────────────────
-// Part 2: gsd-check-update.js regex handles bash "#" comment syntax
+// Part 2: gsd-check-update-worker.js regex handles bash "#" comment syntax
+// (Logic moved from inline -e template literal to dedicated worker file)
 // ─────────────────────────────────────────────────────────────────────────────
 
 describe('bug #2136 part 2: stale-hook detector handles bash comment syntax', () => {
   let src;
 
   before(() => {
-    src = fs.readFileSync(CHECK_UPDATE_FILE, 'utf8');
+    src = fs.readFileSync(WORKER_FILE, 'utf8');
   });
 
   test('version regex in source matches "#" comment syntax in addition to "//"', () => {
     // The regex string in the source must contain the alternation for "#".
-    // We check for the presence of the bash-comment alternative — the exact
-    // form is "(?:\/\/|#)" or its template-literal escaped equivalent.
+    // The worker uses plain JS (no template-literal escaping), so the form is
+    // "(?:\/\/|#)" directly in source.
     const hasBashAlternative =
-      src.includes('(?:\\/\\/|#)') ||     // escaped form inside template literal
-      src.includes('(?:\/\/|#)');          // direct form in source
+      src.includes('(?:\\/\\/|#)') ||     // escaped form (old template-literal style)
+      src.includes('(?:\/\/|#)');          // direct form in plain JS worker
     assert.ok(
       hasBashAlternative,
-      'gsd-check-update.js version regex must include an alternative for bash "#" comments. ' +
+      'gsd-check-update-worker.js version regex must include an alternative for bash "#" comments. ' +
       'Expected to find (?:\\/\\/|#) or (?:\/\/|#) in the source. ' +
       'The original "//" only regex causes bash hooks to always report hookVersion: "unknown"'
     );
@@ -139,7 +141,7 @@ describe('bug #2136 part 2: stale-hook detector handles bash comment syntax', ()
     // We verify that the old exact string no longer appears.
     assert.ok(
       !src.includes('\\/\\/ gsd-hook-version'),
-      'gsd-check-update.js must not use the old JS-only (\\/\\/ gsd-hook-version) ' +
+      'gsd-check-update-worker.js must not use the old JS-only (\\/\\/ gsd-hook-version) ' +
       'escape form as the sole version matcher — it cannot match bash "#" comments'
     );
   });
@@ -154,7 +156,7 @@ describe('bug #2136 part 2: stale-hook detector handles bash comment syntax', ()
     // our expectation and run the regex itself.
     assert.ok(
       src.includes('gsd-hook-version'),
-      'gsd-check-update.js must contain a gsd-hook-version version check'
+      'gsd-check-update-worker.js must contain a gsd-hook-version version check'
     );
 
     // The fixed regex that must be present: matches both comment styles

@@ -18,7 +18,9 @@ const fs = require('fs');
 const path = require('path');
 
 const HOOKS_DIR = path.join(__dirname, '..', 'hooks');
-const CHECK_UPDATE_FILE = path.join(HOOKS_DIR, 'gsd-check-update.js');
+// MANAGED_HOOKS now lives in the worker script (extracted from inline -e code
+// to avoid template-literal regex-escaping concerns). The test reads the worker.
+const MANAGED_HOOKS_FILE = path.join(HOOKS_DIR, 'gsd-check-update-worker.js');
 
 describe('bug #2136: MANAGED_HOOKS must include all shipped hook files', () => {
   let src;
@@ -26,12 +28,12 @@ describe('bug #2136: MANAGED_HOOKS must include all shipped hook files', () => {
   let shippedHooks;
 
   // Read once — all tests share the same source snapshot
-  src = fs.readFileSync(CHECK_UPDATE_FILE, 'utf-8');
+  src = fs.readFileSync(MANAGED_HOOKS_FILE, 'utf-8');
 
   // Extract the MANAGED_HOOKS array entries from the source
   // The array is defined as a multi-line array literal of quoted strings
   const match = src.match(/const MANAGED_HOOKS\s*=\s*\[([\s\S]*?)\]/);
-  assert.ok(match, 'MANAGED_HOOKS array not found in gsd-check-update.js');
+  assert.ok(match, 'MANAGED_HOOKS array not found in gsd-check-update-worker.js');
 
   managedHooks = match[1]
     .split('\n')
@@ -47,7 +49,7 @@ describe('bug #2136: MANAGED_HOOKS must include all shipped hook files', () => {
     for (const hookFile of jsHooks) {
       assert.ok(
         managedHooks.includes(hookFile),
-        `${hookFile} is shipped in hooks/ but missing from MANAGED_HOOKS in gsd-check-update.js`
+        `${hookFile} is shipped in hooks/ but missing from MANAGED_HOOKS in gsd-check-update-worker.js`
       );
     }
   });
@@ -57,7 +59,7 @@ describe('bug #2136: MANAGED_HOOKS must include all shipped hook files', () => {
     for (const hookFile of shHooks) {
       assert.ok(
         managedHooks.includes(hookFile),
-        `${hookFile} is shipped in hooks/ but missing from MANAGED_HOOKS in gsd-check-update.js`
+        `${hookFile} is shipped in hooks/ but missing from MANAGED_HOOKS in gsd-check-update-worker.js`
       );
     }
   });

@@ -1071,8 +1071,10 @@ describe('stale hook filter', () => {
 
 describe('stale hook path', () => {
   test('gsd-check-update.js checks configDir/hooks/ where hooks are actually installed (#1421)', () => {
+    // The stale-hook scan logic lives in the worker (moved from inline -e template literal).
+    // The worker receives configDir via env and constructs the hooksDir path.
     const content = fs.readFileSync(
-      path.join(__dirname, '..', 'hooks', 'gsd-check-update.js'), 'utf-8'
+      path.join(__dirname, '..', 'hooks', 'gsd-check-update-worker.js'), 'utf-8'
     );
     // Hooks are installed at configDir/hooks/ (e.g. ~/.claude/hooks/),
     // not configDir/get-shit-done/hooks/ which doesn't exist (#1421)
