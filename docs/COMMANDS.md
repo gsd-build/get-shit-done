@@ -482,8 +482,13 @@ Retroactively audit and fill Nyquist validation gaps.
 
 Show status and next steps.
 
+| Flag | Description |
+|------|-------------|
+| `--forensic` | Append a 6-check integrity audit after the standard report (STATE consistency, orphaned handoffs, deferred scope drift, memory-flagged pending work, blocking todos, uncommitted code) |
+
 ```bash
 /gsd-progress                       # "Where am I? What's next?"
+/gsd-progress --forensic            # Standard report + integrity audit
 ```
 
 ### `/gsd-resume-work`
