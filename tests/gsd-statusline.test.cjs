@@ -247,3 +247,78 @@ describe('readGsdState', () => {
     assert.deepEqual(s, {});
   });
 });
+
+// ─── CLAUDE_CODE_AUTO_COMPACT_WINDOW context meter (#2219) ──────────────────
+
+describe('context meter respects CLAUDE_CODE_AUTO_COMPACT_WINDOW (#2219)', () => {
+  const { execFileSync } = require('node:child_process');
+  const hookPath = path.join(__dirname, '..', 'hooks', 'gsd-statusline.js');
+
+  /**
+   * Run the statusline hook with a synthetic context_window payload and
+   * return the used_pct written to the bridge file.
+   */
+  function runHook(remainingPct, totalTokens, acwEnv) {
+    const sessionId = `test-2219-${Date.now()}-${Math.random().toString(36).slice(2)}`;
+    const payload = JSON.stringify({
+      model: { display_name: 'Claude' },
+      workspace: { current_dir: os.tmpdir() },
+      session_id: sessionId,
+      context_window: {
+        remaining_percentage: remainingPct,
+        total_tokens: totalTokens,
+      },
+    });
+
+    const env = { ...process.env };
+    if (acwEnv != null) {
+      env.CLAUDE_CODE_AUTO_COMPACT_WINDOW = String(acwEnv);
+    } else {
+      delete env.CLAUDE_CODE_AUTO_COMPACT_WINDOW;
+    }
+
+    try {
+      execFileSync(process.execPath, [hookPath], {
+        input: payload,
+        env,
+        timeout: 4000,
+      });
+    } catch (e) {
+      // Non-zero exit is fine — hook exits 0 on success, but we're reading
+      // the bridge file, not the exit code. Ignore exit failures here.
+    }
+
+    const bridgePath = path.join(os.tmpdir(), `claude-ctx-${sessionId}.json`);
+    const bridge = JSON.parse(fs.readFileSync(bridgePath, 'utf8'));
+    fs.unlinkSync(bridgePath);
+    return bridge.used_pct;
+  }
+
+  test('default buffer (no env var): 50% remaining → ~60% used', () => {
+    // Default 16.5% buffer: usableRemaining = (50 - 16.5) / (100 - 16.5) * 100 ≈ 40.12%
+    // used ≈ 100 - 40.12 = 59.88 → rounded 60
+    const used = runHook(50, 1_000_000, null);
+    assert.strictEqual(used, 60);
+  });
+
+  test('CLAUDE_CODE_AUTO_COMPACT_WINDOW=400000: 50% remaining → ~83% used', () => {
+    // With 1M total, 400k window → buffer = 40%. usableRemaining = (50 - 40) / (100 - 40) * 100 ≈ 16.67%
+    // used ≈ 100 - 16.67 = 83.33 → rounded 83
+    const used = runHook(50, 1_000_000, 400_000);
+    assert.strictEqual(used, 83);
+  });
+
+  test('CLAUDE_CODE_AUTO_COMPACT_WINDOW=0 falls back to default buffer', () => {
+    // Explicit "0" means unset — should behave like no env var (16.5% buffer)
+    const used = runHook(50, 1_000_000, 0);
+    assert.strictEqual(used, 60);
+  });
+
+  test('buffer capped at 100% when ACW exceeds total context', () => {
+    // Pathological: ACW > totalCtx → buffer = 100%. With no usable range left,
+    // usableRemaining = max(0, (50-100)/(100-100)*100) = max(0, -Inf) = 0,
+    // so used = 100 (context reported as completely full).
+    const used = runHook(50, 1_000_000, 2_000_000);
+    assert.strictEqual(used, 100);
+  });
+});
