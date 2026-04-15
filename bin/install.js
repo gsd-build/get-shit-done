@@ -573,6 +573,27 @@ function writeSettings(settingsPath, settings) {
   fs.writeFileSync(settingsPath, JSON.stringify(settings, null, 2) + '\n');
 }
 
+/**
+ * Read model_overrides from ~/.gsd/defaults.json at install time.
+ * Returns an object mapping agent names to model IDs, or null if the file
+ * doesn't exist or has no model_overrides entry.
+ * Used by Codex TOML and OpenCode agent file generators to embed per-agent
+ * model assignments so that model_overrides is respected on non-Claude runtimes (#2256).
+ */
+function readGsdGlobalModelOverrides() {
+  try {
+    const defaultsPath = path.join(os.homedir(), '.gsd', 'defaults.json');
+    if (!fs.existsSync(defaultsPath)) return null;
+    const raw = fs.readFileSync(defaultsPath, 'utf-8');
+    const parsed = JSON.parse(raw);
+    const overrides = parsed.model_overrides;
+    if (!overrides || typeof overrides !== 'object') return null;
+    return overrides;
+  } catch {
+    return null;
+  }
+}
+
 // Cache for attribution settings (populated once per runtime during install)
 const attributionCache = new Map();
 
@@ -1732,7 +1753,7 @@ purpose: ${toSingleLine(description)}
  * Sets required agent metadata, sandbox_mode, and developer_instructions
  * from the agent markdown content.
  */
-function generateCodexAgentToml(agentName, agentContent) {
+function generateCodexAgentToml(agentName, agentContent, modelOverrides = null) {
   const sandboxMode = CODEX_AGENT_SANDBOX[agentName] || 'read-only';
   const { frontmatter, body } = extractFrontmatterAndBody(agentContent);
   const frontmatterText = frontmatter || '';
@@ -1746,12 +1767,22 @@ function generateCodexAgentToml(agentName, agentContent) {
     `name = ${JSON.stringify(resolvedName)}`,
     `description = ${JSON.stringify(resolvedDescription)}`,
     `sandbox_mode = "${sandboxMode}"`,
-    // Agent prompts contain raw backslashes in regexes and shell snippets.
-    // TOML literal multiline strings preserve them without escape parsing.
-    `developer_instructions = '''`,
-    instructions,
-    `'''`,
   ];
+
+  // Embed model override when configured in ~/.gsd/defaults.json so that
+  // model_overrides is respected on Codex (which uses static TOML, not inline
+  // Task() model parameters). See #2256.
+  const modelOverride = modelOverrides?.[resolvedName] || modelOverrides?.[agentName];
+  if (modelOverride) {
+    lines.push(`model = ${JSON.stringify(modelOverride)}`);
+  }
+
+  // Agent prompts contain raw backslashes in regexes and shell snippets.
+  // TOML literal multiline strings preserve them without escape parsing.
+  lines.push(`developer_instructions = '''`);
+  lines.push(instructions);
+  lines.push(`'''`);
+
   return lines.join('\n') + '\n';
 }
 
@@ -2975,7 +3006,10 @@ function installCodexConfig(targetDir, agentsSrc) {
 
     agents.push({ name, description: toSingleLine(description) });
 
-    const tomlContent = generateCodexAgentToml(name, content);
+    // Pass model overrides from ~/.gsd/defaults.json so Codex TOML files
+    // embed the configured model — Codex cannot receive model inline (#2256).
+    const modelOverrides = readGsdGlobalModelOverrides();
+    const tomlContent = generateCodexAgentToml(name, content, modelOverrides);
     fs.writeFileSync(path.join(agentsTomlDir, `${name}.toml`), tomlContent);
   }
 
@@ -3129,7 +3163,7 @@ function convertClaudeToGeminiAgent(content) {
   return `---\n${newFrontmatter}\n---${stripSubTags(neutralBody)}`;
 }
 
-function convertClaudeToOpencodeFrontmatter(content, { isAgent = false } = {}) {
+function convertClaudeToOpencodeFrontmatter(content, { isAgent = false, modelOverride = null } = {}) {
   // Replace tool name references in content (applies to all files)
   let convertedContent = content;
   convertedContent = convertedContent.replace(/\bAskUserQuestion\b/g, 'question');
@@ -3264,6 +3298,12 @@ function convertClaudeToOpencodeFrontmatter(content, { isAgent = false } = {}) {
   // use its default model for subagents. See #1156.
   if (isAgent) {
     newLines.push('mode: subagent');
+    // Embed model override from ~/.gsd/defaults.json so model_overrides is
+    // respected on OpenCode (which uses static agent frontmatter, not inline
+    // Task() model parameters). See #2256.
+    if (modelOverride) {
+      newLines.push(`model: ${modelOverride}`);
+    }
   }
 
   // For commands: add tools object if we had allowed-tools or tools
@@ -5666,7 +5706,11 @@ function install(isGlobal, runtime = 'claude') {
         content = processAttribution(content, getCommitAttribution(runtime));
         // Convert frontmatter for runtime compatibility (agents need different handling)
         if (isOpencode) {
-          content = convertClaudeToOpencodeFrontmatter(content, { isAgent: true });
+          // Resolve per-agent model override from ~/.gsd/defaults.json (#2256)
+          const _ocAgentName = entry.name.replace(/\.md$/, '');
+          const _ocModelOverrides = readGsdGlobalModelOverrides();
+          const _ocModelOverride = _ocModelOverrides?.[_ocAgentName] || null;
+          content = convertClaudeToOpencodeFrontmatter(content, { isAgent: true, modelOverride: _ocModelOverride });
         } else if (isKilo) {
           content = convertClaudeToKiloFrontmatter(content, { isAgent: true });
         } else if (isGemini) {
