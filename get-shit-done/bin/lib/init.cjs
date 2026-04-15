@@ -1658,14 +1658,14 @@ function buildSkillManifest(cwd, skillsDir = null) {
       kind: 'skills',
     },
     {
-      root: '~/.claude/get-shit-done/skills',
+      root: '.claude/get-shit-done/skills',
       path: path.join(os.homedir(), '.claude', 'get-shit-done', 'skills'),
       scope: 'import-only',
       kind: 'skills',
       deprecated: true,
     },
     {
-      root: '~/.claude/commands/gsd',
+      root: '.claude/commands/gsd',
       path: path.join(os.homedir(), '.claude', 'commands', 'gsd'),
       scope: 'legacy-commands',
       kind: 'commands',

@@ -97,7 +97,7 @@ describe('skill-manifest', () => {
         deprecated: importedSkill.deprecated,
       },
       {
-        root: '~/.claude/get-shit-done/skills',
+        root: '.claude/get-shit-done/skills',
         scope: 'import-only',
         installed: false,
         deprecated: true,
