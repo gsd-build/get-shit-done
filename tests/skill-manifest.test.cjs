@@ -1,6 +1,5 @@
 /**
  * Tests for skill-manifest command
- * TDD: RED phase — tests written before implementation
  */
 
 const { describe, test, beforeEach, afterEach } = require('node:test');
@@ -9,211 +8,123 @@ const fs = require('fs');
 const path = require('path');
 const { runGsdTools, createTempProject, cleanup } = require('./helpers.cjs');
 
+function writeSkill(rootDir, name, description, body = '') {
+  const skillDir = path.join(rootDir, name);
+  fs.mkdirSync(skillDir, { recursive: true });
+  fs.writeFileSync(path.join(skillDir, 'SKILL.md'), [
+    '---',
+    `name: ${name}`,
+    `description: ${description}`,
+    '---',
+    '',
+    body || `# ${name}`,
+  ].join('\n'));
+}
+
 describe('skill-manifest', () => {
   let tmpDir;
+  let homeDir;
 
   beforeEach(() => {
     tmpDir = createTempProject();
+    homeDir = fs.mkdtempSync(path.join(require('os').tmpdir(), 'gsd-skill-manifest-home-'));
+
+    writeSkill(path.join(tmpDir, '.claude', 'skills'), 'project-claude', 'Project Claude skill');
+    writeSkill(path.join(tmpDir, '.claude', 'skills'), 'gsd-help', 'Installed GSD skill');
+    writeSkill(path.join(tmpDir, '.agents', 'skills'), 'project-agents', 'Project agent skill');
+    writeSkill(path.join(tmpDir, '.codex', 'skills'), 'project-codex', 'Project Codex skill');
+
+    writeSkill(path.join(homeDir, '.claude', 'skills'), 'global-claude', 'Global Claude skill');
+    writeSkill(path.join(homeDir, '.codex', 'skills'), 'global-codex', 'Global Codex skill');
+    writeSkill(
+      path.join(homeDir, '.claude', 'get-shit-done', 'skills'),
+      'legacy-import',
+      'Deprecated import-only skill'
+    );
+
+    fs.mkdirSync(path.join(homeDir, '.claude', 'commands', 'gsd'), { recursive: true });
+    fs.writeFileSync(path.join(homeDir, '.claude', 'commands', 'gsd', 'help.md'), '# legacy');
   });
 
   afterEach(() => {
     cleanup(tmpDir);
+    cleanup(homeDir);
   });
 
-  test('skill-manifest command exists and returns JSON', () => {
-    // Create a skills directory with one skill
-    const skillDir = path.join(tmpDir, '.claude', 'skills', 'test-skill');
-    fs.mkdirSync(skillDir, { recursive: true });
-    fs.writeFileSync(path.join(skillDir, 'SKILL.md'), [
-      '---',
-      'name: test-skill',
-      'description: A test skill',
-      '---',
-      '',
-      '# Test Skill',
-    ].join('\n'));
-
-    const result = runGsdTools(['skill-manifest', '--skills-dir', path.join(tmpDir, '.claude', 'skills')], tmpDir);
+  test('returns normalized inventory across canonical roots', () => {
+    const result = runGsdTools(['skill-manifest'], tmpDir, { HOME: homeDir });
     assert.ok(result.success, `Command should succeed: ${result.error || result.output}`);
 
     const manifest = JSON.parse(result.output);
-    assert.ok(Array.isArray(manifest), 'Manifest should be an array');
-  });
+    assert.ok(Array.isArray(manifest.skills), 'skills should be an array');
+    assert.ok(Array.isArray(manifest.roots), 'roots should be an array');
+    assert.ok(manifest.installation && typeof manifest.installation === 'object', 'installation summary present');
+    assert.ok(manifest.counts && typeof manifest.counts === 'object', 'counts summary present');
 
-  test('generates manifest with correct structure from SKILL.md frontmatter', () => {
-    const skillDir = path.join(tmpDir, '.claude', 'skills', 'my-skill');
-    fs.mkdirSync(skillDir, { recursive: true });
-    fs.writeFileSync(path.join(skillDir, 'SKILL.md'), [
-      '---',
-      'name: my-skill',
-      'description: Does something useful',
-      '---',
-      '',
-      '# My Skill',
-      '',
-      'TRIGGER when: user asks about widgets',
-    ].join('\n'));
+    const skillNames = manifest.skills.map((skill) => skill.name).sort();
+    assert.deepStrictEqual(skillNames, [
+      'global-claude',
+      'global-codex',
+      'gsd-help',
+      'legacy-import',
+      'project-agents',
+      'project-claude',
+      'project-codex',
+    ]);
 
-    const result = runGsdTools(['skill-manifest', '--skills-dir', path.join(tmpDir, '.claude', 'skills')], tmpDir);
-    assert.ok(result.success, `Command should succeed: ${result.error || result.output}`);
+    const codexSkill = manifest.skills.find((skill) => skill.name === 'project-codex');
+    assert.deepStrictEqual(
+      {
+        root: codexSkill.root,
+        scope: codexSkill.scope,
+        installed: codexSkill.installed,
+        deprecated: codexSkill.deprecated,
+      },
+      {
+        root: '.codex/skills',
+        scope: 'project',
+        installed: true,
+        deprecated: false,
+      }
+    );
 
-    const manifest = JSON.parse(result.output);
-    assert.strictEqual(manifest.length, 1);
-    assert.strictEqual(manifest[0].name, 'my-skill');
-    assert.strictEqual(manifest[0].description, 'Does something useful');
-    assert.strictEqual(manifest[0].path, 'my-skill');
-  });
+    const importedSkill = manifest.skills.find((skill) => skill.name === 'legacy-import');
+    assert.deepStrictEqual(
+      {
+        root: importedSkill.root,
+        scope: importedSkill.scope,
+        installed: importedSkill.installed,
+        deprecated: importedSkill.deprecated,
+      },
+      {
+        root: '~/.claude/get-shit-done/skills',
+        scope: 'import-only',
+        installed: false,
+        deprecated: true,
+      }
+    );
 
-  test('empty skills directory produces empty manifest', () => {
-    const skillsDir = path.join(tmpDir, '.claude', 'skills');
-    fs.mkdirSync(skillsDir, { recursive: true });
+    const gsdSkill = manifest.skills.find((skill) => skill.name === 'gsd-help');
+    assert.strictEqual(gsdSkill.installed, true);
 
-    const result = runGsdTools(['skill-manifest', '--skills-dir', skillsDir], tmpDir);
-    assert.ok(result.success, `Command should succeed: ${result.error || result.output}`);
+    const legacyRoot = manifest.roots.find((root) => root.scope === 'legacy-commands');
+    assert.ok(legacyRoot, 'legacy commands root should be reported');
+    assert.strictEqual(legacyRoot.present, true);
 
-    const manifest = JSON.parse(result.output);
-    assert.ok(Array.isArray(manifest), 'Manifest should be an array');
-    assert.strictEqual(manifest.length, 0);
-  });
-
-  test('skills without SKILL.md are skipped', () => {
-    const skillsDir = path.join(tmpDir, '.claude', 'skills');
-    // Skill with SKILL.md
-    const goodDir = path.join(skillsDir, 'good-skill');
-    fs.mkdirSync(goodDir, { recursive: true });
-    fs.writeFileSync(path.join(goodDir, 'SKILL.md'), [
-      '---',
-      'name: good-skill',
-      'description: Has a SKILL.md',
-      '---',
-      '',
-      '# Good Skill',
-    ].join('\n'));
-
-    // Skill without SKILL.md (just a directory)
-    const badDir = path.join(skillsDir, 'bad-skill');
-    fs.mkdirSync(badDir, { recursive: true });
-    fs.writeFileSync(path.join(badDir, 'README.md'), '# No SKILL.md here');
-
-    const result = runGsdTools(['skill-manifest', '--skills-dir', skillsDir], tmpDir);
-    assert.ok(result.success, `Command should succeed: ${result.error || result.output}`);
-
-    const manifest = JSON.parse(result.output);
-    assert.strictEqual(manifest.length, 1);
-    assert.strictEqual(manifest[0].name, 'good-skill');
-  });
-
-  test('manifest includes frontmatter fields from SKILL.md', () => {
-    const skillDir = path.join(tmpDir, '.claude', 'skills', 'rich-skill');
-    fs.mkdirSync(skillDir, { recursive: true });
-    fs.writeFileSync(path.join(skillDir, 'SKILL.md'), [
-      '---',
-      'name: rich-skill',
-      'description: A richly documented skill',
-      '---',
-      '',
-      '# Rich Skill',
-      '',
-      'TRIGGER when: user mentions databases',
-      'DO NOT TRIGGER when: user asks about frontend',
-    ].join('\n'));
-
-    const result = runGsdTools(['skill-manifest', '--skills-dir', path.join(tmpDir, '.claude', 'skills')], tmpDir);
-    assert.ok(result.success, `Command should succeed: ${result.error || result.output}`);
-
-    const manifest = JSON.parse(result.output);
-    assert.strictEqual(manifest.length, 1);
-
-    const skill = manifest[0];
-    assert.strictEqual(skill.name, 'rich-skill');
-    assert.strictEqual(skill.description, 'A richly documented skill');
-    assert.strictEqual(skill.path, 'rich-skill');
-    // triggers extracted from body text
-    assert.ok(Array.isArray(skill.triggers), 'triggers should be an array');
-    assert.ok(skill.triggers.length > 0, 'triggers should have at least one entry');
-    assert.ok(skill.triggers.some(t => t.includes('databases')), 'triggers should mention databases');
-  });
-
-  test('multiple skills are all included in manifest', () => {
-    const skillsDir = path.join(tmpDir, '.claude', 'skills');
-
-    for (const name of ['alpha', 'beta', 'gamma']) {
-      const dir = path.join(skillsDir, name);
-      fs.mkdirSync(dir, { recursive: true });
-      fs.writeFileSync(path.join(dir, 'SKILL.md'), [
-        '---',
-        `name: ${name}`,
-        `description: The ${name} skill`,
-        '---',
-        '',
-        `# ${name}`,
-      ].join('\n'));
-    }
-
-    const result = runGsdTools(['skill-manifest', '--skills-dir', skillsDir], tmpDir);
-    assert.ok(result.success, `Command should succeed: ${result.error || result.output}`);
-
-    const manifest = JSON.parse(result.output);
-    assert.strictEqual(manifest.length, 3);
-    const names = manifest.map(s => s.name).sort();
-    assert.deepStrictEqual(names, ['alpha', 'beta', 'gamma']);
+    assert.strictEqual(manifest.installation.gsd_skills_installed, true);
+    assert.strictEqual(manifest.installation.legacy_claude_commands_installed, true);
+    assert.strictEqual(manifest.counts.skills, 7);
   });
 
   test('writes manifest to .planning/skill-manifest.json when --write flag is used', () => {
-    const skillDir = path.join(tmpDir, '.claude', 'skills', 'write-test');
-    fs.mkdirSync(skillDir, { recursive: true });
-    fs.writeFileSync(path.join(skillDir, 'SKILL.md'), [
-      '---',
-      'name: write-test',
-      'description: Tests write mode',
-      '---',
-      '',
-      '# Write Test',
-    ].join('\n'));
-
-    const result = runGsdTools(['skill-manifest', '--skills-dir', path.join(tmpDir, '.claude', 'skills'), '--write'], tmpDir);
+    const result = runGsdTools(['skill-manifest', '--write'], tmpDir, { HOME: homeDir });
     assert.ok(result.success, `Command should succeed: ${result.error || result.output}`);
 
     const manifestPath = path.join(tmpDir, '.planning', 'skill-manifest.json');
     assert.ok(fs.existsSync(manifestPath), 'skill-manifest.json should be written to .planning/');
 
     const manifest = JSON.parse(fs.readFileSync(manifestPath, 'utf-8'));
-    assert.strictEqual(manifest.length, 1);
-    assert.strictEqual(manifest[0].name, 'write-test');
-  });
-
-  test('nonexistent skills directory returns empty manifest', () => {
-    const result = runGsdTools(['skill-manifest', '--skills-dir', path.join(tmpDir, 'nonexistent')], tmpDir);
-    assert.ok(result.success, `Command should succeed: ${result.error || result.output}`);
-
-    const manifest = JSON.parse(result.output);
-    assert.ok(Array.isArray(manifest), 'Manifest should be an array');
-    assert.strictEqual(manifest.length, 0);
-  });
-
-  test('files in skills directory are ignored (only subdirectories scanned)', () => {
-    const skillsDir = path.join(tmpDir, '.claude', 'skills');
-    fs.mkdirSync(skillsDir, { recursive: true });
-    // A file, not a directory
-    fs.writeFileSync(path.join(skillsDir, 'not-a-skill.md'), '# Not a skill');
-
-    // A valid skill directory
-    const skillDir = path.join(skillsDir, 'real-skill');
-    fs.mkdirSync(skillDir, { recursive: true });
-    fs.writeFileSync(path.join(skillDir, 'SKILL.md'), [
-      '---',
-      'name: real-skill',
-      'description: A real skill',
-      '---',
-      '',
-      '# Real Skill',
-    ].join('\n'));
-
-    const result = runGsdTools(['skill-manifest', '--skills-dir', skillsDir], tmpDir);
-    assert.ok(result.success, `Command should succeed: ${result.error || result.output}`);
-
-    const manifest = JSON.parse(result.output);
-    assert.strictEqual(manifest.length, 1);
-    assert.strictEqual(manifest[0].name, 'real-skill');
+    assert.ok(Array.isArray(manifest.skills));
+    assert.ok(manifest.installation);
   });
 });

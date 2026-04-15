@@ -1,8 +1,9 @@
 /**
  * Agent skills query handler — scan installed skill directories.
  *
- * Reads from .claude/skills/, .agents/skills/, .cursor/skills/, .github/skills/,
- * and the global ~/.claude/get-shit-done/skills/ directory.
+ * Reads from project `.claude/skills/`, `.agents/skills/`, `.cursor/skills/`,
+ * `.github/skills/`, `.codex/skills/`, plus managed global `~/.claude/skills/`
+ * and `~/.codex/skills/` roots.
  *
  * @example
  * ```typescript
@@ -26,7 +27,9 @@ export const agentSkills: QueryHandler = async (args, projectDir) => {
     join(projectDir, '.agents', 'skills'),
     join(projectDir, '.cursor', 'skills'),
     join(projectDir, '.github', 'skills'),
-    join(homedir(), '.claude', 'get-shit-done', 'skills'),
+    join(projectDir, '.codex', 'skills'),
+    join(homedir(), '.claude', 'skills'),
+    join(homedir(), '.codex', 'skills'),
   ];
 
   const skills: string[] = [];
@@ -35,16 +38,19 @@ export const agentSkills: QueryHandler = async (args, projectDir) => {
     try {
       const entries = readdirSync(dir, { withFileTypes: true });
       for (const entry of entries) {
-        if (entry.isDirectory()) skills.push(entry.name);
+        if (!entry.isDirectory()) continue;
+        if (!existsSync(join(dir, entry.name, 'SKILL.md'))) continue;
+        skills.push(entry.name);
       }
     } catch { /* skip */ }
   }
 
+  const dedupedSkills = [...new Set(skills)];
   return {
     data: {
       agent_type: agentType,
-      skills: [...new Set(skills)],
-      skill_count: skills.length,
+      skills: dedupedSkills,
+      skill_count: dedupedSkills.length,
     },
   };
 };

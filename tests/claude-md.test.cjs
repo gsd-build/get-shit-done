@@ -148,6 +148,38 @@ describe('generate-claude-md skills section', () => {
     assert.ok(content.includes('ERP synchronization flows'));
   });
 
+  test('discovers skills from .codex/skills/ directory and ignores deprecated import-only roots', () => {
+    const codexSkillDir = path.join(tmpDir, '.codex', 'skills', 'automation');
+    fs.mkdirSync(codexSkillDir, { recursive: true });
+    fs.writeFileSync(
+      path.join(codexSkillDir, 'SKILL.md'),
+      '---\nname: automation\ndescription: Project Codex skill.\n---\n\n# Automation\n'
+    );
+
+    const homeDir = fs.mkdtempSync(path.join(require('os').tmpdir(), 'gsd-claude-skills-home-'));
+    fs.mkdirSync(path.join(homeDir, '.claude', 'get-shit-done', 'skills', 'import-only'), { recursive: true });
+    fs.writeFileSync(
+      path.join(homeDir, '.claude', 'get-shit-done', 'skills', 'import-only', 'SKILL.md'),
+      '---\nname: import-only\ndescription: Deprecated import-only skill.\n---\n'
+    );
+
+    const originalHome = process.env.HOME;
+    process.env.HOME = homeDir;
+
+    try {
+      const result = runGsdTools('generate-claude-md', tmpDir);
+      assert.ok(result.success, `Command failed: ${result.error}`);
+
+      const content = fs.readFileSync(path.join(tmpDir, 'CLAUDE.md'), 'utf-8');
+      assert.ok(content.includes('automation'));
+      assert.ok(content.includes('Project Codex skill'));
+      assert.ok(!content.includes('import-only'));
+    } finally {
+      process.env.HOME = originalHome;
+      cleanup(homeDir);
+    }
+  });
+
   test('skips gsd- prefixed skill directories', () => {
     const gsdSkillDir = path.join(tmpDir, '.claude', 'skills', 'gsd-plan-phase');
     const userSkillDir = path.join(tmpDir, '.claude', 'skills', 'my-feature');

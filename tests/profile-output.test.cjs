@@ -157,6 +157,19 @@ describe('generate-claude-md command', () => {
     const content = fs.readFileSync(outputPath, 'utf-8');
     assert.ok(content.length > 0, 'should still have content');
   });
+
+  test('skills fallback mentions the normalized project roots', () => {
+    const result = runGsdTools('generate-claude-md', tmpDir);
+    assert.ok(result.success, `Failed: ${result.error}`);
+
+    const content = fs.readFileSync(path.join(tmpDir, 'CLAUDE.md'), 'utf-8');
+    assert.ok(content.includes('.claude/skills/'));
+    assert.ok(content.includes('.agents/skills/'));
+    assert.ok(content.includes('.cursor/skills/'));
+    assert.ok(content.includes('.github/skills/'));
+    assert.ok(content.includes('.codex/skills/'));
+    assert.ok(!content.includes('get-shit-done/skills'));
+  });
 });
 
 // ─── generate-dev-preferences ─────────────────────────────────────────────────

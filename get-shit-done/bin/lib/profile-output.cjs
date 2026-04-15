@@ -177,11 +177,11 @@ const CLAUDE_MD_FALLBACKS = {
   stack: 'Technology stack not yet documented. Will populate after codebase mapping or first phase.',
   conventions: 'Conventions not yet established. Will populate as patterns emerge during development.',
   architecture: 'Architecture not yet mapped. Follow existing patterns found in the codebase.',
-  skills: 'No project skills found. Add skills to any of: `.claude/skills/`, `.agents/skills/`, `.cursor/skills/`, or `.github/skills/` with a `SKILL.md` index file.',
+  skills: 'No project skills found. Add skills to any of: `.claude/skills/`, `.agents/skills/`, `.cursor/skills/`, `.github/skills/`, or `.codex/skills/` with a `SKILL.md` index file.',
 };
 
 // Directories where project skills may live (checked in order)
-const SKILL_SEARCH_DIRS = ['.claude/skills', '.agents/skills', '.cursor/skills', '.github/skills'];
+const SKILL_SEARCH_DIRS = ['.claude/skills', '.agents/skills', '.cursor/skills', '.github/skills', '.codex/skills'];
 
 const CLAUDE_MD_WORKFLOW_ENFORCEMENT = [
   'Before using Edit, Write, or other file-changing tools, start work through a GSD command so planning artifacts and execution context stay in sync.',
