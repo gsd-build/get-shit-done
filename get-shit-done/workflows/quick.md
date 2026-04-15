@@ -36,6 +36,8 @@ Parse `$ARGUMENTS` for:
 - `--research` flag → store `$RESEARCH_MODE=true`
 - Remaining text → use as `$DESCRIPTION` if non-empty
 
+After parsing, normalize: if `$DISCUSS_MODE` and `$RESEARCH_MODE` and `$VALIDATE_MODE` are all true, set `$FULL_MODE=true`. This ensures `--discuss --research --validate` is treated identically to `--full`.
+
 If `$DESCRIPTION` is empty after parsing, prompt user interactively:
 
 
@@ -59,15 +61,6 @@ If `$FULL_MODE` (all phases enabled — `--full` or all granular flags):
 ```
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
  GSD ► QUICK TASK (FULL)
-━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-
-◆ Discussion + research + plan checking + verification enabled
-```
-
-If `$DISCUSS_MODE` and `$RESEARCH_MODE` and `$VALIDATE_MODE` (no `$FULL_MODE` — composed granularly):
-```
-━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
- GSD ► QUICK TASK (DISCUSS + RESEARCH + VALIDATE)
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
 ◆ Discussion + research + plan checking + verification enabled
