@@ -1024,6 +1024,17 @@ function cmdInitManager(cwd, raw) {
 
   // Dependency satisfaction: check if all depends_on phases are complete
   const completedNums = new Set(phases.filter(p => p.disk_status === 'complete').map(p => p.number));
+
+  // Also include phases from previously shipped milestones — they are all
+  // complete by definition (a milestone only ships when all phases are done).
+  // rawContent is the full ROADMAP.md (including <details>-wrapped shipped
+  // milestone sections that extractCurrentMilestone strips out).
+  const _allCompletedPattern = /-\s*\[x\]\s*.*Phase\s+(\d+[A-Z]?(?:\.\d+)*)[:\s]/gi;
+  let _allMatch;
+  while ((_allMatch = _allCompletedPattern.exec(rawContent)) !== null) {
+    completedNums.add(_allMatch[1]);
+  }
+
   for (const phase of phases) {
     if (!phase.depends_on || /^none$/i.test(phase.depends_on.trim())) {
       phase.deps_satisfied = true;
