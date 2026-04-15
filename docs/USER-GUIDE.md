@@ -935,6 +935,111 @@ When a workflow fails in a way that isn't obvious -- plans reference nonexistent
 
 **Output:** A diagnostic report written to `.planning/forensics/` with findings and suggested remediation steps.
 
+### Executor Subagent Gets "Permission denied" on Bash Commands
+
+GSD's `gsd-executor` subagents need write-capable Bash access to a project's standard tooling — `git commit`, `bin/rails`, `bundle exec`, `npm run`, `uv run`, and similar commands. Claude Code's default `~/.claude/settings.json` only allows a narrow set of read-only git commands, so a fresh install will hit "Permission to use Bash has been denied" the first time an executor tries to make a commit or run a build tool.
+
+**Fix: add the required patterns to `~/.claude/settings.json`.**
+
+The patterns you need depend on your stack. Copy the block for your stack and add it to the `permissions.allow` array.
+
+#### Required for all stacks (git + gh)
+
+```json
+"Bash(git add:*)",
+"Bash(git commit:*)",
+"Bash(git merge:*)",
+"Bash(git worktree:*)",
+"Bash(git rebase:*)",
+"Bash(git reset:*)",
+"Bash(git checkout:*)",
+"Bash(git switch:*)",
+"Bash(git restore:*)",
+"Bash(git stash:*)",
+"Bash(git rm:*)",
+"Bash(git mv:*)",
+"Bash(git fetch:*)",
+"Bash(git cherry-pick:*)",
+"Bash(git apply:*)",
+"Bash(gh:*)"
+```
+
+#### Rails / Ruby
+
+```json
+"Bash(bin/rails:*)",
+"Bash(bin/brakeman:*)",
+"Bash(bin/bundler-audit:*)",
+"Bash(bin/importmap:*)",
+"Bash(bundle:*)",
+"Bash(rubocop:*)",
+"Bash(erb_lint:*)"
+```
+
+#### Python / uv
+
+```json
+"Bash(uv:*)",
+"Bash(python:*)",
+"Bash(pytest:*)",
+"Bash(ruff:*)",
+"Bash(mypy:*)"
+```
+
+#### Node / npm / pnpm / bun
+
+```json
+"Bash(npm:*)",
+"Bash(npx:*)",
+"Bash(pnpm:*)",
+"Bash(bun:*)",
+"Bash(node:*)"
+```
+
+#### Rust / Cargo
+
+```json
+"Bash(cargo:*)"
+```
+
+**Example `~/.claude/settings.json` snippet (Rails project):**
+
+```json
+{
+  "permissions": {
+    "allow": [
+      "Write",
+      "Edit",
+      "Bash(git add:*)",
+      "Bash(git commit:*)",
+      "Bash(git merge:*)",
+      "Bash(git worktree:*)",
+      "Bash(git rebase:*)",
+      "Bash(git reset:*)",
+      "Bash(git checkout:*)",
+      "Bash(git switch:*)",
+      "Bash(git restore:*)",
+      "Bash(git stash:*)",
+      "Bash(git rm:*)",
+      "Bash(git mv:*)",
+      "Bash(git fetch:*)",
+      "Bash(git cherry-pick:*)",
+      "Bash(git apply:*)",
+      "Bash(gh:*)",
+      "Bash(bin/rails:*)",
+      "Bash(bin/brakeman:*)",
+      "Bash(bin/bundler-audit:*)",
+      "Bash(bundle:*)",
+      "Bash(rubocop:*)"
+    ]
+  }
+}
+```
+
+**Per-project permissions (scoped to one repo):** If you prefer to allow these patterns for a single project rather than globally, add the same `permissions.allow` block to `.claude/settings.local.json` in your project root instead of `~/.claude/settings.json`. Claude Code checks project-local settings first.
+
+**Interactive guidance:** When an executor is blocked mid-phase, it will identify the exact pattern needed (e.g. `"Bash(bin/rails:*)"`) so you can add it and re-run `/gsd-execute-phase`.
+
 ### Subagent Appears to Fail but Work Was Done
 
 A known workaround exists for a Claude Code classification bug. GSD's orchestrators (execute-phase, quick) spot-check actual output before reporting failure. If you see a failure message but commits were made, check `git log` -- the work may have succeeded.
