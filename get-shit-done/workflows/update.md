@@ -78,9 +78,27 @@ fi
 # runtime directories.
 if [ -n "$PREFERRED_CONFIG_DIR" ] && { [ -f "$PREFERRED_CONFIG_DIR/get-shit-done/VERSION" ] || [ -f "$PREFERRED_CONFIG_DIR/get-shit-done/workflows/update.md" ]; }; then
   INSTALL_SCOPE="GLOBAL"
+  # Normalize a path for comparison: on Windows with Git Bash, pwd returns
+  # POSIX-style /c/Users/... but PREFERRED_CONFIG_DIR may carry C:/Users/...
+  # Convert Windows drive-letter paths to POSIX form so the comparison works
+  # on both Windows (Git Bash) and POSIX systems.
+  normalize_path() {
+    local p="$1"
+    case "$p" in
+      [A-Za-z]:/*)
+        local drive rest
+        drive="${p%%:*}"
+        rest="${p#?:}"
+        p="/$(printf '%s' "$drive" | tr '[:upper:]' '[:lower:]')$rest"
+        ;;
+    esac
+    printf '%s' "$p"
+  }
+  normalized_preferred="$(normalize_path "$PREFERRED_CONFIG_DIR")"
   for dir in .claude .config/opencode .opencode .gemini .config/kilo .kilo .codex; do
     resolved_local="$(cd "./$dir" 2>/dev/null && pwd)"
-    if [ -n "$resolved_local" ] && [ "$resolved_local" = "$PREFERRED_CONFIG_DIR" ]; then
+    normalized_local="$(normalize_path "$resolved_local")"
+    if [ -n "$normalized_local" ] && [ "$normalized_local" = "$normalized_preferred" ]; then
       INSTALL_SCOPE="LOCAL"
       break
     fi
