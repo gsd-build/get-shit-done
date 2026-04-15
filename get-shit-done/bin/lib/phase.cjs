@@ -585,10 +585,12 @@ function cmdPhaseInsert(cwd, afterPhase, description, raw) {
  */
 function renameDecimalPhases(phasesDir, baseInt, removedDecimal) {
   const renamedDirs = [], renamedFiles = [];
-  const decPattern = new RegExp(`^${baseInt}\\.(\\d+)-(.+)$`);
+  // Capture the zero-padded prefix (e.g. "06" from "06.3-slug") so the renamed
+  // directory preserves the original padding format.
+  const decPattern = new RegExp(`^(0*${baseInt})\\.(\\d+)-(.+)$`);
   const dirs = readSubdirectories(phasesDir, true);
   const toRename = dirs
-    .map(dir => { const m = dir.match(decPattern); return m ? { dir, oldDecimal: parseInt(m[1], 10), slug: m[2] } : null; })
+    .map(dir => { const m = dir.match(decPattern); return m ? { dir, prefix: m[1], oldDecimal: parseInt(m[2], 10), slug: m[3] } : null; })
     .filter(item => item && item.oldDecimal > removedDecimal)
     .sort((a, b) => b.oldDecimal - a.oldDecimal); // descending to avoid conflicts
 
@@ -596,7 +598,7 @@ function renameDecimalPhases(phasesDir, baseInt, removedDecimal) {
     const newDecimal = item.oldDecimal - 1;
     const oldPhaseId = `${baseInt}.${item.oldDecimal}`;
     const newPhaseId = `${baseInt}.${newDecimal}`;
-    const newDirName = `${baseInt}.${newDecimal}-${item.slug}`;
+    const newDirName = `${item.prefix}.${newDecimal}-${item.slug}`;
     fs.renameSync(path.join(phasesDir, item.dir), path.join(phasesDir, newDirName));
     renamedDirs.push({ from: item.dir, to: newDirName });
     for (const f of fs.readdirSync(path.join(phasesDir, newDirName))) {

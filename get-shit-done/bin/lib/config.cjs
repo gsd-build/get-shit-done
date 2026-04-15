@@ -495,6 +495,17 @@ function getCmdConfigSetModelProfileResultMessage(
   return paragraphs.join('\n\n');
 }
 
+/**
+ * Print the resolved config.json path (workstream-aware). Used by settings.md
+ * so the workflow writes/reads the correct file when a workstream is active (#2282).
+ */
+function cmdConfigPath(cwd) {
+  // Always emit as plain text — a file path is used via shell substitution,
+  // never consumed as JSON. Passing raw=true forces plain-text output.
+  const configPath = path.join(planningDir(cwd), 'config.json');
+  output(configPath, true, configPath);
+}
+
 module.exports = {
   VALID_CONFIG_KEYS,
   cmdConfigEnsureSection,
@@ -502,4 +513,5 @@ module.exports = {
   cmdConfigGet,
   cmdConfigSetModelProfile,
   cmdConfigNewProject,
+  cmdConfigPath,
 };

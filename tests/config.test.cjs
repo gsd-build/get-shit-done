@@ -935,3 +935,41 @@ describe('config-set/config-get context', () => {
     assert.ok(fs.existsSync(path.join(contextsDir, 'review.md')), 'review.md should exist');
   });
 });
+
+// ─── config-path (#2282) ────────────────────────────────────────────────────
+
+describe('config-path command (#2282)', () => {
+  let tmpDir;
+
+  beforeEach(() => {
+    tmpDir = createTempProject();
+    runGsdTools('config-ensure-section', tmpDir);
+  });
+
+  afterEach(() => {
+    cleanup(tmpDir);
+  });
+
+  test('returns root config path when no workstream is active', () => {
+    const result = runGsdTools('config-path', tmpDir);
+    assert.ok(result.success, `config-path failed: ${result.error}`);
+    assert.ok(result.output.trim().endsWith('.planning/config.json'), `expected root config path, got: ${result.output}`);
+    assert.ok(!result.output.includes('workstreams'), 'should not include workstreams in path');
+  });
+
+  test('returns workstream config path when GSD_WORKSTREAM is set', () => {
+    const result = runGsdTools('config-path', tmpDir, { GSD_WORKSTREAM: 'my-stream' });
+    assert.ok(result.success, `config-path failed: ${result.error}`);
+    assert.ok(result.output.trim().includes('workstreams/my-stream/config.json'), `expected workstream config path, got: ${result.output}`);
+  });
+
+  test('config-path and config-get agree on the active path', () => {
+    // Write a value via config-set (uses planningDir internally)
+    runGsdTools('config-set model_profile quality', tmpDir);
+    // config-path should point to a file containing that value
+    const pathResult = runGsdTools('config-path', tmpDir);
+    const configPath = pathResult.output.trim();
+    const configContent = JSON.parse(require('fs').readFileSync(configPath, 'utf-8'));
+    assert.strictEqual(configContent.model_profile, 'quality', 'config-path should point to the file config-set wrote');
+  });
+});

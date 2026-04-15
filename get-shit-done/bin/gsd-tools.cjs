@@ -639,6 +639,11 @@ async function runCommand(command, args, cwd, raw, defaultValue) {
       break;
     }
 
+    case 'config-path': {
+      config.cmdConfigPath(cwd, raw);
+      break;
+    }
+
     case 'agent-skills': {
       init.cmdAgentSkills(cwd, args[1], raw);
       break;
