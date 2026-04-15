@@ -628,10 +628,21 @@ After executor returns:
        # Snapshot files on main to detect resurrections
        PRE_MERGE_FILES=$(git ls-files .planning/)
 
-       git merge "$WT_BRANCH" --no-edit -m "chore: merge quick task worktree ($WT_BRANCH)" 2>&1 || {
-         echo "⚠ Merge conflict — resolve manually"
+       # Pre-merge deletion guard: block merges that delete tracked .planning/ files
+       DELETIONS=$(git diff --diff-filter=D --name-only HEAD..."$WT_BRANCH" 2>/dev/null || true)
+       if [ -n "$DELETIONS" ]; then
+         echo "BLOCKED: Worktree branch $WT_BRANCH contains file deletions: $DELETIONS"
+         echo "Review these deletions before merging. If intentional, remove this guard and re-run."
          rm -f "$STATE_BACKUP" "$ROADMAP_BACKUP"
          continue
+       fi
+
+       git merge "$WT_BRANCH" --no-ff --no-edit -m "chore: merge quick task worktree ($WT_BRANCH)" 2>&1 || {
+         echo "⚠ Merge conflict from worktree $WT_BRANCH — resolve manually"
+         echo "  STATE.md backup:   $STATE_BACKUP"
+         echo "  ROADMAP.md backup: $ROADMAP_BACKUP"
+         echo "  Restore with: cp \$STATE_BACKUP .planning/STATE.md && cp \$ROADMAP_BACKUP .planning/ROADMAP.md"
+         break
        }
 
        # Restore orchestrator-owned files
@@ -639,7 +650,7 @@ After executor returns:
        if [ -s "$ROADMAP_BACKUP" ]; then cp "$ROADMAP_BACKUP" .planning/ROADMAP.md; fi
        rm -f "$STATE_BACKUP" "$ROADMAP_BACKUP"
 
-       # Remove files deleted on main but re-added by worktree
+       # Remove files deleted on main but re-added by worktree (--no-ff guarantees a merge commit so HEAD~1 is reliable)
        DELETED_FILES=$(git diff --diff-filter=A --name-only HEAD~1 -- .planning/ 2>/dev/null || true)
        for RESURRECTED in $DELETED_FILES; do
          if ! echo "$PRE_MERGE_FILES" | grep -qxF "$RESURRECTED"; then
