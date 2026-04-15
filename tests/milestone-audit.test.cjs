@@ -3,7 +3,7 @@ const { describe, test, beforeEach, afterEach } = require('node:test');
 const assert = require('node:assert/strict');
 const fs = require('fs');
 const path = require('path');
-const { createTempProject, cleanup } = require('./helpers.cjs');
+const { createTempProject, cleanup, runGsdTools } = require('./helpers.cjs');
 
 describe('audit.cjs module (#2158)', () => {
   let tmpDir;
@@ -141,5 +141,45 @@ describe('state.md template has Deferred Items section (#2158)', () => {
   test('state.md template includes Deferred Items section', () => {
     assert.ok(stateTemplate.includes('Deferred Items'),
       'state.md template missing Deferred Items section');
+  });
+});
+
+describe('audit-open CLI command — ReferenceError regression (#2236)', () => {
+  // The audit-open case in gsd-tools.cjs called bare output() instead of
+  // core.output(), crashing with ReferenceError: output is not defined
+  // on every invocation. These tests exercise the CLI dispatch directly so
+  // a regression at the call site is caught even if the lib tests all pass.
+  let tmpDir;
+
+  beforeEach(() => {
+    tmpDir = createTempProject('audit-open-cli-test');
+  });
+
+  afterEach(() => {
+    cleanup(tmpDir);
+  });
+
+  test('audit-open exits without error on an empty project', () => {
+    const result = runGsdTools(['audit-open'], tmpDir);
+    assert.ok(result.success, `audit-open crashed: ${result.error}`);
+  });
+
+  test('audit-open --json exits without error and returns valid JSON', () => {
+    const result = runGsdTools(['audit-open', '--json'], tmpDir);
+    assert.ok(result.success, `audit-open --json crashed: ${result.error}`);
+    let parsed;
+    assert.doesNotThrow(() => { parsed = JSON.parse(result.output); }, 'output must be valid JSON');
+    assert.ok(typeof parsed === 'object', 'parsed output must be an object');
+    assert.ok(typeof parsed.counts === 'object', 'JSON output must include counts');
+  });
+
+  test('audit-open error is not ReferenceError: output is not defined', () => {
+    // Even if the command fails for some other reason, it must not throw the
+    // specific ReferenceError that was the bug in #2236.
+    const result = runGsdTools(['audit-open'], tmpDir);
+    assert.ok(
+      !String(result.error).includes('output is not defined'),
+      `ReferenceError regression: ${result.error}`
+    );
   });
 });

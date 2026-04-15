@@ -781,9 +781,9 @@ async function runCommand(command, args, cwd, raw, defaultValue) {
       const includeRaw = args.includes('--json');
       const result = auditOpenArtifacts(cwd);
       if (includeRaw) {
-        output(JSON.stringify(result, null, 2), raw);
+        core.output(result, raw);
       } else {
-        output(formatAuditReport(result), raw);
+        core.output(formatAuditReport(result), raw);
       }
       break;
     }
