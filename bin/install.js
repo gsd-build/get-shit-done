@@ -6271,11 +6271,19 @@ function finishInstall(settingsPath, settings, statuslineCommand, shouldInstallS
   const isCline = runtime === 'cline';
 
   if (shouldInstallStatusline && !isOpencode && !isKilo && !isCodex && !isCopilot && !isCursor && !isWindsurf && !isTrae) {
-    settings.statusLine = {
-      type: 'command',
-      command: statuslineCommand
-    };
-    console.log(`  ${green}✓${reset} Configured statusline`);
+    if (!isGlobal && !forceStatusline) {
+      // Local installs skip statusLine by default: repo settings.json takes precedence over
+      // profile-level settings.json in Claude Code, so writing here would silently clobber
+      // any profile-level statusLine the user has configured (#2248).
+      // Pass --force-statusline to override this guard.
+      console.log(`  ${yellow}⚠${reset} Skipping statusLine for local install (avoids overriding profile-level settings; use --force-statusline to override)`);
+    } else {
+      settings.statusLine = {
+        type: 'command',
+        command: statuslineCommand
+      };
+      console.log(`  ${green}✓${reset} Configured statusline`);
+    }
   }
 
   // Write settings when runtime supports settings.json
