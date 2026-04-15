@@ -84,6 +84,32 @@ describe('audit.cjs module (#2158)', () => {
   });
 });
 
+describe('audit-open CLI command (#2236)', () => {
+  let tmpDir;
+
+  beforeEach(() => {
+    tmpDir = createTempProject('audit-cli-');
+  });
+
+  afterEach(() => {
+    cleanup(tmpDir);
+  });
+
+  test('audit-open runs without ReferenceError', () => {
+    const { runGsdTools } = require('./helpers.cjs');
+    const result = runGsdTools(['audit-open'], tmpDir);
+    assert.strictEqual(result.success, true, `audit-open crashed: ${result.error}`);
+    assert.ok(result.output.length > 0, 'audit-open should produce output');
+  });
+
+  test('audit-open --json succeeds without ReferenceError', () => {
+    const { runGsdTools } = require('./helpers.cjs');
+    const result = runGsdTools(['audit-open', '--json'], tmpDir);
+    assert.strictEqual(result.success, true, `audit-open --json crashed: ${result.error}`);
+    assert.ok(result.output.length > 0, 'audit-open --json should produce output');
+  });
+});
+
 describe('complete-milestone workflow has pre-close audit gate (#2158)', () => {
   const completeMilestoneContent = fs.readFileSync(
     path.join(__dirname, '..', 'get-shit-done', 'workflows', 'complete-milestone.md'),
