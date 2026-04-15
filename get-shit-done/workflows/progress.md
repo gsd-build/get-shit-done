@@ -22,6 +22,17 @@ Extract from init JSON: `project_exists`, `roadmap_exists`, `state_exists`, `pha
 DISCUSS_MODE=$(node "$HOME/.claude/get-shit-done/bin/gsd-tools.cjs" config-get workflow.discuss_mode 2>/dev/null || echo "discuss")
 ```
 
+**Parse `--forensic` flag from `$ARGUMENTS`:**
+
+```bash
+FORENSIC=false
+if echo "$ARGUMENTS" | grep -q '\-\-forensic'; then
+  FORENSIC=true
+fi
+```
+
+When `FORENSIC=true`, the standard progress report and routing suggestion still run first, unchanged. The `forensic_audit` step then appends a 6-check integrity audit after routing. When `FORENSIC=false` (default), the `forensic_audit` step is skipped entirely — behavior is byte-for-byte identical to pre-flag behavior.
+
 If `project_exists` is false (no `.planning/` directory):
 
 ```
@@ -485,6 +496,200 @@ Ready to plan the next milestone.
 
 </step>
 
+<step name="forensic_audit">
+**Skip this entire step unless `FORENSIC=true`** (see `init_context`).
+
+When invoked without `--forensic`, this step is a no-op and output is byte-for-byte identical to pre-flag behavior. When `--forensic` is present, append the audit below AFTER the standard report and routing suggestion have been printed.
+
+Present:
+
+```
+---
+
+## Forensic Integrity Audit
+
+Running 6 deep checks against project state...
+```
+
+**Check 1 — STATE.md vs artifact completion**
+
+Read STATE.md and extract:
+- `stopped_at` field (frontmatter)
+- `status` field (frontmatter)
+- Session Continuity section → `Stopped at:` line
+
+If ANY of these mention pending/awaiting/in-progress/blocked work BUT the standard progress report shows the current phase as "complete" or all phases done, flag:
+
+```
+⚠ Check 1 — STATE says work pending, artifacts say complete
+  STATE.md stopped_at: "{stopped_at value}"
+  STATE.md status: "{status value}"
+  Artifact count: {X}/{Y} plans complete
+  → The phase may have been marked complete prematurely
+```
+
+Otherwise:
+```
+✓ Check 1 — STATE.md consistent with artifact count
+```
+
+**Check 2 — Orphaned handoff files**
+
+```bash
+ls .planning/HANDOFF.json 2>/dev/null || true
+ls .planning/phases/*/.continue-here.md 2>/dev/null || true
+find .planning/phases/ -type f \( -iname "*handoff*" \) 2>/dev/null || true
+```
+
+For each found file, read the first 10 lines to extract context.
+
+If ANY handoff files exist:
+```
+⚠ Check 2 — Orphaned handoff files found
+  {path}: {first-line summary or "You are here" extract}
+  → Work was paused mid-flight. Read the handoff before continuing.
+```
+
+Otherwise:
+```
+✓ Check 2 — No orphaned handoff files
+```
+
+**Check 3 — Deferred scope not in ROADMAP**
+
+Scan phase artifacts for mentions of deferred future phases:
+
+```bash
+grep -rn "defer.*[Pp]hase\|future [Pp]hase\|[Pp]hase [0-9]\+\.[0-9]\+.*deferred\|[Pp]hase [0-9]\+\.[0-9]\+.*NOT.*scope\|out of.*scope.*[Pp]hase" \
+  .planning/phases/*/*-BUG-BRIEF.md \
+  .planning/phases/*/*-DISCUSSION-LOG.md \
+  .planning/phases/*/*-CONTEXT.md \
+  .planning/phases/*/*-HANDOFF.md \
+  .planning/phases/*/*-VERIFICATION.md \
+  .planning/phases/*/*-SUMMARY.md \
+  2>/dev/null | head -30 || true
+```
+
+For each deferred phase number found, check if it exists in ROADMAP.md:
+
+```bash
+grep -c "Phase {deferred_phase_number}" .planning/ROADMAP.md 2>/dev/null || echo "0"
+```
+
+If any deferred phase is NOT in ROADMAP:
+```
+⚠ Check 3 — Deferred scope not captured in ROADMAP
+  "{source_file}": mentions Phase {X} deferred — NOT in ROADMAP.md
+  → Insert the phase via /gsd-insert-phase or /gsd-add-phase before it gets lost
+```
+
+Otherwise:
+```
+✓ Check 3 — All deferred scope captured in ROADMAP (or none found)
+```
+
+**Check 4 — Memory entries flagging pending work**
+
+Read the memory index at the user's memory directory `MEMORY.md`. Identify entries whose title/description mentions: "pending", "status", "pause", "deferred", "NOT YET RUN", "needs", "backfill", "blocking", or current milestone phase numbers.
+
+For each such entry, read the memory file and check if it describes work that is:
+- Still pending (not completed)
+- Contradicted by the artifact-based progress report
+- Describing operational steps not captured as todos
+
+If any memory entry flags unfinished work:
+```
+⚠ Check 4 — Memory entries indicate pending work
+  {memory_file}: "{key finding from memory content}"
+  → Verify this work is done or captured as a todo/phase
+```
+
+Otherwise:
+```
+✓ Check 4 — No memory entries flagging pending work
+```
+
+**Check 5 — Blocking operational todos**
+
+```bash
+ls .planning/todos/pending/ 2>/dev/null || true
+```
+
+Read each pending todo file. Flag any that describe:
+- Scripts that need to be run (backfill, migration, seed)
+- API keys or credentials to configure
+- Manual verification steps
+- External actions (managed service dashboards, third-party setup)
+
+These are operational blockers that artifact counting can't detect.
+
+If blocking operational todos exist:
+```
+⚠ Check 5 — Operational todos pending
+  {todo_file}: "{description}"
+  → These require human action before the phase/milestone is truly complete
+```
+
+Otherwise:
+```
+✓ Check 5 — No blocking operational todos
+```
+
+**Check 6 — Uncommitted changes suggesting unfinished work**
+
+```bash
+git status --short 2>/dev/null | head -20
+git stash list 2>/dev/null | head -5
+```
+
+If there are uncommitted changes in source directories (`src/`, `scripts/`, etc.), not just `.planning/`:
+```
+⚠ Check 6 — Uncommitted code changes
+  {file list}
+  → May represent unfinished implementation work
+```
+
+Otherwise:
+```
+✓ Check 6 — Working tree clean (or planning-only changes)
+```
+
+**Verdict**
+
+Count failures from checks 1–6.
+
+If 0 failures:
+```
+---
+
+### Verdict: CLEAN
+
+All 6 forensic checks passed. The standard progress report is trustworthy.
+Proceed with the routing suggestion above.
+```
+
+If 1+ failures:
+```
+---
+
+### Verdict: {N} INTEGRITY ISSUE(S) FOUND
+
+The standard progress report may not reflect true project state.
+Review the flagged items above before proceeding with the routing suggestion.
+
+**Suggested actions:**
+- [list specific actions based on which checks failed]
+```
+
+Suggested-action mapping:
+- Check 1 fail → "Read STATE.md `stopped_at` context and verify the current phase is actually complete"
+- Check 2 fail → "Read the handoff file(s) and resume from where work was paused"
+- Check 3 fail → "Insert deferred phases into ROADMAP via /gsd-insert-phase or /gsd-add-phase"
+- Check 4 fail → "Verify memory-flagged work is done; update or delete stale memory entries"
+- Check 5 fail → "Complete operational steps before marking phase/milestone as done"
+- Check 6 fail → "Review uncommitted changes — commit, stash, or discard"
+</step>
+
 <step name="edge_cases">
 **Handle edge cases:**
 
@@ -504,4 +709,6 @@ Ready to plan the next milestone.
 - [ ] Smart routing: /gsd-execute-phase if plans exist, /gsd-plan-phase if not
 - [ ] User confirms before any action
 - [ ] Seamless handoff to appropriate gsd command
+- [ ] Without `--forensic`, output is byte-for-byte unchanged from pre-flag behavior
+- [ ] With `--forensic`, 6 integrity checks run after the standard report and produce a verdict (CLEAN or N ISSUE(S) FOUND)
       </success_criteria>

@@ -6,6 +6,9 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ## [Unreleased]
 
+### Added
+- **`/gsd-progress --forensic`** — Opt-in integrity audit mode that appends a 6-check forensic pass after the standard progress report. Catches false completions (STATE vs artifact divergence), orphaned handoff files, deferred scope not captured in ROADMAP, memory-flagged pending work, blocking operational todos, and uncommitted source changes. Without the flag, `/gsd-progress` behavior is byte-for-byte unchanged. (#2189)
+
 ## [1.36.0] - 2026-04-14
 
 ### Added
