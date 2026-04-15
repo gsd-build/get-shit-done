@@ -93,19 +93,23 @@ This ensures workstream scope chains automatically through the workflow:
 ## CLI Usage
 
 ```bash
+# GSD_TOOLS resolves to the installed bin path, e.g.:
+#   $HOME/.claude/get-shit-done/bin/gsd-tools.cjs  (global install)
+#   .claude/get-shit-done/bin/gsd-tools.cjs         (local install)
+
 # All gsd-tools commands accept --ws
-node gsd-tools.cjs state json --ws feature-a
-node gsd-tools.cjs find-phase 3 --ws feature-b
+node "$GSD_TOOLS" state json --ws feature-a
+node "$GSD_TOOLS" find-phase 3 --ws feature-b
 
 # Session-local switching without --ws on every command
-GSD_SESSION_KEY=my-terminal-a node gsd-tools.cjs workstream set feature-a
-GSD_SESSION_KEY=my-terminal-a node gsd-tools.cjs state json
-GSD_SESSION_KEY=my-terminal-b node gsd-tools.cjs workstream set feature-b
-GSD_SESSION_KEY=my-terminal-b node gsd-tools.cjs state json
+GSD_SESSION_KEY=my-terminal-a node "$GSD_TOOLS" workstream set feature-a
+GSD_SESSION_KEY=my-terminal-a node "$GSD_TOOLS" state json
+GSD_SESSION_KEY=my-terminal-b node "$GSD_TOOLS" workstream set feature-b
+GSD_SESSION_KEY=my-terminal-b node "$GSD_TOOLS" state json
 
 # Workstream CRUD
-node gsd-tools.cjs workstream create <name>
-node gsd-tools.cjs workstream list
-node gsd-tools.cjs workstream status <name>
-node gsd-tools.cjs workstream complete <name>
+node "$GSD_TOOLS" workstream create <name>
+node "$GSD_TOOLS" workstream list
+node "$GSD_TOOLS" workstream status <name>
+node "$GSD_TOOLS" workstream complete <name>
 ```
