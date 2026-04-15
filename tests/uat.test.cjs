@@ -68,6 +68,45 @@ result: pending
     assert.strictEqual(output.results[0].items[0].name, 'Submit Button');
   });
 
+  // Regression: #2273 — bracketed result values [pending], [blocked], [skipped]
+  test('detects UAT items with bracketed result values (#2273)', () => {
+    const phaseDir = path.join(tmpDir, '.planning', 'phases', '01-foundation');
+    fs.mkdirSync(phaseDir, { recursive: true });
+
+    fs.writeFileSync(path.join(phaseDir, '01-UAT.md'), [
+      '---',
+      'status: testing',
+      'phase: 01-foundation',
+      'started: 2025-01-01T00:00:00Z',
+      'updated: 2025-01-01T00:00:00Z',
+      '---',
+      '',
+      '## Tests',
+      '',
+      '### 1. Login Form',
+      'expected: Form displays correctly',
+      'result: [pending]',
+      '',
+      '### 2. Submit Button',
+      'expected: Shows loading state',
+      'result: [blocked]',
+      'blocked_by: #123',
+      '',
+      '### 3. Error Message',
+      'expected: Shows validation error',
+      'result: [skipped]',
+    ].join('\n'));
+
+    const result = runGsdTools('audit-uat --raw', tmpDir);
+    assert.ok(result.success, `Command failed: ${result.error}`);
+
+    const output = JSON.parse(result.output);
+    assert.strictEqual(output.summary.total_items, 3, 'all 3 bracketed items should be detected');
+    assert.strictEqual(output.results[0].items[0].result, 'pending', '[pending] should parse as pending');
+    assert.strictEqual(output.results[0].items[1].result, 'blocked', '[blocked] should parse as blocked');
+    assert.strictEqual(output.results[0].items[2].result, 'skipped', '[skipped] should parse as skipped');
+  });
+
   test('detects UAT with blocked items and categorizes blocked_by', () => {
     const phaseDir = path.join(tmpDir, '.planning', 'phases', '02-api');
     fs.mkdirSync(phaseDir, { recursive: true });

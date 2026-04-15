@@ -181,7 +181,8 @@ function buildCheckpoint(currentTest) {
 function parseUatItems(content) {
   const items = [];
   // Match test blocks: ### N. Name\nexpected: ...\nresult: ...\n
-  const testPattern = /###\s*(\d+)\.\s*([^\n]+)\nexpected:\s*([^\n]+)\nresult:\s*(\w+)(?:\n(?:reported|reason|blocked_by):\s*[^\n]*)?/g;
+  // Accept both bare (result: pending) and bracketed (result: [pending]) formats (#2273)
+  const testPattern = /###\s*(\d+)\.\s*([^\n]+)\nexpected:\s*([^\n]+)\nresult:\s*\[?(\w+)\]?(?:\n(?:reported|reason|blocked_by):\s*[^\n]*)?/g;
   let match;
   while ((match = testPattern.exec(content)) !== null) {
     const [, num, name, expected, result] = match;
