@@ -465,6 +465,17 @@ describe('buildAdjacencyMap', () => {
     assert.strictEqual(entry.edge.label, 'reads_from');
     assert.strictEqual(entry.edge.confidence, 'EXTRACTED');
   });
+
+  // LINKS-01: graphify emits 'links' key; reader must fall back to it
+  test('falls back to graph.links when graph.edges is absent (LINKS-01)', () => {
+    const graphWithLinks = {
+      nodes: SAMPLE_GRAPH.nodes,
+      links: SAMPLE_GRAPH.edges,
+    };
+    const adj = buildAdjacencyMap(graphWithLinks);
+    assert.ok(adj['n1'].some(e => e.target === 'n2'), 'adjacency must traverse links');
+    assert.ok(adj['n2'].some(e => e.target === 'n1'), 'reverse adjacency must work');
+  });
 });
 
 // ─── seedAndExpand (TEST-01) ───────────────────────────────────────────────
@@ -678,6 +689,19 @@ describe('graphifyStatus', () => {
     const result = graphifyStatus(tmpDir);
     assert.strictEqual(result.hyperedge_count, 1);
   });
+
+  // LINKS-02: status edge_count must read graph.links when graph.edges is absent
+  test('reports correct edge_count when graph uses links key (LINKS-02)', () => {
+    enableGraphify(planningDir);
+    const graphWithLinks = {
+      nodes: SAMPLE_GRAPH.nodes,
+      links: SAMPLE_GRAPH.edges,
+      hyperedges: [],
+    };
+    writeGraphJson(planningDir, graphWithLinks);
+    const result = graphifyStatus(tmpDir);
+    assert.strictEqual(result.edge_count, 5, 'edge_count must equal links array length');
+  });
 });
 
 // ─── graphifyDiff (DIFF-01, DIFF-02) ──────────────────────────────────────
@@ -769,6 +793,35 @@ describe('graphifyDiff', () => {
     const result = graphifyDiff(tmpDir);
     assert.strictEqual(result.nodes.changed, 1, 'n1 label changed');
     assert.strictEqual(result.edges.changed, 1, 'edge confidence changed');
+  });
+
+  // LINKS-03: diff must handle links key in both current and snapshot (LINKS-03)
+  test('detects edge changes when graphs use links key (LINKS-03)', () => {
+    enableGraphify(planningDir);
+    const snapshot = {
+      nodes: [
+        { id: 'n1', label: 'AuthService', description: 'Auth', type: 'service' },
+        { id: 'n2', label: 'UserModel', description: 'User', type: 'model' },
+      ],
+      links: [
+        { source: 'n1', target: 'n2', label: 'reads_from', confidence: 'INFERRED' },
+      ],
+    };
+    const current = {
+      nodes: [
+        { id: 'n1', label: 'AuthService', description: 'Auth', type: 'service' },
+        { id: 'n2', label: 'UserModel', description: 'User', type: 'model' },
+      ],
+      links: [
+        { source: 'n1', target: 'n2', label: 'reads_from', confidence: 'EXTRACTED' },
+      ],
+    };
+    writeSnapshotJson(planningDir, snapshot);
+    writeGraphJson(planningDir, current);
+    const result = graphifyDiff(tmpDir);
+    assert.strictEqual(result.edges.changed, 1, 'edge confidence change must be detected via links key');
+    assert.strictEqual(result.edges.added, 0);
+    assert.strictEqual(result.edges.removed, 0);
   });
 });
 

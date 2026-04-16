@@ -165,7 +165,7 @@ function buildAdjacencyMap(graph) {
   for (const node of (graph.nodes || [])) {
     adj[node.id] = [];
   }
-  for (const edge of (graph.edges || [])) {
+  for (const edge of (graph.edges || graph.links || [])) {
     if (!adj[edge.source]) adj[edge.source] = [];
     if (!adj[edge.target]) adj[edge.target] = [];
     adj[edge.source].push({ target: edge.target, edge });
@@ -337,7 +337,7 @@ function graphifyStatus(cwd) {
     exists: true,
     last_build: stat.mtime.toISOString(),
     node_count: (graph.nodes || []).length,
-    edge_count: (graph.edges || []).length,
+    edge_count: (graph.edges || graph.links || []).length,
     hyperedge_count: (graph.hyperedges || []).length,
     stale: age > STALE_MS,
     age_hours: Math.round(age / (60 * 60 * 1000)),
@@ -384,8 +384,8 @@ function graphifyDiff(cwd) {
 
   // Diff edges (keyed by source+target+relation)
   const edgeKey = (e) => `${e.source}::${e.target}::${e.relation || e.label || ''}`;
-  const currentEdgeMap = Object.fromEntries((current.edges || []).map(e => [edgeKey(e), e]));
-  const snapshotEdgeMap = Object.fromEntries((snapshot.edges || []).map(e => [edgeKey(e), e]));
+  const currentEdgeMap = Object.fromEntries((current.edges || current.links || []).map(e => [edgeKey(e), e]));
+  const snapshotEdgeMap = Object.fromEntries((snapshot.edges || snapshot.links || []).map(e => [edgeKey(e), e]));
 
   const edgesAdded = Object.keys(currentEdgeMap).filter(k => !snapshotEdgeMap[k]);
   const edgesRemoved = Object.keys(snapshotEdgeMap).filter(k => !currentEdgeMap[k]);
@@ -454,7 +454,7 @@ function writeSnapshot(cwd) {
     version: 1,
     timestamp: new Date().toISOString(),
     nodes: graph.nodes || [],
-    edges: graph.edges || [],
+    edges: graph.edges || graph.links || [],
   };
 
   const snapshotPath = path.join(cwd, '.planning', 'graphs', '.last-build-snapshot.json');
