@@ -53,6 +53,7 @@ const MANAGED_HOOKS = [
   'gsd-phase-boundary.sh',
   'gsd-prompt-guard.js',
   'gsd-read-guard.js',
+  'gsd-read-injection-scanner.js',
   'gsd-session-state.sh',
   'gsd-statusline.js',
   'gsd-validate-commit.sh',
