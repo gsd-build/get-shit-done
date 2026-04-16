@@ -3016,6 +3016,10 @@ function installCodexConfig(targetDir, agentsSrc) {
     // Replace full .claude/get-shit-done prefix so path resolves to codex GSD install
     content = content.replace(/~\/\.claude\/get-shit-done\//g, codexGsdPath);
     content = content.replace(/\$HOME\/\.claude\/get-shit-done\//g, codexGsdPath);
+    // Replace remaining .claude paths with .codex equivalents (#2320)
+    content = content.replace(/\$HOME\/\.claude\//g, '$HOME/.codex/');
+    content = content.replace(/~\/\.claude\//g, '~/.codex/');
+    content = content.replace(/\.\/\.claude\//g, './.codex/');
     const { frontmatter } = extractFrontmatterAndBody(content);
     const name = extractFrontmatterField(frontmatter, 'name') || file.replace('.md', '');
     const description = extractFrontmatterField(frontmatter, 'description') || '';
