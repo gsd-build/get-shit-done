@@ -123,10 +123,15 @@ function runStatusline() {
     const session = data.session_id || '';
     const remaining = data.context_window?.remaining_percentage;
 
-    // Context window display (shows USED percentage scaled to usable context)
-    // Claude Code reserves ~16.5% for autocompact buffer, so usable context
-    // is 83.5% of the total window. We normalize to show 100% at that point.
-    const AUTO_COMPACT_BUFFER_PCT = 16.5;
+    // Context window display (shows USED percentage scaled to usable context).
+    // Claude Code reserves CLAUDE_CODE_AUTO_COMPACT_WINDOW tokens for the
+    // autocompact buffer; default ~165k of 1M = 16.5%. When users tune the
+    // env var, the meter tracks the actual threshold instead of the default.
+    const totalCtx = data.context_window?.context_window_size || 1_000_000;
+    const acw = parseInt(process.env.CLAUDE_CODE_AUTO_COMPACT_WINDOW || '0', 10);
+    const AUTO_COMPACT_BUFFER_PCT = acw > 0
+      ? Math.min(100, (acw / totalCtx) * 100)
+      : 16.5;
     let ctx = '';
     if (remaining != null) {
       // Normalize: subtract buffer from remaining, scale to usable range
