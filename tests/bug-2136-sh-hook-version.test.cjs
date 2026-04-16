@@ -1,10 +1,15 @@
 /**
- * Regression tests for bug #2136 / #2206
+ * Regression tests for bug #2136 / #2206 / #2294
  *
  * Root cause: three bash hooks (gsd-phase-boundary.sh, gsd-session-state.sh,
  * gsd-validate-commit.sh) shipped without a gsd-hook-version header, and the
  * stale-hook detector in gsd-check-update.js only matched JavaScript comment
  * syntax (//) — not bash comment syntax (#).
+ *
+ * Re-reported in #2294 by @raphaelbgr with a detailed root-cause analysis and
+ * the two-part fix: stamp bash hooks with "# gsd-hook-version: {{GSD_VERSION}}"
+ * and widen the detector regex to accept both "//" and "#" comment prefixes via
+ * the alternation (?:\/\/|#).
  *
  * Result: every session showed "⚠ stale hooks — run /gsd-update" immediately
  * after a fresh install, because the detector saw hookVersion: 'unknown' for
