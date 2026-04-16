@@ -660,6 +660,15 @@ After executor returns:
          fi
        fi
 
+       # Safety net: rescue uncommitted SUMMARY.md before worktree removal (#2296, mirrors #2070)
+       UNCOMMITTED_SUMMARY=$(git -C "$WT" ls-files --modified --others --exclude-standard -- "*SUMMARY.md" 2>/dev/null || true)
+       if [ -n "$UNCOMMITTED_SUMMARY" ]; then
+         echo "⚠ SUMMARY.md was not committed by executor — committing now to prevent data loss"
+         git -C "$WT" add -- "*SUMMARY.md" 2>/dev/null || true
+         git -C "$WT" commit --no-verify -m "docs(recovery): rescue uncommitted SUMMARY.md before worktree removal (#2070)" 2>/dev/null || true
+         git merge "$WT_BRANCH" --no-edit -m "chore: merge rescued SUMMARY.md from executor worktree ($WT_BRANCH)" 2>/dev/null || true
+       fi
+
        git worktree remove "$WT" --force 2>/dev/null || true
        git branch -D "$WT_BRANCH" 2>/dev/null || true
      fi
