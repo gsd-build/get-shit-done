@@ -75,6 +75,8 @@ ALLOWLIST=(
   'tests/verify.test.cjs'
   'get-shit-done/bin/lib/security.cjs'
   'hooks/gsd-prompt-guard.js'
+  'hooks/gsd-read-injection-scanner.js'
+  'tests/read-injection-scanner.test.cjs'
   'SECURITY.md'
 )
 
