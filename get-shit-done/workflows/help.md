@@ -228,6 +228,19 @@ Archive completed milestone and prepare for next version.
 
 Usage: `/gsd-complete-milestone 1.0.0`
 
+**`/gsd:merge-milestone [target-branch]`**
+Merge a milestone branch into target with AI-assisted conflict resolution.
+
+- Squash merges all commits (surfaces all conflicts at once, not per-commit)
+- Gathers .planning/ context from both branches to understand intent
+- Merges .planning/ files using GSD command-aware logic (each file type has its own merge strategy)
+- Resolves code conflicts guided by merged .planning/ documents
+- Every resolution presented with context + reasoning + preview for user confirmation
+- Post-merge: cross-file consistency check, impact assessment, optional test run
+
+Usage: `/gsd:merge-milestone main`
+Usage: `/gsd:merge-milestone --dry-run`
+
 ### Progress Tracking
 
 **`/gsd-progress`**
