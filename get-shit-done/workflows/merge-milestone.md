@@ -104,17 +104,12 @@ This is the foundation for all subsequent conflict resolution. Read .planning/ a
 
 ### 4a. Collect artifacts from both sides
 
-```bash
-# Target branch versions — current working tree (we're on target after checkout)
-# Source branch versions — from $CURRENT_BRANCH (not MERGE_HEAD, which doesn't exist after --squash)
-git show $CURRENT_BRANCH:.planning/PROJECT.md > /tmp/source-PROJECT.md 2>/dev/null || true
-git show $CURRENT_BRANCH:.planning/ROADMAP.md > /tmp/source-ROADMAP.md 2>/dev/null || true
-git show $CURRENT_BRANCH:.planning/REQUIREMENTS.md > /tmp/source-REQUIREMENTS.md 2>/dev/null || true
-git show $CURRENT_BRANCH:.planning/MILESTONES.md > /tmp/source-MILESTONES.md 2>/dev/null || true
-git show $CURRENT_BRANCH:.planning/STATE.md > /tmp/source-STATE.md 2>/dev/null || true
-```
+Read both branches' `.planning/` artifacts directly using `git show` — no temp files needed:
 
-Read the target branch versions from `.planning/` directly (current working tree, ours side).
+- **Target branch versions**: Read from `.planning/` in the current working tree (we're on target after checkout)
+- **Source branch versions**: Read via `git show $CURRENT_BRANCH:.planning/<file>` (note: use `$CURRENT_BRANCH` not `MERGE_HEAD`, since `MERGE_HEAD` doesn't exist after `--squash`)
+
+Files to collect from source: `PROJECT.md`, `ROADMAP.md`, `REQUIREMENTS.md`, `MILESTONES.md`, `STATE.md`.
 
 **Graceful degradation for missing files:**
 - STATE.md unavailable → Infer progress from ROADMAP.md (`[x]`/`[ ]` marks) and SUMMARY.md one-liners. Note the gap, ask user to supplement if needed.
