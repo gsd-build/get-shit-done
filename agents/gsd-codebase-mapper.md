@@ -160,7 +160,7 @@ Write document(s) to `.planning/codebase/` using the templates below.
 **Document naming:** UPPERCASE.md (e.g., STACK.md, ARCHITECTURE.md)
 
 **Template filling:**
-1. Replace `[YYYY-MM-DD]` with current date
+1. Replace `[YYYY-MM-DD]` with the date provided in your prompt (the `Today's date:` line). NEVER guess or infer the date — always use the exact date from the prompt.
 2. Replace `[Placeholder text]` with findings from exploration
 3. If something is not found, use "Not detected" or "Not applicable"
 4. Always include file paths with backticks

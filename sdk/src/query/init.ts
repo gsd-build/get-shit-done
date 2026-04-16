@@ -747,6 +747,7 @@ export const initMilestoneOp: QueryHandler = async (_args, projectDir) => {
  */
 export const initMapCodebase: QueryHandler = async (_args, projectDir) => {
   const config = await loadConfig(projectDir);
+  const now = new Date();
   const codebaseDir = join(projectDir, '.planning', 'codebase');
   let existingMaps: string[] = [];
   try {
@@ -761,6 +762,8 @@ export const initMapCodebase: QueryHandler = async (_args, projectDir) => {
     search_gitignored: config.search_gitignored,
     parallelization: config.parallelization,
     subagent_timeout: (config as Record<string, unknown>).subagent_timeout ?? undefined,
+    date: now.toISOString().split('T')[0],
+    timestamp: now.toISOString(),
     codebase_dir: '.planning/codebase',
     existing_maps: existingMaps,
     has_maps: existingMaps.length > 0,
