@@ -193,14 +193,21 @@ describe('gsd-read-injection-scanner: edge cases', () => {
 
   test('EDGE-05: malformed JSON input exits silently without crashing', () => {
     const input = '{ not valid json !!!';
+    let stdout = '';
+    let exitCode = 0;
+    let signal = null;
     try {
-      execFileSync(process.execPath, [HOOK_PATH], {
+      stdout = execFileSync(process.execPath, [HOOK_PATH], {
         input, encoding: 'utf-8', timeout: 5000, stdio: ['pipe', 'pipe', 'pipe'],
-      });
+      }).trim();
     } catch (err) {
-      // exit code 0 or non-zero are both acceptable — what matters is no crash/hang
-      assert.ok(err.status !== null, 'should exit cleanly');
+      exitCode = err.status ?? 0;
+      signal = err.signal ?? null;
+      stdout = (err.stdout || '').toString().trim();
     }
+    assert.equal(signal, null, 'should not hang or time out');
+    assert.equal(exitCode, 0, 'should exit 0 on malformed JSON');
+    assert.equal(stdout, '', 'should produce no output on malformed JSON');
   });
 
   test('EDGE-06: object-form tool_response is handled', () => {
