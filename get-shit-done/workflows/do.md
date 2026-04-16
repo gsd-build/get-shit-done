@@ -1,5 +1,5 @@
 <purpose>
-Analyze freeform text from the user and route to the most appropriate GSD command. This is a dispatcher — it never does the work itself. Match user intent to the best command, confirm the routing, and hand off.
+Analyze freeform text from the user and route to the most appropriate GSD command. This is a dispatcher — it never does the work itself. Match user intent to the best command, confirm the routing with a weight label, and hand off.
 </purpose>
 
 <required_reading>
@@ -37,50 +37,58 @@ Track whether `.planning/` exists — some routes require it, others don't.
 
 Evaluate `$ARGUMENTS` against these routing rules. Apply the **first matching** rule:
 
-| If the text describes... | Route to | Why |
-|--------------------------|----------|-----|
-| Starting a new project, "set up", "initialize" | `/gsd-new-project` | Needs full project initialization |
-| Mapping or analyzing an existing codebase | `/gsd-map-codebase` | Codebase discovery |
-| A bug, error, crash, failure, or something broken | `/gsd-debug` | Needs systematic investigation |
-| Exploring, researching, comparing, or "how does X work" | `/gsd-research-phase` | Domain research before planning |
-| Discussing vision, "how should X look", brainstorming | `/gsd-discuss-phase` | Needs context gathering |
-| A complex task: refactoring, migration, multi-file architecture, system redesign | `/gsd-add-phase` | Needs a full phase with plan/build cycle |
-| Planning a specific phase or "plan phase N" | `/gsd-plan-phase` | Direct planning request |
-| Executing a phase or "build phase N", "run phase N" | `/gsd-execute-phase` | Direct execution request |
-| Running all remaining phases automatically | `/gsd-autonomous` | Full autonomous execution |
-| A review or quality concern about existing work | `/gsd-verify-work` | Needs verification |
-| Checking progress, status, "where am I" | `/gsd-progress` | Status check |
-| Resuming work, "pick up where I left off" | `/gsd-resume-work` | Session restoration |
-| A note, idea, or "remember to..." | `/gsd-add-todo` | Capture for later |
-| Adding tests, "write tests", "test coverage" | `/gsd-add-tests` | Test generation |
-| Completing a milestone, shipping, releasing | `/gsd-complete-milestone` | Milestone lifecycle |
-| A specific, actionable, small task (add feature, fix typo, update config) | `/gsd-quick` | Self-contained, single executor |
+| If the text describes... | Route to | Weight | Why |
+|--------------------------|----------|--------|-----|
+| Starting a new project, "set up", "initialize" | `/gsd-new-project` | 🔴 large | Needs full project initialization |
+| Mapping or analyzing an existing codebase | `/gsd-map-codebase` | 🟡 medium | Codebase discovery |
+| A bug, error, crash, failure, or something broken | `/gsd-debug` | 🟡 medium | Needs systematic investigation |
+| Exploring, researching, comparing, or "how does X work" | `/gsd-research-phase` | 🟡 medium | Domain research before planning |
+| Discussing vision, "how should X look", brainstorming | `/gsd-discuss-phase` | 🟡 medium | Needs context gathering |
+| A complex task: refactoring, migration, multi-file architecture, system redesign | `/gsd-add-phase` | 🔴 large | Needs a full phase with plan/build cycle |
+| Planning a specific phase or "plan phase N" | `/gsd-plan-phase` | 🔴 large | Direct planning request |
+| Executing a phase or "build phase N", "run phase N" | `/gsd-execute-phase` | 🔴 large | Direct execution request |
+| Running all remaining phases automatically | `/gsd-autonomous` | 🔴 large | Full autonomous execution |
+| A review or quality concern about existing work | `/gsd-verify-work` | 🟡 medium | Needs verification |
+| Checking progress, status, "where am I" | `/gsd-progress` | 🟢 small | Status check |
+| Resuming work, "pick up where I left off" | `/gsd-resume-work` | 🟢 small | Session restoration |
+| A note, idea, or "remember to..." | `/gsd-add-todo` | 🟢 small | Capture for later |
+| Adding tests, "write tests", "test coverage" | `/gsd-add-tests` | 🟡 medium | Test generation |
+| Completing a milestone, shipping, releasing | `/gsd-complete-milestone` | 🔴 large | Milestone lifecycle |
+| A specific, actionable, small task (add feature, fix typo, update config) | `/gsd-quick` | 🟢 small | Self-contained, single executor |
+
+**Weight definitions:**
+- 🟢 **small** — runs inline, no subagents, no planning artifacts, done in one pass
+- 🟡 **medium** — may spawn one agent or produce a lightweight artifact, no full plan/build cycle
+- 🔴 **large** — triggers a multi-step pipeline (discuss → plan → execute), creates planning artifacts, may take several minutes
 
 **Requires `.planning/` directory:** All routes except `/gsd-new-project`, `/gsd-map-codebase`, `/gsd-help`, and `/gsd-join-discord`. If the project doesn't exist and the route requires it, suggest `/gsd-new-project` first.
 
-**Ambiguity handling:** If the text could reasonably match multiple routes, ask the user via AskUserQuestion with the top 2-3 options. For example:
+**Ambiguity handling:** If the text could reasonably match multiple routes, ask the user via AskUserQuestion with the top 2-3 options. Include the weight label in each option so the user can calibrate. For example:
 
 ```
 "Refactor the authentication system" could be:
-1. /gsd-add-phase — Full planning cycle (recommended for multi-file refactors)
-2. /gsd-quick — Quick execution (if scope is small and clear)
+1. /gsd-add-phase 🔴 large — Full planning cycle (discuss → plan → execute)
+2. /gsd-quick 🟢 small — Inline execution, no planning artifacts
 
-Which approach fits better?
+Which fits the scope of what you need?
 ```
 </step>
 
 <step name="display">
-**Show the routing decision.**
+**Show the routing decision with weight.**
 
 ```
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
  GSD ► ROUTING
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
-**Input:** {first 80 chars of $ARGUMENTS}
+**Input:**  {first 80 chars of $ARGUMENTS}
+**Weight:** {🟢 small | 🟡 medium | 🔴 large} — {one-line description of what this weight means for this task}
 **Routing to:** {chosen command}
 **Reason:** {one-line explanation}
 ```
+
+The weight line removes ambiguity before anything runs — the user knows whether they're about to trigger a 10-second inline fix or a multi-minute planning pipeline.
 </step>
 
 <step name="dispatch">
@@ -98,9 +106,10 @@ After invoking the command, stop. The dispatched command handles everything from
 <success_criteria>
 - [ ] Input validated (not empty)
 - [ ] Intent matched to exactly one GSD command
-- [ ] Ambiguity resolved via user question (if needed)
+- [ ] Weight label (small/medium/large) assigned to chosen command
+- [ ] Ambiguity resolved via user question with weight labels included (if needed)
 - [ ] Project existence checked for routes that require it
-- [ ] Routing decision displayed before dispatch
+- [ ] Routing decision displayed with weight before dispatch
 - [ ] Command invoked with appropriate arguments
 - [ ] No work done directly — dispatcher only
 </success_criteria>
