@@ -10,6 +10,22 @@ const os = require('os');
 // --- GSD state reader -------------------------------------------------------
 
 /**
+ * Walk up from dir looking for a .planning/ directory.
+ * Returns true if GSD planning is present (even without STATE.md).
+ */
+function hasGsdPlanning(dir) {
+  const home = os.homedir();
+  let current = dir;
+  for (let i = 0; i < 10; i++) {
+    if (fs.existsSync(path.join(current, '.planning'))) return true;
+    const parent = path.dirname(current);
+    if (parent === current || current === home) break;
+    current = parent;
+  }
+  return false;
+}
+
+/**
  * Walk up from dir looking for .planning/STATE.md.
  * Returns parsed state object or null.
  */
@@ -195,7 +211,14 @@ function runStatusline() {
     }
 
     // GSD state (milestone · status · phase) — shown when no todo task
-    const gsdStateStr = task ? '' : formatGsdState(readGsdState(dir) || {});
+    const gsdState = readGsdState(dir);
+    const gsdStateStr = task ? '' : formatGsdState(gsdState || {});
+
+    // Helm indicator: ⚡ GSD when .planning/ exists, ◇ CC otherwise
+    const gsdPresent = !!gsdState || hasGsdPlanning(dir);
+    const helm = gsdPresent
+      ? '\x1b[32m⚡ GSD\x1b[0m │ '
+      : '\x1b[2m◇ CC\x1b[0m │ ';
 
     // GSD update available?
     // Check shared cache first (#1421), fall back to runtime-specific cache for
@@ -238,9 +261,9 @@ function runStatusline() {
         : null;
 
     if (middle) {
-      process.stdout.write(`${gsdUpdate}\x1b[2m${model}\x1b[0m │ ${middle} │ \x1b[2m${dirname}\x1b[0m${ctx}`);
+      process.stdout.write(`${gsdUpdate}${helm}\x1b[2m${model}\x1b[0m │ ${middle} │ \x1b[2m${dirname}\x1b[0m${ctx}`);
     } else {
-      process.stdout.write(`${gsdUpdate}\x1b[2m${model}\x1b[0m │ \x1b[2m${dirname}\x1b[0m${ctx}`);
+      process.stdout.write(`${gsdUpdate}${helm}\x1b[2m${model}\x1b[0m │ \x1b[2m${dirname}\x1b[0m${ctx}`);
     }
   } catch (e) {
     // Silent fail - don't break statusline on parse errors
