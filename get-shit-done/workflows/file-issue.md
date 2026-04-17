@@ -70,7 +70,7 @@ Resolve the mapped label only if it exists in the target repo (avoid hard failur
 
 ```bash
 LABEL_NAME="{mapped label from ISSUE_TYPE}"
-EXISTING_LABEL=$(gh label list --repo "$REPO" --search "^${LABEL_NAME}$" --json name -q '.[0].name' 2>/dev/null || true)
+EXISTING_LABEL=$(gh label list --repo "$REPO" --search "$LABEL_NAME" --json name -q '.[] | select(.name == env.LABEL_NAME) | .name' 2>/dev/null || true)
 
 LABEL_FLAG=""
 if [ -n "$EXISTING_LABEL" ]; then
