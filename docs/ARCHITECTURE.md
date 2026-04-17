@@ -409,7 +409,7 @@ UI-SPEC.md (per phase) ───────────────────
 
 ```
 ~/.claude/                          # Claude Code (global install)
-├── commands/gsd/*.md               # 75 slash commands
+├── commands/gsd/*.md               # 79 slash commands
 ├── get-shit-done/
 │   ├── bin/gsd-tools.cjs           # CLI utility
 │   ├── bin/lib/*.cjs               # 19 domain modules
