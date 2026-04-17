@@ -247,7 +247,13 @@ If confirmed, ask:
 
 **Auto path:** Set `ISSUE_TITLE` to `"bug: {concise description from anomaly}"` and `ISSUE_DESCRIPTION` to a brief summary derived from the Root Cause Hypothesis section of the report.
 
-**Custom path:** Run the intake from Step 1 of `@~/.claude/get-shit-done/workflows/feedback.md` (collect_feedback) to let the user author their own `ISSUE_TITLE` and `ISSUE_DESCRIPTION`. Pre-seed `$ARGUMENTS` with the anomaly summary so the user can refine rather than start from scratch.
+**Custom path:** Prompt the user directly for a title and description, pre-seeding the anomaly summary as a starting point:
+
+> "Suggest a title for this issue (or press Enter to use the auto-derived one): {auto title}"
+
+> "Add a description (or press Enter to use the investigation summary):"
+
+Set `ISSUE_TITLE` and `ISSUE_DESCRIPTION` from the user's responses (falling back to the auto-derived values if blank). Do not invoke `feedback.md` — forensics enrichment is already complete.
 
 Then prepare variables for the shared filing workflow:
 
