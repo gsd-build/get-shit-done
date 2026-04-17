@@ -27,6 +27,7 @@ Callers set these variables before delegating to this workflow:
 ```
 
 Validate required inputs. If `ISSUE_TYPE`, `ISSUE_TITLE`, or `ISSUE_DESCRIPTION` is missing, abort with a clear error — callers must satisfy the contract.
+Also validate that `ISSUE_TYPE` is one of `bug`, `feature`, or `question`; if not, abort with a clear error.
 </step>
 
 <step name="render_issue_body">
