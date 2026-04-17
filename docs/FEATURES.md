@@ -2366,6 +2366,20 @@ Test suite that scans all agent, workflow, and command files for embedded inject
 
 **Produces:** `{phase}-LEARNINGS.md` with YAML frontmatter (phase, project, counts per category, missing_artifacts)
 
+**Optional integration — `capture_thought`:** `capture_thought` is a **convention, not a bundled tool**. GSD does not ship one and does not require one. The workflow checks whether any MCP server in the current session exposes a tool named `capture_thought` and, if so, calls it once per extracted learning with the signature below. If no such tool is present, the step is skipped silently and `LEARNINGS.md` remains the primary output.
+
+Expected tool signature:
+```
+capture_thought({
+  category: "decision" | "lesson" | "pattern" | "surprise",
+  phase: <phase_number>,
+  content: <learning_text>,
+  source: <artifact_name>
+})
+```
+
+Users who run a memory / knowledge-base MCP server (for example, ExoCortex-style servers, `claude-mem`, or `mem0`-style servers) can implement this tool name to have learnings routed into their knowledge base automatically with `project`, `phase`, and `source` metadata. Everyone else can use `/gsd-extract-learnings` without any extra setup — the `LEARNINGS.md` artifact is the feature.
+
 ---
 
 ### 113. SDK Workstream Support

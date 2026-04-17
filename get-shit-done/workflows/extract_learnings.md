@@ -95,7 +95,11 @@ Each surprise entry must include:
 </step>
 
 <step name="capture_thought_integration">
-If the `capture_thought` tool is available in the current session, capture each extracted learning as a thought with metadata:
+**What this step is:** `capture_thought` is an **optional convention**, not a bundled GSD tool. GSD does not ship one and does not require one. The step is a hook for users who run a memory / knowledge-base MCP server (for example ExoCortex-style servers, `claude-mem`, or `mem0`-style servers) that exposes a tool with this exact name. If any MCP server in the current session provides a `capture_thought` tool with the signature below, each extracted learning is routed through it with metadata. If no such tool is present, the step is a silent no-op — `LEARNINGS.md` is always the primary output.
+
+**Detection:** Check whether a tool named `capture_thought` is available in the current session. Do not assume any specific MCP server is connected.
+
+**If available**, call once per extracted learning:
 
 ```
 capture_thought({
@@ -106,7 +110,7 @@ capture_thought({
 })
 ```
 
-If `capture_thought` is not available (e.g., runtime does not support it), gracefully skip this step and continue. The LEARNINGS.md file is the primary output — capture_thought is a supplementary integration that provides a fallback for runtimes with thought capture support. The workflow must not fail or warn if capture_thought is unavailable.
+**If not available** (no MCP server in the session exposes this tool, or the runtime does not support it), skip the step silently and continue. The workflow must not fail or warn — this is expected behavior for users who do not run a knowledge-base MCP.
 </step>
 
 <step name="write_learnings">
