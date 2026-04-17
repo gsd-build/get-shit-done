@@ -31,8 +31,8 @@ If `ISSUE_TYPE` is `bug`, ask the user:
 > "Want me to run a quick forensics investigation first? This checks git history, planning state, and artifacts for anomalies that might explain the bug. [Y/n]"
 
 If yes:
-1. Execute Steps 2–4 from `@~/.claude/get-shit-done/workflows/forensics.md` (Gather Evidence → Detect Anomalies → Generate Report). Skip Steps 5–8 (presentation, interactive investigation, issue creation, STATE update — those are handled here).
-2. Read the generated report from `.planning/forensics/report-{timestamp}.md`.
+1. Execute Steps 2â€“4 from `@~/.claude/get-shit-done/workflows/forensics.md` (Gather Evidence â†’ Detect Anomalies â†’ Generate Report). Skip Steps 5â€“8 (presentation, interactive investigation, issue creation, STATE update â€” those are handled here).
+2. Read the most recently generated report from `.planning/forensics/report-*.md` (the file created by the just-completed run).
 3. Set `INVESTIGATION_FINDINGS` to the redacted report contents.
 
 If no (or if `ISSUE_TYPE` is `feature` or `question`):
@@ -55,11 +55,21 @@ esac
 
 GSD_VERSION=""
 for candidate in \
+  "${CLAUDE_CONFIG_DIR:-}/get-shit-done/VERSION" \
   "$PREFERRED_CONFIG_DIR/get-shit-done/VERSION" \
   "$HOME/.claude/get-shit-done/VERSION" \
+  "$HOME/.gemini/get-shit-done/VERSION" \
+  "$HOME/.config/kilo/get-shit-done/VERSION" \
+  "$HOME/.kilo/get-shit-done/VERSION" \
+  "$HOME/.config/opencode/get-shit-done/VERSION" \
+  "$HOME/.opencode/get-shit-done/VERSION" \
   "$HOME/.codex/get-shit-done/VERSION" \
   ".claude/get-shit-done/VERSION" \
-  ".codex/get-shit-done/VERSION"
+  ".gemini/get-shit-done/VERSION" \
+  ".config/kilo/get-shit-done/VERSION" \
+  ".kilo/get-shit-done/VERSION" \
+  ".config/opencode/get-shit-done/VERSION" \
+  ".opencode/get-shit-done/VERSION" \
 do
   if [ -n "$candidate" ] && [ -f "$candidate" ]; then
     GSD_VERSION="$(cat "$candidate")"
@@ -124,16 +134,10 @@ Render the gathered diagnostics into `DIAGNOSTICS_MARKDOWN`:
   - workflow.use_worktrees: {USE_WORKTREES}
   - commit_docs: {COMMIT_DOCS}
 
-### Raw State JSON
+### State Snapshot (redacted)
 
 ```json
-{STATE_JSON}
-```
-
-### Raw State Snapshot
-
-```json
-{STATE_SNAPSHOT}
+{STATE_SNAPSHOT_REDACTED}
 ```
 ````
 </step>
@@ -141,12 +145,12 @@ Render the gathered diagnostics into `DIAGNOSTICS_MARKDOWN`:
 <step name="file_issue">
 Set the variables required by the shared issue-filing workflow, then delegate:
 
-- `ISSUE_TYPE` — from step 1
-- `ISSUE_TITLE` — from step 1
-- `ISSUE_DESCRIPTION` — from step 1
-- `DIAGNOSTICS_MARKDOWN` — from step 3
-- `INVESTIGATION_FINDINGS` — from step 1 forensics enrichment (empty if skipped)
-- `REPO` — `gsd-build/get-shit-done`
+- `ISSUE_TYPE` â€” from step 1
+- `ISSUE_TITLE` â€” from step 1
+- `ISSUE_DESCRIPTION` â€” from step 1
+- `DIAGNOSTICS_MARKDOWN` â€” from step 3
+- `INVESTIGATION_FINDINGS` â€” from step 1 forensics enrichment (empty if skipped)
+- `REPO` â€” `gsd-build/get-shit-done`
 
 Execute `@~/.claude/get-shit-done/workflows/file-issue.md` end-to-end. It handles rendering the final issue body, `gh issue create`, URL fallback, and raw markdown fallback.
 </step>
@@ -156,7 +160,7 @@ Execute `@~/.claude/get-shit-done/workflows/file-issue.md` end-to-end. It handle
 <success_criteria>
 - Intake completes with type, title, and description
 - Diagnostics come from `gsd-sdk query` helpers where available
-- Bug-type issues offer optional forensics enrichment via `/gsd-forensics` steps 2–4
+- Bug-type issues offer optional forensics enrichment via `/gsd-forensics` steps 2â€“4
 - Issue filing delegates to `@~/.claude/get-shit-done/workflows/file-issue.md`
 - `DIAGNOSTICS_MARKDOWN` and `INVESTIGATION_FINDINGS` are set before delegation
 </success_criteria>
