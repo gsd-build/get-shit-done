@@ -610,6 +610,98 @@ function resolveWorktreeRoot(cwd) {
 }
 
 /**
+ * Parse `git worktree list --porcelain` output into an array of
+ * { path, branch } objects.  Entries with a detached HEAD (no branch line)
+ * are skipped because we cannot safely reason about their merge status.
+ *
+ * @param {string} porcelain - raw output from git worktree list --porcelain
+ * @returns {{ path: string, branch: string }[]}
+ */
+function parseWorktreePorcelain(porcelain) {
+  const entries = [];
+  let current = null;
+  for (const line of porcelain.split('\n')) {
+    if (line.startsWith('worktree ')) {
+      current = { path: line.slice('worktree '.length).trim(), branch: null };
+    } else if (line.startsWith('branch refs/heads/') && current) {
+      current.branch = line.slice('branch refs/heads/'.length).trim();
+    } else if (line === '' && current) {
+      if (current.branch) entries.push(current);
+      current = null;
+    }
+  }
+  // flush last entry if file doesn't end with blank line
+  if (current && current.branch) entries.push(current);
+  return entries;
+}
+
+/**
+ * Remove linked git worktrees whose branch has already been merged into the
+ * current HEAD of the main worktree.  Also runs `git worktree prune` to clear
+ * any stale references left by manually-deleted worktree directories.
+ *
+ * Safe guards:
+ *  - Never removes the main worktree (first entry in --porcelain output).
+ *  - Never removes the worktree at process.cwd().
+ *  - Never removes a worktree whose branch has unmerged commits.
+ *  - Skips detached-HEAD worktrees (no branch name).
+ *
+ * @param {string} repoRoot - absolute path to the main (or any) worktree of
+ *   the repository; used as `cwd` for git commands.
+ * @returns {string[]} list of worktree paths that were removed
+ */
+function pruneOrphanedWorktrees(repoRoot) {
+  const pruned = [];
+  const cwd = process.cwd();
+
+  try {
+    // 1. Get all worktrees in porcelain format
+    const listResult = execGit(repoRoot, ['worktree', 'list', '--porcelain']);
+    if (listResult.exitCode !== 0) return pruned;
+
+    const worktrees = parseWorktreePorcelain(listResult.stdout);
+    if (worktrees.length === 0) {
+      execGit(repoRoot, ['worktree', 'prune']);
+      return pruned;
+    }
+
+    // 2. First entry is the main worktree — never touch it
+    const mainWorktreePath = worktrees[0].path;
+
+    // 3. Check each non-main worktree
+    for (let i = 1; i < worktrees.length; i++) {
+      const { path: wtPath, branch } = worktrees[i];
+
+      // Never remove the worktree for the current process directory
+      if (wtPath === cwd || cwd.startsWith(wtPath + path.sep)) continue;
+
+      // Check if the branch is fully merged into HEAD (main)
+      // git merge-base --is-ancestor <branch> HEAD exits 0 when merged
+      const ancestorCheck = execGit(repoRoot, [
+        'merge-base', '--is-ancestor', branch, 'HEAD',
+      ]);
+
+      if (ancestorCheck.exitCode !== 0) {
+        // Not yet merged — leave it alone
+        continue;
+      }
+
+      // Remove the worktree and delete the branch
+      const removeResult = execGit(repoRoot, ['worktree', 'remove', '--force', wtPath]);
+      if (removeResult.exitCode === 0) {
+        execGit(repoRoot, ['branch', '-D', branch]);
+        pruned.push(wtPath);
+      }
+    }
+  } catch { /* never crash the caller */ }
+
+  // 4. Always run prune to clear stale references (e.g. manually-deleted dirs)
+  execGit(repoRoot, ['worktree', 'prune']);
+
+  return pruned;
+}
+
+/**
  * Acquire a file-based lock for .planning/ writes.
  * Prevents concurrent worktrees from corrupting shared planning files.
  * Lock is auto-released after the callback completes.
@@ -1637,4 +1729,5 @@ module.exports = {
   checkAgentsInstalled,
   atomicWriteFileSync,
   timeAgo,
+  pruneOrphanedWorktrees,
 };

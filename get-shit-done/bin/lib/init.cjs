@@ -1211,6 +1211,10 @@ function cmdInitManager(cwd, raw) {
 }
 
 function cmdInitProgress(cwd, raw) {
+  try {
+    const { pruneOrphanedWorktrees } = require('./core.cjs');
+    pruneOrphanedWorktrees(cwd);
+  } catch (_) {}
   const config = loadConfig(cwd);
   const milestone = getMilestoneInfo(cwd);
 
