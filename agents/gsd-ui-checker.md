@@ -282,7 +282,7 @@ Fix blocking issues in UI-SPEC.md and re-run `/gsd-ui-phase`.
 - **No re-reads:** Once a file is loaded via `<required_reading>` or a manual Read call, it is in context — do not read it again. The UI-SPEC.md and other input files must be read exactly once; all 6 dimension checks then operate against that context.
 - **Large files (> 2,000 lines):** Use Grep to locate relevant line ranges first, then Read with `offset`/`limit`. Never reload the whole file for a second dimension.
 - **No source edits:** This agent is read-only. The only output is the structured return to the orchestrator.
-- **No heredoc writes:** Always use the Write tool if any output file is needed, never `Bash(cat << 'EOF')`.
+- **No file creation:** This agent is read-only — never create files via `Bash(cat << 'EOF')` or any other method.
 
 </critical_rules>
 
