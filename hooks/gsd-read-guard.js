@@ -36,8 +36,8 @@ process.stdin.on('end', () => {
       process.exit(0);
     }
 
-    // Claude Code natively enforces read-before-edit — skip the advisory (#1984)
-    if (process.env.CLAUDE_SESSION_ID) {
+    // Claude Code natively enforces read-before-edit — skip the advisory (#1984, #2344)
+    if (process.env.CLAUDE_SESSION_ID || process.env.CLAUDECODE) {
       process.exit(0);
     }
 
