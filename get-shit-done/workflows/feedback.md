@@ -75,7 +75,7 @@ NODE_VERSION=$(node -v 2>/dev/null || echo "unknown")
 OS_NAME=$(uname -s 2>/dev/null || echo "$OS")
 ARCH_NAME=$(uname -m 2>/dev/null || node -p "process.arch" 2>/dev/null || echo "unknown")
 CURRENT_DIR=$(pwd)
-ACTIVE_WORKSTREAM=${GSD_WORKSTREAM:-$(gsd-sdk query workstream get 2>/dev/null || echo "none")}
+ACTIVE_WORKSTREAM=${GSD_WORKSTREAM:-none}
 ```
 
 **2. State and phase diagnostics**
