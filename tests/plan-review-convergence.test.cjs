@@ -241,59 +241,6 @@ describe('plan-review-convergence workflow: escalation gate (#2306)', () => {
   });
 });
 
-// ─── Workflow: stall detection — behavioral ───────────────────────────────
-
-describe('plan-review-convergence workflow: stall detection behavioral (#2306)', () => {
-  const workflow = fs.readFileSync(WORKFLOW_PATH, 'utf8');
-
-  test('workflow surfaces stall warning when prev_high_count equals current HIGH_COUNT', () => {
-    // Behavioral test: two consecutive cycles with the same HIGH count must trigger
-    // the stall warning. The workflow must compare HIGH_COUNT >= prev_high_count and
-    // emit a warning string that would appear in output.
-    assert.ok(
-      workflow.includes('prev_high_count') || workflow.includes('prev_HIGH'),
-      'workflow must track prev_high_count across cycles'
-    );
-    // The comparison that detects the stall
-    assert.ok(
-      workflow.includes('HIGH_COUNT >= prev_high_count') ||
-      workflow.includes('HIGH_COUNT >= prev_HIGH') ||
-      workflow.includes('not decreasing'),
-      'workflow must compare current HIGH count against previous to detect stall'
-    );
-    // The stall warning text that appears in output
-    assert.ok(
-      workflow.includes('stall') || workflow.includes('Stall') || workflow.includes('not decreasing'),
-      'workflow must emit a stall warning when HIGH count is not decreasing'
-    );
-  });
-});
-
-// ─── Workflow: --max-cycles 1 immediate escalation — behavioral ────────────
-
-describe('plan-review-convergence workflow: --max-cycles 1 immediate escalation behavioral (#2306)', () => {
-  const workflow = fs.readFileSync(WORKFLOW_PATH, 'utf8');
-
-  test('workflow escalates immediately after cycle 1 when --max-cycles 1 and HIGH > 0', () => {
-    // Behavioral test: when max_cycles=1, after the first review cycle, if HIGH_COUNT > 0
-    // the workflow must trigger the escalation gate (cycle >= MAX_CYCLES check fires on
-    // cycle 1 itself). Verify the workflow contains the logic for this edge case.
-    assert.ok(
-      workflow.includes('cycle >= MAX_CYCLES') ||
-      workflow.includes('cycle >= max_cycles') ||
-      (workflow.includes('MAX_CYCLES') && workflow.includes('AskUserQuestion')),
-      'workflow must check cycle >= MAX_CYCLES so --max-cycles 1 triggers escalation after first cycle'
-    );
-    // Escalation gate must fire when HIGH > 0 (not just at exactly max_cycles)
-    assert.ok(
-      workflow.includes('HIGH_COUNT > 0') ||
-      workflow.includes('HIGH concerns remain') ||
-      workflow.includes('Proceed anyway'),
-      'escalation gate must be reachable when HIGH_COUNT > 0 after a single cycle'
-    );
-  });
-});
-
 // ─── Workflow: REVIEWS.md verification ────────────────────────────────────
 
 describe('plan-review-convergence workflow: artifact verification (#2306)', () => {

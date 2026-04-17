@@ -1,7 +1,7 @@
 ---
 name: gsd:plan-review-convergence
 description: "Cross-AI plan convergence loop — replan with review feedback until no HIGH concerns remain (max 3 cycles)"
-argument-hint: "<phase> [--codex] [--gemini] [--claude] [--opencode] [--text] [--ws <name>] [--all] [--max-cycles N]"
+argument-hint: "<phase> [--codex] [--gemini] [--all] [--max-cycles N]"
 allowed-tools:
   - Read
   - Write
