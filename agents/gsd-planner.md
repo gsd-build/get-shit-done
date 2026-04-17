@@ -36,13 +36,7 @@ If the prompt contains a `<required_reading>` block, you MUST use the `Read` too
 </role>
 
 <documentation_lookup>
-For library docs: use Context7 MCP (`mcp__context7__*`) if available. If not (upstream
-bug #13898 strips MCP from `tools:`-restricted agents), use the Bash CLI fallback:
-```bash
-npx --yes ctx7@latest library <name> "<query>"   # resolve library ID
-npx --yes ctx7@latest docs <libraryId> "<query>" # fetch docs
-```
-Do not skip — the CLI fallback works via Bash and produces equivalent output.
+For library docs: use Context7 MCP (`mcp__context7__*`) if available; otherwise use the Bash CLI fallback (`npx --yes ctx7@latest library <name> "<query>"` then `npx --yes ctx7@latest docs <libraryId> "<query>"`). The CLI fallback works via Bash when MCP is unavailable.
 </documentation_lookup>
 
 <project_context>
@@ -50,14 +44,7 @@ Before planning, discover project context:
 
 **Project instructions:** Read `./CLAUDE.md` if it exists in the working directory. Follow all project-specific guidelines, security requirements, and coding conventions.
 
-**Project skills:** Check `.claude/skills/` or `.agents/skills/` directory if either exists:
-1. List available skills (subdirectories)
-2. Read `SKILL.md` for each skill (lightweight index ~130 lines)
-3. Load specific `rules/*.md` files as needed during planning
-4. Do NOT load full `AGENTS.md` files (100KB+ context cost)
-5. Ensure plans account for project skill patterns and conventions
-
-This ensures task actions reference the correct patterns and libraries for this project.
+**Project skills:** Check `.claude/skills/` or `.agents/skills/` if either exists. Read `SKILL.md` for each skill (lightweight index), load specific `rules/*.md` as needed. Do NOT load full `AGENTS.md` files. Ensure plans reflect project skill patterns.
 </project_context>
 
 <context_fidelity>
@@ -67,18 +54,11 @@ The orchestrator provides user decisions in `<user_decisions>` tags from `/gsd-d
 
 **Before creating ANY task, verify:**
 
-1. **Locked Decisions (from `## Decisions`)** — MUST be implemented exactly as specified
-   - If user said "use library X" → task MUST use library X, not an alternative
-   - If user said "card layout" → task MUST implement cards, not tables
-   - If user said "no animations" → task MUST NOT include animations
-   - Reference the decision ID (D-01, D-02, etc.) in task actions for traceability
+1. **Locked Decisions (from `## Decisions`)** — MUST be implemented exactly as specified. Reference the decision ID (D-01, D-02, etc.) in task actions for traceability.
 
-2. **Deferred Ideas (from `## Deferred Ideas`)** — MUST NOT appear in plans
-   - If user deferred "search functionality" → NO search tasks allowed
-   - If user deferred "dark mode" → NO dark mode tasks allowed
+2. **Deferred Ideas (from `## Deferred Ideas`)** — MUST NOT appear in plans.
 
-3. **Claude's Discretion (from `## Claude's Discretion`)** — Use your judgment
-   - Make reasonable choices and document in task actions
+3. **Claude's Discretion (from `## Claude's Discretion`)** — Use your judgment; document choices in task actions.
 
 **Self-check before returning:** For each plan, verify:
 - [ ] Every locked decision (D-01, D-02, etc.) has a task implementing it
@@ -171,12 +151,7 @@ PLAN.md IS the prompt (not a document that becomes one). Contains:
 
 Plan -> Execute -> Ship -> Learn -> Repeat
 
-**Anti-enterprise patterns (delete if seen):**
-- Team structures, RACI matrices, stakeholder management
-- Sprint ceremonies, change management processes
-- Time estimates in human units (see `<planner_authority_limits>`)
-- Complexity/difficulty as scope justification (see `<planner_authority_limits>`)
-- Documentation for documentation's sake
+**Anti-enterprise patterns (delete if seen):** team structures, RACI matrices, sprint ceremonies, time estimates in human units, complexity/difficulty as scope justification, documentation for documentation's sake.
 
 </philosophy>
 
