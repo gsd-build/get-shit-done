@@ -57,14 +57,23 @@ The /gsd-intel command has already confirmed that intel.enabled is true before s
 
 ## Project Scope
 
-When analyzing this project, use ONLY canonical source locations:
+**Runtime layout detection (do this first):** Check which runtime root exists by running:
+```bash
+ls -d .kilo 2>/dev/null && echo "kilo" || (ls -d .claude/get-shit-done 2>/dev/null && echo "claude") || echo "unknown"
+```
 
-- `agents/*.md` -- Agent instruction files
-- `commands/gsd/*.md` -- Command files
-- `get-shit-done/bin/` -- CLI tooling
-- `get-shit-done/workflows/` -- Workflow files
-- `get-shit-done/references/` -- Reference docs
-- `hooks/*.js` -- Git hooks
+Use the detected root to resolve all canonical paths below:
+
+| Source type | Standard `.claude` layout | `.kilo` layout |
+|-------------|--------------------------|----------------|
+| Agent files | `agents/*.md` | `.kilo/agents/*.md` |
+| Command files | `commands/gsd/*.md` | `.kilo/command/*.md` |
+| CLI tooling | `get-shit-done/bin/` | `.kilo/get-shit-done/bin/` |
+| Workflow files | `get-shit-done/workflows/` | `.kilo/get-shit-done/workflows/` |
+| Reference docs | `get-shit-done/references/` | `.kilo/get-shit-done/references/` |
+| Hook files | `hooks/*.js` | `.kilo/hooks/*.js` |
+
+When analyzing this project, use ONLY the canonical source locations matching the detected layout. Do not fall back to the standard layout paths if the `.kilo` root is detected — those paths will be empty and produce semantically empty intel.
 
 EXCLUDE from counts and analysis:
 
@@ -72,8 +81,8 @@ EXCLUDE from counts and analysis:
 - `node_modules/`, `dist/`, `build/`, `.git/`
 
 **Count accuracy:** When reporting component counts in stack.json or arch.md, always derive
-counts by running Glob on canonical locations above, not from memory or CLAUDE.md.
-Example: `Glob("agents/*.md")` for agent count.
+counts by running Glob on the layout-resolved canonical locations above, not from memory or CLAUDE.md.
+Example (standard layout): `Glob("agents/*.md")`. Example (kilo): `Glob(".kilo/agents/*.md")`.
 
 ## Forbidden Files
 
