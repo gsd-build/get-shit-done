@@ -879,7 +879,7 @@ describe('graphifyBuild', () => {
     assert.strictEqual(result.timeout_seconds, 300);
     assert.strictEqual(result.version, '0.4.3');
     assert.strictEqual(result.version_warning, null);
-    assert.deepStrictEqual(result.artifacts, ['graph.json', 'graph.html', 'GRAPH_REPORT.md']);
+    assert.deepStrictEqual(result.artifacts, ['graph.json', 'GRAPH_REPORT.md']);
   });
 
   test('creates .planning/graphs/ directory if missing', () => {

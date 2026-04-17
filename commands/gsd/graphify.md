@@ -153,13 +153,13 @@ gsd-tools path: $HOME/.claude/get-shit-done/bin/gsd-tools.cjs
 1. **Invoke graphify:**
    Run from the project root:
    ```
-   graphify . --update
+   graphify update .
    ```
    This builds the knowledge graph with SHA256 incremental caching.
    Timeout: up to 5 minutes (or as configured via graphify.build_timeout).
 
 2. **Validate output:**
-   Check that graphify-out/graph.json exists and is valid JSON with nodes[] and edges[] arrays.
+   Check that graphify-out/graph.json exists and is valid JSON with nodes[] plus either links[] or edges[].
    If graphify exited non-zero or graph.json is not parseable, output:
    ## GRAPHIFY BUILD FAILED
    Include the stderr output for debugging. Do NOT delete .planning/graphs/ -- prior valid graph remains available.
@@ -167,10 +167,9 @@ gsd-tools path: $HOME/.claude/get-shit-done/bin/gsd-tools.cjs
 3. **Copy artifacts to .planning/graphs/:**
    ```
    cp graphify-out/graph.json .planning/graphs/graph.json
-   cp graphify-out/graph.html .planning/graphs/graph.html
    cp graphify-out/GRAPH_REPORT.md .planning/graphs/GRAPH_REPORT.md
    ```
-   These three files are the build output consumed by query, status, and diff commands.
+   These files are the build output consumed by query, status, and diff commands.
 
 4. **Write diff snapshot:**
    ```

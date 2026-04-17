@@ -433,7 +433,7 @@ function graphifyBuild(cwd) {
     timeout_seconds: timeoutSec,
     version: version.version,
     version_warning: version.warning,
-    artifacts: ['graph.json', 'graph.html', 'GRAPH_REPORT.md'],
+    artifacts: ['graph.json', 'GRAPH_REPORT.md'],
   };
 }
 
