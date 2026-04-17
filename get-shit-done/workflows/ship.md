@@ -64,11 +64,14 @@ Verify the work is ready to ship:
    ```
    Detect `origin` remote. If no remote: error — can't create PR.
 
+   If this failure is unexpected or unclear, run `/gsd-feedback` to file a GitHub issue with diagnostics attached.
+
 5. **`gh` CLI available?**
    ```bash
    which gh && gh auth status 2>&1
    ```
    If `gh` not found or not authenticated: provide setup instructions and exit.
+   If this failure is unexpected or unclear, run `/gsd-feedback` to file a GitHub issue with diagnostics attached.
 </step>
 
 <step name="push_branch">

@@ -610,6 +610,7 @@ You're never locked in. The system adapts.
 | `/gsd-next` | Auto-detect state and run the next step |
 | `/gsd-help` | Show all commands and usage guide |
 | `/gsd-update` | Update GSD with changelog preview |
+| `/gsd-feedback [text]` | File a bug, feature request, or question with diagnostics attached |
 | `/gsd-join-discord` | Join the GSD Discord community |
 | `/gsd-manager` | Interactive command center for managing multiple phases |
 

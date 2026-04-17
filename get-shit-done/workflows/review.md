@@ -46,6 +46,8 @@ No external AI CLIs found. Install at least one:
 - cursor: https://cursor.com (Cursor IDE agent mode)
 
 Then run /gsd-review again.
+
+If this failure is unexpected or unclear, run `/gsd-feedback` to file a GitHub issue with diagnostics attached.
 ```
 Exit.
 

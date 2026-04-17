@@ -239,22 +239,36 @@ Read additional files only if specifically needed.
 
 If actionable anomalies were found (HIGH or MEDIUM confidence):
 
-> "Want me to create a GitHub issue for this? I'll format the findings and redact paths."
+> "Want me to create a GitHub issue for this? I'll format the findings and redact paths. [Y/n]"
 
-If confirmed:
-```bash
-# Check if "bug" label exists before using it
-BUG_LABEL=$(gh label list --search "bug" --json name -q '.[0].name' 2>/dev/null)
-LABEL_FLAG=""
-if [ -n "$BUG_LABEL" ]; then
-  LABEL_FLAG="--label bug"
-fi
+If confirmed, ask:
 
-gh issue create \
-  --title "bug: {concise description from anomaly}" \
-  $LABEL_FLAG \
-  --body "{formatted findings from report}"
+> "Use the auto-derived title from the investigation, or customize it? [auto/custom]"
+
+**Auto path:** Set `ISSUE_TITLE` to `"bug: {concise description from anomaly}"` and `ISSUE_DESCRIPTION` to a brief summary derived from the Root Cause Hypothesis section of the report.
+
+**Custom path:** Run the intake from Step 1 of `@~/.claude/get-shit-done/workflows/feedback.md` (collect_feedback) to let the user author their own `ISSUE_TITLE` and `ISSUE_DESCRIPTION`. Pre-seed `$ARGUMENTS` with the anomaly summary so the user can refine rather than start from scratch.
+
+Then prepare variables for the shared filing workflow:
+
+- `ISSUE_TYPE` = `bug`
+- `ISSUE_TITLE` — from auto or custom path above
+- `ISSUE_DESCRIPTION` — from auto or custom path above
+- `INVESTIGATION_FINDINGS` — the redacted forensic report contents (from Step 4)
+- `DIAGNOSTICS_MARKDOWN` — render from evidence already gathered in Step 2:
+
+```markdown
+- Git activity: {commit count} commits over {time span}
+- Last commit: {date} — "{message}"
+- Uncommitted changes: {yes/no}
+- Active worktrees: {count}
+- Current phase: {phase number} — {phase name} — {status}
+- Blockers: {any from STATE.md}
 ```
+
+- `REPO` = `gsd-build/get-shit-done`
+
+Execute `@~/.claude/get-shit-done/workflows/file-issue.md` end-to-end. It handles rendering the final issue body, GitHub submission, URL fallback, and raw markdown fallback.
 
 ## Step 8: Update STATE.md
 

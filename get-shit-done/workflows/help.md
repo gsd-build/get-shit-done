@@ -458,6 +458,17 @@ Update GSD to latest version with changelog preview.
 
 Usage: `/gsd-update`
 
+**`/gsd-feedback [text]`**
+File a GSD bug, feature request, or question with diagnostics auto-attached.
+
+- Collects a short guided intake
+- Tries `gh issue create` first
+- Falls back to a prefilled GitHub issue URL
+- Always returns the full markdown body for manual paste
+
+Usage: `/gsd-feedback`
+Usage: `/gsd-feedback planner skipped my context file`
+
 **`/gsd-join-discord`**
 Join the GSD Discord community.
 

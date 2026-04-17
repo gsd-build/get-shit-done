@@ -280,6 +280,8 @@ npm view get-shit-done-cc version 2>/dev/null
 Couldn't check for updates (offline or npm unavailable).
 
 To update manually: `npx get-shit-done-cc --global`
+
+If this failure is unexpected or unclear, run `/gsd-feedback` to file a GitHub issue with diagnostics attached.
 ```
 
 Exit.
@@ -485,6 +487,7 @@ npx -y get-shit-done-cc@latest --claude --global
 ```
 
 Capture output. If install fails, show error and exit.
+If this failure is unexpected or unclear, run `/gsd-feedback` to file a GitHub issue with diagnostics attached.
 
 Clear the update cache so statusline indicator disappears:
 

@@ -130,11 +130,27 @@ describe('forensics workflow', () => {
     );
   });
 
-  test('workflow offers GitHub issue creation', () => {
+  test('workflow delegates issue filing to shared file-issue workflow', () => {
     const content = fs.readFileSync(workflowPath, 'utf-8');
     assert.ok(
-      content.includes('gh issue create'),
-      'should offer to create GitHub issue from findings'
+      content.includes('workflows/file-issue.md'),
+      'should delegate issue filing to file-issue.md'
+    );
+    assert.ok(
+      !content.includes('gh issue create'),
+      'should NOT contain inline gh issue create (moved to file-issue.md)'
+    );
+  });
+
+  test('workflow offers auto or custom title for issue filing', () => {
+    const content = fs.readFileSync(workflowPath, 'utf-8');
+    assert.ok(
+      content.includes('auto/custom'),
+      'should prompt for auto-derived or custom title'
+    );
+    assert.ok(
+      content.includes('workflows/feedback.md'),
+      'custom path should reference feedback workflow for user intake'
     );
   });
 

@@ -825,7 +825,8 @@ Post-mortem investigation of failed or stuck GSD workflows.
 - STATE.md anomalies and session history
 - Uncommitted work, conflicts, abandoned changes
 - At least 4 anomaly types checked (stuck loop, missing artifacts, abandoned work, crash/interruption)
-- GitHub issue creation offered if actionable findings exist
+- GitHub issue creation offered if actionable findings exist (delegates to shared `file-issue.md` workflow — same submission path as `/gsd-feedback`)
+- Auto-derived or custom title when filing (custom path uses `/gsd-feedback` intake)
 
 ```bash
 /gsd-forensics                              # Interactive — prompted for problem
@@ -1018,6 +1019,21 @@ Update GSD with changelog preview.
 
 ```bash
 /gsd-update                         # Check for updates and install
+```
+
+### `/gsd-feedback [text]`
+
+File a GSD bug, feature request, or question without leaving the current session.
+
+**Behavior:**
+- Collects a short intake for `bug`, `feature`, or `question`
+- Attaches runtime and GSD state diagnostics automatically
+- For `bug` type, offers optional `/gsd-forensics` enrichment (runs investigation steps 2–4 and attaches findings)
+- Delegates issue filing to shared `file-issue.md` workflow (`gh issue create` → prefilled URL → raw markdown fallback)
+
+```bash
+/gsd-feedback                       # Guided feedback intake
+/gsd-feedback planner skipped my context file  # Seed title/description from text
 ```
 
 ### `/gsd-reapply-patches`
