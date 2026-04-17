@@ -116,6 +116,11 @@
   - [SDK Workstream Support](#113-sdk-workstream-support)
   - [Context-Window-Aware Prompt Thinning](#114-context-window-aware-prompt-thinning)
   - [Configurable CLAUDE.md Path](#115-configurable-claudemd-path)
+- [v1.37.0 Features](#v1370-features)
+  - [Spike Command](#117-spike-command)
+  - [Sketch Command](#118-sketch-command)
+  - [Agent Size-Budget Enforcement](#119-agent-size-budget-enforcement)
+  - [Shared Boilerplate Extraction](#120-shared-boilerplate-extraction)
 - [v1.32 Features](#v132-features)
   - [STATE.md Consistency Gates](#69-statemd-consistency-gates)
   - [Autonomous `--to N` Flag](#70-autonomous---to-n-flag)
@@ -2423,3 +2428,82 @@ Test suite that scans all agent, workflow, and command files for embedded inject
 
 **Configuration:** `workflow.tdd_mode`
 **Reference files:** `tdd.md`, `checkpoints.md`
+
+---
+
+## v1.37.0 Features
+
+### 117. Spike Command
+
+**Command:** `/gsd-spike [idea] [--quick]`
+
+**Purpose:** Run 2–5 focused feasibility experiments before committing to an implementation approach. Each experiment uses Given/When/Then framing, produces executable code, and returns a VALIDATED / INVALIDATED / PARTIAL verdict. Companion `/gsd-spike-wrap-up` packages findings into a project-local skill.
+
+**Requirements:**
+- REQ-SPIKE-01: Each experiment MUST produce a Given/When/Then hypothesis before any code is written
+- REQ-SPIKE-02: Each experiment MUST include working code or a minimal reproduction
+- REQ-SPIKE-03: Each experiment MUST return one of: VALIDATED, INVALIDATED, or PARTIAL verdict with evidence
+- REQ-SPIKE-04: Results MUST be stored in `.planning/spikes/NNN-experiment-name/` with a README and MANIFEST.md
+- REQ-SPIKE-05: `--quick` flag skips intake conversation and uses the argument text as the experiment direction
+- REQ-SPIKE-06: `/gsd-spike-wrap-up` MUST package findings into `.claude/skills/spike-findings-[project]/`
+
+**Produces:**
+| Artifact | Description |
+|----------|-------------|
+| `.planning/spikes/NNN-name/README.md` | Hypothesis, experiment code, verdict, and evidence |
+| `.planning/spikes/MANIFEST.md` | Index of all spikes with verdicts |
+| `.claude/skills/spike-findings-[project]/` | Packaged findings (via `/gsd-spike-wrap-up`) |
+
+---
+
+### 118. Sketch Command
+
+**Command:** `/gsd-sketch [idea] [--quick] [--text]`
+
+**Purpose:** Explore design directions through throwaway HTML mockups before committing to implementation. Produces 2–3 interactive variants per design question, all viewable directly in a browser with no build step. Companion `/gsd-sketch-wrap-up` packages winning decisions into a project-local skill.
+
+**Requirements:**
+- REQ-SKETCH-01: Each sketch MUST answer one specific visual design question
+- REQ-SKETCH-02: Each sketch MUST include 2–3 meaningfully different variants in a single `index.html` with tab navigation
+- REQ-SKETCH-03: All interactive elements (hover, click, transitions) MUST be functional
+- REQ-SKETCH-04: Sketches MUST use real-ish content, not lorem ipsum
+- REQ-SKETCH-05: A shared `themes/default.css` MUST provide CSS variables adapted to the agreed aesthetic
+- REQ-SKETCH-06: `--quick` flag skips mood intake; `--text` flag replaces `AskUserQuestion` with numbered lists for non-Claude runtimes
+- REQ-SKETCH-07: The winning variant MUST be marked in the README frontmatter and with a ★ in the HTML tab
+- REQ-SKETCH-08: `/gsd-sketch-wrap-up` MUST package winning decisions into `.claude/skills/sketch-findings-[project]/`
+
+**Produces:**
+| Artifact | Description |
+|----------|-------------|
+| `.planning/sketches/NNN-name/index.html` | 2–3 interactive HTML variants |
+| `.planning/sketches/NNN-name/README.md` | Design question, variants, winner, what to look for |
+| `.planning/sketches/themes/default.css` | Shared CSS theme variables |
+| `.planning/sketches/MANIFEST.md` | Index of all sketches with winners |
+| `.claude/skills/sketch-findings-[project]/` | Packaged decisions (via `/gsd-sketch-wrap-up`) |
+
+---
+
+### 119. Agent Size-Budget Enforcement
+
+**Purpose:** Keep agent prompt files lean with tiered line-count limits enforced in CI. Oversized agents are caught before they bloat context windows in production.
+
+**Requirements:**
+- REQ-BUDGET-01: `agents/gsd-*.md` files are classified into three tiers: XL (≤ 1 600 lines), Large (≤ 1 000 lines), Default (≤ 500 lines)
+- REQ-BUDGET-02: Tier assignment is declared in the file's YAML frontmatter (`size: xl | large | default`)
+- REQ-BUDGET-03: `tests/agent-size-budget.test.cjs` enforces limits and fails CI on violation
+- REQ-BUDGET-04: Files without a `size` frontmatter key default to the Default (500-line) limit
+
+**Test file:** `tests/agent-size-budget.test.cjs`
+
+---
+
+### 120. Shared Boilerplate Extraction
+
+**Purpose:** Reduce duplication across agents by extracting two common boilerplate blocks into shared reference files loaded on demand. Keeps agent files within size budget and makes boilerplate updates a single-file change.
+
+**Requirements:**
+- REQ-BOILER-01: Mandatory-initial-read instructions extracted to `references/mandatory-initial-read.md`
+- REQ-BOILER-02: Project-skills-discovery instructions extracted to `references/project-skills-discovery.md`
+- REQ-BOILER-03: Agents that previously inlined these blocks MUST now reference them via `@` required_reading
+
+**Reference files:** `references/mandatory-initial-read.md`, `references/project-skills-discovery.md`

@@ -89,14 +89,11 @@ People who want to describe what they want and have it built correctly — witho
 
 Built-in quality gates catch real problems: schema drift detection flags ORM changes missing migrations, security enforcement anchors verification to threat models, and scope reduction detection prevents the planner from silently dropping your requirements.
 
-### v1.36.0 Highlights
+### v1.37.0 Highlights
 
-- **Knowledge graph integration** — `/gsd-graphify` brings knowledge graphs to planning agents for richer context connections
-- **SDK typed query foundation** — Registry-based `gsd-sdk query` command with classified errors and handlers for state, roadmap, phase lifecycle, and config
-- **TDD pipeline mode** — Opt-in test-driven development workflow with `--tdd` flag
-- **Context-window-aware prompt thinning** — Automatic prompt size reduction for sub-200K models
-- **Project skills awareness** — 9 GSD agents now discover and use project-scoped skills
-- **30+ bug fixes** — Worktree safety, state management, installer paths, and health check optimizations
+- **Spiking & sketching** — `/gsd-spike` runs 2–5 focused experiments with Given/When/Then verdicts; `/gsd-sketch` produces 2–3 interactive HTML mockup variants per design question — both store artifacts in `.planning/` and pair with wrap-up commands to package findings into project-local skills
+- **Agent size-budget enforcement** — Tiered line-count limits (XL: 1 600, Large: 1 000, Default: 500) keep agent prompts lean; violations surface in CI
+- **Shared boilerplate extraction** — Mandatory-initial-read and project-skills-discovery logic extracted to reference files, reducing duplication across a dozen agents
 
 ---
 

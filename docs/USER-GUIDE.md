@@ -8,6 +8,7 @@ A detailed reference for workflows, troubleshooting, and configuration. For quic
 
 - [Workflow Diagrams](#workflow-diagrams)
 - [UI Design Contract](#ui-design-contract)
+- [Spiking & Sketching](#spiking--sketching)
 - [Backlog & Threads](#backlog--threads)
 - [Workstreams](#workstreams)
 - [Security](#security)
@@ -256,6 +257,59 @@ Controlled by `workflow.ui_safety_gate` config toggle.
 ### Screenshot Storage
 
 `/gsd-ui-review` captures screenshots via Playwright CLI to `.planning/ui-reviews/`. A `.gitignore` is created automatically to prevent binary files from reaching git. Screenshots are cleaned up during `/gsd-complete-milestone`.
+
+---
+
+## Spiking & Sketching
+
+Use `/gsd-spike` to validate technical feasibility before planning, and `/gsd-sketch` to explore visual direction before designing. Both store artifacts in `.planning/` and integrate with the project-skills system via their wrap-up companions.
+
+### When to Spike
+
+Spike when you're uncertain whether a technical approach is feasible or want to compare two implementations before committing a phase to one of them.
+
+```
+/gsd-spike                              # Interactive intake — describes the question, you confirm
+/gsd-spike "can we stream LLM tokens through SSE"
+/gsd-spike --quick "websocket vs SSE latency"
+```
+
+Each spike runs 2–5 experiments. Every experiment has:
+- A **Given / When / Then** hypothesis written before any code
+- **Working code** (not pseudocode)
+- A **VALIDATED / INVALIDATED / PARTIAL** verdict with evidence
+
+Results land in `.planning/spikes/NNN-name/README.md` and are indexed in `.planning/spikes/MANIFEST.md`.
+
+Once you have signal, run `/gsd-spike-wrap-up` to package the findings into `.claude/skills/spike-findings-[project]/` — future sessions will load them automatically via project-skills discovery.
+
+### When to Sketch
+
+Sketch when you need to compare layout structures, interaction models, or visual treatments before writing any real component code.
+
+```
+/gsd-sketch                             # Mood intake — explores feel, references, core action
+/gsd-sketch "dashboard layout"
+/gsd-sketch --quick "sidebar navigation"
+/gsd-sketch --text "onboarding flow"    # For non-Claude runtimes (Codex, Gemini, etc.)
+```
+
+Each sketch answers **one design question** with 2–3 variants in a single `index.html` you open directly in a browser — no build step. Variants use tab navigation and shared CSS variables from `themes/default.css`. All interactive elements (hover, click, transitions) are functional.
+
+After picking a winner, run `/gsd-sketch-wrap-up` to capture the visual decisions into `.claude/skills/sketch-findings-[project]/`.
+
+### Spike → Sketch → Phase Flow
+
+```
+/gsd-spike "SSE vs WebSocket"     # Validate the approach
+/gsd-spike-wrap-up                # Package learnings
+
+/gsd-sketch "real-time feed UI"   # Explore the design
+/gsd-sketch-wrap-up               # Package decisions
+
+/gsd-discuss-phase N              # Lock in preferences (now informed by spike + sketch)
+/gsd-plan-phase N                 # Plan with confidence
+```
 
 ---
 
@@ -1108,6 +1162,14 @@ For reference, here is what GSD creates in your project:
     done/                 # Completed todos
   debug/                  # Active debug sessions
     resolved/             # Archived debug sessions
+  spikes/                 # Feasibility experiments (from /gsd-spike)
+    NNN-name/             # Experiment code + README with verdict
+    MANIFEST.md           # Index of all spikes
+  sketches/               # HTML mockups (from /gsd-sketch)
+    NNN-name/             # index.html (2-3 variants) + README
+    themes/
+      default.css         # Shared CSS variables for all sketches
+    MANIFEST.md           # Index of all sketches with winners
   codebase/               # Brownfield codebase mapping (from /gsd-map-codebase)
   phases/
     XX-phase-name/

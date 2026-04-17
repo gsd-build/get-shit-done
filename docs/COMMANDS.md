@@ -806,6 +806,74 @@ Archive accumulated phase directories from completed milestones.
 
 ---
 
+## Spiking & Sketching Commands
+
+### `/gsd-spike`
+
+Run 2–5 focused feasibility experiments before committing to an implementation approach. Each experiment uses Given/When/Then framing, produces executable code, and returns a VALIDATED / INVALIDATED / PARTIAL verdict.
+
+| Argument | Required | Description |
+|----------|----------|-------------|
+| `idea` | No | The technical question or approach to investigate |
+| `--quick` | No | Skip intake conversation; use `idea` text directly |
+
+**Produces:** `.planning/spikes/NNN-experiment-name/` with code, results, and README; `.planning/spikes/MANIFEST.md`
+
+```bash
+/gsd-spike                              # Interactive intake
+/gsd-spike "can we stream LLM tokens through SSE"
+/gsd-spike --quick websocket-vs-polling
+```
+
+---
+
+### `/gsd-spike-wrap-up`
+
+Package completed spike findings into a reusable project-local skill so future sessions can reference the conclusions.
+
+**Prerequisites:** `.planning/spikes/` exists with at least one completed spike
+**Produces:** `.claude/skills/spike-findings-[project]/` skill file
+
+```bash
+/gsd-spike-wrap-up
+```
+
+---
+
+### `/gsd-sketch`
+
+Explore design directions through throwaway HTML mockups before committing to implementation. Produces 2–3 variants per design question for direct browser comparison.
+
+| Argument | Required | Description |
+|----------|----------|-------------|
+| `idea` | No | The UI design question or direction to explore |
+| `--quick` | No | Skip mood intake; use `idea` text directly |
+| `--text` | No | Text-mode fallback — replace interactive prompts with numbered lists (for non-Claude runtimes) |
+
+**Produces:** `.planning/sketches/NNN-descriptive-name/index.html` (2–3 interactive variants), `README.md`, shared `themes/default.css`; `.planning/sketches/MANIFEST.md`
+
+```bash
+/gsd-sketch                             # Interactive mood intake
+/gsd-sketch "dashboard layout"
+/gsd-sketch --quick "sidebar navigation"
+/gsd-sketch --text "onboarding flow"    # Non-Claude runtime
+```
+
+---
+
+### `/gsd-sketch-wrap-up`
+
+Package winning sketch decisions into a reusable project-local skill so future sessions inherit the visual direction.
+
+**Prerequisites:** `.planning/sketches/` exists with at least one completed sketch (winner marked)
+**Produces:** `.claude/skills/sketch-findings-[project]/` skill file
+
+```bash
+/gsd-sketch-wrap-up
+```
+
+---
+
 ## Diagnostics Commands
 
 ### `/gsd-forensics`
