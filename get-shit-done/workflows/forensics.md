@@ -250,7 +250,6 @@ If confirmed, ask:
 **Custom path:** Prompt the user directly for a title and description, pre-seeding the anomaly summary as a starting point:
 
 > "Suggest a title for this issue (or press Enter to use the auto-derived one): {auto title}"
-
 > "Add a description (or press Enter to use the investigation summary):"
 
 Set `ISSUE_TITLE` and `ISSUE_DESCRIPTION` from the user's responses (falling back to the auto-derived values if blank). Do not invoke `feedback.md` — forensics enrichment is already complete.
