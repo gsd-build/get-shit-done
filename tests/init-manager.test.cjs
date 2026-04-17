@@ -160,7 +160,7 @@ describe('init manager', () => {
     assert.strictEqual(output.phases[1].deps_satisfied, false); // phase 1 not complete
   });
 
-  test('sliding window: only first undiscussed phase is next to discuss', () => {
+  test('parallel discuss: all undiscussed phases are marked is_next_to_discuss', () => {
     writeState(tmpDir);
     writeRoadmap(tmpDir, [
       { number: '1', name: 'Foundation' },
@@ -171,18 +171,17 @@ describe('init manager', () => {
     const result = runGsdTools('init manager', tmpDir);
     const output = JSON.parse(result.output);
 
-    // Only phase 1 should be discussable
+    // All three phases are undiscussed — all should be discussable
     assert.strictEqual(output.phases[0].is_next_to_discuss, true);
-    assert.strictEqual(output.phases[1].is_next_to_discuss, false);
-    assert.strictEqual(output.phases[2].is_next_to_discuss, false);
+    assert.strictEqual(output.phases[1].is_next_to_discuss, true);
+    assert.strictEqual(output.phases[2].is_next_to_discuss, true);
 
-    // Only recommendation should be discuss phase 1
-    assert.strictEqual(output.recommended_actions.length, 1);
-    assert.strictEqual(output.recommended_actions[0].action, 'discuss');
-    assert.strictEqual(output.recommended_actions[0].phase, '1');
+    // All three should have discuss recommendations
+    const discussActions = output.recommended_actions.filter(a => a.action === 'discuss');
+    assert.strictEqual(discussActions.length, 3);
   });
 
-  test('sliding window: after discussing N, plan N + discuss N+1', () => {
+  test('discussed phase is not discussable; undiscussed siblings are', () => {
     writeState(tmpDir);
     writeRoadmap(tmpDir, [
       { number: '1', name: 'Foundation' },
@@ -196,16 +195,18 @@ describe('init manager', () => {
     const result = runGsdTools('init manager', tmpDir);
     const output = JSON.parse(result.output);
 
-    // Phase 1 is discussed, phase 2 is next to discuss
+    // Phase 1 is discussed; phases 2 and 3 are both undiscussed and discussable
     assert.strictEqual(output.phases[0].is_next_to_discuss, false);
     assert.strictEqual(output.phases[1].is_next_to_discuss, true);
-    assert.strictEqual(output.phases[2].is_next_to_discuss, false);
+    assert.strictEqual(output.phases[2].is_next_to_discuss, true);
 
-    // Should recommend plan phase 1 AND discuss phase 2
+    // Should recommend plan phase 1 AND discuss phases 2 and 3
     const phase1Rec = output.recommended_actions.find(r => r.phase === '1');
     const phase2Rec = output.recommended_actions.find(r => r.phase === '2');
+    const phase3Rec = output.recommended_actions.find(r => r.phase === '3');
     assert.strictEqual(phase1Rec.action, 'plan');
     assert.strictEqual(phase2Rec.action, 'discuss');
+    assert.strictEqual(phase3Rec.action, 'discuss');
   });
 
   test('sliding window: full pipeline — execute N, plan N+1, discuss N+2', () => {
@@ -225,17 +226,17 @@ describe('init manager', () => {
     const result = runGsdTools('init manager', tmpDir);
     const output = JSON.parse(result.output);
 
-    // Phase 4 is first undiscussed
+    // Phases 4 and 5 are both undiscussed — both discussable
     assert.strictEqual(output.phases[3].is_next_to_discuss, true);
-    assert.strictEqual(output.phases[4].is_next_to_discuss, false);
+    assert.strictEqual(output.phases[4].is_next_to_discuss, true);
 
-    // Recommendations: execute 2, plan 3, discuss 4
+    // Recommendations: execute 2, plan 3, discuss 4, discuss 5
     assert.strictEqual(output.recommended_actions[0].action, 'execute');
     assert.strictEqual(output.recommended_actions[0].phase, '2');
     assert.strictEqual(output.recommended_actions[1].action, 'plan');
     assert.strictEqual(output.recommended_actions[1].phase, '3');
-    assert.strictEqual(output.recommended_actions[2].action, 'discuss');
-    assert.strictEqual(output.recommended_actions[2].phase, '4');
+    const discussRecs = output.recommended_actions.filter(a => a.action === 'discuss').map(a => a.phase).sort();
+    assert.deepStrictEqual(discussRecs, ['4', '5']);
   });
 
   test('recommendation ordering: execute > plan > discuss', () => {

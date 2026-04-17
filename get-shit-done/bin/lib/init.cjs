@@ -1080,15 +1080,10 @@ function cmdInitManager(cwd, raw) {
       : '—';
   }
 
-  // Sliding window: discuss is sequential — only the first undiscussed phase is available
-  let foundNextToDiscuss = false;
   for (const phase of phases) {
-    if (!foundNextToDiscuss && (phase.disk_status === 'empty' || phase.disk_status === 'no_directory')) {
-      phase.is_next_to_discuss = true;
-      foundNextToDiscuss = true;
-    } else {
-      phase.is_next_to_discuss = false;
-    }
+    phase.is_next_to_discuss =
+      (phase.disk_status === 'empty' || phase.disk_status === 'no_directory') &&
+      phase.deps_satisfied;
   }
 
   // Check for WAITING.json signal
