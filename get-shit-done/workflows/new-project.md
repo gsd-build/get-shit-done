@@ -410,25 +410,80 @@ gsd-sdk query commit "docs: initialize project" .planning/PROJECT.md
 
 **If auto mode:** Skip — config was collected in Step 2a. Proceed to Step 5.5.
 
-**Check for global defaults** at `~/.gsd/defaults.json`. If the file exists, offer to use saved defaults:
+**Check for global defaults** at `~/.gsd/defaults.json`. If the file exists, read and display its contents before asking:
+
+```bash
+DEFAULTS_RAW=$(cat ~/.gsd/defaults.json 2>/dev/null)
+```
+
+Format the JSON into human-readable bullets using these label mappings:
+- `mode` → "Mode"
+- `granularity` → "Granularity"
+- `parallelization` → "Execution" (`true` → "Parallel", `false` → "Sequential")
+- `commit_docs` → "Git Tracking" (`true` → "Yes", `false` → "No")
+- `model_profile` → "AI Models"
+- `workflow.research` → "Research agent" (`true` → "Yes", `false` → "No")
+- `workflow.plan_check` → "Plan Check agent" (`true` → "Yes", `false` → "No")
+- `workflow.verifier` → "Verifier agent" (`true` → "Yes", `false` → "No")
+
+Display above the prompt:
+
+```
+Your saved defaults (~/.gsd/defaults.json):
+  • Mode: [value]
+  • Granularity: [value]
+  • Execution: [Parallel|Sequential]
+  • Git Tracking: [Yes|No]
+  • AI Models: [value]
+  • Research agent: [Yes|No]
+  • Plan Check agent: [Yes|No]
+  • Verifier agent: [Yes|No]
+```
+
+Then ask:
 
 ```
 AskUserQuestion([
   {
-    question: "Use your saved default settings? (from ~/.gsd/defaults.json)",
+    question: "Use these saved defaults?",
     header: "Defaults",
     multiSelect: false,
     options: [
-      { label: "Yes (Recommended)", description: "Use saved defaults, skip settings questions" },
-      { label: "No", description: "Configure settings manually" }
+      { label: "Use as-is (Recommended)", description: "Proceed with the defaults shown above" },
+      { label: "Modify some settings", description: "Keep defaults, change a few" },
+      { label: "Configure fresh", description: "Walk through all questions from scratch" }
     ]
   }
 ])
 ```
 
-If "Yes": read `~/.gsd/defaults.json`, use those values for config.json, and skip directly to **Commit config.json** below.
+**If "Use as-is":** use the defaults values for config.json and skip directly to **Commit config.json** below.
 
-If "No" or `~/.gsd/defaults.json` doesn't exist: proceed with the questions below.
+**If "Modify some settings":** present a multiSelect listing every setting with its current saved value:
+
+```
+AskUserQuestion([
+  {
+    question: "Which settings do you want to change?",
+    header: "Change Settings",
+    multiSelect: true,
+    options: [
+      { label: "Mode", description: "Currently: [value]" },
+      { label: "Granularity", description: "Currently: [value]" },
+      { label: "Execution", description: "Currently: [Parallel|Sequential]" },
+      { label: "Git Tracking", description: "Currently: [Yes|No]" },
+      { label: "AI Models", description: "Currently: [value]" },
+      { label: "Research agent", description: "Currently: [Yes|No]" },
+      { label: "Plan Check agent", description: "Currently: [Yes|No]" },
+      { label: "Verifier agent", description: "Currently: [Yes|No]" }
+    ]
+  }
+])
+```
+
+For each selected setting, ask only that question using the option set from Round 1 / Round 2 below. Merge user answers over the saved defaults — unchanged settings retain their saved values. Then skip to **Commit config.json**.
+
+**If "Configure fresh" or `~/.gsd/defaults.json` doesn't exist:** proceed with the questions below.
 
 **Round 1 — Core workflow settings (4 questions):**
 
