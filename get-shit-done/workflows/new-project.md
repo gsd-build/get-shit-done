@@ -422,27 +422,27 @@ Format the JSON into human-readable bullets using these label mappings:
 - `parallelization` → "Execution" (`true` → "Parallel", `false` → "Sequential")
 - `commit_docs` → "Git Tracking" (`true` → "Yes", `false` → "No")
 - `model_profile` → "AI Models"
-- `workflow.research` → "Research agent" (`true` → "Yes", `false` → "No")
-- `workflow.plan_check` → "Plan Check agent" (`true` → "Yes", `false` → "No")
-- `workflow.verifier` → "Verifier agent" (`true` → "Yes", `false` → "No")
+- `workflow.research` → "Research" (`true` → "Yes", `false` → "No")
+- `workflow.plan_check` → "Plan Check" (`true` → "Yes", `false` → "No")
+- `workflow.verifier` → "Verifier" (`true` → "Yes", `false` → "No")
 
 Display above the prompt:
 
-```
+```text
 Your saved defaults (~/.gsd/defaults.json):
   • Mode: [value]
   • Granularity: [value]
   • Execution: [Parallel|Sequential]
   • Git Tracking: [Yes|No]
   • AI Models: [value]
-  • Research agent: [Yes|No]
-  • Plan Check agent: [Yes|No]
-  • Verifier agent: [Yes|No]
+  • Research: [Yes|No]
+  • Plan Check: [Yes|No]
+  • Verifier: [Yes|No]
 ```
 
 Then ask:
 
-```
+```text
 AskUserQuestion([
   {
     question: "Use these saved defaults?",
@@ -459,9 +459,26 @@ AskUserQuestion([
 
 **If "Use as-is":** use the defaults values for config.json and skip directly to **Commit config.json** below.
 
-**If "Modify some settings":** present a multiSelect listing every setting with its current saved value:
+**If "Modify some settings":** present a selection of every setting with its current saved value.
 
+**If TEXT_MODE is active** (non-Claude runtimes): display a numbered list and ask the user to type the numbers of settings they want to change (comma-separated). Parse the response and proceed.
+
+```text
+Which settings do you want to change? (enter numbers, comma-separated)
+
+  1. Mode — Currently: [value]
+  2. Granularity — Currently: [value]
+  3. Execution — Currently: [Parallel|Sequential]
+  4. Git Tracking — Currently: [Yes|No]
+  5. AI Models — Currently: [value]
+  6. Research — Currently: [Yes|No]
+  7. Plan Check — Currently: [Yes|No]
+  8. Verifier — Currently: [Yes|No]
 ```
+
+**Otherwise** (Claude runtime with AskUserQuestion): use multiSelect:
+
+```text
 AskUserQuestion([
   {
     question: "Which settings do you want to change?",
@@ -473,9 +490,9 @@ AskUserQuestion([
       { label: "Execution", description: "Currently: [Parallel|Sequential]" },
       { label: "Git Tracking", description: "Currently: [Yes|No]" },
       { label: "AI Models", description: "Currently: [value]" },
-      { label: "Research agent", description: "Currently: [Yes|No]" },
-      { label: "Plan Check agent", description: "Currently: [Yes|No]" },
-      { label: "Verifier agent", description: "Currently: [Yes|No]" }
+      { label: "Research", description: "Currently: [Yes|No]" },
+      { label: "Plan Check", description: "Currently: [Yes|No]" },
+      { label: "Verifier", description: "Currently: [Yes|No]" }
     ]
   }
 ])
