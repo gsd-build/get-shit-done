@@ -25,7 +25,7 @@ Spawned by `/gsd-plan-phase` (integrated) or `/gsd-research-phase` (standalone).
 - Write RESEARCH.md with sections the planner expects
 - Return structured result to orchestrator
 
-**Claim provenance (CRITICAL):** Every factual claim in RESEARCH.md must be tagged with its source:
+**Claim provenance:** Every factual claim in RESEARCH.md must be tagged with its source:
 - `[VERIFIED: npm registry]` — confirmed via tool (npm view, web search, codebase grep)
 - `[CITED: docs.example.com/page]` — referenced from official documentation
 - `[ASSUMED]` — based on training knowledge, not verified in this session
@@ -85,7 +85,7 @@ Your RESEARCH.md is consumed by `gsd-planner`:
 
 | Section | How Planner Uses It |
 |---------|---------------------|
-| **`## User Constraints`** | **CRITICAL: Planner MUST honor these - copy from CONTEXT.md verbatim** |
+| **`## User Constraints`** | **Planner MUST honor these — copy from CONTEXT.md verbatim** |
 | `## Standard Stack` | Plans use these libraries, not alternatives |
 | `## Architecture Patterns` | Task structure follows these patterns |
 | `## Don't Hand-Roll` | Tasks NEVER build custom solutions for listed problems |
@@ -94,7 +94,7 @@ Your RESEARCH.md is consumed by `gsd-planner`:
 
 **Be prescriptive, not exploratory.** "Use X" not "Consider X or Y."
 
-**CRITICAL:** `## User Constraints` MUST be the FIRST content section in RESEARCH.md. Copy locked decisions, discretion areas, and deferred ideas verbatim from CONTEXT.md.
+`## User Constraints` MUST be the FIRST content section in RESEARCH.md. Copy locked decisions, discretion areas, and deferred ideas verbatim from CONTEXT.md.
 </downstream_consumer>
 
 <philosophy>
@@ -190,7 +190,7 @@ If `firecrawl: false` (or not set), fall back to WebFetch.
 
 ## Verification Protocol
 
-**WebSearch findings MUST be verified:**
+**Verify every WebSearch finding:**
 
 ```
 For each WebSearch finding:
@@ -308,7 +308,7 @@ Document the verified version and publish date. Training data versions may be mo
 
 ### System Architecture Diagram
 
-Architecture diagrams MUST show data flow through conceptual components, not file listings.
+Architecture diagrams show data flow through conceptual components, not file listings.
 
 Requirements:
 - Show entry points (how data/requests enter the system)
@@ -715,9 +715,9 @@ List missing test files, framework config, or shared fixtures needed before impl
 
 ## Step 6: Write RESEARCH.md
 
-**ALWAYS use the Write tool to create files** — never use `Bash(cat << 'EOF')` or heredoc commands for file creation. Mandatory regardless of `commit_docs` setting.
+Use the Write tool to create files — never use `Bash(cat << 'EOF')` or heredoc commands for file creation. This rule applies regardless of `commit_docs` setting.
 
-**CRITICAL: If CONTEXT.md exists, FIRST content section MUST be `<user_constraints>`:**
+**If CONTEXT.md exists, FIRST content section MUST be `<user_constraints>`:**
 
 ```markdown
 <user_constraints>
