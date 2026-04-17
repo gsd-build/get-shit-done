@@ -15,18 +15,7 @@ Read all files referenced by the invoking prompt's execution_context before star
 
 <process>
 
-## 1. Initialize
-
-```bash
-INIT=$(node "$HOME/.claude/get-shit-done/bin/gsd-tools.cjs" init plan-phase "$PHASE")
-if [[ "$INIT" == @file:* ]]; then INIT=$(cat "${INIT#@file:}"); fi
-```
-
-Parse JSON for: `phase_dir`, `phase_number`, `padded_phase`, `phase_name`, `has_plans`, `plan_count`, `commit_docs`, `text_mode`, `response_language`.
-
-**If `response_language` is set:** All user-facing output should be in `{response_language}`.
-
-## 2. Parse and Normalize Arguments
+## 1. Parse and Normalize Arguments
 
 Extract from $ARGUMENTS: phase number, reviewer flags (`--codex`, `--gemini`, `--claude`, `--opencode`, `--all`), `--max-cycles N`, `--text`, `--ws`.
 
@@ -48,6 +37,17 @@ GSD_WS=""
 echo "$ARGUMENTS" | grep -qE '\-\-ws\s+\S+' && GSD_WS=$(echo "$ARGUMENTS" | grep -oE '\-\-ws\s+\S+')
 ```
 
+## 2. Initialize
+
+```bash
+INIT=$(node "$HOME/.claude/get-shit-done/bin/gsd-tools.cjs" init plan-phase "$PHASE")
+if [[ "$INIT" == @file:* ]]; then INIT=$(cat "${INIT#@file:}"); fi
+```
+
+Parse JSON for: `phase_dir`, `phase_number`, `padded_phase`, `phase_name`, `has_plans`, `plan_count`, `commit_docs`, `text_mode`, `response_language`.
+
+**If `response_language` is set:** All user-facing output should be in `{response_language}`.
+
 Set `TEXT_MODE=true` if `--text` is present in $ARGUMENTS OR `text_mode` from init JSON is `true`. When `TEXT_MODE` is active, replace every `AskUserQuestion` call with a plain-text numbered list and ask the user to type their choice number.
 
 ## 3. Validate Phase + Pre-flight Gate
@@ -60,7 +60,7 @@ PHASE_INFO=$(node "$HOME/.claude/get-shit-done/bin/gsd-tools.cjs" roadmap get-ph
 
 Display startup banner:
 
-```
+```text
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
  GSD ► PLAN CONVERGENCE — Phase {phase_number}
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
@@ -77,7 +77,7 @@ Display startup banner:
 
 Display: `◆ No plans found — spawning initial planning agent...`
 
-```
+```text
 Agent(
   description="Initial planning Phase {PHASE}",
   prompt="Run /gsd-plan-phase for Phase {PHASE}.
@@ -102,7 +102,7 @@ Display: `Initial planning complete: ${PLAN_COUNT} PLAN.md files created.`
 
 Initialize loop variables:
 
-```
+```text
 cycle = 0
 prev_high_count = Infinity
 ```
@@ -113,7 +113,7 @@ Increment `cycle`.
 
 Display: `◆ Cycle {cycle}/{MAX_CYCLES} — spawning review agent...`
 
-```
+```text
 Agent(
   description="Cross-AI review Phase {PHASE} cycle {cycle}",
   prompt="Run /gsd-review for Phase {PHASE}.
@@ -135,7 +135,8 @@ If REVIEWS_FILE is empty: Error — review agent did not produce REVIEWS.md. Exi
 ### 5b. Check for HIGH Concerns
 
 ```bash
-HIGH_COUNT=$(grep -c '\*\*HIGH' "${REVIEWS_FILE}" 2>/dev/null || echo "0")
+HIGH_COUNT=$(grep -c '\*\*HIGH' "${REVIEWS_FILE}" 2>/dev/null || true)
+HIGH_COUNT=${HIGH_COUNT:-0}
 HIGH_LINES=$(grep -B0 -A1 '\*\*HIGH' "${REVIEWS_FILE}" 2>/dev/null)
 ```
 
@@ -146,7 +147,7 @@ node "$HOME/.claude/get-shit-done/bin/gsd-tools.cjs" state planned-phase --phase
 ```
 
 Display:
-```
+```text
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
  GSD ► CONVERGENCE COMPLETE ✓
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
@@ -167,7 +168,7 @@ Exit — convergence achieved.
 Display: `◆ Cycle {cycle}/{MAX_CYCLES} — {HIGH_COUNT} HIGH concerns found`
 
 **Stall detection:** If `HIGH_COUNT >= prev_high_count`:
-```
+```text
 ⚠ Convergence stalled — HIGH concern count not decreasing
   ({HIGH_COUNT} HIGH concerns, previous cycle had {prev_high_count})
 ```
@@ -175,7 +176,7 @@ Display: `◆ Cycle {cycle}/{MAX_CYCLES} — {HIGH_COUNT} HIGH concerns found`
 **Max cycles check:** If `cycle >= MAX_CYCLES`:
 
 If `TEXT_MODE` is true, present as plain-text numbered list:
-```
+```text
 Plan convergence did not complete after {MAX_CYCLES} cycles.
 {HIGH_COUNT} HIGH concerns remain:
 
@@ -190,7 +191,7 @@ Enter number:
 ```
 
 Otherwise use AskUserQuestion:
-```
+```js
 AskUserQuestion([
   {
     question: "Plan convergence did not complete after {MAX_CYCLES} cycles. {HIGH_COUNT} HIGH concerns remain:\n\n{HIGH_LINES}\n\nHow would you like to proceed?",
@@ -206,7 +207,7 @@ AskUserQuestion([
 
 If "Proceed anyway": Display final status and exit.
 If "Manual review":
-```
+```text
 Review the concerns in: {REVIEWS_FILE}
 
 To replan manually:  /gsd-plan-phase {PHASE} --reviews
@@ -222,7 +223,7 @@ Update `prev_high_count = HIGH_COUNT`.
 
 Display: `◆ Spawning replan agent with review feedback...`
 
-```
+```text
 Agent(
   description="Replan Phase {PHASE} with review feedback cycle {cycle}",
   prompt="Run /gsd-plan-phase with --reviews for Phase {PHASE}.
