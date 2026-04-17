@@ -125,6 +125,19 @@ If `$VALIDATE_MODE` only:
 **Step 2: Initialize**
 
 ```bash
+if ! command -v gsd-sdk &>/dev/null; then
+  echo "⚠ gsd-sdk not found in PATH — /gsd-quick requires it."
+  echo ""
+  echo "Install the GSD SDK:"
+  echo "  npm install -g @gsd-build/sdk"
+  echo ""
+  echo "Or update GSD to get the latest packages:"
+  echo "  /gsd-update"
+  exit 1
+fi
+```
+
+```bash
 INIT=$(gsd-sdk query init.quick "$DESCRIPTION")
 if [[ "$INIT" == @file:* ]]; then INIT=$(cat "${INIT#@file:}"); fi
 AGENT_SKILLS_PLANNER=$(gsd-sdk query agent-skills gsd-planner 2>/dev/null)
