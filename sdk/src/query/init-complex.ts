@@ -162,7 +162,7 @@ export const initNewProject: QueryHandler = async (_args, projectDir) => {
     project_path: '.planning/PROJECT.md',
   };
 
-  return { data: withProjectRoot(projectDir, result) };
+  return { data: withProjectRoot(projectDir, result, config as Record<string, unknown>) };
 };
 
 // ─── initProgress ─────────────────────────────────────────────────────────
@@ -309,7 +309,7 @@ export const initProgress: QueryHandler = async (_args, projectDir) => {
     config_path: toPosixPath(relative(projectDir, paths.config)),
   };
 
-  return { data: withProjectRoot(projectDir, result) };
+  return { data: withProjectRoot(projectDir, result, config as Record<string, unknown>) };
 };
 
 // ─── initManager ─────────────────────────────────────────────────────────
@@ -574,5 +574,5 @@ export const initManager: QueryHandler = async (_args, projectDir) => {
     manager_flags: managerFlags,
   };
 
-  return { data: withProjectRoot(projectDir, result) };
+  return { data: withProjectRoot(projectDir, result, config as Record<string, unknown>) };
 };

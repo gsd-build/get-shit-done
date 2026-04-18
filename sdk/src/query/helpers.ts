@@ -17,27 +17,106 @@
  * ```
  */
 
-import { join, relative, resolve, isAbsolute, normalize } from 'node:path';
+import { join, dirname, relative, resolve, isAbsolute, normalize } from 'node:path';
 import { realpath } from 'node:fs/promises';
 import { homedir } from 'node:os';
 import { GSDError, ErrorClassification } from '../errors.js';
 
-// ─── resolveAgentsDir ──────────────────────────────────────────────────────
+// ─── Runtime-aware agents directory resolution ─────────────────────────────
 
 /**
- * Resolve the Claude Code agents directory using the same precedence as the
- * installer (`bin/install.js` getGlobalDir for Claude):
- *   1. GSD_AGENTS_DIR   — explicit SDK override
- *   2. CLAUDE_CONFIG_DIR/agents — matches installer's --config-dir / env
- *   3. ~/.claude/agents — default
- *
- * Must mirror `bin/install.js:389-396` for Claude. Used by both
- * `query/init.ts:checkAgentsInstalled` and `init-runner.ts`.
+ * Supported GSD runtimes. Kept in sync with `bin/install.js:getGlobalDir()`.
  */
-export function resolveAgentsDir(): string {
+export const SUPPORTED_RUNTIMES = [
+  'claude', 'opencode', 'kilo', 'gemini', 'codex', 'copilot', 'antigravity',
+  'cursor', 'windsurf', 'augment', 'trae', 'qwen', 'codebuddy', 'cline',
+] as const;
+
+export type Runtime = (typeof SUPPORTED_RUNTIMES)[number];
+
+function expandTilde(p: string): string {
+  return p.startsWith('~/') || p === '~' ? join(homedir(), p.slice(1)) : p;
+}
+
+/**
+ * Resolve the per-runtime config directory, mirroring
+ * `bin/install.js:getGlobalDir()`. Agents live at `<configDir>/agents`.
+ */
+export function getRuntimeConfigDir(runtime: Runtime): string {
+  switch (runtime) {
+    case 'claude':
+      return process.env.CLAUDE_CONFIG_DIR
+        ? expandTilde(process.env.CLAUDE_CONFIG_DIR)
+        : join(homedir(), '.claude');
+    case 'opencode':
+      if (process.env.OPENCODE_CONFIG_DIR) return expandTilde(process.env.OPENCODE_CONFIG_DIR);
+      if (process.env.OPENCODE_CONFIG) return dirname(expandTilde(process.env.OPENCODE_CONFIG));
+      if (process.env.XDG_CONFIG_HOME) return join(expandTilde(process.env.XDG_CONFIG_HOME), 'opencode');
+      return join(homedir(), '.config', 'opencode');
+    case 'kilo':
+      if (process.env.KILO_CONFIG_DIR) return expandTilde(process.env.KILO_CONFIG_DIR);
+      if (process.env.KILO_CONFIG) return dirname(expandTilde(process.env.KILO_CONFIG));
+      if (process.env.XDG_CONFIG_HOME) return join(expandTilde(process.env.XDG_CONFIG_HOME), 'kilo');
+      return join(homedir(), '.config', 'kilo');
+    case 'gemini':
+      return process.env.GEMINI_CONFIG_DIR ? expandTilde(process.env.GEMINI_CONFIG_DIR) : join(homedir(), '.gemini');
+    case 'codex':
+      return process.env.CODEX_HOME ? expandTilde(process.env.CODEX_HOME) : join(homedir(), '.codex');
+    case 'copilot':
+      return process.env.COPILOT_CONFIG_DIR ? expandTilde(process.env.COPILOT_CONFIG_DIR) : join(homedir(), '.copilot');
+    case 'antigravity':
+      return process.env.ANTIGRAVITY_CONFIG_DIR ? expandTilde(process.env.ANTIGRAVITY_CONFIG_DIR) : join(homedir(), '.gemini', 'antigravity');
+    case 'cursor':
+      return process.env.CURSOR_CONFIG_DIR ? expandTilde(process.env.CURSOR_CONFIG_DIR) : join(homedir(), '.cursor');
+    case 'windsurf':
+      return process.env.WINDSURF_CONFIG_DIR ? expandTilde(process.env.WINDSURF_CONFIG_DIR) : join(homedir(), '.codeium', 'windsurf');
+    case 'augment':
+      return process.env.AUGMENT_CONFIG_DIR ? expandTilde(process.env.AUGMENT_CONFIG_DIR) : join(homedir(), '.augment');
+    case 'trae':
+      return process.env.TRAE_CONFIG_DIR ? expandTilde(process.env.TRAE_CONFIG_DIR) : join(homedir(), '.trae');
+    case 'qwen':
+      return process.env.QWEN_CONFIG_DIR ? expandTilde(process.env.QWEN_CONFIG_DIR) : join(homedir(), '.qwen');
+    case 'codebuddy':
+      return process.env.CODEBUDDY_CONFIG_DIR ? expandTilde(process.env.CODEBUDDY_CONFIG_DIR) : join(homedir(), '.codebuddy');
+    case 'cline':
+      return process.env.CLINE_CONFIG_DIR ? expandTilde(process.env.CLINE_CONFIG_DIR) : join(homedir(), '.cline');
+  }
+}
+
+/**
+ * Detect the invoking runtime using issue #2402 precedence:
+ *   1. `GSD_RUNTIME` env var
+ *   2. `config.runtime` field (from `.planning/config.json` when loaded)
+ *   3. Fallback to `'claude'`
+ *
+ * Unknown values fall through to the next tier rather than throwing, so
+ * stale env values don't hard-block workflows.
+ */
+export function detectRuntime(config?: { runtime?: unknown }): Runtime {
+  const envValue = process.env.GSD_RUNTIME;
+  if (envValue && (SUPPORTED_RUNTIMES as readonly string[]).includes(envValue)) {
+    return envValue as Runtime;
+  }
+  const configValue = config?.runtime;
+  if (typeof configValue === 'string' && (SUPPORTED_RUNTIMES as readonly string[]).includes(configValue)) {
+    return configValue as Runtime;
+  }
+  return 'claude';
+}
+
+/**
+ * Resolve the GSD agents directory for a given runtime.
+ *
+ * Precedence:
+ *   1. `GSD_AGENTS_DIR` — explicit SDK override (wins over runtime selection)
+ *   2. `<getRuntimeConfigDir(runtime)>/agents` — installer-parity default
+ *
+ * Defaults to Claude when no runtime is passed, matching prior behavior
+ * (see `init-runner.ts`, which is Claude-only by design).
+ */
+export function resolveAgentsDir(runtime: Runtime = 'claude'): string {
   if (process.env.GSD_AGENTS_DIR) return process.env.GSD_AGENTS_DIR;
-  if (process.env.CLAUDE_CONFIG_DIR) return join(process.env.CLAUDE_CONFIG_DIR, 'agents');
-  return join(homedir(), '.claude', 'agents');
+  return join(getRuntimeConfigDir(runtime), 'agents');
 }
 
 // ─── Types ──────────────────────────────────────────────────────────────────

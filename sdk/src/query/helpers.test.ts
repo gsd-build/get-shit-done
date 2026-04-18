@@ -18,7 +18,13 @@ import {
   planningPaths,
   normalizeMd,
   resolvePathUnderProject,
+  resolveAgentsDir,
+  getRuntimeConfigDir,
+  detectRuntime,
+  SUPPORTED_RUNTIMES,
+  type Runtime,
 } from './helpers.js';
+import { homedir } from 'node:os';
 
 // ─── escapeRegex ────────────────────────────────────────────────────────────
 
@@ -250,5 +256,158 @@ describe('resolvePathUnderProject', () => {
 
   it('rejects paths that escape the project root', async () => {
     await expect(resolvePathUnderProject(tmpDir, '../../etc/passwd')).rejects.toThrow(GSDError);
+  });
+});
+
+// ─── Runtime-aware agents dir resolution (#2402) ───────────────────────────
+
+const RUNTIME_ENV_VARS = [
+  'GSD_AGENTS_DIR', 'GSD_RUNTIME', 'CLAUDE_CONFIG_DIR', 'OPENCODE_CONFIG_DIR',
+  'OPENCODE_CONFIG', 'KILO_CONFIG_DIR', 'KILO_CONFIG', 'XDG_CONFIG_HOME',
+  'GEMINI_CONFIG_DIR', 'CODEX_HOME', 'COPILOT_CONFIG_DIR', 'ANTIGRAVITY_CONFIG_DIR',
+  'CURSOR_CONFIG_DIR', 'WINDSURF_CONFIG_DIR', 'AUGMENT_CONFIG_DIR', 'TRAE_CONFIG_DIR',
+  'QWEN_CONFIG_DIR', 'CODEBUDDY_CONFIG_DIR', 'CLINE_CONFIG_DIR',
+] as const;
+
+describe('getRuntimeConfigDir', () => {
+  const saved: Record<string, string | undefined> = {};
+  beforeEach(() => {
+    for (const k of RUNTIME_ENV_VARS) { saved[k] = process.env[k]; delete process.env[k]; }
+  });
+  afterEach(() => {
+    for (const k of RUNTIME_ENV_VARS) {
+      if (saved[k] === undefined) delete process.env[k];
+      else process.env[k] = saved[k];
+    }
+  });
+
+  const defaults: Record<Runtime, string> = {
+    claude: join(homedir(), '.claude'),
+    opencode: join(homedir(), '.config', 'opencode'),
+    kilo: join(homedir(), '.config', 'kilo'),
+    gemini: join(homedir(), '.gemini'),
+    codex: join(homedir(), '.codex'),
+    copilot: join(homedir(), '.copilot'),
+    antigravity: join(homedir(), '.gemini', 'antigravity'),
+    cursor: join(homedir(), '.cursor'),
+    windsurf: join(homedir(), '.codeium', 'windsurf'),
+    augment: join(homedir(), '.augment'),
+    trae: join(homedir(), '.trae'),
+    qwen: join(homedir(), '.qwen'),
+    codebuddy: join(homedir(), '.codebuddy'),
+    cline: join(homedir(), '.cline'),
+  };
+
+  for (const runtime of SUPPORTED_RUNTIMES) {
+    it(`resolves default path for ${runtime}`, () => {
+      expect(getRuntimeConfigDir(runtime)).toBe(defaults[runtime]);
+    });
+  }
+
+  const envOverrides: Array<[Runtime, string, string]> = [
+    ['claude', 'CLAUDE_CONFIG_DIR', '/x/claude'],
+    ['gemini', 'GEMINI_CONFIG_DIR', '/x/gemini'],
+    ['codex', 'CODEX_HOME', '/x/codex'],
+    ['copilot', 'COPILOT_CONFIG_DIR', '/x/copilot'],
+    ['antigravity', 'ANTIGRAVITY_CONFIG_DIR', '/x/antigravity'],
+    ['cursor', 'CURSOR_CONFIG_DIR', '/x/cursor'],
+    ['windsurf', 'WINDSURF_CONFIG_DIR', '/x/windsurf'],
+    ['augment', 'AUGMENT_CONFIG_DIR', '/x/augment'],
+    ['trae', 'TRAE_CONFIG_DIR', '/x/trae'],
+    ['qwen', 'QWEN_CONFIG_DIR', '/x/qwen'],
+    ['codebuddy', 'CODEBUDDY_CONFIG_DIR', '/x/codebuddy'],
+    ['cline', 'CLINE_CONFIG_DIR', '/x/cline'],
+    ['opencode', 'OPENCODE_CONFIG_DIR', '/x/opencode'],
+    ['kilo', 'KILO_CONFIG_DIR', '/x/kilo'],
+  ];
+  for (const [runtime, envVar, value] of envOverrides) {
+    it(`${runtime} honors ${envVar}`, () => {
+      process.env[envVar] = value;
+      expect(getRuntimeConfigDir(runtime)).toBe(value);
+    });
+  }
+
+  it('opencode uses XDG_CONFIG_HOME when direct vars unset', () => {
+    process.env.XDG_CONFIG_HOME = '/xdg';
+    expect(getRuntimeConfigDir('opencode')).toBe(join('/xdg', 'opencode'));
+  });
+
+  it('opencode OPENCODE_CONFIG uses dirname', () => {
+    process.env.OPENCODE_CONFIG = '/cfg/opencode.json';
+    expect(getRuntimeConfigDir('opencode')).toBe('/cfg');
+  });
+
+  it('kilo uses XDG_CONFIG_HOME when direct vars unset', () => {
+    process.env.XDG_CONFIG_HOME = '/xdg';
+    expect(getRuntimeConfigDir('kilo')).toBe(join('/xdg', 'kilo'));
+  });
+});
+
+describe('detectRuntime', () => {
+  const saved: Record<string, string | undefined> = {};
+  beforeEach(() => {
+    for (const k of RUNTIME_ENV_VARS) { saved[k] = process.env[k]; delete process.env[k]; }
+  });
+  afterEach(() => {
+    for (const k of RUNTIME_ENV_VARS) {
+      if (saved[k] === undefined) delete process.env[k];
+      else process.env[k] = saved[k];
+    }
+  });
+
+  it('defaults to claude with no signals', () => {
+    expect(detectRuntime()).toBe('claude');
+  });
+
+  it('uses GSD_RUNTIME when set to a known runtime', () => {
+    process.env.GSD_RUNTIME = 'codex';
+    expect(detectRuntime()).toBe('codex');
+  });
+
+  it('falls back to config.runtime when GSD_RUNTIME unset', () => {
+    expect(detectRuntime({ runtime: 'gemini' })).toBe('gemini');
+  });
+
+  it('GSD_RUNTIME wins over config.runtime', () => {
+    process.env.GSD_RUNTIME = 'codex';
+    expect(detectRuntime({ runtime: 'gemini' })).toBe('codex');
+  });
+
+  it('unknown GSD_RUNTIME falls through to config then claude', () => {
+    process.env.GSD_RUNTIME = 'bogus';
+    expect(detectRuntime({ runtime: 'gemini' })).toBe('gemini');
+    expect(detectRuntime()).toBe('claude');
+  });
+
+  it('unknown config.runtime falls through to claude', () => {
+    expect(detectRuntime({ runtime: 'bogus' })).toBe('claude');
+  });
+});
+
+describe('resolveAgentsDir (runtime-aware)', () => {
+  const saved: Record<string, string | undefined> = {};
+  beforeEach(() => {
+    for (const k of RUNTIME_ENV_VARS) { saved[k] = process.env[k]; delete process.env[k]; }
+  });
+  afterEach(() => {
+    for (const k of RUNTIME_ENV_VARS) {
+      if (saved[k] === undefined) delete process.env[k];
+      else process.env[k] = saved[k];
+    }
+  });
+
+  it('defaults to Claude agents dir with no args', () => {
+    expect(resolveAgentsDir()).toBe(join(homedir(), '.claude', 'agents'));
+  });
+
+  it('GSD_AGENTS_DIR short-circuits regardless of runtime', () => {
+    process.env.GSD_AGENTS_DIR = '/explicit/agents';
+    expect(resolveAgentsDir('codex')).toBe('/explicit/agents');
+    expect(resolveAgentsDir('claude')).toBe('/explicit/agents');
+  });
+
+  it('appends /agents to the per-runtime config dir', () => {
+    process.env.CODEX_HOME = '/codex';
+    expect(resolveAgentsDir('codex')).toBe(join('/codex', 'agents'));
   });
 });

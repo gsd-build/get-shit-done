@@ -181,6 +181,109 @@ describe('withProjectRoot', () => {
     }
   });
 
+  // #2402 — runtime-aware resolution: GSD_RUNTIME selects which runtime's
+  // config-dir env chain to consult, so non-Claude installs stop
+  // false-negating.
+  it('GSD_RUNTIME=codex resolves agents under CODEX_HOME/agents', async () => {
+    const { MODEL_PROFILES } = await import('./config-query.js');
+    const codexHome = join(tmpDir, 'codex-home');
+    const agentsDir = join(codexHome, 'agents');
+    await mkdir(agentsDir, { recursive: true });
+    for (const name of Object.keys(MODEL_PROFILES)) {
+      await writeFile(join(agentsDir, `${name}.md`), '# stub');
+    }
+    const prevAgents = process.env.GSD_AGENTS_DIR;
+    const prevRuntime = process.env.GSD_RUNTIME;
+    const prevCodex = process.env.CODEX_HOME;
+    delete process.env.GSD_AGENTS_DIR;
+    process.env.GSD_RUNTIME = 'codex';
+    process.env.CODEX_HOME = codexHome;
+    try {
+      const enriched = withProjectRoot(tmpDir, {}) as Record<string, unknown>;
+      expect(enriched.agents_installed).toBe(true);
+      expect(enriched.missing_agents).toEqual([]);
+    } finally {
+      if (prevAgents === undefined) delete process.env.GSD_AGENTS_DIR;
+      else process.env.GSD_AGENTS_DIR = prevAgents;
+      if (prevRuntime === undefined) delete process.env.GSD_RUNTIME;
+      else process.env.GSD_RUNTIME = prevRuntime;
+      if (prevCodex === undefined) delete process.env.CODEX_HOME;
+      else process.env.CODEX_HOME = prevCodex;
+    }
+  });
+
+  it('config.runtime drives detection when GSD_RUNTIME is unset', async () => {
+    const { MODEL_PROFILES } = await import('./config-query.js');
+    const geminiHome = join(tmpDir, 'gemini-home');
+    const agentsDir = join(geminiHome, 'agents');
+    await mkdir(agentsDir, { recursive: true });
+    for (const name of Object.keys(MODEL_PROFILES)) {
+      await writeFile(join(agentsDir, `${name}.md`), '# stub');
+    }
+    const prevAgents = process.env.GSD_AGENTS_DIR;
+    const prevRuntime = process.env.GSD_RUNTIME;
+    const prevGemini = process.env.GEMINI_CONFIG_DIR;
+    delete process.env.GSD_AGENTS_DIR;
+    delete process.env.GSD_RUNTIME;
+    process.env.GEMINI_CONFIG_DIR = geminiHome;
+    try {
+      const enriched = withProjectRoot(tmpDir, {}, { runtime: 'gemini' }) as Record<string, unknown>;
+      expect(enriched.agents_installed).toBe(true);
+    } finally {
+      if (prevAgents === undefined) delete process.env.GSD_AGENTS_DIR;
+      else process.env.GSD_AGENTS_DIR = prevAgents;
+      if (prevRuntime === undefined) delete process.env.GSD_RUNTIME;
+      else process.env.GSD_RUNTIME = prevRuntime;
+      if (prevGemini === undefined) delete process.env.GEMINI_CONFIG_DIR;
+      else process.env.GEMINI_CONFIG_DIR = prevGemini;
+    }
+  });
+
+  it('GSD_RUNTIME wins over config.runtime', async () => {
+    const { MODEL_PROFILES } = await import('./config-query.js');
+    const codexHome = join(tmpDir, 'codex-win');
+    const agentsDir = join(codexHome, 'agents');
+    await mkdir(agentsDir, { recursive: true });
+    for (const name of Object.keys(MODEL_PROFILES)) {
+      await writeFile(join(agentsDir, `${name}.md`), '# stub');
+    }
+    const prevAgents = process.env.GSD_AGENTS_DIR;
+    const prevRuntime = process.env.GSD_RUNTIME;
+    const prevCodex = process.env.CODEX_HOME;
+    delete process.env.GSD_AGENTS_DIR;
+    process.env.GSD_RUNTIME = 'codex';
+    process.env.CODEX_HOME = codexHome;
+    try {
+      // config says gemini, env says codex — codex should win and find agents.
+      const enriched = withProjectRoot(tmpDir, {}, { runtime: 'gemini' }) as Record<string, unknown>;
+      expect(enriched.agents_installed).toBe(true);
+    } finally {
+      if (prevAgents === undefined) delete process.env.GSD_AGENTS_DIR;
+      else process.env.GSD_AGENTS_DIR = prevAgents;
+      if (prevRuntime === undefined) delete process.env.GSD_RUNTIME;
+      else process.env.GSD_RUNTIME = prevRuntime;
+      if (prevCodex === undefined) delete process.env.CODEX_HOME;
+      else process.env.CODEX_HOME = prevCodex;
+    }
+  });
+
+  it('unknown GSD_RUNTIME falls through to config/Claude default', () => {
+    const prevAgents = process.env.GSD_AGENTS_DIR;
+    const prevRuntime = process.env.GSD_RUNTIME;
+    delete process.env.GSD_AGENTS_DIR;
+    process.env.GSD_RUNTIME = 'not-a-runtime';
+    try {
+      // Should not throw; falls back to Claude — missing_agents on a blank tmpDir.
+      const enriched = withProjectRoot(tmpDir, {}) as Record<string, unknown>;
+      expect(typeof enriched.agents_installed).toBe('boolean');
+    } finally {
+      if (prevAgents === undefined) delete process.env.GSD_AGENTS_DIR;
+      else process.env.GSD_AGENTS_DIR = prevAgents;
+      if (prevRuntime === undefined) delete process.env.GSD_RUNTIME;
+      else process.env.GSD_RUNTIME = prevRuntime;
+    }
+  });
+
   it('GSD_AGENTS_DIR takes precedence over CLAUDE_CONFIG_DIR', async () => {
     const { MODEL_PROFILES } = await import('./config-query.js');
     const winningDir = join(tmpDir, 'winning-agents');
