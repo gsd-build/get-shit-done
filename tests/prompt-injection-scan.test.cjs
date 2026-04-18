@@ -60,6 +60,10 @@ const ALLOWLIST = new Set([
   'tests/prompt-injection-scan.test.cjs',       // This file
 ]);
 
+function toAllowlistPath(file) {
+  return path.relative(PROJECT_ROOT, file).split(path.sep).join('/');
+}
+
 // ─── Scanner ────────────────────────────────────────────────────────────────
 
 function collectFiles(dir) {
@@ -100,7 +104,7 @@ describe('codebase prompt injection scan', () => {
     const findings = [];
 
     for (const file of agentFiles) {
-      const relPath = path.relative(PROJECT_ROOT, file);
+      const relPath = toAllowlistPath(file);
       if (ALLOWLIST.has(relPath)) continue;
 
       const content = fs.readFileSync(file, 'utf-8');
@@ -130,7 +134,7 @@ describe('codebase prompt injection scan', () => {
     const oversized = [];
 
     for (const file of agentFiles) {
-      const relPath = path.relative(PROJECT_ROOT, file);
+      const relPath = toAllowlistPath(file);
       if (ALLOWLIST.has(relPath)) continue;
 
       const content = fs.readFileSync(file, 'utf-8');
@@ -151,7 +155,7 @@ describe('codebase prompt injection scan', () => {
     const findings = [];
 
     for (const file of workflowFiles) {
-      const relPath = path.relative(PROJECT_ROOT, file);
+      const relPath = toAllowlistPath(file);
       if (ALLOWLIST.has(relPath)) continue;
 
       const content = fs.readFileSync(file, 'utf-8');
@@ -174,7 +178,7 @@ describe('codebase prompt injection scan', () => {
     const findings = [];
 
     for (const file of commandFiles) {
-      const relPath = path.relative(PROJECT_ROOT, file);
+      const relPath = toAllowlistPath(file);
       if (ALLOWLIST.has(relPath)) continue;
 
       const content = fs.readFileSync(file, 'utf-8');
@@ -197,7 +201,7 @@ describe('codebase prompt injection scan', () => {
     const findings = [];
 
     for (const file of hookFiles) {
-      const relPath = path.relative(PROJECT_ROOT, file);
+      const relPath = toAllowlistPath(file);
       if (ALLOWLIST.has(relPath)) continue;
 
       const content = fs.readFileSync(file, 'utf-8');
@@ -220,7 +224,7 @@ describe('codebase prompt injection scan', () => {
     const findings = [];
 
     for (const file of libFiles) {
-      const relPath = path.relative(PROJECT_ROOT, file);
+      const relPath = toAllowlistPath(file);
       if (ALLOWLIST.has(relPath)) continue;
 
       const content = fs.readFileSync(file, 'utf-8');
@@ -243,7 +247,7 @@ describe('codebase prompt injection scan', () => {
     const invisiblePattern = /[\u200B-\u200F\u2028-\u202F\uFEFF\u00AD]/;
 
     for (const file of allFiles) {
-      const relPath = path.relative(PROJECT_ROOT, file);
+      const relPath = toAllowlistPath(file);
       if (ALLOWLIST.has(relPath)) continue;
 
       const content = fs.readFileSync(file, 'utf-8');
@@ -272,7 +276,7 @@ describe('codebase prompt injection scan', () => {
     const boundaryPattern = /<\/?(?:system|assistant|human)>/i;
 
     for (const file of allFiles) {
-      const relPath = path.relative(PROJECT_ROOT, file);
+      const relPath = toAllowlistPath(file);
       if (ALLOWLIST.has(relPath)) continue;
       // Allow .md files to use common tags in examples/docs
       // But flag .js/.cjs files that embed these

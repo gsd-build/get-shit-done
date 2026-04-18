@@ -149,6 +149,7 @@ describe('pruneOrphanedWorktrees', () => {
   test('runs git worktree prune to clear stale references', () => {
     const repoDir = path.join(tmpBase, 'repo4');
     const worktreeDir = path.join(tmpBase, 'wt-stale');
+    const normalizedWorktreeDir = worktreeDir.replace(/\\/g, '/');
 
     createGitRepo(repoDir);
 
@@ -157,8 +158,8 @@ describe('pruneOrphanedWorktrees', () => {
     assert.ok(fs.existsSync(worktreeDir), 'worktree dir should exist before manual deletion');
 
     // Verify it appears in git worktree list
-    const beforeList = execSync('git worktree list --porcelain', { cwd: repoDir, encoding: 'utf8' });
-    assert.ok(beforeList.includes(worktreeDir), 'worktree should appear in list before deletion');
+    const beforeList = execSync('git worktree list --porcelain', { cwd: repoDir, encoding: 'utf8' }).replace(/\\/g, '/');
+    assert.ok(beforeList.includes(normalizedWorktreeDir), 'worktree should appear in list before deletion');
 
     // Manually delete the worktree directory (simulate orphan)
     fs.rmSync(worktreeDir, { recursive: true, force: true });
@@ -168,9 +169,9 @@ describe('pruneOrphanedWorktrees', () => {
     pruneOrphanedWorktrees(repoDir);
 
     // Assert: git worktree list no longer shows the stale entry
-    const afterList = execSync('git worktree list --porcelain', { cwd: repoDir, encoding: 'utf8' });
+    const afterList = execSync('git worktree list --porcelain', { cwd: repoDir, encoding: 'utf8' }).replace(/\\/g, '/');
     assert.ok(
-      !afterList.includes(worktreeDir),
+      !afterList.includes(normalizedWorktreeDir),
       'git worktree list still shows stale entry after prune:\n' + afterList
     );
   });

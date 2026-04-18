@@ -44,6 +44,17 @@ function toPosixPath(p) {
   return p.split(path.sep).join('/');
 }
 
+/** Resolve the effective home directory, honoring test/sandbox overrides first. */
+function resolveHomeDir() {
+  return process.env.GSD_HOME || process.env.HOME || process.env.USERPROFILE || os.homedir();
+}
+
+/** Normalize filesystem paths for stable cross-platform comparisons. */
+function normalizeComparablePath(p) {
+  const normalized = path.normalize(path.resolve(p)).replace(/[\\/]+$/, '');
+  return process.platform === 'win32' ? normalized.toLowerCase() : normalized;
+}
+
 /**
  * Scan immediate child directories for separate git repos.
  * Returns a sorted array of directory names that have their own `.git`.
@@ -86,7 +97,7 @@ function detectSubRepos(cwd) {
 function findProjectRoot(startDir) {
   const resolved = path.resolve(startDir);
   const root = path.parse(resolved).root;
-  const homedir = require('os').homedir();
+  const homedir = resolveHomeDir();
 
   // If startDir already contains .planning/, it IS the project root.
   // Do not walk up to a parent workspace that also has .planning/ (#1362).
@@ -399,7 +410,7 @@ function loadConfig(cwd) {
       return defaults;
     }
     try {
-      const home = process.env.GSD_HOME || os.homedir();
+      const home = resolveHomeDir();
       const globalDefaultsPath = path.join(home, '.gsd', 'defaults.json');
       const raw = fs.readFileSync(globalDefaultsPath, 'utf-8');
       const globalDefaults = JSON.parse(raw);
@@ -653,6 +664,7 @@ function parseWorktreePorcelain(porcelain) {
 function pruneOrphanedWorktrees(repoRoot) {
   const pruned = [];
   const cwd = process.cwd();
+  const normalizedCwd = normalizeComparablePath(cwd);
 
   try {
     // 1. Get all worktrees in porcelain format
@@ -665,15 +677,14 @@ function pruneOrphanedWorktrees(repoRoot) {
       return pruned;
     }
 
-    // 2. First entry is the main worktree — never touch it
-    const mainWorktreePath = worktrees[0].path;
-
     // 3. Check each non-main worktree
     for (let i = 1; i < worktrees.length; i++) {
       const { path: wtPath, branch } = worktrees[i];
+      const normalizedWorktreePath = normalizeComparablePath(wtPath);
+      const worktreePrefix = normalizedWorktreePath + path.sep;
 
       // Never remove the worktree for the current process directory
-      if (wtPath === cwd || cwd.startsWith(wtPath + path.sep)) continue;
+      if (normalizedWorktreePath === normalizedCwd || normalizedCwd.startsWith(worktreePrefix)) continue;
 
       // Check if the branch is fully merged into HEAD (main)
       // git merge-base --is-ancestor <branch> HEAD exits 0 when merged
@@ -1685,6 +1696,7 @@ module.exports = {
   output,
   error,
   safeReadFile,
+  resolveHomeDir,
   loadConfig,
   isGitIgnored,
   execGit,

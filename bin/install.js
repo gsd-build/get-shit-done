@@ -13,6 +13,36 @@ const yellow = '\x1b[33m';
 const dim = '\x1b[2m';
 const reset = '\x1b[0m';
 
+function isTransientFsReadError(err) {
+  return err && ['EBUSY', 'EPERM', 'EACCES'].includes(err.code);
+}
+
+function sleepSync(ms) {
+  Atomics.wait(new Int32Array(new SharedArrayBuffer(4)), 0, 0, ms);
+}
+
+function withFsRetry(fn, attempts = 6) {
+  let lastError;
+  for (let i = 0; i < attempts; i++) {
+    try {
+      return fn();
+    } catch (err) {
+      lastError = err;
+      if (!isTransientFsReadError(err) || i === attempts - 1) throw err;
+      sleepSync(25 * (i + 1));
+    }
+  }
+  throw lastError;
+}
+
+function readFileUtf8WithRetry(filePath) {
+  return withFsRetry(() => fs.readFileSync(filePath, 'utf8'));
+}
+
+function copyFileWithRetry(srcPath, destPath) {
+  return withFsRetry(() => fs.copyFileSync(srcPath, destPath));
+}
+
 // Codex config.toml constants
 const GSD_CODEX_MARKER = '# GSD Agent Configuration \u2014 managed by get-shit-done installer';
 const GSD_CODEX_HOOKS_OWNERSHIP_PREFIX = '# GSD codex_hooks ownership: ';
@@ -5815,7 +5845,7 @@ function install(isGlobal, runtime = 'claude') {
           // Template .js files to replace '.claude' with runtime-specific config dir
           // and stamp the current GSD version into the hook version header
           if (entry.endsWith('.js')) {
-            let content = fs.readFileSync(srcFile, 'utf8');
+            let content = readFileUtf8WithRetry(srcFile);
             content = content.replace(/'\.claude'/g, configDirReplacement);
             content = content.replace(/\/\.claude\//g, `/${getDirName(runtime)}/`);
             if (isQwen) {
@@ -5830,12 +5860,12 @@ function install(isGlobal, runtime = 'claude') {
             // .sh hooks carry a gsd-hook-version header so gsd-check-update.js can
             // detect staleness after updates — stamp the version just like .js hooks.
             if (entry.endsWith('.sh')) {
-              let content = fs.readFileSync(srcFile, 'utf8');
+              let content = readFileUtf8WithRetry(srcFile);
               content = content.replace(/\{\{GSD_VERSION\}\}/g, pkg.version);
               fs.writeFileSync(destFile, content);
               try { fs.chmodSync(destFile, 0o755); } catch (e) { /* Windows doesn't support chmod */ }
             } else {
-              fs.copyFileSync(srcFile, destFile);
+              copyFileWithRetry(srcFile, destFile);
             }
           }
         }
@@ -5940,7 +5970,7 @@ function install(isGlobal, runtime = 'claude') {
         if (!fs.statSync(srcFile).isFile()) continue;
         const destFile = path.join(codexHooksDest, entry);
         if (entry.endsWith('.js')) {
-          let content = fs.readFileSync(srcFile, 'utf8');
+          let content = readFileUtf8WithRetry(srcFile);
           content = content.replace(/'\.claude'/g, configDirReplacement);
           content = content.replace(/\/\.claude\//g, `/${getDirName(runtime)}/`);
           content = content.replace(/\{\{GSD_VERSION\}\}/g, pkg.version);
@@ -5948,12 +5978,12 @@ function install(isGlobal, runtime = 'claude') {
           try { fs.chmodSync(destFile, 0o755); } catch (e) { /* Windows */ }
         } else {
           if (entry.endsWith('.sh')) {
-            let content = fs.readFileSync(srcFile, 'utf8');
+            let content = readFileUtf8WithRetry(srcFile);
             content = content.replace(/\{\{GSD_VERSION\}\}/g, pkg.version);
             fs.writeFileSync(destFile, content);
             try { fs.chmodSync(destFile, 0o755); } catch (e) { /* Windows */ }
           } else {
-            fs.copyFileSync(srcFile, destFile);
+            copyFileWithRetry(srcFile, destFile);
           }
         }
       }

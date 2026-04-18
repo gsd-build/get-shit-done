@@ -4,7 +4,7 @@
 
 const fs = require('fs');
 const path = require('path');
-const { output, error, planningDir, withPlanningLock, CONFIG_DEFAULTS, atomicWriteFileSync } = require('./core.cjs');
+const { output, error, planningDir, withPlanningLock, CONFIG_DEFAULTS, atomicWriteFileSync, resolveHomeDir, toPosixPath } = require('./core.cjs');
 const {
   VALID_PROFILES,
   getAgentToModelMapForProfile,
@@ -106,7 +106,7 @@ function validateKnownConfigKeyPath(keyPath) {
  */
 function buildNewProjectConfig(userChoices) {
   const choices = userChoices || {};
-  const homedir = require('os').homedir();
+  const homedir = resolveHomeDir();
 
   // Detect API key availability
   const braveKeyFile = path.join(homedir, '.gsd', 'brave_api_key');
@@ -185,7 +185,7 @@ function buildNewProjectConfig(userChoices) {
   };
 
   // Three-level deep merge: hardcoded <- userDefaults <- choices
-  return {
+  const config = {
     ...hardcoded,
     ...userDefaults,
     ...choices,
@@ -210,6 +210,16 @@ function buildNewProjectConfig(userChoices) {
       ...(choices.agent_skills || {}),
     },
   };
+
+  if (typeof config.parallelization !== 'boolean') {
+    if (config.parallelization && typeof config.parallelization === 'object' && 'enabled' in config.parallelization) {
+      config.parallelization = !!config.parallelization.enabled;
+    } else {
+      config.parallelization = hardcoded.parallelization;
+    }
+  }
+
+  return config;
 }
 
 /**
@@ -502,7 +512,7 @@ function getCmdConfigSetModelProfileResultMessage(
 function cmdConfigPath(cwd) {
   // Always emit as plain text — a file path is used via shell substitution,
   // never consumed as JSON. Passing raw=true forces plain-text output.
-  const configPath = path.join(planningDir(cwd), 'config.json');
+  const configPath = toPosixPath(path.join(planningDir(cwd), 'config.json'));
   output(configPath, true, configPath);
 }
 

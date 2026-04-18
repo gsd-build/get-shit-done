@@ -67,6 +67,10 @@ function cleanup(dir) {
   try { fs.rmSync(dir, { recursive: true, force: true }); } catch { /* ignore */ }
 }
 
+function readUtf8Normalized(filePath) {
+  return fs.readFileSync(filePath, 'utf8').replace(/\r\n/g, '\n');
+}
+
 function runInstaller(configDir) {
   execFileSync(process.execPath, [INSTALL_SCRIPT, '--claude', '--global', '--yes'], {
     encoding: 'utf-8',
@@ -96,7 +100,7 @@ describe('bug #2136 part 1: bash hook sources carry gsd-hook-version placeholder
     // Placing the header immediately after #!/bin/bash ensures it is always
     // found regardless of how much of the file is read.
     for (const sh of SH_HOOKS) {
-      const lines = fs.readFileSync(path.join(HOOKS_DIR, sh), 'utf8').split('\n');
+      const lines = readUtf8Normalized(path.join(HOOKS_DIR, sh)).split('\n');
       assert.strictEqual(lines[0], '#!/bin/bash', `${sh} line 1 must be #!/bin/bash`);
       assert.ok(
         lines[1].startsWith('# gsd-hook-version:'),

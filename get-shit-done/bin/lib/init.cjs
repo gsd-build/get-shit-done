@@ -5,7 +5,7 @@
 const fs = require('fs');
 const path = require('path');
 const { execSync } = require('child_process');
-const { loadConfig, resolveModelInternal, findPhaseInternal, getRoadmapPhaseInternal, pathExistsInternal, generateSlugInternal, getMilestoneInfo, getMilestonePhaseFilter, stripShippedMilestones, extractCurrentMilestone, normalizePhaseName, planningPaths, planningDir, planningRoot, toPosixPath, output, error, checkAgentsInstalled, phaseTokenMatches } = require('./core.cjs');
+const { loadConfig, resolveModelInternal, findPhaseInternal, getRoadmapPhaseInternal, pathExistsInternal, generateSlugInternal, getMilestoneInfo, getMilestonePhaseFilter, stripShippedMilestones, extractCurrentMilestone, normalizePhaseName, planningPaths, planningDir, planningRoot, toPosixPath, output, error, checkAgentsInstalled, phaseTokenMatches, resolveHomeDir } = require('./core.cjs');
 
 function getLatestCompletedMilestone(cwd) {
   const milestonesPath = path.join(planningRoot(cwd), 'MILESTONES.md');
@@ -1534,8 +1534,7 @@ function cmdInitRemoveWorkspace(cwd, name, raw) {
  */
 function buildAgentSkillsBlock(config, agentType, projectRoot) {
   const { validatePath } = require('./security.cjs');
-  const os = require('os');
-  const globalSkillsBase = path.join(os.homedir(), '.claude', 'skills');
+  const globalSkillsBase = path.join(resolveHomeDir(), '.claude', 'skills');
 
   if (!config || !config.agent_skills || !agentType) return '';
 
@@ -1643,7 +1642,7 @@ function cmdAgentSkills(cwd, agentType, raw) {
  */
 function buildSkillManifest(cwd, skillsDir = null) {
   const { extractFrontmatter } = require('./frontmatter.cjs');
-  const os = require('os');
+  const homeDir = resolveHomeDir();
 
   const canonicalRoots = skillsDir ? [{
     root: path.resolve(skillsDir),
@@ -1684,26 +1683,26 @@ function buildSkillManifest(cwd, skillsDir = null) {
     },
     {
       root: '~/.claude/skills',
-      path: path.join(os.homedir(), '.claude', 'skills'),
+      path: path.join(homeDir, '.claude', 'skills'),
       scope: 'global',
       kind: 'skills',
     },
     {
       root: '~/.codex/skills',
-      path: path.join(os.homedir(), '.codex', 'skills'),
+      path: path.join(homeDir, '.codex', 'skills'),
       scope: 'global',
       kind: 'skills',
     },
     {
       root: '.claude/get-shit-done/skills',
-      path: path.join(os.homedir(), '.claude', 'get-shit-done', 'skills'),
+      path: path.join(homeDir, '.claude', 'get-shit-done', 'skills'),
       scope: 'import-only',
       kind: 'skills',
       deprecated: true,
     },
     {
       root: '.claude/commands/gsd',
-      path: path.join(os.homedir(), '.claude', 'commands', 'gsd'),
+      path: path.join(homeDir, '.claude', 'commands', 'gsd'),
       scope: 'legacy-commands',
       kind: 'commands',
       deprecated: true,
@@ -1712,6 +1711,7 @@ function buildSkillManifest(cwd, skillsDir = null) {
 
   const skills = [];
   const roots = [];
+  const seenSkillNames = new Set();
   let legacyClaudeCommandsInstalled = false;
   for (const rootInfo of canonicalRoots) {
     const rootPath = rootInfo.path;
@@ -1769,6 +1769,8 @@ function buildSkillManifest(cwd, skillsDir = null) {
       const frontmatter = extractFrontmatter(content);
       const name = frontmatter.name || entry.name;
       const description = frontmatter.description || '';
+      if (seenSkillNames.has(name)) continue;
+      seenSkillNames.add(name);
 
       // Extract trigger lines from body text (after frontmatter)
       const triggers = [];

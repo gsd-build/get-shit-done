@@ -22,6 +22,7 @@ const { execFileSync } = require('child_process');
 const INSTALL_SRC = path.join(__dirname, '..', 'bin', 'install.js');
 const BUILD_SCRIPT = path.join(__dirname, '..', 'scripts', 'build-hooks.js');
 const { install, copyCommandsAsClaudeSkills } = require(INSTALL_SRC);
+const SUITE_CWD = process.cwd();
 
 // ─── Ensure hooks/dist/ is populated before install tests ────────────────────
 // With --test-concurrency=4, other install tests (bug-1834, bug-1924) run
@@ -46,6 +47,7 @@ describe('#1736: local Claude install populates .claude/commands/gsd/', () => {
   });
 
   afterEach(() => {
+    process.chdir(SUITE_CWD);
     fs.rmSync(tmpDir, { recursive: true, force: true });
   });
 

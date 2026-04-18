@@ -28,6 +28,7 @@ const { execFileSync } = require('child_process');
 const INSTALL_SRC = path.join(__dirname, '..', 'bin', 'install.js');
 const BUILD_SCRIPT = path.join(__dirname, '..', 'scripts', 'build-hooks.js');
 const { install, finishInstall } = require(INSTALL_SRC);
+const SUITE_CWD = process.cwd();
 
 // ─── Ensure hooks/dist/ is populated before install tests ────────────────────
 before(() => {
@@ -47,6 +48,7 @@ describe('#2248: local Claude install does not clobber profile-level statusLine'
   });
 
   afterEach(() => {
+    process.chdir(SUITE_CWD);
     fs.rmSync(tmpDir, { recursive: true, force: true });
   });
 
