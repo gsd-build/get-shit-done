@@ -103,6 +103,23 @@ describe('#1657 / #2385: SDK install must be wired into installer source', () =>
     );
   });
 
+  test('install.js probes gsd-sdk for `query` capability, not just binary presence (#2414)', () => {
+    src = src || fs.readFileSync(INSTALL_SRC, 'utf-8');
+    // v1.37.1 installed @gsd-build/sdk@0.1.0 globally. That binary lacks the
+    // `query` subcommand every /gsd-* skill depends on. When users upgrade,
+    // the old `which gsd-sdk` probe found the stale binary and skipped the
+    // source rebuild. The installer must now probe the actual capability:
+    // run `gsd-sdk --help` and check that the output mentions `query`.
+    assert.ok(
+      /spawnSync\(\s*['"]gsd-sdk['"]\s*,\s*\[\s*['"]--help['"]/.test(src),
+      'installer must probe capability by running `gsd-sdk --help`, not just `which gsd-sdk`'
+    );
+    assert.ok(
+      src.includes("includes('query')") || src.includes('includes("query")'),
+      'installer must check that `gsd-sdk --help` output includes "query" before skipping the rebuild'
+    );
+  });
+
   test('package.json ships sdk source in published tarball (#2385)', () => {
     const rootPkg = JSON.parse(fs.readFileSync(path.join(__dirname, '..', 'package.json'), 'utf-8'));
     const files = rootPkg.files || [];
