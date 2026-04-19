@@ -113,7 +113,7 @@ if (!hasSdk) {
 
 - `bin/install.js` — replace ~7 lines inside `installSdkIfNeeded()` with the capability probe (~15 lines including comment). Net: small.
 - `tests/bugs-1656-1657.test.cjs` — add one test inside the existing `#1657 / #2385: SDK install must be wired into installer source` describe block:
-  ```
+  ```js
   test('install.js probes for `query` capability, not just binary presence (#2414)', ...)
   ```
   Assertions: installer calls `spawnSync('gsd-sdk', ['--help'], …)` AND checks for the string `'query'` in the probe output. Guards against reintroducing the `which`-only probe.
