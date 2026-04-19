@@ -6906,10 +6906,27 @@ function installSdkIfNeeded() {
   const fs = require('fs');
 
   if (!hasSdk) {
-    const resolved = resolveGsdSdk();
-    if (resolved) {
-      console.log(`  ${green}✓${reset} GSD SDK already installed (gsd-sdk on PATH at ${resolved})`);
+    // Capability probe: the stale @gsd-build/sdk@0.1.0 installed by v1.37.1
+    // lacks the `query` subcommand every /gsd-* skill depends on. A bare
+    // `which gsd-sdk` check would find that stale binary and wrongly skip
+    // the rebuild, so we run `gsd-sdk --help` and look for `query` in the
+    // usage text. Missing binary, non-zero exit, or missing capability all
+    // fall through to the build-from-source path below.
+    const probe = spawnSync('gsd-sdk', ['--help'], {
+      encoding: 'utf-8',
+      timeout: 5000,
+      stdio: ['ignore', 'pipe', 'pipe'],
+    });
+    const hasQueryCapability =
+      probe.status === 0 &&
+      typeof probe.stdout === 'string' &&
+      probe.stdout.includes('query');
+    if (hasQueryCapability) {
+      console.log(`  ${green}✓${reset} GSD SDK already installed (gsd-sdk supports \`query\`)`);
       return;
+    }
+    if (probe.status === 0) {
+      console.log(`  ${yellow}→${reset} Detected stale gsd-sdk on PATH (missing \`query\` subcommand). Rebuilding from in-repo source…`);
     }
   }
 
