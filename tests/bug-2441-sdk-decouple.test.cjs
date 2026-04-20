@@ -91,17 +91,20 @@ describe('fix #2441: back-compat shim — parent package bin entry', () => {
 
   test('bin/gsd-sdk.js forwards to sdk/dist/cli.js', () => {
     const shimContent = fs.readFileSync(GSD_SDK_SHIM, 'utf-8');
+    // Must resolve the path to sdk/dist/cli.js using path.resolve (not just mention the strings)
     assert.ok(
-      shimContent.includes('sdk') && shimContent.includes('dist') && shimContent.includes('cli.js'),
-      'bin/gsd-sdk.js must resolve and delegate to sdk/dist/cli.js.'
+      /path\.resolve\s*\([^)]*['"]sdk['"]\s*,\s*['"]dist['"]\s*,\s*['"]cli\.js['"]\s*\)/.test(shimContent) ||
+      /path\.resolve\s*\([^)]*,\s*['"]sdk\/dist\/cli\.js['"]\s*\)/.test(shimContent),
+      'bin/gsd-sdk.js must call path.resolve() to build the path to sdk/dist/cli.js, not merely reference those strings.'
     );
   });
 
   test('bin/gsd-sdk.js uses node to invoke cli.js (no direct exec dependency)', () => {
     const shimContent = fs.readFileSync(GSD_SDK_SHIM, 'utf-8');
+    // Must pass process.execPath as the executable and the resolved cliPath as the first argument
     assert.ok(
-      shimContent.includes('process.execPath') || shimContent.includes('spawnSync') || shimContent.includes('node'),
-      'bin/gsd-sdk.js must invoke sdk/dist/cli.js via node, not rely on execute bit.'
+      /spawnSync\s*\(\s*process\.execPath\s*,\s*\[/.test(shimContent),
+      'bin/gsd-sdk.js must invoke sdk/dist/cli.js via spawnSync(process.execPath, [cliPath, ...]), not rely on execute bit.'
     );
   });
 });
