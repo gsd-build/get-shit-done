@@ -177,9 +177,15 @@ process.stdin.on('end', () => {
           'starting new complex work.';
     }
 
+    // Echo the event name from the input payload rather than guessing the
+    // runtime from env vars. Claude Code users with GEMINI_API_KEY in their
+    // shell (e.g. for an unrelated Gemini project or MCP) would otherwise
+    // get "AfterTool" emitted into a CC runtime, which CC's hook validator
+    // rejects as "(root): Invalid input" — silently dropping all context
+    // warnings.
     const output = {
       hookSpecificOutput: {
-        hookEventName: process.env.GEMINI_API_KEY ? "AfterTool" : "PostToolUse",
+        hookEventName: data.hook_event_name || "PostToolUse",
         additionalContext: message
       }
     };
