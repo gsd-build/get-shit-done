@@ -871,6 +871,38 @@ function cmdValidateHealth(cwd, options, raw) {
     }
   } catch { /* git worktree not available or not a git repo — skip silently */ }
 
+  // ─── Check 12: MILESTONES.md / archive snapshot drift (#2446) ─────────────
+  const milestonesPath = path.join(planBase, 'MILESTONES.md');
+  const milestonesArchiveDir = path.join(planBase, 'milestones');
+  const missingFromRegistry = [];
+  try {
+    if (fs.existsSync(milestonesArchiveDir)) {
+      const archiveFiles = fs.readdirSync(milestonesArchiveDir);
+      const archivedVersions = archiveFiles
+        .map(f => f.match(/^(v\d+\.\d+(?:\.\d+)?)-ROADMAP\.md$/))
+        .filter(Boolean)
+        .map(m => m[1]);
+
+      if (archivedVersions.length > 0) {
+        const registryContent = fs.existsSync(milestonesPath)
+          ? fs.readFileSync(milestonesPath, 'utf-8')
+          : '';
+        for (const ver of archivedVersions) {
+          if (!registryContent.includes(`## ${ver}`)) {
+            missingFromRegistry.push(ver);
+          }
+        }
+        if (missingFromRegistry.length > 0) {
+          addIssue('warning', 'W018',
+            `MILESTONES.md missing ${missingFromRegistry.length} archived milestone(s): ${missingFromRegistry.join(', ')}`,
+            'Run /gsd-health --backfill to synthesize missing entries from archive snapshots',
+            true);
+          repairs.push('backfillMilestones');
+        }
+      }
+    }
+  } catch { /* intentionally empty — milestone sync check is advisory */ }
+
   // ─── Perform repairs if requested ─────────────────────────────────────────
   const repairActions = [];
   if (options.repair && repairs.length > 0) {
@@ -960,6 +992,39 @@ function cmdValidateHealth(cwd, options, raw) {
             }
             break;
           }
+          case 'backfillMilestones': {
+            if (!options.backfill && !options.repair) break;
+            const today = new Date().toISOString().split('T')[0];
+            let backfilled = 0;
+            for (const ver of missingFromRegistry) {
+              try {
+                const snapshotPath = path.join(milestonesArchiveDir, `${ver}-ROADMAP.md`);
+                const snapshot = fs.existsSync(snapshotPath) ? fs.readFileSync(snapshotPath, 'utf-8') : null;
+                // Build minimal entry from snapshot title or version
+                const titleMatch = snapshot && snapshot.match(/^#\s+(.+)$/m);
+                const milestoneName = titleMatch ? titleMatch[1].replace(/^Milestone\s+/i, '').replace(/^v[\d.]+\s*/, '').trim() : ver;
+                const entry = `## ${ver}${milestoneName && milestoneName !== ver ? ` ${milestoneName}` : ''} (Backfilled: ${today})\n\n**Note:** Synthesized from archive snapshot by \`/gsd-health --backfill\`. Original completion date unknown.\n\n---\n\n`;
+                const milestonesContent = fs.existsSync(milestonesPath)
+                  ? fs.readFileSync(milestonesPath, 'utf-8')
+                  : '';
+                if (!milestonesContent.trim()) {
+                  fs.writeFileSync(milestonesPath, `# Milestones\n\n${entry}`, 'utf-8');
+                } else {
+                  const headerMatch = milestonesContent.match(/^(#{1,3}\s+[^\n]*\n\n?)/);
+                  if (headerMatch) {
+                    const header = headerMatch[1];
+                    const rest = milestonesContent.slice(header.length);
+                    fs.writeFileSync(milestonesPath, header + entry + rest, 'utf-8');
+                  } else {
+                    fs.writeFileSync(milestonesPath, entry + milestonesContent, 'utf-8');
+                  }
+                }
+                backfilled++;
+              } catch { /* intentionally empty — partial backfill is acceptable */ }
+            }
+            repairActions.push({ action: repair, success: true, detail: `Backfilled ${backfilled} milestone(s) into MILESTONES.md` });
+            break;
+          }
         }
       } catch (err) {
         repairActions.push({ action: repair, success: false, error: err.message });
@@ -980,14 +1045,16 @@ function cmdValidateHealth(cwd, options, raw) {
   const repairableCount = errors.filter(e => e.repairable).length +
                          warnings.filter(w => w.repairable).length;
 
-  output({
+  const result = {
     status,
     errors,
     warnings,
     info,
     repairable_count: repairableCount,
     repairs_performed: repairActions.length > 0 ? repairActions : undefined,
-  }, raw);
+  };
+  output(result, raw);
+  return result;
 }
 
 /**

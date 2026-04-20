@@ -764,7 +764,8 @@ async function runCommand(command, args, cwd, raw, defaultValue) {
         verify.cmdValidateConsistency(cwd, raw);
       } else if (subcommand === 'health') {
         const repairFlag = args.includes('--repair');
-        verify.cmdValidateHealth(cwd, { repair: repairFlag }, raw);
+        const backfillFlag = args.includes('--backfill');
+        verify.cmdValidateHealth(cwd, { repair: repairFlag, backfill: backfillFlag }, raw);
       } else if (subcommand === 'agents') {
         verify.cmdValidateAgents(cwd, raw);
       } else {

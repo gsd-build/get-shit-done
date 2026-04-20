@@ -11,12 +11,16 @@ Read all files referenced by the invoking prompt's execution_context before star
 <step name="parse_args">
 **Parse arguments:**
 
-Check if `--repair` flag is present in the command arguments.
+Check if `--repair` or `--backfill` flags are present in the command arguments.
 
 ```
 REPAIR_FLAG=""
+BACKFILL_FLAG=""
 if arguments contain "--repair"; then
   REPAIR_FLAG="--repair"
+fi
+if arguments contain "--backfill"; then
+  BACKFILL_FLAG="--backfill"
 fi
 ```
 </step>
@@ -25,7 +29,7 @@ fi
 **Run health validation:**
 
 ```bash
-gsd-sdk query validate.health $REPAIR_FLAG
+gsd-sdk query validate.health $REPAIR_FLAG $BACKFILL_FLAG
 ```
 
 Parse JSON output:
@@ -138,6 +142,7 @@ Report final status.
 | W007 | warning | Phase on disk but not in ROADMAP | No |
 | W008 | warning | config.json: workflow.nyquist_validation absent (defaults to enabled but agents may skip) | Yes |
 | W009 | warning | Phase has Validation Architecture in RESEARCH.md but no VALIDATION.md | No |
+| W018 | warning | MILESTONES.md missing entry for archived milestone snapshot | Yes (`--backfill`) |
 | I001 | info | Plan without SUMMARY (may be in progress) | No |
 
 </error_codes>
@@ -150,6 +155,7 @@ Report final status.
 | resetConfig | Delete + recreate config.json | Loses custom settings |
 | regenerateState | Create STATE.md from ROADMAP structure when it is missing | Loses session history |
 | addNyquistKey | Add workflow.nyquist_validation: true to config.json | None — matches existing default |
+| backfillMilestones | Synthesize missing MILESTONES.md entries from `.planning/milestones/vX.Y-ROADMAP.md` snapshots | None — additive only; triggered by `--backfill` flag |
 
 **Not repairable (too risky):**
 - PROJECT.md, ROADMAP.md content
