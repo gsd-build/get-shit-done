@@ -88,6 +88,7 @@ test('link mode falls back to embed for workflow section (no linkable source)', 
   const content = fs.readFileSync(path.join(dir, 'CLAUDE.md'), 'utf-8');
   // workflow section should still be inlined (it has no linkPath)
   assert.ok(!content.includes('@GSD defaults'), 'workflow should not write @GSD defaults');
+  assert.ok(content.includes('GSD Workflow Enforcement'), 'workflow content should be embedded inline');
 });
 
 test('link mode falls back to embed when source file is missing (hasFallback)', () => {
