@@ -225,6 +225,11 @@ function parseVerificationItems(content, status) {
         const numberedMatch = line.match(/^(\d+)\.\s+(.+)/);
 
         if (tableMatch) {
+          // Skip rows that already have a passing result (PASS, pass, resolved, etc.)
+          const rowRemainder = line.slice(tableMatch.index + tableMatch[0].length);
+          const cellValues = rowRemainder.split('|').map(c => c.trim());
+          const hasPassResult = cellValues.some(c => /^pass$/i.test(c) || /^resolved$/i.test(c));
+          if (hasPassResult) continue;
           items.push({
             test: parseInt(tableMatch[1], 10),
             name: tableMatch[2].trim(),

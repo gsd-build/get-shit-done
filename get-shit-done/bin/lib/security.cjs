@@ -245,14 +245,15 @@ function sanitizeForPrompt(text) {
   // Neutralize XML/HTML tags that mimic system boundaries
   // Replace < > with full-width equivalents to prevent tag interpretation
   // Note: <instructions> is excluded — GSD uses it as legitimate prompt structure
-  sanitized = sanitized.replace(/<(\/?)(?:system|assistant|human)>/gi,
+  // Matches system|assistant|human|user with optional whitespace before the closing >
+  sanitized = sanitized.replace(/<(\/?)\s*(?:system|assistant|human|user)\s*>/gi,
     (_, slash) => `＜${slash || ''}system-text＞`);
 
-  // Neutralize [SYSTEM] / [INST] / [/INST] markers
+  // Neutralize [SYSTEM] / [INST] / [/INST] markers — both opening and closing variants
   sanitized = sanitized.replace(/\[(\/?)(SYSTEM|INST)\]/gi, (_, slash, tag) => `[${slash}${tag.toUpperCase()}-TEXT]`);
 
-  // Neutralize <<SYS>> markers
-  sanitized = sanitized.replace(/<<\s*SYS\s*>>/gi, '«SYS-TEXT»');
+  // Neutralize <<SYS>> and <</SYS>> markers (Llama-style delimiters)
+  sanitized = sanitized.replace(/<<\/?\s*SYS\s*>>/gi, '«SYS-TEXT»');
 
   return sanitized;
 }

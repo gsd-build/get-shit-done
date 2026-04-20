@@ -364,6 +364,65 @@ All checks passed.
     assert.strictEqual(output.summary.total_items, 0);
     assert.strictEqual(output.summary.total_files, 0);
   });
+
+  // Regression: #2383 — human_needed items with result: PASS are still reported
+  test('ignores human_verification items with result PASS (regression #2383)', () => {
+    const phaseDir = path.join(tmpDir, '.planning', 'phases', '31-auth');
+    fs.mkdirSync(phaseDir, { recursive: true });
+
+    // This file has status: human_needed in frontmatter but all individual items
+    // have result: "PASS" — they should not be reported as outstanding
+    fs.writeFileSync(path.join(phaseDir, '31-VERIFICATION.md'), [
+      '---',
+      'status: human_needed',
+      'phase: 31-auth',
+      'gaps_remaining: []',
+      '---',
+      '',
+      '## Human Verification',
+      '',
+      '| # | Item | Result | Evidence |',
+      '|---|------|--------|----------|',
+      '| 1 | Test SSO login with Google | PASS | Verified 2025-01-15 |',
+      '| 2 | Test password reset flow | PASS | Verified 2025-01-15 |',
+      '| 3 | Verify MFA enrollment | PASS | Verified 2025-01-15 |',
+    ].join('\n'));
+
+    const result = runGsdTools('audit-uat --raw', tmpDir);
+    assert.ok(result.success, `Command failed: ${result.error}`);
+
+    const output = JSON.parse(result.output);
+    assert.strictEqual(output.summary.total_items, 0,
+      `Expected 0 outstanding items but got ${output.summary.total_items} — resolved PASS items should not be counted`);
+    assert.strictEqual(output.summary.total_files, 0);
+  });
+
+  test('ignores human_needed VERIFICATION file when file-level status is passed (regression #2383)', () => {
+    const phaseDir = path.join(tmpDir, '.planning', 'phases', '31-auth');
+    fs.mkdirSync(phaseDir, { recursive: true });
+
+    // When the frontmatter status is "passed", skip entirely regardless of section content
+    fs.writeFileSync(path.join(phaseDir, '31-VERIFICATION.md'), [
+      '---',
+      'status: passed',
+      'phase: 31-auth',
+      'gaps_remaining: []',
+      '---',
+      '',
+      '## Human Verification',
+      '',
+      '1. Test SSO login with Google account',
+      '2. Test password reset flow end-to-end',
+    ].join('\n'));
+
+    const result = runGsdTools('audit-uat --raw', tmpDir);
+    assert.ok(result.success, `Command failed: ${result.error}`);
+
+    const output = JSON.parse(result.output);
+    assert.strictEqual(output.summary.total_items, 0,
+      `status: passed file should produce 0 outstanding items, got ${output.summary.total_items}`);
+    assert.strictEqual(output.summary.total_files, 0);
+  });
 });
 
 describe('uat render-checkpoint', () => {
