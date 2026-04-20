@@ -716,7 +716,8 @@ ${CONTEXT_WINDOW >= 500000 ? `
 **Cross-phase context (1M model enrichment):**
 - CONTEXT.md files from the 3 most recent completed phases (locked decisions — maintain consistency)
 - SUMMARY.md files from the 3 most recent completed phases (what was built — reuse patterns, avoid duplication)
-- CONTEXT.md and SUMMARY.md from any phases listed in the current phase's "Depends on:" field in ROADMAP.md (regardless of recency — explicit dependencies always load, deduplicated against the 3 most recent)
+- LEARNINGS.md files from the 3 most recent completed phases (structured decisions, patterns, lessons, surprises — skip silently if a phase has no LEARNINGS.md; prefix each block with \`[from Phase N LEARNINGS]\` for source attribution; if total size exceeds 15% of context budget, drop oldest first)
+- CONTEXT.md, SUMMARY.md, and LEARNINGS.md from any phases listed in the current phase's "Depends on:" field in ROADMAP.md (regardless of recency — explicit dependencies always load, deduplicated against the 3 most recent)
 - Skip all other prior phases to stay within context budget
 ` : ''}
 </files_to_read>

@@ -172,7 +172,7 @@ Full roster at `commands/gsd/*.md`. The groupings below mirror `docs/COMMANDS.md
 
 ---
 
-## Workflows (79 shipped)
+## Workflows (80 shipped)
 
 Full roster at `get-shit-done/workflows/*.md`. Workflows are thin orchestrators that commands reference internally; most are not read directly by end users. Rows below map each workflow file to its role (derived from the `<purpose>` block) and, where applicable, to the command that invokes it.
 
@@ -206,6 +206,7 @@ Full roster at `get-shit-done/workflows/*.md`. Workflows are thin orchestrators 
 | `extract_learnings.md` | Extract decisions, lessons, patterns, and surprises from completed phase artifacts. | `/gsd-extract-learnings` |
 | `fast.md` | Execute a trivial task inline without subagent overhead. | `/gsd-fast` |
 | `forensics.md` | Forensics investigation of failed workflows — git, artifacts, and state analysis. | `/gsd-forensics` |
+| `graduation.md` | Cluster recurring LEARNINGS.md items across phases and surface HITL promotion candidates. | `transition.md` (graduation_scan step) |
 | `health.md` | Validate `.planning/` directory integrity and report actionable issues. | `/gsd-health` |
 | `help.md` | Display the complete GSD command reference. | `/gsd-help` |
 | `import.md` | Ingest external plans with conflict detection against existing project decisions. | `/gsd-import` |

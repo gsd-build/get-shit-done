@@ -135,6 +135,12 @@ missing_artifacts:
 ---
 ```
 
+Individual items may carry an optional `graduated:` annotation (added by `graduation.md` when a cluster is promoted):
+```markdown
+**Graduated:** {target-file}:{ISO_DATE}
+```
+This annotation is appended after the item's existing fields and prevents the item from being re-surfaced in future graduation scans. Do not add this field during extraction — it is written only by the graduation workflow.
+
 The body follows this structure:
 ```markdown
 # Phase {PHASE_NUMBER} Learnings: {PHASE_NAME}

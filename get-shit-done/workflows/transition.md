@@ -271,6 +271,28 @@ After (Phase 2 shipped JWT auth, discovered rate limiting needed):
 
 </step>
 
+<step name="graduation_scan">
+
+Scan LEARNINGS.md files from recent phases for recurring patterns and surface promotion candidates to the developer.
+
+**Invoke the graduation helper:**
+
+```
+@~/.claude/get-shit-done/workflows/graduation.md
+```
+
+This step is fully delegated to `graduation.md`. It handles guard checks (feature flag, window size, threshold), clustering, backlog filtering, HITL prompting, promotion writes, and STATE.md updates.
+
+**This step is always non-blocking:** graduation candidates are surfaced for the developer's decision; no action is required to continue the transition. If the graduation scan produces no qualifying clusters, it prints a single `[graduation: no qualifying clusters]` line and returns.
+
+**Step complete when:**
+
+- [ ] graduation.md guard checks passed (or skipped with silent no-op)
+- [ ] Recurring clusters surfaced (or `[graduation: no qualifying clusters]` printed)
+- [ ] Each cluster resolved as Promote / Defer / Dismiss (or all skipped)
+
+</step>
+
 <step name="update_current_position_after_transition">
 
 **Note:** Basic position updates (Current Phase, Status, Current Plan, Last Activity) were already handled by `gsd-sdk query phase.complete` in the update_roadmap_and_state step.
