@@ -338,10 +338,16 @@ export const stateBeginPhase: QueryHandler = async (args, projectDir) => {
 
   if (args.length > 0 && typeof args[0] === 'string' && args[0].startsWith('--')) {
     const flags: Record<string, string> = {};
-    for (let i = 0; i < args.length - 1; i += 2) {
-      if (typeof args[i] === 'string' && args[i].startsWith('--')) {
-        flags[args[i].slice(2)] = args[i + 1];
+    for (let i = 0; i < args.length; i++) {
+      const token = args[i];
+      if (typeof token !== 'string' || !token.startsWith('--')) continue;
+      const key = token.slice(2);
+      const value = args[i + 1];
+      if (value === undefined || (typeof value === 'string' && value.startsWith('--'))) {
+        throw new GSDError(`missing value for --${key}`, ErrorClassification.Validation);
       }
+      flags[key] = value as string;
+      i += 1;
     }
     phaseNumber = flags['phase'] ?? '';
     phaseName = flags['name'] ?? '';

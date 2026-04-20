@@ -339,6 +339,15 @@ describe('stateBeginPhase', () => {
     expect(data.name).toBe('Positional Test');
     expect(data.plan_count).toBe('5');
   });
+
+  it('bug-2420: flag parser throws when a flag value is missing (next token is a flag)', async () => {
+    const { stateBeginPhase } = await import('./state-mutation.js');
+
+    // --phase has no value — next token is --name, which is itself a flag.
+    await expect(
+      stateBeginPhase(['--phase', '--name', 'Title', '--plans', '1'], tmpDir)
+    ).rejects.toThrow('missing value for --phase');
+  });
 });
 
 // ─── stateAdvancePlan ───────────────────────────────────────────────────────
