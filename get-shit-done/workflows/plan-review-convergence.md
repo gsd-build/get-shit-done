@@ -118,9 +118,31 @@ Agent(
   description="Cross-AI review Phase {PHASE} cycle {cycle}",
   prompt="Run /gsd-review for Phase {PHASE}.
 
-Execute: Skill(skill='gsd-review', args='--phase {PHASE} {REVIEWER_FLAGS}')
+Execute: Skill(skill='gsd-review', args='--phase {PHASE} {REVIEWER_FLAGS} {GSD_WS}')
 
-Complete the full review workflow. Do NOT return until REVIEWS.md is committed.",
+Complete the full review workflow. Do NOT return until REVIEWS.md is committed.
+
+--- RETURN CONTRACT (REQUIRED) ---
+
+Your final return message MUST end with these two sections, exactly as specified.
+This is the contract the orchestrator relies on — do NOT skip or reformat.
+
+Section 1 — Machine-readable summary line (exact format, single line):
+
+CYCLE_SUMMARY: current_high=<N> current_medium=<M>
+
+Where <N> counts HIGH-severity concerns that REMAIN UNRESOLVED in this cycle's findings:
+  - INCLUDE: newly raised HIGHs; PARTIALLY RESOLVED HIGHs; previously raised and still unresolved HIGHs
+  - EXCLUDE: explicitly RESOLVED/FULLY RESOLVED HIGHs; HIGH mentions in retrospective/summary tables comparing cycles; quoted excerpts from prior reviews
+<M> follows the same definition for MEDIUM severity.
+
+Section 2 — Current HIGH Concerns (for display on escalation):
+
+## Current HIGH Concerns
+- <one bullet per currently unresolved HIGH, one sentence each>
+(If <N> is 0, write exactly: None.)
+
+--- END RETURN CONTRACT ---",
   mode="auto"
 )
 ```
@@ -132,13 +154,16 @@ REVIEWS_FILE=$(ls ${phase_dir}/${padded_phase}-REVIEWS.md 2>/dev/null)
 
 If REVIEWS_FILE is empty: Error — review agent did not produce REVIEWS.md. Exit.
 
-### 5b. Check for HIGH Concerns
+### 5b. Extract HIGH Count from Agent Return
 
-```bash
-HIGH_COUNT=$(grep -c '\*\*HIGH' "${REVIEWS_FILE}" 2>/dev/null || true)
-HIGH_COUNT=${HIGH_COUNT:-0}
-HIGH_LINES=$(grep -B0 -A1 '\*\*HIGH' "${REVIEWS_FILE}" 2>/dev/null)
-```
+**Do NOT grep REVIEWS.md.** REVIEWS.md accumulates historical content across cycles; raw text counts are unreliable (a cycle 2 review that re-lists resolved HIGHs for audit would inflate the count and falsely trigger stall detection). Instead, extract the count from the review agent's RETURN MESSAGE using the CYCLE_SUMMARY contract.
+
+Parse the agent's final return message:
+
+- `HIGH_COUNT`: the integer matched by regex `CYCLE_SUMMARY:\s+current_high=(\d+)`. If no match, abort with: `Review agent did not honor the CYCLE_SUMMARY contract — cannot determine HIGH count. Retry or switch reviewer.`
+- `HIGH_LINES`: the bullets under the `## Current HIGH Concerns` section of the return message (up to the next `##` heading or end of message). If the section contains only `None.`, set `HIGH_LINES=""`.
+
+Rationale: `gsd-plan-phase` uses the same data-flow pattern — it parses `gsd-plan-checker`'s structured return rather than re-reading PLAN.md. This keeps the count source-of-truth aligned with what the reviewer actually judged (current cycle only), avoiding false stalls from historical accumulation.
 
 **If HIGH_COUNT == 0 (converged):**
 

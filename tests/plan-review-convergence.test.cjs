@@ -3,8 +3,9 @@
  *
  * Validates that the command source and workflow contain the key structural
  * elements required for correct cross-AI plan convergence loop behavior:
- * initial planning gate, review agent spawning, HIGH count detection,
- * stall detection, escalation gate, and STATE.md update on convergence.
+ * initial planning gate, review agent spawning, HIGH count extraction via
+ * CYCLE_SUMMARY contract, stall detection (behavioral), escalation gate
+ * (including --max-cycles 1 edge case), and STATE.md update on convergence.
  */
 
 const { test, describe } = require('node:test');
@@ -107,6 +108,18 @@ describe('plan-review-convergence workflow: initialization (#2306)', () => {
       'workflow must display a startup banner'
     );
   });
+
+  test('workflow parses ARGUMENTS before calling gsd-tools init (PHASE must be known)', () => {
+    const workflow = fs.readFileSync(WORKFLOW_PATH, 'utf8');
+    const parseIdx = workflow.search(/Parse (and Normalize )?Arguments/i);
+    const initIdx = workflow.search(/node\s+"?\$HOME[^"]*gsd-tools\.cjs"?\s+init\s+plan-phase/);
+    assert.ok(parseIdx > -1, 'workflow must have an ARGUMENTS parsing section');
+    assert.ok(initIdx > -1, 'workflow must call gsd-tools.cjs init plan-phase');
+    assert.ok(
+      parseIdx < initIdx,
+      'Arguments parsing must come BEFORE init plan-phase so $PHASE is populated'
+    );
+  });
 });
 
 // ─── Workflow: initial planning gate ──────────────────────────────────────
@@ -148,10 +161,49 @@ describe('plan-review-convergence workflow: convergence loop (#2306)', () => {
     );
   });
 
-  test('workflow detects HIGH concerns by grepping REVIEWS.md', () => {
+  test('review agent spawn forwards --ws via {GSD_WS} (symmetric with replan agent)', () => {
+    // Extract the review agent spawn block (between "Cross-AI review" description and its closing mode="auto")
+    const reviewMatch = workflow.match(/description="Cross-AI review[\s\S]*?mode="auto"/);
+    assert.ok(reviewMatch, 'review agent spawn block must exist');
     assert.ok(
-      workflow.includes('HIGH_COUNT') || workflow.includes('grep'),
-      'workflow must grep REVIEWS.md for HIGH concerns to determine convergence'
+      reviewMatch[0].includes('{GSD_WS}'),
+      'review agent spawn must include {GSD_WS} in the skill args — asymmetry with replan agent is a correctness bug when user passes --ws'
+    );
+  });
+
+  test('replan agent spawn forwards --ws via {GSD_WS}', () => {
+    const replanMatch = workflow.match(/description="Replan[\s\S]*?mode="auto"/);
+    assert.ok(replanMatch, 'replan agent spawn block must exist');
+    assert.ok(
+      replanMatch[0].includes('{GSD_WS}'),
+      'replan agent must include {GSD_WS} in the skill args'
+    );
+  });
+
+  test('workflow extracts HIGH_COUNT via CYCLE_SUMMARY contract (not raw grep of REVIEWS.md)', () => {
+    assert.ok(
+      workflow.includes('CYCLE_SUMMARY'),
+      'workflow must use CYCLE_SUMMARY contract — raw grep of REVIEWS.md double-counts historical references across cycles'
+    );
+    assert.ok(
+      workflow.includes('current_high='),
+      'CYCLE_SUMMARY contract must use current_high=<N> format'
+    );
+    assert.ok(
+      workflow.match(/CYCLE_SUMMARY:\s*\\s\+\s*current_high=\(\\d\+\)/) ||
+      workflow.match(/CYCLE_SUMMARY:\\s\+current_high=\(\\d\+\)/),
+      'workflow must extract HIGH_COUNT via regex matching CYCLE_SUMMARY: current_high=<N>'
+    );
+  });
+
+  test('workflow instructs reviewer to exclude resolved/historical HIGH from count', () => {
+    assert.ok(
+      workflow.includes('EXCLUDE') && workflow.includes('RESOLVED'),
+      'CYCLE_SUMMARY contract must exclude resolved HIGHs from the count'
+    );
+    assert.ok(
+      workflow.match(/retrospective|summary tables/i),
+      'contract must exclude HIGH mentions in retrospective/summary tables (cycle-comparison artifacts)'
     );
   });
 
@@ -186,9 +238,9 @@ describe('plan-review-convergence workflow: convergence loop (#2306)', () => {
   });
 });
 
-// ─── Workflow: stall detection ─────────────────────────────────────────────
+// ─── Workflow: stall detection (behavioral) ───────────────────────────────
 
-describe('plan-review-convergence workflow: stall detection (#2306)', () => {
+describe('plan-review-convergence workflow: stall detection — behavioral (#2306)', () => {
   const workflow = fs.readFileSync(WORKFLOW_PATH, 'utf8');
 
   test('workflow tracks previous HIGH count to detect stalls', () => {
@@ -198,15 +250,50 @@ describe('plan-review-convergence workflow: stall detection (#2306)', () => {
     );
   });
 
-  test('workflow warns when HIGH count is not decreasing', () => {
+  test('stall condition uses >= (covers both "stable" AND "increasing" cases)', () => {
+    // The exact spec: "If HIGH_COUNT >= prev_high_count"
+    // A bug would be using > alone (misses the stable-count case) or <= (inverted logic)
     assert.ok(
-      workflow.includes('stall') || workflow.includes('Stall') || workflow.includes('not decreasing'),
-      'workflow must warn user when HIGH count is not decreasing between cycles'
+      workflow.match(/HIGH_COUNT\s*>=\s*prev_high_count/),
+      'stall condition must be HIGH_COUNT >= prev_high_count — using > alone would miss the "count stable across cycles" case (real stall)'
+    );
+    assert.ok(
+      !workflow.match(/HIGH_COUNT\s*<=\s*prev_high_count/),
+      'stall condition must NOT be <= (that would be inverted logic — decreasing counts would falsely trigger stall)'
+    );
+  });
+
+  // Behavioral simulation: verify the condition `HIGH_COUNT >= prev_high_count`
+  // produces correct stall/no-stall decisions across the three cycle transitions.
+  const stallCondition = (current, previous) => current >= previous;
+
+  test('BEHAVIORAL: decreasing HIGH count (progress) does NOT trigger stall', () => {
+    // 5 → 3: real progress, cycle should continue to replan
+    assert.strictEqual(stallCondition(3, 5), false, 'decreasing 5→3 must NOT be stall');
+    assert.strictEqual(stallCondition(1, 10), false, 'decreasing 10→1 must NOT be stall');
+  });
+
+  test('BEHAVIORAL: stable HIGH count (no progress) DOES trigger stall', () => {
+    // 5 → 5: the original stall case from revision-loop.md
+    assert.strictEqual(stallCondition(5, 5), true, 'stable 5→5 MUST be stall (revision not converging)');
+    assert.strictEqual(stallCondition(0, 0), true, 'stable 0→0 is stall but HIGH_COUNT==0 exits loop first — trap prevents false alarm');
+  });
+
+  test('BEHAVIORAL: increasing HIGH count (regression) DOES trigger stall', () => {
+    // Regression case: replan made things worse
+    assert.strictEqual(stallCondition(7, 5), true, 'increasing 5→7 MUST be stall (regression)');
+    assert.strictEqual(stallCondition(13, 3), true, 'increasing 3→13 MUST be stall');
+  });
+
+  test('workflow emits stall warning text when condition triggers', () => {
+    assert.ok(
+      workflow.match(/stalled|Stall|not decreasing/),
+      'workflow must emit a stall warning message when condition triggers (for user visibility)'
     );
   });
 });
 
-// ─── Workflow: escalation gate ────────────────────────────────────────────
+// ─── Workflow: escalation gate (including --max-cycles 1 edge) ────────────
 
 describe('plan-review-convergence workflow: escalation gate (#2306)', () => {
   const workflow = fs.readFileSync(WORKFLOW_PATH, 'utf8');
@@ -217,6 +304,28 @@ describe('plan-review-convergence workflow: escalation gate (#2306)', () => {
       (workflow.includes('AskUserQuestion') || workflow.includes('vscode_askquestions')),
       'workflow must escalate to user via AskUserQuestion when max cycles reached'
     );
+  });
+
+  test('max-cycles condition uses >= (so --max-cycles 1 triggers after cycle 1)', () => {
+    assert.ok(
+      workflow.match(/cycle\s*>=\s*MAX_CYCLES/),
+      'max-cycles check must use cycle >= MAX_CYCLES — using > alone would require cycle=MAX_CYCLES+1 before escalation'
+    );
+  });
+
+  // Behavioral simulation: --max-cycles 1 corner case
+  const shouldEscalate = (cycle, maxCycles, highCount) => highCount > 0 && cycle >= maxCycles;
+
+  test('BEHAVIORAL: --max-cycles 1 with HIGHs in cycle 1 immediately escalates (no replan)', () => {
+    // User sets --max-cycles 1 as "review-only / dry-run" mode
+    assert.strictEqual(shouldEscalate(1, 1, 3), true, 'cycle=1, max=1, HIGHs=3 MUST escalate immediately');
+    assert.strictEqual(shouldEscalate(1, 1, 0), false, 'cycle=1, max=1, HIGHs=0 converges instead (HIGH_COUNT==0 branch exits earlier)');
+  });
+
+  test('BEHAVIORAL: --max-cycles 3 (default) only escalates after 3 cycles', () => {
+    assert.strictEqual(shouldEscalate(1, 3, 5), false, 'cycle=1 of 3: must NOT escalate yet — replan next');
+    assert.strictEqual(shouldEscalate(2, 3, 5), false, 'cycle=2 of 3: must NOT escalate yet — replan next');
+    assert.strictEqual(shouldEscalate(3, 3, 5), true, 'cycle=3 of 3: MUST escalate (max reached)');
   });
 
   test('escalation offers "Proceed anyway" option', () => {
@@ -257,6 +366,13 @@ describe('plan-review-convergence workflow: artifact verification (#2306)', () =
     assert.ok(
       workflow.includes('REVIEWS_FILE') || workflow.includes('review agent did not produce'),
       'workflow must error if the review agent fails to produce REVIEWS.md'
+    );
+  });
+
+  test('workflow aborts if review agent omits CYCLE_SUMMARY contract', () => {
+    assert.ok(
+      workflow.match(/did not honor the CYCLE_SUMMARY contract/i),
+      'workflow must fail-loud (not silently default) if review agent omits the CYCLE_SUMMARY summary line'
     );
   });
 });
