@@ -1159,6 +1159,20 @@ gsd-sdk query commit "docs(${PADDED_PHASE}): create phase plan" --files "${PHASE
 
 This commits all PLAN.md files for the phase plus the updated STATE.md to version-control the planning artifacts. Skip this step if `commit_docs` is false.
 
+## 13d. Annotate ROADMAP with Wave Dependencies and Cross-cutting Constraints
+
+After plans are finalized, annotate the ROADMAP.md plan list for this phase with:
+- **Wave dependency notes** — a bold header before each wave group ("Wave 2 *(blocked on Wave 1 completion)*")
+- **Cross-cutting constraints** — a "Cross-cutting constraints:" subsection listing `must_haves.truths` entries that appear in 2 or more plans
+
+This step is derived entirely from existing PLAN frontmatter — no extra LLM pass is required.
+
+```bash
+gsd-sdk query roadmap.annotate-dependencies "${PHASE_NUMBER}"
+```
+
+This operation is idempotent: if wave headers already exist in the ROADMAP phase section, the command returns without modifying the file. Skip this step if `plan_count` is 0.
+
 ## 14. Present Final Status
 
 Route to `<offer_next>` OR `auto_advance` depending on flags/config.

@@ -53,7 +53,7 @@ import {
 } from './init.js';
 import { initNewProject, initProgress, initManager } from './init-complex.js';
 import { agentSkills } from './skills.js';
-import { requirementsMarkComplete } from './roadmap.js';
+import { requirementsMarkComplete, roadmapAnnotateDependencies } from './roadmap.js';
 import { roadmapUpdatePlanProgress } from './roadmap-update-plan-progress.js';
 import { statePlannedPhase } from './state-mutation.js';
 import { verifySchemaDrift } from './verify.js';
@@ -451,6 +451,8 @@ export function createRegistry(
   registry.register('agent-skills', agentSkills);
   registry.register('roadmap.update-plan-progress', roadmapUpdatePlanProgress);
   registry.register('roadmap update-plan-progress', roadmapUpdatePlanProgress);
+  registry.register('roadmap.annotate-dependencies', roadmapAnnotateDependencies);
+  registry.register('roadmap annotate-dependencies', roadmapAnnotateDependencies);
   registry.register('requirements.mark-complete', requirementsMarkComplete);
   registry.register('requirements mark-complete', requirementsMarkComplete);
   registry.register('state.planned-phase', statePlannedPhase);

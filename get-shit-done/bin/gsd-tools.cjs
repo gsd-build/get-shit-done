@@ -49,6 +49,7 @@
  *   roadmap get-phase <phase>          Extract phase section from ROADMAP.md
  *   roadmap analyze                    Full roadmap parse with disk status
  *   roadmap update-plan-progress <N>   Update progress table row from disk (PLAN vs SUMMARY counts)
+ *   roadmap annotate-dependencies <N>  Add wave dependency notes + cross-cutting constraints to ROADMAP.md
  *
  * Requirements Operations:
  *   requirements mark-complete <ids>   Mark requirement IDs as complete in REQUIREMENTS.md
@@ -690,8 +691,10 @@ async function runCommand(command, args, cwd, raw, defaultValue) {
         roadmap.cmdRoadmapAnalyze(cwd, raw);
       } else if (subcommand === 'update-plan-progress') {
         roadmap.cmdRoadmapUpdatePlanProgress(cwd, args[2], raw);
+      } else if (subcommand === 'annotate-dependencies') {
+        roadmap.cmdRoadmapAnnotateDependencies(cwd, args[2], raw);
       } else {
-        error('Unknown roadmap subcommand. Available: get-phase, analyze, update-plan-progress');
+        error('Unknown roadmap subcommand. Available: get-phase, analyze, update-plan-progress, annotate-dependencies');
       }
       break;
     }

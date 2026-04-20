@@ -462,6 +462,53 @@ export const roadmapAnalyze: QueryHandler = async (_args, projectDir) => {
   return { data: result };
 };
 
+
+// ─── roadmapAnnotateDependencies ─────────────────────────────────────────
+
+/**
+ * Annotate the ROADMAP.md plan list with wave dependency notes and
+ * cross-cutting constraints derived from PLAN frontmatter.
+ *
+ * Delegates to gsd-tools.cjs which holds the full annotation logic.
+ * Returns { updated, phase, waves, cross_cutting_constraints }.
+ */
+export const roadmapAnnotateDependencies: QueryHandler = async (args, projectDir) => {
+  const phase = args[0];
+  if (!phase) {
+    return { data: { updated: false, reason: 'phase argument required' } };
+  }
+
+  const { spawnSync } = await import('node:child_process');
+  const { fileURLToPath } = await import('node:url');
+
+  const toolsPath = fileURLToPath(
+    new URL('../../../get-shit-done/bin/gsd-tools.cjs', import.meta.url),
+  );
+
+  const result = spawnSync(process.execPath, [toolsPath, 'roadmap', 'annotate-dependencies', phase], {
+    cwd: projectDir,
+    encoding: 'utf-8',
+    stdio: ['pipe', 'pipe', 'pipe'],
+    timeout: 15000,
+    maxBuffer: 1024 * 1024,
+  });
+
+  if (result.error) {
+    return { data: { updated: false, reason: result.error.message || 'gsd-tools invocation failed' } };
+  }
+
+  if (result.status !== 0) {
+    return { data: { updated: false, reason: result.stderr?.trim() || 'gsd-tools error' } };
+  }
+
+  try {
+    return { data: JSON.parse(result.stdout.trim()) };
+  } catch {
+    return { data: { updated: false, reason: 'failed to parse gsd-tools output' } };
+  }
+};
+
+
 // ─── requirementsMarkComplete ─────────────────────────────────────────────
 
 /**
