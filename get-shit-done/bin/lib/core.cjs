@@ -1337,8 +1337,13 @@ function getRoadmapPhaseInternal(cwd, phaseNum) {
       ? String(phaseNum).replace(/^0+(?=\d)/, '')
       : String(phaseNum);
     const escapedPhase = escapeRegex(normalized);
-    // Match both numeric (Phase 1:) and custom (Phase PROJ-42:) headers
-    const phasePattern = new RegExp(`#{2,4}\\s*Phase\\s+${escapedPhase}:\\s*([^\\n]+)`, 'i');
+    // Match both numeric and custom (Phase PROJ-42:) headers.
+    // For purely numeric phases allow optional leading zeros so both "Phase 1:" and
+    // "Phase 01:" are matched regardless of whether the ROADMAP uses padded numbers.
+    const isNumeric = /^\d+$/.test(String(phaseNum));
+    const phasePattern = isNumeric
+      ? new RegExp(`#{2,4}\\s*Phase\\s+0*${escapedPhase}:\\s*([^\\n]+)`, 'i')
+      : new RegExp(`#{2,4}\\s*Phase\\s+${escapedPhase}:\\s*([^\\n]+)`, 'i');
     const headerMatch = content.match(phasePattern);
     if (!headerMatch) return null;
 
