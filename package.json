@@ -50,9 +50,7 @@
     "ws": "^8.20.0"
   },
   "devDependencies": {
-    "c8": "^11.0.0",
-    "esbuild": "^0.24.0",
-    "vitest": "^4.1.2"
+    "c8": "^11.0.0"
   },
   "scripts": {
     "build:hooks": "node scripts/build-hooks.js",
