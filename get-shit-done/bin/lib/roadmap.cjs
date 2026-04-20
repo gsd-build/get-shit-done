@@ -445,8 +445,11 @@ function cmdRoadmapAnnotateDependencies(cwd, phaseNum, raw) {
     const phaseEnd = nextPhaseOffset >= 0 ? phaseStart + 1 + nextPhaseOffset : content.length;
     const phaseSection = content.slice(phaseStart, phaseEnd);
 
-    // Idempotency: skip if wave annotations already present
-    if (/\*\*Wave\s+\d+/i.test(phaseSection)) return;
+    // Idempotency: skip if annotation markers already present
+    if (
+      /\*\*Wave\s+\d+/i.test(phaseSection) ||
+      /\*\*Cross-cutting constraints:\*\*/i.test(phaseSection)
+    ) return;
 
     // Find the Plans: section within the phase section
     const plansBlockMatch = phaseSection.match(/(Plans:\s*\n)((?:\s*-\s*\[[ x]\][^\n]*\n?)*)/i);
@@ -498,8 +501,9 @@ function cmdRoadmapAnnotateDependencies(cwd, phaseNum, raw) {
       plansHeader + newListBlock
     );
 
-    content = content.slice(0, phaseStart) + newPhaseSection + content.slice(phaseEnd);
-    atomicWriteFileSync(roadmapPath, content);
+    const nextContent = content.slice(0, phaseStart) + newPhaseSection + content.slice(phaseEnd);
+    if (nextContent === content) return;
+    atomicWriteFileSync(roadmapPath, nextContent);
     updated = true;
   });
 

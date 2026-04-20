@@ -1149,17 +1149,7 @@ gsd-sdk query state.planned-phase --phase "${PHASE_NUMBER}" --name "${PHASE_NAME
 
 This updates STATUS to "Ready to execute", sets the correct plan count, and timestamps Last Activity.
 
-## 13c. Commit Plans if commit_docs is true
-
-If `commit_docs` is true (from the init JSON parsed in step 1), commit the generated plan artifacts:
-
-```bash
-gsd-sdk query commit "docs(${PADDED_PHASE}): create phase plan" --files "${PHASE_DIR}"/*-PLAN.md .planning/STATE.md
-```
-
-This commits all PLAN.md files for the phase plus the updated STATE.md to version-control the planning artifacts. Skip this step if `commit_docs` is false.
-
-## 13d. Annotate ROADMAP with Wave Dependencies and Cross-cutting Constraints
+## 13c. Annotate ROADMAP with Wave Dependencies and Cross-cutting Constraints
 
 After plans are finalized, annotate the ROADMAP.md plan list for this phase with:
 - **Wave dependency notes** — a bold header before each wave group ("Wave 2 *(blocked on Wave 1 completion)*")
@@ -1171,7 +1161,17 @@ This step is derived entirely from existing PLAN frontmatter — no extra LLM pa
 gsd-sdk query roadmap.annotate-dependencies "${PHASE_NUMBER}"
 ```
 
-This operation is idempotent: if wave headers already exist in the ROADMAP phase section, the command returns without modifying the file. Skip this step if `plan_count` is 0.
+This operation is idempotent: if wave headers or cross-cutting constraints already exist in the ROADMAP phase section, the command returns without modifying the file. Skip this step if `plan_count` is 0.
+
+## 13d. Commit Plans if commit_docs is true
+
+If `commit_docs` is true (from the init JSON parsed in step 1), commit the generated plan artifacts (including any ROADMAP.md annotations from step 13c):
+
+```bash
+gsd-sdk query commit "docs(${PADDED_PHASE}): create phase plan" --files "${PHASE_DIR}"/*-PLAN.md .planning/STATE.md .planning/ROADMAP.md
+```
+
+This commits all PLAN.md files for the phase plus the updated STATE.md and ROADMAP.md to version-control the planning artifacts. Skip this step if `commit_docs` is false.
 
 ## 14. Present Final Status
 

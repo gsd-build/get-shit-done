@@ -141,6 +141,7 @@ export const QUERY_MUTATION_COMMANDS = new Set<string>([
   'phase add', 'phase add-batch', 'phase insert', 'phase remove', 'phase complete',
   'phase scaffold', 'phases clear', 'phases archive',
   'roadmap.update-plan-progress', 'roadmap update-plan-progress',
+  'roadmap.annotate-dependencies', 'roadmap annotate-dependencies',
   'requirements.mark-complete', 'requirements mark-complete',
   'todo.complete', 'todo complete',
   'milestone.complete', 'milestone complete',
