@@ -350,7 +350,7 @@ The `gsd-planner` agent is decomposed into a core agent plus reference modules t
 
 ---
 
-## CLI Modules (24 shipped)
+## CLI Modules (25 shipped)
 
 Full listing: `get-shit-done/bin/lib/*.cjs`.
 
@@ -358,7 +358,8 @@ Full listing: `get-shit-done/bin/lib/*.cjs`.
 |--------|----------------|
 | `audit.cjs` | Audit dispatch, audit open sessions, audit storage helpers |
 | `commands.cjs` | Misc CLI commands (slug, timestamp, todos, scaffolding, stats) |
-| `config.cjs` | `config.json` read/write, section initialization, `VALID_CONFIG_KEYS` |
+| `config-schema.cjs` | Single source of truth for `VALID_CONFIG_KEYS` and dynamic key patterns; imported by both the validator and the config-schema-docs parity test |
+| `config.cjs` | `config.json` read/write, section initialization; imports validator from `config-schema.cjs` |
 | `core.cjs` | Error handling, output formatting, shared utilities, runtime fallbacks |
 | `docs.cjs` | Docs-update workflow init, Markdown scanning, monorepo detection |
 | `frontmatter.cjs` | YAML frontmatter CRUD operations |
