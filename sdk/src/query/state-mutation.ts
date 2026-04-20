@@ -331,9 +331,26 @@ export const statePatch: QueryHandler = async (args, projectDir) => {
  * @returns QueryResult with { phase, name, plan_count }
  */
 export const stateBeginPhase: QueryHandler = async (args, projectDir) => {
-  const phaseNumber = args[0];
-  const phaseName = args[1] || '';
-  const planCount = args[2] || '?';
+  // Accept both flag form (--phase 04 --name "Title" --plans 3) and positional form (04 "Title" 3).
+  let phaseNumber: string;
+  let phaseName: string;
+  let planCount: string;
+
+  if (args.length > 0 && typeof args[0] === 'string' && args[0].startsWith('--')) {
+    const flags: Record<string, string> = {};
+    for (let i = 0; i < args.length - 1; i += 2) {
+      if (typeof args[i] === 'string' && args[i].startsWith('--')) {
+        flags[args[i].slice(2)] = args[i + 1];
+      }
+    }
+    phaseNumber = flags['phase'] ?? '';
+    phaseName = flags['name'] ?? '';
+    planCount = flags['plans'] ?? flags['plan-count'] ?? '?';
+  } else {
+    phaseNumber = args[0] ?? '';
+    phaseName = args[1] || '';
+    planCount = args[2] || '?';
+  }
 
   if (!phaseNumber) {
     throw new GSDError('phase number required', ErrorClassification.Validation);

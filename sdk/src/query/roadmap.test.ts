@@ -144,6 +144,57 @@ describe('extractCurrentMilestone', () => {
     const result = await extractCurrentMilestone(content, tmpDir);
     expect(result).toBe('current content');
   });
+
+  // ─── Bug #2422: preamble Backlog leak ─────────────────────────────────
+  it('bug-2422: does not include ## Backlog section before the current milestone', async () => {
+    const roadmapWithBacklog = `# ROADMAP
+
+## Backlog
+### Phase 999.1: Parking lot item A
+### Phase 999.2: Parking lot item B
+
+### 🚧 v2.0 My Milestone (In Progress)
+- [ ] **Phase 100: Real work**
+
+## v2.0 Phase Details
+### Phase 100: Real work
+**Goal**: Do stuff.
+`;
+    const state = `---\nmilestone: v2.0\n---\n# State\n`;
+    await writeFile(join(tmpDir, '.planning', 'STATE.md'), state);
+    await writeFile(join(tmpDir, '.planning', 'ROADMAP.md'), roadmapWithBacklog);
+
+    const result = await extractCurrentMilestone(roadmapWithBacklog, tmpDir);
+
+    // Must NOT include backlog phases
+    expect(result).not.toContain('Phase 999.1');
+    expect(result).not.toContain('Phase 999.2');
+    expect(result).not.toContain('Parking lot');
+    // Must include the actual v2.0 content
+    expect(result).toContain('Phase 100');
+  });
+
+  // ─── Bug #2422: same-version sub-heading truncation ───────────────────
+  it('bug-2422: does not truncate at same-version sub-heading (## v2.0 Phase Details)', async () => {
+    const roadmapWithDetails = `# ROADMAP
+
+### 🚧 v2.0 My Milestone (In Progress)
+- [ ] **Phase 100: Real work**
+
+## v2.0 Phase Details
+### Phase 100: Real work
+**Goal**: Do stuff.
+`;
+    const state = `---\nmilestone: v2.0\n---\n# State\n`;
+    await writeFile(join(tmpDir, '.planning', 'STATE.md'), state);
+    await writeFile(join(tmpDir, '.planning', 'ROADMAP.md'), roadmapWithDetails);
+
+    const result = await extractCurrentMilestone(roadmapWithDetails, tmpDir);
+
+    // The detail section must survive — not be cut off
+    expect(result).toContain('Phase 100');
+    expect(result).toContain('Phase Details');
+  });
 });
 
 // ─── roadmapGetPhase ──────────────────────────────────────────────────────

@@ -304,6 +304,41 @@ describe('stateBeginPhase', () => {
     expect(content).toContain('Executing Phase 11');
     expect(content).toContain('State Mutations');
   });
+
+  // ─── Bug #2420: flag-form args not parsed ────────────────────────────
+  it('bug-2420: parses --phase/--name/--plans flag-form args correctly', async () => {
+    const { stateBeginPhase } = await import('./state-mutation.js');
+
+    // This is how execute-phase.md calls it: flag form
+    const result = await stateBeginPhase(
+      ['--phase', '99', '--name', 'probe-test', '--plans', '1'],
+      tmpDir
+    );
+    const data = result.data as Record<string, unknown>;
+
+    // Must return the actual values, not the flag names
+    expect(data.phase).toBe('99');
+    expect(data.name).toBe('probe-test');
+    expect(data.plan_count).toBe('1');
+
+    // STATE.md must contain clean output, not literal "--phase"
+    const content = await readFile(join(tmpDir, '.planning', 'STATE.md'), 'utf-8');
+    expect(content).not.toContain('--phase');
+    expect(content).not.toContain('--name');
+    expect(content).not.toContain('--plans');
+    expect(content).toContain('Executing Phase 99');
+    expect(content).toContain('probe-test');
+  });
+
+  it('bug-2420: positional args still work after flag-parsing fix', async () => {
+    const { stateBeginPhase } = await import('./state-mutation.js');
+
+    const result = await stateBeginPhase(['42', 'Positional Test', '5'], tmpDir);
+    const data = result.data as Record<string, unknown>;
+    expect(data.phase).toBe('42');
+    expect(data.name).toBe('Positional Test');
+    expect(data.plan_count).toBe('5');
+  });
 });
 
 // ─── stateAdvancePlan ───────────────────────────────────────────────────────

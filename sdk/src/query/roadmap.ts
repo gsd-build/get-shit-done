@@ -130,30 +130,34 @@ export async function extractCurrentMilestone(content: string, projectDir: strin
 
   const sectionStart = sectionMatch.index;
 
-  // Find end: next milestone heading at same or higher level, or EOF
+  // Find end: next milestone heading at same or higher level, or EOF.
+  // Skip headings that belong to the SAME version (e.g. "## v2.0 Phase Details").
   const headingLevelMatch = sectionMatch[1].match(/^(#{1,3})\s/);
   const headingLevel = headingLevelMatch ? headingLevelMatch[1].length : 2;
   const restContent = content.slice(sectionStart + sectionMatch[0].length);
-  const nextMilestonePattern = new RegExp(
-    `^#{1,${headingLevel}}\\s+(?:.*v\\d+\\.\\d+|✅|📋|🚧)`,
-    'mi'
-  );
-  const nextMatch = restContent.match(nextMilestonePattern);
 
-  let sectionEnd: number;
-  if (nextMatch && nextMatch.index !== undefined) {
-    sectionEnd = sectionStart + sectionMatch[0].length + nextMatch.index;
-  } else {
-    sectionEnd = content.length;
+  // Extract current version so same-version sub-headings are not treated as boundaries.
+  const currentVersionMatch = version ? version.match(/v(\d+\.\d+)/) : null;
+  const currentVersionStr = currentVersionMatch ? currentVersionMatch[1] : '';
+
+  const nextMilestoneRegex = new RegExp(
+    `^#{1,${headingLevel}}\\s+(?:.*v(\\d+\\.\\d+)[^\\n]*|.*(?:✅|📋|🚧))`,
+    'gm'
+  );
+
+  let sectionEnd = content.length;
+  let m: RegExpExecArray | null;
+  while ((m = nextMilestoneRegex.exec(restContent)) !== null) {
+    const matchedVersion = m[1];
+    // Skip headings that reference the same version (e.g. "## v2.0 Phase Details").
+    if (matchedVersion && currentVersionStr && matchedVersion === currentVersionStr) continue;
+    sectionEnd = sectionStart + sectionMatch[0].length + m.index;
+    break;
   }
 
-  const beforeMilestones = content.slice(0, sectionStart);
-  const currentSection = content.slice(sectionStart, sectionEnd);
-
-  // Strip <details> from preamble
-  const preamble = beforeMilestones.replace(/<details>[\s\S]*?<\/details>/gi, '');
-
-  return preamble + currentSection;
+  // Return only the current milestone section — never include the preamble, which
+  // may contain ## Backlog and other non-current-milestone phases.
+  return content.slice(sectionStart, sectionEnd);
 }
 
 // ─── Internal helpers ─────────────────────────────────────────────────────
