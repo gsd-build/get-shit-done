@@ -89,22 +89,35 @@ describe('fix #2441: back-compat shim — parent package bin entry', () => {
     );
   });
 
-  test('bin/gsd-sdk.js forwards to sdk/dist/cli.js', () => {
+  test('bin/gsd-sdk.js resolves sdk/dist/cli.js relative to itself', () => {
     const shimContent = fs.readFileSync(GSD_SDK_SHIM, 'utf-8');
-    // Must resolve the path to sdk/dist/cli.js using path.resolve (not just mention the strings)
-    assert.ok(
-      /path\.resolve\s*\([^)]*['"]sdk['"]\s*,\s*['"]dist['"]\s*,\s*['"]cli\.js['"]\s*\)/.test(shimContent) ||
-      /path\.resolve\s*\([^)]*,\s*['"]sdk\/dist\/cli\.js['"]\s*\)/.test(shimContent),
-      'bin/gsd-sdk.js must call path.resolve() to build the path to sdk/dist/cli.js, not merely reference those strings.'
+    // Require the actual path.resolve call with the expected segments, not
+    // loose substring matches that would pass from comments or shebangs.
+    assert.match(
+      shimContent,
+      /path\.resolve\(\s*__dirname\s*,\s*['"]\.\.['"]\s*,\s*['"]sdk['"]\s*,\s*['"]dist['"]\s*,\s*['"]cli\.js['"]\s*\)/,
+      'bin/gsd-sdk.js must call path.resolve(__dirname, "..", "sdk", "dist", "cli.js") to locate the prebuilt CLI.'
     );
   });
 
-  test('bin/gsd-sdk.js uses node to invoke cli.js (no direct exec dependency)', () => {
+  test('bin/gsd-sdk.js invokes cli.js via spawnSync(process.execPath, ...)', () => {
     const shimContent = fs.readFileSync(GSD_SDK_SHIM, 'utf-8');
-    // Must pass process.execPath as the executable and the resolved cliPath as the first argument
-    assert.ok(
-      /spawnSync\s*\(\s*process\.execPath\s*,\s*\[/.test(shimContent),
-      'bin/gsd-sdk.js must invoke sdk/dist/cli.js via spawnSync(process.execPath, [cliPath, ...]), not rely on execute bit.'
+    // The shim must invoke via node (not rely on execute bit), which means
+    // spawnSync(process.execPath, [cliPath, ...args]).
+    assert.match(
+      shimContent,
+      /spawnSync\(\s*process\.execPath\s*,/,
+      'bin/gsd-sdk.js must spawn node via process.execPath so the execute bit on cli.js is irrelevant (#2453).'
+    );
+    assert.match(
+      shimContent,
+      /process\.argv\.slice\(\s*2\s*\)/,
+      'bin/gsd-sdk.js must forward user args via process.argv.slice(2).'
+    );
+    assert.match(
+      shimContent,
+      /process\.exit\(/,
+      'bin/gsd-sdk.js must propagate the child exit status via process.exit.'
     );
   });
 });
