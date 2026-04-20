@@ -141,7 +141,7 @@ const INJECTION_PATTERNS = [
   // Requires > to close the tag (not just whitespace) to avoid matching generic types like Promise<User | null>
   /<\/?(?:system|assistant|human)>/i,
   /\[SYSTEM\]/i,
-  /\[INST\]/i,
+  /\[\/?(INST)\]/i,
   /<<\s*SYS\s*>>/i,
 
   // Exfiltration attempts
@@ -163,7 +163,7 @@ const OBFUSCATION_PATTERN_ENTRIES = [
   },
   {
     pattern: /<\/?(system|human|assistant|user)\s*>/i,
-    message: 'Delimiter injection pattern: <system>/<assistant>/<user> tag detected',
+    message: 'Delimiter injection pattern: <system>/<human>/<assistant>/<user> tag detected',
   },
   {
     pattern: /0x[0-9a-fA-F]{16,}/,
@@ -248,8 +248,8 @@ function sanitizeForPrompt(text) {
   sanitized = sanitized.replace(/<(\/?)(?:system|assistant|human)>/gi,
     (_, slash) => `＜${slash || ''}system-text＞`);
 
-  // Neutralize [SYSTEM] / [INST] markers
-  sanitized = sanitized.replace(/\[(SYSTEM|INST)\]/gi, '[$1-TEXT]');
+  // Neutralize [SYSTEM] / [INST] / [/INST] markers
+  sanitized = sanitized.replace(/\[(\/?)(SYSTEM|INST)\]/gi, (_, slash, tag) => `[${slash}${tag.toUpperCase()}-TEXT]`);
 
   // Neutralize <<SYS>> markers
   sanitized = sanitized.replace(/<<\s*SYS\s*>>/gi, '«SYS-TEXT»');
