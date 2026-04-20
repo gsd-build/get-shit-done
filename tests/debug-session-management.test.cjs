@@ -66,6 +66,21 @@ describe('debug session management implementation', () => {
     );
   });
 
+  test('debug.md reads tdd_mode via workflow.tdd_mode key (not bare tdd_mode)', () => {
+    const content = fs.readFileSync(
+      path.join(process.cwd(), 'commands/gsd/debug.md'),
+      'utf8'
+    );
+    assert.ok(
+      !content.includes('config-get tdd_mode'),
+      'debug.md must not use bare "tdd_mode" key — use "workflow.tdd_mode" to match every other consumer'
+    );
+    assert.ok(
+      content.includes('config-get workflow.tdd_mode'),
+      'debug.md must read tdd_mode via the "workflow.tdd_mode" key'
+    );
+  });
+
   test('debug command contains security hardening', () => {
     const content = fs.readFileSync(
       path.join(process.cwd(), 'commands/gsd/debug.md'),
