@@ -720,7 +720,13 @@ function buildStateFrontmatter(bodyContent, cwd) {
   const status = stateExtractField(bodyContent, 'Status');
   const progressRaw = stateExtractField(bodyContent, 'Progress');
   const lastActivity = stateExtractField(bodyContent, 'Last Activity');
-  const stoppedAt = stateExtractField(bodyContent, 'Stopped At') || stateExtractField(bodyContent, 'Stopped at');
+  // Bug #2444: scope Stopped At extraction to the ## Session section so that
+  // historical "Stopped at:" prose elsewhere in the body (e.g. in a
+  // Session Continuity Archive section) never overwrites the current value.
+  // Fall back to full-body search only when no ## Session section exists.
+  const sessionSectionMatch = bodyContent.match(/##\s*Session\s*\n([\s\S]*?)(?=\n##|$)/i);
+  const sessionBodyScope = sessionSectionMatch ? sessionSectionMatch[1] : bodyContent;
+  const stoppedAt = stateExtractField(sessionBodyScope, 'Stopped At') || stateExtractField(sessionBodyScope, 'Stopped at');
   const pausedAt = stateExtractField(bodyContent, 'Paused At');
 
   let milestone = null;
@@ -747,9 +753,33 @@ function buildStateFrontmatter(bodyContent, cwd) {
         let cached = _diskScanCache.get(cwd);
         if (!cached) {
           const isDirInMilestone = getMilestonePhaseFilter(cwd);
-          const phaseDirs = fs.readdirSync(phasesDir, { withFileTypes: true })
+          const allMatchingDirs = fs.readdirSync(phasesDir, { withFileTypes: true })
             .filter(e => e.isDirectory()).map(e => e.name)
             .filter(isDirInMilestone);
+
+          // Bug #2445: when stale phase dirs from a prior milestone remain in
+          // .planning/phases/ alongside new dirs with the same phase number,
+          // de-duplicate by normalized phase number keeping the most recently
+          // modified dir. This prevents double-counting (e.g. two "Phase 1" dirs).
+          const seenPhaseNums = new Map(); // normalizedNum -> dirName
+          for (const dir of allMatchingDirs) {
+            const m = dir.match(/^0*(\d+[A-Za-z]?(?:\.\d+)*)/);
+            const key = m ? m[1].toLowerCase() : dir;
+            if (!seenPhaseNums.has(key)) {
+              seenPhaseNums.set(key, dir);
+            } else {
+              // Keep the dir that is newer on disk (more likely current milestone)
+              try {
+                const existing = path.join(phasesDir, seenPhaseNums.get(key));
+                const candidate = path.join(phasesDir, dir);
+                if (fs.statSync(candidate).mtimeMs > fs.statSync(existing).mtimeMs) {
+                  seenPhaseNums.set(key, dir);
+                }
+              } catch { /* keep existing on stat error */ }
+            }
+          }
+          const phaseDirs = [...seenPhaseNums.values()];
+
           let diskTotalPlans = 0;
           let diskTotalSummaries = 0;
           let diskCompletedPhases = 0;
