@@ -396,7 +396,7 @@ First, resolve the config directory (`RUNTIME_DIR`) from the install scope
 detected in `get_installed_version`:
 
 ```bash
-# RUNTIME_DIR is the resolved config directory (e.g. ~/.claude, ~/.config/opencode)
+# RUNTIME_DIR is the resolved config directory (e.g. ~/.config/opencode, ~/.gemini)
 # It should already be set from get_installed_version as GLOBAL_DIR or LOCAL_DIR.
 # Use the appropriate variable based on INSTALL_SCOPE.
 if [ "$INSTALL_SCOPE" = "LOCAL" ]; then
