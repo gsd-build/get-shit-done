@@ -189,8 +189,8 @@ jobs:
           git add package.json package-lock.json sdk/package.json
           git commit -m "chore: bump to ${PRE_VERSION}"
 
-      - name: Build SDK
-        run: cd sdk && npm ci && npm run build
+      - name: Build SDK dist for tarball
+        run: npm run build:sdk
 
       - name: Dry-run publish validation
         run: |
@@ -330,8 +330,8 @@ jobs:
           npm ci
           npm run test:coverage
 
-      - name: Build SDK
-        run: cd sdk && npm ci && npm run build
+      - name: Build SDK dist for tarball
+        run: npm run build:sdk
 
       - name: Dry-run publish validation
         run: |
