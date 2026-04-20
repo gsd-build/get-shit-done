@@ -600,6 +600,64 @@ describe('getMilestoneInfo', () => {
     assert.strictEqual(info.version, 'v1.0');
     assert.strictEqual(info.name, 'milestone');
   });
+
+  // Bug #2409: getMilestoneInfo must prefer STATE.md milestone: field over regex matching
+  test('uses STATE.md milestone frontmatter when 🚧 is inside <summary> tag without bold (bug #2409)', () => {
+    // STATE.md says v2.9, ROADMAP has 🚧 v2.9 inside <summary> (not bolded) — no bold regex match
+    const roadmap = [
+      '# Milestones',
+      '',
+      '- ✅ v2.2 Old Features — shipped 2026-04-03',
+      '- 🚧 v2.9 Full-Pass Verification',
+      '',
+      '<details>',
+      '<summary>🚧 v2.9 Full-Pass Verification & Bug Fixing — IN PROGRESS</summary>',
+      '',
+      '## Roadmap v2.9: Full-Pass Verification & Bug Fixing',
+      '',
+      '### Phase 1: Verification',
+      '',
+      '</details>',
+      '',
+      '## Phase Details (v2.2 — Old Features)',
+      '',
+      '### Phase 1: Old Stuff',
+    ].join('\n');
+    fs.writeFileSync(path.join(tmpDir, '.planning', 'ROADMAP.md'), roadmap);
+    fs.writeFileSync(
+      path.join(tmpDir, '.planning', 'STATE.md'),
+      '---\nmilestone: v2.9\n---\n\n# State\n'
+    );
+
+    const info = getMilestoneInfo(tmpDir);
+    assert.strictEqual(info.version, 'v2.9',
+      'should return v2.9 from STATE.md, not v2.2 from a stale heading match');
+    assert.ok(info.name.includes('Full-Pass') || info.name.includes('Verification'),
+      `name should reference the v2.9 milestone, got: "${info.name}"`);
+  });
+
+  test('STATE.md milestone takes precedence over first ## heading match (bug #2409)', () => {
+    // ROADMAP with multiple ## headings — without STATE.md anchoring, first match wins
+    const roadmap = [
+      '## Phase Details (v1.5–v2.1)',
+      '',
+      '## Roadmap v2.2: Old Milestone',
+      '',
+      '## Roadmap v2.9: Current Milestone',
+      '',
+      '### Phase 1: Alpha',
+    ].join('\n');
+    fs.writeFileSync(path.join(tmpDir, '.planning', 'ROADMAP.md'), roadmap);
+    fs.writeFileSync(
+      path.join(tmpDir, '.planning', 'STATE.md'),
+      '---\nmilestone: v2.9\n---\n\n# State\n'
+    );
+
+    const info = getMilestoneInfo(tmpDir);
+    assert.strictEqual(info.version, 'v2.9',
+      'should read v2.9 from STATE.md, not v2.2 from first ## heading');
+    assert.strictEqual(info.name, 'Current Milestone');
+  });
 });
 
 // ─── searchPhaseInDir ──────────────────────────────────────────────────────────
@@ -789,6 +847,41 @@ describe('getRoadmapPhaseInternal', () => {
     assert.ok(result.section.includes('Some details here'));
     // Should not include Phase 2 content
     assert.ok(!result.section.includes('Phase 2: API'));
+  });
+
+  // Bug #2391: zero-padded phase numbers ("03") must match unpadded ROADMAP headings ("Phase 3:")
+  test('matches zero-padded phase number against unpadded ROADMAP heading (bug #2391)', () => {
+    fs.writeFileSync(
+      path.join(tmpDir, '.planning', 'ROADMAP.md'),
+      '### Phase 3: Rotation Engine\n**Goal**: Build rotation\n**Requirements**: ROTA-01\n'
+    );
+    const result = getRoadmapPhaseInternal(tmpDir, '03');
+    assert.ok(result !== null, 'should find the phase with zero-padded input "03"');
+    assert.strictEqual(result.found, true);
+    assert.strictEqual(result.phase_name, 'Rotation Engine');
+    assert.strictEqual(result.goal, 'Build rotation');
+  });
+
+  test('matches double-zero-padded phase number against unpadded ROADMAP heading (bug #2391)', () => {
+    fs.writeFileSync(
+      path.join(tmpDir, '.planning', 'ROADMAP.md'),
+      '### Phase 7: Final\n**Goal**: Ship it\n'
+    );
+    const result = getRoadmapPhaseInternal(tmpDir, '007');
+    assert.ok(result !== null, 'should find the phase with "007"');
+    assert.strictEqual(result.found, true);
+    assert.strictEqual(result.phase_name, 'Final');
+  });
+
+  test('unpadded lookup still works after fix (regression check)', () => {
+    fs.writeFileSync(
+      path.join(tmpDir, '.planning', 'ROADMAP.md'),
+      '### Phase 3: Rotation Engine\n**Goal**: Build rotation\n'
+    );
+    const result = getRoadmapPhaseInternal(tmpDir, '3');
+    assert.ok(result !== null);
+    assert.strictEqual(result.found, true);
+    assert.strictEqual(result.phase_name, 'Rotation Engine');
   });
 });
 

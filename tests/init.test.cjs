@@ -423,6 +423,66 @@ describe('init commands ignore archived phases from prior milestones sharing a n
 });
 
 // ─────────────────────────────────────────────────────────────────────────────
+// Bug #2391: zero-padded phase numbers must not bypass archived-phase guard
+// ─────────────────────────────────────────────────────────────────────────────
+
+describe('init plan-phase zero-padded phase number (bug #2391)', () => {
+  let tmpDir;
+
+  beforeEach(() => {
+    tmpDir = createTempProject();
+    // Current milestone ROADMAP has Phase 3 (unpadded heading)
+    fs.writeFileSync(
+      path.join(tmpDir, '.planning', 'ROADMAP.md'),
+      '# v2.0 Roadmap\n\n### Phase 3: Rotation Engine + Availability\n**Goal**: Rotation\n**Requirements**: ROTA-01, ROTA-02\n**Plans:** TBD\n'
+    );
+    // Prior milestone archive has a shipped Phase 3 with different content
+    const archivedDir = path.join(tmpDir, '.planning', 'milestones', 'v1.0-phases', '03-plant-collection-and-rooms');
+    fs.mkdirSync(archivedDir, { recursive: true });
+    fs.writeFileSync(path.join(archivedDir, '03-CONTEXT.md'), '# OLD v1.0 Phase 3 context');
+    fs.writeFileSync(path.join(archivedDir, '03-RESEARCH.md'), '# OLD v1.0 Phase 3 research');
+  });
+
+  afterEach(() => {
+    cleanup(tmpDir);
+  });
+
+  test('zero-padded "03" returns current ROADMAP phase, not archived v1.0 phase', () => {
+    const result = runGsdTools('init plan-phase 03', tmpDir);
+    assert.ok(result.success, `Command failed: ${result.error}`);
+
+    const output = JSON.parse(result.output);
+    assert.strictEqual(output.phase_found, true);
+    assert.strictEqual(output.phase_name, 'Rotation Engine + Availability',
+      'phase_name must come from current ROADMAP.md, not the archived v1.0 phase');
+    assert.strictEqual(output.phase_dir, null,
+      'phase_dir must be null — current milestone has no directory yet');
+    assert.strictEqual(output.has_context, false,
+      'has_context must not inherit archived v1.0 artifacts');
+    assert.strictEqual(output.has_research, false,
+      'has_research must not inherit archived v1.0 artifacts');
+    assert.ok(!output.context_path || !output.context_path.includes('v1.0'),
+      'context_path must not point at archived v1.0 file');
+    assert.strictEqual(output.phase_req_ids, 'ROTA-01, ROTA-02');
+  });
+
+  test('unpadded "3" and zero-padded "03" return identical phase identity', () => {
+    const result3 = runGsdTools('init plan-phase 3', tmpDir);
+    const result03 = runGsdTools('init plan-phase 03', tmpDir);
+    assert.ok(result3.success && result03.success, 'both commands must succeed');
+
+    const out3 = JSON.parse(result3.output);
+    const out03 = JSON.parse(result03.output);
+    assert.strictEqual(out03.phase_name, out3.phase_name,
+      'phase_name must be identical regardless of padding');
+    assert.strictEqual(out03.phase_slug, out3.phase_slug,
+      'phase_slug must be identical regardless of padding');
+    assert.strictEqual(out03.phase_req_ids, out3.phase_req_ids,
+      'phase_req_ids must be identical regardless of padding');
+  });
+});
+
+// ─────────────────────────────────────────────────────────────────────────────
 // cmdInitTodos (INIT-01)
 // ─────────────────────────────────────────────────────────────────────────────
 

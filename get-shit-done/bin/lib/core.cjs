@@ -1331,7 +1331,12 @@ function getRoadmapPhaseInternal(cwd, phaseNum) {
 
   try {
     const content = extractCurrentMilestone(fs.readFileSync(roadmapPath, 'utf-8'), cwd);
-    const escapedPhase = escapeRegex(phaseNum.toString());
+    // Strip leading zeros from purely numeric phase numbers so "03" matches "Phase 3:"
+    // in canonical ROADMAP headings. Non-numeric IDs (e.g. "PROJ-42") are kept as-is.
+    const normalized = /^\d+$/.test(String(phaseNum))
+      ? String(phaseNum).replace(/^0+(?=\d)/, '')
+      : String(phaseNum);
+    const escapedPhase = escapeRegex(normalized);
     // Match both numeric (Phase 1:) and custom (Phase PROJ-42:) headers
     const phasePattern = new RegExp(`#{2,4}\\s*Phase\\s+${escapedPhase}:\\s*([^\\n]+)`, 'i');
     const headerMatch = content.match(phasePattern);
@@ -1505,6 +1510,43 @@ function generateSlugInternal(text) {
 function getMilestoneInfo(cwd) {
   try {
     const roadmap = fs.readFileSync(path.join(planningDir(cwd), 'ROADMAP.md'), 'utf-8');
+
+    // 0. Prefer STATE.md milestone: frontmatter as the authoritative source.
+    // This prevents falling through to a regex that may match an old heading
+    // when the active milestone's 🚧 marker is inside a <summary> tag without
+    // **bold** formatting (bug #2409).
+    let stateVersion = null;
+    if (cwd) {
+      try {
+        const statePath = path.join(planningDir(cwd), 'STATE.md');
+        if (fs.existsSync(statePath)) {
+          const stateRaw = fs.readFileSync(statePath, 'utf-8');
+          const m = stateRaw.match(/^milestone:\s*(.+)/m);
+          if (m) stateVersion = m[1].trim();
+        }
+      } catch { /* intentionally empty */ }
+    }
+
+    if (stateVersion) {
+      // Look up the name for this version in ROADMAP.md
+      const escapedVer = escapeRegex(stateVersion);
+      // Match heading-format: ## Roadmap v2.9: Name  or  ## v2.9 Name
+      const headingMatch = roadmap.match(
+        new RegExp(`##[^\\n]*${escapedVer}[:\\s]+([^\\n(]+)`, 'i')
+      );
+      if (headingMatch) {
+        return { version: stateVersion, name: headingMatch[1].trim() };
+      }
+      // Match list-format: 🚧 **v2.9 Name** or 🚧 v2.9 Name
+      const listMatch = roadmap.match(
+        new RegExp(`🚧\\s*\\*?\\*?${escapedVer}\\s+([^*\\n]+)`, 'i')
+      );
+      if (listMatch) {
+        return { version: stateVersion, name: listMatch[1].trim() };
+      }
+      // Version found in STATE.md but no name match — return with bare version
+      return { version: stateVersion, name: 'milestone' };
+    }
 
     // First: check for list-format roadmaps using 🚧 (in-progress) marker
     // e.g. "- 🚧 **v2.1 Belgium** — Phases 24-28 (in progress)"
