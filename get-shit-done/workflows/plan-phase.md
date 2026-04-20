@@ -1145,6 +1145,20 @@ gsd-sdk query state.planned-phase --phase "${PHASE_NUMBER}" --name "${PHASE_NAME
 
 This updates STATUS to "Ready to execute", sets the correct plan count, and timestamps Last Activity.
 
+## 13c. Commit Plan Artifacts (if commit_docs enabled)
+
+If `commit_docs` is `true`, commit the generated PLAN.md files and updated STATE.md so plan artifacts are tracked in git:
+
+```bash
+if [[ "${COMMIT_DOCS}" == "true" ]]; then
+  gsd-sdk query commit "docs(${padded_phase}): add plan artifacts" \
+    "${phase_dir}/${padded_phase}-01-PLAN.md" \
+    ".planning/STATE.md"
+fi
+```
+
+If multiple PLAN.md files were generated (e.g., wave-split plans), include each one in the commit arguments. Only commit files that exist — skip any that were not produced.
+
 ## 14. Present Final Status
 
 Route to `<offer_next>` OR `auto_advance` depending on flags/config.

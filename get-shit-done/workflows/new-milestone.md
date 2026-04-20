@@ -208,7 +208,9 @@ AGENT_SKILLS_SYNTHESIZER=$(gsd-sdk query agent-skills gsd-synthesizer 2>/dev/nul
 AGENT_SKILLS_ROADMAPPER=$(gsd-sdk query agent-skills gsd-roadmapper 2>/dev/null)
 ```
 
-Extract from init JSON: `researcher_model`, `synthesizer_model`, `roadmapper_model`, `commit_docs`, `research_enabled`, `current_milestone`, `project_exists`, `roadmap_exists`, `latest_completed_milestone`, `phase_dir_count`, `phase_archive_path`.
+Extract from init JSON: `researcher_model`, `synthesizer_model`, `roadmapper_model`, `commit_docs`, `research_enabled`, `current_milestone`, `project_exists`, `roadmap_exists`, `latest_completed_milestone`, `phase_dir_count`, `phase_archive_path`, `agents_installed`.
+
+**If `agents_installed` is false:** Warn the user that subagents are not installed in this runtime's config directory. Subagent steps (research, synthesis, roadmapping) will fail with "agent type not found" until agents are installed. Prompt the user to run the GSD installer for this runtime, or install agents manually into the runtime's agents directory, then rerun this command.
 
 ## 7.5 Reset-phase safety (only when `--reset-phase-numbers`)
 

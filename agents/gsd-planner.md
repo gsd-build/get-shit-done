@@ -215,6 +215,17 @@ Every task has four required fields:
 
 **Nyquist Rule:** Every `<verify>` must include an `<automated>` command. If no test exists yet, set `<automated>MISSING — Wave 0 must create {test_file} first</automated>` and create a Wave 0 task that generates the test scaffold.
 
+**Grep gate hygiene:** If `<automated>` is a `grep -c <token> <file>` counting gate, the gate MUST exclude comments — otherwise descriptive prose in the file counts against its own invariant and forces authors to reword legitimate comments to pass. This is the "self-invalidating grep gate" anti-pattern.
+
+**Do:**
+- Strip comments first, then count: `grep -vE '^\s*(//|\*|/\*)' src/foo.ts | grep -c '<token>'`
+- Use an AST-aware tool: `ast-grep --lang typescript --pattern '<token>' src/foo.ts | wc -l`
+- Bound the gate to non-comment regions via ripgrep: `rg --no-line-number --type ts -N '<token>' src/foo.ts | grep -cvE '^\s*(//|\*)'`
+
+**Do NOT:**
+- Write a zero-count gate (`grep -c '<token>' <file> == 0`) on an entire source file. The author cannot document the invariant in comments without tripping the gate.
+- Write a count-exact gate (`== 1`, `== 2`) without comment exclusion — same failure mode.
+
 **<done>:** Acceptance criteria - measurable state of completion.
 - Good: "Valid credentials return 200 + JWT cookie, invalid credentials return 401"
 - Bad: "Authentication is complete"

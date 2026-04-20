@@ -64,7 +64,9 @@ AGENT_SKILLS_SYNTHESIZER=$(gsd-sdk query agent-skills gsd-synthesizer 2>/dev/nul
 AGENT_SKILLS_ROADMAPPER=$(gsd-sdk query agent-skills gsd-roadmapper 2>/dev/null)
 ```
 
-Parse JSON for: `researcher_model`, `synthesizer_model`, `roadmapper_model`, `commit_docs`, `project_exists`, `has_codebase_map`, `planning_exists`, `has_existing_code`, `has_package_file`, `is_brownfield`, `needs_codebase_map`, `has_git`, `project_path`.
+Parse JSON for: `researcher_model`, `synthesizer_model`, `roadmapper_model`, `commit_docs`, `project_exists`, `has_codebase_map`, `planning_exists`, `has_existing_code`, `has_package_file`, `is_brownfield`, `needs_codebase_map`, `has_git`, `project_path`, `agents_installed`.
+
+**If `agents_installed` is false:** Warn the user that subagents are not installed in this runtime's config directory. Subagent steps (research, synthesis, roadmapping) will fail with "agent type not found" until agents are installed. Prompt the user to run the GSD installer for this runtime, or install agents manually into the runtime's agents directory, then rerun this command.
 
 **Detect runtime and set instruction file name:**
 

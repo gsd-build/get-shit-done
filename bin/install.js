@@ -1004,11 +1004,19 @@ function convertClaudeAgentToCopilotAgent(content, isGlobal = false) {
 function convertClaudeToAntigravityContent(content, isGlobal = false) {
   let c = content;
   if (isGlobal) {
+    // Replace slash-suffixed forms first (most specific)
     c = c.replace(/\$HOME\/\.claude\//g, '$HOME/.gemini/antigravity/');
     c = c.replace(/~\/\.claude\//g, '~/.gemini/antigravity/');
+    // Replace bare forms (no trailing slash) that were not already replaced
+    c = c.replace(/\$HOME\/\.claude(?!\/)/g, '$HOME/.gemini/antigravity');
+    c = c.replace(/~\/\.claude(?!\/)/g, '~/.gemini/antigravity');
   } else {
+    // Replace slash-suffixed forms first (most specific)
     c = c.replace(/\$HOME\/\.claude\//g, '.agent/');
     c = c.replace(/~\/\.claude\//g, '.agent/');
+    // Replace bare forms (no trailing slash) that were not already replaced
+    c = c.replace(/\$HOME\/\.claude(?!\/)/g, '.agent');
+    c = c.replace(/~\/\.claude(?!\/)/g, '.agent');
   }
   c = c.replace(/\.\/\.claude\//g, './.agent/');
   c = c.replace(/\.claude\//g, '.agent/');
