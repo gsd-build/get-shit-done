@@ -21,7 +21,7 @@ GSD stores project settings in `.planning/config.json`. Created during `/gsd-new
     "search_gitignored": false,
     "sub_repos": []
   },
-  "context_profile": null,
+  "context": null,
   "workflow": {
     "research": true,
     "plan_check": true,
@@ -393,6 +393,8 @@ Control confirmation prompts during workflows.
 ## Security Settings
 
 Settings for the security enforcement feature (v1.31). All follow the **absent = enabled** pattern. These keys live under `workflow.*` in `.planning/config.json` — matching the shipped template and the runtime reads in `workflows/plan-phase.md`, `workflows/execute-phase.md`, `workflows/secure-phase.md`, and `workflows/verify-work.md`.
+
+These keys live under `workflow.*` — that is where the workflows and installer write and read them. Setting them at the top level of `config.json` is silently ignored.
 
 | Setting | Type | Default | Description |
 |---------|------|---------|-------------|

@@ -567,6 +567,24 @@ Offer: 1) Force proceed, 2) Abort
 
 ---
 
+**Step 5.6: Pre-dispatch plan commit (worktree mode only)**
+
+When `USE_WORKTREES !== "false"`, commit PLAN.md to the current branch **before** spawning the executor. This ensures the worktree inherits PLAN.md at its branch HEAD so the executor can read it via a worktree-rooted path — avoiding the main-repo path priming that triggers CC #36182 path-resolution drift.
+
+Skip this step entirely if `USE_WORKTREES === "false"` (non-worktree mode: PLAN.md is committed in Step 8 as usual).
+
+```bash
+if [ "${USE_WORKTREES}" != "false" ]; then
+  COMMIT_DOCS=$(gsd-sdk query config-get commit_docs 2>/dev/null || echo "true")
+  if [ "$COMMIT_DOCS" != "false" ]; then
+    git add "${QUICK_DIR}/${quick_id}-PLAN.md"
+    git commit --no-verify -m "docs(${quick_id}): pre-dispatch plan for ${DESCRIPTION}" -- "${QUICK_DIR}/${quick_id}-PLAN.md" || true
+  fi
+fi
+```
+
+---
+
 **Step 6: Spawn executor**
 
 Capture current HEAD before spawning (used for worktree branch check):
