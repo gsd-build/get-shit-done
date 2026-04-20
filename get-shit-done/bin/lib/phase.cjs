@@ -673,7 +673,7 @@ function updateRoadmapAfterPhaseRemoval(roadmapPath, targetPhase, isDecimal, rem
         const oldPad = oldStr.padStart(2, '0'), newPad = newStr.padStart(2, '0');
         content = content.replace(new RegExp(`(#{2,4}\\s*Phase\\s+)${oldStr}(\\s*:)`, 'gi'), `$1${newStr}$2`);
         content = content.replace(new RegExp(`(Phase\\s+)${oldStr}([:\\s])`, 'g'), `$1${newStr}$2`);
-        content = content.replace(new RegExp(`(?<!\\d)${oldPad}-(\\d{2})(?!\\d)`, 'g'), `${newPad}-$1`);
+        content = content.replace(new RegExp(`(?<![0-9-])${oldPad}-(\\d{2})(?![0-9-])`, 'g'), `${newPad}-$1`);
         content = content.replace(new RegExp(`(\\|\\s*)${oldStr}\\.\\s`, 'g'), `$1${newStr}. `);
         content = content.replace(new RegExp(`(Depends on:\\*\\*\\s*Phase\\s+)${oldStr}\\b`, 'gi'), `$1${newStr}`);
       }

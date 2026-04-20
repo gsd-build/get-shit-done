@@ -1357,6 +1357,53 @@ describe('phase remove command', () => {
     // Phase 5 should be renumbered to 4
     assert.ok(roadmap.includes('Phase 4: Final'), 'Phase 5 should be renumbered to Phase 4');
   });
+
+  test('bug-2435: integer phase remove does not corrupt date whose month matches removed phase number', () => {
+    // Setup: removing phase 4 from a roadmap containing 2026-05-14
+    // When renumbering phase 5→4, the regex must not replace "05-14" in the date "2026-05-14"
+    fs.writeFileSync(
+      path.join(tmpDir, '.planning', 'ROADMAP.md'),
+      `# Roadmap
+
+### Phase 1: Foundation
+**Goal:** Setup
+**Completed:** 2026-01-15
+
+### Phase 2: Auth
+**Goal:** Authentication
+**Completed:** 2026-02-20
+
+### Phase 3: Features
+**Goal:** Core features
+**Completed:** 2026-03-10
+
+### Phase 4: Extras
+**Goal:** Extra stuff
+
+### Phase 5: Final
+**Goal:** Final phase
+**Due:** 2026-05-14
+`
+    );
+
+    fs.mkdirSync(path.join(tmpDir, '.planning', 'phases', '01-foundation'), { recursive: true });
+    fs.mkdirSync(path.join(tmpDir, '.planning', 'phases', '02-auth'), { recursive: true });
+    fs.mkdirSync(path.join(tmpDir, '.planning', 'phases', '03-features'), { recursive: true });
+    fs.mkdirSync(path.join(tmpDir, '.planning', 'phases', '04-extras'), { recursive: true });
+    fs.mkdirSync(path.join(tmpDir, '.planning', 'phases', '05-final'), { recursive: true });
+
+    const result = runGsdTools('phase remove 4', tmpDir);
+    assert.ok(result.success, `Command failed: ${result.error}`);
+
+    const roadmap = fs.readFileSync(path.join(tmpDir, '.planning', 'ROADMAP.md'), 'utf-8');
+
+    // Date "2026-05-14" must not be corrupted to "2026-04-14" when phase 5 is renumbered to 4
+    assert.ok(roadmap.includes('2026-05-14'), 'date 2026-05-14 must not be corrupted when renumbering phase 5→4');
+    assert.ok(!roadmap.includes('2026-04-14'), 'date must not be incorrectly mutated to 2026-04-14');
+
+    // Phase 5 should be renumbered to 4
+    assert.ok(roadmap.includes('Phase 4: Final'), 'Phase 5 should be renumbered to Phase 4');
+  });
 });
 
 // ─────────────────────────────────────────────────────────────────────────────
