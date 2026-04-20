@@ -97,6 +97,10 @@ jobs:
         if: steps.skip.outputs.skip != 'true'
         run: npm ci
 
+      - name: Build SDK dist (required in tarball — sdk/dist is gitignored)
+        if: steps.skip.outputs.skip != 'true'
+        run: npm run build:sdk
+
       - name: Pack root tarball
         if: steps.skip.outputs.skip != 'true'
         id: pack
@@ -178,6 +182,9 @@ jobs:
 
       - name: Install root deps
         run: npm ci
+
+      - name: Build SDK dist (sdk/dist is gitignored — must build for unpacked install)
+        run: npm run build:sdk
 
       - name: Ensure npm global bin is on PATH
         shell: bash

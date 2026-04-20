@@ -45,6 +45,9 @@ jobs:
       - name: Install dependencies
         run: npm ci
 
+      - name: Build SDK dist (required by installer)
+        run: npm run build:sdk
+
       - name: Run tests with coverage
         shell: bash
         run: npm run test:coverage
