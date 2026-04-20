@@ -54,6 +54,7 @@ const VALID_CONFIG_KEYS = new Set([
   'graphify.enabled',
   'graphify.build_timeout',
   'claude_md_path',
+  'claude_md_assembly.mode',
 ]);
 
 /**
@@ -61,9 +62,10 @@ const VALID_CONFIG_KEYS = new Set([
  * Each entry has a `test` function and a human-readable `description`.
  */
 const DYNAMIC_KEY_PATTERNS = [
-  { test: (k) => /^agent_skills\.[a-zA-Z0-9_-]+$/.test(k),   description: 'agent_skills.<agent-type>' },
-  { test: (k) => /^review\.models\.[a-zA-Z0-9_-]+$/.test(k), description: 'review.models.<cli-name>' },
-  { test: (k) => /^features\.[a-zA-Z0-9_]+$/.test(k),        description: 'features.<feature_name>' },
+  { test: (k) => /^agent_skills\.[a-zA-Z0-9_-]+$/.test(k),                   description: 'agent_skills.<agent-type>' },
+  { test: (k) => /^review\.models\.[a-zA-Z0-9_-]+$/.test(k),                 description: 'review.models.<cli-name>' },
+  { test: (k) => /^features\.[a-zA-Z0-9_]+$/.test(k),                        description: 'features.<feature_name>' },
+  { test: (k) => /^claude_md_assembly\.blocks\.[a-zA-Z0-9_]+$/.test(k),      description: 'claude_md_assembly.blocks.<section>' },
 ];
 
 /**
