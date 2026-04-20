@@ -1535,17 +1535,24 @@ function getMilestoneInfo(cwd) {
         new RegExp(`##[^\\n]*${escapedVer}[:\\s]+([^\\n(]+)`, 'i')
       );
       if (headingMatch) {
-        return { version: stateVersion, name: headingMatch[1].trim() };
+        // If the heading line contains ✅ the milestone is already shipped.
+        // Fall through to normal detection so the NEW active milestone is returned
+        // instead of the stale shipped one still recorded in STATE.md.
+        if (!headingMatch[0].includes('✅')) {
+          return { version: stateVersion, name: headingMatch[1].trim() };
+        }
+        // Shipped milestone — do not early-return; fall through to normal detection below.
+      } else {
+        // Match list-format: 🚧 **v2.9 Name** or 🚧 v2.9 Name
+        const listMatch = roadmap.match(
+          new RegExp(`🚧\\s*\\*?\\*?${escapedVer}\\s+([^*\\n]+)`, 'i')
+        );
+        if (listMatch) {
+          return { version: stateVersion, name: listMatch[1].trim() };
+        }
+        // Version found in STATE.md but no name match in ROADMAP — return bare version
+        return { version: stateVersion, name: 'milestone' };
       }
-      // Match list-format: 🚧 **v2.9 Name** or 🚧 v2.9 Name
-      const listMatch = roadmap.match(
-        new RegExp(`🚧\\s*\\*?\\*?${escapedVer}\\s+([^*\\n]+)`, 'i')
-      );
-      if (listMatch) {
-        return { version: stateVersion, name: listMatch[1].trim() };
-      }
-      // Version found in STATE.md but no name match — return with bare version
-      return { version: stateVersion, name: 'milestone' };
     }
 
     // First: check for list-format roadmaps using 🚧 (in-progress) marker
@@ -1559,11 +1566,14 @@ function getMilestoneInfo(cwd) {
       };
     }
 
-    // Second: heading-format roadmaps — strip shipped milestones in <details> blocks
+    // Second: heading-format roadmaps — strip shipped milestones.
+    // <details> blocks are stripped by stripShippedMilestones; heading-format ✅ markers
+    // are excluded by the negative lookahead below so a stale STATE.md version (or any
+    // shipped ✅ heading) never wins over the first non-shipped milestone heading.
     const cleaned = stripShippedMilestones(roadmap);
-    // Extract version and name from the same ## heading for consistency
+    // Negative lookahead skips headings that contain ✅ (shipped milestone marker).
     // Supports 2+ segment versions: v1.2, v1.2.1, v2.0.1, etc.
-    const headingMatch = cleaned.match(/## .*v(\d+(?:\.\d+)+)[:\s]+([^\n(]+)/);
+    const headingMatch = cleaned.match(/## (?!.*✅).*v(\d+(?:\.\d+)+)[:\s]+([^\n(]+)/);
     if (headingMatch) {
       return {
         version: 'v' + headingMatch[1],

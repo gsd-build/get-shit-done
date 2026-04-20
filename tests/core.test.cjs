@@ -658,6 +658,50 @@ describe('getMilestoneInfo', () => {
       'should read v2.9 from STATE.md, not v2.2 from first ## heading');
     assert.strictEqual(info.name, 'Current Milestone');
   });
+
+  // Bug found in code review of PR #2458: stateVersion early-return doesn't check if shipped
+  test('falls through to new active milestone when STATE.md version is already shipped (✅ heading)', () => {
+    // STATE.md still says v1.0 (stale), but v1.0 is marked ✅ in ROADMAP.md.
+    // getMilestoneInfo must NOT return v1.0; it must fall through and detect v2.0.
+    const roadmap = [
+      '## v1.0 ✅ Initial Release: Done',
+      '',
+      '### Phase 1: Setup',
+      '',
+      '## v2.0: Active Milestone',
+      '',
+      '### Phase 2: Build',
+    ].join('\n');
+    fs.writeFileSync(path.join(tmpDir, '.planning', 'ROADMAP.md'), roadmap);
+    fs.writeFileSync(
+      path.join(tmpDir, '.planning', 'STATE.md'),
+      '---\nmilestone: v1.0\n---\n\n# State\n'
+    );
+
+    const info = getMilestoneInfo(tmpDir);
+    assert.strictEqual(info.version, 'v2.0',
+      'should return v2.0 (active milestone), not v1.0 (stale shipped milestone from STATE.md)');
+    assert.strictEqual(info.name, 'Active Milestone');
+  });
+
+  test('falls through when STATE.md version matches ✅ heading in alternate position formats', () => {
+    // ✅ can appear before the version: ## ✅ v1.0 Old Name
+    const roadmap = [
+      '## ✅ v1.0 Old Name',
+      '',
+      '## v2.0: New Stuff',
+    ].join('\n');
+    fs.writeFileSync(path.join(tmpDir, '.planning', 'ROADMAP.md'), roadmap);
+    fs.writeFileSync(
+      path.join(tmpDir, '.planning', 'STATE.md'),
+      '---\nmilestone: v1.0\n---\n\n# State\n'
+    );
+
+    const info = getMilestoneInfo(tmpDir);
+    assert.strictEqual(info.version, 'v2.0',
+      'should return v2.0, not stale v1.0 with ✅ prefix in heading');
+    assert.strictEqual(info.name, 'New Stuff');
+  });
 });
 
 // ─── searchPhaseInDir ──────────────────────────────────────────────────────────
