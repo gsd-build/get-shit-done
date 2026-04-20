@@ -78,6 +78,7 @@ const hasCline = args.includes('--cline');
 const hasBoth = args.includes('--both'); // Legacy flag, keeps working
 const hasAll = args.includes('--all');
 const hasUninstall = args.includes('--uninstall') || args.includes('-u');
+const hasSkillsRoot = args.includes('--skills-root');
 const hasPortableHooks = args.includes('--portable-hooks') || process.env.GSD_PORTABLE_HOOKS === '1';
 const hasSdk = args.includes('--sdk');
 const hasNoSdk = args.includes('--no-sdk');
@@ -438,7 +439,7 @@ const explicitConfigDir = parseConfigDirArg();
 const hasHelp = args.includes('--help') || args.includes('-h');
 const forceStatusline = args.includes('--force-statusline');
 
-console.log(banner);
+if (!hasSkillsRoot) console.log(banner);
 
 if (hasUninstall) {
   console.log('  Mode: Uninstall\n');
@@ -6931,7 +6932,17 @@ if (process.env.GSD_TEST_MODE) {
 } else {
 
   // Main logic
-  if (hasGlobal && hasLocal) {
+  if (hasSkillsRoot) {
+    // Print the skills root directory for a given runtime (used by /gsd-sync-skills).
+    // Usage: node install.js --skills-root <runtime>
+    const runtimeArg = args[args.indexOf('--skills-root') + 1];
+    if (!runtimeArg || runtimeArg.startsWith('--')) {
+      console.error('Usage: node install.js --skills-root <runtime>');
+      process.exit(1);
+    }
+    const globalDir = getGlobalDir(runtimeArg, null);
+    console.log(path.join(globalDir, 'skills'));
+  } else if (hasGlobal && hasLocal) {
     console.error(`  ${yellow}Cannot specify both --global and --local${reset}`);
     process.exit(1);
   } else if (explicitConfigDir && hasLocal) {
