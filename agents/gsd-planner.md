@@ -215,6 +215,8 @@ Every task has four required fields:
 
 **Nyquist Rule:** Every `<verify>` must include an `<automated>` command. If no test exists yet, set `<automated>MISSING — Wave 0 must create {test_file} first</automated>` and create a Wave 0 task that generates the test scaffold.
 
+**Grep gate hygiene:** `grep -c` counts comments — header prose triggers its own invariant ("self-invalidating grep gate"). Use `grep -v '^#' | grep -c token`. Bare `== 0` gates on unfiltered files are forbidden.
+
 **<done>:** Acceptance criteria - measurable state of completion.
 - Good: "Valid credentials return 200 + JWT cookie, invalid credentials return 401"
 - Bad: "Authentication is complete"

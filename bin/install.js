@@ -1006,9 +1006,15 @@ function convertClaudeToAntigravityContent(content, isGlobal = false) {
   if (isGlobal) {
     c = c.replace(/\$HOME\/\.claude\//g, '$HOME/.gemini/antigravity/');
     c = c.replace(/~\/\.claude\//g, '~/.gemini/antigravity/');
+    // Bare form (no trailing slash) — must come after slash form to avoid double-replace
+    c = c.replace(/\$HOME\/\.claude\b/g, '$HOME/.gemini/antigravity');
+    c = c.replace(/~\/\.claude\b/g, '~/.gemini/antigravity');
   } else {
     c = c.replace(/\$HOME\/\.claude\//g, '.agent/');
     c = c.replace(/~\/\.claude\//g, '.agent/');
+    // Bare form (no trailing slash) — must come after slash form to avoid double-replace
+    c = c.replace(/\$HOME\/\.claude\b/g, '.agent');
+    c = c.replace(/~\/\.claude\b/g, '.agent');
   }
   c = c.replace(/\.\/\.claude\//g, './.agent/');
   c = c.replace(/\.claude\//g, '.agent/');
