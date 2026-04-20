@@ -48,6 +48,9 @@ const VALID_CONFIG_KEYS = new Set([
   'intel.enabled',
   'graphify.enabled',
   'graphify.build_timeout',
+  'workflow.security_enforcement',
+  'workflow.security_asvs_level',
+  'workflow.security_block_on',
   'claude_md_path',
 ]);
 
