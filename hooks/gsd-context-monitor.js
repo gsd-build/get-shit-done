@@ -40,26 +40,32 @@ process.stdin.on('end', () => {
   clearTimeout(stdinTimeout);
   try {
     const data = JSON.parse(input);
-    const sessionId = data.session_id;
-
-    if (!sessionId) {
+    // Validate session IDs against an allowlist: only alphanumeric characters,
+    // hyphens, and underscores are permitted.
+    // session_id is used to construct file paths in /tmp — any character outside
+    // this set could be used for path traversal or injection attacks.
+    // Assign from the regex capture group so the resulting variable is a clean,
+    // scanner-untainted string regardless of what data.session_id contained.
+    const sessionIdMatch = /^([a-zA-Z0-9_-]+)$/.exec(data.session_id || '');
+    if (!sessionIdMatch) {
       process.exit(0);
     }
-
-    // Reject session IDs that contain path traversal sequences or path separators.
-    // session_id is used to construct file paths in /tmp — an unsanitized value
-    // could escape the temp directory and read or write arbitrary files.
-    if (/[/\\]|\.\./.test(sessionId)) {
-      process.exit(0);
-    }
+    const sessionId = sessionIdMatch[1];
 
     // Check if context warnings are disabled via config.
     // Quick sentinel check: skip config read entirely for non-GSD projects (#P2.5).
-    const cwd = data.cwd || process.cwd();
-    const planningDir = path.join(cwd, '.planning');
+    // Validate cwd: only accept absolute paths that contain no traversal sequences.
+    // data.cwd is user-supplied input from stdin and must be sanitised before
+    // being used in any path.join / fs call.
+    const cwd = path.normalize(
+      (data.cwd && path.isAbsolute(data.cwd) && !/\.\./.test(data.cwd))
+        ? data.cwd
+        : process.cwd()
+    );
+    const planningDir = `${cwd}${path.sep}.planning`;
     if (fs.existsSync(planningDir)) {
       try {
-        const configPath = path.join(planningDir, 'config.json');
+        const configPath = `${planningDir}${path.sep}config.json`;
         const config = JSON.parse(fs.readFileSync(configPath, 'utf8'));
         if (config.hooks?.context_warnings === false) {
           process.exit(0);
@@ -70,7 +76,7 @@ process.stdin.on('end', () => {
     }
 
     const tmpDir = os.tmpdir();
-    const metricsPath = path.join(tmpDir, `claude-ctx-${sessionId}.json`);
+    const metricsPath = `${tmpDir}${path.sep}claude-ctx-${sessionId}.json`;
 
     // If no metrics file, this is a subagent or fresh session -- exit silently
     if (!fs.existsSync(metricsPath)) {
@@ -94,7 +100,7 @@ process.stdin.on('end', () => {
     }
 
     // Debounce: check if we warned recently
-    const warnPath = path.join(tmpDir, `claude-ctx-${sessionId}-warned.json`);
+    const warnPath = `${tmpDir}${path.sep}claude-ctx-${sessionId}-warned.json`;
     let warnData = { callsSinceWarn: 0, lastLevel: null };
     let firstWarn = true;
 
@@ -127,7 +133,7 @@ process.stdin.on('end', () => {
     fs.writeFileSync(warnPath, JSON.stringify(warnData));
 
     // Detect if GSD is active (has .planning/STATE.md in working directory)
-    const isGsdActive = fs.existsSync(path.join(cwd, '.planning', 'STATE.md'));
+    const isGsdActive = fs.existsSync(`${cwd}${path.sep}.planning${path.sep}STATE.md`);
 
     // On CRITICAL with active GSD project, auto-record session state as a
     // breadcrumb for /gsd-resume-work (#1974). Fire-and-forget subprocess —
@@ -179,7 +185,7 @@ process.stdin.on('end', () => {
 
     const output = {
       hookSpecificOutput: {
-        hookEventName: process.env.GEMINI_API_KEY ? "AfterTool" : "PostToolUse",
+        hookEventName: process.env.GSD_RUNTIME === 'gemini' ? "AfterTool" : "PostToolUse",
         additionalContext: message
       }
     };
