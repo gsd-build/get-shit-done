@@ -120,7 +120,7 @@ Cluster: "{title}" [{category}, {K} phases] → {target}
 Action [P/D/X/A]:
 ```
 
-Use `AskUserQuestion` (or equivalent HITL primitive for the current runtime). If `TEXT_MODE` is true, print the prompt as plain text and accept free-text input. Accept single-character input: `P`, `D`, `X`, `A` (case-insensitive).
+Use `AskUserQuestion` (or equivalent HITL primitive for the current runtime). If `TEXT_MODE` is true, display the cluster question as plain text and accept typed input. Accept single-character input: `P`, `D`, `X`, `A` (case-insensitive).
 
 **On `P` (Promote now):**
 
