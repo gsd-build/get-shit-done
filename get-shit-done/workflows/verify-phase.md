@@ -197,22 +197,29 @@ inspecting static artifacts.
 **Step 1: Run test suite**
 
 ```bash
+# Resolve test command: project config > Makefile > language sniff
+TEST_CMD=$(gsd-sdk query config-get workflow.test_command --default "" 2>/dev/null || true)
+if [ -z "$TEST_CMD" ]; then
+  if [ -f "Makefile" ] && grep -q "^test:" Makefile; then
+    TEST_CMD="make test"
+  elif [ -f "Justfile" ] || [ -f "justfile" ]; then
+    TEST_CMD="just test"
+  elif [ -f "package.json" ]; then
+    TEST_CMD="npm test"
+  elif [ -f "Cargo.toml" ]; then
+    TEST_CMD="cargo test"
+  elif [ -f "go.mod" ]; then
+    TEST_CMD="go test ./..."
+  elif [ -f "pyproject.toml" ] || [ -f "requirements.txt" ]; then
+    TEST_CMD="python -m pytest -q --tb=short 2>&1 || uv run python -m pytest -q --tb=short"
+  else
+    TEST_CMD="false"
+    echo "⚠ No test runner detected — skipping test suite"
+  fi
+fi
 # Detect test runner and run all tests (timeout: 5 minutes)
 TEST_EXIT=0
-timeout 300 bash -c '
-if [ -f "package.json" ]; then
-  npm test 2>&1
-elif [ -f "Cargo.toml" ]; then
-  cargo test 2>&1
-elif [ -f "go.mod" ]; then
-  go test ./... 2>&1
-elif [ -f "pyproject.toml" ] || [ -f "requirements.txt" ]; then
-  python -m pytest -q --tb=short 2>&1 || uv run python -m pytest -q --tb=short 2>&1
-else
-  echo "⚠ No test runner detected — skipping test suite"
-  exit 1
-fi
-'
+timeout 300 bash -c "$TEST_CMD" 2>&1
 TEST_EXIT=$?
 if [ "${TEST_EXIT}" -eq 0 ]; then
   echo "✓ Test suite passed"
