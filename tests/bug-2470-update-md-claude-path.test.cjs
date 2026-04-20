@@ -26,7 +26,7 @@ describe('update.md — no bare ~.claude path references (#2470)', () => {
     // /(?:~|\$HOME)\/\.claude\b/g
     // The replacer handles ~/\.claude\/ (with trailing slash) but misses bare ~/\.claude
     // so we must not have bare references in the source file.
-    const matches = content.match(/(?:~|\$HOME)\/\.claude(?!\/)/g);
+    const matches = content.match(/(?:~|\$HOME)\/\.claude\b/g);
     assert.strictEqual(
       matches,
       null,
