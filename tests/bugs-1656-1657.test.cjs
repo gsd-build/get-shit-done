@@ -80,35 +80,42 @@ describe('#1657 / #2385: SDK install must be wired into installer source', () =>
     );
   });
 
-  test('install.js builds gsd-sdk from in-repo sdk/ source (#2385)', () => {
+  test('install.js verifies prebuilt sdk/dist/cli.js instead of building from source (#2441)', () => {
     src = src || fs.readFileSync(INSTALL_SRC, 'utf-8');
-    // The installer must locate the in-repo sdk/ directory, run the build,
-    // and install it globally. We intentionally do NOT install
-    // @gsd-build/sdk from npm because that published version lags the source
-    // tree and shipping it breaks query handlers added since the last
-    // publish.
+    // As of fix/2441-sdk-decouple, the installer no longer runs `npm run build`
+    // or `npm install -g .` from sdk/. Instead it verifies sdk/dist/cli.js exists
+    // (shipped prebuilt in the tarball) and optionally chmods it.
     assert.ok(
-      src.includes("path.resolve(__dirname, '..', 'sdk')") ||
-      src.includes('path.resolve(__dirname, "..", "sdk")'),
-      'installer must locate the in-repo sdk/ directory'
+      src.includes('sdk/dist/cli.js') || src.includes("'dist', 'cli.js'"),
+      'installer must reference sdk/dist/cli.js to verify the prebuilt dist (#2441)'
     );
+    // Confirm the old build-from-source pattern is gone.
+    const hasBuildFromSource =
+      src.includes("['run', 'build']") &&
+      src.includes("cwd: sdkDir");
     assert.ok(
-      src.includes("'npm install -g .'") ||
-      src.includes("['install', '-g', '.']"),
-      'installer must run `npm install -g .` from sdk/ to install the built package globally'
+      !hasBuildFromSource,
+      'installer must NOT run `npm run build` from sdk/ at install time (#2441)'
     );
+    const hasGlobalInstall =
+      (src.includes("['install', '-g', '.']") || src.includes("'npm install -g .'")) &&
+      src.includes("cwd: sdkDir");
     assert.ok(
-      src.includes("['run', 'build']"),
-      'installer must compile TypeScript via `npm run build` before installing globally'
+      !hasGlobalInstall,
+      'installer must NOT run `npm install -g .` from sdk/ (#2441)'
     );
   });
 
-  test('package.json ships sdk source in published tarball (#2385)', () => {
+  test('package.json ships sdk dist and source in published tarball (#2441)', () => {
     const rootPkg = JSON.parse(fs.readFileSync(path.join(__dirname, '..', 'package.json'), 'utf-8'));
     const files = rootPkg.files || [];
     assert.ok(
-      files.some((f) => f === 'sdk' || f.startsWith('sdk/')),
-      'root package.json `files` must include sdk source so npm-registry installs can build gsd-sdk from source'
+      files.some((f) => f === 'sdk/src' || f.startsWith('sdk/src')),
+      'root package.json `files` must include sdk/src'
+    );
+    assert.ok(
+      files.some((f) => f === 'sdk/dist' || f.startsWith('sdk/dist')),
+      'root package.json `files` must include sdk/dist so the prebuilt CLI ships in the tarball (#2441)'
     );
   });
 });

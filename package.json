@@ -3,7 +3,8 @@
   "version": "1.38.2",
   "description": "A meta-prompting, context engineering and spec-driven development system for Claude Code, OpenCode, Gemini and Codex by TÂCHES.",
   "bin": {
-    "get-shit-done-cc": "bin/install.js"
+    "get-shit-done-cc": "bin/install.js",
+    "gsd-sdk": "bin/gsd-sdk.js"
   },
   "files": [
     "bin",
@@ -14,6 +15,7 @@
     "scripts",
     "sdk/src",
     "sdk/prompts",
+    "sdk/dist",
     "sdk/package.json",
     "sdk/package-lock.json",
     "sdk/tsconfig.json"

@@ -1,10 +1,13 @@
 name: Install Smoke
 
-# Exercises the real install path: `npm pack` → `npm install -g <tarball>`
-# → run `bin/install.js` → assert `gsd-sdk` is on PATH.
+# Exercises the real install paths:
+#   tarball: `npm pack` → `npm install -g <tarball>` → assert gsd-sdk on PATH
+#   unpacked: `npm install -g <dir>` (no pack) → assert gsd-sdk on PATH + executable
 #
-# Closes the CI gap that let #2439 ship: the rest of the suite only reads
-# `bin/install.js` as a string and never executes it.
+# The tarball path is the canonical ship path. The unpacked path reproduces the
+# mode-644 failure class (issue #2453): npm does NOT chmod bin targets when
+# installing from an unpacked local directory, so any stale tsc output lacking
+# execute bits will be caught by the unpacked job before release.
 #
 # - PRs: path-filtered, minimal runner (ubuntu + Node LTS) for fast signal.
 # - Push to release branches / main: full matrix.
@@ -16,6 +19,7 @@ on:
       - main
     paths:
       - 'bin/install.js'
+      - 'bin/gsd-sdk.js'
       - 'sdk/**'
       - 'package.json'
       - 'package-lock.json'
@@ -40,6 +44,9 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
+  # ---------------------------------------------------------------------------
+  # Job 1: tarball install (existing canonical path)
+  # ---------------------------------------------------------------------------
   smoke:
     runs-on: ${{ matrix.os }}
     timeout-minutes: 12
@@ -109,7 +116,7 @@ jobs:
           echo "$NPM_BIN" >> "$GITHUB_PATH"
           echo "npm global bin: $NPM_BIN"
 
-      - name: Install tarball globally (runs bin/install.js → installSdkIfNeeded)
+      - name: Install tarball globally
         if: steps.skip.outputs.skip != 'true'
         shell: bash
         env:
@@ -121,12 +128,8 @@ jobs:
           cd "$TMPDIR_ROOT"
           npm install -g "$WORKSPACE/$TARBALL"
           command -v get-shit-done-cc
-          # `--claude --local` is the non-interactive code path (see
-          # install.js main block: when both a runtime and location are set,
-          # installAllRuntimes runs with isInteractive=false, no prompts).
-          # We tolerate non-zero here because the authoritative assertion is
-          # the next step: gsd-sdk must land on PATH. Some runtime targets
-          # may exit before the SDK step for unrelated reasons on CI.
+          # `--claude --local` is the non-interactive code path.
+          # Tolerate non-zero: the authoritative assertion is the next step.
           get-shit-done-cc --claude --local || true
 
       - name: Assert gsd-sdk resolves on PATH
@@ -135,7 +138,7 @@ jobs:
         run: |
           set -euo pipefail
           if ! command -v gsd-sdk >/dev/null 2>&1; then
-            echo "::error::gsd-sdk is not on PATH after install — installSdkIfNeeded() regression"
+            echo "::error::gsd-sdk is not on PATH after tarball install — shim regression"
             NPM_BIN="$(npm config get prefix)/bin"
             echo "npm global bin: $NPM_BIN"
             ls -la "$NPM_BIN" | grep -i gsd || true
@@ -150,3 +153,76 @@ jobs:
           set -euo pipefail
           gsd-sdk --version || gsd-sdk --help
           echo "✓ gsd-sdk is executable"
+
+  # ---------------------------------------------------------------------------
+  # Job 2: unpacked-dir install — reproduces the mode-644 failure class (#2453)
+  #
+  # `npm install -g <directory>` does NOT chmod bin targets when the source
+  # file was produced by a build script (tsc emits 0o644). This job catches
+  # regressions where sdk/dist/cli.js loses its execute bit before publish.
+  # ---------------------------------------------------------------------------
+  smoke-unpacked:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+
+    steps:
+      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd  # v6.0.2
+        with:
+          ref: ${{ inputs.ref || github.ref }}
+
+      - name: Set up Node.js 22
+        uses: actions/setup-node@53b83947a5a98c8d113130e565377fae1a50d02f  # v6.3.0
+        with:
+          node-version: 22
+          cache: 'npm'
+
+      - name: Install root deps
+        run: npm ci
+
+      - name: Ensure npm global bin is on PATH
+        shell: bash
+        run: |
+          NPM_BIN="$(npm config get prefix)/bin"
+          echo "$NPM_BIN" >> "$GITHUB_PATH"
+          echo "npm global bin: $NPM_BIN"
+
+      - name: Strip execute bit from sdk/dist/cli.js to simulate tsc-fresh output
+        shell: bash
+        run: |
+          set -euo pipefail
+          # Simulate the exact state tsc produces: cli.js at mode 644.
+          chmod 644 sdk/dist/cli.js
+          echo "Stripped execute bit: $(stat -c '%a' sdk/dist/cli.js 2>/dev/null || stat -f '%p' sdk/dist/cli.js)"
+
+      - name: Install from unpacked directory (no npm pack)
+        shell: bash
+        run: |
+          set -euo pipefail
+          TMPDIR_ROOT=$(mktemp -d)
+          cd "$TMPDIR_ROOT"
+          npm install -g "$GITHUB_WORKSPACE"
+          command -v get-shit-done-cc
+          get-shit-done-cc --claude --local || true
+
+      - name: Assert gsd-sdk resolves on PATH after unpacked install
+        shell: bash
+        run: |
+          set -euo pipefail
+          if ! command -v gsd-sdk >/dev/null 2>&1; then
+            echo "::error::gsd-sdk is not on PATH after unpacked install — #2453 regression"
+            NPM_BIN="$(npm config get prefix)/bin"
+            ls -la "$NPM_BIN" | grep -i gsd || true
+            exit 1
+          fi
+          echo "✓ gsd-sdk resolves at: $(command -v gsd-sdk)"
+
+      - name: Assert gsd-sdk is executable after unpacked install (#2453)
+        shell: bash
+        run: |
+          set -euo pipefail
+          # This is the exact check that would have caught #2453 before release.
+          # The shim (bin/gsd-sdk.js) invokes sdk/dist/cli.js via `node`, so
+          # the execute bit on cli.js is not needed for the shim path. However
+          # installSdkIfNeeded() also chmods cli.js in-place as a safety net.
+          gsd-sdk --version || gsd-sdk --help
+          echo "✓ gsd-sdk is executable after unpacked install"
