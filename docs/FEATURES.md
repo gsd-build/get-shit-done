@@ -2369,7 +2369,7 @@ Test suite that scans all agent, workflow, and command files for embedded inject
 **Optional integration — `capture_thought`:** `capture_thought` is a **convention, not a bundled tool**. GSD does not ship one and does not require one. The workflow checks whether any MCP server in the current session exposes a tool named `capture_thought` and, if so, calls it once per extracted learning with the signature below. If no such tool is present, the step is skipped silently and `LEARNINGS.md` remains the primary output.
 
 Expected tool signature:
-```
+```javascript
 capture_thought({
   category: "decision" | "lesson" | "pattern" | "surprise",
   phase: <phase_number>,
