@@ -1432,6 +1432,38 @@ gsd-sdk query learnings.copy 2>/dev/null || echo "⚠ Learnings copy failed — 
 Copy failure must NOT block phase completion.
 </step>
 
+<step name="close_phase_todos">
+**Auto-close pending todos tagged for this phase (#2433).**
+
+This step runs AFTER `update_roadmap` marks the phase complete. It moves any pending todos that carry `resolves_phase: <current-phase-number>` to the completed directory.
+
+```bash
+PHASE_NUM="${PHASE_NUMBER}"
+PENDING_DIR=".planning/todos/pending"
+COMPLETED_DIR=".planning/todos/completed"
+mkdir -p "$COMPLETED_DIR"
+
+CLOSED=()
+for TODO_FILE in "$PENDING_DIR"/*.md; do
+  [ -f "$TODO_FILE" ] || continue
+  # Extract resolves_phase from YAML frontmatter (first --- block only)
+  RP=$(awk '/^---/{c++;next} c==1 && /^resolves_phase:/{print $2;exit} c==2{exit}' "$TODO_FILE" 2>/dev/null || true)
+  if [ "$RP" = "$PHASE_NUM" ] || [ "$RP" = "\"$PHASE_NUM\"" ]; then
+    mv "$TODO_FILE" "$COMPLETED_DIR/"
+    CLOSED+=("$(basename "$TODO_FILE")")
+  fi
+done
+
+if [ ${#CLOSED[@]} -gt 0 ]; then
+  gsd-sdk query commit "docs(phase-${PHASE_NUMBER}): auto-close ${#CLOSED[@]} todo(s) resolved by this phase" .planning/todos/completed/ .planning/STATE.md || true
+  echo "◆ Closed ${#CLOSED[@]} todo(s) resolved by Phase ${PHASE_NUMBER}:"
+  for f in "${CLOSED[@]}"; do echo "  ✓ $f"; done
+fi
+```
+
+**If no todos have `resolves_phase: <this-phase>`:** Skip silently — this step is always additive and never blocks phase completion.
+</step>
+
 <step name="update_project_md">
 **Evolve PROJECT.md to reflect phase completion (prevents planning document drift — #956):**
 

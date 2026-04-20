@@ -510,6 +510,56 @@ Success criteria:
 gsd-sdk query commit "docs: create milestone v[X.Y] roadmap ([N] phases)" .planning/ROADMAP.md .planning/STATE.md .planning/REQUIREMENTS.md
 ```
 
+## 10.5. Link Pending Todos to Roadmap Phases
+
+After roadmap approval, scan pending todos against the newly approved phases. For each todo whose scope matches a phase, tag it with `resolves_phase: N` in its YAML frontmatter.
+
+**Check for pending todos:**
+```bash
+PENDING_TODOS=$(ls .planning/todos/pending/*.md 2>/dev/null | head -50)
+```
+
+**If no pending todos exist:** Skip this step silently.
+
+**If pending todos exist:**
+
+Read the approved ROADMAP.md and extract the phase list: phase number, phase name, goal, and requirement IDs.
+
+For each pending todo, compare:
+- The todo's `title` and `area` frontmatter fields
+- The todo body (Problem and Solution sections)
+
+Against each phase's:
+- Phase goal
+- Requirement IDs and descriptions
+
+**Match criteria (best-effort — do not over-match):** A todo is considered resolved by a phase if the phase's goal or requirements directly describe implementing the same feature, area, or capability as the todo. Narrow, specific todos with concrete scopes are the best candidates. Vague or cross-cutting todos should be left unlinked.
+
+**For each matched todo**, add `resolves_phase: [N]` to the YAML frontmatter block (after the existing fields):
+```yaml
+---
+created: [existing]
+title: [existing]
+area: [existing]
+resolves_phase: [N]
+files: [existing]
+---
+```
+
+**Only modify todos that have a clear, confident match.** Leave unmatched todos unmodified.
+
+**If any todos were linked:**
+```bash
+gsd-sdk query commit "docs: tag [count] pending todos with resolves_phase after milestone v[X.Y] roadmap" .planning/todos/pending/*.md
+```
+
+Print a summary:
+```
+◆ Linked [N] pending todos to roadmap phases:
+  → [todo title] → Phase [N]: [Phase Name]
+  (Leave [M] unmatched todos in pending/)
+```
+
 ## 11. Done
 
 ```
@@ -553,6 +603,7 @@ Also: `/gsd-plan-phase [N] ${GSD_WS}` — skip discussion, plan directly
 - [ ] User feedback incorporated (if any)
 - [ ] Phase numbering mode respected (continued or reset)
 - [ ] All commits made (if planning docs committed)
+- [ ] Pending todos scanned for phase matches; matched todos tagged with `resolves_phase: N`
 - [ ] User knows next step: `/gsd-discuss-phase [N] ${GSD_WS}`
 
 **Atomic commits:** Each phase commits its artifacts immediately.
