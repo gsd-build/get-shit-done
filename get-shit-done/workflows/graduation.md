@@ -30,8 +30,7 @@ GRADUATION_THRESHOLD=$(gsd-sdk query config-get features.graduation_threshold 2>
 - `features.graduation` is `false`
 - Fewer than `graduation_threshold` completed prior phases exist (not enough data)
 
-**Skip with `[graduation: no-op — insufficient data]` if:**
-- Total items across all LEARNINGS.md files in the window is fewer than 5
+**Skip silently (print nothing) if total items across all LEARNINGS.md files in the window is fewer than 5.**
 
 ---
 
@@ -95,7 +94,7 @@ For each qualifying cluster, determine the suggested target file:
 
 Print the graduation report:
 
-```
+```text
 📚 Graduation scan across phases {M}–{N}:
 
   HIGH RECURRENCE ({K}/{WINDOW} phases)
@@ -107,7 +106,7 @@ Print the graduation report:
   [repeat for each qualifying cluster, ordered HIGH→LOW recurrence]
 
 For each cluster above, choose an action:
-  P = Promote now   D = Defer (re-surface next transition)   X = Dismiss (never re-surface)
+  P = Promote now   D = Defer (re-surface next transition)   X = Dismiss (never re-surface)   A = Defer all remaining
 ```
 
 ---
@@ -116,12 +115,12 @@ For each cluster above, choose an action:
 
 For each cluster (in order from Step 5), ask the developer:
 
-```
+```text
 Cluster: "{title}" [{category}, {K} phases] → {target}
-Action [P/D/X]:
+Action [P/D/X/A]:
 ```
 
-Use `AskUserQuestion` (or equivalent HITL primitive for the current runtime). Accept single-character input: `P`, `D`, `X` (case-insensitive).
+Use `AskUserQuestion` (or equivalent HITL primitive for the current runtime). If `TEXT_MODE` is true, print the prompt as plain text and accept free-text input. Accept single-character input: `P`, `D`, `X`, `A` (case-insensitive).
 
 **On `P` (Promote now):**
 
@@ -157,18 +156,26 @@ Write to `.planning/STATE.md` under `graduation_backlog`:
   cluster_title: "{title}"
 ```
 
+**On `A` (Defer all):**
+
+Defer the current cluster (same as `D`) and skip all remaining clusters for this run, deferring each to the next transition. Print:
+```text
+[graduation: deferred all remaining clusters to next transition]
+```
+Then proceed directly to Step 7.
+
 ---
 
 ## Step 7: Completion Report
 
 After processing all clusters, print:
 
-```
+```text
 Graduation complete: {promoted} promoted, {deferred} deferred, {dismissed} dismissed.
 ```
 
 If no clusters qualified (all filtered by backlog or threshold), print:
-```
+```text
 [graduation: no qualifying clusters in phases {M}–{N}]
 ```
 

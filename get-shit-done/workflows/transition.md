@@ -277,7 +277,7 @@ Scan LEARNINGS.md files from recent phases for recurring patterns and surface pr
 
 **Invoke the graduation helper:**
 
-```
+```text
 @~/.claude/get-shit-done/workflows/graduation.md
 ```
 
