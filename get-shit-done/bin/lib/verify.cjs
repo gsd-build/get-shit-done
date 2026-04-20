@@ -903,6 +903,22 @@ function cmdValidateHealth(cwd, options, raw) {
     }
   } catch { /* intentionally empty — milestone sync check is advisory */ }
 
+  // ─── Check 13: Unrecognized .planning/ root files (W019) ──────────────────
+  try {
+    const { isCanonicalPlanningFile } = require('./artifacts.cjs');
+    const entries = fs.readdirSync(planBase, { withFileTypes: true });
+    for (const entry of entries) {
+      if (!entry.isFile()) continue;
+      if (!entry.name.endsWith('.md')) continue;
+      if (!isCanonicalPlanningFile(entry.name)) {
+        addIssue('warning', 'W019',
+          `Unrecognized .planning/ file: ${entry.name} — not a canonical GSD artifact`,
+          'Move to .planning/milestones/ archive subdir or delete if stale. See templates/README.md for the canonical artifact list.',
+          false);
+      }
+    }
+  } catch { /* artifact check is advisory — skip on error */ }
+
   // ─── Perform repairs if requested ─────────────────────────────────────────
   const repairActions = [];
   if (options.repair && repairs.length > 0) {

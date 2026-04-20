@@ -350,12 +350,13 @@ The `gsd-planner` agent is decomposed into a core agent plus reference modules t
 
 ---
 
-## CLI Modules (25 shipped)
+## CLI Modules (26 shipped)
 
 Full listing: `get-shit-done/bin/lib/*.cjs`.
 
 | Module | Responsibility |
 |--------|----------------|
+| `artifacts.cjs` | Canonical artifact registry — known `.planning/` root file names; used by `gsd-health` W019 lint |
 | `audit.cjs` | Audit dispatch, audit open sessions, audit storage helpers |
 | `commands.cjs` | Misc CLI commands (slug, timestamp, todos, scaffolding, stats) |
 | `config-schema.cjs` | Single source of truth for `VALID_CONFIG_KEYS` and dynamic key patterns; imported by both the validator and the config-schema-docs parity test |

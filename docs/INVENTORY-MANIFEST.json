@@ -253,6 +253,7 @@
       "workstream-flag.md"
     ],
     "cli_modules": [
+      "artifacts.cjs",
       "audit.cjs",
       "commands.cjs",
       "config-schema.cjs",

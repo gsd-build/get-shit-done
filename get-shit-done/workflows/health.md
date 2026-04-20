@@ -143,6 +143,7 @@ Report final status.
 | W008 | warning | config.json: workflow.nyquist_validation absent (defaults to enabled but agents may skip) | Yes |
 | W009 | warning | Phase has Validation Architecture in RESEARCH.md but no VALIDATION.md | No |
 | W018 | warning | MILESTONES.md missing entry for archived milestone snapshot | Yes (`--backfill`) |
+| W019 | warning | Unrecognized .planning/ root file — not a canonical GSD artifact | No |
 | I001 | info | Plan without SUMMARY (may be in progress) | No |
 
 </error_codes>
