@@ -1268,6 +1268,95 @@ describe('phase remove command', () => {
     const state = fs.readFileSync(path.join(tmpDir, '.planning', 'STATE.md'), 'utf-8');
     assert.ok(state.includes('**Total Phases:** 1'), 'total phases should be decremented');
   });
+
+  test('bug-2434: integer phase remove does not rename 999.x backlog directory', () => {
+    // Setup: an active integer phase 4 and a backlog phase 999.1
+    fs.writeFileSync(
+      path.join(tmpDir, '.planning', 'ROADMAP.md'),
+      `# Roadmap
+
+### Phase 1: Foundation
+**Goal:** Setup
+
+### Phase 2: Auth
+**Goal:** Authentication
+
+### Phase 3: Features
+**Goal:** Core features
+
+### Phase 4: Extras
+**Goal:** Extra stuff
+
+### Phase 999.1: Backlog item
+**Goal:** Parked backlog task
+`
+    );
+
+    fs.mkdirSync(path.join(tmpDir, '.planning', 'phases', '01-foundation'), { recursive: true });
+    fs.mkdirSync(path.join(tmpDir, '.planning', 'phases', '02-auth'), { recursive: true });
+    fs.mkdirSync(path.join(tmpDir, '.planning', 'phases', '03-features'), { recursive: true });
+    fs.mkdirSync(path.join(tmpDir, '.planning', 'phases', '04-extras'), { recursive: true });
+    fs.mkdirSync(path.join(tmpDir, '.planning', 'phases', '999.1-backlog-item'), { recursive: true });
+
+    const result = runGsdTools('phase remove 4', tmpDir);
+    assert.ok(result.success, `Command failed: ${result.error}`);
+
+    // Backlog directory must remain at 999.1, not be decremented to 998.1
+    assert.ok(
+      fs.existsSync(path.join(tmpDir, '.planning', 'phases', '999.1-backlog-item')),
+      'backlog directory 999.1-backlog-item must not be renamed'
+    );
+    assert.ok(
+      !fs.existsSync(path.join(tmpDir, '.planning', 'phases', '998.1-backlog-item')),
+      'backlog directory must not be incorrectly renamed to 998.1'
+    );
+  });
+
+  test('bug-2435: integer phase remove does not corrupt YYYY-MM-DD dates in ROADMAP.md', () => {
+    // Setup: removing phase 4 from a roadmap containing 2026-04-14 date strings
+    fs.writeFileSync(
+      path.join(tmpDir, '.planning', 'ROADMAP.md'),
+      `# Roadmap
+
+### Phase 1: Foundation
+**Goal:** Setup
+**Completed:** 2026-01-15
+
+### Phase 2: Auth
+**Goal:** Authentication
+**Completed:** 2026-02-20
+
+### Phase 3: Features
+**Goal:** Core features
+**Completed:** 2026-04-14
+
+### Phase 4: Extras
+**Goal:** Extra stuff
+
+### Phase 5: Final
+**Goal:** Final phase
+`
+    );
+
+    fs.mkdirSync(path.join(tmpDir, '.planning', 'phases', '01-foundation'), { recursive: true });
+    fs.mkdirSync(path.join(tmpDir, '.planning', 'phases', '02-auth'), { recursive: true });
+    fs.mkdirSync(path.join(tmpDir, '.planning', 'phases', '03-features'), { recursive: true });
+    fs.mkdirSync(path.join(tmpDir, '.planning', 'phases', '04-extras'), { recursive: true });
+    fs.mkdirSync(path.join(tmpDir, '.planning', 'phases', '05-final'), { recursive: true });
+
+    const result = runGsdTools('phase remove 4', tmpDir);
+    assert.ok(result.success, `Command failed: ${result.error}`);
+
+    const roadmap = fs.readFileSync(path.join(tmpDir, '.planning', 'ROADMAP.md'), 'utf-8');
+
+    // Dates must be preserved exactly
+    assert.ok(roadmap.includes('2026-01-15'), 'date 2026-01-15 must not be corrupted');
+    assert.ok(roadmap.includes('2026-02-20'), 'date 2026-02-20 must not be corrupted');
+    assert.ok(roadmap.includes('2026-04-14'), 'date 2026-04-14 must not be corrupted');
+
+    // Phase 5 should be renumbered to 4
+    assert.ok(roadmap.includes('Phase 4: Final'), 'Phase 5 should be renumbered to Phase 4');
+  });
 });
 
 // ─────────────────────────────────────────────────────────────────────────────
