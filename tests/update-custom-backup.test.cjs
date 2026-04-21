@@ -225,4 +225,58 @@ describe('detect-custom-files — update workflow backup detection (#1997)', () 
       `should detect custom reference; got: ${JSON.stringify(json.custom_files)}`
     );
   });
+
+  // #2505 — installer does NOT wipe skills/ or command/; scanning them produces
+  // false-positive "custom file" reports for every skill the user has installed
+  // from other packages.
+  test('does not scan skills/ directory (installer does not wipe it)', () => {
+    writeManifest(tmpDir, {
+      'get-shit-done/workflows/execute-phase.md': '# Execute Phase\n',
+    });
+
+    // Simulate user having third-party skills installed — none in manifest
+    const skillsDir = path.join(tmpDir, 'skills');
+    fs.mkdirSync(skillsDir, { recursive: true });
+    fs.writeFileSync(path.join(skillsDir, 'my-custom-skill.md'), '# My Skill\n');
+    fs.writeFileSync(path.join(skillsDir, 'another-plugin-skill.md'), '# Another\n');
+
+    const result = runGsdTools(
+      ['detect-custom-files', '--config-dir', tmpDir],
+      tmpDir
+    );
+
+    assert.ok(result.success, `Command failed: ${result.error}`);
+
+    const json = JSON.parse(result.output);
+    const skillFiles = json.custom_files.filter(f => f.startsWith('skills/'));
+    assert.strictEqual(
+      skillFiles.length, 0,
+      `skills/ should not be scanned; got false positives: ${JSON.stringify(skillFiles)}`
+    );
+  });
+
+  test('does not scan command/ directory (installer does not wipe it)', () => {
+    writeManifest(tmpDir, {
+      'get-shit-done/workflows/execute-phase.md': '# Execute Phase\n',
+    });
+
+    // Simulate files in command/ dir not wiped by installer
+    const commandDir = path.join(tmpDir, 'command');
+    fs.mkdirSync(commandDir, { recursive: true });
+    fs.writeFileSync(path.join(commandDir, 'user-command.md'), '# User Command\n');
+
+    const result = runGsdTools(
+      ['detect-custom-files', '--config-dir', tmpDir],
+      tmpDir
+    );
+
+    assert.ok(result.success, `Command failed: ${result.error}`);
+
+    const json = JSON.parse(result.output);
+    const commandFiles = json.custom_files.filter(f => f.startsWith('command/'));
+    assert.strictEqual(
+      commandFiles.length, 0,
+      `command/ should not be scanned; got false positives: ${JSON.stringify(commandFiles)}`
+    );
+  });
 });

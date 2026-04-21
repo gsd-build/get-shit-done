@@ -1204,10 +1204,6 @@ async function runCommand(command, args, cwd, raw, defaultValue) {
         'agents',
         path.join('commands', 'gsd'),
         'hooks',
-        // OpenCode/Kilo flat command dir
-        'command',
-        // Codex/Copilot skills dir
-        'skills',
       ];
 
       function walkDir(dir, baseDir) {
