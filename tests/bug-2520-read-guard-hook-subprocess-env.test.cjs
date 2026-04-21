@@ -78,11 +78,18 @@ describe('bug #2520: read guard detects Claude Code without relying on CLAUDECOD
     const filePath = path.join(tmpDir, 'existing.js');
     fs.writeFileSync(filePath, 'const x = 1;\n');
 
-    const result = runHookInClaudeCodeSubprocess({
-      session_id: 'e7123e54-0977-45dd-848a-b9c8a45a5cd3',
-      tool_name: 'Edit',
-      tool_input: { file_path: filePath, old_string: 'const x = 1;', new_string: 'const x = 2;' },
-    });
+    // Isolate the stdin `session_id` signal by clearing the CLAUDE_CODE_*
+    // env fallbacks the helper normally provides. Without this the env
+    // fallback would rescue the skip even if session_id detection broke,
+    // hiding a regression of the primary signal.
+    const result = runHookInClaudeCodeSubprocess(
+      {
+        session_id: 'e7123e54-0977-45dd-848a-b9c8a45a5cd3',
+        tool_name: 'Edit',
+        tool_input: { file_path: filePath, old_string: 'const x = 1;', new_string: 'const x = 2;' },
+      },
+      { CLAUDE_CODE_ENTRYPOINT: '', CLAUDE_CODE_SSE_PORT: '', CLAUDE_PROJECT_DIR: '' },
+    );
 
     assert.equal(result.exitCode, 0);
     assert.equal(
