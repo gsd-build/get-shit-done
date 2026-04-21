@@ -23,7 +23,7 @@ INIT=$(gsd-sdk query init.manager)
 if [[ "$INIT" == @file:* ]]; then INIT=$(cat "${INIT#@file:}"); fi
 ```
 
-Parse JSON for: `milestone_version`, `milestone_name`, `phase_count`, `completed_count`, `in_progress_count`, `phases`, `recommended_actions`, `all_complete`, `waiting_signal`, `manager_flags`.
+Parse JSON for: `milestone_version`, `milestone_name`, `phase_count`, `completed_count`, `in_progress_count`, `phases`, `recommended_actions`, `all_complete`, `waiting_signal`, `manager_flags`, and the optional trio `queued_milestone_version`, `queued_milestone_name`, `queued_phases` (added in SDK fix `2495-2496-2497` — may be absent on older SDK versions, treat missing as empty).
 
 `manager_flags` contains per-step passthrough flags from config:
 - `manager_flags.discuss` — appended to `/gsd-discuss-phase` args (e.g. `"--auto --analyze"`)
@@ -102,6 +102,28 @@ Example output:
  | 5 | Notifications        | —    | ○ | · | · | ○ Ready to discuss  |
  | 6 | Polish & Final Mail… | 1-5  | · | · | · | · Up next           |
 ```
+
+**Queued section (next milestone preview):**
+
+If `queued_phases` is present and non-empty, render a compact preview of the next milestone's phases directly below the main table. This surfaces upcoming work without cluttering the active-milestone grid. Skip this section entirely when `queued_phases` is empty or missing (e.g. the active milestone is the last one in the roadmap).
+
+Use `queued_milestone_version` and `queued_milestone_name` for the header. Phases render without D/P/E columns since they aren't discussed yet — just number, name (pre-truncated `display_name`), dependencies (`deps_display`), and a fixed `· Queued` status. Phase-name padding should match the active-table column width for visual alignment.
+
+Example:
+
+```
+ ───────────────────────────────────────────────────────────────
+ ◆ Queued — {queued_milestone_version} {queued_milestone_name}  ({queued_phases.length} phases)
+ ───────────────────────────────────────────────────────────────
+ | # | Phase                | Deps | Status       |
+ |---|----------------------|------|--------------|
+ | 31| Email Logs           | —    | · Queued     |
+ | 32| Today's Sheets       | 31   | · Queued     |
+ | 33| Resend Backfill      | 31   | · Queued     |
+ | 34| Business Day Audit   | 31   | · Queued     |
+```
+
+Queued phases are NOT eligible for the Continue action menu — they live in a future milestone and must wait for the current milestone to ship. The preview exists purely for situational awareness.
 
 **Recommendations section:**
 
@@ -362,4 +384,5 @@ Display final status with progress bar:
 - [ ] Exit shows final status with resume instructions
 - [ ] "Other" free-text input parsed for phase number and action
 - [ ] Manager loop continues until user exits or milestone completes
+- [ ] Queued section renders when `queued_phases` is non-empty; skipped when absent or empty
 </success_criteria>
