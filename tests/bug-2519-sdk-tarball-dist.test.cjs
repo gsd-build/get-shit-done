@@ -63,9 +63,12 @@ describe('bug #2519: @gsd-build/sdk tarball must ship prebuilt dist/', () => {
 
   test('npm pack --dry-run lists dist/cli.js when dist is present', () => {
     const distCli = path.join(SDK_DIR, 'dist', 'cli.js');
-    if (!fs.existsSync(distCli)) {
+    const hasDistCli = fs.existsSync(distCli);
+    if (!hasDistCli && process.env.CI) {
+      assert.fail('sdk/dist/cli.js must exist in CI before tarball validation');
+    }
+    if (!hasDistCli) {
       // Skip tarball assertion when dist has not been built yet (local dev).
-      // CI pre-builds dist before running tests; this branch is a no-op there.
       return;
     }
 
