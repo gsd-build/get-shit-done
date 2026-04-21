@@ -44,14 +44,14 @@ describe('bug-2502: insert-phase must update STATE.md next-phase recommendation'
   test('insert-phase.md update_project_state step covers next-phase pointer', () => {
     const content = fs.readFileSync(INSERT_PHASE_PATH, 'utf-8');
 
-    // The update_project_state step (or equivalent) must mention updating
-    // the current/next phase value, not just the Roadmap Evolution log.
+    const stepMatch = content.match(/<step name="update_project_state">([\s\S]*?)<\/step>/i);
+    assert.ok(stepMatch, 'insert-phase.md must contain update_project_state step');
+    const stepContent = stepMatch[1];
+
     const hasNextPhasePointerUpdate = (
-      content.includes('current_phase') ||
-      content.includes('next phase') ||
-      content.includes('next-phase') ||
-      /update.{0,60}STATE\.md.{0,200}(decimal_phase|inserted phase|new phase)/is.test(content) ||
-      /(decimal_phase|inserted phase|new phase).{0,200}update.{0,60}STATE\.md/is.test(content)
+      /\bcurrent[_ -]?phase\b/i.test(stepContent) ||
+      /\bnext[_ -]?phase\b/i.test(stepContent) ||
+      /\bnext recommended run\b/i.test(stepContent)
     );
 
     assert.ok(

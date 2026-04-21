@@ -66,8 +66,10 @@ Extract from result: `phase_number`, `after_phase`, `name`, `slug`, `directory`.
 Update STATE.md to reflect the inserted phase:
 
 1. Read `.planning/STATE.md`
-2. Update the "Current Phase" / next-phase recommendation to point to the newly inserted phase:
-   - Find the line that recommends the next phase to run (e.g. `current_phase:`, `## Current Phase`, or `Next recommended run:`) and update it to reference `{decimal_phase}` instead of the old next phase.
+2. Update STATE.md's next-phase pointers to the newly inserted phase `{decimal_phase}`:
+   - Update structured field(s) used by tooling (e.g. `current_phase:`) to `{decimal_phase}`.
+   - Update human-readable recommendation text (e.g. `## Current Phase`, `Next recommended run:`) to `{decimal_phase}`.
+   - If multiple pointer locations exist, update all of them in the same edit.
 3. Under "## Accumulated Context" → "### Roadmap Evolution" add entry:
    ```
    - Phase {decimal_phase} inserted after Phase {after_phase}: {description} (URGENT)
