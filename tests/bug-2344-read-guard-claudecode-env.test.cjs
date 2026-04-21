@@ -29,6 +29,9 @@ function runHook(payload, envOverrides = {}) {
     ...process.env,
     CLAUDE_SESSION_ID: '',
     CLAUDECODE: '',
+    CLAUDE_CODE_ENTRYPOINT: '',
+    CLAUDE_CODE_SSE_PORT: '',
+    CLAUDE_PROJECT_DIR: '',
     ...envOverrides,
   };
   try {

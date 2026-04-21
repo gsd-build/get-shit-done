@@ -36,8 +36,27 @@ process.stdin.on('end', () => {
       process.exit(0);
     }
 
-    // Claude Code natively enforces read-before-edit — skip the advisory (#1984, #2344)
-    if (process.env.CLAUDE_SESSION_ID || process.env.CLAUDECODE) {
+    // Claude Code natively enforces read-before-edit — skip the advisory (#1984, #2344, #2520).
+    //
+    // Detection signals, in priority order:
+    //   1. `data.session_id` on the hook's stdin payload — part of Claude
+    //      Code's documented PreToolUse hook-input schema, always present.
+    //      Reliable across Claude Code versions because it's schema, not env.
+    //   2. `CLAUDE_CODE_ENTRYPOINT` / `CLAUDE_CODE_SSE_PORT` — env vars that
+    //      Claude Code does propagate to hook subprocesses (verified on
+    //      Claude Code CLI 2.1.116).
+    //   3. `CLAUDE_SESSION_ID` / `CLAUDECODE` — kept for back-compat and in
+    //      case future Claude Code versions propagate them to hook
+    //      subprocesses. On 2.1.116 they reach Bash tool subprocesses but
+    //      not hook subprocesses, which is why checking them alone is
+    //      insufficient (regression of #2344 fixed here as #2520).
+    const isClaudeCode =
+      (typeof data.session_id === 'string' && data.session_id.length > 0) ||
+      process.env.CLAUDE_CODE_ENTRYPOINT ||
+      process.env.CLAUDE_CODE_SSE_PORT ||
+      process.env.CLAUDE_SESSION_ID ||
+      process.env.CLAUDECODE;
+    if (isClaudeCode) {
       process.exit(0);
     }
 
