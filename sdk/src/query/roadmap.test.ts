@@ -139,6 +139,24 @@ describe('stripShippedMilestones', () => {
     expect(stripped).toContain('Gamma');
     expect(stripped).toContain('Current content');
   });
+
+  // Bug #2508 follow-up: ### headings must be stripped too
+  it('strips ### heading sections marked ✅ SHIPPED', () => {
+    const content = [
+      '### Milestone v1.0: MVP — ✅ SHIPPED 2026-01-15',
+      '',
+      'Phase 1, Phase 2',
+      '',
+      '### Milestone v2.0: Current',
+      '',
+      'Phase 3',
+    ].join('\n');
+    const stripped = stripShippedMilestones(content);
+    expect(stripped).not.toContain('MVP');
+    expect(stripped).not.toContain('v1.0');
+    expect(stripped).toContain('v2.0');
+    expect(stripped).toContain('Current');
+  });
 });
 
 // ─── getMilestoneInfo ─────────────────────────────────────────────────────
@@ -217,6 +235,24 @@ describe('getMilestoneInfo', () => {
     const info = await getMilestoneInfo(tmpDir);
     expect(info.version).toBe('v2.0');
     expect(info.name).toBe('Current Active');
+  });
+
+  // Bug #2508 follow-up: STATE.md has milestone version but no milestone_name —
+  // should use ROADMAP for the real name, still prefer STATE.md for version.
+  it('uses ROADMAP name when STATE.md has milestone version but no milestone_name', async () => {
+    const roadmap = [
+      '## Milestone v2.0: Real Name From Roadmap',
+      '',
+      'Phase 2',
+    ].join('\n');
+    await writeFile(join(tmpDir, '.planning', 'ROADMAP.md'), roadmap);
+    await writeFile(
+      join(tmpDir, '.planning', 'STATE.md'),
+      '---\nmilestone: v2.0\n---\n',  // no milestone_name
+    );
+    const info = await getMilestoneInfo(tmpDir);
+    expect(info.version).toBe('v2.0');
+    expect(info.name).toBe('Real Name From Roadmap');
   });
 
   it('returns correct milestone from STATE.md even when ROADMAP inline-SHIPPED stripping would fix it', async () => {

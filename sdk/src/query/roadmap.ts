@@ -52,10 +52,10 @@ interface PhaseSection {
 export function stripShippedMilestones(content: string): string {
   // Pattern 1: <details>...</details> blocks (explicit collapse)
   let result = content.replace(/<details>[\s\S]*?<\/details>/gi, '');
-  // Pattern 2: ## Heading — ✅ SHIPPED ... sections (inline heading pattern).
-  // Split on ## boundaries, discard any section whose heading contains ✅ SHIPPED.
-  const sections = result.split(/(?=^## )/m);
-  result = sections.filter(s => !/^## [^\n]*✅\s*SHIPPED/m.test(s)).join('');
+  // Pattern 2: inline milestone headings marked as shipped.
+  // Keep aligned with heading levels accepted by extractCurrentMilestone() (## and ###).
+  const sections = result.split(/(?=^#{2,3}\s)/m);
+  result = sections.filter(s => !/^#{2,3}\s[^\n]*✅\s*SHIPPED\b/im.test(s)).join('');
   return result;
 }
 
@@ -90,31 +90,35 @@ async function parseMilestoneFromState(projectDir: string): Promise<{ version: s
  */
 export async function getMilestoneInfo(projectDir: string): Promise<{ version: string; name: string }> {
   try {
-    // Priority 1: STATE.md frontmatter (authoritative — matches extractCurrentMilestone behaviour)
+    // Priority 1: STATE.md frontmatter (authoritative for version; name only when real)
     const fromState = await parseMilestoneFromState(projectDir);
-    if (fromState) {
-      return fromState;
+    const stateVersion = fromState?.version ?? null;
+    const stateName = fromState && fromState.name !== 'milestone' ? fromState.name : null;
+    if (stateVersion && stateName) {
+      return { version: stateVersion, name: stateName };
     }
+    // STATE.md has a version but no real name — fall through to ROADMAP for the name,
+    // then override the version with the authoritative STATE.md value.
 
     const roadmap = await readFile(planningPaths(projectDir).roadmap, 'utf-8');
 
     // List-format: construction / blocked (legacy emoji)
     const barricadeMatch = roadmap.match(/🚧\s*\*\*v(\d+(?:\.\d+)+)\s+([^*]+)\*\*/);
     if (barricadeMatch) {
-      return { version: 'v' + barricadeMatch[1], name: barricadeMatch[2].trim() };
+      return { version: stateVersion ?? 'v' + barricadeMatch[1], name: barricadeMatch[2].trim() };
     }
 
     // List-format: in flight / active (GSD ROADMAP template uses 🟡 for current milestone)
     const inFlightMatch = roadmap.match(/🟡\s*\*\*v(\d+(?:\.\d+)+)\s+([^*]+)\*\*/);
     if (inFlightMatch) {
-      return { version: 'v' + inFlightMatch[1], name: inFlightMatch[2].trim() };
+      return { version: stateVersion ?? 'v' + inFlightMatch[1], name: inFlightMatch[2].trim() };
     }
 
     // Heading-format — strip shipped <details> blocks first
     const cleaned = stripShippedMilestones(roadmap);
     const headingMatch = cleaned.match(/##\s+.*v(\d+(?:\.\d+)+)[:\s]+([^\n(]+)/);
     if (headingMatch) {
-      return { version: 'v' + headingMatch[1], name: headingMatch[2].trim() };
+      return { version: stateVersion ?? 'v' + headingMatch[1], name: headingMatch[2].trim() };
     }
 
     // Milestone bullet list (## Milestones … ## Phases): use last **vX.Y Title** — typically the current row
@@ -122,16 +126,16 @@ export async function getMilestoneInfo(projectDir: string): Promise<{ version: s
     const boldMatches = [...beforePhases.matchAll(/\*\*v(\d+(?:\.\d+)+)\s+([^*]+)\*\*/g)];
     if (boldMatches.length > 0) {
       const last = boldMatches[boldMatches.length - 1];
-      return { version: 'v' + last[1], name: last[2].trim() };
+      return { version: stateVersion ?? 'v' + last[1], name: last[2].trim() };
     }
 
     const allBare = [...cleaned.matchAll(/\bv(\d+(?:\.\d+)+)\b/g)];
     if (allBare.length > 0) {
       const lastBare = allBare[allBare.length - 1];
-      return { version: lastBare[0], name: 'milestone' };
+      return { version: stateVersion ?? lastBare[0], name: 'milestone' };
     }
 
-    return { version: 'v1.0', name: 'milestone' };
+    return { version: stateVersion ?? 'v1.0', name: 'milestone' };
   } catch {
     const fromState = await parseMilestoneFromState(projectDir);
     if (fromState) return fromState;
