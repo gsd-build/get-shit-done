@@ -950,7 +950,7 @@ arrived). Display:
 ```
 
 Offer 3 options:
-1. **Accept plans** — treat as `## PLANNING COMPLETE` and continue to step 10
+1. **Accept plans** — treat as `## PLANNING COMPLETE` and continue through step 9 `## PLANNING COMPLETE` handling (so `--skip-verify` / `plan_checker_enabled=false` are honored — may skip to step 13 rather than step 10)
 2. **Retry planner** — re-spawn the planner with the same prompt (return to step 8)
 3. **Stop** — exit; user can re-run `/gsd-plan-phase {N}` to resume
 
