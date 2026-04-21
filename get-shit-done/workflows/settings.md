@@ -51,6 +51,17 @@ Parse current values (default to `true` if not present):
 <step name="present_settings">
 
 **Text mode (`workflow.text_mode: true` in config or `--text` flag):** Set `TEXT_MODE=true` if `--text` is present in `$ARGUMENTS` OR `text_mode` from init JSON is `true`. When TEXT_MODE is active, replace every `AskUserQuestion` call with a plain-text numbered list and ask the user to type their choice number. This is required for non-Claude runtimes (OpenAI Codex, Gemini CLI, etc.) where `AskUserQuestion` is not available.
+
+**Non-Claude runtime note:** If `TEXT_MODE` is active (i.e. the runtime is non-Claude), prepend the following notice before the model profile question:
+
+```
+Note: Quality, Balanced, and Budget profiles select Claude model tiers (Opus/Sonnet/Haiku).
+On non-Claude runtimes (Codex, Gemini CLI, etc.) these profiles have no effect on actual
+model selection — GSD agents will use the runtime's default model.
+Choose "Inherit" to use the session model for all agents, or configure model_overrides
+manually in .planning/config.json to target specific models for this runtime.
+```
+
 Use AskUserQuestion with current values pre-selected:
 
 ```
@@ -60,10 +71,10 @@ AskUserQuestion([
     header: "Model",
     multiSelect: false,
     options: [
-      { label: "Quality", description: "Opus everywhere except verification (highest cost)" },
-      { label: "Balanced (Recommended)", description: "Opus for planning, Sonnet for research/execution/verification" },
-      { label: "Budget", description: "Sonnet for writing, Haiku for research/verification (lowest cost)" },
-      { label: "Inherit", description: "Use current session model for all agents (best for OpenRouter, local models, or runtime model switching)" }
+      { label: "Quality", description: "Opus everywhere except verification (highest cost) — Claude only" },
+      { label: "Balanced (Recommended)", description: "Opus for planning, Sonnet for research/execution/verification — Claude only" },
+      { label: "Budget", description: "Sonnet for writing, Haiku for research/verification (lowest cost) — Claude only" },
+      { label: "Inherit", description: "Use current session model for all agents (required for non-Claude runtimes: Codex, Gemini CLI, OpenRouter, local models)" }
     ]
   },
   {
