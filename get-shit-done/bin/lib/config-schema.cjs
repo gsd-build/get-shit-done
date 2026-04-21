@@ -34,6 +34,7 @@ const VALID_CONFIG_KEYS = new Set([
   'workflow.plan_bounce',
   'workflow.plan_bounce_script',
   'workflow.plan_bounce_passes',
+  'workflow.plan_chunked',
   'workflow.security_enforcement',
   'workflow.security_asvs_level',
   'workflow.security_block_on',

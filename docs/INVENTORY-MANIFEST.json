@@ -226,6 +226,7 @@
       "model-profiles.md",
       "phase-argument-parsing.md",
       "planner-antipatterns.md",
+      "planner-chunked.md",
       "planner-gap-closure.md",
       "planner-reviews.md",
       "planner-revision.md",

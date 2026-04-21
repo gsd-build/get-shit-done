@@ -1200,6 +1200,10 @@ Execute: `/gsd-execute-phase {phase} --gaps-only`
 
 Follow templates in checkpoints and revision_mode sections respectively.
 
+## Chunked Mode Returns
+
+See @~/.claude/get-shit-done/references/planner-chunked.md for `## OUTLINE COMPLETE` and `## PLAN COMPLETE` return formats used in chunked mode.
+
 </structured_returns>
 
 <critical_rules>
