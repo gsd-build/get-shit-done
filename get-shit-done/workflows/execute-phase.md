@@ -602,9 +602,6 @@ Execute each selected wave in sequence. Within a wave: parallel if `PARALLELIZAT
        [ -f .planning/STATE.md ] && cp .planning/STATE.md "$STATE_BACKUP" || true
        [ -f .planning/ROADMAP.md ] && cp .planning/ROADMAP.md "$ROADMAP_BACKUP" || true
 
-       # Snapshot list of files on main BEFORE merge to detect resurrections
-       PRE_MERGE_FILES=$(git ls-files .planning/)
-
        # Pre-merge deletion check: warn if the worktree branch deletes tracked files
        DELETIONS=$(git diff --diff-filter=D --name-only HEAD..."$WT_BRANCH" 2>/dev/null || true)
        if [ -n "$DELETIONS" ]; then
@@ -647,19 +644,25 @@ Execute each selected wave in sequence. Within a wave: parallel if `PARALLELIZAT
        fi
        rm -f "$STATE_BACKUP" "$ROADMAP_BACKUP"
 
-       # Detect files deleted on main but re-added by worktree merge
-       # (e.g., archived phase directories that were intentionally removed)
-       DELETED_FILES=$(git diff --diff-filter=A --name-only HEAD~1 -- .planning/ 2>/dev/null || true)
-       for RESURRECTED in $DELETED_FILES; do
-         # Check if this file was NOT in main's pre-merge tree
-         if ! echo "$PRE_MERGE_FILES" | grep -qxF "$RESURRECTED"; then
-           git rm -f "$RESURRECTED" 2>/dev/null || true
+       # Detect true resurrections: files added by the merge that were previously
+       # committed on main AND subsequently deleted (e.g., archived phase directories
+       # removed during milestone transition). Legitimate new files from worktrees
+       # (SUMMARY.md etc.) never existed on main and must be kept.
+       # Fix for #2501 — the previous check deleted every newly-added file.
+       ADDED_BY_MERGE=$(git diff --diff-filter=A --name-only HEAD~1..HEAD -- .planning/ 2>/dev/null || true)
+       RESURRECTED_FILES=""
+       for CANDIDATE in $ADDED_BY_MERGE; do
+         # Ask history (pre-merge main tip) whether this path was ever deleted there.
+         if git log HEAD~1 --diff-filter=D --format= --name-only -- "$CANDIDATE" 2>/dev/null \
+              | grep -qxF "$CANDIDATE"; then
+           git rm -f "$CANDIDATE" 2>/dev/null || true
+           RESURRECTED_FILES="$RESURRECTED_FILES $CANDIDATE"
          fi
        done
 
        # Amend merge commit with restored files if any changed
        if ! git diff --quiet .planning/STATE.md .planning/ROADMAP.md 2>/dev/null || \
-          [ -n "$DELETED_FILES" ]; then
+          [ -n "$RESURRECTED_FILES" ]; then
          # Only amend the commit with .planning/ files if commit_docs is enabled (#1783)
          COMMIT_DOCS=$(gsd-sdk query config-get commit_docs 2>/dev/null || echo "true")
          if [ "$COMMIT_DOCS" != "false" ]; then

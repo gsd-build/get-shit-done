@@ -649,9 +649,6 @@ After executor returns:
        [ -f .planning/STATE.md ] && cp .planning/STATE.md "$STATE_BACKUP" || true
        [ -f .planning/ROADMAP.md ] && cp .planning/ROADMAP.md "$ROADMAP_BACKUP" || true
 
-       # Snapshot files on main to detect resurrections
-       PRE_MERGE_FILES=$(git ls-files .planning/)
-
        # Pre-merge deletion guard: block merges that delete tracked .planning/ files
        DELETIONS=$(git diff --diff-filter=D --name-only HEAD..."$WT_BRANCH" 2>/dev/null || true)
        if [ -n "$DELETIONS" ]; then
@@ -674,16 +671,22 @@ After executor returns:
        if [ -s "$ROADMAP_BACKUP" ]; then cp "$ROADMAP_BACKUP" .planning/ROADMAP.md; fi
        rm -f "$STATE_BACKUP" "$ROADMAP_BACKUP"
 
-       # Remove files deleted on main but re-added by worktree (--no-ff guarantees a merge commit so HEAD~1 is reliable)
-       DELETED_FILES=$(git diff --diff-filter=A --name-only HEAD~1 -- .planning/ 2>/dev/null || true)
-       for RESURRECTED in $DELETED_FILES; do
-         if ! echo "$PRE_MERGE_FILES" | grep -qxF "$RESURRECTED"; then
-           git rm -f "$RESURRECTED" 2>/dev/null || true
+       # Remove true resurrections — paths that were previously committed on main
+       # and deleted, then re-added by the worktree branch. Legitimate new files from
+       # worktrees (SUMMARY.md etc.) never existed on main and must be kept.
+       # Fix for #2501 — previous check deleted every newly-added file.
+       ADDED_BY_MERGE=$(git diff --diff-filter=A --name-only HEAD~1..HEAD -- .planning/ 2>/dev/null || true)
+       RESURRECTED_FILES=""
+       for CANDIDATE in $ADDED_BY_MERGE; do
+         if git log HEAD~1 --diff-filter=D --format= --name-only -- "$CANDIDATE" 2>/dev/null \
+              | grep -qxF "$CANDIDATE"; then
+           git rm -f "$CANDIDATE" 2>/dev/null || true
+           RESURRECTED_FILES="$RESURRECTED_FILES $CANDIDATE"
          fi
        done
 
        if ! git diff --quiet .planning/STATE.md .planning/ROADMAP.md 2>/dev/null || \
-          [ -n "$DELETED_FILES" ]; then
+          [ -n "$RESURRECTED_FILES" ]; then
          COMMIT_DOCS=$(gsd-sdk query config-get commit_docs 2>/dev/null || echo "true")
          if [ "$COMMIT_DOCS" != "false" ]; then
            git add .planning/STATE.md .planning/ROADMAP.md 2>/dev/null || true
