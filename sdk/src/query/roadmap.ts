@@ -50,7 +50,13 @@ interface PhaseSection {
  * Port of stripShippedMilestones from core.cjs line 1082-1084.
  */
 export function stripShippedMilestones(content: string): string {
-  return content.replace(/<details>[\s\S]*?<\/details>/gi, '');
+  // Pattern 1: <details>...</details> blocks (explicit collapse)
+  let result = content.replace(/<details>[\s\S]*?<\/details>/gi, '');
+  // Pattern 2: ## Heading — ✅ SHIPPED ... sections (inline heading pattern).
+  // Split on ## boundaries, discard any section whose heading contains ✅ SHIPPED.
+  const sections = result.split(/(?=^## )/m);
+  result = sections.filter(s => !/^## [^\n]*✅\s*SHIPPED/m.test(s)).join('');
+  return result;
 }
 
 /**
@@ -84,6 +90,12 @@ async function parseMilestoneFromState(projectDir: string): Promise<{ version: s
  */
 export async function getMilestoneInfo(projectDir: string): Promise<{ version: string; name: string }> {
   try {
+    // Priority 1: STATE.md frontmatter (authoritative — matches extractCurrentMilestone behaviour)
+    const fromState = await parseMilestoneFromState(projectDir);
+    if (fromState) {
+      return fromState;
+    }
+
     const roadmap = await readFile(planningPaths(projectDir).roadmap, 'utf-8');
 
     // List-format: construction / blocked (legacy emoji)
@@ -111,11 +123,6 @@ export async function getMilestoneInfo(projectDir: string): Promise<{ version: s
     if (boldMatches.length > 0) {
       const last = boldMatches[boldMatches.length - 1];
       return { version: 'v' + last[1], name: last[2].trim() };
-    }
-
-    const fromState = await parseMilestoneFromState(projectDir);
-    if (fromState) {
-      return fromState;
     }
 
     const allBare = [...cleaned.matchAll(/\bv(\d+(?:\.\d+)+)\b/g)];

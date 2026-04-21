@@ -100,6 +100,45 @@ describe('stripShippedMilestones', () => {
   it('returns content unchanged when no details blocks', () => {
     expect(stripShippedMilestones('no details here')).toBe('no details here');
   });
+
+  // Bug #2496: inline ✅ SHIPPED heading sections must be stripped
+  it('strips ## heading sections marked ✅ SHIPPED', () => {
+    const content = [
+      '## Milestone v1.0: MVP — ✅ SHIPPED 2026-01-15',
+      '',
+      'Phase 1, Phase 2',
+      '',
+      '## Milestone v2.0: Current',
+      '',
+      'Phase 3',
+    ].join('\n');
+    const stripped = stripShippedMilestones(content);
+    expect(stripped).not.toContain('MVP');
+    expect(stripped).not.toContain('v1.0');
+    expect(stripped).toContain('v2.0');
+    expect(stripped).toContain('Current');
+  });
+
+  it('strips multiple inline SHIPPED sections and leaves non-shipped content', () => {
+    const content = [
+      '## Milestone v1.0: Alpha — ✅ SHIPPED 2026-01-01',
+      '',
+      'Old content',
+      '',
+      '## Milestone v1.5: Beta — ✅ SHIPPED 2026-02-01',
+      '',
+      'More old content',
+      '',
+      '## Milestone v2.0: Gamma',
+      '',
+      'Current content',
+    ].join('\n');
+    const stripped = stripShippedMilestones(content);
+    expect(stripped).not.toContain('Alpha');
+    expect(stripped).not.toContain('Beta');
+    expect(stripped).toContain('Gamma');
+    expect(stripped).toContain('Current content');
+  });
 });
 
 // ─── getMilestoneInfo ─────────────────────────────────────────────────────
@@ -157,6 +196,48 @@ describe('getMilestoneInfo', () => {
     const info = await getMilestoneInfo(tmpDir);
     expect(info.version).toBe('v1.0');
     expect(info.name).toBe('milestone');
+  });
+
+  // Bug #2495: STATE.md must take priority over ROADMAP heading matching
+  it('prefers STATE.md milestone over ROADMAP heading match', async () => {
+    const roadmap = [
+      '## Milestone v1.0: Shipped — ✅ SHIPPED 2026-01-01',
+      '',
+      'Phase 1',
+      '',
+      '## Milestone v2.0: Current Active',
+      '',
+      'Phase 2',
+    ].join('\n');
+    await writeFile(join(tmpDir, '.planning', 'ROADMAP.md'), roadmap);
+    await writeFile(
+      join(tmpDir, '.planning', 'STATE.md'),
+      '---\nmilestone: v2.0\nmilestone_name: Current Active\n---\n',
+    );
+    const info = await getMilestoneInfo(tmpDir);
+    expect(info.version).toBe('v2.0');
+    expect(info.name).toBe('Current Active');
+  });
+
+  it('returns correct milestone from STATE.md even when ROADMAP inline-SHIPPED stripping would fix it', async () => {
+    // ROADMAP with an unstripped shipped milestone heading (pre-fix state)
+    const roadmap = [
+      '## Milestone v1.0: Old — ✅ SHIPPED 2026-01-01',
+      '',
+      'Old phases',
+      '',
+      '## Milestone v2.0: New',
+      '',
+      'New phases',
+    ].join('\n');
+    await writeFile(join(tmpDir, '.planning', 'ROADMAP.md'), roadmap);
+    await writeFile(
+      join(tmpDir, '.planning', 'STATE.md'),
+      '---\nmilestone: v2.0\nmilestone_name: New\n---\n',
+    );
+    const info = await getMilestoneInfo(tmpDir);
+    expect(info.version).toBe('v2.0');
+    expect(info.name).toBe('New');
   });
 });
 
