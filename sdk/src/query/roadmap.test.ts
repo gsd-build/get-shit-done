@@ -16,6 +16,8 @@ import {
   roadmapGetPhase,
   getMilestoneInfo,
   extractCurrentMilestone,
+  extractNextMilestoneSection,
+  extractPhasesFromSection,
   stripShippedMilestones,
 } from './roadmap.js';
 
@@ -472,5 +474,101 @@ describe('roadmapAnalyze', () => {
     const data2 = result2.data as Record<string, unknown>;
 
     expect((data1.phases as unknown[]).length).toBe((data2.phases as unknown[]).length);
+  });
+});
+
+// ─── extractPhasesFromSection + extractNextMilestoneSection (#2497) ──────
+
+describe('extractPhasesFromSection', () => {
+  it('parses phase number, name, goal, and depends_on from a milestone section', () => {
+    const section = [
+      '',
+      '### Phase 31: Email Schema',
+      '**Goal**: Set up Prisma models.',
+      '**Depends on**: None',
+      '',
+      '### Phase 32: Today\'s Sheets',
+      '**Goal**: Port the GAS sender.',
+      '**Depends on**: Phase 31',
+      '',
+    ].join('\n');
+    const phases = extractPhasesFromSection(section);
+    expect(phases).toEqual([
+      { number: '31', name: 'Email Schema', goal: 'Set up Prisma models.', depends_on: 'None' },
+      { number: '32', name: "Today's Sheets", goal: 'Port the GAS sender.', depends_on: 'Phase 31' },
+    ]);
+  });
+
+  it('returns empty array when section has no phase headings', () => {
+    expect(extractPhasesFromSection('no phases here\njust prose.')).toEqual([]);
+  });
+});
+
+describe('extractNextMilestoneSection', () => {
+  const MULTI = [
+    '# Roadmap',
+    '',
+    '## Milestone v1.0: Old — ✅ SHIPPED 2026-01-01',
+    '',
+    'Shipped stuff.',
+    '',
+    '## Milestone v2.0.5: Current Milestone',
+    '',
+    '### Phase 35: Audit',
+    '**Goal**: Audit schemas.',
+    '',
+    '## Milestone v2.1: Daily Emails',
+    '',
+    '### Phase 31: Schema',
+    '**Goal**: Build schema.',
+    '**Depends on**: None',
+    '',
+    '### Phase 32: Sending',
+    '**Goal**: Send emails.',
+    '**Depends on**: Phase 31',
+    '',
+    '## Milestone v2.2: Later',
+    '',
+    '### Phase 99: Future',
+    '**Goal**: Later work.',
+  ].join('\n');
+
+  it('returns the milestone immediately after the active one (STATE-driven)', async () => {
+    await writeFile(join(tmpDir, '.planning', 'ROADMAP.md'), MULTI);
+    await writeFile(
+      join(tmpDir, '.planning', 'STATE.md'),
+      '---\nmilestone: v2.0.5\nmilestone_name: Current Milestone\n---\n',
+    );
+    const next = await extractNextMilestoneSection(MULTI, tmpDir);
+    expect(next).not.toBeNull();
+    expect(next!.version).toBe('v2.1');
+    expect(next!.name).toBe('Daily Emails');
+    // Phases parse correctly from the returned section — only v2.1 phases,
+    // not v2.2's Phase 99.
+    const phases = extractPhasesFromSection(next!.section).map(p => p.number);
+    expect(phases).toEqual(['31', '32']);
+  });
+
+  it('returns null when the active milestone is the last one in ROADMAP', async () => {
+    const roadmap = [
+      '# Roadmap',
+      '',
+      '## Milestone v2.0.5: Last One',
+      '',
+      '### Phase 35: Final',
+      '**Goal**: Final work.',
+    ].join('\n');
+    await writeFile(join(tmpDir, '.planning', 'ROADMAP.md'), roadmap);
+    await writeFile(
+      join(tmpDir, '.planning', 'STATE.md'),
+      '---\nmilestone: v2.0.5\n---\n',
+    );
+    const next = await extractNextMilestoneSection(roadmap, tmpDir);
+    expect(next).toBeNull();
+  });
+
+  it('returns null when no current milestone can be resolved', async () => {
+    const next = await extractNextMilestoneSection('# Roadmap\nno milestones\n', tmpDir);
+    expect(next).toBeNull();
   });
 });

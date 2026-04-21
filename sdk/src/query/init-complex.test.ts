@@ -229,4 +229,92 @@ describe('initManager', () => {
     expect(typeof flags.plan).toBe('string');
     expect(typeof flags.execute).toBe('string');
   });
+
+  // ── queued_phases (#2497) ─────────────────────────────────────────────
+  describe('queued_phases (#2497)', () => {
+    const MULTI_MILESTONE = [
+      '# Roadmap',
+      '',
+      '## Milestone v1.0: Old — ✅ SHIPPED 2026-01-01',
+      '',
+      'Shipped.',
+      '',
+      '## Milestone v2.0.5: Current',
+      '',
+      '### Phase 35: Audit',
+      '**Goal**: Audit schemas.',
+      '**Depends on**: None',
+      '',
+      '## Milestone v2.1: Daily Emails',
+      '',
+      '### Phase 31: Schema',
+      '**Goal**: Build schema.',
+      '**Depends on**: None',
+      '',
+      '### Phase 32: Sending',
+      '**Goal**: Send emails.',
+      '**Depends on**: Phase 31',
+      '',
+      '## Milestone v2.2: Later',
+      '',
+      '### Phase 99: Future',
+      '**Goal**: Later work.',
+    ].join('\n');
+
+    beforeEach(async () => {
+      await writeFile(join(tmpDir, '.planning', 'ROADMAP.md'), MULTI_MILESTONE);
+      await writeFile(join(tmpDir, '.planning', 'STATE.md'), [
+        '---',
+        'milestone: v2.0.5',
+        'milestone_name: Current',
+        '---',
+      ].join('\n'));
+    });
+
+    it('surfaces the next milestone in queued_phases with metadata', async () => {
+      const result = await initManager([], tmpDir);
+      const data = result.data as Record<string, unknown>;
+      expect(data.queued_milestone_version).toBe('v2.1');
+      expect(data.queued_milestone_name).toBe('Daily Emails');
+      const queued = data.queued_phases as Record<string, unknown>[];
+      expect(queued.map(p => p.number)).toEqual(['31', '32']);
+      // Only the NEXT milestone's phases appear — not v2.2's Phase 99.
+      expect(queued.find(p => p.number === '99')).toBeUndefined();
+    });
+
+    it('queued_phases entries carry name, deps_display, and display_name', async () => {
+      const result = await initManager([], tmpDir);
+      const data = result.data as Record<string, unknown>;
+      const queued = data.queued_phases as Record<string, unknown>[];
+      const p32 = queued.find(p => p.number === '32');
+      expect(p32).toBeDefined();
+      expect(p32!.name).toBe('Sending');
+      expect(p32!.deps_display).toBe('31');
+      expect(typeof p32!.display_name).toBe('string');
+    });
+
+    it('does NOT mix queued phases into the active phases list', async () => {
+      const result = await initManager([], tmpDir);
+      const data = result.data as Record<string, unknown>;
+      const active = (data.phases as Record<string, unknown>[]).map(p => p.number);
+      // Active milestone is v2.0.5 → only Phase 35 belongs here.
+      expect(active).toContain('35');
+      expect(active).not.toContain('31');
+      expect(active).not.toContain('32');
+    });
+
+    it('returns empty queued_phases and null metadata when active is last milestone', async () => {
+      await writeFile(join(tmpDir, '.planning', 'ROADMAP.md'), [
+        '## Milestone v2.0.5: Only Milestone',
+        '',
+        '### Phase 35: Audit',
+        '**Goal**: Final.',
+      ].join('\n'));
+      const result = await initManager([], tmpDir);
+      const data = result.data as Record<string, unknown>;
+      expect(data.queued_phases).toEqual([]);
+      expect(data.queued_milestone_version).toBeNull();
+      expect(data.queued_milestone_name).toBeNull();
+    });
+  });
 });

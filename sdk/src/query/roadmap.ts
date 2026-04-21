@@ -215,6 +215,121 @@ export async function extractCurrentMilestone(content: string, projectDir: strin
   return content.slice(sectionStart, sectionEnd);
 }
 
+// ─── Next-milestone helpers (issue #2497) ─────────────────────────────────
+
+/**
+ * Phase shape returned by extractPhasesFromSection — mirrors the fields used
+ * by the current-milestone phases array in initManager so consumers can
+ * render queued phases uniformly.
+ */
+export interface QueuedPhase {
+  number: string;
+  name: string;
+  goal: string | null;
+  depends_on: string | null;
+}
+
+/**
+ * Extract phase entries from an arbitrary ROADMAP milestone section.
+ *
+ * Parses `#### Phase N: Name` / `### Phase N: Name` / `## Phase N: Name`
+ * headings and, for each, captures goal + depends_on via the same patterns
+ * used by initManager's current-milestone phase parsing. Used by
+ * `initManager` to populate `queued_phases` (#2497).
+ */
+export function extractPhasesFromSection(section: string): QueuedPhase[] {
+  const phasePattern = /#{2,4}\s*Phase\s+(\d+[A-Z]?(?:\.\d+)*)\s*:\s*([^\n]+)/gi;
+  const phases: QueuedPhase[] = [];
+  let m: RegExpExecArray | null;
+  while ((m = phasePattern.exec(section)) !== null) {
+    const phaseNum = m[1];
+    const phaseName = m[2].replace(/\(INSERTED\)/i, '').trim();
+    const sectionStart = m.index;
+    const rest = section.slice(sectionStart);
+    const nextHeader = rest.match(/\n#{2,4}\s+Phase\s+\d/i);
+    const end = nextHeader ? sectionStart + (nextHeader.index ?? 0) : section.length;
+    const body = section.slice(sectionStart, end);
+    const goalMatch = body.match(/\*\*Goal(?::\*\*|\*\*:)\s*([^\n]+)/i);
+    const dependsMatch = body.match(/\*\*Depends on(?::\*\*|\*\*:)\s*([^\n]+)/i);
+    phases.push({
+      number: phaseNum,
+      name: phaseName,
+      goal: goalMatch ? goalMatch[1].trim() : null,
+      depends_on: dependsMatch ? dependsMatch[1].trim() : null,
+    });
+  }
+  return phases;
+}
+
+/**
+ * Find the milestone section that comes immediately AFTER the active one.
+ *
+ * Used by initManager to surface `queued_phases` without conflating the
+ * active milestone's phase list with the next one (#2497). Returns null
+ * when no subsequent milestone section exists (active is the last one).
+ *
+ * Reuses the same current-version resolution path as `getMilestoneInfo`:
+ * STATE.md frontmatter first, then in-flight emoji markers in ROADMAP.
+ * Shipped milestones are stripped first so they can't shadow the real
+ * "next" one.
+ */
+export async function extractNextMilestoneSection(
+  content: string,
+  projectDir: string,
+): Promise<{ version: string; name: string; section: string } | null> {
+  const cleaned = stripShippedMilestones(content);
+
+  // Resolve current version via STATE.md (priority) then in-flight markers.
+  let currentVersion: string | null = null;
+  const fromState = await parseMilestoneFromState(projectDir);
+  if (fromState?.version) {
+    const raw = fromState.version.trim();
+    currentVersion = /^v\d/i.test(raw) ? raw : `v${raw}`;
+  }
+  if (!currentVersion) {
+    const inProgressMatch = cleaned.match(/(?:🚧|🟡)\s*\*\*v(\d+(?:\.\d+)+)\s/);
+    if (inProgressMatch) currentVersion = 'v' + inProgressMatch[1];
+  }
+  if (!currentVersion) return null;
+
+  // Find the current milestone ## heading.
+  const escaped = escapeRegex(currentVersion);
+  const currentHeadingPattern = new RegExp(
+    `^##\\s+[^\\n]*${escaped}[^\\n]*$`,
+    'mi',
+  );
+  const currentMatch = cleaned.match(currentHeadingPattern);
+  if (!currentMatch || currentMatch.index === undefined) return null;
+
+  // Look for the next ## milestone heading after the current one.
+  const tail = cleaned.slice(currentMatch.index + currentMatch[0].length);
+  const nextMilestonePattern = /^##\s+([^\n]*(?:v(\d+(?:\.\d+)+)|✅|🚧|🟡|📋)[^\n]*)$/gim;
+  let nextMatch: RegExpExecArray | null;
+  while ((nextMatch = nextMilestonePattern.exec(tail)) !== null) {
+    const heading = nextMatch[1];
+    const versionMatch = heading.match(/v(\d+(?:\.\d+)+)/);
+    if (!versionMatch) continue;
+    const nextVersion = 'v' + versionMatch[1];
+    if (nextVersion === currentVersion) continue;
+
+    // Derive a display name: trim through "vX.Y:" or "vX.Y —" prefix.
+    const nameMatch = heading.match(/v\d+(?:\.\d+)+:?\s*[—–-]?\s*([^\n(]+)/);
+    const name = nameMatch ? nameMatch[1].trim() : heading.trim();
+
+    const sectionStart = (nextMatch.index ?? 0) + nextMatch[0].length;
+    const afterStart = tail.slice(sectionStart);
+    const followingHeader = afterStart.match(/^##\s/m);
+    const sectionEnd = followingHeader && followingHeader.index !== undefined
+      ? sectionStart + followingHeader.index
+      : tail.length;
+    const section = tail.slice(sectionStart, sectionEnd);
+
+    return { version: nextVersion, name, section };
+  }
+
+  return null;
+}
+
 // ─── Internal helpers ─────────────────────────────────────────────────────
 
 /**

@@ -26,7 +26,12 @@ import { homedir } from 'node:os';
 import { loadConfig } from '../config.js';
 import { resolveModel } from './config-query.js';
 import { planningPaths, normalizePhaseName, phaseTokenMatches, toPosixPath } from './helpers.js';
-import { getMilestoneInfo, extractCurrentMilestone } from './roadmap.js';
+import {
+  getMilestoneInfo,
+  extractCurrentMilestone,
+  extractNextMilestoneSection,
+  extractPhasesFromSection,
+} from './roadmap.js';
 import { withProjectRoot } from './init.js';
 import type { QueryHandler } from './utils.js';
 
@@ -543,6 +548,40 @@ export const initManager: QueryHandler = async (_args, projectDir) => {
 
   const completedCount = phases.filter(p => p.disk_status === 'complete').length;
 
+  // ── Next-milestone surface (issue #2497) ───────────────────────────────
+  // Populate queued_phases + metadata with the milestone immediately after
+  // the active one, so the /gsd-manager dashboard can preview what's coming
+  // next without mixing it into the active phases grid. Empty/null when the
+  // active milestone is the last one in ROADMAP.
+  let queuedPhases: Record<string, unknown>[] = [];
+  let queuedMilestoneVersion: string | null = null;
+  let queuedMilestoneName: string | null = null;
+  try {
+    const next = await extractNextMilestoneSection(rawContent, projectDir);
+    if (next) {
+      queuedMilestoneVersion = next.version;
+      queuedMilestoneName = next.name;
+      queuedPhases = extractPhasesFromSection(next.section).map(p => {
+        const MAX_NAME_WIDTH = 20;
+        const display_name = p.name.length > MAX_NAME_WIDTH
+          ? p.name.slice(0, MAX_NAME_WIDTH - 1) + '…'
+          : p.name;
+        const depNums = p.depends_on && !/^none$/i.test(p.depends_on.trim())
+          ? (p.depends_on.match(/\d+(?:\.\d+)*/g) || [])
+          : [];
+        return {
+          number: p.number,
+          name: p.name,
+          display_name,
+          goal: p.goal,
+          depends_on: p.depends_on,
+          dep_phases: depNums,
+          deps_display: depNums.length > 0 ? depNums.join(',') : '—',
+        };
+      });
+    }
+  } catch { /* queued_phases is a non-critical enhancement */ }
+
   // Read manager flags from config
   const managerConfig = (config as Record<string, unknown>).manager as Record<string, Record<string, string>> | undefined;
   const sanitizeFlags = (raw: unknown): string => {
@@ -568,6 +607,9 @@ export const initManager: QueryHandler = async (_args, projectDir) => {
     recommended_actions: recommendedActions,
     waiting_signal: waitingSignal,
     all_complete: completedCount === phases.length && phases.length > 0,
+    queued_phases: queuedPhases,
+    queued_milestone_version: queuedMilestoneVersion,
+    queued_milestone_name: queuedMilestoneName,
     project_exists: pathExists(projectDir, '.planning/PROJECT.md'),
     roadmap_exists: true,
     state_exists: true,
