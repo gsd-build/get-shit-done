@@ -34,10 +34,10 @@ import type { QueryHandler } from './utils.js';
  *
  * Port of getMilestonePhaseFilter from core.cjs lines 1409-1442.
  */
-export async function getMilestonePhaseFilter(projectDir: string): Promise<((dirName: string) => boolean) & { phaseCount: number }> {
+export async function getMilestonePhaseFilter(projectDir: string, workstream?: string): Promise<((dirName: string) => boolean) & { phaseCount: number }> {
   const milestonePhaseNums = new Set<string>();
   try {
-    const roadmapContent = await readFile(planningPaths(projectDir).roadmap, 'utf-8');
+    const roadmapContent = await readFile(planningPaths(projectDir, workstream).roadmap, 'utf-8');
     const roadmap = await extractCurrentMilestone(roadmapContent, projectDir);
     const phasePattern = /#{2,4}\s*Phase\s+([\w][\w.-]*)\s*:/gi;
     let m: RegExpExecArray | null;
@@ -77,7 +77,7 @@ export async function getMilestonePhaseFilter(projectDir: string): Promise<((dir
  * Port of buildStateFrontmatter from state.cjs lines 650-760.
  * HIGH complexity: extracts fields, scans disk, computes progress.
  */
-export async function buildStateFrontmatter(bodyContent: string, projectDir: string): Promise<Record<string, unknown>> {
+export async function buildStateFrontmatter(bodyContent: string, projectDir: string, workstream?: string): Promise<Record<string, unknown>> {
   const currentPhase = stateExtractField(bodyContent, 'Current Phase');
   const currentPhaseName = stateExtractField(bodyContent, 'Current Phase Name');
   const currentPlan = stateExtractField(bodyContent, 'Current Plan');
@@ -103,8 +103,8 @@ export async function buildStateFrontmatter(bodyContent: string, projectDir: str
   let completedPlans: number | null = null;
 
   try {
-    const phasesDir = planningPaths(projectDir).phases;
-    const isDirInMilestone = await getMilestonePhaseFilter(projectDir);
+    const phasesDir = planningPaths(projectDir, workstream).phases;
+    const isDirInMilestone = await getMilestonePhaseFilter(projectDir, workstream);
     const entries = await readdir(phasesDir, { withFileTypes: true });
     const phaseDirs = entries
       .filter(e => e.isDirectory())
@@ -198,8 +198,8 @@ export async function buildStateFrontmatter(bodyContent: string, projectDir: str
  * @param projectDir - Project root directory
  * @returns QueryResult with rebuilt state frontmatter
  */
-export const stateJson: QueryHandler = async (_args, projectDir) => {
-  const statePath = planningPaths(projectDir).state;
+export const stateJson: QueryHandler = async (_args, projectDir, workstream) => {
+  const statePath = planningPaths(projectDir, workstream).state;
 
   let content: string;
   try {
@@ -212,7 +212,7 @@ export const stateJson: QueryHandler = async (_args, projectDir) => {
   const body = stripFrontmatter(content);
 
   // Always rebuild from body + disk so progress reflects current state
-  const built = await buildStateFrontmatter(body, projectDir);
+  const built = await buildStateFrontmatter(body, projectDir, workstream);
 
   // Preserve frontmatter-only fields that cannot be recovered from body
   if (existingFm && existingFm.stopped_at && !built.stopped_at) {
@@ -242,8 +242,8 @@ export const stateJson: QueryHandler = async (_args, projectDir) => {
  * @param projectDir - Project root directory
  * @returns QueryResult with field value or full content
  */
-export const stateGet: QueryHandler = async (args, projectDir) => {
-  const statePath = planningPaths(projectDir).state;
+export const stateGet: QueryHandler = async (args, projectDir, workstream) => {
+  const statePath = planningPaths(projectDir, workstream).state;
 
   let content: string;
   try {
@@ -294,8 +294,8 @@ export const stateGet: QueryHandler = async (args, projectDir) => {
  * @param projectDir - Project root directory
  * @returns QueryResult with structured snapshot
  */
-export const stateSnapshot: QueryHandler = async (_args, projectDir) => {
-  const statePath = planningPaths(projectDir).state;
+export const stateSnapshot: QueryHandler = async (_args, projectDir, workstream) => {
+  const statePath = planningPaths(projectDir, workstream).state;
 
   let content: string;
   try {

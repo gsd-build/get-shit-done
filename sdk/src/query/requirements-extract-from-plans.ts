@@ -14,8 +14,8 @@ import {
 } from './helpers.js';
 import type { QueryHandler } from './utils.js';
 
-async function resolvePhaseDir(phase: string, projectDir: string): Promise<string | null> {
-  const phasesDir = planningPaths(projectDir).phases;
+async function resolvePhaseDir(phase: string, projectDir: string, workstream?: string): Promise<string | null> {
+  const phasesDir = planningPaths(projectDir, workstream).phases;
   const normalized = normalizePhaseName(phase);
   try {
     const entries = await readdir(phasesDir, { withFileTypes: true });
@@ -40,14 +40,14 @@ function normalizeReqList(v: unknown): string[] {
 /**
  * Args: `<phase>`
  */
-export const requirementsExtractFromPlans: QueryHandler = async (args, projectDir) => {
+export const requirementsExtractFromPlans: QueryHandler = async (args, projectDir, workstream) => {
   const phase = args[0];
   if (!phase) {
     throw new GSDError('phase required', ErrorClassification.Validation);
   }
 
   const normalized = normalizePhaseName(phase);
-  const phaseDir = await resolvePhaseDir(phase, projectDir);
+  const phaseDir = await resolvePhaseDir(phase, projectDir, workstream);
   if (!phaseDir) {
     return {
       data: {

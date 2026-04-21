@@ -163,8 +163,8 @@ export const summaryExtract: QueryHandler = async (args, projectDir) => {
   return { data: fullResult };
 };
 
-export const historyDigest: QueryHandler = async (_args, projectDir) => {
-  const phasesDir = planningPaths(projectDir).phases;
+export const historyDigest: QueryHandler = async (_args, projectDir, workstream) => {
+  const phasesDir = planningPaths(projectDir, workstream).phases;
   const digest: {
     phases: Record<
       string,

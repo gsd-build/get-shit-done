@@ -14,13 +14,13 @@ import { escapeRegex, planningPaths } from './helpers.js';
 import { GSDError, ErrorClassification } from '../errors.js';
 import type { QueryHandler } from './utils.js';
 
-export const roadmapUpdatePlanProgress: QueryHandler = async (args, projectDir) => {
+export const roadmapUpdatePlanProgress: QueryHandler = async (args, projectDir, workstream) => {
   const phaseNum = args[0];
   if (!phaseNum) {
     throw new GSDError('phase number required for roadmap update-plan-progress', ErrorClassification.Validation);
   }
 
-  const phaseResult = await findPhase([phaseNum], projectDir);
+  const phaseResult = await findPhase([phaseNum], projectDir, workstream);
   const info = phaseResult.data as {
     found: boolean;
     plans: string[];
@@ -49,7 +49,7 @@ export const roadmapUpdatePlanProgress: QueryHandler = async (args, projectDir) 
   const status = isComplete ? 'Complete' : summaryCount > 0 ? 'In Progress' : 'Planned';
   const today = new Date().toISOString().split('T')[0]!;
 
-  const roadmapPath = planningPaths(projectDir).roadmap;
+  const roadmapPath = planningPaths(projectDir, workstream).roadmap;
   if (!existsSync(roadmapPath)) {
     return {
       data: {

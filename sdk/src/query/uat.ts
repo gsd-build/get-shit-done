@@ -230,13 +230,13 @@ function parseVerificationItems(content: string, status: string): Record<string,
 /**
  * Cross-phase UAT / VERIFICATION audit — port of `cmdAuditUat` (`uat.cjs`).
  */
-export const auditUat: QueryHandler = async (_args, projectDir) => {
-  const paths = planningPaths(projectDir);
+export const auditUat: QueryHandler = async (_args, projectDir, workstream) => {
+  const paths = planningPaths(projectDir, workstream);
   if (!existsSync(paths.phases)) {
     throw new GSDError('No phases directory found in planning directory', ErrorClassification.Blocked);
   }
 
-  const isDirInMilestone = await getMilestonePhaseFilter(projectDir);
+  const isDirInMilestone = await getMilestonePhaseFilter(projectDir, workstream);
   const results: Record<string, unknown>[] = [];
 
   const dirs = readdirSync(paths.phases, { withFileTypes: true })

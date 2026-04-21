@@ -52,8 +52,8 @@ async function verificationPassed(phaseDirAbs: string): Promise<boolean> {
   }
 }
 
-export const routeNextAction: QueryHandler = async (_args, projectDir) => {
-  const planning = planningPaths(projectDir).planning;
+export const routeNextAction: QueryHandler = async (_args, projectDir, workstream) => {
+  const planning = planningPaths(projectDir, workstream).planning;
   const continueHere = existsSync(join(planning, '.continue-here.md'));
 
   const sj = await stateJson([], projectDir);
@@ -89,7 +89,7 @@ export const routeNextAction: QueryHandler = async (_args, projectDir) => {
   const raData = ra.data as { phases?: Array<Record<string, unknown>> };
   const phases = raData.phases ?? [];
 
-  const phasesDir = planningPaths(projectDir).phases;
+  const phasesDir = planningPaths(projectDir, workstream).phases;
   let dirCount = 0;
   try {
     dirCount = readdirSync(phasesDir, { withFileTypes: true }).filter(e => e.isDirectory()).length;

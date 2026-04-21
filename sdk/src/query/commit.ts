@@ -95,7 +95,7 @@ export function sanitizeCommitMessage(text: string): string {
  * @param projectDir - Project root directory
  * @returns QueryResult with commit result
  */
-export const commit: QueryHandler = async (args, projectDir) => {
+export const commit: QueryHandler = async (args, projectDir, _workstream) => {
   const allArgs = [...args];
 
   // Extract flags
@@ -180,7 +180,7 @@ export const commit: QueryHandler = async (args, projectDir) => {
  * @param projectDir - Project root directory
  * @returns QueryResult with { can_commit, reason, commit_docs, staged_files }
  */
-export const checkCommit: QueryHandler = async (_args, projectDir) => {
+export const checkCommit: QueryHandler = async (_args, projectDir, _workstream) => {
   const paths = planningPaths(projectDir);
 
   let commitDocs = true;
@@ -227,7 +227,7 @@ export const checkCommit: QueryHandler = async (_args, projectDir) => {
 
 // ─── commitToSubrepo ─────────────────────────────────────────────────────
 
-export const commitToSubrepo: QueryHandler = async (args, projectDir) => {
+export const commitToSubrepo: QueryHandler = async (args, projectDir, _workstream) => {
   const filesIdx = args.indexOf('--files');
   const endIdx = filesIdx >= 0 ? filesIdx : args.length;
   const knownFlags = new Set(['--force', '--amend', '--no-verify']);

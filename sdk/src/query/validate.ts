@@ -186,8 +186,8 @@ export const verifyKeyLinks: QueryHandler = async (args, projectDir) => {
  * @param projectDir - Project root directory
  * @returns QueryResult with { passed, errors, warnings, warning_count }
  */
-export const validateConsistency: QueryHandler = async (_args, projectDir) => {
-  const paths = planningPaths(projectDir);
+export const validateConsistency: QueryHandler = async (_args, projectDir, workstream) => {
+  const paths = planningPaths(projectDir, workstream);
   const errors: string[] = [];
   const warnings: string[] = [];
 
@@ -344,7 +344,7 @@ export const validateConsistency: QueryHandler = async (_args, projectDir) => {
  * @param projectDir - Project root directory
  * @returns QueryResult with { status, errors, warnings, info, repairable_count, repairs_performed? }
  */
-export const validateHealth: QueryHandler = async (args, projectDir) => {
+export const validateHealth: QueryHandler = async (args, projectDir, _workstream) => {
   const doRepair = args.includes('--repair');
 
   // T-12-09: Home directory guard

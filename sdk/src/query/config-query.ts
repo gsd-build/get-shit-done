@@ -79,7 +79,7 @@ export function getAgentToModelMapForProfile(normalizedProfile: string): Record<
  * @returns QueryResult with the config value at the given path
  * @throws GSDError with Validation classification if key missing or not found
  */
-export const configGet: QueryHandler = async (args, projectDir) => {
+export const configGet: QueryHandler = async (args, projectDir, _workstream) => {
   const keyPath = args[0];
   if (!keyPath) {
     throw new GSDError('Usage: config-get <key.path>', ErrorClassification.Validation);
@@ -127,7 +127,7 @@ export const configGet: QueryHandler = async (args, projectDir) => {
  * @param projectDir - Project root directory
  * @returns QueryResult with `{ path: string }` absolute or project-relative resolution via planningPaths
  */
-export const configPath: QueryHandler = async (_args, projectDir) => {
+export const configPath: QueryHandler = async (_args, projectDir, _workstream) => {
   const paths = planningPaths(projectDir);
   return { data: { path: paths.config } };
 };

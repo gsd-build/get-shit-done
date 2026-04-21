@@ -62,9 +62,9 @@ export function stripShippedMilestones(content: string): string {
 /**
  * Read milestone + name from STATE.md frontmatter when ROADMAP does not encode them.
  */
-async function parseMilestoneFromState(projectDir: string): Promise<{ version: string; name: string } | null> {
+async function parseMilestoneFromState(projectDir: string, workstream?: string): Promise<{ version: string; name: string } | null> {
   try {
-    const stateRaw = await readFile(planningPaths(projectDir).state, 'utf-8');
+    const stateRaw = await readFile(planningPaths(projectDir, workstream).state, 'utf-8');
     const vm = stateRaw.match(/^milestone:\s*(.+)$/m);
     if (!vm) return null;
     const version = vm[1].trim().replace(/^["']|["']$/g, '');
@@ -88,10 +88,10 @@ async function parseMilestoneFromState(projectDir: string): Promise<{ version: s
  * @param projectDir - Project root directory
  * @returns Object with version and name
  */
-export async function getMilestoneInfo(projectDir: string): Promise<{ version: string; name: string }> {
+export async function getMilestoneInfo(projectDir: string, workstream?: string): Promise<{ version: string; name: string }> {
   try {
     // Priority 1: STATE.md frontmatter (authoritative for version; name only when real)
-    const fromState = await parseMilestoneFromState(projectDir);
+    const fromState = await parseMilestoneFromState(projectDir, workstream);
     const stateVersion = fromState?.version ?? null;
     const stateName = fromState && fromState.name !== 'milestone' ? fromState.name : null;
     if (stateVersion && stateName) {
@@ -100,7 +100,7 @@ export async function getMilestoneInfo(projectDir: string): Promise<{ version: s
     // STATE.md has a version but no real name — fall through to ROADMAP for the name,
     // then override the version with the authoritative STATE.md value.
 
-    const roadmap = await readFile(planningPaths(projectDir).roadmap, 'utf-8');
+    const roadmap = await readFile(planningPaths(projectDir, workstream).roadmap, 'utf-8');
 
     // List-format: construction / blocked (legacy emoji)
     const barricadeMatch = roadmap.match(/🚧\s*\*\*v(\d+(?:\.\d+)+)\s+([^*]+)\*\*/);
@@ -137,7 +137,7 @@ export async function getMilestoneInfo(projectDir: string): Promise<{ version: s
 
     return { version: stateVersion ?? 'v1.0', name: 'milestone' };
   } catch {
-    const fromState = await parseMilestoneFromState(projectDir);
+    const fromState = await parseMilestoneFromState(projectDir, workstream);
     if (fromState) return fromState;
     return { version: 'v1.0', name: 'milestone' };
   }
@@ -152,11 +152,11 @@ export async function getMilestoneInfo(projectDir: string): Promise<{ version: s
  * @param projectDir - Working directory for reading STATE.md
  * @returns Content scoped to current milestone
  */
-export async function extractCurrentMilestone(content: string, projectDir: string): Promise<string> {
+export async function extractCurrentMilestone(content: string, projectDir: string, workstream?: string): Promise<string> {
   // Get version from STATE.md frontmatter
   let version: string | null = null;
   try {
-    const stateRaw = await readFile(planningPaths(projectDir).state, 'utf-8');
+    const stateRaw = await readFile(planningPaths(projectDir, workstream).state, 'utf-8');
     const milestoneMatch = stateRaw.match(/^milestone:\s*(.+)/m);
     if (milestoneMatch) {
       version = milestoneMatch[1].trim();
@@ -294,7 +294,7 @@ function searchPhaseInContent(content: string, escapedPhase: string, phaseNum: s
  * @param projectDir - Project root directory
  * @returns QueryResult with phase section info or { found: false }
  */
-export const roadmapGetPhase: QueryHandler = async (args, projectDir) => {
+export const roadmapGetPhase: QueryHandler = async (args, projectDir, workstream) => {
   const phaseNum = args[0];
   if (!phaseNum) {
     throw new GSDError(
@@ -303,7 +303,7 @@ export const roadmapGetPhase: QueryHandler = async (args, projectDir) => {
     );
   }
 
-  const roadmapPath = planningPaths(projectDir).roadmap;
+  const roadmapPath = planningPaths(projectDir, workstream).roadmap;
 
   let rawContent: string;
   try {
@@ -312,7 +312,7 @@ export const roadmapGetPhase: QueryHandler = async (args, projectDir) => {
     return { data: { found: false, error: 'ROADMAP.md not found' } };
   }
 
-  const milestoneContent = await extractCurrentMilestone(rawContent, projectDir);
+  const milestoneContent = await extractCurrentMilestone(rawContent, projectDir, workstream);
   const escapedPhase = escapeRegex(phaseNum);
 
   // Search the current milestone slice first, then fall back to full roadmap.
@@ -339,8 +339,8 @@ export const roadmapGetPhase: QueryHandler = async (args, projectDir) => {
  * @param projectDir - Project root directory
  * @returns QueryResult with full roadmap analysis
  */
-export const roadmapAnalyze: QueryHandler = async (_args, projectDir) => {
-  const roadmapPath = planningPaths(projectDir).roadmap;
+export const roadmapAnalyze: QueryHandler = async (_args, projectDir, workstream) => {
+  const roadmapPath = planningPaths(projectDir, workstream).roadmap;
 
   let rawContent: string;
   try {
@@ -349,8 +349,8 @@ export const roadmapAnalyze: QueryHandler = async (_args, projectDir) => {
     return { data: { error: 'ROADMAP.md not found', milestones: [], phases: [], current_phase: null } };
   }
 
-  const content = await extractCurrentMilestone(rawContent, projectDir);
-  const phasesDir = planningPaths(projectDir).phases;
+  const content = await extractCurrentMilestone(rawContent, projectDir, workstream);
+  const phasesDir = planningPaths(projectDir, workstream).phases;
 
   // IMPORTANT: Create regex INSIDE the function to avoid /g lastIndex persistence
   const phasePattern = /#{2,4}\s*Phase\s+(\d+[A-Z]?(?:\.\d+)*)\s*:\s*([^\n]+)/gi;
@@ -526,7 +526,7 @@ export const roadmapAnnotateDependencies: QueryHandler = async (args, projectDir
  * Mark requirement IDs complete in REQUIREMENTS.md (checkbox + traceability table).
  * Port of `cmdRequirementsMarkComplete` from milestone.cjs lines 11–87.
  */
-export const requirementsMarkComplete: QueryHandler = async (args, projectDir) => {
+export const requirementsMarkComplete: QueryHandler = async (args, projectDir, workstream) => {
   if (args.length === 0) {
     throw new GSDError(
       'requirement IDs required. Usage: requirements mark-complete REQ-01,REQ-02 or REQ-01 REQ-02',
@@ -545,7 +545,7 @@ export const requirementsMarkComplete: QueryHandler = async (args, projectDir) =
     throw new GSDError('no valid requirement IDs found', ErrorClassification.Validation);
   }
 
-  const paths = planningPaths(projectDir);
+  const paths = planningPaths(projectDir, workstream);
   if (!existsSync(paths.requirements)) {
     return { data: { updated: false, reason: 'REQUIREMENTS.md not found', ids: reqIds } };
   }

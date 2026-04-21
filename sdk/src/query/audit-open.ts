@@ -491,8 +491,8 @@ export interface AuditOpenResult {
 /**
  * Same structured result as `gsd-tools.cjs audit-open` (JSON).
  */
-export function auditOpenArtifacts(projectDir: string): AuditOpenResult {
-  const planDir = planningPaths(projectDir).planning;
+export function auditOpenArtifacts(projectDir: string, workstream?: string): AuditOpenResult {
+  const planDir = planningPaths(projectDir, workstream).planning;
 
   const debugSessions = (() => {
     try { return scanDebugSessions(planDir); } catch { return [{ scan_error: true }]; }
@@ -707,9 +707,9 @@ export function formatAuditReport(auditResult: AuditOpenResult): string {
 /**
  * `audit-open` / `audit.open` — optional `--json` for structured JSON only (default adds formatted report string).
  */
-export const auditOpen: QueryHandler = async (args, projectDir) => {
+export const auditOpen: QueryHandler = async (args, projectDir, workstream) => {
   const jsonOnly = args.includes('--json');
-  const result = auditOpenArtifacts(projectDir);
+  const result = auditOpenArtifacts(projectDir, workstream);
   if (jsonOnly) {
     return { data: result };
   }

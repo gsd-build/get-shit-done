@@ -133,13 +133,13 @@ export const verifyPlanStructure: QueryHandler = async (args, projectDir) => {
  * @returns QueryResult with { complete, phase, plan_count, summary_count, incomplete_plans, orphan_summaries, errors, warnings }
  * @throws GSDError with Validation classification if phase number missing
  */
-export const verifyPhaseCompleteness: QueryHandler = async (args, projectDir) => {
+export const verifyPhaseCompleteness: QueryHandler = async (args, projectDir, workstream) => {
   const phase = args[0];
   if (!phase) {
     throw new GSDError('phase required', ErrorClassification.Validation);
   }
 
-  const phasesDir = planningPaths(projectDir).phases;
+  const phasesDir = planningPaths(projectDir, workstream).phases;
   const normalized = normalizePhaseName(phase);
 
   // Find phase directory (mirror findPhase pattern from phase.ts)
@@ -554,7 +554,7 @@ export const verifyPathExists: QueryHandler = async (args, projectDir) => {
 /**
  * Detect schema drift for a phase — port of `cmdVerifySchemaDrift` from verify.cjs lines 1013–1086.
  */
-export const verifySchemaDrift: QueryHandler = async (args, projectDir) => {
+export const verifySchemaDrift: QueryHandler = async (args, projectDir, workstream) => {
   const phaseArg = args[0];
   const skipFlag = args.includes('--skip');
 
@@ -565,7 +565,7 @@ export const verifySchemaDrift: QueryHandler = async (args, projectDir) => {
   const { checkSchemaDrift } = await import('./schema-detect.js');
   const { execGit } = await import('./commit.js');
 
-  const phasesDir = planningPaths(projectDir).phases;
+  const phasesDir = planningPaths(projectDir, workstream).phases;
   if (!existsSync(phasesDir)) {
     return {
       data: {

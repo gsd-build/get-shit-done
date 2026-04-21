@@ -118,7 +118,7 @@ function searchArchMd(filePath: string, term: string): string[] {
 
 const INTEL_DISABLED_MSG = 'Intel system disabled. Set intel.enabled=true in config.json to activate.';
 
-export const intelStatus: QueryHandler = async (_args, projectDir) => {
+export const intelStatus: QueryHandler = async (_args, projectDir, _workstream) => {
   if (!isIntelEnabled(projectDir)) {
     return { data: { disabled: true, message: INTEL_DISABLED_MSG } };
   }
@@ -149,7 +149,7 @@ export const intelStatus: QueryHandler = async (_args, projectDir) => {
   return { data: { files, overall_stale: overallStale } };
 };
 
-export const intelDiff: QueryHandler = async (_args, projectDir) => {
+export const intelDiff: QueryHandler = async (_args, projectDir, _workstream) => {
   if (!isIntelEnabled(projectDir)) {
     return { data: { disabled: true, message: INTEL_DISABLED_MSG } };
   }
@@ -172,7 +172,7 @@ export const intelDiff: QueryHandler = async (_args, projectDir) => {
   return { data: { changed, added, removed } };
 };
 
-export const intelSnapshot: QueryHandler = async (_args, projectDir) => {
+export const intelSnapshot: QueryHandler = async (_args, projectDir, _workstream) => {
   if (!isIntelEnabled(projectDir)) {
     return { data: { disabled: true, message: INTEL_DISABLED_MSG } };
   }
@@ -192,7 +192,7 @@ export const intelSnapshot: QueryHandler = async (_args, projectDir) => {
   return { data: { saved: true, timestamp, files: fileCount } };
 };
 
-export const intelValidate: QueryHandler = async (_args, projectDir) => {
+export const intelValidate: QueryHandler = async (_args, projectDir, _workstream) => {
   if (!isIntelEnabled(projectDir)) {
     return { data: { disabled: true, message: INTEL_DISABLED_MSG } };
   }
@@ -219,7 +219,7 @@ export const intelValidate: QueryHandler = async (_args, projectDir) => {
   return { data: { valid: errors.length === 0, errors, warnings } };
 };
 
-export const intelQuery: QueryHandler = async (args, projectDir) => {
+export const intelQuery: QueryHandler = async (args, projectDir, _workstream) => {
   const term = args[0] || '';
   if (!isIntelEnabled(projectDir)) {
     return { data: { disabled: true, message: INTEL_DISABLED_MSG } };
@@ -247,7 +247,7 @@ export const intelQuery: QueryHandler = async (args, projectDir) => {
  * Extract exports from a JS/CJS/ESM file — port of `intelExtractExports` in `intel.cjs` (lines 502–614).
  * Returns `{ file, exports, method }` with `file` as a resolved absolute path (matches `gsd-tools.cjs`).
  */
-export const intelExtractExports: QueryHandler = async (args, projectDir) => {
+export const intelExtractExports: QueryHandler = async (args, projectDir, _workstream) => {
   const raw = args[0];
   if (!raw) {
     return { data: { file: '', exports: [], method: 'none' } };
@@ -351,7 +351,7 @@ export const intelExtractExports: QueryHandler = async (args, projectDir) => {
   return { data: { file: filePath, exports, method } };
 };
 
-export const intelPatchMeta: QueryHandler = async (args, projectDir) => {
+export const intelPatchMeta: QueryHandler = async (args, projectDir, _workstream) => {
   const raw = args[0];
   if (!raw) {
     return { data: { patched: false, error: 'File not found' } };
@@ -391,7 +391,7 @@ export const intelPatchMeta: QueryHandler = async (args, projectDir) => {
  *
  * Port of `intelUpdate` from `intel.cjs` lines 314–321.
  */
-export const intelUpdate: QueryHandler = async (_args, projectDir) => {
+export const intelUpdate: QueryHandler = async (_args, projectDir, _workstream) => {
   if (!isIntelEnabled(projectDir)) {
     return { data: { disabled: true, message: INTEL_DISABLED_MSG } };
   }

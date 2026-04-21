@@ -36,7 +36,7 @@ async function readFileSafe(filePath: string): Promise<string | null> {
   }
 }
 
-export const checkGates: QueryHandler = async (args, projectDir) => {
+export const checkGates: QueryHandler = async (args, projectDir, workstream) => {
   const workflow = args[0];
   if (!workflow) {
     throw new GSDError('workflow name required for check gates', ErrorClassification.Validation);
@@ -51,7 +51,7 @@ export const checkGates: QueryHandler = async (args, projectDir) => {
 
   const blockers: Blocker[] = [];
   const warnings: Warning[] = [];
-  const paths = planningPaths(projectDir);
+  const paths = planningPaths(projectDir, workstream);
 
   // Gate 1: .continue-here.md in project root
   const continueHerePath = join(projectDir, '.continue-here.md');

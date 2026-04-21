@@ -408,7 +408,7 @@ export async function main(argv: string[] = process.argv.slice(2)): Promise<void
         }
         console.log(JSON.stringify(output, null, 2));
       } else {
-        const result = await registry.dispatch(matched.cmd, matched.args, args.projectDir);
+        const result = await registry.dispatch(matched.cmd, matched.args, args.projectDir, args.ws);
         let output: unknown = result.data;
 
         if (pickField) {

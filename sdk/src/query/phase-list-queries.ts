@@ -17,8 +17,8 @@ import {
 import type { QueryHandler } from './utils.js';
 
 /** Resolve `.planning/phases/<dir>` for a phase token, or null. */
-async function resolvePhaseDir(phase: string, projectDir: string): Promise<string | null> {
-  const phasesDir = planningPaths(projectDir).phases;
+async function resolvePhaseDir(phase: string, projectDir: string, workstream?: string): Promise<string | null> {
+  const phasesDir = planningPaths(projectDir, workstream).phases;
   const normalized = normalizePhaseName(phase);
   try {
     const entries = await readdir(phasesDir, { withFileTypes: true });
@@ -40,7 +40,7 @@ type ArtifactType = 'context' | 'summary' | 'verification' | 'research';
  *
  * Args: `<phase>` `--type` `<context|summary|verification|research>`
  */
-export const phaseListArtifacts: QueryHandler = async (args, projectDir) => {
+export const phaseListArtifacts: QueryHandler = async (args, projectDir, workstream) => {
   if (!args[0]) {
     throw new GSDError('phase required', ErrorClassification.Validation);
   }
@@ -56,7 +56,7 @@ export const phaseListArtifacts: QueryHandler = async (args, projectDir) => {
   }
   const artifactType = rawType as ArtifactType;
 
-  const phaseDir = await resolvePhaseDir(phase, projectDir);
+  const phaseDir = await resolvePhaseDir(phase, projectDir, workstream);
   if (!phaseDir) {
     return { data: { phase: normalizePhaseName(phase), type: artifactType, artifacts: [], error: 'Phase not found' } };
   }
@@ -93,7 +93,7 @@ export const phaseListArtifacts: QueryHandler = async (args, projectDir) => {
  *
  * Args: `<phase>` [`--with-schema` `<yamlKey>`]
  */
-export const phaseListPlans: QueryHandler = async (args, projectDir) => {
+export const phaseListPlans: QueryHandler = async (args, projectDir, workstream) => {
   if (!args[0]) {
     throw new GSDError('phase required', ErrorClassification.Validation);
   }
@@ -108,7 +108,7 @@ export const phaseListPlans: QueryHandler = async (args, projectDir) => {
 
   const phase = args[0];
   const normalized = normalizePhaseName(phase);
-  const phaseDir = await resolvePhaseDir(phase, projectDir);
+  const phaseDir = await resolvePhaseDir(phase, projectDir, workstream);
   if (!phaseDir) {
     return {
       data: {

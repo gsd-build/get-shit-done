@@ -27,7 +27,7 @@ export interface QueryResult {
 }
 
 /** Signature for a query handler function. */
-export type QueryHandler = (args: string[], projectDir: string) => Promise<QueryResult>;
+export type QueryHandler = (args: string[], projectDir: string, workstream?: string) => Promise<QueryResult>;
 
 // ─── generateSlug ───────────────────────────────────────────────────────────
 

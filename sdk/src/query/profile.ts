@@ -104,8 +104,8 @@ export const learningsQuery: QueryHandler = async (args) => {
   return { data: { learnings: results, count: results.length, tag } };
 };
 
-export const learningsCopy: QueryHandler = async (_args, projectDir) => {
-  const paths = planningPaths(projectDir);
+export const learningsCopy: QueryHandler = async (_args, projectDir, workstream) => {
+  const paths = planningPaths(projectDir, workstream);
   const learningsPath = join(paths.planning, 'LEARNINGS.md');
   if (!existsSync(learningsPath)) {
     return { data: { copied: false, total: 0, created: 0, skipped: 0, reason: 'No LEARNINGS.md found' } };

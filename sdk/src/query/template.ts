@@ -38,13 +38,13 @@ import type { QueryHandler } from './utils.js';
  * @param projectDir - Project root directory
  * @returns QueryResult with { template: 'plan' | 'summary' | 'verification' }
  */
-export const templateSelect: QueryHandler = async (args, projectDir) => {
+export const templateSelect: QueryHandler = async (args, projectDir, workstream) => {
   const phaseNum = args[0];
   if (!phaseNum) {
     return { data: { template: 'plan' } };
   }
 
-  const paths = planningPaths(projectDir);
+  const paths = planningPaths(projectDir, workstream);
   const normalized = normalizePhaseName(phaseNum);
 
   // Find the phase directory

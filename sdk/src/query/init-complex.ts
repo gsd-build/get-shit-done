@@ -58,7 +58,7 @@ function pathExists(base: string, relPath: string): boolean {
  *
  * Port of cmdInitNewProject from init.cjs lines 296-399.
  */
-export const initNewProject: QueryHandler = async (_args, projectDir) => {
+export const initNewProject: QueryHandler = async (_args, projectDir, _workstream) => {
   const config = await loadConfig(projectDir);
 
   // Detect search API key availability from env vars and ~/.gsd/ files
@@ -174,7 +174,7 @@ export const initNewProject: QueryHandler = async (_args, projectDir) => {
  *
  * Port of cmdInitProgress from init.cjs lines 1139-1284.
  */
-export const initProgress: QueryHandler = async (_args, projectDir) => {
+export const initProgress: QueryHandler = async (_args, projectDir, _workstream) => {
   const config = await loadConfig(projectDir);
   const milestone = await getMilestoneInfo(projectDir);
   const paths = planningPaths(projectDir);
@@ -322,7 +322,7 @@ export const initProgress: QueryHandler = async (_args, projectDir) => {
  *
  * Port of cmdInitManager from init.cjs lines 854-1137.
  */
-export const initManager: QueryHandler = async (_args, projectDir) => {
+export const initManager: QueryHandler = async (_args, projectDir, _workstream) => {
   const config = await loadConfig(projectDir);
   const milestone = await getMilestoneInfo(projectDir);
   const paths = planningPaths(projectDir);

@@ -22,8 +22,9 @@ const UI_INDICATOR_RE = /UI|interface|frontend|component|layout|page|screen|view
 async function roadmapPhaseLineHasUiIndicators(
   projectDir: string,
   phaseNum: string,
+  workstream?: string,
 ): Promise<boolean> {
-  const roadmapPath = planningPaths(projectDir).roadmap;
+  const roadmapPath = planningPaths(projectDir, workstream).roadmap;
   let content: string;
   try {
     content = await readFile(roadmapPath, 'utf-8');
@@ -89,14 +90,14 @@ function inferNextStep(params: {
   return 'complete';
 }
 
-export const checkPhaseReady: QueryHandler = async (args, projectDir) => {
+export const checkPhaseReady: QueryHandler = async (args, projectDir, workstream) => {
   const raw = args[0];
   if (!raw) {
     throw new GSDError('phase number required for check phase-ready', ErrorClassification.Validation);
   }
   const phaseArg = normalizePhaseName(raw);
 
-  const phaseRes = await findPhase([raw], projectDir);
+  const phaseRes = await findPhase([raw], projectDir, workstream);
   const pdata = phaseRes.data as Record<string, unknown>;
   const found = Boolean(pdata.found);
 
@@ -115,10 +116,10 @@ export const checkPhaseReady: QueryHandler = async (args, projectDir) => {
 
   const phaseNumForRoadmap = (pdata.phase_number as string) || phaseArg;
   const has_ui_indicators =
-    (await roadmapPhaseLineHasUiIndicators(projectDir, phaseNumForRoadmap)) ||
-    (phaseNumForRoadmap !== phaseArg ? await roadmapPhaseLineHasUiIndicators(projectDir, phaseArg) : false);
+    (await roadmapPhaseLineHasUiIndicators(projectDir, phaseNumForRoadmap, workstream)) ||
+    (phaseNumForRoadmap !== phaseArg ? await roadmapPhaseLineHasUiIndicators(projectDir, phaseArg, workstream) : false);
 
-  const analysis = await roadmapAnalyze([], projectDir);
+  const analysis = await roadmapAnalyze([], projectDir, workstream);
   const adata = analysis.data as { phases?: Array<Record<string, unknown>> };
   const phases = adata.phases ?? [];
   const deps = dependenciesMet(phases, phaseArg);

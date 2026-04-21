@@ -51,9 +51,9 @@ function loadConfigCjs(projectDir: string): Record<string, unknown> {
  *
  * Port of `cmdStateLoad` from `get-shit-done/bin/lib/state.cjs` lines 44–86.
  */
-export const stateProjectLoad: QueryHandler = async (_args, projectDir) => {
+export const stateProjectLoad: QueryHandler = async (_args, projectDir, workstream) => {
   const config = loadConfigCjs(projectDir);
-  const planDir = planningPaths(projectDir).planning;
+  const planDir = planningPaths(projectDir, workstream).planning;
 
   let stateRaw = '';
   try {

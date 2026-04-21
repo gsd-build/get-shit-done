@@ -21,8 +21,8 @@ const API_INDICATOR_RE = /route\.ts|controller\.|api\//i;
 const API_HEADING_RE = /\bAPI\b|endpoint|REST|GraphQL/i;
 const INFRA_RE = /docker|terraform|k8s|helm|infra/i;
 
-async function roadmapHeadingForPhase(projectDir: string, phaseNum: string): Promise<string | null> {
-  const roadmapPath = planningPaths(projectDir).roadmap;
+async function roadmapHeadingForPhase(projectDir: string, phaseNum: string, workstream?: string): Promise<string | null> {
+  const roadmapPath = planningPaths(projectDir, workstream).roadmap;
   let content: string;
   try {
     content = await readFile(roadmapPath, 'utf-8');
@@ -34,14 +34,14 @@ async function roadmapHeadingForPhase(projectDir: string, phaseNum: string): Pro
   return m ? m[0] : null;
 }
 
-export const detectPhaseType: QueryHandler = async (args, projectDir) => {
+export const detectPhaseType: QueryHandler = async (args, projectDir, workstream) => {
   const raw = args[0];
   if (!raw) {
     throw new GSDError('phase number required for detect phase-type', ErrorClassification.Validation);
   }
   const phaseArg = normalizePhaseName(raw);
 
-  const phaseRes = await findPhase([raw], projectDir);
+  const phaseRes = await findPhase([raw], projectDir, workstream);
   const pdata = phaseRes.data as Record<string, unknown>;
   const found = Boolean(pdata.found);
 
@@ -54,9 +54,9 @@ export const detectPhaseType: QueryHandler = async (args, projectDir) => {
   const phaseNumForRoadmap = (pdata.phase_number as string) || phaseArg;
 
   // Read ROADMAP heading — try both normalized forms
-  let heading = await roadmapHeadingForPhase(projectDir, phaseNumForRoadmap);
+  let heading = await roadmapHeadingForPhase(projectDir, phaseNumForRoadmap, workstream);
   if (!heading && phaseNumForRoadmap !== phaseArg) {
-    heading = await roadmapHeadingForPhase(projectDir, phaseArg);
+    heading = await roadmapHeadingForPhase(projectDir, phaseArg, workstream);
   }
 
   // Frontend detection

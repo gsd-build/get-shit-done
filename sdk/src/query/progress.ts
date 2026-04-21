@@ -76,9 +76,9 @@ export async function determinePhaseStatus(
  * @param projectDir - Project root directory
  * @returns QueryResult with milestone progress data
  */
-export const progressJson: QueryHandler = async (_args, projectDir) => {
-  const phasesDir = planningPaths(projectDir).phases;
-  const milestone = await getMilestoneInfo(projectDir);
+export const progressJson: QueryHandler = async (_args, projectDir, workstream) => {
+  const phasesDir = planningPaths(projectDir, workstream).phases;
+  const milestone = await getMilestoneInfo(projectDir, workstream);
 
   const phases: Array<Record<string, unknown>> = [];
   let totalPlans = 0;
@@ -128,8 +128,8 @@ export const progressJson: QueryHandler = async (_args, projectDir) => {
  * Progress bar line — port of `cmdProgressRender` `format === 'bar'` from commands.cjs (lines 588–593).
  * Uses the same plan/summary counts as `progressJson` / CJS (not `roadmap.analyze` percent).
  */
-export const progressBar: QueryHandler = async (_args, projectDir) => {
-  const json = await progressJson([], projectDir);
+export const progressBar: QueryHandler = async (_args, projectDir, workstream) => {
+  const json = await progressJson([], projectDir, workstream);
   const d = json.data as {
     total_plans: number;
     total_summaries: number;
@@ -148,8 +148,8 @@ export const progressBar: QueryHandler = async (_args, projectDir) => {
 /**
  * Markdown progress table — port of `cmdProgressRender` `format === 'table'` from commands.cjs (lines 575–587).
  */
-export const progressTable: QueryHandler = async (_args, projectDir) => {
-  const json = await progressJson([], projectDir);
+export const progressTable: QueryHandler = async (_args, projectDir, workstream) => {
+  const json = await progressJson([], projectDir, workstream);
   const d = json.data as {
     milestone_version: string;
     milestone_name: string;
@@ -183,14 +183,14 @@ export const progressTable: QueryHandler = async (_args, projectDir) => {
 /**
  * Statistics aggregate — port of `cmdStats` JSON/table output from commands.cjs lines 816–971.
  */
-export const statsJson: QueryHandler = async (args, projectDir) => {
+export const statsJson: QueryHandler = async (args, projectDir, workstream) => {
   const format = args[0] || 'json';
-  const phasesDir = planningPaths(projectDir).phases;
-  const roadmapPath = planningPaths(projectDir).roadmap;
-  const reqPath = planningPaths(projectDir).requirements;
-  const statePath = planningPaths(projectDir).state;
-  const milestone = await getMilestoneInfo(projectDir);
-  const isDirInMilestone = await getMilestonePhaseFilter(projectDir);
+  const phasesDir = planningPaths(projectDir, workstream).phases;
+  const roadmapPath = planningPaths(projectDir, workstream).roadmap;
+  const reqPath = planningPaths(projectDir, workstream).requirements;
+  const statePath = planningPaths(projectDir, workstream).state;
+  const milestone = await getMilestoneInfo(projectDir, workstream);
+  const isDirInMilestone = await getMilestonePhaseFilter(projectDir, workstream);
 
   const phasesByNumber = new Map<
     string,
@@ -201,7 +201,7 @@ export const statsJson: QueryHandler = async (args, projectDir) => {
   let totalSummaries = 0;
 
   try {
-    const roadmapContent = await extractCurrentMilestone(await readFile(roadmapPath, 'utf-8'), projectDir);
+    const roadmapContent = await extractCurrentMilestone(await readFile(roadmapPath, 'utf-8'), projectDir, workstream);
     const headingPattern = /#{2,4}\s*Phase\s+(\d+[A-Z]?(?:\.\d+)*)\s*:\s*([^\n]+)/gi;
     let match: RegExpExecArray | null;
     while ((match = headingPattern.exec(roadmapContent)) !== null) {
@@ -348,8 +348,8 @@ export const statsJson: QueryHandler = async (args, projectDir) => {
  * Markdown statistics table — port of `cmdStats` `format === 'table'` from commands.cjs (lines 942–967).
  * Delegates to `statsJson` with `['table']` (same `rendered` string as CJS).
  */
-export const statsTable: QueryHandler = async (_args, projectDir) => {
-  return statsJson(['table'], projectDir);
+export const statsTable: QueryHandler = async (_args, projectDir, workstream) => {
+  return statsJson(['table'], projectDir, workstream);
 };
 
 // ─── todoMatchPhase ──────────────────────────────────────────────────────

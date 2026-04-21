@@ -259,9 +259,10 @@ async function syncStateFrontmatter(content: string, projectDir: string): Promis
  */
 async function readModifyWriteStateMd(
   projectDir: string,
-  modifier: (content: string) => string | Promise<string>
+  modifier: (content: string) => string | Promise<string>,
+  workstream?: string,
 ): Promise<string> {
-  const statePath = planningPaths(projectDir).state;
+  const statePath = planningPaths(projectDir, workstream).state;
   const lockPath = await acquireStateLock(statePath);
   try {
     let content: string;
@@ -292,8 +293,9 @@ async function readModifyWriteStateMd(
 export async function readModifyWriteStateMdFull(
   projectDir: string,
   modifier: (content: string) => string | Promise<string>,
+  workstream?: string,
 ): Promise<void> {
-  const statePath = planningPaths(projectDir).state;
+  const statePath = planningPaths(projectDir, workstream).state;
   const lockPath = await acquireStateLock(statePath);
   try {
     let content = '';
@@ -321,7 +323,7 @@ export async function readModifyWriteStateMdFull(
  * @param projectDir - Project root directory
  * @returns QueryResult with { updated: true/false, field, value }
  */
-export const stateUpdate: QueryHandler = async (args, projectDir) => {
+export const stateUpdate: QueryHandler = async (args, projectDir, workstream) => {
   const field = args[0];
   const value = args[1];
 
@@ -337,7 +339,7 @@ export const stateUpdate: QueryHandler = async (args, projectDir) => {
       return result;
     }
     return content;
-  });
+  }, workstream);
 
   return { data: { updated, field, value: updated ? value : undefined } };
 };
@@ -351,7 +353,7 @@ export const stateUpdate: QueryHandler = async (args, projectDir) => {
  * @param projectDir - Project root directory
  * @returns QueryResult with `{ updated, failed }` matching `cmdStatePatch` in `state.cjs`
  */
-export const statePatch: QueryHandler = async (args, projectDir) => {
+export const statePatch: QueryHandler = async (args, projectDir, workstream) => {
   let patches: Record<string, string>;
 
   if (args.length >= 2 && args[0]?.startsWith('--')) {
@@ -386,7 +388,7 @@ export const statePatch: QueryHandler = async (args, projectDir) => {
       }
     }
     return content;
-  });
+  }, workstream);
 
   return { data: { updated, failed } };
 };
@@ -404,7 +406,7 @@ export const statePatch: QueryHandler = async (args, projectDir) => {
  * @param projectDir - Project root directory
  * @returns QueryResult with phase metadata and `updated` field names (for raw parity)
  */
-export const stateBeginPhase: QueryHandler = async (args, projectDir) => {
+export const stateBeginPhase: QueryHandler = async (args, projectDir, workstream) => {
   const named = parseNamedArgs(args, ['phase', 'name', 'plans']);
   let phaseNumber = (named.phase as string | null) || '';
   let phaseName = (named.name as string | null) || '';
@@ -527,7 +529,7 @@ export const stateBeginPhase: QueryHandler = async (args, projectDir) => {
     }
 
     return content;
-  });
+  }, workstream);
 
   return {
     data: {
@@ -548,7 +550,7 @@ export const stateBeginPhase: QueryHandler = async (args, projectDir) => {
  * @param projectDir - Project root directory
  * @returns QueryResult with { advanced, current_plan, total_plans }
  */
-export const stateAdvancePlan: QueryHandler = async (_args, projectDir) => {
+export const stateAdvancePlan: QueryHandler = async (_args, projectDir, workstream) => {
   const today = new Date().toISOString().split('T')[0];
   let result: Record<string, unknown> = { error: 'STATE.md not found' };
 
@@ -619,7 +621,7 @@ export const stateAdvancePlan: QueryHandler = async (_args, projectDir) => {
     });
     result = { advanced: true, previous_plan: currentPlan, current_plan: newPlan, total_plans: totalPlans };
     return content;
-  });
+  }, workstream);
 
   return { data: result };
 };
@@ -633,7 +635,7 @@ export const stateAdvancePlan: QueryHandler = async (_args, projectDir) => {
  * @param projectDir - Project root directory
  * @returns QueryResult with { recorded: true/false }
  */
-export const stateRecordMetric: QueryHandler = async (args, projectDir) => {
+export const stateRecordMetric: QueryHandler = async (args, projectDir, workstream) => {
   const parsed = parseNamedArgs(args, ['phase', 'plan', 'duration', 'tasks', 'files']);
   const phase = parsed.phase as string | null;
   const plan = parsed.plan as string | null;
@@ -664,7 +666,7 @@ export const stateRecordMetric: QueryHandler = async (args, projectDir) => {
       recorded = true;
     }
     return content;
-  });
+  }, workstream);
 
   if (recorded) {
     return { data: { recorded: true, phase, plan, duration } };
@@ -681,13 +683,13 @@ export const stateRecordMetric: QueryHandler = async (args, projectDir) => {
  * @param projectDir - Project root directory
  * @returns QueryResult with { updated, percent, completed, total }
  */
-export const stateUpdateProgress: QueryHandler = async (_args, projectDir) => {
-  const phasesDir = planningPaths(projectDir).phases;
+export const stateUpdateProgress: QueryHandler = async (_args, projectDir, workstream) => {
+  const phasesDir = planningPaths(projectDir, workstream).phases;
   let totalPlans = 0;
   let totalSummaries = 0;
 
   try {
-    const isDirInMilestone = await getMilestonePhaseFilter(projectDir);
+    const isDirInMilestone = await getMilestonePhaseFilter(projectDir, workstream);
     const entries = await readdir(phasesDir, { withFileTypes: true });
     const phaseDirs = entries
       .filter(e => e.isDirectory())
@@ -720,7 +722,7 @@ export const stateUpdateProgress: QueryHandler = async (_args, projectDir) => {
       return content.replace(plainProgressPattern, (_match, prefix: string) => `${prefix}${progressStr}`);
     }
     return content;
-  });
+  }, workstream);
 
   if (updated) {
     return { data: { updated: true, percent, completed: totalSummaries, total: totalPlans, bar: progressStr } };
@@ -734,7 +736,7 @@ export const stateUpdateProgress: QueryHandler = async (_args, projectDir) => {
  * Appends a decision to the Decisions section. Removes placeholder text.
  * argv matches `gsd-tools.cjs`: `--phase`, `--summary`, `--rationale`, etc.
  */
-export const stateAddDecision: QueryHandler = async (args, projectDir) => {
+export const stateAddDecision: QueryHandler = async (args, projectDir, workstream) => {
   const parsed = parseNamedArgs(args, ['phase', 'summary', 'summary-file', 'rationale', 'rationale-file']);
   const phase = parsed.phase as string | null;
   let summaryText: string | null = null;
@@ -777,7 +779,7 @@ export const stateAddDecision: QueryHandler = async (args, projectDir) => {
       added = true;
     }
     return content;
-  });
+  }, workstream);
 
   if (added) {
     return { data: { added: true, decision: entry } };
@@ -789,7 +791,7 @@ export const stateAddDecision: QueryHandler = async (args, projectDir) => {
  * Query handler for state.add-blocker command.
  * argv: `--text`, `--text-file` (see `gsd-tools.cjs`).
  */
-export const stateAddBlocker: QueryHandler = async (args, projectDir) => {
+export const stateAddBlocker: QueryHandler = async (args, projectDir, workstream) => {
   const parsed = parseNamedArgs(args, ['text', 'text-file']);
   let blockerText: string | null = null;
 
@@ -824,7 +826,7 @@ export const stateAddBlocker: QueryHandler = async (args, projectDir) => {
       added = true;
     }
     return content;
-  });
+  }, workstream);
 
   if (added) {
     return { data: { added: true, blocker: blockerText } };
@@ -836,7 +838,7 @@ export const stateAddBlocker: QueryHandler = async (args, projectDir) => {
  * Query handler for state.resolve-blocker command.
  * argv: `--text` (see `gsd-tools.cjs`).
  */
-export const stateResolveBlocker: QueryHandler = async (args, projectDir) => {
+export const stateResolveBlocker: QueryHandler = async (args, projectDir, workstream) => {
   const parsed = parseNamedArgs(args, ['text']);
   const searchText = parsed.text as string | null;
   if (!searchText) {
@@ -873,7 +875,7 @@ export const stateResolveBlocker: QueryHandler = async (args, projectDir) => {
       content = content.replace(sectionPattern, (_match, header: string) => `${header}${newBody}`);
     }
     return content;
-  });
+  }, workstream);
 
   if (removedMatchingLine) {
     return { data: { resolved: true, blocker: searchText } };
@@ -888,7 +890,7 @@ export const stateResolveBlocker: QueryHandler = async (args, projectDir) => {
  * Query handler for state.record-session command.
  * argv: `--stopped-at`, `--resume-file` (see `cmdStateRecordSession` in `state.cjs`).
  */
-export const stateRecordSession: QueryHandler = async (args, projectDir) => {
+export const stateRecordSession: QueryHandler = async (args, projectDir, workstream) => {
   const parsed = parseNamedArgs(args, ['stopped-at', 'resume-file']);
   const stoppedAt = parsed['stopped-at'] as string | null | undefined;
   const resumeFile = ((parsed['resume-file'] as string | null) ?? 'None');
@@ -913,7 +915,7 @@ export const stateRecordSession: QueryHandler = async (args, projectDir) => {
     if (result) { content = result; updated.push('Resume File'); }
 
     return content;
-  });
+  }, workstream);
 
   if (updated.length > 0) {
     return { data: { recorded: true, updated } };
@@ -924,7 +926,7 @@ export const stateRecordSession: QueryHandler = async (args, projectDir) => {
 /**
  * Query handler for state.planned-phase — port of `cmdStatePlannedPhase` from `state.cjs`.
  */
-export const statePlannedPhase: QueryHandler = async (args, projectDir) => {
+export const statePlannedPhase: QueryHandler = async (args, projectDir, workstream) => {
   const parsed = parseNamedArgs(args, ['phase', 'name', 'plans']);
   const phaseNumber = parsed.phase as string | null;
   const plansRaw = parsed.plans as string | null;
@@ -943,7 +945,7 @@ export const statePlannedPhase: QueryHandler = async (args, projectDir) => {
 
   const phaseLabel = String(phaseNumber).trim();
 
-  const statePath = planningPaths(projectDir).state;
+  const statePath = planningPaths(projectDir, workstream).state;
   if (!existsSync(statePath)) {
     return { data: { error: 'STATE.md not found' } };
   }
@@ -975,7 +977,7 @@ export const statePlannedPhase: QueryHandler = async (args, projectDir) => {
       lastActivity: `${today} -- Phase ${phaseLabel} planning complete`,
     });
     return content;
-  });
+  }, workstream);
 
   return { data: { updated, phase: phaseNumber, plan_count: planCount } };
 };
@@ -1009,7 +1011,7 @@ function parseNamedArgs(
  * Writes `WAITING.json` under both `.gsd/` and `.planning/` so readers that only
  * watch one location (e.g. init workflows) still observe the signal.
  */
-export const stateSignalWaiting: QueryHandler = async (args, projectDir) => {
+export const stateSignalWaiting: QueryHandler = async (args, projectDir, _workstream) => {
   const parsed = parseNamedArgs(args, ['type', 'question', 'options', 'phase']);
   const type = (parsed.type as string | null) || 'decision_point';
   const question = (parsed.question as string | null) || null;
@@ -1047,7 +1049,7 @@ export const stateSignalWaiting: QueryHandler = async (args, projectDir) => {
 /**
  * Port of `cmdSignalResume` from state.cjs.
  */
-export const stateSignalResume: QueryHandler = async (_args, projectDir) => {
+export const stateSignalResume: QueryHandler = async (_args, projectDir, _workstream) => {
   const paths = [
     join(projectDir, '.gsd', 'WAITING.json'),
     join(projectDir, '.planning', 'WAITING.json'),
@@ -1069,8 +1071,8 @@ export const stateSignalResume: QueryHandler = async (_args, projectDir) => {
 /**
  * Port of `cmdStateValidate` from state.cjs.
  */
-export const stateValidate: QueryHandler = async (_args, projectDir) => {
-  const paths = planningPaths(projectDir);
+export const stateValidate: QueryHandler = async (_args, projectDir, workstream) => {
+  const paths = planningPaths(projectDir, workstream);
   const statePath = paths.state;
   if (!existsSync(statePath)) {
     return { data: { error: 'STATE.md not found' } };
@@ -1140,9 +1142,9 @@ export const stateValidate: QueryHandler = async (_args, projectDir) => {
 /**
  * Port of `cmdStateSync` from state.cjs. Supports `--verify` dry-run.
  */
-export const stateSync: QueryHandler = async (args, projectDir) => {
+export const stateSync: QueryHandler = async (args, projectDir, workstream) => {
   const verify = args.includes('--verify');
-  const paths = planningPaths(projectDir);
+  const paths = planningPaths(projectDir, workstream);
   const statePath = paths.state;
   if (!existsSync(statePath)) {
     return { data: { error: 'STATE.md not found' } };
@@ -1230,7 +1232,7 @@ export const stateSync: QueryHandler = async (args, projectDir) => {
     return { data: { synced: false, changes, dry_run: true } };
   }
 
-  await readModifyWriteStateMd(projectDir, (body) => runModifier(body));
+  await readModifyWriteStateMd(projectDir, (body) => runModifier(body), workstream);
 
   return { data: { synced: true, changes, dry_run: false } };
 };
@@ -1355,7 +1357,7 @@ function prunePass(content: string, cutoff: number): { newContent: string; archi
  * Port of `cmdStatePrune` from state.cjs.
  * Args: `--keep-recent N` (default 3), `--dry-run`, `--silent` (omit extra logging fields — no-op in SDK JSON).
  */
-export const statePrune: QueryHandler = async (args, projectDir) => {
+export const statePrune: QueryHandler = async (args, projectDir, workstream) => {
   const parsed = parseNamedArgs(args, ['keep-recent'], ['dry-run', 'silent']);
   const parsedKeepRecent = Number.parseInt(String(parsed['keep-recent'] ?? '3'), 10);
   if (!Number.isInteger(parsedKeepRecent) || parsedKeepRecent < 0) {
@@ -1364,7 +1366,7 @@ export const statePrune: QueryHandler = async (args, projectDir) => {
   const keepRecent = parsedKeepRecent;
   const dryRun = parsed['dry-run'] === true;
 
-  const paths = planningPaths(projectDir);
+  const paths = planningPaths(projectDir, workstream);
   const statePath = paths.state;
   if (!existsSync(statePath)) {
     return { data: { error: 'STATE.md not found' } };
@@ -1411,7 +1413,7 @@ export const statePrune: QueryHandler = async (args, projectDir) => {
     const result = prunePass(b, cutoff);
     archived.push(...result.archivedSections);
     return result.newContent;
-  });
+  }, workstream);
 
   const archivePath = join(paths.planning, 'STATE-ARCHIVE.md');
   const totalPruned = archived.reduce((sum, s) => sum + s.count, 0);
