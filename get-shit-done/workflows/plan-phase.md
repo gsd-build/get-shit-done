@@ -831,18 +831,26 @@ for crash resilience. If any Task hangs and the terminal is force-killed, rerunn
 
 ### 8.5.1 Outline Phase (outline-only mode, ~2 min)
 
-**Resume detection:** If `${PHASE_DIR}/${PADDED_PHASE}-PLAN-OUTLINE.md` already exists, skip
-this sub-step — the outline already exists from a previous run. Proceed directly to 8.5.2.
+**Resume detection:** If `${PHASE_DIR}/${PADDED_PHASE}-PLAN-OUTLINE.md` already exists **and
+is valid** (contains the `## OUTLINE COMPLETE` marker), skip this sub-step — the outline
+already exists from a previous run. Proceed directly to 8.5.2.
+
+```bash
+OUTLINE_FILE="${PHASE_DIR}/${PADDED_PHASE}-PLAN-OUTLINE.md"
+if [[ -f "$OUTLINE_FILE" ]] && grep -q "^## OUTLINE COMPLETE" "$OUTLINE_FILE"; then
+  # reuse existing outline — skip to 8.5.2
+fi
+```
 
 Display:
-```
+```text
 ◆ Chunked mode: spawning outline planner...
 ```
 
 Spawn the planner in **outline-only** mode — it must write only the outline manifest, not any
 PLAN.md files:
 
-```
+```javascript
 Task(
   prompt="{same planning_context as step 8, plus:}
 
@@ -868,16 +876,24 @@ Handle return:
 
 For each plan entry extracted from `PLAN-OUTLINE.md`:
 
-1. **Resume check:** If `${PHASE_DIR}/{plan_id}-PLAN.md` already exists on disk, skip this
-   plan (do not overwrite completed work — resume safety).
+1. **Resume check:** If `${PHASE_DIR}/{plan_id}-PLAN.md` already exists on disk **and has
+   valid YAML frontmatter** (opening `---` delimiter present), skip this plan (do not
+   overwrite completed work — resume safety).
+
+   ```bash
+   PLAN_FILE="${PHASE_DIR}/${plan_id}-PLAN.md"
+   if [[ -f "$PLAN_FILE" ]] && head -1 "$PLAN_FILE" | grep -q '^---'; then
+     continue  # plan already written, skip
+   fi
+   ```
 
 2. Display:
-   ```
+   ```text
    ◆ Chunked mode: planning {plan_id} ({k}/{N})...
    ```
 
 3. Spawn the planner in **single-plan** mode — it must write exactly one PLAN.md file:
-   ```
+   ```javascript
    Task(
      prompt="{same planning_context as step 8, plus:}
 
@@ -925,7 +941,7 @@ DISK_PLANS=$(ls "${PHASE_DIR}"/*-PLAN.md 2>/dev/null | wc -l | tr -d ' ')
 truncated (the Windows stdio hang pattern — the subagent finished but the return never
 arrived). Display:
 
-```
+```text
 ◆ Planner wrote {DISK_PLANS} plan(s) to disk but did not emit a PLANNING COMPLETE marker.
   This is a known Windows stdio hang pattern — work is likely recoverable.
 
@@ -1086,7 +1102,7 @@ DISK_PLANS=$(ls "${PHASE_DIR}"/*-PLAN.md 2>/dev/null | wc -l | tr -d ' ')
 **If `DISK_PLANS` > 0:** Plans exist on disk; the checker return was empty or truncated (the
 Windows stdio hang pattern — the subagent finished but the return never arrived). Display:
 
-```
+```text
 ◆ Checker return was empty or truncated. {DISK_PLANS} plan(s) exist on disk.
   This is a known Windows stdio hang pattern — checker may have completed without returning.
 ```

@@ -43,6 +43,7 @@ GSD stores project settings in `.planning/config.json`. Created during `/gsd-new
     "plan_bounce": false,
     "plan_bounce_script": null,
     "plan_bounce_passes": 2,
+    "plan_chunked": false,
     "code_review_command": null,
     "cross_ai_execution": false,
     "cross_ai_command": null,
