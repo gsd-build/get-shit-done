@@ -31,12 +31,12 @@ Documents are reference material for Claude when planning/executing. Always incl
 Load codebase mapping context:
 
 ```bash
-INIT=$(node "$HOME/.claude/get-shit-done/bin/gsd-tools.cjs" init map-codebase)
+INIT=$(gsd-sdk query init.map-codebase)
 if [[ "$INIT" == @file:* ]]; then INIT=$(cat "${INIT#@file:}"); fi
-AGENT_SKILLS_MAPPER=$(node "$HOME/.claude/get-shit-done/bin/gsd-tools.cjs" agent-skills gsd-codebase-mapper 2>/dev/null)
+AGENT_SKILLS_MAPPER=$(gsd-sdk query agent-skills gsd-codebase-mapper 2>/dev/null)
 ```
 
-Extract from init JSON: `mapper_model`, `commit_docs`, `codebase_dir`, `existing_maps`, `has_maps`, `codebase_dir_exists`, `subagent_timeout`.
+Extract from init JSON: `mapper_model`, `commit_docs`, `codebase_dir`, `existing_maps`, `has_maps`, `codebase_dir_exists`, `subagent_timeout`, `date`.
 </step>
 
 <step name="check_existing">
@@ -114,12 +114,15 @@ Task(
   run_in_background=true,
   description="Map codebase tech stack",
   prompt="Focus: tech
+Today's date: {date}
 
 Analyze this codebase for technology stack and external integrations.
 
 Write these documents to .planning/codebase/:
 - STACK.md - Languages, runtime, frameworks, dependencies, configuration
 - INTEGRATIONS.md - External APIs, databases, auth providers, webhooks
+
+IMPORTANT: Use {date} for all [YYYY-MM-DD] date placeholders in documents.
 
 Explore thoroughly. Write documents directly using templates. Return confirmation only.
 ${AGENT_SKILLS_MAPPER}"
@@ -135,12 +138,15 @@ Task(
   run_in_background=true,
   description="Map codebase architecture",
   prompt="Focus: arch
+Today's date: {date}
 
 Analyze this codebase architecture and directory structure.
 
 Write these documents to .planning/codebase/:
 - ARCHITECTURE.md - Pattern, layers, data flow, abstractions, entry points
 - STRUCTURE.md - Directory layout, key locations, naming conventions
+
+IMPORTANT: Use {date} for all [YYYY-MM-DD] date placeholders in documents.
 
 Explore thoroughly. Write documents directly using templates. Return confirmation only.
 ${AGENT_SKILLS_MAPPER}"
@@ -156,12 +162,15 @@ Task(
   run_in_background=true,
   description="Map codebase conventions",
   prompt="Focus: quality
+Today's date: {date}
 
 Analyze this codebase for coding conventions and testing patterns.
 
 Write these documents to .planning/codebase/:
 - CONVENTIONS.md - Code style, naming, patterns, error handling
 - TESTING.md - Framework, structure, mocking, coverage
+
+IMPORTANT: Use {date} for all [YYYY-MM-DD] date placeholders in documents.
 
 Explore thoroughly. Write documents directly using templates. Return confirmation only.
 ${AGENT_SKILLS_MAPPER}"
@@ -177,11 +186,14 @@ Task(
   run_in_background=true,
   description="Map codebase concerns",
   prompt="Focus: concerns
+Today's date: {date}
 
 Analyze this codebase for technical debt, known issues, and areas of concern.
 
 Write this document to .planning/codebase/:
 - CONCERNS.md - Tech debt, bugs, security, performance, fragile areas
+
+IMPORTANT: Use {date} for all [YYYY-MM-DD] date placeholders in documents.
 
 Explore thoroughly. Write document directly using template. Return confirmation only.
 ${AGENT_SKILLS_MAPPER}"
@@ -231,6 +243,8 @@ Continue to verify_output.
 When the `Task` tool is unavailable, perform codebase mapping sequentially in the current context. This replaces `spawn_agents` and `collect_confirmations`.
 
 **IMPORTANT:** Do NOT use `browser_subagent`, `Explore`, or any browser-based tool. Use only file system tools (Read, Bash, Write, Grep, Glob, list_dir, view_file, grep_search, or equivalent tools available in your runtime).
+
+**IMPORTANT:** Use `{date}` from init context for all `[YYYY-MM-DD]` date placeholders in documents. NEVER guess the date.
 
 Perform all 4 mapping passes sequentially:
 
@@ -314,7 +328,7 @@ Continue to commit_codebase_map.
 Commit the codebase map:
 
 ```bash
-node "$HOME/.claude/get-shit-done/bin/gsd-tools.cjs" commit "docs: map existing codebase" --files .planning/codebase/*.md
+gsd-sdk query commit "docs: map existing codebase" .planning/codebase/*.md
 ```
 
 Continue to offer_next.
@@ -345,7 +359,7 @@ Created .planning/codebase/:
 
 ---
 
-## ▶ Next Up
+## ▶ Next Up — [${PROJECT_CODE}] ${PROJECT_TITLE}
 
 **Initialize project** — use codebase context for planning
 

@@ -107,7 +107,7 @@ Extract from the imported content:
 
 <step name="plan_conflict_detection">
 
-Run conflict checks against the loaded project context. Output as a plain-text conflict report using [BLOCKER], [WARNING], and [INFO] labels. Do NOT use markdown tables (no `|---|` format).
+Run conflict checks against the loaded project context. The report format, severity semantics, and safety-gate behavior are defined by `references/doc-conflict-engine.md` — read it and apply it here. Operation noun: `import`.
 
 ### BLOCKER checks (any one prevents import):
 
@@ -128,43 +128,15 @@ Run conflict checks against the loaded project context. Output as a plain-text c
 - Plan uses a library not currently in the project tech stack → [INFO]
 - Plan adds a new phase to the ROADMAP.md structure → [INFO]
 
-Display the full Conflict Detection Report:
+Render the full Conflict Detection Report using the format in `references/doc-conflict-engine.md`.
 
-```
-## Conflict Detection Report
-
-### BLOCKERS ({N})
-
-[BLOCKER] {Short title}
-  Found: {what the imported plan says}
-  Expected: {what project context requires}
-  → {Specific action to resolve}
-
-### WARNINGS ({N})
-
-[WARNING] {Short title}
-  Found: {what was detected}
-  Impact: {what could go wrong}
-  → {Suggested action}
-
-### INFO ({N})
-
-[INFO] {Short title}
-  Note: {relevant information}
-```
-
-**If any [BLOCKER] exists:**
-
-Display:
-```
-GSD > BLOCKED: {N} blockers must be resolved before import can proceed.
-```
-
-Exit WITHOUT writing any files. This is the safety gate — no PLAN.md is written when blockers exist.
+**If any [BLOCKER] exists:** apply the safety gate from the reference — exit WITHOUT writing any files. No PLAN.md is written when blockers exist.
 
 **If only WARNINGS and/or INFO (no blockers):**
 
-Ask via AskUserQuestion using the approve-revise-abort pattern:
+**Text mode (`workflow.text_mode: true` in config or `--text` flag):** Set `TEXT_MODE=true` if `--text` is present in `$ARGUMENTS` OR `text_mode` from init JSON is `true`. When TEXT_MODE is active, replace every `AskUserQuestion` call with a plain-text numbered list and ask the user to type their choice number. This is required for non-Claude runtimes (OpenAI Codex, Gemini CLI, etc.) where `AskUserQuestion` is not available.
+
+Ask via AskUserQuestion using the approve-revise-abort pattern (see `references/gate-prompts.md`):
 - question: "Review the warnings above. Proceed with import?"
 - header: "Approve?"
 - options: Approve | Abort
@@ -246,7 +218,7 @@ Update `.planning/STATE.md` if appropriate (e.g., increment total plan count).
 
 Commit the imported plan and updated files:
 ```bash
-node "$HOME/.claude/get-shit-done/bin/gsd-tools.cjs" commit "docs({phase}): import plan from {basename FILEPATH}" --files .planning/phases/{phase}/{plan}-PLAN.md .planning/ROADMAP.md
+gsd-sdk query commit "docs({phase}): import plan from {basename FILEPATH}" .planning/phases/{phase}/{plan}-PLAN.md .planning/ROADMAP.md
 ```
 
 Display completion:
@@ -265,7 +237,7 @@ Show: plan filename written, phase directory, validation result, next steps.
 ## Anti-Patterns
 
 Do NOT:
-- Use markdown tables (`|---|`) in the conflict detection report — use plain-text [BLOCKER]/[WARNING]/[INFO] labels
+- Violate the shared conflict-engine contract in `references/doc-conflict-engine.md` (no markdown tables, no new severity labels, no bypass of the BLOCKER gate)
 - Write PLAN.md files as `PLAN-01.md` or `plan-01.md` — always use `{NN}-{MM}-PLAN.md`
 - Use `pbr:plan-checker` or `pbr:planner` — use `gsd-plan-checker` and `gsd-planner`
 - Write `.planning/.active-skill` — this is a PBR pattern with no GSD equivalent

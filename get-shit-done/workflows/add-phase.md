@@ -29,7 +29,7 @@ Exit.
 Load phase operation context:
 
 ```bash
-INIT=$(node "$HOME/.claude/get-shit-done/bin/gsd-tools.cjs" init phase-op "0")
+INIT=$(gsd-sdk query init.phase-op "0")
 if [[ "$INIT" == @file:* ]]; then INIT=$(cat "${INIT#@file:}"); fi
 ```
 
@@ -42,10 +42,10 @@ Exit.
 </step>
 
 <step name="add_phase">
-**Delegate the phase addition to gsd-tools:**
+**Delegate the phase addition to `gsd-sdk query phase.add`:**
 
 ```bash
-RESULT=$(node "$HOME/.claude/get-shit-done/bin/gsd-tools.cjs" phase add "${description}")
+RESULT=$(gsd-sdk query phase.add "${description}")
 ```
 
 The CLI handles:
@@ -83,7 +83,7 @@ Roadmap updated: .planning/ROADMAP.md
 
 ---
 
-## ▶ Next Up
+## ▶ Next Up — [${PROJECT_CODE}] ${PROJECT_TITLE}
 
 **Phase {N}: {description}**
 
@@ -104,7 +104,7 @@ Roadmap updated: .planning/ROADMAP.md
 </process>
 
 <success_criteria>
-- [ ] `gsd-tools phase add` executed successfully
+- [ ] `gsd-sdk query phase.add` executed successfully
 - [ ] Phase directory created
 - [ ] Roadmap updated with new phase entry
 - [ ] STATE.md updated with roadmap evolution note

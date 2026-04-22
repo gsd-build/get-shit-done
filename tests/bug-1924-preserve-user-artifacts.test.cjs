@@ -57,7 +57,9 @@ function cleanup(dir) {
 function runInstaller(configDir) {
   const env = { ...process.env, CLAUDE_CONFIG_DIR: configDir };
   delete env.GSD_TEST_MODE;
-  execFileSync(process.execPath, [INSTALL_SCRIPT, '--claude', '--global', '--yes'], {
+  // --no-sdk: this test covers user-artifact preservation only; skip SDK
+  // build (covered by install-smoke.yml) to keep the test deterministic.
+  execFileSync(process.execPath, [INSTALL_SCRIPT, '--claude', '--global', '--yes', '--no-sdk'], {
     encoding: 'utf-8',
     stdio: 'pipe',
     env,

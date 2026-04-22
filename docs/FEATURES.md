@@ -86,6 +86,27 @@
   - [Worktree Toggle](#66-worktree-toggle)
   - [Project Code Prefixing](#67-project-code-prefixing)
   - [Claude Code Skills Migration](#68-claude-code-skills-migration)
+- [v1.32 Features](#v132-features)
+  - [STATE.md Consistency Gates](#69-statemd-consistency-gates)
+  - [Autonomous `--to N` Flag](#70-autonomous---to-n-flag)
+  - [Research Gate](#71-research-gate)
+  - [Verifier Milestone Scope Filtering](#72-verifier-milestone-scope-filtering)
+  - [Read-Before-Edit Guard Hook](#73-read-before-edit-guard-hook)
+  - [Context Reduction](#74-context-reduction)
+  - [Discuss-Phase `--power` Flag](#75-discuss-phase---power-flag)
+  - [Debug `--diagnose` Flag](#76-debug---diagnose-flag)
+  - [Phase Dependency Analysis](#77-phase-dependency-analysis)
+  - [Anti-Pattern Severity Levels](#78-anti-pattern-severity-levels)
+  - [Methodology Artifact Type](#79-methodology-artifact-type)
+  - [Planner Reachability Check](#80-planner-reachability-check)
+  - [Playwright-MCP UI Verification](#81-playwright-mcp-ui-verification)
+  - [Pause-Work Expansion](#82-pause-work-expansion)
+  - [Response Language Config](#83-response-language-config)
+  - [Manual Update Procedure](#84-manual-update-procedure)
+  - [New Runtime Support (Trae, Cline, Augment Code)](#85-new-runtime-support-trae-cline-augment-code)
+  - [Autonomous `--interactive` Flag](#86-autonomous---interactive-flag)
+  - [Commit-Docs Guard Hook](#87-commit-docs-guard-hook)
+  - [Community Hooks Opt-In](#88-community-hooks-opt-in)
 - [v1.34.0 Features](#v1340-features)
   - [Global Learnings Store](#89-global-learnings-store)
   - [Queryable Codebase Intelligence](#90-queryable-codebase-intelligence)
@@ -102,6 +123,27 @@
   - [Hard Stop Safety Gates in /gsd-next](#101-hard-stop-safety-gates-in-gsd-next)
   - [Adaptive Model Preset](#102-adaptive-model-preset)
   - [Post-Merge Hunk Verification](#103-post-merge-hunk-verification)
+- [v1.35.0 Features](#v1350-features)
+  - [New Runtime Support (Cline, CodeBuddy, Qwen Code)](#104-new-runtime-support-cline-codebuddy-qwen-code)
+  - [GSD-2 Reverse Migration](#105-gsd-2-reverse-migration)
+  - [AI Integration Phase Wizard](#106-ai-integration-phase-wizard)
+  - [AI Eval Review](#107-ai-eval-review)
+- [v1.36.0 Features](#v1360-features)
+  - [Plan Bounce](#108-plan-bounce)
+  - [External Code Review Command](#109-external-code-review-command)
+  - [Cross-AI Execution Delegation](#110-cross-ai-execution-delegation)
+  - [Architectural Responsibility Mapping](#111-architectural-responsibility-mapping)
+  - [Extract Learnings](#112-extract-learnings)
+  - [SDK Workstream Support](#113-sdk-workstream-support)
+  - [Context-Window-Aware Prompt Thinning](#114-context-window-aware-prompt-thinning)
+  - [Configurable CLAUDE.md Path](#115-configurable-claudemd-path)
+  - [TDD Pipeline Mode](#116-tdd-pipeline-mode)
+- [v1.37.0 Features](#v1370-features)
+  - [Spike Command](#117-spike-command)
+  - [Sketch Command](#118-sketch-command)
+  - [Agent Size-Budget Enforcement](#119-agent-size-budget-enforcement)
+  - [Shared Boilerplate Extraction](#120-shared-boilerplate-extraction)
+  - [Knowledge Graph Integration](#121-knowledge-graph-integration)
 - [v1.32 Features](#v132-features)
   - [STATE.md Consistency Gates](#69-statemd-consistency-gates)
   - [Autonomous `--to N` Flag](#70-autonomous---to-n-flag)
@@ -187,6 +229,8 @@
 - REQ-DISC-05: System MUST support `--auto` flag to auto-select recommended defaults
 - REQ-DISC-06: System MUST support `--batch` flag for grouped question intake
 - REQ-DISC-07: System MUST scout relevant source files before identifying gray areas (code-aware discussion)
+- REQ-DISC-08: System MUST adapt gray area language to product-outcome terms when USER-PROFILE.md indicates a non-technical owner (learning_style: guided, jargon in frustration_triggers, or high-level explanation depth)
+- REQ-DISC-09: When REQ-DISC-08 applies, advisor_research rationale paragraphs MUST be rewritten in plain language — same decisions, translated framing
 
 **Produces:** `{padded_phase}-CONTEXT.md` — User preferences that feed into research and planning
 
@@ -917,7 +961,7 @@ fix(03-01): correct auth token expiry
 **Purpose:** Run GSD across multiple AI coding agent runtimes.
 
 **Requirements:**
-- REQ-RUNTIME-01: System MUST support Claude Code, OpenCode, Gemini CLI, Kilo, Codex, Copilot, Antigravity, Trae, Cline, Augment Code
+- REQ-RUNTIME-01: System MUST support Claude Code, OpenCode, Gemini CLI, Kilo, Codex, Copilot, Antigravity, Trae, Cline, Augment Code, CodeBuddy, Qwen Code
 - REQ-RUNTIME-02: Installer MUST transform content per runtime (tool names, paths, frontmatter)
 - REQ-RUNTIME-03: Installer MUST support interactive and non-interactive (`--claude --global`) modes
 - REQ-RUNTIME-04: Installer MUST support both global and local installation
@@ -926,12 +970,12 @@ fix(03-01): correct auth token expiry
 
 **Runtime Transformations:**
 
-| Aspect | Claude Code | OpenCode | Gemini | Kilo | Codex | Copilot | Antigravity | Trae | Cline | Augment |
-|--------|------------|----------|--------|-------|-------|---------|-------------|------|-------|---------|
-| Commands | Slash commands | Slash commands | Slash commands | Slash commands | Skills (TOML) | Slash commands | Skills | Skills | Rules | Skills |
-| Agent format | Claude native | `mode: subagent` | Claude native | `mode: subagent` | Skills | Tool mapping | Skills | Skills | Rules | Skills |
-| Hook events | `PostToolUse` | N/A | `AfterTool` | N/A | N/A | N/A | N/A | N/A | N/A | N/A |
-| Config | `settings.json` | `opencode.json(c)` | `settings.json` | `kilo.json(c)` | TOML | Instructions | Config | Config | Config | Config |
+| Aspect | Claude Code | OpenCode | Gemini | Kilo | Codex | Copilot | Antigravity | Trae | Cline | Augment | CodeBuddy | Qwen Code |
+|--------|------------|----------|--------|-------|-------|---------|-------------|------|-------|---------|-----------|-----------|
+| Commands | Slash commands | Slash commands | Slash commands | Slash commands | Skills (TOML) | Slash commands | Skills | Skills | Rules | Skills | Skills | Skills |
+| Agent format | Claude native | `mode: subagent` | Claude native | `mode: subagent` | Skills | Tool mapping | Skills | Skills | Rules | Skills | Skills | Skills |
+| Hook events | `PostToolUse` | N/A | `AfterTool` | N/A | N/A | N/A | N/A | N/A | N/A | N/A | N/A | N/A |
+| Config | `settings.json` | `opencode.json(c)` | `settings.json` | `kilo.json(c)` | TOML | Instructions | Config | Config | `.clinerules` | Config | Config | Config |
 
 ---
 
@@ -1068,9 +1112,9 @@ When verification returns `human_needed`, items are persisted as a trackable HUM
 
 ### 42. Cross-AI Peer Review
 
-**Command:** `/gsd-review --phase N [--gemini] [--claude] [--codex] [--coderabbit] [--all]`
+**Command:** `/gsd-review --phase N [--gemini] [--claude] [--codex] [--coderabbit] [--opencode] [--qwen] [--cursor] [--all]`
 
-**Purpose:** Invoke external AI CLIs (Gemini, Claude, Codex, CodeRabbit) to independently review phase plans. Produces structured REVIEWS.md with per-reviewer feedback.
+**Purpose:** Invoke external AI CLIs (Gemini, Claude, Codex, CodeRabbit, OpenCode, Qwen Code, Cursor) to independently review phase plans. Produces structured REVIEWS.md with per-reviewer feedback.
 
 **Requirements:**
 - REQ-REVIEW-01: System MUST detect available AI CLIs on the system
@@ -2179,3 +2223,340 @@ Test suite that scans all agent, workflow, and command files for embedded inject
 - REQ-PATCH-VERIFY-01: Reapply-patches MUST verify each hunk was applied after the merge
 - REQ-PATCH-VERIFY-02: Dropped or partial hunks MUST be reported to the user with file and line context
 - REQ-PATCH-VERIFY-03: Verification MUST run after all patches are applied, not per-patch
+
+---
+
+## v1.35.0 Features
+
+- [New Runtime Support (Cline, CodeBuddy, Qwen Code)](#104-new-runtime-support-cline-codebuddy-qwen-code)
+- [GSD-2 Reverse Migration](#105-gsd-2-reverse-migration)
+- [AI Integration Phase Wizard](#106-ai-integration-phase-wizard)
+- [AI Eval Review](#107-ai-eval-review)
+
+---
+
+### 104. New Runtime Support (Cline, CodeBuddy, Qwen Code)
+
+**Part of:** `npx get-shit-done-cc`
+
+**Purpose:** Extend GSD installation to Cline, CodeBuddy, and Qwen Code runtimes.
+
+**Requirements:**
+- REQ-CLINE-02: Cline install MUST write `.clinerules` to `~/.cline/` (global) or `./.cline/` (local). No custom slash commands — rules-based integration only. Flag: `--cline`.
+- REQ-CODEBUDDY-01: CodeBuddy install MUST deploy skills to `~/.codebuddy/skills/gsd-*/SKILL.md`. Flag: `--codebuddy`.
+- REQ-QWEN-01: Qwen Code install MUST deploy skills to `~/.qwen/skills/gsd-*/SKILL.md`, following the open standard used by Claude Code 2.1.88+. `QWEN_CONFIG_DIR` env var overrides the default path. Flag: `--qwen`.
+
+**Runtime summary:**
+
+| Runtime | Install Format | Config Path | Flag |
+|---------|---------------|-------------|------|
+| Cline | `.clinerules` | `~/.cline/` or `./.cline/` | `--cline` |
+| CodeBuddy | Skills (`SKILL.md`) | `~/.codebuddy/skills/` | `--codebuddy` |
+| Qwen Code | Skills (`SKILL.md`) | `~/.qwen/skills/` | `--qwen` |
+
+---
+
+### 105. GSD-2 Reverse Migration
+
+**Command:** `/gsd-from-gsd2 [--dry-run] [--force] [--path <dir>]`
+
+**Purpose:** Migrate a project from GSD-2 format (`.gsd/` directory with Milestone→Slice→Task hierarchy) back to the v1 `.planning/` format, restoring full compatibility with all GSD v1 commands.
+
+**Requirements:**
+- REQ-FROM-GSD2-01: Importer MUST read `.gsd/` from the specified or current directory
+- REQ-FROM-GSD2-02: Milestone→Slice hierarchy MUST be flattened to sequential phase numbers (M001/S01→phase 01, M001/S02→phase 02, M002/S01→phase 03, etc.)
+- REQ-FROM-GSD2-03: System MUST guard against overwriting an existing `.planning/` directory without `--force`
+- REQ-FROM-GSD2-04: `--dry-run` MUST preview all changes without writing any files
+- REQ-FROM-GSD2-05: Migration MUST produce `PROJECT.md`, `REQUIREMENTS.md`, `ROADMAP.md`, `STATE.md`, and sequential phase directories
+
+**Flags:**
+
+| Flag | Description |
+|------|-------------|
+| `--dry-run` | Preview migration output without writing files |
+| `--force` | Overwrite an existing `.planning/` directory |
+| `--path <dir>` | Specify the GSD-2 root directory |
+
+---
+
+### 106. AI Integration Phase Wizard
+
+**Command:** `/gsd-ai-integration-phase [N]`
+
+**Purpose:** Guide developers through selecting, integrating, and planning evaluation for AI/LLM capabilities in a project phase. Produces a structured `AI-SPEC.md` that feeds into planning and verification.
+
+**Requirements:**
+- REQ-AISPEC-01: Wizard MUST present an interactive decision matrix covering framework selection, model choice, and integration approach
+- REQ-AISPEC-02: System MUST surface domain-specific failure modes and eval criteria relevant to the project type
+- REQ-AISPEC-03: System MUST spawn 3 parallel specialist agents: domain-researcher, framework-selector, and eval-planner
+- REQ-AISPEC-04: Output MUST produce `{phase}-AI-SPEC.md` with framework recommendation, implementation guidance, and evaluation strategy
+
+**Produces:** `{phase}-AI-SPEC.md` in the phase directory
+
+---
+
+### 107. AI Eval Review
+
+**Command:** `/gsd-eval-review [N]`
+
+**Purpose:** Retroactively audit an executed AI phase's evaluation coverage against the `AI-SPEC.md` plan. Identifies gaps between planned and implemented evaluation before the phase is closed.
+
+**Requirements:**
+- REQ-EVALREVIEW-01: Review MUST read `AI-SPEC.md` from the specified phase
+- REQ-EVALREVIEW-02: Each eval dimension MUST be scored as COVERED, PARTIAL, or MISSING
+- REQ-EVALREVIEW-03: Output MUST include findings, gap descriptions, and remediation guidance
+- REQ-EVALREVIEW-04: `EVAL-REVIEW.md` MUST be written to the phase directory
+
+**Produces:** `{phase}-EVAL-REVIEW.md` with scored eval dimensions, gap analysis, and remediation steps
+
+---
+
+## v1.36.0 Features
+
+### 108. Plan Bounce
+
+**Command:** `/gsd-plan-phase N --bounce`
+
+**Purpose:** After plans pass the checker, optionally refine them through an external script (a second AI, a linter, a custom validator). The bounce step backs up each plan, runs the script, validates YAML frontmatter integrity on the result, re-runs the plan checker, and restores the original if anything fails.
+
+**Requirements:**
+- REQ-BOUNCE-01: `--bounce` flag or `workflow.plan_bounce: true` activates the step; `--skip-bounce` always disables it
+- REQ-BOUNCE-02: `workflow.plan_bounce_script` must point to a valid executable; missing script produces a warning and skips
+- REQ-BOUNCE-03: Each plan is backed up to `*-PLAN.pre-bounce.md` before the script runs
+- REQ-BOUNCE-04: Bounced plans with broken YAML frontmatter or that fail the plan checker are restored from backup
+- REQ-BOUNCE-05: `workflow.plan_bounce_passes` (default: 2) controls how many refinement passes the script receives
+
+**Configuration:** `workflow.plan_bounce`, `workflow.plan_bounce_script`, `workflow.plan_bounce_passes`
+
+---
+
+### 109. External Code Review Command
+
+**Command:** `/gsd-ship` (enhanced)
+
+**Purpose:** Before the manual review step in `/gsd-ship`, automatically run an external code review command if configured. The command receives the diff and phase context via stdin and returns a JSON verdict (`APPROVED` or `REVISE`). Falls through to the existing manual review flow regardless of outcome.
+
+**Requirements:**
+- REQ-EXTREVIEW-01: `workflow.code_review_command` must be set to a command string; null means skip
+- REQ-EXTREVIEW-02: Diff is generated against `BASE_BRANCH` with `--stat` summary included
+- REQ-EXTREVIEW-03: Review prompt is piped via stdin (never shell-interpolated)
+- REQ-EXTREVIEW-04: 120-second timeout; stderr captured on failure
+- REQ-EXTREVIEW-05: JSON output parsed for `verdict`, `confidence`, `summary`, `issues` fields
+
+**Configuration:** `workflow.code_review_command`
+
+---
+
+### 110. Cross-AI Execution Delegation
+
+**Command:** `/gsd-execute-phase N --cross-ai`
+
+**Purpose:** Delegate individual plans to an external AI runtime for execution. Plans with `cross_ai: true` in their frontmatter (or all plans when `--cross-ai` is used) are sent to the configured command via stdin. Successfully handled plans are removed from the normal executor queue.
+
+**Requirements:**
+- REQ-CROSSAI-01: `--cross-ai` forces all plans through cross-AI; `--no-cross-ai` disables it
+- REQ-CROSSAI-02: `workflow.cross_ai_execution: true` and plan frontmatter `cross_ai: true` required for per-plan activation
+- REQ-CROSSAI-03: Task prompt is piped via stdin to prevent injection
+- REQ-CROSSAI-04: Dirty working tree produces a warning before execution
+- REQ-CROSSAI-05: On failure, user chooses: retry, skip (fall back to normal executor), or abort
+
+**Configuration:** `workflow.cross_ai_execution`, `workflow.cross_ai_command`, `workflow.cross_ai_timeout`
+
+---
+
+### 111. Architectural Responsibility Mapping
+
+**Command:** `/gsd-plan-phase` (enhanced research step)
+
+**Purpose:** During phase research, the phase-researcher now maps each capability to its architectural tier owner (browser, frontend server, API, CDN/static, database). The planner cross-references tasks against this map, and the plan-checker enforces tier compliance as Dimension 7c.
+
+**Requirements:**
+- REQ-ARM-01: Phase researcher produces an Architectural Responsibility Map table in RESEARCH.md (Step 1.5)
+- REQ-ARM-02: Planner sanity-checks task-to-tier assignments against the map
+- REQ-ARM-03: Plan checker validates tier compliance as Dimension 7c (WARNING for general mismatches, BLOCKER for security-sensitive ones)
+
+**Produces:** `## Architectural Responsibility Map` section in `{phase}-RESEARCH.md`
+
+---
+
+### 112. Extract Learnings
+
+**Command:** `/gsd-extract-learnings N`
+
+**Purpose:** Extract structured knowledge from completed phase artifacts. Reads PLAN.md and SUMMARY.md (required) plus VERIFICATION.md, UAT.md, and STATE.md (optional) to produce four categories of learnings: decisions, lessons, patterns, and surprises. Optionally captures each item to an external knowledge base via `capture_thought` tool.
+
+**Requirements:**
+- REQ-LEARN-01: Requires PLAN.md and SUMMARY.md; exits with clear error if missing
+- REQ-LEARN-02: Each extracted item includes source attribution (artifact and section)
+- REQ-LEARN-03: If `capture_thought` tool is available, captures items with `source`, `project`, and `phase` metadata
+- REQ-LEARN-04: If `capture_thought` is unavailable, completes successfully and logs that external capture was skipped
+- REQ-LEARN-05: Running twice overwrites the previous `LEARNINGS.md`
+
+**Produces:** `{phase}-LEARNINGS.md` with YAML frontmatter (phase, project, counts per category, missing_artifacts)
+
+**Optional integration — `capture_thought`:** `capture_thought` is a **convention, not a bundled tool**. GSD does not ship one and does not require one. The workflow checks whether any MCP server in the current session exposes a tool named `capture_thought` and, if so, calls it once per extracted learning with the signature below. If no such tool is present, the step is skipped silently and `LEARNINGS.md` remains the primary output.
+
+Expected tool signature:
+```javascript
+capture_thought({
+  category: "decision" | "lesson" | "pattern" | "surprise",
+  phase: <phase_number>,
+  content: <learning_text>,
+  source: <artifact_name>
+})
+```
+
+Users who run a memory / knowledge-base MCP server (for example, ExoCortex-style servers, `claude-mem`, or `mem0`-style servers) can implement this tool name to have learnings routed into their knowledge base automatically with `project`, `phase`, and `source` metadata. Everyone else can use `/gsd-extract-learnings` without any extra setup — the `LEARNINGS.md` artifact is the feature.
+
+---
+
+### 113. SDK Workstream Support
+
+**Command:** `gsd-sdk init @prd.md --ws my-workstream`
+
+**Purpose:** Route all SDK `.planning/` paths to `.planning/workstreams/<name>/`, enabling multi-workstream projects without "Project already exists" errors. The `--ws` flag validates the workstream name and propagates to all subsystems (tools, config, context engine).
+
+**Requirements:**
+- REQ-WS-01: `--ws <name>` routes all `.planning/` paths to `.planning/workstreams/<name>/`
+- REQ-WS-02: Without `--ws`, behavior is unchanged (flat mode)
+- REQ-WS-03: Name validated to alphanumeric, hyphens, underscores, and dots only
+- REQ-WS-04: Config resolves from workstream path first, falls back to root `.planning/config.json`
+
+---
+
+### 114. Context-Window-Aware Prompt Thinning
+
+**Purpose:** Reduce static prompt overhead by ~40% for models with context windows under 200K tokens. Extended examples and anti-pattern lists are extracted from agent definitions into reference files loaded on demand via `@` required_reading.
+
+**Requirements:**
+- REQ-THIN-01: When `CONTEXT_WINDOW < 200000`, executor and planner agent prompts omit inline examples
+- REQ-THIN-02: Extracted content lives in `references/executor-examples.md` and `references/planner-antipatterns.md`
+- REQ-THIN-03: Standard (200K-500K) and enriched (500K+) tiers are unaffected
+- REQ-THIN-04: Core rules and decision logic remain inline; only verbose examples are extracted
+
+**Reference files:** `executor-examples.md`, `planner-antipatterns.md`
+
+---
+
+### 115. Configurable CLAUDE.md Path
+
+**Purpose:** Allow projects to store their CLAUDE.md in a non-root location. The `claude_md_path` config key controls where `/gsd-profile-user` and related commands write the generated CLAUDE.md file.
+
+**Requirements:**
+- REQ-CMDPATH-01: `claude_md_path` defaults to `./CLAUDE.md`
+- REQ-CMDPATH-02: Profile generation commands read the path from config and write to the specified location
+- REQ-CMDPATH-03: Relative paths are resolved from the project root
+
+**Configuration:** `claude_md_path`
+
+---
+
+### 116. TDD Pipeline Mode
+
+**Purpose:** Opt-in TDD (red-green-refactor) as a first-class phase execution mode. When enabled, the planner aggressively selects `type: tdd` for eligible tasks and the executor enforces RED/GREEN/REFACTOR gate sequence with fail-fast on unexpected GREEN before RED.
+
+**Requirements:**
+- REQ-TDD-01: `workflow.tdd_mode` config key (boolean, default `false`)
+- REQ-TDD-02: When enabled, planner applies TDD heuristics from `references/tdd.md` to all eligible tasks (business logic, APIs, validations, algorithms, state machines)
+- REQ-TDD-03: Executor enforces gate sequence for `type: tdd` plans — RED commit (`test(...)`) must precede GREEN commit (`feat(...)`)
+- REQ-TDD-04: Executor fails fast if tests pass unexpectedly during RED phase (feature already exists or test is wrong)
+- REQ-TDD-05: End-of-phase collaborative review checkpoint verifies gate compliance across all TDD plans (advisory, non-blocking)
+- REQ-TDD-06: Gate violations surfaced in SUMMARY.md under `## TDD Gate Compliance` section
+
+**Configuration:** `workflow.tdd_mode`
+**Reference files:** `tdd.md`, `checkpoints.md`
+
+---
+
+## v1.37.0 Features
+
+### 117. Spike Command
+
+**Command:** `/gsd-spike [idea] [--quick]`
+
+**Purpose:** Run 2–5 focused feasibility experiments before committing to an implementation approach. Each experiment uses Given/When/Then framing, produces executable code, and returns a VALIDATED / INVALIDATED / PARTIAL verdict. Companion `/gsd-spike-wrap-up` packages findings into a project-local skill.
+
+**Requirements:**
+- REQ-SPIKE-01: Each experiment MUST produce a Given/When/Then hypothesis before any code is written
+- REQ-SPIKE-02: Each experiment MUST include working code or a minimal reproduction
+- REQ-SPIKE-03: Each experiment MUST return one of: VALIDATED, INVALIDATED, or PARTIAL verdict with evidence
+- REQ-SPIKE-04: Results MUST be stored in `.planning/spikes/NNN-experiment-name/` with a README and MANIFEST.md
+- REQ-SPIKE-05: `--quick` flag skips intake conversation and uses the argument text as the experiment direction
+- REQ-SPIKE-06: `/gsd-spike-wrap-up` MUST package findings into `.claude/skills/spike-findings-[project]/`
+
+**Produces:**
+| Artifact | Description |
+|----------|-------------|
+| `.planning/spikes/NNN-name/README.md` | Hypothesis, experiment code, verdict, and evidence |
+| `.planning/spikes/MANIFEST.md` | Index of all spikes with verdicts |
+| `.claude/skills/spike-findings-[project]/` | Packaged findings (via `/gsd-spike-wrap-up`) |
+
+---
+
+### 118. Sketch Command
+
+**Command:** `/gsd-sketch [idea] [--quick] [--text]`
+
+**Purpose:** Explore design directions through throwaway HTML mockups before committing to implementation. Produces 2–3 interactive variants per design question, all viewable directly in a browser with no build step. Companion `/gsd-sketch-wrap-up` packages winning decisions into a project-local skill.
+
+**Requirements:**
+- REQ-SKETCH-01: Each sketch MUST answer one specific visual design question
+- REQ-SKETCH-02: Each sketch MUST include 2–3 meaningfully different variants in a single `index.html` with tab navigation
+- REQ-SKETCH-03: All interactive elements (hover, click, transitions) MUST be functional
+- REQ-SKETCH-04: Sketches MUST use real-ish content, not lorem ipsum
+- REQ-SKETCH-05: A shared `themes/default.css` MUST provide CSS variables adapted to the agreed aesthetic
+- REQ-SKETCH-06: `--quick` flag skips mood intake; `--text` flag replaces `AskUserQuestion` with numbered lists for non-Claude runtimes
+- REQ-SKETCH-07: The winning variant MUST be marked in the README frontmatter and with a ★ in the HTML tab
+- REQ-SKETCH-08: `/gsd-sketch-wrap-up` MUST package winning decisions into `.claude/skills/sketch-findings-[project]/`
+
+**Produces:**
+| Artifact | Description |
+|----------|-------------|
+| `.planning/sketches/NNN-name/index.html` | 2–3 interactive HTML variants |
+| `.planning/sketches/NNN-name/README.md` | Design question, variants, winner, what to look for |
+| `.planning/sketches/themes/default.css` | Shared CSS theme variables |
+| `.planning/sketches/MANIFEST.md` | Index of all sketches with winners |
+| `.claude/skills/sketch-findings-[project]/` | Packaged decisions (via `/gsd-sketch-wrap-up`) |
+
+---
+
+### 119. Agent Size-Budget Enforcement
+
+**Purpose:** Keep agent prompt files lean with tiered line-count limits enforced in CI. Oversized agents are caught before they bloat context windows in production.
+
+**Requirements:**
+- REQ-BUDGET-01: `agents/gsd-*.md` files are classified into three tiers: XL (≤ 1 600 lines), Large (≤ 1 000 lines), Default (≤ 500 lines)
+- REQ-BUDGET-02: Tier assignment is declared in the file's YAML frontmatter (`size: xl | large | default`)
+- REQ-BUDGET-03: `tests/agent-size-budget.test.cjs` enforces limits and fails CI on violation
+- REQ-BUDGET-04: Files without a `size` frontmatter key default to the Default (500-line) limit
+
+**Test file:** `tests/agent-size-budget.test.cjs`
+
+---
+
+### 120. Shared Boilerplate Extraction
+
+**Purpose:** Reduce duplication across agents by extracting two common boilerplate blocks into shared reference files loaded on demand. Keeps agent files within size budget and makes boilerplate updates a single-file change.
+
+**Requirements:**
+- REQ-BOILER-01: Mandatory-initial-read instructions extracted to `references/mandatory-initial-read.md`
+- REQ-BOILER-02: Project-skills-discovery instructions extracted to `references/project-skills-discovery.md`
+- REQ-BOILER-03: Agents that previously inlined these blocks MUST now reference them via `@` required_reading
+
+**Reference files:** `references/mandatory-initial-read.md`, `references/project-skills-discovery.md`
+
+---
+
+### 121. Knowledge Graph Integration
+
+**Purpose:** Build, query, and inspect a lightweight knowledge graph of the project in `.planning/graphs/`. Opt-in per project. Exposed as the `/gsd-graphify` user-facing command and the `gsd-tools.cjs graphify …` programmatic verb family. Complements `/gsd-intel` (snapshot-oriented) with a graph-oriented view of nodes and edges across commands, agents, workflows, and phases.
+
+**Requirements:**
+- REQ-GRAPH-01: Opt-in via `graphify.enabled: true` in `.planning/config.json`. When disabled, `/gsd-graphify` prints an activation hint and stops without writing.
+- REQ-GRAPH-02: Slash-command `/gsd-graphify` exposes subcommands `build`, `query <term>`, `status`, `diff`. The programmatic CLI `node gsd-tools.cjs graphify …` additionally exposes `snapshot`, which is also invoked automatically as the final step of `graphify build`.
+- REQ-GRAPH-03: Build runs within the configurable `graphify.build_timeout` (seconds); exceeding the timeout aborts cleanly without leaving a partial graph.
+- REQ-GRAPH-04: `graphify.cjs` falls back to `graph.links` when `graph.edges` is absent so older graph artifacts keep rendering.
+- REQ-GRAPH-05: CJS-only surface; `gsd-sdk query` does not yet register graphify handlers.
+
+**Configuration:** `graphify.enabled`, `graphify.build_timeout`
+**Reference files:** `commands/gsd/graphify.md`, `bin/lib/graphify.cjs`

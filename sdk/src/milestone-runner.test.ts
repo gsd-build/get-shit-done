@@ -36,12 +36,15 @@ vi.mock('./prompt-builder.js', () => ({
 
 vi.mock('./event-stream.js', () => {
   return {
-    GSDEventStream: vi.fn().mockImplementation(() => ({
-      emitEvent: vi.fn(),
-      on: vi.fn(),
-      emit: vi.fn(),
-      addTransport: vi.fn(),
-    })),
+    // Use function (not arrow) so `new GSDEventStream()` works under Vitest 4
+    GSDEventStream: vi.fn(function GSDEventStreamMock() {
+      return {
+        emitEvent: vi.fn(),
+        on: vi.fn(),
+        emit: vi.fn(),
+        addTransport: vi.fn(),
+      };
+    }),
   };
 });
 
@@ -65,9 +68,12 @@ vi.mock('./phase-prompt.js', () => ({
 }));
 
 vi.mock('./gsd-tools.js', () => ({
-  GSDTools: vi.fn().mockImplementation(() => ({
-    roadmapAnalyze: vi.fn(),
-  })),
+  // Constructor mock for `new GSDTools(...)` (Vitest 4)
+  GSDTools: vi.fn(function GSDToolsMock() {
+    return {
+      roadmapAnalyze: vi.fn(),
+    };
+  }),
   GSDToolsError: class extends Error {
     name = 'GSDToolsError';
   },
@@ -125,12 +131,11 @@ describe('GSD.run()', () => {
 
     // Wire mock roadmapAnalyze on the GSDTools instance
     mockRoadmapAnalyze = vi.fn();
-    vi.mocked(GSDTools).mockImplementation(
-      () =>
-        ({
-          roadmapAnalyze: mockRoadmapAnalyze,
-        }) as any,
-    );
+    vi.mocked(GSDTools).mockImplementation(function () {
+      return {
+        roadmapAnalyze: mockRoadmapAnalyze,
+      } as any;
+    });
   });
 
   it('discovers phases and calls runPhase for each incomplete one', async () => {

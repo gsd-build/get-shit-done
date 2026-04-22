@@ -8,6 +8,9 @@ commands.html
 # Local test installs
 .claude/
 
+# Cursor IDE — local agents/skills bundle (never commit)
+.cursor/
+
 # Build artifacts (committed to npm, not git)
 hooks/dist/
 

@@ -1,6 +1,6 @@
 {
   "name": "get-shit-done-cc",
-  "version": "1.34.2",
+  "version": "1.38.2",
   "description": "A meta-prompting, context engineering and spec-driven development system for Claude Code, OpenCode, Gemini and Codex by TÂCHES.",
   "bin": {
     "get-shit-done-cc": "bin/install.js"
@@ -11,7 +11,12 @@
     "get-shit-done",
     "agents",
     "hooks",
-    "scripts"
+    "scripts",
+    "sdk/src",
+    "sdk/prompts",
+    "sdk/package.json",
+    "sdk/package-lock.json",
+    "sdk/tsconfig.json"
   ],
   "keywords": [
     "claude",

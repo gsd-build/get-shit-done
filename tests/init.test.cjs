@@ -353,6 +353,136 @@ describe('init commands ROADMAP fallback when phase directory does not exist (#1
 });
 
 // ─────────────────────────────────────────────────────────────────────────────
+// init ignores archived phases from prior milestones that share a phase number
+// ─────────────────────────────────────────────────────────────────────────────
+
+describe('init commands ignore archived phases from prior milestones sharing a number', () => {
+  let tmpDir;
+
+  beforeEach(() => {
+    tmpDir = createTempProject();
+    // Current milestone ROADMAP has Phase 2 but no disk directory yet
+    fs.writeFileSync(
+      path.join(tmpDir, '.planning', 'ROADMAP.md'),
+      '# v2.0 Roadmap\n\n### Phase 2: New Feature\n**Goal:** New v2.0 feature\n**Requirements**: NEW-01, NEW-02\n**Plans:** TBD\n'
+    );
+    // Prior milestone archive has a shipped Phase 2 with different slug and artifacts
+    const archivedDir = path.join(tmpDir, '.planning', 'milestones', 'v1.0-phases', '02-old-feature');
+    fs.mkdirSync(archivedDir, { recursive: true });
+    fs.writeFileSync(path.join(archivedDir, '2-CONTEXT.md'), '# OLD v1.0 Phase 2 context');
+    fs.writeFileSync(path.join(archivedDir, '2-RESEARCH.md'), '# OLD v1.0 Phase 2 research');
+  });
+
+  afterEach(() => {
+    cleanup(tmpDir);
+  });
+
+  test('init plan-phase prefers current ROADMAP entry over archived v1.0 phase of same number', () => {
+    const result = runGsdTools('init plan-phase 2', tmpDir);
+    assert.ok(result.success, `Command failed: ${result.error}`);
+
+    const output = JSON.parse(result.output);
+    assert.strictEqual(output.phase_found, true);
+    assert.strictEqual(output.phase_name, 'New Feature',
+      'phase_name must come from current ROADMAP.md, not archived v1.0');
+    assert.strictEqual(output.phase_slug, 'new-feature');
+    assert.strictEqual(output.phase_dir, null,
+      'phase_dir must be null — current milestone has no directory yet');
+    assert.strictEqual(output.has_context, false,
+      'has_context must not inherit archived v1.0 artifacts');
+    assert.strictEqual(output.has_research, false,
+      'has_research must not inherit archived v1.0 artifacts');
+    assert.ok(!output.context_path,
+      'context_path must not point at archived v1.0 file');
+    assert.ok(!output.research_path,
+      'research_path must not point at archived v1.0 file');
+    assert.strictEqual(output.phase_req_ids, 'NEW-01, NEW-02');
+  });
+
+  test('init execute-phase prefers current ROADMAP entry over archived v1.0 phase of same number', () => {
+    const result = runGsdTools('init execute-phase 2', tmpDir);
+    assert.ok(result.success, `Command failed: ${result.error}`);
+
+    const output = JSON.parse(result.output);
+    assert.strictEqual(output.phase_found, true);
+    assert.strictEqual(output.phase_name, 'New Feature');
+    assert.strictEqual(output.phase_slug, 'new-feature');
+    assert.strictEqual(output.phase_dir, null);
+    assert.strictEqual(output.phase_req_ids, 'NEW-01, NEW-02');
+  });
+
+  test('init verify-work prefers current ROADMAP entry over archived v1.0 phase of same number', () => {
+    const result = runGsdTools('init verify-work 2', tmpDir);
+    assert.ok(result.success, `Command failed: ${result.error}`);
+
+    const output = JSON.parse(result.output);
+    assert.strictEqual(output.phase_found, true);
+    assert.strictEqual(output.phase_name, 'New Feature');
+    assert.strictEqual(output.phase_dir, null);
+  });
+});
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Bug #2391: zero-padded phase numbers must not bypass archived-phase guard
+// ─────────────────────────────────────────────────────────────────────────────
+
+describe('init plan-phase zero-padded phase number (bug #2391)', () => {
+  let tmpDir;
+
+  beforeEach(() => {
+    tmpDir = createTempProject();
+    // Current milestone ROADMAP has Phase 3 (unpadded heading)
+    fs.writeFileSync(
+      path.join(tmpDir, '.planning', 'ROADMAP.md'),
+      '# v2.0 Roadmap\n\n### Phase 3: Rotation Engine + Availability\n**Goal**: Rotation\n**Requirements**: ROTA-01, ROTA-02\n**Plans:** TBD\n'
+    );
+    // Prior milestone archive has a shipped Phase 3 with different content
+    const archivedDir = path.join(tmpDir, '.planning', 'milestones', 'v1.0-phases', '03-plant-collection-and-rooms');
+    fs.mkdirSync(archivedDir, { recursive: true });
+    fs.writeFileSync(path.join(archivedDir, '03-CONTEXT.md'), '# OLD v1.0 Phase 3 context');
+    fs.writeFileSync(path.join(archivedDir, '03-RESEARCH.md'), '# OLD v1.0 Phase 3 research');
+  });
+
+  afterEach(() => {
+    cleanup(tmpDir);
+  });
+
+  test('zero-padded "03" returns current ROADMAP phase, not archived v1.0 phase', () => {
+    const result = runGsdTools('init plan-phase 03', tmpDir);
+    assert.ok(result.success, `Command failed: ${result.error}`);
+
+    const output = JSON.parse(result.output);
+    assert.strictEqual(output.phase_found, true);
+    assert.strictEqual(output.phase_name, 'Rotation Engine + Availability',
+      'phase_name must come from current ROADMAP.md, not the archived v1.0 phase');
+    assert.strictEqual(output.phase_dir, null,
+      'phase_dir must be null — current milestone has no directory yet');
+    assert.strictEqual(output.has_context, false,
+      'has_context must not inherit archived v1.0 artifacts');
+    assert.strictEqual(output.has_research, false,
+      'has_research must not inherit archived v1.0 artifacts');
+    assert.ok(!output.context_path || !output.context_path.includes('v1.0'),
+      'context_path must not point at archived v1.0 file');
+    assert.strictEqual(output.phase_req_ids, 'ROTA-01, ROTA-02');
+  });
+
+  test('unpadded "3" and zero-padded "03" return identical phase identity', () => {
+    const result3 = runGsdTools('init plan-phase 3', tmpDir);
+    const result03 = runGsdTools('init plan-phase 03', tmpDir);
+    assert.ok(result3.success && result03.success, 'both commands must succeed');
+
+    const out3 = JSON.parse(result3.output);
+    const out03 = JSON.parse(result03.output);
+    assert.strictEqual(out03.phase_name, out3.phase_name,
+      'phase_name must be identical regardless of padding');
+    assert.strictEqual(out03.phase_slug, out3.phase_slug,
+      'phase_slug must be identical regardless of padding');
+    assert.strictEqual(out03.phase_req_ids, out3.phase_req_ids,
+      'phase_req_ids must be identical regardless of padding');
+  });
+});
+
+// ─────────────────────────────────────────────────────────────────────────────
 // cmdInitTodos (INIT-01)
 // ─────────────────────────────────────────────────────────────────────────────
 
@@ -1285,6 +1415,155 @@ describe('findProjectRoot integration via --cwd', () => {
     // Should find config from project root, not from backend/
     assert.deepStrictEqual(output.config.sub_repos, ['backend', 'frontend'],
       'Should read sub_repos from project root config');
+  });
+});
+
+// ─────────────────────────────────────────────────────────────────────────────
+// #2192: init plan-phase must include auto_advance, auto_chain_active, and mode
+// so workflows don't need separate config-get calls that loop on Kimi K2.5
+// ─────────────────────────────────────────────────────────────────────────────
+
+describe('#2192: init plan-phase includes auto-advance config to prevent separate config-get loops', () => {
+  let tmpDir;
+
+  beforeEach(() => {
+    tmpDir = createTempProject();
+    fs.mkdirSync(path.join(tmpDir, '.planning', 'phases', '01-auth'), { recursive: true });
+    fs.writeFileSync(
+      path.join(tmpDir, '.planning', 'ROADMAP.md'),
+      ['# Roadmap', '', '## Milestone v1', '', '### Phase 1: Auth', '**Goal:** Auth'].join('\n')
+    );
+  });
+
+  afterEach(() => {
+    cleanup(tmpDir);
+  });
+
+  test('init plan-phase includes auto_advance field (defaults false)', () => {
+    const result = runGsdTools('init plan-phase 1', tmpDir);
+    assert.ok(result.success, `Command failed: ${result.error}`);
+    const output = JSON.parse(result.output);
+    assert.ok('auto_advance' in output, 'init plan-phase must include auto_advance field');
+    assert.strictEqual(output.auto_advance, false, 'auto_advance should default to false');
+  });
+
+  test('init plan-phase includes auto_chain_active field (defaults false)', () => {
+    const result = runGsdTools('init plan-phase 1', tmpDir);
+    assert.ok(result.success, `Command failed: ${result.error}`);
+    const output = JSON.parse(result.output);
+    assert.ok('auto_chain_active' in output, 'init plan-phase must include auto_chain_active field');
+    assert.strictEqual(output.auto_chain_active, false, 'auto_chain_active should default to false');
+  });
+
+  test('init plan-phase includes mode field (defaults to interactive)', () => {
+    const result = runGsdTools('init plan-phase 1', tmpDir);
+    assert.ok(result.success, `Command failed: ${result.error}`);
+    const output = JSON.parse(result.output);
+    assert.ok('mode' in output, 'init plan-phase must include mode field');
+    assert.strictEqual(output.mode, 'interactive', 'mode should default to interactive');
+  });
+
+  test('init plan-phase reflects auto_advance true when set in config', () => {
+    const configPath = path.join(tmpDir, '.planning', 'config.json');
+    const cfg = { workflow: { auto_advance: true } };
+    fs.writeFileSync(configPath, JSON.stringify(cfg, null, 2));
+
+    const result = runGsdTools('init plan-phase 1', tmpDir);
+    assert.ok(result.success, `Command failed: ${result.error}`);
+    const output = JSON.parse(result.output);
+    assert.strictEqual(output.auto_advance, true, 'auto_advance should reflect config value');
+  });
+
+  test('init plan-phase reflects auto_chain_active true when set in config', () => {
+    const configPath = path.join(tmpDir, '.planning', 'config.json');
+    const cfg = { workflow: { _auto_chain_active: true } };
+    fs.writeFileSync(configPath, JSON.stringify(cfg, null, 2));
+
+    const result = runGsdTools('init plan-phase 1', tmpDir);
+    assert.ok(result.success, `Command failed: ${result.error}`);
+    const output = JSON.parse(result.output);
+    assert.strictEqual(output.auto_chain_active, true, 'auto_chain_active should reflect config value');
+  });
+});
+
+// ─────────────────────────────────────────────────────────────────────────────
+// withProjectRoot: project identity injection (#1948)
+// ─────────────────────────────────────────────────────────────────────────────
+
+describe('withProjectRoot project identity', () => {
+  let tmpDir;
+
+  beforeEach(() => {
+    tmpDir = createTempProject();
+  });
+
+  afterEach(() => {
+    cleanup(tmpDir);
+  });
+
+  test('injects project_code when config.project_code is set', () => {
+    fs.writeFileSync(
+      path.join(tmpDir, '.planning', 'config.json'),
+      JSON.stringify({ project_code: 'CK' })
+    );
+
+    const result = runGsdTools(['init', 'quick', 'test task'], tmpDir, { HOME: tmpDir });
+    assert.ok(result.success, `Command failed: ${result.error}`);
+
+    const output = JSON.parse(result.output);
+    assert.strictEqual(output.project_code, 'CK');
+  });
+
+  test('injects project_title extracted from PROJECT.md H1', () => {
+    fs.writeFileSync(
+      path.join(tmpDir, '.planning', 'config.json'),
+      JSON.stringify({ project_code: 'CK' })
+    );
+    fs.writeFileSync(
+      path.join(tmpDir, '.planning', 'PROJECT.md'),
+      '# CareKit\n\nA care management platform.\n'
+    );
+
+    const result = runGsdTools(['init', 'quick', 'test task'], tmpDir, { HOME: tmpDir });
+    assert.ok(result.success, `Command failed: ${result.error}`);
+
+    const output = JSON.parse(result.output);
+    assert.strictEqual(output.project_title, 'CareKit');
+  });
+
+  test('omits project_code and project_title when project_code is not set', () => {
+    fs.writeFileSync(
+      path.join(tmpDir, '.planning', 'config.json'),
+      JSON.stringify({})
+    );
+
+    const result = runGsdTools(['init', 'quick', 'test task'], tmpDir, { HOME: tmpDir });
+    assert.ok(result.success, `Command failed: ${result.error}`);
+
+    const output = JSON.parse(result.output);
+    assert.strictEqual(output.project_code, undefined,
+      'project_code should not be present when not configured');
+    // project_title may or may not be present depending on PROJECT.md existence,
+    // but without project_code the workflow omits the identity suffix entirely
+  });
+
+  test('omits project_title when PROJECT.md does not exist', () => {
+    fs.writeFileSync(
+      path.join(tmpDir, '.planning', 'config.json'),
+      JSON.stringify({ project_code: 'CK' })
+    );
+    // Ensure no PROJECT.md exists (createTempProject doesn't create one)
+    const projectMdPath = path.join(tmpDir, '.planning', 'PROJECT.md');
+    if (fs.existsSync(projectMdPath)) fs.unlinkSync(projectMdPath);
+
+    const result = runGsdTools(['init', 'quick', 'test task'], tmpDir, { HOME: tmpDir });
+    assert.ok(result.success, `Command failed: ${result.error}`);
+
+    const output = JSON.parse(result.output);
+    assert.strictEqual(output.project_code, 'CK',
+      'project_code should still be present');
+    assert.strictEqual(output.project_title, undefined,
+      'project_title should not be present when PROJECT.md is missing');
   });
 });
 

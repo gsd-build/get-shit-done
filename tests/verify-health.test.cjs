@@ -418,6 +418,76 @@ describe('validate health command', () => {
     );
   });
 
+  // ─── Check 8b: W006 false-positives for not-yet-started phases (#2009) ──────
+
+  test('does not emit W006 for phases listed in ROADMAP summary as unchecked (not started)', () => {
+    // A ROADMAP with Phase 1 started (has disk dir) and Phase 2 listed but
+    // unchecked (- [ ]) — phase 2 has no directory because it hasn't started.
+    // W006 must NOT fire for phase 2.
+    writeMinimalProjectMd(tmpDir);
+    fs.writeFileSync(
+      path.join(tmpDir, '.planning', 'ROADMAP.md'),
+      [
+        '# Roadmap',
+        '',
+        '## v1.0.0',
+        '',
+        '- [x] **Phase 1: Setup** - First phase',
+        '- [ ] **Phase 2: Build** - Not yet started',
+        '',
+        '### Phase 1: Setup',
+        '',
+        '### Phase 2: Build',
+        '',
+      ].join('\n')
+    );
+    writeMinimalStateMd(tmpDir, '# Session State\n\nPhase 1 in progress.\n');
+    writeValidConfigJson(tmpDir);
+    // Only phase 1 dir exists; phase 2 dir does not (not started yet)
+    fs.mkdirSync(path.join(tmpDir, '.planning', 'phases', '01-setup'), { recursive: true });
+
+    const result = runGsdTools('validate health', tmpDir);
+    assert.ok(result.success, `Command failed: ${result.error}`);
+
+    const output = JSON.parse(result.output);
+    const w006s = output.warnings.filter(w => w.code === 'W006');
+    assert.ok(
+      w006s.length === 0,
+      'W006 must not fire for phases with an unchecked summary checkbox (not yet started), got: ' +
+        JSON.stringify(w006s)
+    );
+  });
+
+  test('still emits W006 for a phase that was started (checked) but has no directory', () => {
+    // Phase 1 is marked complete ([x]) in ROADMAP summary but has no directory
+    // on disk — that IS a genuine inconsistency and should still trigger W006.
+    writeMinimalProjectMd(tmpDir);
+    fs.writeFileSync(
+      path.join(tmpDir, '.planning', 'ROADMAP.md'),
+      [
+        '# Roadmap',
+        '',
+        '- [x] **Phase 1: Setup** - Completed',
+        '',
+        '### Phase 1: Setup',
+        '',
+      ].join('\n')
+    );
+    writeMinimalStateMd(tmpDir, '# Session State\n\nPhase 1 done.\n');
+    writeValidConfigJson(tmpDir);
+    // No phase 1 directory — even though roadmap says it's complete
+
+    const result = runGsdTools('validate health', tmpDir);
+    assert.ok(result.success, `Command failed: ${result.error}`);
+
+    const output = JSON.parse(result.output);
+    assert.ok(
+      output.warnings.some(w => w.code === 'W006'),
+      'W006 must still fire when a completed phase has no directory, warnings: ' +
+        JSON.stringify(output.warnings)
+    );
+  });
+
   // ─── Check 7b: Nyquist VALIDATION.md consistency (W009) ──────────────────
 
   test('detects W009 when RESEARCH.md has Validation Architecture but no VALIDATION.md', () => {
@@ -695,5 +765,49 @@ describe('validate health --repair command', () => {
 
     const output = JSON.parse(result.output);
     assert.strictEqual(output.repairable_count, 0, `Expected no repairable issues for W002: ${JSON.stringify(output)}`);
+  });
+});
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Graceful degradation when phasesDir is missing (#1973)
+// ─────────────────────────────────────────────────────────────────────────────
+
+describe('validate health — missing phasesDir', () => {
+  let tmpDir;
+
+  beforeEach(() => {
+    tmpDir = createTempProject();
+  });
+
+  afterEach(() => {
+    cleanup(tmpDir);
+  });
+
+  test('completes without throwing and emits zero phase-directory warnings when phasesDir does not exist', () => {
+    // Setup: valid PROJECT, ROADMAP, STATE, config but NO phases directory
+    writeMinimalProjectMd(tmpDir);
+    writeMinimalRoadmap(tmpDir, ['1', '2']);
+    writeMinimalStateMd(tmpDir);
+    writeValidConfigJson(tmpDir);
+
+    // Remove the phases directory if it exists
+    const phasesDir = path.join(tmpDir, '.planning', 'phases');
+    if (fs.existsSync(phasesDir)) {
+      fs.rmSync(phasesDir, { recursive: true, force: true });
+    }
+
+    // Should complete without throwing
+    const result = runGsdTools('validate health', tmpDir);
+    assert.ok(result.success, `Command should succeed when phasesDir is missing: ${result.error}`);
+
+    const output = JSON.parse(result.output);
+
+    // Assert no phase-directory warnings fired
+    const phaseDirCodes = ['W005', 'W006', 'W007', 'W009', 'I001'];
+    const issues = output.issues || [];
+    for (const code of phaseDirCodes) {
+      const matches = issues.filter(i => i.code === code);
+      assert.strictEqual(matches.length, 0, `Expected no ${code} issues when phasesDir is missing, got: ${JSON.stringify(matches)}`);
+    }
   });
 });

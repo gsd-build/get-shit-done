@@ -839,6 +839,9 @@ GSDアップデート後にローカルの変更を復元します。
 | `--claude` | Claude CLIレビューを含める（別セッション） |
 | `--codex` | Codex CLIレビューを含める |
 | `--coderabbit` | CodeRabbitレビューを含める |
+| `--opencode` | OpenCodeレビューを含める（GitHub Copilot経由） |
+| `--qwen` | Qwen Codeレビューを含める（Alibaba Qwenモデル） |
+| `--cursor` | Cursorエージェントレビューを含める |
 | `--all` | 利用可能なすべてのCLIを含める |
 
 **生成物:** `{phase}-REVIEWS.md` — `/gsd-plan-phase --reviews` で利用可能

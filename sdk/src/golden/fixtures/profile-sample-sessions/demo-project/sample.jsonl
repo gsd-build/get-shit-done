@@ -1,0 +1,3 @@
+{"type":"user","userType":"external","message":{"content":"profile sample message one"},"timestamp":1700000000000,"cwd":"/fixture/proj"}
+{"type":"assistant","message":{"content":"ok"},"timestamp":1700000000001}
+{"type":"user","userType":"external","message":{"content":"profile sample message two"},"timestamp":1700000000002,"cwd":"/fixture/proj"}

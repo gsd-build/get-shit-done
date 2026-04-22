@@ -53,7 +53,7 @@ Read all files that exist. Missing files are fine — the summary adapts to what
 Find all phase directories:
 
 ```bash
-gsd-tools.cjs init progress
+gsd-sdk query init.progress
 ```
 
 This returns phase metadata. For each phase in the milestone scope:
@@ -189,8 +189,8 @@ mkdir -p .planning/reports
 
 Write the summary, then commit:
 ```bash
-gsd-tools.cjs commit "docs(v${VERSION}): generate milestone summary for onboarding" \
-  --files ".planning/reports/MILESTONE_SUMMARY-v${VERSION}.md"
+gsd-sdk query commit "docs(v${VERSION}): generate milestone summary for onboarding" \
+  ".planning/reports/MILESTONE_SUMMARY-v${VERSION}.md"
 ```
 
 ## Step 7: Present Summary
@@ -217,7 +217,7 @@ If the user is done:
 ## Step 9: Update STATE.md
 
 ```bash
-gsd-tools.cjs state record-session \
-  --stopped-at "Milestone v${VERSION} summary generated" \
-  --resume-file ".planning/reports/MILESTONE_SUMMARY-v${VERSION}.md"
+gsd-sdk query state.record-session "" \
+  "Milestone v${VERSION} summary generated" \
+  ".planning/reports/MILESTONE_SUMMARY-v${VERSION}.md"
 ```

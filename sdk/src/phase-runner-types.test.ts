@@ -325,7 +325,7 @@ describe('GSDTools typed methods', () => {
         `,
       );
 
-      const tools = new GSDTools({ projectDir: tmpDir, gsdToolsPath: scriptPath });
+      const tools = new GSDTools({ projectDir: tmpDir, gsdToolsPath: scriptPath, preferNativeQuery: false });
       const result = await tools.initPhaseOp('5');
 
       expect(result.phase_found).toBe(true);
@@ -346,7 +346,7 @@ describe('GSDTools typed methods', () => {
         `,
       );
 
-      const tools = new GSDTools({ projectDir: tmpDir, gsdToolsPath: scriptPath });
+      const tools = new GSDTools({ projectDir: tmpDir, gsdToolsPath: scriptPath, preferNativeQuery: false });
       const result = await tools.initPhaseOp('7') as { received_args: string[] };
 
       expect(result.received_args).toContain('init');
@@ -363,7 +363,7 @@ describe('GSDTools typed methods', () => {
         'config-get.cjs',
         `
         const args = process.argv.slice(2);
-        if (args[0] === 'config' && args[1] === 'get' && args[2] === 'model_profile') {
+        if (args[0] === 'config-get' && args[1] === 'model_profile') {
           process.stdout.write(JSON.stringify('balanced'));
         } else {
           process.exit(1);
@@ -371,7 +371,7 @@ describe('GSDTools typed methods', () => {
         `,
       );
 
-      const tools = new GSDTools({ projectDir: tmpDir, gsdToolsPath: scriptPath });
+      const tools = new GSDTools({ projectDir: tmpDir, gsdToolsPath: scriptPath, preferNativeQuery: false });
       const result = await tools.configGet('model_profile');
 
       expect(result).toBe('balanced');
@@ -382,7 +382,7 @@ describe('GSDTools typed methods', () => {
         'config-get-null.cjs',
         `
         const args = process.argv.slice(2);
-        if (args[0] === 'config' && args[1] === 'get') {
+        if (args[0] === 'config-get' && args[1] === 'nonexistent_key') {
           process.stdout.write('null');
         } else {
           process.exit(1);
@@ -390,7 +390,7 @@ describe('GSDTools typed methods', () => {
         `,
       );
 
-      const tools = new GSDTools({ projectDir: tmpDir, gsdToolsPath: scriptPath });
+      const tools = new GSDTools({ projectDir: tmpDir, gsdToolsPath: scriptPath, preferNativeQuery: false });
       const result = await tools.configGet('nonexistent_key');
 
       expect(result).toBeNull();
@@ -412,7 +412,7 @@ describe('GSDTools typed methods', () => {
         `,
       );
 
-      const tools = new GSDTools({ projectDir: tmpDir, gsdToolsPath: scriptPath });
+      const tools = new GSDTools({ projectDir: tmpDir, gsdToolsPath: scriptPath, preferNativeQuery: false });
       const result = await tools.stateBeginPhase('3');
 
       expect(result).toBe('ok');

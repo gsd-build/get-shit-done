@@ -40,20 +40,24 @@ import { PromptFactory } from './phase-prompt.js';
 export class GSD {
   private readonly projectDir: string;
   private readonly gsdToolsPath: string;
+  private readonly sessionId?: string;
   private readonly defaultModel?: string;
   private readonly defaultMaxBudgetUsd: number;
   private readonly defaultMaxTurns: number;
   private readonly autoMode: boolean;
+  private readonly workstream?: string;
   readonly eventStream: GSDEventStream;
 
   constructor(options: GSDOptions) {
     this.projectDir = resolve(options.projectDir);
     this.gsdToolsPath =
       options.gsdToolsPath ?? resolveGsdToolsPath(this.projectDir);
+    this.sessionId = options.sessionId;
     this.defaultModel = options.model;
     this.defaultMaxBudgetUsd = options.maxBudgetUsd ?? 5.0;
     this.defaultMaxTurns = options.maxTurns ?? 50;
     this.autoMode = options.autoMode ?? false;
+    this.workstream = options.workstream;
     this.eventStream = new GSDEventStream();
   }
 
@@ -75,7 +79,7 @@ export class GSD {
     const plan = await parsePlanFile(absolutePlanPath);
 
     // Load project config
-    const config = await loadConfig(this.projectDir);
+    const config = await loadConfig(this.projectDir, this.workstream);
 
     // Try to load agent definition for tool restrictions
     const agentDef = await this.loadAgentDefinition();
@@ -117,6 +121,9 @@ export class GSD {
     return new GSDTools({
       projectDir: this.projectDir,
       gsdToolsPath: this.gsdToolsPath,
+      workstream: this.workstream,
+      eventStream: this.eventStream,
+      sessionId: this.sessionId,
     });
   }
 
@@ -133,8 +140,8 @@ export class GSD {
   async runPhase(phaseNumber: string, options?: PhaseRunnerOptions): Promise<PhaseRunnerResult> {
     const tools = this.createTools();
     const promptFactory = new PromptFactory();
-    const contextEngine = new ContextEngine(this.projectDir);
-    const config = await loadConfig(this.projectDir);
+    const contextEngine = new ContextEngine(this.projectDir, undefined, undefined, this.workstream);
+    const config = await loadConfig(this.projectDir, this.workstream);
 
     // Auto mode: force auto_advance on and skip_discuss off so self-discuss kicks in
     if (this.autoMode) {
@@ -313,6 +320,12 @@ export type { PhaseRunnerDeps, VerificationOutcome } from './phase-runner.js';
 export { CLITransport } from './cli-transport.js';
 export { WSTransport } from './ws-transport.js';
 export type { WSTransportOptions } from './ws-transport.js';
+
+// Query registry argv normalization (matches `gsd-sdk query` and `GSDTools` hot path)
+export { createRegistry, normalizeQueryCommand } from './query/index.js';
+
+// Workstream utilities
+export { validateWorkstreamName, relPlanningPath } from './workstream-utils.js';
 
 // Init workflow
 export { InitRunner } from './init-runner.js';

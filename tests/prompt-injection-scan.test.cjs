@@ -53,7 +53,9 @@ const ALLOWLIST = new Set([
   'get-shit-done/bin/lib/security.cjs',        // The security module itself
   'get-shit-done/workflows/discuss-phase.md',  // Large workflow (~50K) with power mode + i18n
   'get-shit-done/workflows/execute-phase.md',  // Large orchestration workflow (~51K) with wave execution + code-review gate
+  'get-shit-done/workflows/plan-phase.md',      // Large orchestration workflow (~51K) with TDD mode integration
   'hooks/gsd-prompt-guard.js',                  // The prompt guard hook
+  'hooks/gsd-read-injection-scanner.js',        // The read injection scanner (contains patterns)
   'tests/security.test.cjs',                    // Security tests
   'tests/prompt-injection-scan.test.cjs',       // This file
 ]);

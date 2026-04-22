@@ -9,18 +9,18 @@ Language versions: [English](README.md) · [Português (pt-BR)](pt-BR/README.md)
 | Document | Audience | Description |
 |----------|----------|-------------|
 | [Architecture](ARCHITECTURE.md) | Contributors, advanced users | System architecture, agent model, data flow, and internal design |
-| [Feature Reference](FEATURES.md) | All users | Complete feature and function documentation with requirements |
-| [Command Reference](COMMANDS.md) | All users | Every command with syntax, flags, options, and examples |
+| [Feature Reference](FEATURES.md) | All users | Feature narratives and requirements for released features (see [CHANGELOG](../CHANGELOG.md) for latest additions) |
+| [Command Reference](COMMANDS.md) | All users | Stable commands with syntax, flags, options, and examples |
 | [Configuration Reference](CONFIGURATION.md) | All users | Full config schema, workflow toggles, model profiles, git branching |
 | [CLI Tools Reference](CLI-TOOLS.md) | Contributors, agent authors | `gsd-tools.cjs` programmatic API for workflows and agents |
-| [Agent Reference](AGENTS.md) | Contributors, advanced users | All 18 specialized agents — roles, tools, spawn patterns |
+| [Agent Reference](AGENTS.md) | Contributors, advanced users | Role cards for primary agents — roles, tools, spawn patterns (the `agents/` filesystem is authoritative) |
 | [User Guide](USER-GUIDE.md) | All users | Workflow walkthroughs, troubleshooting, and recovery |
 | [Context Monitor](context-monitor.md) | All users | Context window monitoring hook architecture |
 | [Discuss Mode](workflow-discuss-mode.md) | All users | Assumptions vs interview mode for discuss-phase |
 
 ## Quick Links
 
-- **What's new in v1.32:** STATE.md consistency gates, `--to N` autonomous flag, research gate, verifier scope filtering, read-before-edit guard, 4 new runtimes (Trae, Kilo, Augment, Cline), context reduction, response language config — see [CHANGELOG](../CHANGELOG.md)
+- **What's new:** see [CHANGELOG](../CHANGELOG.md) for current release notes, and upstream [README](../README.md) for release highlights
 - **Getting started:** [README](../README.md) → install → `/gsd-new-project`
 - **Full workflow walkthrough:** [User Guide](USER-GUIDE.md)
 - **All commands at a glance:** [Command Reference](COMMANDS.md)

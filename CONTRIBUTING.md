@@ -316,12 +316,24 @@ get-shit-done/
   workflows/            — Workflow definitions (.md)
   references/           — Reference documentation (.md)
   templates/            — File templates
-agents/                 — Agent definitions (.md)
+agents/                 — Agent definitions (.md) — CANONICAL SOURCE
 commands/gsd/           — Slash command definitions (.md)
 tests/                  — Test files (.test.cjs)
   helpers.cjs           — Shared test utilities
 docs/                   — User-facing documentation
 ```
+
+### Source of truth for agents
+
+Only `agents/` at the repo root is tracked by git. The following directories may exist on a developer machine with GSD installed and **must not be edited** — they are install-sync outputs and will be overwritten:
+
+| Path | Gitignored | What it is |
+|------|-----------|------------|
+| `.claude/agents/` | Yes (`.gitignore:9`) | Local Claude Code runtime sync |
+| `.cursor/agents/` | Yes (`.gitignore:12`) | Local Cursor IDE bundle |
+| `.github/agents/gsd-*` | Yes (`.gitignore:37`) | Local CI-surface bundle |
+
+If you find that `.claude/agents/` has drifted from `agents/` (e.g., after a branch change), re-run `bin/install.js` to re-sync from the canonical source. Always edit `agents/` — never the derivative directories.
 
 ## Security
 

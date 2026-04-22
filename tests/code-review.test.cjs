@@ -28,7 +28,7 @@ const { runGsdTools, createTempProject, cleanup } = require('./helpers.cjs');
 const AGENTS_DIR = path.join(__dirname, '..', 'agents');
 const COMMANDS_DIR = path.join(__dirname, '..', 'commands', 'gsd');
 const WORKFLOWS_DIR = path.join(__dirname, '..', 'get-shit-done', 'workflows');
-const CONFIG_PATH = path.join(__dirname, '..', 'get-shit-done', 'bin', 'lib', 'config.cjs');
+const CONFIG_PATH = path.join(__dirname, '..', 'get-shit-done', 'bin', 'lib', 'config-schema.cjs');
 
 // Plugin directory resolution (cross-platform safe)
 const PLUGIN_WORKFLOWS_DIR = process.env.GSD_PLUGIN_ROOT || path.join(os.homedir(), '.claude', 'get-shit-done', 'workflows');

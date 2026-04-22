@@ -13,7 +13,7 @@ Read all files referenced by the invoking prompt's execution_context before star
 **MANDATORY FIRST STEP — Execute init command:**
 
 ```bash
-INIT=$(node "$HOME/.claude/get-shit-done/bin/gsd-tools.cjs" init new-workspace)
+INIT=$(gsd-sdk query init.new-workspace)
 if [[ "$INIT" == @file:* ]]; then INIT=$(cat "${INIT#@file:}"); fi
 ```
 
@@ -31,6 +31,8 @@ Extract from $ARGUMENTS:
 
 **If `--name` is missing and not `--auto`:**
 
+
+**Text mode (`workflow.text_mode: true` in config or `--text` flag):** Set `TEXT_MODE=true` if `--text` is present in `$ARGUMENTS` OR `text_mode` from init JSON is `true`. When TEXT_MODE is active, replace every `AskUserQuestion` call with a plain-text numbered list and ask the user to type their choice number. This is required for non-Claude runtimes (OpenAI Codex, Gemini CLI, etc.) where `AskUserQuestion` is not available.
 Use AskUserQuestion:
 - header: "Workspace Name"
 - question: "What should this workspace be called?"
@@ -200,7 +202,7 @@ Workspace created: $TARGET_PATH
   Branch: $BRANCH_NAME
 
 Next steps:
-  cd $TARGET_PATH
+  cd "$TARGET_PATH"
   /gsd-new-project    # Initialize GSD in the workspace
 ```
 
@@ -213,7 +215,7 @@ Workspace created with $SUCCESS_COUNT of $TOTAL_COUNT repos: $TARGET_PATH
   Failed: repo3 (branch already exists), repo4 (not a git repo)
 
 Next steps:
-  cd $TARGET_PATH
+  cd "$TARGET_PATH"
   /gsd-new-project    # Initialize GSD in the workspace
 ```
 
@@ -223,7 +225,7 @@ Use AskUserQuestion:
 - header: "Initialize GSD"
 - question: "Would you like to initialize a GSD project in the new workspace?"
 - options:
-  - "Yes — run /gsd-new-project" → tell user to `cd $TARGET_PATH` first, then run `/gsd-new-project`
+  - "Yes — run /gsd-new-project" → tell user to `cd "$TARGET_PATH"` first, then run `/gsd-new-project`
   - "No — I'll set it up later" → done
 
 </process>

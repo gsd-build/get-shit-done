@@ -38,20 +38,24 @@ describe('command files: gsd-tools path references (#1766)', () => {
       'Violations:\n' + violations.join('\n'));
   });
 
-  test('workstreams.md uses standard gsd-tools.cjs path', () => {
+  test('workstreams.md documents gsd-sdk query or legacy gsd-tools.cjs', () => {
     const content = fs.readFileSync(
       path.join(COMMANDS_DIR, 'workstreams.md'), 'utf-8'
     );
-    const nodeLines = content.split('\n').filter(l => /node\s/.test(l));
 
-    assert.ok(nodeLines.length > 0,
-      'workstreams.md should contain node invocations');
+    assert.ok(
+      /gsd-sdk\s+query/.test(content) || /gsd-tools\.cjs/.test(content),
+      'workstreams.md should document gsd-sdk query or gsd-tools.cjs'
+    );
 
-    for (const line of nodeLines) {
-      assert.ok(
-        line.includes('gsd-tools.cjs'),
-        'Each node invocation must reference gsd-tools.cjs, got: ' + line.trim()
-      );
+    const lines = content.split('\n');
+    for (const line of lines) {
+      if (/node\s/.test(line)) {
+        assert.ok(
+          line.includes('gsd-tools.cjs'),
+          'Each node invocation must reference gsd-tools.cjs, got: ' + line.trim()
+        );
+      }
     }
   });
 });

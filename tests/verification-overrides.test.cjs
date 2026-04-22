@@ -217,7 +217,9 @@ describe('verification overrides reference (#1747)', () => {
       verifierContent = verifierContent || fs.readFileSync(verifierPath, 'utf-8');
       const roleEnd = verifierContent.indexOf('</role>');
       const projectCtx = verifierContent.indexOf('<project_context>');
-      const reqReading = verifierContent.indexOf('<required_reading>');
+      // Use regex to find the actual XML tag (on its own line), not backtick-escaped prose mentions
+      const reqMatch = verifierContent.match(/^<required_reading>/m);
+      const reqReading = reqMatch ? reqMatch.index : -1;
       assert.ok(roleEnd > -1, '</role> tag should exist');
       assert.ok(projectCtx > -1, '<project_context> tag should exist');
       assert.ok(reqReading > -1, '<required_reading> tag should exist');

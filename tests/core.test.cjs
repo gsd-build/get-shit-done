@@ -31,6 +31,7 @@ const {
   findProjectRoot,
   detectSubRepos,
   planningDir,
+  timeAgo,
 } = require('../get-shit-done/bin/lib/core.cjs');
 
 // ─── loadConfig ────────────────────────────────────────────────────────────────
@@ -599,6 +600,108 @@ describe('getMilestoneInfo', () => {
     assert.strictEqual(info.version, 'v1.0');
     assert.strictEqual(info.name, 'milestone');
   });
+
+  // Bug #2409: getMilestoneInfo must prefer STATE.md milestone: field over regex matching
+  test('uses STATE.md milestone frontmatter when 🚧 is inside <summary> tag without bold (bug #2409)', () => {
+    // STATE.md says v2.9, ROADMAP has 🚧 v2.9 inside <summary> (not bolded) — no bold regex match
+    const roadmap = [
+      '# Milestones',
+      '',
+      '- ✅ v2.2 Old Features — shipped 2026-04-03',
+      '- 🚧 v2.9 Full-Pass Verification',
+      '',
+      '<details>',
+      '<summary>🚧 v2.9 Full-Pass Verification & Bug Fixing — IN PROGRESS</summary>',
+      '',
+      '## Roadmap v2.9: Full-Pass Verification & Bug Fixing',
+      '',
+      '### Phase 1: Verification',
+      '',
+      '</details>',
+      '',
+      '## Phase Details (v2.2 — Old Features)',
+      '',
+      '### Phase 1: Old Stuff',
+    ].join('\n');
+    fs.writeFileSync(path.join(tmpDir, '.planning', 'ROADMAP.md'), roadmap);
+    fs.writeFileSync(
+      path.join(tmpDir, '.planning', 'STATE.md'),
+      '---\nmilestone: v2.9\n---\n\n# State\n'
+    );
+
+    const info = getMilestoneInfo(tmpDir);
+    assert.strictEqual(info.version, 'v2.9',
+      'should return v2.9 from STATE.md, not v2.2 from a stale heading match');
+    assert.ok(info.name.includes('Full-Pass') || info.name.includes('Verification'),
+      `name should reference the v2.9 milestone, got: "${info.name}"`);
+  });
+
+  test('STATE.md milestone takes precedence over first ## heading match (bug #2409)', () => {
+    // ROADMAP with multiple ## headings — without STATE.md anchoring, first match wins
+    const roadmap = [
+      '## Phase Details (v1.5–v2.1)',
+      '',
+      '## Roadmap v2.2: Old Milestone',
+      '',
+      '## Roadmap v2.9: Current Milestone',
+      '',
+      '### Phase 1: Alpha',
+    ].join('\n');
+    fs.writeFileSync(path.join(tmpDir, '.planning', 'ROADMAP.md'), roadmap);
+    fs.writeFileSync(
+      path.join(tmpDir, '.planning', 'STATE.md'),
+      '---\nmilestone: v2.9\n---\n\n# State\n'
+    );
+
+    const info = getMilestoneInfo(tmpDir);
+    assert.strictEqual(info.version, 'v2.9',
+      'should read v2.9 from STATE.md, not v2.2 from first ## heading');
+    assert.strictEqual(info.name, 'Current Milestone');
+  });
+
+  // Bug found in code review of PR #2458: stateVersion early-return doesn't check if shipped
+  test('falls through to new active milestone when STATE.md version is already shipped (✅ heading)', () => {
+    // STATE.md still says v1.0 (stale), but v1.0 is marked ✅ in ROADMAP.md.
+    // getMilestoneInfo must NOT return v1.0; it must fall through and detect v2.0.
+    const roadmap = [
+      '## v1.0 ✅ Initial Release: Done',
+      '',
+      '### Phase 1: Setup',
+      '',
+      '## v2.0: Active Milestone',
+      '',
+      '### Phase 2: Build',
+    ].join('\n');
+    fs.writeFileSync(path.join(tmpDir, '.planning', 'ROADMAP.md'), roadmap);
+    fs.writeFileSync(
+      path.join(tmpDir, '.planning', 'STATE.md'),
+      '---\nmilestone: v1.0\n---\n\n# State\n'
+    );
+
+    const info = getMilestoneInfo(tmpDir);
+    assert.strictEqual(info.version, 'v2.0',
+      'should return v2.0 (active milestone), not v1.0 (stale shipped milestone from STATE.md)');
+    assert.strictEqual(info.name, 'Active Milestone');
+  });
+
+  test('falls through when STATE.md version matches ✅ heading in alternate position formats', () => {
+    // ✅ can appear before the version: ## ✅ v1.0 Old Name
+    const roadmap = [
+      '## ✅ v1.0 Old Name',
+      '',
+      '## v2.0: New Stuff',
+    ].join('\n');
+    fs.writeFileSync(path.join(tmpDir, '.planning', 'ROADMAP.md'), roadmap);
+    fs.writeFileSync(
+      path.join(tmpDir, '.planning', 'STATE.md'),
+      '---\nmilestone: v1.0\n---\n\n# State\n'
+    );
+
+    const info = getMilestoneInfo(tmpDir);
+    assert.strictEqual(info.version, 'v2.0',
+      'should return v2.0, not stale v1.0 with ✅ prefix in heading');
+    assert.strictEqual(info.name, 'New Stuff');
+  });
 });
 
 // ─── searchPhaseInDir ──────────────────────────────────────────────────────────
@@ -788,6 +891,41 @@ describe('getRoadmapPhaseInternal', () => {
     assert.ok(result.section.includes('Some details here'));
     // Should not include Phase 2 content
     assert.ok(!result.section.includes('Phase 2: API'));
+  });
+
+  // Bug #2391: zero-padded phase numbers ("03") must match unpadded ROADMAP headings ("Phase 3:")
+  test('matches zero-padded phase number against unpadded ROADMAP heading (bug #2391)', () => {
+    fs.writeFileSync(
+      path.join(tmpDir, '.planning', 'ROADMAP.md'),
+      '### Phase 3: Rotation Engine\n**Goal**: Build rotation\n**Requirements**: ROTA-01\n'
+    );
+    const result = getRoadmapPhaseInternal(tmpDir, '03');
+    assert.ok(result !== null, 'should find the phase with zero-padded input "03"');
+    assert.strictEqual(result.found, true);
+    assert.strictEqual(result.phase_name, 'Rotation Engine');
+    assert.strictEqual(result.goal, 'Build rotation');
+  });
+
+  test('matches double-zero-padded phase number against unpadded ROADMAP heading (bug #2391)', () => {
+    fs.writeFileSync(
+      path.join(tmpDir, '.planning', 'ROADMAP.md'),
+      '### Phase 7: Final\n**Goal**: Ship it\n'
+    );
+    const result = getRoadmapPhaseInternal(tmpDir, '007');
+    assert.ok(result !== null, 'should find the phase with "007"');
+    assert.strictEqual(result.found, true);
+    assert.strictEqual(result.phase_name, 'Final');
+  });
+
+  test('unpadded lookup still works after fix (regression check)', () => {
+    fs.writeFileSync(
+      path.join(tmpDir, '.planning', 'ROADMAP.md'),
+      '### Phase 3: Rotation Engine\n**Goal**: Build rotation\n'
+    );
+    const result = getRoadmapPhaseInternal(tmpDir, '3');
+    assert.ok(result !== null);
+    assert.strictEqual(result.found, true);
+    assert.strictEqual(result.phase_name, 'Rotation Engine');
   });
 });
 
@@ -1070,8 +1208,10 @@ describe('stale hook filter', () => {
 
 describe('stale hook path', () => {
   test('gsd-check-update.js checks configDir/hooks/ where hooks are actually installed (#1421)', () => {
+    // The stale-hook scan logic lives in the worker (moved from inline -e template literal).
+    // The worker receives configDir via env and constructs the hooksDir path.
     const content = fs.readFileSync(
-      path.join(__dirname, '..', 'hooks', 'gsd-check-update.js'), 'utf-8'
+      path.join(__dirname, '..', 'hooks', 'gsd-check-update-worker.js'), 'utf-8'
     );
     // Hooks are installed at configDir/hooks/ (e.g. ~/.claude/hooks/),
     // not configDir/get-shit-done/hooks/ which doesn't exist (#1421)
@@ -1629,9 +1769,11 @@ describe('findProjectRoot', () => {
 // ─── reapStaleTempFiles ─────────────────────────────────────────────────────
 
 describe('reapStaleTempFiles', () => {
+  const gsdTmpDir = path.join(os.tmpdir(), 'gsd');
+
   test('removes stale gsd-*.json files older than maxAgeMs', () => {
-    const tmpDir = os.tmpdir();
-    const stalePath = path.join(tmpDir, `gsd-reap-test-${Date.now()}.json`);
+    fs.mkdirSync(gsdTmpDir, { recursive: true });
+    const stalePath = path.join(gsdTmpDir, `gsd-reap-test-${Date.now()}.json`);
     fs.writeFileSync(stalePath, '{}');
     // Set mtime to 10 minutes ago
     const oldTime = new Date(Date.now() - 10 * 60 * 1000);
@@ -1643,8 +1785,8 @@ describe('reapStaleTempFiles', () => {
   });
 
   test('preserves fresh gsd-*.json files', () => {
-    const tmpDir = os.tmpdir();
-    const freshPath = path.join(tmpDir, `gsd-reap-fresh-${Date.now()}.json`);
+    fs.mkdirSync(gsdTmpDir, { recursive: true });
+    const freshPath = path.join(gsdTmpDir, `gsd-reap-fresh-${Date.now()}.json`);
     fs.writeFileSync(freshPath, '{}');
 
     reapStaleTempFiles('gsd-reap-fresh-', { maxAgeMs: 5 * 60 * 1000 });
@@ -1655,8 +1797,8 @@ describe('reapStaleTempFiles', () => {
   });
 
   test('removes stale temp directories when present', () => {
-    const tmpDir = os.tmpdir();
-    const staleDir = fs.mkdtempSync(path.join(tmpDir, 'gsd-reap-dir-'));
+    fs.mkdirSync(gsdTmpDir, { recursive: true });
+    const staleDir = fs.mkdtempSync(path.join(gsdTmpDir, 'gsd-reap-dir-'));
     fs.writeFileSync(path.join(staleDir, 'data.jsonl'), 'test');
     // Set mtime to 10 minutes ago
     const oldTime = new Date(Date.now() - 10 * 60 * 1000);
@@ -1746,5 +1888,105 @@ describe('planningDir', () => {
       () => planningDir(cwd, '../../../tmp', null),
       /invalid path characters/
     );
+  });
+});
+
+// ─── timeAgo ──────────────────────────────────────────────────────────────────
+
+describe('timeAgo', () => {
+  const now = () => Date.now();
+  const dateAt = (msAgo) => new Date(now() - msAgo);
+
+  // ─── seconds boundary ───
+  test('returns "just now" for dates under 5 seconds old', () => {
+    assert.strictEqual(timeAgo(dateAt(0)), 'just now');
+    assert.strictEqual(timeAgo(dateAt(4_000)), 'just now');
+  });
+
+  test('returns "N seconds ago" between 5 and 59 seconds', () => {
+    assert.strictEqual(timeAgo(dateAt(5_000)), '5 seconds ago');
+    assert.strictEqual(timeAgo(dateAt(30_000)), '30 seconds ago');
+    assert.strictEqual(timeAgo(dateAt(59_000)), '59 seconds ago');
+  });
+
+  // ─── minutes boundary ───
+  test('transitions to minutes at 60 seconds', () => {
+    assert.strictEqual(timeAgo(dateAt(60_000)), '1 minute ago');
+  });
+
+  test('uses singular "1 minute ago" for exactly one minute', () => {
+    assert.strictEqual(timeAgo(dateAt(60_000)), '1 minute ago');
+    assert.strictEqual(timeAgo(dateAt(119_000)), '1 minute ago');
+  });
+
+  test('uses plural "N minutes ago" for 2-59 minutes', () => {
+    assert.strictEqual(timeAgo(dateAt(120_000)), '2 minutes ago');
+    assert.strictEqual(timeAgo(dateAt(5 * 60_000)), '5 minutes ago');
+    assert.strictEqual(timeAgo(dateAt(59 * 60_000)), '59 minutes ago');
+  });
+
+  // ─── hours boundary ───
+  test('transitions to hours at 60 minutes', () => {
+    assert.strictEqual(timeAgo(dateAt(60 * 60_000)), '1 hour ago');
+  });
+
+  test('uses singular "1 hour ago" for exactly one hour', () => {
+    assert.strictEqual(timeAgo(dateAt(60 * 60_000)), '1 hour ago');
+    assert.strictEqual(timeAgo(dateAt(119 * 60_000)), '1 hour ago');
+  });
+
+  test('uses plural "N hours ago" for 2-23 hours', () => {
+    assert.strictEqual(timeAgo(dateAt(2 * 3600_000)), '2 hours ago');
+    assert.strictEqual(timeAgo(dateAt(23 * 3600_000)), '23 hours ago');
+  });
+
+  // ─── days boundary ───
+  test('transitions to days at 24 hours', () => {
+    assert.strictEqual(timeAgo(dateAt(24 * 3600_000)), '1 day ago');
+  });
+
+  test('uses singular "1 day ago" for exactly one day', () => {
+    assert.strictEqual(timeAgo(dateAt(24 * 3600_000)), '1 day ago');
+  });
+
+  test('uses plural "N days ago" for 2-29 days', () => {
+    assert.strictEqual(timeAgo(dateAt(2 * 86400_000)), '2 days ago');
+    assert.strictEqual(timeAgo(dateAt(29 * 86400_000)), '29 days ago');
+  });
+
+  // ─── months boundary ───
+  test('transitions to months at 30 days', () => {
+    assert.strictEqual(timeAgo(dateAt(30 * 86400_000)), '1 month ago');
+  });
+
+  test('uses singular "1 month ago" for exactly one month (30 days)', () => {
+    assert.strictEqual(timeAgo(dateAt(30 * 86400_000)), '1 month ago');
+    assert.strictEqual(timeAgo(dateAt(59 * 86400_000)), '1 month ago');
+  });
+
+  test('uses plural "N months ago" for 2-11 months', () => {
+    assert.strictEqual(timeAgo(dateAt(60 * 86400_000)), '2 months ago');
+    assert.strictEqual(timeAgo(dateAt(180 * 86400_000)), '6 months ago');
+  });
+
+  // ─── years boundary ───
+  test('transitions to years at 365 days', () => {
+    assert.strictEqual(timeAgo(dateAt(365 * 86400_000)), '1 year ago');
+  });
+
+  test('uses singular "1 year ago" for exactly one year', () => {
+    assert.strictEqual(timeAgo(dateAt(365 * 86400_000)), '1 year ago');
+  });
+
+  test('uses plural "N years ago" for 2+ years', () => {
+    assert.strictEqual(timeAgo(dateAt(2 * 365 * 86400_000)), '2 years ago');
+    assert.strictEqual(timeAgo(dateAt(10 * 365 * 86400_000)), '10 years ago');
+  });
+
+  // ─── edge cases ───
+  test('handles future dates as "just now" (negative elapsed)', () => {
+    // A date 5 seconds in the future has negative elapsed time, which floors to a negative
+    // number of seconds and hits the "under 5 seconds" branch.
+    assert.strictEqual(timeAgo(new Date(Date.now() + 5_000)), 'just now');
   });
 });

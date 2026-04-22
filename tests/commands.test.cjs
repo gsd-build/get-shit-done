@@ -1693,6 +1693,36 @@ describe('stats command', () => {
     const output = JSON.parse(result.output);
     assert.strictEqual(output.phases[0].status, 'Executed', 'progress should show Executed without verification');
   });
+
+  test('does not duplicate phases when ROADMAP uses unpadded numbers and dirs use padded numbers', () => {
+    // ROADMAP.md uses "Phase 1:" (unpadded) but directory is "01-auth" (padded).
+    // Without normalization, the Map holds two entries: "1" and "01", doubling phases_total.
+    const p1 = path.join(tmpDir, '.planning', 'phases', '01-auth');
+    fs.mkdirSync(p1, { recursive: true });
+    fs.writeFileSync(path.join(p1, '01-01-PLAN.md'), '# Plan');
+    fs.writeFileSync(path.join(p1, '01-01-SUMMARY.md'), '# Summary');
+    fs.writeFileSync(path.join(p1, 'VERIFICATION.md'), '---\nstatus: passed\n---\n# Verified');
+
+    fs.writeFileSync(
+      path.join(tmpDir, '.planning', 'ROADMAP.md'),
+      [
+        '# Roadmap',
+        '',
+        '## Milestone v1',
+        '',
+        '### Phase 1: Auth',
+        '**Goal:** Authentication',
+      ].join('\n')
+    );
+
+    const result = runGsdTools('stats', tmpDir);
+    assert.ok(result.success, `Command failed: ${result.error}`);
+
+    const stats = JSON.parse(result.output);
+    assert.strictEqual(stats.phases_total, 1, 'unpadded ROADMAP heading and padded dir should merge into one phase');
+    assert.strictEqual(stats.phases_completed, 1);
+    assert.strictEqual(stats.phases.length, 1);
+  });
 });
 
 // ─────────────────────────────────────────────────────────────────────────────

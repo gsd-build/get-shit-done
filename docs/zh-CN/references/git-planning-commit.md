@@ -1,13 +1,15 @@
 # Git 规划提交
 
-使用 gsd-tools CLI 提交规划工件，它会自动检查 `commit_docs` 配置和 gitignore 状态。
+通过 `gsd-sdk query commit` 提交规划工件，它会自动检查 `commit_docs` 配置和 gitignore 状态（与旧版 `gsd-tools.cjs commit` 行为相同）。
 
 ## 通过 CLI 提交
 
-始终使用 `gsd-tools.cjs commit` 处理 `.planning/` 文件 — 它会自动处理 `commit_docs` 和 gitignore 检查：
+先传提交说明，再传文件路径（位置参数）。`commit` 不要使用 `--files`（该标志仅用于 `commit-to-subrepo`）。
+
+对 `.planning/` 文件始终使用此方式 —— 它会自动处理 `commit_docs` 与 gitignore 检查：
 
 ```bash
-node "$HOME/.claude/get-shit-done/bin/gsd-tools.cjs" commit "docs({scope}): {description}" --files .planning/STATE.md .planning/ROADMAP.md
+gsd-sdk query commit "docs({scope}): {description}" .planning/STATE.md .planning/ROADMAP.md
 ```
 
 如果 `commit_docs` 为 `false` 或 `.planning/` 被 gitignore，CLI 会返回 `skipped`（带原因）。无需手动条件检查。
@@ -17,7 +19,7 @@ node "$HOME/.claude/get-shit-done/bin/gsd-tools.cjs" commit "docs({scope}): {des
 将 `.planning/` 文件变更合并到上次提交：
 
 ```bash
-node "$HOME/.claude/get-shit-done/bin/gsd-tools.cjs" commit "" --files .planning/codebase/*.md --amend
+gsd-sdk query commit "" .planning/codebase/*.md --amend
 ```
 
 ## 提交消息模式

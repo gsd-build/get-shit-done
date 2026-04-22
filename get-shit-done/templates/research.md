@@ -38,6 +38,18 @@ Template for `.planning/phases/XX-name/{phase_num}-RESEARCH.md` - comprehensive 
 **If no CONTEXT.md exists:** Write "No user constraints - all decisions at Claude's discretion"
 </user_constraints>
 
+<architectural_responsibility_map>
+## Architectural Responsibility Map
+
+Map each phase capability to its standard architectural tier owner before diving into framework research. This prevents tier misassignment from propagating into plans.
+
+| Capability | Primary Tier | Secondary Tier | Rationale |
+|------------|-------------|----------------|-----------|
+| [capability from phase description] | [Browser/Client, Frontend Server, API/Backend, CDN/Static, or Database/Storage] | [secondary tier or —] | [why this tier owns it] |
+
+**If single-tier application:** Write "Single-tier application — all capabilities reside in [tier]" and omit the table.
+</architectural_responsibility_map>
+
 <research_summary>
 ## Summary
 
@@ -81,6 +93,20 @@ yarn add [packages]
 
 <architecture_patterns>
 ## Architecture Patterns
+
+### System Architecture Diagram
+
+Architecture diagrams MUST show data flow through conceptual components, not file listings.
+
+Requirements:
+- Show entry points (how data/requests enter the system)
+- Show processing stages (what transformations happen, in what order)
+- Show decision points and branching paths
+- Show external dependencies and service boundaries
+- Use arrows to indicate data flow direction
+- A reader should be able to trace the primary use case from input to output by following the arrows
+
+File-to-implementation mapping belongs in the Component Responsibilities table, not in the diagram.
 
 ### Recommended Project Structure
 ```
@@ -299,6 +325,20 @@ npm install three @react-three/fiber @react-three/drei @react-three/rapier zusta
 
 <architecture_patterns>
 ## Architecture Patterns
+
+### System Architecture Diagram
+
+Architecture diagrams MUST show data flow through conceptual components, not file listings.
+
+Requirements:
+- Show entry points (how data/requests enter the system)
+- Show processing stages (what transformations happen, in what order)
+- Show decision points and branching paths
+- Show external dependencies and service boundaries
+- Use arrows to indicate data flow direction
+- A reader should be able to trace the primary use case from input to output by following the arrows
+
+File-to-implementation mapping belongs in the Component Responsibilities table, not in the diagram.
 
 ### Recommended Project Structure
 ```

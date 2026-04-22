@@ -276,6 +276,57 @@ Systematic debugging with persistent state across context resets.
 Usage: `/gsd-debug "login button doesn't work"`
 Usage: `/gsd-debug` (resume active session)
 
+### Spiking & Sketching
+
+**`/gsd-spike [idea] [--quick]`**
+Rapidly spike an idea with throwaway experiments to validate feasibility.
+
+- Decomposes idea into 2-5 focused experiments (risk-ordered)
+- Each spike answers one specific Given/When/Then question
+- Builds minimum code, runs it, captures verdict (VALIDATED/INVALIDATED/PARTIAL)
+- Saves to `.planning/spikes/` with MANIFEST.md tracking
+- Does not require `/gsd-new-project` — works in any repo
+- `--quick` skips decomposition, builds immediately
+
+Usage: `/gsd-spike "can we stream LLM output over WebSockets?"`
+Usage: `/gsd-spike --quick "test if pdfjs extracts tables"`
+
+**`/gsd-sketch [idea] [--quick]`**
+Rapidly sketch UI/design ideas using throwaway HTML mockups with multi-variant exploration.
+
+- Conversational mood/direction intake before building
+- Each sketch produces 2-3 variants as tabbed HTML pages
+- User compares variants, cherry-picks elements, iterates
+- Shared CSS theme system compounds across sketches
+- Saves to `.planning/sketches/` with MANIFEST.md tracking
+- Does not require `/gsd-new-project` — works in any repo
+- `--quick` skips mood intake, jumps to building
+
+Usage: `/gsd-sketch "dashboard layout for the admin panel"`
+Usage: `/gsd-sketch --quick "form card grouping"`
+
+**`/gsd-spike-wrap-up`**
+Package spike findings into a persistent project skill.
+
+- Curates each spike one-at-a-time (include/exclude/partial/UAT)
+- Groups findings by feature area
+- Generates `./.claude/skills/spike-findings-[project]/` with references and sources
+- Writes summary to `.planning/spikes/WRAP-UP-SUMMARY.md`
+- Adds auto-load routing line to project CLAUDE.md
+
+Usage: `/gsd-spike-wrap-up`
+
+**`/gsd-sketch-wrap-up`**
+Package sketch design findings into a persistent project skill.
+
+- Curates each sketch one-at-a-time (include/exclude/partial/revisit)
+- Groups findings by design area
+- Generates `./.claude/skills/sketch-findings-[project]/` with design decisions, CSS patterns, HTML structures
+- Writes summary to `.planning/sketches/WRAP-UP-SUMMARY.md`
+- Adds auto-load routing line to project CLAUDE.md
+
+Usage: `/gsd-sketch-wrap-up`
+
 ### Quick Notes
 
 **`/gsd-note <text>`**
@@ -345,7 +396,7 @@ Usage: `/gsd-ship 4` or `/gsd-ship 4 --draft`
 
 ---
 
-**`/gsd-review --phase N [--gemini] [--claude] [--codex] [--coderabbit] [--all]`**
+**`/gsd-review --phase N [--gemini] [--claude] [--codex] [--coderabbit] [--opencode] [--qwen] [--cursor] [--all]`**
 Cross-AI peer review — invoke external AI CLIs to independently review phase plans.
 
 - Detects available CLIs (gemini, claude, codex, coderabbit)
@@ -478,6 +529,13 @@ Usage: `/gsd-join-discord`
 ├── todos/                # Captured ideas and tasks
 │   ├── pending/          # Todos waiting to be worked on
 │   └── done/             # Completed todos
+├── spikes/               # Spike experiments (/gsd-spike)
+│   ├── MANIFEST.md       # Spike inventory and verdicts
+│   └── NNN-name/         # Individual spike directories
+├── sketches/             # Design sketches (/gsd-sketch)
+│   ├── MANIFEST.md       # Sketch inventory and winners
+│   ├── themes/           # Shared CSS theme files
+│   └── NNN-name/         # Individual sketch directories (HTML + README)
 ├── debug/                # Active debug sessions
 │   └── resolved/         # Archived resolved issues
 ├── milestones/

@@ -4,55 +4,13 @@
 
 const fs = require('fs');
 const path = require('path');
-const { output, error, planningRoot, withPlanningLock, CONFIG_DEFAULTS, atomicWriteFileSync } = require('./core.cjs');
+const { output, error, planningDir, withPlanningLock, CONFIG_DEFAULTS, atomicWriteFileSync } = require('./core.cjs');
 const {
   VALID_PROFILES,
   getAgentToModelMapForProfile,
   formatAgentToModelMapAsTable,
 } = require('./model-profiles.cjs');
-
-const VALID_CONFIG_KEYS = new Set([
-  'mode', 'granularity', 'parallelization', 'commit_docs', 'model_profile',
-  'search_gitignored', 'brave_search', 'firecrawl', 'exa_search',
-  'workflow.research', 'workflow.plan_check', 'workflow.verifier',
-  'workflow.nyquist_validation', 'workflow.ui_phase', 'workflow.ui_safety_gate',
-  'workflow.auto_advance', 'workflow.node_repair', 'workflow.node_repair_budget',
-  'workflow.text_mode',
-  'workflow.research_before_questions',
-  'workflow.discuss_mode',
-  'workflow.skip_discuss',
-  'workflow._auto_chain_active',
-  'workflow.use_worktrees',
-  'workflow.code_review',
-  'workflow.code_review_depth',
-  'git.branching_strategy', 'git.base_branch', 'git.phase_branch_template', 'git.milestone_branch_template', 'git.quick_branch_template',
-  'planning.commit_docs', 'planning.search_gitignored',
-  'workflow.subagent_timeout',
-  'hooks.context_warnings',
-  'features.thinking_partner',
-  'context',
-  'features.global_learnings',
-  'learnings.max_inject',
-  'project_code', 'phase_naming',
-  'manager.flags.discuss', 'manager.flags.plan', 'manager.flags.execute',
-  'response_language',
-]);
-
-/**
- * Check whether a config key path is valid.
- * Supports exact matches from VALID_CONFIG_KEYS plus dynamic patterns
- * like `agent_skills.<agent-type>` where the sub-key is freeform.
- */
-function isValidConfigKey(keyPath) {
-  if (VALID_CONFIG_KEYS.has(keyPath)) return true;
-  // Allow agent_skills.<agent-type> with any agent type string
-  if (/^agent_skills\.[a-zA-Z0-9_-]+$/.test(keyPath)) return true;
-  // Allow features.<feature_name> — dynamic namespace for feature flags.
-  // Intentionally open-ended so new flags (e.g., features.global_learnings) work
-  // without updating VALID_CONFIG_KEYS each time.
-  if (/^features\.[a-zA-Z0-9_]+$/.test(keyPath)) return true;
-  return false;
-}
+const { VALID_CONFIG_KEYS, isValidConfigKey } = require('./config-schema.cjs');
 
 const CONFIG_KEY_SUGGESTIONS = {
   'workflow.nyquist_validation_enabled': 'workflow.nyquist_validation',
@@ -61,9 +19,11 @@ const CONFIG_KEY_SUGGESTIONS = {
   'hooks.research_questions': 'workflow.research_before_questions',
   'workflow.research_questions': 'workflow.research_before_questions',
   'workflow.codereview': 'workflow.code_review',
+  'workflow.review_command': 'workflow.code_review_command',
   'workflow.review': 'workflow.code_review',
   'workflow.code_review_level': 'workflow.code_review_depth',
   'workflow.review_depth': 'workflow.code_review_depth',
+  'review.model': 'review.models.<cli-name>',
 };
 
 function validateKnownConfigKeyPath(keyPath) {
@@ -143,12 +103,23 @@ function buildNewProjectConfig(userChoices) {
       node_repair_budget: 2,
       ui_phase: true,
       ui_safety_gate: true,
+      ai_integration_phase: true,
+      tdd_mode: false,
       text_mode: false,
       research_before_questions: false,
       discuss_mode: 'discuss',
       skip_discuss: false,
       code_review: true,
       code_review_depth: 'standard',
+      code_review_command: null,
+      pattern_mapper: true,
+      plan_bounce: false,
+      plan_bounce_script: null,
+      plan_bounce_passes: 2,
+      auto_prune_state: false,
+      security_enforcement: CONFIG_DEFAULTS.security_enforcement,
+      security_asvs_level: CONFIG_DEFAULTS.security_asvs_level,
+      security_block_on: CONFIG_DEFAULTS.security_block_on,
     },
     hooks: {
       context_warnings: true,
@@ -156,6 +127,7 @@ function buildNewProjectConfig(userChoices) {
     project_code: null,
     phase_naming: 'sequential',
     agent_skills: {},
+    claude_md_path: './CLAUDE.md',
   };
 
   // Three-level deep merge: hardcoded <- userDefaults <- choices
@@ -196,7 +168,7 @@ function buildNewProjectConfig(userChoices) {
  * Idempotent: if config.json already exists, returns { created: false }.
  */
 function cmdConfigNewProject(cwd, choicesJson, raw) {
-  const planningBase = planningRoot(cwd);
+  const planningBase = planningDir(cwd);
   const configPath = path.join(planningBase, 'config.json');
 
   // Idempotent: don't overwrite existing config
@@ -241,7 +213,7 @@ function cmdConfigNewProject(cwd, choicesJson, raw) {
  * the happy path. But note that `error()` will still `exit(1)` out of the process.
  */
 function ensureConfigFile(cwd) {
-  const planningBase = planningRoot(cwd);
+  const planningBase = planningDir(cwd);
   const configPath = path.join(planningBase, 'config.json');
 
   // Ensure .planning directory exists
@@ -291,7 +263,7 @@ function cmdConfigEnsureSection(cwd, raw) {
  * the happy path. But note that `error()` will still `exit(1)` out of the process.
  */
 function setConfigValue(cwd, keyPath, parsedValue) {
-  const configPath = path.join(planningRoot(cwd), 'config.json');
+  const configPath = path.join(planningDir(cwd), 'config.json');
 
   return withPlanningLock(cwd, () => {
     // Load existing config or start with empty object
@@ -364,7 +336,7 @@ function cmdConfigSet(cwd, keyPath, value, raw) {
 }
 
 function cmdConfigGet(cwd, keyPath, raw, defaultValue) {
-  const configPath = path.join(planningRoot(cwd), 'config.json');
+  const configPath = path.join(planningDir(cwd), 'config.json');
   const hasDefault = defaultValue !== undefined;
 
   if (!keyPath) {
@@ -469,6 +441,17 @@ function getCmdConfigSetModelProfileResultMessage(
   return paragraphs.join('\n\n');
 }
 
+/**
+ * Print the resolved config.json path (workstream-aware). Used by settings.md
+ * so the workflow writes/reads the correct file when a workstream is active (#2282).
+ */
+function cmdConfigPath(cwd) {
+  // Always emit as plain text — a file path is used via shell substitution,
+  // never consumed as JSON. Passing raw=true forces plain-text output.
+  const configPath = path.join(planningDir(cwd), 'config.json');
+  output(configPath, true, configPath);
+}
+
 module.exports = {
   VALID_CONFIG_KEYS,
   cmdConfigEnsureSection,
@@ -476,4 +459,5 @@ module.exports = {
   cmdConfigGet,
   cmdConfigSetModelProfile,
   cmdConfigNewProject,
+  cmdConfigPath,
 };

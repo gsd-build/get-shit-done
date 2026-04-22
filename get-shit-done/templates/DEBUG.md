@@ -20,7 +20,9 @@ updated: [ISO timestamp]
 hypothesis: [current theory being tested]
 test: [how testing it]
 expecting: [what result means if true/false]
-next_action: [immediate next step]
+next_action: [immediate next step — be specific, not "continue investigating"]
+reasoning_checkpoint: null  <!-- populated before every fix attempt — see structured_returns -->
+tdd_checkpoint: null  <!-- populated when tdd_mode is active after root cause confirmed -->
 
 ## Symptoms
 <!-- Written during gathering, then immutable -->
@@ -69,7 +71,10 @@ files_changed: []
 - OVERWRITE entirely on each update
 - Always reflects what Claude is doing RIGHT NOW
 - If Claude reads this after /clear, it knows exactly where to resume
-- Fields: hypothesis, test, expecting, next_action
+- Fields: hypothesis, test, expecting, next_action, reasoning_checkpoint, tdd_checkpoint
+- `next_action`: must be concrete and actionable — bad: "continue investigating"; good: "Add logging at line 47 of auth.js to observe token value before jwt.verify()"
+- `reasoning_checkpoint`: OVERWRITE before every fix_and_verify — five-field structured reasoning record (hypothesis, confirming_evidence, falsification_test, fix_rationale, blind_spots)
+- `tdd_checkpoint`: OVERWRITE during TDD red/green phases — test file, name, status, failure output
 
 **Symptoms:**
 - Written during initial gathering phase

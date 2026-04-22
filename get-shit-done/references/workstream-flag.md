@@ -93,19 +93,19 @@ This ensures workstream scope chains automatically through the workflow:
 ## CLI Usage
 
 ```bash
-# All gsd-tools commands accept --ws
-node gsd-tools.cjs state json --ws feature-a
-node gsd-tools.cjs find-phase 3 --ws feature-b
+# All gsd-sdk query commands accept --ws
+gsd-sdk query state.json --ws feature-a
+gsd-sdk query find-phase 3 --ws feature-b
 
 # Session-local switching without --ws on every command
-GSD_SESSION_KEY=my-terminal-a node gsd-tools.cjs workstream set feature-a
-GSD_SESSION_KEY=my-terminal-a node gsd-tools.cjs state json
-GSD_SESSION_KEY=my-terminal-b node gsd-tools.cjs workstream set feature-b
-GSD_SESSION_KEY=my-terminal-b node gsd-tools.cjs state json
+GSD_SESSION_KEY=my-terminal-a gsd-sdk query workstream.set feature-a
+GSD_SESSION_KEY=my-terminal-a gsd-sdk query state.json
+GSD_SESSION_KEY=my-terminal-b gsd-sdk query workstream.set feature-b
+GSD_SESSION_KEY=my-terminal-b gsd-sdk query state.json
 
 # Workstream CRUD
-node gsd-tools.cjs workstream create <name>
-node gsd-tools.cjs workstream list
-node gsd-tools.cjs workstream status <name>
-node gsd-tools.cjs workstream complete <name>
+gsd-sdk query workstream.create <name>
+gsd-sdk query workstream.list
+gsd-sdk query workstream.status <name>
+gsd-sdk query workstream.complete <name>
 ```

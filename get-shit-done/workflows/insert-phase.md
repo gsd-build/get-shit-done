@@ -34,7 +34,7 @@ Validate first argument is an integer.
 Load phase operation context:
 
 ```bash
-INIT=$(node "$HOME/.claude/get-shit-done/bin/gsd-tools.cjs" init phase-op "${after_phase}")
+INIT=$(gsd-sdk query init.phase-op "${after_phase}")
 if [[ "$INIT" == @file:* ]]; then INIT=$(cat "${INIT#@file:}"); fi
 ```
 
@@ -46,10 +46,10 @@ Exit.
 </step>
 
 <step name="insert_phase">
-**Delegate the phase insertion to gsd-tools:**
+**Delegate the phase insertion to `gsd-sdk query phase.insert`:**
 
 ```bash
-RESULT=$(node "$HOME/.claude/get-shit-done/bin/gsd-tools.cjs" phase insert "${after_phase}" "${description}")
+RESULT=$(gsd-sdk query phase.insert "${after_phase}" "${description}")
 ```
 
 The CLI handles:
@@ -66,7 +66,11 @@ Extract from result: `phase_number`, `after_phase`, `name`, `slug`, `directory`.
 Update STATE.md to reflect the inserted phase:
 
 1. Read `.planning/STATE.md`
-2. Under "## Accumulated Context" → "### Roadmap Evolution" add entry:
+2. Update STATE.md's next-phase pointers to the newly inserted phase `{decimal_phase}`:
+   - Update structured field(s) used by tooling (e.g. `current_phase:`) to `{decimal_phase}`.
+   - Update human-readable recommendation text (e.g. `## Current Phase`, `Next recommended run:`) to `{decimal_phase}`.
+   - If multiple pointer locations exist, update all of them in the same edit.
+3. Under "## Accumulated Context" → "### Roadmap Evolution" add entry:
    ```
    - Phase {decimal_phase} inserted after Phase {after_phase}: {description} (URGENT)
    ```
@@ -122,7 +126,7 @@ Project state updated: .planning/STATE.md
 <success_criteria>
 Phase insertion is complete when:
 
-- [ ] `gsd-tools phase insert` executed successfully
+- [ ] `gsd-sdk query phase.insert` executed successfully
 - [ ] Phase directory created
 - [ ] Roadmap updated with new phase entry (includes "(INSERTED)" marker)
 - [ ] STATE.md updated with roadmap evolution note

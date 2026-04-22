@@ -759,6 +759,36 @@ timeout 30 bash -c 'until node -e "fetch(\"http://localhost:3000\").then(r=>{pro
 
 </anti_patterns>
 
+<type name="tdd-review">
+## checkpoint:tdd-review (TDD Mode Only)
+
+**When:** All waves in a phase complete and `workflow.tdd_mode` is enabled. Inserted by the execute-phase orchestrator after `aggregate_results`.
+
+**Purpose:** Collaborative review of TDD gate compliance across all `type: tdd` plans in the phase. Advisory — does not block execution.
+
+**Use for:**
+- Verifying RED/GREEN/REFACTOR commit sequence for each TDD plan
+- Surfacing gate violations (missing RED or GREEN commits)
+- Reviewing test quality (tests fail for the right reason)
+- Confirming minimal GREEN implementations
+
+**Structure:**
+```xml
+<task type="checkpoint:tdd-review" gate="advisory">
+  <what-checked>TDD gate compliance for {count} plans in Phase {X}</what-checked>
+  <gate-results>
+    | Plan | RED | GREEN | REFACTOR | Status |
+    |------|-----|-------|----------|--------|
+    | {id} |  ✓  |   ✓   |    ✓     | Pass   |
+  </gate-results>
+  <violations>[List of gate violations, or "None"]</violations>
+  <resume-signal>Review complete — proceed to phase verification</resume-signal>
+</task>
+```
+
+**Auto-mode behavior:** When `workflow._auto_chain_active` or `workflow.auto_advance` is true, the TDD review checkpoint auto-approves (advisory gate — never blocks).
+</type>
+
 <summary>
 
 Checkpoints formalize human-in-the-loop points for verification and decisions, not manual work.

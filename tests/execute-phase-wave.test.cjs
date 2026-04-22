@@ -128,7 +128,7 @@ describe('use_worktrees config: cross-workflow structural coverage', () => {
   const DIAGNOSE_PATH = path.join(__dirname, '..', 'get-shit-done', 'workflows', 'diagnose-issues.md');
   const EXECUTE_PLAN_PATH = path.join(__dirname, '..', 'get-shit-done', 'workflows', 'execute-plan.md');
   const PLANNING_CONFIG_PATH = path.join(__dirname, '..', 'get-shit-done', 'references', 'planning-config.md');
-  const CONFIG_CJS_PATH = path.join(__dirname, '..', 'get-shit-done', 'bin', 'lib', 'config.cjs');
+  const CONFIG_CJS_PATH = path.join(__dirname, '..', 'get-shit-done', 'bin', 'lib', 'config-schema.cjs');
 
   test('quick workflow reads USE_WORKTREES from config', () => {
     const content = fs.readFileSync(QUICK_PATH, 'utf-8');

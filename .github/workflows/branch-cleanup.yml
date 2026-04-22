@@ -1,0 +1,123 @@
+name: Branch Cleanup
+
+on:
+  pull_request:
+    types: [closed]
+  schedule:
+    - cron: '0 4 * * 0'  # Sunday 4am UTC — weekly orphan sweep
+  workflow_dispatch:
+
+permissions:
+  contents: write
+  pull-requests: read
+
+jobs:
+  # Runs immediately when a PR is merged — deletes the head branch.
+  # Belt-and-suspenders alongside the repo's delete_branch_on_merge setting,
+  # which handles web/API merges but may be bypassed by some CLI paths.
+  delete-merged-branch:
+    name: Delete merged PR branch
+    runs-on: ubuntu-latest
+    timeout-minutes: 2
+    if: github.event_name == 'pull_request' && github.event.pull_request.merged == true
+    steps:
+      - name: Delete head branch
+        uses: actions/github-script@3a2844b7e9c422d3c10d287c895573f7108da1b3 # v9.0.0
+        with:
+          script: |
+            const branch = context.payload.pull_request.head.ref;
+            const protectedBranches = ['main', 'develop', 'release'];
+            if (protectedBranches.includes(branch)) {
+              core.info(`Skipping protected branch: ${branch}`);
+              return;
+            }
+            try {
+              await github.rest.git.deleteRef({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                ref: `heads/${branch}`,
+              });
+              core.info(`Deleted branch: ${branch}`);
+            } catch (e) {
+              // 422 = branch already deleted (e.g. by delete_branch_on_merge setting)
+              if (e.status === 422) {
+                core.info(`Branch already deleted: ${branch}`);
+              } else {
+                throw e;
+              }
+            }
+
+  # Runs weekly to catch any orphaned branches whose PRs were merged
+  # before this workflow existed, or that slipped through edge cases.
+  sweep-orphaned-branches:
+    name: Weekly orphaned branch sweep
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    if: github.event_name == 'schedule' || github.event_name == 'workflow_dispatch'
+    steps:
+      - name: Delete branches from merged PRs
+        uses: actions/github-script@3a2844b7e9c422d3c10d287c895573f7108da1b3 # v9.0.0
+        with:
+          script: |
+            const protectedBranches = new Set(['main', 'develop', 'release']);
+            const deleted = [];
+            const skipped = [];
+
+            // Paginate through all branches (100 per page)
+            let page = 1;
+            let allBranches = [];
+            while (true) {
+              const { data } = await github.rest.repos.listBranches({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                per_page: 100,
+                page,
+              });
+              allBranches = allBranches.concat(data);
+              if (data.length < 100) break;
+              page++;
+            }
+
+            core.info(`Scanning ${allBranches.length} branches...`);
+
+            for (const branch of allBranches) {
+              if (protectedBranches.has(branch.name)) continue;
+
+              // Find the most recent closed PR for this branch
+              const { data: prs } = await github.rest.pulls.list({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                head: `${context.repo.owner}:${branch.name}`,
+                state: 'closed',
+                per_page: 1,
+                sort: 'updated',
+                direction: 'desc',
+              });
+
+              if (prs.length === 0 || !prs[0].merged_at) {
+                skipped.push(branch.name);
+                continue;
+              }
+
+              try {
+                await github.rest.git.deleteRef({
+                  owner: context.repo.owner,
+                  repo: context.repo.repo,
+                  ref: `heads/${branch.name}`,
+                });
+                deleted.push(branch.name);
+              } catch (e) {
+                if (e.status !== 422) {
+                  core.warning(`Failed to delete ${branch.name}: ${e.message}`);
+                }
+              }
+            }
+
+            const summary = [
+              `Deleted ${deleted.length} orphaned branch(es).`,
+              deleted.length > 0 ? `  Removed: ${deleted.join(', ')}` : '',
+              skipped.length > 0 ? `  Skipped (no merged PR): ${skipped.length} branch(es)` : '',
+            ].filter(Boolean).join('\n');
+
+            core.info(summary);
+            await core.summary.addRaw(summary).write();

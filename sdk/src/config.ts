@@ -7,6 +7,7 @@
 
 import { readFile } from 'node:fs/promises';
 import { join } from 'node:path';
+import { relPlanningPath } from './workstream-utils.js';
 
 // ─── Types ───────────────────────────────────────────────────────────────────
 
@@ -22,6 +23,8 @@ export interface WorkflowConfig {
   plan_check: boolean;
   verifier: boolean;
   nyquist_validation: boolean;
+  /** Mirrors gsd-tools flat `config.tdd_mode` (from `workflow.tdd_mode`). */
+  tdd_mode: boolean;
   auto_advance: boolean;
   node_repair: boolean;
   node_repair_budget: number;
@@ -33,6 +36,8 @@ export interface WorkflowConfig {
   skip_discuss: boolean;
   /** Maximum self-discuss passes in auto/headless mode before forcing proceed. Default: 3. */
   max_discuss_passes: number;
+  /** Subagent timeout in ms (matches `get-shit-done/bin/lib/core.cjs` default 300000). */
+  subagent_timeout: number;
 }
 
 export interface HooksConfig {
@@ -51,6 +56,12 @@ export interface GSDConfig {
   workflow: WorkflowConfig;
   hooks: HooksConfig;
   agent_skills: Record<string, unknown>;
+  /** Project slug for branch templates; mirrors gsd-tools `config.project_code`. */
+  project_code?: string | null;
+  /** Interactive vs headless; mirrors gsd-tools flat `config.mode`. */
+  mode?: string;
+  /** Internal auto-chain flag; mirrors gsd-tools `config._auto_chain_active`. */
+  _auto_chain_active?: boolean;
   [key: string]: unknown;
 }
 
@@ -75,6 +86,7 @@ export const CONFIG_DEFAULTS: GSDConfig = {
     plan_check: true,
     verifier: true,
     nyquist_validation: true,
+    tdd_mode: false,
     auto_advance: false,
     node_repair: true,
     node_repair_budget: 2,
@@ -85,11 +97,15 @@ export const CONFIG_DEFAULTS: GSDConfig = {
     discuss_mode: 'discuss',
     skip_discuss: false,
     max_discuss_passes: 3,
+    subagent_timeout: 300000,
   },
   hooks: {
     context_warnings: true,
   },
   agent_skills: {},
+  project_code: null,
+  mode: 'interactive',
+  _auto_chain_active: false,
 };
 
 // ─── Loader ──────────────────────────────────────────────────────────────────
@@ -99,15 +115,25 @@ export const CONFIG_DEFAULTS: GSDConfig = {
  * Returns full defaults when file is missing or empty.
  * Throws on malformed JSON with a helpful error message.
  */
-export async function loadConfig(projectDir: string): Promise<GSDConfig> {
-  const configPath = join(projectDir, '.planning', 'config.json');
+export async function loadConfig(projectDir: string, workstream?: string): Promise<GSDConfig> {
+  const configPath = join(projectDir, relPlanningPath(workstream), 'config.json');
+  const rootConfigPath = join(projectDir, '.planning', 'config.json');
 
   let raw: string;
   try {
     raw = await readFile(configPath, 'utf-8');
   } catch {
-    // File missing — normal for new projects
-    return structuredClone(CONFIG_DEFAULTS);
+    // If workstream config missing, fall back to root config
+    if (workstream) {
+      try {
+        raw = await readFile(rootConfigPath, 'utf-8');
+      } catch {
+        return structuredClone(CONFIG_DEFAULTS);
+      }
+    } else {
+      // File missing — normal for new projects
+      return structuredClone(CONFIG_DEFAULTS);
+    }
   }
 
   const trimmed = raw.trim();

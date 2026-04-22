@@ -11,7 +11,14 @@
     "security_asvs_level": 1,
     "security_block_on": "high",
     "discuss_mode": "discuss",
-    "research_before_questions": false
+    "research_before_questions": false,
+    "code_review_command": null,
+    "plan_bounce": false,
+    "plan_bounce_script": null,
+    "plan_bounce_passes": 2,
+    "cross_ai_execution": false,
+    "cross_ai_command": "",
+    "cross_ai_timeout": 300
   },
   "planning": {
     "commit_docs": true,
@@ -44,5 +51,6 @@
     "context_warnings": true
   },
   "project_code": null,
-  "agent_skills": {}
+  "agent_skills": {},
+  "claude_md_path": "./CLAUDE.md"
 }

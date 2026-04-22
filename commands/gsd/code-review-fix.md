@@ -33,7 +33,7 @@ Optional flags parsed from $ARGUMENTS:
 - `--all` — Include Info findings in fix scope. Default behavior fixes Critical + Warning only.
 - `--auto` — Enable fix + re-review iteration loop. After applying fixes, re-run code-review at same depth. If new issues found, iterate. Cap at 3 iterations total. Without this flag, single fix pass only.
 
-Context files (CLAUDE.md, REVIEW.md, phase state) are resolved inside the workflow via `gsd-tools init phase-op` and delegated to agent via config blocks.
+Context files (CLAUDE.md, REVIEW.md, phase state) are resolved inside the workflow via `gsd-sdk query init.phase-op` and delegated to agent via config blocks.
 </context>
 
 <process>

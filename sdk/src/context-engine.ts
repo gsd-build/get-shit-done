@@ -25,6 +25,7 @@ import {
   DEFAULT_TRUNCATION_OPTIONS,
   type TruncationOptions,
 } from './context-truncation.js';
+import { relPlanningPath } from './workstream-utils.js';
 
 // ─── File manifest per phase ─────────────────────────────────────────────────
 
@@ -63,6 +64,11 @@ const PHASE_FILE_MANIFEST: Record<PhaseType, FileSpec[]> = {
     { key: 'plan', filename: 'PLAN.md', required: false },
     { key: 'summary', filename: 'SUMMARY.md', required: false },
   ],
+  [PhaseType.Repair]: [
+    { key: 'state', filename: 'STATE.md', required: true },
+    { key: 'config', filename: 'config.json', required: false },
+    { key: 'plan', filename: 'PLAN.md', required: false },
+  ],
   [PhaseType.Discuss]: [
     { key: 'state', filename: 'STATE.md', required: true },
     { key: 'roadmap', filename: 'ROADMAP.md', required: false },
@@ -77,8 +83,8 @@ export class ContextEngine {
   private readonly logger?: GSDLogger;
   private readonly truncation: TruncationOptions;
 
-  constructor(projectDir: string, logger?: GSDLogger, truncation?: Partial<TruncationOptions>) {
-    this.planningDir = join(projectDir, '.planning');
+  constructor(projectDir: string, logger?: GSDLogger, truncation?: Partial<TruncationOptions>, workstream?: string) {
+    this.planningDir = join(projectDir, relPlanningPath(workstream));
     this.logger = logger;
     this.truncation = { ...DEFAULT_TRUNCATION_OPTIONS, ...truncation };
   }

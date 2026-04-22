@@ -13,7 +13,7 @@ Read all files referenced by the invoking prompt's execution_context before star
 Extract workspace name from $ARGUMENTS.
 
 ```bash
-INIT=$(node "$HOME/.claude/get-shit-done/bin/gsd-tools.cjs" init remove-workspace "$WORKSPACE_NAME")
+INIT=$(gsd-sdk query init.remove-workspace "$WORKSPACE_NAME")
 if [[ "$INIT" == @file:* ]]; then INIT=$(cat "${INIT#@file:}"); fi
 ```
 
@@ -23,6 +23,8 @@ Parse JSON for: `workspace_name`, `workspace_path`, `has_manifest`, `strategy`, 
 
 First run `/gsd-list-workspaces` to show available workspaces, then ask:
 
+
+**Text mode (`workflow.text_mode: true` in config or `--text` flag):** Set `TEXT_MODE=true` if `--text` is present in `$ARGUMENTS` OR `text_mode` from init JSON is `true`. When TEXT_MODE is active, replace every `AskUserQuestion` call with a plain-text numbered list and ask the user to type their choice number. This is required for non-Claude runtimes (OpenAI Codex, Gemini CLI, etc.) where `AskUserQuestion` is not available.
 Use AskUserQuestion:
 - header: "Remove Workspace"
 - question: "Which workspace do you want to remove?"
@@ -41,7 +43,7 @@ Cannot remove workspace "$WORKSPACE_NAME" — the following repos have uncommitt
   - repo2
 
 Commit or stash changes in these repos before removing the workspace:
-  cd $WORKSPACE_PATH/repo1
+  cd "$WORKSPACE_PATH/repo1"
   git stash   # or git commit
 ```
 

@@ -7,6 +7,11 @@ const path = require('path');
 const { escapeRegex, loadConfig, getMilestoneInfo, getMilestonePhaseFilter, normalizeMd, planningDir, planningPaths, output, error, atomicWriteFileSync } = require('./core.cjs');
 const { extractFrontmatter, reconstructFrontmatter } = require('./frontmatter.cjs');
 
+// Cache disk scan results from buildStateFrontmatter per cwd per process (#1967).
+// Avoids re-reading N+1 directories on every state write when the phase structure
+// hasn't changed within the same gsd-tools invocation.
+const _diskScanCache = new Map();
+
 /** Shorthand — every state command needs this path */
 function getStatePath(cwd) {
   return planningPaths(cwd).state;
@@ -24,12 +29,13 @@ process.on('exit', () => {
 
 // Shared helper: extract a field value from STATE.md content.
 // Supports both **Field:** bold and plain Field: format.
+// Horizontal whitespace only after ':' so YAML keys like `progress:` do not match as `Progress:` (parity with sdk/helpers stateExtractField).
 function stateExtractField(content, fieldName) {
   const escaped = escapeRegex(fieldName);
-  const boldPattern = new RegExp(`\\*\\*${escaped}:\\*\\*\\s*(.+)`, 'i');
+  const boldPattern = new RegExp(`\\*\\*${escaped}:\\*\\*[ \\t]*(.+)`, 'i');
   const boldMatch = content.match(boldPattern);
   if (boldMatch) return boldMatch[1].trim();
-  const plainPattern = new RegExp(`^${escaped}:\\s*(.+)`, 'im');
+  const plainPattern = new RegExp(`^${escaped}:[ \\t]*(.+)`, 'im');
   const plainMatch = content.match(plainPattern);
   return plainMatch ? plainMatch[1].trim() : null;
 }
@@ -715,7 +721,13 @@ function buildStateFrontmatter(bodyContent, cwd) {
   const status = stateExtractField(bodyContent, 'Status');
   const progressRaw = stateExtractField(bodyContent, 'Progress');
   const lastActivity = stateExtractField(bodyContent, 'Last Activity');
-  const stoppedAt = stateExtractField(bodyContent, 'Stopped At') || stateExtractField(bodyContent, 'Stopped at');
+  // Bug #2444: scope Stopped At extraction to the ## Session section so that
+  // historical "Stopped at:" prose elsewhere in the body (e.g. in a
+  // Session Continuity Archive section) never overwrites the current value.
+  // Fall back to full-body search only when no ## Session section exists.
+  const sessionSectionMatch = bodyContent.match(/##\s*Session\s*\n([\s\S]*?)(?=\n##|$)/i);
+  const sessionBodyScope = sessionSectionMatch ? sessionSectionMatch[1] : bodyContent;
+  const stoppedAt = stateExtractField(sessionBodyScope, 'Stopped At') || stateExtractField(sessionBodyScope, 'Stopped at');
   const pausedAt = stateExtractField(bodyContent, 'Paused At');
 
   let milestone = null;
@@ -737,28 +749,64 @@ function buildStateFrontmatter(bodyContent, cwd) {
     try {
       const phasesDir = planningPaths(cwd).phases;
       if (fs.existsSync(phasesDir)) {
-        const isDirInMilestone = getMilestonePhaseFilter(cwd);
-        const phaseDirs = fs.readdirSync(phasesDir, { withFileTypes: true })
-          .filter(e => e.isDirectory()).map(e => e.name)
-          .filter(isDirInMilestone);
-        let diskTotalPlans = 0;
-        let diskTotalSummaries = 0;
-        let diskCompletedPhases = 0;
+        // Use cached disk scan when available — avoids N+1 readdirSync calls
+        // on repeated buildStateFrontmatter invocations within the same process (#1967)
+        let cached = _diskScanCache.get(cwd);
+        if (!cached) {
+          const isDirInMilestone = getMilestonePhaseFilter(cwd);
+          const allMatchingDirs = fs.readdirSync(phasesDir, { withFileTypes: true })
+            .filter(e => e.isDirectory()).map(e => e.name)
+            .filter(isDirInMilestone);
 
-        for (const dir of phaseDirs) {
-          const files = fs.readdirSync(path.join(phasesDir, dir));
-          const plans = files.filter(f => f.match(/-PLAN\.md$/i)).length;
-          const summaries = files.filter(f => f.match(/-SUMMARY\.md$/i)).length;
-          diskTotalPlans += plans;
-          diskTotalSummaries += summaries;
-          if (plans > 0 && summaries >= plans) diskCompletedPhases++;
+          // Bug #2445: when stale phase dirs from a prior milestone remain in
+          // .planning/phases/ alongside new dirs with the same phase number,
+          // de-duplicate by normalized phase number keeping the most recently
+          // modified dir. This prevents double-counting (e.g. two "Phase 1" dirs).
+          const seenPhaseNums = new Map(); // normalizedNum -> dirName
+          for (const dir of allMatchingDirs) {
+            const m = dir.match(/^0*(\d+[A-Za-z]?(?:\.\d+)*)/);
+            const key = m ? m[1].toLowerCase() : dir;
+            if (!seenPhaseNums.has(key)) {
+              seenPhaseNums.set(key, dir);
+            } else {
+              // Keep the dir that is newer on disk (more likely current milestone)
+              try {
+                const existing = path.join(phasesDir, seenPhaseNums.get(key));
+                const candidate = path.join(phasesDir, dir);
+                if (fs.statSync(candidate).mtimeMs > fs.statSync(existing).mtimeMs) {
+                  seenPhaseNums.set(key, dir);
+                }
+              } catch { /* keep existing on stat error */ }
+            }
+          }
+          const phaseDirs = [...seenPhaseNums.values()];
+
+          let diskTotalPlans = 0;
+          let diskTotalSummaries = 0;
+          let diskCompletedPhases = 0;
+
+          for (const dir of phaseDirs) {
+            const files = fs.readdirSync(path.join(phasesDir, dir));
+            const plans = files.filter(f => f.match(/-PLAN\.md$/i)).length;
+            const summaries = files.filter(f => f.match(/-SUMMARY\.md$/i)).length;
+            diskTotalPlans += plans;
+            diskTotalSummaries += summaries;
+            if (plans > 0 && summaries >= plans) diskCompletedPhases++;
+          }
+          cached = {
+            totalPhases: isDirInMilestone.phaseCount > 0
+              ? Math.max(phaseDirs.length, isDirInMilestone.phaseCount)
+              : phaseDirs.length,
+            completedPhases: diskCompletedPhases,
+            totalPlans: diskTotalPlans,
+            completedPlans: diskTotalSummaries,
+          };
+          _diskScanCache.set(cwd, cached);
         }
-        totalPhases = isDirInMilestone.phaseCount > 0
-          ? Math.max(phaseDirs.length, isDirInMilestone.phaseCount)
-          : phaseDirs.length;
-        completedPhases = diskCompletedPhases;
-        totalPlans = diskTotalPlans;
-        completedPlans = diskTotalSummaries;
+        totalPhases = cached.totalPhases;
+        completedPhases = cached.completedPhases;
+        totalPlans = cached.totalPlans;
+        completedPlans = cached.completedPlans;
       }
     } catch { /* intentionally empty */ }
   }
@@ -904,6 +952,10 @@ function releaseStateLock(lockPath) {
  * each other's changes (race condition with read-modify-write cycle).
  */
 function writeStateMd(statePath, content, cwd) {
+  // Invalidate disk scan cache before computing new frontmatter — the write
+  // may create new PLAN/SUMMARY files that buildStateFrontmatter must see.
+  // Safe for any calling pattern, not just short-lived CLI processes (#1967).
+  if (cwd) _diskScanCache.delete(cwd);
   const synced = syncStateFrontmatter(content, cwd);
   const lockPath = acquireStateLock(statePath);
   try {
@@ -1386,6 +1438,187 @@ function cmdStateSync(cwd, options, raw) {
   output({ synced: true, changes, dry_run: false }, raw);
 }
 
+/**
+ * Prune old entries from STATE.md sections that grow unboundedly (#1970).
+ * Moves decisions, recently-completed summaries, and resolved blockers
+ * older than keepRecent phases to STATE-ARCHIVE.md.
+ *
+ * Options:
+ *   keepRecent: number of recent phases to retain (default: 3)
+ *   dryRun: if true, return what would be pruned without modifying STATE.md
+ */
+function cmdStatePrune(cwd, options, raw) {
+  const silent = !!options.silent;
+  const emit = silent ? () => {} : (result, r, v) => output(result, r, v);
+  const statePath = planningPaths(cwd).state;
+  if (!fs.existsSync(statePath)) { emit({ error: 'STATE.md not found' }, raw); return; }
+
+  const keepRecent = parseInt(options.keepRecent, 10) || 3;
+  const dryRun = !!options.dryRun;
+  const currentPhaseRaw = stateExtractField(fs.readFileSync(statePath, 'utf-8'), 'Current Phase');
+  const currentPhase = parseInt(currentPhaseRaw, 10) || 0;
+  const cutoff = currentPhase - keepRecent;
+
+  if (cutoff <= 0) {
+    emit({ pruned: false, reason: `Only ${currentPhase} phases — nothing to prune with --keep-recent ${keepRecent}` }, raw, 'false');
+    return;
+  }
+
+  const archivePath = path.join(path.dirname(statePath), 'STATE-ARCHIVE.md');
+  const archived = [];
+
+  // Shared pruning logic applied to both dry-run and real passes.
+  // Returns { newContent, archivedSections }.
+  function prunePass(content) {
+    const sections = [];
+
+    // Prune Decisions section: entries like "- [Phase N]: ..."
+    const decisionPattern = /(###?\s*(?:Decisions|Decisions Made|Accumulated.*Decisions)\s*\n)([\s\S]*?)(?=\n###?|\n##[^#]|$)/i;
+    const decMatch = content.match(decisionPattern);
+    if (decMatch) {
+      const lines = decMatch[2].split('\n');
+      const keep = [];
+      const archive = [];
+      for (const line of lines) {
+        const phaseMatch = line.match(/^\s*-\s*\[Phase\s+(\d+)/i);
+        if (phaseMatch && parseInt(phaseMatch[1], 10) <= cutoff) {
+          archive.push(line);
+        } else {
+          keep.push(line);
+        }
+      }
+      if (archive.length > 0) {
+        sections.push({ section: 'Decisions', count: archive.length, lines: archive });
+        content = content.replace(decisionPattern, (_m, header) => `${header}${keep.join('\n')}`);
+      }
+    }
+
+    // Prune Recently Completed section: entries mentioning phase numbers
+    const recentPattern = /(###?\s*Recently Completed\s*\n)([\s\S]*?)(?=\n###?|\n##[^#]|$)/i;
+    const recMatch = content.match(recentPattern);
+    if (recMatch) {
+      const lines = recMatch[2].split('\n');
+      const keep = [];
+      const archive = [];
+      for (const line of lines) {
+        const phaseMatch = line.match(/Phase\s+(\d+)/i);
+        if (phaseMatch && parseInt(phaseMatch[1], 10) <= cutoff) {
+          archive.push(line);
+        } else {
+          keep.push(line);
+        }
+      }
+      if (archive.length > 0) {
+        sections.push({ section: 'Recently Completed', count: archive.length, lines: archive });
+        content = content.replace(recentPattern, (_m, header) => `${header}${keep.join('\n')}`);
+      }
+    }
+
+    // Prune resolved blockers: lines marked as resolved (strikethrough ~~text~~
+    // or "[RESOLVED]" prefix) with a phase reference older than cutoff
+    const blockersPattern = /(###?\s*(?:Blockers|Blockers\/Concerns|Blockers\s*&\s*Concerns)\s*\n)([\s\S]*?)(?=\n###?|\n##[^#]|$)/i;
+    const blockersMatch = content.match(blockersPattern);
+    if (blockersMatch) {
+      const lines = blockersMatch[2].split('\n');
+      const keep = [];
+      const archive = [];
+      for (const line of lines) {
+        const isResolved = /~~.*~~|\[RESOLVED\]/i.test(line);
+        const phaseMatch = line.match(/Phase\s+(\d+)/i);
+        if (isResolved && phaseMatch && parseInt(phaseMatch[1], 10) <= cutoff) {
+          archive.push(line);
+        } else {
+          keep.push(line);
+        }
+      }
+      if (archive.length > 0) {
+        sections.push({ section: 'Blockers (resolved)', count: archive.length, lines: archive });
+        content = content.replace(blockersPattern, (_m, header) => `${header}${keep.join('\n')}`);
+      }
+    }
+
+    // Prune Performance Metrics table rows: keep only rows for phases > cutoff.
+    // Preserves header rows (| Phase | ... and |---|...) and any prose around the table.
+    const metricsPattern = /(###?\s*Performance Metrics\s*\n)([\s\S]*?)(?=\n###?|\n##[^#]|$)/i;
+    const metricsMatch = content.match(metricsPattern);
+    if (metricsMatch) {
+      const sectionLines = metricsMatch[2].split('\n');
+      const keep = [];
+      const archive = [];
+      for (const line of sectionLines) {
+        // Table data row: starts with | followed by a number (phase)
+        const tableRowMatch = line.match(/^\|\s*(\d+)\s*\|/);
+        if (tableRowMatch) {
+          const rowPhase = parseInt(tableRowMatch[1], 10);
+          if (rowPhase <= cutoff) {
+            archive.push(line);
+          } else {
+            keep.push(line);
+          }
+        } else {
+          // Header row, separator row, or prose — always keep
+          keep.push(line);
+        }
+      }
+      if (archive.length > 0) {
+        sections.push({ section: 'Performance Metrics', count: archive.length, lines: archive });
+        content = content.replace(metricsPattern, (_m, header) => `${header}${keep.join('\n')}`);
+      }
+    }
+
+    return { newContent: content, archivedSections: sections };
+  }
+
+  if (dryRun) {
+    // Dry-run: compute what would be pruned without writing anything
+    const content = fs.readFileSync(statePath, 'utf-8');
+    const result = prunePass(content);
+    const totalPruned = result.archivedSections.reduce((sum, s) => sum + s.count, 0);
+    emit({
+      pruned: false,
+      dry_run: true,
+      cutoff_phase: cutoff,
+      keep_recent: keepRecent,
+      sections: result.archivedSections.map(s => ({ section: s.section, entries_would_archive: s.count })),
+      total_would_archive: totalPruned,
+      note: totalPruned > 0 ? 'Run without --dry-run to actually prune' : 'Nothing to prune',
+    }, raw, totalPruned > 0 ? 'true' : 'false');
+    return;
+  }
+
+  readModifyWriteStateMd(statePath, (content) => {
+    const result = prunePass(content);
+    archived.push(...result.archivedSections);
+    return result.newContent;
+  }, cwd);
+
+  // Write archived entries to STATE-ARCHIVE.md
+  if (archived.length > 0) {
+    const timestamp = new Date().toISOString().split('T')[0];
+    let archiveContent = '';
+    if (fs.existsSync(archivePath)) {
+      archiveContent = fs.readFileSync(archivePath, 'utf-8');
+    } else {
+      archiveContent = '# STATE Archive\n\nPruned entries from STATE.md. Recoverable but no longer loaded into agent context.\n\n';
+    }
+    archiveContent += `## Pruned ${timestamp} (phases 1-${cutoff}, kept recent ${keepRecent})\n\n`;
+    for (const section of archived) {
+      archiveContent += `### ${section.section}\n\n${section.lines.join('\n')}\n\n`;
+    }
+    atomicWriteFileSync(archivePath, archiveContent);
+  }
+
+  const totalPruned = archived.reduce((sum, s) => sum + s.count, 0);
+  emit({
+    pruned: totalPruned > 0,
+    cutoff_phase: cutoff,
+    keep_recent: keepRecent,
+    sections: archived.map(s => ({ section: s.section, entries_archived: s.count })),
+    total_archived: totalPruned,
+    archive_file: totalPruned > 0 ? 'STATE-ARCHIVE.md' : null,
+  }, raw, totalPruned > 0 ? 'true' : 'false');
+}
+
 module.exports = {
   stateExtractField,
   stateReplaceField,
@@ -1410,6 +1643,7 @@ module.exports = {
   cmdStatePlannedPhase,
   cmdStateValidate,
   cmdStateSync,
+  cmdStatePrune,
   cmdSignalWaiting,
   cmdSignalResume,
 };

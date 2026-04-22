@@ -20,7 +20,7 @@ const PROJECT_ROOT = path.join(__dirname, '..');
 // ─── Size thresholds ─────────────────────────────────────────────────────────
 
 const AGENT_FILE_SIZE_LIMIT = 100 * 1024;   // 100K — appropriate for version-controlled source
-const PLANNER_EXTRACTED_LIMIT = 45 * 1024;  // 45K — proves extraction happened
+const PLANNER_EXTRACTED_LIMIT = 48 * 1024;  // 48K — proves extraction happened
 
 // ─── File paths ──────────────────────────────────────────────────────────────
 

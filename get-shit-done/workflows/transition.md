@@ -160,10 +160,10 @@ If found, delete them — phase is complete, handoffs are stale.
 
 <step name="update_roadmap_and_state">
 
-**Delegate ROADMAP.md and STATE.md updates to gsd-tools:**
+**Delegate ROADMAP.md and STATE.md updates to `gsd-sdk query phase.complete`:**
 
 ```bash
-TRANSITION=$(node "$HOME/.claude/get-shit-done/bin/gsd-tools.cjs" phase complete "${current_phase}")
+TRANSITION=$(gsd-sdk query phase.complete "${current_phase}")
 ```
 
 The CLI handles:
@@ -271,14 +271,36 @@ After (Phase 2 shipped JWT auth, discovered rate limiting needed):
 
 </step>
 
+<step name="graduation_scan">
+
+Scan LEARNINGS.md files from recent phases for recurring patterns and surface promotion candidates to the developer.
+
+**Invoke the graduation helper:**
+
+```text
+@~/.claude/get-shit-done/workflows/graduation.md
+```
+
+This step is fully delegated to `graduation.md`. It handles guard checks (feature flag, window size, threshold), clustering, backlog filtering, HITL prompting, promotion writes, and STATE.md updates.
+
+**This step is always non-blocking:** graduation candidates are surfaced for the developer's decision; no action is required to continue the transition. If the graduation scan produces no qualifying clusters, it prints a single `[graduation: no qualifying clusters]` line and returns.
+
+**Step complete when:**
+
+- [ ] graduation.md guard checks passed (or skipped with silent no-op)
+- [ ] Recurring clusters surfaced (or `[graduation: no qualifying clusters]` printed)
+- [ ] Each cluster resolved as Promote / Defer / Dismiss (or all skipped)
+
+</step>
+
 <step name="update_current_position_after_transition">
 
-**Note:** Basic position updates (Current Phase, Status, Current Plan, Last Activity) were already handled by `gsd-tools phase complete` in the update_roadmap_and_state step.
+**Note:** Basic position updates (Current Phase, Status, Current Plan, Last Activity) were already handled by `gsd-sdk query phase.complete` in the update_roadmap_and_state step.
 
 Verify the updates are correct by reading STATE.md. If the progress bar needs updating, use:
 
 ```bash
-PROGRESS=$(node "$HOME/.claude/get-shit-done/bin/gsd-tools.cjs" progress bar --raw)
+PROGRESS=$(gsd-sdk query progress.bar --raw)
 ```
 
 Update the progress bar line in STATE.md with the result.
@@ -377,7 +399,7 @@ Resume file: None
 
 **MANDATORY: Verify milestone status before presenting next steps.**
 
-**Use the transition result from `gsd-tools phase complete`:**
+**Use the transition result from `gsd-sdk query phase.complete`:**
 
 The `is_last_phase` field from the phase complete result tells you directly:
 - `is_last_phase: false` → More phases remain → Go to **Route A**
@@ -387,7 +409,7 @@ The `next_phase` and `next_phase_name` fields give you the next phase details.
 
 If you need additional context, use:
 ```bash
-ROADMAP=$(node "$HOME/.claude/get-shit-done/bin/gsd-tools.cjs" roadmap analyze)
+ROADMAP=$(gsd-sdk query roadmap.analyze)
 ```
 
 This returns all phases with goals, disk status, and completion info.
@@ -406,7 +428,7 @@ In flat mode, go directly to **Route B**.
 ```bash
 # Only check if we're in workstream mode
 if [ -n "$GSD_WORKSTREAM" ]; then
-  WS_LIST=$(node "$HOME/.claude/get-shit-done/bin/gsd-tools.cjs" workstream list --raw)
+  WS_LIST=$(gsd-sdk query workstream.list --raw)
 fi
 ```
 
@@ -471,7 +493,7 @@ Exit skill and invoke SlashCommand("/gsd-discuss-phase [X+1] --auto ${GSD_WS}")
 
 ---
 
-## ▶ Next Up
+## ▶ Next Up — [${PROJECT_CODE}] ${PROJECT_TITLE}
 
 **Phase [X+1]: [Name]** — [Goal from ROADMAP.md]
 
@@ -495,7 +517,7 @@ Exit skill and invoke SlashCommand("/gsd-discuss-phase [X+1] --auto ${GSD_WS}")
 
 ---
 
-## ▶ Next Up
+## ▶ Next Up — [${PROJECT_CODE}] ${PROJECT_TITLE}
 
 **Phase [X+1]: [Name]** — [Goal from ROADMAP.md]
 <sub>✓ Context gathered, ready to plan</sub>
@@ -526,7 +548,7 @@ to the next milestone — other workstreams are still working.
 **Clear auto-advance chain flag** — workstream boundary is the natural stopping point:
 
 ```bash
-node "$HOME/.claude/get-shit-done/bin/gsd-tools.cjs" config-set workflow._auto_chain_active false
+gsd-sdk query config-set workflow._auto_chain_active false
 ```
 
 <if mode="yolo">
@@ -580,7 +602,7 @@ Do NOT auto-invoke any further slash commands.
 **Clear auto-advance chain flag** — milestone boundary is the natural stopping point:
 
 ```bash
-node "$HOME/.claude/get-shit-done/bin/gsd-tools.cjs" config-set workflow._auto_chain_active false
+gsd-sdk query config-set workflow._auto_chain_active false
 ```
 
 <if mode="yolo">
@@ -606,7 +628,7 @@ Exit skill and invoke SlashCommand("/gsd-complete-milestone {version} ${GSD_WS}"
 
 ---
 
-## ▶ Next Up
+## ▶ Next Up — [${PROJECT_CODE}] ${PROJECT_TITLE}
 
 **Complete Milestone {version}** — archive and prepare for next
 

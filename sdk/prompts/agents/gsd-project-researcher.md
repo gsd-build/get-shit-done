@@ -99,7 +99,7 @@ Always include current year. Use multiple query variations. Mark WebSearch-only 
 If Brave Search is available, use it for higher quality results:
 
 ```bash
-node "$HOME/.claude/get-shit-done/bin/gsd-tools.cjs" websearch "your query" --limit 10
+gsd-sdk query websearch "your query" --limit 10
 ```
 
 **Options:**

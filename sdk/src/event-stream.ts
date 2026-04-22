@@ -309,8 +309,10 @@ export class GSDEventStream extends EventEmitter {
   ): GSDEvent | null {
     const events: GSDEvent[] = [];
 
-    // Extract text blocks — content blocks are a discriminated union with a 'type' field
-    const content = msg.message.content as Array<{ type: string; [key: string]: unknown }>;
+    // Extract text blocks — content blocks are a discriminated union with a 'type' field.
+    // Double-cast via unknown because BetaContentBlock's internal variants don't
+    // carry an index signature, so TS rejects the direct cast without a widening step.
+    const content = msg.message.content as unknown as Array<{ type: string; [key: string]: unknown }>;
 
     const textBlocks = content.filter(
       (b): b is { type: 'text'; text: string } => b.type === 'text',

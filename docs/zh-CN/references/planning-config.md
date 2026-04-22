@@ -36,19 +36,19 @@
 - 用户必须将 `.planning/` 添加到 `.gitignore`
 - 适用于：OSS 贡献、客户项目、保持规划私有
 
-**使用 gsd-tools.cjs（推荐）：**
+**使用 `gsd-sdk query`（推荐）：**
 
 ```bash
 # 提交时自动检查 commit_docs + gitignore：
-node "$HOME/.claude/get-shit-done/bin/gsd-tools.cjs" commit "docs: update state" --files .planning/STATE.md
+gsd-sdk query commit "docs: update state" .planning/STATE.md
 
 # 通过 state load 加载配置（返回 JSON）：
-INIT=$(node "$HOME/.claude/get-shit-done/bin/gsd-tools.cjs" state load)
+INIT=$(gsd-sdk query state.load)
 if [[ "$INIT" == @file:* ]]; then INIT=$(cat "${INIT#@file:}"); fi
 # commit_docs 在 JSON 输出中可用
 
 # 或使用包含 commit_docs 的 init 命令：
-INIT=$(node "$HOME/.claude/get-shit-done/bin/gsd-tools.cjs" init execute-phase "1")
+INIT=$(gsd-sdk query init.execute-phase "1")
 if [[ "$INIT" == @file:* ]]; then INIT=$(cat "${INIT#@file:}"); fi
 # commit_docs 包含在所有 init 命令输出中
 ```
@@ -58,7 +58,7 @@ if [[ "$INIT" == @file:* ]]; then INIT=$(cat "${INIT#@file:}"); fi
 **通过 CLI 提交（自动处理检查）：**
 
 ```bash
-node "$HOME/.claude/get-shit-done/bin/gsd-tools.cjs" commit "docs: update state" --files .planning/STATE.md
+gsd-sdk query commit "docs: update state" .planning/STATE.md
 ```
 
 CLI 在内部检查 `commit_docs` 配置和 gitignore 状态 —— 无需手动条件判断。
@@ -146,14 +146,14 @@ CLI 在内部检查 `commit_docs` 配置和 gitignore 状态 —— 无需手动
 
 使用 `init execute-phase` 返回所有配置为 JSON：
 ```bash
-INIT=$(node "$HOME/.claude/get-shit-done/bin/gsd-tools.cjs" init execute-phase "1")
+INIT=$(gsd-sdk query init.execute-phase "1")
 if [[ "$INIT" == @file:* ]]; then INIT=$(cat "${INIT#@file:}"); fi
 # JSON 输出包含：branching_strategy, phase_branch_template, milestone_branch_template
 ```
 
 或使用 `state load` 获取配置值：
 ```bash
-INIT=$(node "$HOME/.claude/get-shit-done/bin/gsd-tools.cjs" state load)
+INIT=$(gsd-sdk query state.load)
 if [[ "$INIT" == @file:* ]]; then INIT=$(cat "${INIT#@file:}"); fi
 # 从 JSON 解析 branching_strategy, phase_branch_template, milestone_branch_template
 ```

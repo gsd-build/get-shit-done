@@ -247,6 +247,73 @@ Both follow same format: `{type}({phase}-{plan}): {description}`
 - Consistent with overall commit strategy
 </commit_pattern>
 
+<gate_enforcement>
+## Gate Enforcement Rules
+
+When `workflow.tdd_mode` is enabled in config, the RED/GREEN/REFACTOR gate sequence is enforced for all `type: tdd` plans.
+
+### Gate Definitions
+
+| Gate | Required | Commit Pattern | Validation |
+|------|----------|---------------|------------|
+| RED | Yes | `test({phase}-{plan}): ...` | Test exists AND fails before implementation |
+| GREEN | Yes | `feat({phase}-{plan}): ...` | Test passes after implementation |
+| REFACTOR | No | `refactor({phase}-{plan}): ...` | Tests still pass after cleanup |
+
+### Fail-Fast Rules
+
+1. **Unexpected GREEN in RED phase:** If the test passes before any implementation code is written, STOP. The feature may already exist or the test is wrong. Investigate before proceeding.
+2. **Missing RED commit:** If no `test(...)` commit precedes the `feat(...)` commit, the TDD discipline was violated. Flag in SUMMARY.md.
+3. **REFACTOR breaks tests:** Undo the refactor immediately. Commit was premature — refactor in smaller steps.
+
+### Executor Gate Validation
+
+After completing a `type: tdd` plan, the executor validates the git log:
+```bash
+# Check for RED gate commit
+git log --oneline --grep="^test(${PHASE}-${PLAN})" | head -1
+# Check for GREEN gate commit  
+git log --oneline --grep="^feat(${PHASE}-${PLAN})" | head -1
+# Check for optional REFACTOR gate commit
+git log --oneline --grep="^refactor(${PHASE}-${PLAN})" | head -1
+```
+
+If RED or GREEN gate commits are missing, add a `## TDD Gate Compliance` section to SUMMARY.md with the violation details.
+</gate_enforcement>
+
+<end_of_phase_review>
+## End-of-Phase TDD Review Checkpoint
+
+When `workflow.tdd_mode` is enabled, the execute-phase orchestrator inserts a collaborative review checkpoint after all waves complete but before phase verification.
+
+### Review Checkpoint Format
+
+```
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+ TDD REVIEW — Phase {X}
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+TDD Plans: {count} | Gate violations: {count}
+
+| Plan | RED | GREEN | REFACTOR | Status |
+|------|-----|-------|----------|--------|
+| {id} |  ✓  |   ✓   |    ✓     | Pass   |
+| {id} |  ✓  |   ✗   |    —     | FAIL   |
+
+{If violations exist:}
+⚠ Gate violations are advisory — review before advancing.
+```
+
+### What the Review Checks
+
+1. **Gate sequence:** Each TDD plan has RED → GREEN commits in order
+2. **Test quality:** RED phase tests fail for the right reason (not import errors or syntax)
+3. **Minimal GREEN:** Implementation is minimal — no premature optimization in GREEN phase
+4. **Refactor discipline:** If REFACTOR commit exists, tests still pass
+
+This checkpoint is advisory — it does not block phase completion but surfaces TDD discipline issues for human review.
+</end_of_phase_review>
+
 <context_budget>
 ## Context Budget
 

@@ -40,9 +40,60 @@ If the flag is absent, keep the current behavior of continuing phase numbering f
 
 **If no context file:**
 - Present what shipped in last milestone
+
+**Text mode (`workflow.text_mode: true` in config or `--text` flag):** Set `TEXT_MODE=true` if `--text` is present in `$ARGUMENTS` OR `text_mode` from init JSON is `true`. When TEXT_MODE is active, replace every `AskUserQuestion` call with a plain-text numbered list and ask the user to type their choice number. This is required for non-Claude runtimes (OpenAI Codex, Gemini CLI, etc.) where `AskUserQuestion` is not available.
 - Ask inline (freeform, NOT AskUserQuestion): "What do you want to build next?"
 - Wait for their response, then use AskUserQuestion to probe specifics
 - If user selects "Other" at any point to provide freeform input, ask follow-up as plain text — not another AskUserQuestion
+
+## 2.5. Scan Planted Seeds
+
+Check `.planning/seeds/` for seed files that match the milestone goals gathered in step 2.
+
+```bash
+ls .planning/seeds/SEED-*.md 2>/dev/null
+```
+
+**If no seed files exist:** Skip this step silently — do not print any message or prompt.
+
+**If seed files exist:** Read each `SEED-*.md` file and extract from its frontmatter and body:
+- **Idea** — the seed title (heading after frontmatter, e.g. `# SEED-001: <idea>`)
+- **Trigger conditions** — the `trigger_when` frontmatter field and the "When to Surface" section's bullet list
+- **Planted during** — the `planted_during` frontmatter field (for context)
+
+Compare each seed's trigger conditions against the milestone goals from step 2. A seed matches when its trigger conditions are relevant to any of the milestone's target features or goals.
+
+**If no seeds match:** Skip silently — do not prompt the user.
+
+**If matching seeds found:**
+
+**`--auto` mode:** Auto-select ALL matching seeds. Log: `[auto] Selected N matching seed(s): [list seed names]`
+
+**Text mode (`TEXT_MODE=true`):** Present matching seeds as a plain-text numbered list:
+```
+Seeds that match your milestone goals:
+1. SEED-001: <idea> (trigger: <trigger_when>)
+2. SEED-003: <idea> (trigger: <trigger_when>)
+
+Enter numbers to include (comma-separated), or "none" to skip:
+```
+
+**Normal mode:** Present via AskUserQuestion:
+```
+AskUserQuestion(
+  header: "Seeds",
+  question: "These planted seeds match your milestone goals. Include any in this milestone's scope?",
+  multiSelect: true,
+  options: [
+    { label: "SEED-001: <idea>", description: "Trigger: <trigger_when> | Planted during: <planted_during>" },
+    ...
+  ]
+)
+```
+
+**After selection:**
+- Selected seeds become additional context for requirement definition in step 9. Store them in an accumulator (e.g. `$SELECTED_SEEDS`) so step 9 can reference the ideas and their "Why This Matters" sections when defining requirements.
+- Unselected seeds remain untouched in `.planning/seeds/` — never delete or modify seed files during this workflow.
 
 ## 3. Determine Milestone Version
 
@@ -140,24 +191,38 @@ Delete MILESTONE-CONTEXT.md if exists (consumed).
 Clear leftover phase directories from the previous milestone:
 
 ```bash
-node "$HOME/.claude/get-shit-done/bin/gsd-tools.cjs" phases clear --confirm
+gsd-sdk query phases.clear --confirm
 ```
 
 ```bash
-node "$HOME/.claude/get-shit-done/bin/gsd-tools.cjs" commit "docs: start milestone v[X.Y] [Name]" --files .planning/PROJECT.md .planning/STATE.md
+gsd-sdk query commit "docs: start milestone v[X.Y] [Name]" .planning/PROJECT.md .planning/STATE.md
 ```
 
 ## 7. Load Context and Resolve Models
 
 ```bash
-INIT=$(node "$HOME/.claude/get-shit-done/bin/gsd-tools.cjs" init new-milestone)
+INIT=$(gsd-sdk query init.new-milestone)
 if [[ "$INIT" == @file:* ]]; then INIT=$(cat "${INIT#@file:}"); fi
-AGENT_SKILLS_RESEARCHER=$(node "$HOME/.claude/get-shit-done/bin/gsd-tools.cjs" agent-skills gsd-project-researcher 2>/dev/null)
-AGENT_SKILLS_SYNTHESIZER=$(node "$HOME/.claude/get-shit-done/bin/gsd-tools.cjs" agent-skills gsd-synthesizer 2>/dev/null)
-AGENT_SKILLS_ROADMAPPER=$(node "$HOME/.claude/get-shit-done/bin/gsd-tools.cjs" agent-skills gsd-roadmapper 2>/dev/null)
+AGENT_SKILLS_RESEARCHER=$(gsd-sdk query agent-skills gsd-project-researcher 2>/dev/null)
+AGENT_SKILLS_SYNTHESIZER=$(gsd-sdk query agent-skills gsd-synthesizer 2>/dev/null)
+AGENT_SKILLS_ROADMAPPER=$(gsd-sdk query agent-skills gsd-roadmapper 2>/dev/null)
 ```
 
-Extract from init JSON: `researcher_model`, `synthesizer_model`, `roadmapper_model`, `commit_docs`, `research_enabled`, `current_milestone`, `project_exists`, `roadmap_exists`, `latest_completed_milestone`, `phase_dir_count`, `phase_archive_path`.
+Extract from init JSON: `researcher_model`, `synthesizer_model`, `roadmapper_model`, `commit_docs`, `research_enabled`, `current_milestone`, `project_exists`, `roadmap_exists`, `latest_completed_milestone`, `phase_dir_count`, `phase_archive_path`, `agents_installed`, `missing_agents`.
+
+**If `agents_installed` is false:** Display a warning before proceeding:
+```
+⚠ GSD agents not installed. The following agents are missing from your agents directory:
+  {missing_agents joined with newline}
+
+Subagent spawns (gsd-project-researcher, gsd-research-synthesizer, gsd-roadmapper) will fail
+with "agent type not found". Run the installer with --global to make agents available:
+
+  npx get-shit-done-cc@latest --global
+
+Proceeding without research subagents — roadmap will be generated inline.
+```
+Skip the parallel research spawn step and generate the roadmap inline.
 
 ## 7.5 Reset-phase safety (only when `--reset-phase-numbers`)
 
@@ -298,6 +363,8 @@ Display key findings from SUMMARY.md:
 
 Read PROJECT.md: core value, current milestone goals, validated requirements (what exists).
 
+**If `$SELECTED_SEEDS` is non-empty (from step 2.5):** Include selected seed ideas and their "Why This Matters" sections as additional input when defining requirements. Seeds provide user-validated feature ideas that should be incorporated into the requirement categories alongside research findings or conversation-gathered features.
+
 **If research exists:** Read FEATURES.md, extract feature categories.
 
 Present features by category:
@@ -356,7 +423,7 @@ If "adjust": Return to scoping.
 
 **Commit requirements:**
 ```bash
-node "$HOME/.claude/get-shit-done/bin/gsd-tools.cjs" commit "docs: define milestone v[X.Y] requirements" --files .planning/REQUIREMENTS.md
+gsd-sdk query commit "docs: define milestone v[X.Y] requirements" .planning/REQUIREMENTS.md
 ```
 
 ## 10. Create Roadmap
@@ -440,7 +507,57 @@ Success criteria:
 
 **Commit roadmap** (after approval):
 ```bash
-node "$HOME/.claude/get-shit-done/bin/gsd-tools.cjs" commit "docs: create milestone v[X.Y] roadmap ([N] phases)" --files .planning/ROADMAP.md .planning/STATE.md .planning/REQUIREMENTS.md
+gsd-sdk query commit "docs: create milestone v[X.Y] roadmap ([N] phases)" .planning/ROADMAP.md .planning/STATE.md .planning/REQUIREMENTS.md
+```
+
+## 10.5. Link Pending Todos to Roadmap Phases
+
+After roadmap approval, scan pending todos against the newly approved phases. For each todo whose scope matches a phase, tag it with `resolves_phase: N` in its YAML frontmatter.
+
+**Check for pending todos:**
+```bash
+PENDING_TODOS=$(ls .planning/todos/pending/*.md 2>/dev/null | head -50)
+```
+
+**If no pending todos exist:** Skip this step silently.
+
+**If pending todos exist:**
+
+Read the approved ROADMAP.md and extract the phase list: phase number, phase name, goal, and requirement IDs.
+
+For each pending todo, compare:
+- The todo's `title` and `area` frontmatter fields
+- The todo body (Problem and Solution sections)
+
+Against each phase's:
+- Phase goal
+- Requirement IDs and descriptions
+
+**Match criteria (best-effort — do not over-match):** A todo is considered resolved by a phase if the phase's goal or requirements directly describe implementing the same feature, area, or capability as the todo. Narrow, specific todos with concrete scopes are the best candidates. Vague or cross-cutting todos should be left unlinked.
+
+**For each matched todo**, add `resolves_phase: [N]` to the YAML frontmatter block (after the existing fields):
+```yaml
+---
+created: [existing]
+title: [existing]
+area: [existing]
+resolves_phase: [N]
+files: [existing]
+---
+```
+
+**Only modify todos that have a clear, confident match.** Leave unmatched todos unmodified.
+
+**If any todos were linked:**
+```bash
+gsd-sdk query commit "docs: tag [count] pending todos with resolves_phase after milestone v[X.Y] roadmap" .planning/todos/pending/*.md
+```
+
+Print a summary:
+```
+◆ Linked [N] pending todos to roadmap phases:
+  → [todo title] → Phase [N]: [Phase Name]
+  (Leave [M] unmatched todos in pending/)
 ```
 
 ## 11. Done
@@ -461,7 +578,7 @@ node "$HOME/.claude/get-shit-done/bin/gsd-tools.cjs" commit "docs: create milest
 
 **[N] phases** | **[X] requirements** | Ready to build ✓
 
-## ▶ Next Up
+## ▶ Next Up — [${PROJECT_CODE}] ${PROJECT_TITLE}
 
 **Phase [N]: [Phase Name]** — [Goal]
 
@@ -486,7 +603,9 @@ Also: `/gsd-plan-phase [N] ${GSD_WS}` — skip discussion, plan directly
 - [ ] User feedback incorporated (if any)
 - [ ] Phase numbering mode respected (continued or reset)
 - [ ] All commits made (if planning docs committed)
+- [ ] Pending todos scanned for phase matches; matched todos tagged with `resolves_phase: N`
 - [ ] User knows next step: `/gsd-discuss-phase [N] ${GSD_WS}`
 
 **Atomic commits:** Each phase commits its artifacts immediately.
 </success_criteria>
+</output>

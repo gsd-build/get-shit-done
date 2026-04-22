@@ -18,7 +18,10 @@ Determine what kind of work is being paused and set the handoff destination acco
 phase=$(( ls -lt .planning/phases/*/PLAN.md 2>/dev/null || true ) | head -1 | grep -oP 'phases/\K[^/]+' || true)
 
 # Check for active spike
-spike=$(( ls -lt .planning/spikes/*/SPIKE.md .planning/spikes/*/DESIGN.md 2>/dev/null || true ) | head -1 | grep -oP 'spikes/\K[^/]+' || true)
+spike=$(( ls -lt .planning/spikes/*/SPIKE.md .planning/spikes/*/DESIGN.md .planning/spikes/*/README.md 2>/dev/null || true ) | head -1 | grep -oP 'spikes/\K[^/]+' || true)
+
+# Check for active sketch
+sketch=$(( ls -lt .planning/sketches/*/README.md .planning/sketches/*/index.html 2>/dev/null || true ) | head -1 | grep -oP 'sketches/\K[^/]+' || true)
 
 # Check for active deliberation
 deliberation=$(ls .planning/deliberations/*.md 2>/dev/null | head -1 || true)
@@ -26,8 +29,9 @@ deliberation=$(ls .planning/deliberations/*.md 2>/dev/null | head -1 || true)
 
 - **Phase work**: active phase directory → handoff to `.planning/phases/XX-name/.continue-here.md`
 - **Spike work**: active spike directory or spike-related files (no active phase) → handoff to `.planning/spikes/SPIKE-NNN/.continue-here.md` (create directory if needed)
-- **Deliberation work**: active deliberation file (no phase/spike) → handoff to `.planning/deliberations/.continue-here.md`
-- **Research work**: research notes exist but no phase/spike/deliberation → handoff to `.planning/.continue-here.md`
+- **Sketch work**: active sketch directory (no active phase/spike) → handoff to `.planning/sketches/.continue-here.md`
+- **Deliberation work**: active deliberation file (no phase/spike/sketch) → handoff to `.planning/deliberations/.continue-here.md`
+- **Research work**: research notes exist but no phase/spike/sketch/deliberation → handoff to `.planning/.continue-here.md`
 - **Default**: no detectable context → handoff to `.planning/.continue-here.md`, note the ambiguity in `<current_state>`
 
 If phase is detected, proceed with phase handoff path. Otherwise use the first matching non-phase path above.
@@ -62,7 +66,7 @@ Report any summaries with placeholder content as incomplete items.
 **Write structured handoff to `.planning/HANDOFF.json`:**
 
 ```bash
-timestamp=$(node "$HOME/.claude/get-shit-done/bin/gsd-tools.cjs" current-timestamp full --raw)
+timestamp=$(gsd-sdk query current-timestamp full --raw)
 ```
 
 ```json
@@ -106,7 +110,7 @@ timestamp=$(node "$HOME/.claude/get-shit-done/bin/gsd-tools.cjs" current-timesta
 
 ```markdown
 ---
-context: [phase|spike|deliberation|research|default]
+context: [phase|spike|sketch|deliberation|research|default]
 phase: XX-name
 task: 3
 total_tasks: 7
@@ -197,13 +201,13 @@ Be specific enough for a fresh Claude to understand immediately.
 
 Use `current-timestamp` for last_updated field. You can use init todos (which provides timestamps) or call directly:
 ```bash
-timestamp=$(node "$HOME/.claude/get-shit-done/bin/gsd-tools.cjs" current-timestamp full --raw)
+timestamp=$(gsd-sdk query current-timestamp full --raw)
 ```
 </step>
 
 <step name="commit">
 ```bash
-node "$HOME/.claude/get-shit-done/bin/gsd-tools.cjs" commit "wip: [context-name] paused at [X]/[Y]" --files [handoff-path] .planning/HANDOFF.json
+gsd-sdk query commit "wip: [context-name] paused at [X]/[Y]" [handoff-path] .planning/HANDOFF.json
 ```
 </step>
 

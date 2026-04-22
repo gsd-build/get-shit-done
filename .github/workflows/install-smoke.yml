@@ -1,0 +1,152 @@
+name: Install Smoke
+
+# Exercises the real install path: `npm pack` → `npm install -g <tarball>`
+# → run `bin/install.js` → assert `gsd-sdk` is on PATH.
+#
+# Closes the CI gap that let #2439 ship: the rest of the suite only reads
+# `bin/install.js` as a string and never executes it.
+#
+# - PRs: path-filtered, minimal runner (ubuntu + Node LTS) for fast signal.
+# - Push to release branches / main: full matrix.
+# - workflow_call: invoked from release.yml as a pre-publish gate.
+
+on:
+  pull_request:
+    branches:
+      - main
+    paths:
+      - 'bin/install.js'
+      - 'sdk/**'
+      - 'package.json'
+      - 'package-lock.json'
+      - '.github/workflows/install-smoke.yml'
+      - '.github/workflows/release.yml'
+  push:
+    branches:
+      - main
+      - 'release/**'
+      - 'hotfix/**'
+  workflow_call:
+    inputs:
+      ref:
+        description: 'Git ref to check out (branch or SHA). Defaults to the triggering ref.'
+        required: false
+        type: string
+        default: ''
+  workflow_dispatch:
+
+concurrency:
+  group: install-smoke-${{ github.workflow }}-${{ github.head_ref || github.run_id }}
+  cancel-in-progress: true
+
+jobs:
+  smoke:
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 12
+
+    strategy:
+      fail-fast: false
+      matrix:
+        # PRs run the minimal path (ubuntu + LTS). Pushes / release branches
+        # and workflow_call add macOS + Node 24 coverage.
+        include:
+          - os: ubuntu-latest
+            node-version: 22
+            full_only: false
+          - os: ubuntu-latest
+            node-version: 24
+            full_only: true
+          - os: macos-latest
+            node-version: 24
+            full_only: true
+
+    steps:
+      - name: Skip full-only matrix entry on PR
+        id: skip
+        shell: bash
+        env:
+          EVENT: ${{ github.event_name }}
+          FULL_ONLY: ${{ matrix.full_only }}
+        run: |
+          if [ "$EVENT" = "pull_request" ] && [ "$FULL_ONLY" = "true" ]; then
+            echo "skip=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "skip=false" >> "$GITHUB_OUTPUT"
+          fi
+
+      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd  # v6.0.2
+        if: steps.skip.outputs.skip != 'true'
+        with:
+          ref: ${{ inputs.ref || github.ref }}
+
+      - name: Set up Node.js ${{ matrix.node-version }}
+        if: steps.skip.outputs.skip != 'true'
+        uses: actions/setup-node@53b83947a5a98c8d113130e565377fae1a50d02f  # v6.3.0
+        with:
+          node-version: ${{ matrix.node-version }}
+          cache: 'npm'
+
+      - name: Install root deps
+        if: steps.skip.outputs.skip != 'true'
+        run: npm ci
+
+      - name: Pack root tarball
+        if: steps.skip.outputs.skip != 'true'
+        id: pack
+        shell: bash
+        run: |
+          set -euo pipefail
+          npm pack --silent
+          TARBALL=$(ls get-shit-done-cc-*.tgz | head -1)
+          echo "tarball=$TARBALL" >> "$GITHUB_OUTPUT"
+          echo "Packed: $TARBALL"
+
+      - name: Ensure npm global bin is on PATH (CI runner default may differ)
+        if: steps.skip.outputs.skip != 'true'
+        shell: bash
+        run: |
+          NPM_BIN="$(npm config get prefix)/bin"
+          echo "$NPM_BIN" >> "$GITHUB_PATH"
+          echo "npm global bin: $NPM_BIN"
+
+      - name: Install tarball globally (runs bin/install.js → installSdkIfNeeded)
+        if: steps.skip.outputs.skip != 'true'
+        shell: bash
+        env:
+          TARBALL: ${{ steps.pack.outputs.tarball }}
+          WORKSPACE: ${{ github.workspace }}
+        run: |
+          set -euo pipefail
+          TMPDIR_ROOT=$(mktemp -d)
+          cd "$TMPDIR_ROOT"
+          npm install -g "$WORKSPACE/$TARBALL"
+          command -v get-shit-done-cc
+          # `--claude --local` is the non-interactive code path (see
+          # install.js main block: when both a runtime and location are set,
+          # installAllRuntimes runs with isInteractive=false, no prompts).
+          # We tolerate non-zero here because the authoritative assertion is
+          # the next step: gsd-sdk must land on PATH. Some runtime targets
+          # may exit before the SDK step for unrelated reasons on CI.
+          get-shit-done-cc --claude --local || true
+
+      - name: Assert gsd-sdk resolves on PATH
+        if: steps.skip.outputs.skip != 'true'
+        shell: bash
+        run: |
+          set -euo pipefail
+          if ! command -v gsd-sdk >/dev/null 2>&1; then
+            echo "::error::gsd-sdk is not on PATH after install — installSdkIfNeeded() regression"
+            NPM_BIN="$(npm config get prefix)/bin"
+            echo "npm global bin: $NPM_BIN"
+            ls -la "$NPM_BIN" | grep -i gsd || true
+            exit 1
+          fi
+          echo "✓ gsd-sdk resolves at: $(command -v gsd-sdk)"
+
+      - name: Assert gsd-sdk is executable
+        if: steps.skip.outputs.skip != 'true'
+        shell: bash
+        run: |
+          set -euo pipefail
+          gsd-sdk --version || gsd-sdk --help
+          echo "✓ gsd-sdk is executable"

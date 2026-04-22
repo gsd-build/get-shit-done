@@ -4,7 +4,7 @@
 
 const fs = require('fs');
 const path = require('path');
-const { escapeRegex, getMilestonePhaseFilter, extractOneLinerFromBody, normalizeMd, planningPaths, output, error } = require('./core.cjs');
+const { escapeRegex, getMilestonePhaseFilter, extractOneLinerFromBody, normalizeMd, planningPaths, output, error, atomicWriteFileSync } = require('./core.cjs');
 const { extractFrontmatter } = require('./frontmatter.cjs');
 const { writeStateMd, stateReplaceFieldWithFallback } = require('./state.cjs');
 
@@ -74,7 +74,7 @@ function cmdRequirementsMarkComplete(cwd, reqIdsRaw, raw) {
   }
 
   if (updated.length > 0) {
-    fs.writeFileSync(reqPath, reqContent, 'utf-8');
+    atomicWriteFileSync(reqPath, reqContent);
   }
 
   output({
@@ -178,21 +178,21 @@ function cmdMilestoneComplete(cwd, version, options, raw) {
     const existing = fs.readFileSync(milestonesPath, 'utf-8');
     if (!existing.trim()) {
       // Empty file — treat like new
-      fs.writeFileSync(milestonesPath, normalizeMd(`# Milestones\n\n${milestoneEntry}`), 'utf-8');
+      atomicWriteFileSync(milestonesPath, normalizeMd(`# Milestones\n\n${milestoneEntry}`));
     } else {
       // Insert after the header line(s) for reverse chronological order (newest first)
       const headerMatch = existing.match(/^(#{1,3}\s+[^\n]*\n\n?)/);
       if (headerMatch) {
         const header = headerMatch[1];
         const rest = existing.slice(header.length);
-        fs.writeFileSync(milestonesPath, normalizeMd(header + milestoneEntry + rest), 'utf-8');
+        atomicWriteFileSync(milestonesPath, normalizeMd(header + milestoneEntry + rest));
       } else {
         // No recognizable header — prepend the entry
-        fs.writeFileSync(milestonesPath, normalizeMd(milestoneEntry + existing), 'utf-8');
+        atomicWriteFileSync(milestonesPath, normalizeMd(milestoneEntry + existing));
       }
     }
   } else {
-    fs.writeFileSync(milestonesPath, normalizeMd(`# Milestones\n\n${milestoneEntry}`), 'utf-8');
+    atomicWriteFileSync(milestonesPath, normalizeMd(`# Milestones\n\n${milestoneEntry}`));
   }
 
   // Update STATE.md — use shared helpers that handle both **bold:** and plain Field: formats

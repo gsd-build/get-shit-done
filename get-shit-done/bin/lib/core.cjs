@@ -159,14 +159,25 @@ function findProjectRoot(startDir) {
  * @param {number} opts.maxAgeMs - max age in ms before removal (default: 5 min)
  * @param {boolean} opts.dirsOnly - if true, only remove directories (default: false)
  */
+/**
+ * Dedicated GSD temp directory: path.join(os.tmpdir(), 'gsd').
+ * Created on first use. Keeps GSD temp files isolated from the system
+ * temp directory so reap scans only GSD files (#1975).
+ */
+const GSD_TEMP_DIR = path.join(require('os').tmpdir(), 'gsd');
+
+function ensureGsdTempDir() {
+  fs.mkdirSync(GSD_TEMP_DIR, { recursive: true });
+}
+
 function reapStaleTempFiles(prefix = 'gsd-', { maxAgeMs = 5 * 60 * 1000, dirsOnly = false } = {}) {
   try {
-    const tmpDir = require('os').tmpdir();
+    ensureGsdTempDir();
     const now = Date.now();
-    const entries = fs.readdirSync(tmpDir);
+    const entries = fs.readdirSync(GSD_TEMP_DIR);
     for (const entry of entries) {
       if (!entry.startsWith(prefix)) continue;
-      const fullPath = path.join(tmpDir, entry);
+      const fullPath = path.join(GSD_TEMP_DIR, entry);
       try {
         const stat = fs.statSync(fullPath);
         if (now - stat.mtimeMs > maxAgeMs) {
@@ -195,7 +206,8 @@ function output(result, raw, rawValue) {
     // Write to tmpfile and output the path prefixed with @file: so callers can detect it.
     if (json.length > 50000) {
       reapStaleTempFiles();
-      const tmpPath = path.join(require('os').tmpdir(), `gsd-${Date.now()}.json`);
+      ensureGsdTempDir();
+      const tmpPath = path.join(GSD_TEMP_DIR, `gsd-${Date.now()}.json`);
       fs.writeFileSync(tmpPath, json, 'utf-8');
       data = '@file:' + tmpPath;
     } else {
@@ -239,6 +251,7 @@ const CONFIG_DEFAULTS = {
   plan_checker: true,
   verifier: true,
   nyquist_validation: true,
+  ai_integration_phase: true,
   parallelization: true,
   brave_search: false,
   firecrawl: false,
@@ -250,6 +263,9 @@ const CONFIG_DEFAULTS = {
   phase_naming: 'sequential', // 'sequential' (default, auto-increment) or 'custom' (arbitrary string IDs)
   project_code: null, // optional short prefix for phase dirs (e.g., 'CK' → 'CK-01-foundation')
   subagent_timeout: 300000, // 5 min default; increase for large codebases or slower models (ms)
+  security_enforcement: true, // workflow.security_enforcement — threat-model-anchored security verification via /gsd-secure-phase
+  security_asvs_level: 1, // workflow.security_asvs_level — OWASP ASVS verification level (1=opportunistic, 2=standard, 3=comprehensive)
+  security_block_on: 'high', // workflow.security_block_on — minimum severity that blocks phase advancement ('high' | 'medium' | 'low')
 };
 
 function loadConfig(cwd) {
@@ -312,7 +328,7 @@ function loadConfig(cwd) {
       // Section containers that hold nested sub-keys
       'git', 'workflow', 'planning', 'hooks', 'features',
       // Internal keys loadConfig reads but config-set doesn't expose
-      'model_overrides', 'agent_skills', 'context_window', 'resolve_model_ids',
+      'model_overrides', 'agent_skills', 'context_window', 'resolve_model_ids', 'claude_md_path',
       // Deprecated keys (still accepted for migration, not in config-set)
       'depth', 'multiRepo',
     ]);
@@ -362,7 +378,11 @@ function loadConfig(cwd) {
       brave_search: get('brave_search') ?? defaults.brave_search,
       firecrawl: get('firecrawl') ?? defaults.firecrawl,
       exa_search: get('exa_search') ?? defaults.exa_search,
+      tdd_mode: get('tdd_mode', { section: 'workflow', field: 'tdd_mode' }) ?? false,
       text_mode: get('text_mode', { section: 'workflow', field: 'text_mode' }) ?? defaults.text_mode,
+      auto_advance: get('auto_advance', { section: 'workflow', field: 'auto_advance' }) ?? false,
+      _auto_chain_active: get('_auto_chain_active', { section: 'workflow', field: '_auto_chain_active' }) ?? false,
+      mode: get('mode') ?? 'interactive',
       sub_repos: get('sub_repos', { section: 'planning', field: 'sub_repos' }) ?? defaults.sub_repos,
       resolve_model_ids: get('resolve_model_ids') ?? defaults.resolve_model_ids,
       context_window: get('context_window') ?? defaults.context_window,
@@ -373,6 +393,8 @@ function loadConfig(cwd) {
       agent_skills: parsed.agent_skills || {},
       manager: parsed.manager || {},
       response_language: get('response_language') || null,
+      claude_md_path: get('claude_md_path') || null,
+      claude_md_assembly: parsed.claude_md_assembly || null,
     };
   } catch {
     // Fall back to ~/.gsd/defaults.json only for truly pre-project contexts (#1683)
@@ -592,6 +614,98 @@ function resolveWorktreeRoot(cwd) {
 }
 
 /**
+ * Parse `git worktree list --porcelain` output into an array of
+ * { path, branch } objects.  Entries with a detached HEAD (no branch line)
+ * are skipped because we cannot safely reason about their merge status.
+ *
+ * @param {string} porcelain - raw output from git worktree list --porcelain
+ * @returns {{ path: string, branch: string }[]}
+ */
+function parseWorktreePorcelain(porcelain) {
+  const entries = [];
+  let current = null;
+  for (const line of porcelain.split('\n')) {
+    if (line.startsWith('worktree ')) {
+      current = { path: line.slice('worktree '.length).trim(), branch: null };
+    } else if (line.startsWith('branch refs/heads/') && current) {
+      current.branch = line.slice('branch refs/heads/'.length).trim();
+    } else if (line === '' && current) {
+      if (current.branch) entries.push(current);
+      current = null;
+    }
+  }
+  // flush last entry if file doesn't end with blank line
+  if (current && current.branch) entries.push(current);
+  return entries;
+}
+
+/**
+ * Remove linked git worktrees whose branch has already been merged into the
+ * current HEAD of the main worktree.  Also runs `git worktree prune` to clear
+ * any stale references left by manually-deleted worktree directories.
+ *
+ * Safe guards:
+ *  - Never removes the main worktree (first entry in --porcelain output).
+ *  - Never removes the worktree at process.cwd().
+ *  - Never removes a worktree whose branch has unmerged commits.
+ *  - Skips detached-HEAD worktrees (no branch name).
+ *
+ * @param {string} repoRoot - absolute path to the main (or any) worktree of
+ *   the repository; used as `cwd` for git commands.
+ * @returns {string[]} list of worktree paths that were removed
+ */
+function pruneOrphanedWorktrees(repoRoot) {
+  const pruned = [];
+  const cwd = process.cwd();
+
+  try {
+    // 1. Get all worktrees in porcelain format
+    const listResult = execGit(repoRoot, ['worktree', 'list', '--porcelain']);
+    if (listResult.exitCode !== 0) return pruned;
+
+    const worktrees = parseWorktreePorcelain(listResult.stdout);
+    if (worktrees.length === 0) {
+      execGit(repoRoot, ['worktree', 'prune']);
+      return pruned;
+    }
+
+    // 2. First entry is the main worktree — never touch it
+    const mainWorktreePath = worktrees[0].path;
+
+    // 3. Check each non-main worktree
+    for (let i = 1; i < worktrees.length; i++) {
+      const { path: wtPath, branch } = worktrees[i];
+
+      // Never remove the worktree for the current process directory
+      if (wtPath === cwd || cwd.startsWith(wtPath + path.sep)) continue;
+
+      // Check if the branch is fully merged into HEAD (main)
+      // git merge-base --is-ancestor <branch> HEAD exits 0 when merged
+      const ancestorCheck = execGit(repoRoot, [
+        'merge-base', '--is-ancestor', branch, 'HEAD',
+      ]);
+
+      if (ancestorCheck.exitCode !== 0) {
+        // Not yet merged — leave it alone
+        continue;
+      }
+
+      // Remove the worktree and delete the branch
+      const removeResult = execGit(repoRoot, ['worktree', 'remove', '--force', wtPath]);
+      if (removeResult.exitCode === 0) {
+        execGit(repoRoot, ['branch', '-D', branch]);
+        pruned.push(wtPath);
+      }
+    }
+  } catch { /* never crash the caller */ }
+
+  // 4. Always run prune to clear stale references (e.g. manually-deleted dirs)
+  execGit(repoRoot, ['worktree', 'prune']);
+
+  return pruned;
+}
+
+/**
  * Acquire a file-based lock for .planning/ writes.
  * Prevents concurrent worktrees from corrupting shared planning files.
  * Lock is auto-released after the callback completes.
@@ -691,19 +805,23 @@ function planningRoot(cwd) {
 }
 
 /**
- * Get common .planning file paths, workstream-aware.
- * Scoped paths (state, roadmap, phases, requirements) resolve to the active workstream.
- * Shared paths (project, config) always resolve to the root .planning/.
+ * Get common .planning file paths, project-and-workstream-aware.
+ *
+ * All paths route through planningDir(cwd, ws), which honors the GSD_PROJECT
+ * env var and active workstream. This matches loadConfig() above (line 256),
+ * which has always read config.json via planningDir(cwd). Previously project
+ * and config were resolved against the unrouted .planning/ root, which broke
+ * `gsd-tools config-get` in multi-project layouts (the CRUD writers and the
+ * reader pointed at different files).
  */
 function planningPaths(cwd, ws) {
   const base = planningDir(cwd, ws);
-  const root = path.join(cwd, '.planning');
   return {
     planning: base,
     state: path.join(base, 'STATE.md'),
     roadmap: path.join(base, 'ROADMAP.md'),
-    project: path.join(root, 'PROJECT.md'),
-    config: path.join(root, 'config.json'),
+    project: path.join(base, 'PROJECT.md'),
+    config: path.join(base, 'config.json'),
     phases: path.join(base, 'phases'),
     requirements: path.join(base, 'REQUIREMENTS.md'),
   };
@@ -900,7 +1018,10 @@ function normalizePhaseName(phase) {
   const match = stripped.match(/^(\d+)([A-Z])?((?:\.\d+)*)/i);
   if (match) {
     const padded = match[1].padStart(2, '0');
-    const letter = match[2] ? match[2].toUpperCase() : '';
+    // Preserve original case of letter suffix (#1962).
+    // Uppercasing causes directory/roadmap mismatches on case-sensitive filesystems
+    // (e.g., "16c" in ROADMAP.md → directory "16C-name" → progress can't match).
+    const letter = match[2] || '';
     const decimal = match[3] || '';
     return padded + letter + decimal;
   }
@@ -1214,9 +1335,19 @@ function getRoadmapPhaseInternal(cwd, phaseNum) {
 
   try {
     const content = extractCurrentMilestone(fs.readFileSync(roadmapPath, 'utf-8'), cwd);
-    const escapedPhase = escapeRegex(phaseNum.toString());
-    // Match both numeric (Phase 1:) and custom (Phase PROJ-42:) headers
-    const phasePattern = new RegExp(`#{2,4}\\s*Phase\\s+${escapedPhase}:\\s*([^\\n]+)`, 'i');
+    // Strip leading zeros from purely numeric phase numbers so "03" matches "Phase 3:"
+    // in canonical ROADMAP headings. Non-numeric IDs (e.g. "PROJ-42") are kept as-is.
+    const normalized = /^\d+$/.test(String(phaseNum))
+      ? String(phaseNum).replace(/^0+(?=\d)/, '')
+      : String(phaseNum);
+    const escapedPhase = escapeRegex(normalized);
+    // Match both numeric and custom (Phase PROJ-42:) headers.
+    // For purely numeric phases allow optional leading zeros so both "Phase 1:" and
+    // "Phase 01:" are matched regardless of whether the ROADMAP uses padded numbers.
+    const isNumeric = /^\d+$/.test(String(phaseNum));
+    const phasePattern = isNumeric
+      ? new RegExp(`#{2,4}\\s*Phase\\s+0*${escapedPhase}:\\s*([^\\n]+)`, 'i')
+      : new RegExp(`#{2,4}\\s*Phase\\s+${escapedPhase}:\\s*([^\\n]+)`, 'i');
     const headerMatch = content.match(phasePattern);
     if (!headerMatch) return null;
 
@@ -1389,6 +1520,50 @@ function getMilestoneInfo(cwd) {
   try {
     const roadmap = fs.readFileSync(path.join(planningDir(cwd), 'ROADMAP.md'), 'utf-8');
 
+    // 0. Prefer STATE.md milestone: frontmatter as the authoritative source.
+    // This prevents falling through to a regex that may match an old heading
+    // when the active milestone's 🚧 marker is inside a <summary> tag without
+    // **bold** formatting (bug #2409).
+    let stateVersion = null;
+    if (cwd) {
+      try {
+        const statePath = path.join(planningDir(cwd), 'STATE.md');
+        if (fs.existsSync(statePath)) {
+          const stateRaw = fs.readFileSync(statePath, 'utf-8');
+          const m = stateRaw.match(/^milestone:\s*(.+)/m);
+          if (m) stateVersion = m[1].trim();
+        }
+      } catch { /* intentionally empty */ }
+    }
+
+    if (stateVersion) {
+      // Look up the name for this version in ROADMAP.md
+      const escapedVer = escapeRegex(stateVersion);
+      // Match heading-format: ## Roadmap v2.9: Name  or  ## v2.9 Name
+      const headingMatch = roadmap.match(
+        new RegExp(`##[^\\n]*${escapedVer}[:\\s]+([^\\n(]+)`, 'i')
+      );
+      if (headingMatch) {
+        // If the heading line contains ✅ the milestone is already shipped.
+        // Fall through to normal detection so the NEW active milestone is returned
+        // instead of the stale shipped one still recorded in STATE.md.
+        if (!headingMatch[0].includes('✅')) {
+          return { version: stateVersion, name: headingMatch[1].trim() };
+        }
+        // Shipped milestone — do not early-return; fall through to normal detection below.
+      } else {
+        // Match list-format: 🚧 **v2.9 Name** or 🚧 v2.9 Name
+        const listMatch = roadmap.match(
+          new RegExp(`🚧\\s*\\*?\\*?${escapedVer}\\s+([^*\\n]+)`, 'i')
+        );
+        if (listMatch) {
+          return { version: stateVersion, name: listMatch[1].trim() };
+        }
+        // Version found in STATE.md but no name match in ROADMAP — return bare version
+        return { version: stateVersion, name: 'milestone' };
+      }
+    }
+
     // First: check for list-format roadmaps using 🚧 (in-progress) marker
     // e.g. "- 🚧 **v2.1 Belgium** — Phases 24-28 (in progress)"
     // e.g. "- 🚧 **v1.2.1 Tech Debt** — Phases 1-8 (in progress)"
@@ -1400,11 +1575,14 @@ function getMilestoneInfo(cwd) {
       };
     }
 
-    // Second: heading-format roadmaps — strip shipped milestones in <details> blocks
+    // Second: heading-format roadmaps — strip shipped milestones.
+    // <details> blocks are stripped by stripShippedMilestones; heading-format ✅ markers
+    // are excluded by the negative lookahead below so a stale STATE.md version (or any
+    // shipped ✅ heading) never wins over the first non-shipped milestone heading.
     const cleaned = stripShippedMilestones(roadmap);
-    // Extract version and name from the same ## heading for consistency
+    // Negative lookahead skips headings that contain ✅ (shipped milestone marker).
     // Supports 2+ segment versions: v1.2, v1.2.1, v2.0.1, etc.
-    const headingMatch = cleaned.match(/## .*v(\d+(?:\.\d+)+)[:\s]+([^\n(]+)/);
+    const headingMatch = cleaned.match(/## (?!.*✅).*v(\d+(?:\.\d+)+)[:\s]+([^\n(]+)/);
     if (headingMatch) {
       return {
         version: 'v' + headingMatch[1],
@@ -1538,6 +1716,32 @@ function atomicWriteFileSync(filePath, content, encoding = 'utf-8') {
   }
 }
 
+/**
+ * Format a Date as a fuzzy relative time string (e.g. "5 minutes ago").
+ * @param {Date} date
+ * @returns {string}
+ */
+function timeAgo(date) {
+  const seconds = Math.floor((Date.now() - date.getTime()) / 1000);
+  if (seconds < 5) return 'just now';
+  if (seconds < 60) return `${seconds} seconds ago`;
+  const minutes = Math.floor(seconds / 60);
+  if (minutes === 1) return '1 minute ago';
+  if (minutes < 60) return `${minutes} minutes ago`;
+  const hours = Math.floor(minutes / 60);
+  if (hours === 1) return '1 hour ago';
+  if (hours < 24) return `${hours} hours ago`;
+  const days = Math.floor(hours / 24);
+  if (days === 1) return '1 day ago';
+  if (days < 30) return `${days} days ago`;
+  const months = Math.floor(days / 30);
+  if (months === 1) return '1 month ago';
+  if (months < 12) return `${months} months ago`;
+  const years = Math.floor(days / 365);
+  if (years === 1) return '1 year ago';
+  return `${years} years ago`;
+}
+
 module.exports = {
   output,
   error,
@@ -1570,6 +1774,7 @@ module.exports = {
   findProjectRoot,
   detectSubRepos,
   reapStaleTempFiles,
+  GSD_TEMP_DIR,
   MODEL_ALIAS_MAP,
   CONFIG_DEFAULTS,
   planningDir,
@@ -1584,4 +1789,6 @@ module.exports = {
   getAgentsDir,
   checkAgentsInstalled,
   atomicWriteFileSync,
+  timeAgo,
+  pruneOrphanedWorktrees,
 };

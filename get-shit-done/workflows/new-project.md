@@ -57,14 +57,28 @@ The document should describe what you want to build.
 **MANDATORY FIRST STEP — Execute these checks before ANY user interaction:**
 
 ```bash
-INIT=$(node "$HOME/.claude/get-shit-done/bin/gsd-tools.cjs" init new-project)
+INIT=$(gsd-sdk query init.new-project)
 if [[ "$INIT" == @file:* ]]; then INIT=$(cat "${INIT#@file:}"); fi
-AGENT_SKILLS_RESEARCHER=$(node "$HOME/.claude/get-shit-done/bin/gsd-tools.cjs" agent-skills gsd-project-researcher 2>/dev/null)
-AGENT_SKILLS_SYNTHESIZER=$(node "$HOME/.claude/get-shit-done/bin/gsd-tools.cjs" agent-skills gsd-synthesizer 2>/dev/null)
-AGENT_SKILLS_ROADMAPPER=$(node "$HOME/.claude/get-shit-done/bin/gsd-tools.cjs" agent-skills gsd-roadmapper 2>/dev/null)
+AGENT_SKILLS_RESEARCHER=$(gsd-sdk query agent-skills gsd-project-researcher 2>/dev/null)
+AGENT_SKILLS_SYNTHESIZER=$(gsd-sdk query agent-skills gsd-synthesizer 2>/dev/null)
+AGENT_SKILLS_ROADMAPPER=$(gsd-sdk query agent-skills gsd-roadmapper 2>/dev/null)
 ```
 
-Parse JSON for: `researcher_model`, `synthesizer_model`, `roadmapper_model`, `commit_docs`, `project_exists`, `has_codebase_map`, `planning_exists`, `has_existing_code`, `has_package_file`, `is_brownfield`, `needs_codebase_map`, `has_git`, `project_path`.
+Parse JSON for: `researcher_model`, `synthesizer_model`, `roadmapper_model`, `commit_docs`, `project_exists`, `has_codebase_map`, `planning_exists`, `has_existing_code`, `has_package_file`, `is_brownfield`, `needs_codebase_map`, `has_git`, `project_path`, `agents_installed`, `missing_agents`.
+
+**If `agents_installed` is false:** Display a warning before proceeding:
+```
+⚠ GSD agents not installed. The following agents are missing from your agents directory:
+  {missing_agents joined with newline}
+
+Subagent spawns (gsd-project-researcher, gsd-research-synthesizer, gsd-roadmapper) will fail
+with "agent type not found". Run the installer with --global to make agents available:
+
+  npx get-shit-done-cc@latest --global
+
+Proceeding without research subagents — roadmap will be generated inline.
+```
+Skip Steps 6–7 (parallel research and synthesis) and proceed directly to roadmap creation in Step 8.
 
 **Detect runtime and set instruction file name:**
 
@@ -103,6 +117,8 @@ git init
 
 **If `needs_codebase_map` is true** (from init — existing code detected but no codebase map):
 
+
+**Text mode (`workflow.text_mode: true` in config or `--text` flag):** Set `TEXT_MODE=true` if `--text` is present in `$ARGUMENTS` OR `text_mode` from init JSON is `true`. When TEXT_MODE is active, replace every `AskUserQuestion` call with a plain-text numbered list and ask the user to type their choice number. This is required for non-Claude runtimes (OpenAI Codex, Gemini CLI, etc.) where `AskUserQuestion` is not available.
 Use AskUserQuestion:
 
 - header: "Codebase"
@@ -211,7 +227,7 @@ Create `.planning/config.json` with all settings (CLI fills in remaining default
 
 ```bash
 mkdir -p .planning
-node "$HOME/.claude/get-shit-done/bin/gsd-tools.cjs" config-new-project '{"mode":"yolo","granularity":"[selected]","parallelization":true|false,"commit_docs":true|false,"model_profile":"quality|balanced|budget|inherit","workflow":{"research":true|false,"plan_check":true|false,"verifier":true|false,"nyquist_validation":true|false,"auto_advance":true}}'
+gsd-sdk query config-new-project '{"mode":"yolo","granularity":"[selected]","parallelization":true|false,"commit_docs":true|false,"model_profile":"quality|balanced|budget|inherit","workflow":{"research":true|false,"plan_check":true|false,"verifier":true|false,"nyquist_validation":true|false,"auto_advance":true}}'
 ```
 
 **If commit_docs = No:** Add `.planning/` to `.gitignore`.
@@ -220,16 +236,46 @@ node "$HOME/.claude/get-shit-done/bin/gsd-tools.cjs" config-new-project '{"mode"
 
 ```bash
 mkdir -p .planning
-node "$HOME/.claude/get-shit-done/bin/gsd-tools.cjs" commit "chore: add project config" --files .planning/config.json
+gsd-sdk query commit "chore: add project config" .planning/config.json
 ```
 
 **Persist auto-advance chain flag to config (survives context compaction):**
 
 ```bash
-node "$HOME/.claude/get-shit-done/bin/gsd-tools.cjs" config-set workflow._auto_chain_active true
+gsd-sdk query config-set workflow._auto_chain_active true
 ```
 
 Proceed to Step 4 (skip Steps 3 and 5).
+
+## 2b. Prior Spike/Sketch Detection
+
+Check for existing spike and sketch work that should inform project setup:
+
+```bash
+# Check for spike findings skill (project-local)
+SPIKE_SKILL=$(ls ./.claude/skills/spike-findings-*/SKILL.md 2>/dev/null | head -1)
+
+# Check for sketch findings skill (project-local)
+SKETCH_SKILL=$(ls ./.claude/skills/sketch-findings-*/SKILL.md 2>/dev/null | head -1)
+
+# Check for raw spikes/sketches in .planning/
+HAS_SPIKES=$(ls .planning/spikes/MANIFEST.md 2>/dev/null)
+HAS_SKETCHES=$(ls .planning/sketches/MANIFEST.md 2>/dev/null)
+```
+
+If any of these exist, surface them before questioning:
+
+```
+⚡ Prior exploration detected:
+{if SPIKE_SKILL}  ✓ Spike findings skill: {path} — validated patterns from experiments
+{if SKETCH_SKILL}  ✓ Sketch findings skill: {path} — validated design decisions
+{if HAS_SPIKES && !SPIKE_SKILL}  ◆ Raw spikes in .planning/spikes/ — consider `/gsd-spike-wrap-up` to package findings
+{if HAS_SKETCHES && !SKETCH_SKILL}  ◆ Raw sketches in .planning/sketches/ — consider `/gsd-sketch-wrap-up` to package findings
+
+These findings will be incorporated into project context and available to planning agents.
+```
+
+If spike/sketch findings skills exist, read their SKILL.md files to inform the questioning phase — they contain validated patterns, constraints, and design decisions that should shape the project definition.
 
 ## 3. Deep Questioning
 
@@ -401,32 +447,104 @@ Do not compress. Capture everything gathered.
 
 ```bash
 mkdir -p .planning
-node "$HOME/.claude/get-shit-done/bin/gsd-tools.cjs" commit "docs: initialize project" --files .planning/PROJECT.md
+gsd-sdk query commit "docs: initialize project" .planning/PROJECT.md
 ```
 
 ## 5. Workflow Preferences
 
 **If auto mode:** Skip — config was collected in Step 2a. Proceed to Step 5.5.
 
-**Check for global defaults** at `~/.gsd/defaults.json`. If the file exists, offer to use saved defaults:
+**Check for global defaults** at `~/.gsd/defaults.json`. If the file exists, read and display its contents before asking:
 
+```bash
+DEFAULTS_RAW=$(cat ~/.gsd/defaults.json 2>/dev/null)
 ```
+
+Format the JSON into human-readable bullets using these label mappings:
+- `mode` → "Mode"
+- `granularity` → "Granularity"
+- `parallelization` → "Execution" (`true` → "Parallel", `false` → "Sequential")
+- `commit_docs` → "Git Tracking" (`true` → "Yes", `false` → "No")
+- `model_profile` → "AI Models"
+- `workflow.research` → "Research" (`true` → "Yes", `false` → "No")
+- `workflow.plan_check` → "Plan Check" (`true` → "Yes", `false` → "No")
+- `workflow.verifier` → "Verifier" (`true` → "Yes", `false` → "No")
+
+Display above the prompt:
+
+```text
+Your saved defaults (~/.gsd/defaults.json):
+  • Mode: [value]
+  • Granularity: [value]
+  • Execution: [Parallel|Sequential]
+  • Git Tracking: [Yes|No]
+  • AI Models: [value]
+  • Research: [Yes|No]
+  • Plan Check: [Yes|No]
+  • Verifier: [Yes|No]
+```
+
+Then ask:
+
+```text
 AskUserQuestion([
   {
-    question: "Use your saved default settings? (from ~/.gsd/defaults.json)",
+    question: "Use these saved defaults?",
     header: "Defaults",
     multiSelect: false,
     options: [
-      { label: "Yes (Recommended)", description: "Use saved defaults, skip settings questions" },
-      { label: "No", description: "Configure settings manually" }
+      { label: "Use as-is (Recommended)", description: "Proceed with the defaults shown above" },
+      { label: "Modify some settings", description: "Keep defaults, change a few" },
+      { label: "Configure fresh", description: "Walk through all questions from scratch" }
     ]
   }
 ])
 ```
 
-If "Yes": read `~/.gsd/defaults.json`, use those values for config.json, and skip directly to **Commit config.json** below.
+**If "Use as-is":** use the defaults values for config.json and skip directly to **Commit config.json** below.
 
-If "No" or `~/.gsd/defaults.json` doesn't exist: proceed with the questions below.
+**If "Modify some settings":** present a selection of every setting with its current saved value.
+
+**If TEXT_MODE is active** (non-Claude runtimes): display a numbered list and ask the user to type the numbers of settings they want to change (comma-separated). Parse the response and proceed.
+
+```text
+Which settings do you want to change? (enter numbers, comma-separated)
+
+  1. Mode — Currently: [value]
+  2. Granularity — Currently: [value]
+  3. Execution — Currently: [Parallel|Sequential]
+  4. Git Tracking — Currently: [Yes|No]
+  5. AI Models — Currently: [value]
+  6. Research — Currently: [Yes|No]
+  7. Plan Check — Currently: [Yes|No]
+  8. Verifier — Currently: [Yes|No]
+```
+
+**Otherwise** (Claude runtime with AskUserQuestion): use multiSelect:
+
+```text
+AskUserQuestion([
+  {
+    question: "Which settings do you want to change?",
+    header: "Change Settings",
+    multiSelect: true,
+    options: [
+      { label: "Mode", description: "Currently: [value]" },
+      { label: "Granularity", description: "Currently: [value]" },
+      { label: "Execution", description: "Currently: [Parallel|Sequential]" },
+      { label: "Git Tracking", description: "Currently: [Yes|No]" },
+      { label: "AI Models", description: "Currently: [value]" },
+      { label: "Research", description: "Currently: [Yes|No]" },
+      { label: "Plan Check", description: "Currently: [Yes|No]" },
+      { label: "Verifier", description: "Currently: [Yes|No]" }
+    ]
+  }
+])
+```
+
+For each selected setting, ask only that question using the option set from Round 1 / Round 2 below. Merge user answers over the saved defaults — unchanged settings retain their saved values. Then skip to **Commit config.json**.
+
+**If "Configure fresh" or `~/.gsd/defaults.json` doesn't exist:** proceed with the questions below.
 
 **Round 1 — Core workflow settings (4 questions):**
 
@@ -531,7 +649,7 @@ Create `.planning/config.json` with all settings (CLI fills in remaining default
 
 ```bash
 mkdir -p .planning
-node "$HOME/.claude/get-shit-done/bin/gsd-tools.cjs" config-new-project '{"mode":"[yolo|interactive]","granularity":"[selected]","parallelization":true|false,"commit_docs":true|false,"model_profile":"quality|balanced|budget|inherit","workflow":{"research":true|false,"plan_check":true|false,"verifier":true|false,"nyquist_validation":[false if granularity=coarse, true otherwise]}}'
+gsd-sdk query config-new-project '{"mode":"[yolo|interactive]","granularity":"[selected]","parallelization":true|false,"commit_docs":true|false,"model_profile":"quality|balanced|budget|inherit","workflow":{"research":true|false,"plan_check":true|false,"verifier":true|false,"nyquist_validation":[false if granularity=coarse, true otherwise]}}'
 ```
 
 **Note:** Run `/gsd-settings` anytime to update model profile, workflow agents, branching strategy, and other preferences.
@@ -548,7 +666,7 @@ node "$HOME/.claude/get-shit-done/bin/gsd-tools.cjs" config-new-project '{"mode"
 **Commit config.json:**
 
 ```bash
-node "$HOME/.claude/get-shit-done/bin/gsd-tools.cjs" commit "chore: add project config" --files .planning/config.json
+gsd-sdk query commit "chore: add project config" .planning/config.json
 ```
 
 ## 5.1. Sub-Repo Detection
@@ -992,7 +1110,7 @@ If "adjust": Return to scoping.
 **Commit requirements:**
 
 ```bash
-node "$HOME/.claude/get-shit-done/bin/gsd-tools.cjs" commit "docs: define v1 requirements" --files .planning/REQUIREMENTS.md
+gsd-sdk query commit "docs: define v1 requirements" .planning/REQUIREMENTS.md
 ```
 
 ## 8. Create Roadmap
@@ -1132,7 +1250,7 @@ Use AskUserQuestion:
 **Generate or refresh project instruction file before final commit:**
 
 ```bash
-node "$HOME/.claude/get-shit-done/bin/gsd-tools.cjs" generate-claude-md --output "$INSTRUCTION_FILE"
+gsd-sdk query generate-claude-md --output "$INSTRUCTION_FILE"
 ```
 
 This ensures new projects get the default GSD workflow-enforcement guidance and current project context in `$INSTRUCTION_FILE`.
@@ -1140,7 +1258,7 @@ This ensures new projects get the default GSD workflow-enforcement guidance and 
 **Commit roadmap (after approval or auto mode):**
 
 ```bash
-node "$HOME/.claude/get-shit-done/bin/gsd-tools.cjs" commit "docs: create roadmap ([N] phases)" --files .planning/ROADMAP.md .planning/STATE.md .planning/REQUIREMENTS.md "$INSTRUCTION_FILE"
+gsd-sdk query commit "docs: create roadmap ([N] phases)" .planning/ROADMAP.md .planning/STATE.md .planning/REQUIREMENTS.md "$INSTRUCTION_FILE"
 ```
 
 ## 9. Done
@@ -1181,7 +1299,7 @@ Exit skill and invoke SlashCommand("/gsd-discuss-phase 1 --auto")
 Check if Phase 1 has UI indicators (look for `**UI hint**: yes` in Phase 1 detail section of ROADMAP.md):
 
 ```bash
-PHASE1_SECTION=$(node "$HOME/.claude/get-shit-done/bin/gsd-tools.cjs" roadmap get-phase 1 2>/dev/null)
+PHASE1_SECTION=$(gsd-sdk query roadmap.get-phase 1 2>/dev/null)
 PHASE1_HAS_UI=$(echo "$PHASE1_SECTION" | grep -qi "UI hint.*yes" && echo "true" || echo "false")
 ```
 
@@ -1190,7 +1308,7 @@ PHASE1_HAS_UI=$(echo "$PHASE1_SECTION" | grep -qi "UI hint.*yes" && echo "true" 
 ```
 ───────────────────────────────────────────────────────────────
 
-## ▶ Next Up
+## ▶ Next Up — [${PROJECT_CODE}] ${PROJECT_TITLE}
 
 **Phase 1: [Phase Name]** — [Goal from ROADMAP.md]
 
@@ -1212,7 +1330,7 @@ PHASE1_HAS_UI=$(echo "$PHASE1_SECTION" | grep -qi "UI hint.*yes" && echo "true" 
 ```
 ───────────────────────────────────────────────────────────────
 
-## ▶ Next Up
+## ▶ Next Up — [${PROJECT_CODE}] ${PROJECT_TITLE}
 
 **Phase 1: [Phase Name]** — [Goal from ROADMAP.md]
 

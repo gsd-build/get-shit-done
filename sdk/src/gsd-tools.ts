@@ -1,8 +1,13 @@
 /**
- * GSD Tools Bridge — shells out to `gsd-tools.cjs` for state management.
+ * GSD Tools Bridge — programmatic access to GSD planning operations.
  *
- * All `.planning/` state operations go through gsd-tools.cjs rather than
- * reimplementing 12K+ lines of logic.
+ * By default routes commands through the SDK **query registry** (same handlers as
+ * `gsd-sdk query`) so `PhaseRunner`, `InitRunner`, and `GSD` share contracts with
+ * the typed CLI. Runner hot-path helpers (`initPhaseOp`, `phasePlanIndex`,
+ * `phaseComplete`, `initNewProject`, `configSet`, `commit`) call
+ * `registry.dispatch()` with canonical keys when native query is active, avoiding
+ * repeated argv resolution. When a workstream is set, dispatches to `gsd-tools.cjs` so
+ * workstream env stays aligned with CJS.
  */
 
 import { execFile } from 'node:child_process';
@@ -12,6 +17,12 @@ import { join } from 'node:path';
 import { homedir } from 'node:os';
 import { fileURLToPath } from 'node:url';
 import type { InitNewProjectInfo, PhaseOpInfo, PhasePlanIndex, RoadmapAnalysis } from './types.js';
+import type { GSDEventStream } from './event-stream.js';
+import { GSDError, exitCodeFor } from './errors.js';
+import { createRegistry } from './query/index.js';
+import { resolveQueryArgv } from './query/registry.js';
+import { normalizeQueryCommand } from './query/normalize-query-command.js';
+import { formatStateLoadRawStdout } from './query/state-project-load.js';
 
 // ─── Error type ──────────────────────────────────────────────────────────────
 
@@ -22,8 +33,9 @@ export class GSDToolsError extends Error {
     public readonly args: string[],
     public readonly exitCode: number | null,
     public readonly stderr: string,
+    options?: { cause?: unknown },
   ) {
-    super(message);
+    super(message, options);
     this.name = 'GSDToolsError';
   }
 }
@@ -35,20 +47,214 @@ const BUNDLED_GSD_TOOLS_PATH = fileURLToPath(
   new URL('../../get-shit-done/bin/gsd-tools.cjs', import.meta.url),
 );
 
+function formatRegistryRawStdout(matchedCmd: string, data: unknown): string {
+  if (matchedCmd === 'state.load') {
+    return formatStateLoadRawStdout(data);
+  }
+
+  if (matchedCmd === 'commit') {
+    const d = data as Record<string, unknown>;
+    if (d.committed === true) {
+      return d.hash != null ? String(d.hash) : 'committed';
+    }
+    if (d.committed === false) {
+      const r = String(d.reason ?? '');
+      if (
+        r.includes('commit_docs') ||
+        r.includes('skipped') ||
+        r.includes('gitignored') ||
+        r === 'skipped_commit_docs_false'
+      ) {
+        return 'skipped';
+      }
+      if (r.includes('nothing') || r.includes('nothing_to_commit')) {
+        return 'nothing';
+      }
+      return r || 'nothing';
+    }
+    return JSON.stringify(data, null, 2);
+  }
+
+  if (matchedCmd === 'config-set') {
+    const d = data as Record<string, unknown>;
+    if ((d.updated === true || d.set === true) && d.key !== undefined) {
+      const v = d.value;
+      if (v === null || v === undefined) {
+        return `${d.key}=`;
+      }
+      if (typeof v === 'object') {
+        return `${d.key}=${JSON.stringify(v)}`;
+      }
+      return `${d.key}=${String(v)}`;
+    }
+    return JSON.stringify(data, null, 2);
+  }
+
+  if (matchedCmd === 'state.begin-phase' || matchedCmd === 'state begin-phase') {
+    const d = data as Record<string, unknown>;
+    const u = d.updated as string[] | undefined;
+    return Array.isArray(u) && u.length > 0 ? 'true' : 'false';
+  }
+
+  if (typeof data === 'string') {
+    return data;
+  }
+  return JSON.stringify(data, null, 2);
+}
+
 export class GSDTools {
   private readonly projectDir: string;
   private readonly gsdToolsPath: string;
   private readonly timeoutMs: number;
+  private readonly workstream?: string;
+  private readonly registry: ReturnType<typeof createRegistry>;
+  private readonly preferNativeQuery: boolean;
 
   constructor(opts: {
     projectDir: string;
     gsdToolsPath?: string;
     timeoutMs?: number;
+    workstream?: string;
+    /** When set, mutation handlers emit the same events as `gsd-sdk query`. */
+    eventStream?: GSDEventStream;
+    /** Correlation id for mutation events when `eventStream` is set. */
+    sessionId?: string;
+    /**
+     * When true (default), route known commands through the SDK query registry.
+     * Set false in tests that substitute a mock `gsdToolsPath` script.
+     */
+    preferNativeQuery?: boolean;
   }) {
     this.projectDir = opts.projectDir;
     this.gsdToolsPath =
       opts.gsdToolsPath ?? resolveGsdToolsPath(opts.projectDir);
     this.timeoutMs = opts.timeoutMs ?? DEFAULT_TIMEOUT_MS;
+    this.workstream = opts.workstream;
+    this.preferNativeQuery = opts.preferNativeQuery ?? true;
+    this.registry = createRegistry(opts.eventStream, opts.sessionId);
+  }
+
+  private shouldUseNativeQuery(): boolean {
+    return this.preferNativeQuery && !this.workstream;
+  }
+
+  private nativeMatch(command: string, args: string[]) {
+    const [normCmd, normArgs] = normalizeQueryCommand(command, args);
+    const tokens = [normCmd, ...normArgs];
+    return resolveQueryArgv(tokens, this.registry);
+  }
+
+  private toToolsError(command: string, args: string[], err: unknown): GSDToolsError {
+    if (err instanceof GSDError) {
+      return new GSDToolsError(
+        err.message,
+        command,
+        args,
+        exitCodeFor(err.classification),
+        '',
+        { cause: err },
+      );
+    }
+    const msg = err instanceof Error ? err.message : String(err);
+    return new GSDToolsError(
+      msg,
+      command,
+      args,
+      1,
+      '',
+      err instanceof Error ? { cause: err } : undefined,
+    );
+  }
+
+  /**
+   * Enforce {@link GSDTools.timeoutMs} for in-process registry dispatches so native
+   * routing cannot hang indefinitely (subprocess path already uses `execFile` timeout).
+   */
+  private async withRegistryDispatchTimeout<T>(
+    legacyCommand: string,
+    legacyArgs: string[],
+    work: Promise<T>,
+  ): Promise<T> {
+    let timeoutId: ReturnType<typeof setTimeout> | undefined;
+    const timeoutPromise = new Promise<never>((_, reject) => {
+      timeoutId = setTimeout(() => {
+        reject(
+          new GSDToolsError(
+            `gsd-tools timed out after ${this.timeoutMs}ms: ${legacyCommand} ${legacyArgs.join(' ')}`,
+            legacyCommand,
+            legacyArgs,
+            null,
+            '',
+          ),
+        );
+      }, this.timeoutMs);
+    });
+    try {
+      // Promise.race rejects when the timeout fires but does not cancel the handler promise;
+      // native handlers may still run to completion (unlike subprocess + execFile timeout).
+      return await Promise.race([work, timeoutPromise]);
+    } finally {
+      if (timeoutId !== undefined) {
+        clearTimeout(timeoutId);
+      }
+    }
+  }
+
+  /**
+   * Direct registry dispatch for a known handler key — skips `resolveQueryArgv` on the hot path
+   * used by PhaseRunner / InitRunner (`initPhaseOp`, `phasePlanIndex`, etc.).
+   * When native query is off (e.g. workstream or tests with `preferNativeQuery: false`), delegates to `exec`.
+   *
+   * When native query is on, `registry.dispatch` failures are wrapped as {@link GSDToolsError} and
+   * **not** retried via the legacy `gsd-tools.cjs` subprocess — callers see the handler error
+   * explicitly. Only commands with no registry match fall through to subprocess routing in {@link exec}.
+   */
+  private async dispatchNativeJson(
+    legacyCommand: string,
+    legacyArgs: string[],
+    registryCmd: string,
+    registryArgs: string[],
+  ): Promise<unknown> {
+    if (!this.shouldUseNativeQuery()) {
+      return this.exec(legacyCommand, legacyArgs);
+    }
+    try {
+      const result = await this.withRegistryDispatchTimeout(
+        legacyCommand,
+        legacyArgs,
+        this.registry.dispatch(registryCmd, registryArgs, this.projectDir),
+      );
+      return result.data;
+    } catch (err) {
+      if (err instanceof GSDToolsError) throw err;
+      throw this.toToolsError(legacyCommand, legacyArgs, err);
+    }
+  }
+
+  /**
+   * Same as {@link dispatchNativeJson} for handlers whose CLI contract is raw stdout (`execRaw`),
+   * including the same “no silent fallback to CJS on handler failure” behaviour.
+   */
+  private async dispatchNativeRaw(
+    legacyCommand: string,
+    legacyArgs: string[],
+    registryCmd: string,
+    registryArgs: string[],
+  ): Promise<string> {
+    if (!this.shouldUseNativeQuery()) {
+      return this.execRaw(legacyCommand, legacyArgs);
+    }
+    try {
+      const result = await this.withRegistryDispatchTimeout(
+        legacyCommand,
+        legacyArgs,
+        this.registry.dispatch(registryCmd, registryArgs, this.projectDir),
+      );
+      return formatRegistryRawStdout(registryCmd, result.data).trim();
+    } catch (err) {
+      if (err instanceof GSDToolsError) throw err;
+      throw this.toToolsError(legacyCommand, legacyArgs, err);
+    }
   }
 
   // ─── Core exec ───────────────────────────────────────────────────────────
@@ -56,9 +262,30 @@ export class GSDTools {
   /**
    * Execute a gsd-tools command and return parsed JSON output.
    * Handles the `@file:` prefix pattern for large results.
+   *
+   * With native query enabled, a matching registry handler runs in-process;
+   * if that handler throws, the error is surfaced (no automatic fallback to `gsd-tools.cjs`).
    */
   async exec(command: string, args: string[] = []): Promise<unknown> {
-    const fullArgs = [this.gsdToolsPath, command, ...args];
+    if (this.shouldUseNativeQuery()) {
+      const matched = this.nativeMatch(command, args);
+      if (matched) {
+        try {
+          const result = await this.withRegistryDispatchTimeout(
+            command,
+            args,
+            this.registry.dispatch(matched.cmd, matched.args, this.projectDir),
+          );
+          return result.data;
+        } catch (err) {
+          if (err instanceof GSDToolsError) throw err;
+          throw this.toToolsError(command, args, err);
+        }
+      }
+    }
+
+    const wsArgs = this.workstream ? ['--ws', this.workstream] : [];
+    const fullArgs = [this.gsdToolsPath, command, ...args, ...wsArgs];
 
     return new Promise<unknown>((resolve, reject) => {
       const child = execFile(
@@ -74,7 +301,6 @@ export class GSDTools {
           const stderrStr = stderr?.toString() ?? '';
 
           if (error) {
-            // Distinguish timeout from other errors
             if (error.killed || (error as NodeJS.ErrnoException).code === 'ETIMEDOUT') {
               reject(
                 new GSDToolsError(
@@ -119,7 +345,6 @@ export class GSDTools {
         },
       );
 
-      // Safety net: kill if child doesn't respond to timeout signal
       child.on('error', (err) => {
         reject(
           new GSDToolsError(
@@ -147,7 +372,12 @@ export class GSDTools {
     let jsonStr = trimmed;
     if (jsonStr.startsWith('@file:')) {
       const filePath = jsonStr.slice(6).trim();
-      jsonStr = await readFile(filePath, 'utf-8');
+      try {
+        jsonStr = await readFile(filePath, 'utf-8');
+      } catch (err) {
+        const reason = err instanceof Error ? err.message : String(err);
+        throw new Error(`Failed to read gsd-tools @file: indirection at "${filePath}": ${reason}`);
+      }
     }
 
     return JSON.parse(jsonStr);
@@ -160,7 +390,25 @@ export class GSDTools {
    * Use for commands like `config-set` that return plain text, not JSON.
    */
   async execRaw(command: string, args: string[] = []): Promise<string> {
-    const fullArgs = [this.gsdToolsPath, command, ...args, '--raw'];
+    if (this.shouldUseNativeQuery()) {
+      const matched = this.nativeMatch(command, args);
+      if (matched) {
+        try {
+          const result = await this.withRegistryDispatchTimeout(
+            command,
+            args,
+            this.registry.dispatch(matched.cmd, matched.args, this.projectDir),
+          );
+          return formatRegistryRawStdout(matched.cmd, result.data).trim();
+        } catch (err) {
+          if (err instanceof GSDToolsError) throw err;
+          throw this.toToolsError(command, args, err);
+        }
+      }
+    }
+
+    const wsArgs = this.workstream ? ['--ws', this.workstream] : [];
+    const fullArgs = [this.gsdToolsPath, command, ...args, ...wsArgs, '--raw'];
 
     return new Promise<string>((resolve, reject) => {
       const child = execFile(
@@ -207,7 +455,7 @@ export class GSDTools {
   // ─── Typed convenience methods ─────────────────────────────────────────
 
   async stateLoad(): Promise<string> {
-    return this.execRaw('state', ['load']);
+    return this.dispatchNativeRaw('state', ['load'], 'state.load', []);
   }
 
   async roadmapAnalyze(): Promise<RoadmapAnalysis> {
@@ -215,7 +463,7 @@ export class GSDTools {
   }
 
   async phaseComplete(phase: string): Promise<string> {
-    return this.execRaw('phase', ['complete', phase]);
+    return this.dispatchNativeRaw('phase', ['complete', phase], 'phase.complete', [phase]);
   }
 
   async commit(message: string, files?: string[]): Promise<string> {
@@ -223,7 +471,7 @@ export class GSDTools {
     if (files?.length) {
       args.push('--files', ...files);
     }
-    return this.execRaw('commit', args);
+    return this.dispatchNativeRaw('commit', args, 'commit', args);
   }
 
   async verifySummary(path: string): Promise<string> {
@@ -239,15 +487,25 @@ export class GSDTools {
    * Returns a typed PhaseOpInfo describing what exists on disk for this phase.
    */
   async initPhaseOp(phaseNumber: string): Promise<PhaseOpInfo> {
-    const result = await this.exec('init', ['phase-op', phaseNumber]);
+    const result = await this.dispatchNativeJson(
+      'init',
+      ['phase-op', phaseNumber],
+      'init.phase-op',
+      [phaseNumber],
+    );
     return result as PhaseOpInfo;
   }
 
   /**
-   * Get a config value from gsd-tools.cjs.
+   * Get a config value via the `config-get` surface (CJS and registry use the same key path).
    */
   async configGet(key: string): Promise<string | null> {
-    const result = await this.exec('config', ['get', key]);
+    const result = await this.dispatchNativeJson(
+      'config-get',
+      [key],
+      'config-get',
+      [key],
+    );
     return result as string | null;
   }
 
@@ -263,7 +521,12 @@ export class GSDTools {
    * Returns typed PhasePlanIndex with wave assignments and completion status.
    */
   async phasePlanIndex(phaseNumber: string): Promise<PhasePlanIndex> {
-    const result = await this.exec('phase-plan-index', [phaseNumber]);
+    const result = await this.dispatchNativeJson(
+      'phase-plan-index',
+      [phaseNumber],
+      'phase-plan-index',
+      [phaseNumber],
+    );
     return result as PhasePlanIndex;
   }
 
@@ -272,7 +535,7 @@ export class GSDTools {
    * Returns project metadata, model configs, brownfield detection, etc.
    */
   async initNewProject(): Promise<InitNewProjectInfo> {
-    const result = await this.exec('init', ['new-project']);
+    const result = await this.dispatchNativeJson('init', ['new-project'], 'init.new-project', []);
     return result as InitNewProjectInfo;
   }
 
@@ -282,20 +545,49 @@ export class GSDTools {
    * Note: config-set returns `key=value` text, not JSON, so we use execRaw.
    */
   async configSet(key: string, value: string): Promise<string> {
-    return this.execRaw('config-set', [key, value]);
+    return this.dispatchNativeRaw('config-set', [key, value], 'config-set', [key, value]);
   }
+}
+
+/**
+ * Run `gsd-sdk query` semantics in-process: normalize argv, resolve registry, dispatch.
+ * Returns handler JSON payload (same as stdout from the `gsd-sdk query` CLI without `--pick`).
+ */
+export async function runGsdToolsQuery(projectDir: string, queryArgv: string[]): Promise<unknown> {
+  const { createRegistry } = await import('./query/index.js');
+  const { resolveQueryArgv } = await import('./query/registry.js');
+  const { normalizeQueryCommand } = await import('./query/normalize-query-command.js');
+  const { GSDError, ErrorClassification } = await import('./errors.js');
+
+  if (queryArgv.length === 0 || !queryArgv[0]) {
+    throw new GSDError('runGsdToolsQuery requires a command', ErrorClassification.Validation);
+  }
+  const queryCommand = queryArgv[0];
+  const [normCmd, normArgs] = normalizeQueryCommand(queryCommand, queryArgv.slice(1));
+  const registry = createRegistry();
+  const tokens = [normCmd, ...normArgs];
+  const matched = resolveQueryArgv(tokens, registry);
+  if (!matched) {
+    throw new GSDError(
+      `Unknown command: "${tokens.join(' ')}". No native handler registered.`,
+      ErrorClassification.Validation,
+    );
+  }
+  const result = await registry.dispatch(matched.cmd, matched.args, projectDir);
+  return result.data;
 }
 
 // ─── Path resolution ────────────────────────────────────────────────────────
 
 /**
- * Resolve gsd-tools.cjs path with bundled-repo fallback.
- * Probe order: project-local → repo-bundled → global home directory.
+ * Resolve gsd-tools.cjs path.
+ * Probe order: SDK-bundled repo copy → `project/.claude/get-shit-done/` →
+ * `~/.claude/get-shit-done/`.
  */
 export function resolveGsdToolsPath(projectDir: string): string {
   const candidates = [
-    join(projectDir, '.claude', 'get-shit-done', 'bin', 'gsd-tools.cjs'),
     BUNDLED_GSD_TOOLS_PATH,
+    join(projectDir, '.claude', 'get-shit-done', 'bin', 'gsd-tools.cjs'),
     join(homedir(), '.claude', 'get-shit-done', 'bin', 'gsd-tools.cjs'),
   ];
 

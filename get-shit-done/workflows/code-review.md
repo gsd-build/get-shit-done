@@ -17,7 +17,7 @@ Parse arguments and load project state:
 
 ```bash
 PHASE_ARG="${1}"
-INIT=$(node "$HOME/.claude/get-shit-done/bin/gsd-tools.cjs" init phase-op "${PHASE_ARG}")
+INIT=$(gsd-sdk query init.phase-op "${PHASE_ARG}")
 if [[ "$INIT" == @file:* ]]; then INIT=$(cat "${INIT#@file:}"); fi
 ```
 
@@ -74,7 +74,7 @@ fi
 Check if code review is enabled via config:
 
 ```bash
-CODE_REVIEW_ENABLED=$(node "$HOME/.claude/get-shit-done/bin/gsd-tools.cjs" config-get workflow.code_review 2>/dev/null || echo "true")
+CODE_REVIEW_ENABLED=$(gsd-sdk query config-get workflow.code_review 2>/dev/null || echo "true")
 ```
 
 If CODE_REVIEW_ENABLED is "false":
@@ -90,14 +90,14 @@ Default is true — only skip on explicit false. This check runs AFTER phase val
 Determine review depth with priority order:
 
 1. DEPTH_OVERRIDE from --depth flag (highest priority)
-2. Config value: `node "$HOME/.claude/get-shit-done/bin/gsd-tools.cjs" config-get workflow.code_review_depth 2>/dev/null`
+2. Config value: `gsd-sdk query config-get workflow.code_review_depth 2>/dev/null`
 3. Default: "standard"
 
 ```bash
 if [ -n "$DEPTH_OVERRIDE" ]; then
   REVIEW_DEPTH="$DEPTH_OVERRIDE"
 else
-  CONFIG_DEPTH=$(node "$HOME/.claude/get-shit-done/bin/gsd-tools.cjs" config-get workflow.code_review_depth 2>/dev/null || echo "")
+  CONFIG_DEPTH=$(gsd-sdk query config-get workflow.code_review_depth 2>/dev/null || echo "")
   REVIEW_DEPTH="${CONFIG_DEPTH:-standard}"
 fi
 ```
@@ -172,7 +172,7 @@ if [ -z "$FILES_OVERRIDE" ]; then
         for (const line of yaml.split('\n')) {
           if (/^\s+created:/.test(line)) { inSection = 'created'; continue; }
           if (/^\s+modified:/.test(line)) { inSection = 'modified'; continue; }
-          if (/^\s+\w+:/.test(line) && !/^\s+-/.test(line)) { inSection = null; continue; }
+          if (/^\s*\w+:/.test(line) && !/^\s*-/.test(line)) { inSection = null; continue; }
           if (inSection && /^\s+-\s+(.+)/.test(line)) {
             files.push(line.match(/^\s+-\s+(.+)/)[1].trim());
           }
@@ -395,7 +395,7 @@ if [ -f "${REVIEW_PATH}" ]; then
     echo "REVIEW.md created at ${REVIEW_PATH}"
     
     if [ "$COMMIT_DOCS" = "true" ]; then
-      node "$HOME/.claude/get-shit-done/bin/gsd-tools.cjs" commit \
+      gsd-sdk query commit \
         "docs(${PADDED_PHASE}): add code review report" \
         --files "${REVIEW_PATH}"
     fi

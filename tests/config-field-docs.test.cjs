@@ -73,12 +73,16 @@ describe('config-field-docs', () => {
       plan_checker: 'workflow.plan_check',
       verifier: 'workflow.verifier',
       nyquist_validation: 'workflow.nyquist_validation',
+      ai_integration_phase: 'workflow.ai_integration_phase',
       text_mode: 'workflow.text_mode',
       subagent_timeout: 'workflow.subagent_timeout',
       branching_strategy: 'git.branching_strategy',
       phase_branch_template: 'git.phase_branch_template',
       milestone_branch_template: 'git.milestone_branch_template',
       quick_branch_template: 'git.quick_branch_template',
+      security_enforcement: 'workflow.security_enforcement',
+      security_asvs_level: 'workflow.security_asvs_level',
+      security_block_on: 'workflow.security_block_on',
     };
 
     const missing = keys.filter(k => {

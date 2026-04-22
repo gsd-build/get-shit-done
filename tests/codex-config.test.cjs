@@ -17,6 +17,7 @@ const os = require('os');
 const {
   getCodexSkillAdapterHeader,
   convertClaudeAgentToCodexAgent,
+  convertClaudeCommandToCodexSkill,
   generateCodexAgentToml,
   generateCodexConfigBlock,
   stripGsdFromCodexConfig,
@@ -186,6 +187,86 @@ node "$HOME/.claude/get-shit-done/bin/gsd-tools.cjs" commit "docs: resolve"`;
   });
 });
 
+// ─── Codex command prefix conversion ────────────────────────────────────────────
+
+describe('Codex hyphen-style command prefix conversion', () => {
+  test('converts /gsd-command in workflow output to $gsd-command', () => {
+    const input = `---
+name: gsd-test
+description: Test
+tools: Read
+---
+
+/gsd-discuss-phase 1 — gather context
+/gsd-plan-phase 2 — create plan
+/gsd-execute-phase 3 — run it`;
+
+    const result = convertClaudeCommandToCodexSkill(input, 'gsd-test');
+    assert.ok(result.includes('$gsd-discuss-phase'), 'converts /gsd-discuss-phase');
+    assert.ok(result.includes('$gsd-plan-phase'), 'converts /gsd-plan-phase');
+    assert.ok(result.includes('$gsd-execute-phase'), 'converts /gsd-execute-phase');
+    assert.ok(!result.includes('/gsd-discuss-phase'), 'no /gsd-discuss-phase remains');
+  });
+
+  test('converts backtick-wrapped /gsd- commands', () => {
+    const input = `---
+name: gsd-test
+description: Test
+tools: Read
+---
+
+Run \`/gsd-plan-phase 1\` to plan.`;
+
+    const result = convertClaudeCommandToCodexSkill(input, 'gsd-test');
+    assert.ok(result.includes('$gsd-plan-phase'), 'converts backtick-wrapped command');
+  });
+
+  test('does not convert /gsd- in file paths', () => {
+    const input = `---
+name: gsd-test
+description: Test
+tools: Read
+---
+
+node "$HOME/.claude/get-shit-done/bin/gsd-tools.cjs" init`;
+
+    const result = convertClaudeCommandToCodexSkill(input, 'gsd-test');
+    assert.ok(result.includes('gsd-tools.cjs'), 'gsd-tools.cjs preserved in path');
+    assert.ok(!result.includes('$gsd-tools'), 'no $gsd-tools in file path');
+  });
+
+  test('removes /clear then: for Codex', () => {
+    const input = `---
+name: gsd-test
+description: Test
+tools: Read
+---
+
+\`/clear\` then:
+
+\`$gsd-plan-phase 1\``;
+
+    const result = convertClaudeCommandToCodexSkill(input, 'gsd-test');
+    assert.ok(!result.includes('/clear'), 'no /clear remains');
+    assert.ok(result.includes('$gsd-plan-phase'), 'command preserved after /clear removal');
+  });
+
+  test('removes bare /clear then: for Codex', () => {
+    const input = `---
+name: gsd-test
+description: Test
+tools: Read
+---
+
+/clear then:
+/gsd-execute-phase 2`;
+
+    const result = convertClaudeCommandToCodexSkill(input, 'gsd-test');
+    assert.ok(!result.includes('/clear'), 'no /clear remains');
+    assert.ok(result.includes('$gsd-execute-phase'), 'command converted');
+  });
+});
+
 // ─── generateCodexAgentToml ─────────────────────────────────────────────────────
 
 describe('generateCodexAgentToml', () => {
@@ -238,6 +319,35 @@ tools: Read, Grep, Glob
   test('defaults unknown agents to read-only', () => {
     const result = generateCodexAgentToml('gsd-unknown', sampleAgent);
     assert.ok(result.includes('sandbox_mode = "read-only"'), 'defaults to read-only');
+  });
+
+  // ─── #2256: model_overrides support ───────────────────────────────────────
+
+  test('emits model field when modelOverrides contains an entry for the agent (#2256)', () => {
+    const overrides = { 'gsd-executor': 'gpt-5.3-codex' };
+    const result = generateCodexAgentToml('gsd-executor', sampleAgent, overrides);
+    assert.ok(result.includes('model = "gpt-5.3-codex"'), 'model field must be present in TOML');
+  });
+
+  test('does not emit model field when modelOverrides is null (#2256)', () => {
+    const result = generateCodexAgentToml('gsd-executor', sampleAgent, null);
+    assert.ok(!result.includes('model ='), 'model field must be absent when no override');
+  });
+
+  test('does not emit model field when modelOverrides has no entry for this agent (#2256)', () => {
+    const overrides = { 'gsd-planner': 'gpt-5.4' };
+    const result = generateCodexAgentToml('gsd-executor', sampleAgent, overrides);
+    assert.ok(!result.includes('model ='), 'model field must be absent for agents not in overrides');
+  });
+
+  test('model field appears before developer_instructions (#2256)', () => {
+    const overrides = { 'gsd-executor': 'gpt-5.3-codex' };
+    const result = generateCodexAgentToml('gsd-executor', sampleAgent, overrides);
+    const modelIdx = result.indexOf('model = "gpt-5.3-codex"');
+    const instrIdx = result.indexOf("developer_instructions = '''");
+    assert.ok(modelIdx !== -1, 'model field present');
+    assert.ok(instrIdx !== -1, 'developer_instructions present');
+    assert.ok(modelIdx < instrIdx, 'model field must appear before developer_instructions');
   });
 });
 
@@ -700,6 +810,34 @@ describe('installCodexConfig (integration)', () => {
     assert.ok(checkerToml.includes('name = "gsd-plan-checker"'), 'plan-checker has name');
     assert.ok(checkerToml.includes('sandbox_mode = "read-only"'), 'plan-checker is read-only');
   });
+
+  // PATHS-01: no ~/.claude references should leak into generated .toml files (#2320)
+  // Covers both trailing-slash and bare end-of-string forms, and scans all .toml
+  // files (agents/ subdirectory + top-level config.toml if present).
+  (hasAgents ? test : test.skip)('generated .toml files contain no leaked ~/.claude paths (PATHS-01)', () => {
+    const { installCodexConfig } = require('../bin/install.js');
+    installCodexConfig(tmpTarget, agentsSrc);
+
+    // Collect all .toml files: per-agent files in agents/ plus top-level config.toml
+    const agentsDir = path.join(tmpTarget, 'agents');
+    const tomlFiles = fs.readdirSync(agentsDir)
+      .filter(f => f.endsWith('.toml'))
+      .map(f => path.join(agentsDir, f));
+    const topLevel = path.join(tmpTarget, 'config.toml');
+    if (fs.existsSync(topLevel)) tomlFiles.push(topLevel);
+    assert.ok(tomlFiles.length > 0, 'at least one .toml file generated');
+
+    // Match ~/.claude, $HOME/.claude, or ./.claude with or without trailing slash
+    const leakPattern = /(?:~|\$HOME|\.)\/\.claude(?:\/|$)/;
+    const leaks = [];
+    for (const filePath of tomlFiles) {
+      const content = fs.readFileSync(filePath, 'utf8');
+      if (leakPattern.test(content)) {
+        leaks.push(path.relative(tmpTarget, filePath));
+      }
+    }
+    assert.deepStrictEqual(leaks, [], `No .toml files should contain .claude paths; found leaks in: ${leaks.join(', ')}`);
+  });
 });
 
 // ─── Codex config.toml [features] safety (#1202) ─────────────────────────────
@@ -747,6 +885,22 @@ describe('Codex install hook configuration (e2e)', () => {
 
   afterEach(() => {
     fs.rmSync(tmpDir, { recursive: true, force: true });
+  });
+
+  test('Codex install copies hook file that is referenced in config.toml (#2153)', () => {
+    // Regression test: Codex install writes gsd-check-update hook reference into
+    // config.toml but must also copy the hook file to ~/$CODEX_HOME/hooks/
+    runCodexInstall(codexHome);
+
+    const configContent = readCodexConfig(codexHome);
+    // config.toml must reference the hook
+    assert.ok(configContent.includes('gsd-check-update.js'), 'config.toml references gsd-check-update.js');
+    // The hook file must physically exist at the referenced path
+    const hookFile = path.join(codexHome, 'hooks', 'gsd-check-update.js');
+    assert.ok(
+      fs.existsSync(hookFile),
+      `gsd-check-update.js must exist at ${hookFile} — config.toml references it but file was not installed`
+    );
   });
 
   test('fresh CODEX_HOME enables codex_hooks without draft root defaults', () => {

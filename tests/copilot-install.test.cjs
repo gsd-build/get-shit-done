@@ -139,8 +139,8 @@ describe('Source code integration (Copilot)', () => {
     assert.ok(src.includes('--copilot'), 'help text has --copilot option');
   });
 
-  test('CLI-02: promptRuntime runtimeMap has Copilot as option 5', () => {
-    assert.ok(src.includes("'5': 'copilot'"), 'runtimeMap has 5 -> copilot');
+  test('CLI-02: promptRuntime runtimeMap has Copilot as option 7', () => {
+    assert.ok(src.includes("'7': 'copilot'"), 'runtimeMap has 7 -> copilot');
   });
 
   test('CLI-02: promptRuntime allRuntimes array includes copilot', () => {
@@ -1116,7 +1116,7 @@ const EXPECTED_AGENTS = fs.readdirSync(path.join(__dirname, '..', 'agents'))
 function runCopilotInstall(cwd) {
   const env = { ...process.env };
   delete env.GSD_TEST_MODE;
-  return execFileSync(process.execPath, [INSTALL_PATH, '--copilot', '--local'], {
+  return execFileSync(process.execPath, [INSTALL_PATH, '--copilot', '--local', '--no-sdk'], {
     cwd,
     encoding: 'utf-8',
     stdio: ['pipe', 'pipe', 'pipe'],
@@ -1127,7 +1127,7 @@ function runCopilotInstall(cwd) {
 function runCopilotUninstall(cwd) {
   const env = { ...process.env };
   delete env.GSD_TEST_MODE;
-  return execFileSync(process.execPath, [INSTALL_PATH, '--copilot', '--local', '--uninstall'], {
+  return execFileSync(process.execPath, [INSTALL_PATH, '--copilot', '--local', '--uninstall', '--no-sdk'], {
     cwd,
     encoding: 'utf-8',
     stdio: ['pipe', 'pipe', 'pipe'],
@@ -1180,17 +1180,26 @@ describe('E2E: Copilot full install verification', () => {
     const gsdAgents = files.filter(f => f.startsWith('gsd-') && f.endsWith('.agent.md')).sort();
     const expected = [
       'gsd-advisor-researcher.agent.md',
+      'gsd-ai-researcher.agent.md',
       'gsd-assumptions-analyzer.agent.md',
       'gsd-code-fixer.agent.md',
       'gsd-code-reviewer.agent.md',
       'gsd-codebase-mapper.agent.md',
+      'gsd-debug-session-manager.agent.md',
       'gsd-debugger.agent.md',
+      'gsd-doc-classifier.agent.md',
+      'gsd-doc-synthesizer.agent.md',
       'gsd-doc-verifier.agent.md',
       'gsd-doc-writer.agent.md',
+      'gsd-domain-researcher.agent.md',
+      'gsd-eval-auditor.agent.md',
+      'gsd-eval-planner.agent.md',
       'gsd-executor.agent.md',
+      'gsd-framework-selector.agent.md',
       'gsd-integration-checker.agent.md',
       'gsd-intel-updater.agent.md',
       'gsd-nyquist-auditor.agent.md',
+      'gsd-pattern-mapper.agent.md',
       'gsd-phase-researcher.agent.md',
       'gsd-plan-checker.agent.md',
       'gsd-planner.agent.md',
@@ -1367,7 +1376,7 @@ describe('E2E: Copilot uninstall verification', () => {
 function runClaudeInstall(cwd) {
   const env = { ...process.env };
   delete env.GSD_TEST_MODE;
-  return execFileSync(process.execPath, [INSTALL_PATH, '--claude', '--local'], {
+  return execFileSync(process.execPath, [INSTALL_PATH, '--claude', '--local', '--no-sdk'], {
     cwd,
     encoding: 'utf-8',
     stdio: ['pipe', 'pipe', 'pipe'],
@@ -1378,7 +1387,7 @@ function runClaudeInstall(cwd) {
 function runClaudeUninstall(cwd) {
   const env = { ...process.env };
   delete env.GSD_TEST_MODE;
-  return execFileSync(process.execPath, [INSTALL_PATH, '--claude', '--local', '--uninstall'], {
+  return execFileSync(process.execPath, [INSTALL_PATH, '--claude', '--local', '--uninstall', '--no-sdk'], {
     cwd,
     encoding: 'utf-8',
     stdio: ['pipe', 'pipe', 'pipe'],

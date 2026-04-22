@@ -129,7 +129,7 @@ Write to `.planning/research/SUMMARY.md`
 The 4 parallel researcher agents write files but do NOT commit. You commit everything together.
 
 ```bash
-node "$HOME/.claude/get-shit-done/bin/gsd-tools.cjs" commit "docs: complete project research" --files .planning/research/
+gsd-sdk query commit "docs: complete project research" .planning/research/
 ```
 
 ## Step 8: Return Summary
