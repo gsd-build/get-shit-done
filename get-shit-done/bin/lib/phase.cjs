@@ -870,9 +870,10 @@ function cmdPhaseComplete(cwd, phaseNum, raw) {
         const sectionText = phaseSectionMatch ? phaseSectionMatch[1] : '';
         const reqMatch = sectionText.match(/\*\*Requirements:\*\*\s*([^\n]+)/i);
 
+        let reqContent = fs.readFileSync(reqPath, 'utf-8');
+
         if (reqMatch) {
           const reqIds = reqMatch[1].replace(/[\[\]]/g, '').split(/[,\s]+/).map(r => r.trim()).filter(Boolean);
-          let reqContent = fs.readFileSync(reqPath, 'utf-8');
 
           for (const reqId of reqIds) {
             const reqEscaped = escapeRegex(reqId);
@@ -887,10 +888,40 @@ function cmdPhaseComplete(cwd, phaseNum, raw) {
               '$1 Complete $2'
             );
           }
-
-          atomicWriteFileSync(reqPath, reqContent);
-          requirementsUpdated = true;
         }
+
+        // Scan body for all **REQ-ID** patterns, warn about any missing from the Traceability table.
+        // Always runs regardless of whether the roadmap has a Requirements: line.
+        const bodyReqIds = [];
+        const bodyReqPattern = /\*\*([A-Z][A-Z0-9]*-\d+)\*\*/g;
+        let bodyMatch;
+        while ((bodyMatch = bodyReqPattern.exec(reqContent)) !== null) {
+          const id = bodyMatch[1];
+          if (!bodyReqIds.includes(id)) bodyReqIds.push(id);
+        }
+
+        // Collect REQ-IDs present in the Traceability section only, to avoid
+        // picking up IDs from other tables in the document.
+        const traceabilityHeadingMatch = reqContent.match(/^#{1,6}\s+Traceability\b/im);
+        const traceabilitySection = traceabilityHeadingMatch
+          ? reqContent.slice(traceabilityHeadingMatch.index)
+          : '';
+        const tableReqIds = new Set();
+        const tableRowPattern = /^\|\s*([A-Z][A-Z0-9]*-\d+)\s*\|/gm;
+        let tableMatch;
+        while ((tableMatch = tableRowPattern.exec(traceabilitySection)) !== null) {
+          tableReqIds.add(tableMatch[1]);
+        }
+
+        const unregistered = bodyReqIds.filter(id => !tableReqIds.has(id));
+        if (unregistered.length > 0) {
+          warnings.push(
+            `REQUIREMENTS.md: ${unregistered.length} REQ-ID(s) found in body but missing from Traceability table: ${unregistered.join(', ')} — add them manually to keep traceability in sync`
+          );
+        }
+
+        atomicWriteFileSync(reqPath, reqContent);
+        requirementsUpdated = true;
       }
     });
   }
