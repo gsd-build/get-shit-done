@@ -6,7 +6,7 @@ import { describe, it, expect, beforeEach, afterEach } from 'vitest';
 import { mkdtemp, writeFile, mkdir, rm } from 'node:fs/promises';
 import { join } from 'node:path';
 import { tmpdir } from 'node:os';
-import { GSDError } from '../errors.js';
+import { GSDError, ErrorClassification, exitCodeFor } from '../errors.js';
 
 // ─── Test setup ─────────────────────────────────────────────────────────────
 
@@ -56,6 +56,41 @@ describe('configGet', () => {
       JSON.stringify({ model_profile: 'quality' }),
     );
     await expect(configGet(['nonexistent.key'], tmpDir)).rejects.toThrow(GSDError);
+  });
+
+  it('throws GSDError that maps to exit code 1 for missing key (bug #2544)', async () => {
+    const { configGet } = await import('./config-query.js');
+    await writeFile(
+      join(tmpDir, '.planning', 'config.json'),
+      JSON.stringify({ model_profile: 'quality' }),
+    );
+    try {
+      await configGet(['nonexistent.key'], tmpDir);
+      throw new Error('expected configGet to throw for missing key');
+    } catch (err) {
+      expect(err).toBeInstanceOf(GSDError);
+      const gsdErr = err as GSDError;
+      // UNIX convention: missing config key should exit 1 (like `git config --get`).
+      // Validation (exit 10) is the previous buggy classification — see issue #2544.
+      expect(gsdErr.classification).toBe(ErrorClassification.Execution);
+      expect(exitCodeFor(gsdErr.classification)).toBe(1);
+    }
+  });
+
+  it('throws GSDError that maps to exit code 1 when traversing into non-object (bug #2544)', async () => {
+    const { configGet } = await import('./config-query.js');
+    await writeFile(
+      join(tmpDir, '.planning', 'config.json'),
+      JSON.stringify({ model_profile: 'quality' }),
+    );
+    try {
+      await configGet(['model_profile.subkey'], tmpDir);
+      throw new Error('expected configGet to throw');
+    } catch (err) {
+      expect(err).toBeInstanceOf(GSDError);
+      const gsdErr = err as GSDError;
+      expect(exitCodeFor(gsdErr.classification)).toBe(1);
+    }
   });
 
   it('reads raw config without merging defaults', async () => {
