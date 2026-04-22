@@ -497,7 +497,7 @@ function cmdPhaseInsert(cwd, afterPhase, description, raw) {
 
     // Normalize input then strip leading zeros for flexible matching
     const normalizedAfter = normalizePhaseName(afterPhase);
-    const unpadded = normalizedAfter.replace(/^0+/, '');
+    const unpadded = normalizedAfter.replace(/^0+(?=\d)/, '');
     const afterPhaseEscaped = unpadded.replace(/\./g, '\\.');
     const targetPattern = new RegExp(`#{2,4}\\s*Phase\\s+0*${afterPhaseEscaped}:`, 'i');
     if (!targetPattern.test(content)) {

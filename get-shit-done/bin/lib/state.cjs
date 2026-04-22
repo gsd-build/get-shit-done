@@ -1280,7 +1280,7 @@ function cmdStateValidate(cwd, raw) {
     const normalized = currentPhase.replace(/\s+of\s+\d+.*/, '').trim();
     try {
       const entries = fs.readdirSync(phasesDir, { withFileTypes: true });
-      const phaseDir = entries.find(e => e.isDirectory() && e.name.startsWith(normalized.replace(/^0+/, '').padStart(2, '0')));
+      const phaseDir = entries.find(e => e.isDirectory() && e.name.startsWith(normalized.replace(/^0+(?=\d)/, '').padStart(2, '0')));
       if (phaseDir) {
         const phaseDirPath = path.join(phasesDir, phaseDir.name);
         const files = fs.readdirSync(phaseDirPath);

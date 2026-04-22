@@ -782,7 +782,7 @@ function cmdValidateHealth(cwd, options, raw) {
       const currentPhaseMatch = stateContent.match(/\*\*Current Phase:\*\*\s*(\S+)/i) ||
                                  stateContent.match(/Current Phase:\s*(\S+)/i);
       if (currentPhaseMatch) {
-        const statePhase = currentPhaseMatch[1].replace(/^0+/, '');
+        const statePhase = currentPhaseMatch[1].replace(/^0+(?=\d)/, '');
         // Check if ROADMAP shows this phase as already complete
         const phaseCheckboxRe = new RegExp(`-\\s*\\[x\\].*Phase\\s+0*${escapeRegex(statePhase)}[:\\s]`, 'i');
         if (phaseCheckboxRe.test(roadmapContentFull)) {
