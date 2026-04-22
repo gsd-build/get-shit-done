@@ -35,9 +35,11 @@ describe('bug #2519: sdk/package.json ships dist/ in tarball', () => {
 
   test('files whitelist includes dist/ so compiled output is published', () => {
     assert.ok(Array.isArray(pkg.files), '`files` must be an array');
-    const includesDist = pkg.files.some(
-      (entry) => entry === 'dist' || entry === 'dist/' || entry === 'dist/**',
-    );
+    const includesDist = pkg.files.some((entry) => {
+      if (typeof entry !== 'string') return false;
+      const normalized = entry.replace(/\\/g, '/').replace(/^\.\//, '');
+      return /^dist(?:$|\/|\/\*\*|\/\*\*\/\*)/.test(normalized);
+    });
     assert.ok(
       includesDist,
       `sdk/package.json \`files\` must include "dist" so the published tarball contains the compiled CLI (bin target ./dist/cli.js). Found: ${JSON.stringify(pkg.files)}`,
