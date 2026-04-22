@@ -19,8 +19,8 @@ const ROOT = path.resolve(__dirname, '..');
 const { VALID_CONFIG_KEYS } = require('../get-shit-done/bin/lib/config-schema.cjs');
 const CONFIGURATION_MD = fs.readFileSync(path.join(ROOT, 'docs', 'CONFIGURATION.md'), 'utf8');
 
-// Keys starting with _ are internal runtime state, not user-facing config.
-const INTERNAL_KEYS = new Set(['workflow._auto_chain_active']);
+// Reserved for future internal keys; workflow._auto_chain_active removed from VALID_CONFIG_KEYS (#2530).
+const INTERNAL_KEYS = new Set();
 
 test('every key in VALID_CONFIG_KEYS is documented in docs/CONFIGURATION.md', () => {
   const undocumented = [];

@@ -24,6 +24,8 @@ const CONFIG_KEY_SUGGESTIONS = {
   'workflow.code_review_level': 'workflow.code_review_depth',
   'workflow.review_depth': 'workflow.code_review_depth',
   'review.model': 'review.models.<cli-name>',
+  'sub_repos': 'planning.sub_repos',
+  'plan_checker': 'workflow.plan_check',
 };
 
 function validateKnownConfigKeyPath(keyPath) {
