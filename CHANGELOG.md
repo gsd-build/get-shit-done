@@ -6,6 +6,9 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ## [Unreleased](https://github.com/gsd-build/get-shit-done/compare/v1.37.1...HEAD)
 
+### Changed
+- **`/gsd-ship` refuses to open a PR when `HANDOFF.json` declares in-progress work** — preflight now reads `.planning/HANDOFF.json` and blocks `gh pr create` when any `remaining_tasks[].status` is not in the terminal set `{done, cancelled, deferred_to_backend, wont_fix}`. The refusal names each blocking task and lists four resolutions (finish / mark terminal / delete stale file / `--force`). Missing `HANDOFF.json` remains a no-op (#2473)
+
 ### SDK query layer — Phase 3 (what you get)
 
 If you use GSD **as a workflow**—milestones, phases, `.planning/` artifacts, bundled workflows, and `**/gsd:`** commands—Phase 3 is about **behavior matching what the docs and steps promise**, and **a bit less overhead** when the framework advances a phase or bootstraps a new project for you.
