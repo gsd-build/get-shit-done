@@ -1,5 +1,5 @@
 {
-  "generated": "2026-04-20",
+  "generated": "2026-04-22",
   "families": {
     "agents": [
       "gsd-advisor-researcher",
@@ -103,6 +103,7 @@
       "/gsd-session-report",
       "/gsd-set-profile",
       "/gsd-settings",
+      "/gsd-settings-advanced",
       "/gsd-ship",
       "/gsd-sketch",
       "/gsd-sketch-wrap-up",
@@ -110,11 +111,11 @@
       "/gsd-spike",
       "/gsd-spike-wrap-up",
       "/gsd-stats",
+      "/gsd-sync-skills",
       "/gsd-thread",
       "/gsd-ui-phase",
       "/gsd-ui-review",
       "/gsd-ultraplan-phase",
-      "/gsd-sync-skills",
       "/gsd-undo",
       "/gsd-update",
       "/gsd-validate-phase",
@@ -185,6 +186,7 @@
       "scan.md",
       "secure-phase.md",
       "session-report.md",
+      "settings-advanced.md",
       "settings.md",
       "ship.md",
       "sketch-wrap-up.md",

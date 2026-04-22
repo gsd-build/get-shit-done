@@ -1043,6 +1043,29 @@ Interactive configuration of workflow toggles and model profile.
 /gsd-settings                       # Interactive config
 ```
 
+### `/gsd-settings-advanced`
+
+Interactive configuration of power-user knobs — plan bounce, subagent timeouts, branch templates, cross-AI delegation, context window, and runtime output. Use after `/gsd-settings` once the common-case toggles are dialed in.
+
+Six sections, each a focused prompt batch:
+
+| Section | Keys |
+|---------|------|
+| Planning Tuning | `workflow.plan_bounce`, `workflow.plan_bounce_passes`, `workflow.plan_bounce_script`, `workflow.subagent_timeout`, `workflow.inline_plan_threshold` |
+| Execution Tuning | `workflow.node_repair`, `workflow.node_repair_budget`, `workflow.auto_prune_state` |
+| Discussion Tuning | `workflow.max_discuss_passes` |
+| Cross-AI Execution | `workflow.cross_ai_execution`, `workflow.cross_ai_command`, `workflow.cross_ai_timeout` |
+| Git Customization | `git.base_branch`, `git.phase_branch_template`, `git.milestone_branch_template` |
+| Runtime / Output | `response_language`, `context_window`, `search_gitignored`, `graphify.build_timeout` |
+
+Current values are pre-selected; an empty input keeps the existing value. Numeric fields reject non-numeric input and re-prompt. Null-allowed fields (`plan_bounce_script`, `cross_ai_command`, `response_language`) accept an empty input as a clear. Writes route through `gsd-sdk query config-set`, which preserves every unrelated key.
+
+```bash
+/gsd-settings-advanced              # Six-section interactive config
+```
+
+See [CONFIGURATION.md](CONFIGURATION.md) for the full schema and defaults.
+
 ### `/gsd-set-profile`
 
 Quick profile switch.
