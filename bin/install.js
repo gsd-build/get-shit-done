@@ -6812,7 +6812,7 @@ function installSdkIfNeeded() {
         ? path.join(npmPrefix, 'node_modules')
         : path.join(npmPrefix, 'lib', 'node_modules');
       const cliPath = path.join(globalModulesDir, sdkName, 'dist', 'cli.js');
-      try { fs.chmodSync(cliPath, 0o755); } catch (e) { /* Windows / path not found */ }
+      try { fs.chmodSync(cliPath, 0o755); } catch (e) { if (process.platform !== 'win32') throw e; }
     }
   } catch (e) { /* Non-fatal: PATH verification in step 4 will catch any real failure */ }
 
