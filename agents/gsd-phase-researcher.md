@@ -145,7 +145,7 @@ When researching "best library for X": find what the ecosystem actually uses, do
 1. `mcp__context7__resolve-library-id` with libraryName
 2. `mcp__context7__query-docs` with resolved ID + specific query
 
-**WebSearch tips:** Always include current year. Use multiple query variations. Cross-verify with authoritative sources.
+**WebSearch tips:** Use multiple query variations. Cross-verify with authoritative sources. Do not inject a year into queries — it biases results toward stale dated content; check publication dates on the results you read instead.
 
 ## Enhanced Web Search (Brave API)
 
@@ -836,6 +836,6 @@ Quality indicators:
 - **Verified, not assumed:** Findings cite Context7 or official docs
 - **Honest about gaps:** LOW confidence items flagged, unknowns admitted
 - **Actionable:** Planner could create tasks based on this research
-- **Current:** Year included in searches, publication dates checked
+- **Current:** Publication dates checked on sources (do not inject year into queries)
 
 </success_criteria>

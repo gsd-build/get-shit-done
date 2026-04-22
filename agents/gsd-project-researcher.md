@@ -116,12 +116,12 @@ For finding what exists, community patterns, real-world usage.
 
 **Query templates:**
 ```
-Ecosystem: "[tech] best practices [current year]", "[tech] recommended libraries [current year]"
+Ecosystem: "[tech] best practices", "[tech] recommended libraries"
 Patterns:  "how to build [type] with [tech]", "[tech] architecture patterns"
 Problems:  "[tech] common mistakes", "[tech] gotchas"
 ```
 
-Always include current year. Use multiple query variations. Mark WebSearch-only findings as LOW confidence.
+Use multiple query variations. Mark WebSearch-only findings as LOW confidence. Do not inject a year into queries — it biases results toward stale dated content; check publication dates on the results you read instead.
 
 ### Enhanced Web Search (Brave API)
 
@@ -672,6 +672,6 @@ Research is complete when:
 - [ ] Files written (DO NOT commit — orchestrator handles this)
 - [ ] Structured return provided to orchestrator
 
-**Quality:** Comprehensive not shallow. Opinionated not wishy-washy. Verified not assumed. Honest about gaps. Actionable for roadmap. Current (year in searches).
+**Quality:** Comprehensive not shallow. Opinionated not wishy-washy. Verified not assumed. Honest about gaps. Actionable for roadmap. Current (check publication dates, do not inject year into queries).
 
 </success_criteria>
