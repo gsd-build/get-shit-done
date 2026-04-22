@@ -877,14 +877,18 @@ function convertCopilotToolName(claudeTool) {
  */
 function convertClaudeToCopilotContent(content, isGlobal = false) {
   let c = content;
-  // CONV-06: Path replacement — most specific first to avoid substring matches
+  // CONV-06: Path replacement — most specific first to avoid substring matches.
+  // Handle both `~/.claude/foo` (trailing slash) and bare `~/.claude` forms in
+  // one pass via a capture group, matching the approach used by Antigravity,
+  // OpenCode, Kilo, and Codex converters (issue #2545).
   if (isGlobal) {
-    c = c.replace(/\$HOME\/\.claude\//g, '$HOME/.copilot/');
-    c = c.replace(/~\/\.claude\//g, '~/.copilot/');
+    c = c.replace(/\$HOME\/\.claude(\/|\b)/g, '$HOME/.copilot$1');
+    c = c.replace(/~\/\.claude(\/|\b)/g, '~/.copilot$1');
   } else {
     c = c.replace(/\$HOME\/\.claude\//g, '.github/');
     c = c.replace(/~\/\.claude\//g, '.github/');
-    c = c.replace(/~\/\.claude\n/g, '.github/');
+    c = c.replace(/\$HOME\/\.claude\b/g, '.github');
+    c = c.replace(/~\/\.claude\b/g, '.github');
   }
   c = c.replace(/\.\/\.claude\//g, './.github/');
   c = c.replace(/\.claude\//g, '.github/');
