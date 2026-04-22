@@ -1624,7 +1624,7 @@ function getMilestonePhaseFilter(cwd) {
   }
 
   const normalized = new Set(
-    [...milestonePhaseNums].map(n => (n.replace(/^0+/, '') || '0').toLowerCase())
+    [...milestonePhaseNums].map(n => (n.replace(/^0+(?=\d)/, '') || '0').toLowerCase())
   );
 
   function isDirInMilestone(dirName) {
