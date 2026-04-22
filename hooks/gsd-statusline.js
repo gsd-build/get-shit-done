@@ -7,6 +7,92 @@ const fs = require('fs');
 const path = require('path');
 const os = require('os');
 
+// --- Config + last-command readers ------------------------------------------
+
+/**
+ * Walk up from dir looking for .planning/config.json and return its parsed contents.
+ * Returns {} if not found or unreadable.
+ */
+function readGsdConfig(dir) {
+  const home = os.homedir();
+  let current = dir;
+  for (let i = 0; i < 10; i++) {
+    const candidate = path.join(current, '.planning', 'config.json');
+    if (fs.existsSync(candidate)) {
+      try {
+        return JSON.parse(fs.readFileSync(candidate, 'utf8')) || {};
+      } catch (e) {
+        return {};
+      }
+    }
+    const parent = path.dirname(current);
+    if (parent === current || current === home) break;
+    current = parent;
+  }
+  return {};
+}
+
+/**
+ * Lookup a dotted key path (e.g. 'statusline.show_last_command') in a config
+ * object that may use either nested or flat keys.
+ */
+function getConfigValue(cfg, keyPath) {
+  if (!cfg || typeof cfg !== 'object') return undefined;
+  if (keyPath in cfg) return cfg[keyPath];
+  const parts = keyPath.split('.');
+  let cur = cfg;
+  for (const p of parts) {
+    if (cur == null || typeof cur !== 'object' || !(p in cur)) return undefined;
+    cur = cur[p];
+  }
+  return cur;
+}
+
+/**
+ * Extract the most recently invoked slash command from a Claude Code JSONL
+ * transcript file. Returns the command name (no leading slash) or null.
+ *
+ * Claude Code embeds slash invocations in user messages as
+ *   <command-name>/foo</command-name>
+ * We scan lines from the end of the file, stopping at the first match.
+ */
+function readLastSlashCommand(transcriptPath) {
+  if (!transcriptPath || typeof transcriptPath !== 'string') return null;
+  let content;
+  try {
+    if (!fs.existsSync(transcriptPath)) return null;
+    // Read only the tail — typical transcripts grow large. 256 KiB comfortably
+    // covers dozens of recent turns while staying cheap per render.
+    const stat = fs.statSync(transcriptPath);
+    const MAX = 256 * 1024;
+    const start = Math.max(0, stat.size - MAX);
+    const fd = fs.openSync(transcriptPath, 'r');
+    try {
+      const buf = Buffer.alloc(stat.size - start);
+      fs.readSync(fd, buf, 0, buf.length, start);
+      content = buf.toString('utf8');
+    } finally {
+      fs.closeSync(fd);
+    }
+  } catch (e) {
+    return null;
+  }
+  // Find the LAST occurrence — scan right-to-left via lastIndexOf on the tag.
+  const tagClose = '</command-name>';
+  const idx = content.lastIndexOf(tagClose);
+  if (idx < 0) return null;
+  const openTag = '<command-name>';
+  const openIdx = content.lastIndexOf(openTag, idx);
+  if (openIdx < 0) return null;
+  let name = content.slice(openIdx + openTag.length, idx).trim();
+  // Strip a leading slash if present, and any trailing arguments-on-same-line noise.
+  if (name.startsWith('/')) name = name.slice(1);
+  // Command names in Claude Code transcripts are plain identifiers like "gsd-plan-phase"
+  // or namespaced like "plugin:skill". Reject anything with whitespace/newlines/control chars.
+  if (!name || /[\s\\"<>]/.test(name) || name.length > 80) return null;
+  return name;
+}
+
 // --- GSD state reader -------------------------------------------------------
 
 /**
@@ -240,6 +326,23 @@ function runStatusline() {
       } catch (e) {}
     }
 
+    // Last-slash-command suffix (opt-in via statusline.show_last_command, #2538).
+    // Reads the active session transcript for the most recent <command-name> tag.
+    // Failure here must never break the statusline — wrap the entire lookup.
+    let lastCmdSuffix = '';
+    try {
+      const cfg = readGsdConfig(dir);
+      if (getConfigValue(cfg, 'statusline.show_last_command') === true) {
+        const transcriptPath = data.transcript_path;
+        const lastCmd = readLastSlashCommand(transcriptPath);
+        if (lastCmd) {
+          lastCmdSuffix = ` │ \x1b[2mlast: /${lastCmd}\x1b[0m`;
+        }
+      }
+    } catch (e) {
+      // Never break the statusline on config/transcript errors
+    }
+
     // Output
     const dirname = path.basename(dir);
     const middle = task
@@ -249,9 +352,9 @@ function runStatusline() {
         : null;
 
     if (middle) {
-      process.stdout.write(`${gsdUpdate}\x1b[2m${model}\x1b[0m │ ${middle} │ \x1b[2m${dirname}\x1b[0m${ctx}`);
+      process.stdout.write(`${gsdUpdate}\x1b[2m${model}\x1b[0m │ ${middle} │ \x1b[2m${dirname}\x1b[0m${ctx}${lastCmdSuffix}`);
     } else {
-      process.stdout.write(`${gsdUpdate}\x1b[2m${model}\x1b[0m │ \x1b[2m${dirname}\x1b[0m${ctx}`);
+      process.stdout.write(`${gsdUpdate}\x1b[2m${model}\x1b[0m │ \x1b[2m${dirname}\x1b[0m${ctx}${lastCmdSuffix}`);
     }
   } catch (e) {
     // Silent fail - don't break statusline on parse errors
@@ -260,6 +363,39 @@ function runStatusline() {
 }
 
 // Export helpers for unit tests. Harmless when run as a script.
-module.exports = { readGsdState, parseStateMd, formatGsdState };
+module.exports = {
+  readGsdState, parseStateMd, formatGsdState,
+  readGsdConfig, getConfigValue, readLastSlashCommand,
+};
+
+/**
+ * Render the statusline from an already-parsed hook input object. Exported for
+ * testing without feeding stdin. Returns the rendered string.
+ */
+function renderStatusline(data) {
+  const model = data.model?.display_name || 'Claude';
+  const dir = data.workspace?.current_dir || process.cwd();
+  const dirname = path.basename(dir);
+
+  let lastCmdSuffix = '';
+  try {
+    const cfg = readGsdConfig(dir);
+    if (getConfigValue(cfg, 'statusline.show_last_command') === true) {
+      const lastCmd = readLastSlashCommand(data.transcript_path);
+      if (lastCmd) {
+        lastCmdSuffix = ` │ \x1b[2mlast: /${lastCmd}\x1b[0m`;
+      }
+    }
+  } catch (e) { /* swallow */ }
+
+  const gsdStateStr = formatGsdState(readGsdState(dir) || {});
+  const middle = gsdStateStr ? `\x1b[2m${gsdStateStr}\x1b[0m` : null;
+  if (middle) {
+    return `\x1b[2m${model}\x1b[0m │ ${middle} │ \x1b[2m${dirname}\x1b[0m${lastCmdSuffix}`;
+  }
+  return `\x1b[2m${model}\x1b[0m │ \x1b[2m${dirname}\x1b[0m${lastCmdSuffix}`;
+}
+
+module.exports.renderStatusline = renderStatusline;
 
 if (require.main === module) runStatusline();
