@@ -11,6 +11,7 @@ const {
   formatAgentToModelMapAsTable,
 } = require('./model-profiles.cjs');
 const { VALID_CONFIG_KEYS, isValidConfigKey } = require('./config-schema.cjs');
+const { isSecretKey, maskSecret } = require('./secrets.cjs');
 
 const CONFIG_KEY_SUGGESTIONS = {
   'workflow.nyquist_validation_enabled': 'workflow.nyquist_validation',
@@ -345,6 +346,25 @@ function cmdConfigSet(cwd, keyPath, value, raw) {
   }
 
   const setConfigValueResult = setConfigValue(cwd, keyPath, parsedValue);
+
+  // Mask secrets in both JSON and text output. The plaintext is written
+  // to config.json (that's where secrets live on disk); the CLI output
+  // must never echo it. See lib/secrets.cjs.
+  if (isSecretKey(keyPath)) {
+    const masked = maskSecret(parsedValue);
+    const maskedPrev = setConfigValueResult.previousValue === undefined
+      ? undefined
+      : maskSecret(setConfigValueResult.previousValue);
+    const maskedResult = {
+      ...setConfigValueResult,
+      value: masked,
+      previousValue: maskedPrev,
+      masked: true,
+    };
+    output(maskedResult, raw, `${keyPath}=${masked}`);
+    return;
+  }
+
   output(setConfigValueResult, raw, `${keyPath}=${parsedValue}`);
 }
 

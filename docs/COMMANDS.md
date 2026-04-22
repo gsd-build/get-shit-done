@@ -1075,6 +1075,35 @@ Current values are pre-selected; an empty input keeps the existing value. Numeri
 
 See [CONFIGURATION.md](CONFIGURATION.md) for the full schema and defaults.
 
+### `/gsd-settings-integrations`
+
+Interactive configuration of third-party integrations and cross-tool routing.
+Distinct from `/gsd-settings` (workflow toggles) — this command handles
+connectivity: API keys, reviewer CLI routing, and agent-skill injection.
+
+Covers:
+
+- **Search integrations:** `brave_search`, `firecrawl`, `exa_search` API keys,
+  and the `search_gitignored` toggle.
+- **Code-review CLI routing:** `review.models.{claude,codex,gemini,opencode}`
+  — a shell command per reviewer flavor.
+- **Agent-skill injection:** `agent_skills.<agent-type>` — skill names
+  injected into an agent's spawn frontmatter. Agent-type slugs are validated
+  against `[a-zA-Z0-9_-]+` so path separators and shell metacharacters are
+  rejected.
+
+API keys are stored plaintext in `.planning/config.json` but displayed masked
+(`****<last-4>`) in every interactive output, confirmation table, and
+`config-set` stdout/stderr line. Plaintext is never echoed, never logged,
+and never written to any file outside `config.json` by this workflow.
+
+```bash
+/gsd-settings-integrations           # Interactive config (three sections)
+```
+
+See [`docs/CONFIGURATION.md`](CONFIGURATION.md) for the per-field reference and
+[`docs/CLI-TOOLS.md`](CLI-TOOLS.md) for the reviewer-CLI routing contract.
+
 ### `/gsd-set-profile`
 
 Quick profile switch.

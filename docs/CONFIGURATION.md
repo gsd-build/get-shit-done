@@ -129,6 +129,41 @@ GSD stores project settings in `.planning/config.json`. Created during `/gsd-new
 
 ---
 
+## Integration Settings
+
+Configured interactively via [`/gsd-settings-integrations`](COMMANDS.md#gsd-settings-integrations). These are *connectivity* settings — API keys and cross-tool routing — and are intentionally kept separate from `/gsd-settings` (workflow toggles).
+
+### Search API keys
+
+API key fields accept a string value (the key itself). They can also be set to the sentinels `true`/`false`/`null` to override auto-detection from env vars / `~/.gsd/*_api_key` files (legacy behavior, see rows above).
+
+| Setting | Type | Default | Description |
+|---------|------|---------|-------------|
+| `brave_search` | string \| boolean \| null | `null` | Brave Search API key used for web research. Displayed as `****<last-4>` in all UI / `config-set` output; never echoed plaintext |
+| `firecrawl` | string \| boolean \| null | `null` | Firecrawl API key for deep-crawl scraping. Masked in display |
+| `exa_search` | string \| boolean \| null | `null` | Exa Search API key for semantic search. Masked in display |
+
+**Masking convention (`get-shit-done/bin/lib/secrets.cjs`):** keys 8+ characters render as `****<last-4>`; shorter keys render as `****`; `null`/empty renders as `(unset)`. Plaintext is written as-is to `.planning/config.json` — that file is the security boundary — but the CLI, confirmation tables, logs, and `AskUserQuestion` descriptions never display the plaintext. This applies to the `config-set` command output itself: `config-set brave_search <key>` returns a JSON payload with the value masked.
+
+### Code-review CLI routing
+
+`review.models.<cli>` maps a reviewer flavor to a shell command. The code-review workflow shells out using this command when a matching flavor is requested.
+
+| Setting | Type | Default | Description |
+|---------|------|---------|-------------|
+| `review.models.claude` | string | (session model) | Command for Claude-flavored review. Defaults to the session model when unset |
+| `review.models.codex` | string | `null` | Command for Codex review, e.g. `"codex exec --model gpt-5"` |
+| `review.models.gemini` | string | `null` | Command for Gemini review, e.g. `"gemini -m gemini-2.5-pro"` |
+| `review.models.opencode` | string | `null` | Command for OpenCode review, e.g. `"opencode run --model claude-sonnet-4"` |
+
+The `<cli>` slug is validated against `[a-zA-Z0-9_-]+`. Empty or path-containing slugs are rejected by `config-set`.
+
+### Agent-skill injection (dynamic)
+
+`agent_skills.<agent-type>` extends the `agent_skills` map documented below. Slug is validated against `[a-zA-Z0-9_-]+` — no path separators, no whitespace, no shell metacharacters. Configured interactively via `/gsd-settings-integrations`.
+
+---
+
 ## Workflow Toggles
 
 All workflow toggles follow the **absent = enabled** pattern. If a key is missing from config, it defaults to `true`.
