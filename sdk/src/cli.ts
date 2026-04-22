@@ -419,7 +419,11 @@ export async function main(argv: string[] = process.argv.slice(2)): Promise<void
       }
     } catch (err) {
       if (err instanceof GSDError) {
-        console.error(`Error: ${err.message}`);
+        // NotFound is an expected condition (e.g. config key absent) — exit 1
+        // silently, matching `git config --get` convention. No stderr noise.
+        if (err.classification !== ErrorClassification.NotFound) {
+          console.error(`Error: ${err.message}`);
+        }
         process.exitCode = exitCodeFor(err.classification);
       } else if (err instanceof GSDToolsError) {
         console.error(`Error: ${err.message}`);

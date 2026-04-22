@@ -49,24 +49,106 @@ describe('configGet', () => {
     await expect(configGet([], tmpDir)).rejects.toThrow(GSDError);
   });
 
-  it('throws GSDError for nonexistent key', async () => {
+  it('throws GSDError with NotFound classification for nonexistent key', async () => {
+    const { configGet } = await import('./config-query.js');
+    const { ErrorClassification } = await import('../errors.js');
+    await writeFile(
+      join(tmpDir, '.planning', 'config.json'),
+      JSON.stringify({ model_profile: 'quality' }),
+    );
+    try {
+      await configGet(['nonexistent.key'], tmpDir);
+      expect.unreachable('should have thrown');
+    } catch (err) {
+      expect(err).toBeInstanceOf(GSDError);
+      expect((err as GSDError).classification).toBe(ErrorClassification.NotFound);
+    }
+  });
+
+  it('returns --default value when key is absent', async () => {
     const { configGet } = await import('./config-query.js');
     await writeFile(
       join(tmpDir, '.planning', 'config.json'),
       JSON.stringify({ model_profile: 'quality' }),
     );
-    await expect(configGet(['nonexistent.key'], tmpDir)).rejects.toThrow(GSDError);
+    const result = await configGet(['nonexistent.key', '--default', 'fallback'], tmpDir);
+    expect(result.data).toBe('fallback');
+  });
+
+  it('returns --default when config.json does not exist', async () => {
+    const { configGet } = await import('./config-query.js');
+    const result = await configGet(['any.key', '--default', 'safe'], tmpDir);
+    expect(result.data).toBe('safe');
+  });
+
+  it('ignores --default when key exists', async () => {
+    const { configGet } = await import('./config-query.js');
+    await writeFile(
+      join(tmpDir, '.planning', 'config.json'),
+      JSON.stringify({ model_profile: 'quality' }),
+    );
+    const result = await configGet(['model_profile', '--default', 'balanced'], tmpDir);
+    expect(result.data).toBe('quality');
+  });
+
+  it('returns --default for nested key traversal failure', async () => {
+    const { configGet } = await import('./config-query.js');
+    await writeFile(
+      join(tmpDir, '.planning', 'config.json'),
+      JSON.stringify({ model_profile: 'quality' }),
+    );
+    const result = await configGet(['workflow.auto_advance', '--default', 'true'], tmpDir);
+    expect(result.data).toBe(true); // JSON-parsed: "true" → true
+  });
+
+  it('parses --default as JSON for type preservation', async () => {
+    const { configGet } = await import('./config-query.js');
+    await writeFile(
+      join(tmpDir, '.planning', 'config.json'),
+      JSON.stringify({ model_profile: 'quality' }),
+    );
+    // Number
+    const num = await configGet(['missing', '--default', '42'], tmpDir);
+    expect(num.data).toBe(42);
+    // Boolean
+    const bool = await configGet(['missing', '--default', 'false'], tmpDir);
+    expect(bool.data).toBe(false);
+    // Null
+    const nul = await configGet(['missing', '--default', 'null'], tmpDir);
+    expect(nul.data).toBe(null);
+    // Plain string (not valid JSON) stays as string
+    const str = await configGet(['missing', '--default', 'interactive'], tmpDir);
+    expect(str.data).toBe('interactive');
+  });
+
+  it('throws Validation when --default has no value', async () => {
+    const { configGet } = await import('./config-query.js');
+    const { ErrorClassification } = await import('../errors.js');
+    try {
+      await configGet(['some.key', '--default'], tmpDir);
+      expect.unreachable('should have thrown');
+    } catch (err) {
+      expect(err).toBeInstanceOf(GSDError);
+      expect((err as GSDError).classification).toBe(ErrorClassification.Validation);
+    }
   });
 
   it('reads raw config without merging defaults', async () => {
     const { configGet } = await import('./config-query.js');
+    const { ErrorClassification } = await import('../errors.js');
     // Write config with only model_profile -- no workflow section
     await writeFile(
       join(tmpDir, '.planning', 'config.json'),
       JSON.stringify({ model_profile: 'balanced' }),
     );
-    // Accessing workflow should fail (not merged with defaults)
-    await expect(configGet(['workflow.auto_advance'], tmpDir)).rejects.toThrow(GSDError);
+    // Accessing workflow should fail with NotFound (not merged with defaults)
+    try {
+      await configGet(['workflow.auto_advance'], tmpDir);
+      expect.unreachable('should have thrown');
+    } catch (err) {
+      expect(err).toBeInstanceOf(GSDError);
+      expect((err as GSDError).classification).toBe(ErrorClassification.NotFound);
+    }
   });
 });
 

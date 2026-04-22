@@ -30,6 +30,9 @@ export enum ErrorClassification {
 
   /** Timeout, signal, user cancel. Exit code 1. */
   Interruption = 'interruption',
+
+  /** Lookup target does not exist (e.g. config key absent). Exit code 1, silent stderr. */
+  NotFound = 'not_found',
 }
 
 // ─── GSDError ───────────────────────────────────────────────────────────────
@@ -64,6 +67,8 @@ export function exitCodeFor(classification: ErrorClassification): number {
       return 10;
     case ErrorClassification.Blocked:
       return 11;
+    case ErrorClassification.NotFound:
+      return 1;
     case ErrorClassification.Execution:
     case ErrorClassification.Interruption:
     default:

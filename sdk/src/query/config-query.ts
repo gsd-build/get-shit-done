@@ -11,6 +11,9 @@
  * const result = await configGet(['workflow.auto_advance'], '/project');
  * // { data: true }
  *
+ * const withDefault = await configGet(['workflow.discuss_mode', '--default', 'interactive'], '/project');
+ * // { data: 'interactive' }  (when key is absent)
+ *
  * const model = await resolveModel(['gsd-planner'], '/project');
  * // { data: { model: 'opus', profile: 'balanced' } }
  * ```
@@ -74,15 +77,35 @@ export function getAgentToModelMapForProfile(normalizedProfile: string): Record<
  * Reads raw .planning/config.json and traverses dot-notation key paths.
  * Does NOT merge with defaults (matches gsd-tools.cjs behavior).
  *
- * @param args - args[0] is the dot-notation key path (e.g., 'workflow.auto_advance')
+ * @param args - args[0] is the dot-notation key path (e.g., 'workflow.auto_advance').
+ *   Supports `--default <value>` flag: when provided and the key is absent,
+ *   returns the default value instead of throwing (exit 0).
  * @param projectDir - Project root directory
  * @returns QueryResult with the config value at the given path
- * @throws GSDError with Validation classification if key missing or not found
+ * @throws GSDError with Validation classification if no key provided or config malformed
+ * @throws GSDError with NotFound classification if key absent and no --default given (exit 1, silent stderr)
  */
 export const configGet: QueryHandler = async (args, projectDir, _workstream) => {
-  const keyPath = args[0];
+  // Parse --default flag before extracting key path
+  let defaultValue: unknown | undefined;
+  const filteredArgs: string[] = [];
+  for (let i = 0; i < args.length; i++) {
+    if (args[i] === '--default') {
+      if (i + 1 >= args.length) {
+        throw new GSDError('--default requires a value', ErrorClassification.Validation);
+      }
+      const raw = args[++i];
+      // Parse as JSON to preserve types (booleans, numbers, null).
+      // Fall back to raw string for unquoted values like "interactive".
+      try { defaultValue = JSON.parse(raw); } catch { defaultValue = raw; }
+    } else {
+      filteredArgs.push(args[i]);
+    }
+  }
+
+  const keyPath = filteredArgs[0];
   if (!keyPath) {
-    throw new GSDError('Usage: config-get <key.path>', ErrorClassification.Validation);
+    throw new GSDError('Usage: config-get <key.path> [--default <value>]', ErrorClassification.Validation);
   }
 
   const paths = planningPaths(projectDir);
@@ -90,6 +113,7 @@ export const configGet: QueryHandler = async (args, projectDir, _workstream) => 
   try {
     raw = await readFile(paths.config, 'utf-8');
   } catch {
+    if (defaultValue !== undefined) return { data: defaultValue };
     throw new GSDError(`No config.json found at ${paths.config}`, ErrorClassification.Validation);
   }
 
@@ -104,12 +128,14 @@ export const configGet: QueryHandler = async (args, projectDir, _workstream) => 
   let current: unknown = config;
   for (const key of keys) {
     if (current === undefined || current === null || typeof current !== 'object') {
-      throw new GSDError(`Key not found: ${keyPath}`, ErrorClassification.Validation);
+      if (defaultValue !== undefined) return { data: defaultValue };
+      throw new GSDError(`Key not found: ${keyPath}`, ErrorClassification.NotFound);
     }
     current = (current as Record<string, unknown>)[key];
   }
   if (current === undefined) {
-    throw new GSDError(`Key not found: ${keyPath}`, ErrorClassification.Validation);
+    if (defaultValue !== undefined) return { data: defaultValue };
+    throw new GSDError(`Key not found: ${keyPath}`, ErrorClassification.NotFound);
   }
 
   return { data: current };
