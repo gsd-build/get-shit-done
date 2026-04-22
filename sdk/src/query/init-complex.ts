@@ -221,7 +221,7 @@ export const initProgress: QueryHandler = async (_args, projectDir, _workstream)
       const match = dir.match(/^(\d+[A-Z]?(?:\.\d+)*)-?(.*)/i);
       const phaseNumber = match ? match[1] : dir;
       const phaseName = match && match[2] ? match[2] : null;
-      seenPhaseNums.add(phaseNumber.replace(/^0+/, '') || '0');
+      seenPhaseNums.add(phaseNumber.replace(/^0+(?=\d)/, '') || '0');
 
       const phasePath = join(paths.phases, dir);
       const phaseFiles = readdirSync(phasePath);
@@ -258,7 +258,7 @@ export const initProgress: QueryHandler = async (_args, projectDir, _workstream)
 
   // Add ROADMAP-only phases not yet on disk
   for (const [num, name] of roadmapPhaseNames) {
-    const stripped = num.replace(/^0+/, '') || '0';
+    const stripped = num.replace(/^0+(?=\d)/, '') || '0';
     if (!seenPhaseNums.has(stripped)) {
       const phaseInfo: Record<string, unknown> = {
         number: num,

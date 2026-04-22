@@ -587,7 +587,7 @@ export const validateHealth: QueryHandler = async (args, projectDir, _workstream
       const currentPhaseMatch = stateContent.match(/\*\*Current Phase:\*\*\s*(\S+)/i) ||
                                  stateContent.match(/Current Phase:\s*(\S+)/i);
       if (currentPhaseMatch) {
-        const statePhase = currentPhaseMatch[1].replace(/^0+/, '');
+        const statePhase = currentPhaseMatch[1].replace(/^0+(?=\d)/, '');
         const phaseCheckboxRe = new RegExp(`-\\s*\\[x\\].*Phase\\s+0*${escapeRegex(statePhase)}[:\\s]`, 'i');
         if (phaseCheckboxRe.test(roadmapContentFull)) {
           const stateStatus = stateContent.match(/\*\*Status:\*\*\s*(.+)/i);

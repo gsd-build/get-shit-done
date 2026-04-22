@@ -54,7 +54,7 @@ export async function getMilestonePhaseFilter(projectDir: string, workstream?: s
   }
 
   const normalized = new Set<string>(
-    [...milestonePhaseNums].map(n => (n.replace(/^0+/, '') || '0').toLowerCase())
+    [...milestonePhaseNums].map(n => (n.replace(/^0+(?=\d)/, '') || '0').toLowerCase())
   );
 
   const isDirInMilestone = ((dirName: string): boolean => {
