@@ -318,13 +318,20 @@ Extract from these:
 - **REQUIREMENTS.md** — Acceptance criteria, constraints, must-haves vs nice-to-haves
 - **STATE.md** — Current progress, any flags or session notes
 
-**Step 2: Read all prior CONTEXT.md files**
+**Step 2: Read bounded prior CONTEXT.md files**
+
+Reading every prior CONTEXT.md grows linearly with phase count and inflates context cost. Instead, read a bounded set:
+
 ```bash
-# Find all CONTEXT.md files from phases before current
-(find .planning/phases -name "*-CONTEXT.md" 2>/dev/null || true) | sort
+# Find CONTEXT.md files from phases before current, sorted newest-first
+(find .planning/phases -name "*-CONTEXT.md" 2>/dev/null || true) | sort -r
 ```
 
-For each CONTEXT.md where phase number < current phase:
+Read at most **3** prior CONTEXT.md files (the most recent 3 phases before the current one). This is sufficient for decision continuity — earlier decisions are already captured in PROJECT.md and REQUIREMENTS.md.
+
+If `.planning/DECISIONS-INDEX.md` exists, read that instead of individual CONTEXT files — it is a bounded rolling summary that supersedes per-phase reads.
+
+For each CONTEXT.md read:
 - Read the `<decisions>` section — these are locked preferences
 - Read `<specifics>` — particular references or "I want it like X" moments
 - Note any patterns (e.g., "user consistently prefers minimal UI", "user rejected single-key shortcuts")
@@ -436,7 +443,23 @@ Lightweight scan of existing code to inform gray area identification and discuss
 ls .planning/codebase/*.md 2>/dev/null || true
 ```
 
-**If codebase maps exist:** Read the most relevant ones (CONVENTIONS.md, STRUCTURE.md, STACK.md based on phase type). Extract:
+**If codebase maps exist:** Select 2–3 maps based on phase type. Do NOT read all seven — that inflates context without improving discussion quality. Use this selection table:
+
+| Phase type (infer from title + ROADMAP entry) | Read these maps |
+|---|---|
+| UI / frontend / styling / design | CONVENTIONS.md, STRUCTURE.md, STACK.md |
+| Backend / API / service / data model | STACK.md, ARCHITECTURE.md, INTEGRATIONS.md |
+| Integration / third-party / provider | STACK.md, INTEGRATIONS.md, ARCHITECTURE.md |
+| Infrastructure / DevOps / CI / deploy | STACK.md, ARCHITECTURE.md, INTEGRATIONS.md |
+| Testing / QA / coverage | TESTING.md, CONVENTIONS.md, STRUCTURE.md |
+| Documentation / content | CONVENTIONS.md, STRUCTURE.md |
+| Mixed / unclear | STACK.md, ARCHITECTURE.md, CONVENTIONS.md |
+
+Read CONCERNS.md only if the phase explicitly addresses known concerns or security issues.
+
+**Important — no split reads:** Read each map file in a single Read call. Do not read the same file at two different offsets — split reads break prompt cache reuse and cost more than a single full read.
+
+Extract:
 - Reusable components/hooks/utilities
 - Established patterns (state management, styling, data fetching)
 - Integration points (where new code would connect)
