@@ -83,14 +83,56 @@ describe('bug #2598: Windows npm.cmd spawnSync must pass shell: true', () => {
     // Five documented npm invocations: install, run build, install -g .,
     // and two config get prefix calls. If any are still bare spawnSync
     // calls targeting npmCmd, the first assertion above already fails.
-    const wrapperCalls = (body.match(/\bspawnNpm\s*\(/g) || []).length;
-    const explicitShellNpm = (body.match(/spawnSync\s*\(\s*npmCmd[^)]*shell/g) || []).length;
+    // `\bspawnNpm\s*\(` matches real call sites only — a `const spawnNpm = (…)`
+    // declaration does not match because `=` sits between name and `(`. A
+    // `function spawnNpm(…)` declaration WOULD match, so subtract one for that
+    // form. `explicitShellNpm` previously double-counted the wrapper's own
+    // `spawnSync(npmCmd, args, { …, shell })` — when a helper exists, its body
+    // is the only legitimate raw spawn and must be excluded.
+    const wrapperCallMatches = (body.match(/\bspawnNpm\s*\(/g) || []).length;
+    const hasArrowHelper = /\b(?:const|let|var)\s+spawnNpm\s*=/.test(body);
+    const hasFunctionHelper = /\bfunction\s+spawnNpm\s*\(/.test(body);
+    const hasHelper = hasArrowHelper || hasFunctionHelper;
+    const wrapperCalls = hasFunctionHelper
+      ? Math.max(0, wrapperCallMatches - 1)
+      : wrapperCallMatches;
+    const explicitShellNpm = hasHelper
+      ? 0
+      : (body.match(/spawnSync\s*\(\s*npmCmd[^)]*\bshell\s*:/g) || []).length;
     const total = wrapperCalls + explicitShellNpm;
     assert.ok(
       total >= 5,
       `installSdkIfNeeded should route at least 5 npm invocations through ` +
       `a shell-aware wrapper (install, run build, install -g ., and two ` +
       `config get prefix calls). Found ${total}.`
+    );
+  });
+
+  test('installSdkIfNeeded surfaces underlying spawnSync failure in fatal branches', () => {
+    // Root cause of #2598 was invisible because `{ status: null, error: EINVAL }`
+    // was reduced to a generic "Failed to `npm install` in sdk/." with no
+    // diagnostic — stdio: 'inherit' had no child to stream and result.error was
+    // dropped. Each of the three `emitSdkFatal` calls inside the install/build/
+    // global-install failure paths must now thread spawn diagnostics (error,
+    // signal, or numeric status) into the reason string so future regressions
+    // print their real cause instead of failing silently.
+    const body = installSdkBody();
+    const hasFormatter = /formatSpawnFailure\s*\(/.test(body);
+    const fatalCalls = body.match(/emitSdkFatal\s*\([^)]*`[^`]*`[^)]*\)/gs) || [];
+    const fatalWithDiagnostic = fatalCalls.filter(
+      (c) => /formatSpawnFailure|\.error|\.signal|\.status/.test(c),
+    );
+    assert.ok(
+      hasFormatter,
+      'installSdkIfNeeded must define a spawn-failure formatter so fatal ' +
+      'npm failures surface result.error / result.signal / result.status ' +
+      'instead of swallowing them (root cause of #2598 being invisible).',
+    );
+    assert.ok(
+      fatalWithDiagnostic.length >= 3,
+      `At least 3 emitSdkFatal calls (install, build, install -g .) must ` +
+      `include spawn diagnostics. Found ${fatalWithDiagnostic.length} that ` +
+      `reference formatSpawnFailure or result.error/signal/status.`,
     );
   });
 });

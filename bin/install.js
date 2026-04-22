@@ -6796,22 +6796,44 @@ function installSdkIfNeeded() {
   const spawnNpm = (args, opts = {}) =>
     spawnSync(npmCmd, args, { ...opts, shell: opts.shell ?? needsShell });
 
+  // Format the underlying spawnSync failure so EINVAL / ENOENT / signal exits
+  // surface in the fatal banner instead of being swallowed. The #2598 silent
+  // failure happened precisely because `{ status: null, error: EINVAL }` was
+  // reduced to a generic "Failed to npm install" with no diagnostic — the real
+  // cause (CVE-2024-27980 on Windows) was invisible in the output.
+  const formatSpawnFailure = (result) => {
+    if (!result) return '';
+    if (result.error) return ` (${result.error.code || result.error.name || 'spawn error'}: ${result.error.message})`;
+    if (result.signal) return ` (signal: ${result.signal})`;
+    if (typeof result.status === 'number') return ` (exit status: ${result.status})`;
+    return '';
+  };
+
   // 1. Install sdk build-time dependencies (tsc, etc.)
   const installResult = spawnNpm(['install'], { cwd: sdkDir, stdio: 'inherit' });
   if (installResult.status !== 0) {
-    emitSdkFatal('Failed to `npm install` in sdk/.', { globalBin: null, exitCode: 1 });
+    emitSdkFatal(
+      `Failed to \`npm install\` in sdk/.${formatSpawnFailure(installResult)}`,
+      { globalBin: null, exitCode: 1 },
+    );
   }
 
   // 2. Compile TypeScript → sdk/dist/
   const buildResult = spawnNpm(['run', 'build'], { cwd: sdkDir, stdio: 'inherit' });
   if (buildResult.status !== 0) {
-    emitSdkFatal('Failed to `npm run build` in sdk/.', { globalBin: null, exitCode: 1 });
+    emitSdkFatal(
+      `Failed to \`npm run build\` in sdk/.${formatSpawnFailure(buildResult)}`,
+      { globalBin: null, exitCode: 1 },
+    );
   }
 
   // 3. Install the built package globally so `gsd-sdk` lands on PATH.
   const globalResult = spawnNpm(['install', '-g', '.'], { cwd: sdkDir, stdio: 'inherit' });
   if (globalResult.status !== 0) {
-    emitSdkFatal('Failed to `npm install -g .` from sdk/.', { globalBin: null, exitCode: 1 });
+    emitSdkFatal(
+      `Failed to \`npm install -g .\` from sdk/.${formatSpawnFailure(globalResult)}`,
+      { globalBin: null, exitCode: 1 },
+    );
   }
 
   // 3a. Explicitly chmod dist/cli.js to 0o755 in the global install location.
