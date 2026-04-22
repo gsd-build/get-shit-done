@@ -467,8 +467,8 @@ Equivalent paths for other runtimes:
 │   ├── ARCHITECTURE.md
 │   └── PITFALLS.md
 ├── codebase/               # Brownfield mapping (from /gsd-map-codebase)
-│   ├── STACK.md
-│   ├── ARCHITECTURE.md
+│   ├── STACK.md            # YAML frontmatter carries `last_mapped_commit`
+│   ├── ARCHITECTURE.md     # for the post-execute drift gate (#2003)
 │   ├── CONVENTIONS.md
 │   ├── CONCERNS.md
 │   ├── STRUCTURE.md
@@ -501,6 +501,30 @@ Equivalent paths for other runtimes:
 ├── ui-reviews/             # Screenshots from /gsd-ui-review (gitignored)
 └── continue-here.md        # Context handoff (from pause-work)
 ```
+
+### Post-Execute Codebase Drift Gate (#2003)
+
+After the last wave of `/gsd:execute-phase` commits, the workflow runs a
+non-blocking `codebase_drift_gate` step (between `schema_drift_gate` and
+`verify_phase_goal`). It compares the diff `last_mapped_commit..HEAD`
+against `.planning/codebase/STRUCTURE.md` and counts four kinds of
+structural elements:
+
+1. New directories outside mapped paths
+2. New barrel exports at `(packages|apps)/<name>/src/index.*`
+3. New migration files
+4. New route modules under `routes/` or `api/`
+
+If the count meets `workflow.drift_threshold` (default 3), the gate either
+**warns** (default) with the suggested `/gsd:map-codebase --paths …` command,
+or **auto-remaps** (`workflow.drift_action = auto-remap`) by spawning
+`gsd-codebase-mapper` scoped to the affected paths. Any error in detection
+or remap is logged and the phase continues — drift detection cannot fail
+verification.
+
+`last_mapped_commit` lives in YAML frontmatter at the top of each
+`.planning/codebase/*.md` file; `bin/lib/drift.cjs` provides
+`readMappedCommit` and `writeMappedCommit` round-trip helpers.
 
 ---
 

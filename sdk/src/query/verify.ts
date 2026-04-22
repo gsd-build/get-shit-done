@@ -643,3 +643,56 @@ export const verifySchemaDrift: QueryHandler = async (args, projectDir, workstre
     },
   };
 };
+
+/**
+ * verify.codebase-drift — structural drift detector (#2003).
+ *
+ * Non-blocking by contract: every failure mode returns a successful response
+ * with `{ skipped: true, reason }`. The post-execute drift gate in
+ * `/gsd:execute-phase` relies on this guarantee.
+ *
+ * Delegates to the Node-side implementation in `bin/lib/drift.cjs` and
+ * `bin/lib/verify.cjs` via a child process so the drift logic stays in one
+ * canonical place (see `cmdVerifyCodebaseDrift`).
+ */
+export const verifyCodebaseDrift: QueryHandler = async (_args, projectDir) => {
+  try {
+    const { execFileSync } = await import('node:child_process');
+    const { fileURLToPath } = await import('node:url');
+    const { dirname, resolve } = await import('node:path');
+    const here = typeof __dirname === 'string'
+      ? __dirname
+      : dirname(fileURLToPath(import.meta.url));
+    // sdk/src/query -> ../../../get-shit-done/bin/gsd-tools.cjs
+    // sdk/dist/query -> ../../../get-shit-done/bin/gsd-tools.cjs
+    const toolsPath = resolve(here, '..', '..', '..', 'get-shit-done', 'bin', 'gsd-tools.cjs');
+    const out = execFileSync(process.execPath, [toolsPath, 'verify', 'codebase-drift'], {
+      cwd: projectDir,
+      encoding: 'utf-8',
+      stdio: ['pipe', 'pipe', 'pipe'],
+    }).trim();
+    try {
+      return { data: JSON.parse(out) };
+    } catch {
+      return {
+        data: {
+          skipped: true,
+          reason: 'sdk-parse-failed',
+          action_required: false,
+          directive: 'none',
+          elements: [],
+        },
+      };
+    }
+  } catch (err) {
+    return {
+      data: {
+        skipped: true,
+        reason: 'sdk-exception: ' + (err instanceof Error ? err.message : String(err)),
+        action_required: false,
+        directive: 'none',
+        elements: [],
+      },
+    };
+  }
+};

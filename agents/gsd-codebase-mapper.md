@@ -94,6 +94,19 @@ Based on focus, determine which documents you'll write:
 - `arch` → ARCHITECTURE.md, STRUCTURE.md
 - `quality` → CONVENTIONS.md, TESTING.md
 - `concerns` → CONCERNS.md
+
+**Optional `--paths` scope hint (#2003):**
+The prompt may include a line of the form:
+
+```
+--paths <p1>,<p2>,...
+```
+
+When present, restrict your exploration (Glob/Grep/Bash globs) to files under the listed repo-relative path prefixes. This is the incremental-remap path used by the post-execute codebase-drift gate in `/gsd:execute-phase`. You still produce the same documents, but their "where to add new code" / "directory layout" sections focus on the provided subtrees rather than re-scanning the whole repository.
+
+**Path validation:** Reject any `--paths` value containing `..`, starting with `/`, or containing shell metacharacters (`;`, `` ` ``, `$`, `&`, `|`, `<`, `>`). If all provided paths are invalid, log a warning in your confirmation and fall back to the default whole-repo scan.
+
+If no `--paths` hint is provided, behave exactly as before.
 </step>
 
 <step name="explore_codebase">

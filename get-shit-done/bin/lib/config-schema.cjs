@@ -37,6 +37,8 @@ const VALID_CONFIG_KEYS = new Set([
   'workflow.security_enforcement',
   'workflow.security_asvs_level',
   'workflow.security_block_on',
+  'workflow.drift_threshold',
+  'workflow.drift_action',
   'git.branching_strategy', 'git.base_branch', 'git.phase_branch_template', 'git.milestone_branch_template', 'git.quick_branch_template',
   'planning.commit_docs', 'planning.search_gitignored', 'planning.sub_repos',
   'workflow.cross_ai_execution', 'workflow.cross_ai_command', 'workflow.cross_ai_timeout',

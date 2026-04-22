@@ -27,6 +27,25 @@ Documents are reference material for Claude when planning/executing. Always incl
 
 <process>
 
+<step name="parse_paths_flag" priority="first">
+Parse an optional `--paths <p1,p2,...>` argument. When supplied (by the
+post-execute codebase-drift gate in `/gsd:execute-phase` or by a user running
+`/gsd:map-codebase --paths apps/accounting,packages/ui`), the workflow
+operates in **incremental-remap mode**:
+
+- Pass `--paths <p1>,<p2>,...` through to each spawned `gsd-codebase-mapper`
+  agent's prompt. Agents scope their Glob/Grep/Bash exploration to the listed
+  repo-relative prefixes only — no whole-repo scan.
+- Reject path values that contain `..`, start with `/`, or include shell
+  metacharacters (`;`, `` ` ``, `$`, `&`, `|`, `<`, `>`). If all provided
+  paths are invalid, fall back to a normal whole-repo run.
+- On write, each mapper stamps `last_mapped_commit: <HEAD sha>` into the YAML
+  frontmatter of every document it produces (see `bin/lib/drift.cjs:writeMappedCommit`).
+
+When `--paths` is absent, behave exactly as before: full-repo scan, all 7
+documents refreshed.
+</step>
+
 <step name="init_context" priority="first">
 Load codebase mapping context:
 

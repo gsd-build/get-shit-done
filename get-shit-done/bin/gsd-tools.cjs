@@ -112,6 +112,7 @@
  *   verify artifacts <plan-file>       Check must_haves.artifacts
  *   verify key-links <plan-file>       Check must_haves.key_links
  *   verify schema-drift <phase> [--skip]  Detect schema file changes without push
+ *   verify codebase-drift                Detect structural drift since last codebase map (#2003)
  *
  * Template Fill:
  *   template fill summary --phase N    Create pre-filled SUMMARY.md
@@ -593,8 +594,10 @@ async function runCommand(command, args, cwd, raw, defaultValue) {
       } else if (subcommand === 'schema-drift') {
         const skipFlag = args.includes('--skip');
         verify.cmdVerifySchemaDrift(cwd, args[2], skipFlag, raw);
+      } else if (subcommand === 'codebase-drift') {
+        verify.cmdVerifyCodebaseDrift(cwd, raw);
       } else {
-        error('Unknown verify subcommand. Available: plan-structure, phase-completeness, references, commits, artifacts, key-links, schema-drift');
+        error('Unknown verify subcommand. Available: plan-structure, phase-completeness, references, commits, artifacts, key-links, schema-drift, codebase-drift');
       }
       break;
     }

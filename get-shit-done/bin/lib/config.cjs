@@ -333,6 +333,17 @@ function cmdConfigSet(cwd, keyPath, value, raw) {
     error(`Invalid context value '${value}'. Valid values: ${VALID_CONTEXT_VALUES.join(', ')}`);
   }
 
+  // Codebase drift detector (#2003)
+  const VALID_DRIFT_ACTIONS = ['warn', 'auto-remap'];
+  if (keyPath === 'workflow.drift_action' && !VALID_DRIFT_ACTIONS.includes(String(parsedValue))) {
+    error(`Invalid workflow.drift_action '${value}'. Valid values: ${VALID_DRIFT_ACTIONS.join(', ')}`);
+  }
+  if (keyPath === 'workflow.drift_threshold') {
+    if (typeof parsedValue !== 'number' || !Number.isInteger(parsedValue) || parsedValue < 1) {
+      error(`Invalid workflow.drift_threshold '${value}'. Must be a positive integer.`);
+    }
+  }
+
   const setConfigValueResult = setConfigValue(cwd, keyPath, parsedValue);
   output(setConfigValueResult, raw, `${keyPath}=${parsedValue}`);
 }

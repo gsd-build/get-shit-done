@@ -56,7 +56,7 @@ import { agentSkills } from './skills.js';
 import { requirementsMarkComplete, roadmapAnnotateDependencies } from './roadmap.js';
 import { roadmapUpdatePlanProgress } from './roadmap-update-plan-progress.js';
 import { statePlannedPhase } from './state-mutation.js';
-import { verifySchemaDrift } from './verify.js';
+import { verifySchemaDrift, verifyCodebaseDrift } from './verify.js';
 import {
   todoMatchPhase, statsJson, statsTable, progressBar, progressTable, listTodos, todoComplete,
 } from './progress.js';
@@ -460,6 +460,8 @@ export function createRegistry(
   registry.register('state planned-phase', statePlannedPhase);
   registry.register('verify.schema-drift', verifySchemaDrift);
   registry.register('verify schema-drift', verifySchemaDrift);
+  registry.register('verify.codebase-drift', verifyCodebaseDrift);
+  registry.register('verify codebase-drift', verifyCodebaseDrift);
   registry.register('todo.match-phase', todoMatchPhase);
   registry.register('todo match-phase', todoMatchPhase);
   registry.register('list-todos', listTodos);

@@ -354,7 +354,7 @@ The `gsd-planner` agent is decomposed into a core agent plus reference modules t
 
 ---
 
-## CLI Modules (26 shipped)
+## CLI Modules (27 shipped)
 
 Full listing: `get-shit-done/bin/lib/*.cjs`.
 
@@ -367,6 +367,7 @@ Full listing: `get-shit-done/bin/lib/*.cjs`.
 | `config.cjs` | `config.json` read/write, section initialization; imports validator from `config-schema.cjs` |
 | `core.cjs` | Error handling, output formatting, shared utilities, runtime fallbacks |
 | `docs.cjs` | Docs-update workflow init, Markdown scanning, monorepo detection |
+| `drift.cjs` | Post-execute codebase structural drift detector (#2003): classifies file changes into new-dir/barrel/migration/route categories and round-trips `last_mapped_commit` frontmatter |
 | `frontmatter.cjs` | YAML frontmatter CRUD operations |
 | `graphify.cjs` | Knowledge-graph build/query/status/diff for `/gsd-graphify` |
 | `gsd2-import.cjs` | External-plan ingest for `/gsd-from-gsd2` |

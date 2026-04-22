@@ -343,17 +343,25 @@ GSD uses a multi-agent architecture where thin orchestrators (workflow files) sp
 
 | Property | Value |
 |----------|-------|
-| **Spawned by** | `/gsd-map-codebase` |
+| **Spawned by** | `/gsd-map-codebase`, post-execute drift gate in `/gsd:execute-phase` |
 | **Parallelism** | 4 instances (tech, architecture, quality, concerns) |
 | **Tools** | Read, Bash, Grep, Glob, Write |
 | **Model (balanced)** | Haiku |
 | **Color** | Cyan |
-| **Produces** | `.planning/codebase/*.md` (7 documents) |
+| **Produces** | `.planning/codebase/*.md` (7 documents, with `last_mapped_commit` frontmatter) |
 
 **Key behaviors:**
 - Read-only exploration + structured output
 - Writes documents directly to disk
 - No reasoning required — pattern extraction from file contents
+
+**`--paths <p1,p2,...>` scope hint (#2003):**
+Accepts an optional `--paths` directive in its prompt. When present, the
+mapper restricts Glob/Grep/Bash exploration to the listed repo-relative path
+prefixes — this is the incremental-remap path used by the post-execute
+codebase-drift gate. Path values that contain `..`, start with `/`, or
+include shell metacharacters are rejected. Without the hint, the mapper
+runs its default whole-repo scan.
 
 ---
 

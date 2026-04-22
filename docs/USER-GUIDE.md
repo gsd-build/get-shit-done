@@ -585,6 +585,20 @@ claude --dangerously-skip-permissions
 # (normal phase workflow from here)
 ```
 
+**Post-execute drift detection (#2003).** After every `/gsd:execute-phase`,
+GSD checks whether the phase introduced enough structural change
+(new directories, barrel exports, migrations, or route modules) to make
+`.planning/codebase/STRUCTURE.md` stale. If it did, the default behavior is
+to print a one-shot warning suggesting the exact `/gsd:map-codebase --paths …`
+invocation to refresh just the affected subtrees. Flip the behavior with:
+
+```bash
+/gsd:settings workflow.drift_action auto-remap       # remap automatically
+/gsd:settings workflow.drift_threshold 5             # tune sensitivity
+```
+
+The gate is non-blocking: any internal failure logs and the phase continues.
+
 ### Quick Bug Fix
 
 ```bash
