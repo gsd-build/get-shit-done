@@ -36,9 +36,7 @@ fi
 </step>
 
 <step name="preflight_checks">
-Verify the work is ready to ship.
-
-Detect the `--force` override once, before the checks. Set `FORCE=true` if `--force` appears in `$ARGUMENTS`, otherwise `FORCE=false`. The override applies to the "Pending handoff tasks?" check below; it does not skip the other preflight steps.
+Verify the work is ready to ship:
 
 1. **Verification passed?**
    ```bash
@@ -53,71 +51,20 @@ Detect the `--force` override once, before the checks. Set `FORCE=true` if `--fo
    ```
    If uncommitted changes exist: ask user to commit or stash first.
 
-3. **Pending handoff tasks?**
-
-   If `.planning/HANDOFF.json` exists, parse `remaining_tasks[]` and refuse when any entry's `status` is not in the terminal set `{done, cancelled, deferred_to_backend, wont_fix}`. The canonical pause/resume contract treats non-terminal statuses as "work still in progress on this branch" — `/gsd-ship` must not create a public PR while that signal is active.
-
-   Missing `HANDOFF.json` is a no-op (preserves existing behavior for projects that don't use `/gsd-pause-work`). A malformed `HANDOFF.json` (non-parseable JSON) is a hard stop — the exit code from `node` is captured explicitly so a bad file can never fall through to a silent pass.
-
-   ```bash
-   HANDOFF_PATH=.planning/HANDOFF.json
-   if [ -f "${HANDOFF_PATH}" ]; then
-     BLOCKING=$(node -e "
-       const fs = require('fs');
-       const TERMINAL = new Set(['done','cancelled','deferred_to_backend','wont_fix']);
-       let h;
-       try { h = JSON.parse(fs.readFileSync('${HANDOFF_PATH}','utf8')); }
-       catch (e) { console.error('HANDOFF.json is not valid JSON: ' + e.message); process.exit(2); }
-       const tasks = Array.isArray(h.remaining_tasks) ? h.remaining_tasks : [];
-       const blocking = tasks.filter(t => t && !TERMINAL.has(t.status));
-       blocking.forEach(t => console.log('  • [' + (t.status || 'unknown') + ']  ' + (t.name || ('task ' + t.id))));
-     ")
-     HANDOFF_EXIT=$?
-     if [ "${HANDOFF_EXIT}" -ne 0 ]; then
-       echo ""
-       echo "✗ Cannot ship: .planning/HANDOFF.json could not be parsed (node exited ${HANDOFF_EXIT})."
-       echo "  Fix the JSON or delete the file, then retry. The parser error is printed above."
-       exit 1
-     fi
-     if [ -n "${BLOCKING}" ]; then
-       if [ "${FORCE}" = "true" ]; then
-         echo "⚠ HANDOFF.json declares in-progress work — shipping anyway because --force was passed:"
-         echo "${BLOCKING}"
-       else
-         cat <<EOF
-   ✗ Cannot ship: HANDOFF.json declares in-progress work on this branch.
-
-     Blocking tasks:
-   ${BLOCKING}
-
-     Options:
-       1. Complete the remaining tasks, then run /gsd-pause-work or /gsd-verify-work to close them
-       2. Mark each as terminal (done/cancelled/deferred_to_backend/wont_fix) in HANDOFF.json if they're no longer in scope for this branch
-       3. Delete HANDOFF.json if it's stale from an earlier session (resume-project.md documents this as the one-shot cleanup)
-       4. Pass --force to ship anyway (not recommended — the branch will land with declared-unfinished work)
-   EOF
-         exit 1
-       fi
-     fi
-   fi
-   ```
-
-   Terminal statuses contract: see `references/artifact-types.md` (HANDOFF.json entry).
-
-4. **On correct branch?**
+3. **On correct branch?**
    ```bash
    CURRENT_BRANCH=$(git branch --show-current)
    ```
    If on `${BASE_BRANCH}`: warn — should be on a feature branch.
    If branching_strategy is `none`: offer to create a branch now.
 
-5. **Remote configured?**
+4. **Remote configured?**
    ```bash
    git remote -v | head -2
    ```
    Detect `origin` remote. If no remote: error — can't create PR.
 
-6. **`gh` CLI available?**
+5. **`gh` CLI available?**
    ```bash
    which gh && gh auth status 2>&1
    ```
