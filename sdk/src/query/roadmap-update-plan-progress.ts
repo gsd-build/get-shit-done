@@ -117,7 +117,7 @@ export const roadmapUpdatePlanProgress: QueryHandler = async (args, projectDir, 
     }
 
     return roadmapContent;
-  });
+  }, workstream);
 
   return {
     data: {

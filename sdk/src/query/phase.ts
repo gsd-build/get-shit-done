@@ -28,6 +28,7 @@ import {
   toPosixPath,
   planningPaths,
 } from './helpers.js';
+import { relPlanningPath } from '../workstream-utils.js';
 import type { QueryHandler } from './utils.js';
 
 // ─── Types ─────────────────────────────────────────────────────────────────
@@ -179,7 +180,7 @@ export const findPhase: QueryHandler = async (args, projectDir, workstream) => {
   };
 
   // Search current phases first
-  const relPhasesDir = '.planning/phases';
+  const relPhasesDir = relPlanningPath(workstream) + '/phases';
   const current = await searchPhaseInDir(phasesDir, relPhasesDir, normalized);
   if (current) return { data: current };
 

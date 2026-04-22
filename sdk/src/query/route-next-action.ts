@@ -56,7 +56,7 @@ export const routeNextAction: QueryHandler = async (_args, projectDir, workstrea
   const planning = planningPaths(projectDir, workstream).planning;
   const continueHere = existsSync(join(planning, '.continue-here.md'));
 
-  const sj = await stateJson([], projectDir);
+  const sj = await stateJson([], projectDir, workstream);
   const sjd = sj.data as Record<string, unknown>;
   if (sjd.error) {
     return {
@@ -85,7 +85,7 @@ export const routeNextAction: QueryHandler = async (_args, projectDir, workstrea
 
   const consecutiveCalls = readConsecutiveCallCount(planning);
 
-  const ra = await roadmapAnalyze([], projectDir);
+  const ra = await roadmapAnalyze([], projectDir, workstream);
   const raData = ra.data as { phases?: Array<Record<string, unknown>> };
   const phases = raData.phases ?? [];
 
@@ -97,7 +97,7 @@ export const routeNextAction: QueryHandler = async (_args, projectDir, workstrea
 
   let unresolvedVerification = false;
   if (currentPhase) {
-    const fp = await findPhase([currentPhase], projectDir);
+    const fp = await findPhase([currentPhase], projectDir, workstream);
     const fd = fp.data as Record<string, unknown>;
     if (fd.found && fd.directory) {
       unresolvedVerification = await hasUnresolvedVerificationFails(
@@ -126,7 +126,7 @@ export const routeNextAction: QueryHandler = async (_args, projectDir, workstrea
         uat_gaps: 0,
       };
     }
-    const fp = await findPhase([cp], projectDir);
+    const fp = await findPhase([cp], projectDir, workstream);
     const d = fp.data as Record<string, unknown>;
     const plans = (d.plans as string[]) ?? [];
     const summaries = (d.summaries as string[]) ?? [];
@@ -212,7 +212,7 @@ export const routeNextAction: QueryHandler = async (_args, projectDir, workstrea
     };
   }
 
-  const fp = await findPhase([currentPhase], projectDir);
+  const fp = await findPhase([currentPhase], projectDir, workstream);
   const pd = fp.data as Record<string, unknown>;
   const found = Boolean(pd.found);
   const cp = normalizePhaseName(currentPhase);

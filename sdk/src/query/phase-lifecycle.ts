@@ -225,7 +225,7 @@ export const phaseAdd: QueryHandler = async (args, projectDir, workstream) => {
       return rawContent.slice(0, lastSeparator) + phaseEntry + rawContent.slice(lastSeparator);
     }
     return rawContent + phaseEntry;
-  });
+  }, workstream);
 
   if (!dirName) {
     throw new GSDError('Phase directory name was not computed', ErrorClassification.Execution);
@@ -380,7 +380,7 @@ export const phaseAddBatch: QueryHandler = async (args, projectDir, workstream) 
     }
 
     return rawContent;
-  });
+  }, workstream);
 
   return { data: { phases: added, count: added.length } };
 };
@@ -489,7 +489,7 @@ export const phaseInsert: QueryHandler = async (args, projectDir, workstream) =>
     }
 
     return rawContent.slice(0, insertIdx) + phaseEntry + rawContent.slice(insertIdx);
-  });
+  }, workstream);
 
   if (!decimalPhase) {
     throw new GSDError('Decimal phase was not computed', ErrorClassification.Execution);
@@ -821,6 +821,7 @@ async function updateRoadmapAfterPhaseRemoval(
   targetPhase: string,
   isDecimal: boolean,
   removedInt: number,
+  workstream?: string,
 ): Promise<void> {
   await readModifyWriteRoadmapMd(projectDir, (content) => {
     const escaped = escapeRegex(targetPhase);
@@ -886,7 +887,7 @@ async function updateRoadmapAfterPhaseRemoval(
     }
 
     return content;
-  });
+  }, workstream);
 }
 
 // ─── phaseRemove handler ───────────────────────────────────────────────
@@ -966,7 +967,7 @@ export const phaseRemove: QueryHandler = async (args, projectDir, workstream) =>
   } catch { /* intentionally empty — renaming is best-effort */ }
 
   // Update ROADMAP.md
-  await updateRoadmapAfterPhaseRemoval(projectDir, targetPhase, isDecimal, parseInt(normalized, 10));
+  await updateRoadmapAfterPhaseRemoval(projectDir, targetPhase, isDecimal, parseInt(normalized, 10), workstream);
 
   // Update STATE.md: decrement total_phases
   let stateUpdated = false;
@@ -1248,7 +1249,7 @@ export const phaseComplete: QueryHandler = async (args, projectDir, workstream) 
       }
 
       return roadmapContent;
-    });
+    }, workstream);
   }
 
   // Step E: Find next phase — filesystem first, then ROADMAP.md fallback

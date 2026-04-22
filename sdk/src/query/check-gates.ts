@@ -82,7 +82,7 @@ export const checkGates: QueryHandler = async (args, projectDir, workstream) => 
 
   // Gate 3: Verification debt — check VERIFICATION.md in phase dir if phase provided
   if (phaseNum) {
-    const phaseRes = await findPhase([phaseNum], projectDir);
+    const phaseRes = await findPhase([phaseNum], projectDir, workstream);
     const pdata = phaseRes.data as Record<string, unknown>;
     if (pdata.found && pdata.directory) {
       const phaseDirFull = join(projectDir, pdata.directory as string);
