@@ -1037,7 +1037,16 @@ Manage parallel workstreams for concurrent work on different milestone areas.
 
 ### `/gsd-settings`
 
-Interactive configuration of workflow toggles and model profile.
+Interactive configuration of workflow toggles and model profile. Questions are grouped into six visual sections:
+
+- **Planning** — Research, Plan Checker, Pattern Mapper, Nyquist, UI Phase, UI Gate, AI Phase
+- **Execution** — Verifier, TDD Mode, Code Review, Code Review Depth _(conditional — only when Code Review is on)_, UI Review
+- **Docs & Output** — Commit Docs, Skip Discuss, Worktrees
+- **Features** — Intel, Graphify
+- **Model & Pipeline** — Model Profile, Auto-Advance, Branching
+- **Misc** — Context Warnings, Research Qs
+
+All answers are merged into `.planning/config.json` via `gsd-sdk query config-set`, preserving unrelated keys. After confirmation, the user may save the full settings object to `~/.gsd/defaults.json` so future `/gsd-new-project` runs start from the same baseline.
 
 ```bash
 /gsd-settings                       # Interactive config

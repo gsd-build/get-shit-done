@@ -40,9 +40,17 @@ Parse current values (default to `true` if not present):
 - `workflow.plan_check` — spawn plan checker during plan-phase
 - `workflow.verifier` — spawn verifier during execute-phase
 - `workflow.nyquist_validation` — validation architecture research during plan-phase (default: true if absent)
+- `workflow.pattern_mapper` — run gsd-pattern-mapper between research and planning (default: true if absent)
 - `workflow.ui_phase` — generate UI-SPEC.md design contracts for frontend phases (default: true if absent)
 - `workflow.ui_safety_gate` — prompt to run /gsd:ui-phase before planning frontend phases (default: true if absent)
 - `workflow.ai_integration_phase` — framework selection + eval strategy for AI phases (default: true if absent)
+- `workflow.tdd_mode` — enforce RED/GREEN/REFACTOR gate sequence during execute-phase (default: false if absent)
+- `workflow.code_review` — enable /gsd:code-review and /gsd:code-review-fix commands (default: true if absent)
+- `workflow.code_review_depth` — default depth for /gsd:code-review: `quick`, `standard`, or `deep` (default: `"standard"` if absent; only relevant when `code_review` is on)
+- `workflow.ui_review` — run visual quality audit (/gsd:ui-review) in autonomous mode (default: true if absent)
+- `commit_docs` — whether `.planning/` files are committed to git (default: true if absent)
+- `intel.enabled` — enable queryable codebase intelligence (/gsd:intel) (default: false if absent)
+- `graphify.enabled` — enable project knowledge graph (/gsd:graphify) (default: false if absent)
 - `model_profile` — which model each agent uses (default: `balanced`)
 - `git.branching_strategy` — branching approach (default: `"none"`)
 - `workflow.use_worktrees` — whether parallel executor agents run in worktree isolation (default: `true`)
@@ -62,7 +70,29 @@ Choose "Inherit" to use the session model for all agents, or configure model_ove
 manually in .planning/config.json to target specific models for this runtime.
 ```
 
-Use AskUserQuestion with current values pre-selected:
+Use AskUserQuestion with current values pre-selected. Questions are grouped into six visual sections; the first question in each section carries the section-denoting `header` field (AskUserQuestion renders abbreviated section tags for grouping, max 12 chars).
+
+Section layout:
+
+### Planning
+Research, Plan Checker, Pattern Mapper, Nyquist, UI Phase, UI Gate, AI Phase
+
+### Execution
+Verifier, TDD Mode, Code Review, Code Review Depth _(conditional — only when code_review=on)_, UI Review
+
+### Docs & Output
+Commit Docs, Skip Discuss, Worktrees
+
+### Features
+Intel, Graphify
+
+### Model & Pipeline
+Model Profile, Auto-Advance, Branching
+
+### Misc
+Context Warnings, Research Qs
+
+**Conditional visibility — code_review_depth:** This question is shown only when the user's chosen `code_review` value (after they answer that question, or the pre-selected value if unchanged) is on. If `code_review` is off, omit the `code_review_depth` question from the AskUserQuestion block and preserve the existing `workflow.code_review_depth` value in config (do not overwrite). Implementation: ask the Model + Planning + Execution-up-to-Code-Review questions first; if `code_review=on`, include `code_review_depth` in the same batch; otherwise skip it. Conceptually this is a one-branch split on the `code_review` answer.
 
 ```
 AskUserQuestion([
@@ -105,12 +135,61 @@ AskUserQuestion([
     ]
   },
   {
+    question: "Enable TDD Mode? (RED/GREEN/REFACTOR gates for eligible tasks)",
+    header: "TDD",
+    multiSelect: false,
+    options: [
+      { label: "No (Recommended)", description: "Execute tasks normally. Tests written alongside implementation." },
+      { label: "Yes", description: "Planner applies type:tdd to business logic/APIs/validations; executor enforces gate sequence. End-of-phase review checks compliance." }
+    ]
+  },
+  {
+    question: "Enable Code Review? (/gsd:code-review and /gsd:code-review-fix commands)",
+    header: "Code Review",
+    multiSelect: false,
+    options: [
+      { label: "Yes (Recommended)", description: "Enable /gsd:code-review commands for reviewing source files changed during a phase." },
+      { label: "No", description: "Commands exit with a configuration gate message. Use when code review is handled externally." }
+    ]
+  },
+  // Conditional: include the following code_review_depth question ONLY when the user's
+  // chosen code_review value is "Yes". If code_review is "No", omit this question from
+  // the AskUserQuestion call and do not touch the existing workflow.code_review_depth value.
+  {
+    question: "Code Review Depth? (default depth for /gsd:code-review — override per-run with --depth=)",
+    header: "Review Depth",
+    multiSelect: false,
+    options: [
+      { label: "Standard (Recommended)", description: "Per-file analysis. Balanced cost and signal." },
+      { label: "Quick", description: "Pattern-matching only. Fastest, lowest cost." },
+      { label: "Deep", description: "Cross-file analysis with import graphs. Highest cost, highest signal." }
+    ]
+  },
+  {
+    question: "Enable UI Review? (visual quality audit via /gsd:ui-review in autonomous mode)",
+    header: "UI Review",
+    multiSelect: false,
+    options: [
+      { label: "Yes (Recommended)", description: "Run visual quality audit after phase execution in autonomous mode." },
+      { label: "No", description: "Skip the UI audit step. Good for backend-only projects." }
+    ]
+  },
+  {
     question: "Auto-advance pipeline? (discuss → plan → execute automatically)",
     header: "Auto",
     multiSelect: false,
     options: [
       { label: "No (Recommended)", description: "Manual /clear + paste between stages" },
       { label: "Yes", description: "Chain stages via Task() subagents (same isolation)" }
+    ]
+  },
+  {
+    question: "Run Pattern Mapper? (maps new files to existing codebase analogs between research and planning)",
+    header: "Pattern Mapper",
+    multiSelect: false,
+    options: [
+      { label: "Yes (Recommended)", description: "gsd-pattern-mapper runs between research and plan steps. Surfaces conventions so new code follows house style." },
+      { label: "No", description: "Skip pattern mapping. Faster; lose consistency hinting for new files." }
     ]
   },
   {
@@ -147,7 +226,7 @@ AskUserQuestion([
     header: "AI Phase",
     multiSelect: false,
     options: [
-      { label: "Yes (Recommended)", description: "Run /gsd-ai-phase before planning AI system phases. Surfaces the right framework, researches its docs, and designs the evaluation strategy." },
+      { label: "Yes (Recommended)", description: "Run /gsd:ai-integration-phase before planning AI system phases. Surfaces the right framework, researches its docs, and designs the evaluation strategy." },
       { label: "No", description: "Skip AI design contract. Good for non-AI phases or when framework is already decided." }
     ]
   },
@@ -180,6 +259,15 @@ AskUserQuestion([
     ]
   },
   {
+    question: "Commit .planning/ files to git? (controls whether plans/artifacts are tracked in your repo)",
+    header: "Commit Docs",
+    multiSelect: false,
+    options: [
+      { label: "Yes (Recommended)", description: "Commit .planning/ to git. Plans, research, and phase artifacts travel with the repo." },
+      { label: "No", description: "Do not commit .planning/. Keep planning local only. Automatic when .planning/ is in .gitignore." }
+    ]
+  },
+  {
     question: "Skip discuss-phase in autonomous mode? (use ROADMAP phase goals as spec)",
     header: "Skip Discuss",
     multiSelect: false,
@@ -196,6 +284,24 @@ AskUserQuestion([
       { label: "Yes (Recommended)", description: "Each parallel executor runs in its own worktree branch — no conflicts between agents." },
       { label: "No", description: "Disable worktree isolation. Agents run sequentially on the main working tree. Use if EnterWorktree creates branches from wrong base (known cross-platform issue)." }
     ]
+  },
+  {
+    question: "Enable Intel? (queryable codebase intelligence via /gsd:intel — builds a JSON index in .planning/intel/)",
+    header: "Intel",
+    multiSelect: false,
+    options: [
+      { label: "No (Recommended)", description: "Skip intel indexing. Use when codebase is small or intel queries are not needed." },
+      { label: "Yes", description: "Enable /gsd:intel commands. Builds and queries a JSON index of the codebase." }
+    ]
+  },
+  {
+    question: "Enable Graphify? (project knowledge graph via /gsd:graphify — builds a graph in .planning/graphs/)",
+    header: "Graphify",
+    multiSelect: false,
+    options: [
+      { label: "No (Recommended)", description: "Skip knowledge graph. Use when dependency graphs are not needed." },
+      { label: "Yes", description: "Enable /gsd:graphify commands. Builds and queries a project knowledge graph." }
+    ]
   }
 ])
 ```
@@ -208,20 +314,32 @@ Merge new settings into existing config.json:
 {
   ...existing_config,
   "model_profile": "quality" | "balanced" | "budget" | "adaptive" | "inherit",
+  "commit_docs": true/false,
   "workflow": {
     "research": true/false,
     "plan_check": true/false,
     "verifier": true/false,
     "auto_advance": true/false,
     "nyquist_validation": true/false,
+    "pattern_mapper": true/false,
     "ui_phase": true/false,
     "ui_safety_gate": true/false,
     "ai_integration_phase": true/false,
+    "tdd_mode": true/false,
+    "code_review": true/false,
+    "code_review_depth": "quick" | "standard" | "deep",
+    "ui_review": true/false,
     "text_mode": true/false,
     "research_before_questions": true/false,
     "discuss_mode": "discuss" | "assumptions",
     "skip_discuss": true/false,
     "use_worktrees": true/false
+  },
+  "intel": {
+    "enabled": true/false
+  },
+  "graphify": {
+    "enabled": true/false
   },
   "git": {
     "branching_strategy": "none" | "phase" | "milestone",
@@ -233,6 +351,8 @@ Merge new settings into existing config.json:
   }
 }
 ```
+
+**Safe merge:** Apply each chosen value via `gsd-sdk query config-set <key.path> <value>` so unrelated keys are never clobbered. `code_review_depth` is written only if the code_review question was answered `on`; otherwise leave the existing value in place.
 
 Write updated config to `$GSD_CONFIG_PATH` (the workstream-aware path resolved in `ensure_and_load_config`). Never hardcode `.planning/config.json` — workstream installs route to `.planning/workstreams/<slug>/config.json`.
 </step>
@@ -276,10 +396,21 @@ Write `~/.gsd/defaults.json` with:
     "verifier": <current>,
     "auto_advance": <current>,
     "nyquist_validation": <current>,
+    "pattern_mapper": <current>,
     "ui_phase": <current>,
     "ui_safety_gate": <current>,
     "ai_integration_phase": <current>,
+    "tdd_mode": <current>,
+    "code_review": <current>,
+    "code_review_depth": <current>,
+    "ui_review": <current>,
     "skip_discuss": <current>
+  },
+  "intel": {
+    "enabled": <current>
+  },
+  "graphify": {
+    "enabled": <current>
   }
 }
 ```
@@ -298,7 +429,15 @@ Display:
 | Model Profile        | {quality/balanced/budget/inherit} |
 | Plan Researcher      | {On/Off} |
 | Plan Checker         | {On/Off} |
+| Pattern Mapper       | {On/Off} |
 | Execution Verifier   | {On/Off} |
+| TDD Mode             | {On/Off} |
+| Code Review          | {On/Off} |
+| Code Review Depth    | {quick/standard/deep} |
+| UI Review            | {On/Off} |
+| Commit Docs          | {On/Off} |
+| Intel                | {On/Off} |
+| Graphify             | {On/Off} |
 | Auto-Advance         | {On/Off} |
 | Nyquist Validation   | {On/Off} |
 | UI Phase             | {On/Off} |
@@ -323,7 +462,7 @@ Quick commands:
 
 <success_criteria>
 - [ ] Current config read
-- [ ] User presented with 14 settings (profile + 11 workflow toggles + git branching + ctx warnings)
+- [ ] User presented with 22 settings (profile + workflow toggles + features + git branching + ctx warnings), grouped into six sections: Planning, Execution, Docs & Output, Features, Model & Pipeline, Misc. `code_review_depth` is conditional on `code_review=on`.
 - [ ] Config updated with model_profile, workflow, and git sections
 - [ ] User offered to save as global defaults (~/.gsd/defaults.json)
 - [ ] Changes confirmed to user
