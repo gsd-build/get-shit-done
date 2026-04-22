@@ -96,7 +96,7 @@ Status: ✓ = met minimum, ⚠ = below minimum (planner treats as assumption)
 
 *Phase: [XX-name]*
 *Spec created: [date]*
-*Next step: /gsd-discuss-phase [X] — implementation decisions (how to build what's specified above)*
+*Next step: /gsd:discuss-phase [X] — implementation decisions (how to build what's specified above)*
 ```
 
 <good_examples>
@@ -192,7 +192,7 @@ The database has a `posts` table and `follows` table. No feed query or feed UI e
 
 *Phase: 03-post-feed*
 *Spec created: 2025-01-20*
-*Next step: /gsd-discuss-phase 3 — implementation decisions (card layout, loading skeleton, etc.)*
+*Next step: /gsd:discuss-phase 3 — implementation decisions (card layout, loading skeleton, etc.)*
 ```
 
 **Example 2: CLI tool (Database backup)**
@@ -280,7 +280,7 @@ No backup tooling exists. The project uses PostgreSQL. Developers currently use 
 
 *Phase: 02-backup-command*
 *Spec created: 2025-01-20*
-*Next step: /gsd-discuss-phase 2 — implementation decisions (progress reporting, flag design, etc.)*
+*Next step: /gsd:discuss-phase 2 — implementation decisions (progress reporting, flag design, etc.)*
 ```
 
 </good_examples>

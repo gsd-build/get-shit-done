@@ -87,7 +87,7 @@ describe('ultraplan-phase workflow runtime gate', () => {
 
   test('error message references /gsd-plan-phase as local alternative', () => {
     assert.ok(
-      content.includes('gsd-plan-phase'),
+      content.includes('gsd:plan-phase') || content.includes('gsd-plan-phase'),
       'error message should direct users to /gsd-plan-phase as the local alternative'
     );
   });
@@ -104,7 +104,7 @@ describe('ultraplan-phase workflow initialization', () => {
 
   test('handles missing .planning directory', () => {
     assert.ok(
-      content.includes('gsd-new-project') || content.includes('/gsd-new-project'),
+      content.includes('gsd-new-project') || content.includes('/gsd-new-project') || content.includes('gsd:new-project'),
       'workflow should direct user to /gsd-new-project when .planning is missing'
     );
   });
@@ -154,7 +154,7 @@ describe('ultraplan-phase workflow return path', () => {
   });
 
   test('directs user to run /gsd-import --from after ultraplan completes', () => {
-    assert.ok(content.includes('gsd-import'), 'workflow must direct user to run /gsd-import --from with the saved file path');
+    assert.ok(content.includes('gsd-import') || content.includes('gsd:import'), 'workflow must direct user to run /gsd:import --from with the saved file path');
   });
 
   test('mentions the --from flag for gsd-import', () => {

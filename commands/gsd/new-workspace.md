@@ -30,7 +30,7 @@ Create a physical workspace directory containing copies of specified git repos (
 - `<path>/.planning/` — independent planning directory
 - `<path>/<repo>/` — git worktree or clone for each specified repo
 
-**After this command:** `cd` into the workspace and run `/gsd-new-project` to initialize GSD.
+**After this command:** `cd` into the workspace and run `/gsd:new-project` to initialize GSD.
 </objective>
 
 <execution_context>

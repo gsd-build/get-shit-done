@@ -118,7 +118,7 @@ Status: {status from SUMMARY.md frontmatter, or "no summary yet"}
 Description: {first non-empty line from PLAN.md after frontmatter}
 Last action: {last meaningful line of SUMMARY.md, or "none"}
 ─────────────────────────────────────
-Resume with: /gsd-quick resume {slug}
+Resume with: /gsd:quick resume {slug}
 ```
 
 No agent spawn. STOP after printing.

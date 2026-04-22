@@ -76,8 +76,8 @@ describe('verify-work.md — auto-transition after UAT passes with 0 issues', ()
     const content = fs.readFileSync(VERIFY_WORK, 'utf-8');
     // The workflow should suggest /gsd-secure-phase when security is enabled but no file exists
     assert.ok(
-      content.includes('gsd-secure-phase'),
-      'verify-work.md must suggest /gsd-secure-phase when security gate blocks transition'
+      content.includes('gsd-secure-phase') || content.includes('gsd:secure-phase'),
+      'verify-work.md must suggest /gsd:secure-phase when security gate blocks transition'
     );
   });
 });

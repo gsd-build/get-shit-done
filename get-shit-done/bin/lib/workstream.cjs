@@ -78,7 +78,7 @@ function cmdWorkstreamCreate(cwd, name, options, raw) {
 
   const baseDir = planningRoot(cwd);
   if (!fs.existsSync(baseDir)) {
-    error('.planning/ directory not found — run /gsd-new-project first');
+    error('.planning/ directory not found — run /gsd:new-project first');
   }
 
   const wsRoot = path.join(baseDir, 'workstreams');

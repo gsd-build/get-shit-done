@@ -365,12 +365,12 @@ Created .planning/codebase/:
 
 `/clear` then:
 
-`/gsd-new-project`
+`/gsd:new-project`
 
 ---
 
 **Also available:**
-- Re-run mapping: `/gsd-map-codebase`
+- Re-run mapping: `/gsd:map-codebase`
 - Review specific file: `cat .planning/codebase/STACK.md`
 - Edit any document before proceeding
 

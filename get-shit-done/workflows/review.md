@@ -45,7 +45,7 @@ No external AI CLIs found. Install at least one:
 - qwen: https://github.com/nicepkg/qwen-code (Alibaba Qwen models)
 - cursor: https://cursor.com (Cursor IDE agent mode)
 
-Then run /gsd-review again.
+Then run /gsd:review again.
 ```
 Exit.
 
@@ -327,7 +327,7 @@ Consensus concerns:
 Full review: {padded_phase}-REVIEWS.md
 
 To incorporate feedback into planning:
-  /gsd-plan-phase {N} --reviews
+  /gsd:plan-phase {N} --reviews
 ```
 
 Clean up temp files.
@@ -340,5 +340,5 @@ Clean up temp files.
 - [ ] REVIEWS.md written with structured feedback
 - [ ] Consensus summary synthesized from multiple reviewers
 - [ ] Temp files cleaned up
-- [ ] User knows how to use feedback (/gsd-plan-phase --reviews)
+- [ ] User knows how to use feedback (/gsd:plan-phase --reviews)
 </success_criteria>

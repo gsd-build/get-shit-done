@@ -41,7 +41,7 @@ Intel system is disabled. To activate:
 
   gsd-sdk query config-set intel.enabled true
 
-Then run /gsd-intel refresh to build the initial index.
+Then run /gsd:intel refresh to build the initial index.
 ```
 
 ---
@@ -63,7 +63,7 @@ Parse `$ARGUMENTS` to determine the operation mode:
 ```
 GSD > INTEL
 
-Usage: /gsd-intel <mode>
+Usage: /gsd:intel <mode>
 
 Modes:
   query <term>  Search intel files for a term
@@ -82,7 +82,7 @@ gsd-sdk query intel.query <term>
 
 Parse the JSON output and display results:
 - If the output contains `"disabled": true`, display the disabled message from Step 1 and **STOP**
-- If no matches found, display: `No intel matches for '<term>'. Try /gsd-intel refresh to build the index.`
+- If no matches found, display: `No intel matches for '<term>'. Try /gsd:intel refresh to build the index.`
 - Otherwise, display matching entries grouped by intel file
 
 **STOP** after displaying results. Do not spawn an agent.

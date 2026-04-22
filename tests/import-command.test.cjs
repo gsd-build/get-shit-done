@@ -114,7 +114,7 @@ describe('import workflow content', () => {
 
   test('no-args usage display is present', () => {
     assert.ok(
-      content.includes('Usage: /gsd-import'),
+      content.includes('Usage: /gsd:import') || content.includes('Usage: /gsd-import'),
       'workflow should display usage when no arguments provided'
     );
   });

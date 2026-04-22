@@ -101,7 +101,7 @@ describe('execute-phase docs: user-facing wave flag', () => {
       'help.md should describe wave-specific execution'
     );
     assert.ok(
-      content.includes('Usage: `/gsd-execute-phase 5 --wave 2`'),
+      content.includes('Usage: `/gsd:execute-phase 5 --wave 2`') || content.includes('Usage: `/gsd-execute-phase 5 --wave 2`'),
       'help.md should include wave-filter usage'
     );
   });
