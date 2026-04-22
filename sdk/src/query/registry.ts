@@ -126,15 +126,28 @@ export class QueryRegistry {
   }
 }
 
-function expandSingleDottedToken(tokens: string[]): string[] {
-  if (tokens.length !== 1 || tokens[0].startsWith('--')) {
+/**
+ * If the first token contains a dot (e.g. `init.execute-phase`), split it into
+ * segments and prepend those segments in place of the original token. Args that
+ * follow the dotted token are preserved.
+ *
+ * Examples:
+ *   ['init.new-project']               -> ['init', 'new-project']
+ *   ['init.execute-phase', '1']        -> ['init', 'execute-phase', '1']
+ *   ['state.update', 'status', 'X']    -> ['state', 'update', 'status', 'X']
+ *
+ * Returns the original array (by reference) when no expansion applies so callers
+ * can detect "nothing changed" via identity comparison.
+ */
+function expandFirstDottedToken(tokens: string[]): string[] {
+  if (tokens.length === 0) {
     return tokens;
   }
-  const t = tokens[0];
-  if (!t.includes('.')) {
+  const first = tokens[0];
+  if (first.startsWith('--') || !first.includes('.')) {
     return tokens;
   }
-  return t.split('.');
+  return [...first.split('.'), ...tokens.slice(1)];
 }
 
 function matchRegisteredPrefix(
@@ -166,7 +179,7 @@ export function resolveQueryArgv(
 ): { cmd: string; args: string[] } | null {
   let matched = matchRegisteredPrefix(tokens, registry);
   if (!matched) {
-    const expanded = expandSingleDottedToken(tokens);
+    const expanded = expandFirstDottedToken(tokens);
     if (expanded !== tokens) {
       matched = matchRegisteredPrefix(expanded, registry);
     }

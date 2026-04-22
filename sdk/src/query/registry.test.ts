@@ -178,4 +178,31 @@ describe('resolveQueryArgv', () => {
       args: [],
     });
   });
+
+  // Regression: #2597 — dotted command token followed by positional args.
+  // Before the fix, argv like ['init.execute-phase', '1'] returned null because
+  // expansion only ran for single-token input.
+  it('matches a dotted command token when positional args follow (#2597)', () => {
+    const registry = createRegistry();
+    expect(resolveQueryArgv(['init.execute-phase', '1'], registry)).toEqual({
+      cmd: 'init.execute-phase',
+      args: ['1'],
+    });
+  });
+
+  it('matches dotted state.update with trailing args (#2597)', () => {
+    const registry = createRegistry();
+    expect(resolveQueryArgv(['state.update', 'status', 'X'], registry)).toEqual({
+      cmd: 'state.update',
+      args: ['status', 'X'],
+    });
+  });
+
+  it('matches dotted phase.add with trailing args (#2597)', () => {
+    const registry = createRegistry();
+    expect(resolveQueryArgv(['phase.add', 'desc'], registry)).toEqual({
+      cmd: 'phase.add',
+      args: ['desc'],
+    });
+  });
 });
