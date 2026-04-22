@@ -101,6 +101,28 @@ describe('enhancement #2473: /gsd-ship refuses to open PR when HANDOFF.json decl
     );
   });
 
+  test('malformed HANDOFF.json is a hard stop (node exit code is captured, not swallowed by $())', () => {
+    // Command substitution $() discards the inner exit code, so the node parser
+    // exit must be captured explicitly via $? and branched on. Without this,
+    // a corrupted HANDOFF.json would yield empty BLOCKING and ship silently.
+    assert.match(
+      preflight,
+      /HANDOFF_EXIT=\$\?/,
+      'preflight must capture $? from the node invocation so a non-zero exit is visible to the shell'
+    );
+    assert.match(
+      preflight,
+      /HANDOFF_EXIT.*-ne 0/,
+      'preflight must branch on the captured node exit and refuse when parsing failed'
+    );
+    // And the parser itself must still signal failure on bad JSON
+    assert.match(
+      preflight,
+      /process\.exit\(2\)/,
+      'node parser must exit non-zero on invalid JSON so the captured exit code is meaningful'
+    );
+  });
+
   test('pending-handoff check is placed before push_branch and create_pr (cannot fall through to gh pr create)', () => {
     const pushStart = workflow.indexOf('<step name="push_branch">');
     const createStart = workflow.indexOf('<step name="create_pr">');

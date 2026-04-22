@@ -57,7 +57,7 @@ Detect the `--force` override once, before the checks. Set `FORCE=true` if `--fo
 
    If `.planning/HANDOFF.json` exists, parse `remaining_tasks[]` and refuse when any entry's `status` is not in the terminal set `{done, cancelled, deferred_to_backend, wont_fix}`. The canonical pause/resume contract treats non-terminal statuses as "work still in progress on this branch" — `/gsd-ship` must not create a public PR while that signal is active.
 
-   Missing `HANDOFF.json` is a no-op (preserves existing behavior for projects that don't use `/gsd-pause-work`).
+   Missing `HANDOFF.json` is a no-op (preserves existing behavior for projects that don't use `/gsd-pause-work`). A malformed `HANDOFF.json` (non-parseable JSON) is a hard stop — the exit code from `node` is captured explicitly so a bad file can never fall through to a silent pass.
 
    ```bash
    HANDOFF_PATH=.planning/HANDOFF.json
@@ -72,6 +72,13 @@ Detect the `--force` override once, before the checks. Set `FORCE=true` if `--fo
        const blocking = tasks.filter(t => t && !TERMINAL.has(t.status));
        blocking.forEach(t => console.log('  • [' + (t.status || 'unknown') + ']  ' + (t.name || ('task ' + t.id))));
      ")
+     HANDOFF_EXIT=$?
+     if [ "${HANDOFF_EXIT}" -ne 0 ]; then
+       echo ""
+       echo "✗ Cannot ship: .planning/HANDOFF.json could not be parsed (node exited ${HANDOFF_EXIT})."
+       echo "  Fix the JSON or delete the file, then retry. The parser error is printed above."
+       exit 1
+     fi
      if [ -n "${BLOCKING}" ]; then
        if [ "${FORCE}" = "true" ]; then
          echo "⚠ HANDOFF.json declares in-progress work — shipping anyway because --force was passed:"
