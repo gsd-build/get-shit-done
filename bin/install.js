@@ -6075,9 +6075,13 @@ function install(isGlobal, runtime = 'claude') {
     return;
   }
   const settings = validateHookFields(cleanupOrphanedHooks(rawSettings));
-  // Local installs anchor paths to $CLAUDE_PROJECT_DIR so hooks resolve
-  // correctly regardless of the shell's current working directory (#1906).
-  const localPrefix = '"$CLAUDE_PROJECT_DIR"/' + dirName;
+  // Local installs anchor hook paths so they resolve regardless of cwd (#1906).
+  // Claude Code sets $CLAUDE_PROJECT_DIR; Gemini/Antigravity do not — and on
+  // Windows their own substitution logic doubles the path (#2557). Those runtimes
+  // run project hooks with the project dir as cwd, so bare relative paths work.
+  const localPrefix = (runtime === 'gemini' || runtime === 'antigravity')
+    ? dirName
+    : '"$CLAUDE_PROJECT_DIR"/' + dirName;
   const hookOpts = { portableHooks: hasPortableHooks };
   const statuslineCommand = isGlobal
     ? buildHookCommand(targetDir, 'gsd-statusline.js', hookOpts)

@@ -42,9 +42,11 @@ describe('bug #1906: local hook commands use $CLAUDE_PROJECT_DIR', () => {
     src = fs.readFileSync(INSTALL_SRC, 'utf-8');
   });
 
-  test('localPrefix variable is defined with $CLAUDE_PROJECT_DIR', () => {
-    assert.match(src, /const localPrefix\s*=\s*['"]\"\$CLAUDE_PROJECT_DIR['"]\s*\//,
-      'localPrefix should be defined using $CLAUDE_PROJECT_DIR');
+  test('localPrefix definition includes $CLAUDE_PROJECT_DIR for non-Gemini runtimes', () => {
+    // localPrefix is now a ternary — Gemini/Antigravity use bare dirName (#2557),
+    // all other runtimes use "$CLAUDE_PROJECT_DIR"/ to anchor hook paths.
+    assert.match(src, /const localPrefix\s*=[\s\S]*?"\$CLAUDE_PROJECT_DIR"/,
+      'localPrefix definition must include "$CLAUDE_PROJECT_DIR" branch for non-Gemini runtimes');
   });
 
   for (const hook of HOOKS) {
