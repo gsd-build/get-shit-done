@@ -98,7 +98,7 @@ Based on focus, determine which documents you'll write:
 **Optional `--paths` scope hint (#2003):**
 The prompt may include a line of the form:
 
-```
+```text
 --paths <p1>,<p2>,...
 ```
 
