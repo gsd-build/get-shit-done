@@ -52,7 +52,7 @@ jobs:
           set -euo pipefail
           git config user.email "ci@gsd-build"
           git config user.name "CI Rebase Check"
-          git fetch origin main --depth=0 || git fetch origin main
+          git fetch origin main
           if ! git merge --no-edit --no-ff origin/main; then
             echo "::error::This PR cannot cleanly merge origin/main. Rebase your branch onto current main and push again."
             echo "::error::Conflicting files:"
