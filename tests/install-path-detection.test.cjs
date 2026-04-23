@@ -166,4 +166,42 @@ describe('installer HOME-relative PATH detection (#2620)', () => {
       cleanup(home);
     }
   });
+
+  // CodeRabbit finding: bare relative PATH segments (e.g. `bin`) must not be
+  // resolved against $HOME. Relative segments depend on the shell's cwd at
+  // lookup time and are unrelated to $HOME/bin.
+  test('does not treat bare relative PATH segment as HOME-relative', () => {
+    const home = createTempHome();
+    try {
+      fs.writeFileSync(
+        path.join(home, '.zshrc'),
+        'export PATH="bin:$PATH"\n',
+      );
+      const globalBin = path.join(home, 'bin');
+      assert.strictEqual(
+        installer.homePathCoveredByRc(globalBin, home),
+        false,
+        'relative PATH segments must not be resolved against $HOME',
+      );
+    } finally {
+      cleanup(home);
+    }
+  });
+
+  test('does not treat nested relative PATH segment as HOME-relative', () => {
+    const home = createTempHome();
+    try {
+      fs.writeFileSync(
+        path.join(home, '.zshrc'),
+        'export PATH="node_modules/.bin:$PATH"\n',
+      );
+      const globalBin = path.join(home, 'node_modules', '.bin');
+      assert.strictEqual(
+        installer.homePathCoveredByRc(globalBin, home),
+        false,
+      );
+    } finally {
+      cleanup(home);
+    }
+  });
 });

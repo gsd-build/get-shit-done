@@ -6870,10 +6870,16 @@ function homePathCoveredByRc(globalBin, homeDir, rcFileNames) {
 
       for (const segment of rhs.split(':')) {
         if (!segment) continue;
-        const expanded = expandHome(segment.trim());
+        const trimmed = segment.trim();
+        const expanded = expandHome(trimmed);
         if (expanded.includes('$')) continue;
+        // Skip segments that are still relative after HOME expansion. A bare
+        // `bin` entry (or `./bin`, `node_modules/.bin`, etc.) depends on the
+        // shell's cwd at lookup time — it is NOT equivalent to `$HOME/bin`,
+        // so resolving against homeAbs would produce false positives.
+        if (!path.isAbsolute(expanded)) continue;
         try {
-          const abs = normalise(path.resolve(homeAbs, expanded));
+          const abs = normalise(path.resolve(expanded));
           if (abs === targetAbs) return true;
         } catch {
           // ignore unresolvable segments
