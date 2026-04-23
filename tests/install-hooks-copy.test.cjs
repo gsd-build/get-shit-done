@@ -307,6 +307,18 @@ describe('writeManifest includes .sh hooks', () => {
       );
     }
   });
+
+  test('manifest contains hook entries for codex installs too', () => {
+    writeManifest(tmpDir, 'codex');
+
+    const manifestPath = path.join(tmpDir, 'gsd-file-manifest.json');
+    const manifest = JSON.parse(fs.readFileSync(manifestPath, 'utf8'));
+
+    assert.ok(
+      manifest.files['hooks/gsd-check-update.js'],
+      'codex manifest should track hooks/gsd-check-update.js so local edits can be preserved on reinstall'
+    );
+  });
 });
 
 // ─────────────────────────────────────────────────────────────────────────────

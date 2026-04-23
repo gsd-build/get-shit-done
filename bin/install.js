@@ -2093,7 +2093,8 @@ function stripManagedGsdCodexInlineHooks(content, configDir) {
 
   for (let i = 0; i < lines.length; i++) {
     const line = lines[i];
-    if (!/^\s*\[\[hooks\]\]\s*$/.test(line.text)) {
+    const header = parseTomlTableHeader(line.text);
+    if (!header || !header.array || header.path !== 'hooks') {
       kept.push(line);
       continue;
     }
@@ -2103,7 +2104,7 @@ function stripManagedGsdCodexInlineHooks(content, configDir) {
     let j = i + 1;
     for (; j < lines.length; j++) {
       const nextLine = lines[j];
-      if (/^\s*\[/.test(nextLine.text)) {
+      if (parseTomlTableHeader(nextLine.text)) {
         break;
       }
       block.push(nextLine);
@@ -5830,9 +5831,9 @@ function writeManifest(configDir, runtime = 'claude') {
     }
   }
 
-  // Track hook files so saveLocalPatches() can detect user modifications
-  // Hooks are only installed for runtimes that use settings.json (not Codex/Copilot/Cline)
-  if (!isCodex && !isCopilot && !isCline) {
+  // Track hook files so saveLocalPatches() can detect user modifications.
+  // Hooks are installed for managed runtimes except Copilot and Cline.
+  if (!isCopilot && !isCline) {
     const hooksDir = path.join(configDir, 'hooks');
     if (fs.existsSync(hooksDir)) {
       for (const file of fs.readdirSync(hooksDir)) {

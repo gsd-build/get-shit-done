@@ -1023,17 +1023,22 @@ describe('Codex install hook configuration (e2e)', () => {
   });
 
   test('install preserves malformed hooks.json SessionStart entries instead of overwriting them', () => {
-    const malformedHooksJson = {
-      hooks: {
-        SessionStart: {
-          hooks: [
-            { type: 'command', command: 'echo keep-me' },
-          ],
-        },
-      },
-    };
+    const malformedHooksJsonRaw = [
+      '{',
+      '  "hooks": {',
+      '    "SessionStart": {',
+      '      "hooks": [',
+      '        { "command": "echo keep-me", "type": "command" }',
+      '      ]',
+      '    }',
+      '  }',
+      '}',
+      '',
+    ].join('\n');
+    const malformedHooksJson = JSON.parse(malformedHooksJsonRaw);
     const legacyManagedInlineCommand = `node ${path.join(codexHome, 'hooks', 'gsd-check-update.js').replace(/\\/g, '/')}`;
-    writeCodexHooksJson(codexHome, malformedHooksJson);
+    fs.mkdirSync(codexHome, { recursive: true });
+    fs.writeFileSync(path.join(codexHome, 'hooks.json'), malformedHooksJsonRaw, 'utf8');
     writeCodexConfig(codexHome, [
       '# GSD Hooks',
       '[[hooks]]',
@@ -1047,6 +1052,7 @@ describe('Codex install hook configuration (e2e)', () => {
 
     runCodexInstall(codexHome);
 
+    assert.strictEqual(fs.readFileSync(path.join(codexHome, 'hooks.json'), 'utf8'), malformedHooksJsonRaw, 'leaves malformed hooks.json bytes untouched instead of rewriting them');
     assert.deepStrictEqual(readCodexHooksJson(codexHome), malformedHooksJson, 'leaves malformed hooks.json untouched instead of overwriting it');
     assert.ok(readCodexConfig(codexHome).includes(`command = "${legacyManagedInlineCommand}"`), 'preserves the legacy inline hook when hooks.json migration cannot complete safely');
     assert.strictEqual(countMatches(readCodexConfig(codexHome), /^codex_hooks = true$/gm), 0, 'does not enable codex_hooks when hooks.json migration fails');
@@ -1930,7 +1936,7 @@ describe('Codex uninstall symmetry for hook-enabled configs', () => {
   test('install then uninstall removes managed inline TOML hooks with compact assignment formatting', () => {
     const managedCommand = `node ${path.join(codexHome, 'hooks', 'gsd-check-update.js').replace(/\\/g, '/')}`;
     writeCodexConfig(codexHome, [
-      '[[hooks]]',
+      '[[hooks]] # keep comment',
       'event="AfterCommand"',
       `command="${managedCommand}"`,
       '',
