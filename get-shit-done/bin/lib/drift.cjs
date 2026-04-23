@@ -347,7 +347,16 @@ function readMappedCommit(filePath) {
  * the given file, preserving any other frontmatter keys and the body.
  */
 function writeMappedCommit(filePath, commitSha, isoDate) {
-  const content = fs.readFileSync(filePath, 'utf8');
+  // Symmetric with readMappedCommit (which returns null on missing files):
+  // tolerate a missing target by creating a minimal frontmatter-only file
+  // rather than throwing ENOENT. This matters when a mapper produces a new
+  // doc and the caller stamps it before any prior content existed.
+  let content = '';
+  try {
+    content = fs.readFileSync(filePath, 'utf8');
+  } catch (err) {
+    if (err.code !== 'ENOENT') throw err;
+  }
   const { data, body } = parseFrontmatter(content);
   data.last_mapped_commit = commitSha;
   if (isoDate) data.last_mapped_at = isoDate;

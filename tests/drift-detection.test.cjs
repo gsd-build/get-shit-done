@@ -399,6 +399,19 @@ describe('last_mapped_commit frontmatter', () => {
     fs.writeFileSync(file, '# No frontmatter\n');
     assert.strictEqual(readMappedCommit(file), null);
   });
+
+  test('writeMappedCommit creates the file when it does not exist (symmetry with readMappedCommit)', () => {
+    const file = path.join(tmp, '.planning', 'codebase', 'NEW-DOC.md');
+    assert.strictEqual(fs.existsSync(file), false, 'precondition: file absent');
+    // Must not throw — readMappedCommit returns null for missing files,
+    // writeMappedCommit must defensively create them.
+    writeMappedCommit(file, 'feedface00000000000000000000000000000000', '2026-04-22');
+    assert.strictEqual(fs.existsSync(file), true, 'file created');
+    assert.strictEqual(
+      readMappedCommit(file),
+      'feedface00000000000000000000000000000000',
+    );
+  });
 });
 
 // ─── Unit: negative / defensive ──────────────────────────────────────────────
