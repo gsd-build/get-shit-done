@@ -32,8 +32,21 @@ Parse current values (default to `true` if not present):
 - `workflow.nyquist_validation` — validation architecture research during plan-phase (default: true if absent)
 - `workflow.ui_phase` — generate UI-SPEC.md design contracts for frontend phases (default: true if absent)
 - `workflow.ui_safety_gate` — prompt to run /gsd:ui-phase before planning frontend phases (default: true if absent)
+- `brave_search`, `firecrawl`, `exa_search` — search-provider flags (top-level, default: `false`)
 - `model_profile` — which model each agent uses (default: `balanced`)
 - `git.branching_strategy` — branching approach (default: `"none"`)
+</step>
+
+<step name="detect_search_providers">
+Detect which search-provider API keys are available on this machine. These flags are gated on a key being present — flipping the flag on without a key is a no-op (see `references/planning-config.md`). Surface availability in the question so the user can make an informed choice.
+
+```bash
+BRAVE_AVAILABLE=$([ -n "$BRAVE_API_KEY" ] || [ -f "$HOME/.gsd/brave_api_key" ] && echo "available" || echo "no key")
+FIRECRAWL_AVAILABLE=$([ -n "$FIRECRAWL_API_KEY" ] || [ -f "$HOME/.gsd/firecrawl_api_key" ] && echo "available" || echo "no key")
+EXA_AVAILABLE=$([ -n "$EXA_API_KEY" ] || [ -f "$HOME/.gsd/exa_api_key" ] && echo "available" || echo "no key")
+```
+
+Use these values to fill `{BRAVE_STATUS}`, `{FIRECRAWL_STATUS}`, `{EXA_STATUS}` in the Search Providers question below.
 </step>
 
 <step name="present_settings">
@@ -153,9 +166,24 @@ AskUserQuestion([
       { label: "No (Recommended)", description: "Run smart discuss before each phase — surfaces gray areas and captures decisions." },
       { label: "Yes", description: "Skip discuss in /gsd:autonomous — chain directly to plan. Best for backend/pipeline work where phase descriptions are the spec." }
     ]
+  },
+  // Substitute {BRAVE_STATUS} / {FIRECRAWL_STATUS} / {EXA_STATUS} with the values
+  // detected in `detect_search_providers` (either "available" or "no key"). Pre-select
+  // providers whose flag is currently `true` in config.json.
+  {
+    question: "Enable which search providers? (used by research agents during plan-phase)",
+    header: "Search",
+    multiSelect: true,
+    options: [
+      { label: "Brave Search [{BRAVE_STATUS}]", description: "Web search via Brave API. Requires BRAVE_API_KEY env var or ~/.gsd/brave_api_key. Flag without key is a no-op." },
+      { label: "Firecrawl [{FIRECRAWL_STATUS}]", description: "Page scraping via Firecrawl API. Requires FIRECRAWL_API_KEY env var or ~/.gsd/firecrawl_api_key. Flag without key is a no-op." },
+      { label: "Exa Search [{EXA_STATUS}]", description: "Semantic web search via Exa API. Requires EXA_API_KEY env var or ~/.gsd/exa_api_key. Flag without key is a no-op." }
+    ]
   }
 ])
 ```
+
+After the user answers: for any selected provider whose status is "no key", append a note to the confirm output advising the user how to set the key (env var or `~/.gsd/<name>_api_key` file). Still persist the flag — it'll start working once a key becomes available.
 </step>
 
 <step name="update_config">
@@ -165,6 +193,9 @@ Merge new settings into existing config.json:
 {
   ...existing_config,
   "model_profile": "quality" | "balanced" | "budget" | "inherit",
+  "brave_search": true/false,
+  "firecrawl": true/false,
+  "exa_search": true/false,
   "workflow": {
     "research": true/false,
     "plan_check": true/false,
@@ -188,6 +219,8 @@ Merge new settings into existing config.json:
   }
 }
 ```
+
+The three search-provider flags (`brave_search`, `firecrawl`, `exa_search`) are top-level, not nested under `workflow`. Set each to `true` if the user selected it in the Search Providers question, `false` otherwise.
 
 Write updated config to `.planning/config.json`.
 </step>
@@ -260,6 +293,7 @@ Display:
 | Git Branching        | {None/Per Phase/Per Milestone} |
 | Skip Discuss         | {On/Off} |
 | Context Warnings     | {On/Off} |
+| Search Providers     | {comma-separated list of enabled providers, or "None"} |
 | Saved as Defaults    | {Yes/No} |
 
 These settings apply to future /gsd:plan-phase and /gsd:execute-phase runs.
@@ -270,14 +304,24 @@ Quick commands:
 - /gsd:plan-phase --skip-research — skip research
 - /gsd:plan-phase --skip-verify — skip plan check
 ```
+
+If any enabled search provider had status "no key" during detection, append a separate note after the table advising the user how to activate it:
+
+    Note: you enabled {providers} but no API key was detected.
+    Set the key to activate:
+      - Brave:     export BRAVE_API_KEY=... (or echo <key> > ~/.gsd/brave_api_key)
+      - Firecrawl: export FIRECRAWL_API_KEY=... (or echo <key> > ~/.gsd/firecrawl_api_key)
+      - Exa:       export EXA_API_KEY=... (or echo <key> > ~/.gsd/exa_api_key)
 </step>
 
 </process>
 
 <success_criteria>
 - [ ] Current config read
-- [ ] User presented with 10 settings (profile + 8 workflow toggles + git branching)
-- [ ] Config updated with model_profile, workflow, and git sections
+- [ ] Search-provider API key availability detected
+- [ ] User presented with 13 settings (profile + 10 workflow toggles + git branching + search providers)
+- [ ] Config updated with model_profile, top-level search flags, workflow, and git sections
 - [ ] User offered to save as global defaults (~/.gsd/defaults.json)
+- [ ] If any selected provider lacks an API key, activation note shown
 - [ ] Changes confirmed to user
 </success_criteria>
