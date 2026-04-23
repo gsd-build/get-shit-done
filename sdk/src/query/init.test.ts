@@ -447,6 +447,68 @@ describe('initMilestoneOp', () => {
     expect(data.completed_phases).toBeGreaterThanOrEqual(0);
     expect(data.project_root).toBe(tmpDir);
   });
+
+  // Bug #2641: phase_count/completed_phases must scope to the CURRENT
+  // milestone, not every phase directory ever shipped. STATE.md's
+  // progress.{total_phases, completed_phases} is authoritative.
+  it('scopes phase_count/completed_phases to current milestone via STATE.md', async () => {
+    const { writeFile, mkdir } = await import('node:fs/promises');
+    const { join } = await import('node:path');
+
+    // Simulate 5 archived phase directories from prior milestones (each
+    // with a -SUMMARY.md, which the legacy code counted toward completion).
+    for (let i = 1; i <= 5; i++) {
+      const dir = join(tmpDir, '.planning', 'phases', `${String(i).padStart(2, '0')}-old-phase-${i}`);
+      await mkdir(dir, { recursive: true });
+      await writeFile(join(dir, `${String(i).padStart(2, '0')}-PLAN.md`), '');
+      await writeFile(join(dir, `${String(i).padStart(2, '0')}-SUMMARY.md`), '');
+    }
+
+    // STATE.md says we are on a fresh milestone with 4 phases and 1 done.
+    await writeFile(
+      join(tmpDir, '.planning', 'STATE.md'),
+      [
+        '---',
+        'milestone: v2.0',
+        'milestone_name: Current Milestone',
+        'progress:',
+        '  total_phases: 4',
+        '  completed_phases: 1',
+        '---',
+      ].join('\n'),
+    );
+
+    const result = await initMilestoneOp([], tmpDir);
+    const data = result.data as Record<string, unknown>;
+    expect(data.phase_count).toBe(4);
+    expect(data.completed_phases).toBe(1);
+    expect(data.all_phases_complete).toBe(false);
+  });
+
+  it('falls back to disk scan when STATE.md has no progress block', async () => {
+    const { writeFile, mkdir, rm } = await import('node:fs/promises');
+    const { join } = await import('node:path');
+
+    // Reset the phases/ directory so we own the entire fixture.
+    await rm(join(tmpDir, '.planning', 'phases'), { recursive: true, force: true });
+    for (let i = 1; i <= 3; i++) {
+      const dir = join(tmpDir, '.planning', 'phases', `${String(i).padStart(2, '0')}-legacy-${i}`);
+      await mkdir(dir, { recursive: true });
+      await writeFile(join(dir, `${String(i).padStart(2, '0')}-PLAN.md`), '');
+      if (i < 3) await writeFile(join(dir, `${String(i).padStart(2, '0')}-SUMMARY.md`), '');
+    }
+    // STATE.md without a progress block — legacy behaviour applies.
+    await writeFile(
+      join(tmpDir, '.planning', 'STATE.md'),
+      '---\nmilestone: v1.0\n---\n',
+    );
+
+    const result = await initMilestoneOp([], tmpDir);
+    const data = result.data as Record<string, unknown>;
+    expect(data.phase_count).toBe(3);
+    expect(data.completed_phases).toBe(2);
+    expect(data.all_phases_complete).toBe(false);
+  });
 });
 
 describe('initMapCodebase', () => {

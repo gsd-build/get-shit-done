@@ -777,22 +777,42 @@ export const initMilestoneOp: QueryHandler = async (_args, projectDir) => {
   const milestone = await getMilestoneInfo(projectDir);
 
   const phasesDir = join(planningDir, 'phases');
+  // Scope phase counts to the CURRENT milestone. The previous implementation
+  // counted every phase directory on disk — including archived milestones —
+  // which produced misleading "N/N complete, all_phases_complete=true"
+  // readings the moment a new milestone started (issue #2641). Priority:
+  //   1. STATE.md `progress.{total_phases, completed_phases}` (authoritative —
+  //      updated per-phase by the workflow itself).
+  //   2. Fall back to the legacy disk scan when STATE.md has no progress block.
   let phaseCount = 0;
   let completedPhases = 0;
-
+  let progressSourceFromState = false;
   try {
-    const entries = readdirSync(phasesDir, { withFileTypes: true });
-    const dirs = entries.filter(e => e.isDirectory()).map(e => e.name);
-    phaseCount = dirs.length;
-
-    for (const dir of dirs) {
-      try {
-        const phaseFiles = readdirSync(join(phasesDir, dir));
-        const hasSummary = phaseFiles.some(f => f.endsWith('-SUMMARY.md') || f === 'SUMMARY.md');
-        if (hasSummary) completedPhases++;
-      } catch { /* intentionally empty */ }
+    const stateRaw = readFileSync(join(planningDir, 'STATE.md'), 'utf-8');
+    const totalMatch = stateRaw.match(/^\s*total_phases:\s*(\d+)/m);
+    const doneMatch = stateRaw.match(/^\s*completed_phases:\s*(\d+)/m);
+    if (totalMatch && doneMatch) {
+      phaseCount = parseInt(totalMatch[1], 10);
+      completedPhases = parseInt(doneMatch[1], 10);
+      progressSourceFromState = true;
     }
-  } catch { /* intentionally empty */ }
+  } catch { /* STATE.md optional */ }
+
+  if (!progressSourceFromState) {
+    try {
+      const entries = readdirSync(phasesDir, { withFileTypes: true });
+      const dirs = entries.filter(e => e.isDirectory()).map(e => e.name);
+      phaseCount = dirs.length;
+
+      for (const dir of dirs) {
+        try {
+          const phaseFiles = readdirSync(join(phasesDir, dir));
+          const hasSummary = phaseFiles.some(f => f.endsWith('-SUMMARY.md') || f === 'SUMMARY.md');
+          if (hasSummary) completedPhases++;
+        } catch { /* intentionally empty */ }
+      }
+    } catch { /* intentionally empty */ }
+  }
 
   const archiveDir = join(projectDir, '.planning', 'archive');
   let archivedMilestones: string[] = [];
