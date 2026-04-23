@@ -1293,7 +1293,7 @@ Log one line — `Codebase drift check skipped: {reason}` — and continue to
 **If `action_required` is true AND `directive` is `warn`:**
 Print the `message` field verbatim. The format is:
 
-```
+```text
 Codebase drift detected: {N} structural element(s) since last mapping.
 
 New directories:
@@ -1311,9 +1311,17 @@ Run /gsd:map-codebase --paths {affected_paths} to refresh planning context.
 Then continue to `verify_phase_goal`. Do NOT block. Do NOT spawn anything.
 
 **If `action_required` is true AND `directive` is `auto-remap`:**
-Spawn `gsd-codebase-mapper` agents with the `--paths` hint:
 
+First load the mapper agent's skill bundle (the executor's `AGENT_SKILLS`
+from step `init_context` is for `gsd-executor`, not the mapper):
+
+```bash
+AGENT_SKILLS_MAPPER=$(gsd-sdk query agent-skills gsd-codebase-mapper 2>/dev/null || true)
 ```
+
+Then spawn `gsd-codebase-mapper` agents with the `--paths` hint:
+
+```text
 Task(
   subagent_type="gsd-codebase-mapper",
   description="Incremental codebase remap (drift)",
