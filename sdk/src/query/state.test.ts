@@ -345,3 +345,37 @@ describe('stateSnapshot', () => {
     }
   });
 });
+
+// ─── Regression: --ws propagation (#2618 gap 1) ────────────────────────────
+
+describe('stateJson with --ws workstream', () => {
+  it('reads STATE.md from .planning/workstreams/<name>/ when workstream is provided', async () => {
+    // Build a workstream-scoped layout alongside the default .planning/STATE.md
+    const wsName = 'example-ws';
+    const wsDir = join(tmpDir, '.planning', 'workstreams', wsName);
+    await mkdir(join(wsDir, 'phases'), { recursive: true });
+
+    const wsState = `---
+gsd_state_version: 1.0
+milestone: ws-1.0
+milestone_name: Workstream Marker
+status: planning
+---
+
+# Project State
+
+Status: planning
+`;
+    await writeFile(join(wsDir, 'STATE.md'), wsState);
+    await writeFile(join(wsDir, 'ROADMAP.md'), '# Roadmap\n');
+
+    // Root STATE.md still has the old values (SDK-First Migration).
+    // When --ws is threaded, stateJson must read the workstream STATE.md, not the root.
+    const result = await stateJson([], tmpDir, wsName);
+    const data = result.data as Record<string, unknown>;
+
+    expect(data.milestone).toBe('ws-1.0');
+    expect(data.milestone_name).toBe('Workstream Marker');
+    expect(data.status).toBe('planning');
+  });
+});

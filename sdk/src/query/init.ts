@@ -28,6 +28,7 @@ import { resolveModel, MODEL_PROFILES } from './config-query.js';
 import { findPhase } from './phase.js';
 import { roadmapGetPhase, getMilestoneInfo } from './roadmap.js';
 import { planningPaths, normalizePhaseName, toPosixPath, resolveAgentsDir, detectRuntime } from './helpers.js';
+import { relPlanningPath } from '../workstream-utils.js';
 import type { QueryHandler } from './utils.js';
 
 // ─── Internal helpers ──────────────────────────────────────────────────────
@@ -116,15 +117,16 @@ function checkAgentsInstalled(config?: { runtime?: unknown }): { agents_installe
 async function getPhaseInfoWithFallback(
   phase: string,
   projectDir: string,
+  workstream?: string,
 ): Promise<{ phaseInfo: Record<string, unknown> | null; roadmapPhase: Record<string, unknown> | null }> {
-  const phaseResult = await findPhase([phase], projectDir);
+  const phaseResult = await findPhase([phase], projectDir, workstream);
   let phaseInfo = phaseResult.data as Record<string, unknown> | null;
   // findPhase returns { found: false } when missing; findPhaseInternal returns null — align for init parity.
   if (phaseInfo && phaseInfo.found === false) {
     phaseInfo = null;
   }
 
-  const roadmapResult = await roadmapGetPhase([phase], projectDir);
+  const roadmapResult = await roadmapGetPhase([phase], projectDir, workstream);
   const roadmapPhase = roadmapResult.data as Record<string, unknown> | null;
 
   // Match init.cjs: drop archived disk match when the phase is listed in the current ROADMAP
@@ -264,16 +266,16 @@ export function withProjectRoot(
  * Init handler for execute-phase workflow.
  * Port of cmdInitExecutePhase from init.cjs lines 50-171.
  */
-export const initExecutePhase: QueryHandler = async (args, projectDir) => {
+export const initExecutePhase: QueryHandler = async (args, projectDir, workstream) => {
   const phase = args[0];
   if (!phase) {
     return { data: { error: 'phase required for init execute-phase' } };
   }
 
   const config = await loadConfig(projectDir);
-  const planningDir = join(projectDir, '.planning');
+  const planningDir = join(projectDir, relPlanningPath(workstream));
 
-  const { phaseInfo, roadmapPhase } = await getPhaseInfoWithFallback(phase, projectDir);
+  const { phaseInfo, roadmapPhase } = await getPhaseInfoWithFallback(phase, projectDir, workstream);
   const phase_req_ids = extractReqIds(roadmapPhase);
 
   const [executorModel, verifierModel] = await Promise.all([
@@ -281,7 +283,7 @@ export const initExecutePhase: QueryHandler = async (args, projectDir) => {
     getModelAlias('gsd-verifier', projectDir),
   ]);
 
-  const milestone = await getMilestoneInfo(projectDir);
+  const milestone = await getMilestoneInfo(projectDir, workstream);
 
   const phaseNumber = (phaseInfo?.phase_number as string) || null;
   const phaseSlug = (phaseInfo?.phase_slug as string) || null;
@@ -343,16 +345,16 @@ export const initExecutePhase: QueryHandler = async (args, projectDir) => {
  * Init handler for plan-phase workflow.
  * Port of cmdInitPlanPhase from init.cjs lines 173-293.
  */
-export const initPlanPhase: QueryHandler = async (args, projectDir) => {
+export const initPlanPhase: QueryHandler = async (args, projectDir, workstream) => {
   const phase = args[0];
   if (!phase) {
     return { data: { error: 'phase required for init plan-phase' } };
   }
 
   const config = await loadConfig(projectDir);
-  const planningDir = join(projectDir, '.planning');
+  const planningDir = join(projectDir, relPlanningPath(workstream));
 
-  const { phaseInfo, roadmapPhase } = await getPhaseInfoWithFallback(phase, projectDir);
+  const { phaseInfo, roadmapPhase } = await getPhaseInfoWithFallback(phase, projectDir, workstream);
   const phase_req_ids = extractReqIds(roadmapPhase);
 
   const [researcherModel, plannerModel, checkerModel] = await Promise.all([
@@ -603,20 +605,20 @@ export const initVerifyWork: QueryHandler = async (args, projectDir) => {
  * Init handler for discuss-phase and similar phase operations.
  * Port of cmdInitPhaseOp from init.cjs lines 588-697.
  */
-export const initPhaseOp: QueryHandler = async (args, projectDir) => {
+export const initPhaseOp: QueryHandler = async (args, projectDir, workstream) => {
   const phase = args[0];
   if (!phase) {
     return { data: { error: 'phase required for init phase-op' } };
   }
 
   const config = await loadConfig(projectDir);
-  const planningDir = join(projectDir, '.planning');
+  const planningDir = join(projectDir, relPlanningPath(workstream));
 
   // findPhase with archived override: if only match is archived, prefer ROADMAP
-  const phaseResult = await findPhase([phase], projectDir);
+  const phaseResult = await findPhase([phase], projectDir, workstream);
   let phaseInfo = phaseResult.data as Record<string, unknown> | null;
 
-  const roadmapResult = await roadmapGetPhase([phase], projectDir);
+  const roadmapResult = await roadmapGetPhase([phase], projectDir, workstream);
   const roadmapPhase = roadmapResult.data as Record<string, unknown> | null;
 
   // If the only match comes from an archived milestone, prefer current ROADMAP

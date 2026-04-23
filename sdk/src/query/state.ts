@@ -38,7 +38,7 @@ export async function getMilestonePhaseFilter(projectDir: string, workstream?: s
   const milestonePhaseNums = new Set<string>();
   try {
     const roadmapContent = await readFile(planningPaths(projectDir, workstream).roadmap, 'utf-8');
-    const roadmap = await extractCurrentMilestone(roadmapContent, projectDir);
+    const roadmap = await extractCurrentMilestone(roadmapContent, projectDir, workstream);
     const phasePattern = /#{2,4}\s*Phase\s+([\w][\w.-]*)\s*:/gi;
     let m: RegExpExecArray | null;
     while ((m = phasePattern.exec(roadmap)) !== null) {
@@ -105,7 +105,7 @@ export async function buildStateFrontmatter(bodyContent: string, projectDir: str
   let milestone: string | null = null;
   let milestoneName: string | null = null;
   try {
-    const info = await getMilestoneInfo(projectDir);
+    const info = await getMilestoneInfo(projectDir, workstream);
     milestone = info.version;
     milestoneName = info.name;
   } catch { /* intentionally empty */ }
