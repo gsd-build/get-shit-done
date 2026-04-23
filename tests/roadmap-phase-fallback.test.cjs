@@ -239,6 +239,41 @@ describe('roadmap get-phase fallback to full ROADMAP.md (#1634)', () => {
     );
   });
 
+  test('extractCurrentMilestone handles PHASE/phase (case-insensitive) containing vX.Y (#2619 follow-up)', () => {
+    // CodeRabbit follow-up: the negative lookahead `(?!Phase\s+\S)` must be
+    // case-insensitive so PHASE/phase variants are also excluded.
+    const core = require('../get-shit-done/bin/lib/core.cjs');
+    writeState(tmpDir, 'v1.1');
+    const roadmap = `# Roadmap
+
+## Phases
+
+### 🚧 v1.1 Launch-Ready (In Progress)
+
+### PHASE 11: Structured Logging
+**Goal:** Add structured logging
+
+### phase 12: v1.0 Tech-Debt Closure
+**Goal:** Close out v1.0 debt
+
+### Phase 19: Security Audit
+**Goal:** Full security audit
+`;
+    const slice = core.extractCurrentMilestone(roadmap, tmpDir);
+    assert.ok(
+      slice.includes('### PHASE 11: Structured Logging'),
+      'slice must include PHASE 11 (uppercase)'
+    );
+    assert.ok(
+      slice.includes('### phase 12: v1.0 Tech-Debt Closure'),
+      'slice must include phase 12 (lowercase with vX.Y)'
+    );
+    assert.ok(
+      slice.includes('### Phase 19: Security Audit'),
+      'slice must include Phase 19 (truncation at phase 12 would hide it)'
+    );
+  });
+
   test('section extraction from fallback includes correct content boundaries', () => {
     writeState(tmpDir, 'v1.0');
     fs.writeFileSync(

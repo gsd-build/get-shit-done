@@ -200,7 +200,9 @@ export async function extractCurrentMilestone(content: string, projectDir: strin
   // the title. Phase headings always start with the literal `Phase `. See #2619.
   const nextMilestoneRegex = new RegExp(
     `^#{1,${headingLevel}}\\s+(?!Phase\\s+\\S)(?:.*v(\\d+(?:\\.\\d+)+)[^\\n]*|.*(?:✅|📋|🚧|🟡))`,
-    'gm'
+    // `i` flag ensures the `(?!Phase\s+\S)` lookahead matches PHASE/phase too
+    // (CodeRabbit follow-up on #2619).
+    'gmi'
   );
 
   let sectionEnd = content.length;

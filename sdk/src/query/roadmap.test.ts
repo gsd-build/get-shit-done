@@ -358,6 +358,37 @@ describe('extractCurrentMilestone', () => {
     expect(result).toContain('### Phase 19: Security Audit');
   });
 
+  // ─── Bug #2619 (CodeRabbit follow-up): case-insensitive Phase lookahead ───
+  it('bug-2619: does not truncate at PHASE/phase heading containing vX.Y (case-insensitive)', async () => {
+    // The negative lookahead `(?!Phase\s+\S)` must be case-insensitive so that
+    // headings like "### PHASE 12: v1.0 Tech-Debt" or "### phase 12: v1.0 …"
+    // are also excluded from milestone-boundary matching.
+    const roadmapMixedCase = `# ROADMAP
+
+## Phases
+
+### 🚧 v1.1 Launch-Ready (In Progress)
+
+### PHASE 11: Structured Logging
+**Goal**: Add structured logging
+
+### phase 12: v1.0 Tech-Debt Closure
+**Goal**: Close out v1.0 debt
+
+### Phase 19: Security Audit
+**Goal**: Full security audit
+`;
+    const state = `---\nmilestone: v1.1\n---\n# State\n`;
+    await writeFile(join(tmpDir, '.planning', 'STATE.md'), state);
+    await writeFile(join(tmpDir, '.planning', 'ROADMAP.md'), roadmapMixedCase);
+
+    const result = await extractCurrentMilestone(roadmapMixedCase, tmpDir);
+
+    expect(result).toContain('### PHASE 11: Structured Logging');
+    expect(result).toContain('### phase 12: v1.0 Tech-Debt Closure');
+    expect(result).toContain('### Phase 19: Security Audit');
+  });
+
   // ─── Bug #2422: same-version sub-heading truncation ───────────────────
   it('bug-2422: does not truncate at same-version sub-heading (## v2.0 Phase Details)', async () => {
     const roadmapWithDetails = `# ROADMAP
