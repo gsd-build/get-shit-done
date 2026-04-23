@@ -233,7 +233,7 @@ function planSectionsMention(planSections: PlanSections[], decision: ParsedDecis
 async function loadGateConfig(projectDir: string, workstream?: string): Promise<boolean> {
   try {
     const cfg = await loadConfig(projectDir, workstream);
-    const wf = (cfg.workflow ?? {}) as Record<string, unknown>;
+    const wf = (cfg.workflow ?? {}) as unknown as Record<string, unknown>;
     const v = wf.context_coverage_gate;
     if (typeof v === 'boolean') return v;
     // Tolerate stringified booleans coming from environment-variable-style configs,
