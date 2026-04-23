@@ -3,7 +3,7 @@
  */
 
 import { describe, it, expect, beforeEach, afterEach } from 'vitest';
-import { mkdtemp, rm, writeFile } from 'node:fs/promises';
+import { mkdtemp, rm, writeFile, mkdir } from 'node:fs/promises';
 import { join } from 'node:path';
 import { tmpdir } from 'node:os';
 import { GSDError } from '../errors.js';
@@ -21,6 +21,7 @@ import {
   resolveAgentsDir,
   getRuntimeConfigDir,
   detectRuntime,
+  findProjectRoot,
   SUPPORTED_RUNTIMES,
   type Runtime,
 } from './helpers.js';
@@ -422,5 +423,119 @@ describe('resolveAgentsDir (runtime-aware)', () => {
   it('appends /agents to the per-runtime config dir', () => {
     process.env.CODEX_HOME = '/codex';
     expect(resolveAgentsDir('codex')).toBe(join('/codex', 'agents'));
+  });
+});
+
+// ─── findProjectRoot (issue #2623) ─────────────────────────────────────────
+
+describe('findProjectRoot (multi-repo .planning resolution)', () => {
+  let workspace: string;
+
+  beforeEach(async () => {
+    workspace = await mkdtemp(join(tmpdir(), 'gsd-find-root-'));
+  });
+
+  afterEach(async () => {
+    await rm(workspace, { recursive: true, force: true });
+  });
+
+  it('returns startDir unchanged when startDir has its own .planning/', async () => {
+    await mkdir(join(workspace, '.planning'), { recursive: true });
+    expect(findProjectRoot(workspace)).toBe(workspace);
+  });
+
+  it('returns startDir unchanged when no ancestor has .planning/', () => {
+    expect(findProjectRoot(workspace)).toBe(workspace);
+  });
+
+  it('walks up to parent .planning/ when config lists the child in sub_repos (#2623)', async () => {
+    // workspace/.planning/{config.json, PROJECT.md}
+    // workspace/app/.git/
+    await mkdir(join(workspace, '.planning'), { recursive: true });
+    await writeFile(
+      join(workspace, '.planning', 'config.json'),
+      JSON.stringify({ sub_repos: ['app'] }),
+      'utf-8',
+    );
+    const app = join(workspace, 'app');
+    await mkdir(join(app, '.git'), { recursive: true });
+
+    expect(findProjectRoot(app)).toBe(workspace);
+  });
+
+  it('resolves parent root from deeply nested dir inside a sub_repo', async () => {
+    await mkdir(join(workspace, '.planning'), { recursive: true });
+    await writeFile(
+      join(workspace, '.planning', 'config.json'),
+      JSON.stringify({ sub_repos: ['app'] }),
+      'utf-8',
+    );
+    const nested = join(workspace, 'app', 'src', 'modules');
+    await mkdir(join(workspace, 'app', '.git'), { recursive: true });
+    await mkdir(nested, { recursive: true });
+
+    expect(findProjectRoot(nested)).toBe(workspace);
+  });
+
+  it('supports planning.sub_repos nested config shape', async () => {
+    await mkdir(join(workspace, '.planning'), { recursive: true });
+    await writeFile(
+      join(workspace, '.planning', 'config.json'),
+      JSON.stringify({ planning: { sub_repos: ['app'] } }),
+      'utf-8',
+    );
+    const app = join(workspace, 'app');
+    await mkdir(join(app, '.git'), { recursive: true });
+
+    expect(findProjectRoot(app)).toBe(workspace);
+  });
+
+  it('falls back to .git heuristic when parent has .planning/ but no matching sub_repos', async () => {
+    await mkdir(join(workspace, '.planning'), { recursive: true });
+    // Config doesn't list the child, but child has .git and parent has .planning/.
+    await writeFile(
+      join(workspace, '.planning', 'config.json'),
+      JSON.stringify({ sub_repos: [] }),
+      'utf-8',
+    );
+    const app = join(workspace, 'app');
+    await mkdir(join(app, '.git'), { recursive: true });
+
+    expect(findProjectRoot(app)).toBe(workspace);
+  });
+
+  it('swallows unparseable config.json and falls back to .git heuristic', async () => {
+    await mkdir(join(workspace, '.planning'), { recursive: true });
+    await writeFile(join(workspace, '.planning', 'config.json'), '{ not json', 'utf-8');
+    const app = join(workspace, 'app');
+    await mkdir(join(app, '.git'), { recursive: true });
+
+    expect(findProjectRoot(app)).toBe(workspace);
+  });
+
+  it('supports legacy multiRepo: true when child is inside a git repo', async () => {
+    await mkdir(join(workspace, '.planning'), { recursive: true });
+    await writeFile(
+      join(workspace, '.planning', 'config.json'),
+      JSON.stringify({ multiRepo: true }),
+      'utf-8',
+    );
+    const app = join(workspace, 'app');
+    await mkdir(join(app, '.git'), { recursive: true });
+
+    expect(findProjectRoot(app)).toBe(workspace);
+  });
+
+  it('does not walk up when child has its own .planning/ (#1362 guard)', async () => {
+    await mkdir(join(workspace, '.planning'), { recursive: true });
+    await writeFile(
+      join(workspace, '.planning', 'config.json'),
+      JSON.stringify({ sub_repos: ['app'] }),
+      'utf-8',
+    );
+    const app = join(workspace, 'app');
+    await mkdir(join(app, '.planning'), { recursive: true });
+
+    expect(findProjectRoot(app)).toBe(app);
   });
 });

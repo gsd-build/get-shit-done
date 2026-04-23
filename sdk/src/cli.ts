@@ -341,6 +341,21 @@ export async function main(argv: string[] = process.argv.slice(2)): Promise<void
     return;
   }
 
+  // Multi-repo project-root resolution (issue #2623).
+  //
+  // When the user launches `gsd-sdk` from inside a `sub_repos`-listed child repo,
+  // `projectDir` defaults to `process.cwd()` which points at the child, not the
+  // parent workspace that owns `.planning/`. Mirror the legacy `gsd-tools.cjs`
+  // walk-up semantics so handlers see the correct project root.
+  //
+  // Idempotent: if `projectDir` already has its own `.planning/` (including an
+  // explicit `--project-dir` pointing at the workspace root), findProjectRoot
+  // returns it unchanged.
+  {
+    const { findProjectRoot } = await import('./query/helpers.js');
+    args = { ...args, projectDir: findProjectRoot(args.projectDir) };
+  }
+
   // ─── Query command ──────────────────────────────────────────────────────
   if (args.command === 'query') {
     const { createRegistry } = await import('./query/index.js');
