@@ -33,6 +33,20 @@ const NEW_FIELDS = [
 
 const SECTION_HEADERS = ['Planning', 'Execution', 'Docs & Output', 'Features', 'Model & Pipeline', 'Misc'];
 
+/**
+ * Match a dotted config-key path inside a block of text. Falls back to a
+ * simple substring check for single-segment keys; for nested keys, requires
+ * each segment to appear in order within a bounded window so distinct fields
+ * (e.g., intel.enabled vs graphify.enabled) cannot collapse to the same leaf.
+ */
+function hasPathLike(block, field) {
+  const parts = field.split('.');
+  if (parts.length === 1) return block.includes(parts[0]);
+  const escaped = parts.map((p) => p.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'));
+  const pattern = new RegExp(escaped.join('[\\s\\S]{0,600}'), 'i');
+  return pattern.test(block);
+}
+
 describe('#2527: settings.md adds grouped settings layers', () => {
   let content;
 
@@ -71,11 +85,12 @@ describe('#2527: settings.md adds grouped settings layers', () => {
       assert.ok(updateMatch, 'settings.md must have an update_config step');
       const updateBlock = updateMatch[0];
       for (const field of NEW_FIELDS) {
-        // keys may appear as nested JSON (e.g., "pattern_mapper" under workflow)
-        const leaf = field.split('.').pop();
+        // Keys may appear as nested JSON (e.g., "pattern_mapper" under workflow).
+        // Use hasPathLike so distinct dotted keys (e.g., intel.enabled,
+        // graphify.enabled) cannot share a single "enabled" occurrence.
         assert.ok(
-          updateBlock.includes(leaf),
-          `update_config step must write "${leaf}" (from ${field})`
+          hasPathLike(updateBlock, field),
+          `update_config step must write "${field}"`
         );
       }
     });
@@ -87,10 +102,9 @@ describe('#2527: settings.md adds grouped settings layers', () => {
       assert.ok(defaultsMatch, 'settings.md must have a save_as_defaults step');
       const block = defaultsMatch[0];
       for (const field of NEW_FIELDS) {
-        const leaf = field.split('.').pop();
         assert.ok(
-          block.includes(leaf),
-          `save_as_defaults step must persist "${leaf}" (from ${field}) into ~/.gsd/defaults.json`
+          hasPathLike(block, field),
+          `save_as_defaults step must persist "${field}" into ~/.gsd/defaults.json`
         );
       }
     });
@@ -143,22 +157,26 @@ describe('#2527: settings.md adds grouped settings layers', () => {
     });
   });
 
-  describe('Negative: config-set rejects an invalid code_review_depth value', () => {
-    test('config-set workflow.code_review_depth "bogus" fails or is flagged', (t) => {
-      const tmpDir = createTempProject();
-      t.after(() => cleanup(tmpDir));
-
-      // Depth accepts string values (quick|standard|deep). We do not block arbitrary
-      // strings at config-set time today; instead confirm settings.md constrains
-      // the AskUserQuestion options to the valid set, so users can't pick "bogus".
+  describe('Negative: settings.md constrains code_review_depth options', () => {
+    test('settings.md restricts code_review_depth to a known option set', () => {
+      // Depth accepts string values (quick|standard|deep). config-set does not
+      // block arbitrary strings at the value level today; instead settings.md
+      // constrains the AskUserQuestion options to the valid set so users
+      // cannot pick "bogus" via the interactive flow.
       const depthOptionsRegex =
         /code_review_depth[\s\S]{0,800}(quick|standard|deep|surface)/i;
       assert.ok(
         depthOptionsRegex.test(content),
         'settings.md must constrain code_review_depth options to a known set'
       );
+    });
+  });
 
-      // Meanwhile, config-set still works on a known-bad key path (negative path).
+  describe('Negative: config-set rejects an unknown key path', () => {
+    test('config-set workflow.code_review_bogus_key fails', (t) => {
+      const tmpDir = createTempProject();
+      t.after(() => cleanup(tmpDir));
+
       const bad = runGsdTools(['config-set', 'workflow.code_review_bogus_key', 'x'], tmpDir);
       assert.ok(!bad.success, 'config-set on an unknown key must fail');
     });
