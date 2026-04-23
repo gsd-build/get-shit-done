@@ -87,10 +87,12 @@ in `$ARGUMENTS` OR `text_mode` is true in config. When `TEXT_MODE=true`, replace
 choice number or free-text value.
 
 **Numeric-input validation.** For any numeric field (`*_passes`, `*_budget`, `*_timeout`,
-`*_threshold`, `context_window`, `graphify.build_timeout`), if the user types a non-numeric
-value (not an integer `>= 0`), the workflow MUST reject it, state which value was invalid,
-and re-prompt that single field. An empty input means "keep current" — the existing value
-is retained. Non-numeric input is never silently coerced.
+`*_threshold`, `context_window`, `graphify.build_timeout`), if the user types a value that
+is not a non-negative integer, the workflow MUST reject it, state which value was invalid,
+and re-prompt that single field. The minimum accepted value is field-specific and is stated
+in each field's prompt below — `workflow.plan_bounce_passes` and `workflow.max_discuss_passes`
+require `>= 1`; all other numeric fields accept `>= 0`. An empty input means "keep current"
+— the existing value is retained. Non-numeric input is never silently coerced.
 
 **Free-text validation.** For branch template fields (`git.phase_branch_template`,
 `git.milestone_branch_template`), if the user supplies a non-default value, it MUST be
@@ -106,7 +108,7 @@ stored verbatim as a string.
 
 ### Section 1 — Planning Tuning
 
-```
+```text
 AskUserQuestion([
   {
     question: "Run external plan-bounce validator against generated PLAN.md? (current: <value or false>)",
@@ -159,7 +161,7 @@ AskUserQuestion([
 
 ### Section 2 — Execution Tuning
 
-```
+```text
 AskUserQuestion([
   {
     question: "Enable autonomous node repair on verification failure? (current: <value or true>)",
@@ -193,7 +195,7 @@ AskUserQuestion([
 
 ### Section 3 — Discussion Tuning
 
-```
+```text
 AskUserQuestion([
   {
     question: "Maximum discuss-phase question rounds? (current: <value or 3>)",
@@ -209,7 +211,7 @@ AskUserQuestion([
 
 ### Section 4 — Cross-AI Execution
 
-```
+```text
 AskUserQuestion([
   {
     question: "Delegate phase execution to an external AI CLI? (current: <value or false>)",
@@ -244,7 +246,7 @@ AskUserQuestion([
 
 ### Section 5 — Git Customization
 
-```
+```text
 AskUserQuestion([
   {
     question: "Git base branch? (current: <value or main>)",
@@ -278,7 +280,7 @@ AskUserQuestion([
 
 ### Section 6 — Runtime / Output
 
-```
+```text
 AskUserQuestion([
   {
     question: "Response language for agent output? (current: <value or null>)",
@@ -384,7 +386,7 @@ the central setter.
 <step name="confirm">
 Display:
 
-```
+```text
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
  GSD ► ADVANCED SETTINGS UPDATED
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
