@@ -6892,6 +6892,50 @@ function homePathCoveredByRc(globalBin, homeDir, rcFileNames) {
 }
 
 /**
+ * Emit a PATH-export suggestion if globalBin is not already on PATH AND
+ * the user's shell rc files do not already cover it via a HOME-relative
+ * entry (#2620).
+ *
+ * Prints one of:
+ *   - nothing, if `globalBin` is already present on `process.env.PATH`
+ *   - a diagnostic "already covered via rc file" note, if an rc file has
+ *     `export PATH="$HOME/…/bin:$PATH"` (or equivalent) and the user just
+ *     needs to reopen their shell
+ *   - the absolute `echo 'export PATH="…:$PATH"' >> ~/.zshrc` suggestion,
+ *     if neither PATH nor any rc file covers globalBin
+ *
+ * Exported for tests; the installer calls this from finishInstall.
+ *
+ * @param {string} globalBin  Absolute path to npm's global bin directory.
+ * @param {string} homeDir    Absolute HOME path.
+ */
+function maybeSuggestPathExport(globalBin, homeDir) {
+  if (!globalBin || !homeDir) return;
+  const path = require('path');
+
+  const pathEnv = process.env.PATH || '';
+  const targetAbs = path.resolve(globalBin).replace(/[\\/]+$/g, '') || globalBin;
+  const onPath = pathEnv.split(path.delimiter).some((seg) => {
+    if (!seg) return false;
+    const abs = path.resolve(seg).replace(/[\\/]+$/g, '') || seg;
+    return abs === targetAbs;
+  });
+  if (onPath) return;
+
+  if (homePathCoveredByRc(globalBin, homeDir)) {
+    console.log(`  ${yellow}⚠${reset} ${bold}gsd-sdk${reset}'s directory is already on your PATH via an rc file entry — try reopening your shell (or ${cyan}source ~/.zshrc${reset}).`);
+    return;
+  }
+
+  console.log('');
+  console.log(`  ${yellow}⚠${reset} ${bold}${globalBin}${reset} is not on your PATH.`);
+  console.log(`    Add it with one of:`);
+  console.log(`      ${cyan}echo 'export PATH="${globalBin}:$PATH"' >> ~/.zshrc${reset}`);
+  console.log(`      ${cyan}echo 'export PATH="${globalBin}:$PATH"' >> ~/.bashrc${reset}`);
+  console.log('');
+}
+
+/**
  * Verify the prebuilt SDK dist is present and the gsd-sdk shim is wired up.
  *
  * As of fix/2441-sdk-decouple, sdk/dist/ is shipped prebuilt inside the
@@ -6949,6 +6993,21 @@ function installSdkIfNeeded() {
   }
 
   console.log(`  ${green}✓${reset} GSD SDK ready (sdk/dist/cli.js)`);
+
+  // #2620: warn if npm's global bin is not on PATH, suppressing the
+  // absolute-path suggestion when the user's rc already covers it via
+  // a HOME-relative entry (e.g. `export PATH="$HOME/.npm-global/bin:$PATH"`).
+  try {
+    const { execSync } = require('child_process');
+    const npmPrefix = execSync('npm prefix -g', { encoding: 'utf8', stdio: ['ignore', 'pipe', 'ignore'] }).trim();
+    if (npmPrefix) {
+      // On Windows npm prefix IS the bin dir; on POSIX it's `${prefix}/bin`.
+      const globalBin = process.platform === 'win32' ? npmPrefix : path.join(npmPrefix, 'bin');
+      maybeSuggestPathExport(globalBin, os.homedir());
+    }
+  } catch {
+    // npm not available / exec failed — silently skip the PATH advice.
+  }
 }
 
 /**
@@ -7067,6 +7126,7 @@ if (process.env.GSD_TEST_MODE) {
     restoreUserArtifacts,
     finishInstall,
     homePathCoveredByRc,
+    maybeSuggestPathExport,
   };
 } else {
 

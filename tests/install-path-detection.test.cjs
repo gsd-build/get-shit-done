@@ -204,4 +204,89 @@ describe('installer HOME-relative PATH detection (#2620)', () => {
       cleanup(home);
     }
   });
+
+  // CodeRabbit actionable 1 + nitpick: the installer's PATH-export
+  // suggestion banner must be suppressed when an rc file already covers
+  // globalBin via a HOME-relative entry.
+  test('maybeSuggestPathExport suppresses suggestion when rc covers globalBin', () => {
+    const home = createTempHome();
+    try {
+      const globalBin = path.join(home, '.npm-global', 'bin');
+      fs.mkdirSync(globalBin, { recursive: true });
+      fs.writeFileSync(
+        path.join(home, '.zshrc'),
+        'export PATH="$HOME/.npm-global/bin:$PATH"\n',
+      );
+
+      const logs = [];
+      const origLog = console.log;
+      console.log = (...args) => { logs.push(args.join(' ')); };
+      try {
+        installer.maybeSuggestPathExport(globalBin, home);
+      } finally {
+        console.log = origLog;
+      }
+
+      const joined = logs.join('\n');
+      assert.ok(
+        !/echo 'export PATH=/.test(joined),
+        `installer should not emit absolute export suggestion; got:\n${joined}`,
+      );
+    } finally {
+      cleanup(home);
+    }
+  });
+
+  test('maybeSuggestPathExport emits suggestion when rc does not cover globalBin', () => {
+    const home = createTempHome();
+    try {
+      const globalBin = path.join(home, '.npm-global', 'bin');
+      fs.mkdirSync(globalBin, { recursive: true });
+      fs.writeFileSync(
+        path.join(home, '.zshrc'),
+        'export PATH="$HOME/.cargo/bin:$PATH"\n',
+      );
+
+      const logs = [];
+      const origLog = console.log;
+      console.log = (...args) => { logs.push(args.join(' ')); };
+      try {
+        installer.maybeSuggestPathExport(globalBin, home);
+      } finally {
+        console.log = origLog;
+      }
+
+      const joined = logs.join('\n');
+      assert.ok(
+        /echo 'export PATH=/.test(joined),
+        `installer should emit absolute export suggestion when rc does not cover globalBin; got:\n${joined}`,
+      );
+    } finally {
+      cleanup(home);
+    }
+  });
+
+  test('maybeSuggestPathExport is a no-op when globalBin already on process.env.PATH', () => {
+    const home = createTempHome();
+    const origPath = process.env.PATH;
+    try {
+      const globalBin = path.join(home, '.npm-global', 'bin');
+      fs.mkdirSync(globalBin, { recursive: true });
+      process.env.PATH = `${globalBin}${path.delimiter}${origPath || ''}`;
+
+      const logs = [];
+      const origLog = console.log;
+      console.log = (...args) => { logs.push(args.join(' ')); };
+      try {
+        installer.maybeSuggestPathExport(globalBin, home);
+      } finally {
+        console.log = origLog;
+      }
+
+      assert.strictEqual(logs.length, 0, `expected no output when on PATH; got:\n${logs.join('\n')}`);
+    } finally {
+      if (origPath === undefined) delete process.env.PATH; else process.env.PATH = origPath;
+      cleanup(home);
+    }
+  });
 });
