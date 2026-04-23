@@ -7,10 +7,12 @@
 
 ## Effect across steps
 
-- **`check_existing`**: auto-select "Skip" (if context exists) or continue
-  without prompting (if no context/plans). For interrupted checkpoints,
-  auto-select "Resume". For existing plans, auto-select
-  "Continue and replan after". Log every decision so the user can audit.
+- **`check_existing`**: if CONTEXT.md exists, auto-select "Update it" — load
+  existing context and continue to `analyze_phase` (matches the parent step's
+  documented `--auto` branch). If no context exists, continue without
+  prompting. For interrupted checkpoints, auto-select "Resume". For existing
+  plans, auto-select "Continue and replan after". Log every decision so the
+  user can audit.
 - **`cross_reference_todos`**: fold all todos with relevance score >= 0.4
   automatically. Log the selection.
 - **`present_gray_areas`**: auto-select ALL gray areas. Log:
