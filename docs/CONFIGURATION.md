@@ -609,6 +609,17 @@ Override specific agents without changing the entire profile:
 
 Valid override values: `opus`, `sonnet`, `haiku`, `inherit`, or any fully-qualified model ID (e.g., `"openai/o3"`, `"google/gemini-2.5-pro"`).
 
+`model_overrides` can be set in either `.planning/config.json` (per-project)
+or `~/.gsd/defaults.json` (global). Per-project entries win on conflict and
+non-conflicting global entries are preserved, so you can tune a single
+agent's model in one repo without re-setting global defaults. This applies
+uniformly across Claude Code, Codex, OpenCode, Kilo, and the other
+supported runtimes. On Codex and OpenCode, the resolved model is embedded
+into each agent's static config at install time — `spawn_agent` and
+OpenCode's `task` interface do not accept an inline `model` parameter, so
+running `gsd install <runtime>` after editing `model_overrides` is required
+for the change to take effect. See issue #2256.
+
 ### Non-Claude Runtimes (Codex, OpenCode, Gemini CLI, Kilo)
 
 When GSD is installed for a non-Claude runtime, the installer automatically sets `resolve_model_ids: "omit"` in `~/.gsd/defaults.json`. This causes GSD to return an empty model parameter for all agents, so each agent uses whatever model the runtime is configured with. No additional setup is needed for the default case.
