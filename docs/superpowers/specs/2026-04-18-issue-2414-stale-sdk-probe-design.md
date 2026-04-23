@@ -86,7 +86,7 @@ if (!hasSdk) {
 | Binary on PATH (`which gsd-sdk`) | yes | yes |
 | `gsd-sdk --version` output | `v0.1.0` | a version string |
 | `gsd-sdk --help` contains `query` | **no** | **yes** |
-| `gsd-sdk query foo` exit | 1 ("Expected…") | 10 ("requires a command") |
+| `gsd-sdk query <cmd>` exit | 1 ("Expected…") | 10 ("requires a command") |
 
 `--help` is cheap, deterministic, exit-code 0 on both versions, and directly tests the capability the skills depend on. It is robust to future renames of the SDK package (nothing here is coupled to `@gsd-build/sdk`) and stays correct if SDK versioning changes shape.
 
