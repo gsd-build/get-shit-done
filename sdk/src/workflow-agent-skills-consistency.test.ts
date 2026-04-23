@@ -20,7 +20,14 @@ const repoRoot = join(__dirname, '..', '..');
 const workflowsDir = join(repoRoot, 'get-shit-done', 'workflows');
 const agentsDir = join(repoRoot, 'agents');
 
-const QUERY_KEY_PATTERN = /agent-skills\s+([a-z][a-z0-9-]*)/g;
+/**
+ * Matches a full `gsd-sdk query agent-skills <slug>` invocation and captures
+ * the slug. Requires a token boundary before `gsd-sdk` and a word boundary
+ * after the slug so that prose references (e.g. documentation mentioning the
+ * string "agent-skills") do not produce false positives. The `\s+` between
+ * tokens accepts newlines, so commands wrapped across lines still match.
+ */
+const QUERY_KEY_PATTERN = /\bgsd-sdk\s+query\s+agent-skills\s+([a-z][a-z0-9-]*)\b/g;
 
 interface QueryUsage {
   readonly file: string;
@@ -28,6 +35,7 @@ interface QueryUsage {
   readonly slug: string;
 }
 
+/** Recursively collects all `.md` file paths under `dir`. */
 function walkMarkdown(dir: string): string[] {
   const out: string[] = [];
   for (const entry of readdirSync(dir)) {
@@ -41,6 +49,7 @@ function walkMarkdown(dir: string): string[] {
   return out;
 }
 
+/** Returns the set of agent slugs defined by `<slug>.md` files in `dir`. */
 function collectAgentSlugs(dir: string): Set<string> {
   return new Set(
     readdirSync(dir)
@@ -49,15 +58,21 @@ function collectAgentSlugs(dir: string): Set<string> {
   );
 }
 
+/**
+ * Extracts every `gsd-sdk query agent-skills <slug>` usage from the given
+ * markdown files. Runs the regex over each file's full content (not line by
+ * line) so wrapped commands still match, then resolves the 1-based line number
+ * from the match index.
+ */
 function collectQueryUsages(files: readonly string[]): QueryUsage[] {
   const usages: QueryUsage[] = [];
   for (const file of files) {
-    const lines = readFileSync(file, 'utf8').split('\n');
-    lines.forEach((line, idx) => {
-      for (const match of line.matchAll(QUERY_KEY_PATTERN)) {
-        usages.push({ file, line: idx + 1, slug: match[1]! });
-      }
-    });
+    const content = readFileSync(file, 'utf8');
+    for (const match of content.matchAll(QUERY_KEY_PATTERN)) {
+      const index = match.index ?? 0;
+      const line = content.slice(0, index).split('\n').length;
+      usages.push({ file, line, slug: match[1]! });
+    }
   }
   return usages;
 }
