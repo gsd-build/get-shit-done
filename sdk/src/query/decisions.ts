@@ -25,6 +25,7 @@
  */
 
 import { readFile } from 'node:fs/promises';
+import { isAbsolute, join } from 'node:path';
 import type { QueryHandler } from './utils.js';
 
 export interface ParsedDecision {
@@ -52,12 +53,26 @@ const DISCRETION_HEADINGS = new Set([
 const NON_TRACKABLE_TAGS = new Set(['informational', 'folded', 'deferred']);
 
 /**
- * Extract the inner text of the first `<decisions>...</decisions>` block.
- * Returns null when the block is absent.
+ * Strip fenced code blocks from `content` so example `<decisions>` snippets
+ * inside ```` ``` ```` do not pollute the parser (review F11).
+ */
+function stripFencedCode(content: string): string {
+  return content.replace(/```[\s\S]*?```/g, ' ').replace(/~~~[\s\S]*?~~~/g, ' ');
+}
+
+/**
+ * Extract the inner text of EVERY `<decisions>...</decisions>` block in
+ * order, concatenated by `\n\n`. Returns null when no block is present.
+ *
+ * CONTEXT.md may legitimately contain more than one block (for example, a
+ * "current decisions" block plus a "carry-over from prior phase" block);
+ * dropping all-but-the-first silently lost the second batch (review F13).
  */
 function extractDecisionsBlock(content: string): string | null {
-  const match = content.match(/<decisions>([\s\S]*?)<\/decisions>/);
-  return match ? match[1] : null;
+  const cleaned = stripFencedCode(content);
+  const matches = [...cleaned.matchAll(/<decisions>([\s\S]*?)<\/decisions>/g)];
+  if (matches.length === 0) return null;
+  return matches.map((m) => m[1]).join('\n\n');
 }
 
 /**
@@ -98,7 +113,14 @@ export function parseDecisions(content: string): ParsedDecision[] {
     if (headingMatch) {
       flush();
       category = headingMatch[1];
-      const normalized = category.toLowerCase().replace(/[’']/g, '').trim();
+      // Strip the full unicode-quote family so any rendering of "Claude's
+      // Discretion" (ASCII apostrophe, curly U+2019, U+2018, U+201A, U+201B,
+      // double-quote variants U+201C/D/E/F, etc.) collapses to the same key
+      // (review F20).
+      const normalized = category
+        .toLowerCase()
+        .replace(/[\u2018\u2019\u201A\u201B\u201C\u201D\u201E\u201F'"`]/g, '')
+        .trim();
       inDiscretion = DISCRETION_HEADINGS.has(normalized);
       continue;
     }
@@ -119,8 +141,9 @@ export function parseDecisions(content: string): ParsedDecision[] {
       continue;
     }
 
-    // Continuation line for current decision (indented, non-bullet, non-empty)
-    if (current && trimmed !== '' && !trimmed.startsWith('-') && line.startsWith(' ')) {
+    // Continuation line for current decision (indented with space OR tab,
+    // non-bullet, non-empty) — tab indentation must work too (review F12).
+    if (current && trimmed !== '' && !trimmed.startsWith('-') && /^[ \t]/.test(line)) {
       current.text += ' ' + trimmed;
       continue;
     }
@@ -141,16 +164,18 @@ export function parseDecisions(content: string): ParsedDecision[] {
  * `decisions.parse <path>` — parse CONTEXT.md and return decisions array.
  *
  * Used by workflow shell snippets that need to enumerate decisions without
- * spawning a full Node process.
+ * spawning a full Node process. Accepts either an absolute path or a path
+ * relative to `projectDir` — symmetric with the gate handlers (review F14).
  */
-export const decisionsParse: QueryHandler = async (args) => {
+export const decisionsParse: QueryHandler = async (args, projectDir) => {
   const filePath = args[0];
   if (!filePath) {
     return { data: { decisions: [], trackable: 0, total: 0, missing: true } };
   }
+  const resolved = isAbsolute(filePath) ? filePath : join(projectDir, filePath);
   let raw = '';
   try {
-    raw = await readFile(filePath, 'utf-8');
+    raw = await readFile(resolved, 'utf-8');
   } catch {
     return { data: { decisions: [], trackable: 0, total: 0, missing: true } };
   }

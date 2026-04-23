@@ -207,7 +207,13 @@ no `<decisions>` block.
 ```bash
 GATE_CFG=$(gsd-sdk query config-get workflow.context_coverage_gate 2>/dev/null || echo "true")
 if [ "$GATE_CFG" != "false" ]; then
-  CONTEXT_PATH=$(ls "${PHASE_DIR}"/*-CONTEXT.md 2>/dev/null | head -1)
+  # Discover the phase CONTEXT.md via glob expansion rather than `ls | head`
+  # (review F17 / ShellCheck SC2012). Globs preserve filenames containing
+  # spaces and avoid an extra subprocess.
+  CONTEXT_PATH=""
+  for f in "${PHASE_DIR}"/*-CONTEXT.md; do
+    [ -e "$f" ] && CONTEXT_PATH="$f" && break
+  done
   DECISION_RESULT=$(gsd-sdk query check.decision-coverage-verify "${PHASE_DIR}" "${CONTEXT_PATH}")
 fi
 ```

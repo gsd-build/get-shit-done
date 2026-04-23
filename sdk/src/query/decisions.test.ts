@@ -19,7 +19,7 @@
  *
  * Issue #2492.
  */
-import { describe, it, expect } from 'vitest';
+import { describe, it, expect, beforeEach, afterEach } from 'vitest';
 import { parseDecisions } from './decisions.js';
 
 const MINIMAL = `# Phase 17 Context
@@ -120,5 +120,96 @@ describe('parseDecisions (#2492)', () => {
     const decisions = parseDecisions(multi);
     const d01 = decisions.find((d) => d.id === 'D-01');
     expect(d01?.text).toMatch(/First line/);
+  });
+
+  // ─── Adversarial-review regressions ────────────────────────────────────
+
+  it('ignores `<decisions>` blocks inside fenced code (review F11)', () => {
+    const content = `# Doc
+
+\`\`\`
+<decisions>
+### Example
+- **D-99:** Should not be parsed
+</decisions>
+\`\`\`
+
+<decisions>
+### Real
+- **D-01:** Real decision text long enough to soft match
+</decisions>`;
+    const decisions = parseDecisions(content);
+    const ids = decisions.map((d) => d.id);
+    expect(ids).toContain('D-01');
+    expect(ids).not.toContain('D-99');
+  });
+
+  it('captures continuation lines indented with TABS (review F12)', () => {
+    const content = '<decisions>\n### Cat\n- **D-07:** First line\n\tcontinued via tab\n</decisions>';
+    const decisions = parseDecisions(content);
+    const d07 = decisions.find((d) => d.id === 'D-07');
+    expect(d07?.text).toMatch(/continued via tab/);
+  });
+
+  it('parses ALL `<decisions>` blocks, not just the first (review F13)', () => {
+    const content = `<decisions>
+### One
+- **D-01:** First batch
+</decisions>
+
+Some prose.
+
+<decisions>
+### Two
+- **D-02:** Second batch
+</decisions>`;
+    const ids = parseDecisions(content).map((d) => d.id);
+    expect(ids).toContain('D-01');
+    expect(ids).toContain('D-02');
+  });
+
+  it('treats curly-quote variants of "Claude\u2019s Discretion" as non-trackable (review F20)', () => {
+    // U+201B (single high-reversed-9 quotation mark) — uncommon but legal unicode.
+    const content =
+      '<decisions>\n### Claude\u201Bs Discretion\n- **D-50:** Should be non-trackable\n</decisions>';
+    const decisions = parseDecisions(content);
+    const d50 = decisions.find((d) => d.id === 'D-50');
+    expect(d50?.trackable).toBe(false);
+  });
+});
+
+// ─── decisions.parse query handler ────────────────────────────────────────
+
+import { decisionsParse } from './decisions.js';
+import { mkdtemp, writeFile, rm, mkdir } from 'node:fs/promises';
+import { join } from 'node:path';
+import { tmpdir } from 'node:os';
+
+describe('decisionsParse handler (review F14 — accepts relative path via projectDir)', () => {
+  let tmp: string;
+  beforeEach(async () => {
+    tmp = await mkdtemp(join(tmpdir(), 'gsd-decparse-'));
+  });
+  afterEach(async () => {
+    await rm(tmp, { recursive: true, force: true });
+  });
+
+  it('resolves a relative file path against projectDir', async () => {
+    await mkdir(join(tmp, '.planning', 'phases', '17'), { recursive: true });
+    await writeFile(
+      join(tmp, '.planning', 'phases', '17', '17-CONTEXT.md'),
+      '<decisions>\n### Cat\n- **D-01:** Hello\n</decisions>',
+      'utf-8',
+    );
+    const result = await decisionsParse(['.planning/phases/17/17-CONTEXT.md'], tmp);
+    expect((result.data as { trackable: number }).trackable).toBe(1);
+    expect((result.data as { missing: boolean }).missing).toBe(false);
+  });
+
+  it('still accepts an absolute path', async () => {
+    const abs = join(tmp, 'CONTEXT.md');
+    await writeFile(abs, '<decisions>\n### Cat\n- **D-02:** Bye\n</decisions>', 'utf-8');
+    const result = await decisionsParse([abs], tmp);
+    expect((result.data as { trackable: number }).trackable).toBe(1);
   });
 });
