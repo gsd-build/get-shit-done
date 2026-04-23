@@ -407,6 +407,14 @@ function cmdConfigGet(cwd, keyPath, raw, defaultValue) {
     error(`Key not found: ${keyPath}`);
   }
 
+  // Never echo plaintext for sensitive keys via config-get. Plaintext lives
+  // in config.json on disk; the CLI surface always shows the masked form.
+  if (isSecretKey(keyPath)) {
+    const masked = maskSecret(current);
+    output(masked, raw, masked);
+    return;
+  }
+
   output(current, raw, String(current));
 }
 

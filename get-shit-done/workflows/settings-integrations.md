@@ -61,7 +61,7 @@ Read the current config and compute a masked view for display. For each
 integration field, compute one of:
 
 - `(unset)` — field is null / missing
-- `**** already set` — secret field that is populated (plaintext never shown)
+- `****<last-4>` — secret field that is populated (plaintext never shown)
 - `<value>` — non-secret routing/skill string, shown as-is
 
 ```bash
@@ -86,7 +86,7 @@ Ask the user what they want to do for each search API key. For keys that are
 already set, show `**** already set` and offer Leave / Replace / Clear. For
 unset keys, offer Skip / Set.
 
-```
+```text
 AskUserQuestion([
   {
     question: "Brave Search API key — used for web research during plan/discuss phases",
@@ -150,7 +150,7 @@ gsd-sdk query config-set brave_search null
 shell command to invoke for a given reviewer flavor. Supported flavors:
 `claude`, `codex`, `gemini`, `opencode`.
 
-```
+```text
 AskUserQuestion([
   {
     question: "Which reviewer CLI do you want to configure?",
@@ -189,7 +189,7 @@ frontmatter. The slug is user-extensible, so input is free-text validated
 against `^[a-zA-Z0-9_-]+$`. Inputs with path separators, spaces, or shell
 metacharacters are rejected.
 
-```
+```text
 AskUserQuestion([
   {
     question: "Configure agent_skills for which agent type?",
@@ -209,7 +209,7 @@ AskUserQuestion([
 For "Custom…", prompt for a slug and validate it matches
 `^[a-zA-Z0-9_-]+$`. If it fails validation, print:
 
-```
+```text
 Rejected: agent-type '<slug>' must match [a-zA-Z0-9_-]+ (no path separators,
 spaces, or shell metacharacters).
 ```
@@ -230,7 +230,7 @@ Loop until "Done".
 Display the masked confirmation table. **No plaintext API keys appear in this
 output under any circumstance.**
 
-```
+```text
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
  GSD ► INTEGRATIONS UPDATED
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
