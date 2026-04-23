@@ -326,6 +326,38 @@ describe('extractCurrentMilestone', () => {
     expect(result).toContain('Phase 100');
   });
 
+  // ─── Bug #2619: phase heading containing vX.Y triggers truncation ─────
+  it('bug-2619: does not truncate at a phase heading containing vX.Y', async () => {
+    // A phase title like "Phase 12: v1.0 Tech-Debt Closure" was being treated
+    // as a milestone boundary because the greedy `.*v(\d+(?:\.\d+)+)` branch
+    // in nextMilestoneRegex matched any heading with a version literal.
+    const roadmapWithPhaseVersion = `# ROADMAP
+
+## Phases
+
+### 🚧 v1.1 Launch-Ready (In Progress)
+
+### Phase 11: Structured Logging
+**Goal**: Add structured logging
+
+### Phase 12: v1.0 Tech-Debt Closure
+**Goal**: Close out v1.0 debt
+
+### Phase 19: Security Audit
+**Goal**: Full security audit
+`;
+    const state = `---\nmilestone: v1.1\n---\n# State\n`;
+    await writeFile(join(tmpDir, '.planning', 'STATE.md'), state);
+    await writeFile(join(tmpDir, '.planning', 'ROADMAP.md'), roadmapWithPhaseVersion);
+
+    const result = await extractCurrentMilestone(roadmapWithPhaseVersion, tmpDir);
+
+    // Phase 12 and Phase 19 must both survive — the slice cannot be truncated
+    // at "### Phase 12: v1.0 Tech-Debt Closure".
+    expect(result).toContain('### Phase 12: v1.0 Tech-Debt Closure');
+    expect(result).toContain('### Phase 19: Security Audit');
+  });
+
   // ─── Bug #2422: same-version sub-heading truncation ───────────────────
   it('bug-2422: does not truncate at same-version sub-heading (## v2.0 Phase Details)', async () => {
     const roadmapWithDetails = `# ROADMAP

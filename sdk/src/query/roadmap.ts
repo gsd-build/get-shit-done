@@ -195,8 +195,11 @@ export async function extractCurrentMilestone(content: string, projectDir: strin
   const currentVersionMatch = version ? version.match(/v(\d+(?:\.\d+)+)/i) : null;
   const currentVersionStr = currentVersionMatch ? currentVersionMatch[1] : '';
 
+  // Exclude phase headings (e.g. "### Phase 12: v1.0 Tech-Debt Closure") from
+  // being treated as milestone boundaries just because they mention vX.Y in
+  // the title. Phase headings always start with the literal `Phase `. See #2619.
   const nextMilestoneRegex = new RegExp(
-    `^#{1,${headingLevel}}\\s+(?:.*v(\\d+(?:\\.\\d+)+)[^\\n]*|.*(?:✅|📋|🚧|🟡))`,
+    `^#{1,${headingLevel}}\\s+(?!Phase\\s+\\S)(?:.*v(\\d+(?:\\.\\d+)+)[^\\n]*|.*(?:✅|📋|🚧|🟡))`,
     'gm'
   );
 
@@ -303,7 +306,8 @@ export async function extractNextMilestoneSection(
 
   // Look for the next ## milestone heading after the current one.
   const tail = cleaned.slice(currentMatch.index + currentMatch[0].length);
-  const nextMilestonePattern = /^##\s+([^\n]*(?:v(\d+(?:\.\d+)+)|✅|🚧|🟡|📋)[^\n]*)$/gim;
+  // Exclude phase headings — see #2619.
+  const nextMilestonePattern = /^##\s+(?!Phase\s+\S)([^\n]*(?:v(\d+(?:\.\d+)+)|✅|🚧|🟡|📋)[^\n]*)$/gim;
   let nextMatch: RegExpExecArray | null;
   while ((nextMatch = nextMilestonePattern.exec(tail)) !== null) {
     const heading = nextMatch[1];

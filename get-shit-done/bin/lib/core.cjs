@@ -1309,8 +1309,11 @@ function extractCurrentMilestone(content, cwd) {
   // Milestone headings look like: ## v2.0, ## Roadmap v2.0, ## ✅ v1.0, etc.
   const headingLevel = sectionMatch[1].match(/^(#{1,3})\s/)[1].length;
   const restContent = content.slice(sectionStart + sectionMatch[0].length);
+  // Exclude phase headings (e.g. "### Phase 12: v1.0 Tech-Debt Closure") from
+  // being treated as milestone boundaries just because they mention vX.Y in
+  // the title. Phase headings always start with the literal `Phase `. See #2619.
   const nextMilestonePattern = new RegExp(
-    `^#{1,${headingLevel}}\\s+(?:.*v\\d+\\.\\d+|✅|📋|🚧)`,
+    `^#{1,${headingLevel}}\\s+(?!Phase\\s+\\S)(?:.*v\\d+\\.\\d+|✅|📋|🚧)`,
     'mi'
   );
   const nextMatch = restContent.match(nextMilestonePattern);

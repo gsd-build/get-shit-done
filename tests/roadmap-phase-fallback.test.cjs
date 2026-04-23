@@ -207,6 +207,38 @@ describe('roadmap get-phase fallback to full ROADMAP.md (#1634)', () => {
     assert.equal(output.goal, 'Remove deprecated modules');
   });
 
+  test('extractCurrentMilestone does not truncate on phase heading containing vX.Y (#2619)', () => {
+    // Regression: phase heading like "### Phase 12: v1.0 Tech-Debt Closure"
+    // was incorrectly treated as a milestone boundary because the greedy
+    // `.*v\d+\.\d+` subpattern in nextMilestonePattern matched it.
+    const core = require('../get-shit-done/bin/lib/core.cjs');
+    writeState(tmpDir, 'v1.1');
+    const roadmap = `# Roadmap
+
+## Phases
+
+### 🚧 v1.1 Launch-Ready (In Progress)
+
+### Phase 11: Structured Logging
+**Goal:** Add structured logging
+
+### Phase 12: v1.0 Tech-Debt Closure
+**Goal:** Close out v1.0 debt
+
+### Phase 19: Security Audit
+**Goal:** Full security audit
+`;
+    const slice = core.extractCurrentMilestone(roadmap, tmpDir);
+    assert.ok(
+      slice.includes('### Phase 12: v1.0 Tech-Debt Closure'),
+      'slice must include Phase 12 (it lives inside the active milestone)'
+    );
+    assert.ok(
+      slice.includes('### Phase 19: Security Audit'),
+      'slice must include Phase 19 (truncation at Phase 12 would hide it)'
+    );
+  });
+
   test('section extraction from fallback includes correct content boundaries', () => {
     writeState(tmpDir, 'v1.0');
     fs.writeFileSync(
