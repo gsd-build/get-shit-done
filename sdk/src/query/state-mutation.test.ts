@@ -448,3 +448,221 @@ describe('stateRecordSession', () => {
     expect(content).toContain('Completed 11-01-PLAN.md');
   });
 });
+
+// ─── Bug #2613: write-side frontmatter preservation ─────────────────────────
+
+describe('Bug #2613: STATE.md frontmatter preservation through mutations', () => {
+  let tmpDir: string;
+
+  beforeEach(async () => {
+    tmpDir = await mkdtemp(join(tmpdir(), 'gsd-state-2613-'));
+  });
+
+  afterEach(async () => {
+    await rm(tmpDir, { recursive: true, force: true });
+  });
+
+  it('record-session preserves milestone + milestone_name when ROADMAP has a different current milestone', async () => {
+    // STATE.md declares v12.0 / Focus (shipped). ROADMAP's heading-parseable
+    // current is v11.0 / Research-Depth. Before the fix, re-derivation pulled
+    // v11.0 / Research-Depth into STATE.md's frontmatter on every mutation.
+    const stateContent = `---
+gsd_state_version: 1.0
+milestone: v12.0
+milestone_name: Focus
+status: shipped
+---
+
+# Project State
+
+## Session Continuity
+
+Last session: 2026-04-20T00:00:00Z
+Stopped at: v12.0 SHIPPED
+Resume file: None
+`;
+    const roadmapContent = `# Roadmap
+
+## Phases
+
+## v11.0 Research-Depth Scoring (In Progress)
+
+### Phase 55
+- stuff
+
+## v12.0 Focus — ✅ SHIPPED 2026-04-20
+
+### Phase 60
+- shipped stuff
+`;
+    const planningDir = join(tmpDir, '.planning');
+    await mkdir(join(planningDir, 'phases'), { recursive: true });
+    await writeFile(join(planningDir, 'STATE.md'), stateContent, 'utf-8');
+    await writeFile(join(planningDir, 'ROADMAP.md'), roadmapContent, 'utf-8');
+    await writeFile(join(planningDir, 'config.json'), '{}', 'utf-8');
+
+    const { stateRecordSession } = await import('./state-mutation.js');
+    await stateRecordSession(
+      ['--stopped-at', 'regression test', '--resume-file', '.planning/MILESTONES.md'],
+      tmpDir,
+    );
+
+    const after = await readFile(join(planningDir, 'STATE.md'), 'utf-8');
+    const { extractFrontmatter } = await import('./frontmatter.js');
+    const fm = extractFrontmatter(after);
+    expect(fm.milestone).toBe('v12.0');
+    expect(fm.milestone_name).toBe('Focus');
+  });
+
+  it('record-session preserves status from existing frontmatter when body has no Status field', async () => {
+    // STATE.md frontmatter declares status: shipped. Body has no "Status:" line.
+    // Before the fix, derived status defaulted to 'unknown' and the frontmatter
+    // value was lost because existingFm was {} at the preservation branch.
+    const stateContent = `---
+gsd_state_version: 1.0
+milestone: v12.0
+milestone_name: Focus
+status: shipped
+---
+
+# Project State
+
+## Session Continuity
+
+Last session: 2026-04-20T00:00:00Z
+Stopped at: v12.0 SHIPPED
+Resume file: None
+`;
+    const planningDir = join(tmpDir, '.planning');
+    await mkdir(join(planningDir, 'phases'), { recursive: true });
+    await writeFile(join(planningDir, 'STATE.md'), stateContent, 'utf-8');
+    await writeFile(join(planningDir, 'ROADMAP.md'), '# Roadmap\n\n## v12.0 Focus\n', 'utf-8');
+    await writeFile(join(planningDir, 'config.json'), '{}', 'utf-8');
+
+    const { stateRecordSession } = await import('./state-mutation.js');
+    await stateRecordSession(
+      ['--stopped-at', 'regression test', '--resume-file', 'None'],
+      tmpDir,
+    );
+
+    const after = await readFile(join(planningDir, 'STATE.md'), 'utf-8');
+    const { extractFrontmatter } = await import('./frontmatter.js');
+    const fm = extractFrontmatter(after);
+    expect(fm.status).toBe('shipped');
+  });
+
+  it('record-session preserves progress from frontmatter when disk scan returns zero counts', async () => {
+    // Shipped milestone: phase directories have been archived, so disk scan
+    // returns total_plans=0. Existing frontmatter has authoritative counts
+    // (5/5, 12/12, 100%). Before the fix, disk scan stomped the counts to 0/0.
+    const stateContent = `---
+gsd_state_version: 1.0
+milestone: v12.0
+milestone_name: Focus
+status: shipped
+progress:
+  total_phases: 5
+  completed_phases: 5
+  total_plans: 12
+  completed_plans: 12
+  percent: 100
+---
+
+# Project State
+
+## Session Continuity
+
+Last session: 2026-04-20T00:00:00Z
+Stopped at: v12.0 SHIPPED
+Resume file: None
+`;
+    const planningDir = join(tmpDir, '.planning');
+    await mkdir(join(planningDir, 'phases'), { recursive: true });
+    await writeFile(join(planningDir, 'STATE.md'), stateContent, 'utf-8');
+    await writeFile(join(planningDir, 'ROADMAP.md'), '# Roadmap\n\n## v12.0 Focus\n', 'utf-8');
+    await writeFile(join(planningDir, 'config.json'), '{}', 'utf-8');
+
+    const { stateRecordSession } = await import('./state-mutation.js');
+    await stateRecordSession(
+      ['--stopped-at', 'regression test', '--resume-file', 'None'],
+      tmpDir,
+    );
+
+    const after = await readFile(join(planningDir, 'STATE.md'), 'utf-8');
+    const { extractFrontmatter } = await import('./frontmatter.js');
+    const fm = extractFrontmatter(after);
+    const progress = fm.progress as Record<string, unknown>;
+    expect(Number(progress.total_plans)).toBe(12);
+    expect(Number(progress.completed_plans)).toBe(12);
+    expect(Number(progress.percent)).toBe(100);
+  });
+
+  it('regression guard: state.update Status still updates frontmatter status when body is mutated', async () => {
+    // Legitimate status change must still propagate. If the body's Status
+    // field becomes "executing", derived status is 'executing' and option 2
+    // must NOT overwrite it with the frontmatter's prior 'shipped'.
+    await setupTestProject(tmpDir);
+
+    const { stateUpdate } = await import('./state-mutation.js');
+    await stateUpdate(['Status', 'executing'], tmpDir);
+
+    const after = await readFile(join(tmpDir, '.planning', 'STATE.md'), 'utf-8');
+    const { extractFrontmatter } = await import('./frontmatter.js');
+    const fm = extractFrontmatter(after);
+    expect(fm.status).toBe('executing');
+  });
+
+  it('regression guard: disk-scanned progress wins when scan returns non-zero counts', async () => {
+    // Mid-milestone: disk has real phase directories with plans + summaries.
+    // Disk is the ground truth — frontmatter progress must not override it.
+    const stateContent = `---
+gsd_state_version: 1.0
+milestone: v3.0
+milestone_name: SDK-First Migration
+status: executing
+progress:
+  total_phases: 99
+  completed_phases: 99
+  total_plans: 99
+  completed_plans: 99
+  percent: 99
+---
+
+# Project State
+
+## Current Position
+
+Status: Executing
+Last activity: today
+
+## Session Continuity
+
+Last session: 2026-04-08T05:00:00Z
+Stopped at: work
+Resume file: None
+`;
+    const planningDir = join(tmpDir, '.planning');
+    const phasesDir = join(planningDir, 'phases');
+    await mkdir(phasesDir, { recursive: true });
+    // Real phase with 1 plan and 1 summary — disk scan must report these.
+    const phase10 = join(phasesDir, '10-foo');
+    await mkdir(phase10, { recursive: true });
+    await writeFile(join(phase10, '10-01-PLAN.md'), 'plan', 'utf-8');
+    await writeFile(join(phase10, '10-01-SUMMARY.md'), 'summary', 'utf-8');
+    await writeFile(join(planningDir, 'STATE.md'), stateContent, 'utf-8');
+    await writeFile(join(planningDir, 'ROADMAP.md'), '# Roadmap\n\n### Phase 10: Foo\n', 'utf-8');
+    await writeFile(join(planningDir, 'config.json'), '{}', 'utf-8');
+
+    const { stateRecordSession } = await import('./state-mutation.js');
+    await stateRecordSession(['--stopped-at', 'x', '--resume-file', 'None'], tmpDir);
+
+    const after = await readFile(join(planningDir, 'STATE.md'), 'utf-8');
+    const { extractFrontmatter } = await import('./frontmatter.js');
+    const fm = extractFrontmatter(after);
+    const progress = fm.progress as Record<string, unknown>;
+    // Disk ground truth — not the stale 99/99 from frontmatter.
+    expect(Number(progress.total_plans)).toBe(1);
+    expect(Number(progress.completed_plans)).toBe(1);
+    expect(Number(progress.percent)).toBe(100);
+  });
+});

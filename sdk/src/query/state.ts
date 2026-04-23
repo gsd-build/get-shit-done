@@ -89,6 +89,19 @@ export async function buildStateFrontmatter(bodyContent: string, projectDir: str
   const stoppedAt = stateExtractField(bodyContent, 'Stopped At') || stateExtractField(bodyContent, 'Stopped at');
   const pausedAt = stateExtractField(bodyContent, 'Paused At');
 
+  // Bug #2613: read existing STATE.md frontmatter as preservation backstop.
+  // The write path through `readModifyWriteStateMd` strips frontmatter before
+  // invoking the modifier, so callers of `buildStateFrontmatter` only see the
+  // body. Without reading frontmatter here, status defaults to 'unknown' when
+  // body has no Status field, and progress is stomped to 0/0 when the current
+  // milestone's phase directories have been archived. Matches the #2495 READ
+  // pattern: STATE.md is authoritative, re-derive only when absent.
+  let existingFm: Record<string, unknown> = {};
+  try {
+    const raw = await readFile(planningPaths(projectDir, workstream).state, 'utf-8');
+    existingFm = extractFrontmatter(raw);
+  } catch { /* STATE.md missing on first write — no preservation needed */ }
+
   let milestone: string | null = null;
   let milestoneName: string | null = null;
   try {
@@ -160,6 +173,12 @@ export async function buildStateFrontmatter(bodyContent: string, projectDir: str
     normalizedStatus = 'executing';
   }
 
+  // Bug #2613: status preservation — if body has no Status field and existing
+  // frontmatter has a non-unknown status, prefer existing.
+  if (normalizedStatus === 'unknown' && typeof existingFm.status === 'string' && existingFm.status && existingFm.status !== 'unknown') {
+    normalizedStatus = existingFm.status;
+  }
+
   const fm: Record<string, unknown> = { gsd_state_version: '1.0' };
 
   if (milestone) fm.milestone = milestone;
@@ -180,6 +199,20 @@ export async function buildStateFrontmatter(bodyContent: string, projectDir: str
   if (completedPlans !== null) progress.completed_plans = completedPlans;
   if (progressPercent !== null) progress.percent = progressPercent;
   if (Object.keys(progress).length > 0) fm.progress = progress;
+
+  // Bug #2613: progress preservation — when disk scan returns zero counts
+  // (archived/shipped milestone) and existing frontmatter has non-zero counts,
+  // prefer existing. Legitimate mid-milestone updates see non-zero disk counts
+  // and fall through, keeping disk as ground truth.
+  const existingProgress = existingFm.progress as Record<string, unknown> | undefined;
+  if (existingProgress && typeof existingProgress === 'object') {
+    const derivedTotalPlans = Number(progress.total_plans ?? 0);
+    const derivedCompletedPlans = Number(progress.completed_plans ?? 0);
+    const existingTotalPlans = Number(existingProgress.total_plans ?? 0);
+    if (derivedTotalPlans === 0 && derivedCompletedPlans === 0 && existingTotalPlans > 0) {
+      fm.progress = existingProgress;
+    }
+  }
 
   return fm;
 }
