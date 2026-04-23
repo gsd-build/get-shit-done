@@ -46,18 +46,58 @@ describe('plan-phase decision-coverage gate (#2492)', () => {
   });
 
   test('decision gate appears AFTER the existing Requirements Coverage Gate', () => {
-    const reqIdx = md.indexOf('Requirements Coverage Gate');
-    const decIdx = md.indexOf('Decision Coverage Gate');
-    assert.ok(reqIdx !== -1, 'Requirements Coverage Gate must still exist');
-    assert.ok(decIdx !== -1, 'Decision Coverage Gate must exist');
+    // Anchored heading regexes — avoid prose-substring traps (review F8/F9).
+    const reqIdx = md.search(/^## 13[a-z]?\.\s+Requirements Coverage Gate/m);
+    const decIdx = md.search(/^## 13[a-z]?\.\s+Decision Coverage Gate/m);
+    assert.ok(reqIdx !== -1, 'Requirements Coverage Gate heading must exist as ## 13[a-z]?.');
+    assert.ok(decIdx !== -1, 'Decision Coverage Gate heading must exist as ## 13[a-z]?.');
     assert.ok(decIdx > reqIdx, 'Decision gate must run after Requirements gate');
   });
 
   test('decision gate appears BEFORE plans are committed', () => {
-    const decIdx = md.indexOf('Decision Coverage Gate');
-    const commitIdx = md.indexOf('Commit Plans');
-    assert.ok(decIdx !== -1 && commitIdx !== -1);
+    const decIdx = md.search(/^## 13[a-z]?\.\s+Decision Coverage Gate/m);
+    const commitIdx = md.search(/^## 13[a-z]?\.\s+Commit Plans/m);
+    assert.ok(decIdx !== -1, 'Decision Coverage Gate heading must exist as ## 13[a-z]?.');
+    assert.ok(commitIdx !== -1, 'Commit Plans heading must exist as ## 13[a-z]?.');
     assert.ok(decIdx < commitIdx, 'Decision gate must run before commit so failures block the commit');
+  });
+
+  test('plan-phase Decision Coverage Gate uses CONTEXT_PATH variable defined in INIT extraction (review F1)', () => {
+    // The CONTEXT_PATH bash variable is defined at Step 4 (`CONTEXT_PATH=$(_gsd_field "$INIT" context_path)`).
+    // The plan-phase gate snippet must reference the same casing — `${CONTEXT_PATH}` — not `${context_path}`,
+    // otherwise the BLOCKING gate is invoked with an empty path and silently skips.
+    const defIdx = md.indexOf('CONTEXT_PATH=$(_gsd_field "$INIT" context_path)');
+    assert.ok(defIdx !== -1, 'CONTEXT_PATH must be defined from INIT JSON');
+
+    const gateIdx = md.indexOf('check.decision-coverage-plan');
+    assert.ok(gateIdx !== -1, 'check.decision-coverage-plan invocation must exist');
+
+    // Slice the surrounding gate snippet (~600 chars) and verify variable casing matches the definition.
+    const snippet = md.slice(Math.max(0, gateIdx - 200), gateIdx + 400);
+    assert.ok(
+      snippet.includes('${CONTEXT_PATH}'),
+      'Gate snippet must reference ${CONTEXT_PATH} (uppercase) to match the variable defined in Step 4',
+    );
+    assert.ok(
+      !snippet.includes('${context_path}'),
+      'Gate snippet must NOT reference ${context_path} (lowercase) — that name is undefined in shell scope',
+    );
+  });
+
+  test('plan-phase blocking gate exits non-zero on failure (review F15)', () => {
+    // The gate is documented as BLOCKING. To actually block, the shell snippet must
+    // exit with non-zero status when `passed` is false. Without exit-1 the workflow
+    // continues silently past the failure.
+    const gateIdx = md.indexOf('check.decision-coverage-plan');
+    assert.ok(gateIdx !== -1);
+    const snippet = md.slice(gateIdx, gateIdx + 800);
+    // Accept either an inline `|| exit 1` or a `|| { ...; exit 1; }` group.
+    const hasJqGuard = /jq[^\n]*passed\s*==\s*true/.test(snippet);
+    const hasExitOne = /\|\|\s*(?:exit\s+1|\{[\s\S]{0,200}?exit\s+1)/.test(snippet);
+    assert.ok(
+      hasJqGuard && hasExitOne,
+      'plan-phase gate must guard with `jq -e .passed == true || exit 1` (or `|| { ...; exit 1; }`) to actually block',
+    );
   });
 });
 

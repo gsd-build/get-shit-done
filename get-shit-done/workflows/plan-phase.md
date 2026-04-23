@@ -1325,18 +1325,26 @@ silently dropped on the way into the plans.
 ```bash
 GATE_CFG=$(gsd-sdk query config-get workflow.context_coverage_gate 2>/dev/null || echo "true")
 if [ "$GATE_CFG" != "false" ]; then
-  GATE_RESULT=$(gsd-sdk query check.decision-coverage-plan "${PHASE_DIR}" "${context_path}")
+  GATE_RESULT=$(gsd-sdk query check.decision-coverage-plan "${PHASE_DIR}" "${CONTEXT_PATH}")
+  # BLOCKING: refuse to mark phase planned when a trackable decision is uncovered.
+  # `passed: true` covers both real-pass and skipped cases (gate disabled / no CONTEXT.md /
+  # no trackable decisions). Verify-phase counterpart deliberately omits this exit-1 — that
+  # gate is non-blocking by design (review finding F15).
+  echo "$GATE_RESULT" | jq -e '.data.passed == true' >/dev/null || {
+    echo "$GATE_RESULT" | jq -r '.data.message'
+    exit 1
+  }
 fi
 ```
 
 The handler returns JSON:
-```
+```json
 {
-  "passed": true|false,
-  "skipped": true|false,
-  "total":  N,
-  "covered": M,
-  "uncovered": [ { id, text, category }, ... ],
+  "passed": true,
+  "skipped": false,
+  "total":  2,
+  "covered": 2,
+  "uncovered": [ { "id": "D-01", "text": "...", "category": "..." } ],
   "message": "..."
 }
 ```
@@ -1352,7 +1360,7 @@ what to do — cite the id in a relevant plan's `must_haves` / `truths`, or
 move the decision under `### Claude's Discretion` / tag it `[informational]`
 if it should not be tracked. Then offer:
 
-```
+```text
 Options:
 1. Re-plan to cover missing decisions (recommended)
 2. Edit CONTEXT.md to mark dropped decisions as [informational] / Discretion
