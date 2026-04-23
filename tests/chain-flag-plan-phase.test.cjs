@@ -16,6 +16,12 @@ const path = require('path');
 describe('plan-phase chain flag preservation (#1620)', () => {
   const planPath = path.join(__dirname, '..', 'get-shit-done', 'workflows', 'plan-phase.md');
   const discussPath = path.join(__dirname, '..', 'get-shit-done', 'workflows', 'discuss-phase.md');
+  // After #2551, discuss-phase chain logic moved to modes/chain.md.
+  const discussChainPath = path.join(__dirname, '..', 'get-shit-done', 'workflows', 'discuss-phase', 'modes', 'chain.md');
+  const readDiscuss = () => {
+    const parts = [discussPath, discussChainPath].filter(p => fs.existsSync(p));
+    return parts.map(p => fs.readFileSync(p, 'utf8')).join('\n');
+  };
 
   test('plan-phase sync-flag guard checks both --auto AND --chain', () => {
     const content = fs.readFileSync(planPath, 'utf8');
@@ -37,7 +43,7 @@ describe('plan-phase chain flag preservation (#1620)', () => {
 
   test('plan-phase and discuss-phase use the same guard pattern for clearing _auto_chain_active', () => {
     const planContent = fs.readFileSync(planPath, 'utf8');
-    const discussContent = fs.readFileSync(discussPath, 'utf8');
+    const discussContent = readDiscuss();
 
     const guardPattern = 'if [[ ! "$ARGUMENTS" =~ --auto ]] && [[ ! "$ARGUMENTS" =~ --chain ]]; then';
 
@@ -47,7 +53,7 @@ describe('plan-phase chain flag preservation (#1620)', () => {
     );
     assert.ok(
       discussContent.includes(guardPattern),
-      'discuss-phase should use the dual-flag guard pattern'
+      'discuss-phase (or discuss-phase/modes/chain.md after #2551 split) should use the dual-flag guard pattern'
     );
   });
 

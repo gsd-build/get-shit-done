@@ -131,6 +131,33 @@ Orchestration logic that commands reference. Contains the step-by-step process i
 
 **Total workflows:** see [`docs/INVENTORY.md`](INVENTORY.md#workflows) for the authoritative count and full roster.
 
+#### Progressive disclosure for workflows
+
+Workflow files are loaded verbatim into Claude's context every time the
+corresponding `/gsd:*` command is invoked. To keep that cost bounded, the
+workflow size budget enforced by `tests/workflow-size-budget.test.cjs`
+mirrors the agent budget from #2361:
+
+| Tier      | Per-file line limit |
+|-----------|--------------------|
+| `XL`      | 1700 — top-level orchestrators (`execute-phase`, `plan-phase`, `new-project`) |
+| `LARGE`   | 1500 — multi-step planners and large feature workflows |
+| `DEFAULT` | 1000 — focused single-purpose workflows (the target tier) |
+
+`workflows/discuss-phase.md` is held to a stricter <500-line ceiling per
+issue #2551. When a workflow grows beyond its tier, extract per-mode bodies
+into `workflows/<workflow>/modes/<mode>.md`, templates into
+`workflows/<workflow>/templates/`, and shared knowledge into
+`get-shit-done/references/`. The parent file becomes a thin dispatcher that
+Reads only the mode and template files needed for the current invocation.
+
+`workflows/discuss-phase/` is the canonical example of this pattern —
+parent dispatches, modes/ holds per-flag behavior (`power.md`, `all.md`,
+`auto.md`, `chain.md`, `text.md`, `batch.md`, `analyze.md`, `default.md`,
+`advisor.md`), and templates/ holds CONTEXT.md, DISCUSSION-LOG.md, and
+checkpoint.json schemas that are read only when the corresponding output
+file is being written.
+
 ### Agents (`agents/*.md`)
 
 Specialized agent definitions with frontmatter specifying:

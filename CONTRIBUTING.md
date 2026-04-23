@@ -314,6 +314,15 @@ bin/install.js          — Installer (multi-runtime)
 get-shit-done/
   bin/lib/              — Core library modules (.cjs)
   workflows/            — Workflow definitions (.md)
+                          Large workflows split per progressive-disclosure
+                          pattern: workflows/<name>/modes/*.md +
+                          workflows/<name>/templates/*. Parent dispatches
+                          to mode files. See workflows/discuss-phase/ as
+                          the canonical example (#2551). New modes for
+                          discuss-phase land in
+                          workflows/discuss-phase/modes/<mode>.md.
+                          Per-file budgets enforced by
+                          tests/workflow-size-budget.test.cjs.
   references/           — Reference documentation (.md)
   templates/            — File templates
 agents/                 — Agent definitions (.md) — CANONICAL SOURCE

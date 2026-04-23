@@ -14,9 +14,20 @@ const path = require('path');
 
 describe('discuss-phase incremental checkpoint saves (#1485)', () => {
   const workflowPath = path.join(__dirname, '..', 'get-shit-done', 'workflows', 'discuss-phase.md');
+  // After #2551 progressive-disclosure refactor, checkpoint logic lives in the
+  // default mode file and the JSON schema lives in the templates directory.
+  const defaultModePath = path.join(__dirname, '..', 'get-shit-done', 'workflows', 'discuss-phase', 'modes', 'default.md');
+  const checkpointTplPath = path.join(__dirname, '..', 'get-shit-done', 'workflows', 'discuss-phase', 'templates', 'checkpoint.json');
+
+  function readAll() {
+    return [workflowPath, defaultModePath, checkpointTplPath]
+      .filter(p => fs.existsSync(p))
+      .map(p => fs.readFileSync(p, 'utf8'))
+      .join('\n');
+  }
 
   test('workflow writes checkpoint file after each area completes', () => {
-    const content = fs.readFileSync(workflowPath, 'utf8');
+    const content = readAll();
     assert.ok(
       content.includes('DISCUSS-CHECKPOINT.json'),
       'workflow should reference checkpoint JSON file'
@@ -28,14 +39,14 @@ describe('discuss-phase incremental checkpoint saves (#1485)', () => {
   });
 
   test('checkpoint includes decisions, areas completed, and areas remaining', () => {
-    const content = fs.readFileSync(workflowPath, 'utf8');
+    const content = readAll();
     assert.ok(content.includes('areas_completed'), 'checkpoint should track completed areas');
     assert.ok(content.includes('areas_remaining'), 'checkpoint should track remaining areas');
     assert.ok(content.includes('"decisions"'), 'checkpoint should include decisions object');
   });
 
   test('check_existing step detects checkpoint for session resume', () => {
-    const content = fs.readFileSync(workflowPath, 'utf8');
+    const content = readAll();
     // The check_existing step should look for checkpoint files
     assert.ok(
       content.includes('DISCUSS-CHECKPOINT.json') && content.includes('Resume'),

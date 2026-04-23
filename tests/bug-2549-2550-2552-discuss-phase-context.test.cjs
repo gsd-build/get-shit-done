@@ -16,17 +16,27 @@ const path = require('node:path');
 const DISCUSS_PHASE = path.join(
   __dirname, '..', 'get-shit-done', 'workflows', 'discuss-phase.md',
 );
+// After #2551 progressive-disclosure refactor, the scout_codebase phase-type
+// table and split-reads warning live in references/scout-codebase.md.
+const SCOUT_REF = path.join(
+  __dirname, '..', 'get-shit-done', 'references', 'scout-codebase.md',
+);
+
+function readDiscussContext() {
+  const parts = [DISCUSS_PHASE, SCOUT_REF].filter(p => fs.existsSync(p));
+  return parts.map(p => fs.readFileSync(p, 'utf-8')).join('\n');
+}
 
 describe('discuss-phase context fixes (#2549, #2550, #2552)', () => {
   let src;
   test('discuss-phase.md source exists', () => {
     assert.ok(fs.existsSync(DISCUSS_PHASE), 'discuss-phase.md must exist');
-    src = fs.readFileSync(DISCUSS_PHASE, 'utf-8');
+    src = readDiscussContext();
   });
 
   // ─── #2549: load_prior_context cap ──────────────────────────────────────
   test('#2549: load_prior_context must NOT instruct reading ALL prior CONTEXT.md files', () => {
-    if (!src) src = fs.readFileSync(DISCUSS_PHASE, 'utf-8');
+    if (!src) src = readDiscussContext();
     assert.ok(
       !src.includes('For each CONTEXT.md where phase number < current phase'),
       'load_prior_context must not unboundedly read all prior CONTEXT.md files',
@@ -34,7 +44,7 @@ describe('discuss-phase context fixes (#2549, #2550, #2552)', () => {
   });
 
   test('#2549: load_prior_context must reference a bounded read (3 phases or DECISIONS-INDEX)', () => {
-    if (!src) src = fs.readFileSync(DISCUSS_PHASE, 'utf-8');
+    if (!src) src = readDiscussContext();
     const hasBound = src.includes('3') && src.includes('prior CONTEXT.md');
     const hasIndex = src.includes('DECISIONS-INDEX.md');
     assert.ok(
@@ -45,7 +55,7 @@ describe('discuss-phase context fixes (#2549, #2550, #2552)', () => {
 
   // ─── #2550: scout_codebase phase-type selection ──────────────────────────
   test('#2550: scout_codebase must not instruct reading all 7 codebase maps', () => {
-    if (!src) src = fs.readFileSync(DISCUSS_PHASE, 'utf-8');
+    if (!src) src = readDiscussContext();
     assert.ok(
       !src.includes('Read the most relevant ones (CONVENTIONS.md, STRUCTURE.md, STACK.md based on phase type)'),
       'scout_codebase must not use the old vague "most relevant" instruction without a selection table',
@@ -53,7 +63,7 @@ describe('discuss-phase context fixes (#2549, #2550, #2552)', () => {
   });
 
   test('#2550: scout_codebase must include a phase-type-to-maps selection table', () => {
-    if (!src) src = fs.readFileSync(DISCUSS_PHASE, 'utf-8');
+    if (!src) src = readDiscussContext();
     // The table maps phase types to specific map selections
     assert.ok(
       src.includes('Phase type') && src.includes('Read these maps'),
@@ -68,7 +78,7 @@ describe('discuss-phase context fixes (#2549, #2550, #2552)', () => {
 
   // ─── #2552: no split reads ───────────────────────────────────────────────
   test('#2552: scout_codebase must explicitly prohibit split reads of the same file', () => {
-    if (!src) src = fs.readFileSync(DISCUSS_PHASE, 'utf-8');
+    if (!src) src = readDiscussContext();
     const prohibitsSplit = src.includes('split reads') || src.includes('split read');
     assert.ok(
       prohibitsSplit,

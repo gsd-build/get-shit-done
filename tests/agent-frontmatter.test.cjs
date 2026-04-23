@@ -359,16 +359,23 @@ describe('VERIFY: data-flow trace, environment audit, and behavioral spot-checks
 
 describe('DISCUSS: discussion log generation', () => {
   test('discuss-phase workflow references DISCUSSION-LOG.md generation', () => {
-    const content = fs.readFileSync(
+    // After #2551 progressive-disclosure refactor, the DISCUSSION-LOG.md template
+    // body lives in workflows/discuss-phase/templates/discussion-log.md and is
+    // read at the git_commit step. Both files together must satisfy the
+    // documentation contract.
+    const parent = fs.readFileSync(
       path.join(WORKFLOWS_DIR, 'discuss-phase.md'), 'utf-8'
     );
+    const tplPath = path.join(WORKFLOWS_DIR, 'discuss-phase', 'templates', 'discussion-log.md');
+    const tpl = fs.existsSync(tplPath) ? fs.readFileSync(tplPath, 'utf-8') : '';
+    const content = parent + '\n' + tpl;
     assert.ok(
       content.includes('DISCUSSION-LOG.md'),
       'discuss-phase must reference DISCUSSION-LOG.md generation'
     );
     assert.ok(
       content.includes('Audit trail only'),
-      'discuss-phase must mark discussion log as audit-only'
+      'discuss-phase (or its discussion-log template after #2551) must mark discussion log as audit-only'
     );
   });
 
