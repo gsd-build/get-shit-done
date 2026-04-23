@@ -189,6 +189,25 @@ export const workstreamCreate: QueryHandler = async (args, projectDir) => {
   };
 };
 
+/**
+ * Rewrite the root `.planning/STATE.md` to mirror the active workstream's STATE.md.
+ *
+ * Fixes #2618 gap 2 — downstream consumers (statusline, progress, any tool that
+ * reads the root mirror) must see the new workstream's state immediately after a
+ * switch. The workstream STATE.md is authoritative; the root file is a
+ * pass-through copy. We write content verbatim (atomic write via writeFileSync)
+ * so frontmatter fields and body stay in lockstep with the source.
+ */
+function syncRootStateMirror(projectDir: string, name: string): void {
+  const wsStatePath = join(workstreamsDir(projectDir), name, 'STATE.md');
+  const rootStatePath = join(planningRoot(projectDir), 'STATE.md');
+  if (!existsSync(wsStatePath)) return;
+  try {
+    const content = readFileSync(wsStatePath, 'utf-8');
+    writeFileSync(rootStatePath, content, 'utf-8');
+  } catch { /* best-effort mirror; do not fail the switch */ }
+}
+
 export const workstreamSet: QueryHandler = async (args, projectDir) => {
   const name = args[0];
 
@@ -211,7 +230,8 @@ export const workstreamSet: QueryHandler = async (args, projectDir) => {
   }
 
   setActiveWorkstream(projectDir, name);
-  return { data: { active: name, set: true } };
+  syncRootStateMirror(projectDir, name);
+  return { data: { active: name, set: true, mirror_synced: existsSync(join(wsDir, 'STATE.md')) } };
 };
 
 export const workstreamStatus: QueryHandler = async (args, projectDir) => {
