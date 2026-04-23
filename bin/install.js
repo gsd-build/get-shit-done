@@ -57,6 +57,20 @@ const claudeToCopilotTools = {
 // Get version from package.json
 const pkg = require('../package.json');
 
+// #2517 — runtime-aware tier resolution shared with core.cjs.
+// Hoisted to top with absolute __dirname-based paths so `gsd install codex` works
+// when invoked via npm global install (cwd is the user's project, not the gsd repo
+// root). Inline `require('../get-shit-done/...')` from inside install functions
+// works only because Node resolves it relative to the install.js file regardless
+// of cwd, but keeping the require at the top makes the dependency explicit and
+// surfaces resolution failures at process start instead of at first install call.
+const _gsdLibDir = path.join(__dirname, '..', 'get-shit-done', 'bin', 'lib');
+const { MODEL_PROFILES: GSD_MODEL_PROFILES } = require(path.join(_gsdLibDir, 'model-profiles.cjs'));
+const {
+  RUNTIME_PROFILE_MAP: GSD_RUNTIME_PROFILE_MAP,
+  resolveTierEntry: gsdResolveTierEntry,
+} = require(path.join(_gsdLibDir, 'core.cjs'));
+
 // Parse args
 const args = process.argv.slice(2);
 const hasGlobal = args.includes('--global') || args.includes('-g');
@@ -621,53 +635,112 @@ function readGsdGlobalModelOverrides() {
 }
 
 /**
- * #2517 — Build a runtime-aware tier resolver for the install path.
- * Reads runtime + model_profile + model_profile_overrides from ~/.gsd/defaults.json.
- * Returns null if no runtime is configured (preserves prior behavior — only
- * model_overrides is embedded, no tier/reasoning-effort inference).
- *
- * Caller passes one of:
- *   { runtime: 'codex' }                           → use built-in Codex defaults
- *   { runtime: 'codex', model_profile_overrides:{} } → user overrides on top
- *
- * Returns { resolve(agentName) -> { model, reasoning_effort? } | null }
+ * #2517 — Read a single GSD config file (defaults.json or per-project
+ * config.json) into a plain object, returning null on missing/empty files
+ * and warning to stderr on JSON parse failures so silent corruption can't
+ * mask broken configs (review finding #5).
  */
-function readGsdRuntimeProfileResolver() {
+function _readGsdConfigFile(absPath, label) {
+  if (!fs.existsSync(absPath)) return null;
+  let raw;
   try {
-    const defaultsPath = path.join(os.homedir(), '.gsd', 'defaults.json');
-    if (!fs.existsSync(defaultsPath)) return null;
-    const raw = fs.readFileSync(defaultsPath, 'utf-8');
-    const parsed = JSON.parse(raw);
-    const runtime = parsed.runtime;
-    if (!runtime) return null;
-
-    const profile = String(parsed.model_profile || 'balanced').toLowerCase();
-    if (profile === 'inherit') return null;
-
-    const { MODEL_PROFILES } = require('../get-shit-done/bin/lib/model-profiles.cjs');
-    const { RUNTIME_PROFILE_MAP } = require('../get-shit-done/bin/lib/core.cjs');
-    const userOverrides = parsed.model_profile_overrides?.[runtime];
-    const builtin = RUNTIME_PROFILE_MAP[runtime];
-
-    return {
-      runtime,
-      resolve(agentName) {
-        const agentModels = MODEL_PROFILES[agentName];
-        if (!agentModels) return null;
-        const tier = agentModels[profile] || agentModels['balanced'];
-        if (!tier) return null;
-        const userEntry = userOverrides?.[tier];
-        if (userEntry) {
-          if (typeof userEntry === 'string') return { model: userEntry };
-          return userEntry;
-        }
-        if (builtin?.[tier]) return builtin[tier];
-        return null;
-      },
-    };
-  } catch {
+    raw = fs.readFileSync(absPath, 'utf-8');
+  } catch (err) {
+    process.stderr.write(`gsd: warning — could not read ${label} (${absPath}): ${err.message}\n`);
     return null;
   }
+  try {
+    return JSON.parse(raw);
+  } catch (err) {
+    process.stderr.write(`gsd: warning — invalid JSON in ${label} (${absPath}): ${err.message}\n`);
+    return null;
+  }
+}
+
+/**
+ * #2517 — Build a runtime-aware tier resolver for the install path.
+ *
+ * Probes BOTH per-project `<targetDir>/.planning/config.json` AND
+ * `~/.gsd/defaults.json`, with per-project keys winning over global. This
+ * matches `loadConfig`'s precedence and is the only way the PR's headline claim
+ * — "set runtime in .planning/config.json and the Codex TOML emit picks it up"
+ * — actually holds end-to-end (review finding #1).
+ *
+ * `targetDir` should be the consuming runtime's install root — install code
+ * passes `path.dirname(<runtime root>)` so `.planning/config.json` resolves
+ * relative to the user's project. When `targetDir` is null/undefined, only the
+ * global defaults are consulted.
+ *
+ * Returns null if no `runtime` is configured (preserves prior behavior — only
+ * model_overrides is embedded, no tier/reasoning-effort inference). Returns
+ * null when `model_profile` is `inherit` so the literal alias passes through
+ * unchanged.
+ *
+ * Returns { runtime, resolve(agentName) -> { model, reasoning_effort? } | null }
+ */
+function readGsdRuntimeProfileResolver(targetDir = null) {
+  const homeDefaults = _readGsdConfigFile(
+    path.join(os.homedir(), '.gsd', 'defaults.json'),
+    '~/.gsd/defaults.json'
+  );
+
+  // Per-project config probe. Resolve the project root by walking up from
+  // targetDir until we hit a `.planning/` directory; this covers both the
+  // common case (caller passes the project root) and the case where caller
+  // passes a nested install dir like `<root>/.codex/`.
+  let projectConfig = null;
+  if (targetDir) {
+    let probeDir = path.resolve(targetDir);
+    for (let depth = 0; depth < 8; depth += 1) {
+      const candidate = path.join(probeDir, '.planning', 'config.json');
+      if (fs.existsSync(candidate)) {
+        projectConfig = _readGsdConfigFile(candidate, '.planning/config.json');
+        break;
+      }
+      const parent = path.dirname(probeDir);
+      if (parent === probeDir) break;
+      probeDir = parent;
+    }
+  }
+
+  // Per-project wins. Only fall back to ~/.gsd/defaults.json when the project
+  // didn't set the field. Field-level merge (not whole-object replace) so a
+  // user can keep `runtime` global while overriding only `model_profile` per
+  // project, and vice versa.
+  const merged = {
+    runtime:
+      (projectConfig && projectConfig.runtime) ||
+      (homeDefaults && homeDefaults.runtime) ||
+      null,
+    model_profile:
+      (projectConfig && projectConfig.model_profile) ||
+      (homeDefaults && homeDefaults.model_profile) ||
+      'balanced',
+    model_profile_overrides:
+      (projectConfig && projectConfig.model_profile_overrides) ||
+      (homeDefaults && homeDefaults.model_profile_overrides) ||
+      null,
+  };
+
+  if (!merged.runtime) return null;
+
+  const profile = String(merged.model_profile).toLowerCase();
+  if (profile === 'inherit') return null;
+
+  return {
+    runtime: merged.runtime,
+    resolve(agentName) {
+      const agentModels = GSD_MODEL_PROFILES[agentName];
+      if (!agentModels) return null;
+      const tier = agentModels[profile] || agentModels.balanced;
+      if (!tier) return null;
+      return gsdResolveTierEntry({
+        runtime: merged.runtime,
+        tier,
+        overrides: merged.model_profile_overrides,
+      });
+    },
+  };
 }
 
 // Cache for attribution settings (populated once per runtime during install)
@@ -3115,7 +3188,11 @@ function installCodexConfig(targetDir, agentsSrc) {
     // resolve to Codex-native model IDs + reasoning_effort when `runtime: "codex"`
     // is set in defaults.json.
     const modelOverrides = readGsdGlobalModelOverrides();
-    const runtimeResolver = readGsdRuntimeProfileResolver();
+    // Pass `targetDir` so per-project .planning/config.json wins over global
+    // ~/.gsd/defaults.json — without this, the PR's headline claim that
+    // setting runtime in the project config reaches the Codex emit path is
+    // false (review finding #1).
+    const runtimeResolver = readGsdRuntimeProfileResolver(targetDir);
     const tomlContent = generateCodexAgentToml(name, content, modelOverrides, runtimeResolver);
     fs.writeFileSync(path.join(agentsTomlDir, `${name}.toml`), tomlContent);
   }
@@ -7008,6 +7085,7 @@ if (process.env.GSD_TEST_MODE) {
     stripGsdFromCodexConfig,
     mergeCodexConfig,
     installCodexConfig,
+    readGsdRuntimeProfileResolver,
     install,
     uninstall,
     convertClaudeCommandToCodexSkill,

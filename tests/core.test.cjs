@@ -162,15 +162,25 @@ describe('loadConfig', () => {
     const { VALID_CONFIG_KEYS } = require('../get-shit-done/bin/lib/config.cjs');
     // Every top-level key from VALID_CONFIG_KEYS should be recognized
     const topLevelKeys = [...VALID_CONFIG_KEYS].map(k => k.split('.')[0]);
+    // For value-validated keys (e.g. `runtime` enforces an enum at loadConfig
+    // time, see #2517 review finding #10), seed a known-good value so the
+    // value-validation warning doesn't fire — this test only checks that the
+    // key NAME is recognized, not whether the value itself is valid.
+    const KEY_VALID_VALUES = { runtime: 'codex' };
     for (const key of topLevelKeys) {
-      writeConfig({ [key]: 'test-value' });
+      const value = KEY_VALID_VALUES[key] ?? 'test-value';
+      writeConfig({ [key]: value });
       const origWrite = process.stderr.write;
       let stderrOutput = '';
       process.stderr.write = (chunk) => { stderrOutput += chunk; };
       try {
         loadConfig(tmpDir);
+        // Look only for the unknown-KEY warning shape, not any incidental match
+        // (the value-validation warning emitted by #2517 mentions key names too).
+        const unknownKeyWarning = stderrOutput.includes('unknown config key(s)') &&
+          stderrOutput.includes(key);
         assert.ok(
-          !stderrOutput.includes(key),
+          !unknownKeyWarning,
           `VALID_CONFIG_KEYS key "${key}" should not trigger unknown-key warning`
         );
       } finally {
