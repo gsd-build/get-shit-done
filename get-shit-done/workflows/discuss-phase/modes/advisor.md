@@ -54,6 +54,18 @@ Set `NON_TECHNICAL_OWNER = true` if ANY of the following are present:
 - `explanation_depth: practical-detailed` (without a technical modifier)
 - `explanation_depth: high-level`
 
+**Tie-breaker / precedence (when signals conflict):**
+1. An explicit `technical_background: true` (or any `explanation_depth` value
+   tagged with a technical modifier such as `practical-detailed:technical`)
+   **overrides** all inferred non-technical signals — set
+   `NON_TECHNICAL_OWNER = false`.
+2. Otherwise, ANY single matching signal is sufficient to set
+   `NON_TECHNICAL_OWNER = true` (signals are OR-aggregated, not weighted).
+3. Contradictory `explanation_depth` values: the most recent entry wins.
+
+Log the resolved value and the matched/overriding signal so the user can
+audit why a given framing was used.
+
 When `NON_TECHNICAL_OWNER` is true, reframe gray area labels and
 descriptions in product-outcome language before presenting them. Preserve
 the same underlying decision — only change the framing:

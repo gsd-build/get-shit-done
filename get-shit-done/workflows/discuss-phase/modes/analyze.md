@@ -14,7 +14,7 @@ a brief **trade-off analysis** for the decision:
 
 ## Example
 
-```
+```markdown
 **Trade-off analysis: Authentication strategy**
 
 | Approach | Pros | Cons |

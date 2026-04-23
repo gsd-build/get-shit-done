@@ -25,7 +25,7 @@ Text mode applies to ALL workflows in the session, not just discuss-phase.
 ## Question rendering
 
 Replace this:
-```
+```text
 AskUserQuestion(
   header="Layout",
   question="How should posts be displayed?",
@@ -34,7 +34,7 @@ AskUserQuestion(
 ```
 
 With this:
-```
+```text
 Layout — How should posts be displayed?
   1. Cards
   2. List

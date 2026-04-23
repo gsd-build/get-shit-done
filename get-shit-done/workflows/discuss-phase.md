@@ -354,6 +354,8 @@ Overlays (combine with the active mode):
 - `--batch` → `workflows/discuss-phase/modes/batch.md` (group 2–5 questions per turn)
 - `--analyze` → `workflows/discuss-phase/modes/analyze.md` (trade-off table before each question)
 
+**Overlay stacking:** overlays combine and apply outer→inner in fixed order `--analyze` → `--batch` → `--text` (e.g., `--batch --analyze` = trade-off table per question group; add `--text` for plain-text rendering). Mode-specific precedence (e.g., `--auto --power`) is documented in each overlay file's "Combination rules" section.
+
 All modes preserve the universal rules below.
 
 **Universal rules (apply to every mode):**

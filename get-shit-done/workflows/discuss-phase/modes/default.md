@@ -21,7 +21,7 @@ For each selected area, conduct a focused discussion loop.
 3. Present the research alongside the question so the user can make a more informed decision
 
 Example with research enabled:
-```
+```text
 Let's talk about [Authentication Strategy].
 
 📊 Best practices research:
@@ -40,7 +40,7 @@ check whether to continue. Each answer should reveal the next question.
 **For each area:**
 
 1. **Announce the area:**
-   ```
+   ```text
    Let's talk about [Area].
    ```
 
@@ -49,7 +49,7 @@ check whether to continue. Each answer should reveal the next question.
    - question: Specific decision for this area
    - options: 2-3 concrete choices (AskUserQuestion adds "Other" automatically), with the recommended choice highlighted and brief explanation why
    - **Annotate options with code context** when relevant:
-     ```
+     ```text
      "How should posts be displayed?"
      - Cards (reuses existing Card component — consistent with Messages)
      - List (simpler, would be a new pattern)
@@ -98,7 +98,7 @@ These user-referenced docs are often MORE important than ROADMAP.md refs because
 If `features.thinking_partner` is enabled in config, check the user's answer for tradeoff signals
 (see `references/thinking-partner.md` for signal list). If tradeoff detected:
 
-```
+```text
 I notice competing priorities here — {option_A} optimizes for {goal_A} while {option_B} optimizes for {goal_B}.
 
 Want me to think through the tradeoffs before we lock this in?
@@ -109,7 +109,7 @@ If yes: provide 3-5 bullet analysis (what each optimizes/sacrifices, alignment w
 
 **Scope creep handling:**
 If user mentions something outside the phase domain:
-```
+```text
 "[Feature] sounds like a new capability — that belongs in its own phase.
 I'll note it as a deferred idea.
 
