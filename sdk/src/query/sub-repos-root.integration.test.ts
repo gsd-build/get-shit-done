@@ -20,7 +20,6 @@ describe('issue #2623 — sub_repos project-root resolution through query dispat
 
   beforeEach(async () => {
     workspace = await mkdtemp(join(tmpdir(), 'gsd-2623-'));
-    await mkdir(join(workspace, '.planing'), { recursive: true }).catch(() => {});
     await mkdir(join(workspace, '.planning'), { recursive: true });
     await mkdir(join(workspace, '.planning', 'phases'), { recursive: true });
     await writeFile(
