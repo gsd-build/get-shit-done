@@ -63,11 +63,17 @@ Parse current values (default to `true` if not present):
 **Non-Claude runtime note:** If `TEXT_MODE` is active (i.e. the runtime is non-Claude), prepend the following notice before the model profile question:
 
 ```
-Note: Quality, Balanced, and Budget profiles select Claude model tiers (Opus/Sonnet/Haiku).
-On non-Claude runtimes (Codex, Gemini CLI, etc.) these profiles have no effect on actual
-model selection — GSD agents will use the runtime's default model.
-Choose "Inherit" to use the session model for all agents, or configure model_overrides
-manually in .planning/config.json to target specific models for this runtime.
+Note: Quality, Balanced, Budget, and Adaptive profiles assign semantic tiers
+(Opus/Sonnet/Haiku) to each agent. When `runtime` is set in .planning/config.json,
+tiers resolve to runtime-native model IDs — on Codex that's gpt-5.4 / gpt-5.3-codex /
+gpt-5.4-mini with appropriate reasoning effort. See "Runtime-Aware Profiles" in
+docs/CONFIGURATION.md.
+
+If `runtime` is unset on a non-Claude runtime, the profile tiers have no effect on
+actual model selection — agents use the runtime's default model. Choose "Inherit" to
+force session-model behavior, set `runtime` + a profile to get tiered models, or
+configure `model_overrides` manually in .planning/config.json to target specific
+models per agent.
 ```
 
 Use AskUserQuestion with current values pre-selected. Questions are grouped into six visual sections; the first question in each section carries the section-denoting `header` field (AskUserQuestion renders abbreviated section tags for grouping, max 12 chars).

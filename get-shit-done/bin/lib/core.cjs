@@ -390,6 +390,10 @@ function loadConfig(cwd) {
       project_code: get('project_code') ?? defaults.project_code,
       subagent_timeout: get('subagent_timeout', { section: 'workflow', field: 'subagent_timeout' }) ?? defaults.subagent_timeout,
       model_overrides: parsed.model_overrides || null,
+      // #2517 — runtime-aware profiles. `runtime` defaults to null (back-compat).
+      // When null, resolveModelInternal preserves today's Claude-native behavior.
+      runtime: parsed.runtime || null,
+      model_profile_overrides: parsed.model_profile_overrides || null,
       agent_skills: parsed.agent_skills || {},
       manager: parsed.manager || {},
       response_language: get('response_language') || null,
@@ -1449,37 +1453,138 @@ const MODEL_ALIAS_MAP = {
   'haiku': 'claude-haiku-4-5',
 };
 
+/**
+ * #2517 — runtime-aware tier resolution.
+ * Maps `model_profile` tiers (opus/sonnet/haiku) to runtime-native model IDs and
+ * (where supported) reasoning_effort settings.
+ *
+ * Each entry: { model: <id>, reasoning_effort?: <level> }
+ *
+ * `claude` mirrors MODEL_ALIAS_MAP — present for symmetry so `runtime: "claude"`
+ * resolves through the same code path. `codex` defaults are taken from the spec
+ * in #2517. Unknown runtimes fall back to the Claude alias to avoid emitting
+ * provider-specific IDs the runtime cannot accept.
+ */
+const RUNTIME_PROFILE_MAP = {
+  claude: {
+    opus:   { model: 'claude-opus-4-6' },
+    sonnet: { model: 'claude-sonnet-4-6' },
+    haiku:  { model: 'claude-haiku-4-5' },
+  },
+  codex: {
+    opus:   { model: 'gpt-5.4',        reasoning_effort: 'xhigh' },
+    sonnet: { model: 'gpt-5.3-codex',  reasoning_effort: 'medium' },
+    haiku:  { model: 'gpt-5.4-mini',   reasoning_effort: 'medium' },
+  },
+};
+
+const RUNTIMES_WITH_REASONING_EFFORT = new Set(['codex']);
+
+/**
+ * Resolve the runtime-aware tier entry for (runtime, tier).
+ * Order: user-supplied model_profile_overrides[runtime][tier] beats built-in
+ * RUNTIME_PROFILE_MAP[runtime][tier]. Returns null if neither has the entry.
+ *
+ * Result shape: { model: string, reasoning_effort?: string } | null
+ */
+function _resolveRuntimeTier(config, tier) {
+  const runtime = config.runtime;
+  if (!runtime || !tier) return null;
+
+  const userOverrides = config.model_profile_overrides?.[runtime];
+  const builtin = RUNTIME_PROFILE_MAP[runtime];
+
+  // User override takes precedence. Built-in map provides the fallback.
+  // String shorthand: a user can write { codex: { opus: "gpt-5-pro" } } instead
+  // of { codex: { opus: { model: "gpt-5-pro" } } }.
+  const userEntry = userOverrides?.[tier];
+  if (userEntry) {
+    if (typeof userEntry === 'string') return { model: userEntry };
+    return userEntry;
+  }
+  if (builtin?.[tier]) return builtin[tier];
+  return null;
+}
+
 function resolveModelInternal(cwd, agentType) {
   const config = loadConfig(cwd);
 
-  // Check per-agent override first — always respected regardless of resolve_model_ids.
+  // 1. Per-agent override — always respected; highest precedence.
   // Users who set fully-qualified model IDs (e.g., "openai/gpt-5.4") get exactly that.
   const override = config.model_overrides?.[agentType];
   if (override) {
     return override;
   }
 
-  // resolve_model_ids: "omit" — return empty string so the runtime uses its configured
-  // default model. For non-Claude runtimes (OpenCode, Codex, etc.) that don't recognize
-  // Claude aliases (opus/sonnet/haiku/inherit). Set automatically during install. See #1156.
+  // 2. Compute the tier (opus/sonnet/haiku) for this agent under the active profile.
+  const profile = String(config.model_profile || 'balanced').toLowerCase();
+  const agentModels = MODEL_PROFILES[agentType];
+  const tier = agentModels ? (agentModels[profile] || agentModels['balanced']) : null;
+
+  // 3. Runtime-aware resolution (#2517) — only when `runtime` is explicitly set.
+  // Deliberate ordering: explicit `runtime` opt-in beats `resolve_model_ids: "omit"`
+  // so users on Codex installs that auto-set "omit" can still flip on tiered behavior
+  // by setting runtime alone. inherit profile is preserved verbatim.
+  if (config.runtime && profile !== 'inherit' && tier) {
+    const entry = _resolveRuntimeTier(config, tier);
+    if (entry?.model) return entry.model;
+    // Unknown runtime with no user-supplied overrides — fall through to Claude-safe
+    // default rather than emit an ID the runtime can't accept.
+  }
+
+  // 4. resolve_model_ids: "omit" — return empty string so the runtime uses its
+  // configured default model. For non-Claude runtimes (OpenCode, Codex, etc.) that
+  // don't recognize Claude aliases. Set automatically during install. See #1156.
   if (config.resolve_model_ids === 'omit') {
     return '';
   }
 
-  // Fall back to profile lookup
-  const profile = String(config.model_profile || 'balanced').toLowerCase();
-  const agentModels = MODEL_PROFILES[agentType];
+  // 5. Profile lookup (Claude-native default).
   if (!agentModels) return 'sonnet';
   if (profile === 'inherit') return 'inherit';
-  const alias = agentModels[profile] || agentModels['balanced'] || 'sonnet';
+  const alias = tier || 'sonnet';
 
-  // resolve_model_ids: true — map alias to full Claude model ID
-  // Prevents 404s when the Task tool passes aliases directly to the API
+  // resolve_model_ids: true — map alias to full Claude model ID.
+  // Prevents 404s when the Task tool passes aliases directly to the API.
   if (config.resolve_model_ids) {
     return MODEL_ALIAS_MAP[alias] || alias;
   }
 
   return alias;
+}
+
+/**
+ * #2517 — Resolve runtime-specific reasoning_effort for an agent.
+ * Returns null unless:
+ *   - `runtime` is explicitly set in config,
+ *   - the runtime supports reasoning_effort (currently: codex),
+ *   - profile is not 'inherit',
+ *   - the resolved tier entry has a `reasoning_effort` value.
+ *
+ * Never returns a value for Claude — keeps reasoning_effort out of Claude spawn paths.
+ */
+function resolveReasoningEffortInternal(cwd, agentType) {
+  const config = loadConfig(cwd);
+  if (!config.runtime) return null;
+  if (!RUNTIMES_WITH_REASONING_EFFORT.has(config.runtime)) {
+    // Even with user overrides, only known reasoning-effort runtimes propagate it
+    // — we don't want a typo in `runtime` to leak xhigh into a Claude install.
+    // User overrides for unknown runtimes still resolve a model, just no effort.
+    if (!config.model_profile_overrides?.[config.runtime]) return null;
+  }
+  // Per-agent override means user supplied a fully-qualified ID; reasoning_effort
+  // for that case must be set via per-agent mechanism, not tier inference.
+  if (config.model_overrides?.[agentType]) return null;
+
+  const profile = String(config.model_profile || 'balanced').toLowerCase();
+  if (profile === 'inherit') return null;
+  const agentModels = MODEL_PROFILES[agentType];
+  if (!agentModels) return null;
+  const tier = agentModels[profile] || agentModels['balanced'];
+  if (!tier) return null;
+
+  const entry = _resolveRuntimeTier(config, tier);
+  return entry?.reasoning_effort || null;
 }
 
 // ─── Summary body helpers ─────────────────────────────────────────────────
@@ -1760,6 +1865,8 @@ module.exports = {
   getArchivedPhaseDirs,
   getRoadmapPhaseInternal,
   resolveModelInternal,
+  resolveReasoningEffortInternal,
+  RUNTIME_PROFILE_MAP,
   pathExistsInternal,
   generateSlugInternal,
   getMilestoneInfo,

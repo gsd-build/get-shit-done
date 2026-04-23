@@ -111,7 +111,9 @@ GSD stores project settings in `.planning/config.json`. Created during `/gsd-new
 |---------|------|---------|---------|-------------|
 | `mode` | enum | `interactive`, `yolo` | `interactive` | `yolo` auto-approves decisions; `interactive` confirms at each step |
 | `granularity` | enum | `coarse`, `standard`, `fine` | `standard` | Controls phase count: `coarse` (3-5), `standard` (5-8), `fine` (8-12) |
-| `model_profile` | enum | `quality`, `balanced`, `budget`, `inherit` | `balanced` | Model tier for each agent (see [Model Profiles](#model-profiles)) |
+| `model_profile` | enum | `quality`, `balanced`, `budget`, `adaptive`, `inherit` | `balanced` | Model tier for each agent (see [Model Profiles](#model-profiles)) |
+| `runtime` | string | `claude`, `codex`, `opencode`, or any string | (none) | Active runtime for [runtime-aware profile resolution](#runtime-aware-profiles-2517). When set, profile tiers (opus/sonnet/haiku) resolve to runtime-native model IDs. When unset (default), behavior is unchanged from prior versions. Added in v1.39 |
+| `model_profile_overrides.<runtime>.<tier>` | string \| object | per-runtime tier override | (none) | Override the runtime-aware tier mapping for a specific `(runtime, tier)`. Tier is one of `opus`, `sonnet`, `haiku`. Value is either a model ID string (e.g. `"gpt-5-pro"`) or `{ model, reasoning_effort }`. See [Runtime-Aware Profiles](#runtime-aware-profiles-2517). Added in v1.39 |
 | `project_code` | string | any short string | (none) | Prefix for phase directory names (e.g., `"ABC"` produces `ABC-01-setup/`). Added in v1.31 |
 | `response_language` | string | language code | (none) | Language for agent responses (e.g., `"pt"`, `"ko"`, `"ja"`). Propagates to all spawned agents for cross-phase language consistency. Added in v1.32 |
 | `context_window` | number | any integer | `200000` | Context window size in tokens. Set `1000000` for 1M-context models (e.g., `claude-opus-4-7[1m]`). Values `>= 500000` enable adaptive context enrichment (full-body reads of prior SUMMARY.md, deeper anti-pattern reads). Configured via `/gsd-settings-advanced`. |
@@ -587,6 +589,64 @@ The intent is the same as the Claude profile tiers -- use a stronger model for p
 | `false` (default) | Returns Claude aliases (`opus`, `sonnet`, `haiku`) | Claude Code with native Anthropic API |
 | `true` | Maps aliases to full Claude model IDs (`claude-opus-4-6`) | Claude Code with API that requires full IDs |
 | `"omit"` | Returns empty string (runtime picks its default) | Non-Claude runtimes (Codex, OpenCode, Gemini CLI, Kilo) |
+
+### Runtime-Aware Profiles (#2517)
+
+When `runtime` is set, profile tiers (`opus`/`sonnet`/`haiku`) resolve to runtime-native model IDs instead of Claude aliases. This lets a single shared `.planning/config.json` work cleanly across Claude and Codex.
+
+**Built-in tier maps:**
+
+| Runtime | `opus` | `sonnet` | `haiku` | reasoning_effort |
+|---------|--------|----------|---------|------------------|
+| `claude` | `claude-opus-4-6` | `claude-sonnet-4-6` | `claude-haiku-4-5` | (not used) |
+| `codex` | `gpt-5.4` | `gpt-5.3-codex` | `gpt-5.4-mini` | `xhigh` / `medium` / `medium` |
+
+**Codex example** — one config, tiered models, no large `model_overrides` block:
+
+```json
+{
+  "runtime": "codex",
+  "model_profile": "balanced"
+}
+```
+
+This resolves `gsd-planner` → `gpt-5.4` (xhigh), `gsd-executor` → `gpt-5.3-codex` (medium), `gsd-codebase-mapper` → `gpt-5.4-mini` (medium). The Codex installer embeds `model = "..."` and `model_reasoning_effort = "..."` in each generated agent TOML.
+
+**Claude example** — explicit opt-in resolves to full Claude IDs (no `resolve_model_ids: true` needed):
+
+```json
+{
+  "runtime": "claude",
+  "model_profile": "quality"
+}
+```
+
+**Per-runtime overrides** — replace one or more tier defaults:
+
+```json
+{
+  "runtime": "codex",
+  "model_profile": "quality",
+  "model_profile_overrides": {
+    "codex": {
+      "opus": "gpt-5-pro",
+      "haiku": { "model": "gpt-5-nano", "reasoning_effort": "low" }
+    }
+  }
+}
+```
+
+**Precedence (highest to lowest):**
+
+1. `model_overrides[<agent>]` — explicit per-agent ID always wins.
+2. **Runtime-aware tier resolution** (this section) — when `runtime` is set and profile is not `inherit`.
+3. `resolve_model_ids: "omit"` — returns empty string when no `runtime` is set.
+4. Claude-native default — `model_profile` tier as alias (current default).
+5. `inherit` — propagates literal `inherit` for `Task(model="inherit")` semantics.
+
+**Backwards compatibility.** Setups without `runtime` set see zero behavior change — every existing config continues to work identically. Codex installs that auto-set `resolve_model_ids: "omit"` continue to omit the model field unless the user opts in by setting `runtime: "codex"`.
+
+**Unknown runtimes.** If `runtime` is set to a value with no built-in tier map and no `model_profile_overrides[<runtime>]`, GSD falls back to the Claude-alias safe default rather than emit a model ID the runtime cannot accept. To support a new runtime, populate `model_profile_overrides.<runtime>.{opus,sonnet,haiku}` with valid IDs.
 
 ### Profile Philosophy
 

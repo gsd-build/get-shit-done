@@ -62,6 +62,8 @@ const VALID_CONFIG_KEYS = new Set([
   'graphify.build_timeout',
   'claude_md_path',
   'claude_md_assembly.mode',
+  // #2517 — runtime-aware model profiles
+  'runtime',
 ]);
 
 /**
@@ -73,6 +75,10 @@ const DYNAMIC_KEY_PATTERNS = [
   { test: (k) => /^review\.models\.[a-zA-Z0-9_-]+$/.test(k),                 description: 'review.models.<cli-name>' },
   { test: (k) => /^features\.[a-zA-Z0-9_]+$/.test(k),                        description: 'features.<feature_name>' },
   { test: (k) => /^claude_md_assembly\.blocks\.[a-zA-Z0-9_]+$/.test(k),      description: 'claude_md_assembly.blocks.<section>' },
+  // #2517 — runtime-aware model profile overrides: model_profile_overrides.<runtime>.<tier>
+  // <runtime> is a free string (so users can map non-built-in runtimes); <tier> is enum-restricted.
+  { test: (k) => /^model_profile_overrides\.[a-zA-Z0-9_-]+\.(opus|sonnet|haiku)$/.test(k),
+    description: 'model_profile_overrides.<runtime>.<opus|sonnet|haiku>' },
 ];
 
 /**

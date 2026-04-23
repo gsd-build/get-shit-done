@@ -620,6 +620,56 @@ function readGsdGlobalModelOverrides() {
   }
 }
 
+/**
+ * #2517 — Build a runtime-aware tier resolver for the install path.
+ * Reads runtime + model_profile + model_profile_overrides from ~/.gsd/defaults.json.
+ * Returns null if no runtime is configured (preserves prior behavior — only
+ * model_overrides is embedded, no tier/reasoning-effort inference).
+ *
+ * Caller passes one of:
+ *   { runtime: 'codex' }                           → use built-in Codex defaults
+ *   { runtime: 'codex', model_profile_overrides:{} } → user overrides on top
+ *
+ * Returns { resolve(agentName) -> { model, reasoning_effort? } | null }
+ */
+function readGsdRuntimeProfileResolver() {
+  try {
+    const defaultsPath = path.join(os.homedir(), '.gsd', 'defaults.json');
+    if (!fs.existsSync(defaultsPath)) return null;
+    const raw = fs.readFileSync(defaultsPath, 'utf-8');
+    const parsed = JSON.parse(raw);
+    const runtime = parsed.runtime;
+    if (!runtime) return null;
+
+    const profile = String(parsed.model_profile || 'balanced').toLowerCase();
+    if (profile === 'inherit') return null;
+
+    const { MODEL_PROFILES } = require('../get-shit-done/bin/lib/model-profiles.cjs');
+    const { RUNTIME_PROFILE_MAP } = require('../get-shit-done/bin/lib/core.cjs');
+    const userOverrides = parsed.model_profile_overrides?.[runtime];
+    const builtin = RUNTIME_PROFILE_MAP[runtime];
+
+    return {
+      runtime,
+      resolve(agentName) {
+        const agentModels = MODEL_PROFILES[agentName];
+        if (!agentModels) return null;
+        const tier = agentModels[profile] || agentModels['balanced'];
+        if (!tier) return null;
+        const userEntry = userOverrides?.[tier];
+        if (userEntry) {
+          if (typeof userEntry === 'string') return { model: userEntry };
+          return userEntry;
+        }
+        if (builtin?.[tier]) return builtin[tier];
+        return null;
+      },
+    };
+  } catch {
+    return null;
+  }
+}
+
 // Cache for attribution settings (populated once per runtime during install)
 const attributionCache = new Map();
 
@@ -1789,7 +1839,7 @@ purpose: ${toSingleLine(description)}
  * Sets required agent metadata, sandbox_mode, and developer_instructions
  * from the agent markdown content.
  */
-function generateCodexAgentToml(agentName, agentContent, modelOverrides = null) {
+function generateCodexAgentToml(agentName, agentContent, modelOverrides = null, runtimeResolver = null) {
   const sandboxMode = CODEX_AGENT_SANDBOX[agentName] || 'read-only';
   const { frontmatter, body } = extractFrontmatterAndBody(agentContent);
   const frontmatterText = frontmatter || '';
@@ -1808,9 +1858,20 @@ function generateCodexAgentToml(agentName, agentContent, modelOverrides = null) 
   // Embed model override when configured in ~/.gsd/defaults.json so that
   // model_overrides is respected on Codex (which uses static TOML, not inline
   // Task() model parameters). See #2256.
+  // Precedence: per-agent model_overrides > runtime-aware tier resolution (#2517).
   const modelOverride = modelOverrides?.[resolvedName] || modelOverrides?.[agentName];
   if (modelOverride) {
     lines.push(`model = ${JSON.stringify(modelOverride)}`);
+  } else if (runtimeResolver) {
+    // #2517 — runtime-aware tier resolution. Embeds Codex-native model + reasoning_effort
+    // from RUNTIME_PROFILE_MAP / model_profile_overrides for the configured tier.
+    const entry = runtimeResolver.resolve(resolvedName) || runtimeResolver.resolve(agentName);
+    if (entry?.model) {
+      lines.push(`model = ${JSON.stringify(entry.model)}`);
+      if (entry.reasoning_effort) {
+        lines.push(`model_reasoning_effort = ${JSON.stringify(entry.reasoning_effort)}`);
+      }
+    }
   }
 
   // Agent prompts contain raw backslashes in regexes and shell snippets.
@@ -3050,8 +3111,12 @@ function installCodexConfig(targetDir, agentsSrc) {
 
     // Pass model overrides from ~/.gsd/defaults.json so Codex TOML files
     // embed the configured model — Codex cannot receive model inline (#2256).
+    // #2517 — also pass the runtime-aware tier resolver so profile tiers can
+    // resolve to Codex-native model IDs + reasoning_effort when `runtime: "codex"`
+    // is set in defaults.json.
     const modelOverrides = readGsdGlobalModelOverrides();
-    const tomlContent = generateCodexAgentToml(name, content, modelOverrides);
+    const runtimeResolver = readGsdRuntimeProfileResolver();
+    const tomlContent = generateCodexAgentToml(name, content, modelOverrides, runtimeResolver);
     fs.writeFileSync(path.join(agentsTomlDir, `${name}.toml`), tomlContent);
   }
 
