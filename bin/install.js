@@ -6798,6 +6798,94 @@ function promptLocation(runtimes) {
 }
 
 /**
+ * Check whether any common shell rc file already contains a `PATH=` line
+ * whose HOME-expanded value places `globalBin` on PATH (#2620).
+ *
+ * Parses `~/.zshrc`, `~/.bashrc`, `~/.bash_profile`, `~/.profile` (or the
+ * override list in `rcFileNames`), matches `export PATH=` / bare `PATH=`
+ * lines, and substitutes the common HOME forms (`$HOME`, `${HOME}`, `~`)
+ * with `homeDir` before comparing each PATH segment against `globalBin`.
+ *
+ * Best-effort: any unreadable / malformed / non-existent rc file is ignored
+ * and the fallback is the caller's existing absolute-path suggestion. Only
+ * the `$HOME/…`, `${HOME}/…`, and `~/…` forms are handled — we do not try
+ * to fully parse bash syntax.
+ *
+ * @param {string} globalBin  Absolute path to npm's global bin directory.
+ * @param {string} homeDir    Absolute path used to substitute HOME / ~.
+ * @param {string[]} [rcFileNames]  Override the default rc file list.
+ * @returns {boolean}         true iff any rc file adds globalBin to PATH.
+ */
+function homePathCoveredByRc(globalBin, homeDir, rcFileNames) {
+  if (!globalBin || !homeDir) return false;
+  const path = require('path');
+  const fs = require('fs');
+
+  const normalise = (p) => {
+    if (!p) return '';
+    let n = p.replace(/[\\/]+$/g, '');
+    if (n === '') n = p.startsWith('/') ? '/' : p;
+    return n;
+  };
+
+  const targetAbs = normalise(path.resolve(globalBin));
+  const homeAbs = path.resolve(homeDir);
+  const files = rcFileNames || ['.zshrc', '.bashrc', '.bash_profile', '.profile'];
+
+  const expandHome = (segment) => {
+    let s = segment;
+    s = s.replace(/\$\{HOME\}/g, homeAbs);
+    s = s.replace(/\$HOME/g, homeAbs);
+    if (s.startsWith('~/') || s === '~') {
+      s = s === '~' ? homeAbs : path.join(homeAbs, s.slice(2));
+    }
+    return s;
+  };
+
+  // Match `PATH=…` (optionally prefixed with `export `). The RHS captures
+  // through end-of-line; surrounding quotes are stripped before splitting.
+  const assignRe = /^\s*(?:export\s+)?PATH\s*=\s*(.+?)\s*$/;
+
+  for (const name of files) {
+    const rcPath = path.join(homeAbs, name);
+    let content;
+    try {
+      content = fs.readFileSync(rcPath, 'utf8');
+    } catch {
+      continue;
+    }
+
+    for (const rawLine of content.split(/\r?\n/)) {
+      const line = rawLine.replace(/^\s+/, '');
+      if (line.startsWith('#')) continue;
+
+      const m = assignRe.exec(rawLine);
+      if (!m) continue;
+
+      let rhs = m[1];
+      if ((rhs.startsWith('"') && rhs.endsWith('"')) ||
+          (rhs.startsWith("'") && rhs.endsWith("'"))) {
+        rhs = rhs.slice(1, -1);
+      }
+
+      for (const segment of rhs.split(':')) {
+        if (!segment) continue;
+        const expanded = expandHome(segment.trim());
+        if (expanded.includes('$')) continue;
+        try {
+          const abs = normalise(path.resolve(homeAbs, expanded));
+          if (abs === targetAbs) return true;
+        } catch {
+          // ignore unresolvable segments
+        }
+      }
+    }
+  }
+
+  return false;
+}
+
+/**
  * Verify the prebuilt SDK dist is present and the gsd-sdk shim is wired up.
  *
  * As of fix/2441-sdk-decouple, sdk/dist/ is shipped prebuilt inside the
@@ -6972,6 +7060,7 @@ if (process.env.GSD_TEST_MODE) {
     preserveUserArtifacts,
     restoreUserArtifacts,
     finishInstall,
+    homePathCoveredByRc,
   };
 } else {
 
