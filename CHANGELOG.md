@@ -21,6 +21,7 @@ If you use GSD **as a workflow**—milestones, phases, `.planning/` artifacts, b
 
 ### Changed
 
+- **Codex install now writes the GSD SessionStart hook into `hooks.json` instead of inline `[[hooks]]` TOML** — fixes invalid `config.toml` shapes that made Codex reject model-setting updates with `invalid type: map, expected a sequence`; uninstall now removes only the managed `hooks.json` entry and source-checkout installs fall back to `hooks/` when `hooks/dist/` is absent.
 - **SDK Phase 3 — runner hot path uses the registry directly** — When you run **phase lifecycle** or **new-project init** through the SDK, the common STATE/roadmap/plan-index/complete/commit/config calls **skip extra subprocess overhead** on the default path (workstreams and test overrides unchanged). *Contributors:* `GSDTools` → `initPhaseOp`, `phasePlanIndex`, `phaseComplete`, `initNewProject`, `configSet`, `commit` (#2302).
 - **Docs — `docs/CLI-TOOLS.md`** — New **SDK and programmatic access** section (registry-first guidance, CJS→`gsd-sdk query` examples, `GSDTools`/workstream behavior, `state load` vs registry state handlers, CLI-only commands); **See also** links to `QUERY-HANDLERS.md`, Architecture, and COMMANDS (#2302).
 - **Docs — `docs/USER-GUIDE.md`** — Programmatic CLI subsection: corrected CLI-only vs registry commands; anchor link to CLI-TOOLS SDK section; `state load` caveat cross-reference (#2302).

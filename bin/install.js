@@ -2050,11 +2050,287 @@ function stripCodexGsdAgentSections(content) {
   return content.replace(/^\[agents\.gsd-[^\]]+\]\n(?:(?!\[)[^\n]*\n?)*/gm, '');
 }
 
+function getManagedCodexLegacyInlineCommands(configDir) {
+  const commands = new Set();
+  if (!configDir) {
+    return commands;
+  }
+
+  const normalized = configDir.replace(/\\/g, '/');
+  const home = os.homedir().replace(/\\/g, '/');
+  const portableBase = normalized.startsWith(home)
+    ? '$HOME' + normalized.slice(home.length)
+    : normalized;
+  const legacyUpdateHookName = 'gsd-update-check' + '.js';
+
+  for (const hookName of ['gsd-check-update.js', legacyUpdateHookName]) {
+    for (const baseDir of new Set([normalized, portableBase])) {
+      const hookPath = `${baseDir}/hooks/${hookName}`;
+      commands.add(`node ${hookPath}`);
+      commands.add(`node "${hookPath}"`);
+    }
+  }
+
+  return commands;
+}
+
+function parseSimpleTomlStringAssignment(line, key) {
+  const commentStart = findTomlCommentStart(line);
+  const content = (commentStart === -1 ? line : line.slice(0, commentStart)).trim();
+  const match = content.match(new RegExp(`^${escapeRegExp(key)}\\s*=\\s*([\"'])(.*)\\1$`));
+  return match ? match[2] : null;
+}
+
+function stripManagedGsdCodexInlineHooks(content, configDir) {
+  const managedCommands = getManagedCodexLegacyInlineCommands(configDir);
+  if (managedCommands.size === 0) {
+    return content;
+  }
+
+  const lines = splitTomlLines(content);
+  const kept = [];
+  let removedHookBlock = false;
+
+  for (let i = 0; i < lines.length; i++) {
+    const line = lines[i];
+    if (!/^\s*\[\[hooks\]\]\s*$/.test(line.text)) {
+      kept.push(line);
+      continue;
+    }
+
+    const block = [line];
+    let commandValue = null;
+    let j = i + 1;
+    for (; j < lines.length; j++) {
+      const nextLine = lines[j];
+      if (/^\s*\[/.test(nextLine.text)) {
+        break;
+      }
+      block.push(nextLine);
+      const parsedCommand = parseSimpleTomlStringAssignment(nextLine.text, 'command');
+      if (parsedCommand !== null) {
+        commandValue = parsedCommand;
+      }
+    }
+
+    if (commandValue !== null && managedCommands.has(commandValue)) {
+      removedHookBlock = true;
+      let commentIndex = kept.length - 1;
+      while (commentIndex >= 0 && kept[commentIndex].text.trim() === '') {
+        commentIndex--;
+      }
+      if (commentIndex >= 0 && kept[commentIndex].text.trim() === '# GSD Hooks') {
+        kept.splice(commentIndex);
+      }
+      i = j - 1;
+      continue;
+    }
+
+    kept.push(...block);
+    i = j - 1;
+  }
+
+  if (!removedHookBlock) {
+    return content;
+  }
+
+  return kept.map((line) => line.text + line.eol).join('');
+}
+
+function parseCodexHooksJson(content, hooksPath = 'hooks.json') {
+  let parsed;
+  try {
+    parsed = JSON.parse(stripJsonComments(content));
+  } catch (error) {
+    throw new Error(`Could not parse ${hooksPath}: ${error.message}`);
+  }
+
+  if (!parsed || typeof parsed !== 'object' || Array.isArray(parsed)) {
+    throw new Error(`Could not parse ${hooksPath}: root must be an object`);
+  }
+
+  if (parsed.hooks === undefined) {
+    parsed.hooks = {};
+  }
+
+  if (!parsed.hooks || typeof parsed.hooks !== 'object' || Array.isArray(parsed.hooks)) {
+    throw new Error(`Could not parse ${hooksPath}: \"hooks\" must be an object`);
+  }
+
+  return parsed;
+}
+
+function getCodexHookGroups(parsed, eventName, hooksPath = 'hooks.json') {
+  const groups = parsed.hooks[eventName];
+  if (groups === undefined) {
+    return [];
+  }
+  if (!Array.isArray(groups)) {
+    throw new Error(`Could not parse ${hooksPath}: hooks.${eventName} must be an array`);
+  }
+  return groups;
+}
+
+function getManagedCodexSessionStartCommands(configDir) {
+  return getManagedCodexLegacyInlineCommands(configDir);
+}
+
+function isManagedGsdCodexHook(handler, managedCommands) {
+  return Boolean(
+    handler &&
+    typeof handler === 'object' &&
+    typeof handler.command === 'string' &&
+    managedCommands.has(handler.command.trim())
+  );
+}
+
+function serializeCodexHooksJson(parsed, eol = '\n') {
+  return JSON.stringify(parsed, null, 2).replace(/\n/g, eol) + eol;
+}
+
+function filterManagedCodexHookGroup(group, managedCommands) {
+  if (!group || typeof group !== 'object' || Array.isArray(group) || !Array.isArray(group.hooks)) {
+    return { group, changed: false };
+  }
+
+  const nextHooks = group.hooks.filter((handler) => !isManagedGsdCodexHook(handler, managedCommands));
+  if (nextHooks.length === group.hooks.length) {
+    return { group, changed: false };
+  }
+  if (nextHooks.length === 0) {
+    return { group: null, changed: true };
+  }
+  return { group: { ...group, hooks: nextHooks }, changed: true };
+}
+
+function stripGsdFromCodexHooksJson(content, hooksPath = 'hooks.json', configDir) {
+  const eol = detectLineEnding(content);
+  const parsed = parseCodexHooksJson(content, hooksPath);
+  const managedCommands = getManagedCodexSessionStartCommands(configDir);
+  // Remove references to the managed GSD update-check command from any event.
+  // Uninstall also removes the underlying hook file from targetDir/hooks/, so
+  // keeping a user-edited hook that still points at that managed command would
+  // leave a broken hook configuration behind.
+  let changed = false;
+
+  for (const [eventName, groups] of Object.entries(parsed.hooks)) {
+    const normalizedGroups = Array.isArray(groups)
+      ? groups
+      : (groups && typeof groups === 'object' && !Array.isArray(groups) && Array.isArray(groups.hooks)
+          ? [groups]
+          : null);
+    if (!normalizedGroups) {
+      continue;
+    }
+
+    const nextGroups = [];
+    for (const group of normalizedGroups) {
+      const { group: nextGroup, changed: groupChanged } = filterManagedCodexHookGroup(group, managedCommands);
+      if (groupChanged) {
+        changed = true;
+      }
+      if (nextGroup) {
+        nextGroups.push(nextGroup);
+      }
+    }
+
+    if (Array.isArray(groups)) {
+      if (nextGroups.length > 0) {
+        parsed.hooks[eventName] = nextGroups;
+        continue;
+      }
+
+      if (groups.length > 0) {
+        changed = true;
+      }
+      delete parsed.hooks[eventName];
+      continue;
+    }
+
+    if (nextGroups.length > 0) {
+      parsed.hooks[eventName] = nextGroups[0];
+      continue;
+    }
+
+    changed = true;
+    delete parsed.hooks[eventName];
+  }
+
+  if (!changed) {
+    return content;
+  }
+
+  if (Object.keys(parsed.hooks).length === 0) {
+    const userRootKeys = Object.keys(parsed).filter((key) => key !== 'hooks');
+    if (userRootKeys.length === 0) {
+      return null;
+    }
+  }
+
+  return serializeCodexHooksJson(parsed, eol);
+}
+
+function assertCodexHooksJsonInstallSafe(parsed, hooksPath = 'hooks.json') {
+  for (const [eventName, groups] of Object.entries(parsed.hooks)) {
+    if (!Array.isArray(groups)) {
+      throw new Error(`Could not parse ${hooksPath}: hooks.${eventName} must be an array`);
+    }
+
+    for (const group of groups) {
+      if (!group || typeof group !== 'object' || Array.isArray(group)) {
+        throw new Error(`Could not parse ${hooksPath}: hooks.${eventName} groups must be objects`);
+      }
+      if (!Array.isArray(group.hooks)) {
+        throw new Error(`Could not parse ${hooksPath}: hooks.${eventName} groups must have a hooks array`);
+      }
+    }
+  }
+}
+
+function mergeGsdIntoCodexHooksJson(existingContent, command, hooksPath = 'hooks.json', configDir) {
+  const eol = existingContent ? detectLineEnding(existingContent) : '\n';
+  const parsed = existingContent
+    ? parseCodexHooksJson(existingContent, hooksPath)
+    : { hooks: {} };
+  assertCodexHooksJsonInstallSafe(parsed, hooksPath);
+  const managedCommands = getManagedCodexSessionStartCommands(configDir);
+  if (typeof command === 'string') {
+    managedCommands.add(command.trim());
+  }
+
+  const sessionStartGroups = getCodexHookGroups(parsed, 'SessionStart', hooksPath);
+  const cleanedGroups = [];
+
+  for (const group of sessionStartGroups) {
+    if (!group || typeof group !== 'object' || Array.isArray(group) || !Array.isArray(group.hooks)) {
+      cleanedGroups.push(group);
+      continue;
+    }
+
+    const nextHooks = group.hooks.filter((handler) => !isManagedGsdCodexHook(handler, managedCommands));
+    if (nextHooks.length > 0) {
+      cleanedGroups.push({ ...group, hooks: nextHooks });
+    }
+  }
+
+  cleanedGroups.push({
+    hooks: [
+      {
+        type: 'command',
+        command,
+      }
+    ]
+  });
+
+  parsed.hooks.SessionStart = cleanedGroups;
+  return serializeCodexHooksJson(parsed, eol);
+}
+
 /**
  * Strip GSD sections from Codex config.toml content.
  * Returns cleaned content, or null if file would be empty.
  */
-function stripGsdFromCodexConfig(content) {
+function stripGsdFromCodexConfig(content, configDir) {
   const eol = detectLineEnding(content);
   const markerIndex = content.indexOf(GSD_CODEX_MARKER);
   const codexHooksOwnership = getManagedCodexHooksOwnership(content);
@@ -2062,6 +2338,7 @@ function stripGsdFromCodexConfig(content) {
   if (markerIndex !== -1) {
     // Has GSD marker — remove everything from marker to EOF
     let before = content.substring(0, markerIndex);
+    before = stripManagedGsdCodexInlineHooks(before, configDir);
     before = stripCodexHooksFeatureAssignments(before, codexHooksOwnership);
     // Also strip GSD-injected feature keys above the marker (Case 3 inject)
     before = before.replace(/^multi_agent\s*=\s*true\s*(?:\r?\n)?/m, '');
@@ -2074,7 +2351,7 @@ function stripGsdFromCodexConfig(content) {
   }
 
   // No marker but may have GSD-injected feature keys
-  let cleaned = content;
+  let cleaned = stripManagedGsdCodexInlineHooks(content, configDir);
   cleaned = stripCodexHooksFeatureAssignments(cleaned, codexHooksOwnership);
   cleaned = cleaned.replace(/^multi_agent\s*=\s*true\s*(?:\r?\n)?/m, '');
   cleaned = cleaned.replace(/^default_mode_request_user_input\s*=\s*true\s*(?:\r?\n)?/m, '');
@@ -4772,7 +5049,7 @@ function uninstall(isGlobal, runtime = 'claude') {
       const configPath = path.join(targetDir, 'config.toml');
       if (fs.existsSync(configPath)) {
         const content = fs.readFileSync(configPath, 'utf8');
-        const cleaned = stripGsdFromCodexConfig(content);
+        const cleaned = stripGsdFromCodexConfig(content, targetDir);
         if (cleaned === null) {
           // File is empty after stripping — delete it
           fs.unlinkSync(configPath);
@@ -4782,6 +5059,25 @@ function uninstall(isGlobal, runtime = 'claude') {
           fs.writeFileSync(configPath, cleaned);
           removedCount++;
           console.log(`  ${green}✓${reset} Cleaned GSD sections from config.toml`);
+        }
+      }
+
+      const hooksJsonPath = path.join(targetDir, 'hooks.json');
+      if (fs.existsSync(hooksJsonPath)) {
+        try {
+          const hooksContent = fs.readFileSync(hooksJsonPath, 'utf8');
+          const cleanedHooks = stripGsdFromCodexHooksJson(hooksContent, hooksJsonPath, targetDir);
+          if (cleanedHooks === null) {
+            fs.unlinkSync(hooksJsonPath);
+            removedCount++;
+            console.log(`  ${green}✓${reset} Removed hooks.json (was GSD-only)`);
+          } else if (cleanedHooks !== hooksContent) {
+            fs.writeFileSync(hooksJsonPath, cleanedHooks);
+            removedCount++;
+            console.log(`  ${green}✓${reset} Cleaned GSD hooks from hooks.json`);
+          }
+        } catch (error) {
+          console.warn(`  ${yellow}⚠${reset}  Could not clean hooks.json: ${error.message}`);
         }
       }
     }
@@ -6165,10 +6461,11 @@ function install(isGlobal, runtime = 'claude') {
     console.log(`  ${green}✓${reset} Generated config.toml with ${agentCount} agent roles`);
     console.log(`  ${green}✓${reset} Generated ${agentCount} agent .toml config files`);
 
-    // Copy hook files that are referenced in config.toml (#2153)
-    // The main hook-copy block is gated to non-Codex runtimes, but Codex registers
-    // gsd-check-update.js in config.toml — the file must physically exist.
-    const codexHooksSrc = path.join(src, 'hooks', 'dist');
+    // Copy hook files referenced by hooks.json/config. Prefer bundled hooks/dist in published
+    // packages, but fall back to source hooks/ when running from a checkout.
+    const codexHooksSrc = fs.existsSync(path.join(src, 'hooks', 'dist'))
+      ? path.join(src, 'hooks', 'dist')
+      : path.join(src, 'hooks');
     if (fs.existsSync(codexHooksSrc)) {
       const codexHooksDest = path.join(targetDir, 'hooks');
       fs.mkdirSync(codexHooksDest, { recursive: true });
@@ -6201,33 +6498,25 @@ function install(isGlobal, runtime = 'claude') {
 
     // Add Codex hooks (SessionStart for update checking) — requires codex_hooks feature flag
     const configPath = path.join(targetDir, 'config.toml');
+    const hooksJsonPath = path.join(targetDir, 'hooks.json');
     try {
-      let configContent = fs.existsSync(configPath) ? fs.readFileSync(configPath, 'utf-8') : '';
-      const eol = detectLineEnding(configContent);
-      const codexHooksFeature = ensureCodexHooksFeature(configContent);
-      configContent = setManagedCodexHooksOwnership(codexHooksFeature.content, codexHooksFeature.ownership);
+      const originalConfigContent = fs.existsSync(configPath) ? fs.readFileSync(configPath, 'utf-8') : '';
+      const codexHooksFeature = ensureCodexHooksFeature(originalConfigContent);
+      const nextConfigContent = setManagedCodexHooksOwnership(codexHooksFeature.content, codexHooksFeature.ownership);
 
-      // Add SessionStart hook for update checking
-      const updateCheckScript = path.resolve(targetDir, 'hooks', 'gsd-check-update.js').replace(/\\/g, '/');
-      const hookBlock =
-        `${eol}# GSD Hooks${eol}` +
-        `[[hooks]]${eol}` +
-        `event = "SessionStart"${eol}` +
-        `command = "node ${updateCheckScript}"${eol}`;
+      if (hasEnabledCodexHooksFeature(nextConfigContent)) {
+        const updateCheckCommand = buildHookCommand(targetDir, 'gsd-check-update.js', { portableHooks: hasPortableHooks });
+        const hooksJsonContent = fs.existsSync(hooksJsonPath) ? fs.readFileSync(hooksJsonPath, 'utf8') : '';
+        const mergedHooksJson = mergeGsdIntoCodexHooksJson(hooksJsonContent, updateCheckCommand, hooksJsonPath, targetDir);
+        fs.writeFileSync(hooksJsonPath, mergedHooksJson, 'utf8');
 
-      // Migrate legacy gsd-update-check entries from prior installs (#1755 followup)
-      // Remove stale hook blocks that used the inverted filename or wrong path
-      if (configContent.includes('gsd-update-check')) {
-        configContent = configContent.replace(/\n# GSD Hooks\n\[\[hooks\]\]\nevent = "SessionStart"\ncommand = "node [^\n]*gsd-update-check\.js"\n/g, '\n');
-        configContent = configContent.replace(/\r\n# GSD Hooks\r\n\[\[hooks\]\]\r\nevent = "SessionStart"\r\ncommand = "node [^\r\n]*gsd-update-check\.js"\r\n/g, '\r\n');
+        const migratedConfigContent = stripManagedGsdCodexInlineHooks(nextConfigContent, targetDir);
+        fs.writeFileSync(configPath, migratedConfigContent, 'utf-8');
+      } else if (nextConfigContent !== originalConfigContent) {
+        fs.writeFileSync(configPath, nextConfigContent, 'utf-8');
       }
 
-      if (hasEnabledCodexHooksFeature(configContent) && !configContent.includes('gsd-check-update')) {
-        configContent += hookBlock;
-      }
-
-      fs.writeFileSync(configPath, configContent, 'utf-8');
-      console.log(`  ${green}✓${reset} Configured Codex hooks (SessionStart)`);
+      console.log(`  ${green}✓${reset} Configured Codex hooks (SessionStart via hooks.json)`);
     } catch (e) {
       console.warn(`  ${yellow}⚠${reset}  Could not configure Codex hooks: ${e.message}`);
     }

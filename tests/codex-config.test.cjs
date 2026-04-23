@@ -23,18 +23,19 @@ const {
   stripGsdFromCodexConfig,
   mergeCodexConfig,
   install,
+  uninstall,
   GSD_CODEX_MARKER,
   CODEX_AGENT_SANDBOX,
 } = require('../bin/install.js');
 
-function runCodexInstall(codexHome, cwd = path.join(__dirname, '..')) {
+function withCodexHome(codexHome, cwd, callback) {
   const previousCodeHome = process.env.CODEX_HOME;
   const previousCwd = process.cwd();
   process.env.CODEX_HOME = codexHome;
 
   try {
     process.chdir(cwd);
-    return install(true, 'codex');
+    return callback();
   } finally {
     process.chdir(previousCwd);
     if (previousCodeHome === undefined) {
@@ -45,6 +46,14 @@ function runCodexInstall(codexHome, cwd = path.join(__dirname, '..')) {
   }
 }
 
+function runCodexInstall(codexHome, cwd = path.join(__dirname, '..')) {
+  return withCodexHome(codexHome, cwd, () => install(true, 'codex'));
+}
+
+function runCodexUninstall(codexHome, cwd = path.join(__dirname, '..')) {
+  return withCodexHome(codexHome, cwd, () => uninstall(true, 'codex'));
+}
+
 function readCodexConfig(codexHome) {
   return fs.readFileSync(path.join(codexHome, 'config.toml'), 'utf8');
 }
@@ -52,6 +61,40 @@ function readCodexConfig(codexHome) {
 function writeCodexConfig(codexHome, content) {
   fs.mkdirSync(codexHome, { recursive: true });
   fs.writeFileSync(path.join(codexHome, 'config.toml'), content, 'utf8');
+}
+
+function readCodexHooksJson(codexHome) {
+  return JSON.parse(fs.readFileSync(path.join(codexHome, 'hooks.json'), 'utf8'));
+}
+
+function writeCodexHooksJson(codexHome, content) {
+  fs.mkdirSync(codexHome, { recursive: true });
+  fs.writeFileSync(path.join(codexHome, 'hooks.json'), JSON.stringify(content, null, 2) + '\n', 'utf8');
+}
+
+function getManagedGsdUpdateHookCommands(codexHome) {
+  const hooksDir = path.join(codexHome, 'hooks').replace(/\\/g, '/');
+  return new Set([
+    `node "${hooksDir}/gsd-check-update.js"`,
+    `node "${hooksDir}/gsd-update-check.js"`,
+  ]);
+}
+
+function isManagedGsdUpdateHookCommand(command, codexHome) {
+  return typeof command === 'string' && getManagedGsdUpdateHookCommands(codexHome).has(command);
+}
+
+function countGsdUpdateHooksInHooksJson(codexHome) {
+  const hooksPath = path.join(codexHome, 'hooks.json');
+  if (!fs.existsSync(hooksPath)) {
+    return 0;
+  }
+
+  return Object.values(readCodexHooksJson(codexHome).hooks || {})
+    .flatMap(eventGroups => Array.isArray(eventGroups) ? eventGroups : [])
+    .flatMap(group => Array.isArray(group && group.hooks) ? group.hooks : [])
+    .filter(hook => isManagedGsdUpdateHookCommand(hook && hook.command, codexHome))
+    .length;
 }
 
 function countMatches(content, pattern) {
@@ -887,32 +930,190 @@ describe('Codex install hook configuration (e2e)', () => {
     fs.rmSync(tmpDir, { recursive: true, force: true });
   });
 
-  test('Codex install copies hook file that is referenced in config.toml (#2153)', () => {
-    // Regression test: Codex install writes gsd-check-update hook reference into
-    // config.toml but must also copy the hook file to ~/$CODEX_HOME/hooks/
+  test('Codex install copies update hook file and writes a hooks.json SessionStart entry', () => {
     runCodexInstall(codexHome);
 
     const configContent = readCodexConfig(codexHome);
-    // config.toml must reference the hook
-    assert.ok(configContent.includes('gsd-check-update.js'), 'config.toml references gsd-check-update.js');
-    // The hook file must physically exist at the referenced path
+    const hooksJson = readCodexHooksJson(codexHome);
     const hookFile = path.join(codexHome, 'hooks', 'gsd-check-update.js');
-    assert.ok(
-      fs.existsSync(hookFile),
-      `gsd-check-update.js must exist at ${hookFile} — config.toml references it but file was not installed`
+
+    assert.ok(!configContent.includes('gsd-check-update.js'), 'config.toml no longer embeds the update hook command');
+    assert.ok(fs.existsSync(hookFile), `gsd-check-update.js must exist at ${hookFile}`);
+    assert.deepStrictEqual(
+      hooksJson,
+      {
+        hooks: {
+          SessionStart: [
+            {
+              hooks: [
+                {
+                  type: 'command',
+                  command: `node "${hookFile.replace(/\\/g, '/')}"`
+                }
+              ]
+            }
+          ]
+        }
+      },
+      'writes a Codex-compatible hooks.json SessionStart hook'
     );
   });
 
-  test('fresh CODEX_HOME enables codex_hooks without draft root defaults', () => {
+  test('fresh CODEX_HOME enables codex_hooks without inline TOML hooks or draft root defaults', () => {
     runCodexInstall(codexHome);
 
     const content = readCodexConfig(codexHome);
     assert.ok(content.includes('[features]\ncodex_hooks = true\n'), 'writes codex_hooks feature');
-    assert.ok(content.includes('# GSD Hooks\n[[hooks]]\nevent = "SessionStart"\n'), 'writes GSD SessionStart hook block');
+    assert.ok(!content.includes('[[hooks]]'), 'does not write legacy inline TOML hooks');
     assert.strictEqual(countMatches(content, /^codex_hooks = true$/gm), 1, 'writes one codex_hooks key');
-    assert.strictEqual(countMatches(content, /gsd-check-update\.js/g), 1, 'writes one GSD update hook');
     assertNoDraftRootKeys(content);
     assertUsesOnlyEol(content, '\n');
+  });
+
+  test('install merges the GSD SessionStart hook into an existing hooks.json file', () => {
+    writeCodexHooksJson(codexHome, {
+      hooks: {
+        SessionStart: [
+          {
+            hooks: [
+              {
+                type: 'command',
+                command: 'echo custom-session-start'
+              }
+            ]
+          }
+        ],
+        PreToolUse: [
+          {
+            matcher: '^Read$',
+            hooks: [
+              {
+                type: 'command',
+                command: 'echo custom-pre-tool'
+              }
+            ]
+          }
+        ]
+      }
+    });
+
+    runCodexInstall(codexHome);
+
+    const hooksJson = readCodexHooksJson(codexHome);
+    const sessionStartHooks = hooksJson.hooks.SessionStart.flatMap(entry => entry.hooks || []);
+
+    assert.ok(sessionStartHooks.some(hook => hook.command === 'echo custom-session-start'), 'preserves existing SessionStart hooks');
+    assert.ok(sessionStartHooks.some(hook => hook.command.includes('gsd-check-update.js')), 'adds the GSD SessionStart hook');
+    assert.strictEqual(countGsdUpdateHooksInHooksJson(codexHome), 1, 'adds the GSD hook once');
+    assert.deepStrictEqual(
+      hooksJson.hooks.PreToolUse,
+      [
+        {
+          matcher: '^Read$',
+          hooks: [
+            {
+              type: 'command',
+              command: 'echo custom-pre-tool'
+            }
+          ]
+        }
+      ],
+      'preserves non-SessionStart hooks'
+    );
+  });
+
+  test('install preserves malformed hooks.json SessionStart entries instead of overwriting them', () => {
+    const malformedHooksJson = {
+      hooks: {
+        SessionStart: {
+          hooks: [
+            { type: 'command', command: 'echo keep-me' },
+          ],
+        },
+      },
+    };
+    const legacyManagedInlineCommand = `node ${path.join(codexHome, 'hooks', 'gsd-check-update.js').replace(/\\/g, '/')}`;
+    writeCodexHooksJson(codexHome, malformedHooksJson);
+    writeCodexConfig(codexHome, [
+      '# GSD Hooks',
+      '[[hooks]]',
+      'event = "SessionStart"',
+      `command = "${legacyManagedInlineCommand}"`,
+      '',
+      '[model]',
+      'name = "o3"',
+      '',
+    ].join('\n'));
+
+    runCodexInstall(codexHome);
+
+    assert.deepStrictEqual(readCodexHooksJson(codexHome), malformedHooksJson, 'leaves malformed hooks.json untouched instead of overwriting it');
+    assert.ok(readCodexConfig(codexHome).includes(`command = "${legacyManagedInlineCommand}"`), 'preserves the legacy inline hook when hooks.json migration cannot complete safely');
+    assert.strictEqual(countMatches(readCodexConfig(codexHome), /^codex_hooks = true$/gm), 0, 'does not enable codex_hooks when hooks.json migration fails');
+  });
+
+  test('install preserves malformed hooks.json event objects outside SessionStart instead of overwriting them', () => {
+    const malformedHooksJson = {
+      hooks: {
+        AfterCommand: {
+          hooks: [
+            { type: 'command', command: 'echo keep-me' },
+          ],
+        },
+      },
+    };
+    writeCodexHooksJson(codexHome, malformedHooksJson);
+
+    runCodexInstall(codexHome);
+
+    assert.deepStrictEqual(readCodexHooksJson(codexHome), malformedHooksJson, 'leaves malformed non-SessionStart hooks.json entries untouched instead of rewriting them');
+    assert.strictEqual(countGsdUpdateHooksInHooksJson(codexHome), 0, 'does not add the managed GSD hook when hooks.json cannot be rewritten safely');
+    assert.strictEqual(countMatches(readCodexConfig(codexHome), /^codex_hooks = true$/gm), 0, 'does not enable codex_hooks when malformed hooks.json prevents safe migration');
+  });
+
+  test('install preserves user SessionStart hooks whose command mentions gsd-check-update', () => {
+    const customWrapperCommand = 'node "/custom/my-gsd-check-update-wrapper.js"';
+    writeCodexHooksJson(codexHome, {
+      hooks: {
+        SessionStart: [
+          {
+            hooks: [
+              {
+                type: 'command',
+                command: customWrapperCommand,
+              }
+            ]
+          }
+        ]
+      }
+    });
+
+    runCodexInstall(codexHome);
+
+    const sessionStartHooks = readCodexHooksJson(codexHome).hooks.SessionStart.flatMap(entry => entry.hooks || []);
+    assert.ok(sessionStartHooks.some(hook => hook.command === customWrapperCommand), 'preserves the user-managed wrapper hook');
+    assert.strictEqual(countGsdUpdateHooksInHooksJson(codexHome), 1, 'adds the managed GSD hook separately');
+  });
+
+  test('install preserves custom inline SessionStart hooks whose command path mentions gsd-check-update', () => {
+    const customInlineCommand = 'node /custom/my-gsd-check-update.js';
+    writeCodexConfig(codexHome, [
+      '# user comment',
+      '[[hooks]]',
+      'event = "SessionStart"',
+      `command = "${customInlineCommand}"`,
+      '',
+      '[model]',
+      'name = "o3"',
+      '',
+    ].join('\n'));
+
+    runCodexInstall(codexHome);
+
+    const content = readCodexConfig(codexHome);
+    assert.ok(content.includes(`command = "${customInlineCommand}"`), 'preserves the user inline SessionStart hook');
+    assert.ok(!content.includes(`# GSD Hooks\n[[hooks]]\nevent = "SessionStart"\ncommand = "${customInlineCommand}"`), 'does not misclassify the user inline hook as a GSD-managed legacy block');
+    assert.strictEqual(countGsdUpdateHooksInHooksJson(codexHome), 1, 'adds the managed GSD hook in hooks.json separately');
   });
 
   test('config_file paths are absolute using CODEX_HOME', () => {
@@ -992,7 +1193,7 @@ describe('Codex install hook configuration (e2e)', () => {
     assert.ok(content.includes('# user comment'), 'preserves user comment');
     assert.ok(content.includes('[model]\nname = "o3"'), 'preserves model section');
     assert.ok(content.includes('command = "echo custom"'), 'preserves custom hook');
-    assert.strictEqual(countMatches(content, /gsd-check-update\.js/g), 1, 'adds one GSD update hook');
+    assert.strictEqual(countGsdUpdateHooksInHooksJson(codexHome), 1, 'adds one GSD update hook');
     assertNoDraftRootKeys(content);
   });
 
@@ -1129,7 +1330,7 @@ describe('Codex install hook configuration (e2e)', () => {
     assert.ok(!content.includes('codex_hooks = false'), 'removes false codex_hooks value');
     assert.ok(content.includes('other_feature = true'), 'preserves other feature keys');
     assert.ok(content.includes('command = "echo custom"'), 'preserves custom hook');
-    assert.strictEqual(countMatches(content, /gsd-check-update\.js/g), 1, 'does not duplicate GSD update hook');
+    assert.strictEqual(countGsdUpdateHooksInHooksJson(codexHome), 1, 'does not duplicate GSD update hook');
     assertNoDraftRootKeys(content);
   });
 
@@ -1171,7 +1372,7 @@ describe('Codex install hook configuration (e2e)', () => {
     assert.strictEqual(countMatches(content, /^"codex_hooks" = true$/gm), 1, 'normalizes the quoted codex_hooks key to true');
     assert.strictEqual(countMatches(content, /^\[features\]\s*$/gm), 0, 'does not prepend a second bare features table');
     assert.ok(content.includes('other_feature = true'), 'preserves existing feature keys');
-    assert.strictEqual(countMatches(content, /gsd-check-update\.js/g), 1, 'keeps one GSD update hook');
+    assert.strictEqual(countGsdUpdateHooksInHooksJson(codexHome), 1, 'keeps one GSD update hook');
     assertNoDraftRootKeys(content);
   });
 
@@ -1192,7 +1393,7 @@ describe('Codex install hook configuration (e2e)', () => {
     assert.ok(content.includes('[features."a#b"]\nenabled = true'), 'preserves the quoted nested features table');
     assert.strictEqual(countMatches(content, /^\[features\]\s*$/gm), 1, 'adds one real top-level features table');
     assert.strictEqual(countMatches(content, /^codex_hooks = true$/gm), 1, 'adds one codex_hooks key');
-    assert.strictEqual(countMatches(content, /gsd-check-update\.js/g), 1, 'remains idempotent for the GSD hook block');
+    assert.strictEqual(countGsdUpdateHooksInHooksJson(codexHome), 1, 'remains idempotent for the GSD hook block');
     assertNoDraftRootKeys(content);
   });
 
@@ -1212,7 +1413,7 @@ describe('Codex install hook configuration (e2e)', () => {
     assert.strictEqual(countMatches(content, /^\[features\]\s*$/gm), 0, 'does not add a [features] table');
     assert.strictEqual(countMatches(content, /^features\.codex_hooks = true$/gm), 1, 'adds one dotted codex_hooks key');
     assert.ok(content.includes('features.other_feature = true'), 'preserves existing dotted features key');
-    assert.strictEqual(countMatches(content, /gsd-check-update\.js/g), 1, 'adds one GSD update hook for dotted codex_hooks and remains idempotent');
+    assert.strictEqual(countGsdUpdateHooksInHooksJson(codexHome), 1, 'adds one GSD update hook for dotted codex_hooks and remains idempotent');
     assertNoDraftRootKeys(content);
   });
 
@@ -1232,7 +1433,7 @@ describe('Codex install hook configuration (e2e)', () => {
     assert.ok(content.includes('features = { other_feature = true }'), 'preserves the root inline-table assignment');
     assert.strictEqual(countMatches(content, /^features\.codex_hooks = true$/gm), 0, 'does not append an invalid dotted codex_hooks key');
     assert.strictEqual(countMatches(content, /^\[features\]\s*$/gm), 0, 'does not prepend a features table');
-    assert.strictEqual(countMatches(content, /gsd-check-update\.js/g), 0, 'does not add the GSD hook block when codex_hooks cannot be enabled safely');
+    assert.strictEqual(countGsdUpdateHooksInHooksJson(codexHome), 0, 'does not add the GSD hook block when codex_hooks cannot be enabled safely');
     assert.ok(content.includes('[agents.gsd-executor]'), 'still installs the managed agent block');
     assertNoDraftRootKeys(content);
   });
@@ -1253,9 +1454,31 @@ describe('Codex install hook configuration (e2e)', () => {
     assert.ok(content.includes('features = "disabled"'), 'preserves the root scalar assignment');
     assert.strictEqual(countMatches(content, /^features\.codex_hooks = true$/gm), 0, 'does not append an invalid dotted codex_hooks key');
     assert.strictEqual(countMatches(content, /^\[features\]\s*$/gm), 0, 'does not prepend a features table');
-    assert.strictEqual(countMatches(content, /gsd-check-update\.js/g), 0, 'does not add the GSD hook block when codex_hooks cannot be enabled safely');
+    assert.strictEqual(countGsdUpdateHooksInHooksJson(codexHome), 0, 'does not add the GSD hook block when codex_hooks cannot be enabled safely');
     assert.ok(content.includes('[agents.gsd-executor]'), 'still installs the managed agent block');
     assertNoDraftRootKeys(content);
+  });
+
+  test('root scalar features assignments preserve an existing legacy inline GSD hook until hooks.json can be enabled', () => {
+    const legacyManagedInlineCommand = `node ${path.join(codexHome, 'hooks', 'gsd-check-update.js').replace(/\\/g, '/')}`;
+    writeCodexConfig(codexHome, [
+      'features = "disabled"',
+      '',
+      '# GSD Hooks',
+      '[[hooks]]',
+      'event = "SessionStart"',
+      `command = "${legacyManagedInlineCommand}"`,
+      '',
+      '[model]',
+      'name = "o3"',
+      '',
+    ].join('\n'));
+
+    runCodexInstall(codexHome);
+
+    const content = readCodexConfig(codexHome);
+    assert.ok(content.includes(`command = "${legacyManagedInlineCommand}"`), 'preserves the legacy inline GSD hook when hooks.json migration cannot complete safely');
+    assert.ok(!fs.existsSync(path.join(codexHome, 'hooks.json')), 'does not create hooks.json when codex_hooks cannot be enabled safely');
   });
 
   test('quoted dotted codex_hooks keys stay dotted and are normalized without duplication', () => {
@@ -1276,7 +1499,7 @@ describe('Codex install hook configuration (e2e)', () => {
     assert.strictEqual(countMatches(content, /^features\."codex_hooks" = true$/gm), 1, 'normalizes the quoted dotted key to true');
     assert.strictEqual(countMatches(content, /^features\.codex_hooks = true$/gm), 0, 'does not append a bare dotted duplicate');
     assert.ok(content.includes('features.other_feature = true'), 'preserves other dotted features keys');
-    assert.strictEqual(countMatches(content, /gsd-check-update\.js/g), 1, 'adds one GSD update hook for quoted dotted codex_hooks and remains idempotent');
+    assert.strictEqual(countGsdUpdateHooksInHooksJson(codexHome), 1, 'adds one GSD update hook for quoted dotted codex_hooks and remains idempotent');
     assertNoDraftRootKeys(content);
   });
 
@@ -1384,7 +1607,7 @@ describe('Codex install hook configuration (e2e)', () => {
     assert.strictEqual(countMatches(content, /^codex_hooks = true$/gm), 1, 'replaces the multiline basic-string assignment with one true value');
     assert.ok(!content.includes('multiline-basic-sentinel'), 'removes multiline basic-string continuation lines');
     assert.ok(content.includes('other_feature = true'), 'preserves following feature keys');
-    assert.strictEqual(countMatches(content, /gsd-check-update\.js/g), 1, 'remains idempotent for the GSD hook block');
+    assert.strictEqual(countGsdUpdateHooksInHooksJson(codexHome), 1, 'remains idempotent for the GSD hook block');
     assertNoDraftRootKeys(content);
   });
 
@@ -1409,7 +1632,7 @@ describe('Codex install hook configuration (e2e)', () => {
     assert.strictEqual(countMatches(content, /^codex_hooks = true$/gm), 1, 'replaces the multiline literal-string assignment with one true value');
     assert.ok(!content.includes('multiline-literal-sentinel'), 'removes multiline literal-string continuation lines');
     assert.ok(content.includes('other_feature = true'), 'preserves following feature keys');
-    assert.strictEqual(countMatches(content, /gsd-check-update\.js/g), 1, 'remains idempotent for the GSD hook block');
+    assert.strictEqual(countGsdUpdateHooksInHooksJson(codexHome), 1, 'remains idempotent for the GSD hook block');
     assertNoDraftRootKeys(content);
   });
 
@@ -1435,7 +1658,7 @@ describe('Codex install hook configuration (e2e)', () => {
     assert.ok(!content.includes('array-sentinel-1'), 'removes multiline array continuation lines');
     assert.ok(!content.includes('array-sentinel-2'), 'removes multiline array continuation lines');
     assert.ok(content.includes('other_feature = true'), 'preserves following feature keys');
-    assert.strictEqual(countMatches(content, /gsd-check-update\.js/g), 1, 'remains idempotent for the GSD hook block');
+    assert.strictEqual(countGsdUpdateHooksInHooksJson(codexHome), 1, 'remains idempotent for the GSD hook block');
     assertNoDraftRootKeys(content);
   });
 
@@ -1480,7 +1703,7 @@ describe('Codex install hook configuration (e2e)', () => {
     assert.strictEqual(countMatches(content, /^codex_hooks = true$/gm), 1, 'keeps one codex_hooks = true');
     assert.ok(content.includes('other_feature = true'), 'preserves other feature keys');
     assert.strictEqual(countMatches(content, /echo custom-after-command/g), 1, 'preserves non-GSD hook exactly once');
-    assert.strictEqual(countMatches(content, /gsd-check-update\.js/g), 1, 'keeps one GSD update hook');
+    assert.strictEqual(countGsdUpdateHooksInHooksJson(codexHome), 1, 'keeps one GSD update hook');
     assertUsesOnlyEol(content, '\r\n');
     assertNoDraftRootKeys(content);
   });
@@ -1503,7 +1726,7 @@ describe('Codex install hook configuration (e2e)', () => {
     assert.strictEqual(countMatches(content, /^\[features\]\s*$/gm), 1, 'keeps one [features] section');
     assert.strictEqual(countMatches(content, /^codex_hooks = true # keep me$/gm), 1, 'preserves the commented true value');
     assert.ok(content.includes('other_feature = true'), 'preserves other feature keys');
-    assert.strictEqual(countMatches(content, /gsd-check-update\.js/g), 1, 'adds the GSD update hook once');
+    assert.strictEqual(countGsdUpdateHooksInHooksJson(codexHome), 1, 'adds the GSD update hook once');
     assertNoDraftRootKeys(content);
   });
 
@@ -1517,10 +1740,10 @@ describe('Codex install hook configuration (e2e)', () => {
     // [features] is inserted after top-level lines, before [model] — not prepended
     assert.ok(content.includes('# first line wins\n\n[features]\ncodex_hooks = true\n'), 'inserts features after top-level lines using first newline style');
     assert.ok(content.includes(`# GSD Agent Configuration — managed by get-shit-done installer\n`), 'writes the managed agent block using the first newline style');
-    assert.ok(content.includes('# GSD Hooks\n[[hooks]]\nevent = "SessionStart"\n'), 'writes the GSD hook block using the first newline style');
+    assert.ok(!content.includes('# GSD Hooks\n[[hooks]]\nevent = "SessionStart"\n'), 'does not reintroduce inline GSD hook TOML blocks');
     assert.ok(content.includes('[model]\r\nname = "o3"'), 'preserves the existing CRLF model lines');
     assert.strictEqual(countMatches(content, /^codex_hooks = true$/gm), 1, 'remains idempotent on repeated installs');
-    assert.strictEqual(countMatches(content, /gsd-check-update\.js/g), 1, 'does not duplicate the GSD hook block');
+    assert.strictEqual(countGsdUpdateHooksInHooksJson(codexHome), 1, 'does not duplicate the GSD hook block');
     assertNoDraftRootKeys(content);
   });
 });
@@ -1543,6 +1766,183 @@ describe('Codex uninstall symmetry for hook-enabled configs', () => {
 
     const cleaned = stripGsdFromCodexConfig(readCodexConfig(codexHome));
     assert.strictEqual(cleaned, null, 'fresh GSD-only config strips back to nothing');
+  });
+
+  test('fresh install removes a GSD-only hooks.json on uninstall', () => {
+    runCodexInstall(codexHome);
+    assert.ok(fs.existsSync(path.join(codexHome, 'hooks.json')), 'install writes hooks.json');
+
+    runCodexUninstall(codexHome);
+
+    assert.ok(!fs.existsSync(path.join(codexHome, 'hooks.json')), 'uninstall removes a hooks.json owned only by GSD');
+  });
+
+  test('install then uninstall removes only the GSD hooks.json entry and preserves user hooks', () => {
+    writeCodexHooksJson(codexHome, {
+      hooks: {
+        SessionStart: [
+          { hooks: [{ type: 'command', command: 'echo keep-sessionstart' }] },
+        ],
+        AfterCommand: [
+          { hooks: [{ type: 'command', command: 'echo keep-after-command' }] },
+        ],
+      },
+    });
+
+    runCodexInstall(codexHome);
+    assert.strictEqual(countGsdUpdateHooksInHooksJson(codexHome), 1, 'install merges the GSD SessionStart hook');
+
+    runCodexUninstall(codexHome);
+
+    const hooksJson = readCodexHooksJson(codexHome);
+    assert.strictEqual(countGsdUpdateHooksInHooksJson(codexHome), 0, 'uninstall removes the GSD hooks.json entry');
+    assert.deepStrictEqual(hooksJson.hooks.SessionStart, [
+      { hooks: [{ type: 'command', command: 'echo keep-sessionstart' }] },
+    ], 'preserves user SessionStart hooks');
+    assert.deepStrictEqual(hooksJson.hooks.AfterCommand, [
+      { hooks: [{ type: 'command', command: 'echo keep-after-command' }] },
+    ], 'preserves non-SessionStart hooks');
+  });
+
+  test('install then uninstall preserves user wrapper hooks that mention gsd-check-update', () => {
+    const customWrapperCommand = 'node "/custom/my-gsd-check-update-wrapper.js"';
+    writeCodexHooksJson(codexHome, {
+      hooks: {
+        SessionStart: [
+          { hooks: [{ type: 'command', command: customWrapperCommand }] },
+        ],
+      },
+    });
+
+    runCodexInstall(codexHome);
+    runCodexUninstall(codexHome);
+
+    const hooksJson = readCodexHooksJson(codexHome);
+    assert.deepStrictEqual(hooksJson.hooks.SessionStart, [
+      { hooks: [{ type: 'command', command: customWrapperCommand }] },
+    ], 'preserves wrapper hooks that are not the managed GSD command');
+    assert.strictEqual(countGsdUpdateHooksInHooksJson(codexHome), 0, 'removes only the managed GSD hook');
+  });
+
+  test('install then uninstall preserves hooks.json files that still have user root keys', () => {
+    writeCodexHooksJson(codexHome, {
+      version: 1,
+      hooks: {},
+    });
+
+    runCodexInstall(codexHome);
+    runCodexUninstall(codexHome);
+
+    assert.deepStrictEqual(readCodexHooksJson(codexHome), {
+      version: 1,
+      hooks: {},
+    }, 'keeps hooks.json when user-owned root keys remain');
+  });
+
+  test('install then uninstall removes legacy inline GSD hooks even when hooks.json migration previously bailed out', () => {
+    const malformedHooksJson = {
+      hooks: {
+        SessionStart: {
+          hooks: [
+            { type: 'command', command: 'echo keep-me' },
+          ],
+        },
+      },
+    };
+    const legacyManagedInlineCommand = `node ${path.join(codexHome, 'hooks', 'gsd-check-update.js').replace(/\\/g, '/')}`;
+    writeCodexHooksJson(codexHome, malformedHooksJson);
+    writeCodexConfig(codexHome, [
+      '# GSD Hooks',
+      '[[hooks]]',
+      'event = "SessionStart"',
+      `command = "${legacyManagedInlineCommand}"`,
+      '',
+      '[model]',
+      'name = "o3"',
+      '',
+    ].join('\n'));
+
+    runCodexInstall(codexHome);
+    runCodexUninstall(codexHome);
+
+    assert.ok(readCodexConfig(codexHome).includes('name = "o3"'), 'preserves user config after uninstall');
+    assert.ok(!readCodexConfig(codexHome).includes(legacyManagedInlineCommand), 'removes the legacy inline GSD hook even after a failed hooks.json migration');
+    assert.deepStrictEqual(readCodexHooksJson(codexHome), malformedHooksJson, 'leaves malformed user hooks.json entries untouched when they are not managed commands');
+  });
+
+  test('install then uninstall removes managed-command hooks from malformed hooks.json event objects', () => {
+    const managedCommand = `node "${path.join(codexHome, 'hooks', 'gsd-check-update.js').replace(/\\/g, '/')}"`;
+    writeCodexHooksJson(codexHome, {
+      hooks: {
+        AfterCommand: {
+          hooks: [
+            { type: 'command', command: managedCommand },
+          ],
+        },
+      },
+    });
+
+    runCodexUninstall(codexHome);
+
+    assert.ok(!fs.existsSync(path.join(codexHome, 'hooks.json')), 'removes malformed event objects when they only reference the managed GSD hook');
+  });
+
+  test('install then uninstall removes unquoted managed-command hooks from hooks.json arrays', () => {
+    runCodexInstall(codexHome);
+
+    const managedCommand = `node ${path.join(codexHome, 'hooks', 'gsd-check-update.js').replace(/\\/g, '/')}`;
+    writeCodexHooksJson(codexHome, {
+      hooks: {
+        AfterCommand: [
+          {
+            hooks: [
+              { type: 'command', command: managedCommand },
+            ],
+          },
+        ],
+      },
+    });
+
+    runCodexUninstall(codexHome);
+
+    assert.ok(!fs.existsSync(path.join(codexHome, 'hooks.json')), 'removes unquoted managed-command hooks before deleting the underlying GSD hook file');
+  });
+
+  test('install then uninstall removes managed inline TOML hooks even outside SessionStart', () => {
+    const managedCommand = `node ${path.join(codexHome, 'hooks', 'gsd-check-update.js').replace(/\\/g, '/')}`;
+    writeCodexConfig(codexHome, [
+      '# GSD Hooks',
+      '[[hooks]]',
+      'event = "AfterCommand"',
+      `command = "${managedCommand}"`,
+      '',
+      '[model]',
+      'name = "o3"',
+      '',
+    ].join('\n'));
+
+    runCodexUninstall(codexHome);
+
+    assert.ok(readCodexConfig(codexHome).includes('name = "o3"'), 'preserves user config after removing the managed inline hook');
+    assert.ok(!readCodexConfig(codexHome).includes(managedCommand), 'removes managed inline TOML hooks even when they are not SessionStart hooks');
+  });
+
+  test('install then uninstall removes managed inline TOML hooks with compact assignment formatting', () => {
+    const managedCommand = `node ${path.join(codexHome, 'hooks', 'gsd-check-update.js').replace(/\\/g, '/')}`;
+    writeCodexConfig(codexHome, [
+      '[[hooks]]',
+      'event="AfterCommand"',
+      `command="${managedCommand}"`,
+      '',
+      '[model]',
+      'name = "o3"',
+      '',
+    ].join('\n'));
+
+    runCodexUninstall(codexHome);
+
+    assert.ok(readCodexConfig(codexHome).includes('name = "o3"'), 'preserves user config after removing the compact managed inline hook');
+    assert.ok(!readCodexConfig(codexHome).includes(managedCommand), 'removes managed inline TOML hooks even when spacing around assignments differs');
   });
 
   test('install then uninstall removes [features].codex_hooks while preserving other feature keys, comments, hooks, and CRLF', () => {
