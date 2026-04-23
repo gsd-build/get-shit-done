@@ -126,7 +126,7 @@ describe('gsd-settings-advanced — workflow structure', () => {
     'Discussion Tuning',
     'Cross-AI Execution',
     'Git Customization',
-    'Runtime',
+    'Runtime / Output',
   ];
   for (const section of requiredSections) {
     test(`workflow renders section "${section}"`, () => {
@@ -294,7 +294,7 @@ describe('gsd-settings-advanced — negative scenarios', () => {
     assert.match(combined, /Unknown config key/i);
   });
 
-  test('context_window set to a string still stores a number-like parse (integer preserved)', (t) => {
+  test('workflow.subagent_timeout numeric input is coerced and stored as Number', (t) => {
     // The config-set parser coerces numeric-looking strings to Number.
     // This test locks in the coercion so users can't accidentally save
     // a string for a numeric knob. A non-numeric string would be stored
@@ -323,5 +323,55 @@ describe('gsd-settings-advanced — negative scenarios', () => {
       /(non-numeric|must be a number|integer|numeric input|re-?prompt)/i,
       'workflow must document how non-numeric input is handled for numeric fields'
     );
+  });
+
+  // Behavioral coverage for numeric-key inputs at the config-set boundary.
+  // The /gsd-settings-advanced workflow promises non-numeric input is never
+  // silently coerced — that promise is enforced by the AskUserQuestion
+  // re-prompt loop in the workflow runner, not by config-set itself. The
+  // CLI parser passes numeric-looking strings through Number() and stores
+  // anything else verbatim. These tests lock in both behaviors so a future
+  // regression that changes either layer surfaces immediately.
+  test('config-set on a numeric key stores non-numeric input verbatim as string (workflow layer must reject before reaching here)', (t) => {
+    const tmpDir = createTempProject();
+    t.after(() => cleanup(tmpDir));
+
+    const configPath = path.join(tmpDir, '.planning', 'config.json');
+    fs.writeFileSync(configPath, '{}');
+
+    const result = runGsdTools(
+      ['config-set', 'workflow.subagent_timeout', 'not-a-number'],
+      tmpDir,
+      { HOME: tmpDir }
+    );
+    // The CLI layer accepts the write — type validation lives in the
+    // /gsd-settings-advanced workflow. If a future change adds a numeric
+    // type-check at config-set, flip this assertion to !result.success.
+    assert.ok(result.success, `config-set should accept the raw value at the CLI boundary: ${result.error || result.output}`);
+    const stored = JSON.parse(fs.readFileSync(configPath, 'utf-8'));
+    assert.strictEqual(
+      typeof stored.workflow.subagent_timeout,
+      'string',
+      'non-numeric input on a numeric key currently lands as a string at the CLI boundary'
+    );
+    assert.strictEqual(stored.workflow.subagent_timeout, 'not-a-number');
+  });
+
+  test('config-set on a numeric key coerces a numeric string to Number (parser invariant)', (t) => {
+    const tmpDir = createTempProject();
+    t.after(() => cleanup(tmpDir));
+
+    const configPath = path.join(tmpDir, '.planning', 'config.json');
+    fs.writeFileSync(configPath, '{}');
+
+    const result = runGsdTools(
+      ['config-set', 'workflow.max_discuss_passes', '7'],
+      tmpDir,
+      { HOME: tmpDir }
+    );
+    assert.ok(result.success, `config-set failed: ${result.error || result.output}`);
+    const stored = JSON.parse(fs.readFileSync(configPath, 'utf-8'));
+    assert.strictEqual(typeof stored.workflow.max_discuss_passes, 'number');
+    assert.strictEqual(stored.workflow.max_discuss_passes, 7);
   });
 });
