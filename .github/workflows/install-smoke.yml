@@ -85,6 +85,31 @@ jobs:
         if: steps.skip.outputs.skip != 'true'
         with:
           ref: ${{ inputs.ref || github.ref }}
+          # Need enough history to merge origin/main for stale-base detection.
+          fetch-depth: 0
+
+      # The default `refs/pull/N/merge` ref GitHub produces for PRs is cached
+      # against the recorded merge-base, not current main. When main advances
+      # after the PR was opened, the merge ref stays stale and CI can fail on
+      # issues that were already fixed upstream. Explicitly merge current
+      # origin/main into the PR head so smoke always tests the PR against the
+      # latest trunk. If the merge conflicts, emit a clear "rebase onto main"
+      # diagnostic instead of a downstream build error that looks unrelated.
+      - name: Rebase check — merge origin/main into PR head
+        if: steps.skip.outputs.skip != 'true' && github.event_name == 'pull_request'
+        shell: bash
+        run: |
+          set -euo pipefail
+          git config user.email "ci@gsd-build"
+          git config user.name "CI Rebase Check"
+          git fetch origin main --depth=0 || git fetch origin main
+          if ! git merge --no-edit --no-ff origin/main; then
+            echo "::error::This PR cannot cleanly merge origin/main. Rebase your branch onto current main and push again."
+            echo "::error::Conflicting files:"
+            git diff --name-only --diff-filter=U
+            git merge --abort
+            exit 1
+          fi
 
       - name: Set up Node.js ${{ matrix.node-version }}
         if: steps.skip.outputs.skip != 'true'
@@ -97,9 +122,22 @@ jobs:
         if: steps.skip.outputs.skip != 'true'
         run: npm ci
 
-      - name: Build SDK dist (required in tarball — sdk/dist is gitignored)
+      # Isolated SDK typecheck — if the build fails, emit a clear "stale base
+      # or real type error" diagnostic instead of letting the failure cascade
+      # into the tarball install step, where the downstream PATH assertion
+      # misreports it as "gsd-sdk not on PATH — installSdkIfNeeded regression".
+      - name: SDK typecheck (fails fast on type regressions)
         if: steps.skip.outputs.skip != 'true'
-        run: npm run build:sdk
+        shell: bash
+        run: |
+          set -euo pipefail
+          if ! npm run build:sdk; then
+            echo "::error::SDK build (npm run build:sdk) failed."
+            echo "::error::Common cause: your PR base is behind main and picks up intermediate type errors that are already fixed on trunk."
+            echo "::error::Fix: git fetch origin main && git rebase origin/main && git push --force-with-lease"
+            echo "::error::If the error persists on a fresh rebase, the type error is real — fix it in sdk/src/ and push."
+            exit 1
+          fi
 
       - name: Pack root tarball
         if: steps.skip.outputs.skip != 'true'
@@ -132,9 +170,14 @@ jobs:
           cd "$TMPDIR_ROOT"
           npm install -g "$WORKSPACE/$TARBALL"
           command -v get-shit-done-cc
-          # `--claude --local` is the non-interactive code path.
-          # Tolerate non-zero: the authoritative assertion is the next step.
-          get-shit-done-cc --claude --local || true
+          # `--claude --local` is the non-interactive code path. Don't swallow
+          # non-zero exit — if the installer fails, that IS the CI failure, and
+          # its own error message is more useful than the downstream "shim
+          # regression" assertion masking the real cause.
+          if ! get-shit-done-cc --claude --local; then
+            echo "::error::get-shit-done-cc --claude --local failed. See the install.js output above for the real error (SDK build, PATH resolution, chmod, etc.)."
+            exit 1
+          fi
 
       - name: Assert gsd-sdk resolves on PATH
         if: steps.skip.outputs.skip != 'true'

@@ -35,6 +35,31 @@ jobs:
 
     steps:
       - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd  # v6.0.2
+        with:
+          # Fetch full history so we can merge origin/main for stale-base detection.
+          fetch-depth: 0
+
+      # GitHub's `refs/pull/N/merge` is cached against the recorded merge-base.
+      # When main advances after a PR is opened, the cache stays stale and CI
+      # runs against the pre-advance state — hiding bugs that are already fixed
+      # on trunk and surfacing type errors that were introduced and then patched
+      # on main in between. Explicitly merge current origin/main here so tests
+      # always run against the latest trunk.
+      - name: Rebase check — merge origin/main into PR head
+        if: github.event_name == 'pull_request'
+        shell: bash
+        run: |
+          set -euo pipefail
+          git config user.email "ci@gsd-build"
+          git config user.name "CI Rebase Check"
+          git fetch origin main --depth=0 || git fetch origin main
+          if ! git merge --no-edit --no-ff origin/main; then
+            echo "::error::This PR cannot cleanly merge origin/main. Rebase your branch onto current main and push again."
+            echo "::error::Conflicting files:"
+            git diff --name-only --diff-filter=U
+            git merge --abort
+            exit 1
+          fi
 
       - name: Set up Node.js ${{ matrix.node-version }}
         uses: actions/setup-node@53b83947a5a98c8d113130e565377fae1a50d02f  # v6.3.0
