@@ -52,7 +52,8 @@ GSD stores project settings in `.planning/config.json`. Created during `/gsd-new
     "cross_ai_timeout": 300,
     "security_enforcement": true,
     "security_asvs_level": 1,
-    "security_block_on": "high"
+    "security_block_on": "high",
+    "post_planning_gaps": true
   },
   "hooks": {
     "context_warnings": true,

@@ -352,4 +352,35 @@ describe('workflow.post_planning_gaps config (#2493)', () => {
     assert.ok(!r.success, 'non-boolean value must be rejected');
     assert.match(r.error || r.output, /boolean|true|false/i);
   });
+
+  // CodeRabbit PR #2610 (comment 3127977404): loadConfig() must surface post_planning_gaps
+  // in its return so callers can read config.post_planning_gaps regardless of whether
+  // config.json exists, has the workflow section, or sets the flat key.
+  test('loadConfig() returns post_planning_gaps default true when key absent', () => {
+    const { loadConfig } = require('../get-shit-done/bin/lib/core.cjs');
+    runGsdTools('config-ensure-section', tmpDir);
+    // Remove the key to simulate older configs that pre-date the toggle
+    const cfgPath = path.join(tmpDir, '.planning', 'config.json');
+    const raw = JSON.parse(fs.readFileSync(cfgPath, 'utf-8'));
+    delete raw.workflow.post_planning_gaps;
+    fs.writeFileSync(cfgPath, JSON.stringify(raw, null, 2));
+    const config = loadConfig(tmpDir);
+    assert.strictEqual(config.post_planning_gaps, true);
+  });
+
+  test('loadConfig() returns post_planning_gaps:false when workflow.post_planning_gaps=false', () => {
+    const { loadConfig } = require('../get-shit-done/bin/lib/core.cjs');
+    runGsdTools('config-ensure-section', tmpDir);
+    runGsdTools(['config-set', 'workflow.post_planning_gaps', 'false'], tmpDir);
+    const config = loadConfig(tmpDir);
+    assert.strictEqual(config.post_planning_gaps, false);
+  });
+
+  test('loadConfig() returns post_planning_gaps:true when workflow.post_planning_gaps=true', () => {
+    const { loadConfig } = require('../get-shit-done/bin/lib/core.cjs');
+    runGsdTools('config-ensure-section', tmpDir);
+    runGsdTools(['config-set', 'workflow.post_planning_gaps', 'true'], tmpDir);
+    const config = loadConfig(tmpDir);
+    assert.strictEqual(config.post_planning_gaps, true);
+  });
 });
