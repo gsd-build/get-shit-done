@@ -179,6 +179,47 @@ By default, `/gsd-discuss-phase` asks open-ended questions about your implementa
 
 See [docs/workflow-discuss-mode.md](workflow-discuss-mode.md) for the full discuss-mode reference.
 
+### Decision Coverage Gates
+
+The discuss-phase captures implementation decisions in CONTEXT.md under a
+`<decisions>` block as numbered bullets (`- **D-01:** …`). Two gates — added
+for issue #2492 — ensure those decisions survive into plans and shipped
+code.
+
+**Plan-phase translation gate (blocking).** After planning, GSD refuses to
+mark the phase planned until every trackable decision appears in at least
+one plan's `must_haves`, `truths`, or body. The gate names each missed
+decision by id (`D-07: …`) so you know exactly what to add, move, or
+reclassify.
+
+**Verify-phase validation gate (non-blocking).** During verification, GSD
+searches plans, SUMMARY.md, modified files, and recent commit messages for
+each trackable decision. Misses are logged to VERIFICATION.md as a warning
+section; verification status is unchanged. The asymmetry is deliberate —
+the blocking gate is cheap at plan time but hostile at verify time.
+
+**Writing decisions the gate can match.** Two match modes:
+
+1. **Strict id match (recommended).** Cite the decision id anywhere in a
+   plan that implements it — `must_haves.truths: ["D-12: bit offsets
+   exposed"]`, a bullet in the plan body, a frontmatter comment. This is
+   deterministic and unambiguous.
+2. **Soft phrase match (fallback).** If a 6+-word slice of the decision
+   text appears verbatim in any plan or shipped artifact, it counts. This
+   forgives paraphrasing but is less reliable.
+
+**Opting a decision out.** If a decision genuinely should not be tracked —
+an implementation-discretion note, an informational capture, a decision
+already deferred — mark it one of these ways:
+
+- Move it under the `### Claude's Discretion` heading inside `<decisions>`.
+- Tag it in its bullet: `- **D-08 [informational]:** …`,
+  `- **D-09 [folded]:** …`, `- **D-10 [deferred]:** …`.
+
+**Disabling the gates.** Set
+`workflow.context_coverage_gate: false` in `.planning/config.json` (or via
+`/gsd-settings`) to skip both gates silently. Default is `true`.
+
 ---
 
 ## UI Design Contract

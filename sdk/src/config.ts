@@ -38,6 +38,13 @@ export interface WorkflowConfig {
   max_discuss_passes: number;
   /** Subagent timeout in ms (matches `get-shit-done/bin/lib/core.cjs` default 300000). */
   subagent_timeout: number;
+  /**
+   * Issue #2492. When true (default), enforces that every trackable decision in
+   * CONTEXT.md `<decisions>` is referenced by at least one plan (translation
+   * gate, blocking) and reports decisions not honored by shipped artifacts at
+   * verify-phase (validation gate, non-blocking). Set false to disable both.
+   */
+  context_coverage_gate: boolean;
 }
 
 export interface HooksConfig {
@@ -98,6 +105,7 @@ export const CONFIG_DEFAULTS: GSDConfig = {
     skip_discuss: false,
     max_discuss_passes: 3,
     subagent_timeout: 300000,
+    context_coverage_gate: true,
   },
   hooks: {
     context_warnings: true,

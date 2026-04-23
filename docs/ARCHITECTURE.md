@@ -411,7 +411,9 @@ plan-phase
     ├── Research gate (blocks if RESEARCH.md has unresolved open questions)
     ├── Phase Researcher → RESEARCH.md
     ├── Planner (with reachability check) → PLAN.md files
-    └── Plan Checker → Verify loop (max 3x)
+    ├── Plan Checker → Verify loop (max 3x)
+    ├── Requirements coverage gate (REQ-IDs → plans)
+    └── Decision coverage gate (CONTEXT.md `<decisions>` → plans, BLOCKING — #2492)
     │
     ▼
 state planned-phase → STATE.md (Planned/Ready to execute)
@@ -422,6 +424,7 @@ execute-phase (context reduction: truncated prompts, cache-friendly ordering)
     ├── Executor per plan → code + atomic commits
     ├── SUMMARY.md per plan
     └── Verifier → VERIFICATION.md
+        └── Decision coverage gate (CONTEXT.md decisions → shipped artifacts, NON-BLOCKING — #2492)
     │
     ▼
 verify-work → UAT.md (user acceptance testing)

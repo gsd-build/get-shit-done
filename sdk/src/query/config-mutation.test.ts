@@ -34,6 +34,13 @@ describe('isValidConfigKey', () => {
     expect(isValidConfigKey('workflow.auto_advance').valid).toBe(true);
   });
 
+  it('accepts workflow.context_coverage_gate (#2492)', async () => {
+    const { isValidConfigKey, parseConfigValue } = await import('./config-mutation.js');
+    expect(isValidConfigKey('workflow.context_coverage_gate').valid).toBe(true);
+    expect(parseConfigValue('true')).toBe(true);
+    expect(parseConfigValue('false')).toBe(false);
+  });
+
   it('accepts wildcard agent_skills.* patterns', async () => {
     const { isValidConfigKey } = await import('./config-mutation.js');
     expect(isValidConfigKey('agent_skills.gsd-planner').valid).toBe(true);

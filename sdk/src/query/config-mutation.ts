@@ -72,6 +72,7 @@ const VALID_CONFIG_KEYS = new Set([
   'git.milestone_branch_template', 'git.quick_branch_template',
   'planning.commit_docs', 'planning.search_gitignored',
   'workflow.subagent_timeout',
+  'workflow.context_coverage_gate',
   'hooks.context_warnings',
   'hooks.workflow_guard',
   'features.thinking_partner',

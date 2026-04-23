@@ -39,6 +39,8 @@ import {
 import { commit, checkCommit } from './commit.js';
 import { templateFill, templateSelect } from './template.js';
 import { verifyPlanStructure, verifyPhaseCompleteness, verifyArtifacts, verifyCommits, verifyReferences, verifySummary, verifyPathExists } from './verify.js';
+import { decisionsParse } from './decisions.js';
+import { checkDecisionCoveragePlan, checkDecisionCoverageVerify } from './check-decision-coverage.js';
 import { verifyKeyLinks, validateConsistency, validateHealth, validateAgents } from './validate.js';
 import {
   phaseAdd, phaseAddBatch, phaseInsert, phaseRemove, phaseComplete,
@@ -359,6 +361,14 @@ export function createRegistry(
   registry.register('verify-path-exists', verifyPathExists);
   registry.register('verify.path-exists', verifyPathExists);
   registry.register('verify path-exists', verifyPathExists);
+
+  // Decision coverage gates (issue #2492)
+  registry.register('decisions.parse', decisionsParse);
+  registry.register('decisions parse', decisionsParse);
+  registry.register('check.decision-coverage-plan', checkDecisionCoveragePlan);
+  registry.register('check decision-coverage-plan', checkDecisionCoveragePlan);
+  registry.register('check.decision-coverage-verify', checkDecisionCoverageVerify);
+  registry.register('check decision-coverage-verify', checkDecisionCoverageVerify);
   registry.register('validate.consistency', validateConsistency);
   registry.register('validate consistency', validateConsistency);
   registry.register('validate.health', validateHealth);

@@ -63,6 +63,7 @@ export const checkConfigGates: QueryHandler = async (args, projectDir) => {
     verifier: workflowBool(wf.verifier, true),
     plan_check: workflowBool(planCheckFlag, true),
     subagent_timeout: wf.subagent_timeout ?? CONFIG_DEFAULTS.workflow.subagent_timeout,
+    context_coverage_gate: workflowBool(wf.context_coverage_gate, true),
   };
 
   return { data };

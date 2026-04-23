@@ -183,6 +183,51 @@ grep -E "Phase ${PHASE_NUM}" .planning/REQUIREMENTS.md 2>/dev/null || true
 For each requirement: parse description → identify supporting truths/artifacts → status: ✓ SATISFIED / ✗ BLOCKED / ? NEEDS HUMAN.
 </step>
 
+<step name="verify_decisions">
+**Decision coverage validation gate (issue #2492).**
+
+After requirements coverage, also check that each trackable CONTEXT.md
+`<decisions>` entry shows up somewhere in the shipped artifacts (plans,
+SUMMARY.md, files modified by the phase, or recent commit subjects on the
+phase branch).
+
+This gate is **non-blocking / warning only** by deliberate asymmetry with
+the plan-phase translation gate. The plan-phase gate already blocked at
+translation time, so by the time verification runs every decision has
+either been translated or explicitly deferred. This gate's job is to
+surface decisions that *were* translated but vanished during execution —
+that's a soft signal because "honors a decision" is a fuzzy substring
+heuristic, and we don't want a paraphrase miss to fail an otherwise good
+phase.
+
+**Skip if** `workflow.context_coverage_gate` is explicitly set to `false`
+(absent key = enabled). Also skip cleanly when CONTEXT.md is missing or has
+no `<decisions>` block.
+
+```bash
+GATE_CFG=$(gsd-sdk query config-get workflow.context_coverage_gate 2>/dev/null || echo "true")
+if [ "$GATE_CFG" != "false" ]; then
+  CONTEXT_PATH=$(ls "${PHASE_DIR}"/*-CONTEXT.md 2>/dev/null | head -1)
+  DECISION_RESULT=$(gsd-sdk query check.decision-coverage-verify "${PHASE_DIR}" "${CONTEXT_PATH}")
+fi
+```
+
+The handler returns JSON `{ skipped, blocking: false, total, honored,
+not_honored: [...], message }`.
+
+**Reporting:** Append the handler's `message` (a `### Decision Coverage`
+section) to VERIFICATION.md regardless of outcome — even when all
+decisions are honored, recording the count helps reviewers spot drift over
+time. Set `decision_coverage` in the verification result to
+`{honored, total, not_honored: [...]}` so downstream tooling can read it.
+
+**Status impact:** none. The decision gate does NOT influence the
+`gaps_found` / `human_needed` / `passed` decision tree in
+`determine_status`. Its findings are warnings the user reviews and may act
+on by re-opening the phase or by acknowledging the decision was abandoned
+intentionally.
+</step>
+
 <step name="behavioral_verification">
 **Run the project's test suite and CLI commands to verify behavior, not just structure.**
 
@@ -479,6 +524,7 @@ Orchestrator routes: `passed` → update_roadmap | `gaps_found` → create/execu
 - [ ] All artifacts checked at all three levels
 - [ ] All key links verified
 - [ ] Requirements coverage assessed (if applicable)
+- [ ] CONTEXT.md decisions checked against shipped artifacts (#2492 — non-blocking)
 - [ ] Anti-patterns scanned and categorized
 - [ ] Test quality audited (disabled tests, circular patterns, assertion strength, provenance)
 - [ ] Human verification items identified
