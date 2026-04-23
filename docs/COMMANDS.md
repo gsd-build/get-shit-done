@@ -562,6 +562,24 @@ Interactive command center for managing multiple phases from one terminal.
 /gsd-manager                        # Open command center dashboard
 ```
 
+**Checkpoint Heartbeats (#2410):**
+
+Background `execute-phase` runs emit `[checkpoint]` markers at every wave and plan
+boundary so the Claude API SSE stream never idles long enough to trigger
+`Stream idle timeout - partial response received` on multi-plan phases. The
+format is:
+
+```
+[checkpoint] phase {N} wave {W}/{M} starting, {count} plan(s), {P}/{Q} plans done
+[checkpoint] phase {N} wave {W}/{M} plan {plan_id} starting ({P}/{Q} plans done)
+[checkpoint] phase {N} wave {W}/{M} plan {plan_id} complete ({P}/{Q} plans done)
+[checkpoint] phase {N} wave {W}/{M} complete, {P}/{Q} plans done ({ok}/{count} ok)
+```
+
+If a background phase fails partway through, grep the transcript for `[checkpoint]`
+to see the last confirmed boundary. The manager's background-completion handler
+uses these markers to report partial progress when an agent errors out.
+
 **Manager Passthrough Flags:**
 
 Configure per-step flags in `.planning/config.json` under `manager.flags`. These flags are appended to each dispatched command:

@@ -336,6 +336,26 @@ CROSS_AI_TIMEOUT=$(gsd-sdk query config-get workflow.cross_ai_timeout 2>/dev/nul
 <step name="execute_waves">
 Execute each selected wave in sequence. Within a wave: parallel if `PARALLELIZATION=true`, sequential if `false`.
 
+**Stream-idle-timeout prevention — checkpoint heartbeats (#2410):**
+
+Multi-plan phases can accumulate enough subagent context that the Claude API
+SSE layer terminates with `Stream idle timeout - partial response received`
+between a large tool_result and the next assistant turn (seen on Claude Code
++ Opus 4.7 at ~200K+ cache_read). To keep the stream warm, emit short
+assistant-text heartbeats — **no tool call, just a literal line** — at every
+wave and plan boundary. Each heartbeat MUST start with `[checkpoint]` so
+tooling and `/gsd:manager`'s background-completion handler can grep partial
+transcripts. `{P}/{Q}` is the phase-wide completed/total plans counter and
+increases monotonically across waves. `{status}` is `complete` (success),
+`failed` (executor error), or `checkpoint` (human-gate returned).
+
+```
+[checkpoint] phase {PHASE_NUMBER} wave {N}/{M} starting, {wave_plan_count} plan(s), {P}/{Q} plans done
+[checkpoint] phase {PHASE_NUMBER} wave {N}/{M} plan {plan_id} starting ({P}/{Q} plans done)
+[checkpoint] phase {PHASE_NUMBER} wave {N}/{M} plan {plan_id} {status} ({P}/{Q} plans done)
+[checkpoint] phase {PHASE_NUMBER} wave {N}/{M} complete, {P}/{Q} plans done ({wave_success}/{wave_plan_count} ok)
+```
+
 **For each wave:**
 
 1. **Intra-wave files_modified overlap check (BEFORE spawning):**
@@ -374,7 +394,15 @@ Execute each selected wave in sequence. Within a wave: parallel if `PARALLELIZAT
 
 2. **Describe what's being built (BEFORE spawning):**
 
-   Read each plan's `<objective>`. Extract what's being built and why.
+   **First, emit the wave-start checkpoint heartbeat as a literal assistant-text
+   line — no tool call (#2410). Do NOT skip this even for single-plan waves; it
+   is required before any further reasoning or spawning:**
+
+   ```
+   [checkpoint] phase {PHASE_NUMBER} wave {N}/{M} starting, {wave_plan_count} plan(s), {P}/{Q} plans done
+   ```
+
+   Then read each plan's `<objective>`. Extract what's being built and why.
 
    ```
    ---
@@ -391,6 +419,13 @@ Execute each selected wave in sequence. Within a wave: parallel if `PARALLELIZAT
    - Good: "Procedural terrain generator using Perlin noise — creates height maps, biome zones, and collision meshes. Required before vehicle physics can interact with ground."
 
 3. **Spawn executor agents:**
+
+   **Emit a plan-start heartbeat (literal line, no tool call) immediately before
+   each `Task()` dispatch (#2410):**
+
+   ```
+   [checkpoint] phase {PHASE_NUMBER} wave {N}/{M} plan {plan_id} starting ({P}/{Q} plans done)
+   ```
 
    Pass paths only — executors read files themselves with their fresh context window.
    For 200k models, this keeps orchestrator context lean (~10-15%).
@@ -551,6 +586,16 @@ Execute each selected wave in sequence. Within a wave: parallel if `PARALLELIZAT
    When worktrees are disabled, execute plans **one at a time within each wave** (sequential) regardless of the `PARALLELIZATION` setting — multiple agents writing to the same working tree concurrently would cause conflicts.
 
 4. **Wait for all agents in wave to complete.**
+
+   **Plan-complete heartbeat (#2410):** as each executor returns (or is verified
+   via spot-check below), emit one line — `complete` advances `{P}`, `failed`
+   and `checkpoint` do not but still warm the stream:
+
+   ```
+   [checkpoint] phase {PHASE_NUMBER} wave {N}/{M} plan {plan_id} complete ({P}/{Q} plans done)
+   [checkpoint] phase {PHASE_NUMBER} wave {N}/{M} plan {plan_id} failed ({P}/{Q} plans done)
+   [checkpoint] phase {PHASE_NUMBER} wave {N}/{M} plan {plan_id} checkpoint ({P}/{Q} plans done)
+   ```
 
    **Completion signal fallback (Copilot and runtimes where Task() may not return):**
 
@@ -829,6 +874,15 @@ Execute each selected wave in sequence. Within a wave: parallel if `PARALLELIZAT
    the next wave builds on a broken foundation.
 
 6. **Report completion — spot-check claims first:**
+
+   **Wave-close heartbeat (#2410):** after spot-checks finish (pass or fail),
+   before the `## Wave {N} Complete` summary, emit as a literal line:
+
+   ```
+   [checkpoint] phase {PHASE_NUMBER} wave {N}/{M} complete, {P}/{Q} plans done ({wave_success}/{wave_plan_count} ok)
+   ```
+
+
 
    For each SUMMARY.md:
    - Verify first 2 files from `key-files.created` exist on disk
