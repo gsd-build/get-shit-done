@@ -297,14 +297,11 @@ describe('SIZE: discuss-phase progressive disclosure (issue #2551)', () => {
     // Heuristic: the parent should not contain the full DISCUSSION-LOG.md template body
     // (extracted to templates/discussion-log.md) — that's the heaviest single block.
     // Look for unique strings that ONLY appear in the original inline template.
-    const inlineDiscussionLogSignal = /\| Option \| Description \| Selected \|/;
-    if (inlineDiscussionLogSignal.test(parent)) {
-      // Allowed only if the parent shows it as a one-line example reference; flag if duplicated
-      const occurrences = (parent.match(/\| Option \| Description \| Selected \|/g) || []).length;
-      assert.ok(occurrences === 0,
-        `Parent discuss-phase.md still contains the inline DISCUSSION-LOG.md table — ` +
-        `that block must move to workflows/discuss-phase/templates/discussion-log.md.`);
-    }
+    const inlineDiscussionLogSignal = /\| Option \| Description \| Selected \|/g;
+    const occurrences = (parent.match(inlineDiscussionLogSignal) || []).length;
+    assert.ok(occurrences === 0,
+      `Parent discuss-phase.md still contains the inline DISCUSSION-LOG.md table — ` +
+      `that block must move to workflows/discuss-phase/templates/discussion-log.md.`);
   });
 
   test('negative: invalid mode flag combinations document a clear error path', () => {

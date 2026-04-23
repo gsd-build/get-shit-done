@@ -19,8 +19,11 @@ describe('plan-phase chain flag preservation (#1620)', () => {
   // After #2551, discuss-phase chain logic moved to modes/chain.md.
   const discussChainPath = path.join(__dirname, '..', 'get-shit-done', 'workflows', 'discuss-phase', 'modes', 'chain.md');
   const readDiscuss = () => {
-    const parts = [discussPath, discussChainPath].filter(p => fs.existsSync(p));
-    return parts.map(p => fs.readFileSync(p, 'utf8')).join('\n');
+    // Fail loudly if either source is missing — silent filtering would let a
+    // regression that deletes modes/chain.md pass this whole suite.
+    assert.ok(fs.existsSync(discussPath), `discuss-phase.md missing: ${discussPath}`);
+    assert.ok(fs.existsSync(discussChainPath), `discuss-phase/modes/chain.md missing after #2551 split: ${discussChainPath}`);
+    return [discussPath, discussChainPath].map(p => fs.readFileSync(p, 'utf8')).join('\n');
   };
 
   test('plan-phase sync-flag guard checks both --auto AND --chain', () => {

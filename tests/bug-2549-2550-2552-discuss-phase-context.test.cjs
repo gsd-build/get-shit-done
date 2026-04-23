@@ -23,14 +23,22 @@ const SCOUT_REF = path.join(
 );
 
 function readDiscussContext() {
-  const parts = [DISCUSS_PHASE, SCOUT_REF].filter(p => fs.existsSync(p));
-  return parts.map(p => fs.readFileSync(p, 'utf-8')).join('\n');
+  // Both files are required after #2551 — fail loudly if either is missing
+  // rather than silently weakening the regression coverage.
+  for (const p of [DISCUSS_PHASE, SCOUT_REF]) {
+    assert.ok(fs.existsSync(p), `Required discuss-phase context source missing: ${p}`);
+  }
+  return [DISCUSS_PHASE, SCOUT_REF].map(p => fs.readFileSync(p, 'utf-8')).join('\n');
 }
 
 describe('discuss-phase context fixes (#2549, #2550, #2552)', () => {
   let src;
   test('discuss-phase.md source exists', () => {
     assert.ok(fs.existsSync(DISCUSS_PHASE), 'discuss-phase.md must exist');
+    assert.ok(
+      fs.existsSync(SCOUT_REF),
+      'references/scout-codebase.md must exist after #2551 extraction',
+    );
     src = readDiscussContext();
   });
 
@@ -44,9 +52,13 @@ describe('discuss-phase context fixes (#2549, #2550, #2552)', () => {
   });
 
   test('#2549: load_prior_context must reference a bounded read (3 phases or DECISIONS-INDEX)', () => {
-    if (!src) src = readDiscussContext();
-    const hasBound = src.includes('3') && src.includes('prior CONTEXT.md');
-    const hasIndex = src.includes('DECISIONS-INDEX.md');
+    // Read ONLY the parent file — `src.includes('3')` against the
+    // concatenated source can be satisfied by unrelated occurrences of "3"
+    // in scout-codebase.md (e.g., "3-5 most relevant files"), masking a
+    // regression where the parent drops the bounded-read instruction.
+    const parent = fs.readFileSync(DISCUSS_PHASE, 'utf-8');
+    const hasBound = /\b(?:most recent|latest|last|up to)\s+3\b[\s\S]{0,160}\bprior CONTEXT\.md\b/i.test(parent);
+    const hasIndex = parent.includes('DECISIONS-INDEX.md');
     assert.ok(
       hasBound || hasIndex,
       'load_prior_context must reference a bounded read (e.g., most recent 3 phases) or DECISIONS-INDEX.md',

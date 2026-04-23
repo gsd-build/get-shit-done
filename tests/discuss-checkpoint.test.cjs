@@ -20,8 +20,13 @@ describe('discuss-phase incremental checkpoint saves (#1485)', () => {
   const checkpointTplPath = path.join(__dirname, '..', 'get-shit-done', 'workflows', 'discuss-phase', 'templates', 'checkpoint.json');
 
   function readAll() {
+    // Fail loudly if any required source is missing — silent filtering would
+    // let a regression that deletes the extracted default-mode or checkpoint
+    // template pass the suite.
+    for (const p of [workflowPath, defaultModePath, checkpointTplPath]) {
+      assert.ok(fs.existsSync(p), `Required discuss-phase checkpoint source missing: ${p}`);
+    }
     return [workflowPath, defaultModePath, checkpointTplPath]
-      .filter(p => fs.existsSync(p))
       .map(p => fs.readFileSync(p, 'utf8'))
       .join('\n');
   }
