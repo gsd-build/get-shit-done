@@ -266,6 +266,7 @@ const CONFIG_DEFAULTS = {
   security_enforcement: true, // workflow.security_enforcement — threat-model-anchored security verification via /gsd:secure-phase
   security_asvs_level: 1, // workflow.security_asvs_level — OWASP ASVS verification level (1=opportunistic, 2=standard, 3=comprehensive)
   security_block_on: 'high', // workflow.security_block_on — minimum severity that blocks phase advancement ('high' | 'medium' | 'low')
+  post_planning_gaps: true, // workflow.post_planning_gaps — unified post-planning gap report (#2493): scan REQUIREMENTS.md + CONTEXT.md decisions vs all PLAN.md files
 };
 
 function loadConfig(cwd) {

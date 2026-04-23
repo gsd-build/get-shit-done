@@ -1344,6 +1344,53 @@ gsd-sdk query commit "docs(${PADDED_PHASE}): create phase plan" --files "${PHASE
 
 This commits all PLAN.md files for the phase plus the updated STATE.md and ROADMAP.md to version-control the planning artifacts. Skip this step if `commit_docs` is false.
 
+## 13e. Post-Planning Gap Analysis
+
+After all plans are generated, committed, and the Requirements Coverage Gate (§13)
+has run, emit a single unified gap report covering both REQUIREMENTS.md and the
+CONTEXT.md `<decisions>` section. This is a **proactive, post-hoc report** — it
+does not block phase advancement and does not re-plan. It exists so that any
+requirement or decision that slipped through the per-plan checks is surfaced in
+one place before execution begins.
+
+**Skip if:** `workflow.post_planning_gaps` is `false`. Default is `true`.
+
+```bash
+POST_PLANNING_GAPS=$(gsd-sdk query config-get workflow.post_planning_gaps --default true 2>/dev/null || echo true)
+if [ "$POST_PLANNING_GAPS" = "true" ]; then
+  gsd-tools gap-analysis --phase-dir "${PHASE_DIR}"
+fi
+```
+
+(`gsd-tools gap-analysis` reads `.planning/REQUIREMENTS.md`, `${PHASE_DIR}/CONTEXT.md`,
+and `${PHASE_DIR}/*-PLAN.md`, then prints a markdown table with one row per
+REQ-ID and D-ID. Word-boundary matching prevents `REQ-1` from being mistaken for
+`REQ-10`.)
+
+**Output format (deterministic; sorted REQUIREMENTS.md → CONTEXT.md, then natural
+sort within source):**
+
+```
+## Post-Planning Gap Analysis
+
+| Source | Item | Status |
+|--------|------|--------|
+| REQUIREMENTS.md | REQ-01 | ✓ Covered |
+| REQUIREMENTS.md | REQ-02 | ✗ Not covered |
+| CONTEXT.md | D-01 | ✓ Covered |
+| CONTEXT.md | D-02 | ✗ Not covered |
+
+⚠ N items not covered by any plan
+```
+
+**Skip-gracefully behavior:**
+- REQUIREMENTS.md missing → CONTEXT-only report.
+- CONTEXT.md missing → REQUIREMENTS-only report.
+- Both missing or `<decisions>` block missing → "No requirements or decisions to check" line, no error.
+
+This step is non-blocking. If items are reported as not covered, the user may
+re-run `/gsd:plan-phase --gaps` to add plans, or proceed to execute-phase as-is.
+
 ## 14. Present Final Status
 
 Route to `<offer_next>` OR `auto_advance` depending on flags/config.

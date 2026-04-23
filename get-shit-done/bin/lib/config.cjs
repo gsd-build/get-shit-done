@@ -120,6 +120,7 @@ function buildNewProjectConfig(userChoices) {
       plan_bounce_script: null,
       plan_bounce_passes: 2,
       auto_prune_state: false,
+      post_planning_gaps: CONFIG_DEFAULTS.post_planning_gaps,
       security_enforcement: CONFIG_DEFAULTS.security_enforcement,
       security_asvs_level: CONFIG_DEFAULTS.security_asvs_level,
       security_block_on: CONFIG_DEFAULTS.security_block_on,
@@ -342,6 +343,13 @@ function cmdConfigSet(cwd, keyPath, value, raw) {
   if (keyPath === 'workflow.drift_threshold') {
     if (typeof parsedValue !== 'number' || !Number.isInteger(parsedValue) || parsedValue < 1) {
       error(`Invalid workflow.drift_threshold '${value}'. Must be a positive integer.`);
+    }
+  }
+
+  // Post-planning gap checker (#2493)
+  if (keyPath === 'workflow.post_planning_gaps') {
+    if (typeof parsedValue !== 'boolean') {
+      error(`Invalid workflow.post_planning_gaps '${value}'. Must be a boolean (true or false).`);
     }
   }
 

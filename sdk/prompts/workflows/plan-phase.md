@@ -73,6 +73,14 @@ After plans pass the checker (or checker is skipped), verify all phase requireme
 3. If gaps found: log as warning, continue (headless mode does not block for coverage gaps)
 </step>
 
+<step name="post_planning_gaps">
+Unified post-planning gap report (#2493). Gated on `workflow.post_planning_gaps`
+(default true). When enabled, scan REQUIREMENTS.md and CONTEXT.md `<decisions>`
+against all generated PLAN.md files, then emit one `Source | Item | Status` table.
+Skip-gracefully on missing sources. Non-blocking — headless mode reports gaps
+via the event stream and continues.
+</step>
+
 </process>
 
 <success_criteria>

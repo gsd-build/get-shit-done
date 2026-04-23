@@ -188,6 +188,7 @@ const profileOutput = require('./lib/profile-output.cjs');
 const workstream = require('./lib/workstream.cjs');
 const docs = require('./lib/docs.cjs');
 const learnings = require('./lib/learnings.cjs');
+const gapChecker = require('./lib/gap-checker.cjs');
 
 // ─── Arg parsing helpers ──────────────────────────────────────────────────────
 
@@ -709,6 +710,13 @@ async function runCommand(command, args, cwd, raw, defaultValue) {
       } else {
         error('Unknown requirements subcommand. Available: mark-complete');
       }
+      break;
+    }
+
+    case 'gap-analysis': {
+      // Post-planning gap checker (#2493) — unified REQUIREMENTS.md +
+      // CONTEXT.md <decisions> coverage report against PLAN.md files.
+      gapChecker.cmdGapAnalysis(cwd, args.slice(1), raw);
       break;
     }
 
