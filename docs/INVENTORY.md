@@ -358,7 +358,7 @@ The `gsd-planner` agent is decomposed into a core agent plus reference modules t
 
 ---
 
-## CLI Modules (27 shipped)
+## CLI Modules (28 shipped)
 
 Full listing: `get-shit-done/bin/lib/*.cjs`.
 
