@@ -42,6 +42,25 @@ operates in **incremental-remap mode**:
 - On write, each mapper stamps `last_mapped_commit: <HEAD sha>` into the YAML
   frontmatter of every document it produces (see `bin/lib/drift.cjs:writeMappedCommit`).
 
+**Explicit contract — propagate `--paths` through a single normalized
+variable.** Downstream steps (`spawn_agents`, `sequential_mapping`, and any
+Task-mode prompt construction) MUST use `${PATH_SCOPE_HINT}` to ensure every
+mapper receives the same deterministic scope. Without this contract
+incremental-remap can silently regress to a whole-repo scan.
+
+```bash
+# Validated, comma-separated paths (empty if --paths absent or all rejected):
+SCOPED_PATHS="<validated paths or empty>"
+if [ -n "$SCOPED_PATHS" ]; then
+  PATH_SCOPE_HINT="--paths $SCOPED_PATHS"
+else
+  PATH_SCOPE_HINT=""
+fi
+```
+
+All mapper prompts built later in this workflow MUST include
+`${PATH_SCOPE_HINT}` (expanded to empty when full-repo mode is in effect).
+
 When `--paths` is absent, behave exactly as before: full-repo scan, all 7
 documents refreshed.
 </step>
@@ -143,6 +162,8 @@ Write these documents to .planning/codebase/:
 
 IMPORTANT: Use {date} for all [YYYY-MM-DD] date placeholders in documents.
 
+Scope: ${PATH_SCOPE_HINT:-(full repo)} — when --paths is supplied, restrict exploration to those prefixes only.
+
 Explore thoroughly. Write documents directly using templates. Return confirmation only.
 ${AGENT_SKILLS_MAPPER}"
 )
@@ -166,6 +187,8 @@ Write these documents to .planning/codebase/:
 - STRUCTURE.md - Directory layout, key locations, naming conventions
 
 IMPORTANT: Use {date} for all [YYYY-MM-DD] date placeholders in documents.
+
+Scope: ${PATH_SCOPE_HINT:-(full repo)} — when --paths is supplied, restrict exploration to those prefixes only.
 
 Explore thoroughly. Write documents directly using templates. Return confirmation only.
 ${AGENT_SKILLS_MAPPER}"
@@ -191,6 +214,8 @@ Write these documents to .planning/codebase/:
 
 IMPORTANT: Use {date} for all [YYYY-MM-DD] date placeholders in documents.
 
+Scope: ${PATH_SCOPE_HINT:-(full repo)} — when --paths is supplied, restrict exploration to those prefixes only.
+
 Explore thoroughly. Write documents directly using templates. Return confirmation only.
 ${AGENT_SKILLS_MAPPER}"
 )
@@ -213,6 +238,8 @@ Write this document to .planning/codebase/:
 - CONCERNS.md - Tech debt, bugs, security, performance, fragile areas
 
 IMPORTANT: Use {date} for all [YYYY-MM-DD] date placeholders in documents.
+
+Scope: ${PATH_SCOPE_HINT:-(full repo)} — when --paths is supplied, restrict exploration to those prefixes only.
 
 Explore thoroughly. Write document directly using template. Return confirmation only.
 ${AGENT_SKILLS_MAPPER}"
@@ -264,6 +291,8 @@ When the `Task` tool is unavailable, perform codebase mapping sequentially in th
 **IMPORTANT:** Do NOT use `browser_subagent`, `Explore`, or any browser-based tool. Use only file system tools (Read, Bash, Write, Grep, Glob, list_dir, view_file, grep_search, or equivalent tools available in your runtime).
 
 **IMPORTANT:** Use `{date}` from init context for all `[YYYY-MM-DD]` date placeholders in documents. NEVER guess the date.
+
+**SCOPE:** When `${PATH_SCOPE_HINT}` is non-empty (i.e. `--paths` was supplied), restrict every pass below to the validated path prefixes in `${SCOPED_PATHS}`. Do NOT scan files outside those prefixes. When `${PATH_SCOPE_HINT}` is empty, perform a full-repo scan.
 
 Perform all 4 mapping passes sequentially:
 
