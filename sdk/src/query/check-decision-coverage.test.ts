@@ -76,7 +76,8 @@ describe('checkDecisionCoveragePlan — translation gate (#2492)', () => {
     - "D-01: bit offsets are exposed via API"
   artifacts: []
   key_links: []`,
-          'Implements D-02: TArray display logic.',
+          // D-02 cited under a designated `## tasks` heading (review F4).
+          '## tasks\n- Implements D-02: TArray display logic.\n',
         ),
       },
     );
@@ -251,5 +252,268 @@ describe('checkDecisionCoverageVerify — validation gate (#2492)', () => {
     await mkdir(phaseDir, { recursive: true });
     const result = await checkDecisionCoverageVerify([phaseDir, contextPath], tmp);
     expect(result.data.skipped).toBe(true);
+  });
+});
+
+// ─── Adversarial-review regression tests ──────────────────────────────────
+
+describe('translation gate haystack restriction (review F4)', () => {
+  it('does NOT count a D-NN citation buried in an HTML comment', async () => {
+    await setupPhase(
+      `<decisions>
+### Cat
+- **D-77:** A trackable decision worth six or more words long
+</decisions>`,
+      {
+        '17-01-PLAN.md': planFile(
+          `  truths: []\n  artifacts: []\n  key_links: []`,
+          '<!-- D-77 was here -->\nNothing else mentions the decision.',
+        ),
+      },
+    );
+    const result = await checkDecisionCoveragePlan([phaseDir, contextPath], tmp);
+    expect(result.data.passed).toBe(false);
+    expect(result.data.uncovered.map((u: { id: string }) => u.id)).toContain('D-77');
+  });
+
+  it('does NOT count a D-NN citation buried in a fenced code example', async () => {
+    await setupPhase(
+      `<decisions>
+### Cat
+- **D-78:** A trackable decision worth six or more words long
+</decisions>`,
+      {
+        '17-01-PLAN.md': planFile(
+          `  truths: []\n  artifacts: []\n  key_links: []`,
+          '## Design notes\n\n```text\nExample: D-78 should appear here\n```\n',
+        ),
+      },
+    );
+    const result = await checkDecisionCoveragePlan([phaseDir, contextPath], tmp);
+    expect(result.data.passed).toBe(false);
+    expect(result.data.uncovered.map((u: { id: string }) => u.id)).toContain('D-78');
+  });
+
+  it('counts a citation in front-matter `must_haves`', async () => {
+    await setupPhase(
+      `<decisions>
+### Cat
+- **D-79:** Trackable decision text long enough to soft-match.
+</decisions>`,
+      {
+        '17-01-PLAN.md': `---
+phase: 17
+plan: 1
+must_haves:
+  - "D-79 must be honored"
+truths: []
+artifacts: []
+key_links: []
+---
+`,
+      },
+    );
+    const result = await checkDecisionCoveragePlan([phaseDir, contextPath], tmp);
+    expect(result.data.passed).toBe(true);
+  });
+
+  it('counts a citation in front-matter `truths`', async () => {
+    await setupPhase(
+      `<decisions>
+### Cat
+- **D-80:** Trackable decision text long enough to soft-match.
+</decisions>`,
+      {
+        '17-01-PLAN.md': planFile(`  truths: ["D-80 honored"]\n  artifacts: []\n  key_links: []`),
+      },
+    );
+    const result = await checkDecisionCoveragePlan([phaseDir, contextPath], tmp);
+    expect(result.data.passed).toBe(true);
+  });
+});
+
+describe('soft-phrase length gating (review F5)', () => {
+  it('flags a sub-6-word decision when only the body paraphrases — id citation is required', async () => {
+    await setupPhase(
+      // 4 words → cannot soft-match; user must cite the id.
+      `<decisions>
+### Cat
+- **D-81:** Use bit offsets always
+</decisions>`,
+      {
+        '17-01-PLAN.md': planFile(
+          `  truths: ["something else"]\n  artifacts: []\n  key_links: []`,
+          // No D-81 citation, paraphrase only.
+          '## tasks\n- Use bit offsets in storage layer\n',
+        ),
+      },
+    );
+    const result = await checkDecisionCoveragePlan([phaseDir, contextPath], tmp);
+    expect(result.data.passed).toBe(false);
+    expect(result.data.uncovered.map((u: { id: string }) => u.id)).toEqual(['D-81']);
+  });
+
+  it('still passes a sub-6-word decision when the id is cited', async () => {
+    await setupPhase(
+      `<decisions>
+### Cat
+- **D-82:** Disable cache
+</decisions>`,
+      {
+        '17-01-PLAN.md': planFile(`  truths: ["D-82"]\n  artifacts: []\n  key_links: []`),
+      },
+    );
+    const result = await checkDecisionCoveragePlan([phaseDir, contextPath], tmp);
+    expect(result.data.passed).toBe(true);
+  });
+});
+
+describe('verify-phase summary parsing (review F6, F7)', () => {
+  it('reads files_modified from EVERY summary, not just the first', async () => {
+    await mkdir(phaseDir, { recursive: true });
+    await writeFile(
+      contextPath,
+      `# Phase 17 Context
+
+<decisions>
+### Cat
+- **D-83:** A long-enough trackable decision text for soft matching honored elsewhere.
+</decisions>
+`,
+      'utf-8',
+    );
+    await writeFile(
+      join(phaseDir, '17-01-PLAN.md'),
+      planFile(`  truths: []\n  artifacts: []\n  key_links: []`),
+      'utf-8',
+    );
+    // Summary 01 — no files_modified mentioning D-83.
+    await writeFile(
+      join(phaseDir, '17-01-SUMMARY.md'),
+      'files_modified:\n  - "src/unrelated.ts"\n',
+      'utf-8',
+    );
+    // Summary 02 — files_modified entry whose content mentions D-83.
+    await writeFile(
+      join(phaseDir, '17-02-SUMMARY.md'),
+      'files_modified:\n  - "src/keeper.ts"\n',
+      'utf-8',
+    );
+    await mkdir(join(tmp, 'src'), { recursive: true });
+    await writeFile(join(tmp, 'src', 'unrelated.ts'), '// nothing relevant\n', 'utf-8');
+    await writeFile(join(tmp, 'src', 'keeper.ts'), '// honors D-83 in code\n', 'utf-8');
+    const result = await checkDecisionCoverageVerify([phaseDir, contextPath], tmp);
+    // If only the first SUMMARY were parsed, D-83 would be missing.
+    expect(result.data.honored).toBe(1);
+    expect(result.data.not_honored).toEqual([]);
+  });
+
+  it('rejects absolute files_modified paths outside projectDir (path traversal guard)', async () => {
+    await mkdir(phaseDir, { recursive: true });
+    await writeFile(
+      contextPath,
+      `# Phase 17
+
+<decisions>
+### Cat
+- **D-84:** A trackable decision text spanning enough words to soft-match.
+</decisions>
+`,
+      'utf-8',
+    );
+    await writeFile(
+      join(phaseDir, '17-01-PLAN.md'),
+      planFile(`  truths: []\n  artifacts: []\n  key_links: []`),
+      'utf-8',
+    );
+    // Summary points at /etc/passwd and a parent-traversal path. Both must be skipped.
+    await writeFile(
+      join(phaseDir, '17-01-SUMMARY.md'),
+      'files_modified:\n  - "/etc/passwd"\n  - "../../../etc/hostname"\n',
+      'utf-8',
+    );
+    const result = await checkDecisionCoverageVerify([phaseDir, contextPath], tmp);
+    // Should not honor D-84 from those files (and should not throw).
+    expect(result.data.honored).toBe(0);
+    expect(result.data.not_honored.map((u: { id: string }) => u.id)).toEqual(['D-84']);
+  });
+});
+
+describe('workstream-aware config (review F3)', () => {
+  it('honors workstream-scoped context_coverage_gate=false', async () => {
+    await setupPhase(
+      `<decisions>
+### Cat
+- **D-85:** A trackable decision long enough to potentially soft match.
+</decisions>`,
+      { '17-01-PLAN.md': planFile(`  truths: []\n  artifacts: []\n  key_links: []`) },
+    );
+    // Root config does NOT disable the gate.
+    await mkdir(join(tmp, '.planning'), { recursive: true });
+    await writeFile(
+      join(tmp, '.planning', 'config.json'),
+      JSON.stringify({ workflow: { context_coverage_gate: true } }),
+      'utf-8',
+    );
+    // Workstream config DOES disable it.
+    await mkdir(join(tmp, '.planning', 'workstreams', 'feat-x'), { recursive: true });
+    await writeFile(
+      join(tmp, '.planning', 'workstreams', 'feat-x', 'config.json'),
+      JSON.stringify({ workflow: { context_coverage_gate: false } }),
+      'utf-8',
+    );
+
+    // Without workstream → enabled → would fail
+    const rootResult = await checkDecisionCoveragePlan([phaseDir, contextPath], tmp);
+    expect(rootResult.data.skipped).toBe(false);
+    expect(rootResult.data.passed).toBe(false);
+
+    // With workstream → workstream config disables → skipped
+    const wsResult = await checkDecisionCoveragePlan(
+      [phaseDir, contextPath],
+      tmp,
+      'feat-x',
+    );
+    expect(wsResult.data.skipped).toBe(true);
+    expect(wsResult.data.passed).toBe(true);
+
+    // Same for verify
+    const wsVerify = await checkDecisionCoverageVerify(
+      [phaseDir, contextPath],
+      tmp,
+      'feat-x',
+    );
+    expect(wsVerify.data.skipped).toBe(true);
+  });
+});
+
+describe('config-type validation (review F16)', () => {
+  it('warns and defaults to ON when context_coverage_gate is a number', async () => {
+    await setupPhase(
+      `<decisions>
+### Cat
+- **D-86:** A trackable decision text long enough to soft-match.
+</decisions>`,
+      { '17-01-PLAN.md': planFile(`  truths: []\n  artifacts: []\n  key_links: []`) },
+    );
+    await mkdir(join(tmp, '.planning'), { recursive: true });
+    await writeFile(
+      join(tmp, '.planning', 'config.json'),
+      JSON.stringify({ workflow: { context_coverage_gate: 1 } }),
+      'utf-8',
+    );
+
+    const warnings: string[] = [];
+    const origWarn = console.warn;
+    console.warn = (msg: string) => warnings.push(String(msg));
+    try {
+      const result = await checkDecisionCoveragePlan([phaseDir, contextPath], tmp);
+      // Defaulted to ON → not skipped, runs the gate (and fails with uncovered D-86).
+      expect(result.data.skipped).toBe(false);
+      expect(result.data.passed).toBe(false);
+    } finally {
+      console.warn = origWarn;
+    }
+    expect(warnings.some((w) => /context_coverage_gate.*invalid type/.test(w))).toBe(true);
   });
 });

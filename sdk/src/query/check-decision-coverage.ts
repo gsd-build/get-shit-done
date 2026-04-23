@@ -73,14 +73,28 @@ function normalizePhrase(text: string): string {
     .trim();
 }
 
+/** Minimum normalized words a decision must have to be soft-matchable. */
+const SOFT_PHRASE_MIN_WORDS = 6;
+
 /**
  * Build a soft-match phrase: the first 6 normalized words. Six is empirically
  * long enough to avoid collisions with common English fragments and short
  * enough to survive minor rewordings.
+ *
+ * Returns an empty string when the decision text has fewer than
+ * SOFT_PHRASE_MIN_WORDS words — such decisions are effectively id-only and
+ * callers must rely on a `D-NN` citation (review F5).
  */
 function softPhrase(text: string): string {
   const words = normalizePhrase(text).split(' ').filter(Boolean);
-  return words.slice(0, 6).join(' ');
+  if (words.length < SOFT_PHRASE_MIN_WORDS) return '';
+  return words.slice(0, SOFT_PHRASE_MIN_WORDS).join(' ');
+}
+
+/** True when a decision is too short to soft-match — caller must cite by id. */
+function requiresIdCitation(decision: ParsedDecision): boolean {
+  const wordCount = normalizePhrase(decision.text).split(' ').filter(Boolean).length;
+  return wordCount < SOFT_PHRASE_MIN_WORDS;
 }
 
 /** True when decision text or id appears in `haystack`. */
@@ -89,7 +103,7 @@ function decisionMentioned(haystack: string, decision: ParsedDecision): boolean 
   const idRe = new RegExp(`\\b${decision.id}\\b`);
   if (idRe.test(haystack)) return true;
   const phrase = softPhrase(decision.text);
-  if (phrase.length < 12) return false; // too short to be unique
+  if (!phrase) return false; // too short to soft-match — id citation required
   return normalizePhrase(haystack).includes(phrase);
 }
 
@@ -117,13 +131,127 @@ async function loadPlanContents(phaseDir: string): Promise<string[]> {
   return out;
 }
 
-async function loadGateConfig(projectDir: string): Promise<boolean> {
+/**
+ * One plan reduced to the sections the BLOCKING translation gate searches.
+ *
+ * The plan-phase gate refuses to honor a decision mention buried in a code
+ * fence, an HTML comment, or arbitrary prose elsewhere on the page. The user
+ * must put a `D-NN` citation (or a 6+-word phrase) in a designated section
+ * so they have an unambiguous way to make a decision deliberately uncovered.
+ *
+ * Designated sections (review F4):
+ *   - Front-matter `must_haves` block (YAML)
+ *   - Front-matter `truths` block (YAML)
+ *   - Front-matter `objective` field
+ *   - Body section under a heading whose text contains "must_haves",
+ *     "truths", "tasks", or "objective" (case-insensitive)
+ *
+ * HTML comments (`<!-- ... -->`) and fenced code blocks are stripped before
+ * extraction so neither a commented-out citation nor a literal example
+ * counts as coverage.
+ */
+interface PlanSections {
+  /** Concatenation of all designated section text, with HTML comments and code fences stripped. */
+  designated: string;
+}
+
+const DESIGNATED_HEADINGS_RE = /^#{1,6}\s+(?:must[_ ]haves?|truths?|tasks?|objective)\b/i;
+
+/** Strip HTML comments AND fenced code blocks from `text`. */
+function stripCommentsAndFences(text: string): string {
+  return text
+    .replace(/<!--[\s\S]*?-->/g, ' ')
+    .replace(/```[\s\S]*?```/g, ' ')
+    .replace(/~~~[\s\S]*?~~~/g, ' ');
+}
+
+/** Extract a YAML block scalar (key followed by indented continuation lines). */
+function extractYamlBlock(frontmatter: string, key: string): string {
+  const re = new RegExp(`^${key}\\s*:(.*)$`, 'm');
+  const match = frontmatter.match(re);
+  if (!match) return '';
+  const startIdx = (match.index ?? 0) + match[0].length;
+  const sameLine = match[1] ?? '';
+  const rest = frontmatter.slice(startIdx + 1).split(/\r?\n/);
+  const block: string[] = [sameLine];
+  for (const line of rest) {
+    // Stop at a non-indented, non-empty line (next top-level key) or end of frontmatter.
+    if (line === '' || /^\s/.test(line)) {
+      block.push(line);
+    } else {
+      break;
+    }
+  }
+  return block.join('\n');
+}
+
+function extractPlanSections(planContent: string): PlanSections {
+  if (!planContent) return { designated: '' };
+  const cleaned = stripCommentsAndFences(planContent);
+
+  // Split front-matter from body.
+  const fmMatch = cleaned.match(/^---\r?\n([\s\S]*?)\r?\n---\r?\n?([\s\S]*)$/);
+  const frontmatter = fmMatch ? fmMatch[1] : '';
+  const body = fmMatch ? fmMatch[2] : cleaned;
+
+  const fmParts: string[] = [];
+  for (const key of ['must_haves', 'truths', 'objective']) {
+    const block = extractYamlBlock(frontmatter, key);
+    if (block) fmParts.push(block);
+  }
+
+  // Body sections under designated headings (must_haves, truths, tasks, objective).
+  const bodyLines = body.split(/\r?\n/);
+  const bodyParts: string[] = [];
+  let inDesignated = false;
+  for (const line of bodyLines) {
+    const heading = /^#{1,6}\s+/.test(line);
+    if (heading) {
+      inDesignated = DESIGNATED_HEADINGS_RE.test(line);
+      if (inDesignated) bodyParts.push(line);
+      continue;
+    }
+    if (inDesignated) bodyParts.push(line);
+  }
+
+  return { designated: [...fmParts, bodyParts.join('\n')].join('\n\n') };
+}
+
+async function loadPlanSections(phaseDir: string): Promise<PlanSections[]> {
+  const contents = await loadPlanContents(phaseDir);
+  return contents.map(extractPlanSections);
+}
+
+/** True when a decision is mentioned in any plan's designated sections. */
+function planSectionsMention(planSections: PlanSections[], decision: ParsedDecision): boolean {
+  for (const p of planSections) {
+    if (decisionMentioned(p.designated, decision)) return true;
+  }
+  return false;
+}
+
+async function loadGateConfig(projectDir: string, workstream?: string): Promise<boolean> {
   try {
-    const cfg = await loadConfig(projectDir);
-    const wf = (cfg.workflow ?? {}) as unknown as Record<string, unknown>;
+    const cfg = await loadConfig(projectDir, workstream);
+    const wf = (cfg.workflow ?? {}) as Record<string, unknown>;
     const v = wf.context_coverage_gate;
     if (typeof v === 'boolean') return v;
-    if (typeof v === 'string') return v.toLowerCase() !== 'false';
+    // Tolerate stringified booleans coming from environment-variable-style configs,
+    // but warn loudly on numeric / other-shaped values so silent type drift surfaces.
+    // Schema-vs-loadConfig validation gap (review F16, mirror of #2609).
+    if (typeof v === 'string') {
+      const lower = v.toLowerCase();
+      if (lower === 'false' || lower === 'true') return lower !== 'false';
+      console.warn(
+        `[gsd] workflow.context_coverage_gate is a string "${v}" — expected boolean. Defaulting to ON.`,
+      );
+      return true;
+    }
+    if (v !== undefined && v !== null) {
+      console.warn(
+        `[gsd] workflow.context_coverage_gate has invalid type ${typeof v} (value: ${JSON.stringify(v)}); expected boolean. Defaulting to ON.`,
+      );
+    }
     return true; // default ON
   } catch {
     return true;
@@ -174,11 +302,11 @@ function buildVerifyMessage(notHonored: GateUncoveredItem[]): string {
 
 // ─── Plan-phase gate ──────────────────────────────────────────────────────
 
-export const checkDecisionCoveragePlan: QueryHandler = async (args, projectDir) => {
+export const checkDecisionCoveragePlan: QueryHandler = async (args, projectDir, workstream) => {
   const phaseDir = args[0] ? resolvePath(args[0], projectDir) : '';
   const contextPath = args[1] ? resolvePath(args[1], projectDir) : '';
 
-  const enabled = await loadGateConfig(projectDir);
+  const enabled = await loadGateConfig(projectDir, workstream);
   if (!enabled) {
     const data: PlanGateData = {
       passed: true,
@@ -189,7 +317,7 @@ export const checkDecisionCoveragePlan: QueryHandler = async (args, projectDir) 
       uncovered: [],
       message: 'Decision coverage gate disabled by config.',
     };
-    return { data: data as unknown as Record<string, unknown> };
+    return { data };
   }
 
   if (!contextPath || !existsSync(contextPath)) {
@@ -202,7 +330,7 @@ export const checkDecisionCoveragePlan: QueryHandler = async (args, projectDir) 
       uncovered: [],
       message: 'No CONTEXT.md — nothing to check.',
     };
-    return { data: data as unknown as Record<string, unknown> };
+    return { data };
   }
 
   const contextRaw = await readIfExists(contextPath);
@@ -217,16 +345,15 @@ export const checkDecisionCoveragePlan: QueryHandler = async (args, projectDir) 
       uncovered: [],
       message: 'No trackable decisions in CONTEXT.md.',
     };
-    return { data: data as unknown as Record<string, unknown> };
+    return { data };
   }
 
-  const planContents = await loadPlanContents(phaseDir);
-  const planHaystack = planContents.join('\n\n');
+  const planSections = await loadPlanSections(phaseDir);
 
   const uncovered: GateUncoveredItem[] = [];
   let covered = 0;
   for (const d of decisions) {
-    if (decisionMentioned(planHaystack, d)) {
+    if (planSectionsMention(planSections, d)) {
       covered++;
     } else {
       uncovered.push({ id: d.id, text: d.text, category: d.category });
@@ -242,12 +369,18 @@ export const checkDecisionCoveragePlan: QueryHandler = async (args, projectDir) 
     uncovered,
     message: buildPlanMessage(uncovered),
   };
-  return { data: data as unknown as Record<string, unknown> };
+  return { data };
 };
 
 // ─── Verify-phase gate ────────────────────────────────────────────────────
 
-async function recentCommitMessages(projectDir: string, limit = 50): Promise<string> {
+/**
+ * Recent commit subjects + bodies, capped at 200 to span typical phase boundaries
+ * even on busy repos. The non-blocking verify gate trades precision for recall —
+ * a few extra commits in the haystack only inflate "honored" counts harmlessly,
+ * while too few commits could cause false misses on long-running phases (review F18).
+ */
+async function recentCommitMessages(projectDir: string, limit = 200): Promise<string> {
   try {
     const { stdout } = await execFile('git', ['log', `-n`, String(limit), '--pretty=%s%n%b'], {
       cwd: projectDir,
@@ -259,24 +392,80 @@ async function recentCommitMessages(projectDir: string, limit = 50): Promise<str
   }
 }
 
-async function readModifiedFilesContent(projectDir: string, summary: string): Promise<string> {
-  // Find a `files_modified:` YAML or markdown list and read each.
+/** Per-file size cap when slurping modified-file contents into the verify haystack. */
+const MAX_MODIFIED_FILE_BYTES = 256 * 1024;
+
+/** Read a file and truncate to MAX_MODIFIED_FILE_BYTES; returns '' on error. */
+async function readBoundedFile(absPath: string): Promise<string> {
+  try {
+    const raw = await readFile(absPath, 'utf-8');
+    return raw.length > MAX_MODIFIED_FILE_BYTES ? raw.slice(0, MAX_MODIFIED_FILE_BYTES) : raw;
+  } catch {
+    return '';
+  }
+}
+
+/**
+ * True when `candidatePath` (after resolution) is contained within `rootDir`.
+ * Rejects absolute paths outside the root, `..` traversal, and any input
+ * whose canonical form escapes the project boundary (review F7).
+ *
+ * Note: this is a lexical check. Symlink targets are NOT resolved here — we
+ * intentionally do not follow links, so a symlink inside the project pointing
+ * outside is not de-referenced (we read the link's target only if it resolves
+ * within projectDir). For full symlink hardening callers should run on a
+ * trusted SUMMARY.md.
+ */
+function isInsideRoot(candidatePath: string, rootDir: string): boolean {
+  const root = isAbsolute(rootDir) ? rootDir : join(process.cwd(), rootDir);
+  const target = isAbsolute(candidatePath) ? candidatePath : join(root, candidatePath);
+  // Normalize both via path.resolve-equivalent (join handles `..`).
+  const normalizedRoot = root.endsWith('/') ? root : root + '/';
+  const normalizedTarget = target;
+  return normalizedTarget === root || normalizedTarget.startsWith(normalizedRoot);
+}
+
+async function readModifiedFilesContent(projectDir: string, summaries: string[]): Promise<string> {
+  // Walk EVERY summary independently and aggregate file paths. The previous
+  // implementation matched only the first `files_modified:` block in a
+  // concatenated string — when two summaries shipped in one phase the second
+  // plan's files were silently dropped (review F6).
   const out: string[] = [];
-  const fmMatch = summary.match(/files_modified:\s*\n((?:\s*-\s+.+\n?)+)/);
-  const block = fmMatch ? fmMatch[1] : '';
-  const files = [...block.matchAll(/-\s+(.+)/g)].map((m) => m[1].trim().replace(/^["']|["']$/g, ''));
-  for (const f of files.slice(0, 50)) {
-    if (!f) continue;
-    out.push(await readIfExists(resolvePath(f, projectDir)));
+  let total = 0;
+  for (const summary of summaries) {
+    if (!summary) continue;
+    // /g so multiple `files_modified:` blocks in a single summary are also captured.
+    const blockMatches = summary.matchAll(/files_modified:\s*\n((?:[ \t]*-\s+.+\n?)+)/g);
+    for (const blockMatch of blockMatches) {
+      const block = blockMatch[1] ?? '';
+      const files = [...block.matchAll(/-\s+(.+)/g)].map((m) =>
+        m[1].trim().replace(/^["']|["']$/g, ''),
+      );
+      for (const f of files) {
+        if (!f) continue;
+        if (total >= 50) break; // cap total files across all summaries
+        // Reject absolute paths AND any relative path that escapes projectDir.
+        if (!isInsideRoot(f, projectDir)) {
+          console.warn(
+            `[gsd] decision-coverage: skipping files_modified entry "${f}" — outside project root`,
+          );
+          continue;
+        }
+        out.push(await readBoundedFile(resolvePath(f, projectDir)));
+        total++;
+      }
+      if (total >= 50) break;
+    }
+    if (total >= 50) break;
   }
   return out.join('\n\n');
 }
 
-export const checkDecisionCoverageVerify: QueryHandler = async (args, projectDir) => {
+export const checkDecisionCoverageVerify: QueryHandler = async (args, projectDir, workstream) => {
   const phaseDir = args[0] ? resolvePath(args[0], projectDir) : '';
   const contextPath = args[1] ? resolvePath(args[1], projectDir) : '';
 
-  const enabled = await loadGateConfig(projectDir);
+  const enabled = await loadGateConfig(projectDir, workstream);
   if (!enabled) {
     const data: VerifyGateData = {
       skipped: true,
@@ -287,7 +476,7 @@ export const checkDecisionCoverageVerify: QueryHandler = async (args, projectDir
       not_honored: [],
       message: 'Decision coverage gate disabled by config.',
     };
-    return { data: data as unknown as Record<string, unknown> };
+    return { data };
   }
 
   if (!contextPath || !existsSync(contextPath)) {
@@ -300,7 +489,7 @@ export const checkDecisionCoverageVerify: QueryHandler = async (args, projectDir
       not_honored: [],
       message: 'No CONTEXT.md — nothing to check.',
     };
-    return { data: data as unknown as Record<string, unknown> };
+    return { data };
   }
 
   const contextRaw = await readIfExists(contextPath);
@@ -315,24 +504,28 @@ export const checkDecisionCoverageVerify: QueryHandler = async (args, projectDir
       not_honored: [],
       message: 'No trackable decisions in CONTEXT.md.',
     };
-    return { data: data as unknown as Record<string, unknown> };
+    return { data };
   }
 
+  // Verify-phase haystack is intentionally broad — this gate is non-blocking and looks
+  // for honored decisions across all phase artifacts, not just plan front-matter sections.
   const planContents = await loadPlanContents(phaseDir);
-  // Read all *-SUMMARY.md files in phaseDir
+  // Read all *-SUMMARY.md files in phaseDir, capped to keep the haystack bounded.
+  const summaryParts: string[] = [];
   let summaryContent = '';
   if (existsSync(phaseDir)) {
     try {
       const entries = await readdir(phaseDir);
       for (const e of entries.filter((x) => /-SUMMARY\.md$/.test(x))) {
-        summaryContent += '\n\n' + (await readIfExists(join(phaseDir, e)));
+        summaryParts.push(await readIfExists(join(phaseDir, e)));
       }
     } catch {
       /* ignore */
     }
   }
+  summaryContent = summaryParts.join('\n\n');
 
-  const filesModifiedContent = await readModifiedFilesContent(projectDir, summaryContent);
+  const filesModifiedContent = await readModifiedFilesContent(projectDir, summaryParts);
   const commits = await recentCommitMessages(projectDir);
 
   const haystack = [planContents.join('\n\n'), summaryContent, filesModifiedContent, commits].join(
@@ -357,5 +550,5 @@ export const checkDecisionCoverageVerify: QueryHandler = async (args, projectDir
     not_honored: notHonored,
     message: buildVerifyMessage(notHonored),
   };
-  return { data: data as unknown as Record<string, unknown> };
+  return { data };
 };

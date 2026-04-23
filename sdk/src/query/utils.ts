@@ -22,12 +22,16 @@ import { GSDError, ErrorClassification } from '../errors.js';
 // ─── Types ──────────────────────────────────────────────────────────────────
 
 /** Structured result returned by all query handlers. */
-export interface QueryResult {
-  data: unknown;
+export interface QueryResult<T = unknown> {
+  data: T;
 }
 
 /** Signature for a query handler function. */
-export type QueryHandler = (args: string[], projectDir: string, workstream?: string) => Promise<QueryResult>;
+export type QueryHandler<T = unknown> = (
+  args: string[],
+  projectDir: string,
+  workstream?: string,
+) => Promise<QueryResult<T>>;
 
 // ─── generateSlug ───────────────────────────────────────────────────────────
 
