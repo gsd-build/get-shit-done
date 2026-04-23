@@ -131,6 +131,6 @@ If no reviewed-but-deferred todos: omit this subsection entirely.]
 
 ---
 
-*Phase: XX-name*
+*Phase: [X]-[Name]*
 *Context gathered: [date]*
 ```

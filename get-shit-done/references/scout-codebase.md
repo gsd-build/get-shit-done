@@ -34,8 +34,9 @@ than a single full read.
 If `.planning/codebase/*.md` does not exist:
 1. Extract key terms from the phase goal (e.g., "feed" → "post", "card",
    "list"; "auth" → "login", "session", "token")
-2. `grep -rl "{term1}\|{term2}" src/ app/ --include="*.ts" ...` and `ls`
-   the conventional component/hook/util dirs
+2. `grep -rlE "{term1}|{term2}" src/ app/ --include="*.ts" ...` (use `-E`
+   for extended regex so the `|` alternation works on both GNU grep and BSD
+   grep / macOS), and `ls` the conventional component/hook/util dirs
 3. Read the 3–5 most relevant files
 
 ## Output (internal `<codebase_context>`)
