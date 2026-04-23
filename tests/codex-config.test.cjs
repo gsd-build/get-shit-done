@@ -1059,19 +1059,21 @@ describe('Codex install hook configuration (e2e)', () => {
   });
 
   test('install preserves malformed hooks.json event objects outside SessionStart instead of overwriting them', () => {
-    const malformedHooksJson = {
-      hooks: {
-        AfterCommand: {
-          hooks: [
-            { type: 'command', command: 'echo keep-me' },
-          ],
-        },
-      },
-    };
-    writeCodexHooksJson(codexHome, malformedHooksJson);
+    const malformedHooksJsonRaw = [
+      '{',
+      '  "hooks": {',
+      '    "AfterCommand": { "hooks": [ { "command": "echo keep-me", "type": "command" } ] }',
+      '  }',
+      '}',
+      '',
+    ].join('\n');
+    const malformedHooksJson = JSON.parse(malformedHooksJsonRaw);
+    fs.mkdirSync(codexHome, { recursive: true });
+    fs.writeFileSync(path.join(codexHome, 'hooks.json'), malformedHooksJsonRaw, 'utf8');
 
     runCodexInstall(codexHome);
 
+    assert.strictEqual(fs.readFileSync(path.join(codexHome, 'hooks.json'), 'utf8'), malformedHooksJsonRaw, 'leaves malformed non-SessionStart hooks.json bytes untouched instead of rewriting them');
     assert.deepStrictEqual(readCodexHooksJson(codexHome), malformedHooksJson, 'leaves malformed non-SessionStart hooks.json entries untouched instead of rewriting them');
     assert.strictEqual(countGsdUpdateHooksInHooksJson(codexHome), 0, 'does not add the managed GSD hook when hooks.json cannot be rewritten safely');
     assert.strictEqual(countMatches(readCodexConfig(codexHome), /^codex_hooks = true$/gm), 0, 'does not enable codex_hooks when malformed hooks.json prevents safe migration');
@@ -1120,6 +1122,27 @@ describe('Codex install hook configuration (e2e)', () => {
     assert.ok(content.includes(`command = "${customInlineCommand}"`), 'preserves the user inline SessionStart hook');
     assert.ok(!content.includes(`# GSD Hooks\n[[hooks]]\nevent = "SessionStart"\ncommand = "${customInlineCommand}"`), 'does not misclassify the user inline hook as a GSD-managed legacy block');
     assert.strictEqual(countGsdUpdateHooksInHooksJson(codexHome), 1, 'adds the managed GSD hook in hooks.json separately');
+  });
+
+  test('install removes legacy inline GSD hooks whose TOML command escapes quotes', () => {
+    const managedCommand = `node "${path.join(codexHome, 'hooks', 'gsd-check-update.js').replace(/\\/g, '/')}"`;
+    writeCodexConfig(codexHome, [
+      '# GSD Hooks',
+      '[[hooks]]',
+      'event = "SessionStart"',
+      `command = ${JSON.stringify(managedCommand)}`,
+      '',
+      '[model]',
+      'name = "o3"',
+      '',
+    ].join('\n'));
+
+    runCodexInstall(codexHome);
+
+    const content = readCodexConfig(codexHome);
+    assert.ok(content.includes('name = "o3"'), 'preserves user config after removing the legacy hook');
+    assert.ok(!content.includes('[[hooks]]'), 'removes the legacy inline GSD hook when TOML escaped quotes are decoded');
+    assert.strictEqual(countGsdUpdateHooksInHooksJson(codexHome), 1, 'adds the managed GSD hook to hooks.json');
   });
 
   test('config_file paths are absolute using CODEX_HOME', () => {
@@ -1949,6 +1972,26 @@ describe('Codex uninstall symmetry for hook-enabled configs', () => {
 
     assert.ok(readCodexConfig(codexHome).includes('name = "o3"'), 'preserves user config after removing the compact managed inline hook');
     assert.ok(!readCodexConfig(codexHome).includes(managedCommand), 'removes managed inline TOML hooks even when spacing around assignments differs');
+  });
+
+  test('install then uninstall removes managed inline TOML hooks whose command escapes quotes', () => {
+    const managedCommand = `node "${path.join(codexHome, 'hooks', 'gsd-check-update.js').replace(/\\/g, '/')}"`;
+    writeCodexConfig(codexHome, [
+      '# GSD Hooks',
+      '[[hooks]]',
+      'event = "AfterCommand"',
+      `command = ${JSON.stringify(managedCommand)}`,
+      '',
+      '[model]',
+      'name = "o3"',
+      '',
+    ].join('\n'));
+
+    runCodexUninstall(codexHome);
+
+    const content = readCodexConfig(codexHome);
+    assert.ok(content.includes('name = "o3"'), 'preserves user config after removing the quoted managed inline hook');
+    assert.ok(!content.includes('gsd-check-update.js'), 'removes managed inline TOML hooks whose command uses escaped quotes');
   });
 
   test('install then uninstall removes [features].codex_hooks while preserving other feature keys, comments, hooks, and CRLF', () => {

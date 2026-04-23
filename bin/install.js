@@ -2077,8 +2077,23 @@ function getManagedCodexLegacyInlineCommands(configDir) {
 function parseSimpleTomlStringAssignment(line, key) {
   const commentStart = findTomlCommentStart(line);
   const content = (commentStart === -1 ? line : line.slice(0, commentStart)).trim();
-  const match = content.match(new RegExp(`^${escapeRegExp(key)}\\s*=\\s*([\"'])(.*)\\1$`));
-  return match ? match[2] : null;
+  const match = content.match(new RegExp(`^${escapeRegExp(key)}\\s*=\\s*(.+)$`));
+  if (!match) {
+    return null;
+  }
+
+  const valueText = match[1].trim();
+  if (valueText.startsWith('"')) {
+    try {
+      const parsed = JSON.parse(valueText);
+      return typeof parsed === 'string' ? parsed : null;
+    } catch {
+      return null;
+    }
+  }
+
+  const literalMatch = valueText.match(/^'(.*)'$/);
+  return literalMatch ? literalMatch[1] : null;
 }
 
 function stripManagedGsdCodexInlineHooks(content, configDir) {
