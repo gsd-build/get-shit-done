@@ -45,13 +45,28 @@ interface PhaseSection {
 // ─── Exported helpers ─────────────────────────────────────────────────────
 
 /**
- * Strip <details>...</details> blocks from content (shipped milestones).
+ * Strip <details>...</details> blocks from content (shipped milestones only).
+ *
+ * Only strips blocks whose <summary> contains a SHIPPED/✅/COMPLETE marker.
+ * Blocks with no marker (or an "IN PROGRESS" marker) are preserved so the
+ * current-milestone block — which is commonly rendered inside <details> for
+ * collapsible UX on GitHub — remains visible to downstream parsers. Fixes
+ * the case where a new milestone wrapped in <details> disappeared from
+ * `roadmap.analyze` output (issue #2641).
  *
  * Port of stripShippedMilestones from core.cjs line 1082-1084.
  */
 export function stripShippedMilestones(content: string): string {
-  // Pattern 1: <details>...</details> blocks (explicit collapse)
-  let result = content.replace(/<details>[\s\S]*?<\/details>/gi, '');
+  // Pattern 1: <details>...</details> blocks — strip only when the
+  // <summary> marks the block as shipped. A missing summary is treated
+  // as shipped for backward compatibility with pre-summary ROADMAPs.
+  let result = content.replace(/<details>[\s\S]*?<\/details>/gi, (block) => {
+    const summaryMatch = block.match(/<summary>([\s\S]*?)<\/summary>/i);
+    if (!summaryMatch) return '';
+    const summary = summaryMatch[1];
+    const isShipped = /\bSHIPPED\b|✅|\bCOMPLETE\b/i.test(summary);
+    return isShipped ? '' : block;
+  });
   // Pattern 2: inline milestone headings marked as shipped.
   // Keep aligned with heading levels accepted by extractCurrentMilestone() (## and ###).
   const sections = result.split(/(?=^#{2,3}\s)/m);
@@ -524,10 +539,15 @@ export const roadmapAnalyze: QueryHandler = async (_args, projectDir, workstream
       }
     } catch { /* intentionally empty */ }
 
-    // Check ROADMAP checkbox status
-    const checkboxPattern = new RegExp(`-\\s*\\[(x| )\\]\\s*.*Phase\\s+${escapeRegex(phaseNum)}[:\\s]`, 'i');
-    const checkboxMatch = content.match(checkboxPattern);
-    const roadmapComplete = checkboxMatch ? checkboxMatch[1] === 'x' : false;
+    // Check ROADMAP checkbox status against the RAW ROADMAP — archived
+    // milestones' shipped checkboxes live inside <details> blocks that
+    // `extractCurrentMilestone` strips, so they were invisible before.
+    // Require `[x]` followed by a space/`**` then `Phase N` — this avoids
+    // false positives from "- [ ] TBD (run /gsd-plan-phase N to break down)"
+    // placeholders in appendix Plans subsections, which otherwise overrode
+    // the authoritative `[x]` marker in the milestone block (issue #2641).
+    const checkedPattern = new RegExp(`-\\s*\\[x\\]\\s+(?:\\*\\*)?Phase\\s+${escapeRegex(phaseNum)}[:\\s]`, 'i');
+    const roadmapComplete = checkedPattern.test(rawContent);
 
     // If roadmap marks phase complete, trust that over disk
     if (roadmapComplete && diskStatus !== 'complete') {

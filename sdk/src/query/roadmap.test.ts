@@ -159,6 +159,57 @@ describe('stripShippedMilestones', () => {
     expect(stripped).toContain('v2.0');
     expect(stripped).toContain('Current');
   });
+
+  // Bug #2641: current-milestone <details> block with "IN PROGRESS"
+  // summary must NOT be stripped (common GitHub collapse layout for
+  // long-running ROADMAPs that accumulate many shipped milestones).
+  it('preserves <details> block when <summary> says IN PROGRESS', () => {
+    const content = [
+      '<details>',
+      '<summary>v1.0 Old (Phases 1-2) — SHIPPED 2026-01-01</summary>',
+      'shipped stuff',
+      '</details>',
+      '',
+      '<details>',
+      '<summary>v2.0 Current (Phases 3-4) -- IN PROGRESS 2026-04-23</summary>',
+      '',
+      '### Phase 3: Work',
+      '',
+      '</details>',
+    ].join('\n');
+    const stripped = stripShippedMilestones(content);
+    expect(stripped).not.toContain('v1.0 Old');
+    expect(stripped).not.toContain('shipped stuff');
+    expect(stripped).toContain('v2.0 Current');
+    expect(stripped).toContain('### Phase 3: Work');
+  });
+
+  it('strips <details> block when <summary> contains SHIPPED marker', () => {
+    const content = [
+      '<details>',
+      '<summary>v1.0 Old — SHIPPED 2026-01-01</summary>',
+      'shipped phase list',
+      '</details>',
+      'after',
+    ].join('\n');
+    expect(stripShippedMilestones(content)).toBe('\nafter');
+  });
+
+  it('strips <details> block when <summary> uses ✅ marker', () => {
+    const content = [
+      '<details>',
+      '<summary>✅ v1.0 Old — SHIPPED 2026-01-01</summary>',
+      'shipped phase list',
+      '</details>',
+    ].join('\n');
+    expect(stripShippedMilestones(content).trim()).toBe('');
+  });
+
+  it('strips <details> block when <summary> is missing (back-compat)', () => {
+    // Legacy ROADMAPs without a <summary> are still treated as shipped.
+    const content = '<details>legacy content</details>after';
+    expect(stripShippedMilestones(content)).toBe('after');
+  });
 });
 
 // ─── getMilestoneInfo ─────────────────────────────────────────────────────
@@ -537,6 +588,111 @@ describe('roadmapAnalyze', () => {
     const data2 = result2.data as Record<string, unknown>;
 
     expect((data1.phases as unknown[]).length).toBe((data2.phases as unknown[]).length);
+  });
+
+  // Bug #2641: surfaces the current milestone's phases when the milestone
+  // block is wrapped in <details>/<summary> (common GitHub layout).
+  it('surfaces current-milestone phases wrapped in <details>/<summary>', async () => {
+    const roadmap = [
+      '# Roadmap',
+      '',
+      '<details>',
+      '<summary>v1.0 Old (Phases 1-2) — SHIPPED 2026-01-01</summary>',
+      '',
+      '- [x] **Phase 1: Foundation** (shipped)',
+      '- [x] **Phase 2: Polish** (shipped)',
+      '',
+      '</details>',
+      '',
+      '<details>',
+      '<summary>v2.0 Current (Phases 3-4) -- IN PROGRESS 2026-04-23</summary>',
+      '',
+      '- [ ] Phase 3: New Feature',
+      '- [ ] Phase 4: Harden',
+      '',
+      '### Phase 3: New Feature',
+      '**Goal:** Ship the new feature end to end.',
+      '',
+      '### Phase 4: Harden',
+      '**Goal:** Close gaps.',
+      '',
+      '</details>',
+    ].join('\n');
+    await writeFile(join(tmpDir, '.planning', 'ROADMAP.md'), roadmap);
+    await writeFile(
+      join(tmpDir, '.planning', 'STATE.md'),
+      '---\nmilestone: v2.0\nmilestone_name: Current\n---\n',
+    );
+
+    const result = await roadmapAnalyze([], tmpDir);
+    const phases = (result.data as Record<string, unknown>).phases as Array<Record<string, unknown>>;
+    const numbers = phases.map(p => p.number).sort();
+    expect(numbers).toContain('3');
+    expect(numbers).toContain('4');
+    const p3 = phases.find(p => p.number === '3');
+    const p4 = phases.find(p => p.number === '4');
+    expect(p3!.roadmap_complete).toBe(false);
+    expect(p4!.roadmap_complete).toBe(false);
+  });
+
+  // Bug #2641: appendix "### Phase N" headings from archived milestones
+  // must be marked `roadmap_complete=true` via their `[x]` in the raw
+  // ROADMAP, not falsely `false` via a stale "- [ ] TBD (run …)"
+  // placeholder under the appendix heading's Plans subsection.
+  it('honours archived-milestone [x] in raw ROADMAP over appendix [ ] TBD placeholders', async () => {
+    const roadmap = [
+      '# Roadmap',
+      '',
+      '<details>',
+      '<summary>v1.0 Old (Phases 1-2) — SHIPPED 2026-01-01</summary>',
+      '',
+      '- [x] **Phase 1: Foundation** (shipped)',
+      '- [x] **Phase 2: Polish** (shipped)',
+      '',
+      '</details>',
+      '',
+      '<details>',
+      '<summary>v2.0 Current -- IN PROGRESS</summary>',
+      '',
+      '- [ ] Phase 3: Work',
+      '',
+      '### Phase 3: Work',
+      '**Goal:** do the thing.',
+      '',
+      '</details>',
+      '',
+      '## v1.0 Phase Details (appendix — kept for cross-reference)',
+      '',
+      '### Phase 1: Foundation',
+      '**Goal:** Original v1.0 foundation.',
+      '',
+      'Plans:',
+      '- [ ] TBD (run /gsd-plan-phase 1 to break down)',
+      '',
+      '### Phase 2: Polish',
+      '**Goal:** Original v1.0 polish.',
+      '',
+      'Plans:',
+      '- [ ] TBD (run /gsd-plan-phase 2 to break down)',
+    ].join('\n');
+    await writeFile(join(tmpDir, '.planning', 'ROADMAP.md'), roadmap);
+    await writeFile(
+      join(tmpDir, '.planning', 'STATE.md'),
+      '---\nmilestone: v2.0\nmilestone_name: Current\n---\n',
+    );
+
+    const result = await roadmapAnalyze([], tmpDir);
+    const phases = (result.data as Record<string, unknown>).phases as Array<Record<string, unknown>>;
+    const p1 = phases.find(p => p.number === '1');
+    const p2 = phases.find(p => p.number === '2');
+    const p3 = phases.find(p => p.number === '3');
+    // Archived-milestone phases surface (via appendix heading) but are
+    // flagged complete from their [x] in the archived <details> block —
+    // NOT false-incomplete from the "- [ ] TBD" appendix placeholder.
+    expect(p1!.roadmap_complete).toBe(true);
+    expect(p2!.roadmap_complete).toBe(true);
+    // Current-milestone phase is correctly incomplete.
+    expect(p3!.roadmap_complete).toBe(false);
   });
 });
 
