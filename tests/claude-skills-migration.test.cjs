@@ -69,7 +69,7 @@ describe('convertClaudeCommandToClaudeSkill', () => {
     );
   });
 
-  test('converts name format from gsd:xxx to skill naming', () => {
+  test('emits colon-form name (gsd:<cmd>) from hyphen-form dir (#2643)', () => {
     const input = [
       '---',
       'name: gsd:next',
@@ -79,9 +79,10 @@ describe('convertClaudeCommandToClaudeSkill', () => {
       'Body.',
     ].join('\n');
 
+    // Directory name is gsd-next (hyphen, Windows-safe), frontmatter name is
+    // gsd:next (colon) so Claude Code resolves `/gsd:next` against the skill.
     const result = convertClaudeCommandToClaudeSkill(input, 'gsd-next');
-    assert.ok(result.includes('name: gsd-next'), 'name uses skill naming convention');
-    assert.ok(!result.includes('name: gsd:next'), 'old name format removed');
+    assert.ok(result.includes('name: gsd:next'), 'frontmatter name uses colon form');
   });
 
   test('preserves body content unchanged', () => {

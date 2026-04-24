@@ -66,7 +66,7 @@ describe('Qwen Code: convertClaudeCommandToClaudeSkill', () => {
     );
   });
 
-  test('converts name format from gsd:xxx to skill naming', () => {
+  test('emits colon-form name (gsd:<cmd>) from hyphen-form dir (#2643)', () => {
     const input = [
       '---',
       'name: gsd:next',
@@ -76,9 +76,10 @@ describe('Qwen Code: convertClaudeCommandToClaudeSkill', () => {
       'Body.',
     ].join('\n');
 
+    // Directory name is gsd-next (hyphen, Windows-safe), frontmatter name is
+    // gsd:next (colon) so Claude Code resolves `/gsd:next` against the skill.
     const result = convertClaudeCommandToClaudeSkill(input, 'gsd-next');
-    assert.ok(result.includes('name: gsd-next'), 'name uses skill naming convention');
-    assert.ok(!result.includes('name: gsd:next'), 'old name format removed');
+    assert.ok(result.includes('name: gsd:next'), 'frontmatter name uses colon form');
   });
 
   test('preserves body content unchanged', () => {
@@ -153,7 +154,7 @@ describe('Qwen Code: copyCommandsAsClaudeSkills', () => {
 
     // Verify content
     const content = fs.readFileSync(skillPath, 'utf8');
-    assert.ok(content.includes('name: gsd-quick'), 'skill name converted');
+    assert.ok(content.includes('name: gsd:quick'), 'frontmatter name uses colon form (#2643)');
     assert.ok(content.includes('description:'), 'description present');
     assert.ok(content.includes('allowed-tools:'), 'allowed-tools preserved');
     assert.ok(content.includes('<objective>'), 'body content preserved');
@@ -273,7 +274,7 @@ describe('Qwen Code: SKILL.md format validation', () => {
     assert.ok(fmMatch, 'has frontmatter block');
 
     const fmLines = fmMatch[1].split('\n');
-    const hasName = fmLines.some(l => l.startsWith('name: gsd-review'));
+    const hasName = fmLines.some(l => l.startsWith('name: gsd:review'));
     const hasDesc = fmLines.some(l => l.startsWith('description:'));
     const hasAgent = fmLines.some(l => l.startsWith('agent:'));
     const hasTools = fmLines.some(l => l.startsWith('allowed-tools:'));

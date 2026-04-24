@@ -1114,10 +1114,30 @@ function convertClaudeCommandToCopilotSkill(content, skillName, isGlobal = false
 }
 
 /**
+ * Map a skill directory name (gsd-<cmd>) to the frontmatter `name:` used
+ * by Claude Code as the skill identity. Workflows emit `Skill(skill="gsd:<cmd>")`
+ * (colon form) and Claude Code resolves skills by frontmatter `name:`, not
+ * directory name — so emit colon form here. Directory stays hyphenated for
+ * Windows path safety. See #2643.
+ *
+ * Codex must NOT use this helper: its adapter invokes skills as `$gsd-<cmd>`
+ * (shell-var syntax) and a colon would terminate the variable name. Codex
+ * keeps the hyphen form via `yamlQuote(skillName)` directly.
+ */
+function skillFrontmatterName(skillDirName) {
+  if (typeof skillDirName !== 'string') return skillDirName;
+  // Idempotent on already-colon form.
+  if (skillDirName.includes(':')) return skillDirName;
+  // Only rewrite the first hyphen after the `gsd` prefix.
+  return skillDirName.replace(/^gsd-/, 'gsd:');
+}
+
+/**
  * Convert a Claude command (.md) to a Claude skill (SKILL.md).
  * Claude Code is the native format, so minimal conversion needed —
- * preserve allowed-tools as YAML multiline list, preserve argument-hint,
- * convert name from gsd:xxx to gsd-xxx format.
+ * preserve allowed-tools as YAML multiline list, preserve argument-hint.
+ * Emits `name: gsd:<cmd>` (colon) so Skill(skill="gsd:<cmd>") calls in
+ * workflows resolve on flat-skills installs — see #2643.
  */
 function convertClaudeCommandToClaudeSkill(content, skillName) {
   const { frontmatter, body } = extractFrontmatterAndBody(content);
@@ -1137,7 +1157,8 @@ function convertClaudeCommandToClaudeSkill(content, skillName) {
   }
 
   // Reconstruct frontmatter in Claude skill format
-  let fm = `---\nname: ${skillName}\ndescription: ${yamlQuote(description)}\n`;
+  const frontmatterName = skillFrontmatterName(skillName);
+  let fm = `---\nname: ${frontmatterName}\ndescription: ${yamlQuote(description)}\n`;
   if (argumentHint) fm += `argument-hint: ${yamlQuote(argumentHint)}\n`;
   if (agent) fm += `agent: ${agent}\n`;
   if (toolsBlock) fm += toolsBlock;
@@ -7173,6 +7194,7 @@ if (process.env.GSD_TEST_MODE) {
     convertClaudeAgentToAntigravityAgent,
     copyCommandsAsAntigravitySkills,
     convertClaudeCommandToClaudeSkill,
+    skillFrontmatterName,
     copyCommandsAsClaudeSkills,
     convertClaudeToWindsurfMarkdown,
     convertClaudeCommandToWindsurfSkill,
