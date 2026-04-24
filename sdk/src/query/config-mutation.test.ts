@@ -14,14 +14,25 @@ import { GSDError } from '../errors.js';
 // ─── Test setup ─────────────────────────────────────────────────────────────
 
 let tmpDir: string;
+let homeDir: string;
+let previousHome: string | undefined;
 
 beforeEach(async () => {
   tmpDir = await mkdtemp(join(tmpdir(), 'gsd-cfgmut-'));
+  homeDir = await mkdtemp(join(tmpdir(), 'gsd-cfgmut-home-'));
+  previousHome = process.env.HOME;
+  process.env.HOME = homeDir;
   await mkdir(join(tmpDir, '.planning'), { recursive: true });
 });
 
 afterEach(async () => {
-  await rm(tmpDir, { recursive: true, force: true });
+  try {
+    await rm(tmpDir, { recursive: true, force: true });
+    await rm(homeDir, { recursive: true, force: true });
+  } finally {
+    if (previousHome === undefined) delete process.env.HOME;
+    else process.env.HOME = previousHome;
+  }
 });
 
 // ─── isValidConfigKey ──────────────────────────────────────────────────────
@@ -242,6 +253,35 @@ describe('configNewProject global defaults (D11)', () => {
 
     const raw = JSON.parse(await readFile(join(tmpDir, '.planning', 'config.json'), 'utf-8'));
     expect(raw.model_profile).toBe('balanced');
+  });
+
+  it('deep-merges global defaults before user choices', async () => {
+    const { configNewProject } = await import('./config-mutation.js');
+    await mkdir(join(homeDir, '.gsd'), { recursive: true });
+    await writeFile(
+      join(homeDir, '.gsd', 'defaults.json'),
+      JSON.stringify({
+        git: { branching_strategy: 'milestone' },
+        workflow: { auto_advance: true, research: false },
+        agent_skills: { 'gsd-planner': 'global-planner-skill' },
+        features: { global_learnings: true, thinking_partner: true },
+      }),
+    );
+    const choices = JSON.stringify({
+      workflow: { research: true },
+      features: { thinking_partner: false },
+    });
+
+    const result = await configNewProject([choices], tmpDir);
+
+    expect((result.data as { created: boolean }).created).toBe(true);
+    const raw = JSON.parse(await readFile(join(tmpDir, '.planning', 'config.json'), 'utf-8'));
+    expect(raw.git.branching_strategy).toBe('milestone');
+    expect(raw.git.phase_branch_template).toBe('gsd/phase-{phase}-{slug}');
+    expect(raw.workflow.auto_advance).toBe(true);
+    expect(raw.workflow.research).toBe(true);
+    expect(raw.agent_skills).toEqual({ 'gsd-planner': 'global-planner-skill' });
+    expect(raw.features).toEqual({ global_learnings: true, thinking_partner: false });
   });
 });
 

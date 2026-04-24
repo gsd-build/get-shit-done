@@ -1,52 +1,47 @@
 import { describe, it, expect, beforeEach, afterEach } from 'vitest';
 import { loadConfig, CONFIG_DEFAULTS } from './config.js';
-import { mkdir, writeFile, rm } from 'node:fs/promises';
+import { mkdir, mkdtemp, writeFile, rm } from 'node:fs/promises';
 import { join } from 'node:path';
 import { tmpdir } from 'node:os';
 
 describe('loadConfig', () => {
   let tmpDir: string;
-  let fakeHome: string;
-  let prevHome: string | undefined;
-  let prevGsdHome: string | undefined;
+  let homeDir: string;
 
   beforeEach(async () => {
-    tmpDir = join(tmpdir(), `gsd-config-test-${Date.now()}-${Math.random().toString(36).slice(2)}`);
+    tmpDir = await mkdtemp(join(tmpdir(), 'gsd-config-test-'));
+    homeDir = await mkdtemp(join(tmpdir(), 'gsd-home-test-'));
     await mkdir(join(tmpDir, '.planning'), { recursive: true });
-    // Isolate ~/.gsd/defaults.json by pointing HOME at an empty tmp dir.
-    fakeHome = join(tmpdir(), `gsd-home-test-${Date.now()}-${Math.random().toString(36).slice(2)}`);
-    await mkdir(fakeHome, { recursive: true });
-    prevHome = process.env.HOME;
-    process.env.HOME = fakeHome;
-    // Also isolate GSD_HOME (loadUserDefaults prefers it over HOME).
-    prevGsdHome = process.env.GSD_HOME;
-    delete process.env.GSD_HOME;
   });
 
   afterEach(async () => {
     await rm(tmpDir, { recursive: true, force: true });
-    await rm(fakeHome, { recursive: true, force: true });
-    if (prevHome === undefined) delete process.env.HOME;
-    else process.env.HOME = prevHome;
-    if (prevGsdHome === undefined) delete process.env.GSD_HOME;
-    else process.env.GSD_HOME = prevGsdHome;
+    await rm(homeDir, { recursive: true, force: true });
   });
 
+  /**
+   * Write isolated user-level defaults under the test-controlled home dir.
+   */
   async function writeUserDefaults(defaults: unknown) {
-    await mkdir(join(fakeHome, '.gsd'), { recursive: true });
-    await writeFile(join(fakeHome, '.gsd', 'defaults.json'), JSON.stringify(defaults));
+    await mkdir(join(homeDir, '.gsd'), { recursive: true });
+    const content = typeof defaults === 'string' ? defaults : JSON.stringify(defaults);
+    await writeFile(join(homeDir, '.gsd', 'defaults.json'), content);
+  }
+
+  function loadTestConfig() {
+    return loadConfig(tmpDir, undefined, { homeDir });
   }
 
   it('returns all defaults when config file is missing', async () => {
     // No config.json created
     await rm(join(tmpDir, '.planning', 'config.json'), { force: true });
-    const config = await loadConfig(tmpDir);
+    const config = await loadTestConfig();
     expect(config).toEqual(CONFIG_DEFAULTS);
   });
 
   it('returns all defaults when config file is empty', async () => {
     await writeFile(join(tmpDir, '.planning', 'config.json'), '');
-    const config = await loadConfig(tmpDir);
+    const config = await loadTestConfig();
     expect(config).toEqual(CONFIG_DEFAULTS);
   });
 
@@ -60,7 +55,7 @@ describe('loadConfig', () => {
       JSON.stringify(userConfig),
     );
 
-    const config = await loadConfig(tmpDir);
+    const config = await loadTestConfig();
 
     expect(config.model_profile).toBe('fast');
     expect(config.workflow.research).toBe(false);
@@ -70,6 +65,94 @@ describe('loadConfig', () => {
     // Top-level defaults preserved
     expect(config.commit_docs).toBe(true);
     expect(config.parallelization).toBe(true);
+  });
+
+  it('layers user defaults from ~/.gsd/defaults.json when project config is missing', async () => {
+    await rm(join(tmpDir, '.planning', 'config.json'), { force: true });
+    await writeUserDefaults({
+      resolve_model_ids: 'omit',
+      workflow: { auto_advance: true },
+      agent_skills: { 'gsd-planner': ['codex-skill'] },
+      features: { global_learnings: true },
+      model_overrides: { 'gsd-planner': 'openai/gpt-5.4' },
+    });
+
+    const config = await loadTestConfig();
+
+    expect(config.resolve_model_ids).toBe('omit');
+    expect(config.workflow.auto_advance).toBe(true);
+    expect(config.workflow.research).toBe(true);
+    expect(config.agent_skills).toEqual({ 'gsd-planner': ['codex-skill'] });
+    expect(config.features).toEqual({ global_learnings: true });
+    expect(config.model_overrides).toEqual({ 'gsd-planner': 'openai/gpt-5.4' });
+  });
+
+  it('lets project config override user defaults while preserving nested fallbacks', async () => {
+    await writeUserDefaults({
+      resolve_model_ids: 'omit',
+      workflow: { auto_advance: true, research: false },
+      git: { branching_strategy: 'phase' },
+      agent_skills: { 'gsd-planner': 'global-skill' },
+      features: { global_learnings: true, thinking_partner: true },
+      model_overrides: {
+        'gsd-planner': 'global-planner',
+        'gsd-executor': 'global-executor',
+      },
+    });
+    await writeFile(
+      join(tmpDir, '.planning', 'config.json'),
+      JSON.stringify({
+        resolve_model_ids: false,
+        workflow: { auto_advance: false },
+        git: { branching_strategy: 'none' },
+        agent_skills: { 'gsd-planner': 'project-skill' },
+        features: { thinking_partner: false },
+        model_overrides: { 'gsd-planner': 'project-planner' },
+      }),
+    );
+
+    const config = await loadTestConfig();
+
+    expect(config.resolve_model_ids).toBe(false);
+    expect(config.workflow.auto_advance).toBe(false);
+    expect(config.workflow.research).toBe(false);
+    expect(config.git.branching_strategy).toBe('none');
+    expect(config.agent_skills).toEqual({ 'gsd-planner': 'project-skill' });
+    expect(config.features).toEqual({ global_learnings: true, thinking_partner: false });
+    expect(config.model_overrides).toEqual({
+      'gsd-planner': 'project-planner',
+      'gsd-executor': 'global-executor',
+    });
+  });
+
+  it('deep-merges features from defaults, user defaults, and project config', async () => {
+    await writeUserDefaults({
+      features: { global_learnings: true, thinking_partner: true },
+    });
+    await writeFile(
+      join(tmpDir, '.planning', 'config.json'),
+      JSON.stringify({ features: { thinking_partner: false } }),
+    );
+
+    const config = await loadTestConfig();
+
+    expect(config.features).toEqual({
+      global_learnings: true,
+      thinking_partner: false,
+    });
+  });
+
+  it('ignores malformed user defaults', async () => {
+    await writeUserDefaults('{bad json');
+    await writeFile(
+      join(tmpDir, '.planning', 'config.json'),
+      JSON.stringify({ model_profile: 'fast' }),
+    );
+
+    const config = await loadTestConfig();
+
+    expect(config.model_profile).toBe('fast');
+    expect(config.resolve_model_ids).toBe(CONFIG_DEFAULTS.resolve_model_ids);
   });
 
   it('partial config merges correctly for nested objects', async () => {
@@ -82,7 +165,7 @@ describe('loadConfig', () => {
       JSON.stringify(userConfig),
     );
 
-    const config = await loadConfig(tmpDir);
+    const config = await loadTestConfig();
 
     expect(config.git.branching_strategy).toBe('milestone');
     // Other git defaults preserved
@@ -97,7 +180,7 @@ describe('loadConfig', () => {
       JSON.stringify(userConfig),
     );
 
-    const config = await loadConfig(tmpDir);
+    const config = await loadTestConfig();
     expect(config.custom_key).toBe('custom_value');
   });
 
@@ -110,7 +193,7 @@ describe('loadConfig', () => {
       JSON.stringify(userConfig),
     );
 
-    const config = await loadConfig(tmpDir);
+    const config = await loadTestConfig();
     expect(config.agent_skills).toEqual({ planner: 'custom-skill' });
   });
 
@@ -122,7 +205,7 @@ describe('loadConfig', () => {
       '{bad json',
     );
 
-    await expect(loadConfig(tmpDir)).rejects.toThrow(/Failed to parse config/);
+    await expect(loadTestConfig()).rejects.toThrow(/Failed to parse config/);
   });
 
   it('throws when config is not an object (array)', async () => {
@@ -131,7 +214,7 @@ describe('loadConfig', () => {
       '[1, 2, 3]',
     );
 
-    await expect(loadConfig(tmpDir)).rejects.toThrow(/must be a JSON object/);
+    await expect(loadTestConfig()).rejects.toThrow(/must be a JSON object/);
   });
 
   it('throws when config is not an object (string)', async () => {
@@ -140,7 +223,7 @@ describe('loadConfig', () => {
       '"just a string"',
     );
 
-    await expect(loadConfig(tmpDir)).rejects.toThrow(/must be a JSON object/);
+    await expect(loadTestConfig()).rejects.toThrow(/must be a JSON object/);
   });
 
   it('ignores unknown keys without error', async () => {
@@ -153,7 +236,7 @@ describe('loadConfig', () => {
       JSON.stringify(userConfig),
     );
 
-    const config = await loadConfig(tmpDir);
+    const config = await loadTestConfig();
     // Should load fine, with unknowns passed through
     expect(config.model_profile).toBe('balanced');
     expect((config as Record<string, unknown>).totally_unknown).toBe(true);
@@ -169,73 +252,10 @@ describe('loadConfig', () => {
       JSON.stringify(userConfig),
     );
 
-    const config = await loadConfig(tmpDir);
+    const config = await loadTestConfig();
     // We pass through the user's values as-is — runtime code handles type mismatches
     expect(config.commit_docs).toBe('yes');
     expect(config.parallelization).toBe(0);
-  });
-
-  // ─── User-level defaults (~/.gsd/defaults.json) ─────────────────────────
-  // Regression: issue #2652 — SDK loadConfig ignored user-level defaults
-  // for pre-project Codex installs, so init.quick still emitted Claude
-  // model aliases from MODEL_PROFILES via resolveModel even when the user
-  // had `resolve_model_ids: "omit"` in ~/.gsd/defaults.json.
-  //
-  // Mirrors CJS behavior in get-shit-done/bin/lib/core.cjs:421 (#1683):
-  // user-level defaults only apply when no project .planning/config.json
-  // exists (pre-project context). Once a project is initialized, its
-  // config.json is authoritative — buildNewProjectConfig baked the user
-  // defaults in at /gsd:new-project time.
-
-  it('pre-project: layers user defaults from ~/.gsd/defaults.json', async () => {
-    await writeUserDefaults({ resolve_model_ids: 'omit' });
-    // No project config.json
-    const config = await loadConfig(tmpDir);
-    expect((config as Record<string, unknown>).resolve_model_ids).toBe('omit');
-    // Built-in defaults still present for keys user did not override
-    expect(config.model_profile).toBe('balanced');
-    expect(config.workflow.plan_check).toBe(true);
-  });
-
-  it('pre-project: deep-merges nested keys from user defaults', async () => {
-    await writeUserDefaults({
-      git: { branching_strategy: 'milestone' },
-      agent_skills: { planner: 'user-skill' },
-    });
-
-    const config = await loadConfig(tmpDir);
-    expect(config.git.branching_strategy).toBe('milestone');
-    expect(config.git.phase_branch_template).toBe('gsd/phase-{phase}-{slug}');
-    expect(config.agent_skills).toEqual({ planner: 'user-skill' });
-  });
-
-  it('project config is authoritative over user defaults (CJS parity)', async () => {
-    // User defaults set resolve_model_ids: "omit", but project config omits it.
-    // Per CJS core.cjs loadConfig (#1683): once .planning/config.json exists,
-    // ~/.gsd/defaults.json is ignored — buildNewProjectConfig already baked
-    // the user defaults in at project creation time.
-    await writeUserDefaults({
-      resolve_model_ids: 'omit',
-      model_profile: 'fast',
-    });
-    await writeFile(
-      join(tmpDir, '.planning', 'config.json'),
-      JSON.stringify({ model_profile: 'quality' }),
-    );
-
-    const config = await loadConfig(tmpDir);
-    expect(config.model_profile).toBe('quality');
-    // User-defaults not layered when project config present
-    expect((config as Record<string, unknown>).resolve_model_ids).toBeUndefined();
-  });
-
-  it('ignores malformed ~/.gsd/defaults.json', async () => {
-    await mkdir(join(fakeHome, '.gsd'), { recursive: true });
-    await writeFile(join(fakeHome, '.gsd', 'defaults.json'), '{not json');
-
-    const config = await loadConfig(tmpDir);
-    // Falls back to built-in defaults
-    expect(config).toEqual(CONFIG_DEFAULTS);
   });
 
   it('does not mutate CONFIG_DEFAULTS between calls', async () => {
@@ -245,7 +265,7 @@ describe('loadConfig', () => {
       join(tmpDir, '.planning', 'config.json'),
       JSON.stringify({ model_profile: 'fast', workflow: { research: false } }),
     );
-    await loadConfig(tmpDir);
+    await loadTestConfig();
 
     expect(CONFIG_DEFAULTS).toEqual(before);
   });

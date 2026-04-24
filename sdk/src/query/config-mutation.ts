@@ -21,6 +21,7 @@ import { readFile, writeFile, mkdir, rename, unlink } from 'node:fs/promises';
 import { existsSync } from 'node:fs';
 import { homedir } from 'node:os';
 import { join } from 'node:path';
+import { loadUserDefaults, mergeConfig } from '../config.js';
 import { GSDError, ErrorClassification } from '../errors.js';
 import { VALID_PROFILES, getAgentToModelMapForProfile } from './config-query.js';
 import { VALID_CONFIG_KEYS, DYNAMIC_KEY_PATTERNS } from './config-schema.js';
@@ -342,16 +343,8 @@ export const configNewProject: QueryHandler = async (args, projectDir, _workstre
     await mkdir(planningDir, { recursive: true });
   }
 
-  // D11: Load global defaults from ~/.gsd/defaults.json if present
   const homeDir = homedir();
-  let globalDefaults: Record<string, unknown> = {};
-  try {
-    const defaultsPath = join(homeDir, '.gsd', 'defaults.json');
-    const defaultsRaw = await readFile(defaultsPath, 'utf-8');
-    globalDefaults = JSON.parse(defaultsRaw) as Record<string, unknown>;
-  } catch {
-    // No global defaults — continue with hardcoded defaults only
-  }
+  const globalDefaults = await loadUserDefaults(homeDir);
 
   // Detect API key availability (boolean only, never store keys)
   const hasBraveSearch = !!(process.env.BRAVE_API_KEY || existsSync(join(homeDir, '.gsd', 'brave_api_key')));
@@ -399,32 +392,8 @@ export const configNewProject: QueryHandler = async (args, projectDir, _workstre
     features: {},
   };
 
-  // Deep merge: hardcoded <- globalDefaults <- userChoices (D11)
-  const config: Record<string, unknown> = {
-    ...defaults,
-    ...globalDefaults,
-    ...userChoices,
-    git: {
-      ...(defaults.git as Record<string, unknown>),
-      ...((userChoices.git as Record<string, unknown>) || {}),
-    },
-    workflow: {
-      ...(defaults.workflow as Record<string, unknown>),
-      ...((userChoices.workflow as Record<string, unknown>) || {}),
-    },
-    hooks: {
-      ...(defaults.hooks as Record<string, unknown>),
-      ...((userChoices.hooks as Record<string, unknown>) || {}),
-    },
-    agent_skills: {
-      ...((defaults.agent_skills as Record<string, unknown>) || {}),
-      ...((userChoices.agent_skills as Record<string, unknown>) || {}),
-    },
-    features: {
-      ...((defaults.features as Record<string, unknown>) || {}),
-      ...((userChoices.features as Record<string, unknown>) || {}),
-    },
-  };
+  // Shared deep merge: hardcoded <- globalDefaults <- userChoices (D11).
+  const config = mergeConfig(mergeConfig(defaults, globalDefaults), userChoices);
 
   await atomicWriteConfig(paths.config, config);
 

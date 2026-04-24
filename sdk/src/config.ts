@@ -52,6 +52,11 @@ export interface HooksConfig {
   context_warnings: boolean;
 }
 
+export interface LoadConfigOptions {
+  /** Home directory used to resolve `.gsd/defaults.json`; injectable for tests. */
+  homeDir?: string;
+}
+
 export interface GSDConfig {
   model_profile: string;
   commit_docs: boolean;
@@ -64,6 +69,9 @@ export interface GSDConfig {
   workflow: WorkflowConfig;
   hooks: HooksConfig;
   agent_skills: Record<string, unknown>;
+  features: Record<string, unknown>;
+  /** Per-agent model override map, e.g. `{ 'gsd-planner': 'claude-opus-4-7' }`. */
+  model_overrides: Record<string, string>;
   /** Project slug for branch templates; mirrors gsd-tools `config.project_code`. */
   project_code?: string | null;
   /** Interactive vs headless; mirrors gsd-tools flat `config.mode`. */
@@ -112,6 +120,8 @@ export const CONFIG_DEFAULTS: GSDConfig = {
     context_warnings: true,
   },
   agent_skills: {},
+  features: {},
+  model_overrides: {},
   project_code: null,
   mode: 'interactive',
   _auto_chain_active: false,
@@ -119,78 +129,103 @@ export const CONFIG_DEFAULTS: GSDConfig = {
 
 // ─── Loader ──────────────────────────────────────────────────────────────────
 
+function isPlainRecord(value: unknown): value is Record<string, unknown> {
+  return typeof value === 'object' && value !== null && !Array.isArray(value);
+}
+
+const NESTED_CONFIG_SECTIONS = [
+  'git',
+  'workflow',
+  'hooks',
+  'agent_skills',
+  'features',
+  'model_overrides',
+] as const;
+
 /**
- * Load project config from `.planning/config.json`, merging with defaults.
- * When project config is missing or empty, layers user defaults
- * (`~/.gsd/defaults.json`) over built-in defaults.
- * Throws on malformed JSON with a helpful error message.
+ * Merge a config override onto a fully materialized base config.
+ *
+ * Top-level keys override directly while known nested sections retain defaults
+ * for omitted fields. Shared by config loading and project config creation so
+ * nested merge allowlists do not drift.
  */
-/**
- * Read user-level defaults from `~/.gsd/defaults.json` (or `$GSD_HOME/.gsd/`
- * when set). Returns `{}` when the file is missing, empty, or malformed —
- * matches CJS behavior in `get-shit-done/bin/lib/core.cjs` (#1683, #2652).
- */
-async function loadUserDefaults(): Promise<Record<string, unknown>> {
-  const home = process.env.GSD_HOME || homedir();
-  const defaultsPath = join(home, '.gsd', 'defaults.json');
-  let raw: string;
-  try {
-    raw = await readFile(defaultsPath, 'utf-8');
-  } catch {
-    return {};
-  }
-  const trimmed = raw.trim();
-  if (trimmed === '') return {};
-  try {
-    const parsed = JSON.parse(trimmed);
-    if (typeof parsed !== 'object' || parsed === null || Array.isArray(parsed)) {
-      return {};
+export function mergeConfig<T extends Record<string, unknown>>(base: T, override: Record<string, unknown>): T {
+  const merged: Record<string, unknown> = {
+    ...base,
+    ...override,
+  };
+
+  for (const section of NESTED_CONFIG_SECTIONS) {
+    const baseSection = base[section];
+    const overrideSection = override[section];
+
+    if (isPlainRecord(baseSection) || isPlainRecord(overrideSection)) {
+      merged[section] = {
+        ...(isPlainRecord(baseSection) ? baseSection : {}),
+        ...(isPlainRecord(overrideSection) ? overrideSection : {}),
+      };
     }
-    return parsed as Record<string, unknown>;
+  }
+
+  return merged as T;
+}
+
+/**
+ * Read user-level defaults from `<homeDir>/.gsd/defaults.json`.
+ *
+ * Missing, empty, malformed, or non-object defaults are ignored because global
+ * defaults must never block SDK query execution.
+ */
+export async function loadUserDefaults(homeDir = homedir()): Promise<Record<string, unknown>> {
+  const defaultsPath = join(homeDir, '.gsd', 'defaults.json');
+
+  try {
+    const raw = await readFile(defaultsPath, 'utf-8');
+    const trimmed = raw.trim();
+    if (trimmed === '') return {};
+
+    const parsed: unknown = JSON.parse(trimmed);
+    return isPlainRecord(parsed) ? parsed : {};
   } catch {
     return {};
   }
 }
 
-export async function loadConfig(projectDir: string, workstream?: string): Promise<GSDConfig> {
+/**
+ * Load project config from `.planning/config.json`, merging with defaults and
+ * optional user defaults from `~/.gsd/defaults.json`.
+ * Returns merged defaults when file is missing or empty.
+ * Throws on malformed JSON with a helpful error message.
+ */
+export async function loadConfig(
+  projectDir: string,
+  workstream?: string,
+  options: LoadConfigOptions = {},
+): Promise<GSDConfig> {
   const configPath = join(projectDir, relPlanningPath(workstream), 'config.json');
   const rootConfigPath = join(projectDir, '.planning', 'config.json');
+  const baseConfig = mergeConfig(CONFIG_DEFAULTS, await loadUserDefaults(options.homeDir));
 
   let raw: string;
-  let projectConfigFound = false;
   try {
     raw = await readFile(configPath, 'utf-8');
-    projectConfigFound = true;
   } catch {
     // If workstream config missing, fall back to root config
     if (workstream) {
       try {
         raw = await readFile(rootConfigPath, 'utf-8');
-        projectConfigFound = true;
       } catch {
-        raw = '';
+        return baseConfig;
       }
     } else {
-      raw = '';
+      // File missing — normal for new projects
+      return baseConfig;
     }
-  }
-
-  // Pre-project context: no .planning/config.json exists. Layer user-level
-  // defaults from ~/.gsd/defaults.json over built-in defaults. Mirrors the
-  // CJS fall-back branch in get-shit-done/bin/lib/core.cjs:421 (#1683) so
-  // SDK-dispatched init queries (e.g. resolveModel in Codex installs, #2652)
-  // honor user-level knobs like `resolve_model_ids: "omit"`.
-  if (!projectConfigFound) {
-    const userDefaults = await loadUserDefaults();
-    return mergeDefaults(userDefaults);
   }
 
   const trimmed = raw.trim();
   if (trimmed === '') {
-    // Empty project config — treat as no project config (CJS core.cjs
-    // catches JSON.parse on empty and falls through to the pre-project path).
-    const userDefaults = await loadUserDefaults();
-    return mergeDefaults(userDefaults);
+    return baseConfig;
   }
 
   let parsed: Record<string, unknown>;
@@ -205,30 +240,6 @@ export async function loadConfig(projectDir: string, workstream?: string): Promi
     throw new Error(`Config at ${configPath} must be a JSON object`);
   }
 
-  // Project config exists — user-level defaults are ignored (CJS parity).
-  // `buildNewProjectConfig` already baked them into config.json at /gsd:new-project.
-  return mergeDefaults(parsed);
-}
-
-function mergeDefaults(parsed: Record<string, unknown>): GSDConfig {
-  return {
-    ...structuredClone(CONFIG_DEFAULTS),
-    ...parsed,
-    git: {
-      ...CONFIG_DEFAULTS.git,
-      ...(parsed.git as Partial<GitConfig> ?? {}),
-    },
-    workflow: {
-      ...CONFIG_DEFAULTS.workflow,
-      ...(parsed.workflow as Partial<WorkflowConfig> ?? {}),
-    },
-    hooks: {
-      ...CONFIG_DEFAULTS.hooks,
-      ...(parsed.hooks as Partial<HooksConfig> ?? {}),
-    },
-    agent_skills: {
-      ...CONFIG_DEFAULTS.agent_skills,
-      ...(parsed.agent_skills as Record<string, unknown> ?? {}),
-    },
-  };
+  // Three-level deep merge: defaults <- global defaults <- project config
+  return mergeConfig(baseConfig, parsed);
 }

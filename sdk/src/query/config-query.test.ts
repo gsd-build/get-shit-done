@@ -11,14 +11,22 @@ import { GSDError, ErrorClassification, exitCodeFor } from '../errors.js';
 // ─── Test setup ─────────────────────────────────────────────────────────────
 
 let tmpDir: string;
+let previousHome: string | undefined;
 
 beforeEach(async () => {
   tmpDir = await mkdtemp(join(tmpdir(), 'gsd-cfg-'));
+  previousHome = process.env.HOME;
+  process.env.HOME = join(tmpDir, 'home');
   await mkdir(join(tmpDir, '.planning'), { recursive: true });
 });
 
 afterEach(async () => {
-  await rm(tmpDir, { recursive: true, force: true });
+  try {
+    await rm(tmpDir, { recursive: true, force: true });
+  } finally {
+    if (previousHome === undefined) delete process.env.HOME;
+    else process.env.HOME = previousHome;
+  }
 });
 
 // ─── configGet ──────────────────────────────────────────────────────────────
@@ -160,6 +168,22 @@ describe('resolveModel', () => {
         model_profile: 'balanced',
         resolve_model_ids: 'omit',
       }),
+    );
+    const result = await resolveModel(['gsd-planner'], tmpDir);
+    const data = result.data as Record<string, unknown>;
+    expect(data).toHaveProperty('model', '');
+  });
+
+  it('returns empty model when resolve_model_ids omit comes from global defaults', async () => {
+    const { resolveModel } = await import('./config-query.js');
+    await mkdir(join(tmpDir, 'home', '.gsd'), { recursive: true });
+    await writeFile(
+      join(tmpDir, 'home', '.gsd', 'defaults.json'),
+      JSON.stringify({ resolve_model_ids: 'omit' }),
+    );
+    await writeFile(
+      join(tmpDir, '.planning', 'config.json'),
+      JSON.stringify({ model_profile: 'balanced' }),
     );
     const result = await resolveModel(['gsd-planner'], tmpDir);
     const data = result.data as Record<string, unknown>;

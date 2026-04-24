@@ -157,8 +157,7 @@ export const resolveModel: QueryHandler = async (args, projectDir) => {
   const profile = String(config.model_profile || 'balanced').toLowerCase();
 
   // Check per-agent override first
-  const overrides = (config as Record<string, unknown>).model_overrides as Record<string, string> | undefined;
-  const override = overrides?.[agentType];
+  const override = config.model_overrides[agentType];
   if (override) {
     const agentModels = MODEL_PROFILES[agentType];
     const result = agentModels
