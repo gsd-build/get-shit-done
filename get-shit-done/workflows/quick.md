@@ -140,10 +140,10 @@ fi
 ```bash
 INIT=$(gsd-sdk query init.quick "$DESCRIPTION")
 if [[ "$INIT" == @file:* ]]; then INIT=$(cat "${INIT#@file:}"); fi
-AGENT_SKILLS_PLANNER=$(gsd-sdk query agent-skills gsd-planner 2>/dev/null)
-AGENT_SKILLS_EXECUTOR=$(gsd-sdk query agent-skills gsd-executor 2>/dev/null)
-AGENT_SKILLS_CHECKER=$(gsd-sdk query agent-skills gsd-plan-checker 2>/dev/null)
-AGENT_SKILLS_VERIFIER=$(gsd-sdk query agent-skills gsd-verifier 2>/dev/null)
+AGENT_SKILLS_PLANNER=$(gsd-sdk query agent-skills gsd-planner)
+AGENT_SKILLS_EXECUTOR=$(gsd-sdk query agent-skills gsd-executor)
+AGENT_SKILLS_CHECKER=$(gsd-sdk query agent-skills gsd-plan-checker)
+AGENT_SKILLS_VERIFIER=$(gsd-sdk query agent-skills gsd-verifier)
 ```
 
 Parse JSON for: `planner_model`, `executor_model`, `checker_model`, `verifier_model`, `commit_docs`, `branch_name`, `quick_id`, `slug`, `date`, `timestamp`, `quick_dir`, `task_dir`, `roadmap_exists`, `planning_exists`.

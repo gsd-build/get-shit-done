@@ -16,7 +16,7 @@ Load docs-update context:
 ```bash
 INIT=$(gsd-sdk query docs-init)
 if [[ "$INIT" == @file:* ]]; then INIT=$(cat "${INIT#@file:}"); fi
-AGENT_SKILLS=$(gsd-sdk query agent-skills gsd-doc-writer 2>/dev/null)
+AGENT_SKILLS=$(gsd-sdk query agent-skills gsd-doc-writer)
 ```
 
 Extract from init JSON:

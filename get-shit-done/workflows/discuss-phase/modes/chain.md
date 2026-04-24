@@ -26,8 +26,7 @@
    (the user's persistent settings preference):
    ```bash
    if [[ ! "$ARGUMENTS" =~ --auto ]] && [[ ! "$ARGUMENTS" =~ --chain ]]; then
-     gsd-sdk query config-set workflow._auto_chain_active false 2>/dev/null
-   fi
+     gsd-sdk query config-set workflow._auto_chain_active false || true   fi
    ```
 
 3. Read consolidated auto-mode (`active` = chain flag OR user preference):

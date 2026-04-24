@@ -42,7 +42,7 @@ If exists: Offer update/view/skip options.
 INIT=$(gsd-sdk query init.phase-op "${PHASE}")
 if [[ "$INIT" == @file:* ]]; then INIT=$(cat "${INIT#@file:}"); fi
 # Extract: phase_dir, padded_phase, phase_number, state_path, requirements_path, context_path
-AGENT_SKILLS_RESEARCHER=$(gsd-sdk query agent-skills gsd-phase-researcher 2>/dev/null)
+AGENT_SKILLS_RESEARCHER=$(gsd-sdk query agent-skills gsd-phase-researcher)
 ```
 
 ## Step 4: Spawn Researcher

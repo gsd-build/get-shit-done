@@ -87,7 +87,7 @@ This runs in parallel - all gaps investigated simultaneously.
 **Load agent skills:**
 
 ```bash
-AGENT_SKILLS_DEBUGGER=$(gsd-sdk query agent-skills gsd-debugger 2>/dev/null)
+AGENT_SKILLS_DEBUGGER=$(gsd-sdk query agent-skills gsd-debugger)
 EXPECTED_BASE=$(git rev-parse HEAD)
 ```
 

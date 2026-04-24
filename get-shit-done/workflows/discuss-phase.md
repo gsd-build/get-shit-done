@@ -111,7 +111,7 @@ Phase number from argument (required).
 ```bash
 INIT=$(gsd-sdk query init.phase-op "${PHASE}")
 if [[ "$INIT" == @file:* ]]; then INIT=$(cat "${INIT#@file:}"); fi
-AGENT_SKILLS_ADVISOR=$(gsd-sdk query agent-skills gsd-advisor-researcher 2>/dev/null)
+AGENT_SKILLS_ADVISOR=$(gsd-sdk query agent-skills gsd-advisor-researcher)
 ```
 
 Parse JSON for: `commit_docs`, `phase_found`, `phase_dir`, `phase_number`, `phase_name`, `phase_slug`, `padded_phase`, `has_research`, `has_context`, `has_plans`, `has_verification`, `plan_count`, `roadmap_exists`, `planning_exists`, `response_language`.
