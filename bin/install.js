@@ -2050,7 +2050,106 @@ function stripCodexGsdAgentSections(content) {
   return content.replace(/^\[agents\.gsd-[^\]]+\]\n(?:(?!\[)[^\n]*\n?)*/gm, '');
 }
 
-function getManagedCodexLegacyInlineCommands(configDir) {
+function compareSemver(a, b) {
+  for (const key of ['major', 'minor', 'patch']) {
+    const diff = a[key] - b[key];
+    if (diff !== 0) {
+      return diff;
+    }
+  }
+  return 0;
+}
+
+function parseCodexCliVersion(output) {
+  if (typeof output !== 'string') {
+    return null;
+  }
+
+  const match = output.match(/\bv?(\d+)\.(\d+)\.(\d+)\b/);
+  if (!match) {
+    return null;
+  }
+
+  return {
+    major: Number(match[1]),
+    minor: Number(match[2]),
+    patch: Number(match[3]),
+  };
+}
+
+function formatCodexCliVersion(version) {
+  return `${version.major}.${version.minor}.${version.patch}`;
+}
+
+function selectCodexHookInstallModeForVersion(versionOutput) {
+  const version = parseCodexCliVersion(versionOutput);
+  if (!version) {
+    return {
+      mode: 'skip',
+      reason: 'Codex version could not be detected',
+    };
+  }
+
+  const hooksJsonMinVersion = { major: 0, minor: 124, patch: 0 };
+  if (compareSemver(version, hooksJsonMinVersion) >= 0) {
+    return {
+      mode: 'hooks-json',
+      reason: `Codex ${formatCodexCliVersion(version)} supports hooks.json`,
+    };
+  }
+
+  return {
+    mode: 'legacy-inline',
+    reason: `Codex ${formatCodexCliVersion(version)} predates hooks.json support`,
+  };
+}
+
+function detectCodexHookInstallMode() {
+  const override = process.env.GSD_CODEX_HOOKS_MODE;
+  if (override) {
+    if (override === 'hooks-json' || override === 'legacy-inline' || override === 'skip') {
+      return { mode: override, reason: `GSD_CODEX_HOOKS_MODE=${override}` };
+    }
+    return {
+      mode: 'skip',
+      reason: `invalid GSD_CODEX_HOOKS_MODE=${override}`,
+    };
+  }
+
+  let result;
+  try {
+    const { spawnSync } = require('child_process');
+    result = spawnSync('codex', ['--version'], {
+      encoding: 'utf8',
+      stdio: ['ignore', 'pipe', 'pipe'],
+      timeout: 5000,
+    });
+  } catch (error) {
+    return {
+      mode: 'skip',
+      reason: `Codex version probe failed: ${error.message}`,
+    };
+  }
+
+  if (result.error) {
+    return {
+      mode: 'skip',
+      reason: `Codex version probe failed: ${result.error.message}`,
+    };
+  }
+
+  if (result.status !== 0) {
+    const stderr = (result.stderr || '').trim();
+    return {
+      mode: 'skip',
+      reason: stderr ? `Codex version probe exited ${result.status}: ${stderr}` : `Codex version probe exited ${result.status}`,
+    };
+  }
+
+  return selectCodexHookInstallModeForVersion(`${result.stdout || ''}\n${result.stderr || ''}`);
+}
+
+function getManagedCodexUpdateHookCommands(configDir) {
   const commands = new Set();
   if (!configDir) {
     return commands;
@@ -2098,7 +2197,7 @@ function parseSimpleTomlStringAssignment(line, key) {
 }
 
 function stripManagedGsdCodexInlineHooks(content, configDir) {
-  const managedCommands = getManagedCodexLegacyInlineCommands(configDir);
+  const managedCommands = getManagedCodexUpdateHookCommands(configDir);
   if (managedCommands.size === 0) {
     return content;
   }
@@ -2188,10 +2287,6 @@ function getCodexHookGroups(parsed, eventName, hooksPath = 'hooks.json') {
   return groups;
 }
 
-function getManagedCodexSessionStartCommands(configDir) {
-  return getManagedCodexLegacyInlineCommands(configDir);
-}
-
 function isManagedGsdCodexHook(handler, managedCommands) {
   return Boolean(
     handler &&
@@ -2223,7 +2318,7 @@ function filterManagedCodexHookGroup(group, managedCommands) {
 function stripGsdFromCodexHooksJson(content, hooksPath = 'hooks.json', configDir) {
   const eol = detectLineEnding(content);
   const parsed = parseCodexHooksJson(content, hooksPath);
-  const managedCommands = getManagedCodexSessionStartCommands(configDir);
+  const managedCommands = getManagedCodexUpdateHookCommands(configDir);
   // Remove references to the managed GSD update-check command from any event.
   // Uninstall also removes the underlying hook file from targetDir/hooks/, so
   // keeping a user-edited hook that still points at that managed command would
@@ -2311,7 +2406,7 @@ function mergeGsdIntoCodexHooksJson(existingContent, command, hooksPath = 'hooks
     ? parseCodexHooksJson(existingContent, hooksPath)
     : { hooks: {} };
   assertCodexHooksJsonInstallSafe(parsed, hooksPath);
-  const managedCommands = getManagedCodexSessionStartCommands(configDir);
+  const managedCommands = getManagedCodexUpdateHookCommands(configDir);
   if (typeof command === 'string') {
     managedCommands.add(command.trim());
   }
@@ -2342,6 +2437,19 @@ function mergeGsdIntoCodexHooksJson(existingContent, command, hooksPath = 'hooks
 
   parsed.hooks.SessionStart = cleanedGroups;
   return serializeCodexHooksJson(parsed, eol);
+}
+
+function mergeGsdIntoCodexLegacyInlineHooks(configContent, command, configDir) {
+  const eol = detectLineEnding(configContent);
+  const cleaned = stripManagedGsdCodexInlineHooks(configContent, configDir).trimEnd();
+  const hookBlock = [
+    '# GSD Hooks',
+    '[[hooks]]',
+    'event = "SessionStart"',
+    `command = ${JSON.stringify(command)}`,
+  ].join(eol);
+
+  return (cleaned ? `${cleaned}${eol}${eol}` : '') + hookBlock + eol;
 }
 
 /**
@@ -6641,27 +6749,40 @@ function install(isGlobal, runtime = 'claude') {
       console.log(`  ${green}✓${reset} Installed hooks`);
     }
 
-    // Add Codex hooks (SessionStart for update checking) — requires codex_hooks feature flag
+    // Add Codex hooks (SessionStart for update checking) — use hooks.json only on Codex builds that support it.
     const configPath = path.join(targetDir, 'config.toml');
     const hooksJsonPath = path.join(targetDir, 'hooks.json');
     try {
-      const originalConfigContent = fs.existsSync(configPath) ? fs.readFileSync(configPath, 'utf-8') : '';
-      const codexHooksFeature = ensureCodexHooksFeature(originalConfigContent);
-      const nextConfigContent = setManagedCodexHooksOwnership(codexHooksFeature.content, codexHooksFeature.ownership);
-
-      if (hasEnabledCodexHooksFeature(nextConfigContent)) {
+      const hookInstallMode = detectCodexHookInstallMode();
+      if (hookInstallMode.mode === 'skip') {
+        console.warn(`  ${yellow}⚠${reset}  Skipped Codex hook configuration: ${hookInstallMode.reason}`);
+      } else {
+        const originalConfigContent = fs.existsSync(configPath) ? fs.readFileSync(configPath, 'utf-8') : '';
+        const codexHooksFeature = ensureCodexHooksFeature(originalConfigContent);
+        const nextConfigContent = setManagedCodexHooksOwnership(codexHooksFeature.content, codexHooksFeature.ownership);
         const updateCheckCommand = buildHookCommand(targetDir, 'gsd-check-update.js', { portableHooks: hasPortableHooks });
-        const hooksJsonContent = fs.existsSync(hooksJsonPath) ? fs.readFileSync(hooksJsonPath, 'utf8') : null;
-        const mergedHooksJson = mergeGsdIntoCodexHooksJson(hooksJsonContent, updateCheckCommand, hooksJsonPath, targetDir);
-        fs.writeFileSync(hooksJsonPath, mergedHooksJson, 'utf8');
 
-        const migratedConfigContent = stripManagedGsdCodexInlineHooks(nextConfigContent, targetDir);
-        fs.writeFileSync(configPath, migratedConfigContent, 'utf-8');
-      } else if (nextConfigContent !== originalConfigContent) {
-        fs.writeFileSync(configPath, nextConfigContent, 'utf-8');
+        if (hasEnabledCodexHooksFeature(nextConfigContent)) {
+          if (hookInstallMode.mode === 'hooks-json') {
+            const hooksJsonContent = fs.existsSync(hooksJsonPath) ? fs.readFileSync(hooksJsonPath, 'utf8') : null;
+            const mergedHooksJson = mergeGsdIntoCodexHooksJson(hooksJsonContent, updateCheckCommand, hooksJsonPath, targetDir);
+            fs.writeFileSync(hooksJsonPath, mergedHooksJson, 'utf8');
+
+            const migratedConfigContent = stripManagedGsdCodexInlineHooks(nextConfigContent, targetDir);
+            fs.writeFileSync(configPath, migratedConfigContent, 'utf-8');
+            console.log(`  ${green}✓${reset} Configured Codex hooks (SessionStart via hooks.json)`);
+          } else {
+            const legacyConfigContent = mergeGsdIntoCodexLegacyInlineHooks(nextConfigContent, updateCheckCommand, targetDir);
+            fs.writeFileSync(configPath, legacyConfigContent, 'utf-8');
+            console.log(`  ${green}✓${reset} Configured Codex hooks (SessionStart via legacy config.toml)`);
+          }
+        } else {
+          if (nextConfigContent !== originalConfigContent) {
+            fs.writeFileSync(configPath, nextConfigContent, 'utf-8');
+          }
+          console.warn(`  ${yellow}⚠${reset}  Skipped Codex hook configuration: codex_hooks could not be enabled safely`);
+        }
       }
-
-      console.log(`  ${green}✓${reset} Configured Codex hooks (SessionStart via hooks.json)`);
     } catch (e) {
       console.warn(`  ${yellow}⚠${reset}  Could not configure Codex hooks: ${e.message}`);
     }
@@ -7582,6 +7703,9 @@ if (process.env.GSD_TEST_MODE) {
     generateCodexConfigBlock,
     stripGsdFromCodexConfig,
     mergeCodexConfig,
+    parseCodexCliVersion,
+    selectCodexHookInstallModeForVersion,
+    detectCodexHookInstallMode,
     installCodexConfig,
     readGsdRuntimeProfileResolver,
     readGsdEffectiveModelOverrides,

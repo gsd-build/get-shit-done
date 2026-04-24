@@ -24,6 +24,8 @@ const {
   mergeCodexConfig,
   install,
   uninstall,
+  parseCodexCliVersion,
+  selectCodexHookInstallModeForVersion,
   GSD_CODEX_MARKER,
   CODEX_AGENT_SANDBOX,
 } = require('../bin/install.js');
@@ -46,8 +48,27 @@ function withCodexHome(codexHome, cwd, callback) {
   }
 }
 
-function runCodexInstall(codexHome, cwd = path.join(__dirname, '..')) {
-  return withCodexHome(codexHome, cwd, () => install(true, 'codex'));
+function withCodexHooksMode(mode, callback) {
+  const previousMode = process.env.GSD_CODEX_HOOKS_MODE;
+  if (mode === null || mode === undefined) {
+    delete process.env.GSD_CODEX_HOOKS_MODE;
+  } else {
+    process.env.GSD_CODEX_HOOKS_MODE = mode;
+  }
+
+  try {
+    return callback();
+  } finally {
+    if (previousMode === undefined) {
+      delete process.env.GSD_CODEX_HOOKS_MODE;
+    } else {
+      process.env.GSD_CODEX_HOOKS_MODE = previousMode;
+    }
+  }
+}
+
+function runCodexInstall(codexHome, cwd = path.join(__dirname, '..'), hooksMode = 'hooks-json') {
+  return withCodexHooksMode(hooksMode, () => withCodexHome(codexHome, cwd, () => install(true, 'codex')));
 }
 
 function runCodexUninstall(codexHome, cwd = path.join(__dirname, '..')) {
@@ -127,6 +148,21 @@ function assertUsesOnlyEol(content, eol) {
   }
   assert.ok(!content.includes('\r\n'), 'does not contain CRLF line endings');
 }
+
+describe('Codex hook compatibility detection', () => {
+  test('classifies Codex versions around the hooks.json migration boundary', () => {
+    assert.deepStrictEqual(parseCodexCliVersion('codex-cli 0.124.0'), { major: 0, minor: 124, patch: 0 });
+    assert.strictEqual(selectCodexHookInstallModeForVersion('codex-cli 0.124.0').mode, 'hooks-json');
+    assert.strictEqual(selectCodexHookInstallModeForVersion('codex-cli 0.124.1').mode, 'hooks-json');
+    assert.strictEqual(selectCodexHookInstallModeForVersion('codex-cli 0.123.9').mode, 'legacy-inline');
+  });
+
+  test('skips Codex hook installation when version detection is ambiguous', () => {
+    assert.strictEqual(parseCodexCliVersion('codex experimental build'), null);
+    assert.strictEqual(selectCodexHookInstallModeForVersion('codex experimental build').mode, 'skip');
+    assert.strictEqual(selectCodexHookInstallModeForVersion('').mode, 'skip');
+  });
+});
 
 // ─── getCodexSkillAdapterHeader ─────────────────────────────────────────────────
 
@@ -982,6 +1018,30 @@ describe('Codex install hook configuration (e2e)', () => {
     assert.strictEqual(countMatches(content, /^codex_hooks = true$/gm), 1, 'writes one codex_hooks key');
     assertNoDraftRootKeys(content);
     assertUsesOnlyEol(content, '\n');
+  });
+
+  test('older Codex installs fall back to one legacy inline SessionStart hook', () => {
+    runCodexInstall(codexHome, path.join(__dirname, '..'), 'legacy-inline');
+    runCodexInstall(codexHome, path.join(__dirname, '..'), 'legacy-inline');
+
+    const content = readCodexConfig(codexHome);
+    const hookFile = path.join(codexHome, 'hooks', 'gsd-check-update.js').replace(/\\/g, '/');
+
+    assert.ok(content.includes('[features]\ncodex_hooks = true\n'), 'enables codex_hooks for legacy Codex');
+    assert.strictEqual(countMatches(content, /^\[\[hooks\]\]$/gm), 1, 'keeps one legacy inline hook block after repeated installs');
+    assert.ok(content.includes('event = "SessionStart"'), 'writes the SessionStart event');
+    assert.ok(content.includes(`command = "node \\"${hookFile}\\""`), 'writes the managed update command as a TOML string');
+    assert.ok(!fs.existsSync(path.join(codexHome, 'hooks.json')), 'does not write hooks.json in legacy-inline mode');
+  });
+
+  test('ambiguous Codex hook detection skips hook feature enablement and hook config writes', () => {
+    runCodexInstall(codexHome, path.join(__dirname, '..'), 'skip');
+
+    const content = readCodexConfig(codexHome);
+
+    assert.strictEqual(countMatches(content, /^codex_hooks = true$/gm), 0, 'does not enable codex_hooks when detection is ambiguous');
+    assert.ok(!content.includes('[[hooks]]'), 'does not write legacy inline hooks when detection is ambiguous');
+    assert.ok(!fs.existsSync(path.join(codexHome, 'hooks.json')), 'does not write hooks.json when detection is ambiguous');
   });
 
   test('install merges the GSD SessionStart hook into an existing hooks.json file', () => {
