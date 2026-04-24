@@ -74,10 +74,22 @@ function writeCodexHooksJson(codexHome, content) {
 
 function getManagedGsdUpdateHookCommands(codexHome) {
   const hooksDir = path.join(codexHome, 'hooks').replace(/\\/g, '/');
-  return new Set([
-    `node "${hooksDir}/gsd-check-update.js"`,
-    `node "${hooksDir}/gsd-update-check.js"`,
-  ]);
+  const home = os.homedir().replace(/\\/g, '/');
+  const portableHooksDir = hooksDir.startsWith(home)
+    ? '$HOME' + hooksDir.slice(home.length)
+    : hooksDir;
+  const commands = new Set();
+
+  for (const hookName of ['gsd-check-update.js', 'gsd-update-check.js']) {
+    for (const baseDir of new Set([hooksDir, portableHooksDir])) {
+      const hookPath = `${baseDir}/${hookName}`;
+      commands.add(`node ${hookPath}`);
+      commands.add(`node "${hookPath}"`);
+      commands.add(`node '${hookPath}'`);
+    }
+  }
+
+  return commands;
 }
 
 function isManagedGsdUpdateHookCommand(command, codexHome) {
@@ -1526,6 +1538,34 @@ describe('Codex install hook configuration (e2e)', () => {
     assert.strictEqual(countMatches(content, /^features\.codex_hooks = true$/gm), 0, 'does not append an invalid dotted codex_hooks key');
     assert.strictEqual(countMatches(content, /^\[features\]\s*$/gm), 0, 'does not prepend a features table');
     assert.strictEqual(countGsdUpdateHooksInHooksJson(codexHome), 0, 'does not add the GSD hook block when codex_hooks cannot be enabled safely');
+    assert.ok(content.includes('[agents.gsd-executor]'), 'still installs the managed agent block');
+    assertNoDraftRootKeys(content);
+  });
+
+  test('root inline-table codex_hooks = true runs hooks.json migration without rewriting features', () => {
+    const legacyManagedInlineCommand = `node ${path.join(codexHome, 'hooks', 'gsd-check-update.js').replace(/\\/g, '/')}`;
+    writeCodexConfig(codexHome, [
+      'features = { codex_hooks = true, other_feature = true }',
+      '',
+      '# GSD Hooks',
+      '[[hooks]]',
+      'event = "SessionStart"',
+      `command = "${legacyManagedInlineCommand}"`,
+      '',
+      '[model]',
+      'name = "o3"',
+      '',
+    ].join('\n'));
+
+    runCodexInstall(codexHome);
+    runCodexInstall(codexHome);
+
+    const content = readCodexConfig(codexHome);
+    assert.ok(content.includes('features = { codex_hooks = true, other_feature = true }'), 'preserves the root inline-table assignment');
+    assert.strictEqual(countMatches(content, /^features\.codex_hooks = true$/gm), 0, 'does not append an invalid dotted codex_hooks key');
+    assert.strictEqual(countMatches(content, /^\[features\]\s*$/gm), 0, 'does not prepend a features table');
+    assert.ok(!content.includes('[[hooks]]'), 'removes the legacy inline GSD hook after migrating to hooks.json');
+    assert.strictEqual(countGsdUpdateHooksInHooksJson(codexHome), 1, 'adds the managed GSD hook to hooks.json and remains idempotent');
     assert.ok(content.includes('[agents.gsd-executor]'), 'still installs the managed agent block');
     assertNoDraftRootKeys(content);
   });

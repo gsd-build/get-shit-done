@@ -3418,6 +3418,119 @@ function ensureCodexHooksFeature(configContent) {
   return { content: configContent + (needsGap ? eol : '') + featuresBlock, ownership: 'section' };
 }
 
+function splitTomlInlineTableEntries(inner) {
+  const entries = [];
+  let start = 0;
+  let i = 0;
+  let arrayDepth = 0;
+  let inlineTableDepth = 0;
+
+  while (i < inner.length) {
+    const ch = inner[i];
+
+    if (ch === '\'') {
+      i += 1;
+      while (i < inner.length) {
+        if (inner[i] === '\'') {
+          i += 1;
+          break;
+        }
+        i += 1;
+      }
+      continue;
+    }
+
+    if (ch === '"') {
+      i += 1;
+      while (i < inner.length) {
+        if (inner[i] === '\\') {
+          i += 2;
+          continue;
+        }
+        if (inner[i] === '"') {
+          i += 1;
+          break;
+        }
+        i += 1;
+      }
+      continue;
+    }
+
+    if (ch === '[') {
+      arrayDepth += 1;
+      i += 1;
+      continue;
+    }
+
+    if (ch === ']') {
+      if (arrayDepth > 0) {
+        arrayDepth -= 1;
+      }
+      i += 1;
+      continue;
+    }
+
+    if (ch === '{') {
+      inlineTableDepth += 1;
+      i += 1;
+      continue;
+    }
+
+    if (ch === '}') {
+      if (inlineTableDepth > 0) {
+        inlineTableDepth -= 1;
+      }
+      i += 1;
+      continue;
+    }
+
+    if (ch === ',' && arrayDepth === 0 && inlineTableDepth === 0) {
+      const entry = inner.slice(start, i).trim();
+      if (entry) {
+        entries.push(entry);
+      }
+      start = i + 1;
+    }
+
+    i += 1;
+  }
+
+  const finalEntry = inner.slice(start).trim();
+  if (finalEntry) {
+    entries.push(finalEntry);
+  }
+  return entries;
+}
+
+function inlineTomlFeaturesTableEnablesCodexHooks(record) {
+  const equalsIndex = findTomlAssignmentEquals(record.text);
+  if (equalsIndex === -1) {
+    return false;
+  }
+
+  const commentStart = findTomlCommentStart(record.text);
+  const valueText = record.text
+    .slice(equalsIndex + 1, commentStart === -1 ? record.text.length : commentStart)
+    .trim();
+  if (!valueText.startsWith('{') || !valueText.endsWith('}')) {
+    return false;
+  }
+
+  return splitTomlInlineTableEntries(valueText.slice(1, -1)).some((entry) => {
+    const entryEqualsIndex = findTomlAssignmentEquals(entry);
+    if (entryEqualsIndex === -1) {
+      return false;
+    }
+
+    const keySegments = parseTomlKeyPath(entry.slice(0, entryEqualsIndex).trim());
+    if (!keySegments || keySegments.length !== 1 || keySegments[0] !== 'codex_hooks') {
+      return false;
+    }
+
+    return entry.slice(entryEqualsIndex + 1).trim() === 'true';
+  });
+}
+
 function hasEnabledCodexHooksFeature(configContent) {
   const lineRecords = getTomlLineRecords(configContent);
 
@@ -3433,6 +3546,13 @@ function hasEnabledCodexHooksFeature(configContent) {
       record.keySegments.length === 2 &&
       record.keySegments[0] === 'features' &&
       record.keySegments[1] === 'codex_hooks';
+    const isRootInlineFeaturesTable = record.tablePath === null &&
+      record.keySegments.length === 1 &&
+      record.keySegments[0] === 'features';
+
+    if (isRootInlineFeaturesTable) {
+      return inlineTomlFeaturesTableEnablesCodexHooks(record);
+    }
 
     if (!isSectionKey && !isRootDottedKey) {
       return false;
