@@ -666,3 +666,108 @@ Resume file: None
     expect(Number(progress.percent)).toBe(100);
   });
 });
+
+// ─── stateMilestoneSwitch (#2630) ──────────────────────────────────────────
+
+describe('stateMilestoneSwitch', () => {
+  let tmpDir: string;
+
+  beforeEach(async () => {
+    tmpDir = await mkdtemp(join(tmpdir(), 'gsd-milestone-switch-'));
+  });
+
+  afterEach(async () => {
+    await rm(tmpDir, { recursive: true, force: true });
+  });
+
+  it('writes milestone/milestone_name/status into STATE.md frontmatter and resets progress on milestone switch', async () => {
+    // Previous milestone shipped: STATE.md frontmatter points at v1.0 with
+    // non-zero progress. ROADMAP.md now advertises the NEW milestone v1.1.
+    // Regardless of what getMilestoneInfo derives from the old STATE.md
+    // frontmatter, a milestone switch must stomp the frontmatter with the new
+    // version/name and reset progress counters.
+    const stateContent = `---
+gsd_state_version: 1.0
+milestone: v1.0
+milestone_name: Foundation
+status: completed
+progress:
+  total_phases: 5
+  completed_phases: 5
+  total_plans: 12
+  completed_plans: 12
+  percent: 100
+---
+
+# Project State
+
+## Current Position
+
+Phase: 5 (Foundation) — COMPLETED
+Plan: 3 of 3
+Status: v1.0 milestone complete
+Last activity: 2026-04-20 -- v1.0 shipped
+
+## Accumulated Context
+
+### Decisions
+
+- [Phase 1]: Use Node 20
+`;
+    const planningDir = join(tmpDir, '.planning');
+    await mkdir(join(planningDir, 'phases'), { recursive: true });
+    await writeFile(join(planningDir, 'STATE.md'), stateContent, 'utf-8');
+    // ROADMAP advertises the new milestone
+    await writeFile(
+      join(planningDir, 'ROADMAP.md'),
+      '# Roadmap\n\n## v1.1 Notifications\n\n### Phase 6: Notify\n',
+      'utf-8',
+    );
+    await writeFile(join(planningDir, 'config.json'), '{}', 'utf-8');
+
+    const { stateMilestoneSwitch } = await import('./state-mutation.js');
+    const result = await stateMilestoneSwitch(
+      ['--milestone', 'v1.1', '--name', 'Notifications'],
+      tmpDir,
+    );
+
+    const data = result.data as Record<string, unknown>;
+    expect(data.switched).toBe(true);
+    expect(data.version).toBe('v1.1');
+    expect(data.name).toBe('Notifications');
+
+    const after = await readFile(join(planningDir, 'STATE.md'), 'utf-8');
+    const { extractFrontmatter } = await import('./frontmatter.js');
+    const fm = extractFrontmatter(after);
+
+    // The heart of #2630 — frontmatter must reflect the NEW milestone.
+    expect(fm.milestone).toBe('v1.1');
+    expect(fm.milestone_name).toBe('Notifications');
+    // Status resets to planning (Defining requirements phase).
+    expect(fm.status).toBe('planning');
+    // Progress counters reset for the new milestone (no phases executed yet).
+    const progress = fm.progress as Record<string, unknown> | undefined;
+    if (progress) {
+      expect(Number(progress.completed_phases ?? 0)).toBe(0);
+      expect(Number(progress.completed_plans ?? 0)).toBe(0);
+      expect(Number(progress.percent ?? 0)).toBe(0);
+    }
+
+    // Accumulated Context is preserved across the milestone switch.
+    expect(after).toContain('[Phase 1]: Use Node 20');
+
+    // Current Position body is reset to the new milestone's starting state.
+    expect(after).toMatch(/Status:\s*Defining requirements/);
+  });
+
+  it('rejects missing --milestone', async () => {
+    await writeFile(join(tmpDir, '.planning', 'config.json'), '{}', 'utf-8').catch(async () => {
+      await mkdir(join(tmpDir, '.planning'), { recursive: true });
+      await writeFile(join(tmpDir, '.planning', 'config.json'), '{}', 'utf-8');
+    });
+    const { stateMilestoneSwitch } = await import('./state-mutation.js');
+    const result = await stateMilestoneSwitch([], tmpDir);
+    const data = result.data as Record<string, unknown>;
+    expect(data.error).toBeDefined();
+  });
+});

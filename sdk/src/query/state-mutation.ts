@@ -982,6 +982,124 @@ export const statePlannedPhase: QueryHandler = async (args, projectDir, workstre
   return { data: { updated, phase: phaseNumber, plan_count: planCount } };
 };
 
+// ─── stateMilestoneSwitch (bug #2630) ─────────────────────────────────────
+
+/**
+ * Query handler for `state.milestone-switch` — resets STATE.md for a new
+ * milestone cycle (bug #2630 regression guard).
+ *
+ * The `/gsd:new-milestone` workflow only rewrote STATE.md's body (Current
+ * Position section). The YAML frontmatter (`milestone`, `milestone_name`,
+ * `status`, `progress.*`) was never touched on a mid-flight switch, so queries
+ * that read frontmatter (`state.json`, `getMilestoneInfo`, every handler that
+ * calls `buildStateFrontmatter`) kept reporting the old milestone and stale
+ * progress counters until the first phase advance forced a resync.
+ *
+ * This handler performs the reset atomically under the STATE.md lock:
+ * - Stomps frontmatter milestone/milestone_name with the caller-supplied
+ *   values so `parseMilestoneFromState` reports the new milestone immediately.
+ * - Resets `status` to `'planning'` (workflow is at "Defining requirements").
+ * - Resets `progress` counters to zero (new milestone, nothing executed yet).
+ * - Rewrites the `## Current Position` body to the new-milestone template so
+ *   subsequent body-derived field extraction stays consistent with frontmatter.
+ * - Preserves Accumulated Context (decisions, todos, blockers) — symmetric
+ *   with `milestone.complete` which also keeps history.
+ *
+ * Args (named, matches gsd-tools style):
+ * - `--version <vX.Y>` (required)
+ * - `--name <milestone name>` (optional; defaults to 'milestone')
+ *
+ * Sibling CJS parity: `cmdInitNewMilestone` in `init.cjs` is read-only (like
+ * the TS `initNewMilestone`). The workflow-level fix is to call
+ * `state.milestone-switch` from `/gsd:new-milestone` Step 5 in place of the
+ * manual body rewrite.
+ */
+export const stateMilestoneSwitch: QueryHandler = async (args, projectDir, workstream) => {
+  // NOTE: the CLI flag is `--milestone` (not `--version`). gsd-tools reserves
+  // `--version` as a globally-invalid help flag, so the workflow invokes this
+  // handler with `--milestone vX.Y`. The internal variable is still `version`
+  // because the value is a milestone version string.
+  const parsed = parseNamedArgs(args, ['milestone', 'name']);
+  const version = (parsed.milestone as string | null)?.trim();
+  const name = ((parsed.name as string | null) ?? 'milestone').trim() || 'milestone';
+
+  if (!version) {
+    return { data: { error: 'milestone required (--milestone <vX.Y>)' } };
+  }
+
+  const today = new Date().toISOString().split('T')[0]!;
+  const statePath = planningPaths(projectDir, workstream).state;
+  const lockPath = await acquireStateLock(statePath);
+
+  try {
+    let content = '';
+    try {
+      content = await readFile(statePath, 'utf-8');
+    } catch { /* STATE.md may not exist yet */ }
+
+    const existingFm = extractFrontmatter(content);
+    const body = stripFrontmatter(content);
+
+    // Reset Current Position section body so body-derived extraction stays
+    // consistent with the new frontmatter.
+    const positionPattern = /(##\s*Current Position\s*\n)([\s\S]*?)(?=\n##|$)/i;
+    const resetPositionBody =
+      `\nPhase: Not started (defining requirements)\n` +
+      `Plan: —\n` +
+      `Status: Defining requirements\n` +
+      `Last activity: ${today} — Milestone ${version} started\n\n`;
+    let newBody: string;
+    if (positionPattern.test(body)) {
+      newBody = body.replace(positionPattern, (_m, header: string) => `${header}${resetPositionBody}`);
+    } else {
+      // Preserve any existing body but prepend a Current Position section.
+      const preface = body.trim().length > 0 ? body : '# Project State\n';
+      newBody = `${preface.trimEnd()}\n\n## Current Position\n${resetPositionBody}`;
+    }
+
+    // Build fresh frontmatter explicitly — do NOT rely on buildStateFrontmatter
+    // here, because getMilestoneInfo reads the ON-DISK STATE.md and would
+    // return the OLD milestone until we write it first. This is the crux of
+    // bug #2630: any sync-based approach races against the very file it is
+    // about to rewrite.
+    const fm: Record<string, unknown> = {
+      gsd_state_version: '1.0',
+      milestone: version,
+      milestone_name: name,
+      status: 'planning',
+      last_updated: new Date().toISOString(),
+      last_activity: today,
+      progress: {
+        total_phases: 0,
+        completed_phases: 0,
+        total_plans: 0,
+        completed_plans: 0,
+        percent: 0,
+      },
+    };
+    // Preserve frontmatter-only fields the caller may still care about
+    // (paused_at cleared deliberately — a new milestone is a fresh start).
+    if (existingFm.gsd_state_version) {
+      fm.gsd_state_version = existingFm.gsd_state_version;
+    }
+
+    const yamlStr = reconstructFrontmatter(fm);
+    const assembled = `---\n${yamlStr}\n---\n\n${newBody.replace(/^\n+/, '')}`;
+    await writeFile(statePath, normalizeMd(assembled), 'utf-8');
+
+    return {
+      data: {
+        switched: true,
+        version,
+        name,
+        status: 'planning',
+      },
+    };
+  } finally {
+    await releaseStateLock(lockPath);
+  }
+};
+
 // ─── parseNamedArgs (matches gsd-tools.cjs) ───────────────────────────────
 
 function parseNamedArgs(

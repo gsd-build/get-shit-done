@@ -173,6 +173,19 @@ This document evolves at phase transitions and milestone boundaries.
 
 ## 5. Update STATE.md
 
+Reset STATE.md frontmatter AND body atomically via the SDK. This writes the new
+milestone version/name into the YAML frontmatter, resets `status` to
+`planning`, zeroes `progress.*` counters, and rewrites the `## Current Position`
+section to the new-milestone template. Accumulated Context (decisions,
+blockers, todos) is preserved across the switch — symmetric with
+`milestone.complete`.
+
+```bash
+gsd-sdk query state.milestone-switch --milestone "v[X.Y]" --name "[Name]"
+```
+
+The resulting Current Position section looks like:
+
 ```markdown
 ## Current Position
 
@@ -182,7 +195,11 @@ Status: Defining requirements
 Last activity: [today] — Milestone v[X.Y] started
 ```
 
-Keep Accumulated Context section from previous milestone.
+Bug #2630: a prior version of this workflow rewrote the Current Position body
+manually but left the frontmatter pointing at the previous milestone, so every
+downstream reader (`state.json`, `getMilestoneInfo`, progress bars) reported the
+stale milestone until the first phase advance forced a resync. Always use the
+SDK handler above — do not hand-edit STATE.md here.
 
 ## 6. Cleanup and Commit
 
