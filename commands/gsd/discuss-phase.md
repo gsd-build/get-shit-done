@@ -30,10 +30,15 @@ Extract implementation decisions that downstream agents need — researcher and 
 
 <execution_context>
 @~/.claude/get-shit-done/workflows/discuss-phase.md
-@~/.claude/get-shit-done/workflows/discuss-phase-assumptions.md
-@~/.claude/get-shit-done/workflows/discuss-phase-power.md
-@~/.claude/get-shit-done/templates/context.md
 </execution_context>
+
+<deferred_reads>
+The files below are NOT pre-loaded — the process block and workflow branches direct `Read` at the moment the file is actually needed. This avoids ~13k tokens of up-front load for files that are mode-specific or only used by one step.
+
+- `~/.claude/get-shit-done/workflows/discuss-phase-assumptions.md` — Read when `workflow.discuss_mode` is `"assumptions"` (see <process>).
+- `~/.claude/get-shit-done/workflows/discuss-phase-power.md` — Read when `--power` is in ARGUMENTS (see workflow's `power_user_mode` branch).
+- `~/.claude/get-shit-done/templates/context.md` — Read in the workflow's `write_context` step.
+</deferred_reads>
 
 <runtime_note>
 **Copilot (VS Code):** Use `vscode_askquestions` wherever this workflow calls `AskUserQuestion`. They are equivalent — `vscode_askquestions` is the VS Code Copilot implementation of the same interactive question API.

@@ -6,9 +6,15 @@ You are a thinking partner, not an interviewer. The user is the visionary — yo
 
 <required_reading>
 @~/.claude/get-shit-done/references/domain-probes.md
-@~/.claude/get-shit-done/references/gate-prompts.md
-@~/.claude/get-shit-done/references/universal-anti-patterns.md
 </required_reading>
+
+<deferred_reads>
+The files below are NOT pre-loaded — individual steps direct `Read` at the point they are actually needed. This keeps the up-front load small while still giving steps access to the canonical patterns when relevant.
+
+- `~/.claude/get-shit-done/references/gate-prompts.md` — Read in `check_existing` (and any step that designs a new AskUserQuestion gate) when you need the standard approve/revise/yes-no patterns.
+- `~/.claude/get-shit-done/references/universal-anti-patterns.md` — Read in `advisor_research` before spawning subagents (the rules govern subagent usage and context budget).
+- `~/.claude/get-shit-done/templates/context.md` — Read in `write_context` for the canonical CONTEXT.md template, annotated examples, and concrete-vs-vague decision guidelines.
+</deferred_reads>
 
 <downstream_awareness>
 **CONTEXT.md feeds into:**
@@ -240,6 +246,8 @@ ls ${phase_dir}/*-SPEC.md 2>/dev/null | grep -v AI-SPEC | head -1 || true
 
 <step name="check_existing">
 Check if CONTEXT.md already exists using `has_context` from init.
+
+**Gate prompt reference (JIT):** This step and several that follow design `AskUserQuestion` gates (Update/View/Skip, Resume/Start fresh, Continue/View/Cancel). If you need the canonical gate patterns, `Read ~/.claude/get-shit-done/references/gate-prompts.md` now — it defines approve-revise-abort, yes-no, and stale-continue, plus the 12-char header and "Other" handling rules. Skip the Read if you already know the conventions.
 
 ```bash
 ls ${phase_dir}/*-CONTEXT.md 2>/dev/null || true
@@ -651,6 +659,8 @@ Continue to discuss_areas with selected areas (or advisor_research if ADVISOR_MO
 <step name="advisor_research">
 **Advisor Research** (only when ADVISOR_MODE is true)
 
+**Anti-pattern reference (JIT):** Before spawning subagents in this step, `Read ~/.claude/get-shit-done/references/universal-anti-patterns.md` — it covers the rules that apply when orchestrating subagents (don't read agent definition files, don't inline large files into prompts, delegate heavy work, context-budget scaling). If `ADVISOR_MODE` is false and this step is skipped entirely, skip the Read too.
+
 After user selects gray areas in present_gray_areas, spawn parallel research agents.
 
 1. Display brief status: "Researching {N} areas..."
@@ -959,6 +969,8 @@ This data is used to generate DISCUSSION-LOG.md in the `write_context` step.
 
 <step name="write_context">
 Create CONTEXT.md capturing decisions made.
+
+**Template reference (JIT):** `Read ~/.claude/get-shit-done/templates/context.md` now — it contains the canonical template, three annotated good examples (visual feature, CLI tool, organization task), and guidelines distinguishing concrete decisions from vague aspirations. The inline skeleton below mirrors the template's structure; the examples and guidelines in the template file are the source of truth for what "good content" looks like.
 
 **Also generate DISCUSSION-LOG.md** — a full audit trail of the discuss-phase Q&A.
 This file is for human reference only (software audits, compliance reviews). It is NOT
