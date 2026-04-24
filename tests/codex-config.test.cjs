@@ -1024,6 +1024,22 @@ describe('Codex install hook configuration (e2e)', () => {
     );
   });
 
+  test('install preserves zero-byte hooks.json instead of overwriting it', () => {
+    fs.mkdirSync(codexHome, { recursive: true });
+    fs.writeFileSync(path.join(codexHome, 'hooks.json'), '', 'utf8');
+    writeCodexConfig(codexHome, [
+      '[model]',
+      'name = "o3"',
+      '',
+    ].join('\n'));
+
+    runCodexInstall(codexHome);
+
+    assert.strictEqual(fs.readFileSync(path.join(codexHome, 'hooks.json'), 'utf8'), '', 'leaves zero-byte hooks.json untouched instead of replacing it');
+    assert.ok(readCodexConfig(codexHome).includes('name = "o3"'), 'preserves user config when hooks.json migration cannot complete safely');
+    assert.strictEqual(countMatches(readCodexConfig(codexHome), /^codex_hooks = true$/gm), 0, 'does not enable codex_hooks when zero-byte hooks.json prevents safe migration');
+  });
+
   test('install preserves malformed hooks.json SessionStart entries instead of overwriting them', () => {
     const malformedHooksJsonRaw = [
       '{',
@@ -1168,6 +1184,28 @@ describe('Codex install hook configuration (e2e)', () => {
     assert.ok(content.includes('name = "o3"'), 'preserves user config after removing the legacy hook');
     assert.ok(!content.includes('[[hooks]]'), 'removes the legacy inline GSD hook when TOML literal apostrophes are decoded');
     assert.strictEqual(countGsdUpdateHooksInHooksJson(codexHomeWithApostrophe), 1, 'adds the managed GSD hook to hooks.json');
+  });
+
+  test('install removes legacy inline GSD hooks whose decoded command single-quotes the hook path', () => {
+    const managedCommand = `node '${path.join(codexHome, 'hooks', 'gsd-check-update.js').replace(/\\/g, '/')}'`;
+    const tomlLiteralCommand = managedCommand.replace(/'/g, "''");
+    writeCodexConfig(codexHome, [
+      '# GSD Hooks',
+      '[[hooks]]',
+      'event = "SessionStart"',
+      `command = '${tomlLiteralCommand}'`,
+      '',
+      '[model]',
+      'name = "o3"',
+      '',
+    ].join('\n'));
+
+    runCodexInstall(codexHome);
+
+    const content = readCodexConfig(codexHome);
+    assert.ok(content.includes('name = "o3"'), 'preserves user config after removing the legacy hook');
+    assert.ok(!content.includes('[[hooks]]'), 'removes the legacy inline GSD hook when the decoded command single-quotes the path');
+    assert.strictEqual(countGsdUpdateHooksInHooksJson(codexHome), 1, 'adds the managed GSD hook to hooks.json');
   });
 
   test('config_file paths are absolute using CODEX_HOME', () => {

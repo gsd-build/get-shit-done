@@ -2068,6 +2068,7 @@ function getManagedCodexLegacyInlineCommands(configDir) {
       const hookPath = `${baseDir}/hooks/${hookName}`;
       commands.add(`node ${hookPath}`);
       commands.add(`node "${hookPath}"`);
+      commands.add(`node '${hookPath}'`);
     }
   }
 
@@ -2304,8 +2305,9 @@ function assertCodexHooksJsonInstallSafe(parsed, hooksPath = 'hooks.json') {
 }
 
 function mergeGsdIntoCodexHooksJson(existingContent, command, hooksPath = 'hooks.json', configDir) {
-  const eol = existingContent ? detectLineEnding(existingContent) : '\n';
-  const parsed = existingContent
+  const hasExistingFile = existingContent !== null && existingContent !== undefined;
+  const eol = hasExistingFile && existingContent.length > 0 ? detectLineEnding(existingContent) : '\n';
+  const parsed = hasExistingFile
     ? parseCodexHooksJson(existingContent, hooksPath)
     : { hooks: {} };
   assertCodexHooksJsonInstallSafe(parsed, hooksPath);
@@ -6527,7 +6529,7 @@ function install(isGlobal, runtime = 'claude') {
 
       if (hasEnabledCodexHooksFeature(nextConfigContent)) {
         const updateCheckCommand = buildHookCommand(targetDir, 'gsd-check-update.js', { portableHooks: hasPortableHooks });
-        const hooksJsonContent = fs.existsSync(hooksJsonPath) ? fs.readFileSync(hooksJsonPath, 'utf8') : '';
+        const hooksJsonContent = fs.existsSync(hooksJsonPath) ? fs.readFileSync(hooksJsonPath, 'utf8') : null;
         const mergedHooksJson = mergeGsdIntoCodexHooksJson(hooksJsonContent, updateCheckCommand, hooksJsonPath, targetDir);
         fs.writeFileSync(hooksJsonPath, mergedHooksJson, 'utf8');
 
