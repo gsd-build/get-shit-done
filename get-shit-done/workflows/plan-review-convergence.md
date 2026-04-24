@@ -158,8 +158,6 @@ If REVIEWS_FILE is empty: Error — review agent did not produce REVIEWS.md. Exi
 
 **Do NOT grep REVIEWS.md.** REVIEWS.md accumulates historical content across cycles; raw text counts are unreliable (a cycle 2 review that re-lists resolved HIGHs for audit would inflate the count and falsely trigger stall detection). Instead, extract the count from the review agent's RETURN MESSAGE using the CYCLE_SUMMARY contract.
 
-**Parsing layer:** this step is performed by the orchestrator LLM on the Agent's final return message (text returned from `Agent(...)`), not by a bash pipeline. There is no `$AGENT_RETURN` variable to feed `grep`/`sed`; the return message is in-context for the orchestrator. The contract below is therefore expressed as extraction rules, not shell code — the same shape `gsd-plan-phase` uses when parsing `gsd-plan-checker`'s return.
-
 Parse the agent's final return message:
 
 - `HIGH_COUNT`: the integer matched by regex `CYCLE_SUMMARY:\s+current_high=(\d+)`. If no match, abort with: `Review agent did not honor the CYCLE_SUMMARY contract — cannot determine HIGH count. Retry or switch reviewer.`
