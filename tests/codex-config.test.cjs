@@ -1909,6 +1909,19 @@ describe('Codex uninstall symmetry for hook-enabled configs', () => {
     assert.ok(!fs.existsSync(path.join(codexHome, 'hooks.json')), 'uninstall removes a hooks.json owned only by GSD');
   });
 
+  test('fresh install removes managed Codex hook files on uninstall', () => {
+    runCodexInstall(codexHome);
+    const updateHook = path.join(codexHome, 'hooks', 'gsd-check-update.js');
+    const updateWorker = path.join(codexHome, 'hooks', 'gsd-check-update-worker.js');
+    assert.ok(fs.existsSync(updateHook), 'install writes the managed update hook');
+    assert.ok(fs.existsSync(updateWorker), 'install writes the managed update worker');
+
+    runCodexUninstall(codexHome);
+
+    assert.ok(!fs.existsSync(updateHook), 'uninstall removes the managed update hook');
+    assert.ok(!fs.existsSync(updateWorker), 'uninstall removes the managed update worker');
+  });
+
   test('install then uninstall removes only the GSD hooks.json entry and preserves user hooks', () => {
     writeCodexHooksJson(codexHome, {
       hooks: {
@@ -2021,6 +2034,7 @@ describe('Codex uninstall symmetry for hook-enabled configs', () => {
 
   test('uninstall preserves the update hook file when hooks.json cannot be cleaned', () => {
     const hookFile = path.join(codexHome, 'hooks', 'gsd-check-update.js');
+    const workerFile = path.join(codexHome, 'hooks', 'gsd-check-update-worker.js');
     const hooksJsonRaw = [
       '{',
       '  "hooks": {',
@@ -2032,12 +2046,14 @@ describe('Codex uninstall symmetry for hook-enabled configs', () => {
     ].join('\n');
     fs.mkdirSync(path.dirname(hookFile), { recursive: true });
     fs.writeFileSync(hookFile, '// managed update hook\n', 'utf8');
+    fs.writeFileSync(workerFile, '// managed update worker\n', 'utf8');
     fs.writeFileSync(path.join(codexHome, 'hooks.json'), hooksJsonRaw, 'utf8');
 
     runCodexUninstall(codexHome);
 
     assert.strictEqual(fs.readFileSync(path.join(codexHome, 'hooks.json'), 'utf8'), hooksJsonRaw, 'leaves uncleanable hooks.json bytes untouched');
     assert.ok(fs.existsSync(hookFile), 'keeps gsd-check-update.js so the uncleaned hooks.json does not point at a deleted command');
+    assert.ok(fs.existsSync(workerFile), 'keeps gsd-check-update-worker.js so the retained update hook can still start');
   });
 
   test('install then uninstall removes unquoted managed-command hooks from hooks.json arrays', () => {

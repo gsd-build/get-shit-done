@@ -5428,9 +5428,11 @@ function uninstall(isGlobal, runtime = 'claude') {
   const hooksDir = path.join(targetDir, 'hooks');
   if (fs.existsSync(hooksDir)) {
     const gsdHooks = ['gsd-statusline.js', 'gsd-check-update.js', 'gsd-context-monitor.js', 'gsd-prompt-guard.js', 'gsd-read-guard.js', 'gsd-read-injection-scanner.js', 'gsd-workflow-guard.js', 'gsd-session-state.sh', 'gsd-validate-commit.sh', 'gsd-phase-boundary.sh'];
+    const gsdHookHelpers = ['gsd-check-update-worker.js'];
+    const keepUpdateHookChain = isCodex && codexHooksJsonCleanFailed;
     let hookCount = 0;
-    for (const hook of gsdHooks) {
-      if (isCodex && codexHooksJsonCleanFailed && hook === 'gsd-check-update.js') {
+    for (const hook of [...gsdHooks, ...gsdHookHelpers]) {
+      if (keepUpdateHookChain && (hook === 'gsd-check-update.js' || hook === 'gsd-check-update-worker.js')) {
         continue;
       }
       const hookPath = path.join(hooksDir, hook);
