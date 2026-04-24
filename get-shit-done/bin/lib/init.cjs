@@ -827,20 +827,63 @@ function cmdInitMilestoneOp(cwd, raw) {
   let phaseCount = 0;
   let completedPhases = 0;
   const phasesDir = path.join(planningDir(cwd), 'phases');
+
+  // Bug #2633 — ROADMAP.md (current milestone section) is the authority for
+  // phase counts, NOT the on-disk `.planning/phases/` directory. After
+  // `phases clear` between milestones, on-disk dirs will be a subset of the
+  // roadmap until each phase is materialized; reading from disk causes
+  // `all_phases_complete: true` to fire prematurely.
+  let roadmapPhaseNumbers = [];
+  try {
+    const roadmapPath = path.join(planningDir(cwd), 'ROADMAP.md');
+    const roadmapRaw = fs.readFileSync(roadmapPath, 'utf-8');
+    const currentSection = extractCurrentMilestone(roadmapRaw, cwd);
+    const phasePattern = /#{2,4}\s*Phase\s+(\d+[A-Z]?(?:\.\d+)*)\s*:/gi;
+    let m;
+    while ((m = phasePattern.exec(currentSection)) !== null) {
+      roadmapPhaseNumbers.push(m[1]);
+    }
+  } catch { /* intentionally empty */ }
+
+  // Build disk index: integer/padded phase number -> dir name.
+  const diskPhaseDirs = new Map();
   try {
     const entries = fs.readdirSync(phasesDir, { withFileTypes: true });
-    const dirs = entries.filter(e => e.isDirectory()).map(e => e.name);
-    phaseCount = dirs.length;
+    for (const e of entries) {
+      if (!e.isDirectory()) continue;
+      const m = e.name.match(/^(\d+(?:\.\d+)*)/);
+      if (!m) continue;
+      diskPhaseDirs.set(String(parseInt(m[1], 10)), e.name);
+      diskPhaseDirs.set(m[1], e.name);
+    }
+  } catch { /* intentionally empty */ }
 
-    // Count phases with summaries (completed)
-    for (const dir of dirs) {
+  if (roadmapPhaseNumbers.length > 0) {
+    phaseCount = roadmapPhaseNumbers.length;
+    for (const num of roadmapPhaseNumbers) {
+      const dirName = diskPhaseDirs.get(String(parseInt(num, 10))) || diskPhaseDirs.get(num);
+      if (!dirName) continue;
       try {
-        const phaseFiles = fs.readdirSync(path.join(phasesDir, dir));
+        const phaseFiles = fs.readdirSync(path.join(phasesDir, dirName));
         const hasSummary = phaseFiles.some(f => f.endsWith('-SUMMARY.md') || f === 'SUMMARY.md');
         if (hasSummary) completedPhases++;
       } catch { /* intentionally empty */ }
     }
-  } catch { /* intentionally empty */ }
+  } else {
+    // Fallback: no parseable ROADMAP — preserve legacy on-disk behavior.
+    try {
+      const entries = fs.readdirSync(phasesDir, { withFileTypes: true });
+      const dirs = entries.filter(e => e.isDirectory()).map(e => e.name);
+      phaseCount = dirs.length;
+      for (const dir of dirs) {
+        try {
+          const phaseFiles = fs.readdirSync(path.join(phasesDir, dir));
+          const hasSummary = phaseFiles.some(f => f.endsWith('-SUMMARY.md') || f === 'SUMMARY.md');
+          if (hasSummary) completedPhases++;
+        } catch { /* intentionally empty */ }
+      }
+    } catch { /* intentionally empty */ }
+  }
 
   // Check archive
   const archiveDir = path.join(planningRoot(cwd), 'archive');

@@ -433,23 +433,46 @@ export const validateHealth: QueryHandler = async (args, projectDir, _workstream
     try {
       const stateContent = await readFile(statePath, 'utf-8');
       const phaseRefs = [...stateContent.matchAll(/[Pp]hase\s+(\d+(?:\.\d+)*)/g)].map(m => m[1]);
-      const diskPhases = new Set<string>();
+
+      // Bug #2633 — ROADMAP.md is the authority for which phases are valid.
+      // STATE.md may legitimately reference current-milestone future phases
+      // (not yet materialized on disk) and shipped-milestone history phases
+      // (archived / cleared off disk). Matching only against on-disk dirs
+      // produces false W002 warnings in both cases.
+      const validPhases = new Set<string>();
       try {
         const entries = await readdir(phasesDir, { withFileTypes: true });
         for (const e of entries) {
           if (e.isDirectory()) {
             const m = e.name.match(/^(\d+(?:\.\d+)*)/);
-            if (m) diskPhases.add(m[1]);
+            if (m) validPhases.add(m[1]);
           }
         }
       } catch { /* intentionally empty */ }
 
+      // Union in every phase declared anywhere in ROADMAP.md — current milestone,
+      // shipped milestones (inside <details> / ✅ SHIPPED sections), and any
+      // preamble/Backlog. We deliberately do NOT filter by current milestone.
+      try {
+        const roadmapRaw = await readFile(roadmapPath, 'utf-8');
+        const all = [...roadmapRaw.matchAll(/#{2,4}\s*Phase\s+(\d+(?:\.\d+)*)/gi)];
+        for (const m of all) validPhases.add(m[1]);
+      } catch { /* intentionally empty */ }
+
+      const normalizedValid = new Set<string>();
+      for (const p of validPhases) {
+        normalizedValid.add(p);
+        normalizedValid.add(String(parseInt(p, 10)));
+        normalizedValid.add(String(parseInt(p, 10)).padStart(2, '0'));
+      }
+
       for (const ref of phaseRefs) {
         const normalizedRef = String(parseInt(ref, 10)).padStart(2, '0');
-        if (!diskPhases.has(ref) && !diskPhases.has(normalizedRef) && !diskPhases.has(String(parseInt(ref, 10)))) {
-          if (diskPhases.size > 0) {
+        const intRef = String(parseInt(ref, 10));
+        if (!normalizedValid.has(ref) && !normalizedValid.has(normalizedRef) && !normalizedValid.has(intRef)) {
+          if (normalizedValid.size > 0) {
             addIssue('warning', 'W002',
-              `STATE.md references phase ${ref}, but only phases ${[...diskPhases].sort().join(', ')} exist`,
+              `STATE.md references phase ${ref}, but only phases ${[...validPhases].sort().join(', ')} are declared`,
               'Review STATE.md manually');
           }
         }
