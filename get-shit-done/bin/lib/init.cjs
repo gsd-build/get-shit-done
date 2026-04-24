@@ -1230,6 +1230,7 @@ function cmdInitProgress(cwd, raw) {
   // Build set of phases defined in ROADMAP for the current milestone
   const roadmapPhaseNums = new Set();
   const roadmapPhaseNames = new Map();
+  const roadmapCheckboxStates = new Map();
   try {
     const roadmapContent = extractCurrentMilestone(
       fs.readFileSync(path.join(planningDir(cwd), 'ROADMAP.md'), 'utf-8'), cwd
@@ -1239,6 +1240,13 @@ function cmdInitProgress(cwd, raw) {
     while ((hm = headingPattern.exec(roadmapContent)) !== null) {
       roadmapPhaseNums.add(hm[1]);
       roadmapPhaseNames.set(hm[1], hm[2].replace(/\(INSERTED\)/i, '').trim());
+    }
+    // #2646: parse `- [x] Phase N` checkbox states so ROADMAP-only phases
+    // inherit completion from the ROADMAP when no phase directory exists.
+    const cbPattern = /-\s*\[(x| )\]\s*.*Phase\s+(\d+[A-Z]?(?:\.\d+)*)[:\s]/gi;
+    let cbm;
+    while ((cbm = cbPattern.exec(roadmapContent)) !== null) {
+      roadmapCheckboxStates.set(cbm[2], cbm[1].toLowerCase() === 'x');
     }
   } catch { /* intentionally empty */ }
 
@@ -1295,21 +1303,27 @@ function cmdInitProgress(cwd, raw) {
     }
   } catch { /* intentionally empty */ }
 
-  // Add phases defined in ROADMAP but not yet scaffolded to disk
+  // Add phases defined in ROADMAP but not yet scaffolded to disk. When the
+  // ROADMAP has a `- [x] Phase N` checkbox, honor it as 'complete' so
+  // completed_count and status reflect the ROADMAP source of truth (#2646).
   for (const [num, name] of roadmapPhaseNames) {
     const stripped = num.replace(/^0+/, '') || '0';
     if (!seenPhaseNums.has(stripped)) {
+      const checkboxComplete =
+        roadmapCheckboxStates.get(num) === true ||
+        roadmapCheckboxStates.get(stripped) === true;
+      const status = checkboxComplete ? 'complete' : 'not_started';
       const phaseInfo = {
         number: num,
         name: name.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, ''),
         directory: null,
-        status: 'not_started',
+        status,
         plan_count: 0,
         summary_count: 0,
         has_research: false,
       };
       phases.push(phaseInfo);
-      if (!nextPhase && !currentPhase) {
+      if (!nextPhase && !currentPhase && status !== 'complete') {
         nextPhase = phaseInfo;
       }
     }

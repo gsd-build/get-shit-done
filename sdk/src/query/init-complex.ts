@@ -53,6 +53,36 @@ function pathExists(base: string, relPath: string): boolean {
   return existsSync(join(base, relPath));
 }
 
+/**
+ * Extract ROADMAP checkbox states: `- [x] Phase N` → true, `- [ ] Phase N` → false.
+ * Shared by initProgress and initManager so both treat ROADMAP as the
+ * fallback/override source of truth for completion.
+ */
+function extractCheckboxStates(content: string): Map<string, boolean> {
+  const states = new Map<string, boolean>();
+  const pattern = /-\s*\[(x| )\]\s*.*Phase\s+(\d+[A-Z]?(?:\.\d+)*)[:\s]/gi;
+  let m: RegExpExecArray | null;
+  while ((m = pattern.exec(content)) !== null) {
+    states.set(m[2], m[1].toLowerCase() === 'x');
+  }
+  return states;
+}
+
+/**
+ * Derive progress-level status from a ROADMAP checkbox when the phase has
+ * no on-disk directory. Returns 'complete' for `[x]`, 'not_started' otherwise.
+ * Disk status (when present) always wins — it's more recent truth for in-flight work.
+ */
+function deriveStatusFromCheckbox(
+  phaseNum: string,
+  checkboxStates: Map<string, boolean>,
+): 'complete' | 'not_started' {
+  const stripped = phaseNum.replace(/^0+/, '') || '0';
+  if (checkboxStates.get(phaseNum) === true) return 'complete';
+  if (checkboxStates.get(stripped) === true) return 'complete';
+  return 'not_started';
+}
+
 // ─── initNewProject ───────────────────────────────────────────────────────
 
 /**
@@ -191,6 +221,7 @@ export const initProgress: QueryHandler = async (_args, projectDir, _workstream)
   // Build set of phases from ROADMAP for the current milestone
   const roadmapPhaseNames = new Map<string, string>();
   const seenPhaseNums = new Set<string>();
+  let checkboxStates = new Map<string, boolean>();
 
   try {
     const rawRoadmap = await readFile(paths.roadmap, 'utf-8');
@@ -202,6 +233,7 @@ export const initProgress: QueryHandler = async (_args, projectDir, _workstream)
       const pName = hm[2].replace(/\(INSERTED\)/i, '').trim();
       roadmapPhaseNames.set(pNum, pName);
     }
+    checkboxStates = extractCheckboxStates(roadmapContent);
   } catch { /* intentionally empty */ }
 
   // Scan phase directories
@@ -256,21 +288,23 @@ export const initProgress: QueryHandler = async (_args, projectDir, _workstream)
     }
   } catch { /* intentionally empty */ }
 
-  // Add ROADMAP-only phases not yet on disk
+  // Add ROADMAP-only phases not yet on disk. For phases with a ROADMAP
+  // `[x]` checkbox, treat them as complete (#2646).
   for (const [num, name] of roadmapPhaseNames) {
     const stripped = num.replace(/^0+/, '') || '0';
     if (!seenPhaseNums.has(stripped)) {
+      const status = deriveStatusFromCheckbox(num, checkboxStates);
       const phaseInfo: Record<string, unknown> = {
         number: num,
         name: name.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, ''),
         directory: null,
-        status: 'not_started',
+        status,
         plan_count: 0,
         summary_count: 0,
         has_research: false,
       };
       phases.push(phaseInfo);
-      if (!nextPhase && !currentPhase) {
+      if (!nextPhase && !currentPhase && status !== 'complete') {
         nextPhase = phaseInfo;
       }
     }
@@ -349,13 +383,8 @@ export const initManager: QueryHandler = async (_args, projectDir, _workstream) 
       .map(e => e.name);
   } catch { /* intentionally empty */ }
 
-  // Pre-extract checkbox states in a single pass
-  const checkboxStates = new Map<string, boolean>();
-  const cbPattern = /-\s*\[(x| )\]\s*.*Phase\s+(\d+[A-Z]?(?:\.\d+)*)[:\s]/gi;
-  let cbMatch: RegExpExecArray | null;
-  while ((cbMatch = cbPattern.exec(content)) !== null) {
-    checkboxStates.set(cbMatch[2], cbMatch[1].toLowerCase() === 'x');
-  }
+  // Pre-extract checkbox states in a single pass (shared helper — #2646)
+  const checkboxStates = extractCheckboxStates(content);
 
   const phasePattern = /#{2,4}\s*Phase\s+(\d+[A-Z]?(?:\.\d+)*)\s*:\s*([^\n]+)/gi;
   const phases: Record<string, unknown>[] = [];
