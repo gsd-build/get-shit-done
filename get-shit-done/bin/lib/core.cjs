@@ -291,22 +291,34 @@ function loadConfig(cwd) {
     if (parsed.multiRepo === true && !parsed.sub_repos && !parsed.planning?.sub_repos) {
       const detected = detectSubRepos(cwd);
       if (detected.length > 0) {
-        parsed.sub_repos = detected;
         if (!parsed.planning) parsed.planning = {};
+        parsed.planning.sub_repos = detected;
+        delete parsed.sub_repos;
         parsed.planning.commit_docs = false;
         delete parsed.multiRepo;
         configDirty = true;
       }
     }
 
+    // Canonicalize legacy top-level sub_repos to planning.sub_repos (#2638)
+    if (Object.prototype.hasOwnProperty.call(parsed, 'sub_repos')) {
+      if (!parsed.planning) parsed.planning = {};
+      if (parsed.planning.sub_repos === undefined) {
+        parsed.planning.sub_repos = parsed.sub_repos;
+      }
+      delete parsed.sub_repos;
+      configDirty = true;
+    }
+
     // Keep sub_repos in sync with actual filesystem
-    const currentSubRepos = parsed.sub_repos || parsed.planning?.sub_repos || [];
+    const currentSubRepos = parsed.planning?.sub_repos || [];
     if (Array.isArray(currentSubRepos) && currentSubRepos.length > 0) {
       const detected = detectSubRepos(cwd);
       if (detected.length > 0) {
         const sorted = [...currentSubRepos].sort();
         if (JSON.stringify(sorted) !== JSON.stringify(detected)) {
-          parsed.sub_repos = detected;
+          if (!parsed.planning) parsed.planning = {};
+          parsed.planning.sub_repos = detected;
           configDirty = true;
         }
       }

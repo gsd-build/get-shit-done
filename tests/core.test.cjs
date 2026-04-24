@@ -1509,17 +1509,61 @@ describe('loadConfig sub_repos auto-sync', () => {
     assert.deepStrictEqual(config.sub_repos, ['backend', 'frontend']);
     assert.strictEqual(config.commit_docs, false);
 
-    // Verify config was persisted
+    // Verify config was persisted under planning.sub_repos (canonical location)
     const saved = JSON.parse(fs.readFileSync(path.join(projectRoot, '.planning', 'config.json'), 'utf-8'));
-    assert.deepStrictEqual(saved.sub_repos, ['backend', 'frontend']);
+    assert.strictEqual(saved.sub_repos, undefined, 'sub_repos should not be written to top-level');
+    assert.deepStrictEqual(saved.planning?.sub_repos, ['backend', 'frontend']);
     assert.strictEqual(saved.multiRepo, undefined, 'multiRepo should be removed');
+  });
+
+  // Bug #2638: loadConfig wrote sub_repos to top-level, triggering unknown-key warning
+  test('writes sub_repos under planning and does not emit unknown-key warning (#2638)', (t) => {
+    fs.writeFileSync(
+      path.join(projectRoot, '.planning', 'config.json'),
+      JSON.stringify({ model_profile: 'balanced', planning: { sub_repos: ['backend', 'frontend'] } })
+    );
+    fs.mkdirSync(path.join(projectRoot, 'backend', '.git'), { recursive: true });
+    fs.mkdirSync(path.join(projectRoot, 'frontend', '.git'), { recursive: true });
+    fs.mkdirSync(path.join(projectRoot, 'shared', '.git'), { recursive: true });
+
+    const origWrite = process.stderr.write;
+    let stderrOutput = '';
+    process.stderr.write = (chunk) => { stderrOutput += chunk; };
+    t.after(() => { process.stderr.write = origWrite; });
+
+    const config = loadConfig(projectRoot);
+    assert.deepStrictEqual(config.sub_repos, ['backend', 'frontend', 'shared']);
+
+    const saved = JSON.parse(fs.readFileSync(path.join(projectRoot, '.planning', 'config.json'), 'utf-8'));
+    assert.strictEqual(saved.sub_repos, undefined, 'top-level sub_repos should not exist');
+    assert.deepStrictEqual(saved.planning?.sub_repos, ['backend', 'frontend', 'shared']);
+    assert.ok(
+      !stderrOutput.includes('unknown config key(s): sub_repos'),
+      'should not warn about sub_repos as unknown key'
+    );
+  });
+
+  // Bug #2638: stale top-level sub_repos should be canonicalized even when no drift
+  test('removes stale top-level sub_repos even when detected repos are unchanged (#2638)', () => {
+    fs.writeFileSync(
+      path.join(projectRoot, '.planning', 'config.json'),
+      JSON.stringify({ model_profile: 'balanced', sub_repos: ['backend'] })
+    );
+    fs.mkdirSync(path.join(projectRoot, 'backend', '.git'), { recursive: true });
+
+    const config = loadConfig(projectRoot);
+    assert.deepStrictEqual(config.sub_repos, ['backend']);
+
+    const saved = JSON.parse(fs.readFileSync(path.join(projectRoot, '.planning', 'config.json'), 'utf-8'));
+    assert.strictEqual(saved.sub_repos, undefined, 'top-level sub_repos should be canonicalized away');
+    assert.deepStrictEqual(saved.planning?.sub_repos, ['backend']);
   });
 
   test('adds newly detected repos to sub_repos', () => {
     fs.mkdirSync(path.join(projectRoot, 'backend', '.git'), { recursive: true });
     fs.writeFileSync(
       path.join(projectRoot, '.planning', 'config.json'),
-      JSON.stringify({ sub_repos: ['backend'] })
+      JSON.stringify({ planning: { sub_repos: ['backend'] } })
     );
 
     // Add a new repo
@@ -1533,7 +1577,7 @@ describe('loadConfig sub_repos auto-sync', () => {
     fs.mkdirSync(path.join(projectRoot, 'backend', '.git'), { recursive: true });
     fs.writeFileSync(
       path.join(projectRoot, '.planning', 'config.json'),
-      JSON.stringify({ sub_repos: ['backend', 'old-repo'] })
+      JSON.stringify({ planning: { sub_repos: ['backend', 'old-repo'] } })
     );
 
     const config = loadConfig(projectRoot);
@@ -1543,7 +1587,7 @@ describe('loadConfig sub_repos auto-sync', () => {
   test('does not sync when sub_repos is empty and no repos detected', () => {
     fs.writeFileSync(
       path.join(projectRoot, '.planning', 'config.json'),
-      JSON.stringify({ sub_repos: [] })
+      JSON.stringify({ planning: { sub_repos: [] } })
     );
 
     const config = loadConfig(projectRoot);
