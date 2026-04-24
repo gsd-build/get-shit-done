@@ -262,10 +262,21 @@ export const initProgress: QueryHandler = async (_args, projectDir, _workstream)
       const summaries = phaseFiles.filter(f => f.endsWith('-SUMMARY.md') || f === 'SUMMARY.md');
       const hasResearch = phaseFiles.some(f => f.endsWith('-RESEARCH.md') || f === 'RESEARCH.md');
 
-      const status =
+      let status =
         summaries.length >= plans.length && plans.length > 0 ? 'complete' :
         plans.length > 0 ? 'in_progress' :
         hasResearch ? 'researched' : 'pending';
+
+      // #2674: align with initManager — a ROADMAP `- [x] Phase N` checkbox
+      // wins over disk state. A stub phase dir with no SUMMARY is leftover
+      // scaffolding; the user's explicit [x] is the authoritative signal.
+      const strippedNum = phaseNumber.replace(/^0+/, '') || '0';
+      const roadmapComplete =
+        checkboxStates.get(phaseNumber) === true ||
+        checkboxStates.get(strippedNum) === true;
+      if (roadmapComplete && status !== 'complete') {
+        status = 'complete';
+      }
 
       const phaseInfo: Record<string, unknown> = {
         number: phaseNumber,
