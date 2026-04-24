@@ -1873,6 +1873,14 @@ function convertClaudeToCodexMarkdown(content) {
   converted = converted.replace(/\$HOME\/\.claude\//g, '$HOME/.codex/');
   converted = converted.replace(/~\/\.claude\//g, '~/.codex/');
   converted = converted.replace(/\.\/\.claude\//g, './.codex/');
+  // Bare/project-relative .claude/... references (#2639). Covers strings like
+  // "check `.claude/skills/`" where there is no ~/, $HOME/, or ./ anchor.
+  // Negative lookbehind prevents double-replacing already-anchored forms and
+  // avoids matching inside URLs or other slash-prefixed paths.
+  converted = converted.replace(/(?<![A-Za-z0-9_\-./~$])\.claude\//g, '.codex/');
+  // `.claudeignore` → `.codexignore` (#2639). Codex honors its own ignore
+  // file; leaving the Claude-specific name is misleading in agent prompts.
+  converted = converted.replace(/\.claudeignore\b/g, '.codexignore');
   // Runtime-neutral agent name replacement (#766)
   converted = neutralizeAgentReferences(converted, 'AGENTS.md');
   return converted;
@@ -3232,15 +3240,16 @@ function installCodexConfig(targetDir, agentsSrc) {
 
   for (const file of agentEntries) {
     let content = fs.readFileSync(path.join(agentsSrc, file), 'utf8');
-    // Replace full .claude/get-shit-done prefix so path resolves to codex GSD install
+    // Replace full .claude/get-shit-done prefix so path resolves to the Codex
+    // GSD install before generic .claude → .codex conversion rewrites it.
     content = content.replace(/~\/\.claude\/get-shit-done\//g, codexGsdPath);
     content = content.replace(/\$HOME\/\.claude\/get-shit-done\//g, codexGsdPath);
-    // Replace remaining .claude paths with .codex equivalents (#2320).
-    // Capture group handles both trailing-slash form (~/.claude/) and
-    // bare end-of-string form (~/.claude) in a single pass.
-    content = content.replace(/\$HOME\/\.claude(\/|$)/g, '$HOME/.codex$1');
-    content = content.replace(/~\/\.claude(\/|$)/g, '~/.codex$1');
-    content = content.replace(/\.\/\.claude(\/|$)/g, './.codex$1');
+    // Route TOML emit through the same full Claude→Codex conversion pipeline
+    // used on the `.md` emit path (#2639). Covers: slash-command rewrites,
+    // $ARGUMENTS → {{GSD_ARGS}}, /clear removal, anchored and bare .claude/
+    // paths, .claudeignore → .codexignore, and standalone "Claude" /
+    // CLAUDE.md neutralization via neutralizeAgentReferences(..., 'AGENTS.md').
+    content = convertClaudeToCodexMarkdown(content);
     const { frontmatter } = extractFrontmatterAndBody(content);
     const name = extractFrontmatterField(frontmatter, 'name') || file.replace('.md', '');
     const description = extractFrontmatterField(frontmatter, 'description') || '';
