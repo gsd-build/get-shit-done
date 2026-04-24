@@ -6,6 +6,7 @@
  */
 
 import { readFile } from 'node:fs/promises';
+import { homedir } from 'node:os';
 import { join } from 'node:path';
 import { relPlanningPath } from './workstream-utils.js';
 
@@ -63,6 +64,7 @@ export interface GSDConfig {
   workflow: WorkflowConfig;
   hooks: HooksConfig;
   agent_skills: Record<string, unknown>;
+  model_overrides: Record<string, unknown>;
   /** Project slug for branch templates; mirrors gsd-tools `config.project_code`. */
   project_code?: string | null;
   /** Interactive vs headless; mirrors gsd-tools flat `config.mode`. */
@@ -111,6 +113,7 @@ export const CONFIG_DEFAULTS: GSDConfig = {
     context_warnings: true,
   },
   agent_skills: {},
+  model_overrides: {},
   project_code: null,
   mode: 'interactive',
   _auto_chain_active: false,
@@ -118,14 +121,64 @@ export const CONFIG_DEFAULTS: GSDConfig = {
 
 // ─── Loader ──────────────────────────────────────────────────────────────────
 
+function isPlainRecord(value: unknown): value is Record<string, unknown> {
+  return typeof value === 'object' && value !== null && !Array.isArray(value);
+}
+
+function mergeConfig(base: GSDConfig, override: Record<string, unknown>): GSDConfig {
+  return {
+    ...structuredClone(base),
+    ...override,
+    git: {
+      ...base.git,
+      ...(isPlainRecord(override.git) ? override.git : {}),
+    },
+    workflow: {
+      ...base.workflow,
+      ...(isPlainRecord(override.workflow) ? override.workflow : {}),
+    },
+    hooks: {
+      ...base.hooks,
+      ...(isPlainRecord(override.hooks) ? override.hooks : {}),
+    },
+    agent_skills: {
+      ...base.agent_skills,
+      ...(isPlainRecord(override.agent_skills) ? override.agent_skills : {}),
+    },
+    model_overrides: {
+      ...base.model_overrides,
+      ...(isPlainRecord(override.model_overrides) ? override.model_overrides : {}),
+    },
+  };
+}
+
+async function loadGlobalDefaults(): Promise<Record<string, unknown>> {
+  const home = process.env.GSD_HOME || homedir();
+  const globalDefaultsPath = join(home, '.gsd', 'defaults.json');
+
+  try {
+    const raw = await readFile(globalDefaultsPath, 'utf-8');
+    const trimmed = raw.trim();
+    if (trimmed === '') return {};
+
+    const parsed: unknown = JSON.parse(trimmed);
+    return isPlainRecord(parsed) ? parsed : {};
+  } catch {
+    // User defaults are optional and should never block SDK queries.
+    return {};
+  }
+}
+
 /**
- * Load project config from `.planning/config.json`, merging with defaults.
- * Returns full defaults when file is missing or empty.
+ * Load project config from `.planning/config.json`, merging with defaults and
+ * optional user defaults from `~/.gsd/defaults.json`.
+ * Returns merged defaults when file is missing or empty.
  * Throws on malformed JSON with a helpful error message.
  */
 export async function loadConfig(projectDir: string, workstream?: string): Promise<GSDConfig> {
   const configPath = join(projectDir, relPlanningPath(workstream), 'config.json');
   const rootConfigPath = join(projectDir, '.planning', 'config.json');
+  const baseConfig = mergeConfig(CONFIG_DEFAULTS, await loadGlobalDefaults());
 
   let raw: string;
   try {
@@ -136,17 +189,17 @@ export async function loadConfig(projectDir: string, workstream?: string): Promi
       try {
         raw = await readFile(rootConfigPath, 'utf-8');
       } catch {
-        return structuredClone(CONFIG_DEFAULTS);
+        return structuredClone(baseConfig);
       }
     } else {
       // File missing — normal for new projects
-      return structuredClone(CONFIG_DEFAULTS);
+      return structuredClone(baseConfig);
     }
   }
 
   const trimmed = raw.trim();
   if (trimmed === '') {
-    return structuredClone(CONFIG_DEFAULTS);
+    return structuredClone(baseConfig);
   }
 
   let parsed: Record<string, unknown>;
@@ -161,25 +214,6 @@ export async function loadConfig(projectDir: string, workstream?: string): Promi
     throw new Error(`Config at ${configPath} must be a JSON object`);
   }
 
-  // Three-level deep merge: defaults <- parsed
-  return {
-    ...structuredClone(CONFIG_DEFAULTS),
-    ...parsed,
-    git: {
-      ...CONFIG_DEFAULTS.git,
-      ...(parsed.git as Partial<GitConfig> ?? {}),
-    },
-    workflow: {
-      ...CONFIG_DEFAULTS.workflow,
-      ...(parsed.workflow as Partial<WorkflowConfig> ?? {}),
-    },
-    hooks: {
-      ...CONFIG_DEFAULTS.hooks,
-      ...(parsed.hooks as Partial<HooksConfig> ?? {}),
-    },
-    agent_skills: {
-      ...CONFIG_DEFAULTS.agent_skills,
-      ...(parsed.agent_skills as Record<string, unknown> ?? {}),
-    },
-  };
+  // Three-level deep merge: defaults <- global defaults <- project config
+  return mergeConfig(baseConfig, parsed);
 }

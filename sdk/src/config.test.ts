@@ -6,15 +6,28 @@ import { tmpdir } from 'node:os';
 
 describe('loadConfig', () => {
   let tmpDir: string;
+  let previousGsdHome: string | undefined;
 
   beforeEach(async () => {
     tmpDir = join(tmpdir(), `gsd-config-test-${Date.now()}-${Math.random().toString(36).slice(2)}`);
+    previousGsdHome = process.env.GSD_HOME;
+    process.env.GSD_HOME = join(tmpDir, 'home');
     await mkdir(join(tmpDir, '.planning'), { recursive: true });
   });
 
   afterEach(async () => {
+    if (previousGsdHome === undefined) delete process.env.GSD_HOME;
+    else process.env.GSD_HOME = previousGsdHome;
     await rm(tmpDir, { recursive: true, force: true });
   });
+
+  async function writeGlobalDefaults(defaults: Record<string, unknown>) {
+    await mkdir(join(tmpDir, 'home', '.gsd'), { recursive: true });
+    await writeFile(
+      join(tmpDir, 'home', '.gsd', 'defaults.json'),
+      JSON.stringify(defaults),
+    );
+  }
 
   it('returns all defaults when config file is missing', async () => {
     // No config.json created
@@ -49,6 +62,73 @@ describe('loadConfig', () => {
     // Top-level defaults preserved
     expect(config.commit_docs).toBe(true);
     expect(config.parallelization).toBe(true);
+  });
+
+  it('merges global defaults when project config is missing', async () => {
+    await rm(join(tmpDir, '.planning', 'config.json'), { force: true });
+    await writeGlobalDefaults({
+      resolve_model_ids: 'omit',
+      workflow: { auto_advance: true },
+      agent_skills: { 'gsd-planner': ['codex-skill'] },
+      model_overrides: { 'gsd-planner': 'openai/gpt-5.4' },
+    });
+
+    const config = await loadConfig(tmpDir);
+
+    expect(config.resolve_model_ids).toBe('omit');
+    expect(config.workflow.auto_advance).toBe(true);
+    expect(config.workflow.research).toBe(true);
+    expect(config.agent_skills).toEqual({ 'gsd-planner': ['codex-skill'] });
+    expect(config.model_overrides).toEqual({ 'gsd-planner': 'openai/gpt-5.4' });
+  });
+
+  it('lets project config override global defaults while preserving nested fallbacks', async () => {
+    await writeGlobalDefaults({
+      resolve_model_ids: 'omit',
+      workflow: { auto_advance: true, research: false },
+      git: { branching_strategy: 'phase' },
+      agent_skills: { 'gsd-planner': 'global-skill' },
+      model_overrides: {
+        'gsd-planner': 'global-planner',
+        'gsd-executor': 'global-executor',
+      },
+    });
+    await writeFile(
+      join(tmpDir, '.planning', 'config.json'),
+      JSON.stringify({
+        resolve_model_ids: false,
+        workflow: { auto_advance: false },
+        git: { branching_strategy: 'none' },
+        agent_skills: { 'gsd-planner': 'project-skill' },
+        model_overrides: { 'gsd-planner': 'project-planner' },
+      }),
+    );
+
+    const config = await loadConfig(tmpDir);
+
+    expect(config.resolve_model_ids).toBe(false);
+    expect(config.workflow.auto_advance).toBe(false);
+    expect(config.workflow.research).toBe(false);
+    expect(config.git.branching_strategy).toBe('none');
+    expect(config.agent_skills).toEqual({ 'gsd-planner': 'project-skill' });
+    expect(config.model_overrides).toEqual({
+      'gsd-planner': 'project-planner',
+      'gsd-executor': 'global-executor',
+    });
+  });
+
+  it('ignores malformed global defaults', async () => {
+    await mkdir(join(tmpDir, 'home', '.gsd'), { recursive: true });
+    await writeFile(join(tmpDir, 'home', '.gsd', 'defaults.json'), '{bad json');
+    await writeFile(
+      join(tmpDir, '.planning', 'config.json'),
+      JSON.stringify({ model_profile: 'fast' }),
+    );
+
+    const config = await loadConfig(tmpDir);
+
+    expect(config.model_profile).toBe('fast');
+    expect(config.resolve_model_ids).toBeUndefined();
   });
 
   it('partial config merges correctly for nested objects', async () => {

@@ -28,9 +28,12 @@ import {
 } from './init.js';
 
 let tmpDir: string;
+let previousGsdHome: string | undefined;
 
 beforeEach(async () => {
   tmpDir = await mkdtemp(join(tmpdir(), 'gsd-init-'));
+  previousGsdHome = process.env.GSD_HOME;
+  process.env.GSD_HOME = join(tmpDir, 'home');
   // Create minimal .planning structure
   await mkdir(join(tmpDir, '.planning', 'phases', '09-foundation'), { recursive: true });
   await mkdir(join(tmpDir, '.planning', 'phases', '10-read-only-queries'), { recursive: true });
@@ -92,6 +95,8 @@ beforeEach(async () => {
 });
 
 afterEach(async () => {
+  if (previousGsdHome === undefined) delete process.env.GSD_HOME;
+  else process.env.GSD_HOME = previousGsdHome;
   await rm(tmpDir, { recursive: true, force: true });
 });
 
@@ -375,6 +380,20 @@ describe('initQuick', () => {
     expect(data.executor_model).toBeDefined();
     expect(data.quick_dir).toBe('.planning/quick');
     expect(data.project_root).toBe(tmpDir);
+  });
+
+  it('omits model aliases when global defaults set resolve_model_ids to omit', async () => {
+    await mkdir(join(tmpDir, 'home', '.gsd'), { recursive: true });
+    await writeFile(
+      join(tmpDir, 'home', '.gsd', 'defaults.json'),
+      JSON.stringify({ resolve_model_ids: 'omit' }),
+    );
+
+    const result = await initQuick(['codex-task'], tmpDir);
+    const data = result.data as Record<string, unknown>;
+
+    expect(data.planner_model).toBe('');
+    expect(data.executor_model).toBe('');
   });
 });
 
