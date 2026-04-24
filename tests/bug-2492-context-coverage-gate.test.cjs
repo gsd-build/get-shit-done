@@ -18,6 +18,8 @@ const PLAN_PHASE = path.join(__dirname, '..', 'get-shit-done', 'workflows', 'pla
 const VERIFY_PHASE = path.join(__dirname, '..', 'get-shit-done', 'workflows', 'verify-phase.md');
 const CONFIG_TS = path.join(__dirname, '..', 'sdk', 'src', 'config.ts');
 const CONFIG_MUTATION_TS = path.join(__dirname, '..', 'sdk', 'src', 'query', 'config-mutation.ts');
+// #2653 — allowlist moved to shared schema module.
+const CONFIG_SCHEMA_TS = path.join(__dirname, '..', 'sdk', 'src', 'query', 'config-schema.ts');
 const CONFIG_GATES_TS = path.join(__dirname, '..', 'sdk', 'src', 'query', 'config-gates.ts');
 const QUERY_INDEX_TS = path.join(__dirname, '..', 'sdk', 'src', 'query', 'index.ts');
 
@@ -144,8 +146,9 @@ describe('SDK wiring for #2492 gates', () => {
     );
   });
 
-  test('config-mutation.ts VALID_CONFIG_KEYS allows workflow.context_coverage_gate', () => {
-    const c = fs.readFileSync(CONFIG_MUTATION_TS, 'utf-8');
+  test('config-schema.ts VALID_CONFIG_KEYS allows workflow.context_coverage_gate', () => {
+    // #2653 — allowlist moved out of config-mutation.ts into shared config-schema.ts.
+    const c = fs.readFileSync(CONFIG_SCHEMA_TS, 'utf-8');
     assert.ok(
       c.includes("'workflow.context_coverage_gate'"),
       'workflow.context_coverage_gate must be in VALID_CONFIG_KEYS',

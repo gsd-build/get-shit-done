@@ -1,19 +1,21 @@
-'use strict';
-
 /**
- * Single source of truth for valid config key paths.
+ * SDK-side mirror of get-shit-done/bin/lib/config-schema.cjs.
  *
- * Imported by:
- *   - config.cjs (isValidConfigKey validator)
- *   - tests/config-schema-docs-parity.test.cjs (CI drift guard)
+ * Single source of truth for valid config key paths accepted by
+ * `config-set`. MUST stay in sync with the CJS schema — enforced
+ * by tests/config-schema-sdk-parity.test.cjs (CI drift guard).
  *
- * Adding a key here without documenting it in docs/CONFIGURATION.md will
- * fail the parity test. Adding a key to docs/CONFIGURATION.md without
- * adding it here will cause config-set to reject it at runtime.
+ * If you add/remove a key here, make the identical change in
+ * get-shit-done/bin/lib/config-schema.cjs (and vice versa). The
+ * parity test asserts the two allowlists are set-equal and that
+ * DYNAMIC_KEY_PATTERN_SOURCES produce identical regex source strings.
+ *
+ * See #2653 — CJS/SDK drift caused config-set to reject documented
+ * keys. #2479 added CJS↔docs parity; #2653 adds CJS↔SDK parity.
  */
 
 /** Exact-match config key paths accepted by config-set. */
-const VALID_CONFIG_KEYS = new Set([
+export const VALID_CONFIG_KEYS: ReadonlySet<string> = new Set([
   'mode', 'granularity', 'parallelization', 'commit_docs', 'model_profile',
   'search_gitignored', 'brave_search', 'firecrawl', 'exa_search',
   'workflow.research', 'workflow.plan_check', 'workflow.verifier',
@@ -70,25 +72,46 @@ const VALID_CONFIG_KEYS = new Set([
 
 /**
  * Dynamic-pattern validators — keys matching these regexes are also accepted.
- * Each entry has a `test` function and a human-readable `description`.
+ * Each entry's `source` MUST equal the corresponding CJS regex `.source`
+ * (the parity test enforces this).
  */
-const DYNAMIC_KEY_PATTERNS = [
-  { test: (k) => /^agent_skills\.[a-zA-Z0-9_-]+$/.test(k),                   description: 'agent_skills.<agent-type>' },
-  { test: (k) => /^review\.models\.[a-zA-Z0-9_-]+$/.test(k),                 description: 'review.models.<cli-name>' },
-  { test: (k) => /^features\.[a-zA-Z0-9_]+$/.test(k),                        description: 'features.<feature_name>' },
-  { test: (k) => /^claude_md_assembly\.blocks\.[a-zA-Z0-9_]+$/.test(k),      description: 'claude_md_assembly.blocks.<section>' },
+export interface DynamicKeyPattern {
+  readonly test: (k: string) => boolean;
+  readonly description: string;
+  readonly source: string;
+}
+
+export const DYNAMIC_KEY_PATTERNS: readonly DynamicKeyPattern[] = [
+  {
+    source: '^agent_skills\\.[a-zA-Z0-9_-]+$',
+    description: 'agent_skills.<agent-type>',
+    test: (k) => /^agent_skills\.[a-zA-Z0-9_-]+$/.test(k),
+  },
+  {
+    source: '^review\\.models\\.[a-zA-Z0-9_-]+$',
+    description: 'review.models.<cli-name>',
+    test: (k) => /^review\.models\.[a-zA-Z0-9_-]+$/.test(k),
+  },
+  {
+    source: '^features\\.[a-zA-Z0-9_]+$',
+    description: 'features.<feature_name>',
+    test: (k) => /^features\.[a-zA-Z0-9_]+$/.test(k),
+  },
+  {
+    source: '^claude_md_assembly\\.blocks\\.[a-zA-Z0-9_]+$',
+    description: 'claude_md_assembly.blocks.<section>',
+    test: (k) => /^claude_md_assembly\.blocks\.[a-zA-Z0-9_]+$/.test(k),
+  },
   // #2517 — runtime-aware model profile overrides: model_profile_overrides.<runtime>.<tier>
-  // <runtime> is a free string (so users can map non-built-in runtimes); <tier> is enum-restricted.
-  { test: (k) => /^model_profile_overrides\.[a-zA-Z0-9_-]+\.(opus|sonnet|haiku)$/.test(k),
-    description: 'model_profile_overrides.<runtime>.<opus|sonnet|haiku>' },
+  {
+    source: '^model_profile_overrides\\.[a-zA-Z0-9_-]+\\.(opus|sonnet|haiku)$',
+    description: 'model_profile_overrides.<runtime>.<opus|sonnet|haiku>',
+    test: (k) => /^model_profile_overrides\.[a-zA-Z0-9_-]+\.(opus|sonnet|haiku)$/.test(k),
+  },
 ];
 
-/**
- * Returns true if keyPath is a valid config key (exact or dynamic pattern).
- */
-function isValidConfigKey(keyPath) {
+/** Returns true if keyPath is a valid config key (exact or dynamic pattern). */
+export function isValidConfigKeyPath(keyPath: string): boolean {
   if (VALID_CONFIG_KEYS.has(keyPath)) return true;
   return DYNAMIC_KEY_PATTERNS.some((p) => p.test(keyPath));
 }
-
-module.exports = { VALID_CONFIG_KEYS, DYNAMIC_KEY_PATTERNS, isValidConfigKey };
