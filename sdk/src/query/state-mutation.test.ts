@@ -420,6 +420,166 @@ describe('stateAddDecision', () => {
   });
 });
 
+// ─── stateAddRoadmapEvolution (bug #2662) ──────────────────────────────────
+
+describe('stateAddRoadmapEvolution', () => {
+  let tmpDir: string;
+
+  beforeEach(async () => {
+    tmpDir = await mkdtemp(join(tmpdir(), 'gsd-state-evo-'));
+  });
+
+  afterEach(async () => {
+    await rm(tmpDir, { recursive: true, force: true });
+  });
+
+  it('creates the Roadmap Evolution subsection when missing and appends the entry', async () => {
+    await setupTestProject(tmpDir); // MINIMAL_STATE has no Roadmap Evolution.
+    const { stateAddRoadmapEvolution } = await import('./state-mutation.js');
+
+    const result = await stateAddRoadmapEvolution(
+      ['--phase', '72.1', '--action', 'inserted', '--after', '72',
+       '--note', 'Fix critical auth bug', '--urgent'],
+      tmpDir,
+    );
+    const data = result.data as Record<string, unknown>;
+    expect(data.added).toBe(true);
+    expect(data.entry).toBe('- Phase 72.1 inserted after Phase 72: Fix critical auth bug (URGENT)');
+
+    const content = await readFile(join(tmpDir, '.planning', 'STATE.md'), 'utf-8');
+    expect(content).toContain('### Roadmap Evolution');
+    expect(content).toContain('- Phase 72.1 inserted after Phase 72: Fix critical auth bug (URGENT)');
+    // Subsection sits under Accumulated Context.
+    const idxAccum = content.indexOf('## Accumulated Context');
+    const idxEvo = content.indexOf('### Roadmap Evolution');
+    expect(idxAccum).toBeGreaterThan(-1);
+    expect(idxEvo).toBeGreaterThan(idxAccum);
+  });
+
+  it('appends to an existing Roadmap Evolution subsection preserving prior entries', async () => {
+    const stateWithEvo = `---
+gsd_state_version: 1.0
+milestone: v3.0
+milestone_name: SDK-First Migration
+status: executing
+---
+
+# Project State
+
+## Current Position
+
+Phase: 10 — EXECUTING
+
+## Accumulated Context
+
+### Decisions
+
+None yet.
+
+### Roadmap Evolution
+
+- Phase 5 added: Baseline work
+- Phase 6 added: Follow-up
+
+## Session Continuity
+
+Last session: 2026-04-07T10:00:00.000Z
+`;
+    await setupTestProject(tmpDir, stateWithEvo);
+    const { stateAddRoadmapEvolution } = await import('./state-mutation.js');
+
+    const result = await stateAddRoadmapEvolution(
+      ['--phase', '72.1', '--action', 'inserted', '--after', '72', '--note', 'Urgent fix', '--urgent'],
+      tmpDir,
+    );
+    expect((result.data as Record<string, unknown>).added).toBe(true);
+
+    const content = await readFile(join(tmpDir, '.planning', 'STATE.md'), 'utf-8');
+    expect(content).toContain('- Phase 5 added: Baseline work');
+    expect(content).toContain('- Phase 6 added: Follow-up');
+    expect(content).toContain('- Phase 72.1 inserted after Phase 72: Urgent fix (URGENT)');
+
+    // Order preserved: existing entries come before the new one.
+    const idx5 = content.indexOf('Phase 5 added');
+    const idx6 = content.indexOf('Phase 6 added');
+    const idxNew = content.indexOf('Phase 72.1 inserted');
+    expect(idx5).toBeLessThan(idx6);
+    expect(idx6).toBeLessThan(idxNew);
+  });
+
+  it('dedupes exact-match entries and reports reason=duplicate', async () => {
+    await setupTestProject(tmpDir);
+    const { stateAddRoadmapEvolution } = await import('./state-mutation.js');
+
+    const argv = ['--phase', '72.1', '--action', 'inserted', '--after', '72', '--note', 'Fix X', '--urgent'];
+
+    const first = await stateAddRoadmapEvolution(argv, tmpDir);
+    expect((first.data as Record<string, unknown>).added).toBe(true);
+
+    const second = await stateAddRoadmapEvolution(argv, tmpDir);
+    const data = second.data as Record<string, unknown>;
+    expect(data.added).toBe(false);
+    expect(data.reason).toBe('duplicate');
+
+    // Entry appears exactly once.
+    const content = await readFile(join(tmpDir, '.planning', 'STATE.md'), 'utf-8');
+    const matches = content.match(/Phase 72\.1 inserted after Phase 72: Fix X \(URGENT\)/g) || [];
+    expect(matches.length).toBe(1);
+  });
+
+  it('is idempotent: calling twice with same input leaves a single entry', async () => {
+    await setupTestProject(tmpDir);
+    const { stateAddRoadmapEvolution } = await import('./state-mutation.js');
+    const argv = ['--phase', '9', '--action', 'added', '--note', 'new work'];
+
+    await stateAddRoadmapEvolution(argv, tmpDir);
+    await stateAddRoadmapEvolution(argv, tmpDir);
+
+    const content = await readFile(join(tmpDir, '.planning', 'STATE.md'), 'utf-8');
+    const matches = content.match(/Phase 9 added: new work/g) || [];
+    expect(matches.length).toBe(1);
+  });
+
+  it('throws GSDError(Validation) when phase is missing', async () => {
+    await setupTestProject(tmpDir);
+    const { stateAddRoadmapEvolution } = await import('./state-mutation.js');
+    const { GSDError, ErrorClassification } = await import('../errors.js');
+
+    await expect(stateAddRoadmapEvolution(
+      ['--action', 'inserted'],
+      tmpDir,
+    )).rejects.toSatisfy((err: unknown) => {
+      return err instanceof GSDError && err.classification === ErrorClassification.Validation;
+    });
+  });
+
+  it('throws GSDError(Validation) when action is missing', async () => {
+    await setupTestProject(tmpDir);
+    const { stateAddRoadmapEvolution } = await import('./state-mutation.js');
+    const { GSDError, ErrorClassification } = await import('../errors.js');
+
+    await expect(stateAddRoadmapEvolution(
+      ['--phase', '72.1'],
+      tmpDir,
+    )).rejects.toSatisfy((err: unknown) => {
+      return err instanceof GSDError && err.classification === ErrorClassification.Validation;
+    });
+  });
+
+  it('throws GSDError(Validation) on invalid action', async () => {
+    await setupTestProject(tmpDir);
+    const { stateAddRoadmapEvolution } = await import('./state-mutation.js');
+    const { GSDError, ErrorClassification } = await import('../errors.js');
+
+    await expect(stateAddRoadmapEvolution(
+      ['--phase', '72.1', '--action', 'frobnicated'],
+      tmpDir,
+    )).rejects.toSatisfy((err: unknown) => {
+      return err instanceof GSDError && err.classification === ErrorClassification.Validation;
+    });
+  });
+});
+
 // ─── stateRecordSession ─────────────────────────────────────────────────────
 
 describe('stateRecordSession', () => {

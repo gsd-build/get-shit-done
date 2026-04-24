@@ -886,6 +886,146 @@ export const stateResolveBlocker: QueryHandler = async (args, projectDir, workst
   } };
 };
 
+// ─── state.add-roadmap-evolution ─────────────────────────────────────────
+
+const VALID_ROADMAP_EVOLUTION_ACTIONS = new Set([
+  'inserted', 'removed', 'moved', 'edited', 'added',
+]);
+
+/**
+ * Format a canonical Roadmap Evolution entry line.
+ *
+ * Shapes match existing workflow templates (`insert-phase.md`, `add-phase.md`):
+ *   - inserted: `- Phase {phase} inserted after Phase {after}: {note} (URGENT)`
+ *   - added:    `- Phase {phase} added: {note}`
+ *   - removed:  `- Phase {phase} removed: {note}`
+ *   - moved:    `- Phase {phase} moved: {note}`
+ *   - edited:   `- Phase {phase} edited: {note}`
+ */
+function formatRoadmapEvolutionEntry(opts: {
+  phase: string;
+  action: string;
+  note?: string | null;
+  after?: string | null;
+  urgent?: boolean;
+}): string {
+  const { phase, action, note, after, urgent } = opts;
+  const trimmedNote = note ? note.trim() : '';
+  let line: string;
+  if (action === 'inserted') {
+    const afterClause = after ? ` after Phase ${after}` : '';
+    line = `- Phase ${phase} inserted${afterClause}`;
+    if (trimmedNote) line += `: ${trimmedNote}`;
+    if (urgent) line += ' (URGENT)';
+  } else {
+    // added | removed | moved | edited
+    line = `- Phase ${phase} ${action}`;
+    if (trimmedNote) line += `: ${trimmedNote}`;
+  }
+  return line;
+}
+
+/**
+ * Query handler for `state.add-roadmap-evolution`.
+ *
+ * Appends a single entry to the `### Roadmap Evolution` subsection under
+ * `## Accumulated Context` in STATE.md. Creates the subsection if missing.
+ * Deduplicates on exact line match against existing entries.
+ *
+ * Canonical replacement for the raw `Edit`/`Write` instructions in
+ * `insert-phase.md` / `add-phase.md` step "update_project_state" so that
+ * projects with a `protect-files.sh` PreToolUse hook blocking direct
+ * STATE.md writes still update the Roadmap Evolution log.
+ *
+ * argv: `--phase`, `--action` (inserted|removed|moved|edited|added),
+ *       `--note` (optional), `--after` (optional, for `inserted`),
+ *       `--urgent` (boolean flag, appends "(URGENT)" when action=inserted).
+ *
+ * Returns `{ added: true, entry }` on success, or
+ * `{ added: false, reason: 'duplicate', entry }` when an identical line
+ * already exists.
+ *
+ * Throws `GSDError` with `ErrorClassification.Validation` when required
+ * inputs are missing or `--action` is not in the allowed set.
+ *
+ * Atomicity: goes through `readModifyWriteStateMd` which holds a lockfile
+ * across read -> transform -> write. Matches sibling mutation handlers.
+ */
+export const stateAddRoadmapEvolution: QueryHandler = async (args, projectDir, workstream) => {
+  const parsed = parseNamedArgs(args, ['phase', 'action', 'note', 'after'], ['urgent']);
+  const phase = (parsed.phase as string | null) ?? null;
+  const action = (parsed.action as string | null) ?? null;
+  const note = (parsed.note as string | null) ?? null;
+  const after = (parsed.after as string | null) ?? null;
+  const urgent = Boolean(parsed.urgent);
+
+  if (!phase) {
+    throw new GSDError('phase required for state.add-roadmap-evolution', ErrorClassification.Validation);
+  }
+  if (!action) {
+    throw new GSDError('action required for state.add-roadmap-evolution', ErrorClassification.Validation);
+  }
+  if (!VALID_ROADMAP_EVOLUTION_ACTIONS.has(action)) {
+    throw new GSDError(
+      `invalid action "${action}" (expected one of: ${Array.from(VALID_ROADMAP_EVOLUTION_ACTIONS).join(', ')})`,
+      ErrorClassification.Validation,
+    );
+  }
+
+  const entry = formatRoadmapEvolutionEntry({ phase, action, note, after, urgent });
+
+  let added = false;
+  let duplicate = false;
+
+  await readModifyWriteStateMd(projectDir, (content) => {
+    // Match `### Roadmap Evolution` subsection up to the next heading or EOF.
+    const subsectionPattern = /(###\s*Roadmap Evolution\s*\n)([\s\S]*?)(?=\n###?\s|\n##[^#]|$)/i;
+    const match = content.match(subsectionPattern);
+
+    if (match) {
+      let sectionBody = match[2];
+      // Dedupe: exact line match against any existing entry line.
+      const existingLines = sectionBody.split('\n').map(l => l.trim());
+      if (existingLines.some(l => l === entry.trim())) {
+        duplicate = true;
+        return content;
+      }
+      // Strip placeholder "None" / "None yet." lines.
+      sectionBody = sectionBody.replace(/^None(?:\s+yet)?\.?\s*$/gim, '');
+      sectionBody = sectionBody.trimEnd() + '\n' + entry + '\n';
+      content = content.replace(subsectionPattern, (_m, header: string) => `${header}${sectionBody}`);
+      added = true;
+      return content;
+    }
+
+    // Subsection missing — create it.
+    const accumulatedPattern = /(##\s*Accumulated Context\s*\n)/i;
+    const newSubsection = `\n### Roadmap Evolution\n\n${entry}\n`;
+
+    if (accumulatedPattern.test(content)) {
+      // Insert immediately after the "## Accumulated Context" header.
+      content = content.replace(accumulatedPattern, (_m, header: string) => `${header}${newSubsection}`);
+      added = true;
+      return content;
+    }
+
+    // No Accumulated Context section either — append both at EOF.
+    const suffix = `\n## Accumulated Context\n${newSubsection}`;
+    content = content.trimEnd() + suffix + '\n';
+    added = true;
+    return content;
+  }, workstream);
+
+  if (duplicate) {
+    return { data: { added: false, reason: 'duplicate', entry } };
+  }
+  if (added) {
+    return { data: { added: true, entry } };
+  }
+  // Unreachable given the logic above, but defensive.
+  return { data: { added: false, reason: 'unknown', entry } };
+};
+
 /**
  * Query handler for state.record-session command.
  * argv: `--stopped-at`, `--resume-file` (see `cmdStateRecordSession` in `state.cjs`).

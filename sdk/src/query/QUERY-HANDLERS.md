@@ -62,6 +62,8 @@ No `gsd-tools.cjs` mirror — agents use these instead of shell `ls`/`find`/`gre
 
 Handlers for `**state.signal-waiting`**, `**state.signal-resume**`, `**state.validate**`, `**state.sync**` (supports `--verify` dry-run), and `**state.prune**` live in `state-mutation.ts`, with dotted and `state …` space aliases in `index.ts`.
 
+**`state.add-roadmap-evolution`** (bug #2662) — appends one entry to the `### Roadmap Evolution` subsection under `## Accumulated Context` in STATE.md, creating the subsection if missing. argv: `--phase`, `--action` (`inserted|removed|moved|edited|added`), optional `--note`, `--after` (for `inserted`), and `--urgent` flag. Returns `{ added: true, entry }` or `{ added: false, reason: 'duplicate', entry }`. Throws `GSDError(Validation)` when `--phase` / `--action` are missing or action is not in the allowed set. Canonical replacement for raw `Edit`/`Write` on STATE.md in `insert-phase.md` / `add-phase.md` workflows — required when projects ship a `protect-files.sh` PreToolUse hook that blocks direct STATE.md writes.
+
 **`state.json` vs `state.load` (different CJS commands):**
 
 - **`state.json`** / `state json` — port of **`cmdStateJson`** (`state.ts` `stateJson`): rebuilt STATE.md frontmatter JSON. Read-only golden: `read-only-parity.integration.test.ts` compares to CJS `state json` with **`last_updated`** stripped.
