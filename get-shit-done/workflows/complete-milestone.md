@@ -41,7 +41,8 @@ When a milestone completes:
 Before proceeding with milestone close, run the comprehensive open artifact audit.
 
 ```bash
-gsd-sdk query audit-open```
+gsd-sdk query audit-open
+```
 
 If the output contains open items (any section with count > 0):
 

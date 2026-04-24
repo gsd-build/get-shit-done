@@ -271,7 +271,8 @@ Write updated analysis JSON back to `$ANALYSIS_PATH`.
 Display: "◆ Writing profile..."
 
 ```bash
-gsd-sdk query write-profile --input "$ANALYSIS_PATH" --json```
+gsd-sdk query write-profile --input "$ANALYSIS_PATH" --json
+```
 
 Display: "✓ Profile written to $HOME/.claude/get-shit-done/USER-PROFILE.md"
 
@@ -349,21 +350,24 @@ Generate selected artifacts sequentially (file I/O is fast, no benefit from para
 **For /gsd-dev-preferences (if selected):**
 
 ```bash
-gsd-sdk query generate-dev-preferences --analysis "$ANALYSIS_PATH" --json```
+gsd-sdk query generate-dev-preferences --analysis "$ANALYSIS_PATH" --json
+```
 
 Display: "✓ Generated /gsd-dev-preferences at $HOME/.claude/commands/gsd/dev-preferences.md"
 
 **For CLAUDE.md profile section (if selected):**
 
 ```bash
-gsd-sdk query generate-claude-profile --analysis "$ANALYSIS_PATH" --json```
+gsd-sdk query generate-claude-profile --analysis "$ANALYSIS_PATH" --json
+```
 
 Display: "✓ Added profile section to CLAUDE.md"
 
 **For Global CLAUDE.md (if selected):**
 
 ```bash
-gsd-sdk query generate-claude-profile --analysis "$ANALYSIS_PATH" --global --json```
+gsd-sdk query generate-claude-profile --analysis "$ANALYSIS_PATH" --global --json
+```
 
 Display: "✓ Added profile section to $HOME/.claude/CLAUDE.md"
 

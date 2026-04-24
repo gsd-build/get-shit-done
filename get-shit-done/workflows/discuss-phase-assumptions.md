@@ -619,7 +619,8 @@ Check for auto-advance trigger:
 2. Sync chain flag:
    ```bash
    if [[ ! "$ARGUMENTS" =~ --auto ]]; then
-     gsd-sdk query config-set workflow._auto_chain_active false || true   fi
+     gsd-sdk query config-set workflow._auto_chain_active false || true
+   fi
    ```
 3. Read consolidated auto-mode (`active` = chain flag OR user preference):
    ```bash

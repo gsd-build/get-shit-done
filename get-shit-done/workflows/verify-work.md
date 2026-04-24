@@ -464,7 +464,8 @@ Run phase artifact scan to surface any open items before marking phase verified:
 `audit-open` is CJS-only until registered on `gsd-sdk query`:
 
 ```bash
-gsd-sdk query audit-open --json```
+gsd-sdk query audit-open --json
+```
 
 Parse the JSON output. For the CURRENT PHASE ONLY, surface:
 - UAT files with status != 'complete'

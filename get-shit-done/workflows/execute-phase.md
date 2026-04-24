@@ -130,7 +130,8 @@ inline path for each plan.
 ```bash
 # REQUIRED: prevents stale auto-chain from previous --auto runs
 if [[ ! "$ARGUMENTS" =~ --auto ]]; then
-  gsd-sdk query config-set workflow._auto_chain_active false || truefi
+  gsd-sdk query config-set workflow._auto_chain_active false || true
+fi
 ```
 </step>
 

@@ -1470,7 +1470,8 @@ Check for auto-advance trigger using values already loaded in step 1:
 3. **Sync chain flag with intent** — if user invoked manually (no `--auto` and no `--chain`), clear the ephemeral chain flag from any previous interrupted `--auto` chain. This does NOT touch `workflow.auto_advance` (the user's persistent settings preference):
    ```bash
    if [[ ! "$ARGUMENTS" =~ --auto ]] && [[ ! "$ARGUMENTS" =~ --chain ]]; then
-     gsd-sdk query config-set workflow._auto_chain_active false || true   fi
+     gsd-sdk query config-set workflow._auto_chain_active false || true
+   fi
    ```
 
 Set local variables from INIT (parsed once in step 1):
