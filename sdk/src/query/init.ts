@@ -794,27 +794,34 @@ export const initMilestoneOp: QueryHandler = async (_args, projectDir) => {
     roadmapPhaseNumbers = extractPhasesFromSection(currentSection).map(p => p.number);
   } catch { /* intentionally empty */ }
 
-  // Build the on-disk index: map integer phase number -> dir name. Used to
-  // decide which roadmap phases have been materialized with summaries.
+  // Build the on-disk index keyed by the canonical full phase token (e.g.
+  // "3", "3A", "3.1") so distinct tokens with the same integer prefix never
+  // collide. Roadmap writes "Phase 3", "Phase 3A", and "Phase 3.1" as
+  // distinct phases and disk dirs preserve those tokens.
+  // Canonicalize a phase token by stripping leading zeros from the integer
+  // head while preserving any [A-Z]? suffix and dotted segments. So "03" →
+  // "3", "03A" → "3A", "03.1" → "3.1", "3A" → "3A". This lets disk dirs that
+  // pad ("03-alpha") match roadmap tokens ("Phase 3") without ever collapsing
+  // distinct tokens like "3" / "3A" / "3.1" into the same bucket.
+  const canonicalizePhase = (tok: string): string => {
+    const m = tok.match(/^(\d+)([A-Z]?(?:\.\d+)*)$/);
+    return m ? String(parseInt(m[1], 10)) + m[2] : tok;
+  };
   const diskPhaseDirs: Map<string, string> = new Map();
   try {
     const entries = readdirSync(phasesDir, { withFileTypes: true });
     for (const e of entries) {
       if (!e.isDirectory()) continue;
-      const m = e.name.match(/^(\d+(?:\.\d+)*)/);
+      const m = e.name.match(/^(\d+[A-Z]?(?:\.\d+)*)/);
       if (!m) continue;
-      // Normalize to unpadded integer-ish key (matches how roadmap writes "Phase 3").
-      const key = String(parseInt(m[1], 10));
-      diskPhaseDirs.set(key, e.name);
-      diskPhaseDirs.set(m[1], e.name); // also keep padded form for direct match
+      diskPhaseDirs.set(canonicalizePhase(m[1]), e.name);
     }
   } catch { /* intentionally empty */ }
 
   if (roadmapPhaseNumbers.length > 0) {
     phaseCount = roadmapPhaseNumbers.length;
     for (const num of roadmapPhaseNumbers) {
-      const key = String(parseInt(num, 10));
-      const dirName = diskPhaseDirs.get(key) ?? diskPhaseDirs.get(num);
+      const dirName = diskPhaseDirs.get(canonicalizePhase(num));
       if (!dirName) continue;
       try {
         const phaseFiles = readdirSync(join(phasesDir, dirName));

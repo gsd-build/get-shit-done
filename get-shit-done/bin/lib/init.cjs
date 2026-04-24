@@ -845,23 +845,30 @@ function cmdInitMilestoneOp(cwd, raw) {
     }
   } catch { /* intentionally empty */ }
 
-  // Build disk index: integer/padded phase number -> dir name.
+  // Canonicalize a phase token by stripping leading zeros from the integer
+  // head while preserving any [A-Z]? suffix and dotted segments. So "03" →
+  // "3", "03A" → "3A", "03.1" → "3.1", "3A" → "3A". Disk dirs that pad
+  // ("03-alpha") then match roadmap tokens ("Phase 3") without ever
+  // collapsing distinct tokens like "3" / "3A" / "3.1" into the same bucket.
+  const canonicalizePhase = (tok) => {
+    const m = tok.match(/^(\d+)([A-Z]?(?:\.\d+)*)$/);
+    return m ? String(parseInt(m[1], 10)) + m[2] : tok;
+  };
   const diskPhaseDirs = new Map();
   try {
     const entries = fs.readdirSync(phasesDir, { withFileTypes: true });
     for (const e of entries) {
       if (!e.isDirectory()) continue;
-      const m = e.name.match(/^(\d+(?:\.\d+)*)/);
+      const m = e.name.match(/^(\d+[A-Z]?(?:\.\d+)*)/);
       if (!m) continue;
-      diskPhaseDirs.set(String(parseInt(m[1], 10)), e.name);
-      diskPhaseDirs.set(m[1], e.name);
+      diskPhaseDirs.set(canonicalizePhase(m[1]), e.name);
     }
   } catch { /* intentionally empty */ }
 
   if (roadmapPhaseNumbers.length > 0) {
     phaseCount = roadmapPhaseNumbers.length;
     for (const num of roadmapPhaseNumbers) {
-      const dirName = diskPhaseDirs.get(String(parseInt(num, 10))) || diskPhaseDirs.get(num);
+      const dirName = diskPhaseDirs.get(canonicalizePhase(num));
       if (!dirName) continue;
       try {
         const phaseFiles = fs.readdirSync(path.join(phasesDir, dirName));
