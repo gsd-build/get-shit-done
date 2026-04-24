@@ -121,7 +121,8 @@ export const CONFIG_DEFAULTS: GSDConfig = {
 
 /**
  * Load project config from `.planning/config.json`, merging with defaults.
- * Returns full defaults when file is missing or empty.
+ * When project config is missing or empty, layers user defaults
+ * (`~/.gsd/defaults.json`) over built-in defaults.
  * Throws on malformed JSON with a helpful error message.
  */
 /**

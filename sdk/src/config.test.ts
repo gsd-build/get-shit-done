@@ -8,6 +8,7 @@ describe('loadConfig', () => {
   let tmpDir: string;
   let fakeHome: string;
   let prevHome: string | undefined;
+  let prevGsdHome: string | undefined;
 
   beforeEach(async () => {
     tmpDir = join(tmpdir(), `gsd-config-test-${Date.now()}-${Math.random().toString(36).slice(2)}`);
@@ -17,6 +18,9 @@ describe('loadConfig', () => {
     await mkdir(fakeHome, { recursive: true });
     prevHome = process.env.HOME;
     process.env.HOME = fakeHome;
+    // Also isolate GSD_HOME (loadUserDefaults prefers it over HOME).
+    prevGsdHome = process.env.GSD_HOME;
+    delete process.env.GSD_HOME;
   });
 
   afterEach(async () => {
@@ -24,6 +28,8 @@ describe('loadConfig', () => {
     await rm(fakeHome, { recursive: true, force: true });
     if (prevHome === undefined) delete process.env.HOME;
     else process.env.HOME = prevHome;
+    if (prevGsdHome === undefined) delete process.env.GSD_HOME;
+    else process.env.GSD_HOME = prevGsdHome;
   });
 
   async function writeUserDefaults(defaults: unknown) {
