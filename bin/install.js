@@ -2059,24 +2059,29 @@ function generateCodexConfigBlock(agents, targetDir) {
  * A section runs from its header to the next `[` header or EOF.
  */
 function stripCodexGsdAgentSections(content) {
-  // Legacy `[agents.gsd-<name>]` map tables.
-  let result = content.replace(/^\[agents\.gsd-[^\]]+\]\n(?:(?!\[)[^\n]*\n?)*/gm, '');
+  // Use the TOML-aware section parser so we never absorb adjacent user-authored
+  // tables — even if their headers are indented or otherwise oddly placed.
+  const sections = getTomlTableSections(content).filter((section) => {
+    // Legacy `[agents.gsd-<name>]` map tables (pre-#2645).
+    if (!section.array && /^agents\.gsd-/.test(section.path)) {
+      return true;
+    }
 
-  // Current `[[agents]]` array-of-tables. Only strip when the block's
-  // `name = "gsd-..."` — preserve user-authored [[agents]] entries.
-  result = result.replace(
-    /^\[\[agents\]\][ \t]*\r?\n(?:(?!\[)[^\n]*\n?)*/gm,
-    (block) => {
-      // Match either "name = \"gsd-...\"" or single-quoted 'gsd-...'.
-      const nameMatch = block.match(/^[ \t]*name[ \t]*=[ \t]*["']([^"']+)["']/m);
-      if (nameMatch && /^gsd-/.test(nameMatch[1])) {
-        return '';
-      }
-      return block;
-    },
+    // Current `[[agents]]` array-of-tables — only strip blocks whose
+    // `name = "gsd-..."`, preserving user-authored [[agents]] entries.
+    if (section.array && section.path === 'agents') {
+      const body = content.slice(section.headerEnd, section.end);
+      const nameMatch = body.match(/^[ \t]*name[ \t]*=[ \t]*["']([^"']+)["']/m);
+      return Boolean(nameMatch && /^gsd-/.test(nameMatch[1]));
+    }
+
+    return false;
+  });
+
+  return removeContentRanges(
+    content,
+    sections.map(({ start, end }) => ({ start, end })),
   );
-
-  return result;
 }
 
 /**

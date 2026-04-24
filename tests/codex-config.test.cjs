@@ -497,6 +497,48 @@ describe('stripGsdFromCodexConfig', () => {
     assert.ok(!/name = "gsd-executor"/.test(result), 'removes managed GSD [[agents]] entry');
     assert.ok(result.includes('name = "custom-agent"'), 'preserves user [[agents]] entry');
   });
+
+  test('#2645: handles mixed legacy + new shapes and multiple user/gsd entries in one file', () => {
+    // Multiple GSD entries (both legacy map and new array-of-tables) interleaved
+    // with multiple user-authored agents in both shapes — none of the user
+    // entries may be removed and all GSD entries must be stripped.
+    const content = [
+      '[agents.gsd-executor]',
+      'description = "legacy gsd"',
+      'config_file = "agents/gsd-executor.toml"',
+      '',
+      '[agents.custom-legacy]',
+      'description = "user legacy"',
+      '',
+      '[[agents]]',
+      'name = "gsd-planner"',
+      'description = "new gsd"',
+      '',
+      '[[agents]]',
+      'name = "my-helper"',
+      'description = "user new"',
+      '',
+      '[[agents]]',
+      "name = 'gsd-debugger'",
+      'description = "single-quoted gsd"',
+      '',
+      '[[agents]]',
+      'name = "another-user"',
+      'description = "second user agent"',
+      '',
+    ].join('\n');
+    const result = stripGsdFromCodexConfig(content);
+    // All GSD entries removed.
+    assert.ok(!result.includes('gsd-executor'), 'removes legacy gsd-executor');
+    assert.ok(!/name\s*=\s*"gsd-planner"/.test(result), 'removes new gsd-planner');
+    assert.ok(!/name\s*=\s*'gsd-debugger'/.test(result), 'removes single-quoted gsd-debugger');
+    // All user-authored entries preserved.
+    assert.ok(result.includes('[agents.custom-legacy]'), 'preserves user legacy [agents.custom-legacy]');
+    assert.ok(result.includes('user legacy'), 'preserves user legacy body');
+    assert.ok(result.includes('name = "my-helper"'), 'preserves user new [[agents]]');
+    assert.ok(result.includes('name = "another-user"'), 'preserves second user [[agents]]');
+    assert.ok(result.includes('second user agent'), 'preserves second user body');
+  });
 });
 
 // ─── mergeCodexConfig ───────────────────────────────────────────────────────────
