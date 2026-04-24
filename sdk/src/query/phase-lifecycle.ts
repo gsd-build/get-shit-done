@@ -1258,10 +1258,19 @@ export const phaseComplete: QueryHandler = async (args, projectDir, workstream) 
   let isLastPhase = true;
 
   try {
+    // Parallel-milestone fix: if STATE.milestone differs from the milestone
+    // that owns the completed phase, the milestone filter excludes sibling
+    // phases and the handler falsely returns is_last_phase: true. Detect the
+    // mismatch by checking whether the completed phase passes the filter; if
+    // not, drop the filter for next-phase detection.
     const isDirInMilestone = await getMilestonePhaseFilter(projectDir, workstream);
+    const completedPhaseInCurrentMilestone = isDirInMilestone(`${phaseNum}-x`)
+      || isDirInMilestone(phaseNum);
     const entries = await readdir(paths.phases, { withFileTypes: true });
-    const dirs = entries.filter(e => e.isDirectory()).map(e => e.name)
-      .filter(isDirInMilestone)
+    const baseDirs = entries.filter(e => e.isDirectory()).map(e => e.name);
+    const dirs = (completedPhaseInCurrentMilestone
+        ? baseDirs.filter(isDirInMilestone)
+        : baseDirs)
       .sort((a, b) => comparePhaseNum(a, b));
 
     for (const dir of dirs) {
@@ -1281,7 +1290,13 @@ export const phaseComplete: QueryHandler = async (args, projectDir, workstream) 
   if (isLastPhase && existsSync(paths.roadmap)) {
     try {
       const roadmapContent = await readFile(paths.roadmap, 'utf-8');
-      const roadmapForPhases = await extractCurrentMilestone(roadmapContent, projectDir);
+      // Same parallel-milestone fix: if the milestone slice does not contain
+      // the completed phase, scan the full ROADMAP instead.
+      const milestoneSlice = await extractCurrentMilestone(roadmapContent, projectDir);
+      const sliceContainsCompletedPhase = new RegExp(
+        `#{2,4}\\s*Phase\\s+${phaseNum.replace(/\./g, '\\.')}\\s*:`, 'i'
+      ).test(milestoneSlice);
+      const roadmapForPhases = sliceContainsCompletedPhase ? milestoneSlice : roadmapContent;
       const phasePattern = /#{2,4}\s*Phase\s+(\d+[A-Z]?(?:\.\d+)*)\s*:\s*([^\n]+)/gi;
       let pm: RegExpExecArray | null;
       while ((pm = phasePattern.exec(roadmapForPhases)) !== null) {

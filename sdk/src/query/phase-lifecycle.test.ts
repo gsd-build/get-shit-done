@@ -951,6 +951,91 @@ describe('phaseComplete', () => {
     expect(state).toMatch(/Status:\s*Milestone complete/);
   });
 
+  it('finds next phase across parallel milestones (STATE points at different milestone)', async () => {
+    // Regression test: a project with two active milestones where STATE.md
+    // points at milestone vA (e.g. feature work), but the phase being
+    // completed belongs to vB (e.g. parallel rebrand). Without the
+    // parallel-milestone fix, getMilestonePhaseFilter excludes all vB
+    // phases, both the directory scan and ROADMAP fallback find no
+    // candidate, and is_last_phase falsely returns true.
+    const { phaseComplete } = await import('./phase-lifecycle.js');
+
+    const PARALLEL_ROADMAP = `# Roadmap
+
+## Current Milestone: vA Feature Work
+
+| Phase | Plans | Status | Completed |
+|-------|-------|--------|-----------|
+| 9.    | 3/3   | Complete | 2026-04-01 |
+
+- [x] Phase 9: Foundation (completed 2026-04-01)
+
+### Phase 9: Foundation
+
+**Goal:** Build foundation
+**Plans:** 3/3 plans complete
+
+## Parallel Milestone: vB Rebrand
+
+- [x] Phase 41.1: Tokens (completed 2026-04-23)
+- [x] Phase 41.2: Primitives
+- [ ] Phase 41.3: Screens
+
+### Phase 41.1: Tokens
+
+**Goal:** Design tokens
+
+### Phase 41.2: Primitives
+
+**Goal:** UI primitives
+
+### Phase 41.3: Screens
+
+**Goal:** Solver screens
+`;
+
+    const PARALLEL_STATE = `---
+gsd_state_version: 1.0
+milestone: vA
+milestone_name: Feature Work
+status: executing
+progress:
+  total_phases: 1
+  completed_phases: 1
+  total_plans: 3
+  completed_plans: 3
+  percent: 100
+---
+
+# Project State
+
+## Current Position
+
+Phase: 9 of 1 (Foundation)
+Plan: 3 of 3
+Status: Executing
+Last activity: 2026-04-23
+`;
+
+    await setupTestProject(tmpDir, {
+      roadmap: PARALLEL_ROADMAP,
+      state: PARALLEL_STATE,
+      phases: ['09-foundation', '41.1-tokens', '41.2-primitives', '41.3-screens'],
+    });
+
+    // Phase 41.2 has plan + summary so it's "complete" on disk
+    const p412Dir = join(tmpDir, '.planning', 'phases', '41.2-primitives');
+    await writeFile(join(p412Dir, '41.2-01-PLAN.md'), 'plan', 'utf-8');
+    await writeFile(join(p412Dir, '41.2-01-SUMMARY.md'), 'summary', 'utf-8');
+
+    const result = await phaseComplete(['41.2'], tmpDir);
+    const data = result.data as Record<string, unknown>;
+
+    // Despite STATE pointing at vA, completing 41.2 should find 41.3 as next.
+    expect(data.next_phase).toBe('41.3');
+    expect(data.is_last_phase).toBe(false);
+  });
+
   it('collects UAT/VERIFICATION warnings without blocking', async () => {
     const { phaseComplete } = await import('./phase-lifecycle.js');
     await setupTestProject(tmpDir, {
