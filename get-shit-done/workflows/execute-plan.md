@@ -402,17 +402,15 @@ If SUMMARY "Issues Encountered" ≠ "None": yolo → log and continue. Interacti
 </step>
 
 <step name="update_roadmap">
-**Skip this step if running in parallel mode** (the orchestrator handles ROADMAP.md
-updates centrally after merging worktrees).
+Always run this step — the handler is idempotent and atomically serialized via a
+lockfile, so concurrent plans (parallel mode, with or without worktrees) and
+later orchestrator reruns converge on the same result. This is the only
+checkbox-sync point guaranteed to fire after every plan completion; skipping
+here leaves ROADMAP.md checkboxes stale when a phase is interrupted or when
+`use_worktrees: false` disables the post-wave merge-hook sync (see bug #2661).
 
 ```bash
-# Auto-detect parallel mode: .git is a file in worktrees, a directory in main repo
-IS_WORKTREE=$([ -f .git ] && echo "true" || echo "false")
-
-# Skip in parallel mode — orchestrator handles ROADMAP.md centrally
-if [ "$IS_WORKTREE" != "true" ]; then
-  gsd-sdk query roadmap.update-plan-progress "${PHASE}"
-fi
+gsd-sdk query roadmap.update-plan-progress "${PHASE}"
 ```
 Counts PLAN vs SUMMARY files on disk. Updates progress table row with correct count and status (`In Progress` or `Complete` with date).
 </step>
