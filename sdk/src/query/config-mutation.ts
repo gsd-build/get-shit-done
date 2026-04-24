@@ -432,28 +432,36 @@ export const configNewProject: QueryHandler = async (args, projectDir, _workstre
   };
 
   // Deep merge: hardcoded <- globalDefaults <- userChoices (D11)
+  // Nested sections must merge all three sources in order; omitting the
+  // `globalDefaults.<section>` spread drops every nested key set in
+  // ~/.gsd/defaults.json under workflow / git / hooks / features / agent_skills.
   const config: Record<string, unknown> = {
     ...defaults,
     ...globalDefaults,
     ...userChoices,
     git: {
       ...(defaults.git as Record<string, unknown>),
+      ...((globalDefaults.git as Record<string, unknown>) || {}),
       ...((userChoices.git as Record<string, unknown>) || {}),
     },
     workflow: {
       ...(defaults.workflow as Record<string, unknown>),
+      ...((globalDefaults.workflow as Record<string, unknown>) || {}),
       ...((userChoices.workflow as Record<string, unknown>) || {}),
     },
     hooks: {
       ...(defaults.hooks as Record<string, unknown>),
+      ...((globalDefaults.hooks as Record<string, unknown>) || {}),
       ...((userChoices.hooks as Record<string, unknown>) || {}),
     },
     agent_skills: {
       ...((defaults.agent_skills as Record<string, unknown>) || {}),
+      ...((globalDefaults.agent_skills as Record<string, unknown>) || {}),
       ...((userChoices.agent_skills as Record<string, unknown>) || {}),
     },
     features: {
       ...((defaults.features as Record<string, unknown>) || {}),
+      ...((globalDefaults.features as Record<string, unknown>) || {}),
       ...((userChoices.features as Record<string, unknown>) || {}),
     },
   };

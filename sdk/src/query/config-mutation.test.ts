@@ -209,6 +209,116 @@ describe('configNewProject global defaults (D11)', () => {
   });
 });
 
+// ─── configNewProject — nested global defaults merge (regression) ──────────
+//
+// Regression tests for the nested-object override merge bug: when
+// ~/.gsd/defaults.json sets keys under nested sections (workflow.*, git.*,
+// hooks.*, features.*, agent_skills.*), the final per-project config
+// previously dropped them because the nested spread only merged `defaults`
+// with `userChoices`, ignoring `globalDefaults`.
+//
+// The doc comment in config-mutation.ts promises:
+//   "Deep merge: hardcoded <- globalDefaults <- userChoices (D11)"
+// Top-level keys already honored that precedence; nested keys did not.
+//
+// Each test overrides HOME to an isolated tmp dir so the assertions do not
+// depend on whether the machine running the tests has a real
+// ~/.gsd/defaults.json present.
+
+describe('configNewProject nested global defaults merge', () => {
+  let homeTmpDir: string;
+  let originalHome: string | undefined;
+
+  beforeEach(async () => {
+    homeTmpDir = await mkdtemp(join(tmpdir(), 'gsd-cfgmut-home-'));
+    await mkdir(join(homeTmpDir, '.gsd'), { recursive: true });
+    originalHome = process.env.HOME;
+    process.env.HOME = homeTmpDir;
+  });
+
+  afterEach(async () => {
+    if (originalHome === undefined) {
+      delete process.env.HOME;
+    } else {
+      process.env.HOME = originalHome;
+    }
+    await rm(homeTmpDir, { recursive: true, force: true });
+  });
+
+  async function writeGlobalDefaults(contents: Record<string, unknown>): Promise<void> {
+    await writeFile(join(homeTmpDir, '.gsd', 'defaults.json'), JSON.stringify(contents));
+  }
+
+  it('propagates nested workflow.* keys from ~/.gsd/defaults.json', async () => {
+    await writeGlobalDefaults({
+      workflow: {
+        code_review_depth: 'deep',
+        auto_advance: true,
+        node_repair_budget: 3,
+      },
+    });
+    const { configNewProject } = await import('./config-mutation.js');
+    await configNewProject([], tmpDir);
+
+    const raw = JSON.parse(await readFile(join(tmpDir, '.planning', 'config.json'), 'utf-8'));
+    expect(raw.workflow.code_review_depth).toBe('deep');
+    expect(raw.workflow.auto_advance).toBe(true);
+    expect(raw.workflow.node_repair_budget).toBe(3);
+    // Non-overridden hardcoded workflow defaults must still be present.
+    expect(raw.workflow.research).toBe(true);
+    expect(raw.workflow.plan_check).toBe(true);
+  });
+
+  it('propagates nested git.* keys from ~/.gsd/defaults.json', async () => {
+    await writeGlobalDefaults({
+      git: { branching_strategy: 'milestone' },
+    });
+    const { configNewProject } = await import('./config-mutation.js');
+    await configNewProject([], tmpDir);
+
+    const raw = JSON.parse(await readFile(join(tmpDir, '.planning', 'config.json'), 'utf-8'));
+    expect(raw.git.branching_strategy).toBe('milestone');
+    // Non-overridden hardcoded git defaults must still be present.
+    expect(raw.git.phase_branch_template).toBe('gsd/phase-{phase}-{slug}');
+  });
+
+  it('propagates nested hooks.* and features.* keys from ~/.gsd/defaults.json', async () => {
+    await writeGlobalDefaults({
+      hooks: { context_warnings: false },
+      features: { thinking_partner: true, global_learnings: true },
+    });
+    const { configNewProject } = await import('./config-mutation.js');
+    await configNewProject([], tmpDir);
+
+    const raw = JSON.parse(await readFile(join(tmpDir, '.planning', 'config.json'), 'utf-8'));
+    expect(raw.hooks.context_warnings).toBe(false);
+    expect(raw.features.thinking_partner).toBe(true);
+    expect(raw.features.global_learnings).toBe(true);
+  });
+
+  it('enforces precedence: userChoices > globalDefaults > hardcoded', async () => {
+    await writeGlobalDefaults({
+      workflow: {
+        code_review_depth: 'deep', // only in global
+        auto_advance: true,        // will be overridden by userChoices
+      },
+    });
+    const userChoices = JSON.stringify({
+      workflow: { auto_advance: false },
+    });
+    const { configNewProject } = await import('./config-mutation.js');
+    await configNewProject([userChoices], tmpDir);
+
+    const raw = JSON.parse(await readFile(join(tmpDir, '.planning', 'config.json'), 'utf-8'));
+    // userChoices wins over globalDefaults
+    expect(raw.workflow.auto_advance).toBe(false);
+    // globalDefaults wins over hardcoded when userChoices is silent
+    expect(raw.workflow.code_review_depth).toBe('deep');
+    // hardcoded applies when neither source specifies
+    expect(raw.workflow.research).toBe(true);
+  });
+});
+
 // ─── configSet ─────────────────────────────────────────────────────────────
 
 describe('configSet', () => {
