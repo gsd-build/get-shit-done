@@ -300,7 +300,9 @@ function loadConfig(cwd) {
       }
     }
 
-    // Canonicalize legacy top-level sub_repos to planning.sub_repos (#2638)
+    // Canonicalize legacy top-level sub_repos to planning.sub_repos (#2638).
+    // Ensures stale top-level keys are cleaned up even when detected repos
+    // match the current list (no-drift case), preventing repeated warnings.
     if (Object.prototype.hasOwnProperty.call(parsed, 'sub_repos')) {
       if (!parsed.planning) parsed.planning = {};
       if (parsed.planning.sub_repos === undefined) {
