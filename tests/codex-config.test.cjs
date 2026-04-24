@@ -92,7 +92,7 @@ function countGsdUpdateHooksInHooksJson(codexHome) {
 
   return Object.values(readCodexHooksJson(codexHome).hooks || {})
     .flatMap(eventGroups => Array.isArray(eventGroups) ? eventGroups : [])
-    .flatMap(group => Array.isArray(group && group.hooks) ? group.hooks : [])
+    .flatMap(group => group && Array.isArray(group.hooks) ? group.hooks : [])
     .filter(hook => isManagedGsdUpdateHookCommand(hook && hook.command, codexHome))
     .length;
 }
@@ -936,9 +936,11 @@ describe('Codex install hook configuration (e2e)', () => {
     const configContent = readCodexConfig(codexHome);
     const hooksJson = readCodexHooksJson(codexHome);
     const hookFile = path.join(codexHome, 'hooks', 'gsd-check-update.js');
+    const manifest = JSON.parse(fs.readFileSync(path.join(codexHome, 'gsd-file-manifest.json'), 'utf8'));
 
     assert.ok(!configContent.includes('gsd-check-update.js'), 'config.toml no longer embeds the update hook command');
     assert.ok(fs.existsSync(hookFile), `gsd-check-update.js must exist at ${hookFile}`);
+    assert.ok(manifest.files['hooks/gsd-check-update.js'], 'manifest tracks the Codex update hook after Codex-specific hook installation');
     assert.deepStrictEqual(
       hooksJson,
       {
@@ -1143,6 +1145,29 @@ describe('Codex install hook configuration (e2e)', () => {
     assert.ok(content.includes('name = "o3"'), 'preserves user config after removing the legacy hook');
     assert.ok(!content.includes('[[hooks]]'), 'removes the legacy inline GSD hook when TOML escaped quotes are decoded');
     assert.strictEqual(countGsdUpdateHooksInHooksJson(codexHome), 1, 'adds the managed GSD hook to hooks.json');
+  });
+
+  test('install removes legacy inline GSD hooks whose TOML literal command doubles apostrophes', () => {
+    const codexHomeWithApostrophe = path.join(tmpDir, "codex-O'Brien");
+    const managedCommand = `node "${path.join(codexHomeWithApostrophe, 'hooks', 'gsd-check-update.js').replace(/\\/g, '/')}"`;
+    const tomlLiteralCommand = managedCommand.replace(/'/g, "''");
+    writeCodexConfig(codexHomeWithApostrophe, [
+      '# GSD Hooks',
+      '[[hooks]]',
+      'event = "SessionStart"',
+      `command = '${tomlLiteralCommand}'`,
+      '',
+      '[model]',
+      'name = "o3"',
+      '',
+    ].join('\n'));
+
+    runCodexInstall(codexHomeWithApostrophe);
+
+    const content = readCodexConfig(codexHomeWithApostrophe);
+    assert.ok(content.includes('name = "o3"'), 'preserves user config after removing the legacy hook');
+    assert.ok(!content.includes('[[hooks]]'), 'removes the legacy inline GSD hook when TOML literal apostrophes are decoded');
+    assert.strictEqual(countGsdUpdateHooksInHooksJson(codexHomeWithApostrophe), 1, 'adds the managed GSD hook to hooks.json');
   });
 
   test('config_file paths are absolute using CODEX_HOME', () => {
@@ -1914,6 +1939,27 @@ describe('Codex uninstall symmetry for hook-enabled configs', () => {
     runCodexUninstall(codexHome);
 
     assert.ok(!fs.existsSync(path.join(codexHome, 'hooks.json')), 'removes malformed event objects when they only reference the managed GSD hook');
+  });
+
+  test('uninstall preserves the update hook file when hooks.json cannot be cleaned', () => {
+    const hookFile = path.join(codexHome, 'hooks', 'gsd-check-update.js');
+    const hooksJsonRaw = [
+      '{',
+      '  "hooks": {',
+      '    "SessionStart": [',
+      '      { "hooks": [ { "type": "command", "command": "node \\\"' + hookFile.replace(/\\/g, '/') + '\\\"" } ] }',
+      '    ]',
+      '  ',
+      '',
+    ].join('\n');
+    fs.mkdirSync(path.dirname(hookFile), { recursive: true });
+    fs.writeFileSync(hookFile, '// managed update hook\n', 'utf8');
+    fs.writeFileSync(path.join(codexHome, 'hooks.json'), hooksJsonRaw, 'utf8');
+
+    runCodexUninstall(codexHome);
+
+    assert.strictEqual(fs.readFileSync(path.join(codexHome, 'hooks.json'), 'utf8'), hooksJsonRaw, 'leaves uncleanable hooks.json bytes untouched');
+    assert.ok(fs.existsSync(hookFile), 'keeps gsd-check-update.js so the uncleaned hooks.json does not point at a deleted command');
   });
 
   test('install then uninstall removes unquoted managed-command hooks from hooks.json arrays', () => {

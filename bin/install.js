@@ -2093,7 +2093,7 @@ function parseSimpleTomlStringAssignment(line, key) {
   }
 
   const literalMatch = valueText.match(/^'(.*)'$/);
-  return literalMatch ? literalMatch[1] : null;
+  return literalMatch ? literalMatch[1].replace(/''/g, "'") : null;
 }
 
 function stripManagedGsdCodexInlineHooks(content, configDir) {
@@ -5010,6 +5010,7 @@ function uninstall(isGlobal, runtime = 'claude') {
   }
 
   let removedCount = 0;
+  let codexHooksJsonCleanFailed = false;
 
   // 1. Remove GSD commands/skills
   if (isOpencode || isKilo) {
@@ -5093,6 +5094,7 @@ function uninstall(isGlobal, runtime = 'claude') {
             console.log(`  ${green}✓${reset} Cleaned GSD hooks from hooks.json`);
           }
         } catch (error) {
+          codexHooksJsonCleanFailed = true;
           console.warn(`  ${yellow}⚠${reset}  Could not clean hooks.json: ${error.message}`);
         }
       }
@@ -5306,6 +5308,9 @@ function uninstall(isGlobal, runtime = 'claude') {
     const gsdHooks = ['gsd-statusline.js', 'gsd-check-update.js', 'gsd-context-monitor.js', 'gsd-prompt-guard.js', 'gsd-read-guard.js', 'gsd-read-injection-scanner.js', 'gsd-workflow-guard.js', 'gsd-session-state.sh', 'gsd-validate-commit.sh', 'gsd-phase-boundary.sh'];
     let hookCount = 0;
     for (const hook of gsdHooks) {
+      if (isCodex && codexHooksJsonCleanFailed && hook === 'gsd-check-update.js') {
+        continue;
+      }
       const hookPath = path.join(hooksDir, hook);
       if (fs.existsSync(hookPath)) {
         fs.unlinkSync(hookPath);
@@ -6535,6 +6540,13 @@ function install(isGlobal, runtime = 'claude') {
       console.log(`  ${green}✓${reset} Configured Codex hooks (SessionStart via hooks.json)`);
     } catch (e) {
       console.warn(`  ${yellow}⚠${reset}  Could not configure Codex hooks: ${e.message}`);
+    }
+
+    try {
+      writeManifest(targetDir, runtime);
+      console.log(`  ${green}✓${reset} Refreshed file manifest (${MANIFEST_NAME})`);
+    } catch (e) {
+      console.warn(`  ${yellow}⚠${reset}  Could not refresh file manifest: ${e.message}`);
     }
 
     return { settingsPath: null, settings: null, statuslineCommand: null, runtime, configDir: targetDir };
