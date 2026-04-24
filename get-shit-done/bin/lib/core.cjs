@@ -1744,9 +1744,24 @@ function extractOneLinerFromBody(content) {
   if (!content) return null;
   // Strip frontmatter first
   const body = content.replace(/^---\n[\s\S]*?\n---\n*/, '');
-  // Find the first **...** line after a # heading
-  const match = body.match(/^#[^\n]*\n+\*\*([^*]+)\*\*/m);
-  return match ? match[1].trim() : null;
+  // Find the first **...** span on a line after a # heading.
+  // Two supported template forms:
+  //   1) Labeled:  **One-liner:** Real prose here.   (bug #2660 — new template)
+  //   2) Bare:     **Real prose here.**              (legacy template)
+  // For (1), the first bold span ends in a colon and the prose that follows
+  // on the same line is the one-liner. For (2), the bold span itself is the
+  // one-liner.
+  const match = body.match(/^#[^\n]*\n+\*\*([^*\n]+)\*\*([^\n]*)/m);
+  if (!match) return null;
+  const boldInner = match[1].trim();
+  const afterBold = match[2];
+  // Labeled form: bold span is a "Label:" prefix — capture prose after it.
+  if (/:\s*$/.test(boldInner)) {
+    const prose = afterBold.trim();
+    return prose.length > 0 ? prose : null;
+  }
+  // Bare form: the bold content itself is the one-liner.
+  return boldInner.length > 0 ? boldInner : null;
 }
 
 // ─── Misc utilities ───────────────────────────────────────────────────────────
