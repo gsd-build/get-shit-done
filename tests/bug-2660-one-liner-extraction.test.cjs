@@ -70,4 +70,13 @@ describe('bug #2660: extractOneLinerFromBody', () => {
       '# Phase 1: Foundation Summary\n\n**Summary:** Built the thing.\n';
     assert.strictEqual(extractOneLinerFromBody(content), 'Built the thing.');
   });
+
+  test('h) CRLF line endings (Windows) are handled', () => {
+    const content =
+      '---\r\nphase: "01"\r\n---\r\n\r\n# Phase 1: Foundation Summary\r\n\r\n**One-liner:** Windows-authored prose.\r\n';
+    assert.strictEqual(
+      extractOneLinerFromBody(content),
+      'Windows-authored prose.'
+    );
+  });
 });

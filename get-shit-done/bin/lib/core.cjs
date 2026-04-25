@@ -1742,8 +1742,10 @@ function resolveReasoningEffortInternal(cwd, agentType) {
  */
 function extractOneLinerFromBody(content) {
   if (!content) return null;
+  // Normalize EOLs so matching works for LF and CRLF files.
+  const normalized = content.replace(/\r\n/g, '\n').replace(/\r/g, '\n');
   // Strip frontmatter first
-  const body = content.replace(/^---\n[\s\S]*?\n---\n*/, '');
+  const body = normalized.replace(/^---\n[\s\S]*?\n---\n*/, '');
   // Find the first **...** span on a line after a # heading.
   // Two supported template forms:
   //   1) Labeled:  **One-liner:** Real prose here.   (bug #2660 — new template)
