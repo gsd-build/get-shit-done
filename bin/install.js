@@ -6294,10 +6294,13 @@ function install(isGlobal, runtime = 'claude') {
         `command = "node ${updateCheckScript}"${eol}`;
 
       // Migrate legacy gsd-update-check entries from prior installs (#1755 followup)
-      // Remove stale hook blocks that used the inverted filename or wrong path
+      // Remove stale hook blocks that used the inverted filename or wrong path.
+      // Single \r?\n-aware regex handles LF, CRLF, and block-at-file-start (#2698).
       if (configContent.includes('gsd-update-check')) {
-        configContent = configContent.replace(/\n# GSD Hooks\n\[\[hooks\]\]\nevent = "SessionStart"\ncommand = "node [^\n]*gsd-update-check\.js"\n/g, '\n');
-        configContent = configContent.replace(/\r\n# GSD Hooks\r\n\[\[hooks\]\]\r\nevent = "SessionStart"\r\ncommand = "node [^\r\n]*gsd-update-check\.js"\r\n/g, '\r\n');
+        configContent = configContent.replace(
+          /(?:\r?\n|^)# GSD Hooks\r?\n\[\[hooks\]\]\r?\nevent = "SessionStart"\r?\ncommand = "node [^\r\n]*gsd-update-check\.js"\r?\n/gm,
+          (match) => (match.startsWith('\r\n') ? '\r\n' : match.startsWith('\n') ? '\n' : ''),
+        );
       }
 
       if (hasEnabledCodexHooksFeature(configContent) && !configContent.includes('gsd-check-update')) {
@@ -7171,6 +7174,13 @@ function installSdkIfNeeded(opts) {
     return;
   }
 
+  // #2678: local installs do not write to global node_modules, so the SDK
+  // global-install check is not applicable. Warn and return instead of exiting.
+  if (opts.isLocal) {
+    console.warn(`\n  ${yellow}⚠${reset}  Skipping SDK check for local install — install @gsd-build/sdk globally if you need /gsd-* CLI support.`);
+    return;
+  }
+
   const path = require('path');
   const fs = require('fs');
 
@@ -7268,8 +7278,8 @@ function installAllRuntimes(runtimes, isGlobal, isInteractive) {
     // Verify sdk/dist/cli.js is present and executable. The dist is shipped
     // prebuilt in the tarball (fix/2441-sdk-decouple); gsd-sdk reaches users via
     // the parent package's bin/gsd-sdk.js shim, so no sub-install is needed.
-    // Skip with --no-sdk.
-    installSdkIfNeeded();
+    // Skip with --no-sdk. Skip with isLocal (#2678 — local installs don't own global npm).
+    installSdkIfNeeded({ isLocal: !isGlobal });
 
     const printSummaries = () => {
       for (const result of results) {
