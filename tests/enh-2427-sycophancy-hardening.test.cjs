@@ -15,7 +15,6 @@ const fs = require('node:fs');
 const path = require('node:path');
 
 const AGENTS_DIR = path.join(__dirname, '../agents');
-const SDK_AGENTS_DIR = path.join(__dirname, '../sdk/prompts/agents');
 
 const AUDIT_AGENTS = [
   'gsd-plan-checker.md',
@@ -27,11 +26,6 @@ const AUDIT_AGENTS = [
   'gsd-ui-auditor.md',
   'gsd-integration-checker.md',
   'gsd-doc-verifier.md',
-];
-
-const SDK_AUDIT_AGENTS = [
-  'gsd-plan-checker.md',
-  'gsd-verifier.md',
 ];
 
 function readAgent(agentsDir, filename) {
@@ -102,26 +96,5 @@ describe('enh-2427 — sycophancy hardening: audit-class agents', () => {
     });
   }
 
-  describe('sdk/prompts/agents variants', () => {
-    for (const filename of SDK_AUDIT_AGENTS) {
-      const label = `sdk/${filename.replace('.md', '')}`;
-
-      describe(label, () => {
-        test('third-person framing and adversarial_stance block present', () => {
-          const content = readAgent(SDK_AGENTS_DIR, filename);
-          const role = extractRole(content);
-          const firstSentence = role.trim().slice(0, 80);
-
-          assert.ok(
-            !firstSentence.startsWith('You are a GSD'),
-            `${filename}: SDK variant must not open <role> with "You are a GSD"`
-          );
-          assert.ok(
-            content.includes('<adversarial_stance>'),
-            `${filename}: SDK variant must contain <adversarial_stance> block`
-          );
-        });
-      });
-    }
-  });
 });
+// sdk/prompts/agents/ was removed in 377a6d2 — SDK now loads installed agents directly.

@@ -150,34 +150,7 @@ describe('verifier deferred-items filtering (#1624)', () => {
     });
   });
 
-  // ── verify-phase.md (SDK variant) ──────────────────────────────────────────
-
-  describe('sdk/prompts/workflows/verify-phase.md', () => {
-    const sdkPath = path.join(ROOT, 'sdk', 'prompts', 'workflows', 'verify-phase.md');
-    let sdkContent;
-
-    test('file exists', () => {
-      assert.ok(fs.existsSync(sdkPath), 'SDK verify-phase.md should exist');
-      sdkContent = fs.readFileSync(sdkPath, 'utf-8');
-    });
-
-    test('loads roadmap analyze in context step', () => {
-      sdkContent = sdkContent || fs.readFileSync(sdkPath, 'utf-8');
-      assert.ok(
-        sdkContent.includes('roadmap analyze'),
-        'SDK verify-phase.md should reference roadmap analyze for deferred-item filtering'
-      );
-    });
-
-    test('contains deferred-item filtering step', () => {
-      sdkContent = sdkContent || fs.readFileSync(sdkPath, 'utf-8');
-      assert.ok(
-        sdkContent.includes('filter_deferred_items') ||
-        sdkContent.includes('deferred'),
-        'SDK verify-phase.md should contain deferred-item filtering logic'
-      );
-    });
-  });
+  // sdk/prompts/workflows/verify-phase.md removed in 377a6d2 — SDK loads installed workflow directly.
 
   // ── planner-gap-closure.md ─────────────────────────────────────────────────
 
