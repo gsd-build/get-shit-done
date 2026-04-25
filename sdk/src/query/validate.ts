@@ -432,24 +432,57 @@ export const validateHealth: QueryHandler = async (args, projectDir, _workstream
   } else {
     try {
       const stateContent = await readFile(statePath, 'utf-8');
-      const phaseRefs = [...stateContent.matchAll(/[Pp]hase\s+(\d+(?:\.\d+)*)/g)].map(m => m[1]);
-      const diskPhases = new Set<string>();
+      const phaseRefs = [...stateContent.matchAll(/[Pp]hase\s+(\d+[A-Z]?(?:\.\d+)*)/g)].map(m => m[1]);
+
+      // Bug #2633 — ROADMAP.md is the authority for which phases are valid.
+      // STATE.md may legitimately reference current-milestone future phases
+      // (not yet materialized on disk) and shipped-milestone history phases
+      // (archived / cleared off disk). Matching only against on-disk dirs
+      // produces false W002 warnings in both cases.
+      const validPhases = new Set<string>();
       try {
         const entries = await readdir(phasesDir, { withFileTypes: true });
         for (const e of entries) {
           if (e.isDirectory()) {
-            const m = e.name.match(/^(\d+(?:\.\d+)*)/);
-            if (m) diskPhases.add(m[1]);
+            const m = e.name.match(/^(\d+[A-Z]?(?:\.\d+)*)/);
+            if (m) validPhases.add(m[1]);
           }
         }
       } catch { /* intentionally empty */ }
 
+      // Union in every phase declared anywhere in ROADMAP.md — current milestone,
+      // shipped milestones (inside <details> / ✅ SHIPPED sections), and any
+      // preamble/Backlog. We deliberately do NOT filter by current milestone.
+      try {
+        const roadmapRaw = await readFile(roadmapPath, 'utf-8');
+        const all = [...roadmapRaw.matchAll(/#{2,4}\s*Phase\s+(\d+[A-Z]?(?:\.\d+)*)/gi)];
+        for (const m of all) validPhases.add(m[1]);
+      } catch { /* intentionally empty */ }
+
+      // Compare canonical full phase tokens. Also accept a leading-zero
+      // variant on the integer prefix only (e.g. "03" → "3", "03.1" → "3.1")
+      // so historic STATE.md formatting still validates. Suffix tokens like
+      // "3A" must match exactly — never collapsed to "3".
+      const normalizedValid = new Set<string>();
+      for (const p of validPhases) {
+        normalizedValid.add(p);
+        const dotIdx = p.indexOf('.');
+        const head = dotIdx === -1 ? p : p.slice(0, dotIdx);
+        const tail = dotIdx === -1 ? '' : p.slice(dotIdx);
+        if (/^\d+$/.test(head)) {
+          normalizedValid.add(head.padStart(2, '0') + tail);
+        }
+      }
+
       for (const ref of phaseRefs) {
-        const normalizedRef = String(parseInt(ref, 10)).padStart(2, '0');
-        if (!diskPhases.has(ref) && !diskPhases.has(normalizedRef) && !diskPhases.has(String(parseInt(ref, 10)))) {
-          if (diskPhases.size > 0) {
+        const dotIdx = ref.indexOf('.');
+        const head = dotIdx === -1 ? ref : ref.slice(0, dotIdx);
+        const tail = dotIdx === -1 ? '' : ref.slice(dotIdx);
+        const padded = /^\d+$/.test(head) ? head.padStart(2, '0') + tail : ref;
+        if (!normalizedValid.has(ref) && !normalizedValid.has(padded)) {
+          if (normalizedValid.size > 0) {
             addIssue('warning', 'W002',
-              `STATE.md references phase ${ref}, but only phases ${[...diskPhases].sort().join(', ')} exist`,
+              `STATE.md references phase ${ref}, but only phases ${[...validPhases].sort().join(', ')} are declared`,
               'Review STATE.md manually');
           }
         }

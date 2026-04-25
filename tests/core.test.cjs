@@ -1519,9 +1519,10 @@ describe('loadConfig sub_repos auto-sync', () => {
     assert.deepStrictEqual(config.sub_repos, ['backend', 'frontend']);
     assert.strictEqual(config.commit_docs, false);
 
-    // Verify config was persisted
+    // Verify config was persisted to the canonical location (planning.sub_repos per #2561/#2638)
     const saved = JSON.parse(fs.readFileSync(path.join(projectRoot, '.planning', 'config.json'), 'utf-8'));
-    assert.deepStrictEqual(saved.sub_repos, ['backend', 'frontend']);
+    assert.deepStrictEqual(saved.planning?.sub_repos, ['backend', 'frontend']);
+    assert.strictEqual(saved.sub_repos, undefined, 'top-level sub_repos should not be written (#2638)');
     assert.strictEqual(saved.multiRepo, undefined, 'multiRepo should be removed');
   });
 

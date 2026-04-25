@@ -172,6 +172,61 @@ describe('initProgress', () => {
     expect(typeof data.roadmap_path).toBe('string');
     expect(typeof data.config_path).toBe('string');
   });
+
+  // ── #2646: ROADMAP checkbox fallback when no phases/ directory ─────────
+  it('derives completed_count from ROADMAP [x] checkboxes when phases/ is absent', async () => {
+    // Fresh fixture: NO phases/ directory at all, checkbox-driven ROADMAP.
+    const tmp = await mkdtemp(join(tmpdir(), 'gsd-init-complex-2646-'));
+    try {
+      await mkdir(join(tmp, '.planning'), { recursive: true });
+      await writeFile(join(tmp, '.planning', 'config.json'), JSON.stringify({
+        model_profile: 'balanced',
+        commit_docs: false,
+        git: {
+          branching_strategy: 'none',
+          phase_branch_template: 'gsd/phase-{phase}-{slug}',
+          milestone_branch_template: 'gsd/{milestone}-{slug}',
+          quick_branch_template: null,
+        },
+        workflow: { research: true, plan_check: true, verifier: true, nyquist_validation: true },
+      }));
+      await writeFile(join(tmp, '.planning', 'STATE.md'), [
+        '---',
+        'milestone: v1.0',
+        '---',
+      ].join('\n'));
+      await writeFile(join(tmp, '.planning', 'ROADMAP.md'), [
+        '# Roadmap',
+        '',
+        '## v1.0: Checkbox-Driven',
+        '',
+        '- [x] Phase 1: Scaffold',
+        '- [ ] Phase 2: Build',
+        '',
+        '### Phase 1: Scaffold',
+        '',
+        '**Goal:** Scaffold the thing',
+        '',
+        '### Phase 2: Build',
+        '',
+        '**Goal:** Build the thing',
+        '',
+      ].join('\n'));
+
+      const result = await initProgress([], tmp);
+      const data = result.data as Record<string, unknown>;
+      const phases = data.phases as Record<string, unknown>[];
+
+      expect(data.phase_count).toBe(2);
+      expect(data.completed_count).toBe(1);
+      const phase1 = phases.find(p => p.number === '1');
+      const phase2 = phases.find(p => p.number === '2');
+      expect(phase1?.status).toBe('complete');
+      expect(phase2?.status).toBe('not_started');
+    } finally {
+      await rm(tmp, { recursive: true, force: true });
+    }
+  });
 });
 
 describe('initManager', () => {

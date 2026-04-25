@@ -591,28 +591,57 @@ function cmdValidateHealth(cwd, options, raw) {
   } else {
     const stateContent = fs.readFileSync(statePath, 'utf-8');
     // Extract phase references from STATE.md
-    const phaseRefs = [...stateContent.matchAll(/[Pp]hase\s+(\d+(?:\.\d+)*)/g)].map(m => m[1]);
-    // Get disk phases
-    const diskPhases = new Set();
+    const phaseRefs = [...stateContent.matchAll(/[Pp]hase\s+(\d+[A-Z]?(?:\.\d+)*)/g)].map(m => m[1]);
+    // Bug #2633 — ROADMAP.md is the authority for which phases are valid.
+    // STATE.md may legitimately reference current-milestone future phases
+    // (not yet materialized on disk) and shipped-milestone history phases
+    // (archived / cleared off disk). Matching only against on-disk dirs
+    // produces false W002 warnings in both cases.
+    const validPhases = new Set();
     try {
       const entries = fs.readdirSync(phasesDir, { withFileTypes: true });
       for (const e of entries) {
         if (e.isDirectory()) {
-          const m = e.name.match(/^(\d+(?:\.\d+)*)/);
-          if (m) diskPhases.add(m[1]);
+          const m = e.name.match(/^(\d+[A-Z]?(?:\.\d+)*)/);
+          if (m) validPhases.add(m[1]);
         }
       }
     } catch { /* intentionally empty */ }
+    // Union in every phase declared anywhere in ROADMAP.md (current + shipped + backlog).
+    try {
+      if (fs.existsSync(roadmapPath)) {
+        const roadmapRaw = fs.readFileSync(roadmapPath, 'utf-8');
+        const all = [...roadmapRaw.matchAll(/#{2,4}\s*Phase\s+(\d+[A-Z]?(?:\.\d+)*)/gi)];
+        for (const m of all) validPhases.add(m[1]);
+      }
+    } catch { /* intentionally empty */ }
+    // Compare canonical full phase tokens. Also accept a leading-zero variant
+    // on the integer prefix only (e.g. "03" matching "3", "03.1" matching
+    // "3.1") so historic STATE.md formatting still validates. Suffix tokens
+    // like "3A" must match exactly — never collapsed to "3".
+    const normalizedValid = new Set();
+    for (const p of validPhases) {
+      normalizedValid.add(p);
+      const dotIdx = p.indexOf('.');
+      const head = dotIdx === -1 ? p : p.slice(0, dotIdx);
+      const tail = dotIdx === -1 ? '' : p.slice(dotIdx);
+      if (/^\d+$/.test(head)) {
+        normalizedValid.add(head.padStart(2, '0') + tail);
+      }
+    }
     // Check for invalid references
     for (const ref of phaseRefs) {
-      const normalizedRef = String(parseInt(ref, 10)).padStart(2, '0');
-      if (!diskPhases.has(ref) && !diskPhases.has(normalizedRef) && !diskPhases.has(String(parseInt(ref, 10)))) {
-        // Only warn if phases dir has any content (not just an empty project)
-        if (diskPhases.size > 0) {
+      const dotIdx = ref.indexOf('.');
+      const head = dotIdx === -1 ? ref : ref.slice(0, dotIdx);
+      const tail = dotIdx === -1 ? '' : ref.slice(dotIdx);
+      const padded = /^\d+$/.test(head) ? head.padStart(2, '0') + tail : ref;
+      if (!normalizedValid.has(ref) && !normalizedValid.has(padded)) {
+        // Only warn if we know any valid phases (not just an empty project)
+        if (normalizedValid.size > 0) {
           addIssue(
             'warning',
             'W002',
-            `STATE.md references phase ${ref}, but only phases ${[...diskPhases].sort().join(', ')} exist`,
+            `STATE.md references phase ${ref}, but only phases ${[...validPhases].sort().join(', ')} are declared`,
             'Review STATE.md manually before changing it; /gsd:health --repair will not overwrite an existing STATE.md for phase mismatches'
           );
         }

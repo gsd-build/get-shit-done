@@ -192,6 +192,9 @@ jobs:
       - name: Build SDK dist for tarball
         run: npm run build:sdk
 
+      - name: Verify tarball ships sdk/dist/cli.js (bug #2647)
+        run: bash scripts/verify-tarball-sdk-dist.sh
+
       - name: Dry-run publish validation
         run: |
           npm publish --dry-run --tag next
@@ -332,6 +335,9 @@ jobs:
 
       - name: Build SDK dist for tarball
         run: npm run build:sdk
+
+      - name: Verify tarball ships sdk/dist/cli.js (bug #2647)
+        run: bash scripts/verify-tarball-sdk-dist.sh
 
       - name: Dry-run publish validation
         run: |

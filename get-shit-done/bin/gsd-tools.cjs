@@ -483,6 +483,12 @@ async function runCommand(command, args, cwd, raw, defaultValue) {
       } else if (subcommand === 'prune') {
         const { 'keep-recent': keepRecent, 'dry-run': dryRun } = parseNamedArgs(args, ['keep-recent'], ['dry-run']);
         state.cmdStatePrune(cwd, { keepRecent: keepRecent || '3', dryRun: !!dryRun }, raw);
+      } else if (subcommand === 'milestone-switch') {
+        // Bug #2630: reset STATE.md frontmatter + Current Position for new milestone.
+        // NB: the flag is `--milestone`, not `--version` — gsd-tools reserves
+        // `--version` as a globally-invalid help flag (see NEVER_VALID_FLAGS above).
+        const { milestone, name } = parseNamedArgs(args, ['milestone', 'name']);
+        state.cmdStateMilestoneSwitch(cwd, milestone, name, raw);
       } else {
         state.cmdStateLoad(cwd, raw);
       }

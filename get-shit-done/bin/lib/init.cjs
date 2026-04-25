@@ -827,20 +827,70 @@ function cmdInitMilestoneOp(cwd, raw) {
   let phaseCount = 0;
   let completedPhases = 0;
   const phasesDir = path.join(planningDir(cwd), 'phases');
+
+  // Bug #2633 — ROADMAP.md (current milestone section) is the authority for
+  // phase counts, NOT the on-disk `.planning/phases/` directory. After
+  // `phases clear` between milestones, on-disk dirs will be a subset of the
+  // roadmap until each phase is materialized; reading from disk causes
+  // `all_phases_complete: true` to fire prematurely.
+  let roadmapPhaseNumbers = [];
+  try {
+    const roadmapPath = path.join(planningDir(cwd), 'ROADMAP.md');
+    const roadmapRaw = fs.readFileSync(roadmapPath, 'utf-8');
+    const currentSection = extractCurrentMilestone(roadmapRaw, cwd);
+    const phasePattern = /#{2,4}\s*Phase\s+(\d+[A-Z]?(?:\.\d+)*)\s*:/gi;
+    let m;
+    while ((m = phasePattern.exec(currentSection)) !== null) {
+      roadmapPhaseNumbers.push(m[1]);
+    }
+  } catch { /* intentionally empty */ }
+
+  // Canonicalize a phase token by stripping leading zeros from the integer
+  // head while preserving any [A-Z]? suffix and dotted segments. So "03" →
+  // "3", "03A" → "3A", "03.1" → "3.1", "3A" → "3A". Disk dirs that pad
+  // ("03-alpha") then match roadmap tokens ("Phase 3") without ever
+  // collapsing distinct tokens like "3" / "3A" / "3.1" into the same bucket.
+  const canonicalizePhase = (tok) => {
+    const m = tok.match(/^(\d+)([A-Z]?(?:\.\d+)*)$/);
+    return m ? String(parseInt(m[1], 10)) + m[2] : tok;
+  };
+  const diskPhaseDirs = new Map();
   try {
     const entries = fs.readdirSync(phasesDir, { withFileTypes: true });
-    const dirs = entries.filter(e => e.isDirectory()).map(e => e.name);
-    phaseCount = dirs.length;
+    for (const e of entries) {
+      if (!e.isDirectory()) continue;
+      const m = e.name.match(/^(\d+[A-Z]?(?:\.\d+)*)/);
+      if (!m) continue;
+      diskPhaseDirs.set(canonicalizePhase(m[1]), e.name);
+    }
+  } catch { /* intentionally empty */ }
 
-    // Count phases with summaries (completed)
-    for (const dir of dirs) {
+  if (roadmapPhaseNumbers.length > 0) {
+    phaseCount = roadmapPhaseNumbers.length;
+    for (const num of roadmapPhaseNumbers) {
+      const dirName = diskPhaseDirs.get(canonicalizePhase(num));
+      if (!dirName) continue;
       try {
-        const phaseFiles = fs.readdirSync(path.join(phasesDir, dir));
+        const phaseFiles = fs.readdirSync(path.join(phasesDir, dirName));
         const hasSummary = phaseFiles.some(f => f.endsWith('-SUMMARY.md') || f === 'SUMMARY.md');
         if (hasSummary) completedPhases++;
       } catch { /* intentionally empty */ }
     }
-  } catch { /* intentionally empty */ }
+  } else {
+    // Fallback: no parseable ROADMAP — preserve legacy on-disk behavior.
+    try {
+      const entries = fs.readdirSync(phasesDir, { withFileTypes: true });
+      const dirs = entries.filter(e => e.isDirectory()).map(e => e.name);
+      phaseCount = dirs.length;
+      for (const dir of dirs) {
+        try {
+          const phaseFiles = fs.readdirSync(path.join(phasesDir, dir));
+          const hasSummary = phaseFiles.some(f => f.endsWith('-SUMMARY.md') || f === 'SUMMARY.md');
+          if (hasSummary) completedPhases++;
+        } catch { /* intentionally empty */ }
+      }
+    } catch { /* intentionally empty */ }
+  }
 
   // Check archive
   const archiveDir = path.join(planningRoot(cwd), 'archive');
@@ -1230,6 +1280,7 @@ function cmdInitProgress(cwd, raw) {
   // Build set of phases defined in ROADMAP for the current milestone
   const roadmapPhaseNums = new Set();
   const roadmapPhaseNames = new Map();
+  const roadmapCheckboxStates = new Map();
   try {
     const roadmapContent = extractCurrentMilestone(
       fs.readFileSync(path.join(planningDir(cwd), 'ROADMAP.md'), 'utf-8'), cwd
@@ -1239,6 +1290,13 @@ function cmdInitProgress(cwd, raw) {
     while ((hm = headingPattern.exec(roadmapContent)) !== null) {
       roadmapPhaseNums.add(hm[1]);
       roadmapPhaseNames.set(hm[1], hm[2].replace(/\(INSERTED\)/i, '').trim());
+    }
+    // #2646: parse `- [x] Phase N` checkbox states so ROADMAP-only phases
+    // inherit completion from the ROADMAP when no phase directory exists.
+    const cbPattern = /-\s*\[(x| )\]\s*.*Phase\s+(\d+[A-Z]?(?:\.\d+)*)[:\s]/gi;
+    let cbm;
+    while ((cbm = cbPattern.exec(roadmapContent)) !== null) {
+      roadmapCheckboxStates.set(cbm[2], cbm[1].toLowerCase() === 'x');
     }
   } catch { /* intentionally empty */ }
 
@@ -1295,21 +1353,27 @@ function cmdInitProgress(cwd, raw) {
     }
   } catch { /* intentionally empty */ }
 
-  // Add phases defined in ROADMAP but not yet scaffolded to disk
+  // Add phases defined in ROADMAP but not yet scaffolded to disk. When the
+  // ROADMAP has a `- [x] Phase N` checkbox, honor it as 'complete' so
+  // completed_count and status reflect the ROADMAP source of truth (#2646).
   for (const [num, name] of roadmapPhaseNames) {
     const stripped = num.replace(/^0+/, '') || '0';
     if (!seenPhaseNums.has(stripped)) {
+      const checkboxComplete =
+        roadmapCheckboxStates.get(num) === true ||
+        roadmapCheckboxStates.get(stripped) === true;
+      const status = checkboxComplete ? 'complete' : 'not_started';
       const phaseInfo = {
         number: num,
         name: name.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, ''),
         directory: null,
-        status: 'not_started',
+        status,
         plan_count: 0,
         summary_count: 0,
         has_research: false,
       };
       phases.push(phaseInfo);
-      if (!nextPhase && !currentPhase) {
+      if (!nextPhase && !currentPhase && status !== 'complete') {
         nextPhase = phaseInfo;
       }
     }

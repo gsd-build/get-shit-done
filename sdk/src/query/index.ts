@@ -32,6 +32,7 @@ import {
   stateRecordMetric, stateUpdateProgress, stateAddDecision,
   stateAddBlocker, stateResolveBlocker, stateRecordSession,
   stateSignalWaiting, stateSignalResume, stateValidate, stateSync, statePrune,
+  stateMilestoneSwitch, stateAddRoadmapEvolution,
 } from './state-mutation.js';
 import {
   configSet, configSetModelProfile, configNewProject, configEnsureSection,
@@ -133,6 +134,8 @@ export const QUERY_MUTATION_COMMANDS = new Set<string>([
   'state.signal-resume', 'state signal-resume',
   'state.sync', 'state sync',
   'state.prune', 'state prune',
+  'state.milestone-switch', 'state milestone-switch',
+  'state.add-roadmap-evolution', 'state add-roadmap-evolution',
   'frontmatter.set', 'frontmatter.merge', 'frontmatter.validate', 'frontmatter validate',
   'config-set', 'config-set-model-profile', 'config-new-project', 'config-ensure-section',
   'commit', 'check-commit', 'commit-to-subrepo',
@@ -321,6 +324,10 @@ export function createRegistry(
   registry.register('state.validate', stateValidate);
   registry.register('state.sync', stateSync);
   registry.register('state.prune', statePrune);
+  registry.register('state.milestone-switch', stateMilestoneSwitch);
+  registry.register('state.add-roadmap-evolution', stateAddRoadmapEvolution);
+  registry.register('state milestone-switch', stateMilestoneSwitch);
+  registry.register('state add-roadmap-evolution', stateAddRoadmapEvolution);
   registry.register('state signal-waiting', stateSignalWaiting);
   registry.register('state signal-resume', stateSignalResume);
   registry.register('state validate', stateValidate);

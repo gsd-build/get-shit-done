@@ -288,26 +288,40 @@ function loadConfig(cwd) {
     // Auto-detect and sync sub_repos: scan for child directories with .git
     let configDirty = false;
 
-    // Migrate legacy "multiRepo: true" boolean → sub_repos array
+    // Migrate legacy "multiRepo: true" boolean → planning.sub_repos array.
+    // Canonical location is planning.sub_repos (#2561); writing to top-level
+    // would be flagged as unknown by the validator below (#2638).
     if (parsed.multiRepo === true && !parsed.sub_repos && !parsed.planning?.sub_repos) {
       const detected = detectSubRepos(cwd);
       if (detected.length > 0) {
-        parsed.sub_repos = detected;
         if (!parsed.planning) parsed.planning = {};
+        parsed.planning.sub_repos = detected;
         parsed.planning.commit_docs = false;
         delete parsed.multiRepo;
         configDirty = true;
       }
     }
 
-    // Keep sub_repos in sync with actual filesystem
-    const currentSubRepos = parsed.sub_repos || parsed.planning?.sub_repos || [];
+    // Self-heal legacy/buggy installs: strip any stale top-level sub_repos,
+    // preserving its value as the planning.sub_repos seed if that slot is empty.
+    if (Object.prototype.hasOwnProperty.call(parsed, 'sub_repos')) {
+      if (!parsed.planning) parsed.planning = {};
+      if (!parsed.planning.sub_repos) {
+        parsed.planning.sub_repos = parsed.sub_repos;
+      }
+      delete parsed.sub_repos;
+      configDirty = true;
+    }
+
+    // Keep planning.sub_repos in sync with actual filesystem
+    const currentSubRepos = parsed.planning?.sub_repos || [];
     if (Array.isArray(currentSubRepos) && currentSubRepos.length > 0) {
       const detected = detectSubRepos(cwd);
       if (detected.length > 0) {
         const sorted = [...currentSubRepos].sort();
         if (JSON.stringify(sorted) !== JSON.stringify(detected)) {
-          parsed.sub_repos = detected;
+          if (!parsed.planning) parsed.planning = {};
+          parsed.planning.sub_repos = detected;
           configDirty = true;
         }
       }
@@ -1742,11 +1756,28 @@ function resolveReasoningEffortInternal(cwd, agentType) {
  */
 function extractOneLinerFromBody(content) {
   if (!content) return null;
+  // Normalize EOLs so matching works for LF and CRLF files.
+  const normalized = content.replace(/\r\n/g, '\n').replace(/\r/g, '\n');
   // Strip frontmatter first
-  const body = content.replace(/^---\n[\s\S]*?\n---\n*/, '');
-  // Find the first **...** line after a # heading
-  const match = body.match(/^#[^\n]*\n+\*\*([^*]+)\*\*/m);
-  return match ? match[1].trim() : null;
+  const body = normalized.replace(/^---\n[\s\S]*?\n---\n*/, '');
+  // Find the first **...** span on a line after a # heading.
+  // Two supported template forms:
+  //   1) Labeled:  **One-liner:** Real prose here.   (bug #2660 — new template)
+  //   2) Bare:     **Real prose here.**              (legacy template)
+  // For (1), the first bold span ends in a colon and the prose that follows
+  // on the same line is the one-liner. For (2), the bold span itself is the
+  // one-liner.
+  const match = body.match(/^#[^\n]*\n+\*\*([^*\n]+)\*\*([^\n]*)/m);
+  if (!match) return null;
+  const boldInner = match[1].trim();
+  const afterBold = match[2];
+  // Labeled form: bold span is a "Label:" prefix — capture prose after it.
+  if (/:\s*$/.test(boldInner)) {
+    const prose = afterBold.trim();
+    return prose.length > 0 ? prose : null;
+  }
+  // Bare form: the bold content itself is the one-liner.
+  return boldInner.length > 0 ? boldInner : null;
 }
 
 // ─── Misc utilities ───────────────────────────────────────────────────────────

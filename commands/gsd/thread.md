@@ -38,7 +38,7 @@ ls .planning/threads/*.md 2>/dev/null
 For each thread file found:
 - Read frontmatter `status` field via:
   ```bash
-  gsd-sdk query frontmatter.get .planning/threads/{file} status 2>/dev/null
+  gsd-sdk query frontmatter.get .planning/threads/{file} status
   ```
 - If frontmatter `status` field is missing, fall back to reading markdown heading `## Status: OPEN` (or IN PROGRESS / RESOLVED) from the file body
 - Read frontmatter `updated` field for the last-updated date

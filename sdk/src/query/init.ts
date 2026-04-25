@@ -26,7 +26,7 @@ import { homedir } from 'node:os';
 import { loadConfig, type GSDConfig } from '../config.js';
 import { resolveModel, MODEL_PROFILES } from './config-query.js';
 import { findPhase } from './phase.js';
-import { roadmapGetPhase, getMilestoneInfo } from './roadmap.js';
+import { roadmapGetPhase, getMilestoneInfo, extractCurrentMilestone, extractPhasesFromSection } from './roadmap.js';
 import { planningPaths, normalizePhaseName, toPosixPath, resolveAgentsDir, detectRuntime } from './helpers.js';
 import { relPlanningPath } from '../workstream-utils.js';
 import type { QueryHandler } from './utils.js';
@@ -780,19 +780,71 @@ export const initMilestoneOp: QueryHandler = async (_args, projectDir) => {
   let phaseCount = 0;
   let completedPhases = 0;
 
+  // Bug #2633 — ROADMAP.md (current milestone section) is the authority for
+  // phase counts, NOT the on-disk `.planning/phases/` directory. After
+  // `phases clear` between milestones, on-disk dirs will be a subset of the
+  // roadmap until each phase is materialized, and reading from disk causes
+  // `all_phases_complete: true` to fire as soon as the materialized subset
+  // gets summaries — even though the roadmap has phases still to do.
+  let roadmapPhaseNumbers: string[] = [];
+  try {
+    const { readFile } = await import('node:fs/promises');
+    const roadmapRaw = await readFile(join(planningDir, 'ROADMAP.md'), 'utf-8');
+    const currentSection = await extractCurrentMilestone(roadmapRaw, projectDir);
+    roadmapPhaseNumbers = extractPhasesFromSection(currentSection).map(p => p.number);
+  } catch { /* intentionally empty */ }
+
+  // Build the on-disk index keyed by the canonical full phase token (e.g.
+  // "3", "3A", "3.1") so distinct tokens with the same integer prefix never
+  // collide. Roadmap writes "Phase 3", "Phase 3A", and "Phase 3.1" as
+  // distinct phases and disk dirs preserve those tokens.
+  // Canonicalize a phase token by stripping leading zeros from the integer
+  // head while preserving any [A-Z]? suffix and dotted segments. So "03" →
+  // "3", "03A" → "3A", "03.1" → "3.1", "3A" → "3A". This lets disk dirs that
+  // pad ("03-alpha") match roadmap tokens ("Phase 3") without ever collapsing
+  // distinct tokens like "3" / "3A" / "3.1" into the same bucket.
+  const canonicalizePhase = (tok: string): string => {
+    const m = tok.match(/^(\d+)([A-Z]?(?:\.\d+)*)$/);
+    return m ? String(parseInt(m[1], 10)) + m[2] : tok;
+  };
+  const diskPhaseDirs: Map<string, string> = new Map();
   try {
     const entries = readdirSync(phasesDir, { withFileTypes: true });
-    const dirs = entries.filter(e => e.isDirectory()).map(e => e.name);
-    phaseCount = dirs.length;
+    for (const e of entries) {
+      if (!e.isDirectory()) continue;
+      const m = e.name.match(/^(\d+[A-Z]?(?:\.\d+)*)/);
+      if (!m) continue;
+      diskPhaseDirs.set(canonicalizePhase(m[1]), e.name);
+    }
+  } catch { /* intentionally empty */ }
 
-    for (const dir of dirs) {
+  if (roadmapPhaseNumbers.length > 0) {
+    phaseCount = roadmapPhaseNumbers.length;
+    for (const num of roadmapPhaseNumbers) {
+      const dirName = diskPhaseDirs.get(canonicalizePhase(num));
+      if (!dirName) continue;
       try {
-        const phaseFiles = readdirSync(join(phasesDir, dir));
+        const phaseFiles = readdirSync(join(phasesDir, dirName));
         const hasSummary = phaseFiles.some(f => f.endsWith('-SUMMARY.md') || f === 'SUMMARY.md');
         if (hasSummary) completedPhases++;
       } catch { /* intentionally empty */ }
     }
-  } catch { /* intentionally empty */ }
+  } else {
+    // Fallback: no parseable ROADMAP (e.g. brand-new project). Preserve the
+    // legacy on-disk-count behavior so existing no-roadmap tests still pass.
+    try {
+      const entries = readdirSync(phasesDir, { withFileTypes: true });
+      const dirs = entries.filter(e => e.isDirectory()).map(e => e.name);
+      phaseCount = dirs.length;
+      for (const dir of dirs) {
+        try {
+          const phaseFiles = readdirSync(join(phasesDir, dir));
+          const hasSummary = phaseFiles.some(f => f.endsWith('-SUMMARY.md') || f === 'SUMMARY.md');
+          if (hasSummary) completedPhases++;
+        } catch { /* intentionally empty */ }
+      }
+    } catch { /* intentionally empty */ }
+  }
 
   const archiveDir = join(projectDir, '.planning', 'archive');
   let archivedMilestones: string[] = [];

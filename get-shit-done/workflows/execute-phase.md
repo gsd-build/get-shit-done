@@ -69,7 +69,7 @@ Load all context in one call:
 ```bash
 INIT=$(gsd-sdk query init.execute-phase "${PHASE_ARG}")
 if [[ "$INIT" == @file:* ]]; then INIT=$(cat "${INIT#@file:}"); fi
-AGENT_SKILLS=$(gsd-sdk query agent-skills gsd-executor 2>/dev/null)
+AGENT_SKILLS=$(gsd-sdk query agent-skills gsd-executor)
 ```
 
 Parse JSON for: `executor_model`, `verifier_model`, `commit_docs`, `parallelization`, `branching_strategy`, `branch_name`, `phase_found`, `phase_dir`, `phase_number`, `phase_name`, `phase_slug`, `plans`, `incomplete_plans`, `plan_count`, `incomplete_count`, `state_exists`, `roadmap_exists`, `phase_req_ids`, `response_language`.
@@ -130,7 +130,7 @@ inline path for each plan.
 ```bash
 # REQUIRED: prevents stale auto-chain from previous --auto runs
 if [[ ! "$ARGUMENTS" =~ --auto ]]; then
-  gsd-sdk query config-set workflow._auto_chain_active false 2>/dev/null
+  gsd-sdk query config-set workflow._auto_chain_active false || true
 fi
 ```
 </step>
@@ -1339,7 +1339,7 @@ spawn template, and the two `workflow.drift_*` config keys.
 Verify phase achieved its GOAL, not just completed tasks.
 
 ```bash
-VERIFIER_SKILLS=$(gsd-sdk query agent-skills gsd-verifier 2>/dev/null)
+VERIFIER_SKILLS=$(gsd-sdk query agent-skills gsd-verifier)
 ```
 
 ```

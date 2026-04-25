@@ -45,7 +45,7 @@ First load the mapper agent's skill bundle (the executor's `AGENT_SKILLS`
 from step `init_context` is for `gsd-executor`, not the mapper):
 
 ```bash
-AGENT_SKILLS_MAPPER=$(gsd-sdk query agent-skills gsd-codebase-mapper 2>/dev/null || true)
+AGENT_SKILLS_MAPPER=$(gsd-sdk query agent-skills gsd-codebase-mapper)
 ```
 
 Then spawn `gsd-codebase-mapper` agents with the `--paths` hint:

@@ -886,6 +886,146 @@ export const stateResolveBlocker: QueryHandler = async (args, projectDir, workst
   } };
 };
 
+// ─── state.add-roadmap-evolution ─────────────────────────────────────────
+
+const VALID_ROADMAP_EVOLUTION_ACTIONS = new Set([
+  'inserted', 'removed', 'moved', 'edited', 'added',
+]);
+
+/**
+ * Format a canonical Roadmap Evolution entry line.
+ *
+ * Shapes match existing workflow templates (`insert-phase.md`, `add-phase.md`):
+ *   - inserted: `- Phase {phase} inserted after Phase {after}: {note} (URGENT)`
+ *   - added:    `- Phase {phase} added: {note}`
+ *   - removed:  `- Phase {phase} removed: {note}`
+ *   - moved:    `- Phase {phase} moved: {note}`
+ *   - edited:   `- Phase {phase} edited: {note}`
+ */
+function formatRoadmapEvolutionEntry(opts: {
+  phase: string;
+  action: string;
+  note?: string | null;
+  after?: string | null;
+  urgent?: boolean;
+}): string {
+  const { phase, action, note, after, urgent } = opts;
+  const trimmedNote = note ? note.trim() : '';
+  let line: string;
+  if (action === 'inserted') {
+    const afterClause = after ? ` after Phase ${after}` : '';
+    line = `- Phase ${phase} inserted${afterClause}`;
+    if (trimmedNote) line += `: ${trimmedNote}`;
+    if (urgent) line += ' (URGENT)';
+  } else {
+    // added | removed | moved | edited
+    line = `- Phase ${phase} ${action}`;
+    if (trimmedNote) line += `: ${trimmedNote}`;
+  }
+  return line;
+}
+
+/**
+ * Query handler for `state.add-roadmap-evolution`.
+ *
+ * Appends a single entry to the `### Roadmap Evolution` subsection under
+ * `## Accumulated Context` in STATE.md. Creates the subsection if missing.
+ * Deduplicates on exact line match against existing entries.
+ *
+ * Canonical replacement for the raw `Edit`/`Write` instructions in
+ * `insert-phase.md` / `add-phase.md` step "update_project_state" so that
+ * projects with a `protect-files.sh` PreToolUse hook blocking direct
+ * STATE.md writes still update the Roadmap Evolution log.
+ *
+ * argv: `--phase`, `--action` (inserted|removed|moved|edited|added),
+ *       `--note` (optional), `--after` (optional, for `inserted`),
+ *       `--urgent` (boolean flag, appends "(URGENT)" when action=inserted).
+ *
+ * Returns `{ added: true, entry }` on success, or
+ * `{ added: false, reason: 'duplicate', entry }` when an identical line
+ * already exists.
+ *
+ * Throws `GSDError` with `ErrorClassification.Validation` when required
+ * inputs are missing or `--action` is not in the allowed set.
+ *
+ * Atomicity: goes through `readModifyWriteStateMd` which holds a lockfile
+ * across read -> transform -> write. Matches sibling mutation handlers.
+ */
+export const stateAddRoadmapEvolution: QueryHandler = async (args, projectDir, workstream) => {
+  const parsed = parseNamedArgs(args, ['phase', 'action', 'note', 'after'], ['urgent']);
+  const phase = (parsed.phase as string | null) ?? null;
+  const action = (parsed.action as string | null) ?? null;
+  const note = (parsed.note as string | null) ?? null;
+  const after = (parsed.after as string | null) ?? null;
+  const urgent = Boolean(parsed.urgent);
+
+  if (!phase) {
+    throw new GSDError('phase required for state.add-roadmap-evolution', ErrorClassification.Validation);
+  }
+  if (!action) {
+    throw new GSDError('action required for state.add-roadmap-evolution', ErrorClassification.Validation);
+  }
+  if (!VALID_ROADMAP_EVOLUTION_ACTIONS.has(action)) {
+    throw new GSDError(
+      `invalid action "${action}" (expected one of: ${Array.from(VALID_ROADMAP_EVOLUTION_ACTIONS).join(', ')})`,
+      ErrorClassification.Validation,
+    );
+  }
+
+  const entry = formatRoadmapEvolutionEntry({ phase, action, note, after, urgent });
+
+  let added = false;
+  let duplicate = false;
+
+  await readModifyWriteStateMd(projectDir, (content) => {
+    // Match `### Roadmap Evolution` subsection up to the next heading or EOF.
+    const subsectionPattern = /(###\s*Roadmap Evolution\s*\n)([\s\S]*?)(?=\n###?\s|\n##[^#]|$)/i;
+    const match = content.match(subsectionPattern);
+
+    if (match) {
+      let sectionBody = match[2];
+      // Dedupe: exact line match against any existing entry line.
+      const existingLines = sectionBody.split('\n').map(l => l.trim());
+      if (existingLines.some(l => l === entry.trim())) {
+        duplicate = true;
+        return content;
+      }
+      // Strip placeholder "None" / "None yet." lines.
+      sectionBody = sectionBody.replace(/^None(?:\s+yet)?\.?\s*$/gim, '');
+      sectionBody = sectionBody.trimEnd() + '\n' + entry + '\n';
+      content = content.replace(subsectionPattern, (_m, header: string) => `${header}${sectionBody}`);
+      added = true;
+      return content;
+    }
+
+    // Subsection missing — create it.
+    const accumulatedPattern = /(##\s*Accumulated Context\s*\n)/i;
+    const newSubsection = `\n### Roadmap Evolution\n\n${entry}\n`;
+
+    if (accumulatedPattern.test(content)) {
+      // Insert immediately after the "## Accumulated Context" header.
+      content = content.replace(accumulatedPattern, (_m, header: string) => `${header}${newSubsection}`);
+      added = true;
+      return content;
+    }
+
+    // No Accumulated Context section either — append both at EOF.
+    const suffix = `\n## Accumulated Context\n${newSubsection}`;
+    content = content.trimEnd() + suffix + '\n';
+    added = true;
+    return content;
+  }, workstream);
+
+  if (duplicate) {
+    return { data: { added: false, reason: 'duplicate', entry } };
+  }
+  if (added) {
+    return { data: { added: true, entry } };
+  }
+  // Unreachable given the logic above, but defensive.
+  return { data: { added: false, reason: 'unknown', entry } };
+};
+
 /**
  * Query handler for state.record-session command.
  * argv: `--stopped-at`, `--resume-file` (see `cmdStateRecordSession` in `state.cjs`).
@@ -980,6 +1120,124 @@ export const statePlannedPhase: QueryHandler = async (args, projectDir, workstre
   }, workstream);
 
   return { data: { updated, phase: phaseNumber, plan_count: planCount } };
+};
+
+// ─── stateMilestoneSwitch (bug #2630) ─────────────────────────────────────
+
+/**
+ * Query handler for `state.milestone-switch` — resets STATE.md for a new
+ * milestone cycle (bug #2630 regression guard).
+ *
+ * The `/gsd:new-milestone` workflow only rewrote STATE.md's body (Current
+ * Position section). The YAML frontmatter (`milestone`, `milestone_name`,
+ * `status`, `progress.*`) was never touched on a mid-flight switch, so queries
+ * that read frontmatter (`state.json`, `getMilestoneInfo`, every handler that
+ * calls `buildStateFrontmatter`) kept reporting the old milestone and stale
+ * progress counters until the first phase advance forced a resync.
+ *
+ * This handler performs the reset atomically under the STATE.md lock:
+ * - Stomps frontmatter milestone/milestone_name with the caller-supplied
+ *   values so `parseMilestoneFromState` reports the new milestone immediately.
+ * - Resets `status` to `'planning'` (workflow is at "Defining requirements").
+ * - Resets `progress` counters to zero (new milestone, nothing executed yet).
+ * - Rewrites the `## Current Position` body to the new-milestone template so
+ *   subsequent body-derived field extraction stays consistent with frontmatter.
+ * - Preserves Accumulated Context (decisions, todos, blockers) — symmetric
+ *   with `milestone.complete` which also keeps history.
+ *
+ * Args (named, matches gsd-tools style):
+ * - `--version <vX.Y>` (required)
+ * - `--name <milestone name>` (optional; defaults to 'milestone')
+ *
+ * Sibling CJS parity: `cmdInitNewMilestone` in `init.cjs` is read-only (like
+ * the TS `initNewMilestone`). The workflow-level fix is to call
+ * `state.milestone-switch` from `/gsd:new-milestone` Step 5 in place of the
+ * manual body rewrite.
+ */
+export const stateMilestoneSwitch: QueryHandler = async (args, projectDir, workstream) => {
+  // NOTE: the CLI flag is `--milestone` (not `--version`). gsd-tools reserves
+  // `--version` as a globally-invalid help flag, so the workflow invokes this
+  // handler with `--milestone vX.Y`. The internal variable is still `version`
+  // because the value is a milestone version string.
+  const parsed = parseNamedArgs(args, ['milestone', 'name']);
+  const version = (parsed.milestone as string | null)?.trim();
+  const name = ((parsed.name as string | null) ?? 'milestone').trim() || 'milestone';
+
+  if (!version) {
+    return { data: { error: 'milestone required (--milestone <vX.Y>)' } };
+  }
+
+  const today = new Date().toISOString().split('T')[0]!;
+  const statePath = planningPaths(projectDir, workstream).state;
+  const lockPath = await acquireStateLock(statePath);
+
+  try {
+    let content = '';
+    try {
+      content = await readFile(statePath, 'utf-8');
+    } catch { /* STATE.md may not exist yet */ }
+
+    const existingFm = extractFrontmatter(content);
+    const body = stripFrontmatter(content);
+
+    // Reset Current Position section body so body-derived extraction stays
+    // consistent with the new frontmatter.
+    const positionPattern = /(##\s*Current Position\s*\n)([\s\S]*?)(?=\n##|$)/i;
+    const resetPositionBody =
+      `\nPhase: Not started (defining requirements)\n` +
+      `Plan: —\n` +
+      `Status: Defining requirements\n` +
+      `Last activity: ${today} — Milestone ${version} started\n\n`;
+    let newBody: string;
+    if (positionPattern.test(body)) {
+      newBody = body.replace(positionPattern, (_m, header: string) => `${header}${resetPositionBody}`);
+    } else {
+      // Preserve any existing body but prepend a Current Position section.
+      const preface = body.trim().length > 0 ? body : '# Project State\n';
+      newBody = `${preface.trimEnd()}\n\n## Current Position\n${resetPositionBody}`;
+    }
+
+    // Build fresh frontmatter explicitly — do NOT rely on buildStateFrontmatter
+    // here, because getMilestoneInfo reads the ON-DISK STATE.md and would
+    // return the OLD milestone until we write it first. This is the crux of
+    // bug #2630: any sync-based approach races against the very file it is
+    // about to rewrite.
+    const fm: Record<string, unknown> = {
+      gsd_state_version: '1.0',
+      milestone: version,
+      milestone_name: name,
+      status: 'planning',
+      last_updated: new Date().toISOString(),
+      last_activity: today,
+      progress: {
+        total_phases: 0,
+        completed_phases: 0,
+        total_plans: 0,
+        completed_plans: 0,
+        percent: 0,
+      },
+    };
+    // Preserve frontmatter-only fields the caller may still care about
+    // (paused_at cleared deliberately — a new milestone is a fresh start).
+    if (existingFm.gsd_state_version) {
+      fm.gsd_state_version = existingFm.gsd_state_version;
+    }
+
+    const yamlStr = reconstructFrontmatter(fm);
+    const assembled = `---\n${yamlStr}\n---\n\n${newBody.replace(/^\n+/, '')}`;
+    await writeFile(statePath, normalizeMd(assembled), 'utf-8');
+
+    return {
+      data: {
+        switched: true,
+        version,
+        name,
+        status: 'planning',
+      },
+    };
+  } finally {
+    await releaseStateLock(lockPath);
+  }
 };
 
 // ─── parseNamedArgs (matches gsd-tools.cjs) ───────────────────────────────

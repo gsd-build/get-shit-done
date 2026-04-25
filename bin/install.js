@@ -1114,10 +1114,30 @@ function convertClaudeCommandToCopilotSkill(content, skillName, isGlobal = false
 }
 
 /**
+ * Map a skill directory name (gsd-<cmd>) to the frontmatter `name:` used
+ * by Claude Code as the skill identity. Workflows emit `Skill(skill="gsd:<cmd>")`
+ * (colon form) and Claude Code resolves skills by frontmatter `name:`, not
+ * directory name — so emit colon form here. Directory stays hyphenated for
+ * Windows path safety. See #2643.
+ *
+ * Codex must NOT use this helper: its adapter invokes skills as `$gsd-<cmd>`
+ * (shell-var syntax) and a colon would terminate the variable name. Codex
+ * keeps the hyphen form via `yamlQuote(skillName)` directly.
+ */
+function skillFrontmatterName(skillDirName) {
+  if (typeof skillDirName !== 'string') return skillDirName;
+  // Idempotent on already-colon form.
+  if (skillDirName.includes(':')) return skillDirName;
+  // Only rewrite the first hyphen after the `gsd` prefix.
+  return skillDirName.replace(/^gsd-/, 'gsd:');
+}
+
+/**
  * Convert a Claude command (.md) to a Claude skill (SKILL.md).
  * Claude Code is the native format, so minimal conversion needed —
- * preserve allowed-tools as YAML multiline list, preserve argument-hint,
- * convert name from gsd:xxx to gsd-xxx format.
+ * preserve allowed-tools as YAML multiline list, preserve argument-hint.
+ * Emits `name: gsd:<cmd>` (colon) so Skill(skill="gsd:<cmd>") calls in
+ * workflows resolve on flat-skills installs — see #2643.
  */
 function convertClaudeCommandToClaudeSkill(content, skillName) {
   const { frontmatter, body } = extractFrontmatterAndBody(content);
@@ -1137,7 +1157,8 @@ function convertClaudeCommandToClaudeSkill(content, skillName) {
   }
 
   // Reconstruct frontmatter in Claude skill format
-  let fm = `---\nname: ${skillName}\ndescription: ${yamlQuote(description)}\n`;
+  const frontmatterName = skillFrontmatterName(skillName);
+  let fm = `---\nname: ${frontmatterName}\ndescription: ${yamlQuote(description)}\n`;
   if (argumentHint) fm += `argument-hint: ${yamlQuote(argumentHint)}\n`;
   if (agent) fm += `agent: ${agent}\n`;
   if (toolsBlock) fm += toolsBlock;
@@ -1873,6 +1894,14 @@ function convertClaudeToCodexMarkdown(content) {
   converted = converted.replace(/\$HOME\/\.claude\//g, '$HOME/.codex/');
   converted = converted.replace(/~\/\.claude\//g, '~/.codex/');
   converted = converted.replace(/\.\/\.claude\//g, './.codex/');
+  // Bare/project-relative .claude/... references (#2639). Covers strings like
+  // "check `.claude/skills/`" where there is no ~/, $HOME/, or ./ anchor.
+  // Negative lookbehind prevents double-replacing already-anchored forms and
+  // avoids matching inside URLs or other slash-prefixed paths.
+  converted = converted.replace(/(?<![A-Za-z0-9_\-./~$])\.claude\//g, '.codex/');
+  // `.claudeignore` → `.codexignore` (#2639). Codex honors its own ignore
+  // file; leaving the Claude-specific name is misleading in agent prompts.
+  converted = converted.replace(/\.claudeignore\b/g, '.codexignore');
   // Runtime-neutral agent name replacement (#766)
   converted = neutralizeAgentReferences(converted, 'AGENTS.md');
   return converted;
@@ -2037,7 +2066,10 @@ function generateCodexConfigBlock(agents, targetDir) {
   ];
 
   for (const { name, description } of agents) {
-    lines.push(`[agents.${name}]`);
+    // #2645 — Codex schema requires [[agents]] array-of-tables, not [agents.<name>] maps.
+    // Emitting [agents.<name>] produces `invalid type: map, expected a sequence` on load.
+    lines.push(`[[agents]]`);
+    lines.push(`name = ${JSON.stringify(name)}`);
     lines.push(`description = ${JSON.stringify(description)}`);
     lines.push(`config_file = "${agentsPrefix}/${name}.toml"`);
     lines.push('');
@@ -2046,8 +2078,39 @@ function generateCodexConfigBlock(agents, targetDir) {
   return lines.join('\n');
 }
 
+/**
+ * Strip any managed GSD agent sections from a TOML string.
+ *
+ * Handles BOTH shapes so reinstall self-heals broken legacy configs:
+ *   - Legacy: `[agents.gsd-*]` single-keyed map tables (pre-#2645).
+ *   - Current: `[[agents]]` array-of-tables whose `name = "gsd-*"`.
+ *
+ * A section runs from its header to the next `[` header or EOF.
+ */
 function stripCodexGsdAgentSections(content) {
-  return content.replace(/^\[agents\.gsd-[^\]]+\]\n(?:(?!\[)[^\n]*\n?)*/gm, '');
+  // Use the TOML-aware section parser so we never absorb adjacent user-authored
+  // tables — even if their headers are indented or otherwise oddly placed.
+  const sections = getTomlTableSections(content).filter((section) => {
+    // Legacy `[agents.gsd-<name>]` map tables (pre-#2645).
+    if (!section.array && /^agents\.gsd-/.test(section.path)) {
+      return true;
+    }
+
+    // Current `[[agents]]` array-of-tables — only strip blocks whose
+    // `name = "gsd-..."`, preserving user-authored [[agents]] entries.
+    if (section.array && section.path === 'agents') {
+      const body = content.slice(section.headerEnd, section.end);
+      const nameMatch = body.match(/^[ \t]*name[ \t]*=[ \t]*["']([^"']+)["']/m);
+      return Boolean(nameMatch && /^gsd-/.test(nameMatch[1]));
+    }
+
+    return false;
+  });
+
+  return removeContentRanges(
+    content,
+    sections.map(({ start, end }) => ({ start, end })),
+  );
 }
 
 function compareSemver(a, b) {
@@ -3148,13 +3211,27 @@ function isLegacyGsdAgentsSection(body) {
 
 function stripLeakedGsdCodexSections(content) {
   const leakedSections = getTomlTableSections(content)
-    .filter((section) =>
-      section.path.startsWith('agents.gsd-') ||
-      (
+    .filter((section) => {
+      // Legacy [agents.gsd-<name>] map tables (pre-#2645).
+      if (!section.array && section.path.startsWith('agents.gsd-')) return true;
+
+      // Legacy bare [agents] table with only the old max_threads/max_depth keys.
+      if (
+        !section.array &&
         section.path === 'agents' &&
         isLegacyGsdAgentsSection(content.slice(section.headerEnd, section.end))
-      )
-    );
+      ) return true;
+
+      // Current [[agents]] array-of-tables whose name is gsd-*. Preserve
+      // user-authored [[agents]] entries (other names) untouched.
+      if (section.array && section.path === 'agents') {
+        const body = content.slice(section.headerEnd, section.end);
+        const nameMatch = body.match(/^[ \t]*name[ \t]*=[ \t]*["']([^"']+)["']/m);
+        if (nameMatch && /^gsd-/.test(nameMatch[1])) return true;
+      }
+
+      return false;
+    });
 
   if (leakedSections.length === 0) {
     return content;
@@ -3755,15 +3832,16 @@ function installCodexConfig(targetDir, agentsSrc) {
 
   for (const file of agentEntries) {
     let content = fs.readFileSync(path.join(agentsSrc, file), 'utf8');
-    // Replace full .claude/get-shit-done prefix so path resolves to codex GSD install
+    // Replace full .claude/get-shit-done prefix so path resolves to the Codex
+    // GSD install before generic .claude → .codex conversion rewrites it.
     content = content.replace(/~\/\.claude\/get-shit-done\//g, codexGsdPath);
     content = content.replace(/\$HOME\/\.claude\/get-shit-done\//g, codexGsdPath);
-    // Replace remaining .claude paths with .codex equivalents (#2320).
-    // Capture group handles both trailing-slash form (~/.claude/) and
-    // bare end-of-string form (~/.claude) in a single pass.
-    content = content.replace(/\$HOME\/\.claude(\/|$)/g, '$HOME/.codex$1');
-    content = content.replace(/~\/\.claude(\/|$)/g, '~/.codex$1');
-    content = content.replace(/\.\/\.claude(\/|$)/g, './.codex$1');
+    // Route TOML emit through the same full Claude→Codex conversion pipeline
+    // used on the `.md` emit path (#2639). Covers: slash-command rewrites,
+    // $ARGUMENTS → {{GSD_ARGS}}, /clear removal, anchored and bare .claude/
+    // paths, .claudeignore → .codexignore, and standalone "Claude" /
+    // CLAUDE.md neutralization via neutralizeAgentReferences(..., 'AGENTS.md').
+    content = convertClaudeToCodexMarkdown(content);
     const { frontmatter } = extractFrontmatterAndBody(content);
     const name = extractFrontmatterField(frontmatter, 'name') || file.replace('.md', '');
     const description = extractFrontmatterField(frontmatter, 'description') || '';
@@ -7585,8 +7663,72 @@ function maybeSuggestPathExport(globalBin, homeDir) {
  * --no-sdk skips the check entirely (back-compat).
  * --sdk forces the check even if it would otherwise be skipped.
  */
-function installSdkIfNeeded() {
-  if (hasNoSdk) {
+/**
+ * Classify the install context for the SDK directory.
+ *
+ * Distinguishes three shapes the installer must handle differently when
+ * `sdk/dist/` is missing:
+ *
+ *   - `tarball` + `npxCache: true`
+ *       User ran `npx get-shit-done-cc@latest`. sdk/ lives under
+ *       `<npm-cache>/_npx/<hash>/node_modules/get-shit-done-cc/sdk` which
+ *       is treated as read-only by npm/npx on Windows (#2649). We MUST
+ *       NOT attempt a nested `npm install` there — it will fail with
+ *       EACCES/EPERM and produce the misleading "Failed to npm install
+ *       in sdk/" error the user reported. Point at the global upgrade.
+ *
+ *   - `tarball` + `npxCache: false`
+ *       User ran a global install (`npm i -g get-shit-done-cc`). sdk/dist
+ *       ships in the published tarball; if it's missing, the published
+ *       artifact itself is broken (see #2647). Same user-facing fix:
+ *       upgrade to latest.
+ *
+ *   - `dev-clone`
+ *       Developer running from a git clone. Keep the existing "cd sdk &&
+ *       npm install && npm run build" hint — the user is expected to run
+ *       that themselves. The installer itself never shells out to npm.
+ *
+ * Detection heuristics are path-based and side-effect-free: we look for
+ * `_npx` and `node_modules` segments that indicate a packaged install,
+ * and for a `.git` directory nearby that indicates a clone. A best-effort
+ * write probe detects read-only filesystems (tmpfile create + unlink);
+ * probe failures are treated as read-only.
+ */
+function classifySdkInstall(sdkDir) {
+  const path = require('path');
+  const fs = require('fs');
+  const segments = sdkDir.split(/[\\/]+/);
+  const npxCache = segments.includes('_npx');
+  const inNodeModules = segments.includes('node_modules');
+  const parent = path.dirname(sdkDir);
+  const hasGitNearby = fs.existsSync(path.join(parent, '.git'));
+
+  let mode;
+  if (hasGitNearby && !npxCache && !inNodeModules) {
+    mode = 'dev-clone';
+  } else if (npxCache || inNodeModules) {
+    mode = 'tarball';
+  } else {
+    mode = 'dev-clone';
+  }
+
+  let readOnly = npxCache; // assume true for npx cache
+  if (!readOnly) {
+    try {
+      const probe = path.join(sdkDir, `.gsd-write-probe-${process.pid}`);
+      fs.writeFileSync(probe, '');
+      fs.unlinkSync(probe);
+    } catch {
+      readOnly = true;
+    }
+  }
+
+  return { mode, npxCache, readOnly };
+}
+
+function installSdkIfNeeded(opts) {
+  opts = opts || {};
+  if (hasNoSdk && !opts.sdkDir) {
     console.log(`\n  ${dim}Skipping GSD SDK check (--no-sdk)${reset}`);
     return;
   }
@@ -7594,9 +7736,11 @@ function installSdkIfNeeded() {
   const path = require('path');
   const fs = require('fs');
 
-  const sdkCliPath = path.resolve(__dirname, '..', 'sdk', 'dist', 'cli.js');
+  const sdkDir = opts.sdkDir || path.resolve(__dirname, '..', 'sdk');
+  const sdkCliPath = path.join(sdkDir, 'dist', 'cli.js');
 
   if (!fs.existsSync(sdkCliPath)) {
+    const ctx = classifySdkInstall(sdkDir);
     const bar = '━'.repeat(72);
     const redBold = `${red}${bold}`;
     console.error('');
@@ -7605,9 +7749,33 @@ function installSdkIfNeeded() {
     console.error(`${redBold}${bar}${reset}`);
     console.error(`  ${red}Reason:${reset} sdk/dist/cli.js not found at ${sdkCliPath}`);
     console.error('');
-    console.error(`  This should not happen with a published tarball install.`);
-    console.error(`  If you are running from a git clone, build the SDK first:`);
-    console.error(`    ${cyan}cd sdk && npm install && npm run build${reset}`);
+
+    if (ctx.mode === 'tarball') {
+      // User install (including `npx get-shit-done-cc@latest`, which stages
+      // a read-only tarball under the npx cache). The sdk/dist/ artifact
+      // should ship in the published tarball. If it's missing, the only
+      // sane fix from the user's side is a fresh global install of a
+      // version that includes dist/. Do NOT attempt a nested `npm install`
+      // inside the (read-only) npx cache — that's the #2649 failure mode.
+      if (ctx.npxCache) {
+        console.error(`  Detected read-only npx cache install (${dim}${sdkDir}${reset}).`);
+        console.error(`  The installer will ${bold}not${reset} attempt \`npm install\` inside the npx cache.`);
+        console.error('');
+      } else {
+        console.error(`  The published tarball appears to be missing sdk/dist/ (see #2647).`);
+        console.error('');
+      }
+      console.error(`  Fix: install a version that ships sdk/dist/ globally:`);
+      console.error(`    ${cyan}npm install -g get-shit-done-cc@latest${reset}`);
+      console.error(`  Or, if you prefer a one-shot run, clear the npx cache first:`);
+      console.error(`    ${cyan}npx --yes get-shit-done-cc@latest${reset}`);
+      console.error(`  Or build from source (git clone):`);
+      console.error(`    ${cyan}git clone https://github.com/gsd-build/get-shit-done && cd get-shit-done/sdk && npm install && npm run build${reset}`);
+    } else {
+      // Dev clone: keep the existing build-from-source hint.
+      console.error(`  Running from a git clone — build the SDK first:`);
+      console.error(`    ${cyan}cd sdk && npm install && npm run build${reset}`);
+    }
     console.error(`${redBold}${bar}${reset}`);
     console.error('');
     process.exit(1);
@@ -7711,6 +7879,8 @@ if (process.env.GSD_TEST_MODE) {
     readGsdEffectiveModelOverrides,
     install,
     uninstall,
+    installSdkIfNeeded,
+    classifySdkInstall,
     convertClaudeCommandToCodexSkill,
     convertClaudeToOpencodeFrontmatter,
     convertClaudeToKiloFrontmatter,
@@ -7738,6 +7908,7 @@ if (process.env.GSD_TEST_MODE) {
     convertClaudeAgentToAntigravityAgent,
     copyCommandsAsAntigravitySkills,
     convertClaudeCommandToClaudeSkill,
+    skillFrontmatterName,
     copyCommandsAsClaudeSkills,
     convertClaudeToWindsurfMarkdown,
     convertClaudeCommandToWindsurfSkill,

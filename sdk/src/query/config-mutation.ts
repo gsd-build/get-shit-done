@@ -23,6 +23,7 @@ import { homedir } from 'node:os';
 import { join } from 'node:path';
 import { GSDError, ErrorClassification } from '../errors.js';
 import { VALID_PROFILES, getAgentToModelMapForProfile } from './config-query.js';
+import { VALID_CONFIG_KEYS, DYNAMIC_KEY_PATTERNS } from './config-schema.js';
 import { planningPaths } from './helpers.js';
 import { acquireStateLock, releaseStateLock } from './state-mutation.js';
 import type { QueryHandler } from './utils.js';
@@ -45,44 +46,8 @@ async function atomicWriteConfig(configPath: string, config: Record<string, unkn
 }
 
 // ─── VALID_CONFIG_KEYS ────────────────────────────────────────────────────
-
-/**
- * Allowlist of valid config key paths.
- *
- * Ported from config.cjs lines 14-37.
- * Dynamic patterns (agent_skills.*, features.*) are handled
- * separately in isValidConfigKey.
- */
-const VALID_CONFIG_KEYS = new Set([
-  'mode', 'granularity', 'parallelization', 'commit_docs', 'model_profile',
-  'search_gitignored', 'brave_search', 'firecrawl', 'exa_search',
-  'workflow.research', 'workflow.plan_check', 'workflow.verifier',
-  'workflow.nyquist_validation', 'workflow.ui_phase', 'workflow.ui_safety_gate',
-  'workflow.auto_advance', 'workflow.node_repair', 'workflow.node_repair_budget',
-  'workflow.text_mode',
-  'workflow.research_before_questions',
-  'workflow.discuss_mode',
-  'workflow.skip_discuss',
-  'workflow.ui_review',
-  'workflow.max_discuss_passes',
-  'workflow.use_worktrees',
-  'workflow.code_review',
-  'workflow.code_review_depth',
-  'git.branching_strategy', 'git.base_branch', 'git.phase_branch_template',
-  'git.milestone_branch_template', 'git.quick_branch_template',
-  'planning.commit_docs', 'planning.search_gitignored',
-  'workflow.subagent_timeout',
-  'workflow.context_coverage_gate',
-  'hooks.context_warnings',
-  'hooks.workflow_guard',
-  'features.thinking_partner',
-  'features.global_learnings',
-  'learnings.max_inject',
-  'context',
-  'project_code', 'phase_naming',
-  'manager.flags.discuss', 'manager.flags.plan', 'manager.flags.execute',
-  'response_language',
-]);
+// Imported from ./config-schema.js — single source of truth, kept in sync
+// with get-shit-done/bin/lib/config-schema.cjs by a CI parity test (#2653).
 
 // ─── CONFIG_KEY_SUGGESTIONS (D9 — match CJS config.cjs:57-67) ────────────
 
@@ -97,9 +62,13 @@ const CONFIG_KEY_SUGGESTIONS: Record<string, string> = {
   'hooks.research_questions': 'workflow.research_before_questions',
   'workflow.research_questions': 'workflow.research_before_questions',
   'workflow.codereview': 'workflow.code_review',
+  'workflow.review_command': 'workflow.code_review_command',
   'workflow.review': 'workflow.code_review',
   'workflow.code_review_level': 'workflow.code_review_depth',
   'workflow.review_depth': 'workflow.code_review_depth',
+  'review.model': 'review.models.<cli-name>',
+  'sub_repos': 'planning.sub_repos',
+  'plan_checker': 'workflow.plan_check',
 };
 
 // ─── isValidConfigKey ─────────────────────────────────────────────────────
@@ -117,11 +86,10 @@ const CONFIG_KEY_SUGGESTIONS: Record<string, string> = {
 export function isValidConfigKey(keyPath: string): { valid: boolean; suggestion?: string } {
   if (VALID_CONFIG_KEYS.has(keyPath)) return { valid: true };
 
-  // Dynamic patterns: agent_skills.<agent-type>
-  if (/^agent_skills\.[a-zA-Z0-9_-]+$/.test(keyPath)) return { valid: true };
-
-  // Dynamic patterns: features.<feature_name>
-  if (/^features\.[a-zA-Z0-9_]+$/.test(keyPath)) return { valid: true };
+  // Dynamic patterns — all sourced from shared config-schema (#2653).
+  // Covers agent_skills.*, review.models.*, features.*,
+  // claude_md_assembly.blocks.*, and model_profile_overrides.*.<tier>.
+  if (DYNAMIC_KEY_PATTERNS.some((p) => p.test(keyPath))) return { valid: true };
 
   // D9: Check curated suggestions before LCP fallback
   if (CONFIG_KEY_SUGGESTIONS[keyPath]) {
