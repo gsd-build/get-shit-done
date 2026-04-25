@@ -128,6 +128,103 @@ describe('execute-phase docs: user-facing wave flag', () => {
   });
 });
 
+describe('phase-plan-index: wave grouping behavior', () => {
+  test('phase-plan-index groups plans by wave frontmatter field', () => {
+    // allow-test-rule: behavioral — calls gsd-tools and asserts structured output
+    const fs = require('fs');
+    const path = require('path');
+    const tmpDir = createTempProject();
+    try {
+      const phaseDir = path.join(tmpDir, '.planning', 'phases', '01-alpha');
+      fs.mkdirSync(phaseDir, { recursive: true });
+
+      // Wave 1 plan
+      fs.writeFileSync(path.join(phaseDir, 'P001-PLAN.md'), [
+        '---',
+        'wave: 1',
+        'objective: First wave task',
+        'autonomous: true',
+        '---',
+        '',
+        '# Plan 001',
+        '',
+        '<objective>First wave task</objective>',
+        '',
+        '<task>Do the thing</task>',
+      ].join('\n'));
+
+      // Wave 2 plan
+      fs.writeFileSync(path.join(phaseDir, 'P002-PLAN.md'), [
+        '---',
+        'wave: 2',
+        'objective: Second wave task',
+        'autonomous: true',
+        '---',
+        '',
+        '# Plan 002',
+        '',
+        '<objective>Second wave task</objective>',
+        '',
+        '<task>Do the other thing</task>',
+      ].join('\n'));
+
+      const result = runGsdTools(['phase-plan-index', '1', '--raw'], tmpDir);
+      assert.ok(result.success, `phase-plan-index should succeed: ${result.error}`);
+
+      const data = JSON.parse(result.output);
+
+      // Wave grouping must be present
+      assert.ok(data.waves, 'output should have a waves property');
+      assert.deepEqual(data.waves['1'], ['P001'], 'wave 1 should contain P001');
+      assert.deepEqual(data.waves['2'], ['P002'], 'wave 2 should contain P002');
+
+      // Individual plan records must carry their wave numbers
+      const p001 = data.plans.find(p => p.id === 'P001');
+      const p002 = data.plans.find(p => p.id === 'P002');
+      assert.ok(p001, 'P001 should be in plans array');
+      assert.ok(p002, 'P002 should be in plans array');
+      assert.equal(p001.wave, 1, 'P001 should have wave=1');
+      assert.equal(p002.wave, 2, 'P002 should have wave=2');
+    } finally {
+      cleanup(tmpDir);
+    }
+  });
+
+  test('phase-plan-index defaults missing wave frontmatter to wave 1', () => {
+    // allow-test-rule: behavioral — exercises gsd-tools wave-defaulting logic
+    const fs = require('fs');
+    const path = require('path');
+    const tmpDir = createTempProject();
+    try {
+      const phaseDir = path.join(tmpDir, '.planning', 'phases', '01-alpha');
+      fs.mkdirSync(phaseDir, { recursive: true });
+
+      // Plan with no wave field in frontmatter
+      fs.writeFileSync(path.join(phaseDir, 'P001-PLAN.md'), [
+        '---',
+        'objective: No wave specified',
+        'autonomous: true',
+        '---',
+        '',
+        '# Plan 001',
+        '',
+        '<task>Some work</task>',
+      ].join('\n'));
+
+      const result = runGsdTools(['phase-plan-index', '1', '--raw'], tmpDir);
+      assert.ok(result.success, `phase-plan-index should succeed: ${result.error}`);
+
+      const data = JSON.parse(result.output);
+      const p001 = data.plans.find(p => p.id === 'P001');
+      assert.ok(p001, 'P001 should appear in plans');
+      assert.equal(p001.wave, 1, 'plan with no wave frontmatter should default to wave 1');
+      assert.deepEqual(data.waves['1'], ['P001'], 'defaulted plan should land in wave 1 group');
+    } finally {
+      cleanup(tmpDir);
+    }
+  });
+});
+
 describe('use_worktrees config: cross-workflow structural coverage', () => {
   const QUICK_PATH = path.join(__dirname, '..', 'get-shit-done', 'workflows', 'quick.md');
   const DIAGNOSE_PATH = path.join(__dirname, '..', 'get-shit-done', 'workflows', 'diagnose-issues.md');
