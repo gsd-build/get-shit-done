@@ -190,7 +190,7 @@ Parse HIGH_COUNT from the review agent's return message via the CYCLE_SUMMARY co
 
 ```bash
 # Extract the integer from "CYCLE_SUMMARY: current_high=N" in the agent's return message
-HIGH_COUNT=$(echo "$REVIEW_AGENT_RETURN" | grep -oE 'CYCLE_SUMMARY:\s*current_high=[0-9]+' | grep -oE '[0-9]+$')
+HIGH_COUNT=$(echo "$REVIEW_AGENT_RETURN" | grep -oE 'CYCLE_SUMMARY:\s*current_high=[0-9]+' | head -1 | grep -oE '[0-9]+$')
 
 if [ -z "$HIGH_COUNT" ]; then
   # Distinguish malformed contract from completely absent contract

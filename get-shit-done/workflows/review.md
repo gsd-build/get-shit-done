@@ -321,7 +321,7 @@ Combine all review responses into `{phase_dir}/{padded_phase}-REVIEWS.md`:
 ```markdown
 ---
 phase: {N}
-reviewers: [gemini, claude, codex, coderabbit, opencode, qwen, cursor, ollama, lm_studio, llama_cpp]
+reviewers: [{comma-separated list of reviewers actually invoked this run}]
 reviewed_at: {ISO timestamp}
 plans_reviewed: [{list of PLAN.md files}]
 ---
