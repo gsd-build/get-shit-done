@@ -354,8 +354,8 @@ export const configNewProject: QueryHandler = async (args, projectDir, _workstre
   // Build default config
   const defaults: Record<string, unknown> = {
     model_profile: 'balanced',
-    commit_docs: false,
-    parallelization: 1,
+    commit_docs: true,
+    parallelization: true,
     search_gitignored: false,
     brave_search: hasBraveSearch,
     firecrawl: hasFirecrawl,
