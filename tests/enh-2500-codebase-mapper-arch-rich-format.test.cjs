@@ -98,33 +98,26 @@ describe('enh-2500: gsd-codebase-mapper arch focus — rich architecture output'
   });
 
   test('template includes data flow traces with numbered steps', () => {
-    // The template should show numbered steps (1. ... 2. ... 3. ...) for request path tracing
-    const hasNumberedSteps =
-      /\d+\.\s+\[/.test(archTemplate) ||
-      /\d+\.\s+[A-Z]/.test(archTemplate) ||
-      archTemplate.includes('Request Flow') ||
-      archTemplate.includes('request flow') ||
-      archTemplate.includes('Data Flow') ||
-      archTemplate.includes('Primary Request Path');
+    const hasPrimaryRequestPath = /###\s+Primary Request Path/i.test(archTemplate);
+    const hasThreeNumberedSteps = /^\s*1\..+\n\s*2\..+\n\s*3\./m.test(archTemplate);
+    const hasFileLineRefs = /\(`\[.*:(?:line|\d+)\]`\)/.test(archTemplate);
 
     assert.ok(
-      hasNumberedSteps,
-      'ARCHITECTURE.md template must include data flow traces with numbered steps for primary request paths (#2500)'
+      hasPrimaryRequestPath && hasThreeNumberedSteps && hasFileLineRefs,
+      'ARCHITECTURE.md template must include a "Primary Request Path" section with numbered steps and file:line references (#2500)'
     );
   });
 
   test('template includes architectural constraints section', () => {
     const hasConstraints =
-      archTemplate.includes('Constraint') ||
-      archTemplate.includes('constraint') ||
-      archTemplate.includes('threading') ||
-      archTemplate.includes('Threading') ||
-      archTemplate.includes('Critical') ||
-      archTemplate.includes('Invariant');
+      /##\s+Architectural Constraints/i.test(archTemplate) &&
+      /\bThreading\b/.test(archTemplate) &&
+      /\bGlobal state\b/i.test(archTemplate) &&
+      /\bCircular imports\b/i.test(archTemplate);
 
     assert.ok(
       hasConstraints,
-      'ARCHITECTURE.md template must include a section for critical architectural constraints (threading, global state, circular imports) as required by #2500'
+      'ARCHITECTURE.md template must include an "Architectural Constraints" section with Threading, Global state, and Circular imports categories (#2500)'
     );
   });
 
