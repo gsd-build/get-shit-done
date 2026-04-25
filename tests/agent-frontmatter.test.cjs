@@ -6,6 +6,10 @@
  * - skills: field absent from all agents (breaks Gemini CLI)
  * - Commented hooks: pattern in file-writing agents
  * - Spawn type consistency across workflows
+ *
+ * allow-test-rule: source-text-is-the-product
+ * Agent .md files are the installed AI agents — their frontmatter and body text IS what
+ * Claude Code loads at runtime. Checking text content IS checking the deployed contract.
  */
 
 const { test, describe } = require('node:test');

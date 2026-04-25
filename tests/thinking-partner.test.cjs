@@ -2,6 +2,7 @@ const { describe, test } = require('node:test');
 const assert = require('node:assert/strict');
 const fs = require('fs');
 const path = require('path');
+const { runGsdTools, createTempProject, cleanup } = require('./helpers.cjs');
 
 const GSD_ROOT = path.join(__dirname, '..', 'get-shit-done');
 
@@ -66,27 +67,16 @@ describe('Thinking Partner Integration (#1726)', () => {
 
   // Config tests
   describe('Config integration', () => {
-    test('features.thinking_partner is in VALID_CONFIG_KEYS', () => {
-      const configSrc = fs.readFileSync(
-        path.join(GSD_ROOT, 'bin', 'lib', 'config-schema.cjs'),
-        'utf-8'
-      );
-      assert.ok(
-        configSrc.includes("'features.thinking_partner'"),
-        'VALID_CONFIG_KEYS should contain features.thinking_partner'
-      );
-    });
-
-    test('features is in KNOWN_TOP_LEVEL section containers', () => {
-      const coreSrc = fs.readFileSync(
-        path.join(GSD_ROOT, 'bin', 'lib', 'core.cjs'),
-        'utf-8'
-      );
-      // The KNOWN_TOP_LEVEL set should include 'features' in section containers
-      assert.ok(
-        coreSrc.includes("'features'"),
-        'KNOWN_TOP_LEVEL should contain features as a section container'
-      );
+    test('config-set accepts features.thinking_partner', () => {
+      // Exercises VALID_CONFIG_KEYS membership and KNOWN_TOP_LEVEL acceptance in one call.
+      // Replaces two source-grep tests that read config-schema.cjs and core.cjs (see #2691).
+      const tmpDir = createTempProject();
+      try {
+        const result = runGsdTools('config-set features.thinking_partner true', tmpDir);
+        assert.ok(result.success, `config-set should accept features.thinking_partner: ${result.error}`);
+      } finally {
+        cleanup(tmpDir);
+      }
     });
   });
 

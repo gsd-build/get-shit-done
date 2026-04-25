@@ -12,12 +12,17 @@ const { test, describe } = require('node:test');
 const assert = require('node:assert/strict');
 const fs = require('fs');
 const path = require('path');
+const { runGsdTools, createTempProject, cleanup } = require('./helpers.cjs');
 
 const COMMAND_PATH = path.join(__dirname, '..', 'commands', 'gsd', 'execute-phase.md');
 const WORKFLOW_PATH = path.join(__dirname, '..', 'get-shit-done', 'workflows', 'execute-phase.md');
 const COMMANDS_DOC_PATH = path.join(__dirname, '..', 'docs', 'COMMANDS.md');
 const HELP_PATH = path.join(__dirname, '..', 'get-shit-done', 'workflows', 'help.md');
 
+// allow-test-rule: source-text-is-the-product
+// The workflow and command .md files are the installed AI instructions — their text content
+// IS what executes. String presence tests guard against accidental deletion of critical clauses.
+// See #2692 for the missing behavioral test for --wave N argument parsing.
 describe('execute-phase command: --wave flag', () => {
   test('command file exists', () => {
     assert.ok(fs.existsSync(COMMAND_PATH), 'commands/gsd/execute-phase.md should exist');
@@ -128,7 +133,6 @@ describe('use_worktrees config: cross-workflow structural coverage', () => {
   const DIAGNOSE_PATH = path.join(__dirname, '..', 'get-shit-done', 'workflows', 'diagnose-issues.md');
   const EXECUTE_PLAN_PATH = path.join(__dirname, '..', 'get-shit-done', 'workflows', 'execute-plan.md');
   const PLANNING_CONFIG_PATH = path.join(__dirname, '..', 'get-shit-done', 'references', 'planning-config.md');
-  const CONFIG_CJS_PATH = path.join(__dirname, '..', 'get-shit-done', 'bin', 'lib', 'config-schema.cjs');
 
   test('quick workflow reads USE_WORKTREES from config', () => {
     const content = fs.readFileSync(QUICK_PATH, 'utf-8');
@@ -174,11 +178,14 @@ describe('use_worktrees config: cross-workflow structural coverage', () => {
     );
   });
 
-  test('config.cjs includes workflow.use_worktrees in VALID_CONFIG_KEYS', () => {
-    const content = fs.readFileSync(CONFIG_CJS_PATH, 'utf-8');
-    assert.ok(
-      content.includes("'workflow.use_worktrees'"),
-      'config.cjs VALID_CONFIG_KEYS should include workflow.use_worktrees'
-    );
+  test('config-set accepts workflow.use_worktrees', () => {
+    // allow-test-rule: behavioral — exercises config-set validation, not source text
+    const tmpDir = createTempProject();
+    try {
+      const result = runGsdTools('config-set workflow.use_worktrees true', tmpDir);
+      assert.ok(result.success, `config-set should accept workflow.use_worktrees: ${result.error}`);
+    } finally {
+      cleanup(tmpDir);
+    }
   });
 });

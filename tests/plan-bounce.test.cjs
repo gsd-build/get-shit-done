@@ -15,35 +15,41 @@ const { test, describe } = require('node:test');
 const assert = require('node:assert/strict');
 const fs = require('fs');
 const path = require('path');
+const { runGsdTools, createTempProject, cleanup } = require('./helpers.cjs');
 
 const GSD_ROOT = path.join(__dirname, '..', 'get-shit-done');
-const CONFIG_CJS_PATH = path.join(GSD_ROOT, 'bin', 'lib', 'config-schema.cjs');
 const CONFIG_TEMPLATE_PATH = path.join(GSD_ROOT, 'templates', 'config.json');
 const PLAN_PHASE_PATH = path.join(GSD_ROOT, 'workflows', 'plan-phase.md');
 
 describe('Plan Bounce: config keys', () => {
-  test('workflow.plan_bounce is in VALID_CONFIG_KEYS', () => {
-    const content = fs.readFileSync(CONFIG_CJS_PATH, 'utf-8');
-    assert.ok(
-      content.includes("'workflow.plan_bounce'"),
-      'VALID_CONFIG_KEYS should contain workflow.plan_bounce'
-    );
+  test('config-set accepts workflow.plan_bounce', () => {
+    const tmpDir = createTempProject();
+    try {
+      const result = runGsdTools('config-set workflow.plan_bounce true', tmpDir);
+      assert.ok(result.success, `config-set should accept workflow.plan_bounce: ${result.error}`);
+    } finally {
+      cleanup(tmpDir);
+    }
   });
 
-  test('workflow.plan_bounce_script is in VALID_CONFIG_KEYS', () => {
-    const content = fs.readFileSync(CONFIG_CJS_PATH, 'utf-8');
-    assert.ok(
-      content.includes("'workflow.plan_bounce_script'"),
-      'VALID_CONFIG_KEYS should contain workflow.plan_bounce_script'
-    );
+  test('config-set accepts workflow.plan_bounce_script', () => {
+    const tmpDir = createTempProject();
+    try {
+      const result = runGsdTools('config-set workflow.plan_bounce_script ./bounce.sh', tmpDir);
+      assert.ok(result.success, `config-set should accept workflow.plan_bounce_script: ${result.error}`);
+    } finally {
+      cleanup(tmpDir);
+    }
   });
 
-  test('workflow.plan_bounce_passes is in VALID_CONFIG_KEYS', () => {
-    const content = fs.readFileSync(CONFIG_CJS_PATH, 'utf-8');
-    assert.ok(
-      content.includes("'workflow.plan_bounce_passes'"),
-      'VALID_CONFIG_KEYS should contain workflow.plan_bounce_passes'
-    );
+  test('config-set accepts workflow.plan_bounce_passes', () => {
+    const tmpDir = createTempProject();
+    try {
+      const result = runGsdTools('config-set workflow.plan_bounce_passes 2', tmpDir);
+      assert.ok(result.success, `config-set should accept workflow.plan_bounce_passes: ${result.error}`);
+    } finally {
+      cleanup(tmpDir);
+    }
   });
 });
 
@@ -76,6 +82,9 @@ describe('Plan Bounce: config template defaults', () => {
   });
 });
 
+// allow-test-rule: source-text-is-the-product
+// plan-phase.md is the installed AI workflow instruction — its text content IS what executes.
+// String presence tests guard against accidental deletion of bounce step clauses.
 describe('Plan Bounce: plan-phase.md step 12.5', () => {
   let content;
 

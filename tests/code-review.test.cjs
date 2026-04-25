@@ -28,7 +28,6 @@ const { runGsdTools, createTempProject, cleanup } = require('./helpers.cjs');
 const AGENTS_DIR = path.join(__dirname, '..', 'agents');
 const COMMANDS_DIR = path.join(__dirname, '..', 'commands', 'gsd');
 const WORKFLOWS_DIR = path.join(__dirname, '..', 'get-shit-done', 'workflows');
-const CONFIG_PATH = path.join(__dirname, '..', 'get-shit-done', 'bin', 'lib', 'config-schema.cjs');
 
 // Plugin directory resolution (cross-platform safe)
 const PLUGIN_WORKFLOWS_DIR = process.env.GSD_PLUGIN_ROOT || path.join(os.homedir(), '.claude', 'get-shit-done', 'workflows');
@@ -271,18 +270,24 @@ describe('CR-WORKFLOW: code review workflow structure', () => {
 // --- CR-CONFIG: config key registration ---
 
 describe('CR-CONFIG: config key registration', () => {
-  test('config.cjs contains workflow.code_review key', () => {
-    const content = fs.readFileSync(CONFIG_PATH, 'utf-8');
-
-    assert.ok(content.includes('workflow.code_review'),
-      'config.cjs missing workflow.code_review key registration');
+  test('config-set accepts workflow.code_review', () => {
+    const tmpDir = createTempProject();
+    try {
+      const result = runGsdTools('config-set workflow.code_review true', tmpDir);
+      assert.ok(result.success, `config-set should accept workflow.code_review: ${result.error}`);
+    } finally {
+      cleanup(tmpDir);
+    }
   });
 
-  test('config.cjs contains workflow.code_review_depth key', () => {
-    const content = fs.readFileSync(CONFIG_PATH, 'utf-8');
-
-    assert.ok(content.includes('workflow.code_review_depth'),
-      'config.cjs missing workflow.code_review_depth key registration');
+  test('config-set accepts workflow.code_review_depth', () => {
+    const tmpDir = createTempProject();
+    try {
+      const result = runGsdTools('config-set workflow.code_review_depth standard', tmpDir);
+      assert.ok(result.success, `config-set should accept workflow.code_review_depth: ${result.error}`);
+    } finally {
+      cleanup(tmpDir);
+    }
   });
 
   test('gsd-tools config-get workflow.code_review succeeds', () => {

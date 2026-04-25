@@ -21,6 +21,9 @@ const path = require('path');
 
 const AGENTS_DIR = path.join(__dirname, '..', 'agents');
 
+// allow-test-rule: source-text-is-the-product
+// The <critical_rules> block in agent .md files IS the fix — it is the AI instruction that
+// prevents unbounded Read loops. There is no behavioral equivalent without a live LLM run.
 describe('bug #2346: agent read loop guards', () => {
 
   describe('gsd-ui-checker', () => {
