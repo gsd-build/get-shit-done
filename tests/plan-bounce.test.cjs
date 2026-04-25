@@ -86,10 +86,9 @@ describe('Plan Bounce: config template defaults', () => {
 // plan-phase.md is the installed AI workflow instruction — its text content IS what executes.
 // String presence tests guard against accidental deletion of bounce step clauses.
 describe('Plan Bounce: plan-phase.md step 12.5', () => {
-  let content;
+  const content = fs.readFileSync(PLAN_PHASE_PATH, 'utf-8');
 
   test('plan-phase.md contains step 12.5', () => {
-    content = fs.readFileSync(PLAN_PHASE_PATH, 'utf-8');
     assert.ok(
       content.includes('## 12.5'),
       'plan-phase.md should contain step 12.5'
@@ -97,7 +96,6 @@ describe('Plan Bounce: plan-phase.md step 12.5', () => {
   });
 
   test('step 12.5 references plan bounce', () => {
-    content = content || fs.readFileSync(PLAN_PHASE_PATH, 'utf-8');
     // The step title should mention bounce
     assert.ok(
       /## 12\.5.*[Bb]ounce/i.test(content),
@@ -106,7 +104,6 @@ describe('Plan Bounce: plan-phase.md step 12.5', () => {
   });
 
   test('plan-phase.md has --bounce flag handling', () => {
-    content = content || fs.readFileSync(PLAN_PHASE_PATH, 'utf-8');
     assert.ok(
       content.includes('--bounce'),
       'plan-phase.md should handle --bounce flag'
@@ -114,7 +111,6 @@ describe('Plan Bounce: plan-phase.md step 12.5', () => {
   });
 
   test('plan-phase.md has --skip-bounce flag handling', () => {
-    content = content || fs.readFileSync(PLAN_PHASE_PATH, 'utf-8');
     assert.ok(
       content.includes('--skip-bounce'),
       'plan-phase.md should handle --skip-bounce flag'
@@ -122,7 +118,6 @@ describe('Plan Bounce: plan-phase.md step 12.5', () => {
   });
 
   test('plan-phase.md has backup pattern (pre-bounce.md)', () => {
-    content = content || fs.readFileSync(PLAN_PHASE_PATH, 'utf-8');
     assert.ok(
       content.includes('pre-bounce.md'),
       'plan-phase.md should reference pre-bounce.md backup files'
@@ -130,7 +125,6 @@ describe('Plan Bounce: plan-phase.md step 12.5', () => {
   });
 
   test('plan-phase.md has frontmatter integrity validation for bounced plans', () => {
-    content = content || fs.readFileSync(PLAN_PHASE_PATH, 'utf-8');
     // Should mention YAML frontmatter validation after bounce
     assert.ok(
       /frontmatter.*bounced|bounced.*frontmatter|YAML.*bounce|bounce.*YAML/i.test(content),
@@ -139,7 +133,6 @@ describe('Plan Bounce: plan-phase.md step 12.5', () => {
   });
 
   test('plan-phase.md re-runs checker on bounced plans', () => {
-    content = content || fs.readFileSync(PLAN_PHASE_PATH, 'utf-8');
     // Should mention re-running plan checker after bounce
     assert.ok(
       /[Rr]e-run.*checker.*bounce|bounce.*checker.*re-run|checker.*bounced/i.test(content),
@@ -148,7 +141,6 @@ describe('Plan Bounce: plan-phase.md step 12.5', () => {
   });
 
   test('plan-phase.md references plan_bounce config keys', () => {
-    content = content || fs.readFileSync(PLAN_PHASE_PATH, 'utf-8');
     assert.ok(
       content.includes('plan_bounce_script'),
       'plan-phase.md should reference plan_bounce_script config'
@@ -160,7 +152,6 @@ describe('Plan Bounce: plan-phase.md step 12.5', () => {
   });
 
   test('plan-phase.md disables bounce when --gaps flag is present', () => {
-    content = content || fs.readFileSync(PLAN_PHASE_PATH, 'utf-8');
     // Should mention that --gaps disables bounce
     assert.ok(
       /--gaps.*bounce|bounce.*--gaps/i.test(content),
@@ -169,7 +160,6 @@ describe('Plan Bounce: plan-phase.md step 12.5', () => {
   });
 
   test('plan-phase.md restores original on script failure', () => {
-    content = content || fs.readFileSync(PLAN_PHASE_PATH, 'utf-8');
     // Should mention restoring from backup on failure
     assert.ok(
       /restore.*original|restore.*pre-bounce|original.*restore/i.test(content),
