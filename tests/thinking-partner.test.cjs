@@ -72,8 +72,14 @@ describe('Thinking Partner Integration (#1726)', () => {
       // Replaces two source-grep tests that read config-schema.cjs and core.cjs (see #2691).
       const tmpDir = createTempProject();
       try {
-        const result = runGsdTools('config-set features.thinking_partner true', tmpDir);
-        assert.ok(result.success, `config-set should accept features.thinking_partner: ${result.error}`);
+        const setResult = runGsdTools('config-set features.thinking_partner true', tmpDir);
+        assert.ok(setResult.success, `config-set should accept features.thinking_partner: ${setResult.error}`);
+        const getResult = runGsdTools('config-get features.thinking_partner', tmpDir);
+        assert.ok(getResult.success, `config-get should read features.thinking_partner: ${getResult.error}`);
+        assert.ok(
+          getResult.output.trim() === 'true' || getResult.output.includes('true'),
+          `config-get should return "true", got: ${getResult.output}`
+        );
       } finally {
         cleanup(tmpDir);
       }
