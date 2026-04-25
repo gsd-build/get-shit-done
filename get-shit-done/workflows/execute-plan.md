@@ -402,15 +402,21 @@ If SUMMARY "Issues Encountered" ≠ "None": yolo → log and continue. Interacti
 </step>
 
 <step name="update_roadmap">
-Always run this step — the handler is idempotent and atomically serialized via a
-lockfile, so concurrent plans (parallel mode, with or without worktrees) and
-later orchestrator reruns converge on the same result. This is the only
-checkbox-sync point guaranteed to fire after every plan completion; skipping
-here leaves ROADMAP.md checkboxes stale when a phase is interrupted or when
-`use_worktrees: false` disables the post-wave merge-hook sync (see bug #2661).
+Run this step only when NOT executing inside a git worktree (i.e.
+`use_worktrees: false`, the bug #2661 reproducer). In worktree mode each
+worktree has its own ROADMAP.md, so per-plan writes here would diverge
+across siblings; the orchestrator owns the post-merge sync centrally
+(see execute-phase.md §5.7, single-writer contract from #1486 / dcb50396).
 
 ```bash
-gsd-sdk query roadmap.update-plan-progress "${PHASE}"
+# Auto-detect worktree mode: .git is a file in worktrees, a directory in main repo.
+# This mirrors the use_worktrees config flag for the executing handler.
+IS_WORKTREE=$([ -f .git ] && echo "true" || echo "false")
+
+if [ "$IS_WORKTREE" != "true" ]; then
+  # use_worktrees: false → this handler is the sole post-plan sync point (#2661)
+  gsd-sdk query roadmap.update-plan-progress "${PHASE}"
+fi
 ```
 Counts PLAN vs SUMMARY files on disk. Updates progress table row with correct count and status (`In Progress` or `Complete` with date).
 </step>

@@ -4,17 +4,30 @@
  *   left ROADMAP plan checkboxes unchecked until a manual
  *   `roadmap update-plan-progress` was run.
  *
- * Root cause (workflow-level): execute-plan.md Checkpoint A was wrapped in a
- * "Skip in parallel mode" guard that also short-circuited the
- * parallelization-without-worktrees case, leaving Checkpoint B (worktree-merge
- * post-step) and Checkpoint C (phase.complete) as the only syncs.
+ * Root cause (workflow-level): execute-plan.md `update_roadmap` step was
+ * gated on a worktree-detection branch that incorrectly conflated
+ * "parallel mode" with "worktree mode". When `parallelization: true,
+ * use_worktrees: false` was configured, the step was still gated by the
+ * worktree-only check (which is true: the executing tree IS the main repo,
+ * not a worktree, so the gate happened to fire correctly there) — the
+ * actual reproducer was a different code path. The original PR #2682 fix
+ * made the sync unconditional, which violated the single-writer contract
+ * for shared ROADMAP.md established by #1486 / dcb50396 in worktree mode.
  *
- * Fix: remove the guard — make Checkpoint A unconditional. The handler is
- * idempotent and atomically serialized via readModifyWriteRoadmapMd's lockfile.
+ * Minimal fix (this PR): restore the worktree guard and document its
+ * intent explicitly. The `IS_WORKTREE != "true"` branch IS the
+ * `use_worktrees: false` mode: only that mode runs the in-handler sync.
+ * Worktree mode relies on the orchestrator's post-merge sync at
+ * execute-phase.md §5.7 (lines 815-834) — the single writer for shared
+ * tracking files.
  *
- * These tests exercise the handler directly (the workflow change is markdown
- * that drives an LLM prompt and cannot be meaningfully unit-tested end-to-end)
- * plus a structural assertion that the guard is gone from the workflow.
+ * These tests:
+ *   (1) assert the workflow gates the sync call on `use_worktrees: false`
+ *       (i.e. the IS_WORKTREE != "true" branch is present and gates the call);
+ *   (2) assert the handler itself behaves correctly under the
+ *       use_worktrees: false reproducer (the original #2661 case);
+ *   (3) assert the handler is idempotent and lock-safe (lockfile is the
+ *       in-handler defense; the workflow gate is the cross-handler one).
  */
 
 const { test, describe, beforeEach, afterEach } = require('node:test');
@@ -62,35 +75,64 @@ const THREE_PLAN_ROADMAP = `# Roadmap
 | 1. Test | v1.0 | 0/3 | Planned |  |
 `;
 
-// ─── Structural: workflow guard removed ──────────────────────────────────────
+// ─── Structural: workflow gates sync on use_worktrees=false ──────────────────
 
-describe('bug #2661: execute-plan.md Checkpoint A guard removed', () => {
-  test('update_roadmap step does not skip in parallel mode', () => {
-    const content = fs.readFileSync(WORKFLOW_PATH, 'utf-8');
-    const stepMatch = content.match(
-      /<step name="update_roadmap">([\s\S]*?)<\/step>/
-    );
+describe('bug #2661: execute-plan.md update_roadmap gating', () => {
+  const content = fs.readFileSync(WORKFLOW_PATH, 'utf-8');
+  const stepMatch = content.match(
+    /<step name="update_roadmap">([\s\S]*?)<\/step>/
+  );
+  const step = stepMatch && stepMatch[1];
+
+  test('update_roadmap step exists and invokes roadmap.update-plan-progress', () => {
     assert.ok(stepMatch, 'update_roadmap step must exist');
-    const step = stepMatch[1];
-
-    assert.ok(
-      !/Skip (in parallel|this step if running in parallel)/i.test(step),
-      'update_roadmap must no longer instruct the agent to skip in parallel mode'
-    );
-    assert.ok(
-      !/IS_WORKTREE/.test(step),
-      'update_roadmap must no longer gate the sync on an IS_WORKTREE branch'
-    );
     assert.ok(
       /gsd-sdk query roadmap\.update-plan-progress/.test(step),
       'update_roadmap must still invoke roadmap.update-plan-progress'
     );
   });
+
+  test('use_worktrees: false mode — sync call is gated to fire (the #2661 reproducer)', () => {
+    // The non-worktree branch must contain the sync call.
+    assert.ok(
+      /IS_WORKTREE.*!=.*"true"[\s\S]*?gsd-sdk query roadmap\.update-plan-progress/.test(step),
+      'sync call must execute on the IS_WORKTREE != "true" branch (use_worktrees: false)'
+    );
+  });
+
+  test('use_worktrees: true mode — sync call does NOT fire (single-writer contract)', () => {
+    // The sync call must be inside an `if [ "$IS_WORKTREE" != "true" ]` block,
+    // i.e. it must NOT be unconditional and it must NOT appear on the worktree branch.
+    // We verify by extracting the bash block and checking the call sits under the gate.
+    const bashMatch = step.match(/```bash\s*([\s\S]*?)```/);
+    assert.ok(bashMatch, 'update_roadmap must contain a bash block');
+    const bash = bashMatch[1];
+
+    assert.ok(
+      /IS_WORKTREE/.test(bash),
+      'bash block must include the IS_WORKTREE worktree-detection check'
+    );
+    // Sync call must appear after the guard check, not before.
+    const guardIdx = bash.search(/if \[ "\$IS_WORKTREE" != "true" \]/);
+    const callIdx = bash.search(/gsd-sdk query roadmap\.update-plan-progress/);
+    assert.ok(guardIdx >= 0, 'guard must be present');
+    assert.ok(callIdx > guardIdx,
+      'sync call must appear inside the use_worktrees: false guard, not before/outside it');
+  });
+
+  test('intent doc references single-writer contract / orchestrator-owns-write', () => {
+    // The prose must justify why worktree mode is excluded so future readers
+    // do not regress this back to unconditional.
+    assert.ok(
+      /worktree|orchestrator|single-writer|#1486|#2661/i.test(step),
+      'update_roadmap must document the contract that justifies the gate'
+    );
+  });
 });
 
-// ─── Handler-level: idempotence + multi-plan sync ────────────────────────────
+// ─── Handler-level: idempotence + multi-plan sync (use_worktrees: false case) ─
 
-describe('bug #2661: roadmap update-plan-progress handler', () => {
+describe('bug #2661: roadmap update-plan-progress handler (use_worktrees: false)', () => {
   let tmpDir;
   beforeEach(() => { tmpDir = createTempProject('gsd-2661-'); });
   afterEach(() => { cleanup(tmpDir); });
@@ -140,11 +182,13 @@ describe('bug #2661: roadmap update-plan-progress handler', () => {
     assert.ok(roadmap.includes('1/3'), 'progress row should reflect 1/3');
   });
 
-  test('concurrent handler invocations do not corrupt ROADMAP.md', async () => {
+  test('lockfile contention: concurrent handler invocations within a single tree do not corrupt ROADMAP.md', async () => {
+    // Scope: lockfile only serializes within a single working tree. Cross-worktree
+    // serialization is enforced by the workflow gate (worktree mode never calls
+    // this handler from execute-plan.md), not by the lockfile.
     writeRoadmap(tmpDir, THREE_PLAN_ROADMAP);
     seedPhase(tmpDir, 1, ['01-01', '01-02', '01-03'], ['01-01', '01-02', '01-03']);
 
-    // Simulate Checkpoint A firing concurrently from three parallel plans.
     const invocations = Array.from({ length: 3 }, () =>
       new Promise((resolve) => {
         const r = runGsdTools('roadmap update-plan-progress 1', tmpDir);
