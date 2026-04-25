@@ -48,21 +48,23 @@ describe('bug-2686: review-fix agent worktree isolation', () => {
     // `git checkout -- {file}` is a file-restore within the worktree — safe, not a branch switch.
     // The dangerous operation is `git checkout <branch>` (no leading --).
     // Find the first branch-switching checkout (pattern: "git checkout " NOT followed by "--").
-    const branchCheckoutMatch = agentContent.match(/git checkout (?!--)/);
+    const branchCheckoutMatch = /git checkout (?!--)/.exec(agentContent);
     if (branchCheckoutMatch) {
-      const branchCheckoutPos = agentContent.indexOf(branchCheckoutMatch[0]);
+      const branchCheckoutPos = branchCheckoutMatch.index;
       assert.ok(
         worktreePos < branchCheckoutPos,
         'git worktree add must appear before any branch-switching git checkout in the agent instructions'
       );
     }
 
-    // git commit must come after worktree setup
-    const commitPos = agentContent.indexOf('git commit');
-    if (commitPos !== -1) {
+    // commit command must come after worktree setup — the fixer may use
+    // either `git commit` directly or `gsd-sdk query commit`
+    const commitMatch = /(?:git commit|gsd-sdk query commit)/.exec(agentContent);
+    if (commitMatch) {
+      const commitPos = commitMatch.index;
       assert.ok(
         worktreePos < commitPos,
-        'git worktree add must appear before any git commit in the agent instructions'
+        'git worktree add must appear before any commit command in the agent instructions'
       );
     }
   });
@@ -75,8 +77,14 @@ describe('bug-2686: review-fix agent worktree isolation', () => {
   });
 
   test('agent instructions use a /tmp path for the worktree', () => {
+    // Require either a literal /tmp/sv- path or a variable assignment to /tmp/sv-
+    // (e.g. `wt=$(mktemp -d "/tmp/sv-..."`).  Bare `$wt` or `wt=` references
+    // without a /tmp/sv- assignment are not sufficient.
+    const hasTmpWorktreePath =
+      /\/tmp\/sv-/.test(agentContent) ||
+      /\bwt\s*=\s*["']?\/tmp\/sv-/.test(agentContent);
     assert.ok(
-      agentContent.includes('/tmp/sv-') || agentContent.includes('$wt') || agentContent.includes('${wt}') || agentContent.includes('wt='),
+      hasTmpWorktreePath,
       'gsd-code-fixer.md must define a worktree variable at a /tmp/sv-... path, consistent with other GSD agents (#2686)'
     );
   });

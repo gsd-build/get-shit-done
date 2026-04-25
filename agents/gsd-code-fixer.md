@@ -218,22 +218,21 @@ This agent runs as a background process that makes commits. Operating on the mai
 # Derive worktree path from padded_phase (parsed from config in next step,
 # but the shell snippet below is illustrative — adapt once config is parsed).
 # In practice: parse padded_phase from config first, then run:
-wt=/tmp/sv-${padded_phase}-reviewfix
-git worktree add "$wt" HEAD
+branch=$(git branch --show-current)
+test -n "$branch" || { echo "Detached HEAD is not supported for review-fix (#2686)"; exit 1; }
+wt=$(mktemp -d "/tmp/sv-${padded_phase}-reviewfix-XXXXXX")
+git worktree add "$wt" "$branch"
 cd "$wt"
 ```
 
 Concrete steps:
 1. Parse `padded_phase` from the `<config>` block (needed for the path).
-2. Set `wt=/tmp/sv-${padded_phase}-reviewfix`.
-3. Run `git worktree add "$wt" HEAD` — this checks out the current HEAD into the new worktree without creating a new branch (the fixer never switches branches; it only edits and commits on the current branch).
-4. All subsequent file reads, edits, and commits happen inside `$wt`.
+2. Resolve the current branch: `branch=$(git branch --show-current)`. If empty (detached HEAD), print an error and exit — detached-HEAD state is not supported; commits made in a detached-HEAD worktree would not advance the branch.
+3. Create a unique worktree path: `wt=$(mktemp -d "/tmp/sv-${padded_phase}-reviewfix-XXXXXX")`. The `mktemp` suffix ensures concurrent runs for the same phase do not collide.
+4. Run `git worktree add "$wt" "$branch"` — this attaches the worktree to the current branch so commits advance it.
+5. All subsequent file reads, edits, and commits happen inside `$wt`.
 
-**If `git worktree add` fails** (e.g., path already exists from a crashed prior run):
-```bash
-git worktree remove "$wt" --force 2>/dev/null || true
-git worktree add "$wt" HEAD
-```
+**If `git worktree add` fails**, surface the error and exit — do not force-remove the path, as another concurrent run may be holding it.
 
 **Cleanup (ALWAYS — even on failure):** After writing REVIEW-FIX.md and before returning to the orchestrator, run:
 ```bash
@@ -471,7 +470,7 @@ _Iteration: {N}_
 
 <critical_rules>
 
-**ALWAYS run inside the isolated worktree** — set up via `git worktree add /tmp/sv-${padded_phase}-reviewfix HEAD` at the very start (see `setup_worktree` step). Every file read, edit, and commit must happen inside that path. Run `git worktree remove /tmp/sv-${padded_phase}-reviewfix --force` unconditionally when done (treat it as a finally block). This prevents racing the foreground session on the shared main working tree (#2686).
+**ALWAYS run inside the isolated worktree** — set up via `branch=$(git branch --show-current)` + `wt=$(mktemp -d "/tmp/sv-${padded_phase}-reviewfix-XXXXXX")` + `git worktree add "$wt" "$branch"` at the very start (see `setup_worktree` step). Using `mktemp` ensures concurrent runs do not collide. Attaching to `$branch` (not `HEAD`) ensures commits advance the branch. Every file read, edit, and commit must happen inside `$wt`. Run `git worktree remove "$wt" --force` unconditionally when done (treat it as a finally block). If `git worktree add` fails, exit with an error rather than force-removing a path another run may hold. This prevents racing the foreground session on the shared main working tree (#2686).
 
 **ALWAYS use the Write tool to create files** — never use `Bash(cat << 'EOF')` or heredoc commands for file creation.
 
