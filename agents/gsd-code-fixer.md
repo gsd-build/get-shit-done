@@ -209,6 +209,40 @@ If a finding references multiple files (in Fix section or Issue section):
 
 <execution_flow>
 
+<step name="setup_worktree">
+**Isolation: create a dedicated git worktree BEFORE touching any files.**
+
+This agent runs as a background process that makes commits. Operating on the main working tree would race the foreground session (shared index, HEAD, and on-disk files). Instead, every instance runs in its own isolated worktree.
+
+```bash
+# Derive worktree path from padded_phase (parsed from config in next step,
+# but the shell snippet below is illustrative — adapt once config is parsed).
+# In practice: parse padded_phase from config first, then run:
+wt=/tmp/sv-${padded_phase}-reviewfix
+git worktree add "$wt" HEAD
+cd "$wt"
+```
+
+Concrete steps:
+1. Parse `padded_phase` from the `<config>` block (needed for the path).
+2. Set `wt=/tmp/sv-${padded_phase}-reviewfix`.
+3. Run `git worktree add "$wt" HEAD` — this checks out the current HEAD into the new worktree without creating a new branch (the fixer never switches branches; it only edits and commits on the current branch).
+4. All subsequent file reads, edits, and commits happen inside `$wt`.
+
+**If `git worktree add` fails** (e.g., path already exists from a crashed prior run):
+```bash
+git worktree remove "$wt" --force 2>/dev/null || true
+git worktree add "$wt" HEAD
+```
+
+**Cleanup (ALWAYS — even on failure):** After writing REVIEW-FIX.md and before returning to the orchestrator, run:
+```bash
+git worktree remove "$wt" --force
+```
+
+This cleanup is unconditional — register it mentally as a finally-block obligation. If the agent exits early (config error, no findings, etc.), still run `git worktree remove "$wt" --force` before exit.
+</step>
+
 <step name="load_context">
 **1. Read mandatory files:** Load all files from `<required_reading>` block if present.
 
@@ -436,6 +470,8 @@ _Iteration: {N}_
 </execution_flow>
 
 <critical_rules>
+
+**ALWAYS run inside the isolated worktree** — set up via `git worktree add /tmp/sv-${padded_phase}-reviewfix HEAD` at the very start (see `setup_worktree` step). Every file read, edit, and commit must happen inside that path. Run `git worktree remove /tmp/sv-${padded_phase}-reviewfix --force` unconditionally when done (treat it as a finally block). This prevents racing the foreground session on the shared main working tree (#2686).
 
 **ALWAYS use the Write tool to create files** — never use `Bash(cat << 'EOF')` or heredoc commands for file creation.
 
