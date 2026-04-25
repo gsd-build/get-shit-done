@@ -65,13 +65,16 @@ describe('MODEL_PROFILES', () => {
 // ─── VALID_PROFILES ───────────────────────────────────────────────────────────
 
 describe('VALID_PROFILES', () => {
-  test('contains quality, balanced, and budget', () => {
-    assert.deepStrictEqual(VALID_PROFILES.sort(), ['adaptive', 'balanced', 'budget', 'quality']);
+  test('contains quality, balanced, budget, adaptive, and inherit', () => {
+    assert.deepStrictEqual(VALID_PROFILES.sort(), ['adaptive', 'balanced', 'budget', 'inherit', 'quality']);
   });
 
-  test('is derived from MODEL_PROFILES keys', () => {
+  test('includes all MODEL_PROFILES keys plus inherit', () => {
     const fromData = Object.keys(MODEL_PROFILES['gsd-planner']);
-    assert.deepStrictEqual(VALID_PROFILES.sort(), fromData.sort());
+    for (const profile of fromData) {
+      assert.ok(VALID_PROFILES.includes(profile), `VALID_PROFILES should include ${profile}`);
+    }
+    assert.ok(VALID_PROFILES.includes('inherit'), 'VALID_PROFILES should include inherit');
   });
 });
 
