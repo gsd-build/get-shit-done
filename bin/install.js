@@ -6216,8 +6216,9 @@ function install(isGlobal, runtime = 'claude') {
             }
             throw err;
           }
-          const matches = content.match(/(?:~|\$HOME)\/\.claude\b/g);
-          if (matches) {
+          const isMarkdown = entry.name.endsWith('.md');
+          const matches = detectClaudePathRefs(content, isMarkdown);
+          if (matches.length > 0) {
             leakedPaths.push({ file: fullPath.replace(targetDir + '/', ''), count: matches.length });
           }
         }
@@ -7045,6 +7046,174 @@ function homePathCoveredByRc(globalBin, homeDir, rcFileNames) {
 }
 
 /**
+ * Detect .claude path references in content.
+ *
+ * Behavior:
+ * - Markdown: scan code blocks only (fenced and indented blocks).
+ * - Non-Markdown: scan the whole content.
+ * - Before matching, remove block comments (/* ... *\/) and drop line comments
+ *   that start with # or // to reduce false positives from examples.
+ *
+ * Exported for tests; used by install() when scanning for leaked paths.
+ *
+ * @param {string} content     File content to scan.
+ * @param {boolean} isMarkdown Whether content is from a Markdown file.
+ * @returns {string[]}         Array of matched .claude path patterns.
+ */
+function _parseMarkdownFenceOpen(line) {
+  const fenceOpen = line.match(/^\s{0,3}(`{3,}|~{3,})/);
+  if (!fenceOpen) return null;
+  return { char: fenceOpen[1][0], len: fenceOpen[1].length };
+}
+
+function _isMarkdownFenceClose(line, fenceChar, fenceLen) {
+  const trimmed = line.trim();
+  // Close fence must use the same marker type (` or ~) and be at least
+  // as long as the opening fence.
+  return trimmed.length >= fenceLen && trimmed.split('').every((ch) => ch === fenceChar);
+}
+
+function _isIndentedMarkdownCodeLine(line) {
+  return line.startsWith('    ') || line.startsWith('\t');
+}
+
+function _stripIndentedMarkdownCodeLine(line) {
+  return line.startsWith('\t') ? line.slice(1) : line.slice(4);
+}
+
+function _createMarkdownExtractorState() {
+  return {
+    codeBlocks: [],
+    inFence: false,
+    fenceChar: '',
+    fenceLen: 0,
+    fencedBlock: [],
+    inIndentedBlock: false,
+    indentedBlock: [],
+  };
+}
+
+function _flushMarkdownExtractorState(state) {
+  // Flush unterminated trailing blocks at EOF (best-effort extraction).
+  if (state.inFence && state.fencedBlock.length > 0) {
+    state.codeBlocks.push(state.fencedBlock.join('\n'));
+  }
+  if (state.inIndentedBlock && state.indentedBlock.length > 0) {
+    state.codeBlocks.push(state.indentedBlock.join('\n'));
+  }
+}
+
+function _consumeMarkdownFenceLine(line, state) {
+  if (!state.inFence) return false;
+  if (_isMarkdownFenceClose(line, state.fenceChar, state.fenceLen)) {
+    state.codeBlocks.push(state.fencedBlock.join('\n'));
+    state.inFence = false;
+    state.fencedBlock = [];
+    return true;
+  }
+  state.fencedBlock.push(line);
+  return true;
+}
+
+function _openMarkdownFenceIfPresent(line, state) {
+  const fenceOpen = _parseMarkdownFenceOpen(line);
+  if (!fenceOpen) return false;
+  // Markdown allows up to 3 leading spaces before fenced delimiters.
+  state.inFence = true;
+  state.fenceChar = fenceOpen.char;
+  state.fenceLen = fenceOpen.len;
+  state.fencedBlock = [];
+  return true;
+}
+
+function _consumeMarkdownIndentedLine(line, state) {
+  const isIndented = _isIndentedMarkdownCodeLine(line);
+  const isBlank = line.trim() === '';
+
+  if (state.inIndentedBlock) {
+    // Keep blank lines inside indented blocks; they are valid block content.
+    if (isIndented || isBlank) {
+      state.indentedBlock.push(isIndented ? _stripIndentedMarkdownCodeLine(line) : '');
+      return;
+    }
+    state.codeBlocks.push(state.indentedBlock.join('\n'));
+    state.inIndentedBlock = false;
+    state.indentedBlock = [];
+  }
+
+  if (isIndented) {
+    // For indented code blocks, strip one indentation unit before scanning.
+    state.inIndentedBlock = true;
+    state.indentedBlock.push(_stripIndentedMarkdownCodeLine(line));
+  }
+}
+
+function _extractMarkdownCodeBlocks(content) {
+  // Extract Markdown code blocks only (fenced + 4-space/tab indented).
+  // This skips prose sections that may mention ~/.claude as documentation text.
+  const state = _createMarkdownExtractorState();
+
+  for (const line of content.split('\n')) {
+    if (_consumeMarkdownFenceLine(line, state)) continue;
+    if (_openMarkdownFenceIfPresent(line, state)) continue;
+    _consumeMarkdownIndentedLine(line, state);
+  }
+
+  _flushMarkdownExtractorState(state);
+  return state.codeBlocks.join('\n');
+}
+
+function _stripBlockComments(text) {
+  // Remove C-style block comments while preserving newlines so later line-based
+  // filtering (for # and //) keeps the original line structure intact.
+  if (!text || !text.includes('/*')) return text;
+
+  let out = '';
+  let cursor = 0;
+
+  while (cursor < text.length) {
+    const blockStart = text.indexOf('/*', cursor);
+    if (blockStart === -1) {
+      out += text.slice(cursor);
+      break;
+    }
+
+    out += text.slice(cursor, blockStart);
+
+    const blockEnd = text.indexOf('*/', blockStart + 2);
+    const blockBody = blockEnd === -1
+      ? text.slice(blockStart + 2)
+      : text.slice(blockStart + 2, blockEnd);
+
+    // Drop comment content but keep newline count stable for downstream filters.
+    out += blockBody.replace(/[^\n]/g, '');
+
+    if (blockEnd === -1) break;
+    cursor = blockEnd + 2;
+  }
+
+  return out;
+}
+
+function _stripSingleLineComments(text) {
+  // Filter out single-line comment styles to avoid false positives
+  return text.split('\n').filter((line) => {
+    const trimmed = line.trim();
+    return !trimmed.startsWith('#') && !trimmed.startsWith('//');
+  }).join('\n');
+}
+
+function detectClaudePathRefs(content, isMarkdown = false) {
+  if (!content) return [];
+
+  const scanContent = isMarkdown ? _extractMarkdownCodeBlocks(content) : content;
+  const withoutBlockComments = _stripBlockComments(scanContent);
+  const codeContent = _stripSingleLineComments(withoutBlockComments);
+  const matches = codeContent.match(/(?:~|\$HOME)\/\.claude\b/g);
+  return matches || [];
+}
+
+/**
  * Emit a PATH-export suggestion if globalBin is not already on PATH AND
  * the user's shell rc files do not already cover it via a HOME-relative
  * entry (#2620).
@@ -7381,6 +7550,7 @@ if (process.env.GSD_TEST_MODE) {
     finishInstall,
     homePathCoveredByRc,
     maybeSuggestPathExport,
+    detectClaudePathRefs,
   };
 } else {
 

@@ -4,11 +4,9 @@
  * Regression test for #2470.
  *
  * update.md is installed into every runtime directory including .gemini, .codex,
- * .opencode, etc. The installer's scanForLeakedPaths() uses the regex
- * /(?:~|\$HOME)\/\.claude\b/g to detect unresolved .claude path references after
- * copyWithPathReplacement() runs. The replacer handles "~/.claude/" (trailing slash)
- * but not "~/.claude" (bare, no trailing slash) — so any bare reference in
- * update.md would slip through and trigger the installer warning for non-Claude runtimes.
+ * .opencode, etc. We assert against the installer's exported detector so this
+ * test remains aligned with real leak-scan behavior (Markdown code blocks +
+ * comment filtering + `(?:~|$HOME)/.claude` matching).
  */
 
 const { test, describe } = require('node:test');
@@ -16,21 +14,21 @@ const assert = require('node:assert/strict');
 const fs = require('fs');
 const path = require('path');
 
+process.env.GSD_TEST_MODE = '1';
+
+const { detectClaudePathRefs } = require('../bin/install.js');
+
 const UPDATE_MD = path.join(__dirname, '..', 'get-shit-done', 'workflows', 'update.md');
 
-describe('update.md — no bare ~.claude path references (#2470)', () => {
+describe('update.md — no leaked .claude refs under installer scan (#2470)', () => {
   const content = fs.readFileSync(UPDATE_MD, 'utf-8');
 
-  test('update.md does not contain bare ~/\\.claude (without trailing slash)', () => {
-    // This is the exact pattern from the installer's scanForLeakedPaths():
-    // /(?:~|\$HOME)\/\.claude\b/g
-    // The replacer handles ~/\.claude\/ (with trailing slash) but misses bare ~/\.claude
-    // so we must not have bare references in the source file.
-    const matches = content.match(/(?:~|\$HOME)\/\.claude(?!\/)/g);
-    assert.strictEqual(
+  test('update.md has no .claude refs detected by installer markdown scan', () => {
+    const matches = detectClaudePathRefs(content, /* isMarkdown */ true);
+    assert.deepStrictEqual(
       matches,
-      null,
-      `update.md must not contain bare ~/\.claude (without trailing slash) — installer scanner flags these as unresolved path refs: ${JSON.stringify(matches)}`
+      [],
+      `update.md contains leaked .claude references under installer scan: ${JSON.stringify(matches)}`
     );
   });
 });
