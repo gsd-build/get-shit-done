@@ -1,3 +1,8 @@
+// allow-test-rule: architectural-invariant
+// verify.cjs must contain the W017 warning code and the worktree list invocation.
+// These checks guard the existence of the detection feature, not its text output.
+// Behavioral tests cover the detection flow; structural tests guard the implementation contract.
+
 /**
  * GSD Tools Tests - Orphan/Stale Worktree Detection (W017)
  *

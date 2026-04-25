@@ -1,3 +1,9 @@
+// allow-test-rule: structural-regression-guard
+// milestone.cjs must use replace()+compare, not test()+replace(), to avoid regex
+// lastIndex corruption with global flags. A behavioral test cannot distinguish which
+// pattern was used — it can only observe wrong output after multiple calls, which is
+// fragile. Structural inspection locks the correct fix in place.
+
 /**
  * Regression tests for regex global state bug in milestone.cjs
  *

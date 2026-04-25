@@ -1,3 +1,8 @@
+// allow-test-rule: docs-parity
+// Extracts CONFIG_DEFAULTS keys from core.cjs source to verify planning-config.md
+// stays in sync. The canonical list of defaults lives in source; there is no runtime
+// API to enumerate them. Source inspection is the only practical parity check here.
+
 /**
  * Verify planning-config.md documents all config fields from source code.
  */

@@ -1,3 +1,8 @@
+// allow-test-rule: architectural-invariant
+// state.cjs locking must use Atomics.wait() (not a spin-loop) and register an exit
+// handler. These are implementation primitives, not string literals — behavioral tests
+// cannot verify which sleep primitive was chosen. Source inspection is the right level.
+
 /**
  * Regression tests for locking bugs #1909, #1916, #1925, #1927.
  *
