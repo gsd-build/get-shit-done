@@ -138,6 +138,28 @@ describe('forensics workflow', () => {
     );
   });
 
+  test('workflow submits issues to gsd-build/get-shit-done, not the current repo', () => {
+    const content = fs.readFileSync(workflowPath, 'utf-8');
+    // gh resolves the target repo from $PWD's git remote by default.
+    // Forensics always reports GSD bugs, so every gh call must pin the repo explicitly.
+    assert.ok(
+      content.includes('--repo gsd-build/get-shit-done'),
+      'gh issue create must use --repo gsd-build/get-shit-done to avoid submitting to the user\'s current project repo'
+    );
+  });
+
+  test('workflow checks bug label in gsd-build/get-shit-done, not the current repo', () => {
+    const content = fs.readFileSync(workflowPath, 'utf-8');
+    // gh label list also defaults to $PWD repo — must pin the same target repo
+    const labelListIdx = content.indexOf('gh label list');
+    assert.notStrictEqual(labelListIdx, -1, 'should have gh label list command');
+    const labelListSection = content.slice(labelListIdx, labelListIdx + 200);
+    assert.ok(
+      labelListSection.includes('gsd-build/get-shit-done'),
+      'gh label list must target gsd-build/get-shit-done'
+    );
+  });
+
   test('workflow updates STATE.md', () => {
     const content = fs.readFileSync(workflowPath, 'utf-8');
     assert.ok(
