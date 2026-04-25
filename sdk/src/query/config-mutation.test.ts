@@ -265,11 +265,32 @@ describe('configNewProject global defaults (D11)', () => {
         workflow: { auto_advance: true, research: false },
         agent_skills: { 'gsd-planner': 'global-planner-skill' },
         features: { global_learnings: true, thinking_partner: true },
+        review: {
+          models: {
+            codex: 'codex exec --model gpt-5',
+            gemini: 'gemini -m gemini-2.5-pro',
+          },
+        },
+        claude_md_assembly: {
+          blocks: {
+            architecture: 'link',
+            workflow: 'embed',
+          },
+        },
+        model_profile_overrides: {
+          codex: {
+            opus: 'gpt-5.5',
+            sonnet: 'gpt-5.4',
+          },
+        },
       }),
     );
     const choices = JSON.stringify({
       workflow: { research: true },
       features: { thinking_partner: false },
+      review: { models: { codex: 'codex exec --model gpt-5.5' } },
+      claude_md_assembly: { blocks: { workflow: 'link' } },
+      model_profile_overrides: { codex: { sonnet: 'gpt-5.4-mini' } },
     });
 
     const result = await configNewProject([choices], tmpDir);
@@ -282,6 +303,24 @@ describe('configNewProject global defaults (D11)', () => {
     expect(raw.workflow.research).toBe(true);
     expect(raw.agent_skills).toEqual({ 'gsd-planner': 'global-planner-skill' });
     expect(raw.features).toEqual({ global_learnings: true, thinking_partner: false });
+    expect(raw.review).toEqual({
+      models: {
+        codex: 'codex exec --model gpt-5.5',
+        gemini: 'gemini -m gemini-2.5-pro',
+      },
+    });
+    expect(raw.claude_md_assembly).toEqual({
+      blocks: {
+        architecture: 'link',
+        workflow: 'link',
+      },
+    });
+    expect(raw.model_profile_overrides).toEqual({
+      codex: {
+        opus: 'gpt-5.5',
+        sonnet: 'gpt-5.4-mini',
+      },
+    });
   });
 });
 

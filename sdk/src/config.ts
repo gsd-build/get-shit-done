@@ -136,18 +136,46 @@ function isPlainRecord(value: unknown): value is Record<string, unknown> {
 const NESTED_CONFIG_SECTIONS = [
   'git',
   'workflow',
+  'planning',
   'hooks',
+  'statusline',
   'agent_skills',
+  'review',
   'features',
+  'learnings',
+  'manager',
+  'intel',
+  'graphify',
+  'claude_md_assembly',
   'model_overrides',
+  'model_profile_overrides',
 ] as const;
+
+function mergePlainRecords(
+  base: Record<string, unknown>,
+  override: Record<string, unknown>,
+): Record<string, unknown> {
+  const merged: Record<string, unknown> = {
+    ...base,
+    ...override,
+  };
+
+  for (const [key, overrideValue] of Object.entries(override)) {
+    const baseValue = base[key];
+    if (isPlainRecord(baseValue) && isPlainRecord(overrideValue)) {
+      merged[key] = mergePlainRecords(baseValue, overrideValue);
+    }
+  }
+
+  return merged;
+}
 
 /**
  * Merge a config override onto a fully materialized base config.
  *
- * Top-level keys override directly while known nested sections retain defaults
- * for omitted fields. Shared by config loading and project config creation so
- * nested merge allowlists do not drift.
+ * Top-level keys override directly while known nested config trees retain
+ * omitted sibling keys recursively. Shared by config loading and project config
+ * creation so nested merge allowlists do not drift.
  */
 export function mergeConfig<T extends Record<string, unknown>>(base: T, override: Record<string, unknown>): T {
   const merged: Record<string, unknown> = {
@@ -160,10 +188,10 @@ export function mergeConfig<T extends Record<string, unknown>>(base: T, override
     const overrideSection = override[section];
 
     if (isPlainRecord(baseSection) || isPlainRecord(overrideSection)) {
-      merged[section] = {
-        ...(isPlainRecord(baseSection) ? baseSection : {}),
-        ...(isPlainRecord(overrideSection) ? overrideSection : {}),
-      };
+      merged[section] = mergePlainRecords(
+        isPlainRecord(baseSection) ? baseSection : {},
+        isPlainRecord(overrideSection) ? overrideSection : {},
+      );
     }
   }
 

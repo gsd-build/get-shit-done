@@ -142,6 +142,78 @@ describe('loadConfig', () => {
     });
   });
 
+  it('recursively merges deeper config trees without clobbering sibling defaults', async () => {
+    await writeUserDefaults({
+      review: {
+        models: {
+          codex: 'codex exec --model gpt-5',
+          gemini: 'gemini -m gemini-2.5-pro',
+        },
+      },
+      claude_md_assembly: {
+        mode: 'embed',
+        blocks: {
+          architecture: 'link',
+          workflow: 'embed',
+        },
+      },
+      model_profile_overrides: {
+        codex: {
+          opus: { model: 'gpt-5.5', reasoning_effort: 'xhigh' },
+          sonnet: 'gpt-5.4',
+        },
+        gemini: {
+          opus: 'gemini-2.5-pro',
+        },
+      },
+    });
+    await writeFile(
+      join(tmpDir, '.planning', 'config.json'),
+      JSON.stringify({
+        review: {
+          models: {
+            codex: 'codex exec --model gpt-5.5',
+          },
+        },
+        claude_md_assembly: {
+          blocks: {
+            workflow: 'link',
+          },
+        },
+        model_profile_overrides: {
+          codex: {
+            sonnet: { model: 'gpt-5.4', reasoning_effort: 'high' },
+          },
+        },
+      }),
+    );
+
+    const config = await loadTestConfig();
+
+    expect(config.review).toEqual({
+      models: {
+        codex: 'codex exec --model gpt-5.5',
+        gemini: 'gemini -m gemini-2.5-pro',
+      },
+    });
+    expect(config.claude_md_assembly).toEqual({
+      mode: 'embed',
+      blocks: {
+        architecture: 'link',
+        workflow: 'link',
+      },
+    });
+    expect(config.model_profile_overrides).toEqual({
+      codex: {
+        opus: { model: 'gpt-5.5', reasoning_effort: 'xhigh' },
+        sonnet: { model: 'gpt-5.4', reasoning_effort: 'high' },
+      },
+      gemini: {
+        opus: 'gemini-2.5-pro',
+      },
+    });
+  });
+
   it('ignores malformed user defaults', async () => {
     await writeUserDefaults('{bad json');
     await writeFile(
