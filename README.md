@@ -110,6 +110,8 @@ The installer prompts you to choose:
 1. **Runtime** — Claude Code, OpenCode, Gemini, Kilo, Codex, Copilot, Cursor, Windsurf, Antigravity, Augment, Trae, Qwen Code, CodeBuddy, Cline, or all (interactive multi-select — pick multiple runtimes in a single install session)
 2. **Location** — Global (all projects) or local (current project only)
 
+**New to the workflow?** Read the single-phase path from `/gsd-new-project` through `/gsd-verify-work` in the User Guide: [End-to-end walkthrough](docs/USER-GUIDE.md#end-to-end-walkthrough-single-phase).
+
 Verify with:
 - Claude Code / Gemini / Copilot / Antigravity / Qwen Code: `/gsd-help`
 - OpenCode / Kilo / Augment / Trae / CodeBuddy: `/gsd-help`

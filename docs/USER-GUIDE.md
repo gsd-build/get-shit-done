@@ -6,6 +6,7 @@ A detailed reference for workflows, troubleshooting, and configuration. For quic
 
 ## Table of Contents
 
+- [End-to-end walkthrough (single phase)](#end-to-end-walkthrough-single-phase)
 - [Workflow Diagrams](#workflow-diagrams)
 - [UI Design Contract](#ui-design-contract)
 - [Backlog & Threads](#backlog--threads)
@@ -16,6 +17,339 @@ A detailed reference for workflows, troubleshooting, and configuration. For quic
 - [Usage Examples](#usage-examples)
 - [Troubleshooting](#troubleshooting)
 - [Recovery Quick Reference](#recovery-quick-reference)
+
+---
+
+## End-to-end walkthrough (single phase)
+
+Walk through **one phase** from `/gsd-new-project` to `/gsd-verify-work`: what to run, what appears on disk, how each step feeds the next, and how `--full`, `--research`, and `--validate` attach to different commands. For syntax details see `/gsd-help` and [Command Reference](#command-reference).
+
+Between heavy commands, clearing context (`/clear` in Claude Code) keeps each step in a fresh window, similar to GSD subagents.
+
+The example below uses a deliberately small project so the artifact chain is easy to see:
+
+> **Scenario (illustrative only):** Build a Node.js CLI named `tempconv` that converts Celsius to Fahrenheit. Phase 1 creates the core CLI: parse a numeric Celsius argument, print Fahrenheit, return exit code 1 for invalid input, and document usage. Packaging, publishing, and extra units are later phases. *No `tempconv` artifact in this guide came from a real GSD run — values like `bin/tempconv.js`, `D-01`, or `32°F` are written here for readability only. Treat them as placeholders for whatever your own project produces.*
+
+**Commands in order (single phase):**
+
+```text
+/gsd-new-project
+# → writes .planning/PROJECT.md, REQUIREMENTS.md, ROADMAP.md, STATE.md, config.json, research/*
+
+/gsd-discuss-phase 1
+# → writes .planning/phases/01-…/01-CONTEXT.md (+ discussion log)
+
+/gsd-ui-phase 1
+# → optional; skip if no UI. Writes …/01-UI-SPEC.md
+
+/gsd-plan-phase 1
+# → writes …/01-RESEARCH.md, 01-01-PLAN.md, …, 01-VALIDATION.md (when Nyquist on)
+
+/gsd-execute-phase 1
+# → commits code; writes …/01-01-SUMMARY.md, …; finishes with …/01-VERIFICATION.md
+
+/gsd-verify-work 1
+# → writes …/01-UAT.md; may spawn fix / quick-task follow-ups
+```
+
+Paths use `01` as an example; your phase folder matches `ROADMAP.md` (e.g. `03-user-settings`).
+
+**About the excerpts below.** Every Markdown section header, frontmatter key, and command-output block in this walkthrough is copied from the canonical sources that ship in this repo: `get-shit-done/templates/*.md` (artifact shapes) and `get-shit-done/workflows/*.md` (command-completion text). The `tempconv` strings inside them are placeholders — they show *where* your real values appear, not what GSD itself emitted. Use the structure to recognize artifacts when you see them in your own `.planning/`, and ignore the literal text.
+
+### 1) Bootstrap the project: `/gsd-new-project`
+
+**Greenfield:** Run `/gsd-new-project`, or `/gsd-new-project --auto @your-prd.md` when you already have a written brief (see [COMMANDS.md](COMMANDS.md)).
+
+**Brownfield:** Run `/gsd-map-codebase` first, then `/gsd-new-project`, so roadmap and questions target what you are **adding**, not rediscovering the entire tree.
+
+**Produces (project-wide):** `.planning/PROJECT.md`, `REQUIREMENTS.md`, `ROADMAP.md`, `STATE.md`, `config.json`, and `research/` output from the initial project researchers. Nothing in `.planning/phases/` is meaningful until the roadmap lists phase rows — the roadmap is the spine that every later command follows.
+
+Example result after answering the project questions:
+
+```text
+GSD project initialized
+
+Created:
+- .planning/PROJECT.md
+- .planning/REQUIREMENTS.md
+- .planning/ROADMAP.md
+- .planning/STATE.md
+- .planning/config.json
+- .planning/research/
+
+First phase:
+Phase 1: Core Temperature CLI
+
+Next:
+/clear
+/gsd-discuss-phase 1
+```
+
+The key ROADMAP entry for this example would read like this:
+
+```markdown
+### Phase 1: Core Temperature CLI
+
+**Goal:** Create a Node.js CLI that accepts a Celsius value, prints the Fahrenheit conversion, and handles invalid input with a non-zero exit.
+**Requirements:** REQ-CLI-01, REQ-CLI-02, REQ-CLI-03
+**Plans:** 0 plans
+
+Plans:
+- [ ] TBD (run /gsd-plan-phase 1 to break down)
+```
+
+### 2) Lock implementation choices: `/gsd-discuss-phase 1`
+
+**Consumes:** `PROJECT.md`, `REQUIREMENTS.md`, `ROADMAP.md`, and any specs the workflow discovers.
+
+**Produces:** `{phase}-CONTEXT.md` (implementation decisions) and usually a discussion log. The phase researcher and planner **must** treat CONTEXT as authoritative for locked choices.
+
+The excerpt below matches the built-in template `get-shit-done/templates/context.md` so you can recognize the same sections in your `{phase}-CONTEXT.md`:
+
+```markdown
+# Phase 1: Core Temperature CLI - Context
+
+**Gathered:** 2026-04-25
+**Status:** Ready for planning
+
+<domain>
+## Phase Boundary
+
+Implement the first usable `tempconv` command. It accepts one Celsius value from the command line, prints the Fahrenheit value, and exits with a clear error for missing or non-numeric input.
+
+</domain>
+
+<decisions>
+## Implementation Decisions
+
+### Runtime and interface
+- **D-01:** Use Node.js with no runtime dependencies.
+- **D-02:** Put the executable entry point in `bin/tempconv.js`.
+- **D-03:** Print only the converted value on success, e.g. `32°F`.
+
+### Error handling
+- **D-04:** Missing or non-numeric input prints usage to stderr.
+- **D-05:** Invalid input exits with code `1`.
+</decisions>
+```
+
+The command confirms the hand-off to planning using the same output shape as the discuss workflow:
+
+```text
+Created: .planning/phases/01-core-temperature-cli/01-CONTEXT.md
+
+## Decisions Captured
+
+### Runtime and interface
+- Use Node.js with no runtime dependencies
+- Entry point: bin/tempconv.js
+- Success output: converted Fahrenheit value only
+
+### Error handling
+- Missing/non-numeric input prints usage to stderr
+- Invalid input exits 1
+
+---
+
+## ▶ Next Up — tempconv
+
+Phase 1: Core Temperature CLI — Create the first usable CLI command
+
+/clear then:
+
+/gsd-plan-phase 1
+```
+
+### 3) (Optional) Frontend design contract: `/gsd-ui-phase 1`
+
+Only when the phase includes UI. **Order:** after discuss-phase, **before** plan-phase. **Produces:** `{phase}-UI-SPEC.md` in the phase directory (see [UI Design Contract](#ui-design-contract)).
+
+### 4) Research, executable plans, and gates: `/gsd-plan-phase 1`
+
+**Consumes:** `CONTEXT.md`, project requirements, and (when present) `UI-SPEC.md`.
+
+**Produces (typical):** `{phase}-RESEARCH.md`, one or more `{phase}-{plan}-PLAN.md` files, and — when Nyquist validation is enabled — `{phase}-VALIDATION.md` (see [Validation Architecture (Nyquist Layer)](#validation-architecture-nyquist-layer)). A plan-checker loop may revise plans before you ever execute.
+
+RESEARCH always anchors back to CONTEXT. Opening shape from `get-shit-done/templates/research.md`:
+
+```markdown
+# Phase 1: Core Temperature CLI - Research
+
+<user_constraints>
+## User Constraints (from CONTEXT.md)
+
+- Use Node.js with no runtime dependencies.
+- Entry point: `bin/tempconv.js`.
+- Success output contains only the converted value.
+- Invalid input prints usage to stderr and exits 1.
+</user_constraints>
+```
+
+Plans are what `/gsd-execute-phase` actually runs. The PLAN skeleton below is from `get-shit-done/templates/phase-prompt.md` (your repo will show real tasks, waves, and requirement IDs):
+
+```markdown
+---
+phase: 01-core-temperature-cli
+plan: 01
+type: execute
+wave: 1
+depends_on: []
+requirements: [REQ-CLI-01, REQ-CLI-02, REQ-CLI-03]
+must_haves:
+  truths:
+    - `node bin/tempconv.js 0` prints `32°F`
+    - `node bin/tempconv.js abc` exits 1 and prints usage
+  artifacts:
+    - `bin/tempconv.js`
+    - `README.md`
+---
+
+<tasks>
+<task type="auto">
+  <name>Task 1: Implement the tempconv CLI entry point</name>
+  <files>bin/tempconv.js</files>
+  <read_first>package.json</read_first>
+  <action>Create `bin/tempconv.js` with a Node shebang. Read `process.argv[2]`, convert Celsius to Fahrenheit using `(celsius * 9) / 5 + 32`, print the rounded result with `°F`, and print `Usage: tempconv <celsius>` to stderr with exit code 1 when the input is missing or non-numeric.</action>
+  <verify>node bin/tempconv.js 0 && node bin/tempconv.js abc; test $? -eq 1</verify>
+</task>
+</tasks>
+```
+
+When planning finishes, the workflow displays a summary and the exact next command:
+
+```text
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+ GSD ► PHASE 1 PLANNED ✓
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+Phase 1: Core Temperature CLI — 2 plan(s) in 1 wave(s)
+
+| Wave | Plans | What it builds |
+|------|-------|----------------|
+| 1    | 01    | CLI entry point and input handling |
+| 1    | 02    | README usage docs and verification commands |
+
+Research: Completed
+Verification: Passed
+
+───────────────────────────────────────────────────────────────
+
+## ▶ Next Up — tempconv
+
+Execute Phase 1 — run all 2 plans
+
+/clear then:
+
+/gsd-execute-phase 1
+
+───────────────────────────────────────────────────────────────
+```
+
+### 5) Parallel implementation: `/gsd-execute-phase 1`
+
+**Consumes:** every `*-PLAN.md` for the phase, respecting `wave` and `depends_on`.
+
+**Produces:** code changes with atomic commits, one `{phase}-{plan}-SUMMARY.md` per plan, and — when the orchestrator completes — `{phase}-VERIFICATION.md` from the verifier agent.
+
+SUMMARY frontmatter shape (`get-shit-done/templates/summary.md`):
+
+```markdown
+---
+phase: 01-core-temperature-cli
+plan: 01
+subsystem: cli
+tags: [node, cli, validation]
+requirements-completed: [REQ-CLI-01, REQ-CLI-02]
+---
+```
+
+VERIFICATION header shape (`get-shit-done/templates/verification-report.md`):
+
+```markdown
+---
+phase: 01-core-temperature-cli
+status: passed | gaps_found | human_needed
+score: 3/3 must-haves verified
+---
+
+## Goal Achievement
+### Observable Truths
+| # | Truth | Status | Evidence |
+|---|-------|--------|----------|
+| 1 | `node bin/tempconv.js 0` prints `32°F` | ✓ VERIFIED | Command output matched |
+| 2 | Invalid input exits 1 | ✓ VERIFIED | `node bin/tempconv.js abc` returned non-zero |
+```
+
+When all plans and verification finish, `/gsd-execute-phase` returns a phase-complete summary:
+
+```text
+## PHASE COMPLETE
+
+Phase: 1 - Core Temperature CLI
+Plans: 2/2
+Verification: Passed
+
+- `bin/tempconv.js` created with Celsius-to-Fahrenheit conversion
+- Invalid input path exits with code 1 and prints usage
+- `README.md` documents `tempconv <celsius>`
+```
+
+### 6) Manual UAT: `/gsd-verify-work 1`
+
+**Consumes:** implementation state, `SUMMARY.md` files, and verifier output.
+
+**Produces:** `{phase}-UAT.md` tracking pass/fail/diagnosed items. Template shape (`get-shit-done/templates/UAT.md`):
+
+```markdown
+---
+status: testing
+phase: 01-core-temperature-cli
+source:
+  - 01-01-SUMMARY.md
+  - 01-02-SUMMARY.md
+---
+
+## Tests
+### 1. Convert freezing point
+expected: Running `node bin/tempconv.js 0` prints `32°F`.
+result: [pending]
+```
+
+If automated verification already failed, fix the underlying issues before expecting UAT to pass — use targeted `/gsd-quick`, gap-style replanning (`/gsd-plan-phase` with `--gaps` when appropriate), or a fresh discuss/plan cycle rather than blindly repeating execute.
+
+After you answer the UAT prompts, the command summarizes the session:
+
+```text
+## UAT Complete: Phase 1
+
+| Result | Count |
+|--------|-------|
+| Passed | 3     |
+| Issues | 0     |
+| Skipped| 0     |
+
+All tests passed. Ready to continue.
+
+- `/gsd-secure-phase 1` — security review (if enabled)
+- `/gsd-plan-phase 2` — Plan next phase
+- `/gsd-execute-phase 2` — Execute next phase
+```
+
+### How `--full`, `--research`, and `--validate` line up
+
+These flags are **not** global modifiers — they attach to specific commands:
+
+| Flag | Where | What it does |
+|------|--------|----------------|
+| `--research` | `/gsd-plan-phase N` | Forces regeneration of `{phase}-RESEARCH.md` even when a file already exists. Use after major CONTEXT changes or when research is stale. |
+| `--validate` | `/gsd-plan-phase N`, `/gsd-execute-phase N` | Runs **state validation** before planning or execution so `STATE.md` matches filesystem reality (see [COMMANDS.md](COMMANDS.md)). |
+| `--full`, `--validate`, `--research`, `--discuss` | `/gsd-quick` | **Composable** “mini pipeline” flags for ad-hoc tasks: `--full` enables discussion + research + plan-check + post-execution verification together; `--validate` enables plan-check + verification only; `--research` adds focused pre-plan research. Per the quick-task workflow, `--discuss --research --validate` is equivalent to `--full`. |
+
+A common point of confusion: `--full` does **not** attach to phase-rail commands like `/gsd-plan-phase` or `/gsd-execute-phase` — it is a `/gsd-quick`-only switch. On the **standard phase rail** (`discuss → plan → execute → verify`), you usually keep research / plan-check / verification on via `.planning/config.json` and reach for `--research` / `--validate` only when you need an explicit redo or a hard state sync. `/gsd-quick … --full` then packages the same *kinds* of gates for one-off work without walking the full phase artifact chain.
+
+### After phase 1
+
+Repeat the same chain for the next roadmap row, or run `/gsd-next` to let GSD pick the next command from disk state. Optional steps shown in [Workflow Diagrams](#workflow-diagrams) — `/gsd-code-review`, `/gsd-ship`, `/gsd-ui-review`, milestone audits — layer on once this core loop is comfortable. Full path reference: [Project File Structure](#project-file-structure).
 
 ---
 
