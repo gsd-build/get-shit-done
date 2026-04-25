@@ -82,6 +82,23 @@ Workflow files (`get-shit-done/workflows/*.md`) never do heavy lifting. They:
 - Collect results and route to the next step
 - Update state between steps
 
+#### Thin dispatcher pattern
+
+A thin dispatcher command file contains only dispatch logic: it spawns a
+general-purpose subagent that reads the full workflow file in its own context window.
+No workflow logic lives in the command file — the subagent owns the entire execution.
+(This is distinct from progressive-disclosure extraction, which reduces workflow file
+size rather than command file size.)
+
+Resumability comes from a checkpoint contract. The subagent writes `dispatch-state.json`
+after each major stage. On re-invocation the dispatcher reads this file and passes
+resume context so execution continues from the last completed stage. Checkpoints older
+than 24 hours are ignored as a staleness safety net; the file is deleted on success.
+
+Apply this pattern when a workflow hits its size-budget tier ceiling and is stateless or checkpoint-resumable.
+Skip it when the workflow requires complex runtime dispatch decisions, or when progressive-disclosure extraction
+already keeps it within budget. `commands/gsd/plan-phase.md` is the canonical living reference.
+
 ### 3. File-Based State
 
 All state lives in `.planning/` as human-readable Markdown and JSON. No database, no server, no external dependencies. This means:
@@ -171,7 +188,7 @@ Specialized agent definitions with frontmatter specifying:
 
 ### References (`get-shit-done/references/*.md`)
 
-Shared knowledge documents that workflows and agents `@-reference` (see [`docs/INVENTORY.md`](INVENTORY.md#references-41-shipped) for the authoritative count and full roster):
+Shared knowledge documents that workflows and agents `@-reference` (see [`docs/INVENTORY.md`](INVENTORY.md#references-51-shipped) for the authoritative count and full roster):
 
 **Core references:**
 
@@ -257,7 +274,7 @@ See [`docs/INVENTORY.md`](INVENTORY.md#hooks-11-shipped) for the authoritative 1
 
 ### CLI Tools (`get-shit-done/bin/`)
 
-Node.js CLI utility (`gsd-tools.cjs`) with domain modules split across `get-shit-done/bin/lib/` (see [`docs/INVENTORY.md`](INVENTORY.md#cli-modules-24-shipped) for the authoritative roster):
+Node.js CLI utility (`gsd-tools.cjs`) with domain modules split across `get-shit-done/bin/lib/` (see [`docs/INVENTORY.md`](INVENTORY.md#cli-modules-30-shipped) for the authoritative roster):
 
 
 | Module                 | Responsibility                                                                                      |
@@ -311,7 +328,7 @@ Orchestrator (workflow .md)
 
 ### Primary Agent Spawn Categories
 
-Conceptual spawn-pattern taxonomy for the 21 primary agents. For the authoritative 31-agent roster (including the 10 advanced/specialized agents such as `gsd-pattern-mapper`, `gsd-code-reviewer`, `gsd-code-fixer`, `gsd-ai-researcher`, `gsd-domain-researcher`, `gsd-eval-planner`, `gsd-eval-auditor`, `gsd-framework-selector`, `gsd-debug-session-manager`, `gsd-intel-updater`), see [`docs/INVENTORY.md`](INVENTORY.md#agents-31-shipped).
+Conceptual spawn-pattern taxonomy for the 21 primary agents. For the authoritative 33-agent roster (including the 12 advanced/specialized agents such as `gsd-pattern-mapper`, `gsd-code-reviewer`, `gsd-code-fixer`, `gsd-ai-researcher`, `gsd-domain-researcher`, `gsd-eval-planner`, `gsd-eval-auditor`, `gsd-framework-selector`, `gsd-debug-session-manager`, `gsd-intel-updater`, `gsd-doc-classifier`, `gsd-doc-synthesizer`), see [`docs/INVENTORY.md`](INVENTORY.md#agents-33-shipped).
 
 
 | Category         | Agents                                                                                  | Parallelism                                                                               |
