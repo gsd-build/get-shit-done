@@ -60,5 +60,14 @@ describe('audit-open — does not crash with ReferenceError (#2659)', () => {
       result.output && result.output.length > 0,
       'audit-open --json must write output to stdout'
     );
+    let parsed;
+    assert.doesNotThrow(
+      () => { parsed = JSON.parse(result.output); },
+      'audit-open --json must emit valid JSON'
+    );
+    assert.ok(
+      parsed !== null && typeof parsed === 'object',
+      'audit-open --json must emit a JSON object or array'
+    );
   });
 });
