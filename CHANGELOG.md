@@ -6,6 +6,19 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ## [Unreleased](https://github.com/gsd-build/get-shit-done/compare/v1.37.1...HEAD)
 
+### Enhancement: richer architecture docs from `/gsd-map-codebase` (#2500)
+
+`/gsd-map-codebase` (arch focus) now produces a `.planning/codebase/ARCHITECTURE.md` with the same richness as the research version created at project creation:
+
+- **ASCII system overview diagram** — component boxes and request-flow arrows, generated from actual codebase analysis
+- **Component responsibility table** — Component / Responsibility / File columns for at-a-glance orientation
+- **Data flow traces** — Primary request path and secondary flows with numbered steps and code references (`file:line`)
+- **Architectural constraints** — Threading model, global state inventory, circular import chains
+- **Anti-patterns** — Codebase-specific patterns to avoid, with the correct alternative
+- **`<!-- refreshed: {date} -->`** marker at the top so users can see when the doc was last generated
+
+Running `/gsd-map-codebase` or `/gsd-scan --focus arch` after a major refactor now produces an up-to-date architectural reference that includes the visual diagrams previously only available in the (non-refreshable) research version.
+
 ### SDK query layer — Phase 3 (what you get)
 
 If you use GSD **as a workflow**—milestones, phases, `.planning/` artifacts, bundled workflows, and `**/gsd:`** commands—Phase 3 is about **behavior matching what the docs and steps promise**, and **a bit less overhead** when the framework advances a phase or bootstraps a new project for you.
