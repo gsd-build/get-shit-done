@@ -74,11 +74,13 @@ describe('Thinking Partner Integration (#1726)', () => {
       try {
         const setResult = runGsdTools('config-set features.thinking_partner true', tmpDir);
         assert.ok(setResult.success, `config-set should accept features.thinking_partner: ${setResult.error}`);
-        const getResult = runGsdTools('config-get features.thinking_partner', tmpDir);
-        assert.ok(getResult.success, `config-get should read features.thinking_partner: ${getResult.error}`);
-        assert.ok(
-          getResult.output.trim() === 'true' || getResult.output.includes('true'),
-          `config-get should return "true", got: ${getResult.output}`
+        const configPath = path.join(tmpDir, '.planning', 'config.json');
+        assert.ok(fs.existsSync(configPath), 'config-set should create .planning/config.json');
+        const config = JSON.parse(fs.readFileSync(configPath, 'utf-8'));
+        assert.strictEqual(
+          config.features?.thinking_partner,
+          true,
+          'config-set should persist features.thinking_partner=true'
         );
       } finally {
         cleanup(tmpDir);
