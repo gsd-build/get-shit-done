@@ -122,7 +122,7 @@ De-duplicate the union (a file matched by multiple patterns is one doc).
 ```
 GSD > Discovered {N} docs, which exceeds the v1 cap of 50.
       Use --manifest to narrow the set to ≤ 50 files, or run
-      /gsd:ingest-docs again with a narrower <path>.
+      /gsd-ingest-docs again with a narrower <path>.
 ```
 
 Exit without proceeding.
@@ -309,7 +309,7 @@ Show:
 - Docs ingested (count + type breakdown)
 - Decisions locked, requirements created, constraints captured
 - Conflict report path (`.planning/INGEST-CONFLICTS.md`)
-- Next step: `/gsd:plan-phase 1` (new mode) or `/gsd:plan-phase N` (merge, pointing at the first newly-added phase)
+- Next step: `/gsd-plan-phase 1` (new mode) or `/gsd-plan-phase N` (merge, pointing at the first newly-added phase)
 
 </step>
 

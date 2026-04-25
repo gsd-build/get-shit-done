@@ -9,7 +9,7 @@ allowed-tools:
 ---
 
 <objective>
-Interactive configuration of GSD power-user knobs that don't belong in the common-case `/gsd:settings` prompt.
+Interactive configuration of GSD power-user knobs that don't belong in the common-case `/gsd-settings` prompt.
 
 Routes to the settings-advanced workflow which handles:
 - Config existence ensuring (workstream-aware path resolution)
@@ -18,7 +18,7 @@ Routes to the settings-advanced workflow which handles:
 - Config merging that preserves every unrelated key
 - Confirmation table display
 
-Use `/gsd:settings` for the common-case toggles (model profile, research/plan_check/verifier, branching strategy, context warnings). Use `/gsd:settings-advanced` once those are set and you want to tune the internals.
+Use `/gsd-settings` for the common-case toggles (model profile, research/plan_check/verifier, branching strategy, context warnings). Use `/gsd-settings-advanced` once those are set and you want to tune the internals.
 </objective>
 
 <execution_context>

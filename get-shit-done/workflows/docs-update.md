@@ -988,8 +988,8 @@ Failed claims:
 
 Display note:
 ```
-To fix failures automatically: /gsd:docs-update (runs generation + fix loop)
-To regenerate all docs from scratch: /gsd:docs-update --force
+To fix failures automatically: /gsd-docs-update (runs generation + fix loop)
+To regenerate all docs from scratch: /gsd-docs-update --force
 ```
 
 Clean up temp files: remove `.planning/tmp/verify-*.json` files.
@@ -1024,7 +1024,7 @@ This would expose credentials if committed.
 Action required:
 1. Review the flagged lines above
 2. Remove any real secrets from the doc files
-3. Re-run /gsd:docs-update to regenerate clean docs
+3. Re-run /gsd-docs-update to regenerate clean docs
 ```
 
 Then confirm with AskUserQuestion:
@@ -1126,7 +1126,7 @@ All generated files committed.
 Remind the user they can fact-check generated docs:
 
 ```
-Run `/gsd:docs-update --verify-only` to fact-check generated docs against the codebase.
+Run `/gsd-docs-update --verify-only` to fact-check generated docs against the codebase.
 ```
 
 End workflow.

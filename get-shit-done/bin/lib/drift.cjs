@@ -253,7 +253,7 @@ function buildMessage(elements, affectedPaths, action) {
     lines.push(`Auto-remap scheduled for paths: ${affectedPaths.join(', ')}`);
   } else {
     lines.push(
-      `Run /gsd:map-codebase --paths ${affectedPaths.join(',')} to refresh planning context.`,
+      `Run /gsd-map-codebase --paths ${affectedPaths.join(',')} to refresh planning context.`,
     );
   }
   return lines.join('\n');

@@ -38,7 +38,7 @@ Canonical gate types used across GSD workflows. Every validation checkpoint maps
 **Recovery:** Developer investigates root cause, fixes, restarts from checkpoint.
 **Examples:**
 - Context window critically low during execution
-- STATE.md in error state blocking /gsd:next
+- STATE.md in error state blocking /gsd-next
 - Verification finds critical missing deliverables
 
 ---

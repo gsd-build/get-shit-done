@@ -2,7 +2,7 @@
 
 /**
  * Secrets handling — masking convention for API keys and other
- * credentials managed via /gsd:settings-integrations.
+ * credentials managed via /gsd-settings-integrations.
  *
  * Convention: strings 8+ chars long render as `****<last-4>`; shorter
  * strings render as `****` with no tail (to avoid leaking a meaningful

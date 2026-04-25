@@ -381,7 +381,7 @@ function cmdPhaseAdd(cwd, description, raw, customId) {
 
     // Build phase entry
     const dependsOn = config.phase_naming === 'custom' ? '' : `\n**Depends on:** Phase ${typeof _newPhaseId === 'number' ? _newPhaseId - 1 : 'TBD'}`;
-    const phaseEntry = `\n### Phase ${_newPhaseId}: ${description}\n\n**Goal:** [To be planned]\n**Requirements**: TBD${dependsOn}\n**Plans:** 0 plans\n\nPlans:\n- [ ] TBD (run /gsd:plan-phase ${_newPhaseId} to break down)\n`;
+    const phaseEntry = `\n### Phase ${_newPhaseId}: ${description}\n\n**Goal:** [To be planned]\n**Requirements**: TBD${dependsOn}\n**Plans:** 0 plans\n\nPlans:\n- [ ] TBD (run /gsd-plan-phase ${_newPhaseId} to break down)\n`;
 
     // Find insertion point: before last "---" or at end
     let updatedContent;
@@ -458,7 +458,7 @@ function cmdPhaseAddBatch(cwd, descriptions, raw) {
       fs.mkdirSync(dirPath, { recursive: true });
       fs.writeFileSync(path.join(dirPath, '.gitkeep'), '');
       const dependsOn = config.phase_naming === 'custom' ? '' : `\n**Depends on:** Phase ${typeof newPhaseId === 'number' ? newPhaseId - 1 : 'TBD'}`;
-      const phaseEntry = `\n### Phase ${newPhaseId}: ${description}\n\n**Goal:** [To be planned]\n**Requirements**: TBD${dependsOn}\n**Plans:** 0 plans\n\nPlans:\n- [ ] TBD (run /gsd:plan-phase ${newPhaseId} to break down)\n`;
+      const phaseEntry = `\n### Phase ${newPhaseId}: ${description}\n\n**Goal:** [To be planned]\n**Requirements**: TBD${dependsOn}\n**Plans:** 0 plans\n\nPlans:\n- [ ] TBD (run /gsd-plan-phase ${newPhaseId} to break down)\n`;
       const lastSeparator = rawContent.lastIndexOf('\n---');
       rawContent = lastSeparator > 0
         ? rawContent.slice(0, lastSeparator) + phaseEntry + rawContent.slice(lastSeparator)
@@ -542,7 +542,7 @@ function cmdPhaseInsert(cwd, afterPhase, description, raw) {
     fs.writeFileSync(path.join(dirPath, '.gitkeep'), '');
 
     // Build phase entry
-    const phaseEntry = `\n### Phase ${_decimalPhase}: ${description} (INSERTED)\n\n**Goal:** [Urgent work - to be planned]\n**Requirements**: TBD\n**Depends on:** Phase ${afterPhase}\n**Plans:** 0 plans\n\nPlans:\n- [ ] TBD (run /gsd:plan-phase ${_decimalPhase} to break down)\n`;
+    const phaseEntry = `\n### Phase ${_decimalPhase}: ${description} (INSERTED)\n\n**Goal:** [Urgent work - to be planned]\n**Requirements**: TBD\n**Depends on:** Phase ${afterPhase}\n**Plans:** 0 plans\n\nPlans:\n- [ ] TBD (run /gsd-plan-phase ${_decimalPhase} to break down)\n`;
 
     // Insert after the target phase section
     const headerPattern = new RegExp(`(#{2,4}\\s*Phase\\s+0*${afterPhaseEscaped}:[^\\n]*\\n)`, 'i');
@@ -828,7 +828,7 @@ function cmdPhaseComplete(cwd, phaseNum, raw) {
       // Update plan count in phase section.
       // Use direct .replace() rather than replaceInCurrentMilestone() so this
       // works when the current milestone section is itself inside a <details>
-      // block (the standard /gsd:new-project layout). replaceInCurrentMilestone
+      // block (the standard /gsd-new-project layout). replaceInCurrentMilestone
       // scopes to content after the last </details>, which misses content inside
       // the current milestone's own <details> wrapper (#2005).
       // The phase-scoped heading pattern is specific enough to avoid matching

@@ -420,7 +420,7 @@ function buildPreview(gsd2Data, artifacts) {
   lines.push('');
   lines.push('Cannot migrate automatically:');
   lines.push('  - GSD-2 cost/token ledger (no v1 equivalent)');
-  lines.push('  - GSD-2 database state (rebuilt from files on first /gsd:health)');
+  lines.push('  - GSD-2 database state (rebuilt from files on first /gsd-health)');
   lines.push('  - VS Code extension state');
 
   return lines.join('\n');
