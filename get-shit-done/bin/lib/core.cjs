@@ -336,14 +336,17 @@ function loadConfig(cwd) {
     // Derived from config-set's VALID_CONFIG_KEYS (canonical source) plus internal-only
     // keys that loadConfig handles but config-set doesn't expose. This avoids maintaining
     // a hardcoded duplicate that drifts when new config keys are added.
-    const { VALID_CONFIG_KEYS } = require('./config.cjs');
+    // DYNAMIC_KEY_PATTERNS supplies topLevel for each pattern so adding a new
+    // dynamic-pattern namespace to config-schema.cjs automatically updates this set
+    // — no more drift between the read side and the write side (#2687).
+    const { VALID_CONFIG_KEYS, DYNAMIC_KEY_PATTERNS } = require('./config-schema.cjs');
     const KNOWN_TOP_LEVEL = new Set([
       // Extract top-level key names from dot-notation paths (e.g., 'workflow.research' → 'workflow')
       ...[...VALID_CONFIG_KEYS].map(k => k.split('.')[0]),
-      // Section containers that hold nested sub-keys
-      'git', 'workflow', 'planning', 'hooks', 'features',
+      // Dynamic-pattern top-level containers (e.g. review, model_profile_overrides)
+      ...DYNAMIC_KEY_PATTERNS.map(p => p.topLevel),
       // Internal keys loadConfig reads but config-set doesn't expose
-      'model_overrides', 'agent_skills', 'context_window', 'resolve_model_ids', 'claude_md_path',
+      'model_overrides', 'context_window', 'resolve_model_ids', 'claude_md_path',
       // Deprecated keys (still accepted for migration, not in config-set)
       'depth', 'multiRepo',
     ]);
