@@ -140,22 +140,22 @@ describe('forensics workflow', () => {
 
   test('workflow submits issues to gsd-build/get-shit-done, not the current repo', () => {
     const content = fs.readFileSync(workflowPath, 'utf-8');
-    // gh resolves the target repo from $PWD's git remote by default.
-    // Forensics always reports GSD bugs, so every gh call must pin the repo explicitly.
-    assert.ok(
-      content.includes('--repo gsd-build/get-shit-done'),
+    // Scope check to the gh issue create invocation — a whole-file search would
+    // pass even if gh issue create lacked --repo, because gh label list also
+    // contains the repo string.
+    assert.match(
+      content,
+      /gh issue create[\s\S]{0,250}--repo\s+gsd-build\/get-shit-done/,
       'gh issue create must use --repo gsd-build/get-shit-done to avoid submitting to the user\'s current project repo'
     );
   });
 
   test('workflow checks bug label in gsd-build/get-shit-done, not the current repo', () => {
     const content = fs.readFileSync(workflowPath, 'utf-8');
-    // gh label list also defaults to $PWD repo — must pin the same target repo
-    const labelListIdx = content.indexOf('gh label list');
-    assert.notStrictEqual(labelListIdx, -1, 'should have gh label list command');
-    const labelListSection = content.slice(labelListIdx, labelListIdx + 200);
-    assert.ok(
-      labelListSection.includes('gsd-build/get-shit-done'),
+    // Regex is more robust than a fixed-length slice to formatting changes
+    assert.match(
+      content,
+      /gh label list[\s\S]{0,250}--repo\s+gsd-build\/get-shit-done/,
       'gh label list must target gsd-build/get-shit-done'
     );
   });
