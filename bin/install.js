@@ -7195,12 +7195,36 @@ function _stripBlockComments(text) {
   return out;
 }
 
+function _findSingleLineCommentStart(line) {
+  let first = -1;
+
+  const hashIdx = line.indexOf('#');
+  if (hashIdx === 0 || (hashIdx > 0 && /\s/.test(line[hashIdx - 1]))) {
+    first = hashIdx;
+  }
+
+  let searchFrom = 0;
+  while (searchFrom < line.length) {
+    const slashIdx = line.indexOf('//', searchFrom);
+    if (slashIdx === -1) break;
+    if (slashIdx === 0 || /\s/.test(line[slashIdx - 1])) {
+      first = first === -1 ? slashIdx : Math.min(first, slashIdx);
+      break;
+    }
+    searchFrom = slashIdx + 2;
+  }
+
+  return first;
+}
+
 function _stripSingleLineComments(text) {
-  // Filter out single-line comment styles to avoid false positives
-  return text.split('\n').filter((line) => {
-    const trimmed = line.trim();
-    return !trimmed.startsWith('#') && !trimmed.startsWith('//');
-  }).join('\n');
+  // Strip both full-line and inline # / // comments while preserving code
+  // before the comment marker. Drop now-empty lines after stripping.
+  return text.split('\n').map((line) => {
+    const markerIdx = _findSingleLineCommentStart(line);
+    const stripped = markerIdx === -1 ? line : line.slice(0, markerIdx);
+    return stripped.trimEnd();
+  }).filter((line) => line.trim() !== '').join('\n');
 }
 
 function detectClaudePathRefs(content, isMarkdown = false) {

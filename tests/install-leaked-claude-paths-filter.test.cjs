@@ -84,6 +84,13 @@ describe('detectClaudePathRefs', () => {
         expectNoMatches('  # example: ~/.claude\n  // example: $HOME/.claude', false);
       });
 
+      // Ignore inline single-line comments and keep code before markers.
+      test('ignores inline # and // comment text', () => {
+        expectNoMatches('const x = 1; // ~/.claude', false);
+        expectNoMatches('export FLAG=1 # $HOME/.claude', false);
+        expectMatches('export PATH="~/.claude/skills:$PATH" // note: $HOME/.claude', false, ['~/.claude']);
+      });
+
       // Ignore C-style block comments in one-line and multi-line forms.
       test('ignores /* */ block comments (single-line and multi-line)', () => {
         expectNoMatches('/* example: ~/.claude */', false);
@@ -166,6 +173,15 @@ Outside docs mention $HOME/.claude`;
 export PATH="~/.claude/skills:$PATH"
 \`\`\``;
         expectMatches(content, true, ['~/.claude']);
+      });
+
+      // Ignore inline single-line comment tails in code blocks.
+      test('ignores inline # and // comment text', () => {
+        const content = `\`\`\`bash
+const x = 1; // ~/.claude
+export FLAG=1 # $HOME/.claude
+\`\`\``;
+        expectNoMatches(content, true);
       });
 
       // Ignore multi-line C-style comments while preserving valid code below.
