@@ -37,7 +37,7 @@ const CJS_PATH_CONST_RE = /(?:const|let|var)\s+(\w+)\s*=\s*path\.join\s*\([^)]*(
 const READ_WITH_CONST_RE = /readFileSync\s*\(\s*([A-Za-z_][A-Za-z0-9_]*)\s*,/gm;
 
 // Matches readFileSync with an inline path.join(.cjs) as first arg
-const READ_WITH_INLINE_CJS_RE = /readFileSync\s*\([^,)]*path\.join\s*\([^)]*['"][^'"]*\.cjs['"]/;
+const READ_WITH_INLINE_CJS_RE = /readFileSync\s*\([^,)]*path\.join\s*\([^)]*(?:'bin'|"bin"|'lib'|"lib"|'get-shit-done'|"get-shit-done")[^)]*['"][^'"]*\.cjs['"]/;
 
 function setFromMatches(content, re) {
   const found = new Set();

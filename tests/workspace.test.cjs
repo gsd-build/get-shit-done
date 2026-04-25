@@ -378,7 +378,7 @@ describe('workspace routing in gsd-tools', () => {
   // covered by the functional tests above; these guard against routing deletions.
 
   test('init new-workspace is routed correctly', () => {
-    const result = runGsdTools('init new-workspace --name test-ws', tmpDir);
+    const result = runGsdTools('init new-workspace test-ws', tmpDir);
     const stderr = result.error || '';
     assert.ok(
       !stderr.includes('Unknown init workflow'),
@@ -394,7 +394,7 @@ describe('workspace routing in gsd-tools', () => {
   });
 
   test('init remove-workspace is routed correctly', () => {
-    const result = runGsdTools('init remove-workspace --name nonexistent-ws', tmpDir);
+    const result = runGsdTools('init remove-workspace nonexistent-ws', tmpDir);
     const stderr = result.error || '';
     assert.ok(
       !stderr.includes('Unknown init workflow'),

@@ -271,7 +271,7 @@ This single test covers key registration in `VALID_CONFIG_KEYS`, the key's names
 
 ### Exception: `allow-test-rule: <reason>`
 
-Some tests legitimately read source files. There are four recognized categories:
+Some tests legitimately read source files. There are six recognized categories:
 
 | Reason | When to use |
 |--------|-------------|
