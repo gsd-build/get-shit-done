@@ -25,7 +25,7 @@ const fs = require('fs');
 const path = require('path');
 
 const TESTS_DIR = path.join(__dirname, '..', 'tests');
-const ALLOW_ANNOTATION = /\/\/\s*allow-test-rule:/;
+const ALLOW_ANNOTATION = /\/\/\s*allow-test-rule:\s*\S/;
 
 // Matches constant definitions that hold a .cjs path in a SOURCE directory.
 // Requires a source-dir indicator ('bin', 'lib', 'get-shit-done') to avoid
@@ -79,9 +79,20 @@ function check(filepath) {
   return null;
 }
 
-const testFiles = fs.readdirSync(TESTS_DIR)
-  .filter(f => f.endsWith('.test.cjs'))
-  .map(f => path.join(TESTS_DIR, f));
+function findTestFiles(dir) {
+  const results = [];
+  for (const entry of fs.readdirSync(dir, { withFileTypes: true })) {
+    const full = path.join(dir, entry.name);
+    if (entry.isDirectory()) {
+      results.push(...findTestFiles(full));
+    } else if (entry.name.endsWith('.test.cjs')) {
+      results.push(full);
+    }
+  }
+  return results;
+}
+
+const testFiles = findTestFiles(TESTS_DIR);
 
 const violations = testFiles.map(check).filter(Boolean);
 
