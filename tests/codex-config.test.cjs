@@ -21,6 +21,7 @@ const {
   generateCodexAgentToml,
   generateCodexConfigBlock,
   stripGsdFromCodexConfig,
+  migrateCodexHooksMapFormat,
   mergeCodexConfig,
   install,
   GSD_CODEX_MARKER,
@@ -551,6 +552,155 @@ describe('stripGsdFromCodexConfig', () => {
     assert.ok(result.includes('name = "my-helper"'), 'preserves user new [[agents]]');
     assert.ok(result.includes('name = "another-user"'), 'preserves second user [[agents]]');
     assert.ok(result.includes('second user agent'), 'preserves second user body');
+  });
+});
+
+// ─── migrateCodexHooksMapFormat ─────────────────────────────────────────────────
+
+describe('migrateCodexHooksMapFormat', () => {
+  test('returns content unchanged when no legacy [hooks] map sections present', () => {
+    const content = [
+      '[features]',
+      'codex_hooks = true',
+      '',
+      '[[hooks]]',
+      'event = "SessionStart"',
+      'command = "node /home/.codex/hooks/gsd-check-update.js"',
+      '',
+    ].join('\n');
+    assert.strictEqual(migrateCodexHooksMapFormat(content), content);
+  });
+
+  test('returns content unchanged for empty string', () => {
+    assert.strictEqual(migrateCodexHooksMapFormat(''), '');
+  });
+
+  test('converts [hooks.shell] with command key to [[hooks]] with type = "shell"', () => {
+    const content = [
+      '[features]',
+      'codex_hooks = true',
+      '',
+      '[hooks]',
+      '',
+      '[hooks.shell]',
+      'command = "node /home/.codex/hooks/gsd-check-update.js"',
+      '',
+    ].join('\n');
+    const result = migrateCodexHooksMapFormat(content);
+    // Old format removed
+    assert.ok(!result.includes('[hooks.shell]'), 'removes [hooks.shell] map header');
+    assert.ok(!result.match(/^\[hooks\]$/m), 'removes bare [hooks] container');
+    // New format present
+    assert.ok(result.includes('[[hooks]]'), 'adds [[hooks]] array header');
+    assert.ok(result.includes('type = "shell"'), 'adds type = "shell" key');
+    assert.ok(result.includes('command = "node /home/.codex/hooks/gsd-check-update.js"'), 'preserves command value');
+    // User content preserved
+    assert.ok(result.includes('[features]'), 'preserves [features] section');
+    assert.ok(result.includes('codex_hooks = true'), 'preserves codex_hooks key');
+  });
+
+  test('converts [hooks.exec] to [[hooks]] with type = "exec"', () => {
+    const content = [
+      '[hooks.exec]',
+      'command = "echo hello"',
+      'event = "SessionStart"',
+      '',
+    ].join('\n');
+    const result = migrateCodexHooksMapFormat(content);
+    assert.ok(!result.includes('[hooks.exec]'), 'removes [hooks.exec] map header');
+    assert.ok(result.includes('[[hooks]]'), 'adds [[hooks]] array header');
+    assert.ok(result.includes('type = "exec"'), 'adds type = "exec" key');
+    assert.ok(result.includes('command = "echo hello"'), 'preserves command');
+    assert.ok(result.includes('event = "SessionStart"'), 'preserves event');
+  });
+
+  test('converts multiple [hooks.TYPE] sections to separate [[hooks]] blocks', () => {
+    const content = [
+      '[hooks.shell]',
+      'command = "node /home/.codex/hooks/gsd-check-update.js"',
+      '',
+      '[hooks.exec]',
+      'command = "echo done"',
+      '',
+    ].join('\n');
+    const result = migrateCodexHooksMapFormat(content);
+    assert.ok(!result.includes('[hooks.shell]'), 'removes [hooks.shell]');
+    assert.ok(!result.includes('[hooks.exec]'), 'removes [hooks.exec]');
+    const hookHeaders = (result.match(/\[\[hooks\]\]/g) || []).length;
+    assert.strictEqual(hookHeaders, 2, 'produces two [[hooks]] array entries');
+    assert.ok(result.includes('type = "shell"'), 'first entry has type = "shell"');
+    assert.ok(result.includes('type = "exec"'), 'second entry has type = "exec"');
+  });
+
+  test('leaves user-authored [[hooks]] array entries untouched when no legacy [hooks] map present', () => {
+    const content = [
+      '[[hooks]]',
+      'event = "AfterCommand"',
+      'command = "echo custom"',
+      '',
+    ].join('\n');
+    assert.strictEqual(migrateCodexHooksMapFormat(content), content);
+  });
+
+  test('end-to-end: install on config with old [hooks] map format produces [[hooks]] array format (#2637)', () => {
+    // Simulates the exact old GSD config.toml format that broke on Codex 0.124.0
+    const oldContent = [
+      '[features]',
+      'codex_hooks = true',
+      '',
+      '[hooks]',
+      '',
+      '  [hooks.shell]',
+      '  command = "node /home/.codex/hooks/gsd-check-update.js"',
+      '',
+    ].join('\n');
+    const result = migrateCodexHooksMapFormat(oldContent);
+    // Must not contain any [hooks] or [hooks.*] map-style headers
+    assert.ok(!result.match(/^\s*\[hooks\]\s*$/m), 'no bare [hooks] map header');
+    assert.ok(!result.match(/^\s*\[hooks\./m), 'no [hooks.TYPE] map headers');
+    // Must contain [[hooks]] array format
+    assert.ok(result.includes('[[hooks]]'), 'has [[hooks]] array-of-tables header');
+    // type key must be present
+    assert.ok(result.includes('type = "shell"'), 'has type = "shell" in [[hooks]] entry');
+    // command is preserved
+    assert.ok(result.includes('command = "node /home/.codex/hooks/gsd-check-update.js"'), 'command preserved');
+    // [features] user content preserved
+    assert.ok(result.includes('[features]'), 'preserves [features]');
+    assert.ok(result.includes('codex_hooks = true'), 'preserves codex_hooks');
+  });
+
+  test('bare [hooks] section without sub-tables is dropped (no [[hooks]] block added)', () => {
+    const content = [
+      '[features]',
+      'codex_hooks = true',
+      '',
+      '[hooks]',
+      '# no sub-tables, just an empty container',
+      '',
+      '[model]',
+      'name = "o3"',
+      '',
+    ].join('\n');
+    const result = migrateCodexHooksMapFormat(content);
+    assert.ok(!result.match(/^\[hooks\]$/m), 'removes bare [hooks] section');
+    assert.ok(!result.includes('[[hooks]]'), 'no [[hooks]] added for bare [hooks] with no sub-tables');
+    assert.ok(result.includes('[features]'), 'preserves [features]');
+    assert.ok(result.includes('[model]'), 'preserves [model]');
+  });
+
+  test('CRLF line endings are preserved through migration', () => {
+    const content = [
+      '[features]',
+      'codex_hooks = true',
+      '',
+      '[hooks.shell]',
+      'command = "node /home/.codex/hooks/gsd-check-update.js"',
+      '',
+    ].join('\r\n');
+    const result = migrateCodexHooksMapFormat(content);
+    assert.ok(result.includes('[[hooks]]\r\n'), 'uses CRLF in [[hooks]] header');
+    assert.ok(result.includes('type = "shell"\r\n'), 'uses CRLF in type line');
+    assert.ok(!result.includes('[hooks.shell]'), 'removes legacy [hooks.shell]');
   });
 });
 
