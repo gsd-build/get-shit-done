@@ -270,11 +270,16 @@ LM_STUDIO_MODEL=$(gsd-sdk query config-get review.models.lm_studio 2>/dev/null |
 if [ -z "$LM_STUDIO_MODEL" ] || [ "$LM_STUDIO_MODEL" = "null" ]; then
   LM_STUDIO_MODEL=$(curl -s --max-time 2 "${LM_STUDIO_HOST}/v1/models" 2>/dev/null | jq -r '.data[0].id // "local-model"' 2>/dev/null || echo "local-model")
 fi
-jq -n --rawfile content /tmp/gsd-review-prompt-{phase}.md \
+LM_STUDIO_RESPONSE=$(jq -n --rawfile content /tmp/gsd-review-prompt-{phase}.md \
   --arg model "$LM_STUDIO_MODEL" \
   '{model: $model, messages: [{role: "user", content: $content}]}' | \
   curl -s --max-time 120 -X POST "${LM_STUDIO_HOST}/v1/chat/completions" \
-    -H "Content-Type: application/json" -d @- 2>/dev/null | \
+    -H "Content-Type: application/json" -d @- 2>/dev/null)
+LM_STUDIO_ACTUAL_MODEL=$(echo "$LM_STUDIO_RESPONSE" | jq -r '.model // ""' 2>/dev/null || echo "")
+if [ -n "$LM_STUDIO_ACTUAL_MODEL" ] && [ "$LM_STUDIO_ACTUAL_MODEL" != "null" ] && [ "$LM_STUDIO_ACTUAL_MODEL" != "$LM_STUDIO_MODEL" ]; then
+  echo "Warning: LM Studio served model '$LM_STUDIO_ACTUAL_MODEL' but '$LM_STUDIO_MODEL' was requested. Review may be from a different model." >&2
+fi
+echo "$LM_STUDIO_RESPONSE" | \
   jq -r '.choices[0].message.content // "LM Studio review failed or returned empty output."' \
   > /tmp/gsd-review-lm_studio-{phase}.md
 if [ ! -s /tmp/gsd-review-lm_studio-{phase}.md ]; then
