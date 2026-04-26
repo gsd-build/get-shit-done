@@ -491,8 +491,10 @@ async function runCommand(command, args, cwd, raw, defaultValue) {
         // `--version` as a globally-invalid help flag (see NEVER_VALID_FLAGS above).
         const { milestone, name } = parseNamedArgs(args, ['milestone', 'name']);
         state.cmdStateMilestoneSwitch(cwd, milestone, name, raw);
-      } else {
+      } else if (subcommand === undefined || subcommand === 'load') {
         state.cmdStateLoad(cwd, raw);
+      } else {
+        error(`Unknown state subcommand: "${subcommand}". Available: load, json, get, patch, update, advance-plan, record-metric, update-progress, add-decision, add-blocker, resolve-blocker, record-session, begin-phase, signal-waiting, signal-resume, planned-phase, validate, sync, prune, complete-phase, milestone-switch`);
       }
       break;
     }

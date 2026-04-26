@@ -66,6 +66,13 @@ describe('dispatcher error paths', () => {
     assert.ok(result.error.includes('Invalid --cwd'), `Expected "Invalid --cwd" in stderr, got: ${result.error}`);
   });
 
+  // Unknown subcommand: state
+  test('state unknown subcommand errors', () => {
+    const result = runGsdTools('state bogus', tmpDir);
+    assert.strictEqual(result.success, false, 'Should exit non-zero');
+    assert.ok(result.error.includes('Unknown state subcommand'), `Expected "Unknown state subcommand" in stderr, got: ${result.error}`);
+  });
+
   // Unknown subcommand: template
   test('template unknown subcommand errors', () => {
     const result = runGsdTools('template bogus', tmpDir);
