@@ -109,6 +109,8 @@ research agents.
    All `Task()` calls spawn simultaneously — do NOT wait for one before
    starting the next.
 
+   > **ORCHESTRATOR RULE — CODEX RUNTIME**: After calling all Task() calls above to spawn research agents, do NOT independently research or analyze any of the gray areas while the subagents are active. Wait for all subagents to return before synthesizing results. This prevents duplicate work and wasted context.
+
 3. After ALL agents return, **synthesize results** before presenting:
 
    For each agent's return:

@@ -106,6 +106,8 @@ Task(
 )
 ```
 
+> **ORCHESTRATOR RULE — CODEX RUNTIME**: After calling Task() above, stop working on this task immediately. Do not read more files, edit code, or run tests related to this task while the subagent is active. Wait for the subagent to return its result. This prevents duplicate work, conflicting edits, and wasted context. Only resume when the subagent result is available.
+
 Handle return:
 - `## GAPS FILLED` → record tests + map updates, Step 6
 - `## PARTIAL` → record resolved, move escalated to manual-only, Step 6

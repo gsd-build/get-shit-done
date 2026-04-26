@@ -560,6 +560,8 @@ increases monotonically across waves. `{status}` is `complete` (success),
    )
    ```
 
+   > **ORCHESTRATOR RULE — CODEX RUNTIME**: After calling Task() above to spawn executor agent(s), stop working on this task immediately. Do not read more files, edit code, or run tests related to this task while the subagent is active. Wait for the subagent to return its result. This prevents duplicate work, conflicting edits, and wasted context. Only resume when the subagent result is available.
+
    **Sequential mode** (`USE_WORKTREES` is `false`):
 
    Omit `isolation="worktree"` from the Task call. Replace the `<parallel_execution>` block with:
@@ -1369,6 +1371,8 @@ ${VERIFIER_SKILLS}",
   model="{verifier_model}"
 )
 ```
+
+> **ORCHESTRATOR RULE — CODEX RUNTIME**: After calling Task() above, stop working on this task immediately. Do not read more files, edit code, or run tests related to this task while the subagent is active. Wait for the subagent to return its result. This prevents duplicate work, conflicting edits, and wasted context. Only resume when the subagent result is available.
 
 Read status:
 ```bash
