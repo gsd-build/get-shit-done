@@ -279,11 +279,11 @@ LM_STUDIO_ACTUAL_MODEL=$(echo "$LM_STUDIO_RESPONSE" | jq -r '.model // ""' 2>/de
 if [ -n "$LM_STUDIO_ACTUAL_MODEL" ] && [ "$LM_STUDIO_ACTUAL_MODEL" != "null" ] && [ "$LM_STUDIO_ACTUAL_MODEL" != "$LM_STUDIO_MODEL" ]; then
   echo "Warning: LM Studio served model '$LM_STUDIO_ACTUAL_MODEL' but '$LM_STUDIO_MODEL' was requested. Review may be from a different model." >&2
 fi
-echo "$LM_STUDIO_RESPONSE" | \
-  jq -r '.choices[0].message.content // "LM Studio review failed or returned empty output."' \
-  > /tmp/gsd-review-lm_studio-{phase}.md
-if [ ! -s /tmp/gsd-review-lm_studio-{phase}.md ]; then
-  echo "LM Studio review failed or returned empty output." > /tmp/gsd-review-lm_studio-{phase}.md
+LM_STUDIO_CONTENT=$(echo "$LM_STUDIO_RESPONSE" | jq -r '.choices[0].message.content // ""' 2>/dev/null || echo "")
+if [ -n "$LM_STUDIO_CONTENT" ]; then
+  echo "$LM_STUDIO_CONTENT" > /tmp/gsd-review-lm_studio-{phase}.md
+else
+  echo "Warning: LM Studio returned empty content — skipping review." >&2
 fi
 ```
 
@@ -295,15 +295,16 @@ LLAMA_CPP_MODEL=$(gsd-sdk query config-get review.models.llama_cpp 2>/dev/null |
 if [ -z "$LLAMA_CPP_MODEL" ] || [ "$LLAMA_CPP_MODEL" = "null" ]; then
   LLAMA_CPP_MODEL=$(curl -s --max-time 2 "${LLAMA_CPP_HOST}/v1/models" 2>/dev/null | jq -r '.data[0].id // "local-model"' 2>/dev/null || echo "local-model")
 fi
-jq -n --rawfile content /tmp/gsd-review-prompt-{phase}.md \
+LLAMA_CPP_CONTENT=$(jq -n --rawfile content /tmp/gsd-review-prompt-{phase}.md \
   --arg model "$LLAMA_CPP_MODEL" \
   '{model: $model, messages: [{role: "user", content: $content}]}' | \
   curl -s --max-time 120 -X POST "${LLAMA_CPP_HOST}/v1/chat/completions" \
     -H "Content-Type: application/json" -d @- 2>/dev/null | \
-  jq -r '.choices[0].message.content // "llama.cpp review failed or returned empty output."' \
-  > /tmp/gsd-review-llama_cpp-{phase}.md
-if [ ! -s /tmp/gsd-review-llama_cpp-{phase}.md ]; then
-  echo "llama.cpp review failed or returned empty output." > /tmp/gsd-review-llama_cpp-{phase}.md
+  jq -r '.choices[0].message.content // ""' 2>/dev/null || echo "")
+if [ -n "$LLAMA_CPP_CONTENT" ]; then
+  echo "$LLAMA_CPP_CONTENT" > /tmp/gsd-review-llama_cpp-{phase}.md
+else
+  echo "Warning: llama.cpp returned empty content — skipping review." >&2
 fi
 ```
 
