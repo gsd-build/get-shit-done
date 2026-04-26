@@ -57,7 +57,7 @@ Read and execute `~/.claude/get-shit-done/workflows/discuss-phase.md` end-to-end
 
 **MANDATORY:** Read the appropriate workflow file BEFORE taking any action. The objective and success_criteria sections in this command file are summaries — the workflow file contains the complete step-by-step process with all required behaviors, config checks, and interaction patterns. Do not improvise from the summary.
 
-**Lazy loading:** `templates/context.md` is loaded inside the `write_context` step of the active workflow. Do not load it here.
+**Lazy loading:** `templates/context.md` is loaded inside the `write_context` step of the active workflow. `discuss-phase-power.md` is loaded inside `discuss-phase.md` when `--power` is detected. Do not load either here.
 </process>
 
 <success_criteria>
