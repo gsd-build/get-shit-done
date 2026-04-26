@@ -44,6 +44,36 @@ describe('review.models.<cli> config key', () => {
     assert.ok(result.success, `config-set should succeed for review.models.codex: ${result.error}`);
   });
 
+  test('isValidConfigKey accepts review.models.claude (#2688)', () => {
+    const result = runGsdTools(
+      ['config-set', 'review.models.claude', 'claude-opus-4-6'],
+      tmpDir,
+      { HOME: tmpDir, USERPROFILE: tmpDir }
+    );
+    assert.ok(result.success, `config-set should succeed for review.models.claude: ${result.error}`);
+  });
+
+  test('round-trip: review.models.claude config-set then config-get (#2688)', () => {
+    const setResult = runGsdTools(
+      ['config-set', 'review.models.claude', 'claude-opus-4-6'],
+      tmpDir,
+      { HOME: tmpDir, USERPROFILE: tmpDir }
+    );
+    assert.ok(setResult.success, `config-set failed: ${setResult.error}`);
+
+    const getResult = runGsdTools(
+      ['config-get', 'review.models.claude', '--raw'],
+      tmpDir,
+      { HOME: tmpDir, USERPROFILE: tmpDir }
+    );
+    assert.ok(getResult.success, `config-get failed: ${getResult.error}`);
+    assert.strictEqual(
+      getResult.output,
+      'claude-opus-4-6',
+      'config-get should return the model ID set via config-set'
+    );
+  });
+
   test('review.model is rejected and suggests review.models.<cli-name>', () => {
     // The suggestion path goes through validateKnownConfigKeyPath, which is
     // called before isValidConfigKey in cmdConfigSet.
