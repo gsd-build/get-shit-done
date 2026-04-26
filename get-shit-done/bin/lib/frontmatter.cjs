@@ -244,8 +244,13 @@ function parseMustHavesBlock(content, blockName) {
         if (current) items.push(current);
         current = {};
         const afterDash = trimmed.slice(2);
+        const trimmedAfterDash = afterDash.trim();
+        // Check if it's a fully-quoted string (may contain ':' inside the quotes)
+        if ((trimmedAfterDash.startsWith('"') && trimmedAfterDash.endsWith('"')) ||
+            (trimmedAfterDash.startsWith("'") && trimmedAfterDash.endsWith("'"))) {
+          current = trimmedAfterDash.slice(1, -1);
         // Check if it's a simple string item (no colon means not a key-value)
-        if (!afterDash.includes(':')) {
+        } else if (!afterDash.includes(':')) {
           current = afterDash.replace(/^["']|["']$/g, '');
         } else {
           // Key-value on same line as dash: "- path: value"
