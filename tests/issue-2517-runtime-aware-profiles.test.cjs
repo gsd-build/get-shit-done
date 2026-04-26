@@ -590,3 +590,227 @@ describe('issue #2517: RUNTIME_PROFILE_MAP single source of truth (finding #16)'
     assert.deepStrictEqual(claudeOpus, { model: 'claude-opus-4-7' });
   });
 });
+
+// ─── Issue #2612: gemini runtime tier resolution ─────────────────────────────
+describe('issue #2612: runtime "gemini" — Gemini tier resolution', () => {
+  let tmpDir;
+  beforeEach(() => { isolateHome(); tmpDir = createTempProject(); _resetRuntimeWarningCacheForTests(); });
+  afterEach(() => { cleanup(tmpDir); restoreHome(); });
+
+  test('opus tier -> gemini-3-pro', () => {
+    writeConfig(tmpDir, { runtime: 'gemini', model_profile: 'quality' });
+    assert.strictEqual(resolveModelInternal(tmpDir, 'gsd-planner'), 'gemini-3-pro');
+  });
+
+  test('sonnet tier -> gemini-3-flash', () => {
+    writeConfig(tmpDir, { runtime: 'gemini', model_profile: 'balanced' });
+    assert.strictEqual(resolveModelInternal(tmpDir, 'gsd-roadmapper'), 'gemini-3-flash');
+  });
+
+  test('haiku tier -> gemini-2.5-flash-lite', () => {
+    writeConfig(tmpDir, { runtime: 'gemini', model_profile: 'budget' });
+    assert.strictEqual(resolveModelInternal(tmpDir, 'gsd-codebase-mapper'), 'gemini-2.5-flash-lite');
+  });
+
+  test('reasoning_effort is null for gemini (no reasoning_effort in spec)', () => {
+    writeConfig(tmpDir, { runtime: 'gemini', model_profile: 'quality' });
+    assert.strictEqual(resolveReasoningEffortInternal(tmpDir, 'gsd-planner'), null);
+  });
+});
+
+// ─── Issue #2612: qwen runtime tier resolution ───────────────────────────────
+describe('issue #2612: runtime "qwen" — Qwen tier resolution', () => {
+  let tmpDir;
+  beforeEach(() => { isolateHome(); tmpDir = createTempProject(); _resetRuntimeWarningCacheForTests(); });
+  afterEach(() => { cleanup(tmpDir); restoreHome(); });
+
+  test('opus tier -> qwen3-max-2026-01-23', () => {
+    writeConfig(tmpDir, { runtime: 'qwen', model_profile: 'quality' });
+    assert.strictEqual(resolveModelInternal(tmpDir, 'gsd-planner'), 'qwen3-max-2026-01-23');
+  });
+
+  test('sonnet tier -> qwen3-coder-plus', () => {
+    writeConfig(tmpDir, { runtime: 'qwen', model_profile: 'balanced' });
+    assert.strictEqual(resolveModelInternal(tmpDir, 'gsd-roadmapper'), 'qwen3-coder-plus');
+  });
+
+  test('haiku tier -> qwen3-coder-next', () => {
+    writeConfig(tmpDir, { runtime: 'qwen', model_profile: 'budget' });
+    assert.strictEqual(resolveModelInternal(tmpDir, 'gsd-codebase-mapper'), 'qwen3-coder-next');
+  });
+
+  test('reasoning_effort is null for qwen (no reasoning_effort in spec)', () => {
+    writeConfig(tmpDir, { runtime: 'qwen', model_profile: 'quality' });
+    assert.strictEqual(resolveReasoningEffortInternal(tmpDir, 'gsd-planner'), null);
+  });
+});
+
+// ─── Issue #2612: opencode runtime tier resolution ───────────────────────────
+describe('issue #2612: runtime "opencode" — OpenCode tier resolution', () => {
+  let tmpDir;
+  beforeEach(() => { isolateHome(); tmpDir = createTempProject(); _resetRuntimeWarningCacheForTests(); });
+  afterEach(() => { cleanup(tmpDir); restoreHome(); });
+
+  test('opus tier -> anthropic/claude-opus-4-7', () => {
+    writeConfig(tmpDir, { runtime: 'opencode', model_profile: 'quality' });
+    assert.strictEqual(resolveModelInternal(tmpDir, 'gsd-planner'), 'anthropic/claude-opus-4-7');
+  });
+
+  test('sonnet tier -> anthropic/claude-sonnet-4-6', () => {
+    writeConfig(tmpDir, { runtime: 'opencode', model_profile: 'balanced' });
+    assert.strictEqual(resolveModelInternal(tmpDir, 'gsd-roadmapper'), 'anthropic/claude-sonnet-4-6');
+  });
+
+  test('haiku tier -> anthropic/claude-haiku-4-5', () => {
+    writeConfig(tmpDir, { runtime: 'opencode', model_profile: 'budget' });
+    assert.strictEqual(resolveModelInternal(tmpDir, 'gsd-codebase-mapper'), 'anthropic/claude-haiku-4-5');
+  });
+
+  test('reasoning_effort is null for opencode (no reasoning_effort in spec)', () => {
+    writeConfig(tmpDir, { runtime: 'opencode', model_profile: 'quality' });
+    assert.strictEqual(resolveReasoningEffortInternal(tmpDir, 'gsd-planner'), null);
+  });
+});
+
+// ─── Issue #2612: copilot runtime tier resolution ────────────────────────────
+describe('issue #2612: runtime "copilot" — Copilot tier resolution', () => {
+  let tmpDir;
+  beforeEach(() => { isolateHome(); tmpDir = createTempProject(); _resetRuntimeWarningCacheForTests(); });
+  afterEach(() => { cleanup(tmpDir); restoreHome(); });
+
+  test('opus tier -> claude-opus-4-7', () => {
+    writeConfig(tmpDir, { runtime: 'copilot', model_profile: 'quality' });
+    assert.strictEqual(resolveModelInternal(tmpDir, 'gsd-planner'), 'claude-opus-4-7');
+  });
+
+  test('sonnet tier -> claude-sonnet-4-6', () => {
+    writeConfig(tmpDir, { runtime: 'copilot', model_profile: 'balanced' });
+    assert.strictEqual(resolveModelInternal(tmpDir, 'gsd-roadmapper'), 'claude-sonnet-4-6');
+  });
+
+  test('haiku tier -> claude-haiku-4-5', () => {
+    writeConfig(tmpDir, { runtime: 'copilot', model_profile: 'budget' });
+    assert.strictEqual(resolveModelInternal(tmpDir, 'gsd-codebase-mapper'), 'claude-haiku-4-5');
+  });
+
+  test('reasoning_effort is null for copilot (no reasoning_effort in spec)', () => {
+    writeConfig(tmpDir, { runtime: 'copilot', model_profile: 'quality' });
+    assert.strictEqual(resolveReasoningEffortInternal(tmpDir, 'gsd-planner'), null);
+  });
+});
+
+// ─── Issue #2612: Group B runtimes fall through (no built-in map) ────────────
+describe('issue #2612: Group B runtimes — no built-in map, use unknown-runtime fallback', () => {
+  test('cursor is not in RUNTIME_PROFILE_MAP (uses unknown-runtime fallback)', () => {
+    assert.strictEqual(RUNTIME_PROFILE_MAP.cursor, undefined);
+  });
+
+  test('kilo is not in RUNTIME_PROFILE_MAP', () => {
+    assert.strictEqual(RUNTIME_PROFILE_MAP.kilo, undefined);
+  });
+
+  test('windsurf is not in RUNTIME_PROFILE_MAP', () => {
+    assert.strictEqual(RUNTIME_PROFILE_MAP.windsurf, undefined);
+  });
+
+  test('cline is not in RUNTIME_PROFILE_MAP', () => {
+    assert.strictEqual(RUNTIME_PROFILE_MAP.cline, undefined);
+  });
+
+  test('augment is not in RUNTIME_PROFILE_MAP', () => {
+    assert.strictEqual(RUNTIME_PROFILE_MAP.augment, undefined);
+  });
+
+  test('trae is not in RUNTIME_PROFILE_MAP', () => {
+    assert.strictEqual(RUNTIME_PROFILE_MAP.trae, undefined);
+  });
+
+  test('codebuddy is not in RUNTIME_PROFILE_MAP', () => {
+    assert.strictEqual(RUNTIME_PROFILE_MAP.codebuddy, undefined);
+  });
+
+  test('antigravity is not in RUNTIME_PROFILE_MAP', () => {
+    assert.strictEqual(RUNTIME_PROFILE_MAP.antigravity, undefined);
+  });
+
+  test('cursor runtime falls back to Claude alias (not a Gemini/Qwen/etc ID)', () => {
+    const { createTempProject, cleanup } = require('./helpers.cjs');
+    isolateHome();
+    const tmpDir = createTempProject();
+    _resetRuntimeWarningCacheForTests();
+    try {
+      writeConfig(tmpDir, { runtime: 'cursor', model_profile: 'quality' });
+      // Should fall back to Claude alias, not emit a provider-specific ID
+      const resolved = resolveModelInternal(tmpDir, 'gsd-planner');
+      assert.strictEqual(resolved, 'opus');
+    } finally {
+      cleanup(tmpDir);
+      restoreHome();
+    }
+  });
+});
+
+// ─── Issue #2612: Partial override merge for new runtimes ────────────────────
+describe('issue #2612: partial override merge for new Group A runtimes', () => {
+  let tmpDir;
+  beforeEach(() => { isolateHome(); tmpDir = createTempProject(); _resetRuntimeWarningCacheForTests(); });
+  afterEach(() => { cleanup(tmpDir); restoreHome(); });
+
+  test('gemini.opus override wins; sonnet and haiku use built-in defaults', () => {
+    writeConfig(tmpDir, {
+      runtime: 'gemini',
+      model_profile: 'quality',
+      model_profile_overrides: {
+        gemini: { opus: 'gemini-3-ultra' },
+      },
+    });
+    // opus is overridden
+    assert.strictEqual(resolveModelInternal(tmpDir, 'gsd-planner'), 'gemini-3-ultra');
+    // sonnet not overridden — built-in default (quality -> sonnet for gsd-codebase-mapper)
+    assert.strictEqual(resolveModelInternal(tmpDir, 'gsd-codebase-mapper'), 'gemini-3-flash');
+  });
+
+  test('qwen.opus override wins; sonnet and haiku use built-in defaults', () => {
+    writeConfig(tmpDir, {
+      runtime: 'qwen',
+      model_profile: 'quality',
+      model_profile_overrides: {
+        qwen: { opus: 'qwen3-max-custom' },
+      },
+    });
+    // opus is overridden
+    assert.strictEqual(resolveModelInternal(tmpDir, 'gsd-planner'), 'qwen3-max-custom');
+    // sonnet not overridden — quality -> sonnet for gsd-codebase-mapper
+    assert.strictEqual(resolveModelInternal(tmpDir, 'gsd-codebase-mapper'), 'qwen3-coder-plus');
+  });
+
+  test('opencode.sonnet override wins; opus and haiku still use built-in defaults', () => {
+    writeConfig(tmpDir, {
+      runtime: 'opencode',
+      model_profile: 'balanced',
+      model_profile_overrides: {
+        opencode: { sonnet: 'anthropic/claude-sonnet-4-7' },
+      },
+    });
+    // gsd-planner balanced -> opus -> built-in default
+    assert.strictEqual(resolveModelInternal(tmpDir, 'gsd-planner'), 'anthropic/claude-opus-4-7');
+    // gsd-roadmapper balanced -> sonnet -> overridden
+    assert.strictEqual(resolveModelInternal(tmpDir, 'gsd-roadmapper'), 'anthropic/claude-sonnet-4-7');
+    // gsd-codebase-mapper balanced -> haiku -> built-in default (haiku not overridden)
+    assert.strictEqual(resolveModelInternal(tmpDir, 'gsd-codebase-mapper'), 'anthropic/claude-haiku-4-5');
+  });
+
+  test('copilot.haiku override wins; opus and sonnet still use built-in defaults', () => {
+    writeConfig(tmpDir, {
+      runtime: 'copilot',
+      model_profile: 'budget',
+      model_profile_overrides: {
+        copilot: { haiku: 'claude-haiku-4-6' },
+      },
+    });
+    // gsd-codebase-mapper budget -> haiku -> overridden
+    assert.strictEqual(resolveModelInternal(tmpDir, 'gsd-codebase-mapper'), 'claude-haiku-4-6');
+    // gsd-planner budget -> sonnet -> built-in default
+    assert.strictEqual(resolveModelInternal(tmpDir, 'gsd-planner'), 'claude-sonnet-4-6');
+  });
+});

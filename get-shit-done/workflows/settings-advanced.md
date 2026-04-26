@@ -1,12 +1,12 @@
 <purpose>
 Interactive configuration of GSD power-user knobs — plan bounce, node repair, subagent timeouts,
 inline plan threshold, cross-AI execution, base branch, branch templates, response language,
-context window, gitignored search, and graphify build timeout.
+context window, gitignored search, graphify build timeout, and runtime model tier overrides.
 
 This is a companion to `/gsd-settings` — the common-case prompt there covers model profile,
 research/plan_check/verifier toggles, branching strategy, UI/AI phase gates, and worktree
 isolation. This advanced command covers everything else that is user-settable, grouped into
-six sections so each prompt batch stays cognitively scoped. Every answer pre-selects the
+seven sections so each prompt batch stays cognitively scoped. Every answer pre-selects the
 current value; numeric-input answers that are non-numeric are rejected and re-prompted.
 </purpose>
 
@@ -73,6 +73,12 @@ Runtime / Output:
 - `context_window` (default: `200000`)
 - `search_gitignored` (default: `false`)
 - `graphify.build_timeout` (default: `300`)
+
+Runtime Model Tiers:
+- `runtime` (default: `null` — reads as `"claude"`)
+- `model_profile_overrides.<runtime>.opus` (default: built-in for the runtime, or absent)
+- `model_profile_overrides.<runtime>.sonnet` (default: built-in for the runtime, or absent)
+- `model_profile_overrides.<runtime>.haiku` (default: built-in for the runtime, or absent)
 
 Each field's **current value is pre-selected** in the prompt rendering below. When the
 current value is absent from the config, render the documented default as the pre-selected
@@ -322,6 +328,121 @@ AskUserQuestion([
 ])
 ```
 
+### Section 7 — Runtime Model Tiers
+
+This section lets the user inspect and override the built-in model IDs GSD resolves for each
+profile tier (`opus` / `sonnet` / `haiku`) on their configured runtime.
+
+**Step A — Show current runtime and built-in defaults:**
+
+Read `runtime` from the config (or treat as `"claude"` if absent). Look up the built-in
+tier map from the table below. For each tier, also read the current override from
+`model_profile_overrides.<runtime>.<tier>` if present.
+
+Built-in tier defaults by runtime:
+
+| Runtime    | `opus`                        | `sonnet`                        | `haiku`                       |
+|------------|-------------------------------|---------------------------------|-------------------------------|
+| `claude`   | `claude-opus-4-7`             | `claude-sonnet-4-6`             | `claude-haiku-4-5`            |
+| `codex`    | `gpt-5.4`                     | `gpt-5.3-codex`                 | `gpt-5.4-mini`                |
+| `gemini`   | `gemini-3-pro`                | `gemini-3-flash`                | `gemini-2.5-flash-lite`       |
+| `qwen`     | `qwen3-max-2026-01-23`        | `qwen3-coder-plus`              | `qwen3-coder-next`            |
+| `opencode` | `anthropic/claude-opus-4-7`   | `anthropic/claude-sonnet-4-6`   | `anthropic/claude-haiku-4-5`  |
+| `copilot`  | `claude-opus-4-7`             | `claude-sonnet-4-6`             | `claude-haiku-4-5`            |
+| Group B (`kilo`, `cline`, `cursor`, `windsurf`, `augment`, `trae`, `codebuddy`, `antigravity`) | (no built-in default — your runtime handles model selection) | | |
+
+Display a table to the user showing the effective configuration:
+
+```text
+Runtime model tiers — runtime: <current runtime or "claude (default)">
+
+| Tier   | Built-in default                  | Current override (if any)         |
+|--------|-----------------------------------|-----------------------------------|
+| opus   | <built-in or "(no built-in)">     | <override value or "(none)">      |
+| sonnet | <built-in or "(no built-in)">     | <override value or "(none)">      |
+| haiku  | <built-in or "(no built-in)">     | <override value or "(none)">      |
+```
+
+For Group B runtimes (those without a built-in default), show `(no built-in default — your runtime handles model selection)` in the built-in column.
+
+**Step B — Let the user choose a runtime (optional):**
+
+```text
+AskUserQuestion([
+  {
+    question: "Which runtime do you want to configure tier overrides for? (current: <runtime or 'claude'>)",
+    header: "Runtime Selection",
+    multiSelect: false,
+    options: [
+      { label: "Keep current (<runtime>)", description: "Configure overrides for the current runtime." },
+      { label: "claude", description: "Claude Code / Anthropic CLI." },
+      { label: "codex", description: "OpenAI Codex CLI." },
+      { label: "gemini", description: "Gemini CLI." },
+      { label: "qwen", description: "Qwen CLI." },
+      { label: "opencode", description: "OpenCode (uses anthropic/ prefix)." },
+      { label: "copilot", description: "GitHub Copilot." },
+      { label: "Other (Group B or custom)", description: "kilo, cline, cursor, windsurf, augment, trae, codebuddy, antigravity, or a custom runtime string. Overrides are honored even though no built-in map exists." }
+    ]
+  }
+])
+```
+
+If "Other" is selected, prompt the user to enter the runtime name as a free-text string.
+If the selected runtime differs from the stored `runtime` key, update `runtime` via
+`gsd-sdk query config-set runtime <value>` before proceeding to Step C.
+
+**Step C — Configure tier overrides for the selected runtime:**
+
+```text
+AskUserQuestion([
+  {
+    question: "Override for opus tier? Built-in: <opus default or '(no built-in)'>  Current: <override or '(none)'>",
+    header: "Opus Override",
+    multiSelect: false,
+    options: [
+      { label: "Keep current", description: "Leave unchanged (uses built-in default if no override)." },
+      { label: "Clear override", description: "Remove any existing override; fall back to built-in." },
+      { label: "Enter model ID", description: "Type the exact model ID string to use for opus-tier agents on this runtime." }
+    ]
+  },
+  {
+    question: "Override for sonnet tier? Built-in: <sonnet default or '(no built-in)'>  Current: <override or '(none)'>",
+    header: "Sonnet Override",
+    multiSelect: false,
+    options: [
+      { label: "Keep current", description: "Leave unchanged." },
+      { label: "Clear override", description: "Remove any existing override; fall back to built-in." },
+      { label: "Enter model ID", description: "Type the exact model ID string to use for sonnet-tier agents on this runtime." }
+    ]
+  },
+  {
+    question: "Override for haiku tier? Built-in: <haiku default or '(no built-in)'>  Current: <override or '(none)'>",
+    header: "Haiku Override",
+    multiSelect: false,
+    options: [
+      { label: "Keep current", description: "Leave unchanged." },
+      { label: "Clear override", description: "Remove any existing override; fall back to built-in." },
+      { label: "Enter model ID", description: "Type the exact model ID string to use for haiku-tier agents on this runtime." }
+    ]
+  }
+])
+```
+
+**Step D — Apply the changes:**
+
+For each tier where the user chose "Enter model ID":
+```bash
+gsd-sdk query config-set model_profile_overrides.<runtime>.<tier> "<model-id>"
+```
+
+For each tier where the user chose "Clear override", remove the key by setting it to null:
+```bash
+gsd-sdk query config-set model_profile_overrides.<runtime>.<tier> null
+```
+
+"Keep current" selections are skipped entirely. Never write a key the user did not explicitly
+change.
+
 </step>
 
 <step name="update_config">
@@ -338,11 +459,15 @@ gsd-sdk query config-set workflow.plan_bounce_passes 5
 gsd-sdk query config-set workflow.subagent_timeout 900
 gsd-sdk query config-set git.base_branch main
 gsd-sdk query config-set context_window 1000000
+# Runtime model tier examples:
+gsd-sdk query config-set runtime gemini
+gsd-sdk query config-set model_profile_overrides.gemini.opus gemini-3-ultra
+gsd-sdk query config-set model_profile_overrides.gemini.haiku null
 ```
 
 Conceptual shape after merge (unchanged top-level keys like `model_profile`,
 `granularity`, `mode`, `brave_search`, `agent_skills.*`, `hooks.context_warnings`, and
-anything not listed in Sections 1–6 MUST survive the update):
+anything not listed in Sections 1–7 MUST survive the update):
 
 ```json
 {
@@ -374,6 +499,16 @@ anything not listed in Sections 1–6 MUST survive the update):
   "graphify": {
     ...existing_graphify,
     "build_timeout": <new|existing>
+  },
+  "runtime": <new|existing|null>,
+  "model_profile_overrides": {
+    ...existing_model_profile_overrides,
+    "<runtime>": {
+      ...existing_runtime_overrides,
+      "opus": <new|existing|null>,
+      "sonnet": <new|existing|null>,
+      "haiku": <new|existing|null>
+    }
   }
 }
 ```
@@ -391,27 +526,31 @@ Display:
  GSD ► ADVANCED SETTINGS UPDATED
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
-| Setting                        | Value |
-|--------------------------------|-------|
-| workflow.plan_bounce           | {on/off} |
-| workflow.plan_bounce_passes    | {n} |
-| workflow.plan_bounce_script    | {path/null} |
-| workflow.subagent_timeout      | {seconds} |
-| workflow.inline_plan_threshold | {n} |
-| workflow.node_repair           | {on/off} |
-| workflow.node_repair_budget    | {n} |
-| workflow.auto_prune_state      | {on/off} |
-| workflow.max_discuss_passes    | {n} |
-| workflow.cross_ai_execution    | {on/off} |
-| workflow.cross_ai_command      | {cmd/null} |
-| workflow.cross_ai_timeout      | {seconds} |
-| git.base_branch                | {branch} |
-| git.phase_branch_template      | {template} |
-| git.milestone_branch_template  | {template} |
-| response_language              | {lang/null} |
-| context_window                 | {tokens} |
-| search_gitignored              | {on/off} |
-| graphify.build_timeout         | {seconds} |
+| Setting                                    | Value |
+|--------------------------------------------|-------|
+| workflow.plan_bounce                       | {on/off} |
+| workflow.plan_bounce_passes                | {n} |
+| workflow.plan_bounce_script                | {path/null} |
+| workflow.subagent_timeout                  | {seconds} |
+| workflow.inline_plan_threshold             | {n} |
+| workflow.node_repair                       | {on/off} |
+| workflow.node_repair_budget                | {n} |
+| workflow.auto_prune_state                  | {on/off} |
+| workflow.max_discuss_passes                | {n} |
+| workflow.cross_ai_execution                | {on/off} |
+| workflow.cross_ai_command                  | {cmd/null} |
+| workflow.cross_ai_timeout                  | {seconds} |
+| git.base_branch                            | {branch} |
+| git.phase_branch_template                  | {template} |
+| git.milestone_branch_template              | {template} |
+| response_language                          | {lang/null} |
+| context_window                             | {tokens} |
+| search_gitignored                          | {on/off} |
+| graphify.build_timeout                     | {seconds} |
+| runtime                                    | {runtime/null} |
+| model_profile_overrides.<runtime>.opus     | {model/built-in/null} |
+| model_profile_overrides.<runtime>.sonnet   | {model/built-in/null} |
+| model_profile_overrides.<runtime>.haiku    | {model/built-in/null} |
 
 These settings apply to future /gsd-plan-phase, /gsd-execute-phase, /gsd-discuss-phase,
 and /gsd-ship runs.
@@ -425,11 +564,14 @@ UI/AI phase gates), use /gsd-settings.
 
 <success_criteria>
 - [ ] Current config read from resolved `$GSD_CONFIG_PATH`
-- [ ] Six sections rendered (Planning, Execution, Discussion, Cross-AI, Git, Runtime)
+- [ ] Seven sections rendered (Planning, Execution, Discussion, Cross-AI, Git, Runtime/Output, Runtime Model Tiers)
 - [ ] Every field pre-selected to its current value (or documented default if absent)
 - [ ] Numeric inputs validated — non-numeric rejected and re-prompted
 - [ ] Branch-template inputs validated — non-default must contain a placeholder
 - [ ] Null-allowed fields accept an empty input as a clear
 - [ ] Writes routed through `gsd-sdk query config-set` so unrelated keys are preserved
-- [ ] Confirmation table rendered listing all 19 fields
+- [ ] Section 7 shows current runtime and built-in tier table
+- [ ] Group B runtimes display "(no built-in default — your runtime handles model selection)"
+- [ ] Override set/clear/keep paths all work correctly for each tier
+- [ ] Confirmation table rendered listing all 23 fields (19 + runtime + 3 tier overrides)
 </success_criteria>

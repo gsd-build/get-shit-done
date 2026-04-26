@@ -1572,6 +1572,26 @@ const RUNTIME_PROFILE_MAP = {
     sonnet: { model: 'gpt-5.3-codex',  reasoning_effort: 'medium' },
     haiku:  { model: 'gpt-5.4-mini',   reasoning_effort: 'medium' },
   },
+  gemini: {
+    opus:   { model: 'gemini-3-pro' },
+    sonnet: { model: 'gemini-3-flash' },
+    haiku:  { model: 'gemini-2.5-flash-lite' },
+  },
+  qwen: {
+    opus:   { model: 'qwen3-max-2026-01-23' },
+    sonnet: { model: 'qwen3-coder-plus' },
+    haiku:  { model: 'qwen3-coder-next' },
+  },
+  opencode: {
+    opus:   { model: 'anthropic/claude-opus-4-7' },
+    sonnet: { model: 'anthropic/claude-sonnet-4-6' },
+    haiku:  { model: 'anthropic/claude-haiku-4-5' },
+  },
+  copilot: {
+    opus:   { model: 'claude-opus-4-7' },
+    sonnet: { model: 'claude-sonnet-4-6' },
+    haiku:  { model: 'claude-haiku-4-5' },
+  },
 };
 
 const RUNTIMES_WITH_REASONING_EFFORT = new Set(['codex']);
