@@ -1507,9 +1507,9 @@ const MODEL_ALIAS_MAP = {
  */
 const RUNTIME_PROFILE_MAP = {
   claude: {
-    opus:   { model: 'claude-opus-4-7' },
-    sonnet: { model: 'claude-sonnet-4-6' },
-    haiku:  { model: 'claude-haiku-4-5' },
+    opus:   { model: MODEL_ALIAS_MAP['opus'] },
+    sonnet: { model: MODEL_ALIAS_MAP['sonnet'] },
+    haiku:  { model: MODEL_ALIAS_MAP['haiku'] },
   },
   codex: {
     opus:   { model: 'gpt-5.4',        reasoning_effort: 'xhigh' },
