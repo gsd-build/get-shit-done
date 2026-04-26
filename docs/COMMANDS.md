@@ -425,6 +425,28 @@ Append new phase to roadmap.
 /gsd-add-phase                      # Interactive — describe the phase
 ```
 
+### `/gsd-edit-phase`
+
+Edit any field of an existing roadmap phase in place.
+
+| Argument | Required | Description |
+|----------|----------|-------------|
+| `N` | Yes | Phase number to edit |
+
+| Flag | Description |
+|------|-------------|
+| `--force` | Allow editing in-progress or completed phases |
+
+**Prerequisites:** `.planning/ROADMAP.md` exists, phase N must exist
+**Produces:** Updated phase section in ROADMAP.md (in place, number and position preserved)
+
+```bash
+/gsd-edit-phase 5                   # Edit any field of phase 5 (future phases only)
+/gsd-edit-phase 5 --force           # Edit phase 5 even if in-progress or completed
+```
+
+---
+
 ### `/gsd-insert-phase`
 
 Insert urgent work between phases using decimal numbering.
