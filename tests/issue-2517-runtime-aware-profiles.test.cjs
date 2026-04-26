@@ -90,7 +90,7 @@ describe('issue #2517: backwards compat — no runtime key set', () => {
 
   test('resolve_model_ids:true still maps alias -> full Claude ID with no runtime', () => {
     writeConfig(tmpDir, { model_profile: 'balanced', resolve_model_ids: true });
-    assert.strictEqual(resolveModelInternal(tmpDir, 'gsd-planner'), 'claude-opus-4-6');
+    assert.strictEqual(resolveModelInternal(tmpDir, 'gsd-planner'), 'claude-opus-4-7');
   });
 
   test('resolve_model_ids:"omit" still returns "" with no runtime', () => {
@@ -125,7 +125,7 @@ describe('issue #2517: runtime "claude" is a no-op for resolution (finding #4)',
 
   test('runtime:"claude" + resolve_model_ids:"omit" returns "" (finding #4 regression)', () => {
     // The pre-fix bug: runtime:"claude" hijacked the resolution chain and
-    // returned `claude-opus-4-6` even when the user explicitly asked for the
+    // returned the resolved Claude ID even when the user explicitly asked for the
     // omit semantics.
     writeConfig(tmpDir, {
       runtime: 'claude',
@@ -141,7 +141,7 @@ describe('issue #2517: runtime "claude" is a no-op for resolution (finding #4)',
       model_profile: 'quality',
       resolve_model_ids: true,
     });
-    assert.strictEqual(resolveModelInternal(tmpDir, 'gsd-planner'), 'claude-opus-4-6');
+    assert.strictEqual(resolveModelInternal(tmpDir, 'gsd-planner'), 'claude-opus-4-7');
   });
 
   test('reasoning_effort is null on Claude (never leaks)', () => {
@@ -587,6 +587,6 @@ describe('issue #2517: RUNTIME_PROFILE_MAP single source of truth (finding #16)'
     const codexOpus = RUNTIME_PROFILE_MAP.codex?.opus;
     assert.deepStrictEqual(codexOpus, { model: 'gpt-5.4', reasoning_effort: 'xhigh' });
     const claudeOpus = RUNTIME_PROFILE_MAP.claude?.opus;
-    assert.deepStrictEqual(claudeOpus, { model: 'claude-opus-4-6' });
+    assert.deepStrictEqual(claudeOpus, { model: 'claude-opus-4-7' });
   });
 });
