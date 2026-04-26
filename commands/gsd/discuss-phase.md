@@ -29,10 +29,8 @@ Extract implementation decisions that downstream agents need — researcher and 
 </objective>
 
 <execution_context>
-@~/.claude/get-shit-done/workflows/discuss-phase.md
-@~/.claude/get-shit-done/workflows/discuss-phase-assumptions.md
-@~/.claude/get-shit-done/workflows/discuss-phase-power.md
-@~/.claude/get-shit-done/templates/context.md
+Workflow files are loaded on-demand in the <process> section below — not upfront.
+Do not pre-load any workflow files before reading the mode routing instructions.
 </execution_context>
 
 <runtime_note>
@@ -51,11 +49,21 @@ Context files are resolved in-workflow using `init phase-op` and roadmap/state t
 DISCUSS_MODE=$(gsd-sdk query config-get workflow.discuss_mode 2>/dev/null || echo "discuss")
 ```
 
-If `DISCUSS_MODE` is `"assumptions"`: Read and execute @~/.claude/get-shit-done/workflows/discuss-phase-assumptions.md end-to-end.
+If `DISCUSS_MODE` is `"assumptions"`:
+```
+Read(~/.claude/get-shit-done/workflows/discuss-phase-assumptions.md)
+```
+Then execute that workflow end-to-end.
 
-If `DISCUSS_MODE` is `"discuss"` (or unset, or any other value): Read and execute @~/.claude/get-shit-done/workflows/discuss-phase.md end-to-end.
+If `DISCUSS_MODE` is `"discuss"` (or unset, or any other value):
+```
+Read(~/.claude/get-shit-done/workflows/discuss-phase.md)
+```
+Then execute that workflow end-to-end.
 
-**MANDATORY:** The execution_context files listed above ARE the instructions. Read the workflow file BEFORE taking any action. The objective and success_criteria sections in this command file are summaries — the workflow file contains the complete step-by-step process with all required behaviors, config checks, and interaction patterns. Do not improvise from the summary.
+**MANDATORY:** Read the appropriate workflow file BEFORE taking any action. The objective and success_criteria sections in this command file are summaries — the workflow file contains the complete step-by-step process with all required behaviors, config checks, and interaction patterns. Do not improvise from the summary.
+
+**Lazy loading:** `templates/context.md` is loaded inside the `write_context` step of the active workflow. Do not load it here.
 </process>
 
 <success_criteria>
