@@ -41,7 +41,7 @@ npx get-shit-done-cc@latest
 
 **Trusted by engineers at Amazon, Google, Shopify, and Webflow.**
 
-[Why I Built This](#why-i-built-this) · [How It Works](#how-it-works) · [Commands](#commands) · [Why It Works](#why-it-works) · [User Guide](docs/USER-GUIDE.md)
+[Why I Built This](#why-i-built-this) · [How It Works](#how-it-works) · [Commands](#commands) · [Why It Works](#why-it-works) · [User Guide](docs/USER-GUIDE.md) · [Walkthrough](docs/USER-GUIDE.md#end-to-end-walkthrough)
 
 </div>
 
@@ -262,6 +262,8 @@ If you prefer not to use that flag, add this to your project's `.claude/settings
 ---
 
 ## How It Works
+
+> **New to GSD?** See the [end-to-end walkthrough](docs/USER-GUIDE.md#end-to-end-walkthrough) in the User Guide — it shows a complete project from `/gsd-new-project` through `/gsd-verify-work` with concrete example outputs.
 
 > **Already have code?** Run `/gsd-map-codebase` first. It spawns parallel agents to analyze your stack, architecture, conventions, and concerns. Then `/gsd-new-project` knows your codebase — questions focus on what you're adding, and planning automatically loads your patterns.
 
