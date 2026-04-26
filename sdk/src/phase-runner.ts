@@ -26,6 +26,7 @@ import type { PromptFactory } from './phase-prompt.js';
 import type { ContextEngine } from './context-engine.js';
 import type { GSDLogger } from './logger.js';
 import { runPhaseStepSession, runPlanSession } from './session-runner.js';
+import { parsePlanFile } from './plan-parser.js';
 import { readFile } from 'node:fs/promises';
 import { join } from 'node:path';
 import { checkResearchGate } from './research-gate.js';
@@ -437,9 +438,34 @@ export class PhaseRunner {
       const contextFiles = await this.contextEngine.resolveContextFiles(PhaseType.Discuss);
       let prompt = await this.promptFactory.buildPrompt(PhaseType.Discuss, null, contextFiles);
 
-      // Supplement with self-discuss instructions with pass cap
+      // Prepend self-discuss override BEFORE the workflow prompt.
+      // The workflow prompt contains interactive patterns (user questions, area selection)
+      // that the agent will follow unless explicitly overridden up front.
       const maxPasses = this.config.workflow.max_discuss_passes ?? 3;
-      prompt += `\n\n## Self-Discuss Mode\n\nYou are the AI discussing decisions with yourself. No human is present. Identify 3-5 gray areas in the project scope, reason through each one, make opinionated choices, and write CONTEXT.md with your decisions.\n\n**CRITICAL: Single-pass only.** You MUST complete all decisions in ONE pass and write CONTEXT.md once. Do NOT re-read your own CONTEXT.md to find "gaps" and do additional passes. The maximum allowed passes is ${maxPasses} — if you have already written CONTEXT.md, you are DONE. Proceed to the next workflow step. Self-referential gap-finding loops waste resources without adding value.`;
+      const selfDiscussOverride = [
+        '## HEADLESS MODE — MANDATORY OVERRIDE',
+        '',
+        '**This session is running headless with no human present.**',
+        '',
+        'You MUST NOT:',
+        '- Use AskUserQuestion or any interactive tools',
+        '- Invoke Skill() or SlashCommand()',
+        '- Ask the user anything or wait for input',
+        '- Use multi-select, checkbox, or prompt UIs',
+        '',
+        'You MUST:',
+        '- Make all decisions autonomously and opinionatedly',
+        '- Identify 3-5 gray areas in the project scope',
+        '- Reason through each one yourself and pick the best option',
+        '- Write CONTEXT.md with your decisions in a single pass',
+        `- Complete within ${maxPasses} pass(es) maximum — do not re-read your own output to find gaps`,
+        '',
+        'Any instructions below about "asking the user", "discussing with the user", or "interactive" should be read as "decide yourself."',
+        '',
+        '---',
+        '',
+      ].join('\n');
+      prompt = selfDiscussOverride + prompt;
 
       planResult = await runPhaseStepSession(
         prompt,
@@ -745,6 +771,8 @@ export class PhaseRunner {
 
   /**
    * Execute a single plan by ID within the execute step.
+   * Loads the plan file, parses it, and passes the parsed plan to the prompt
+   * builder so the executor gets the full plan content (tasks, objectives, etc.).
    */
   private async executeSinglePlan(
     phaseNumber: string,
@@ -752,9 +780,17 @@ export class PhaseRunner {
     sessionOpts: SessionOptions,
   ): Promise<PlanResult> {
     try {
+      // Resolve the plan file path from phase directory + planId
+      const phaseOp = await this.tools.initPhaseOp(phaseNumber);
+      const planFilename = planId === 'PLAN' ? 'PLAN.md' : `${planId}-PLAN.md`;
+      const planPath = join(this.projectDir, phaseOp.phase_dir, planFilename);
+
+      // Parse the plan file so the executor prompt includes the actual tasks
+      const parsedPlan = await parsePlanFile(planPath);
+
       const phaseType = PhaseType.Execute;
       const contextFiles = await this.contextEngine.resolveContextFiles(phaseType);
-      const prompt = await this.promptFactory.buildPrompt(phaseType, null, contextFiles);
+      const prompt = await this.promptFactory.buildPrompt(phaseType, parsedPlan, contextFiles, phaseOp.phase_dir);
 
       return await runPhaseStepSession(
         prompt,
@@ -849,8 +885,8 @@ export class PhaseRunner {
         };
       }
 
-      // Parse verification outcome from session result
-      outcome = this.parseVerificationOutcome(lastResult);
+      // Parse verification outcome from VERIFICATION.md (not just session exit code)
+      outcome = await this.parseVerificationOutcome(lastResult, phaseNumber);
 
       if (outcome === 'passed') {
         break;
@@ -1084,14 +1120,40 @@ export class PhaseRunner {
   }
 
   /**
-   * Parse the verification outcome from a PlanResult.
-   * In a real implementation, this would parse the session output for
-   * structured verification signals. For now, map from success/error.
+   * Parse the verification outcome by checking VERIFICATION.md on disk.
+   * The verify session may succeed (no runtime errors) while writing
+   * status: gaps_found to VERIFICATION.md — we need to check the file,
+   * not just the session exit code.
+   *
+   * Falls back to session result if VERIFICATION.md can't be parsed.
    */
-  private parseVerificationOutcome(result: PlanResult): VerificationOutcome {
-    if (result.success) return 'passed';
-    if (result.error?.subtype === 'human_review_needed') return 'human_needed';
-    return 'gaps_found';
+  private async parseVerificationOutcome(result: PlanResult, phaseNumber: string): Promise<VerificationOutcome> {
+    // If the session itself crashed, that's a clear failure
+    if (!result.success) {
+      if (result.error?.subtype === 'human_review_needed') return 'human_needed';
+      return 'gaps_found';
+    }
+
+    // Session succeeded — check what the verifier actually wrote to VERIFICATION.md
+    try {
+      const verStatus = await this.tools.exec('check.verification-status', [phaseNumber]);
+      const data = typeof verStatus === 'string' ? JSON.parse(verStatus) : verStatus;
+      const status = (data?.status ?? '').toLowerCase();
+
+      if (status === 'pass' || status === 'passed') return 'passed';
+      if (status === 'fail' || status === 'gaps_found') return 'gaps_found';
+      if (status === 'missing') {
+        // VERIFICATION.md doesn't exist yet — treat session success as passed
+        return 'passed';
+      }
+      // Unknown status — log and treat as gaps_found to be safe
+      this.logger?.warn(`Unknown verification status '${status}' for phase ${phaseNumber}, treating as gaps_found`);
+      return 'gaps_found';
+    } catch (err) {
+      // Can't parse VERIFICATION.md — fall back to session result
+      this.logger?.warn(`Could not check verification status for phase ${phaseNumber}: ${err instanceof Error ? err.message : String(err)}`);
+      return 'passed';
+    }
   }
 
   /**

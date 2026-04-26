@@ -144,7 +144,7 @@ describe('PromptFactory', () => {
 
       const prompt = await factory.buildPrompt(PhaseType.Research, null, contextFiles);
 
-      expect(prompt).toContain('## Role');
+      expect(prompt).toContain('## Agent Instructions');
       expect(prompt).toContain('You are a researcher.');
       expect(prompt).toContain('## Purpose');
       expect(prompt).toContain('Research the phase.');
@@ -153,12 +153,11 @@ describe('PromptFactory', () => {
       expect(prompt).toContain('## Context');
       expect(prompt).toContain('# State');
       expect(prompt).toContain('# Roadmap');
-      expect(prompt).toContain('## Phase Instructions');
 
       // Cache-friendly ordering (#1614): stable prefix before variable context
-      const phaseInstrIdx = prompt.indexOf('## Phase Instructions');
+      const agentIdx = prompt.indexOf('## Agent Instructions');
       const contextIdx = prompt.indexOf('## Context');
-      expect(phaseInstrIdx).toBeLessThan(contextIdx);
+      expect(agentIdx).toBeLessThan(contextIdx);
     });
 
     it('assembles plan prompt with all context files', async () => {
@@ -187,7 +186,7 @@ describe('PromptFactory', () => {
       expect(prompt).toContain('# State');
       expect(prompt).toContain('# Research');
       expect(prompt).toContain('# Requirements');
-      expect(prompt).toContain('executable plans');
+      expect(prompt).toContain('You are a planner.');
     });
 
     it('delegates execute phase with plan to buildExecutorPrompt', async () => {
@@ -225,7 +224,7 @@ describe('PromptFactory', () => {
       const prompt = await factory.buildPrompt(PhaseType.Execute, null, contextFiles);
 
       // Falls through to general assembly path
-      expect(prompt).toContain('## Role');
+      expect(prompt).toContain('## Agent Instructions');
       expect(prompt).toContain('You are an executor.');
       expect(prompt).toContain('## Purpose');
       expect(prompt).toContain('Execute the plan.');
@@ -252,7 +251,7 @@ describe('PromptFactory', () => {
 
       expect(prompt).toContain('You are a verifier.');
       expect(prompt).toContain('Verify phase goals.');
-      expect(prompt).toContain('goal achievement');
+      expect(prompt).toContain('You are a verifier.');
     });
 
     it('assembles discuss prompt without agent role (no dedicated agent)', async () => {
@@ -266,12 +265,10 @@ describe('PromptFactory', () => {
 
       const prompt = await factory.buildPrompt(PhaseType.Discuss, null, contextFiles);
 
-      // Discuss has no agent, so no Role section
-      expect(prompt).not.toContain('## Role');
+      // Discuss has no agent, so no Agent Instructions section
+      expect(prompt).not.toContain('## Agent Instructions');
       expect(prompt).toContain('## Purpose');
       expect(prompt).toContain('Discuss implementation decisions.');
-      expect(prompt).toContain('## Phase Instructions');
-      expect(prompt).toContain('Extract implementation decisions');
     });
 
     it('handles missing workflow file gracefully', async () => {
@@ -286,8 +283,8 @@ describe('PromptFactory', () => {
 
       const prompt = await factory.buildPrompt(PhaseType.Research, null, contextFiles);
 
-      // Should still produce a prompt with role and context
-      expect(prompt).toContain('## Role');
+      // Should still produce a prompt with agent instructions and context
+      expect(prompt).toContain('## Agent Instructions');
       expect(prompt).toContain('## Context');
       expect(prompt).not.toContain('## Purpose');
     });
@@ -304,7 +301,7 @@ describe('PromptFactory', () => {
 
       const prompt = await factory.buildPrompt(PhaseType.Research, null, contextFiles);
 
-      expect(prompt).not.toContain('## Role');
+      expect(prompt).not.toContain('## Agent Instructions');
       expect(prompt).toContain('## Purpose');
       expect(prompt).toContain('Research the phase.');
     });
@@ -401,13 +398,13 @@ describe('PromptFactory', () => {
   // ─── Headless prompt loading ─────────────────────────────────────────────
 
   describe('headless prompt loading', () => {
-    it('loadWorkflowFile prefers sdkPromptsDir over GSD-1 workflowsDir', async () => {
+    it('loadWorkflowFile prefers installed GSD over sdkPromptsDir', async () => {
       const sdkDir = join(tempDir, 'sdk-prompts');
       await mkdir(join(sdkDir, 'workflows'), { recursive: true });
 
-      // Write both: GSD-1 original and SDK headless version
+      // Write both: installed GSD and SDK bundled version
       await writeFile(join(workflowsDir, 'research-phase.md'), 'GSD-1 original');
-      await writeFile(join(sdkDir, 'workflows', 'research-phase.md'), 'SDK headless version');
+      await writeFile(join(sdkDir, 'workflows', 'research-phase.md'), 'SDK bundled version');
 
       const factory = new PromptFactory({
         gsdInstallDir: tempDir,
@@ -416,7 +413,7 @@ describe('PromptFactory', () => {
       });
 
       const content = await factory.loadWorkflowFile(PhaseType.Research);
-      expect(content).toBe('SDK headless version');
+      expect(content).toBe('GSD-1 original');
     });
 
     it('loadWorkflowFile falls back to GSD-1 when sdkPromptsDir file missing', async () => {
@@ -436,13 +433,13 @@ describe('PromptFactory', () => {
       expect(content).toBe('GSD-1 original');
     });
 
-    it('loadAgentDef prefers sdkPromptsDir over user agents dir', async () => {
+    it('loadAgentDef prefers installed agents over sdkPromptsDir', async () => {
       const sdkDir = join(tempDir, 'sdk-prompts');
       await mkdir(join(sdkDir, 'agents'), { recursive: true });
 
-      // Write both: user agent and SDK headless agent
+      // Write both: installed agent and SDK bundled agent
       await writeFile(join(agentsDir, 'gsd-executor.md'), 'user agent');
-      await writeFile(join(sdkDir, 'agents', 'gsd-executor.md'), 'SDK headless agent');
+      await writeFile(join(sdkDir, 'agents', 'gsd-executor.md'), 'SDK bundled agent');
 
       const factory = new PromptFactory({
         gsdInstallDir: tempDir,
@@ -451,7 +448,7 @@ describe('PromptFactory', () => {
       });
 
       const content = await factory.loadAgentDef(PhaseType.Execute);
-      expect(content).toBe('SDK headless agent');
+      expect(content).toBe('user agent');
     });
 
     it('loadAgentDef falls back to user agents when sdkPromptsDir file missing', async () => {

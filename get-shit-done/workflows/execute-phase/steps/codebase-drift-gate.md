@@ -34,7 +34,7 @@ New migrations:
 New route modules:
   - {path}
 
-Run /gsd:map-codebase --paths {affected_paths} to refresh planning context.
+Run /gsd-map-codebase --paths {affected_paths} to refresh planning context.
 ```
 
 Then continue to `verify_phase_goal`. Do NOT block. Do NOT spawn anything.

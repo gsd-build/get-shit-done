@@ -1256,12 +1256,31 @@ export const phaseComplete: QueryHandler = async (args, projectDir, workstream) 
   let nextPhaseNum: string | null = null;
   let nextPhaseName: string | null = null;
   let isLastPhase = true;
+  // Tracks whether the completed phase belongs to the primary milestone in STATE.md.
+  // When false (parallel-milestone case, Bug #2676), the milestone filter is bypassed
+  // for next-phase detection so phases from the same secondary milestone are visible.
+  let completedPhaseInPrimaryMilestone = true;
 
   try {
     const isDirInMilestone = await getMilestonePhaseFilter(projectDir, workstream);
     const entries = await readdir(paths.phases, { withFileTypes: true });
-    const dirs = entries.filter(e => e.isDirectory()).map(e => e.name)
-      .filter(isDirInMilestone)
+    const allDirs = entries.filter(e => e.isDirectory()).map(e => e.name);
+
+    // Guard: if the completed phase's directory is not in the current-milestone filter
+    // set, the filter was built from a different (primary) milestone in STATE.md.
+    // In that case skip the filter so we can find the true next phase on disk.
+    // This handles parallel-milestone workflows where STATE.md's `milestone:` field
+    // points at the primary milestone but the phase being completed belongs to a
+    // secondary in-flight milestone. (Bug #2676)
+    const completedDirInFilter = allDirs.some((d) => {
+      const dm = d.match(/^(\d+[A-Z]?(?:\.\d+)*)-?/i);
+      return dm && comparePhaseNum(dm[1], phaseNum) === 0 && isDirInMilestone(d);
+    });
+    completedPhaseInPrimaryMilestone = completedDirInFilter;
+    const effectiveFilter = completedDirInFilter ? isDirInMilestone : (_d: string) => true;
+
+    const dirs = allDirs
+      .filter(effectiveFilter)
       .sort((a, b) => comparePhaseNum(a, b));
 
     for (const dir of dirs) {
@@ -1277,11 +1296,16 @@ export const phaseComplete: QueryHandler = async (args, projectDir, workstream) 
     }
   } catch { /* intentionally empty */ }
 
-  // Fallback: check ROADMAP.md for phases not yet scaffolded
+  // Fallback: check ROADMAP.md for phases not yet scaffolded.
+  // When the completed phase is from a parallel (non-primary) milestone, scan the
+  // full ROADMAP rather than the primary-milestone slice so 41.3 is visible when
+  // completing 41.2 for a secondary milestone. (Bug #2676)
   if (isLastPhase && existsSync(paths.roadmap)) {
     try {
       const roadmapContent = await readFile(paths.roadmap, 'utf-8');
-      const roadmapForPhases = await extractCurrentMilestone(roadmapContent, projectDir);
+      const roadmapForPhases = completedPhaseInPrimaryMilestone
+        ? await extractCurrentMilestone(roadmapContent, projectDir)
+        : roadmapContent;
       const phasePattern = /#{2,4}\s*Phase\s+(\d+[A-Z]?(?:\.\d+)*)\s*:\s*([^\n]+)/gi;
       let pm: RegExpExecArray | null;
       while ((pm = phasePattern.exec(roadmapForPhases)) !== null) {

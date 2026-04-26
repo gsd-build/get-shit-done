@@ -1,6 +1,6 @@
 # sync-skills — Cross-Runtime GSD Skill Sync
 
-**Command:** `/gsd:sync-skills`
+**Command:** `/gsd-sync-skills`
 
 Sync managed `gsd-*` skill directories from one canonical runtime's skills root to one or more destination runtime skills roots. Keeps multi-runtime installs aligned after a `gsd-update` on one runtime.
 

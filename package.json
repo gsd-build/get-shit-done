@@ -1,6 +1,6 @@
 {
   "name": "get-shit-done-cc",
-  "version": "1.38.2",
+  "version": "1.38.5",
   "description": "A meta-prompting, context engineering and spec-driven development system for Claude Code, OpenCode, Gemini and Codex by TÂCHES.",
   "bin": {
     "get-shit-done-cc": "bin/install.js",
@@ -58,6 +58,7 @@
     "prepublishOnly": "npm run build:hooks && npm run build:sdk",
     "pretest": "npm run build:sdk",
     "pretest:coverage": "npm run build:sdk",
+    "lint:tests": "node scripts/lint-no-source-grep.cjs",
     "test": "node scripts/run-tests.cjs",
     "test:coverage": "c8 --check-coverage --lines 70 --reporter text --include 'get-shit-done/bin/lib/*.cjs' --exclude 'tests/**' --all node scripts/run-tests.cjs"
   }

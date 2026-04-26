@@ -50,13 +50,13 @@ Standard format for presenting next steps after completing a command or workflow
 
 `/clear` then:
 
-`/gsd:execute-phase 2`
+`/gsd-execute-phase 2`
 
 ---
 
 **Also available:**
 - Review plan before executing
-- `/gsd:list-phase-assumptions 2` — check assumptions
+- `/gsd-list-phase-assumptions 2` — check assumptions
 
 ---
 ```
@@ -75,7 +75,7 @@ Add note that this is the last plan and what comes after:
 
 `/clear` then:
 
-`/gsd:execute-phase 2`
+`/gsd-execute-phase 2`
 
 ---
 
@@ -97,13 +97,13 @@ Add note that this is the last plan and what comes after:
 
 `/clear` then:
 
-`/gsd:plan-phase 2`
+`/gsd-plan-phase 2`
 
 ---
 
 **Also available:**
-- `/gsd:discuss-phase 2` — gather context first
-- `/gsd:research-phase 2` — investigate unknowns
+- `/gsd-discuss-phase 2` — gather context first
+- `/gsd-research-phase 2` — investigate unknowns
 - Review roadmap
 
 ---
@@ -126,13 +126,13 @@ Show completion status before next action:
 
 `/clear` then:
 
-`/gsd:plan-phase 3`
+`/gsd-plan-phase 3`
 
 ---
 
 **Also available:**
-- `/gsd:discuss-phase 3` — gather context first
-- `/gsd:research-phase 3` — investigate unknowns
+- `/gsd-discuss-phase 3` — gather context first
+- `/gsd-research-phase 3` — investigate unknowns
 - Review what Phase 2 built
 
 ---
@@ -151,11 +151,11 @@ When there's no clear primary action:
 
 `/clear` then one of:
 
-**To plan directly:** `/gsd:plan-phase 3`
+**To plan directly:** `/gsd-plan-phase 3`
 
-**To discuss context first:** `/gsd:discuss-phase 3`
+**To discuss context first:** `/gsd-discuss-phase 3`
 
-**To research unknowns:** `/gsd:research-phase 3`
+**To research unknowns:** `/gsd-research-phase 3`
 
 ---
 ```
@@ -175,7 +175,7 @@ All 4 phases shipped
 
 `/clear` then:
 
-`/gsd:new-milestone`
+`/gsd-new-milestone`
 
 ---
 ```
@@ -218,7 +218,7 @@ Extract: `**02-03: Refresh Token Rotation** — Add /api/auth/refresh with slidi
 ## To Continue
 
 Run `/clear`, then paste:
-/gsd:execute-phase 2
+/gsd-execute-phase 2
 ```
 
 User has no idea what 02-03 is about.
@@ -226,7 +226,7 @@ User has no idea what 02-03 is about.
 ### Don't: Missing /clear explanation
 
 ```
-`/gsd:plan-phase 3`
+`/gsd-plan-phase 3`
 
 Run /clear first.
 ```
@@ -246,7 +246,7 @@ Sounds like an afterthought. Use "Also available:" instead.
 
 ```
 ```
-/gsd:plan-phase 3
+/gsd-plan-phase 3
 ```
 ```
 

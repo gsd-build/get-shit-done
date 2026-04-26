@@ -28,7 +28,6 @@ const { runGsdTools, createTempProject, cleanup } = require('./helpers.cjs');
 const AGENTS_DIR = path.join(__dirname, '..', 'agents');
 const COMMANDS_DIR = path.join(__dirname, '..', 'commands', 'gsd');
 const WORKFLOWS_DIR = path.join(__dirname, '..', 'get-shit-done', 'workflows');
-const CONFIG_PATH = path.join(__dirname, '..', 'get-shit-done', 'bin', 'lib', 'config-schema.cjs');
 
 // Plugin directory resolution (cross-platform safe)
 const PLUGIN_WORKFLOWS_DIR = process.env.GSD_PLUGIN_ROOT || path.join(os.homedir(), '.claude', 'get-shit-done', 'workflows');
@@ -271,67 +270,50 @@ describe('CR-WORKFLOW: code review workflow structure', () => {
 // --- CR-CONFIG: config key registration ---
 
 describe('CR-CONFIG: config key registration', () => {
-  test('config.cjs contains workflow.code_review key', () => {
-    const content = fs.readFileSync(CONFIG_PATH, 'utf-8');
-
-    assert.ok(content.includes('workflow.code_review'),
-      'config.cjs missing workflow.code_review key registration');
-  });
-
-  test('config.cjs contains workflow.code_review_depth key', () => {
-    const content = fs.readFileSync(CONFIG_PATH, 'utf-8');
-
-    assert.ok(content.includes('workflow.code_review_depth'),
-      'config.cjs missing workflow.code_review_depth key registration');
-  });
-
-  test('gsd-tools config-get workflow.code_review succeeds', () => {
+  test('config-set accepts workflow.code_review', () => {
     const tmpDir = createTempProject();
-
     try {
-      // Initialize config with code_review key
-      const configPath = path.join(tmpDir, '.planning', 'config.json');
-      fs.writeFileSync(configPath, JSON.stringify({
-        workflow: {
-          code_review: true,
-          code_review_depth: 'standard'
-        }
-      }, null, 2), 'utf-8');
-
-      const result = runGsdTools(['config-get', 'workflow.code_review'], tmpDir);
-
-      assert.ok(result.success,
-        'config-get workflow.code_review failed — key not recognized');
-      assert.strictEqual(result.output, 'true',
-        'workflow.code_review should return "true"');
+      const result = runGsdTools('config-set workflow.code_review true', tmpDir);
+      assert.ok(result.success, `config-set should accept workflow.code_review: ${result.error}`);
     } finally {
       cleanup(tmpDir);
     }
   });
 
-  test('gsd-tools config-get workflow.code_review_depth succeeds', () => {
+  test('config-set accepts workflow.code_review_depth', () => {
     const tmpDir = createTempProject();
-
     try {
-      // Initialize config with code_review_depth key
-      const configPath = path.join(tmpDir, '.planning', 'config.json');
-      fs.writeFileSync(configPath, JSON.stringify({
-        workflow: {
-          code_review: true,
-          code_review_depth: 'standard'
-        }
-      }, null, 2), 'utf-8');
-
-      const result = runGsdTools(['config-get', 'workflow.code_review_depth'], tmpDir);
-
-      assert.ok(result.success,
-        'config-get workflow.code_review_depth failed — key not recognized');
-      // Output may include quotes from JSON serialization
-      assert.ok(result.output === 'standard' || result.output === '"standard"',
-        `workflow.code_review_depth should return "standard", got ${result.output}`);
+      const result = runGsdTools('config-set workflow.code_review_depth standard', tmpDir);
+      assert.ok(result.success, `config-set should accept workflow.code_review_depth: ${result.error}`);
     } finally {
       cleanup(tmpDir);
     }
+  });
+
+  test('config-get workflow.code_review returns value set via config-set', (t) => {
+    const tmpDir = createTempProject();
+    t.after(() => cleanup(tmpDir));
+
+    const setResult = runGsdTools(['config-set', 'workflow.code_review', 'true'], tmpDir);
+    assert.ok(setResult.success, `config-set workflow.code_review failed: ${setResult.error}`);
+
+    const getResult = runGsdTools(['config-get', 'workflow.code_review'], tmpDir);
+    assert.ok(getResult.success, `config-get workflow.code_review failed: ${getResult.error}`);
+    assert.strictEqual(getResult.output, 'true',
+      `workflow.code_review should return "true", got ${getResult.output}`);
+  });
+
+  test('config-get workflow.code_review_depth returns value set via config-set', (t) => {
+    const tmpDir = createTempProject();
+    t.after(() => cleanup(tmpDir));
+
+    const setResult = runGsdTools(['config-set', 'workflow.code_review_depth', 'standard'], tmpDir);
+    assert.ok(setResult.success, `config-set workflow.code_review_depth failed: ${setResult.error}`);
+
+    const getResult = runGsdTools(['config-get', 'workflow.code_review_depth'], tmpDir);
+    assert.ok(getResult.success, `config-get workflow.code_review_depth failed: ${getResult.error}`);
+    assert.strictEqual(getResult.output, '"standard"',
+      `workflow.code_review_depth should return '"standard"', got ${getResult.output}`);
   });
 });
 

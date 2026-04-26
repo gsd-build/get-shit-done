@@ -1,3 +1,9 @@
+// allow-test-rule: structural-implementation-guard
+// gsd-tools.cjs @file: resolution is a low-level stdout interception that cannot be
+// exercised end-to-end via runGsdTools without a real workflow that emits @file: output.
+// These structural tests guard the interception wiring until a behavioral integration
+// test suite for the full @file: path is added.
+
 /**
  * Regression tests for bug #1891
  *

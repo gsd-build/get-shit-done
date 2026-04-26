@@ -156,11 +156,23 @@ describe('buildExecutorPrompt', () => {
     expect(prompt).toContain('Refresh tokens rotate correctly');
   });
 
-  it('includes SUMMARY.md creation instruction', () => {
+  it('includes SUMMARY.md creation instruction with derived filename', () => {
     const plan = makePlan();
     const prompt = buildExecutorPrompt(plan);
+    expect(prompt).toContain('01-01-SUMMARY.md');
+  });
+
+  it('includes phaseDir in SUMMARY path when provided', () => {
+    const plan = makePlan();
+    const prompt = buildExecutorPrompt(plan, { phaseDir: '.planning/phases/01-auth' });
+    expect(prompt).toContain('.planning/phases/01-auth/01-01-SUMMARY.md');
+  });
+
+  it('uses bare SUMMARY.md when phase/plan numbers missing', () => {
+    const plan = makePlan({ frontmatter: { phase: '', plan: '', type: 'execute', wave: 1, depends_on: [], files_modified: [], autonomous: true, requirements: [], must_haves: { truths: [], artifacts: [], key_links: [] } } });
+    const prompt = buildExecutorPrompt(plan);
     expect(prompt).toContain('SUMMARY.md');
-    expect(prompt).toContain('Create a SUMMARY.md file');
+    expect(prompt).not.toContain('/SUMMARY.md');
   });
 
   it('includes sequential execution instruction', () => {

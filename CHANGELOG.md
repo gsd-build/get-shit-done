@@ -4,7 +4,37 @@ All notable changes to GSD will be documented in this file.
 
 Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
-## [Unreleased](https://github.com/gsd-build/get-shit-done/compare/v1.37.1...HEAD)
+## [Unreleased](https://github.com/gsd-build/get-shit-done/compare/v1.38.5...HEAD)
+
+## [1.38.5] - 2026-04-25
+
+### Fixed
+- SDK executor agents now write SUMMARY.md to `.planning/phases/{phase}/` instead of the project root — `phaseDir` is threaded from PhaseRunner through to the executor prompt's completion instructions
+
+## [1.38.4] - 2026-04-25
+
+### Fixed
+- **SDK uses full installed agent/workflow prompts** — The SDK was bundling stripped-down copies of agent definitions (~17% of the real content), missing critical instructions like plan file naming conventions, scope reduction rules, and discovery protocols. The SDK now loads the complete installed agents at runtime and resolves `@`-file references instead of stripping them.
+- **SDK executor receives actual plan content** — `executeSinglePlan` was passing `null` to the prompt builder instead of the parsed plan file. The executor now loads, parses, and passes the full plan (tasks, objectives, verification criteria) to the prompt.
+- **SDK verification checks VERIFICATION.md, not just session exit code** — A verify session that wrote `status: gaps_found` to VERIFICATION.md was treated as "passed" because the session itself didn't crash. The gap-closure retry loop now reads the actual verification status from disk.
+- **SDK plan ID derivation for bare PLAN.md files** — Plans named `PLAN.md` (instead of `01-01-PLAN.md`) produced an empty-string ID, causing downstream execution issues.
+- **SDK headless discuss mode prevents interactive tool calls** — The self-discuss step loaded the full interactive workflow prompt, causing the agent to invoke `AskUserQuestion` and `Skill()` in headless mode. A mandatory headless override is now prepended to prevent interactive tool usage.
+
+### Removed
+- Deleted 13 bundled SDK prompt files (`sdk/prompts/agents/`, `sdk/prompts/workflows/`) that were maintained as stripped-down copies and had drifted from the real agents.
+
+### Enhancement: richer architecture docs from `/gsd-map-codebase` (#2500)
+
+`/gsd-map-codebase` (arch focus) now produces a `.planning/codebase/ARCHITECTURE.md` with the same richness as the research version created at project creation:
+
+- **ASCII system overview diagram** — component boxes and request-flow arrows, generated from actual codebase analysis
+- **Component responsibility table** — Component / Responsibility / File columns for at-a-glance orientation
+- **Data flow traces** — Primary request path and secondary flows with numbered steps and code references (`file:line`)
+- **Architectural constraints** — Threading model, global state inventory, circular import chains
+- **Anti-patterns** — Codebase-specific patterns to avoid, with the correct alternative
+- **`<!-- refreshed: {date} -->`** marker at the top so users can see when the doc was last generated
+
+Running `/gsd-map-codebase` or `/gsd-scan --focus arch` after a major refactor now produces an up-to-date architectural reference that includes the visual diagrams previously only available in the (non-refreshable) research version.
 
 ### SDK query layer — Phase 3 (what you get)
 
@@ -30,6 +60,8 @@ If you use GSD **as a workflow**—milestones, phases, `.planning/` artifacts, b
 ### Fixed
 
 - **Codex hook migration follow-up** — Codex installs refresh `gsd-file-manifest.json` after the Codex-specific hook copy/config pass so edited hook files are preserved on later updates; legacy inline hook cleanup decodes TOML literal-string doubled apostrophes before matching managed commands; and uninstall preserves `hooks/gsd-check-update.js` when `hooks.json` cannot be parsed or safely cleaned, avoiding a dangling `hooks.json` reference after users repair the file (#2637).
+- **End-of-phase routing suggestions now use `/gsd-<cmd>` (not the retired `/gsd:<cmd>`)** — All user-visible command suggestions in workflows (`execute-phase.md`, `transition.md`), tool output (`profile-output.cjs`, `init.cjs`), references, and templates have been updated from `/gsd:<cmd>` to `/gsd-<cmd>`, matching the Claude Code skill directory name and the user-typed slash-command format. Internal `Skill(skill="gsd:<cmd>")` calls (no leading slash) are preserved unchanged — those resolve by frontmatter `name:` not directory name. The namespace test (`bug-2543-gsd-slash-namespace.test.cjs`) has been updated to enforce the current invariant. Closes #2697.
+
 - **`gsd-sdk query` now resolves parent `.planning/` root in multi-repo (`sub_repos`) workspaces** — when invoked from inside a `sub_repos`-listed child repo (e.g. `workspace/app/`), the SDK now walks up to the parent workspace that owns `.planning/`, matching the legacy `gsd-tools.cjs` `findProjectRoot` behavior. Previously `gsd-sdk query init.new-milestone` reported `project_exists: false` from the sub-repo, while `gsd-tools.cjs` resolved the parent root correctly. Resolution happens once in `cli.ts` before dispatch; if `projectDir` already owns `.planning/` (including explicit `--project-dir`), the walk is a no-op. Ported as `findProjectRoot` in `sdk/src/query/helpers.ts` with the same detection order (own `.planning/` wins, then parent `sub_repos` match, then legacy `multiRepo: true`, then `.git` heuristic), capped at 10 parent levels and never crossing `$HOME`. Closes #2623.
 - **Shell hooks falsely flagged as stale on every session** — `gsd-phase-boundary.sh`, `gsd-session-state.sh`, and `gsd-validate-commit.sh` now ship with a `# gsd-hook-version: {{GSD_VERSION}}` header; the installer substitutes `{{GSD_VERSION}}` in `.sh` hooks the same way it does for `.js` hooks; and the stale-hook detector in `gsd-check-update.js` now matches bash `#` comment syntax in addition to JS `//` syntax. All three changes are required together — neither the regex fix alone nor the install fix alone is sufficient to resolve the false positive (#2136, #2206, #2209, #2210, #2212)
 
@@ -2377,7 +2409,8 @@ Technical implementation details for Phase 2 appear in the **Changed** section b
 - YOLO mode for autonomous execution
 - Interactive mode with checkpoints
 
-[Unreleased]: https://github.com/gsd-build/get-shit-done/compare/v1.38.2...HEAD
+[Unreleased]: https://github.com/gsd-build/get-shit-done/compare/v1.38.4...HEAD
+[1.38.4]: https://github.com/gsd-build/get-shit-done/compare/v1.38.2...v1.38.4
 [1.38.2]: https://github.com/gsd-build/get-shit-done/compare/v1.37.1...v1.38.2
 [1.37.1]: https://github.com/gsd-build/get-shit-done/compare/v1.37.0...v1.37.1
 [1.37.0]: https://github.com/gsd-build/get-shit-done/compare/v1.36.0...v1.37.0

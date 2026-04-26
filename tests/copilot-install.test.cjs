@@ -1,3 +1,9 @@
+// allow-test-rule: integration-test-input
+// Reads verify.cjs as real test fixture input to the convertClaudeToCopilotContent()
+// function under test. The file is not inspected for string presence; it is the
+// input whose *transformation* is being asserted. This is the correct level of testing
+// for format-conversion functions where a real source file is the canonical test case.
+
 /**
  * GSD Tools Tests - Copilot Install Plumbing
  *

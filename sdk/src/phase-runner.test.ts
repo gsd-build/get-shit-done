@@ -26,6 +26,18 @@ vi.mock('./session-runner.js', () => ({
   runPlanSession: vi.fn(),
 }));
 
+// Mock plan-parser to avoid real file I/O in executeSinglePlan
+vi.mock('./plan-parser.js', () => ({
+  parsePlanFile: vi.fn().mockResolvedValue({
+    frontmatter: { phase: '01-auth', plan: '01', type: 'execute', wave: 1, depends_on: [], files_modified: [], autonomous: true, requirements: [], must_haves: { truths: [], artifacts: [], key_links: [] } },
+    objective: 'Test plan objective',
+    execution_context: [],
+    context_refs: [],
+    tasks: [{ name: 'Test task', type: 'auto', files: [], read_first: [], action: 'do the thing', verify: 'check it', done: 'done', acceptance_criteria: [] }],
+    raw: '',
+  }),
+}));
+
 import { runPhaseStepSession } from './session-runner.js';
 
 const mockRunPhaseStepSession = vi.mocked(runPhaseStepSession);
@@ -129,7 +141,10 @@ function makeDeps(overrides: Partial<PhaseRunnerDeps> = {}): PhaseRunnerDeps {
       initPhaseOp: vi.fn().mockResolvedValue(makePhaseOp()),
       phaseComplete: vi.fn().mockResolvedValue(undefined),
       phasePlanIndex: vi.fn().mockResolvedValue(makePlanIndex(1)),
-      exec: vi.fn(),
+      exec: vi.fn().mockImplementation((cmd: string) => {
+        if (cmd === 'check.verification-status') return Promise.resolve({ status: 'pass' });
+        return Promise.resolve(undefined);
+      }),
       stateLoad: vi.fn(),
       roadmapAnalyze: vi.fn(),
       commit: vi.fn(),
@@ -1974,8 +1989,8 @@ Use TypeScript.`, 'utf-8');
       );
       expect(discussCalls.length).toBeGreaterThanOrEqual(1);
       const prompt = discussCalls[0][0] as string;
-      expect(prompt).toContain('Self-Discuss Mode');
-      expect(prompt).toContain('No human is present');
+      expect(prompt).toContain('HEADLESS MODE');
+      expect(prompt).toContain('no human present');
     });
 
     it('skips self-discuss when context already exists even in auto-mode', async () => {

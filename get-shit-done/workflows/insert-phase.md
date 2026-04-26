@@ -13,7 +13,7 @@ Parse the command arguments:
 - First argument: integer phase number to insert after
 - Remaining arguments: phase description
 
-Example: `/gsd:insert-phase 72 Fix critical auth bug`
+Example: `/gsd-insert-phase 72 Fix critical auth bug`
 -> after = 72
 -> description = "Fix critical auth bug"
 
@@ -21,8 +21,8 @@ If arguments missing:
 
 ```
 ERROR: Both phase number and description required
-Usage: /gsd:insert-phase <after> <description>
-Example: /gsd:insert-phase 72 Fix critical auth bug
+Usage: /gsd-insert-phase <after> <description>
+Example: /gsd-insert-phase 72 Fix critical auth bug
 ```
 
 Exit.
@@ -71,7 +71,7 @@ blocks direct STATE.md writes):
    `{decimal_phase}`:
 
    ```bash
-   gsd-sdk query state.patch '{"Current Phase":"{decimal_phase}","Next recommended run":"/gsd:plan-phase {decimal_phase}"}'
+   gsd-sdk query state.patch '{"Current Phase":"{decimal_phase}","Next recommended run":"/gsd-plan-phase {decimal_phase}"}'
    ```
 
    (Adjust field names to whatever pointers STATE.md exposes — the handler
@@ -115,7 +115,7 @@ Project state updated: .planning/STATE.md
 
 `/clear` then:
 
-`/gsd:plan-phase {decimal_phase}`
+`/gsd-plan-phase {decimal_phase}`
 
 ---
 
@@ -131,11 +131,11 @@ Project state updated: .planning/STATE.md
 
 <anti_patterns>
 
-- Don't use this for planned work at end of milestone (use /gsd:add-phase)
+- Don't use this for planned work at end of milestone (use /gsd-add-phase)
 - Don't insert before Phase 1 (decimal 0.1 makes no sense)
 - Don't renumber existing phases
 - Don't modify the target phase content
-- Don't create plans yet (that's /gsd:plan-phase)
+- Don't create plans yet (that's /gsd-plan-phase)
 - Don't commit changes (user decides when to commit)
 </anti_patterns>
 

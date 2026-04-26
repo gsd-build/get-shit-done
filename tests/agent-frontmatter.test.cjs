@@ -1,3 +1,7 @@
+// allow-test-rule: source-text-is-the-product
+// Agent .md files are the installed AI agents — their frontmatter and body text IS what
+// Claude Code loads at runtime. Checking text content IS checking the deployed contract.
+
 /**
  * GSD Agent Frontmatter Tests
  *

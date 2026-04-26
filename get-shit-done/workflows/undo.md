@@ -29,7 +29,7 @@ Parse $ARGUMENTS for the undo mode:
 If no valid argument is provided, display usage and exit:
 
 ```
-Usage: /gsd:undo --last N | --phase NN | --plan NN-MM
+Usage: /gsd-undo --last N | --phase NN | --plan NN-MM
 
 Modes:
   --last N      Show last N GSD commits for interactive selection
@@ -37,9 +37,9 @@ Modes:
   --plan NN-MM  Revert all commits for plan NN-MM
 
 Examples:
-  /gsd:undo --last 5
-  /gsd:undo --phase 03
-  /gsd:undo --plan 03-02
+  /gsd-undo --last 5
+  /gsd-undo --phase 03
+  /gsd-undo --plan 03-02
 ```
 </step>
 
@@ -204,7 +204,7 @@ Store the response as REVERT_REASON. Continue to execute_revert.
 
 Run `git status --porcelain`. If the output is non-empty, display the dirty files and abort:
 ```
-Working tree has uncommitted changes. Commit or stash them before running /gsd:undo.
+Working tree has uncommitted changes. Commit or stash them before running /gsd-undo.
 ```
 Exit immediately — do not proceed to any revert operations.
 
@@ -285,13 +285,13 @@ Show next steps:
 
 /clear then:
 
-/gsd:progress
+/gsd-progress
 
 ───────────────────────────────────────────────────────────────
 
 **Also available:**
-- `/gsd:execute-phase ${PHASE}` — re-execute if needed
-- `/gsd:undo --last 1` — undo the revert itself if something went wrong
+- `/gsd-execute-phase ${PHASE}` — re-execute if needed
+- `/gsd-undo --last 1` — undo the revert itself if something went wrong
 
 ───────────────────────────────────────────────────────────────
 ```

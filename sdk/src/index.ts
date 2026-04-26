@@ -139,7 +139,7 @@ export class GSD {
    */
   async runPhase(phaseNumber: string, options?: PhaseRunnerOptions): Promise<PhaseRunnerResult> {
     const tools = this.createTools();
-    const promptFactory = new PromptFactory();
+    const promptFactory = new PromptFactory({ projectDir: this.projectDir });
     const contextEngine = new ContextEngine(this.projectDir, undefined, undefined, this.workstream);
     const config = await loadConfig(this.projectDir, this.workstream);
 
@@ -296,6 +296,7 @@ export type { GSDConfig } from './config.js';
 export { GSDTools, GSDToolsError, resolveGsdToolsPath } from './gsd-tools.js';
 export { runPlanSession, runPhaseStepSession } from './session-runner.js';
 export { buildExecutorPrompt, parseAgentTools } from './prompt-builder.js';
+export type { ExecutorPromptOptions } from './prompt-builder.js';
 export * from './types.js';
 
 // S02: Event stream, context, prompt, and logging modules

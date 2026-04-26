@@ -1,3 +1,6 @@
+// allow-test-rule: source-text-is-the-product
+// Agent .md files are the installed AI agents — the "Project skills" block IS the deployed
+// instruction. Checking text content IS checking what runs in production.
 'use strict';
 
 const { describe, test } = require('node:test');

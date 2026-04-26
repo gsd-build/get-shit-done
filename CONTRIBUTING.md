@@ -229,6 +229,73 @@ const content = `
 `;
 ```
 
+### Prohibited: Source-Grep Tests
+
+**Never read source-code `.cjs` files with `readFileSync` to assert that strings exist within them.** This is source-grep theater: it proves a literal is present in a file, not that the feature works at runtime.
+
+```javascript
+// BAD — source-grep theater
+const configSrc = fs.readFileSync(
+  path.join(GSD_ROOT, 'bin', 'lib', 'config-schema.cjs'), 'utf-8'
+);
+assert.ok(
+  configSrc.includes("'workflow.plan_bounce'"),
+  'VALID_CONFIG_KEYS should contain workflow.plan_bounce'
+);
+```
+
+This test passes even if `workflow.plan_bounce` is present but misspelled in the schema, removed from the validation path, or moved to a different file under a different name. It survives every behavioral regression and fails only on trivial renames.
+
+The correct pattern for config key tests — use the CLI:
+
+```javascript
+// GOOD — behavioral test via the CLI
+test('config-set accepts workflow.plan_bounce', (t) => {
+  const tmpDir = createTempProject();
+  t.after(() => cleanup(tmpDir));
+
+  const result = runGsdTools('config-set workflow.plan_bounce true', tmpDir);
+  assert.ok(result.success, `config-set should accept workflow.plan_bounce: ${result.error}`);
+
+  const configPath = path.join(tmpDir, '.planning', 'config.json');
+  const config = JSON.parse(fs.readFileSync(configPath, 'utf-8'));
+  assert.strictEqual(config.workflow?.plan_bounce, true, 'value must be persisted');
+});
+```
+
+This single test covers key registration in `VALID_CONFIG_KEYS`, the key's namespace resolution in `KNOWN_TOP_LEVEL`, and value persistence — all behaviors that the source-grep test could not touch.
+
+**Why this pattern broke at scale:** Commit `990c3e64` in this repo updated 5 source-grep tests in one pass when `VALID_CONFIG_KEYS` moved between files. Zero of those tests were testing behavior. If they had been behavioral tests, the migration would have been invisible.
+
+**CI enforcement:** A linter (`scripts/lint-no-source-grep.cjs`, run as `npm run lint:tests`) detects violations. Any test file that calls `readFileSync` on a `.cjs` path in a source directory without the exemption annotation below will fail the `lint-tests` CI job.
+
+### Exception: `allow-test-rule: <reason>`
+
+Some tests legitimately read source files. There are six recognized categories:
+
+| Reason | When to use |
+|--------|-------------|
+| `source-text-is-the-product` | Agent `.md`, workflow `.md`, command `.md` files — their text IS what the runtime loads. Testing text content tests the deployed contract. |
+| `architectural-invariant` | Implementation must use a specific primitive (e.g., `Atomics.wait`, atomic file writes) that cannot be tested by observing outputs. |
+| `structural-regression-guard` | A specific code pattern must (or must not) exist to prevent a class of bug (e.g., regex global-state misuse). Behavioral tests cannot distinguish which pattern was used. |
+| `docs-parity` | A reference doc must stay in sync with source-defined constants (e.g., `CONFIG_DEFAULTS`). The source is the canonical list; there is no runtime API to enumerate it. |
+| `integration-test-input` | A source file is used as a real fixture input to a transformation function under test — the file is not inspected for strings but passed as data. |
+| `structural-implementation-guard` | A feature's interception or wiring point is not reachable end-to-end via `runGsdTools`. Used temporarily until a behavioral path exists. |
+
+Annotate with a standalone `//` comment before the file's opening block comment:
+
+```javascript
+// allow-test-rule: architectural-invariant
+// state.cjs locking must use Atomics.wait(), not a spin-loop. Behavioral tests
+// cannot observe which sleep primitive was chosen — only source inspection can.
+
+/**
+ * Regression tests for locking bugs #1909...
+ */
+```
+
+The annotation **must** be a standalone `// allow-test-rule:` line, not inside a `/** */` block comment — the CI linter scans for the pattern `// allow-test-rule:`.
+
 ### Node.js Version Compatibility
 
 **Node 22 is the minimum supported version.** Node 24 is the primary CI target. All tests must pass on both.
@@ -277,6 +344,16 @@ node --test tests/core.test.cjs
 # Run with coverage
 npm run test:coverage
 ```
+
+### CI Test Quality Checks
+
+The following checks run on every PR in addition to the test suite:
+
+| Job | What it checks | How to pass |
+|-----|----------------|-------------|
+| `lint-tests` | No source-grep tests (see above) | Replace with `runGsdTools()` behavioral tests, or add `// allow-test-rule: <reason>` |
+
+Run locally before pushing: `npm run lint:tests`
 
 ### Test Requirements by Contribution Type
 

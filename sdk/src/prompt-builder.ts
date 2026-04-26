@@ -88,6 +88,16 @@ function formatTask(task: PlanTask, index: number): string {
 }
 
 /**
+ * Options for buildExecutorPrompt beyond the required plan.
+ */
+export interface ExecutorPromptOptions {
+  /** Raw content of gsd-executor.md agent definition. */
+  agentDef?: string;
+  /** Phase directory relative to project root (e.g. `.planning/phases/01-auth`). */
+  phaseDir?: string;
+}
+
+/**
  * Build the executor prompt from a parsed plan and optional agent definition.
  *
  * The prompt instructs the executor to:
@@ -97,10 +107,14 @@ function formatTask(task: PlanTask, index: number): string {
  * 4. Produce a SUMMARY.md file on completion
  *
  * @param plan - Parsed plan structure from plan-parser
- * @param agentDef - Raw content of gsd-executor.md agent definition (optional)
+ * @param agentDefOrOpts - Raw agent definition string (legacy) or ExecutorPromptOptions
  * @returns Assembled prompt string
  */
-export function buildExecutorPrompt(plan: ParsedPlan, agentDef?: string): string {
+export function buildExecutorPrompt(plan: ParsedPlan, agentDefOrOpts?: string | ExecutorPromptOptions): string {
+  const opts: ExecutorPromptOptions = typeof agentDefOrOpts === 'string'
+    ? { agentDef: agentDefOrOpts }
+    : agentDefOrOpts ?? {};
+  const { agentDef, phaseDir } = opts;
   const sections: string[] = [];
 
   // ── Role instructions from agent definition ──
@@ -173,11 +187,22 @@ export function buildExecutorPrompt(plan: ParsedPlan, agentDef?: string): string
   }
 
   // ── Completion instructions ──
+  // Derive the SUMMARY filename from plan frontmatter (e.g. "01-01-SUMMARY.md")
+  // Phase may be "01-auth" or "01" — extract leading number, zero-pad to 2 digits.
+  const phaseNum = (plan.frontmatter.phase || '').match(/^(\d+)/)?.[1] || '';
+  const planNum = (plan.frontmatter.plan || '').match(/^(\d+)/)?.[1] || '';
+  const summaryName = phaseNum && planNum
+    ? `${phaseNum.padStart(2, '0')}-${planNum.padStart(2, '0')}-SUMMARY.md`
+    : 'SUMMARY.md';
+  const summaryPath = phaseDir
+    ? `${phaseDir}/${summaryName}`
+    : summaryName;
+
   sections.push(
     `## Completion\n\n` +
     `After all tasks are complete:\n` +
     `1. Run any overall verification or success criteria checks\n` +
-    `2. Create a SUMMARY.md file documenting:\n` +
+    `2. Create \`${summaryPath}\` documenting:\n` +
     `   - One-line summary of what was accomplished\n` +
     `   - Tasks completed with commit hashes\n` +
     `   - Any deviations from the plan\n` +

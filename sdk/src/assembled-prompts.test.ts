@@ -128,7 +128,7 @@ describe('PromptFactory assembled output', () => {
   it('includes role section for phases with agents', async () => {
     // Research, Plan, Execute, Verify all have agents; Discuss does not
     const researchOutput = await factory.buildPrompt(PhaseType.Research, null, EMPTY_CONTEXT);
-    expect(researchOutput).toContain('## Role');
+    expect(researchOutput).toContain('## Agent Instructions');
   });
 
   it('includes purpose section from workflow files', async () => {

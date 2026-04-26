@@ -263,9 +263,9 @@ export const phasePlanIndex: QueryHandler = async (args, projectDir, workstream)
   const planFiles = phaseFiles.filter(f => f.endsWith('-PLAN.md') || f === 'PLAN.md').sort();
   const summaryFiles = phaseFiles.filter(f => f.endsWith('-SUMMARY.md') || f === 'SUMMARY.md');
 
-  // Build set of plan IDs with summaries
+  // Build set of plan IDs with summaries — match the planId derivation logic
   const completedPlanIds = new Set(
-    summaryFiles.map(s => s.replace('-SUMMARY.md', '').replace('SUMMARY.md', ''))
+    summaryFiles.map(s => s === 'SUMMARY.md' ? 'PLAN' : s.replace('-SUMMARY.md', ''))
   );
 
   const plans: Array<Record<string, unknown>> = [];
@@ -274,7 +274,9 @@ export const phasePlanIndex: QueryHandler = async (args, projectDir, workstream)
   let hasCheckpoints = false;
 
   for (const planFile of planFiles) {
-    const planId = planFile.replace('-PLAN.md', '').replace('PLAN.md', '');
+    // For named plans (01-01-PLAN.md): strip suffix to get '01-01'
+    // For bare PLAN.md: use the filename itself as the ID
+    const planId = planFile === 'PLAN.md' ? 'PLAN' : planFile.replace('-PLAN.md', '');
     const planPath = join(phaseDir, planFile);
     const content = await readFile(planPath, 'utf-8');
     const fm = extractFrontmatter(content);

@@ -30,7 +30,6 @@ const { runGsdTools, createTempProject, cleanup } = require('./helpers.cjs');
 
 const REPO_ROOT = path.join(__dirname, '..');
 const PLAN_PHASE_PATH = path.join(REPO_ROOT, 'get-shit-done', 'workflows', 'plan-phase.md');
-const PLAN_PHASE_SDK_PATH = path.join(REPO_ROOT, 'sdk', 'prompts', 'workflows', 'plan-phase.md');
 
 // ─── Workflow file structure ──────────────────────────────────────────────────
 
@@ -77,10 +76,7 @@ describe('plan-phase.md Step 13e insertion (#2493)', () => {
     assert.match(content, /## 13\.\s*Requirements Coverage Gate/);
   });
 
-  test('Headless plan-phase variant has post_planning_gaps step', () => {
-    const content = fs.readFileSync(PLAN_PHASE_SDK_PATH, 'utf-8');
-    assert.match(content, /post_planning_gaps/);
-  });
+  // sdk/prompts/workflows/plan-phase.md removed in 377a6d2 — SDK loads installed workflow directly.
 });
 
 // ─── Decisions parser ────────────────────────────────────────────────────────

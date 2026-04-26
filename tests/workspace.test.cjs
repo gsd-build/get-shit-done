@@ -11,7 +11,7 @@ const fs = require('fs');
 const path = require('path');
 const os = require('os');
 const { execSync } = require('child_process');
-const { runGsdTools, createTempDir, cleanup } = require('./helpers.cjs');
+const { runGsdTools, createTempProject, createTempDir, cleanup } = require('./helpers.cjs');
 const { detectChildRepos } = require('../get-shit-done/bin/lib/init.cjs');
 
 // ─── detectChildRepos ────────────────────────────────────────────────────────
@@ -368,30 +368,37 @@ describe('workspace command files', () => {
 // ─── Routing in gsd-tools ───────────────────────────────────────────────────
 
 describe('workspace routing in gsd-tools', () => {
+  let tmpDir;
+
+  beforeEach(() => { tmpDir = createTempProject(); });
+  afterEach(() => { cleanup(tmpDir); });
+
+  // Behavioral routing tests: verify each command is recognized by the router
+  // (does not return "Unknown init workflow: ..."). The exact command output is
+  // covered by the functional tests above; these guard against routing deletions.
+
   test('init new-workspace is routed correctly', () => {
-    const toolsContent = fs.readFileSync(
-      path.join(__dirname, '..', 'get-shit-done', 'bin', 'gsd-tools.cjs'),
-      'utf8'
+    const result = runGsdTools('init new-workspace test-ws', tmpDir);
+    const stderr = result.error || '';
+    assert.ok(
+      !stderr.includes('Unknown init workflow'),
+      `init new-workspace must be a recognized command; got: ${stderr}`
     );
-    assert.ok(toolsContent.includes("case 'new-workspace'"));
-    assert.ok(toolsContent.includes('cmdInitNewWorkspace'));
   });
 
   test('init list-workspaces is routed correctly', () => {
-    const toolsContent = fs.readFileSync(
-      path.join(__dirname, '..', 'get-shit-done', 'bin', 'gsd-tools.cjs'),
-      'utf8'
-    );
-    assert.ok(toolsContent.includes("case 'list-workspaces'"));
-    assert.ok(toolsContent.includes('cmdInitListWorkspaces'));
+    const result = runGsdTools('init list-workspaces', tmpDir);
+    assert.ok(result.success, `init list-workspaces should succeed: ${result.error}`);
+    const parsed = JSON.parse(result.output);
+    assert.ok(Array.isArray(parsed.workspaces), 'list-workspaces must return a workspaces array');
   });
 
   test('init remove-workspace is routed correctly', () => {
-    const toolsContent = fs.readFileSync(
-      path.join(__dirname, '..', 'get-shit-done', 'bin', 'gsd-tools.cjs'),
-      'utf8'
+    const result = runGsdTools('init remove-workspace nonexistent-ws', tmpDir);
+    const stderr = result.error || '';
+    assert.ok(
+      !stderr.includes('Unknown init workflow'),
+      `init remove-workspace must be a recognized command; got: ${stderr}`
     );
-    assert.ok(toolsContent.includes("case 'remove-workspace'"));
-    assert.ok(toolsContent.includes('cmdInitRemoveWorkspace'));
   });
 });

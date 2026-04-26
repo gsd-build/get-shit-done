@@ -13,7 +13,7 @@ import { homedir } from 'node:os';
 
 import type { ContextFiles, ParsedPlan } from './types.js';
 import { PhaseType } from './types.js';
-import { buildExecutorPrompt, parseAgentRole } from './prompt-builder.js';
+import { buildExecutorPrompt } from './prompt-builder.js';
 import { PHASE_AGENT_MAP } from './tool-scoping.js';
 import { sanitizePrompt } from './prompt-sanitizer.js';
 
@@ -62,6 +62,17 @@ export function extractSteps(processContent: string): Array<{ name: string; cont
   return steps;
 }
 
+// ─── YAML frontmatter stripping ─────────────────────────────────────────────
+
+/**
+ * Strip YAML frontmatter (---...---) from an agent definition file,
+ * returning only the markdown/XML content body.
+ */
+export function stripYamlFrontmatter(content: string): string {
+  const match = content.match(/^---\s*\n[\s\S]*?\n---\s*\n?([\s\S]*)$/);
+  return match ? match[1].trim() : content.trim();
+}
+
 // ─── PromptFactory class ─────────────────────────────────────────────────────
 
 export class PromptFactory {
@@ -69,17 +80,20 @@ export class PromptFactory {
   private readonly agentsDir: string;
   private readonly projectAgentsDir?: string;
   private readonly sdkPromptsDir: string;
+  private readonly projectDir?: string;
 
   constructor(options?: {
     gsdInstallDir?: string;
     agentsDir?: string;
     projectAgentsDir?: string;
     sdkPromptsDir?: string;
+    projectDir?: string;
   }) {
     const gsdInstallDir = options?.gsdInstallDir ?? join(homedir(), '.claude', 'get-shit-done');
     this.workflowsDir = join(gsdInstallDir, 'workflows');
     this.agentsDir = options?.agentsDir ?? join(homedir(), '.claude', 'agents');
     this.projectAgentsDir = options?.projectAgentsDir;
+    this.projectDir = options?.projectDir;
     // SDK prompts dir: explicit override → package-relative default via import.meta.url
     this.sdkPromptsDir =
       options?.sdkPromptsDir ??
@@ -96,11 +110,12 @@ export class PromptFactory {
     phaseType: PhaseType,
     plan: ParsedPlan | null,
     contextFiles: ContextFiles,
+    phaseDir?: string,
   ): Promise<string> {
     // Execute phase with a plan: delegate to existing buildExecutorPrompt
     if (phaseType === PhaseType.Execute && plan) {
       const agentDef = await this.loadAgentDef(phaseType);
-      return sanitizePrompt(buildExecutorPrompt(plan, agentDef));
+      return sanitizePrompt(buildExecutorPrompt(plan, { agentDef, phaseDir }), this.projectDir);
     }
 
     // Prompt assembly order is cache-optimized (#1614):
@@ -110,12 +125,16 @@ export class PromptFactory {
 
     // ── STABLE PREFIX (cacheable across runs for the same phase type) ──
 
-    // ── Agent role ──
+    // ── Full agent definition ──
+    // Include the complete agent definition (minus YAML frontmatter), not just
+    // the <role> block. The real agents have critical instructions in sections
+    // like <philosophy>, <task_breakdown>, <plan_format>, <execution_flow>,
+    // <scope_estimation>, <context_fidelity>, <checkpoints>, etc.
     const agentDef = await this.loadAgentDef(phaseType);
     if (agentDef) {
-      const role = parseAgentRole(agentDef);
-      if (role) {
-        sections.push(`## Role\n\n${role}`);
+      const agentContent = stripYamlFrontmatter(agentDef);
+      if (agentContent) {
+        sections.push(`## Agent Instructions\n\n${agentContent}`);
       }
     }
 
@@ -137,12 +156,6 @@ export class PromptFactory {
       }
     }
 
-    // ── Phase-specific instructions (hardcoded per phase type — stable) ──
-    const phaseInstructions = this.getPhaseInstructions(phaseType);
-    if (phaseInstructions) {
-      sections.push(`## Phase Instructions\n\n${phaseInstructions}`);
-    }
-
     // ── VARIABLE SUFFIX (project-specific, changes per run) ──
 
     // ── Context files ──
@@ -151,55 +164,56 @@ export class PromptFactory {
       sections.push(contextSection);
     }
 
-    return sanitizePrompt(sections.join('\n\n'));
+    return sanitizePrompt(sections.join('\n\n'), this.projectDir);
   }
 
   /**
    * Load the workflow file for a phase type.
-   * Tries sdk/prompts/workflows/ first (headless versions), then
-   * falls back to GSD-1 originals in workflowsDir.
+   * Tries installed GSD workflows first (the complete, up-to-date versions),
+   * then falls back to SDK bundled copies only if installed not found.
    * Returns the raw content, or undefined if not found.
    */
   async loadWorkflowFile(phaseType: PhaseType): Promise<string | undefined> {
     const filename = PHASE_WORKFLOW_MAP[phaseType];
 
-    // Try SDK prompts dir first (headless versions)
-    const sdkPath = join(this.sdkPromptsDir, 'workflows', filename);
-    try {
-      return await readFile(sdkPath, 'utf-8');
-    } catch {
-      // Not in sdk/prompts/, fall through to GSD-1 originals
+    // Try installed GSD workflows first (complete versions)
+    const paths = [
+      join(this.workflowsDir, filename),
+      join(this.sdkPromptsDir, 'workflows', filename),
+    ];
+
+    for (const p of paths) {
+      try {
+        return await readFile(p, 'utf-8');
+      } catch {
+        // Not found at this path, try next
+      }
     }
 
-    // Fall back to GSD-1 originals
-    const filePath = join(this.workflowsDir, filename);
-    try {
-      return await readFile(filePath, 'utf-8');
-    } catch {
-      return undefined;
-    }
+    return undefined;
   }
 
   /**
    * Load the agent definition for a phase type.
-   * Tries sdk/prompts/agents/ first (headless versions), then
-   * user-level agents dir, then project-level.
+   * Tries installed agents first (the complete, up-to-date versions),
+   * then SDK bundled copies as last resort.
    * Returns undefined if no agent is mapped or file not found.
    */
   async loadAgentDef(phaseType: PhaseType): Promise<string | undefined> {
     const agentFilename = PHASE_AGENT_MAP[phaseType];
     if (!agentFilename) return undefined;
 
-    // Try SDK prompts dir first (headless versions)
+    // Priority: installed agents → project-level → SDK bundled (last resort)
     const paths = [
-      join(this.sdkPromptsDir, 'agents', agentFilename),
       join(this.agentsDir, agentFilename),
     ];
 
-    // Then project-level if configured
     if (this.projectAgentsDir) {
       paths.push(join(this.projectAgentsDir, agentFilename));
     }
+
+    // SDK bundled copies are last resort only
+    paths.push(join(this.sdkPromptsDir, 'agents', agentFilename));
 
     for (const p of paths) {
       try {
@@ -240,25 +254,6 @@ export class PromptFactory {
     return `## Context\n\n${entries.join('\n\n')}`;
   }
 
-  /**
-   * Get phase-specific instructions that aren't covered by the workflow file.
-   */
-  private getPhaseInstructions(phaseType: PhaseType): string | null {
-    switch (phaseType) {
-      case PhaseType.Research:
-        return 'Focus on technical investigation. Do not modify source files. Produce RESEARCH.md with findings organized by topic, confidence levels (HIGH/MEDIUM/LOW), and specific recommendations.';
-      case PhaseType.Plan:
-        return 'Create executable plans with task breakdown, dependency analysis, and verification criteria. Each task must have clear acceptance criteria and a done condition.';
-      case PhaseType.Verify:
-        return 'Verify goal achievement, not just task completion. Start from what the phase SHOULD deliver, then verify it actually exists and works. Produce VERIFICATION.md with pass/fail for each criterion.';
-      case PhaseType.Discuss:
-        return 'Extract implementation decisions that downstream agents need. Identify gray areas, capture decisions that guide research and planning.';
-      case PhaseType.Execute:
-        return null;
-      default:
-        return null;
-    }
-  }
 }
 
 export { PHASE_WORKFLOW_MAP };

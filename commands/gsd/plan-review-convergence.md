@@ -1,7 +1,7 @@
 ---
 name: gsd:plan-review-convergence
 description: "Cross-AI plan convergence loop — replan with review feedback until no HIGH concerns remain (max 3 cycles)"
-argument-hint: "<phase> [--codex] [--gemini] [--claude] [--opencode] [--text] [--ws <name>] [--all] [--max-cycles N]"
+argument-hint: "<phase> [--codex] [--gemini] [--claude] [--opencode] [--ollama] [--lm-studio] [--llama-cpp] [--text] [--ws <name>] [--all] [--max-cycles N]"
 allowed-tools:
   - Read
   - Write
@@ -42,8 +42,14 @@ Phase number: extracted from $ARGUMENTS (required)
 - `--gemini` — Use Gemini CLI as reviewer
 - `--claude` — Use Claude CLI as reviewer (separate session)
 - `--opencode` — Use OpenCode as reviewer
-- `--all` — Use all available CLIs
+- `--ollama` — Use local Ollama server as reviewer (OpenAI-compatible, default host `http://localhost:11434`; configure model via `review.models.ollama`)
+- `--lm-studio` — Use local LM Studio server as reviewer (OpenAI-compatible, default host `http://localhost:1234`; configure model via `review.models.lm_studio`)
+- `--llama-cpp` — Use local llama.cpp server as reviewer (OpenAI-compatible, default host `http://localhost:8080`; configure model via `review.models.llama_cpp`)
+- `--all` — Use all available CLIs and running local model servers
 - `--max-cycles N` — Maximum replan→review cycles (default: 3)
+
+**Feature gate:** This command requires `workflow.plan_review_convergence=true`. Enable with:
+`gsd config-set workflow.plan_review_convergence true`
 </context>
 
 <process>

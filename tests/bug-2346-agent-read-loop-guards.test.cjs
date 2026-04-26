@@ -21,19 +21,20 @@ const path = require('path');
 
 const AGENTS_DIR = path.join(__dirname, '..', 'agents');
 
+// allow-test-rule: source-text-is-the-product
+// The <critical_rules> block in agent .md files IS the fix — it is the AI instruction that
+// prevents unbounded Read loops. There is no behavioral equivalent without a live LLM run.
 describe('bug #2346: agent read loop guards', () => {
 
   describe('gsd-ui-checker', () => {
     const agentPath = path.join(AGENTS_DIR, 'gsd-ui-checker.md');
-    let content;
+    const content = fs.readFileSync(agentPath, 'utf-8');
 
     test('agent file exists', () => {
       assert.ok(fs.existsSync(agentPath), 'agents/gsd-ui-checker.md must exist');
-      content = fs.readFileSync(agentPath, 'utf-8');
     });
 
     test('has <critical_rules> block', () => {
-      content = content || fs.readFileSync(agentPath, 'utf-8');
       assert.ok(
         content.includes('<critical_rules>'),
         'gsd-ui-checker.md must have a <critical_rules> block to prevent unbounded read loops (#2346)'
@@ -41,7 +42,6 @@ describe('bug #2346: agent read loop guards', () => {
     });
 
     test('critical_rules contains no-re-read constraint', () => {
-      content = content || fs.readFileSync(agentPath, 'utf-8');
       const rulesStart = content.indexOf('<critical_rules>');
       const rulesEnd = content.indexOf('</critical_rules>', rulesStart);
       assert.ok(rulesStart !== -1 && rulesEnd !== -1, '<critical_rules> block must be complete');
@@ -53,7 +53,6 @@ describe('bug #2346: agent read loop guards', () => {
     });
 
     test('critical_rules appears before success_criteria', () => {
-      content = content || fs.readFileSync(agentPath, 'utf-8');
       const rulesIdx = content.indexOf('<critical_rules>');
       const successIdx = content.indexOf('<success_criteria>');
       assert.ok(rulesIdx !== -1 && successIdx !== -1, 'both sections must exist');
@@ -66,15 +65,13 @@ describe('bug #2346: agent read loop guards', () => {
 
   describe('gsd-planner', () => {
     const agentPath = path.join(AGENTS_DIR, 'gsd-planner.md');
-    let content;
+    const content = fs.readFileSync(agentPath, 'utf-8');
 
     test('agent file exists', () => {
       assert.ok(fs.existsSync(agentPath), 'agents/gsd-planner.md must exist');
-      content = fs.readFileSync(agentPath, 'utf-8');
     });
 
     test('has <critical_rules> block', () => {
-      content = content || fs.readFileSync(agentPath, 'utf-8');
       assert.ok(
         content.includes('<critical_rules>'),
         'gsd-planner.md must have a <critical_rules> block to prevent unbounded read loops (#2346)'
@@ -82,7 +79,6 @@ describe('bug #2346: agent read loop guards', () => {
     });
 
     test('critical_rules contains no-re-read constraint', () => {
-      content = content || fs.readFileSync(agentPath, 'utf-8');
       const rulesStart = content.indexOf('<critical_rules>');
       const rulesEnd = content.indexOf('</critical_rules>', rulesStart);
       assert.ok(rulesStart !== -1 && rulesEnd !== -1, '<critical_rules> block must be complete');
@@ -94,7 +90,6 @@ describe('bug #2346: agent read loop guards', () => {
     });
 
     test('critical_rules appears before success_criteria', () => {
-      content = content || fs.readFileSync(agentPath, 'utf-8');
       const rulesIdx = content.indexOf('<critical_rules>');
       const successIdx = content.lastIndexOf('<success_criteria>');
       assert.ok(rulesIdx !== -1 && successIdx !== -1, 'both sections must exist');

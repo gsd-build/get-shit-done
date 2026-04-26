@@ -19,6 +19,9 @@ const path = require('path');
 
 const WORKFLOW_PATH = path.join(__dirname, '..', 'get-shit-done', 'workflows', 'quick.md');
 
+// allow-test-rule: source-text-is-the-product
+// quick.md is the AI instruction workflow — the `command -v gsd-sdk` guard IS the fix.
+// There is no behavioral equivalent: the check runs inside the AI agent, not in gsd-tools.
 describe('bug #2334: quick workflow gsd-sdk pre-flight check', () => {
   let content;
 

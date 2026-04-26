@@ -263,7 +263,7 @@ const CONFIG_DEFAULTS = {
   phase_naming: 'sequential', // 'sequential' (default, auto-increment) or 'custom' (arbitrary string IDs)
   project_code: null, // optional short prefix for phase dirs (e.g., 'CK' → 'CK-01-foundation')
   subagent_timeout: 300000, // 5 min default; increase for large codebases or slower models (ms)
-  security_enforcement: true, // workflow.security_enforcement — threat-model-anchored security verification via /gsd:secure-phase
+  security_enforcement: true, // workflow.security_enforcement — threat-model-anchored security verification via /gsd-secure-phase
   security_asvs_level: 1, // workflow.security_asvs_level — OWASP ASVS verification level (1=opportunistic, 2=standard, 3=comprehensive)
   security_block_on: 'high', // workflow.security_block_on — minimum severity that blocks phase advancement ('high' | 'medium' | 'low')
   post_planning_gaps: true, // workflow.post_planning_gaps — unified post-planning gap report (#2493): scan REQUIREMENTS.md + CONTEXT.md decisions vs all PLAN.md files
@@ -336,14 +336,17 @@ function loadConfig(cwd) {
     // Derived from config-set's VALID_CONFIG_KEYS (canonical source) plus internal-only
     // keys that loadConfig handles but config-set doesn't expose. This avoids maintaining
     // a hardcoded duplicate that drifts when new config keys are added.
-    const { VALID_CONFIG_KEYS } = require('./config.cjs');
+    // DYNAMIC_KEY_PATTERNS supplies topLevel for each pattern so adding a new
+    // dynamic-pattern namespace to config-schema.cjs automatically updates this set
+    // — no more drift between the read side and the write side (#2687).
+    const { VALID_CONFIG_KEYS, DYNAMIC_KEY_PATTERNS } = require('./config-schema.cjs');
     const KNOWN_TOP_LEVEL = new Set([
       // Extract top-level key names from dot-notation paths (e.g., 'workflow.research' → 'workflow')
       ...[...VALID_CONFIG_KEYS].map(k => k.split('.')[0]),
-      // Section containers that hold nested sub-keys
-      'git', 'workflow', 'planning', 'hooks', 'features',
+      // Dynamic-pattern top-level containers (e.g. review, model_profile_overrides)
+      ...DYNAMIC_KEY_PATTERNS.map(p => p.topLevel),
       // Internal keys loadConfig reads but config-set doesn't expose
-      'model_overrides', 'agent_skills', 'context_window', 'resolve_model_ids', 'claude_md_path',
+      'model_overrides', 'context_window', 'resolve_model_ids', 'claude_md_path',
       // Deprecated keys (still accepted for migration, not in config-set)
       'depth', 'multiRepo',
     ]);

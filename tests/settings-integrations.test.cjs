@@ -260,14 +260,14 @@ describe('#2529 config merge safety', () => {
   });
 });
 
-// ─── /gsd:settings mentions /gsd:settings-integrations ───────────────────────
+// ─── /gsd-settings mentions /gsd-settings-integrations ──────────────────────
 
-describe('#2529 /gsd:settings mentions new command', () => {
-  test('settings workflow mentions /gsd:settings-integrations in its confirmation output', () => {
+describe('#2529 /gsd-settings mentions new command', () => {
+  test('settings workflow mentions /gsd-settings-integrations in its confirmation output', () => {
     const src = fs.readFileSync(SETTINGS_WORKFLOW_PATH, 'utf-8');
     assert.ok(
-      src.includes('/gsd:settings-integrations') || src.includes('/gsd-settings-integrations'),
-      'settings.md must mention /gsd:settings-integrations as a follow-up'
+      src.includes('/gsd-settings-integrations'),
+      'settings.md must mention /gsd-settings-integrations as a follow-up'
     );
   });
 });
