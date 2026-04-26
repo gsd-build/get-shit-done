@@ -2066,10 +2066,10 @@ function generateCodexConfigBlock(agents, targetDir) {
   ];
 
   for (const { name, description } of agents) {
-    // #2645 — Codex schema requires [[agents]] array-of-tables, not [agents.<name>] maps.
-    // Emitting [agents.<name>] produces `invalid type: map, expected a sequence` on load.
-    lines.push(`[[agents]]`);
-    lines.push(`name = ${JSON.stringify(name)}`);
+    // Live Codex parser validation on 26.422.3464.0 accepts [agents.<name>]
+    // subtables and rejects [[agents]] with:
+    // `invalid type: sequence, expected struct AgentsToml`.
+    lines.push(`[agents.${name}]`);
     lines.push(`description = ${JSON.stringify(description)}`);
     lines.push(`config_file = "${agentsPrefix}/${name}.toml"`);
     lines.push('');
@@ -2082,8 +2082,8 @@ function generateCodexConfigBlock(agents, targetDir) {
  * Strip any managed GSD agent sections from a TOML string.
  *
  * Handles BOTH shapes so reinstall self-heals broken legacy configs:
- *   - Legacy: `[agents.gsd-*]` single-keyed map tables (pre-#2645).
- *   - Current: `[[agents]]` array-of-tables whose `name = "gsd-*"`.
+ *   - Current: `[agents.gsd-*]` subtables.
+ *   - Broken v1.38.5: `[[agents]]` array-of-tables whose `name = "gsd-*"`.
  *
  * A section runs from its header to the next `[` header or EOF.
  */
@@ -2091,12 +2091,12 @@ function stripCodexGsdAgentSections(content) {
   // Use the TOML-aware section parser so we never absorb adjacent user-authored
   // tables — even if their headers are indented or otherwise oddly placed.
   const sections = getTomlTableSections(content).filter((section) => {
-    // Legacy `[agents.gsd-<name>]` map tables (pre-#2645).
+    // Current `[agents.gsd-<name>]` subtables.
     if (!section.array && /^agents\.gsd-/.test(section.path)) {
       return true;
     }
 
-    // Current `[[agents]]` array-of-tables — only strip blocks whose
+    // Broken v1.38.5 `[[agents]]` array-of-tables — only strip blocks whose
     // `name = "gsd-..."`, preserving user-authored [[agents]] entries.
     if (section.array && section.path === 'agents') {
       const body = content.slice(section.headerEnd, section.end);
@@ -2118,6 +2118,7 @@ function stripCodexGsdAgentSections(content) {
  * Returns cleaned content, or null if file would be empty.
  */
 function stripGsdFromCodexConfig(content) {
+  content = stripLegacyCodexHookBlockFromConfig(content);
   const eol = detectLineEnding(content);
   const markerIndex = content.indexOf(GSD_CODEX_MARKER);
   const codexHooksOwnership = getManagedCodexHooksOwnership(content);
@@ -2809,7 +2810,7 @@ function isLegacyGsdAgentsSection(body) {
 function stripLeakedGsdCodexSections(content) {
   const leakedSections = getTomlTableSections(content)
     .filter((section) => {
-      // Legacy [agents.gsd-<name>] map tables (pre-#2645).
+      // Current [agents.gsd-<name>] subtables.
       if (!section.array && section.path.startsWith('agents.gsd-')) return true;
 
       // Legacy bare [agents] table with only the old max_threads/max_depth keys.
@@ -2819,7 +2820,7 @@ function stripLeakedGsdCodexSections(content) {
         isLegacyGsdAgentsSection(content.slice(section.headerEnd, section.end))
       ) return true;
 
-      // Current [[agents]] array-of-tables whose name is gsd-*. Preserve
+      // Broken v1.38.5 [[agents]] array-of-tables whose name is gsd-*. Preserve
       // user-authored [[agents]] entries (other names) untouched.
       if (section.array && section.path === 'agents') {
         const body = content.slice(section.headerEnd, section.end);
@@ -4862,6 +4863,36 @@ function uninstall(isGlobal, runtime = 'claude') {
           console.log(`  ${green}✓${reset} Cleaned GSD sections from config.toml`);
         }
       }
+
+      const hooksPath = path.join(targetDir, 'hooks.json');
+      if (fs.existsSync(hooksPath)) {
+        let hooksSettings = readSettings(hooksPath);
+        if (hooksSettings === null) {
+          console.log(`  ${yellow}i${reset} Skipping hooks.json cleanup — file could not be parsed`);
+        } else {
+          let hooksModified = false;
+          for (const eventName of ['SessionStart', 'PostToolUse', 'AfterTool', 'PreToolUse', 'BeforeTool']) {
+            if (hooksSettings.hooks && hooksSettings.hooks[eventName]) {
+              const before = JSON.stringify(hooksSettings.hooks[eventName]);
+              hooksSettings.hooks[eventName] = filterGsdHooks(hooksSettings.hooks[eventName]);
+              if (JSON.stringify(hooksSettings.hooks[eventName]) !== before) {
+                hooksModified = true;
+              }
+              if (hooksSettings.hooks[eventName].length === 0) {
+                delete hooksSettings.hooks[eventName];
+              }
+            }
+          }
+          if (hooksSettings.hooks && Object.keys(hooksSettings.hooks).length === 0) {
+            delete hooksSettings.hooks;
+          }
+          if (hooksModified) {
+            writeSettings(hooksPath, hooksSettings);
+            removedCount++;
+            console.log(`  ${green}✓${reset} Removed GSD hooks from hooks.json`);
+          }
+        }
+      }
     }
   } else if (isCopilot) {
     // Copilot: remove skills/gsd-*/ directories (same layout as Codex skills)
@@ -5118,26 +5149,10 @@ function uninstall(isGlobal, runtime = 'claude') {
       console.log(`  ${green}✓${reset} Removed GSD statusline from settings`);
     }
 
-    // Remove GSD hooks from settings — per-hook granularity to preserve
-    // user hooks that share an entry with a GSD hook (#1755 followup)
-    const isGsdHookCommand = (cmd) =>
-      cmd && (cmd.includes('gsd-check-update') || cmd.includes('gsd-statusline') ||
-        cmd.includes('gsd-session-state') || cmd.includes('gsd-context-monitor') ||
-        cmd.includes('gsd-phase-boundary') || cmd.includes('gsd-prompt-guard') ||
-        cmd.includes('gsd-read-guard') || cmd.includes('gsd-read-injection-scanner') ||
-        cmd.includes('gsd-validate-commit') || cmd.includes('gsd-workflow-guard'));
-
     for (const eventName of ['SessionStart', 'PostToolUse', 'AfterTool', 'PreToolUse', 'BeforeTool']) {
       if (settings.hooks && settings.hooks[eventName]) {
         const before = JSON.stringify(settings.hooks[eventName]);
-        settings.hooks[eventName] = settings.hooks[eventName]
-          .map(entry => {
-            if (!entry.hooks || !Array.isArray(entry.hooks)) return entry;
-            // Filter out individual GSD hooks, keep user hooks
-            entry.hooks = entry.hooks.filter(h => !isGsdHookCommand(h.command));
-            return entry.hooks.length > 0 ? entry : null;
-          })
-          .filter(Boolean);
+        settings.hooks[eventName] = filterGsdHooks(settings.hooks[eventName]);
         if (JSON.stringify(settings.hooks[eventName]) !== before) {
           settingsModified = true;
         }
@@ -6277,40 +6292,27 @@ function install(isGlobal, runtime = 'claude') {
       console.log(`  ${green}✓${reset} Installed hooks`);
     }
 
-    // Add Codex hooks (SessionStart for update checking) — requires codex_hooks feature flag
+    // Enable Codex hooks feature in config.toml; actual hook registrations live
+    // in hooks.json for current Codex builds.
     const configPath = path.join(targetDir, 'config.toml');
     try {
       let configContent = fs.existsSync(configPath) ? fs.readFileSync(configPath, 'utf-8') : '';
-      const eol = detectLineEnding(configContent);
       const codexHooksFeature = ensureCodexHooksFeature(configContent);
       configContent = setManagedCodexHooksOwnership(codexHooksFeature.content, codexHooksFeature.ownership);
-
-      // Add SessionStart hook for update checking
-      const updateCheckScript = path.resolve(targetDir, 'hooks', 'gsd-check-update.js').replace(/\\/g, '/');
-      const hookBlock =
-        `${eol}# GSD Hooks${eol}` +
-        `[[hooks]]${eol}` +
-        `event = "SessionStart"${eol}` +
-        `command = "node ${updateCheckScript}"${eol}`;
-
-      // Migrate legacy gsd-update-check entries from prior installs (#1755 followup)
-      // Remove stale hook blocks that used the inverted filename or wrong path.
-      // Single \r?\n-aware regex handles LF, CRLF, and block-at-file-start (#2698).
-      if (configContent.includes('gsd-update-check')) {
-        configContent = configContent.replace(
-          /(?:\r?\n|^)# GSD Hooks\r?\n\[\[hooks\]\]\r?\nevent = "SessionStart"\r?\ncommand = "node [^\r\n]*gsd-update-check\.js"\r?\n/gm,
-          (match) => (match.startsWith('\r\n') ? '\r\n' : match.startsWith('\n') ? '\n' : ''),
-        );
-      }
-
-      if (hasEnabledCodexHooksFeature(configContent) && !configContent.includes('gsd-check-update')) {
-        configContent += hookBlock;
-      }
+      configContent = stripLegacyCodexHookBlockFromConfig(configContent);
 
       fs.writeFileSync(configPath, configContent, 'utf-8');
-      console.log(`  ${green}✓${reset} Configured Codex hooks (SessionStart)`);
+      console.log(`  ${green}✓${reset} Enabled Codex hook feature`);
+
+      const updateCheckFile = path.join(targetDir, 'hooks', 'gsd-check-update.js');
+      if (hasEnabledCodexHooksFeature(configContent) && fs.existsSync(updateCheckFile)) {
+        const updateCheckCommand = `node ${path.resolve(updateCheckFile).replace(/\\/g, '/')}`;
+        configureCodexHooksJson(targetDir, updateCheckCommand);
+      } else if (!fs.existsSync(updateCheckFile)) {
+        console.warn(`  ${yellow}⚠${reset}  Skipped hooks.json update — gsd-check-update.js not found at target`);
+      }
     } catch (e) {
-      console.warn(`  ${yellow}⚠${reset}  Could not configure Codex hooks: ${e.message}`);
+      console.warn(`  ${yellow}⚠${reset}  Could not configure Codex hook settings: ${e.message}`);
     }
 
     return { settingsPath: null, settings: null, statuslineCommand: null, runtime, configDir: targetDir };
@@ -7042,6 +7044,80 @@ function homePathCoveredByRc(globalBin, homeDir, rcFileNames) {
   }
 
   return false;
+}
+
+function isGsdHookCommand(cmd) {
+  return cmd && (
+    cmd.includes('gsd-check-update') ||
+    cmd.includes('gsd-update-check') ||
+    cmd.includes('gsd-statusline') ||
+    cmd.includes('gsd-session-state') ||
+    cmd.includes('gsd-context-monitor') ||
+    cmd.includes('gsd-phase-boundary') ||
+    cmd.includes('gsd-prompt-guard') ||
+    cmd.includes('gsd-read-guard') ||
+    cmd.includes('gsd-read-injection-scanner') ||
+    cmd.includes('gsd-validate-commit') ||
+    cmd.includes('gsd-workflow-guard')
+  );
+}
+
+function filterGsdHooks(entries, predicate = isGsdHookCommand) {
+  if (!Array.isArray(entries)) return entries;
+  return entries
+    .map((entry) => {
+      if (!entry || !entry.hooks || !Array.isArray(entry.hooks)) return entry;
+      const hooks = entry.hooks.filter((hook) => !predicate(hook.command));
+      return hooks.length > 0 ? { ...entry, hooks } : null;
+    })
+    .filter(Boolean);
+}
+
+function stripLegacyCodexHookBlockFromConfig(content) {
+  return content.replace(
+    /(?:\r?\n|^)# GSD Hooks\r?\n\[\[hooks\]\]\r?\nevent = "SessionStart"\r?\ncommand = "node [^\r\n]*gsd-(?:update-check|check-update)\.js"\r?\n/gm,
+    (match) => (match.startsWith('\r\n') ? '\r\n' : match.startsWith('\n') ? '\n' : '')
+  );
+}
+
+function configureCodexHooksJson(targetDir, updateCheckCommand) {
+  const hooksPath = path.join(targetDir, 'hooks.json');
+  let settings = readSettings(hooksPath);
+  if (settings === null) {
+    console.log(`  ${yellow}i${reset} Skipping hooks.json configuration — file could not be parsed (comments or malformed JSON). Your existing hooks are preserved.`);
+    return;
+  }
+
+  settings = cleanupOrphanedHooks(settings);
+  settings = validateHookFields(settings);
+
+  if (!settings.hooks) {
+    settings.hooks = {};
+  }
+  if (!settings.hooks.SessionStart) {
+    settings.hooks.SessionStart = [];
+  }
+
+  const before = JSON.stringify(settings.hooks.SessionStart);
+  settings.hooks.SessionStart = filterGsdHooks(
+    settings.hooks.SessionStart,
+    (cmd) => cmd && (cmd.includes('gsd-check-update') || cmd.includes('gsd-update-check'))
+  );
+
+  settings.hooks.SessionStart.push({
+    hooks: [
+      {
+        type: 'command',
+        command: updateCheckCommand,
+      }
+    ]
+  });
+
+  if (JSON.stringify(settings.hooks.SessionStart) !== before || !fs.existsSync(hooksPath)) {
+    writeSettings(hooksPath, settings);
+  }
+
+  console.log(`  ${green}✓${reset} Configured Codex hooks in hooks.json (SessionStart)`);
 }
 
 /**
