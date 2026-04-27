@@ -8,11 +8,30 @@
 // Enable test exports from install.js (skips main CLI logic)
 process.env.GSD_TEST_MODE = '1';
 
-const { test, describe, beforeEach, afterEach } = require('node:test');
+const { test, describe, before, beforeEach, afterEach } = require('node:test');
 const assert = require('node:assert/strict');
 const fs = require('fs');
 const path = require('path');
 const os = require('os');
+const { execFileSync } = require('child_process');
+
+// #2153 follow-up: ensure hooks/dist/ exists before any install integration
+// test runs. The Codex install path copies hook files from hooks/dist/, which
+// is gitignored and only populated by `npm run build:hooks`. When this file is
+// run in isolation (`node --test tests/codex-config.test.cjs`) the build step
+// from the npm-test pretest chain does not run, and the "Codex install copies
+// hook file" regression silently fails because hooks/dist/ is empty.
+// Build on demand so the test passes regardless of runner ordering.
+const HOOKS_DIST = path.join(__dirname, '..', 'hooks', 'dist');
+const BUILD_HOOKS_SCRIPT = path.join(__dirname, '..', 'scripts', 'build-hooks.js');
+before(() => {
+  if (!fs.existsSync(HOOKS_DIST) || fs.readdirSync(HOOKS_DIST).length === 0) {
+    execFileSync(process.execPath, [BUILD_HOOKS_SCRIPT], {
+      encoding: 'utf-8',
+      stdio: 'pipe',
+    });
+  }
+});
 
 const {
   getCodexSkillAdapterHeader,
