@@ -417,6 +417,7 @@ function cmdRoadmapAnnotateDependencies(cwd, phaseNum, raw) {
   for (const { truths } of planData) {
     const seen = new Set();
     for (const t of truths) {
+      if (typeof t !== 'string') continue;
       const key = t.trim().toLowerCase();
       if (!key || seen.has(key)) continue;
       seen.add(key);

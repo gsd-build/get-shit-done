@@ -547,6 +547,27 @@ must_haves:
     assert.strictEqual(result[0], 'Key: value pattern preserved');
   });
 
+  test('#2757: unquoted truth containing ":" is preserved as a string — not left as {}', () => {
+    // Unquoted strings with colons (e.g. Rails idioms) were falling through the KV
+    // regex and leaving current as {}, which caused t.trim() to throw in roadmap.cjs.
+    const content = `---
+phase: 01
+must_haves:
+  truths:
+    - GET /foo/:id resolves to controller#show
+    - Service.call(arg:, key:) returns a record
+    - Class::Method is idempotent
+---
+`;
+    const result = parseMustHavesBlock(content, 'truths');
+    assert.ok(Array.isArray(result), 'should return an array');
+    assert.strictEqual(result.length, 3, `expected 3, got ${result.length}: ${JSON.stringify(result)}`);
+    assert.ok(typeof result[0] === 'string', `result[0] should be string, got ${typeof result[0]}`);
+    assert.ok(typeof result[1] === 'string', `result[1] should be string, got ${typeof result[1]}`);
+    assert.ok(typeof result[2] === 'string', `result[2] should be string, got ${typeof result[2]}`);
+    assert.ok(result[0].includes(':'), 'colon should be preserved in the string');
+  });
+
   test('handles nested arrays within artifact objects', () => {
     const content = `---
 phase: 01
