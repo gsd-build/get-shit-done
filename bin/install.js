@@ -7395,14 +7395,49 @@ function installSdkIfNeeded(opts) {
     // `node sdkCliPath` invocation in bin/gsd-sdk.js.
   }
 
-  console.log(`  ${green}✓${reset} GSD SDK ready (sdk/dist/cli.js)`);
+  // #2775: do not assert "GSD SDK ready" until `gsd-sdk` actually resolves on
+  // PATH. `npx get-shit-done-cc` only links the package's primary bin; the
+  // secondary `gsd-sdk` shim is left dangling under the npx cache and is NOT
+  // callable as a bare command. The previous file-presence-only check was a
+  // strictly weaker invariant than the one workflows depend on
+  // (`command -v gsd-sdk` resolving), and led to a false ✓ in npx-cache
+  // installs (issue #2775).
+  const shimSrc = path.resolve(__dirname, 'gsd-sdk.js');
+  let onPath = isGsdSdkOnPath();
+
+  if (!onPath) {
+    // Try to materialize the shim into a user-writable PATH location so the
+    // installer can deliver on the success message without requiring the user
+    // to run `npm install -g` separately. Picks the first PATH entry that
+    // looks like a user-owned bin dir; falls back to ~/.local/bin even if
+    // it's not on PATH (then a follow-up suggestion is printed).
+    const linked = trySelfLinkGsdSdk(shimSrc);
+    if (linked) {
+      onPath = isGsdSdkOnPath();
+      if (onPath) {
+        console.log(`  ${dim}↪ linked gsd-sdk → ${linked}${reset}`);
+      }
+    }
+  }
+
+  if (onPath) {
+    console.log(`  ${green}✓${reset} GSD SDK ready (sdk/dist/cli.js)`);
+  } else {
+    console.log('');
+    console.log(`  ${yellow}⚠${reset} GSD SDK files are present but ${bold}gsd-sdk${reset} is not on your PATH.`);
+    console.log(`    Workflows that call ${cyan}gsd-sdk query …${reset} will fail with "command not found".`);
+    console.log(`    Install globally to materialize the bin symlink:`);
+    console.log(`      ${cyan}npm install -g get-shit-done-cc${reset}`);
+    console.log(`    Or add a directory containing the shim to your PATH manually.`);
+    console.log('');
+  }
 
   // #2620: warn if npm's global bin is not on PATH, suppressing the
   // absolute-path suggestion when the user's rc already covers it via
   // a HOME-relative entry (e.g. `export PATH="$HOME/.npm-global/bin:$PATH"`).
   try {
-    const { execSync } = require('child_process');
-    const npmPrefix = execSync('npm prefix -g', { encoding: 'utf8', stdio: ['ignore', 'pipe', 'ignore'] }).trim();
+    const cp = require('child_process');
+    const npmPrefix = cp.execSync('npm prefix -g', { encoding: 'utf8', stdio: ['ignore', 'pipe', 'ignore'] }).trim();
     if (npmPrefix) {
       // On Windows npm prefix IS the bin dir; on POSIX it's `${prefix}/bin`.
       const globalBin = process.platform === 'win32' ? npmPrefix : path.join(npmPrefix, 'bin');
@@ -7411,6 +7446,88 @@ function installSdkIfNeeded(opts) {
   } catch {
     // npm not available / exec failed — silently skip the PATH advice.
   }
+}
+
+/**
+ * #2775 helper: check whether a callable `gsd-sdk` exists on the current PATH.
+ *
+ * Pure PATH walk (no spawn) — we look for a regular file or symlink named
+ * `gsd-sdk` (or `gsd-sdk.cmd`/`.exe` on Windows) in any directory on PATH and
+ * verify it carries the execute bit on POSIX. Avoids paying spawn cost and
+ * avoids the chicken-and-egg of needing to run the not-yet-installed binary.
+ */
+function isGsdSdkOnPath() {
+  const path = require('path');
+  const fs = require('fs');
+  const pathEnv = process.env.PATH || '';
+  const exts = process.platform === 'win32' ? ['.cmd', '.exe', '.bat', ''] : [''];
+  for (const seg of pathEnv.split(path.delimiter)) {
+    if (!seg) continue;
+    for (const ext of exts) {
+      const candidate = path.join(seg, `gsd-sdk${ext}`);
+      try {
+        const st = fs.statSync(candidate);
+        if (st.isFile()) {
+          if (process.platform === 'win32') return true;
+          if ((st.mode & 0o111) !== 0) return true;
+        }
+      } catch {
+        // missing / EACCES on dir — keep scanning.
+      }
+    }
+  }
+  return false;
+}
+
+/**
+ * #2775 helper: attempt to materialize the `gsd-sdk` shim at a user-writable
+ * PATH location. Returns the absolute path created on success, or null if no
+ * suitable location was usable.
+ *
+ * Strategy (POSIX): prefer ~/.local/bin (creating it if absent — many distros
+ * already have it on PATH via .profile). Fall back to the first PATH entry
+ * under HOME we can write to. Skip on Windows (npm install -g is the right
+ * primitive there; we don't try to fabricate a .cmd shim).
+ */
+function trySelfLinkGsdSdk(shimSrc) {
+  if (process.platform === 'win32') return null;
+  const path = require('path');
+  const fs = require('fs');
+  const home = os.homedir();
+  if (!home) return null;
+
+  const candidates = [];
+  const localBin = path.join(home, '.local', 'bin');
+  candidates.push(localBin);
+  const pathEnv = process.env.PATH || '';
+  for (const seg of pathEnv.split(path.delimiter)) {
+    if (!seg) continue;
+    const abs = path.resolve(seg);
+    if (abs.startsWith(home + path.sep) && !candidates.includes(abs)) {
+      candidates.push(abs);
+    }
+  }
+
+  for (const dir of candidates) {
+    try {
+      fs.mkdirSync(dir, { recursive: true });
+      const target = path.join(dir, 'gsd-sdk');
+      // Replace any existing entry — it may be stale (prior install of an
+      // older version pointing at a now-absent shim).
+      try { fs.unlinkSync(target); } catch {}
+      try {
+        fs.symlinkSync(shimSrc, target);
+      } catch {
+        // Filesystems that don't support symlinks (some FUSE mounts): copy.
+        fs.copyFileSync(shimSrc, target);
+        try { fs.chmodSync(target, 0o755); } catch {}
+      }
+      return target;
+    } catch {
+      // permission / EROFS — try next candidate.
+    }
+  }
+  return null;
 }
 
 /**
