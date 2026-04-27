@@ -5780,6 +5780,14 @@ function saveLocalPatches(configDir) {
   let manifest;
   try { manifest = JSON.parse(fs.readFileSync(manifestPath, 'utf8')); } catch { return []; }
 
+  // Normalize legacy manifests written before #2771 fix: strip user-owned artifacts
+  // that were incorrectly recorded so refreshes don't surface false patches warnings.
+  if (manifest.files) {
+    for (const artifact of USER_OWNED_ARTIFACTS) {
+      delete manifest.files[`get-shit-done/${artifact}`];
+    }
+  }
+
   const patchesDir = path.join(configDir, PATCHES_DIR_NAME);
   const pristineDir = path.join(configDir, 'gsd-pristine');
   const modified = [];

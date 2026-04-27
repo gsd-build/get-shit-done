@@ -128,9 +128,63 @@ describe('#2771: refreshed USER-PROFILE.md does not trigger local-patches warnin
       'USER-PROFILE.md must NOT appear in gsd-local-patches/ — it is a user artifact, not a modified distribution file'
     );
 
+    const offendingLine = output
+      .split('\n')
+      .find((line) => /locally modified GSD file/.test(line) && /USER-PROFILE/.test(line));
+    assert.strictEqual(
+      offendingLine,
+      undefined,
+      'installer output must not report USER-PROFILE.md as a locally modified GSD file on any single line. Output was:\n' + output
+    );
+  });
+});
+
+// ─── Test 5: legacy manifest with USER-PROFILE.md entry is normalized ─────────
+
+describe('#2771: legacy manifest entries for USER_OWNED_ARTIFACTS are normalized', () => {
+  let tmpDir;
+
+  beforeEach(() => { tmpDir = createTempDir('gsd-2771-legacy-'); });
+  afterEach(() => { cleanup(tmpDir); });
+
+  test('pre-existing manifest entry for USER-PROFILE.md does not trigger patches warning', () => {
+    // Initial install
+    runInstaller(tmpDir);
+
+    const profilePath = path.join(tmpDir, 'get-shit-done', 'USER-PROFILE.md');
+    fs.writeFileSync(profilePath, '# Profile v1\n');
+
+    // Reinstall to populate manifest under the (now-fixed) writer
+    runInstaller(tmpDir);
+
+    // Inject a stale manifest entry simulating a pre-#2771 install: a hash for
+    // USER-PROFILE.md that does NOT match current content.
+    const manifestPath = path.join(tmpDir, MANIFEST_NAME);
+    const manifest = JSON.parse(fs.readFileSync(manifestPath, 'utf8'));
+    manifest.files = manifest.files || {};
+    manifest.files['get-shit-done/USER-PROFILE.md'] = 'deadbeef'.repeat(8); // stale hash
+    fs.writeFileSync(manifestPath, JSON.stringify(manifest, null, 2));
+
+    // /gsd-profile-user --refresh rewrites USER-PROFILE.md
+    fs.writeFileSync(profilePath, '# Profile v2 — refreshed\n');
+
+    // Reinstall — saveLocalPatches must strip the legacy entry before scanning
+    const output = runInstaller(tmpDir);
+
+    const patchesDir = path.join(tmpDir, PATCHES_DIR_NAME);
+    const patchFile = path.join(patchesDir, 'get-shit-done', 'USER-PROFILE.md');
     assert.ok(
-      !/locally modified GSD file/.test(output) || !/USER-PROFILE/.test(output),
-      'installer output must not report USER-PROFILE.md as a locally modified GSD file. Output was:\n' + output
+      !fs.existsSync(patchFile),
+      'legacy USER-PROFILE.md manifest entry must be normalized away — not backed up as a patch'
+    );
+
+    const offendingLine = output
+      .split('\n')
+      .find((line) => /locally modified GSD file/.test(line) && /USER-PROFILE/.test(line));
+    assert.strictEqual(
+      offendingLine,
+      undefined,
+      'legacy manifest entry must not surface a USER-PROFILE.md patches warning. Output was:\n' + output
     );
   });
 });
