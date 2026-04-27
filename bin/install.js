@@ -7518,8 +7518,19 @@ function trySelfLinkGsdSdk(shimSrc) {
       try {
         fs.symlinkSync(shimSrc, target);
       } catch {
-        // Filesystems that don't support symlinks (some FUSE mounts): copy.
-        fs.copyFileSync(shimSrc, target);
+        // Filesystems that don't support symlinks (some FUSE mounts): write a
+        // tiny wrapper that `require()`s the real shim by absolute path. We
+        // cannot copyFileSync(shimSrc, target) — bin/gsd-sdk.js resolves the
+        // CLI via `path.resolve(__dirname, '..', 'sdk', 'dist', 'cli.js')`,
+        // and after a copy `__dirname` would be the link directory (e.g.
+        // ~/.local/bin), causing the resolved CLI path to be broken
+        // (~/.local/sdk/dist/cli.js). Wrapping via require() preserves
+        // __dirname resolution because the require runs against shimSrc's
+        // own location. (#2775 CodeRabbit follow-up)
+        fs.writeFileSync(
+          target,
+          `#!/usr/bin/env node\nrequire(${JSON.stringify(shimSrc)});\n`,
+        );
         try { fs.chmodSync(target, 0o755); } catch {}
       }
       return target;

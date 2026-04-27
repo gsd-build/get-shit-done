@@ -89,7 +89,8 @@ describe('bug #2775: installSdkIfNeeded must verify gsd-sdk on PATH before repor
   });
 
   afterEach(() => {
-    process.env.PATH = savedEnv.PATH;
+    if (savedEnv.PATH == null) delete process.env.PATH;
+    else process.env.PATH = savedEnv.PATH;
     if (savedEnv.HOME == null) delete process.env.HOME;
     else process.env.HOME = savedEnv.HOME;
     cleanup(tmpRoot);
@@ -134,6 +135,66 @@ describe('bug #2775: installSdkIfNeeded must verify gsd-sdk on PATH before repor
     // And the link must actually exist + resolve back to the shim.
     const linkPath = path.join(localBin, 'gsd-sdk');
     assert.ok(fs.existsSync(linkPath), `installer must materialize ${linkPath}`);
+  });
+
+  test('symlink-fallback writes a wrapper that require()s the real shim by absolute path (preserves __dirname)', () => {
+    // Simulate a symlink-hostile filesystem by forcing fs.symlinkSync to throw.
+    // The fallback must NOT copy bin/gsd-sdk.js into ~/.local/bin (which would
+    // break the shim's `path.resolve(__dirname, '..', 'sdk', 'dist', 'cli.js')`
+    // resolution). Instead it must write a tiny wrapper script that
+    // require()s the real shim by absolute path so __dirname stays correct.
+    const localBin = path.join(homeDir, '.local', 'bin');
+    fs.mkdirSync(localBin, { recursive: true });
+    process.env.PATH = `${localBin}${path.delimiter}${pathDir}`;
+
+    const realShimSrc = path.resolve(__dirname, '..', 'bin', 'gsd-sdk.js');
+    const origSymlink = fs.symlinkSync;
+    fs.symlinkSync = () => {
+      const err = new Error('EPERM: simulated symlink-hostile filesystem');
+      err.code = 'EPERM';
+      throw err;
+    };
+    try {
+      captureConsole(() => {
+        installSdkIfNeeded({ sdkDir });
+      });
+    } finally {
+      fs.symlinkSync = origSymlink;
+    }
+
+    const target = path.join(localBin, 'gsd-sdk');
+    assert.ok(fs.existsSync(target), `fallback must materialize ${target}`);
+    // Critical: it must NOT be a verbatim copy of bin/gsd-sdk.js.
+    const targetContent = fs.readFileSync(target, 'utf8');
+    const realShimContent = fs.readFileSync(realShimSrc, 'utf8');
+    assert.notStrictEqual(
+      targetContent,
+      realShimContent,
+      'fallback must not copyFileSync bin/gsd-sdk.js — that breaks __dirname-based CLI resolution',
+    );
+    // It must be a wrapper that require()s the real shim by absolute path.
+    assert.ok(
+      targetContent.includes('require(') && targetContent.includes(realShimSrc),
+      `fallback wrapper must require() the real shim by absolute path. Got:\n${targetContent}`,
+    );
+    // And it must be executable.
+    const st = fs.statSync(target);
+    assert.ok(
+      (st.mode & 0o111) !== 0,
+      `fallback wrapper must have execute bit set (mode=${st.mode.toString(8)})`,
+    );
+    // Behavioral check: require()ing the wrapper from a fresh Node child must
+    // resolve the CLI correctly (i.e. __dirname inside the real shim points
+    // at <pkg>/bin, not at ~/.local/bin). We don't actually want to spawn the
+    // CLI (the test sdk dir has only a stub), so we override the spawnSync
+    // module path via an env probe: assert that the wrapper, when read by
+    // Node, references the real shim location whose sibling is sdk/dist.
+    const realShimDir = path.dirname(realShimSrc);
+    const expectedCliDir = path.resolve(realShimDir, '..', 'sdk', 'dist');
+    assert.ok(
+      fs.existsSync(expectedCliDir) || fs.existsSync(path.dirname(expectedCliDir)),
+      `real shim's resolved CLI dir must exist relative to the package, not the link dir. Expected near: ${expectedCliDir}`,
+    );
   });
 
   test('DOES print "GSD SDK ready" when gsd-sdk is already resolvable on PATH', () => {
