@@ -1689,7 +1689,7 @@ function cmdStatePrune(cwd, options, raw) {
  * that the phase execution is finished and the project is ready for the next phase.
  * Implements the `gsd state complete-phase` subcommand (issue #2735).
  */
-function cmdStateCompletePhase(cwd, args, raw) {
+function cmdStateCompletePhase(cwd, raw) {
   const statePath = planningPaths(cwd).state;
   if (!fs.existsSync(statePath)) {
     output({ error: 'STATE.md not found' }, raw);
@@ -1698,12 +1698,14 @@ function cmdStateCompletePhase(cwd, args, raw) {
 
   const today = new Date().toISOString().split('T')[0];
   const updated = [];
+  let resolvedPhase = '?';
 
   readModifyWriteStateMd(statePath, (content) => {
     // Read the current phase number for descriptive messages
     const currentPhase = stateExtractField(content, 'Current Phase') ||
                          stateExtractField(content, 'Phase') ||
                          '?';
+    resolvedPhase = currentPhase;
 
     // Update Status field
     const statusValue = `Phase ${currentPhase} complete`;
@@ -1752,7 +1754,7 @@ function cmdStateCompletePhase(cwd, args, raw) {
   }, cwd);
 
   output(
-    { updated, phase: stateExtractField(fs.readFileSync(planningPaths(cwd).state, 'utf-8'), 'Current Phase') || '?' },
+    { updated, phase: resolvedPhase },
     raw,
     updated.length > 0 ? 'true' : 'false',
   );
