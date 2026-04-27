@@ -45,6 +45,7 @@ const {
   install,
   GSD_CODEX_MARKER,
   CODEX_AGENT_SANDBOX,
+  parseTomlToObject,
 } = require('../bin/install.js');
 
 function runCodexInstall(codexHome, cwd = path.join(__dirname, '..')) {
@@ -736,10 +737,15 @@ describe('Codex hooks emit: migration and managed paths use the same field name'
   // (#2760 class). Lock parity here by running the actual install for the
   // managed path and migrateCodexHooksMapFormat for the legacy path.
   function firstHookBlockField(content) {
-    // Skip past "# GSD Hooks" comment if present, capture key on first key line
-    // after [[hooks]] header.
-    const match = content.match(/\[\[hooks\]\][\r\n]+([A-Za-z_][\w]*)\s*=/);
-    return match ? match[1] : null;
+    // Structural: parse the TOML and look at the first [[hooks]] element's
+    // schema-relevant keys. Order-independent — won't false-fail if a future
+    // change reorders fields or inserts a comment before the event/type key.
+    const parsed = parseTomlToObject(content);
+    const firstHook = Array.isArray(parsed.hooks) ? parsed.hooks[0] : null;
+    if (!firstHook) return null;
+    if ('event' in firstHook) return 'event';
+    if ('type' in firstHook) return 'type';
+    return null;
   }
 
   let tmpDir;
@@ -756,9 +762,11 @@ describe('Codex hooks emit: migration and managed paths use the same field name'
     fs.mkdirSync(codexHome, { recursive: true });
     runCodexInstall(codexHome);
     const installedContent = readCodexConfig(codexHome);
-    const managedField = firstHookBlockField(
-      installedContent.slice(installedContent.indexOf('# GSD Hooks')),
+    assert.ok(
+      installedContent.includes('# GSD Hooks'),
+      'managed install writes a "# GSD Hooks" tagged section',
     );
+    const managedField = firstHookBlockField(installedContent);
     assert.ok(managedField, 'managed install emits a [[hooks]] block with a field key');
 
     // Migration path — convert a legacy [hooks.TYPE] map and read what it wrote.
@@ -1039,9 +1047,21 @@ describe('mergeCodexConfig', () => {
     // Bare [agents] is invalid under Codex's current schema (rejected with
     // "expected struct AgentsToml") so install-time stripping always purges
     // it (#2760). User feature keys above the marker are preserved.
-    assert.strictEqual(countMatches(beforeMarker, /^\[agents\]\s*$/gm), 0, 'strips bare [agents] block (#2760)');
-    assert.ok(beforeMarker.includes('child_agents_md = false'), 'preserves user feature keys above marker');
-    assert.strictEqual(countMatches(beforeMarker, /^\[agents\.gsd-executor\]\s*$/gm), 0, 'removes leaked GSD agent section above marker');
+    // Structural assertion: TOML-parse the pre-marker region and verify the
+    // bare [agents] block is fully gone — header AND body keys (e.g.,
+    // `default = "custom-agent"`). A header-only check would miss a
+    // partial-strip regression that leaves orphan body keys reparented to a
+    // sibling section.
+    const parsedBefore = parseTomlToObject(beforeMarker);
+    assert.equal(
+      parsedBefore.agents,
+      undefined,
+      'bare [agents] block fully purged including body keys (#2760)',
+    );
+    assert.ok(
+      parsedBefore.features && parsedBefore.features.child_agents_md === false,
+      'preserves user feature keys above marker',
+    );
     // New struct format: exactly one [agents.gsd-executor] in the GSD block (after marker)
     assert.strictEqual(countMatches(content, /^\[agents\.gsd-executor\]\s*$/gm), 1, 'exactly one struct agent header in GSD block');
     assert.strictEqual(countMatches(content, /name = "gsd-executor"/g), 0, 'no name = field in struct format');
