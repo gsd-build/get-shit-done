@@ -96,40 +96,9 @@ else
 fi
 ```
 
-For each plan, decide `USE_WORKTREES` per-plan by intersecting `SUBMODULE_PATHS` with the plan's `files_modified` frontmatter (a list of repo-relative paths/globs the plan declares it will touch):
+`SUBMODULE_PATHS` is exported to the `execute_waves` step, where the per-plan decision actually happens (see "Per-plan worktree decision" sub-step inside `execute_waves`). The decision is per-plan because different plans in the same wave can touch different files — only plans whose paths intersect a submodule must drop worktree isolation; plans nowhere near a submodule keep parallel isolation.
 
-```bash
-# Per-plan decision (run for each plan before dispatching its executor):
-#   PLAN_FILES = whitespace-separated list parsed from the plan's `files_modified` frontmatter.
-#   USE_WORKTREES_FOR_PLAN starts from the project-level USE_WORKTREES.
-USE_WORKTREES_FOR_PLAN="$USE_WORKTREES"
-
-if [ -n "$SUBMODULE_PATHS" ]; then
-  if [ -z "$PLAN_FILES" ]; then
-    # Fallback: planned paths are unknown/unparseable — fall back to the safe
-    # behavior (disable worktree isolation for this plan) and log why.
-    echo "[worktree] Plan ${plan_id}: files_modified missing/unparseable — disabling worktree isolation as a safety fallback (submodule project)"
-    USE_WORKTREES_FOR_PLAN=false
-  else
-    # Compute intersection: any planned path that lies inside a submodule path
-    # makes worktree isolation unsafe for this plan.
-    INTERSECT=""
-    for sm in $SUBMODULE_PATHS; do
-      for pf in $PLAN_FILES; do
-        case "$pf" in
-          "$sm"|"$sm"/*) INTERSECT="$INTERSECT $pf" ;;
-        esac
-      done
-    done
-    if [ -n "$INTERSECT" ]; then
-      echo "[worktree] Plan ${plan_id}: planned paths intersect submodule paths (${INTERSECT# }) — disabling worktree isolation for this plan"
-      USE_WORKTREES_FOR_PLAN=false
-    fi
-  fi
-fi
-```
-
-When `USE_WORKTREES_FOR_PLAN` is `false`, that plan's executor agent runs without `isolation="worktree"` — it executes on the main working tree instead of in a parallel worktree. Other plans in the same wave whose paths do not intersect submodules continue to run with worktree isolation in parallel. When `USE_WORKTREES` (project-level) is `false`, all executor agents run without `isolation="worktree"` — they execute sequentially on the main working tree instead of in parallel worktrees.
+When `USE_WORKTREES` (project-level) is `false`, all executor agents run without `isolation="worktree"` — they execute sequentially on the main working tree instead of in parallel worktrees. The per-plan decision below has no effect when worktrees are project-disabled.
 
 Read context window size for adaptive prompt enrichment:
 
@@ -454,6 +423,12 @@ increases monotonically across waves. `{status}` is `complete` (success),
    - Bad: "Executing terrain generation plan"
    - Good: "Procedural terrain generator using Perlin noise — creates height maps, biome zones, and collision meshes. Required before vehicle physics can interact with ground."
 
+2.5. **Per-plan worktree decision (run for each plan in this wave BEFORE its dispatch):**
+
+   Read and execute `get-shit-done/workflows/execute-phase/steps/per-plan-worktree-gate.md` for each plan. It extracts `PLAN_FILES` from the plan's JSON, intersects against `SUBMODULE_PATHS` (with normalization, bidirectional matching, and glob-prefix handling), and sets `USE_WORKTREES_FOR_PLAN` to `false` when the plan touches a submodule path. Append `plan_id` to a `WAVE_WORKTREE_PLANS` accumulator when `USE_WORKTREES_FOR_PLAN != false`.
+
+   The dispatch branches in step 3 below MUST gate on `USE_WORKTREES_FOR_PLAN` for the current plan, not on the project-level `USE_WORKTREES`.
+
 3. **Spawn executor agents:**
 
    **Emit a plan-start heartbeat (literal line, no tool call) immediately before
@@ -467,7 +442,7 @@ increases monotonically across waves. `{status}` is `complete` (success),
    For 200k models, this keeps orchestrator context lean (~10-15%).
    For 1M+ models (Opus 4.6, Sonnet 4.6), richer context can be passed directly.
 
-   **Worktree mode** (`USE_WORKTREES` is not `false`):
+   **Worktree mode** (`USE_WORKTREES_FOR_PLAN` is not `false` — evaluated per-plan in step 2.5):
 
    Before spawning, capture the current HEAD:
    ```bash
@@ -598,7 +573,7 @@ increases monotonically across waves. `{status}` is `complete` (success),
 
    > **ORCHESTRATOR RULE — CODEX RUNTIME**: After calling Task() above to spawn executor agent(s), stop working on this task immediately. Do not read more files, edit code, or run tests related to this task while the subagent is active. Wait for the subagent to return its result. This prevents duplicate work, conflicting edits, and wasted context. Only resume when the subagent result is available.
 
-   **Sequential mode** (`USE_WORKTREES` is `false`):
+   **Sequential mode** (`USE_WORKTREES_FOR_PLAN` is `false` — either project-level `USE_WORKTREES=false`, or per-plan submodule intersection forced it false in step 2.5):
 
    Omit `isolation="worktree"` from the Task call. Replace the `<parallel_execution>` block with:
 
@@ -621,7 +596,7 @@ increases monotonically across waves. `{status}` is `complete` (success),
        </success_criteria>
    ```
 
-   When worktrees are disabled, execute plans **one at a time within each wave** (sequential) regardless of the `PARALLELIZATION` setting — multiple agents writing to the same working tree concurrently would cause conflicts.
+   When worktrees are disabled for a plan (per-plan or project-level), that plan's executor runs on the main working tree. If **any** plan in the current wave dropped to sequential mode, execute the affected plan(s) **one at a time** to avoid concurrent writes to the main working tree — plans in the same wave that retained worktree isolation can still run in parallel alongside the sequential ones, but two non-worktree plans in the same wave must serialize. When the project-level `USE_WORKTREES=false`, all plans in the wave serialize regardless of the `PARALLELIZATION` setting.
 
 4. **Wait for all agents in wave to complete.**
 
@@ -793,9 +768,11 @@ increases monotonically across waves. `{status}` is `complete` (success),
    done
    ```
 
-   **If `workflow.use_worktrees` is `false`:** Agents ran on the main working tree — skip this step entirely.
+   **If no plan in this wave used worktree isolation** (project-level `USE_WORKTREES=false` OR every plan in the wave had `USE_WORKTREES_FOR_PLAN=false` — i.e. `WAVE_WORKTREE_PLANS` from step 2.5 is empty): all agents ran on the main working tree — skip this step entirely.
 
-   **If no worktrees found:** Skip silently — agents may have been spawned without worktree isolation.
+   **If at least one plan used worktrees but others did not:** still run this cleanup — it iterates over actual `git worktree list` output and only merges back the worktrees that were created, leaving sequential plans' commits on the main tree untouched.
+
+   **If no worktrees found at runtime:** Skip silently — agents may have been spawned without worktree isolation, or the orchestrator already cleaned them up.
 
 5.6. **Post-merge build & test gate:**
 
@@ -810,9 +787,9 @@ increases monotonically across waves. `{status}` is `complete` (success),
 
    Read and execute `get-shit-done/workflows/execute-phase/steps/post-merge-gate.md`.
 
-5.7. **Post-wave shared artifact update (worktree mode only, skip if tests failed):**
+5.7. **Post-wave shared artifact update (when at least one plan used worktrees, skip if tests failed):**
 
-   When executor agents ran with `isolation="worktree"`, they skipped STATE.md and ROADMAP.md updates to avoid last-merge-wins overwrites. The orchestrator is the single writer for these files. After worktrees are merged back, update shared artifacts once.
+   When **any** executor agent in this wave ran with `isolation="worktree"`, that agent skipped STATE.md and ROADMAP.md updates to avoid last-merge-wins overwrites. The orchestrator is the single writer for these files. After worktrees are merged back, update shared artifacts once for every completed plan in the wave (worktree-mode plans **and** sequential plans that ran on the main tree but deferred to the orchestrator for tracking writes).
 
    **Only update tracking when tests passed (TEST_EXIT=0).**
    If tests failed or timed out, skip the tracking update — plans should
@@ -840,7 +817,7 @@ increases monotonically across waves. `{status}` is `complete` (success),
 
    Where `WAVE_PLAN_IDS` is the space-separated list of plan IDs that completed in this wave.
 
-   **If `workflow.use_worktrees` is `false`:** Sequential agents already updated STATE.md and ROADMAP.md themselves — skip this step.
+   **If no plan in this wave used worktrees** (project-level `USE_WORKTREES=false` OR `WAVE_WORKTREE_PLANS` is empty): sequential agents already updated STATE.md and ROADMAP.md themselves — skip this step.
 
 5.8. **Handle test gate failures (when `WAVE_FAILURE_COUNT > 0`):**
 

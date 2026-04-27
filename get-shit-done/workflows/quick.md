@@ -636,9 +636,44 @@ This corrects a known issue where EnterWorktree creates branches from main inste
 
 ${AGENT_SKILLS_EXECUTOR}
 
+<submodule_commit_guard>
+SUBMODULE_PATHS for this project: ${SUBMODULE_PATHS}
+
+If SUBMODULE_PATHS is non-empty, you MUST run this fail-loud guard immediately
+before EVERY git commit you create during this quick task (after \`git add\`,
+before \`git commit\`). Quick mode does not have a pre-declared files_modified
+list, so the guard runs at commit time:
+
+\`\`\`bash
+SUBMODULE_PATHS=\"${SUBMODULE_PATHS}\"
+if [ -n \"\$SUBMODULE_PATHS\" ]; then
+  STAGED=\$(git diff --cached --name-only)
+  for sm_raw in \$SUBMODULE_PATHS; do
+    sm=\"\${sm_raw#./}\"
+    sm=\"\${sm%/}\"
+    [ -z \"\$sm\" ] && continue
+    for f_raw in \$STAGED; do
+      f=\"\${f_raw#./}\"
+      f=\"\${f%/}\"
+      case \"\$f\" in
+        \"\$sm\"|\"\$sm\"/*)
+          echo \"ABORT: staged path \$f_raw falls inside submodule \$sm — worktree-isolated commits cannot safely span submodule boundaries. Re-run with workflow.use_worktrees=false.\" >&2
+          exit 1 ;;
+      esac
+    done
+  done
+fi
+\`\`\`
+
+If the guard aborts, do NOT attempt the commit, do NOT remove the staged files,
+and do NOT continue subsequent tasks. Surface the abort message in your
+SUMMARY.md and stop — the user must rerun with worktrees disabled.
+</submodule_commit_guard>
+
 <constraints>
 - Execute all tasks in the plan
 - Commit each task atomically (code changes only)
+- Run the <submodule_commit_guard> bash block before every \`git commit\` if SUBMODULE_PATHS is non-empty
 - Create summary at: ${QUICK_DIR}/${quick_id}-SUMMARY.md
 - Do NOT commit docs artifacts (SUMMARY.md, STATE.md, PLAN.md) — the orchestrator handles the docs commit in Step 8
 - Do NOT update ROADMAP.md (quick tasks are separate from planned phases)
