@@ -38,39 +38,43 @@ function makePlanProject(files = {}) {
   return dir;
 }
 
-const ROADMAP = `# Roadmap
-
-### Phase 1: Foundation
-**Goal:** Set up project
-**Plans:** 2 plans
-
-Plans:
-- [ ] 01-01-PLAN.md — Set up DB
-- [ ] 01-02-PLAN.md — Build API
-`;
+const ROADMAP = [
+  '# Roadmap',
+  '',
+  '### Phase 1: Foundation',
+  '**Goal:** Set up project',
+  '**Plans:** 2 plans',
+  '',
+  'Plans:',
+  '- [ ] 01-01-PLAN.md — Set up DB',
+  '- [ ] 01-02-PLAN.md — Build API',
+  '',
+].join('\n');
 
 // PLAN where must_haves.truths includes a bare numeric scalar AND a kv-shaped
 // item whose value is numeric — both must be surfaced as cross-cutting
 // constraints when shared across plans, not silently dropped.
-const PLAN_NUMERIC_TRUTH = (wave, sharedTitle) => `---
-phase: "1"
-plan: "01-0${wave}"
-type: standard
-wave: ${wave}
-depends_on: []
-files_modified: []
-autonomous: true
-must_haves:
-  truths:
-    - title: ${sharedTitle}
-      count: 3
-    - 42
-  artifacts: []
-  key_links: []
----
-
-<objective>Plan ${wave}</objective>
-`;
+const PLAN_NUMERIC_TRUTH = (wave, sharedTitle) => [
+  '---',
+  'phase: "1"',
+  `plan: "01-0${wave}"`,
+  'type: standard',
+  `wave: ${wave}`,
+  'depends_on: []',
+  'files_modified: []',
+  'autonomous: true',
+  'must_haves:',
+  '  truths:',
+  `    - title: ${sharedTitle}`,
+  '      count: 3',
+  '    - 42',
+  '  artifacts: []',
+  '  key_links: []',
+  '---',
+  '',
+  `<objective>Plan ${wave}</objective>`,
+  '',
+].join('\n');
 
 describe('bug #2770 — non-string truths must be coerced, not dropped', () => {
   let tmpDir;
@@ -80,23 +84,25 @@ describe('bug #2770 — non-string truths must be coerced, not dropped', () => {
     // Both plans share the numeric truth `42`. Pre-fix: silently dropped by
     // `typeof t !== 'string' continue`, so cross_cutting_constraints == 0.
     // Post-fix: coerced to "42" and surfaced as a constraint.
-    const PLAN_BARE_INT_TRUTH = (wave) => `---
-phase: "1"
-plan: "01-0${wave}"
-type: standard
-wave: ${wave}
-depends_on: []
-files_modified: []
-autonomous: true
-must_haves:
-  truths:
-    - 42
-  artifacts: []
-  key_links: []
----
-
-<objective>Plan ${wave}</objective>
-`;
+    const PLAN_BARE_INT_TRUTH = (wave) => [
+      '---',
+      'phase: "1"',
+      `plan: "01-0${wave}"`,
+      'type: standard',
+      `wave: ${wave}`,
+      'depends_on: []',
+      'files_modified: []',
+      'autonomous: true',
+      'must_haves:',
+      '  truths:',
+      '    - 42',
+      '  artifacts: []',
+      '  key_links: []',
+      '---',
+      '',
+      `<objective>Plan ${wave}</objective>`,
+      '',
+    ].join('\n');
     tmpDir = makePlanProject({
       '.planning/ROADMAP.md': ROADMAP,
       '.planning/phases/01-foundation/01-01-PLAN.md': PLAN_BARE_INT_TRUTH(1),
@@ -157,13 +163,15 @@ describe('bug #2770 — bare-int depends_on values parse as preserved strings', 
     // string "3". The frontmatter parser already returns strings here; this
     // test pins the behaviour so a future "convert YAML scalars to numbers"
     // optimization cannot silently regress dependency tracking.
-    const fm = extractFrontmatter(`---
-phase: "1"
-plan: "01"
-depends_on: 3
----
-body
-`);
+    const fm = extractFrontmatter([
+      '---',
+      'phase: "1"',
+      'plan: "01"',
+      'depends_on: 3',
+      '---',
+      'body',
+      '',
+    ].join('\n'));
     assert.strictEqual(typeof fm.depends_on, 'string',
       'scalar depends_on must remain a string after parse');
     assert.strictEqual(fm.depends_on, '3',
@@ -171,13 +179,15 @@ body
   });
 
   test('inline-array bare-int depends_on parses to ["3","4"] (preserved as strings)', () => {
-    const fm = extractFrontmatter(`---
-phase: "1"
-plan: "01"
-depends_on: [3, 4]
----
-body
-`);
+    const fm = extractFrontmatter([
+      '---',
+      'phase: "1"',
+      'plan: "01"',
+      'depends_on: [3, 4]',
+      '---',
+      'body',
+      '',
+    ].join('\n'));
     assert.ok(Array.isArray(fm.depends_on),
       'inline array depends_on must be an array');
     assert.deepStrictEqual(fm.depends_on, ['3', '4'],
