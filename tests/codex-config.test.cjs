@@ -575,7 +575,7 @@ describe('migrateCodexHooksMapFormat', () => {
     assert.strictEqual(migrateCodexHooksMapFormat(''), '');
   });
 
-  test('converts [hooks.shell] with command key to [[hooks]] with type = "shell"', () => {
+  test('converts [hooks.shell] with command key to [[hooks]] with event = "shell"', () => {
     const content = [
       '[features]',
       'codex_hooks = true',
@@ -590,28 +590,30 @@ describe('migrateCodexHooksMapFormat', () => {
     // Old format removed
     assert.ok(!result.includes('[hooks.shell]'), 'removes [hooks.shell] map header');
     assert.ok(!result.match(/^\[hooks\]$/m), 'removes bare [hooks] container');
-    // New format present
+    // New format present (#2760 knock-on: field name normalized to "event"
+    // to match GSD-managed emit path)
     assert.ok(result.includes('[[hooks]]'), 'adds [[hooks]] array header');
-    assert.ok(result.includes('type = "shell"'), 'adds type = "shell" key');
+    assert.ok(result.includes('event = "shell"'), 'adds event = "shell" key');
+    assert.ok(!/\btype = "shell"/.test(result), 'does not emit legacy type = "shell" field');
     assert.ok(result.includes('command = "node /home/.codex/hooks/gsd-check-update.js"'), 'preserves command value');
     // User content preserved
     assert.ok(result.includes('[features]'), 'preserves [features] section');
     assert.ok(result.includes('codex_hooks = true'), 'preserves codex_hooks key');
   });
 
-  test('converts [hooks.exec] to [[hooks]] with type = "exec"', () => {
+  test('converts [hooks.exec] to [[hooks]] with event = "exec"', () => {
     const content = [
       '[hooks.exec]',
       'command = "echo hello"',
-      'event = "SessionStart"',
+      'extra_key = "preserved"',
       '',
     ].join('\n');
     const result = migrateCodexHooksMapFormat(content);
     assert.ok(!result.includes('[hooks.exec]'), 'removes [hooks.exec] map header');
     assert.ok(result.includes('[[hooks]]'), 'adds [[hooks]] array header');
-    assert.ok(result.includes('type = "exec"'), 'adds type = "exec" key');
+    assert.ok(result.includes('event = "exec"'), 'adds event = "exec" key');
     assert.ok(result.includes('command = "echo hello"'), 'preserves command');
-    assert.ok(result.includes('event = "SessionStart"'), 'preserves event');
+    assert.ok(result.includes('extra_key = "preserved"'), 'preserves other body keys');
   });
 
   test('converts multiple [hooks.TYPE] sections to separate [[hooks]] blocks', () => {
@@ -628,8 +630,8 @@ describe('migrateCodexHooksMapFormat', () => {
     assert.ok(!result.includes('[hooks.exec]'), 'removes [hooks.exec]');
     const hookHeaders = (result.match(/\[\[hooks\]\]/g) || []).length;
     assert.strictEqual(hookHeaders, 2, 'produces two [[hooks]] array entries');
-    assert.ok(result.includes('type = "shell"'), 'first entry has type = "shell"');
-    assert.ok(result.includes('type = "exec"'), 'second entry has type = "exec"');
+    assert.ok(result.includes('event = "shell"'), 'first entry has event = "shell"');
+    assert.ok(result.includes('event = "exec"'), 'second entry has event = "exec"');
   });
 
   test('leaves user-authored [[hooks]] array entries untouched when no legacy [hooks] map present', () => {
@@ -660,8 +662,8 @@ describe('migrateCodexHooksMapFormat', () => {
     assert.ok(!result.match(/^\s*\[hooks\./m), 'no [hooks.TYPE] map headers');
     // Must contain [[hooks]] array format
     assert.ok(result.includes('[[hooks]]'), 'has [[hooks]] array-of-tables header');
-    // type key must be present
-    assert.ok(result.includes('type = "shell"'), 'has type = "shell" in [[hooks]] entry');
+    // event key must be present (#2760 knock-on: normalized to "event")
+    assert.ok(result.includes('event = "shell"'), 'has event = "shell" in [[hooks]] entry');
     // command is preserved
     assert.ok(result.includes('command = "node /home/.codex/hooks/gsd-check-update.js"'), 'command preserved');
     // [features] user content preserved
@@ -699,8 +701,65 @@ describe('migrateCodexHooksMapFormat', () => {
     ].join('\r\n');
     const result = migrateCodexHooksMapFormat(content);
     assert.ok(result.includes('[[hooks]]\r\n'), 'uses CRLF in [[hooks]] header');
-    assert.ok(result.includes('type = "shell"\r\n'), 'uses CRLF in type line');
+    assert.ok(result.includes('event = "shell"\r\n'), 'uses CRLF in event line');
     assert.ok(!result.includes('[hooks.shell]'), 'removes legacy [hooks.shell]');
+  });
+});
+
+// ─── field-name parity between migration and managed emit (#2760 knock-on) ──
+
+describe('Codex hooks emit: migration and managed paths use the same field name', () => {
+  // Both migrateCodexHooksMapFormat (legacy [hooks.TYPE] → [[hooks]] AoT) and
+  // the GSD-managed Codex install (writes "# GSD Hooks" + [[hooks]]) target the
+  // same [[hooks]] schema. They must emit the SAME field name for the
+  // event/trigger key. Codex currently tolerates either "event" or "type" via
+  // permissive parsing, but the moment one path tightens we'd silently regress
+  // (#2760 class). Lock parity here by running the actual install for the
+  // managed path and migrateCodexHooksMapFormat for the legacy path.
+  function firstHookBlockField(content) {
+    // Skip past "# GSD Hooks" comment if present, capture key on first key line
+    // after [[hooks]] header.
+    const match = content.match(/\[\[hooks\]\][\r\n]+([A-Za-z_][\w]*)\s*=/);
+    return match ? match[1] : null;
+  }
+
+  let tmpDir;
+  beforeEach(() => {
+    tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), 'gsd-codex-fieldparity-'));
+  });
+  afterEach(() => {
+    fs.rmSync(tmpDir, { recursive: true, force: true });
+  });
+
+  test('migration emit field name equals managed install emit field name', () => {
+    // Managed path — drive a real install and read what it wrote.
+    const codexHome = path.join(tmpDir, 'codex-home');
+    fs.mkdirSync(codexHome, { recursive: true });
+    runCodexInstall(codexHome);
+    const installedContent = readCodexConfig(codexHome);
+    const managedField = firstHookBlockField(
+      installedContent.slice(installedContent.indexOf('# GSD Hooks')),
+    );
+    assert.ok(managedField, 'managed install emits a [[hooks]] block with a field key');
+
+    // Migration path — convert a legacy [hooks.TYPE] map and read what it wrote.
+    const legacyContent = [
+      '[features]',
+      'codex_hooks = true',
+      '',
+      '[hooks.shell]',
+      'command = "node /home/.codex/hooks/gsd-check-update.js"',
+      '',
+    ].join('\n');
+    const migrated = migrateCodexHooksMapFormat(legacyContent);
+    const migrationField = firstHookBlockField(migrated);
+    assert.ok(migrationField, 'migration emits a [[hooks]] block with a field key');
+
+    assert.strictEqual(
+      migrationField,
+      managedField,
+      `migration emits "${migrationField}" but managed emit uses "${managedField}" — both [[hooks]] paths must use the same field name for the event/trigger key`,
+    );
   });
 });
 

@@ -2875,8 +2875,11 @@ function stripLeakedGsdCodexSections(content) {
  *
  * to the new array-of-tables format:
  *   [[hooks]]
- *   type = "shell"
+ *   event = "shell"
  *   command = "..."
+ *
+ * The "event" field name matches the GSD-managed Codex hook emit path
+ * (#2760 knock-on) so both call sites produce identical [[hooks]] schema.
  *
  * This function detects any non-array hooks sections in the config and
  * converts them to the [[hooks]] format, preserving all key-value pairs and
@@ -2912,8 +2915,12 @@ function migrateCodexHooksMapFormat(content) {
     const type = section.path.slice('hooks.'.length);
     const body = content.slice(section.headerEnd, section.end);
 
-    // Build [[hooks]] block: type line + original body lines
-    const block = `[[hooks]]${eol}type = "${type}"${eol}${body}`;
+    // Build [[hooks]] block: event line + original body lines.
+    // Field name is "event" (not "type") to match the GSD-managed emit path
+    // (#2760 knock-on). Both code paths target the same Codex [[hooks]]
+    // schema; divergent field names risk silent regression the moment
+    // Codex's permissive parser tightens.
+    const block = `[[hooks]]${eol}event = "${type}"${eol}${body}`;
     newHooksBlocks.push(block);
   }
 
