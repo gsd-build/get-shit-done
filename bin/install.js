@@ -3689,6 +3689,14 @@ function convertClaudeToOpencodeFrontmatter(content, { isAgent = false, modelOve
       continue;
     }
 
+    // Strip agent: field from commands — plan-phase is the only command that
+    // had agent: set, but plan-phase is an orchestrator command, not an agent.
+    // agent: in a command frontmatter causes OpenCode to spawn a subagent to
+    // execute the command, which breaks the orchestrator flow.
+    if (!isAgent && trimmed.startsWith('agent:')) {
+      continue;
+    }
+
     // Strip model: field — OpenCode doesn't support Claude Code model aliases
     // like 'haiku', 'sonnet', 'opus', or 'inherit'. Omitting lets OpenCode use
     // its configured default model. See #1156.
@@ -3865,6 +3873,12 @@ function convertClaudeToKiloFrontmatter(content, { isAgent = false } = {}) {
     // For commands: remove name: field (Kilo uses filename for command name)
     // For agents: keep name: (required by Kilo agents)
     if (!isAgent && trimmed.startsWith('name:')) {
+      continue;
+    }
+
+    // Strip agent: field from commands — plan-phase is the only command that
+    // had agent: set, but plan-phase is an orchestrator command, not an agent.
+    if (!isAgent && trimmed.startsWith('agent:')) {
       continue;
     }
 
