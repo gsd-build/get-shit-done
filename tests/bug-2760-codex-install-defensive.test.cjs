@@ -38,6 +38,7 @@ const {
   hasUserNamespacedAotHooks,
   stripGsdFromCodexConfig,
   installCodexConfig,
+  parseTomlToObject,
 } = require('../bin/install.js');
 
 function runCodexInstall(codexHome, cwd = path.join(__dirname, '..')) {
@@ -92,28 +93,40 @@ describe('#2760 defect 3 — Hooks AoT preservation across install/uninstall/rei
 
     runCodexInstall(codexHome);
     const afterInstall = readCodexConfig(codexHome);
+    const parsed = parseTomlToObject(afterInstall);
 
-    // Both pre-existing user hook entries survive verbatim.
+    // hooks.SessionStart must be an array-of-tables (namespaced AoT form).
     assert.ok(
-      afterInstall.includes('command = "echo first user hook"'),
-      'first user [[hooks.SessionStart]] entry preserved'
+      parsed.hooks && Array.isArray(parsed.hooks.SessionStart),
+      'hooks.SessionStart must be an array-of-tables, got: '
+        + (parsed.hooks ? typeof parsed.hooks.SessionStart : 'no hooks table')
+    );
+
+    const commands = parsed.hooks.SessionStart.map((entry) => entry.command);
+
+    // Both pre-existing user hook entries survive in the parsed structure.
+    assert.ok(
+      commands.includes('echo first user hook'),
+      'first user [[hooks.SessionStart]] entry preserved in parsed structure: ' + JSON.stringify(commands)
     );
     assert.ok(
-      afterInstall.includes('command = "echo second user hook"'),
-      'second user [[hooks.SessionStart]] entry preserved'
+      commands.includes('echo second user hook'),
+      'second user [[hooks.SessionStart]] entry preserved in parsed structure: ' + JSON.stringify(commands)
     );
 
     // GSD's managed entry is emitted in the same namespaced AoT shape so it
     // does not collide with the user's preferred form.
     assert.ok(
-      /\[\[hooks\.SessionStart\]\][^\n]*\ncommand = "node [^\n]*gsd-check-update\.js"/.test(afterInstall),
-      'GSD entry uses [[hooks.SessionStart]] namespaced form (not [[hooks]] top-level)'
+      commands.some((cmd) => typeof cmd === 'string' && /gsd-check-update\.js/.test(cmd)),
+      'GSD entry must appear in hooks.SessionStart array (not top-level [[hooks]]): '
+        + JSON.stringify(commands)
     );
 
-    // No bare single-bracket [hooks.SessionStart] downgrade ever appears.
+    // Top-level [[hooks]] AoT must not coexist when namespaced form is in use —
+    // mixing forms is what produces the round-trip break this fix prevents.
     assert.ok(
-      !/^\[hooks\.SessionStart\]\s*$/m.test(afterInstall),
-      'no [hooks.SessionStart] single-bracket downgrade'
+      !Array.isArray(parsed.hooks) || parsed.hooks.length === 0,
+      'no top-level [[hooks]] AoT entries when namespaced form is in use'
     );
   });
 
@@ -121,9 +134,18 @@ describe('#2760 defect 3 — Hooks AoT preservation across install/uninstall/rei
     writeCodexConfig(codexHome, '');
     runCodexInstall(codexHome);
     const content = readCodexConfig(codexHome);
+    const parsed = parseTomlToObject(content);
+
+    // Top-level hooks must be an array-of-tables; the GSD entry must be one
+    // of those tables and carry event = "SessionStart".
     assert.ok(
-      content.includes('[[hooks]]\nevent = "SessionStart"'),
-      'fresh install uses top-level [[hooks]] AoT with event field'
+      Array.isArray(parsed.hooks),
+      'fresh install must produce top-level [[hooks]] AoT, got: ' + typeof parsed.hooks
+    );
+    assert.ok(
+      parsed.hooks.some((h) => h && h.event === 'SessionStart'),
+      'top-level [[hooks]] AoT must contain an entry with event = "SessionStart": '
+        + JSON.stringify(parsed.hooks)
     );
   });
 });
@@ -154,20 +176,27 @@ describe('#2760 fix 2 — Strip purges invalid legacy [agents] / [[agents]] rega
 
     runCodexInstall(codexHome);
     const content = readCodexConfig(codexHome);
+    const parsed = parseTomlToObject(content);
 
+    // Bare [agents] would have left { default, extra_key } as scalar leaves
+    // on parsed.agents. After strip + struct emit, every key under agents
+    // must itself be a table (the gsd-* struct form).
     assert.ok(
-      !/^\[agents\]\s*$/m.test(content),
-      'bare [agents] single-bracket block stripped'
+      parsed.agents && typeof parsed.agents === 'object' && !Array.isArray(parsed.agents),
+      'agents must be a table-of-tables in parsed structure, got: ' + typeof parsed.agents
     );
-    // The new struct form is the only agents content.
+    assert.equal(parsed.agents.default, undefined, 'bare [agents] default key must be stripped');
+    assert.equal(parsed.agents.extra_key, undefined, 'bare [agents] extra_key must be stripped');
+    const gsdAgents = Object.keys(parsed.agents).filter((k) => k.startsWith('gsd-'));
     assert.ok(
-      /^\[agents\.gsd-/m.test(content),
-      'new [agents.gsd-*] struct form present'
+      gsdAgents.length > 0 && gsdAgents.every((k) => typeof parsed.agents[k] === 'object'),
+      'agents.gsd-* struct form must be present: ' + JSON.stringify(Object.keys(parsed.agents))
     );
-    // User's unrelated section preserved.
+
+    // User's unrelated [model] section preserved structurally.
     assert.ok(
-      content.includes('[model]\nname = "o3"'),
-      'unrelated user section preserved'
+      parsed.model && parsed.model.name === 'o3',
+      'unrelated user [model] section preserved with name = "o3", got: ' + JSON.stringify(parsed.model)
     );
   });
 
@@ -188,23 +217,36 @@ describe('#2760 fix 2 — Strip purges invalid legacy [agents] / [[agents]] rega
 
     runCodexInstall(codexHome);
     const content = readCodexConfig(codexHome);
+    const parsed = parseTomlToObject(content);
 
+    // [[agents]] sequence form would parse to Array — after strip it must be
+    // a table-of-tables with gsd-* struct keys.
     assert.ok(
-      !/^\[\[agents\]\]\s*$/m.test(content),
-      'all [[agents]] sequence blocks stripped (invalid in current Codex schema)'
+      parsed.agents && typeof parsed.agents === 'object' && !Array.isArray(parsed.agents),
+      'agents must be a table-of-tables in parsed structure (sequence form must be stripped), got: '
+        + (Array.isArray(parsed.agents) ? 'array' : typeof parsed.agents)
     );
+    const gsdAgents = Object.keys(parsed.agents).filter((k) => k.startsWith('gsd-'));
     assert.ok(
-      /^\[agents\.gsd-/m.test(content),
-      'new [agents.<name>] struct form present'
+      gsdAgents.length > 0,
+      'agents.gsd-* struct form must be present: ' + JSON.stringify(Object.keys(parsed.agents))
     );
+
+    // User's unrelated [projects."/tmp/x"] section preserved structurally.
     assert.ok(
-      content.includes('[projects."/tmp/x"]'),
-      'unrelated user project section preserved'
+      parsed.projects && parsed.projects['/tmp/x'] && parsed.projects['/tmp/x'].trust_level === 'trusted',
+      'unrelated user [projects."/tmp/x"] section preserved with trust_level = "trusted", got: '
+        + JSON.stringify(parsed.projects)
     );
   });
 });
 
-describe('#2760 fix 3 — Post-write Codex schema validation', () => {
+// concurrency: false — the third test mutates installModule.__codexSchemaValidator,
+// a module-level test seam. Other tests in this file (and in bug-2153, etc.)
+// also call runCodexInstall() and would observe the injected validator if
+// node:test ran them in parallel. Serializing this describe block keeps the
+// seam mutation invisible to siblings.
+describe('#2760 fix 3 — Post-write Codex schema validation', { concurrency: false }, () => {
   test('passes a clean config produced by GSD install', () => {
     const tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), 'gsd-2760-f3a-'));
     try {
@@ -317,5 +359,97 @@ describe('#2760 — hasUserNamespacedAotHooks helper', () => {
       '',
     ].join('\n');
     assert.equal(hasUserNamespacedAotHooks(content, 'SessionStart'), false);
+  });
+});
+
+// concurrency: false — these tests monkey-patch fs.writeFileSync, a global
+// shared with every other suite running in parallel. Serializing prevents
+// stray writes from sibling tests landing in the stub.
+describe('#2760 fix 4 — Write-failure rollback (atomic write + snapshot restore)', { concurrency: false }, () => {
+  let tmpDir;
+  let codexHome;
+  let originalWriteFileSync;
+
+  beforeEach(() => {
+    tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), 'gsd-2760-f4-'));
+    codexHome = path.join(tmpDir, 'codex-home');
+    originalWriteFileSync = fs.writeFileSync;
+  });
+
+  afterEach(() => {
+    fs.writeFileSync = originalWriteFileSync;
+    fs.rmSync(tmpDir, { recursive: true, force: true });
+  });
+
+  test('pre-install config bytes survive when fs.writeFileSync throws on configPath', () => {
+    const preInstall = [
+      '# user file',
+      '[model]',
+      'name = "o3"',
+      '',
+    ].join('\n');
+    writeCodexConfig(codexHome, preInstall);
+
+    // After fs is restored we'll re-read the file. Capture the byte buffer
+    // exactly so the comparison is bit-for-bit.
+    const preInstallBytes = fs.readFileSync(path.join(codexHome, 'config.toml'));
+
+    const configPath = path.join(codexHome, 'config.toml');
+    const tempPattern = new RegExp('^' + configPath.replace(/[.*+?^${}()|[\]\\]/g, '\\$&') + '\\.tmp-');
+
+    // Stub: allow writes to atomic temp files (which renameSync overwrites
+    // the target, never truncating it directly) but throw on any direct
+    // write to the canonical configPath. This simulates either:
+    //   (a) an older code path doing a non-atomic write, or
+    //   (b) a downstream module bypassing atomicWriteFileSync.
+    // Either way the snapshot must be restored. We let the temp write go
+    // through, then make renameSync throw to simulate the partial write
+    // never landing.
+    const originalRenameSync = fs.renameSync;
+    fs.renameSync = (src, dst) => {
+      if (dst === configPath) {
+        throw new Error('simulated rename failure mid-install');
+      }
+      return originalRenameSync(src, dst);
+    };
+
+    try {
+      let threw = false;
+      try {
+        runCodexInstall(codexHome);
+      } catch (e) {
+        threw = true;
+        // The runtime may swallow non-validation throws as a warning per the
+        // existing hook-config catch; the assertion below is on bytes, not
+        // on whether it threw at top level. Both outcomes (throw or warn)
+        // are acceptable AS LONG AS the file bytes are preserved.
+        assert.ok(/rename failure|simulated/.test(e.message),
+          'thrown error must surface the simulated failure: ' + e.message);
+      }
+      // Threw or not, the user's bytes must be intact.
+      void threw;
+
+      const afterBytes = fs.readFileSync(path.join(codexHome, 'config.toml'));
+      assert.deepStrictEqual(
+        afterBytes,
+        preInstallBytes,
+        'pre-install config.toml bytes must survive a mid-install write/rename failure'
+      );
+
+      // And the parsed structure of the surviving file must still be the
+      // user's [model] section, not a half-written GSD block.
+      const parsed = parseTomlToObject(afterBytes.toString('utf8'));
+      assert.equal(parsed.model && parsed.model.name, 'o3',
+        'surviving file must still be the user pre-install content');
+      assert.equal(parsed.agents, undefined,
+        'no GSD agents block may have leaked into the surviving file');
+
+      // No stray .tmp-* siblings left behind in the codex home.
+      const stray = fs.readdirSync(codexHome).filter((f) => tempPattern.test(path.join(codexHome, f)));
+      assert.equal(stray.length, 0,
+        'atomic write must clean up its temp file on failure: ' + stray.join(', '));
+    } finally {
+      fs.renameSync = originalRenameSync;
+    }
   });
 });

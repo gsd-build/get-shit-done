@@ -2989,31 +2989,292 @@ function hasUserNamespacedAotHooks(content, event) {
 }
 
 /**
+ * Parse a TOML value RHS expression starting at index `i` of `text`.
+ * Returns { value, end } on success or throws on parse failure.
+ *
+ * Supports the value forms GSD emits or that real Codex configs commonly use:
+ *   - basic strings ("…" with simple escapes)
+ *   - literal strings ('…')
+ *   - booleans (true / false)
+ *   - integers (optional sign, decimal digits)
+ *   - inline arrays of the above
+ *   - inline tables { k = v, … }
+ *
+ * This is intentionally not a complete TOML implementation — it is the
+ * minimal value grammar required to validate Codex config structure and to
+ * back behavioral assertions in tests (#2760).
+ */
+function parseTomlValue(text, i) {
+  // Skip leading whitespace.
+  while (i < text.length && (text[i] === ' ' || text[i] === '\t')) {
+    i += 1;
+  }
+  if (i >= text.length) {
+    throw new Error('expected value, got end of input');
+  }
+
+  const ch = text[i];
+
+  // Basic string
+  if (ch === '"') {
+    if (text.startsWith('"""', i)) {
+      const close = findMultilineBasicStringClose(text, i + 3);
+      if (close === -1) {
+        throw new Error('unterminated multi-line basic string');
+      }
+      const raw = text.slice(i + 3, close);
+      return { value: raw.replace(/^\r?\n/, ''), end: close + 3 };
+    }
+    let j = i + 1;
+    let out = '';
+    while (j < text.length) {
+      const c = text[j];
+      if (c === '\\') {
+        const next = text[j + 1];
+        if (next === 'n') { out += '\n'; j += 2; continue; }
+        if (next === 't') { out += '\t'; j += 2; continue; }
+        if (next === 'r') { out += '\r'; j += 2; continue; }
+        if (next === '\\') { out += '\\'; j += 2; continue; }
+        if (next === '"') { out += '"'; j += 2; continue; }
+        if (next === '/') { out += '/'; j += 2; continue; }
+        // Pass-through unrecognized escape (Codex/GSD don't use these).
+        out += next === undefined ? '' : next;
+        j += 2;
+        continue;
+      }
+      if (c === '"') {
+        return { value: out, end: j + 1 };
+      }
+      out += c;
+      j += 1;
+    }
+    throw new Error('unterminated basic string');
+  }
+
+  // Literal string
+  if (ch === '\'') {
+    if (text.startsWith('\'\'\'', i)) {
+      const close = text.indexOf('\'\'\'', i + 3);
+      if (close === -1) throw new Error('unterminated multi-line literal string');
+      return { value: text.slice(i + 3, close).replace(/^\r?\n/, ''), end: close + 3 };
+    }
+    const close = text.indexOf('\'', i + 1);
+    if (close === -1) throw new Error('unterminated literal string');
+    return { value: text.slice(i + 1, close), end: close + 1 };
+  }
+
+  // Boolean
+  if (text.startsWith('true', i) && !/[A-Za-z0-9_-]/.test(text[i + 4] || '')) {
+    return { value: true, end: i + 4 };
+  }
+  if (text.startsWith('false', i) && !/[A-Za-z0-9_-]/.test(text[i + 5] || '')) {
+    return { value: false, end: i + 5 };
+  }
+
+  // Inline array
+  if (ch === '[') {
+    const arr = [];
+    let j = i + 1;
+    while (true) {
+      while (j < text.length && /[\s\r\n]/.test(text[j])) j += 1;
+      if (j >= text.length) throw new Error('unterminated inline array');
+      if (text[j] === ']') return { value: arr, end: j + 1 };
+      if (text[j] === '#') {
+        const nl = text.indexOf('\n', j);
+        j = nl === -1 ? text.length : nl + 1;
+        continue;
+      }
+      const parsed = parseTomlValue(text, j);
+      arr.push(parsed.value);
+      j = parsed.end;
+      while (j < text.length && /[\s\r\n]/.test(text[j])) j += 1;
+      if (j < text.length && text[j] === ',') {
+        j += 1;
+        continue;
+      }
+      while (j < text.length && /[\s\r\n]/.test(text[j])) j += 1;
+      if (text[j] === ']') return { value: arr, end: j + 1 };
+      throw new Error(`expected , or ] in inline array at offset ${j}`);
+    }
+  }
+
+  // Inline table
+  if (ch === '{') {
+    const obj = {};
+    let j = i + 1;
+    while (true) {
+      while (j < text.length && /[\s\r\n]/.test(text[j])) j += 1;
+      if (text[j] === '}') return { value: obj, end: j + 1 };
+      const keyMatch = text.slice(j).match(/^([A-Za-z0-9_-]+|"[^"]*"|'[^']*')\s*=\s*/);
+      if (!keyMatch) throw new Error(`expected key in inline table at offset ${j}`);
+      let rawKey = keyMatch[1];
+      if ((rawKey.startsWith('"') && rawKey.endsWith('"')) || (rawKey.startsWith('\'') && rawKey.endsWith('\''))) {
+        rawKey = rawKey.slice(1, -1);
+      }
+      j += keyMatch[0].length;
+      const parsed = parseTomlValue(text, j);
+      obj[rawKey] = parsed.value;
+      j = parsed.end;
+      while (j < text.length && /[\s\r\n]/.test(text[j])) j += 1;
+      if (text[j] === ',') { j += 1; continue; }
+      if (text[j] === '}') return { value: obj, end: j + 1 };
+      throw new Error(`expected , or } in inline table at offset ${j}`);
+    }
+  }
+
+  // Number (integer with optional sign). Float / date / time not needed here.
+  const numMatch = text.slice(i).match(/^[+-]?\d[\d_]*/);
+  if (numMatch) {
+    const digits = numMatch[0].replace(/_/g, '');
+    const n = Number(digits);
+    if (!Number.isFinite(n)) throw new Error(`invalid number: ${numMatch[0]}`);
+    return { value: n, end: i + numMatch[0].length };
+  }
+
+  throw new Error(`unsupported value at offset ${i}: ${text.slice(i, i + 20)}`);
+}
+
+/**
+ * Parse TOML content into a JavaScript object. Throws on malformed input.
+ *
+ * Handles `[table]`, `[[array.of.tables]]`, dotted key paths, and the value
+ * forms supported by parseTomlValue. Sufficient for validating Codex config
+ * structure and for behavioral test assertions in #2760 — not a general
+ * TOML implementation.
+ */
+function parseTomlToObject(content) {
+  const root = {};
+  const records = getTomlLineRecords(content);
+  // Tracks the *object* (not path) that subsequent key=value lines target.
+  let currentTable = root;
+
+  function walkPath(segments, { creatingArrayElement = false } = {}) {
+    let node = root;
+    const parents = segments.slice(0, -1);
+    const last = segments[segments.length - 1];
+
+    for (const seg of parents) {
+      if (node[seg] === undefined) {
+        node[seg] = {};
+      } else if (Array.isArray(node[seg])) {
+        // Walk into the latest element of an array-of-tables.
+        node[seg] = node[seg];
+        node = node[seg][node[seg].length - 1];
+        continue;
+      } else if (typeof node[seg] !== 'object' || node[seg] === null) {
+        throw new Error(`path segment ${seg} is not a table`);
+      }
+      node = node[seg];
+    }
+
+    if (creatingArrayElement) {
+      if (node[last] === undefined) {
+        node[last] = [];
+      } else if (!Array.isArray(node[last])) {
+        throw new Error(`cannot redefine ${segments.join('.')} as array of tables`);
+      }
+      const elem = {};
+      node[last].push(elem);
+      return elem;
+    }
+
+    if (node[last] === undefined) {
+      node[last] = {};
+    } else if (typeof node[last] !== 'object' || Array.isArray(node[last])) {
+      throw new Error(`cannot redefine ${segments.join('.')} as table`);
+    }
+    return node[last];
+  }
+
+  for (let idx = 0; idx < records.length; idx += 1) {
+    const rec = records[idx];
+    if (rec.startsInMultilineString) continue;
+    if (rec.tableHeader) {
+      const segs = rec.tableHeader.segments;
+      currentTable = walkPath(segs, { creatingArrayElement: rec.tableHeader.array });
+      continue;
+    }
+
+    const trimmed = rec.text.trim();
+    if (trimmed === '' || trimmed.startsWith('#')) continue;
+
+    const equalsIndex = findTomlAssignmentEquals(rec.text);
+    if (equalsIndex === -1) continue;
+
+    const keyText = rec.text.slice(0, equalsIndex).trim();
+    const segments = parseTomlKeyPath(keyText);
+    if (!segments) {
+      throw new Error(`invalid TOML key on line ${idx + 1}: ${rec.text}`);
+    }
+
+    // Value RHS may span multiple lines (inline arrays, multi-line strings,
+    // inline tables). Parse from the absolute content offset right after `=`.
+    const valueStartAbs = rec.start + equalsIndex + 1;
+    const parsed = parseTomlValue(content, valueStartAbs);
+
+    // Place value into currentTable under dotted key.
+    let target = currentTable;
+    for (let s = 0; s < segments.length - 1; s += 1) {
+      const seg = segments[s];
+      if (target[seg] === undefined) target[seg] = {};
+      else if (typeof target[seg] !== 'object' || Array.isArray(target[seg])) {
+        throw new Error(`cannot descend into non-table key ${seg}`);
+      }
+      target = target[seg];
+    }
+    target[segments[segments.length - 1]] = parsed.value;
+  }
+
+  return root;
+}
+
+/**
  * Validate that the post-install config.toml matches Codex's expected schema
  * (#2760, fix 3). Returns { ok: true } on success, or { ok: false, reason }
  * with a human-readable explanation of the offending section.
  *
+ * Strategy: parse the bytes into a structured object first — malformed TOML
+ * fails validation immediately rather than slipping past a header-only scan.
+ * Then enforce the schema-shape rules against the parsed structure.
+ *
  * Schema rules enforced:
- *   - `agents` MUST NOT appear as a bare table (`[agents]`) or sequence
- *     (`[[agents]]`) — Codex 0.120+ requires `[agents.<name>]` struct form.
- *   - `hooks.<Event>` MUST be an array of tables when present (not a bare
- *     `[hooks.<Event>]` single-bracket map, which Codex ≥0.124 rejects).
+ *   - File MUST parse as TOML (no syntax errors).
+ *   - `agents` MUST be a struct table (`[agents.<name>]`) — never a bare
+ *     table value or an array of tables.
+ *   - `hooks.<Event>` MUST be an array of tables when present (Codex ≥0.124
+ *     rejects bare `[hooks.<Event>]` single-bracket maps).
  */
 function validateCodexConfigSchema(content) {
+  let parsed;
+  try {
+    parsed = parseTomlToObject(content);
+  } catch (e) {
+    return {
+      ok: false,
+      reason: `TOML parse failed: ${e.message}`,
+    };
+  }
+
+  // Header-shape check: arrays-of-tables are visible in the parsed structure
+  // (as Array values) but bare-vs-struct distinction for `[agents]` requires
+  // looking at section headers too — `[agents]` with `default = "x"` parses
+  // to `{ agents: { default: 'x' } }`, indistinguishable from
+  // `[agents.foo]` writing into the same shape. Use header sections to
+  // disambiguate.
   const sections = getTomlTableSections(content);
 
   for (const section of sections) {
-    if (!section.array && section.path === 'agents') {
-      return {
-        ok: false,
-        reason: 'bare [agents] table is invalid in current Codex schema (expected [agents.<name>] struct form)',
-      };
-    }
-
     if (section.array && section.path === 'agents') {
       return {
         ok: false,
         reason: '[[agents]] sequence form is invalid in current Codex schema (expected [agents.<name>] struct form)',
+      };
+    }
+
+    if (!section.array && section.path === 'agents') {
+      return {
+        ok: false,
+        reason: 'bare [agents] table is invalid in current Codex schema (expected [agents.<name>] struct form)',
       };
     }
 
@@ -3022,6 +3283,19 @@ function validateCodexConfigSchema(content) {
         ok: false,
         reason: `bare [${section.path}] table is invalid in current Codex schema (expected [[${section.path}]] array-of-tables)`,
       };
+    }
+  }
+
+  // Structural confirmation against parsed object: any present hooks.<Event>
+  // must be an array.
+  if (parsed.hooks && typeof parsed.hooks === 'object' && !Array.isArray(parsed.hooks)) {
+    for (const [event, value] of Object.entries(parsed.hooks)) {
+      if (!Array.isArray(value)) {
+        return {
+          ok: false,
+          reason: `hooks.${event} must be an array of tables, got ${typeof value}`,
+        };
+      }
     }
   }
 
@@ -3166,13 +3440,37 @@ function rewriteTomlKeyLines(content, matches, key) {
 }
 
 /**
+ * Atomic write — write to <target>.tmp-<pid>-<n> first, then renameSync over
+ * the target. Eliminates the partial-write corruption window: an interrupted
+ * write leaves the temp file (which we clean up) but never truncates the
+ * original target. Used for any mutation of Codex config.toml so we cannot
+ * leave the user with a half-written file (#2760 fix 4).
+ */
+let __atomicWriteCounter = 0;
+function atomicWriteFileSync(target, data, options) {
+  __atomicWriteCounter += 1;
+  const tmp = `${target}.tmp-${process.pid}-${__atomicWriteCounter}`;
+  try {
+    fs.writeFileSync(tmp, data, options);
+    fs.renameSync(tmp, target);
+  } catch (e) {
+    // Best-effort cleanup of the partial temp file; never mask the real error.
+    try { fs.rmSync(tmp, { force: true }); } catch (_) { /* ignore */ }
+    throw e;
+  }
+}
+
+/**
  * Merge GSD config block into an existing or new config.toml.
  * Three cases: new file, existing with GSD marker, existing without marker.
+ *
+ * All writes go through atomicWriteFileSync so a mid-write failure leaves
+ * the original config.toml untouched (#2760 fix 4).
  */
 function mergeCodexConfig(configPath, gsdBlock) {
   // Case 1: No config.toml — create fresh
   if (!fs.existsSync(configPath)) {
-    fs.writeFileSync(configPath, gsdBlock + '\n');
+    atomicWriteFileSync(configPath, gsdBlock + '\n');
     return;
   }
 
@@ -3188,9 +3486,9 @@ function mergeCodexConfig(configPath, gsdBlock) {
       // Strip any GSD-managed sections that leaked above the marker from previous installs
       before = stripLeakedGsdCodexSections(before).trimEnd();
 
-      fs.writeFileSync(configPath, before + eol + eol + normalizedGsdBlock + eol);
+      atomicWriteFileSync(configPath, before + eol + eol + normalizedGsdBlock + eol);
     } else {
-      fs.writeFileSync(configPath, normalizedGsdBlock + eol);
+      atomicWriteFileSync(configPath, normalizedGsdBlock + eol);
     }
     return;
   }
@@ -3203,7 +3501,7 @@ function mergeCodexConfig(configPath, gsdBlock) {
     content = normalizedGsdBlock + eol;
   }
 
-  fs.writeFileSync(configPath, content);
+  atomicWriteFileSync(configPath, content);
 }
 
 /**
@@ -6486,16 +6784,35 @@ function install(isGlobal, runtime = 'claude') {
 
   if (isCodex && !isMinimalMode(installMode)) {
     // Capture pre-install snapshot of config.toml before ANY GSD mutation
-    // (#2760 fix 3). On post-write schema-validation failure we restore
-    // these exact bytes so the user is never left with a broken Codex CLI.
+    // (#2760 fix 3). On post-write schema-validation failure OR any throw
+    // during the mutation sequence (write failure, merge throw, etc.) we
+    // restore these exact bytes so the user is never left with a broken
+    // Codex CLI (#2760 fix 4 — extends snapshot coverage to write-failure
+    // paths, paired with atomic temp-file writes in mergeCodexConfig and
+    // the final hooks-write below).
     const codexConfigPathPreInstall = path.join(targetDir, 'config.toml');
     const codexConfigPreInstallSnapshot = fs.existsSync(codexConfigPathPreInstall)
       ? fs.readFileSync(codexConfigPathPreInstall)
       : null;
 
-    // Generate Codex config.toml and per-agent .toml files.
-    // Skipped under --minimal — same rationale as filesystem agents above.
-    const agentCount = installCodexConfig(targetDir, agentsSrc);
+    const restoreCodexSnapshot = () => {
+      if (codexConfigPreInstallSnapshot !== null) {
+        try { fs.writeFileSync(codexConfigPathPreInstall, codexConfigPreInstallSnapshot); }
+        catch (_) { /* best-effort restore — surface the original error */ }
+      } else if (fs.existsSync(codexConfigPathPreInstall)) {
+        try { fs.rmSync(codexConfigPathPreInstall); } catch (_) { /* best-effort */ }
+      }
+    };
+
+    let agentCount;
+    try {
+      // Generate Codex config.toml and per-agent .toml files.
+      // Skipped under --minimal — same rationale as filesystem agents above.
+      agentCount = installCodexConfig(targetDir, agentsSrc);
+    } catch (e) {
+      restoreCodexSnapshot();
+      throw e;
+    }
     console.log(`  ${green}✓${reset} Generated config.toml with ${agentCount} agent roles`);
     console.log(`  ${green}✓${reset} Generated ${agentCount} agent .toml config files`);
 
@@ -6597,27 +6914,38 @@ function install(isGlobal, runtime = 'claude') {
         : validateCodexConfigSchema;
       const validation = validatorFn(configContent);
       if (!validation.ok) {
-        if (preWriteBackup !== null) {
-          fs.writeFileSync(configPath, preWriteBackup);
-        } else if (fs.existsSync(configPath)) {
-          fs.rmSync(configPath);
-        }
+        restoreCodexSnapshot();
         throw new Error(
           `post-write Codex schema validation failed: ${validation.reason}. ` +
           `Restored ${preWriteBackup !== null ? 'pre-install backup' : 'empty state'}.`
         );
       }
 
-      fs.writeFileSync(configPath, configContent, 'utf-8');
+      // Atomic write (#2760 fix 4) — write to a sibling temp file, then
+      // renameSync over the target. A mid-write failure cannot truncate the
+      // existing config; the snapshot restore below is a second line of
+      // defense if even the rename fails.
+      try {
+        atomicWriteFileSync(configPath, configContent, 'utf-8');
+      } catch (writeErr) {
+        restoreCodexSnapshot();
+        throw writeErr;
+      }
       console.log(`  ${green}✓${reset} Configured Codex hooks (SessionStart)`);
     } catch (e) {
       // #2760 — schema validation failures must be loud and fatal so the
       // user is never left with a config Codex refuses to load. Other
-      // hook-config errors (FS, etc.) remain non-fatal warnings.
+      // hook-config errors (FS, etc.) remain non-fatal warnings, but the
+      // pre-install snapshot restore has already run for write-side throws
+      // via the inner catch above and via restoreCodexSnapshot in the
+      // validation branch.
       if (e && typeof e.message === 'string' && e.message.startsWith('post-write Codex schema validation failed')) {
         console.error(`  ${red}✗${reset} ${e.message}`);
         throw e;
       }
+      // Best-effort restore for any remaining throw paths (e.g., a throw
+      // during configContent construction before validation/write).
+      restoreCodexSnapshot();
       console.warn(`  ${yellow}⚠${reset}  Could not configure Codex hooks: ${e.message}`);
     }
 
@@ -7762,6 +8090,7 @@ if (process.env.GSD_TEST_MODE) {
     stripGsdFromCodexConfig,
     migrateCodexHooksMapFormat,
     hasUserNamespacedAotHooks,
+    parseTomlToObject,
     validateCodexConfigSchema,
     mergeCodexConfig,
     installCodexConfig,
