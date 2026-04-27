@@ -2873,18 +2873,17 @@ function stripLeakedGsdCodexSections(content) {
  *     [hooks.shell]
  *     command = "..."
  *
- * to the new array-of-tables format:
- *   [[hooks]]
- *   event = "shell"
+ * to the new array-of-tables format. #2760 CR5 finding 3 — emit the
+ * namespaced AoT shape directly so a mixed flat + namespaced layout never
+ * arises post-install:
+ *   [[hooks.shell]]
  *   command = "..."
  *
- * The "event" field name matches the GSD-managed Codex hook emit path
- * (#2760 knock-on) so both call sites produce identical [[hooks]] schema.
- *
  * This function detects any non-array hooks sections in the config and
- * converts them to the [[hooks]] format, preserving all key-value pairs and
- * user comments. Bare [hooks] container sections (no key-value content) are
- * dropped. User-authored [[hooks]] array entries are left untouched.
+ * converts them to the namespaced `[[hooks.<TYPE>]]` array-of-tables form,
+ * preserving all key-value pairs and user comments. Bare [hooks] container
+ * sections (no key-value content) are dropped. User-authored AoT entries are
+ * left untouched.
  *
  * Returns the migrated content, or the original content unchanged if no
  * legacy hooks sections were found.
@@ -2915,12 +2914,15 @@ function migrateCodexHooksMapFormat(content) {
     const type = section.path.slice('hooks.'.length);
     const body = content.slice(section.headerEnd, section.end);
 
-    // Build [[hooks]] block: event line + original body lines.
-    // Field name is "event" (not "type") to match the GSD-managed emit path
-    // (#2760 knock-on). Both code paths target the same Codex [[hooks]]
-    // schema; divergent field names risk silent regression the moment
-    // Codex's permissive parser tightens.
-    const block = `[[hooks]]${eol}event = "${type}"${eol}${body}`;
+    // #2760 CR5 finding 3 — emit the namespaced AoT form directly:
+    // `[[hooks.<TYPE>]]` (no synthetic `event` field — the namespace IS the
+    // event). Previously we emitted flat `[[hooks]]\nevent = "<TYPE>"`,
+    // which produced mixed flat + namespaced layouts when the user already
+    // had `[[hooks.<OTHER>]]` entries. With every migration emit using the
+    // namespaced shape, the managed-emit detector
+    // (`hasUserNamespacedAotHooks`) fires correctly and the install
+    // converges on a single hook layout.
+    const block = `[[hooks.${type}]]${eol}${body}`;
     newHooksBlocks.push(block);
   }
 
@@ -3158,17 +3160,52 @@ function parseTomlToObject(content) {
   // Tracks the *object* (not path) that subsequent key=value lines target.
   let currentTable = root;
 
+  // #2760 CR5 finding 2 — track shape and definition status of every path so
+  // we can reject duplicate header redeclarations, shape mismatches, and
+  // duplicate keys per real TOML 1.0 semantics. Without this, walkPath
+  // silently reuses existing tables and assignment overwrites existing keys —
+  // a real TOML parser would refuse the file.
+  //
+  // pathShape: dotted path -> 'table' | 'array' | 'inline_parent' | 'key'
+  //   - 'table' — declared via [a.b]
+  //   - 'array' — declared via [[a.b]] (path is the array itself; each
+  //               element is its own implicit table)
+  //   - 'inline_parent' — created implicitly while walking parents
+  //   - 'key'   — assigned a scalar value
+  // declaredHeaders: set of dotted paths explicitly declared via [hdr] (not
+  //   [[arr]]) — used to reject duplicate [a] / [a] sections.
+  // tableKeys: dotted-path -> Set<string> of keys assigned in that exact
+  //   table instance. For [[arr]] elements we use a per-element marker.
+  const pathShape = new Map();
+  const declaredHeaders = new Set();
+  const tableKeys = new Map();
+  // currentTableId — string identifier for the current table instance, used
+  // as the key into tableKeys so that key uniqueness is per-table-instance
+  // (each [[arr]] element gets its own id).
+  let currentTableId = '__root__';
+  pathShape.set('__root__', 'table');
+  tableKeys.set('__root__', new Set());
+
+  function ensureKeySet(id) {
+    if (!tableKeys.has(id)) tableKeys.set(id, new Set());
+    return tableKeys.get(id);
+  }
+
   function walkPath(segments, { creatingArrayElement = false } = {}) {
     let node = root;
     const parents = segments.slice(0, -1);
     const last = segments[segments.length - 1];
 
-    for (const seg of parents) {
+    for (let p = 0; p < parents.length; p += 1) {
+      const seg = parents[p];
+      const partialPath = parents.slice(0, p + 1).join('.');
       if (node[seg] === undefined) {
         node[seg] = {};
+        if (!pathShape.has(partialPath)) {
+          pathShape.set(partialPath, 'inline_parent');
+        }
       } else if (Array.isArray(node[seg])) {
         // Walk into the latest element of an array-of-tables.
-        node[seg] = node[seg];
         node = node[seg][node[seg].length - 1];
         continue;
       } else if (typeof node[seg] !== 'object' || node[seg] === null) {
@@ -3177,22 +3214,59 @@ function parseTomlToObject(content) {
       node = node[seg];
     }
 
+    const fullPath = segments.join('.');
+
     if (creatingArrayElement) {
+      const existingShape = pathShape.get(fullPath);
       if (node[last] === undefined) {
         node[last] = [];
+        pathShape.set(fullPath, 'array');
       } else if (!Array.isArray(node[last])) {
-        throw new Error(`cannot redefine ${segments.join('.')} as array of tables`);
+        throw new Error(
+          `duplicate or shape-mismatched table header at ${fullPath}: ` +
+          `cannot redefine as array of tables (previously seen as ${existingShape || 'table'})`
+        );
+      } else if (existingShape && existingShape !== 'array') {
+        throw new Error(
+          `duplicate or shape-mismatched table header at ${fullPath}: ` +
+          `previously seen as ${existingShape}, cannot extend as array of tables`
+        );
       }
       const elem = {};
       node[last].push(elem);
+      const elemId = `${fullPath}[${node[last].length - 1}]`;
+      pathShape.set(elemId, 'array_element');
+      tableKeys.set(elemId, new Set());
+      currentTableId = elemId;
       return elem;
     }
 
+    // Plain [table] header.
     if (node[last] === undefined) {
       node[last] = {};
-    } else if (typeof node[last] !== 'object' || Array.isArray(node[last])) {
-      throw new Error(`cannot redefine ${segments.join('.')} as table`);
+      pathShape.set(fullPath, 'table');
+      declaredHeaders.add(fullPath);
+      tableKeys.set(fullPath, new Set());
+    } else if (Array.isArray(node[last])) {
+      throw new Error(
+        `duplicate or shape-mismatched table header at ${fullPath}: ` +
+          `previously declared as array of tables ([[${fullPath}]]), cannot redeclare as table ([${fullPath}])`
+      );
+    } else if (typeof node[last] !== 'object') {
+      throw new Error(`cannot redefine ${fullPath} as table`);
+    } else if (declaredHeaders.has(fullPath)) {
+      throw new Error(
+        `duplicate or shape-mismatched table header at ${fullPath}: ` +
+          `[${fullPath}] declared more than once`
+      );
+    } else {
+      // Implicitly created earlier (e.g., as a parent path); first explicit
+      // declaration is allowed.
+      pathShape.set(fullPath, 'table');
+      declaredHeaders.add(fullPath);
+      if (!tableKeys.has(fullPath)) tableKeys.set(fullPath, new Set());
     }
+    currentTableId = fullPath;
     return node[last];
   }
 
@@ -3240,6 +3314,9 @@ function parseTomlToObject(content) {
     }
 
     // Place value into currentTable under dotted key.
+    // #2760 CR5 finding 2 — reject duplicate keys per real TOML 1.0. Track
+    // the dotted key against the current table instance id; an exact repeat
+    // throws.
     let target = currentTable;
     for (let s = 0; s < segments.length - 1; s += 1) {
       const seg = segments[s];
@@ -3249,7 +3326,16 @@ function parseTomlToObject(content) {
       }
       target = target[seg];
     }
-    target[segments[segments.length - 1]] = parsed.value;
+    const finalKey = segments[segments.length - 1];
+    const dottedKey = segments.join('.');
+    const keySet = ensureKeySet(currentTableId);
+    if (keySet.has(dottedKey) || Object.prototype.hasOwnProperty.call(target, finalKey)) {
+      throw new Error(
+        `duplicate key ${dottedKey} in ${currentTableId === '__root__' ? 'root table' : currentTableId}`
+      );
+    }
+    keySet.add(dottedKey);
+    target[finalKey] = parsed.value;
   }
 
   return root;
@@ -6988,18 +7074,27 @@ function install(isGlobal, runtime = 'claude') {
     } catch (e) {
       // #2760 — schema-validation and write failures must be loud and fatal
       // so the user is never left with a config Codex refuses to load (or no
-      // Codex agents configured at all). Other hook-config errors (FS, etc.)
-      // remain non-fatal warnings, but the pre-install snapshot restore has
+      // Codex agents configured at all). The pre-install snapshot restore has
       // already run for write-side throws via the inner catch above and via
       // restoreCodexSnapshot in the validation branch.
       if (e && typeof e.message === 'string' && e.message.startsWith('post-write')) {
         console.error(`  ${red}✗${reset} ${e.message}`);
         throw e;
       }
-      // Best-effort restore for any remaining throw paths (e.g., a throw
-      // during configContent construction before validation/write).
+      // #2760 CR5 finding 1 — pre-write failures (migrateCodexHooksMapFormat,
+      // ensureCodexHooksFeature, config reads, configContent construction,
+      // etc.) must ALSO be fatal. Previously this branch downgraded to a
+      // console.warn, leaving the install to print "Done!" with no Codex
+      // hooks configured — same defect class as finding 1, different layer.
+      // Restore the pre-install snapshot and rethrow so the outer install
+      // pipeline aborts.
       restoreCodexSnapshot();
-      console.warn(`  ${yellow}⚠${reset}  Could not configure Codex hooks: ${e.message}`);
+      const wrapped = new Error(
+        `Codex hook configuration failed (pre-write): ${e && e.message ? e.message : String(e)}. ` +
+          `Restored ${preWriteBackup !== null ? 'pre-install backup' : 'empty state'}.`
+      );
+      console.error(`  ${red}✗${reset} ${wrapped.message}`);
+      throw wrapped;
     }
 
     return { settingsPath: null, settings: null, statuslineCommand: null, runtime, configDir: targetDir };

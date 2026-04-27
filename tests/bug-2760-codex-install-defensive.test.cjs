@@ -379,14 +379,21 @@ describe('#2760 fix 4 — Write-failure rollback (atomic write + snapshot restor
   let tmpDir;
   let codexHome;
   let originalWriteFileSync;
+  // #2760 CR5 finding 5 — symmetric snapshot/restore for fs.renameSync. The
+  // first test below monkey-patches renameSync; without a beforeEach/afterEach
+  // pair, only the local `finally` restores it, which is fragile to future
+  // edits that add early-return paths.
+  let originalRenameSync;
 
   beforeEach(() => {
     tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), 'gsd-2760-f4-'));
     codexHome = path.join(tmpDir, 'codex-home');
     originalWriteFileSync = fs.writeFileSync;
+    originalRenameSync = fs.renameSync;
   });
 
   afterEach(() => {
+    fs.renameSync = originalRenameSync;
     fs.writeFileSync = originalWriteFileSync;
     fs.rmSync(tmpDir, { recursive: true, force: true });
   });
@@ -415,7 +422,8 @@ describe('#2760 fix 4 — Write-failure rollback (atomic write + snapshot restor
     // Either way the snapshot must be restored. We let the temp write go
     // through, then make renameSync throw to simulate the partial write
     // never landing.
-    const originalRenameSync = fs.renameSync;
+    // #2760 CR5 finding 5 — fs.renameSync is restored by the suite-level
+    // afterEach; no local finally needed.
     fs.renameSync = (src, dst) => {
       if (dst === configPath) {
         throw new Error('simulated rename failure mid-install');
@@ -423,44 +431,40 @@ describe('#2760 fix 4 — Write-failure rollback (atomic write + snapshot restor
       return originalRenameSync(src, dst);
     };
 
+    let threw = false;
+    let thrownErr = null;
     try {
-      let threw = false;
-      try {
-        runCodexInstall(codexHome);
-      } catch (e) {
-        threw = true;
-        // The runtime may swallow non-validation throws as a warning per the
-        // existing hook-config catch; the assertion below is on bytes, not
-        // on whether it threw at top level. Both outcomes (throw or warn)
-        // are acceptable AS LONG AS the file bytes are preserved.
-        assert.ok(/rename failure|simulated/.test(e.message),
-          'thrown error must surface the simulated failure: ' + e.message);
-      }
-      // Threw or not, the user's bytes must be intact.
-      void threw;
-
-      const afterBytes = fs.readFileSync(path.join(codexHome, 'config.toml'));
-      assert.deepStrictEqual(
-        afterBytes,
-        preInstallBytes,
-        'pre-install config.toml bytes must survive a mid-install write/rename failure'
-      );
-
-      // And the parsed structure of the surviving file must still be the
-      // user's [model] section, not a half-written GSD block.
-      const parsed = parseTomlToObject(afterBytes.toString('utf8'));
-      assert.equal(parsed.model && parsed.model.name, 'o3',
-        'surviving file must still be the user pre-install content');
-      assert.equal(parsed.agents, undefined,
-        'no GSD agents block may have leaked into the surviving file');
-
-      // No stray .tmp-* siblings left behind in the codex home.
-      const stray = fs.readdirSync(codexHome).filter((f) => tempPattern.test(path.join(codexHome, f)));
-      assert.equal(stray.length, 0,
-        'atomic write must clean up its temp file on failure: ' + stray.join(', '));
-    } finally {
-      fs.renameSync = originalRenameSync;
+      runCodexInstall(codexHome);
+    } catch (e) {
+      threw = true;
+      thrownErr = e;
+      assert.ok(/rename failure|simulated|post-write/.test(e.message),
+        'thrown error must surface the simulated failure or its post-write wrapper: ' + e.message);
     }
+    // #2760 CR5 finding 4 — tighten contract per finding #1: ALL pre-write
+    // and write failures must be fatal. This test previously accepted either
+    // throw OR warn — sibling tests already require throw, so lock parity.
+    assert.equal(threw, true, 'rename failure must be fatal: ' + (thrownErr && thrownErr.message));
+
+    const afterBytes = fs.readFileSync(path.join(codexHome, 'config.toml'));
+    assert.deepStrictEqual(
+      afterBytes,
+      preInstallBytes,
+      'pre-install config.toml bytes must survive a mid-install write/rename failure'
+    );
+
+    // And the parsed structure of the surviving file must still be the
+    // user's [model] section, not a half-written GSD block.
+    const parsed = parseTomlToObject(afterBytes.toString('utf8'));
+    assert.equal(parsed.model && parsed.model.name, 'o3',
+      'surviving file must still be the user pre-install content');
+    assert.equal(parsed.agents, undefined,
+      'no GSD agents block may have leaked into the surviving file');
+
+    // No stray .tmp-* siblings left behind in the codex home.
+    const stray = fs.readdirSync(codexHome).filter((f) => tempPattern.test(path.join(codexHome, f)));
+    assert.equal(stray.length, 0,
+      'atomic write must clean up its temp file on failure: ' + stray.join(', '));
   });
 
   test('pre-install config bytes survive when fs.writeFileSync throws on the .tmp- target', () => {
@@ -480,45 +484,43 @@ describe('#2760 fix 4 — Write-failure rollback (atomic write + snapshot restor
     // of atomicWriteFileSync). Other writes (agent .toml files in CODEX_HOME)
     // pass through. This exercises the failure path where the temp write itself
     // throws, not the rename — the case the prior test left untested.
-    const originalLocalWrite = fs.writeFileSync;
+    // #2760 CR5 finding 5 — fs.writeFileSync is restored by the suite-level
+    // afterEach (via originalWriteFileSync); no local finally needed.
+    const captured = originalWriteFileSync;
     fs.writeFileSync = function patchedWriteFileSync(target, data, options) {
       if (typeof target === 'string' && tempPattern.test(target)) {
         throw new Error('simulated writeFileSync failure on .tmp- target');
       }
-      return originalLocalWrite.call(this, target, data, options);
+      return captured.call(this, target, data, options);
     };
 
+    let threw = false;
     try {
-      let threw = false;
-      try {
-        runCodexInstall(codexHome);
-      } catch (e) {
-        threw = true;
-        assert.ok(/simulated writeFileSync failure|post-write Codex install failed/.test(e.message),
-          'thrown error must surface the simulated failure or its post-write wrapper: ' + e.message);
-      }
-      // Per #2760 CR4 finding 1, write failures must abort install (not warn).
-      assert.equal(threw, true, 'install must throw when atomic temp-write fails');
-
-      const afterBytes = fs.readFileSync(path.join(codexHome, 'config.toml'));
-      assert.deepStrictEqual(
-        afterBytes,
-        preInstallBytes,
-        'pre-install config.toml bytes must survive a temp-write failure'
-      );
-
-      const parsed = parseTomlToObject(afterBytes.toString('utf8'));
-      assert.equal(parsed.model && parsed.model.name, 'o3',
-        'surviving file must still be the user pre-install content');
-      assert.equal(parsed.agents, undefined,
-        'no GSD agents block may have leaked into the surviving file');
-
-      const stray = fs.readdirSync(codexHome).filter((f) => tempPattern.test(path.join(codexHome, f)));
-      assert.equal(stray.length, 0,
-        'atomic write must clean up its temp file on failure: ' + stray.join(', '));
-    } finally {
-      fs.writeFileSync = originalLocalWrite;
+      runCodexInstall(codexHome);
+    } catch (e) {
+      threw = true;
+      assert.ok(/simulated writeFileSync failure|post-write Codex install failed|pre-write/.test(e.message),
+        'thrown error must surface the simulated failure or its post-write wrapper: ' + e.message);
     }
+    // Per #2760 CR4 finding 1 / CR5 finding 1, write failures must abort install (not warn).
+    assert.equal(threw, true, 'install must throw when atomic temp-write fails');
+
+    const afterBytes = fs.readFileSync(path.join(codexHome, 'config.toml'));
+    assert.deepStrictEqual(
+      afterBytes,
+      preInstallBytes,
+      'pre-install config.toml bytes must survive a temp-write failure'
+    );
+
+    const parsed = parseTomlToObject(afterBytes.toString('utf8'));
+    assert.equal(parsed.model && parsed.model.name, 'o3',
+      'surviving file must still be the user pre-install content');
+    assert.equal(parsed.agents, undefined,
+      'no GSD agents block may have leaked into the surviving file');
+
+    const stray = fs.readdirSync(codexHome).filter((f) => tempPattern.test(path.join(codexHome, f)));
+    assert.equal(stray.length, 0,
+      'atomic write must clean up its temp file on failure: ' + stray.join(', '));
   });
 });
 
@@ -730,5 +732,247 @@ describe('#2760 CR4 finding 1 — atomicWriteFileSync failure aborts install (po
     // And the user's pre-install bytes are intact (snapshot restore).
     const after = fs.readFileSync(configPath, 'utf8');
     assert.equal(after, preInstall, 'pre-install bytes preserved after fatal abort');
+  });
+});
+
+// concurrency: false — patches module.exports.__codexSchemaValidator, a
+// shared test seam. Serializing prevents stray patches from sibling tests.
+describe('#2760 CR5 finding 1 — pre-write failures abort install (outer catch fatal)', { concurrency: false }, () => {
+  let tmpDir;
+  let codexHome;
+  let originalConsoleLog;
+  let consoleOutput;
+  const installModule = require('../bin/install.js');
+
+  beforeEach(() => {
+    tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), 'gsd-2760-cr5-f1-'));
+    codexHome = path.join(tmpDir, 'codex-home');
+    originalConsoleLog = console.log;
+    consoleOutput = [];
+    console.log = (...args) => { consoleOutput.push(args.join(' ')); };
+  });
+
+  afterEach(() => {
+    console.log = originalConsoleLog;
+    delete installModule.__codexSchemaValidator;
+    fs.rmSync(tmpDir, { recursive: true, force: true });
+  });
+
+  test('pre-write throw (validator throws, not returns {ok:false}) is fatal and restores snapshot', () => {
+    // A validator that THROWS (vs returning {ok:false}) bypasses the
+    // validation branch and exits the inner try via the catch at the outer
+    // level. Pre-CR5, that catch downgraded to console.warn and let the
+    // install print "Done!" with no Codex hooks. Post-CR5 it must rethrow.
+    const preInstall = [
+      '# user file',
+      '[model]',
+      'name = "o3"',
+      '',
+    ].join('\n');
+    writeCodexConfig(codexHome, preInstall);
+
+    installModule.__codexSchemaValidator = () => {
+      throw new Error('synthetic validator-throw simulating a pre-write helper failure');
+    };
+
+    let threw = false;
+    let thrownMsg = '';
+    try {
+      runCodexInstall(codexHome);
+    } catch (e) {
+      threw = true;
+      thrownMsg = e.message;
+    }
+
+    assert.equal(threw, true,
+      'install must rethrow when a pre-write step throws (CR5 finding 1)');
+    assert.match(thrownMsg, /pre-write|synthetic validator-throw/,
+      'thrown error must surface the pre-write wrapper or original message: ' + thrownMsg);
+
+    const printedDone = consoleOutput.some(
+      (line) => typeof line === 'string' && /Done!/i.test(line)
+    );
+    assert.equal(printedDone, false,
+      'install must NOT print "Done!" after a pre-write failure: ' +
+      JSON.stringify(consoleOutput.filter((l) => /Done|✓/.test(l))));
+
+    // Pre-install bytes intact (snapshot restored).
+    const after = fs.readFileSync(path.join(codexHome, 'config.toml'), 'utf8');
+    assert.equal(after, preInstall,
+      'pre-install bytes must survive a pre-write helper throw');
+  });
+});
+
+describe('#2760 CR5 finding 2 — parseTomlToObject rejects duplicate keys and shape-mismatched headers', () => {
+  test('rejects duplicate scalar key in same table ([a]\\nx=1\\nx=2)', () => {
+    const content = [
+      '[a]',
+      'x = 1',
+      'x = 2',
+      '',
+    ].join('\n');
+    assert.throws(
+      () => parseTomlToObject(content),
+      /duplicate key/,
+      'real TOML 1.0 rejects duplicate keys in the same table'
+    );
+  });
+
+  test('rejects duplicate scalar key in root table', () => {
+    const content = [
+      'x = 1',
+      'x = 2',
+      '',
+    ].join('\n');
+    assert.throws(
+      () => parseTomlToObject(content),
+      /duplicate key/,
+      'duplicate root-table keys must be rejected'
+    );
+  });
+
+  test('rejects re-declared [a] table header ([a] then [a] again)', () => {
+    const content = [
+      '[a]',
+      'x = 1',
+      '',
+      '[a]',
+      'y = 2',
+      '',
+    ].join('\n');
+    assert.throws(
+      () => parseTomlToObject(content),
+      /duplicate or shape-mismatched table header/,
+      'real TOML 1.0 rejects re-declaring the same [a] header twice'
+    );
+  });
+
+  test('rejects [[arr]] then [arr] for same path (array-of-tables → table)', () => {
+    const content = [
+      '[[arr]]',
+      'x = 1',
+      '',
+      '[arr]',
+      'y = 2',
+      '',
+    ].join('\n');
+    assert.throws(
+      () => parseTomlToObject(content),
+      /duplicate or shape-mismatched table header/,
+      'cannot redeclare an array-of-tables path as a plain table'
+    );
+  });
+
+  test('accepts repeated [[arr]] (genuine array-of-tables)', () => {
+    const content = [
+      '[[arr]]',
+      'x = 1',
+      '',
+      '[[arr]]',
+      'x = 2',
+      '',
+    ].join('\n');
+    const parsed = parseTomlToObject(content);
+    assert.ok(Array.isArray(parsed.arr));
+    assert.strictEqual(parsed.arr.length, 2);
+    assert.strictEqual(parsed.arr[0].x, 1);
+    assert.strictEqual(parsed.arr[1].x, 2);
+  });
+
+  test('accepts disjoint nested headers (not duplicates)', () => {
+    const content = [
+      '[a.b]',
+      'x = 1',
+      '',
+      '[a.c]',
+      'y = 2',
+      '',
+    ].join('\n');
+    const parsed = parseTomlToObject(content);
+    assert.strictEqual(parsed.a.b.x, 1);
+    assert.strictEqual(parsed.a.c.y, 2);
+  });
+});
+
+// concurrency: false — drives the same install pipeline as the other f-suites.
+describe('#2760 CR5 finding 3 — migration emits namespaced AoT (no flat/namespaced mixing)', { concurrency: false }, () => {
+  let tmpDir;
+  let codexHome;
+
+  beforeEach(() => {
+    tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), 'gsd-2760-cr5-f3-'));
+    codexHome = path.join(tmpDir, 'codex-home');
+  });
+
+  afterEach(() => {
+    fs.rmSync(tmpDir, { recursive: true, force: true });
+  });
+
+  test('user has [[hooks.AfterTool]] AND legacy [hooks.SessionStart] → post-install both namespaced, no flat AoT', () => {
+    // Reproduces the mixed-form scenario from finding 3:
+    //  - User pre-config has both a namespaced AoT entry [[hooks.AfterTool]]
+    //    AND a legacy single-bracket [hooks.SessionStart].
+    //  - Pre-CR5 migration converts the legacy section to flat [[hooks]]
+    //    with event="SessionStart", leaving a mixed flat+namespaced layout.
+    //  - Post-CR5 migration emits [[hooks.SessionStart]] directly so both
+    //    of the user's hooks coexist in the namespaced shape, and the
+    //    GSD-managed entry converges on namespaced too.
+    const userPlusLegacy = [
+      '[[hooks.AfterTool]]',
+      'command = "x"',
+      '',
+      '[hooks.SessionStart]',
+      'command = "y"',
+      '',
+    ].join('\n');
+    writeCodexConfig(codexHome, userPlusLegacy);
+
+    runCodexInstall(codexHome);
+    const after = readCodexConfig(codexHome);
+    const parsed = parseTomlToObject(after);
+
+    // The pre-existing [[hooks.AfterTool]] entry is preserved.
+    assert.ok(
+      parsed.hooks && Array.isArray(parsed.hooks.AfterTool),
+      'pre-existing [[hooks.AfterTool]] must remain a namespaced AoT array'
+    );
+    assert.ok(
+      parsed.hooks.AfterTool.some((entry) => entry.command === 'x'),
+      'user AfterTool entry must be preserved: ' + JSON.stringify(parsed.hooks.AfterTool)
+    );
+
+    // The migrated SessionStart entry is now namespaced AoT, not flat
+    // [[hooks]] with event="SessionStart".
+    assert.ok(
+      parsed.hooks && Array.isArray(parsed.hooks.SessionStart),
+      'migrated SessionStart must be namespaced AoT (not flat [[hooks]])'
+    );
+    const ssCommands = parsed.hooks.SessionStart.map((e) => e.command);
+    assert.ok(
+      ssCommands.includes('y'),
+      'user SessionStart command "y" must be preserved in namespaced array: ' +
+        JSON.stringify(ssCommands)
+    );
+    // GSD's managed gsd-check-update entry also lives in the namespaced array.
+    assert.ok(
+      ssCommands.some((cmd) => typeof cmd === 'string' && /gsd-check-update\.js/.test(cmd)),
+      'managed gsd-check-update entry must appear in hooks.SessionStart array: ' +
+        JSON.stringify(ssCommands)
+    );
+
+    // No flat top-level [[hooks]] AoT may remain.
+    assert.ok(
+      !Array.isArray(parsed.hooks) || parsed.hooks.length === 0,
+      'no flat top-level [[hooks]] AoT entries may remain after migration: ' +
+        JSON.stringify(parsed.hooks)
+    );
+
+    // No synthetic event field on the migrated SessionStart entries — the
+    // namespace IS the event.
+    for (const entry of parsed.hooks.SessionStart) {
+      assert.equal(entry.event, undefined,
+        'no synthetic event field — namespace [[hooks.SessionStart]] encodes the event: ' +
+          JSON.stringify(entry));
+    }
   });
 });

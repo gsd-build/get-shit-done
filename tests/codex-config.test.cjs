@@ -595,7 +595,7 @@ describe('migrateCodexHooksMapFormat', () => {
     assert.strictEqual(migrateCodexHooksMapFormat(''), '');
   });
 
-  test('converts [hooks.shell] with command key to [[hooks]] with event = "shell"', () => {
+  test('converts [hooks.shell] to namespaced AoT [[hooks.shell]] (#2760 CR5 finding 3)', () => {
     const content = [
       '[features]',
       'codex_hooks = true',
@@ -607,21 +607,22 @@ describe('migrateCodexHooksMapFormat', () => {
       '',
     ].join('\n');
     const result = migrateCodexHooksMapFormat(content);
-    // Old format removed
-    assert.ok(!result.includes('[hooks.shell]'), 'removes [hooks.shell] map header');
-    assert.ok(!result.match(/^\[hooks\]$/m), 'removes bare [hooks] container');
-    // New format present (#2760 knock-on: field name normalized to "event"
-    // to match GSD-managed emit path)
-    assert.ok(result.includes('[[hooks]]'), 'adds [[hooks]] array header');
-    assert.ok(result.includes('event = "shell"'), 'adds event = "shell" key');
-    assert.ok(!/\btype = "shell"/.test(result), 'does not emit legacy type = "shell" field');
-    assert.ok(result.includes('command = "node /home/.codex/hooks/gsd-check-update.js"'), 'preserves command value');
-    // User content preserved
-    assert.ok(result.includes('[features]'), 'preserves [features] section');
-    assert.ok(result.includes('codex_hooks = true'), 'preserves codex_hooks key');
+    // Parse structurally — no source-grep on raw bytes.
+    const parsed = parseTomlToObject(result);
+    assert.ok(parsed.hooks && Array.isArray(parsed.hooks.shell),
+      'hooks.shell must be an array of tables, got: ' + (parsed.hooks ? typeof parsed.hooks.shell : 'no hooks table'));
+    assert.strictEqual(parsed.hooks.shell.length, 1);
+    assert.strictEqual(parsed.hooks.shell[0].command, 'node /home/.codex/hooks/gsd-check-update.js');
+    // No flat top-level [[hooks]] AoT and no synthetic event field.
+    assert.ok(!Array.isArray(parsed.hooks),
+      'no top-level [[hooks]] AoT — namespace IS the event in CR5 form');
+    assert.equal(parsed.hooks.shell[0].event, undefined,
+      'no synthetic event field — namespace [[hooks.shell]] encodes the event');
+    // User content preserved.
+    assert.equal(parsed.features && parsed.features.codex_hooks, true);
   });
 
-  test('converts [hooks.exec] to [[hooks]] with event = "exec"', () => {
+  test('converts [hooks.exec] to namespaced AoT [[hooks.exec]] (#2760 CR5 finding 3)', () => {
     const content = [
       '[hooks.exec]',
       'command = "echo hello"',
@@ -629,14 +630,15 @@ describe('migrateCodexHooksMapFormat', () => {
       '',
     ].join('\n');
     const result = migrateCodexHooksMapFormat(content);
-    assert.ok(!result.includes('[hooks.exec]'), 'removes [hooks.exec] map header');
-    assert.ok(result.includes('[[hooks]]'), 'adds [[hooks]] array header');
-    assert.ok(result.includes('event = "exec"'), 'adds event = "exec" key');
-    assert.ok(result.includes('command = "echo hello"'), 'preserves command');
-    assert.ok(result.includes('extra_key = "preserved"'), 'preserves other body keys');
+    const parsed = parseTomlToObject(result);
+    assert.ok(parsed.hooks && Array.isArray(parsed.hooks.exec));
+    assert.strictEqual(parsed.hooks.exec.length, 1);
+    assert.strictEqual(parsed.hooks.exec[0].command, 'echo hello');
+    assert.strictEqual(parsed.hooks.exec[0].extra_key, 'preserved');
+    assert.equal(parsed.hooks.exec[0].event, undefined);
   });
 
-  test('converts multiple [hooks.TYPE] sections to separate [[hooks]] blocks', () => {
+  test('converts multiple [hooks.TYPE] sections to separate namespaced AoT blocks (#2760 CR5 finding 3)', () => {
     const content = [
       '[hooks.shell]',
       'command = "node /home/.codex/hooks/gsd-check-update.js"',
@@ -646,12 +648,13 @@ describe('migrateCodexHooksMapFormat', () => {
       '',
     ].join('\n');
     const result = migrateCodexHooksMapFormat(content);
-    assert.ok(!result.includes('[hooks.shell]'), 'removes [hooks.shell]');
-    assert.ok(!result.includes('[hooks.exec]'), 'removes [hooks.exec]');
-    const hookHeaders = (result.match(/\[\[hooks\]\]/g) || []).length;
-    assert.strictEqual(hookHeaders, 2, 'produces two [[hooks]] array entries');
-    assert.ok(result.includes('event = "shell"'), 'first entry has event = "shell"');
-    assert.ok(result.includes('event = "exec"'), 'second entry has event = "exec"');
+    const parsed = parseTomlToObject(result);
+    assert.ok(parsed.hooks && Array.isArray(parsed.hooks.shell));
+    assert.ok(parsed.hooks && Array.isArray(parsed.hooks.exec));
+    assert.strictEqual(parsed.hooks.shell.length, 1);
+    assert.strictEqual(parsed.hooks.exec.length, 1);
+    assert.strictEqual(parsed.hooks.shell[0].command, 'node /home/.codex/hooks/gsd-check-update.js');
+    assert.strictEqual(parsed.hooks.exec[0].command, 'echo done');
   });
 
   test('leaves user-authored [[hooks]] array entries untouched when no legacy [hooks] map present', () => {
@@ -664,7 +667,7 @@ describe('migrateCodexHooksMapFormat', () => {
     assert.strictEqual(migrateCodexHooksMapFormat(content), content);
   });
 
-  test('end-to-end: install on config with old [hooks] map format produces [[hooks]] array format (#2637)', () => {
+  test('end-to-end: install on config with old [hooks] map format produces namespaced AoT (#2637, #2760 CR5)', () => {
     // Simulates the exact old GSD config.toml format that broke on Codex 0.124.0
     const oldContent = [
       '[features]',
@@ -677,18 +680,15 @@ describe('migrateCodexHooksMapFormat', () => {
       '',
     ].join('\n');
     const result = migrateCodexHooksMapFormat(oldContent);
-    // Must not contain any [hooks] or [hooks.*] map-style headers
-    assert.ok(!result.match(/^\s*\[hooks\]\s*$/m), 'no bare [hooks] map header');
-    assert.ok(!result.match(/^\s*\[hooks\./m), 'no [hooks.TYPE] map headers');
-    // Must contain [[hooks]] array format
-    assert.ok(result.includes('[[hooks]]'), 'has [[hooks]] array-of-tables header');
-    // event key must be present (#2760 knock-on: normalized to "event")
-    assert.ok(result.includes('event = "shell"'), 'has event = "shell" in [[hooks]] entry');
-    // command is preserved
-    assert.ok(result.includes('command = "node /home/.codex/hooks/gsd-check-update.js"'), 'command preserved');
-    // [features] user content preserved
-    assert.ok(result.includes('[features]'), 'preserves [features]');
-    assert.ok(result.includes('codex_hooks = true'), 'preserves codex_hooks');
+    const parsed = parseTomlToObject(result);
+    // Codex 0.124.0+: must produce array-of-tables form. CR5 finding 3:
+    // namespaced AoT [[hooks.shell]] (no flat [[hooks]] with synthetic event).
+    assert.ok(parsed.hooks && Array.isArray(parsed.hooks.shell),
+      'hooks.shell must be array-of-tables in namespaced form');
+    assert.strictEqual(parsed.hooks.shell.length, 1);
+    assert.strictEqual(parsed.hooks.shell[0].command,
+      'node /home/.codex/hooks/gsd-check-update.js');
+    assert.equal(parsed.features && parsed.features.codex_hooks, true);
   });
 
   test('bare [hooks] section without sub-tables is dropped (no [[hooks]] block added)', () => {
@@ -710,7 +710,7 @@ describe('migrateCodexHooksMapFormat', () => {
     assert.ok(result.includes('[model]'), 'preserves [model]');
   });
 
-  test('CRLF line endings are preserved through migration', () => {
+  test('CRLF line endings are preserved through migration (#2760 CR5: namespaced AoT)', () => {
     const content = [
       '[features]',
       'codex_hooks = true',
@@ -720,33 +720,27 @@ describe('migrateCodexHooksMapFormat', () => {
       '',
     ].join('\r\n');
     const result = migrateCodexHooksMapFormat(content);
-    assert.ok(result.includes('[[hooks]]\r\n'), 'uses CRLF in [[hooks]] header');
-    assert.ok(result.includes('event = "shell"\r\n'), 'uses CRLF in event line');
-    assert.ok(!result.includes('[hooks.shell]'), 'removes legacy [hooks.shell]');
+    assert.ok(result.includes('[[hooks.shell]]\r\n'),
+      'uses CRLF in namespaced [[hooks.shell]] header');
+    // Round-trip parse confirms the structural shape independent of EOL.
+    const parsed = parseTomlToObject(result);
+    assert.ok(parsed.hooks && Array.isArray(parsed.hooks.shell));
+    assert.strictEqual(parsed.hooks.shell[0].command,
+      'node /home/.codex/hooks/gsd-check-update.js');
   });
 });
 
-// ─── field-name parity between migration and managed emit (#2760 knock-on) ──
+// ─── shape parity between migration and managed emit (#2760 CR5 finding 3) ──
 
-describe('Codex hooks emit: migration and managed paths use the same field name', () => {
-  // Both migrateCodexHooksMapFormat (legacy [hooks.TYPE] → [[hooks]] AoT) and
-  // the GSD-managed Codex install (writes "# GSD Hooks" + [[hooks]]) target the
-  // same [[hooks]] schema. They must emit the SAME field name for the
-  // event/trigger key. Codex currently tolerates either "event" or "type" via
-  // permissive parsing, but the moment one path tightens we'd silently regress
-  // (#2760 class). Lock parity here by running the actual install for the
-  // managed path and migrateCodexHooksMapFormat for the legacy path.
-  function firstHookBlockField(content) {
-    // Structural: parse the TOML and look at the first [[hooks]] element's
-    // schema-relevant keys. Order-independent — won't false-fail if a future
-    // change reorders fields or inserts a comment before the event/type key.
-    const parsed = parseTomlToObject(content);
-    const firstHook = Array.isArray(parsed.hooks) ? parsed.hooks[0] : null;
-    if (!firstHook) return null;
-    if ('event' in firstHook) return 'event';
-    if ('type' in firstHook) return 'type';
-    return null;
-  }
+describe('Codex hooks emit: migration produces namespaced AoT so managed-emit converges', () => {
+  // After #2760 CR5 finding 3, the legacy migration path
+  // (migrateCodexHooksMapFormat) emits `[[hooks.<TYPE>]]` directly — the
+  // namespace IS the event, no synthetic `event = ...` field. The managed
+  // install path (writes "# GSD Hooks") detects existing namespaced AoT via
+  // hasUserNamespacedAotHooks and emits its block in the same shape. The two
+  // paths must therefore both produce a namespaced layout when a legacy
+  // [hooks.SessionStart] is migrated, eliminating the mixed flat+namespaced
+  // bug class entirely.
 
   let tmpDir;
   beforeEach(() => {
@@ -756,36 +750,27 @@ describe('Codex hooks emit: migration and managed paths use the same field name'
     fs.rmSync(tmpDir, { recursive: true, force: true });
   });
 
-  test('migration emit field name equals managed install emit field name', () => {
-    // Managed path — drive a real install and read what it wrote.
-    const codexHome = path.join(tmpDir, 'codex-home');
-    fs.mkdirSync(codexHome, { recursive: true });
-    runCodexInstall(codexHome);
-    const installedContent = readCodexConfig(codexHome);
-    assert.ok(
-      installedContent.includes('# GSD Hooks'),
-      'managed install writes a "# GSD Hooks" tagged section',
-    );
-    const managedField = firstHookBlockField(installedContent);
-    assert.ok(managedField, 'managed install emits a [[hooks]] block with a field key');
-
-    // Migration path — convert a legacy [hooks.TYPE] map and read what it wrote.
+  test('migration of legacy [hooks.SessionStart] produces namespaced AoT', () => {
     const legacyContent = [
       '[features]',
       'codex_hooks = true',
       '',
-      '[hooks.shell]',
+      '[hooks.SessionStart]',
       'command = "node /home/.codex/hooks/gsd-check-update.js"',
       '',
     ].join('\n');
     const migrated = migrateCodexHooksMapFormat(legacyContent);
-    const migrationField = firstHookBlockField(migrated);
-    assert.ok(migrationField, 'migration emits a [[hooks]] block with a field key');
-
-    assert.strictEqual(
-      migrationField,
-      managedField,
-      `migration emits "${migrationField}" but managed emit uses "${managedField}" — both [[hooks]] paths must use the same field name for the event/trigger key`,
+    const parsed = parseTomlToObject(migrated);
+    assert.ok(
+      parsed.hooks && Array.isArray(parsed.hooks.SessionStart),
+      'migration must emit [[hooks.SessionStart]] namespaced AoT'
+    );
+    assert.equal(parsed.hooks.SessionStart[0].event, undefined,
+      'migration must NOT emit a synthetic event field — namespace IS the event');
+    assert.equal(
+      Array.isArray(parsed.hooks),
+      false,
+      'migration must NOT emit a flat top-level [[hooks]] AoT'
     );
   });
 });
