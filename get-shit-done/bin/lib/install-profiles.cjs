@@ -60,10 +60,25 @@ function cleanupStagedSkills() {
   STAGED_DIRS.clear();
 }
 
+// Signals we register a cleanup handler for in addition to the natural
+// 'exit' event. `process.on('exit')` does NOT fire on these — an installer
+// is exactly the kind of process users abort mid-run, so without explicit
+// signal handling Ctrl+C would leave staged tmp dirs behind.
+const CLEANUP_SIGNALS = ['SIGINT', 'SIGTERM', 'SIGHUP'];
+
 function ensureExitCleanup() {
   if (exitHandlerRegistered) return;
   exitHandlerRegistered = true;
   process.on('exit', cleanupStagedSkills);
+  for (const sig of CLEANUP_SIGNALS) {
+    // `once` so re-raising the signal below isn't intercepted by us a second
+    // time — the OS-default handler should take over and exit with the right
+    // status code (so CI sees the abort, scripts see 130 for SIGINT, etc.).
+    process.once(sig, () => {
+      cleanupStagedSkills();
+      process.kill(process.pid, sig);
+    });
+  }
 }
 
 /**

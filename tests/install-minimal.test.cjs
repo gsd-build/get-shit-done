@@ -237,6 +237,69 @@ describe('install-profiles: cleanupStagedSkills', () => {
     }
   });
 
+  test('SIGINT triggers cleanup and re-raises the signal (Ctrl+C path)', () => {
+    // Run a child process that calls stageSkillsForMode then sleeps; send it
+    // SIGINT and assert (a) the child exits with the SIGINT-induced status
+    // (signal: 'SIGINT' OR exit code 130 depending on platform), and (b) the
+    // staged tmp dir is gone afterwards. Skipping on Windows where signal
+    // semantics differ — the unit test for natural `exit` covers Linux/macOS
+    // CI matrix, and signal handling is a Unix concern in practice.
+    if (process.platform === 'win32') return;
+
+    const { spawnSync } = require('child_process');
+    const probe = `
+      const { stageSkillsForMode } = require(${JSON.stringify(
+        path.join(__dirname, '..', 'get-shit-done', 'bin', 'lib', 'install-profiles.cjs'),
+      )});
+      const fs = require('fs');
+      const path = require('path');
+      const os = require('os');
+      const src = fs.mkdtempSync(path.join(os.tmpdir(), 'gsd-stage-sig-src-'));
+      fs.writeFileSync(path.join(src, 'plan-phase.md'), '# plan\\n');
+      const staged = stageSkillsForMode(src, 'minimal');
+      // Print the staged path so the parent knows what to look for, then
+      // signal readiness and block until SIGINT.
+      process.stdout.write(staged + '\\n');
+      setInterval(() => {}, 1000);
+    `;
+    // Spawn detached so we control the signal cleanly.
+    const child = require('child_process').spawn(process.execPath, ['-e', probe], {
+      stdio: ['ignore', 'pipe', 'pipe'],
+    });
+    let staged = '';
+    child.stdout.on('data', (chunk) => {
+      staged += chunk.toString();
+      if (!staged.includes('\n')) return;
+      // Once we have the staged path, send SIGINT and check on exit.
+      child.kill('SIGINT');
+    });
+
+    return new Promise((resolve, reject) => {
+      child.on('exit', (code, signal) => {
+        try {
+          const stagedPath = staged.split('\n')[0];
+          assert.ok(
+            stagedPath && stagedPath.startsWith(os.tmpdir()),
+            `child should have printed a staged path under tmpdir, got: ${JSON.stringify(stagedPath)}`,
+          );
+          assert.ok(
+            !fs.existsSync(stagedPath),
+            `staged dir should have been cleaned up on SIGINT, but ${stagedPath} still exists`,
+          );
+          // The child should have exited *because* of the signal, not 0.
+          assert.ok(
+            signal === 'SIGINT' || code === 130 || code === null,
+            `child should exit via SIGINT, got code=${code} signal=${signal}`,
+          );
+          resolve();
+        } catch (err) {
+          reject(err);
+        }
+      });
+      child.on('error', reject);
+    });
+  });
+
   test('mid-copy failure removes the partial staged dir and re-throws', () => {
     cleanupStagedSkills();
     const src = fs.mkdtempSync(path.join(os.tmpdir(), 'gsd-stage-fail-'));
