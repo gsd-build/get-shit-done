@@ -4,7 +4,7 @@ Commit planning artifacts via `gsd-sdk query commit`, which checks `commit_docs`
 
 ## Commit via CLI
 
-Pass the message first, then file paths (positional). Do not use `--files` for `commit` (that flag is only for `commit-to-subrepo`).
+Pass the message first, then file paths via `--files`. Both `commit` and `commit-to-subrepo` use `--files` to declare the paths to commit.
 
 Always use this for `.planning/` files — it handles `commit_docs` and gitignore checks automatically:
 

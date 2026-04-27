@@ -4,7 +4,7 @@
 
 ## 通过 CLI 提交
 
-先传提交说明，再传文件路径（位置参数）。`commit` 不要使用 `--files`（该标志仅用于 `commit-to-subrepo`）。
+先传提交说明，然后用 `--files` 显式传入文件路径。`commit` 与 `commit-to-subrepo` 都应使用 `--files` 来声明要提交的路径。
 
 对 `.planning/` 文件始终使用此方式 —— 它会自动处理 `commit_docs` 与 gitignore 检查：
 

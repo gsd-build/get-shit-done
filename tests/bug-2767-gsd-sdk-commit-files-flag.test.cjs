@@ -11,6 +11,11 @@
  *   - exactly the listed files are staged;
  *   - `commit-to-subrepo` rejects when `--files` is absent (commit.ts:258).
  *
+ * Note: the supplementary doc-lint's `isWellFormed` accepts any invocation that
+ * has no positional path args after the message — i.e. message-only commits pass
+ * regardless of any trailing comment. There is no required marker (`# message-only`
+ * or otherwise); the absence of positional path tokens is the sole signal.
+ *
  * Primary test: invoke the actual `gsd-sdk query commit[-to-subrepo]` binary
  * against a real tmp git project and assert the runtime behavior. Supplementary
  * test: a doc-lint that scans every shipped .md file to catch regressions of
