@@ -643,9 +643,9 @@ increases monotonically across waves. `{status}` is `complete` (success),
    # workspace's `.git` whenever the workspace itself was a worktree (multi-workspace
    # setups, and the cross-drive Windows case where `git worktree list` reports the
    # registry path on a different drive than `$(pwd)`).
-   WORKTREES=$(git worktree list --porcelain | grep "^worktree " | grep "\.claude/worktrees/agent-" | sed 's/^worktree //')
-
-   for WT in $WORKTREES; do
+   # Read line-by-line so worktree paths containing whitespace are preserved (#2774).
+   while IFS= read -r WT; do
+     [ -z "$WT" ] && continue
      # Get the branch name for this worktree
      WT_BRANCH=$(git -C "$WT" rev-parse --abbrev-ref HEAD 2>/dev/null)
      if [ -n "$WT_BRANCH" ] && [ "$WT_BRANCH" != "HEAD" ]; then
@@ -760,7 +760,7 @@ increases monotonically across waves. `{status}` is `complete` (success),
        # Delete the temporary branch
        git branch -D "$WT_BRANCH" 2>/dev/null || true
      fi
-   done
+   done < <(git worktree list --porcelain | grep "^worktree " | grep "\.claude/worktrees/agent-" | sed 's/^worktree //')
    ```
 
    **If `workflow.use_worktrees` is `false`:** Agents ran on the main working tree — skip this step entirely.

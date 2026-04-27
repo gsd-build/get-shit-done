@@ -62,7 +62,7 @@ function runDiscoveryAgainstRepo(repoCwd) {
   return out.split('\n').filter((l) => l.length > 0);
 }
 
-function makeBareTempGitRepo(prefix) {
+function makeTempUpstreamRepo(prefix) {
   const tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), prefix));
   execSync('git init -b main', { cwd: tmpDir, stdio: 'pipe' });
   execSync('git config user.email "test@test.com"', { cwd: tmpDir, stdio: 'pipe' });
@@ -149,6 +149,77 @@ describe('bug #2774 — worktree cleanup pipeline must not target the parent wor
         '/repo/main/.claude/worktrees/agent-bbb',
       ]);
     });
+
+    test('selects agent worktree even when path contains whitespace', () => {
+      // Regression for CodeRabbit feedback on PR #2778: `for WT in $WORKTREES`
+      // splits on whitespace and would emit broken half-paths like
+      // "/Users/dev/My" and "Workspace/.claude/worktrees/agent-xyz". The
+      // pipeline output itself is line-delimited and preserves the full path —
+      // the workflow's loop must consume it line-by-line via `while IFS= read`.
+      const porcelain = [
+        'worktree /Users/dev/My Workspace',
+        'HEAD def456',
+        'branch refs/heads/workspace/feature-x',
+        '',
+        'worktree /Users/dev/My Workspace/.claude/worktrees/agent-deadbeef',
+        'HEAD 789abc',
+        'branch refs/heads/worktree-agent-deadbeef',
+        '',
+      ].join('\n');
+
+      const discovered = runDiscoveryAgainstFixture(porcelain);
+
+      assert.deepEqual(
+        discovered,
+        ['/Users/dev/My Workspace/.claude/worktrees/agent-deadbeef'],
+        'pipeline output must preserve whitespace-bearing agent worktree path on a single line'
+      );
+    });
+
+    test('while/read loop iterates each whitespace-bearing path exactly once', () => {
+      // Verify the actual consumer pattern from quick.md / execute-phase.md:
+      //   while IFS= read -r WT; do ...; done < <(<pipeline>)
+      // Counts the lines yielded to the loop body. With the previous
+      // `for WT in $WORKTREES` form, a path containing one space would yield
+      // 2 iterations (broken halves). The `while/read` form yields exactly 1.
+      const porcelain = [
+        'worktree /tmp/has space/.claude/worktrees/agent-aaa',
+        'HEAD a',
+        'branch refs/heads/agent-aaa',
+        '',
+        'worktree /tmp/two  spaces/.claude/worktrees/agent-bbb',
+        'HEAD b',
+        'branch refs/heads/agent-bbb',
+        '',
+      ].join('\n');
+
+      // Mirror the workflow's loop verbatim. Print one line per iteration with
+      // a sentinel so we can count and inspect what the loop actually saw.
+      const script = `
+while IFS= read -r WT; do
+  [ -z "$WT" ] && continue
+  printf 'ITER:%s\\n' "$WT"
+done < <(${DISCOVERY_PIPELINE})
+`;
+      // bash needed for process substitution `< <(...)`.
+      const out = execSync(`bash -c '${script.replace(/'/g, `'\\''`)}'`, {
+        input: porcelain,
+        encoding: 'utf-8',
+      });
+      const iterations = out
+        .split('\n')
+        .filter((l) => l.startsWith('ITER:'))
+        .map((l) => l.slice('ITER:'.length));
+
+      assert.deepEqual(
+        iterations,
+        [
+          '/tmp/has space/.claude/worktrees/agent-aaa',
+          '/tmp/two  spaces/.claude/worktrees/agent-bbb',
+        ],
+        'while/read loop must yield exactly one iteration per worktree, with whitespace preserved'
+      );
+    });
   });
 
   describe('end-to-end against real git worktrees', () => {
@@ -162,7 +233,7 @@ describe('bug #2774 — worktree cleanup pipeline must not target the parent wor
       //   upstream/         <- main repo
       //   workspace/        <- worktree of upstream (the "workspace")
       //   workspace/.claude/worktrees/agent-XXXX/  <- agent worktree
-      upstream = makeBareTempGitRepo('gsd-2774-upstream-');
+      upstream = makeTempUpstreamRepo('gsd-2774-upstream-');
 
       workspacesParent = fs.mkdtempSync(
         path.join(os.tmpdir(), 'gsd-2774-workspaces-')
