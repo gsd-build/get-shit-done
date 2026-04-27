@@ -102,7 +102,10 @@ function cmdInitExecutePhase(cwd, phase, raw, options = {}) {
       has_reviews: false,
     };
   }
-  const reqMatch = roadmapPhase?.section?.match(/^\*\*Requirements\*\*:[^\S\n]*([^\n]*)$/m);
+  // Accept all bold/colon variants of the Requirements header (#2769):
+  // **Requirements:** / **Requirements**: / **Requirements** : render the
+  // same in markdown but differ textually.
+  const reqMatch = roadmapPhase?.section?.match(/^\*\*Requirements:?\*\*[^\S\n]*:?[^\S\n]*([^\n]*)$/m);
   const reqExtracted = reqMatch
     ? reqMatch[1].replace(/[\[\]]/g, '').split(',').map(s => s.trim()).filter(Boolean).join(', ')
     : null;
@@ -235,7 +238,10 @@ function cmdInitPlanPhase(cwd, phase, raw, options = {}) {
       has_reviews: false,
     };
   }
-  const reqMatch = roadmapPhase?.section?.match(/^\*\*Requirements\*\*:[^\S\n]*([^\n]*)$/m);
+  // Accept all bold/colon variants of the Requirements header (#2769):
+  // **Requirements:** / **Requirements**: / **Requirements** : render the
+  // same in markdown but differ textually.
+  const reqMatch = roadmapPhase?.section?.match(/^\*\*Requirements:?\*\*[^\S\n]*:?[^\S\n]*([^\n]*)$/m);
   const reqExtracted = reqMatch
     ? reqMatch[1].replace(/[\[\]]/g, '').split(',').map(s => s.trim()).filter(Boolean).join(', ')
     : null;

@@ -252,6 +252,64 @@ describe('init commands', () => {
     assert.strictEqual(output.phase_req_ids, null, 'TBD placeholder should return null');
   });
 
+  // ── #2769: Requirements header bold/colon variants ───────────────────────
+  // The visible label "**Requirements:**" (colon INSIDE bold) and
+  // "**Requirements**:" (colon OUTSIDE bold) render identically. The parser
+  // must accept both, plus the spaced "**Requirements** :" variant and the
+  // plain "## Requirements" header form (used in REQUIREMENTS.md), so phase
+  // metadata is robust to authoring style.
+  const headerVariants = [
+    { name: 'colon inside bold (**Requirements:**)', header: '**Requirements:** RV-01, RV-02' },
+    { name: 'colon outside bold (**Requirements**:)', header: '**Requirements**: RV-01, RV-02' },
+    { name: 'space before colon (**Requirements** :)', header: '**Requirements** : RV-01, RV-02' },
+  ];
+
+  for (const variant of headerVariants) {
+    test(`init plan-phase parses Requirements with ${variant.name}`, () => {
+      fs.mkdirSync(path.join(tmpDir, '.planning', 'phases', '03-api'), { recursive: true });
+      const roadmap = [
+        '# Roadmap',
+        '',
+        '### Phase 3: API',
+        '**Goal:** Build API',
+        variant.header,
+        '**Plans:** 0 plans',
+        '',
+      ].join('\n');
+      fs.writeFileSync(path.join(tmpDir, '.planning', 'ROADMAP.md'), roadmap);
+
+      const result = runGsdTools('init plan-phase 3', tmpDir);
+      assert.ok(result.success, `Command failed: ${result.error}`);
+
+      const output = JSON.parse(result.output);
+      assert.strictEqual(output.phase_req_ids, 'RV-01, RV-02',
+        `phase_req_ids must be parsed when header uses "${variant.header}"`);
+    });
+
+    test(`init execute-phase parses Requirements with ${variant.name}`, () => {
+      const phaseDir = path.join(tmpDir, '.planning', 'phases', '03-api');
+      fs.mkdirSync(phaseDir, { recursive: true });
+      fs.writeFileSync(path.join(phaseDir, '03-01-PLAN.md'), '# Plan');
+      const roadmap = [
+        '# Roadmap',
+        '',
+        '### Phase 3: API',
+        '**Goal:** Build API',
+        variant.header,
+        '**Plans:** 1 plans',
+        '',
+      ].join('\n');
+      fs.writeFileSync(path.join(tmpDir, '.planning', 'ROADMAP.md'), roadmap);
+
+      const result = runGsdTools('init execute-phase 3', tmpDir);
+      assert.ok(result.success, `Command failed: ${result.error}`);
+
+      const output = JSON.parse(result.output);
+      assert.strictEqual(output.phase_req_ids, 'RV-01, RV-02',
+        `phase_req_ids must be parsed when header uses "${variant.header}"`);
+    });
+  }
+
   test('init execute-phase returns null phase_req_ids when Requirements line is absent', () => {
     const phaseDir = path.join(tmpDir, '.planning', 'phases', '03-api');
     fs.mkdirSync(phaseDir, { recursive: true });
