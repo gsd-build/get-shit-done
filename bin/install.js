@@ -4506,6 +4506,24 @@ function copyCommandsAsAntigravitySkills(srcDir, skillsDir, prefix, isGlobal = f
 }
 
 /**
+ * Single source of truth for user-owned artifacts inside get-shit-done/.
+ *
+ * These files are created/refreshed by user-facing workflows (e.g.
+ * /gsd-profile-user) and must be preserved across reinstalls. Critically, they
+ * MUST be excluded from gsd-file-manifest.json — otherwise saveLocalPatches()
+ * will compare a refreshed file against a stale manifest hash and emit a
+ * spurious "locally modified GSD file" warning (bug #2771).
+ *
+ * Invariant: a file is either distribution (manifest-tracked, diff'd against
+ * manifest) or user artifact (preserved across installs, never diff'd). Never
+ * both. Both preserveUserArtifacts call sites and writeManifest must agree on
+ * this list, which is why it lives here as a single constant.
+ *
+ * Paths are relative to the get-shit-done/ directory.
+ */
+const USER_OWNED_ARTIFACTS = ['USER-PROFILE.md'];
+
+/**
  * Save user-generated files from destDir to an in-memory map before a wipe.
  *
  * @param {string} destDir - Directory that is about to be wiped
@@ -5687,6 +5705,12 @@ function writeManifest(configDir, runtime = 'claude', options = {}) {
 
   const gsdHashes = generateManifest(gsdDir);
   for (const [rel, hash] of Object.entries(gsdHashes)) {
+    // Skip user-owned artifacts (e.g. USER-PROFILE.md). They are preserved
+    // across reinstalls by preserveUserArtifacts and must NOT be hashed into
+    // the manifest — otherwise saveLocalPatches() would flag every refresh
+    // as a "local patch" (bug #2771). Single source of truth:
+    // USER_OWNED_ARTIFACTS at top of file.
+    if (USER_OWNED_ARTIFACTS.includes(rel)) continue;
     manifest.files['get-shit-done/' + rel] = hash;
   }
   if (isGemini && fs.existsSync(commandsDir)) {
@@ -6109,7 +6133,7 @@ function install(isGlobal, runtime = 'claude') {
   // Preserve user-generated files before the wipe-and-copy so they survive re-install
   const skillSrc = path.join(src, 'get-shit-done');
   const skillDest = path.join(targetDir, 'get-shit-done');
-  const savedGsdArtifacts = preserveUserArtifacts(skillDest, ['USER-PROFILE.md']);
+  const savedGsdArtifacts = preserveUserArtifacts(skillDest, USER_OWNED_ARTIFACTS);
   copyWithPathReplacement(skillSrc, skillDest, pathPrefix, runtime, false, isGlobal);
   restoreUserArtifacts(skillDest, savedGsdArtifacts);
   if (verifyInstalled(skillDest, 'get-shit-done')) {
@@ -7532,6 +7556,7 @@ if (process.env.GSD_TEST_MODE) {
     validateHookFields,
     preserveUserArtifacts,
     restoreUserArtifacts,
+    USER_OWNED_ARTIFACTS,
     finishInstall,
     homePathCoveredByRc,
     maybeSuggestPathExport,
