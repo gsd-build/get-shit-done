@@ -2785,6 +2785,111 @@ function setManagedCodexHooksOwnership(content, ownership) {
     remainder;
 }
 
+// Substring marker used to identify the GSD-managed hook in hooks.json.
+// Matching by command-substring stays stable across install locations.
+const GSD_CODEX_HOOK_MARKER = 'gsd-check-update';
+const GSD_CODEX_HOOK_EVENT = 'SessionStart';
+
+function isManagedCodexHookCommand(command) {
+  return typeof command === 'string' && command.includes(GSD_CODEX_HOOK_MARKER);
+}
+
+/**
+ * Insert (or update) the managed GSD SessionStart hook in Codex's hooks.json.
+ * Schema: https://developers.openai.com/codex/hooks. User-authored entries are
+ * preserved; unsupported root/`hooks` shapes return false without rewriting.
+ */
+function upsertManagedCodexHookInHooksJson(hooksJsonPath, command) {
+  let data = { hooks: {} };
+  if (fs.existsSync(hooksJsonPath)) {
+    try {
+      const parsed = JSON.parse(fs.readFileSync(hooksJsonPath, 'utf-8'));
+      if (!parsed || typeof parsed !== 'object' || Array.isArray(parsed)) return false;
+      data = parsed;
+    } catch (e) {
+      return false;
+    }
+  }
+  if (data.hooks === undefined) {
+    data.hooks = {};
+  } else if (!data.hooks || typeof data.hooks !== 'object' || Array.isArray(data.hooks)) {
+    return false;
+  }
+  if (data.hooks[GSD_CODEX_HOOK_EVENT] === undefined) {
+    data.hooks[GSD_CODEX_HOOK_EVENT] = [];
+  } else if (!Array.isArray(data.hooks[GSD_CODEX_HOOK_EVENT])) {
+    return false;
+  }
+
+  let updated = false;
+  for (const entry of data.hooks[GSD_CODEX_HOOK_EVENT]) {
+    if (!entry || !Array.isArray(entry.hooks)) continue;
+    for (const h of entry.hooks) {
+      if (h && isManagedCodexHookCommand(h.command)) {
+        h.command = command;
+        updated = true;
+      }
+    }
+  }
+  if (!updated) {
+    data.hooks[GSD_CODEX_HOOK_EVENT].push({ hooks: [{ type: 'command', command }] });
+  }
+
+  fs.writeFileSync(hooksJsonPath, JSON.stringify(data, null, 2) + '\n');
+  return true;
+}
+
+/**
+ * Remove the managed GSD hook from Codex's hooks.json. User entries stay.
+ * Deletes the file only when the whole root object is empty after cleanup.
+ */
+function removeManagedCodexHookFromHooksJson(hooksJsonPath) {
+  if (!fs.existsSync(hooksJsonPath)) return false;
+  let data;
+  try {
+    data = JSON.parse(fs.readFileSync(hooksJsonPath, 'utf-8'));
+  } catch (e) {
+    return false;
+  }
+  if (!data || typeof data !== 'object' || Array.isArray(data) ||
+      !data.hooks || typeof data.hooks !== 'object' || Array.isArray(data.hooks)) {
+    // Unsupported root or `hooks` shape — leave the user's file alone.
+    return false;
+  }
+
+  let changed = false;
+  for (const event of Object.keys(data.hooks)) {
+    if (!Array.isArray(data.hooks[event])) continue;
+    const filtered = data.hooks[event]
+      .map((entry) => {
+        if (!entry || !Array.isArray(entry.hooks)) return entry;
+        const before = entry.hooks.length;
+        entry.hooks = entry.hooks.filter((h) => !(h && isManagedCodexHookCommand(h.command)));
+        if (entry.hooks.length !== before) changed = true;
+        return entry.hooks.length > 0 ? entry : null;
+      })
+      .filter(Boolean);
+    if (filtered.length !== data.hooks[event].length) changed = true;
+    if (filtered.length === 0) delete data.hooks[event];
+    else data.hooks[event] = filtered;
+  }
+
+  if (!changed) return false;
+  if (Object.keys(data.hooks).length === 0) {
+    // Only delete the file when the entire root is empty — otherwise the user's
+    // sibling top-level keys (e.g. version markers, custom metadata) survive.
+    delete data.hooks;
+    if (Object.keys(data).length === 0) {
+      fs.unlinkSync(hooksJsonPath);
+    } else {
+      fs.writeFileSync(hooksJsonPath, JSON.stringify(data, null, 2) + '\n');
+    }
+  } else {
+    fs.writeFileSync(hooksJsonPath, JSON.stringify(data, null, 2) + '\n');
+  }
+  return true;
+}
+
 function isLegacyGsdAgentsSection(body) {
   const lineRecords = getTomlLineRecords(body);
   const legacyKeys = new Set(['max_threads', 'max_depth']);
@@ -4971,6 +5076,13 @@ function uninstall(isGlobal, runtime = 'claude') {
           console.log(`  ${green}✓${reset} Cleaned GSD sections from config.toml`);
         }
       }
+
+      // Codex: remove the managed GSD hook from hooks.json (preserves user hooks).
+      const hooksJsonPath = path.join(targetDir, 'hooks.json');
+      if (removeManagedCodexHookFromHooksJson(hooksJsonPath)) {
+        removedCount++;
+        console.log(`  ${green}✓${reset} Removed GSD hook from hooks.json`);
+      }
     }
   } else if (isCopilot) {
     // Copilot: remove skills/gsd-*/ directories (same layout as Codex skills)
@@ -6420,48 +6532,35 @@ function install(isGlobal, runtime = 'claude') {
       console.log(`  ${green}✓${reset} Installed hooks`);
     }
 
-    // Add Codex hooks (SessionStart for update checking) — requires codex_hooks feature flag
+    // SessionStart hook lives in hooks.json (https://developers.openai.com/codex/hooks);
+    // older GSD installs wrote it inline in config.toml — strip that on migration.
     const configPath = path.join(targetDir, 'config.toml');
+    const hooksJsonPath = path.join(targetDir, 'hooks.json');
     try {
       let configContent = fs.existsSync(configPath) ? fs.readFileSync(configPath, 'utf-8') : '';
-      const eol = detectLineEnding(configContent);
-
-      // Migrate legacy [hooks] map format to [[hooks]] array-of-tables (#2637).
-      // Codex 0.124.0 requires [[hooks]] array-of-tables; old GSD installs wrote
-      // [hooks.shell] map tables which now cause a startup parse error.
-      const migratedContent = migrateCodexHooksMapFormat(configContent);
-      if (migratedContent !== configContent) {
-        configContent = migratedContent;
-        console.log(`  ${green}✓${reset} Migrated legacy Codex [hooks] map format to [[hooks]] array-of-tables`);
-      }
 
       const codexHooksFeature = ensureCodexHooksFeature(configContent);
       configContent = setManagedCodexHooksOwnership(codexHooksFeature.content, codexHooksFeature.ownership);
 
-      // Add SessionStart hook for update checking
-      const updateCheckScript = path.resolve(targetDir, 'hooks', 'gsd-check-update.js').replace(/\\/g, '/');
-      const hookBlock =
-        `${eol}# GSD Hooks${eol}` +
-        `[[hooks]]${eol}` +
-        `event = "SessionStart"${eol}` +
-        `command = "node ${updateCheckScript}"${eol}`;
-
-      // Migrate legacy gsd-update-check entries from prior installs (#1755 followup)
-      // Remove stale hook blocks that used the inverted filename or wrong path.
-      // Single \r?\n-aware regex handles LF, CRLF, and block-at-file-start (#2698).
-      if (configContent.includes('gsd-update-check')) {
-        configContent = configContent.replace(
-          /(?:\r?\n|^)# GSD Hooks\r?\n\[\[hooks\]\]\r?\nevent = "SessionStart"\r?\ncommand = "node [^\r\n]*gsd-update-check\.js"\r?\n/gm,
-          (match) => (match.startsWith('\r\n') ? '\r\n' : match.startsWith('\n') ? '\n' : ''),
-        );
-      }
-
-      if (hasEnabledCodexHooksFeature(configContent) && !configContent.includes('gsd-check-update')) {
-        configContent += hookBlock;
-      }
+      // Single \r?\n-aware regex covers LF, CRLF, mixed EOLs, and both filenames
+      // (gsd-check-update.js and the older gsd-update-check.js).
+      configContent = configContent.replace(
+        /(?:\r?\n|^)# GSD Hooks(?:\r?\n)\[\[hooks\]\](?:\r?\n)event = "SessionStart"(?:\r?\n)command = "node [^\r\n]*gsd-(?:check-update|update-check)\.js"(?:\r?\n)/g,
+        (match) => (match.startsWith('\r\n') ? '\r\n' : match.startsWith('\n') ? '\n' : ''),
+      );
 
       fs.writeFileSync(configPath, configContent, 'utf-8');
-      console.log(`  ${green}✓${reset} Configured Codex hooks (SessionStart)`);
+
+      if (hasEnabledCodexHooksFeature(configContent)) {
+        const command = buildHookCommand(targetDir, 'gsd-check-update.js');
+        if (upsertManagedCodexHookInHooksJson(hooksJsonPath, command)) {
+          console.log(`  ${green}✓${reset} Configured Codex hooks (SessionStart)`);
+        } else {
+          console.warn(`  ${yellow}⚠${reset}  Skipped hooks.json update — file is malformed or has an unsupported root shape`);
+        }
+      } else {
+        console.warn(`  ${yellow}⚠${reset}  Skipped Codex hooks — could not enable codex_hooks feature flag in config.toml`);
+      }
     } catch (e) {
       console.warn(`  ${yellow}⚠${reset}  Could not configure Codex hooks: ${e.message}`);
     }
@@ -7486,6 +7585,7 @@ if (process.env.GSD_TEST_MODE) {
     configureOpencodePermissions,
     neutralizeAgentReferences,
     GSD_CODEX_MARKER,
+    GSD_CODEX_HOOK_MARKER,
     CODEX_AGENT_SANDBOX,
     getDirName,
     getGlobalDir,

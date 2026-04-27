@@ -37,7 +37,7 @@ const { execFileSync } = require('child_process');
 
 const INSTALL_SRC = path.join(__dirname, '..', 'bin', 'install.js');
 const BUILD_SCRIPT = path.join(__dirname, '..', 'scripts', 'build-hooks.js');
-const { install, GSD_CODEX_MARKER } = require(INSTALL_SRC);
+const { install, GSD_CODEX_MARKER, GSD_CODEX_HOOK_MARKER } = require(INSTALL_SRC);
 
 // Ensure hooks/dist/ is populated before install tests
 before(() => {
@@ -46,6 +46,16 @@ before(() => {
     stdio: 'pipe',
   });
 });
+
+function hasManagedGsdHookInHooksJson(codexDir) {
+  const p = path.join(codexDir, 'hooks.json');
+  if (!fs.existsSync(p)) return false;
+  const data = JSON.parse(fs.readFileSync(p, 'utf-8'));
+  const entries = data && data.hooks && data.hooks.SessionStart;
+  if (!Array.isArray(entries)) return false;
+  return entries.some((entry) => Array.isArray(entry.hooks) &&
+    entry.hooks.some((h) => typeof h.command === 'string' && h.command.includes(GSD_CODEX_HOOK_MARKER)));
+}
 
 describe('#2698: CRLF stale gsd-update-check block is removed on Codex reinstall', () => {
   let tmpDir;
@@ -103,8 +113,8 @@ describe('#2698: CRLF stale gsd-update-check block is removed on Codex reinstall
       'Stale gsd-update-check entry must be removed from LF config.toml (#2698)'
     );
     assert.ok(
-      content.includes('gsd-check-update'),
-      'New gsd-check-update hook must appear after reinstall'
+      hasManagedGsdHookInHooksJson(path.join(tmpDir, '.codex')),
+      'New gsd-check-update hook must appear in hooks.json after reinstall'
     );
   });
 
@@ -124,8 +134,8 @@ describe('#2698: CRLF stale gsd-update-check block is removed on Codex reinstall
       'Stale gsd-update-check entry must be removed from CRLF config.toml (#2698)'
     );
     assert.ok(
-      content.includes('gsd-check-update'),
-      'New gsd-check-update hook must appear after reinstall'
+      hasManagedGsdHookInHooksJson(path.join(tmpDir, '.codex')),
+      'New gsd-check-update hook must appear in hooks.json after reinstall'
     );
   });
 
