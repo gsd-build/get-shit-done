@@ -929,7 +929,7 @@ describe('mergeCodexConfig', () => {
     assertUsesOnlyEol(content, '\r\n');
   });
 
-  test('case 2 preserves user-authored [agents] tables while stripping leaked GSD sections in CRLF files', () => {
+  test('case 2 strips bare [agents] tables (invalid in current Codex schema, #2760) and removes leaked GSD sections in CRLF files', () => {
     const configPath = path.join(tmpDir, 'config.toml');
     const brokenContent = [
       '[features]',
@@ -958,7 +958,11 @@ describe('mergeCodexConfig', () => {
     const markerIndex = content.indexOf(GSD_CODEX_MARKER);
     const beforeMarker = content.slice(0, markerIndex);
 
-    assert.ok(beforeMarker.includes('[agents]\r\ndefault = "custom-agent"\r\n'), 'preserves user-authored [agents] table');
+    // Bare [agents] is invalid under Codex's current schema (rejected with
+    // "expected struct AgentsToml") so install-time stripping always purges
+    // it (#2760). User feature keys above the marker are preserved.
+    assert.strictEqual(countMatches(beforeMarker, /^\[agents\]\s*$/gm), 0, 'strips bare [agents] block (#2760)');
+    assert.ok(beforeMarker.includes('child_agents_md = false'), 'preserves user feature keys above marker');
     assert.strictEqual(countMatches(beforeMarker, /^\[agents\.gsd-executor\]\s*$/gm), 0, 'removes leaked GSD agent section above marker');
     // New struct format: exactly one [agents.gsd-executor] in the GSD block (after marker)
     assert.strictEqual(countMatches(content, /^\[agents\.gsd-executor\]\s*$/gm), 1, 'exactly one struct agent header in GSD block');

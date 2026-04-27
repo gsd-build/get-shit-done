@@ -2089,6 +2089,10 @@ function generateCodexConfigBlock(agents, targetDir) {
 /**
  * Strip any managed GSD agent sections from a TOML string.
  *
+ * Used by the uninstall path (`stripGsdFromCodexConfig`). Removes only what GSD
+ * owns; user-authored `[agents.<name>]` and `[[agents]]` entries are preserved
+ * so uninstall returns the file to its pre-GSD shape.
+ *
  * Handles BOTH shapes so reinstall self-heals configs from all GSD versions:
  *   - Current (#2727): `[agents.gsd-*]` struct tables (Codex 0.120.0+).
  *   - Legacy (#2645): `[[agents]]` array-of-tables whose `name = "gsd-*"`.
@@ -2815,25 +2819,32 @@ function isLegacyGsdAgentsSection(body) {
 }
 
 function stripLeakedGsdCodexSections(content) {
+  // Defensive precedence (#2760): we own the `agents` namespace under our
+  // managed `gsd-*` names, and the legacy bare-table and sequence forms
+  // (`[agents]`, `[[agents]]`) are invalid in the current Codex schema —
+  // they trigger "invalid type: ..., expected struct AgentsToml" and break
+  // every Codex CLI invocation. They MUST never coexist with the new
+  // `[agents.<name>]` struct format we now emit, so install-time always
+  // purges them regardless of GSD marker presence. Users who had legitimate
+  // user-authored `[[agents]]` entries before are already broken on Codex
+  // ≥0.124 — purging is the only path to a loadable config.
   const leakedSections = getTomlTableSections(content)
     .filter((section) => {
       // Legacy [agents.gsd-<name>] map tables (pre-#2645).
       if (!section.array && section.path.startsWith('agents.gsd-')) return true;
 
-      // Legacy bare [agents] table with only the old max_threads/max_depth keys.
-      if (
-        !section.array &&
-        section.path === 'agents' &&
-        isLegacyGsdAgentsSection(content.slice(section.headerEnd, section.end))
-      ) return true;
+      // ANY bare [agents] single-bracket table — invalid in current Codex
+      // schema, always purged at install time (#2760). Previously gated
+      // on `isLegacyGsdAgentsSection`, which missed bare tables holding
+      // arbitrary user keys (`default = "..."`, etc.) that still produce
+      // the AgentsToml type error.
+      if (!section.array && section.path === 'agents') return true;
 
-      // Current [[agents]] array-of-tables whose name is gsd-*. Preserve
-      // user-authored [[agents]] entries (other names) untouched.
-      if (section.array && section.path === 'agents') {
-        const body = content.slice(section.headerEnd, section.end);
-        const nameMatch = body.match(/^[ \t]*name[ \t]*=[ \t]*["']([^"']+)["']/m);
-        if (nameMatch && /^gsd-/.test(nameMatch[1])) return true;
-      }
+      // ANY [[agents]] array-of-tables — invalid in current Codex schema,
+      // always purged at install time (#2760). Previously gated on
+      // `name = "gsd-..."` which preserved user-authored entries that are
+      // themselves rejected by Codex 0.124+.
+      if (section.array && section.path === 'agents') return true;
 
       return false;
     });
@@ -2953,6 +2964,61 @@ function migrateCodexHooksMapFormat(content) {
   }
 
   return result;
+}
+
+/**
+ * Detect whether the user already uses the namespaced AoT hooks form
+ * (`[[hooks.<EVENT>]]`) for the given event in the config. When true,
+ * the GSD-managed hook block must be emitted in the same shape so it
+ * coexists cleanly — mixing `[[hooks]]` (flat) with `[[hooks.SessionStart]]`
+ * (namespaced) in the same file confuses round-trip writers and can
+ * produce a config that Codex rejects (#2760, defect 3).
+ */
+function hasUserNamespacedAotHooks(content, event) {
+  const sections = getTomlTableSections(content);
+  return sections.some(
+    (section) => section.array && section.path === `hooks.${event}`
+  );
+}
+
+/**
+ * Validate that the post-install config.toml matches Codex's expected schema
+ * (#2760, fix 3). Returns { ok: true } on success, or { ok: false, reason }
+ * with a human-readable explanation of the offending section.
+ *
+ * Schema rules enforced:
+ *   - `agents` MUST NOT appear as a bare table (`[agents]`) or sequence
+ *     (`[[agents]]`) — Codex 0.120+ requires `[agents.<name>]` struct form.
+ *   - `hooks.<Event>` MUST be an array of tables when present (not a bare
+ *     `[hooks.<Event>]` single-bracket map, which Codex ≥0.124 rejects).
+ */
+function validateCodexConfigSchema(content) {
+  const sections = getTomlTableSections(content);
+
+  for (const section of sections) {
+    if (!section.array && section.path === 'agents') {
+      return {
+        ok: false,
+        reason: 'bare [agents] table is invalid in current Codex schema (expected [agents.<name>] struct form)',
+      };
+    }
+
+    if (section.array && section.path === 'agents') {
+      return {
+        ok: false,
+        reason: '[[agents]] sequence form is invalid in current Codex schema (expected [agents.<name>] struct form)',
+      };
+    }
+
+    if (!section.array && section.path.startsWith('hooks.')) {
+      return {
+        ok: false,
+        reason: `bare [${section.path}] table is invalid in current Codex schema (expected [[${section.path}]] array-of-tables)`,
+      };
+    }
+  }
+
+  return { ok: true };
 }
 
 function normalizeCodexHooksLine(line, key) {
@@ -6412,6 +6478,14 @@ function install(isGlobal, runtime = 'claude') {
   }
 
   if (isCodex && !isMinimalMode(installMode)) {
+    // Capture pre-install snapshot of config.toml before ANY GSD mutation
+    // (#2760 fix 3). On post-write schema-validation failure we restore
+    // these exact bytes so the user is never left with a broken Codex CLI.
+    const codexConfigPathPreInstall = path.join(targetDir, 'config.toml');
+    const codexConfigPreInstallSnapshot = fs.existsSync(codexConfigPathPreInstall)
+      ? fs.readFileSync(codexConfigPathPreInstall)
+      : null;
+
     // Generate Codex config.toml and per-agent .toml files.
     // Skipped under --minimal — same rationale as filesystem agents above.
     const agentCount = installCodexConfig(targetDir, agentsSrc);
@@ -6454,6 +6528,10 @@ function install(isGlobal, runtime = 'claude') {
 
     // Add Codex hooks (SessionStart for update checking) — requires codex_hooks feature flag
     const configPath = path.join(targetDir, 'config.toml');
+    // Use the pre-install snapshot captured before installCodexConfig ran so
+    // restore returns the file to its true pre-GSD state on validation
+    // failure (#2760 fix 3) — not to the post-agent-merge state.
+    const preWriteBackup = codexConfigPreInstallSnapshot;
     try {
       let configContent = fs.existsSync(configPath) ? fs.readFileSync(configPath, 'utf-8') : '';
       const eol = detectLineEnding(configContent);
@@ -6470,13 +6548,22 @@ function install(isGlobal, runtime = 'claude') {
       const codexHooksFeature = ensureCodexHooksFeature(configContent);
       configContent = setManagedCodexHooksOwnership(codexHooksFeature.content, codexHooksFeature.ownership);
 
-      // Add SessionStart hook for update checking
+      // Add SessionStart hook for update checking. Default to top-level
+      // `[[hooks]]` AoT with `event` field — the form GSD has emitted since
+      // the Codex 0.124 migration (#2637). When the user already uses the
+      // namespaced AoT form `[[hooks.SessionStart]]` for their own hooks,
+      // emit our managed entry in that same shape so the two forms don't
+      // collide on round-trip (#2760, defect 3).
       const updateCheckScript = path.resolve(targetDir, 'hooks', 'gsd-check-update.js').replace(/\\/g, '/');
-      const hookBlock =
-        `${eol}# GSD Hooks${eol}` +
-        `[[hooks]]${eol}` +
-        `event = "SessionStart"${eol}` +
-        `command = "node ${updateCheckScript}"${eol}`;
+      const useNamespacedAot = hasUserNamespacedAotHooks(configContent, 'SessionStart');
+      const hookBlock = useNamespacedAot
+        ? `${eol}# GSD Hooks${eol}` +
+          `[[hooks.SessionStart]]${eol}` +
+          `command = "node ${updateCheckScript}"${eol}`
+        : `${eol}# GSD Hooks${eol}` +
+          `[[hooks]]${eol}` +
+          `event = "SessionStart"${eol}` +
+          `command = "node ${updateCheckScript}"${eol}`;
 
       // Migrate legacy gsd-update-check entries from prior installs (#1755 followup)
       // Remove stale hook blocks that used the inverted filename or wrong path.
@@ -6492,9 +6579,38 @@ function install(isGlobal, runtime = 'claude') {
         configContent += hookBlock;
       }
 
+      // #2760 fix 3 — post-write schema validation. Parse the bytes we are
+      // about to commit and assert they match Codex's expected shape. If
+      // validation fails we restore the pre-install backup and abort so the
+      // user is never left with a Codex CLI that won't load.
+      // Test seam: tests can inject `__codexSchemaValidator` to force the
+      // validator to fail and exercise the restore-and-abort path.
+      const validatorFn = (typeof module !== 'undefined' && module.exports && module.exports.__codexSchemaValidator)
+        ? module.exports.__codexSchemaValidator
+        : validateCodexConfigSchema;
+      const validation = validatorFn(configContent);
+      if (!validation.ok) {
+        if (preWriteBackup !== null) {
+          fs.writeFileSync(configPath, preWriteBackup);
+        } else if (fs.existsSync(configPath)) {
+          fs.rmSync(configPath);
+        }
+        throw new Error(
+          `post-write Codex schema validation failed: ${validation.reason}. ` +
+          `Restored ${preWriteBackup !== null ? 'pre-install backup' : 'empty state'}.`
+        );
+      }
+
       fs.writeFileSync(configPath, configContent, 'utf-8');
       console.log(`  ${green}✓${reset} Configured Codex hooks (SessionStart)`);
     } catch (e) {
+      // #2760 — schema validation failures must be loud and fatal so the
+      // user is never left with a config Codex refuses to load. Other
+      // hook-config errors (FS, etc.) remain non-fatal warnings.
+      if (e && typeof e.message === 'string' && e.message.startsWith('post-write Codex schema validation failed')) {
+        console.error(`  ${red}✗${reset} ${e.message}`);
+        throw e;
+      }
       console.warn(`  ${yellow}⚠${reset}  Could not configure Codex hooks: ${e.message}`);
     }
 
@@ -7638,6 +7754,8 @@ if (process.env.GSD_TEST_MODE) {
     generateCodexConfigBlock,
     stripGsdFromCodexConfig,
     migrateCodexHooksMapFormat,
+    hasUserNamespacedAotHooks,
+    validateCodexConfigSchema,
     mergeCodexConfig,
     installCodexConfig,
     readGsdRuntimeProfileResolver,
