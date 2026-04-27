@@ -24,6 +24,10 @@
  *     backup and abort so the user never gets a broken Codex CLI.
  */
 
+// Scope GSD_TEST_MODE to module load only — restore prior value (or unset) so
+// downstream tests in the same node process never see test-only behaviour
+// leak through (#2760 CR4 finding 5).
+const previousGsdTestMode = process.env.GSD_TEST_MODE;
 process.env.GSD_TEST_MODE = '1';
 
 const { test, describe, beforeEach, afterEach } = require('node:test');
@@ -40,6 +44,12 @@ const {
   installCodexConfig,
   parseTomlToObject,
 } = require('../bin/install.js');
+
+if (previousGsdTestMode === undefined) {
+  delete process.env.GSD_TEST_MODE;
+} else {
+  process.env.GSD_TEST_MODE = previousGsdTestMode;
+}
 
 function runCodexInstall(codexHome, cwd = path.join(__dirname, '..')) {
   const previousCodeHome = process.env.CODEX_HOME;
@@ -381,7 +391,7 @@ describe('#2760 fix 4 — Write-failure rollback (atomic write + snapshot restor
     fs.rmSync(tmpDir, { recursive: true, force: true });
   });
 
-  test('pre-install config bytes survive when fs.writeFileSync throws on configPath', () => {
+  test('pre-install config bytes survive when fs.renameSync throws over configPath', () => {
     const preInstall = [
       '# user file',
       '[model]',
@@ -451,5 +461,274 @@ describe('#2760 fix 4 — Write-failure rollback (atomic write + snapshot restor
     } finally {
       fs.renameSync = originalRenameSync;
     }
+  });
+
+  test('pre-install config bytes survive when fs.writeFileSync throws on the .tmp- target', () => {
+    const preInstall = [
+      '# user file',
+      '[model]',
+      'name = "o3"',
+      '',
+    ].join('\n');
+    writeCodexConfig(codexHome, preInstall);
+
+    const preInstallBytes = fs.readFileSync(path.join(codexHome, 'config.toml'));
+    const configPath = path.join(codexHome, 'config.toml');
+    const tempPattern = new RegExp('^' + configPath.replace(/[.*+?^${}()|[\]\\]/g, '\\$&') + '\\.tmp-');
+
+    // Stub: fault writes targeting the atomic temp file (the pre-rename branch
+    // of atomicWriteFileSync). Other writes (agent .toml files in CODEX_HOME)
+    // pass through. This exercises the failure path where the temp write itself
+    // throws, not the rename — the case the prior test left untested.
+    const originalLocalWrite = fs.writeFileSync;
+    fs.writeFileSync = function patchedWriteFileSync(target, data, options) {
+      if (typeof target === 'string' && tempPattern.test(target)) {
+        throw new Error('simulated writeFileSync failure on .tmp- target');
+      }
+      return originalLocalWrite.call(this, target, data, options);
+    };
+
+    try {
+      let threw = false;
+      try {
+        runCodexInstall(codexHome);
+      } catch (e) {
+        threw = true;
+        assert.ok(/simulated writeFileSync failure|post-write Codex install failed/.test(e.message),
+          'thrown error must surface the simulated failure or its post-write wrapper: ' + e.message);
+      }
+      // Per #2760 CR4 finding 1, write failures must abort install (not warn).
+      assert.equal(threw, true, 'install must throw when atomic temp-write fails');
+
+      const afterBytes = fs.readFileSync(path.join(codexHome, 'config.toml'));
+      assert.deepStrictEqual(
+        afterBytes,
+        preInstallBytes,
+        'pre-install config.toml bytes must survive a temp-write failure'
+      );
+
+      const parsed = parseTomlToObject(afterBytes.toString('utf8'));
+      assert.equal(parsed.model && parsed.model.name, 'o3',
+        'surviving file must still be the user pre-install content');
+      assert.equal(parsed.agents, undefined,
+        'no GSD agents block may have leaked into the surviving file');
+
+      const stray = fs.readdirSync(codexHome).filter((f) => tempPattern.test(path.join(codexHome, f)));
+      assert.equal(stray.length, 0,
+        'atomic write must clean up its temp file on failure: ' + stray.join(', '));
+    } finally {
+      fs.writeFileSync = originalLocalWrite;
+    }
+  });
+});
+
+// concurrency: false — these tests rely on the same install path and module-
+// level pre-install snapshot that the fix-3/fix-4 suites exercise. Serializing
+// keeps state mutations from leaking across parallel siblings.
+describe('#2760 CR4 finding 2 — Legacy flat [[hooks]] block migrates to namespaced AoT on reinstall', { concurrency: false }, () => {
+  let tmpDir;
+  let codexHome;
+
+  beforeEach(() => {
+    tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), 'gsd-2760-cr4-f2-'));
+    codexHome = path.join(tmpDir, 'codex-home');
+  });
+
+  afterEach(() => {
+    fs.rmSync(tmpDir, { recursive: true, force: true });
+  });
+
+  test('pre-install legacy flat [[hooks]] gsd-check-update + user namespaced [[hooks.SessionStart]] → post-install converges on namespaced AoT', () => {
+    // Reproduce the upgrade scenario:
+    //   - User has [[hooks.SessionStart]] entry of their own (signal that GSD
+    //     should emit in the namespaced shape).
+    //   - A previous GSD install left the legacy flat [[hooks]] managed block
+    //     for gsd-check-update. The pre-CR4 strip step would short-circuit
+    //     the namespaced emit and leave the user stuck in the mixed layout.
+    const userPlusLegacy = [
+      '[[hooks.SessionStart]]',
+      'command = "echo user hook"',
+      '',
+      '# GSD Hooks',
+      '[[hooks]]',
+      'event = "SessionStart"',
+      'command = "node /old/path/hooks/gsd-check-update.js"',
+      '',
+    ].join('\n');
+    writeCodexConfig(codexHome, userPlusLegacy);
+
+    runCodexInstall(codexHome);
+    const afterInstall = readCodexConfig(codexHome);
+    const parsed = parseTomlToObject(afterInstall);
+
+    // After CR4 finding 2: the legacy flat [[hooks]] managed block is stripped
+    // and the GSD entry is re-emitted in the namespaced AoT shape so the two
+    // forms do not coexist.
+    assert.ok(
+      parsed.hooks && Array.isArray(parsed.hooks.SessionStart),
+      'hooks.SessionStart must be an array-of-tables, got: '
+        + (parsed.hooks ? typeof parsed.hooks.SessionStart : 'no hooks table')
+    );
+
+    const namespacedCommands = parsed.hooks.SessionStart.map((entry) => entry.command);
+    assert.ok(
+      namespacedCommands.includes('echo user hook'),
+      'user [[hooks.SessionStart]] entry preserved: ' + JSON.stringify(namespacedCommands)
+    );
+    assert.ok(
+      namespacedCommands.some((cmd) => typeof cmd === 'string' && /gsd-check-update\.js/.test(cmd)),
+      'GSD entry must appear in hooks.SessionStart array (namespaced AoT form): '
+        + JSON.stringify(namespacedCommands)
+    );
+
+    // The legacy top-level [[hooks]] AoT must NOT coexist with the namespaced
+    // form after migration. parseTomlToObject distinguishes via Array.isArray.
+    assert.ok(
+      !Array.isArray(parsed.hooks) || parsed.hooks.length === 0,
+      'no top-level [[hooks]] AoT entries may remain after legacy migration: '
+        + JSON.stringify(parsed.hooks)
+    );
+
+    // No duplicate gsd-check-update entries — exactly one managed entry.
+    const gsdEntries = namespacedCommands.filter(
+      (cmd) => typeof cmd === 'string' && /gsd-check-update\.js/.test(cmd)
+    );
+    assert.equal(gsdEntries.length, 1,
+      'exactly one gsd-check-update entry after migration, got: ' + gsdEntries.length);
+  });
+});
+
+describe('#2760 CR4 finding 3 — parseTomlToObject rejects malformed input that previously slipped through', () => {
+  test('rejects float values (timeout = 0.5)', () => {
+    const content = [
+      '[server]',
+      'timeout = 0.5',
+      '',
+    ].join('\n');
+    assert.throws(
+      () => parseTomlToObject(content),
+      /unsupported TOML value|trailing bytes/,
+      'float values must be rejected, not silently truncated to int prefix'
+    );
+  });
+
+  test('rejects date values (created = 1979-05-27)', () => {
+    const content = [
+      '[meta]',
+      'created = 1979-05-27',
+      '',
+    ].join('\n');
+    assert.throws(
+      () => parseTomlToObject(content),
+      /unsupported TOML value|trailing bytes/,
+      'date values must be rejected, not silently truncated'
+    );
+  });
+
+  test('rejects trailing garbage after a string value (key = "x" junk)', () => {
+    const content = [
+      '[section]',
+      'key = "x" junk',
+      '',
+    ].join('\n');
+    assert.throws(
+      () => parseTomlToObject(content),
+      /trailing bytes/,
+      'trailing bytes after a complete value must be rejected'
+    );
+  });
+
+  test('accepts trailing whitespace and # comment after a value', () => {
+    const content = [
+      '[section]',
+      'key = "x"   # an inline comment',
+      'flag = true',
+      'count = 7   ',
+      '',
+    ].join('\n');
+    const parsed = parseTomlToObject(content);
+    assert.equal(parsed.section.key, 'x');
+    assert.equal(parsed.section.flag, true);
+    assert.equal(parsed.section.count, 7);
+  });
+});
+
+// concurrency: false — see the fix-3 suite above for the same rationale.
+describe('#2760 CR4 finding 1 — atomicWriteFileSync failure aborts install (post-write fatal)', { concurrency: false }, () => {
+  let tmpDir;
+  let codexHome;
+  let originalRenameSync;
+  let originalConsoleLog;
+  let consoleOutput;
+
+  beforeEach(() => {
+    tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), 'gsd-2760-cr4-f1-'));
+    codexHome = path.join(tmpDir, 'codex-home');
+    originalRenameSync = fs.renameSync;
+    originalConsoleLog = console.log;
+    consoleOutput = [];
+    console.log = (...args) => { consoleOutput.push(args.join(' ')); };
+  });
+
+  afterEach(() => {
+    fs.renameSync = originalRenameSync;
+    console.log = originalConsoleLog;
+    fs.rmSync(tmpDir, { recursive: true, force: true });
+  });
+
+  test('install throws and never prints "Done!" when atomicWriteFileSync fails on configPath', () => {
+    const preInstall = [
+      '# user file',
+      '[model]',
+      'name = "o3"',
+      '',
+    ].join('\n');
+    writeCodexConfig(codexHome, preInstall);
+
+    const configPath = path.join(codexHome, 'config.toml');
+    // Only fault the hook-block atomic rename — earlier writes to config.toml
+    // happen via mergeCodexConfig (agent-block emit). We want to exercise the
+    // post-write Codex install branch specifically. Detect by reading the temp
+    // file's contents and only faulting when the hook block is present.
+    fs.renameSync = (src, dst) => {
+      if (dst === configPath) {
+        let isHookWrite = false;
+        try {
+          const data = fs.readFileSync(src, 'utf8');
+          isHookWrite = /gsd-check-update\.js/.test(data);
+        } catch (_) { /* ignore */ }
+        if (isHookWrite) {
+          throw new Error('simulated rename failure');
+        }
+      }
+      return originalRenameSync(src, dst);
+    };
+
+    let threw = false;
+    let thrownMessage = '';
+    try {
+      runCodexInstall(codexHome);
+    } catch (e) {
+      threw = true;
+      thrownMessage = e.message;
+    }
+
+    assert.equal(threw, true, 'install must throw when atomic write fails');
+    assert.match(
+      thrownMessage,
+      /post-write Codex install failed/,
+      'thrown error must use the post-write prefix so the outer catch treats it as fatal'
+    );
+
+    // Critical: install must NOT have printed any "Done!" success banner.
+    const printedDone = consoleOutput.some(
+      (line) => typeof line === 'string' && /Done!/i.test(line)
+    );
+    assert.equal(printedDone, false,
+      'install must NOT print "Done!" after a write failure: ' + JSON.stringify(consoleOutput.filter((l) => /Done|✓/.test(l))));
+
+    // And the user's pre-install bytes are intact (snapshot restore).
+    const after = fs.readFileSync(configPath, 'utf8');
+    assert.equal(after, preInstall, 'pre-install bytes preserved after fatal abort');
   });
 });
