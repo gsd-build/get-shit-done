@@ -24,106 +24,249 @@
 
 'use strict';
 
-const { describe, test } = require('node:test');
+const { describe, test, beforeEach, afterEach } = require('node:test');
 const assert = require('node:assert/strict');
+const { execSync } = require('child_process');
 const fs = require('fs');
 const path = require('path');
+const os = require('os');
 
-const QUICK_PATH = path.join(__dirname, '..', 'get-shit-done', 'workflows', 'quick.md');
-const EXECUTE_PHASE_PATH = path.join(__dirname, '..', 'get-shit-done', 'workflows', 'execute-phase.md');
+const { cleanup } = require('./helpers.cjs');
 
-/**
- * Extract the WORKTREES=... discovery line from a workflow file.
- * Returns the first matching line of shell that assigns the WORKTREES variable
- * via `git worktree list`.
- */
-function extractWorktreeDiscoveryLine(content) {
-  const lines = content.split('\n');
-  for (const line of lines) {
-    if (line.includes('WORKTREES=') && line.includes('git worktree list')) {
-      return line;
-    }
-  }
-  return null;
+// The exact discovery pipeline from get-shit-done/workflows/quick.md and
+// get-shit-done/workflows/execute-phase.md (line: `WORKTREES=$(git worktree
+// list --porcelain | grep "^worktree " | grep "\.claude/worktrees/agent-" |
+// sed 's/^worktree //')`). We invoke it as a standalone shell pipeline
+// against either real `git worktree list --porcelain` output (in the
+// end-to-end case) or piped-in fixture text (in the unit case).
+// Note: execSync runs with `shell: '/bin/sh'` by default, which interprets the
+// command string directly — no extra `bash -c '...'` wrapper needed. The
+// pipeline string below is the verbatim shell from quick.md / execute-phase.md
+// (the RHS of the `WORKTREES=$(...)` substitution).
+const DISCOVERY_PIPELINE =
+  'grep "^worktree " | grep "\\.claude/worktrees/agent-" | sed \'s/^worktree //\'';
+
+function runDiscoveryAgainstFixture(porcelain) {
+  const out = execSync(DISCOVERY_PIPELINE, {
+    input: porcelain,
+    encoding: 'utf-8',
+  });
+  return out.split('\n').filter((l) => l.length > 0);
 }
 
-describe('bug #2774 — worktree cleanup must not target the parent workspace', () => {
-  test('quick.md uses inclusion-based agent worktree filter', () => {
-    const content = fs.readFileSync(QUICK_PATH, 'utf8');
-    const line = extractWorktreeDiscoveryLine(content);
+function runDiscoveryAgainstRepo(repoCwd) {
+  const out = execSync(
+    `git worktree list --porcelain | ${DISCOVERY_PIPELINE}`,
+    { cwd: repoCwd, encoding: 'utf-8' }
+  );
+  return out.split('\n').filter((l) => l.length > 0);
+}
 
-    assert.ok(line, 'quick.md must contain a WORKTREES discovery line backed by git worktree list');
+function makeBareTempGitRepo(prefix) {
+  const tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), prefix));
+  execSync('git init -b main', { cwd: tmpDir, stdio: 'pipe' });
+  execSync('git config user.email "test@test.com"', { cwd: tmpDir, stdio: 'pipe' });
+  execSync('git config user.name "Test"', { cwd: tmpDir, stdio: 'pipe' });
+  execSync('git config commit.gpgsign false', { cwd: tmpDir, stdio: 'pipe' });
+  fs.writeFileSync(path.join(tmpDir, 'README.md'), '# upstream\n');
+  execSync('git add -A', { cwd: tmpDir, stdio: 'pipe' });
+  execSync('git commit -m "initial"', { cwd: tmpDir, stdio: 'pipe' });
+  return tmpDir;
+}
 
-    assert.ok(
-      line.includes('.claude/worktrees/agent-'),
-      `quick.md WORKTREES discovery must include only agent-spawned worktrees ` +
-        `(matching '.claude/worktrees/agent-' prefix), got: ${line}`
-    );
+describe('bug #2774 — worktree cleanup pipeline must not target the parent workspace', () => {
+  describe('discovery pipeline (unit)', () => {
+    test('selects only the agent worktree when workspace itself is a worktree', () => {
+      // Fixture mirrors the multi-workspace setup: upstream main + sibling
+      // workspace worktree + agent worktree under workspace's
+      // `.claude/worktrees/agent-` namespace.
+      const porcelain = [
+        'worktree /Users/dev/upstream/get-shit-done',
+        'HEAD abc123',
+        'branch refs/heads/main',
+        '',
+        'worktree /Users/dev/workspaces/feature-x',
+        'HEAD def456',
+        'branch refs/heads/workspace/feature-x',
+        '',
+        'worktree /Users/dev/workspaces/feature-x/.claude/worktrees/agent-deadbeef',
+        'HEAD 789abc',
+        'branch refs/heads/worktree-agent-deadbeef',
+        '',
+      ].join('\n');
 
-    assert.ok(
-      !/grep\s+-v\s+["']?\$\(pwd\)\$/.test(line),
-      `quick.md WORKTREES discovery must not rely on 'grep -v "$(pwd)$"' as the ` +
-        `sole guard — that exclusion fails when the workspace itself is a worktree, ` +
-        `got: ${line}`
-    );
+      const discovered = runDiscoveryAgainstFixture(porcelain);
+
+      assert.deepEqual(
+        discovered,
+        ['/Users/dev/workspaces/feature-x/.claude/worktrees/agent-deadbeef'],
+        'pipeline must select only the agent-spawned worktree, never the ' +
+          'workspace or upstream main repo'
+      );
+    });
+
+    test('selects nothing when no agent worktrees exist', () => {
+      const porcelain = [
+        'worktree /Users/dev/upstream/get-shit-done',
+        'HEAD abc123',
+        'branch refs/heads/main',
+        '',
+        'worktree /Users/dev/workspaces/feature-x',
+        'HEAD def456',
+        'branch refs/heads/workspace/feature-x',
+        '',
+      ].join('\n');
+
+      const discovered = runDiscoveryAgainstFixture(porcelain);
+
+      assert.deepEqual(discovered, []);
+    });
+
+    test('selects multiple agent worktrees and excludes non-agent paths', () => {
+      const porcelain = [
+        'worktree /repo/main',
+        'HEAD a',
+        'branch refs/heads/main',
+        '',
+        'worktree /repo/main/.claude/worktrees/agent-aaa',
+        'HEAD b',
+        'branch refs/heads/agent-aaa',
+        '',
+        'worktree /repo/main/.claude/worktrees/agent-bbb',
+        'HEAD c',
+        'branch refs/heads/agent-bbb',
+        '',
+        'worktree /repo/main/some-other-dir',
+        'HEAD d',
+        'branch refs/heads/feature',
+        '',
+      ].join('\n');
+
+      const discovered = runDiscoveryAgainstFixture(porcelain);
+
+      assert.deepEqual(discovered.sort(), [
+        '/repo/main/.claude/worktrees/agent-aaa',
+        '/repo/main/.claude/worktrees/agent-bbb',
+      ]);
+    });
   });
 
-  test('execute-phase.md uses inclusion-based agent worktree filter', () => {
-    const content = fs.readFileSync(EXECUTE_PHASE_PATH, 'utf8');
-    const line = extractWorktreeDiscoveryLine(content);
+  describe('end-to-end against real git worktrees', () => {
+    let upstream;
+    let workspace;
+    let agentWorktree;
+    let workspacesParent;
 
-    assert.ok(line, 'execute-phase.md must contain a WORKTREES discovery line backed by git worktree list');
+    beforeEach(() => {
+      // Build the multi-worktree scenario from #2774:
+      //   upstream/         <- main repo
+      //   workspace/        <- worktree of upstream (the "workspace")
+      //   workspace/.claude/worktrees/agent-XXXX/  <- agent worktree
+      upstream = makeBareTempGitRepo('gsd-2774-upstream-');
 
-    assert.ok(
-      line.includes('.claude/worktrees/agent-'),
-      `execute-phase.md WORKTREES discovery must include only agent-spawned worktrees ` +
-        `(matching '.claude/worktrees/agent-' prefix), got: ${line}`
-    );
+      workspacesParent = fs.mkdtempSync(
+        path.join(os.tmpdir(), 'gsd-2774-workspaces-')
+      );
+      workspace = path.join(workspacesParent, 'feature-x');
+      execSync(`git worktree add -b workspace/feature-x "${workspace}"`, {
+        cwd: upstream,
+        stdio: 'pipe',
+      });
 
-    assert.ok(
-      !/grep\s+-v\s+["']?\$\(pwd\)\$/.test(line),
-      `execute-phase.md WORKTREES discovery must not rely on 'grep -v "$(pwd)$"' as ` +
-        `the sole guard — that exclusion fails when the workspace itself is a worktree, ` +
-        `got: ${line}`
-    );
-  });
+      const agentDir = path.join(workspace, '.claude', 'worktrees');
+      fs.mkdirSync(agentDir, { recursive: true });
+      agentWorktree = path.join(agentDir, 'agent-deadbeef');
+      execSync(
+        `git worktree add -b worktree-agent-deadbeef "${agentWorktree}"`,
+        { cwd: upstream, stdio: 'pipe' }
+      );
+    });
 
-  test('end-to-end: simulated git worktree list output yields only agent worktrees', () => {
-    // Simulate `git worktree list --porcelain` output where the *current* worktree
-    // is itself a workspace (a worktree of a main repo at a DIFFERENT path), and
-    // an agent worktree exists alongside it.
-    //
-    // Exclusion-based filter ("grep -v '$(pwd)$'") would keep BOTH the upstream main
-    // repo path AND the agent worktree, deleting the upstream main on cleanup.
-    // Inclusion-based filter must keep ONLY the agent worktree.
-    const porcelain = [
-      'worktree /Users/dev/upstream/get-shit-done',
-      'HEAD abc123',
-      'branch refs/heads/main',
-      '',
-      'worktree /Users/dev/workspaces/feature-x',
-      'HEAD def456',
-      'branch refs/heads/workspace/feature-x',
-      '',
-      'worktree /Users/dev/workspaces/feature-x/.claude/worktrees/agent-deadbeef',
-      'HEAD 789abc',
-      'branch refs/heads/worktree-agent-deadbeef',
-      '',
-    ].join('\n');
+    afterEach(() => {
+      try {
+        execSync('git worktree prune', { cwd: upstream, stdio: 'pipe' });
+      } catch (_) {
+        /* ignore */
+      }
+      cleanup(upstream);
+      cleanup(workspacesParent);
+    });
 
-    // The discovery filter, applied as text:
-    //   grep "^worktree " | grep ".claude/worktrees/agent-" | sed 's/^worktree //'
-    const discovered = porcelain
-      .split('\n')
-      .filter((l) => l.startsWith('worktree '))
-      .filter((l) => l.includes('.claude/worktrees/agent-'))
-      .map((l) => l.replace(/^worktree /, ''));
+    test('discovery from inside workspace returns only the agent worktree', () => {
+      const discovered = runDiscoveryAgainstRepo(workspace);
 
-    assert.deepEqual(
-      discovered,
-      ['/Users/dev/workspaces/feature-x/.claude/worktrees/agent-deadbeef'],
-      'inclusion-based filter must select only the agent-spawned worktree, ' +
-        'never the workspace or upstream main repo'
-    );
+      // Resolve symlinks (macOS /var → /private/var) for stable comparison.
+      const expected = fs.realpathSync(agentWorktree);
+      const actual = discovered.map((p) => fs.realpathSync(p));
+
+      assert.deepEqual(
+        actual,
+        [expected],
+        'pipeline must list only the agent worktree, not the workspace or upstream'
+      );
+    });
+
+    test('running cleanup loop on discovered paths preserves workspace .git', () => {
+      const workspaceGitBefore = fs.readFileSync(
+        path.join(workspace, '.git'),
+        'utf-8'
+      );
+      assert.ok(
+        fs.existsSync(path.join(upstream, '.git')),
+        'precondition: upstream .git must exist'
+      );
+
+      const discovered = runDiscoveryAgainstRepo(workspace);
+      assert.equal(
+        discovered.length,
+        1,
+        'precondition: exactly one agent worktree should be discovered'
+      );
+
+      // Execute the cleanup behavior end-to-end: `git worktree remove --force`
+      // each discovered path. This mirrors the workflow's cleanup loop.
+      for (const wt of discovered) {
+        execSync(`git worktree remove --force "${wt}"`, {
+          cwd: workspace,
+          stdio: 'pipe',
+        });
+      }
+
+      // Agent worktree dir must be gone.
+      assert.equal(
+        fs.existsSync(agentWorktree),
+        false,
+        'agent worktree dir should be removed by cleanup'
+      );
+
+      // Workspace `.git` pointer file must still exist and be unchanged —
+      // the regression we are guarding against.
+      assert.ok(
+        fs.existsSync(path.join(workspace, '.git')),
+        'workspace .git pointer must survive cleanup (regression #2774)'
+      );
+      assert.equal(
+        fs.readFileSync(path.join(workspace, '.git'), 'utf-8'),
+        workspaceGitBefore,
+        'workspace .git pointer contents must be unchanged'
+      );
+
+      // Upstream repo's .git directory must also be intact.
+      assert.ok(
+        fs.existsSync(path.join(upstream, '.git')),
+        'upstream .git must survive cleanup'
+      );
+
+      // Workspace must still be a functional git worktree.
+      const branch = execSync('git rev-parse --abbrev-ref HEAD', {
+        cwd: workspace,
+        encoding: 'utf-8',
+      }).trim();
+      assert.equal(
+        branch,
+        'workspace/feature-x',
+        'workspace must still be a functional worktree on its branch'
+      );
+    });
   });
 });
