@@ -3122,9 +3122,19 @@ function parseTomlValue(text, i) {
     }
   }
 
-  // Number (integer with optional sign). Float / date / time not needed here.
+  // Number (integer with optional sign). Float / date / time / hex / oct / bin
+  // are NOT supported — we reject them explicitly instead of silently truncating
+  // an integer prefix off a `0.5` float or `1979-05-27` date. (#2760 CR4 finding 3)
   const numMatch = text.slice(i).match(/^[+-]?\d[\d_]*/);
   if (numMatch) {
+    const after = text[i + numMatch[0].length];
+    // Reject: float (`.`, `e`, `E`), date/time (`-`, `:`, `T`, `Z`), or any
+    // continuation digit/letter that suggests an unsupported numeric form.
+    if (after !== undefined && /[.eE:\-TZ]/.test(after)) {
+      throw new Error(
+        `unsupported TOML value at offset ${i}: floats, dates, and times are not supported (got ${text.slice(i, i + 20)})`
+      );
+    }
     const digits = numMatch[0].replace(/_/g, '');
     const n = Number(digits);
     if (!Number.isFinite(n)) throw new Error(`invalid number: ${numMatch[0]}`);
@@ -3211,6 +3221,23 @@ function parseTomlToObject(content) {
     // inline tables). Parse from the absolute content offset right after `=`.
     const valueStartAbs = rec.start + equalsIndex + 1;
     const parsed = parseTomlValue(content, valueStartAbs);
+
+    // #2760 CR4 finding 3 — verify the full RHS was consumed. Anything other
+    // than whitespace + optional # comment between parsed.end and the next
+    // newline (or EOF) means the parser silently accepted a prefix and
+    // dropped trailing bytes. Reject so malformed TOML cannot slip past
+    // "parse before commit" guarantees.
+    let scan = parsed.end;
+    while (scan < content.length && (content[scan] === ' ' || content[scan] === '\t')) {
+      scan += 1;
+    }
+    if (scan < content.length && content[scan] !== '\n' && content[scan] !== '\r' && content[scan] !== '#') {
+      const lineEnd = content.indexOf('\n', scan);
+      const trailing = content.slice(scan, lineEnd === -1 ? content.length : lineEnd);
+      throw new Error(
+        `trailing bytes after value on line ${idx + 1}: ${JSON.stringify(trailing)}`
+      );
+    }
 
     // Place value into currentTable under dotted key.
     let target = currentTable;
@@ -6899,6 +6926,24 @@ function install(isGlobal, runtime = 'claude') {
         );
       }
 
+      // #2760 CR4 finding 2 — Strip ALL existing managed gsd-check-update
+      // hook blocks (top-level [[hooks]] AND namespaced [[hooks.SessionStart]])
+      // BEFORE evaluating the includes guard. Without this, an install that
+      // already has a legacy flat [[hooks]] block short-circuits the new
+      // namespaced AoT emit and stays stuck in the mixed layout this fix is
+      // designed to eliminate. Stripping first means every install converges
+      // on the right shape regardless of prior state.
+      if (configContent.includes('gsd-check-update')) {
+        configContent = configContent.replace(
+          /(?:\r?\n|^)# GSD Hooks\r?\n\[\[hooks\]\]\r?\nevent = "SessionStart"\r?\ncommand = "node [^\r\n]*gsd-check-update\.js"\r?\n/gm,
+          (match) => (match.startsWith('\r\n') ? '\r\n' : match.startsWith('\n') ? '\n' : ''),
+        );
+        configContent = configContent.replace(
+          /(?:\r?\n|^)# GSD Hooks\r?\n\[\[hooks\.SessionStart\]\]\r?\ncommand = "node [^\r\n]*gsd-check-update\.js"\r?\n/gm,
+          (match) => (match.startsWith('\r\n') ? '\r\n' : match.startsWith('\n') ? '\n' : ''),
+        );
+      }
+
       if (hasEnabledCodexHooksFeature(configContent) && !configContent.includes('gsd-check-update')) {
         configContent += hookBlock;
       }
@@ -6928,18 +6973,26 @@ function install(isGlobal, runtime = 'claude') {
       try {
         atomicWriteFileSync(configPath, configContent, 'utf-8');
       } catch (writeErr) {
+        // #2760 CR4 finding 1 — write failure must be loud and fatal. Wrap
+        // with a `post-write` prefix the outer catch recognises so install
+        // aborts with a clear error rather than warn-and-continue (which
+        // produced "Done!" with no Codex agents configured).
         restoreCodexSnapshot();
-        throw writeErr;
+        const wrapped = new Error(
+          `post-write Codex install failed: ${writeErr && writeErr.message ? writeErr.message : String(writeErr)}. ` +
+          `Restored ${preWriteBackup !== null ? 'pre-install backup' : 'empty state'}.`
+        );
+        throw wrapped;
       }
       console.log(`  ${green}✓${reset} Configured Codex hooks (SessionStart)`);
     } catch (e) {
-      // #2760 — schema validation failures must be loud and fatal so the
-      // user is never left with a config Codex refuses to load. Other
-      // hook-config errors (FS, etc.) remain non-fatal warnings, but the
-      // pre-install snapshot restore has already run for write-side throws
-      // via the inner catch above and via restoreCodexSnapshot in the
-      // validation branch.
-      if (e && typeof e.message === 'string' && e.message.startsWith('post-write Codex schema validation failed')) {
+      // #2760 — schema-validation and write failures must be loud and fatal
+      // so the user is never left with a config Codex refuses to load (or no
+      // Codex agents configured at all). Other hook-config errors (FS, etc.)
+      // remain non-fatal warnings, but the pre-install snapshot restore has
+      // already run for write-side throws via the inner catch above and via
+      // restoreCodexSnapshot in the validation branch.
+      if (e && typeof e.message === 'string' && e.message.startsWith('post-write')) {
         console.error(`  ${red}✗${reset} ${e.message}`);
         throw e;
       }
