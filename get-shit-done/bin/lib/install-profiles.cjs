@@ -41,6 +41,31 @@ function shouldInstallSkill(skillBaseName, mode) {
   return MINIMAL_ALLOWLIST_SET.has(skillBaseName);
 }
 
+// Stage dirs created during this process — cleaned up on exit.
+// 13 runtime dispatch sites in install.js can each call stageSkillsForMode,
+// so accumulating them in a single set avoids leaks without forcing each
+// site to track its own cleanup handle.
+const STAGED_DIRS = new Set();
+let exitHandlerRegistered = false;
+
+function cleanupStagedSkills() {
+  for (const dir of STAGED_DIRS) {
+    try {
+      fs.rmSync(dir, { recursive: true, force: true });
+    } catch {
+      // Best-effort: missing dir or permission error shouldn't crash a
+      // successful install. The OS reaps tmpdir eventually.
+    }
+  }
+  STAGED_DIRS.clear();
+}
+
+function ensureExitCleanup() {
+  if (exitHandlerRegistered) return;
+  exitHandlerRegistered = true;
+  process.on('exit', cleanupStagedSkills);
+}
+
 /**
  * Stage a filtered copy of the source commands/gsd directory when in
  * minimal mode. All runtime-specific copy fns recurse a source dir,
@@ -48,6 +73,10 @@ function shouldInstallSkill(skillBaseName, mode) {
  * (DRY: one filter, not 12).
  *
  * In full mode this is a no-op — the original srcDir is returned.
+ *
+ * Cleanup: the staged dir is automatically removed on process exit.
+ * If the copy loop throws mid-flight, the partially-populated dir is
+ * removed and the error re-raised, so callers never see an orphan.
  *
  * @param {string} srcDir absolute path to commands/gsd
  * @param {string} mode 'full' | 'minimal'
@@ -58,17 +87,24 @@ function stageSkillsForMode(srcDir, mode) {
   if (!fs.existsSync(srcDir)) return srcDir;
 
   const stageDir = fs.mkdtempSync(path.join(os.tmpdir(), 'gsd-minimal-skills-'));
-  const entries = fs.readdirSync(srcDir, { withFileTypes: true });
-  for (const entry of entries) {
-    if (!entry.isFile()) continue;
-    if (!entry.name.endsWith('.md')) continue;
-    const baseName = entry.name.replace(/\.md$/, '');
-    if (!shouldInstallSkill(baseName, mode)) continue;
-    fs.copyFileSync(
-      path.join(srcDir, entry.name),
-      path.join(stageDir, entry.name),
-    );
+  try {
+    const entries = fs.readdirSync(srcDir, { withFileTypes: true });
+    for (const entry of entries) {
+      if (!entry.isFile()) continue;
+      if (!entry.name.endsWith('.md')) continue;
+      const baseName = entry.name.replace(/\.md$/, '');
+      if (!shouldInstallSkill(baseName, mode)) continue;
+      fs.copyFileSync(
+        path.join(srcDir, entry.name),
+        path.join(stageDir, entry.name),
+      );
+    }
+  } catch (err) {
+    try { fs.rmSync(stageDir, { recursive: true, force: true }); } catch {}
+    throw err;
   }
+  STAGED_DIRS.add(stageDir);
+  ensureExitCleanup();
   return stageDir;
 }
 
@@ -77,4 +113,5 @@ module.exports = {
   isMinimalMode,
   shouldInstallSkill,
   stageSkillsForMode,
+  cleanupStagedSkills,
 };

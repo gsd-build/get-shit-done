@@ -6127,15 +6127,36 @@ function install(isGlobal, runtime = 'claude') {
 
   // Always remove stale gsd-* agents first so re-installing with
   // `--minimal` actually shrinks a previously-full install.
+  // For Codex this also covers per-agent `.toml` files alongside the `.md`
+  // sources so a full → minimal switch doesn't leave stale registrations.
   if (fs.existsSync(agentsDest)) {
     for (const file of fs.readdirSync(agentsDest)) {
-      if (file.startsWith('gsd-') && file.endsWith('.md')) {
+      if (
+        file.startsWith('gsd-') &&
+        (file.endsWith('.md') || (isCodex && file.endsWith('.toml')))
+      ) {
         fs.unlinkSync(path.join(agentsDest, file));
       }
     }
   }
 
   if (isMinimalMode(installMode)) {
+    // Codex registers agents in `config.toml` via `[agents.gsd-*]` sections.
+    // Without stripping them here, a full → minimal reinstall would leave the
+    // runtime advertising the old full agent surface even though the agent
+    // files are gone. Reuse the same helper that powers `--uninstall`.
+    if (isCodex) {
+      const codexConfigPath = path.join(targetDir, 'config.toml');
+      if (fs.existsSync(codexConfigPath)) {
+        const existing = fs.readFileSync(codexConfigPath, 'utf8');
+        const cleaned = stripGsdFromCodexConfig(existing);
+        if (cleaned === null) {
+          fs.unlinkSync(codexConfigPath);
+        } else if (cleaned !== existing) {
+          fs.writeFileSync(codexConfigPath, cleaned);
+        }
+      }
+    }
     console.log(`  ${dim}↳${reset} Skipping agents (minimal install — run \`gsd update\` without \`--minimal\` to add full surface)`);
   } else if (fs.existsSync(agentsSrc)) {
     fs.mkdirSync(agentsDest, { recursive: true });

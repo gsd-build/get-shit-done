@@ -361,7 +361,7 @@ The `gsd-planner` agent is decomposed into a core agent plus reference modules t
 
 ---
 
-## CLI Modules (30 shipped)
+## CLI Modules (31 shipped)
 
 Full listing: `get-shit-done/bin/lib/*.cjs`.
 
@@ -381,6 +381,7 @@ Full listing: `get-shit-done/bin/lib/*.cjs`.
 | `graphify.cjs` | Knowledge-graph build/query/status/diff for `/gsd-graphify` |
 | `gsd2-import.cjs` | External-plan ingest for `/gsd-from-gsd2` |
 | `init.cjs` | Compound context loading for each workflow type |
+| `install-profiles.cjs` | Install profile allowlist + skill staging for `--minimal` install (#2762); single source of truth for which `gsd-*` skills/agents land in runtime config dirs |
 | `intel.cjs` | Codebase intel store backing `/gsd-intel` and `gsd-intel-updater` |
 | `learnings.cjs` | Cross-phase learnings extraction for `/gsd-extract-learnings` |
 | `milestone.cjs` | Milestone archival, requirements marking |

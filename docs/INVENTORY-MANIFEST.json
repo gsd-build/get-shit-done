@@ -1,5 +1,5 @@
 {
-  "generated": "2026-04-23",
+  "generated": "2026-04-27",
   "families": {
     "agents": [
       "gsd-advisor-researcher",
@@ -278,6 +278,7 @@
       "graphify.cjs",
       "gsd2-import.cjs",
       "init.cjs",
+      "install-profiles.cjs",
       "intel.cjs",
       "learnings.cjs",
       "milestone.cjs",
