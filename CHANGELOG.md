@@ -6,6 +6,14 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ## [Unreleased](https://github.com/gsd-build/get-shit-done/compare/v1.38.5...HEAD)
 
+### Added
+- `--minimal` install flag (alias `--core-only`) writes only the main-loop core skills
+  (`new-project`, `discuss-phase`, `plan-phase`, `execute-phase`, `help`, `update`) and
+  zero `gsd-*` subagents. Cuts cold-start system-prompt overhead from ~12k tokens to
+  ~700, useful for local LLMs with 32K–128K context (Sonnet 4.6 / Opus 4.7 don't need
+  it). Re-run `gsd update` without `--minimal` to expand to the full surface. The
+  install manifest now records `mode: "minimal" | "full"`. (#2762)
+
 ## [1.38.5] - 2026-04-25
 
 ### Fixed
