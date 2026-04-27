@@ -1701,10 +1701,19 @@ function cmdStateCompletePhase(cwd, raw) {
   let resolvedPhase = '?';
 
   readModifyWriteStateMd(statePath, (content) => {
-    // Read the current phase number for descriptive messages
-    const currentPhase = stateExtractField(content, 'Current Phase') ||
-                         stateExtractField(content, 'Phase') ||
-                         '?';
+    // Read the current phase number for descriptive messages.
+    //
+    // The 'Phase' fallback can match the decorated body line under
+    // `## Current Position` (e.g. `Phase: 01 (Foo) — EXECUTING`), which would
+    // flow downstream into messy `Status: Phase 01 (Foo) — EXECUTING complete`
+    // output. Strip everything past the leading numeric/decimal token so the
+    // fallback path produces a clean phase identifier matching the canonical
+    // `Current Phase` field. CodeRabbit nitpick on PR #2761.
+    const rawPhase = stateExtractField(content, 'Current Phase') ||
+                     stateExtractField(content, 'Phase') ||
+                     '';
+    const phaseToken = rawPhase.match(/^\s*([\w.-]+)/);
+    const currentPhase = phaseToken ? phaseToken[1] : '?';
     resolvedPhase = currentPhase;
 
     // Update Status field
