@@ -29,14 +29,10 @@ const { describe, test, beforeEach, afterEach } = require('node:test');
 const assert = require('node:assert/strict');
 const fs = require('fs');
 const path = require('path');
-const os = require('os');
 
 const installModule = require('../bin/install.js');
 const { installSdkIfNeeded } = installModule;
-
-function makeTempDir(prefix) {
-  return fs.mkdtempSync(path.join(os.tmpdir(), prefix));
-}
+const { createTempDir, cleanup } = require('./helpers.cjs');
 
 function captureConsole(fn) {
   const stdout = [];
@@ -74,7 +70,7 @@ describe('bug #2775: installSdkIfNeeded must verify gsd-sdk on PATH before repor
   let savedEnv;
 
   beforeEach(() => {
-    tmpRoot = makeTempDir('gsd-2775-');
+    tmpRoot = createTempDir('gsd-2775-');
     sdkDir = path.join(tmpRoot, 'sdk');
     fs.mkdirSync(path.join(sdkDir, 'dist'), { recursive: true });
     fs.writeFileSync(
@@ -96,7 +92,7 @@ describe('bug #2775: installSdkIfNeeded must verify gsd-sdk on PATH before repor
     process.env.PATH = savedEnv.PATH;
     if (savedEnv.HOME == null) delete process.env.HOME;
     else process.env.HOME = savedEnv.HOME;
-    try { fs.rmSync(tmpRoot, { recursive: true, force: true }); } catch {}
+    cleanup(tmpRoot);
   });
 
   test('does NOT print "GSD SDK ready" when gsd-sdk is not callable on PATH and cannot be linked', () => {
