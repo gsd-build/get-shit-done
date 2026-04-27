@@ -84,16 +84,52 @@ Read worktree config:
 USE_WORKTREES=$(gsd-sdk query config-get workflow.use_worktrees 2>/dev/null || echo "true")
 ```
 
-If the project uses git submodules, worktree isolation is skipped regardless of the `workflow.use_worktrees` config — the executor commit protocol cannot correctly handle submodule commits inside isolated worktrees. Sequential execution handles submodules transparently.
+If the project uses git submodules, worktree isolation is unsafe **only when a plan touches a submodule path** — the executor commit protocol cannot correctly handle submodule commits inside isolated worktrees. The previous behavior unconditionally disabled worktree isolation whenever `.gitmodules` existed, which penalised every plan in a submodule project even when the plan was nowhere near a submodule. Compute submodule paths once and intersect them per-plan with the plan's declared `files_modified` frontmatter.
 
 ```bash
+# Parse submodule paths from .gitmodules once (empty if no .gitmodules).
+# SUBMODULE_PATHS is a newline-separated list of repo-relative paths.
 if [ -f .gitmodules ]; then
-  echo "[worktree] Submodule project detected (.gitmodules exists) — falling back to sequential execution"
-  USE_WORKTREES=false
+  SUBMODULE_PATHS=$(git config --file .gitmodules --get-regexp '^submodule\..*\.path$' 2>/dev/null | awk '{print $2}')
+else
+  SUBMODULE_PATHS=""
 fi
 ```
 
-When `USE_WORKTREES` is `false`, all executor agents run without `isolation="worktree"` — they execute sequentially on the main working tree instead of in parallel worktrees.
+For each plan, decide `USE_WORKTREES` per-plan by intersecting `SUBMODULE_PATHS` with the plan's `files_modified` frontmatter (a list of repo-relative paths/globs the plan declares it will touch):
+
+```bash
+# Per-plan decision (run for each plan before dispatching its executor):
+#   PLAN_FILES = whitespace-separated list parsed from the plan's `files_modified` frontmatter.
+#   USE_WORKTREES_FOR_PLAN starts from the project-level USE_WORKTREES.
+USE_WORKTREES_FOR_PLAN="$USE_WORKTREES"
+
+if [ -n "$SUBMODULE_PATHS" ]; then
+  if [ -z "$PLAN_FILES" ]; then
+    # Fallback: planned paths are unknown/unparseable — fall back to the safe
+    # behavior (disable worktree isolation for this plan) and log why.
+    echo "[worktree] Plan ${plan_id}: files_modified missing/unparseable — disabling worktree isolation as a safety fallback (submodule project)"
+    USE_WORKTREES_FOR_PLAN=false
+  else
+    # Compute intersection: any planned path that lies inside a submodule path
+    # makes worktree isolation unsafe for this plan.
+    INTERSECT=""
+    for sm in $SUBMODULE_PATHS; do
+      for pf in $PLAN_FILES; do
+        case "$pf" in
+          "$sm"|"$sm"/*) INTERSECT="$INTERSECT $pf" ;;
+        esac
+      done
+    done
+    if [ -n "$INTERSECT" ]; then
+      echo "[worktree] Plan ${plan_id}: planned paths intersect submodule paths (${INTERSECT# }) — disabling worktree isolation for this plan"
+      USE_WORKTREES_FOR_PLAN=false
+    fi
+  fi
+fi
+```
+
+When `USE_WORKTREES_FOR_PLAN` is `false`, that plan's executor agent runs without `isolation="worktree"` — it executes on the main working tree instead of in a parallel worktree. Other plans in the same wave whose paths do not intersect submodules continue to run with worktree isolation in parallel. When `USE_WORKTREES` (project-level) is `false`, all executor agents run without `isolation="worktree"` — they execute sequentially on the main working tree instead of in parallel worktrees.
 
 Read context window size for adaptive prompt enrichment:
 
