@@ -14,6 +14,19 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
   it). Re-run `gsd update` without `--minimal` to expand to the full surface. The
   install manifest now records `mode: "minimal" | "full"`. (#2762)
 
+### Fixed
+- **Codex install no longer corrupts existing `~/.codex/config.toml`** — the installer
+  now defensively strips legacy `[agents]` (single-bracket) and `[[agents]]` (sequence)
+  blocks regardless of GSD marker presence (both invalid in current Codex schema), emits
+  the GSD-managed hook in the user's preferred shape (`[[hooks.<Event>]]` namespaced AoT
+  if any user hook uses it, otherwise top-level `[[hooks]]`), migrates legacy
+  `[hooks.<Event>]` to namespaced AoT, and atomically writes via temp-file +
+  `renameSync`. A strict TOML parser validates the post-write bytes against the Codex
+  schema and rejects duplicate keys, repeated table headers, trailing bytes after
+  values, and unsupported value types. Both pre-write helper failures and write-time
+  failures restore the pre-install snapshot and abort with a clear error rather than
+  warn-and-continue. (#2760)
+
 ## [1.38.5] - 2026-04-25
 
 ### Fixed
