@@ -58,7 +58,7 @@ Configuration options for `.planning/` directory behavior.
 
 ```bash
 # Commit with automatic commit_docs + gitignore checks:
-gsd-sdk query commit "docs: update state" .planning/STATE.md
+gsd-sdk query commit "docs: update state" --files .planning/STATE.md
 
 # Load config via state load (returns JSON):
 INIT=$(gsd-sdk query state.load)
@@ -76,7 +76,7 @@ if [[ "$INIT" == @file:* ]]; then INIT=$(cat "${INIT#@file:}"); fi
 **Commit via CLI (handles checks automatically):**
 
 ```bash
-gsd-sdk query commit "docs: update state" .planning/STATE.md
+gsd-sdk query commit "docs: update state" --files .planning/STATE.md
 ```
 
 The CLI checks `commit_docs` config and gitignore status internally — no manual conditionals needed.

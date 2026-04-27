@@ -257,7 +257,7 @@ gsd-sdk query state.update "Status" "Phase ${PHASE_NUMBER} shipped — PR #${PR_
 
 If `commit_docs` is true:
 ```bash
-gsd-sdk query commit "docs(${padded_phase}): ship phase ${PHASE_NUMBER} — PR #${PR_NUMBER}" .planning/STATE.md
+gsd-sdk query commit "docs(${padded_phase}): ship phase ${PHASE_NUMBER} — PR #${PR_NUMBER}" --files .planning/STATE.md
 ```
 </step>
 

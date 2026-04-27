@@ -345,6 +345,7 @@ Use `gsd-sdk query commit` with conventional format (message first, then every s
 ```bash
 gsd-sdk query commit \
   "fix({padded_phase}): {finding_id} {short_description}" \
+  --files \
   {all_modified_files}
 ```
 
@@ -354,7 +355,7 @@ Examples:
 
 **Multiple files:** List ALL modified files after the message (space-separated):
 ```bash
-gsd-sdk query commit "fix(02): CR-01 ..." \
+gsd-sdk query commit "fix(02): CR-01 ..." --files \
   src/api/auth.ts src/types/user.ts tests/auth.test.ts
 ```
 

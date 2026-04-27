@@ -55,7 +55,7 @@ Group by plan, dimension, severity.
 ### Step 6: Commit
 
 ```bash
-gsd-sdk query commit "fix($PHASE): revise plans based on checker feedback" .planning/phases/$PHASE-*/$PHASE-*-PLAN.md
+gsd-sdk query commit "fix($PHASE): revise plans based on checker feedback" --files .planning/phases/$PHASE-*/$PHASE-*-PLAN.md
 ```
 
 ### Step 7: Return Revision Summary

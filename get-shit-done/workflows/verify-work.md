@@ -391,7 +391,7 @@ Clear Current Test section:
 
 Commit the UAT file:
 ```bash
-gsd-sdk query commit "test({phase_num}): complete UAT - {passed} passed, {issues} issues" ".planning/phases/XX-name/{phase_num}-UAT.md"
+gsd-sdk query commit "test({phase_num}): complete UAT - {passed} passed, {issues} issues" --files ".planning/phases/XX-name/{phase_num}-UAT.md"
 ```
 
 Present summary:

@@ -249,7 +249,7 @@ None — discuss phase skipped.
 Commit the minimal context:
 
 ```bash
-gsd-sdk query commit "docs(${PADDED_PHASE}): auto-generated context (discuss skipped)" "${phase_dir}/${padded_phase}-CONTEXT.md"
+gsd-sdk query commit "docs(${PADDED_PHASE}): auto-generated context (discuss skipped)" --files "${phase_dir}/${padded_phase}-CONTEXT.md"
 ```
 
 Proceed to 3b.

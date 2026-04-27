@@ -201,7 +201,7 @@ Use full relative paths. Group by topic area.]
 
 5. Commit:
 ```bash
-gsd-sdk query commit "docs(${padded_phase}): generate context from PRD" "${phase_dir}/${padded_phase}-CONTEXT.md"
+gsd-sdk query commit "docs(${padded_phase}): generate context from PRD" --files "${phase_dir}/${padded_phase}-CONTEXT.md"
 ```
 
 6. Set `context_content` to the generated CONTEXT.md content and continue to step 5 (Handle Research).
@@ -925,7 +925,7 @@ For each plan entry extracted from `PLAN-OUTLINE.md`:
 
 5. **Commit per-plan:**
    ```bash
-   gsd-sdk query commit "docs(${PADDED_PHASE}): plan ${plan_id} (chunked)" "${PHASE_DIR}/${plan_id}-PLAN.md"
+   gsd-sdk query commit "docs(${PADDED_PHASE}): plan ${plan_id} (chunked)" --files "${PHASE_DIR}/${plan_id}-PLAN.md"
    ```
 
 After all N plans are written and committed, treat this as `## PLANNING COMPLETE` and continue
@@ -1263,7 +1263,7 @@ After the script returns, check that the bounced file still has valid YAML front
 
 6. **Commit surviving bounced plans:** If at least one plan survived both the frontmatter validation and the checker re-run, commit the changes:
 ```bash
-gsd-sdk query commit "refactor(${padded_phase}): bounce plans through external refinement" "${PHASE_DIR}/*-PLAN.md"
+gsd-sdk query commit "refactor(${padded_phase}): bounce plans through external refinement" --files "${PHASE_DIR}/*-PLAN.md"
 ```
 
 Display summary:
