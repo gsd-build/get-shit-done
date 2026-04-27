@@ -201,7 +201,88 @@ describe('install-profiles: cleanupStagedSkills', () => {
     cleanupStagedSkills();
     cleanupStagedSkills();
   });
+
+  test('full mode does not register a staged dir (no leak source for default install)', () => {
+    cleanupStagedSkills();
+    const src = fs.mkdtempSync(path.join(os.tmpdir(), 'gsd-stage-fullmode-'));
+    fs.writeFileSync(path.join(src, 'plan-phase.md'), '# plan\n');
+    try {
+      const before = listTmpStageDirs();
+      const result = stageSkillsForMode(src, 'full');
+      assert.strictEqual(result, src, 'full mode returns original src unchanged');
+      cleanupStagedSkills();
+      const after = listTmpStageDirs();
+      // No new gsd-minimal-skills- dirs should have been created.
+      assert.deepStrictEqual(after, before);
+    } finally {
+      fs.rmSync(src, { recursive: true, force: true });
+    }
+  });
+
+  test('exit handler registers exactly once across many stageSkillsForMode calls', () => {
+    cleanupStagedSkills();
+    const src = fs.mkdtempSync(path.join(os.tmpdir(), 'gsd-stage-exit-handler-'));
+    fs.writeFileSync(path.join(src, 'plan-phase.md'), '# plan\n');
+    try {
+      const before = process.listenerCount('exit');
+      // Call 5x — install.js has 13 dispatch sites, so this matters.
+      for (let i = 0; i < 5; i++) stageSkillsForMode(src, 'minimal');
+      const after = process.listenerCount('exit');
+      // Either 0 (handler was already registered by an earlier test) or +1.
+      // Never +5.
+      assert.ok(after - before <= 1, `expected <=1 new exit listener, got ${after - before}`);
+    } finally {
+      fs.rmSync(src, { recursive: true, force: true });
+      cleanupStagedSkills();
+    }
+  });
+
+  test('mid-copy failure removes the partial staged dir and re-throws', () => {
+    cleanupStagedSkills();
+    const src = fs.mkdtempSync(path.join(os.tmpdir(), 'gsd-stage-fail-'));
+    fs.writeFileSync(path.join(src, 'plan-phase.md'), '# plan\n');
+    try {
+      // Force a failure mid-loop by making fs.copyFileSync throw on the
+      // second allowlisted file. Capture the staged dir from the first
+      // successful call (we can't see it directly, so we count tmp dirs).
+      const before = listTmpStageDirs();
+      const realCopy = fs.copyFileSync;
+      let copyCount = 0;
+      fs.copyFileSync = (s, d) => {
+        copyCount++;
+        if (copyCount === 2) throw new Error('synthetic disk full');
+        return realCopy(s, d);
+      };
+      // Need at least 2 allowlisted files in src for the second copy to fire.
+      fs.writeFileSync(path.join(src, 'execute-phase.md'), '# x\n');
+      try {
+        assert.throws(() => stageSkillsForMode(src, 'minimal'), /synthetic disk full/);
+      } finally {
+        fs.copyFileSync = realCopy;
+      }
+      const after = listTmpStageDirs();
+      // Partial dir must have been cleaned up by stageSkillsForMode itself
+      // before re-throwing — so the count is unchanged.
+      assert.deepStrictEqual(after, before, 'partial staged dir should be removed on throw');
+    } finally {
+      fs.rmSync(src, { recursive: true, force: true });
+      cleanupStagedSkills();
+    }
+  });
 });
+
+// Helper for the cleanup tests above. Listed as a sibling so the describe
+// block stays focused on the contract assertions.
+function listTmpStageDirs() {
+  try {
+    return fs
+      .readdirSync(os.tmpdir())
+      .filter((n) => n.startsWith('gsd-minimal-skills-'))
+      .sort();
+  } catch {
+    return [];
+  }
+}
 
 // ─── End-to-end install regression: full → minimal Codex downgrade ─────────
 //
@@ -282,6 +363,154 @@ describe('install: Codex full → minimal downgrade cleans stale agent state', (
       assert.ok(fs.existsSync(configPath), 'config.toml with user content should remain');
     } finally {
       fs.rmSync(targetDir, { recursive: true, force: true });
+    }
+  });
+});
+
+// ─── Claude full → minimal downgrade ────────────────────────────────────────
+//
+// Mirrors the Codex test for the most common runtime. The Codex test pins
+// the .toml + config.toml cleanup; this one pins the .md-only path that
+// every non-Codex runtime shares.
+describe('install: Claude full → minimal downgrade removes stale agents', () => {
+  const { spawnSync } = require('child_process');
+  const installScript = path.join(__dirname, '..', 'bin', 'install.js');
+
+  test('--minimal removes stale gsd-*.md agents but preserves user-owned agents', () => {
+    const targetDir = fs.mkdtempSync(path.join(os.tmpdir(), 'gsd-claude-downgrade-'));
+    try {
+      const agentsDir = path.join(targetDir, 'agents');
+      fs.mkdirSync(agentsDir, { recursive: true });
+      // Fake a previous full install + a user-owned agent:
+      fs.writeFileSync(path.join(agentsDir, 'gsd-executor.md'), 'stale\n');
+      fs.writeFileSync(path.join(agentsDir, 'gsd-planner.md'), 'stale\n');
+      fs.writeFileSync(path.join(agentsDir, 'my-custom-agent.md'), 'user owns this\n');
+
+      spawnSync(
+        process.execPath,
+        [installScript, '--claude', '--global', '--config-dir', targetDir, '--minimal'],
+        { encoding: 'utf8' },
+      );
+
+      const remaining = fs.existsSync(agentsDir) ? fs.readdirSync(agentsDir) : [];
+      assert.ok(!remaining.includes('gsd-executor.md'), 'stale gsd-executor.md removed');
+      assert.ok(!remaining.includes('gsd-planner.md'), 'stale gsd-planner.md removed');
+      assert.ok(remaining.includes('my-custom-agent.md'), 'user agent preserved');
+
+      // No `gsd-*` files at all should remain:
+      const stragglers = remaining.filter((f) => f.startsWith('gsd-'));
+      assert.deepStrictEqual(stragglers, [], 'no gsd-* files should remain in agents/');
+    } finally {
+      fs.rmSync(targetDir, { recursive: true, force: true });
+    }
+  });
+});
+
+// ─── Manifest mode field round-trip ─────────────────────────────────────────
+//
+// Locks in the contract that downstream tooling (uninstaller, drift detector,
+// future profile-aware commands) can rely on the `mode` field being present
+// and accurate after every install. Catches regressions in writeManifest's
+// options threading.
+describe('install: manifest records mode for both profiles', () => {
+  const { spawnSync } = require('child_process');
+  const installScript = path.join(__dirname, '..', 'bin', 'install.js');
+
+  function manifestModeAfterInstall(extraArgs) {
+    const targetDir = fs.mkdtempSync(path.join(os.tmpdir(), 'gsd-manifest-mode-'));
+    try {
+      spawnSync(
+        process.execPath,
+        [installScript, '--claude', '--global', '--config-dir', targetDir, ...extraArgs],
+        { encoding: 'utf8' },
+      );
+      const manifestPath = path.join(targetDir, 'gsd-file-manifest.json');
+      if (!fs.existsSync(manifestPath)) {
+        return { mode: '<no manifest>', skillCount: 0, agentCount: 0 };
+      }
+      const m = JSON.parse(fs.readFileSync(manifestPath, 'utf8'));
+      const skillCount = new Set(
+        Object.keys(m.files || {})
+          .filter((k) => k.startsWith('skills/'))
+          .map((k) => k.split('/')[1]),
+      ).size;
+      const agentCount = Object.keys(m.files || {}).filter((k) => k.startsWith('agents/')).length;
+      return { mode: m.mode, skillCount, agentCount };
+    } finally {
+      fs.rmSync(targetDir, { recursive: true, force: true });
+    }
+  }
+
+  test('default install records mode: "full" with the full skill+agent count', () => {
+    const r = manifestModeAfterInstall([]);
+    assert.strictEqual(r.mode, 'full');
+    assert.ok(r.skillCount > 6, `full install should have >6 skills, got ${r.skillCount}`);
+    assert.ok(r.agentCount > 0, `full install should have agents, got ${r.agentCount}`);
+  });
+
+  test('--minimal records mode: "minimal" with exactly 6 skills and 0 agents', () => {
+    const r = manifestModeAfterInstall(['--minimal']);
+    assert.strictEqual(r.mode, 'minimal');
+    assert.strictEqual(r.skillCount, 6);
+    assert.strictEqual(r.agentCount, 0);
+  });
+
+  test('--core-only is an alias for --minimal', () => {
+    const r = manifestModeAfterInstall(['--core-only']);
+    assert.strictEqual(r.mode, 'minimal');
+    assert.strictEqual(r.skillCount, 6);
+    assert.strictEqual(r.agentCount, 0);
+  });
+});
+
+// ─── Allowlist scope guard ─────────────────────────────────────────────────
+//
+// Catches drift in the opposite direction: someone adds an off-loop command
+// to the allowlist, or removes a main-loop command. The first test in this
+// file asserts the exact set; these add semantic guard rails so the failure
+// mode is clear ("autonomous shouldn't be in core") rather than just a diff.
+describe('install-profiles: allowlist scope guards', () => {
+  test('every main-loop command is in the allowlist', () => {
+    for (const required of ['new-project', 'discuss-phase', 'plan-phase', 'execute-phase']) {
+      assert.ok(
+        shouldInstallSkill(required, 'minimal'),
+        `main-loop command "${required}" must be in MINIMAL_SKILL_ALLOWLIST`,
+      );
+    }
+  });
+
+  test('off-loop convenience commands are NOT in the allowlist', () => {
+    // These exist in commands/gsd/ and are valid skills, but they're not part
+    // of the core main loop. If any of these slip into the allowlist the
+    // floor erodes.
+    for (const offLoop of [
+      'autonomous',
+      'ship',
+      'do',
+      'progress',
+      'next',
+      'fast',
+      'quick',
+      'debug',
+      'code-review',
+      'verify-work',
+    ]) {
+      assert.ok(
+        !shouldInstallSkill(offLoop, 'minimal'),
+        `off-loop command "${offLoop}" must NOT be in MINIMAL_SKILL_ALLOWLIST`,
+      );
+    }
+  });
+
+  test('mode is required to be a known string — defensive against typos', () => {
+    // Any non-'minimal' mode should admit everything (full-mode behavior).
+    // This catches a future bug where someone adds a 'compact' or 'tier2'
+    // mode and forgets to wire up the predicate.
+    for (const unknownMode of ['compact', 'tier2', 'CORE', 'Minimal', 'mini']) {
+      assert.ok(
+        shouldInstallSkill('autonomous', unknownMode),
+        `unknown mode "${unknownMode}" should fall through to full behavior`,
+      );
     }
   });
 });
