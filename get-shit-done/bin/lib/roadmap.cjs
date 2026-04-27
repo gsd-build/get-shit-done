@@ -456,10 +456,11 @@ function cmdRoadmapAnnotateDependencies(cwd, phaseNum, raw) {
     for (const t of truths) {
       const text = coerceTruthToString(t);
       if (!text) continue;
-      const key = text.trim().toLowerCase();
+      const trimmed = text.trim();
+      const key = trimmed.toLowerCase();
       if (!key || seen.has(key)) continue;
       seen.add(key);
-      truthCounts.set(key, (truthCounts.get(key) || { count: 0, text: text.trim() }));
+      if (!truthCounts.has(key)) truthCounts.set(key, { count: 0, text: trimmed });
       truthCounts.get(key).count++;
     }
   }
