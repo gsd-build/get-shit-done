@@ -53,12 +53,16 @@ function captureConsole(fn) {
     console.warn = origWarn;
     console.error = origError;
   }
+  // Re-throw any captured exception AFTER restoring console so callers don't
+  // have to destructure-and-assert on `threw` (and a future regression that
+  // crashes before printing won't falsely pass `!hasReady`). (#2775
+  // CodeRabbit follow-up)
+  if (threw) throw threw;
   // strip ANSI for matching
   const strip = (s) => s.replace(/\x1b\[[0-9;]*m/g, '');
   return {
     stdout: stdout.map(strip).join('\n'),
     stderr: stderr.map(strip).join('\n'),
-    threw,
   };
 }
 
@@ -183,17 +187,34 @@ describe('bug #2775: installSdkIfNeeded must verify gsd-sdk on PATH before repor
       (st.mode & 0o111) !== 0,
       `fallback wrapper must have execute bit set (mode=${st.mode.toString(8)})`,
     );
-    // Behavioral check: require()ing the wrapper from a fresh Node child must
-    // resolve the CLI correctly (i.e. __dirname inside the real shim points
-    // at <pkg>/bin, not at ~/.local/bin). We don't actually want to spawn the
-    // CLI (the test sdk dir has only a stub), so we override the spawnSync
-    // module path via an env probe: assert that the wrapper, when read by
-    // Node, references the real shim location whose sibling is sdk/dist.
-    const realShimDir = path.dirname(realShimSrc);
-    const expectedCliDir = path.resolve(realShimDir, '..', 'sdk', 'dist');
+    // (Earlier assertions on targetContent already verify the wrapper points
+    // at the real shim by absolute path, which is what guarantees __dirname
+    // resolves correctly. A separate "does <pkg>/sdk/dist exist?" check would
+    // be tautological — that path is true regardless of what the wrapper
+    // wrote.) (#2775 CodeRabbit follow-up)
+  });
+
+  test('self-link prefers a PATH-backed HOME dir over ~/.local/bin when ~/.local/bin is off-PATH', () => {
+    // Regression for #2775 CodeRabbit follow-up: the candidate ordering must
+    // try PATH-backed HOME dirs FIRST, falling back to ~/.local/bin only when
+    // it's not on PATH. Otherwise we self-link to ~/.local/bin (off-PATH) and
+    // warn — when we could have linked to ~/bin (on-PATH) and printed success.
+    const homeBin = path.join(homeDir, 'bin');
+    fs.mkdirSync(homeBin, { recursive: true });
+    // PATH contains ~/bin (a HOME dir) but NOT ~/.local/bin.
+    process.env.PATH = `${homeBin}${path.delimiter}${pathDir}`;
+
+    const { stdout, stderr } = captureConsole(() => {
+      installSdkIfNeeded({ sdkDir });
+    });
+    const combined = `${stdout}\n${stderr}`;
     assert.ok(
-      fs.existsSync(expectedCliDir) || fs.existsSync(path.dirname(expectedCliDir)),
-      `real shim's resolved CLI dir must exist relative to the package, not the link dir. Expected near: ${expectedCliDir}`,
+      /GSD SDK ready/.test(combined),
+      `installer must self-link into the on-PATH HOME dir and print success. Output:\n${combined}`,
+    );
+    assert.ok(
+      fs.existsSync(path.join(homeBin, 'gsd-sdk')),
+      `installer must materialize the link in the on-PATH HOME dir (~/bin), not ~/.local/bin`,
     );
   });
 

@@ -7496,17 +7496,23 @@ function trySelfLinkGsdSdk(shimSrc) {
   const home = os.homedir();
   if (!home) return null;
 
-  const candidates = [];
   const localBin = path.join(home, '.local', 'bin');
-  candidates.push(localBin);
+  const pathCandidates = [];
   const pathEnv = process.env.PATH || '';
   for (const seg of pathEnv.split(path.delimiter)) {
     if (!seg) continue;
     const abs = path.resolve(seg);
-    if (abs.startsWith(home + path.sep) && !candidates.includes(abs)) {
-      candidates.push(abs);
+    if (abs.startsWith(home + path.sep) && !pathCandidates.includes(abs)) {
+      pathCandidates.push(abs);
     }
   }
+  // If ~/.local/bin is already on PATH, keep it first (preserves existing UX
+  // for the common case). Otherwise prefer PATH-backed HOME dirs first so we
+  // self-link somewhere actually on PATH, falling back to ~/.local/bin only
+  // when no on-PATH HOME dir is writable. (#2775 CodeRabbit follow-up)
+  const candidates = pathCandidates.includes(localBin)
+    ? [localBin, ...pathCandidates.filter((dir) => dir !== localBin)]
+    : [...pathCandidates, localBin];
 
   for (const dir of candidates) {
     try {
