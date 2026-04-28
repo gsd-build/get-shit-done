@@ -34,13 +34,14 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 - **Codex install no longer corrupts existing `~/.codex/config.toml`** — the installer
   now defensively strips legacy `[agents]` (single-bracket) and `[[agents]]` (sequence)
   blocks regardless of GSD marker presence (both invalid in current Codex schema), emits
-  the GSD-managed hook in the namespaced shape (`[[hooks.SessionStart]]`) which is required
-  by Codex 0.124.0+, migrates legacy `[hooks.<Event>]` to namespaced AoT, and atomically
-  writes via temp-file + `renameSync`. A strict TOML parser validates the post-write bytes
-  against the Codex schema and rejects duplicate keys, repeated table headers, trailing
-  bytes after values, and unsupported value types. Both pre-write helper failures and
-  write-time failures restore the pre-install snapshot and abort with a clear error
-  rather than warn-and-continue. (#2760, #2727)
+  the GSD-managed hook in the user's preferred shape (`[[hooks.<Event>]]` namespaced AoT
+  if any user hook uses it, otherwise top-level `[[hooks]]`), migrates legacy
+  `[hooks.<Event>]` to namespaced AoT, and atomically writes via temp-file +
+  `renameSync`. A strict TOML parser validates the post-write bytes against the Codex
+  schema and rejects duplicate keys, repeated table headers, trailing bytes after
+  values, and unsupported value types. Both pre-write helper failures and write-time
+  failures restore the pre-install snapshot and abort with a clear error rather than
+  warn-and-continue. (#2760)
 - **Codex `[[agents]]` reverted to `[agents.<name>]` struct format** — the sequence
   format introduced in #2645 is rejected by codex-cli 0.124.0 with "invalid type:
   sequence, expected struct AgentsToml". Reverted to struct format which is correct for

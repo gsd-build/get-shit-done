@@ -2977,16 +2977,16 @@ function migrateCodexHooksMapFormat(content) {
 
 /**
  * Detect whether the user already uses the namespaced AoT hooks form
- * (`[[hooks.<EVENT>]]`) for the given event in the config. When true,
+ * (`[[hooks.<EVENT>]]`) in the config. When true,
  * the GSD-managed hook block must be emitted in the same shape so it
  * coexists cleanly — mixing `[[hooks]]` (flat) with `[[hooks.SessionStart]]`
  * (namespaced) in the same file confuses round-trip writers and can
  * produce a config that Codex rejects (#2760, defect 3).
  */
-function hasUserNamespacedAotHooks(content, event) {
+function hasUserNamespacedAotHooks(content) {
   const sections = getTomlTableSections(content);
   return sections.some(
-    (section) => section.array && section.path === `hooks.${event}`
+    (section) => section.array && section.path.startsWith('hooks.')
   );
 }
 
@@ -6985,13 +6985,20 @@ function install(isGlobal, runtime = 'claude') {
       const codexHooksFeature = ensureCodexHooksFeature(configContent);
       configContent = setManagedCodexHooksOwnership(codexHooksFeature.content, codexHooksFeature.ownership);
 
-      // Add SessionStart hook for update checking. We always use the
-      // namespaced AoT form `[[hooks.SessionStart]]` which is required
-      // by Codex 0.124.0+ (#2637, #2760, #2727).
+      // Add SessionStart hook for update checking. Default to top-level
+      // `[[hooks]]` AoT with `event` field — the form GSD has emitted since
+      // the Codex 0.124 migration (#2637). When the user already uses the
+      // namespaced AoT form `[[hooks.<Event>]]` for their own hooks,
+      // emit our managed entry in that same shape so the two forms don't
+      // collide on round-trip (#2760, defect 3).
       const updateCheckScript = path.resolve(targetDir, 'hooks', 'gsd-check-update.js').replace(/\\/g, '/');
       const hookBlock = `${eol}# GSD Hooks${eol}` +
-          `[[hooks.SessionStart]]${eol}` +
-          `command = "node ${updateCheckScript}"${eol}`;
+        (hasUserNamespacedAotHooks(configContent)
+          ? `[[hooks.SessionStart]]${eol}` +
+            `command = "node ${updateCheckScript}"${eol}`
+          : `[[hooks]]${eol}` +
+            `event = "SessionStart"${eol}` +
+            `command = "node ${updateCheckScript}"${eol}`);
 
       // Migrate legacy gsd-update-check entries from prior installs (#1755 followup)
       // Remove stale hook blocks that used the inverted filename or wrong path.

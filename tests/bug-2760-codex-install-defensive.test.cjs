@@ -349,7 +349,7 @@ describe('#2760 — hasUserNamespacedAotHooks helper', () => {
       'command = "x"',
       '',
     ].join('\n');
-    assert.equal(hasUserNamespacedAotHooks(content, 'SessionStart'), true);
+    assert.equal(hasUserNamespacedAotHooks(content), true);
   });
 
   test('returns false when only top-level [[hooks]] entries exist', () => {
@@ -359,7 +359,7 @@ describe('#2760 — hasUserNamespacedAotHooks helper', () => {
       'command = "x"',
       '',
     ].join('\n');
-    assert.equal(hasUserNamespacedAotHooks(content, 'SessionStart'), false);
+    assert.equal(hasUserNamespacedAotHooks(content), false);
   });
 
   test('returns false when only single-bracket [hooks.SessionStart] exists', () => {
@@ -368,7 +368,7 @@ describe('#2760 — hasUserNamespacedAotHooks helper', () => {
       'command = "x"',
       '',
     ].join('\n');
-    assert.equal(hasUserNamespacedAotHooks(content, 'SessionStart'), false);
+    assert.equal(hasUserNamespacedAotHooks(content), false);
   });
 });
 
