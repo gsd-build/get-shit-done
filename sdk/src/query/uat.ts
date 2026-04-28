@@ -188,11 +188,61 @@ function parseUatItems(content: string): Record<string, unknown>[] {
   return items;
 }
 
+/**
+ * Parse frontmatter human_verification: YAML array entries into audit items.
+ *
+ * Fixes #2788: when gsd-verifier encodes human items in YAML frontmatter
+ * rather than the body, parseVerificationItems was returning [] because it
+ * only searched the body for a "## Human Verification" heading.
+ */
+function parseVerificationFrontmatterItems(fm: Record<string, unknown>): Record<string, unknown>[] {
+  const items: Record<string, unknown>[] = [];
+  const hvArray = fm.human_verification;
+  if (!Array.isArray(hvArray)) return items;
+
+  let i = 0;
+  for (const entry of hvArray) {
+    i++;
+    if (typeof entry === 'string') {
+      if (entry.length > 0) {
+        items.push({ test: i, name: entry.trim(), result: 'human_needed', category: 'human_uat' });
+      }
+    } else if (typeof entry === 'object' && entry !== null) {
+      const obj = entry as Record<string, unknown>;
+      // Accept any string property as the item name; prefer 'test' key.
+      const name = (obj.test as string | undefined) || (obj.name as string | undefined) || '';
+      if (name) {
+        const item: Record<string, unknown> = {
+          test: i,
+          name: String(name).trim(),
+          result: 'human_needed',
+          category: 'human_uat',
+        };
+        if (obj.expected) item.expected = String(obj.expected).trim();
+        if (obj.why_human) item.why_human = String(obj.why_human).trim();
+        items.push(item);
+      }
+    }
+  }
+  return items;
+}
+
 /** Port of `parseVerificationItems` from `uat.cjs`. */
-function parseVerificationItems(content: string, status: string): Record<string, unknown>[] {
+function parseVerificationItems(content: string, status: string, fm?: Record<string, unknown>): Record<string, unknown>[] {
   const items: Record<string, unknown>[] = [];
   if (status === 'human_needed') {
-    const hvSection = content.match(/##\s*Human Verification.*?\n([\s\S]*?)(?=\n##\s|\n---\s|$)/i);
+    // Check frontmatter human_verification: array first (#2788).
+    // gsd-verifier writes items here; body-section fallback is secondary.
+    if (fm) {
+      const fmItems = parseVerificationFrontmatterItems(fm);
+      if (fmItems.length > 0) return fmItems;
+    }
+
+    // Body fallback: match ## human_verification or ## Human Verification
+    // (case-insensitive, underscore or space, with optional parenthetical).
+    const hvSection = content.match(
+      /##\s*[Hh]uman[_\s][Vv]erification[^\n]*\n([\s\S]*?)(?=\n##\s|\n---\s|$)/i
+    );
     if (hvSection) {
       const lines = hvSection[1].split('\n');
       for (const line of lines) {
@@ -273,7 +323,7 @@ export const auditUat: QueryHandler = async (_args, projectDir, workstream) => {
       const fm = extractFrontmatter(content);
       const status = (fm.status || 'unknown') as string;
       if (status === 'human_needed' || status === 'gaps_found') {
-        const items = parseVerificationItems(content, status);
+        const items = parseVerificationItems(content, status, fm);
         if (items.length > 0) {
           results.push({
             phase: phaseNum,
