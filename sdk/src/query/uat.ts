@@ -204,8 +204,9 @@ function parseVerificationFrontmatterItems(fm: Record<string, unknown>): Record<
   for (const entry of hvArray) {
     i++;
     if (typeof entry === 'string') {
-      if (entry.length > 0) {
-        items.push({ test: i, name: entry.trim(), result: 'human_needed', category: 'human_uat' });
+      const name = entry.trim();
+      if (name.length > 0) {
+        items.push({ test: i, name, result: 'human_needed', category: 'human_uat' });
       }
     } else if (typeof entry === 'object' && entry !== null) {
       const obj = entry as Record<string, unknown>;
@@ -241,7 +242,7 @@ function parseVerificationItems(content: string, status: string, fm?: Record<str
     // Body fallback: match ## human_verification or ## Human Verification
     // (case-insensitive, underscore or space, with optional parenthetical).
     const hvSection = content.match(
-      /##\s*[Hh]uman[_\s][Vv]erification[^\n]*\n([\s\S]*?)(?=\n##\s|\n---\s|$)/i
+      /##\s*human[_\s-]verification[^\n]*\n([\s\S]*?)(?=\n##\s|\n---\s|$)/i
     );
     if (hvSection) {
       const lines = hvSection[1].split('\n');
