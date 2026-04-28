@@ -4,7 +4,8 @@
   "description": "A meta-prompting, context engineering and spec-driven development system for Claude Code, OpenCode, Gemini and Codex by TÂCHES.",
   "bin": {
     "get-shit-done-cc": "bin/install.js",
-    "gsd-sdk": "bin/gsd-sdk.js"
+    "gsd-sdk": "bin/gsd-sdk.js",
+    "gsd-tools": "bin/gsd-sdk.js"
   },
   "files": [
     "bin",

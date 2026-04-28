@@ -341,6 +341,17 @@ export async function main(argv: string[] = process.argv.slice(2)): Promise<void
     return;
   }
 
+  // Fall back to GSD_WORKSTREAM env var when --ws is not supplied (#2791).
+  // gsd-tools.cjs resolves the active workstream via this env var; parity
+  // means gsd-sdk query commands see the same .planning/ path as gsd-tools.
+  if (args.ws === undefined && process.env.GSD_WORKSTREAM) {
+    const envWs = process.env.GSD_WORKSTREAM;
+    if (validateWorkstreamName(envWs)) {
+      args = { ...args, ws: envWs };
+    }
+    // If the env var contains an invalid name, silently ignore it (same as CJS).
+  }
+
   // Multi-repo project-root resolution (issue #2623).
   //
   // When the user launches `gsd-sdk` from inside a `sub_repos`-listed child repo,
