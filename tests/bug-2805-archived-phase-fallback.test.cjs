@@ -135,10 +135,11 @@ describe('bug-2805: init.plan-phase prefers current ROADMAP over archived dir', 
     const result = runSdkQuery('init.plan-phase', ['2'], tmpDir);
 
     // Archived dir is named "02-auth"; current ROADMAP says "New Auth Refactor"
-    const phaseName = result.json?.phase_name ?? '';
-    assert.ok(
-      !phaseName.toLowerCase().includes('02-auth') && phaseName.length > 0,
-      `phase_name should not be the archived dir slug "02-auth", got: "${phaseName}"`
+    // Assert the exact value from the ROADMAP fixture to fully protect the regression.
+    assert.strictEqual(
+      result.json?.phase_name,
+      'New Auth Refactor',
+      `phase_name should come from ROADMAP ("New Auth Refactor"), not the archived dir slug "02-auth", got: "${result.json?.phase_name}"`
     );
   });
 });
