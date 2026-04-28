@@ -564,8 +564,16 @@ async function runCommand(command, args, cwd, raw, defaultValue) {
           type: type || 'execute',
           wave: wave || '1',
         }, raw);
+      } else if (subcommand === 'sme') {
+        // D-07: output template to stdout; caller redirects to target path
+        const tmplPath = path.resolve(__dirname, '..', 'templates', 'sme.md');
+        if (!fs.existsSync(tmplPath)) {
+          error('SME template not found: ' + tmplPath);
+        }
+        const content = fs.readFileSync(tmplPath, 'utf-8');
+        process.stdout.write(content);
       } else {
-        error('Unknown template subcommand. Available: select, fill');
+        error('Unknown template subcommand. Available: select, fill, sme');
       }
       break;
     }
