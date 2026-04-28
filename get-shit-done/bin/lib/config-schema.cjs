@@ -68,6 +68,8 @@ const VALID_CONFIG_KEYS = new Set([
   'claude_md_assembly.mode',
   // #2517 — runtime-aware model profiles
   'runtime',
+  'workflow.use_sme_agents',
+  'sme.blocking',
 ]);
 
 /**
@@ -83,6 +85,7 @@ const DYNAMIC_KEY_PATTERNS = [
   // <runtime> is a free string (so users can map non-built-in runtimes); <tier> is enum-restricted.
   { topLevel: 'model_profile_overrides', test: (k) => /^model_profile_overrides\.[a-zA-Z0-9_-]+\.(opus|sonnet|haiku)$/.test(k),
     description: 'model_profile_overrides.<runtime>.<opus|sonnet|haiku>' },
+  { topLevel: 'sme', test: (k) => /^sme\.processes\.[a-zA-Z0-9_-]+\.block_mode$/.test(k), description: 'sme.processes.<process-name>.block_mode' },
 ];
 
 /**

@@ -70,6 +70,8 @@ export const VALID_CONFIG_KEYS: ReadonlySet<string> = new Set([
   'claude_md_assembly.mode',
   // #2517 — runtime-aware model profiles
   'runtime',
+  'workflow.use_sme_agents',
+  'sme.blocking',
 ]);
 
 /**
@@ -109,6 +111,11 @@ export const DYNAMIC_KEY_PATTERNS: readonly DynamicKeyPattern[] = [
     source: '^model_profile_overrides\\.[a-zA-Z0-9_-]+\\.(opus|sonnet|haiku)$',
     description: 'model_profile_overrides.<runtime>.<opus|sonnet|haiku>',
     test: (k) => /^model_profile_overrides\.[a-zA-Z0-9_-]+\.(opus|sonnet|haiku)$/.test(k),
+  },
+  {
+    source: '^sme\\.processes\\.[a-zA-Z0-9_-]+\\.block_mode$',
+    description: 'sme.processes.<process-name>.block_mode',
+    test: (k) => /^sme\.processes\.[a-zA-Z0-9_-]+\.block_mode$/.test(k),
   },
 ];
 

@@ -213,6 +213,7 @@ All workflow toggles follow the **absent = enabled** pattern. If a key is missin
 | `workflow.drift_action` | string | `warn` | What to do when `workflow.drift_threshold` is exceeded after `/gsd-execute-phase`. `warn` prints a message suggesting `/gsd-map-codebase --paths …`; `auto-remap` spawns `gsd-codebase-mapper` scoped to the affected paths. Added in v1.39 |
 | `workflow.build_command` | string | (none) | Shell command to build the project in the post-merge build gate (Step A of step 5.6 in execute-phase). When unset, the gate auto-detects: Xcode (`.xcodeproj` present) → `xcodebuild build`, `Makefile` with `build:` target → `make build`, Justfile → `just build`, `Cargo.toml` → `cargo build`, `go.mod` → `go build ./...`, Python → `python -m py_compile`, `package.json` with `build` script → `npm run build`. Runs with a 5-minute timeout; failure increments `WAVE_FAILURE_COUNT`. Added in v1.39 |
 | `workflow.test_command` | string | (none) | Shell command to run the project's test suite in the post-merge test gate (Step B of step 5.6 in execute-phase) and the regression gate. When unset, the gate auto-detects: Xcode (`.xcodeproj` present) → `xcodebuild test`, `Makefile` with `test:` target → `make test`, Justfile → `just test`, `package.json` → `npm test`, `Cargo.toml` → `cargo test`, `go.mod` → `go test ./...`, Python → `python -m pytest`. Runs with a 5-minute timeout; failure increments `WAVE_FAILURE_COUNT`. Added in v1.39 |
+| `workflow.use_sme_agents` | boolean | `false` | Enable SME (Subject Matter Expert) agent framework. When `false` (default), all SME workflow steps are unconditionally skipped. Opt-in -- existing projects are unaffected until this is set to `true`. |
 
 ### Recommended Presets
 
@@ -467,6 +468,17 @@ These keys live under `workflow.*` — that is where the workflows and installer
 | `workflow.security_enforcement` | boolean | `true` | Enable threat-model-anchored security verification via `/gsd-secure-phase`. When `false`, security checks are skipped entirely |
 | `workflow.security_asvs_level` | number (1-3) | `1` | OWASP ASVS verification level. Level 1 = opportunistic, Level 2 = standard, Level 3 = comprehensive |
 | `workflow.security_block_on` | string | `"high"` | Minimum severity that blocks phase advancement. Options: `"high"`, `"medium"`, `"low"` |
+
+---
+
+## SME Settings
+
+Settings for the SME (Subject Matter Expert) agent framework. Requires `workflow.use_sme_agents` set to `true`.
+
+| Key | Type | Default | Description |
+|-----|------|---------|-------------|
+| `sme.blocking` | string | `soft` | Default block mode for newly created SME documents. `soft` = surface concerns as warnings, allow user to proceed. `strict` = BLOCKER findings halt plan finalization until acknowledged. Can be overridden per process. |
+| `sme.processes.<process-name>.block_mode` | string | (inherits `sme.blocking`) | Per-process block mode override. `<process-name>` must match `[a-zA-Z0-9_-]+`. Example: `gsd-sdk config-set sme.processes.payments.block_mode strict`. |
 
 ---
 
