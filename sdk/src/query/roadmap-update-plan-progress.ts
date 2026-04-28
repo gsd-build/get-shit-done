@@ -15,7 +15,18 @@ import { GSDError, ErrorClassification } from '../errors.js';
 import type { QueryHandler } from './utils.js';
 
 export const roadmapUpdatePlanProgress: QueryHandler = async (args, projectDir, workstream) => {
-  const phaseNum = args[0];
+  // Support --phase <N> flag form in addition to positional (fixes #2796).
+  // execute-phase.md:228 passes --phase so positional-only parsing silently
+  // took the literal string "--phase" as the phase value.
+  const phaseIdx = args.indexOf('--phase');
+  let phaseNum: string;
+  if (phaseIdx !== -1 && args[phaseIdx + 1] !== undefined) {
+    phaseNum = String(args[phaseIdx + 1]);
+  } else {
+    // Positional: skip any leading flag tokens in case of mixed invocations.
+    const positional = args.filter((a) => !String(a).startsWith('--'));
+    phaseNum = positional[0] ? String(positional[0]) : '';
+  }
   if (!phaseNum) {
     throw new GSDError('phase number required for roadmap update-plan-progress', ErrorClassification.Validation);
   }
