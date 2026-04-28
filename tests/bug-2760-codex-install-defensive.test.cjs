@@ -203,11 +203,11 @@ describe('#2760 defect 3 — Hooks AoT preservation across install/uninstall/rei
     assert.strictEqual(handler.type, 'command');
     assert.ok(/gsd-check-update\.js/.test(handler.command));
     // Only one GSD hook entry must exist (no duplication).
-    assert.strictEqual(
-      (content.match(/gsd-check-update\.js/g) || []).length,
-      1,
-      'exactly one gsd-check-update.js reference after upgrade'
-    );
+    const sessionStart = parsed.hooks?.SessionStart ?? [];
+    const gsdHandlers = sessionStart.flatMap((entry) =>
+      Array.isArray(entry.hooks) ? entry.hooks : []
+    ).filter((h) => typeof h?.command === 'string' && /gsd-check-update\.js/.test(h.command));
+    assert.strictEqual(gsdHandlers.length, 1, 'exactly one managed handler after upgrade');
   });
 
   test('reinstall replaces single-block [[hooks.SessionStart]] (no .hooks sub-table) with nested schema', () => {
@@ -234,10 +234,13 @@ describe('#2760 defect 3 — Hooks AoT preservation across install/uninstall/rei
     const handler = eventEntry.hooks[0];
     assert.strictEqual(handler.type, 'command');
     assert.ok(/gsd-check-update\.js/.test(handler.command));
+    const handlers = (parsed.hooks?.SessionStart ?? []).flatMap((entry) =>
+      Array.isArray(entry.hooks) ? entry.hooks : []
+    );
     assert.strictEqual(
-      (content.match(/gsd-check-update\.js/g) || []).length,
+      handlers.filter((h) => typeof h?.command === 'string' && /gsd-check-update\.js/.test(h.command)).length,
       1,
-      'exactly one gsd-check-update.js reference after upgrade from PR-#2802-shape'
+      'exactly one managed handler after upgrade from PR-#2802-shape'
     );
   });
 
@@ -247,21 +250,12 @@ describe('#2760 defect 3 — Hooks AoT preservation across install/uninstall/rei
     runCodexInstall(codexHome); // second install
     const content = readCodexConfig(codexHome);
 
-    assert.strictEqual(
-      (content.match(/gsd-check-update\.js/g) || []).length,
-      1,
-      'exactly one gsd-check-update.js reference after double install'
-    );
-    assert.strictEqual(
-      (content.match(/\[\[hooks\.SessionStart\]\]/g) || []).length,
-      1,
-      'exactly one [[hooks.SessionStart]] header after double install'
-    );
-    assert.strictEqual(
-      (content.match(/\[\[hooks\.SessionStart\.hooks\]\]/g) || []).length,
-      1,
-      'exactly one [[hooks.SessionStart.hooks]] header after double install'
-    );
+    const parsed = parseTomlToObject(content);
+    const sessionStart = parsed.hooks?.SessionStart ?? [];
+    assert.strictEqual(sessionStart.length, 1, 'exactly one SessionStart event entry after double install');
+    assert.ok(Array.isArray(sessionStart[0].hooks), 'SessionStart event has nested handlers array');
+    assert.strictEqual(sessionStart[0].hooks.length, 1, 'exactly one handler in SessionStart after double install');
+    assert.ok(/gsd-check-update\.js/.test(sessionStart[0].hooks[0].command), 'managed handler command preserved');
   });
 });
 

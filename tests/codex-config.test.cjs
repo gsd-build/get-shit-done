@@ -1723,8 +1723,14 @@ describe('Codex install hook configuration (e2e)', () => {
     assert.ok(content.includes('notes = \'\'\'\n[model]\ncodex_hooks = false\n\'\'\''), 'preserves multiline string content');
     assert.strictEqual(countMatches(content, /^codex_hooks = false$/gm), 1, 'does not rewrite codex_hooks text inside multiline string');
     assert.ok(content.indexOf('codex_hooks = true') > content.indexOf('other_feature = true'), 'does not stop the features section at multiline string content');
-    // After migration flat [[hooks]]+event="AfterCommand" becomes [[hooks.AfterCommand]]
-    assert.ok(content.indexOf('codex_hooks = true') < content.indexOf('[[hooks.AfterCommand]]'), 'inserts the real codex_hooks key before the next table');
+    // Parse structurally — verify codex_hooks and migrated AfterCommand hook via parsed object
+    const parsed = parseTomlToObject(content);
+    assert.equal(parsed.features?.codex_hooks, true, 'writes a real codex_hooks boolean key');
+    assert.ok(Array.isArray(parsed.hooks?.AfterCommand), 'AfterCommand flat [[hooks]] migrated to namespaced AoT');
+    const afterCmds = parsed.hooks.AfterCommand.flatMap((entry) =>
+      Array.isArray(entry.hooks) ? entry.hooks.map((h) => h.command).filter(Boolean) : []
+    );
+    assert.ok(afterCmds.includes('echo custom-after-command'), 'preserves AfterCommand user hook command');
     assertNoDraftRootKeys(content);
   });
 

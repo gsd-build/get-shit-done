@@ -2951,9 +2951,12 @@ function migrateCodexHooksMapFormat(content) {
 
   // Collect which flat AoT sections are migratable (have an `event` key).
   // Sections without an `event` key cannot be migrated and are left untouched.
+  // TOML allows both double-quoted ("SessionStart") and single-quoted ('SessionStart')
+  // string values, so the filter accepts both forms.
+  const TOML_QUOTED_STRING = /^\s*event\s*=\s*(?:"(?:[^"\\]|\\.)*"|'[^']*')/m;
   const migratedFlatAotSections = flatAotSections.filter((section) => {
     const body = content.slice(section.headerEnd, section.end);
-    return /^\s*event\s*=\s*"[^"]+"/m.test(body);
+    return TOML_QUOTED_STRING.test(body);
   });
 
   const legacyHooksSections = [...legacyMapSections, ...migratedFlatAotSections];
@@ -2979,11 +2982,15 @@ function migrateCodexHooksMapFormat(content) {
       return buildNestedBlock(type, body);
     });
 
+  // Extract the event name from a flat [[hooks]] body, handling both quote styles.
+  const TOML_EVENT_CAPTURE = /^\s*event\s*=\s*(?:"((?:[^"\\]|\\.)*)"|'([^']*)')/m;
   const flatAotBlocks = migratedFlatAotSections.map((s) => {
     const body = content.slice(s.headerEnd, s.end);
-    const eventMatch = body.match(/^\s*event\s*=\s*"([^"]+)"/m);
-    return buildNestedBlock(eventMatch[1], body, new Set(['event']));
-  });
+    const eventMatch = body.match(TOML_EVENT_CAPTURE);
+    const eventName = eventMatch ? (eventMatch[1] ?? eventMatch[2]) : null;
+    if (!eventName) return '';
+    return buildNestedBlock(eventName, body, new Set(['event']));
+  }).filter(Boolean);
 
   // Insert map-format conversions before the first remaining table section.
   if (mapOnlyBlocks.length > 0) {
@@ -7059,41 +7066,15 @@ function install(isGlobal, runtime = 'claude') {
       let configContent = fs.existsSync(configPath) ? fs.readFileSync(configPath, 'utf-8') : '';
       const eol = detectLineEnding(configContent);
 
-      // Migrate legacy [hooks] map format to [[hooks]] array-of-tables (#2637).
-      // Codex 0.124.0 requires [[hooks]] array-of-tables; old GSD installs wrote
-      // [hooks.shell] map tables which now cause a startup parse error.
-      const migratedContent = migrateCodexHooksMapFormat(configContent);
-      if (migratedContent !== configContent) {
-        configContent = migratedContent;
-        console.log(`  ${green}✓${reset} Migrated legacy Codex [hooks] map format to [[hooks]] array-of-tables`);
-      }
-
-      const codexHooksFeature = ensureCodexHooksFeature(configContent);
-      configContent = setManagedCodexHooksOwnership(codexHooksFeature.content, codexHooksFeature.ownership);
-
-      // Add SessionStart hook for update checking. Codex 0.124.0+ requires the
-      // two-level nested AoT schema: [[hooks.SessionStart]] for the event entry
-      // (holds optional matcher) and [[hooks.SessionStart.hooks]] for the handler
-      // (holds type, command, statusMessage, timeout). The flat [[hooks]] form
-      // with a synthetic `event` field and the single-block [[hooks.SessionStart]]
-      // form were pre-release approximations that Codex 0.124.0 stable does not
-      // accept. (#2637, #2760, #2773)
-      const updateCheckScript = path.resolve(targetDir, 'hooks', 'gsd-check-update.js').replace(/\\/g, '/');
-      const hookBlock = `${eol}# GSD Hooks${eol}` +
-        `[[hooks.SessionStart]]${eol}` +
-        `${eol}` +
-        `[[hooks.SessionStart.hooks]]${eol}` +
-        `type = "command"${eol}` +
-        `command = "node ${updateCheckScript}"${eol}`;
-
-      // Strip ALL prior GSD-managed hook blocks before re-emitting so every
-      // install converges on the correct nested schema regardless of what a
-      // previous GSD version wrote. Handles four historical shapes in order:
+      // Strip ALL prior GSD-managed hook blocks BEFORE migration so the migration
+      // only touches user-authored hooks, not GSD-owned stale entries. Running
+      // strip after migration causes Shape 1 (legacy gsd-update-check filename)
+      // to be converted by migration before the strip regex can match it (#2698).
       //
+      // Historical shapes stripped, in order:
       //   Shape 1 — legacy gsd-update-check filename (pre-#1755): flat [[hooks]] + event
       //   Shape 2 — flat [[hooks]] + event = "SessionStart" (#2637 era, never correct)
-      //   Shape 4 — correct two-block nested schema (must strip before shape 3 to
-      //             avoid leaving an orphaned [[hooks.SessionStart]] header behind)
+      //   Shape 4 — correct two-block nested (strip before shape 3 to avoid orphaned header)
       //   Shape 3 — single-block [[hooks.SessionStart]] without nested .hooks (#2760 era)
       if (configContent.includes('gsd-update-check') || configContent.includes('gsd-check-update')) {
         // Shape 1
@@ -7108,15 +7089,41 @@ function install(isGlobal, runtime = 'claude') {
         );
         // Shape 4 — strip before shape 3 to avoid orphaned header
         configContent = configContent.replace(
-          /(?:\r?\n|^)# GSD Hooks\r?\n\[\[hooks\.SessionStart\]\]\r?\n\r?\n\[\[hooks\.SessionStart\.hooks\]\]\r?\ntype = "command"\r?\ncommand = "node [^\r\n]*gsd-check-update\.js"\r?\n/gm,
+          /(?:\r?\n|^)# GSD Hooks\r?\n\[\[hooks\.SessionStart\]\]\r?\n\r?\n\[\[hooks\.SessionStart\.hooks\]\]\r?\ntype = "command"\r?\ncommand = "node [^\r\n]*(?:gsd-check-update|gsd-update-check)\.js"\r?\n/gm,
           (match) => (match.startsWith('\r\n') ? '\r\n' : match.startsWith('\n') ? '\n' : ''),
         );
         // Shape 3
         configContent = configContent.replace(
-          /(?:\r?\n|^)# GSD Hooks\r?\n\[\[hooks\.SessionStart\]\]\r?\ncommand = "node [^\r\n]*gsd-check-update\.js"\r?\n/gm,
+          /(?:\r?\n|^)# GSD Hooks\r?\n\[\[hooks\.SessionStart\]\]\r?\ncommand = "node [^\r\n]*(?:gsd-check-update|gsd-update-check)\.js"\r?\n/gm,
           (match) => (match.startsWith('\r\n') ? '\r\n' : match.startsWith('\n') ? '\n' : ''),
         );
       }
+
+      // Migrate legacy [hooks] map format and flat [[hooks]] AoT entries to the
+      // namespaced [[hooks.<EVENT>]] form after stripping GSD-managed stale blocks.
+      // Running migration after strip ensures only user-authored hooks are migrated
+      // (#2698 regression: migration before strip converts stale GSD blocks before
+      // the strip regexes can match their original shape).
+      const migratedContent = migrateCodexHooksMapFormat(configContent);
+      if (migratedContent !== configContent) {
+        configContent = migratedContent;
+        console.log(`  ${green}✓${reset} Migrated legacy Codex [hooks] format to two-level nested AoT`);
+      }
+
+      const codexHooksFeature = ensureCodexHooksFeature(configContent);
+      configContent = setManagedCodexHooksOwnership(codexHooksFeature.content, codexHooksFeature.ownership);
+
+      // Add SessionStart hook for update checking. Codex 0.124.0+ requires the
+      // two-level nested AoT schema: [[hooks.SessionStart]] for the event entry
+      // (holds optional matcher) and [[hooks.SessionStart.hooks]] for the handler
+      // (holds type, command, statusMessage, timeout). (#2637, #2760, #2773)
+      const updateCheckScript = path.resolve(targetDir, 'hooks', 'gsd-check-update.js').replace(/\\/g, '/');
+      const hookBlock = `${eol}# GSD Hooks${eol}` +
+        `[[hooks.SessionStart]]${eol}` +
+        `${eol}` +
+        `[[hooks.SessionStart.hooks]]${eol}` +
+        `type = "command"${eol}` +
+        `command = "node ${updateCheckScript}"${eol}`;
 
       if (hasEnabledCodexHooksFeature(configContent) && !configContent.includes('gsd-check-update')) {
         configContent += hookBlock;
