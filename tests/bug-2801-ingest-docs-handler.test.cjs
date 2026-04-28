@@ -89,6 +89,7 @@ describe('bug-2801: gsd-tools init ingest-docs handler exists', () => {
     assert.strictEqual(exitCode, 0);
     const json = JSON.parse(stdout.trim());
     assert.ok(Object.prototype.hasOwnProperty.call(json, 'project_path'), 'project_path present');
+    assert.ok(Object.prototype.hasOwnProperty.call(json, 'commit_docs'), 'commit_docs present');
   });
 
   test('planning_exists is true when .planning/ directory exists', () => {
@@ -102,23 +103,26 @@ describe('bug-2801: gsd-tools init ingest-docs handler exists', () => {
 describe('bug-2801: ingest-docs.md workflow calls gsd-tools not gsd-sdk', () => {
   test('no bash code block in ingest-docs.md calls gsd-sdk', () => {
     const content = fs.readFileSync(WORKFLOW_FILE, 'utf-8');
-    const codeBlocks = [];
+    // Extract bash fenced code blocks structurally.
+    const bashBlocks = [];
     const codeBlockRe = /```bash\n([\s\S]*?)```/g;
     let m;
     while ((m = codeBlockRe.exec(content)) !== null) {
-      codeBlocks.push(m[1]);
+      bashBlocks.push(m[1]);
     }
-    assert.ok(codeBlocks.length > 0, 'expected bash code blocks in workflow');
+    assert.ok(bashBlocks.length > 0, 'expected bash code blocks in workflow');
 
-    const sdkCalls = codeBlocks
+    // Check every line in every bash block — not just lines that start with the token,
+    // since gsd-sdk can appear in subshell expansions like $(gsd-sdk query ...).
+    const sdkCalls = bashBlocks
       .join('\n')
       .split('\n')
-      .filter(line => line.trim().startsWith('gsd-sdk'));
+      .filter((line) => /\bgsd-sdk\b/.test(line));
 
     assert.deepStrictEqual(
       sdkCalls,
       [],
-      `workflow still calls gsd-sdk (should use gsd-tools): ${sdkCalls.join(', ')}`
+      `workflow bash blocks still reference gsd-sdk (should use gsd-tools): ${sdkCalls.join(', ')}`
     );
   });
 
