@@ -2628,6 +2628,11 @@ function getTomlTableSections(content) {
 
   return headerLines.map((record, index) => ({
     path: record.tableHeader.path,
+    // segments preserves the true parsed key count so callers that need to
+    // distinguish a 2-segment path like hooks."before.tool" from a 3-segment
+    // path like hooks.SessionStart.hooks can do so without splitting on dots
+    // (which misclassifies quoted key names that contain dot characters).
+    segments: record.tableHeader.segments,
     array: record.tableHeader.array,
     start: record.start,
     headerEnd: record.end + record.eol.length,
@@ -2915,8 +2920,12 @@ function migrateCodexHooksMapFormat(content) {
   const staleNamespacedAotSections = sections.filter((section) => {
     if (!section.array) return false;
     if (!section.path.startsWith('hooks.')) return false;
-    // [[hooks.TYPE.hooks]] sub-tables have 3 path segments — skip them.
-    if (section.path.split('.').length > 2) return false;
+    // [[hooks.TYPE.hooks]] sub-tables have 3 parsed segments — skip them.
+    // Use section.segments (true parsed key count) rather than splitting
+    // section.path on '.', which misclassifies quoted event names that contain
+    // dots (e.g. [[hooks."before.tool"]] has segments ['hooks','before.tool']
+    // but path 'hooks.before.tool' would split into 3 parts).
+    if (section.segments.length !== 2) return false;
     // Must carry at least one handler field at event-entry level.
     const body = content.slice(section.headerEnd, section.end);
     if (!STALE_HANDLER_FIELD_PATTERN.test(body)) return false;

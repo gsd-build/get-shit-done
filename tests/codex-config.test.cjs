@@ -795,8 +795,19 @@ describe('migrateCodexHooksMapFormat', () => {
       '',
     ].join('\n');
     const result = migrateCodexHooksMapFormat(content);
-    // Content unchanged — migration finds nothing to migrate.
-    assert.strictEqual(result, content);
+    const parsed = parseTomlToObject(result);
+    assert.ok(Array.isArray(parsed.hooks?.SessionStart),
+      'SessionStart must remain a namespaced AoT after no-op migration');
+    assert.strictEqual(parsed.hooks.SessionStart.length, 1,
+      'must not duplicate the event entry');
+    assert.ok(Array.isArray(parsed.hooks.SessionStart[0].hooks),
+      'nested [[hooks.SessionStart.hooks]] sub-table must still be present');
+    assert.strictEqual(parsed.hooks.SessionStart[0].hooks.length, 1,
+      'must not create a double-wrapped [[hooks.SessionStart.hooks.hooks]]');
+    assert.strictEqual(parsed.hooks.SessionStart[0].hooks[0].type, 'command');
+    assert.strictEqual(parsed.hooks.SessionStart[0].hooks[0].command, 'echo already-nested');
+    assert.equal(parsed.hooks.SessionStart[0].command, undefined,
+      'command must not appear at event-entry level');
   });
 
   test('promotes multiple stale [[hooks.TYPE]] entries from different event types', () => {
@@ -829,8 +840,16 @@ describe('migrateCodexHooksMapFormat', () => {
       '',
     ].join('\n');
     const result = migrateCodexHooksMapFormat(content);
-    // Nothing to migrate — content must be unchanged.
-    assert.strictEqual(result, content);
+    const parsed = parseTomlToObject(result);
+    assert.ok(Array.isArray(parsed.hooks?.SessionStart),
+      'matcher-only SessionStart must remain a namespaced AoT');
+    assert.strictEqual(parsed.hooks.SessionStart.length, 1);
+    assert.strictEqual(parsed.hooks.SessionStart[0].matcher, 'some-tool',
+      'matcher key must be preserved');
+    assert.equal(parsed.hooks.SessionStart[0].hooks, undefined,
+      'matcher-only entry must not gain a .hooks sub-array');
+    assert.equal(parsed.hooks.SessionStart[0].command, undefined,
+      'no spurious command key must appear');
   });
 
   test('CRLF line endings are preserved through migration (#2760 CR5: namespaced AoT)', () => {
