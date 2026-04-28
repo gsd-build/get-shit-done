@@ -6875,14 +6875,23 @@ function install(isGlobal, runtime = 'claude') {
         content = processAttribution(content, getCommitAttribution(runtime));
         // Convert frontmatter for runtime compatibility (agents need different handling)
         if (isOpencode) {
-          // Resolve per-agent model override from BOTH per-project
-          // `.planning/config.json` and `~/.gsd/defaults.json`, with
-          // per-project winning on conflict (#2256). Without the per-project
-          // probe, an override set in `.planning/config.json` was silently
-          // ignored and the child inherited OpenCode's default model.
+          // Resolve per-agent model for OpenCode agents.
+          // Precedence: model_overrides[agent] > model_profile_overrides.opencode.<tier> > omit.
+          // model_overrides (#2256): explicit per-agent override, highest precedence.
+          // model_profile_overrides (#2794): tier-based runtime resolver, same parity as Codex.
           const _ocAgentName = entry.name.replace(/\.md$/, '');
           const _ocModelOverrides = readGsdEffectiveModelOverrides(targetDir);
-          const _ocModelOverride = _ocModelOverrides?.[_ocAgentName] || null;
+          let _ocModelOverride = _ocModelOverrides?.[_ocAgentName] || null;
+          if (!_ocModelOverride) {
+            // Fall back to tier-based resolution via model_profile_overrides.opencode.<tier>.
+            const _ocRuntimeResolver = readGsdRuntimeProfileResolver(targetDir);
+            if (_ocRuntimeResolver) {
+              const _ocEntry = _ocRuntimeResolver.resolve(_ocAgentName);
+              if (_ocEntry?.model) {
+                _ocModelOverride = _ocEntry.model;
+              }
+            }
+          }
           content = convertClaudeToOpencodeFrontmatter(content, { isAgent: true, modelOverride: _ocModelOverride });
         } else if (isKilo) {
           content = convertClaudeToKiloFrontmatter(content, { isAgent: true });
