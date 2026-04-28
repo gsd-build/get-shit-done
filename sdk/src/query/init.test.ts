@@ -351,6 +351,40 @@ describe('initPlanPhase', () => {
     const data = result.data as Record<string, unknown>;
     expect(data.error).toBeDefined();
   });
+
+  // #2769: extractReqIds must accept all bold/colon variants of the
+  // Requirements header. The forms render identically in markdown but differ
+  // textually; the previous regex only matched **Requirements**: (colon
+  // outside bold) and silently returned null for **Requirements:** (colon
+  // inside bold) and **Requirements** : (spaced).
+  describe.each([
+    { name: 'colon inside bold', header: '**Requirements:** RV-01, RV-02' },
+    { name: 'colon outside bold', header: '**Requirements**: RV-01, RV-02' },
+    { name: 'space before colon', header: '**Requirements** : RV-01, RV-02' },
+  ])('phase_req_ids extraction (#2769)', ({ name, header }) => {
+    it(`parses Requirements header with ${name}`, async () => {
+      // Overwrite ROADMAP.md so phase 9 carries the variant header.
+      await writeFile(join(tmpDir, '.planning', 'ROADMAP.md'), [
+        '# Roadmap',
+        '',
+        '## v3.0: SDK-First Migration',
+        '',
+        '### Phase 9: Foundation',
+        '',
+        '**Goal:** Build foundation',
+        header,
+        '',
+        '### Phase 10: Read-Only Queries',
+        '',
+        '**Goal:** Implement queries',
+        '',
+      ].join('\n'));
+
+      const result = await initPlanPhase(['9'], tmpDir);
+      const data = result.data as Record<string, unknown>;
+      expect(data.phase_req_ids).toBe('RV-01, RV-02');
+    });
+  });
 });
 
 describe('initNewMilestone', () => {

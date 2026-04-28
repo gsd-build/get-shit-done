@@ -1,6 +1,6 @@
 {
   "name": "@gsd-build/sdk",
-  "version": "0.1.0",
+  "version": "1.39.0-rc.4",
   "description": "GSD SDK — programmatic interface for running GSD plans via the Agent SDK",
   "type": "module",
   "main": "dist/index.js",

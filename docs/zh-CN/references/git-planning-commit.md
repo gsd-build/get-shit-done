@@ -4,12 +4,12 @@
 
 ## 通过 CLI 提交
 
-先传提交说明，再传文件路径（位置参数）。`commit` 不要使用 `--files`（该标志仅用于 `commit-to-subrepo`）。
+先传提交说明，然后用 `--files` 显式传入文件路径。`commit` 与 `commit-to-subrepo` 都应使用 `--files` 来声明要提交的路径。
 
 对 `.planning/` 文件始终使用此方式 —— 它会自动处理 `commit_docs` 与 gitignore 检查：
 
 ```bash
-gsd-sdk query commit "docs({scope}): {description}" .planning/STATE.md .planning/ROADMAP.md
+gsd-sdk query commit "docs({scope}): {description}" --files .planning/STATE.md .planning/ROADMAP.md
 ```
 
 如果 `commit_docs` 为 `false` 或 `.planning/` 被 gitignore，CLI 会返回 `skipped`（带原因）。无需手动条件检查。
@@ -19,7 +19,7 @@ gsd-sdk query commit "docs({scope}): {description}" .planning/STATE.md .planning
 将 `.planning/` 文件变更合并到上次提交：
 
 ```bash
-gsd-sdk query commit "" .planning/codebase/*.md --amend
+gsd-sdk query commit "" --files .planning/codebase/*.md --amend
 ```
 
 ## 提交消息模式

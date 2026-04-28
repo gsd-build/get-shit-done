@@ -410,7 +410,7 @@ plans_reviewed: [{list of PLAN.md files}]
 
 Commit:
 ```bash
-gsd-sdk query commit "docs: cross-AI review for phase {N}" {phase_dir}/{padded_phase}-REVIEWS.md
+gsd-sdk query commit "docs: cross-AI review for phase {N}" --files {phase_dir}/{padded_phase}-REVIEWS.md
 ```
 </step>
 

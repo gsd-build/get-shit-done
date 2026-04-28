@@ -124,7 +124,7 @@ Repeat for all milestones in the cleanup set.
 Commit the changes:
 
 ```bash
-gsd-sdk query commit "chore: archive phase directories from completed milestones" .planning/milestones/ .planning/phases/
+gsd-sdk query commit "chore: archive phase directories from completed milestones" --files .planning/milestones/ .planning/phases/
 ```
 
 </step>

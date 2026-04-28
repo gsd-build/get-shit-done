@@ -378,7 +378,7 @@ Continue to commit_codebase_map.
 Commit the codebase map:
 
 ```bash
-gsd-sdk query commit "docs: map existing codebase" .planning/codebase/*.md
+gsd-sdk query commit "docs: map existing codebase" --files .planning/codebase/*.md
 ```
 
 Continue to offer_next.

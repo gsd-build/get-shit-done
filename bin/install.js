@@ -2089,6 +2089,10 @@ function generateCodexConfigBlock(agents, targetDir) {
 /**
  * Strip any managed GSD agent sections from a TOML string.
  *
+ * Used by the uninstall path (`stripGsdFromCodexConfig`). Removes only what GSD
+ * owns; user-authored `[agents.<name>]` and `[[agents]]` entries are preserved
+ * so uninstall returns the file to its pre-GSD shape.
+ *
  * Handles BOTH shapes so reinstall self-heals configs from all GSD versions:
  *   - Current (#2727): `[agents.gsd-*]` struct tables (Codex 0.120.0+).
  *   - Legacy (#2645): `[[agents]]` array-of-tables whose `name = "gsd-*"`.
@@ -2922,25 +2926,32 @@ function isLegacyGsdAgentsSection(body) {
 }
 
 function stripLeakedGsdCodexSections(content) {
+  // Defensive precedence (#2760): we own the `agents` namespace under our
+  // managed `gsd-*` names, and the legacy bare-table and sequence forms
+  // (`[agents]`, `[[agents]]`) are invalid in the current Codex schema —
+  // they trigger "invalid type: ..., expected struct AgentsToml" and break
+  // every Codex CLI invocation. They MUST never coexist with the new
+  // `[agents.<name>]` struct format we now emit, so install-time always
+  // purges them regardless of GSD marker presence. Users who had legitimate
+  // user-authored `[[agents]]` entries before are already broken on Codex
+  // ≥0.124 — purging is the only path to a loadable config.
   const leakedSections = getTomlTableSections(content)
     .filter((section) => {
       // Legacy [agents.gsd-<name>] map tables (pre-#2645).
       if (!section.array && section.path.startsWith('agents.gsd-')) return true;
 
-      // Legacy bare [agents] table with only the old max_threads/max_depth keys.
-      if (
-        !section.array &&
-        section.path === 'agents' &&
-        isLegacyGsdAgentsSection(content.slice(section.headerEnd, section.end))
-      ) return true;
+      // ANY bare [agents] single-bracket table — invalid in current Codex
+      // schema, always purged at install time (#2760). Previously gated
+      // on `isLegacyGsdAgentsSection`, which missed bare tables holding
+      // arbitrary user keys (`default = "..."`, etc.) that still produce
+      // the AgentsToml type error.
+      if (!section.array && section.path === 'agents') return true;
 
-      // Current [[agents]] array-of-tables whose name is gsd-*. Preserve
-      // user-authored [[agents]] entries (other names) untouched.
-      if (section.array && section.path === 'agents') {
-        const body = content.slice(section.headerEnd, section.end);
-        const nameMatch = body.match(/^[ \t]*name[ \t]*=[ \t]*["']([^"']+)["']/m);
-        if (nameMatch && /^gsd-/.test(nameMatch[1])) return true;
-      }
+      // ANY [[agents]] array-of-tables — invalid in current Codex schema,
+      // always purged at install time (#2760). Previously gated on
+      // `name = "gsd-..."` which preserved user-authored entries that are
+      // themselves rejected by Codex 0.124+.
+      if (section.array && section.path === 'agents') return true;
 
       return false;
     });
@@ -2969,15 +2980,17 @@ function stripLeakedGsdCodexSections(content) {
  *     [hooks.shell]
  *     command = "..."
  *
- * to the new array-of-tables format:
- *   [[hooks]]
- *   type = "shell"
+ * to the new array-of-tables format. #2760 CR5 finding 3 — emit the
+ * namespaced AoT shape directly so a mixed flat + namespaced layout never
+ * arises post-install:
+ *   [[hooks.shell]]
  *   command = "..."
  *
  * This function detects any non-array hooks sections in the config and
- * converts them to the [[hooks]] format, preserving all key-value pairs and
- * user comments. Bare [hooks] container sections (no key-value content) are
- * dropped. User-authored [[hooks]] array entries are left untouched.
+ * converts them to the namespaced `[[hooks.<TYPE>]]` array-of-tables form,
+ * preserving all key-value pairs and user comments. Bare [hooks] container
+ * sections (no key-value content) are dropped. User-authored AoT entries are
+ * left untouched.
  *
  * Returns the migrated content, or the original content unchanged if no
  * legacy hooks sections were found.
@@ -3008,8 +3021,15 @@ function migrateCodexHooksMapFormat(content) {
     const type = section.path.slice('hooks.'.length);
     const body = content.slice(section.headerEnd, section.end);
 
-    // Build [[hooks]] block: type line + original body lines
-    const block = `[[hooks]]${eol}type = "${type}"${eol}${body}`;
+    // #2760 CR5 finding 3 — emit the namespaced AoT form directly:
+    // `[[hooks.<TYPE>]]` (no synthetic `event` field — the namespace IS the
+    // event). Previously we emitted flat `[[hooks]]\nevent = "<TYPE>"`,
+    // which produced mixed flat + namespaced layouts when the user already
+    // had `[[hooks.<OTHER>]]` entries. With every migration emit using the
+    // namespaced shape, the managed-emit detector
+    // (`hasUserNamespacedAotHooks`) fires correctly and the install
+    // converges on a single hook layout.
+    const block = `[[hooks.${type}]]${eol}${body}`;
     newHooksBlocks.push(block);
   }
 
@@ -3060,6 +3080,446 @@ function migrateCodexHooksMapFormat(content) {
   }
 
   return result;
+}
+
+/**
+ * Detect whether the user already uses the namespaced AoT hooks form
+ * (`[[hooks.<EVENT>]]`) for the given event in the config. When true,
+ * the GSD-managed hook block must be emitted in the same shape so it
+ * coexists cleanly — mixing `[[hooks]]` (flat) with `[[hooks.SessionStart]]`
+ * (namespaced) in the same file confuses round-trip writers and can
+ * produce a config that Codex rejects (#2760, defect 3).
+ */
+function hasUserNamespacedAotHooks(content, event) {
+  const sections = getTomlTableSections(content);
+  return sections.some(
+    (section) => section.array && section.path === `hooks.${event}`
+  );
+}
+
+/**
+ * Parse a TOML value RHS expression starting at index `i` of `text`.
+ * Returns { value, end } on success or throws on parse failure.
+ *
+ * Supports the value forms GSD emits or that real Codex configs commonly use:
+ *   - basic strings ("…" with simple escapes)
+ *   - literal strings ('…')
+ *   - booleans (true / false)
+ *   - integers (optional sign, decimal digits)
+ *   - inline arrays of the above
+ *   - inline tables { k = v, … }
+ *
+ * This is intentionally not a complete TOML implementation — it is the
+ * minimal value grammar required to validate Codex config structure and to
+ * back behavioral assertions in tests (#2760).
+ */
+function parseTomlValue(text, i) {
+  // Skip leading whitespace.
+  while (i < text.length && (text[i] === ' ' || text[i] === '\t')) {
+    i += 1;
+  }
+  if (i >= text.length) {
+    throw new Error('expected value, got end of input');
+  }
+
+  const ch = text[i];
+
+  // Basic string
+  if (ch === '"') {
+    if (text.startsWith('"""', i)) {
+      const close = findMultilineBasicStringClose(text, i + 3);
+      if (close === -1) {
+        throw new Error('unterminated multi-line basic string');
+      }
+      const raw = text.slice(i + 3, close);
+      return { value: raw.replace(/^\r?\n/, ''), end: close + 3 };
+    }
+    let j = i + 1;
+    let out = '';
+    while (j < text.length) {
+      const c = text[j];
+      if (c === '\\') {
+        const next = text[j + 1];
+        if (next === 'n') { out += '\n'; j += 2; continue; }
+        if (next === 't') { out += '\t'; j += 2; continue; }
+        if (next === 'r') { out += '\r'; j += 2; continue; }
+        if (next === '\\') { out += '\\'; j += 2; continue; }
+        if (next === '"') { out += '"'; j += 2; continue; }
+        if (next === '/') { out += '/'; j += 2; continue; }
+        // Pass-through unrecognized escape (Codex/GSD don't use these).
+        out += next === undefined ? '' : next;
+        j += 2;
+        continue;
+      }
+      if (c === '"') {
+        return { value: out, end: j + 1 };
+      }
+      out += c;
+      j += 1;
+    }
+    throw new Error('unterminated basic string');
+  }
+
+  // Literal string
+  if (ch === '\'') {
+    if (text.startsWith('\'\'\'', i)) {
+      const close = text.indexOf('\'\'\'', i + 3);
+      if (close === -1) throw new Error('unterminated multi-line literal string');
+      return { value: text.slice(i + 3, close).replace(/^\r?\n/, ''), end: close + 3 };
+    }
+    const close = text.indexOf('\'', i + 1);
+    if (close === -1) throw new Error('unterminated literal string');
+    return { value: text.slice(i + 1, close), end: close + 1 };
+  }
+
+  // Boolean
+  if (text.startsWith('true', i) && !/[A-Za-z0-9_-]/.test(text[i + 4] || '')) {
+    return { value: true, end: i + 4 };
+  }
+  if (text.startsWith('false', i) && !/[A-Za-z0-9_-]/.test(text[i + 5] || '')) {
+    return { value: false, end: i + 5 };
+  }
+
+  // Inline array
+  if (ch === '[') {
+    const arr = [];
+    let j = i + 1;
+    while (true) {
+      while (j < text.length && /[\s\r\n]/.test(text[j])) j += 1;
+      if (j >= text.length) throw new Error('unterminated inline array');
+      if (text[j] === ']') return { value: arr, end: j + 1 };
+      if (text[j] === '#') {
+        const nl = text.indexOf('\n', j);
+        j = nl === -1 ? text.length : nl + 1;
+        continue;
+      }
+      const parsed = parseTomlValue(text, j);
+      arr.push(parsed.value);
+      j = parsed.end;
+      while (j < text.length && /[\s\r\n]/.test(text[j])) j += 1;
+      if (j < text.length && text[j] === ',') {
+        j += 1;
+        continue;
+      }
+      while (j < text.length && /[\s\r\n]/.test(text[j])) j += 1;
+      if (text[j] === ']') return { value: arr, end: j + 1 };
+      throw new Error(`expected , or ] in inline array at offset ${j}`);
+    }
+  }
+
+  // Inline table
+  if (ch === '{') {
+    const obj = {};
+    let j = i + 1;
+    while (true) {
+      while (j < text.length && /[\s\r\n]/.test(text[j])) j += 1;
+      if (text[j] === '}') return { value: obj, end: j + 1 };
+      const keyMatch = text.slice(j).match(/^([A-Za-z0-9_-]+|"[^"]*"|'[^']*')\s*=\s*/);
+      if (!keyMatch) throw new Error(`expected key in inline table at offset ${j}`);
+      let rawKey = keyMatch[1];
+      if ((rawKey.startsWith('"') && rawKey.endsWith('"')) || (rawKey.startsWith('\'') && rawKey.endsWith('\''))) {
+        rawKey = rawKey.slice(1, -1);
+      }
+      j += keyMatch[0].length;
+      const parsed = parseTomlValue(text, j);
+      obj[rawKey] = parsed.value;
+      j = parsed.end;
+      while (j < text.length && /[\s\r\n]/.test(text[j])) j += 1;
+      if (text[j] === ',') { j += 1; continue; }
+      if (text[j] === '}') return { value: obj, end: j + 1 };
+      throw new Error(`expected , or } in inline table at offset ${j}`);
+    }
+  }
+
+  // Number (integer with optional sign). Float / date / time / hex / oct / bin
+  // are NOT supported — we reject them explicitly instead of silently truncating
+  // an integer prefix off a `0.5` float or `1979-05-27` date. (#2760 CR4 finding 3)
+  const numMatch = text.slice(i).match(/^[+-]?\d[\d_]*/);
+  if (numMatch) {
+    const after = text[i + numMatch[0].length];
+    // Reject: float (`.`, `e`, `E`), date/time (`-`, `:`, `T`, `Z`), or any
+    // continuation digit/letter that suggests an unsupported numeric form.
+    if (after !== undefined && /[.eE:\-TZ]/.test(after)) {
+      throw new Error(
+        `unsupported TOML value at offset ${i}: floats, dates, and times are not supported (got ${text.slice(i, i + 20)})`
+      );
+    }
+    const digits = numMatch[0].replace(/_/g, '');
+    const n = Number(digits);
+    if (!Number.isFinite(n)) throw new Error(`invalid number: ${numMatch[0]}`);
+    return { value: n, end: i + numMatch[0].length };
+  }
+
+  throw new Error(`unsupported value at offset ${i}: ${text.slice(i, i + 20)}`);
+}
+
+/**
+ * Parse TOML content into a JavaScript object. Throws on malformed input.
+ *
+ * Handles `[table]`, `[[array.of.tables]]`, dotted key paths, and the value
+ * forms supported by parseTomlValue. Sufficient for validating Codex config
+ * structure and for behavioral test assertions in #2760 — not a general
+ * TOML implementation.
+ */
+function parseTomlToObject(content) {
+  const root = {};
+  const records = getTomlLineRecords(content);
+  // Tracks the *object* (not path) that subsequent key=value lines target.
+  let currentTable = root;
+
+  // #2760 CR5 finding 2 — track shape and definition status of every path so
+  // we can reject duplicate header redeclarations, shape mismatches, and
+  // duplicate keys per real TOML 1.0 semantics. Without this, walkPath
+  // silently reuses existing tables and assignment overwrites existing keys —
+  // a real TOML parser would refuse the file.
+  //
+  // pathShape: dotted path -> 'table' | 'array' | 'inline_parent' | 'key'
+  //   - 'table' — declared via [a.b]
+  //   - 'array' — declared via [[a.b]] (path is the array itself; each
+  //               element is its own implicit table)
+  //   - 'inline_parent' — created implicitly while walking parents
+  //   - 'key'   — assigned a scalar value
+  // declaredHeaders: set of dotted paths explicitly declared via [hdr] (not
+  //   [[arr]]) — used to reject duplicate [a] / [a] sections.
+  // tableKeys: dotted-path -> Set<string> of keys assigned in that exact
+  //   table instance. For [[arr]] elements we use a per-element marker.
+  const pathShape = new Map();
+  const declaredHeaders = new Set();
+  const tableKeys = new Map();
+  // currentTableId — string identifier for the current table instance, used
+  // as the key into tableKeys so that key uniqueness is per-table-instance
+  // (each [[arr]] element gets its own id).
+  let currentTableId = '__root__';
+  pathShape.set('__root__', 'table');
+  tableKeys.set('__root__', new Set());
+
+  function ensureKeySet(id) {
+    if (!tableKeys.has(id)) tableKeys.set(id, new Set());
+    return tableKeys.get(id);
+  }
+
+  function walkPath(segments, { creatingArrayElement = false } = {}) {
+    let node = root;
+    const parents = segments.slice(0, -1);
+    const last = segments[segments.length - 1];
+
+    for (let p = 0; p < parents.length; p += 1) {
+      const seg = parents[p];
+      const partialPath = parents.slice(0, p + 1).join('.');
+      if (node[seg] === undefined) {
+        node[seg] = {};
+        if (!pathShape.has(partialPath)) {
+          pathShape.set(partialPath, 'inline_parent');
+        }
+      } else if (Array.isArray(node[seg])) {
+        // Walk into the latest element of an array-of-tables.
+        node = node[seg][node[seg].length - 1];
+        continue;
+      } else if (typeof node[seg] !== 'object' || node[seg] === null) {
+        throw new Error(`path segment ${seg} is not a table`);
+      }
+      node = node[seg];
+    }
+
+    const fullPath = segments.join('.');
+
+    if (creatingArrayElement) {
+      const existingShape = pathShape.get(fullPath);
+      if (node[last] === undefined) {
+        node[last] = [];
+        pathShape.set(fullPath, 'array');
+      } else if (!Array.isArray(node[last])) {
+        throw new Error(
+          `duplicate or shape-mismatched table header at ${fullPath}: ` +
+          `cannot redefine as array of tables (previously seen as ${existingShape || 'table'})`
+        );
+      } else if (existingShape && existingShape !== 'array') {
+        throw new Error(
+          `duplicate or shape-mismatched table header at ${fullPath}: ` +
+          `previously seen as ${existingShape}, cannot extend as array of tables`
+        );
+      }
+      const elem = {};
+      node[last].push(elem);
+      const elemId = `${fullPath}[${node[last].length - 1}]`;
+      pathShape.set(elemId, 'array_element');
+      tableKeys.set(elemId, new Set());
+      currentTableId = elemId;
+      return elem;
+    }
+
+    // Plain [table] header.
+    if (node[last] === undefined) {
+      node[last] = {};
+      pathShape.set(fullPath, 'table');
+      declaredHeaders.add(fullPath);
+      tableKeys.set(fullPath, new Set());
+    } else if (Array.isArray(node[last])) {
+      throw new Error(
+        `duplicate or shape-mismatched table header at ${fullPath}: ` +
+          `previously declared as array of tables ([[${fullPath}]]), cannot redeclare as table ([${fullPath}])`
+      );
+    } else if (typeof node[last] !== 'object') {
+      throw new Error(`cannot redefine ${fullPath} as table`);
+    } else if (declaredHeaders.has(fullPath)) {
+      throw new Error(
+        `duplicate or shape-mismatched table header at ${fullPath}: ` +
+          `[${fullPath}] declared more than once`
+      );
+    } else {
+      // Implicitly created earlier (e.g., as a parent path); first explicit
+      // declaration is allowed.
+      pathShape.set(fullPath, 'table');
+      declaredHeaders.add(fullPath);
+      if (!tableKeys.has(fullPath)) tableKeys.set(fullPath, new Set());
+    }
+    currentTableId = fullPath;
+    return node[last];
+  }
+
+  for (let idx = 0; idx < records.length; idx += 1) {
+    const rec = records[idx];
+    if (rec.startsInMultilineString) continue;
+    if (rec.tableHeader) {
+      const segs = rec.tableHeader.segments;
+      currentTable = walkPath(segs, { creatingArrayElement: rec.tableHeader.array });
+      continue;
+    }
+
+    const trimmed = rec.text.trim();
+    if (trimmed === '' || trimmed.startsWith('#')) continue;
+
+    const equalsIndex = findTomlAssignmentEquals(rec.text);
+    if (equalsIndex === -1) continue;
+
+    const keyText = rec.text.slice(0, equalsIndex).trim();
+    const segments = parseTomlKeyPath(keyText);
+    if (!segments) {
+      throw new Error(`invalid TOML key on line ${idx + 1}: ${rec.text}`);
+    }
+
+    // Value RHS may span multiple lines (inline arrays, multi-line strings,
+    // inline tables). Parse from the absolute content offset right after `=`.
+    const valueStartAbs = rec.start + equalsIndex + 1;
+    const parsed = parseTomlValue(content, valueStartAbs);
+
+    // #2760 CR4 finding 3 — verify the full RHS was consumed. Anything other
+    // than whitespace + optional # comment between parsed.end and the next
+    // newline (or EOF) means the parser silently accepted a prefix and
+    // dropped trailing bytes. Reject so malformed TOML cannot slip past
+    // "parse before commit" guarantees.
+    let scan = parsed.end;
+    while (scan < content.length && (content[scan] === ' ' || content[scan] === '\t')) {
+      scan += 1;
+    }
+    if (scan < content.length && content[scan] !== '\n' && content[scan] !== '\r' && content[scan] !== '#') {
+      const lineEnd = content.indexOf('\n', scan);
+      const trailing = content.slice(scan, lineEnd === -1 ? content.length : lineEnd);
+      throw new Error(
+        `trailing bytes after value on line ${idx + 1}: ${JSON.stringify(trailing)}`
+      );
+    }
+
+    // Place value into currentTable under dotted key.
+    // #2760 CR5 finding 2 — reject duplicate keys per real TOML 1.0. Track
+    // the dotted key against the current table instance id; an exact repeat
+    // throws.
+    let target = currentTable;
+    for (let s = 0; s < segments.length - 1; s += 1) {
+      const seg = segments[s];
+      if (target[seg] === undefined) target[seg] = {};
+      else if (typeof target[seg] !== 'object' || Array.isArray(target[seg])) {
+        throw new Error(`cannot descend into non-table key ${seg}`);
+      }
+      target = target[seg];
+    }
+    const finalKey = segments[segments.length - 1];
+    const dottedKey = segments.join('.');
+    const keySet = ensureKeySet(currentTableId);
+    if (keySet.has(dottedKey) || Object.prototype.hasOwnProperty.call(target, finalKey)) {
+      throw new Error(
+        `duplicate key ${dottedKey} in ${currentTableId === '__root__' ? 'root table' : currentTableId}`
+      );
+    }
+    keySet.add(dottedKey);
+    target[finalKey] = parsed.value;
+  }
+
+  return root;
+}
+
+/**
+ * Validate that the post-install config.toml matches Codex's expected schema
+ * (#2760, fix 3). Returns { ok: true } on success, or { ok: false, reason }
+ * with a human-readable explanation of the offending section.
+ *
+ * Strategy: parse the bytes into a structured object first — malformed TOML
+ * fails validation immediately rather than slipping past a header-only scan.
+ * Then enforce the schema-shape rules against the parsed structure.
+ *
+ * Schema rules enforced:
+ *   - File MUST parse as TOML (no syntax errors).
+ *   - `agents` MUST be a struct table (`[agents.<name>]`) — never a bare
+ *     table value or an array of tables.
+ *   - `hooks.<Event>` MUST be an array of tables when present (Codex ≥0.124
+ *     rejects bare `[hooks.<Event>]` single-bracket maps).
+ */
+function validateCodexConfigSchema(content) {
+  let parsed;
+  try {
+    parsed = parseTomlToObject(content);
+  } catch (e) {
+    return {
+      ok: false,
+      reason: `TOML parse failed: ${e.message}`,
+    };
+  }
+
+  // Header-shape check: arrays-of-tables are visible in the parsed structure
+  // (as Array values) but bare-vs-struct distinction for `[agents]` requires
+  // looking at section headers too — `[agents]` with `default = "x"` parses
+  // to `{ agents: { default: 'x' } }`, indistinguishable from
+  // `[agents.foo]` writing into the same shape. Use header sections to
+  // disambiguate.
+  const sections = getTomlTableSections(content);
+
+  for (const section of sections) {
+    if (section.array && section.path === 'agents') {
+      return {
+        ok: false,
+        reason: '[[agents]] sequence form is invalid in current Codex schema (expected [agents.<name>] struct form)',
+      };
+    }
+
+    if (!section.array && section.path === 'agents') {
+      return {
+        ok: false,
+        reason: 'bare [agents] table is invalid in current Codex schema (expected [agents.<name>] struct form)',
+      };
+    }
+
+    if (!section.array && section.path.startsWith('hooks.')) {
+      return {
+        ok: false,
+        reason: `bare [${section.path}] table is invalid in current Codex schema (expected [[${section.path}]] array-of-tables)`,
+      };
+    }
+  }
+
+  // Structural confirmation against parsed object: any present hooks.<Event>
+  // must be an array.
+  if (parsed.hooks && typeof parsed.hooks === 'object' && !Array.isArray(parsed.hooks)) {
+    for (const [event, value] of Object.entries(parsed.hooks)) {
+      if (!Array.isArray(value)) {
+        return {
+          ok: false,
+          reason: `hooks.${event} must be an array of tables, got ${typeof value}`,
+        };
+      }
+    }
+  }
+
+  return { ok: true };
 }
 
 function normalizeCodexHooksLine(line, key) {
@@ -3200,13 +3660,37 @@ function rewriteTomlKeyLines(content, matches, key) {
 }
 
 /**
+ * Atomic write — write to <target>.tmp-<pid>-<n> first, then renameSync over
+ * the target. Eliminates the partial-write corruption window: an interrupted
+ * write leaves the temp file (which we clean up) but never truncates the
+ * original target. Used for any mutation of Codex config.toml so we cannot
+ * leave the user with a half-written file (#2760 fix 4).
+ */
+let __atomicWriteCounter = 0;
+function atomicWriteFileSync(target, data, options) {
+  __atomicWriteCounter += 1;
+  const tmp = `${target}.tmp-${process.pid}-${__atomicWriteCounter}`;
+  try {
+    fs.writeFileSync(tmp, data, options);
+    fs.renameSync(tmp, target);
+  } catch (e) {
+    // Best-effort cleanup of the partial temp file; never mask the real error.
+    try { fs.rmSync(tmp, { force: true }); } catch (_) { /* ignore */ }
+    throw e;
+  }
+}
+
+/**
  * Merge GSD config block into an existing or new config.toml.
  * Three cases: new file, existing with GSD marker, existing without marker.
+ *
+ * All writes go through atomicWriteFileSync so a mid-write failure leaves
+ * the original config.toml untouched (#2760 fix 4).
  */
 function mergeCodexConfig(configPath, gsdBlock) {
   // Case 1: No config.toml — create fresh
   if (!fs.existsSync(configPath)) {
-    fs.writeFileSync(configPath, gsdBlock + '\n');
+    atomicWriteFileSync(configPath, gsdBlock + '\n');
     return;
   }
 
@@ -3222,9 +3706,9 @@ function mergeCodexConfig(configPath, gsdBlock) {
       // Strip any GSD-managed sections that leaked above the marker from previous installs
       before = stripLeakedGsdCodexSections(before).trimEnd();
 
-      fs.writeFileSync(configPath, before + eol + eol + normalizedGsdBlock + eol);
+      atomicWriteFileSync(configPath, before + eol + eol + normalizedGsdBlock + eol);
     } else {
-      fs.writeFileSync(configPath, normalizedGsdBlock + eol);
+      atomicWriteFileSync(configPath, normalizedGsdBlock + eol);
     }
     return;
   }
@@ -3237,7 +3721,7 @@ function mergeCodexConfig(configPath, gsdBlock) {
     content = normalizedGsdBlock + eol;
   }
 
-  fs.writeFileSync(configPath, content);
+  atomicWriteFileSync(configPath, content);
 }
 
 /**
@@ -4613,6 +5097,24 @@ function copyCommandsAsAntigravitySkills(srcDir, skillsDir, prefix, isGlobal = f
 }
 
 /**
+ * Single source of truth for user-owned artifacts inside get-shit-done/.
+ *
+ * These files are created/refreshed by user-facing workflows (e.g.
+ * /gsd-profile-user) and must be preserved across reinstalls. Critically, they
+ * MUST be excluded from gsd-file-manifest.json — otherwise saveLocalPatches()
+ * will compare a refreshed file against a stale manifest hash and emit a
+ * spurious "locally modified GSD file" warning (bug #2771).
+ *
+ * Invariant: a file is either distribution (manifest-tracked, diff'd against
+ * manifest) or user artifact (preserved across installs, never diff'd). Never
+ * both. Both preserveUserArtifacts call sites and writeManifest must agree on
+ * this list, which is why it lives here as a single constant.
+ *
+ * Paths are relative to the get-shit-done/ directory.
+ */
+const USER_OWNED_ARTIFACTS = ['USER-PROFILE.md'];
+
+/**
  * Save user-generated files from destDir to an in-memory map before a wipe.
  *
  * @param {string} destDir - Directory that is about to be wiped
@@ -5801,6 +6303,12 @@ function writeManifest(configDir, runtime = 'claude', options = {}) {
 
   const gsdHashes = generateManifest(gsdDir);
   for (const [rel, hash] of Object.entries(gsdHashes)) {
+    // Skip user-owned artifacts (e.g. USER-PROFILE.md). They are preserved
+    // across reinstalls by preserveUserArtifacts and must NOT be hashed into
+    // the manifest — otherwise saveLocalPatches() would flag every refresh
+    // as a "local patch" (bug #2771). Single source of truth:
+    // USER_OWNED_ARTIFACTS at top of file.
+    if (USER_OWNED_ARTIFACTS.includes(rel)) continue;
     manifest.files['get-shit-done/' + rel] = hash;
   }
   if (isGemini && fs.existsSync(commandsDir)) {
@@ -5869,6 +6377,14 @@ function saveLocalPatches(configDir) {
 
   let manifest;
   try { manifest = JSON.parse(fs.readFileSync(manifestPath, 'utf8')); } catch { return []; }
+
+  // Normalize legacy manifests written before #2771 fix: strip user-owned artifacts
+  // that were incorrectly recorded so refreshes don't surface false patches warnings.
+  if (manifest.files) {
+    for (const artifact of USER_OWNED_ARTIFACTS) {
+      delete manifest.files[`get-shit-done/${artifact}`];
+    }
+  }
 
   const patchesDir = path.join(configDir, PATCHES_DIR_NAME);
   const pristineDir = path.join(configDir, 'gsd-pristine');
@@ -6223,7 +6739,7 @@ function install(isGlobal, runtime = 'claude') {
   // Preserve user-generated files before the wipe-and-copy so they survive re-install
   const skillSrc = path.join(src, 'get-shit-done');
   const skillDest = path.join(targetDir, 'get-shit-done');
-  const savedGsdArtifacts = preserveUserArtifacts(skillDest, ['USER-PROFILE.md']);
+  const savedGsdArtifacts = preserveUserArtifacts(skillDest, USER_OWNED_ARTIFACTS);
   copyWithPathReplacement(skillSrc, skillDest, pathPrefix, runtime, false, isGlobal);
   restoreUserArtifacts(skillDest, savedGsdArtifacts);
   if (verifyInstalled(skillDest, 'get-shit-done')) {
@@ -6494,9 +7010,36 @@ function install(isGlobal, runtime = 'claude') {
   }
 
   if (isCodex && !isMinimalMode(installMode)) {
-    // Generate Codex config.toml and per-agent .toml files.
-    // Skipped under --minimal — same rationale as filesystem agents above.
-    const agentCount = installCodexConfig(targetDir, agentsSrc);
+    // Capture pre-install snapshot of config.toml before ANY GSD mutation
+    // (#2760 fix 3). On post-write schema-validation failure OR any throw
+    // during the mutation sequence (write failure, merge throw, etc.) we
+    // restore these exact bytes so the user is never left with a broken
+    // Codex CLI (#2760 fix 4 — extends snapshot coverage to write-failure
+    // paths, paired with atomic temp-file writes in mergeCodexConfig and
+    // the final hooks-write below).
+    const codexConfigPathPreInstall = path.join(targetDir, 'config.toml');
+    const codexConfigPreInstallSnapshot = fs.existsSync(codexConfigPathPreInstall)
+      ? fs.readFileSync(codexConfigPathPreInstall)
+      : null;
+
+    const restoreCodexSnapshot = () => {
+      if (codexConfigPreInstallSnapshot !== null) {
+        try { fs.writeFileSync(codexConfigPathPreInstall, codexConfigPreInstallSnapshot); }
+        catch (_) { /* best-effort restore — surface the original error */ }
+      } else if (fs.existsSync(codexConfigPathPreInstall)) {
+        try { fs.rmSync(codexConfigPathPreInstall); } catch (_) { /* best-effort */ }
+      }
+    };
+
+    let agentCount;
+    try {
+      // Generate Codex config.toml and per-agent .toml files.
+      // Skipped under --minimal — same rationale as filesystem agents above.
+      agentCount = installCodexConfig(targetDir, agentsSrc);
+    } catch (e) {
+      restoreCodexSnapshot();
+      throw e;
+    }
     console.log(`  ${green}✓${reset} Generated config.toml with ${agentCount} agent roles`);
     console.log(`  ${green}✓${reset} Generated ${agentCount} agent .toml config files`);
 
@@ -6538,33 +7081,110 @@ function install(isGlobal, runtime = 'claude') {
     // older GSD installs wrote it inline in config.toml — strip that on migration.
     const configPath = path.join(targetDir, 'config.toml');
     const hooksJsonPath = path.join(targetDir, 'hooks.json');
+    // Use the pre-install snapshot captured before installCodexConfig ran so
+    // restore returns the file to its true pre-GSD state on validation
+    // failure (#2760 fix 3) — not to the post-agent-merge state.
+    const preWriteBackup = codexConfigPreInstallSnapshot;
     try {
-      const configContent = fs.existsSync(configPath) ? fs.readFileSync(configPath, 'utf-8') : '';
+      let configContent = fs.existsSync(configPath) ? fs.readFileSync(configPath, 'utf-8') : '';
+
+      const migratedConfigContent = migrateCodexHooksMapFormat(configContent);
+      if (migratedConfigContent !== configContent) {
+        configContent = migratedConfigContent;
+        console.log(`  ${green}✓${reset} Migrated legacy Codex [hooks] map format to namespaced array-of-tables`);
+      }
 
       const codexHooksFeature = ensureCodexHooksFeature(configContent);
       let candidateConfigContent = setManagedCodexHooksOwnership(codexHooksFeature.content, codexHooksFeature.ownership);
 
-      // Single \r?\n-aware regex covers LF, CRLF, mixed EOLs, and both filenames
-      // (gsd-check-update.js and the older gsd-update-check.js).
+      // Strip managed GSD hook blocks from config.toml before registering the
+      // hook in hooks.json. Covers LF/CRLF, flat and namespaced TOML shapes,
+      // and both the current and old inverted filenames.
       candidateConfigContent = candidateConfigContent.replace(
         /(?:\r?\n|^)# GSD Hooks(?:\r?\n)\[\[hooks\]\](?:\r?\n)event = "SessionStart"(?:\r?\n)command = "node [^\r\n]*gsd-(?:check-update|update-check)\.js"(?:\r?\n)/g,
+        (match) => (match.startsWith('\r\n') ? '\r\n' : match.startsWith('\n') ? '\n' : ''),
+      );
+      candidateConfigContent = candidateConfigContent.replace(
+        /(?:\r?\n|^)# GSD Hooks(?:\r?\n)\[\[hooks\.SessionStart\]\](?:\r?\n)command = "node [^\r\n]*gsd-(?:check-update|update-check)\.js"(?:\r?\n)/g,
         (match) => (match.startsWith('\r\n') ? '\r\n' : match.startsWith('\n') ? '\n' : ''),
       );
 
       if (hasEnabledCodexHooksFeature(candidateConfigContent)) {
         const command = buildHookCommand(targetDir, 'gsd-check-update.js');
         if (upsertManagedCodexHookInHooksJson(hooksJsonPath, command)) {
-          fs.writeFileSync(configPath, candidateConfigContent, 'utf-8');
+          const validatorFn = (typeof module !== 'undefined' && module.exports && module.exports.__codexSchemaValidator)
+            ? module.exports.__codexSchemaValidator
+            : validateCodexConfigSchema;
+          const validation = validatorFn(candidateConfigContent);
+          if (!validation.ok) {
+            restoreCodexSnapshot();
+            throw new Error(
+              `post-write Codex schema validation failed: ${validation.reason}. ` +
+              `Restored ${preWriteBackup !== null ? 'pre-install backup' : 'empty state'}.`
+            );
+          }
+
+          try {
+            atomicWriteFileSync(configPath, candidateConfigContent, 'utf-8');
+          } catch (writeErr) {
+            restoreCodexSnapshot();
+            throw new Error(
+              `post-write Codex install failed: ${writeErr && writeErr.message ? writeErr.message : String(writeErr)}. ` +
+              `Restored ${preWriteBackup !== null ? 'pre-install backup' : 'empty state'}.`
+            );
+          }
           console.log(`  ${green}✓${reset} Configured Codex hooks (SessionStart)`);
         } else {
-          console.warn(`  ${yellow}⚠${reset}  Skipped hooks.json update — file is malformed or has an unsupported root shape; config.toml left unchanged`);
+          console.warn(`  ${yellow}⚠${reset}  Skipped hooks.json update — file is malformed or has an unsupported root shape; codex_hooks change not written`);
         }
       } else {
-        fs.writeFileSync(configPath, candidateConfigContent, 'utf-8');
+        const validatorFn = (typeof module !== 'undefined' && module.exports && module.exports.__codexSchemaValidator)
+          ? module.exports.__codexSchemaValidator
+          : validateCodexConfigSchema;
+        const validation = validatorFn(candidateConfigContent);
+        if (!validation.ok) {
+          restoreCodexSnapshot();
+          throw new Error(
+            `post-write Codex schema validation failed: ${validation.reason}. ` +
+            `Restored ${preWriteBackup !== null ? 'pre-install backup' : 'empty state'}.`
+          );
+        }
+
+        try {
+          atomicWriteFileSync(configPath, candidateConfigContent, 'utf-8');
+        } catch (writeErr) {
+          restoreCodexSnapshot();
+          throw new Error(
+            `post-write Codex install failed: ${writeErr && writeErr.message ? writeErr.message : String(writeErr)}. ` +
+            `Restored ${preWriteBackup !== null ? 'pre-install backup' : 'empty state'}.`
+          );
+        }
         console.warn(`  ${yellow}⚠${reset}  Skipped Codex hooks — could not enable codex_hooks feature flag in config.toml`);
       }
     } catch (e) {
-      console.warn(`  ${yellow}⚠${reset}  Could not configure Codex hooks: ${e.message}`);
+      // #2760 — schema-validation and write failures must be loud and fatal
+      // so the user is never left with a config Codex refuses to load (or no
+      // Codex agents configured at all). The pre-install snapshot restore has
+      // already run for write-side throws via the inner catch above and via
+      // restoreCodexSnapshot in the validation branch.
+      if (e && typeof e.message === 'string' && e.message.startsWith('post-write')) {
+        console.error(`  ${red}✗${reset} ${e.message}`);
+        throw e;
+      }
+      // #2760 CR5 finding 1 — pre-write failures (migrateCodexHooksMapFormat,
+      // ensureCodexHooksFeature, config reads, configContent construction,
+      // etc.) must ALSO be fatal. Previously this branch downgraded to a
+      // console.warn, leaving the install to print "Done!" with no Codex
+      // hooks configured — same defect class as finding 1, different layer.
+      // Restore the pre-install snapshot and rethrow so the outer install
+      // pipeline aborts.
+      restoreCodexSnapshot();
+      const wrapped = new Error(
+        `Codex hook configuration failed (pre-write): ${e && e.message ? e.message : String(e)}. ` +
+          `Restored ${preWriteBackup !== null ? 'pre-install backup' : 'empty state'}.`
+      );
+      console.error(`  ${red}✗${reset} ${wrapped.message}`);
+      throw wrapped;
     }
 
     return { settingsPath: null, settings: null, statuslineCommand: null, runtime, configDir: targetDir };
@@ -7496,14 +8116,49 @@ function installSdkIfNeeded(opts) {
     // `node sdkCliPath` invocation in bin/gsd-sdk.js.
   }
 
-  console.log(`  ${green}✓${reset} GSD SDK ready (sdk/dist/cli.js)`);
+  // #2775: do not assert "GSD SDK ready" until `gsd-sdk` actually resolves on
+  // PATH. `npx get-shit-done-cc` only links the package's primary bin; the
+  // secondary `gsd-sdk` shim is left dangling under the npx cache and is NOT
+  // callable as a bare command. The previous file-presence-only check was a
+  // strictly weaker invariant than the one workflows depend on
+  // (`command -v gsd-sdk` resolving), and led to a false ✓ in npx-cache
+  // installs (issue #2775).
+  const shimSrc = path.resolve(__dirname, 'gsd-sdk.js');
+  let onPath = isGsdSdkOnPath();
+
+  if (!onPath) {
+    // Try to materialize the shim into a user-writable PATH location so the
+    // installer can deliver on the success message without requiring the user
+    // to run `npm install -g` separately. Picks the first PATH entry that
+    // looks like a user-owned bin dir; falls back to ~/.local/bin even if
+    // it's not on PATH (then a follow-up suggestion is printed).
+    const linked = trySelfLinkGsdSdk(shimSrc);
+    if (linked) {
+      onPath = isGsdSdkOnPath();
+      if (onPath) {
+        console.log(`  ${dim}↪ linked gsd-sdk → ${linked}${reset}`);
+      }
+    }
+  }
+
+  if (onPath) {
+    console.log(`  ${green}✓${reset} GSD SDK ready (sdk/dist/cli.js)`);
+  } else {
+    console.log('');
+    console.log(`  ${yellow}⚠${reset} GSD SDK files are present but ${bold}gsd-sdk${reset} is not on your PATH.`);
+    console.log(`    Workflows that call ${cyan}gsd-sdk query …${reset} will fail with "command not found".`);
+    console.log(`    Install globally to materialize the bin symlink:`);
+    console.log(`      ${cyan}npm install -g get-shit-done-cc${reset}`);
+    console.log(`    Or add a directory containing the shim to your PATH manually.`);
+    console.log('');
+  }
 
   // #2620: warn if npm's global bin is not on PATH, suppressing the
   // absolute-path suggestion when the user's rc already covers it via
   // a HOME-relative entry (e.g. `export PATH="$HOME/.npm-global/bin:$PATH"`).
   try {
-    const { execSync } = require('child_process');
-    const npmPrefix = execSync('npm prefix -g', { encoding: 'utf8', stdio: ['ignore', 'pipe', 'ignore'] }).trim();
+    const cp = require('child_process');
+    const npmPrefix = cp.execSync('npm prefix -g', { encoding: 'utf8', stdio: ['ignore', 'pipe', 'ignore'] }).trim();
     if (npmPrefix) {
       // On Windows npm prefix IS the bin dir; on POSIX it's `${prefix}/bin`.
       const globalBin = process.platform === 'win32' ? npmPrefix : path.join(npmPrefix, 'bin');
@@ -7512,6 +8167,105 @@ function installSdkIfNeeded(opts) {
   } catch {
     // npm not available / exec failed — silently skip the PATH advice.
   }
+}
+
+/**
+ * #2775 helper: check whether a callable `gsd-sdk` exists on the current PATH.
+ *
+ * Pure PATH walk (no spawn) — we look for a regular file or symlink named
+ * `gsd-sdk` (or `gsd-sdk.cmd`/`.exe` on Windows) in any directory on PATH and
+ * verify it carries the execute bit on POSIX. Avoids paying spawn cost and
+ * avoids the chicken-and-egg of needing to run the not-yet-installed binary.
+ */
+function isGsdSdkOnPath() {
+  const path = require('path');
+  const fs = require('fs');
+  const pathEnv = process.env.PATH || '';
+  const exts = process.platform === 'win32' ? ['.cmd', '.exe', '.bat', ''] : [''];
+  for (const seg of pathEnv.split(path.delimiter)) {
+    if (!seg) continue;
+    for (const ext of exts) {
+      const candidate = path.join(seg, `gsd-sdk${ext}`);
+      try {
+        const st = fs.statSync(candidate);
+        if (st.isFile()) {
+          if (process.platform === 'win32') return true;
+          if ((st.mode & 0o111) !== 0) return true;
+        }
+      } catch {
+        // missing / EACCES on dir — keep scanning.
+      }
+    }
+  }
+  return false;
+}
+
+/**
+ * #2775 helper: attempt to materialize the `gsd-sdk` shim at a user-writable
+ * PATH location. Returns the absolute path created on success, or null if no
+ * suitable location was usable.
+ *
+ * Strategy (POSIX): prefer ~/.local/bin (creating it if absent — many distros
+ * already have it on PATH via .profile). Fall back to the first PATH entry
+ * under HOME we can write to. Skip on Windows (npm install -g is the right
+ * primitive there; we don't try to fabricate a .cmd shim).
+ */
+function trySelfLinkGsdSdk(shimSrc) {
+  if (process.platform === 'win32') return null;
+  const path = require('path');
+  const fs = require('fs');
+  const home = os.homedir();
+  if (!home) return null;
+
+  const localBin = path.join(home, '.local', 'bin');
+  const pathCandidates = [];
+  const pathEnv = process.env.PATH || '';
+  for (const seg of pathEnv.split(path.delimiter)) {
+    if (!seg) continue;
+    const abs = path.resolve(seg);
+    if (abs.startsWith(home + path.sep) && !pathCandidates.includes(abs)) {
+      pathCandidates.push(abs);
+    }
+  }
+  // If ~/.local/bin is already on PATH, keep it first (preserves existing UX
+  // for the common case). Otherwise prefer PATH-backed HOME dirs first so we
+  // self-link somewhere actually on PATH, falling back to ~/.local/bin only
+  // when no on-PATH HOME dir is writable. (#2775 CodeRabbit follow-up)
+  const candidates = pathCandidates.includes(localBin)
+    ? [localBin, ...pathCandidates.filter((dir) => dir !== localBin)]
+    : [...pathCandidates, localBin];
+
+  for (const dir of candidates) {
+    try {
+      fs.mkdirSync(dir, { recursive: true });
+      const target = path.join(dir, 'gsd-sdk');
+      // Replace any existing entry — it may be stale (prior install of an
+      // older version pointing at a now-absent shim).
+      try { fs.unlinkSync(target); } catch {}
+      try {
+        fs.symlinkSync(shimSrc, target);
+      } catch {
+        // Filesystems that don't support symlinks (some FUSE mounts): write a
+        // tiny wrapper that `require()`s the real shim by absolute path. We
+        // cannot copyFileSync(shimSrc, target) — bin/gsd-sdk.js resolves the
+        // CLI via `path.resolve(__dirname, '..', 'sdk', 'dist', 'cli.js')`,
+        // and after a copy `__dirname` would be the link directory (e.g.
+        // ~/.local/bin), causing the resolved CLI path to be broken
+        // (~/.local/sdk/dist/cli.js). Wrapping via require() preserves
+        // __dirname resolution because the require runs against shimSrc's
+        // own location. (#2775 CodeRabbit follow-up)
+        fs.writeFileSync(
+          target,
+          `#!/usr/bin/env node\nrequire(${JSON.stringify(shimSrc)});\n`,
+        );
+        try { fs.chmodSync(target, 0o755); } catch {}
+      }
+      return target;
+    } catch {
+      // permission / EROFS — try next candidate.
+    }
+  }
+  return null;
 }
 
 /**
@@ -7573,6 +8327,9 @@ if (process.env.GSD_TEST_MODE) {
     generateCodexConfigBlock,
     stripGsdFromCodexConfig,
     migrateCodexHooksMapFormat,
+    hasUserNamespacedAotHooks,
+    parseTomlToObject,
+    validateCodexConfigSchema,
     mergeCodexConfig,
     installCodexConfig,
     readGsdRuntimeProfileResolver,
@@ -7634,6 +8391,7 @@ if (process.env.GSD_TEST_MODE) {
     validateHookFields,
     preserveUserArtifacts,
     restoreUserArtifacts,
+    USER_OWNED_ARTIFACTS,
     finishInstall,
     homePathCoveredByRc,
     maybeSuggestPathExport,

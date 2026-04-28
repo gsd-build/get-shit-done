@@ -40,7 +40,7 @@
 
 ```bash
 # 提交时自动检查 commit_docs + gitignore：
-gsd-sdk query commit "docs: update state" .planning/STATE.md
+gsd-sdk query commit "docs: update state" --files .planning/STATE.md
 
 # 通过 state load 加载配置（返回 JSON）：
 INIT=$(gsd-sdk query state.load)
@@ -58,7 +58,7 @@ if [[ "$INIT" == @file:* ]]; then INIT=$(cat "${INIT#@file:}"); fi
 **通过 CLI 提交（自动处理检查）：**
 
 ```bash
-gsd-sdk query commit "docs: update state" .planning/STATE.md
+gsd-sdk query commit "docs: update state" --files .planning/STATE.md
 ```
 
 CLI 在内部检查 `commit_docs` 配置和 gitignore 状态 —— 无需手动条件判断。

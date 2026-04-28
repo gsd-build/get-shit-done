@@ -13,6 +13,125 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
   ~700, useful for local LLMs with 32K–128K context (Sonnet 4.6 / Opus 4.7 don't need
   it). Re-run `gsd update` without `--minimal` to expand to the full surface. The
   install manifest now records `mode: "minimal" | "full"`. (#2762)
+- **`/gsd-edit-phase` command** — modify any field of an existing phase in ROADMAP.md
+  without changing its number or position. Supports `--force` to skip the confirmation
+  diff, validates `depends_on` references, and updates STATE.md on write. (#2617)
+- **Post-merge build & test gate** — execute-phase step 5.6 now runs in both parallel
+  and serial mode. Adds a build gate that auto-detects the build command from
+  `workflow.build_command` config, then falls back to Xcode (`.xcodeproj`), Makefile,
+  Justfile, Cargo, Go, Python, or npm. Xcode/iOS projects run `xcodebuild build` and
+  `xcodebuild test` automatically. (#2720)
+- **Extended runtime model profiles** — RUNTIME_PROFILE_MAP now covers `gemini`,
+  `qwen`, `opencode`, and `copilot` runtimes with full three-tier (fast/balanced/opus)
+  model mappings. Group B runtimes (kilo, cline, cursor, windsurf, augment, trae,
+  codebuddy, antigravity) fall through to the existing unknown-runtime fallback. (#2612)
+- **Workstream config inheritance** — when `GSD_WORKSTREAM` is set, the root
+  `.planning/config.json` is loaded first and deep-merged with the workstream config
+  (workstream wins on conflict). Explicit `null` in a workstream config now correctly
+  overrides a root value. (#2714)
+
+### Fixed
+- **Codex install no longer corrupts existing `~/.codex/config.toml`** — the installer
+  now defensively strips legacy `[agents]` (single-bracket) and `[[agents]]` (sequence)
+  blocks regardless of GSD marker presence (both invalid in current Codex schema), migrates
+  legacy `[hooks.<Event>]` to namespaced AoT for user-authored hooks, removes legacy
+  GSD-managed TOML hook blocks, and registers the managed `SessionStart` hook in
+  `hooks.json`. Config writes are atomic via temp-file + `renameSync`. A strict TOML
+  parser validates the post-write bytes against the Codex
+  schema and rejects duplicate keys, repeated table headers, trailing bytes after
+  values, and unsupported value types. Both pre-write helper failures and write-time
+  failures restore the pre-install snapshot and abort with a clear error rather than
+  warn-and-continue. (#2760)
+- **Codex `[[agents]]` reverted to `[agents.<name>]` struct format** — the sequence
+  format introduced in #2645 is rejected by codex-cli 0.124.0 with "invalid type:
+  sequence, expected struct AgentsToml". Reverted to struct format which is correct for
+  0.120.0+. The self-healing stripper handles both formats for configs written by prior
+  GSD versions. (#2727)
+- **Codex legacy `[hooks]` map format auto-migrated** — Codex 0.124.0 requires
+  `[[hooks]]` array-of-tables; old GSD installs that wrote `[hooks.shell]` map-style
+  now self-heal on the next `gsd install --codex`. (#2637)
+- **`gsd-sdk` PATH verification tightened** — installer now probes for an executable
+  `gsd-sdk` shim on PATH after confirming `sdk/dist/cli.js` is present, and attempts
+  to materialize one via symlink at `~/.local/bin/gsd-sdk` when absent. Only prints
+  `✓ GSD SDK ready` when the probe succeeds. (#2775, #2777)
+- **USER-PROFILE.md no longer triggers false "locally modified" warning** — the file
+  was both preserved across reinstalls and tracked in `gsd-file-manifest.json`, causing
+  the stale-hash diff to fire on every profile refresh. `USER_OWNED_ARTIFACTS` is now a
+  single source of truth used by both the preserve and manifest write paths. (#2771)
+- **All `gsd-sdk query` handlers now respect `--ws`** — 18+ handlers accepted
+  `_workstream` but never forwarded it to `planningPaths`/`loadConfig`. Workstream now
+  scopes path resolution correctly in `initNewProject`, `configGet`, `configSet`,
+  `commit`, `validateHealth`, and all other handlers. (#2731)
+- **`resolveModel` threads workstream** — config-query `resolveModel` ignored
+  `_workstream` unlike `configGet`/`configPath`, so different workstreams with different
+  `model_profile` settings would get the root profile instead of their own. (#2742)
+- **`parseMustHavesBlock` quoted strings** — fully-quoted truths containing `:` (e.g.
+  `"App-side UUIDv4: generated locally"`) fell into the kv-parse branch, the regex
+  failed, and `current` stayed as `{}`, crashing `annotate-dependencies` with
+  `TypeError: t.trim is not a function`. Fixed in both `frontmatter.cjs` and
+  `roadmap.cjs`. (#2757, #2734)
+- **`gsd state complete-phase` subcommand** — was missing; unknown subcommands fell
+  through to `cmdStateLoad`. Now updates `Status`, `Last Activity`, and
+  `Current Position` to `COMPLETE`. (#2735)
+- **Non-string `depends_on` values preserved** — numeric YAML scalars and kv-shaped
+  truths were silently dropped by `annotate-dependencies` via an early `typeof t !==
+  'string'` skip. A `coerceTruthToString` helper now coerces numbers/booleans and
+  extracts a string field from object-shaped items. (#2770)
+- **Worktree isolation scoped to submodule-touching plans** — the previous guard
+  unconditionally set `USE_WORKTREES=false` when `.gitmodules` existed. Now parses
+  submodule paths and intersects per-plan `files_modified`; only plans that touch a
+  submodule path skip worktree isolation. (#2772)
+- **Worktree cleanup uses inclusion filter** — the exclusion-based cleanup
+  (`grep -v "$(pwd)$"`) failed in multi-workspace and cross-drive Windows setups,
+  destroying the workspace's `.git` pointer. Cleanup now targets only
+  `.claude/worktrees/agent-*` paths, which agent-spawned worktrees always use. (#2774)
+- **`Requirements:` header variants all parse correctly** — both `**Requirements:**`
+  (colon inside bold) and `**Requirements**:` (colon outside bold) now match in
+  `extractReqIds` and the `phase complete` traceability sweep. (#2769)
+- **`gsd-sdk query commit` paths passed via `--files`** — 81 invocations across 50
+  files were passing paths positionally, which appended them to the commit subject and
+  triggered the wholesale-stage fallback. All sites updated. (#2767)
+- **Phase detection in bullet/bold ROADMAP formats** — `phaseAdd`'s regex only matched
+  heading format (`## Phase N:`), missing bullet checklist and bold entries. Broadened
+  to all three formats with filesystem fallback on zero matches. (#2726)
+- **Plan-line overwrite when `**Plans:**` is empty** — `\s*` after `**Plans:**`
+  matched newlines, causing `[^\n]+` to consume the first plan checkbox. Replaced with
+  `[ \t]*` (horizontal whitespace only) and added section-boundary lookahead. (#2728)
+- **Phase-lifecycle `<details>`-wrapped active milestone** — `replaceInCurrentMilestone`
+  silently dropped replacements when the active milestone was itself inside a `<details>`
+  block (the after-slice was empty). Falls back to locating the last complete
+  `<details>…</details>` span. (#2641)
+- **Phase-lifecycle project-code-prefixed directory names** — filesystem fallback regex
+  `/^(\d+)-/` missed directories like `CK-45-foundation`. Updated to
+  `/^(?:[A-Z][A-Z0-9]*-)?(\d+)-/i`.
+- **`roadmap.update-plan-progress` regex** — `\s*` crossing newlines shared the same
+  corruption vector as `planCountPattern`; replaced with `[ \t]*` plus section-boundary
+  lookahead.
+- **`replaceInCurrentMilestone` fast-path guard** — the `after.trim().length > 0`
+  check incorrectly triggered when `after` contained only footer text, returning
+  unchanged content instead of falling through to the slow path.
+- **`graphify` CLI updated to subcommand form** — `graphify . --update` was removed in
+  v0.4.x in favour of `graphify update .`. Version detection now tries
+  `graphify --version` before falling back to the Python importlib query. (#2732)
+- **LM Studio model identity validated in review workflow** — captures the full API
+  response and compares the top-level `.model` field against `LM_STUDIO_MODEL`, emitting
+  a warning when the served model differs. Empty-content responses no longer write error
+  text into the review temp file (same fix applied to llama.cpp). (#2721)
+- **SDK `globalDefaults` preserved for nested config keys** — `workflow`, `git`,
+  `hooks`, `agent_skills`, and `features` sections were missing the `globalDefaults`
+  spread at the correct precedence level, silently dropping user values from
+  `~/.gsd/defaults.json`. (#2673)
+- **`MODEL_ALIAS_MAP` updated to `claude-opus-4-7`** — both `MODEL_ALIAS_MAP` and
+  `RUNTIME_PROFILE_MAP.claude.opus` were pinned to `claude-opus-4-6`. (#2733)
+- **Orchestrators wait for subagents before continuing** — 26 GSD workflow files now
+  include an explicit `ORCHESTRATOR RULE` blockquote immediately after every `Task()`
+  spawn, preventing the Codex parallel-work anti-pattern where the parent continues
+  reading files and producing conflicting output. (#2729)
+
+### Performance
+- **`discuss-phase` lazy file loading** — entry-point `@file` directives replaced with
+  on-demand `Read()` calls gated behind mode routing. Tokens loaded at skill entry drop
+  from ~13k to near zero; only the branch actually invoked is loaded. (#2606)
 
 ### Fixed
 - **Codex hook configuration moved to `hooks.json` (#2637).** The installer no longer writes GSD's legacy flat `[[hooks]]` block with `event = "SessionStart"` to `~/.codex/config.toml`; Codex 0.124.0+ rejects that deprecated shape, while nested TOML event tables remain supported by Codex. The managed `SessionStart` hook now lives in `hooks.json` (Codex's canonical location, per https://developers.openai.com/codex/hooks). Re-installing migrates legacy GSD `[[hooks]]` blocks (both `gsd-check-update.js` and the older `gsd-update-check.js` filename, LF/CRLF/mixed EOLs). User-authored hooks in either file are preserved. Uninstall removes only the managed GSD entry.

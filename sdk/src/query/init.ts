@@ -203,7 +203,12 @@ async function getPhaseInfoForVerifyWork(
  */
 function extractReqIds(roadmapPhase: Record<string, unknown> | null): string | null {
   const section = roadmapPhase?.section as string | undefined;
-  const reqMatch = section?.match(/^\*\*Requirements\*\*:[^\S\n]*([^\n]*)$/m);
+  // Accept all bold/colon variants of the Requirements header. The forms
+  //   **Requirements:**  (colon inside bold)
+  //   **Requirements**:  (colon outside bold)
+  //   **Requirements** : (space before outside colon)
+  // render identically in markdown but differ textually. Issue #2769.
+  const reqMatch = section?.match(/^\*\*Requirements:?\*\*[^\S\n]*:?[^\S\n]*([^\n]*)$/m);
   const reqExtracted = reqMatch
     ? reqMatch[1].replace(/[\[\]]/g, '').split(',').map((s: string) => s.trim()).filter(Boolean).join(', ')
     : null;

@@ -289,7 +289,7 @@ Preview the merge diff to the user and gate via approve-revise-abort before writ
 Commit the ingest results:
 
 ```bash
-gsd-sdk query commit "docs: ingest {N} docs from {SCAN_PATH} (#2387)" \
+gsd-sdk query commit "docs: ingest {N} docs from {SCAN_PATH} (#2387)" --files \
   .planning/PROJECT.md \
   .planning/REQUIREMENTS.md \
   .planning/ROADMAP.md \

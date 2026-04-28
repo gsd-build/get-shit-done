@@ -7,6 +7,35 @@ const path = require('path');
 const { escapeRegex, normalizePhaseName, planningPaths, withPlanningLock, output, error, findPhaseInternal, stripShippedMilestones, extractCurrentMilestone, replaceInCurrentMilestone, phaseTokenMatches, atomicWriteFileSync } = require('./core.cjs');
 
 /**
+ * Coerce an arbitrary YAML scalar/object into a string for cross-cutting
+ * truth aggregation. Handles:
+ *   - strings (passthrough)
+ *   - numbers / booleans (String() coercion — issue #2770: bare YAML ints
+ *     like `- 3` must be surfaced, not silently skipped)
+ *   - kv-shaped objects from parseMustHavesBlock continuation kv (issue
+ *     #2757) — extract the first meaningful string field
+ *
+ * Returns the empty string when no usable text can be derived; callers should
+ * skip empty results.
+ */
+function coerceTruthToString(t) {
+  if (t === null || t === undefined) return '';
+  if (typeof t === 'string') return t;
+  if (typeof t === 'number' || typeof t === 'boolean' || typeof t === 'bigint') {
+    return String(t);
+  }
+  if (typeof t === 'object') {
+    // Prefer common title-bearing keys produced by parseMustHavesBlock
+    for (const k of ['title', 'text', 'name', 'rule', 'path', 'provides']) {
+      const v = t[k];
+      if (typeof v === 'string' && v.trim()) return v;
+      if (typeof v === 'number' || typeof v === 'boolean') return String(v);
+    }
+  }
+  return '';
+}
+
+/**
  * Search for a phase header (and its section) within the given content string.
  * Returns a result object if found (either a full match or a malformed_roadmap
  * checklist-only match), or null if the phase is not present at all.
@@ -412,16 +441,26 @@ function cmdRoadmapAnnotateDependencies(cwd, phaseNum, raw) {
   }
   const waves = [...waveGroups.keys()].sort((a, b) => a - b);
 
-  // Find cross-cutting truths: appear in 2+ plans (de-duplicated, case-insensitive)
+  // Find cross-cutting truths: appear in 2+ plans (de-duplicated, case-insensitive).
+  //
+  // Issue #2770: must **coerce, not skip**. A previous guard
+  // `if (typeof t !== 'string') continue` silently dropped numeric scalars
+  // (YAML ints like `- 3`) and kv-shaped truths (`- title: X`), so the
+  // cross-cutting analysis lost real constraints rather than crashing on
+  // `t.trim()`. We coerce primitives via `String(t)` and extract a sensible
+  // string field from object-shaped items produced by parseMustHavesBlock's
+  // continuation-kv path (issue #2757 produces those shapes for nested keys).
   const truthCounts = new Map();
   for (const { truths } of planData) {
     const seen = new Set();
     for (const t of truths) {
-      if (typeof t !== 'string') continue;
-      const key = t.trim().toLowerCase();
+      const text = coerceTruthToString(t);
+      if (!text) continue;
+      const trimmed = text.trim();
+      const key = trimmed.toLowerCase();
       if (!key || seen.has(key)) continue;
       seen.add(key);
-      truthCounts.set(key, (truthCounts.get(key) || { count: 0, text: t.trim() }));
+      if (!truthCounts.has(key)) truthCounts.set(key, { count: 0, text: trimmed });
       truthCounts.get(key).count++;
     }
   }

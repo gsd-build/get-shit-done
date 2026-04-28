@@ -1136,7 +1136,7 @@ Plans:
 
 <step name="git_commit">
 ```bash
-gsd-sdk query commit "docs($PHASE): create phase plan" \
+gsd-sdk query commit "docs($PHASE): create phase plan" --files \
   .planning/phases/$PHASE-*/$PHASE-*-PLAN.md .planning/ROADMAP.md
 ```
 </step>

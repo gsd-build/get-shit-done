@@ -207,7 +207,7 @@ timestamp=$(gsd-sdk query current-timestamp full --raw)
 
 <step name="commit">
 ```bash
-gsd-sdk query commit "wip: [context-name] paused at [X]/[Y]" [handoff-path] .planning/HANDOFF.json
+gsd-sdk query commit "wip: [context-name] paused at [X]/[Y]" --files [handoff-path] .planning/HANDOFF.json
 ```
 </step>
 
