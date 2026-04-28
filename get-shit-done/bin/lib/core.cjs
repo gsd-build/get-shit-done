@@ -1380,8 +1380,10 @@ function extractCurrentMilestone(content, cwd) {
 
   const sectionStart = sectionMatch.index;
 
-  // Find the end: next milestone heading at same or higher level, or EOF
+  // Find the end: next milestone heading at same or higher level, or EOF.
   // Milestone headings look like: ## v2.0, ## Roadmap v2.0, ## ✅ v1.0, etc.
+  // Scan line-by-line so that heading-like lines inside fenced code blocks
+  // (``` or ~~~) are not mistaken for milestone boundaries. See #2787.
   const headingLevel = sectionMatch[1].match(/^(#{1,3})\s/)[1].length;
   const restContent = content.slice(sectionStart + sectionMatch[0].length);
   // Exclude phase headings (e.g. "### Phase 12: v1.0 Tech-Debt Closure") from
@@ -1389,15 +1391,20 @@ function extractCurrentMilestone(content, cwd) {
   // the title. Phase headings always start with the literal `Phase `. See #2619.
   const nextMilestonePattern = new RegExp(
     `^#{1,${headingLevel}}\\s+(?!Phase\\s+\\S)(?:.*v\\d+\\.\\d+|✅|📋|🚧)`,
-    'mi'
+    'i'
   );
-  const nextMatch = restContent.match(nextMilestonePattern);
 
-  let sectionEnd;
-  if (nextMatch) {
-    sectionEnd = sectionStart + sectionMatch[0].length + nextMatch.index;
-  } else {
-    sectionEnd = content.length;
+  let sectionEnd = content.length;
+  let inFence = false;
+  let charOffset = 0;
+  for (const line of restContent.split('\n')) {
+    if (/^(`{3,}|~{3,})/.test(line)) {
+      inFence = !inFence;
+    } else if (!inFence && nextMilestonePattern.test(line)) {
+      sectionEnd = sectionStart + sectionMatch[0].length + charOffset;
+      break;
+    }
+    charOffset += line.length + 1;
   }
 
   // Return everything before the current milestone section (non-milestone content
