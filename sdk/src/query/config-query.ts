@@ -80,9 +80,19 @@ export function getAgentToModelMapForProfile(normalizedProfile: string): Record<
  * @throws GSDError with Validation classification if key missing or not found
  */
 export const configGet: QueryHandler = async (args, projectDir, workstream) => {
-  const keyPath = args[0];
+  // Support --default <value> flag (#2803): return this value (exit 0) when the
+  // key is absent, mirroring gsd-tools.cjs config-get behavior from #1893.
+  const defaultIdx = args.indexOf('--default');
+  let defaultValue: string | undefined;
+  let filteredArgs = args;
+  if (defaultIdx !== -1) {
+    defaultValue = args[defaultIdx + 1] !== undefined ? String(args[defaultIdx + 1]) : '';
+    filteredArgs = [...args.slice(0, defaultIdx), ...args.slice(defaultIdx + 2)];
+  }
+
+  const keyPath = filteredArgs[0];
   if (!keyPath) {
-    throw new GSDError('Usage: config-get <key.path>', ErrorClassification.Validation);
+    throw new GSDError('Usage: config-get <key.path> [--default <value>]', ErrorClassification.Validation);
   }
 
   const paths = planningPaths(projectDir, workstream);
@@ -90,6 +100,7 @@ export const configGet: QueryHandler = async (args, projectDir, workstream) => {
   try {
     raw = await readFile(paths.config, 'utf-8');
   } catch {
+    if (defaultValue !== undefined) return { data: defaultValue };
     throw new GSDError(`No config.json found at ${paths.config}`, ErrorClassification.Validation);
   }
 
@@ -106,11 +117,13 @@ export const configGet: QueryHandler = async (args, projectDir, workstream) => {
     if (current === undefined || current === null || typeof current !== 'object') {
       // UNIX convention (cf. `git config --get`): missing key exits 1, not 10.
       // See issue #2544 — callers use `if ! gsd-sdk query config-get k; then` patterns.
+      if (defaultValue !== undefined) return { data: defaultValue };
       throw new GSDError(`Key not found: ${keyPath}`, ErrorClassification.Execution);
     }
     current = (current as Record<string, unknown>)[key];
   }
   if (current === undefined) {
+    if (defaultValue !== undefined) return { data: defaultValue };
     throw new GSDError(`Key not found: ${keyPath}`, ErrorClassification.Execution);
   }
 
