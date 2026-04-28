@@ -29,58 +29,58 @@ const UPDATE_WORKFLOW = path.join(
 const CHECK_UPDATE_HOOK = path.join(REPO_ROOT, 'hooks', 'gsd-check-update.js');
 
 describe('bug-2784: update.md cache-clear covers shared cache path', () => {
-  test('gsd-check-update.js hook writes to ~/.cache/gsd/ path', () => {
+  test('gsd-check-update.js hook constructs cache dir from .cache and gsd path segments', () => {
     const hookContent = fs.readFileSync(CHECK_UPDATE_HOOK, 'utf-8');
-    // Verify the hook writes to the shared path (the one being missed).
-    // The hook uses path.join(homeDir, '.cache', 'gsd') so check for the
-    // constituent parts rather than a collapsed path string.
-    const referencesSharedCache =
-      hookContent.includes('.cache/gsd') ||
-      hookContent.includes("'.cache'") ||
-      hookContent.includes('".cache"') ||
-      (hookContent.includes("'.cache'") && hookContent.includes("'gsd'")) ||
-      (hookContent.includes('".cache"') && hookContent.includes('"gsd"')) ||
-      hookContent.includes("path.join(homeDir, '.cache', 'gsd')");
+    // Parse the path.join() call structurally rather than text-grepping.
+    const m = hookContent.match(/const cacheDir\s*=\s*path\.join\(([^)]+)\)/);
     assert.ok(
-      referencesSharedCache,
-      'hook should write to ~/.cache/gsd/ shared path (via path.join or direct string)'
+      m !== null,
+      'hook must assign cacheDir via path.join() with explicit path segments'
+    );
+    const segments = m[1].split(',').map((a) => a.trim().replace(/^['"]|['"]$/g, ''));
+    assert.ok(
+      segments.includes('.cache'),
+      `hook cacheDir path.join() must include '.cache' segment; got: ${JSON.stringify(segments)}`
+    );
+    assert.ok(
+      segments.includes('gsd'),
+      `hook cacheDir path.join() must include 'gsd' segment; got: ${JSON.stringify(segments)}`
     );
   });
 
-  test('update.md run_update step clears ~/.cache/gsd/gsd-update-check.json', () => {
+  test('update.md run_update bash commands include rm for shared gsd cache file', () => {
     const workflowContent = fs.readFileSync(UPDATE_WORKFLOW, 'utf-8');
+    // Parse the step block structurally, then extract only bash fenced code lines.
+    const stepMatch = workflowContent.match(/<step name="run_update">[\s\S]*?<\/step>/);
+    assert.ok(stepMatch, 'update.md must have a <step name="run_update"> block');
+    const stepContent = stepMatch[0];
 
-    // The workflow must explicitly clear the shared cache path the hook writes to.
-    // Accept either literal $HOME or tilde expansion pattern.
-    const clearsSharedPath =
-      workflowContent.includes('"$HOME/.cache/gsd/gsd-update-check.json"') ||
-      workflowContent.includes("'$HOME/.cache/gsd/gsd-update-check.json'") ||
-      workflowContent.includes('~/.cache/gsd/gsd-update-check.json') ||
-      workflowContent.includes('$HOME/.cache/gsd/gsd-update-check.json');
+    const bashLines = [];
+    const fenceRe = /```(?:bash|sh)\n([\s\S]*?)```/g;
+    let m;
+    while ((m = fenceRe.exec(stepContent)) !== null) {
+      for (const line of m[1].split('\n')) {
+        const trimmed = line.trim();
+        if (trimmed) bashLines.push(trimmed);
+      }
+    }
 
-    assert.ok(
-      clearsSharedPath,
-      'update.md must clear $HOME/.cache/gsd/gsd-update-check.json — the path written by gsd-check-update.js'
-    );
-  });
-
-  test('update.md run_update step places shared cache clear in the same block as per-runtime clears', () => {
-    const workflowContent = fs.readFileSync(UPDATE_WORKFLOW, 'utf-8');
-
-    // The run_update step should have a bash block that clears the cache.
-    // The shared path clear must appear in the same run_update step block.
-    const runUpdateStepMatch = workflowContent.match(
-      /<step name="run_update">([\s\S]*?)<\/step>/
+    const sharedCacheClearCmds = bashLines.filter(
+      (line) => /^rm\b/.test(line) && line.includes('.cache/gsd/gsd-update-check.json')
     );
     assert.ok(
-      runUpdateStepMatch,
-      'update.md must have a <step name="run_update"> block'
+      sharedCacheClearCmds.length > 0,
+      [
+        'run_update step bash blocks must include an `rm` command targeting .cache/gsd/gsd-update-check.json.',
+        `Bash lines found: ${JSON.stringify(bashLines)}`,
+      ].join('\n')
     );
-
-    const stepContent = runUpdateStepMatch[1];
+    const hasHomeExpansion = sharedCacheClearCmds.some(
+      (line) => line.includes('$HOME') || line.includes('~/')
+    );
     assert.ok(
-      stepContent.includes('.cache/gsd/gsd-update-check.json'),
-      'run_update step must clear .cache/gsd/gsd-update-check.json'
+      hasHomeExpansion,
+      `shared cache rm command must use $HOME or ~/ expansion; found: ${JSON.stringify(sharedCacheClearCmds)}`
     );
   });
 });

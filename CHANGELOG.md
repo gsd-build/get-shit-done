@@ -42,7 +42,7 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
   values, and unsupported value types. Both pre-write helper failures and write-time
   failures restore the pre-install snapshot and abort with a clear error rather than
   warn-and-continue. (#2760)
-- **Codex hooks migrator correctness hardening** — five edge-cases in the
+- **Codex hooks migrator correctness hardening** — four edge-cases in the
   `[[hooks.<Event>]]` → `[[hooks.<Event>.hooks]]` migration path fixed: (1) the TOML
   key parser in hook-body classification now uses `parseTomlKey()` instead of a bare
   regex, so hyphenated keys (e.g. `status-message`) and quoted keys are no longer
