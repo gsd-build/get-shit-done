@@ -67,7 +67,18 @@ describe('skill frontmatter name parity (#2643 / #2808)', () => {
   test('convertClaudeCommandToClaudeSkill emits name: gsd-<cmd> (hyphen)', () => {
     const input = '---\nname: old\ndescription: test\n---\n\nBody.';
     const result = convertClaudeCommandToClaudeSkill(input, 'gsd-execute-phase');
-    assert.match(result, /^---\nname: gsd-execute-phase\n/);
+    // Parse the frontmatter block structurally: extract the name: field value.
+    const frontmatterMatch = result.match(/^---\n([\s\S]*?)\n---/);
+    assert.ok(frontmatterMatch, 'output must have a frontmatter block delimited by ---');
+    const frontmatterLines = frontmatterMatch[1].split('\n');
+    const nameEntry = frontmatterLines.find((l) => l.startsWith('name:'));
+    assert.ok(nameEntry, 'frontmatter must contain a name: field');
+    const nameValue = nameEntry.replace(/^name:\s*/, '').trim();
+    assert.strictEqual(
+      nameValue,
+      'gsd-execute-phase',
+      `frontmatter name: must be 'gsd-execute-phase' (hyphen form), got '${nameValue}'`
+    );
   });
 
   test('no workflow uses deprecated Skill(skill="gsd:<cmd>") colon form', () => {
@@ -93,7 +104,10 @@ describe('skill frontmatter name parity (#2643 / #2808)', () => {
       const src = fs.readFileSync(f, 'utf-8');
       for (const n of extractSkillNamesHyphen(src)) referenced.add(n);
     }
-    if (referenced.size === 0) return;
+    assert.ok(
+      referenced.size > 0,
+      `expected at least one Skill(skill="gsd-<cmd>") reference in workflows under ${WORKFLOWS_DIR}`
+    );
 
     const emitted = new Set();
     const cmdFiles = fs.readdirSync(COMMANDS_DIR).filter(f => f.endsWith('.md'));

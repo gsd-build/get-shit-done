@@ -43,7 +43,9 @@ function walkMd(dir) {
       if (e.isDirectory()) files.push(...walkMd(full));
       else if (e.name.endsWith('.md')) files.push(full);
     }
-  } catch { /* ok */ }
+  } catch (err) {
+    assert.fail(`failed to read markdown files from ${dir}: ${err.message}`);
+  }
   return files;
 }
 
@@ -64,10 +66,14 @@ describe('bug-2808: SKILL.md name: uses hyphen form', () => {
       const src = fs.readFileSync(path.join(COMMANDS_DIR, cmd), 'utf-8');
       const skillContent = convertClaudeCommandToClaudeSkill(src, skillDirName);
 
-      const nameMatch = skillContent.match(/^name:\s*(.+)$/m);
-      if (!nameMatch) continue;
+      // Parse frontmatter structurally: extract name: line from the --- block.
+      const fmMatch = skillContent.match(/^---\n([\s\S]*?)\n---/);
+      assert.ok(fmMatch, `${cmd}: generated skill content must have a frontmatter block`);
+      const fmLines = fmMatch[1].split('\n');
+      const nameEntry = fmLines.find((l) => l.startsWith('name:'));
+      assert.ok(nameEntry, `${cmd}: generated SKILL.md is missing required name: field`);
 
-      const name = nameMatch[1].trim();
+      const name = nameEntry.replace(/^name:\s*/, '').trim();
       assert.ok(
         !name.includes(':'),
         `${cmd}: SKILL.md name should be hyphen form, got "${name}"`
@@ -81,12 +87,24 @@ describe('bug-2808: SKILL.md name: uses hyphen form', () => {
 
   test('no workflow contains Skill(skill="gsd:<cmd>") colon form', () => {
     const workflowFiles = walkMd(WORKFLOWS_DIR);
+    assert.ok(
+      workflowFiles.length > 0,
+      `expected workflow markdown files under ${WORKFLOWS_DIR}`
+    );
     const colonCalls = [];
     for (const f of workflowFiles) {
       const src = fs.readFileSync(f, 'utf-8');
-      const matches = src.match(/Skill\(skill=['"]gsd:[a-z0-9-]+['"]/gi) || [];
-      for (const m of matches) {
-        colonCalls.push(`${path.basename(f)}: ${m}`);
+      // Strip HTML comments to avoid matching commented-out examples.
+      const stripped = src.replace(/<!--[\s\S]*?-->/g, '');
+      // Scan each line for Skill() calls using the colon form.
+      // Parsing line-by-line is more precise than a multi-line regex
+      // and avoids false positives from incidental matches in prose.
+      for (const line of stripped.split('\n')) {
+        const colonCallRe = /Skill\(skill=['"]gsd:([a-z0-9-]+)['"]/gi;
+        let m;
+        while ((m = colonCallRe.exec(line)) !== null) {
+          colonCalls.push(`${path.basename(f)}: Skill(skill="gsd:${m[1]}")`);
+        }
       }
     }
     assert.deepStrictEqual(

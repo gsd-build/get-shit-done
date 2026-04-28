@@ -371,7 +371,7 @@ Skill(skill="gsd-code-review", args="${PHASE_NUM}")
 ```
 
 Parse status from REVIEW.md frontmatter. If "clean" or "skipped": proceed to 3d. If findings found: auto-invoke:
-```
+```text
 Skill(skill="gsd-code-review-fix", args="${PHASE_NUM} --auto")
 ```
 
