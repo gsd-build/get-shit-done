@@ -6,9 +6,9 @@ Select the template that matches your PR:
 
 | PR Type | When to use | Template link |
 |---------|-------------|---------------|
-| **Fix** | Correcting a bug, crash, or behavior that doesn't match documentation | [Use fix template](?template=PULL_REQUEST_TEMPLATE/fix.md) |
-| **Enhancement** | Improving an existing feature — better output, expanded edge cases, performance | [Use enhancement template](?template=PULL_REQUEST_TEMPLATE/enhancement.md) |
-| **Feature** | Adding something new — new command, workflow, concept, or integration | [Use feature template](?template=PULL_REQUEST_TEMPLATE/feature.md) |
+| **Fix** | Correcting a bug, crash, or behavior that doesn't match documentation | [Use fix template](?template=fix.md) |
+| **Enhancement** | Improving an existing feature — better output, expanded edge cases, performance | [Use enhancement template](?template=enhancement.md) |
+| **Feature** | Adding something new — new command, workflow, concept, or integration | [Use feature template](?template=feature.md) |
 
 ---
 
