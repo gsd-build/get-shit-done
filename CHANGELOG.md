@@ -15,7 +15,7 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
   install manifest now records `mode: "minimal" | "full"`. (#2762)
 
 ### Fixed
-- **Codex hook configuration moved to `hooks.json` (#2637).** The installer no longer writes an inline `[[hooks]]` block to `~/.codex/config.toml`; Codex 0.124.0+ rejects that shape with `invalid type: map, expected a sequence in 'hooks'`. The managed `SessionStart` hook now lives in `hooks.json` (Codex's canonical location, per https://developers.openai.com/codex/hooks). Re-installing migrates legacy `[[hooks]]` blocks (both `gsd-check-update.js` and the older `gsd-update-check.js` filename, LF/CRLF/mixed EOLs). User-authored hooks in either file are preserved. Uninstall removes only the managed GSD entry.
+- **Codex hook configuration moved to `hooks.json` (#2637).** The installer no longer writes GSD's legacy flat `[[hooks]]` block with `event = "SessionStart"` to `~/.codex/config.toml`; Codex 0.124.0+ rejects that deprecated shape, while nested TOML event tables remain supported by Codex. The managed `SessionStart` hook now lives in `hooks.json` (Codex's canonical location, per https://developers.openai.com/codex/hooks). Re-installing migrates legacy GSD `[[hooks]]` blocks (both `gsd-check-update.js` and the older `gsd-update-check.js` filename, LF/CRLF/mixed EOLs). User-authored hooks in either file are preserved. Uninstall removes only the managed GSD entry.
 
 ## [1.38.5] - 2026-04-25
 

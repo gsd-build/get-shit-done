@@ -2785,13 +2785,15 @@ function setManagedCodexHooksOwnership(content, ownership) {
     remainder;
 }
 
-// Substring marker used to identify the GSD-managed hook in hooks.json.
-// Matching by command-substring stays stable across install locations.
-const GSD_CODEX_HOOK_MARKER = 'gsd-check-update';
+// Filename marker used to identify the GSD-managed hook in hooks.json.
+// Matching the concrete script avoids colliding with the worker or prose.
+const GSD_CODEX_HOOK_MARKER = 'gsd-check-update.js';
 const GSD_CODEX_HOOK_EVENT = 'SessionStart';
 
 function isManagedCodexHookCommand(command) {
-  return typeof command === 'string' && command.includes(GSD_CODEX_HOOK_MARKER);
+  return typeof command === 'string' &&
+    /^\s*node(?:\s|$)/.test(command) &&
+    /(?:^|[\\/])gsd-check-update\.js(?:"|'|\s|$)/.test(command);
 }
 
 /**
@@ -6537,28 +6539,28 @@ function install(isGlobal, runtime = 'claude') {
     const configPath = path.join(targetDir, 'config.toml');
     const hooksJsonPath = path.join(targetDir, 'hooks.json');
     try {
-      let configContent = fs.existsSync(configPath) ? fs.readFileSync(configPath, 'utf-8') : '';
+      const configContent = fs.existsSync(configPath) ? fs.readFileSync(configPath, 'utf-8') : '';
 
       const codexHooksFeature = ensureCodexHooksFeature(configContent);
-      configContent = setManagedCodexHooksOwnership(codexHooksFeature.content, codexHooksFeature.ownership);
+      let candidateConfigContent = setManagedCodexHooksOwnership(codexHooksFeature.content, codexHooksFeature.ownership);
 
       // Single \r?\n-aware regex covers LF, CRLF, mixed EOLs, and both filenames
       // (gsd-check-update.js and the older gsd-update-check.js).
-      configContent = configContent.replace(
+      candidateConfigContent = candidateConfigContent.replace(
         /(?:\r?\n|^)# GSD Hooks(?:\r?\n)\[\[hooks\]\](?:\r?\n)event = "SessionStart"(?:\r?\n)command = "node [^\r\n]*gsd-(?:check-update|update-check)\.js"(?:\r?\n)/g,
         (match) => (match.startsWith('\r\n') ? '\r\n' : match.startsWith('\n') ? '\n' : ''),
       );
 
-      fs.writeFileSync(configPath, configContent, 'utf-8');
-
-      if (hasEnabledCodexHooksFeature(configContent)) {
+      if (hasEnabledCodexHooksFeature(candidateConfigContent)) {
         const command = buildHookCommand(targetDir, 'gsd-check-update.js');
         if (upsertManagedCodexHookInHooksJson(hooksJsonPath, command)) {
+          fs.writeFileSync(configPath, candidateConfigContent, 'utf-8');
           console.log(`  ${green}✓${reset} Configured Codex hooks (SessionStart)`);
         } else {
-          console.warn(`  ${yellow}⚠${reset}  Skipped hooks.json update — file is malformed or has an unsupported root shape`);
+          console.warn(`  ${yellow}⚠${reset}  Skipped hooks.json update — file is malformed or has an unsupported root shape; config.toml left unchanged`);
         }
       } else {
+        fs.writeFileSync(configPath, candidateConfigContent, 'utf-8');
         console.warn(`  ${yellow}⚠${reset}  Skipped Codex hooks — could not enable codex_hooks feature flag in config.toml`);
       }
     } catch (e) {

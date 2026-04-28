@@ -77,20 +77,32 @@ function readCodexHooksJson(codexHome) {
   return JSON.parse(fs.readFileSync(p, 'utf8'));
 }
 
-function countCodexGsdHooks(codexHome) {
+function findCodexGsdHooks(codexHome) {
   const data = readCodexHooksJson(codexHome);
-  if (!data || !data.hooks || typeof data.hooks !== 'object') return 0;
-  let count = 0;
+  if (!data || !data.hooks || typeof data.hooks !== 'object' || Array.isArray(data.hooks)) return [];
+  const matches = [];
   for (const event of Object.keys(data.hooks)) {
     if (!Array.isArray(data.hooks[event])) continue;
     for (const entry of data.hooks[event]) {
       if (!entry || !Array.isArray(entry.hooks)) continue;
       for (const h of entry.hooks) {
-        if (h && typeof h.command === 'string' && h.command.includes(GSD_CODEX_HOOK_MARKER)) count++;
+        const command = h && h.command;
+        const isManagedCommand = typeof command === 'string' &&
+          /^\s*node(?:\s|$)/.test(command) &&
+          command.includes(GSD_CODEX_HOOK_MARKER);
+        if (isManagedCommand) {
+          matches.push({ event, entry, hook: h });
+        }
       }
     }
   }
-  return count;
+  return matches;
+}
+
+function countCodexGsdHooks(codexHome) {
+  return findCodexGsdHooks(codexHome)
+    .filter((match) => match.event === 'SessionStart')
+    .length;
 }
 
 function countMatches(content, pattern) {
@@ -1812,6 +1824,7 @@ describe('Codex install hook configuration (e2e)', () => {
         ],
         UserPromptSubmit: [
           { hooks: [{ type: 'command', command: 'echo user-prompt' }] },
+          { hooks: [{ type: 'command', command: 'node /tmp/gsd-check-update.js' }] },
         ],
       },
     }, null, 2) + '\n');
@@ -1820,22 +1833,32 @@ describe('Codex install hook configuration (e2e)', () => {
 
     const data = readCodexHooksJson(codexHome);
     // User hooks preserved
-    assert.strictEqual(data.hooks.UserPromptSubmit.length, 1, 'UserPromptSubmit kept');
+    assert.strictEqual(data.hooks.UserPromptSubmit.length, 2, 'UserPromptSubmit entries kept');
     assert.strictEqual(
       data.hooks.UserPromptSubmit[0].hooks[0].command,
       'echo user-prompt',
       'UserPromptSubmit command kept verbatim'
     );
+    assert.strictEqual(
+      data.hooks.UserPromptSubmit[1].hooks[0].command,
+      'node /tmp/gsd-check-update.js',
+      'UserPromptSubmit command mentioning gsd-check-update.js kept verbatim'
+    );
     // SessionStart now has both user entry and GSD entry
     const cmds = data.hooks.SessionStart.flatMap((e) => e.hooks.map((h) => h.command));
     assert.ok(cmds.includes('echo user-session-start'), 'preserves user SessionStart');
     assert.strictEqual(countCodexGsdHooks(codexHome), 1, 'adds exactly one GSD hook');
+    assert.deepStrictEqual(
+      findCodexGsdHooks(codexHome).map((match) => match.event).sort(),
+      ['SessionStart', 'UserPromptSubmit'],
+      'helper records event slots so wrong-event hooks cannot satisfy SessionStart assertions'
+    );
 
     // Idempotent
     runCodexInstall(codexHome);
     assert.strictEqual(countCodexGsdHooks(codexHome), 1, 'second install does not duplicate');
     const data2 = readCodexHooksJson(codexHome);
-    assert.strictEqual(data2.hooks.UserPromptSubmit.length, 1, 'UserPromptSubmit still kept');
+    assert.strictEqual(data2.hooks.UserPromptSubmit.length, 2, 'UserPromptSubmit entries still kept');
   });
 
   test('hooks.json: install does NOT write [[hooks]] block in config.toml (#2637)', () => {
@@ -1857,6 +1880,7 @@ describe('Codex install hook configuration (e2e)', () => {
     // Array root is unsupported — file untouched, no GSD hook written.
     assert.strictEqual(fs.readFileSync(userHooksPath, 'utf8'), arrayRoot, 'array-rooted file preserved');
     assert.strictEqual(countCodexGsdHooks(codexHome), 0, 'no GSD hook written into array-rooted file');
+    assert.ok(!readCodexConfig(codexHome).includes('codex_hooks = true'), 'does not enable codex_hooks when hooks.json upsert is skipped');
   });
 
   test('hooks.json: uninstall preserves sibling top-level keys when hooks become empty', () => {
@@ -1889,6 +1913,7 @@ describe('Codex install hook configuration (e2e)', () => {
 
     assert.strictEqual(fs.readFileSync(userHooksPath, 'utf8'), noncanonical, 'noncanonical hooks payload preserved verbatim');
     assert.strictEqual(countCodexGsdHooks(codexHome), 0, 'no GSD hook injected into noncanonical file');
+    assert.ok(!readCodexConfig(codexHome).includes('codex_hooks = true'), 'does not enable codex_hooks when hooks.json upsert is skipped');
   });
 
   test('hooks.json: unsupported event-array shape is left untouched', () => {
@@ -1902,6 +1927,7 @@ describe('Codex install hook configuration (e2e)', () => {
 
     assert.strictEqual(fs.readFileSync(userHooksPath, 'utf8'), noncanonical, 'noncanonical SessionStart shape preserved');
     assert.strictEqual(countCodexGsdHooks(codexHome), 0, 'no GSD hook injected when event slot has wrong shape');
+    assert.ok(!readCodexConfig(codexHome).includes('codex_hooks = true'), 'does not enable codex_hooks when hooks.json upsert is skipped');
   });
 
   test('hooks.json: command path is shell-quoted so spaces in config dir work', () => {
@@ -1937,6 +1963,29 @@ describe('Codex install hook configuration (e2e)', () => {
 
     // File untouched — we don't overwrite user content we can't parse.
     assert.strictEqual(fs.readFileSync(userHooksPath, 'utf8'), malformed, 'malformed file preserved');
+    assert.ok(!readCodexConfig(codexHome).includes('codex_hooks = true'), 'does not enable codex_hooks when hooks.json upsert is skipped');
+  });
+
+  test('hooks.json: malformed file preserves prior codex_hooks=false state', () => {
+    fs.mkdirSync(codexHome, { recursive: true });
+    writeCodexConfig(codexHome, [
+      '[features]',
+      'codex_hooks = false',
+      '',
+      '[model]',
+      'name = "o3"',
+      '',
+    ].join('\n'));
+    const userHooksPath = path.join(codexHome, 'hooks.json');
+    const malformed = '{ this is not valid json';
+    fs.writeFileSync(userHooksPath, malformed);
+
+    runCodexInstall(codexHome);
+
+    const content = readCodexConfig(codexHome);
+    assert.strictEqual(fs.readFileSync(userHooksPath, 'utf8'), malformed, 'malformed file preserved');
+    assert.ok(content.includes('codex_hooks = false'), 'preserves prior disabled hook feature state');
+    assert.ok(!content.includes('codex_hooks = true'), 'does not flip codex_hooks on failed upsert');
   });
 
   test('hooks.json: uninstall removes only the GSD hook and preserves user hooks', () => {
