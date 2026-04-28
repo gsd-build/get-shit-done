@@ -671,17 +671,17 @@ describe('#2760 CR4 finding 2 — Legacy flat [[hooks]] block migrates to namesp
         + (parsed.hooks ? typeof parsed.hooks.SessionStart : 'no hooks table')
     );
 
-    // Collect commands from both event-entry level (user-authored [[hooks.SessionStart]]
-    // entries are preserved as-is, with command at event level) and nested .hooks
-    // sub-tables (the GSD-managed entry uses the Codex 0.124.0+ nested schema).
-    // Migration only upgrades [hooks.TYPE] map-format sections, not existing
-    // namespaced AoT entries, so both shapes can coexist in this test.
-    const allSessionStartCommands = parsed.hooks.SessionStart.flatMap((entry) => {
-      const cmds = [];
-      if (entry.command) cmds.push(entry.command);
-      if (Array.isArray(entry.hooks)) cmds.push(...entry.hooks.map((h) => h.command).filter(Boolean));
-      return cmds;
-    });
+    // Migration now handles stale [[hooks.SessionStart]] entries with handler
+    // fields at event-entry level (pre-#2773 shape), promoting them to the
+    // two-level nested form. Every entry must carry a .hooks sub-array after
+    // migration, so collect from nested handlers only.
+    assert.ok(
+      parsed.hooks.SessionStart.every((entry) => Array.isArray(entry.hooks)),
+      'every hooks.SessionStart entry must use nested [[hooks.SessionStart.hooks]] handlers after migration'
+    );
+    const allSessionStartCommands = parsed.hooks.SessionStart.flatMap((entry) =>
+      entry.hooks.map((h) => h.command).filter(Boolean)
+    );
     assert.ok(
       allSessionStartCommands.includes('echo user hook'),
       'user [[hooks.SessionStart]] entry preserved: ' + JSON.stringify(allSessionStartCommands)
@@ -1045,16 +1045,16 @@ describe('#2760 CR5 finding 3 — migration emits namespaced AoT (no flat/namesp
       parsed.hooks && Array.isArray(parsed.hooks.AfterTool),
       'pre-existing [[hooks.AfterTool]] must remain a namespaced AoT array'
     );
-    // AfterTool was authored in [[hooks.AfterTool]] namespaced AoT form (not a legacy
-    // map-format section), so migration leaves it untouched. Collect commands from
-    // both event-entry level (the shape it was authored in) and any nested .hooks
-    // sub-tables (for future-proofing) so the assertion covers the preserved entry.
-    const afterToolCommands = parsed.hooks.AfterTool.flatMap((e) => {
-      const cmds = [];
-      if (e.command) cmds.push(e.command);
-      if (Array.isArray(e.hooks)) cmds.push(...e.hooks.map((h) => h.command).filter(Boolean));
-      return cmds;
-    });
+    // AfterTool was in [[hooks.AfterTool]] with command at event-entry level
+    // (pre-#2773 stale namespaced AoT shape). Migration now promotes these to
+    // the two-level nested form, so every entry must have a .hooks sub-array.
+    assert.ok(
+      parsed.hooks.AfterTool.every((e) => Array.isArray(e.hooks)),
+      'every AfterTool entry must use nested [[hooks.AfterTool.hooks]] handlers after migration'
+    );
+    const afterToolCommands = parsed.hooks.AfterTool.flatMap((e) =>
+      e.hooks.map((h) => h.command).filter(Boolean)
+    );
     assert.ok(
       afterToolCommands.includes('x'),
       'user AfterTool entry must be preserved: ' + JSON.stringify(afterToolCommands)

@@ -756,6 +756,83 @@ describe('migrateCodexHooksMapFormat', () => {
     assert.ok(result.includes('[model]'), 'preserves [model]');
   });
 
+  test('upgrades stale [[hooks.SessionStart]] with event-level command to nested schema (#2773 CR6)', () => {
+    // Pre-#2773 single-block format: handler fields live directly under
+    // [[hooks.SessionStart]] rather than under [[hooks.SessionStart.hooks]].
+    // Codex 0.124.0+ rejects this shape. Migration must promote it.
+    const content = [
+      '[features]',
+      'codex_hooks = true',
+      '',
+      '[[hooks.SessionStart]]',
+      'command = "echo stale-user-hook"',
+      '',
+    ].join('\n');
+    const result = migrateCodexHooksMapFormat(content);
+    const parsed = parseTomlToObject(result);
+    assert.ok(parsed.hooks && Array.isArray(parsed.hooks.SessionStart),
+      'stale [[hooks.SessionStart]] must remain a namespaced AoT');
+    assert.strictEqual(parsed.hooks.SessionStart.length, 1);
+    assert.ok(Array.isArray(parsed.hooks.SessionStart[0].hooks),
+      'must emit [[hooks.SessionStart.hooks]] sub-table');
+    assert.strictEqual(parsed.hooks.SessionStart[0].hooks[0].command, 'echo stale-user-hook');
+    assert.strictEqual(parsed.hooks.SessionStart[0].hooks[0].type, 'command',
+      'must inject type = "command" when source body has no explicit type');
+    assert.equal(parsed.hooks.SessionStart[0].command, undefined,
+      'command must not remain at event-entry level after promotion');
+    assert.equal(parsed.features && parsed.features.codex_hooks, true);
+  });
+
+  test('leaves [[hooks.SessionStart]] + [[hooks.SessionStart.hooks]] untouched (already nested)', () => {
+    // Properly-nested schema: handler lives under [[hooks.SessionStart.hooks]].
+    // Migration must NOT create a double-wrapped [[hooks.SessionStart.hooks.hooks]] shape.
+    const content = [
+      '[[hooks.SessionStart]]',
+      '',
+      '[[hooks.SessionStart.hooks]]',
+      'type = "command"',
+      'command = "echo already-nested"',
+      '',
+    ].join('\n');
+    const result = migrateCodexHooksMapFormat(content);
+    // Content unchanged — migration finds nothing to migrate.
+    assert.strictEqual(result, content);
+  });
+
+  test('promotes multiple stale [[hooks.TYPE]] entries from different event types', () => {
+    const content = [
+      '[[hooks.SessionStart]]',
+      'command = "echo session"',
+      '',
+      '[[hooks.AfterCommand]]',
+      'command = "echo after-cmd"',
+      '',
+    ].join('\n');
+    const result = migrateCodexHooksMapFormat(content);
+    const parsed = parseTomlToObject(result);
+    assert.ok(parsed.hooks && Array.isArray(parsed.hooks.SessionStart));
+    assert.ok(parsed.hooks && Array.isArray(parsed.hooks.AfterCommand));
+    assert.strictEqual(parsed.hooks.SessionStart[0].hooks[0].command, 'echo session');
+    assert.strictEqual(parsed.hooks.SessionStart[0].hooks[0].type, 'command');
+    assert.strictEqual(parsed.hooks.AfterCommand[0].hooks[0].command, 'echo after-cmd');
+    assert.strictEqual(parsed.hooks.AfterCommand[0].hooks[0].type, 'command');
+    assert.equal(parsed.hooks.SessionStart[0].command, undefined);
+    assert.equal(parsed.hooks.AfterCommand[0].command, undefined);
+  });
+
+  test('matcher-only [[hooks.SessionStart]] (no handler fields) is left untouched', () => {
+    // A [[hooks.SessionStart]] entry with only a `matcher` key is a valid
+    // event filter — no handler fields → not a stale single-block entry.
+    const content = [
+      '[[hooks.SessionStart]]',
+      'matcher = "some-tool"',
+      '',
+    ].join('\n');
+    const result = migrateCodexHooksMapFormat(content);
+    // Nothing to migrate — content must be unchanged.
+    assert.strictEqual(result, content);
+  });
+
   test('CRLF line endings are preserved through migration (#2760 CR5: namespaced AoT)', () => {
     const content = [
       '[features]',
@@ -775,6 +852,8 @@ describe('migrateCodexHooksMapFormat', () => {
     assert.ok(Array.isArray(parsed.hooks.shell[0].hooks), 'must emit [[hooks.shell.hooks]] sub-table');
     assert.strictEqual(parsed.hooks.shell[0].hooks[0].command,
       'node /home/.codex/hooks/gsd-check-update.js');
+    assert.strictEqual(parsed.hooks.shell[0].hooks[0].type, 'command',
+      'migrated shell handler must carry type = "command" per Codex 0.124.0+ schema');
   });
 });
 

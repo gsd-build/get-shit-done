@@ -2905,7 +2905,27 @@ function migrateCodexHooksMapFormat(content) {
     (section) => section.array && section.path === 'hooks'
   );
 
-  if (legacyMapSections.length === 0 && flatAotSections.length === 0) {
+  // Find [[hooks.TYPE]] namespaced AoT entries that carry handler fields
+  // (command, type, timeout, statusMessage) at event-entry level but have no
+  // [[hooks.TYPE.hooks]] sub-table. This is the pre-#2773 single-block shape
+  // that Codex 0.124.0+ rejects. Promote them to the two-level nested form.
+  // Entries that already have a [[hooks.TYPE.hooks]] sub-table are left untouched.
+  // Matcher-only entries (no handler fields) are intentionally valid and skipped.
+  const STALE_HANDLER_FIELD_PATTERN = /^\s*(?:command|type|timeout|statusMessage)\s*=/m;
+  const staleNamespacedAotSections = sections.filter((section) => {
+    if (!section.array) return false;
+    if (!section.path.startsWith('hooks.')) return false;
+    // [[hooks.TYPE.hooks]] sub-tables have 3 path segments — skip them.
+    if (section.path.split('.').length > 2) return false;
+    // Must carry at least one handler field at event-entry level.
+    const body = content.slice(section.headerEnd, section.end);
+    if (!STALE_HANDLER_FIELD_PATTERN.test(body)) return false;
+    // Don't migrate when the nested [[hooks.TYPE.hooks]] sub-table already exists.
+    const subPath = section.path + '.hooks';
+    return !sections.some((s) => s.array && s.path === subPath);
+  });
+
+  if (legacyMapSections.length === 0 && flatAotSections.length === 0 && staleNamespacedAotSections.length === 0) {
     return content;
   }
 
@@ -2941,12 +2961,23 @@ function migrateCodexHooksMapFormat(content) {
     return { eventEntries, handlerEntries, hasExplicitType };
   }
 
+  // TOML key quoting: bare keys may only contain [A-Za-z0-9_-]. Event names
+  // containing spaces, dots, or other punctuation must be wrapped in double-
+  // quoted TOML strings with backslash and double-quote characters escaped.
+  // Using raw event names in [[hooks.${type}]] headers produces invalid TOML
+  // for any non-bare-key character (e.g. "Before Tool" → [[hooks.Before Tool]]).
+  function tomlBareKey(key) {
+    if (/^[A-Za-z0-9_-]+$/.test(key)) return key;
+    return '"' + key.replace(/\\/g, '\\\\').replace(/"/g, '\\"') + '"';
+  }
+
   function buildNestedBlock(type, body, skipKeys = new Set()) {
+    const quotedType = tomlBareKey(type);
     const { eventEntries, handlerEntries, hasExplicitType } = parseHooksBody(body, skipKeys);
     if (!hasExplicitType) handlerEntries.unshift('type = "command"');
     const eventBody = eventEntries.length > 0 ? eventEntries.join(eol) + eol : '';
     const handlerBody = handlerEntries.join(eol) + eol;
-    return `[[hooks.${type}]]${eol}${eventBody}${eol}[[hooks.${type}.hooks]]${eol}${handlerBody}`;
+    return `[[hooks.${quotedType}]]${eol}${eventBody}${eol}[[hooks.${quotedType}.hooks]]${eol}${handlerBody}`;
   }
 
   // Extract the event name from a flat [[hooks]] section body.
@@ -2967,7 +2998,7 @@ function migrateCodexHooksMapFormat(content) {
     return extractFlatHookEventName(body) !== null;
   });
 
-  const legacyHooksSections = [...legacyMapSections, ...migratedFlatAotSections];
+  const legacyHooksSections = [...legacyMapSections, ...migratedFlatAotSections, ...staleNamespacedAotSections];
 
   // Remove all legacy hooks sections from the content
   let result = removeContentRanges(
@@ -2990,6 +3021,15 @@ function migrateCodexHooksMapFormat(content) {
       return buildNestedBlock(type, body);
     });
 
+  // Stale namespaced AoT blocks: [[hooks.TYPE]] entries with handler fields at
+  // event-entry level (no .hooks sub-table). Treated like map-format blocks —
+  // inserted before the first remaining table section.
+  const staleNamespacedAotBlocks = staleNamespacedAotSections.map((s) => {
+    const type = s.path.slice('hooks.'.length);
+    const body = content.slice(s.headerEnd, s.end);
+    return buildNestedBlock(type, body);
+  });
+
   const flatAotBlocks = migratedFlatAotSections.map((s) => {
     const body = content.slice(s.headerEnd, s.end);
     const eventName = extractFlatHookEventName(body);
@@ -2997,9 +3037,11 @@ function migrateCodexHooksMapFormat(content) {
     return buildNestedBlock(eventName, body, new Set(['event']));
   }).filter(Boolean);
 
-  // Insert map-format conversions before the first remaining table section.
-  if (mapOnlyBlocks.length > 0) {
-    const insertionText = mapOnlyBlocks.join('');
+  // Insert map-format and stale-namespaced-AoT conversions before the first
+  // remaining table section (both share the same placement strategy).
+  const allMapStyleBlocks = [...mapOnlyBlocks, ...staleNamespacedAotBlocks];
+  if (allMapStyleBlocks.length > 0) {
+    const insertionText = allMapStyleBlocks.join('');
     const remainingSections = getTomlTableSections(result);
     if (remainingSections.length > 0) {
       const firstTable = remainingSections[0];
@@ -3482,26 +3524,40 @@ function validateCodexConfigSchema(content) {
             reason: `hooks.${event} must be an array of tables, got ${typeof value}`,
           };
         }
-        // Each entry in hooks.<Event> must have a .hooks sub-array of handlers.
-        // An entry without any .hooks is structurally valid (matcher-only event
-        // filter) but warn rather than hard-fail to avoid blocking user configs
-        // that haven't been migrated yet. GSD-managed blocks always emit .hooks.
+        // Each entry in hooks.<Event> must either be a matcher-only filter (no
+        // handler fields) or carry a .hooks sub-array of handler tables.
+        // Entries with handler fields (command, type, timeout, statusMessage) at
+        // event-entry level but without a .hooks sub-table are the pre-#2773
+        // single-block shape that Codex 0.124.0+ rejects. migrateCodexHooksMapFormat
+        // converts these before validation runs; their presence here means migration
+        // failed to cover this entry — fail loudly rather than pass a broken config.
+        const HANDLER_FIELD_NAMES = new Set(['command', 'type', 'timeout', 'statusMessage']);
         for (const entry of value) {
-          if (entry && typeof entry === 'object' && entry.hooks !== undefined) {
-            if (!Array.isArray(entry.hooks)) {
+          if (!entry || typeof entry !== 'object') continue;
+          if (entry.hooks === undefined) {
+            const strayKey = Object.keys(entry).find((k) => HANDLER_FIELD_NAMES.has(k));
+            if (strayKey) {
               return {
                 ok: false,
-                reason: `hooks.${event}[].hooks must be an array of handler tables, got ${typeof entry.hooks}`,
+                reason: `hooks.${event}[] entry has handler field "${strayKey}" at event-entry level; ` +
+                  `Codex 0.124.0+ requires handler fields nested under [[hooks.${event}.hooks]]`,
               };
             }
-            for (const handler of entry.hooks) {
-              if (handler && typeof handler === 'object' && handler.type !== undefined) {
-                if (handler.type !== 'command') {
-                  return {
-                    ok: false,
-                    reason: `hooks.${event}[].hooks[].type must be "command", got "${handler.type}"`,
-                  };
-                }
+            continue;
+          }
+          if (!Array.isArray(entry.hooks)) {
+            return {
+              ok: false,
+              reason: `hooks.${event}[].hooks must be an array of handler tables, got ${typeof entry.hooks}`,
+            };
+          }
+          for (const handler of entry.hooks) {
+            if (handler && typeof handler === 'object' && handler.type !== undefined) {
+              if (handler.type !== 'command') {
+                return {
+                  ok: false,
+                  reason: `hooks.${event}[].hooks[].type must be "command", got "${handler.type}"`,
+                };
               }
             }
           }
