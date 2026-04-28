@@ -52,7 +52,7 @@ If `PATH_NOT_FOUND` or `MANIFEST_NOT_FOUND`: display error and exit.
 Run the init query:
 
 ```bash
-INIT=$(gsd-sdk query init.ingest-docs)
+INIT=$(gsd-tools init ingest-docs)
 ```
 
 Parse `project_exists`, `planning_exists`, `has_git`, `project_path` from INIT.
@@ -289,7 +289,7 @@ Preview the merge diff to the user and gate via approve-revise-abort before writ
 Commit the ingest results:
 
 ```bash
-gsd-sdk query commit "docs: ingest {N} docs from {SCAN_PATH} (#2387)" --files \
+gsd-tools commit "docs: ingest {N} docs from {SCAN_PATH} (#2387)" --files \
   .planning/PROJECT.md \
   .planning/REQUIREMENTS.md \
   .planning/ROADMAP.md \

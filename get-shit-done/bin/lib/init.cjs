@@ -562,6 +562,25 @@ function cmdInitQuick(cwd, description, raw) {
   output(withProjectRoot(cwd, result), raw);
 }
 
+/**
+ * Init handler for ingest-docs workflow (#2801).
+ *
+ * Returns the minimal set of fields that ingest-docs.md needs to detect
+ * whether a project/planning dir exists and choose new vs merge mode.
+ * Mirrors the initIngestDocs SDK handler in sdk/src/query/init.ts.
+ */
+function cmdInitIngestDocs(cwd, raw) {
+  const config = loadConfig(cwd);
+  const result = {
+    project_exists: pathExistsInternal(cwd, '.planning/PROJECT.md'),
+    planning_exists: fs.existsSync(planningRoot(cwd)),
+    has_git: fs.existsSync(path.join(cwd, '.git')),
+    project_path: '.planning/PROJECT.md',
+    commit_docs: config.commit_docs,
+  };
+  output(withProjectRoot(cwd, result), raw);
+}
+
 function cmdInitResume(cwd, raw) {
   const config = loadConfig(cwd);
 
@@ -1928,6 +1947,7 @@ module.exports = {
   cmdInitNewProject,
   cmdInitNewMilestone,
   cmdInitQuick,
+  cmdInitIngestDocs,
   cmdInitResume,
   cmdInitVerifyWork,
   cmdInitPhaseOp,

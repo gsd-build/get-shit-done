@@ -884,6 +884,9 @@ async function runCommand(command, args, cwd, raw, defaultValue) {
         case 'quick':
           init.cmdInitQuick(cwd, args.slice(2).join(' '), raw);
           break;
+        case 'ingest-docs':
+          init.cmdInitIngestDocs(cwd, raw);
+          break;
         case 'resume':
           init.cmdInitResume(cwd, raw);
           break;
@@ -918,7 +921,7 @@ async function runCommand(command, args, cwd, raw, defaultValue) {
           init.cmdInitRemoveWorkspace(cwd, args[2], raw);
           break;
         default:
-          error(`Unknown init workflow: ${workflow}\nAvailable: execute-phase, plan-phase, new-project, new-milestone, quick, resume, verify-work, phase-op, todos, milestone-op, map-codebase, progress, manager, new-workspace, list-workspaces, remove-workspace`);
+          error(`Unknown init workflow: ${workflow}\nAvailable: execute-phase, plan-phase, new-project, new-milestone, quick, ingest-docs, resume, verify-work, phase-op, todos, milestone-op, map-codebase, progress, manager, new-workspace, list-workspaces, remove-workspace`);
       }
       break;
     }
