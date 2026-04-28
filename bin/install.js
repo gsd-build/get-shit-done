@@ -6991,9 +6991,13 @@ function install(isGlobal, runtime = 'claude') {
       // namespaced AoT form `[[hooks.<Event>]]` for their own hooks,
       // emit our managed entry in that same shape so the two forms don't
       // collide on round-trip (#2760, defect 3).
+      //
+      // #2802 review finding: sense style from user content ONLY by stripping
+      // previous GSD-managed blocks first.
+      const userContent = stripGsdFromCodexConfig(configContent) || '';
       const updateCheckScript = path.resolve(targetDir, 'hooks', 'gsd-check-update.js').replace(/\\/g, '/');
       const hookBlock = `${eol}# GSD Hooks${eol}` +
-        (hasUserNamespacedAotHooks(configContent)
+        (hasUserNamespacedAotHooks(userContent)
           ? `[[hooks.SessionStart]]${eol}` +
             `command = "node ${updateCheckScript}"${eol}`
           : `[[hooks]]${eol}` +
