@@ -20,8 +20,13 @@ export const roadmapUpdatePlanProgress: QueryHandler = async (args, projectDir, 
   // took the literal string "--phase" as the phase value.
   const phaseIdx = args.indexOf('--phase');
   let phaseNum: string;
-  if (phaseIdx !== -1 && args[phaseIdx + 1] !== undefined) {
-    phaseNum = String(args[phaseIdx + 1]);
+  const phaseFlagValue = phaseIdx !== -1 ? args[phaseIdx + 1] : undefined;
+  if (
+    phaseIdx !== -1 &&
+    phaseFlagValue !== undefined &&
+    !String(phaseFlagValue).startsWith('--')
+  ) {
+    phaseNum = String(phaseFlagValue);
   } else {
     // Positional: skip any leading flag tokens in case of mixed invocations.
     const positional = args.filter((a) => !String(a).startsWith('--'));
