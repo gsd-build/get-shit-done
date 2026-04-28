@@ -2,7 +2,7 @@
 
 Pre-release candidate. Published to npm under the `next` tag.
 
-```
+```bash
 npx get-shit-done-cc@next
 ```
 

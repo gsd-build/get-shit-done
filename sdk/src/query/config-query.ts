@@ -86,7 +86,10 @@ export const configGet: QueryHandler = async (args, projectDir, workstream) => {
   let defaultValue: string | undefined;
   let filteredArgs = args;
   if (defaultIdx !== -1) {
-    defaultValue = args[defaultIdx + 1] !== undefined ? String(args[defaultIdx + 1]) : '';
+    if (defaultIdx + 1 >= args.length) {
+      throw new GSDError('Usage: config-get <key.path> [--default <value>]', ErrorClassification.Validation);
+    }
+    defaultValue = String(args[defaultIdx + 1]);
     filteredArgs = [...args.slice(0, defaultIdx), ...args.slice(defaultIdx + 2)];
   }
 
@@ -100,7 +103,6 @@ export const configGet: QueryHandler = async (args, projectDir, workstream) => {
   try {
     raw = await readFile(paths.config, 'utf-8');
   } catch {
-    if (defaultValue !== undefined) return { data: defaultValue };
     throw new GSDError(`No config.json found at ${paths.config}`, ErrorClassification.Validation);
   }
 
