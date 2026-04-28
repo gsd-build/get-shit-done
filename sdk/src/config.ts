@@ -46,6 +46,8 @@ export interface WorkflowConfig {
    * verify-phase (validation gate, non-blocking). Set false to disable both.
    */
   context_coverage_gate: boolean;
+  /** Enable SME (Subject Matter Expert) agent framework. Default: false (opt-in). */
+  use_sme_agents: boolean;
 }
 
 export interface HooksConfig {
@@ -70,6 +72,11 @@ export interface GSDConfig {
   mode?: string;
   /** Internal auto-chain flag; mirrors gsd-tools `config._auto_chain_active`. */
   _auto_chain_active?: boolean;
+  /** SME agent framework settings. */
+  sme?: {
+    blocking?: string;
+    [key: string]: unknown;
+  };
   [key: string]: unknown;
 }
 
@@ -107,6 +114,7 @@ export const CONFIG_DEFAULTS: GSDConfig = {
     max_discuss_passes: 3,
     subagent_timeout: 300000,
     context_coverage_gate: true,
+    use_sme_agents: false,
   },
   hooks: {
     context_warnings: true,

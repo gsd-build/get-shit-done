@@ -124,6 +124,10 @@ function buildNewProjectConfig(userChoices) {
       security_enforcement: CONFIG_DEFAULTS.security_enforcement,
       security_asvs_level: CONFIG_DEFAULTS.security_asvs_level,
       security_block_on: CONFIG_DEFAULTS.security_block_on,
+      use_sme_agents: false,
+    },
+    sme: {
+      blocking: 'soft',
     },
     hooks: {
       context_warnings: true,
@@ -153,6 +157,11 @@ function buildNewProjectConfig(userChoices) {
       ...hardcoded.hooks,
       ...(userDefaults.hooks || {}),
       ...(choices.hooks || {}),
+    },
+    sme: {
+      ...hardcoded.sme,
+      ...(userDefaults.sme || {}),
+      ...(choices.sme || {}),
     },
     agent_skills: {
       ...hardcoded.agent_skills,

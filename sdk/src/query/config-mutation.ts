@@ -361,7 +361,7 @@ export const configNewProject: QueryHandler = async (args, projectDir, workstrea
   // Build default config
   const defaults: Record<string, unknown> = {
     model_profile: 'balanced',
-    commit_docs: false,
+    commit_docs: true,
     parallelization: 1,
     search_gitignored: false,
     brave_search: hasBraveSearch,
@@ -389,6 +389,10 @@ export const configNewProject: QueryHandler = async (args, projectDir, workstrea
       skip_discuss: false,
       code_review: true,
       code_review_depth: 'standard',
+      use_sme_agents: false,
+    },
+    sme: {
+      blocking: 'soft',
     },
     hooks: {
       context_warnings: true,
@@ -428,6 +432,11 @@ export const configNewProject: QueryHandler = async (args, projectDir, workstrea
       ...((defaults.features as Record<string, unknown>) || {}),
       ...((globalDefaults.features as Record<string, unknown>) || {}),
       ...((userChoices.features as Record<string, unknown>) || {}),
+    },
+    sme: {
+      ...((defaults.sme as Record<string, unknown>) || {}),
+      ...((globalDefaults.sme as Record<string, unknown>) || {}),
+      ...((userChoices.sme as Record<string, unknown>) || {}),
     },
   };
 
