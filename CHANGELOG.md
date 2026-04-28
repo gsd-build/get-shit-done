@@ -42,6 +42,19 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
   values, and unsupported value types. Both pre-write helper failures and write-time
   failures restore the pre-install snapshot and abort with a clear error rather than
   warn-and-continue. (#2760)
+- **Codex hooks migrator correctness hardening** — five edge-cases in the
+  `[[hooks.<Event>]]` → `[[hooks.<Event>.hooks]]` migration path fixed: (1) the TOML
+  key parser in hook-body classification now uses `parseTomlKey()` instead of a bare
+  regex, so hyphenated keys (e.g. `status-message`) and quoted keys are no longer
+  silently dropped; (2) `buildNestedBlock` no longer synthesises an empty
+  `[[hooks.TYPE.hooks]]` sub-table for matcher-only sections that carry no handler
+  fields — previously produced a broken entry with `type = "command"` but no
+  `command`; (3) the `legacyMapSections` filter now uses the parsed segment count
+  instead of dot-splitting the path string, preventing three-segment tables such as
+  `[hooks.SessionStart.hooks]` from being misclassified as event entries (same class
+  of bug fixed for `staleNamespacedAotSections` in the previous round); (4) regression
+  test added: `[[hooks."before.tool"]]` (a quoted key containing a dot) is correctly
+  treated as a two-segment namespace and not split on the inner dot. (#2809)
 - **Codex `[[agents]]` reverted to `[agents.<name>]` struct format** — the sequence
   format introduced in #2645 is rejected by codex-cli 0.124.0 with "invalid type:
   sequence, expected struct AgentsToml". Reverted to struct format which is correct for
