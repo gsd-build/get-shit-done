@@ -119,21 +119,34 @@ describe('bug-2791: GSD_WORKSTREAM env var respected by gsd-sdk query', () => {
     );
   });
 
-  test('--ws flag still works (explicit override)', () => {
-    const result = runSdkQuery(['roadmap.analyze', '--ws', 'my-ws'], tmpDir);
+  test('--ws flag takes precedence over GSD_WORKSTREAM env var', () => {
+    // Set GSD_WORKSTREAM to a non-existent workstream; --ws should override it.
+    // This verifies flag-wins-over-env precedence, not just that --ws works.
+    const result = runSdkQuery(['roadmap.analyze', '--ws', 'my-ws'], tmpDir, {
+      GSD_WORKSTREAM: 'nonexistent-ws',
+    });
     assert.strictEqual(result.exitCode, 0, `expected exit 0: ${result.stdout}`);
     assert.ok(result.json !== null, 'expected JSON output');
+    // --ws my-ws should route to the workstream ROADMAP which has 1 phase,
+    // proving the flag overrides the env var (nonexistent-ws has no phases).
     assert.strictEqual(
       result.json.phase_count,
       1,
-      `expected 1 phase via --ws flag, got ${result.json.phase_count}`
+      `expected 1 phase via --ws flag (overriding GSD_WORKSTREAM), got ${result.json.phase_count}`
     );
   });
 
-  test('invalid GSD_WORKSTREAM value is silently ignored (no crash)', () => {
+  test('invalid GSD_WORKSTREAM value is silently ignored and falls back to root', () => {
     const result = runSdkQuery(['roadmap.analyze'], tmpDir, { GSD_WORKSTREAM: '../evil' });
-    // Should not crash; invalid name is silently ignored and falls back to root
+    // Should not crash; invalid name is silently ignored and falls back to root ROADMAP.
     assert.strictEqual(result.exitCode, 0, `expected exit 0 (invalid GSD_WORKSTREAM ignored): ${result.stdout}`);
+    assert.ok(result.json !== null, 'expected JSON output after invalid GSD_WORKSTREAM fallback');
+    // Root ROADMAP has no phases — confirming root fallback, not an error path.
+    assert.strictEqual(
+      result.json.phase_count,
+      0,
+      `expected 0 phases from root ROADMAP fallback (invalid GSD_WORKSTREAM), got ${result.json.phase_count}`
+    );
   });
 });
 
