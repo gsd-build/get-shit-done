@@ -599,6 +599,8 @@ describe('migrateCodexHooksMapFormat', () => {
       'must emit [[hooks.SessionStart.hooks]] sub-table');
     assert.strictEqual(parsed.hooks.SessionStart[0].hooks[0].command,
       'node /home/.codex/hooks/gsd-check-update.js');
+    assert.strictEqual(parsed.hooks.SessionStart[0].hooks[0].type, 'command',
+      'migrated handler must carry type = "command" per Codex 0.124.0+ schema');
     assert.equal(parsed.hooks.SessionStart[0].event, undefined,
       'event key consumed as namespace — must not appear in emitted block');
     assert.ok(!Array.isArray(parsed.hooks), 'hooks must be a table, not a flat array');
@@ -653,6 +655,8 @@ describe('migrateCodexHooksMapFormat', () => {
     // #2773: command and extra keys now live in [[hooks.exec.hooks]] sub-table
     assert.ok(Array.isArray(parsed.hooks.exec[0].hooks), 'must emit [[hooks.exec.hooks]] sub-table');
     assert.strictEqual(parsed.hooks.exec[0].hooks[0].command, 'echo hello');
+    assert.strictEqual(parsed.hooks.exec[0].hooks[0].type, 'command',
+      'migrated handler must carry type = "command" per Codex 0.124.0+ schema');
     assert.strictEqual(parsed.hooks.exec[0].hooks[0].extra_key, 'preserved');
     assert.equal(parsed.hooks.exec[0].event, undefined);
   });
@@ -674,7 +678,11 @@ describe('migrateCodexHooksMapFormat', () => {
     assert.strictEqual(parsed.hooks.exec.length, 1);
     // #2773: commands now live in the [[hooks.<TYPE>.hooks]] sub-table
     assert.strictEqual(parsed.hooks.shell[0].hooks[0].command, 'node /home/.codex/hooks/gsd-check-update.js');
+    assert.strictEqual(parsed.hooks.shell[0].hooks[0].type, 'command',
+      'migrated shell handler must carry type = "command"');
     assert.strictEqual(parsed.hooks.exec[0].hooks[0].command, 'echo done');
+    assert.strictEqual(parsed.hooks.exec[0].hooks[0].type, 'command',
+      'migrated exec handler must carry type = "command"');
   });
 
   test('migrates flat [[hooks]] with event=AfterCommand to [[hooks.AfterCommand]] namespaced form', () => {
@@ -694,6 +702,8 @@ describe('migrateCodexHooksMapFormat', () => {
     assert.ok(Array.isArray(parsed.hooks.AfterCommand[0].hooks),
       'must emit [[hooks.AfterCommand.hooks]] sub-table');
     assert.strictEqual(parsed.hooks.AfterCommand[0].hooks[0].command, 'echo custom');
+    assert.strictEqual(parsed.hooks.AfterCommand[0].hooks[0].type, 'command',
+      'migrated AfterCommand handler must carry type = "command" per Codex 0.124.0+ schema');
     assert.equal(parsed.hooks.AfterCommand[0].event, undefined,
       'event key consumed as namespace — must not appear in emitted block');
     assert.ok(!Array.isArray(parsed.hooks), 'hooks must be a table, not a flat array');
@@ -722,6 +732,8 @@ describe('migrateCodexHooksMapFormat', () => {
     assert.ok(Array.isArray(parsed.hooks.shell[0].hooks), 'must emit [[hooks.shell.hooks]] sub-table');
     assert.strictEqual(parsed.hooks.shell[0].hooks[0].command,
       'node /home/.codex/hooks/gsd-check-update.js');
+    assert.strictEqual(parsed.hooks.shell[0].hooks[0].type, 'command',
+      'migrated shell handler must carry type = "command" per Codex 0.124.0+ schema');
     assert.equal(parsed.features && parsed.features.codex_hooks, true);
   });
 

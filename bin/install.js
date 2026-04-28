@@ -2949,14 +2949,22 @@ function migrateCodexHooksMapFormat(content) {
     return `[[hooks.${type}]]${eol}${eventBody}${eol}[[hooks.${type}.hooks]]${eol}${handlerBody}`;
   }
 
-  // Collect which flat AoT sections are migratable (have an `event` key).
-  // Sections without an `event` key cannot be migrated and are left untouched.
-  // TOML allows both double-quoted ("SessionStart") and single-quoted ('SessionStart')
-  // string values, so the filter accepts both forms.
-  const TOML_QUOTED_STRING = /^\s*event\s*=\s*(?:"(?:[^"\\]|\\.)*"|'[^']*')/m;
+  // Extract the event name from a flat [[hooks]] section body.
+  // Returns null if no `event` key is found, if the value is an empty string, or if
+  // the quoting is unrecognised. Both TOML double-quoted ("...") and single-quoted
+  // ('...') strings are accepted. An empty event string (event = "" or event = '')
+  // is explicitly rejected — it cannot be meaningfully namespaced and is left untouched.
+  function extractFlatHookEventName(body) {
+    const TOML_EVENT_CAPTURE = /^\s*event\s*=\s*(?:"((?:[^"\\]|\\.)*)"|'([^']*)')/m;
+    const m = body.match(TOML_EVENT_CAPTURE);
+    if (!m) return null;
+    const name = (m[1] ?? m[2] ?? '').trim();
+    return name || null;
+  }
+
   const migratedFlatAotSections = flatAotSections.filter((section) => {
     const body = content.slice(section.headerEnd, section.end);
-    return TOML_QUOTED_STRING.test(body);
+    return extractFlatHookEventName(body) !== null;
   });
 
   const legacyHooksSections = [...legacyMapSections, ...migratedFlatAotSections];
@@ -2982,12 +2990,9 @@ function migrateCodexHooksMapFormat(content) {
       return buildNestedBlock(type, body);
     });
 
-  // Extract the event name from a flat [[hooks]] body, handling both quote styles.
-  const TOML_EVENT_CAPTURE = /^\s*event\s*=\s*(?:"((?:[^"\\]|\\.)*)"|'([^']*)')/m;
   const flatAotBlocks = migratedFlatAotSections.map((s) => {
     const body = content.slice(s.headerEnd, s.end);
-    const eventMatch = body.match(TOML_EVENT_CAPTURE);
-    const eventName = eventMatch ? (eventMatch[1] ?? eventMatch[2]) : null;
+    const eventName = extractFlatHookEventName(body);
     if (!eventName) return '';
     return buildNestedBlock(eventName, body, new Set(['event']));
   }).filter(Boolean);

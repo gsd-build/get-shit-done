@@ -671,8 +671,11 @@ describe('#2760 CR4 finding 2 — Legacy flat [[hooks]] block migrates to namesp
         + (parsed.hooks ? typeof parsed.hooks.SessionStart : 'no hooks table')
     );
 
-    // Collect commands from both event-level (old user schema) and nested
-    // .hooks sub-tables (new GSD schema) so the test covers both shapes.
+    // Collect commands from both event-entry level (user-authored [[hooks.SessionStart]]
+    // entries are preserved as-is, with command at event level) and nested .hooks
+    // sub-tables (the GSD-managed entry uses the Codex 0.124.0+ nested schema).
+    // Migration only upgrades [hooks.TYPE] map-format sections, not existing
+    // namespaced AoT entries, so both shapes can coexist in this test.
     const allSessionStartCommands = parsed.hooks.SessionStart.flatMap((entry) => {
       const cmds = [];
       if (entry.command) cmds.push(entry.command);
@@ -1042,7 +1045,10 @@ describe('#2760 CR5 finding 3 — migration emits namespaced AoT (no flat/namesp
       parsed.hooks && Array.isArray(parsed.hooks.AfterTool),
       'pre-existing [[hooks.AfterTool]] must remain a namespaced AoT array'
     );
-    // AfterTool was authored in old single-level form; command may be at event level.
+    // AfterTool was authored in [[hooks.AfterTool]] namespaced AoT form (not a legacy
+    // map-format section), so migration leaves it untouched. Collect commands from
+    // both event-entry level (the shape it was authored in) and any nested .hooks
+    // sub-tables (for future-proofing) so the assertion covers the preserved entry.
     const afterToolCommands = parsed.hooks.AfterTool.flatMap((e) => {
       const cmds = [];
       if (e.command) cmds.push(e.command);
@@ -1059,13 +1065,15 @@ describe('#2760 CR5 finding 3 — migration emits namespaced AoT (no flat/namesp
       parsed.hooks && Array.isArray(parsed.hooks.SessionStart),
       'migrated SessionStart must be namespaced AoT (not flat [[hooks]])'
     );
-    // After migration, command lives in .hooks[0].command (nested schema).
-    const ssCommands = parsed.hooks.SessionStart.flatMap((e) => {
-      const cmds = [];
-      if (e.command) cmds.push(e.command);
-      if (Array.isArray(e.hooks)) cmds.push(...e.hooks.map((h) => h.command).filter(Boolean));
-      return cmds;
-    });
+    // After migration, [hooks.SessionStart] map-format is promoted to nested AoT.
+    // Command lives in [[hooks.SessionStart.hooks]][0].command (nested schema).
+    assert.ok(
+      parsed.hooks.SessionStart.every((e) => Array.isArray(e.hooks)),
+      'every SessionStart entry must use nested [[hooks.SessionStart.hooks]] handlers after migration'
+    );
+    const ssCommands = parsed.hooks.SessionStart.flatMap((e) =>
+      e.hooks.map((h) => h.command).filter(Boolean)
+    );
     assert.ok(
       ssCommands.includes('y'),
       'user SessionStart command "y" must be preserved in namespaced array: ' +
