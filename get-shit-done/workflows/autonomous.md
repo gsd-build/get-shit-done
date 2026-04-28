@@ -262,7 +262,7 @@ The discuss step in `--auto` mode MUST NOT loop. If CONTEXT.md already exists af
 **If `INTERACTIVE` is set:** Run the standard discuss-phase skill inline (asks interactive questions, waits for user answers). This preserves user input on all design decisions while keeping plan+execute out of the main context:
 
 ```
-Skill(skill="gsd:discuss-phase", args="${PHASE_NUM}")
+Skill(skill="gsd-discuss-phase", args="${PHASE_NUM}")
 ```
 
 **If `INTERACTIVE` is NOT set:** Execute the smart_discuss step for this phase (batch table proposals, auto-optimized).
@@ -367,12 +367,12 @@ CODE_REVIEW_ENABLED=$(gsd-sdk query config-get workflow.code_review 2>/dev/null 
 If `"false"`: display "Code review skipped (workflow.code_review=false)" and proceed to 3d.
 
 ```
-Skill(skill="gsd:code-review", args="${PHASE_NUM}")
+Skill(skill="gsd-code-review", args="${PHASE_NUM}")
 ```
 
 Parse status from REVIEW.md frontmatter. If "clean" or "skipped": proceed to 3d. If findings found: auto-invoke:
 ```
-Skill(skill="gsd:code-review-fix", args="${PHASE_NUM} --auto")
+Skill(skill="gsd-code-review-fix", args="${PHASE_NUM} --auto")
 ```
 
 **Error handling:** If either Skill fails, catch the error, display as non-blocking, and proceed to 3d.

@@ -1123,21 +1123,21 @@ function convertClaudeCommandToCopilotSkill(content, skillName, isGlobal = false
 
 /**
  * Map a skill directory name (gsd-<cmd>) to the frontmatter `name:` used
- * by Claude Code as the skill identity. Workflows emit `Skill(skill="gsd:<cmd>")`
- * (colon form) and Claude Code resolves skills by frontmatter `name:`, not
- * directory name — so emit colon form here. Directory stays hyphenated for
- * Windows path safety. See #2643.
+ * by Claude Code as the skill identity. Emits the hyphen form (gsd-<cmd>)
+ * so Claude Code autocomplete shows the canonical invocation form, not the
+ * deprecated colon form. See #2808.
+ *
+ * Historical note: this previously returned `gsd:<cmd>` (colon) because
+ * workflows called Skill(skill="gsd:<cmd>"). Those calls have been updated
+ * to use hyphen form (#2808) so the colon rewrite is no longer needed.
  *
  * Codex must NOT use this helper: its adapter invokes skills as `$gsd-<cmd>`
- * (shell-var syntax) and a colon would terminate the variable name. Codex
- * keeps the hyphen form via `yamlQuote(skillName)` directly.
+ * (shell-var syntax) — hyphen form is already correct there.
  */
 function skillFrontmatterName(skillDirName) {
   if (typeof skillDirName !== 'string') return skillDirName;
-  // Idempotent on already-colon form.
-  if (skillDirName.includes(':')) return skillDirName;
-  // Only rewrite the first hyphen after the `gsd` prefix.
-  return skillDirName.replace(/^gsd-/, 'gsd:');
+  // Return the hyphen form as-is (gsd-<cmd>) — canonical since #2808.
+  return skillDirName;
 }
 
 /**

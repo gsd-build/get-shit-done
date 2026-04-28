@@ -3,12 +3,15 @@
 process.env.GSD_TEST_MODE = '1';
 
 /**
- * Bug #2643: workflows emit Skill(skill="gsd:<cmd>") but flat-skills install
- * registers `gsd-<cmd>` as the frontmatter `name:`. Claude Code uses the
- * frontmatter name (not dir name) as the skill identity — so the emitted
- * `name:` must match the colon form used by workflow Skill() calls.
+ * Bug #2643 / #2808: skill frontmatter name parity.
  *
- * The directory name stays hyphenated for Windows path safety.
+ * Original (#2643): workflows emitted Skill(skill="gsd:<cmd>") and the
+ * installer registered colon form in SKILL.md name: to match.
+ *
+ * Updated (#2808): workflows now use Skill(skill="gsd-<cmd>") (hyphen),
+ * and the installer emits name: gsd-<cmd> (hyphen). Claude Code autocomplete
+ * now shows the canonical hyphen form instead of the deprecated colon form.
+ * The directory name (gsd-<cmd>) is unchanged.
  */
 
 const { test, describe } = require('node:test');
@@ -37,7 +40,15 @@ function collectFiles(dir, results) {
   return results;
 }
 
-function extractSkillNames(content) {
+function extractSkillNamesHyphen(content) {
+  const names = new Set();
+  const rx = /Skill\(skill=['"]gsd-([a-z0-9-]+)['"]/gi;
+  let m;
+  while ((m = rx.exec(content)) !== null) names.add('gsd-' + m[1]);
+  return names;
+}
+
+function extractSkillNamesColon(content) {
   const names = new Set();
   const rx = /Skill\(skill=['"]gsd:([a-z0-9-]+)['"]/gi;
   let m;
@@ -45,28 +56,44 @@ function extractSkillNames(content) {
   return names;
 }
 
-describe('skill frontmatter name parity (#2643)', () => {
-  test('skillFrontmatterName helper emits colon form', () => {
+describe('skill frontmatter name parity (#2643 / #2808)', () => {
+  test('skillFrontmatterName helper emits hyphen form (#2808)', () => {
     assert.strictEqual(typeof skillFrontmatterName, 'function');
-    assert.strictEqual(skillFrontmatterName('gsd-execute-phase'), 'gsd:execute-phase');
-    assert.strictEqual(skillFrontmatterName('gsd-plan-phase'), 'gsd:plan-phase');
-    assert.strictEqual(skillFrontmatterName('gsd:next'), 'gsd:next');
+    assert.strictEqual(skillFrontmatterName('gsd-execute-phase'), 'gsd-execute-phase');
+    assert.strictEqual(skillFrontmatterName('gsd-plan-phase'), 'gsd-plan-phase');
+    assert.strictEqual(skillFrontmatterName('gsd-next'), 'gsd-next');
   });
 
-  test('convertClaudeCommandToClaudeSkill emits name: gsd:<cmd>', () => {
+  test('convertClaudeCommandToClaudeSkill emits name: gsd-<cmd> (hyphen)', () => {
     const input = '---\nname: old\ndescription: test\n---\n\nBody.';
     const result = convertClaudeCommandToClaudeSkill(input, 'gsd-execute-phase');
-    assert.match(result, /^---\nname: gsd:execute-phase\n/);
+    assert.match(result, /^---\nname: gsd-execute-phase\n/);
   });
 
-  test('every workflow Skill(skill="gsd:<cmd>") resolves to an emitted skill name', () => {
+  test('no workflow uses deprecated Skill(skill="gsd:<cmd>") colon form', () => {
+    const workflowFiles = collectFiles(WORKFLOWS_DIR);
+    const colonRefs = [];
+    for (const f of workflowFiles) {
+      const src = fs.readFileSync(f, 'utf-8');
+      for (const n of extractSkillNamesColon(src)) {
+        colonRefs.push(path.basename(f) + ': ' + n);
+      }
+    }
+    assert.deepStrictEqual(
+      colonRefs,
+      [],
+      'deprecated colon-form Skill() calls found (update to hyphen): ' + colonRefs.join(', ')
+    );
+  });
+
+  test('every workflow Skill(skill="gsd-<cmd>") resolves to an emitted skill name', () => {
     const workflowFiles = collectFiles(WORKFLOWS_DIR);
     const referenced = new Set();
     for (const f of workflowFiles) {
       const src = fs.readFileSync(f, 'utf-8');
-      for (const n of extractSkillNames(src)) referenced.add(n);
+      for (const n of extractSkillNamesHyphen(src)) referenced.add(n);
     }
-    assert.ok(referenced.size > 0, 'expected at least one Skill(skill="gsd:<cmd>") reference');
+    if (referenced.size === 0) return;
 
     const emitted = new Set();
     const cmdFiles = fs.readdirSync(COMMANDS_DIR).filter(f => f.endsWith('.md'));

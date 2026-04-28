@@ -66,7 +66,7 @@ describe('Qwen Code: convertClaudeCommandToClaudeSkill', () => {
     );
   });
 
-  test('emits colon-form name (gsd:<cmd>) from hyphen-form dir (#2643)', () => {
+  test('emits hyphen-form name (gsd-<cmd>) from hyphen-form dir (#2808)', () => {
     const input = [
       '---',
       'name: gsd:next',
@@ -77,9 +77,9 @@ describe('Qwen Code: convertClaudeCommandToClaudeSkill', () => {
     ].join('\n');
 
     // Directory name is gsd-next (hyphen, Windows-safe), frontmatter name is
-    // gsd:next (colon) so Claude Code resolves `/gsd:next` against the skill.
+    // gsd-next (hyphen, #2808 — canonical invocation form for Claude Code autocomplete).
     const result = convertClaudeCommandToClaudeSkill(input, 'gsd-next');
-    assert.ok(result.includes('name: gsd:next'), 'frontmatter name uses colon form');
+    assert.ok(result.includes('name: gsd-next'), 'frontmatter name uses hyphen form (#2808)');
   });
 
   test('preserves body content unchanged', () => {
@@ -154,7 +154,7 @@ describe('Qwen Code: copyCommandsAsClaudeSkills', () => {
 
     // Verify content
     const content = fs.readFileSync(skillPath, 'utf8');
-    assert.ok(content.includes('name: gsd:quick'), 'frontmatter name uses colon form (#2643)');
+    assert.ok(content.includes('name: gsd-quick'), 'frontmatter name uses hyphen form (#2808)');
     assert.ok(content.includes('description:'), 'description present');
     assert.ok(content.includes('allowed-tools:'), 'allowed-tools preserved');
     assert.ok(content.includes('<objective>'), 'body content preserved');
@@ -274,7 +274,7 @@ describe('Qwen Code: SKILL.md format validation', () => {
     assert.ok(fmMatch, 'has frontmatter block');
 
     const fmLines = fmMatch[1].split('\n');
-    const hasName = fmLines.some(l => l.startsWith('name: gsd:review'));
+    const hasName = fmLines.some(l => l.startsWith('name: gsd-review'));
     const hasDesc = fmLines.some(l => l.startsWith('description:'));
     const hasAgent = fmLines.some(l => l.startsWith('agent:'));
     const hasTools = fmLines.some(l => l.startsWith('allowed-tools:'));
