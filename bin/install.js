@@ -6985,21 +6985,12 @@ function install(isGlobal, runtime = 'claude') {
       const codexHooksFeature = ensureCodexHooksFeature(configContent);
       configContent = setManagedCodexHooksOwnership(codexHooksFeature.content, codexHooksFeature.ownership);
 
-      // Add SessionStart hook for update checking. Default to top-level
-      // `[[hooks]]` AoT with `event` field — the form GSD has emitted since
-      // the Codex 0.124 migration (#2637). When the user already uses the
-      // namespaced AoT form `[[hooks.SessionStart]]` for their own hooks,
-      // emit our managed entry in that same shape so the two forms don't
-      // collide on round-trip (#2760, defect 3).
+      // Add SessionStart hook for update checking. We always use the
+      // namespaced AoT form `[[hooks.SessionStart]]` which is required
+      // by Codex 0.124.0+ (#2637, #2760, #2727).
       const updateCheckScript = path.resolve(targetDir, 'hooks', 'gsd-check-update.js').replace(/\\/g, '/');
-      const useNamespacedAot = hasUserNamespacedAotHooks(configContent, 'SessionStart');
-      const hookBlock = useNamespacedAot
-        ? `${eol}# GSD Hooks${eol}` +
+      const hookBlock = `${eol}# GSD Hooks${eol}` +
           `[[hooks.SessionStart]]${eol}` +
-          `command = "node ${updateCheckScript}"${eol}`
-        : `${eol}# GSD Hooks${eol}` +
-          `[[hooks]]${eol}` +
-          `event = "SessionStart"${eol}` +
           `command = "node ${updateCheckScript}"${eol}`;
 
       // Migrate legacy gsd-update-check entries from prior installs (#1755 followup)
