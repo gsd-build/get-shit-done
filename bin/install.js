@@ -2896,9 +2896,15 @@ function stripLeakedGsdCodexSections(content) {
 function migrateCodexHooksMapFormat(content) {
   const sections = getTomlTableSections(content);
 
-  // Find all non-array hooks sections: [hooks] or [hooks.TYPE]
+  // Find all non-array hooks sections: bare [hooks] container or [hooks.TYPE] event tables.
+  // Use section.segments (parsed key count) rather than section.path.startsWith() so that
+  // nested handler tables like [hooks.SessionStart.hooks] (3 segments) are not mistakenly
+  // included and re-emitted as an event named "SessionStart.hooks".
   const legacyMapSections = sections.filter(
-    (section) => !section.array && (section.path === 'hooks' || section.path.startsWith('hooks.'))
+    (section) => !section.array && (
+      section.path === 'hooks' ||
+      (section.path.startsWith('hooks.') && section.segments.length === 2)
+    )
   );
 
   // Find flat [[hooks]] array-of-tables entries (path === 'hooks', array === true).
@@ -2954,9 +2960,12 @@ function migrateCodexHooksMapFormat(content) {
     for (const line of bodyLines) {
       const trimmed = line.trim();
       if (!trimmed || trimmed.startsWith('#')) continue;
-      const keyMatch = trimmed.match(/^([\w.]+)\s*=/);
-      if (!keyMatch) continue;
-      const key = keyMatch[1];
+      // Use parseTomlKey so hyphenated keys (e.g. status-message) and quoted
+      // keys are recognised — the old /^([\w.]+)\s*=/ regex silently dropped them.
+      const parsed = parseTomlKey(trimmed);
+      if (!parsed) continue;
+      // Hook body keys are always single-segment; use segments[0] for the name.
+      const key = parsed.segments[0];
       if (skipKeys.has(key)) continue;
       if (key === 'type') {
         hasExplicitType = true;
@@ -2983,8 +2992,14 @@ function migrateCodexHooksMapFormat(content) {
   function buildNestedBlock(type, body, skipKeys = new Set()) {
     const quotedType = tomlBareKey(type);
     const { eventEntries, handlerEntries, hasExplicitType } = parseHooksBody(body, skipKeys);
-    if (!hasExplicitType) handlerEntries.unshift('type = "command"');
     const eventBody = eventEntries.length > 0 ? eventEntries.join(eol) + eol : '';
+    // If no handler fields were found (e.g. matcher-only entry), do not synthesise
+    // an empty [[hooks.TYPE.hooks]] block — that would produce structurally valid
+    // TOML but semantically broken output (a handler entry with no command).
+    if (handlerEntries.length === 0) {
+      return `[[hooks.${quotedType}]]${eol}${eventBody}`;
+    }
+    if (!hasExplicitType) handlerEntries.unshift('type = "command"');
     const handlerBody = handlerEntries.join(eol) + eol;
     return `[[hooks.${quotedType}]]${eol}${eventBody}${eol}[[hooks.${quotedType}.hooks]]${eol}${handlerBody}`;
   }

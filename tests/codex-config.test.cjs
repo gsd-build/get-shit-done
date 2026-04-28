@@ -852,6 +852,36 @@ describe('migrateCodexHooksMapFormat', () => {
       'no spurious command key must appear');
   });
 
+  test('quoted event name with dot ([[hooks."before.tool"]]) is treated as single 2-segment namespace', () => {
+    // Regression for the split('.') bug: "before.tool" contains a dot, but the
+    // key is quoted so it is ONE segment — [[hooks."before.tool"]] has exactly
+    // two path segments and must be classified the same as [[hooks.SessionStart]].
+    // It should NOT be treated as a 3-level path (hooks / before / tool).
+    const content = [
+      '[[hooks."before.tool"]]',
+      'command = "echo hi"',
+      '',
+    ].join('\n');
+    const result = migrateCodexHooksMapFormat(content);
+    const parsed = parseTomlToObject(result);
+    // The key in the parsed object is the unquoted event name "before.tool".
+    assert.ok(
+      parsed.hooks && Array.isArray(parsed.hooks['before.tool']),
+      '[[hooks."before.tool"]] must be a namespaced AoT — not split on the inner dot'
+    );
+    assert.ok(
+      Array.isArray(parsed.hooks['before.tool'][0].hooks),
+      'must emit [[hooks."before.tool".hooks]] sub-table'
+    );
+    assert.strictEqual(
+      parsed.hooks['before.tool'][0].hooks[0].command,
+      'echo hi',
+      'command must be preserved in the nested handler sub-table'
+    );
+    // Ensure no spurious "before" or "tool" top-level hook keys appeared.
+    assert.equal(parsed.hooks?.before, undefined, 'must not split quoted key on dot');
+  });
+
   test('CRLF line endings are preserved through migration (#2760 CR5: namespaced AoT)', () => {
     const content = [
       '[features]',
@@ -1399,9 +1429,10 @@ describe('Codex install hook configuration (e2e)', () => {
     assert.ok(parsed.hooks && Array.isArray(parsed.hooks.SessionStart), 'writes [[hooks.SessionStart]] AoT');
     assert.ok(Array.isArray(parsed.hooks.SessionStart[0].hooks), 'writes [[hooks.SessionStart.hooks]] sub-table');
     assert.strictEqual(parsed.hooks.SessionStart[0].hooks[0].type, 'command', 'handler type is "command"');
-    assert.ok(
-      /gsd-check-update\.js/.test(parsed.hooks.SessionStart[0].hooks[0].command),
-      'handler command references gsd-check-update.js'
+    assert.strictEqual(
+      parsed.hooks.SessionStart[0].hooks[0].command,
+      'node ' + path.join(codexHome, 'hooks', 'gsd-check-update.js').replace(/\\/g, '/'),
+      'handler command must be the exact absolute path to gsd-check-update.js'
     );
     assert.ok(!Array.isArray(parsed.hooks), 'no flat [[hooks]] AoT emitted');
     assert.strictEqual(countMatches(content, /^codex_hooks = true$/gm), 1, 'writes one codex_hooks key');
