@@ -2896,6 +2896,58 @@ function stripLeakedGsdCodexSections(content) {
 }
 
 /**
+ * Strip GSD-managed legacy Codex hook blocks from a config.toml string.
+ *
+ * Targets four historical shapes that GSD installers may have written:
+ *
+ *   Shape 1 — pre-#1755: flat [[hooks]] entry with the legacy
+ *             `gsd-update-check.js` filename.
+ *   Shape 2 — #2637 era: flat [[hooks]] entry with the current
+ *             `gsd-check-update.js` filename. Never the correct shape for
+ *             Codex 0.124.0+, which requires nested `[[hooks.SessionStart]]`.
+ *   Shape 4 — correct two-block nested shape that we still want to strip
+ *             before re-adding to keep the file clean. Stripped before
+ *             Shape 3 to avoid leaving an orphaned `[[hooks.SessionStart]]`
+ *             header behind.
+ *   Shape 3 — single-block `[[hooks.SessionStart]]` written without the
+ *             nested `.hooks` table (#2760 era).
+ *
+ * Each shape's trailing `(?:\r?\n|$)` accepts either a newline OR
+ * end-of-file as terminator, so a stale block at the very end of a config
+ * without a trailing newline still strips (#2866).
+ *
+ * Pure function, exported for test coverage. Returns the input unchanged
+ * if no shape matches.
+ */
+function stripStaleGsdHookBlocks(configContent) {
+  if (!configContent.includes('gsd-update-check') && !configContent.includes('gsd-check-update')) {
+    return configContent;
+  }
+  let out = configContent;
+  // Shape 1
+  out = out.replace(
+    /(?:\r?\n|^)# GSD Hooks\r?\n\[\[hooks\]\]\r?\nevent = "SessionStart"\r?\ncommand = "node [^\r\n]*gsd-update-check\.js"(?:\r?\n|$)/gm,
+    (match) => (match.startsWith('\r\n') ? '\r\n' : match.startsWith('\n') ? '\n' : ''),
+  );
+  // Shape 2
+  out = out.replace(
+    /(?:\r?\n|^)# GSD Hooks\r?\n\[\[hooks\]\]\r?\nevent = "SessionStart"\r?\ncommand = "node [^\r\n]*gsd-check-update\.js"(?:\r?\n|$)/gm,
+    (match) => (match.startsWith('\r\n') ? '\r\n' : match.startsWith('\n') ? '\n' : ''),
+  );
+  // Shape 4 — strip before Shape 3 to avoid orphaned header
+  out = out.replace(
+    /(?:\r?\n|^)# GSD Hooks\r?\n\[\[hooks\.SessionStart\]\]\r?\n\r?\n\[\[hooks\.SessionStart\.hooks\]\]\r?\ntype = "command"\r?\ncommand = "node [^\r\n]*(?:gsd-check-update|gsd-update-check)\.js"(?:\r?\n|$)/gm,
+    (match) => (match.startsWith('\r\n') ? '\r\n' : match.startsWith('\n') ? '\n' : ''),
+  );
+  // Shape 3
+  out = out.replace(
+    /(?:\r?\n|^)# GSD Hooks\r?\n\[\[hooks\.SessionStart\]\]\r?\ncommand = "node [^\r\n]*(?:gsd-check-update|gsd-update-check)\.js"(?:\r?\n|$)/gm,
+    (match) => (match.startsWith('\r\n') ? '\r\n' : match.startsWith('\n') ? '\n' : ''),
+  );
+  return out;
+}
+
+/**
  * Migrate legacy Codex [hooks] map format to [[hooks]] array-of-tables format.
  *
  * Codex 0.124.0 changed from the old map-style hooks config:
@@ -7201,28 +7253,7 @@ function install(isGlobal, runtime = 'claude') {
       //   Shape 2 — flat [[hooks]] + event = "SessionStart" (#2637 era, never correct)
       //   Shape 4 — correct two-block nested (strip before shape 3 to avoid orphaned header)
       //   Shape 3 — single-block [[hooks.SessionStart]] without nested .hooks (#2760 era)
-      if (configContent.includes('gsd-update-check') || configContent.includes('gsd-check-update')) {
-        // Shape 1
-        configContent = configContent.replace(
-          /(?:\r?\n|^)# GSD Hooks\r?\n\[\[hooks\]\]\r?\nevent = "SessionStart"\r?\ncommand = "node [^\r\n]*gsd-update-check\.js"\r?\n/gm,
-          (match) => (match.startsWith('\r\n') ? '\r\n' : match.startsWith('\n') ? '\n' : ''),
-        );
-        // Shape 2
-        configContent = configContent.replace(
-          /(?:\r?\n|^)# GSD Hooks\r?\n\[\[hooks\]\]\r?\nevent = "SessionStart"\r?\ncommand = "node [^\r\n]*gsd-check-update\.js"\r?\n/gm,
-          (match) => (match.startsWith('\r\n') ? '\r\n' : match.startsWith('\n') ? '\n' : ''),
-        );
-        // Shape 4 — strip before shape 3 to avoid orphaned header
-        configContent = configContent.replace(
-          /(?:\r?\n|^)# GSD Hooks\r?\n\[\[hooks\.SessionStart\]\]\r?\n\r?\n\[\[hooks\.SessionStart\.hooks\]\]\r?\ntype = "command"\r?\ncommand = "node [^\r\n]*(?:gsd-check-update|gsd-update-check)\.js"\r?\n/gm,
-          (match) => (match.startsWith('\r\n') ? '\r\n' : match.startsWith('\n') ? '\n' : ''),
-        );
-        // Shape 3
-        configContent = configContent.replace(
-          /(?:\r?\n|^)# GSD Hooks\r?\n\[\[hooks\.SessionStart\]\]\r?\ncommand = "node [^\r\n]*(?:gsd-check-update|gsd-update-check)\.js"\r?\n/gm,
-          (match) => (match.startsWith('\r\n') ? '\r\n' : match.startsWith('\n') ? '\n' : ''),
-        );
-      }
+      configContent = stripStaleGsdHookBlocks(configContent);
 
       // Migrate legacy [hooks] map format and flat [[hooks]] AoT entries to the
       // namespaced [[hooks.<EVENT>]] form after stripping GSD-managed stale blocks.
@@ -8464,6 +8495,7 @@ if (process.env.GSD_TEST_MODE) {
     generateCodexConfigBlock,
     stripGsdFromCodexConfig,
     migrateCodexHooksMapFormat,
+    stripStaleGsdHookBlocks,
     hasUserNamespacedAotHooks,
     parseTomlToObject,
     validateCodexConfigSchema,
