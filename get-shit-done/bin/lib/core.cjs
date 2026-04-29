@@ -1395,12 +1395,22 @@ function extractCurrentMilestone(content, cwd) {
   );
 
   let sectionEnd = content.length;
-  let inFence = false;
+  let fenceChar = null;
+  let fenceLen = 0;
   let charOffset = 0;
   for (const line of restContent.split('\n')) {
-    if (/^(`{3,}|~{3,})/.test(line)) {
-      inFence = !inFence;
-    } else if (!inFence && nextMilestonePattern.test(line)) {
+    const fenceMatch = line.match(/^\s{0,3}([`~]{3,})/);
+    if (fenceMatch) {
+      const char = fenceMatch[1][0];
+      const len = fenceMatch[1].length;
+      if (!fenceChar) {
+        fenceChar = char;
+        fenceLen = len;
+      } else if (char === fenceChar && len >= fenceLen) {
+        fenceChar = null;
+        fenceLen = 0;
+      }
+    } else if (!fenceChar && nextMilestonePattern.test(line)) {
       sectionEnd = sectionStart + sectionMatch[0].length + charOffset;
       break;
     }
