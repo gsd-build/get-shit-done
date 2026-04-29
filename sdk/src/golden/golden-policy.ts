@@ -51,6 +51,12 @@ const NO_CJS_SUBPROCESS_REASON: Record<string, string> = {
     'SDK-only structured plan parse (no CJS mirror). Covered in sdk/src/query/plan-task-structure.test.ts.',
   'requirements.extract-from-plans':
     'SDK-only requirements aggregation (no CJS mirror). Covered in sdk/src/query/requirements-extract-from-plans.test.ts.',
+  'sme.list':
+    'SDK-only SME document listing query (no `gsd-tools.cjs` mirror). Covered in sdk/src/query/sme.test.ts.',
+  'sme.detect-processes':
+    'SDK-only SME process detection query (no `gsd-tools.cjs` mirror). Covered in sdk/src/query/sme.test.ts.',
+  'sme.context-block':
+    'SDK-only SME context block producer (no `gsd-tools.cjs` mirror). Covered in sdk/src/query/sme.test.ts.',
 };
 
 const READ_HANDLER_ONLY_REASON = (cmd: string) =>
