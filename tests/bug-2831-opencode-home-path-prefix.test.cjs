@@ -9,54 +9,38 @@
  * include syntax does NOT shell-expand `$HOME` on any platform.
  *
  * Fix: pathPrefix must use the absolute path for OpenCode on all platforms.
+ *
+ * Tests exercise install.js's exported `computePathPrefix` directly (no source
+ * grepping) and additionally simulate the `copyFlattenedCommands` substitution
+ * pipeline on a temp tree to verify no `$HOME` literal leaks into emitted files.
  */
 
 'use strict';
 
-const { describe, test } = require('node:test');
+const { describe, test, before, after } = require('node:test');
 const assert = require('node:assert/strict');
 const fs = require('fs');
 const path = require('path');
 const os = require('os');
 
-const INSTALL_JS_PATH = path.join(__dirname, '..', 'bin', 'install.js');
+let computePathPrefix;
 
-// Mirror of the install.js pathPrefix logic for simulation. Keep the structural
-// expression identical so a regression in install.js is detectable by failing
-// these simulations.
-function computePathPrefix({ isGlobal, isOpencode, isWindowsHost, resolvedTarget, homeDir }) {
-  // The fix: OpenCode (any platform) must NOT use $HOME-relative paths because
-  // `@file` references are not shell-expanded.
-  return isGlobal && resolvedTarget.startsWith(homeDir) && !isOpencode && !(isOpencode && isWindowsHost)
-    ? '$HOME' + resolvedTarget.slice(homeDir.length) + '/'
-    : `${resolvedTarget}/`;
-}
+before(() => {
+  process.env.GSD_TEST_MODE = '1';
+  delete require.cache[require.resolve('../bin/install.js')];
+  ({ computePathPrefix } = require('../bin/install.js'));
+});
+
+after(() => {
+  delete process.env.GSD_TEST_MODE;
+});
 
 describe('bug-2831: OpenCode pathPrefix uses absolute path on all platforms', () => {
-  test('install.js exists', () => {
-    assert.ok(fs.existsSync(INSTALL_JS_PATH));
+  test('computePathPrefix is exported by install.js', () => {
+    assert.equal(typeof computePathPrefix, 'function');
   });
 
-  test('install.js pathPrefix expression excludes OpenCode (any platform) from $HOME substitution', () => {
-    const content = fs.readFileSync(INSTALL_JS_PATH, 'utf-8');
-    // Find the pathPrefix block.
-    const match = content.match(/const pathPrefix[\s\S]*?\$HOME[\s\S]*?resolvedTarget\.slice\(homeDir\.length\)/);
-    assert.ok(match, 'pathPrefix block must exist');
-    const block = match[0];
-
-    // Must contain a guard that excludes isOpencode unconditionally (not just
-    // when paired with isWindowsHost).
-    const hasUnconditionalOpencodeGuard =
-      /!\s*isOpencode\b(?!\s*&&\s*isWindowsHost)/.test(block) ||
-      /isOpencode\s*\?\s*`?\$\{?resolvedTarget/.test(block);
-
-    assert.ok(
-      hasUnconditionalOpencodeGuard,
-      'pathPrefix must exclude $HOME substitution for OpenCode on all platforms'
-    );
-  });
-
-  test('simulated pathPrefix: OpenCode on macOS uses absolute path (no $HOME)', () => {
+  test('OpenCode on macOS: pathPrefix is absolute (no $HOME)', () => {
     const pathPrefix = computePathPrefix({
       isGlobal: true,
       isOpencode: true,
@@ -68,7 +52,7 @@ describe('bug-2831: OpenCode pathPrefix uses absolute path on all platforms', ()
     assert.ok(!pathPrefix.includes('$HOME'));
   });
 
-  test('simulated pathPrefix: OpenCode on Linux uses absolute path (no $HOME)', () => {
+  test('OpenCode on Linux: pathPrefix is absolute (no $HOME)', () => {
     const pathPrefix = computePathPrefix({
       isGlobal: true,
       isOpencode: true,
@@ -80,7 +64,7 @@ describe('bug-2831: OpenCode pathPrefix uses absolute path on all platforms', ()
     assert.ok(!pathPrefix.includes('$HOME'));
   });
 
-  test('simulated pathPrefix: OpenCode on Windows still uses absolute path (preserves #2376)', () => {
+  test('OpenCode on Windows: pathPrefix is absolute (preserves #2376)', () => {
     const pathPrefix = computePathPrefix({
       isGlobal: true,
       isOpencode: true,
@@ -91,7 +75,7 @@ describe('bug-2831: OpenCode pathPrefix uses absolute path on all platforms', ()
     assert.strictEqual(pathPrefix, 'C:/Users/carol/.config/opencode/');
   });
 
-  test('simulated pathPrefix: Claude Code on macOS still uses $HOME (unaffected)', () => {
+  test('Claude Code on macOS: pathPrefix still uses $HOME (unaffected)', () => {
     const pathPrefix = computePathPrefix({
       isGlobal: true,
       isOpencode: false,
@@ -102,46 +86,64 @@ describe('bug-2831: OpenCode pathPrefix uses absolute path on all platforms', ()
     assert.strictEqual(pathPrefix, '$HOME/.claude/');
   });
 
-  test('end-to-end: copyFlattenedCommands produces no @$HOME literal in OpenCode output', () => {
-    // Stage a fake source command with @~/.claude/... and run install with
-    // OpenCode runtime selected, then assert no @$HOME or $HOME/ remains in
-    // emitted file.
-    const tmp = fs.mkdtempSync(path.join(os.tmpdir(), 'gsd-2831-'));
-    const srcRoot = path.join(tmp, 'src');
-    const targetRoot = path.join(tmp, 'home', '.config', 'opencode');
-    const srcCmdDir = path.join(srcRoot, 'commands', 'gsd');
-    fs.mkdirSync(srcCmdDir, { recursive: true });
-    fs.mkdirSync(targetRoot, { recursive: true });
-
-    fs.writeFileSync(path.join(srcCmdDir, 'autonomous.md'),
-      '---\nname: autonomous\n---\n<execution_context>\n@~/.claude/get-shit-done/workflows/autonomous.md\n@$HOME/.claude/get-shit-done/references/ui-brand.md\n</execution_context>\n');
-
-    // Load install.js in a way that exposes copyFlattenedCommands.
-    // Since it's a script, we re-implement the relevant call path using the
-    // simulated pathPrefix above to validate the regex behavior.
-    const isGlobal = true;
-    const isOpencode = true;
-    const isWindowsHost = false;
-    const homeDir = path.join(tmp, 'home');
-    const resolvedTarget = targetRoot.replace(/\\/g, '/');
+  test('Local install (non-global): pathPrefix uses absolute path regardless of runtime', () => {
     const pathPrefix = computePathPrefix({
-      isGlobal, isOpencode, isWindowsHost,
-      homeDir: homeDir.replace(/\\/g, '/'),
-      resolvedTarget,
+      isGlobal: false,
+      isOpencode: false,
+      isWindowsHost: false,
+      homeDir: '/Users/alice',
+      resolvedTarget: '/Users/alice/projects/foo/.claude',
     });
+    assert.strictEqual(pathPrefix, '/Users/alice/projects/foo/.claude/');
+  });
 
-    // Apply the same substitutions install.js applies in copyFlattenedCommands.
-    let content = fs.readFileSync(path.join(srcCmdDir, 'autonomous.md'), 'utf8');
-    content = content.replace(/~\/\.claude\//g, pathPrefix);
-    content = content.replace(/\$HOME\/\.claude\//g, pathPrefix);
+  test('Substitution pipeline simulation: OpenCode emits no @$HOME literal', () => {
+    // This validates the same regex substitution pipeline used by
+    // copyFlattenedCommands when writing OpenCode command files. We invoke the
+    // real exported computePathPrefix; the regex passes mirror the install.js
+    // call sites (globalClaudeRegex / globalClaudeHomeRegex).
+    const tmp = fs.mkdtempSync(path.join(os.tmpdir(), 'gsd-2831-'));
+    try {
+      const srcRoot = path.join(tmp, 'src');
+      const targetRoot = path.join(tmp, 'home', '.config', 'opencode');
+      const srcCmdDir = path.join(srcRoot, 'commands', 'gsd');
+      fs.mkdirSync(srcCmdDir, { recursive: true });
+      fs.mkdirSync(targetRoot, { recursive: true });
 
-    assert.ok(!/@\$HOME\b/.test(content),
-      `output must not contain @$HOME literal; got:\n${content}`);
-    assert.ok(!/\$HOME\b/.test(content),
-      `output must not contain $HOME literal; got:\n${content}`);
-    assert.ok(content.includes(`@${resolvedTarget}/`),
-      `output should include absolute path with @ prefix; got:\n${content}`);
+      const srcFile = path.join(srcCmdDir, 'autonomous.md');
+      fs.writeFileSync(
+        srcFile,
+        '---\nname: autonomous\n---\n<execution_context>\n@~/.claude/get-shit-done/workflows/autonomous.md\n@$HOME/.claude/get-shit-done/references/ui-brand.md\n</execution_context>\n'
+      );
 
-    fs.rmSync(tmp, { recursive: true, force: true });
+      const homeDir = path.join(tmp, 'home').replace(/\\/g, '/');
+      const resolvedTarget = targetRoot.replace(/\\/g, '/');
+      const pathPrefix = computePathPrefix({
+        isGlobal: true,
+        isOpencode: true,
+        isWindowsHost: false,
+        homeDir,
+        resolvedTarget,
+      });
+
+      let content = fs.readFileSync(srcFile, 'utf8');
+      content = content.replace(/~\/\.claude\//g, pathPrefix);
+      content = content.replace(/\$HOME\/\.claude\//g, pathPrefix);
+
+      assert.ok(
+        !/@\$HOME\b/.test(content),
+        `output must not contain @$HOME literal; got:\n${content}`
+      );
+      assert.ok(
+        !/\$HOME\b/.test(content),
+        `output must not contain $HOME literal; got:\n${content}`
+      );
+      assert.ok(
+        content.includes(`@${resolvedTarget}/`),
+        `output should include absolute path with @ prefix; got:\n${content}`
+      );
+    } finally {
+      fs.rmSync(tmp, { recursive: true, force: true });
+    }
   });
 });
