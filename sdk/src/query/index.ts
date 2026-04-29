@@ -96,6 +96,7 @@ import { checkCompletion } from './check-completion.js';
 import { checkGates } from './check-gates.js';
 import { checkVerificationStatus } from './check-verification-status.js';
 import { checkShipReady } from './check-ship-ready.js';
+import { smeList, smeDetectProcesses, smeContextBlock } from './sme.js';
 import { GSDEventStream } from '../event-stream.js';
 import {
   GSDEventType,
@@ -402,6 +403,14 @@ export function createRegistry(
   registry.register('check verification-status', checkVerificationStatus);
   registry.register('check.ship-ready', checkShipReady);
   registry.register('check ship-ready', checkShipReady);
+
+  // SME query handlers (SDK-only — no gsd-tools.cjs mirror; see golden-policy.ts)
+  registry.register('sme.list', smeList);
+  registry.register('sme list', smeList);
+  registry.register('sme.detect-processes', smeDetectProcesses);
+  registry.register('sme detect-processes', smeDetectProcesses);
+  registry.register('sme.context-block', smeContextBlock);
+  registry.register('sme context-block', smeContextBlock);
 
   // Phase lifecycle handlers
   registry.register('phase.add', phaseAdd);
