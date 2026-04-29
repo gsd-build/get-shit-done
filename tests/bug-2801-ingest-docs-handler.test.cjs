@@ -129,8 +129,13 @@ describe('bug-2801: ingest-docs.md workflow calls gsd-tools not gsd-sdk', () => 
   test('ingest-docs.md init step uses gsd-tools init ingest-docs', () => {
     const content = fs.readFileSync(WORKFLOW_FILE, 'utf-8');
     const lines = content.split('\n');
-    const initLine = lines.find(l => /gsd-tools\s+init\s+ingest-docs/.test(l));
-    assert.ok(initLine, 'workflow must contain "gsd-tools init ingest-docs"');
+    // The canonical invocation form (per #2851 sweep) is
+    //   node "$HOME/.claude/get-shit-done/bin/gsd-tools.cjs" init ingest-docs
+    // The legacy bare form `gsd-tools init ingest-docs` is also accepted
+    // because the call may be quoted differently across editors. Either way,
+    // we just want to confirm the dispatch handler is wired.
+    const initLine = lines.find(l => /gsd-tools(?:\.cjs)?["']?\s+init\s+ingest-docs/.test(l));
+    assert.ok(initLine, 'workflow must contain "gsd-tools[.cjs] init ingest-docs"');
   });
 
   test('cmdInitIngestDocs is exported from init.cjs', () => {

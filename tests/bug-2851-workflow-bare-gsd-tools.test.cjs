@@ -81,6 +81,16 @@ function lineHasBareGsdTools(line) {
   const hashIdx = l.search(/(?:^|[^"'\w])#/);
   if (hashIdx > 0) l = l.slice(0, hashIdx);
 
+  // Unwrap command-substitution forms so the substituted command is in
+  // command position. `$(cmd …)` and `` `cmd …` `` both run the inner string
+  // as a fresh command, so a bare `gsd-tools` inside them is just as broken
+  // as one at the start of the line. Iterate until stable for nested forms.
+  let prev;
+  do {
+    prev = l;
+    l = l.replace(/\$\(([^()]*)\)/g, ' $1 ').replace(/`([^`]*)`/g, ' $1 ');
+  } while (l !== prev);
+
   // Tokenize on whitespace, semicolons, pipes, and && / ||
   // Then walk tokens — a violation is a token that starts with `gsd-tools`
   // followed by a word boundary (so `gsd-tools.cjs` does NOT match), and the
