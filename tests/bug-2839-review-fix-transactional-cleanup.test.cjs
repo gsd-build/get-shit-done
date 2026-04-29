@@ -121,13 +121,25 @@ describe('bug-2839: /gsd-code-review-fix cleanup is transactional', () => {
   });
 
   test('sentinel removal happens only AFTER git worktree remove succeeds', () => {
-    const removeIdx = agentContent.indexOf('git worktree remove');
-    assert.ok(removeIdx !== -1, 'agent must contain `git worktree remove` for cleanup');
+    const setupStep = extractStep(agentContent, 'setup_worktree');
+    assert.ok(setupStep, 'setup_worktree step must exist');
 
+    const cleanupAnchor = setupStep.lastIndexOf('Cleanup tail (transactional');
+    assert.ok(cleanupAnchor !== -1, 'setup_worktree must document cleanup-tail section');
+    const cleanupSection = setupStep.slice(cleanupAnchor);
+
+    const removeIdx = cleanupSection.indexOf('git worktree remove "$wt" --force');
+    assert.ok(removeIdx !== -1, 'cleanup-tail must remove worktree');
+
+    // Within the cleanup-tail section, accept either a literal-filename form
+    // (`rm -f .../.review-fix-recovery-pending.json`) or a shell-variable form
+    // referring to the previously-declared `sentinel` variable
+    // (`rm -f "$sentinel"` / `rm -f "${sentinel}"`).
+    const escapedName = SENTINEL_NAME.replace(/\./g, '\\.');
     const sentinelRemovalRe = new RegExp(
-      `(rm\\s+(?:-f\\s+)?[^\\n]*${SENTINEL_NAME.replace(/\./g, '\\.')}|unlink[^\\n]*${SENTINEL_NAME.replace(/\./g, '\\.')})`
+      `(rm\\s+(?:-f\\s+)?[^\\n]*(?:${escapedName}|\\$\\{?sentinel\\}?)|unlink[^\\n]*(?:${escapedName}|\\$\\{?sentinel\\}?))`
     );
-    const sentinelRemovalMatch = sentinelRemovalRe.exec(agentContent);
+    const sentinelRemovalMatch = sentinelRemovalRe.exec(cleanupSection);
     assert.ok(
       sentinelRemovalMatch,
       `agent must remove the sentinel file (rm or unlink ${SENTINEL_NAME}) as part of the cleanup tail (#2839)`

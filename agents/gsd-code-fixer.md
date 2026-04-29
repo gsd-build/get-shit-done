@@ -231,7 +231,16 @@ test -n "$branch" || { echo "Detached HEAD is not supported for review-fix (#268
 sentinel="${phase_dir}/.review-fix-recovery-pending.json"
 if [ -f "$sentinel" ]; then
   echo "Detected pre-existing recovery sentinel from a prior interrupted run: $sentinel"
-  prior_wt=$(node -e "console.log(JSON.parse(require('fs').readFileSync(process.argv[1],'utf-8')).worktree_path||'')" "$sentinel")
+  prior_wt=$(node -e '
+    const fs = require("fs");
+    try {
+      const parsed = JSON.parse(fs.readFileSync(process.argv[1], "utf-8"));
+      process.stdout.write(parsed.worktree_path || "");
+    } catch (err) {
+      process.stderr.write(`Warning: malformed recovery sentinel ${process.argv[1]}: ${err.message}\n`);
+      process.stdout.write("");
+    }
+  ' "$sentinel")
   if [ -n "$prior_wt" ] && git worktree list --porcelain | grep -q "^worktree $prior_wt$"; then
     echo "Removing orphan worktree from prior run: $prior_wt"
     git worktree remove "$prior_wt" --force || true
