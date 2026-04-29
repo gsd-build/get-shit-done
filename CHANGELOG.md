@@ -14,6 +14,15 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
   it). Re-run `gsd update` without `--minimal` to expand to the full surface. The
   install manifest now records `mode: "minimal" | "full"`. (#2762)
 
+### Changed
+- **Skill descriptions trimmed to ≤ 100 chars across all `commands/gsd/*.md`** — three
+  anti-patterns eliminated: flag documentation already present in `argument-hint:` (e.g.
+  `discuss-phase` was 380 chars, now 76), `Triggers:` keyword-stuffing lists, and
+  numbered enumeration patterns. Range was 45–380 chars; now 45–99. (#2789)
+- **`scripts/lint-descriptions.cjs` added** — CI lint gate that fails if any
+  `commands/gsd/*.md` description exceeds 100 chars. Run via `npm run lint:descriptions`.
+  (#2789)
+
 ### Fixed
 - **Codex install no longer corrupts existing `~/.codex/config.toml`** — the installer
   now defensively strips legacy `[agents]` (single-bracket) and `[[agents]]` (sequence)
