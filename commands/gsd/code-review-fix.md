@@ -1,6 +1,6 @@
 ---
 name: gsd:code-review-fix
-description: Auto-fix issues found by code review in REVIEW.md. Spawns fixer agent, commits each fix atomically, produces REVIEW-FIX.md summary.
+description: Auto-fix issues found by code review in REVIEW.md; commits each fix atomically.
 argument-hint: "<phase-number> [--all] [--auto]"
 allowed-tools:
   - Read
