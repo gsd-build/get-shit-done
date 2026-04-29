@@ -20,11 +20,31 @@ import { getToolsForPhase } from './tool-scoping.js';
  * Resolve model identifier from options or config profile.
  *
  * Priority: explicit model option > config model_profile > default.
+ *
+ * Runtime-aware (#2832): the profile -> Claude-id map only applies when the
+ * project is targeting the Claude runtime. For Codex, Gemini, OpenCode, etc.,
+ * forcing a Claude model id (e.g. 'claude-sonnet-4-6') silently routes the
+ * autonomous run through the Claude path, which is wrong for those runtimes.
+ * In those cases — and whenever `resolve_model_ids: "omit"` is set — leave
+ * `model` unset so the runtime falls back to its configured default.
  */
 function resolveModel(options?: SessionOptions, config?: GSDConfig): string | undefined {
   if (options?.model) return options.model;
 
-  // Map model_profile names to model IDs
+  // Honor the explicit "don't resolve model ids" config knob (#2652, #2832).
+  // Mirrors `query/config-query.ts` resolve_model_ids === 'omit' branch.
+  if ((config as Record<string, unknown> | undefined)?.resolve_model_ids === 'omit') {
+    return undefined;
+  }
+
+  // Profile -> Claude id map. Applies only on the Claude runtime.
+  const runtime = (config as Record<string, unknown> | undefined)?.runtime;
+  const isClaudeRuntime = runtime === undefined || runtime === null || runtime === 'claude';
+  if (!isClaudeRuntime) {
+    // Non-Claude runtimes: never inject a Claude id from the profile map.
+    return undefined;
+  }
+
   if (config?.model_profile) {
     const profileMap: Record<string, string> = {
       balanced: 'claude-sonnet-4-6',

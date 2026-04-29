@@ -95,4 +95,53 @@ describe('runPhaseStepSession', () => {
     expect(result.success).toBe(true);
     expect(result.sessionId).toBe('test-session');
   });
+
+  // ─── #2832: runtime-aware model resolution ─────────────────────────────────
+  // Issue: with `runtime: codex` and `model_profile: balanced`, resolveModel
+  // mapped balanced -> 'claude-sonnet-4-6' and forced the Codex run through
+  // a Claude model. For non-Claude runtimes the SDK must NOT inject a Claude
+  // model id; it should leave model unset (or honor explicit overrides) and
+  // let the runtime use its configured default.
+  describe('resolveModel runtime awareness (#2832)', () => {
+    it('does NOT pass a Claude profile model id when runtime is codex', async () => {
+      await runPhaseStepSession(
+        'prompt',
+        PhaseStepType.Execute,
+        makeConfig({ runtime: 'codex', model_profile: 'balanced' } as Partial<GSDConfig>),
+      );
+      const opts = mockQueryCalls[0].options as { model?: string };
+      expect(opts.model).toBeUndefined();
+    });
+
+    it('does NOT pass a Claude profile model id when resolve_model_ids is "omit"', async () => {
+      await runPhaseStepSession(
+        'prompt',
+        PhaseStepType.Execute,
+        makeConfig({ resolve_model_ids: 'omit', model_profile: 'balanced' } as Partial<GSDConfig>),
+      );
+      const opts = mockQueryCalls[0].options as { model?: string };
+      expect(opts.model).toBeUndefined();
+    });
+
+    it('still maps profile -> Claude id when runtime is claude (no regression)', async () => {
+      await runPhaseStepSession(
+        'prompt',
+        PhaseStepType.Execute,
+        makeConfig({ runtime: 'claude', model_profile: 'balanced' } as Partial<GSDConfig>),
+      );
+      const opts = mockQueryCalls[0].options as { model?: string };
+      expect(opts.model).toBe('claude-sonnet-4-6');
+    });
+
+    it('explicit options.model wins for any runtime', async () => {
+      await runPhaseStepSession(
+        'prompt',
+        PhaseStepType.Execute,
+        makeConfig({ runtime: 'codex' } as Partial<GSDConfig>),
+        { model: 'gpt-5.3-codex' },
+      );
+      const opts = mockQueryCalls[0].options as { model?: string };
+      expect(opts.model).toBe('gpt-5.3-codex');
+    });
+  });
 });
