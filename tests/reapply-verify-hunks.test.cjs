@@ -24,6 +24,14 @@ const WORKFLOW_PATH = path.join(
   __dirname, '..', 'get-shit-done', 'workflows', 'reapply-patches.md'
 );
 
+function extractTagBlock(markdown, tagName) {
+  const start = markdown.indexOf(`<${tagName}>`);
+  const end = markdown.indexOf(`</${tagName}>`);
+  assert.notEqual(start, -1, `Missing <${tagName}> block in workflow`);
+  assert.notEqual(end, -1, `Missing </${tagName}> block in workflow`);
+  return markdown.slice(start, end);
+}
+
 describe('reapply-patches post-merge verification (#1758)', () => {
   let content;
 
@@ -53,9 +61,12 @@ describe('reapply-patches post-merge verification (#1758)', () => {
   });
 
   test('success criteria includes verification', () => {
+    // Scope to the structured <success_criteria> block so the assertion can't
+    // false-pass when the phrase appears elsewhere (e.g. inline prose).
+    const successCriteriaBlock = extractTagBlock(content, 'success_criteria');
     assert.ok(
-      content.includes('Post-merge verification checks each file for dropped hunks'),
-      'workflow success_criteria must include post-merge verification requirement'
+      successCriteriaBlock.includes('Post-merge verification checks each file for dropped hunks'),
+      'workflow success_criteria block must include post-merge verification requirement'
     );
   });
 
