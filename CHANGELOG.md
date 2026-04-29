@@ -58,7 +58,7 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
   (new-workspace, list-workspaces, remove-workspace). Six parent skills absorb wrap-up
   and sub-operations as flags: `update --sync/--reapply`, `sketch --wrap-up`,
   `spike --wrap-up`, `map-codebase --fast/--query`, `code-review --fix`,
-  `progress --do`. Zero functional loss. (#2790)
+  `progress --do/--next`. Zero functional loss. (#2790)
 - **`autonomous.md` corrected** — was invoking deleted `gsd:code-review-fix`; now calls
   `gsd:code-review --fix`. (#2790)
 

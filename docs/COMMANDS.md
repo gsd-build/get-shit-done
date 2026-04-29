@@ -371,8 +371,8 @@ CRUD for phases in ROADMAP.md — add, insert, remove, or edit phases with a sin
 **Produces:** Updated ROADMAP.md
 
 ```bash
-/gsd-phase                          # Interactive — append new phase
-/gsd-phase --insert 3               # Insert between phase 3 and 4 → creates 3.1
+/gsd-phase "Add authentication system"          # Append new phase with description
+/gsd-phase --insert 3 "Fix auth race condition" # Insert between phase 3 and 4 → creates 3.1
 /gsd-phase --remove 7               # Remove phase 7, renumber 8→7, 9→8, etc.
 /gsd-phase --edit 5                 # Edit any field of phase 5
 /gsd-phase --edit 5 --force         # Edit phase 5 even if in-progress or completed
@@ -402,6 +402,8 @@ Show status, next steps, and automatically advance to the next logical workflow 
 
 | Flag | Description |
 |------|-------------|
+| `--next` | Automatically advance to the next logical workflow step without manual route selection |
+| `--do "task description"` | Analyze freeform intent and dispatch to the most appropriate GSD command |
 | `--forensic` | Append a 6-check integrity audit after the standard report (STATE consistency, orphaned handoffs, deferred scope drift, memory-flagged pending work, blocking todos, uncommitted code) |
 
 **Auto-routing behavior (absorbed from `/gsd-next`):**
@@ -414,6 +416,8 @@ Show status, next steps, and automatically advance to the next logical workflow 
 
 ```bash
 /gsd-progress                       # "Where am I? What's next?" with auto-routing
+/gsd-progress --next                # Advance to next step automatically
+/gsd-progress --do "fix the auth bug"  # Dispatch freeform intent to best GSD command
 /gsd-progress --forensic            # Standard report + integrity audit
 ```
 

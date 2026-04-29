@@ -42,7 +42,7 @@ Arguments: $ARGUMENTS
 Parse the first token of $ARGUMENTS:
 - If it is `--advanced`: strip the flag, execute settings-advanced workflow
 - If it is `--integrations`: strip the flag, execute settings-integrations workflow
-- If it starts with `--profile`: extract the profile name (remainder after `--profile `), run:
+- If it starts with `--profile`: extract the profile name (remainder after `--profile`), run:
   `gsd-sdk query config-set-model-profile <profile-name> --raw`
   and display the output verbatim.
 - Otherwise: execute settings workflow (no argument needed)
