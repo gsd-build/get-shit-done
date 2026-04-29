@@ -8147,18 +8147,24 @@ function installSdkIfNeeded(opts) {
     return;
   }
 
-  // #2678: local installs do not write to global node_modules, so the SDK
-  // global-install check is not applicable. Warn and return instead of exiting.
-  if (opts.isLocal) {
-    console.warn(`\n  ${yellow}⚠${reset}  Skipping SDK check for local install — install @gsd-build/sdk globally if you need /gsd-* CLI support.`);
-    return;
-  }
-
   const path = require('path');
   const fs = require('fs');
 
   const sdkDir = opts.sdkDir || path.resolve(__dirname, '..', 'sdk');
   const sdkCliPath = path.join(sdkDir, 'dist', 'cli.js');
+
+  // #2678 / #2829: local installs do not write to global node_modules, so we
+  // cannot fall through to the global-install error path. But the parent
+  // package (which carries bin/gsd-sdk.js and sdk/dist/cli.js) IS available
+  // wherever the installer is running from — npx cache, npm-global, or git
+  // clone. The shim resolves sdk/dist/cli.js relative to its own __dirname,
+  // so a self-link into a user-writable PATH dir makes `gsd-sdk` callable
+  // from local-mode installs too. Only when the dist is genuinely missing
+  // do we bail out with a non-fatal warning.
+  if (opts.isLocal && !fs.existsSync(sdkCliPath)) {
+    console.warn(`\n  ${yellow}⚠${reset}  Skipping SDK check for local install — sdk/dist/cli.js not found at ${sdkCliPath}.`);
+    return;
+  }
 
   if (!fs.existsSync(sdkCliPath)) {
     const ctx = classifySdkInstall(sdkDir);
