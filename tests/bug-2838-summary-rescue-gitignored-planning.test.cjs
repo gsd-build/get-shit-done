@@ -202,6 +202,11 @@ cd "${tmp}"
 ${block}
 `;
       const r = spawnSync('bash', ['-c', script], { cwd: tmp, encoding: 'utf-8' });
+      assert.strictEqual(
+        r.status,
+        0,
+        `Rescue block failed unexpectedly.\nstdout: ${r.stdout}\nstderr: ${r.stderr}`
+      );
       // No "Rescued" message expected because cmp -s matches.
       assert.doesNotMatch(r.stdout + r.stderr, /Rescued .*x-SUMMARY\.md/);
       assert.strictEqual(fs.readFileSync(path.join(mainDir, 'x-SUMMARY.md'), 'utf-8'), body);
