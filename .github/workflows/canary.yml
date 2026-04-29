@@ -14,7 +14,7 @@ on:
 
 concurrency:
   group: canary
-  cancel-in-progress: true
+  cancel-in-progress: false
 
 env:
   NODE_VERSION: 24
@@ -83,7 +83,7 @@ jobs:
           NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
 
       - name: Tag and push
-        if: ${{ !inputs.dry_run }}
+        if: ${{ github.ref == 'refs/heads/main' && !inputs.dry_run }}
         env:
           CANARY_VERSION: ${{ steps.canary.outputs.canary_version }}
         run: |
@@ -91,30 +91,38 @@ jobs:
           git push origin "v${CANARY_VERSION}"
 
       - name: Publish to npm (canary)
-        if: ${{ !inputs.dry_run }}
+        if: ${{ github.ref == 'refs/heads/main' && !inputs.dry_run }}
         run: npm publish --provenance --access public --tag canary
         env:
           NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
 
       - name: Publish SDK to npm (canary)
-        if: ${{ !inputs.dry_run }}
+        if: ${{ github.ref == 'refs/heads/main' && !inputs.dry_run }}
         run: cd sdk && npm publish --provenance --access public --tag canary
         env:
           NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
 
       - name: Verify publish
-        if: ${{ !inputs.dry_run }}
+        if: ${{ github.ref == 'refs/heads/main' && !inputs.dry_run }}
         env:
           CANARY_VERSION: ${{ steps.canary.outputs.canary_version }}
         run: |
-          sleep 10
-          PUBLISHED=$(npm view get-shit-done-cc@"$CANARY_VERSION" version 2>/dev/null || echo "NOT_FOUND")
+          PUBLISHED="NOT_FOUND"
+          SDK_PUBLISHED="NOT_FOUND"
+          for delay in 5 10 20 30 45; do
+            PUBLISHED=$(npm view get-shit-done-cc@"$CANARY_VERSION" version 2>/dev/null || echo "NOT_FOUND")
+            SDK_PUBLISHED=$(npm view @gsd-build/sdk@"$CANARY_VERSION" version 2>/dev/null || echo "NOT_FOUND")
+            if [ "$PUBLISHED" = "$CANARY_VERSION" ] && [ "$SDK_PUBLISHED" = "$CANARY_VERSION" ]; then
+              break
+            fi
+            echo "Not yet live (sleeping ${delay}s)..."
+            sleep "$delay"
+          done
           if [ "$PUBLISHED" != "$CANARY_VERSION" ]; then
             echo "::error::Published version verification failed. Expected $CANARY_VERSION, got $PUBLISHED"
             exit 1
           fi
           echo "Verified: get-shit-done-cc@$CANARY_VERSION is live on npm"
-          SDK_PUBLISHED=$(npm view @gsd-build/sdk@"$CANARY_VERSION" version 2>/dev/null || echo "NOT_FOUND")
           if [ "$SDK_PUBLISHED" != "$CANARY_VERSION" ]; then
             echo "::error::SDK version verification failed. Expected $CANARY_VERSION, got $SDK_PUBLISHED"
             exit 1
