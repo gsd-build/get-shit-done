@@ -157,14 +157,14 @@ Full roster at `get-shit-done/workflows/*.md`. Workflows are thin orchestrators 
 |----------|------|------------|
 | `add-phase.md` | Add a new integer phase to the end of the current milestone in the roadmap. | `/gsd-add-phase` |
 | `add-tests.md` | Generate unit and E2E tests for a completed phase based on its artifacts. | `/gsd-add-tests` |
-| `add-todo.md` | Capture an idea or task that surfaces during a session as a structured todo. | `/gsd-add-todo`, `/gsd-add-backlog` |
+| `add-todo.md` | Capture an idea or task that surfaces during a session as a structured todo. | `/gsd-capture` (default), `/gsd-capture --backlog` |
 | `ai-integration-phase.md` | Orchestrate framework selection → AI research → domain research → eval planning into AI-SPEC.md. | `/gsd-ai-integration-phase` |
 | `analyze-dependencies.md` | Analyze ROADMAP.md phases for file overlap and semantic dependencies; suggest `Depends on` edges. | `/gsd-analyze-dependencies` |
 | `audit-fix.md` | Autonomous audit-to-fix pipeline — run audit, parse, classify, fix, test, commit. | `/gsd-audit-fix` |
 | `audit-milestone.md` | Verify milestone met its definition of done by aggregating phase verifications. | `/gsd-audit-milestone` |
 | `audit-uat.md` | Cross-phase audit of UAT and verification files; produces prioritized outstanding-items list. | `/gsd-audit-uat` |
 | `autonomous.md` | Drive milestone phases autonomously — all remaining, a range, or a single phase. | `/gsd-autonomous` |
-| `check-todos.md` | List pending todos, allow selection, load context, and route to the appropriate action. | `/gsd-check-todos` |
+| `check-todos.md` | List pending todos, allow selection, load context, and route to the appropriate action. | `/gsd-capture --list` |
 | `cleanup.md` | Archive accumulated phase directories from completed milestones. | `/gsd-cleanup` |
 | `code-review-fix.md` | Auto-fix issues from REVIEW.md via gsd-code-fixer with per-fix atomic commits. | `/gsd-code-review-fix` |
 | `code-review.md` | Review phase source changes via gsd-code-reviewer; produces REVIEW.md. | `/gsd-code-review` |
@@ -174,7 +174,7 @@ Full roster at `get-shit-done/workflows/*.md`. Workflows are thin orchestrators 
 | `discuss-phase-assumptions.md` | Assumptions-mode discuss — extract implementation decisions via codebase-first analysis. | `/gsd-discuss-phase` (when `discuss_mode=assumptions`) |
 | `discuss-phase-power.md` | Power-user discuss — pre-generate all questions into a JSON state file + HTML UI. | `/gsd-discuss-phase --power` |
 | `discuss-phase.md` | Extract implementation decisions through iterative gray-area discussion. | `/gsd-discuss-phase` |
-| `do.md` | Route freeform text from the user to the best matching GSD command. | `/gsd-do` |
+| `do.md` | Route freeform text from the user to the best matching GSD command. | `/gsd-progress --do` |
 | `docs-update.md` | Generate, update, and verify canonical and hand-written project documentation. | `/gsd-docs-update` |
 | `edit-phase.md` | Edit any field of an existing phase in ROADMAP.md in place, preserving number and position. | `/gsd-edit-phase` |
 | `eval-review.md` | Retroactive audit of an implemented AI phase's evaluation coverage. | `/gsd-eval-review` |
@@ -199,14 +199,14 @@ Full roster at `get-shit-done/workflows/*.md`. Workflows are thin orchestrators 
 | `new-milestone.md` | Start a new milestone cycle — load project context, gather goals, update PROJECT.md/STATE.md. | `/gsd-new-milestone` |
 | `new-project.md` | Unified new-project flow — questioning, research (optional), requirements, roadmap. | `/gsd-new-project` |
 | `new-workspace.md` | Create an isolated workspace with repo worktrees/clones and an independent `.planning/`. | `/gsd-new-workspace` |
-| `next.md` | Detect current project state and automatically advance to the next logical step. | `/gsd-next` |
+| `next.md` | Detect current project state and automatically advance to the next logical step. | `/gsd-progress --next` |
 | `node-repair.md` | Autonomous repair operator for failed task verification; invoked by `execute-plan`. | `execute-plan.md` (recovery) |
-| `note.md` | Zero-friction idea capture — one Write call, one confirmation line. | `/gsd-note` |
+| `note.md` | Zero-friction idea capture — one Write call, one confirmation line. | `/gsd-capture --note` |
 | `pause-work.md` | Create structured `.planning/HANDOFF.json` and `.continue-here.md` handoff files. | `/gsd-pause-work` |
 | `plan-milestone-gaps.md` | Create all phases necessary to close gaps identified by `/gsd-audit-milestone`. | `/gsd-plan-milestone-gaps` |
 | `plan-phase.md` | Create executable PLAN.md files with integrated research and verification loop. | `/gsd-plan-phase`, `/gsd-quick` |
 | `plan-review-convergence.md` | Cross-AI plan convergence loop — replan with review feedback until no HIGH concerns remain. | `/gsd-plan-review-convergence` |
-| `plant-seed.md` | Capture a forward-looking idea as a structured seed file with trigger conditions. | `/gsd-plant-seed` |
+| `plant-seed.md` | Capture a forward-looking idea as a structured seed file with trigger conditions. | `/gsd-capture --seed` |
 | `pr-branch.md` | Create a clean branch for pull requests by filtering `.planning/` commits. | `/gsd-pr-branch` |
 | `profile-user.md` | Orchestrate the full developer profiling flow — consent, session scan, profile generation. | `/gsd-profile-user` |
 | `progress.md` | Progress rendering — project context, position, and next-action routing. | `/gsd-progress` |

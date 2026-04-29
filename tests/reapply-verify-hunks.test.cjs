@@ -73,10 +73,12 @@ describe('reapply-patches post-merge verification (#1758)', () => {
     );
   });
 
-  test('verification tracks per-file status', () => {
+  test('verification tracks per-file status via Hunk Verification Table', () => {
     assert.ok(
-      content.includes('per-file') || content.includes('Track verification status'),
-      'workflow must track verification status per file'
+      content.includes('Hunk Verification Table') &&
+        content.includes('one row per hunk per file') &&
+        content.includes('verified'),
+      'workflow must track verification status per hunk per file via the Hunk Verification Table contract'
     );
   });
 
