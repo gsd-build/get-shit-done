@@ -50,6 +50,28 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
   `commands/gsd/*.md` description exceeds 100 chars. Run via `npm run lint:descriptions`.
   (#2789)
 
+### Changed
+- **Skill surface consolidated from 86 → 59 `commands/gsd/*.md` entries** — four new
+  grouped skills replace clusters of micro-skills: `capture` (add-todo, note, add-backlog,
+  plant-seed, check-todos), `phase` (add-phase, insert-phase, remove-phase, edit-phase),
+  `config` (settings-advanced, settings-integrations, set-profile), `workspace`
+  (new-workspace, list-workspaces, remove-workspace). Six parent skills absorb wrap-up
+  and sub-operations as flags: `update --sync/--reapply`, `sketch --wrap-up`,
+  `spike --wrap-up`, `map-codebase --fast/--query`, `code-review --fix`,
+  `progress --do`. Zero functional loss. (#2790)
+- **`autonomous.md` corrected** — was invoking deleted `gsd:code-review-fix`; now calls
+  `gsd:code-review --fix`. (#2790)
+
+### Removed
+- **31 micro-skills deleted** — absorbed into consolidated parents or removed outright:
+  add-todo, note, add-backlog, plant-seed, check-todos, add-phase, insert-phase,
+  remove-phase, edit-phase, settings-advanced, settings-integrations, set-profile,
+  new-workspace, list-workspaces, remove-workspace, sync-skills, reapply-patches,
+  sketch-wrap-up, spike-wrap-up, scan, intel, code-review-fix, next, do,
+  join-discord, research-phase, session-report, from-gsd2, analyze-dependencies,
+  list-phase-assumptions, plan-milestone-gaps. All functionality preserved via flags on
+  consolidated skills. (#2790)
+
 ### Fixed
 - **`extractCurrentMilestone` no longer truncates ROADMAP.md at heading-like lines inside fenced code blocks** — the milestone-end search now scans line-by-line while tracking ` ``` ` / `~~~` fence state, so a line like `# Ops runbook (v1.0 compat)` inside a code block no longer acts as a milestone boundary. Previously, any phase defined after such a block was invisible to `roadmap analyze`, `roadmap get-phase`, `/gsd-autonomous`, and all phase-number commands. (#2787)
 - **Codex install no longer corrupts existing `~/.codex/config.toml`** — the installer
