@@ -304,7 +304,7 @@ describe('smeDetectProcesses', () => {
 
   it('does not return duplicate matches when process matches both file path and keyword', async () => {
     const { data } = await smeDetectProcesses(
-      ['--file-paths', 'src/billing/payments/charge.ts', '--goal', 'update payment processing'],
+      ['--file-paths', 'src/billing/payments/charge.ts', '--goal', 'update payments processing'],
       projectDir,
     );
     const d = data as Record<string, unknown>;
