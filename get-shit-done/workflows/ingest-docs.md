@@ -289,7 +289,8 @@ Preview the merge diff to the user and gate via approve-revise-abort before writ
 Commit the ingest results:
 
 ```bash
-gsd-tools commit "docs: ingest {N} docs from {SCAN_PATH} (#2387)" --files \
+node "$HOME/.claude/get-shit-done/bin/gsd-tools.cjs" commit \
+  "docs: ingest {N} docs from {SCAN_PATH} (#2387)" --files \
   .planning/PROJECT.md \
   .planning/REQUIREMENTS.md \
   .planning/ROADMAP.md \
