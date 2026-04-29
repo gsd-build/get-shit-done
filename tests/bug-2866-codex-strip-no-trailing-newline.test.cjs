@@ -34,6 +34,35 @@ const pkg = JSON.parse(fs.readFileSync(path.join(REPO_ROOT, 'package.json'), 'ut
 const installPath = path.resolve(REPO_ROOT, pkg.bin['get-shit-done-cc']);
 const { stripStaleGsdHookBlocks } = require(installPath);
 
+/**
+ * Parse the TOML output line-structurally so assertions check shape, not
+ * substring presence in raw text. Comments are dropped, table headers are
+ * recorded, and string-valued keys are captured. Sufficient for the small,
+ * well-formed TOML produced by these tests.
+ */
+function parseTomlShape(text) {
+  const tableHeaders = [];
+  const keys = new Map(); // dotted path → string value (last-write-wins, fine for these inputs)
+  let currentTable = '';
+  for (const rawLine of text.split('\n')) {
+    const line = rawLine.replace(/(?:^|\s)#.*$/, '').trim();
+    if (!line) continue;
+    const tableMatch = line.match(/^\[(\[)?([^\]]+)\]?\]$/);
+    if (tableMatch) {
+      currentTable = tableMatch[2];
+      tableHeaders.push((tableMatch[1] ? '[[' : '[') + currentTable + (tableMatch[1] ? ']]' : ']'));
+      continue;
+    }
+    const kvMatch = line.match(/^([A-Za-z_][\w-]*)\s*=\s*(.*)$/);
+    if (kvMatch) {
+      const key = currentTable ? `${currentTable}.${kvMatch[1]}` : kvMatch[1];
+      const value = kvMatch[2].replace(/^"(.*)"$/, '$1');
+      keys.set(key, value);
+    }
+  }
+  return { tableHeaders, keys };
+}
+
 const SHAPES = {
   'Shape 1 (legacy gsd-update-check)': [
     '# GSD Hooks',
@@ -68,43 +97,50 @@ describe('bug-2866: stripStaleGsdHookBlocks handles end-of-file without trailing
       'bin/install.js must export stripStaleGsdHookBlocks');
   });
 
+  function assertStripped(out, shape, scenario) {
+    const shape_ = parseTomlShape(out);
+    const hooksTable = shape_.tableHeaders.find((h) => /^\[\[?hooks(\.|]\])/.test(h));
+    assert.strictEqual(hooksTable, undefined,
+      `(${shape}, ${scenario}) no hooks table header may remain after strip, got tables: ${shape_.tableHeaders.join(', ')}`);
+    const staleCmd = [...shape_.keys.entries()].find(([_, v]) =>
+      /gsd-(update-check|check-update)/.test(v));
+    assert.strictEqual(staleCmd, undefined,
+      `(${shape}, ${scenario}) no key may carry a stale gsd-*-update command, got: ${staleCmd && staleCmd.join('=')}`);
+    assert.strictEqual(shape_.keys.get('history.persistence'), 'save-all',
+      `(${shape}, ${scenario}) history.persistence must be preserved as "save-all"`);
+  }
+
   for (const [shape, block] of Object.entries(SHAPES)) {
     test(`${shape}: stripped when terminated by trailing newline`, () => {
       const input = `[history]\npersistence = "save-all"\n${block}\n`;
-      const out = stripStaleGsdHookBlocks(input);
-      assert.ok(!out.includes('# GSD Hooks'),
-        `expected stale GSD Hooks block to be stripped, got:\n${out}`);
-      assert.ok(!out.includes('gsd-update-check') && !out.includes('gsd-check-update'),
-        `expected gsd-*-update reference to be stripped, got:\n${out}`);
-      // Pre-existing user content must remain intact.
-      assert.ok(out.includes('persistence = "save-all"'),
-        `pre-existing user content must remain, got:\n${out}`);
+      assertStripped(stripStaleGsdHookBlocks(input), shape, 'with trailing newline');
     });
 
     test(`${shape}: stripped when at end-of-file without trailing newline`, () => {
       // The reporter's repro: stale block sits at the very end with no \n.
       const input = `[history]\npersistence = "save-all"\n${block}`;
-      const out = stripStaleGsdHookBlocks(input);
-      assert.ok(!out.includes('# GSD Hooks'),
-        `(${shape}, no trailing newline) expected stale block to be stripped, got:\n${out}`);
-      assert.ok(!out.includes('gsd-update-check') && !out.includes('gsd-check-update'),
-        `(${shape}, no trailing newline) expected gsd-*-update reference to be stripped, got:\n${out}`);
-      assert.ok(out.includes('persistence = "save-all"'),
-        `pre-existing user content must remain, got:\n${out}`);
+      assertStripped(stripStaleGsdHookBlocks(input), shape, 'no trailing newline');
     });
   }
 
   test('returns input unchanged when no GSD hook block is present', () => {
     const benign = '[history]\npersistence = "save-all"\n';
-    assert.strictEqual(stripStaleGsdHookBlocks(benign), benign,
-      'helper must be a no-op when no GSD reference exists');
+    const out = stripStaleGsdHookBlocks(benign);
+    assert.strictEqual(out, benign, 'helper must be a no-op when no GSD reference exists');
+    const benignShape = parseTomlShape(out);
+    assert.strictEqual(benignShape.keys.get('history.persistence'), 'save-all',
+      'parsed shape must preserve history.persistence');
+    assert.deepStrictEqual(benignShape.tableHeaders, ['[history]'],
+      'parsed shape must contain only the [history] table');
   });
 
   test('Shape 4 strip does not leave an orphaned [[hooks.SessionStart]] header', () => {
     // Shape 4 is stripped before Shape 3 specifically to avoid this.
     const block = SHAPES['Shape 4 (nested [[hooks.SessionStart]] + [[hooks.SessionStart.hooks]])'];
     const out = stripStaleGsdHookBlocks(`[history]\npersistence = "save-all"\n${block}`);
-    assert.ok(!out.includes('[[hooks.SessionStart]]'),
-      `Shape 4 strip must remove the parent [[hooks.SessionStart]] header too, got:\n${out}`);
+    const outShape = parseTomlShape(out);
+    const orphan = outShape.tableHeaders.find((h) => /hooks\.SessionStart/.test(h));
+    assert.strictEqual(orphan, undefined,
+      `Shape 4 strip must remove the parent [[hooks.SessionStart]] header too, got tables: ${outShape.tableHeaders.join(', ')}`);
   });
 });
