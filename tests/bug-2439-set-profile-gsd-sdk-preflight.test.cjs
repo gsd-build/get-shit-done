@@ -36,11 +36,12 @@ describe('bug #2439: /gsd-set-profile gsd-sdk pre-flight check', () => {
   });
 
   test('pre-flight guard or note exists in config.md for gsd-sdk dependency', () => {
-    // The config.md delegates to gsd-sdk; at minimum it must document the --profile mode
-    const hasProfileFlag = content.includes('--profile');
+    // The bug (#2439) was that gsd-sdk was called with no pre-flight check, producing
+    // an opaque "command not found: gsd-sdk" error. Fix: config.md must reference
+    // gsd-sdk so users know the dependency exists when --profile fails.
     assert.ok(
-      hasProfileFlag,
-      'config.md must document --profile flag (was /gsd-set-profile before #2790)'
+      content.includes('gsd-sdk'),
+      'config.md must reference gsd-sdk (pre-flight guard for #2439: "command not found: gsd-sdk")'
     );
   });
 });

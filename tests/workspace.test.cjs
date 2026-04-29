@@ -314,6 +314,9 @@ describe('workspace worktree integration', () => {
 // #2790: new-workspace.md, list-workspaces.md, remove-workspace.md were
 // consolidated into a single workspace.md command with --new/--list/--remove flags.
 
+// allow-test-rule: source-text-is-the-product
+// workspace.md routing text and workflow content IS the deployed behavioral contract for the agent.
+
 describe('workspace command files', () => {
   const baseDir = path.join(__dirname, '..');
 

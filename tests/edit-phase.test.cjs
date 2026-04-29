@@ -365,14 +365,14 @@ describe('edit-phase: documentation registration', () => {
     );
   });
 
-  test('docs/COMMANDS.md contains /gsd-edit-phase', () => {
+  test('docs/COMMANDS.md documents /gsd-phase (absorbed /gsd-edit-phase via --edit flag, #2790)', () => {
     const commands = fs.readFileSync(
       path.join(ROOT, 'docs', 'COMMANDS.md'),
       'utf-8'
     );
     assert.ok(
-      commands.includes('/gsd-edit-phase'),
-      'docs/COMMANDS.md must document /gsd-edit-phase'
+      commands.includes('/gsd-phase'),
+      'docs/COMMANDS.md must document /gsd-phase (which absorbed /gsd-edit-phase via --edit flag in #2790)'
     );
   });
 });

@@ -161,17 +161,19 @@ describe('/gsd-next safety gates (#1732, #2089)', () => {
     );
   });
 
-  test('command definition documents --force flag and completeness scan (#2790: in progress.md --next)', () => {
+  test('command definition documents --next flag (#2790: absorbed into progress.md)', () => {
     const content = fs.readFileSync(commandPath, 'utf8');
-    // --next flag in progress.md passes --force through to the next workflow
     assert.ok(
-      content.includes('--force') || content.includes('--next'),
-      'progress.md (consolidated) should mention --force or --next flag'
+      content.includes('--next'),
+      'progress.md must document the --next flag (absorbed from standalone next.md command in #2790)'
     );
-    // completeness scan is in the next workflow; the command routes to it
+  });
+
+  test('next workflow documents --force bypass flag', () => {
+    const content = fs.readFileSync(workflowPath, 'utf8');
     assert.ok(
-      content.includes('completeness') || content.includes('next workflow') || content.includes('--next'),
-      'progress.md should document or route to the prior-phase completeness scan'
+      content.includes('--force'),
+      'next.md workflow must document --force flag for bypassing safety gates'
     );
   });
 

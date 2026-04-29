@@ -243,6 +243,24 @@ describe('saveLocalPatches — patch backup and pristine hash tracking (#1469)',
   });
 });
 
+// allow-test-rule: source-text-is-the-product
+// update.md routing and reapply-patches.md workflow text IS the deployed behavioral contract.
+
+/**
+ * Parse a field from YAML frontmatter between --- markers.
+ * Returns null if the frontmatter or field is absent.
+ */
+function parseFrontmatterField(content, field) {
+  const fmMatch = content.match(/^---\r?\n([\s\S]*?)\r?\n---/);
+  if (!fmMatch) return null;
+  const fm = fmMatch[1];
+  const quoted = fm.match(new RegExp(`^${field}:\\s+"((?:[^"\\\\]|\\\\.)*)"\\s*$`, 'm'));
+  if (quoted) return quoted[1];
+  const plain = fm.match(new RegExp(`^${field}:\\s+(.+)$`, 'm'));
+  if (plain) return plain[1].trim();
+  return null;
+}
+
 // #2790: reapply-patches.md command was absorbed into update.md as the --reapply flag.
 // The full workflow content (three-way merge, hunk verification) is in the referenced workflow.
 // These tests now verify the update.md command delegates to the reapply-patches workflow correctly.
@@ -252,62 +270,70 @@ describe('reapply-patches workflow contract (#1469)', () => {
     assert.ok(!fs.existsSync(oldPath), 'reapply-patches.md should be deleted (absorbed into update.md)');
   });
 
-  test('update.md --reapply flag is documented (replaced standalone command)', () => {
+  test('update.md argument-hint declares --reapply as consolidated entry point', () => {
     const updatePath = path.join(__dirname, '..', 'commands', 'gsd', 'update.md');
     const content = fs.readFileSync(updatePath, 'utf8');
-    assert.ok(content.includes('--reapply'), 'update.md must document --reapply flag');
+    const argHint = parseFrontmatterField(content, 'argument-hint');
+    assert.ok(
+      argHint && argHint.includes('--reapply'),
+      `update.md argument-hint must declare --reapply flag; got: ${argHint || '(none)'}`
+    );
   });
 
-  test('update.md references reapply-patches workflow for three-way merge logic', () => {
+  test('update.md execution_context_extended references reapply-patches workflow', () => {
     const updatePath = path.join(__dirname, '..', 'commands', 'gsd', 'update.md');
     const content = fs.readFileSync(updatePath, 'utf8');
     assert.ok(
-      content.includes('reapply-patches') || content.includes('three-way'),
-      'update.md must reference reapply-patches workflow or three-way merge'
+      content.includes('reapply-patches.md'),
+      'update.md must reference reapply-patches.md via execution_context_extended'
     );
   });
 });
 
 // #2790: reapply-patches.md (the command file which contained the inline workflow)
-// was deleted. The hunk verification contract is maintained in update.md --reapply
-// which delegates to the reapply-patches workflow. These tests now verify the delegation.
+// was deleted. The hunk verification contract now lives in the workflow file
+// get-shit-done/workflows/reapply-patches.md, referenced via execution_context_extended.
 describe('reapply-patches gated hunk verification (#1999)', () => {
+  const workflowPath = path.join(__dirname, '..', 'get-shit-done', 'workflows', 'reapply-patches.md');
+
   test('reapply-patches.md command is deleted and absorbed into update.md (#2790)', () => {
     const oldPath = path.join(__dirname, '..', 'commands', 'gsd', 'reapply-patches.md');
     assert.ok(!fs.existsSync(oldPath), 'reapply-patches.md should be absent (absorbed into update.md --reapply)');
   });
 
-  test('update.md --reapply flag exists (delegating to full hunk-verification workflow)', () => {
-    const updatePath = path.join(__dirname, '..', 'commands', 'gsd', 'update.md');
-    const content = fs.readFileSync(updatePath, 'utf8');
-    assert.ok(content.includes('--reapply'), 'update.md must document --reapply');
+  test('reapply-patches workflow file exists (behavioral contract for --reapply)', () => {
+    assert.ok(fs.existsSync(workflowPath), 'get-shit-done/workflows/reapply-patches.md must exist');
   });
 
-  // Skipped behavioral checks: the detailed hunk-verification invariants now live in the
-  // workflow referenced via --reapply. The workflow file content is tested in
-  // reapply-verify-hunks.test.cjs if those tests are updated to read the workflow path.
   test('Step 4 requires a Hunk Verification Table output format', () => {
-    // Behavioral contract maintained by runtime workflow; command file is deleted (#2790).
-    // This test acknowledges the consolidation and confirms update.md remains the entry point.
-    const updatePath = path.join(__dirname, '..', 'commands', 'gsd', 'update.md');
-    assert.ok(fs.existsSync(updatePath), 'update.md must exist as the consolidated entry point');
+    const content = fs.readFileSync(workflowPath, 'utf8');
+    assert.ok(
+      content.includes('Hunk Verification Table'),
+      'reapply-patches workflow must define the Hunk Verification Table in Step 4'
+    );
   });
 
   test('Hunk Verification Table includes required columns: file, hunk_id, signature_line, line_count, verified', () => {
-    // Contract is now in the workflow, not the command file. Command file consolidated (#2790).
-    const updatePath = path.join(__dirname, '..', 'commands', 'gsd', 'update.md');
-    assert.ok(fs.existsSync(updatePath), 'update.md (consolidated) must exist');
+    const content = fs.readFileSync(workflowPath, 'utf8');
+    assert.ok(content.includes('hunk_id'), 'Hunk Verification Table must have hunk_id column');
+    assert.ok(content.includes('signature_line'), 'Hunk Verification Table must have signature_line column');
+    assert.ok(content.includes('line_count'), 'Hunk Verification Table must have line_count column');
+    assert.ok(content.includes('verified'), 'Hunk Verification Table must have verified column');
   });
 
   test('Step 5 references the Hunk Verification Table before proceeding', () => {
-    // See above - contract in workflow. Consolidated into update.md --reapply (#2790).
-    const updatePath = path.join(__dirname, '..', 'commands', 'gsd', 'update.md');
-    assert.ok(fs.existsSync(updatePath), 'update.md (consolidated) must exist');
+    const content = fs.readFileSync(workflowPath, 'utf8');
+    assert.ok(
+      content.includes('Hunk Verification Gate') || content.includes('Step 5'),
+      'reapply-patches workflow must have a Step 5 gating on the Hunk Verification Table'
+    );
   });
 
   test('Step 5 includes an explicit gate that stops execution when verification fails', () => {
-    // See above - contract in workflow. Consolidated into update.md --reapply (#2790).
-    const updatePath = path.join(__dirname, '..', 'commands', 'gsd', 'update.md');
-    assert.ok(fs.existsSync(updatePath), 'update.md (consolidated) must exist');
+    const content = fs.readFileSync(workflowPath, 'utf8');
+    assert.ok(
+      content.includes('verified: no') || content.includes('STOP'),
+      'workflow Step 5 gate must stop execution when any hunk shows verified: no'
+    );
   });
 });

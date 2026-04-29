@@ -573,7 +573,7 @@ Check for gsd-local-patches/backup-meta.json in the config directory.
 
 ```
 Local patches were backed up before the update.
-Run /gsd-reapply-patches to merge your modifications into the new version.
+Run /gsd-update --reapply to merge your modifications into the new version.
 ```
 
 **If no patches:** Continue normally.
