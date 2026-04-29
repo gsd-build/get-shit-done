@@ -141,10 +141,14 @@ jobs:
         env:
           CANARY_VERSION: ${{ steps.canary.outputs.canary_version }}
           DRY_RUN: ${{ inputs.dry_run }}
+          PUBLISH_ELIGIBLE: ${{ github.ref == 'refs/heads/dev' && !inputs.dry_run }}
+          BRANCH_REF: ${{ github.ref }}
         run: |
           echo "## Canary v${CANARY_VERSION}" >> "$GITHUB_STEP_SUMMARY"
           if [ "$DRY_RUN" = "true" ]; then
             echo "**DRY RUN** — npm publish, tagging, and push skipped" >> "$GITHUB_STEP_SUMMARY"
+          elif [ "$PUBLISH_ELIGIBLE" != "true" ]; then
+            echo "**VALIDATION ONLY** — publish/tag skipped for \`${BRANCH_REF}\`; canary publish is gated to \`refs/heads/dev\`." >> "$GITHUB_STEP_SUMMARY"
           else
             echo "- Published to npm as \`canary\`" >> "$GITHUB_STEP_SUMMARY"
             echo "- SDK also published: \`@gsd-build/sdk@${CANARY_VERSION}\` on \`canary\`" >> "$GITHUB_STEP_SUMMARY"
