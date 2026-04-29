@@ -29,6 +29,141 @@ const AGENTS_DIR = path.join(__dirname, '..', 'agents');
 const COMMANDS_DIR = path.join(__dirname, '..', 'commands', 'gsd');
 const WORKFLOWS_DIR = path.join(__dirname, '..', 'get-shit-done', 'workflows');
 
+/**
+ * Parse top-level (non-nested, non-escaped) Skill() invocations from a workflow .md file.
+ *
+ * Returns an array of structured objects: [{ skill, args }]
+ *  - `skill` is the value of the `skill="..."` keyword argument
+ *  - `args` is the value of the `args="..."` keyword argument (or null if absent)
+ *
+ * Skips occurrences inside escaped string contexts like
+ *   prompt="... Skill(skill=\"x\", args=\"y\") ..."
+ * by walking the file character-by-character and tracking whether we are inside
+ * a double-quoted string. Escaped quotes (\") are treated as literal content.
+ *
+ * This avoids regex/.includes() text-matching: callers receive a structured list
+ * and assert against fields and tokenized args.
+ */
+function parseWorkflowSkillInvocations(content) {
+  const invocations = [];
+  let i = 0;
+  let inString = false;
+
+  while (i < content.length) {
+    const ch = content[i];
+
+    if (inString) {
+      if (ch === '\\' && i + 1 < content.length) {
+        // Skip escape sequence (e.g. \" or \\)
+        i += 2;
+        continue;
+      }
+      if (ch === '"') {
+        inString = false;
+      }
+      i += 1;
+      continue;
+    }
+
+    if (ch === '"') {
+      inString = true;
+      i += 1;
+      continue;
+    }
+
+    // Look for top-level "Skill(" at this position
+    if (content.startsWith('Skill(', i)) {
+      const callStart = i + 'Skill('.length;
+      // Find the matching close paren, respecting strings/escapes inside the call
+      let j = callStart;
+      let depth = 1;
+      let innerInString = false;
+      while (j < content.length && depth > 0) {
+        const c = content[j];
+        if (innerInString) {
+          if (c === '\\' && j + 1 < content.length) {
+            j += 2;
+            continue;
+          }
+          if (c === '"') innerInString = false;
+          j += 1;
+          continue;
+        }
+        if (c === '"') {
+          innerInString = true;
+        } else if (c === '(') {
+          depth += 1;
+        } else if (c === ')') {
+          depth -= 1;
+          if (depth === 0) break;
+        }
+        j += 1;
+      }
+      const callBody = content.slice(callStart, j);
+      const parsed = parseSkillCallBody(callBody);
+      if (parsed) invocations.push(parsed);
+      i = j + 1;
+      continue;
+    }
+
+    i += 1;
+  }
+
+  return invocations;
+}
+
+/**
+ * Parse the body of a Skill(...) call into { skill, args }.
+ * Body looks like: skill="name", args="value" (args optional).
+ * Returns null if no skill keyword is found.
+ */
+function parseSkillCallBody(body) {
+  const kwargs = {};
+  const isIdentChar = (c) => /[A-Za-z0-9_]/.test(c);
+  const isWs = (c) => /\s/.test(c);
+  let i = 0;
+  while (i < body.length) {
+    // Skip whitespace and commas
+    while (i < body.length && (isWs(body[i]) || body[i] === ',')) i += 1;
+    if (i >= body.length) break;
+
+    // Read identifier key
+    const keyStart = i;
+    while (i < body.length && isIdentChar(body[i])) i += 1;
+    const key = body.slice(keyStart, i);
+    if (!key) break;
+
+    // Expect '='
+    while (i < body.length && isWs(body[i])) i += 1;
+    if (body[i] !== '=') break;
+    i += 1;
+    while (i < body.length && isWs(body[i])) i += 1;
+
+    // Expect quoted value
+    if (body[i] !== '"') break;
+    i += 1;
+    let value = '';
+    while (i < body.length) {
+      const c = body[i];
+      if (c === '\\' && i + 1 < body.length) {
+        value += body[i + 1];
+        i += 2;
+        continue;
+      }
+      if (c === '"') {
+        i += 1;
+        break;
+      }
+      value += c;
+      i += 1;
+    }
+    kwargs[key] = value;
+  }
+
+  if (!('skill' in kwargs)) return null;
+  return { skill: kwargs.skill, args: 'args' in kwargs ? kwargs.args : null };
+}
+
 // Plugin directory resolution (cross-platform safe)
 const PLUGIN_WORKFLOWS_DIR = process.env.GSD_PLUGIN_ROOT || path.join(os.homedir(), '.claude', 'get-shit-done', 'workflows');
 const PLUGIN_AVAILABLE = fs.existsSync(PLUGIN_WORKFLOWS_DIR);
@@ -367,10 +502,12 @@ describe('CR-INTEGRATION: workflow integration points', () => {
   test('autonomous.md contains gsd-code-review skill invocation', () => {
     const content = fs.readFileSync(path.join(WORKFLOWS_DIR, 'autonomous.md'), 'utf-8');
 
-    // Parse Skill(skill="<name>", ...) invocations and assert canonical hyphen form is referenced.
-    // Canonical command form is hyphen (gsd-code-review); colon form (gsd:code-review) is the
-    // legacy frontmatter-name form removed in PR #2819.
-    const skillNames = Array.from(content.matchAll(/Skill\(\s*skill\s*=\s*"([^"]+)"/g)).map(m => m[1]);
+    // Parse Skill(...) invocations into structured objects and assert canonical
+    // hyphen form is referenced. Canonical command form is hyphen
+    // (gsd-code-review); colon form (gsd:code-review) is the legacy
+    // frontmatter-name form removed in PR #2819.
+    const invocations = parseWorkflowSkillInvocations(content);
+    const skillNames = invocations.map(inv => inv.skill);
     assert.ok(skillNames.includes('gsd-code-review'),
       `autonomous.md must invoke Skill(skill="gsd-code-review", ...); found skills: ${JSON.stringify(skillNames)}`);
     assert.ok(!skillNames.includes('gsd:code-review'),
@@ -380,7 +517,8 @@ describe('CR-INTEGRATION: workflow integration points', () => {
   test('autonomous.md contains gsd-code-review-fix skill invocation', () => {
     const content = fs.readFileSync(path.join(WORKFLOWS_DIR, 'autonomous.md'), 'utf-8');
 
-    const skillNames = Array.from(content.matchAll(/Skill\(\s*skill\s*=\s*"([^"]+)"/g)).map(m => m[1]);
+    const invocations = parseWorkflowSkillInvocations(content);
+    const skillNames = invocations.map(inv => inv.skill);
     assert.ok(skillNames.includes('gsd-code-review-fix'),
       `autonomous.md must invoke Skill(skill="gsd-code-review-fix", ...); found skills: ${JSON.stringify(skillNames)}`);
     assert.ok(!skillNames.includes('gsd:code-review-fix'),
@@ -390,10 +528,14 @@ describe('CR-INTEGRATION: workflow integration points', () => {
   test('autonomous.md contains --auto flag for code-review-fix', () => {
     const content = fs.readFileSync(path.join(WORKFLOWS_DIR, 'autonomous.md'), 'utf-8');
 
-    // Find the gsd-code-review-fix Skill invocation and assert its args include --auto.
-    const fixMatch = content.match(/Skill\(\s*skill\s*=\s*"gsd-code-review-fix"\s*,\s*args\s*=\s*"([^"]*)"/);
-    assert.ok(fixMatch, 'autonomous.md missing Skill(skill="gsd-code-review-fix", ...) invocation');
-    assert.ok(fixMatch[1].includes('--auto'),
-      `autonomous.md gsd-code-review-fix args missing --auto flag; got args="${fixMatch[1]}"`);
+    // Find the gsd-code-review-fix Skill invocation, then tokenize its args
+    // (whitespace-split) and assert --auto is one of the tokens. This avoids
+    // substring matches that could conflate --auto with --auto-foo.
+    const invocations = parseWorkflowSkillInvocations(content);
+    const fixInvocation = invocations.find(inv => inv.skill === 'gsd-code-review-fix');
+    assert.ok(fixInvocation, 'autonomous.md missing Skill(skill="gsd-code-review-fix", ...) invocation');
+    const argTokens = new Set((fixInvocation.args ?? '').split(/\s+/).filter(Boolean));
+    assert.ok(argTokens.has('--auto'),
+      `autonomous.md gsd-code-review-fix args missing --auto flag; got args="${fixInvocation.args}"`);
   });
 });
