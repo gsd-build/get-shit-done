@@ -1610,16 +1610,6 @@ const RUNTIME_PROFILE_MAP = {
     sonnet: { model: 'claude-sonnet-4-6' },
     haiku:  { model: 'claude-haiku-4-5' },
   },
-  hermes: {
-    // Hermes Agent is provider-agnostic; users pick any provider in ~/.hermes/config.yaml.
-    // Defaults use OpenRouter slugs because (a) OpenRouter is Hermes' default provider and
-    // (b) the same slugs resolve on OpenRouter, native Anthropic, and Copilot via Hermes'
-    // aggregator-aware resolver. Users on a different provider override per-tier via
-    // model_profile_overrides.hermes.{opus,sonnet,haiku} in .planning/config.json.
-    opus:   { model: 'anthropic/claude-opus-4-7' },
-    sonnet: { model: 'anthropic/claude-sonnet-4-6' },
-    haiku:  { model: 'anthropic/claude-haiku-4-5' },
-  },
 };
 
 const RUNTIMES_WITH_REASONING_EFFORT = new Set(['codex']);
@@ -1642,7 +1632,7 @@ const RUNTIME_OVERRIDE_TIERS = new Set(['opus', 'sonnet', 'haiku']);
 const KNOWN_RUNTIMES = new Set([
   'claude', 'codex', 'opencode', 'kilo', 'gemini', 'qwen',
   'copilot', 'cursor', 'windsurf', 'augment', 'trae', 'codebuddy',
-  'antigravity', 'cline', 'hermes',
+  'antigravity', 'cline',
 ]);
 
 const _warnedConfigKeys = new Set();

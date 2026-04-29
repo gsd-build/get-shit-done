@@ -221,12 +221,12 @@ describe('Source code integration (Kilo)', () => {
     assert.ok(src.includes("'kilo'"), '--all includes kilo runtime');
   });
 
-  test('promptRuntime runtimeMap has Kilo as option 11', () => {
-    assert.ok(src.includes("'11': 'kilo'"), 'runtimeMap has 11 -> kilo');
+  test('promptRuntime runtimeMap has Kilo as option 10', () => {
+    assert.ok(src.includes("'10': 'kilo'"), 'runtimeMap has 10 -> kilo');
   });
 
   test('prompt text shows Kilo above OpenCode without marketing copy', () => {
-    assert.ok(src.includes('11${reset}) Kilo'), 'prompt lists Kilo as option 11');
+    assert.ok(src.includes('10${reset}) Kilo'), 'prompt lists Kilo as option 10');
     assert.ok(!src.includes('the #1 AI coding platform on OpenRouter'), 'prompt does not include marketing tagline');
   });
 

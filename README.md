@@ -4,7 +4,7 @@
 
 **English** · [Português](README.pt-BR.md) · [简体中文](README.zh-CN.md) · [日本語](README.ja-JP.md) · [한국어](README.ko-KR.md)
 
-**A light-weight and powerful meta-prompting, context engineering and spec-driven development system for Claude Code, OpenCode, Gemini CLI, Kilo, Codex, Copilot, Cursor, Windsurf, Antigravity, Augment, Trae, Qwen Code, Hermes Agent, Cline, and CodeBuddy.**
+**A light-weight and powerful meta-prompting, context engineering and spec-driven development system for Claude Code, OpenCode, Gemini CLI, Kilo, Codex, Copilot, Cursor, Windsurf, Antigravity, Augment, Trae, Qwen Code, Cline, and CodeBuddy.**
 
 **Solves context rot — the quality degradation that happens as Claude fills its context window.**
 
@@ -104,12 +104,11 @@ npx get-shit-done-cc@latest
 ```
 
 The installer prompts you to choose:
-1. **Runtime** — Claude Code, OpenCode, Gemini, Kilo, Codex, Copilot, Cursor, Windsurf, Antigravity, Augment, Trae, Qwen Code, Hermes Agent, CodeBuddy, Cline, or all (interactive multi-select — pick multiple runtimes in a single install session)
+1. **Runtime** — Claude Code, OpenCode, Gemini, Kilo, Codex, Copilot, Cursor, Windsurf, Antigravity, Augment, Trae, Qwen Code, CodeBuddy, Cline, or all (interactive multi-select — pick multiple runtimes in a single install session)
 2. **Location** — Global (all projects) or local (current project only)
 
 Verify with:
 - Claude Code / Gemini / Copilot / Antigravity / Qwen Code: `/gsd-help`
-- Hermes Agent: ask the agent to use `gsd-help` (skills are natural-language-triggered)
 - OpenCode / Kilo / Augment / Trae / CodeBuddy: `/gsd-help`
 - Codex: `$gsd-help`
 - Cline: GSD installs via `.clinerules` — verify by checking `.clinerules` exists
@@ -180,10 +179,6 @@ npx get-shit-done-cc --trae --local         # Install to ./.trae/
 npx get-shit-done-cc --qwen --global        # Install to ~/.qwen/
 npx get-shit-done-cc --qwen --local         # Install to ./.qwen/
 
-# Hermes Agent
-npx get-shit-done-cc --hermes --global      # Install to ~/.hermes/ (honors $HERMES_HOME)
-npx get-shit-done-cc --hermes --local       # Install to ./.hermes/
-
 # CodeBuddy
 npx get-shit-done-cc --codebuddy --global   # Install to ~/.codebuddy/
 npx get-shit-done-cc --codebuddy --local    # Install to ./.codebuddy/
@@ -197,7 +192,7 @@ npx get-shit-done-cc --all --global      # Install to all directories
 ```
 
 Use `--global` (`-g`) or `--local` (`-l`) to skip the location prompt.
-Use `--claude`, `--opencode`, `--gemini`, `--kilo`, `--codex`, `--copilot`, `--cursor`, `--windsurf`, `--antigravity`, `--augment`, `--trae`, `--qwen`, `--hermes`, `--codebuddy`, `--cline`, or `--all` to skip the runtime prompt.
+Use `--claude`, `--opencode`, `--gemini`, `--kilo`, `--codex`, `--copilot`, `--cursor`, `--windsurf`, `--antigravity`, `--augment`, `--trae`, `--qwen`, `--codebuddy`, `--cline`, or `--all` to skip the runtime prompt.
 The GSD SDK CLI (`gsd-sdk`) is installed automatically (required by `/gsd-*` commands). Pass `--no-sdk` to skip the SDK install, or `--sdk` to force a reinstall.
 
 </details>
