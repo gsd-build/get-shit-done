@@ -153,7 +153,7 @@ Granular flags are composable: `--discuss --research --validate` gives the same 
 Usage: `/gsd-quick`
 Usage: `/gsd-quick --full`
 Usage: `/gsd-quick --research --validate`
-Result: Creates `.planning/quick/NNN-slug/PLAN.md`, `.planning/quick/NNN-slug/SUMMARY.md`
+Result: Creates `.planning/quick/NNN-slug/PLAN.md`, `.planning/quick/NNN-slug/NNN-slug-SUMMARY.md`
 
 ---
 
