@@ -146,7 +146,7 @@ describe('bug #2829: local-mode install must materialize gsd-sdk on PATH', () =>
   });
 
   test('isLocal=true with dist present and no on-PATH HOME bin still warns rather than lying about readiness', () => {
-    // PATH stays as a single non-HOME dir; ~/.local/bin exists but is off-PATH.
+    // PATH stays as a single non-HOME dir; any HOME bin candidate remains off-PATH.
     // Mirrors the #2775 invariant: do not print "ready" when the post-link
     // probe still cannot find gsd-sdk on PATH.
     const { stdout, stderr } = captureConsole(() => {
