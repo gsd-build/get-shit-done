@@ -29,6 +29,11 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
   `.planning/config.json` is loaded first and deep-merged with the workstream config
   (workstream wins on conflict). Explicit `null` in a workstream config now correctly
   overrides a root value. (#2714)
+- **Manual canary release workflow** — `.github/workflows/canary.yml` publishes
+  `{base}-canary.{N}` builds of `get-shit-done-cc` and `@gsd-build/sdk` under the
+  `canary` dist-tag on demand via `workflow_dispatch` (manual trigger only — auto-publish
+  on every push to main was rejected because submission rate is too high). Includes an
+  optional `dry_run` boolean and the same publish-verification gate as `release.yml`. (#2828)
 
 ### Changed
 - **Skill descriptions trimmed to ≤ 100 chars across all `commands/gsd/*.md`** — three
@@ -150,6 +155,69 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
   include an explicit `ORCHESTRATOR RULE` blockquote immediately after every `Task()`
   spawn, preventing the Codex parallel-work anti-pattern where the parent continues
   reading files and producing conflicting output. (#2729)
+- **`audit-uat` parser reads `human_verification:` from frontmatter array** — the
+  previous body-only regex was too strict and missed valid UAT items declared in YAML
+  frontmatter, surfacing false-positive open gaps at every `/gsd-complete-milestone`
+  audit. (#2788)
+- **`gsd-sdk` binary collision with `@gsd-build/sdk` resolved** — workstream-aware
+  query registry now respects `GSD_WORKSTREAM` env var; `gsd-tools` bin alias added so
+  the two SDK packages no longer fight over the `gsd-sdk` name in `node_modules/.bin`.
+  (#2791)
+- **OpenCode generated agents embed `model_profile_overrides.opencode.<tier>`** —
+  per-tier model overrides set via `/gsd-settings-advanced` are now propagated into the
+  generated agent files instead of being silently ignored. (#2794)
+- **`roadmap update-plan-progress` accepts `--phase` flag form** — SDK arg-parsing
+  regression in v0.1.0 silently dropped `--phase`/`--name`/`--plans` flags, causing
+  `state.begin-phase` and `roadmap update-plan-progress` to corrupt STATE.md. (#2796)
+- **`context_window` added to `VALID_CONFIG_KEYS` allowlist** — `/gsd-settings-advanced`
+  could not set `context_window` because the key was missing from the allowlist used by
+  `config-set` validation. (#2798)
+- **`gsd-tools init` dispatches `ingest-docs` handler** — `/gsd-ingest-docs` was broken
+  in v1.38.5 because the workflow called `gsd-sdk` (now `gsd-tools`) but no
+  `ingest-docs` init handler was registered. (#2801)
+- **`config-get` honors `--default <value>` flag** — fallback for missing keys was
+  ported from the CJS implementation (#1893) into the SDK. (#2803)
+- **`find-phase` returns `null` for archived phases** — when the current-milestone
+  phase had no directory yet, `init.plan-phase` / `init.execute-phase` returned the
+  archived prior-milestone directory instead of `null`, causing wrong-phase work. (#2805)
+- **SKILL.md frontmatter `name:` migrated to hyphen form** — files that still used the
+  deprecated colon form (`gsd:cmd`) caused autocomplete to suggest `/gsd:command`.
+  Frontmatter now uses canonical `gsd-cmd` hyphen names. (#2808)
+- **`gsd-sdk` resolvable in local-mode installs** — the previous `isLocal` short-circuit
+  in `installSdkIfNeeded()` returned before the PATH probe + self-link path could run
+  (the same path that fixed npx-cache global installs in #2775). When `sdk/dist/cli.js`
+  is present, local installs now run the same probe-and-link flow as global installs.
+  (#2829)
+- **OpenCode `@file` references use absolute paths on all platforms** — OpenCode does
+  not shell-expand `$HOME` in `@file` references on any platform, but the Windows-only
+  guard from #2376 left macOS/Linux producing literal `@$HOME/...` strings that resolved
+  to `command/$HOME/...` (file not found). Guard now applies to OpenCode unconditionally.
+  (#2831)
+- **`gsd-sdk auto` detects Codex runtime correctly** — `auto` mode ignored
+  `runtime: codex` and routed through `@anthropic-ai/claude-agent-sdk`, producing the
+  `[FAILED] $0.00 0.1s` symptom on autonomous runs. New `runtime-gate` raises a clear
+  error for non-Claude runtimes; `resolveModel()` is now runtime-aware (honours
+  `GSD_RUNTIME` env precedence) and never injects a Claude profile id under non-Claude
+  runtimes. (#2832)
+- **CR-INTEGRATION tests aligned with hyphen-form skill names** — tests previously
+  asserted `gsd:code-review` (colon) against `autonomous.md` which now uses the canonical
+  hyphen form. Tests now parse `Skill(skill="...")` invocations structurally and reject
+  the legacy colon form. (#2835)
+- **`audit-open` quick-task scanner accepts `${quick_id}-SUMMARY.md`** — the previous
+  bare-`SUMMARY.md` filename check produced false-positive `status: missing` for every
+  documented quick task. UAT terminal-status enum also adds `resolved` (matches
+  `execute-phase.md`'s post-gap-closure terminal); `help.md` one-liner reconciled with
+  the canonical `quick.md` workflow. (#2836)
+- **`quick.md` / `execute-phase.md` SUMMARY rescue handles gitignored `.planning/`** —
+  rescue blocks used `git ls-files --exclude-standard` which honoured `.gitignore`,
+  silently no-op'ing when `.planning/` was excluded; the worktree was then deleted with
+  the SUMMARY. Replaced with filesystem-level `find` + idempotent `cp` that bypasses git
+  entirely. (#2838)
+- **`/gsd-code-review-fix` cleanup tail is transactional** — JSON recovery sentinel at
+  `${phase_dir}/.review-fix-recovery-pending.json` is written after `git worktree add`
+  succeeds and removed only after `git worktree remove` returns. A new run that finds a
+  pre-existing sentinel force-removes the orphan worktree before starting fresh, making
+  the agent self-healing across crashes. (#2839)
 
 ### Performance
 - **`discuss-phase` lazy file loading** — entry-point `@file` directives replaced with
