@@ -170,9 +170,9 @@ describe('commands/gsd/sync-skills.md', () => {
 // ── INVENTORY sync ────────────────────────────────────────────────────────────
 
 describe('INVENTORY sync', () => {
-  test('INVENTORY.md lists /gsd-sync-skills command', () => {
+  test('INVENTORY.md lists /gsd-update --sync command (#2790: absorbed /gsd-sync-skills)', () => {
     const inventory = fs.readFileSync(path.join(__dirname, '../docs/INVENTORY.md'), 'utf-8');
-    assert.ok(inventory.includes('/gsd-sync-skills'), 'INVENTORY.md must list /gsd-sync-skills');
+    assert.ok(inventory.includes('/gsd-update --sync'), 'INVENTORY.md must list /gsd-update --sync (absorbed /gsd-sync-skills in #2790)');
   });
 
   test('INVENTORY.md lists sync-skills.md workflow', () => {

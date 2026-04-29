@@ -22,13 +22,12 @@ const path = require('path');
 const COMMAND_PATH = path.join(__dirname, '..', 'commands', 'gsd', 'config.md');
 
 describe('bug #2439: /gsd-set-profile gsd-sdk pre-flight check', () => {
-  const content = fs.readFileSync(COMMAND_PATH, 'utf-8');
-
   test('command file exists (config.md — absorbed set-profile in #2790)', () => {
     assert.ok(fs.existsSync(COMMAND_PATH), 'commands/gsd/config.md should exist (absorbed set-profile)');
   });
 
   test('config.md --profile flag references gsd-sdk config-set-model-profile', () => {
+    const content = fs.readFileSync(COMMAND_PATH, 'utf-8');
     assert.ok(
       content.includes('gsd-sdk query config-set-model-profile') || content.includes('config-set-model-profile'),
       'config.md must reference gsd-sdk query config-set-model-profile for --profile flag'
@@ -39,6 +38,7 @@ describe('bug #2439: /gsd-set-profile gsd-sdk pre-flight check', () => {
     // The bug (#2439) was that gsd-sdk was called with no pre-flight check, producing
     // an opaque "command not found: gsd-sdk" error. Fix: config.md must reference
     // gsd-sdk so users know the dependency exists when --profile fails.
+    const content = fs.readFileSync(COMMAND_PATH, 'utf-8');
     assert.ok(
       content.includes('gsd-sdk'),
       'config.md must reference gsd-sdk (pre-flight guard for #2439: "command not found: gsd-sdk")'

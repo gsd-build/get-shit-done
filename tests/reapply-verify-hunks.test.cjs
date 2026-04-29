@@ -84,6 +84,9 @@ describe('reapply-patches post-merge verification (#1758)', () => {
     const verifyIdx = content.indexOf('Post-merge verification');
     const writeIdx = content.indexOf('Write merged result');
     const reportIdx = content.indexOf('Step 7: Report');
+    assert.notEqual(writeIdx, -1, 'Missing "Write merged result" anchor in reapply-patches.md');
+    assert.notEqual(verifyIdx, -1, 'Missing "Post-merge verification" anchor in reapply-patches.md');
+    assert.notEqual(reportIdx, -1, 'Missing "Step 7: Report" anchor in reapply-patches.md');
     assert.ok(
       writeIdx < verifyIdx && verifyIdx < reportIdx,
       'Post-merge verification must appear between "Write merged result" and "Step 7: Report"'
