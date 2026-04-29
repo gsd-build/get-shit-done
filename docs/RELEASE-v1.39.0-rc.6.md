@@ -15,7 +15,7 @@ was bumped from `1.39.0-rc.5` to `1.39.0-rc.6` without first being merged with
 `main`, so the branch contents at the time of tag are byte-for-byte equivalent
 to rc.5 plus the version-bump commit.
 
-```
+```bash
 $ git log v1.39.0-rc.5..v1.39.0-rc.6 --pretty='%h %s'
 388118d8 chore: bump to 1.39.0-rc.6
 ```
@@ -23,26 +23,6 @@ $ git log v1.39.0-rc.5..v1.39.0-rc.6 --pretty='%h %s'
 If you are already on `1.39.0-rc.5`, there is nothing new to install in rc.6.
 The expected next step is an rc.7 cut that first merges `main` into
 `release/1.39.0` so the eight fixes that landed after rc.5 reach the registry.
-
-### Known issue: split publish
-
-The release workflow run for rc.6 published the main package successfully but
-the SDK publish step failed:
-
-```
-npm error code E404
-npm error 404 Not Found - PUT https://registry.npmjs.org/@gsd-build%2fsdk
-npm error 404  The requested resource '@gsd-build/sdk@1.39.0-rc.6' could not be
-              found or you do not have permission to access it.
-```
-
-| Package | Version on npm `next` | Notes |
-|---------|----------------------|-------|
-| `get-shit-done-cc` | `1.39.0-rc.6` | Published |
-| `@gsd-build/sdk` | `0.1.0` only | rc.5 and rc.6 never published — registry permission / scope-creation error |
-
-If your install path uses `@gsd-build/sdk@next`, it will fall back to `0.1.0`.
-Tracked in the rc.7 follow-up below.
 
 ---
 
@@ -125,20 +105,12 @@ To pin to this exact RC:
 npm install -g get-shit-done-cc@1.39.0-rc.6
 ```
 
-> **Note:** `@gsd-build/sdk@1.39.0-rc.6` is **not** on the registry — see the
-> "Known issue: split publish" section above. Pin with `@1.39.0-rc.5` if your
-> install needs the SDK package directly (also missing — see issue), otherwise
-> the `0.1.0` fallback applies.
-
 ---
 
 ## What's next
 
 - **rc.7** — cut from `release/1.39.0` after merging `main` into the release branch,
   so the eight fixes that landed after rc.5 (#2828, #2829, #2831, #2832, #2835,
-  #2836, #2838, #2839) actually reach the registry. Track in the rc.6 audit issue.
-- **`@gsd-build/sdk` registry fix** — investigate the 404 on `PUT /@gsd-build%2fsdk`.
-  Likely a one-time `npm publish --access public` is needed to create the scoped
-  package on the registry before the workflow can publish into it.
+  #2836, #2838, #2839) actually reach the registry.
 - Run `finalize` on the release workflow to promote `1.39.0` to `latest` once an RC
   with the full main-branch contents is stable.
