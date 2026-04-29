@@ -32,14 +32,17 @@ Initialize a new project with deep context gathering.
 
 ---
 
-### `/gsd-new-workspace`
+### `/gsd-workspace`
 
-Create an isolated workspace with repo copies and independent `.planning/` directory.
+Manage GSD workspaces — create, list, or remove isolated workspace environments with repo copies and independent `.planning/` directories.
 
 | Flag | Description |
 |------|-------------|
-| `--name <name>` | Workspace name (required) |
-| `--repos repo1,repo2` | Comma-separated repo paths or names |
+| `--new` | Create a new workspace (use with `--name`, `--repos`, etc.) |
+| `--list` | List active GSD workspaces and their status |
+| `--remove <name>` | Remove a workspace and clean up git worktrees |
+| `--name <name>` | Workspace name (used with `--new`) |
+| `--repos repo1,repo2` | Comma-separated repo paths or names (used with `--new`) |
 | `--path /target` | Target directory (default: `~/gsd-workspaces/<name>`) |
 | `--strategy worktree\|clone` | Copy strategy (default: `worktree`) |
 | `--branch <name>` | Branch to checkout (default: `workspace/<name>`) |
@@ -52,38 +55,10 @@ Create an isolated workspace with repo copies and independent `.planning/` direc
 **Produces:** `WORKSPACE.md`, `.planning/`, repo copies (worktrees or clones)
 
 ```bash
-/gsd-new-workspace --name feature-b --repos hr-ui,ZeymoAPI
-/gsd-new-workspace --name feature-b --repos . --strategy worktree  # Same-repo isolation
-/gsd-new-workspace --name spike --repos api,web --strategy clone   # Full clones
-```
-
----
-
-### `/gsd-list-workspaces`
-
-List active GSD workspaces and their status.
-
-**Scans:** `~/gsd-workspaces/` for `WORKSPACE.md` manifests
-**Shows:** Name, repo count, strategy, GSD project status
-
-```bash
-/gsd-list-workspaces
-```
-
----
-
-### `/gsd-remove-workspace`
-
-Remove a workspace and clean up git worktrees.
-
-| Argument | Required | Description |
-|----------|----------|-------------|
-| `<name>` | Yes | Workspace name to remove |
-
-**Safety:** Refuses removal if any repo has uncommitted changes. Requires name confirmation.
-
-```bash
-/gsd-remove-workspace feature-b
+/gsd-workspace --new --name feature-b --repos hr-ui,ZeymoAPI
+/gsd-workspace --new --name feature-b --repos . --strategy worktree  # Same-repo isolation
+/gsd-workspace --list
+/gsd-workspace --remove feature-b
 ```
 
 ---
@@ -247,43 +222,6 @@ User acceptance testing with auto-diagnosis.
 
 ---
 
-### `/gsd-next`
-
-Automatically advance to the next logical workflow step. Reads project state and runs the appropriate command.
-
-**Prerequisites:** `.planning/` directory exists
-**Behavior:**
-- No project → suggests `/gsd-new-project`
-- Phase needs discussion → runs `/gsd-discuss-phase`
-- Phase needs planning → runs `/gsd-plan-phase`
-- Phase needs execution → runs `/gsd-execute-phase`
-- Phase needs verification → runs `/gsd-verify-work`
-- All phases complete → suggests `/gsd-complete-milestone`
-
-```bash
-/gsd-next                           # Auto-detect and run next step
-```
-
----
-
-### `/gsd-session-report`
-
-Generate a session report with work summary, outcomes, and estimated resource usage.
-
-**Prerequisites:** Active project with recent work
-**Produces:** `.planning/reports/SESSION_REPORT.md`
-
-```bash
-/gsd-session-report                 # Generate post-session summary
-```
-
-**Report includes:**
-- Work performed (commits, plans executed, phases progressed)
-- Outcomes and deliverables
-- Blockers and decisions made
-- Estimated token/cost usage
-- Next steps recommendation
-
 ---
 
 ### `/gsd-ship`
@@ -417,111 +355,30 @@ Start next version cycle.
 
 ## Phase Management Commands
 
-### `/gsd-add-phase`
+### `/gsd-phase`
 
-Append new phase to roadmap.
-
-```bash
-/gsd-add-phase                      # Interactive — describe the phase
-```
-
-### `/gsd-edit-phase`
-
-Edit any field of an existing roadmap phase in place.
-
-| Argument | Required | Description |
-|----------|----------|-------------|
-| `N` | Yes | Phase number to edit |
+CRUD for phases in ROADMAP.md — add, insert, remove, or edit phases with a single consolidated command.
 
 | Flag | Description |
 |------|-------------|
-| `--force` | Allow editing in-progress or completed phases |
-
-**Prerequisites:** `.planning/ROADMAP.md` exists, phase N must exist
-**Produces:** Updated phase section in ROADMAP.md (in place, number and position preserved)
-
-```bash
-/gsd-edit-phase 5                   # Edit any field of phase 5 (future phases only)
-/gsd-edit-phase 5 --force           # Edit phase 5 even if in-progress or completed
-```
-
----
-
-### `/gsd-insert-phase`
-
-Insert urgent work between phases using decimal numbering.
-
-| Argument | Required | Description |
-|----------|----------|-------------|
-| `N` | No | Insert after this phase number |
-
-```bash
-/gsd-insert-phase 3                 # Insert between phase 3 and 4 → creates 3.1
-```
-
-### `/gsd-remove-phase`
-
-Remove future phase and renumber subsequent phases.
-
-| Argument | Required | Description |
-|----------|----------|-------------|
-| `N` | No | Phase number to remove |
-
-```bash
-/gsd-remove-phase 7                 # Remove phase 7, renumber 8→7, 9→8, etc.
-```
-
-### `/gsd-list-phase-assumptions`
-
-Preview Claude's intended approach before planning.
-
-| Argument | Required | Description |
-|----------|----------|-------------|
-| `N` | No | Phase number |
-
-```bash
-/gsd-list-phase-assumptions 2       # See assumptions for phase 2
-```
-
-### `/gsd-analyze-dependencies`
-
-Analyze phase dependencies and suggest `Depends on` entries for ROADMAP.md before running `/gsd-manager`.
+| (none) | Append a new integer phase to the end of the current milestone |
+| `--insert <N>` | Insert urgent work as a decimal phase (e.g., 3.1) after phase N |
+| `--remove <N>` | Remove a future phase and renumber subsequent phases |
+| `--edit <N>` | Edit any field of an existing phase in place |
+| `--force` | Allow editing in-progress or completed phases (used with `--edit`) |
 
 **Prerequisites:** `.planning/ROADMAP.md` exists
-**Produces:** Dependency suggestion table; optionally updates `Depends on` fields in ROADMAP.md with confirmation
-
-**Run this before `/gsd-manager`** when phases have empty `Depends on` fields and you want to avoid merge conflicts from unordered parallel execution.
+**Produces:** Updated ROADMAP.md
 
 ```bash
-/gsd-analyze-dependencies           # Analyze all phases and suggest dependencies
+/gsd-phase                          # Interactive — append new phase
+/gsd-phase --insert 3               # Insert between phase 3 and 4 → creates 3.1
+/gsd-phase --remove 7               # Remove phase 7, renumber 8→7, 9→8, etc.
+/gsd-phase --edit 5                 # Edit any field of phase 5
+/gsd-phase --edit 5 --force         # Edit phase 5 even if in-progress or completed
 ```
-
-**Detection methods:**
-- File overlap — phases touching the same files/domains must be ordered
-- Semantic dependencies — a phase that consumes an API or schema built by another phase
-- Data flow — a phase that reads output produced by another phase
 
 ---
-
-### `/gsd-plan-milestone-gaps`
-
-Create phases to close gaps from milestone audit.
-
-```bash
-/gsd-plan-milestone-gaps             # Creates phases for each audit gap
-```
-
-### `/gsd-research-phase`
-
-Deep ecosystem research only (standalone — usually use `/gsd-plan-phase` instead).
-
-| Argument | Required | Description |
-|----------|----------|-------------|
-| `N` | No | Phase number |
-
-```bash
-/gsd-research-phase 4               # Research phase 4 domain
-```
 
 ### `/gsd-validate-phase`
 
@@ -541,14 +398,22 @@ Retroactively audit and fill Nyquist validation gaps.
 
 ### `/gsd-progress`
 
-Check project progress, show context, and route to the next action (execute or plan).
+Show status, next steps, and automatically advance to the next logical workflow step. Reads project state and determines the appropriate action.
 
 | Flag | Description |
 |------|-------------|
 | `--forensic` | Append a 6-check integrity audit after the standard report (STATE consistency, orphaned handoffs, deferred scope drift, memory-flagged pending work, blocking todos, uncommitted code) |
 
+**Auto-routing behavior (absorbed from `/gsd-next`):**
+- No project → suggests `/gsd-new-project`
+- Phase needs discussion → runs `/gsd-discuss-phase`
+- Phase needs planning → runs `/gsd-plan-phase`
+- Phase needs execution → runs `/gsd-execute-phase`
+- Phase needs verification → runs `/gsd-verify-work`
+- All phases complete → suggests `/gsd-complete-milestone`
+
 ```bash
-/gsd-progress                       # "Where am I? What's next?"
+/gsd-progress                       # "Where am I? What's next?" with auto-routing
 /gsd-progress --forensic            # Standard report + integrity audit
 ```
 
@@ -704,31 +569,6 @@ Bootstrap or merge a .planning/ setup from existing ADRs, PRDs, SPECs, and docs 
 
 ---
 
-### `/gsd-from-gsd2`
-
-Reverse migration from GSD-2 format (`.gsd/` with Milestone→Slice→Task hierarchy) back to v1 `.planning/` format.
-
-| Flag | Required | Description |
-|------|----------|-------------|
-| `--dry-run` | No | Preview what would be migrated without writing anything |
-| `--force` | No | Overwrite existing `.planning/` directory |
-| `--path <dir>` | No | Specify GSD-2 root directory (defaults to current directory) |
-
-**Flattening:** Milestone→Slice hierarchy is flattened to sequential phase numbers (M001/S01→phase 01, M001/S02→phase 02, M002/S01→phase 03, etc.).
-
-**Produces:** `PROJECT.md`, `REQUIREMENTS.md`, `ROADMAP.md`, `STATE.md`, and sequential phase directories in `.planning/`.
-
-**Safety:** Guards against overwriting an existing `.planning/` directory without `--force`.
-
-```bash
-/gsd-from-gsd2                          # Migrate .gsd/ in current directory
-/gsd-from-gsd2 --dry-run                # Preview migration without writing
-/gsd-from-gsd2 --force                  # Overwrite existing .planning/
-/gsd-from-gsd2 --path /path/to/gsd2-project  # Specify GSD-2 root
-```
-
----
-
 ### `/gsd-quick`
 
 Execute ad-hoc task with GSD guarantees.
@@ -775,34 +615,6 @@ Run all remaining phases autonomously.
 /gsd-autonomous --from 3 --to 5     # Run phases 3 through 5
 ```
 
-### `/gsd-do`
-
-Route freeform text to the right GSD command.
-
-```bash
-/gsd-do                             # Then describe what you want
-```
-
-### `/gsd-note`
-
-Zero-friction idea capture — append, list, or promote notes to todos.
-
-| Argument | Required | Description |
-|----------|----------|-------------|
-| `text` | No | Note text to capture (default: append mode) |
-| `list` | No | List all notes from project and global scopes |
-| `promote N` | No | Convert note N into a structured todo |
-
-| Flag | Description |
-|------|-------------|
-| `--global` | Use global scope for note operations |
-
-```bash
-/gsd-note "Consider caching strategy for API responses"
-/gsd-note list
-/gsd-note promote 3
-```
-
 ### `/gsd-debug`
 
 Systematic debugging with persistent state.
@@ -829,26 +641,6 @@ Systematic debugging with persistent state.
 /gsd-debug list
 /gsd-debug status auth-token-null
 /gsd-debug continue form-submit-500
-```
-
-### `/gsd-add-todo`
-
-Capture idea or task for later.
-
-| Argument | Required | Description |
-|----------|----------|-------------|
-| `description` | No | Todo description |
-
-```bash
-/gsd-add-todo "Consider adding dark mode support"
-```
-
-### `/gsd-check-todos`
-
-List pending todos and select one to work on.
-
-```bash
-/gsd-check-todos
 ```
 
 ### `/gsd-add-tests`
@@ -924,26 +716,16 @@ Run 2–5 focused feasibility experiments before committing to an implementation
 |----------|----------|-------------|
 | `idea` | No | The technical question or approach to investigate |
 | `--quick` | No | Skip intake conversation; use `idea` text directly |
+| `--wrap-up` | No | Package completed spike findings into a reusable project-local skill |
 
 **Produces:** `.planning/spikes/NNN-experiment-name/` with code, results, and README; `.planning/spikes/MANIFEST.md`
+**`--wrap-up` produces:** `.claude/skills/spike-findings-[project]/` skill file
 
 ```bash
 /gsd-spike                              # Interactive intake
 /gsd-spike "can we stream LLM tokens through SSE"
 /gsd-spike --quick websocket-vs-polling
-```
-
----
-
-### `/gsd-spike-wrap-up`
-
-Package completed spike findings into a reusable project-local skill so future sessions can reference the conclusions.
-
-**Prerequisites:** `.planning/spikes/` exists with at least one completed spike
-**Produces:** `.claude/skills/spike-findings-[project]/` skill file
-
-```bash
-/gsd-spike-wrap-up
+/gsd-spike --wrap-up                    # Package findings into a reusable skill
 ```
 
 ---
@@ -957,27 +739,17 @@ Explore design directions through throwaway HTML mockups before committing to im
 | `idea` | No | The UI design question or direction to explore |
 | `--quick` | No | Skip mood intake; use `idea` text directly |
 | `--text` | No | Text-mode fallback — replace interactive prompts with numbered lists (for non-Claude runtimes) |
+| `--wrap-up` | No | Package winning sketch decisions into a reusable project-local skill |
 
 **Produces:** `.planning/sketches/NNN-descriptive-name/index.html` (2–3 interactive variants), `README.md`, shared `themes/default.css`; `.planning/sketches/MANIFEST.md`
+**`--wrap-up` produces:** `.claude/skills/sketch-findings-[project]/` skill file
 
 ```bash
 /gsd-sketch                             # Interactive mood intake
 /gsd-sketch "dashboard layout"
 /gsd-sketch --quick "sidebar navigation"
 /gsd-sketch --text "onboarding flow"    # Non-Claude runtime
-```
-
----
-
-### `/gsd-sketch-wrap-up`
-
-Package winning sketch decisions into a reusable project-local skill so future sessions inherit the visual direction.
-
-**Prerequisites:** `.planning/sketches/` exists with at least one completed sketch (winner marked)
-**Produces:** `.claude/skills/sketch-findings-[project]/` skill file
-
-```bash
-/gsd-sketch-wrap-up
+/gsd-sketch --wrap-up                   # Package winning sketch into a skill
 ```
 
 ---
@@ -1092,11 +864,18 @@ All answers are merged via `gsd-sdk query config-set` into the resolved project 
 /gsd-settings                       # Interactive config
 ```
 
-### `/gsd-settings-advanced`
+### `/gsd-config`
 
-Power-user configuration for plan bounce, timeouts, branch templates, and cross-AI execution. Use after `/gsd-settings` once the common-case toggles are dialed in.
+Configure GSD settings interactively — workflow toggles, advanced knobs, integrations, and model profile — with a single consolidated command.
 
-Six sections, each a focused prompt batch:
+| Flag | Description |
+|------|-------------|
+| (none) | Common-case toggles: model, research, plan_check, verifier, branching |
+| `--advanced` | Power-user knobs: planning tuning, timeouts, branch templates, cross-AI execution, runtime/output |
+| `--integrations` | Third-party API keys, code-review CLI routing, agent-skill injection |
+| `--profile <name>` | Quick profile switch: `quality`, `balanced`, `budget`, or `inherit` |
+
+**`--advanced` sections:**
 
 | Section | Keys |
 |---------|------|
@@ -1107,55 +886,17 @@ Six sections, each a focused prompt batch:
 | Git Customization | `git.base_branch`, `git.phase_branch_template`, `git.milestone_branch_template` |
 | Runtime / Output | `response_language`, `context_window`, `search_gitignored`, `graphify.build_timeout` |
 
-Current values are pre-selected; an empty input keeps the existing value. Numeric fields reject non-numeric input and re-prompt. Null-allowed fields (`plan_bounce_script`, `cross_ai_command`, `response_language`) accept an empty input as a clear. Writes route through `gsd-sdk query config-set`, which preserves every unrelated key.
+All answers merge via `gsd-sdk query config-set`, preserving unrelated keys. API keys are masked (`****<last-4>`) in all output.
 
 ```bash
-/gsd-settings-advanced              # Six-section interactive config
+/gsd-config                         # Common-case interactive config
+/gsd-config --advanced              # Power-user knobs (six-section prompt)
+/gsd-config --integrations          # API keys, review CLI routing, agent skills
+/gsd-config --profile budget        # Switch to budget profile
+/gsd-config --profile quality       # Switch to quality profile
 ```
 
 See [CONFIGURATION.md](CONFIGURATION.md) for the full schema and defaults.
-
-### `/gsd-settings-integrations`
-
-Interactive configuration of third-party integrations and cross-tool routing.
-Distinct from `/gsd-settings` (workflow toggles) — this command handles
-connectivity: API keys, reviewer CLI routing, and agent-skill injection.
-
-Covers:
-
-- **Search integrations:** `brave_search`, `firecrawl`, `exa_search` API keys,
-  and the `search_gitignored` toggle.
-- **Code-review CLI routing:** `review.models.{claude,codex,gemini,opencode}`
-  — a shell command per reviewer flavor.
-- **Agent-skill injection:** `agent_skills.<agent-type>` — skill names
-  injected into an agent's spawn frontmatter. Agent-type slugs are validated
-  against `[a-zA-Z0-9_-]+` so path separators and shell metacharacters are
-  rejected.
-
-API keys are stored plaintext in `.planning/config.json` but displayed masked
-(`****<last-4>`) in every interactive output, confirmation table, and
-`config-set` stdout/stderr line. Plaintext is never echoed, never logged,
-and never written to any file outside `config.json` by this workflow.
-
-```bash
-/gsd-settings-integrations           # Interactive config (three sections)
-```
-
-See [`docs/CONFIGURATION.md`](CONFIGURATION.md) for the per-field reference and
-[`docs/CLI-TOOLS.md`](CLI-TOOLS.md) for the reviewer-CLI routing contract.
-
-### `/gsd-set-profile`
-
-Quick profile switch.
-
-| Argument | Required | Description |
-|----------|----------|-------------|
-| `profile` | **Yes** | `quality`, `balanced`, `budget`, or `inherit` |
-
-```bash
-/gsd-set-profile budget             # Switch to budget profile
-/gsd-set-profile quality            # Switch to quality profile
-```
 
 ---
 
@@ -1163,55 +904,26 @@ Quick profile switch.
 
 ### `/gsd-map-codebase`
 
-Analyze existing codebase with parallel mapper agents.
+Analyze existing codebase with parallel mapper agents. Use `--fast` for a quick single-agent scan, or `--query` to search existing intel.
 
 | Argument | Required | Description |
 |----------|----------|-------------|
 | `area` | No | Scope mapping to a specific area |
-
-```bash
-/gsd-map-codebase                   # Full codebase analysis
-/gsd-map-codebase auth              # Focus on auth area
-```
-
----
-
-### `/gsd-scan`
-
-Rapid single-focus codebase assessment — lightweight alternative to `/gsd-map-codebase` that spawns one mapper agent instead of four parallel ones.
+| `--fast` | No | Rapid single-focus assessment — spawns one mapper agent instead of four parallel ones (lightweight alternative) |
+| `--query <term>` | No | Search queryable codebase intel files in `.planning/intel/` (requires `intel.enabled: true`) |
 
 | Flag | Description |
 |------|-------------|
-| `--focus tech\|arch\|quality\|concerns\|tech+arch` | Focus area (default: `tech+arch`) |
+| `--focus tech\|arch\|quality\|concerns\|tech+arch` | Focus area for `--fast` mode (default: `tech+arch`) |
 
-**Produces:** Targeted document(s) in `.planning/codebase/`
-
-```bash
-/gsd-scan                           # Quick tech + arch overview
-/gsd-scan --focus quality           # Quality and code health only
-/gsd-scan --focus concerns          # Surface concerns and risk areas
-```
-
----
-
-### `/gsd-intel`
-
-Query, inspect, or refresh queryable codebase intelligence files stored in `.planning/intel/`. Requires `intel.enabled: true` in `config.json`.
-
-| Argument | Description |
-|----------|-------------|
-| `query <term>` | Search intel files for a term |
-| `status` | Show intel file freshness (FRESH/STALE) |
-| `diff` | Show changes since last snapshot |
-| `refresh` | Rebuild all intel files from codebase analysis |
-
-**Produces:** `.planning/intel/` JSON files (stack, api-map, dependency-graph, file-roles, arch-decisions)
+**Produces:** `.planning/codebase/` analysis documents (full mode); targeted document(s) in `.planning/codebase/` (`--fast`); intel query results (`--query`)
 
 ```bash
-/gsd-intel status                   # Check freshness of intel files
-/gsd-intel query authentication     # Search intel for a term
-/gsd-intel diff                     # What changed since last snapshot
-/gsd-intel refresh                  # Rebuild intel index
+/gsd-map-codebase                   # Full codebase analysis (4 parallel agents)
+/gsd-map-codebase auth              # Focus on auth area
+/gsd-map-codebase --fast            # Quick tech + arch overview (1 agent)
+/gsd-map-codebase --fast --focus quality  # Quality and code health only
+/gsd-map-codebase --query authentication  # Search intel for a term
 ```
 
 ### `/gsd-graphify`
@@ -1273,18 +985,17 @@ Audit an executed AI phase's evaluation coverage and produce an EVAL-REVIEW.md r
 
 ### `/gsd-update`
 
-Update GSD with changelog preview.
+Update GSD with changelog preview, and optionally sync skills or reapply local patches.
+
+| Flag | Description |
+|------|-------------|
+| `--sync` | Sync skills from the GSD registry after updating |
+| `--reapply` | Restore local modifications (patches) after updating |
 
 ```bash
 /gsd-update                         # Check for updates and install
-```
-
-### `/gsd-reapply-patches`
-
-Restore local modifications after a GSD update.
-
-```bash
-/gsd-reapply-patches                # Merge back local changes
+/gsd-update --sync                  # Update and sync skills
+/gsd-update --reapply               # Update and reapply local patches
 ```
 
 ---
@@ -1293,44 +1004,28 @@ Restore local modifications after a GSD update.
 
 ### `/gsd-code-review`
 
-Review source files changed during a phase for bugs, security vulnerabilities, and code quality problems.
+Review source files changed during a phase for bugs, security vulnerabilities, and code quality problems. Use `--fix` to auto-fix findings after review.
 
 | Argument | Required | Description |
 |----------|----------|-------------|
 | `N` | **Yes** | Phase number whose changes to review (e.g., `2` or `02`) |
 | `--depth=quick\|standard\|deep` | No | Review depth level (overrides `workflow.code_review_depth` config). `quick`: pattern-matching only (~2 min). `standard`: per-file analysis with language-specific checks (~5–15 min, default). `deep`: cross-file analysis including import graphs and call chains (~15–30 min) |
 | `--files file1,file2,...` | No | Explicit comma-separated file list; skips SUMMARY/git scoping entirely |
+| `--fix` | No | Auto-fix issues after review — reads REVIEW.md, spawns fixer agent, commits each fix atomically |
+| `--fix --all` | No | Include Info findings in fix scope (default: Critical + Warning only) |
+| `--fix --auto` | No | Fix + re-review iteration loop, capped at 3 iterations |
 
 **Prerequisites:** Phase has been executed and has SUMMARY.md or git history
-**Produces:** `{phase}-REVIEW.md` in phase directory with severity-classified findings
-**Spawns:** `gsd-code-reviewer` agent
+**Produces:** `{phase}-REVIEW.md` with severity-classified findings; `{phase}-REVIEW-FIX.md` when `--fix` is used
+**Spawns:** `gsd-code-reviewer` agent; `gsd-code-fixer` agent (with `--fix`)
 
 ```bash
 /gsd-code-review 3                          # Standard review for phase 3
 /gsd-code-review 2 --depth=deep             # Deep cross-file review
 /gsd-code-review 4 --files src/auth.ts,src/token.ts  # Explicit file list
-```
-
----
-
-### `/gsd-code-review-fix`
-
-Auto-fix issues found by code review in REVIEW.md; commits each fix atomically. Reads `REVIEW.md`, spawns a fixer agent, and produces a `REVIEW-FIX.md` summary.
-
-| Argument | Required | Description |
-|----------|----------|-------------|
-| `N` | **Yes** | Phase number whose REVIEW.md to fix |
-| `--all` | No | Include Info findings in fix scope (default: Critical + Warning only) |
-| `--auto` | No | Enable fix + re-review iteration loop, capped at 3 iterations |
-
-**Prerequisites:** Phase has a `{phase}-REVIEW.md` file (run `/gsd-code-review` first)
-**Produces:** `{phase}-REVIEW-FIX.md` with applied fixes summary
-**Spawns:** `gsd-code-fixer` agent
-
-```bash
-/gsd-code-review-fix 3                      # Fix Critical + Warning findings for phase 3
-/gsd-code-review-fix 3 --all               # Include Info findings
-/gsd-code-review-fix 3 --auto              # Fix and re-review until clean (max 3 iterations)
+/gsd-code-review 3 --fix                    # Review then fix Critical + Warning findings
+/gsd-code-review 3 --fix --all             # Review then fix all findings including Info
+/gsd-code-review 3 --fix --auto            # Review, fix, and re-review until clean (max 3 iterations)
 ```
 
 ---
@@ -1422,19 +1117,6 @@ Create a clean PR branch by filtering out `.planning/` commits.
 
 ---
 
-### `/gsd-audit-uat`
-
-Cross-phase audit of all outstanding UAT and verification items.
-
-**Prerequisites:** At least one phase has been executed with UAT or verification
-**Produces:** Categorized audit report with human test plan
-
-```bash
-/gsd-audit-uat
-```
-
----
-
 ### `/gsd-secure-phase`
 
 Retroactively verify threat mitigations for a completed phase.
@@ -1481,21 +1163,34 @@ Each doc writer explores the codebase directly — no hallucinated paths or stal
 
 ---
 
-## Backlog & Thread Commands
+## Task Capture & Backlog Commands
 
-### `/gsd-add-backlog`
+### `/gsd-capture`
 
-Add an idea to the backlog parking lot using 999.x numbering.
+Capture ideas, tasks, notes, and seeds to their appropriate destination. Default mode adds a structured todo; flags route to specialized capture workflows.
 
-| Argument | Required | Description |
-|----------|----------|-------------|
-| `description` | **Yes** | Backlog item description |
+| Flag | Description |
+|------|-------------|
+| (none) | Capture as a structured todo for later work |
+| `--note [text]` | Zero-friction note — append, list (`--note list`), or promote (`--note promote N`) |
+| `--backlog <description>` | Add to the backlog parking lot using 999.x numbering |
+| `--seed [idea summary]` | Capture a forward-looking idea with trigger conditions |
+| `--list` | List pending todos and select one to work on |
+| `--global` | Use global scope (for note operations) |
 
-**999.x numbering** keeps backlog items outside the active phase sequence. Phase directories are created immediately so `/gsd-discuss-phase` and `/gsd-plan-phase` work on them.
+**Backlog:** 999.x numbering keeps items outside the active phase sequence; phase directories are created immediately so `/gsd-discuss-phase` and `/gsd-plan-phase` work on them.
+**Seeds:** Preserve full WHY, WHEN to surface, and breadcrumbs — consumed by `/gsd-new-milestone`.
+
+**Produces:** `.planning/todos/` (default), note files (--note), ROADMAP.md backlog section (--backlog), `.planning/seeds/SEED-NNN-slug.md` (--seed)
 
 ```bash
-/gsd-add-backlog "GraphQL API layer"
-/gsd-add-backlog "Mobile responsive redesign"
+/gsd-capture "Consider adding dark mode support"   # Add todo
+/gsd-capture --note "Caching strategy idea"        # Quick note
+/gsd-capture --note list                           # List all notes
+/gsd-capture --note promote 3                      # Promote note 3 to todo
+/gsd-capture --backlog "GraphQL API layer"         # Add to backlog
+/gsd-capture --seed "Add real-time collaboration when WebSocket infra is in place"
+/gsd-capture --list                                # Browse and act on todos
 ```
 
 ---
@@ -1508,25 +1203,6 @@ Review and promote backlog items to active milestone.
 
 ```bash
 /gsd-review-backlog
-```
-
----
-
-### `/gsd-plant-seed`
-
-Capture a forward-looking idea that surfaces automatically at the right milestone.
-
-| Argument | Required | Description |
-|----------|----------|-------------|
-| `idea summary` | No | Seed description (prompted if omitted) |
-
-Seeds solve context rot: instead of a one-liner in Deferred that nobody reads, a seed preserves the full WHY, WHEN to surface, and breadcrumbs to details.
-
-**Produces:** `.planning/seeds/SEED-NNN-slug.md`
-**Consumed by:** `/gsd-new-milestone` (scans seeds and presents matches)
-
-```bash
-/gsd-plant-seed "Add real-time collaboration when WebSocket infra is in place"
 ```
 
 ---
@@ -1629,13 +1305,9 @@ Enable with:
 
 ---
 
-### `/gsd-join-discord`
+### Community Invite
 
-Open Discord community invite.
-
-```bash
-/gsd-join-discord
-```
+To join the GSD Discord community, visit the link in the GSD README or run `/gsd-help` and follow the Discord link shown there.
 
 ---
 
