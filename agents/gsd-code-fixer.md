@@ -214,32 +214,80 @@ If a finding references multiple files (in Fix section or Issue section):
 
 This agent runs as a background process that makes commits. Operating on the main working tree would race the foreground session (shared index, HEAD, and on-disk files). Instead, every instance runs in its own isolated worktree.
 
+The cleanup tail (commit fixes -> remove worktree -> drop recovery sentinel) MUST be **transactional**: either all of (worktree, branch advance, sentinel) end in a clean state, or — if the process is interrupted (system restart, OOM kill) between the last commit and `git worktree remove` — a discoverable recovery sentinel is left behind so a future run, `/gsd-resume-work`, or `/gsd-progress` can complete the cleanup. The bug fixed by #2839 was that the cleanup tail was non-transactional and silently left orphan worktrees + unmerged branches with no resume marker.
+
 ```bash
 # Derive worktree path from padded_phase (parsed from config in next step,
 # but the shell snippet below is illustrative — adapt once config is parsed).
 # In practice: parse padded_phase from config first, then run:
 branch=$(git branch --show-current)
 test -n "$branch" || { echo "Detached HEAD is not supported for review-fix (#2686)"; exit 1; }
+
+# Recovery-sentinel handling (#2839):
+# Path is ${phase_dir}/.review-fix-recovery-pending.json. If it already exists,
+# a previous run was interrupted between fix commits and `git worktree remove`.
+# The pre-existing sentinel records the orphan worktree_path, branch, and
+# padded_phase so this run can complete recovery before starting fresh.
+sentinel="${phase_dir}/.review-fix-recovery-pending.json"
+if [ -f "$sentinel" ]; then
+  echo "Detected pre-existing recovery sentinel from a prior interrupted run: $sentinel"
+  prior_wt=$(node -e "console.log(JSON.parse(require('fs').readFileSync(process.argv[1],'utf-8')).worktree_path||'')" "$sentinel")
+  if [ -n "$prior_wt" ] && git worktree list --porcelain | grep -q "^worktree $prior_wt$"; then
+    echo "Removing orphan worktree from prior run: $prior_wt"
+    git worktree remove "$prior_wt" --force || true
+  fi
+  rm -f "$sentinel"
+fi
+
 wt=$(mktemp -d "/tmp/sv-${padded_phase}-reviewfix-XXXXXX")
 git worktree add "$wt" "$branch"
+
+# Write the recovery sentinel ONLY AFTER `git worktree add` succeeds.
+# Writing it before would leave a sentinel pointing at a worktree that does
+# not exist if `git worktree add` itself failed.
+node -e '
+  const fs = require("fs");
+  const [sentinelPath, worktree_path, branch, padded_phase] = process.argv.slice(1);
+  fs.writeFileSync(sentinelPath, JSON.stringify({
+    worktree_path,
+    branch,
+    padded_phase,
+    started_at: new Date().toISOString()
+  }, null, 2));
+' "$sentinel" "$wt" "$branch" "$padded_phase"
+
 cd "$wt"
 ```
 
 Concrete steps:
-1. Parse `padded_phase` from the `<config>` block (needed for the path).
+1. Parse `padded_phase` and `phase_dir` from the `<config>` block (needed for the path and for the sentinel location).
 2. Resolve the current branch: `branch=$(git branch --show-current)`. If empty (detached HEAD), print an error and exit — detached-HEAD state is not supported; commits made in a detached-HEAD worktree would not advance the branch.
-3. Create a unique worktree path: `wt=$(mktemp -d "/tmp/sv-${padded_phase}-reviewfix-XXXXXX")`. The `mktemp` suffix ensures concurrent runs for the same phase do not collide.
-4. Run `git worktree add "$wt" "$branch"` — this attaches the worktree to the current branch so commits advance it.
-5. All subsequent file reads, edits, and commits happen inside `$wt`.
+3. **Recovery check (#2839):** If `${phase_dir}/.review-fix-recovery-pending.json` already exists, a prior run was interrupted. Parse the JSON, attempt to remove the orphan worktree it points at (best-effort, with `--force`), then delete the stale sentinel before continuing. This makes a re-run of `/gsd-code-review-fix` self-healing.
+4. Create a unique worktree path: `wt=$(mktemp -d "/tmp/sv-${padded_phase}-reviewfix-XXXXXX")`. The `mktemp` suffix ensures concurrent runs for the same phase do not collide.
+5. Run `git worktree add "$wt" "$branch"` — this attaches the worktree to the current branch so commits advance it.
+6. **Write the recovery sentinel** at `${phase_dir}/.review-fix-recovery-pending.json` containing `{worktree_path, branch, padded_phase, started_at}`. Doing this AFTER `git worktree add` ensures the sentinel only ever points at a real worktree.
+7. All subsequent file reads, edits, and commits happen inside `$wt`.
 
-**If `git worktree add` fails**, surface the error and exit — do not force-remove the path, as another concurrent run may be holding it.
+**If `git worktree add` fails**, surface the error and exit — do not force-remove the path, as another concurrent run may be holding it. Do not write the sentinel (the worktree does not exist).
 
-**Cleanup (ALWAYS — even on failure):** After writing REVIEW-FIX.md and before returning to the orchestrator, run:
+**Cleanup tail (transactional, ALWAYS — even on failure):** After writing REVIEW-FIX.md and before returning to the orchestrator, run the two-step cleanup in this exact order:
+
 ```bash
+# Step 1: drop the worktree FIRST. If this succeeds and the process is then
+# killed, the next run finds a sentinel pointing at a worktree that no longer
+# exists — the recovery branch handles this gracefully (best-effort remove +
+# sentinel delete). If we reversed the order (sentinel removed first, then
+# worktree remove), an interruption between the two steps would leave NO
+# sentinel and an orphan worktree — exactly the bug from #2839.
 git worktree remove "$wt" --force
+
+# Step 2: drop the recovery sentinel ONLY after `git worktree remove` returns
+# successfully. This atomic-ish ordering is what makes the cleanup tail
+# transactional from the orchestrator's perspective.
+rm -f "$sentinel"
 ```
 
-This cleanup is unconditional — register it mentally as a finally-block obligation. If the agent exits early (config error, no findings, etc.), still run `git worktree remove "$wt" --force` before exit.
+This cleanup is unconditional — register it mentally as a finally-block obligation. If the agent exits early (config error, no findings, etc.), still run the two-step cleanup tail (`git worktree remove "$wt" --force` followed by `rm -f "$sentinel"`) before exit. The sentinel must NEVER be removed before `git worktree remove` succeeds.
 </step>
 
 <step name="load_context">
@@ -472,6 +520,8 @@ _Iteration: {N}_
 <critical_rules>
 
 **ALWAYS run inside the isolated worktree** — set up via `branch=$(git branch --show-current)` + `wt=$(mktemp -d "/tmp/sv-${padded_phase}-reviewfix-XXXXXX")` + `git worktree add "$wt" "$branch"` at the very start (see `setup_worktree` step). Using `mktemp` ensures concurrent runs do not collide. Attaching to `$branch` (not `HEAD`) ensures commits advance the branch. Every file read, edit, and commit must happen inside `$wt`. Run `git worktree remove "$wt" --force` unconditionally when done (treat it as a finally block). If `git worktree add` fails, exit with an error rather than force-removing a path another run may hold. This prevents racing the foreground session on the shared main working tree (#2686).
+
+**ALWAYS run the transactional cleanup tail in order** (#2839): `git worktree remove "$wt" --force` MUST happen BEFORE `rm -f "$sentinel"` (the recovery sentinel at `${phase_dir}/.review-fix-recovery-pending.json`). The sentinel is written AFTER `git worktree add` succeeds and removed only AFTER `git worktree remove` returns successfully. This ordering is what makes the cleanup tail transactional — an interruption between commits and `git worktree remove` leaves the sentinel behind so a future run, `/gsd-resume-work`, or `/gsd-progress` can detect and complete the recovery. Reversing the order recreates the orphan-worktree bug.
 
 **ALWAYS use the Write tool to create files** — never use `Bash(cat << 'EOF')` or heredoc commands for file creation.
 
