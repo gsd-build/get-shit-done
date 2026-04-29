@@ -90,7 +90,7 @@ Remove a workspace and clean up git worktrees.
 
 ### `/gsd-discuss-phase`
 
-Capture implementation decisions before planning.
+Gather phase context through adaptive questioning before planning.
 
 | Argument | Required | Description |
 |----------|----------|-------------|
@@ -171,7 +171,7 @@ Research, plan, and verify a phase.
 
 ### `/gsd-plan-review-convergence`
 
-Cross-AI plan convergence loop. Runs `plan-phase → review → replan → re-review` cycles until no HIGH concerns remain (max 3 cycles by default). Spawns isolated agents for planning and review; orchestrator handles loop control, HIGH-concern counting, stall detection, and escalation.
+Cross-AI plan convergence loop — replan with review feedback until no HIGH concerns remain. Runs `plan-phase → review → replan → re-review` cycles (max 3 cycles by default). Spawns isolated agents for planning and review; orchestrator handles loop control, HIGH-concern counting, stall detection, and escalation.
 
 | Argument / Flag | Required | Description |
 |-----------------|----------|-------------|
@@ -192,7 +192,7 @@ Cross-AI plan convergence loop. Runs `plan-phase → review → replan → re-re
 
 ### `/gsd-ultraplan-phase`
 
-**[BETA — Claude Code only.]** Offload plan-phase work to Claude Code's ultraplan cloud. The plan drafts remotely so the terminal stays free; review inline comments in a browser, then import the finalized plan back into `.planning/` via `/gsd-import`.
+**[BETA]** Offload plan phase to Claude Code's ultraplan cloud; review in browser and import back. The plan drafts remotely so the terminal stays free; review inline comments in a browser, then import the finalized plan back into `.planning/` via `/gsd-import`.
 
 | Flag | Required | Description |
 |------|----------|-------------|
@@ -541,7 +541,7 @@ Retroactively audit and fill Nyquist validation gaps.
 
 ### `/gsd-progress`
 
-Show status and next steps.
+Check project progress, show context, and route to the next action (execute or plan).
 
 | Flag | Description |
 |------|-------------|
@@ -685,7 +685,7 @@ Ingest an external plan file into the GSD planning system with conflict detectio
 
 ### `/gsd-ingest-docs`
 
-Scan a repo containing mixed ADRs, PRDs, SPECs, and DOCs and bootstrap or merge the full `.planning/` setup from them in a single pass. Parallel classification (`gsd-doc-classifier`) plus synthesis with precedence rules and cycle detection (`gsd-doc-synthesizer`). Produces a three-bucket conflicts report (`INGEST-CONFLICTS.md`: auto-resolved, competing-variants, unresolved-blockers) and hard-blocks on LOCKED-vs-LOCKED ADR contradictions.
+Bootstrap or merge a .planning/ setup from existing ADRs, PRDs, SPECs, and docs in a repo. Runs parallel classification (`gsd-doc-classifier`) plus synthesis with precedence rules and cycle detection (`gsd-doc-synthesizer`). Produces a three-bucket conflicts report (`INGEST-CONFLICTS.md`: auto-resolved, competing-variants, unresolved-blockers) and hard-blocks on LOCKED-vs-LOCKED ADR contradictions.
 
 | Argument / Flag | Required | Description |
 |-----------------|----------|-------------|
@@ -986,7 +986,7 @@ Package winning sketch decisions into a reusable project-local skill so future s
 
 ### `/gsd-forensics`
 
-Post-mortem investigation of failed or stuck GSD workflows.
+Post-mortem investigation for failed GSD workflows — diagnoses what went wrong.
 
 | Argument | Required | Description |
 |----------|----------|-------------|
@@ -1094,7 +1094,7 @@ All answers are merged via `gsd-sdk query config-set` into the resolved project 
 
 ### `/gsd-settings-advanced`
 
-Interactive configuration of power-user knobs — plan bounce, subagent timeouts, branch templates, cross-AI delegation, context window, and runtime output. Use after `/gsd-settings` once the common-case toggles are dialed in.
+Power-user configuration for plan bounce, timeouts, branch templates, and cross-AI execution. Use after `/gsd-settings` once the common-case toggles are dialed in.
 
 Six sections, each a focused prompt batch:
 
@@ -1242,7 +1242,7 @@ Build, query, and inspect the project knowledge graph stored in `.planning/graph
 
 ### `/gsd-ai-integration-phase`
 
-AI framework selection wizard for integrating AI/LLM capabilities into a project phase. Presents an interactive decision matrix, surfaces domain-specific failure modes and eval criteria, and produces `AI-SPEC.md` with a framework recommendation, implementation guidance, and evaluation strategy.
+Generate an AI-SPEC.md design contract for phases that involve building AI systems. Presents an interactive decision matrix, surfaces domain-specific failure modes and eval criteria, and produces `AI-SPEC.md` with a framework recommendation, implementation guidance, and evaluation strategy.
 
 **Produces:** `{phase}-AI-SPEC.md` in the phase directory
 
@@ -1257,7 +1257,7 @@ AI framework selection wizard for integrating AI/LLM capabilities into a project
 
 ### `/gsd-eval-review`
 
-Retroactive audit of an implemented AI phase's evaluation coverage. Checks implementation against the `AI-SPEC.md` evaluation plan produced by `/gsd-ai-integration-phase`. Scores each eval dimension as COVERED/PARTIAL/MISSING.
+Audit an executed AI phase's evaluation coverage and produce an EVAL-REVIEW.md remediation plan. Checks implementation against the `AI-SPEC.md` evaluation plan produced by `/gsd-ai-integration-phase`. Scores each eval dimension as COVERED/PARTIAL/MISSING.
 
 **Prerequisites:** Phase has been executed and has an `AI-SPEC.md`
 **Produces:** `{phase}-EVAL-REVIEW.md` with findings, gaps, and remediation guidance
@@ -1315,7 +1315,7 @@ Review source files changed during a phase for bugs, security vulnerabilities, a
 
 ### `/gsd-code-review-fix`
 
-Auto-fix issues found by `/gsd-code-review`. Reads `REVIEW.md`, spawns a fixer agent, commits each fix atomically, and produces a `REVIEW-FIX.md` summary.
+Auto-fix issues found by code review in REVIEW.md; commits each fix atomically. Reads `REVIEW.md`, spawns a fixer agent, and produces a `REVIEW-FIX.md` summary.
 
 | Argument | Required | Description |
 |----------|----------|-------------|
@@ -1514,7 +1514,7 @@ Review and promote backlog items to active milestone.
 
 ### `/gsd-plant-seed`
 
-Capture a forward-looking idea with trigger conditions — surfaces automatically at the right milestone.
+Capture a forward-looking idea that surfaces automatically at the right milestone.
 
 | Argument | Required | Description |
 |----------|----------|-------------|
@@ -1636,3 +1636,19 @@ Open Discord community invite.
 ```bash
 /gsd-join-discord
 ```
+
+---
+
+## Contributing: Skill Description Standards
+
+Skill descriptions (the `description:` field in each `commands/gsd/*.md` frontmatter) are
+injected into every session's system prompt. To keep per-session overhead low, descriptions
+must be ≤ 100 chars and must not duplicate flag documentation already in `argument-hint:`.
+
+A lint gate enforces the budget:
+
+```bash
+npm run lint:descriptions
+```
+
+The check is also run as part of `npm test` via `tests/enh-2789-description-budget.test.cjs`.
