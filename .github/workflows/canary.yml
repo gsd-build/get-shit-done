@@ -1,3 +1,12 @@
+# Release stream policy:
+#   dev   → @canary  (this workflow — preview builds for the long-lived integration branch)
+#   main  → @next    (RC train, see release.yml)
+#   main  → @latest  (stable cuts, see release.yml)
+#
+# Streams do not mix. The publish/tag steps below gate on `refs/heads/dev` so a
+# workflow_dispatch run on any other branch (including main) completes the
+# build/test/dry-run validation but does not publish or tag.
+
 name: Canary
 
 on:
@@ -80,7 +89,7 @@ jobs:
           NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
 
       - name: Tag and push
-        if: ${{ github.ref == 'refs/heads/main' && !inputs.dry_run }}
+        if: ${{ github.ref == 'refs/heads/dev' && !inputs.dry_run }}
         env:
           CANARY_VERSION: ${{ steps.canary.outputs.canary_version }}
         run: |
@@ -88,19 +97,19 @@ jobs:
           git push origin "v${CANARY_VERSION}"
 
       - name: Publish to npm (canary)
-        if: ${{ github.ref == 'refs/heads/main' && !inputs.dry_run }}
+        if: ${{ github.ref == 'refs/heads/dev' && !inputs.dry_run }}
         run: npm publish --provenance --access public --tag canary
         env:
           NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
 
       - name: Publish SDK to npm (canary)
-        if: ${{ github.ref == 'refs/heads/main' && !inputs.dry_run }}
+        if: ${{ github.ref == 'refs/heads/dev' && !inputs.dry_run }}
         run: cd sdk && npm publish --provenance --access public --tag canary
         env:
           NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
 
       - name: Verify publish
-        if: ${{ github.ref == 'refs/heads/main' && !inputs.dry_run }}
+        if: ${{ github.ref == 'refs/heads/dev' && !inputs.dry_run }}
         env:
           CANARY_VERSION: ${{ steps.canary.outputs.canary_version }}
         run: |
