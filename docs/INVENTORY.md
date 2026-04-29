@@ -54,7 +54,7 @@ Full roster at `agents/gsd-*.md`. The "Primary doc" column flags whether [`docs/
 
 ---
 
-## Commands (86 shipped)
+## Commands (59 shipped)
 
 Full roster at `commands/gsd/*.md`. The groupings below mirror `docs/COMMANDS.md` section order; each row carries the command name, a one-line role derived from the command's frontmatter `description:`, and a link to the source file. `tests/command-count-sync.test.cjs` locks the count against the filesystem.
 
@@ -63,9 +63,7 @@ Full roster at `commands/gsd/*.md`. The groupings below mirror `docs/COMMANDS.md
 | Command | Role | Source |
 |---------|------|--------|
 | `/gsd-new-project` | Initialize a new project with deep context gathering and PROJECT.md. | [commands/gsd/new-project.md](../commands/gsd/new-project.md) |
-| `/gsd-new-workspace` | Create an isolated workspace with repo copies and independent `.planning/`. | [commands/gsd/new-workspace.md](../commands/gsd/new-workspace.md) |
-| `/gsd-list-workspaces` | List active GSD workspaces and their status. | [commands/gsd/list-workspaces.md](../commands/gsd/list-workspaces.md) |
-| `/gsd-remove-workspace` | Remove a GSD workspace and clean up worktrees. | [commands/gsd/remove-workspace.md](../commands/gsd/remove-workspace.md) |
+| `/gsd-workspace` | Manage GSD workspaces — create (`--new`), list (`--list`), or remove (`--remove`) isolated workspace environments. | [commands/gsd/workspace.md](../commands/gsd/workspace.md) |
 | `/gsd-discuss-phase` | Gather phase context through adaptive questioning before planning. | [commands/gsd/discuss-phase.md](../commands/gsd/discuss-phase.md) |
 | `/gsd-spec-phase` | Socratic spec refinement producing a SPEC.md with falsifiable requirements. | [commands/gsd/spec-phase.md](../commands/gsd/spec-phase.md) |
 | `/gsd-ui-phase` | Generate UI design contract (UI-SPEC.md) for frontend phases. | [commands/gsd/ui-phase.md](../commands/gsd/ui-phase.md) |
@@ -73,37 +71,28 @@ Full roster at `commands/gsd/*.md`. The groupings below mirror `docs/COMMANDS.md
 | `/gsd-plan-phase` | Create detailed phase plan (PLAN.md) with verification loop. | [commands/gsd/plan-phase.md](../commands/gsd/plan-phase.md) |
 | `/gsd-plan-review-convergence` | Cross-AI plan convergence loop — replan with review feedback until no HIGH concerns remain (max 3 cycles). | [commands/gsd/plan-review-convergence.md](../commands/gsd/plan-review-convergence.md) |
 | `/gsd-ultraplan-phase` | [BETA] Offload plan phase to Claude Code's ultraplan cloud — drafts remotely, review in browser, import back via `/gsd-import`. Claude Code only. | [commands/gsd/ultraplan-phase.md](../commands/gsd/ultraplan-phase.md) |
-| `/gsd-spike` | Rapidly spike an idea with throwaway experiments to validate feasibility before planning. | [commands/gsd/spike.md](../commands/gsd/spike.md) |
-| `/gsd-sketch` | Rapidly sketch UI/design ideas using throwaway HTML mockups with multi-variant exploration. | [commands/gsd/sketch.md](../commands/gsd/sketch.md) |
-| `/gsd-research-phase` | Research how to implement a phase (standalone). | [commands/gsd/research-phase.md](../commands/gsd/research-phase.md) |
+| `/gsd-spike` | Rapidly spike an idea with throwaway experiments; use `--wrap-up` to package findings as a persistent skill. | [commands/gsd/spike.md](../commands/gsd/spike.md) |
+| `/gsd-sketch` | Rapidly sketch UI/design ideas using throwaway HTML mockups; use `--wrap-up` to package findings. | [commands/gsd/sketch.md](../commands/gsd/sketch.md) |
 | `/gsd-execute-phase` | Execute all plans in a phase with wave-based parallelization. | [commands/gsd/execute-phase.md](../commands/gsd/execute-phase.md) |
 | `/gsd-verify-work` | Validate built features through conversational UAT with auto-diagnosis. | [commands/gsd/verify-work.md](../commands/gsd/verify-work.md) |
 | `/gsd-ship` | Create PR, run review, and prepare for merge after verification. | [commands/gsd/ship.md](../commands/gsd/ship.md) |
-| `/gsd-next` | Automatically advance to the next logical step in the GSD workflow. | [commands/gsd/next.md](../commands/gsd/next.md) |
 | `/gsd-fast` | Execute a trivial task inline — no subagents, no planning overhead. | [commands/gsd/fast.md](../commands/gsd/fast.md) |
 | `/gsd-quick` | Execute a quick task with GSD guarantees (atomic commits, state tracking) but skip optional agents. | [commands/gsd/quick.md](../commands/gsd/quick.md) |
 | `/gsd-ui-review` | Retroactive 6-pillar visual audit of implemented frontend code. | [commands/gsd/ui-review.md](../commands/gsd/ui-review.md) |
-| `/gsd-code-review` | Review source files changed during a phase for bugs, security, and code-quality problems. | [commands/gsd/code-review.md](../commands/gsd/code-review.md) |
-| `/gsd-code-review-fix` | Auto-fix issues found by `/gsd-code-review`, committing each fix atomically. | [commands/gsd/code-review-fix.md](../commands/gsd/code-review-fix.md) |
+| `/gsd-code-review` | Review source files changed during a phase for bugs, security, and code-quality problems; use `--fix` to auto-apply findings. | [commands/gsd/code-review.md](../commands/gsd/code-review.md) |
 | `/gsd-eval-review` | Retroactively audit an executed AI phase's evaluation coverage; produces EVAL-REVIEW.md. | [commands/gsd/eval-review.md](../commands/gsd/eval-review.md) |
 
 ### Phase & Milestone Management
 
 | Command | Role | Source |
 |---------|------|--------|
-| `/gsd-add-phase` | Add phase to end of current milestone in roadmap. | [commands/gsd/add-phase.md](../commands/gsd/add-phase.md) |
-| `/gsd-edit-phase` | Edit any field of an existing roadmap phase in place, preserving number and position. | [commands/gsd/edit-phase.md](../commands/gsd/edit-phase.md) |
-| `/gsd-insert-phase` | Insert urgent work as decimal phase (e.g., 72.1) between existing phases. | [commands/gsd/insert-phase.md](../commands/gsd/insert-phase.md) |
-| `/gsd-remove-phase` | Remove a future phase from roadmap and renumber subsequent phases. | [commands/gsd/remove-phase.md](../commands/gsd/remove-phase.md) |
+| `/gsd-phase` | CRUD for phases — add (default), insert (`--insert`), remove (`--remove`), or edit (`--edit`) phases in ROADMAP.md. | [commands/gsd/phase.md](../commands/gsd/phase.md) |
 | `/gsd-add-tests` | Generate tests for a completed phase based on UAT criteria and implementation. | [commands/gsd/add-tests.md](../commands/gsd/add-tests.md) |
-| `/gsd-list-phase-assumptions` | Surface Claude's assumptions about a phase approach before planning. | [commands/gsd/list-phase-assumptions.md](../commands/gsd/list-phase-assumptions.md) |
-| `/gsd-analyze-dependencies` | Analyze phase dependencies and suggest `Depends on` entries for ROADMAP.md. | [commands/gsd/analyze-dependencies.md](../commands/gsd/analyze-dependencies.md) |
 | `/gsd-validate-phase` | Retroactively audit and fill Nyquist validation gaps for a completed phase. | [commands/gsd/validate-phase.md](../commands/gsd/validate-phase.md) |
 | `/gsd-secure-phase` | Retroactively verify threat mitigations for a completed phase. | [commands/gsd/secure-phase.md](../commands/gsd/secure-phase.md) |
 | `/gsd-audit-milestone` | Audit milestone completion against original intent before archiving. | [commands/gsd/audit-milestone.md](../commands/gsd/audit-milestone.md) |
 | `/gsd-audit-uat` | Cross-phase audit of all outstanding UAT and verification items. | [commands/gsd/audit-uat.md](../commands/gsd/audit-uat.md) |
 | `/gsd-audit-fix` | Autonomous audit-to-fix pipeline — find issues, classify, fix, test, commit. | [commands/gsd/audit-fix.md](../commands/gsd/audit-fix.md) |
-| `/gsd-plan-milestone-gaps` | Create phases to close all gaps identified by milestone audit. | [commands/gsd/plan-milestone-gaps.md](../commands/gsd/plan-milestone-gaps.md) |
 | `/gsd-complete-milestone` | Archive completed milestone and prepare for next version. | [commands/gsd/complete-milestone.md](../commands/gsd/complete-milestone.md) |
 | `/gsd-new-milestone` | Start a new milestone cycle — update PROJECT.md and route to requirements. | [commands/gsd/new-milestone.md](../commands/gsd/new-milestone.md) |
 | `/gsd-milestone-summary` | Generate a comprehensive project summary from milestone artifacts. | [commands/gsd/milestone-summary.md](../commands/gsd/milestone-summary.md) |
@@ -117,28 +106,20 @@ Full roster at `commands/gsd/*.md`. The groupings below mirror `docs/COMMANDS.md
 
 | Command | Role | Source |
 |---------|------|--------|
-| `/gsd-progress` | Check project progress, show context, and route to next action. | [commands/gsd/progress.md](../commands/gsd/progress.md) |
+| `/gsd-progress` | Check project progress, show context, and route to next action; use `--next` to advance automatically or `--do` to run a freeform task. | [commands/gsd/progress.md](../commands/gsd/progress.md) |
+| `/gsd-capture` | Capture ideas, tasks, notes, and seeds — todo (default), `--note`, `--backlog`, `--seed`, or `--list` pending todos. | [commands/gsd/capture.md](../commands/gsd/capture.md) |
 | `/gsd-stats` | Display project statistics — phases, plans, requirements, git metrics, timeline. | [commands/gsd/stats.md](../commands/gsd/stats.md) |
-| `/gsd-session-report` | Generate a session report with token usage estimates, work summary, outcomes. | [commands/gsd/session-report.md](../commands/gsd/session-report.md) |
 | `/gsd-pause-work` | Create context handoff when pausing work mid-phase. | [commands/gsd/pause-work.md](../commands/gsd/pause-work.md) |
 | `/gsd-resume-work` | Resume work from previous session with full context restoration. | [commands/gsd/resume-work.md](../commands/gsd/resume-work.md) |
 | `/gsd-explore` | Socratic ideation and idea routing — think through ideas before committing. | [commands/gsd/explore.md](../commands/gsd/explore.md) |
-| `/gsd-do` | Route freeform text to the right GSD command automatically. | [commands/gsd/do.md](../commands/gsd/do.md) |
-| `/gsd-note` | Zero-friction idea capture — append, list, or promote notes to todos. | [commands/gsd/note.md](../commands/gsd/note.md) |
-| `/gsd-add-todo` | Capture idea or task as todo from current conversation context. | [commands/gsd/add-todo.md](../commands/gsd/add-todo.md) |
-| `/gsd-check-todos` | List pending todos and select one to work on. | [commands/gsd/check-todos.md](../commands/gsd/check-todos.md) |
-| `/gsd-add-backlog` | Add an idea to the backlog parking lot (999.x numbering). | [commands/gsd/add-backlog.md](../commands/gsd/add-backlog.md) |
 | `/gsd-review-backlog` | Review and promote backlog items to active milestone. | [commands/gsd/review-backlog.md](../commands/gsd/review-backlog.md) |
-| `/gsd-plant-seed` | Capture a forward-looking idea with trigger conditions. | [commands/gsd/plant-seed.md](../commands/gsd/plant-seed.md) |
 | `/gsd-thread` | Manage persistent context threads for cross-session work. | [commands/gsd/thread.md](../commands/gsd/thread.md) |
 
 ### Codebase Intelligence
 
 | Command | Role | Source |
 |---------|------|--------|
-| `/gsd-map-codebase` | Analyze codebase with parallel mapper agents; produces `.planning/codebase/` documents. | [commands/gsd/map-codebase.md](../commands/gsd/map-codebase.md) |
-| `/gsd-scan` | Rapid codebase assessment — lightweight alternative to `/gsd-map-codebase`. | [commands/gsd/scan.md](../commands/gsd/scan.md) |
-| `/gsd-intel` | Query, inspect, or refresh codebase intelligence files in `.planning/intel/`. | [commands/gsd/intel.md](../commands/gsd/intel.md) |
+| `/gsd-map-codebase` | Analyze codebase with parallel mapper agents; use `--fast` for lightweight scan or `--query` for intel queries. | [commands/gsd/map-codebase.md](../commands/gsd/map-codebase.md) |
 | `/gsd-graphify` | Build, query, and inspect the project knowledge graph in `.planning/graphs/`. | [commands/gsd/graphify.md](../commands/gsd/graphify.md) |
 | `/gsd-extract-learnings` | Extract decisions, lessons, patterns, and surprises from completed phase artifacts. | [commands/gsd/extract_learnings.md](../commands/gsd/extract_learnings.md) |
 
@@ -151,7 +132,6 @@ Full roster at `commands/gsd/*.md`. The groupings below mirror `docs/COMMANDS.md
 | `/gsd-forensics` | Post-mortem investigation for failed GSD workflows — analyzes git, artifacts, state. | [commands/gsd/forensics.md](../commands/gsd/forensics.md) |
 | `/gsd-health` | Diagnose planning directory health and optionally repair issues. | [commands/gsd/health.md](../commands/gsd/health.md) |
 | `/gsd-import` | Ingest external plans with conflict detection against project decisions. | [commands/gsd/import.md](../commands/gsd/import.md) |
-| `/gsd-from-gsd2` | Import a GSD-2 (`.gsd/`) project back to GSD v1 (`.planning/`) format. | [commands/gsd/from-gsd2.md](../commands/gsd/from-gsd2.md) |
 | `/gsd-inbox` | Triage and review all open GitHub issues and PRs against project templates. | [commands/gsd/inbox.md](../commands/gsd/inbox.md) |
 
 ### Docs, Profile & Utilities
@@ -160,19 +140,12 @@ Full roster at `commands/gsd/*.md`. The groupings below mirror `docs/COMMANDS.md
 |---------|------|--------|
 | `/gsd-docs-update` | Generate or update project documentation verified against the codebase. | [commands/gsd/docs-update.md](../commands/gsd/docs-update.md) |
 | `/gsd-ingest-docs` | Scan a repo for mixed ADRs/PRDs/SPECs/DOCs and bootstrap or merge the full `.planning/` setup with classification, synthesis, and conflicts report. | [commands/gsd/ingest-docs.md](../commands/gsd/ingest-docs.md) |
-| `/gsd-spike-wrap-up` | Package spike findings into a persistent project skill for future build conversations. | [commands/gsd/spike-wrap-up.md](../commands/gsd/spike-wrap-up.md) |
-| `/gsd-sketch-wrap-up` | Package sketch design findings into a persistent project skill for future build conversations. | [commands/gsd/sketch-wrap-up.md](../commands/gsd/sketch-wrap-up.md) |
 | `/gsd-profile-user` | Generate developer behavioral profile and Claude-discoverable artifacts. | [commands/gsd/profile-user.md](../commands/gsd/profile-user.md) |
 | `/gsd-settings` | Configure GSD workflow toggles and model profile. | [commands/gsd/settings.md](../commands/gsd/settings.md) |
-| `/gsd-settings-advanced` | Power-user configuration — plan bounce, timeouts, branch templates, cross-AI execution, runtime knobs. | [commands/gsd/settings-advanced.md](../commands/gsd/settings-advanced.md) |
-| `/gsd-settings-integrations` | Configure third-party API keys, code-review CLI routing, and agent-skill injection. | [commands/gsd/settings-integrations.md](../commands/gsd/settings-integrations.md) |
-| `/gsd-set-profile` | Switch model profile for GSD agents (quality/balanced/budget/inherit). | [commands/gsd/set-profile.md](../commands/gsd/set-profile.md) |
+| `/gsd-config` | Configure GSD settings — workflow toggles (default), advanced knobs (`--advanced`), integrations (`--integrations`), or model profile (`--profile`). | [commands/gsd/config.md](../commands/gsd/config.md) |
 | `/gsd-pr-branch` | Create a clean PR branch by filtering out `.planning/` commits. | [commands/gsd/pr-branch.md](../commands/gsd/pr-branch.md) |
-| `/gsd-sync-skills` | Sync managed GSD skill directories across runtime roots for multi-runtime users. | [commands/gsd/sync-skills.md](../commands/gsd/sync-skills.md) |
-| `/gsd-update` | Update GSD to latest version with changelog display. | [commands/gsd/update.md](../commands/gsd/update.md) |
-| `/gsd-reapply-patches` | Reapply local modifications after a GSD update. | [commands/gsd/reapply-patches.md](../commands/gsd/reapply-patches.md) |
+| `/gsd-update` | Update GSD to latest version; use `--sync` to sync skills across runtimes or `--reapply` to reapply local patches. | [commands/gsd/update.md](../commands/gsd/update.md) |
 | `/gsd-help` | Show available GSD commands and usage guide. | [commands/gsd/help.md](../commands/gsd/help.md) |
-| `/gsd-join-discord` | Join the GSD Discord community. | [commands/gsd/join-discord.md](../commands/gsd/join-discord.md) |
 
 ---
 

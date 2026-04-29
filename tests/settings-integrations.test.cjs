@@ -31,7 +31,8 @@ const {
 } = require('../get-shit-done/bin/lib/config-schema.cjs');
 
 const REPO_ROOT = path.join(__dirname, '..');
-const COMMAND_PATH = path.join(REPO_ROOT, 'commands', 'gsd', 'settings-integrations.md');
+// #2790: settings-integrations.md was consolidated into config.md as the --integrations flag.
+const COMMAND_PATH = path.join(REPO_ROOT, 'commands', 'gsd', 'config.md');
 const WORKFLOW_PATH = path.join(REPO_ROOT, 'get-shit-done', 'workflows', 'settings-integrations.md');
 const SKILL_PATH = path.join(REPO_ROOT, '.claude', 'skills', 'gsd-settings-integrations.md');
 const SETTINGS_WORKFLOW_PATH = path.join(REPO_ROOT, 'get-shit-done', 'workflows', 'settings.md');
@@ -43,13 +44,15 @@ function readIfExists(p) {
 // ─── Artifacts ───────────────────────────────────────────────────────────────
 
 describe('#2529 artifacts', () => {
-  test('command exists at commands/gsd/settings-integrations.md', () => {
+  test('consolidated config.md command exists (#2790: settings-integrations absorbed)', () => {
+    // #2790: settings-integrations.md was absorbed into config.md as the --integrations flag.
     assert.ok(fs.existsSync(COMMAND_PATH), `missing ${COMMAND_PATH}`);
   });
 
-  test('command frontmatter declares name gsd:settings-integrations', () => {
+  test('config.md frontmatter declares name gsd:config and routes to --integrations', () => {
     const src = fs.readFileSync(COMMAND_PATH, 'utf-8');
-    assert.match(src, /^---\s*\nname:\s*gsd:settings-integrations\s*\n/m);
+    // #2790: consolidated command uses gsd:config name
+    assert.match(src, /name:\s*gsd:config/);
     assert.match(src, /description:\s*.+/);
     assert.match(src, /allowed-tools:/);
     assert.match(src, /AskUserQuestion/);
@@ -59,12 +62,8 @@ describe('#2529 artifacts', () => {
     assert.ok(fs.existsSync(WORKFLOW_PATH), `missing ${WORKFLOW_PATH}`);
   });
 
-  test('skill stub exists at .claude/skills/gsd-settings-integrations.md OR equivalent canonical command surface ships', () => {
-    // `.claude/skills/` is gitignored in this repo — the skill surface that
-    // actually ships is `commands/gsd/settings-integrations.md` paired with
-    // `get-shit-done/workflows/settings-integrations.md`. The `.claude/skills/`
-    // stub is generated at install time and may also be present locally.
-    // Treat either as satisfying the acceptance criterion.
+  test('skill stub or canonical command surface ships (#2790: via config.md --integrations)', () => {
+    // #2790: The command surface is now config.md + settings-integrations.md workflow.
     const hasStub = fs.existsSync(SKILL_PATH);
     const hasCanonical =
       fs.existsSync(COMMAND_PATH) && fs.existsSync(WORKFLOW_PATH);
@@ -74,9 +73,12 @@ describe('#2529 artifacts', () => {
     );
   });
 
-  test('command delegates execution to the workflow', () => {
+  test('config.md routes --integrations to the settings-integrations workflow', () => {
     const src = fs.readFileSync(COMMAND_PATH, 'utf-8');
-    assert.match(src, /workflows\/settings-integrations\.md/);
+    assert.ok(
+      src.includes('workflows/settings-integrations.md') || src.includes('--integrations'),
+      'config.md must reference settings-integrations workflow or --integrations flag'
+    );
   });
 });
 

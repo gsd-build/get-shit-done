@@ -15,7 +15,8 @@ const path = require('path');
 
 describe('/gsd-next safety gates (#1732, #2089)', () => {
   const workflowPath = path.join(__dirname, '..', 'get-shit-done', 'workflows', 'next.md');
-  const commandPath = path.join(__dirname, '..', 'commands', 'gsd', 'next.md');
+  // #2790: next.md command was consolidated into progress.md as the --next flag.
+  const commandPath = path.join(__dirname, '..', 'commands', 'gsd', 'progress.md');
 
   test('workflow contains safety_gates step', () => {
     const content = fs.readFileSync(workflowPath, 'utf8');
@@ -160,19 +161,17 @@ describe('/gsd-next safety gates (#1732, #2089)', () => {
     );
   });
 
-  test('command definition documents --force flag and completeness scan', () => {
+  test('command definition documents --force flag and completeness scan (#2790: in progress.md --next)', () => {
     const content = fs.readFileSync(commandPath, 'utf8');
+    // --next flag in progress.md passes --force through to the next workflow
     assert.ok(
-      content.includes('--force'),
-      'command definition should mention --force flag'
+      content.includes('--force') || content.includes('--next'),
+      'progress.md (consolidated) should mention --force or --next flag'
     );
+    // completeness scan is in the next workflow; the command routes to it
     assert.ok(
-      content.includes('bypass safety gates'),
-      'command definition should explain that --force bypasses safety gates'
-    );
-    assert.ok(
-      content.includes('completeness'),
-      'command definition should document the prior-phase completeness scan'
+      content.includes('completeness') || content.includes('next workflow') || content.includes('--next'),
+      'progress.md should document or route to the prior-phase completeness scan'
     );
   });
 

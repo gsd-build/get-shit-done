@@ -149,18 +149,21 @@ describe('sync-skills.md — required behavioral specs', () => {
 });
 
 // ── commands/gsd/sync-skills.md ───────────────────────────────────────────────
+// #2790: sync-skills.md was consolidated into update.md as the --sync flag.
 
 describe('commands/gsd/sync-skills.md', () => {
-  test('slash command file exists', () => {
-    assert.ok(fs.existsSync(COMMAND), 'commands/gsd/sync-skills.md must exist');
+  test('sync-skills is now --sync flag on update.md (#2790)', () => {
+    const updateCmd = path.join(__dirname, '../commands/gsd/update.md');
+    assert.ok(fs.existsSync(updateCmd), 'commands/gsd/update.md must exist');
+    const content = fs.readFileSync(updateCmd, 'utf-8');
+    assert.ok(
+      content.includes('--sync'),
+      'update.md must document --sync flag (absorbed sync-skills)'
+    );
   });
 
-  test('has valid frontmatter name field', () => {
-    const content = fs.readFileSync(COMMAND, 'utf-8');
-    assert.ok(
-      content.includes('name: gsd:sync-skills'),
-      'command must have name: gsd:sync-skills in frontmatter'
-    );
+  test('sync-skills.md command file is deleted (#2790)', () => {
+    assert.ok(!fs.existsSync(COMMAND), 'commands/gsd/sync-skills.md should be deleted (consolidated into update.md)');
   });
 });
 
@@ -177,13 +180,15 @@ describe('INVENTORY sync', () => {
     assert.ok(inventory.includes('sync-skills.md'), 'INVENTORY.md must list sync-skills.md workflow');
   });
 
-  test('INVENTORY-MANIFEST.json includes /gsd-sync-skills', () => {
+  test('INVENTORY-MANIFEST.json includes /gsd-update (#2790: sync-skills absorbed into update.md --sync)', () => {
+    // #2790: /gsd-sync-skills was absorbed into /gsd-update as the --sync flag.
+    // The manifest now records /gsd-update instead of /gsd-sync-skills.
     const manifest = JSON.parse(
       fs.readFileSync(path.join(__dirname, '../docs/INVENTORY-MANIFEST.json'), 'utf-8')
     );
     assert.ok(
-      manifest.families.commands.includes('/gsd-sync-skills'),
-      'INVENTORY-MANIFEST.json must include /gsd-sync-skills in commands'
+      manifest.families.commands.includes('/gsd-update'),
+      'INVENTORY-MANIFEST.json must include /gsd-update in commands (absorbed /gsd-sync-skills via #2790)'
     );
   });
 

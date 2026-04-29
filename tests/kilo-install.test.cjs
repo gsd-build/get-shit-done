@@ -207,7 +207,10 @@ describe('configureKiloPermissions', () => {
 describe('Source code integration (Kilo)', () => {
   const src = fs.readFileSync(path.join(__dirname, '..', 'bin', 'install.js'), 'utf8');
   const updateWorkflowSrc = fs.readFileSync(path.join(__dirname, '..', 'get-shit-done', 'workflows', 'update.md'), 'utf8');
-  const reapplyPatchesSrc = fs.readFileSync(path.join(__dirname, '..', 'commands', 'gsd', 'reapply-patches.md'), 'utf8');
+  // #2790: reapply-patches.md command was absorbed into update.md --reapply.
+  // The Kilo-specific env-var checks (KILO_CONFIG_DIR, KILO_CONFIG, XDG_CONFIG_HOME)
+  // now live in the update.md workflow (which covers both --sync and --reapply paths).
+  const reapplyPatchesSrc = updateWorkflowSrc;
 
   test('--kilo flag parsing exists', () => {
     assert.ok(src.includes("args.includes('--kilo')"), '--kilo flag parsed');

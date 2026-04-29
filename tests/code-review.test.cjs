@@ -269,12 +269,11 @@ describe('CR-CMD: code review command structure', () => {
       'code-review.md missing correct name in frontmatter');
   });
 
-  test('code-review-fix.md has correct frontmatter name: gsd:code-review-fix', () => {
-    const content = fs.readFileSync(path.join(COMMANDS_DIR, 'code-review-fix.md'), 'utf-8');
-    const frontmatter = content.split('---')[1] || '';
-
-    assert.ok(frontmatter.includes('name: gsd:code-review-fix'),
-      'code-review-fix.md missing correct name in frontmatter');
+  // #2790: code-review-fix.md was consolidated into code-review.md as the --fix flag.
+  test('code-review.md has --fix flag absorbing code-review-fix (#2790)', () => {
+    const content = fs.readFileSync(path.join(COMMANDS_DIR, 'code-review.md'), 'utf-8');
+    assert.ok(content.includes('--fix'),
+      'code-review.md must document --fix flag (absorbed code-review-fix)');
   });
 
   test('code-review.md references workflow: code-review.md', () => {
@@ -284,11 +283,10 @@ describe('CR-CMD: code review command structure', () => {
       'code-review.md does not reference its workflow');
   });
 
-  test('code-review-fix.md references workflow: code-review-fix.md', () => {
-    const content = fs.readFileSync(path.join(COMMANDS_DIR, 'code-review-fix.md'), 'utf-8');
-
-    assert.ok(content.includes('code-review-fix.md'),
-      'code-review-fix.md does not reference its workflow');
+  test('code-review.md references code-review-fix workflow via --fix (#2790)', () => {
+    const content = fs.readFileSync(path.join(COMMANDS_DIR, 'code-review.md'), 'utf-8');
+    assert.ok(content.includes('code-review-fix') || content.includes('--fix'),
+      'code-review.md must reference code-review-fix workflow or --fix flag');
   });
 
   test('code-review.md has argument-hint in frontmatter', () => {
@@ -299,12 +297,11 @@ describe('CR-CMD: code review command structure', () => {
       'code-review.md missing argument-hint');
   });
 
-  test('code-review-fix.md has argument-hint in frontmatter', () => {
-    const content = fs.readFileSync(path.join(COMMANDS_DIR, 'code-review-fix.md'), 'utf-8');
+  test('code-review.md argument-hint includes --fix flag (#2790: absorbed code-review-fix)', () => {
+    const content = fs.readFileSync(path.join(COMMANDS_DIR, 'code-review.md'), 'utf-8');
     const frontmatter = content.split('---')[1] || '';
-
-    assert.ok(frontmatter.includes('argument-hint:'),
-      'code-review-fix.md missing argument-hint');
+    assert.ok(frontmatter.includes('argument-hint:') && content.includes('--fix'),
+      'code-review.md must have argument-hint with --fix');
   });
 
   test('code-review.md has allowed-tools in frontmatter', () => {
@@ -315,12 +312,11 @@ describe('CR-CMD: code review command structure', () => {
       'code-review.md missing allowed-tools');
   });
 
-  test('code-review-fix.md has allowed-tools in frontmatter', () => {
-    const content = fs.readFileSync(path.join(COMMANDS_DIR, 'code-review-fix.md'), 'utf-8');
+  test('code-review.md has allowed-tools in frontmatter (covers fix too, #2790)', () => {
+    const content = fs.readFileSync(path.join(COMMANDS_DIR, 'code-review.md'), 'utf-8');
     const frontmatter = content.split('---')[1] || '';
-
     assert.ok(frontmatter.includes('allowed-tools:'),
-      'code-review-fix.md missing allowed-tools');
+      'code-review.md missing allowed-tools');
   });
 });
 

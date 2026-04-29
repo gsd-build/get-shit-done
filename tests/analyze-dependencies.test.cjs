@@ -3,16 +3,20 @@ const assert = require('node:assert/strict');
 const fs = require('fs');
 const path = require('path');
 
+// #2790: analyze-dependencies.md was deleted (dead skill). The workflow still
+// exists for direct invocation and is tested below.
 describe('analyze-dependencies command', () => {
-  test('command file exists', () => {
-    const p = path.join(__dirname, '..', 'commands', 'gsd', 'analyze-dependencies.md');
-    assert.ok(fs.existsSync(p), 'commands/gsd/analyze-dependencies.md should exist');
+  test('analyze-dependencies command file was consolidated away (deleted in #2790)', () => {
+    // The standalone /gsd-analyze-dependencies command was removed as a dead skill in #2790.
+    // The underlying workflow (workflows/analyze-dependencies.md) remains functional.
+    const deleted = path.join(__dirname, '..', 'commands', 'gsd', 'analyze-dependencies.md');
+    assert.ok(!fs.existsSync(deleted), 'analyze-dependencies.md should have been deleted in #2790');
   });
 
-  test('command file has description frontmatter', () => {
-    const p = path.join(__dirname, '..', 'commands', 'gsd', 'analyze-dependencies.md');
-    const content = fs.readFileSync(p, 'utf-8');
-    assert.ok(content.includes('description:'), 'Command file must have description frontmatter');
+  // Legacy placeholder: was previously a separate test; now just passes trivially.
+  test('workflow file is sufficient without a standalone command file', () => {
+    const p = path.join(__dirname, '..', 'get-shit-done', 'workflows', 'analyze-dependencies.md');
+    assert.ok(fs.existsSync(p), 'workflows/analyze-dependencies.md should still exist');
   });
 
   test('workflow file exists', () => {

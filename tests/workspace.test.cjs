@@ -311,28 +311,32 @@ describe('workspace worktree integration', () => {
 });
 
 // ─── Command and workflow file existence ────────────────────────────────────
+// #2790: new-workspace.md, list-workspaces.md, remove-workspace.md were
+// consolidated into a single workspace.md command with --new/--list/--remove flags.
 
 describe('workspace command files', () => {
   const baseDir = path.join(__dirname, '..');
 
-  test('new-workspace command exists with correct frontmatter', () => {
-    const content = fs.readFileSync(path.join(baseDir, 'commands/gsd/new-workspace.md'), 'utf8');
-    assert.ok(content.includes('name: gsd:new-workspace'));
-    assert.ok(content.includes('--name'));
-    assert.ok(content.includes('--repos'));
-    assert.ok(content.includes('--strategy'));
+  test('consolidated workspace.md command exists with correct frontmatter (#2790)', () => {
+    const content = fs.readFileSync(path.join(baseDir, 'commands/gsd/workspace.md'), 'utf8');
+    assert.ok(content.includes('name: gsd:workspace'));
+    assert.ok(content.includes('--new'));
+    assert.ok(content.includes('--list'));
+    assert.ok(content.includes('--remove'));
+  });
+
+  test('workspace.md routes to new-workspace workflow', () => {
+    const content = fs.readFileSync(path.join(baseDir, 'commands/gsd/workspace.md'), 'utf8');
     assert.ok(content.includes('workflows/new-workspace.md'));
   });
 
-  test('list-workspaces command exists with correct frontmatter', () => {
-    const content = fs.readFileSync(path.join(baseDir, 'commands/gsd/list-workspaces.md'), 'utf8');
-    assert.ok(content.includes('name: gsd:list-workspaces'));
+  test('workspace.md routes to list-workspaces workflow', () => {
+    const content = fs.readFileSync(path.join(baseDir, 'commands/gsd/workspace.md'), 'utf8');
     assert.ok(content.includes('workflows/list-workspaces.md'));
   });
 
-  test('remove-workspace command exists with correct frontmatter', () => {
-    const content = fs.readFileSync(path.join(baseDir, 'commands/gsd/remove-workspace.md'), 'utf8');
-    assert.ok(content.includes('name: gsd:remove-workspace'));
+  test('workspace.md routes to remove-workspace workflow', () => {
+    const content = fs.readFileSync(path.join(baseDir, 'commands/gsd/workspace.md'), 'utf8');
     assert.ok(content.includes('workflows/remove-workspace.md'));
   });
 

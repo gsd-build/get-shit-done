@@ -1,7 +1,7 @@
 ---
 name: gsd:sketch
 description: Sketch UI/design ideas with throwaway HTML mockups, or propose what to sketch next (frontier mode)
-argument-hint: "[design idea to explore] [--quick] [--text] or [frontier]"
+argument-hint: "[design idea to explore] [--quick] [--text] [--wrap-up] or [frontier]"
 allowed-tools:
   - Read
   - Write
@@ -46,6 +46,7 @@ Design idea: $ARGUMENTS
 
 **Available flags:**
 - `--quick` — Skip mood/direction intake, jump straight to decomposition and building. Use when the design direction is already clear.
+- `--wrap-up` — Package sketch design findings into a persistent project skill for future build conversations. Runs the sketch-wrap-up workflow.
 </context>
 
 <process>
