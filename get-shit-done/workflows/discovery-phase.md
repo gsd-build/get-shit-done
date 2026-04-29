@@ -58,8 +58,8 @@ For: Single known library, confirming syntax/version still correct.
 2. Fetch relevant docs:
 
    ```
-   mcp__context7__get-library-docs with:
-   - context7CompatibleLibraryID: [from step 1]
+   mcp__context7__query-docs with:
+   - libraryId: [from step 1]
    - topic: [specific concern]
    ```
 
@@ -94,7 +94,7 @@ For: Choosing between options, new external integration.
    ```
    For each library/framework:
    - mcp__context7__resolve-library-id
-   - mcp__context7__get-library-docs (mode: "code" for API, "info" for concepts)
+   - mcp__context7__query-docs (mode: "code" for API, "info" for concepts)
    ```
 
 3. **Official docs** for anything Context7 lacks.
