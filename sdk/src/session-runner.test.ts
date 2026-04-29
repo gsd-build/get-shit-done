@@ -133,6 +133,23 @@ describe('runPhaseStepSession', () => {
       expect(opts.model).toBe('claude-sonnet-4-6');
     });
 
+    it('respects GSD_RUNTIME env precedence over config (no Claude id when env=codex)', async () => {
+      const prev = process.env.GSD_RUNTIME;
+      process.env.GSD_RUNTIME = 'codex';
+      try {
+        await runPhaseStepSession(
+          'prompt',
+          PhaseStepType.Execute,
+          makeConfig({ model_profile: 'balanced' } as Partial<GSDConfig>),
+        );
+        const opts = mockQueryCalls[0].options as { model?: string };
+        expect(opts.model).toBeUndefined();
+      } finally {
+        if (prev === undefined) delete process.env.GSD_RUNTIME;
+        else process.env.GSD_RUNTIME = prev;
+      }
+    });
+
     it('explicit options.model wins for any runtime', async () => {
       await runPhaseStepSession(
         'prompt',

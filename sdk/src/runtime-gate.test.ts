@@ -65,4 +65,20 @@ describe('assertRuntimeSupportsAutoMode', () => {
     // so they fall through to 'claude' rather than hard-blocking.
     expect(() => assertRuntimeSupportsAutoMode({ runtime: 'totally-bogus' })).not.toThrow();
   });
+
+  it('attributes source to config when GSD_RUNTIME is set to an unsupported value', () => {
+    // Unsupported env values fall through to config in detectRuntime; the
+    // gate's error message must report config (not the discarded env value)
+    // as the source so users debug the right thing.
+    process.env.GSD_RUNTIME = 'unsupported-env';
+    let caught: Error | undefined;
+    try {
+      assertRuntimeSupportsAutoMode({ runtime: 'codex' });
+    } catch (err) {
+      caught = err as Error;
+    }
+    expect(caught).toBeDefined();
+    expect(caught!.message).toMatch(/config\.runtime="codex"/);
+    expect(caught!.message).not.toMatch(/GSD_RUNTIME=unsupported-env/);
+  });
 });

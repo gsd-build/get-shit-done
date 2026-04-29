@@ -13,6 +13,7 @@ import type { GSDConfig } from './config.js';
 import { buildExecutorPrompt, parseAgentTools, DEFAULT_ALLOWED_TOOLS } from './prompt-builder.js';
 import type { GSDEventStream, EventStreamContext } from './event-stream.js';
 import { getToolsForPhase } from './tool-scoping.js';
+import { detectRuntime } from './query/helpers.js';
 
 // ─── Model resolution ────────────────────────────────────────────────────────
 
@@ -38,9 +39,12 @@ function resolveModel(options?: SessionOptions, config?: GSDConfig): string | un
   }
 
   // Profile -> Claude id map. Applies only on the Claude runtime.
-  const runtime = (config as Record<string, unknown> | undefined)?.runtime;
-  const isClaudeRuntime = runtime === undefined || runtime === null || runtime === 'claude';
-  if (!isClaudeRuntime) {
+  // Use `detectRuntime` so `GSD_RUNTIME` env precedence is honored — a Codex
+  // run with a Claude-shaped config must NOT be silently routed to Claude.
+  const runtime = detectRuntime({
+    runtime: (config as Record<string, unknown> | undefined)?.runtime,
+  });
+  if (runtime !== 'claude') {
     // Non-Claude runtimes: never inject a Claude id from the profile map.
     return undefined;
   }

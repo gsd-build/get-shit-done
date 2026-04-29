@@ -12,7 +12,7 @@
  * up front and points users at the supported in-session GSD slash commands
  * for non-Claude runtimes.
  */
-import { detectRuntime, type Runtime } from './query/helpers.js';
+import { detectRuntime, SUPPORTED_RUNTIMES, type Runtime } from './query/helpers.js';
 
 /**
  * Throw a clear error when the active runtime is not Claude.
@@ -29,8 +29,15 @@ export function assertRuntimeSupportsAutoMode(config?: Record<string, unknown> |
   const runtime: Runtime = detectRuntime({ runtime: cfg.runtime });
   if (runtime === 'claude') return;
 
+  // Source attribution must reflect what `detectRuntime()` actually used:
+  // a `GSD_RUNTIME` value that isn't in SUPPORTED_RUNTIMES falls through to
+  // the config tier, so reporting it as the source would be misleading.
   const env = process.env.GSD_RUNTIME;
-  const source = env ? `GSD_RUNTIME=${env}` : `config.runtime="${String(cfg.runtime ?? '')}"`;
+  const envIsSupported =
+    typeof env === 'string' && (SUPPORTED_RUNTIMES as readonly string[]).includes(env);
+  const source = envIsSupported
+    ? `GSD_RUNTIME=${env}`
+    : `config.runtime="${String(cfg.runtime ?? '')}"`;
 
   throw new Error(
     `gsd-sdk auto currently supports the Claude runtime only ` +
