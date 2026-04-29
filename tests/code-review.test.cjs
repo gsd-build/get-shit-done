@@ -360,24 +360,40 @@ describe('CR-INTEGRATION: workflow integration points', () => {
       'quick.md missing config-get workflow.code_review call');
   });
 
-  test('autonomous.md contains gsd:code-review skill invocation', { skip: !PLUGIN_AVAILABLE ? 'Plugin dir not installed' : false }, () => {
-    const content = fs.readFileSync(path.join(PLUGIN_WORKFLOWS_DIR, 'autonomous.md'), 'utf-8');
+  // autonomous.md tests read from the repo's canonical workflow source (WORKFLOWS_DIR),
+  // not the user-installed plugin dir. The plugin dir can lag behind the repo until the
+  // user re-installs, so asserting against it produces false negatives. The repo file
+  // is the source of truth and is always present in CI checkouts.
+  test('autonomous.md contains gsd-code-review skill invocation', () => {
+    const content = fs.readFileSync(path.join(WORKFLOWS_DIR, 'autonomous.md'), 'utf-8');
 
-    assert.ok(content.includes('gsd:code-review'),
-      'autonomous.md missing gsd:code-review skill invocation');
+    // Parse Skill(skill="<name>", ...) invocations and assert canonical hyphen form is referenced.
+    // Canonical command form is hyphen (gsd-code-review); colon form (gsd:code-review) is the
+    // legacy frontmatter-name form removed in PR #2819.
+    const skillNames = Array.from(content.matchAll(/Skill\(\s*skill\s*=\s*"([^"]+)"/g)).map(m => m[1]);
+    assert.ok(skillNames.includes('gsd-code-review'),
+      `autonomous.md must invoke Skill(skill="gsd-code-review", ...); found skills: ${JSON.stringify(skillNames)}`);
+    assert.ok(!skillNames.includes('gsd:code-review'),
+      'autonomous.md must not use legacy colon form gsd:code-review (canonical is hyphen form)');
   });
 
-  test('autonomous.md contains gsd:code-review-fix skill invocation', { skip: !PLUGIN_AVAILABLE ? 'Plugin dir not installed' : false }, () => {
-    const content = fs.readFileSync(path.join(PLUGIN_WORKFLOWS_DIR, 'autonomous.md'), 'utf-8');
+  test('autonomous.md contains gsd-code-review-fix skill invocation', () => {
+    const content = fs.readFileSync(path.join(WORKFLOWS_DIR, 'autonomous.md'), 'utf-8');
 
-    assert.ok(content.includes('gsd:code-review-fix'),
-      'autonomous.md missing gsd:code-review-fix skill invocation');
+    const skillNames = Array.from(content.matchAll(/Skill\(\s*skill\s*=\s*"([^"]+)"/g)).map(m => m[1]);
+    assert.ok(skillNames.includes('gsd-code-review-fix'),
+      `autonomous.md must invoke Skill(skill="gsd-code-review-fix", ...); found skills: ${JSON.stringify(skillNames)}`);
+    assert.ok(!skillNames.includes('gsd:code-review-fix'),
+      'autonomous.md must not use legacy colon form gsd:code-review-fix (canonical is hyphen form)');
   });
 
-  test('autonomous.md contains --auto flag for code-review-fix', { skip: !PLUGIN_AVAILABLE ? 'Plugin dir not installed' : false }, () => {
-    const content = fs.readFileSync(path.join(PLUGIN_WORKFLOWS_DIR, 'autonomous.md'), 'utf-8');
+  test('autonomous.md contains --auto flag for code-review-fix', () => {
+    const content = fs.readFileSync(path.join(WORKFLOWS_DIR, 'autonomous.md'), 'utf-8');
 
-    assert.ok(content.includes('--auto'),
-      'autonomous.md missing --auto flag for code-review-fix iteration');
+    // Find the gsd-code-review-fix Skill invocation and assert its args include --auto.
+    const fixMatch = content.match(/Skill\(\s*skill\s*=\s*"gsd-code-review-fix"\s*,\s*args\s*=\s*"([^"]*)"/);
+    assert.ok(fixMatch, 'autonomous.md missing Skill(skill="gsd-code-review-fix", ...) invocation');
+    assert.ok(fixMatch[1].includes('--auto'),
+      `autonomous.md gsd-code-review-fix args missing --auto flag; got args="${fixMatch[1]}"`);
   });
 });
