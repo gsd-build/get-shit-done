@@ -148,13 +148,10 @@ describe('bug-2851: workflow files must not call bare `gsd-tools` (#2245 sweep r
       for (const line of blk.lines) {
         if (/gap-analysis/.test(line) && !/^\s*#/.test(line)) {
           foundGapAnalysisCall = true;
-          assert.ok(
-            line.includes('gsd-tools.cjs'),
-            `gap-analysis call must reference gsd-tools.cjs, got: ${line.trim()}`,
-          );
-          assert.ok(
-            /\bnode\b/.test(line),
-            `gap-analysis call must invoke via node, got: ${line.trim()}`,
+          assert.match(
+            line,
+            /\bnode\s+["']?\$HOME\/\.claude\/get-shit-done\/bin\/gsd-tools\.cjs["']?\s+gap-analysis\b/,
+            `gap-analysis call must use canonical absolute-path invocation, got: ${line.trim()}`,
           );
         }
       }
