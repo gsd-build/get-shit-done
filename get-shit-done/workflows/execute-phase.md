@@ -742,16 +742,20 @@ increases monotonically across waves. `{status}` is `complete` (success),
          fi
        fi
 
-       # Safety net: commit any uncommitted SUMMARY.md before force-removing the worktree.
-       # This guards against executors that skipped the git_commit_metadata step (#2070).
-       UNCOMMITTED_SUMMARY=$(git -C "$WT" ls-files --modified --others --exclude-standard -- "*SUMMARY.md" 2>/dev/null || true)
-       if [ -n "$UNCOMMITTED_SUMMARY" ]; then
-         echo "⚠ SUMMARY.md was not committed by executor — committing now to prevent data loss"
-         git -C "$WT" add -- "*SUMMARY.md" 2>/dev/null || true
-         git -C "$WT" commit --no-verify -m "docs(recovery): rescue uncommitted SUMMARY.md before worktree removal (#2070)" 2>/dev/null || true
-         # Re-merge the recovery commit
-         git merge "$WT_BRANCH" --no-edit -m "chore: merge rescued SUMMARY.md from executor worktree ($WT_BRANCH)" 2>/dev/null || true
-       fi
+       # Safety net: rescue uncommitted SUMMARY.md before worktree removal (#2070, #2838).
+       # Filesystem-level (find + cp) bypasses git's --exclude-standard filter, which silently
+       # drops .planning/SUMMARY.md when projects gitignore .planning/ — the rescue's prior
+       # `git ls-files --exclude-standard` form returned empty in that case and the SUMMARY
+       # was lost on `git worktree remove --force`.
+       while IFS= read -r SUMMARY; do
+         [ -z "$SUMMARY" ] && continue
+         REL_PATH="${SUMMARY#$WT/}"
+         if [ ! -f "$REL_PATH" ] || ! cmp -s "$SUMMARY" "$REL_PATH"; then
+           mkdir -p "$(dirname "$REL_PATH")"
+           cp "$SUMMARY" "$REL_PATH"
+           echo "⚠ Rescued $REL_PATH from worktree before removal"
+         fi
+       done < <(find "$WT/.planning" -name "*SUMMARY.md" 2>/dev/null)
 
        # Remove the worktree
        if ! git worktree remove "$WT" --force; then
