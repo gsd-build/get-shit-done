@@ -125,6 +125,47 @@ describe('extractCurrentMilestone — fenced code block boundary (#2787)', () =>
     );
   });
 
+  test('fenced block with info string (e.g. ```js) is not closed by a nested info-string line', () => {
+    // A closing fence MUST have only optional trailing spaces — an info string
+    // like ```js inside an open fence must NOT close it. Before the fix the
+    // regex matched any line starting with ``` regardless of what followed, so
+    // a line like "```js" inside the fenced block would toggle fenceChar off
+    // and expose the heading-like line that follows to the milestone-end check.
+    const roadmap = [
+      '## Roadmap v3.0: Info-String Edge Case',
+      '',
+      '### Phase 1: Setup',
+      '**Goal:** First phase',
+      '',
+      '```text',
+      '```js',
+      '# This heading-like line (v3.0 compat) must NOT end the milestone',
+      '```',
+      '',
+      '### Phase 2: Core',
+      '**Goal:** Second phase',
+    ].join('\n');
+
+    fs.writeFileSync(path.join(tmpDir, '.planning', 'ROADMAP.md'), roadmap);
+    fs.writeFileSync(
+      path.join(tmpDir, '.planning', 'STATE.md'),
+      '---\nmilestone: v3.0\n---\n\n# GSD State\n'
+    );
+
+    const result = runGsdTools('roadmap analyze', tmpDir);
+    assert.ok(result.success, `roadmap analyze should succeed: ${result.error}`);
+
+    const output = JSON.parse(result.output);
+    assert.strictEqual(
+      output.phase_count,
+      2,
+      [
+        'Both phases should be found; the ```js line inside the fence must not close it.',
+        `Got ${output.phase_count} phase(s).`,
+      ].join(' ')
+    );
+  });
+
   test('roadmap get-phase finds a phase defined after a fenced code block', () => {
     const roadmap = [
       '## Roadmap v1.1: New Work',

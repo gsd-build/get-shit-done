@@ -1399,14 +1399,15 @@ function extractCurrentMilestone(content, cwd) {
   let fenceLen = 0;
   let charOffset = 0;
   for (const line of restContent.split('\n')) {
-    const fenceMatch = line.match(/^\s{0,3}([`~]{3,})/);
+    const fenceMatch = line.match(/^\s{0,3}((?:`{3,}|~{3,}))(.*)/);
     if (fenceMatch) {
       const char = fenceMatch[1][0];
       const len = fenceMatch[1].length;
+      const trailing = fenceMatch[2] || '';
       if (!fenceChar) {
         fenceChar = char;
         fenceLen = len;
-      } else if (char === fenceChar && len >= fenceLen) {
+      } else if (char === fenceChar && len >= fenceLen && /^\s*$/.test(trailing)) {
         fenceChar = null;
         fenceLen = 0;
       }
