@@ -359,6 +359,11 @@ function scanSeeds(planDir) {
   return results;
 }
 
+// Terminal UAT states: `complete` (legacy) and `resolved` (post-gap-closure
+// per workflows/execute-phase.md). Hoisted outside scanUatGaps so the Set is
+// not recreated on each loop iteration.
+const TERMINAL_UAT_STATUSES = new Set(['complete', 'resolved']);
+
 /**
  * Scan .planning/phases for UAT gaps (UAT files with status != 'complete').
  */
@@ -411,10 +416,8 @@ function scanUatGaps(planDir) {
       const status = (fm.status || 'unknown').toLowerCase();
       const result = (fm.result || '').toString().toLowerCase();
 
-      // Terminal UAT states: `complete` (legacy) and `resolved` (post-gap-closure
-      // per workflows/execute-phase.md). Also accept `result: all_pass` as a
-      // fallback when status is absent — covers UATs that omit `status:`.
-      const TERMINAL_UAT_STATUSES = new Set(['complete', 'resolved']);
+      // Also accept `result: all_pass` as a fallback when status is absent
+      // — covers UATs that omit `status:`.
       if (TERMINAL_UAT_STATUSES.has(status)) continue;
       if (status === 'unknown' && result === 'all_pass') continue;
 
