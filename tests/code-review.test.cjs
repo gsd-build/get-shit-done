@@ -510,26 +510,44 @@ describe('CR-INTEGRATION: workflow integration points', () => {
       'autonomous.md must not use legacy colon form gsd:code-review (canonical is hyphen form)');
   });
 
-  test('autonomous.md contains gsd-code-review-fix skill invocation', () => {
+  test('autonomous.md auto-fix uses consolidated gsd-code-review --fix invocation (#2790)', () => {
+    // After #2790, gsd-code-review-fix was absorbed into gsd-code-review as
+    // the --fix flag. The autonomous workflow must invoke the consolidated
+    // form, not the deleted gsd-code-review-fix skill.
     const content = fs.readFileSync(path.join(WORKFLOWS_DIR, 'autonomous.md'), 'utf-8');
 
     const invocations = parseWorkflowSkillInvocations(content);
     const skillNames = invocations.map(inv => inv.skill);
-    assert.ok(skillNames.includes('gsd-code-review-fix'),
-      `autonomous.md must invoke Skill(skill="gsd-code-review-fix", ...); found skills: ${JSON.stringify(skillNames)}`);
+    assert.ok(!skillNames.includes('gsd-code-review-fix'),
+      `autonomous.md must not invoke deleted gsd-code-review-fix skill (consolidated into --fix); found: ${JSON.stringify(skillNames)}`);
     assert.ok(!skillNames.includes('gsd:code-review-fix'),
-      'autonomous.md must not use legacy colon form gsd:code-review-fix (canonical is hyphen form)');
+      'autonomous.md must not use legacy colon form gsd:code-review-fix');
+
+    // Find a gsd-code-review invocation that carries the --fix flag (the
+    // consolidated auto-fix entry point).
+    const fixInvocation = invocations.find(inv => {
+      if (inv.skill !== 'gsd-code-review') return false;
+      const tokens = new Set((inv.args ?? '').split(/\s+/).filter(Boolean));
+      return tokens.has('--fix');
+    });
+    assert.ok(fixInvocation,
+      `autonomous.md must invoke Skill(skill="gsd-code-review", args="... --fix ...") for auto-fix; found: ${JSON.stringify(invocations)}`);
   });
 
-  test('autonomous.md contains --auto flag for code-review-fix', () => {
+  test('autonomous.md contains --auto flag on consolidated --fix invocation (#2790)', () => {
     const content = fs.readFileSync(path.join(WORKFLOWS_DIR, 'autonomous.md'), 'utf-8');
 
-    // Find the gsd-code-review-fix Skill invocation, then tokenize its args
-    // (whitespace-split) and assert --auto is one of the tokens. This avoids
-    // substring matches that could conflate --auto with --auto-foo.
+    // Find the gsd-code-review invocation that carries --fix (the consolidated
+    // auto-fix entry point), then assert --auto is one of its arg tokens.
+    // Tokenize via whitespace-split to avoid substring matches that could
+    // conflate --auto with --auto-foo.
     const invocations = parseWorkflowSkillInvocations(content);
-    const fixInvocation = invocations.find(inv => inv.skill === 'gsd-code-review-fix');
-    assert.ok(fixInvocation, 'autonomous.md missing Skill(skill="gsd-code-review-fix", ...) invocation');
+    const fixInvocation = invocations.find(inv => {
+      if (inv.skill !== 'gsd-code-review') return false;
+      const tokens = new Set((inv.args ?? '').split(/\s+/).filter(Boolean));
+      return tokens.has('--fix');
+    });
+    assert.ok(fixInvocation, 'autonomous.md missing Skill(skill="gsd-code-review", args="... --fix ...") invocation');
     const argTokens = new Set((fixInvocation.args ?? '').split(/\s+/).filter(Boolean));
     assert.ok(argTokens.has('--auto'),
       `autonomous.md gsd-code-review-fix args missing --auto flag; got args="${fixInvocation.args}"`);
