@@ -88,6 +88,18 @@ jobs:
       - name: Build SDK dist (required by installer)
         run: npm run build:sdk
 
+      # Seam contract gate: keep manifest -> generated aliases -> registry/CJS adapters aligned.
+      # Run once per workflow on the primary Linux node to avoid redundant matrix cost.
+      - name: SDK seam coverage tests
+        if: matrix.os == 'ubuntu-latest' && matrix.node-version == 24
+        shell: bash
+        run: cd sdk && npx vitest run src/query/command-seam-coverage.test.ts
+
+      - name: SDK generated alias artifact drift check
+        if: matrix.os == 'ubuntu-latest' && matrix.node-version == 24
+        shell: bash
+        run: node sdk/scripts/check-command-aliases-fresh.mjs
+
       - name: Run tests with coverage
         shell: bash
         run: npm run test:coverage

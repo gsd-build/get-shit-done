@@ -345,6 +345,33 @@ node --test tests/core.test.cjs
 npm run test:coverage
 ```
 
+### Pre-PR Seam Checks (Manifest/Alias Routing)
+
+If you touched any of the command-manifest or generated alias files, run:
+
+```bash
+npm run check:alias-drift
+```
+
+This verifies generated alias artifacts are in sync with manifest source-of-truth.
+
+Optional local pre-commit hook entry (Git-native):
+
+```bash
+# one-time setup
+mkdir -p .githooks
+cat > .githooks/pre-commit <<'EOF'
+#!/usr/bin/env bash
+set -euo pipefail
+
+if git diff --cached --name-only | rg -q "^sdk/src/query/command-manifest\.|^sdk/src/query/command-aliases\.generated\.ts$|^get-shit-done/bin/lib/command-aliases\.generated\.cjs$|^sdk/scripts/gen-command-aliases\.ts$"; then
+  npm run check:alias-drift
+fi
+EOF
+chmod +x .githooks/pre-commit
+git config core.hooksPath .githooks
+```
+
 ### CI Test Quality Checks
 
 The following checks run on every PR in addition to the test suite:
