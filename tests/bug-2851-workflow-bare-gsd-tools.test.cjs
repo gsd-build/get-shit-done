@@ -99,9 +99,10 @@ function lineHasBareGsdTools(line) {
   for (const seg of segments) {
     const tokens = seg.trim().split(/\s+/).filter(Boolean);
     if (tokens.length === 0) continue;
-    // Skip env var assignments at the start (FOO=bar gsd-tools …)
+    // Skip env var assignments at the start (FOO=bar gsd-tools …, tmp=1 gsd-tools …).
+    // POSIX shell variable names are [A-Za-z_][A-Za-z0-9_]*; lowercase is valid.
     let cmdIdx = 0;
-    while (cmdIdx < tokens.length && /^[A-Z_][A-Z0-9_]*=/.test(tokens[cmdIdx])) {
+    while (cmdIdx < tokens.length && /^[A-Za-z_][A-Za-z0-9_]*=/.test(tokens[cmdIdx])) {
       cmdIdx++;
     }
     if (cmdIdx >= tokens.length) continue;
