@@ -310,11 +310,17 @@ Exceptions where `tdd="true"` is not needed: `type="checkpoint:*"` tasks, config
 
 **Plan structure under MVP_MODE:**
 
-1. Frame the phase goal as a user story at the top of `PLAN.md`:
+1. Frame the phase goal as a user story at the top of `PLAN.md`. The user story is sourced from the `**Goal:**` line in ROADMAP.md (set by `mvp-phase`). Emit it with bolded keywords:
+
    ```
    ## Phase Goal
-   **As a** [user], **I want to** [capability], **so that** [outcome].
+
+   **As a** [user role], **I want to** [capability], **so that** [outcome].
    ```
+
+   Format rules from `@~/.claude/get-shit-done/references/user-story-template.md`:
+   - All three slots required. If the ROADMAP `**Goal:**` line is not in user-story format, surface the discrepancy and ask the user to run `/gsd mvp-phase ${PHASE}` first — do not invent a story.
+   - Bold the three keywords (`**As a**`, `**I want to**`, `**so that**`) when emitting to PLAN.md. The ROADMAP form does not use bolded keywords; the PLAN form does.
 2. First task: failing end-to-end test for the happy path.
 3. Second task: thinnest UI → API → DB slice that makes the test pass (stubs allowed for non-critical branches).
 4. Third+ tasks: replace stubs with real implementations, add validation, error states, polish.

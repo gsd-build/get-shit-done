@@ -46,4 +46,21 @@ describe('gsd-planner — MVP-mode branch', () => {
       'agent must enforce all-or-nothing per phase'
     );
   });
+
+  test('agent requires PLAN.md to start with user-story header in MVP mode', () => {
+    // The MVP Mode Detection section must instruct the planner to emit
+    // a "## Phase Goal" section with **As a** / **I want to** / **so that**
+    // bolded keywords as the first content under the phase header in PLAN.md.
+    assert.match(content, /Phase\s*Goal/i, 'must mention "Phase Goal" header');
+    assert.match(
+      content,
+      /\*\*As a\*\*[^\n]*\*\*I want to\*\*[^\n]*\*\*so that\*\*/i,
+      'must specify the bolded user-story format for PLAN.md emit'
+    );
+    assert.match(
+      content,
+      /user-story-template\.md/,
+      'must reference the user-story-template reference file'
+    );
+  });
 });

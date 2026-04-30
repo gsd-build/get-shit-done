@@ -7,6 +7,7 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 ## [Unreleased](https://github.com/gsd-build/get-shit-done/compare/v1.38.5...HEAD)
 
 ### Added
+- **`/gsd mvp-phase <N>` command** — guided MVP planning entry point. Prompts for an "As a / I want to / So that" user story (three structured fields), runs SPIDR splitting check (full interactive flow per PRD Q3) if the story is too large, writes `**Mode:** mvp` and the formatted goal to ROADMAP.md, then delegates to `/gsd plan-phase <N>` (which auto-detects MVP via the roadmap mode field shipped in PRD Phase 1). The `gsd-planner` agent now emits a `## Phase Goal` section with bolded **As a** / **I want to** / **so that** keywords as the first content under the phase header in PLAN.md when MVP_MODE is active. (#2826)
 - **`--mvp` flag on `/gsd plan-phase`** — opt-in vertical-slice planning. Plans are
   organized as feature slices (UI→API→DB) instead of horizontal layers, so each task
   moves a real user-visible capability forward. Persistable per-phase via `**Mode:** mvp`
