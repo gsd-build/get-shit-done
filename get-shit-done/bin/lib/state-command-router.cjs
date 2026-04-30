@@ -45,7 +45,11 @@ function routeStateCommand({ state, args, cwd, raw, parseNamedArgs, error }) {
     state.cmdStateRecordSession(cwd, { stopped_at, resume_file: resume_file || 'None' }, raw);
   } else if (subcommand === 'begin-phase') {
     const { phase: p, name, plans } = parseNamedArgs(args, ['phase', 'name', 'plans']);
-    state.cmdStateBeginPhase(cwd, p, name, plans !== null ? parseInt(plans, 10) : null, raw);
+    const parsedPlans = plans == null ? null : Number.parseInt(plans, 10);
+    if (plans != null && Number.isNaN(parsedPlans)) {
+      return error('Invalid --plans value. Expected an integer.');
+    }
+    state.cmdStateBeginPhase(cwd, p, name, parsedPlans, raw);
   } else if (subcommand === 'signal-waiting') {
     const { type, question, options, phase: p } = parseNamedArgs(args, ['type', 'question', 'options', 'phase']);
     state.cmdSignalWaiting(cwd, type, question, options, p, raw);
@@ -53,7 +57,11 @@ function routeStateCommand({ state, args, cwd, raw, parseNamedArgs, error }) {
     state.cmdSignalResume(cwd, raw);
   } else if (subcommand === 'planned-phase') {
     const { phase: p, plans } = parseNamedArgs(args, ['phase', 'name', 'plans']);
-    state.cmdStatePlannedPhase(cwd, p, plans !== null ? parseInt(plans, 10) : null, raw);
+    const parsedPlans = plans == null ? null : Number.parseInt(plans, 10);
+    if (plans != null && Number.isNaN(parsedPlans)) {
+      return error('Invalid --plans value. Expected an integer.');
+    }
+    state.cmdStatePlannedPhase(cwd, p, parsedPlans, raw);
   } else if (subcommand === 'validate') {
     state.cmdStateValidate(cwd, raw);
   } else if (subcommand === 'sync') {
