@@ -372,6 +372,46 @@ chmod +x .githooks/pre-commit
 git config core.hooksPath .githooks
 ```
 
+Optional local pre-push hook to block a private author-email pattern:
+
+```bash
+# set locally in your shell profile (example)
+export GSD_BLOCKED_AUTHOR_REGEX='@example-corp\\.com$'
+
+cat > .githooks/pre-push <<'EOF'
+#!/usr/bin/env bash
+set -euo pipefail
+
+zero_sha='0000000000000000000000000000000000000000'
+blocked_regex="${GSD_BLOCKED_AUTHOR_REGEX:-}"
+[[ -z "$blocked_regex" ]] && exit 0
+violations=()
+
+while read -r local_ref local_sha remote_ref remote_sha; do
+  [[ "$local_sha" == "$zero_sha" ]] && continue
+  if [[ "$remote_sha" == "$zero_sha" ]]; then
+    commits=$(git rev-list "$local_sha" --not --remotes)
+  else
+    commits=$(git rev-list "$remote_sha..$local_sha")
+  fi
+  while read -r commit; do
+    [[ -z "$commit" ]] && continue
+    email=$(git show -s --format='%ae' "$commit" | tr '[:upper:]' '[:lower:]')
+    if printf '%s' "$email" | rg -q "$blocked_regex"; then
+      violations+=("$commit <$email>")
+    fi
+  done <<< "$commits"
+done
+
+if [[ ${#violations[@]} -gt 0 ]]; then
+  echo "Push blocked: commit author email matched local blocked regex ($blocked_regex)." >&2
+  printf '  - %s\n' "${violations[@]}" >&2
+  exit 1
+fi
+EOF
+chmod +x .githooks/pre-push
+```
+
 ### CI Test Quality Checks
 
 The following checks run on every PR in addition to the test suite:

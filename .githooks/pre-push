@@ -1,0 +1,48 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+zero_sha='0000000000000000000000000000000000000000'
+blocked_regex="${GSD_BLOCKED_AUTHOR_REGEX:-}"
+
+# Local-only guard: no-op unless the developer opts in via env var, e.g.
+# export GSD_BLOCKED_AUTHOR_REGEX='@example-corp\.com$'
+if [[ -z "$blocked_regex" ]]; then
+  exit 0
+fi
+
+violations=()
+
+while read -r local_ref local_sha remote_ref remote_sha; do
+  # branch/tag deletion
+  if [[ "$local_sha" == "$zero_sha" ]]; then
+    continue
+  fi
+
+  if [[ "$remote_sha" == "$zero_sha" ]]; then
+    # New remote ref: inspect commits not already on any remote
+    commit_list=$(git rev-list "$local_sha" --not --remotes)
+  else
+    commit_list=$(git rev-list "$remote_sha..$local_sha")
+  fi
+
+  while read -r commit; do
+    [[ -z "$commit" ]] && continue
+    author_email=$(git show -s --format='%ae' "$commit")
+    lower_email=$(printf '%s' "$author_email" | tr '[:upper:]' '[:lower:]')
+    if printf '%s' "$lower_email" | rg -q "$blocked_regex"; then
+      violations+=("$commit <$author_email>")
+    fi
+  done <<< "$commit_list"
+done
+
+if [[ ${#violations[@]} -gt 0 ]]; then
+  {
+    echo "Push blocked: commit author email matched local blocked regex ($blocked_regex)."
+    echo "Rewrite author info before pushing these commits:"
+    for v in "${violations[@]}"; do
+      echo "  - $v"
+    done
+    echo "Suggested fix: git rebase -i <base> --exec \"git commit --amend --no-edit --author='Your Name <non-enterprise@email>'\""
+  } >&2
+  exit 1
+fi
