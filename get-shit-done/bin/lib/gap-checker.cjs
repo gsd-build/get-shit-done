@@ -16,7 +16,8 @@
 
 const fs = require('fs');
 const path = require('path');
-const { planningPaths, planningDir, escapeRegex, output, error } = require('./core.cjs');
+const { escapeRegex, output, error } = require('./core.cjs');
+const { planningPaths, planningDir } = require('./planning-workspace.cjs');
 const { parseDecisions } = require('./decisions.cjs');
 
 /**

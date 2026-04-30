@@ -172,7 +172,8 @@
 const fs = require('fs');
 const path = require('path');
 const core = require('./lib/core.cjs');
-const { error, findProjectRoot, getActiveWorkstream } = core;
+const { error, findProjectRoot } = core;
+const { getActiveWorkstream } = require('./lib/planning-workspace.cjs');
 const state = require('./lib/state.cjs');
 const phase = require('./lib/phase.cjs');
 const roadmap = require('./lib/roadmap.cjs');

@@ -140,16 +140,17 @@ describe('#1916 lock cleanup on process.exit()', () => {
     );
   });
 
-  test('core.cjs .planning/.lock is removed after a command exits with an error', () => {
-    // The withPlanningLock in core.cjs also needs exit cleanup.
-    const coreSrc = fs.readFileSync(
-      path.join(__dirname, '..', 'get-shit-done', 'bin', 'lib', 'core.cjs'),
+  test('planning workspace lock owner registers exit cleanup', () => {
+    // withPlanningLock moved from core.cjs to planning-workspace.cjs.
+    // The lock owner must keep module-level process exit cleanup.
+    const workspaceSrc = fs.readFileSync(
+      path.join(__dirname, '..', 'get-shit-done', 'bin', 'lib', 'planning-workspace.cjs'),
       'utf-8'
     );
 
     assert.ok(
-      coreSrc.includes("process.on('exit'"),
-      "core.cjs must register process.on('exit', ...) to clean up held planning lock files"
+      workspaceSrc.includes("process.on('exit'"),
+      "planning-workspace.cjs must register process.on('exit', ...) to clean up held planning lock files"
     );
   });
 });

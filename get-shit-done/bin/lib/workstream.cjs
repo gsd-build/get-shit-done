@@ -10,7 +10,8 @@
 
 const fs = require('fs');
 const path = require('path');
-const { output, error, planningPaths, planningRoot, toPosixPath, getMilestoneInfo, generateSlugInternal, setActiveWorkstream, getActiveWorkstream, filterPlanFiles, filterSummaryFiles, readSubdirectories } = require('./core.cjs');
+const { output, error, toPosixPath, getMilestoneInfo, generateSlugInternal, filterPlanFiles, filterSummaryFiles, readSubdirectories } = require('./core.cjs');
+const { planningPaths, planningRoot, setActiveWorkstream, getActiveWorkstream } = require('./planning-workspace.cjs');
 const { stateExtractField } = require('./state.cjs');
 
 // ─── Migration ──────────────────────────────────────────────────────────────

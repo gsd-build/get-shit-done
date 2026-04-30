@@ -4,7 +4,8 @@
 
 const fs = require('fs');
 const path = require('path');
-const { output, error, planningDir, withPlanningLock, CONFIG_DEFAULTS, atomicWriteFileSync } = require('./core.cjs');
+const { output, error, CONFIG_DEFAULTS, atomicWriteFileSync } = require('./core.cjs');
+const { planningDir, withPlanningLock } = require('./planning-workspace.cjs');
 const {
   VALID_PROFILES,
   getAgentToModelMapForProfile,

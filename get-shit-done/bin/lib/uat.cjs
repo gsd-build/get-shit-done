@@ -7,7 +7,8 @@
 
 const fs = require('fs');
 const path = require('path');
-const { output, error, getMilestonePhaseFilter, planningDir, toPosixPath } = require('./core.cjs');
+const { output, error, getMilestonePhaseFilter, toPosixPath } = require('./core.cjs');
+const { planningDir } = require('./planning-workspace.cjs');
 const { extractFrontmatter } = require('./frontmatter.cjs');
 const { requireSafePath, sanitizeForDisplay } = require('./security.cjs');
 
