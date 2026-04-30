@@ -265,6 +265,7 @@
       "milestone.cjs",
       "model-profiles.cjs",
       "phase.cjs",
+      "planning-workspace.cjs",
       "profile-output.cjs",
       "profile-pipeline.cjs",
       "roadmap.cjs",

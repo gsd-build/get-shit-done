@@ -26,6 +26,7 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
   RC. (#2833)
 
 ### Changed — 1.40.0-rc.1
+- **Planning workspace seam extracted from `core.cjs` into `planning-workspace.cjs`** — path/workstream/lock behavior now lives in a dedicated module (`planningDir`, `planningPaths`, `planningRoot`, active-workstream routing, `withPlanningLock`). `core.cjs` keeps compatibility re-exports while call-sites migrate to direct imports, improving locality and reducing coupling. (#2900)
 - **Skill surface consolidated 86 → 59 `commands/gsd/*.md` entries** — four new
   grouped skills (`capture`, `phase`, `config`, `workspace`) replace clusters of
   micro-skills. Six existing parents absorb wrap-up and sub-operations as flags:
