@@ -42,7 +42,7 @@ import { templateFill, templateSelect } from './template.js';
 import { verifyPlanStructure, verifyPhaseCompleteness, verifyArtifacts, verifyCommits, verifyReferences, verifySummary, verifyPathExists } from './verify.js';
 import { decisionsParse } from './decisions.js';
 import { checkDecisionCoveragePlan, checkDecisionCoverageVerify } from './check-decision-coverage.js';
-import { verifyKeyLinks, validateConsistency, validateHealth, validateAgents } from './validate.js';
+import { verifyKeyLinks, validateConsistency, validateHealth, validateAgents, validateContext } from './validate.js';
 import {
   phaseAdd, phaseAddBatch, phaseInsert, phaseRemove, phaseComplete,
   phaseScaffold, phasesClear, phasesArchive,
@@ -141,6 +141,7 @@ export const QUERY_MUTATION_COMMANDS = new Set<string>([
   'commit', 'check-commit', 'commit-to-subrepo',
   'template.fill', 'template.select', 'template select',
   'validate.health', 'validate health',
+  'validate.context', 'validate context',
   'phase.add', 'phase.add-batch', 'phase.insert', 'phase.remove', 'phase.complete',
   'phase.scaffold', 'phases.clear', 'phases.archive',
   'phase add', 'phase add-batch', 'phase insert', 'phase remove', 'phase complete',
@@ -382,6 +383,8 @@ export function createRegistry(
   registry.register('validate health', validateHealth);
   registry.register('validate.agents', validateAgents);
   registry.register('validate agents', validateAgents);
+  registry.register('validate.context', validateContext);
+  registry.register('validate context', validateContext);
 
   // Decision routing (SDK-only — no `gsd-tools.cjs` mirror yet; see QUERY-HANDLERS.md)
   registry.register('check.config-gates', checkConfigGates);

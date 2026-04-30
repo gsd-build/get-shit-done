@@ -249,6 +249,7 @@
       "commands.cjs",
       "config-schema.cjs",
       "config.cjs",
+      "context-utilization.cjs",
       "core.cjs",
       "decisions.cjs",
       "docs.cjs",

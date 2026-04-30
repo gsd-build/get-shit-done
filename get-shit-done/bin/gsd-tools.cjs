@@ -792,8 +792,48 @@ async function runCommand(command, args, cwd, raw, defaultValue) {
         verify.cmdValidateHealth(cwd, { repair: repairFlag, backfill: backfillFlag }, raw);
       } else if (subcommand === 'agents') {
         verify.cmdValidateAgents(cwd, raw);
+      } else if (subcommand === 'context') {
+        // The model self-reports tokensUsed and contextWindow — the SDK has
+        // no privileged access to either. Recommendation copy lives here
+        // (the renderer), not in the classifier, so it can change without
+        // re-validating the math layer.
+        const opts = parseNamedArgs(args, ['tokens-used', 'context-window']);
+        if (opts['tokens-used'] === null) {
+          error('--tokens-used <integer> is required for `validate context`');
+          break;
+        }
+        if (opts['context-window'] === null) {
+          error('--context-window <integer> is required for `validate context`');
+          break;
+        }
+        const { classifyContextUtilization, STATES } = require('./lib/context-utilization.cjs');
+        const RECOMMENDATIONS = {
+          [STATES.HEALTHY]: null,
+          [STATES.WARNING]: 'Context is approaching the fracture zone — consider /gsd-thread to continue in a fresh window.',
+          [STATES.CRITICAL]: 'Reasoning quality may degrade past 70% utilization (fracture point). Run /gsd-thread now to preserve output quality.',
+        };
+        let classified;
+        try {
+          classified = classifyContextUtilization(Number(opts['tokens-used']), Number(opts['context-window']));
+        } catch (e) {
+          // Translate the classifier's TypeError into a CLI-shaped error
+          // message that names the offending flag.
+          const flag = /tokensUsed/.test(e.message) ? '--tokens-used' : '--context-window';
+          error(`${flag} must be a non-negative integer (window > 0), got the values supplied`);
+          break;
+        }
+        const result = { ...classified, recommendation: RECOMMENDATIONS[classified.state] };
+        if (args.includes('--json')) {
+          core.output(result, raw);
+        } else {
+          const lines = [`Context utilization: ${result.percent}% (${result.state})`];
+          if (result.recommendation) lines.push(result.recommendation);
+          // Use core.output's rawValue path for the sync-flush guarantee
+          // — process.stdout.write can be truncated on process exit.
+          core.output(result, true, lines.join('\n'));
+        }
       } else {
-        error('Unknown validate subcommand. Available: consistency, health, agents');
+        error('Unknown validate subcommand. Available: consistency, health, agents, context');
       }
       break;
     }

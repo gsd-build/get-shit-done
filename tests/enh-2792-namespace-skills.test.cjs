@@ -150,6 +150,63 @@ describe('Namespace skill bodies carry a routing table', () => {
   }
 });
 
+// ── Context guard contract on gsd-health ──────────────────────────────
+// Asserts the `--context` surface promised by #2792 is wired through to
+// both the command frontmatter and the workflow body. The classifier
+// itself is covered by tests/context-utilization.test.cjs and the SDK
+// CLI by tests/validate-context.test.cjs.
+
+describe('gsd-health --context flag is wired into command + workflow', () => {
+  const HEALTH_CMD = path.join(COMMANDS_DIR, 'health.md');
+  const HEALTH_WORKFLOW = path.join(__dirname, '..', 'get-shit-done', 'workflows', 'health.md');
+
+  test('commands/gsd/health.md argument-hint advertises --context', () => {
+    const raw = fs.readFileSync(HEALTH_CMD, 'utf-8');
+    const fm = parseFrontmatter(raw);
+    assert.ok(
+      fm['argument-hint'] && fm['argument-hint'].includes('--context'),
+      `health.md argument-hint must include --context, got: ${fm['argument-hint']}`,
+    );
+  });
+
+  test('commands/gsd/health.md body documents the three-state utilization table', () => {
+    const raw = fs.readFileSync(HEALTH_CMD, 'utf-8');
+    const body = parseFrontmatter(raw)._body.toLowerCase();
+    assert.ok(body.includes('healthy'), 'body must name the healthy state');
+    assert.ok(body.includes('warning'), 'body must name the warning state');
+    assert.ok(body.includes('critical'), 'body must name the critical state');
+    assert.ok(
+      body.includes('60%') && body.includes('70%'),
+      'body must reference the 60% and 70% threshold boundaries',
+    );
+  });
+
+  test('get-shit-done/workflows/health.md has a context_check step', () => {
+    const raw = fs.readFileSync(HEALTH_WORKFLOW, 'utf-8');
+    assert.match(
+      raw,
+      /<step name="context_check">/,
+      'workflow must define a <step name="context_check"> branch',
+    );
+  });
+
+  test('workflow context_check invokes gsd-sdk query validate.context', () => {
+    const raw = fs.readFileSync(HEALTH_WORKFLOW, 'utf-8');
+    // Extract just the context_check step's body so a stray reference
+    // elsewhere in the file can't satisfy this assertion.
+    const stepMatch = raw.match(/<step name="context_check">([\s\S]*?)<\/step>/);
+    assert.ok(stepMatch, 'context_check step must be a closed <step>...</step> block');
+    const stepBody = stepMatch[1];
+    assert.match(
+      stepBody,
+      /gsd-sdk\s+query\s+validate\.context/,
+      'context_check must call `gsd-sdk query validate.context`',
+    );
+    assert.match(stepBody, /--tokens-used/, 'context_check must pass --tokens-used');
+    assert.match(stepBody, /--context-window/, 'context_check must pass --context-window');
+  });
+});
+
 // ── Cross-reference: every routed sub-skill must exist ─────────────────
 // This is the regression guard the original PR lacked. Without it,
 // post-#2790 consolidations can quietly invalidate router targets again.
