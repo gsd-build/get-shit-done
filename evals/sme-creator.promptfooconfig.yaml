@@ -1,0 +1,182 @@
+# Run: npx promptfoo eval --config evals/sme-creator.promptfooconfig.yaml
+# Code-only (no LLM cost): npx promptfoo eval --config evals/sme-creator.promptfooconfig.yaml --filter-type javascript
+
+description: SME Creator Agent -- regression eval suite
+
+tests:
+  - description: "Schema completeness -- frontmatter has last_analyzed_commit as valid git SHA"
+    assert:
+      - type: javascript
+        value: |
+          const fs = require('fs');
+          const smeDir = '.planning/smes';
+          let files;
+          try {
+            files = fs.readdirSync(smeDir).filter(f => f.endsWith('-SME.md'));
+          } catch (e) {
+            return false;
+          }
+          if (files.length === 0) return false;
+          const sme = fs.readFileSync(`${smeDir}/${files[0]}`, 'utf-8');
+          return /last_analyzed_commit: [0-9a-f]{7,40}/.test(sme);
+
+  - description: "Schema completeness -- frontmatter has block_mode field"
+    assert:
+      - type: javascript
+        value: |
+          const fs = require('fs');
+          const smeDir = '.planning/smes';
+          let files;
+          try {
+            files = fs.readdirSync(smeDir).filter(f => f.endsWith('-SME.md'));
+          } catch (e) {
+            return false;
+          }
+          if (files.length === 0) return false;
+          const sme = fs.readFileSync(`${smeDir}/${files[0]}`, 'utf-8');
+          return /block_mode: (soft|strict)/.test(sme);
+
+  - description: "Schema completeness -- frontmatter has finding_counts with blocker, warning, watch"
+    assert:
+      - type: javascript
+        value: |
+          const fs = require('fs');
+          const smeDir = '.planning/smes';
+          let files;
+          try {
+            files = fs.readdirSync(smeDir).filter(f => f.endsWith('-SME.md'));
+          } catch (e) {
+            return false;
+          }
+          if (files.length === 0) return false;
+          const sme = fs.readFileSync(`${smeDir}/${files[0]}`, 'utf-8');
+          return /finding_counts:/.test(sme)
+            && /blocker: \d+/.test(sme)
+            && /warning: \d+/.test(sme)
+            && /watch: \d+/.test(sme);
+
+  - description: "Schema completeness -- document has all 6 required section headers"
+    assert:
+      - type: javascript
+        value: |
+          const fs = require('fs');
+          const smeDir = '.planning/smes';
+          let files;
+          try {
+            files = fs.readdirSync(smeDir).filter(f => f.endsWith('-SME.md'));
+          } catch (e) {
+            return false;
+          }
+          if (files.length === 0) return false;
+          const sme = fs.readFileSync(`${smeDir}/${files[0]}`, 'utf-8');
+          return sme.includes('## Process Overview')
+            && sme.includes('## Identified Risks')
+            && sme.includes('## Test Gaps')
+            && sme.includes('## Outdated Logic')
+            && sme.includes('## Edge Cases')
+            && sme.includes('## Known Blockers');
+
+  - description: "BLOCKER severity -- every BLOCKER must cite historical evidence"
+    assert:
+      - type: llm-rubric
+        value: |
+          Review the SME document for findings labeled [BLOCKER]. Every BLOCKER finding MUST include at least one of: a specific git commit hash (7-40 hex characters), a PR number (e.g., PR #123), or a direct quote from a code comment as evidence that the risk has a real production failure path. A BLOCKER that only describes code structure without citing historical evidence of a real production failure path is a FAIL. If no BLOCKER findings exist, PASS (absence is not a violation).
+
+  - description: "Finding traceability -- every finding references a specific file path"
+    assert:
+      - type: javascript
+        value: |
+          const fs = require('fs');
+          const smeDir = '.planning/smes';
+          let files;
+          try {
+            files = fs.readdirSync(smeDir).filter(f => f.endsWith('-SME.md'));
+          } catch (e) {
+            return false;
+          }
+          if (files.length === 0) return false;
+          const sme = fs.readFileSync(`${smeDir}/${files[0]}`, 'utf-8');
+          // Split on finding markers and check each block contains File: or backtick-quoted path
+          const findingBlocks = sme.split(/\[(BLOCKER|WARNING|WATCH)\]/).slice(1);
+          if (findingBlocks.length === 0) return true; // No findings -- not a traceability failure
+          return findingBlocks.every(block => {
+            // Take only the text up to the next finding or section header
+            const blockText = block.split(/\n##|\n\[(?:BLOCKER|WARNING|WATCH)\]/)[0];
+            return /File:/.test(blockText) || /`[^`]+`/.test(blockText);
+          });
+
+  - description: "No hallucinated file paths -- every cited .ts path must exist in repo"
+    assert:
+      - type: javascript
+        value: |
+          const fs = require('fs');
+          const smeDir = '.planning/smes';
+          let files;
+          try {
+            files = fs.readdirSync(smeDir).filter(f => f.endsWith('-SME.md'));
+          } catch (e) {
+            return false;
+          }
+          if (files.length === 0) return false;
+          const sme = fs.readFileSync(`${smeDir}/${files[0]}`, 'utf-8');
+          // Extract all backtick-quoted paths with known repo prefixes
+          const pathMatches = [...sme.matchAll(/`((?:src|sdk|agents|get-shit-done)[^`]+\.ts[^`]*)`/g)];
+          const paths = pathMatches.map(m => m[1].split(':')[0]); // Strip :line references
+          if (paths.length === 0) return true; // No .ts paths cited -- not a hallucination failure
+          return paths.every(p => {
+            try { fs.statSync(p); return true; } catch { return false; }
+          });
+
+  - description: "Process boundary -- findings should reference files matching the process name"
+    assert:
+      - type: javascript
+        value: |
+          const fs = require('fs');
+          const smeDir = '.planning/smes';
+          let files;
+          try {
+            files = fs.readdirSync(smeDir).filter(f => f.endsWith('-SME.md'));
+          } catch (e) {
+            return false;
+          }
+          if (files.length === 0) return false;
+          const sme = fs.readFileSync(`${smeDir}/${files[0]}`, 'utf-8');
+          // Extract process_name from frontmatter
+          const processNameMatch = sme.match(/^process_name:\s*(.+)$/m);
+          if (!processNameMatch) return false;
+          const processName = processNameMatch[1].trim().replace(/-/g, '');
+          // Extract all cited file paths
+          const pathMatches = [...sme.matchAll(/`([^`]+\.ts[^`]*)`/g)];
+          const paths = pathMatches.map(m => m[1].split(':')[0]);
+          if (paths.length === 0) return true; // No paths cited -- boundary not violated
+          // Check >= 70% of cited paths contain the process name (hyphens stripped for comparison)
+          const matchingPaths = paths.filter(p => p.replace(/-/g, '').toLowerCase().includes(processName.toLowerCase()));
+          return paths.length === 0 || (matchingPaths.length / paths.length) >= 0.7;
+
+  - description: "Task completion -- SME document is non-empty with at least one finding"
+    assert:
+      - type: javascript
+        value: |
+          const fs = require('fs');
+          const smeDir = '.planning/smes';
+          let files;
+          try {
+            files = fs.readdirSync(smeDir).filter(f => f.endsWith('-SME.md'));
+          } catch (e) {
+            return false;
+          }
+          if (files.length === 0) return false;
+          const sme = fs.readFileSync(`${smeDir}/${files[0]}`, 'utf-8');
+          return sme.length > 200 && /\[(BLOCKER|WARNING|WATCH)\]/.test(sme);
+
+  - description: "Cleanup -- no .tmp directory left behind after agent completion"
+    assert:
+      - type: javascript
+        value: |
+          const fs = require('fs');
+          try {
+            fs.accessSync('.planning/smes/.tmp');
+            return false; // Directory exists -- not cleaned up
+          } catch {
+            return true; // Directory does not exist -- cleaned up correctly
+          }
