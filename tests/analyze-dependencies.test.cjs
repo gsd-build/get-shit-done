@@ -44,12 +44,15 @@ describe('analyze-dependencies command', () => {
     );
   });
 
-  test('docs/COMMANDS.md references analyze-dependencies', () => {
+  test('docs/COMMANDS.md does not document the consolidated-away /gsd-analyze-dependencies entry', () => {
+    // #2790 deleted the standalone command file. COMMANDS.md must no longer advertise it.
+    // The underlying capability lives in workflows/analyze-dependencies.md and is invoked
+    // from consolidated entry points (see gsd-phase / gsd-progress workflow chains).
     const p = path.join(__dirname, '..', 'docs', 'COMMANDS.md');
-    if (fs.existsSync(p)) {
-      const content = fs.readFileSync(p, 'utf-8');
-      assert.ok(content.includes('analyze-dependencies'),
-        'COMMANDS.md should document the new command');
-    }
+    if (!fs.existsSync(p)) return;
+    const content = fs.readFileSync(p, 'utf-8');
+    // Look only for the section header form so we tolerate workflow-internal references.
+    assert.ok(!/^### `\/gsd-analyze-dependencies`/m.test(content),
+      'COMMANDS.md should not document the removed /gsd-analyze-dependencies command');
   });
 });
