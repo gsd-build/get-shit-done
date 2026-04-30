@@ -52,8 +52,8 @@ Plans:
   3. `sme.context-block` query produces an XML block containing SME findings ready for injection into an agent prompt
 **Plans:** 2 plans
 Plans:
-- [ ] 02-01-PLAN.md — Implement three SME query handlers (smeList, smeDetectProcesses, smeContextBlock) with TDD
-- [ ] 02-02-PLAN.md — Register handlers in SDK registry and add golden policy exception entries
+- [x] 02-01-PLAN.md — Implement three SME query handlers (smeList, smeDetectProcesses, smeContextBlock) with TDD
+- [x] 02-02-PLAN.md — Register handlers in SDK registry and add golden policy exception entries
 
 ### Phase 3: SME Creator Agent
 **Goal**: The creator agent can produce a complete, accurate SME document for a given process by analyzing code, git history, PR descriptions, and docs
@@ -64,7 +64,10 @@ Plans:
   2. The generated document captures the "why" behind patterns by referencing `git log --follow` output and PR descriptions, not just current code state
   3. The creator uses parallel sub-agent decomposition for large codepaths without burning the session context budget
   4. On the HSA engine target, the document correctly identifies the contribution fraud logic, member-ID character limit fragility, and COVID-era logic as domain risks
-**Plans**: TBD
+**Plans:** 2 plans
+Plans:
+- [ ] 03-01-PLAN.md — Create both SME creator agent definitions (orchestrator + analyzer sub-agent)
+- [ ] 03-02-PLAN.md — Create Promptfoo eval config and validate all Phase 3 deliverables
 
 ### Phase 4: Creation Command & Workflow
 **Goal**: Users can create and refresh SME documents via the `/gsd-create-sme` command with an interactive flow
@@ -144,7 +147,7 @@ Phases execute in numeric order: 1 → 2 → 3 → 4 → 5 → 6 → 7 → 8 →
 |-------|----------------|--------|-----------|
 | 1. Schema & Config | 3/3 | Complete   | 2026-04-28 |
 | 2. SDK Query Handlers | 0/2 | Not started | - |
-| 3. SME Creator Agent | 0/TBD | Not started | - |
+| 3. SME Creator Agent | 0/2 | Not started | - |
 | 4. Creation Command & Workflow | 0/TBD | Not started | - |
 | 5. SME Auditor Agent | 0/TBD | Not started | - |
 | 6. Plan-Phase Gate | 0/TBD | Not started | - |
