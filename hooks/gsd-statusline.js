@@ -120,22 +120,60 @@ function readGsdState(dir) {
 
 /**
  * Parse STATE.md frontmatter + Phase line from body.
- * Returns { status, milestone, milestoneName, phaseNum, phaseTotal, phaseName }
+ *
+ * Returns:
+ *   { status, milestone, milestoneName, phaseNum, phaseTotal, phaseName,
+ *     activePhase, nextAction, nextPhases, completedPhases, totalPhases, percent }
+ *
+ * Phase-lifecycle fields (issue #2833):
+ *   - activePhase  : phase number ("4.5") when an orchestrator is mid-flight, null otherwise
+ *   - nextAction   : recommended next command ("execute-phase") when idle, null otherwise
+ *   - nextPhases   : array of phase numbers (["4.5"]) for nextAction, null otherwise
+ *   - completedPhases / totalPhases / percent : milestone progress dimension
+ *
+ * All new fields default to undefined when absent — formatGsdState() degrades
+ * gracefully so existing STATE.md files (without these fields) keep working.
  */
 function parseStateMd(content) {
   const state = {};
 
-  // YAML frontmatter between --- markers
+  // YAML frontmatter between --- markers (anchored at file start)
   const fmMatch = content.match(/^---\n([\s\S]*?)\n---/);
   if (fmMatch) {
-    for (const line of fmMatch[1].split('\n')) {
+    const fm = fmMatch[1];
+    // Top-level scalar key: value
+    for (const line of fm.split('\n')) {
       const m = line.match(/^(\w+):\s*(.+)/);
       if (!m) continue;
       const [, key, val] = m;
       const v = val.trim().replace(/^["']|["']$/g, '');
+      // status / milestone-level fields (existing — preserved exactly)
       if (key === 'status') state.status = v === 'null' ? null : v;
       if (key === 'milestone') state.milestone = v === 'null' ? null : v;
       if (key === 'milestone_name') state.milestoneName = v === 'null' ? null : v;
+      // Phase-lifecycle fields (new in issue #2833)
+      // active_phase: phase number when an orchestrator is in-flight, null when idle
+      if (key === 'active_phase') state.activePhase = (v === 'null' || v === '') ? null : v;
+      // next_action: recommended command when idle (discuss-phase / plan-phase / execute-phase / verify-phase)
+      if (key === 'next_action') state.nextAction = (v === 'null' || v === '') ? null : v;
+    }
+    // next_phases YAML flow array: ["4.5", "4.6"] — single-line flow only
+    // Block sequences (- 4.5 / - 4.6 over multiple lines) are intentionally
+    // not parsed here; statusline only needs the primary recommendation.
+    const npMatch = fm.match(/^next_phases:\s*\[([^\]]*)\]/m);
+    if (npMatch) {
+      const items = npMatch[1].split(',').map(s => s.trim().replace(/^["']|["']$/g, '')).filter(Boolean);
+      state.nextPhases = items.length > 0 ? items : null;
+    }
+    // progress nested block: completed_phases / total_phases / percent (2-space indent)
+    const progMatch = fm.match(/^progress:\s*\n((?:[ \t]+\w+:.+\n?)+)/m);
+    if (progMatch) {
+      const cp = progMatch[1].match(/^[ \t]+completed_phases:\s*(\d+)/m);
+      const tp = progMatch[1].match(/^[ \t]+total_phases:\s*(\d+)/m);
+      const pc = progMatch[1].match(/^[ \t]+percent:\s*(\d+)/m);
+      if (cp) state.completedPhases = cp[1];
+      if (tp) state.totalPhases = tp[1];
+      if (pc) state.percent = pc[1];
     }
   }
 
