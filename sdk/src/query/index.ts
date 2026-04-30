@@ -144,8 +144,6 @@ export const QUERY_MUTATION_COMMANDS = new Set<string>([
   'config-set', 'config-set-model-profile', 'config-new-project', 'config-ensure-section',
   'commit', 'check-commit', 'commit-to-subrepo',
   'template.fill', 'template.select', 'template select',
-  'validate.health', 'validate health',
-  'validate.context', 'validate context',
   ...PHASE_MUTATION_COMMANDS,
   ...PHASES_MUTATION_COMMANDS,
   ...ROADMAP_MUTATION_COMMANDS,

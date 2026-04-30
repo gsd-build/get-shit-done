@@ -70,7 +70,8 @@ function routeStateCommand({ state, args, cwd, raw, parseNamedArgs, error }) {
   } else if (subcommand === undefined || subcommand === 'load') {
     state.cmdStateLoad(cwd, raw);
   } else {
-    error(`Unknown state subcommand: "${subcommand}". Available: ${['load', ...STATE_SUBCOMMANDS.filter((s) => s !== 'load')].join(', ')}`);
+    const available = ['load', 'complete-phase', ...STATE_SUBCOMMANDS.filter((s) => s !== 'load')];
+    error(`Unknown state subcommand: "${subcommand}". Available: ${available.join(', ')}`);
   }
 }
 

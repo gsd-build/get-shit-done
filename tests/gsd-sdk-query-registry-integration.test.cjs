@@ -14,6 +14,7 @@ const path = require('path');
 
 const REPO_ROOT = path.join(__dirname, '..');
 const REGISTRY_FILE = path.join(REPO_ROOT, 'sdk', 'src', 'query', 'index.ts');
+const COMMAND_ALIASES_FILE = path.join(REPO_ROOT, 'get-shit-done', 'bin', 'lib', 'command-aliases.generated.cjs');
 
 // Prose tokens that repeatedly appear after `gsd-sdk query` in English
 // documentation but aren't real command names.
@@ -41,9 +42,39 @@ const SKIP_DIRS = new Set(['node_modules', '.git', 'dist', 'build']);
 function collectRegisteredNames() {
   const src = fs.readFileSync(REGISTRY_FILE, 'utf8');
   const names = new Set();
+
+  // Static registrations in index.ts
   const re = /registry\.register\(\s*['"]([^'"]+)['"]/g;
   let m;
   while ((m = re.exec(src)) !== null) names.add(m[1]);
+
+  // Manifest-generated family aliases registered via loop in index.ts.
+  // Keep this in sync with command-manifest-driven routing seams.
+  try {
+    // eslint-disable-next-line global-require, import/no-dynamic-require
+    const aliases = require(COMMAND_ALIASES_FILE);
+    const familyArrays = [
+      aliases.STATE_COMMAND_ALIASES,
+      aliases.VERIFY_COMMAND_ALIASES,
+      aliases.INIT_COMMAND_ALIASES,
+      aliases.PHASE_COMMAND_ALIASES,
+      aliases.PHASES_COMMAND_ALIASES,
+      aliases.VALIDATE_COMMAND_ALIASES,
+      aliases.ROADMAP_COMMAND_ALIASES,
+    ];
+    for (const arr of familyArrays) {
+      if (!Array.isArray(arr)) continue;
+      for (const entry of arr) {
+        if (entry?.canonical) names.add(entry.canonical);
+        if (Array.isArray(entry?.aliases)) {
+          for (const alias of entry.aliases) names.add(alias);
+        }
+      }
+    }
+  } catch {
+    // If generated aliases are unavailable, fall back to static extraction only.
+  }
+
   return names;
 }
 
