@@ -355,6 +355,21 @@ When the plan frontmatter has `type: tdd`, the entire plan follows the RED/GREEN
 If RED or GREEN gate commits are missing, add a warning to SUMMARY.md under a `## TDD Gate Compliance` section.
 </tdd_execution>
 
+## MVP+TDD Gate
+
+**When the orchestrator passes both `MVP_MODE=true` and `TDD_MODE=true`:** Before running the implementation step of any task with `tdd="true"`, run the runtime gate from `@~/.claude/get-shit-done/references/execute-mvp-tdd.md`. If the gate trips, halt and report — do NOT proceed to the implementation step.
+
+**Halt-and-report protocol:**
+
+1. Stop. Do not run the task's implementation step.
+2. Emit the structured halt report defined in `references/execute-mvp-tdd.md` (header line, reason code, expected behavior, required next step).
+3. Update `STATE.md` with `last_gate_trip: {plan_id}/{task_id}`.
+4. Exit the current execution wave cleanly. Prior commits in the same wave stay — do not roll back.
+
+**Behavior-adding task detection** (the gate only fires for behavior-adding tasks): see `references/execute-mvp-tdd.md` for the precise definition. Pure doc-only / config-only / test-only tasks are exempt.
+
+**Mode is all-or-nothing per phase** (PRD decision Q1, inherited from Phase 1). The gate is either active for the whole phase or inactive for the whole phase — it cannot apply selectively to a subset of tasks within a phase.
+
 <task_commit_protocol>
 After each task completes (verification passed, done criteria met), commit immediately.
 

@@ -138,6 +138,23 @@ if [[ ! "$ARGUMENTS" =~ --auto ]]; then
   gsd-sdk query config-set workflow._auto_chain_active false || true
 fi
 ```
+
+Resolve MVP_MODE (CLI flag → roadmap phase mode → config → false):
+```bash
+MVP_MODE_CFG=$(gsd-sdk query config-get workflow.mvp_mode 2>/dev/null || echo "false")
+PHASE_MODE=$(gsd-sdk query roadmap.get-phase "${PHASE_NUMBER}" --pick mode 2>/dev/null || echo "")
+MVP_MODE=false
+if [[ "$ARGUMENTS" =~ --mvp ]] || [ "$PHASE_MODE" = "mvp" ] || [ "$MVP_MODE_CFG" = "true" ]; then MVP_MODE=true; fi
+```
+
+**MVP+TDD gate.** When `MVP_MODE=true` AND `TDD_MODE=true` AND `TASK_TDD=true`, require a failing-test commit before the implementation step. Doc-only / config-only tasks are exempt. See `execute-mvp-tdd.md` for full halt report format and "behavior-adding task" definition.
+```bash
+if [ "$MVP_MODE" = "true" ] && [ "$TDD_MODE" = "true" ] && [ "$TASK_TDD" = "true" ]; then
+  RED_COMMIT=$(git log --oneline --grep="^test(${PHASE_NUMBER}-${PLAN_ID}):" -- "**/*.test.*" "**/*.spec.*" "tests/" | head -1)
+  if [ -z "$RED_COMMIT" ]; then echo "MVP+TDD GATE TRIPPED: missing RED commit for ${PLAN_ID}/${TASK_ID}"; exit 1; fi
+fi
+```
+On trip, updates `STATE.md` with `last_gate_trip: {plan_id}/{task_id}`.
 </step>
 
 <step name="check_blocking_antipatterns" priority="first">
@@ -1052,6 +1069,14 @@ TDD_PLANS=$(grep -rl "^type: tdd" "${PHASE_DIR}"/*-PLAN.md 2>/dev/null | wc -l |
    | {id} |  ✓  |   ✓   |    ✓     | Pass   |
    | {id} |  ✓  |   ✗   |    —     | FAIL   |
    ```
+
+**Escalation under MVP+TDD.** When `MVP_MODE=true` AND `TDD_MODE=true`, the review verdict escalates from advisory to **blocking**: missing RED or GREEN gate commits prevent marking the phase complete.
+```
+Phase blocked: {N} TDD plan(s) violate the RED→GREEN gate sequence under MVP+TDD.
+Resolve and re-run /gsd execute-phase, or override with
+/gsd execute-phase {phase} --force-mvp-gate to ship anyway.
+```
+`--force-mvp-gate` is the escape hatch (documented, not yet implemented). Without both modes active, the existing advisory behavior is preserved.
 
 **Gate violations are advisory** — they do not block execution but are surfaced to the user for review. The verifier agent (step `verify_phase_goal`) will also check TDD discipline as part of its quality assessment.
 </step>

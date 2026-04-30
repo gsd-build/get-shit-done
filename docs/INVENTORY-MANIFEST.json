@@ -1,5 +1,5 @@
 {
-  "generated": "2026-04-29",
+  "generated": "2026-04-30",
   "families": {
     "agents": [
       "gsd-advisor-researcher",
@@ -226,6 +226,7 @@
       "decimal-phase-calculation.md",
       "doc-conflict-engine.md",
       "domain-probes.md",
+      "execute-mvp-tdd.md",
       "executor-examples.md",
       "gate-prompts.md",
       "gates.md",
