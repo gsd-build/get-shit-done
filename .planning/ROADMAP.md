@@ -66,8 +66,8 @@ Plans:
   4. On the HSA engine target, the document correctly identifies the contribution fraud logic, member-ID character limit fragility, and COVID-era logic as domain risks
 **Plans:** 2 plans
 Plans:
-- [ ] 03-01-PLAN.md — Create both SME creator agent definitions (orchestrator + analyzer sub-agent)
-- [ ] 03-02-PLAN.md — Create Promptfoo eval config and validate all Phase 3 deliverables
+- [x] 03-01-PLAN.md — Create both SME creator agent definitions (orchestrator + analyzer sub-agent)
+- [x] 03-02-PLAN.md — Create Promptfoo eval config and validate all Phase 3 deliverables
 
 ### Phase 4: Creation Command & Workflow
 **Goal**: Users can create and refresh SME documents via the `/gsd-create-sme` command with an interactive flow
@@ -78,7 +78,9 @@ Plans:
   2. `/gsd-create-sme` with no arguments presents an interactive process menu for the user to choose from
   3. When an SME already exists for the specified process, the user is offered a choice: create new or update existing
   4. The workflow shows progress indicators during SME creation so the user knows the agent is working
-**Plans**: TBD
+**Plans:** 1 plan
+Plans:
+- [ ] 04-01-PLAN.md — Create /gsd-create-sme command, create-sme workflow, and structural validation tests
 
 ### Phase 5: SME Auditor Agent
 **Goal**: The adversarial SME auditor agent can review a PLAN.md against domain knowledge and return structured findings with the correct return markers
@@ -148,7 +150,7 @@ Phases execute in numeric order: 1 → 2 → 3 → 4 → 5 → 6 → 7 → 8 →
 | 1. Schema & Config | 3/3 | Complete   | 2026-04-28 |
 | 2. SDK Query Handlers | 0/2 | Not started | - |
 | 3. SME Creator Agent | 0/2 | Not started | - |
-| 4. Creation Command & Workflow | 0/TBD | Not started | - |
+| 4. Creation Command & Workflow | 0/1 | Not started | - |
 | 5. SME Auditor Agent | 0/TBD | Not started | - |
 | 6. Plan-Phase Gate | 0/TBD | Not started | - |
 | 7. Discuss-Phase Integration | 0/TBD | Not started | - |
