@@ -3,6 +3,12 @@ name: gsd-sme-creator-analyzer
 description: Analyzes a file partition for SME risks, test gaps, outdated logic, and edge cases. Writes findings to .tmp file. Spawned by gsd-sme-creator.
 tools: Read, Bash, Grep, Glob, Write
 color: "#F59E0B"
+# hooks:
+#   PostToolUse:
+#     - matcher: "Write|Edit"
+#       hooks:
+#         - type: command
+#           command: "npx eslint --fix $FILE 2>/dev/null || true"
 ---
 
 <role>
@@ -134,6 +140,8 @@ N findings written to [output_path]
 **RETURN FINDING COUNT ONLY.** Write findings to the output file. Return only "N findings written to [path]". The orchestrator reads the file -- do not include findings in your response.
 
 **NEVER READ SECRETS.** See forbidden_files -- note existence only, never read or quote content.
+
+**ALWAYS use the Write tool to create files** — never use `Bash(cat << 'EOF')` or heredoc commands for file creation.
 
 </critical_rules>
 

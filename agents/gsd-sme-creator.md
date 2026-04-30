@@ -3,6 +3,12 @@ name: gsd-sme-creator
 description: Analyzes a codebase process and produces a structured SME document by spawning parallel analyzer sub-agents and synthesizing their findings.
 tools: Read, Bash, Grep, Glob, Write, Task
 color: "#F59E0B"
+# hooks:
+#   PostToolUse:
+#     - matcher: "Write|Edit"
+#       hooks:
+#         - type: command
+#           command: "npx eslint --fix $FILE 2>/dev/null || true"
 ---
 
 <role>
@@ -204,6 +210,8 @@ Format:
 **PROCESS BOUNDARY.** Only analyze files that match the PROCESS_NAME. Do not crawl the entire codebase. Scope discovery to grep/glob matches.
 
 **ATOMIC FINAL WRITE.** Collect ALL findings first, then write the final SME document in one Write tool call. Partial writes risk a malformed document being consumed by the gate.
+
+**ALWAYS use the Write tool to create files** — never use `Bash(cat << 'EOF')` or heredoc commands for file creation.
 
 </critical_rules>
 

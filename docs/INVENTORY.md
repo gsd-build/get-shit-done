@@ -10,7 +10,7 @@
 
 ---
 
-## Agents (33 shipped)
+## Agents (35 shipped)
 
 Full roster at `agents/gsd-*.md`. The "Primary doc" column flags whether [`docs/AGENTS.md`](AGENTS.md) carries a full role card (*primary*), a short stub in the "Advanced and Specialized Agents" section (*advanced stub*), or no coverage (*inventory only*).
 
@@ -47,10 +47,12 @@ Full roster at `agents/gsd-*.md`. The "Primary doc" column flags whether [`docs/
 | gsd-eval-auditor | Retroactive audit of an AI phase's evaluation coverage; produces EVAL-REVIEW.md (COVERED/PARTIAL/MISSING). | `/gsd-eval-review` | advanced stub |
 | gsd-framework-selector | ≤6-question interactive decision matrix that scores and recommends an AI/LLM framework. | `/gsd-ai-integration-phase`, `/gsd-select-framework` | advanced stub |
 | gsd-intel-updater | Writes structured intel files (`.planning/intel/*.json`) used as a queryable codebase knowledge base. | `/gsd-intel` | advanced stub |
+| gsd-sme-creator | Analyzes a codebase process and produces a structured SME document by spawning parallel analyzer sub-agents and synthesizing their findings. | `/gsd-create-sme` (Phase 4) | inventory only |
+| gsd-sme-creator-analyzer | Analyzes a file partition for SME risks, test gaps, outdated logic, and edge cases. Writes findings to .tmp file. | `gsd-sme-creator` (sub-agent) | inventory only |
 | gsd-doc-classifier | Classifies a single planning document as ADR, PRD, SPEC, DOC, or UNKNOWN; spawned in parallel to process the doc corpus. | `/gsd-ingest-docs` | advanced stub |
 | gsd-doc-synthesizer | Synthesizes classified planning docs into a single consolidated context with precedence rules, cycle detection, and three-bucket conflicts report. | `/gsd-ingest-docs` | advanced stub |
 
-**Coverage note.** `docs/AGENTS.md` gives full role cards for 21 primary agents plus concise stubs for the 12 advanced agents. The Agent Tool Permissions Summary in that file covers only the primary 21 agents; the advanced agents' tool lists are captured in their per-agent frontmatter in `agents/gsd-*.md`.
+**Coverage note.** `docs/AGENTS.md` gives full role cards for 21 primary agents plus concise stubs for the 12 advanced agents. The Agent Tool Permissions Summary in that file covers only the primary 21 agents; the advanced agents' tool lists are captured in their per-agent frontmatter in `agents/gsd-*.md`. The 2 SME creator agents (`gsd-sme-creator`, `gsd-sme-creator-analyzer`) are inventory-only until Phase 4 integrates them into the create-sme workflow.
 
 ---
 

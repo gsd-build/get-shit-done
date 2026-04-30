@@ -30,6 +30,8 @@
       "gsd-research-synthesizer",
       "gsd-roadmapper",
       "gsd-security-auditor",
+      "gsd-sme-creator",
+      "gsd-sme-creator-analyzer",
       "gsd-ui-auditor",
       "gsd-ui-checker",
       "gsd-ui-researcher",
