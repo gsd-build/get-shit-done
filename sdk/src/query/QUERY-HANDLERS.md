@@ -10,6 +10,20 @@ This document records contracts for the typed query layer consumed by `gsd-sdk q
   - CJS `**summary-extract**` → SDK `**summary.extract**` / `**summary extract**` / `**history-digest**` (see `index.ts`).
   - CJS top-level `**scaffold <type> ...**` → SDK `**phase.scaffold**` / `**phase scaffold**` with the scaffold type as the first argument (no separate `scaffold` alias on the registry).
 
+### Manifest-backed family ownership
+
+These families are sourced from `command-manifest.*.ts` files and expanded into generated alias artifacts (`command-aliases.generated.ts` + CJS mirror):
+
+- `state.*` → `command-manifest.state.ts`
+- `verify.*` → `command-manifest.verify.ts`
+- `init.*` → `command-manifest.init.ts`
+- `phase.*` → `command-manifest.phase.ts`
+- `phases.*` → `command-manifest.phases.ts`
+- `validate.*` → `command-manifest.validate.ts`
+- `roadmap.*` → `command-manifest.roadmap.ts`
+
+CJS routing seams mirror these families with thin adapters (`state/verify/init/phase/phases/validate/roadmap-command-router.cjs`) so `gsd-tools.cjs` stays orchestration-only.
+
 ## `gsd-sdk query` routing
 
 1. **`normalizeQueryCommand()`** (`normalize-query-command.ts`) — maps the first argv tokens to the same **command + subcommand** patterns as `gsd-tools` `runCommand()` where needed (e.g. `state json` → `state.json`, `init execute-phase 9` → `init.execute-phase` with args `['9']`, `scaffold …` → `phase.scaffold`). Re-exported from **`@gsd-build/sdk`** and **`createRegistry`’s module** (`sdk/src/query/index.ts`) so programmatic callers can mirror CLI tokenization without importing a deep path.

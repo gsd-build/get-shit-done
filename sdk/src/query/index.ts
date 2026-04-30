@@ -20,6 +20,19 @@ import { frontmatterGet } from './frontmatter.js';
 import { configGet, configPath, resolveModel } from './config-query.js';
 import { stateJson, stateGet, stateSnapshot } from './state.js';
 import { stateProjectLoad } from './state-project-load.js';
+import {
+  STATE_COMMAND_ALIASES,
+  STATE_MUTATION_COMMANDS,
+  VERIFY_COMMAND_ALIASES,
+  INIT_COMMAND_ALIASES,
+  PHASE_COMMAND_ALIASES,
+  PHASE_MUTATION_COMMANDS,
+  PHASES_COMMAND_ALIASES,
+  PHASES_MUTATION_COMMANDS,
+  VALIDATE_COMMAND_ALIASES,
+  ROADMAP_COMMAND_ALIASES,
+  ROADMAP_MUTATION_COMMANDS,
+} from './command-aliases.generated.js';
 import { findPhase, phasePlanIndex } from './phase.js';
 import { phaseListPlans, phaseListArtifacts } from './phase-list-queries.js';
 import { planTaskStructure } from './plan-task-structure.js';
@@ -126,28 +139,16 @@ export { normalizeQueryCommand } from './normalize-query-command.js';
  * (they emit JSON for workflows; agents perform writes).
  */
 export const QUERY_MUTATION_COMMANDS = new Set<string>([
-  'state.update', 'state.patch', 'state.begin-phase', 'state.advance-plan',
-  'state.record-metric', 'state.update-progress', 'state.add-decision',
-  'state.add-blocker', 'state.resolve-blocker', 'state.record-session',
-  'state.planned-phase', 'state planned-phase',
-  'state.signal-waiting', 'state signal-waiting',
-  'state.signal-resume', 'state signal-resume',
-  'state.sync', 'state sync',
-  'state.prune', 'state prune',
-  'state.milestone-switch', 'state milestone-switch',
-  'state.add-roadmap-evolution', 'state add-roadmap-evolution',
+  ...STATE_MUTATION_COMMANDS,
   'frontmatter.set', 'frontmatter.merge', 'frontmatter.validate', 'frontmatter validate',
   'config-set', 'config-set-model-profile', 'config-new-project', 'config-ensure-section',
   'commit', 'check-commit', 'commit-to-subrepo',
   'template.fill', 'template.select', 'template select',
   'validate.health', 'validate health',
   'validate.context', 'validate context',
-  'phase.add', 'phase.add-batch', 'phase.insert', 'phase.remove', 'phase.complete',
-  'phase.scaffold', 'phases.clear', 'phases.archive',
-  'phase add', 'phase add-batch', 'phase insert', 'phase remove', 'phase complete',
-  'phase scaffold', 'phases clear', 'phases archive',
-  'roadmap.update-plan-progress', 'roadmap update-plan-progress',
-  'roadmap.annotate-dependencies', 'roadmap annotate-dependencies',
+  ...PHASE_MUTATION_COMMANDS,
+  ...PHASES_MUTATION_COMMANDS,
+  ...ROADMAP_MUTATION_COMMANDS,
   'requirements.mark-complete', 'requirements mark-complete',
   'todo.complete', 'todo complete',
   'milestone.complete', 'milestone complete',
@@ -284,22 +285,62 @@ export function createRegistry(
   registry.register('config-get', configGet);
   registry.register('config-path', configPath);
   registry.register('resolve-model', resolveModel);
-  registry.register('state.load', stateProjectLoad);
-  registry.register('state.json', stateJson);
-  registry.register('state.get', stateGet);
+  const stateHandlers: Record<string, QueryHandler> = {
+    'state.load': stateProjectLoad,
+    'state.json': stateJson,
+    'state.get': stateGet,
+    'state.update': stateUpdate,
+    'state.patch': statePatch,
+    'state.begin-phase': stateBeginPhase,
+    'state.advance-plan': stateAdvancePlan,
+    'state.record-metric': stateRecordMetric,
+    'state.update-progress': stateUpdateProgress,
+    'state.add-decision': stateAddDecision,
+    'state.add-blocker': stateAddBlocker,
+    'state.resolve-blocker': stateResolveBlocker,
+    'state.record-session': stateRecordSession,
+    'state.signal-waiting': stateSignalWaiting,
+    'state.signal-resume': stateSignalResume,
+    'state.planned-phase': statePlannedPhase,
+    'state.validate': stateValidate,
+    'state.sync': stateSync,
+    'state.prune': statePrune,
+    'state.milestone-switch': stateMilestoneSwitch,
+    'state.add-roadmap-evolution': stateAddRoadmapEvolution,
+  };
+
+  for (const entry of STATE_COMMAND_ALIASES) {
+    const handler = stateHandlers[entry.canonical];
+    if (!handler) continue;
+    registry.register(entry.canonical, handler);
+    for (const alias of entry.aliases) {
+      registry.register(alias, handler);
+    }
+  }
+
   registry.register('state-snapshot', stateSnapshot);
   registry.register('find-phase', findPhase);
   registry.register('phase-plan-index', phasePlanIndex);
-  registry.register('phase.list-plans', phaseListPlans);
-  registry.register('phase list-plans', phaseListPlans);
-  registry.register('phase.list-artifacts', phaseListArtifacts);
-  registry.register('phase list-artifacts', phaseListArtifacts);
   registry.register('plan.task-structure', planTaskStructure);
   registry.register('plan task-structure', planTaskStructure);
   registry.register('requirements.extract-from-plans', requirementsExtractFromPlans);
   registry.register('requirements extract-from-plans', requirementsExtractFromPlans);
-  registry.register('roadmap.analyze', roadmapAnalyze);
-  registry.register('roadmap.get-phase', roadmapGetPhase);
+  const roadmapHandlers: Record<string, QueryHandler> = {
+    'roadmap.analyze': roadmapAnalyze,
+    'roadmap.get-phase': roadmapGetPhase,
+    'roadmap.update-plan-progress': roadmapUpdatePlanProgress,
+    'roadmap.annotate-dependencies': roadmapAnnotateDependencies,
+  };
+
+  for (const entry of ROADMAP_COMMAND_ALIASES) {
+    const handler = roadmapHandlers[entry.canonical];
+    if (!handler) continue;
+    registry.register(entry.canonical, handler);
+    for (const alias of entry.aliases) {
+      registry.register(alias, handler);
+    }
+  }
+
   registry.register('progress', progressJson);
   registry.register('progress.json', progressJson);
 
@@ -308,32 +349,6 @@ export function createRegistry(
   registry.register('frontmatter.merge', frontmatterMerge);
   registry.register('frontmatter.validate', frontmatterValidate);
   registry.register('frontmatter validate', frontmatterValidate);
-
-  // State mutation handlers
-  registry.register('state.update', stateUpdate);
-  registry.register('state.patch', statePatch);
-  registry.register('state.begin-phase', stateBeginPhase);
-  registry.register('state.advance-plan', stateAdvancePlan);
-  registry.register('state.record-metric', stateRecordMetric);
-  registry.register('state.update-progress', stateUpdateProgress);
-  registry.register('state.add-decision', stateAddDecision);
-  registry.register('state.add-blocker', stateAddBlocker);
-  registry.register('state.resolve-blocker', stateResolveBlocker);
-  registry.register('state.record-session', stateRecordSession);
-  registry.register('state.signal-waiting', stateSignalWaiting);
-  registry.register('state.signal-resume', stateSignalResume);
-  registry.register('state.validate', stateValidate);
-  registry.register('state.sync', stateSync);
-  registry.register('state.prune', statePrune);
-  registry.register('state.milestone-switch', stateMilestoneSwitch);
-  registry.register('state.add-roadmap-evolution', stateAddRoadmapEvolution);
-  registry.register('state milestone-switch', stateMilestoneSwitch);
-  registry.register('state add-roadmap-evolution', stateAddRoadmapEvolution);
-  registry.register('state signal-waiting', stateSignalWaiting);
-  registry.register('state signal-resume', stateSignalResume);
-  registry.register('state validate', stateValidate);
-  registry.register('state sync', stateSync);
-  registry.register('state prune', statePrune);
 
   // Config mutation handlers
   registry.register('config-set', configSet);
@@ -350,19 +365,26 @@ export function createRegistry(
   registry.register('template.select', templateSelect);
   registry.register('template select', templateSelect);
 
-  // Verification handlers
-  registry.register('verify.plan-structure', verifyPlanStructure);
-  registry.register('verify plan-structure', verifyPlanStructure);
-  registry.register('verify.phase-completeness', verifyPhaseCompleteness);
-  registry.register('verify phase-completeness', verifyPhaseCompleteness);
-  registry.register('verify.artifacts', verifyArtifacts);
-  registry.register('verify artifacts', verifyArtifacts);
-  registry.register('verify.key-links', verifyKeyLinks);
-  registry.register('verify key-links', verifyKeyLinks);
-  registry.register('verify.commits', verifyCommits);
-  registry.register('verify commits', verifyCommits);
-  registry.register('verify.references', verifyReferences);
-  registry.register('verify references', verifyReferences);
+  const verifyHandlers: Record<string, QueryHandler> = {
+    'verify.plan-structure': verifyPlanStructure,
+    'verify.phase-completeness': verifyPhaseCompleteness,
+    'verify.references': verifyReferences,
+    'verify.commits': verifyCommits,
+    'verify.artifacts': verifyArtifacts,
+    'verify.key-links': verifyKeyLinks,
+    'verify.schema-drift': verifySchemaDrift,
+    'verify.codebase-drift': verifyCodebaseDrift,
+  };
+
+  for (const entry of VERIFY_COMMAND_ALIASES) {
+    const handler = verifyHandlers[entry.canonical];
+    if (!handler) continue;
+    registry.register(entry.canonical, handler);
+    for (const alias of entry.aliases) {
+      registry.register(alias, handler);
+    }
+  }
+
   registry.register('verify-summary', verifySummary);
   registry.register('verify.summary', verifySummary);
   registry.register('verify summary', verifySummary);
@@ -377,14 +399,21 @@ export function createRegistry(
   registry.register('check decision-coverage-plan', checkDecisionCoveragePlan);
   registry.register('check.decision-coverage-verify', checkDecisionCoverageVerify);
   registry.register('check decision-coverage-verify', checkDecisionCoverageVerify);
-  registry.register('validate.consistency', validateConsistency);
-  registry.register('validate consistency', validateConsistency);
-  registry.register('validate.health', validateHealth);
-  registry.register('validate health', validateHealth);
-  registry.register('validate.agents', validateAgents);
-  registry.register('validate agents', validateAgents);
-  registry.register('validate.context', validateContext);
-  registry.register('validate context', validateContext);
+  const validateHandlers: Record<string, QueryHandler> = {
+    'validate.consistency': validateConsistency,
+    'validate.health': validateHealth,
+    'validate.agents': validateAgents,
+    'validate.context': validateContext,
+  };
+
+  for (const entry of VALIDATE_COMMAND_ALIASES) {
+    const handler = validateHandlers[entry.canonical];
+    if (!handler) continue;
+    registry.register(entry.canonical, handler);
+    for (const alias of entry.aliases) {
+      registry.register(alias, handler);
+    }
+  }
 
   // Decision routing (SDK-only — no `gsd-tools.cjs` mirror yet; see QUERY-HANDLERS.md)
   registry.register('check.config-gates', checkConfigGates);
@@ -406,82 +435,75 @@ export function createRegistry(
   registry.register('check.ship-ready', checkShipReady);
   registry.register('check ship-ready', checkShipReady);
 
-  // Phase lifecycle handlers
-  registry.register('phase.add', phaseAdd);
-  registry.register('phase.add-batch', phaseAddBatch);
-  registry.register('phase.insert', phaseInsert);
-  registry.register('phase.remove', phaseRemove);
-  registry.register('phase.complete', phaseComplete);
-  registry.register('phase.scaffold', phaseScaffold);
-  registry.register('phases.clear', phasesClear);
-  registry.register('phases.archive', phasesArchive);
-  registry.register('phases.list', phasesList);
-  registry.register('phase.next-decimal', phaseNextDecimal);
-  // Space-delimited aliases for CJS compatibility
-  registry.register('phase add', phaseAdd);
-  registry.register('phase add-batch', phaseAddBatch);
-  registry.register('phase insert', phaseInsert);
-  registry.register('phase remove', phaseRemove);
-  registry.register('phase complete', phaseComplete);
-  registry.register('phase scaffold', phaseScaffold);
-  registry.register('phases clear', phasesClear);
-  registry.register('phases archive', phasesArchive);
-  registry.register('phases list', phasesList);
-  registry.register('phase next-decimal', phaseNextDecimal);
+  const phaseHandlers: Record<string, QueryHandler> = {
+    'phase.list-plans': phaseListPlans,
+    'phase.list-artifacts': phaseListArtifacts,
+    'phase.add': phaseAdd,
+    'phase.add-batch': phaseAddBatch,
+    'phase.insert': phaseInsert,
+    'phase.remove': phaseRemove,
+    'phase.complete': phaseComplete,
+    'phase.scaffold': phaseScaffold,
+    'phase.next-decimal': phaseNextDecimal,
+  };
 
-  // Init composition handlers
-  registry.register('init.execute-phase', initExecutePhase);
-  registry.register('init.plan-phase', initPlanPhase);
-  registry.register('init.new-milestone', initNewMilestone);
-  registry.register('init.quick', initQuick);
-  registry.register('init.resume', initResume);
-  registry.register('init.verify-work', initVerifyWork);
-  registry.register('init.phase-op', initPhaseOp);
-  registry.register('init.todos', initTodos);
-  registry.register('init.milestone-op', initMilestoneOp);
-  registry.register('init.map-codebase', initMapCodebase);
-  registry.register('init.new-workspace', initNewWorkspace);
-  registry.register('init.list-workspaces', initListWorkspaces);
-  registry.register('init.remove-workspace', initRemoveWorkspace);
-  registry.register('init.ingest-docs', initIngestDocs);
-  // Space-delimited aliases for CJS compatibility
-  registry.register('init execute-phase', initExecutePhase);
-  registry.register('init plan-phase', initPlanPhase);
-  registry.register('init new-milestone', initNewMilestone);
-  registry.register('init quick', initQuick);
-  registry.register('init resume', initResume);
-  registry.register('init verify-work', initVerifyWork);
-  registry.register('init phase-op', initPhaseOp);
-  registry.register('init todos', initTodos);
-  registry.register('init milestone-op', initMilestoneOp);
-  registry.register('init map-codebase', initMapCodebase);
-  registry.register('init new-workspace', initNewWorkspace);
-  registry.register('init list-workspaces', initListWorkspaces);
-  registry.register('init remove-workspace', initRemoveWorkspace);
-  registry.register('init ingest-docs', initIngestDocs);
+  for (const entry of PHASE_COMMAND_ALIASES) {
+    const handler = phaseHandlers[entry.canonical];
+    if (!handler) continue;
+    registry.register(entry.canonical, handler);
+    for (const alias of entry.aliases) {
+      registry.register(alias, handler);
+    }
+  }
 
-  // Complex init handlers
-  registry.register('init.new-project', initNewProject);
-  registry.register('init.progress', initProgress);
-  registry.register('init.manager', initManager);
-  registry.register('init new-project', initNewProject);
-  registry.register('init progress', initProgress);
-  registry.register('init manager', initManager);
+  const phasesHandlers: Record<string, QueryHandler> = {
+    'phases.list': phasesList,
+    'phases.clear': phasesClear,
+    'phases.archive': phasesArchive,
+  };
+
+  for (const entry of PHASES_COMMAND_ALIASES) {
+    const handler = phasesHandlers[entry.canonical];
+    if (!handler) continue;
+    registry.register(entry.canonical, handler);
+    for (const alias of entry.aliases) {
+      registry.register(alias, handler);
+    }
+  }
+
+  const initHandlers: Record<string, QueryHandler> = {
+    'init.execute-phase': initExecutePhase,
+    'init.plan-phase': initPlanPhase,
+    'init.new-project': initNewProject,
+    'init.new-milestone': initNewMilestone,
+    'init.quick': initQuick,
+    'init.ingest-docs': initIngestDocs,
+    'init.resume': initResume,
+    'init.verify-work': initVerifyWork,
+    'init.phase-op': initPhaseOp,
+    'init.todos': initTodos,
+    'init.milestone-op': initMilestoneOp,
+    'init.map-codebase': initMapCodebase,
+    'init.progress': initProgress,
+    'init.manager': initManager,
+    'init.new-workspace': initNewWorkspace,
+    'init.list-workspaces': initListWorkspaces,
+    'init.remove-workspace': initRemoveWorkspace,
+  };
+
+  for (const entry of INIT_COMMAND_ALIASES) {
+    const handler = initHandlers[entry.canonical];
+    if (!handler) continue;
+    registry.register(entry.canonical, handler);
+    for (const alias of entry.aliases) {
+      registry.register(alias, handler);
+    }
+  }
 
   // Domain-specific handlers (fully implemented)
   registry.register('agent-skills', agentSkills);
-  registry.register('roadmap.update-plan-progress', roadmapUpdatePlanProgress);
-  registry.register('roadmap update-plan-progress', roadmapUpdatePlanProgress);
-  registry.register('roadmap.annotate-dependencies', roadmapAnnotateDependencies);
-  registry.register('roadmap annotate-dependencies', roadmapAnnotateDependencies);
   registry.register('requirements.mark-complete', requirementsMarkComplete);
   registry.register('requirements mark-complete', requirementsMarkComplete);
-  registry.register('state.planned-phase', statePlannedPhase);
-  registry.register('state planned-phase', statePlannedPhase);
-  registry.register('verify.schema-drift', verifySchemaDrift);
-  registry.register('verify schema-drift', verifySchemaDrift);
-  registry.register('verify.codebase-drift', verifyCodebaseDrift);
-  registry.register('verify codebase-drift', verifyCodebaseDrift);
   registry.register('todo.match-phase', todoMatchPhase);
   registry.register('todo match-phase', todoMatchPhase);
   registry.register('list-todos', listTodos);

@@ -7,16 +7,23 @@
  * under `runCommand()` so two-token (and longer) invocations resolve to dotted registry names.
  */
 
+import {
+  STATE_SUBCOMMANDS,
+  VERIFY_SUBCOMMANDS,
+  INIT_SUBCOMMANDS,
+  PHASE_SUBCOMMANDS,
+  PHASES_SUBCOMMANDS,
+  VALIDATE_SUBCOMMANDS,
+  ROADMAP_SUBCOMMANDS,
+} from './command-aliases.generated.js';
+
 const MERGE_FIRST_WITH_SUBCOMMAND = new Set<string>([
   'state',
   'template',
   'frontmatter',
   'verify',
   'phase',
-  'phases',
-  'roadmap',
   'requirements',
-  'validate',
   'init',
   'workstream',
   'intel',
@@ -41,6 +48,62 @@ export function normalizeQueryCommand(command: string, args: string[]): [string,
 
   if (command === 'state' && args.length === 0) {
     return ['state.load', []];
+  }
+
+  if (command === 'state' && args.length > 0) {
+    const sub = args[0];
+    if (STATE_SUBCOMMANDS.has(sub)) {
+      return [`state.${sub}`, args.slice(1)];
+    }
+    return [command, args];
+  }
+
+  if (command === 'verify' && args.length > 0) {
+    const sub = args[0];
+    if (VERIFY_SUBCOMMANDS.has(sub)) {
+      return [`verify.${sub}`, args.slice(1)];
+    }
+    return [command, args];
+  }
+
+  if (command === 'init' && args.length > 0) {
+    const sub = args[0];
+    if (INIT_SUBCOMMANDS.has(sub)) {
+      return [`init.${sub}`, args.slice(1)];
+    }
+    return [command, args];
+  }
+
+  if (command === 'phase' && args.length > 0) {
+    const sub = args[0];
+    if (PHASE_SUBCOMMANDS.has(sub)) {
+      return [`phase.${sub}`, args.slice(1)];
+    }
+    return [command, args];
+  }
+
+  if (command === 'phases' && args.length > 0) {
+    const sub = args[0];
+    if (PHASES_SUBCOMMANDS.has(sub)) {
+      return [`phases.${sub}`, args.slice(1)];
+    }
+    return [command, args];
+  }
+
+  if (command === 'validate' && args.length > 0) {
+    const sub = args[0];
+    if (VALIDATE_SUBCOMMANDS.has(sub)) {
+      return [`validate.${sub}`, args.slice(1)];
+    }
+    return [command, args];
+  }
+
+  if (command === 'roadmap' && args.length > 0) {
+    const sub = args[0];
+    if (ROADMAP_SUBCOMMANDS.has(sub)) {
+      return [`roadmap.${sub}`, args.slice(1)];
+    }
+    return [command, args];
   }
 
   if (MERGE_FIRST_WITH_SUBCOMMAND.has(command) && args.length > 0) {

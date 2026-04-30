@@ -190,6 +190,13 @@ const workstream = require('./lib/workstream.cjs');
 const docs = require('./lib/docs.cjs');
 const learnings = require('./lib/learnings.cjs');
 const gapChecker = require('./lib/gap-checker.cjs');
+const { routeStateCommand } = require('./lib/state-command-router.cjs');
+const { routeVerifyCommand } = require('./lib/verify-command-router.cjs');
+const { routeInitCommand } = require('./lib/init-command-router.cjs');
+const { routePhaseCommand } = require('./lib/phase-command-router.cjs');
+const { routePhasesCommand } = require('./lib/phases-command-router.cjs');
+const { routeValidateCommand } = require('./lib/validate-command-router.cjs');
+const { routeRoadmapCommand } = require('./lib/roadmap-command-router.cjs');
 
 // ─── Arg parsing helpers ──────────────────────────────────────────────────────
 
@@ -430,73 +437,14 @@ function extractField(obj, fieldPath) {
 async function runCommand(command, args, cwd, raw, defaultValue) {
   switch (command) {
     case 'state': {
-      const subcommand = args[1];
-      if (subcommand === 'json') {
-        state.cmdStateJson(cwd, raw);
-      } else if (subcommand === 'update') {
-        state.cmdStateUpdate(cwd, args[2], args[3]);
-      } else if (subcommand === 'get') {
-        state.cmdStateGet(cwd, args[2], raw);
-      } else if (subcommand === 'patch') {
-        const patches = {};
-        for (let i = 2; i < args.length; i += 2) {
-          const key = args[i].replace(/^--/, '');
-          const value = args[i + 1];
-          if (key && value !== undefined) {
-            patches[key] = value;
-          }
-        }
-        state.cmdStatePatch(cwd, patches, raw);
-      } else if (subcommand === 'advance-plan') {
-        state.cmdStateAdvancePlan(cwd, raw);
-      } else if (subcommand === 'record-metric') {
-        const { phase: p, plan, duration, tasks, files } = parseNamedArgs(args, ['phase', 'plan', 'duration', 'tasks', 'files']);
-        state.cmdStateRecordMetric(cwd, { phase: p, plan, duration, tasks, files }, raw);
-      } else if (subcommand === 'update-progress') {
-        state.cmdStateUpdateProgress(cwd, raw);
-      } else if (subcommand === 'add-decision') {
-        const { phase: p, summary, 'summary-file': summary_file, rationale, 'rationale-file': rationale_file } = parseNamedArgs(args, ['phase', 'summary', 'summary-file', 'rationale', 'rationale-file']);
-        state.cmdStateAddDecision(cwd, { phase: p, summary, summary_file, rationale: rationale || '', rationale_file }, raw);
-      } else if (subcommand === 'add-blocker') {
-        const { text, 'text-file': text_file } = parseNamedArgs(args, ['text', 'text-file']);
-        state.cmdStateAddBlocker(cwd, { text, text_file }, raw);
-      } else if (subcommand === 'resolve-blocker') {
-        state.cmdStateResolveBlocker(cwd, parseNamedArgs(args, ['text']).text, raw);
-      } else if (subcommand === 'record-session') {
-        const { 'stopped-at': stopped_at, 'resume-file': resume_file } = parseNamedArgs(args, ['stopped-at', 'resume-file']);
-        state.cmdStateRecordSession(cwd, { stopped_at, resume_file: resume_file || 'None' }, raw);
-      } else if (subcommand === 'begin-phase') {
-        const { phase: p, name, plans } = parseNamedArgs(args, ['phase', 'name', 'plans']);
-        state.cmdStateBeginPhase(cwd, p, name, plans !== null ? parseInt(plans, 10) : null, raw);
-      } else if (subcommand === 'signal-waiting') {
-        const { type, question, options, phase: p } = parseNamedArgs(args, ['type', 'question', 'options', 'phase']);
-        state.cmdSignalWaiting(cwd, type, question, options, p, raw);
-      } else if (subcommand === 'signal-resume') {
-        state.cmdSignalResume(cwd, raw);
-      } else if (subcommand === 'planned-phase') {
-        const { phase: p, name, plans } = parseNamedArgs(args, ['phase', 'name', 'plans']);
-        state.cmdStatePlannedPhase(cwd, p, plans !== null ? parseInt(plans, 10) : null, raw);
-      } else if (subcommand === 'validate') {
-        state.cmdStateValidate(cwd, raw);
-      } else if (subcommand === 'sync') {
-        const { verify } = parseNamedArgs(args, [], ['verify']);
-        state.cmdStateSync(cwd, { verify }, raw);
-      } else if (subcommand === 'prune') {
-        const { 'keep-recent': keepRecent, 'dry-run': dryRun } = parseNamedArgs(args, ['keep-recent'], ['dry-run']);
-        state.cmdStatePrune(cwd, { keepRecent: keepRecent || '3', dryRun: !!dryRun }, raw);
-      } else if (subcommand === 'complete-phase') {
-        state.cmdStateCompletePhase(cwd, raw);
-      } else if (subcommand === 'milestone-switch') {
-        // Bug #2630: reset STATE.md frontmatter + Current Position for new milestone.
-        // NB: the flag is `--milestone`, not `--version` — gsd-tools reserves
-        // `--version` as a globally-invalid help flag (see NEVER_VALID_FLAGS above).
-        const { milestone, name } = parseNamedArgs(args, ['milestone', 'name']);
-        state.cmdStateMilestoneSwitch(cwd, milestone, name, raw);
-      } else if (subcommand === undefined || subcommand === 'load') {
-        state.cmdStateLoad(cwd, raw);
-      } else {
-        error(`Unknown state subcommand: "${subcommand}". Available: load, json, get, patch, update, advance-plan, record-metric, update-progress, add-decision, add-blocker, resolve-blocker, record-session, begin-phase, signal-waiting, signal-resume, planned-phase, validate, sync, prune, complete-phase, milestone-switch`);
-      }
+      routeStateCommand({
+        state,
+        args,
+        cwd,
+        raw,
+        parseNamedArgs,
+        error,
+      });
       break;
     }
 
@@ -590,27 +538,13 @@ async function runCommand(command, args, cwd, raw, defaultValue) {
     }
 
     case 'verify': {
-      const subcommand = args[1];
-      if (subcommand === 'plan-structure') {
-        verify.cmdVerifyPlanStructure(cwd, args[2], raw);
-      } else if (subcommand === 'phase-completeness') {
-        verify.cmdVerifyPhaseCompleteness(cwd, args[2], raw);
-      } else if (subcommand === 'references') {
-        verify.cmdVerifyReferences(cwd, args[2], raw);
-      } else if (subcommand === 'commits') {
-        verify.cmdVerifyCommits(cwd, args.slice(2), raw);
-      } else if (subcommand === 'artifacts') {
-        verify.cmdVerifyArtifacts(cwd, args[2], raw);
-      } else if (subcommand === 'key-links') {
-        verify.cmdVerifyKeyLinks(cwd, args[2], raw);
-      } else if (subcommand === 'schema-drift') {
-        const skipFlag = args.includes('--skip');
-        verify.cmdVerifySchemaDrift(cwd, args[2], skipFlag, raw);
-      } else if (subcommand === 'codebase-drift') {
-        verify.cmdVerifyCodebaseDrift(cwd, raw);
-      } else {
-        error('Unknown verify subcommand. Available: plan-structure, phase-completeness, references, commits, artifacts, key-links, schema-drift, codebase-drift');
-      }
+      routeVerifyCommand({
+        verify,
+        args,
+        cwd,
+        raw,
+        error,
+      });
       break;
     }
 
@@ -680,37 +614,25 @@ async function runCommand(command, args, cwd, raw, defaultValue) {
     }
 
     case 'phases': {
-      const subcommand = args[1];
-      if (subcommand === 'list') {
-        const typeIndex = args.indexOf('--type');
-        const phaseIndex = args.indexOf('--phase');
-        const options = {
-          type: typeIndex !== -1 ? args[typeIndex + 1] : null,
-          phase: phaseIndex !== -1 ? args[phaseIndex + 1] : null,
-          includeArchived: args.includes('--include-archived'),
-        };
-        phase.cmdPhasesList(cwd, options, raw);
-      } else if (subcommand === 'clear') {
-        milestone.cmdPhasesClear(cwd, raw, args.slice(2));
-      } else {
-        error('Unknown phases subcommand. Available: list, clear');
-      }
+      routePhasesCommand({
+        phase,
+        milestone,
+        args,
+        cwd,
+        raw,
+        error,
+      });
       break;
     }
 
     case 'roadmap': {
-      const subcommand = args[1];
-      if (subcommand === 'get-phase') {
-        roadmap.cmdRoadmapGetPhase(cwd, args[2], raw);
-      } else if (subcommand === 'analyze') {
-        roadmap.cmdRoadmapAnalyze(cwd, raw);
-      } else if (subcommand === 'update-plan-progress') {
-        roadmap.cmdRoadmapUpdatePlanProgress(cwd, args[2], raw);
-      } else if (subcommand === 'annotate-dependencies') {
-        roadmap.cmdRoadmapAnnotateDependencies(cwd, args[2], raw);
-      } else {
-        error('Unknown roadmap subcommand. Available: get-phase, analyze, update-plan-progress, annotate-dependencies');
-      }
+      routeRoadmapCommand({
+        roadmap,
+        args,
+        cwd,
+        raw,
+        error,
+      });
       break;
     }
 
@@ -732,42 +654,13 @@ async function runCommand(command, args, cwd, raw, defaultValue) {
     }
 
     case 'phase': {
-      const subcommand = args[1];
-      if (subcommand === 'next-decimal') {
-        phase.cmdPhaseNextDecimal(cwd, args[2], raw);
-      } else if (subcommand === 'add') {
-        const idIdx = args.indexOf('--id');
-        let customId = null;
-        const descArgs = [];
-        for (let i = 2; i < args.length; i++) {
-          if (args[i] === '--id' && i + 1 < args.length) {
-            customId = args[i + 1];
-            i++; // skip value
-          } else {
-            descArgs.push(args[i]);
-          }
-        }
-        phase.cmdPhaseAdd(cwd, descArgs.join(' '), raw, customId);
-      } else if (subcommand === 'add-batch') {
-        // Accepts JSON array of descriptions via --descriptions '[...]' or positional args
-        const descFlagIdx = args.indexOf('--descriptions');
-        let descriptions;
-        if (descFlagIdx !== -1 && args[descFlagIdx + 1]) {
-          try { descriptions = JSON.parse(args[descFlagIdx + 1]); } catch (e) { error('--descriptions must be a JSON array'); }
-        } else {
-          descriptions = args.slice(2).filter(a => a !== '--raw');
-        }
-        phase.cmdPhaseAddBatch(cwd, descriptions, raw);
-      } else if (subcommand === 'insert') {
-        phase.cmdPhaseInsert(cwd, args[2], args.slice(3).join(' '), raw);
-      } else if (subcommand === 'remove') {
-        const forceFlag = args.includes('--force');
-        phase.cmdPhaseRemove(cwd, args[2], { force: forceFlag }, raw);
-      } else if (subcommand === 'complete') {
-        phase.cmdPhaseComplete(cwd, args[2], raw);
-      } else {
-        error('Unknown phase subcommand. Available: next-decimal, add, add-batch, insert, remove, complete');
-      }
+      routePhaseCommand({
+        phase,
+        args,
+        cwd,
+        raw,
+        error,
+      });
       break;
     }
 
@@ -784,58 +677,15 @@ async function runCommand(command, args, cwd, raw, defaultValue) {
     }
 
     case 'validate': {
-      const subcommand = args[1];
-      if (subcommand === 'consistency') {
-        verify.cmdValidateConsistency(cwd, raw);
-      } else if (subcommand === 'health') {
-        const repairFlag = args.includes('--repair');
-        const backfillFlag = args.includes('--backfill');
-        verify.cmdValidateHealth(cwd, { repair: repairFlag, backfill: backfillFlag }, raw);
-      } else if (subcommand === 'agents') {
-        verify.cmdValidateAgents(cwd, raw);
-      } else if (subcommand === 'context') {
-        // The model self-reports tokensUsed and contextWindow — the SDK has
-        // no privileged access to either. Recommendation copy lives here
-        // (the renderer), not in the classifier, so it can change without
-        // re-validating the math layer.
-        const opts = parseNamedArgs(args, ['tokens-used', 'context-window']);
-        if (opts['tokens-used'] === null) {
-          error('--tokens-used <integer> is required for `validate context`');
-          break;
-        }
-        if (opts['context-window'] === null) {
-          error('--context-window <integer> is required for `validate context`');
-          break;
-        }
-        const { classifyContextUtilization, STATES } = require('./lib/context-utilization.cjs');
-        const RECOMMENDATIONS = {
-          [STATES.HEALTHY]: null,
-          [STATES.WARNING]: 'Context is approaching the fracture zone — consider /gsd-thread to continue in a fresh window.',
-          [STATES.CRITICAL]: 'Reasoning quality may degrade past 70% utilization (fracture point). Run /gsd-thread now to preserve output quality.',
-        };
-        let classified;
-        try {
-          classified = classifyContextUtilization(Number(opts['tokens-used']), Number(opts['context-window']));
-        } catch (e) {
-          // Translate the classifier's TypeError into a CLI-shaped error
-          // message that names the offending flag.
-          const flag = /tokensUsed/.test(e.message) ? '--tokens-used' : '--context-window';
-          error(`${flag} must be a non-negative integer (window > 0), got the values supplied`);
-          break;
-        }
-        const result = { ...classified, recommendation: RECOMMENDATIONS[classified.state] };
-        if (args.includes('--json')) {
-          core.output(result, raw);
-        } else {
-          const lines = [`Context utilization: ${result.percent}% (${result.state})`];
-          if (result.recommendation) lines.push(result.recommendation);
-          // Use core.output's rawValue path for the sync-flush guarantee
-          // — process.stdout.write can be truncated on process exit.
-          core.output(result, true, lines.join('\n'));
-        }
-      } else {
-        error('Unknown validate subcommand. Available: consistency, health, agents, context');
-      }
+      routeValidateCommand({
+        verify,
+        args,
+        cwd,
+        raw,
+        parseNamedArgs,
+        output: core.output,
+        error,
+      });
       break;
     }
 
@@ -904,66 +754,14 @@ async function runCommand(command, args, cwd, raw, defaultValue) {
     }
 
     case 'init': {
-      const workflow = args[1];
-      switch (workflow) {
-        case 'execute-phase': {
-          const { validate: epValidate, tdd: epTdd } = parseNamedArgs(args, [], ['validate', 'tdd']);
-          init.cmdInitExecutePhase(cwd, args[2], raw, { validate: epValidate, tdd: epTdd });
-          break;
-        }
-        case 'plan-phase': {
-          const { validate: ppValidate, tdd: ppTdd } = parseNamedArgs(args, [], ['validate', 'tdd']);
-          init.cmdInitPlanPhase(cwd, args[2], raw, { validate: ppValidate, tdd: ppTdd });
-          break;
-        }
-        case 'new-project':
-          init.cmdInitNewProject(cwd, raw);
-          break;
-        case 'new-milestone':
-          init.cmdInitNewMilestone(cwd, raw);
-          break;
-        case 'quick':
-          init.cmdInitQuick(cwd, args.slice(2).join(' '), raw);
-          break;
-        case 'ingest-docs':
-          init.cmdInitIngestDocs(cwd, raw);
-          break;
-        case 'resume':
-          init.cmdInitResume(cwd, raw);
-          break;
-        case 'verify-work':
-          init.cmdInitVerifyWork(cwd, args[2], raw);
-          break;
-        case 'phase-op':
-          init.cmdInitPhaseOp(cwd, args[2], raw);
-          break;
-        case 'todos':
-          init.cmdInitTodos(cwd, args[2], raw);
-          break;
-        case 'milestone-op':
-          init.cmdInitMilestoneOp(cwd, raw);
-          break;
-        case 'map-codebase':
-          init.cmdInitMapCodebase(cwd, raw);
-          break;
-        case 'progress':
-          init.cmdInitProgress(cwd, raw);
-          break;
-        case 'manager':
-          init.cmdInitManager(cwd, raw);
-          break;
-        case 'new-workspace':
-          init.cmdInitNewWorkspace(cwd, raw);
-          break;
-        case 'list-workspaces':
-          init.cmdInitListWorkspaces(cwd, raw);
-          break;
-        case 'remove-workspace':
-          init.cmdInitRemoveWorkspace(cwd, args[2], raw);
-          break;
-        default:
-          error(`Unknown init workflow: ${workflow}\nAvailable: execute-phase, plan-phase, new-project, new-milestone, quick, ingest-docs, resume, verify-work, phase-op, todos, milestone-op, map-codebase, progress, manager, new-workspace, list-workspaces, remove-workspace`);
-      }
+      routeInitCommand({
+        init,
+        args,
+        cwd,
+        raw,
+        parseNamedArgs,
+        error,
+      });
       break;
     }
 
