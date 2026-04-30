@@ -8,10 +8,14 @@
 
 import { describe, it, expect, beforeEach, afterEach } from 'vitest';
 import { mkdtemp, mkdir, rm, writeFile } from 'node:fs/promises';
-import { join } from 'node:path';
-import { tmpdir } from 'node:os';
+import { execSync } from 'node:child_process';
+import { join, resolve } from 'node:path';
+import { tmpdir, homedir } from 'node:os';
+import { fileURLToPath } from 'node:url';
 
 import { agentSkills } from './skills.js';
+
+const CLI = resolve(fileURLToPath(import.meta.url), '../../../dist/cli.js');
 
 async function writeSkill(rootDir: string, name: string) {
   const skillDir = join(rootDir, name);
@@ -119,5 +123,76 @@ describe('agentSkills', () => {
     await writeConfig(tmpDir, { agent_skills: { 'gsd-planner': [] } });
     const r = await agentSkills(['gsd-planner'], tmpDir);
     expect(r.data).toBe('');
+  });
+
+  it('signals format:"text" for non-empty blocks (used by CLI dispatcher)', async () => {
+    await writeSkill(join(tmpDir, '.claude', 'skills'), 'a-skill');
+    await writeConfig(tmpDir, {
+      agent_skills: { 'gsd-planner': '.claude/skills/a-skill' },
+    });
+
+    const r = await agentSkills(['gsd-planner'], tmpDir);
+    expect(r.format).toBe('text');
+  });
+
+  it('does not signal format:"text" for empty result', async () => {
+    const r = await agentSkills(['gsd-planner'], tmpDir);
+    expect(r.format).toBeUndefined();
+  });
+});
+
+// ─── CLI stdout integration ─────────────────────────────────────────────────
+// Regression guard for the JSON-wrapping bug (#2914): the CLI must emit the
+// raw <agent_skills> block to stdout, not a JSON-quoted string.  Spawns the
+// CLI as a child process so the full dispatch path (including cli.ts format
+// handling) is exercised.
+
+describe('agentSkills CLI stdout', () => {
+  let tmpDir: string;
+
+  beforeEach(async () => {
+    tmpDir = await mkdtemp(join(tmpdir(), 'gsd-skills-cli-'));
+  });
+
+  afterEach(async () => {
+    await rm(tmpDir, { recursive: true, force: true });
+  });
+
+  it('writes raw <agent_skills> block to stdout — not JSON-wrapped', async () => {
+    const skillDir = join(tmpDir, '.claude', 'skills', 'cli-skill');
+    await mkdir(skillDir, { recursive: true });
+    await writeFile(join(skillDir, 'SKILL.md'), '# cli-skill\n');
+    await mkdir(join(tmpDir, '.planning'), { recursive: true });
+    await writeFile(
+      join(tmpDir, '.planning', 'config.json'),
+      JSON.stringify({ agent_skills: { 'gsd-planner': '.claude/skills/cli-skill' } }),
+    );
+
+    const stdout = execSync(
+      `node "${CLI}" query --project-dir "${tmpDir}" agent-skills gsd-planner`,
+      { encoding: 'utf-8' },
+    );
+
+    expect(stdout).toBe(
+      '<agent_skills>\nRead these user-configured skills:\n- @.claude/skills/cli-skill/SKILL.md\n</agent_skills>',
+    );
+  });
+
+  it('emits empty output (no JSON null) when agent type is unmapped', async () => {
+    await mkdir(join(tmpDir, '.planning'), { recursive: true });
+    await writeFile(
+      join(tmpDir, '.planning', 'config.json'),
+      JSON.stringify({ agent_skills: { 'gsd-executor': ['.claude/skills/foo'] } }),
+    );
+
+    const stdout = execSync(
+      `node "${CLI}" query --project-dir "${tmpDir}" agent-skills gsd-planner`,
+      { encoding: 'utf-8' },
+    );
+
+    // Unmapped agent → empty string → CLI falls through to JSON (""), not raw
+    // text. This is acceptable: workflows that embed an empty var are no-ops.
+    // The important invariant is that a MAPPED agent never gets JSON-wrapped.
+    expect(stdout.trim()).toBe('""');
   });
 });

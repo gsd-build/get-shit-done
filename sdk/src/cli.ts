@@ -443,7 +443,13 @@ export async function main(argv: string[] = process.argv.slice(2)): Promise<void
           output = extractField(output, pickField);
         }
 
-        console.log(JSON.stringify(output, null, 2));
+        // Handlers can signal format:'text' to emit a raw string (e.g. agent-skills
+        // emits an <agent_skills> XML block workflows embed via $(...) substitution).
+        if (!pickField && result.format === 'text' && typeof output === 'string') {
+          process.stdout.write(output);
+        } else {
+          console.log(JSON.stringify(output, null, 2));
+        }
       }
     } catch (err) {
       if (err instanceof GSDError) {
