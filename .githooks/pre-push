@@ -29,7 +29,7 @@ while read -r local_ref local_sha remote_ref remote_sha; do
     [[ -z "$commit" ]] && continue
     author_email=$(git show -s --format='%ae' "$commit")
     lower_email=$(printf '%s' "$author_email" | tr '[:upper:]' '[:lower:]')
-    if printf '%s' "$lower_email" | rg -q "$blocked_regex"; then
+    if printf '%s' "$lower_email" | grep -Eq "$blocked_regex"; then
       violations+=("$commit <$author_email>")
     fi
   done <<< "$commit_list"

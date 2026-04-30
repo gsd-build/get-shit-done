@@ -364,7 +364,7 @@ cat > .githooks/pre-commit <<'EOF'
 #!/usr/bin/env bash
 set -euo pipefail
 
-if git diff --cached --name-only | rg -q "^sdk/src/query/command-manifest\.|^sdk/src/query/command-aliases\.generated\.ts$|^get-shit-done/bin/lib/command-aliases\.generated\.cjs$|^sdk/scripts/gen-command-aliases\.ts$"; then
+if git diff --cached --name-only | grep -Eq "^sdk/src/query/command-manifest\.|^sdk/src/query/command-aliases\.generated\.ts$|^get-shit-done/bin/lib/command-aliases\.generated\.cjs$|^sdk/scripts/gen-command-aliases\.ts$"; then
   npm run check:alias-drift
 fi
 EOF
@@ -397,7 +397,7 @@ while read -r local_ref local_sha remote_ref remote_sha; do
   while read -r commit; do
     [[ -z "$commit" ]] && continue
     email=$(git show -s --format='%ae' "$commit" | tr '[:upper:]' '[:lower:]')
-    if printf '%s' "$email" | rg -q "$blocked_regex"; then
+    if printf '%s' "$email" | grep -Eq "$blocked_regex"; then
       violations+=("$commit <$email>")
     fi
   done <<< "$commits"
