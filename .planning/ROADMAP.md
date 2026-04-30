@@ -92,7 +92,9 @@ Plans:
   3. The auditor returns either `## SME_APPROVED` or `## SME_CONCERNS` with severity-classified findings
   4. BLOCKER findings cite concrete mitigations naming specific file paths and function calls, not abstract patterns
   5. The auditor's return markers are registered in `agent-contracts.md`
-**Plans**: TBD
+**Plans:** 1 plan
+Plans:
+- [ ] 05-01-PLAN.md — TDD: Structural tests (RED) then agent definition + contracts registration (GREEN)
 
 ### Phase 6: Plan-Phase Gate
 **Goal**: The plan-phase gate runs as step 12.5, detects relevant processes, spawns the auditor, and enforces soft or strict blocking based on per-process config
@@ -151,7 +153,7 @@ Phases execute in numeric order: 1 → 2 → 3 → 4 → 5 → 6 → 7 → 8 →
 | 2. SDK Query Handlers | 0/2 | Not started | - |
 | 3. SME Creator Agent | 0/2 | Not started | - |
 | 4. Creation Command & Workflow | 0/1 | Not started | - |
-| 5. SME Auditor Agent | 0/TBD | Not started | - |
+| 5. SME Auditor Agent | 0/1 | Not started | - |
 | 6. Plan-Phase Gate | 0/TBD | Not started | - |
 | 7. Discuss-Phase Integration | 0/TBD | Not started | - |
 | 8. New-Milestone Process Detection | 0/TBD | Not started | - |
