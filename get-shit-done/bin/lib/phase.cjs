@@ -8,6 +8,47 @@ const { escapeRegex, loadConfig, normalizePhaseName, comparePhaseNum, findPhaseI
 const { extractFrontmatter } = require('./frontmatter.cjs');
 const { writeStateMd, readModifyWriteStateMd, stateExtractField, stateReplaceField, stateReplaceFieldWithFallback, updatePerformanceMetricsSection } = require('./state.cjs');
 
+// #2893 — strict canonical filter: `{padded_phase}-{NN}-PLAN.md` or `PLAN.md`.
+// Documented in agents/gsd-planner.md (write_phase_prompt step). The wider
+// "looks like a plan but isn't canonical" probe below is used to surface a
+// loud warning instead of silently returning zero plans.
+const isCanonicalPlanFile = (f) => f.endsWith('-PLAN.md') || f === 'PLAN.md';
+
+// Any .md file with PLAN anywhere in the basename — the diagnostic net for
+// catching agent deviations like `01-PLAN-01-foundation.md` (#2893).
+// Excludes derivative files (`-PLAN-OUTLINE.md`, `*.pre-bounce.md`, etc.) that
+// the planner legitimately produces alongside canonical plans.
+const PLAN_OUTLINE_RE = /-PLAN-OUTLINE\.md$/i;
+const PLAN_PRE_BOUNCE_RE = /-PLAN.*\.pre-bounce\.md$/i;
+const looksLikePlanFile = (f) =>
+  /\.md$/i.test(f)
+  && /PLAN/i.test(f)
+  && !PLAN_OUTLINE_RE.test(f)
+  && !PLAN_PRE_BOUNCE_RE.test(f);
+
+/**
+ * Detect plan-shaped files that the canonical filter would reject. Returns
+ * a warning string when offenders exist, else null. Centralised so every
+ * read site (phase-plan-index, phases list --type plans, find-phase) emits
+ * the same message.
+ *
+ * @param {string[]} dirFiles — readdirSync output for one phase directory
+ * @param {string[]} matchedFiles — what the canonical filter accepted
+ * @returns {string|null}
+ */
+function describeNonCanonicalPlans(dirFiles, matchedFiles) {
+  const matched = new Set(matchedFiles);
+  const offenders = dirFiles.filter((f) => looksLikePlanFile(f) && !matched.has(f));
+  if (offenders.length === 0) return null;
+  return (
+    `Found ${offenders.length} plan-shaped file(s) in this phase that don't match the canonical ` +
+    `naming convention "{padded_phase}-{NN}-PLAN.md" (or bare "PLAN.md") and were skipped: ` +
+    offenders.map((f) => `"${f}"`).join(', ') +
+    `. Rename to the canonical form (e.g. "01-01-PLAN.md") so the executor can detect them. ` +
+    `See agents/gsd-planner.md write_phase_prompt step for the full contract.`
+  );
+}
+
 function cmdPhasesList(cwd, options, raw) {
   const phasesDir = path.join(planningDir(cwd), 'phases');
   const { type, phase, includeArchived } = options;
@@ -52,13 +93,18 @@ function cmdPhasesList(cwd, options, raw) {
     // If listing files of a specific type
     if (type) {
       const files = [];
+      const warnings = [];
       for (const dir of dirs) {
         const dirPath = path.join(phasesDir, dir);
         const dirFiles = fs.readdirSync(dirPath);
 
         let filtered;
         if (type === 'plans') {
-          filtered = dirFiles.filter(f => f.endsWith('-PLAN.md') || f === 'PLAN.md');
+          filtered = dirFiles.filter(isCanonicalPlanFile);
+          // #2893 — surface plan-shaped files the canonical filter rejected
+          // so callers (executor init, etc.) don't silently see zero plans.
+          const w = describeNonCanonicalPlans(dirFiles, filtered);
+          if (w) warnings.push(`${dir}: ${w}`);
         } else if (type === 'summaries') {
           filtered = dirFiles.filter(f => f.endsWith('-SUMMARY.md') || f === 'SUMMARY.md');
         } else {
@@ -73,6 +119,7 @@ function cmdPhasesList(cwd, options, raw) {
         count: files.length,
         phase_dir: phase ? dirs[0].replace(/^\d+(?:\.\d+)*-?/, '') : null,
       };
+      if (warnings.length) result.warning = warnings.join(' | ');
       output(result, raw, files.join('\n'));
       return;
     }
@@ -176,8 +223,10 @@ function cmdFindPhase(cwd, phase, raw) {
 
     const phaseDir = path.join(phasesDir, match);
     const phaseFiles = fs.readdirSync(phaseDir);
-    const plans = phaseFiles.filter(f => f.endsWith('-PLAN.md') || f === 'PLAN.md').sort();
+    const plans = phaseFiles.filter(isCanonicalPlanFile).sort();
     const summaries = phaseFiles.filter(f => f.endsWith('-SUMMARY.md') || f === 'SUMMARY.md').sort();
+    // #2893 — same diagnostic as phase-plan-index for consistency.
+    const planNamingWarning = describeNonCanonicalPlans(phaseFiles, plans);
 
     const result = {
       found: true,
@@ -187,6 +236,7 @@ function cmdFindPhase(cwd, phase, raw) {
       plans,
       summaries,
     };
+    if (planNamingWarning) result.warning = planNamingWarning;
 
     output(result, raw, result.directory);
   } catch {
@@ -229,8 +279,11 @@ function cmdPhasePlanIndex(cwd, phase, raw) {
 
   // Get all files in phase directory
   const phaseFiles = fs.readdirSync(phaseDir);
-  const planFiles = phaseFiles.filter(f => f.endsWith('-PLAN.md') || f === 'PLAN.md').sort();
+  const planFiles = phaseFiles.filter(isCanonicalPlanFile).sort();
   const summaryFiles = phaseFiles.filter(f => f.endsWith('-SUMMARY.md') || f === 'SUMMARY.md');
+  // #2893 — surface plan-shaped files the canonical filter rejected so a
+  // misnamed plan never silently produces plan_count: 0 at executor init.
+  const planNamingWarning = describeNonCanonicalPlans(phaseFiles, planFiles);
 
   // Build set of plan IDs with summaries
   const completedPlanIds = new Set(
@@ -305,6 +358,7 @@ function cmdPhasePlanIndex(cwd, phase, raw) {
     incomplete,
     has_checkpoints: hasCheckpoints,
   };
+  if (planNamingWarning) result.warning = planNamingWarning;
 
   output(result, raw);
 }
