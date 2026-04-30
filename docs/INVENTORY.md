@@ -54,9 +54,22 @@ Full roster at `agents/gsd-*.md`. The "Primary doc" column flags whether [`docs/
 
 ---
 
-## Commands (59 shipped)
+## Commands (65 shipped)
 
 Full roster at `commands/gsd/*.md`. The groupings below mirror `docs/COMMANDS.md` section order; each row carries the command name, a one-line role derived from the command's frontmatter `description:`, and a link to the source file. `tests/command-count-sync.test.cjs` locks the count against the filesystem.
+
+### Namespace Meta-Skills
+
+These six routers are descriptor-only entries that the model picks first; the body of each contains a routing table that points at the correct concrete sub-skill. They exist to keep the eager skill-listing token cost low while the full surface remains reachable. See [#2792](https://github.com/gsd-build/get-shit-done/issues/2792) for the rationale; the routing tables target the post-[#2790](https://github.com/gsd-build/get-shit-done/issues/2790) consolidated surface.
+
+| Command | Role | Source |
+|---------|------|--------|
+| `/gsd-ns-workflow` | Phase pipeline router — discuss / plan / execute / verify / phase / progress. | [commands/gsd/ns-workflow.md](../commands/gsd/ns-workflow.md) |
+| `/gsd-ns-project` | Project lifecycle router — milestones, audits, summary. | [commands/gsd/ns-project.md](../commands/gsd/ns-project.md) |
+| `/gsd-ns-review` | Quality-gate router — code review, debug, audit, security, eval, ui. | [commands/gsd/ns-review.md](../commands/gsd/ns-review.md) |
+| `/gsd-ns-context` | Codebase-intelligence router — map, graphify, docs, learnings. | [commands/gsd/ns-context.md](../commands/gsd/ns-context.md) |
+| `/gsd-ns-manage` | Management router — config, workspace, workstreams, thread, update, ship, inbox. | [commands/gsd/ns-manage.md](../commands/gsd/ns-manage.md) |
+| `/gsd-ns-ideate` | Exploration & capture router — explore, sketch, spike, spec, capture. | [commands/gsd/ns-ideate.md](../commands/gsd/ns-ideate.md) |
 
 ### Core Workflow
 
