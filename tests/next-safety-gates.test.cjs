@@ -161,12 +161,24 @@ describe('/gsd-next safety gates (#1732, #2089)', () => {
     );
   });
 
-  test('command definition documents --next flag (#2790: absorbed into progress.md)', () => {
+  test('command definition documents --next flag with --force AND completeness routing (#2790)', () => {
+    // #2790 absorbed standalone /gsd-next into /gsd-progress --next. The
+    // consolidated command must preserve BOTH safety-relevant contracts:
+    //  (a) --force escape hatch for bypassing safety gates
+    //  (b) the completeness scan / next-workflow routing semantics
+    // Earlier OR-based predicates passed when only `--next` was mentioned,
+    // letting the completeness contract regress silently.
     const content = fs.readFileSync(commandPath, 'utf8');
-    assert.ok(
-      content.includes('--next'),
-      'progress.md must document the --next flag (absorbed from standalone next.md command in #2790)'
-    );
+    assert.ok(content.includes('--next'),
+      'progress.md must document the --next flag (absorbed from standalone next.md command in #2790)');
+    assert.ok(content.includes('--force'),
+      'progress.md must document the --force escape hatch for --next (#2790 carried over from next.md)');
+    const documentsCompleteness =
+      /completeness/i.test(content) ||
+      /next workflow/i.test(content) ||
+      /scans? all prior phases/i.test(content);
+    assert.ok(documentsCompleteness,
+      'progress.md must document the completeness scan / next-workflow routing for --next (#2790)');
   });
 
   test('next workflow documents --force bypass flag', () => {

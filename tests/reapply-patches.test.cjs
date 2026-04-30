@@ -264,6 +264,37 @@ function parseFrontmatterField(content, field) {
 // #2790: reapply-patches.md command was absorbed into update.md as the --reapply flag.
 // The full workflow content (three-way merge, hunk verification) is in the referenced workflow.
 // These tests now verify the update.md command delegates to the reapply-patches workflow correctly.
+
+/**
+ * Parse a markdown pipe-table into header + rows. Returns null if no table
+ * with the expected header tokens is found. Used to assert structurally
+ * against the Hunk Verification Table without raw substring matching.
+ */
+function parsePipeTable(content, expectedHeaderTokens) {
+  const lines = content.split('\n');
+  for (let i = 0; i < lines.length - 1; i++) {
+    const headerLine = lines[i].trim();
+    const sepLine = (lines[i + 1] || '').trim();
+    if (!headerLine.startsWith('|') || !sepLine.startsWith('|')) continue;
+    if (!/^\|\s*[:\- |]+\|\s*$/.test(sepLine)) continue;
+    const header = headerLine.slice(1, -1).split('|').map((s) => s.trim());
+    const headerLower = header.map((h) => h.toLowerCase());
+    const allFound = expectedHeaderTokens.every((tok) => headerLower.includes(tok.toLowerCase()));
+    if (!allFound) continue;
+    const rows = [];
+    for (let j = i + 2; j < lines.length; j++) {
+      const rowLine = lines[j].trim();
+      if (!rowLine.startsWith('|')) break;
+      const cells = rowLine.slice(1, -1).split('|').map((s) => s.trim());
+      const row = {};
+      header.forEach((col, idx) => { row[col] = cells[idx] !== undefined ? cells[idx] : ''; });
+      rows.push(row);
+    }
+    return { header, rows };
+  }
+  return null;
+}
+
 describe('reapply-patches workflow contract (#1469)', () => {
   test('reapply-patches.md command file is deleted (absorbed into update.md --reapply, #2790)', () => {
     const oldPath = path.join(__dirname, '..', 'commands', 'gsd', 'reapply-patches.md');
@@ -271,21 +302,46 @@ describe('reapply-patches workflow contract (#1469)', () => {
   });
 
   test('update.md argument-hint declares --reapply as consolidated entry point', () => {
+    // Structural: parse frontmatter, then tokenize the argument-hint pipes
+    // and assert --reapply is one of the documented flags (no raw substring
+    // matching on prose, per the no-source-grep contract).
     const updatePath = path.join(__dirname, '..', 'commands', 'gsd', 'update.md');
     const content = fs.readFileSync(updatePath, 'utf8');
     const argHint = parseFrontmatterField(content, 'argument-hint');
+    assert.ok(argHint, 'update.md frontmatter must declare argument-hint');
+    // argument-hint may include multiple bracketed segments; pull every
+    // `--flag` token out of any bracketed section to assert on a parsed
+    // flag set rather than the surrounding punctuation.
+    const bracketed = [...argHint.matchAll(/\[([^\]]*)\]/g)].map((m) => m[1]);
+    const flagList = bracketed
+      .flatMap((seg) => seg.split('|').map((s) => s.trim().split(/\s+/)[0]))
+      .filter((tok) => tok.startsWith('--'));
     assert.ok(
-      argHint && argHint.includes('--reapply'),
-      `update.md argument-hint must declare --reapply flag; got: ${argHint || '(none)'}`
+      flagList.includes('--reapply'),
+      `update.md argument-hint flag list must include --reapply; got: ${JSON.stringify(flagList)}`
     );
   });
 
-  test('update.md execution_context_extended references reapply-patches workflow', () => {
+  test('update.md @-include declares the reapply-patches workflow as a dependency', () => {
+    // Structural: scan ALL <execution_context> and <execution_context_extended>
+    // blocks for an `@~/.../workflows/reapply-patches.md` include. The earlier
+    // substring check tolerated incidental mentions in prose; matching only the
+    // first context block missed the _extended block where the delegate lives.
     const updatePath = path.join(__dirname, '..', 'commands', 'gsd', 'update.md');
     const content = fs.readFileSync(updatePath, 'utf8');
+    const blocks = [
+      ...content.matchAll(/<execution_context(?:_extended)?>([\s\S]*?)<\/execution_context(?:_extended)?>/g),
+    ].map((m) => m[1]);
+    assert.ok(blocks.length > 0, 'update.md must define at least one <execution_context> block');
+    const includes = blocks
+      .flatMap((blk) => blk.split('\n'))
+      .map((l) => l.trim())
+      .filter((l) => l.startsWith('@'))
+      .map((l) => l.replace(/^@/, ''));
+    const declaresReapply = includes.some((p) => /(^|\/)workflows\/reapply-patches\.md$/.test(p));
     assert.ok(
-      content.includes('reapply-patches.md'),
-      'update.md must reference reapply-patches.md via execution_context_extended'
+      declaresReapply,
+      `update.md execution_context blocks must @-include workflows/reapply-patches.md; got: ${JSON.stringify(includes)}`
     );
   });
 });
@@ -305,35 +361,59 @@ describe('reapply-patches gated hunk verification (#1999)', () => {
     assert.ok(fs.existsSync(workflowPath), 'get-shit-done/workflows/reapply-patches.md must exist');
   });
 
-  test('Step 4 requires a Hunk Verification Table output format', () => {
+  test('Step 4 declares a Hunk Verification Table with all required columns', () => {
+    // Structural: parse the markdown pipe-table out of the workflow and
+    // assert its header columns directly. Substring checks let row text
+    // collide with prose mentions and fail under harmless rewording.
     const content = fs.readFileSync(workflowPath, 'utf8');
+    const required = ['file', 'hunk_id', 'signature_line', 'line_count', 'verified'];
+    const table = parsePipeTable(content, required);
     assert.ok(
-      content.includes('Hunk Verification Table'),
-      'reapply-patches workflow must define the Hunk Verification Table in Step 4'
+      table,
+      `reapply-patches workflow must declare a pipe-table with header columns ${JSON.stringify(required)} (Hunk Verification Table)`
+    );
+    const headerLower = table.header.map((h) => h.toLowerCase());
+    for (const col of required) {
+      assert.ok(headerLower.includes(col.toLowerCase()), `Hunk Verification Table is missing required column "${col}"; got header ${JSON.stringify(table.header)}`);
+    }
+  });
+
+  test('Step 5 gates progression on the Hunk Verification Table', () => {
+    // Locate the Step 5 section structurally via heading parsing, then
+    // assert it both names the table and defines an explicit gate
+    // condition tied to the `verified` column.
+    const content = fs.readFileSync(workflowPath, 'utf8');
+    const step5Match = content.match(/^##\s+Step 5[^\n]*\n([\s\S]*?)(?=^##\s|\Z)/m);
+    assert.ok(step5Match, 'reapply-patches workflow must contain a "## Step 5" section');
+    const step5 = step5Match[1];
+    assert.ok(
+      /Hunk Verification Table/.test(step5),
+      'Step 5 body must explicitly reference the Hunk Verification Table'
+    );
+    // Gate condition: must mention verified=no (or "verified: no") AND a stop
+    // directive (STOP / halt / abort), so missing-table or any-no-row halts.
+    const referencesVerifiedNo = /verified:\s*no/i.test(step5) || /verified\s*=\s*no/i.test(step5);
+    const referencesStop = /\bSTOP\b/.test(step5) || /\bhalt\b/i.test(step5) || /\babort\b/i.test(step5);
+    assert.ok(
+      referencesVerifiedNo,
+      'Step 5 gate must reference the `verified: no` failure condition (no row may slip past)'
+    );
+    assert.ok(
+      referencesStop,
+      'Step 5 gate must explicitly STOP/halt/abort when verification fails'
     );
   });
 
-  test('Hunk Verification Table includes required columns: file, hunk_id, signature_line, line_count, verified', () => {
+  test('Step 5 also halts when the Hunk Verification Table is absent (Step 4 produced nothing)', () => {
+    // Independent gate: missing-table is a separate halt path from any-no-row.
     const content = fs.readFileSync(workflowPath, 'utf8');
-    assert.ok(content.includes('hunk_id'), 'Hunk Verification Table must have hunk_id column');
-    assert.ok(content.includes('signature_line'), 'Hunk Verification Table must have signature_line column');
-    assert.ok(content.includes('line_count'), 'Hunk Verification Table must have line_count column');
-    assert.ok(content.includes('verified'), 'Hunk Verification Table must have verified column');
-  });
-
-  test('Step 5 references the Hunk Verification Table before proceeding', () => {
-    const content = fs.readFileSync(workflowPath, 'utf8');
+    const step5Match = content.match(/^##\s+Step 5[^\n]*\n([\s\S]*?)(?=^##\s|\Z)/m);
+    assert.ok(step5Match, 'Step 5 section must exist');
+    const step5 = step5Match[1];
+    const handlesAbsent = /(table is absent|table is missing|missing.*table|absent.*table)/i.test(step5);
     assert.ok(
-      content.includes('Hunk Verification Gate') || content.includes('Step 5'),
-      'reapply-patches workflow must have a Step 5 gating on the Hunk Verification Table'
-    );
-  });
-
-  test('Step 5 includes an explicit gate that stops execution when verification fails', () => {
-    const content = fs.readFileSync(workflowPath, 'utf8');
-    assert.ok(
-      content.includes('verified: no') || content.includes('STOP'),
-      'workflow Step 5 gate must stop execution when any hunk shows verified: no'
+      handlesAbsent,
+      'Step 5 must include an explicit "table absent / missing" halt path so Step 4 silently producing nothing cannot bypass the gate'
     );
   });
 });

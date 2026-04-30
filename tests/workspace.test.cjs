@@ -320,27 +320,97 @@ describe('workspace worktree integration', () => {
 describe('workspace command files', () => {
   const baseDir = path.join(__dirname, '..');
 
-  test('consolidated workspace.md command exists with correct frontmatter (#2790)', () => {
-    const content = fs.readFileSync(path.join(baseDir, 'commands/gsd/workspace.md'), 'utf8');
-    assert.ok(content.includes('name: gsd:workspace'));
-    assert.ok(content.includes('--new'));
-    assert.ok(content.includes('--list'));
-    assert.ok(content.includes('--remove'));
+  /**
+   * Split frontmatter / body and parse simple YAML-ish key:value pairs.
+   * Returns { fm: { name, argument-hint, ... }, body }. Avoids raw
+   * substring matching on the file as a whole.
+   */
+  function parseCommandFile(filePath) {
+    const raw = fs.readFileSync(filePath, 'utf8');
+    const fmMatch = raw.match(/^---\r?\n([\s\S]*?)\r?\n---\r?\n([\s\S]*)$/);
+    assert.ok(fmMatch, `${path.basename(filePath)} must start with a YAML frontmatter block`);
+    const fm = {};
+    for (const line of fmMatch[1].split('\n')) {
+      const kv = line.match(/^([a-zA-Z_-]+):\s*(.*)$/);
+      if (!kv) continue;
+      const key = kv[1];
+      let val = kv[2].trim();
+      if (val.startsWith('"') && val.endsWith('"')) val = val.slice(1, -1);
+      fm[key] = val;
+    }
+    return { fm, body: fmMatch[2] };
+  }
+
+  /**
+   * Extract `@`-include targets from any of the <execution_context*> blocks.
+   * Each line of the form `@~/.claude/get-shit-done/workflows/foo.md` becomes
+   * a relative target like `workflows/foo.md`. Used to assert workflow
+   * routing structurally instead of substring-matching prose.
+   */
+  function executionContextIncludes(body) {
+    const blocks = [...body.matchAll(/<execution_context(?:_extended)?>([\s\S]*?)<\/execution_context(?:_extended)?>/g)]
+      .map((m) => m[1]);
+    const targets = [];
+    for (const blk of blocks) {
+      for (const line of blk.split('\n')) {
+        const t = line.trim();
+        if (!t.startsWith('@')) continue;
+        // Normalize away the home-prefix and the `.claude/get-shit-done/` root
+        // so the test only cares about the workflow path tail.
+        const rel = t.replace(/^@~?\/?(?:\.claude\/)?(?:get-shit-done\/)?/, '');
+        targets.push(rel);
+      }
+    }
+    return targets;
+  }
+
+  test('consolidated workspace.md command declares correct frontmatter contract (#2790)', () => {
+    // Structural: parse frontmatter, then split argument-hint into the
+    // tokenized flag list. Each consolidated flag must appear there.
+    const { fm } = parseCommandFile(path.join(baseDir, 'commands/gsd/workspace.md'));
+    assert.equal(fm.name, 'gsd:workspace', `workspace.md frontmatter name must be "gsd:workspace"; got "${fm.name}"`);
+    assert.ok(fm['argument-hint'], 'workspace.md frontmatter must declare argument-hint');
+    // argument-hint can include multiple bracketed segments and free tokens,
+    // e.g. "[--new | --list | --remove] [name]". Pull every `--flag` token
+    // out of any bracketed segment so the test asserts on a parsed flag set,
+    // not the punctuation around it.
+    const bracketed = [...fm['argument-hint'].matchAll(/\[([^\]]*)\]/g)].map((m) => m[1]);
+    const flagList = bracketed
+      .flatMap((seg) => seg.split('|').map((s) => s.trim().split(/\s+/)[0]))
+      .filter((tok) => tok.startsWith('--'));
+    for (const flag of ['--new', '--list', '--remove']) {
+      assert.ok(
+        flagList.includes(flag),
+        `workspace.md argument-hint must declare ${flag}; got: ${JSON.stringify(flagList)}`
+      );
+    }
   });
 
-  test('workspace.md routes to new-workspace workflow', () => {
-    const content = fs.readFileSync(path.join(baseDir, 'commands/gsd/workspace.md'), 'utf8');
-    assert.ok(content.includes('workflows/new-workspace.md'));
+  test('workspace.md @-includes the new-workspace workflow', () => {
+    const { body } = parseCommandFile(path.join(baseDir, 'commands/gsd/workspace.md'));
+    const targets = executionContextIncludes(body);
+    assert.ok(
+      targets.some((t) => /(^|\/)workflows\/new-workspace\.md$/.test(t)),
+      `workspace.md execution_context must @-include workflows/new-workspace.md; got: ${JSON.stringify(targets)}`
+    );
   });
 
-  test('workspace.md routes to list-workspaces workflow', () => {
-    const content = fs.readFileSync(path.join(baseDir, 'commands/gsd/workspace.md'), 'utf8');
-    assert.ok(content.includes('workflows/list-workspaces.md'));
+  test('workspace.md @-includes the list-workspaces workflow', () => {
+    const { body } = parseCommandFile(path.join(baseDir, 'commands/gsd/workspace.md'));
+    const targets = executionContextIncludes(body);
+    assert.ok(
+      targets.some((t) => /(^|\/)workflows\/list-workspaces\.md$/.test(t)),
+      `workspace.md execution_context must @-include workflows/list-workspaces.md; got: ${JSON.stringify(targets)}`
+    );
   });
 
-  test('workspace.md routes to remove-workspace workflow', () => {
-    const content = fs.readFileSync(path.join(baseDir, 'commands/gsd/workspace.md'), 'utf8');
-    assert.ok(content.includes('workflows/remove-workspace.md'));
+  test('workspace.md @-includes the remove-workspace workflow', () => {
+    const { body } = parseCommandFile(path.join(baseDir, 'commands/gsd/workspace.md'));
+    const targets = executionContextIncludes(body);
+    assert.ok(
+      targets.some((t) => /(^|\/)workflows\/remove-workspace\.md$/.test(t)),
+      `workspace.md execution_context must @-include workflows/remove-workspace.md; got: ${JSON.stringify(targets)}`
+    );
   });
 
   test('new-workspace workflow exists', () => {

@@ -42,9 +42,11 @@ Arguments: $ARGUMENTS
 Parse the first token of $ARGUMENTS:
 - If it is `--advanced`: strip the flag, execute settings-advanced workflow
 - If it is `--integrations`: strip the flag, execute settings-integrations workflow
-- If it starts with `--profile`: extract the profile name (remainder after `--profile`), run:
-  `gsd-sdk query config-set-model-profile <profile-name> --raw`
-  and display the output verbatim.
+- If it starts with `--profile`: extract the profile name (remainder after `--profile`), then:
+  1. **Pre-flight check (#2439):** verify `gsd-sdk` is on PATH via `command -v gsd-sdk`.
+     If absent, emit the install hint `Install GSD via 'npm i -g get-shit-done'` and stop —
+     do NOT invoke `gsd-sdk` directly (avoids the opaque `command not found: gsd-sdk` failure).
+  2. Run: `gsd-sdk query config-set-model-profile <profile-name> --raw` and display the output verbatim.
 - Otherwise: execute settings workflow (no argument needed)
 </context>
 

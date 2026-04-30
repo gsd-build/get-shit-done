@@ -321,14 +321,26 @@ describe('edit-phase workflow: STATE.md roadmap evolution', () => {
 // ─── Docs registration ────────────────────────────────────────────────────────
 
 describe('edit-phase: documentation registration', () => {
-  test('INVENTORY.md contains /gsd-edit-phase', () => {
+  test('INVENTORY.md routes edit-phase workflow through consolidated /gsd-phase --edit (#2790)', () => {
+    // #2790 absorbed /gsd-edit-phase into /gsd-phase as the --edit flag. The
+    // workflow file (edit-phase.md) survives, but its "Invoked by" column must
+    // point at the consolidated command surface, not the deleted standalone.
     const inventory = fs.readFileSync(
       path.join(ROOT, 'docs', 'INVENTORY.md'),
       'utf-8'
     );
+    // Locate the edit-phase.md row in the Workflows table and assert the
+    // "Invoked by" column documents /gsd-phase --edit (not the deleted form).
+    const rowMatch = inventory.match(/^\|\s*`edit-phase\.md`\s*\|[^|]*\|\s*([^|]+?)\s*\|$/m);
+    assert.ok(rowMatch, 'docs/INVENTORY.md must contain an edit-phase.md workflow row');
+    const invokedBy = rowMatch[1];
     assert.ok(
-      inventory.includes('/gsd-edit-phase'),
-      'docs/INVENTORY.md must contain /gsd-edit-phase'
+      /\/gsd-phase\s+--edit/.test(invokedBy),
+      `edit-phase.md row must list "/gsd-phase --edit" as caller; got: "${invokedBy}"`
+    );
+    assert.ok(
+      !/\/gsd-edit-phase\b/.test(invokedBy),
+      `edit-phase.md row must not still cite the deleted /gsd-edit-phase command; got: "${invokedBy}"`
     );
   });
 
