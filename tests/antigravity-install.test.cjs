@@ -189,7 +189,7 @@ Initialize new project at ~/.claude/get-shit-done/workflows/new-project.md
     const result = convertClaudeCommandToAntigravitySkill(claudeCommand, 'gsd-new-project', false);
     assert.ok(result.startsWith('---\n'), result);
     assert.ok(result.includes('name: gsd-new-project'), result);
-    assert.ok(result.includes('description: Initialize a new GSD project'), result);
+    assert.ok(result.includes('description: "Initialize a new GSD project'), result);
     // No allowed-tools in output
     assert.ok(!result.includes('allowed-tools'), result);
     // No argument-hint in output
@@ -243,7 +243,7 @@ Execute plans from ~/.claude/get-shit-done/workflows/execute-phase.md
   test('preserves name and description', () => {
     const result = convertClaudeAgentToAntigravityAgent(claudeAgent, false);
     assert.ok(result.includes('name: gsd-executor'), result);
-    assert.ok(result.includes('description: Executes GSD plans'), result);
+    assert.ok(result.includes('description: "Executes GSD plans'), result);
   });
 
   test('maps Claude tools to Gemini tool names', () => {
@@ -345,7 +345,7 @@ Body text.
     copyCommandsAsAntigravitySkills(srcDir, skillsDir, 'gsd', false);
     const content = fs.readFileSync(path.join(skillsDir, 'gsd-new-project', 'SKILL.md'), 'utf8');
     assert.ok(content.includes('name: gsd-new-project'), content);
-    assert.ok(content.includes('description: Initialize a new project'), content);
+    assert.ok(content.includes('description: "Initialize a new project'), content);
     assert.ok(!content.includes('allowed-tools'), content);
   });
 

@@ -369,7 +369,7 @@ Body content here referencing ~/.claude/foo and gsd:health.`;
 
     const result = convertClaudeCommandToCopilotSkill(input, 'gsd-health');
     assert.ok(result.startsWith('---\nname: gsd-health\n'), 'name uses param');
-    assert.ok(result.includes('description: Diagnose planning directory health'), 'description preserved');
+    assert.ok(result.includes('description: "Diagnose planning directory health'), 'description preserved (quoted per #2876)');
     assert.ok(result.includes('argument-hint: "[--repair]"'), 'argument-hint double-quoted');
     assert.ok(result.includes('allowed-tools: Read, Bash, Write, AskUserQuestion'), 'tools comma-separated');
     assert.ok(result.includes('.github/foo'), 'CONV-06 applied to body (local mode default)');
@@ -387,7 +387,7 @@ Help content.`;
 
     const result = convertClaudeCommandToCopilotSkill(input, 'gsd-help');
     assert.ok(result.includes('name: gsd-help'), 'name set');
-    assert.ok(result.includes('description: Show available GSD commands'), 'description preserved');
+    assert.ok(result.includes('description: "Show available GSD commands'), 'description preserved');
     assert.ok(!result.includes('allowed-tools:'), 'no allowed-tools line');
   });
 
@@ -531,7 +531,7 @@ Body.`;
 
     const result = convertClaudeAgentToCopilotAgent(input);
     assert.ok(result.includes('name: gsd-executor'), 'name preserved');
-    assert.ok(result.includes('description: Executes GSD plans with atomic commits'), 'description preserved');
+    assert.ok(result.includes('description: "Executes GSD plans with atomic commits'), 'description preserved');
     assert.ok(result.includes('color: yellow'), 'color preserved');
   });
 
@@ -662,7 +662,7 @@ describe('copyCommandsAsCopilotSkills', () => {
 
     // Frontmatter: name converted from gsd:autonomous to gsd-autonomous
     assert.ok(skillContent.startsWith('---\nname: gsd-autonomous\n'), 'name is gsd-autonomous');
-    assert.ok(skillContent.includes('description: Run all remaining phases autonomously'),
+    assert.ok(skillContent.includes('description: "Run all remaining phases autonomously'),
       'description preserved');
     // argument-hint present and double-quoted
     assert.ok(skillContent.includes('argument-hint: "[--from N] [--to N] [--only N] [--interactive]"'), 'argument-hint present and quoted');

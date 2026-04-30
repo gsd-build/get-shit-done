@@ -1137,7 +1137,11 @@ function convertClaudeCommandToCopilotSkill(content, skillName, isGlobal = false
   }
 
   // Reconstruct frontmatter in Copilot format
-  let fm = `---\nname: ${skillName}\ndescription: ${description}\n`;
+  // #2876: descriptions starting with a YAML flow indicator (`[BETA] …`,
+  // `{ … }`, `*ref`, `&anchor`, etc.) parse as flow sequences/mappings and
+  // crash gh-copilot's frontmatter loader. Always quote so any leading
+  // character is parser-safe.
+  let fm = `---\nname: ${skillName}\ndescription: ${yamlQuote(description)}\n`;
   if (argumentHint) fm += `argument-hint: ${yamlQuote(argumentHint)}\n`;
   if (agent) fm += `agent: ${agent}\n`;
   if (toolsLine) fm += `allowed-tools: ${toolsLine}\n`;
@@ -1223,8 +1227,10 @@ function convertClaudeAgentToCopilotAgent(content, isGlobal = false) {
     ? "['" + uniqueTools.join("', '") + "']"
     : '[]';
 
-  // Reconstruct frontmatter in Copilot format
-  let fm = `---\nname: ${name}\ndescription: ${description}\ntools: ${toolsArray}\n`;
+  // Reconstruct frontmatter in Copilot format. Quote description (#2876)
+  // so a leading YAML flow indicator (`[BETA] …`, `{ … }`, etc.) doesn't
+  // crash the Copilot frontmatter loader.
+  let fm = `---\nname: ${name}\ndescription: ${yamlQuote(description)}\ntools: ${toolsArray}\n`;
   if (color) fm += `color: ${color}\n`;
   fm += '---';
 
@@ -1277,7 +1283,9 @@ function convertClaudeCommandToAntigravitySkill(content, skillName, isGlobal = f
   const name = skillName || extractFrontmatterField(frontmatter, 'name') || 'unknown';
   const description = extractFrontmatterField(frontmatter, 'description') || '';
 
-  const fm = `---\nname: ${name}\ndescription: ${description}\n---`;
+  // #2876: quote description so YAML flow indicators in the source
+  // (e.g. `[BETA] …`) don't break downstream frontmatter parsers.
+  const fm = `---\nname: ${name}\ndescription: ${yamlQuote(description)}\n---`;
   return `${fm}\n${body}`;
 }
 
@@ -1299,7 +1307,8 @@ function convertClaudeAgentToAntigravityAgent(content, isGlobal = false) {
   const claudeTools = toolsRaw.split(',').map(t => t.trim()).filter(Boolean);
   const mappedTools = claudeTools.map(t => convertGeminiToolName(t)).filter(Boolean);
 
-  let fm = `---\nname: ${name}\ndescription: ${description}\ntools: ${mappedTools.join(', ')}\n`;
+  // #2876: quote description for the same reason as the skill variant.
+  let fm = `---\nname: ${name}\ndescription: ${yamlQuote(description)}\ntools: ${mappedTools.join(', ')}\n`;
   if (color) fm += `color: ${color}\n`;
   fm += '---';
 
@@ -1799,7 +1808,9 @@ function convertClaudeCommandToTraeSkill(content, skillName) {
   }
   description = toSingleLine(description);
   const shortDescription = description.length > 180 ? `${description.slice(0, 177)}...` : description;
-  return `---\nname: ${yamlIdentifier(skillName)}\ndescription: ${shortDescription}\n---\n${body}`;
+  // #2876: quote so YAML flow indicators (`[BETA] …`) don't break Trae's
+  // frontmatter parser.
+  return `---\nname: ${yamlIdentifier(skillName)}\ndescription: ${yamlQuote(shortDescription)}\n---\n${body}`;
 }
 
 function convertClaudeAgentToTraeAgent(content) {
@@ -1852,7 +1863,9 @@ function convertClaudeCommandToCodebuddySkill(content, skillName) {
   }
   description = toSingleLine(description);
   const shortDescription = description.length > 180 ? `${description.slice(0, 177)}...` : description;
-  return `---\nname: ${yamlIdentifier(skillName)}\ndescription: ${shortDescription}\n---\n${body}`;
+  // #2876: quote so YAML flow indicators (`[BETA] …`) don't break
+  // CodeBuddy's frontmatter parser.
+  return `---\nname: ${yamlIdentifier(skillName)}\ndescription: ${yamlQuote(shortDescription)}\n---\n${body}`;
 }
 
 function convertClaudeAgentToCodebuddyAgent(content) {
