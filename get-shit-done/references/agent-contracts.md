@@ -32,6 +32,7 @@ This doc describes what IS, not what should be. Casing inconsistencies are docum
 | gsd-advisor-researcher | Advisory research | No marker (utility agent) |
 | gsd-user-profiler | User profiling | No marker (returns JSON in analysis tags) |
 | gsd-intel-updater | Codebase intelligence analysis | `## INTEL UPDATE COMPLETE`, `## INTEL UPDATE FAILED` |
+| gsd-sme-auditor | SME domain audit | `## SME_APPROVED`, `## SME_CONCERNS` |
 
 ## Marker Rules
 
@@ -62,6 +63,13 @@ This doc describes what IS, not what should be. Casing inconsistencies are docum
 | Deviations section | Yes | Auto-fixed issues or "None" |
 | Self-Check | Yes | PASSED or FAILED with details |
 
+### SME Auditor Output Contract
+
+| Marker | Condition | Gate Action |
+|--------|-----------|-------------|
+| `## SME_APPROVED` | Zero unaddressed BLOCKERs | Gate proceeds unconditionally |
+| `## SME_CONCERNS` | One or more unaddressed findings | Gate routes per block_mode (soft: warn + proceed, strict: halt until acknowledged) |
+
 ## Workflow Regex Patterns
 
 Workflows match these markers to detect agent completion:
@@ -71,6 +79,7 @@ Workflows match these markers to detect agent completion:
 - `## PLANNING COMPLETE` (planner output)
 - `## CHECKPOINT REACHED` (planner/executor pause)
 - `## VERIFICATION PASSED` / `## ISSUES FOUND` (plan-checker output)
+- `## SME_APPROVED` / `## SME_CONCERNS` (sme-auditor output)
 
 **execute-phase.md matches:**
 - `## PHASE COMPLETE` (all plans in phase done)
