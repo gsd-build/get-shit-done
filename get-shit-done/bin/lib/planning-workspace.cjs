@@ -246,24 +246,28 @@ function withPlanningLock(cwd, fn) {
   // Ensure .planning/ exists
   try { fs.mkdirSync(planningDir(cwd), { recursive: true }); } catch { /* ok */ }
 
+  function runWithHeldLock() {
+    // Atomic create — fails if file exists
+    fs.writeFileSync(lockPath, JSON.stringify({
+      pid: process.pid,
+      cwd,
+      acquired: new Date().toISOString(),
+    }), { flag: 'wx' });
+
+    _heldPlanningLocks.add(lockPath);
+
+    // Lock acquired — run the function
+    try {
+      return fn();
+    } finally {
+      _heldPlanningLocks.delete(lockPath);
+      try { fs.unlinkSync(lockPath); } catch { /* already released */ }
+    }
+  }
+
   while (Date.now() - start < lockTimeout) {
     try {
-      // Atomic create — fails if file exists
-      fs.writeFileSync(lockPath, JSON.stringify({
-        pid: process.pid,
-        cwd,
-        acquired: new Date().toISOString(),
-      }), { flag: 'wx' });
-
-      _heldPlanningLocks.add(lockPath);
-
-      // Lock acquired — run the function
-      try {
-        return fn();
-      } finally {
-        _heldPlanningLocks.delete(lockPath);
-        try { fs.unlinkSync(lockPath); } catch { /* already released */ }
-      }
+      return runWithHeldLock();
     } catch (err) {
       if (err.code === 'EEXIST') {
         // Lock exists — check if stale (>30s old)
@@ -282,9 +286,10 @@ function withPlanningLock(cwd, fn) {
       throw err;
     }
   }
-  // Timeout — force acquire (stale lock recovery)
+
+  // Timeout — stale-lock recovery, then re-acquire atomically before entering critical section.
   try { fs.unlinkSync(lockPath); } catch { /* ok */ }
-  return fn();
+  return runWithHeldLock();
 }
 
 function createPlanningWorkspace(cwd, opts = {}) {
@@ -331,6 +336,8 @@ function createPlanningWorkspace(cwd, opts = {}) {
           throw new Error('Invalid workstream name: must be alphanumeric, hyphens, and underscores only');
         }
 
+        const wsDir = path.join(planningRoot(cwd), 'workstreams', name);
+        fs.mkdirSync(wsDir, { recursive: true });
         adapter.write(name);
       },
       clear() {
