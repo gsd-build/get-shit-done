@@ -28,7 +28,7 @@ const path = require('path');
 
 const WORKFLOWS_DIR = path.join(__dirname, '..', 'get-shit-done', 'workflows');
 
-const XL_BUDGET = 1700;
+const XL_BUDGET = 1800; // bumped from 1700: plan-phase step 12.6 (SME audit gate) adds ~148 lines of inline orchestration
 const LARGE_BUDGET = 1500;
 const DEFAULT_BUDGET = 1000;
 
