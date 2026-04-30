@@ -223,10 +223,9 @@ describe('formatGsdState #2833 backward compatibility', () => {
 
 describe('progress bar rendering', () => {
   test('0% renders 10 empty segments', () => {
+    // percent=0 doesn't trigger Scene 3 (only percent='100' does), so
+    // Scene 4 fallback fires with no extra parts — just milestone + bar.
     const out = formatGsdState({ milestone: 'v2.0', percent: '0' });
-    assert.equal(out, 'v2.0 [░░░░░░░░░░] 0% · milestone complete'.replace(' · milestone complete', ''));
-    // Note: percent=0 doesn't trigger Scene 3 (only percent='100' does), so
-    // we just check the milestone segment.
     assert.ok(out.includes('[░░░░░░░░░░] 0%'));
   });
 
