@@ -25,9 +25,9 @@ function subcommandFor(canonical: string, family: 'state' | 'verify' | 'init' | 
 
 describe('command seam coverage (manifest -> generated -> adapters)', () => {
   it('state/verify/init/phase/phases/validate/roadmap manifest canonicals are present in generated alias artifacts', () => {
-    const generated = new Map<string, { aliases: string[]; subcommand: string }>();
+    const generated = new Map<string, { aliases: string[]; subcommand: string; mutation: boolean }>();
     for (const entry of [...STATE_COMMAND_ALIASES, ...VERIFY_COMMAND_ALIASES, ...INIT_COMMAND_ALIASES, ...PHASE_COMMAND_ALIASES, ...PHASES_COMMAND_ALIASES, ...VALIDATE_COMMAND_ALIASES, ...ROADMAP_COMMAND_ALIASES]) {
-      generated.set(entry.canonical, { aliases: [...entry.aliases], subcommand: entry.subcommand });
+      generated.set(entry.canonical, { aliases: [...entry.aliases], subcommand: entry.subcommand, mutation: !!entry.mutation });
     }
 
     for (const entry of STATE_COMMAND_MANIFEST) {
@@ -35,6 +35,7 @@ describe('command seam coverage (manifest -> generated -> adapters)', () => {
       expect(g, `missing generated canonical ${entry.canonical}`).toBeTruthy();
       expect(g?.subcommand).toBe(subcommandFor(entry.canonical, 'state'));
       expect(g?.aliases ?? []).toEqual(entry.aliases);
+      expect(g?.mutation).toBe(entry.mutation);
     }
 
     for (const entry of VERIFY_COMMAND_MANIFEST) {
@@ -42,6 +43,7 @@ describe('command seam coverage (manifest -> generated -> adapters)', () => {
       expect(g, `missing generated canonical ${entry.canonical}`).toBeTruthy();
       expect(g?.subcommand).toBe(subcommandFor(entry.canonical, 'verify'));
       expect(g?.aliases ?? []).toEqual(entry.aliases);
+      expect(g?.mutation).toBe(entry.mutation);
     }
 
     for (const entry of INIT_COMMAND_MANIFEST) {
@@ -49,6 +51,7 @@ describe('command seam coverage (manifest -> generated -> adapters)', () => {
       expect(g, `missing generated canonical ${entry.canonical}`).toBeTruthy();
       expect(g?.subcommand).toBe(subcommandFor(entry.canonical, 'init'));
       expect(g?.aliases ?? []).toEqual(entry.aliases);
+      expect(g?.mutation).toBe(entry.mutation);
     }
 
     for (const entry of PHASE_COMMAND_MANIFEST) {
@@ -56,6 +59,7 @@ describe('command seam coverage (manifest -> generated -> adapters)', () => {
       expect(g, `missing generated canonical ${entry.canonical}`).toBeTruthy();
       expect(g?.subcommand).toBe(subcommandFor(entry.canonical, 'phase'));
       expect(g?.aliases ?? []).toEqual(entry.aliases);
+      expect(g?.mutation).toBe(entry.mutation);
     }
 
     for (const entry of PHASES_COMMAND_MANIFEST) {
@@ -63,6 +67,7 @@ describe('command seam coverage (manifest -> generated -> adapters)', () => {
       expect(g, `missing generated canonical ${entry.canonical}`).toBeTruthy();
       expect(g?.subcommand).toBe(subcommandFor(entry.canonical, 'phases'));
       expect(g?.aliases ?? []).toEqual(entry.aliases);
+      expect(g?.mutation).toBe(entry.mutation);
     }
 
     for (const entry of VALIDATE_COMMAND_MANIFEST) {
@@ -70,6 +75,7 @@ describe('command seam coverage (manifest -> generated -> adapters)', () => {
       expect(g, `missing generated canonical ${entry.canonical}`).toBeTruthy();
       expect(g?.subcommand).toBe(subcommandFor(entry.canonical, 'validate'));
       expect(g?.aliases ?? []).toEqual(entry.aliases);
+      expect(g?.mutation).toBe(entry.mutation);
     }
 
     for (const entry of ROADMAP_COMMAND_MANIFEST) {
@@ -77,6 +83,7 @@ describe('command seam coverage (manifest -> generated -> adapters)', () => {
       expect(g, `missing generated canonical ${entry.canonical}`).toBeTruthy();
       expect(g?.subcommand).toBe(subcommandFor(entry.canonical, 'roadmap'));
       expect(g?.aliases ?? []).toEqual(entry.aliases);
+      expect(g?.mutation).toBe(entry.mutation);
     }
   });
 

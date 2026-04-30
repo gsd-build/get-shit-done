@@ -8,7 +8,7 @@
  */
 
 import { writeFile } from 'node:fs/promises';
-import { resolve } from 'node:path';
+import { fileURLToPath } from 'node:url';
 
 import { STATE_COMMAND_MANIFEST } from '../src/query/command-manifest.state.js';
 import { VERIFY_COMMAND_MANIFEST } from '../src/query/command-manifest.verify.js';
@@ -73,7 +73,7 @@ async function main(): Promise<void> {
     mutation: entry.mutation,
   }));
 
-  const outPath = resolve('sdk/src/query/command-aliases.generated.ts');
+  const outPath = fileURLToPath(new URL('../src/query/command-aliases.generated.ts', import.meta.url));
   const header = `/**\n * GENERATED FILE — command alias expansion for state.*, verify.*, init.*, phase.*, phases.*, validate.*, and roadmap.* pilots.\n * Source: sdk/src/query/command-manifest.{state,verify,init,phase,phases,validate,roadmap}.ts\n */\n\n`;
   const body = [
     `export const STATE_COMMAND_ALIASES = ${JSON.stringify(stateEntries, null, 2)} as const;`,

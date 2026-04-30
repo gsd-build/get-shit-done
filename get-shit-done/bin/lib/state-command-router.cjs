@@ -67,6 +67,8 @@ function routeStateCommand({ state, args, cwd, raw, parseNamedArgs, error }) {
   } else if (subcommand === 'milestone-switch') {
     const { milestone, name } = parseNamedArgs(args, ['milestone', 'name']);
     state.cmdStateMilestoneSwitch(cwd, milestone, name, raw);
+  } else if (subcommand === 'add-roadmap-evolution') {
+    error('state add-roadmap-evolution is SDK-only. Use: gsd-sdk query state.add-roadmap-evolution ...');
   } else if (subcommand === undefined || subcommand === 'load') {
     state.cmdStateLoad(cwd, raw);
   } else {

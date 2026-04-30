@@ -1,10 +1,15 @@
 'use strict';
 
+const { PHASES_SUBCOMMANDS } = require('./command-aliases.generated.cjs');
+
 /**
  * Manifest-backed phases subcommand router.
  * Keeps gsd-tools.cjs thin while preserving current CJS semantics:
  * - list
  * - clear
+ *
+ * Note: `archive` is currently SDK-only (`phases.archive` handler in SDK query
+ * registry). CJS `gsd-tools phases` intentionally supports list/clear only.
  */
 function routePhasesCommand({ phase, milestone, args, cwd, raw, error }) {
   const subcommand = args[1];
@@ -21,7 +26,8 @@ function routePhasesCommand({ phase, milestone, args, cwd, raw, error }) {
   } else if (subcommand === 'clear') {
     milestone.cmdPhasesClear(cwd, raw, args.slice(2));
   } else {
-    error('Unknown phases subcommand. Available: list, clear');
+    const cjsSupported = PHASES_SUBCOMMANDS.filter((s) => s !== 'archive');
+    error(`Unknown phases subcommand. Available: ${cjsSupported.join(', ')}`);
   }
 }
 

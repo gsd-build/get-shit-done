@@ -1,5 +1,7 @@
 'use strict';
 
+const { INIT_SUBCOMMANDS } = require('./command-aliases.generated.cjs');
+
 function routeInitCommand({ init, args, cwd, raw, parseNamedArgs, error }) {
   const workflow = args[1];
   switch (workflow) {
@@ -59,7 +61,7 @@ function routeInitCommand({ init, args, cwd, raw, parseNamedArgs, error }) {
       init.cmdInitRemoveWorkspace(cwd, args[2], raw);
       break;
     default:
-      error(`Unknown init workflow: ${workflow}\nAvailable: execute-phase, plan-phase, new-project, new-milestone, quick, ingest-docs, resume, verify-work, phase-op, todos, milestone-op, map-codebase, progress, manager, new-workspace, list-workspaces, remove-workspace`);
+      error(`Unknown init workflow: ${workflow}\nAvailable: ${INIT_SUBCOMMANDS.join(', ')}`);
   }
 }
 

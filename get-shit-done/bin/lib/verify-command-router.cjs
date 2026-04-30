@@ -18,8 +18,10 @@ function routeVerifyCommand({ verify, args, cwd, raw, error }) {
   } else if (subcommand === 'key-links') {
     verify.cmdVerifyKeyLinks(cwd, args[2], raw);
   } else if (subcommand === 'schema-drift') {
-    const skipFlag = args.includes('--skip');
-    verify.cmdVerifySchemaDrift(cwd, args[2], skipFlag, raw);
+    const rest = args.slice(2);
+    const skipFlag = rest.includes('--skip');
+    const phaseArg = rest.find((arg) => !arg.startsWith('-'));
+    verify.cmdVerifySchemaDrift(cwd, phaseArg, skipFlag, raw);
   } else if (subcommand === 'codebase-drift') {
     verify.cmdVerifyCodebaseDrift(cwd, raw);
   } else {
