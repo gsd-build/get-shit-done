@@ -35,6 +35,10 @@ import { PhaseRunner } from './phase-runner.js';
 import { ContextEngine } from './context-engine.js';
 import { PromptFactory } from './phase-prompt.js';
 
+export { PlanningJournal } from './planning-journal.js';
+export type { PlanningEvent, PlanningEventActor, PlanningJournalAppendInput } from './planning-journal.js';
+export { PlanningRuntime } from './planning-runtime.js';
+
 // ─── GSD class ───────────────────────────────────────────────────────────────
 
 export class GSD {
