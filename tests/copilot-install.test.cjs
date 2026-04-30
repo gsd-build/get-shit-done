@@ -20,6 +20,7 @@ const assert = require('node:assert/strict');
 const path = require('path');
 const os = require('os');
 const fs = require('fs');
+const { parseFrontmatter } = require('./helpers.cjs');
 
 const {
   getDirName,
@@ -368,9 +369,10 @@ allowed-tools:
 Body content here referencing ~/.claude/foo and gsd:health.`;
 
     const result = convertClaudeCommandToCopilotSkill(input, 'gsd-health');
-    assert.ok(result.startsWith('---\nname: gsd-health\n'), 'name uses param');
-    assert.ok(result.includes('description: "Diagnose planning directory health'), 'description preserved (quoted per #2876)');
-    assert.ok(result.includes('argument-hint: "[--repair]"'), 'argument-hint double-quoted');
+    const fm = parseFrontmatter(result);
+    assert.equal(fm.name, 'gsd-health', 'name uses param');
+    assert.equal(fm.description, 'Diagnose planning directory health', 'description preserved (quoted per #2876)');
+    assert.equal(fm['argument-hint'], '[--repair]', 'argument-hint round-trips');
     assert.ok(result.includes('allowed-tools: Read, Bash, Write, AskUserQuestion'), 'tools comma-separated');
     assert.ok(result.includes('.github/foo'), 'CONV-06 applied to body (local mode default)');
     assert.ok(result.includes('gsd-health'), 'CONV-07 applied to body');
@@ -386,9 +388,10 @@ description: Show available GSD commands
 Help content.`;
 
     const result = convertClaudeCommandToCopilotSkill(input, 'gsd-help');
-    assert.ok(result.includes('name: gsd-help'), 'name set');
-    assert.ok(result.includes('description: "Show available GSD commands'), 'description preserved');
-    assert.ok(!result.includes('allowed-tools:'), 'no allowed-tools line');
+    const fm = parseFrontmatter(result);
+    assert.equal(fm.name, 'gsd-help', 'name set');
+    assert.equal(fm.description, 'Show available GSD commands', 'description preserved');
+    assert.ok(!('allowed-tools' in fm), 'no allowed-tools line');
   });
 
   test('handles skill without argument-hint', () => {
@@ -530,9 +533,10 @@ color: yellow
 Body.`;
 
     const result = convertClaudeAgentToCopilotAgent(input);
-    assert.ok(result.includes('name: gsd-executor'), 'name preserved');
-    assert.ok(result.includes('description: "Executes GSD plans with atomic commits'), 'description preserved');
-    assert.ok(result.includes('color: yellow'), 'color preserved');
+    const fm = parseFrontmatter(result);
+    assert.equal(fm.name, 'gsd-executor', 'name preserved');
+    assert.equal(fm.description, 'Executes GSD plans with atomic commits', 'description preserved');
+    assert.equal(fm.color, 'yellow', 'color preserved');
   });
 
   test('handles mcp__context7__ tools', () => {
@@ -659,13 +663,17 @@ describe('copyCommandsAsCopilotSkills', () => {
     assert.ok(fs.existsSync(path.join(tempDir, 'gsd-autonomous', 'SKILL.md')), 'gsd-autonomous/SKILL.md exists');
 
     const skillContent = fs.readFileSync(path.join(tempDir, 'gsd-autonomous', 'SKILL.md'), 'utf8');
+    const fm = parseFrontmatter(skillContent);
 
     // Frontmatter: name converted from gsd:autonomous to gsd-autonomous
-    assert.ok(skillContent.startsWith('---\nname: gsd-autonomous\n'), 'name is gsd-autonomous');
-    assert.ok(skillContent.includes('description: "Run all remaining phases autonomously'),
-      'description preserved');
-    // argument-hint present and double-quoted
-    assert.ok(skillContent.includes('argument-hint: "[--from N] [--to N] [--only N] [--interactive]"'), 'argument-hint present and quoted');
+    assert.equal(fm.name, 'gsd-autonomous', 'name is gsd-autonomous');
+    assert.equal(
+      fm.description,
+      'Run all remaining phases autonomously — discuss→plan→execute per phase',
+      'description preserved (round-trips through #2876 yamlQuote)',
+    );
+    // argument-hint round-trips
+    assert.equal(fm['argument-hint'], '[--from N] [--to N] [--only N] [--interactive]', 'argument-hint round-trips');
     // allowed-tools comma-separated
     assert.ok(skillContent.includes('allowed-tools: Read, Write, Bash, Glob, Grep, AskUserQuestion, Task'),
       'allowed-tools is comma-separated');

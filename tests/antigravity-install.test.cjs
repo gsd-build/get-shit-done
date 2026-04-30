@@ -12,7 +12,7 @@ const assert = require('node:assert/strict');
 const path = require('path');
 const os = require('os');
 const fs = require('fs');
-const { createTempDir, cleanup } = require('./helpers.cjs');
+const { createTempDir, cleanup, parseFrontmatter } = require('./helpers.cjs');
 
 const {
   getDirName,
@@ -187,13 +187,11 @@ Initialize new project at ~/.claude/get-shit-done/workflows/new-project.md
 
   test('produces name and description only in frontmatter', () => {
     const result = convertClaudeCommandToAntigravitySkill(claudeCommand, 'gsd-new-project', false);
-    assert.ok(result.startsWith('---\n'), result);
-    assert.ok(result.includes('name: gsd-new-project'), result);
-    assert.ok(result.includes('description: "Initialize a new GSD project'), result);
-    // No allowed-tools in output
-    assert.ok(!result.includes('allowed-tools'), result);
-    // No argument-hint in output
-    assert.ok(!result.includes('argument-hint'), result);
+    const fm = parseFrontmatter(result);
+    assert.equal(fm.name, 'gsd-new-project', result);
+    assert.equal(fm.description, 'Initialize a new GSD project with requirements and roadmap', result);
+    assert.ok(!('allowed-tools' in fm), 'no allowed-tools field');
+    assert.ok(!('argument-hint' in fm), 'no argument-hint field');
   });
 
   test('applies path replacement in body', () => {
@@ -242,8 +240,9 @@ Execute plans from ~/.claude/get-shit-done/workflows/execute-phase.md
 
   test('preserves name and description', () => {
     const result = convertClaudeAgentToAntigravityAgent(claudeAgent, false);
-    assert.ok(result.includes('name: gsd-executor'), result);
-    assert.ok(result.includes('description: "Executes GSD plans'), result);
+    const fm = parseFrontmatter(result);
+    assert.equal(fm.name, 'gsd-executor', result);
+    assert.equal(fm.description, 'Executes GSD plans with atomic commits', result);
   });
 
   test('maps Claude tools to Gemini tool names', () => {
@@ -344,9 +343,10 @@ Body text.
   test('SKILL.md has minimal frontmatter (name + description only)', () => {
     copyCommandsAsAntigravitySkills(srcDir, skillsDir, 'gsd', false);
     const content = fs.readFileSync(path.join(skillsDir, 'gsd-new-project', 'SKILL.md'), 'utf8');
-    assert.ok(content.includes('name: gsd-new-project'), content);
-    assert.ok(content.includes('description: "Initialize a new project'), content);
-    assert.ok(!content.includes('allowed-tools'), content);
+    const fm = parseFrontmatter(content);
+    assert.equal(fm.name, 'gsd-new-project', content);
+    assert.equal(fm.description, 'Initialize a new project', content);
+    assert.ok(!('allowed-tools' in fm), 'no allowed-tools field');
   });
 
   test('SKILL.md body has paths converted for local install', () => {

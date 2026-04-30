@@ -107,4 +107,56 @@ function cleanup(tmpDir) {
   fs.rmSync(tmpDir, { recursive: true, force: true });
 }
 
-module.exports = { runGsdTools, createTempDir, createTempProject, createTempGitProject, cleanup, TOOLS_PATH };
+/**
+ * Parse a Markdown frontmatter block into a flat key→value map.
+ *
+ * Handles the YAML scalar forms emitted by the install converters:
+ *   key: "json-encoded value"   → JSON.parse
+ *   key: 'value with ''escape'' → strip quotes, unescape ''
+ *   key: bare value             → trimmed string
+ *
+ * Multi-line and block scalars are out of scope — every converter in
+ * `bin/install.js` emits single-line scalars only. Throws if the content
+ * has no closed `---` block so a regression in the emitter shape fails
+ * loudly rather than silently returning {}.
+ *
+ * Tests use this helper instead of `result.includes('key: value')` to
+ * follow the project's "tests parse, never grep" convention.
+ *
+ * @param {string} content - Full file content beginning with `---`.
+ * @returns {Record<string, string>} Map of frontmatter keys to decoded values.
+ */
+function parseFrontmatter(content) {
+  if (!content.startsWith('---')) {
+    throw new Error(`parseFrontmatter: content must start with '---', got: ${content.slice(0, 40)}`);
+  }
+  const lines = content.split('\n');
+  let openIdx = -1;
+  let closeIdx = -1;
+  for (let i = 0; i < lines.length; i += 1) {
+    if (lines[i] === '---') {
+      if (openIdx === -1) openIdx = i;
+      else { closeIdx = i; break; }
+    }
+  }
+  if (openIdx === -1 || closeIdx === -1) {
+    throw new Error('parseFrontmatter: no closed --- block');
+  }
+  const fields = {};
+  for (const line of lines.slice(openIdx + 1, closeIdx)) {
+    const match = line.match(/^([A-Za-z][A-Za-z0-9_-]*):\s*(.*)$/);
+    if (!match) continue; // skip block-list items, blank lines, comments
+    const [, key, rawValue] = match;
+    const value = rawValue.trim();
+    if (value.startsWith('"') && value.endsWith('"') && value.length >= 2) {
+      fields[key] = JSON.parse(value);
+    } else if (value.startsWith("'") && value.endsWith("'") && value.length >= 2) {
+      fields[key] = value.slice(1, -1).replace(/''/g, "'");
+    } else {
+      fields[key] = value;
+    }
+  }
+  return fields;
+}
+
+module.exports = { runGsdTools, createTempDir, createTempProject, createTempGitProject, cleanup, parseFrontmatter, TOOLS_PATH };
