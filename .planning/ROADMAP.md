@@ -119,7 +119,9 @@ Plans:
   1. Before plan-phase, discuss-phase checks whether `milestone.active_smes` is populated in STATE.md
   2. When active SMEs exist, the auditor generates domain-specific probing questions that surface known risks
   3. SME insights appear in `{phase_num}-CONTEXT.md` under a `<sme_context>` block, visible to the planner
-**Plans**: TBD
+**Plans:** 1 plan
+Plans:
+- [ ] 07-01-PLAN.md — TDD: Structural tests (RED) then sme-step.md sub-workflow + context template update (GREEN)
 
 ### Phase 8: New-Milestone Process Detection
 **Goal**: When a new milestone starts, GSD automatically detects which processes it touches and surfaces or queues the relevant SMEs
@@ -157,6 +159,6 @@ Phases execute in numeric order: 1 → 2 → 3 → 4 → 5 → 6 → 7 → 8 →
 | 4. Creation Command & Workflow | 0/1 | Not started | - |
 | 5. SME Auditor Agent | 0/1 | Not started | - |
 | 6. Plan-Phase Gate | 0/1 | Not started | - |
-| 7. Discuss-Phase Integration | 0/TBD | Not started | - |
+| 7. Discuss-Phase Integration | 0/1 | Not started | - |
 | 8. New-Milestone Process Detection | 0/TBD | Not started | - |
 | 9. Post-Execution Refresh | 0/TBD | Not started | - |
