@@ -130,11 +130,15 @@ function parseFrontmatter(content) {
   if (!content.startsWith('---')) {
     throw new Error(`parseFrontmatter: content must start with '---', got: ${content.slice(0, 40)}`);
   }
-  const lines = content.split('\n');
+  // CRLF tolerance: a Windows-authored file split on `\n` would leave a
+  // trailing `\r` on every line, making `lines[i] === '---'` fail to
+  // recognize delimiters. Same goes for whitespace-padded delimiter lines.
+  // Normalize via a CRLF-aware split + trimmed comparison.
+  const lines = content.split(/\r?\n/);
   let openIdx = -1;
   let closeIdx = -1;
   for (let i = 0; i < lines.length; i += 1) {
-    if (lines[i] === '---') {
+    if (lines[i].trim() === '---') {
       if (openIdx === -1) openIdx = i;
       else { closeIdx = i; break; }
     }
