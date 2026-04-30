@@ -134,6 +134,75 @@ describe('bug-2866: stripStaleGsdHookBlocks handles end-of-file without trailing
       'parsed shape must contain only the [history] table');
   });
 
+  // The structural rewrite (TOML-AST-driven, not regex-driven) must handle
+  // whitespace and key-ordering variations that the previous regex missed.
+  // These cases were silently leaked by the old implementation; one
+  // (V3) actually corrupted the file by leaving an orphaned key=value line
+  // outside any table.
+  const VARIATIONS = {
+    'extra blank line in Shape 4': [
+      '# GSD Hooks',
+      '[[hooks.SessionStart]]',
+      '',
+      '',
+      '[[hooks.SessionStart.hooks]]',
+      'type = "command"',
+      'command = "node /Users/USER/.codex/hooks/gsd-check-update.js"',
+    ].join('\n'),
+    'keys reordered (command before event in Shape 2)': [
+      '# GSD Hooks',
+      '[[hooks]]',
+      'command = "node /Users/USER/.codex/hooks/gsd-check-update.js"',
+      'event = "SessionStart"',
+    ].join('\n'),
+    'extra key alongside command (Shape 3 + timeout)': [
+      '# GSD Hooks',
+      '[[hooks.SessionStart]]',
+      'command = "node /Users/USER/.codex/hooks/gsd-check-update.js"',
+      'timeout = 5000',
+    ].join('\n'),
+    'tight whitespace (no spaces around `=`)': [
+      '# GSD Hooks',
+      '[[hooks]]',
+      'event="SessionStart"',
+      'command="node /Users/USER/.codex/hooks/gsd-check-update.js"',
+    ].join('\n'),
+  };
+
+  for (const [variation, block] of Object.entries(VARIATIONS)) {
+    test(`variation stripped: ${variation}`, () => {
+      const input = `[history]\npersistence = "save-all"\n${block}\n`;
+      assertStripped(stripStaleGsdHookBlocks(input), variation, 'with trailing newline');
+    });
+    test(`variation stripped at EOF without trailing newline: ${variation}`, () => {
+      const input = `[history]\npersistence = "save-all"\n${block}`;
+      assertStripped(stripStaleGsdHookBlocks(input), variation, 'no trailing newline');
+    });
+  }
+
+  test('user-authored [[hooks.UserPromptSubmit]] is preserved', () => {
+    // The structural strip must not touch hook tables that don't carry a
+    // GSD-managed `gsd-(check-update|update-check).js` command.
+    const input = [
+      '[history]',
+      'persistence = "save-all"',
+      '[[hooks.UserPromptSubmit]]',
+      'command = "node /Users/USER/my-hook.js"',
+      '',
+    ].join('\n');
+    const out = stripStaleGsdHookBlocks(input);
+    const shape = parseTomlShape(out);
+    assert.ok(
+      shape.tableHeaders.includes('[[hooks.UserPromptSubmit]]'),
+      `user-authored [[hooks.UserPromptSubmit]] must survive, got: ${shape.tableHeaders.join(', ')}`,
+    );
+    assert.strictEqual(
+      shape.keys.get('hooks.UserPromptSubmit.command'),
+      'node /Users/USER/my-hook.js',
+      'user-authored command value must be preserved verbatim',
+    );
+  });
+
   test('Shape 4 strip does not leave an orphaned [[hooks.SessionStart]] header', () => {
     // Shape 4 is stripped before Shape 3 specifically to avoid this.
     const block = SHAPES['Shape 4 (nested [[hooks.SessionStart]] + [[hooks.SessionStart.hooks]])'];
