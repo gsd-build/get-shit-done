@@ -4,4 +4,14 @@
  * tests land; other mutations rely on `MUTATION_DEFERRED_REASON` in golden-policy.
  */
 
-export const GOLDEN_MUTATION_SUBPROCESS_COVERED: readonly string[] = [];
+export const GOLDEN_MUTATION_SUBPROCESS_COVERED: readonly string[] = [
+  'state.update',
+  'state.patch',
+  'state.begin-phase',
+  'state.sync',
+  'phase.add',
+  'phase.add-batch',
+  'phase.insert',
+  'phases.clear',
+  'roadmap.update-plan-progress',
+];

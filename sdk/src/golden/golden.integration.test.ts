@@ -35,6 +35,73 @@ function omitAgentInstallFields(data: Record<string, unknown>): Record<string, u
   return o;
 }
 
+const MINIMAL_STATE = `---
+gsd_state_version: 1.0
+milestone: v3.0
+milestone_name: SDK-First Migration
+status: executing
+---
+
+# Project State
+
+## Current Position
+
+Phase: 10 (Read-Only Queries) — EXECUTING
+Plan: 2 of 3
+Status: Executing Phase 10
+Last activity: 2026-04-08 -- Phase 10 execution started
+
+Progress: [░░░░░░░░░░] 50%
+`;
+
+async function setupMinimalStateProject(root: string): Promise<void> {
+  await mkdir(join(root, '.planning', 'phases'), { recursive: true });
+  await writeFile(join(root, '.planning', 'STATE.md'), MINIMAL_STATE, 'utf-8');
+  await writeFile(
+    join(root, '.planning', 'ROADMAP.md'),
+    '# Roadmap\n\n## Current Milestone: v3.0 SDK-First Migration\n\n### Phase 10: Read-Only Queries\n',
+    'utf-8',
+  );
+  await writeFile(join(root, '.planning', 'config.json'), '{"model_profile":"balanced"}', 'utf-8');
+}
+
+async function setupPhasesFixture(root: string): Promise<void> {
+  await setupMinimalStateProject(root);
+  const phasesRoot = join(root, '.planning', 'phases');
+  await mkdir(join(phasesRoot, '10-read-only-queries'), { recursive: true });
+  await mkdir(join(phasesRoot, '11-foundation-cleanup'), { recursive: true });
+  await mkdir(join(phasesRoot, '999-backlog'), { recursive: true });
+  await writeFile(join(phasesRoot, '10-read-only-queries', '10-01-PLAN.md'), '# plan\n', 'utf-8');
+  await writeFile(join(phasesRoot, '10-read-only-queries', '10-02-PLAN.md'), '# plan\n', 'utf-8');
+  await writeFile(join(phasesRoot, '11-foundation-cleanup', '11-01-SUMMARY.md'), '# summary\n', 'utf-8');
+
+  await writeFile(
+    join(root, '.planning', 'ROADMAP.md'),
+    [
+      '# Roadmap',
+      '',
+      '| Phase | Plans | Status | Completed |',
+      '|---|---|---|---|',
+      '| 10. | 0/2 | Planned     |  |',
+      '| 11. | 1/1 | Complete    | 2026-04-01 |',
+      '',
+      '### Phase 10: Read-Only Queries',
+      '',
+      '**Plans:** 0/2 plans executed',
+      '',
+      'Plans:',
+      '- [ ] 10-01',
+      '- [ ] 10-02',
+      '',
+      '### Phase 11: Foundation Cleanup',
+    ].join('\n'),
+    'utf-8',
+  );
+
+  const archivedRoot = join(root, '.planning', 'milestones', 'v0.9-phases', '09-legacy-foundation');
+  await mkdir(archivedRoot, { recursive: true });
+}
+
 describe('Golden file tests', () => {
   describe('generate-slug', () => {
     it('SDK output matches gsd-tools.cjs and checked-in golden fixture (fixture must track CLI, not SDK alone)', async () => {
@@ -121,6 +188,43 @@ describe('Golden file tests', () => {
     });
   });
 
+  describe('roadmap parity (subprocess parity)', () => {
+    async function withFreshRoadmapProjects(): Promise<{ gsdDir: string; sdkDir: string }> {
+      const suffix = `${Date.now()}-${Math.random().toString(36).slice(2)}`;
+      const gsdDir = join(tmpdir(), `gsd-golden-roadmap-gsd-${suffix}`);
+      const sdkDir = join(tmpdir(), `gsd-golden-roadmap-sdk-${suffix}`);
+      await setupPhasesFixture(gsdDir);
+      await setupPhasesFixture(sdkDir);
+      return { gsdDir, sdkDir };
+    }
+
+    it('roadmap.get-phase matches gsd-tools.cjs on fixture', async () => {
+      const { gsdDir, sdkDir } = await withFreshRoadmapProjects();
+      try {
+        const gsdOutput = await captureGsdToolsOutput('roadmap', ['get-phase', '10'], gsdDir);
+        const registry = createRegistry();
+        const sdkResult = await registry.dispatch('roadmap.get-phase', ['10'], sdkDir);
+        expect(sdkResult.data).toEqual(gsdOutput);
+      } finally {
+        await rm(gsdDir, { recursive: true, force: true });
+        await rm(sdkDir, { recursive: true, force: true });
+      }
+    });
+
+    it('roadmap.update-plan-progress matches gsd-tools.cjs on fixture', async () => {
+      const { gsdDir, sdkDir } = await withFreshRoadmapProjects();
+      try {
+        const gsdOutput = await captureGsdToolsOutput('roadmap', ['update-plan-progress', '10'], gsdDir);
+        const registry = createRegistry();
+        const sdkResult = await registry.dispatch('roadmap.update-plan-progress', ['10'], sdkDir);
+        expect(sdkResult.data).toEqual(gsdOutput);
+      } finally {
+        await rm(gsdDir, { recursive: true, force: true });
+        await rm(sdkDir, { recursive: true, force: true });
+      }
+    });
+  });
+
   describe('progress', () => {
     it('SDK JSON matches gsd-tools.cjs (`progress json`)', async () => {
       const gsdOutput = await captureGsdToolsOutput('progress', ['json'], REPO_ROOT);
@@ -165,6 +269,188 @@ describe('Golden file tests', () => {
       expect(sdkResult.data).toEqual(gsdOutput);
       const config = JSON.parse(await readFile(join(tmpDir, '.planning', 'config.json'), 'utf-8'));
       expect(config.model_profile).toBe('quality');
+    });
+  });
+
+  describe('state mutations (subprocess parity)', () => {
+    let tmpDir: string;
+
+    beforeEach(async () => {
+      tmpDir = join(tmpdir(), `gsd-golden-state-${Date.now()}-${Math.random().toString(36).slice(2)}`);
+      await setupMinimalStateProject(tmpDir);
+    });
+
+    afterEach(async () => {
+      await rm(tmpDir, { recursive: true, force: true });
+    });
+
+    it('state.update matches gsd-tools.cjs', async () => {
+      const gsdOutput = await captureGsdToolsOutput('state', ['update', 'Status', 'Executing SDK'], tmpDir);
+      const registry = createRegistry();
+      const sdkResult = await registry.dispatch('state.update', ['Status', 'Executing SDK'], tmpDir);
+      expect(sdkResult.data).toEqual(gsdOutput);
+    });
+
+    it('state.patch matches gsd-tools.cjs', async () => {
+      const gsdOutput = await captureGsdToolsOutput('state', ['patch', '--status', 'Patched via parity'], tmpDir);
+      const registry = createRegistry();
+      const sdkResult = await registry.dispatch('state.patch', ['--status', 'Patched via parity'], tmpDir);
+      expect(sdkResult.data).toEqual(gsdOutput);
+    });
+
+    it('state.begin-phase matches gsd-tools.cjs', async () => {
+      const argv = ['begin-phase', '--phase', '11', '--name', 'State Pilot', '--plans', '3'];
+      const gsdOutput = await captureGsdToolsOutput('state', argv, tmpDir);
+      const registry = createRegistry();
+      const sdkResult = await registry.dispatch('state.begin-phase', ['--phase', '11', '--name', 'State Pilot', '--plans', '3'], tmpDir);
+      expect(sdkResult.data).toEqual(gsdOutput);
+    });
+
+    it('state.sync --verify matches gsd-tools.cjs', async () => {
+      const gsdOutput = await captureGsdToolsOutput('state', ['sync', '--verify'], tmpDir);
+      const registry = createRegistry();
+      const sdkResult = await registry.dispatch('state.sync', ['--verify'], tmpDir);
+      expect(sdkResult.data).toEqual(gsdOutput);
+    });
+  });
+
+  describe('phase mutations (subprocess parity)', () => {
+    async function withFreshPhaseProjects(): Promise<{ gsdDir: string; sdkDir: string }> {
+      const suffix = `${Date.now()}-${Math.random().toString(36).slice(2)}`;
+      const gsdDir = join(tmpdir(), `gsd-golden-phase-gsd-${suffix}`);
+      const sdkDir = join(tmpdir(), `gsd-golden-phase-sdk-${suffix}`);
+      await setupMinimalStateProject(gsdDir);
+      await setupMinimalStateProject(sdkDir);
+      return { gsdDir, sdkDir };
+    }
+
+    it('phase.add matches gsd-tools.cjs', async () => {
+      const { gsdDir, sdkDir } = await withFreshPhaseProjects();
+      try {
+        const gsdOutput = await captureGsdToolsOutput('phase', ['add', 'Phase parity add'], gsdDir);
+        const registry = createRegistry();
+        const sdkResult = await registry.dispatch('phase.add', ['Phase parity add'], sdkDir);
+        expect(sdkResult.data).toEqual(gsdOutput);
+      } finally {
+        await rm(gsdDir, { recursive: true, force: true });
+        await rm(sdkDir, { recursive: true, force: true });
+      }
+    });
+
+    it('phase.add-batch matches gsd-tools.cjs', async () => {
+      const { gsdDir, sdkDir } = await withFreshPhaseProjects();
+      try {
+        const argv = ['add-batch', '--descriptions', '["Batch A","Batch B"]'];
+        const gsdOutput = await captureGsdToolsOutput('phase', argv, gsdDir);
+        const registry = createRegistry();
+        const sdkResult = await registry.dispatch('phase.add-batch', ['--descriptions', '["Batch A","Batch B"]'], sdkDir);
+        expect(sdkResult.data).toEqual(gsdOutput);
+      } finally {
+        await rm(gsdDir, { recursive: true, force: true });
+        await rm(sdkDir, { recursive: true, force: true });
+      }
+    });
+
+    it('phase.insert matches gsd-tools.cjs', async () => {
+      const { gsdDir, sdkDir } = await withFreshPhaseProjects();
+      try {
+        const gsdOutput = await captureGsdToolsOutput('phase', ['insert', '10', 'Inserted parity phase'], gsdDir);
+        const registry = createRegistry();
+        const sdkResult = await registry.dispatch('phase.insert', ['10', 'Inserted parity phase'], sdkDir);
+        expect(sdkResult.data).toEqual(gsdOutput);
+      } finally {
+        await rm(gsdDir, { recursive: true, force: true });
+        await rm(sdkDir, { recursive: true, force: true });
+      }
+    });
+  });
+
+  describe('phases parity (subprocess parity)', () => {
+    async function withFreshPhasesProjects(): Promise<{ gsdDir: string; sdkDir: string }> {
+      const suffix = `${Date.now()}-${Math.random().toString(36).slice(2)}`;
+      const gsdDir = join(tmpdir(), `gsd-golden-phases-gsd-${suffix}`);
+      const sdkDir = join(tmpdir(), `gsd-golden-phases-sdk-${suffix}`);
+      await setupPhasesFixture(gsdDir);
+      await setupPhasesFixture(sdkDir);
+      return { gsdDir, sdkDir };
+    }
+
+    it('phases.list matches gsd-tools.cjs', async () => {
+      const { gsdDir, sdkDir } = await withFreshPhasesProjects();
+      try {
+        const gsdOutput = await captureGsdToolsOutput('phases', ['list'], gsdDir);
+        const registry = createRegistry();
+        const sdkResult = await registry.dispatch('phases.list', [], sdkDir);
+        expect(sdkResult.data).toEqual(gsdOutput);
+      } finally {
+        await rm(gsdDir, { recursive: true, force: true });
+        await rm(sdkDir, { recursive: true, force: true });
+      }
+    });
+
+    it('phases.list --type plans matches gsd-tools.cjs', async () => {
+      const { gsdDir, sdkDir } = await withFreshPhasesProjects();
+      try {
+        const gsdOutput = await captureGsdToolsOutput('phases', ['list', '--type', 'plans'], gsdDir);
+        const registry = createRegistry();
+        const sdkResult = await registry.dispatch('phases.list', ['--type', 'plans'], sdkDir);
+        expect(sdkResult.data).toEqual(gsdOutput);
+      } finally {
+        await rm(gsdDir, { recursive: true, force: true });
+        await rm(sdkDir, { recursive: true, force: true });
+      }
+    });
+
+    it('phases.list --type summaries matches gsd-tools.cjs', async () => {
+      const { gsdDir, sdkDir } = await withFreshPhasesProjects();
+      try {
+        const gsdOutput = await captureGsdToolsOutput('phases', ['list', '--type', 'summaries'], gsdDir);
+        const registry = createRegistry();
+        const sdkResult = await registry.dispatch('phases.list', ['--type', 'summaries'], sdkDir);
+        expect(sdkResult.data).toEqual(gsdOutput);
+      } finally {
+        await rm(gsdDir, { recursive: true, force: true });
+        await rm(sdkDir, { recursive: true, force: true });
+      }
+    });
+
+    it('phases.list --phase 10 matches gsd-tools.cjs', async () => {
+      const { gsdDir, sdkDir } = await withFreshPhasesProjects();
+      try {
+        const gsdOutput = await captureGsdToolsOutput('phases', ['list', '--phase', '10'], gsdDir);
+        const registry = createRegistry();
+        const sdkResult = await registry.dispatch('phases.list', ['--phase', '10'], sdkDir);
+        expect(sdkResult.data).toEqual(gsdOutput);
+      } finally {
+        await rm(gsdDir, { recursive: true, force: true });
+        await rm(sdkDir, { recursive: true, force: true });
+      }
+    });
+
+    it('phases.list --include-archived matches gsd-tools.cjs', async () => {
+      const { gsdDir, sdkDir } = await withFreshPhasesProjects();
+      try {
+        const gsdOutput = await captureGsdToolsOutput('phases', ['list', '--include-archived'], gsdDir);
+        const registry = createRegistry();
+        const sdkResult = await registry.dispatch('phases.list', ['--include-archived'], sdkDir);
+        expect(sdkResult.data).toEqual(gsdOutput);
+      } finally {
+        await rm(gsdDir, { recursive: true, force: true });
+        await rm(sdkDir, { recursive: true, force: true });
+      }
+    });
+
+    it('phases.clear --confirm matches gsd-tools.cjs', async () => {
+      const { gsdDir, sdkDir } = await withFreshPhasesProjects();
+      try {
+        const gsdOutput = await captureGsdToolsOutput('phases', ['clear', '--confirm'], gsdDir);
+        const registry = createRegistry();
+        const sdkResult = await registry.dispatch('phases.clear', ['--confirm'], sdkDir);
+        expect(sdkResult.data).toEqual(gsdOutput);
+      } finally {
+        await rm(gsdDir, { recursive: true, force: true });
+        await rm(sdkDir, { recursive: true, force: true });
+      }
     });
   });
 
@@ -238,6 +524,24 @@ describe('Golden file tests', () => {
       patchedGsd.warning_count = (sdkResult.data as Record<string, unknown>).warning_count;
 
       expect(sdkResult.data).toEqual(patchedGsd);
+    });
+  });
+
+  describe('validate.health', () => {
+    it('SDK JSON matches gsd-tools.cjs', async () => {
+      const gsdOutput = await captureGsdToolsOutput('validate', ['health'], REPO_ROOT);
+      const registry = createRegistry();
+      const sdkResult = await registry.dispatch('validate.health', [], REPO_ROOT);
+      expect(sdkResult.data).toEqual(gsdOutput);
+    });
+  });
+
+  describe('validate.agents', () => {
+    it('SDK JSON matches gsd-tools.cjs', async () => {
+      const gsdOutput = await captureGsdToolsOutput('validate', ['agents'], REPO_ROOT);
+      const registry = createRegistry();
+      const sdkResult = await registry.dispatch('validate.agents', [], REPO_ROOT);
+      expect(sdkResult.data).toEqual(gsdOutput);
     });
   });
 
