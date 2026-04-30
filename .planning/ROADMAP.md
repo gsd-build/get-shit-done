@@ -94,7 +94,7 @@ Plans:
   5. The auditor's return markers are registered in `agent-contracts.md`
 **Plans:** 1 plan
 Plans:
-- [ ] 05-01-PLAN.md — TDD: Structural tests (RED) then agent definition + contracts registration (GREEN)
+- [x] 05-01-PLAN.md — TDD: Structural tests (RED) then agent definition + contracts registration (GREEN)
 
 ### Phase 6: Plan-Phase Gate
 **Goal**: The plan-phase gate runs as step 12.5, detects relevant processes, spawns the auditor, and enforces soft or strict blocking based on per-process config
@@ -107,7 +107,9 @@ Plans:
   4. In strict mode, BLOCKER findings halt plan finalization until the user acknowledges the risk or revises the plan
   5. The `--acknowledge-sme-risk` flag overrides strict mode and allows the user to proceed with documented risk acceptance
   6. When no SME exists for a detected process, the gate emits a warning with `/gsd-create-sme` instructions and never blocks (CONFIG-04, GATE-07)
-**Plans**: TBD
+**Plans:** 1 plan
+Plans:
+- [ ] 06-01-PLAN.md — TDD: Structural tests (RED) then SME audit gate step 12.6 in plan-phase workflow (GREEN)
 
 ### Phase 7: Discuss-Phase Integration
 **Goal**: SME domain knowledge is injected into discuss-phase as probing questions so domain risks surface before planning even begins
@@ -154,7 +156,7 @@ Phases execute in numeric order: 1 → 2 → 3 → 4 → 5 → 6 → 7 → 8 →
 | 3. SME Creator Agent | 0/2 | Not started | - |
 | 4. Creation Command & Workflow | 0/1 | Not started | - |
 | 5. SME Auditor Agent | 0/1 | Not started | - |
-| 6. Plan-Phase Gate | 0/TBD | Not started | - |
+| 6. Plan-Phase Gate | 0/1 | Not started | - |
 | 7. Discuss-Phase Integration | 0/TBD | Not started | - |
 | 8. New-Milestone Process Detection | 0/TBD | Not started | - |
 | 9. Post-Execution Refresh | 0/TBD | Not started | - |
