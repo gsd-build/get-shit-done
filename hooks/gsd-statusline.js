@@ -200,30 +200,76 @@ function parseStateMd(content) {
 }
 
 /**
+ * Render a 10-segment milestone progress bar (matches the context meter style).
+ *
+ * @param {number|string|null|undefined} percent — 0-100; missing/NaN returns ''
+ * @returns {string} '[█████░░░░░] 50%' or '' (so callers can `[bar].filter(Boolean)`)
+ */
+function renderProgressBar(percent) {
+  if (percent == null || isNaN(percent)) return '';
+  const pct = Math.max(0, Math.min(100, parseInt(percent, 10)));
+  const filled = Math.floor(pct / 10);
+  const bar = '█'.repeat(filled) + '░'.repeat(10 - filled);
+  return `[${bar}] ${pct}%`;
+}
+
+/**
  * Format GSD state into display string.
- * Format: "v1.9 Code Quality · executing · fix-graphiti-deployment (1/5)"
- * Gracefully degrades when parts are missing.
+ *
+ * Backward-compatible default (no new fields populated):
+ *   "v1.9 Code Quality · executing · fix-graphiti-deployment (1/5)"
+ *
+ * Phase-lifecycle scenes (issue #2833 — activate when STATE.md frontmatter
+ * carries the new fields; otherwise rendering falls through to the default):
+ *
+ *   active_phase set                       → "v2.0 [██░] X% · Phase 4.5 executing"
+ *   active_phase null + next_action set    → "v2.0 [██░] X% · next execute-phase 4.5"
+ *   percent=100 (milestone done)           → "v2.0 [██████████] 100% · milestone complete"
+ *   none of the above                      → existing "<status> · <phase>" path
+ *
+ * Progress bar is opt-in: appended to the milestone segment only when
+ * progress.percent is present in frontmatter; absent → empty string.
  */
 function formatGsdState(s) {
   const parts = [];
 
-  // Milestone: version + name (skip placeholder "milestone")
+  // Milestone segment: version + name + (opt-in) progress bar
   if (s.milestone || s.milestoneName) {
     const ver = s.milestone || '';
     const name = (s.milestoneName && s.milestoneName !== 'milestone') ? s.milestoneName : '';
-    const ms = [ver, name].filter(Boolean).join(' ');
-    if (ms) parts.push(ms);
+    const bar = renderProgressBar(s.percent);
+    const pieces = [ver, name, bar].filter(Boolean);
+    if (pieces.length > 0) parts.push(pieces.join(' '));
   }
 
-  // Status
-  if (s.status) parts.push(s.status);
+  // Phase-lifecycle scenes (issue #2833) — first match wins; falls through to
+  // the original "<status> · <phase>" path when none of the new fields apply.
+  const phasesStr = (s.nextPhases && s.nextPhases.length > 0) ? s.nextPhases.join('/') : null;
 
-  // Phase
-  if (s.phaseNum && s.phaseTotal) {
-    const phase = s.phaseName
-      ? `${s.phaseName} (${s.phaseNum}/${s.phaseTotal})`
-      : `ph ${s.phaseNum}/${s.phaseTotal}`;
-    parts.push(phase);
+  if (s.activePhase) {
+    // Scene 1: an orchestrator is mid-flight on this phase.
+    // stage = whichever lifecycle status was written by the orchestrator
+    //   (discussing / planning / executing / verifying)
+    const stage = s.status || '';
+    parts.push(stage ? `Phase ${s.activePhase} ${stage}` : `Phase ${s.activePhase}`);
+  } else if (s.nextAction && phasesStr) {
+    // Scene 2: idle + a recommended next command is visible to the user.
+    // Surfaces "what to run next" without the user opening STATE.md.
+    parts.push(`next ${s.nextAction} ${phasesStr}`);
+  } else if (s.percent === '100' || (s.completedPhases && s.totalPhases && s.completedPhases === s.totalPhases)) {
+    // Scene 3: milestone complete (every phase done).
+    parts.push('milestone complete');
+  } else {
+    // Backward-compatible default — preserved EXACTLY for STATE.md files that
+    // don't carry the new lifecycle fields. Identical output to v1.38.x and
+    // earlier so no existing project's status-line changes shape.
+    if (s.status) parts.push(s.status);
+    if (s.phaseNum && s.phaseTotal) {
+      const phase = s.phaseName
+        ? `${s.phaseName} (${s.phaseNum}/${s.phaseTotal})`
+        : `ph ${s.phaseNum}/${s.phaseTotal}`;
+      parts.push(phase);
+    }
   }
 
   return parts.join(' · ');
