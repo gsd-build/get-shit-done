@@ -54,9 +54,11 @@ Parse JSON for: `researcher_model`, `planner_model`, `checker_model`, `research_
 
 ## 2. Parse and Normalize Arguments
 
-Extract from $ARGUMENTS: phase number (integer or decimal like `2.1`), flags (`--research`, `--skip-research`, `--gaps`, `--skip-verify`, `--skip-ui`, `--prd <filepath>`, `--reviews`, `--text`, `--bounce`, `--skip-bounce`, `--chunked`).
+Extract from $ARGUMENTS: phase number (integer or decimal like `2.1`), flags (`--research`, `--skip-research`, `--gaps`, `--skip-verify`, `--skip-ui`, `--prd <filepath>`, `--reviews`, `--text`, `--bounce`, `--skip-bounce`, `--chunked`, `--acknowledge-sme-risk`).
 
 Set `TEXT_MODE=true` if `--text` is present in $ARGUMENTS OR `text_mode` from init JSON is `true`. When `TEXT_MODE` is active, replace every `AskUserQuestion` call with a plain-text numbered list and ask the user to type their choice number. This is required for Claude Code remote sessions (`/rc` mode) where TUI menus don't work through the Claude App.
+
+Set `ACKNOWLEDGE_SME_RISK=true` if `--acknowledge-sme-risk` is present in $ARGUMENTS.
 
 Extract `--prd <filepath>` from $ARGUMENTS. If present, set PRD_FILE to the filepath.
 
@@ -1272,6 +1274,152 @@ Plan bounce complete: {survived}/{total} plans refined
 ```
 
 **Clean up:** Remove all `*-PLAN.pre-bounce.md` backup files after the bounce step completes (whether plans survived or were restored).
+
+## 12.6. SME Audit Gate
+
+> Skip if `workflow.use_sme_agents` is not `true`. Absent = disabled (default is `false`).
+
+```bash
+SME_AGENTS=$(gsd-sdk query config-get workflow.use_sme_agents --raw 2>/dev/null || echo "false")
+```
+
+**If `SME_AGENTS` is not `true`:** Skip to step 13.
+
+Display banner:
+```
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+ GSD ► SME AUDIT GATE
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+◆ Detecting relevant processes...
+```
+
+### Detect Processes
+
+Collect file paths from PLAN.md frontmatter `files_modified` fields and the phase goal:
+
+```bash
+PLAN_FILES=$(grep -h "files_modified:" "${PHASE_DIR}"/*-PLAN.md 2>/dev/null | tr ' ' '\n' | grep "^\s*-" | sed 's/^\s*-\s*//' | tr '\n' ' ')
+PHASE_GOAL=$(gsd-sdk query roadmap.get-phase "${PHASE}" --pick goal 2>/dev/null || echo "")
+
+SME_DETECT=$(gsd-sdk query sme.detect-processes --file-paths ${PLAN_FILES} --goal "${PHASE_GOAL}" 2>/dev/null || echo '{"data":{"enabled":false,"matches":[]}}')
+```
+
+Parse `SME_DETECT`: extract `enabled` and `matches[]`.
+
+**If `enabled` is false:** Skip to step 13.
+
+**If `matches` is empty:**
+
+Check if any SME documents exist at all:
+
+```bash
+SME_LIST=$(gsd-sdk query sme.list 2>/dev/null || echo '{"data":{"enabled":true,"smes":[]}}')
+```
+
+Parse `SME_LIST`: extract `smes[]`.
+
+If `smes[]` is empty (CONFIG-04 — no SME documents exist yet):
+```
+◆ SME agents enabled but no SME documents exist yet.
+  Create one with: /gsd-create-sme [process-name]
+  Skipping SME audit for this phase.
+```
+
+If `smes[]` is non-empty but `matches` is empty (GATE-07 — processes detected but no matching SME):
+```
+◆ No SME found for processes detected in this phase.
+  Create one with: /gsd-create-sme [process-name]
+  Skipping SME audit for this phase.
+```
+
+Proceed to step 13. Never block when no SME exists.
+
+### Fetch Context Blocks
+
+For each match in `matches[]`, fetch its SME context block:
+
+```bash
+SME_CONTEXT_BLOCKS=""
+for match in matches; do
+  PROCESS_NAME=$(extract process_name from match)
+  CTX=$(gsd-sdk query sme.context-block "${PROCESS_NAME}" 2>/dev/null || echo "")
+  SME_CONTEXT_BLOCKS="${SME_CONTEXT_BLOCKS}${CTX_BLOCK}"
+done
+```
+
+### Determine Effective Block Mode
+
+When multiple SMEs are matched, use strict-wins resolution:
+
+```
+EFFECTIVE_BLOCK_MODE=soft
+for match in matches; do
+  if match.block_mode == "strict"; then
+    EFFECTIVE_BLOCK_MODE=strict
+  fi
+done
+```
+
+### Spawn Auditor
+
+Construct auditor prompt with SME context blocks injected FIRST (GATE-08 — prevents context window saturation from hiding BLOCKERs):
+
+```
+Task(
+  prompt="""${SME_CONTEXT_BLOCKS}
+
+PLAN.md path: ${PHASE_DIR}/${PADDED_PHASE}-PLAN.md
+
+Phase: ${phase_name}
+""",
+  subagent_type="gsd-sme-auditor",
+  model="${checker_model}",
+  description="SME audit Phase ${PHASE}"
+)
+```
+
+> **ORCHESTRATOR RULE — CODEX RUNTIME**: After calling Task() above, stop working on this task immediately. Do not read more files, edit code, or run tests related to this task while the subagent is active. Wait for the subagent to return its result. This prevents duplicate work, conflicting edits, and wasted context. Only resume when the subagent result is available.
+
+### Route on Return Marker
+
+**`## SME_APPROVED`:** Display approval message. Proceed to step 13.
+
+**`## SME_CONCERNS`:**
+
+**If `ACKNOWLEDGE_SME_RISK` is true:** Log risk acceptance to output. Display: "SME concerns acknowledged via --acknowledge-sme-risk flag. Proceeding." Proceed to step 13.
+
+**If `EFFECTIVE_BLOCK_MODE` is `soft`:** Display SME concerns as warnings. Proceed to step 13.
+
+**If `EFFECTIVE_BLOCK_MODE` is `strict`:**
+
+Display SME concerns.
+
+If `TEXT_MODE` is true, present as a plain-text numbered list:
+```
+SME Audit: BLOCKERs Found
+The SME auditor found unaddressed domain risks in the plan.
+Options:
+1. Acknowledge risk and proceed (risk documented in output)
+2. Revise plan (return to step 8 for replanning)
+Type your choice (1 or 2):
+```
+
+Otherwise use:
+```
+AskUserQuestion(
+  header: "SME Audit: BLOCKERs Found",
+  question: "The SME auditor found unaddressed domain risks in the plan. How would you like to proceed?",
+  options:
+    - "Acknowledge risk and proceed" — risk documented in output, proceed to step 13
+    - "Revise plan" — return to step 8 for replanning
+)
+```
+
+If user selects "Acknowledge risk": Log acknowledgment. Proceed to step 13.
+If user selects "Revise plan": Return to step 8.
+
+**No recognized marker / empty return:** Log warning. Offer: 1) Retry audit, 2) Skip audit and proceed, 3) Stop.
 
 ## 13. Requirements Coverage Gate
 

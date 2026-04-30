@@ -50,6 +50,7 @@ Canonical gate types used across GSD workflows. Every validation checkpoint maps
 | plan-phase | Entry | Pre-flight | REQUIREMENTS.md, ROADMAP.md | Block with missing-file message |
 | plan-phase | Step 12 | Revision | PLAN.md quality | Loop to planner (max 3) |
 | plan-phase | Post-revision | Escalation | Unresolved issues | Surface to developer |
+| plan-phase | Step 12.6 | Escalation | SME domain risks in PLAN.md | Soft: warn + proceed; Strict: halt until acknowledged |
 | execute-phase | Entry | Pre-flight | PLAN.md | Block with missing-plan message |
 | execute-phase | Completion | Revision | SUMMARY.md completeness | Re-run incomplete tasks |
 | verify-work | Entry | Pre-flight | SUMMARY.md | Block with missing-summary |
