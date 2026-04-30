@@ -109,7 +109,7 @@ Plans:
   6. When no SME exists for a detected process, the gate emits a warning with `/gsd-create-sme` instructions and never blocks (CONFIG-04, GATE-07)
 **Plans:** 1 plan
 Plans:
-- [ ] 06-01-PLAN.md — TDD: Structural tests (RED) then SME audit gate step 12.6 in plan-phase workflow (GREEN)
+- [x] 06-01-PLAN.md — TDD: Structural tests (RED) then SME audit gate step 12.6 in plan-phase workflow (GREEN)
 
 ### Phase 7: Discuss-Phase Integration
 **Goal**: SME domain knowledge is injected into discuss-phase as probing questions so domain risks surface before planning even begins
