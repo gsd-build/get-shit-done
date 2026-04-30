@@ -93,8 +93,12 @@ describe('Gemini Slash Command Namespacing (Regex)', () => {
   });
 
   test('converts commands ending with punctuation', () => {
-    const input = 'Run /gsd-help. Or /gsd-scan!';
-    const expected = 'Run /gsd:help. Or /gsd:scan!';
+    // Use two stable, foundational commands so this test doesn't drift when
+    // the roster gets consolidated (cf. #2790, which removed `scan`). `help`
+    // and `health` are both bedrock; if either ever gets removed, swap to
+    // any other entry currently in commands/gsd/.
+    const input = 'Run /gsd-help. Or /gsd-health!';
+    const expected = 'Run /gsd:help. Or /gsd:health!';
     assert.strictEqual(convertSlashCommandsToGeminiMentions(input), expected);
   });
 
