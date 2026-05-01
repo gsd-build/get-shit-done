@@ -222,34 +222,41 @@ if [ "$IS_LOCAL" = true ]; then
   INSTALLED_VERSION="$(cat "$LOCAL_VERSION_FILE")"
   INSTALL_SCOPE="LOCAL"
   TARGET_RUNTIME="$LOCAL_RUNTIME"
+  RESOLVED_GSD_DIR="$LOCAL_DIR"
 elif [ -n "$GLOBAL_VERSION_FILE" ] && [ -f "$GLOBAL_VERSION_FILE" ] && [ -f "$GLOBAL_MARKER_FILE" ] && grep -Eq '^[0-9]+\.[0-9]+\.[0-9]+' "$GLOBAL_VERSION_FILE"; then
   INSTALLED_VERSION="$(cat "$GLOBAL_VERSION_FILE")"
   INSTALL_SCOPE="GLOBAL"
   TARGET_RUNTIME="$GLOBAL_RUNTIME"
+  RESOLVED_GSD_DIR="$GLOBAL_DIR"
 elif [ -n "$LOCAL_RUNTIME" ] && [ -f "$LOCAL_MARKER_FILE" ]; then
   # Runtime detected but VERSION missing/corrupt: treat as unknown version, keep runtime target
   INSTALLED_VERSION="0.0.0"
   INSTALL_SCOPE="LOCAL"
   TARGET_RUNTIME="$LOCAL_RUNTIME"
+  RESOLVED_GSD_DIR="$LOCAL_DIR"
 elif [ -n "$GLOBAL_RUNTIME" ] && [ -f "$GLOBAL_MARKER_FILE" ]; then
   INSTALLED_VERSION="0.0.0"
   INSTALL_SCOPE="GLOBAL"
   TARGET_RUNTIME="$GLOBAL_RUNTIME"
+  RESOLVED_GSD_DIR="$GLOBAL_DIR"
 else
   INSTALLED_VERSION="0.0.0"
   INSTALL_SCOPE="UNKNOWN"
   TARGET_RUNTIME="claude"
+  RESOLVED_GSD_DIR=""
 fi
 
 echo "$INSTALLED_VERSION"
 echo "$INSTALL_SCOPE"
 echo "$TARGET_RUNTIME"
+echo "$RESOLVED_GSD_DIR"
 ```
 
 Parse output:
 - Line 1 = installed version (`0.0.0` means unknown version)
 - Line 2 = install scope (`LOCAL`, `GLOBAL`, or `UNKNOWN`)
 - Line 3 = target runtime (`claude`, `opencode`, `gemini`, `kilo`, or `codex`)
+- Line 4 = resolved GSD config dir (e.g. `/Users/me/.claude`, `/Users/me/.gemini`); empty if scope is `UNKNOWN`. Capture this as `GSD_DIR` and pass it to subsequent steps so they don't have to re-derive the runtime path.
 - If scope is `UNKNOWN`, proceed to install step using `--claude --global` fallback.
 
 If multiple runtime installs are detected and the invoking runtime cannot be determined from execution_context, ask the user which runtime to update before running install.
@@ -271,9 +278,17 @@ Proceed to install step (treat as version 0.0.0 for comparison).
 <step name="check_latest_version">
 Check npm for latest version via the deterministic script. **Do NOT run `npm view` or `npm search` directly** — the package name must come from the script, not from a free choice at execution time. (#2992: LLM-driven prescriptions of npm package names produced wrong-package queries; moving the package name into a script constant closes that gap.)
 
+The `GSD_DIR` value emitted by `get_installed_version` (line 4) resolves to the runtime-specific config dir (`~/.claude/`, `~/.gemini/`, `~/.codex/`, etc.), so the script invocation works for every runtime — not just Claude. If `GSD_DIR` is empty (scope `UNKNOWN`), skip this step and go directly to install.
+
 ```bash
-LATEST_RESULT="$(node "${GSD_HOME:-$HOME/.claude/}/get-shit-done/bin/check-latest-version.cjs" --json 2>/dev/null)"
-LATEST_STATUS=$?
+if [ -z "$GSD_DIR" ]; then
+  # No install detected — fall through to install step; the version-check is skipped.
+  LATEST_OK=false
+  LATEST_REASON="no_install_detected"
+else
+  LATEST_RESULT="$(node "$GSD_DIR/get-shit-done/bin/check-latest-version.cjs" --json 2>/dev/null)"
+  LATEST_STATUS=$?
+fi
 ```
 
 `LATEST_RESULT` is a JSON document with the documented shape `{ ok: bool, version: string, reason: string, detail?: string }`. Parse via `jq`:
