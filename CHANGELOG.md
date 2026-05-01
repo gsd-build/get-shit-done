@@ -6,6 +6,10 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ## [Unreleased](https://github.com/gsd-build/get-shit-done/compare/v1.38.5...HEAD)
 
+### Fixed
+
+- **`sketch --wrap-up` now dispatches correctly** — `/gsd-sketch --wrap-up` was silently no-oping because the flag dispatch wiring was omitted when the micro-skill entry point was absorbed in #2790. (#2949)
+
 ### Added — 1.40.0-rc.1
 - **Six namespace meta-skills with keyword-tag descriptions** — replace the flat 86-skill
   listing with two-stage hierarchical routing. Model sees 6 namespace routers
