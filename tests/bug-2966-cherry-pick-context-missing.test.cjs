@@ -135,6 +135,16 @@ describe('bug-2966: release-sdk hotfix cherry-pick distinguishes context-missing
       /context absent at base/,
       'auto_cherry_pick must annotate skipped picks with "context absent at base" so the run summary surfaces them (#2966)'
     );
+    // The cherry-pick must pin merge.conflictStyle=merge so the awk
+    // classifier sees deterministic marker shapes regardless of the
+    // runner's git config (diff3/zdiff3 would inject `||||||| ancestor`
+    // lines into the HEAD section and misclassify context-missing
+    // conflicts as real ones).
+    assert.match(
+      script,
+      /git -c merge\.conflictStyle=merge cherry-pick/,
+      'auto_cherry_pick must pin `merge.conflictStyle=merge` on the cherry-pick command so marker parsing is deterministic across runner git configs (#2966)'
+    );
   });
 
   test('cherry-pick of a patch whose target section is absent at base produces empty-HEAD conflict markers and exits non-zero', () => {

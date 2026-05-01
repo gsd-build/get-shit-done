@@ -167,7 +167,12 @@ jobs:
                 SUBJECT=$(git log -1 --format='%s' "$SHA")
                 if echo "$SUBJECT" | grep -qE '^(fix|chore)(\([^)]+\))?!?: '; then
                   echo "→ cherry-picking $SHA  $SUBJECT"
-                  if ! git cherry-pick -x --allow-empty --keep-redundant-commits "$SHA"; then
+                  # Pin merge.conflictStyle=merge on the cherry-pick so the
+                  # awk classifier below sees deterministic marker shapes —
+                  # diff3/zdiff3 would inject `||||||| ancestor` lines into
+                  # the HEAD section and cause context-missing conflicts to
+                  # misclassify as real. Bug #2966.
+                  if ! git -c merge.conflictStyle=merge cherry-pick -x --allow-empty --keep-redundant-commits "$SHA"; then
                     # Distinguish patch-context-missing (the picked commit
                     # modifies code that doesn't exist at the base — typically
                     # because the surrounding infrastructure was added in a
@@ -176,9 +181,8 @@ jobs:
                     # context-missing conflict produces marker blocks where the
                     # `<<<<<<< HEAD ... =======` HEAD section is empty for every
                     # block in every conflicted file. A real conflict has
-                    # non-blank content in the HEAD section. Default
-                    # merge.conflictStyle is assumed (the workflow doesn't
-                    # override it). Bug #2966.
+                    # non-blank content in the HEAD section. Marker style is
+                    # pinned on the cherry-pick command above. Bug #2966.
                     UNMERGED=$(git diff --name-only --diff-filter=U)
                     CONTEXT_MISSING_ONLY=true
                     if [ -z "$UNMERGED" ]; then
