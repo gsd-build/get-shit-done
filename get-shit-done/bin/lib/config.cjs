@@ -377,6 +377,15 @@ function cmdConfigSet(cwd, keyPath, value, raw) {
   output(setConfigValueResult, raw, `${keyPath}=${parsedValue}`);
 }
 
+/**
+ * Schema-level defaults for well-known config keys.
+ * When a key is absent from config.json and no --default flag was supplied,
+ * cmdConfigGet checks here before emitting "Key not found".
+ */
+const SCHEMA_DEFAULTS = {
+  'context_window': 200000,
+};
+
 function cmdConfigGet(cwd, keyPath, raw, defaultValue) {
   const configPath = path.join(planningDir(cwd), 'config.json');
   const hasDefault = defaultValue !== undefined;
@@ -406,6 +415,11 @@ function cmdConfigGet(cwd, keyPath, raw, defaultValue) {
   for (const key of keys) {
     if (current === undefined || current === null || typeof current !== 'object') {
       if (hasDefault) { output(defaultValue, raw, String(defaultValue)); return; }
+      if (Object.prototype.hasOwnProperty.call(SCHEMA_DEFAULTS, keyPath)) {
+        const def = SCHEMA_DEFAULTS[keyPath];
+        output(def, raw, String(def));
+        return;
+      }
       error(`Key not found: ${keyPath}`);
     }
     current = current[key];
@@ -413,6 +427,11 @@ function cmdConfigGet(cwd, keyPath, raw, defaultValue) {
 
   if (current === undefined) {
     if (hasDefault) { output(defaultValue, raw, String(defaultValue)); return; }
+    if (Object.prototype.hasOwnProperty.call(SCHEMA_DEFAULTS, keyPath)) {
+      const def = SCHEMA_DEFAULTS[keyPath];
+      output(def, raw, String(def));
+      return;
+    }
     error(`Key not found: ${keyPath}`);
   }
 
