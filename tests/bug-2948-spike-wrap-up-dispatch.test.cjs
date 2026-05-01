@@ -35,17 +35,23 @@ const SPIKE_WORKFLOW_PATH = path.join(__dirname, '..', 'get-shit-done', 'workflo
  */
 function parseFrontmatter(content) {
   const lines = content.split(/\r?\n/);
-  let openIdx = -1;
+
+  // Frontmatter must start at the very first line; a mid-file '---' is a
+  // horizontal rule, not a frontmatter delimiter.
+  if (lines[0]?.trim() !== '---') {
+    return { _body: content };
+  }
+
   let closeIdx = -1;
-  for (let i = 0; i < lines.length; i += 1) {
+  for (let i = 1; i < lines.length; i += 1) {
     if (lines[i].trim() === '---') {
-      if (openIdx === -1) openIdx = i;
-      else { closeIdx = i; break; }
+      closeIdx = i;
+      break;
     }
   }
-  assert.ok(openIdx !== -1 && closeIdx !== -1, 'frontmatter block must be delimited by --- on its own lines');
+  assert.ok(closeIdx !== -1, 'frontmatter block must be delimited by --- on its own lines');
   const fm = {};
-  for (const line of lines.slice(openIdx + 1, closeIdx)) {
+  for (const line of lines.slice(1, closeIdx)) {
     const m = line.match(/^([A-Za-z][A-Za-z0-9_-]*):\s*(.*)$/);
     if (!m) continue;
     const [, key, raw] = m;
