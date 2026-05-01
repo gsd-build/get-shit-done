@@ -89,11 +89,17 @@ People who want to describe what they want and have it built correctly — witho
 
 Built-in quality gates catch real problems: schema drift detection flags ORM changes missing migrations, security enforcement anchors verification to threat models, and scope reduction detection prevents the planner from silently dropping your requirements.
 
-### v1.37.0 Highlights
+### v1.39.0 Highlights
 
-- **Spiking & sketching** — `/gsd-spike` runs 2–5 focused experiments with Given/When/Then verdicts; `/gsd-sketch` produces 2–3 interactive HTML mockup variants per design question — both store artifacts in `.planning/` and pair with wrap-up commands to package findings into project-local skills
-- **Agent size-budget enforcement** — Tiered line-count limits (XL: 1 600, Large: 1 000, Default: 500) keep agent prompts lean; violations surface in CI
-- **Shared boilerplate extraction** — Mandatory-initial-read and project-skills-discovery logic extracted to reference files, reducing duplication across a dozen agents
+See the [v1.39.0 release notes](https://github.com/gsd-build/get-shit-done/releases/tag/v1.39.0) for the full list.
+
+- **`--minimal` install profile** — alias `--core-only`, writes only the six main-loop skills (`new-project`, `discuss-phase`, `plan-phase`, `execute-phase`, `help`, `update`) and zero `gsd-*` subagents. Cuts cold-start system-prompt overhead from ~12k tokens to ~700 (≥94% reduction). Useful for local LLMs with 32K–128K context and token-billed APIs.
+- **`/gsd-edit-phase`** — modify any field of an existing phase in `ROADMAP.md` in place, without changing its number or position. `--force` skips the confirmation diff; `depends_on` references are validated and `STATE.md` is updated on write.
+- **Post-merge build & test gate** — `execute-phase` step 5.6 now auto-detects the build command from `workflow.build_command`, then falls back to Xcode (`.xcodeproj`), Makefile, Justfile, Cargo, Go, Python, or npm. Xcode/iOS projects get `xcodebuild build` + `xcodebuild test` automatically. Runs in both parallel and serial mode.
+- **Per-runtime review-model selection** — `review.models.<cli>` lets each external review CLI (codex, gemini, etc.) pick its own model independently of the planner/executor profile.
+- **Workstream config inheritance** — when `GSD_WORKSTREAM` is set, the root `.planning/config.json` is loaded first and deep-merged with the workstream config (workstream wins on conflict). Explicit `null` in a workstream config now correctly overrides a root value.
+- **Manual canary release workflow** — `.github/workflows/canary.yml` publishes `{base}-canary.{N}` builds of `get-shit-done-cc` and `@gsd-build/sdk` to the `@canary` dist-tag from `dev` on demand via `workflow_dispatch`.
+- **Skill consolidation: 86 → 59** — four new grouped skills (`capture`, `phase`, `config`, `workspace`) absorb 31 micro-skills. Six existing parents absorb wrap-up and sub-operations as flags: `update --sync/--reapply`, `sketch --wrap-up`, `spike --wrap-up`, `map-codebase --fast/--query`, `code-review --fix`, `progress --do/--next`. Zero functional loss.
 
 ---
 
@@ -689,6 +695,7 @@ You're never locked in. The system adapts.
 |---------|--------------|
 | `/gsd-add-phase` | Append phase to roadmap |
 | `/gsd-insert-phase [N]` | Insert urgent work between phases |
+| `/gsd-edit-phase [N] [--force]` | Modify any field of an existing phase in place — number and position unchanged |
 | `/gsd-remove-phase [N]` | Remove future phase, renumber |
 | `/gsd-list-phase-assumptions [N]` | See Claude's intended approach before planning |
 | `/gsd-plan-milestone-gaps` | Create phases to close gaps from audit |
@@ -750,6 +757,8 @@ You're never locked in. The system adapts.
 
 GSD stores project settings in `.planning/config.json`. Configure during `/gsd-new-project` or update later with `/gsd-settings`. For the full config schema, workflow toggles, git branching options, and per-agent model breakdown, see the [User Guide](docs/USER-GUIDE.md#configuration-reference).
 
+When `GSD_WORKSTREAM` is set, GSD loads the root `.planning/config.json` first and deep-merges the workstream's `config.json` on top — workstream values win on conflict, and an explicit `null` in a workstream config overrides a root value.
+
 ### Core Settings
 
 | Setting | Options | Default | What it controls |
@@ -778,6 +787,8 @@ Use `inherit` when using non-Anthropic providers (OpenRouter, local models) or t
 
 Or configure via `/gsd-settings`.
 
+Per-runtime review-model overrides live under `review.models.<cli>` (e.g. `review.models.codex`, `review.models.gemini`) and let each external review CLI pick its own model independently of the planner/executor profile.
+
 ### Workflow Agents
 
 These spawn additional agents during planning/execution. They improve quality but add tokens and time.
@@ -793,6 +804,7 @@ These spawn additional agents during planning/execution. They improve quality bu
 | `workflow.skip_discuss` | `false` | Skip discuss-phase in autonomous mode |
 | `workflow.text_mode` | `false` | Text-only mode for remote sessions (no TUI menus) |
 | `workflow.use_worktrees` | `true` | Toggle worktree isolation for execution |
+| `workflow.build_command` | _(auto-detect)_ | Override the post-merge build gate command. Falls back to Xcode (`.xcodeproj`), Makefile, Justfile, Cargo, Go, Python, or npm; Xcode/iOS projects also run `xcodebuild test`. |
 
 Use `/gsd-settings` to toggle these, or override per-invocation:
 - `/gsd-plan-phase --skip-research`

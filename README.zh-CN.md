@@ -73,15 +73,17 @@ GSD 解决的就是这个问题。它是让 Claude Code 变得可靠的上下文
 
 适合那些想把自己的需求说明白，然后让系统正确构建出来的人，而不是假装自己在运营一个 50 人工程组织的人。
 
-### v1.32.0 亮点
+### v1.39.0 亮点
 
-- **STATE.md 一致性检查** — `state validate` 检测 STATE.md 与文件系统之间的偏差；`state sync` 从实际项目状态重建
-- **`--to N` 标志** — 在完成特定阶段后停止自主执行
-- **研究门控** — 当 RESEARCH.md 有未解决的开放问题时阻止规划
-- **验证里程碑范围过滤** — 后续阶段将处理的差距标记为"延迟"而非差距
-- **读取后编辑保护** — 咨询性 hook 防止非 Claude 运行时的无限重试循环
-- **上下文缩减** — Markdown 截断和缓存友好的 prompt 排序，降低 token 使用量
-- **4 个新运行时** — Trae、Kilo、Augment 和 Cline（共 12 个运行时）
+完整列表请参阅 [v1.39.0 发行说明](https://github.com/gsd-build/get-shit-done/releases/tag/v1.39.0)。
+
+- **`--minimal` 安装档** — 别名 `--core-only`。仅安装主循环的 6 个核心技能（`new-project`、`discuss-phase`、`plan-phase`、`execute-phase`、`help`、`update`），不安装任何 `gsd-*` 子代理。将冷启动系统提示开销从 ~12k token 降至 ~700 token（≥94% 减少）。适合 32K–128K 上下文的本地 LLM 和按 token 计费的 API。
+- **`/gsd-edit-phase`** — 就地修改 `ROADMAP.md` 中已有阶段的任意字段，不改变其编号或位置。`--force` 跳过确认 diff，验证 `depends_on` 引用，并在写入时更新 `STATE.md`。
+- **合并后构建与测试门** — `execute-phase` 步骤 5.6 优先自动检测 `workflow.build_command` 配置，否则按 Xcode（`.xcodeproj`）、Makefile、Justfile、Cargo、Go、Python、npm 顺序回退。Xcode/iOS 项目自动运行 `xcodebuild build` 和 `xcodebuild test`。在并行与串行模式下均生效。
+- **每运行时评审模型选择** — `review.models.<cli>` 让每个外部评审 CLI（codex、gemini 等）独立于规划/执行档选择自己的模型。
+- **工作流设置继承** — 设置 `GSD_WORKSTREAM` 后，先加载根 `.planning/config.json`，再与该工作流的配置进行深合并（冲突时工作流优先）。工作流配置中显式 `null` 会覆盖根值。
+- **手动 canary 发布工作流** — `.github/workflows/canary.yml` 通过 `workflow_dispatch` 从 `dev` 分支按需将 `{base}-canary.{N}` 构建（`get-shit-done-cc` 与 `@gsd-build/sdk`）发布到 `@canary` dist-tag。
+- **技能整合：86 → 59** — 4 个新分组技能（`capture`、`phase`、`config`、`workspace`）吸收了 31 个微技能。6 个已有父技能将收尾与子操作合并为标志：`update --sync/--reapply`、`sketch --wrap-up`、`spike --wrap-up`、`map-codebase --fast/--query`、`code-review --fix`、`progress --do/--next`。功能无损失。
 
 ---
 
@@ -589,6 +591,7 @@ lmn012o feat(08-02): create registration endpoint
 |------|------|
 | `/gsd-add-phase` | 在路线图末尾追加 phase |
 | `/gsd-insert-phase [N]` | 在 phase 之间插入紧急工作 |
+| `/gsd-edit-phase [N] [--force]` | 就地修改已有 phase 的任意字段 — 编号与位置保持不变 |
 | `/gsd-remove-phase [N]` | 删除未来 phase，并重编号 |
 | `/gsd-list-phase-assumptions [N]` | 在规划前查看 Claude 打算采用的方案 |
 | `/gsd-plan-milestone-gaps` | 为 audit 发现的缺口创建 phase |

@@ -20,7 +20,7 @@ Get Shit Done (GSD) 프레임워크의 종합 문서입니다. GSD는 AI 코딩 
 
 ## 빠른 링크
 
-- **v1.32의 새로운 기능:** STATE.md 일관성 게이트, `--to N` 자율 모드, 리서치 게이트, 검증자 마일스톤 범위 필터링, read-before-edit 가드, 컨텍스트 축소, 신규 런타임(Trae, Cline, Augment Code), 응답 언어 설정, `--power`/`--diagnose` 플래그, `/gsd-analyze-dependencies`
+- **v1.39의 새로운 기능:** `--minimal` 설치 프로파일(콜드 스타트 ≥94% 감소), `/gsd-edit-phase`, 머지 후 빌드 & 테스트 게이트, `review.models.<cli>` 런타임별 리뷰 모델, 워크스트림 설정 상속, 수동 카나리 릴리스 워크플로, 스킬 통합(86 → 59)
 - **시작하기:** [README](../README.md) → 설치 → `/gsd-new-project`
 - **전체 워크플로우 안내:** [User Guide](USER-GUIDE.md)
 - **모든 명령어 한눈에 보기:** [Command Reference](COMMANDS.md)

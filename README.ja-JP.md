@@ -75,15 +75,17 @@ GSDはそれを解決します。Claude Codeを信頼性の高いものにする
 
 ビルトインの品質ゲートが本当の問題を検出します：スキーマドリフト検出はマイグレーション漏れのORM変更をフラグし、セキュリティ強制は検証を脅威モデルに紐付け、スコープ削減検出はプランナーが要件を暗黙的に落とすのを防止します。
 
-### v1.32.0 ハイライト
+### v1.39.0 ハイライト
 
-- **STATE.md整合性ゲート** — `state validate`がSTATE.mdとファイルシステムの差分を検出、`state sync`が実際のプロジェクト状態から再構築
-- **`--to N`フラグ** — 自律実行を特定のフェーズ完了後に停止
-- **リサーチゲート** — RESEARCH.mdに未解決の質問がある場合、計画をブロック
-- **検証マイルストーンスコープフィルタリング** — 後のフェーズで対処されるギャップは「ギャップ」ではなく「延期」としてマーク
-- **読み取り後編集ガード** — 非Claudeランタイムでの無限リトライループを防止するアドバイザリーフック
-- **コンテキスト削減** — Markdownのトランケーションとキャッシュフレンドリーなプロンプト順序でトークン使用量を削減
-- **4つの新ランタイム** — Trae、Kilo、Augment、Cline（合計12ランタイム）
+完全なリストは [v1.39.0 リリースノート](https://github.com/gsd-build/get-shit-done/releases/tag/v1.39.0) を参照してください。
+
+- **`--minimal` インストールプロファイル** — エイリアス `--core-only`。メインループの6スキル（`new-project`、`discuss-phase`、`plan-phase`、`execute-phase`、`help`、`update`）のみをインストールし、`gsd-*` サブエージェントはゼロ。コールドスタート時のシステムプロンプトのオーバーヘッドを ~12kトークンから ~700トークンへ削減（≥94%減）。32K〜128Kコンテキストのローカル LLM やトークン課金 API に有効。
+- **`/gsd-edit-phase`** — `ROADMAP.md` 上の既存フェーズの任意フィールドをその場で編集（番号や位置は変更されない）。`--force` で確認 diff をスキップ、`depends_on` の参照を検証し、書き込み時に `STATE.md` も更新。
+- **マージ後ビルド & テストゲート** — `execute-phase` のステップ 5.6 が `workflow.build_command` の設定を自動検出し、無ければ Xcode（`.xcodeproj`）、Makefile、Justfile、Cargo、Go、Python、npm の順にフォールバック。Xcode/iOS プロジェクトでは `xcodebuild build` と `xcodebuild test` を自動実行。並列・直列両モードで動作。
+- **ランタイム別レビューモデル選択** — `review.models.<cli>` で各外部レビュー CLI（codex、gemini など）が使うモデルをプランナー/実行プロファイルとは独立に指定可能。
+- **ワークストリーム設定の継承** — `GSD_WORKSTREAM` が設定されている場合、ルートの `.planning/config.json` を先に読み込み、ワークストリーム設定をディープマージ（衝突時はワークストリーム側が優先）。ワークストリーム設定で明示的に `null` を指定するとルート値を上書き可能。
+- **手動カナリアリリースワークフロー** — `.github/workflows/canary.yml` が `workflow_dispatch` 経由で `dev` ブランチから `{base}-canary.{N}` ビルドを `@canary` dist-tag に手動公開（`get-shit-done-cc` と `@gsd-build/sdk`）。
+- **スキルの統合：86 → 59** — 4つの新しいグループ化スキル（`capture`、`phase`、`config`、`workspace`）が31のマイクロスキルを吸収。既存の親スキル6つはラップアップやサブ操作をフラグ化：`update --sync/--reapply`、`sketch --wrap-up`、`spike --wrap-up`、`map-codebase --fast/--query`、`code-review --fix`、`progress --do/--next`。機能の欠損なし。
 
 ---
 
@@ -597,6 +599,7 @@ lmn012o feat(08-02): create registration endpoint
 |---------|--------------|
 | `/gsd-add-phase` | ロードマップにフェーズを追加 |
 | `/gsd-insert-phase [N]` | フェーズ間に緊急作業を挿入 |
+| `/gsd-edit-phase [N] [--force]` | 既存フェーズの任意フィールドをその場で編集 — 番号と位置は変更されない |
 | `/gsd-remove-phase [N]` | 将来のフェーズを削除し番号を振り直し |
 | `/gsd-list-phase-assumptions [N]` | 計画前にClaudeの意図するアプローチを確認 |
 | `/gsd-plan-milestone-gaps` | 監査で見つかったギャップを埋めるフェーズを作成 |

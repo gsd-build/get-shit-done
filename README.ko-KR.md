@@ -75,15 +75,17 @@ GSD가 그걸 고칩니다. Claude Code를 신뢰할 수 있게 만드는 컨텍
 
 내장 품질 게이트가 실제 문제를 잡아냅니다: 스키마 드리프트 감지는 마이그레이션 누락된 ORM 변경을 플래그하고, 보안 강제는 검증을 위협 모델에 고정시키고, 스코프 축소 감지는 플래너가 요구사항을 몰래 빠뜨리는 걸 방지합니다.
 
-### v1.32.0 하이라이트
+### v1.39.0 하이라이트
 
-- **STATE.md 일관성 게이트** — `state validate`가 STATE.md와 파일시스템 간 드리프트를 감지, `state sync`가 실제 프로젝트 상태에서 재구성
-- **`--to N` 플래그** — 자율 실행을 특정 단계 완료 후 중지
-- **리서치 게이트** — RESEARCH.md에 미해결 질문이 있으면 기획을 차단
-- **검증 마일스톤 스코프 필터링** — 이후 단계에서 처리될 격차는 "격차"가 아닌 "지연됨"으로 표시
-- **읽기-후-편집 가드** — 비Claude 런타임에서 무한 재시도 루프를 방지하는 어드바이저리 훅
-- **컨텍스트 축소** — 마크다운 잘라내기 및 캐시 친화적 프롬프트 순서로 토큰 사용량 절감
-- **4개의 새 런타임** — Trae, Kilo, Augment, Cline (총 12개 런타임)
+전체 목록은 [v1.39.0 릴리스 노트](https://github.com/gsd-build/get-shit-done/releases/tag/v1.39.0)를 참고하세요.
+
+- **`--minimal` 설치 프로파일** — 별칭 `--core-only`. 메인 루프 6개 스킬(`new-project`, `discuss-phase`, `plan-phase`, `execute-phase`, `help`, `update`)만 설치하고 `gsd-*` 서브에이전트는 설치하지 않음. 콜드 스타트 시스템 프롬프트 오버헤드를 ~12k 토큰에서 ~700 토큰으로 축소(≥94% 감소). 32K–128K 컨텍스트의 로컬 LLM이나 토큰 과금 API에 유용.
+- **`/gsd-edit-phase`** — `ROADMAP.md`에 있는 기존 단계의 임의 필드를 그 자리에서 수정(번호와 위치는 변경되지 않음). `--force`는 확인 diff를 건너뛰고, `depends_on` 참조를 검증하며 쓰기 시 `STATE.md`도 갱신.
+- **머지 후 빌드 & 테스트 게이트** — `execute-phase` 5.6 단계가 `workflow.build_command` 설정을 우선 자동 감지하고, 없으면 Xcode(`.xcodeproj`), Makefile, Justfile, Cargo, Go, Python, npm 순으로 폴백. Xcode/iOS 프로젝트는 `xcodebuild build` 및 `xcodebuild test`를 자동 실행. 병렬·직렬 모드 모두에서 동작.
+- **런타임별 리뷰 모델 선택** — `review.models.<cli>`로 각 외부 리뷰 CLI(codex, gemini 등)가 플래너/실행 프로파일과 독립적으로 자체 모델을 선택할 수 있음.
+- **워크스트림 설정 상속** — `GSD_WORKSTREAM`이 설정되면 루트 `.planning/config.json`을 먼저 로드한 뒤 워크스트림 설정을 딥 머지(충돌 시 워크스트림 우선). 워크스트림 설정에서 명시적 `null`은 루트 값을 덮어씀.
+- **수동 카나리 릴리스 워크플로** — `.github/workflows/canary.yml`이 `workflow_dispatch`로 `dev` 브랜치에서 `{base}-canary.{N}` 빌드를 `@canary` dist-tag로 수동 게시(`get-shit-done-cc`와 `@gsd-build/sdk`).
+- **스킬 통합: 86 → 59** — 4개의 새로운 그룹 스킬(`capture`, `phase`, `config`, `workspace`)이 31개의 마이크로 스킬을 흡수. 기존 6개의 부모 스킬은 래퍼업/하위 동작을 플래그로 흡수: `update --sync/--reapply`, `sketch --wrap-up`, `spike --wrap-up`, `map-codebase --fast/--query`, `code-review --fix`, `progress --do/--next`. 기능 손실 없음.
 
 ---
 
@@ -594,6 +596,7 @@ lmn012o feat(08-02): create registration endpoint
 |---------|------------|
 | `/gsd-add-phase` | 로드맵에 단계 추가 |
 | `/gsd-insert-phase [N]` | 단계 사이에 긴급 작업 삽입 |
+| `/gsd-edit-phase [N] [--force]` | 기존 단계의 임의 필드를 그 자리에서 수정 — 번호와 위치는 그대로 |
 | `/gsd-remove-phase [N]` | 미래 단계 제거, 번호 재정렬 |
 | `/gsd-list-phase-assumptions [N]` | 기획 전 Claude의 의도된 접근 방식 확인 |
 | `/gsd-plan-milestone-gaps` | 감사에서 발견된 갭을 해소하기 위한 단계 생성 |
