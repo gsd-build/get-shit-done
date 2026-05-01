@@ -93,8 +93,7 @@ describe('Bug #2982: assert.ok(...match(...)) detector', () => {
     assert.deepEqual(detectWrappedAssertOkMatch(src), []);
   });
 
-  test('does NOT flag Array.prototype.match — wait, that does not exist; flag is regex-only on .match (', () => {
-    // Realistic non-trigger: .matchAll is not flagged.
+  test('does NOT flag .matchAll(...) — matchAll is not match, so assert.ok(.matchAll(...)) is not flagged', () => {
     const src = "assert.ok([...text.matchAll(/foo/g)].length > 0);";
     assert.deepEqual(detectWrappedAssertOkMatch(src), []);
   });
