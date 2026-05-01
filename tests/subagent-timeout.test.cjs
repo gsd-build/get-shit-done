@@ -199,16 +199,17 @@ describe('config-get context_window (#1472)', () => {
     assert.strictEqual(output, 1000000);
   });
 
-  test('config-get context_window errors when key is absent', () => {
+  test('config-get context_window returns schema default (200000) when key is absent', () => {
+    // Bug #2943: context_window has a schema-level default of 200000.
+    // config-get must return it (exit 0) rather than "Key not found" (exit 1).
     const configPath = path.join(tmpDir, '.planning', 'config.json');
     fs.writeFileSync(configPath, JSON.stringify({}, null, 2));
 
     const result = runGsdTools('config-get context_window', tmpDir);
-    assert.strictEqual(result.success, false);
-    assert.ok(
-      result.error.includes('Key not found'),
-      `Expected "Key not found" in error: ${result.error}`
-    );
+    assert.ok(result.success, `Expected success but got: ${result.error}`);
+
+    const output = JSON.parse(result.output);
+    assert.strictEqual(output, 200000, 'schema default for context_window should be 200000');
   });
 });
 
