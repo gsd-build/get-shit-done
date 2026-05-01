@@ -1070,6 +1070,7 @@ async function runCommand(command, args, cwd, raw, defaultValue) {
         'agents',
         path.join('commands', 'gsd'),
         'hooks',
+        'skills',
       ];
 
       function walkDir(dir, baseDir) {

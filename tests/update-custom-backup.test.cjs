@@ -226,19 +226,20 @@ describe('detect-custom-files — update workflow backup detection (#1997)', () 
     );
   });
 
-  // #2505 — installer does NOT wipe skills/ or command/; scanning them produces
-  // false-positive "custom file" reports for every skill the user has installed
-  // from other packages.
-  test('does not scan skills/ directory (installer does not wipe it)', () => {
+  // After v1.39.0 skill consolidation (#2790), the installer wipes skills/ on
+  // update. skills/ is now a GSD-managed directory and must be scanned so that
+  // user-added skill directories are backed up before the wipe (#2942).
+  // GSD-owned skills (tracked in manifest) must NOT be flagged as custom.
+  test('scans skills/ directory and detects user-added skills not in manifest (#2942)', () => {
     writeManifest(tmpDir, {
       'get-shit-done/workflows/execute-phase.md': '# Execute Phase\n',
+      'skills/gsd-planner/SKILL.md': '# GSD Planner\n',
     });
 
-    // Simulate user having third-party skills installed — none in manifest
-    const skillsDir = path.join(tmpDir, 'skills');
-    fs.mkdirSync(skillsDir, { recursive: true });
-    fs.writeFileSync(path.join(skillsDir, 'my-custom-skill.md'), '# My Skill\n');
-    fs.writeFileSync(path.join(skillsDir, 'another-plugin-skill.md'), '# Another\n');
+    // Simulate user having a custom skill installed — NOT in manifest
+    const customSkillDir = path.join(tmpDir, 'skills', 'my-custom-skill');
+    fs.mkdirSync(customSkillDir, { recursive: true });
+    fs.writeFileSync(path.join(customSkillDir, 'SKILL.md'), '# My Custom Skill\n');
 
     const result = runGsdTools(
       ['detect-custom-files', '--config-dir', tmpDir],
@@ -248,10 +249,17 @@ describe('detect-custom-files — update workflow backup detection (#1997)', () 
     assert.ok(result.success, `Command failed: ${result.error}`);
 
     const json = JSON.parse(result.output);
-    const skillFiles = json.custom_files.filter(f => f.startsWith('skills/'));
-    assert.strictEqual(
-      skillFiles.length, 0,
-      `skills/ should not be scanned; got false positives: ${JSON.stringify(skillFiles)}`
+
+    // The user's custom skill should be detected
+    assert.ok(
+      json.custom_files.includes('skills/my-custom-skill/SKILL.md'),
+      `custom skill should be detected; got: ${JSON.stringify(json.custom_files)}`
+    );
+
+    // The GSD-owned skill (in manifest) should NOT be flagged as custom
+    assert.ok(
+      !json.custom_files.includes('skills/gsd-planner/SKILL.md'),
+      `GSD-owned skill should not be flagged as custom; got: ${JSON.stringify(json.custom_files)}`
     );
   });
 
