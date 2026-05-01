@@ -539,7 +539,59 @@ function computePathPrefix({ isGlobal, isOpencode, isWindowsHost: _isWindowsHost
  * the right default runtime for hooks invoked under the same install.
  */
 function resolveNodeRunner() {
-  return '"' + (process.execPath || 'node').replace(/\\/g, '/') + '"';
+  const execPath = typeof process.execPath === 'string' ? process.execPath : '';
+  if (!execPath) return null;
+  // JSON.stringify produces a properly escaped double-quoted shell token,
+  // safe for paths containing spaces or unusual characters.
+  return JSON.stringify(execPath.replace(/\\/g, '/'));
+}
+
+/**
+ * Rewrite legacy `node .../gsd-*.js` command strings in settings.hooks to use
+ * the absolute Node binary path (#2979 follow-up: CR feedback on #3002).
+ *
+ * The original #2979 fix only emitted absolute paths for *newly registered*
+ * hooks. Pre-existing entries kept their bare `node ` prefix on reinstall,
+ * which left them broken under minimal-PATH GUI runtimes — exactly the
+ * failure mode the original fix was meant to close. This walker normalizes
+ * any managed-hook entry whose command starts with bare `node ` to
+ * `<absoluteRunner> <script>` while leaving non-managed and non-bare-node
+ * entries (user-authored hooks, shell scripts, etc.) untouched.
+ *
+ * Returns true if any entry was rewritten.
+ */
+function rewriteLegacyManagedNodeHookCommands(settings, absoluteRunner) {
+  if (!settings || !settings.hooks || !absoluteRunner) return false;
+  const MANAGED_HOOK_FILES = new Set([
+    'gsd-check-update.js',
+    'gsd-statusline.js',
+    'gsd-context-monitor.js',
+    'gsd-prompt-guard.js',
+    'gsd-read-guard.js',
+    'gsd-read-injection-scanner.js',
+    'gsd-workflow-guard.js',
+  ]);
+  let changed = false;
+  for (const entries of Object.values(settings.hooks)) {
+    if (!Array.isArray(entries)) continue;
+    for (const entry of entries) {
+      if (!entry || !Array.isArray(entry.hooks)) continue;
+      for (const h of entry.hooks) {
+        if (!h || typeof h.command !== 'string') continue;
+        const trimmed = h.command.trim();
+        if (!/^node(\s|$)/.test(trimmed)) continue;
+        let isManaged = false;
+        for (const name of MANAGED_HOOK_FILES) {
+          if (trimmed.includes(name)) { isManaged = true; break; }
+        }
+        if (!isManaged) continue;
+        const script = trimmed.replace(/^node\s+/, '');
+        h.command = `${absoluteRunner} ${script}`;
+        changed = true;
+      }
+    }
+  }
+  return changed;
 }
 
 /**
@@ -559,7 +611,12 @@ function buildHookCommand(configDir, hookName, opts) {
   // so bare `bash` is fine. .js hooks need the absolute node path because
   // GUI-launched runtimes start with a minimal PATH that does not include
   // nvm/Homebrew/Volta-installed node binaries (#2979).
-  const runner = hookName.endsWith('.sh') ? 'bash' : resolveNodeRunner();
+  const nodeRunner = resolveNodeRunner();
+  const runner = hookName.endsWith('.sh') ? 'bash' : nodeRunner;
+  // resolveNodeRunner returns null when process.execPath is unavailable.
+  // Fall through with null so callers can skip registration with a warning
+  // instead of emitting bare `node` (which would recreate the #2979 bug).
+  if (runner === null) return null;
 
   if (opts.portableHooks) {
     // Replace the home directory prefix with $HOME so the path works when
@@ -7776,6 +7833,14 @@ function install(isGlobal, runtime = 'claude') {
     return;
   }
   const settings = validateHookFields(cleanupOrphanedHooks(rawSettings));
+  // #3002 CR: rewrite legacy `node .../gsd-*.js` command strings carried over
+  // from pre-#2979 installs to use the absolute node binary path. Without this,
+  // existing managed hook entries stay bare-`node`-prefixed across reinstalls
+  // and remain broken under GUI/minimal-PATH runtimes.
+  const settingsRunner = resolveNodeRunner();
+  if (settingsRunner && rewriteLegacyManagedNodeHookCommands(settings, settingsRunner)) {
+    console.log(`  ${green}✓${reset} Rewrote legacy bare-node managed-hook commands to absolute path (#2979)`);
+  }
   // Local installs anchor hook paths so they resolve regardless of cwd (#1906).
   // Claude Code sets $CLAUDE_PROJECT_DIR; Gemini/Antigravity do not — and on
   // Windows their own substitution logic doubles the path (#2557). Those runtimes
@@ -7788,24 +7853,31 @@ function install(isGlobal, runtime = 'claude') {
   // GUI/minimal-PATH runtimes can resolve them. Bare `node` fails when the
   // host launches the runtime with a stripped PATH (Finder/Antigravity/etc).
   const localNodeRunner = resolveNodeRunner();
+  // If we cannot resolve an absolute node path AND this is a local install,
+  // skip managed-hook registration. Returning null from buildHookCommand on
+  // global installs has the same effect. Better to skip than to emit a bare
+  // `node` command that recreates the #2979 failure.
+  const localCmd = (hookFile) => localNodeRunner === null
+    ? null
+    : localNodeRunner + ' ' + localPrefix + '/hooks/' + hookFile;
   const statuslineCommand = isGlobal
     ? buildHookCommand(targetDir, 'gsd-statusline.js', hookOpts)
-    : localNodeRunner + ' ' + localPrefix + '/hooks/gsd-statusline.js';
+    : localCmd('gsd-statusline.js');
   const updateCheckCommand = isGlobal
     ? buildHookCommand(targetDir, 'gsd-check-update.js', hookOpts)
-    : localNodeRunner + ' ' + localPrefix + '/hooks/gsd-check-update.js';
+    : localCmd('gsd-check-update.js');
   const contextMonitorCommand = isGlobal
     ? buildHookCommand(targetDir, 'gsd-context-monitor.js', hookOpts)
-    : localNodeRunner + ' ' + localPrefix + '/hooks/gsd-context-monitor.js';
+    : localCmd('gsd-context-monitor.js');
   const promptGuardCommand = isGlobal
     ? buildHookCommand(targetDir, 'gsd-prompt-guard.js', hookOpts)
-    : localNodeRunner + ' ' + localPrefix + '/hooks/gsd-prompt-guard.js';
+    : localCmd('gsd-prompt-guard.js');
   const readGuardCommand = isGlobal
     ? buildHookCommand(targetDir, 'gsd-read-guard.js', hookOpts)
-    : localNodeRunner + ' ' + localPrefix + '/hooks/gsd-read-guard.js';
+    : localCmd('gsd-read-guard.js');
   const readInjectionScannerCommand = isGlobal
     ? buildHookCommand(targetDir, 'gsd-read-injection-scanner.js', hookOpts)
-    : localNodeRunner + ' ' + localPrefix + '/hooks/gsd-read-injection-scanner.js';
+    : localCmd('gsd-read-injection-scanner.js');
 
   // Enable experimental agents for Gemini CLI (required for custom sub-agents)
   if (isGemini) {
@@ -7982,7 +8054,7 @@ function install(isGlobal, runtime = 'claude') {
     // /gsd-quick or /gsd-fast for state-tracked changes. Advisory only.
     const workflowGuardCommand = isGlobal
       ? buildHookCommand(targetDir, 'gsd-workflow-guard.js', hookOpts)
-      : localNodeRunner + ' ' + localPrefix + '/hooks/gsd-workflow-guard.js';
+      : localCmd('gsd-workflow-guard.js');
     const hasWorkflowGuardHook = settings.hooks[preToolEvent].some(entry =>
       entry.hooks && entry.hooks.some(h => h.command && h.command.includes('gsd-workflow-guard'))
     );
@@ -9110,6 +9182,7 @@ if (process.env.GSD_TEST_MODE) {
     buildRuntimePromptText,
     buildHookCommand,
     resolveNodeRunner,
+    rewriteLegacyManagedNodeHookCommands,
   };
 } else {
 

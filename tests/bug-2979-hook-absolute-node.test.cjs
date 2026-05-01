@@ -109,3 +109,113 @@ describe('Bug #2979: buildHookCommand for .sh hooks still uses bare "bash" (POSI
     assert.equal(parsed.runner, 'bash');
   });
 });
+
+// ─── #3002 CR follow-up: legacy-bare-node migration ─────────────────────────
+
+const { rewriteLegacyManagedNodeHookCommands } = INSTALL;
+
+describe('Bug #2979 (#3002 CR): rewriteLegacyManagedNodeHookCommands rewrites bare-node managed hooks on reinstall', () => {
+  test('exported as a function', () => {
+    assert.equal(typeof rewriteLegacyManagedNodeHookCommands, 'function');
+  });
+
+  test('rewrites a managed hook entry that uses bare `node ` to the absolute runner', () => {
+    const settings = {
+      hooks: {
+        SessionStart: [{
+          hooks: [
+            { type: 'command', command: 'node "/Users/x/.gemini/hooks/gsd-check-update.js"' },
+          ],
+        }],
+      },
+    };
+    const runner = '"/usr/local/bin/node"';
+    const changed = rewriteLegacyManagedNodeHookCommands(settings, runner);
+    assert.equal(changed, true);
+    assert.equal(
+      settings.hooks.SessionStart[0].hooks[0].command,
+      '"/usr/local/bin/node" "/Users/x/.gemini/hooks/gsd-check-update.js"',
+    );
+  });
+
+  test('does NOT touch entries that already use a quoted absolute runner', () => {
+    const settings = {
+      hooks: {
+        SessionStart: [{
+          hooks: [{ type: 'command', command: '"/usr/local/bin/node" "/x/hooks/gsd-statusline.js"' }],
+        }],
+      },
+    };
+    const runner = '"/usr/local/bin/node"';
+    const before = settings.hooks.SessionStart[0].hooks[0].command;
+    const changed = rewriteLegacyManagedNodeHookCommands(settings, runner);
+    assert.equal(changed, false);
+    assert.equal(settings.hooks.SessionStart[0].hooks[0].command, before);
+  });
+
+  test('does NOT touch user-authored bare-node hooks (filename not in managed allowlist)', () => {
+    const settings = {
+      hooks: {
+        SessionStart: [{
+          hooks: [{ type: 'command', command: 'node /home/me/my-custom-hook.js' }],
+        }],
+      },
+    };
+    const runner = '"/usr/local/bin/node"';
+    const before = settings.hooks.SessionStart[0].hooks[0].command;
+    const changed = rewriteLegacyManagedNodeHookCommands(settings, runner);
+    assert.equal(changed, false);
+    assert.equal(settings.hooks.SessionStart[0].hooks[0].command, before);
+  });
+
+  test('does NOT touch .sh hooks (they correctly use bare bash)', () => {
+    const settings = {
+      hooks: {
+        SessionStart: [{
+          hooks: [{ type: 'command', command: 'bash "/x/hooks/gsd-session-state.sh"' }],
+        }],
+      },
+    };
+    const runner = '"/usr/local/bin/node"';
+    const changed = rewriteLegacyManagedNodeHookCommands(settings, runner);
+    assert.equal(changed, false);
+  });
+
+  test('is a no-op when absoluteRunner is null (resolveNodeRunner failed)', () => {
+    const settings = {
+      hooks: {
+        SessionStart: [{
+          hooks: [{ type: 'command', command: 'node "/x/hooks/gsd-check-update.js"' }],
+        }],
+      },
+    };
+    const before = settings.hooks.SessionStart[0].hooks[0].command;
+    const changed = rewriteLegacyManagedNodeHookCommands(settings, null);
+    assert.equal(changed, false);
+    assert.equal(settings.hooks.SessionStart[0].hooks[0].command, before);
+  });
+});
+
+describe('Bug #2979 (#3002 CR): resolveNodeRunner returns null when execPath unavailable', () => {
+  test('returns null instead of bare "node" when process.execPath is empty', () => {
+    const orig = process.execPath;
+    try {
+      Object.defineProperty(process, 'execPath', { value: '', configurable: true });
+      const r = resolveNodeRunner();
+      assert.equal(r, null, 'expected null, not bare "node"');
+    } finally {
+      Object.defineProperty(process, 'execPath', { value: orig, configurable: true });
+    }
+  });
+
+  test('buildHookCommand returns null when execPath is unavailable (caller skips registration)', () => {
+    const orig = process.execPath;
+    try {
+      Object.defineProperty(process, 'execPath', { value: '', configurable: true });
+      const cmd = buildHookCommand('/tmp/.claude', 'gsd-statusline.js');
+      assert.equal(cmd, null);
+    } finally {
+      Object.defineProperty(process, 'execPath', { value: orig, configurable: true });
+    }
+  });
+});
