@@ -47,10 +47,14 @@ function parseFragment(src) {
   if (!Number.isInteger(pr) || pr <= 0) {
     return { ok: false, reason: FRAGMENT_ERROR.INVALID_PR, detail: fields.pr };
   }
-  const trimmedBody = body.trim();
-  if (!trimmedBody) return { ok: false, reason: FRAGMENT_ERROR.EMPTY_BODY };
+  // Use trim() only for the emptiness check; preserve the body verbatim
+  // (including significant leading/trailing whitespace, code blocks, etc.)
+  // so render → serialize round-trips exactly. Strip only a single trailing
+  // newline added by editors so byte-equality holds for typical fragments.
+  if (!body.trim()) return { ok: false, reason: FRAGMENT_ERROR.EMPTY_BODY };
+  const verbatimBody = body.endsWith('\n') ? body.slice(0, -1) : body;
 
-  return { ok: true, fragment: { type: fields.type, pr, body: trimmedBody } };
+  return { ok: true, fragment: { type: fields.type, pr, body: verbatimBody } };
 }
 
 module.exports = { parseFragment, FRAGMENT_ERROR, ALLOWED_TYPES };

@@ -23,16 +23,36 @@ const { serializeChangelog } = require('./serialize.cjs');
 
 function parseArgs(argv) {
   const opts = { cmd: null, repo: process.cwd(), version: null, date: null, json: false };
-  if (argv.length === 0) return opts;
+  if (argv.length === 0) return { ok: true, opts };
   opts.cmd = argv[0];
+
+  // Pull a value for a value-taking flag, validating that the next token
+  // exists and is not itself another flag (which is the silently-misparsed
+  // case CR called out: e.g. `--repo --json` would consume `--json` as the
+  // repo path).
+  const requireValue = (flag, i) => {
+    const v = argv[i + 1];
+    if (v === undefined || v.startsWith('--')) {
+      return { ok: false, error: `missing value for ${flag}` };
+    }
+    return { ok: true, value: v };
+  };
+
   for (let i = 1; i < argv.length; i++) {
     const a = argv[i];
-    if (a === '--repo') opts.repo = argv[++i];
-    else if (a === '--version') opts.version = argv[++i];
-    else if (a === '--date') opts.date = argv[++i];
-    else if (a === '--json') opts.json = true;
+    if (a === '--json') { opts.json = true; continue; }
+    if (a === '--repo' || a === '--version' || a === '--date') {
+      const r = requireValue(a, i);
+      if (!r.ok) return { ok: false, error: r.error };
+      if (a === '--repo') opts.repo = r.value;
+      else if (a === '--version') opts.version = r.value;
+      else if (a === '--date') opts.date = r.value;
+      i++;
+      continue;
+    }
+    return { ok: false, error: `unknown argument: ${a}` };
   }
-  return opts;
+  return { ok: true, opts };
 }
 
 function listFragmentFiles(changesetDir) {
@@ -106,20 +126,42 @@ function cmdRender(opts) {
   ].join('\n');
 
   fs.writeFileSync(changelogPath, out);
-  for (const f of fragments) fs.unlinkSync(f.file);
+
+  // Delete consumed fragments. If any unlink fails the changelog is written
+  // but the fragment is still on disk, so a re-run would double-consume it.
+  // Surface the partial-failure as exitCode=1 with structured detail so the
+  // operator can manually clean up before retrying.
+  const deleteFailures = [];
+  for (const f of fragments) {
+    try {
+      fs.unlinkSync(f.file);
+    } catch (e) {
+      deleteFailures.push({
+        file: path.relative(repo, f.file),
+        reason: 'fail_fragment_delete',
+        detail: e.code || e.message,
+      });
+    }
+  }
 
   return {
-    exitCode: 0,
+    exitCode: deleteFailures.length > 0 ? 1 : 0,
     report: {
-      consumed: fragments.length,
-      failures: [],
+      consumed: fragments.length - deleteFailures.length,
+      failures: deleteFailures,
       release: { version: opts.version, date: opts.date },
     },
   };
 }
 
 function main() {
-  const opts = parseArgs(process.argv.slice(2));
+  const parsed = parseArgs(process.argv.slice(2));
+  if (!parsed.ok) {
+    process.stderr.write(`${parsed.error}\n`);
+    process.stderr.write('usage: changeset/cli.cjs render --repo <dir> --version V --date D [--json]\n');
+    process.exit(2);
+  }
+  const { opts } = parsed;
   if (opts.cmd !== 'render') {
     process.stderr.write('usage: changeset/cli.cjs render --repo <dir> --version V --date D [--json]\n');
     process.exit(2);
@@ -146,4 +188,4 @@ function main() {
 
 if (require.main === module) main();
 
-module.exports = { cmdRender, splitChangelog, listFragmentFiles };
+module.exports = { cmdRender, parseArgs, splitChangelog, listFragmentFiles };

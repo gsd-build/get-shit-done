@@ -21,7 +21,7 @@ This writes `.changeset/<adjective>-<noun>-<noun>.md` with frontmatter and a bod
 
 ## Format
 
-```
+```md
 ---
 type: Fixed
 pr: 1234

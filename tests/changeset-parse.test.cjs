@@ -19,6 +19,13 @@ describe('changeset parse: fragment file → typed record (#2975)', () => {
     });
   });
 
+  test('preserves verbatim body content (e.g. code blocks) — does not trim significant whitespace', () => {
+    const src = '---\ntype: Fixed\npr: 1\n---\n```js\nlet x = 1;\n```\n';
+    const r = parseFragment(src);
+    assert.equal(r.ok, true);
+    assert.equal(r.fragment.body, '```js\nlet x = 1;\n```');
+  });
+
   test('exposes a frozen FRAGMENT_ERROR enum with the documented codes', () => {
     assert.deepEqual(
       Object.keys(FRAGMENT_ERROR).sort(),

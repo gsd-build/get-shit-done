@@ -33,7 +33,13 @@ const USER_FACING_PREFIXES = [
   'sdk/prompts/',
 ];
 
+// Exact-match user-facing files. Any direct edit to one of these without a
+// fragment also fails the lint — closes the bypass where a contributor edits
+// CHANGELOG.md directly to sneak past the new workflow.
+const USER_FACING_FILES = new Set(['CHANGELOG.md']);
+
 function isUserFacing(file) {
+  if (USER_FACING_FILES.has(file)) return true;
   return USER_FACING_PREFIXES.some((p) => file.startsWith(p));
 }
 
@@ -69,7 +75,16 @@ function main() {
   const base = process.env.GITHUB_BASE_REF || 'main';
   let changedFiles = [];
   try {
-    const out = cp.execSync(`git diff --name-only origin/${base}...HEAD`, { encoding: 'utf8' });
+    // Use execFileSync with an argv array — the base ref is interpolated
+    // into a refspec argument, but execFileSync does not invoke a shell, so
+    // even a malicious GITHUB_BASE_REF cannot inject shell syntax. The
+    // refspec-bound metacharacters that git itself rejects (e.g. spaces in
+    // ref names) are caught by git's own arg parser.
+    const out = cp.execFileSync(
+      'git',
+      ['diff', '--name-only', `origin/${base}...HEAD`],
+      { encoding: 'utf8' },
+    );
     changedFiles = out.split('\n').filter(Boolean);
   } catch (e) {
     process.stderr.write(`could not compute diff: ${e.message}\n`);

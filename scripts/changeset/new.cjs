@@ -51,17 +51,26 @@ function generateFragmentName() {
 function scaffoldFragment({ repo, type, pr, body }) {
   const dir = path.join(repo, '.changeset');
   fs.mkdirSync(dir, { recursive: true });
-  let name;
-  let target;
-  // Re-roll on collision (rare with 40^3 space; the loop terminates).
-  for (let i = 0; i < 16; i++) {
-    name = generateFragmentName();
-    target = path.join(dir, `${name}.md`);
-    if (!fs.existsSync(target)) break;
-  }
   const content = `---\ntype: ${type}\npr: ${pr}\n---\n${body}\n`;
-  fs.writeFileSync(target, content);
-  return target;
+  // Atomic create: writeFileSync with `flag: 'wx'` fails (EEXIST) when the
+  // file already exists, so concurrent invocations can't race past
+  // `existsSync` and overwrite each other. Re-roll the random name on
+  // collision; fail loudly after exhausting the retry budget.
+  for (let i = 0; i < 16; i++) {
+    const name = generateFragmentName();
+    const target = path.join(dir, `${name}.md`);
+    try {
+      fs.writeFileSync(target, content, { flag: 'wx' });
+      return target;
+    } catch (e) {
+      if (e.code !== 'EEXIST') throw e;
+      // collision — try another random draw
+    }
+  }
+  throw new Error(
+    'scaffoldFragment: 16 random filename draws all collided; ' +
+    'expand the word lists or investigate corrupted .changeset/ state',
+  );
 }
 
 function parseArgs(argv) {

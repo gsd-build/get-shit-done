@@ -50,6 +50,14 @@ describe('changeset lint: pure verdict (#2975)', () => {
     assert.deepEqual(verdict, { ok: true, reason: LINT_REASON.OK_NO_USER_FACING_CHANGES });
   });
 
+  test('FAIL_MISSING_FRAGMENT when CHANGELOG.md is edited directly (closes the workflow bypass)', () => {
+    const verdict = evaluateLint({
+      changedFiles: ['CHANGELOG.md'],
+      labels: [],
+    });
+    assert.deepEqual(verdict, { ok: false, reason: LINT_REASON.FAIL_MISSING_FRAGMENT });
+  });
+
   test('a fragment alone (no source change) is OK_FRAGMENT_PRESENT — fragment-only PR is allowed', () => {
     const verdict = evaluateLint({
       changedFiles: ['.changeset/silly-bears-dance.md'],
