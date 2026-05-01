@@ -78,9 +78,10 @@ Plans:
   2. `/gsd-create-sme` with no arguments presents an interactive process menu for the user to choose from
   3. When an SME already exists for the specified process, the user is offered a choice: create new or update existing
   4. The workflow shows progress indicators during SME creation so the user knows the agent is working
-**Plans:** 1 plan
+**Plans:** 2 plans
 Plans:
-- [ ] 04-01-PLAN.md — Create /gsd-create-sme command, create-sme workflow, and structural validation tests
+- [x] 04-01-PLAN.md — Create /gsd-create-sme command, create-sme workflow, and structural validation tests
+- [ ] 04-02-PLAN.md — Gap closure: fuzzy overlap detection and related_smes cross-referencing
 
 ### Phase 5: SME Auditor Agent
 **Goal**: The adversarial SME auditor agent can review a PLAN.md against domain knowledge and return structured findings with the correct return markers
@@ -148,19 +149,19 @@ Plans:
   4. The plan-phase gate warns the user when an SME's `last_analyzed_commit` is behind the current HEAD before running the audit
 **Plans:** 1 plan
 Plans:
-- [ ] 09-01-PLAN.md — TDD: Structural tests (RED) then sme_refresh step + staleness pre-flight check (GREEN)
+- [x] 09-01-PLAN.md — TDD: Structural tests (RED) then sme_refresh step + staleness pre-flight check (GREEN)
 
 ## Progress
 
 **Execution Order:**
-Phases execute in numeric order: 1 → 2 → 3 → 4 → 5 → 6 → 7 → 8 → 9
+Phases execute in numeric order: 1 -> 2 -> 3 -> 4 -> 5 -> 6 -> 7 -> 8 -> 9
 
 | Phase | Plans Complete | Status | Completed |
 |-------|----------------|--------|-----------|
 | 1. Schema & Config | 3/3 | Complete   | 2026-04-28 |
 | 2. SDK Query Handlers | 0/2 | Not started | - |
 | 3. SME Creator Agent | 0/2 | Not started | - |
-| 4. Creation Command & Workflow | 0/1 | Not started | - |
+| 4. Creation Command & Workflow | 1/2 | In progress | - |
 | 5. SME Auditor Agent | 0/1 | Not started | - |
 | 6. Plan-Phase Gate | 0/1 | Not started | - |
 | 7. Discuss-Phase Integration | 0/1 | Not started | - |
