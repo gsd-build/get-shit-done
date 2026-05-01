@@ -1,5 +1,9 @@
 'use strict';
 
+// allow-test-rule: source-text-is-the-product
+// Reads .md/.json/.yml product files whose deployed text IS what the
+// runtime loads — testing text content tests the deployed contract.
+
 /**
  * Tests for claude_md_assembly "link" mode (#2415).
  * Verifies that generate-claude-md writes @-references instead of inlined

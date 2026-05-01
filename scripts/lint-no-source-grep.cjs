@@ -110,6 +110,28 @@ function check(filepath) {
     }
   }
 
+  // Patterns F..G (#2982): var-binding readFileSync().<text-method>() and
+  // assert.ok(<expr>.match(...)). These escape the simpler patterns above
+  // because the bind and the use are on different lines or wrapped.
+  const extras = require('./lint-no-source-grep-extras.cjs');
+  const varBindFindings = extras.detectVarBindingViolations(content);
+  if (varBindFindings.length > 0) {
+    const samples = varBindFindings.slice(0, 3)
+      .map((f) => `${f.variable}.${f.method}()`)
+      .join(', ');
+    violations.push({
+      reason: `readFileSync-bound variable used in text-match method: ${samples}${varBindFindings.length > 3 ? `, …+${varBindFindings.length - 3} more` : ''}`,
+      fix: 'Expose typed IR; assert on structured fields. Or // allow-test-rule: <reason>',
+    });
+  }
+  const wrappedFindings = extras.detectWrappedAssertOkMatch(content);
+  if (wrappedFindings.length > 0) {
+    violations.push({
+      reason: `assert.ok(<expr>.match(...)) — escapes assert.match rule (${wrappedFindings.length} occurrence${wrappedFindings.length > 1 ? 's' : ''})`,
+      fix: 'Use assert.equal on a typed field, not regex match on text. Or // allow-test-rule: <reason>',
+    });
+  }
+
   if (violations.length === 0) return null;
   return { file: rel, violations };
 }

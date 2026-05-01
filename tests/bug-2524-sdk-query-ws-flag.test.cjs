@@ -1,5 +1,9 @@
 'use strict';
 
+// allow-test-rule: pending-migration-to-typed-ir [#2974]
+// Tracked in #2974 for migration to typed-IR assertions per CONTRIBUTING.md
+// "Prohibited: Raw Text Matching on Test Outputs". Do not copy this pattern.
+
 /**
  * Bug #2524: gsd-sdk query --ws <name> silently ignores the workstream flag.
  * Tests that --ws is forwarded through the call chain:

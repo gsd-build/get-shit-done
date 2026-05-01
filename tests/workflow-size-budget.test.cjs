@@ -1,3 +1,7 @@
+// allow-test-rule: pending-migration-to-typed-ir [#2974]
+// Tracked in #2974 for migration to typed-IR assertions per CONTRIBUTING.md
+// "Prohibited: Raw Text Matching on Test Outputs". Do not copy this pattern.
+
 /**
  * Workflow size budget.
  *
