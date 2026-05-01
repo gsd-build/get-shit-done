@@ -6732,7 +6732,12 @@ function writeManifest(configDir, runtime = 'claude', options = {}) {
     if (USER_OWNED_ARTIFACTS.includes(rel)) continue;
     manifest.files['get-shit-done/' + rel] = hash;
   }
-  if (isGemini && fs.existsSync(commandsDir)) {
+  // Record commands/gsd/ for any runtime that emits it (Gemini globally,
+  // Claude Code locally — see #2923). Manifest must reflect everything on
+  // disk so saveLocalPatches() can detect user edits and so per-runtime
+  // assertions about minimal-mode emit can read manifest.files instead of
+  // re-walking the dir.
+  if (fs.existsSync(commandsDir)) {
     const cmdHashes = generateManifest(commandsDir);
     for (const [rel, hash] of Object.entries(cmdHashes)) {
       manifest.files['commands/gsd/' + rel] = hash;
