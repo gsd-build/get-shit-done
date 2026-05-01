@@ -8768,7 +8768,9 @@ function isGsdSdkOnPath() {
  * primitive there; we don't try to fabricate a .cmd shim).
  */
 function trySelfLinkGsdSdk(shimSrc) {
-  if (process.platform === 'win32') return null;
+  if (process.platform === 'win32') {
+    return trySelfLinkGsdSdkWindows(shimSrc);
+  }
   const path = require('path');
   const fs = require('fs');
   const home = os.homedir();
@@ -8823,6 +8825,101 @@ function trySelfLinkGsdSdk(shimSrc) {
     }
   }
   return null;
+}
+
+/**
+ * #2962: Windows counterpart to trySelfLinkGsdSdk. Prior to this, the function
+ * unconditionally returned null on Windows ("we don't try to fabricate a .cmd
+ * shim there"), which left `--sdk --global` installs without a callable
+ * `gsd-sdk` on PATH despite the installer reporting success.
+ *
+ * Strategy: discover npm's global bin directory via `npm prefix -g` (which on
+ * Windows IS the bin dir, no `bin/` suffix — see line 8721) and write the same
+ * three-file shim set npm itself emits: `gsd-sdk.cmd` (cmd.exe), `gsd-sdk.ps1`
+ * (PowerShell), and a Bash wrapper named `gsd-sdk` (for Cygwin/MSYS/Git-Bash).
+ * Each shim invokes `node "<absolute path to bin/gsd-sdk.js>"` with passed
+ * args so the shim location is decoupled from the SDK location — same logical
+ * structure as the POSIX wrapper-via-require() fallback above.
+ *
+ * Returns the .cmd file path on success (the primary handle the installer's
+ * onPath check looks for), null otherwise.
+ */
+function trySelfLinkGsdSdkWindows(shimSrc) {
+  const path = require('path');
+  const fs = require('fs');
+  const cp = require('child_process');
+
+  let npmPrefix;
+  try {
+    // execFileSync avoids shell interpolation; `npm` is resolved via PATH.
+    npmPrefix = cp
+      .execFileSync('npm', ['prefix', '-g'], {
+        encoding: 'utf8',
+        stdio: ['ignore', 'pipe', 'ignore'],
+        shell: false,
+      })
+      .trim();
+  } catch {
+    return null;
+  }
+  if (!npmPrefix || !fs.existsSync(npmPrefix)) return null;
+
+  // Verify writability before producing partial shim sets.
+  try {
+    fs.mkdirSync(npmPrefix, { recursive: true });
+    const probe = path.join(npmPrefix, '.gsd-sdk-write-probe');
+    fs.writeFileSync(probe, '');
+    fs.unlinkSync(probe);
+  } catch {
+    return null;
+  }
+
+  // Quote the shim path JSON-safely for embedding inside cmd.exe / PowerShell
+  // double-quoted strings. JSON.stringify handles backslash + quote escaping.
+  const shimAbs = path.resolve(shimSrc);
+  const shimQuoted = JSON.stringify(shimAbs); // includes outer quotes
+
+  const cmdShim =
+    '@ECHO OFF\r\n' +
+    `@SETLOCAL\r\n` +
+    `@node ${shimQuoted} %*\r\n`;
+
+  const ps1Shim =
+    '#!/usr/bin/env pwsh\n' +
+    `& node ${shimQuoted} $args\n` +
+    'exit $LASTEXITCODE\n';
+
+  const bashShim =
+    '#!/usr/bin/env sh\n' +
+    `exec node ${shimQuoted} "$@"\n`;
+
+  const targets = {
+    cmd: path.join(npmPrefix, 'gsd-sdk.cmd'),
+    ps1: path.join(npmPrefix, 'gsd-sdk.ps1'),
+    sh: path.join(npmPrefix, 'gsd-sdk'),
+  };
+
+  try {
+    // Replace any existing shims — they may be stale (prior install of an
+    // older version pointing at a now-absent shim path).
+    for (const target of Object.values(targets)) {
+      try { fs.unlinkSync(target); } catch {}
+    }
+    fs.writeFileSync(targets.cmd, cmdShim);
+    fs.writeFileSync(targets.ps1, ps1Shim);
+    fs.writeFileSync(targets.sh, bashShim);
+    // chmod is a no-op on Windows-native node but harmless; sets exec bit on
+    // WSL-mounted filesystems where Bash users live.
+    try { fs.chmodSync(targets.sh, 0o755); } catch {}
+    return targets.cmd;
+  } catch {
+    // Partial-write on permission flap — best-effort cleanup so the next run
+    // starts from a clean slate.
+    for (const target of Object.values(targets)) {
+      try { fs.unlinkSync(target); } catch {}
+    }
+    return null;
+  }
 }
 
 /**
@@ -8954,6 +9051,9 @@ if (process.env.GSD_TEST_MODE) {
     restoreUserArtifacts,
     USER_OWNED_ARTIFACTS,
     finishInstall,
+    trySelfLinkGsdSdk,
+    trySelfLinkGsdSdkWindows,
+    isGsdSdkOnPath,
     homePathCoveredByRc,
     maybeSuggestPathExport,
     runtimeMap,
