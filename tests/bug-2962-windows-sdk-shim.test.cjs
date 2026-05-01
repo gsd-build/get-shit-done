@@ -63,6 +63,7 @@ describe('Bug #2962: trySelfLinkGsdSdkWindows shim materialization', () => {
 
   test('each shim invokes node with the absolute path to bin/gsd-sdk.js', () => {
     const shimSrc = path.join(ROOT, 'bin', 'gsd-sdk.js');
+    installModule.trySelfLinkGsdSdkWindows(shimSrc); // self-contained: write before reading
     const shimAbs = path.resolve(shimSrc);
     const cmdContent = fs.readFileSync(path.join(tmpDir, 'gsd-sdk.cmd'), 'utf8');
     const ps1Content = fs.readFileSync(path.join(tmpDir, 'gsd-sdk.ps1'), 'utf8');
@@ -77,6 +78,8 @@ describe('Bug #2962: trySelfLinkGsdSdkWindows shim materialization', () => {
   });
 
   test('.cmd file uses CRLF line endings (Windows convention)', () => {
+    const shimSrc = path.join(ROOT, 'bin', 'gsd-sdk.js');
+    installModule.trySelfLinkGsdSdkWindows(shimSrc); // self-contained: write before reading
     const cmdContent = fs.readFileSync(path.join(tmpDir, 'gsd-sdk.cmd'), 'utf8');
     assert.ok(cmdContent.includes('\r\n'), '.cmd file uses CRLF');
     assert.ok(cmdContent.startsWith('@ECHO OFF\r\n'), '.cmd starts with @ECHO OFF');
