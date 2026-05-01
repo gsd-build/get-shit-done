@@ -62,6 +62,9 @@
     "pretest:coverage": "npm run build:sdk",
     "lint:descriptions": "node scripts/lint-descriptions.cjs",
     "lint:tests": "node scripts/lint-no-source-grep.cjs",
+    "lint:changeset": "node scripts/changeset/lint.cjs",
+    "changeset": "node scripts/changeset/new.cjs",
+    "changelog:render": "node scripts/changeset/cli.cjs render",
     "test": "node scripts/run-tests.cjs",
     "test:coverage": "c8 --check-coverage --lines 70 --reporter text --include 'get-shit-done/bin/lib/*.cjs' --exclude 'tests/**' --all node scripts/run-tests.cjs"
   }

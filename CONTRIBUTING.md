@@ -91,6 +91,23 @@ PRs that arrive without a properly-labeled linked issue are closed automatically
 - **CI must pass** — all matrix jobs (Ubuntu × Node 22, 24; macOS × Node 24) must be green
 - **Scope matches the approved issue** — if your PR does more than what the issue describes, the extra changes will be asked to be removed or moved to a new issue
 
+## CHANGELOG Entries — Drop a Fragment
+
+**Do not edit `CHANGELOG.md` directly.** Two PRs that both append to a `### Fixed` block always conflict on merge — git can't pick a serialization order without a human. Instead, every PR with user-facing changes drops a fragment file in `.changeset/`.
+
+```bash
+npm run changeset -- --type Fixed --pr <YOUR_PR_NUMBER> \
+  --body "**\`/gsd-foo\` no longer drops trailing slashes** — explain the user-visible change."
+```
+
+This writes `.changeset/<adjective>-<noun>-<noun>.md`. Three random words → concurrent PRs never collide. Allowed `type:` values follow [Keep a Changelog](https://keepachangelog.com/): `Added`, `Changed`, `Deprecated`, `Removed`, `Fixed`, `Security`.
+
+Fragments are consolidated into `CHANGELOG.md` at release time by the release workflow. See [`.changeset/README.md`](.changeset/README.md) for the format spec and [#2975](https://github.com/gsd-build/get-shit-done/issues/2975) for the rationale.
+
+**CI enforcement:** the `Changeset Required` workflow (`scripts/changeset/lint.cjs`) fails any PR that touches `bin/`, `get-shit-done/`, `agents/`, `commands/`, `hooks/`, or `sdk/src/` without a `.changeset/*.md` fragment.
+
+**Opt-out:** PRs with no user-facing impact (test refactors, lint config changes, CI tweaks, formatting-only changes) can add the `no-changelog` label. The lint honors it. When unsure whether a change is user-facing, **add the fragment**.
+
 ## Testing Standards
 
 All tests use Node.js built-in test runner (`node:test`) and assertion library (`node:assert`). **Do not use Jest, Mocha, Chai, or any external test framework.**
