@@ -62,8 +62,11 @@ gsd-sdk query commit "docs: initialize [project-name] ([N] phases)" --files .pla
 Each task gets its own commit immediately after completion.
 
 > **Parallel agents:** When running as a parallel executor (spawned by execute-phase),
-> use `--no-verify` on all commits to avoid pre-commit hook lock contention.
-> The orchestrator validates hooks once after all agents complete.
+> run commits normally — let pre-commit hooks run. Do NOT pass `--no-verify` by default
+> (#2924). Hooks should fire on the introducing commit; silent bypass violates project
+> CLAUDE.md guidance. If a project explicitly opts out via
+> `workflow.worktree_skip_hooks=true`, the orchestrator surfaces that flag in the
+> executor prompt; absent that signal, hooks run normally.
 
 ```
 {type}({phase}-{plan}): {task-name}
