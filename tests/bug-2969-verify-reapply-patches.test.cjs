@@ -29,7 +29,10 @@ const path = require('node:path');
 const cp = require('node:child_process');
 
 const ROOT = path.join(__dirname, '..');
-const SCRIPT = path.join(ROOT, 'scripts', 'verify-reapply-patches.cjs');
+// Script lives at get-shit-done/bin/ so the installer ships it under
+// `${GSD_HOME}/get-shit-done/bin/` (issue #2994). The top-level scripts/
+// directory is not copied to user installs.
+const SCRIPT = path.join(ROOT, 'get-shit-done', 'bin', 'verify-reapply-patches.cjs');
 const { REASON } = require(SCRIPT);
 
 let tmpRoot;

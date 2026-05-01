@@ -295,7 +295,7 @@ VERIFY_ARGS+=(--json)
 # Node warnings, deprecation notices, or stack traces do not corrupt the
 # JSON parse downstream. Stderr is preserved on the controlling terminal
 # for operator visibility.
-VERIFY_OUTPUT="$(node "${GSD_HOME}/scripts/verify-reapply-patches.cjs" "${VERIFY_ARGS[@]}")"
+VERIFY_OUTPUT="$(node "${GSD_HOME}/get-shit-done/bin/verify-reapply-patches.cjs" "${VERIFY_ARGS[@]}")"
 VERIFY_STATUS=$?
 ```
 
