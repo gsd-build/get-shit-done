@@ -204,8 +204,8 @@ describe('/gsd-settings advertises /gsd-settings-advanced', () => {
   test('settings workflow confirmation mentions gsd-settings-advanced', () => {
     const text = fs.readFileSync(SETTINGS_WORKFLOW_PATH, 'utf-8');
     assert.ok(
-      text.includes('gsd-settings-advanced') || text.includes('gsd:settings-advanced'),
-      'get-shit-done/workflows/settings.md must mention /gsd-settings-advanced or /gsd:settings-advanced'
+      text.includes('gsd-settings-advanced') || text.includes('gsd:settings-advanced') || text.includes('gsd-config --advanced'),
+      'get-shit-done/workflows/settings.md must mention /gsd-settings-advanced, /gsd:settings-advanced, or /gsd-config --advanced'
     );
   });
 });
