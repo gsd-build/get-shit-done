@@ -168,6 +168,47 @@ jobs:
                 if echo "$SUBJECT" | grep -qE '^(fix|chore)(\([^)]+\))?!?: '; then
                   echo "→ cherry-picking $SHA  $SUBJECT"
                   if ! git cherry-pick -x --allow-empty --keep-redundant-commits "$SHA"; then
+                    # Distinguish patch-context-missing (the picked commit
+                    # modifies code that doesn't exist at the base — typically
+                    # because the surrounding infrastructure was added in a
+                    # feat/refactor commit excluded by this filter) from a real
+                    # content conflict (operator must resolve). Signal: a
+                    # context-missing conflict produces marker blocks where the
+                    # `<<<<<<< HEAD ... =======` HEAD section is empty for every
+                    # block in every conflicted file. A real conflict has
+                    # non-blank content in the HEAD section. Default
+                    # merge.conflictStyle is assumed (the workflow doesn't
+                    # override it). Bug #2966.
+                    UNMERGED=$(git diff --name-only --diff-filter=U)
+                    CONTEXT_MISSING_ONLY=true
+                    if [ -z "$UNMERGED" ]; then
+                      CONTEXT_MISSING_ONLY=false
+                    fi
+                    while IFS= read -r CONFLICTED; do
+                      [ -z "$CONFLICTED" ] && continue
+                      REAL=$(awk '
+                        /^<<<<<<< / { in_head=1; head=""; next }
+                        /^=======$/ && in_head { in_head=0; next }
+                        /^>>>>>>> / {
+                          if (head ~ /[^[:space:]]/) { print "real"; exit }
+                          head=""
+                          next
+                        }
+                        in_head { head = head $0 "\n" }
+                      ' "$CONFLICTED")
+                      if [ "$REAL" = "real" ]; then
+                        CONTEXT_MISSING_ONLY=false
+                        break
+                      fi
+                    done <<< "$UNMERGED"
+
+                    if [ "$CONTEXT_MISSING_ONLY" = "true" ]; then
+                      echo "↷ skipping $SHA — patch context absent at $BASE_TAG"
+                      git cherry-pick --skip
+                      SKIPPED="${SKIPPED}- \`${SHA}\` ${SUBJECT} (context absent at base)"$'\n'
+                      continue
+                    fi
+
                     git cherry-pick --abort || true
                     # On real runs: push the partial-pick state so the operator
                     # can fetch + resolve $SHA + push + re-run with auto_cherry_pick=false.
