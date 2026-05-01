@@ -173,75 +173,51 @@ jobs:
                   # the HEAD section and cause context-missing conflicts to
                   # misclassify as real. Bug #2966.
                   if ! git -c merge.conflictStyle=merge cherry-pick -x --allow-empty --keep-redundant-commits "$SHA"; then
-                    # Distinguish patch-context-missing (the picked commit
-                    # modifies code that doesn't exist at the base — typically
-                    # because the surrounding infrastructure was added in a
-                    # feat/refactor commit excluded by this filter) from a real
-                    # content conflict (operator must resolve). Signal: a
-                    # context-missing conflict produces marker blocks where the
-                    # `<<<<<<< HEAD ... =======` HEAD section is empty for every
-                    # block in every conflicted file. A real conflict has
-                    # non-blank content in the HEAD section. Marker style is
-                    # pinned on the cherry-pick command above. Bug #2966.
+                    # Full automation policy (bug #2968): any conflict the
+                    # cherry-pick can't auto-resolve is skipped, not aborted.
+                    # The hotfix run completes with whatever applies cleanly;
+                    # the SKIPPED list below becomes the operator's review
+                    # queue (see "Cherry-pick summary" in the run summary).
+                    #
+                    # Classify the conflict for the skip reason (operator-
+                    # facing diagnostic — doesn't change control flow):
+                    #   - context absent at base: HEAD section in every
+                    #     conflict marker is empty (the picked commit modifies
+                    #     code that doesn't exist at the base). Bug #2966.
+                    #   - merge conflict: HEAD section has content (both base
+                    #     and patch want different content for the same
+                    #     region). Typical when the base tag was cut from a
+                    #     branch that has diverged from main. Bug #2968.
                     UNMERGED=$(git diff --name-only --diff-filter=U)
-                    CONTEXT_MISSING_ONLY=true
-                    if [ -z "$UNMERGED" ]; then
-                      CONTEXT_MISSING_ONLY=false
-                    fi
-                    while IFS= read -r CONFLICTED; do
-                      [ -z "$CONFLICTED" ] && continue
-                      REAL=$(awk '
-                        /^<<<<<<< / { in_head=1; head=""; next }
-                        /^=======$/ && in_head { in_head=0; next }
-                        /^>>>>>>> / {
-                          if (head ~ /[^[:space:]]/) { print "real"; exit }
-                          head=""
-                          next
-                        }
-                        in_head { head = head $0 "\n" }
-                      ' "$CONFLICTED")
-                      if [ "$REAL" = "real" ]; then
-                        CONTEXT_MISSING_ONLY=false
-                        break
-                      fi
-                    done <<< "$UNMERGED"
-
-                    if [ "$CONTEXT_MISSING_ONLY" = "true" ]; then
-                      echo "↷ skipping $SHA — patch context absent at $BASE_TAG"
-                      git cherry-pick --skip
-                      SKIPPED="${SKIPPED}- \`${SHA}\` ${SUBJECT} (context absent at base)"$'\n'
-                      continue
-                    fi
-
-                    git cherry-pick --abort || true
-                    # On real runs: push the partial-pick state so the operator
-                    # can fetch + resolve $SHA + push + re-run with auto_cherry_pick=false.
-                    if [ "$DRY_RUN" != "true" ]; then
-                      git push --force-with-lease origin "$BRANCH" || git push origin "$BRANCH" || true
-                    fi
-                    {
-                      echo "## Cherry-pick conflict"
-                      echo ""
-                      echo "Failed at: \`${SHA}\` — \`${SUBJECT}\`"
-                      echo ""
-                      if [ "$DRY_RUN" = "true" ]; then
-                        echo "**Dry run:** branch was not pushed, so the picks below were discarded with the runner."
-                        if [ -n "$INCLUDED" ]; then
-                          echo ""
-                          echo "Already-applied picks (lost — must be re-applied before resolving \`${SHA}\`):"
-                          echo ""
-                          echo "$INCLUDED"
+                    REASON="merge conflict — manual review"
+                    if [ -n "$UNMERGED" ]; then
+                      ALL_EMPTY_HEAD=true
+                      while IFS= read -r CONFLICTED; do
+                        [ -z "$CONFLICTED" ] && continue
+                        REAL=$(awk '
+                          /^<<<<<<< / { in_head=1; head=""; next }
+                          /^=======$/ && in_head { in_head=0; next }
+                          /^>>>>>>> / {
+                            if (head ~ /[^[:space:]]/) { print "real"; exit }
+                            head=""
+                            next
+                          }
+                          in_head { head = head $0 "\n" }
+                        ' "$CONFLICTED")
+                        if [ "$REAL" = "real" ]; then
+                          ALL_EMPTY_HEAD=false
+                          break
                         fi
-                        echo ""
-                        echo "**To resolve:** re-run a real hotfix with \`auto_cherry_pick=true\` to materialize the partial branch on origin, then resolve \`${SHA}\` manually. Re-running with \`auto_cherry_pick=false\` would recreate the branch from \`${BASE_TAG}\` and lose every pick listed above."
-                      else
-                        echo "Branch \`${BRANCH}\` was pushed with picks applied up to (but not including) the conflicting commit."
-                        echo ""
-                        echo "**To resolve:** \`git fetch origin && git checkout ${BRANCH} && git cherry-pick -x ${SHA}\`, fix the conflict, push, then re-run with \`auto_cherry_pick=false\`."
+                      done <<< "$UNMERGED"
+                      if [ "$ALL_EMPTY_HEAD" = "true" ]; then
+                        REASON="context absent at base"
                       fi
-                    } >> "$GITHUB_STEP_SUMMARY"
-                    echo "::error::Cherry-pick of $SHA failed. See run summary."
-                    exit 1
+                    fi
+
+                    echo "↷ skipping $SHA — $REASON"
+                    git cherry-pick --skip
+                    SKIPPED="${SKIPPED}- \`${SHA}\` ${SUBJECT} ($REASON)"$'\n'
+                    continue
                   fi
                   INCLUDED="${INCLUDED}- \`${SHA}\` ${SUBJECT}"$'\n'
                 else

@@ -114,8 +114,8 @@ function git(cwd, args) {
   });
 }
 
-describe('bug-2966: release-sdk hotfix cherry-pick distinguishes context-missing from real conflicts', () => {
-  test('Prepare hotfix branch step skips on context-missing conflicts and aborts on real ones', () => {
+describe('bug-2966: release-sdk hotfix cherry-pick classifies context-missing vs real conflicts for skip-reason annotation', () => {
+  test('Prepare hotfix branch step classifies and annotates context-missing conflicts', () => {
     const yaml = fs.readFileSync(WORKFLOW_PATH, 'utf8');
     const script = extractStepRun(yaml, 'Prepare hotfix branch');
 
