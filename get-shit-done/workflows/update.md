@@ -280,23 +280,23 @@ Check npm for latest version via the deterministic script. **Do NOT run `npm vie
 
 The `GSD_DIR` value emitted by `get_installed_version` (line 4) resolves to the runtime-specific config dir (`~/.claude/`, `~/.gemini/`, `~/.codex/`, etc.), so the script invocation works for every runtime — not just Claude. If `GSD_DIR` is empty (scope `UNKNOWN`), skip this step and go directly to install.
 
+`LATEST_RESULT` is a JSON document with the documented shape `{ ok: bool, version: string, reason: string, detail?: string }`. Parse via `jq` ONLY when the script actually ran. When `GSD_DIR` is empty (scope `UNKNOWN`), skip the check entirely and seed the parsed fields with their no-op values so downstream logic does not mistake an unset `LATEST_RESULT` for a failed network check (#2993 CR feedback):
+
 ```bash
 if [ -z "$GSD_DIR" ]; then
-  # No install detected — fall through to install step; the version-check is skipped.
+  # No install detected — fall through to install step; version-check is skipped.
+  LATEST_RESULT=""
+  LATEST_STATUS=0
   LATEST_OK=false
+  LATEST_VERSION=""
   LATEST_REASON="no_install_detected"
 else
   LATEST_RESULT="$(node "$GSD_DIR/get-shit-done/bin/check-latest-version.cjs" --json 2>/dev/null)"
   LATEST_STATUS=$?
+  LATEST_OK="$(printf '%s' "$LATEST_RESULT" | jq -r '.ok // false')"
+  LATEST_VERSION="$(printf '%s' "$LATEST_RESULT" | jq -r '.version // empty')"
+  LATEST_REASON="$(printf '%s' "$LATEST_RESULT" | jq -r '.reason // empty')"
 fi
-```
-
-`LATEST_RESULT` is a JSON document with the documented shape `{ ok: bool, version: string, reason: string, detail?: string }`. Parse via `jq`:
-
-```bash
-LATEST_OK="$(printf '%s' "$LATEST_RESULT" | jq -r '.ok // false')"
-LATEST_VERSION="$(printf '%s' "$LATEST_RESULT" | jq -r '.version // empty')"
-LATEST_REASON="$(printf '%s' "$LATEST_RESULT" | jq -r '.reason // empty')"
 ```
 
 **If `LATEST_OK` is not `true`** (or `LATEST_STATUS` is non-zero):
