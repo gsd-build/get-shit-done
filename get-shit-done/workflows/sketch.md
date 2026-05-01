@@ -1,7 +1,7 @@
 <purpose>
 Explore design directions through throwaway HTML mockups before committing to implementation.
 Each sketch produces 2-3 variants for comparison. Saves artifacts to `.planning/sketches/`.
-Companion to `/gsd-sketch-wrap-up`.
+Companion to `/gsd-sketch --wrap-up`.
 
 Supports two modes:
 - **Idea mode** (default) — user describes a design idea to sketch
@@ -331,7 +331,7 @@ After all sketches complete:
 
 **Package findings** — wrap design decisions into a reusable skill
 
-`/gsd-sketch-wrap-up`
+`/gsd-sketch --wrap-up`
 
 ───────────────────────────────────────────────────────────────
 

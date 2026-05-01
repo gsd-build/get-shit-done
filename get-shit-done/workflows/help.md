@@ -172,26 +172,26 @@ Usage: `/gsd-fast "add .env to gitignore"`
 
 ### Roadmap Management
 
-**`/gsd-add-phase <description>`**
+**`/gsd-phase <description>`**
 Add new phase to end of current milestone.
 
 - Appends to ROADMAP.md
 - Uses next sequential number
 - Updates phase directory structure
 
-Usage: `/gsd-add-phase "Add admin dashboard"`
+Usage: `/gsd-phase "Add admin dashboard"`
 
-**`/gsd-insert-phase <after> <description>`**
+**`/gsd-phase --insert <after> <description>`**
 Insert urgent work as decimal phase between existing phases.
 
 - Creates intermediate phase (e.g., 7.1 between 7 and 8)
 - Useful for discovered work that must happen mid-milestone
 - Maintains phase ordering
 
-Usage: `/gsd-insert-phase 7 "Fix critical auth bug"`
+Usage: `/gsd-phase --insert 7 "Fix critical auth bug"`
 Result: Creates Phase 7.1
 
-**`/gsd-remove-phase <number>`**
+**`/gsd-phase --remove <number>`**
 Remove a future phase and renumber subsequent phases.
 
 - Deletes phase directory and all references
@@ -199,7 +199,7 @@ Remove a future phase and renumber subsequent phases.
 - Only works on future (unstarted) phases
 - Git commit preserves historical record
 
-Usage: `/gsd-remove-phase 17`
+Usage: `/gsd-phase --remove 17`
 Result: Phase 17 deleted, phases 18-20 become 17-19
 
 ### Milestone Management
@@ -305,7 +305,7 @@ Rapidly sketch UI/design ideas using throwaway HTML mockups with multi-variant e
 Usage: `/gsd-sketch "dashboard layout for the admin panel"`
 Usage: `/gsd-sketch --quick "form card grouping"`
 
-**`/gsd-spike-wrap-up`**
+**`/gsd-spike --wrap-up`**
 Package spike findings into a persistent project skill.
 
 - Curates each spike one-at-a-time (include/exclude/partial/UAT)
@@ -314,9 +314,9 @@ Package spike findings into a persistent project skill.
 - Writes summary to `.planning/spikes/WRAP-UP-SUMMARY.md`
 - Adds auto-load routing line to project CLAUDE.md
 
-Usage: `/gsd-spike-wrap-up`
+Usage: `/gsd-spike --wrap-up`
 
-**`/gsd-sketch-wrap-up`**
+**`/gsd-sketch --wrap-up`**
 Package sketch design findings into a persistent project skill.
 
 - Curates each sketch one-at-a-time (include/exclude/partial/revisit)
@@ -325,7 +325,7 @@ Package sketch design findings into a persistent project skill.
 - Writes summary to `.planning/sketches/WRAP-UP-SUMMARY.md`
 - Adds auto-load routing line to project CLAUDE.md
 
-Usage: `/gsd-sketch-wrap-up`
+Usage: `/gsd-sketch --wrap-up`
 
 ### Quick Notes
 
@@ -344,7 +344,7 @@ Usage: `/gsd-note --global cross-project idea`
 
 ### Todo Management
 
-**`/gsd-add-todo [description]`**
+**`/gsd-capture [description]`**
 Capture idea or task as todo from current conversation.
 
 - Extracts context from conversation (or uses provided description)
@@ -353,8 +353,8 @@ Capture idea or task as todo from current conversation.
 - Checks for duplicates before creating
 - Updates STATE.md todo count
 
-Usage: `/gsd-add-todo` (infers from conversation)
-Usage: `/gsd-add-todo Add auth token refresh`
+Usage: `/gsd-capture` (infers from conversation)
+Usage: `/gsd-capture Add auth token refresh`
 
 **`/gsd-check-todos [area]`**
 List pending todos and select one to work on.
@@ -473,7 +473,7 @@ Configure workflow toggles and model profile interactively.
 
 Usage: `/gsd-settings`
 
-**`/gsd-set-profile <profile>`**
+**`/gsd-config --profile <profile>`**
 Quick switch model profile for GSD agents.
 
 - `quality` — Opus everywhere except verification
@@ -481,7 +481,7 @@ Quick switch model profile for GSD agents.
 - `budget` — Sonnet for writing, Haiku for research/verification
 - `inherit` — Use current session model for all agents (OpenCode `/model`)
 
-Usage: `/gsd-set-profile budget`
+Usage: `/gsd-config --profile budget`
 
 ### Utility Commands
 
@@ -627,7 +627,7 @@ Example config:
 **Adding urgent mid-milestone work:**
 
 ```
-/gsd-insert-phase 5 "Critical security fix"
+/gsd-phase --insert 5 "Critical security fix"
 /gsd-plan-phase 5.1
 /gsd-execute-phase 5.1
 ```
@@ -643,8 +643,8 @@ Example config:
 **Capturing ideas during work:**
 
 ```
-/gsd-add-todo                    # Capture from conversation context
-/gsd-add-todo Fix modal z-index  # Capture with explicit description
+/gsd-capture                    # Capture from conversation context
+/gsd-capture Fix modal z-index  # Capture with explicit description
 /gsd-check-todos                 # Review and work on todos
 /gsd-check-todos api             # Filter by area
 ```
