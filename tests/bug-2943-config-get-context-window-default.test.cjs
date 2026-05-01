@@ -92,10 +92,10 @@ describe('bug-2943: config-get returns schema default for context_window', () =>
       JSON.stringify({ workflow: { auto_advance: false } })
     );
 
-    const result = runConfigGet('context_window', ['--default', '200000']);
+    const result = runConfigGet('context_window', ['--default', '123456']);
 
     assert.strictEqual(result.exitCode, 0, 'should exit 0 when --default provided');
-    assert.strictEqual(result.stdout, '200000', 'should return the --default value');
+    assert.strictEqual(result.stdout, '123456', 'should return the --default value, not schema default');
   });
 
   test('errors with "Key not found" (exit 1) for an unknown absent key — no regression', () => {
