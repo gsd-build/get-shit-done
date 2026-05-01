@@ -64,7 +64,7 @@ Usage: `/gsd-map-codebase`
 
 ### Phase Planning
 
-**`/gsd-discuss-phase <number> [--chain | --analyze | --power]`**
+**`/gsd-discuss-phase <number> [--chain | --analyze | --power] [--batch[=N]]`**
 Help articulate your vision for a phase before planning.
 
 - `--chain` — chained-prompt discuss flow
