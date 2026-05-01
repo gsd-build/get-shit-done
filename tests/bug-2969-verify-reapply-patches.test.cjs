@@ -107,6 +107,25 @@ describe('Bug #2969: deterministic Step 5 verification gate', () => {
     assert.match(r.stdout, /visual companion block that must survive/);
   });
 
+  test('exits 1 with diagnostic (no crash) when installed path is a directory, not a file', () => {
+    fs.rmSync(patchesDir, { recursive: true });
+    fs.rmSync(configDir, { recursive: true });
+    fs.rmSync(pristineDir, { recursive: true });
+    fs.mkdirSync(patchesDir);
+    fs.mkdirSync(configDir);
+    fs.mkdirSync(pristineDir);
+
+    writeFile(path.join(pristineDir, 'a.md'), 'pristine line of substantial content here\n');
+    writeFile(path.join(patchesDir, 'a.md'), 'pristine line of substantial content here\nuser added line that is substantial\n');
+    // Replace the merged file's path with a directory — verifier must not crash with EISDIR.
+    fs.mkdirSync(path.join(configDir, 'a.md'));
+
+    const r = runScript();
+    assert.equal(r.status, 1, 'directory at installed path should fail the gate');
+    assert.match(r.stdout, /not a regular file/);
+    assert.doesNotMatch(r.stderr || '', /Error: EISDIR/);
+  });
+
   test('exits 1 when the merged installed file has been deleted entirely', () => {
     fs.rmSync(patchesDir, { recursive: true });
     fs.rmSync(configDir, { recursive: true });

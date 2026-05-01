@@ -279,22 +279,29 @@ Run the verifier as a child process (the gsd-tools binary directory is not requi
 
 ```bash
 PRISTINE_DIR="${CONFIG_DIR}/gsd-pristine"
-PRISTINE_FLAG=""
-if [ -d "$PRISTINE_DIR" ]; then
-  PRISTINE_FLAG="--pristine-dir $PRISTINE_DIR"
-fi
 
-VERIFY_OUTPUT="$(node "${GSD_HOME}/scripts/verify-reapply-patches.cjs" \
-  --patches-dir "$PATCHES_DIR" \
-  --config-dir "$CONFIG_DIR" \
-  $PRISTINE_FLAG \
-  --json 2>&1)"
+# Build args as a bash array so paths with spaces survive expansion intact
+# (string-concat + unquoted expansion would split incorrectly on whitespace).
+VERIFY_ARGS=(
+  --patches-dir "$PATCHES_DIR"
+  --config-dir  "$CONFIG_DIR"
+)
+if [ -d "$PRISTINE_DIR" ]; then
+  VERIFY_ARGS+=(--pristine-dir "$PRISTINE_DIR")
+fi
+VERIFY_ARGS+=(--json)
+
+# Capture stdout (the structured JSON report) separately from stderr so that
+# Node warnings, deprecation notices, or stack traces do not corrupt the
+# JSON parse downstream. Stderr is preserved on the controlling terminal
+# for operator visibility.
+VERIFY_OUTPUT="$(node "${GSD_HOME}/scripts/verify-reapply-patches.cjs" "${VERIFY_ARGS[@]}")"
 VERIFY_STATUS=$?
 ```
 
 **If `VERIFY_STATUS` is non-zero**, STOP and report to the user, parsing the JSON output:
 
-```
+```text
 ERROR: {failures} file(s) failed deterministic post-merge verification (#2969 gate).
 
 The verifier compared user-added lines (computed from the diff between

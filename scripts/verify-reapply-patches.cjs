@@ -11,7 +11,11 @@
  *   node scripts/verify-reapply-patches.cjs \
  *     --patches-dir <path>        \  # gsd-local-patches/
  *     --config-dir <path>         \  # ~/.claude (or runtime equivalent)
- *     [--pristine-dir <path>]        # gsd-pristine/, falls back to backup-meta lookup
+ *     [--pristine-dir <path>]        # gsd-pristine/; if absent, falls back to
+ *                                    # treating every significant backup line as
+ *                                    # required (over-broad but safe for #2969:
+ *                                    # false-positive halts beat silent successes
+ *                                    # on lost content)
  *     [--json]                       # emit JSON report instead of human text
  *
  * Exit codes:
@@ -104,20 +108,45 @@ function verifyFile({ relPath, patchesDir, configDir, pristineDir }) {
   if (!fs.existsSync(backupPath) || !fs.statSync(backupPath).isFile()) {
     return result; // walked entry no longer exists — non-fatal
   }
-  if (!fs.existsSync(installedPath)) {
+
+  // Installed path checks: must exist, must be a regular file, must be
+  // readable. Anything else is a fail-with-diagnostic, not a crash that
+  // aborts the whole gate run and drops structured output.
+  let installedStat;
+  try {
+    installedStat = fs.statSync(installedPath);
+  } catch {
     result.status = 'fail';
     result.reason = 'installed file missing after merge';
     return result;
   }
+  if (!installedStat.isFile()) {
+    result.status = 'fail';
+    result.reason = `installed path is not a regular file (mode ${installedStat.mode.toString(8)})`;
+    return result;
+  }
 
-  const backupContent = fs.readFileSync(backupPath, 'utf8');
-  const installedContent = fs.readFileSync(installedPath, 'utf8');
+  let backupContent;
+  let installedContent;
+  try {
+    backupContent = fs.readFileSync(backupPath, 'utf8');
+    installedContent = fs.readFileSync(installedPath, 'utf8');
+  } catch (err) {
+    result.status = 'fail';
+    result.reason = `read failure: ${err.code || err.message}`;
+    return result;
+  }
 
   let pristineContent = null;
   if (pristineDir) {
     const pristinePath = path.join(pristineDir, relPath);
-    if (fs.existsSync(pristinePath) && fs.statSync(pristinePath).isFile()) {
-      pristineContent = fs.readFileSync(pristinePath, 'utf8');
+    try {
+      const stat = fs.statSync(pristinePath);
+      if (stat.isFile()) {
+        pristineContent = fs.readFileSync(pristinePath, 'utf8');
+      }
+    } catch {
+      // Pristine missing or unreadable — fall through to over-broad mode.
     }
   }
 
