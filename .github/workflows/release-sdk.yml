@@ -458,8 +458,11 @@ jobs:
         env:
           VERSION: ${{ steps.ver.outputs.version }}
         run: |
-          npm version "$VERSION" --no-git-tag-version
-          cd sdk && npm version "$VERSION" --no-git-tag-version
+          # --allow-same-version: prepare may have already committed this bump
+          # on the hotfix branch (release checks out BRANCH in real runs,
+          # BASE_TAG in dry-runs — only the latter has the older version).
+          npm version "$VERSION" --no-git-tag-version --allow-same-version
+          cd sdk && npm version "$VERSION" --no-git-tag-version --allow-same-version
 
       - name: Install dependencies
         run: npm ci
