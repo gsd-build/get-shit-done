@@ -123,18 +123,25 @@ describe('bug-2980: release-sdk hotfix only picks commits that touch shipped pat
       /git diff-tree --no-commit-id --name-only -r "\$SHA"/,
       'pre-pick region must extract the candidate SHA\'s file list with `git diff-tree` so the classifier has accurate input (#2980)'
     );
+    // After #2983 the classifier is invoked via the staged $CLASSIFIER
+    // variable (not the in-tree path), to survive the working-tree swap
+    // performed by `git checkout -b "$BRANCH" "$BASE_TAG"`. Either form
+    // proves the classifier participates; the bug-2983 test enforces
+    // the staged-path form specifically.
     assert.match(
       prePick,
-      /node scripts\/diff-touches-shipped-paths\.cjs/,
-      'pre-pick region must invoke scripts/diff-touches-shipped-paths.cjs to decide whether the commit touches any shipped path (#2980)'
+      /node "\$CLASSIFIER"/,
+      'pre-pick region must invoke `node "$CLASSIFIER"` (the staged classifier) — the in-tree path is unsafe after the base-tag checkout (#2980, #2983)'
     );
-    // The conditional negates the script's exit code — exit 0 means at
-    // least one shipped path was touched (proceed), exit 1 means none
-    // (skip). `if !` is the only correct form.
+    // Skip-on-exit-1 dispatch: pre-#2983 used `if ! ... ; then skip`,
+    // but that conflated classifier errors (exit 2+) with the
+    // legitimate "not shipped" signal. Post-#2983 the dispatch is
+    // explicit `case "$CLASSIFIER_RC" in 1) skip ;; *) error ;; esac`.
+    // This test accepts the modern form; bug-2983 enforces it.
     assert.match(
       prePick,
-      /if ! git diff-tree[\s\S]*scripts\/diff-touches-shipped-paths\.cjs;/,
-      'pre-pick region must skip on classifier exit 1 (no shipped paths) — `if ! ... ; then ... continue` is the required shape (#2980)'
+      /case "\$CLASSIFIER_RC" in[\s\S]+?1\)[\s\S]+?continue/,
+      'pre-pick region must skip on exit 1 via case-dispatch on $CLASSIFIER_RC — the post-#2983 shape that distinguishes "not shipped" from classifier errors (#2980, #2983)'
     );
   });
 

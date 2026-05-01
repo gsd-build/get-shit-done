@@ -5,8 +5,8 @@
  *
  * Reads a newline-separated list of paths from stdin (typically the
  * output of `git diff-tree --no-commit-id --name-only -r <SHA>`) and
- * exits 0 if any path is part of the npm tarball's shipped contents,
- * 1 otherwise.
+ * exits with one of three codes so the workflow can distinguish a
+ * legitimate "skip this commit" signal from a classifier failure.
  *
  * "Shipped" = the union of:
  *   - package.json (always included by `npm pack`, regardless of `files`)
@@ -17,16 +17,30 @@
  * excludes it from the tarball unless it's explicitly in `files`, and at
  * the time of writing this repo's `files` whitelist does not include it.
  *
- * Exit codes:
- *   0  at least one path is shipped → cherry-pick is meaningful
- *   1  no shipped paths             → CI / test / docs / planning-only;
- *                                     hotfix loop skips the commit
+ * Exit codes (the workflow MUST treat these distinctly — bug #2983):
+ *   0  at least one path is shipped       → cherry-pick is meaningful
+ *   1  no shipped paths                   → CI / test / docs / planning
+ *                                            only; hotfix loop skips
+ *   2  classifier error                   → bad/missing package.json,
+ *                                            I/O failure, or any
+ *                                            uncaught exception. The
+ *                                            workflow MUST fail-fast on
+ *                                            this code rather than
+ *                                            treating it as a skip.
+ *
+ * Why distinct codes: Node's default exit code for uncaught throws is 1,
+ * which would otherwise be indistinguishable from the legitimate "no
+ * shipped paths" result. CodeRabbit on PR #2981 / bug #2983.
  */
 
 'use strict';
 
 const fs = require('node:fs');
 const path = require('node:path');
+
+const EXIT_SHIPPED = 0;
+const EXIT_NOT_SHIPPED = 1;
+const EXIT_ERROR = 2;
 
 function loadShipPrefixes(pkgPath) {
   const pkg = JSON.parse(fs.readFileSync(pkgPath, 'utf8'));
@@ -42,19 +56,41 @@ function isShipped(diffPath, shipPrefixes) {
   return shipPrefixes.some((s) => p === s || p.startsWith(s + '/'));
 }
 
+function fail(message, err) {
+  process.stderr.write(`diff-touches-shipped-paths: ${message}\n`);
+  if (err && err.stack) process.stderr.write(`${err.stack}\n`);
+  process.exit(EXIT_ERROR);
+}
+
 function main() {
-  const pkgPath = path.resolve(process.cwd(), 'package.json');
-  const shipPrefixes = loadShipPrefixes(pkgPath);
+  // Surface ANY uncaught failure as exit 2 (classifier error) rather
+  // than letting Node's default-1 shadow the legitimate
+  // "no shipped paths" result. Bug #2983.
+  process.on('uncaughtException', (err) => fail('uncaught exception', err));
+  process.on('unhandledRejection', (err) => fail('unhandled rejection', err));
+
+  let shipPrefixes;
+  try {
+    const pkgPath = path.resolve(process.cwd(), 'package.json');
+    shipPrefixes = loadShipPrefixes(pkgPath);
+  } catch (err) {
+    return fail(`failed to read package.json from ${process.cwd()}`, err);
+  }
 
   let buf = '';
   process.stdin.setEncoding('utf8');
+  process.stdin.on('error', (err) => fail('stdin read error', err));
   process.stdin.on('data', (chunk) => {
     buf += chunk;
   });
   process.stdin.on('end', () => {
-    const paths = buf.split('\n').map((s) => s.trim()).filter(Boolean);
-    const hit = paths.some((p) => isShipped(p, shipPrefixes));
-    process.exit(hit ? 0 : 1);
+    try {
+      const paths = buf.split('\n').map((s) => s.trim()).filter(Boolean);
+      const hit = paths.some((p) => isShipped(p, shipPrefixes));
+      process.exit(hit ? EXIT_SHIPPED : EXIT_NOT_SHIPPED);
+    } catch (err) {
+      fail('classification failed', err);
+    }
   });
 }
 
@@ -62,4 +98,4 @@ if (require.main === module) {
   main();
 }
 
-module.exports = { loadShipPrefixes, isShipped };
+module.exports = { loadShipPrefixes, isShipped, EXIT_SHIPPED, EXIT_NOT_SHIPPED, EXIT_ERROR };

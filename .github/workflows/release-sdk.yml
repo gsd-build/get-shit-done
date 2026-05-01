@@ -122,6 +122,23 @@ jobs:
           DRY_RUN: ${{ inputs.dry_run }}
         run: |
           set -euo pipefail
+          # Stash the shipped-paths classifier from the dispatched ref's
+          # working tree BEFORE `git checkout -b ... "$BASE_TAG"` below
+          # overwrites it. Base tags predating #2980 don't have the
+          # classifier in their tree, so the loop must reference a
+          # location that survives the working-tree swap. Bug #2983.
+          CLASSIFIER_SRC="scripts/diff-touches-shipped-paths.cjs"
+          if [ ! -f "$CLASSIFIER_SRC" ]; then
+            echo "::error::shipped-paths classifier not found at $CLASSIFIER_SRC in dispatched ref — refusing to run"
+            exit 1
+          fi
+          CLASSIFIER="${RUNNER_TEMP}/diff-touches-shipped-paths.cjs"
+          cp "$CLASSIFIER_SRC" "$CLASSIFIER"
+          if [ ! -f "$CLASSIFIER" ]; then
+            echo "::error::failed to stage classifier at $CLASSIFIER"
+            exit 1
+          fi
+
           MAJOR_MINOR=$(echo "$VERSION" | cut -d. -f1-2)
           TARGET_TAG="v${VERSION}"
           BRANCH="hotfix/${VERSION}"
@@ -213,13 +230,31 @@ jobs:
                   # treat entries as file-OR-directory prefix, the
                   # `package.json`-always-shipped rule) are
                   # unit-testable. Bug #2980.
-                  if ! git diff-tree --no-commit-id --name-only -r "$SHA" \
-                       | node scripts/diff-touches-shipped-paths.cjs; then
-                    REASON="touches no shipped paths (CI / test / docs / planning only)"
-                    echo "↷ skipping $SHA — $REASON"
-                    NON_SHIPPED_SKIPPED="${NON_SHIPPED_SKIPPED}- \`${SHA}\` ${SUBJECT}"$'\n'
-                    continue
-                  fi
+                  #
+                  # Use $CLASSIFIER (staged at workflow-start, before
+                  # `git checkout -b ... "$BASE_TAG"` swapped the working
+                  # tree) rather than `scripts/...` directly — base tags
+                  # older than #2980 don't have the classifier in their
+                  # tree. Capture the exit code via PIPESTATUS and
+                  # dispatch on it: 0 = shipped, 1 = not shipped, 2+ =
+                  # classifier error → fail-fast (don't silently treat
+                  # tooling errors as informational skips). Bug #2983.
+                  git diff-tree --no-commit-id --name-only -r "$SHA" \
+                    | node "$CLASSIFIER" || true
+                  CLASSIFIER_RC="${PIPESTATUS[1]}"
+                  case "$CLASSIFIER_RC" in
+                    0) ;;
+                    1)
+                      REASON="touches no shipped paths (CI / test / docs / planning only)"
+                      echo "↷ skipping $SHA — $REASON"
+                      NON_SHIPPED_SKIPPED="${NON_SHIPPED_SKIPPED}- \`${SHA}\` ${SUBJECT}"$'\n'
+                      continue
+                      ;;
+                    *)
+                      echo "::error::shipped-paths classifier failed for $SHA (exit $CLASSIFIER_RC). Refusing to silently skip — bug #2983."
+                      exit "$CLASSIFIER_RC"
+                      ;;
+                  esac
                   echo "→ cherry-picking $SHA  $SUBJECT"
                   # Pin merge.conflictStyle=merge on the cherry-pick so the
                   # awk classifier below sees deterministic marker shapes —
@@ -385,9 +420,11 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 15
     permissions:
-      contents: write       # tag + push + GitHub Release
-      id-token: write       # provenance
-      pull-requests: write  # hotfix mode opens merge-back PR via gh pr create
+      contents: write  # tag + push + GitHub Release
+      id-token: write  # provenance
+      # The merge-back PR step (and the pull-request scope it required)
+      # was removed in #2983 — auto-cherry-pick hotfix flow only picks
+      # commits already on main, so there's nothing to merge back.
     environment: npm-publish
     steps:
       - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd  # v6.0.2
@@ -639,25 +676,22 @@ jobs:
           fi
           echo "✅ GitHub Release v${VERSION} ready"
 
-      - name: Open merge-back PR (hotfix only)
-        if: ${{ !inputs.dry_run && inputs.action == 'hotfix' }}
-        env:
-          GH_TOKEN: ${{ github.token }}
-          BRANCH: ${{ needs.prepare.outputs.ref }}
-          VERSION: ${{ steps.ver.outputs.version }}
-        run: |
-          EXISTING_PR=$(gh pr list --base main --head "$BRANCH" --state open --json number --jq '.[0].number')
-          if [ -n "$EXISTING_PR" ]; then
-            gh pr edit "$EXISTING_PR" \
-              --title "chore: merge hotfix v${VERSION} back to main" \
-              --body "Merge hotfix changes back to main after v${VERSION} release."
-          else
-            gh pr create \
-              --base main \
-              --head "$BRANCH" \
-              --title "chore: merge hotfix v${VERSION} back to main" \
-              --body "Merge hotfix changes back to main after v${VERSION} release."
-          fi
+      # Merge-back PR step removed — bug #2983.
+      #
+      # The auto-cherry-pick hotfix flow only picks commits already on
+      # main (`git cherry HEAD origin/main` outputs unmerged commits;
+      # we filter to fix:/chore: from main). By construction every code
+      # commit on the hotfix branch is already on main. The only
+      # hotfix-branch-only commit is `chore: bump version to X.Y.Z for
+      # hotfix`, which would either no-op against main (already past
+      # X.Y.Z) or rewind main's in-progress version — strictly
+      # counterproductive in either case.
+      #
+      # The original merge-back step also failed in production with
+      # `GitHub Actions is not permitted to create or approve pull
+      # requests (createPullRequest)` (org policy), but even if the
+      # policy were lifted the PR would have nothing useful to merge.
+      # Run 25232968975 was the trigger for removal.
 
       - name: Verify publish landed on registry
         if: ${{ !inputs.dry_run }}
