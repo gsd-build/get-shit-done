@@ -269,30 +269,51 @@ After writing each merged file, verify that user modifications survived the merg
 
 ## Step 5: Hunk Verification Gate
 
-Before proceeding to cleanup, evaluate the Hunk Verification Table produced in Step 4.
+Before proceeding to cleanup, run the deterministic verifier script. **Do NOT** rely on a free-text "verified: yes/no" table generated during Step 4 — bug #2969 traced repeated false-positive `verified: yes` reports to that table being filled in without an actual content-presence check. The script below performs the check structurally and exits non-zero on any miss.
 
-**If the Hunk Verification Table is absent** (Step 4 did not produce it), STOP immediately and report to the user:
+Run the verifier as a child process (the gsd-tools binary directory is not required — the script ships under `scripts/` in the source repo and is also exposed via the SDK at `sdk/dist/cli.js verify-reapply` when present):
+
+```bash
+PRISTINE_DIR="${CONFIG_DIR}/gsd-pristine"
+PRISTINE_FLAG=""
+if [ -d "$PRISTINE_DIR" ]; then
+  PRISTINE_FLAG="--pristine-dir $PRISTINE_DIR"
+fi
+
+VERIFY_OUTPUT="$(node "${GSD_HOME}/scripts/verify-reapply-patches.cjs" \
+  --patches-dir "$PATCHES_DIR" \
+  --config-dir "$CONFIG_DIR" \
+  $PRISTINE_FLAG \
+  --json 2>&1)"
+VERIFY_STATUS=$?
 ```
-ERROR: Hunk Verification Table is missing. Post-merge verification was not completed.
-Rerun /gsd-update --reapply to retry with full verification.
+
+**If `VERIFY_STATUS` is non-zero**, STOP and report to the user, parsing the JSON output:
+
 ```
+ERROR: {failures} file(s) failed deterministic post-merge verification (#2969 gate).
 
-**If any row in the Hunk Verification Table shows `verified: no`**, STOP and report to the user:
-```
-ERROR: {N} hunk(s) failed verification — content may have been dropped during merge.
+The verifier compared user-added lines (computed from the diff between
+the backup and the pristine baseline) against the merged installed file.
+Lines listed below are present in the backup but absent from the merged result.
 
-Unverified hunks:
-  {file} hunk {hunk_id}: signature line "{signature_line}" not found in merged output
+For each failed file:
+  {file}
+    missing: {first significant missing line, up to 5 per file}
+    backup:  {patches_dir}/{file}
 
-The backup is preserved at: {patches_dir}/{file}
-Review the merged file manually, then either:
-  (a) Re-merge the missing content by hand, or
+Resolve before proceeding:
+  (a) Re-merge the missing content into the installed file by hand, or
   (b) Restore from backup: cp {patches_dir}/{file} {installed_path}
+
+Then re-run /gsd-update --reapply to re-verify.
 ```
 
-Do not proceed to cleanup until the user confirms they have resolved all unverified hunks.
+Do not proceed to cleanup until the verifier exits 0.
 
-**Only when all rows show `verified: yes`** (or when all files had zero user-added hunks) may execution continue to Step 6.
+**Only when `VERIFY_STATUS` is 0** (or when all files had zero significant user-added lines, which the verifier reports as `Failures: 0`) may execution continue to Step 6.
+
+**Why the script and not the table?** The Step 4 Hunk Verification Table is still produced as a Claude-readable summary, but it is *advisory* — the gate is the script. Determinism comes from doing the substring check in code rather than asking the LLM to do it during workflow execution.
 
 ## Step 6: Cleanup option
 
