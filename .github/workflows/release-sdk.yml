@@ -161,7 +161,14 @@ jobs:
               ORDERED=$(git log --reverse --format='%H' "${BASE_TAG}..origin/main" \
                 | grep -F -f <(echo "$CANDIDATES") || true)
               INCLUDED=""
-              SKIPPED=""
+              # POLICY_SKIPPED — commits intentionally not picked because they
+              # don't match the fix/chore filter (feat/refactor/docs/etc).
+              # CONFLICT_SKIPPED — fix/chore commits whose cherry-pick failed
+              # and were skipped per the full-automation policy (#2968).
+              # Operators reviewing the run summary need these distinct so
+              # the manual-review queue isn't buried in the policy bucket.
+              POLICY_SKIPPED=""
+              CONFLICT_SKIPPED=""
               while IFS= read -r SHA; do
                 [ -z "$SHA" ] && continue
                 SUBJECT=$(git log -1 --format='%s' "$SHA")
@@ -176,8 +183,9 @@ jobs:
                     # Full automation policy (bug #2968): any conflict the
                     # cherry-pick can't auto-resolve is skipped, not aborted.
                     # The hotfix run completes with whatever applies cleanly;
-                    # the SKIPPED list below becomes the operator's review
-                    # queue (see "Cherry-pick summary" in the run summary).
+                    # the CONFLICT_SKIPPED list below becomes the operator's
+                    # review queue (see "Cherry-pick summary" in the run
+                    # summary).
                     #
                     # Classify the conflict for the skip reason (operator-
                     # facing diagnostic — doesn't change control flow):
@@ -216,12 +224,12 @@ jobs:
 
                     echo "↷ skipping $SHA — $REASON"
                     git cherry-pick --skip
-                    SKIPPED="${SKIPPED}- \`${SHA}\` ${SUBJECT} ($REASON)"$'\n'
+                    CONFLICT_SKIPPED="${CONFLICT_SKIPPED}- \`${SHA}\` ${SUBJECT} ($REASON)"$'\n'
                     continue
                   fi
                   INCLUDED="${INCLUDED}- \`${SHA}\` ${SUBJECT}"$'\n'
                 else
-                  SKIPPED="${SKIPPED}- \`${SHA}\` ${SUBJECT}"$'\n'
+                  POLICY_SKIPPED="${POLICY_SKIPPED}- \`${SHA}\` ${SUBJECT}"$'\n'
                 fi
               done <<< "$ORDERED"
               {
@@ -236,10 +244,15 @@ jobs:
                 else
                   echo "_No fix/chore commits to include._"
                 fi
-                if [ -n "$SKIPPED" ]; then
-                  echo "### Skipped (feat/refactor/etc — not auto-included)"
+                if [ -n "$CONFLICT_SKIPPED" ]; then
+                  echo "### Skipped — cherry-pick conflict (manual review)"
                   echo ""
-                  echo "$SKIPPED"
+                  echo "$CONFLICT_SKIPPED"
+                fi
+                if [ -n "$POLICY_SKIPPED" ]; then
+                  echo "### Not auto-included (feat/refactor/docs/etc)"
+                  echo ""
+                  echo "$POLICY_SKIPPED"
                 fi
               } >> "$GITHUB_STEP_SUMMARY"
             fi

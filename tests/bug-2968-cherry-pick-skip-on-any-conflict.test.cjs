@@ -133,7 +133,7 @@ describe('bug-2968: release-sdk hotfix cherry-pick skips all conflicts (full aut
     );
   });
 
-  test('cherry-pick failure path always calls `git cherry-pick --skip` and appends to SKIPPED', () => {
+  test('cherry-pick failure path always calls `git cherry-pick --skip` and appends to CONFLICT_SKIPPED', () => {
     const yaml = fs.readFileSync(WORKFLOW_PATH, 'utf8');
     const script = extractStepRun(yaml, 'Prepare hotfix branch');
     const failureBlock = extractCherryPickFailureBlock(script);
@@ -143,15 +143,54 @@ describe('bug-2968: release-sdk hotfix cherry-pick skips all conflicts (full aut
       /git cherry-pick --skip/,
       'auto_cherry_pick failure path must call `git cherry-pick --skip` to clear cherry-pick state and continue the loop (#2968)'
     );
+    // Conflict skips MUST go into a dedicated bucket — operators reviewing
+    // the run summary need to find manual-review items without scanning
+    // through policy-excluded feat/refactor/etc commits. Bug #2968.
     assert.match(
       failureBlock,
-      /SKIPPED=/,
-      'auto_cherry_pick failure path must append the skipped pick to the SKIPPED list (so it appears in the run summary review queue) (#2968)'
+      /CONFLICT_SKIPPED=/,
+      'auto_cherry_pick failure path must append to CONFLICT_SKIPPED (a separate bucket from POLICY_SKIPPED) so operators can find manual-review items in the run summary (#2968)'
+    );
+    assert.doesNotMatch(
+      failureBlock,
+      /\bSKIPPED=/,
+      'auto_cherry_pick failure path must NOT append to the legacy SKIPPED bucket — that buries manual-review conflicts under "feat/refactor/etc — not auto-included" (#2968)'
     );
     assert.match(
       failureBlock,
       /\bcontinue\b/,
       'auto_cherry_pick failure path must `continue` the loop after skipping — full-automation policy is best-effort cherry-pick (#2968)'
+    );
+  });
+
+  test('run summary uses distinct sections for conflict skips vs policy skips', () => {
+    const yaml = fs.readFileSync(WORKFLOW_PATH, 'utf8');
+    const script = extractStepRun(yaml, 'Prepare hotfix branch');
+
+    // The summary must surface both buckets with distinct headings so
+    // operators can act on the right one. Conflict skips are the review
+    // queue; policy skips are informational.
+    assert.match(
+      script,
+      /Skipped — cherry-pick conflict \(manual review\)/,
+      'run summary must show conflict skips under a "manual review" heading distinct from policy skips (#2968)'
+    );
+    assert.match(
+      script,
+      /Not auto-included \(feat\/refactor\/docs\/etc\)/,
+      'run summary must show policy skips under a heading that names the excluded categories — they are not failures (#2968)'
+    );
+    // Both buckets must be referenced when emitting the summary so a
+    // future edit can't silently drop one section.
+    assert.match(
+      script,
+      /\$CONFLICT_SKIPPED/,
+      'run summary must echo $CONFLICT_SKIPPED so the manual-review queue actually appears (#2968)'
+    );
+    assert.match(
+      script,
+      /\$POLICY_SKIPPED/,
+      'run summary must echo $POLICY_SKIPPED so policy-excluded commits remain visible to operators (#2968)'
     );
   });
 
