@@ -272,7 +272,7 @@ Proceed to install step (treat as version 0.0.0 for comparison).
 Check npm for latest version via the deterministic script. **Do NOT run `npm view` or `npm search` directly** — the package name must come from the script, not from a free choice at execution time. (#2992: LLM-driven prescriptions of npm package names produced wrong-package queries; moving the package name into a script constant closes that gap.)
 
 ```bash
-LATEST_RESULT="$(node "${GSD_HOME:-$HOME/.claude}/get-shit-done/bin/check-latest-version.cjs" --json 2>/dev/null)"
+LATEST_RESULT="$(node "${GSD_HOME:-$HOME/.claude/}/get-shit-done/bin/check-latest-version.cjs" --json 2>/dev/null)"
 LATEST_STATUS=$?
 ```
 
