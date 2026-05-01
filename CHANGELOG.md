@@ -8,6 +8,7 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ### Fixed
 
+- **`gsd-sdk query agent-skills` emits raw `<agent_skills>` block instead of JSON-wrapped string** — workflows that embed via `$(gsd-sdk query agent-skills <agent>)` were receiving a JSON-quoted string literal mid-prompt (e.g. `"<agent_skills>\n…"`), silently breaking all `<agent_skills>` injection into spawned subagents. The CLI dispatcher now honors an opt-in `format: 'text'` field on `QueryResult` and writes such results raw via `process.stdout.write`; `--pick` always returns JSON regardless. (#2917)
 - **`sketch --wrap-up` now dispatches correctly** — `/gsd-sketch --wrap-up` was silently no-oping because the flag dispatch wiring was omitted when the micro-skill entry point was absorbed in #2790. (#2949)
 
 ### Added — 1.40.0-rc.1

@@ -123,7 +123,9 @@ export const agentSkills: QueryHandler = async (args, projectDir) => {
   if (validEntries.length === 0) return { data: '' };
 
   const lines = validEntries.map((e) => `- @${e.ref}`).join('\n');
-  return {
-    data: `<agent_skills>\nRead these user-configured skills:\n${lines}\n</agent_skills>`,
-  };
+  const block = `<agent_skills>\nRead these user-configured skills:\n${lines}\n</agent_skills>`;
+  // Signal the CLI dispatcher to write raw text — workflows embed the result
+  // with `$(gsd-sdk query agent-skills …)` and need the XML block verbatim, not
+  // a JSON-quoted string (see cli.ts QueryResult.format handling).
+  return { data: block, format: 'text' };
 };
