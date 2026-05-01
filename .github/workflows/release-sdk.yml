@@ -173,6 +173,19 @@ jobs:
                 [ -z "$SHA" ] && continue
                 SUBJECT=$(git log -1 --format='%s' "$SHA")
                 if echo "$SUBJECT" | grep -qE '^(fix|chore)(\([^)]+\))?!?: '; then
+                  # Merge commits with fix:/chore: titles can't be cherry-picked
+                  # without `-m <parent>` and we can't pick the parent
+                  # automatically. They fail BEFORE entering cherry-pick state
+                  # (no CHERRY_PICK_HEAD), so an unconditional `--skip` would
+                  # then fail and brick the loop. Skip them upfront with a
+                  # distinct reason. Bug #2968 / CodeRabbit on PR #2970.
+                  PARENT_COUNT=$(git rev-list --parents -n 1 "$SHA" | awk '{print NF - 1}')
+                  if [ "$PARENT_COUNT" -gt 1 ]; then
+                    REASON="merge commit — manual -m parent selection required"
+                    echo "↷ skipping $SHA — $REASON"
+                    CONFLICT_SKIPPED="${CONFLICT_SKIPPED}- \`${SHA}\` ${SUBJECT} ($REASON)"$'\n'
+                    continue
+                  fi
                   echo "→ cherry-picking $SHA  $SUBJECT"
                   # Pin merge.conflictStyle=merge on the cherry-pick so the
                   # awk classifier below sees deterministic marker shapes —
@@ -223,7 +236,14 @@ jobs:
                     fi
 
                     echo "↷ skipping $SHA — $REASON"
-                    git cherry-pick --skip
+                    # Guard `--skip`: cherry-pick can fail before entering the
+                    # conflict state (e.g. unreadable commit, empty-without-
+                    # --allow-empty edge cases the flag misses). Calling
+                    # `--skip` outside an in-progress cherry-pick exits non-
+                    # zero and would brick the loop. CodeRabbit on PR #2970.
+                    if git rev-parse -q --verify CHERRY_PICK_HEAD >/dev/null 2>&1; then
+                      git cherry-pick --skip
+                    fi
                     CONFLICT_SKIPPED="${CONFLICT_SKIPPED}- \`${SHA}\` ${SUBJECT} ($REASON)"$'\n'
                     continue
                   fi

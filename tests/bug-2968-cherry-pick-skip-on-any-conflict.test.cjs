@@ -163,6 +163,44 @@ describe('bug-2968: release-sdk hotfix cherry-pick skips all conflicts (full aut
     );
   });
 
+  test('merge commits are pre-skipped before cherry-pick is attempted', () => {
+    // Cherry-picking a merge commit requires `-m <parent>` which the loop
+    // can't choose automatically. Without it, `git cherry-pick <merge-sha>`
+    // fails BEFORE entering cherry-pick state — no CHERRY_PICK_HEAD — so
+    // the unconditional `--skip` would also fail and brick the loop.
+    // The loop must detect parent count > 1 and skip with a distinct
+    // reason BEFORE invoking cherry-pick. CodeRabbit on PR #2970.
+    const yaml = fs.readFileSync(WORKFLOW_PATH, 'utf8');
+    const script = extractStepRun(yaml, 'Prepare hotfix branch');
+
+    assert.match(
+      script,
+      /git rev-list --parents -n 1 "\$SHA"/,
+      'auto_cherry_pick must inspect parent count before invoking cherry-pick — merge commits need `-m <parent>` and we can\'t pick the parent automatically (#2968)'
+    );
+    assert.match(
+      script,
+      /merge commit — manual -m parent selection required/,
+      'auto_cherry_pick must annotate merge-commit skips with a distinct reason so operators understand why the pick wasn\'t attempted (#2968)'
+    );
+  });
+
+  test('git cherry-pick --skip is guarded by CHERRY_PICK_HEAD existence', () => {
+    // If cherry-pick fails for a reason that doesn't enter conflict state
+    // (e.g. unreadable commit, ref problem), CHERRY_PICK_HEAD doesn't exist
+    // and `git cherry-pick --skip` exits non-zero — bricking the loop.
+    // The skip call must be guarded. CodeRabbit on PR #2970.
+    const yaml = fs.readFileSync(WORKFLOW_PATH, 'utf8');
+    const script = extractStepRun(yaml, 'Prepare hotfix branch');
+    const failureBlock = extractCherryPickFailureBlock(script);
+
+    assert.match(
+      failureBlock,
+      /git rev-parse[^\n]*CHERRY_PICK_HEAD/,
+      'auto_cherry_pick must check CHERRY_PICK_HEAD exists before calling `git cherry-pick --skip` — calling --skip outside an in-progress cherry-pick fails (#2968)'
+    );
+  });
+
   test('run summary uses distinct sections for conflict skips vs policy skips', () => {
     const yaml = fs.readFileSync(WORKFLOW_PATH, 'utf8');
     const script = extractStepRun(yaml, 'Prepare hotfix branch');
