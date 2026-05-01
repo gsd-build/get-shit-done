@@ -72,25 +72,6 @@ Usage: `/gsd-discuss-phase 2`
 Usage: `/gsd-discuss-phase 2 --batch`
 Usage: `/gsd-discuss-phase 2 --batch=3`
 
-**`/gsd-research-phase <number>`**
-Comprehensive ecosystem research for niche/complex domains.
-
-- Discovers standard stack, architecture patterns, pitfalls
-- Creates RESEARCH.md with "how experts build this" knowledge
-- Use for 3D, games, audio, shaders, ML, and other specialized domains
-- Goes beyond "which library" to ecosystem knowledge
-
-Usage: `/gsd-research-phase 3`
-
-**`/gsd-list-phase-assumptions <number>`**
-See what Claude is planning to do before it starts.
-
-- Shows Claude's intended approach for a phase
-- Lets you course-correct if Claude misunderstood your vision
-- No files created - conversational output only
-
-Usage: `/gsd-list-phase-assumptions 3`
-
 **`/gsd-plan-phase <number>`**
 Create detailed execution plan for a specific phase.
 
@@ -120,7 +101,7 @@ Usage: `/gsd-execute-phase 5 --wave 2`
 
 ### Smart Router
 
-**`/gsd-do <description>`**
+**`/gsd-progress --do "<description>"`**
 Route freeform text to the right GSD command automatically.
 
 - Analyzes natural language input to find the best matching GSD command
@@ -128,9 +109,9 @@ Route freeform text to the right GSD command automatically.
 - Resolves ambiguity by asking you to pick between top matches
 - Use when you know what you want but don't know which `/gsd-*` command to run
 
-Usage: `/gsd-do fix the login button`
-Usage: `/gsd-do refactor the auth system`
-Usage: `/gsd-do I want to start a new milestone`
+Usage: `/gsd-progress --do "fix the login button"`
+Usage: `/gsd-progress --do "refactor the auth system"`
+Usage: `/gsd-progress --do "I want to start a new milestone"`
 
 ### Quick Mode
 
@@ -327,25 +308,10 @@ Package sketch design findings into a persistent project skill.
 
 Usage: `/gsd-sketch --wrap-up`
 
-### Quick Notes
-
-**`/gsd-note <text>`**
-Zero-friction idea capture — one command, instant save, no questions.
-
-- Saves timestamped note to `.planning/notes/` (or `~/.claude/notes/` globally)
-- Three subcommands: append (default), list, promote
-- Promote converts a note into a structured todo
-- Works without a project (falls back to global scope)
-
-Usage: `/gsd-note refactor the hook system`
-Usage: `/gsd-note list`
-Usage: `/gsd-note promote 3`
-Usage: `/gsd-note --global cross-project idea`
-
-### Todo Management
+### Capturing Ideas, Notes, and Todos
 
 **`/gsd-capture [description]`**
-Capture idea or task as todo from current conversation.
+Capture an idea or task as a structured todo from current conversation.
 
 - Extracts context from conversation (or uses provided description)
 - Creates structured todo file in `.planning/todos/pending/`
@@ -356,17 +322,30 @@ Capture idea or task as todo from current conversation.
 Usage: `/gsd-capture` (infers from conversation)
 Usage: `/gsd-capture Add auth token refresh`
 
-**`/gsd-check-todos [area]`**
+**`/gsd-capture --note <text>`**
+Zero-friction note capture — one command, instant save, no questions.
+
+- Saves timestamped note to `.planning/notes/` (or `~/.claude/notes/` globally)
+- Three subcommands: append (default), list, promote
+- Promote converts a note into a structured todo
+- Works without a project (falls back to global scope)
+
+Usage: `/gsd-capture --note refactor the hook system`
+Usage: `/gsd-capture --note list`
+Usage: `/gsd-capture --note promote 3`
+Usage: `/gsd-capture --note --global cross-project idea`
+
+**`/gsd-capture --list [area]`**
 List pending todos and select one to work on.
 
 - Lists all pending todos with title, area, age
-- Optional area filter (e.g., `/gsd-check-todos api`)
+- Optional area filter (e.g., `/gsd-capture --list api`)
 - Loads full context for selected todo
 - Routes to appropriate action (work now, add to phase, brainstorm)
 - Moves todo to done/ when work begins
 
-Usage: `/gsd-check-todos`
-Usage: `/gsd-check-todos api`
+Usage: `/gsd-capture --list`
+Usage: `/gsd-capture --list api`
 
 ### User Acceptance Testing
 
@@ -420,14 +399,14 @@ Usage: `/gsd-pr-branch` or `/gsd-pr-branch main`
 
 ---
 
-**`/gsd-plant-seed [idea]`**
+**`/gsd-capture --seed [idea]`**
 Capture a forward-looking idea with trigger conditions for automatic surfacing.
 
 - Seeds preserve WHY, WHEN to surface, and breadcrumbs to related code
 - Auto-surfaces during `/gsd-new-milestone` when trigger conditions match
 - Better than deferred items — triggers are checked, not forgotten
 
-Usage: `/gsd-plant-seed "add real-time notifications when we build the events system"`
+Usage: `/gsd-capture --seed "add real-time notifications when we build the events system"`
 
 ---
 
@@ -451,16 +430,6 @@ Audit milestone completion against original intent.
 - Creates MILESTONE-AUDIT.md with gaps and tech debt
 
 Usage: `/gsd-audit-milestone`
-
-**`/gsd-plan-milestone-gaps`**
-Create phases to close gaps identified by audit.
-
-- Reads MILESTONE-AUDIT.md and groups gaps into phases
-- Prioritizes by requirement priority (must/should/nice)
-- Adds gap closure phases to ROADMAP.md
-- Ready for `/gsd-plan-phase` on new phases
-
-Usage: `/gsd-plan-milestone-gaps`
 
 ### Configuration
 
@@ -508,14 +477,6 @@ Update GSD to latest version with changelog preview.
 - Better than raw `npx get-shit-done-cc`
 
 Usage: `/gsd-update`
-
-**`/gsd-join-discord`**
-Join the GSD Discord community.
-
-- Get help, share what you're building, stay updated
-- Connect with other GSD users
-
-Usage: `/gsd-join-discord`
 
 ## Files & Structure
 
@@ -645,8 +606,8 @@ Example config:
 ```
 /gsd-capture                    # Capture from conversation context
 /gsd-capture Fix modal z-index  # Capture with explicit description
-/gsd-check-todos                 # Review and work on todos
-/gsd-check-todos api             # Filter by area
+/gsd-capture --list             # Review and work on todos
+/gsd-capture --list api         # Filter by area
 ```
 
 **Debugging an issue:**
