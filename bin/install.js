@@ -526,6 +526,23 @@ function computePathPrefix({ isGlobal, isOpencode, isWindowsHost: _isWindowsHost
 }
 
 /**
+ * Resolve the absolute path to the node binary running the installer.
+ * Used as the runner for .js hooks so they execute in GUI/minimal-PATH
+ * runtimes (Gemini, Antigravity, Codex CLIs launched from a Finder
+ * shortcut etc.) where bare `node` is not on `/usr/bin:/bin:/usr/sbin:/sbin`
+ * and the hook would fail with `node: command not found` (#2979).
+ *
+ * Returns a forward-slash-normalized, double-quoted path so the emitted
+ * command is shell-safe across POSIX and Windows. `process.execPath`
+ * gives the absolute path of the node binary actively running the
+ * installer — that is the version the user just installed under, and
+ * the right default runtime for hooks invoked under the same install.
+ */
+function resolveNodeRunner() {
+  return '"' + (process.execPath || 'node').replace(/\\/g, '/') + '"';
+}
+
+/**
  * Build a hook command path using forward slashes for cross-platform compatibility.
  * On Windows, $HOME is not expanded by cmd.exe/PowerShell, so we use the actual path.
  *
@@ -538,7 +555,11 @@ function computePathPrefix({ isGlobal, isOpencode, isWindowsHost: _isWindowsHost
  */
 function buildHookCommand(configDir, hookName, opts) {
   if (!opts) opts = {};
-  const runner = hookName.endsWith('.sh') ? 'bash' : 'node';
+  // .sh hooks run under /bin/bash (POSIX std PATH always includes /bin),
+  // so bare `bash` is fine. .js hooks need the absolute node path because
+  // GUI-launched runtimes start with a minimal PATH that does not include
+  // nvm/Homebrew/Volta-installed node binaries (#2979).
+  const runner = hookName.endsWith('.sh') ? 'bash' : resolveNodeRunner();
 
   if (opts.portableHooks) {
     // Replace the home directory prefix with $HOME so the path works when
@@ -7763,24 +7784,28 @@ function install(isGlobal, runtime = 'claude') {
     ? dirName
     : '"$CLAUDE_PROJECT_DIR"/' + dirName;
   const hookOpts = { portableHooks: hasPortableHooks };
+  // #2979: local-install hook commands also use the absolute node path so
+  // GUI/minimal-PATH runtimes can resolve them. Bare `node` fails when the
+  // host launches the runtime with a stripped PATH (Finder/Antigravity/etc).
+  const localNodeRunner = resolveNodeRunner();
   const statuslineCommand = isGlobal
     ? buildHookCommand(targetDir, 'gsd-statusline.js', hookOpts)
-    : 'node ' + localPrefix + '/hooks/gsd-statusline.js';
+    : localNodeRunner + ' ' + localPrefix + '/hooks/gsd-statusline.js';
   const updateCheckCommand = isGlobal
     ? buildHookCommand(targetDir, 'gsd-check-update.js', hookOpts)
-    : 'node ' + localPrefix + '/hooks/gsd-check-update.js';
+    : localNodeRunner + ' ' + localPrefix + '/hooks/gsd-check-update.js';
   const contextMonitorCommand = isGlobal
     ? buildHookCommand(targetDir, 'gsd-context-monitor.js', hookOpts)
-    : 'node ' + localPrefix + '/hooks/gsd-context-monitor.js';
+    : localNodeRunner + ' ' + localPrefix + '/hooks/gsd-context-monitor.js';
   const promptGuardCommand = isGlobal
     ? buildHookCommand(targetDir, 'gsd-prompt-guard.js', hookOpts)
-    : 'node ' + localPrefix + '/hooks/gsd-prompt-guard.js';
+    : localNodeRunner + ' ' + localPrefix + '/hooks/gsd-prompt-guard.js';
   const readGuardCommand = isGlobal
     ? buildHookCommand(targetDir, 'gsd-read-guard.js', hookOpts)
-    : 'node ' + localPrefix + '/hooks/gsd-read-guard.js';
+    : localNodeRunner + ' ' + localPrefix + '/hooks/gsd-read-guard.js';
   const readInjectionScannerCommand = isGlobal
     ? buildHookCommand(targetDir, 'gsd-read-injection-scanner.js', hookOpts)
-    : 'node ' + localPrefix + '/hooks/gsd-read-injection-scanner.js';
+    : localNodeRunner + ' ' + localPrefix + '/hooks/gsd-read-injection-scanner.js';
 
   // Enable experimental agents for Gemini CLI (required for custom sub-agents)
   if (isGemini) {
@@ -7957,7 +7982,7 @@ function install(isGlobal, runtime = 'claude') {
     // /gsd-quick or /gsd-fast for state-tracked changes. Advisory only.
     const workflowGuardCommand = isGlobal
       ? buildHookCommand(targetDir, 'gsd-workflow-guard.js', hookOpts)
-      : 'node ' + localPrefix + '/hooks/gsd-workflow-guard.js';
+      : localNodeRunner + ' ' + localPrefix + '/hooks/gsd-workflow-guard.js';
     const hasWorkflowGuardHook = settings.hooks[preToolEvent].some(entry =>
       entry.hooks && entry.hooks.some(h => h.command && h.command.includes('gsd-workflow-guard'))
     );
@@ -9083,6 +9108,8 @@ if (process.env.GSD_TEST_MODE) {
     allRuntimes,
     parseRuntimeInput,
     buildRuntimePromptText,
+    buildHookCommand,
+    resolveNodeRunner,
   };
 } else {
 
