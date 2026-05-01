@@ -63,7 +63,7 @@ Fixes #
 - [ ] Fix is scoped to the reported bug — no unrelated changes included
 - [ ] Regression test added (or explained why not)
 - [ ] All existing tests pass (`npm test`)
-- [ ] CHANGELOG.md updated if this is a user-facing fix
+- [ ] `.changeset/` fragment added if this is a user-facing fix (`npm run changeset -- --type Fixed --pr <NNN> --body "..."`) — or `no-changelog` label applied
 - [ ] No unnecessary dependencies added
 
 ## Breaking changes
