@@ -8844,6 +8844,42 @@ function trySelfLinkGsdSdk(shimSrc) {
  * Returns the .cmd file path on success (the primary handle the installer's
  * onPath check looks for), null otherwise.
  */
+/**
+ * Pure builder: compute the structured Windows shim triple from a shimSrc path.
+ * No filesystem I/O, no spawn — produces the IR that `trySelfLinkGsdSdkWindows`
+ * then renders to disk. Exposed for tests so assertions can run against typed
+ * fields (interpreter, shimAbs, eol, fileNames) instead of substring matches
+ * over rendered shim text.
+ */
+function buildWindowsShimTriple(shimSrc) {
+  const path = require('path');
+  const shimAbs = path.resolve(shimSrc);
+  // JSON.stringify produces a double-quoted string with backslash+quote
+  // escaping — the safe quoting form for cmd.exe and PowerShell paths alike.
+  const shimQuoted = JSON.stringify(shimAbs);
+
+  const invocation = {
+    interpreter: 'node',
+    target: shimAbs,
+  };
+
+  // Renderers are template literals — the only place text is constructed.
+  // Tests do not parse these strings; they assert on the typed fields above.
+  const renderCmd = () =>
+    '@ECHO OFF\r\n@SETLOCAL\r\n@node ' + shimQuoted + ' %*\r\n';
+  const renderPs1 = () =>
+    '#!/usr/bin/env pwsh\n& node ' + shimQuoted + ' $args\nexit $LASTEXITCODE\n';
+  const renderSh = () =>
+    '#!/usr/bin/env sh\nexec node ' + shimQuoted + ' "$@"\n';
+
+  return {
+    invocation,
+    eol: { cmd: '\r\n', ps1: '\n', sh: '\n' },
+    fileNames: { cmd: 'gsd-sdk.cmd', ps1: 'gsd-sdk.ps1', sh: 'gsd-sdk' },
+    render: { cmd: renderCmd, ps1: renderPs1, sh: renderSh },
+  };
+}
+
 function trySelfLinkGsdSdkWindows(shimSrc) {
   const path = require('path');
   const fs = require('fs');
@@ -8878,29 +8914,11 @@ function trySelfLinkGsdSdkWindows(shimSrc) {
     return null;
   }
 
-  // Quote the shim path JSON-safely for embedding inside cmd.exe / PowerShell
-  // double-quoted strings. JSON.stringify handles backslash + quote escaping.
-  const shimAbs = path.resolve(shimSrc);
-  const shimQuoted = JSON.stringify(shimAbs); // includes outer quotes
-
-  const cmdShim =
-    '@ECHO OFF\r\n' +
-    `@SETLOCAL\r\n` +
-    `@node ${shimQuoted} %*\r\n`;
-
-  const ps1Shim =
-    '#!/usr/bin/env pwsh\n' +
-    `& node ${shimQuoted} $args\n` +
-    'exit $LASTEXITCODE\n';
-
-  const bashShim =
-    '#!/usr/bin/env sh\n' +
-    `exec node ${shimQuoted} "$@"\n`;
-
+  const triple = buildWindowsShimTriple(shimSrc);
   const targets = {
-    cmd: path.join(npmPrefix, 'gsd-sdk.cmd'),
-    ps1: path.join(npmPrefix, 'gsd-sdk.ps1'),
-    sh: path.join(npmPrefix, 'gsd-sdk'),
+    cmd: path.join(npmPrefix, triple.fileNames.cmd),
+    ps1: path.join(npmPrefix, triple.fileNames.ps1),
+    sh: path.join(npmPrefix, triple.fileNames.sh),
   };
 
   try {
@@ -8909,9 +8927,9 @@ function trySelfLinkGsdSdkWindows(shimSrc) {
     for (const target of Object.values(targets)) {
       try { fs.unlinkSync(target); } catch {}
     }
-    fs.writeFileSync(targets.cmd, cmdShim);
-    fs.writeFileSync(targets.ps1, ps1Shim);
-    fs.writeFileSync(targets.sh, bashShim);
+    fs.writeFileSync(targets.cmd, triple.render.cmd());
+    fs.writeFileSync(targets.ps1, triple.render.ps1());
+    fs.writeFileSync(targets.sh, triple.render.sh());
     // chmod is a no-op on Windows-native node but harmless; sets exec bit on
     // WSL-mounted filesystems where Bash users live.
     try { fs.chmodSync(targets.sh, 0o755); } catch {}
@@ -9057,6 +9075,7 @@ if (process.env.GSD_TEST_MODE) {
     finishInstall,
     trySelfLinkGsdSdk,
     trySelfLinkGsdSdkWindows,
+    buildWindowsShimTriple,
     isGsdSdkOnPath,
     homePathCoveredByRc,
     maybeSuggestPathExport,
