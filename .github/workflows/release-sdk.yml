@@ -167,7 +167,7 @@ jobs:
                 SUBJECT=$(git log -1 --format='%s' "$SHA")
                 if echo "$SUBJECT" | grep -qE '^(fix|chore)(\([^)]+\))?!?: '; then
                   echo "→ cherry-picking $SHA  $SUBJECT"
-                  if ! git cherry-pick -x "$SHA"; then
+                  if ! git cherry-pick -x --allow-empty --keep-redundant-commits "$SHA"; then
                     git cherry-pick --abort || true
                     # On real runs: push the partial-pick state so the operator
                     # can fetch + resolve $SHA + push + re-run with auto_cherry_pick=false.
