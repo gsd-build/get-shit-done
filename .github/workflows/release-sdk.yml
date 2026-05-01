@@ -165,10 +165,15 @@ jobs:
               # don't match the fix/chore filter (feat/refactor/docs/etc).
               # CONFLICT_SKIPPED — fix/chore commits whose cherry-pick failed
               # and were skipped per the full-automation policy (#2968).
+              # WORKFLOW_SKIPPED — fix/chore commits that touch
+              # .github/workflows/* and therefore can't be pushed by the
+              # default GITHUB_TOKEN (lacks `workflow` scope). Skipped
+              # pre-pick so the push doesn't get rejected. Bug #2980.
               # Operators reviewing the run summary need these distinct so
               # the manual-review queue isn't buried in the policy bucket.
               POLICY_SKIPPED=""
               CONFLICT_SKIPPED=""
+              WORKFLOW_SKIPPED=""
               while IFS= read -r SHA; do
                 [ -z "$SHA" ] && continue
                 SUBJECT=$(git log -1 --format='%s' "$SHA")
@@ -184,6 +189,23 @@ jobs:
                     REASON="merge commit — manual -m parent selection required"
                     echo "↷ skipping $SHA — $REASON"
                     CONFLICT_SKIPPED="${CONFLICT_SKIPPED}- \`${SHA}\` ${SUBJECT} ($REASON)"$'\n'
+                    continue
+                  fi
+                  # Pre-pick guard: commits touching .github/workflows/* can't
+                  # be pushed by the default GITHUB_TOKEN (it lacks the
+                  # `workflow` scope), so the push step would be rejected with
+                  # "refusing to allow a GitHub App to create or update
+                  # workflow ... without `workflows` permission". Skip such
+                  # commits up-front and surface them loudly via a
+                  # ::warning:: annotation AND a dedicated summary bucket so
+                  # operators don't ship a hotfix that silently dropped a
+                  # workflow-file fix. Bug #2980.
+                  if git diff-tree --no-commit-id --name-only -r "$SHA" \
+                       | grep -qE '^\.github/workflows/'; then
+                    REASON="touches .github/workflows/* — push blocked by GITHUB_TOKEN scope"
+                    echo "↷ skipping $SHA — $REASON"
+                    echo "::warning::Hotfix dropped commit ${SHA} (${SUBJECT}) — touches .github/workflows/*. The default GITHUB_TOKEN cannot push workflow-file changes. If this fix needs to ship in the hotfix, apply it manually on the hotfix branch using a token with the 'workflow' scope, or land it on main and re-cut the release."
+                    WORKFLOW_SKIPPED="${WORKFLOW_SKIPPED}- \`${SHA}\` ${SUBJECT}"$'\n'
                     continue
                   fi
                   echo "→ cherry-picking $SHA  $SUBJECT"
@@ -276,6 +298,13 @@ jobs:
                   echo "$INCLUDED"
                 else
                   echo "_No fix/chore commits to include._"
+                fi
+                if [ -n "$WORKFLOW_SKIPPED" ]; then
+                  echo "### ⚠️  Skipped — touches .github/workflows/* (manual review required)"
+                  echo ""
+                  echo "These fix/chore commits modify workflow files. The default \`GITHUB_TOKEN\` lacks the \`workflow\` scope and cannot push such changes, so they were skipped pre-pick to avoid a rejected push. **If any of these need to ship in this hotfix, apply them manually on \`$BRANCH\` using a token with \`workflow\` scope, or land them on \`main\` and re-cut the release.**"
+                  echo ""
+                  echo "$WORKFLOW_SKIPPED"
                 fi
                 if [ -n "$CONFLICT_SKIPPED" ]; then
                   echo "### Skipped — cherry-pick conflict (manual review)"
