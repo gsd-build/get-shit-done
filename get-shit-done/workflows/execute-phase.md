@@ -551,13 +551,7 @@ increases monotonically across waves. `{status}` is `complete` (success),
        only (STATE.md and ROADMAP.md are excluded automatically). Do NOT skip or defer
        this commit — the orchestrator force-removes the worktree after you return, and
        any uncommitted SUMMARY.md will be permanently lost (#2070).
-
-       REQUIRED ORDER: SUMMARY.md MUST be committed BEFORE any concluding narrative output.
-       Do NOT emit "Now writing the SUMMARY.md" or similar narration between the Write and
-       the commit. Treat Write+commit as one atomic block: Write tool call → commit tool
-       call → only then any concluding text. Response truncation between Write and commit
-       is a known failure mode and the rescue net (#2070) should not be relied on as
-       primary defense.
+       REQUIRED ORDER: Write SUMMARY.md → commit → only then any narration. No text between Write and commit (truncation risk; #2070 rescue is not primary defense).
        </parallel_execution>
 
        <execution_context>
@@ -612,13 +606,7 @@ increases monotonically across waves. `{status}` is `complete` (success),
        <sequential_execution>
        You are running as a SEQUENTIAL executor agent on the main working tree.
        Use normal git commits (with hooks). Do NOT use --no-verify.
-
-       REQUIRED ORDER: SUMMARY.md MUST be committed BEFORE any concluding narrative output.
-       Do NOT emit "Now writing the SUMMARY.md" or similar narration between the Write and
-       the commit. Treat Write+commit as one atomic block: Write tool call → commit tool
-       call → only then any concluding text. Response truncation between Write and commit
-       is a known failure mode and the rescue net (#2070) should not be relied on as
-       primary defense.
+       REQUIRED ORDER: Write SUMMARY.md → commit → only then any narration. No text between Write and commit (truncation risk; #2070 rescue is not primary defense).
        </sequential_execution>
    ```
 
