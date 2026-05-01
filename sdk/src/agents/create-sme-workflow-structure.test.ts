@@ -123,6 +123,58 @@ describe('CMD-03: existing SME detection', () => {
   });
 });
 
+// ─── CMD-03-GAP: Fuzzy overlap detection ────────────────────────────────────
+
+describe('CMD-03-GAP: fuzzy overlap detection', () => {
+  let workflow: string;
+
+  beforeAll(() => {
+    workflow = readAgent(WORKFLOW_PATH);
+  });
+
+  it('workflow scans existing SME filenames for substring overlap', () => {
+    // The workflow must list existing *-SME.md files and check for substring match
+    expect(workflow).toContain('OVERLAPPING_SMES');
+  });
+
+  it('workflow performs case-insensitive overlap comparison', () => {
+    // The substring check must be case-insensitive
+    expect(workflow).toMatch(/[Cc]ase.insensitive|[Ll]owercase|tolower|,,/);
+  });
+
+  it('workflow checks both directions: input-in-existing and existing-in-input', () => {
+    // "document" should match "document-creation" (input is substring of existing)
+    // "document-creation" should match "document" (existing is substring of input)
+    // The workflow must document or implement bidirectional substring matching
+    expect(workflow).toMatch(/bidirectional|both directions|input.*existing.*existing.*input|substring.*both/i);
+  });
+
+  it('workflow presents overlap choices when fuzzy match found', () => {
+    // When overlap detected, user gets: Update existing / Create new alongside / Cancel
+    expect(workflow).toMatch(/[Cc]reate new alongside|[Aa]longside/);
+  });
+
+  it('workflow passes related_smes to creator when overlap exists', () => {
+    // The spawn_creator step must communicate related SME names
+    expect(workflow).toContain('related_smes');
+  });
+});
+
+// ─── SME Template: related_smes field ───────────────────────────────────────
+
+describe('SME template: related_smes field', () => {
+  let template: string;
+
+  beforeAll(() => {
+    const TEMPLATE_PATH = resolve(REPO_ROOT, 'get-shit-done', 'templates', 'sme.md');
+    template = readAgent(TEMPLATE_PATH);
+  });
+
+  it('SME template frontmatter contains related_smes field', () => {
+    expect(template).toContain('related_smes');
+  });
+});
+
 // ─── CMD-04: Progress indicators and creator spawning ────────────────────────
 
 describe('CMD-04: progress indicators and creator spawning', () => {

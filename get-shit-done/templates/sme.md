@@ -7,6 +7,7 @@ finding_counts:
   blocker: 0
   warning: 0
   watch: 0
+related_smes: []
 ---
 
 # [PROCESS_NAME] SME Document
