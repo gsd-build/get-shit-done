@@ -440,7 +440,10 @@ describe('bug #2924: worktree HEAD attachment + destructive recovery', () => {
       // Find the parallel-agents callout and parse its sentences.
       const idx = content.indexOf('Parallel agents');
       assert.notStrictEqual(idx, -1, 'must contain a "Parallel agents" callout');
-      const tail = content.slice(idx, idx + 2000);
+      const section = content.slice(idx);
+      const endMatch = section.slice(1).match(/\n#{1,6}\s/);
+      assert.ok(endMatch, 'Parallel agents section must terminate at the next heading');
+      const tail = section.slice(0, 1 + endMatch.index);
       const sentences = tail.replace(/\n+/g, ' ').split(/(?<=[.!?])\s+/);
       for (const sentence of sentences) {
         if (!sentence.includes('--no-verify')) continue;
