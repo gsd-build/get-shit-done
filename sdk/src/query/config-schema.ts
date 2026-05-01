@@ -28,6 +28,7 @@ export const VALID_CONFIG_KEYS: ReadonlySet<string> = new Set([
   'workflow.skip_discuss',
   'workflow.auto_prune_state',
   'workflow.use_worktrees',
+  'workflow.worktree_skip_hooks',
   'workflow.code_review',
   'workflow.code_review_depth',
   'workflow.code_review_command',

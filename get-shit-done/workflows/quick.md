@@ -637,7 +637,21 @@ if [ "${USE_WORKTREES}" != "false" ]; then
   COMMIT_DOCS=$(gsd-sdk query config-get commit_docs 2>/dev/null || echo "true")
   if [ "$COMMIT_DOCS" != "false" ]; then
     git add "${QUICK_DIR}/${quick_id}-PLAN.md"
-    git commit --no-verify -m "docs(${quick_id}): pre-dispatch plan for ${DESCRIPTION}" -- "${QUICK_DIR}/${quick_id}-PLAN.md" || true
+    # No-op skip if nothing actually staged (idempotent re-runs).
+    if git diff --cached --quiet -- "${QUICK_DIR}/${quick_id}-PLAN.md"; then
+      echo "ℹ Pre-dispatch PLAN.md commit skipped (no staged changes)"
+    else
+      # Run hooks normally (#2924). If a project opts out via
+      # workflow.worktree_skip_hooks=true, honor that opt-in only.
+      SKIP_HOOKS=$(gsd-sdk query config-get workflow.worktree_skip_hooks 2>/dev/null || echo "false")
+      if [ "$SKIP_HOOKS" = "true" ]; then
+        git commit --no-verify -m "docs(${quick_id}): pre-dispatch plan for ${DESCRIPTION}" -- "${QUICK_DIR}/${quick_id}-PLAN.md" \
+          || { echo "ERROR: pre-dispatch PLAN.md commit failed (--no-verify path). Aborting before executor dispatch." >&2; exit 1; }
+      else
+        git commit -m "docs(${quick_id}): pre-dispatch plan for ${DESCRIPTION}" -- "${QUICK_DIR}/${quick_id}-PLAN.md" \
+          || { echo "ERROR: pre-dispatch PLAN.md commit failed — likely a pre-commit hook failure. Fix the hook output above (or set workflow.worktree_skip_hooks=true to bypass) and re-run." >&2; exit 1; }
+      fi
+    fi
   fi
 fi
 ```
@@ -660,12 +674,31 @@ Execute quick task ${quick_id}.
 
 ${USE_WORKTREES !== "false" ? `
 <worktree_branch_check>
-FIRST ACTION before any other work: verify this worktree branch is based on the correct commit.
-Run: git merge-base HEAD ${EXPECTED_BASE}
-If the result differs from ${EXPECTED_BASE}, hard-reset to the correct base (safe — runs before any agent work):
-  git reset --hard ${EXPECTED_BASE}
-Then verify: if [ "$(git rev-parse HEAD)" != "${EXPECTED_BASE}" ]; then echo "ERROR: Could not correct worktree base"; exit 1; fi
-This corrects a known issue where EnterWorktree creates branches from main instead of the feature branch HEAD (affects all platforms).
+FIRST ACTION before any other work: verify this worktree's HEAD is bound to a per-agent
+branch and that the branch is based on the correct commit.
+
+Step 1 — HEAD attachment assertion (MANDATORY, runs before any reset/commit):
+  HEAD_REF=$(git symbolic-ref --quiet HEAD || echo "DETACHED")
+  ACTUAL_BRANCH=$(git rev-parse --abbrev-ref HEAD)
+  if [ "$HEAD_REF" = "DETACHED" ] || echo "$ACTUAL_BRANCH" | grep -Eq '^(main|master|develop|trunk|release/.*)$'; then
+    echo "FATAL: worktree HEAD is on '$ACTUAL_BRANCH' (expected per-agent branch like worktree-agent-*)." >&2
+    echo "Refusing to commit/reset on a protected ref. DO NOT self-recover via 'git update-ref refs/heads/$ACTUAL_BRANCH' — that destroys concurrent work (#2924)." >&2
+    echo "Aborting before any commits. Surface as a blocker for human review." >&2
+    exit 1
+  fi
+  if ! echo "$ACTUAL_BRANCH" | grep -Eq '^worktree-agent-[A-Za-z0-9._/-]+$'; then
+    echo "FATAL: worktree HEAD '$ACTUAL_BRANCH' is not in the worktree-agent-* namespace (Claude Code's per-agent worktree branch namespace)." >&2
+    echo "Refusing to commit; surface as blocker (#2924)." >&2
+    exit 1
+  fi
+
+Step 2 — Base correctness (only after Step 1 passes):
+  Run: git merge-base HEAD ${EXPECTED_BASE}
+  If the result differs from ${EXPECTED_BASE}, hard-reset to the correct base (safe — Step 1 confirmed HEAD is on a per-agent branch and the worktree is fresh):
+    git reset --hard ${EXPECTED_BASE}
+  Then verify: if [ "$(git rev-parse HEAD)" != "${EXPECTED_BASE}" ]; then echo "ERROR: Could not correct worktree base"; exit 1; fi
+
+This corrects a known issue where EnterWorktree creates branches from main instead of the feature branch HEAD (#2015) and prevents the destructive HEAD-on-master self-recovery path (#2924).
 </worktree_branch_check>
 ` : ''}
 
