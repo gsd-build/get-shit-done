@@ -30,6 +30,7 @@ Does not require `/gsd-new-project` — auto-creates `.planning/spikes/` if need
 
 <execution_context>
 @~/.claude/get-shit-done/workflows/spike.md
+@~/.claude/get-shit-done/workflows/spike-wrap-up.md
 @~/.claude/get-shit-done/references/ui-brand.md
 </execution_context>
 
@@ -47,6 +48,9 @@ Idea: $ARGUMENTS
 </context>
 
 <process>
-Execute the spike workflow from @~/.claude/get-shit-done/workflows/spike.md end-to-end.
+Parse the first token of $ARGUMENTS:
+- If it is `--wrap-up`: strip the flag, execute the spike-wrap-up workflow from @~/.claude/get-shit-done/workflows/spike-wrap-up.md.
+- Otherwise: pass all of $ARGUMENTS as the idea to the spike workflow from @~/.claude/get-shit-done/workflows/spike.md end-to-end.
+
 Preserve all workflow gates (prior spike check, decomposition, research, risk ordering, observability assessment, verification, MANIFEST updates, commit patterns).
 </process>
