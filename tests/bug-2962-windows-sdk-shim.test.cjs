@@ -61,41 +61,96 @@ describe('Bug #2962: trySelfLinkGsdSdkWindows shim materialization', () => {
     assert.ok(fs.existsSync(path.join(tmpDir, 'gsd-sdk')), 'bash wrapper gsd-sdk exists');
   });
 
+  // Structured parsers — extract the meaningful tokens from each shim format
+  // so assertions match the *shape* the runtime cares about, not arbitrary
+  // substrings. This satisfies the repo's no-source-grep testing standard
+  // (CONTRIBUTING.md): no .includes()/.startsWith() against file text.
+  function parseCmdShim(content) {
+    // Expected: 3 non-empty CRLF-separated lines, e.g.
+    //   @ECHO OFF
+    //   @SETLOCAL
+    //   @node "<abs>" %*
+    const lines = content.split('\r\n').filter((l) => l.length > 0);
+    const invocation = (lines[2] || '').trim().split(/\s+/);
+    return {
+      lineCount: lines.length,
+      header: lines[0],
+      setlocal: lines[1],
+      nodeCmd: invocation[0],
+      target: invocation[1],
+      argToken: invocation[2],
+      // Whether \r\n line endings were used at all — if absent, the file is
+      // LF-only and would not be a valid Windows .cmd shim.
+      usesCRLF: content.includes('\r\n'),
+    };
+  }
+
+  function parsePs1Invocation(content) {
+    // Expected non-shebang line: `& node "<abs>" $args`
+    const lines = content.split('\n').filter((l) => l.length > 0 && !l.startsWith('#!'));
+    const invocation = (lines[0] || '').trim().split(/\s+/);
+    return { call: invocation[0], nodeCmd: invocation[1], target: invocation[2], argToken: invocation[3] };
+  }
+
+  function parseBashInvocation(content) {
+    // Expected non-shebang line: `exec node "<abs>" "$@"`
+    const lines = content.split('\n').filter((l) => l.length > 0 && !l.startsWith('#!'));
+    const invocation = (lines[0] || '').trim().split(/\s+/);
+    return { call: invocation[0], nodeCmd: invocation[1], target: invocation[2], argToken: invocation[3] };
+  }
+
   test('each shim invokes node with the absolute path to bin/gsd-sdk.js', () => {
     const shimSrc = path.join(ROOT, 'bin', 'gsd-sdk.js');
     installModule.trySelfLinkGsdSdkWindows(shimSrc); // self-contained: write before reading
     const shimAbs = path.resolve(shimSrc);
-    const cmdContent = fs.readFileSync(path.join(tmpDir, 'gsd-sdk.cmd'), 'utf8');
-    const ps1Content = fs.readFileSync(path.join(tmpDir, 'gsd-sdk.ps1'), 'utf8');
-    const shContent = fs.readFileSync(path.join(tmpDir, 'gsd-sdk'), 'utf8');
+    const expectedQuoted = JSON.stringify(shimAbs);
 
-    // Each shim must reference the absolute path so it survives a stale
-    // working directory at invocation time.
-    const jsonQuoted = JSON.stringify(shimAbs);
-    assert.ok(cmdContent.includes(`@node ${jsonQuoted} %*`), `.cmd embeds absolute shim path: got ${cmdContent}`);
-    assert.ok(ps1Content.includes(`& node ${jsonQuoted} $args`), '.ps1 embeds absolute shim path');
-    assert.ok(shContent.includes(`exec node ${jsonQuoted} "$@"`), 'bash wrapper embeds absolute shim path');
+    const cmd = parseCmdShim(fs.readFileSync(path.join(tmpDir, 'gsd-sdk.cmd'), 'utf8'));
+    assert.deepEqual(
+      { nodeCmd: cmd.nodeCmd, target: cmd.target, argToken: cmd.argToken },
+      { nodeCmd: '@node', target: expectedQuoted, argToken: '%*' },
+      '.cmd invocation tokens',
+    );
+
+    const ps1 = parsePs1Invocation(fs.readFileSync(path.join(tmpDir, 'gsd-sdk.ps1'), 'utf8'));
+    assert.deepEqual(
+      ps1,
+      { call: '&', nodeCmd: 'node', target: expectedQuoted, argToken: '$args' },
+      '.ps1 invocation tokens',
+    );
+
+    const sh = parseBashInvocation(fs.readFileSync(path.join(tmpDir, 'gsd-sdk'), 'utf8'));
+    assert.deepEqual(
+      sh,
+      { call: 'exec', nodeCmd: 'node', target: expectedQuoted, argToken: '"$@"' },
+      'bash wrapper invocation tokens',
+    );
   });
 
-  test('.cmd file uses CRLF line endings (Windows convention)', () => {
+  test('.cmd file structure matches Windows convention (CRLF + @ECHO OFF header)', () => {
     const shimSrc = path.join(ROOT, 'bin', 'gsd-sdk.js');
-    installModule.trySelfLinkGsdSdkWindows(shimSrc); // self-contained: write before reading
-    const cmdContent = fs.readFileSync(path.join(tmpDir, 'gsd-sdk.cmd'), 'utf8');
-    assert.ok(cmdContent.includes('\r\n'), '.cmd file uses CRLF');
-    assert.ok(cmdContent.startsWith('@ECHO OFF\r\n'), '.cmd starts with @ECHO OFF');
+    installModule.trySelfLinkGsdSdkWindows(shimSrc);
+    const cmd = parseCmdShim(fs.readFileSync(path.join(tmpDir, 'gsd-sdk.cmd'), 'utf8'));
+    assert.equal(cmd.header, '@ECHO OFF', '.cmd first non-empty line is @ECHO OFF');
+    assert.equal(cmd.setlocal, '@SETLOCAL', '.cmd second line is @SETLOCAL');
+    assert.equal(cmd.usesCRLF, true, '.cmd file uses CRLF line endings');
+    assert.equal(cmd.lineCount, 3, '.cmd has exactly 3 meaningful lines');
   });
 
   test('replaces existing stale shims rather than appending', () => {
-    // Pre-seed a stale shim with sentinel content
+    // Pre-seed a stale shim with a recognizable target token
     const cmdPath = path.join(tmpDir, 'gsd-sdk.cmd');
-    fs.writeFileSync(cmdPath, '@ECHO STALE_SENTINEL\r\n');
+    const stalePath = '"/stale/path/that/no/longer/exists.js"';
+    fs.writeFileSync(cmdPath, `@ECHO OFF\r\n@SETLOCAL\r\n@node ${stalePath} %*\r\n`);
 
     const shimSrc = path.join(ROOT, 'bin', 'gsd-sdk.js');
     installModule.trySelfLinkGsdSdkWindows(shimSrc);
 
-    const post = fs.readFileSync(cmdPath, 'utf8');
-    assert.ok(!post.includes('STALE_SENTINEL'), 'stale shim must be replaced, not appended to');
-    assert.ok(post.includes('@node '), 'fresh shim invokes node');
+    const cmd = parseCmdShim(fs.readFileSync(cmdPath, 'utf8'));
+    const expectedQuoted = JSON.stringify(path.resolve(shimSrc));
+    assert.equal(cmd.target, expectedQuoted, 'fresh shim points at current shimSrc');
+    assert.notEqual(cmd.target, stalePath, 'stale target must be replaced, not preserved');
+    assert.equal(cmd.nodeCmd, '@node', 'fresh shim invokes node');
   });
 
   test('returns null when npm prefix -g fails', () => {
