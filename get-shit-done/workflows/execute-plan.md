@@ -116,7 +116,12 @@ Pattern B only (verify-only checkpoints). Skip for A/C.
 2. Per segment:
    - Subagent route: spawn gsd-executor for assigned tasks only. Prompt: task range, plan path, read full plan for context, execute assigned tasks, track deviations, NO SUMMARY/commit. Track via agent protocol.
    - Main route: execute tasks using standard flow (step name="execute")
-3. After ALL segments: aggregate files/deviations/decisions → create SUMMARY.md → commit → self-check:
+3. **Critical ordering — write and commit SUMMARY.md as one atomic block.** Do NOT
+   emit narrative output between the Write tool call and the commit tool call.
+   Truncation at this boundary is a known failure mode (see #2070 rescue logic in
+   execute-phase.md step 5.5).
+
+   After ALL segments: aggregate files/deviations/decisions → create SUMMARY.md → commit → self-check:
    - Verify key-files.created exist on disk with `[ -f ]`
    - Check `git log --oneline --all --grep="{phase}-{plan}"` returns ≥1 commit
    - Re-run ALL `<acceptance_criteria>` from every task — if any fail, fix before finalizing SUMMARY
@@ -331,6 +336,11 @@ If user_setup exists: create `{phase}-USER-SETUP.md` using template `~/.claude/g
 </step>
 
 <step name="create_summary">
+**Critical ordering — write and commit SUMMARY.md as one atomic block.** Do NOT
+emit narrative output between the Write tool call and the commit tool call.
+Truncation at this boundary is a known failure mode (see #2070 rescue logic in
+execute-phase.md step 5.5).
+
 Create `{phase}-{plan}-SUMMARY.md` at `.planning/phases/XX-name/`. Use `~/.claude/get-shit-done/templates/summary.md`.
 
 **Frontmatter:** phase, plan, subsystem, tags | requires/provides/affects | tech-stack.added/patterns | key-files.created/modified | key-decisions | requirements-completed (**MUST** copy `requirements` array from PLAN.md frontmatter verbatim) | duration ($DURATION), completed ($PLAN_END_TIME date).
@@ -432,6 +442,11 @@ Extract requirement IDs from the plan's frontmatter (e.g., `requirements: [AUTH-
 </step>
 
 <step name="git_commit_metadata">
+**Critical ordering — write and commit SUMMARY.md as one atomic block.** Do NOT
+emit narrative output between the Write tool call and the commit tool call.
+Truncation at this boundary is a known failure mode (see #2070 rescue logic in
+execute-phase.md step 5.5).
+
 Task code already committed per-task. Commit plan metadata:
 
 ```bash
