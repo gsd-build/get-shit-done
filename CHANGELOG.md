@@ -39,6 +39,7 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
   posting a comment that points to the contribution guide. (#2872)
 
 ### Fixed — 1.40.0-rc.1
+- **`config-get context_window` returns `200000` when key absent** — querying an unset `context_window` previously exited 1 with "Key not found", surfacing a confusing error in planning logs even though the workflow fallback worked correctly. `cmdConfigGet` now consults a `SCHEMA_DEFAULTS` map and returns the documented default (`200000`, exit 0) for absent schema-defaulted keys; unknown absent keys still error as before. (#2943)
 - **`gap-analysis` now parses non-`REQ-` requirement IDs and ignores traceability table headers** — `parseRequirements()` no longer hard-codes the `REQ-` prefix and now accepts uppercase prefixed IDs such as `TST-01`, `BACK-07`, and `INSP-04`; markdown table header rows (for example `| REQ-ID | ... |`) are excluded so header tokens are not reported as phantom uncovered requirements. Added regression coverage for mixed-prefix REQUIREMENTS files with traceability tables. (#2897)
 - **Gemini slash commands namespaced as `/gsd:<cmd>` instead of `/gsd-<cmd>`** —
   Gemini CLI namespaces commands under `gsd:`, so `/gsd-plan-phase` was unexecutable.
