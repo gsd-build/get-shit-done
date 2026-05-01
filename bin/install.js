@@ -6822,24 +6822,48 @@ function writeManifest(configDir, runtime = 'claude', options = {}) {
  */
 function populatePristineDir({ packageSrc, pristineDir, modified, runtime, pathPrefix, isGlobal }) {
   if (!modified || modified.length === 0) return 0;
-  // Source root contains get-shit-done/, agents/, etc. The transform
-  // pipeline mirrors that structure into a configDir-shaped layout.
+  // Modified paths come from manifest.files which can live under several
+  // install roots: get-shit-done/, commands/gsd/, command/, skills/, agents/,
+  // hooks/, plus runtime-specific root files (#3004 CR). Stage every
+  // top-level dir that actually contains a modified path; root-level files
+  // are copied directly without the transform pipeline (they don't need
+  // path replacement).
   const stageRoot = fs.mkdtempSync(path.join(os.tmpdir(), 'gsd-pristine-stage-'));
   let written = 0;
   try {
-    // Stage just the get-shit-done/ subtree (where local patches live —
-    // every modified path under the manifest starts with `get-shit-done/`).
-    // Copying agents/ etc. is unnecessary work and risks runtime-specific
-    // copy paths that aren't relevant for pristine population.
-    const srcGsd = path.join(packageSrc, 'get-shit-done');
-    const stageGsd = path.join(stageRoot, 'get-shit-done');
-    if (fs.existsSync(srcGsd)) {
-      copyWithPathReplacement(srcGsd, stageGsd, pathPrefix, runtime, false, isGlobal);
-    }
+    const topLevels = new Set();
     for (const relPath of modified) {
-      // Only populate pristine for paths we successfully staged. If a path
-      // is outside get-shit-done/ (rare — only certain runtimes track other
-      // dirs), skip silently rather than corrupting pristine with stale data.
+      const norm = relPath.replace(/\\/g, '/');
+      const slash = norm.indexOf('/');
+      topLevels.add(slash === -1 ? '' : norm.slice(0, slash));
+    }
+
+    for (const top of topLevels) {
+      if (top === '') {
+        // Root-level files — copy directly from package source. The transform
+        // pipeline is directory-oriented; root files don't need path-prefix
+        // substitution (they're not markdown content with embedded paths).
+        for (const relPath of modified) {
+          const norm = relPath.replace(/\\/g, '/');
+          if (norm.includes('/')) continue;
+          const src = path.join(packageSrc, relPath);
+          if (!fs.existsSync(src)) continue;
+          const stagedFile = path.join(stageRoot, relPath);
+          fs.mkdirSync(path.dirname(stagedFile), { recursive: true });
+          fs.copyFileSync(src, stagedFile);
+        }
+        continue;
+      }
+      const srcDir = path.join(packageSrc, top);
+      const stageDir = path.join(stageRoot, top);
+      if (!fs.existsSync(srcDir)) continue;
+      copyWithPathReplacement(srcDir, stageDir, pathPrefix, runtime, false, isGlobal);
+    }
+
+    for (const relPath of modified) {
+      // Only populate pristine for paths we successfully staged. If a path's
+      // source dir does not exist (obsolete manifest entry), skip silently
+      // rather than corrupting pristine with stale data.
       const stagedPath = path.join(stageRoot, relPath);
       if (!fs.existsSync(stagedPath)) continue;
       const out = path.join(pristineDir, relPath);
@@ -6925,6 +6949,11 @@ function saveLocalPatches(configDir, pristineCtx) {
     // reapply-patches verifier (#2972) gets a real diff baseline instead of
     // falling back to its over-broad "every significant backup line" heuristic.
     if (pristineCtx) {
+      // #3004 CR: wipe any pre-existing pristine content BEFORE populating
+      // (and again in the catch path). Without this, a previous run's stale
+      // pristine could be picked up by the verifier as if it were the
+      // baseline for THIS modified set, causing a misleading three-way diff.
+      try { fs.rmSync(pristineDir, { recursive: true, force: true }); } catch { /* not present */ }
       try {
         const written = populatePristineDir({
           packageSrc: pristineCtx.packageSrc,
@@ -6939,8 +6968,10 @@ function saveLocalPatches(configDir, pristineCtx) {
         }
       } catch (err) {
         // Soft failure: keep the install moving even if the transform pipeline
-        // throws on an unusual configuration. The verifier falls back to its
-        // pre-#2998 heuristic, no worse than before.
+        // throws on an unusual configuration. Wipe the partial pristine so the
+        // verifier falls back cleanly to its pre-#2998 heuristic instead of
+        // reading half-populated data (#3004 CR).
+        try { fs.rmSync(pristineDir, { recursive: true, force: true }); } catch { /* best-effort */ }
         console.log('  ' + yellow + 'i' + reset + '  Could not populate gsd-pristine/ (' + (err && err.message ? err.message : 'unknown') + '). Falls back to over-broad verify heuristic.');
       }
     }

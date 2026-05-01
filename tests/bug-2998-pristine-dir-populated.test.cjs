@@ -138,6 +138,57 @@ describe('Bug #2998: populatePristineDir is exported and writes pristine for mod
   });
 });
 
+// ─── #3004 CR follow-up: multi-root pristine expansion ─────────────────────
+
+describe('Bug #2998 (#3004 CR): pristine expansion covers every manifest install root', () => {
+  test('paths under agents/ are staged via copyWithPathReplacement, not silently skipped', () => {
+    const tmp = fs.mkdtempSync(path.join(os.tmpdir(), 'gsd-2998-multi-'));
+    const pristineDir = path.join(tmp, 'gsd-pristine');
+    try {
+      const candidate = path.join('agents', 'gsd-planner.md');
+      const sourcePath = path.join(ROOT, candidate);
+      assert.equal(fs.existsSync(sourcePath), true,
+        `precondition: source file exists at ${candidate}`);
+      const written = INSTALL.populatePristineDir({
+        packageSrc: ROOT,
+        pristineDir,
+        modified: [candidate],
+        runtime: 'claude',
+        pathPrefix: '$HOME/.claude/',
+        isGlobal: true,
+      });
+      assert.equal(written, 1, 'expected agents/ path to be staged and copied to pristine');
+      assert.equal(fs.existsSync(path.join(pristineDir, candidate)), true);
+    } finally {
+      fs.rmSync(tmp, { recursive: true, force: true });
+    }
+  });
+
+  test('a mix of get-shit-done/ and agents/ paths in modified list are all staged', () => {
+    const tmp = fs.mkdtempSync(path.join(os.tmpdir(), 'gsd-2998-mix-'));
+    const pristineDir = path.join(tmp, 'gsd-pristine');
+    try {
+      const a = path.join('get-shit-done', 'workflows', 'reapply-patches.md');
+      const b = path.join('agents', 'gsd-planner.md');
+      assert.equal(fs.existsSync(path.join(ROOT, a)), true);
+      assert.equal(fs.existsSync(path.join(ROOT, b)), true);
+      const written = INSTALL.populatePristineDir({
+        packageSrc: ROOT,
+        pristineDir,
+        modified: [a, b],
+        runtime: 'claude',
+        pathPrefix: '$HOME/.claude/',
+        isGlobal: true,
+      });
+      assert.equal(written, 2, 'expected both top-level dirs to be staged');
+      assert.equal(fs.existsSync(path.join(pristineDir, a)), true);
+      assert.equal(fs.existsSync(path.join(pristineDir, b)), true);
+    } finally {
+      fs.rmSync(tmp, { recursive: true, force: true });
+    }
+  });
+});
+
 describe('Bug #2998: saveLocalPatches no longer leaves the pristineDir variable unused', () => {
   test('saveLocalPatches accepts a pristineCtx and exposes the helper for direct testing', () => {
     // Structural assertion: the function exists with the new signature shape.
