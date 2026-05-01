@@ -1,8 +1,8 @@
 'use strict';
 
-// allow-test-rule: pre-existing-text-matching
-// Pre-dates the no-raw-text-matching rule (CONTRIBUTING.md, 2026-05-01).
-// Tracked for migration to typed-IR assertions; do not copy this pattern.
+// allow-test-rule: pending-migration-to-typed-ir [#2974]
+// Tracked in #2974 for migration to typed-IR assertions per CONTRIBUTING.md
+// "Prohibited: Raw Text Matching on Test Outputs". Do not copy this pattern.
 
 /**
  * Regression test for #2687 — loadConfig must not emit "unknown config key"

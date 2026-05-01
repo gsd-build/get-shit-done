@@ -281,7 +281,7 @@ Some tests legitimately read source files. There are six recognized categories:
 | `docs-parity` | A reference doc must stay in sync with source-defined constants (e.g., `CONFIG_DEFAULTS`). The source is the canonical list; there is no runtime API to enumerate it. |
 | `integration-test-input` | A source file is used as a real fixture input to a transformation function under test — the file is not inspected for strings but passed as data. |
 | `structural-implementation-guard` | A feature's interception or wiring point is not reachable end-to-end via `runGsdTools`. Used temporarily until a behavioral path exists. |
-| `pre-existing-text-matching` | **Transitional.** Test was written before the "Prohibited: Raw Text Matching on Test Outputs" rule landed (2026-05-01). New tests must NOT use this category — refactor production to expose typed IR instead. Existing tests carrying this label are tracked for migration. |
+| `pending-migration-to-typed-ir` | **Tracked for correction, not exempted.** Test was identified by the lint as carrying a raw-text-matching pattern that contradicts the rule above. Each annotated file MUST cite the open migration issue (e.g. `// allow-test-rule: pending-migration-to-typed-ir [#NNNN]`) so the tracking is auditable. New tests cannot use this category — they must refactor production to expose typed IR. The annotation is removed when the test is corrected. |
 
 Annotate with a standalone `//` comment before the file's opening block comment:
 
