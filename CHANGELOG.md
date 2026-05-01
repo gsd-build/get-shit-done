@@ -7,6 +7,12 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 ## [Unreleased](https://github.com/gsd-build/get-shit-done/compare/v1.38.5...HEAD)
 
 ### Added — 1.40.0-rc.1
+- **`statusline.context_position` opt-in flag** — controls whether the
+  context-window meter renders at the `"end"` of the statusline (default,
+  byte-identical to prior behavior) or at the `"front"` immediately after the
+  model name. Front placement keeps the meter visible when the line is
+  truncated by a narrow terminal. Default preserves existing layout — no
+  behavioral change for users who don't opt in. (#2937)
 - **Six namespace meta-skills with keyword-tag descriptions** — replace the flat 86-skill
   listing with two-stage hierarchical routing. Model sees 6 namespace routers
   (`gsd:workflow`, `gsd:project`, `gsd:review`, `gsd:context`, `gsd:manage`,

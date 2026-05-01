@@ -427,6 +427,19 @@ function runStatusline() {
       // Never break the statusline on config/transcript errors
     }
 
+    // Context-meter position (opt-in via statusline.context_position, #2937).
+    // Default 'end' preserves byte-identical output. 'front' puts the meter
+    // immediately after the model name so it stays visible when the line is
+    // truncated by a narrow terminal.
+    let contextPosition = 'end';
+    try {
+      const cfg = readGsdConfig(dir);
+      const v = getConfigValue(cfg, 'statusline.context_position');
+      if (v === 'front' || v === 'end') contextPosition = v;
+    } catch (e) {
+      // Never break the statusline on config errors
+    }
+
     // Output
     const dirname = path.basename(dir);
     const middle = task
@@ -435,28 +448,58 @@ function runStatusline() {
         ? `\x1b[2m${gsdStateStr}\x1b[0m`
         : null;
 
-    if (middle) {
-      process.stdout.write(`${gsdUpdate}\x1b[2m${model}\x1b[0m │ ${middle} │ \x1b[2m${dirname}\x1b[0m${ctx}${lastCmdSuffix}`);
-    } else {
-      process.stdout.write(`${gsdUpdate}\x1b[2m${model}\x1b[0m │ \x1b[2m${dirname}\x1b[0m${ctx}${lastCmdSuffix}`);
-    }
+    process.stdout.write(composeStatusline({
+      gsdUpdate, model, ctx, middle, dirname, lastCmdSuffix, position: contextPosition,
+    }));
   } catch (e) {
     // Silent fail - don't break statusline on parse errors
   }
 });
 }
 
+/**
+ * Compose the final statusline string from its segments. Single source of
+ * truth for layout — used by both runStatusline (real output) and
+ * renderStatusline (test output) so layout regressions surface in tests.
+ *
+ * @param {object} parts
+ * @param {string} parts.gsdUpdate     - leading update-available indicator (already formatted, possibly empty)
+ * @param {string} parts.model         - model display name (raw, no ANSI)
+ * @param {string} parts.ctx           - context meter segment (already formatted with ANSI + leading space, possibly empty)
+ * @param {string|null} parts.middle   - middle segment (task or gsdState, already ANSI-wrapped) or null
+ * @param {string} parts.dirname       - directory basename (raw, no ANSI)
+ * @param {string} parts.lastCmdSuffix - last-slash-command suffix (already formatted, possibly empty)
+ * @param {'front'|'end'} parts.position - where to render the context meter (default 'end' for back-compat)
+ * @returns {string}
+ */
+function composeStatusline({ gsdUpdate = '', model, ctx = '', middle = null, dirname, lastCmdSuffix = '', position = 'end' } = {}) {
+  const modelSeg = `\x1b[2m${model}\x1b[0m`;
+  const dirSeg = `\x1b[2m${dirname}\x1b[0m`;
+  if (position === 'front') {
+    if (middle) return `${gsdUpdate}${modelSeg}${ctx} │ ${middle} │ ${dirSeg}${lastCmdSuffix}`;
+    return `${gsdUpdate}${modelSeg}${ctx} │ ${dirSeg}${lastCmdSuffix}`;
+  }
+  // 'end' — preserved byte-for-byte from previous behavior
+  if (middle) return `${gsdUpdate}${modelSeg} │ ${middle} │ ${dirSeg}${ctx}${lastCmdSuffix}`;
+  return `${gsdUpdate}${modelSeg} │ ${dirSeg}${ctx}${lastCmdSuffix}`;
+}
+
 // Export helpers for unit tests. Harmless when run as a script.
 module.exports = {
   readGsdState, parseStateMd, formatGsdState,
   readGsdConfig, getConfigValue, readLastSlashCommand,
+  composeStatusline,
 };
 
 /**
  * Render the statusline from an already-parsed hook input object. Exported for
  * testing without feeding stdin. Returns the rendered string.
+ *
+ * Optional `ctx` parameter (default '') lets tests assert the placement of the
+ * context meter for issue #2937. Production rendering goes through
+ * runStatusline which builds ctx from the live context_window data.
  */
-function renderStatusline(data) {
+function renderStatusline(data, ctx = '') {
   const model = data.model?.display_name || 'Claude';
   const dir = data.workspace?.current_dir || process.cwd();
   const dirname = path.basename(dir);
@@ -472,12 +515,16 @@ function renderStatusline(data) {
     }
   } catch (e) { /* swallow */ }
 
+  let position = 'end';
+  try {
+    const cfg = readGsdConfig(dir);
+    const v = getConfigValue(cfg, 'statusline.context_position');
+    if (v === 'front' || v === 'end') position = v;
+  } catch (e) { /* swallow */ }
+
   const gsdStateStr = formatGsdState(readGsdState(dir) || {});
   const middle = gsdStateStr ? `\x1b[2m${gsdStateStr}\x1b[0m` : null;
-  if (middle) {
-    return `\x1b[2m${model}\x1b[0m │ ${middle} │ \x1b[2m${dirname}\x1b[0m${lastCmdSuffix}`;
-  }
-  return `\x1b[2m${model}\x1b[0m │ \x1b[2m${dirname}\x1b[0m${lastCmdSuffix}`;
+  return composeStatusline({ model, ctx, middle, dirname, lastCmdSuffix, position });
 }
 
 module.exports.renderStatusline = renderStatusline;
