@@ -254,7 +254,9 @@ describe('bug #2924: worktree HEAD attachment + destructive recovery', () => {
       // sentences under it.
       const headingIdx = block.indexOf('parallel executor');
       assert.notStrictEqual(headingIdx, -1, 'must contain a parallel-executor sub-section');
-      const subBlock = block.slice(headingIdx, block.indexOf('**If running as the sole', headingIdx));
+      const endIdx = block.indexOf('**If running as the sole', headingIdx);
+      assert.notStrictEqual(endIdx, -1, 'parallel-executor sub-section terminator must exist');
+      const subBlock = block.slice(headingIdx, endIdx);
       assert.ok(subBlock.length > 0, 'sub-section must have content');
       const sentences = subBlock.replace(/\n+/g, ' ').split(/(?<=[.!?])\s+/);
       for (const sentence of sentences) {
