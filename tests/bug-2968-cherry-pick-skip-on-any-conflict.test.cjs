@@ -138,9 +138,14 @@ describe('bug-2968: release-sdk hotfix cherry-pick skips all conflicts (full aut
     const script = extractStepRun(yaml, 'Prepare hotfix branch');
     const failureBlock = extractCherryPickFailureBlock(script);
 
+    // All assertions on `failureBlock` are line-anchored (`^\s*...`, `m`
+    // flag) so a comment that mentions a command — e.g. "Calling `--skip`
+    // outside an in-progress cherry-pick exits non-zero" — can't satisfy
+    // the assertion. Only executable shell lines count. CodeRabbit on
+    // PR #2970.
     assert.match(
       failureBlock,
-      /git cherry-pick --skip/,
+      /^\s*git cherry-pick --skip\b/m,
       'auto_cherry_pick failure path must call `git cherry-pick --skip` to clear cherry-pick state and continue the loop (#2968)'
     );
     // Conflict skips MUST go into a dedicated bucket — operators reviewing
@@ -148,17 +153,17 @@ describe('bug-2968: release-sdk hotfix cherry-pick skips all conflicts (full aut
     // through policy-excluded feat/refactor/etc commits. Bug #2968.
     assert.match(
       failureBlock,
-      /CONFLICT_SKIPPED=/,
+      /^\s*CONFLICT_SKIPPED="\$\{CONFLICT_SKIPPED\}/m,
       'auto_cherry_pick failure path must append to CONFLICT_SKIPPED (a separate bucket from POLICY_SKIPPED) so operators can find manual-review items in the run summary (#2968)'
     );
     assert.doesNotMatch(
       failureBlock,
-      /\bSKIPPED=/,
+      /^\s*SKIPPED="\$\{SKIPPED\}/m,
       'auto_cherry_pick failure path must NOT append to the legacy SKIPPED bucket — that buries manual-review conflicts under "feat/refactor/etc — not auto-included" (#2968)'
     );
     assert.match(
       failureBlock,
-      /\bcontinue\b/,
+      /^\s*continue\s*$/m,
       'auto_cherry_pick failure path must `continue` the loop after skipping — full-automation policy is best-effort cherry-pick (#2968)'
     );
   });
@@ -182,6 +187,39 @@ describe('bug-2968: release-sdk hotfix cherry-pick skips all conflicts (full aut
       script,
       /merge commit — manual -m parent selection required/,
       'auto_cherry_pick must annotate merge-commit skips with a distinct reason so operators understand why the pick wasn\'t attempted (#2968)'
+    );
+  });
+
+  test('classifier guards against unreadable / markerless unmerged paths', () => {
+    // A degenerate unmerged file (missing, unreadable, or no conflict
+    // markers) must NOT be misclassified as "context absent at base" — the
+    // auto-skip path. Treat as real so the operator can investigate.
+    // Also: `awk` runs under `set -e`; a non-zero exit on a missing file
+    // would terminate the step. CodeRabbit on PR #2970.
+    const yaml = fs.readFileSync(WORKFLOW_PATH, 'utf8');
+    const script = extractStepRun(yaml, 'Prepare hotfix branch');
+    const failureBlock = extractCherryPickFailureBlock(script);
+
+    // Readability check before invoking the marker classifier.
+    assert.match(
+      failureBlock,
+      /\[\s*!\s*-r\s+"\$CONFLICTED"\s*\]/,
+      'auto_cherry_pick must check `[ ! -r "$CONFLICTED" ]` before running the awk classifier so an unreadable unmerged path does not terminate the step under `set -e` (#2968)'
+    );
+    // Marker-presence check before invoking the marker classifier — a file
+    // listed as unmerged but with no `<<<<<<< ` header is anomalous.
+    assert.match(
+      failureBlock,
+      /grep -q '\^<<<<<<< '\s+"\$CONFLICTED"/,
+      'auto_cherry_pick must verify `<<<<<<< ` markers exist in the file before running the awk classifier so a markerless unmerged file is not misclassified as context-missing (#2968)'
+    );
+    // The awk invocation must tolerate non-zero exits (e.g. via 2>/dev/null
+    // and `|| echo "real"`) so a transient awk failure can't slip the file
+    // into the auto-skip bucket.
+    assert.match(
+      failureBlock,
+      /awk[\s\S]+?\|\|\s*echo\s+"real"/,
+      'awk classifier must default to "real" on non-zero exit so transient awk failures do not auto-skip a real conflict (#2968)'
     );
   });
 

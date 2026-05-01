@@ -215,6 +215,19 @@ jobs:
                       ALL_EMPTY_HEAD=true
                       while IFS= read -r CONFLICTED; do
                         [ -z "$CONFLICTED" ] && continue
+                        # Guard the classifier against degenerate cases that
+                        # would otherwise skew toward "context absent" (the
+                        # auto-skip path) when they're actually unsafe to skip:
+                        #   - file missing or unreadable: don't pretend the
+                        #     conflict is benign; treat as real.
+                        #   - file listed as unmerged but no conflict markers
+                        #     present: anomalous git state; treat as real so
+                        #     the pick goes to the manual-review queue.
+                        # CodeRabbit on PR #2970.
+                        if [ ! -r "$CONFLICTED" ] || ! grep -q '^<<<<<<< ' "$CONFLICTED" 2>/dev/null; then
+                          ALL_EMPTY_HEAD=false
+                          break
+                        fi
                         REAL=$(awk '
                           /^<<<<<<< / { in_head=1; head=""; next }
                           /^=======$/ && in_head { in_head=0; next }
@@ -224,7 +237,7 @@ jobs:
                             next
                           }
                           in_head { head = head $0 "\n" }
-                        ' "$CONFLICTED")
+                        ' "$CONFLICTED" 2>/dev/null || echo "real")
                         if [ "$REAL" = "real" ]; then
                           ALL_EMPTY_HEAD=false
                           break
