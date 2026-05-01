@@ -46,7 +46,7 @@ Evaluate `$ARGUMENTS` against these routing rules. Apply the **first matching** 
 | Sketching, "mockup", "what would this look like", "prototype the UI", "design this", explore visual direction | `/gsd-sketch` | Throwaway HTML mockups to explore design |
 | Wrapping up spikes, "package the spikes", "consolidate spike findings" | `/gsd-spike --wrap-up` | Package spike findings into reusable skill |
 | Wrapping up sketches, "package the designs", "consolidate sketch findings" | `/gsd-sketch --wrap-up` | Package sketch findings into reusable skill |
-| Exploring, researching, comparing, or "how does X work" | `/gsd-research-phase` | Domain research before planning |
+| Exploring, researching, comparing, or "how does X work" | `/gsd-explore` | Socratic ideation and idea routing |
 | Discussing vision, "how should X look", brainstorming | `/gsd-discuss-phase` | Needs context gathering |
 | A complex task: refactoring, migration, multi-file architecture, system redesign | `/gsd-phase` | Needs a full phase with plan/build cycle |
 | Planning a specific phase or "plan phase N" | `/gsd-plan-phase` | Direct planning request |
@@ -60,7 +60,7 @@ Evaluate `$ARGUMENTS` against these routing rules. Apply the **first matching** 
 | Completing a milestone, shipping, releasing | `/gsd-complete-milestone` | Milestone lifecycle |
 | A specific, actionable, small task (add feature, fix typo, update config) | `/gsd-quick` | Self-contained, single executor |
 
-**Requires `.planning/` directory:** All routes except `/gsd-new-project`, `/gsd-map-codebase`, `/gsd-spike`, `/gsd-sketch`, `/gsd-help`, and `/gsd-join-discord`. If the project doesn't exist and the route requires it, suggest `/gsd-new-project` first.
+**Requires `.planning/` directory:** All routes except `/gsd-new-project`, `/gsd-map-codebase`, `/gsd-spike`, `/gsd-sketch`, and `/gsd-help`. If the project doesn't exist and the route requires it, suggest `/gsd-new-project` first.
 
 **Ambiguity handling:** If the text could reasonably match multiple routes, ask the user via AskUserQuestion with the top 2-3 options. For example:
 
