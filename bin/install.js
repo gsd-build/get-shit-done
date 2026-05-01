@@ -6799,12 +6799,73 @@ function writeManifest(configDir, runtime = 'claude', options = {}) {
 }
 
 /**
+ * Populate gsd-pristine/ with the transformed pristine versions of every
+ * `modified` file, derived from the current package's source tree by
+ * running the install transform pipeline (`copyWithPathReplacement`)
+ * into a tmp directory, then copying out only the relevant paths.
+ *
+ * Pristine semantically represents "what the install would write to
+ * configDir/<relPath> if the user had not modified it." This is what the
+ * /gsd-reapply-patches Step 5 verifier (#2972) uses as the diff base
+ * for "user-added lines" — lines in the user's backup that are NOT in
+ * the pristine baseline. Without this dir, the verifier degrades to its
+ * over-broad fallback ("every significant backup line"), exactly the
+ * silent-success-on-lost-content failure mode #2969 was designed to
+ * prevent (#2998).
+ *
+ * Implementation note: we run the FULL transform pipeline against a tmp
+ * staging dir (one-time, only when modified.length > 0), then copy out
+ * just the modified paths. This re-uses the existing transform code
+ * exactly — pristine is byte-identical to what `copyWithPathReplacement`
+ * would have written under normal install. Cost: one extra full transform
+ * pass per install where local patches were detected; acceptable.
+ */
+function populatePristineDir({ packageSrc, pristineDir, modified, runtime, pathPrefix, isGlobal }) {
+  if (!modified || modified.length === 0) return 0;
+  // Source root contains get-shit-done/, agents/, etc. The transform
+  // pipeline mirrors that structure into a configDir-shaped layout.
+  const stageRoot = fs.mkdtempSync(path.join(os.tmpdir(), 'gsd-pristine-stage-'));
+  let written = 0;
+  try {
+    // Stage just the get-shit-done/ subtree (where local patches live —
+    // every modified path under the manifest starts with `get-shit-done/`).
+    // Copying agents/ etc. is unnecessary work and risks runtime-specific
+    // copy paths that aren't relevant for pristine population.
+    const srcGsd = path.join(packageSrc, 'get-shit-done');
+    const stageGsd = path.join(stageRoot, 'get-shit-done');
+    if (fs.existsSync(srcGsd)) {
+      copyWithPathReplacement(srcGsd, stageGsd, pathPrefix, runtime, false, isGlobal);
+    }
+    for (const relPath of modified) {
+      // Only populate pristine for paths we successfully staged. If a path
+      // is outside get-shit-done/ (rare — only certain runtimes track other
+      // dirs), skip silently rather than corrupting pristine with stale data.
+      const stagedPath = path.join(stageRoot, relPath);
+      if (!fs.existsSync(stagedPath)) continue;
+      const out = path.join(pristineDir, relPath);
+      fs.mkdirSync(path.dirname(out), { recursive: true });
+      fs.copyFileSync(stagedPath, out);
+      written++;
+    }
+  } finally {
+    try { fs.rmSync(stageRoot, { recursive: true, force: true }); } catch { /* best-effort cleanup */ }
+  }
+  return written;
+}
+
+/**
  * Detect user-modified GSD files by comparing against install manifest.
  * Backs up modified files to gsd-local-patches/ for reapply after update.
  * Also saves pristine copies (from manifest) to gsd-pristine/ to enable
  * three-way merge during reapply-patches (pristine vs user vs new).
+ *
+ * The optional `pristineCtx` parameter (set by the install entry point)
+ * carries the source package root, runtime, pathPrefix, and isGlobal
+ * needed to populate gsd-pristine/. If omitted (legacy callers), pristine
+ * stays empty — the verifier falls back to its over-broad heuristic, same
+ * behavior as before #2998.
  */
-function saveLocalPatches(configDir) {
+function saveLocalPatches(configDir, pristineCtx) {
   const manifestPath = path.join(configDir, MANIFEST_NAME);
   if (!fs.existsSync(manifestPath)) return [];
 
@@ -6836,16 +6897,12 @@ function saveLocalPatches(configDir) {
     }
   }
 
-  // Save pristine copies of modified files from the CURRENT install (before wipe)
-  // These represent the original GSD distribution files that the user then modified.
-  // The reapply-patches workflow uses these for three-way merge:
-  //   pristine (original) → user's version (what they changed) → new version (after update)
+  // Save pristine copies of modified files from the CURRENT install (before wipe).
+  // Pristine semantically represents "what the install would write to configDir
+  // if the user had not modified it" — used by /gsd-reapply-patches Step 5
+  // (#2972) as the diff baseline for the user-added-lines computation. Without
+  // this dir the verifier degrades to its over-broad fallback heuristic (#2998).
   if (modified.length > 0) {
-    // We need the pristine originals, but the current files on disk are user-modified.
-    // The manifest records SHA-256 hashes but not content. However, we can reconstruct
-    // the pristine version from the npm package cache or git history.
-    // As a practical approach: save the manifest's version info so the reapply workflow
-    // knows which GSD version these files came from, enabling npm-based reconstruction.
     const meta = {
       backed_up_at: new Date().toISOString(),
       from_version: manifest.version,
@@ -6862,6 +6919,30 @@ function saveLocalPatches(configDir) {
     console.log('  ' + yellow + 'i' + reset + '  Found ' + modified.length + ' locally modified GSD file(s) — backed up to ' + PATCHES_DIR_NAME + '/');
     for (const f of modified) {
       console.log('     ' + dim + f + reset);
+    }
+
+    // #2998: populate gsd-pristine/ via the install transform pipeline so the
+    // reapply-patches verifier (#2972) gets a real diff baseline instead of
+    // falling back to its over-broad "every significant backup line" heuristic.
+    if (pristineCtx) {
+      try {
+        const written = populatePristineDir({
+          packageSrc: pristineCtx.packageSrc,
+          pristineDir,
+          modified,
+          runtime: pristineCtx.runtime,
+          pathPrefix: pristineCtx.pathPrefix,
+          isGlobal: pristineCtx.isGlobal,
+        });
+        if (written > 0) {
+          console.log('  ' + green + '✓' + reset + '  Populated ' + cyan + 'gsd-pristine/' + reset + ' (' + written + ' file(s)) for three-way merge');
+        }
+      } catch (err) {
+        // Soft failure: keep the install moving even if the transform pipeline
+        // throws on an unusual configuration. The verifier falls back to its
+        // pre-#2998 heuristic, no worse than before.
+        console.log('  ' + yellow + 'i' + reset + '  Could not populate gsd-pristine/ (' + (err && err.message ? err.message : 'unknown') + '). Falls back to over-broad verify heuristic.');
+      }
     }
   }
   return modified;
@@ -6974,8 +7055,16 @@ function install(isGlobal, runtime = 'claude') {
   // Track installation failures
   const failures = [];
 
-  // Save any locally modified GSD files before they get wiped
-  saveLocalPatches(targetDir);
+  // Save any locally modified GSD files before they get wiped.
+  // The pristine context lets saveLocalPatches populate gsd-pristine/ via
+  // the install transform pipeline, giving the reapply-patches Step 5
+  // verifier a real diff baseline (#2998).
+  saveLocalPatches(targetDir, {
+    packageSrc: src,
+    runtime,
+    pathPrefix,
+    isGlobal,
+  });
 
   // Clean up orphaned files from previous versions
   cleanupOrphanedFiles(targetDir);
@@ -9071,6 +9160,7 @@ if (process.env.GSD_TEST_MODE) {
     validateHookFields,
     preserveUserArtifacts,
     restoreUserArtifacts,
+    populatePristineDir,
     USER_OWNED_ARTIFACTS,
     finishInstall,
     trySelfLinkGsdSdk,
