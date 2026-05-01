@@ -126,23 +126,27 @@ jobs:
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
 
       - name: Create hotfix branch from base tag and push (skeleton)
-        if: ${{ !inputs.dry_run }}
         env:
           BRANCH: ${{ needs.validate-version.outputs.branch }}
           BASE_TAG: ${{ needs.validate-version.outputs.base_tag }}
+          DRY_RUN: ${{ inputs.dry_run }}
         run: |
           set -euo pipefail
           git checkout -b "$BRANCH" "$BASE_TAG"
           # Push the skeleton branch up-front so any subsequent cherry-pick
           # conflict leaves a remote artefact the operator can fetch, resolve,
-          # and re-push. Without this, conflicts strand state on the runner.
-          git push -u origin "$BRANCH"
+          # and re-push. Skipped on dry-run — local checkout still exercises
+          # the same cherry-pick + bump flow so conflicts are caught.
+          if [ "$DRY_RUN" != "true" ]; then
+            git push -u origin "$BRANCH"
+          fi
 
       - name: Cherry-pick fix/chore commits from origin/main since base tag
-        if: ${{ !inputs.dry_run && inputs.auto_cherry_pick }}
+        if: ${{ inputs.auto_cherry_pick }}
         env:
           BRANCH: ${{ needs.validate-version.outputs.branch }}
           BASE_TAG: ${{ needs.validate-version.outputs.base_tag }}
+          DRY_RUN: ${{ inputs.dry_run }}
         run: |
           set -euo pipefail
           git fetch origin main:refs/remotes/origin/main
@@ -173,21 +177,27 @@ jobs:
             if echo "$SUBJECT" | grep -qE '^(fix|chore)(\([^)]+\))?!?: '; then
               echo "→ cherry-picking $SHA  $SUBJECT"
               if ! git cherry-pick -x "$SHA"; then
-                # Abort restores HEAD to the last successful pick. Push that
-                # state so the operator can fetch, resolve $SHA manually, and
-                # finalize with auto_cherry_pick=false.
+                # Abort restores HEAD to the last successful pick. On real
+                # runs, push that state so the operator can fetch, resolve
+                # $SHA manually, and finalize with auto_cherry_pick=false.
                 git cherry-pick --abort || true
-                git push --force-with-lease origin "$BRANCH" || git push origin "$BRANCH" || true
+                if [ "$DRY_RUN" != "true" ]; then
+                  git push --force-with-lease origin "$BRANCH" || git push origin "$BRANCH" || true
+                fi
                 {
                   echo "## Cherry-pick conflict"
                   echo ""
                   echo "Failed at: \`${SHA}\` — \`${SUBJECT}\`"
                   echo ""
-                  echo "Branch \`${BRANCH}\` was pushed with picks applied up to (but not including) the conflicting commit."
-                  echo ""
-                  echo "**To resolve:** \`git fetch origin && git checkout ${BRANCH} && git cherry-pick -x ${SHA}\`, fix the conflict, push, then re-run \`finalize\` with \`auto_cherry_pick=false\`."
+                  if [ "$DRY_RUN" = "true" ]; then
+                    echo "**Dry run:** branch was not pushed. Re-run a real \`create\` with \`auto_cherry_pick=false\`, then resolve \`${SHA}\` manually on \`${BRANCH}\`."
+                  else
+                    echo "Branch \`${BRANCH}\` was pushed with picks applied up to (but not including) the conflicting commit."
+                    echo ""
+                    echo "**To resolve:** \`git fetch origin && git checkout ${BRANCH} && git cherry-pick -x ${SHA}\`, fix the conflict, push, then re-run \`finalize\` with \`auto_cherry_pick=false\`."
+                  fi
                 } >> "$GITHUB_STEP_SUMMARY"
-                echo "::error::Cherry-pick of $SHA failed. See summary; resolve on $BRANCH and re-run finalize with auto_cherry_pick=false."
+                echo "::error::Cherry-pick of $SHA failed. See summary."
                 exit 1
               fi
               INCLUDED="${INCLUDED}- \`${SHA}\` ${SUBJECT}"$'\n'
@@ -218,11 +228,11 @@ jobs:
           } >> "$GITHUB_STEP_SUMMARY"
 
       - name: Bump version and push
-        if: ${{ !inputs.dry_run }}
         env:
           BRANCH: ${{ needs.validate-version.outputs.branch }}
           BASE_TAG: ${{ needs.validate-version.outputs.base_tag }}
           VERSION: ${{ inputs.version }}
+          DRY_RUN: ${{ inputs.dry_run }}
         run: |
           set -euo pipefail
           npm version "$VERSION" --no-git-tag-version
@@ -234,7 +244,11 @@ jobs:
             [ -f sdk/package-lock.json ] && git add sdk/package-lock.json
           fi
           git commit -m "chore: bump version to $VERSION for hotfix"
-          git push origin "$BRANCH"
+          if [ "$DRY_RUN" != "true" ]; then
+            git push origin "$BRANCH"
+          else
+            echo "DRY RUN — branch not pushed. Local checkout exercised the cherry-pick and bump flow."
+          fi
           {
             echo "## Hotfix branch created"
             echo ""
@@ -279,14 +293,17 @@ jobs:
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
 
-      - name: Refuse if version already on npm
+      - name: Detect prior publish (reconciliation mode)
+        id: prior_publish
         env:
           VERSION: ${{ inputs.version }}
         run: |
           EXISTING=$(npm view get-shit-done-cc@"$VERSION" version 2>/dev/null || true)
           if [ -n "$EXISTING" ]; then
-            echo "::error::get-shit-done-cc@${VERSION} is already published."
-            exit 1
+            echo "::warning::get-shit-done-cc@${VERSION} is already on the registry — entering reconciliation mode (skip publish, continue with tag/release/PR/dist-tag)."
+            echo "skip_publish=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "skip_publish=false" >> "$GITHUB_OUTPUT"
           fi
 
       - name: Install and test
@@ -373,7 +390,7 @@ jobs:
           fi
 
       - name: Publish to npm (latest)
-        if: ${{ !inputs.dry_run }}
+        if: ${{ !inputs.dry_run && steps.prior_publish.outputs.skip_publish != 'true' }}
         env:
           NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
         run: npm publish --provenance --access public --tag latest
@@ -387,16 +404,21 @@ jobs:
           npm dist-tag add "get-shit-done-cc@${VERSION}" next
           echo "✅ next dist-tag re-pointed to v${VERSION} (matches latest)"
 
-      - name: Create GitHub Release
+      - name: Create GitHub Release (idempotent)
         if: ${{ !inputs.dry_run }}
         env:
           GH_TOKEN: ${{ github.token }}
           VERSION: ${{ inputs.version }}
         run: |
-          gh release create "v${VERSION}" \
-            --title "v${VERSION} (hotfix)" \
-            --generate-notes \
-            --latest
+          if gh release view "v${VERSION}" >/dev/null 2>&1; then
+            echo "GitHub Release v${VERSION} already exists; ensuring --latest flag is set"
+            gh release edit "v${VERSION}" --latest || true
+          else
+            gh release create "v${VERSION}" \
+              --title "v${VERSION} (hotfix)" \
+              --generate-notes \
+              --latest
+          fi
 
       - name: Create PR to merge hotfix back to main
         if: ${{ !inputs.dry_run }}

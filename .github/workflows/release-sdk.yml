@@ -339,14 +339,21 @@ jobs:
           echo "tag=$INPUT_TAG" >> "$GITHUB_OUTPUT"
           echo "→ Will publish v${VERSION} to dist-tag '${INPUT_TAG}'"
 
-      - name: Refuse if version already exists on npm
+      # Reconciliation mode: if version is already on npm (a prior run
+       # published successfully but a downstream step failed), don't hard-fail.
+       # Set a flag and skip the publish step below; tag/release/PR/dist-tag
+       # steps still execute so the rerun can finish reconciling state.
+      - name: Detect prior publish (reconciliation mode)
+        id: prior_publish
         env:
           VERSION: ${{ steps.ver.outputs.version }}
         run: |
           EXISTING=$(npm view get-shit-done-cc@"$VERSION" version 2>/dev/null || true)
           if [ -n "$EXISTING" ]; then
-            echo "::error::get-shit-done-cc@${VERSION} is already published. Bump version or pass an explicit override input."
-            exit 1
+            echo "::warning::get-shit-done-cc@${VERSION} is already on the registry — entering reconciliation mode (skip publish, continue with tag/release/PR/dist-tag)."
+            echo "skip_publish=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "skip_publish=false" >> "$GITHUB_OUTPUT"
           fi
 
       # Tolerant tag-existence check (matches release.yml pattern). An
@@ -464,7 +471,7 @@ jobs:
           git push origin "v${VERSION}"
 
       - name: Publish to npm (CC bundle, SDK included as both loose tree and .tgz)
-        if: ${{ !inputs.dry_run }}
+        if: ${{ !inputs.dry_run && steps.prior_publish.outputs.skip_publish != 'true' }}
         env:
           TAG: ${{ steps.ver.outputs.tag }}
           NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
@@ -483,7 +490,7 @@ jobs:
           npm dist-tag add "get-shit-done-cc@${VERSION}" next
           echo "✅ next dist-tag re-pointed to v${VERSION} (matches latest)"
 
-      - name: Create GitHub Release
+      - name: Create GitHub Release (idempotent)
         if: ${{ !inputs.dry_run }}
         env:
           GH_TOKEN: ${{ github.token }}
@@ -493,7 +500,14 @@ jobs:
           # Per-tag release flags:
           #   dev, next → --prerelease (won't be highlighted as the latest release on the repo page)
           #   latest    → --latest (becomes the highlighted release)
-          if [ "$TAG" = "latest" ]; then
+          # Idempotent: if release already exists (rerun after a transient
+          # downstream failure), edit the latest flag instead of failing.
+          if gh release view "v${VERSION}" >/dev/null 2>&1; then
+            echo "GitHub Release v${VERSION} already exists; reconciling --latest flag"
+            if [ "$TAG" = "latest" ]; then
+              gh release edit "v${VERSION}" --latest || true
+            fi
+          elif [ "$TAG" = "latest" ]; then
             gh release create "v${VERSION}" \
               --title "v${VERSION}" \
               --generate-notes \
@@ -504,7 +518,7 @@ jobs:
               --generate-notes \
               --prerelease
           fi
-          echo "✅ GitHub Release v${VERSION} created"
+          echo "✅ GitHub Release v${VERSION} ready"
 
       - name: Open merge-back PR (hotfix only)
         if: ${{ !inputs.dry_run && inputs.action == 'hotfix' }}
