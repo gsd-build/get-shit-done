@@ -72,11 +72,14 @@ describe('bug-2964: release-sdk hotfix cherry-pick survives empty commits', () =
 
     // The cherry-pick call lives within ~30 lines of the anchor. Limit the
     // window to avoid matching unrelated cherry-pick references elsewhere.
+    // Allow arbitrary git options between `git` and `cherry-pick` (e.g.
+    // `git -c merge.conflictStyle=merge cherry-pick ...` added for #2966)
+    // so this test doesn't false-fail on legitimate option additions.
     const window = yaml.slice(loopAnchor, loopAnchor + 2000);
-    const pickMatch = /git cherry-pick[^\n]*"\$SHA"/.exec(window);
+    const pickMatch = /git\b[^\n]*?cherry-pick[^\n]*"\$SHA"/.exec(window);
     assert.ok(
       pickMatch,
-      'auto_cherry_pick loop must invoke `git cherry-pick ... "$SHA"` (#2964)'
+      'auto_cherry_pick loop must invoke `git ... cherry-pick ... "$SHA"` (#2964)'
     );
 
     const pickLine = pickMatch[0];
