@@ -39,6 +39,7 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
   posting a comment that points to the contribution guide. (#2872)
 
 ### Fixed — 1.40.0-rc.1
+- **`detect-custom-files` now detects user-added skills in `skills/<name>/SKILL.md`** — custom skill directories were silently destroyed during `/gsd-update` because `GSD_MANAGED_DIRS` was missing `'skills'` after the v1.39.0 skill consolidation (#2790). Adding `'skills'` to the managed-root list ensures custom skills are detected, reported in `custom_files`, and backed up to `gsd-user-files-backup/` before the installer wipes the directory. (#2942)
 - **`gap-analysis` now parses non-`REQ-` requirement IDs and ignores traceability table headers** — `parseRequirements()` no longer hard-codes the `REQ-` prefix and now accepts uppercase prefixed IDs such as `TST-01`, `BACK-07`, and `INSP-04`; markdown table header rows (for example `| REQ-ID | ... |`) are excluded so header tokens are not reported as phantom uncovered requirements. Added regression coverage for mixed-prefix REQUIREMENTS files with traceability tables. (#2897)
 - **Gemini slash commands namespaced as `/gsd:<cmd>` instead of `/gsd-<cmd>`** —
   Gemini CLI namespaces commands under `gsd:`, so `/gsd-plan-phase` was unexecutable.
