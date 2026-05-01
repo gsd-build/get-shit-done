@@ -48,7 +48,20 @@ function generateFragmentName() {
   return `${pick(ADJECTIVES)}-${pick(NOUNS_A)}-${pick(NOUNS_B)}`;
 }
 
+// Allowed Keep-a-Changelog section types. Used by both scaffoldFragment
+// (sanitization at write time) and parse.cjs (validation at consume time).
+const ALLOWED_TYPES = new Set(['Added', 'Changed', 'Deprecated', 'Removed', 'Fixed', 'Security']);
+
 function scaffoldFragment({ repo, type, pr, body }) {
+  // Sanitize: reject any type value not on the allowlist BEFORE embedding it
+  // in frontmatter. A newline in `type` would corrupt the fragment; an
+  // unrecognized value would be rejected later by parse.cjs but with a
+  // confusing diagnostic. Catch both at the write boundary.
+  if (!ALLOWED_TYPES.has(type)) {
+    throw new Error(
+      `scaffoldFragment: type=${JSON.stringify(type)} is not one of [${[...ALLOWED_TYPES].join(', ')}]`,
+    );
+  }
   const dir = path.join(repo, '.changeset');
   fs.mkdirSync(dir, { recursive: true });
   const content = `---\ntype: ${type}\npr: ${pr}\n---\n${body}\n`;
@@ -75,18 +88,42 @@ function scaffoldFragment({ repo, type, pr, body }) {
 
 function parseArgs(argv) {
   const opts = { type: null, pr: null, body: null, repo: process.cwd() };
+  // Validate flag values: argv[++i] could be undefined (flag with no value)
+  // or another flag (silently misparsed). Match the cli.cjs convention: return
+  // { ok: true, opts } on success, { ok: false, error } on malformed input.
+  const requireValue = (flag, i) => {
+    const v = argv[i + 1];
+    if (v === undefined || v.startsWith('--')) {
+      return { ok: false, error: `missing value for ${flag}` };
+    }
+    return { ok: true, value: v };
+  };
+
   for (let i = 0; i < argv.length; i++) {
     const a = argv[i];
-    if (a === '--type') opts.type = argv[++i];
-    else if (a === '--pr') opts.pr = Number(argv[++i]);
-    else if (a === '--body') opts.body = argv[++i];
-    else if (a === '--repo') opts.repo = argv[++i];
+    if (a === '--type' || a === '--pr' || a === '--body' || a === '--repo') {
+      const r = requireValue(a, i);
+      if (!r.ok) return { ok: false, error: r.error };
+      if (a === '--type') opts.type = r.value;
+      else if (a === '--pr') opts.pr = Number(r.value);
+      else if (a === '--body') opts.body = r.value;
+      else if (a === '--repo') opts.repo = r.value;
+      i++;
+      continue;
+    }
+    return { ok: false, error: `unknown argument: ${a}` };
   }
-  return opts;
+  return { ok: true, opts };
 }
 
 function main() {
-  const opts = parseArgs(process.argv.slice(2));
+  const parsed = parseArgs(process.argv.slice(2));
+  if (!parsed.ok) {
+    process.stderr.write(`${parsed.error}\n`);
+    process.stderr.write('usage: changeset/new.cjs --type <Fixed|Added|...> --pr NNNN --body "..."\n');
+    process.exit(2);
+  }
+  const { opts } = parsed;
   if (!opts.type || !opts.pr || !opts.body) {
     process.stderr.write('usage: changeset/new.cjs --type <Fixed|Added|...> --pr NNNN --body "..."\n');
     process.exit(2);
@@ -97,4 +134,4 @@ function main() {
 
 if (require.main === module) main();
 
-module.exports = { generateFragmentName, scaffoldFragment };
+module.exports = { generateFragmentName, scaffoldFragment, parseArgs, ALLOWED_TYPES };

@@ -60,4 +60,36 @@ describe('changeset new: name generator + scaffold writer (#2975)', () => {
     const b = scaffoldFragment({ repo: tmp, type: 'Added', pr: 2, body: 'bbb.' });
     assert.notEqual(path.basename(a), path.basename(b));
   });
+
+  test('rejects type values not on the Keep-a-Changelog allowlist (sanitization)', () => {
+    // Includes the newline-injection case from the CR finding.
+    for (const badType of ['Refactored', 'fixed', 'Fixed\ntype: Added', 'Fixed; rm -rf /', '']) {
+      assert.throws(
+        () => scaffoldFragment({ repo: tmp, type: badType, pr: 1, body: 'x.' }),
+        /not one of \[Added, Changed, Deprecated, Removed, Fixed, Security\]/,
+        `bad type ${JSON.stringify(badType)} should be rejected`,
+      );
+    }
+  });
+
+  test('parseArgs returns { ok: false, error } when --repo is missing its value', () => {
+    const { parseArgs } = require(path.join(ROOT, 'scripts', 'changeset', 'new.cjs'));
+    const r = parseArgs(['--type', 'Fixed', '--pr', '1', '--body', 'x.', '--repo']);
+    assert.equal(r.ok, false);
+    assert.equal(r.error, 'missing value for --repo');
+  });
+
+  test('parseArgs returns { ok: false, error } when a flag value is itself another flag', () => {
+    const { parseArgs } = require(path.join(ROOT, 'scripts', 'changeset', 'new.cjs'));
+    const r = parseArgs(['--type', 'Fixed', '--repo', '--pr', '1', '--body', 'x.']);
+    assert.equal(r.ok, false);
+    assert.equal(r.error, 'missing value for --repo');
+  });
+
+  test('parseArgs returns { ok: true, opts } on a well-formed argv', () => {
+    const { parseArgs } = require(path.join(ROOT, 'scripts', 'changeset', 'new.cjs'));
+    const r = parseArgs(['--type', 'Fixed', '--pr', '42', '--body', 'a body', '--repo', '/tmp/x']);
+    assert.equal(r.ok, true);
+    assert.deepEqual(r.opts, { type: 'Fixed', pr: 42, body: 'a body', repo: '/tmp/x' });
+  });
 });
