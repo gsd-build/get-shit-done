@@ -108,14 +108,26 @@ describe('bug-2948: /gsd-spike --wrap-up dispatch wiring', () => {
       );
     });
 
-    test('context or process section routes --wrap-up to the spike-wrap-up workflow', () => {
+    test('process section dispatches first-token --wrap-up to spike-wrap-up workflow', () => {
       const fm = parseFrontmatter(fs.readFileSync(SPIKE_CMD_PATH, 'utf-8'));
-      const contextSection = extractSection(fm._body, 'context') || '';
-      const processSection = extractSection(fm._body, 'process') || '';
-      const dispatchText = contextSection + processSection;
+      const processSection = extractSection(fm._body, 'process');
+      assert.ok(processSection, 'spike.md must have a <process> section');
+
+      const rules = processSection
+        .split(/\r?\n/)
+        .map(line => line.trim())
+        .filter(Boolean);
+
+      const wrapUpRule = rules.find(line => line.startsWith('- If it is `--wrap-up`:'));
+      const fallbackRule = rules.find(line => line.startsWith('- Otherwise:'));
+
       assert.ok(
-        dispatchText.includes('--wrap-up') && dispatchText.includes('spike-wrap-up'),
-        'The <context> or <process> section must contain routing that maps --wrap-up to the spike-wrap-up workflow'
+        wrapUpRule && wrapUpRule.includes('strip the flag') && wrapUpRule.includes('spike-wrap-up'),
+        'process must define a --wrap-up branch that strips the flag and routes to spike-wrap-up'
+      );
+      assert.ok(
+        fallbackRule && fallbackRule.includes('spike workflow'),
+        'process must define an Otherwise fallback to the normal spike workflow'
       );
     });
   });
