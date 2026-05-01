@@ -269,7 +269,11 @@ After writing each merged file, verify that user modifications survived the merg
 
 ## Step 5: Hunk Verification Gate
 
-Before proceeding to cleanup, run the deterministic verifier script. **Do NOT** rely on a free-text "verified: yes/no" table generated during Step 4 — bug #2969 traced repeated false-positive `verified: yes` reports to that table being filled in without an actual content-presence check. The script below performs the check structurally and exits non-zero on any miss.
+Two layered gates. Both must pass before proceeding to cleanup.
+
+### 5a: Deterministic verifier (binding gate, #2969)
+
+Run the deterministic verifier script. Do NOT rely solely on the free-text `verified: yes/no` Hunk Verification Table from Step 4 — bug #2969 traced repeated false-positive `verified: yes` reports to that table being filled in without an actual content-presence check. The script performs the check structurally and exits non-zero on any miss.
 
 Run the verifier as a child process (the gsd-tools binary directory is not required — the script ships under `scripts/` in the source repo and is also exposed via the SDK at `sdk/dist/cli.js verify-reapply` when present):
 
@@ -311,9 +315,40 @@ Then re-run /gsd-update --reapply to re-verify.
 
 Do not proceed to cleanup until the verifier exits 0.
 
-**Only when `VERIFY_STATUS` is 0** (or when all files had zero significant user-added lines, which the verifier reports as `Failures: 0`) may execution continue to Step 6.
+**Only when `VERIFY_STATUS` is 0** (or when all files had zero significant user-added lines, which the verifier reports as `Failures: 0`) may execution continue to gate 5b.
 
-**Why the script and not the table?** The Step 4 Hunk Verification Table is still produced as a Claude-readable summary, but it is *advisory* — the gate is the script. Determinism comes from doing the substring check in code rather than asking the LLM to do it during workflow execution.
+### 5b: Hunk Verification Table review (advisory gate, #1999)
+
+The Hunk Verification Table produced in Step 4 must also be reviewed before proceeding. This is advisory after the script gate but is preserved as a defense-in-depth check — if the script ever has a bug or the pristine baseline is unavailable, the table-based gate still catches obvious regressions.
+
+**If the Hunk Verification Table is absent** (Step 4 silently produced nothing), STOP and report:
+
+```
+ERROR: Hunk Verification Table is missing — Step 4 did not produce it.
+The deterministic verifier (5a) may still have passed, but a missing table
+means post-merge verification was not fully completed. Rerun
+/gsd-update --reapply to retry with full verification.
+```
+
+A missing table absent from the workflow output cannot bypass this gate.
+
+**If any row in the Hunk Verification Table shows `verified: no`**, STOP and report:
+
+```
+ERROR: {N} hunk(s) failed Step 5b verification — content may have been dropped during merge.
+
+Unverified hunks:
+  {file} hunk {hunk_id}: signature line "{signature_line}" not found in merged output
+
+The backup is preserved at: {patches_dir}/{file}
+Review the merged file manually, then either:
+  (a) Re-merge the missing content by hand, or
+  (b) Restore from backup: cp {patches_dir}/{file} {installed_path}
+```
+
+Do not proceed to cleanup until both gates (5a and 5b) pass.
+
+**Why both gates?** 5a (the script) is the binding gate — it does the actual substring check structurally and cannot be shortcut by the LLM. 5b (the table review) is the advisory gate — it provides a redundant safety net via the Step 4 prose summary, ensuring that even a script regression or absent pristine baseline cannot silently allow a `verified: no` row to slip past, nor can a missing table go unnoticed. Layered gates favour false-positive halts (recoverable) over silent successes on lost content (unrecoverable).
 
 ## Step 6: Cleanup option
 
