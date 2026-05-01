@@ -201,6 +201,11 @@ downstream reader (`state.json`, `getMilestoneInfo`, progress bars) reported the
 stale milestone until the first phase advance forced a resync. Always use the
 SDK handler above — do not hand-edit STATE.md here.
 
+## 5.5. SME Process Detection
+
+If `workflow.use_sme_agents` is true: Read `workflows/new-milestone/sme-step.md` and execute its steps.
+Otherwise skip silently.
+
 ## 6. Cleanup and Commit
 
 Delete MILESTONE-CONTEXT.md if exists (consumed).
