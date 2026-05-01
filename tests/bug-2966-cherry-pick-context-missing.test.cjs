@@ -95,9 +95,19 @@ function extractStepRun(workflowText, stepName) {
 
 function git(cwd, args) {
   // Force-disable signing inline — a developer's global gpgsign config
-  // can't be allowed to fail commits in this throwaway repo.
-  const signingOff = ['-c', 'commit.gpgsign=false', '-c', 'tag.gpgsign=false', '-c', 'gpg.format=openpgp', '-c', 'user.signingkey='];
-  return spawnSync('git', [...signingOff, ...args], {
+  // can't be allowed to fail commits in this throwaway repo. Also pin
+  // merge.conflictStyle=merge so the cherry-pick reproducer below sees
+  // the same marker shape the workflow guards against (diff3/zdiff3 in
+  // the developer or CI runner's global config would inject `|||||||`
+  // sections and break the empty-HEAD assertion).
+  const inlineConfig = [
+    '-c', 'commit.gpgsign=false',
+    '-c', 'tag.gpgsign=false',
+    '-c', 'gpg.format=openpgp',
+    '-c', 'user.signingkey=',
+    '-c', 'merge.conflictStyle=merge',
+  ];
+  return spawnSync('git', [...inlineConfig, ...args], {
     cwd,
     encoding: 'utf8',
     env: { ...process.env, GIT_AUTHOR_NAME: 'test', GIT_AUTHOR_EMAIL: 't@t', GIT_COMMITTER_NAME: 'test', GIT_COMMITTER_EMAIL: 't@t' },
@@ -216,6 +226,11 @@ describe('bug-2966: release-sdk hotfix cherry-pick distinguishes context-missing
       fs.writeFileSync(tmpFile, conflictText);
       try {
         const r = spawnSync('awk', [awkProgram, tmpFile], { encoding: 'utf8' });
+        // Fail loudly on awk execution errors — silently consuming an
+        // empty stdout from a crashed/missing awk would let context-missing
+        // assertions falsely pass.
+        assert.ok(!r.error, `awk failed to launch: ${r.error && r.error.message}`);
+        assert.equal(r.status, 0, `awk predicate exited non-zero: ${r.stderr || '(no stderr)'}`);
         return r.stdout.trim();
       } finally {
         fs.rmSync(tmpFile, { force: true });
