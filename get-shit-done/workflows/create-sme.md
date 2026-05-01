@@ -76,31 +76,92 @@ mkdir -p .planning/smes
 </step>
 
 <step name="check_existing_sme">
-Check if an SME already exists for this process:
+Check for exact match AND fuzzy overlap with existing SMEs.
+
+**Phase 1: Exact match check**
 
 ```bash
 SME_PATH=".planning/smes/${PROCESS_NAME}-SME.md"
 ```
 
-**If `$SME_PATH` exists** (i.e., `[ -f "$SME_PATH" ]` is true):
-- Present choice using `AskUserQuestion`:
-  ```
-  AskUserQuestion(
-    header: "SME Exists",
-    question: "An SME document already exists for '${PROCESS_NAME}' at ${SME_PATH}. What would you like to do?",
-    options:
-      - "Update existing -- refresh with current code state"
-      - "Create new -- overwrite with a fresh analysis"
-      - "Cancel"
-  )
-  ```
+**Phase 2: Fuzzy overlap scan (bidirectional substring matching)**
+
+Scan all existing `*-SME.md` files in `.planning/smes/` and collect any whose
+base name (without the `-SME.md` suffix) overlaps with `PROCESS_NAME`.
+
+Overlap is defined as **bidirectional case-insensitive substring match**:
+- The input is a substring of an existing name: "document" matches "document-creation"
+- An existing name is a substring of the input: "document-creation" matches "document"
+
+```bash
+OVERLAPPING_SMES=""
+if [ -d ".planning/smes" ]; then
+  INPUT_LOWER=$(echo "$PROCESS_NAME" | tr '[:upper:]' '[:lower:]')
+  for sme_file in .planning/smes/*-SME.md; do
+    [ -f "$sme_file" ] || continue
+    base=$(basename "$sme_file" -SME.md)
+    BASE_LOWER=$(echo "$base" | tr '[:upper:]' '[:lower:]')
+    # Skip exact match -- handled separately
+    [ "$BASE_LOWER" = "$INPUT_LOWER" ] && continue
+    # Bidirectional substring: input-in-existing OR existing-in-input (case-insensitive)
+    if echo "$BASE_LOWER" | grep -q "$INPUT_LOWER" || echo "$INPUT_LOWER" | grep -q "$BASE_LOWER"; then
+      OVERLAPPING_SMES="${OVERLAPPING_SMES}${OVERLAPPING_SMES:+, }${base}-SME.md"
+    fi
+  done
+fi
+```
+
+**Phase 3: Decision tree**
+
+**Case A -- Exact match exists (`$SME_PATH` exists):**
+
+Present the same update/create/cancel choice as before:
+
+```
+AskUserQuestion(
+  header: "SME Exists",
+  question: "An SME document already exists for '${PROCESS_NAME}' at ${SME_PATH}. What would you like to do?",
+  options:
+    - "Update existing -- refresh with current code state"
+    - "Create new -- overwrite with a fresh analysis"
+    - "Cancel"
+)
+```
+
 - If "Cancel": display "Cancelled." and exit workflow.
 - If "Update existing": set `UPDATE_MODE=true`
 - If "Create new": set `UPDATE_MODE=false`
 
-**If `$SME_PATH` does not exist:**
-- Set `UPDATE_MODE=false`
-- Continue to step 5
+Set `RELATED_SMES` from the overlap scan (may be empty -- that is fine).
+
+**Case B -- No exact match, but fuzzy overlaps found (`OVERLAPPING_SMES` is non-empty):**
+
+Present an overlap-aware choice:
+
+```
+AskUserQuestion(
+  header: "Overlapping SME Detected",
+  question: |
+    The process name '${PROCESS_NAME}' overlaps with existing SME(s):
+      ${OVERLAPPING_SMES}
+
+    This may indicate a near-duplicate. What would you like to do?
+  options:
+    - "Update existing -- switch to updating the overlapping SME instead"
+    - "Create new alongside -- create '${PROCESS_NAME}-SME.md' as a separate SME (will cross-reference)"
+    - "Cancel"
+)
+```
+
+- If "Cancel": display "Cancelled." and exit workflow.
+- If "Update existing":
+  - If only one overlap: set `PROCESS_NAME` to that SME's base name, `SME_PATH` to its path, `UPDATE_MODE=true`
+  - If multiple overlaps: ask user which one to update (numbered list)
+- If "Create new alongside": set `UPDATE_MODE=false`, set `RELATED_SMES="${OVERLAPPING_SMES}"`
+
+**Case C -- No exact match, no overlaps:**
+
+Set `UPDATE_MODE=false`, `RELATED_SMES=""`, continue to step 5.
 </step>
 
 <step name="spawn_creator">
@@ -127,6 +188,8 @@ Today: {date}
 Analyze the '{PROCESS_NAME}' process and produce .planning/smes/{PROCESS_NAME}-SME.md.
 
 {if UPDATE_MODE is true: 'UPDATE MODE: An SME already exists at .planning/smes/{PROCESS_NAME}-SME.md. Refresh it with the current code state. Preserve historical findings that still apply.'}
+
+{if RELATED_SMES is non-empty: 'RELATED SMES: The following existing SMEs overlap with this process: ${RELATED_SMES}. Populate the related_smes frontmatter field with these filenames. Consider reading them for context on what is already documented.'}
 
 {AGENT_SKILLS_CREATOR}"
 )
