@@ -627,6 +627,15 @@ jobs:
           rm -f "$TARBALL"
 
       - name: Dry-run publish validation
+        # Skip the rehearsal when the version is already on npm
+        # (reconciliation mode). `npm publish --dry-run` contacts the
+        # registry and fails with "You cannot publish over the
+        # previously published versions" if the version exists, even
+        # though no actual publish would be attempted. The real publish
+        # step (further down) is gated on the same condition; gate the
+        # rehearsal too so re-runs of an already-published hotfix don't
+        # fail here on a check that doesn't apply. Bug #2987.
+        if: ${{ steps.prior_publish.outputs.skip_publish != 'true' }}
         env:
           TAG: ${{ steps.ver.outputs.tag }}
           NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
