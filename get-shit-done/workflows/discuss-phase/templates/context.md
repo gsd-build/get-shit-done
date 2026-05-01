@@ -21,6 +21,8 @@ The caller substitutes:
   was found by `check_spec`). Otherwise omit the entire `<spec_lock>` block.
 - **Folded Todos / Reviewed Todos** — include subsections only when the
   `cross_reference_todos` step folded or reviewed at least one todo.
+- **`<sme_context>`** — include only when `sme_risk_areas` is non-empty (SME
+  check ran and produced probing questions). Otherwise omit entirely.
 
 ## Template body
 
@@ -128,6 +130,18 @@ If no reviewed-but-deferred todos: omit this subsection entirely.]
 [If none: "None — discussion stayed within phase scope"]
 
 </deferred>
+
+[If sme_risk_areas exist (SME check ran and produced questions):]
+<sme_context>
+## SME Domain Risks Surfaced
+
+Domain-specific risks from active SME documents, surfaced during discussion.
+The planner must address these risks in the plan.
+
+{numbered list of probing questions/risk areas surfaced by the auditor}
+
+**Active SMEs:** {list of process names}
+</sme_context>
 
 ---
 

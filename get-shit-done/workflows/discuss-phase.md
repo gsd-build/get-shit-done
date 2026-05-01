@@ -277,6 +277,8 @@ Parse JSON for: `todo_count`, `matches[]` (each with `file`, `title`, `area`, `s
 **Auto mode (`--auto`):** Fold all todos with score >= 0.4 automatically. Log the selection.
 </step>
 
+If `use_sme_agents` is true: Read `workflows/discuss-phase/sme-step.md` and execute its steps. Otherwise skip.
+
 <step name="scout_codebase">
 Lightweight scan of existing code to inform gray area identification (~10% context).
 
