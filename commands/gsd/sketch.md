@@ -52,7 +52,7 @@ Design idea: $ARGUMENTS
 
 <process>
 Parse the first token of $ARGUMENTS:
-- If it contains `--wrap-up`: strip the flag, execute the sketch-wrap-up workflow from @~/.claude/get-shit-done/workflows/sketch-wrap-up.md end-to-end.
+- If it is `--wrap-up`: strip the flag, execute the sketch-wrap-up workflow from @~/.claude/get-shit-done/workflows/sketch-wrap-up.md end-to-end.
 - Otherwise: execute the sketch workflow from @~/.claude/get-shit-done/workflows/sketch.md end-to-end.
 
 Preserve all workflow gates (intake, decomposition, target stack research, variant evaluation, MANIFEST updates, commit patterns).
