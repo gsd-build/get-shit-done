@@ -165,15 +165,20 @@ jobs:
               # don't match the fix/chore filter (feat/refactor/docs/etc).
               # CONFLICT_SKIPPED — fix/chore commits whose cherry-pick failed
               # and were skipped per the full-automation policy (#2968).
-              # WORKFLOW_SKIPPED — fix/chore commits that touch
-              # .github/workflows/* and therefore can't be pushed by the
-              # default GITHUB_TOKEN (lacks `workflow` scope). Skipped
-              # pre-pick so the push doesn't get rejected. Bug #2980.
+              # NON_SHIPPED_SKIPPED — fix/chore commits whose diff doesn't
+              # touch any path in the npm tarball's `files` whitelist
+              # (CI / test / docs / planning-only changes). They can't
+              # affect the published package's behavior, so picking them
+              # into a hotfix is meaningless — and picking workflow-file
+              # changes specifically would also fail the push step because
+              # the default GITHUB_TOKEN lacks the `workflow` scope. The
+              # shipped-paths filter is the precise root cause: bug #2980.
               # Operators reviewing the run summary need these distinct so
-              # the manual-review queue isn't buried in the policy bucket.
+              # the manual-review queue (CONFLICT_SKIPPED) isn't buried in
+              # the noise from the other two buckets.
               POLICY_SKIPPED=""
               CONFLICT_SKIPPED=""
-              WORKFLOW_SKIPPED=""
+              NON_SHIPPED_SKIPPED=""
               while IFS= read -r SHA; do
                 [ -z "$SHA" ] && continue
                 SUBJECT=$(git log -1 --format='%s' "$SHA")
@@ -191,21 +196,28 @@ jobs:
                     CONFLICT_SKIPPED="${CONFLICT_SKIPPED}- \`${SHA}\` ${SUBJECT} ($REASON)"$'\n'
                     continue
                   fi
-                  # Pre-pick guard: commits touching .github/workflows/* can't
-                  # be pushed by the default GITHUB_TOKEN (it lacks the
-                  # `workflow` scope), so the push step would be rejected with
-                  # "refusing to allow a GitHub App to create or update
-                  # workflow ... without `workflows` permission". Skip such
-                  # commits up-front and surface them loudly via a
-                  # ::warning:: annotation AND a dedicated summary bucket so
-                  # operators don't ship a hotfix that silently dropped a
-                  # workflow-file fix. Bug #2980.
-                  if git diff-tree --no-commit-id --name-only -r "$SHA" \
-                       | grep -qE '^\.github/workflows/'; then
-                    REASON="touches .github/workflows/* — push blocked by GITHUB_TOKEN scope"
+                  # Pre-pick guard: a hotfix release can only be affected
+                  # by commits whose diff intersects the npm tarball's
+                  # shipped paths (package.json `files` whitelist plus
+                  # package.json itself, which `npm pack` always
+                  # includes). Commits that touch only CI workflows,
+                  # tests, docs, or planning artifacts cannot change what
+                  # ships, so picking them into a hotfix is meaningless.
+                  # As a side benefit, this excludes
+                  # `.github/workflows/*` changes whose push would
+                  # otherwise be rejected by GitHub because the default
+                  # GITHUB_TOKEN lacks the `workflow` scope. The filter
+                  # is implemented in
+                  # scripts/diff-touches-shipped-paths.cjs rather than
+                  # inline so the rules (read package.json `files`,
+                  # treat entries as file-OR-directory prefix, the
+                  # `package.json`-always-shipped rule) are
+                  # unit-testable. Bug #2980.
+                  if ! git diff-tree --no-commit-id --name-only -r "$SHA" \
+                       | node scripts/diff-touches-shipped-paths.cjs; then
+                    REASON="touches no shipped paths (CI / test / docs / planning only)"
                     echo "↷ skipping $SHA — $REASON"
-                    echo "::warning::Hotfix dropped commit ${SHA} (${SUBJECT}) — touches .github/workflows/*. The default GITHUB_TOKEN cannot push workflow-file changes. If this fix needs to ship in the hotfix, apply it manually on the hotfix branch using a token with the 'workflow' scope, or land it on main and re-cut the release."
-                    WORKFLOW_SKIPPED="${WORKFLOW_SKIPPED}- \`${SHA}\` ${SUBJECT}"$'\n'
+                    NON_SHIPPED_SKIPPED="${NON_SHIPPED_SKIPPED}- \`${SHA}\` ${SUBJECT}"$'\n'
                     continue
                   fi
                   echo "→ cherry-picking $SHA  $SUBJECT"
@@ -299,12 +311,12 @@ jobs:
                 else
                   echo "_No fix/chore commits to include._"
                 fi
-                if [ -n "$WORKFLOW_SKIPPED" ]; then
-                  echo "### ⚠️  Skipped — touches .github/workflows/* (manual review required)"
+                if [ -n "$NON_SHIPPED_SKIPPED" ]; then
+                  echo "### Skipped — touches no shipped paths (informational)"
                   echo ""
-                  echo "These fix/chore commits modify workflow files. The default \`GITHUB_TOKEN\` lacks the \`workflow\` scope and cannot push such changes, so they were skipped pre-pick to avoid a rejected push. **If any of these need to ship in this hotfix, apply them manually on \`$BRANCH\` using a token with \`workflow\` scope, or land them on \`main\` and re-cut the release.**"
+                  echo "These fix/chore commits don't touch any path in the npm tarball's \`files\` whitelist (or \`package.json\`), so they cannot change the published package's behavior. CI / test / docs / planning-only changes belong on \`main\`, not in a hotfix. No action needed."
                   echo ""
-                  echo "$WORKFLOW_SKIPPED"
+                  echo "$NON_SHIPPED_SKIPPED"
                 fi
                 if [ -n "$CONFLICT_SKIPPED" ]; then
                   echo "### Skipped — cherry-pick conflict (manual review)"
