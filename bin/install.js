@@ -8150,6 +8150,20 @@ function finishInstall(settingsPath, settings, statuslineCommand, shouldInstallS
   if (runtime === 'cline') command = '/gsd-new-project';
   if (runtime === 'qwen') command = '/gsd-new-project';
   if (runtime === 'hermes') command = '/gsd-new-project';
+
+  // Claude Code global installs use the skills/ format (CC 2.1.88+).
+  // Restart is required for CC to pick up newly-installed skills, and the
+  // slash-menu surface depends on CC version — so the instruction needs to
+  // cover both invocation paths to avoid #2957-style "no commands appear".
+  if (runtime === 'claude' && isGlobal) {
+    console.log(`
+  ${green}Done!${reset} Restart ${program}, then in any directory either type ${cyan}${command}${reset} or ask Claude to run the ${cyan}gsd-new-project${reset} skill.
+
+  ${cyan}Join the community:${reset} https://discord.gg/mYgfVNfA2r
+`);
+    return;
+  }
+
   console.log(`
   ${green}Done!${reset} Open a blank directory in ${program} and run ${cyan}${command}${reset}.
 
