@@ -30,22 +30,24 @@ const installModule = require(path.join(ROOT, 'bin', 'install.js'));
 
 describe('Bug #2962: trySelfLinkGsdSdkWindows shim materialization', () => {
   let tmpDir;
-  let origExecFileSync;
+  let origExecSync;
 
   before(() => {
     tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), 'gsd-2962-'));
-    origExecFileSync = cp.execFileSync;
+    origExecSync = cp.execSync;
     // Intercept `npm prefix -g` so the shim writer targets our temp dir.
-    cp.execFileSync = (file, args) => {
-      if (file === 'npm' && Array.isArray(args) && args[0] === 'prefix' && args[1] === '-g') {
+    // On Windows `npm` is `npm.cmd`, so the production code uses execSync
+    // (which spawns through cmd.exe) per Node's documented .cmd handling.
+    cp.execSync = (cmd, opts) => {
+      if (typeof cmd === 'string' && cmd.trim() === 'npm prefix -g') {
         return tmpDir + '\n';
       }
-      return origExecFileSync.apply(cp, arguments);
+      return origExecSync.call(cp, cmd, opts);
     };
   });
 
   after(() => {
-    cp.execFileSync = origExecFileSync;
+    cp.execSync = origExecSync;
     fs.rmSync(tmpDir, { recursive: true, force: true });
   });
 
@@ -94,17 +96,13 @@ describe('Bug #2962: trySelfLinkGsdSdkWindows shim materialization', () => {
   });
 
   test('returns null when npm prefix -g fails', () => {
-    cp.execFileSync = () => { throw new Error('npm not on PATH'); };
+    const restoreSpy = cp.execSync;
+    cp.execSync = () => { throw new Error('npm not on PATH'); };
     try {
       const result = installModule.trySelfLinkGsdSdkWindows(path.join(ROOT, 'bin', 'gsd-sdk.js'));
       assert.equal(result, null);
     } finally {
-      cp.execFileSync = (file, args) => {
-        if (file === 'npm' && Array.isArray(args) && args[0] === 'prefix' && args[1] === '-g') {
-          return tmpDir + '\n';
-        }
-        return origExecFileSync.apply(cp, arguments);
-      };
+      cp.execSync = restoreSpy;
     }
   });
 });

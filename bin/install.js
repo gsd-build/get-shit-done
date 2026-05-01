@@ -8851,12 +8851,16 @@ function trySelfLinkGsdSdkWindows(shimSrc) {
 
   let npmPrefix;
   try {
-    // execFileSync avoids shell interpolation; `npm` is resolved via PATH.
+    // On Windows, `npm` is `npm.cmd` — Node's child_process docs explicitly
+    // call out that .cmd/.bat files cannot be spawned via execFile/execFileSync
+    // without a shell ("Spawning .bat and .cmd files on Windows" section).
+    // Match the existing convention at line ~8718 which uses execSync for the
+    // same `npm prefix -g` lookup. Inputs here are static literals, so shell
+    // interpolation is not an injection vector.
     npmPrefix = cp
-      .execFileSync('npm', ['prefix', '-g'], {
+      .execSync('npm prefix -g', {
         encoding: 'utf8',
         stdio: ['ignore', 'pipe', 'ignore'],
-        shell: false,
       })
       .trim();
   } catch {
